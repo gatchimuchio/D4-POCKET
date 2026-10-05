@@ -220,6 +220,10 @@
       "責任": "Agent Runtimeの日本語意味、Task要求と対話Approval／作業Permissionの分離、物理Workspace root照合、未接続実行境界"
     },
     {
+      "path": "docs/specs/agent-task-history.md",
+      "責任": "Agent TaskのAudit由来履歴projection、現在Runtime承認への束縛、本文・Authority非投影、旧Auditとの互換境界"
+    },
+    {
       "path": "docs/specs/gui-shell-export.md",
       "責任": "GUI Shell独立書出しのOwner境界、権限非継承、manifest-onlyと未成立製品経路"
     },

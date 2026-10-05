@@ -1,8 +1,297 @@
 //! 検証済み監査から過去の状態遷移だけを取り出す。実行権限を所有しない。
-use super::audit::BrokerAuditLog;
+use super::audit::{BrokerAuditEvent, BrokerAuditLog};
 use crate::audit_hash::sha256_tagged;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+
+pub(crate) const AGENT_TASK_HISTORY_PREFIX: &str = "AgentTask履歴:";
+pub(crate) const AGENT_TASK_RECOVERY_OPERATION: &str =
+    "Agent Task中断回復（状態隔離・RecoveryAction=Workspace差分を確認）";
+
+/// Auditに保存するTask履歴metadata。指示本文・結果本文・資格情報を含めない。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct AgentTaskHistoryAuditRecord {
+    pub version: u8,
+    pub stage: String,
+    pub task_id: String,
+    pub runtime_id: String,
+    pub session_id: String,
+    pub workspace_id: String,
+    pub instruction_hash: String,
+    pub request_hash: String,
+    pub created_at: i64,
+    pub status: String,
+    pub updated_at: i64,
+    pub result_hash: Option<String>,
+    pub failure_class: Option<String>,
+    pub start_audit_event_id: Option<String>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct AgentTaskHistoryQuery {
+    pub after: usize,
+    pub limit: usize,
+}
+
+#[derive(Clone)]
+struct ProjectedAgentTask {
+    record: AgentTaskHistoryAuditRecord,
+    start_audit_event_id: String,
+    latest_audit_event_id: String,
+    latest_event_hash: String,
+    latest_index: usize,
+}
+
+/// Structured Task markerだけを認識する。marker以外の過去Auditは読み飛ばす。
+pub(crate) fn agent_task_audit_record(
+    event: &BrokerAuditEvent,
+) -> Result<Option<AgentTaskHistoryAuditRecord>, &'static str> {
+    let Some(body) = event.reason.strip_prefix(AGENT_TASK_HISTORY_PREFIX) else {
+        return Ok(None);
+    };
+    let is_recovery = event.operation == AGENT_TASK_RECOVERY_OPERATION;
+    if body.is_empty()
+        || body.len() > 4096
+        || (!is_recovery && event.decision != "recorded")
+        || (is_recovery && event.decision != "suspended")
+        || event.evidence_source != "INTERNAL_STATE"
+        || sha256_tagged(body.as_bytes()) != event.payload_hash
+    {
+        return Err("Agent Task履歴Auditのhashまたは証拠が不正");
+    }
+    let value: Value = super::json_input::read_unique(body)
+        .map_err(|_| "Agent Task履歴形式が不正")?;
+    let record: AgentTaskHistoryAuditRecord =
+        serde_json::from_value(value).map_err(|_| "Agent Task履歴形式が不正")?;
+    validate_agent_task_record(&record)?;
+    if event.request_id != record.task_id
+        || match record.stage.as_str() {
+            "start" => event.operation != "AgentTask実行",
+            "terminal" => ![
+                "AgentTask実行",
+                "AgentTask状態",
+                AGENT_TASK_RECOVERY_OPERATION,
+            ]
+            .contains(&event.operation.as_str()),
+            _ => true,
+        }
+    {
+        return Err("Agent Task履歴Auditの要求または操作が不一致");
+    }
+    Ok(Some(record))
+}
+
+pub(crate) fn encode_agent_task_audit(
+    record: &AgentTaskHistoryAuditRecord,
+) -> Result<(String, String), &'static str> {
+    validate_agent_task_record(record)?;
+    let body = serde_json::to_string(record).map_err(|_| "Agent Task履歴の直列化失敗")?;
+    if body.len() > 4096 {
+        return Err("Agent Task履歴metadataが上限を超過");
+    }
+    let digest = sha256_tagged(body.as_bytes());
+    Ok((format!("{AGENT_TASK_HISTORY_PREFIX}{body}"), digest))
+}
+
+fn valid_id(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 128
+        && value.as_bytes()[0].is_ascii_alphanumeric()
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"_.:-".contains(&byte))
+}
+
+fn valid_hash(value: &str) -> bool {
+    value.len() == 71
+        && value.starts_with("sha256:")
+        && value[7..]
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn validate_agent_task_record(
+    record: &AgentTaskHistoryAuditRecord,
+) -> Result<(), &'static str> {
+    if record.version != 1
+        || !["start", "terminal"].contains(&record.stage.as_str())
+        || !valid_id(&record.task_id)
+        || !valid_id(&record.runtime_id)
+        || !valid_id(&record.session_id)
+        || !valid_id(&record.workspace_id)
+        || !valid_hash(&record.instruction_hash)
+        || !valid_hash(&record.request_hash)
+        || record.created_at < 0
+        || record.updated_at < record.created_at
+    {
+        return Err("Agent Task履歴metadataが不正");
+    }
+    match record.stage.as_str() {
+        "start"
+            if record.status == "running"
+                && record.updated_at == record.created_at
+                && record.result_hash.is_none()
+                && record.failure_class.is_none()
+                && record.start_audit_event_id.is_none() =>
+        {
+            Ok(())
+        }
+        "terminal" => {
+            if record
+                .start_audit_event_id
+                .as_deref()
+                .is_none_or(|id| !valid_id(id))
+            {
+                return Err("Agent Task履歴の開始Audit参照が不正");
+            }
+            match record.status.as_str() {
+                "completed"
+                    if record.result_hash.as_deref().is_some_and(valid_hash)
+                        && record.failure_class.is_none() =>
+                {
+                    Ok(())
+                }
+                "failed"
+                    if record.result_hash.is_none()
+                        && record.failure_class.as_deref().is_some_and(|failure| {
+                            [
+                                "要求不正",
+                                "実行系不在",
+                                "権限拒否",
+                                "セッション不一致",
+                                "通信失敗",
+                                "期限超過",
+                                "応答不正",
+                                "監査失敗",
+                                "実行系隔離済み",
+                                "作業領域不在",
+                                "AgentTask実行非対応",
+                            ]
+                            .contains(&failure)
+                        }) =>
+                {
+                    Ok(())
+                }
+                "cancelled"
+                    if record.result_hash.is_none()
+                        && record.failure_class.as_deref() == Some("取消") =>
+                {
+                    Ok(())
+                }
+                "suspended"
+                    if record.result_hash.is_none()
+                        && record.failure_class.as_deref() == Some("中断回復") =>
+                {
+                    Ok(())
+                }
+                _ => Err("Agent Task履歴の終端状態が不正"),
+            }
+        }
+        _ => Err("Agent Task履歴状態が不正"),
+    }
+}
+
+pub(crate) fn agent_task_page(
+    log: &BrokerAuditLog,
+    runtime_id: &str,
+    query: AgentTaskHistoryQuery,
+) -> Result<Value, &'static str> {
+    if !valid_id(runtime_id)
+        || query.limit == 0
+        || query.limit > 50
+        || query.after > log.events().len()
+    {
+        return Err("Agent Task履歴範囲が不正");
+    }
+    let mut tasks = std::collections::BTreeMap::<String, ProjectedAgentTask>::new();
+    for (index, event) in log.events().iter().enumerate() {
+        if let Some(record) = agent_task_audit_record(event)? {
+            match record.stage.as_str() {
+                "start" => {
+                    if tasks.contains_key(&record.task_id) {
+                        return Err("Agent Task履歴に重複開始があります");
+                    }
+                    tasks.insert(
+                        record.task_id.clone(),
+                        ProjectedAgentTask {
+                            record,
+                            start_audit_event_id: event.event_id.clone(),
+                            latest_audit_event_id: event.event_id.clone(),
+                            latest_event_hash: event.event_hash.clone(),
+                            latest_index: index,
+                        },
+                    );
+                }
+                "terminal" => {
+                    let projected = tasks
+                        .get_mut(&record.task_id)
+                        .ok_or("Agent Task履歴の開始Auditがありません")?;
+                    if projected.record.stage != "start"
+                        || record.runtime_id != projected.record.runtime_id
+                        || record.session_id != projected.record.session_id
+                        || record.workspace_id != projected.record.workspace_id
+                        || record.instruction_hash != projected.record.instruction_hash
+                        || record.request_hash != projected.record.request_hash
+                        || record.created_at != projected.record.created_at
+                        || record.start_audit_event_id.as_deref()
+                            != Some(projected.start_audit_event_id.as_str())
+                    {
+                        return Err("Agent Task履歴の開始・終端が不一致");
+                    }
+                    projected.record = record;
+                    projected.latest_audit_event_id = event.event_id.clone();
+                    projected.latest_event_hash = event.event_hash.clone();
+                    projected.latest_index = index;
+                }
+                _ => return Err("Agent Task履歴段階が不正"),
+            }
+        }
+    }
+
+    let mut candidates = tasks
+        .into_values()
+        .filter(|task| task.record.runtime_id == runtime_id && task.latest_index >= query.after)
+        .collect::<Vec<_>>();
+    candidates.sort_by_key(|task| task.latest_index);
+    let has_more = candidates.len() > query.limit;
+    candidates.truncate(query.limit);
+    let next_cursor = candidates
+        .last()
+        .map_or(query.after, |task| task.latest_index.saturating_add(1));
+    let entries = candidates
+        .into_iter()
+        .map(|task| {
+            json!({
+                "audit_event_id": task.latest_audit_event_id,
+                "event_hash": task.latest_event_hash,
+                "record": {
+                    "version": 1,
+                    "task_id": task.record.task_id,
+                    "runtime_id": task.record.runtime_id,
+                    "session_id": task.record.session_id,
+                    "workspace_id": task.record.workspace_id,
+                    "instruction_hash": task.record.instruction_hash,
+                    "status": task.record.status,
+                    "created_at": task.record.created_at,
+                    "updated_at": task.record.updated_at,
+                    "result_hash": task.record.result_hash,
+                    "failure_class": task.record.failure_class,
+                    "start_audit_event_id": task.start_audit_event_id,
+                    "latest_audit_event_id": task.latest_audit_event_id,
+                }
+            })
+        })
+        .collect::<Vec<_>>();
+    Ok(json!({
+        "version": 1,
+        "entries": entries,
+        "next_cursor": next_cursor,
+        "has_more": has_more,
+        "head_hash": log.events().last().map(|event| event.event_hash.clone()),
+    }))
+}
 
 #[derive(Deserialize, Default)]
 #[serde(deny_unknown_fields)]
@@ -302,6 +591,120 @@ fn content_receipt(events: &[super::audit::BrokerAuditEvent], archive: &Value) -
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn task_history_start(task_id: &str, runtime_id: &str) -> AgentTaskHistoryAuditRecord {
+        AgentTaskHistoryAuditRecord {
+            version: 1,
+            stage: "start".into(),
+            task_id: task_id.into(),
+            runtime_id: runtime_id.into(),
+            session_id: "session-a".into(),
+            workspace_id: "workspace-a".into(),
+            instruction_hash: sha256_tagged(b"instruction"),
+            request_hash: sha256_tagged(b"request"),
+            created_at: 100,
+            status: "running".into(),
+            updated_at: 100,
+            result_hash: None,
+            failure_class: None,
+            start_audit_event_id: None,
+        }
+    }
+
+    #[test]
+    fn agent_task_history_projection_is_runtime_scoped_and_hash_only() {
+        let mut log = BrokerAuditLog::default();
+        let task_id = "a".repeat(32);
+        let start = task_history_start(&task_id, "runtime-a");
+        let (reason, digest) = encode_agent_task_audit(&start).unwrap();
+        let started = log.append(
+            &task_id,
+            "AgentTask実行",
+            "recorded",
+            &reason,
+            "INTERNAL_STATE",
+            &digest,
+        );
+        let mut terminal = start.clone();
+        terminal.stage = "terminal".into();
+        terminal.status = "completed".into();
+        terminal.updated_at = 101;
+        terminal.result_hash = Some(sha256_tagged(b"result"));
+        terminal.start_audit_event_id = Some(started.event_id.clone());
+        let (reason, digest) = encode_agent_task_audit(&terminal).unwrap();
+        let finished = log.append(
+            &task_id,
+            "AgentTask状態",
+            "recorded",
+            &reason,
+            "INTERNAL_STATE",
+            &digest,
+        );
+
+        let page = agent_task_page(
+            &log,
+            "runtime-a",
+            AgentTaskHistoryQuery {
+                after: 0,
+                limit: 50,
+            },
+        )
+        .unwrap();
+        assert_eq!(page["entries"].as_array().unwrap().len(), 1);
+        assert_eq!(page["entries"][0]["record"]["status"], "completed");
+        assert_eq!(page["entries"][0]["record"]["result_hash"], terminal.result_hash.unwrap());
+        assert_eq!(page["entries"][0]["audit_event_id"], finished.event_id);
+        assert!(page["entries"][0]["record"].get("result_body").is_none());
+        assert_eq!(
+            agent_task_page(
+                &log,
+                "runtime-b",
+                AgentTaskHistoryQuery {
+                    after: 0,
+                    limit: 50,
+                },
+            )
+            .unwrap()["entries"]
+                .as_array()
+                .unwrap()
+                .len(),
+            0
+        );
+    }
+
+    #[test]
+    fn agent_task_history_rejects_malformed_and_orphan_terminal_records() {
+        let task_id = "b".repeat(32);
+        let start = task_history_start(&task_id, "runtime-a");
+        let mut inconsistent = start.clone();
+        inconsistent.stage = "terminal".into();
+        inconsistent.status = "cancelled".into();
+        inconsistent.updated_at = 101;
+        inconsistent.failure_class = Some("通信失敗".into());
+        inconsistent.start_audit_event_id = Some("broker-audit-1".into());
+        assert!(encode_agent_task_audit(&inconsistent).is_err());
+
+        let mut log = BrokerAuditLog::default();
+        let mut terminal = start.clone();
+        terminal.stage = "terminal".into();
+        terminal.status = "failed".into();
+        terminal.updated_at = 101;
+        terminal.failure_class = Some("通信失敗".into());
+        terminal.start_audit_event_id = Some("broker-audit-1".into());
+        let (reason, digest) = encode_agent_task_audit(&terminal).unwrap();
+        log.append(&task_id, "AgentTask状態", "recorded", &reason, "INTERNAL_STATE", &digest);
+        assert!(agent_task_page(&log, "runtime-a", AgentTaskHistoryQuery { after: 0, limit: 10 }).is_err());
+
+        let mut log = BrokerAuditLog::default();
+        let (reason, digest) = encode_agent_task_audit(&start).unwrap();
+        log.append(&task_id, "AgentTask実行", "recorded", &reason, "INTERNAL_STATE", &digest);
+        log.append(&task_id, "AgentTask実行", "recorded", &reason, "INTERNAL_STATE", &digest);
+        assert!(agent_task_page(&log, "runtime-a", AgentTaskHistoryQuery { after: 0, limit: 10 }).is_err());
+
+        let mut log = BrokerAuditLog::default();
+        log.append(&task_id, "AgentTask実行", "recorded", &format!("{AGENT_TASK_HISTORY_PREFIX}{{}}"), "INTERNAL_STATE", &sha256_tagged(b"{}"));
+        assert!(agent_task_page(&log, "runtime-a", AgentTaskHistoryQuery { after: 0, limit: 10 }).is_err());
+    }
 
     #[test]
     fn 要求集約は最後の観測を選んでから検索しページを継続する() {

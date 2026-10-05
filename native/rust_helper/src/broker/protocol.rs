@@ -374,6 +374,8 @@ pub enum BrokerOperation {
     対話履歴閲覧状態,
     #[serde(rename = "対話履歴閲覧")]
     対話履歴閲覧,
+    #[serde(rename = "AgentTask履歴閲覧")]
+    AgentTask履歴閲覧,
     #[serde(rename = "対話再実行")]
     対話再実行,
     #[serde(rename = "対話分岐")]
@@ -631,6 +633,7 @@ impl BrokerOperation {
             BrokerOperation::対話履歴失効 => "対話履歴失効",
             BrokerOperation::対話履歴閲覧状態 => "対話履歴閲覧状態",
             BrokerOperation::対話履歴閲覧 => "対話履歴閲覧",
+            BrokerOperation::AgentTask履歴閲覧 => "AgentTask履歴閲覧",
             BrokerOperation::対話再実行 => "対話再実行",
             BrokerOperation::対話分岐 => "対話分岐",
             BrokerOperation::対話履歴一覧 => "対話履歴一覧",
@@ -1086,17 +1089,38 @@ impl Broker {
         const TASK_FAILED: &str = "Agent Task失敗・取消（RecoveryAction=Workspace差分を確認）";
         const TASK_WORKER_START_FAILED: &str =
             "Agent Task worker起動失敗 RecoveryAction=再試行前にRuntime状態確認";
-        const TASK_RECOVERY: &str =
-            "Agent Task中断回復（状態隔離・RecoveryAction=Workspace差分を確認）";
+        const TASK_RECOVERY: &str = super::execution_history::AGENT_TASK_RECOVERY_OPERATION;
 
-        let mut started = BTreeMap::<String, String>::new();
+        let mut started = BTreeMap::<
+            String,
+            (String, Option<(String, super::execution_history::AgentTaskHistoryAuditRecord)>),
+        >::new();
         let mut terminal = BTreeSet::<String>::new();
         for event in self.audit_log.events() {
+            let structured = super::execution_history::agent_task_audit_record(event)
+                .map_err(|error| BrokerStoreError::MalformedAuditState(error.into()))?;
+            if let Some(record) = structured {
+                if record.stage == "start" {
+                    started.insert(
+                        event.request_id.clone(),
+                        (
+                            event.event_hash.clone(),
+                            Some((event.event_id.clone(), record)),
+                        ),
+                    );
+                } else {
+                    terminal.insert(event.request_id.clone());
+                }
+                continue;
+            }
             // 実製品のAuditEvent.operationにはBroker操作名（例：AgentTask実行）が入り、
             // Taskの意味識別子はreasonに保存される。旧形式のように意味識別子を
             // operationへ直接記録したeventも、互換性維持のため受理する。
             if event.operation == TASK_START || event.reason == TASK_START {
-                started.insert(event.request_id.clone(), event.event_hash.clone());
+                started.insert(
+                    event.request_id.clone(),
+                    (event.event_hash.clone(), None),
+                );
             } else if [
                 TASK_COMPLETE,
                 TASK_FAILED,
@@ -1110,8 +1134,29 @@ impl Broker {
             }
         }
 
-        for (task_id, start_event_hash) in started {
+        for (task_id, (start_event_hash, structured_start)) in started {
             if terminal.contains(&task_id) {
+                continue;
+            }
+            if let Some((start_audit_event_id, mut record)) = structured_start {
+                record.stage = "terminal".into();
+                record.status = "suspended".into();
+                record.updated_at = self
+                    .current_epoch_seconds()
+                    .max(record.created_at);
+                record.result_hash = None;
+                record.failure_class = Some("中断回復".into());
+                record.start_audit_event_id = Some(start_audit_event_id);
+                let (reason, digest) = super::execution_history::encode_agent_task_audit(&record)
+                    .map_err(|error| BrokerStoreError::MalformedAuditState(error.into()))?;
+                self.append_audit(
+                    &task_id,
+                    TASK_RECOVERY,
+                    "suspended",
+                    &reason,
+                    EVIDENCE_SOURCE_INTERNAL_STATE,
+                    &digest,
+                )?;
                 continue;
             }
             let recovery_hash = sha256_tagged(
@@ -2329,7 +2374,8 @@ impl Broker {
             operation @ (BrokerOperation::対話履歴承認
             | BrokerOperation::対話履歴失効
             | BrokerOperation::対話履歴閲覧状態
-            | BrokerOperation::対話履歴閲覧) => self.履歴閲覧処理(
+            | BrokerOperation::対話履歴閲覧
+            | BrokerOperation::AgentTask履歴閲覧) => self.履歴閲覧処理(
                 &request_id,
                 operation.as_str(),
                 envelope.payload.as_ref().unwrap_or(&Value::Null),
@@ -5724,6 +5770,66 @@ mod tests {
         }
         drop(broker);
         fs::remove_dir_all(root).expect("回復fixture storeを削除");
+    }
+
+    #[test]
+    fn structured_agent_task_history_recovers_as_suspended_after_restart() {
+        let root = temp_store_dir("agent-task-history-recovery");
+        let task_id = "c".repeat(32);
+        {
+            let mut broker =
+                Broker::new_persistent("task-history-seed", &root).expect("永続Brokerを作成");
+            let start = super::super::execution_history::AgentTaskHistoryAuditRecord {
+                version: 1,
+                stage: "start".into(),
+                task_id: task_id.clone(),
+                runtime_id: "runtime-a".into(),
+                session_id: "session-a".into(),
+                workspace_id: "workspace-a".into(),
+                instruction_hash: sha256_tagged(b"private instruction"),
+                request_hash: sha256_tagged(b"execution request"),
+                created_at: 100,
+                status: "running".into(),
+                updated_at: 100,
+                result_hash: None,
+                failure_class: None,
+                start_audit_event_id: None,
+            };
+            let (reason, digest) =
+                super::super::execution_history::encode_agent_task_audit(&start).unwrap();
+            broker
+                .append_audit(
+                    &task_id,
+                    "AgentTask実行",
+                    "recorded",
+                    &reason,
+                    EVIDENCE_SOURCE_INTERNAL_STATE,
+                    &digest,
+                )
+                .expect("Task開始metadataを保存");
+        }
+        let broker = Broker::new_persistent("task-history-restart", &root)
+            .expect("中断Taskを再開せず隔離");
+        let page = super::super::execution_history::agent_task_page(
+            &broker.audit_log,
+            "runtime-a",
+            super::super::execution_history::AgentTaskHistoryQuery {
+                after: 0,
+                limit: 50,
+            },
+        )
+        .expect("中断履歴を読む");
+        assert_eq!(page["entries"].as_array().unwrap().len(), 1);
+        assert_eq!(page["entries"][0]["record"]["status"], "suspended");
+        assert_eq!(page["entries"][0]["record"]["failure_class"], "中断回復");
+        assert!(page["entries"][0]["record"].get("result_body").is_none());
+        assert!(broker.audit_events().iter().any(|event| {
+            event.request_id == task_id
+                && event.operation.starts_with("Agent Task中断回復")
+                && event.decision == "suspended"
+        }));
+        drop(broker);
+        fs::remove_dir_all(root).expect("履歴回復fixtureを削除");
     }
 
     pub(super) fn persistent_test_broker(store_dir: &Path) -> Broker {

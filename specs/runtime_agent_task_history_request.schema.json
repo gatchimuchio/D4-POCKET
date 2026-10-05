@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/runtime_agent_task_history_request.schema.json",
+  "title": "Agent Task履歴閲覧要求",
+  "description": "Runtimeは現在の期限付き履歴承認から導出し、要求からRuntime・Authorityを受け取らない。",
+  "type": "object",
+  "required": ["approval_id", "query"],
+  "additionalProperties": false,
+  "properties": {
+    "approval_id": {"type": "string", "pattern": "^[0-9a-f]{32}$(?![\\s\\S])"},
+    "query": {
+      "type": "object",
+      "required": ["after", "limit"],
+      "additionalProperties": false,
+      "properties": {
+        "after": {"type": "integer", "minimum": 0},
+        "limit": {"type": "integer", "minimum": 1, "maximum": 50}
+      }
+    }
+  }
+}

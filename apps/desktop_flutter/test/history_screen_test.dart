@@ -15,6 +15,9 @@ class Fixture implements BrokerTransport {
   void Function(Map<String, Object?>)? alterRecord;
   bool revokeDuringRead = false;
   String runtime = 'local';
+  String taskRuntime = 'local';
+  String taskWorkspace = 'workspace-a';
+  void Function(Map<String, Object?>)? alterTaskRecord;
   String state = '成功';
   Completer<void>? gate;
   final operations = <String>[];
@@ -52,6 +55,49 @@ class Fixture implements BrokerTransport {
     if (op == '対話履歴閲覧') {
       expect((payload!['query'] as Map)['latest_per_request'], true);
       lastFilter = (payload['query'] as Map)['filter'] as Map;
+    }
+    if (op == 'AgentTask履歴閲覧') {
+      final query = payload!['query'] as Map;
+      expect(query.keys.toSet(), {'after', 'limit'});
+      if (revokeDuringRead) revoked = true;
+      final record = <String, Object?>{
+        'version': 1,
+        'task_id': 'a' * 32,
+        'runtime_id': taskRuntime,
+        'session_id': 'b' * 32,
+        'workspace_id': taskWorkspace,
+        'instruction_hash': 'sha256:${'1' * 64}',
+        'status': 'completed',
+        'created_at': 100,
+        'updated_at': 101,
+        'result_hash': 'sha256:${'2' * 64}',
+        'failure_class': null,
+        'start_audit_event_id': 'task-start',
+        'latest_audit_event_id': 'task-finish'
+      };
+      alterTaskRecord?.call(record);
+      return {
+        'operation': op,
+        'status': 'accepted',
+        'evidence_source': 'INTERNAL_STATE',
+        'audit_event_id': 'task-page-audit',
+        'body': {
+          'grant': revoked ? null : grant,
+          'task_page': {
+            'version': 1,
+            'entries': [
+              {
+                'audit_event_id': 'task-finish',
+                'event_hash': 'sha256:${'3' * 64}',
+                'record': record
+              }
+            ],
+            'next_cursor': 1,
+            'has_more': false,
+            'head_hash': 'sha256:${'4' * 64}'
+          }
+        }
+      };
     }
     if (op == '対話再実行' || op == '対話分岐') {
       sent = payload;
@@ -417,6 +463,57 @@ void main() {
     f.state = '成功';
     f.revokeDuringRead = true;
     await expectLater(c.page(grant), throwsA(isA<BrokerClientException>()));
+  });
+  test('Agent Task履歴は現在Runtime承認・Audit hash・本文非露出を要求する', () async {
+    final f = Fixture();
+    final c = HistoryClient(f);
+    final grant = (await c.status())!;
+    final page = await c.taskPage(grant);
+    expect(page.entries.single.status, 'completed');
+    expect(page.entries.single.runtimeId, grant.runtime);
+    expect(page.entries.single.auditId, 'task-finish');
+    expect(f.operations, ['対話履歴閲覧状態', '対話履歴閲覧状態', 'AgentTask履歴閲覧', '対話履歴閲覧状態']);
+    f.taskRuntime = 'other-runtime';
+    await expectLater(c.taskPage(grant), throwsA(isA<BrokerClientException>()));
+    f.taskRuntime = 'local';
+    f.taskWorkspace = 'unsafe workspace';
+    await expectLater(c.taskPage(grant), throwsA(isA<BrokerClientException>()));
+    f.taskWorkspace = 'workspace-a';
+    f.alterTaskRecord = (record) {
+      record['status'] = 'failed';
+      record['failure_class'] = '中断回復';
+      record['result_hash'] = null;
+    };
+    await expectLater(c.taskPage(grant), throwsA(isA<BrokerClientException>()));
+    f.alterTaskRecord = null;
+    f.alterTaskRecord = (record) => record['result_body'] = 'hidden content';
+    await expectLater(c.taskPage(grant), throwsA(isA<BrokerClientException>()));
+    f.alterTaskRecord = null;
+    f.revokeDuringRead = true;
+    await expectLater(c.taskPage(grant), throwsA(isA<BrokerClientException>()));
+  });
+  testWidgets('Task履歴一覧はhashと状態だけを表示し承認失効で破棄する', (tester) async {
+    final f = Fixture();
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(body: HistoryScreen(client: HistoryClient(f)))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Agent Task履歴'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('completed ／ ${'a' * 32}'), findsOneWidget);
+    expect(find.textContaining('導入前の記録はAuditに保持されますが、この一覧へ推測再構成しません。'),
+        findsOneWidget);
+    await tester.tap(find.byKey(ValueKey('agent-task-${'a' * 32}')));
+    await tester.pumpAndSettle();
+    expect(
+        find.textContaining(
+            '本文・Permission・Approval・Credential・Authorityは復元しません。'),
+        findsOneWidget);
+    expect(find.textContaining('secret Task content'), findsNothing);
+    f.revoked = true;
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('completed ／ ${'a' * 32}'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
   });
   testWidgets('実履歴表示と失効時の破棄', (tester) async {
     final f = Fixture();

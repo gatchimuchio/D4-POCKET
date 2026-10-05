@@ -4125,6 +4125,54 @@ def 履歴入力概要のhash_only境界を検査する() -> list[str]:
     return errors
 
 
+def AgentTask履歴のContractと現在承認経路を検査する() -> list[str]:
+    errors: list[str] = []
+    for schema_name, fixture_name in (
+        ("agent_task_history_page", "agent_task_history_page.valid.json"),
+        ("runtime_agent_task_history_access", "runtime_agent_task_history_access.valid.json"),
+        ("runtime_agent_task_history_request", "runtime_agent_task_history_request.valid.json"),
+    ):
+        errors.extend(validate_instance(
+            load_contract_fixture(fixture_name), load_schema(schema_name + ".schema.json")
+        ))
+    invalid_request = load_contract_fixture("invalid/runtime_agent_task_history_request_authority.invalid.json")
+    if not validate_instance(invalid_request, load_schema("runtime_agent_task_history_request.schema.json")):
+        errors.append("Agent Task履歴要求がRuntimeまたはAuthority注入を受理")
+    invalid_page = load_contract_fixture("invalid/agent_task_history_page_content.invalid.json")
+    if not validate_instance(invalid_page, load_schema("agent_task_history_page.schema.json")):
+        errors.append("Agent Task履歴projectionがTask本文を受理")
+    for schema_name in ("ipc_request", "ipc_response"):
+        operations = load_schema(schema_name + ".schema.json")["properties"]["operation"]["enum"]
+        if "AgentTask履歴閲覧" not in operations:
+            errors.append(f"{schema_name}にAgent Task履歴操作がない")
+    protocol = (RUST_HELPER / "src" / "broker" / "protocol.rs").read_text(encoding="utf-8")
+    access = (RUST_HELPER / "src" / "broker" / "history_access.rs").read_text(encoding="utf-8")
+    audit_projection = (RUST_HELPER / "src" / "broker" / "execution_history.rs").read_text(encoding="utf-8")
+    task_runtime = (RUST_HELPER / "src" / "broker" / "dialogue.rs").read_text(encoding="utf-8")
+    client = (ROOT / "packages" / "gui_shell_ui" / "lib" / "src" / "history_client.dart").read_text(encoding="utf-8")
+    screen = (DESKTOP_FLUTTER / "lib" / "screens" / "history_screen.dart").read_text(encoding="utf-8")
+    for token, source in (
+        ("AgentTask履歴閲覧", protocol),
+        ("履歴閲覧処理", protocol),
+        ("agent_task_page(log, &g.runtime", access),
+        ("INTERNAL_STATE", audit_projection),
+        ("AGENT_TASK_HISTORY_PREFIX", audit_projection),
+        ("encode_agent_task_audit", task_runtime),
+        ("AgentTask履歴閲覧", client),
+        ("Agent Task履歴", screen),
+    ):
+        if token not in source:
+            errors.append(f"Agent Task履歴のproduction接続または境界がない: {token}")
+    page_schema = load_schema("agent_task_history_page.schema.json")
+    entry_properties = page_schema["properties"]["entries"]["items"]["properties"]
+    record_properties = entry_properties["record"]["properties"]
+    exposed_names = set(entry_properties) | set(record_properties)
+    for forbidden in ("result_body", "instruction", "credential", "approval_id", "authority"):
+        if forbidden in exposed_names:
+            errors.append(f"Agent Task履歴Schemaが非公開fieldを投影: {forbidden}")
+    return errors
+
+
 def 実行系資源観測の証拠境界を検査する() -> list[str]:
     query_schema = load_schema("runtime_resource_query.schema.json")
     observation_schema = load_schema("runtime_resource_observation.schema.json")
@@ -10491,6 +10539,7 @@ def main() -> int:
         対話操作の分岐と未知fieldを検査する,
         対話セッション一覧の有界投影を検査する,
         履歴入力概要のhash_only境界を検査する,
+        AgentTask履歴のContractと現在承認経路を検査する,
         実行系資源観測の証拠境界を検査する,
         実行系ライフサイクルの契約と統治境界を検査する,
         端末契約の構造と禁止操作を検査する,

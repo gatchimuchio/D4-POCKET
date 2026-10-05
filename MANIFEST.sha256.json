@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "0ffed7d8e39ddb62dae4b33c929a7e9be53efdfdc06faa39c279b6277d0ef654"
+      "sha256": "bb274c2cc864efccf57f7a74edb58559c2a9db2517484516ddd055c4002563b2"
     },
     {
       "path": "SECURITY.md",
@@ -240,7 +240,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/history_screen.dart",
-      "sha256": "57719654e607da9353e53a903106d0b3b8adb03ced34d7a6fc2916042b780421"
+      "sha256": "f3f94a2aead37ad1c33daa762a59bf6e70648d161a113f4fd23cbce454367796"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/host_capability_center.dart",
@@ -600,7 +600,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/history_screen_test.dart",
-      "sha256": "34375206d8b8b2b0ab4bd22b1ccbbf4960da9aec7aa74b47fb44e9a3133b6562"
+      "sha256": "f2ef19e0128177464044834a0f20a21ac5c0fe05ab5484e63fa6aaaf4e13856f"
     },
     {
       "path": "apps/desktop_flutter/test/mcp_connection_center_test.dart",
@@ -1224,7 +1224,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "545c0933c58e0cc95c14fbc6294a481b05bd9a8e5ef5ab89c536fc60be4e5d80"
+      "sha256": "ff5d8b80b71d1788ebc82f4f676d5d7c1cb0a1b7494bdfe5f7a6abeccaa32444"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1332,7 +1332,11 @@
     },
     {
       "path": "docs/specs/agent-runtime.md",
-      "sha256": "5c73c6ae4b8aacb8bc6da7cb40725e900480bfd280c5d0aefacf4822fcd4cd6e"
+      "sha256": "2b00d20b9acdb956179b9281a2f9fae7d8b4d519d1cc8b492403554408da1246"
+    },
+    {
+      "path": "docs/specs/agent-task-history.md",
+      "sha256": "782208da039a2c27301f3fc69c1232d783b8ca81c65ec25b695cf8b98a7f1dd9"
     },
     {
       "path": "docs/specs/approval-visibility-boundary.md",
@@ -1625,6 +1629,10 @@
     {
       "path": "examples/contracts/agent_task_content_exposure.valid.json",
       "sha256": "d4792fabeee478388512c1e979d2a34e55b39c75d612dc024943525480229a72"
+    },
+    {
+      "path": "examples/contracts/agent_task_history_page.valid.json",
+      "sha256": "cf9317f136a883598dcd1fb7158f008d5ca2d7957af1a16b79bd4e97ed9c1d91"
     },
     {
       "path": "examples/contracts/agent_task_id_request.valid.json",
@@ -1953,6 +1961,10 @@
     {
       "path": "examples/contracts/invalid/agent_task_content_exposure_authority_escalation.invalid.json",
       "sha256": "b15e97ed07ca6c7a070636cb4f468dfc9cad49e8a8d723537c0dc2bf766dca83"
+    },
+    {
+      "path": "examples/contracts/invalid/agent_task_history_page_content.invalid.json",
+      "sha256": "93e7ed389a434cb672c790d2b3f92f6b2b7a843541d02ef24c27e6cf5576e2c7"
     },
     {
       "path": "examples/contracts/invalid/agent_task_id_request_escalation.invalid.json",
@@ -2407,6 +2419,10 @@
       "sha256": "3db744f9546bfeedd1c73d254b91c1bd3db187ad2f059a7100fb537fae1ae224"
     },
     {
+      "path": "examples/contracts/invalid/provider_model_selection_unknown_provider.invalid.json",
+      "sha256": "7a51654c4f4824ff5f25516bd6c3f0fc21cc57ef070b4a2adde955654a4dcb64"
+    },
+    {
       "path": "examples/contracts/invalid/recovery_missing_message.invalid.json",
       "sha256": "fa7a4c08d29e63fde254fcfbe072c335c85080a93cac71b1541fb4252068c45d"
     },
@@ -2453,6 +2469,10 @@
     {
       "path": "examples/contracts/invalid/regression_case_registration_authority.invalid.json",
       "sha256": "939535dea53d6eb16407c816333e182ca11478e691095ceb674a9e6f6092d217"
+    },
+    {
+      "path": "examples/contracts/invalid/runtime_agent_task_history_request_authority.invalid.json",
+      "sha256": "7d6a41944c077b8425e812bdd62da467aa0833825d601f937de571b3bab41285"
     },
     {
       "path": "examples/contracts/invalid/runtime_bad_status.invalid.json",
@@ -2759,6 +2779,10 @@
       "sha256": "19744fbf4c334e775033746efb7c58bb98a2b9007a0b0922ed92835cf994d120"
     },
     {
+      "path": "examples/contracts/provider_model_selection.valid.json",
+      "sha256": "f7669521dc797e0d6843a6dc9153163e486f961544e22a989e73de9d76551848"
+    },
+    {
       "path": "examples/contracts/recovery.valid.json",
       "sha256": "63d9afc31517579fca1a2647d3c1526bf29dfced41782ec8045eaf26fe781826"
     },
@@ -2797,6 +2821,14 @@
     {
       "path": "examples/contracts/runtime.valid.json",
       "sha256": "ecd5265af3621911433c8eef86b3b9d02d2d9cac16dadadb48453daeb40de872"
+    },
+    {
+      "path": "examples/contracts/runtime_agent_task_history_access.valid.json",
+      "sha256": "be93c82ec188045cebcadae9f7d4ffc69ebae7fad7c9628ada8b6d29f7380178"
+    },
+    {
+      "path": "examples/contracts/runtime_agent_task_history_request.valid.json",
+      "sha256": "5bd166d8b0c6d86515e1904860e8eb117f6215de2fd1429ba091517a1a0f4c8b"
     },
     {
       "path": "examples/contracts/runtime_content_access.valid.json",
@@ -3160,7 +3192,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/dialogue.rs",
-      "sha256": "6e603d517c77eb019be23472223401376c8722cc37bd887df69ba6c3eab95a00"
+      "sha256": "4ecdd206f54061fd0024ee2638d8eaddad66c0a87c14e661f74b2d508e180191"
     },
     {
       "path": "native/rust_helper/src/broker/evaluation_control.rs",
@@ -3172,7 +3204,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/execution_history.rs",
-      "sha256": "129784906bfcfe4af0c95961e1e6c6f1235d2e54da4c5cbe0ac48017f9f3b496"
+      "sha256": "976db30c1d4e2c46845d9f73d34c78572722d6ce0460a3f53b7a0f4c42b34604"
     },
     {
       "path": "native/rust_helper/src/broker/export_center.rs",
@@ -3180,7 +3212,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/history_access.rs",
-      "sha256": "9be039fb803b265dd77fafac116a76b1530d71cd87589cee93b470d99c1a2e8c"
+      "sha256": "ea6b48fee638a549044f011c1e1389dfdd69d437fd2831465d48e6990463138f"
     },
     {
       "path": "native/rust_helper/src/broker/host_capability.rs",
@@ -3220,7 +3252,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "03f424e8ccdf2d074e761e0c34852f606a2cdce24072c626939661c9dc2f5b37"
+      "sha256": "5c3fb1a596c99753fe2b7aacbb0272ebd147b2a80990f2f936a43fb5b76b320b"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -3656,7 +3688,7 @@
     },
     {
       "path": "packages/gui_shell_ui/lib/src/history_client.dart",
-      "sha256": "0ec704795fcf50cfb63b14f2b2e7d6e0f4be403483860347ed861341d2849750"
+      "sha256": "94666506df760fc05771a054e4b31988bcd68077822f87a4ed42175d98743550"
     },
     {
       "path": "packages/gui_shell_ui/lib/src/regression_case_client.dart",
@@ -3935,6 +3967,10 @@
       "sha256": "6e2c21d9c432e978a5b5fff6d4f6b5a84b066dc8a864357b444b591739779bf5"
     },
     {
+      "path": "specs/agent_task_history_page.schema.json",
+      "sha256": "87f1cd1d0955f01818f24d50d42536f611a758071fd8057db476ff7a5a14cc88"
+    },
+    {
       "path": "specs/agent_task_id_request.schema.json",
       "sha256": "802790e6ef83c55ee4c067e64af3951609ab6fe07694996658a63598e12b1069"
     },
@@ -4172,11 +4208,11 @@
     },
     {
       "path": "specs/ipc_request.schema.json",
-      "sha256": "6beb5d00dfc64dcdaab082ddb158e35412dffedbf157f89d05d1cda1e7a641dd"
+      "sha256": "84d01f6bfb3633de94491d194b838613e695ce56eb263a25081530267866f63c"
     },
     {
       "path": "specs/ipc_response.schema.json",
-      "sha256": "642a93b8c54a3d132ee8e567b732e1153b68c035390de13663b511331f7813ad"
+      "sha256": "c5b9eab2146d3b8fa104a310d16ffa38bb237f8b08a0bdfa77f5fc26df88fffc"
     },
     {
       "path": "specs/mcp_connection.schema.json",
@@ -4271,6 +4307,10 @@
       "sha256": "ed54fbcc6af966802634e250883cc7a02eb64ffa69f560669e4ba76a34d02da3"
     },
     {
+      "path": "specs/provider_model_selection.schema.json",
+      "sha256": "0f6e364f517b565b677517b5cf34f03be98ac8d2b097d982cfba14c5f3b37650"
+    },
+    {
       "path": "specs/recovery.schema.json",
       "sha256": "5c5dbc7174f3c676e33cd5d951cad0355214654603c20a69fdf60b233eb66f33"
     },
@@ -4309,6 +4349,14 @@
     {
       "path": "specs/runtime.schema.json",
       "sha256": "c474427b8cb046155946483d9a8f1aee1989904ecebc729928d4b27738a7ca05"
+    },
+    {
+      "path": "specs/runtime_agent_task_history_access.schema.json",
+      "sha256": "a2d180f2f7dc512866ce64c4fccbd8e74ab0872fd05d98db1e95dfd4a7fb3d7e"
+    },
+    {
+      "path": "specs/runtime_agent_task_history_request.schema.json",
+      "sha256": "672fdcb718bd66199b745d7f0f746dd72072f95050deb8b152b8c130cc62f0a9"
     },
     {
       "path": "specs/runtime_content_access.schema.json",
@@ -4508,7 +4556,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "8b1b99cfa88c6b3a8cdc0080c4228e5dfdc35a7a026d928bdbdb71e2a602ce8b"
+      "sha256": "0357f54402d8e881fa4edaca1ce436c5855dcc32fc80f6c22957c59bd1f820a3"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
@@ -4628,7 +4676,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "ccaedd843fd29db679951a63e9d4b7558b91dc77672c39f4a8a4f88ebd8c37eb"
+      "sha256": "e3e8663b254a306303b2c4175c4c8ec723bfc38f80b94495fac1203dcc9a4452"
     }
   ]
 }

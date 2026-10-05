@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/runtime_agent_task_history_access.schema.json",
+  "title": "現在のowner承認に束縛したAgent Task履歴閲覧応答",
+  "description": "Task履歴はAudit由来の過去情報であり、実行権限や本文を含まない。",
+  "type": "object",
+  "required": ["grant", "task_page"],
+  "additionalProperties": false,
+  "properties": {
+    "grant": {
+      "type": "object",
+      "required": ["approval_id", "runtime_id", "expires_at"],
+      "additionalProperties": false,
+      "properties": {
+        "approval_id": {"type": "string", "pattern": "^[0-9a-f]{32}$(?![\\s\\S])"},
+        "runtime_id": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"},
+        "expires_at": {"type": "integer"}
+      }
+    },
+    "task_page": {"$ref": "agent_task_history_page.schema.json"}
+  }
+}

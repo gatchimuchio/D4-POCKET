@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/agent_task_history_page.schema.json",
+  "title": "現在承認に束縛したAgent Task履歴ページ",
+  "description": "検証済みAuditから得た過去のTask状態projection。実行権限、Approval、本文を復元しない。",
+  "type": "object",
+  "required": ["version", "entries", "next_cursor", "has_more", "head_hash"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {"const": 1},
+    "entries": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "type": "object",
+        "required": ["audit_event_id", "event_hash", "record"],
+        "additionalProperties": false,
+        "properties": {
+          "audit_event_id": {"type": "string", "minLength": 1, "maxLength": 128},
+          "event_hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"},
+          "record": {
+            "type": "object",
+            "required": ["version", "task_id", "runtime_id", "session_id", "workspace_id", "instruction_hash", "status", "created_at", "updated_at", "result_hash", "failure_class", "start_audit_event_id", "latest_audit_event_id"],
+            "additionalProperties": false,
+            "properties": {
+              "version": {"const": 1},
+              "task_id": {"type": "string", "minLength": 1, "maxLength": 128},
+              "runtime_id": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$"},
+              "session_id": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$"},
+              "workspace_id": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$"},
+              "instruction_hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"},
+              "status": {"enum": ["running", "completed", "failed", "cancelled", "suspended"]},
+              "created_at": {"type": "integer", "minimum": 0},
+              "updated_at": {"type": "integer", "minimum": 0},
+              "result_hash": {"type": ["string", "null"], "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"},
+              "failure_class": {"type": ["string", "null"], "enum": ["要求不正", "実行系不在", "権限拒否", "セッション不一致", "通信失敗", "期限超過", "応答不正", "監査失敗", "取消", "実行系隔離済み", "作業領域不在", "AgentTask実行非対応", "中断回復", null]},
+              "start_audit_event_id": {"type": "string", "minLength": 1, "maxLength": 128},
+              "latest_audit_event_id": {"type": "string", "minLength": 1, "maxLength": 128}
+            }
+          }
+        }
+      }
+    },
+    "next_cursor": {"type": "integer", "minimum": 0},
+    "has_more": {"type": "boolean"},
+    "head_hash": {"type": ["string", "null"], "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"}
+  }
+}

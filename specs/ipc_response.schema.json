@@ -39,6 +39,7 @@
         "AgentTaskOwnerApprovalGrant",
         "AgentTask実行",
         "AgentTask状態",
+        "AgentTask履歴閲覧",
         "AgentTask取消",
         "実行系列挙",
         "対話セッション一覧",

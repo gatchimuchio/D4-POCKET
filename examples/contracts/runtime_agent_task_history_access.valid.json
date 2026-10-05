@@ -1,0 +1,14 @@
+{
+  "grant": {
+    "approval_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "runtime_id": "runtime-a",
+    "expires_at": 1700000300
+  },
+  "task_page": {
+    "version": 1,
+    "entries": [],
+    "next_cursor": 0,
+    "has_more": false,
+    "head_hash": null
+  }
+}

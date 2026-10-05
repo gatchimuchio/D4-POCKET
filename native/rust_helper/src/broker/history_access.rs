@@ -2,7 +2,7 @@
 use super::{
     audit::BrokerAuditLog,
     dialogue::識別子生成,
-    execution_history::{page, Query},
+    execution_history::{agent_task_page, page, AgentTaskHistoryQuery, Query},
 };
 use crate::audit_hash::sha256_tagged;
 use serde::Deserialize;
@@ -32,6 +32,12 @@ struct Approval {
 struct Read {
     approval_id: String,
     query: Query,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AgentTaskRead {
+    approval_id: String,
+    query: AgentTaskHistoryQuery,
 }
 
 impl HistoryAccess {
@@ -116,12 +122,24 @@ impl HistoryAccess {
                 }
                 result_page = page(log, p.query)?;
             }
+            "AgentTask履歴閲覧" => {
+                let p: AgentTaskRead = serde_json::from_value(payload.clone())
+                    .map_err(|_| "Agent Task履歴閲覧形式が不正")?;
+                let g = self.grant.as_ref().ok_or("現在の履歴閲覧承認が必要")?;
+                if p.approval_id != g.id {
+                    return Err("Agent Task履歴の承認が不一致");
+                }
+                result_page = agent_task_page(log, &g.runtime, p.query)?;
+            }
             _ => return Err("未知の履歴閲覧操作"),
         }
         let grant = self
             .grant
             .as_ref()
             .map(|g| json!({"approval_id":g.id,"runtime_id":g.runtime,"expires_at":g.expires}));
+        if op == "AgentTask履歴閲覧" {
+            return Ok(json!({"grant":grant,"task_page":result_page}));
+        }
         Ok(json!({"grant":grant,"page":result_page}))
     }
 }
@@ -213,5 +231,83 @@ mod tests {
             )
             .is_err());
         assert!(!access.current(&c, 403));
+    }
+
+    #[test]
+    fn agent_task_history_requires_current_runtime_bound_grant() {
+        let mut access = HistoryAccess::default();
+        let mut log = BrokerAuditLog::default();
+        let task_id = "a".repeat(32);
+        let record = super::super::execution_history::AgentTaskHistoryAuditRecord {
+            version: 1,
+            stage: "start".into(),
+            task_id: task_id.clone(),
+            runtime_id: "runtime-a".into(),
+            session_id: "session-a".into(),
+            workspace_id: "workspace-a".into(),
+            instruction_hash: sha256_tagged(b"instruction"),
+            request_hash: sha256_tagged(b"request"),
+            created_at: 100,
+            status: "running".into(),
+            updated_at: 100,
+            result_hash: None,
+            failure_class: None,
+            start_audit_event_id: None,
+        };
+        let (reason, digest) =
+            super::super::execution_history::encode_agent_task_audit(&record).unwrap();
+        log.append(
+            &task_id,
+            "AgentTask実行",
+            "recorded",
+            &reason,
+            "INTERNAL_STATE",
+            &digest,
+        );
+        let mut audit = |_: &str, _: &str| Ok(());
+        let grant = access
+            .operate(
+                "対話履歴承認",
+                &json!({"実行系ID":"runtime-a"}),
+                true,
+                100,
+                &log,
+                &mut audit,
+            )
+            .unwrap();
+        let approval_id = grant["grant"]["approval_id"].as_str().unwrap();
+        assert!(access
+            .operate(
+                "AgentTask履歴閲覧",
+                &json!({"approval_id":"f".repeat(32),"query":{"after":0,"limit":20}}),
+                false,
+                100,
+                &log,
+                &mut audit,
+            )
+            .is_err());
+        assert!(access
+            .operate(
+                "AgentTask履歴閲覧",
+                &json!({"approval_id":approval_id,"query":{"after":0,"limit":20,"runtime_id":"runtime-b"}}),
+                false,
+                100,
+                &log,
+                &mut audit,
+            )
+            .is_err());
+        let response = access
+            .operate(
+                "AgentTask履歴閲覧",
+                &json!({"approval_id":approval_id,"query":{"after":0,"limit":20}}),
+                false,
+                100,
+                &log,
+                &mut audit,
+            )
+            .unwrap();
+        assert!(response.get("page").is_none());
+        assert_eq!(response["grant"]["runtime_id"], "runtime-a");
+        assert_eq!(response["task_page"]["entries"][0]["record"]["task_id"], task_id);
     }
 }

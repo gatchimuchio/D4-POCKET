@@ -232,6 +232,144 @@ class HistoryClient {
     return HistoryPage(List.unmodifiable(parsed), next, more, grant);
   }
 
+  Future<AgentTaskHistoryPage> taskPage(HistoryGrant grant,
+      {int after = 0}) async {
+    if (!grant.current || after < 0) _reject();
+    final before = await status();
+    if (before == null || !grant.same(before) || !grant.current) _reject();
+    final response = await transport.request('AgentTask履歴閲覧', payload: {
+      'approval_id': grant.id,
+      'query': {'after': after, 'limit': 50}
+    });
+    if (response['operation'] != 'AgentTask履歴閲覧' ||
+        response['status'] != 'accepted' ||
+        response['evidence_source'] != 'INTERNAL_STATE' ||
+        !_text(response['audit_event_id'])) {
+      _reject();
+    }
+    final body = _shape(response['body'], {'grant', 'task_page'});
+    final returned = HistoryGrant.parse(body['grant']);
+    if (!grant.same(returned) || !grant.current) _reject();
+    final page = _shape(body['task_page'],
+        {'version', 'entries', 'next_cursor', 'has_more', 'head_hash'});
+    final entries = page['entries'];
+    final next = page['next_cursor'];
+    final more = page['has_more'];
+    if (page['version'] != 1 ||
+        entries is! List ||
+        entries.length > 50 ||
+        next is! int ||
+        next < after ||
+        more is! bool ||
+        (more && (next <= after || entries.isEmpty)) ||
+        (page['head_hash'] != null && !_hash(page['head_hash']))) {
+      _reject();
+    }
+    final parsed = <AgentTaskHistoryEntry>[];
+    final auditIds = <String>{};
+    final taskIds = <String>{};
+    const failures = {
+      '要求不正',
+      '実行系不在',
+      '権限拒否',
+      'セッション不一致',
+      '通信失敗',
+      '期限超過',
+      '応答不正',
+      '監査失敗',
+      '取消',
+      '実行系隔離済み',
+      '作業領域不在',
+      'AgentTask実行非対応',
+      '中断回復'
+    };
+    for (final raw in entries) {
+      final entry = _shape(raw, {'audit_event_id', 'event_hash', 'record'});
+      final auditId = entry['audit_event_id'];
+      final eventHash = entry['event_hash'];
+      final record = _shape(entry['record'], {
+        'version',
+        'task_id',
+        'runtime_id',
+        'session_id',
+        'workspace_id',
+        'instruction_hash',
+        'status',
+        'created_at',
+        'updated_at',
+        'result_hash',
+        'failure_class',
+        'start_audit_event_id',
+        'latest_audit_event_id'
+      });
+      final taskId = record['task_id'];
+      final runtime = record['runtime_id'];
+      final session = record['session_id'];
+      final workspace = record['workspace_id'];
+      final status = record['status'];
+      final created = record['created_at'];
+      final updated = record['updated_at'];
+      final resultHash = record['result_hash'];
+      final failure = record['failure_class'];
+      final startAuditId = record['start_audit_event_id'];
+      final latestAuditId = record['latest_audit_event_id'];
+      if (!_text(auditId) ||
+          !_hash(eventHash) ||
+          !auditIds.add(auditId as String) ||
+          record['version'] != 1 ||
+          !RuntimeDialogueClient.validId(taskId) ||
+          !taskIds.add(taskId as String) ||
+          runtime != grant.runtime ||
+          !RuntimeDialogueClient.validId(session) ||
+          !_validScopedIdentifier(workspace) ||
+          !_hash(record['instruction_hash']) ||
+          !['running', 'completed', 'failed', 'cancelled', 'suspended']
+              .contains(status) ||
+          created is! int ||
+          updated is! int ||
+          created < 0 ||
+          updated < created ||
+          !_text(startAuditId) ||
+          !_text(latestAuditId) ||
+          latestAuditId != auditId ||
+          !((resultHash == null || _hash(resultHash)) &&
+              (failure == null ||
+                  (failure is String && failures.contains(failure))))) {
+        _reject();
+      }
+      final validState = switch (status) {
+        'running' => resultHash == null && failure == null,
+        'completed' => _hash(resultHash) && failure == null,
+        'failed' => resultHash == null &&
+            failure != null &&
+            failure != '取消' &&
+            failure != '中断回復',
+        'cancelled' => resultHash == null && failure == '取消',
+        'suspended' => resultHash == null && failure == '中断回復',
+        _ => false
+      };
+      if (!validState) _reject();
+      parsed.add(AgentTaskHistoryEntry(
+          taskId,
+          runtime as String,
+          session as String,
+          workspace as String,
+          record['instruction_hash'] as String,
+          status as String,
+          created,
+          updated,
+          resultHash as String?,
+          failure as String?,
+          startAuditId as String,
+          latestAuditId as String,
+          eventHash as String));
+    }
+    final current = await status();
+    if (current == null || !grant.same(current) || !grant.current) _reject();
+    return AgentTaskHistoryPage(
+        List<AgentTaskHistoryEntry>.unmodifiable(parsed), next, more, grant);
+  }
+
   Future<Map<String, Object?>> replay(
       HistoryGrant grant, HistoryEntry parent, String input,
       {required bool branch}) async {
@@ -418,6 +556,35 @@ class HistoryPage {
   final HistoryGrant grant;
 }
 
+class AgentTaskHistoryEntry {
+  const AgentTaskHistoryEntry(
+      this.taskId,
+      this.runtimeId,
+      this.sessionId,
+      this.workspaceId,
+      this.instructionHash,
+      this.status,
+      this.createdAt,
+      this.updatedAt,
+      this.resultHash,
+      this.failureClass,
+      this.startAuditEventId,
+      this.auditId,
+      this.eventHash);
+  final String taskId, runtimeId, sessionId, workspaceId, instructionHash;
+  final String status, startAuditEventId, auditId, eventHash;
+  final int createdAt, updatedAt;
+  final String? resultHash, failureClass;
+}
+
+class AgentTaskHistoryPage {
+  const AgentTaskHistoryPage(this.entries, this.next, this.more, this.grant);
+  final List<AgentTaskHistoryEntry> entries;
+  final int next;
+  final bool more;
+  final HistoryGrant grant;
+}
+
 Map _shape(Object? raw, Set<String> keys) {
   if (raw is! Map || raw.length != keys.length || !keys.containsAll(raw.keys)) {
     _reject();
@@ -434,6 +601,10 @@ bool _hash(Object? v) =>
     v is String &&
     v.length == 71 &&
     RegExp(r'^sha256:[0-9a-f]{64}$').hasMatch(v);
+bool _validScopedIdentifier(Object? value) =>
+    value is String &&
+    value.length <= 128 &&
+    RegExp(r'^[A-Za-z0-9][A-Za-z0-9_.:-]*$').hasMatch(value);
 Never _reject() => throw const BrokerClientException('履歴の現在承認または応答を確認できません');
 
 /// 過去のAdapter申告hash。現在権限と実使用証明は持たない。

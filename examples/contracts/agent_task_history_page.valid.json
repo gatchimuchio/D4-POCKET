@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "audit_event_id": "broker-audit-12",
+      "event_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "record": {
+        "version": 1,
+        "task_id": "0123456789abcdef0123456789abcdef",
+        "runtime_id": "runtime-a",
+        "session_id": "0123456789abcdef0123456789abcdef",
+        "workspace_id": "workspace-a",
+        "instruction_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "status": "completed",
+        "created_at": 1700000000,
+        "updated_at": 1700000001,
+        "result_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "failure_class": null,
+        "start_audit_event_id": "broker-audit-8",
+        "latest_audit_event_id": "broker-audit-12"
+      }
+    }
+  ],
+  "next_cursor": 12,
+  "has_more": false,
+  "head_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+}

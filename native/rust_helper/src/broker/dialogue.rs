@@ -495,6 +495,9 @@ struct AgentTask作業 {
     workspace_id: String,
     workspace_root_identity: AgentTaskWorkspaceIdentity,
     instruction_hash: String,
+    request_hash: String,
+    created_at_epoch_seconds: i64,
+    start_audit_event_id: String,
     status: &'static str,
     audit_event_id: String,
     result_hash: Option<String>,
@@ -1573,11 +1576,26 @@ impl 対話制御 {
                     .to_string()
                     .as_bytes(),
                 );
-                let start_audit_id = 監査(
-                    "Agent Task実行開始（Permission／Owner Approval一回消費）",
-                    &task_id,
-                    &start_hash,
-                )?;
+                let start_record = super::execution_history::AgentTaskHistoryAuditRecord {
+                    version: 1,
+                    stage: "start".into(),
+                    task_id: task_id.clone(),
+                    runtime_id: request.agent_runtime_id.clone(),
+                    session_id: request.session_id.clone(),
+                    workspace_id: request.workspace_id.clone(),
+                    instruction_hash: instruction_hash.clone(),
+                    request_hash: start_hash.clone(),
+                    created_at: 現在,
+                    status: "running".into(),
+                    updated_at: 現在,
+                    result_hash: None,
+                    failure_class: None,
+                    start_audit_event_id: None,
+                };
+                let (start_reason, start_digest) =
+                    super::execution_history::encode_agent_task_audit(&start_record)
+                        .map_err(|_| 対話失敗::監査失敗)?;
+                let start_audit_id = 監査(&start_reason, &task_id, &start_digest)?;
                 // Audit確定後、同じBroker排他区間内でgrantを消費してからworkerを起動する。
                 self.agent_task_permissions.remove(&request.session_id);
                 let cancel = Arc::new(AtomicBool::new(false));
@@ -1619,18 +1637,29 @@ impl 対話制御 {
                         });
                     });
                 let (status, receiver, audit_event_id) = match spawn_result {
-                    Ok(_) => ("running", Some(receive), start_audit_id),
+                    Ok(_) => ("running", Some(receive), start_audit_id.clone()),
                     Err(_) => {
-                        let failure_hash = sha256_tagged(
-                            json!({"task_id": task_id, "status": "failed", "reason": "worker_start_failed"})
-                                .to_string()
-                                .as_bytes(),
-                        );
-                        let failure_audit = 監査(
-                            "Agent Task worker起動失敗 RecoveryAction=再試行前にRuntime状態確認",
-                            &task_id,
-                            &failure_hash,
-                        );
+                        let failure_record =
+                            super::execution_history::AgentTaskHistoryAuditRecord {
+                                version: 1,
+                                stage: "terminal".into(),
+                                task_id: task_id.clone(),
+                                runtime_id: request.agent_runtime_id.clone(),
+                                session_id: request.session_id.clone(),
+                                workspace_id: request.workspace_id.clone(),
+                                instruction_hash: instruction_hash.clone(),
+                                request_hash: start_hash.clone(),
+                                created_at: 現在,
+                                status: "failed".into(),
+                                updated_at: 現在,
+                                result_hash: None,
+                                failure_class: Some("通信失敗".into()),
+                                start_audit_event_id: Some(start_audit_id.clone()),
+                            };
+                        let (failure_reason, failure_hash) =
+                            super::execution_history::encode_agent_task_audit(&failure_record)
+                                .map_err(|_| 対話失敗::監査失敗)?;
+                        let failure_audit = 監査(&failure_reason, &task_id, &failure_hash);
                         let failure_audit_id = match failure_audit {
                             Ok(event_id) => event_id,
                             Err(error) => {
@@ -1643,6 +1672,9 @@ impl 対話制御 {
                                         workspace_id: request.workspace_id,
                                         workspace_root_identity: binding.root_identity(),
                                         instruction_hash,
+                                        request_hash: start_hash,
+                                        created_at_epoch_seconds: 現在,
+                                        start_audit_event_id: start_audit_id.clone(),
                                         status: "quarantined",
                                         audit_event_id: start_audit_id,
                                         result_hash: None,
@@ -1669,6 +1701,9 @@ impl 対話制御 {
                     workspace_id: request.workspace_id,
                     workspace_root_identity: binding.root_identity(),
                     instruction_hash,
+                    request_hash: start_hash,
+                    created_at_epoch_seconds: 現在,
+                    start_audit_event_id: start_audit_id.clone(),
                     status,
                     audit_event_id,
                     result_hash: None,
@@ -2413,27 +2448,30 @@ impl 対話制御 {
                 }
                 Err(error) => ("failed", None, None, Some(error)),
             };
-            let event_hash = sha256_tagged(
-                json!({
-                    "task_id": task_id,
-                    "status": status,
-                    "instruction_hash": self.agent_tasks[&task_id].instruction_hash,
-                    "result_hash": result_hash,
-                    "failure_class": failure.map(対話失敗::分類),
-                    "completed_at": 現在,
-                })
-                .to_string()
-                .as_bytes(),
-            );
-            let event_id = match 監査(
-                if status == "completed" {
-                    "Agent Task完了（本文は期限付き揮発保管・Auditはhashのみ）"
-                } else {
-                    "Agent Task失敗・取消（RecoveryAction=Workspace差分を確認）"
-                },
-                &task_id,
-                &event_hash,
-            ) {
+            let task = self
+                .agent_tasks
+                .get(&task_id)
+                .ok_or(対話失敗::要求不正)?;
+            let terminal_record = super::execution_history::AgentTaskHistoryAuditRecord {
+                version: 1,
+                stage: "terminal".into(),
+                task_id: task.task_id.clone(),
+                runtime_id: task.runtime_id.clone(),
+                session_id: task.session_id.clone(),
+                workspace_id: task.workspace_id.clone(),
+                instruction_hash: task.instruction_hash.clone(),
+                request_hash: task.request_hash.clone(),
+                created_at: task.created_at_epoch_seconds,
+                status: status.into(),
+                updated_at: 現在.max(task.created_at_epoch_seconds),
+                result_hash: result_hash.clone(),
+                failure_class: failure.map(|error| error.分類().to_string()),
+                start_audit_event_id: Some(task.start_audit_event_id.clone()),
+            };
+            let (terminal_reason, event_hash) =
+                super::execution_history::encode_agent_task_audit(&terminal_record)
+                    .map_err(|_| 対話失敗::監査失敗)?;
+            let event_id = match 監査(&terminal_reason, &task_id, &event_hash) {
                 Ok(event_id) => event_id,
                 Err(error) => {
                     let Some(task) = self.agent_tasks.get_mut(&task_id) else {
