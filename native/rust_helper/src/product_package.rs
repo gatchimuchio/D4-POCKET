@@ -3,12 +3,16 @@
 //! package の外側digest／署名はBrokerが検証する。本moduleはpackage構造、製品identity、
 //! file一覧、各file hashを再検査して新しい一時directoryへ展開する。Authorityを生成しない。
 
+use cap_fs_ext::{DirExt, FollowSymlinks, OpenOptionsFollowExt};
+#[cfg(windows)]
+use cap_std::fs::MetadataExt as CapMetadataExt;
+use cap_std::fs::{Dir, OpenOptions};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, File};
 use std::io::{Read, Write};
-use std::path::{Component, Path, PathBuf};
+use std::path::{Component, Path};
 
 const MAGIC: &[u8; 8] = b"D4PKG01\n";
 const MAX_MANIFEST_BYTES: u32 = 1024 * 1024;
@@ -90,15 +94,6 @@ pub(crate) fn extract_verified_package_from_reader<R: Read>(
     destination: &Path,
     expected: ProductPackageExpectation<'_>,
 ) -> Result<ProductPackageInfo, ProductPackageError> {
-    if !(12..=MAX_PACKAGE_BYTES).contains(&package_bytes) {
-        return Err(err("package_size_invalid"));
-    }
-    if expected_package_sha256.is_some_and(|digest| !valid_sha256(digest)) {
-        return Err(err("package_outer_hash_invalid"));
-    }
-    if destination.exists() || fs::symlink_metadata(destination).is_ok() {
-        return Err(err("package_destination_exists"));
-    }
     let parent = destination
         .parent()
         .ok_or_else(|| err("package_destination_invalid"))?;
@@ -113,26 +108,85 @@ pub(crate) fn extract_verified_package_from_reader<R: Read>(
     let parent = fs::canonicalize(parent).map_err(|_| err("package_parent_invalid"))?;
     let destination_name = destination
         .file_name()
+        .and_then(|name| name.to_str())
         .ok_or_else(|| err("package_destination_invalid"))?;
-    let stage_root = parent.join(destination_name);
+    let parent = Dir::open_ambient_dir(&parent, cap_std::ambient_authority())
+        .map_err(|_| err("package_parent_invalid"))?;
+    extract_verified_package_into_directory(
+        input,
+        package_bytes,
+        expected_package_sha256,
+        &parent,
+        destination_name,
+        expected,
+    )
+}
+
+/// Brokerが所有するdirectory capabilityの直下にだけpackageを展開する。
+/// 途中失敗時は開いたstage handle自身を除去し、ambient pathへ戻らない。
+pub(crate) fn extract_verified_package_into_directory<R: Read>(
+    input: R,
+    package_bytes: u64,
+    expected_package_sha256: Option<&str>,
+    parent: &Dir,
+    stage_name: &str,
+    expected: ProductPackageExpectation<'_>,
+) -> Result<ProductPackageInfo, ProductPackageError> {
+    if !(12..=MAX_PACKAGE_BYTES).contains(&package_bytes) {
+        return Err(err("package_size_invalid"));
+    }
+    if expected_package_sha256.is_some_and(|digest| !valid_sha256(digest)) {
+        return Err(err("package_outer_hash_invalid"));
+    }
+    validate_stage_name(stage_name)?;
+    let parent_metadata = parent
+        .dir_metadata()
+        .map_err(|_| err("package_parent_invalid"))?;
+    if !parent_metadata.is_dir() || is_cap_reparse_point(&parent_metadata) {
+        return Err(err("package_parent_invalid"));
+    }
+    match parent.symlink_metadata(stage_name) {
+        Ok(_) => return Err(err("package_destination_exists")),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(_) => return Err(err("package_destination_invalid")),
+    }
+    parent
+        .create_dir(stage_name)
+        .map_err(|_| err("package_stage_create_failed"))?;
+    let created_metadata = parent
+        .symlink_metadata(stage_name)
+        .map_err(|_| err("package_stage_invalid"))?;
+    if !created_metadata.is_dir() || is_cap_reparse_point(&created_metadata) {
+        return Err(err("package_stage_invalid"));
+    }
+    let stage = match parent.open_dir_nofollow(stage_name) {
+        Ok(stage) => stage,
+        Err(_) => return Err(err("package_stage_invalid")),
+    };
+    let stage_metadata = match stage.dir_metadata() {
+        Ok(metadata) => metadata,
+        Err(_) => {
+            let _ = stage.remove_open_dir_all();
+            return Err(err("package_stage_invalid"));
+        }
+    };
+    if !same_cap_file(&created_metadata, &stage_metadata) {
+        return Err(err("package_stage_changed"));
+    }
+    if !stage_metadata.is_dir() || is_cap_reparse_point(&stage_metadata) {
+        let _ = stage.remove_open_dir_all();
+        return Err(err("package_stage_invalid"));
+    }
 
     let mut input = PackageHashReader::new(input);
-    let result =
-        extract_inner(&mut input, &stage_root, &expected, package_bytes).and_then(|info| {
-            if expected_package_sha256.is_some_and(|expected| input.finish() != expected) {
-                return Err(err("package_outer_hash_mismatch"));
-            }
-            Ok(info)
-        });
-    if result.is_err() {
-        if let Ok(root_metadata) = fs::symlink_metadata(&stage_root) {
-            if root_metadata.is_dir()
-                && !root_metadata.file_type().is_symlink()
-                && !is_reparse_point(&root_metadata)
-            {
-                let _ = fs::remove_dir_all(&stage_root);
-            }
+    let result = extract_inner(&mut input, &stage, &expected, package_bytes).and_then(|info| {
+        if expected_package_sha256.is_some_and(|expected| input.finish() != expected) {
+            return Err(err("package_outer_hash_mismatch"));
         }
+        Ok(info)
+    });
+    if result.is_err() {
+        let _ = stage.remove_open_dir_all();
     }
     result
 }
@@ -165,7 +219,7 @@ impl<R: Read> Read for PackageHashReader<R> {
 
 fn extract_inner<R: Read>(
     input: &mut R,
-    destination: &Path,
+    destination: &Dir,
     expected: &ProductPackageExpectation<'_>,
     package_bytes: u64,
 ) -> Result<ProductPackageInfo, ProductPackageError> {
@@ -203,21 +257,20 @@ fn extract_inner<R: Read>(
         return Err(err("package_length_mismatch"));
     }
 
-    fs::create_dir(destination).map_err(|_| err("package_stage_create_failed"))?;
-    let canonical_root = fs::canonicalize(destination).map_err(|_| err("package_stage_invalid"))?;
     let mut buffer = vec![0u8; COPY_BUFFER_BYTES];
     let mut product_manifest_validated = false;
     for entry in &manifest.files {
         if entry.path == "product_manifest.json" && entry.byte_length > MAX_PRODUCT_MANIFEST_BYTES {
             return Err(err("package_product_manifest_size_invalid"));
         }
-        let target = safe_target(&canonical_root, &entry.path)?;
-        let parent = target.parent().ok_or_else(|| err("package_path_invalid"))?;
-        create_safe_directories(&canonical_root, parent)?;
-        let mut output = OpenOptions::new()
+        let (parent, file_name) = open_package_parent(destination, &entry.path)?;
+        let mut options = OpenOptions::new();
+        options
             .write(true)
             .create_new(true)
-            .open(&target)
+            .follow(FollowSymlinks::No);
+        let mut output = parent
+            .open_with(file_name, &options)
             .map_err(|_| err("package_file_create_failed"))?;
         let mut remaining = entry.byte_length;
         let mut digest = Sha256::new();
@@ -465,43 +518,73 @@ fn is_reserved_windows_component(value: &str) -> bool {
             && matches!(stem.as_bytes()[3], b'1'..=b'9'))
 }
 
-fn safe_target(root: &Path, relative: &str) -> Result<PathBuf, ProductPackageError> {
-    validate_path(relative)?;
-    let target = relative
-        .split('/')
-        .fold(root.to_path_buf(), |path, part| path.join(part));
-    if !target.starts_with(root) {
-        return Err(err("package_path_outside_payload"));
-    }
-    Ok(target)
-}
-
-fn create_safe_directories(root: &Path, parent: &Path) -> Result<(), ProductPackageError> {
-    if !parent.starts_with(root) {
-        return Err(err("package_path_outside_payload"));
-    }
-    let relative = parent
-        .strip_prefix(root)
-        .map_err(|_| err("package_path_outside_payload"))?;
-    let mut current = root.to_path_buf();
-    for component in relative.components() {
-        let Component::Normal(name) = component else {
-            return Err(err("package_path_invalid"));
-        };
-        current.push(name);
-        match fs::symlink_metadata(&current) {
-            Ok(metadata)
-                if metadata.is_dir()
-                    && !metadata.file_type().is_symlink()
-                    && !is_reparse_point(&metadata) => {}
-            Ok(_) => return Err(err("package_path_reparse_or_conflict")),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                fs::create_dir(&current).map_err(|_| err("package_directory_create_failed"))?;
-            }
-            Err(_) => return Err(err("package_directory_invalid")),
-        }
+fn validate_stage_name(value: &str) -> Result<(), ProductPackageError> {
+    if value.is_empty()
+        || value.len() > 160
+        || value == "."
+        || value == ".."
+        || value.ends_with('.')
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
+        || is_reserved_windows_component(value)
+    {
+        return Err(err("package_stage_name_invalid"));
     }
     Ok(())
+}
+
+fn open_package_parent<'a>(
+    root: &Dir,
+    relative: &'a str,
+) -> Result<(Dir, &'a str), ProductPackageError> {
+    validate_path(relative)?;
+    let mut components = relative.split('/').peekable();
+    let mut current = root
+        .try_clone()
+        .map_err(|_| err("package_directory_invalid"))?;
+    while let Some(component) = components.next() {
+        if components.peek().is_none() {
+            return Ok((current, component));
+        }
+        match current.open_dir_nofollow(component) {
+            Ok(next) => current = next,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                current
+                    .create_dir(component)
+                    .map_err(|_| err("package_directory_create_failed"))?;
+                current = current
+                    .open_dir_nofollow(component)
+                    .map_err(|_| err("package_directory_invalid"))?;
+            }
+            Err(_) => return Err(err("package_path_reparse_or_conflict")),
+        }
+        let metadata = current
+            .dir_metadata()
+            .map_err(|_| err("package_directory_invalid"))?;
+        if !metadata.is_dir() || is_cap_reparse_point(&metadata) {
+            return Err(err("package_path_reparse_or_conflict"));
+        }
+    }
+    Err(err("package_path_invalid"))
+}
+
+fn is_cap_reparse_point(metadata: &cap_std::fs::Metadata) -> bool {
+    #[cfg(windows)]
+    {
+        metadata.file_attributes() & 0x400 != 0
+    }
+    #[cfg(not(windows))]
+    {
+        metadata.file_type().is_symlink()
+    }
+}
+
+fn same_cap_file(left: &cap_std::fs::Metadata, right: &cap_std::fs::Metadata) -> bool {
+    let left_id = cap_fs_ext::MetadataExt::ino(left);
+    left_id != 0
+        && cap_fs_ext::MetadataExt::dev(left) == cap_fs_ext::MetadataExt::dev(right)
+        && left_id == cap_fs_ext::MetadataExt::ino(right)
 }
 
 #[cfg(windows)]
@@ -524,6 +607,7 @@ mod tests {
     use super::*;
     use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
     use serde_json::json;
+    use std::path::PathBuf;
 
     const APP: &str = "d4-pocket-app-11111111111111111111111111111111";
     const AUDIT: &str = "audit-store-22222222222222222222222222222222";
@@ -612,33 +696,127 @@ mod tests {
         options.read(true).follow(FollowSymlinks::No);
         let file = directory.open_with("package.pkg", &options).unwrap();
         let length = file.metadata().unwrap().len();
-        let destination = path.parent().unwrap().join("stage-valid");
-        let info = extract_verified_package_from_reader(
+        let info = extract_verified_package_into_directory(
             file,
             length,
             Some(&package_sha256),
-            &destination,
+            &directory,
+            "stage-valid",
             expectation(Some("1.2.3")),
         )
         .unwrap();
         assert_eq!(info.product_version, "1.2.3");
+        let destination = path.parent().unwrap().join("stage-valid");
         assert!(destination.join("product_manifest.json").is_file());
 
         let file = directory.open_with("package.pkg", &options).unwrap();
-        let rejected_destination = path.parent().unwrap().join("stage-bad-hash");
         assert_eq!(
-            extract_verified_package_from_reader(
+            extract_verified_package_into_directory(
                 file,
                 length,
                 Some(&"b".repeat(64)),
-                &rejected_destination,
+                &directory,
+                "stage-bad-hash",
                 expectation(Some("1.2.3")),
             )
             .unwrap_err()
             .0,
             "package_outer_hash_mismatch"
         );
+        let rejected_destination = path.parent().unwrap().join("stage-bad-hash");
         assert!(!rejected_destination.exists());
+        drop(directory);
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn capability_extraction_rejects_non_component_stage_name_without_mutation() {
+        let path = write_temp(&package_with(files_for_test()), "stage-name");
+        let directory = cap_std::fs::Dir::open_ambient_dir(
+            path.parent().unwrap(),
+            cap_std::ambient_authority(),
+        )
+        .unwrap();
+        let package = directory.open("package.pkg").unwrap();
+        let length = package.metadata().unwrap().len();
+        assert_eq!(
+            extract_verified_package_into_directory(
+                package,
+                length,
+                None,
+                &directory,
+                "../escaped",
+                expectation(Some("1.2.3")),
+            )
+            .unwrap_err()
+            .0,
+            "package_stage_name_invalid"
+        );
+        assert!(!path
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("escaped")
+            .exists());
+        drop(directory);
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn capability_extraction_preserves_existing_stage_and_cleans_its_own_failed_stage() {
+        let path = write_temp(&package_with(files_for_test()), "stage-collision");
+        let directory = cap_std::fs::Dir::open_ambient_dir(
+            path.parent().unwrap(),
+            cap_std::ambient_authority(),
+        )
+        .unwrap();
+        directory.create_dir("stage-existing").unwrap();
+        fs::write(
+            path.parent().unwrap().join("stage-existing/sentinel"),
+            b"keep",
+        )
+        .unwrap();
+        let package = directory.open("package.pkg").unwrap();
+        let length = package.metadata().unwrap().len();
+        assert_eq!(
+            extract_verified_package_into_directory(
+                package,
+                length,
+                None,
+                &directory,
+                "stage-existing",
+                expectation(Some("1.2.3")),
+            )
+            .unwrap_err()
+            .0,
+            "package_destination_exists"
+        );
+        assert_eq!(
+            fs::read(path.parent().unwrap().join("stage-existing/sentinel")).unwrap(),
+            b"keep"
+        );
+
+        let mut conflicting_files = files_for_test();
+        conflicting_files.insert(0, ("app", b"not a directory"));
+        let bytes = package_with(conflicting_files);
+        let conflicting_package = path.parent().unwrap().join("conflict.pkg");
+        fs::write(&conflicting_package, &bytes).unwrap();
+        let package = directory.open("conflict.pkg").unwrap();
+        assert_eq!(
+            extract_verified_package_into_directory(
+                package,
+                bytes.len() as u64,
+                None,
+                &directory,
+                "stage-conflict",
+                expectation(Some("1.2.3")),
+            )
+            .unwrap_err()
+            .0,
+            "package_path_reparse_or_conflict"
+        );
+        assert!(!path.parent().unwrap().join("stage-conflict").exists());
         drop(directory);
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
     }

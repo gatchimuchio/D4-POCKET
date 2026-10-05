@@ -31,6 +31,8 @@
 
 2026-10-06 P11追加記録: reader変更時の逐次全Rust試験は453 passed／1 failed／9 ignoredで、`broker::update_download::tests::local_tls_server_repairs_only_after_verified_package_bytes`がOS error 10054／`ConnectionReset`で失敗した。同testの単独再実行は1 passed。既存`FQ-TEST-LOOPBACK`のfixture安定性と同分類で、P11 reader差分外かつ現phaseをblockしない。
 
+2026-10-06 P11 capability-reader追試: 非選別の逐次Rust suiteは465件中454 passed／2 failed／9 ignored。失敗は`adapters::minidora::tests::ContentLength付きJSONだけを期限内に取得する`と上記Update TLS fixtureで、どちらも現行reader差分外。MINIDORA fixture単独再実行は1 passed、Update TLS fixture単独再実行はOS error 10054／`ConnectionReset`で再失敗した。`FQ-TEST-LOOPBACK`の既存対象を更新し、P11 blockerへ追加しない。
+
 ## 3. Final QA段階
 
 | 段階 | 対象 | 開始条件 |
