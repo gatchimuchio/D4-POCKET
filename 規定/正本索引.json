@@ -189,7 +189,15 @@
     },
     {
       "path": "ROADMAP.md",
-      "責任": "現行phase、v1.0射程、release blocker"
+      "責任": "rev5現行製品phaseへの入口、v1.0射程、release gate。履歴記録は現行状態を上書きしない"
+    },
+    {
+      "path": "docs/REV5_PRODUCT_PROGRESS.md",
+      "責任": "rev5 Product-First工程の現行phase、機能受入れ、過去phaseからの移送対応"
+    },
+    {
+      "path": "docs/FINAL_QA_QUEUE.md",
+      "責任": "Feature Complete後に実施する最終統合品質保証の有限queue。製品開発phaseの進行条件にしない"
     },
     {
       "path": "docs/D4_POCKET_PHASE_MAPPING.md",

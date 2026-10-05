@@ -1,9 +1,11 @@
-# D4 Pocket / GUI-Shell rev4 受入れ台帳
+# D4 Pocket / GUI-Shell rev4 受入れ台帳（履歴）
 
-更新日: 2026-10-05
+最終更新日: 2026-10-05
+状態: rev4時点の受入れ履歴。rev5 Product-First工程の現行状態ではない
 工程正本: ユーザー提示「D4 Pocket / GUI-Shell rev4 工程収束制御」
-状態正本: 本台帳
+当時の状態正本: 本台帳
 補助索引: `release_blockers.registry.json` の `comprehensive_extension_rev1_completion.r2_bounded_exit_gate`
+現行状態: `docs/REV5_PRODUCT_PROGRESS.md`。rev4の判定・失敗・証拠は履歴として保持し、rev5へ合格状態を推定転記しない。
 
 ## 1. 目的と品質段階
 

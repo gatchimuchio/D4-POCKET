@@ -1,8 +1,10 @@
 # GUI Shell ロードマップ
 
-状態: D4 Pocket / GUI-Shell統合rev4の工程収束規則を適用して開発中。R2は探索・最終出荷検査ではなく、R3へ安全に進むための有限な開発通過gateとする。現行Acceptance状態、順序、証拠、R14への最終QA移送先は`docs/REV4_ACCEPTANCE_LEDGER.md`を正本とする。Technical Completeおよび正式releaseは未成立。
+状態: D4 Pocket / GUI-Shell統合rev5 Product-First工程で開発中。現行の製品phaseと実装状況は`docs/REV5_PRODUCT_PROGRESS.md`、最終統合後へ送る検査項目は`docs/FINAL_QA_QUEUE.md`を正本とする。旧R2 Agent TaskはPRODUCT BUILD上`FUNCTIONALLY ESTABLISHED`、rev5 P1は`DONE FOR PRODUCT BUILD`であり、R2-A〜Hの深掘りを次phase開始gateにしない。Technical Completeおよび正式releaseは未成立。
 
-R2-A〜HをAcceptance Ledgerの順で処理する。既にCLOSEDと定められたpositive Task、Permission／Approval一回消費、durable Audit、tray終了、局所cross-Workspace隔離は再試験しない。R2では各条件の機能成立と必要最小限の安全境界だけを確認し、全数回帰、長時間稼働、網羅的fault injection、性能、Formal Evidenceの強化は後工程へ送る。安全・Authority・Audit・Recovery要件そのものは変更しない。全有限条件のPASS後はnormal Releaseの`task_execution=supported`へ昇格し、release readinessとは分離したままR2をCLOSED、R3をOPENにしてCompareを開始する。rev3の進捗記録は履歴として保持し、現行状態の正本へ逆流させない。
+現行phaseはP2 Multi-Agent Compare（rev5実装指示書ではR3と表記。どちらも同じCompare範囲を指す）。既存のAgent比較はBroker metadataからsession/runtime/Workspace参照の重複を検査するprojectionに限られ、独立Taskの生成・同時実行・結果比較・選択・選択結果の適用を実装した証拠ではない。rev4受入れ台帳とrev2/rev3進捗は当時の状態・失敗・証拠を保持する履歴であり、rev5現行phaseを上書きしない。R2で追加確認が必要な最終統合検査はFinal QA queueへ移送する。Authority、安全境界、release gateおよび通常Releaseのfail-closed状態は維持し、製品開発の継続をrelease-readyの主張へ読み替えない。
+
+本書の以下の過去日付付き記録は、記録当時の証拠・計画を保持する。rev5の現在状態と作業順を判断するときは上記の現行正本を優先し、過去の「現行」表記を現在状態として再利用しない。
 
 ## rev3作業履歴（現行工程の正本ではない）
 

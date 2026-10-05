@@ -733,10 +733,16 @@ phase固有実装は、次を保持する。
 
 ### 28. 工程内Acceptanceと最終品質保証の分離
 
-現行工程のAcceptanceは、当該機能の成立、基本安全境界、致命的failureの不在、および次工程へ安全に進める条件だけを判定する。これは製品全体のrelease acceptanceではない。
+工程内Acceptanceは、その製品機能が開発を続けられる状態にあるかを確認する。製品全体の完成・release acceptanceとは分ける。必要な安全・Authority・Approval・Audit・Recovery・Content Exposure境界は常に維持するが、最終出荷級の全数回帰、長時間稼働、網羅的fault injection、性能、Formal Evidenceを未統合の機能へ前倒ししない。
 
-品質基準やAuthority境界を弱めず、工程の証明深度だけを段階化する。現行工程の明示Acceptance Contractは満たすが、最終出荷級の全数回帰、長時間稼働、網羅的fault injection、性能、Formal Evidenceの追加強化を要求しない。それらは正本の定める後続工程へ送る。
+統合後の徹底検査は、現行rev5仕様が定めるFinal QA工程へ送る。必要な証拠がAcceptance Contractを満たしたら工程を閉じる。「さらに検査できる」ことだけを理由に同じ工程を延長しない。Acceptance外で見つけた事項は、現工程の機能成立・安全境界を直接破壊しない限りFinal QA、後続工程、release gate、既知制約のいずれかへ明記して移送する。
 
-D4 Pocket rev4では、作業開始時に`docs/REV4_ACCEPTANCE_LEDGER.md`を読み、`OPEN`または`FAIL`だけを順番に処理する。`PASS`は同じblockで`CLOSED`へ移す。CLOSED条件の再訪は、具体的regression evidenceが成立条件を破壊した場合に限る。強い証拠を追加取得できること、未知riskの可能性、文書表現の修正だけでは再試験しない。
+### 29. D4 Pocket rev5 製品構築先行運用
 
-R2はR3へ進むための有限な開発通過gateであり、R2-A〜H以外の条件を追加しない。R2のCLOSEDはrelease ready、formal acceptance、最終製品保証を意味しない。Formal EvidenceはR13、統合後の最終品質保証（全数回帰・長時間・fault・performance）はR14で実施し、R2で成立した証拠の再生成ではなく、最終統合状態を対象にする。MxC、OS、Provider等の外部所有内部実装の完全性をD4 Pocketの保証へ取り込まない。
+現行の工程順、Acceptance、進捗、Final QA移送先は`docs/REV5_PRODUCT_PROGRESS.md`、`docs/FINAL_QA_QUEUE.md`、`ROADMAP.md`およびユーザーが提示した最新rev5正本で確定する。`docs/REV4_ACCEPTANCE_LEDGER.md`とrev2/rev3進捗は履歴・証拠の出所として保持し、rev5の現行phaseを上書きしない。
+
+R2 Agent Taskは製品開発を続けるための機能が成立したものとして扱い、R2-A〜Hの追加探索・深掘りをR3以降の開始条件にしない。未実施または最終統合状態で再確認が必要な項目はFinal QA queueに残す。これはR2-A〜Hがすべて合格した、通常ReleaseのTask capabilityを昇格した、またはrelease-readyであるという主張ではない。明示されたRelease Gateと通常Releaseのfail-closed状態を保持する。
+
+現行製品工程はrev5のP2 Multi-Agent Compare（rev5実装指示書のR3表記と同じ機能範囲）から始め、既存の識別子projectionだけを実Compare機能とみなさない。以後は最新rev5で定めるP3以降の製品機能を順に完成し、Feature Complete後に限ってQ0〜Q7 Final QAを開始する。PASS済みの製品Acceptanceを再試験する場合は、再現可能な回帰が該当Acceptanceを破壊した証拠を記録する。
+
+通常のOwner承認・入力を開発進行の待ち条件にしない。製品のAuthority境界は維持したうえで、テスト専用Owner identity、fixture、UI automation等の隔離された試験経路を用いる。production identity・鍵・不可逆な事業判断・Final GOなど、Owner本人にしか成立させられない事項だけをOwner待ちとして残す。実際のOwner確認画面を自動承認するために既存安全境界を迂回してはならない。
