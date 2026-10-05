@@ -50,6 +50,10 @@ Map<String, Object?> buildComposeManifestDraft({
   required String agentIds,
   required String toolIds,
   required String mcpConnectionIds,
+  String themeMode = 'system',
+  String density = 'comfortable',
+  String contentVisibility = 'summary',
+  String capabilityRequirements = 'runtime.read\nagent.metadata',
 }) =>
     {
       'version': 1,
@@ -59,12 +63,13 @@ Map<String, Object?> buildComposeManifestDraft({
       'agent_ids': composeReferenceIdsFromLines(agentIds),
       'tool_ids': composeReferenceIdsFromLines(toolIds),
       'mcp_connection_ids': composeReferenceIdsFromLines(mcpConnectionIds),
-      'theme': {'theme_id': 'd4-pocket', 'mode': 'system'},
-      'capability_requirements': ['runtime.read', 'agent.metadata'],
+      'theme': {'theme_id': 'd4-pocket', 'mode': themeMode},
+      'capability_requirements':
+          composeReferenceIdsFromLines(capabilityRequirements),
       'settings': {
         'locale': 'ja-JP',
-        'density': 'comfortable',
-        'content_visibility': 'summary',
+        'density': density,
+        'content_visibility': contentVisibility,
       },
       'inheritance_policy': {
         'authority': 'none',

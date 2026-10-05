@@ -63,6 +63,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       TextEditingController();
   final TextEditingController _composeMcpIdsController =
       TextEditingController();
+  final TextEditingController _composeCapabilityRequirementsController =
+      TextEditingController(text: 'runtime.read\nagent.metadata');
+  String _composeThemeMode = 'system';
+  String _composeDensity = 'comfortable';
+  String _composeContentVisibility = 'summary';
   Map<String, Object?>? _lastAcceptedComposeManifest;
   final TextEditingController _editInstructionController =
       TextEditingController(text: '構成Preview結果へ対象platformを表示する');
@@ -80,6 +85,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _composeAgentIdsController.dispose();
     _composeToolIdsController.dispose();
     _composeMcpIdsController.dispose();
+    _composeCapabilityRequirementsController.dispose();
     _editInstructionController.dispose();
     _editTargetPathController.dispose();
     super.dispose();
@@ -239,11 +245,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
               FilledButton.icon(
+                key: const ValueKey('compose-manifest-button'),
                 onPressed: () => _runCompose(client),
                 icon: const Icon(Icons.account_tree_outlined),
                 label: const Text('構成Manifest作成'),
               ),
               OutlinedButton.icon(
+                key: const ValueKey('compose-preview-button'),
                 onPressed: () => _runPreview(client),
                 icon: const Icon(Icons.preview_outlined),
                 label: const Text('構成Preview'),
@@ -256,6 +264,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 8),
           TextField(
+            key: const ValueKey('compose-runtime-ids'),
             controller: _composeRuntimeIdsController,
             minLines: 1,
             maxLines: 3,
@@ -266,6 +275,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 8),
           TextField(
+            key: const ValueKey('compose-agent-ids'),
             controller: _composeAgentIdsController,
             minLines: 1,
             maxLines: 3,
@@ -276,6 +286,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 8),
           TextField(
+            key: const ValueKey('compose-tool-ids'),
             controller: _composeToolIdsController,
             minLines: 1,
             maxLines: 3,
@@ -286,6 +297,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 8),
           TextField(
+            key: const ValueKey('compose-mcp-ids'),
             controller: _composeMcpIdsController,
             minLines: 1,
             maxLines: 3,
@@ -295,12 +307,98 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           const SizedBox(height: 8),
+          const Text('UI構成（Manifest上の要求。実際の権限は生成しません）'),
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            children: [
+              SizedBox(
+                width: 190,
+                child: DropdownButtonFormField<String>(
+                  key: const ValueKey('compose-theme-mode'),
+                  initialValue: _composeThemeMode,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Theme表示',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'system', child: Text('OSに合わせる')),
+                    DropdownMenuItem(value: 'light', child: Text('明るい')),
+                    DropdownMenuItem(value: 'dark', child: Text('暗い')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _composeThemeMode = value);
+                    }
+                  },
+                ),
+              ),
+              SizedBox(
+                width: 190,
+                child: DropdownButtonFormField<String>(
+                  key: const ValueKey('compose-density'),
+                  initialValue: _composeDensity,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: '表示密度',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'compact', child: Text('コンパクト')),
+                    DropdownMenuItem(value: 'comfortable', child: Text('標準')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) setState(() => _composeDensity = value);
+                  },
+                ),
+              ),
+              SizedBox(
+                width: 220,
+                child: DropdownButtonFormField<String>(
+                  key: const ValueKey('compose-content-visibility'),
+                  initialValue: _composeContentVisibility,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: '内容表示要求',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'none', child: Text('内容を表示しない')),
+                    DropdownMenuItem(value: 'hash_only', child: Text('hashのみ')),
+                    DropdownMenuItem(value: 'summary', child: Text('要約')),
+                    DropdownMenuItem(value: 'redacted', child: Text('伏字を含む表示')),
+                    DropdownMenuItem(
+                      value: 'full',
+                      child: Text('全文（実行時の許可は別途必要）'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _composeContentVisibility = value);
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            key: const ValueKey('compose-capability-requirements'),
+            controller: _composeCapabilityRequirementsController,
+            minLines: 1,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              labelText: '機能要件ID（任意・1行に1つ）',
+              helperText: '要求の記録だけを行い、PermissionやAuthorityは生成しません。',
+            ),
+          ),
+          const SizedBox(height: 8),
           const SectionList(
-            title: '選択内容',
+            title: '固定・継承境界',
             rows: [
-              '表示テーマ: d4-pocket / system',
-              '機能要件: runtime.read、agent.metadata',
-              '設定: ja-JP、comfortable、summary',
+              'Theme識別子: d4-pocket / Locale: ja-JP',
               '継承禁止: Authority、Permission、Approval、Credential、Audit chainはすべてなし',
             ],
           ),
@@ -329,6 +427,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         agentIds: _composeAgentIdsController.text,
         toolIds: _composeToolIdsController.text,
         mcpConnectionIds: _composeMcpIdsController.text,
+        themeMode: _composeThemeMode,
+        density: _composeDensity,
+        contentVisibility: _composeContentVisibility,
+        capabilityRequirements: _composeCapabilityRequirementsController.text,
       );
 
   Future<void> _runCompose(ComposeClient client) async {
@@ -381,6 +483,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Text('任意画面', style: Theme.of(context).textTheme.titleSmall),
           for (final entry in guiShellOptionalExportModules.entries)
             CheckboxListTile(
+              key: ValueKey('export-module-${entry.key}'),
               contentPadding: EdgeInsets.zero,
               dense: true,
               value: _selectedExportModules.contains(entry.key),
@@ -398,6 +501,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           const SizedBox(height: 8),
           FilledButton.icon(
+            key: const ValueKey('compose-export-button'),
             onPressed: _exportInProgress ? null : () => _runExport(client),
             icon: _exportInProgress
                 ? const SizedBox.square(
@@ -486,6 +590,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 8),
           FilledButton.icon(
+            key: const ValueKey('compose-ai-edit-button'),
             onPressed: () => _runAiEdit(client),
             icon: const Icon(Icons.rate_review_outlined),
             label: const Text('編集提案を送信'),

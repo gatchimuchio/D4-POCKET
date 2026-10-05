@@ -91,6 +91,39 @@ void main() {
       ['runtime.local', 'agent.example', 'runtime.local'],
     );
   });
+
+  test('Theme、表示設定、機能要件の選択をManifestへ反映する', () {
+    final manifest = buildComposeManifestDraft(
+      composeId: 'compose.dark',
+      displayName: '暗色構成',
+      runtimeIds: 'runtime.local',
+      agentIds: 'agent.codex',
+      toolIds: 'tool.notes',
+      mcpConnectionIds: 'mcp.local',
+      themeMode: 'dark',
+      density: 'compact',
+      contentVisibility: 'redacted',
+      capabilityRequirements: 'runtime.read\n\nagent.metadata',
+    );
+
+    expect(manifest['theme'], {'theme_id': 'd4-pocket', 'mode': 'dark'});
+    expect(manifest['settings'], {
+      'locale': 'ja-JP',
+      'density': 'compact',
+      'content_visibility': 'redacted',
+    });
+    expect(manifest['capability_requirements'], [
+      'runtime.read',
+      'agent.metadata',
+    ]);
+    expect(manifest['inheritance_policy'], {
+      'authority': 'none',
+      'permission': 'none',
+      'approval': 'none',
+      'credential': 'none',
+      'audit_chain': 'none',
+    });
+  });
 }
 
 class _FakeComposeTransport implements BrokerTransport {

@@ -2,7 +2,7 @@
 
 更新日: 2026-10-05
 工程正本: ユーザー提示「D4 Pocket / GUI-Shell 統合実装仕様書 rev5」「統合開発工程表 rev5」「Codex実装指示書 rev5」
-現行phase: `P8 GUI-Shell Compose` (`OPEN`)。`P7 A2A / Host / Adapter`は2026-10-05にrev5 Product Build受入れを閉鎖。`P6 Credential / MCP`、`P5 Workspace / History / Evaluation`も同日に閉鎖済み。
+現行phase: `P9 Standalone Export` (`OPEN`)。`P8 GUI-Shell Compose`は2026-10-05にrev5 Product Build受入れを閉鎖。`P7 A2A / Host / Adapter`、`P6 Credential / MCP`、`P5 Workspace / History / Evaluation`も同日に閉鎖済み。
 基準Repository状態: rev5文書同期commit `39dd3f4bc7aafe350ca94fce9392095f1064d2bc`。その後の実装・検証状態は本書末尾の更新履歴を参照。
 
 ## 正本の選び方
@@ -180,9 +180,24 @@ rev5工程表の「実接続または決定的fixtureで主要経路成立」に
 
 実Host間の認証付き通信・remote capability discovery・Host間Workspace隔離、外部Adapter artifactのdownload／filesystem導入・削除・process管理、Windows installed product evidenceは未成立のままrelease blockerとして保持する。これらを成立済み、C17〜C19の全要件完了、またはrelease-readyへ読み替えない。Feature Complete後の横断保証はFinal QA queueに従う。
 
+### P8 GUI-Shell構成 — CLOSED（製品構築受入れ完了）
+
+| 受入れ項目 | 結果 | 現行証拠・境界 |
+| --- | --- | --- |
+| Runtime／Agent／Tool／MCP選択 | 合格 | Desktop設定画面で参照IDを入力しManifestへ正規化してBrokerへ送る。実在性・接続・Agent trustの発見や判定は行わない。 |
+| UI構成 | 合格 | Theme mode、表示密度、内容表示要求、Capability requirementを画面から選択しManifestへ反映。Theme IDとLocaleは現行契約により固定。これらの要求はPermission／Authorityを生成しない。 |
+| Module選択 | 合格 | 任意Module checkboxをCompose Manifestと同じ書出し操作へ渡し、BrokerがExport ReceiptのModule planを生成する。Compose Manifest本体とは別fieldであり、実binary pruningを意味しない。 |
+| 事前表示（Preview） | 合格 | 直近受理済みManifestと候補をBrokerへ送り差分を計算。rollback、build、Exportを実行しない。 |
+| AI編集提案（AI Edit） | 合格 | 明示指示を審査待ちproposalとしてBrokerへ送り、自己承認とfile writeをしない。 |
+| 一構成を作成 | 合格 | Desktop設定画面からManifest作成・Preview・Module選択・proposal要求へ接続。Compose結果はManifest-onlyであり、独立App／executableは生成しない。 |
+
+検証結果: Compose関連Desktop client／Widget試験12件合格（800px幅のSettings画面統合fixtureを含む）。Rust Broker focused試験はCompose／Preview 7件、Export／Module plan 13件、AI Edit 2件が合格。Schema検査158 schema／155正常例／205負例、Conformance 234 checksが合格。変更Dart 4 fileの`flutter analyze --no-pub`は問題なし、Mobile全体の`flutter analyze --no-pub`は問題なし。Desktop全体解析は終了値1で、未変更`agent_center.dart`の既存deprecated API情報5件だけ。Windows Desktop debug buildはASCII一時複製で成功（MSB8029一時directory警告あり）。OneDrive checkoutでのFlutter試験起動は`build\unit_test_assets`削除失敗により不可だったため、Flutter試験／buildはASCII一時複製で実行した。これはfixtureとlocal buildのProduct Build証拠で、Windows installed／standalone product実起動証拠ではない。
+
+これをrev5工程表のP8範囲に限ったProduct Build受入れとしてCLOSEDにする。実executable、portable package、installed product、実Module binary除去はP9以降またはrelease gateで扱い、P8へ逆流させない。
+
 ## 3. 後続製品工程
 
-P2 Multi-Agent Compare、P3 Handoff、P4 Provider / Model Center、P5 Workspace / History / Evaluation、P6 Credential / MCP、P7 A2A / Host / AdapterはProduct Build受入れを閉鎖した。現行はP8 GUI-Shell Compose。続いてP9 Standalone Export、P10 Module Selection / Pruning、P11 Windows Productization、P12 Product Integrationを進める。P12の統合経路成立をWindows Feature Completeとし、その後にQ0〜Q7 Final QAへ移る。P13 Mobile / Non-WindowsはWindows Feature Completeを止めず別trackとして扱う。Owner Finalizationではproduction Publisher／signing identity、production Audit key、不可逆な事業判断、Final GOだけをOwnerへ戻す。
+P2 Multi-Agent Compare、P3 Handoff、P4 Provider / Model Center、P5 Workspace / History / Evaluation、P6 Credential / MCP、P7 A2A / Host / Adapter、P8 GUI-Shell ComposeはProduct Build受入れを閉鎖した。現行はP9 Standalone Export。続いてP10 Module Selection / Pruning、P11 Windows Productization、P12 Product Integrationを進める。P12の統合経路成立をWindows Feature Completeとし、その後にQ0〜Q7 Final QAへ移る。P13 Mobile / Non-WindowsはWindows Feature Completeを止めず別trackとして扱う。Owner Finalizationではproduction Publisher／signing identity、production Audit key、不可逆な事業判断、Final GOだけをOwnerへ戻す。
 
 ## 4. 関連正本
 

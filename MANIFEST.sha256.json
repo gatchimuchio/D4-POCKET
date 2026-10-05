@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "022227ae246f9f188c0d0f5f997ae97ca019046e45af17578c0595fc96271d42"
+      "sha256": "752ca93e9ec886b4abea43592bd3ede04b70fcd35bb5eebca8eca60588b74015"
     },
     {
       "path": "SECURITY.md",
@@ -288,7 +288,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/settings.dart",
-      "sha256": "22530a8567ee2b1b32ae326906f892edf52b00711dbc445c0395fe257addcfc6"
+      "sha256": "2ce557f64d073b3f73c4753b2414bcf104f28f6db0b27d83fd91b26330f24e77"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/setup_doctor.dart",
@@ -340,7 +340,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/compose_client.dart",
-      "sha256": "66acbb429fe590274217d00eb1e9555553ecb26e5525431c442cd38aee00d293"
+      "sha256": "f3370eaed6da9b66b194864b24428513e0c4afb0d82d918a2c530377d878f1e4"
     },
     {
       "path": "apps/desktop_flutter/lib/services/evaluation_client.dart",
@@ -592,7 +592,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/compose_client_test.dart",
-      "sha256": "d260eafe9538cef807b0d1c74f80b7707315d43deca4477b48b23abb944f23ed"
+      "sha256": "1bbdd5d3a20c0d0753e9919add041b7868a3f35ccf9befd1320c4bdfaff2f021"
     },
     {
       "path": "apps/desktop_flutter/test/evaluation_lab_test.dart",
@@ -1236,7 +1236,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "12c3f889144d155f06f5fe7bc5c1818b086e5fb3d8d37ca4420d4f6ee565c46c"
+      "sha256": "ba735384f4b91605d165bc2fcc3fae874ad78cf0046975f756a65414be0d1aa0"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1416,7 +1416,7 @@
     },
     {
       "path": "docs/specs/gui-shell-compose.md",
-      "sha256": "7163dcc9a4cdc8ae41ca25e0a389e60f90891ab6c46b8a6c8be9727a926f08d5"
+      "sha256": "838a606c5903010ebebf15a1e9121e8e36062988c28b1423dd155aa77772389f"
     },
     {
       "path": "docs/specs/gui-shell-export.md",
