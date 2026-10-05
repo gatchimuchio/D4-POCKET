@@ -14,6 +14,7 @@ void main() {
     expect(mcp.first.title, 'MCP接続');
     expect(mcp.first.pageIndex, 11);
     expect(a2a.first.title, 'A2A接続');
+    expect(a2a.first.pageIndex, 20);
     expect(a2a.first.evidenceSource, '不明');
   });
 

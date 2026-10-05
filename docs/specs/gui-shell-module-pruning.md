@@ -2,7 +2,7 @@
 
 ## 目的と適用範囲
 
-独立Appへ含めるDesktop画面Moduleを選択し、構成Manifestへ機械可読に記録する。現行Module一覧は`specs/gui_shell_module_catalog.json`を唯一の一覧正本とし、各画面pathは対応付け候補である。`unprunable_core_ids`は安全保持条件であり、Rust Broker／暗号／監査等が個別linkable moduleへ分割済みという主張ではない。画面一覧もRust Broker内部Module、crate依存、第三者runtime／tool、最終binaryの実測済み除去を意味しない。
+独立Appへ含めるDesktop画面Moduleを選択し、構成Manifestへ機械可読に記録する。現行Module一覧は`specs/gui_shell_module_catalog.json`を唯一の一覧正本とし、各画面pathは対応付け候補である。A2A接続センターは必須`shell.agent_operation`の一部で、独立除外できない。`unprunable_core_ids`は安全保持条件であり、Rust Broker／暗号／監査等が個別linkable moduleへ分割済みという主張ではない。画面一覧もRust Broker内部Module、crate依存、第三者runtime／tool、最終binaryの実測済み除去を意味しない。
 
 ## 必須Module
 

@@ -6558,9 +6558,9 @@ def Desktop_UX統合の表示境界を検査する() -> list[str]:
         int(index)
         for index in re.findall(r"_ShellPageEntry\(\s*(\d+)\s*,", main)
     }
-    if page_indices != set(range(20)):
+    if page_indices != set(range(21)):
         不整合.append(
-            "C23 Desktop UX統合が既存20画面のindexを保持していない: "
+            "C23 Desktop UX統合が現行21画面のindexを保持していない: "
             f"{sorted(page_indices)}"
         )
     for forbidden in (
@@ -8241,6 +8241,7 @@ def test_agent_task_owner_confirmation_wait_uses_native_operation_timeout() -> l
         "回帰Case削除",
         "回帰Case削除中断確認",
         "資格情報失効",
+        "A2A接続",
         "MCP接続",
         "MCP切断",
         "MCP Tool実行",

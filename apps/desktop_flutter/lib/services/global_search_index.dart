@@ -169,7 +169,6 @@ class GlobalSearchIndex {
     for (final surface in const [
       ('エージェント', 'エージェントセンター', 'エージェントの表示面', 'agent-surface', 5),
       ('MCP', 'MCP接続', '設定のMCP接続面', 'mcp-surface', 11),
-      ('A2A', 'A2A接続', 'エージェントセンターの接続面', 'a2a-surface', 5),
       ('評価', '評価ラボ', '評価の表示面', 'evaluation-surface', 14),
       ('通知', '通知センター', '通知の表示面', 'notification-surface', 16),
     ]) {
@@ -181,6 +180,13 @@ class GlobalSearchIndex {
         pageIndex: surface.$5,
       );
     }
+    add(
+      category: 'A2A',
+      title: 'A2A接続',
+      detail: 'loopback Agent CardのBroker接続面',
+      recordId: 'a2a-surface',
+      pageIndex: 20,
+    );
     return List.unmodifiable(results);
   }
 

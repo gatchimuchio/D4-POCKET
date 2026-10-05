@@ -20,6 +20,7 @@ import 'screens/runtime_dialogue.dart';
 import 'screens/history_screen.dart';
 import 'screens/host_capability_center.dart';
 import 'screens/host_operation_center.dart';
+import 'screens/a2a_connection_center.dart';
 import 'screens/notifications.dart';
 import 'screens/observability_center.dart';
 import 'screens/trace_inspector.dart';
@@ -444,6 +445,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
         HostOperationCenter(client: widget.client)
       else
         const SizedBox.shrink(),
+      A2aConnectionCenter(transport: widget.client.brokerTransport),
     ];
     final pageEntries = _pageEntries();
     final visiblePageEntries = pageEntries
@@ -663,6 +665,11 @@ class _ShellHomePageState extends State<ShellHomePage> {
                                                   Icon(Icons.swap_horiz),
                                               label: Text('Host操作'),
                                             ),
+                                          NavigationRailDestination(
+                                            icon: Icon(Icons.hub_outlined),
+                                            selectedIcon: Icon(Icons.hub),
+                                            label: Text('A2A接続'),
+                                          ),
                                         ]
                                       : [
                                           for (final page in visiblePageEntries)
@@ -745,6 +752,8 @@ class _ShellHomePageState extends State<ShellHomePage> {
       if (kGuiShellModuleHostOperations)
         _ShellPageEntry(19, 'Host操作面', Icons.swap_horiz_outlined,
             _ShellNavigationGroup.operation),
+      _ShellPageEntry(
+          20, 'A2A接続', Icons.hub_outlined, _ShellNavigationGroup.operation),
     ];
   }
 
@@ -996,6 +1005,13 @@ class _ShellHomePageState extends State<ShellHomePage> {
           icon: Icons.swap_horiz_outlined,
           keywords: 'Host 切替 接続状態 Trust',
         ),
+      const _CommandEntry(
+        title: 'A2A接続',
+        subtitle: 'A2A Agent Cardのloopback metadata接続面を開く',
+        pageIndex: 20,
+        icon: Icons.hub_outlined,
+        keywords: 'A2A Agent Card 接続 metadata Trust',
+      ),
       const _CommandEntry(
         title: '全Runtime停止要求を確認',
         subtitle: '実行系センターを開き、Brokerの承認境界を確認する',

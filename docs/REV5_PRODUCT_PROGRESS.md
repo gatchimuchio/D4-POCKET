@@ -129,6 +129,18 @@ Provider結合の`FIXTURE`試験では、合成CredentialがCodex CLI親process�
 
 現行rev5の範囲はA2A、Multi Host、Adapter Manager、Host capability、接続性、degraded mode、local／remote Runtimeの区別である。P6を再訪せず、現行rev5 Acceptanceに対して実装済み経路と未成立条件を確認して順に進める。過去版の状態を現行受入れへ継承しない。
 
+#### P7内の完結単位: A2A loopback接続面 — CLOSED（Product Build）
+
+- 必須`shell.agent_operation`へDesktop専用A2A接続センターを追加。専用画面、全体検索、コマンドパレット、NavigationRailから到達し、optional Moduleを全て除いたbuildでも表示する。
+- 接続要求はFlutterから既存Broker IPCへ送り、Rust起動器のnative Owner確認を経る。BrokerもA2A接続をnative確認専用とし、通常IPC／Owner credential要求を拒否する。Owner対象表示とBroker helper双方で、loopback IPv4 HTTP、query／fragment／userinfoなし、未対応Credential ref、Task等を送らない境界を検査する。Windows Runnerのnative確認応答timeout allowlistにもA2A操作を追加。
+- Brokerが既に持つAgent Card取得・永続Audit・接続state・metadata-only一覧をDesktopへ接続。画面は接続先URIを成功後に消去し、endpoint hashとbounded metadataを表示する。Trustは`pending_review`を維持し、Permission／Approval／AuthorityやA2A Task実行へ昇格させない。
+- Agent Card由来の表示文字列は未信頼として表示し、改行／方向制御文字を含む値をUI clientで拒否する。認証実値は要求へ含めない。
+- 個別検証結果: RustのA2A境界試験9件、native Owner確認候補1件、Brokerのnative確認専用gate 1件、Flutter接続service／画面／検索試験9件、任意Moduleをすべて無効にしたNavigationRail試験2件、`Conformance` 234件、Windows版Desktopのdebug build成功（MSB8029の一時作業フォルダー警告あり）。Flutter試験とWindows buildはOneDrive外の`ASCII`一時複製で実行。
+- Rust全targetは444件中435成功／2失敗／7 ignored。今回のA2A関連11件は全件成功。失敗のうち`failed_tool_result_is_not_replayed_as_another_exec_command`は単独再試験で成功し、`local_tls_server_repairs_only_after_verified_package_bytes`は単独でもHTTP/TLS fixtureの応答不整合とConnectionResetで失敗した。いずれも今回変更したA2A経路外で、既存`FQ-TEST-LOOPBACK`へ追加記録し、このA2A受入れを拡張しない。
+- Strict日本語基底監査は終了コード1で、現行変更fileは0 finding。既存findingは3件（旧rev3文書1、旧rev4文書1、未変更Codex CLI診断文字列1）。過去文書・無関係Adapter診断は今回のA2A Acceptance外として保持し、監査全体をPASS扱いしない。
+- rev5 Product Buildの基準（実装、build、基本正常経路、次工程からの利用、Authority非破壊）を満たしたため、このloopback UI接続単位をCLOSEDとする。C16の既存Desktop画面未成立記述を現行状態へ訂正した。P7全体はOPENで、次は現行rev5のMulti Host／Host capability／Adapter Managerの未成立範囲へ進む。外部A2A transport／実作用とinstalled product証拠は別gateであり、この受入れを拡張しない。
+- この単位だけでP7全体は閉じない。Multi Host、Adapter Manager、Host capability／接続状態／degraded mode／local・remote区別のrev5受入れは引き続きOPEN。Windows installed product全経路証拠とA2A外部transport／Task等の別gateも未主張。
+
 ## 3. 後続製品工程
 
 P2 Multi-Agent Compare、P3 Handoff、P4 Provider / Model Center、P5 Workspace / History / Evaluation、P6 Credential / MCPはProduct Build受入れを閉鎖した。現行はP7 A2A / Host / Adapter。続いてP8 GUI-Shell Compose、P9 Standalone Export、P10 Module Selection / Pruning、P11 Windows Productization、P12 Product Integrationを進める。P12の統合経路成立をWindows Feature Completeとし、その後にQ0〜Q7 Final QAへ移る。P13 Mobile / Non-WindowsはWindows Feature Completeを止めず別trackとして扱う。Owner Finalizationではproduction Publisher／signing identity、production Audit key、不可逆な事業判断、Final GOだけをOwnerへ戻す。

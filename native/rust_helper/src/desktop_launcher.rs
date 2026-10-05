@@ -143,6 +143,11 @@ enum DesktopOwnerOperationSummary {
         credential_environment_variable: Option<String>,
         payload_hash: String,
     },
+    A2aConnect {
+        agent_id: String,
+        target: String,
+        payload_hash: String,
+    },
     McpDisconnect {
         server_id: String,
         payload_hash: String,
@@ -1125,6 +1130,15 @@ fn owner_operation_candidate(
         .as_ref()
         .unwrap_or(&serde_json::Value::Null);
     let summary = match envelope.operation? {
+        BrokerOperation::A2A接続 => {
+            let (agent_id, target) =
+                crate::broker::a2a_center::owner_confirmation_summary(payload).ok()?;
+            DesktopOwnerOperationSummary::A2aConnect {
+                agent_id,
+                target,
+                payload_hash,
+            }
+        }
         BrokerOperation::MCP接続 => {
             let request: McpConnectOwnerRequest = serde_json::from_value(payload.clone()).ok()?;
             let reference = &request.credential_ref;
@@ -1802,6 +1816,16 @@ fn owner_confirmation_text_for_identity(
         } => format!(
             "指定したMCP Serverの接続を切断しますか？\n\nServer ID: {}\n対象: このBrokerが保持する指定stdio process群だけ\n処理: Windows Job Objectによるprocess群停止確認後、永続Auditを確定して接続記録を解消\n\nCredential、他Server、Permission、Approvalを変更せず、Toolを実行しません。停止またはAudit確定に失敗した場合は成功扱いしません。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
             owner_confirmation_value(server_id),
+            payload_hash
+        ),
+        DesktopOwnerOperationSummary::A2aConnect {
+            agent_id,
+            target,
+            payload_hash,
+        } => format!(
+            "指定したloopback A2A Agent Cardのmetadataを取得しますか？\n\nAgent ID: {}\n取得先: {}\nTransport: HTTP（loopback IP限定）\n\nCredential実値は受け取らず、Task送信・Message送信・Workspace変更は行いません。Agent Cardは未信頼metadataとして記録し、Trustはpending reviewのままです。外部Agentの宣言からPermission、Approval、Authorityを生成しません。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
+            owner_confirmation_value(agent_id),
+            owner_confirmation_value(target),
             payload_hash
         ),
         DesktopOwnerOperationSummary::McpConnect {
@@ -4867,6 +4891,104 @@ mod tests {
         assert!(!text.contains(r"%LOCALAPPDATA%\GUI-Shell\broker\desktop\exports"));
         assert!(owner_confirmation_text(&summary)
             .contains(r"%LOCALAPPDATA%\GUI-Shell\broker\desktop\exports"));
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn A2A接続のnative確認はloopback対象を示し秘密とqueryを拒否する() {
+        let payload = serde_json::json!({
+            "版": 1,
+            "操作": "接続",
+            "AgentID": "remote-agent-fixture",
+            "Agent Card URI": "http://127.0.0.1:9080/.well-known/agent-card.json",
+            "protocol_version": "1.0",
+            "Transport": "http",
+            "Credential ref": {
+                "credential_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "purpose": "A2A接続",
+                "target": "remote-agent-fixture",
+                "required": false,
+                "status": "missing"
+            }
+        });
+        let request = desktop_owner_request(
+            "A2A接続",
+            "desktop-a2a-connect",
+            "desktop-a2a-connect-nonce",
+            payload.clone(),
+        );
+        let endpoint = BrokerEndpoint {
+            host: "127.0.0.1".into(),
+            port: 43123,
+            session_id: "desktop-session".into(),
+            session_secret: "not-used-by-candidate".into(),
+            credential_role: BrokerCredentialRole::Owner,
+            transport: "tcp".into(),
+            max_request_bytes: MAX_REQUEST_BYTES,
+        };
+        let (normalized, summary) =
+            owner_operation_candidate(request.to_string().as_bytes(), &endpoint)
+                .expect("A2A接続はnative Owner確認候補");
+        assert_eq!(
+            BrokerRequestEnvelope::from_json_str(&normalized)
+                .unwrap()
+                .session_id
+                .as_deref(),
+            Some("desktop-session")
+        );
+        let DesktopOwnerOperationSummary::A2aConnect {
+            agent_id,
+            target,
+            payload_hash,
+        } = summary
+        else {
+            panic!("A2A接続はA2A専用のnative確認を使う")
+        };
+        assert_eq!(agent_id, "remote-agent-fixture");
+        assert_eq!(target, "http://127.0.0.1:9080/.well-known/agent-card.json");
+        assert_eq!(payload_hash, request["payload_hash"]);
+        let confirmation = owner_confirmation_text(&DesktopOwnerOperationSummary::A2aConnect {
+            agent_id,
+            target,
+            payload_hash,
+        });
+        assert!(confirmation.contains("loopback IP限定"));
+        assert!(confirmation.contains("Trustはpending review"));
+        assert!(confirmation.contains("Task送信"));
+        assert!(!confirmation.contains("credential_value"));
+
+        for uri in [
+            "http://127.0.0.1:9080/card?token=secret-marker",
+            "http://192.0.2.7:9080/card",
+            "https://127.0.0.1:9080/card",
+            "http://user@127.0.0.1:9080/card",
+        ] {
+            let mut invalid_payload = payload.clone();
+            invalid_payload["Agent Card URI"] = serde_json::json!(uri);
+            let invalid_request = desktop_owner_request(
+                "A2A接続",
+                "desktop-a2a-invalid",
+                "desktop-a2a-invalid-nonce",
+                invalid_payload,
+            );
+            assert!(
+                owner_operation_candidate(invalid_request.to_string().as_bytes(), &endpoint)
+                    .is_none()
+            );
+        }
+
+        let mut secret_payload = payload;
+        secret_payload["Credential ref"]["secret_value"] =
+            serde_json::json!("secret-marker");
+        let secret_request = desktop_owner_request(
+            "A2A接続",
+            "desktop-a2a-secret",
+            "desktop-a2a-secret-nonce",
+            secret_payload,
+        );
+        assert!(
+            owner_operation_candidate(secret_request.to_string().as_bytes(), &endpoint).is_none()
+        );
     }
 
     #[test]

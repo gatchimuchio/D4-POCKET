@@ -46,7 +46,7 @@ pub(crate) fn fetch_agent_card(
     credential_ref: &Value,
 ) -> Result<Value, A2aError> {
     let endpoint = parse_endpoint(uri)?;
-    validate_credential_ref(credential_ref)?;
+    validate_credential_ref(credential_ref, agent_id)?;
     let raw = http_get(&endpoint)?;
     let card_text = std::str::from_utf8(&raw)
         .map_err(|_| A2aError::new("a2a_card_invalid_json", "A2A Agent CardがUTF-8ではない"))?;
@@ -82,10 +82,10 @@ fn parse_endpoint(uri: &str) -> Result<Endpoint, A2aError> {
             "C16の現行Rust helperはhttps Agent Card取得を未接続とする",
         ));
     }
-    if remainder.contains('@') || remainder.contains('#') {
+    if remainder.contains('@') || remainder.contains('#') || remainder.contains('?') {
         return Err(A2aError::new(
             "a2a_endpoint_invalid",
-            "A2A Agent Card URIへuserinfoまたはfragmentを含められない",
+            "A2A Agent Card URIへuserinfo、query、fragmentを含められない",
         ));
     }
     let (authority, path) = match remainder.split_once('/') {
@@ -114,6 +114,12 @@ fn parse_endpoint(uri: &str) -> Result<Endpoint, A2aError> {
             "A2A Agent Card URIのhost、port、pathが不正",
         ));
     }
+    if !path.is_ascii() || path.bytes().any(|byte| !(b'!'..=b'~').contains(&byte)) {
+        return Err(A2aError::new(
+            "a2a_endpoint_invalid",
+            "A2A Agent Card URIのpathは空白のないASCII URI表記が必要",
+        ));
+    }
     let ip = host.parse::<IpAddr>().map_err(|_| {
         A2aError::new(
             "a2a_http_non_loopback",
@@ -135,24 +141,26 @@ fn parse_endpoint(uri: &str) -> Result<Endpoint, A2aError> {
     })
 }
 
-fn validate_credential_ref(value: &Value) -> Result<(), A2aError> {
+pub(crate) fn owner_confirmation_target(
+    uri: &str,
+    credential_ref: &Value,
+    agent_id: &str,
+) -> Result<String, A2aError> {
+    let endpoint = parse_endpoint(uri)?;
+    validate_credential_ref(credential_ref, agent_id)?;
+    Ok(format!(
+        "{}://{}{}",
+        endpoint.scheme, endpoint.authority, endpoint.path
+    ))
+}
+
+fn validate_credential_ref(value: &Value, agent_id: &str) -> Result<(), A2aError> {
     let object = value.as_object().ok_or_else(|| {
         A2aError::new(
             "a2a_credential_ref_invalid",
             "A2A Credential refがobjectではない",
         )
     })?;
-    if object
-        .get("required")
-        .and_then(Value::as_bool)
-        .unwrap_or(true)
-        || object.get("status").and_then(Value::as_str) != Some("missing")
-    {
-        return Err(A2aError::new(
-            "a2a_credential_unavailable",
-            "C16ではA2A credential実値注入を行わない",
-        ));
-    }
     for key in [
         "secret",
         "secret_value",
@@ -166,6 +174,35 @@ fn validate_credential_ref(value: &Value) -> Result<(), A2aError> {
                 "A2A Credential refへ秘密値を含められない",
             ));
         }
+    }
+    if object.get("required").and_then(Value::as_bool) != Some(false)
+        || object.get("status").and_then(Value::as_str) != Some("missing")
+    {
+        return Err(A2aError::new(
+            "a2a_credential_unavailable",
+            "現行A2A接続ではCredential注入を行わない",
+        ));
+    }
+    let credential_id = object.get("credential_id").and_then(Value::as_str);
+    let purpose = object.get("purpose").and_then(Value::as_str);
+    let target = object.get("target").and_then(Value::as_str);
+    if object.len() != 5
+        || object.keys().any(|key| {
+            !["credential_id", "purpose", "target", "required", "status"].contains(&key.as_str())
+        })
+        || credential_id.is_none_or(|id| {
+            id.len() != 32
+                || !id
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        })
+        || purpose != Some("A2A接続")
+        || target != Some(agent_id)
+    {
+        return Err(A2aError::new(
+            "a2a_credential_ref_invalid",
+            "A2A Credential refの識別・用途・対象が不正",
+        ));
     }
     Ok(())
 }
@@ -586,6 +623,17 @@ mod tests {
                 .code,
             "a2a_endpoint_invalid"
         );
+        for uri in [
+            "http://127.0.0.1/card?token=secret-marker",
+            "http://127.0.0.1/card#fragment",
+            "http://127.0.0.1/card with-space",
+            "http://127.0.0.1/card\u{3000}wide-space",
+        ] {
+            assert_eq!(
+                parse_endpoint(uri).unwrap_err().code,
+                "a2a_endpoint_invalid"
+            );
+        }
     }
 
     #[test]
@@ -639,7 +687,38 @@ mod tests {
     fn credential実値をAgent_Card取得へ持ち込めない() {
         let mut credential = credential();
         credential["required"] = Value::Bool(true);
-        let error = validate_credential_ref(&credential).expect_err("credential required拒否");
+        let error = validate_credential_ref(&credential, "remote-agent-example")
+            .expect_err("credential required拒否");
         assert_eq!(error.code, "a2a_credential_unavailable");
+    }
+
+    #[test]
+    fn A2A_Credential参照の未知fieldと別Agent対象を拒否する() {
+        let mut with_secret = credential();
+        with_secret["secret_value"] = Value::String("secret-marker".into());
+        assert_eq!(
+            validate_credential_ref(&with_secret, "remote-agent-example")
+                .unwrap_err()
+                .code,
+            "a2a_credential_secret_received"
+        );
+
+        let mut wrong_target = credential();
+        wrong_target["target"] = Value::String("other-agent".into());
+        assert_eq!(
+            validate_credential_ref(&wrong_target, "remote-agent-example")
+                .unwrap_err()
+                .code,
+            "a2a_credential_ref_invalid"
+        );
+
+        let mut unknown_field = credential();
+        unknown_field["extra"] = Value::Bool(true);
+        assert_eq!(
+            validate_credential_ref(&unknown_field, "remote-agent-example")
+                .unwrap_err()
+                .code,
+            "a2a_credential_ref_invalid"
+        );
     }
 }

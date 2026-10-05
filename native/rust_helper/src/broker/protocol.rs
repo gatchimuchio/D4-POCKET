@@ -1704,6 +1704,7 @@ impl Broker {
             envelope.operation,
             Some(
                 BrokerOperation::GuiShell書出し
+                    | BrokerOperation::A2A接続
                     | BrokerOperation::AgentCLI実行系作業領域登録
                     | BrokerOperation::AgentTaskWorkspacePermissionGrant
                     | BrokerOperation::AgentTaskOwnerApprovalGrant
@@ -1810,13 +1811,14 @@ impl Broker {
             || envelope.operation == Some(BrokerOperation::作業領域基準点保存)
             || envelope.operation == Some(BrokerOperation::作業領域全体基準点保存)
             || envelope.operation == Some(BrokerOperation::MCPTool実行)
+            || envelope.operation == Some(BrokerOperation::A2A接続)
         {
             if export_confirmation != OwnerConfirmationSource::DesktopNativeConfirmation {
                 return self.reject_with_payload_hash(
                     &request_id,
                     &operation,
                     "desktop_native_owner_confirmation_required",
-                    "Agent Task権限・Approval・結果表示、Workspace読取・比較制御、MCP Tool実行はRust Desktopのnative Owner確認経路だけで許可します",
+                    "Agent Task権限・Approval・結果表示、Workspace読取・比較制御、MCP Tool実行、A2A接続はRust Desktopのnative Owner確認経路だけで許可します",
                     true,
                     envelope.payload_hash.as_deref().unwrap_or("unknown"),
                 );
@@ -7911,6 +7913,78 @@ mod tests {
         assert_eq!(body["dispatch_decision"], "suspended");
         assert_eq!(body["execution_gate"]["dispatch"], "suspended");
         assert_eq!(broker.audit_events()[0].decision, "suspended");
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn A2A接続はDesktop_native確認を必須とする() {
+        let payload = json!({
+            "版": 1,
+            "操作": "接続",
+            "AgentID": "native-confirmation-fixture",
+            "Agent Card URI": "http://127.0.0.1:1/card",
+            "protocol_version": "1.0",
+            "Transport": "http",
+            "Credential ref": {
+                "credential_id": "00000000000000000000000000000000",
+                "purpose": "A2A接続",
+                "target": "native-confirmation-fixture",
+                "required": false,
+                "status": "missing"
+            }
+        });
+        let mut normal_request =
+            BrokerRequestEnvelope::health("a2a-normal", "a2a-normal-nonce");
+        normal_request.session_id = Some("session-1".to_string());
+        normal_request.operation = Some(BrokerOperation::A2A接続);
+        normal_request.payload = Some(payload.clone());
+        normal_request.issued_at = Some(BrokerRequestEnvelope::current_issued_at());
+        normal_request.refresh_payload_hash();
+
+        let mut normal_broker = test_broker();
+        let normal = normal_broker.handle(normal_request.clone());
+        assert_eq!(normal.status, BrokerStatus::Rejected);
+        assert_eq!(
+            normal.error.as_ref().map(|error| error.code.as_str()),
+            Some("desktop_native_owner_confirmation_required")
+        );
+
+        let owner_envelope = json!({
+            "request_id": "a2a-owner-credential",
+            "session_id": "session-1",
+            "operation": "A2A接続",
+            "payload": payload,
+            "payload_hash": normal_request.payload_hash,
+            "nonce": "a2a-owner-credential-nonce",
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {}
+        });
+        let mut owner_broker = test_broker();
+        let owner = owner_broker.owner要求処理(&owner_envelope.to_string());
+        assert_eq!(owner.status, BrokerStatus::Rejected);
+        assert_eq!(
+            owner.error.as_ref().map(|error| error.code.as_str()),
+            Some("desktop_native_owner_confirmation_required")
+        );
+
+        let desktop_envelope = json!({
+            "request_id": "a2a-desktop-confirmed",
+            "session_id": "session-1",
+            "operation": "A2A接続",
+            "payload": normal_request.payload,
+            "payload_hash": normal_request.payload_hash,
+            "nonce": "a2a-desktop-confirmed-nonce",
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {"client": "desktop_flutter"}
+        });
+        let mut desktop_broker = test_broker();
+        let desktop = desktop_broker.desktop_owner_operation_json(&desktop_envelope.to_string());
+        assert_eq!(desktop.status, BrokerStatus::Rejected);
+        assert_ne!(
+            desktop.error.as_ref().map(|error| error.code.as_str()),
+            Some("desktop_native_owner_confirmation_required")
+        );
+        assert!(desktop_broker.a2a_connections.is_empty());
     }
 
     #[test]

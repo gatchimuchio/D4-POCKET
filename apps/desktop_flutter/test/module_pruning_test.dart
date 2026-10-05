@@ -38,7 +38,7 @@ void main() {
         .whereType<String>()
         .toList(growable: false);
 
-    expect(rail.destinations, hasLength(12));
+    expect(rail.destinations, hasLength(13));
     expect(
       labels,
       containsAll([
@@ -54,6 +54,7 @@ void main() {
         '証拠',
         '設定',
         '対話',
+        'A2A接続',
       ]),
     );
     for (final excluded in [
@@ -74,6 +75,11 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('この書出し構成には対象Moduleが含まれていません。'), findsNothing);
     expect(find.byType(NavigationRail), findsOneWidget);
+
+    rail.onDestinationSelected!(12);
+    await tester.pumpAndSettle();
+    expect(find.text('A2A接続センター'), findsOneWidget);
+    expect(find.textContaining('Broker接続がない'), findsOneWidget);
 
     await tester.tap(find.byTooltip('コマンドパレットを開く（Ctrl+KまたはCtrl+P）'));
     await tester.pumpAndSettle();

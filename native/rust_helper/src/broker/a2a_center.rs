@@ -839,6 +839,17 @@ fn parse_request(payload: &Value) -> Result<ConnectionRequest, A2aError> {
     Ok(request)
 }
 
+pub(crate) fn owner_confirmation_summary(payload: &Value) -> Result<(String, String), String> {
+    let request = parse_request(payload).map_err(|error| error.message)?;
+    let target = crate::a2a::owner_confirmation_target(
+        &request.agent_card_uri,
+        &request.credential_ref,
+        &request.agent_id,
+    )
+    .map_err(|error| error.message)?;
+    Ok((request.agent_id, target))
+}
+
 fn valid_agent_id(value: &str) -> bool {
     let mut chars = value.chars();
     let Some(first) = chars.next() else {
