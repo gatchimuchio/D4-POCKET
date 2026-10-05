@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "752ca93e9ec886b4abea43592bd3ede04b70fcd35bb5eebca8eca60588b74015"
+      "sha256": "4668eecb00cb92175c3360a00b4d3a893fc8cb44adf9ab36932b0f27d6f8d12c"
     },
     {
       "path": "SECURITY.md",
@@ -645,6 +645,10 @@
     {
       "path": "apps/desktop_flutter/test/runtime_resource_test.dart",
       "sha256": "183a32eee70fe153d817bcfe9c641fce9ae9f77239cf32e25fd75edf7e797082"
+    },
+    {
+      "path": "apps/desktop_flutter/test/settings_compose_test.dart",
+      "sha256": "41a290960b4c8bb15740d0af52d3a2f07e62c80c1ae95ce197b9b89a48bea4ed"
     },
     {
       "path": "apps/desktop_flutter/test/support/test_broker_tcp_transport.dart",
@@ -1236,7 +1240,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "ba735384f4b91605d165bc2fcc3fae874ad78cf0046975f756a65414be0d1aa0"
+      "sha256": "c4a564fbef6bec9c420c51fa15c7ed6a6209b1bf66927f037ec53a7b2952e3de"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",

@@ -2,7 +2,7 @@
 
 更新日: 2026-10-05
 工程正本: ユーザー提示「D4 Pocket / GUI-Shell 統合実装仕様書 rev5」「統合開発工程表 rev5」「Codex実装指示書 rev5」
-現行phase: `P9 Standalone Export` (`OPEN`)。`P8 GUI-Shell Compose`は2026-10-05にrev5 Product Build受入れを閉鎖。`P7 A2A / Host / Adapter`、`P6 Credential / MCP`、`P5 Workspace / History / Evaluation`も同日に閉鎖済み。
+現行phase: `P10 Module Selection / Pruning` (`OPEN`)。`P9 Standalone Export`は2026-10-05にrev5 Product Build受入れを閉鎖。`P8 GUI-Shell Compose`、`P7 A2A / Host / Adapter`、`P6 Credential / MCP`、`P5 Workspace / History / Evaluation`も同日に閉鎖済み。
 基準Repository状態: rev5文書同期commit `39dd3f4bc7aafe350ca94fce9392095f1064d2bc`。その後の実装・検証状態は本書末尾の更新履歴を参照。
 
 ## 正本の選び方
@@ -195,9 +195,25 @@ rev5工程表の「実接続または決定的fixtureで主要経路成立」に
 
 これをrev5工程表のP8範囲に限ったProduct Build受入れとしてCLOSEDにする。実executable、portable package、installed product、実Module binary除去はP9以降またはrelease gateで扱い、P8へ逆流させない。
 
+### P9 Standalone Export — CLOSED（製品構築受入れ完了）
+
+| 受入れ項目 | 結果 | 現行証拠・境界 |
+| --- | --- | --- |
+| 独立App ID／Audit Store IDとManifest | 合格 | clean `main` commit `77821953a70ee3d1ff1059835dad56fc658a35b3`のchecked-in test Receipt／Manifestから、App ID `d4-pocket-app-11111111111111111111111111111111`、Audit Store ID `audit-store-22222222222222222222222222222222`を含む製品をbuild。入力は合成fixtureであり、Owner承認済みproduction Exportではない。 |
+| executable／Rust Broker／選択Module／portable package | 合格 | Windows Release bundleにRust起動器、Flutter executable／assets、Rust Broker、byte-for-byte Manifest copyを含む14 filesを生成。要求された`shell.trace_inspector`をincludeし、optional module planをFlutter compile defineへ渡した。 |
+| 生成物一覧／秘密情報の既知パターン検査 | 合格 | 62,856,402 bytes、tree SHA-256 `d5624b93eb73e3f1f9b9a1102e43ea32394fb76404be67f8e581ea4d1a73360e`。既知パターン検査は14 files／0件。未知形式を含むCredential不存在やbinary pruningは証明しない。 |
+| 元D4 Pocketと分離した製品起動 | 合格 | 生成bundleのRust起動器から同bundle内Flutter childが起動し、Windows process parent／image path、応答中の`D4 Pocket` main window、製品ID別runtime pathの新規生成を`LIVE_RUNTIME`で観測。runtime rootは起動前に不在で、起動後は`%LOCALAPPDATA%\D4Pocket\apps\<App ID>\stores\<Audit Store ID>`に専用Store／新規Audit anchorができ、generic GUI-Shell Broker pathと異なる。 |
+| Credential／Permission／Approval／Audit chain／Authority非継承 | 合格 | fixture Manifest／Receiptのauthority stripと全`*_inherited=false`、build evidenceの同境界、起動前に不在だった専用runtime root、新規Audit anchorを確認。Credential実値は入力していない。これはfixture起動範囲であり、production Owner operation、署名、一般的なsecret不存在の証拠ではない。 |
+
+実行したbuild commandは`python -X utf8 tooling/export_windows_product.py`（checked-in test Receiptと対応Manifestを使い、一意なTemp input／output directoryを指定）。Flutter 3.44.0／Dart 3.12.0、Rust/Cargo 1.95.0でRelease build・Schema／Receipt／Manifest照合・Module plan解決・inventory再計算・known-pattern scanまで成功した。Manifestはpackage rootの`product_manifest.json`にbyte-for-byteで含まれる。Rust起動器のStore選択は現行launcher contractどおりManifest再読込ではなくbuild時のSchema検証済みIDを使用する。
+
+Windows Computer Useはこの2個目の同名Flutter windowをtargetable windowとして返さなかったため、画面screenshotや視覚的UI確認は主張しない。Windows process metadataではchildが`Responding=true`でmain windowを生成したことを観測した。`WM_CLOSE`は現行Windows Runner仕様に従い通知領域へ隠す動作だった。normal tray exitはP9の受入れ項目ではなく、この試験では未確認。試験cleanupでは対象bundleのfrontendだけを停止し、起動器が終了Error dialogを出した後、対象launcherも停止した。これはnormal exit evidenceに数えず、P12統合Productのnormal exit確認へ送る。Broker session fileは消え、専用Audit Storeは独立確認用のtest stateとして保持した。
+
+これをrev5工程表P9の有限なProduct Build条件の完了としてCLOSEDにする。実Owner確認によるExport、別user profile／installed artifact同一性、署名済み配布、正式Installer、runtime Manifestのproduction trust、binary pruning、normal exit、release readinessは成立扱いにせず、既存release blockerまたは後続P12／Final QAの範囲で保持する。現在phaseは直ちにP10 Module Selection / Pruningとする。
+
 ## 3. 後続製品工程
 
-P2 Multi-Agent Compare、P3 Handoff、P4 Provider / Model Center、P5 Workspace / History / Evaluation、P6 Credential / MCP、P7 A2A / Host / Adapter、P8 GUI-Shell ComposeはProduct Build受入れを閉鎖した。現行はP9 Standalone Export。続いてP10 Module Selection / Pruning、P11 Windows Productization、P12 Product Integrationを進める。P12の統合経路成立をWindows Feature Completeとし、その後にQ0〜Q7 Final QAへ移る。P13 Mobile / Non-WindowsはWindows Feature Completeを止めず別trackとして扱う。Owner Finalizationではproduction Publisher／signing identity、production Audit key、不可逆な事業判断、Final GOだけをOwnerへ戻す。
+P2 Multi-Agent Compare、P3 Handoff、P4 Provider / Model Center、P5 Workspace / History / Evaluation、P6 Credential / MCP、P7 A2A / Host / Adapter、P8 GUI-Shell Compose、P9 Standalone ExportはProduct Build受入れを閉鎖した。現行はP10 Module Selection / Pruning。続いてP11 Windows Productization、P12 Product Integrationを進める。P12の統合経路成立をWindows Feature Completeとし、その後にQ0〜Q7 Final QAへ移る。P13 Mobile / Non-WindowsはWindows Feature Completeを止めず別trackとして扱う。Owner Finalizationではproduction Publisher／signing identity、production Audit key、不可逆な事業判断、Final GOだけをOwnerへ戻す。
 
 ## 4. 関連正本
 
