@@ -42,7 +42,8 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
         const BorderedPanel(
           child: Text(
             'Host一覧はRust Brokerのmetadata-only projectionです。'
-            'Host切替は表示対象を変えるだけで、Permission、Approval、Authority、Credentialを生成・共有しません。',
+            'Host切替は表示対象を変えるだけで、Permission、Approval、Authority、Credentialを生成・共有しません。'
+            'ローカル実測は、認証済みBrokerから受理したsnapshotでHost IDが一致する場合だけに限定します。',
           ),
         ),
         if (hosts.isEmpty)
@@ -192,9 +193,19 @@ class _HostDetail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final localObservation = snapshot.hostCapabilities.any(
-      (item) => item.hostId == host.hostId,
-    );
+    final brokerSnapshot = snapshot.snapshotSource == 'broker';
+    final localObservation = brokerSnapshot &&
+        snapshot.hostCapabilities.any(
+          (item) => item.hostId == host.hostId,
+        );
+    final hostLocation = !brokerSnapshot
+        ? '未確認（Broker由来の実測証拠がありません）'
+        : localObservation
+            ? '現在のBroker実行Host（ローカル）'
+            : '別登録Host（remote接続・個別状態は未観測）';
+    final unobservedMessage = !brokerSnapshot
+        ? '未観測（snapshotはBroker確定経路ではありません。summary以外を実状態として扱いません）'
+        : '未観測（別Hostへのlive接続がないため、summary以外を表示しません）';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -206,12 +217,13 @@ class _HostDetail extends StatelessWidget {
                   style: Theme.of(context).textTheme.titleLarge),
               Text('ホスト識別子: ${host.hostId}'),
               Text('基盤: ${host.platform}'),
+              Text('Host所在: $hostLocation'),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  StatusPill(label: '接続', value: host.connectionState),
+                  StatusPill(label: '登録接続状態', value: host.connectionState),
                   StatusPill(label: '信頼', value: host.trustState),
                   StatusPill(label: '証拠', value: host.evidenceSource),
                   StatusPill(label: '公開範囲', value: host.visibility),
@@ -244,6 +256,7 @@ class _HostDetail extends StatelessWidget {
           icon: Icons.hub_outlined,
           observed: localObservation,
           count: host.runtimeCount,
+          unobservedMessage: unobservedMessage,
           children: localObservation
               ? [
                   for (final runtime in snapshot.runtimes)
@@ -264,6 +277,7 @@ class _HostDetail extends StatelessWidget {
           icon: Icons.smart_toy_outlined,
           observed: localObservation,
           count: host.agentCount,
+          unobservedMessage: unobservedMessage,
           children: localObservation
               ? [
                   for (final agent in snapshot.agentSessions)
@@ -283,7 +297,7 @@ class _HostDetail extends StatelessWidget {
             padding: EdgeInsets.only(top: 16),
             child: BorderedPanel(
               child: Text(
-                'Problem: Hostはpending_reviewまたは未接続です。live Runtime／Agent一覧、Trust、権限作用は停止しています。',
+                'Host registryのTrust／接続状態は未確認です。Brokerのローカル実測が存在しても、このmetadataからTrustや権限作用は生成しません。',
               ),
             ),
           ),
@@ -298,6 +312,7 @@ class _ObservationPanel extends StatelessWidget {
     required this.icon,
     required this.observed,
     required this.count,
+    required this.unobservedMessage,
     required this.children,
   });
 
@@ -305,6 +320,7 @@ class _ObservationPanel extends StatelessWidget {
   final IconData icon;
   final bool observed;
   final int count;
+  final String unobservedMessage;
   final List<Widget> children;
 
   @override
@@ -327,9 +343,7 @@ class _ObservationPanel extends StatelessWidget {
             ...children
           else
             Text(
-              observed
-                  ? '現在のBrokerから個別項目は観測されていません。'
-                  : '未観測（このHostへのlive接続がないため、summary以外を表示しません）',
+              observed ? '現在のBrokerから個別項目は観測されていません。' : unobservedMessage,
             ),
         ],
       ),

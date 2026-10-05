@@ -12,6 +12,8 @@ import 'package:gui_shell_desktop/screens/audit_viewer.dart';
 import 'package:gui_shell_desktop/screens/agent_center.dart';
 import 'package:gui_shell_desktop/screens/dashboard.dart';
 import 'package:gui_shell_desktop/screens/evidence_center.dart';
+import 'package:gui_shell_desktop/screens/host_capability_center.dart';
+import 'package:gui_shell_desktop/screens/host_operation_center.dart';
 import 'package:gui_shell_desktop/screens/problems_panel.dart';
 import 'package:gui_shell_desktop/screens/recovery_center.dart';
 import 'package:gui_shell_desktop/screens/runtime_center.dart';
@@ -77,7 +79,7 @@ void main() {
   testWidgets('履歴の遷移先がナビゲーションに存在し離脱できる', (tester) async {
     await tester.pumpWidget(const GuiShellDesktopApp());
     final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
-    expect(rail.destinations.length, 20);
+    expect(rail.destinations.length, 21);
     rail.onDestinationSelected!(13);
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
@@ -93,7 +95,7 @@ void main() {
     await tester.pumpWidget(const GuiShellDesktopApp());
 
     final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
-    expect(rail.destinations.length, 20);
+    expect(rail.destinations.length, 21);
     rail.onDestinationSelected!(14);
     await tester.pumpAndSettle();
 
@@ -161,8 +163,70 @@ void main() {
     expect(find.text('Host一覧'), findsOneWidget);
     expect(find.text('Runtime一覧'), findsOneWidget);
     expect(find.text('Agent一覧'), findsOneWidget);
+    expect(find.textContaining('未確認（Broker由来の実測証拠がありません）'), findsOneWidget);
+    expect(find.textContaining('未観測（snapshotはBroker確定経路ではありません'), findsWidgets);
+    expect(find.textContaining('/ Broker観測'), findsNothing);
     expect(find.text('現在のHost'), findsOneWidget);
     expect(find.textContaining('Permission、Approval、Authority'), findsWidgets);
+  });
+
+  testWidgets('ホスト能力mockはBroker実測またはlocal／remoteの証拠へ昇格しない', (tester) async {
+    await tester.pumpWidget(const GuiShellDesktopApp());
+
+    final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
+    rail.onDestinationSelected!(15);
+    await tester.pumpAndSettle();
+
+    expect(find.text('D4 Pocket ホスト能力'), findsOneWidget);
+    expect(find.textContaining('試験・診断用の表示です'), findsOneWidget);
+    expect(find.textContaining('所在: 未確認'), findsOneWidget);
+    expect(find.textContaining('fixture／診断値をBroker実測へ昇格しない'), findsOneWidget);
+  });
+
+  testWidgets('ホスト能力画面はBroker受理snapshotの状態を表示情報に限定する', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home:
+          Scaffold(body: HostCapabilityCenter(client: ShellCoreClient.mock())),
+    ));
+
+    expect(find.textContaining('PermissionやApprovalは生成しません'), findsOneWidget);
+    expect(find.textContaining('fixture／診断値をBroker実測へ昇格しない'), findsOneWidget);
+    expect(find.textContaining('表示用状態（未観測）: degraded'), findsOneWidget);
+  });
+
+  testWidgets('診断snapshotの別登録HostをRuntime／Agentのlive一覧へ昇格しない', (tester) async {
+    final base = ShellCoreClient.mock().getSnapshot();
+    const registeredOtherHost = HostRegistryRecord(
+      hostId: 'registered-other-host',
+      displayName: '登録済み別Host',
+      platform: 'linux',
+      connectionState: 'pending_review',
+      trustState: 'pending_review',
+      runtimeCount: 2,
+      agentCount: 1,
+      evidenceSource: 'INTERNAL_STATE',
+      visibility: 'metadata_only',
+      authorityStrip: true,
+    );
+    final client = ShellCoreClient.local(
+      snapshot: base.copyWith(hosts: [...base.hosts, registeredOtherHost]),
+    );
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: HostOperationCenter(client: client)),
+    ));
+    await tester.tap(find.text('登録済み別Host').first);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.textContaining('未確認（Broker由来の実測証拠がありません）'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Runtime summary: 2件 / Agent summary: 1件'),
+        findsOneWidget);
+    for (final runtime in base.runtimes) {
+      expect(find.text(runtime.runtimeId), findsNothing);
+    }
+    expect(find.textContaining('snapshotはBroker確定経路ではありません'), findsWidgets);
   });
 
   testWidgets('GUI Shellデスクトップアプリの簡易試験', (WidgetTester tester) async {
@@ -324,7 +388,7 @@ void main() {
     await tester.pumpWidget(const GuiShellDesktopApp());
 
     final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
-    expect(rail.destinations.length, 20);
+    expect(rail.destinations.length, 21);
     expect(find.text('すべて'), findsOneWidget);
 
     await tester.tap(find.text('すべて'));
@@ -491,11 +555,13 @@ void main() {
     );
   });
 
-  test('製品クライアントがブローカー経由の権限スナップショットを描画する', () async {
+  testWidgets('製品クライアントがブローカー経由の権限スナップショットを描画する', (tester) async {
     final transport = _FakeBrokerTransport([
       _brokerHealthResponse(),
       _brokerHostCapabilityResponse(),
-      _brokerHostListResponse(),
+      _brokerHostListResponse(
+        additionalHosts: [_brokerRemoteHostRecord()],
+      ),
       _brokerAdapterListResponse(),
       _brokerAgentAdapterListResponse(),
       _brokerDialogueSessionListResponse(sessions: [
@@ -608,6 +674,32 @@ void main() {
       )['payload'],
       const <String, Object?>{},
     );
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: HostOperationCenter(client: client)),
+    ));
+    expect(find.textContaining('現在のBroker実行Host（ローカル）'), findsOneWidget);
+    expect(find.textContaining('snapshotはBroker確定経路ではありません'), findsNothing);
+    await tester.tap(find.text('登録Remote fixture').first);
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('別登録Host（remote接続・個別状態は未観測）'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('Runtime summary: 2件 / Agent summary: 1件'),
+      findsOneWidget,
+    );
+    for (final runtime in snapshot.runtimes) {
+      expect(find.text(runtime.runtimeId), findsNothing);
+    }
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: HostCapabilityCenter(client: client)),
+    ));
+    expect(
+        find.textContaining('認証済みRust Brokerの現在の実行Host（ローカル）'), findsOneWidget);
+    expect(find.textContaining('degradedを含む観測状態: degraded'), findsOneWidget);
   });
 
   testWidgets('Broker対話sessionは検証済みWorkspace参照と隔離未検証を区別して表示する',
@@ -2683,8 +2775,10 @@ Map<String, Object?> _brokerHostCapabilityResponse() {
   });
 }
 
-Map<String, Object?> _brokerHostListResponse() {
-  return _brokerAcceptedBody('Host一覧', {
+Map<String, Object?> _brokerHostListResponse({
+  List<Map<String, Object?>> additionalHosts = const [],
+}) {
+  final response = _brokerAcceptedBody('Host一覧', {
     '版': 1,
     'Host一覧': [
       {
@@ -2723,7 +2817,45 @@ Map<String, Object?> _brokerHostListResponse() {
     '公開範囲': 'metadata_only',
     '証拠種別': 'INTERNAL_STATE',
   });
+  final body = response['body'] as Map<String, Object?>;
+  final hosts = List<Map<String, Object?>>.from(body['Host一覧'] as List)
+    ..addAll(additionalHosts);
+  body['Host一覧'] = hosts;
+  body['件数'] = hosts.length;
+  return response;
 }
+
+Map<String, Object?> _brokerRemoteHostRecord() => {
+      '版': 1,
+      'Host ID': 'remote-host-fixture',
+      '表示名': '登録Remote fixture',
+      'Platform': 'linux',
+      '接続状態': 'pending_review',
+      'Trust': {
+        'state': 'pending_review',
+        'evidence_source': 'INTERNAL_STATE',
+        'requires_operator_review': true,
+      },
+      '証明書/identity': {
+        '種別': 'identity_hash',
+        'hash': 'sha256:${List.filled(64, 'b').join()}',
+      },
+      'Runtime summary': {
+        'runtime_count': 2,
+        'agent_count': 1,
+        'evidence_source': 'INTERNAL_STATE',
+      },
+      '最終接続': null,
+      '公開範囲': 'metadata_only',
+      '証拠種別': 'INTERNAL_STATE',
+      '権限生成': 'なし',
+      'authority_strip': true,
+      '能力ID': 'host.registry.register',
+      '権限ID': 'permission.host.registry.register',
+      '承認状態': 'owner_control_approved',
+      '復旧ID': 'recover-host-registration',
+      '登録監査ID': 'audit-host-remote',
+    };
 
 Map<String, Object?> _brokerAdapterListResponse() {
   return _brokerAcceptedBody('アダプター一覧', {

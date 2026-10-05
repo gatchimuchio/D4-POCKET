@@ -14,7 +14,11 @@ Host metadataの証拠種別は`INTERNAL_STATE`であり、未接続HostのRunti
 
 ## Runtime／Agent一覧
 
-選択Hostが現在のBroker観測Host IDと一致し、現在のBrokerが返した観測を利用できる場合だけ、DesktopはそのRuntime／Agentを現在観測として表示する。それ以外のHostではregistryの件数と`未観測`を表示し、推測した名前や状態を追加しない。
+選択Hostを現在のBroker実行Host（local）として扱えるのは、product初期化で受理した`snapshot_source=broker`のホスト能力観測とHost IDが一致する場合だけである。`mock`、fallback、診断、未検証snapshot、表示名、Host metadataだけではlocal／remote区分やlive状態を推定しない。
+
+一致した場合だけ、そのHostのRuntime／Agentを現在のBroker観測として表示する。一致しない登録Hostは別Hostとして表示し、remote接続と個別Runtime／Agent状態は未観測のままにする。registryのRuntime／Agent件数はmetadata summaryとして別表示し、個別live一覧へ展開しない。snapshot sourceがBroker確定経路でない場合は、全HostのRuntime／Agentを未観測として扱う。
+
+Host registryの接続状態・Trustは登録metadataとして表示し、Broker現在HostのLIVE_RUNTIME観測と混同しない。ホスト能力画面の`degraded`は観測された機能状態の投影であり、Permission、Approval、Authority、Credential、接続Trustを生成しない。
 
 ## 残存範囲
 

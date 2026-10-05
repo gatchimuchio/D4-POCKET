@@ -138,8 +138,16 @@ Provider結合の`FIXTURE`試験では、合成CredentialがCodex CLI親process�
 - 個別検証結果: RustのA2A境界試験9件、native Owner確認候補1件、Brokerのnative確認専用gate 1件、Flutter接続service／画面／検索試験9件、任意Moduleをすべて無効にしたNavigationRail試験2件、`Conformance` 234件、Windows版Desktopのdebug build成功（MSB8029の一時作業フォルダー警告あり）。Flutter試験とWindows buildはOneDrive外の`ASCII`一時複製で実行。
 - Rust全targetは444件中435成功／2失敗／7 ignored。今回のA2A関連11件は全件成功。失敗のうち`failed_tool_result_is_not_replayed_as_another_exec_command`は単独再試験で成功し、`local_tls_server_repairs_only_after_verified_package_bytes`は単独でもHTTP/TLS fixtureの応答不整合とConnectionResetで失敗した。いずれも今回変更したA2A経路外で、既存`FQ-TEST-LOOPBACK`へ追加記録し、このA2A受入れを拡張しない。
 - Strict日本語基底監査は終了コード1で、現行変更fileは0 finding。既存findingは3件（旧rev3文書1、旧rev4文書1、未変更Codex CLI診断文字列1）。過去文書・無関係Adapter診断は今回のA2A Acceptance外として保持し、監査全体をPASS扱いしない。
-- rev5 Product Buildの基準（実装、build、基本正常経路、次工程からの利用、Authority非破壊）を満たしたため、このloopback UI接続単位をCLOSEDとする。C16の既存Desktop画面未成立記述を現行状態へ訂正した。P7全体はOPENで、次は現行rev5のMulti Host／Host capability／Adapter Managerの未成立範囲へ進む。外部A2A transport／実作用とinstalled product証拠は別gateであり、この受入れを拡張しない。
-- この単位だけでP7全体は閉じない。Multi Host、Adapter Manager、Host capability／接続状態／degraded mode／local・remote区別のrev5受入れは引き続きOPEN。Windows installed product全経路証拠とA2A外部transport／Task等の別gateも未主張。
+- rev5 Product Buildの基準（実装、build、基本正常経路、次工程からの利用、Authority非破壊）を満たしたため、このloopback UI接続単位をCLOSEDとする。C16の既存Desktop画面未成立記述を現行状態へ訂正した。P7全体はOPENで、次はHostのremote接続／capability取得とAdapter Managerの未成立範囲へ進む。外部A2A transport／実作用とinstalled product証拠は別gateであり、この受入れを拡張しない。
+- P7全体はOPEN。A2A loopback接続面とHost所在・能力表示の完結単位は閉じた。Windows installed product全経路証拠とA2A外部transport／Task等は別gateであり、ここでは主張しない。
+
+#### P7内の完結単位: Host所在・能力・degraded表示 — CLOSED（Product Build）
+
+- Host operation surfaceは、`snapshot_source=broker`として受理された製品snapshot内で、Host capabilityのHost IDとHost registry IDが一致した場合だけ、そのHostを現在Brokerの実行場所（ローカル）と表示し、Broker由来Runtime／Agent一覧を接続する。
+- `mock`、fallback、in-memory diagnostic、未検証snapshotはlocal／remoteまたは実測能力の証拠にしない。別Hostは登録metadataのruntime／agent件数だけを表示し、remote接続と個別一覧は未観測に保つ。Host registryの接続／Trust状態と現在Brokerの実測を別表示する。
+- Host capability画面では、受理済みBroker snapshotの`degraded`と機能別証拠を表示し、権限生成へ昇格させない。非Broker snapshotでは能力値を未観測の表示用状態として明示する。
+- 検証: 画面試験54件は全て合格（模擬／診断snapshotの昇格拒否、受理済みBroker snapshotによるローカルHost判定、別Host要約の分離、縮退表示を含む）。変更対象のDart 3 fileの静的解析とWindows向けデバッグbuildも合格した。`MSB8029`は`ASCII`一時検証先へのbuild出力警告。試験とbuildは`OneDrive`外の`ASCII`一時複製で実行した。
+- この完結単位はHost状態の製品表示・snapshot分類を閉じる。実Host間接続、Device Link認証、remote capability discovery、Host間Workspace隔離、Adapter Managerの現行未接続作用は証明せず、P7はOPENのまま後続へ進む。試験中に検出したNavigationRail件数3箇所の旧値（20）は新しい必須A2A画面を含む現行値（21）へ同期した。
 
 ## 3. 後続製品工程
 
