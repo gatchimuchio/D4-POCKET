@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "6a8a870f71645af9cd3a2f7721172ac390d8dc0b5bd12dd96422769f0a478114"
+      "sha256": "022227ae246f9f188c0d0f5f997ae97ca019046e45af17578c0595fc96271d42"
     },
     {
       "path": "SECURITY.md",
@@ -1236,7 +1236,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "8420e5c7208b3966fd6bc71862e895456d4e0125f312c65018da182d267fcba6"
+      "sha256": "12c3f889144d155f06f5fe7bc5c1818b086e5fb3d8d37ca4420d4f6ee565c46c"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1599,6 +1599,10 @@
       "sha256": "90d3b0ba9ad5703107cbc58dccc28067606f4a5c975da19d65e6ad77fa2e517e"
     },
     {
+      "path": "examples/contracts/adapter_management_update.valid.json",
+      "sha256": "49db2c634562b6b71965f16d5d758e9ffd7c7839d1ad6cce115479e6a71a023c"
+    },
+    {
       "path": "examples/contracts/adapter_manifest.valid.json",
       "sha256": "120a408d3ddd3dd148dd10f798e4563afc1bd3c272aa29e8e29afa3149822234"
     },
@@ -1915,6 +1919,10 @@
       "sha256": "50fb20944a17fc333199ea96ac491a9d19f272519ab240483b7dfe127be9d18f"
     },
     {
+      "path": "examples/contracts/invalid/adapter_management_install_with_hash.invalid.json",
+      "sha256": "5d635b5d31de6ba22371fd0d919229c5efbfa22db5b3e33b162b8728dde4dbc8"
+    },
+    {
       "path": "examples/contracts/invalid/adapter_management_list_authority.invalid.json",
       "sha256": "be680343734f7af679baf6af251df83fc018cab9a943a870669d26e4898e16f2"
     },
@@ -1933,6 +1941,10 @@
     {
       "path": "examples/contracts/invalid/adapter_management_unknown_field.invalid.json",
       "sha256": "4ae410beb47d08615363a1d67e071cce0e804d45e337f7e9e06a2b3298605c01"
+    },
+    {
+      "path": "examples/contracts/invalid/adapter_management_update_missing_hash.invalid.json",
+      "sha256": "857d134063e6092842424bae2d33be347d195f3ce666da7b30387750ccec7a0f"
     },
     {
       "path": "examples/contracts/invalid/adapter_manifest_authority_escalation.invalid.json",

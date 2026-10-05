@@ -2,7 +2,7 @@
 
 更新日: 2026-10-05
 工程正本: ユーザー提示「D4 Pocket / GUI-Shell 統合実装仕様書 rev5」「統合開発工程表 rev5」「Codex実装指示書 rev5」
-現行phase: `P7 A2A / Host / Adapter` (`OPEN`)。`P6 Credential / MCP`は2026-10-05にProduct Build受入れを閉鎖。`P5 Workspace / History / Evaluation`も同日に閉鎖済み。
+現行phase: `P8 GUI-Shell Compose` (`OPEN`)。`P7 A2A / Host / Adapter`は2026-10-05にrev5 Product Build受入れを閉鎖。`P6 Credential / MCP`、`P5 Workspace / History / Evaluation`も同日に閉鎖済み。
 基準Repository状態: rev5文書同期commit `39dd3f4bc7aafe350ca94fce9392095f1064d2bc`。その後の実装・検証状態は本書末尾の更新履歴を参照。
 
 ## 正本の選び方
@@ -125,9 +125,9 @@ Provider結合の`FIXTURE`試験では、合成CredentialがCodex CLI親process�
 
 日本語基底strict監査は終了code 1で、旧rev3／rev4履歴文書の2件と、試験内の外部Authorization protocol値`Bearer`に対する静的heuristic finding 1件が残る。今回のテスト説明文は日本語化済み。過去履歴は改変せず、protocol値も監査回避のために変形しない。この監査結果は日本語文書負債として記録し、P6のCredential authority境界・Provider結合Acceptanceとは分離する。
 
-### P7 対A2A連携／複数Host／Adapter管理 — OPEN
+### P7 対A2A連携／複数Host／Adapter管理 — CLOSED（Product Build）
 
-現行rev5の範囲はA2A、Multi Host、Adapter Manager、Host capability、接続性、degraded mode、local／remote Runtimeの区別である。P6を再訪せず、現行rev5 Acceptanceに対して実装済み経路と未成立条件を確認して順に進める。過去版の状態を現行受入れへ継承しない。
+rev5の範囲はA2A、Multi Host、Adapter Manager、Host capability、接続性、degraded mode、local／remote Runtimeの区別である。実接続または決定的fixtureで主要経路を成立させる受入れ条件を満たしたため、P7 Product Buildを閉鎖する。各機能の経路・証拠は次の完結単位に記録する。
 
 #### P7内の完結単位: A2A loopback接続面 — CLOSED（Product Build）
 
@@ -138,8 +138,7 @@ Provider結合の`FIXTURE`試験では、合成CredentialがCodex CLI親process�
 - 個別検証結果: RustのA2A境界試験9件、native Owner確認候補1件、Brokerのnative確認専用gate 1件、Flutter接続service／画面／検索試験9件、任意Moduleをすべて無効にしたNavigationRail試験2件、`Conformance` 234件、Windows版Desktopのdebug build成功（MSB8029の一時作業フォルダー警告あり）。Flutter試験とWindows buildはOneDrive外の`ASCII`一時複製で実行。
 - Rust全targetは444件中435成功／2失敗／7 ignored。今回のA2A関連11件は全件成功。失敗のうち`failed_tool_result_is_not_replayed_as_another_exec_command`は単独再試験で成功し、`local_tls_server_repairs_only_after_verified_package_bytes`は単独でもHTTP/TLS fixtureの応答不整合とConnectionResetで失敗した。いずれも今回変更したA2A経路外で、既存`FQ-TEST-LOOPBACK`へ追加記録し、このA2A受入れを拡張しない。
 - Strict日本語基底監査は終了コード1で、現行変更fileは0 finding。既存findingは3件（旧rev3文書1、旧rev4文書1、未変更Codex CLI診断文字列1）。過去文書・無関係Adapter診断は今回のA2A Acceptance外として保持し、監査全体をPASS扱いしない。
-- rev5 Product Buildの基準（実装、build、基本正常経路、次工程からの利用、Authority非破壊）を満たしたため、このloopback UI接続単位をCLOSEDとする。C16の既存Desktop画面未成立記述を現行状態へ訂正した。P7全体はOPENで、次はHostのremote接続／capability取得とAdapter Managerの未成立範囲へ進む。外部A2A transport／実作用とinstalled product証拠は別gateであり、この受入れを拡張しない。
-- P7全体はOPEN。A2A loopback接続面とHost所在・能力表示の完結単位は閉じた。Windows installed product全経路証拠とA2A外部transport／Task等は別gateであり、ここでは主張しない。
+- rev5 Product Buildの基準（実装、build、基本正常経路、次工程からの利用、Authority非破壊）を満たしたため、このloopback UI接続単位をCLOSEDとする。C16の既存Desktop画面未成立記述を現行状態へ訂正した。外部A2A transport／Task実作用とinstalled product証拠は別gateであり、この受入れを拡張しない。P7全体の受入れ判定は本章末尾に記録する。
 
 #### P7内の完結単位: Host所在・能力・degraded表示 — CLOSED（Product Build）
 
@@ -147,7 +146,7 @@ Provider結合の`FIXTURE`試験では、合成CredentialがCodex CLI親process�
 - `mock`、fallback、in-memory diagnostic、未検証snapshotはlocal／remoteまたは実測能力の証拠にしない。別Hostは登録metadataのruntime／agent件数だけを表示し、remote接続と個別一覧は未観測に保つ。Host registryの接続／Trust状態と現在Brokerの実測を別表示する。
 - Host capability画面では、受理済みBroker snapshotの`degraded`と機能別証拠を表示し、権限生成へ昇格させない。非Broker snapshotでは能力値を未観測の表示用状態として明示する。
 - 検証: 画面試験54件は全て合格（模擬／診断snapshotの昇格拒否、受理済みBroker snapshotによるローカルHost判定、別Host要約の分離、縮退表示を含む）。変更対象のDart 3 fileの静的解析とWindows向けデバッグbuildも合格した。`MSB8029`は`ASCII`一時検証先へのbuild出力警告。試験とbuildは`OneDrive`外の`ASCII`一時複製で実行した。
-- この完結単位はHost状態の製品表示・snapshot分類を閉じる。実Host間接続、Device Link認証、remote capability discovery、Host間Workspace隔離、Adapter Managerの現行未接続作用は証明せず、P7はOPENのまま後続へ進む。試験中に検出したNavigationRail件数3箇所の旧値（20）は新しい必須A2A画面を含む現行値（21）へ同期した。
+- この完結単位はHost状態の製品表示・snapshot分類を閉じる。実Host間接続、Device Link認証、remote capability discovery、Host間Workspace隔離を証明するものではない。これらの未成立範囲はrelease gateで保持し、P7 Product Buildのfixture受入れとは分離する。試験中に検出したNavigationRail件数3箇所の旧値（20）は新しい必須A2A画面を含む現行値（21）へ同期した。
 
 #### P7内の完結単位: Adapter既存recordのDesktop操作 — CLOSED（Product Build）
 
@@ -162,14 +161,28 @@ Provider結合の`FIXTURE`試験では、合成CredentialがCodex CLI親process�
 - Runtime CenterからManifestを上限48 KiBで既存Broker transportへ送り、PID結合pipe、Rust Desktop起動器のnative Owner確認、Broker Owner操作queueを通じて、Broker catalogのmetadataだけを登録・更新する。通常IPCからの直接変更は停止する。
 - Owner確認は申告Capability／許可差分／危険・互換性・署名metadataと署名対象／signature hashを示すが、署名実値は表示しない。Owner確認はTrust、署名検証、Permission、Approval、Credential、Authorityを生成しない。未検証Adapterは有効化できない。
 - 更新は対象Adapter IDと現在hashを要求に束縛し、Brokerが処理時にhash・disabled・非隔離状態を再確認する。古いhash、有効化中、隔離済み、対象ID不一致は変更前に拒否する。拒否・受理はBroker Audit receiptへ結合する。
-- 受入れ範囲はmetadata登録・更新であり、外部download、filesystem install／remove、process起動・管理、Windows installed product evidenceを含まない。C19とP7全体は完了扱いにせず、これらのrelease blockerも解消したとはしない。
+- 受入れ範囲はmetadata登録・更新であり、外部download、filesystem install／remove、process起動・管理、Windows installed product evidenceを含まない。これらC19のrelease blockerは解消していない。P7 Product Buildの総合判定は本章末尾へ分離し、この完結単位とC19全要件を同一視しない。
 - 検証: Rust Adapter Center対象試験9件合格、Manifest Owner候補／中継試験合格、実Win32 Owner確認画面の自動操作（拒否・承認）1件合格、Desktop全画面試験57件合格（日本語表示ラベル修正後に対象Widgetを再実行）、変更したDart 3 fileの静的解析合格、Schema 158件／正常例155件／負例205件合格、適合確認234件合格、Windows Desktop debug build合格。全Desktop静的解析は未変更の`agent_center.dart`に廃止予定APIの情報指摘5件があり終了コード1、今回変更したDart fileに問題はない。BuildはASCII一時複製で行い、MSB8029一時出力先警告を記録。厳格日本語監査は今回変更fileの指摘0件、全体では既存の3指摘（rev3履歴、rev4履歴、未変更Codex CLI診断文字列）により終了コード1。旧記録・既存指摘は保持し、本完結単位へ転記・修正しない。
 - Rust全体試験`cargo test --locked -- --test-threads=1`は443件合格／2件失敗／9件ignored。失敗は既存Codex loopbackとUpdate Downloadのlocal TLS fixtureでConnectionResetを観測したもの。2件を個別再実行すると各1件合格し、Adapter差分外だったため、既存`FQ-TEST-LOOPBACK`へ追記した。Adapter対象focused試験と本単位の受入れは合格であり、P7を阻止しない。
-- 本単位をCLOSEDとし、P7はOPENのままHost実接続／remote capabilityおよび外部artifact作用など残るP7範囲へ進む。PASS済みのこのmetadata単位は再開しない。現行状態は本rev5進捗と現行codeを正本とし、旧revは補助履歴に限る。
+- 本単位をCLOSEDとする。Host実接続／remote capabilityと外部artifactのfilesystem・process作用は、C17〜C19のrelease blockerとして別管理する。rev5 Product Build受入れとrelease gateを混同せず、PASS済み単位は再開しない。
+
+#### P7 rev5 Product Build受入れ — CLOSED
+
+| 受入れ領域 | 結果 | 現行証拠・境界 |
+| --- | --- | --- |
+| A2A／接続性 | PASS | Rust Brokerのloopback接続とDesktop接続面を実装・試験済み。外部A2A transport／Task実作用は未成立。 |
+| Multi Host／local・remote区別 | PASS | Host registryとHost操作面を接続。localは受理済みBroker Host ID一致時だけ、他Hostは登録metadataとして表示し個別状態を未観測に保つ。 |
+| ホスト能力と縮退表示 | 合格 | Broker snapshotの証拠種別と制限状態を表示し、試験用fixture／診断値を実測値へ読み替えない。 |
+| Adapter管理 | 合格 | 既存記録の検証・状態制御・削除と、native Owner確認経路によるManifest metadata導入／更新を実装。署名未検証では有効化を拒否する。 |
+| Authority非生成 | PASS | Host／Adapter metadata、Owner確認、接続表示からPermission／Approval／Trust／Credential／Authorityを生成しない。 |
+
+rev5工程表の「実接続または決定的fixtureで主要経路成立」に対し、A2A loopbackの実接続とHost／degraded／remote未観測の決定的fixture、Broker Owner経路のAdapter管理を確認した。これによりP7のProduct Build機能範囲を満たし、P7をCLOSEDとする。
+
+実Host間の認証付き通信・remote capability discovery・Host間Workspace隔離、外部Adapter artifactのdownload／filesystem導入・削除・process管理、Windows installed product evidenceは未成立のままrelease blockerとして保持する。これらを成立済み、C17〜C19の全要件完了、またはrelease-readyへ読み替えない。Feature Complete後の横断保証はFinal QA queueに従う。
 
 ## 3. 後続製品工程
 
-P2 Multi-Agent Compare、P3 Handoff、P4 Provider / Model Center、P5 Workspace / History / Evaluation、P6 Credential / MCPはProduct Build受入れを閉鎖した。現行はP7 A2A / Host / Adapter。続いてP8 GUI-Shell Compose、P9 Standalone Export、P10 Module Selection / Pruning、P11 Windows Productization、P12 Product Integrationを進める。P12の統合経路成立をWindows Feature Completeとし、その後にQ0〜Q7 Final QAへ移る。P13 Mobile / Non-WindowsはWindows Feature Completeを止めず別trackとして扱う。Owner Finalizationではproduction Publisher／signing identity、production Audit key、不可逆な事業判断、Final GOだけをOwnerへ戻す。
+P2 Multi-Agent Compare、P3 Handoff、P4 Provider / Model Center、P5 Workspace / History / Evaluation、P6 Credential / MCP、P7 A2A / Host / AdapterはProduct Build受入れを閉鎖した。現行はP8 GUI-Shell Compose。続いてP9 Standalone Export、P10 Module Selection / Pruning、P11 Windows Productization、P12 Product Integrationを進める。P12の統合経路成立をWindows Feature Completeとし、その後にQ0〜Q7 Final QAへ移る。P13 Mobile / Non-WindowsはWindows Feature Completeを止めず別trackとして扱う。Owner Finalizationではproduction Publisher／signing identity、production Audit key、不可逆な事業判断、Final GOだけをOwnerへ戻す。
 
 ## 4. 関連正本
 
