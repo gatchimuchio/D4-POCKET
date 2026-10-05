@@ -77,6 +77,25 @@ pub fn extract_verified_package(
     if metadata.len() < 12 || metadata.len() > MAX_PACKAGE_BYTES {
         return Err(err("package_size_invalid"));
     }
+    let input = File::open(package_path).map_err(|_| err("package_file_open_failed"))?;
+    extract_verified_package_from_reader(input, metadata.len(), None, destination, expected)
+}
+
+/// Brokerがcapability directoryから開いた同一file handleを検証・展開する。
+/// 期待digestを指定した場合、全package byteの読取とstage作成が同一handleに束縛される。
+pub(crate) fn extract_verified_package_from_reader<R: Read>(
+    input: R,
+    package_bytes: u64,
+    expected_package_sha256: Option<&str>,
+    destination: &Path,
+    expected: ProductPackageExpectation<'_>,
+) -> Result<ProductPackageInfo, ProductPackageError> {
+    if !(12..=MAX_PACKAGE_BYTES).contains(&package_bytes) {
+        return Err(err("package_size_invalid"));
+    }
+    if expected_package_sha256.is_some_and(|digest| !valid_sha256(digest)) {
+        return Err(err("package_outer_hash_invalid"));
+    }
     if destination.exists() || fs::symlink_metadata(destination).is_ok() {
         return Err(err("package_destination_exists"));
     }
@@ -97,7 +116,14 @@ pub fn extract_verified_package(
         .ok_or_else(|| err("package_destination_invalid"))?;
     let stage_root = parent.join(destination_name);
 
-    let result = extract_inner(package_path, &stage_root, &expected, metadata.len());
+    let mut input = PackageHashReader::new(input);
+    let result =
+        extract_inner(&mut input, &stage_root, &expected, package_bytes).and_then(|info| {
+            if expected_package_sha256.is_some_and(|expected| input.finish() != expected) {
+                return Err(err("package_outer_hash_mismatch"));
+            }
+            Ok(info)
+        });
     if result.is_err() {
         if let Ok(root_metadata) = fs::symlink_metadata(&stage_root) {
             if root_metadata.is_dir()
@@ -111,13 +137,38 @@ pub fn extract_verified_package(
     result
 }
 
-fn extract_inner(
-    package_path: &Path,
+struct PackageHashReader<R> {
+    inner: R,
+    digest: Sha256,
+}
+
+impl<R> PackageHashReader<R> {
+    fn new(inner: R) -> Self {
+        Self {
+            inner,
+            digest: Sha256::new(),
+        }
+    }
+
+    fn finish(self) -> String {
+        hex::encode(self.digest.finalize())
+    }
+}
+
+impl<R: Read> Read for PackageHashReader<R> {
+    fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+        let count = self.inner.read(buffer)?;
+        self.digest.update(&buffer[..count]);
+        Ok(count)
+    }
+}
+
+fn extract_inner<R: Read>(
+    input: &mut R,
     destination: &Path,
     expected: &ProductPackageExpectation<'_>,
     package_bytes: u64,
 ) -> Result<ProductPackageInfo, ProductPackageError> {
-    let mut input = File::open(package_path).map_err(|_| err("package_file_open_failed"))?;
     let mut magic = [0u8; 8];
     input
         .read_exact(&mut magic)
@@ -471,6 +522,7 @@ fn err(code: &'static str) -> ProductPackageError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
     use serde_json::json;
 
     const APP: &str = "d4-pocket-app-11111111111111111111111111111111";
@@ -543,6 +595,51 @@ mod tests {
             b"d"
         );
         assert_eq!(fs::read_dir(&destination).unwrap().count(), 4);
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn broker_reader_binds_outer_digest_and_stage_to_one_open_file() {
+        let path = write_temp(&package_with(files_for_test()), "outer-digest");
+        let package_bytes = fs::read(&path).unwrap();
+        let package_sha256 = hex::encode(Sha256::digest(&package_bytes));
+        let directory = cap_std::fs::Dir::open_ambient_dir(
+            path.parent().unwrap(),
+            cap_std::ambient_authority(),
+        )
+        .unwrap();
+        let mut options = cap_std::fs::OpenOptions::new();
+        options.read(true).follow(FollowSymlinks::No);
+        let file = directory.open_with("package.pkg", &options).unwrap();
+        let length = file.metadata().unwrap().len();
+        let destination = path.parent().unwrap().join("stage-valid");
+        let info = extract_verified_package_from_reader(
+            file,
+            length,
+            Some(&package_sha256),
+            &destination,
+            expectation(Some("1.2.3")),
+        )
+        .unwrap();
+        assert_eq!(info.product_version, "1.2.3");
+        assert!(destination.join("product_manifest.json").is_file());
+
+        let file = directory.open_with("package.pkg", &options).unwrap();
+        let rejected_destination = path.parent().unwrap().join("stage-bad-hash");
+        assert_eq!(
+            extract_verified_package_from_reader(
+                file,
+                length,
+                Some(&"b".repeat(64)),
+                &rejected_destination,
+                expectation(Some("1.2.3")),
+            )
+            .unwrap_err()
+            .0,
+            "package_outer_hash_mismatch"
+        );
+        assert!(!rejected_destination.exists());
+        drop(directory);
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
     }
 

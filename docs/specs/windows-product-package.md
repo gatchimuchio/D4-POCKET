@@ -10,6 +10,8 @@ Developer専用の`tooling/package_windows_product.py`は、commit／build recei
 
 Rust `product_package` readerは、期待するApp ID／Audit Store ID／製品版を呼出し元から固定で受け、packageの構造、path、file数、size、各file hash、同梱`product_manifest.json`の新規identityとAuthority非継承を検査する。展開先は未存在の新規stage directoryに限定する。検査失敗時はreaderが作成したstageだけを除去する。
 
+Broker consumer向けreaderは、capability directoryから開いたfile handle、正確なbyte長、署名済み候補のpackage SHA-256を受け取り、同じopen handleから読んだ全byteを検査・stage展開する。path再openによる検証fileと展開fileの差替えを避け、外側digest不一致時は作成したstageだけを除去する。reader自身は署名検証・Owner確認・install root公開を行わない。
+
 package reader自体はBrokerの署名検証、Owner確認、Permission、Approval、Audit、製品配置を実施しない。package内SHA-256は自己整合性検査であり、配布元の真正性を証明しない。今後の導入・更新consumerはBrokerのtrust、native Owner確認、Permission／Approval、durable Audit、Recovery経路へ接続しなければならない。これらが未接続のpackageを正式配布用として扱ってはならない。
 
 ## 2. 導入・更新consumerの必須境界

@@ -29,6 +29,8 @@
 
 2026-10-06追補: `cargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1`は449 passed／1 failed／9 ignored。失敗は`a2a::tests::loopback_HTTPからAgent_Cardを取得してmetadata_onlyへ射影する`の応答期限超過で、同testの単独再実行は1 passed。並列全試験では同A2A fixtureとUpdate Download TLS fixtureの2件が失敗し、逐次実行でTLS fixtureはPASSした。fixture server／client競合の根本原因は未確定で、最終統合後の全Rust試験として再確認する。現phaseはblockしない。
 
+2026-10-06 P11追加記録: reader変更時の逐次全Rust試験は453 passed／1 failed／9 ignoredで、`broker::update_download::tests::local_tls_server_repairs_only_after_verified_package_bytes`がOS error 10054／`ConnectionReset`で失敗した。同testの単独再実行は1 passed。既存`FQ-TEST-LOOPBACK`のfixture安定性と同分類で、P11 reader差分外かつ現phaseをblockしない。
+
 ## 3. Final QA段階
 
 | 段階 | 対象 | 開始条件 |

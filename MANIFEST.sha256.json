@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "5a228b3e9a4420653a5d523e884fc5e06a1a2667fe9c3c694757cf56dac31832"
+      "sha256": "169834e6fe3f9c9efb91a528494198f3875f3c82c3e6a821c020506169fe0cac"
     },
     {
       "path": "SECURITY.md",
@@ -1184,7 +1184,7 @@
     },
     {
       "path": "docs/FINAL_QA_QUEUE.md",
-      "sha256": "089eacac3719c83fecd54e64f960ea64c520c7e96c7a411231f213fb87eb8d67"
+      "sha256": "d1639771a6787b54e65f951eb9cfd833b777f427a1242f0e7c479e1d4728e2a6"
     },
     {
       "path": "docs/FIRST_RUN.md",
@@ -1240,7 +1240,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "1fdcefbfca3ffbc3fdd41d7a19977ac08384f1348561b799c813e7409f80ce4d"
+      "sha256": "7ff3701f4447192dcc94028501d9ba8376386e6c97ca123ea8223485074d4995"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1516,7 +1516,7 @@
     },
     {
       "path": "docs/specs/windows-product-package.md",
-      "sha256": "0004bc12681935f704fe62a51bcfa152703707af77cf973d60265308a0f70db6"
+      "sha256": "9b33888ca2e405e579cdff5683eeb1531405281e2be509e0762b04660ce81fb0"
     },
     {
       "path": "docs/specs/windows-protection.md",
@@ -3404,7 +3404,7 @@
     },
     {
       "path": "native/rust_helper/src/product_package.rs",
-      "sha256": "f97e7eeb9676e05fb9b04635fbf4e36d1590e4d461f708b6c24561f7cff1acd2"
+      "sha256": "28e8b71bf7a4a4819f65cdfd6864955f00551d5921b38651d736987bc5d6655a"
     },
     {
       "path": "native/rust_helper/src/protected_store.rs",
