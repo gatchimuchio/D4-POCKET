@@ -1,7 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:gui_shell_desktop/models/generated_contracts.dart';
+import 'package:gui_shell_desktop/services/agent_task_client.dart';
 import 'package:gui_shell_desktop/services/agent_coordination.dart';
+import 'package:gui_shell_desktop/services/broker_client.dart'
+    show BrokerClientException;
 
 AgentSessionRecord _session(
   String id,
@@ -29,6 +34,88 @@ AgentSessionRecord _session(
 }
 
 void main() {
+  test('Compareは両Taskを並行開始し片側失敗を他方へ伝播させない', () async {
+    const instruction = '同一の合成Task';
+    const sessionA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const sessionB = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    const requestA = AgentTaskRequest(
+      runtimeId: 'codex-a',
+      sessionId: sessionA,
+      workspaceId: 'workspace-a',
+      instruction: instruction,
+    );
+    const requestB = AgentTaskRequest(
+      runtimeId: 'codex-b',
+      sessionId: sessionB,
+      workspaceId: 'workspace-b',
+      instruction: instruction,
+    );
+    final first = Completer<AgentTaskRecord>();
+    final second = Completer<AgentTaskRecord>();
+    final dispatched = <String>[];
+
+    final result = startAgentComparisonTasks(
+      agentA: requestA,
+      agentB: requestB,
+      start: (request) {
+        dispatched.add(request.sessionId);
+        return request.sessionId == sessionA ? first.future : second.future;
+      },
+    );
+    await Future<void>.delayed(Duration.zero);
+    expect(dispatched, [sessionA, sessionB]);
+
+    second.complete(const AgentTaskRecord(
+      taskId: 'cccccccccccccccccccccccccccccccc',
+      runtimeId: 'codex-b',
+      sessionId: sessionB,
+      workspaceId: 'workspace-b',
+      instructionHash:
+          'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      status: 'running',
+      auditEventId: 'audit-task-b',
+    ));
+    first.completeError(const BrokerClientException('Agent A rejected'));
+
+    final outcomes = await result;
+    expect(outcomes, hasLength(2));
+    expect(outcomes[0].record, isNull);
+    expect(outcomes[0].error, isA<BrokerClientException>());
+    expect(outcomes[1].record?.sessionId, sessionB);
+    expect(outcomes[1].error, isNull);
+  });
+
+  test('CompareはTask不一致または共有識別子ならdispatch前に拒否する', () async {
+    const sessionA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const sessionB = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    var dispatchCount = 0;
+    const requestA = AgentTaskRequest(
+      runtimeId: 'codex-a',
+      sessionId: sessionA,
+      workspaceId: 'workspace-a',
+      instruction: 'Task A',
+    );
+    const requestB = AgentTaskRequest(
+      runtimeId: 'codex-b',
+      sessionId: sessionB,
+      workspaceId: 'workspace-b',
+      instruction: 'Task B',
+    );
+
+    await expectLater(
+      startAgentComparisonTasks(
+        agentA: requestA,
+        agentB: requestB,
+        start: (_) async {
+          dispatchCount++;
+          throw StateError('要求を送信してはならない');
+        },
+      ),
+      throwsA(isA<BrokerClientException>()),
+    );
+    expect(dispatchCount, 0);
+  });
+
   test('Agent比較は二つの独立Workspaceだけを対象にする', () {
     final single = AgentComparisonProjection.fromSessions([
       _session('a', 'workspace-a'),

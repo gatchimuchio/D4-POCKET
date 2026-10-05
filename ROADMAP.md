@@ -2,7 +2,7 @@
 
 状態: D4 Pocket / GUI-Shell統合rev5 Product-First工程で開発中。現行の製品phaseと実装状況は`docs/REV5_PRODUCT_PROGRESS.md`、最終統合後へ送る検査項目は`docs/FINAL_QA_QUEUE.md`を正本とする。旧R2 Agent TaskはPRODUCT BUILD上`FUNCTIONALLY ESTABLISHED`、rev5 P1は`DONE FOR PRODUCT BUILD`であり、R2-A〜Hの深掘りを次phase開始gateにしない。Technical Completeおよび正式releaseは未成立。
 
-現行phaseはP2 Multi-Agent Compare（rev5実装指示書ではR3と表記。どちらも同じCompare範囲を指す）。既存のAgent比較はBroker metadataからsession/runtime/Workspace参照の重複を検査するprojectionに限られ、独立Taskの生成・同時実行・結果比較・選択・選択結果の適用を実装した証拠ではない。rev4受入れ台帳とrev2/rev3進捗は当時の状態・失敗・証拠を保持する履歴であり、rev5現行phaseを上書きしない。R2で追加確認が必要な最終統合検査はFinal QA queueへ移送する。Authority、安全境界、release gateおよび通常Releaseのfail-closed状態は維持し、製品開発の継続をrelease-readyの主張へ読み替えない。
+現行phaseはP3 Agent Handoff（rev5実装指示書ではR4と表記）。P2 Multi-Agent Compare（R3）は2026-10-05にProduct Build受入れを閉鎖した。Agent CenterのCompare UIは、独立したRuntime／Workspace／Sessionへ同一Taskを事前検査し、Permission／Approvalを分離して並行開始し、結果・Auditを分離表示し、結果選択と新規認可を伴う別Workspace Taskへの適用準備を行うWidget／service happy-path試験を通過した。試験は`FIXTURE`であり、通常Release capability、実Codex installed Compare、release readinessの証拠ではない。これらの統合保証は`docs/FINAL_QA_QUEUE.md`へ移送し、通常Releaseのfail-closed状態は維持する。rev4受入れ台帳とrev2/rev3進捗は当時の状態・失敗・証拠を保持する履歴であり、rev5現行phaseを上書きしない。Authority、安全境界、release gateを維持し、製品開発の継続をrelease-readyの主張へ読み替えない。
 
 本書の以下の過去日付付き記録は、記録当時の証拠・計画を保持する。rev5の現在状態と作業順を判断するときは上記の現行正本を優先し、過去の「現行」表記を現在状態として再利用しない。
 

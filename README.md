@@ -303,15 +303,17 @@ tooling/    schema_check · conformance_tests · broker_parity · ...
 
 <br>
 
-## 📊 現状
+## 📊 製品状態と履歴
 
-### 2026-09-29 の現況
+現行工程はD4 Pocket / GUI-Shell rev5のProduct-First工程である。P2 Multi-Agent Compareは2026-10-05にProduct Build受入れを閉じ、P3 Agent Handoffへ進行中。Compare画面・Task調停のhappy pathはWidget／service fixtureで検証済みだが、これは実Codex installed Compare、通常Release capability、release readinessを証明しない。現行phase、受入れ根拠、Final QAへ送った検査は[rev5製品進捗](docs/REV5_PRODUCT_PROGRESS.md)と[Final QA Queue](docs/FINAL_QA_QUEUE.md)を参照する。
+
+### 2026-09-29 の履歴
 
 D4 Pocket統合rev2は、C33のWindows最大到達点とGUI Shell構成Manifest／Preview／編集提案の開発検証まで実装・検証済みである。Rust Broker、共有Flutter、Desktop Flutter、Mobile Flutter、Evidence assertion、C27性能smoke、C28短時間運用smoke、C29障害注入smoke、C30回帰matrix、C33のrelease buildおよびBroker smokeは開発環境でPASSしている。GUI Shell構成はManifest-only、Previewは読み取り専用、編集提案は審査待ちである。Windows書出しはOwner確認後に独立Manifest JSON fileをBroker固定保存先へ生成し、hash付きReceipt／Auditを返す段階まで成立したが、実行可能App package、独立Runtime、binary pruning、Installerや配布は未成立である。C28の8時間実測、Windows installed productの総合証拠、外部Runtime／Agent／MCP／A2A、実端末、正式署名、owner GOは未成立であり、PASSを製品releaseへ昇格させない。
 
 2026-09-29、Rust source commit `6441ae8b2827d2afa01f9963ff2472fd2b889ce2`に対する手動Windows Actions #17で、Rust全target checkと12 test target／391件が成功し、そのcommitを`main`へ統合した。これはhosted Windows上の指定commitに対するRust検査と偽CLI `FIXTURE`の証拠であり、installed product、実Agent隔離、ローカルApplication Control、release readinessを証明しない。
 
-現行基準検査数と実行日時点の証拠は [docs/REV2_PROGRESS.md](docs/REV2_PROGRESS.md) を参照する。Agent Adapterの対話開始ではWorkspace IDを必須とし、Rust Brokerが同一Runtimeの登録Workspaceとの対応を監査してDesktopへ投影する。Desktop共有対話画面はBrokerの登録一覧から対象RuntimeのWorkspace IDを明示選択して通常要求へ渡す。Agent Task要求Schema、別Owner Approval、Workspace Permission、実行前の原子的再検証・一回消費、Brokerのbounded Task状態／取消経路は接続済みである。ただしCodex Adapterはread-onlyのままTask実行非対応であり、実Agent起動、実Agentのprocess-tree終了保証、隔離Workspace書込み、結果本文／diff表示、実Agent比較、Handoffは未成立である。対話ApprovalはWorkspace書込みPermissionやTask専用Approvalではない。C30のAgent probeもPATH上のCodex CLI version/help interfaceだけを観測し、実task、credential、workspace書込を証明しない。GUI Shell構成のCapability requirementはPermissionを生成せず、Previewもrollback実行可能性を生成しない。編集提案は`proposal_only`であり、自動applyや自己承認を行わない。Manifest fileのApp ID／Audit store IDは将来用の新規識別子であり、実packageや物理storeではない。Developer専用のFlutter画面選択Windows Release buildは独立製品、Owner権限、binary除去完了の証拠ではない。独立製品Export、pruning、Installer、署名、Distribution、実起動は未成立である。詳細な証拠範囲と残存分類は [docs/REV2_PROGRESS.md](docs/REV2_PROGRESS.md) と [総合機能拡張rev1の進捗](docs/総合機能拡張_rev1/進捗.md)を正本とする。
+2026-09-29当時の基準検査数と証拠は [docs/REV2_PROGRESS.md](docs/REV2_PROGRESS.md) と [総合機能拡張rev1の進捗](docs/総合機能拡張_rev1/進捗.md) に保存する。これは履歴snapshotであり、現行rev5工程や現在の実装状態を示す正本ではない。Agent Adapterの対話開始ではWorkspace IDを必須とし、Rust Brokerが同一Runtimeの登録Workspaceとの対応を監査してDesktopへ投影する。Desktop共有対話画面はBrokerの登録一覧から対象RuntimeのWorkspace IDを明示選択して通常要求へ渡す。Agent Task要求Schema、別Owner Approval、Workspace Permission、実行前の原子的再検証・一回消費、Brokerのbounded Task状態／取消経路は接続済みである。ただしCodex Adapterはread-onlyのままTask実行非対応であり、実Agent起動、実Agentのprocess-tree終了保証、隔離Workspace書込み、結果本文／diff表示、実Agent比較、Handoffは未成立である。対話ApprovalはWorkspace書込みPermissionやTask専用Approvalではない。C30のAgent probeもPATH上のCodex CLI version/help interfaceだけを観測し、実task、credential、workspace書込を証明しない。GUI Shell構成のCapability requirementはPermissionを生成せず、Previewもrollback実行可能性を生成しない。編集提案は`proposal_only`であり、自動applyや自己承認を行わない。Manifest fileのApp ID／Audit store IDは将来用の新規識別子であり、実packageや物理storeではない。Developer専用のFlutter画面選択Windows Release buildは独立製品、Owner権限、binary除去完了の証拠ではない。独立製品Export、pruning、Installer、署名、Distribution、実起動は未成立である。
 
 この repository は **v1.0 product completion に向けた作業中であり、product release をまだ主張していない。** 機械判定上の状態は `not yet a completed product release` である。
 

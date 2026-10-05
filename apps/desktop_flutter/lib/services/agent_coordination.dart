@@ -1,4 +1,50 @@
+import 'agent_task_client.dart';
+import 'broker_client.dart' show BrokerClientException;
 import '../models/generated_contracts.dart';
+
+typedef AgentTaskStarter = Future<AgentTaskRecord> Function(
+  AgentTaskRequest request,
+);
+
+class AgentComparisonTaskOutcome {
+  const AgentComparisonTaskOutcome({this.record, this.error});
+
+  final AgentTaskRecord? record;
+  final Object? error;
+}
+
+/// 独立した二つのAgent Taskを同時に開始し、各側の失敗を分離して保持する。
+Future<List<AgentComparisonTaskOutcome>> startAgentComparisonTasks({
+  required AgentTaskStarter start,
+  required AgentTaskRequest agentA,
+  required AgentTaskRequest agentB,
+}) async {
+  agentA.validate();
+  agentB.validate();
+  if (agentA.instruction != agentB.instruction ||
+      agentA.runtimeId == agentB.runtimeId ||
+      agentA.sessionId == agentB.sessionId ||
+      agentA.workspaceId == agentB.workspaceId) {
+    throw const BrokerClientException(
+      'Compare要求は同一Task本文と独立したRuntime／Session／Workspaceが必要です',
+    );
+  }
+
+  Future<AgentComparisonTaskOutcome> startIndependently(
+    AgentTaskRequest request,
+  ) async {
+    try {
+      return AgentComparisonTaskOutcome(record: await start(request));
+    } on Object catch (error) {
+      return AgentComparisonTaskOutcome(error: error);
+    }
+  }
+
+  return Future.wait([
+    startIndependently(agentA),
+    startIndependently(agentB),
+  ]);
+}
 
 class AgentComparisonProjection {
   const AgentComparisonProjection({

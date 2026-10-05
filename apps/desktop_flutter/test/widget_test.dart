@@ -788,6 +788,422 @@ void main() {
         isTrue);
   });
 
+  testWidgets('Agent Centerは独立2 Taskを開始・比較し一方だけを選択する',
+      (WidgetTester tester) async {
+    const sessionA = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    const sessionB = 'cccccccccccccccccccccccccccccccc';
+    const sessionC = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const taskA = 'dddddddddddddddddddddddddddddddd';
+    const taskB = 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
+    const taskC = 'ffffffffffffffffffffffffffffffff';
+    const instructionHash =
+        'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const resultHashA =
+        'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    const resultHashB =
+        'sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc';
+    Map<String, Object?> taskRecord({
+      required String taskId,
+      required String runtimeId,
+      required String sessionId,
+      required String workspaceId,
+      required String status,
+      required String auditId,
+      String? resultHash,
+    }) =>
+        {
+          'task_id': taskId,
+          'record_version': 2,
+          'agent_runtime_id': runtimeId,
+          'session_id': sessionId,
+          'workspace_id': workspaceId,
+          'description': 'Agent作業Task（結果本文とWorkspace差分は別の権限経路）',
+          'instruction_hash': instructionHash,
+          'status': status,
+          'audit_event_id': auditId,
+          if (resultHash != null) 'result_hash': resultHash,
+          'result_content_available': resultHash != null,
+        };
+    Map<String, Object?> permissionReceipt({
+      required String runtimeId,
+      required String sessionId,
+      required String workspaceId,
+      required String registrationHash,
+    }) =>
+        {
+          'permission_id': sessionId,
+          'agent_runtime_id': runtimeId,
+          'session_id': sessionId,
+          'workspace_id': workspaceId,
+          'workspace_registration_hash': registrationHash,
+          'operation': 'agent_task.execute',
+          'scope': 'session_workspace_once',
+          'decision': 'allow',
+          'source': 'owner',
+          'expires_at_epoch_seconds': 1900000000,
+          'use_limit': 1,
+          'uses_remaining': 1,
+          'status': 'active',
+        };
+    Map<String, Object?> approvalReceipt({
+      required String runtimeId,
+      required String sessionId,
+      required String workspaceId,
+      required String executionHash,
+    }) =>
+        {
+          '状態': 'Owner Approval発行済み',
+          '実行状態': '未実行',
+          '実行系ID': runtimeId,
+          '対話セッションID': sessionId,
+          '作業領域ID': workspaceId,
+          '指示hash': instructionHash,
+          '実行条件hash': executionHash,
+          '適用ポリシー': 'gui-shell-agent-task-sandbox-v1-max-runtime-900s',
+          'expires_at_epoch_seconds': 1900000000,
+          'use_limit': 1,
+          'uses_remaining': 1,
+          'status': 'issued_unconsumed',
+        };
+
+    final transport = _FakeBrokerTransport([
+      _brokerHealthResponse(),
+      _brokerHostCapabilityResponse(),
+      _brokerHostListResponse(),
+      _brokerAdapterListResponse(),
+      _brokerAgentAdapterListResponse(),
+      _brokerDialogueSessionListResponse(sessions: [
+        {
+          '対話セッションID': sessionA,
+          '実行系ID': 'codex-agent-a',
+          '状態': '利用中',
+          '作成監査ID': 'audit-session-a',
+          '作業領域ID': 'workspace-agent-a',
+          '作業領域結合監査ID': 'audit-workspace-a',
+        },
+        {
+          '対話セッションID': sessionB,
+          '実行系ID': 'codex-agent-b',
+          '状態': '利用中',
+          '作成監査ID': 'audit-session-b',
+          '作業領域ID': 'workspace-agent-b',
+          '作業領域結合監査ID': 'audit-workspace-b',
+        },
+        {
+          '対話セッションID': sessionC,
+          '実行系ID': 'codex-agent-c',
+          '状態': '利用中',
+          '作成監査ID': 'audit-session-c',
+          '作業領域ID': 'workspace-agent-c',
+          '作業領域結合監査ID': 'audit-workspace-c',
+        },
+      ]),
+      _brokerAcceptedBody('normalize_payload', {'quarantined': false}),
+      _brokerAcceptedBody('content_projection', {'redacted_payload': {}}),
+      _brokerAcceptedBody('approval_edit', {'ok': false}),
+      _brokerCommandSuspendedResponse(),
+      for (final side in [
+        ('codex-agent-a', sessionA, 'workspace-agent-a'),
+        ('codex-agent-b', sessionB, 'workspace-agent-b'),
+      ])
+        _brokerAcceptedBody('Agent作業要求検査', {
+          '版': 1,
+          '状態': '要求検査済み',
+          '実行状態': '未実行',
+          'Permission状態': '未付与',
+          'Approval状態': '未取得',
+          '実行系ID': side.$1,
+          '対話セッションID': side.$2,
+          '作業領域ID': side.$3,
+          '指示hash': instructionHash,
+        }),
+      _brokerAcceptedBody(
+        'AgentTaskWorkspacePermissionGrant',
+        permissionReceipt(
+          runtimeId: 'codex-agent-a',
+          sessionId: sessionA,
+          workspaceId: 'workspace-agent-a',
+          registrationHash:
+              'sha256:1111111111111111111111111111111111111111111111111111111111111111',
+        ),
+      ),
+      _brokerAcceptedBody(
+        'AgentTaskWorkspacePermissionGrant',
+        permissionReceipt(
+          runtimeId: 'codex-agent-b',
+          sessionId: sessionB,
+          workspaceId: 'workspace-agent-b',
+          registrationHash:
+              'sha256:2222222222222222222222222222222222222222222222222222222222222222',
+        ),
+      ),
+      _brokerAcceptedBody(
+        'AgentTaskOwnerApprovalGrant',
+        approvalReceipt(
+          runtimeId: 'codex-agent-a',
+          sessionId: sessionA,
+          workspaceId: 'workspace-agent-a',
+          executionHash: resultHashA,
+        ),
+      ),
+      _brokerAcceptedBody(
+        'AgentTaskOwnerApprovalGrant',
+        approvalReceipt(
+          runtimeId: 'codex-agent-b',
+          sessionId: sessionB,
+          workspaceId: 'workspace-agent-b',
+          executionHash: resultHashB,
+        ),
+      ),
+      _brokerAcceptedBody(
+        'AgentTask実行',
+        taskRecord(
+          taskId: taskA,
+          runtimeId: 'codex-agent-a',
+          sessionId: sessionA,
+          workspaceId: 'workspace-agent-a',
+          status: 'running',
+          auditId: 'audit-task-a-start',
+        ),
+      ),
+      _brokerAcceptedBody(
+        'AgentTask実行',
+        taskRecord(
+          taskId: taskB,
+          runtimeId: 'codex-agent-b',
+          sessionId: sessionB,
+          workspaceId: 'workspace-agent-b',
+          status: 'running',
+          auditId: 'audit-task-b-start',
+        ),
+      ),
+      _brokerAcceptedBody(
+        'AgentTask状態',
+        taskRecord(
+          taskId: taskA,
+          runtimeId: 'codex-agent-a',
+          sessionId: sessionA,
+          workspaceId: 'workspace-agent-a',
+          status: 'completed',
+          auditId: 'audit-task-a-complete',
+          resultHash: resultHashA,
+        ),
+      ),
+      _brokerAcceptedBody(
+        'AgentTask状態',
+        taskRecord(
+          taskId: taskB,
+          runtimeId: 'codex-agent-b',
+          sessionId: sessionB,
+          workspaceId: 'workspace-agent-b',
+          status: 'completed',
+          auditId: 'audit-task-b-complete',
+          resultHash: resultHashB,
+        ),
+      ),
+      _brokerAcceptedBody('AgentTask結果表示承認', {
+        'task_id': taskA,
+        'result_hash': resultHashA,
+        'content_visibility': 'full',
+        'approval_id': '11111111111111111111111111111111',
+        'expires_at_epoch_seconds': 1900000000,
+        'use_limit': 1,
+        'uses_remaining': 1,
+      }),
+      _brokerAcceptedBody('AgentTask結果取得', {
+        'task_id': taskA,
+        'result_hash': resultHashA,
+        'content_visibility': 'full',
+        'projection': {
+          'result_hash': resultHashA,
+          'text': 'candidate patch body: add isolated implementation',
+        },
+      }),
+      _brokerAcceptedBody('Agent作業要求検査', {
+        '版': 1,
+        '状態': '要求検査済み',
+        '実行状態': '未実行',
+        'Permission状態': '未付与',
+        'Approval状態': '未取得',
+        '実行系ID': 'codex-agent-c',
+        '対話セッションID': sessionC,
+        '作業領域ID': 'workspace-agent-c',
+        '指示hash': instructionHash,
+      }),
+      _brokerAcceptedBody(
+        'AgentTaskWorkspacePermissionGrant',
+        permissionReceipt(
+          runtimeId: 'codex-agent-c',
+          sessionId: sessionC,
+          workspaceId: 'workspace-agent-c',
+          registrationHash:
+              'sha256:3333333333333333333333333333333333333333333333333333333333333333',
+        ),
+      ),
+      _brokerAcceptedBody(
+        'AgentTaskOwnerApprovalGrant',
+        approvalReceipt(
+          runtimeId: 'codex-agent-c',
+          sessionId: sessionC,
+          workspaceId: 'workspace-agent-c',
+          executionHash: resultHashA,
+        ),
+      ),
+      _brokerAcceptedBody(
+        'AgentTask実行',
+        taskRecord(
+          taskId: taskC,
+          runtimeId: 'codex-agent-c',
+          sessionId: sessionC,
+          workspaceId: 'workspace-agent-c',
+          status: 'running',
+          auditId: 'audit-task-c-start',
+        ),
+      ),
+    ]);
+    final client = await ShellCoreClient.product(transport: transport);
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: AgentCenter(client: client)),
+    ));
+    final prepareComparison =
+        find.byKey(const ValueKey('prepare-agent-comparison'));
+    await tester.ensureVisible(prepareComparison);
+    await tester.tap(prepareComparison);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byType(TextFormField),
+      '独立Compare用の安全なTask',
+    );
+    await tester.tap(find.text('両Agentを事前検査'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining(instructionHash), findsOneWidget);
+    expect(
+      find.text('Agent A Permission／Approval: 未付与 / 未取得'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Agent B Permission／Approval: 未付与 / 未取得'),
+      findsOneWidget,
+    );
+    final permissionButtons = find.text('Workspace PermissionのOwner確認');
+    await tester.ensureVisible(permissionButtons.first);
+    await tester.tap(permissionButtons.first);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(permissionButtons.last);
+    await tester.tap(permissionButtons.last);
+    await tester.pumpAndSettle();
+
+    final approvalButtons = find.text('Task一回ApprovalのOwner確認');
+    await tester.ensureVisible(approvalButtons.first);
+    await tester.tap(approvalButtons.first);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(approvalButtons.last);
+    await tester.tap(approvalButtons.last);
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('start-agent-comparison')),
+    );
+    await tester.tap(find.byKey(const ValueKey('start-agent-comparison')));
+    await tester.pumpAndSettle();
+    expect(find.text('Task状態: running'), findsNWidgets(4));
+    expect(
+        transport.operations.where((op) => op == 'AgentTask実行'), hasLength(2));
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('refresh-agent-comparison')),
+    );
+    await tester.tap(find.byKey(const ValueKey('refresh-agent-comparison')));
+    await tester.pumpAndSettle();
+    expect(find.text('Task状態: completed'), findsNWidgets(4));
+    expect(find.textContaining('audit-task-a-complete'), findsNWidgets(3));
+    expect(find.textContaining('audit-task-b-complete'), findsNWidgets(3));
+    expect(find.text('Resource: runtime実測値は未提供のためunknown'), findsOneWidget);
+    expect(find.text('Test実行record／Resource実測値: unknown'), findsNWidgets(2));
+
+    final selectedA = find.byKey(
+      const ValueKey('select-compare-result-$sessionA'),
+    );
+    final selectedB = find.byKey(
+      const ValueKey('select-compare-result-$sessionB'),
+    );
+    await tester.ensureVisible(selectedA);
+    await tester.tap(selectedA);
+    await tester.pumpAndSettle();
+    expect(tester.widget<ChoiceChip>(selectedA).selected, isTrue);
+    expect(tester.widget<ChoiceChip>(selectedB).selected, isFalse);
+    expect(find.textContaining('Authorityを与えません'), findsOneWidget);
+
+    final visibilityA =
+        find.byKey(const ValueKey('agent-task-visibility-$sessionA'));
+    await tester.ensureVisible(visibilityA);
+    await tester.tap(visibilityA);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('full').last);
+    await tester.pumpAndSettle();
+    final showResultA =
+        find.byKey(const ValueKey('agent-task-show-result-$sessionA'));
+    await tester.ensureVisible(showResultA);
+    await tester.tap(showResultA);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('candidate patch body'), findsOneWidget);
+
+    final prepareApply =
+        find.byKey(const ValueKey('prepare-selected-result-apply'));
+    await tester.ensureVisible(prepareApply);
+    expect(tester.widget<OutlinedButton>(prepareApply).onPressed, isNotNull);
+    await tester.tap(prepareApply);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byType(TextFormField),
+      'このcandidate patchだけを適用する',
+    );
+    await tester.tap(find.text('適用先Taskを事前検査'));
+    await tester.pumpAndSettle();
+
+    final applyPermission =
+        find.byKey(const ValueKey('agent-task-permission-$sessionC'));
+    await tester.ensureVisible(applyPermission);
+    await tester.tap(applyPermission);
+    await tester.pumpAndSettle();
+    final applyApproval =
+        find.byKey(const ValueKey('agent-task-approval-$sessionC'));
+    await tester.ensureVisible(applyApproval);
+    await tester.tap(applyApproval);
+    await tester.pumpAndSettle();
+    final applyStart = find.byKey(const ValueKey('agent-task-start-$sessionC'));
+    await tester.ensureVisible(applyStart);
+    await tester.tap(applyStart);
+    await tester.pumpAndSettle();
+    expect(find.text('Task状態: running'), findsOneWidget);
+
+    final applyTaskRequest = transport.requests.lastWhere(
+      (request) =>
+          request['operation'] == 'AgentTask実行' &&
+          ((request['payload']! as Map)['session_id'] == sessionC),
+    );
+    final applyInstruction =
+        ((applyTaskRequest['payload']! as Map)['instruction'] as String);
+    expect(applyInstruction, contains('candidate patch body'));
+    expect(applyInstruction, contains('このcandidate patchだけを適用する'));
+    expect(applyInstruction, contains('未信頼データ'));
+    expect(applyTaskRequest['payload'], isNot(contains('approval_id')));
+
+    final starts = transport.requests
+        .where((request) => request['operation'] == 'AgentTask実行')
+        .map((request) => request['payload']! as Map)
+        .toList(growable: false);
+    expect(starts, hasLength(3));
+    expect(starts.take(2).map((request) => request['instruction']).toSet(),
+        {'独立Compare用の安全なTask'});
+    expect(starts.take(2).map((request) => request['session_id']).toSet(),
+        {sessionA, sessionB});
+    expect(starts.take(2).map((request) => request['workspace_id']).toSet(),
+        {'workspace-agent-a', 'workspace-agent-b'});
+  });
+
   testWidgets('Agent CenterはSession結合後のTask unsupportedを事前検査しgrantへ進まない',
       (WidgetTester tester) async {
     const sessionId = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
