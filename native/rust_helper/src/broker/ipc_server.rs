@@ -34,7 +34,9 @@ pub struct BrokerServerConfig {
     /// Rust Desktop起動器が固定runtime隣接pathを渡す製品内ProtectedStore。
     /// owner起動設定の任意ProtectedStoreとは別経路で、資格・権限を生成しない。
     pub desktop_protected_store_dir: Option<PathBuf>,
-    /// Desktop起動器が固定installed package配置を検証済みの場合のみtrue。
+    /// Rust Desktop起動器が固定sibling構成のpackage layoutを検証済みの場合のみtrue。
+    pub(crate) desktop_package_layout_verified: bool,
+    /// Rust Desktop起動器が正式installed rootを独立に検証済みの場合のみtrue。
     pub(crate) desktop_install_path_verified: bool,
 }
 
@@ -53,6 +55,7 @@ impl BrokerServerConfig {
             workspace_config: None,
             protected_store_dir: None,
             desktop_protected_store_dir: None,
+            desktop_package_layout_verified: false,
             desktop_install_path_verified: false,
         }
     }
@@ -180,8 +183,12 @@ fn run_loopback_server_inner(
             )
             .map_err(|error| BrokerServerError::new(error.message()))?;
     }
-    if shutdown.is_some() && config.desktop_install_path_verified {
-        broker.set_desktop_setup_doctor_runtime_evidence(true, false);
+    if shutdown.is_some() && config.desktop_package_layout_verified {
+        broker.set_desktop_setup_doctor_runtime_evidence(
+            config.desktop_package_layout_verified,
+            config.desktop_install_path_verified,
+            false,
+        );
         broker
             .initialize_desktop_first_run_configuration()
             .map_err(|_| {
@@ -333,6 +340,7 @@ fn run_loopback_server_inner(
         ));
     }
     broker.set_desktop_setup_doctor_runtime_evidence(
+        config.desktop_package_layout_verified,
         config.desktop_install_path_verified,
         local_addr.ip() == IpAddr::V4(Ipv4Addr::LOCALHOST),
     );

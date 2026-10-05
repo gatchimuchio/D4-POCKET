@@ -2083,7 +2083,8 @@ struct RunningBroker {
 impl RunningBroker {
     fn start(
         runtime_dir: &Path,
-        installed_package_verified: bool,
+        package_layout_verified: bool,
+        installed_path_verified: bool,
         product_identity: Option<ProductRuntimeIdentity>,
     ) -> Result<Self, DesktopLaunchError> {
         let store_dir = ensure_store_directory(runtime_dir)?;
@@ -2105,7 +2106,8 @@ impl RunningBroker {
         let thread_shutdown = Arc::clone(&shutdown);
         let mut config = BrokerServerConfig::new(store_dir, session_file.clone());
         config.desktop_protected_store_dir = Some(protected_store_dir);
-        config.desktop_install_path_verified = installed_package_verified;
+        config.desktop_package_layout_verified = package_layout_verified;
+        config.desktop_install_path_verified = installed_path_verified;
         let (ready_tx, ready_rx) = mpsc::sync_channel(1);
         let (owner_operation_tx, owner_operation_rx) = mpsc::sync_channel(1);
         let server = thread::Builder::new()
@@ -2412,7 +2414,9 @@ pub fn run() -> Result<(), DesktopLaunchError> {
     let product_identity = compiled_product_runtime_identity()?;
     let runtime_dir = runtime_directory_with_identity(&local_app_data, product_identity.as_ref())?;
     let _instance_lock = acquire_instance_lock(&runtime_dir)?;
-    let mut broker = RunningBroker::start(&runtime_dir, true, product_identity)?;
+    // package構成の検証はinstalled rootの由来確認とは別の証拠である。
+    // P11のBroker統治Installerが未接続のため、installed証拠はまだ渡さない。
+    let mut broker = RunningBroker::start(&runtime_dir, true, false, product_identity)?;
 
     let frontend_result = launch_frontend(&layout, &broker);
     let broker_result = broker.finish();
@@ -4496,7 +4500,7 @@ mod tests {
         let server = thread::spawn(move || {
             let mut config = BrokerServerConfig::new(server_store_dir, server_session_file);
             config.owner_session_file = Some(owner_session_file);
-            config.desktop_install_path_verified = true;
+            config.desktop_package_layout_verified = true;
             crate::broker::ipc_server::run_loopback_server_cancellable_with_owner_operations(
                 config,
                 server_shutdown,

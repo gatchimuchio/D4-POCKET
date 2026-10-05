@@ -84,7 +84,7 @@ reportは機密・path・資格を含まない最大64 KiBのJSONとし、Broker
 
 ### 8.2 Broker統治の初回UI設定
 
-Windows Rust Desktop起動器がinstalled package配置を検証した場合に限り、Brokerはruntime identityに対応する固定durable store内のfirst_run_configuration.jsonを初回起動時に生成する。generic GUI Shellではpathは%LOCALAPPDATA%\GUI-Shell\broker\desktop\store\first_run_configuration.json、D4 Pocket Exportでは%LOCALAPPDATA%\D4Pocket\apps\<App ID>\stores\<Audit store ID>\store\first_run_configuration.jsonである。要求本文・環境変数・UIがpathを指定できない。開発Broker、installed配置未検証、永続store未接続では生成済みと扱わない。
+Windows Rust Desktop起動器が固定sibling構成のpackage layoutを検証した場合に限り、Brokerはruntime identityに対応する固定durable store内のfirst_run_configuration.jsonを初回起動時に生成する。generic GUI Shellではpathは%LOCALAPPDATA%\GUI-Shell\broker\desktop\store\first_run_configuration.json、D4 Pocket Exportでは%LOCALAPPDATA%\D4Pocket\apps\<App ID>\stores\<Audit store ID>\store\first_run_configuration.jsonである。要求本文・環境変数・UIがpathを指定できない。開発Broker、package layout未検証、永続store未接続では生成済みと扱わない。package layout検証は配置構造の検査だけであり、署名・信頼・installed root・配布元を証明しない。
 
 設定内容はspecs/first_run_configuration.schema.jsonの日本語UI既定値だけとする。追加field、Profile、Permission、Capability、Approval、Authority、Runtime、Agent、Credential、監査内容、filesystem pathを含めない。設定は要求設定であり権限源ではない。現在の初回契約では既定値だけを受理し、利用者設定の更新・migrationは別contractが成立するまで行わない。
 
@@ -92,4 +92,6 @@ Windows Rust Desktop起動器がinstalled package配置を検証した場合に�
 
 境界対応はCapability=製品初回設定、Permission=固定store内の初期設定一fileだけをcreate-onlyで作成・読取、Approval=固定かつ非権限の既定値初期化のため不要、AuditEvent=受信・生成または既存検証・拒否。acceptedのpayload hashは設定byte列、RecoveryAction=既存fileを保持し、保存物を保全した上で固定storeの破損原因を確認して再起動、とする。Runtime Capability、要求metadata、ProfileからこのPermissionを得ない。
 
-Flutterは既存の認証済みBroker IPCで初回設定の安全なprojectionを取得し、UI preferenceとしてだけ使用する。接続失敗、拒否、unknown field、非既定値、不一致応答では、設定を推測・合成せず、Broker未利用のlocal fallbackへ切り替えない。Setup Doctorのconfig_createdは、installed pathが検証済みで、Brokerが固定storeの設定をSchema検証し、Auditへhash結合できた同一runtimeだけでpassにできる。別Windows profileからのclean installed実測はこの実装状態だけでは証明されず、release evidenceを別途要する。
+Setup Doctorの`ran_from_installed_app_path`はpackage layout検証とは別の実行時根拠で判定する。正式installed rootの独立検証がないportable起動では`unknown`のままにし、package layout検証や初回設定生成をinstalled証拠へ昇格しない。installed rootを確定する導入contractはP11でBroker統治Installerを接続するときに定義する。
+
+Flutterは既存の認証済みBroker IPCで初回設定の安全なprojectionを取得し、UI preferenceとしてだけ使用する。接続失敗、拒否、unknown field、非既定値、不一致応答では、設定を推測・合成せず、Broker未利用のlocal fallbackへ切り替えない。Setup Doctorのconfig_createdは、package layoutが検証済みで、Brokerが固定storeの設定をSchema検証し、Auditへhash結合できた同一runtimeだけでpassにできる。これはinstalled pathの判定と独立である。別Windows profileからのclean installed実測はこの実装状態だけでは証明されず、release evidenceを別途要する。

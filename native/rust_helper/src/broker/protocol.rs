@@ -960,6 +960,7 @@ pub struct Broker {
     pub(super) state_store: BrokerStateStore,
     agent_task_scratch: Option<super::agent_task_scratch::AgentTaskScratchJournal>,
     pub(super) desktop_export_root: Option<(std::path::PathBuf, cap_std::fs::Dir)>,
+    desktop_package_layout_verified: bool,
     desktop_install_path_verified: bool,
     desktop_agent_workspace_protected_paths: Vec<PathBuf>,
     desktop_loopback_bind_verified: bool,
@@ -999,6 +1000,7 @@ impl Broker {
             state_store: BrokerStateStore::in_memory_skeleton(),
             agent_task_scratch: None,
             desktop_export_root: None,
+            desktop_package_layout_verified: false,
             desktop_install_path_verified: false,
             desktop_agent_workspace_protected_paths: Vec::new(),
             desktop_loopback_bind_verified: false,
@@ -1072,6 +1074,7 @@ impl Broker {
             state_store: BrokerStateStore::durable_file_store(persistent_store),
             agent_task_scratch: Some(agent_task_scratch),
             desktop_export_root: None,
+            desktop_package_layout_verified: false,
             desktop_install_path_verified: false,
             desktop_agent_workspace_protected_paths: Vec::new(),
             desktop_loopback_bind_verified: false,
@@ -1176,9 +1179,11 @@ impl Broker {
 
     pub(crate) fn set_desktop_setup_doctor_runtime_evidence(
         &mut self,
+        package_layout_verified: bool,
         installed_path_verified: bool,
         loopback_bind_verified: bool,
     ) {
+        self.desktop_package_layout_verified = package_layout_verified;
         self.desktop_install_path_verified = installed_path_verified;
         self.desktop_loopback_bind_verified = loopback_bind_verified;
     }
@@ -1293,7 +1298,7 @@ impl Broker {
                 payload_hash,
             );
         }
-        if !self.desktop_install_path_verified
+        if !self.desktop_package_layout_verified
             || self.desktop_agent_workspace_protected_paths.is_empty()
         {
             return self.reject_with_payload_hash(
@@ -1484,9 +1489,9 @@ impl Broker {
     pub(crate) fn initialize_desktop_first_run_configuration(
         &mut self,
     ) -> Result<(), BrokerStoreError> {
-        if !self.desktop_install_path_verified {
+        if !self.desktop_package_layout_verified {
             return Err(BrokerStoreError::MalformedFirstRunConfiguration(
-                "installed package配置の検証がない".to_string(),
+                "Rust起動器による固定package配置の検証がない".to_string(),
             ));
         }
         let operation = "D4 Pocket初回設定生成";
@@ -4596,7 +4601,7 @@ impl Broker {
                 if self.desktop_first_run_configuration.is_some() {
                     "Rust Brokerが固定storeの初回UI設定をSchema検証し、Audit hashへ結合しました。"
                 } else {
-                    "installed Desktop起動器が検証した初回UI設定を確認できません。"
+                    "検証済みDesktop packageの初回UI設定を確認できません。"
                 },
                 "設定状態を確認できない場合はRust Desktop起動器から再起動し、固定Broker storeとAuditを確認してください。",
                 if self.desktop_first_run_configuration.is_some() { EVIDENCE_SOURCE_LIVE_RUNTIME } else { "CONFIG" },
@@ -5531,7 +5536,7 @@ mod tests {
     #[test]
     fn agent_cli_runtime_workspace_registration_requires_desktop_native_owner_confirmation() {
         let mut broker = test_broker();
-        broker.desktop_install_path_verified = true;
+        broker.desktop_package_layout_verified = true;
         broker.desktop_agent_workspace_protected_paths =
             vec![std::env::temp_dir().join("gui-shell-protected")];
 
@@ -5563,7 +5568,7 @@ mod tests {
     }
 
     #[test]
-    fn agent_cli_runtime_workspace_registration_requires_verified_desktop_installation() {
+    fn agent_cli_runtime_workspace_registration_requires_verified_desktop_package_layout() {
         let mut broker = test_broker();
         let mut request =
             codex_registration_request("codex-register-unverified", "codex-register-unverified");
@@ -5586,7 +5591,7 @@ mod tests {
     #[test]
     fn agent_cli_runtime_workspace_registration_rejects_unknown_adapter_id() {
         let mut broker = test_broker();
-        broker.desktop_install_path_verified = true;
+        broker.desktop_package_layout_verified = true;
         broker.desktop_agent_workspace_protected_paths =
             vec![std::env::temp_dir().join("gui-shell-protected")];
         let mut request = codex_registration_request("unknown-adapter", "unknown-adapter");
@@ -6040,7 +6045,11 @@ mod tests {
         assert!(broker.initialize_desktop_first_run_configuration().is_err());
         assert!(!root.join("first_run_configuration.json").exists());
 
-        broker.set_desktop_setup_doctor_runtime_evidence(true, true);
+        broker.set_desktop_setup_doctor_runtime_evidence(false, true, false);
+        assert!(broker.initialize_desktop_first_run_configuration().is_err());
+        assert!(!root.join("first_run_configuration.json").exists());
+
+        broker.set_desktop_setup_doctor_runtime_evidence(true, true, true);
         broker.initialize_desktop_first_run_configuration().unwrap();
         let bytes = fs::read(root.join("first_run_configuration.json")).unwrap();
         let created_hash = crate::audit_hash::sha256_tagged(&bytes);
@@ -6097,13 +6106,43 @@ mod tests {
     }
 
     #[test]
+    fn portable_package_layout_keeps_installed_path_unknown() {
+        let root = temp_store_dir("portable-package-layout");
+        let mut broker = Broker::new_persistent("portable-package-session", &root).unwrap();
+        broker.set_desktop_setup_doctor_runtime_evidence(true, false, true);
+        broker
+            .initialize_desktop_first_run_configuration()
+            .expect("検証済みportable packageのUI設定をBrokerが作成する");
+
+        let mut request = setup_doctor_request("portable-package-report", json!({"version": 1}));
+        request.session_id = Some("portable-package-session".to_string());
+        let response = broker.handle(request);
+        assert_eq!(
+            response.status,
+            BrokerStatus::Accepted,
+            "{:?}",
+            response.error
+        );
+        let report = response.body.expect("Broker生成Setup Doctor report");
+        assert_eq!(report["checks"][0]["status"], "unknown");
+        assert_eq!(report["checks"][0]["evidence_class"], "CONFIG");
+        assert_eq!(report["checks"][6]["status"], "pass");
+        assert_eq!(
+            report["checks"][6]["evidence_class"],
+            EVIDENCE_SOURCE_LIVE_RUNTIME
+        );
+        assert_eq!(report["status"], "warning");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn malformed_existing_first_run_configuration_is_not_replaced() {
         let root = temp_store_dir("first-run-config-preserve");
         let target = root.join("first_run_configuration.json");
         let original = br#"{"version":1,"product":"D4 Pocket","ui_preferences":{"theme":"dark","density":"compact","locale":"ja-JP"}}"#;
         fs::write(&target, original).unwrap();
         let mut broker = Broker::new_persistent("first-run-session", &root).unwrap();
-        broker.set_desktop_setup_doctor_runtime_evidence(true, false);
+        broker.set_desktop_setup_doctor_runtime_evidence(true, true, false);
         assert!(broker.initialize_desktop_first_run_configuration().is_err());
         assert_eq!(fs::read(&target).unwrap(), original);
         assert!(broker.audit_events().iter().any(|event| {
@@ -6116,7 +6155,7 @@ mod tests {
     fn setup_doctor_report_is_broker_generated_audited_and_keeps_unknown_unknown() {
         let root = temp_store_dir("setup-doctor-report");
         let mut broker = Broker::new_persistent("setup-doctor-session", &root).unwrap();
-        broker.set_desktop_setup_doctor_runtime_evidence(true, true);
+        broker.set_desktop_setup_doctor_runtime_evidence(true, true, true);
 
         let response = broker.handle(setup_doctor_request(
             "setup-report-1",
