@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/agent_handoff_package.schema.json",
+  "title": "Agent Handoff公開package",
+  "description": "送信Agentの明示Task入力とContent Exposure承認済み結果から作る未信頼データ。受信Agent Taskの本文としてのみ渡し、Authorityを含めない。",
+  "type": "object",
+  "required": [
+    "version",
+    "handoff_id",
+    "source_task_id",
+    "source_session_id",
+    "source_agent_runtime_id",
+    "source_workspace_id",
+    "target_session_id",
+    "target_agent_runtime_id",
+    "target_workspace_id",
+    "task_context",
+    "approved_result_hash",
+    "approved_result",
+    "result_summary",
+    "artifacts",
+    "changed_files",
+    "diff",
+    "test_result",
+    "authority_reassessment_required",
+    "permission_reused",
+    "approval_reused",
+    "credential_included",
+    "hidden_context_included"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {"const": 1},
+    "handoff_id": {"$ref": "#/$defs/id"},
+    "source_task_id": {"$ref": "#/$defs/id"},
+    "source_session_id": {"$ref": "#/$defs/id"},
+    "source_agent_runtime_id": {"$ref": "#/$defs/id"},
+    "source_workspace_id": {"$ref": "#/$defs/id"},
+    "target_session_id": {"$ref": "#/$defs/id"},
+    "target_agent_runtime_id": {"$ref": "#/$defs/id"},
+    "target_workspace_id": {"$ref": "#/$defs/id"},
+    "task_context": {"type": "string", "minLength": 1, "maxLength": 8192},
+    "approved_result_hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"},
+    "approved_result": {"type": "string", "minLength": 1, "maxLength": 32768},
+    "result_summary": {"type": "string", "minLength": 1, "maxLength": 2048},
+    "artifacts": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "required": ["name", "content"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {"type": "string", "minLength": 1, "maxLength": 256},
+          "content": {"type": "string", "minLength": 1, "maxLength": 8192}
+        }
+      }
+    },
+    "changed_files": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 512,
+        "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(/|$))(?!.*\\\\)(?!.*:)[^\\u0000-\\u001f\\u007f]+$"
+      }
+    },
+    "diff": {"type": "string", "minLength": 1, "maxLength": 8192},
+    "test_result": {"type": "string", "minLength": 1, "maxLength": 2048},
+    "authority_reassessment_required": {"const": true},
+    "permission_reused": {"const": false},
+    "approval_reused": {"const": false},
+    "credential_included": {"const": false},
+    "hidden_context_included": {"const": false}
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$(?![\\s\\S])"
+    }
+  }
+}

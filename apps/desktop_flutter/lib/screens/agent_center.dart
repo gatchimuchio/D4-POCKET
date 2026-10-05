@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../models/generated_contracts.dart';
 import '../services/agent_task_client.dart';
+import '../services/agent_handoff.dart';
 import '../services/broker_client.dart' show BrokerClientException;
 import '../services/runtime_dialogue_client.dart' show RuntimeDialogueClient;
 import '../services/shell_core_client.dart';
@@ -28,12 +29,18 @@ class AgentCenter extends StatefulWidget {
 
 class _AgentTaskUiState {
   _AgentTaskUiState({
-    required this.request,
+    required AgentTaskRequest request,
     required AgentTaskPreflight preflight,
-  })  : permissionStatus = preflight.permissionStatus,
+    this.handoffPackage,
+  })  : request = request,
+        taskContext = request.instruction,
+        permissionStatus = preflight.permissionStatus,
         approvalStatus = preflight.approvalStatus;
 
   AgentTaskRequest? request;
+  String? taskContext;
+  AgentHandoffPackage? handoffPackage;
+  Map<String, Object?>? handoffReceipt;
   String permissionStatus;
   String approvalStatus;
   String resultVisibility = 'hash_only';
@@ -94,6 +101,11 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
   String? _comparisonApplyStatus;
   _AgentComparisonUiState? _comparison;
   bool _showCompareWorkspaceInspectors = false;
+  bool _handoffPending = false;
+  String? _handoffSourceSessionId;
+  String? _handoffTargetSessionId;
+  String? _handoffStatus;
+  AgentHandoffPackage? _handoffPreview;
   late List<AgentSessionRecord> _sessions;
   final List<_CodexRegistrationInput> _registrations = [];
 
@@ -146,13 +158,18 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
 
   bool get _active => widget.active && _appActive;
 
-  void _clearAllResultProjections() {
+  void _clearAllResultProjections({String? preserveTaskContextForSession}) {
     _resultGeneration++;
     _resultClearTimer?.cancel();
     _resultClearTimer = null;
-    for (final task in _agentTasks.values) {
+    for (final entry in _agentTasks.entries) {
+      final task = entry.value;
       task.resultProjection = null;
+      if (entry.key != preserveTaskContextForSession) {
+        task.taskContext = null;
+      }
     }
+    _handoffPreview = null;
   }
 
   Future<void> _registerCodexRuntime() async {
@@ -771,6 +788,145 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     }
   }
 
+  List<AgentSessionRecord> _handoffSources() => _sessions.where((session) {
+        final state = _agentTasks[session.sessionId];
+        final task = state?.record;
+        final projection = state?.resultProjection;
+        return _sessionAvailable(session) &&
+            task?.status == 'completed' &&
+            task?.resultContentAvailable == true &&
+            projection?.visibility == 'full' &&
+            projection?.text != null &&
+            projection?.taskId == task?.taskId &&
+            projection?.resultHash == task?.resultHash &&
+            state?.taskContext?.trim().isNotEmpty == true;
+      }).toList(growable: false);
+
+  List<AgentSessionRecord> _handoffTargets(AgentSessionRecord? source) {
+    if (source == null) return const [];
+    return _sessions.where((target) {
+      return _sessionAvailable(target) &&
+          target.sessionId != source.sessionId &&
+          target.agentRuntimeId != source.agentRuntimeId &&
+          target.workspace != source.workspace &&
+          !_agentTasks.containsKey(target.sessionId);
+    }).toList(growable: false);
+  }
+
+  Future<void> _previewAgentHandoff() async {
+    final sources = _handoffSources();
+    final source = sources.cast<AgentSessionRecord?>().firstWhere(
+          (session) => session?.sessionId == _handoffSourceSessionId,
+          orElse: () => sources.isEmpty ? null : sources.first,
+        );
+    final targets = _handoffTargets(source);
+    final target = targets.cast<AgentSessionRecord?>().firstWhere(
+          (session) => session?.sessionId == _handoffTargetSessionId,
+          orElse: () => targets.isEmpty ? null : targets.first,
+        );
+    if (source == null || target == null) {
+      setState(
+          () => _handoffStatus = '完了済みfull結果を持つ送信Agentと、未使用の独立受信Sessionが必要です。');
+      return;
+    }
+    final sourceState = _agentTasks[source.sessionId]!;
+    try {
+      final package = AgentHandoffPackage.fromSource(
+        source: source,
+        task: sourceState.record!,
+        taskContext: sourceState.taskContext!,
+        result: sourceState.resultProjection!,
+        target: target,
+      );
+      setState(() {
+        _handoffSourceSessionId = source.sessionId;
+        _handoffTargetSessionId = target.sessionId;
+        _handoffPreview = package;
+        _handoffStatus = '内容を確認してください。ここではBroker要求・権限・Taskを発行していません。';
+      });
+    } on BrokerClientException catch (error) {
+      setState(() {
+        _handoffPreview = null;
+        _handoffStatus = error.message;
+      });
+    }
+  }
+
+  Future<void> _prepareAgentHandoffTask() async {
+    final package = _handoffPreview;
+    final source = _sessionById(package?.sourceSessionId ?? '');
+    final target = _sessionById(package?.targetSessionId ?? '');
+    final sourceState = source == null ? null : _agentTasks[source.sessionId];
+    if (package == null ||
+        source == null ||
+        target == null ||
+        sourceState?.record?.taskId != package.sourceTaskId ||
+        sourceState?.resultProjection?.visibility != 'full' ||
+        sourceState?.resultProjection?.resultHash !=
+            package.approvedResultHash ||
+        !_sessionAvailable(source) ||
+        !_sessionAvailable(target) ||
+        _agentTasks.containsKey(target.sessionId)) {
+      setState(() {
+        _handoffPreview = null;
+        _handoffStatus = 'Handoff元の結果または受信先Sessionが変化したため停止しました。';
+      });
+      return;
+    }
+    final request = AgentTaskRequest(
+      runtimeId: target.agentRuntimeId,
+      sessionId: target.sessionId,
+      workspaceId: target.workspace,
+      instruction: package.toInstruction(),
+    );
+    try {
+      request.validate();
+    } on BrokerClientException catch (error) {
+      setState(() => _handoffStatus = error.message);
+      return;
+    }
+    final transport = widget.client.brokerTransport;
+    if (transport == null) {
+      setState(() => _handoffStatus = '安全BrokerがないためHandoffを停止しました。');
+      return;
+    }
+    setState(() {
+      _handoffPending = true;
+      _handoffStatus = '受信Agentの新規TaskをBrokerで事前検査中です。';
+    });
+    try {
+      final preflight = await AgentTaskClient(transport).inspect(request);
+      if (!mounted ||
+          !_sessionAvailable(source) ||
+          !_sessionAvailable(target) ||
+          sourceState?.record?.taskId != package.sourceTaskId ||
+          sourceState?.resultProjection?.resultHash !=
+              package.approvedResultHash ||
+          _agentTasks.containsKey(target.sessionId)) {
+        return;
+      }
+      setState(() {
+        _agentTasks[target.sessionId] = _AgentTaskUiState(
+          request: request,
+          preflight: preflight,
+          handoffPackage: package,
+        );
+        _taskPreflightStatus[target.sessionId] =
+            'Handoff内容を新規Taskとして事前検査しました。PermissionとApprovalは移送されていません。';
+        _handoffPreview = null;
+        _handoffStatus =
+            '受信Taskを準備しました。受信先のWorkspace PermissionとTask Approvalを新規に取得してください。';
+      });
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _handoffStatus = error is BrokerClientException
+          ? error.message
+          : '受信AgentのHandoff事前検査に失敗しました。');
+    } finally {
+      if (mounted) setState(() => _handoffPending = false);
+    }
+  }
+
   bool _sessionStillMatchesRegistration(AgentSessionRecord session) {
     return _sessionAvailable(session);
   }
@@ -865,6 +1021,14 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
         );
       }
       state.record = await client.start(state.request!);
+      final handoffPackage = state.handoffPackage;
+      if (handoffPackage != null) {
+        state.handoffReceipt = buildAgentHandoffReceipt(
+          package: handoffPackage,
+          targetTask: state.record!,
+        );
+        state.handoffPackage = null;
+      }
       state.request = null;
     });
   }
@@ -918,7 +1082,9 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     }
     final taskId = task.taskId;
     final visibility = state.resultVisibility;
-    _clearAllResultProjections();
+    _clearAllResultProjections(
+      preserveTaskContextForSession: session.sessionId,
+    );
     final resultGeneration = _resultGeneration;
     setState(() {
       _taskPreflightSession = session.sessionId;
@@ -1023,6 +1189,18 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
           if (task != null) '終了監査参照: ${task.auditEventId}',
         ],
       ),
+      if (taskState.handoffReceipt case final receipt?)
+        SectionList(
+          title: 'Agent引き継ぎ記録',
+          rows: [
+            '引き継ぎID: ${receipt['handoff_id']}',
+            '送信元Task: ${receipt['source_task_id']}',
+            '受信Session: ${receipt['target_session_id']}',
+            '承認済み結果hash: ${receipt['approved_result_hash']}',
+            '受信Task開始Audit: ${receipt['audit_event_id']}',
+            '権限は非継承。受信Taskは新規Permission／Approvalで開始',
+          ],
+        ),
       if (task == null && taskState.permissionStatus != '有効')
         OutlinedButton(
           key: ValueKey('agent-task-permission-${session.sessionId}'),
@@ -1077,7 +1255,9 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
               ? null
               : (value) {
                   if (value == null) return;
-                  _clearAllResultProjections();
+                  _clearAllResultProjections(
+                    preserveTaskContextForSession: session.sessionId,
+                  );
                   setState(() {
                     taskState.resultVisibility = value;
                   });
@@ -1166,6 +1346,99 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _agentHandoffPanel() {
+    final sources = _handoffSources();
+    final selectedSources = sources
+        .where((session) => session.sessionId == _handoffSourceSessionId)
+        .toList(growable: false);
+    final source = selectedSources.isNotEmpty
+        ? selectedSources.first
+        : (sources.isEmpty ? null : sources.first);
+    final targets = _handoffTargets(source);
+    final selectedTargets = targets
+        .where((session) => session.sessionId == _handoffTargetSessionId)
+        .toList(growable: false);
+    final target = selectedTargets.isNotEmpty
+        ? selectedTargets.first
+        : (targets.isEmpty ? null : targets.first);
+    final preview = _handoffPreview;
+    return BorderedPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Agent引き継ぎ'),
+          const Text(
+            '完了済みTaskの元入力とnative Owner確認済みfull結果を、独立した未使用Sessionの新規Taskへ渡します。artifact・changed files・diff・test結果はAgent申告として扱い、実証済みの試験とはみなしません。',
+          ),
+          DropdownButton<String>(
+            key: const ValueKey('agent-handoff-source'),
+            isExpanded: true,
+            value: source?.sessionId,
+            hint: const Text('Handoff元の完了Agent Taskを選択'),
+            items: sources
+                .map((session) => DropdownMenuItem(
+                      value: session.sessionId,
+                      child: Text(
+                          '${session.agentRuntimeId} / ${session.workspace}'),
+                    ))
+                .toList(growable: false),
+            onChanged: _handoffPending || sources.isEmpty
+                ? null
+                : (value) => setState(() {
+                      _handoffSourceSessionId = value;
+                      _handoffTargetSessionId = null;
+                      _handoffPreview = null;
+                      _handoffStatus = null;
+                    }),
+          ),
+          DropdownButton<String>(
+            key: const ValueKey('agent-handoff-target'),
+            isExpanded: true,
+            value: target?.sessionId,
+            hint: const Text('Handoff先の独立Sessionを選択'),
+            items: targets
+                .map((session) => DropdownMenuItem(
+                      value: session.sessionId,
+                      child: Text(
+                          '${session.agentRuntimeId} / ${session.workspace}'),
+                    ))
+                .toList(growable: false),
+            onChanged: _handoffPending || targets.isEmpty
+                ? null
+                : (value) => setState(() {
+                      _handoffTargetSessionId = value;
+                      _handoffPreview = null;
+                      _handoffStatus = null;
+                    }),
+          ),
+          OutlinedButton(
+            key: const ValueKey('preview-agent-handoff'),
+            onPressed: _handoffPending || source == null || target == null
+                ? null
+                : _previewAgentHandoff,
+            child: const Text('引き継ぎ内容を確認'),
+          ),
+          if (preview != null) ...[
+            const Text('受信Taskへ渡す正確な公開データ（Agent申告は未検証）'),
+            SelectableText(
+              jsonEncode(preview.toJson()),
+              key: const ValueKey('agent-handoff-preview'),
+            ),
+            FilledButton(
+              key: const ValueKey('prepare-agent-handoff'),
+              onPressed: _handoffPending ? null : _prepareAgentHandoffTask,
+              child: Text(_handoffPending ? 'Broker応答待ち' : 'この内容で受信側Taskを事前検査'),
+            ),
+          ],
+          if (_handoffStatus != null) Text(_handoffStatus!),
+          const Text(
+            '受信側は通常のBroker経路で再評価します。Permission／Approval／Credential／Authority／Trust／hidden stateは含めません。Handoff監査参照は受信Task開始のAudit IDであり、独立したHandoff Broker操作を意味しません。',
+          ),
+        ],
       ),
     );
   }
@@ -1569,15 +1842,17 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
             ],
           ),
         ),
-        const BorderedPanel(
-          child: SectionList(
-            title: 'Agent引き継ぎ',
-            rows: [
-              '未接続です。Task成果・diff・試験結果のBroker経路が成立するまで引き継ぎ概要を生成しません。',
-              '接続後もAuthority・Permission・Approval・Credential・hidden contextは引き継がず、target条件で再評価します。',
-            ],
+        if (client.mode == 'broker') _agentHandoffPanel(),
+        if (client.mode != 'broker')
+          const BorderedPanel(
+            child: SectionList(
+              title: 'Agent引き継ぎ',
+              rows: [
+                '未接続です。Task成果・diff・試験結果をBrokerから取得できない模擬画面では引き継ぎを生成しません。',
+                '接続後もAuthority・Permission・Approval・Credential・hidden contextは引き継がず、target条件で再評価します。',
+              ],
+            ),
           ),
-        ),
         if (client.mode != 'broker' && snapshot.agentSessions.isNotEmpty)
           const BorderedPanel(
             child: SectionList(

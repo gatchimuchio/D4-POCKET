@@ -1,10 +1,13 @@
 {
   "handoff_id": "handoff.agent.1",
+  "source_task_id": "task-source-1",
   "source_session_id": "agent-session-a",
   "source_agent_runtime_id": "codex",
+  "target_session_id": "agent-session-b",
   "target_agent_runtime_id": "claude",
   "source_workspace_id": "workspace-a",
   "target_workspace_id": "workspace-b",
+  "approved_result_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "task_summary": "文書を更新する",
   "diff_summary": "2 files changed",
   "test_status": "適合検査に合格",

@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "handoff_id": "handoff.task-source-1.agent-session-b",
+  "source_task_id": "task-source-1",
+  "source_session_id": "agent-session-a",
+  "source_agent_runtime_id": "codex-a",
+  "source_workspace_id": "workspace-a",
+  "target_session_id": "agent-session-b",
+  "target_agent_runtime_id": "codex-b",
+  "target_workspace_id": "workspace-b",
+  "task_context": "公開文書を更新する",
+  "approved_result_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "approved_result": "{\"result_summary\":\"見出しを追加した\",\"artifacts\":[{\"name\":\"patch.txt\",\"content\":\"diff --git a/README.md b/README.md\"}],\"changed_files\":[\"README.md\"],\"diff\":\"+## 更新\\n\",\"test_result\":\"Agent申告: 文書検査に合格（独立検証なし）\"}",
+  "result_summary": "見出しを追加した",
+  "artifacts": [
+    {"name": "patch.txt", "content": "diff --git a/README.md b/README.md"}
+  ],
+  "changed_files": ["README.md"],
+  "diff": "+## 更新\n",
+  "test_result": "Agent申告: 文書検査に合格（独立検証なし）",
+  "authority_reassessment_required": true,
+  "permission_reused": false,
+  "approval_reused": false,
+  "credential_included": false,
+  "hidden_context_included": false
+}

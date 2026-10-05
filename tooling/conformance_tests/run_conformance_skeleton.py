@@ -189,6 +189,7 @@ REQUIRED_SCHEMA_NAMES = {
     "agent_diff",
     "agent_comparison",
     "agent_handoff",
+    "agent_handoff_package",
     "gui_shell_compose",
     "gui_shell_compose_receipt",
     "gui_shell_preview",
@@ -8757,7 +8758,51 @@ def test_agent_handoff_projection_requires_reassessment_and_redaction() -> list[
         load_contract_fixture("invalid/agent_handoff_authority.invalid.json"), schema
     ):
         return ["agent handoffのAuthority・秘密値混入negativeが拒否されない"]
+
+    package = load_contract_fixture("agent_handoff_package.valid.json")
+    package_schema = load_schema("agent_handoff_package.schema.json")
+    if validate_instance(package, package_schema):
+        return ["agent handoff packageの正常fixtureがSchemaに適合しない"]
+    if package.get("source_session_id") == package.get("target_session_id") or \
+            package.get("source_agent_runtime_id") == package.get("target_agent_runtime_id") or \
+            package.get("source_workspace_id") == package.get("target_workspace_id"):
+        return ["agent handoff packageの送信元・受信先が独立していない"]
+    if not validate_instance(
+        load_contract_fixture("invalid/agent_handoff_package_authority.invalid.json"),
+        package_schema,
+    ):
+        return ["agent handoff packageのAuthority混入negativeが拒否されない"]
+    same_session = copy.deepcopy(package)
+    same_session["target_session_id"] = same_session["source_session_id"]
+    if not agent_handoff_package_errors(same_session):
+        return ["agent handoff packageが同じSessionを受入れた"]
+    unsafe_path = copy.deepcopy(package)
+    unsafe_path["changed_files"] = ["../secrets/token.txt"]
+    if not validate_instance(unsafe_path, package_schema):
+        return ["agent handoff packageがWorkspace外相対pathを受け入れた"]
     return []
+
+
+def agent_handoff_package_errors(package: dict) -> list[str]:
+    errors = []
+    for source_key, target_key in (
+        ("source_session_id", "target_session_id"),
+        ("source_agent_runtime_id", "target_agent_runtime_id"),
+        ("source_workspace_id", "target_workspace_id"),
+    ):
+        if package.get(source_key) == package.get(target_key):
+            errors.append(f"handoff packageの{source_key}/{target_key}が同一")
+    for key in (
+        "authority_reassessment_required",
+        "permission_reused",
+        "approval_reused",
+        "credential_included",
+        "hidden_context_included",
+    ):
+        expected = key == "authority_reassessment_required"
+        if package.get(key) is not expected:
+            errors.append(f"handoff packageの{key}が不正")
+    return errors
 
 
 def test_gui_shell_compose_is_manifest_only_and_non_inheriting() -> list[str]:

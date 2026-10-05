@@ -158,6 +158,7 @@ REQUIRED = {
     "agent_diff.schema.json",
     "agent_comparison.schema.json",
     "agent_handoff.schema.json",
+    "agent_handoff_package.schema.json",
     "gui_shell_compose.schema.json",
     "gui_shell_compose_receipt.schema.json",
     "gui_shell_preview.schema.json",

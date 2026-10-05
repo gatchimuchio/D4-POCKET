@@ -1,6 +1,6 @@
 # Agent比較・Handoffの境界付き契約
 
-> 現行製品工程と実装状況の正本は`docs/REV5_PRODUCT_PROGRESS.md`およびユーザー提示の最新rev5文書である。本書中の過去状態・未接続記述は履歴スナップショットとして扱い、現在の受入れ状態を上書きしない。2026-10-05時点でDesktop Agent Centerは複数Runtime／WorkspaceのBroker内登録と、登録ごとのSession開始に対応した。登録はAuthorityを生成せず、実Compare runは未接続である。
+> 現行製品工程と実装状況の正本は`docs/REV5_PRODUCT_PROGRESS.md`およびユーザー提示の最新rev5文書である。本書中の過去状態・未接続記述は履歴スナップショットとして扱い、現在の受入れ状態を上書きしない。2026-10-05時点でDesktop Agent Centerは複数Runtime／WorkspaceのBroker内登録、Session開始、Product Build上のCompare、bounded Agent Handoffを実装した。Compare／Handoff試験は`FIXTURE`であり、実Codex installed経路やrelease readinessの証拠ではない。
 
 ## 目的
 
@@ -28,7 +28,7 @@ Brokerの`Agent一覧`はAdapterが返すmetadataを未信頼の宣言として�
 
 ## Agent引き継ぎ
 
-`agent_handoff.schema.json`のHandoff投影が渡すのは、Task概要、差分概要、試験状態、公開実行概要だけである。次は固定して引き継がない。
+`agent_handoff_package.schema.json`が定めるbounded packageは、送信Taskの明示instruction、full Content Exposureをnative Ownerが許可したresultとそのhash、result本文の厳密形式から得るartifact／changed files／diff／test申告を含む。送信resultは、未知fieldのないJSON objectで、`result_summary`（2048文字以下）、`artifacts`（最大8件。各`name` 256文字以下・`content` 8192文字以下）、`changed_files`（最大64件の相対path）、`diff`（8192文字以下）、`test_result`（2048文字以下）を持つ。空値、絶対path、親directoryへの遡り、余分なfieldは拒否する。引継ぐTask contextは8192 rune以下、生成する受信Task本文全体は32768 rune以下とする。Task contextはresult本文と同じ5分間・foreground表示寿命に限りFlutter memoryに保持し、結果期限、画面離脱、app background／終了で消去する。artifact内容とAgentのdiff／test申告は未信頼であり、独立検証済みとして扱わない。受信側は独立Runtime／Workspace／Sessionで新規Agent TaskとしてBroker事前検査し、Workspace PermissionとTask Owner Approvalを改めて取得する。
 
 - 権限
 - Permission
@@ -36,13 +36,13 @@ Brokerの`Agent一覧`はAdapterが返すmetadataを未信頼の宣言として�
 - Credential実値
 - 非公開コンテキスト
 
-target Agentの条件でAuthorityを再評価することを必須とする。Handoff投影は引き継ぎ操作を実行せず、対象Agentの起動、Workspace作成、Approval、監査確定、復旧操作はBroker統治経路が別途成立するまで`unsupported`または`release_blocker`として扱う。
+権限、Permission、Approval、Credential実値、Trust、hidden runtime stateはpackageへ含めない。`agent_handoff.schema.json`のreceiptは受信Task start responseから生成し、そのAudit IDは受信Task開始Auditを指す。現在は独立したHandoff Broker operation／AuditEventを定義していない。Brokerによる受信Taskの新規事前検査・Permission・Approval・Task開始経路がreceipt生成に先行し、target Agent側で再評価する。
 
 ## UI責任
 
-Desktop Agent Centerは、product modeではBrokerが返したAgent対話SessionのID・状態・監査参照・登録Workspace IDだけを実値として表示する。`local`／`mock` snapshotのAgent sessionは実行結果として表示しない。Task、diff、Tool、command情報は現在のBroker一覧contractにないため表示しない。従来の実行情報surfaceは項目名と「Brokerから未取得」等の明示状態に限り残し、fixture値、架空の0件、実値らしい合成内容を表示しない。保留中のApprovalが未取得であることをApprovalがない証拠として扱わない。比較の識別子重複検査は比較機能そのものではなく、実Agent実行・隔離結果も示さない。Handoffは常に未接続表示とし、fixtureやregex redactionで公開概要を合成しない。FlutterはAgentを起動せず、Workspace、Permission、Approval、Credential、process、networkを直接操作しない。同一Workspaceを検出した場合はfail-closedで比較候補を拒否する。
+Desktop Agent Centerはproduct modeでBrokerが返したAgent対話Session metadataを表示し、Task結果本文は専用Content Exposure経路とnative Owner確認後だけ表示する。Task開始／状態、Handoff元候補、受信先候補はBroker識別子と現在のUI状態を照合する。Handoffは完了Taskのfull結果と、その結果が持つ厳密形式を必要とし、独立Workspaceへ新規Taskを事前検査する。`local`／`mock` snapshotをHandoff実績として表示しない。fixture値、架空の0件、実値らしい合成内容を表示しない。保留中のApprovalが未取得であることをApprovalがない証拠として扱わない。FlutterはAgentを直接起動せず、Workspace、Permission、Approval、Credential、process、networkを直接操作しない。同一Session／Runtime／Workspaceを検出した場合はfail-closedでHandoff候補を拒否する。
 
-Rust Brokerの`対話セッション一覧`は、Agent metadataがSchema適合したAgent Adapterに結び付き、同一Runtimeの登録WorkspaceへSession開始時に明示結合した現在対話sessionのID、実行系ID、状態、作成監査ID、Workspace ID、結合監査IDだけを`INTERNAL_STATE`としてDesktopへ渡す。Agent metadata適合は分類に限り、Trust・Permission・Approval・Authorityを与えず、実Agentの稼働証明でもない。Workspace結合は登録IDの対応だけであり、Agent専用実行Session、実行directory、書込み分離を証明しない。実Agent Sessionと実結果がまだないため比較・Handoffは未接続のまま、Task、差分、Tool、コマンド内容を表示しない。ローカル／mock snapshotのサンプル情報をBroker観測へ読み替えない。
+Rust Brokerの`対話セッション一覧`は、Agent metadataがSchema適合したAgent Adapterに結び付き、同一Runtimeの登録WorkspaceへSession開始時に明示結合した現在対話sessionのID、実行系ID、状態、作成監査ID、Workspace ID、結合監査IDだけを`INTERNAL_STATE`としてDesktopへ渡す。Agent metadata適合は分類に限り、Trust・Permission・Approval・Authorityを与えず、実Agentの稼働証明でもない。Workspace結合は登録IDの対応だけであり、Agent専用実行Session、実行directory、書込み分離を証明しない。Compare／HandoffのProduct Build経路はこのSession metadataとAgentTask Broker contractを使うが、現在のWidget／service証拠は`FIXTURE`であり、実Agentの同時実行やinstalled product保証ではない。ローカル／mock snapshotのサンプル情報をBroker観測へ読み替えない。
 
 Workspace registryは、異なる実行系ID間の同一rootと通常pathで観測した親子rootの登録を拒否する。起動登録ではnofollowで開いた各directoryの(device ID, file ID)列を二度のpath解決間で照合し、別runtimeとの範囲交差を確認する。Rust試験は親→子・子→親の拒否、独立rootの許可、root identityだけの不完全列と識別列を持たないhandle-only登録の拒否、およびBroker起動登録での拒否Auditを確認する。これらは一時directoryと試験Brokerを使う`FIXTURE`証拠であり、bind mount等の別path aliasを網羅せず、実Agent間の書込み隔離も証明しない。
 

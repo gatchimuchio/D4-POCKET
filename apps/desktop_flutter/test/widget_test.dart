@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -1202,6 +1203,304 @@ void main() {
         {sessionA, sessionB});
     expect(starts.take(2).map((request) => request['workspace_id']).toSet(),
         {'workspace-agent-a', 'workspace-agent-b'});
+  });
+
+  testWidgets('Agent Centerはfull承認結果を別Sessionへ引き継ぎ、新規grantを要求する',
+      (WidgetTester tester) async {
+    const sessionA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const sessionB = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    const sourceTask = 'cccccccccccccccccccccccccccccccc';
+    const targetTask = 'dddddddddddddddddddddddddddddddd';
+    const instructionHash =
+        'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const resultHash =
+        'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    const resultText =
+        r'{"result_summary":"公開文書を更新した","artifacts":[{"name":"patch.txt","content":"patch body"}],"changed_files":["README.md"],"diff":"+## 更新","test_result":"Agent申告: test passed（独立検証なし）"}';
+
+    Map<String, Object?> taskRecord({
+      required String taskId,
+      required String runtimeId,
+      required String sessionId,
+      required String workspaceId,
+      required String status,
+      required String auditId,
+      String? resultHashValue,
+    }) =>
+        {
+          'task_id': taskId,
+          'record_version': 2,
+          'agent_runtime_id': runtimeId,
+          'session_id': sessionId,
+          'workspace_id': workspaceId,
+          'description': 'Agent作業Task（結果本文とWorkspace差分は別の権限経路）',
+          'instruction_hash': instructionHash,
+          'status': status,
+          'audit_event_id': auditId,
+          if (resultHashValue != null) 'result_hash': resultHashValue,
+          'result_content_available': resultHashValue != null,
+        };
+    Map<String, Object?> permissionReceipt({
+      required String sessionId,
+      required String workspaceId,
+      required String registrationHash,
+    }) =>
+        {
+          'permission_id': sessionId,
+          'agent_runtime_id': sessionId == sessionA ? 'codex-a' : 'codex-b',
+          'session_id': sessionId,
+          'workspace_id': workspaceId,
+          'workspace_registration_hash': registrationHash,
+          'operation': 'agent_task.execute',
+          'scope': 'session_workspace_once',
+          'decision': 'allow',
+          'source': 'owner',
+          'expires_at_epoch_seconds': 1900000000,
+          'use_limit': 1,
+          'uses_remaining': 1,
+          'status': 'active',
+        };
+    Map<String, Object?> approvalReceipt({
+      required String sessionId,
+    }) =>
+        {
+          '状態': 'Owner Approval発行済み',
+          '実行状態': '未実行',
+          '実行系ID': sessionId == sessionA ? 'codex-a' : 'codex-b',
+          '対話セッションID': sessionId,
+          '作業領域ID': sessionId == sessionA ? 'workspace-a' : 'workspace-b',
+          '指示hash': instructionHash,
+          '実行条件hash': resultHash,
+          '適用ポリシー': 'gui-shell-agent-task-sandbox-v1-max-runtime-900s',
+          'expires_at_epoch_seconds': 1900000000,
+          'use_limit': 1,
+          'uses_remaining': 1,
+          'status': 'issued_unconsumed',
+        };
+
+    final transport = _FakeBrokerTransport([
+      _brokerHealthResponse(),
+      _brokerHostCapabilityResponse(),
+      _brokerHostListResponse(),
+      _brokerAdapterListResponse(),
+      _brokerAgentAdapterListResponse(),
+      _brokerDialogueSessionListResponse(sessions: [
+        {
+          '対話セッションID': sessionA,
+          '実行系ID': 'codex-a',
+          '状態': '利用中',
+          '作成監査ID': 'audit-session-a',
+          '作業領域ID': 'workspace-a',
+          '作業領域結合監査ID': 'audit-workspace-a',
+        },
+        {
+          '対話セッションID': sessionB,
+          '実行系ID': 'codex-b',
+          '状態': '利用中',
+          '作成監査ID': 'audit-session-b',
+          '作業領域ID': 'workspace-b',
+          '作業領域結合監査ID': 'audit-workspace-b',
+        },
+      ]),
+      _brokerAcceptedBody('normalize_payload', {'quarantined': false}),
+      _brokerAcceptedBody('content_projection', {'redacted_payload': {}}),
+      _brokerAcceptedBody('approval_edit', {'ok': false}),
+      _brokerCommandSuspendedResponse(),
+      _brokerAcceptedBody('Agent作業要求検査', {
+        '版': 1,
+        '状態': '要求検査済み',
+        '実行状態': '未実行',
+        'Permission状態': '未付与',
+        'Approval状態': '未取得',
+        '実行系ID': 'codex-a',
+        '対話セッションID': sessionA,
+        '作業領域ID': 'workspace-a',
+        '指示hash': instructionHash,
+      }),
+      _brokerAcceptedBody(
+        'AgentTaskWorkspacePermissionGrant',
+        permissionReceipt(
+          sessionId: sessionA,
+          workspaceId: 'workspace-a',
+          registrationHash:
+              'sha256:1111111111111111111111111111111111111111111111111111111111111111',
+        ),
+      ),
+      _brokerAcceptedBody(
+        'AgentTaskOwnerApprovalGrant',
+        approvalReceipt(sessionId: sessionA),
+      ),
+      _brokerAcceptedBody(
+        'AgentTask実行',
+        taskRecord(
+          taskId: sourceTask,
+          runtimeId: 'codex-a',
+          sessionId: sessionA,
+          workspaceId: 'workspace-a',
+          status: 'completed',
+          auditId: 'audit-source-task-start',
+          resultHashValue: resultHash,
+        ),
+      ),
+      _brokerAcceptedBody('AgentTask結果表示承認', {
+        'task_id': sourceTask,
+        'result_hash': resultHash,
+        'content_visibility': 'full',
+        'approval_id': '22222222222222222222222222222222',
+        'expires_at_epoch_seconds': 1900000000,
+        'use_limit': 1,
+        'uses_remaining': 1,
+      }),
+      _brokerAcceptedBody('AgentTask結果取得', {
+        'task_id': sourceTask,
+        'result_hash': resultHash,
+        'content_visibility': 'full',
+        'projection': {'result_hash': resultHash, 'text': resultText},
+      }),
+      _brokerAcceptedBody('Agent作業要求検査', {
+        '版': 1,
+        '状態': '要求検査済み',
+        '実行状態': '未実行',
+        'Permission状態': '未付与',
+        'Approval状態': '未取得',
+        '実行系ID': 'codex-b',
+        '対話セッションID': sessionB,
+        '作業領域ID': 'workspace-b',
+        '指示hash': instructionHash,
+      }),
+      _brokerAcceptedBody(
+        'AgentTaskWorkspacePermissionGrant',
+        permissionReceipt(
+          sessionId: sessionB,
+          workspaceId: 'workspace-b',
+          registrationHash:
+              'sha256:3333333333333333333333333333333333333333333333333333333333333333',
+        ),
+      ),
+      _brokerAcceptedBody(
+        'AgentTaskOwnerApprovalGrant',
+        approvalReceipt(sessionId: sessionB),
+      ),
+      _brokerAcceptedBody(
+        'AgentTask実行',
+        taskRecord(
+          taskId: targetTask,
+          runtimeId: 'codex-b',
+          sessionId: sessionB,
+          workspaceId: 'workspace-b',
+          status: 'running',
+          auditId: 'audit-target-task-start',
+        ),
+      ),
+    ]);
+    final client = await ShellCoreClient.product(transport: transport);
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: AgentCenter(client: client)),
+    ));
+
+    final sourcePreflight = find.text('Task実行能力を事前検査（実行なし）').first;
+    await tester.ensureVisible(sourcePreflight);
+    await tester.tap(sourcePreflight);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField), '公開文書を更新する');
+    await tester.tap(find.text('Broker事前検査'));
+    await tester.pumpAndSettle();
+    final sourcePermission =
+        find.byKey(const ValueKey('agent-task-permission-$sessionA'));
+    await tester.ensureVisible(sourcePermission);
+    await tester.tap(sourcePermission);
+    await tester.pumpAndSettle();
+    final sourceApproval =
+        find.byKey(const ValueKey('agent-task-approval-$sessionA'));
+    await tester.ensureVisible(sourceApproval);
+    await tester.tap(sourceApproval);
+    await tester.pumpAndSettle();
+    final sourceStart =
+        find.byKey(const ValueKey('agent-task-start-$sessionA'));
+    await tester.ensureVisible(sourceStart);
+    await tester.tap(sourceStart);
+    await tester.pumpAndSettle();
+
+    final visibility =
+        find.byKey(const ValueKey('agent-task-visibility-$sessionA'));
+    await tester.ensureVisible(visibility);
+    await tester.tap(visibility);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('full').last);
+    await tester.pumpAndSettle();
+    final showResult =
+        find.byKey(const ValueKey('agent-task-show-result-$sessionA'));
+    await tester.ensureVisible(showResult);
+    await tester.tap(showResult);
+    await tester.pumpAndSettle();
+
+    final preview = find.byKey(const ValueKey('preview-agent-handoff'));
+    await tester.ensureVisible(preview);
+    await tester.tap(preview);
+    await tester.pumpAndSettle();
+    final bundlePreview = find.byKey(const ValueKey('agent-handoff-preview'));
+    expect(bundlePreview, findsOneWidget);
+    expect(tester.widget<SelectableText>(bundlePreview).data,
+        contains('patch.txt'));
+    expect(tester.widget<SelectableText>(bundlePreview).data,
+        contains('test_result'));
+
+    final prepare = find.byKey(const ValueKey('prepare-agent-handoff'));
+    await tester.ensureVisible(prepare);
+    await tester.tap(prepare);
+    await tester.pumpAndSettle();
+    final targetPermission =
+        find.byKey(const ValueKey('agent-task-permission-$sessionB'));
+    await tester.ensureVisible(targetPermission);
+    await tester.tap(targetPermission);
+    await tester.pumpAndSettle();
+    final targetApproval =
+        find.byKey(const ValueKey('agent-task-approval-$sessionB'));
+    await tester.ensureVisible(targetApproval);
+    await tester.tap(targetApproval);
+    await tester.pumpAndSettle();
+    final targetStart =
+        find.byKey(const ValueKey('agent-task-start-$sessionB'));
+    await tester.ensureVisible(targetStart);
+    await tester.tap(targetStart);
+    await tester.pumpAndSettle();
+
+    final targetStartRequest = transport.requests.singleWhere((request) =>
+        request['operation'] == 'AgentTask実行' &&
+        ((request['payload']! as Map)['session_id'] == sessionB));
+    final targetPayload = targetStartRequest['payload']! as Map;
+    final targetInstruction = targetPayload['instruction'] as String;
+    final transferredJson = targetInstruction.substring(
+      targetInstruction.indexOf('\n') + 1,
+    );
+    final transferred =
+        Map<String, Object?>.from(jsonDecode(transferredJson) as Map);
+    expect(transferred['task_context'], '公開文書を更新する');
+    expect(transferred['approved_result_hash'], resultHash);
+    expect(transferred['changed_files'], ['README.md']);
+    expect(transferred['diff'], '+## 更新');
+    expect(transferred['test_result'], contains('独立検証なし'));
+    expect(transferred['authority_reassessment_required'], isTrue);
+    expect(transferred['permission_reused'], isFalse);
+    expect(transferred['approval_reused'], isFalse);
+    expect(targetPayload, isNot(contains('approval_id')));
+    expect(targetPayload, isNot(contains('permission_id')));
+    expect(find.text('Agent引き継ぎ記録'), findsOneWidget);
+    expect(find.textContaining('audit-target-task-start'), findsNWidgets(3));
+
+    final handoffRequests = transport.requests.where((request) =>
+        request['operation'] == 'Agent作業要求検査' &&
+        ((request['payload']! as Map)['session_id'] == sessionB));
+    expect(handoffRequests, hasLength(1));
+    final grantOperations = transport.requests
+        .where((request) =>
+            (request['operation'] == 'AgentTaskWorkspacePermissionGrant' ||
+                request['operation'] == 'AgentTaskOwnerApprovalGrant') &&
+            ((request['payload']! as Map)['session_id'] == sessionB))
+        .map((request) => request['operation'])
+        .toSet();
+    expect(grantOperations,
+        {'AgentTaskWorkspacePermissionGrant', 'AgentTaskOwnerApprovalGrant'});
   });
 
   testWidgets('Agent CenterはSession結合後のTask unsupportedを事前検査しgrantへ進まない',
