@@ -92,7 +92,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "513edd2ad357bb7548ac1dc4a9c619f93dcef3074da811f391f1d5659ab792c4"
+      "sha256": "fa2d40532246e0770fa6b37fbe5655e68c74f1139c4f81198ce768dd4d3475fb"
     },
     {
       "path": "AUDIT.md",
@@ -1747,6 +1747,10 @@
       "sha256": "e87d29db00e767a0a8d2688afe058bb83182d2f98e272957d394c5b486dcfb7f"
     },
     {
+      "path": "examples/contracts/d4_pocket_active_version.valid.json",
+      "sha256": "8e7153d403a6d6b144a72a9625b6127209b9e4909a749b4719380e1ea67a1636"
+    },
+    {
       "path": "examples/contracts/d4_pocket_product_package_manifest.valid.json",
       "sha256": "464a86ac13bbd8c7bdefc1eb7e26ad257eabb5bf3c943f44551f880bf0311209"
     },
@@ -2105,6 +2109,10 @@
     {
       "path": "examples/contracts/invalid/credential_revocation_request_secret.invalid.json",
       "sha256": "03e994f99e84849744f9ed8c13b4160f02b81e14240b38b0c483947549973d21"
+    },
+    {
+      "path": "examples/contracts/invalid/d4_pocket_active_version_arbitrary_path.invalid.json",
+      "sha256": "0bd8016a8e89f019ad171409f9943da3b038ca69b5aa3410be5b95b92927f24b"
     },
     {
       "path": "examples/contracts/invalid/d4_pocket_product_package_manifest_parent_path.invalid.json",
@@ -3403,6 +3411,10 @@
       "sha256": "34615c193fbc16ced050cedb995bdc1d000b31aff667cd3f8bada1d6cd3bdd6c"
     },
     {
+      "path": "native/rust_helper/src/product_bootstrapper.rs",
+      "sha256": "c21e78991812c94042654591125caa46c8d576f15f226ad367241d45e4cb21ed"
+    },
+    {
       "path": "native/rust_helper/src/product_package.rs",
       "sha256": "2d19262cb3828859f03befe5a72584d1b6ca5774bef5c19af5d18aacd33a2166"
     },
@@ -4119,6 +4131,10 @@
       "sha256": "41bd539bb7a362bdcbc3364104a04b45d617874e8ffe33b7eea5f97c6cac2f26"
     },
     {
+      "path": "specs/d4_pocket_active_version.schema.json",
+      "sha256": "5b495f96442bf496c5c2cf8fc8951b39ee3e5c646212512cd1ebcff2e806e799"
+    },
+    {
       "path": "specs/d4_pocket_product_package_manifest.schema.json",
       "sha256": "1dd3a2747432b8d586743acf16649d8ae2171a4ddcbbcb92157afe4a644c7dc6"
     },
@@ -4744,7 +4760,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "774c8154295be687224066768c9bd450900e16da2dd7271250dab0389f062757"
+      "sha256": "6ee48de6747daba0d4d70694181c99764095d414de0a64d1b5cffa4635bb105f"
     }
   ]
 }

@@ -671,12 +671,14 @@ Product UI完成をcontract完成として扱わない。
 
 第I部の優先順位modelの範囲内で、リポジトリ固有の現行指針を次の順に使用する。
 
-1. `docs/specs/gui-shell-spec-v1.md`
-2. `docs/specs/adapter-conformance.md`、`docs/specs/content-exposure-policy.md`、`docs/specs/approval-visibility-boundary.md`、および関連する`docs/specs/` contract文書
+1. 作業対象についてユーザーが明示した最新版の仕様・工程表・実装指示書と、それへ同期した現行進捗。これらが現行phaseの対象・Acceptance・状態を決める。
+2. `docs/specs/adapter-conformance.md`、`docs/specs/content-exposure-policy.md`、`docs/specs/approval-visibility-boundary.md`および関連する`docs/specs/`契約。`docs/specs/gui-shell-spec-v1.md`は基盤仕様として扱い、最新版の現行指示で置き換えられていない技術責任範囲にだけ適用する。
 3. `specs/*.schema.json`
 4. `tooling/conformance_tests/`
-5. phaseおよび技術選択の文脈を示す`ROADMAP.md`と`docs/standards/gui-shell-extended-standard.md`
+5. 現行工程の入口・release gateを示す`ROADMAP.md`と、適用範囲内の技術選択文脈を示す`docs/standards/gui-shell-extended-standard.md`
 6. 既存実装pattern
+
+同じ仕様・工程表・実装指示書に複数版がある場合、明示された最新版だけを現行正本とする。旧版は当時の決定・失敗・証拠を確認する補助的な履歴資料であり、要求・Acceptance・進捗を現行状態へ自動継承しない。
 
 日本語の意味正本については`規定/00_日本語基底規定.md`、正本の所在と責任については`規定/正本索引.json`を併せて確認する。これらは、上記実装contractの安全要件を弱めない。
 
@@ -688,16 +690,17 @@ Product UI完成をcontract完成として扱わない。
 
 オーナーが明示的に別の指示をしない限り、次の順で作業する。
 
-1. `docs/specs/gui-shell-spec-v1.md`を読む
-2. 関連する`docs/specs/` contract文書を読む
-3. `docs/standards/gui-shell-extended-standard.md`を読む
-4. `specs/`配下の関連Schemaを読む
-5. Shell Core / UI / Adapter / Rust helperの境界を保持する
-6. contract変更時は実装前にSchemaを追加または更新する
-7. Product UIより前にconformance testを追加または更新する
-8. 最小かつ境界付きのcodeを実装する
-9. validationを実行する
-10. 正確な結果を報告する
+1. 最新版の現行仕様・工程表・実装指示書と現行進捗を確認し、phase、Acceptance、実状態を確定する。旧版は補助履歴としてのみ読む
+2. `docs/specs/gui-shell-spec-v1.md`を基盤仕様として確認し、現行最新版に置き換えられていない技術責任範囲に限って適用する
+3. 関連する`docs/specs/` contract文書を読む
+4. `docs/standards/gui-shell-extended-standard.md`を読む
+5. `specs/`配下の関連Schemaを読む
+6. Shell Core / UI / Adapter / Rust helperの境界を保持する
+7. contract変更時は実装前にSchemaを追加または更新する
+8. Product UIより前にconformance testを追加または更新する
+9. 最小かつ境界付きのcodeを実装する
+10. validationを実行する
+11. 正確な結果を報告する
 
 後続phaseの安全性、検査可能性、validation可能性を低下させる方法でlocal taskを最適化してはならない。
 
@@ -705,7 +708,7 @@ Product UI完成をcontract完成として扱わない。
 
 現行ROADMAPの正本は`ROADMAP.md`である。
 
-正式実装仕様は`docs/specs/gui-shell-spec-v1.md`である。
+基盤の共通実装仕様は`docs/specs/gui-shell-spec-v1.md`である。同じ製品工程に対する仕様・工程表・実装指示書は、ユーザーが明示した最新版が現行正本となる。現在のrev5製品構築工程では、最新rev5指示と`docs/REV5_PRODUCT_PROGRESS.md`が現行phase・Acceptance・状態を決める。旧版は最新版で置き換えられていない基盤責任範囲または補助履歴に限って参照し、現行phaseを上書きしない。
 
 拡張標準は`docs/standards/gui-shell-extended-standard.md`である。
 

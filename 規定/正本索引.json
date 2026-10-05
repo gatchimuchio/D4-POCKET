@@ -125,7 +125,7 @@
     },
     {
       "path": "docs/specs/gui-shell-spec-v1.md",
-      "責任": "GUI-Shell v1の正式実装仕様"
+      "責任": "GUI-Shellの共通基盤仕様。現行Product phaseの範囲・Acceptance・状態はユーザー指定最新版と現行進捗を優先し、本仕様は最新版で置き換えられていない技術責任範囲に適用する"
     },
     {
       "path": "docs/specs/adapter-conformance.md",
@@ -488,7 +488,7 @@
     "AGENTS.mdの共通基底規律",
     "AGENTS.mdのリポジトリ拡張規則",
     "規定/00_日本語基底規定.md。ただし言語・意味正本の責任範囲に限り、上位の安全規則を変更しない",
-    "現行実装指示・ROADMAP・phase文書",
+    "ユーザーが明示した最新版の実装指示・ROADMAP・phase文書。旧版は補助履歴とし、現行状態を上書きしない",
     "リポジトリ契約・Schema・test・validation script",
     "既存実装pattern"
   ],
