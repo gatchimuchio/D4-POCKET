@@ -103,6 +103,18 @@ Task履歴のAudit記録は本文を含めず、Task開始・終端の照合に�
 
 今回の追加検証: `cargo test --locked --lib agent_task_history -- --test-threads=1` PASS（4件）、`cargo build --locked` PASS、Desktop履歴画面 `flutter test --no-pub test/history_screen_test.dart` PASS（16件）、Desktopと共通UIの`flutter analyze --no-pub` PASS、Schema検査PASS（158 schema／155正常例／201負例）、Conformance PASS（234 checks）。Flutter試験はOneDrive上の既知のbuild cleanup問題を避けたASCII一時cloneで実行し、検査対象の3 Dart fileだけを同期した。`python -X utf8 tooling/日本語基底監査.py --strict`はFAILのまま。今回変更fileは0 findingであり、残る2 findingは旧rev3／rev4履歴文書の既存記録で、現行意味正本へ昇格・書換えしない。既存P5 focused tests: Workspace Inspector 22、履歴／内容表示14+4、Evaluation画面5、対話履歴27、Regression Case Client 6+2、Evaluation Client 10、Rust P5対象51（合計141件）PASS。これはProduct Build受入れであり、通常Release capability、installed product、広域regression、最終出荷保証を意味しない。大規模evaluationとFeature Complete後の横断品質保証はFinal QAへ送る。
 
+### P6 資格情報／MCP — OPEN
+
+| 受入れ条件 | 状態 | 成立範囲・証拠 |
+| --- | --- | --- |
+| 資格情報のOwner登録・一覧・失効 | 合格（Broker経路） | 登録はOwner control、一覧はmetadata-only、失効はRust Desktop native確認と永続Auditを要求。資格情報Broker試験6件PASS |
+| 提供元への資格情報結合 | 未成立 | 現行提供元`openai_codex_cli`は利用者のCodex CLI設定へ認証を委譲し、D4 Pocketは秘密値を受け取らない。別の提供元実行経路がD4管理Credentialを消費する結合は未接続 |
+| MCP Credential結合 | 合格（Windows製品経路） | 登録済みCredential ID・用途・対象Server・状態をDPAPI保管と照合し、対象stdio childだけへ短命値を渡す。別Server再利用を拒否 |
+| MCP接続・Tool一覧 | 合格 | BrokerがWindows stdio childからdiscovery／Tool Schemaを取得し、通常IPCへmetadata-onlyで投影。Trustや権限は生成しない |
+| MCP Tool実行・監査 | 合格（Product Build範囲） | Rust Broker・DPAPI・実`cmd.exe` fixture processを通すWindows統合試験で一回限りPermission、Owner-confirmation要求、永続Auditへの記録、hash-only結果、切断を確認 |
+
+2026-10-05にP6のMCP基本経路を実装・検証した。`cargo test --locked --lib broker::mcp_center::tests -- --test-threads=1`は2件、`broker::credential_vault::tests`は6件、`adapters::mcp_stdio::tests`は5件すべてPASS。統合試験は合成Credentialだけを使い、実値とTool本文markerがBroker応答・Auditに現れないことを確認した。Tool応答の`LIVE_RUNTIME`はfixture child processとの実通信を示す。試験はBrokerのOwner-confirmation要求入口までを通すが、Windows確認dialogを表示するDesktop製品操作の証拠ではない。P6はProvider credential bindingが未成立のためOPENを維持し、現行Codex CLI認証境界を変更せず、この受入れを消費する実Provider経路を施工する。
+
 ## 3. 後続製品工程
 
 P2 Multi-Agent Compare、P3 Handoff、P4 Provider / Model Center、P5 Workspace / History / EvaluationはProduct Build受入れを閉鎖した。現行はP6 Credential / MCP。続いてP7 A2A / Host / Adapter、P8 GUI-Shell Compose、P9 Standalone Export、P10 Module Selection / Pruning、P11 Windows Productization、P12 Product Integrationを進める。P12の統合経路成立をWindows Feature Completeとし、その後にQ0〜Q7 Final QAへ移る。P13 Mobile / Non-WindowsはWindows Feature Completeを止めず別trackとして扱う。Owner Finalizationではproduction Publisher／signing identity、production Audit key、不可逆な事業判断、Final GOだけをOwnerへ戻す。

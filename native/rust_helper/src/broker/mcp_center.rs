@@ -1065,7 +1065,19 @@ pub(super) fn safe_credential_environment_name(name: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(windows)]
+    use super::super::protocol::{BrokerOperation, BrokerRequestEnvelope};
     use super::*;
+
+    #[cfg(windows)]
+    struct TestTempRoot(std::path::PathBuf);
+
+    #[cfg(windows)]
+    impl Drop for TestTempRoot {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
 
     fn request(credential_ref: Value) -> Value {
         json!({
@@ -1129,6 +1141,237 @@ mod tests {
         let mut missing_with_variable = missing_reference();
         missing_with_variable["environment_variable"] = json!("MCP_API_KEY");
         assert!(parse_request(&request(missing_with_variable)).is_err());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn broker_mcp_credential_to_audited_tool_call_uses_live_stdio_and_hash_only_result() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        const SECRET: &str = "synthetic-p6-mcp-secret-not-real";
+        const OUTPUT: &str = "synthetic-p6-mcp-result-not-for-projection";
+        const SERVER: &str = "p6-integrated-mcp-server";
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let temp_root = TestTempRoot(std::env::temp_dir().join(format!(
+            "gui-shell-p6-mcp-e2e-{}-{nonce}",
+            std::process::id()
+        )));
+        let root = &temp_root.0;
+        let audit_root = root.join("audit");
+        let vault_root = root.join("vault");
+        let workspace = root.join("workspace");
+        std::fs::create_dir_all(&vault_root).expect("資格情報保管先を作成");
+        std::fs::create_dir_all(&workspace).expect("MCP作業領域を作成");
+        let mut broker =
+            Broker::new_persistent("session-1", &audit_root).expect("永続Brokerを作成");
+        broker.current_epoch_seconds_override = Some(
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("現在時刻を取得")
+                .as_secs() as i64,
+        );
+        broker
+            .保管先起動登録(&vault_root, true, std::slice::from_ref(&audit_root))
+            .expect("DPAPI保管先を登録");
+
+        let credential_id = "a".repeat(32);
+        let registration = json!({
+            "版": 1,
+            "操作": "追加",
+            "資格情報ID": credential_id,
+            "用途": "mcp_transport",
+            "接続対象": SERVER,
+            "種類": "api_key",
+            "保管方式": "windows_dpapi",
+            "登録者種別": "owner",
+            "登録経路": "owner_control",
+            "秘密値": SECRET,
+        });
+        let add = broker_test_operation(
+            &mut broker,
+            BrokerOperation::資格情報登録,
+            registration,
+            true,
+        );
+        assert_eq!(add.status, BrokerStatus::Accepted, "{add:?}");
+        let add_json = serde_json::to_string(&add).expect("公開登録応答を直列化");
+        assert!(!add_json.contains(SECRET));
+
+        let script_path = workspace.join("mcp-server.cmd");
+        let script = r#"@echo off
+if not "%MCP_TEST_CREDENTIAL%"=="__SECRET__" exit /b 41
+setlocal EnableDelayedExpansion
+set /p request=
+echo !request! | findstr /c:"server/discover" > nul
+if errorlevel 1 exit /b 42
+echo {"jsonrpc":"2.0","id":1,"result":{"resultType":"complete","supportedVersions":["__PROTOCOL_VERSION__"],"capabilities":{"tools":{}}},"_meta":{"io.modelcontextprotocol/serverInfo":{"name":"p6-e2e-fixture","version":"1"}}}
+set /p request=
+echo !request! | findstr /c:"tools/list" > nul
+if errorlevel 1 exit /b 43
+echo {"jsonrpc":"2.0","id":2,"result":{"resultType":"complete","tools":[{"name":"echo","inputSchema":{"type":"object","properties":{"text":{"type":"string"}},"required":["text"],"additionalProperties":false}}]}}
+set /p request=
+echo !request! | findstr /c:"tools/call" > nul
+if errorlevel 1 exit /b 44
+echo {"jsonrpc":"2.0","id":3,"result":{"resultType":"complete","content":[{"type":"text","text":"__OUTPUT__"}],"isError":false}}
+"%SystemRoot%\System32\ping.exe" -t 127.0.0.1 > nul
+"#
+            .replace("__SECRET__", SECRET)
+            .replace("__OUTPUT__", OUTPUT)
+            .replace("__PROTOCOL_VERSION__", crate::mcp::MODERN_PROTOCOL_VERSION);
+        std::fs::write(&script_path, script).expect("MCP fixture scriptを書き込む");
+        let executable = std::env::var_os("SystemRoot")
+            .map(std::path::PathBuf::from)
+            .expect("Windows環境根を取得")
+            .join("System32")
+            .join("cmd.exe");
+        let connect = json!({
+            "版": 1,
+            "操作": "接続",
+            "ServerID": SERVER,
+            "実行file": executable.to_string_lossy(),
+            "引数": ["/D", "/C", script_path.to_string_lossy()],
+            "workspace": workspace.to_string_lossy(),
+            "Transport": "stdio",
+            "Credential ref": {
+                "credential_id": credential_id,
+                "purpose": "mcp_transport",
+                "target": SERVER,
+                "required": true,
+                "status": "configured",
+                "environment_variable": "MCP_TEST_CREDENTIAL"
+            }
+        });
+        let connected = broker_test_operation(&mut broker, BrokerOperation::MCP接続, connect, true);
+        assert_eq!(connected.status, BrokerStatus::Accepted, "{connected:?}");
+        assert_eq!(connected.evidence_source, EVIDENCE_SOURCE_INTERNAL_STATE);
+        let connect_json = serde_json::to_string(&connected).expect("接続応答を直列化");
+        assert!(!connect_json.contains(SECRET));
+        assert_eq!(
+            connected.body.as_ref().unwrap()["Trust"]["state"],
+            "unverified"
+        );
+        assert_eq!(connected.body.as_ref().unwrap()["権限生成"], "なし");
+
+        let listed = broker_test_operation(
+            &mut broker,
+            BrokerOperation::MCP接続一覧,
+            json!({"版": 1}),
+            false,
+        );
+        assert_eq!(listed.status, BrokerStatus::Accepted, "{listed:?}");
+        let listed_json = serde_json::to_string(&listed).expect("metadata-only Tool一覧を直列化");
+        assert!(!listed_json.contains(SECRET));
+        let tool = &listed.body.as_ref().unwrap()["MCP接続一覧"][0]["Tool"][0];
+        assert_eq!(tool["name"], "echo");
+        let tool_id = tool["tool_id"].as_str().expect("Broker発行Tool ID");
+
+        let tool_request = json!({
+            "版": 1,
+            "操作": "実行",
+            "ServerID": SERVER,
+            "ToolID": tool_id,
+            "名前": "echo",
+            "arguments": {"text": "synthetic public input"}
+        });
+        let unconfirmed = broker_test_operation(
+            &mut broker,
+            BrokerOperation::MCPTool実行,
+            tool_request.clone(),
+            true,
+        );
+        assert_eq!(unconfirmed.status, BrokerStatus::Rejected);
+        assert_eq!(
+            unconfirmed.error.as_ref().map(|error| error.code.as_str()),
+            Some("desktop_native_owner_confirmation_required")
+        );
+        let call = broker_test_native_owner_operation(
+            &mut broker,
+            BrokerOperation::MCPTool実行,
+            tool_request,
+        );
+        assert_eq!(call.status, BrokerStatus::Accepted, "{call:?}");
+        assert_eq!(call.evidence_source, EVIDENCE_SOURCE_LIVE_RUNTIME);
+        let call_json = serde_json::to_string(&call).expect("hash-only呼出し記録を直列化");
+        assert!(!call_json.contains(SECRET));
+        assert!(!call_json.contains(OUTPUT));
+        assert!(call.body.as_ref().unwrap()["result_hash"]
+            .as_str()
+            .is_some_and(|hash| hash.starts_with("sha256:")));
+        assert_eq!(call.body.as_ref().unwrap()["公開範囲"], "hash_only");
+
+        let audit_json = serde_json::to_string(&broker.audit_events()).expect("永続Auditを直列化");
+        assert!(!audit_json.contains(SECRET));
+        assert!(!audit_json.contains(OUTPUT));
+        assert!(broker.audit_events().iter().any(|event| {
+            event.operation == "MCP Tool実行"
+                && event.decision == "approved"
+                && event.reason.contains("arguments_hash=")
+        }));
+        assert!(broker.audit_events().iter().any(|event| {
+            event.operation == "MCP Tool実行"
+                && event.decision == "accepted"
+                && event.evidence_source == EVIDENCE_SOURCE_LIVE_RUNTIME
+        }));
+
+        let disconnected = broker_test_operation(
+            &mut broker,
+            BrokerOperation::MCP切断,
+            json!({"版": 1, "操作": "切断", "ServerID": SERVER}),
+            true,
+        );
+        assert_eq!(
+            disconnected.status,
+            BrokerStatus::Accepted,
+            "{disconnected:?}"
+        );
+        assert!(broker.mcp_connections.is_empty());
+        drop(broker);
+        drop(temp_root);
+    }
+
+    #[cfg(windows)]
+    fn broker_test_operation(
+        broker: &mut Broker,
+        operation: BrokerOperation,
+        payload: Value,
+        owner: bool,
+    ) -> BrokerResponse {
+        let request_id = format!("p6-mcp-e2e-{}", broker.audit_events().len());
+        let mut envelope = BrokerRequestEnvelope::command_envelope_at(
+            &request_id,
+            "session-1",
+            &format!("nonce-{request_id}"),
+            &BrokerRequestEnvelope::current_issued_at(),
+        );
+        envelope.operation = Some(operation);
+        envelope.payload = Some(payload);
+        envelope.refresh_payload_hash();
+        broker.処理(envelope, owner)
+    }
+
+    #[cfg(windows)]
+    fn broker_test_native_owner_operation(
+        broker: &mut Broker,
+        operation: BrokerOperation,
+        payload: Value,
+    ) -> BrokerResponse {
+        let request_id = format!("p6-mcp-native-{}", broker.audit_events().len());
+        let payload_hash = super::super::protocol::canonical_payload_hash(Some(&payload));
+        let input = json!({
+            "request_id": request_id,
+            "session_id": "session-1",
+            "operation": operation.as_str(),
+            "payload": payload,
+            "payload_hash": payload_hash,
+            "nonce": format!("nonce-{request_id}"),
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {"client": "desktop_flutter"}
+        });
+        broker.desktop_owner_operation_json(&input.to_string())
     }
 }
 
