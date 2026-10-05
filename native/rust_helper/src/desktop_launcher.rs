@@ -152,6 +152,12 @@ enum DesktopOwnerOperationSummary {
         server_id: String,
         payload_hash: String,
     },
+    AdapterManagement {
+        operation: String,
+        adapter_id: String,
+        adapter_hash: String,
+        payload_hash: String,
+    },
     McpToolCall {
         server_id: String,
         tool_id: String,
@@ -1139,6 +1145,21 @@ fn owner_operation_candidate(
                 payload_hash,
             }
         }
+        operation @ (BrokerOperation::アダプター検証
+        | BrokerOperation::アダプター有効化
+        | BrokerOperation::アダプター無効化
+        | BrokerOperation::アダプター隔離
+        | BrokerOperation::アダプター削除) => {
+            let operation_name = operation.as_str().strip_prefix("アダプター")?;
+            let summary =
+                crate::broker::adapter_center::owner_confirmation_summary(operation_name, payload)?;
+            DesktopOwnerOperationSummary::AdapterManagement {
+                operation: summary.operation,
+                adapter_id: summary.adapter_id,
+                adapter_hash: summary.adapter_hash,
+                payload_hash,
+            }
+        }
         BrokerOperation::MCP接続 => {
             let request: McpConnectOwnerRequest = serde_json::from_value(payload.clone()).ok()?;
             let reference = &request.credential_ref;
@@ -1828,6 +1849,29 @@ fn owner_confirmation_text_for_identity(
             owner_confirmation_value(target),
             payload_hash
         ),
+        DesktopOwnerOperationSummary::AdapterManagement {
+            operation,
+            adapter_id,
+            adapter_hash,
+            payload_hash,
+        } => {
+            let effect = match operation.as_str() {
+                "検証" => "Broker所有の署名trustと正本byteを再検証します。結果により検証状態を更新しますが、有効化や実行はしません。",
+                "有効化" => "Broker内catalog状態を有効へ変更します。実行系processや外部fileは起動・変更せず、Permission、Approval、Trustを新たに付与しません。",
+                "無効化" => "Broker内catalog状態を無効へ変更します。既に起動中のprocessは停止しません。Permission、Approval、Credentialは変更しません。",
+                "隔離" => "Broker内catalog状態を隔離へ変更し、対象Runtime IDの新たな利用を拒否します。既に起動中のprocessや外部fileは変更しません。",
+                "削除" => "無効化済みcatalog recordだけを削除します。外部artifactのfile削除やprocess停止は行いません。",
+                _ => "未対応操作のため、状態は変更しません。",
+            };
+            format!(
+                "Adapter管理操作「{}」を実行しますか？\n\nAdapter ID: {}\n現在のAdapter hash: {}\n\n{}\n\nBrokerは処理直前に現在のAdapter hashと状態条件を再確認します。結果はRust BrokerのAuditへ記録し、権限生成はありません。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
+                owner_confirmation_value(operation),
+                owner_confirmation_value(adapter_id),
+                adapter_hash,
+                effect,
+                payload_hash
+            )
+        }
         DesktopOwnerOperationSummary::McpConnect {
             server_id,
             executable,
@@ -2553,6 +2597,21 @@ mod tests {
                 },
                 "confirm": confirm
             }),
+            DesktopOwnerOperationSummary::AdapterManagement {
+                operation,
+                adapter_id,
+                adapter_hash,
+                payload_hash,
+            } => json!({
+                "summary": {
+                    "kind": "adapter_management",
+                    "operation": operation,
+                    "adapter_id": adapter_id,
+                    "adapter_hash": adapter_hash,
+                    "payload_hash": payload_hash
+                },
+                "confirm": confirm
+            }),
             _ => panic!("このUI試験ではAgent Taskの固定summaryだけを使用する"),
         };
 
@@ -2752,6 +2811,35 @@ mod tests {
             &summary,
             true,
             Some(instruction)
+        ));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "対話型Windows desktopでAdapter native Owner dialogを制御自動操作する"]
+    #[allow(non_snake_case)]
+    fn Adapter状態操作の実Win32Owner確認を自動操作し対象情報だけを表示する() {
+        let secret_marker = "adapter-owner-ui-secret-marker";
+        let summary = DesktopOwnerOperationSummary::AdapterManagement {
+            operation: "隔離".into(),
+            adapter_id: "adapter-ui-fixture".into(),
+            adapter_hash: format!("sha256:{}", "a".repeat(64)),
+            payload_hash: sha256_tagged(b"adapter-owner-ui-payload"),
+        };
+        let prompt = owner_confirmation_text(&summary);
+        assert!(prompt.contains("adapter-ui-fixture"));
+        assert!(prompt.contains("新たな利用を拒否"));
+        assert!(!prompt.contains(secret_marker));
+
+        assert!(!automate_native_owner_confirmation(
+            &summary,
+            false,
+            Some(secret_marker)
+        ));
+        assert!(automate_native_owner_confirmation(
+            &summary,
+            true,
+            Some(secret_marker)
         ));
     }
 
@@ -3010,6 +3098,12 @@ mod tests {
                 credential_id: Option<String>,
                 payload_hash: String,
             },
+            AdapterManagement {
+                operation: String,
+                adapter_id: String,
+                adapter_hash: String,
+                payload_hash: String,
+            },
         }
         #[derive(Deserialize)]
         struct TestRequest {
@@ -3129,6 +3223,17 @@ mod tests {
                 model_id,
                 authentication_source,
                 credential_id,
+                payload_hash,
+            },
+            TestSummary::AdapterManagement {
+                operation,
+                adapter_id,
+                adapter_hash,
+                payload_hash,
+            } => DesktopOwnerOperationSummary::AdapterManagement {
+                operation,
+                adapter_id,
+                adapter_hash,
                 payload_hash,
             },
         };
@@ -4989,6 +5094,231 @@ mod tests {
         assert!(
             owner_operation_candidate(secret_request.to_string().as_bytes(), &endpoint).is_none()
         );
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn Adapter状態操作は対象hashを固定したnativeOwner確認だけへ進む() {
+        let endpoint = BrokerEndpoint {
+            host: "127.0.0.1".into(),
+            port: 43123,
+            session_id: "desktop-session".into(),
+            session_secret: "not-used-by-candidate".into(),
+            credential_role: BrokerCredentialRole::Normal,
+            transport: "tcp".into(),
+            max_request_bytes: MAX_REQUEST_BYTES,
+        };
+        let adapter_hash = format!("sha256:{}", "a".repeat(64));
+        let actions = [
+            ("アダプター検証", "検証"),
+            ("アダプター有効化", "有効化"),
+            ("アダプター無効化", "無効化"),
+            ("アダプター隔離", "隔離"),
+            ("アダプター削除", "削除"),
+        ];
+
+        for (index, (broker_operation, operation)) in actions.into_iter().enumerate() {
+            let payload = serde_json::json!({
+                "版": 1,
+                "操作": operation,
+                "Adapter ID": "fixture_adapter",
+                "Adapter hash": adapter_hash.clone(),
+            });
+            let request = desktop_owner_request(
+                broker_operation,
+                &format!("desktop-adapter-{index}"),
+                &format!("desktop-adapter-nonce-{index}"),
+                payload,
+            );
+            let (normalized, summary) =
+                owner_operation_candidate(request.to_string().as_bytes(), &endpoint)
+                    .expect("Adapter状態変更はnative Owner確認候補");
+            let normalized = BrokerRequestEnvelope::from_json_str(&normalized).unwrap();
+            assert_eq!(normalized.session_id.as_deref(), Some("desktop-session"));
+            let DesktopOwnerOperationSummary::AdapterManagement {
+                operation: confirmed_operation,
+                adapter_id,
+                adapter_hash: confirmed_hash,
+                payload_hash,
+            } = summary
+            else {
+                panic!("Adapter操作は専用確認summaryを使う")
+            };
+            assert_eq!(confirmed_operation, operation);
+            assert_eq!(adapter_id, "fixture_adapter");
+            assert_eq!(confirmed_hash, adapter_hash);
+            assert_eq!(payload_hash, request["payload_hash"]);
+            let prompt = owner_confirmation_text(
+                &DesktopOwnerOperationSummary::AdapterManagement {
+                    operation: confirmed_operation,
+                    adapter_id,
+                    adapter_hash: confirmed_hash,
+                    payload_hash,
+                },
+            );
+            assert!(prompt.contains("fixture_adapter"));
+            assert!(prompt.contains(&adapter_hash));
+            assert!(prompt.contains("権限生成はありません"));
+            assert!(!prompt.contains("secret-marker"));
+        }
+
+        let valid_payload = serde_json::json!({
+            "版": 1,
+            "操作": "隔離",
+            "Adapter ID": "fixture_adapter",
+            "Adapter hash": adapter_hash,
+        });
+        let invalid_payloads = [
+            {
+                let mut value = valid_payload.clone();
+                value["操作"] = serde_json::json!("削除");
+                value
+            },
+            {
+                let mut value = valid_payload.clone();
+                value["Adapter hash"] = serde_json::json!("sha256:ABC");
+                value
+            },
+            {
+                let mut value = valid_payload.clone();
+                value["Adapter ID"] = serde_json::json!("bad\nidentifier");
+                value
+            },
+            {
+                let mut value = valid_payload.clone();
+                value["秘密値"] = serde_json::json!("secret-marker");
+                value
+            },
+        ];
+        for invalid_payload in invalid_payloads {
+            let request = desktop_owner_request(
+                "アダプター隔離",
+                "desktop-adapter-invalid",
+                "desktop-adapter-invalid-nonce",
+                invalid_payload,
+            );
+            assert!(owner_operation_candidate(request.to_string().as_bytes(), &endpoint).is_none());
+        }
+
+        let mut stale = desktop_owner_request(
+            "アダプター隔離",
+            "desktop-adapter-stale",
+            "desktop-adapter-stale-nonce",
+            valid_payload,
+        );
+        stale["payload_hash"] = serde_json::json!(format!("sha256:{}", "f".repeat(64)));
+        assert!(owner_operation_candidate(stale.to_string().as_bytes(), &endpoint).is_none());
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn Adapter状態操作はDesktopOwner経路で否認停止とBroker到達を分離する() {
+        let root = test_root("adapter-owner-relay");
+        let session_file = root.join(SESSION_FILE);
+        let store_dir = root.join("store");
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let (ready_tx, ready_rx) = mpsc::sync_channel(1);
+        let (owner_operation_tx, owner_operation_rx) = mpsc::sync_channel(1);
+        let server_shutdown = Arc::clone(&shutdown);
+        let server_session_file = session_file.clone();
+        let server_store_dir = store_dir.clone();
+        let server = thread::spawn(move || {
+            let config = BrokerServerConfig::new(server_store_dir, server_session_file);
+            crate::broker::ipc_server::run_loopback_server_cancellable_with_owner_operations(
+                config,
+                server_shutdown,
+                ready_tx,
+                owner_operation_rx,
+                None,
+            )
+        });
+        ready_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        let (mut session_bytes, mut endpoint) = read_endpoint(&session_file).unwrap();
+        let adapter_hash = format!("sha256:{}", "a".repeat(64));
+
+        let declined_request = desktop_owner_request(
+            "アダプター隔離",
+            "desktop-adapter-owner-declined",
+            "desktop-adapter-owner-declined-nonce",
+            serde_json::json!({
+                "版": 1,
+                "操作": "隔離",
+                "Adapter ID": "missing_adapter",
+                "Adapter hash": adapter_hash,
+            }),
+        );
+        let mut decline_prompt_count = 0;
+        let declined = relay_channel_frame_with_owner_operations(
+            gui_shell_windows_broker_channel::PipeFrame::Line(
+                serde_json::to_vec(&declined_request).unwrap(),
+            ),
+            &endpoint,
+            Some(&owner_operation_tx),
+            |summary| {
+                decline_prompt_count += 1;
+                let DesktopOwnerOperationSummary::AdapterManagement {
+                    operation,
+                    adapter_id,
+                    adapter_hash: confirmed_hash,
+                    payload_hash,
+                } = summary
+                else {
+                    panic!("Adapter操作はAdapter専用native確認を使う")
+                };
+                assert_eq!(operation, "隔離");
+                assert_eq!(adapter_id, "missing_adapter");
+                assert_eq!(confirmed_hash, &adapter_hash);
+                assert_eq!(payload_hash, declined_request["payload_hash"].as_str().unwrap());
+                assert!(owner_confirmation_text(summary).contains("新たな利用を拒否"));
+                false
+            },
+        )
+        .unwrap();
+        let declined: serde_json::Value = serde_json::from_slice(&declined).unwrap();
+        assert_eq!(decline_prompt_count, 1);
+        assert_eq!(declined["status"], "suspended");
+        assert_eq!(declined["body"]["承認状態"], "owner_reapproval_required");
+        assert!(declined["audit_event_id"].as_str().is_some());
+
+        let confirmed_request = desktop_owner_request(
+            "アダプター隔離",
+            "desktop-adapter-owner-confirmed",
+            "desktop-adapter-owner-confirmed-nonce",
+            serde_json::json!({
+                "版": 1,
+                "操作": "隔離",
+                "Adapter ID": "missing_adapter",
+                "Adapter hash": adapter_hash,
+            }),
+        );
+        let mut confirm_prompt_count = 0;
+        let confirmed = relay_channel_frame_with_owner_operations(
+            gui_shell_windows_broker_channel::PipeFrame::Line(
+                serde_json::to_vec(&confirmed_request).unwrap(),
+            ),
+            &endpoint,
+            Some(&owner_operation_tx),
+            |summary| {
+                confirm_prompt_count += 1;
+                assert!(matches!(
+                    summary,
+                    DesktopOwnerOperationSummary::AdapterManagement { .. }
+                ));
+                true
+            },
+        )
+        .unwrap();
+        let confirmed: serde_json::Value = serde_json::from_slice(&confirmed).unwrap();
+        assert_eq!(confirm_prompt_count, 1);
+        assert_eq!(confirmed["status"], "rejected");
+        assert_eq!(confirmed["error"]["code"], "adapter_not_found");
+        assert!(confirmed["audit_event_id"].as_str().is_some());
+
+        shutdown.store(true, Ordering::Release);
+        server.join().unwrap().unwrap();
+        endpoint.session_secret.zeroize();
+        session_bytes.zeroize();
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

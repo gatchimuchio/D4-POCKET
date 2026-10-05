@@ -149,6 +149,14 @@ Provider結合の`FIXTURE`試験では、合成CredentialがCodex CLI親process�
 - 検証: 画面試験54件は全て合格（模擬／診断snapshotの昇格拒否、受理済みBroker snapshotによるローカルHost判定、別Host要約の分離、縮退表示を含む）。変更対象のDart 3 fileの静的解析とWindows向けデバッグbuildも合格した。`MSB8029`は`ASCII`一時検証先へのbuild出力警告。試験とbuildは`OneDrive`外の`ASCII`一時複製で実行した。
 - この完結単位はHost状態の製品表示・snapshot分類を閉じる。実Host間接続、Device Link認証、remote capability discovery、Host間Workspace隔離、Adapter Managerの現行未接続作用は証明せず、P7はOPENのまま後続へ進む。試験中に検出したNavigationRail件数3箇所の旧値（20）は新しい必須A2A画面を含む現行値（21）へ同期した。
 
+#### P7内の完結単位: Adapter既存recordのDesktop操作 — CLOSED（Product Build）
+
+- Desktop Runtime Centerの`検証`、`有効化`、`無効化`、`隔離`、`削除`を、既存のPID結合named pipe、Rust Desktop起動器のnative Owner確認、Broker Owner操作queueへ接続した。操作名、Adapter ID、現在hash、payload hashを確認対象に固定し、未知field、操作不一致、形式不正、古いpayload hashは確認候補から拒否する。
+- native Owner確認で拒否すると状態変更なしの`Suspended` receiptとAuditで終わる。承認後はBrokerが現行catalog recordのhashと状態条件を再照合する。変更範囲はBroker内catalogとAuditに限り、Permission／Approval／Credential／Trust、外部file、process、既存processへ作用しない。通常IPCの直接変更要求は引き続き`owner_reapproval_required`で停止する。
+- Install／UpdateのManifest経路、外部artifactのdownload／filesystem導入・削除、process起動、Windows installed product証拠はこの完結単位に含まれない。C19の既存release blockerを解消したとは扱わない。
+- 個別検証: Adapter Center Rust試験7件、Desktop Owner候補／relay試験2件、実Win32 Owner dialog自動化（拒否・承認）1件、既存Flutter通常IPC拒否widget試験1件が成功。ASCII一時複製で`flutter build windows --debug --no-pub`も成功し、Windows Runnerの変更を含むcompileを確認した。MSB8029一時出力先警告あり。試験自動化がdialogを操作し、Ownerの画面操作は不要だった。
+- この既存record操作のProduct Build受入れを閉じ、P7はOPENのままHost実接続／remote capabilityとAdapter Manifest等の残りへ進む。旧rev3／rev4の進捗記録は変更せず、現行状態の判定には本rev5進捗と現行codeを使う。
+
 ## 3. 後続製品工程
 
 P2 Multi-Agent Compare、P3 Handoff、P4 Provider / Model Center、P5 Workspace / History / Evaluation、P6 Credential / MCPはProduct Build受入れを閉鎖した。現行はP7 A2A / Host / Adapter。続いてP8 GUI-Shell Compose、P9 Standalone Export、P10 Module Selection / Pruning、P11 Windows Productization、P12 Product Integrationを進める。P12の統合経路成立をWindows Feature Completeとし、その後にQ0〜Q7 Final QAへ移る。P13 Mobile / Non-WindowsはWindows Feature Completeを止めず別trackとして扱う。Owner Finalizationではproduction Publisher／signing identity、production Audit key、不可逆な事業判断、Final GOだけをOwnerへ戻す。

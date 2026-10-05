@@ -28,6 +28,13 @@ const OP_UPDATE: &str = "アダプター更新";
 const OP_REMOVE: &str = "アダプター削除";
 const RECOVERY_ID: &str = "recover-adapter-management";
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct OwnerConfirmationSummary {
+    pub operation: String,
+    pub adapter_id: String,
+    pub adapter_hash: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct AdapterManifest {
@@ -346,6 +353,29 @@ fn operation_label(operation: &str) -> &'static str {
         OP_REMOVE => "削除",
         _ => "",
     }
+}
+
+pub(crate) fn owner_confirmation_summary(
+    operation: &str,
+    payload: &Value,
+) -> Option<OwnerConfirmationSummary> {
+    if !matches!(operation, "検証" | "有効化" | "無効化" | "隔離" | "削除") {
+        return None;
+    }
+    let request: AdapterManagementRequest = serde_json::from_value(payload.clone()).ok()?;
+    if request.version != VERSION || request.operation != operation || request.manifest.is_some() {
+        return None;
+    }
+    let adapter_id = request.adapter_id?;
+    let adapter_hash = request.adapter_hash?;
+    if !valid_identifier(&adapter_id) || !valid_hash(&adapter_hash) {
+        return None;
+    }
+    Some(OwnerConfirmationSummary {
+        operation: operation.to_owned(),
+        adapter_id,
+        adapter_hash,
+    })
 }
 
 fn install(
@@ -1215,6 +1245,66 @@ mod tests {
         let result = response(&mut broker, BrokerOperation::アダプター導入, payload, false);
         assert_eq!(result.status, BrokerStatus::Suspended);
         assert!(broker.adapters.is_empty());
+    }
+
+    #[test]
+    fn desktop_native_owner_allowlist_routes_adapter_mutation_to_catalog_handler() {
+        let mut broker = Broker::new("adapter-session");
+        let payload = json!({
+            "版": VERSION,
+            "操作": "隔離",
+            "Adapter ID": "fixture_adapter",
+            "Adapter hash": hash(),
+        });
+        let request = json!({
+            "request_id": "adapter-native-owner-confirmed",
+            "operation": "アダプター隔離",
+            "payload_hash": super::super::protocol::canonical_payload_hash(Some(&payload)),
+            "session_id": "adapter-session",
+            "nonce": "adapter-native-owner-nonce",
+            "issued_at": super::super::protocol::BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {"client": "desktop_flutter"},
+            "payload": payload,
+        });
+        let result = broker.desktop_owner_operation_json(&request.to_string());
+        assert_eq!(result.status, BrokerStatus::Rejected);
+        assert_eq!(result.error.unwrap().code, "adapter_not_found");
+    }
+
+    #[test]
+    fn owner_confirmation_summary_accepts_only_bounded_record_operations() {
+        let adapter_hash = hash();
+        for operation in ["検証", "有効化", "無効化", "隔離", "削除"] {
+            let summary = owner_confirmation_summary(
+                operation,
+                &json!({
+                    "版": VERSION,
+                    "操作": operation,
+                    "Adapter ID": "fixture_adapter",
+                    "Adapter hash": adapter_hash,
+                }),
+            )
+            .expect("既存Adapter record操作の確認summary");
+            assert_eq!(summary.operation, operation);
+            assert_eq!(summary.adapter_id, "fixture_adapter");
+            assert_eq!(summary.adapter_hash, adapter_hash);
+        }
+        assert!(owner_confirmation_summary(
+            "導入",
+            &json!({"版": VERSION, "操作": "導入"})
+        )
+        .is_none());
+        assert!(owner_confirmation_summary(
+            "隔離",
+            &json!({
+                "版": VERSION,
+                "操作": "隔離",
+                "Adapter ID": "fixture_adapter",
+                "Adapter hash": hash(),
+                "owner": true,
+            })
+        )
+        .is_none());
     }
 
     #[test]

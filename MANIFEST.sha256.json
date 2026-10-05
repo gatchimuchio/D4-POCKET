@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "25a56bf87c4f0d446a3d3169bab4d698a9dae25f62f7a51152e4ca9a87d21ca1"
+      "sha256": "1e975c9baf3fd91332197ea55c494d4e1642f2c81199776e3861ed1ebb28bd19"
     },
     {
       "path": "SECURITY.md",
@@ -712,7 +712,7 @@
     },
     {
       "path": "apps/desktop_flutter/windows/runner/broker_pipe_controller.cpp",
-      "sha256": "be9524dc2717fe451cbcc6957e4d671b4cbc067e873ed4ccd29ce7230771328f"
+      "sha256": "c37c408d6bc61df63595c03436bd44dea0e2851e2154e9f11da23144c572a37c"
     },
     {
       "path": "apps/desktop_flutter/windows/runner/broker_pipe_controller.h",
@@ -1236,7 +1236,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "e6351c211df332eb26ab6b74050527832bf6dab94ff2abaf1d2bf92de6f565d3"
+      "sha256": "ac8acc2d0ec6978ecc057169e1699309b87dfb035a80b39fc1ace25d2f609b30"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1336,7 +1336,7 @@
     },
     {
       "path": "docs/specs/adapter-management-surface.md",
-      "sha256": "ae81a52d85771f06e98edcc716238735a3fbf1f6d9d55d42f14ef334efb5d445"
+      "sha256": "e0603f911bc731d112fb80b78cd75ab3035130caea5b21ba1aa184f1e0fbfc79"
     },
     {
       "path": "docs/specs/agent-coordination.md",
@@ -1396,7 +1396,7 @@
     },
     {
       "path": "docs/specs/final-development-audit.json",
-      "sha256": "bfb6e4c6680a47eafd16ca02270836db2c033b8a88d9dad8de072541e3c728ad"
+      "sha256": "5099bda84768ba874a0fab77c5fac6d44d6d15eb353701cc0161736402ab0f0a"
     },
     {
       "path": "docs/specs/final-development-audit.md",
@@ -3152,7 +3152,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/adapter_center.rs",
-      "sha256": "7ac106c225d82342e8f472234394fe077e6d54f2ab8a4d3074a6d0b11b9c4981"
+      "sha256": "6a50a39a20425e49eaf53bc3f74ba7db18cff30449075523c4aef54b966c3281"
     },
     {
       "path": "native/rust_helper/src/broker/agent_task_scratch.rs",
@@ -3276,7 +3276,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "1aefc6f4c8126f8c92e8f5f9803189298678767e27cd60c01192e05f82af5c46"
+      "sha256": "99d582a22a75374eaef9674e81b80eb2bbebc9b240f2e6ac4635693bd60186a8"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -3328,7 +3328,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "3ec08946ea69cf74ec32310764a91e6457058e4acf1302b593c0b10a6d3b173e"
+      "sha256": "b3d2057fa7149cf696bf8beb1af280fe4e59a33c2121ad4d902ddeaa759bfa2a"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",

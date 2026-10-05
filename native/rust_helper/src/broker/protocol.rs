@@ -1705,6 +1705,11 @@ impl Broker {
             Some(
                 BrokerOperation::GuiShell書出し
                     | BrokerOperation::A2A接続
+                    | BrokerOperation::アダプター検証
+                    | BrokerOperation::アダプター有効化
+                    | BrokerOperation::アダプター無効化
+                    | BrokerOperation::アダプター隔離
+                    | BrokerOperation::アダプター削除
                     | BrokerOperation::AgentCLI実行系作業領域登録
                     | BrokerOperation::AgentTaskWorkspacePermissionGrant
                     | BrokerOperation::AgentTaskOwnerApprovalGrant

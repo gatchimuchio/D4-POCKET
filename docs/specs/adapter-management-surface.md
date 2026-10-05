@@ -16,6 +16,12 @@ Desktop Runtime Center
 
 `アダプター一覧`は通常IPCで参照できる。`アダプター導入`、`アダプター検証`、`アダプター有効化`、`アダプター無効化`、`アダプター隔離`、`アダプター更新`、`アダプター削除`はowner controlだけが状態を変更できる。通常IPCからの変更要求は`owner_reapproval_required`の`Suspended`として監査され、状態を変更しない。
 
+### Desktop既存record操作のnative Owner経路
+
+Desktop Runtime Centerからの`検証`、`有効化`、`無効化`、`隔離`、`削除`は、通常IPCだけでは状態変更しない。Windows Flutter RunnerのPID結合named pipeからRust Desktop起動器へ要求を送り、起動器が操作、Adapter ID、現在hash、payload hashをnative Owner dialogに表示する。承認後だけ、同じ要求をBrokerのOwner操作queueへ渡す。Brokerは処理直前に現在のrecord、hash、状態条件を再照合し、結果をAuditへ記録する。Windows Runnerの確認応答待ち時間はこの5操作に限って延長する。
+
+native dialogの拒否は状態を変更せず、通常Broker経路の`Suspended` receiptとAuditで終わる。承認はOwner明示操作の記録であり、Permission、Approval、Credential、Trustを生成しない。5操作が変更するのはBroker内catalogだけで、外部file、process、既存process、Runtime実行状態には作用しない。`導入`と`更新`のManifest操作はこのDesktop接続単位に含めない。
+
 ## 検証と状態
 
 導入・更新は、ownerが提示したManifestをBroker内部catalogへ登録するmetadata操作である。署名、発行者、source、version、hash、要求Capability、許可差分、既知の危険、互換性、Content Exposureを保存する。署名の真偽はManifestやUIの申告ではなく、Broker所有のEd25519 trustと正本byteで検証する。検証済みでないAdapterは有効化できない。

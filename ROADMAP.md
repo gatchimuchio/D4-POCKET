@@ -6,6 +6,8 @@ P6 Credential / MCPは2026-10-05にProduct Build受入れを閉鎖し、現行ph
 
 P3 Agent Handoff（rev5実装指示書ではR4）も2026-10-05にProduct Build受入れを閉鎖した。Agent Centerは明示Task contextとfull Content Exposure承認済みresultからbounded Handoff packageを作り、artifact／changed files／diff／test申告を含めて独立した受信Sessionの新規TaskへBroker事前検査する。Permission／Approval／Credential／Authority／Trust／hidden stateは非継承とし、受信側で通常の新規Permission／Approval経路を通す。Widget／service／Schema試験は`FIXTURE`であり、実Codex間・通常Release・installed productの証拠ではない。artifact／diff／testは未検証のAgent申告として扱い、receiptのAudit IDは受信Task開始Auditの参照であって独立したHandoff Auditではない。P2 Multi-Agent Compare（R3）もProduct Build受入れを閉鎖済みで、通常Release capability・installed product保証は`docs/FINAL_QA_QUEUE.md`およびrelease blockerで管理し、fail-closed状態を維持する。rev4受入れ台帳とrev2/rev3進捗は当時の状態・失敗・証拠を保持する履歴であり、rev5現行phaseを上書きしない。Authority、安全境界、release gateを維持し、製品開発の継続をrelease-readyの主張へ読み替えない。
 
+P7内のAdapter既存record操作（検証／有効化／無効化／隔離／削除）は、Windows Desktopのnative Owner確認からBroker Owner操作queueまでを接続し、2026-10-05にProduct Build単位を閉じた。通常IPC変更要求の拒否、Broker側hash／state再照合、catalog内限定の状態変更を維持する。Install／UpdateのManifest、外部artifact作用、Windows installed product証拠は未成立で、P7全体とC19を完了扱いしない。詳細な現行証拠は`docs/REV5_PRODUCT_PROGRESS.md`と`docs/specs/adapter-management-surface.md`に置く。
+
 本書の以下の過去日付付き記録は、記録当時の証拠・計画を保持する。rev5の現在状態と作業順を判断するときは上記の現行正本を優先し、過去の「現行」表記を現在状態として再利用しない。
 
 ## rev3作業履歴（現行工程の正本ではない）
