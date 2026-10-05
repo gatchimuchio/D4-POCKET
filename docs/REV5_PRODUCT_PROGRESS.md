@@ -2,7 +2,7 @@
 
 更新日: 2026-10-05
 工程正本: ユーザー提示「D4 Pocket / GUI-Shell 統合実装仕様書 rev5」「統合開発工程表 rev5」「Codex実装指示書 rev5」
-現行phase: `P10 Module Selection / Pruning` (`OPEN`)。`P9 Standalone Export`は2026-10-05にrev5 Product Build受入れを閉鎖。`P8 GUI-Shell Compose`、`P7 A2A / Host / Adapter`、`P6 Credential / MCP`、`P5 Workspace / History / Evaluation`も同日に閉鎖済み。
+現行phase: `P11 Windows Productization` (`OPEN`)。`P10 Module Selection / Pruning`は2026-10-05にrev5 Product Build受入れを閉鎖。`P9 Standalone Export`、`P8 GUI-Shell Compose`、`P7 A2A / Host / Adapter`、`P6 Credential / MCP`、`P5 Workspace / History / Evaluation`も同日に閉鎖済み。
 基準Repository状態: rev5文書同期commit `39dd3f4bc7aafe350ca94fce9392095f1064d2bc`。その後の実装・検証状態は本書末尾の更新履歴を参照。
 
 ## 正本の選び方
@@ -211,9 +211,21 @@ Windows Computer Useはこの2個目の同名Flutter windowをtargetable window�
 
 これをrev5工程表P9の有限なProduct Build条件の完了としてCLOSEDにする。実Owner確認によるExport、別user profile／installed artifact同一性、署名済み配布、正式Installer、runtime Manifestのproduction trust、binary pruning、normal exit、release readinessは成立扱いにせず、既存release blockerまたは後続P12／Final QAの範囲で保持する。現在phaseは直ちにP10 Module Selection / Pruningとする。
 
+### P10 Module Selection / Pruning — CLOSED（機能上の除外）
+
+| 受入れ項目 | 結果 | 現行証拠・境界 |
+| --- | --- | --- |
+| 選択Moduleと依存閉包 | 合格 | `python -X utf8 tooling/build_module_pruned_windows.py --receipt examples/contracts/gui_shell_export_receipt.valid.json --plan-only`が追跡画面と依存先の観測画面だけを含め、任意画面6件を除外した。固定安全Coreと必須画面はすべて保持し、Authority検証false、binary pruning未実施を出力した。 |
+| 書出し製品への選択反映 | 合格 | P9 Windows Release bundleのbuild receiptは、選択された追跡画面と依存先にtrue、除外6画面にfalseのcompile-time defineを記録する。これはbuild設定の証拠であり、AOT／実行可能fileからのbinary除去証拠ではない。 |
+| 製品画面の機能上の除外 | 合格 | 全8任意画面を無効にしたFlutter Widget試験2件が、任意画面のナビゲーション非表示、必須画面13件の保持、除外後の操作で例外・未搭載画面が出ないこと、除外されたHost操作Commandが出ないことを確認した。証拠源は`FIXTURE`。 |
+
+実行した試験は、Desktop projectで`flutter test --no-pub --no-test-assets --dart-define=GUI_SHELL_MODULE_SETUP_DOCTOR=false --dart-define=GUI_SHELL_MODULE_HISTORY=false --dart-define=GUI_SHELL_MODULE_EVALUATION_LAB=false --dart-define=GUI_SHELL_MODULE_HOST_CAPABILITIES=false --dart-define=GUI_SHELL_MODULE_NOTIFICATIONS=false --dart-define=GUI_SHELL_MODULE_OBSERVABILITY=false --dart-define=GUI_SHELL_MODULE_TRACE_INSPECTOR=false --dart-define=GUI_SHELL_MODULE_HOST_OPERATIONS=false test/module_pruning_test.dart`（2件合格）、`python -X utf8 tooling/build_module_pruned_windows.py --receipt examples/contracts/gui_shell_export_receipt.valid.json --plan-only`、Schema検査（158 Schema／155正常例／205負例）、Conformance（234 checks）。最初のasset付きFlutter試験は、OneDrive上の`build/unit_test_assets`をFlutterが削除できず、試験本体開始前に失敗した。assetを要しない対象試験を`--no-test-assets`で再実行して合格した。
+
+P9 portable bundleのWindows再起動時、Computer Use helperは同名製品windowを対象可能な窓として返さなかった。process path／parentは対象bundleを識別できたが、視覚的な画面確認は主張しない。P10の機能受入れはcompile-time define、製品build記録、Widget試験の範囲で閉じる。AOT／binaryの意味上の除去、Rust／第三者依存の除去、サイズ、cold startup、実行時resource、最終統合製品上の再確認は`docs/FINAL_QA_QUEUE.md`と既存release blockerへ送る。`binary_pruning_verified=false`は維持する。現行phaseは直ちにP11 Windows Productizationとする。
+
 ## 3. 後続製品工程
 
-P2 Multi-Agent Compare、P3 Handoff、P4 Provider / Model Center、P5 Workspace / History / Evaluation、P6 Credential / MCP、P7 A2A / Host / Adapter、P8 GUI-Shell Compose、P9 Standalone ExportはProduct Build受入れを閉鎖した。現行はP10 Module Selection / Pruning。続いてP11 Windows Productization、P12 Product Integrationを進める。P12の統合経路成立をWindows Feature Completeとし、その後にQ0〜Q7 Final QAへ移る。P13 Mobile / Non-WindowsはWindows Feature Completeを止めず別trackとして扱う。Owner Finalizationではproduction Publisher／signing identity、production Audit key、不可逆な事業判断、Final GOだけをOwnerへ戻す。
+P2 Multi-Agent Compare、P3 Handoff、P4 Provider / Model Center、P5 Workspace / History / Evaluation、P6 Credential / MCP、P7 A2A / Host / Adapter、P8 GUI-Shell Compose、P9 Standalone Export、P10 Module Selection / PruningはProduct Build受入れを閉鎖した。現行はP11 Windows Productization。続いてP12 Product Integrationを進める。P12の統合経路成立をWindows Feature Completeとし、その後にQ0〜Q7 Final QAへ移る。P13 Mobile / Non-WindowsはWindows Feature Completeを止めず別trackとして扱う。Owner Finalizationではproduction Publisher／signing identity、production Audit key、不可逆な事業判断、Final GOだけをOwnerへ戻す。
 
 ## 4. 関連正本
 

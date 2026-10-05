@@ -23,6 +23,7 @@
 | FQ-R2-G | 通常Release `task_execution` capabilityのrelease昇格条件 | rev4 R2-G、通常Releaseをfail-closedに維持 | いいえ（release gateは別途維持） |
 | FQ-R2-H | source／app／launcher／Broker hash、runtime identity、installed root、Audit store identityの正式evidence結合 | `rev4 R2-H` | いいえ |
 | FQ-R2-TEMP | MxC／Windows TEMPの観測と責任境界。D4-owned scratch保証と混同しない。外部componentの物理削除をD4の保証条件にしない | rev3/rev4の観測履歴 | いいえ |
+| FQ-MODULE-PRUNING | P10の機能除外を最終統合製品で再確認し、hash固定artifactにおける画面／共有symbolの意味上の除去、安全Core保持、Rust／第三者Module除去、cold startup、実行時resourceを測定する | rev5 P10は機能除外のみ受入れ。binary・起動・resource評価をFinal QAへ移送 | いいえ |
 | FQ-TEST-LOOPBACK | P4検証時のA2A／Codex接続fixtureに加え、P6全Rust試験でもCodex loopbackとUpdate Downloadのlocal TLS fixtureでOS error 10054 / `ConnectionReset`を観測。`failed_tool_result_is_not_replayed_as_another_exec_command`と`local_tls_server_repairs_only_after_verified_package_bytes`は単独再実行で成功した一方、`failed_replacement_keeps_the_existing_corrupt_package_unchanged`は単独でも同じ接続切断を再現。2026-10-05のP7 A2A全target試験では444件中435成功／2失敗／7 ignored。Codex loopback fixtureは単独再実行で成功、TLS修復fixtureは単独でも`InvalidContentType`とOS error 10054を再現。さらにP7 Adapter Manifest単位の`cargo test --locked -- --test-threads=1`は443成功／2失敗／9 ignoredで、このCodex loopback testとTLS修復testがConnectionResetしたが、両方とも個別再実行では各1件成功した。すべてP7 Adapter差分外である。Feature Complete後にWindowsで一括再実行し、fixture server／clientの切断競合を確認する。現行P7 acceptanceを阻止しない | 2026-10-05 P4／P6／P7検証 | いいえ |
 | FQ-INTEGRATED | rev5で定めるQ0–Q7最終品質保証 | `rev5 Final QA` | いいえ |
 
