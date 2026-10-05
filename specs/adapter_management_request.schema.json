@@ -26,7 +26,17 @@
       "required": ["版", "操作", "Manifest"],
       "properties": {
         "版": { "const": 1 },
-        "操作": { "enum": ["導入", "更新"] },
+        "操作": { "const": "導入" },
+        "Manifest": { "$ref": "adapter_management_manifest.schema.json" }
+      },
+      "additionalProperties": false
+    },
+    {
+      "required": ["版", "操作", "Adapter hash", "Manifest"],
+      "properties": {
+        "版": { "const": 1 },
+        "操作": { "const": "更新" },
+        "Adapter hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
         "Manifest": { "$ref": "adapter_management_manifest.schema.json" }
       },
       "additionalProperties": false

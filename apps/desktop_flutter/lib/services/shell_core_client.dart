@@ -364,6 +364,133 @@ class ShellCoreClient {
     );
   }
 
+  Future<AdapterManagementResult> manageAdapterManifest(
+    String operation,
+    Map<String, Object?> manifest, {
+    String? currentAdapterId,
+    String? currentAdapterHash,
+  }) async {
+    if (operation != '導入' && operation != '更新') {
+      throw const BrokerClientException('未対応のAdapter Manifest操作です');
+    }
+    final adapterId = manifest['Adapter ID'];
+    if (adapterId is! String || !_isRuntimeIdentifier(adapterId)) {
+      throw const BrokerClientException('ManifestのAdapter IDが不正です');
+    }
+    if (utf8.encode(jsonEncode(manifest)).length > 48 * 1024) {
+      throw const BrokerClientException('Manifestが画面要求の上限を超えています');
+    }
+
+    final Map<String, Object?> payload;
+    if (operation == '導入') {
+      if (currentAdapterId != null || currentAdapterHash != null) {
+        throw const BrokerClientException('導入要求に更新対象が指定されています');
+      }
+      payload = {'版': 1, '操作': operation, 'Manifest': manifest};
+    } else {
+      final hash = currentAdapterHash;
+      if (currentAdapterId == null ||
+          adapterId != currentAdapterId ||
+          hash == null ||
+          !RegExp(r'^sha256:[a-f0-9]{64}$').hasMatch(hash)) {
+        throw const BrokerClientException('更新対象IDまたは現在hashが一致しません');
+      }
+      payload = {
+        '版': 1,
+        '操作': operation,
+        'Adapter hash': hash,
+        'Manifest': manifest,
+      };
+    }
+
+    final transport = brokerTransport;
+    if (transport == null) {
+      return AdapterManagementResult(
+        status: 'suspended',
+        operation: operation,
+        adapterId: adapterId,
+        managementState: 'unchanged',
+        verificationState: 'unknown',
+        auditId: 'not-audited',
+        recoveryId: 'recover-adapter-management',
+        message: 'Broker接続がないためManifest操作を停止しました。',
+      );
+    }
+
+    final brokerOperation = operation == '導入' ? 'アダプター導入' : 'アダプター更新';
+    final response = await transport.request(brokerOperation, payload: payload);
+    if (response['operation'] != brokerOperation) {
+      throw const BrokerClientException('Broker応答がAdapter Manifest要求と一致しません');
+    }
+    final body = response['body'] is Map
+        ? Map<String, Object?>.from(response['body'] as Map)
+        : const <String, Object?>{};
+    if (response['status'] == 'accepted' &&
+        (response['evidence_source'] != 'INTERNAL_STATE' ||
+            body['Adapter ID'] != adapterId ||
+            body['操作'] != operation ||
+            body['公開範囲'] != 'metadata_only' ||
+            body['権限生成'] != 'なし' ||
+            body['authority_strip'] != true ||
+            !_isSafeAuditIdentifier(
+              response['audit_event_id']?.toString() ?? '',
+            ))) {
+      throw const BrokerClientException('Adapter Manifest receiptの証拠またはAuthority境界が不正です');
+    }
+    final error = response['error'];
+    final errorMessage = error is Map ? error['message'] : null;
+    return AdapterManagementResult(
+      status: response['status']?.toString() ?? 'unknown',
+      operation: brokerOperation,
+      adapterId: body['Adapter ID']?.toString() ?? adapterId,
+      managementState: body['管理状態']?.toString() ?? 'unchanged',
+      verificationState: body['検証状態']?.toString() ?? 'unknown',
+      auditId: response['audit_event_id']?.toString() ??
+          body['監査ID']?.toString() ??
+          '',
+      recoveryId: body['復旧ID']?.toString() ?? 'recover-adapter-management',
+      message: errorMessage is String && errorMessage.isNotEmpty
+          ? _boundedBrokerDisplayText(errorMessage)
+          : body['承認状態']?.toString() ?? 'BrokerがManifest要求を処理しました。',
+    );
+  }
+
+  Future<List<AdapterCatalogRecord>> refreshAdapterCatalog() async {
+    final transport = brokerTransport;
+    if (transport == null) {
+      throw const BrokerClientException('Broker接続がないためAdapter一覧を更新できません');
+    }
+    final response = await transport.request(
+      'アダプター一覧',
+      payload: const <String, Object?>{'版': 1},
+    );
+    if (response['operation'] != 'アダプター一覧' ||
+        response['evidence_source'] != 'INTERNAL_STATE') {
+      throw const BrokerClientException('Adapter一覧のBroker識別または証拠種別が不正です');
+    }
+    final body = _acceptedResponseBodyMap(response, 'アダプター一覧');
+    final adapters = body['Adapter一覧'];
+    final count = body['件数'];
+    if (body['版'] != 1 ||
+        body['公開範囲'] != 'metadata_only' ||
+        body['証拠種別'] != 'INTERNAL_STATE' ||
+        body['権限生成'] != 'なし' ||
+        body['authority_strip'] != true ||
+        adapters is! List ||
+        adapters.length > 64 ||
+        count != adapters.length) {
+      throw const BrokerClientException(
+          'Adapter一覧のbounded metadata contractが不正です');
+    }
+    final normalized = _adapterCatalogSnapshotJson(body);
+    if (normalized.length != adapters.length) {
+      throw const BrokerClientException('Adapter一覧にobject以外のrecordがあります');
+    }
+    return normalized
+        .map(AdapterCatalogRecord.fromJson)
+        .toList(growable: false);
+  }
+
   Future<TrayStopResult> requestAllRuntimeStop() async {
     final transport = brokerTransport;
     if (transport == null) {
@@ -632,6 +759,24 @@ bool _isSafeAuditIdentifier(String value) =>
     value.trim().isNotEmpty &&
     value.length <= 256 &&
     !value.codeUnits.any((unit) => unit < 0x20 || unit == 0x7f);
+
+String _boundedBrokerDisplayText(String value) {
+  final output = StringBuffer();
+  var count = 0;
+  for (final codepoint in value.runes) {
+    if (count >= 256) break;
+    final unsafe = codepoint <= 0x1f ||
+        (codepoint >= 0x7f && codepoint <= 0x9f) ||
+        codepoint == 0x061c ||
+        codepoint == 0x200e ||
+        codepoint == 0x200f ||
+        (codepoint >= 0x202a && codepoint <= 0x202e) ||
+        (codepoint >= 0x2066 && codepoint <= 0x206f);
+    output.write(unsafe ? '�' : String.fromCharCode(codepoint));
+    count++;
+  }
+  return output.toString();
+}
 
 const _adapterIdSnapshotKey = 'adapter_id';
 const _runtimeIdSnapshotKey = 'runtime_id';

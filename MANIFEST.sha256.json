@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "1e975c9baf3fd91332197ea55c494d4e1642f2c81199776e3861ed1ebb28bd19"
+      "sha256": "6a8a870f71645af9cd3a2f7721172ac390d8dc0b5bd12dd96422769f0a478114"
     },
     {
       "path": "SECURITY.md",
@@ -280,7 +280,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/runtime_center.dart",
-      "sha256": "db5dff9c0388a5335c1983272494dc27cb0733cf7bab424faa1f3eb790c5bf38"
+      "sha256": "38f8598805825ea4f9a41fbe0701560847036eb697531f1d120be19e5aea70e1"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/runtime_dialogue.dart",
@@ -336,7 +336,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/broker_client.dart",
-      "sha256": "efab441dda01a9537ed4917bd0d1cfa82d82f6674c2faf7bfc2d349765779402"
+      "sha256": "90cad562dd7ccd14c3e6909fa2fc0f9cd8b03ad597f2ce18bbb1b2539f2cd490"
     },
     {
       "path": "apps/desktop_flutter/lib/services/compose_client.dart",
@@ -388,7 +388,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/shell_core_client.dart",
-      "sha256": "e8d58ed06949b477fb5329470e4b8cf1b1b70f7056427b91a59b1bf27dee16aa"
+      "sha256": "76a35086eee55a0c85032f9f66feb6091fea67e1d4750fffa88de519db6f0897"
     },
     {
       "path": "apps/desktop_flutter/lib/services/update_client.dart",
@@ -656,7 +656,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "0f8cab83e1465e33c2bff2083d7899c32b348ffada7c3c1dfd6c824e8631b350"
+      "sha256": "6a1828eb5b881627309a98381897c221019a2618fc68235c5b1e5c1c09b6d6ee"
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
@@ -712,7 +712,7 @@
     },
     {
       "path": "apps/desktop_flutter/windows/runner/broker_pipe_controller.cpp",
-      "sha256": "c37c408d6bc61df63595c03436bd44dea0e2851e2154e9f11da23144c572a37c"
+      "sha256": "8ef8b7e38cff7011f70368c6a3248e69422c756c781de3fded23df899a064258"
     },
     {
       "path": "apps/desktop_flutter/windows/runner/broker_pipe_controller.h",
@@ -1180,7 +1180,7 @@
     },
     {
       "path": "docs/FINAL_QA_QUEUE.md",
-      "sha256": "910398376161c6fb313963e73a76f8b1e68062a0eb82f0d64c6a9f27dcedc905"
+      "sha256": "40d846dbc852442aaaa0c414ac36fc49f92d65c233242be2991ae101843d6fde"
     },
     {
       "path": "docs/FIRST_RUN.md",
@@ -1236,7 +1236,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "ac8acc2d0ec6978ecc057169e1699309b87dfb035a80b39fc1ace25d2f609b30"
+      "sha256": "8420e5c7208b3966fd6bc71862e895456d4e0125f312c65018da182d267fcba6"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1336,7 +1336,7 @@
     },
     {
       "path": "docs/specs/adapter-management-surface.md",
-      "sha256": "e0603f911bc731d112fb80b78cd75ab3035130caea5b21ba1aa184f1e0fbfc79"
+      "sha256": "d8c5a5e703959fcfa765f041506e3a4a3ae0429906493aa19681dd347f3cc0f8"
     },
     {
       "path": "docs/specs/agent-coordination.md",
@@ -1396,7 +1396,7 @@
     },
     {
       "path": "docs/specs/final-development-audit.json",
-      "sha256": "5099bda84768ba874a0fab77c5fac6d44d6d15eb353701cc0161736402ab0f0a"
+      "sha256": "efb04ee695661bf91743edd1ac7a54dd5dac7e93d941f476cfa593afd8785227"
     },
     {
       "path": "docs/specs/final-development-audit.md",
@@ -3152,7 +3152,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/adapter_center.rs",
-      "sha256": "6a50a39a20425e49eaf53bc3f74ba7db18cff30449075523c4aef54b966c3281"
+      "sha256": "190c1a7c9daccbf44f563069d2705be6b3becbfb0ed3f3ddb783b67d1e44bbb3"
     },
     {
       "path": "native/rust_helper/src/broker/agent_task_scratch.rs",
@@ -3276,7 +3276,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "99d582a22a75374eaef9674e81b80eb2bbebc9b240f2e6ac4635693bd60186a8"
+      "sha256": "faa7efce21d179bbaeca7cfcac29cd2114d6d6bb6606d6a2c2476a059e13541b"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -3328,7 +3328,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "b3d2057fa7149cf696bf8beb1af280fe4e59a33c2121ad4d902ddeaa759bfa2a"
+      "sha256": "3b4c0a9f9d987b47ccc73064f4c0b4a939cd6e2f03b6591b3d21fecacfc1cb9e"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -3944,7 +3944,7 @@
     },
     {
       "path": "specs/adapter_management_request.schema.json",
-      "sha256": "871766adcf6e49abf90443997b2b3a71e5f4715b5d5512869c8e657f7ab308ea"
+      "sha256": "883a1444a7bd5c27ee57aa9a87cc5886dd8c95698759e6a61c1a3833478f0174"
     },
     {
       "path": "specs/adapter_manifest.schema.json",
@@ -4580,7 +4580,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "620314e709cec2b1a2ea47113481573c253660b108994035e91367cf1b895af6"
+      "sha256": "3bbc7814eb477f4b7b2786d243cd26b7c8a786c6b344e5ddf4f24cb005008e0b"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",

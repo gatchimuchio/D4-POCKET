@@ -2322,6 +2322,106 @@ void main() {
     expect(transport.operations.last, 'アダプター検証');
   });
 
+  test('Adapter Manifest導入はnative Owner Broker操作へ本文を限定送信する', () async {
+    final transport = _FakeBrokerTransport([
+      ..._shellCoreProductBootstrapResponses(),
+      _brokerAdapterManifestMutationResponse('導入', 'ui_fixture_adapter'),
+    ]);
+    final client = await ShellCoreClient.product(transport: transport);
+    final result = await client.manageAdapterManifest(
+      '導入',
+      _adapterManifestFixture(),
+    );
+
+    expect(result.status, 'accepted');
+    expect(result.adapterId, 'ui_fixture_adapter');
+    final request = transport.requests.last;
+    expect(request['operation'], 'アダプター導入');
+    expect(request['payload'], {
+      '版': 1,
+      '操作': '導入',
+      'Manifest': _adapterManifestFixture(),
+    });
+    expect(request['payload'], isNot(contains('permission')));
+  });
+
+  test('Adapter Manifest更新は対象IDと現在hashを再結合しstale要求を送らない', () async {
+    final transport = _FakeBrokerTransport([
+      ..._shellCoreProductBootstrapResponses(),
+      _brokerAdapterManifestMutationResponse(
+        '更新',
+        'mock_local_llm_adapter',
+        managementState: 'disabled',
+      ),
+    ]);
+    final client = await ShellCoreClient.product(transport: transport);
+    const currentHash =
+        'sha256:1111111111111111111111111111111111111111111111111111111111111111';
+    final manifest = _adapterManifestFixture(
+      adapterId: 'mock_local_llm_adapter',
+      version: '1.0.1',
+    );
+    final result = await client.manageAdapterManifest(
+      '更新',
+      manifest,
+      currentAdapterId: 'mock_local_llm_adapter',
+      currentAdapterHash: currentHash,
+    );
+
+    expect(result.status, 'accepted');
+    expect(transport.requests.last, {
+      'operation': 'アダプター更新',
+      'payload': {
+        '版': 1,
+        '操作': '更新',
+        'Adapter hash': currentHash,
+        'Manifest': manifest,
+      },
+    });
+    final beforeInvalid = transport.requests.length;
+    await expectLater(
+      client.manageAdapterManifest(
+        '更新',
+        _adapterManifestFixture(adapterId: 'different_adapter'),
+        currentAdapterId: 'mock_local_llm_adapter',
+        currentAdapterHash: currentHash,
+      ),
+      throwsA(isA<BrokerClientException>()),
+    );
+    expect(transport.requests, hasLength(beforeInvalid));
+  });
+
+  testWidgets('Runtime CenterからManifest JSONをnative Owner経路へ送りcatalogを更新する',
+      (WidgetTester tester) async {
+    final listAfterInstall = _brokerAdapterListInternalResponse();
+    final transport = _FakeBrokerTransport([
+      ..._shellCoreProductBootstrapResponses(),
+      _brokerAdapterManifestMutationResponse('導入', 'ui_fixture_adapter'),
+      listAfterInstall,
+    ]);
+    final client = await ShellCoreClient.product(transport: transport);
+    await tester.pumpWidget(
+      MaterialApp(home: Scaffold(body: RuntimeCenter(client: client))),
+    );
+
+    final installButton =
+        find.byKey(const ValueKey('adapter-manifest-install'));
+    await tester.ensureVisible(installButton);
+    await tester.pumpAndSettle();
+    await tester.tap(installButton);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('adapter-manifest-json-input')),
+      jsonEncode(_adapterManifestFixture()),
+    );
+    await tester.tap(find.byKey(const ValueKey('adapter-manifest-submit')));
+    await tester.pumpAndSettle();
+
+    expect(transport.operations, contains('アダプター導入'));
+    expect(find.textContaining('ui_fixture_adapter: accepted'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   test('不正なブローカー応答で製品クライアントが閉鎖側へ失敗する', () async {
     final client = await ShellCoreClient.product(
       transport: _FakeBrokerTransport([
@@ -2729,6 +2829,38 @@ Map<String, Object?> _brokerAcceptedBody(
   };
 }
 
+Map<String, Object?> _brokerAdapterManifestMutationResponse(
+  String operation,
+  String adapterId, {
+  String managementState = 'installed',
+}) {
+  final brokerOperation = operation == '導入' ? 'アダプター導入' : 'アダプター更新';
+  return {
+    'request_id': 'test-$brokerOperation',
+    'operation': brokerOperation,
+    'status': 'accepted',
+    'evidence_source': 'INTERNAL_STATE',
+    'audit_event_id': 'audit-$brokerOperation',
+    'error': null,
+    'health': null,
+    'body': {
+      '版': 1,
+      'Adapter ID': adapterId,
+      '管理状態': managementState,
+      '検証状態': 'pending_review',
+      '公開範囲': 'metadata_only',
+      '証拠種別': 'INTERNAL_STATE',
+      '権限生成': 'なし',
+      'authority_strip': true,
+      '操作': operation,
+      '実行状態': 'accepted',
+      '監査ID': 'audit-$brokerOperation',
+      '復旧ID': 'recover-adapter-management',
+    },
+    'shutdown_requested': false,
+  };
+}
+
 Map<String, Object?> _brokerDialogueSessionListResponse({
   List<Map<String, Object?>> sessions = const [],
 }) {
@@ -2896,6 +3028,50 @@ Map<String, Object?> _brokerAdapterListResponse() {
     'authority_strip': true,
   });
 }
+
+Map<String, Object?> _brokerAdapterListInternalResponse() {
+  final response = _brokerAdapterListResponse();
+  response['evidence_source'] = 'INTERNAL_STATE';
+  return response;
+}
+
+List<Map<String, Object?>> _shellCoreProductBootstrapResponses() => [
+      _brokerHealthResponse(),
+      _brokerHostCapabilityResponse(),
+      _brokerHostListResponse(),
+      _brokerAdapterListResponse(),
+      _brokerAgentAdapterListResponse(),
+      _brokerAcceptedBody('normalize_payload', {'quarantined': false}),
+      _brokerAcceptedBody('content_projection', {
+        'redacted_payload': const <String, Object?>{},
+      }),
+      _brokerAcceptedBody('approval_edit', {'ok': false}),
+      _brokerCommandSuspendedResponse(),
+    ];
+
+Map<String, Object?> _adapterManifestFixture({
+  String adapterId = 'ui_fixture_adapter',
+  String version = '1.0.0',
+}) =>
+    {
+      '版': 1,
+      'Adapter ID': adapterId,
+      'Runtime ID': 'ui_fixture_runtime',
+      '発行者': 'UI試験fixture',
+      'source': 'owner_manifest',
+      'version': version,
+      'transport': 'mock',
+      'Content Exposure': 'summary',
+      '要求Capability': ['runtime.read'],
+      '許可差分': ['content_visibility:none->summary'],
+      '既知の危険': ['試験用未検証発行者'],
+      '互換性': 'compatible',
+      'authority_strip': true,
+      'signed_manifest': true,
+      '署名対象': '7b',
+      '署名': List.filled(128, '0').join(),
+      '署名者fingerprint': 'sha256:${List.filled(64, '0').join()}',
+    };
 
 Map<String, Object?> _brokerAgentAdapterListResponse() {
   return _brokerAcceptedBody('Agent一覧', {

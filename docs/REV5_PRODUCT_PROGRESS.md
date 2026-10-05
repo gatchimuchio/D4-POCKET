@@ -155,7 +155,17 @@ Provider結合の`FIXTURE`試験では、合成CredentialがCodex CLI親process�
 - native Owner確認で拒否すると状態変更なしの`Suspended` receiptとAuditで終わる。承認後はBrokerが現行catalog recordのhashと状態条件を再照合する。変更範囲はBroker内catalogとAuditに限り、Permission／Approval／Credential／Trust、外部file、process、既存processへ作用しない。通常IPCの直接変更要求は引き続き`owner_reapproval_required`で停止する。
 - Install／UpdateのManifest経路、外部artifactのdownload／filesystem導入・削除、process起動、Windows installed product証拠はこの完結単位に含まれない。C19の既存release blockerを解消したとは扱わない。
 - 個別検証: Adapter Center Rust試験7件、Desktop Owner候補／relay試験2件、実Win32 Owner dialog自動化（拒否・承認）1件、既存Flutter通常IPC拒否widget試験1件が成功。ASCII一時複製で`flutter build windows --debug --no-pub`も成功し、Windows Runnerの変更を含むcompileを確認した。MSB8029一時出力先警告あり。試験自動化がdialogを操作し、Ownerの画面操作は不要だった。
-- この既存record操作のProduct Build受入れを閉じ、P7はOPENのままHost実接続／remote capabilityとAdapter Manifest等の残りへ進む。旧rev3／rev4の進捗記録は変更せず、現行状態の判定には本rev5進捗と現行codeを使う。
+- この既存record操作のProduct Build受入れを閉じた。旧rev3／rev4の進捗記録は変更せず、現行状態の判定には本rev5進捗と現行codeを使う。
+
+#### P7内の完結単位: Adapter Manifest導入・更新のDesktop metadata操作 — CLOSED（Product Build）
+
+- Runtime CenterからManifestを上限48 KiBで既存Broker transportへ送り、PID結合pipe、Rust Desktop起動器のnative Owner確認、Broker Owner操作queueを通じて、Broker catalogのmetadataだけを登録・更新する。通常IPCからの直接変更は停止する。
+- Owner確認は申告Capability／許可差分／危険・互換性・署名metadataと署名対象／signature hashを示すが、署名実値は表示しない。Owner確認はTrust、署名検証、Permission、Approval、Credential、Authorityを生成しない。未検証Adapterは有効化できない。
+- 更新は対象Adapter IDと現在hashを要求に束縛し、Brokerが処理時にhash・disabled・非隔離状態を再確認する。古いhash、有効化中、隔離済み、対象ID不一致は変更前に拒否する。拒否・受理はBroker Audit receiptへ結合する。
+- 受入れ範囲はmetadata登録・更新であり、外部download、filesystem install／remove、process起動・管理、Windows installed product evidenceを含まない。C19とP7全体は完了扱いにせず、これらのrelease blockerも解消したとはしない。
+- 検証: Rust Adapter Center対象試験9件合格、Manifest Owner候補／中継試験合格、実Win32 Owner確認画面の自動操作（拒否・承認）1件合格、Desktop全画面試験57件合格（日本語表示ラベル修正後に対象Widgetを再実行）、変更したDart 3 fileの静的解析合格、Schema 158件／正常例155件／負例205件合格、適合確認234件合格、Windows Desktop debug build合格。全Desktop静的解析は未変更の`agent_center.dart`に廃止予定APIの情報指摘5件があり終了コード1、今回変更したDart fileに問題はない。BuildはASCII一時複製で行い、MSB8029一時出力先警告を記録。厳格日本語監査は今回変更fileの指摘0件、全体では既存の3指摘（rev3履歴、rev4履歴、未変更Codex CLI診断文字列）により終了コード1。旧記録・既存指摘は保持し、本完結単位へ転記・修正しない。
+- Rust全体試験`cargo test --locked -- --test-threads=1`は443件合格／2件失敗／9件ignored。失敗は既存Codex loopbackとUpdate Downloadのlocal TLS fixtureでConnectionResetを観測したもの。2件を個別再実行すると各1件合格し、Adapter差分外だったため、既存`FQ-TEST-LOOPBACK`へ追記した。Adapter対象focused試験と本単位の受入れは合格であり、P7を阻止しない。
+- 本単位をCLOSEDとし、P7はOPENのままHost実接続／remote capabilityおよび外部artifact作用など残るP7範囲へ進む。PASS済みのこのmetadata単位は再開しない。現行状態は本rev5進捗と現行codeを正本とし、旧revは補助履歴に限る。
 
 ## 3. 後続製品工程
 

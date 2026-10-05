@@ -35,6 +35,27 @@ pub(crate) struct OwnerConfirmationSummary {
     pub adapter_hash: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, Deserialize)]
+pub(crate) struct OwnerManifestConfirmationSummary {
+    pub operation: String,
+    pub adapter_id: String,
+    pub runtime_id: String,
+    pub publisher: String,
+    pub source: String,
+    pub adapter_version: String,
+    pub transport: String,
+    pub content_exposure: String,
+    pub requested_capabilities: Vec<String>,
+    pub permission_diff: Vec<String>,
+    pub known_risks: Vec<String>,
+    pub compatibility: String,
+    pub signer_fingerprint: String,
+    pub signed_bytes_hash: String,
+    pub signed_bytes_length: usize,
+    pub signature_hash: String,
+    pub current_adapter_hash: Option<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct AdapterManifest {
@@ -272,6 +293,33 @@ fn mutate(
                 )
             }
         };
+    let operation_shape_is_valid = match operation {
+        OP_INSTALL => {
+            request.adapter_id.is_none()
+                && request.adapter_hash.is_none()
+                && request.manifest.is_some()
+        }
+        OP_UPDATE => {
+            request.adapter_id.is_none()
+                && request.adapter_hash.as_deref().is_some_and(valid_hash)
+                && request.manifest.is_some()
+        }
+        _ => {
+            request.manifest.is_none()
+                && request.adapter_id.as_deref().is_some_and(valid_identifier)
+                && request.adapter_hash.as_deref().is_some_and(valid_hash)
+        }
+    };
+    if !operation_shape_is_valid {
+        return reject(
+            broker,
+            request_id,
+            operation,
+            "adapter_request_invalid",
+            "Adapter管理要求の操作別field構成が不正",
+            hash,
+        );
+    }
     if !owner {
         return suspended(
             broker,
@@ -295,7 +343,13 @@ fn mutate(
     }
     match operation {
         OP_INSTALL => install(broker, request.manifest, request_id, hash),
-        OP_UPDATE => update(broker, request.manifest, request_id, hash),
+        OP_UPDATE => update(
+            broker,
+            request.manifest,
+            request.adapter_hash,
+            request_id,
+            hash,
+        ),
         OP_VERIFY => verify(
             broker,
             request.adapter_id,
@@ -378,6 +432,91 @@ pub(crate) fn owner_confirmation_summary(
     })
 }
 
+pub(crate) fn owner_manifest_confirmation_summary(
+    operation: &str,
+    payload: &Value,
+) -> Option<OwnerManifestConfirmationSummary> {
+    if !matches!(operation, "導入" | "更新") {
+        return None;
+    }
+    let request: AdapterManagementRequest = serde_json::from_value(payload.clone()).ok()?;
+    if request.version != VERSION || request.operation != operation || request.adapter_id.is_some()
+    {
+        return None;
+    }
+    let current_adapter_hash = match operation {
+        "導入" if request.adapter_hash.is_none() => None,
+        "更新" if request.adapter_hash.as_deref().is_some_and(valid_hash) => {
+            request.adapter_hash
+        }
+        _ => return None,
+    };
+    let manifest = request.manifest?;
+    if validate_manifest(&manifest).is_err()
+        || !owner_manifest_display_text_is_valid(&manifest.publisher, 256)
+        || !owner_manifest_display_text_is_valid(&manifest.adapter_version, 128)
+        || manifest
+            .requested_capabilities
+            .iter()
+            .any(|value| !owner_manifest_display_text_is_valid(value, 128))
+        || manifest
+            .permission_diff
+            .iter()
+            .any(|value| !owner_manifest_display_text_is_valid(value, 256))
+        || manifest
+            .known_risks
+            .iter()
+            .any(|value| !owner_manifest_display_text_is_valid(value, 512))
+    {
+        return None;
+    }
+    let display_chars = [
+        manifest.adapter_id.chars().count(),
+        manifest.runtime_id.chars().count(),
+        manifest.publisher.chars().count(),
+        manifest.adapter_version.chars().count(),
+        manifest.requested_capabilities.iter().map(|value| value.chars().count()).sum(),
+        manifest.permission_diff.iter().map(|value| value.chars().count()).sum(),
+        manifest.known_risks.iter().map(|value| value.chars().count()).sum(),
+    ]
+    .into_iter()
+    .sum::<usize>();
+    if display_chars > 4096 {
+        return None;
+    }
+    let signed_bytes = hex::decode(&manifest.signed_bytes_hex).ok()?;
+    let signature = hex::decode(&manifest.signature_hex).ok()?;
+    Some(OwnerManifestConfirmationSummary {
+        operation: operation.to_owned(),
+        adapter_id: manifest.adapter_id,
+        runtime_id: manifest.runtime_id,
+        publisher: manifest.publisher,
+        source: manifest.source,
+        adapter_version: manifest.adapter_version,
+        transport: manifest.transport,
+        content_exposure: manifest.content_exposure,
+        requested_capabilities: manifest.requested_capabilities,
+        permission_diff: manifest.permission_diff,
+        known_risks: manifest.known_risks,
+        compatibility: manifest.compatibility,
+        signer_fingerprint: manifest.signer_fingerprint,
+        signed_bytes_hash: crate::audit_hash::sha256_tagged(&signed_bytes),
+        signed_bytes_length: signed_bytes.len(),
+        signature_hash: crate::audit_hash::sha256_tagged(&signature),
+        current_adapter_hash,
+    })
+}
+
+fn owner_manifest_display_text_is_valid(value: &str, max_characters: usize) -> bool {
+    !value.trim().is_empty()
+        && value.chars().count() <= max_characters
+        && value.chars().all(|character| {
+            let codepoint = character as u32;
+            !character.is_control()
+                && !matches!(codepoint, 0x061c | 0x200e | 0x200f | 0x202a..=0x202e | 0x2066..=0x206f)
+        })
+}
+
 fn install(
     broker: &mut Broker,
     manifest: Option<AdapterManifest>,
@@ -445,6 +584,7 @@ fn install(
 fn update(
     broker: &mut Broker,
     manifest: Option<AdapterManifest>,
+    expected_adapter_hash: Option<String>,
     request_id: &str,
     hash: &str,
 ) -> BrokerResponse {
@@ -491,6 +631,46 @@ fn update(
             )
         }
     };
+    let Some(expected_adapter_hash) = expected_adapter_hash.filter(|value| valid_hash(value)) else {
+        return reject(
+            broker,
+            request_id,
+            OP_UPDATE,
+            "adapter_request_invalid",
+            "更新には現在Adapter hashが必要",
+            hash,
+        );
+    };
+    if previous_record.hash != expected_adapter_hash {
+        return reject(
+            broker,
+            request_id,
+            OP_UPDATE,
+            "adapter_stale",
+            "更新対象Adapter hashが一致しない",
+            hash,
+        );
+    }
+    if previous_record.management_state == "enabled" {
+        return reject(
+            broker,
+            request_id,
+            OP_UPDATE,
+            "adapter_enabled",
+            "有効化中のAdapterは更新できない。先に無効化が必要",
+            hash,
+        );
+    }
+    if previous_record.management_state == "quarantined" {
+        return reject(
+            broker,
+            request_id,
+            OP_UPDATE,
+            "adapter_quarantined",
+            "隔離済みAdapterは更新で状態を置換できない",
+            hash,
+        );
+    }
     let mut record = new_record(manifest);
     record.audit_id = broker.audit_log.next_event_id();
     let body = receipt(&record);
@@ -1245,6 +1425,35 @@ mod tests {
         let result = response(&mut broker, BrokerOperation::アダプター導入, payload, false);
         assert_eq!(result.status, BrokerStatus::Suspended);
         assert!(broker.adapters.is_empty());
+
+        let installed = response(
+            &mut broker,
+            BrokerOperation::アダプター導入,
+            json!({"版": VERSION, "操作": "導入", "Manifest": manifest()}),
+            true,
+        );
+        assert_eq!(installed.status, BrokerStatus::Accepted);
+        let current = broker.adapters.get("fixture_adapter").unwrap().clone();
+        let current_hash = serde_json::from_value::<AdapterRecord>(current.clone())
+            .unwrap()
+            .hash;
+        let mut replacement = manifest();
+        replacement.adapter_version = "1.0.1".into();
+        replacement.signed_bytes_hex = hex::encode(signed_payload_bytes(&replacement));
+        let update = response(
+            &mut broker,
+            BrokerOperation::アダプター更新,
+            json!({
+                "版": VERSION,
+                "操作": "更新",
+                "Adapter hash": current_hash,
+                "Manifest": replacement,
+            }),
+            false,
+        );
+        assert_eq!(update.status, BrokerStatus::Suspended);
+        assert_eq!(update.body.unwrap()["承認状態"], "owner_reapproval_required");
+        assert_eq!(broker.adapters.get("fixture_adapter"), Some(&current));
     }
 
     #[test]
@@ -1305,6 +1514,125 @@ mod tests {
             })
         )
         .is_none());
+    }
+
+    #[test]
+    fn owner_manifest_confirmation_summary_binds_manifest_and_update_target() {
+        let adapter_hash = hash();
+        let manifest_json = serde_json::to_value(manifest()).unwrap();
+        let install = owner_manifest_confirmation_summary(
+            "導入",
+            &json!({"版": VERSION, "操作": "導入", "Manifest": manifest_json.clone()}),
+        )
+        .expect("導入Manifest確認summary");
+        assert_eq!(install.operation, "導入");
+        assert_eq!(install.adapter_id, "fixture_adapter");
+        assert_eq!(install.runtime_id, "fixture_runtime");
+        assert_eq!(install.requested_capabilities, ["runtime.read"]);
+        assert!(install.current_adapter_hash.is_none());
+        assert!(install.signed_bytes_length > 0);
+        assert!(install.signed_bytes_hash.starts_with("sha256:"));
+
+        let update = owner_manifest_confirmation_summary(
+            "更新",
+            &json!({
+                "版": VERSION,
+                "操作": "更新",
+                "Adapter hash": adapter_hash,
+                "Manifest": manifest_json,
+            }),
+        )
+        .expect("hash結合update確認summary");
+        assert_eq!(update.current_adapter_hash.as_deref(), Some(adapter_hash));
+
+        let invalid = [
+            json!({"版": VERSION, "操作": "導入", "Manifest": serde_json::to_value(manifest()).unwrap(), "Adapter hash": hash()}),
+            json!({"版": VERSION, "操作": "更新", "Manifest": serde_json::to_value(manifest()).unwrap()}),
+            {
+                let mut value = serde_json::to_value(manifest()).unwrap();
+                value["発行者"] = json!("fixture\nunsafe");
+                json!({"版": VERSION, "操作": "導入", "Manifest": value})
+            },
+        ];
+        for payload in invalid {
+            let operation = payload["操作"].as_str().unwrap();
+            assert!(owner_manifest_confirmation_summary(operation, &payload).is_none());
+        }
+    }
+
+    #[test]
+    fn owner_update_requires_current_hash_and_disabled_nonquarantined_record() {
+        let mut broker = Broker::new("adapter-update-session");
+        let installed = response(
+            &mut broker,
+            BrokerOperation::アダプター導入,
+            json!({"版": VERSION, "操作": "導入", "Manifest": manifest()}),
+            true,
+        );
+        assert_eq!(installed.status, BrokerStatus::Accepted);
+        let original_hash = serde_json::from_value::<AdapterRecord>(
+            broker.adapters.get("fixture_adapter").unwrap().clone(),
+        )
+        .unwrap()
+        .hash;
+        let mut replacement = manifest();
+        replacement.adapter_version = "2.0.0".into();
+        replacement.signed_bytes_hex = hex::encode(signed_payload_bytes(&replacement));
+        let updated = response(
+            &mut broker,
+            BrokerOperation::アダプター更新,
+            json!({
+                "版": VERSION,
+                "操作": "更新",
+                "Adapter hash": original_hash,
+                "Manifest": replacement.clone(),
+            }),
+            true,
+        );
+        assert_eq!(updated.status, BrokerStatus::Accepted);
+        assert_eq!(broker.adapters["fixture_adapter"]["マニフェスト"]["version"], "2.0.0");
+        let updated_value = broker.adapters.get("fixture_adapter").unwrap().clone();
+        let updated_hash = serde_json::from_value::<AdapterRecord>(updated_value.clone())
+            .unwrap()
+            .hash;
+
+        let stale = response(
+            &mut broker,
+            BrokerOperation::アダプター更新,
+            json!({
+                "版": VERSION,
+                "操作": "更新",
+                "Adapter hash": hash(),
+                "Manifest": replacement.clone(),
+            }),
+            true,
+        );
+        assert_eq!(stale.status, BrokerStatus::Rejected);
+        assert_eq!(stale.error.unwrap().code, "adapter_stale");
+        assert_eq!(broker.adapters.get("fixture_adapter"), Some(&updated_value));
+
+        for (state, expected_code) in [
+            ("enabled", "adapter_enabled"),
+            ("quarantined", "adapter_quarantined"),
+        ] {
+            let mut record_value = updated_value.clone();
+            record_value["管理状態"] = json!(state);
+            broker.adapters.insert("fixture_adapter".into(), record_value.clone());
+            let rejected = response(
+                &mut broker,
+                BrokerOperation::アダプター更新,
+                json!({
+                    "版": VERSION,
+                    "操作": "更新",
+                    "Adapter hash": updated_hash,
+                    "Manifest": replacement.clone(),
+                }),
+                true,
+            );
+            assert_eq!(rejected.status, BrokerStatus::Rejected);
+            assert_eq!(rejected.error.unwrap().code, expected_code);
+            assert_eq!(broker.adapters.get("fixture_adapter"), Some(&record_value));
+        }
     }
 
     #[test]

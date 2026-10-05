@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../models/generated_contracts.dart';
@@ -45,6 +47,8 @@ class _RuntimeCenterState extends State<RuntimeCenter>
   int _lifecycleGeneration = 0;
   final Map<String, String> _adapterMessages = <String, String>{};
   final Set<String> _adapterBusy = <String>{};
+  List<AdapterCatalogRecord>? _adapterCatalogOverride;
+  bool _manifestInstallBusy = false;
   String _resourceMessage = '資源は自動更新しません。実行系IDを指定して、監査付きの一回観測を実行してください。';
   String _lifecycleMessage =
       'ライフサイクルは自動実行しません。Brokerへ状態を照会して、Capabilityがある操作だけを表示します。';
@@ -60,6 +64,12 @@ class _RuntimeCenterState extends State<RuntimeCenter>
   @override
   void didUpdateWidget(covariant RuntimeCenter oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.client != widget.client) {
+      _adapterCatalogOverride = null;
+      _adapterMessages.clear();
+      _adapterBusy.clear();
+      _manifestInstallBusy = false;
+    }
     if (oldWidget.resourceClient != widget.resourceClient ||
         oldWidget.connectResource != widget.connectResource) {
       _resourceGeneration++;
@@ -124,6 +134,7 @@ class _RuntimeCenterState extends State<RuntimeCenter>
   }
 
   Widget _overview(ShellSnapshot snapshot, RuntimeRecord? selectedRuntime) {
+    final adapterCatalog = _adapterCatalogOverride ?? snapshot.adapterCatalog;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -165,20 +176,33 @@ class _RuntimeCenterState extends State<RuntimeCenter>
             },
           ),
         const SizedBox(height: 16),
-        for (final adapter in snapshot.adapterCatalog)
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton.icon(
+            key: const ValueKey('adapter-manifest-install'),
+            onPressed: _manifestInstallBusy
+                ? null
+                : () => _manageAdapterManifest('導入'),
+            icon: const Icon(Icons.add),
+            label: const Text('Adapter Manifestを導入'),
+          ),
+        ),
+        const SizedBox(height: 8),
+        for (final adapter in adapterCatalog)
           Padding(
             padding: const EdgeInsets.only(bottom: 16),
             child: _adapterManagementPanel(adapter),
           ),
-        if (snapshot.adapterCatalog.isEmpty)
+        if (adapterCatalog.isEmpty)
           const EmptyStatePanel(
             title: 'Adapter catalogなし',
             meaning:
                 'Brokerからmetadata-onlyのAdapter一覧を取得できましたが、登録済みAdapterはありません。',
             phaseBBlocked: false,
-            nextAction: 'owner Manifest経路を用意してから導入操作を行ってください。',
+            nextAction:
+                '上のボタンからManifest JSONを提示できます。導入はBroker内catalogへのmetadata登録です。',
           ),
-        for (final adapter in snapshot.adapterCatalog)
+        for (final adapter in adapterCatalog)
           if (adapter.managementState == 'unknown') const SizedBox.shrink(),
         const SizedBox(height: 4),
         const SectionList(
@@ -188,13 +212,11 @@ class _RuntimeCenterState extends State<RuntimeCenter>
             'アダプター導入・更新・削除は現行単位ではcatalog metadata操作です。外部filesystem・process作用は未接続です。',
           ],
         ),
-        for (final adapter in snapshot.adapterCatalog)
-          if (_adapterMessages.containsKey(adapter.adapterId))
+        for (final entry in _adapterMessages.entries)
+          if (!adapterCatalog.any((adapter) => adapter.adapterId == entry.key))
             Padding(
               padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                '${adapter.adapterId}: ${_adapterMessages[adapter.adapterId]}',
-              ),
+              child: Text('${entry.key}: ${entry.value}'),
             ),
         for (final diff in snapshot.permissionDiffs)
           Padding(
@@ -261,13 +283,15 @@ class _RuntimeCenterState extends State<RuntimeCenter>
                       busy ? null : () => _manageAdapter(adapter, operation),
                   child: Text('アダプター$operation'),
                 ),
-              const OutlinedButton(
-                onPressed: null,
-                child: Text('アダプター導入（Manifest待ち）'),
-              ),
-              const OutlinedButton(
-                onPressed: null,
-                child: Text('アダプター更新（Manifest待ち）'),
+              OutlinedButton(
+                key: ValueKey('adapter-${adapter.adapterId}-manifest-update'),
+                onPressed: busy
+                    ? null
+                    : () => _manageAdapterManifest(
+                          '更新',
+                          adapter: adapter,
+                        ),
+                child: const Text('Manifestで更新'),
               ),
             ],
           ),
@@ -290,9 +314,19 @@ class _RuntimeCenterState extends State<RuntimeCenter>
       final result =
           await widget.client.manageAdapter(adapter.adapterId, operation);
       if (!mounted) return;
+      var refreshMessage = '';
+      if (result.status == 'accepted') {
+        try {
+          final catalog = await widget.client.refreshAdapterCatalog();
+          if (!mounted) return;
+          _adapterCatalogOverride = catalog;
+        } catch (_) {
+          refreshMessage = '（処理結果は受理済み。catalog再取得は未確認です）';
+        }
+      }
       setState(() {
         _adapterMessages[adapter.adapterId] =
-            '${result.status} / ${result.message} / 監査（Audit）=${result.auditId} / 復旧（Recovery）=${result.recoveryId}';
+            '${result.status} / ${result.message} / 監査（Audit）=${result.auditId} / 復旧（Recovery）=${result.recoveryId}$refreshMessage';
       });
     } catch (error) {
       if (!mounted) return;
@@ -300,6 +334,90 @@ class _RuntimeCenterState extends State<RuntimeCenter>
     } finally {
       if (mounted) {
         setState(() => _adapterBusy.remove(adapter.adapterId));
+      }
+    }
+  }
+
+  Future<void> _manageAdapterManifest(
+    String operation, {
+    AdapterCatalogRecord? adapter,
+  }) async {
+    final rawManifest = await showDialog<String>(
+      context: context,
+      builder: (_) => _AdapterManifestEntryDialog(
+        operation: operation,
+        adapterId: adapter?.adapterId,
+      ),
+    );
+    final adapterKey = adapter?.adapterId ?? '__manifest_install__';
+    if (rawManifest == null || !mounted) {
+      return;
+    }
+
+    try {
+      if (utf8.encode(rawManifest).length > 48 * 1024) {
+        setState(() =>
+            _adapterMessages[adapterKey] = 'Manifest JSONは48 KiB以下にしてください。');
+        return;
+      }
+      final decoded = jsonDecode(rawManifest);
+      if (decoded is! Map) {
+        setState(() => _adapterMessages[adapterKey] =
+            'Manifest JSONのrootはobjectである必要があります。');
+        return;
+      }
+      final manifest = Map<String, Object?>.from(decoded);
+      final manifestAdapterId = manifest['Adapter ID'];
+      if (adapter != null && manifestAdapterId != adapter.adapterId) {
+        setState(() =>
+            _adapterMessages[adapterKey] = 'ManifestのAdapter IDが更新対象と一致しません。');
+        return;
+      }
+
+      setState(() {
+        if (adapter == null) {
+          _manifestInstallBusy = true;
+        } else {
+          _adapterBusy.add(adapterKey);
+        }
+        _adapterMessages.remove(adapterKey);
+      });
+      final result = await widget.client.manageAdapterManifest(
+        operation,
+        manifest,
+        currentAdapterId: adapter?.adapterId,
+        currentAdapterHash: adapter?.hash,
+      );
+      if (!mounted) return;
+      var refreshMessage = '';
+      if (result.status == 'accepted') {
+        try {
+          _adapterCatalogOverride = await widget.client.refreshAdapterCatalog();
+        } catch (_) {
+          refreshMessage = '（処理は受理済み。catalog再取得は未確認です）';
+        }
+      }
+      setState(() {
+        _adapterMessages[
+                result.adapterId.isEmpty ? adapterKey : result.adapterId] =
+            '${result.status} / ${result.message} / 監査（Audit）=${result.auditId} / 復旧（Recovery）=${result.recoveryId}$refreshMessage';
+      });
+    } on FormatException {
+      if (mounted) {
+        setState(() => _adapterMessages[adapterKey] =
+            'Manifest JSONを解析できません。本文は画面外へ出していません。');
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _adapterMessages[adapterKey] =
+            'Manifest操作を完了できませんでした。本文は記録していません。');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _adapterBusy.remove(adapterKey);
+          _manifestInstallBusy = false;
+        });
       }
     }
   }
@@ -1203,3 +1321,79 @@ String _formatUnixMillis(int value) =>
         .toIso8601String();
 
 String _formatNumber(num value) => value.toString();
+
+class _AdapterManifestEntryDialog extends StatefulWidget {
+  const _AdapterManifestEntryDialog({
+    required this.operation,
+    this.adapterId,
+  });
+
+  final String operation;
+  final String? adapterId;
+
+  @override
+  State<_AdapterManifestEntryDialog> createState() =>
+      _AdapterManifestEntryDialogState();
+}
+
+class _AdapterManifestEntryDialogState
+    extends State<_AdapterManifestEntryDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isInstall = widget.operation == '導入';
+    return AlertDialog(
+      scrollable: true,
+      title: Text(isInstall ? 'Adapter Manifestを導入' : 'Adapter Manifestで更新'),
+      content: SizedBox(
+        width: 640,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isInstall
+                  ? 'Manifest JSONをBrokerへ提示します。登録前にnative Owner確認が表示されます。'
+                  : '更新対象 ${widget.adapterId ?? ''} の現在hashをBrokerが再照合します。',
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              '署名対象byte・署名は確認画面に表示せず、hashで識別します。Manifest本文はAuditへ記録しません。',
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              key: const ValueKey('adapter-manifest-json-input'),
+              controller: _controller,
+              minLines: 5,
+              maxLines: 8,
+              maxLength: 48 * 1024,
+              decoration: const InputDecoration(
+                labelText: 'Adapter定義書（JSON）',
+                border: OutlineInputBorder(),
+                alignLabelWithHint: true,
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('キャンセル'),
+        ),
+        FilledButton(
+          key: const ValueKey('adapter-manifest-submit'),
+          onPressed: () => Navigator.of(context).pop(_controller.text),
+          child: const Text('native Owner確認へ'),
+        ),
+      ],
+    );
+  }
+}

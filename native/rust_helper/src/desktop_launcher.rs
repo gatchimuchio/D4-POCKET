@@ -158,6 +158,10 @@ enum DesktopOwnerOperationSummary {
         adapter_hash: String,
         payload_hash: String,
     },
+    AdapterManifestManagement {
+        summary: crate::broker::adapter_center::OwnerManifestConfirmationSummary,
+        payload_hash: String,
+    },
     McpToolCall {
         server_id: String,
         tool_id: String,
@@ -1160,6 +1164,17 @@ fn owner_operation_candidate(
                 payload_hash,
             }
         }
+        operation @ (BrokerOperation::アダプター導入 | BrokerOperation::アダプター更新) => {
+            let operation_name = operation.as_str().strip_prefix("アダプター")?;
+            let summary = crate::broker::adapter_center::owner_manifest_confirmation_summary(
+                operation_name,
+                payload,
+            )?;
+            DesktopOwnerOperationSummary::AdapterManifestManagement {
+                summary,
+                payload_hash,
+            }
+        }
         BrokerOperation::MCP接続 => {
             let request: McpConnectOwnerRequest = serde_json::from_value(payload.clone()).ok()?;
             let reference = &request.credential_ref;
@@ -1870,6 +1885,48 @@ fn owner_confirmation_text_for_identity(
                 adapter_hash,
                 effect,
                 payload_hash
+            )
+        }
+        DesktopOwnerOperationSummary::AdapterManifestManagement {
+            summary,
+            payload_hash,
+        } => {
+            let list = |values: &[String]| {
+                if values.is_empty() {
+                    "（なし）".to_owned()
+                } else {
+                    values
+                        .iter()
+                        .map(|value| format!("• {}", owner_confirmation_value(value)))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                }
+            };
+            let current_hash = summary
+                .current_adapter_hash
+                .as_deref()
+                .map(owner_confirmation_value)
+                .unwrap_or_else(|| "（新規登録）".to_owned());
+            format!(
+                "Adapter Manifestの{}をBroker catalogへ登録しますか？\n\nAdapter ID: {}\nRuntime ID: {}\n発行者（申告）: {}\nsource: {}\nversion: {}\ntransport: {}\nContent Exposure: {}\n互換性（申告）: {}\n署名者fingerprint（申告）: {}\n\n要求Capability（申告）:\n{}\n許可差分（申告）:\n{}\n既知の危険（申告）:\n{}\n\n署名対象byte: {} bytes / {}\n署名byte hash: {}\n更新対象の現在Adapter hash: {}\n\nこの操作はManifestをBroker内catalogへmetadata-onlyで登録します。外部download、filesystemへの書込・削除、process起動は行いません。表示内容は未信頼Manifestの申告であり、この確認は署名検証、発行者Trust、Permission、Approval、Authorityを成立・付与しません。署名検証は別のBroker操作です。検証済みでないAdapterは有効化できません。結果はAuditへ記録されます。\n\npayload hash:\n{}",
+                owner_confirmation_value(&summary.operation),
+                owner_confirmation_value(&summary.adapter_id),
+                owner_confirmation_value(&summary.runtime_id),
+                owner_confirmation_value(&summary.publisher),
+                owner_confirmation_value(&summary.source),
+                owner_confirmation_value(&summary.adapter_version),
+                owner_confirmation_value(&summary.transport),
+                owner_confirmation_value(&summary.content_exposure),
+                owner_confirmation_value(&summary.compatibility),
+                owner_confirmation_value(&summary.signer_fingerprint),
+                list(&summary.requested_capabilities),
+                list(&summary.permission_diff),
+                list(&summary.known_risks),
+                summary.signed_bytes_length,
+                owner_confirmation_value(&summary.signed_bytes_hash),
+                owner_confirmation_value(&summary.signature_hash),
+                current_hash,
+                owner_confirmation_value(payload_hash),
             )
         }
         DesktopOwnerOperationSummary::McpConnect {
@@ -2612,6 +2669,17 @@ mod tests {
                 },
                 "confirm": confirm
             }),
+            DesktopOwnerOperationSummary::AdapterManifestManagement {
+                summary,
+                payload_hash,
+            } => json!({
+                "summary": {
+                    "kind": "adapter_manifest_management",
+                    "summary": summary,
+                    "payload_hash": payload_hash
+                },
+                "confirm": confirm
+            }),
             _ => panic!("このUI試験ではAgent Taskの固定summaryだけを使用する"),
         };
 
@@ -2841,6 +2909,37 @@ mod tests {
             true,
             Some(secret_marker)
         ));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "対話型Windows desktopでAdapter Manifest native Owner dialogを制御自動操作する"]
+    #[allow(non_snake_case)]
+    fn AdapterManifest導入の実Win32Owner確認を自動操作し署名byteを隠す() {
+        let raw_bytes = b"manifest-private-content";
+        let raw_signature = "ab".repeat(64);
+        let request = desktop_owner_request(
+            "アダプター導入",
+            "adapter-manifest-native-dialog",
+            "adapter-manifest-native-dialog-nonce",
+            serde_json::json!({
+                "版": 1,
+                "操作": "導入",
+                "Manifest": adapter_manifest_fixture("1.0.0"),
+            }),
+        );
+        let (_, summary) = owner_operation_candidate(request.to_string().as_bytes(), &endpoint())
+            .expect("導入Manifestはnative Owner dialog候補");
+        let prompt = owner_confirmation_text(&summary);
+        assert!(prompt.contains("fixture_adapter"));
+        assert!(prompt.contains("runtime.read"));
+        assert!(prompt.contains("署名検証は別のBroker操作"));
+        assert!(!prompt.contains(&hex::encode(raw_bytes)));
+        assert!(!prompt.contains(&raw_signature));
+        assert!(!prompt.contains("manifest-private-content"));
+
+        assert!(!automate_native_owner_confirmation(&summary, false, None));
+        assert!(automate_native_owner_confirmation(&summary, true, None));
     }
 
     #[cfg(windows)]
@@ -3104,6 +3203,10 @@ mod tests {
                 adapter_hash: String,
                 payload_hash: String,
             },
+            AdapterManifestManagement {
+                summary: crate::broker::adapter_center::OwnerManifestConfirmationSummary,
+                payload_hash: String,
+            },
         }
         #[derive(Deserialize)]
         struct TestRequest {
@@ -3113,7 +3216,7 @@ mod tests {
 
         let mut input = String::new();
         std::io::stdin()
-            .take(8 * 1024)
+            .take(32 * 1024)
             .read_to_string(&mut input)
             .expect("Owner確認dialog child request");
         let request: TestRequest =
@@ -3234,6 +3337,13 @@ mod tests {
                 operation,
                 adapter_id,
                 adapter_hash,
+                payload_hash,
+            },
+            TestSummary::AdapterManifestManagement {
+                summary,
+                payload_hash,
+            } => DesktopOwnerOperationSummary::AdapterManifestManagement {
+                summary,
                 payload_hash,
             },
         };
@@ -3389,6 +3499,29 @@ mod tests {
             "issued_at": BrokerRequestEnvelope::current_issued_at(),
             "metadata": {"client": "desktop_flutter"},
             "payload": payload
+        })
+    }
+
+    fn adapter_manifest_fixture(version: &str) -> serde_json::Value {
+        let signed_bytes = b"manifest-private-content";
+        serde_json::json!({
+            "版": 1,
+            "Adapter ID": "fixture_adapter",
+            "Runtime ID": "fixture_runtime",
+            "発行者": "fixture publisher",
+            "source": "owner_manifest",
+            "version": version,
+            "transport": "mock",
+            "Content Exposure": "summary",
+            "要求Capability": ["runtime.read", "model.chat"],
+            "許可差分": ["content_visibility:none->summary"],
+            "既知の危険": ["fixture does not verify publisher trust"],
+            "互換性": "compatible",
+            "authority_strip": true,
+            "signed_manifest": true,
+            "署名対象": hex::encode(signed_bytes),
+            "署名": "ab".repeat(64),
+            "署名者fingerprint": format!("sha256:{}", "c".repeat(64))
         })
     }
 
@@ -5212,6 +5345,122 @@ mod tests {
 
     #[test]
     #[allow(non_snake_case)]
+    fn AdapterManifestOwner確認は導入更新の申告全体を示しraw署名byteを出さない() {
+        let endpoint = endpoint();
+        let signed_bytes_text = "manifest-private-content";
+        let signature_hex = "ab".repeat(64);
+        let manifest = adapter_manifest_fixture("1.0.0");
+        for (index, (operation, operation_name, adapter_hash)) in [
+            ("アダプター導入", "導入", None),
+            (
+                "アダプター更新",
+                "更新",
+                Some(format!("sha256:{}", "d".repeat(64))),
+            ),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let mut payload = serde_json::json!({
+                "版": 1,
+                "操作": operation_name,
+                "Manifest": manifest.clone(),
+            });
+            if let Some(adapter_hash) = adapter_hash {
+                payload["Adapter hash"] = serde_json::json!(adapter_hash);
+            }
+            let request = desktop_owner_request(
+                operation,
+                &format!("desktop-adapter-manifest-{index}"),
+                &format!("desktop-adapter-manifest-nonce-{index}"),
+                payload.clone(),
+            );
+            let (normalized, summary) =
+                owner_operation_candidate(request.to_string().as_bytes(), &endpoint)
+                    .expect("導入・更新Manifestはnative Owner確認候補");
+            let normalized = BrokerRequestEnvelope::from_json_str(&normalized).unwrap();
+            assert_eq!(normalized.session_id.as_deref(), Some(endpoint.session_id.as_str()));
+            let DesktopOwnerOperationSummary::AdapterManifestManagement {
+                summary,
+                payload_hash,
+            } = summary
+            else {
+                panic!("Manifest操作は専用native Owner確認を使う")
+            };
+            assert_eq!(summary.operation, operation_name);
+            assert_eq!(summary.adapter_id, "fixture_adapter");
+            assert_eq!(summary.requested_capabilities.len(), 2);
+            assert_eq!(summary.permission_diff.len(), 1);
+            assert_eq!(summary.known_risks.len(), 1);
+            assert_eq!(summary.current_adapter_hash.is_some(), operation_name == "更新");
+            assert_eq!(payload_hash, request["payload_hash"]);
+
+            let confirmation = owner_confirmation_text(
+                &DesktopOwnerOperationSummary::AdapterManifestManagement {
+                    summary: summary.clone(),
+                    payload_hash,
+                },
+            );
+            for visible in [
+                "fixture_adapter",
+                "fixture_runtime",
+                "fixture publisher",
+                "runtime.read",
+                "model.chat",
+                "content_visibility:none->summary",
+                "fixture does not verify publisher trust",
+                &summary.signer_fingerprint,
+                &summary.signed_bytes_hash,
+                &summary.signature_hash,
+                "metadata-only",
+                "署名検証は別のBroker操作",
+            ] {
+                assert!(confirmation.contains(visible), "確認表示に不足: {visible}");
+            }
+            assert!(!confirmation.contains(signed_bytes_text));
+            assert!(!confirmation.contains(&signature_hex));
+            assert!(!confirmation.contains("manifest-private-content"));
+            if let Some(current_hash) = summary.current_adapter_hash {
+                assert!(confirmation.contains(&current_hash));
+            }
+        }
+
+        let invalid_payloads = [
+            serde_json::json!({
+                "版": 1,
+                "操作": "更新",
+                "Manifest": manifest,
+            }),
+            serde_json::json!({
+                "版": 1,
+                "操作": "導入",
+                "Adapter hash": format!("sha256:{}", "d".repeat(64)),
+                "Manifest": adapter_manifest_fixture("1.0.0"),
+            }),
+            {
+                let mut invalid = adapter_manifest_fixture("1.0.0");
+                invalid["既知の危険"] = serde_json::json!(["unsafe\u{202e}claim"]);
+                serde_json::json!({"版": 1, "操作": "導入", "Manifest": invalid})
+            },
+        ];
+        for (index, payload) in invalid_payloads.into_iter().enumerate() {
+            let operation = if payload["操作"] == "更新" {
+                "アダプター更新"
+            } else {
+                "アダプター導入"
+            };
+            let request = desktop_owner_request(
+                operation,
+                &format!("desktop-adapter-manifest-invalid-{index}"),
+                &format!("desktop-adapter-manifest-invalid-nonce-{index}"),
+                payload,
+            );
+            assert!(owner_operation_candidate(request.to_string().as_bytes(), &endpoint).is_none());
+        }
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
     fn Adapter状態操作はDesktopOwner経路で否認停止とBroker到達を分離する() {
         let root = test_root("adapter-owner-relay");
         let session_file = root.join(SESSION_FILE);
@@ -5316,6 +5565,119 @@ mod tests {
 
         shutdown.store(true, Ordering::Release);
         server.join().unwrap().unwrap();
+        endpoint.session_secret.zeroize();
+        session_bytes.zeroize();
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn AdapterManifest導入はnativeOwner確認後にBrokerのmetadata登録だけを行う() {
+        let root = test_root("adapter-manifest-owner-relay");
+        let session_file = root.join(SESSION_FILE);
+        let store_dir = root.join("store");
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let (ready_tx, ready_rx) = mpsc::sync_channel(1);
+        let (owner_operation_tx, owner_operation_rx) = mpsc::sync_channel(1);
+        let server_shutdown = Arc::clone(&shutdown);
+        let server_session_file = session_file.clone();
+        let server_store_dir = store_dir.clone();
+        let server = thread::spawn(move || {
+            let config = BrokerServerConfig::new(server_store_dir, server_session_file);
+            crate::broker::ipc_server::run_loopback_server_cancellable_with_owner_operations(
+                config,
+                server_shutdown,
+                ready_tx,
+                owner_operation_rx,
+                None,
+            )
+        });
+        ready_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        let (mut session_bytes, mut endpoint) = read_endpoint(&session_file).unwrap();
+        let initial_adapter_state = fs::read(store_dir.join("adapters.json")).unwrap();
+        let payload = serde_json::json!({
+            "版": 1,
+            "操作": "導入",
+            "Manifest": adapter_manifest_fixture("1.0.0"),
+        });
+        let declined_request = desktop_owner_request(
+            "アダプター導入",
+            "desktop-adapter-manifest-declined",
+            "desktop-adapter-manifest-declined-nonce",
+            payload.clone(),
+        );
+        let mut decline_count = 0;
+        let declined = relay_channel_frame_with_owner_operations(
+            gui_shell_windows_broker_channel::PipeFrame::Line(
+                serde_json::to_vec(&declined_request).unwrap(),
+            ),
+            &endpoint,
+            Some(&owner_operation_tx),
+            |summary| {
+                decline_count += 1;
+                assert!(matches!(
+                    summary,
+                    DesktopOwnerOperationSummary::AdapterManifestManagement { .. }
+                ));
+                assert!(owner_confirmation_text(summary).contains("外部download"));
+                false
+            },
+        )
+        .unwrap();
+        let declined: serde_json::Value = serde_json::from_slice(&declined).unwrap();
+        assert_eq!(decline_count, 1);
+        assert_eq!(declined["status"], "suspended");
+        assert_eq!(declined["body"]["承認状態"], "owner_reapproval_required");
+        assert!(declined["audit_event_id"].as_str().is_some());
+        assert_eq!(
+            fs::read(store_dir.join("adapters.json")).unwrap(),
+            initial_adapter_state,
+            "native Owner拒否でAdapter catalogを変えない"
+        );
+
+        let confirmed_request = desktop_owner_request(
+            "アダプター導入",
+            "desktop-adapter-manifest-confirmed",
+            "desktop-adapter-manifest-confirmed-nonce",
+            payload,
+        );
+        let mut confirm_count = 0;
+        let confirmed = relay_channel_frame_with_owner_operations(
+            gui_shell_windows_broker_channel::PipeFrame::Line(
+                serde_json::to_vec(&confirmed_request).unwrap(),
+            ),
+            &endpoint,
+            Some(&owner_operation_tx),
+            |summary| {
+                confirm_count += 1;
+                let text = owner_confirmation_text(summary);
+                assert!(text.contains("fixture_adapter"));
+                assert!(text.contains("runtime.read"));
+                assert!(text.contains("fixture does not verify publisher trust"));
+                true
+            },
+        )
+        .unwrap();
+        let confirmed: serde_json::Value = serde_json::from_slice(&confirmed).unwrap();
+        assert_eq!(confirm_count, 1);
+        assert_eq!(confirmed["status"], "accepted");
+        assert_eq!(confirmed["body"]["Adapter ID"], "fixture_adapter");
+        assert_eq!(confirmed["body"]["検証状態"], "pending_review");
+        assert_eq!(confirmed["body"]["署名状態"], "unverified");
+        assert!(confirmed["audit_event_id"].as_str().is_some());
+
+        shutdown.store(true, Ordering::Release);
+        server.join().unwrap().unwrap();
+        let audit = fs::read_to_string(store_dir.join("audit.jsonl")).unwrap();
+        let raw_bytes_hex = hex::encode(b"manifest-private-content");
+        let raw_signature = "ab".repeat(64);
+        assert!(audit.contains("desktop-adapter-manifest-declined"));
+        assert!(audit.contains("desktop-adapter-manifest-confirmed"));
+        assert!(!audit.contains("manifest-private-content"));
+        assert!(!audit.contains(&raw_bytes_hex));
+        assert!(!audit.contains(&raw_signature));
+        assert!(store_dir.join("adapters.json").exists());
+
         endpoint.session_secret.zeroize();
         session_bytes.zeroize();
         fs::remove_dir_all(root).unwrap();

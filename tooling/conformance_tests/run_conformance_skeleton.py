@@ -6322,6 +6322,9 @@ def Adapter管理操作の統治境界を検査する() -> list[str]:
     store = (RUST_HELPER / "src" / "broker" / "store.rs").read_text(encoding="utf-8")
     desktop = (DESKTOP_FLUTTER / "lib" / "screens" / "runtime_center.dart").read_text(encoding="utf-8")
     client = (DESKTOP_FLUTTER / "lib" / "services" / "shell_core_client.dart").read_text(encoding="utf-8")
+    launcher = (RUST_HELPER / "src" / "desktop_launcher.rs").read_text(encoding="utf-8")
+    broker_client = (DESKTOP_FLUTTER / "lib" / "services" / "broker_client.dart").read_text(encoding="utf-8")
+    pipe_controller = (DESKTOP_FLUTTER / "windows" / "runner" / "broker_pipe_controller.cpp").read_text(encoding="utf-8")
     for token, source in (
         ("owner_reapproval_required", center + desktop + client),
         ("runtime_is_quarantined", center + protocol),
@@ -6333,6 +6336,13 @@ def Adapter管理操作の統治境界を検査する() -> list[str]:
         ("アダプター一覧", center + protocol + desktop + client),
         ("アダプター隔離", center + protocol + desktop + client),
         ("アダプター削除", center + protocol + desktop + client),
+        ("owner_manifest_confirmation_summary", center + launcher),
+        ("AdapterManifestManagement", launcher),
+        ("currentAdapterHash", client),
+        ("アダプター導入", protocol + launcher + desktop + client + broker_client),
+        ("アダプター更新", protocol + launcher + desktop + client + broker_client),
+        ("アダプター一覧", client),
+        (r"\xE3\x82\xA2\xE3\x83\x80\xE3\x83\x97\xE3\x82\xBF\xE3\x83\xBC\xE5\xB0\x8E\xE5\x85\xA5", pipe_controller),
     ):
         if token not in source:
             不整合.append(f"C19 Adapter管理操作実装に統治境界tokenがない: {token}")
@@ -6346,6 +6356,10 @@ def Adapter管理操作の統治境界を検査する() -> list[str]:
         failures = validate_instance(valid, schema)
         if failures:
             不整合.extend(f"C19 {name} valid fixtureが拒否された: {failure}" for failure in failures)
+    update_valid = load_contract_fixture("adapter_management_update.valid.json")
+    failures = validate_instance(update_valid, load_schema("adapter_management_request.schema.json"))
+    if failures:
+        不整合.extend(f"C19 adapter_management_update valid fixtureが拒否された: {failure}" for failure in failures)
     list_schema = load_schema("adapter_management_list.schema.json")
     receipt = load_contract_fixture("adapter_management_receipt.valid.json")
     list_fixture = {
@@ -6363,6 +6377,8 @@ def Adapter管理操作の統治境界を検査する() -> list[str]:
     for file_name, schema_name in (
         ("adapter_management_authority.invalid.json", "adapter_management_request"),
         ("adapter_management_unknown_field.invalid.json", "adapter_management_request"),
+        ("adapter_management_update_missing_hash.invalid.json", "adapter_management_request"),
+        ("adapter_management_install_with_hash.invalid.json", "adapter_management_request"),
     ):
         invalid = load_contract_fixture("invalid/" + file_name)
         if not validate_instance(invalid, load_schema(schema_name + ".schema.json")):
@@ -8253,6 +8269,8 @@ def test_agent_task_owner_confirmation_wait_uses_native_operation_timeout() -> l
         "作業領域失効",
         "作業領域全体基準点保存",
         "AgentCLI実行系作業領域登録",
+        "アダプター導入",
+        "アダプター更新",
     )
     owner_set_match = re.search(
         r"const _nativeOwnerConfirmationOperations = <String>\{(.*?)\};",
