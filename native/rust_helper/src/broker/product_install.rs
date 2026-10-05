@@ -115,6 +115,20 @@ pub(crate) fn open_existing_product_root(
     Ok((product_root, current))
 }
 
+/// 既存の固定rootと`versions`だけをno-followで開く。activation時にdirectoryを新規作成しない。
+pub(crate) fn open_existing_product_versions_directory(
+    local_app_data: &Path,
+    app_id: &str,
+) -> Result<(PathBuf, Dir), ProductInstallPlanError> {
+    let (root_path, root) = open_existing_product_root(local_app_data, app_id)?;
+    let metadata = root
+        .dir_metadata()
+        .map_err(|_| ProductInstallPlanError("product_install_directory_invalid"))?;
+    let device = CapMetadataExt::dev(&metadata);
+    let versions = open_existing_child_directory(&root, VERSIONS_DIRECTORY, device)?;
+    Ok((root_path.join(VERSIONS_DIRECTORY), versions))
+}
+
 /// 固定導入root pathを導出する。directoryを作成せず、任意pathを受け取らない。
 pub(crate) fn product_install_root(
     local_app_data: &Path,
@@ -340,7 +354,8 @@ fn valid_product_version(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        open_existing_product_root, open_product_versions_directory, plan_product_install,
+        open_existing_product_root, open_existing_product_versions_directory,
+        open_product_versions_directory, plan_product_install,
     };
     use std::path::Path;
 
@@ -425,6 +440,43 @@ mod tests {
         let (opened_path, capability) =
             open_existing_product_root(&local_app_data, APP_ID).unwrap();
         assert_eq!(opened_path, std::fs::canonicalize(product_root).unwrap());
+        assert!(capability.dir_metadata().unwrap().is_dir());
+        drop(capability);
+        std::fs::remove_dir_all(local_app_data).unwrap();
+    }
+
+    #[test]
+    fn existing_versions_capability_never_creates_installation_directories() {
+        let local_app_data = std::env::temp_dir().join(format!(
+            "d4p-product-versions-readonly-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&local_app_data).unwrap();
+        assert_eq!(
+            open_existing_product_versions_directory(&local_app_data, APP_ID)
+                .unwrap_err()
+                .0,
+            "product_install_directory_unavailable"
+        );
+        assert!(!local_app_data.join("Programs").exists());
+
+        let product_root = local_app_data
+            .join("Programs")
+            .join("D4 Pocket")
+            .join(APP_ID);
+        std::fs::create_dir_all(product_root.join("versions")).unwrap();
+        let (versions_path, capability) =
+            open_existing_product_versions_directory(&local_app_data, APP_ID).unwrap();
+        assert_eq!(
+            versions_path,
+            std::fs::canonicalize(&product_root)
+                .unwrap()
+                .join("versions")
+        );
         assert!(capability.dir_metadata().unwrap().is_dir());
         drop(capability);
         std::fs::remove_dir_all(local_app_data).unwrap();

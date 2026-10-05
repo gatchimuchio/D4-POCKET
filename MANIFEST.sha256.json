@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "28900ca6ab219858f97493ec34d11bb6eca1e6f1adbfa7070520b7e87958bd67"
+      "sha256": "9b50c1438e8fdedbe6cacbaa46685104db0943feefb2b4a0581be49da451d9a5"
     },
     {
       "path": "SECURITY.md",
@@ -288,7 +288,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/settings.dart",
-      "sha256": "87f9e4512b7b20b44d432c7dc553e6250b18cf9adb77509f0201d282bd3ec14f"
+      "sha256": "a9b2a5d929fe80a67432e227875bfc8225b955a15ae803f4396d36e72e3ad84a"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/setup_doctor.dart",
@@ -336,7 +336,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/broker_client.dart",
-      "sha256": "90cad562dd7ccd14c3e6909fa2fc0f9cd8b03ad597f2ce18bbb1b2539f2cd490"
+      "sha256": "9fbbab722b62c40c45818ef324c390541907b227372728deb9246eaf7c8a9827"
     },
     {
       "path": "apps/desktop_flutter/lib/services/compose_client.dart",
@@ -392,7 +392,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/update_client.dart",
-      "sha256": "806682bb2e0a40005970349536e0e808c92f606ad2d379fa1c6749ecca003460"
+      "sha256": "9406c5bee5359c68bcc9969fb745a1b58a67b382c7409e477414c76d4d78a4c5"
     },
     {
       "path": "apps/desktop_flutter/lib/services/windows_tray_client.dart",
@@ -656,7 +656,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/update_client_test.dart",
-      "sha256": "a9061a422f4b2ca6cf0924c1f0d10a7b0e813bd1e61107cb2fb7e865f3261fda"
+      "sha256": "ae61db6760278f4f2f3fb5b5a0a5ef631080f6b0145b74c12f13878cad2cd0aa"
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
@@ -716,7 +716,7 @@
     },
     {
       "path": "apps/desktop_flutter/windows/runner/broker_pipe_controller.cpp",
-      "sha256": "8ef8b7e38cff7011f70368c6a3248e69422c756c781de3fded23df899a064258"
+      "sha256": "ee164cc8f12c6cefb0ec8ee382932e49a84425b4093048821ca61cec5749b7c2"
     },
     {
       "path": "apps/desktop_flutter/windows/runner/broker_pipe_controller.h",
@@ -1240,7 +1240,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "d307c50c7f442f41c97d245230a4944c580efd5b79a7a085c78f6540c5a4a894"
+      "sha256": "e29a882b6472907d580d55e4420271827b94a1f7ed3672805230093a67a2e5ab"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1508,15 +1508,15 @@
     },
     {
       "path": "docs/specs/update-center.md",
-      "sha256": "ae864b4357d86c98a57214d6d76fb559b2b9c820e67ccfa116828aa285c90497"
+      "sha256": "d9a062dcff6d558944730d1a00767830a0a09125aa1c1999f333f1e4146a24c1"
     },
     {
       "path": "docs/specs/windows-desktop-launcher.md",
-      "sha256": "4a0b147cc7adf862b78bc6b351ecc3218e6d79d7bc17a8858c26f59cf5ba7515"
+      "sha256": "9931d45c00013a7eae8c71debaa0e86a77c96f91dd64b443513b23141e2fbfb4"
     },
     {
       "path": "docs/specs/windows-product-package.md",
-      "sha256": "670be0b67dd4e4931be634191f9fb051421338279f7d8e53cebbb3697148d834"
+      "sha256": "7c8c98398427b755e52396a4fc46cc3ec85159a5bd0c0e98eb7fbda8129bdaa2"
     },
     {
       "path": "docs/specs/windows-protection.md",
@@ -3284,7 +3284,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/ipc_server.rs",
-      "sha256": "f4d2bd8042cc4163a83ec3eed4456c10668fca05bd9d29046f19fc39fc7521d9"
+      "sha256": "30b6ddc31386cd55dcc5e7ab1819b2efa6396fe5e73d1885c54c481fafa63186"
     },
     {
       "path": "native/rust_helper/src/broker/json_input.rs",
@@ -3308,7 +3308,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/product_install.rs",
-      "sha256": "7afe5f65702f6d2414ef4c583529a3d11a956bf9aa74cb1c0ae151fd4eb7aa67"
+      "sha256": "c1a40173bca560009ff0b3549366564dea27d90b3932fc62b27cffc4eed43ca0"
     },
     {
       "path": "native/rust_helper/src/broker/profile_center.rs",
@@ -3316,7 +3316,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "00cc0716dad8dba336d428d05153dcb7a28c100e3f06d106531fc7c86b652245"
+      "sha256": "2be88109bf69fb4f638eb6ebc1abdb901765c1ab1d0caf85a85300c86819682e"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -3340,11 +3340,11 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "ef5eec5c9e2a6bd9a8fe562a0746f4800b316008b3b45837d071387579b21fd7"
+      "sha256": "4ba783131141a6e34199098197f7b898bdd5c66dfca2be44c81f2b401601e066"
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
-      "sha256": "52155397b8f838e86285a0756397c9ed7e9e51c6f781891e3aed1d0eb21973ee"
+      "sha256": "a06c06cf39598fd4b711a20b0d2003f4ffff25e7414feea5e10049e4e23ac923"
     },
     {
       "path": "native/rust_helper/src/broker/update_download/windows_dns.rs",
@@ -3368,7 +3368,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "279fea66c7f176f817c505ce9c7454d42c2cd0ba8b1934ae93c2ca948636bb8d"
+      "sha256": "0a62064a1f74c28e1679c5dbebe56d2a2ecfccd9d3225c4a60f2b89213bb67e7"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -3412,11 +3412,11 @@
     },
     {
       "path": "native/rust_helper/src/product_bootstrapper.rs",
-      "sha256": "c21e78991812c94042654591125caa46c8d576f15f226ad367241d45e4cb21ed"
+      "sha256": "3defcf43d1386d79e9825ed26899e96673231cea764d8e92a22312911b4de8a6"
     },
     {
       "path": "native/rust_helper/src/product_package.rs",
-      "sha256": "2d19262cb3828859f03befe5a72584d1b6ca5774bef5c19af5d18aacd33a2166"
+      "sha256": "2d2fa2bfbc2bd530225035b06323ee3f913ea520a531a0a74f68ee7039b17626"
     },
     {
       "path": "native/rust_helper/src/protected_store.rs",
@@ -3940,7 +3940,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "1f620a39ec6a89d5ce6f30dbab094662a4c89c626998ef3fd1b87c24b17889e1"
+      "sha256": "80fda31c875461544c7c9b095860f92b0e59ef9ca3ad0e411668f2bacea9d9da"
     },
     {
       "path": "requirements-dev.txt",
@@ -4288,11 +4288,11 @@
     },
     {
       "path": "specs/ipc_request.schema.json",
-      "sha256": "84d01f6bfb3633de94491d194b838613e695ce56eb263a25081530267866f63c"
+      "sha256": "e00f834969fbf4ced9011e7164699d128eabea497bb94f500ac6d3d3f416450c"
     },
     {
       "path": "specs/ipc_response.schema.json",
-      "sha256": "c5b9eab2146d3b8fa104a310d16ffa38bb237f8b08a0bdfa77f5fc26df88fffc"
+      "sha256": "931bc8ebd9f82c5b48fabf1a57aa13d67d972e95aa2710d562ac6499bba9d25e"
     },
     {
       "path": "specs/mcp_connection.schema.json",
@@ -4636,7 +4636,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "a27c87699ed8f7d29ca0af703924981522ca7306a826bb8a95c29dd1bbeda049"
+      "sha256": "2a5230d18353b11da58c767713131190a5d8e2fdd742c6bbf72757121f0d2b47"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",

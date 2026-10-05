@@ -752,7 +752,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Text('更新センター', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 4),
               Text(
-                '信頼設定=${body['署名信頼設定'] ?? 'unknown'}。downloadは直接HTTPS接続のみ（system proxy・自動retryなし）で、Rust Desktopの確認が必要です。適用要求は署名済みpackageを固定version directoryへ未起動状態で展開します。Start Menu切替・process起動・rollbackはsuspendedです。',
+                '信頼設定=${body['署名信頼設定'] ?? 'unknown'}。downloadは直接HTTPS接続のみ（system proxy・自動retryなし）で、Rust Desktopの確認が必要です。適用要求は署名済みpackageを固定version directoryへ未起動状態で展開します。有効版切替は別のRust Desktop確認後にpackageとstage全体を再検証してrecordを更新します。切替だけではprocessを起動せず、Start Menuとrollbackは変更しません。',
               ),
               if (downloadJob != null) ...[
                 const SizedBox(height: 4),
@@ -819,6 +819,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         sourceConfigured &&
         !downloadBusy &&
         !alreadyDownloaded;
+    final canRequestActivation = update['署名状態'] == 'verified' &&
+        RegExp(r'^[a-f0-9]{64}$').hasMatch(packageSha256 ?? '') &&
+        packageSize is num &&
+        packageSize > 0;
     return ListTile(
       contentPadding: EdgeInsets.zero,
       title: Text('${update['提供版'] ?? ''} ($updateId)'),
@@ -854,6 +858,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
               '署名済みpackageを未起動versionとして固定導入先へ展開しました。Start Menu切替・process起動・rollbackはsuspendedです。',
             ),
             child: const Text('適用要求'),
+          ),
+          TextButton(
+            onPressed: canRequestActivation
+                ? () => _runUpdateRequest(
+                      () => client.requestActivation(
+                        updateId: updateId,
+                        candidateHash: candidateHash,
+                      ),
+                      '有効版recordを切り替えました。次回の固定root起動時に選択版を使用します。process・Start Menu・rollbackは変更していません。',
+                    )
+                : null,
+            child: const Text('有効版へ切替'),
           ),
           TextButton(
             onPressed: () => _runUpdateRequest(

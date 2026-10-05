@@ -178,6 +178,10 @@ enum DesktopOwnerOperationSummary {
         confirmation: crate::broker::update_center::UpdateApplyConfirmation,
         payload_hash: String,
     },
+    UpdateActivation {
+        confirmation: crate::broker::update_center::UpdateActivationConfirmation,
+        payload_hash: String,
+    },
 }
 
 #[derive(Deserialize)]
@@ -331,6 +335,17 @@ struct UpdateDownloadOwnerRequest {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct UpdateApplyOwnerRequest {
+    #[serde(rename = "版")]
+    version: u64,
+    #[serde(rename = "更新ID")]
+    update_id: String,
+    #[serde(rename = "候補hash")]
+    candidate_hash: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct UpdateActivationOwnerRequest {
     #[serde(rename = "版")]
     version: u64,
     #[serde(rename = "更新ID")]
@@ -510,6 +525,32 @@ fn current_update_apply_confirmation(
         app_id: identity.app_id,
         audit_store_id: identity.audit_store_id,
         version_directory: plan.version_directory,
+    })
+}
+
+fn current_update_activation_confirmation(
+    request: &UpdateActivationOwnerRequest,
+    payload_hash: &str,
+    endpoint: &BrokerEndpoint,
+) -> Option<crate::broker::update_center::UpdateActivationConfirmation> {
+    let apply_request = UpdateApplyOwnerRequest {
+        version: request.version,
+        update_id: request.update_id.clone(),
+        candidate_hash: request.candidate_hash.clone(),
+    };
+    let apply = current_update_apply_confirmation(&apply_request, payload_hash, endpoint)?;
+    Some(crate::broker::update_center::UpdateActivationConfirmation {
+        update_id: apply.download.update_id,
+        candidate_hash: apply.download.candidate_hash,
+        package_sha256: apply.download.package_sha256,
+        package_size_bytes: apply.download.package_size_bytes,
+        offered_version: apply.download.offered_version,
+        channel: apply.download.channel,
+        summary: apply.download.summary,
+        payload_hash: apply.download.payload_hash,
+        app_id: apply.app_id,
+        audit_store_id: apply.audit_store_id,
+        version_directory: apply.version_directory,
     })
 }
 
@@ -1410,6 +1451,22 @@ fn owner_operation_candidate(
                 payload_hash,
             }
         }
+        BrokerOperation::更新有効版切替要求 => {
+            let request: UpdateActivationOwnerRequest =
+                serde_json::from_value(payload.clone()).ok()?;
+            if request.version != 1
+                || !valid_update_identifier(&request.update_id)
+                || !is_tagged_sha256(&request.candidate_hash)
+            {
+                return None;
+            }
+            let confirmation =
+                current_update_activation_confirmation(&request, &payload_hash, endpoint)?;
+            DesktopOwnerOperationSummary::UpdateActivation {
+                confirmation,
+                payload_hash,
+            }
+        }
         BrokerOperation::AgentTaskWorkspacePermissionGrant => {
             let request: AgentTaskWorkspacePermissionRequest =
                 serde_json::from_value(payload.clone()).ok()?;
@@ -1748,11 +1805,18 @@ where
                             }
                             _ => None,
                         };
+                        let activation_confirmation = match &summary {
+                            DesktopOwnerOperationSummary::UpdateActivation {
+                                confirmation, ..
+                            } => Some(confirmation.clone()),
+                            _ => None,
+                        };
                         owner_operations
                             .send(DesktopOwnerOperationRequest {
                                 request_json,
                                 download_confirmation,
                                 apply_confirmation,
+                                activation_confirmation,
                                 reply,
                             })
                             .ok()?;
@@ -2118,6 +2182,22 @@ fn owner_confirmation_text_for_identity(
             owner_confirmation_value(&confirmation.audit_store_id),
             owner_confirmation_value(&confirmation.version_directory.display().to_string()),
             owner_confirmation_value(&confirmation.download.summary),
+            payload_hash
+        ),
+        DesktopOwnerOperationSummary::UpdateActivation {
+            confirmation,
+            payload_hash,
+        } => format!(
+            "署名済みD4 Pocketの未起動版を有効版へ切り替えますか？\n\n更新ID: {}\n提供版: {}\nchannel: {}\n署名済みpackage SHA-256: {}\n署名済みbyte長: {}\nApp ID: {}\nAudit Store ID: {}\n固定version directory: {}\n内容概要: {}\n\nこの操作はRust Desktop起動器が現在のBroker候補とKnown Folderから表示内容を作成し、Brokerが実行直前にtrust・署名・package全体・stage内file／directory inventory・製品identity・固定rootを再検証します。有効版recordを固定root内でatomicに置換し、初回だけ検証済みstageからroot Bootstrapperをcreate-onlyで配置します。processは起動せず、Start Menu・現在実行中process・旧versionを変更／削除せず、rollbackもしません。切替後の起動は次回の固定root Bootstrapper起動時です。操作intentと結果をdurable Auditへ記録します。\n\npayload hash:\n{}",
+            owner_confirmation_value(&confirmation.update_id),
+            owner_confirmation_value(&confirmation.offered_version),
+            owner_confirmation_value(&confirmation.channel),
+            confirmation.package_sha256,
+            confirmation.package_size_bytes,
+            owner_confirmation_value(&confirmation.app_id),
+            owner_confirmation_value(&confirmation.audit_store_id),
+            owner_confirmation_value(&confirmation.version_directory.display().to_string()),
+            owner_confirmation_value(&confirmation.summary),
             payload_hash
         ),
         DesktopOwnerOperationSummary::RegressionCaseDelete {
@@ -2895,6 +2975,26 @@ mod tests {
                 },
                 "confirm": confirm
             }),
+            DesktopOwnerOperationSummary::UpdateActivation {
+                confirmation,
+                payload_hash,
+            } => json!({
+                "summary": {
+                    "kind": "update_activation",
+                    "update_id": confirmation.update_id,
+                    "candidate_hash": confirmation.candidate_hash,
+                    "package_sha256": confirmation.package_sha256,
+                    "package_size_bytes": confirmation.package_size_bytes,
+                    "offered_version": confirmation.offered_version,
+                    "channel": confirmation.channel,
+                    "summary": confirmation.summary,
+                    "payload_hash": payload_hash,
+                    "app_id": confirmation.app_id,
+                    "audit_store_id": confirmation.audit_store_id,
+                    "version_directory": confirmation.version_directory,
+                },
+                "confirm": confirm
+            }),
             _ => panic!("このUI試験ではAgent Taskの固定summaryだけを使用する"),
         };
 
@@ -3436,6 +3536,19 @@ mod tests {
                 audit_store_id: String,
                 version_directory: PathBuf,
             },
+            UpdateActivation {
+                update_id: String,
+                candidate_hash: String,
+                package_sha256: String,
+                package_size_bytes: u64,
+                offered_version: String,
+                channel: String,
+                summary: String,
+                payload_hash: String,
+                app_id: String,
+                audit_store_id: String,
+                version_directory: PathBuf,
+            },
         }
         #[derive(Deserialize)]
         struct TestRequest {
@@ -3602,6 +3715,34 @@ mod tests {
                         display_host,
                         payload_hash: payload_hash.clone(),
                     },
+                    app_id,
+                    audit_store_id,
+                    version_directory,
+                },
+                payload_hash,
+            },
+            TestSummary::UpdateActivation {
+                update_id,
+                candidate_hash,
+                package_sha256,
+                package_size_bytes,
+                offered_version,
+                channel,
+                summary,
+                payload_hash,
+                app_id,
+                audit_store_id,
+                version_directory,
+            } => DesktopOwnerOperationSummary::UpdateActivation {
+                confirmation: crate::broker::update_center::UpdateActivationConfirmation {
+                    update_id,
+                    candidate_hash,
+                    package_sha256,
+                    package_size_bytes,
+                    offered_version,
+                    channel,
+                    summary,
+                    payload_hash: payload_hash.clone(),
                     app_id,
                     audit_store_id,
                     version_directory,
@@ -6777,6 +6918,32 @@ mod tests {
     }
 
     #[cfg(windows)]
+    fn update_activation_owner_confirmation_fixture() -> DesktopOwnerOperationSummary {
+        DesktopOwnerOperationSummary::UpdateActivation {
+            confirmation: crate::broker::update_center::UpdateActivationConfirmation {
+                update_id: "update-test".into(),
+                candidate_hash:
+                    "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
+                package_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                    .into(),
+                package_size_bytes: 512,
+                offered_version: "1.2.3".into(),
+                channel: "stable".into(),
+                summary: "有効版切替の確認試験".into(),
+                payload_hash:
+                    "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".into(),
+                app_id: "d4-pocket-app-11111111111111111111111111111111".into(),
+                audit_store_id: "audit-store-22222222222222222222222222222222".into(),
+                version_directory: PathBuf::from(
+                    r"C:\Users\test\AppData\Local\Programs\D4 Pocket\d4-pocket-app-11111111111111111111111111111111\versions\1.2.3-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                ),
+            },
+            payload_hash: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                .into(),
+        }
+    }
+
+    #[cfg(windows)]
     #[test]
     fn update_apply_confirmation_describes_staging_without_granting_activation() {
         let summary = update_apply_owner_confirmation_fixture();
@@ -6801,9 +6968,44 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
+    fn update_activation_confirmation_describes_fixed_target_and_no_immediate_launch() {
+        let prompt = owner_confirmation_text(&update_activation_owner_confirmation_fixture());
+        for visible in [
+            "1.2.3",
+            "stable",
+            "固定version directory:",
+            "atomic",
+            "次回の固定root Bootstrapper起動時",
+            "Start Menu",
+            "process",
+            "payload hash:",
+        ] {
+            assert!(
+                prompt.contains(visible),
+                "Owner confirmation missing {visible}"
+            );
+        }
+        assert!(!prompt.contains("updates.example"));
+    }
+
+    #[cfg(windows)]
+    #[test]
     #[ignore = "対話型Windows desktopで実Win32 Update Owner dialogを制御自動操作する"]
     fn update_apply_native_confirmation_limits_approval_to_staging() {
         let summary = update_apply_owner_confirmation_fixture();
+        assert!(!automate_native_owner_confirmation(
+            &summary,
+            false,
+            Some("Rollback実行")
+        ));
+        assert!(automate_native_owner_confirmation(&summary, true, None));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "対話型Windows desktopで実Win32有効版切替Owner dialogを制御自動操作する"]
+    fn update_activation_native_confirmation_has_an_independent_yes_no_dialog() {
+        let summary = update_activation_owner_confirmation_fixture();
         assert!(!automate_native_owner_confirmation(
             &summary,
             false,

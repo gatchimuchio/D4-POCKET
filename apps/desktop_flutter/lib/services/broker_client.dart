@@ -20,6 +20,7 @@ const _nativeOwnerConfirmationOperations = <String>{
   'MCP切断',
   'MCP Tool実行',
   '更新download要求',
+  '更新有効版切替要求',
   'AgentTaskWorkspacePermissionGrant',
   'AgentTaskOwnerApprovalGrant',
   'AgentTask結果表示承認',

@@ -105,6 +105,16 @@ class UpdateClient {
         '候補hash': candidateHash,
       });
 
+  Future<Map<String, Object?>> requestActivation({
+    required String updateId,
+    required String candidateHash,
+  }) =>
+      _request('更新有効版切替要求', {
+        '版': 1,
+        '更新ID': updateId,
+        '候補hash': candidateHash,
+      });
+
   Future<Map<String, Object?>> defer({
     required String updateId,
     required String candidateHash,

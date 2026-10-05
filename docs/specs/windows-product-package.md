@@ -1,6 +1,6 @@
 # Windows製品Package
 
-状態: P11のpackage format／readerおよびBroker統治の未起動version staging consumer。Installer、active version切替、Start Menu、Rollback、installed product、正式配布の成立を意味しない。
+状態: P11のpackage format／reader、Broker統治の未起動version staging、および独立した有効版record切替fixture経路。Installer、installed next-launch、Start Menu、Rollback、正式配布の成立を意味しない。
 
 ## 1. 責任境界
 
@@ -61,4 +61,6 @@ Bootstrapperはroot直下の`active_version.json`を最大4 KiB、`versions` dir
 
 この記録は起動対象の選択情報であり、配布元trust、Permission、Approval、Capabilityを作らない。Bootstrapperは受信引数を転送せず、環境をOS用allowlistへ絞り、`LOCALAPPDATA`はKnown Folder API由来値へ固定してからversion-local launcherを起動する。起動後のBroker lifecycle／Auditはversion-local launcherの現行契約に従う。記録欠損・identity不一致・JSON重複／未知field・version path不正・hash不一致・reparse・required payload欠損は、UIやBrokerを起動せず固定codeで失敗する。
 
-現行実装はこの有効版記録を読むBootstrapper分岐と拒否試験までである。Brokerによる記録生成、固定rootへの初回Bootstrapper配置、有効版切替、Start Menu、Rollbackは未接続であり、今回のreaderとfixture試験をinstalled productの起動成立へ昇格しない。記録生成と切替はstage操作と別のnative Owner確認・Broker Permission・durable Auditを持つ次のP11操作として接続する。
+Brokerにはstageとは独立した`更新有効版切替要求`があり、独立native Owner確認、現在候補／identity／固定導入先の再照合、永続intent／completion Auditを経て、既存stageを元の署名packageとread-onlyで全byte／inventory照合する。一致した場合のみ、固定root Bootstrapperを未配置時に一度配置し、`active_version.json`を同一root内renameで原子的に公開する。再確認・切替試験では既存Bootstrapperを上書きしないこと、recordから選択版launcherへ解決することをRust fixtureで確認する。
+
+このfixture接続はinstalled productの起動成立を意味しない。初回Installer／Uninstaller、Start Menu登録・切替、通常の次回プロセス起動、Rollback、crash／電源断後のinstalled Recoveryおよびrelease evidenceは未成立のままで、P11 blockerを維持する。切替応答は有効版recordの公開までであり、その場でprocessを起動しない。

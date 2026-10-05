@@ -530,6 +530,8 @@ pub enum BrokerOperation {
     更新download要求,
     #[serde(rename = "更新適用要求")]
     更新適用要求,
+    #[serde(rename = "更新有効版切替要求")]
+    更新有効版切替要求,
     #[serde(rename = "更新延期")]
     更新延期,
     #[serde(rename = "更新rollback要求")]
@@ -693,6 +695,7 @@ impl BrokerOperation {
             BrokerOperation::更新署名検査 => "更新署名検査",
             BrokerOperation::更新download要求 => "更新download要求",
             BrokerOperation::更新適用要求 => "更新適用要求",
+            BrokerOperation::更新有効版切替要求 => "更新有効版切替要求",
             BrokerOperation::更新延期 => "更新延期",
             BrokerOperation::更新rollback要求 => "更新rollback要求",
             BrokerOperation::通知一覧 => "通知一覧",
@@ -1713,11 +1716,27 @@ impl Broker {
         self.desktop_owner_operation_json_with_update_confirmation(input, None, None)
     }
 
+    #[cfg(test)]
     pub(crate) fn desktop_owner_operation_json_with_update_confirmation(
         &mut self,
         input: &str,
         download_confirmation: Option<super::update_center::UpdateDownloadConfirmation>,
         apply_confirmation: Option<super::update_center::UpdateApplyConfirmation>,
+    ) -> BrokerResponse {
+        self.desktop_owner_operation_json_with_update_confirmations(
+            input,
+            download_confirmation,
+            apply_confirmation,
+            None,
+        )
+    }
+
+    pub(crate) fn desktop_owner_operation_json_with_update_confirmations(
+        &mut self,
+        input: &str,
+        download_confirmation: Option<super::update_center::UpdateDownloadConfirmation>,
+        apply_confirmation: Option<super::update_center::UpdateApplyConfirmation>,
+        activation_confirmation: Option<super::update_center::UpdateActivationConfirmation>,
     ) -> BrokerResponse {
         let envelope = match BrokerRequestEnvelope::from_json_str(input) {
             Ok(envelope) => envelope,
@@ -1768,6 +1787,7 @@ impl Broker {
                     | BrokerOperation::資格情報失効
                     | BrokerOperation::更新download要求
                     | BrokerOperation::更新適用要求
+                    | BrokerOperation::更新有効版切替要求
             )
         );
         if !operation_is_allowlisted
@@ -1783,12 +1803,13 @@ impl Broker {
                 payload_hash,
             );
         }
-        self.処理_with_export_confirmation(
+        self.処理_with_export_and_activation_confirmation(
             envelope,
             true,
             OwnerConfirmationSource::DesktopNativeConfirmation,
             download_confirmation,
             apply_confirmation,
+            activation_confirmation,
         )
     }
 
@@ -1817,6 +1838,25 @@ impl Broker {
         export_confirmation: OwnerConfirmationSource,
         download_confirmation: Option<super::update_center::UpdateDownloadConfirmation>,
         apply_confirmation: Option<super::update_center::UpdateApplyConfirmation>,
+    ) -> BrokerResponse {
+        self.処理_with_export_and_activation_confirmation(
+            envelope,
+            owner,
+            export_confirmation,
+            download_confirmation,
+            apply_confirmation,
+            None,
+        )
+    }
+
+    fn 処理_with_export_and_activation_confirmation(
+        &mut self,
+        envelope: BrokerRequestEnvelope,
+        owner: bool,
+        export_confirmation: OwnerConfirmationSource,
+        download_confirmation: Option<super::update_center::UpdateDownloadConfirmation>,
+        apply_confirmation: Option<super::update_center::UpdateApplyConfirmation>,
+        activation_confirmation: Option<super::update_center::UpdateActivationConfirmation>,
     ) -> BrokerResponse {
         self.端末期限処理();
         let request_id = envelope
@@ -2294,6 +2334,7 @@ impl Broker {
             | BrokerOperation::更新署名検査
             | BrokerOperation::更新download要求
             | BrokerOperation::更新適用要求
+            | BrokerOperation::更新有効版切替要求
             | BrokerOperation::更新延期
             | BrokerOperation::更新rollback要求) => super::update_center::dispatch(
                 self,
@@ -2304,6 +2345,7 @@ impl Broker {
                 export_confirmation,
                 download_confirmation.as_ref(),
                 apply_confirmation.as_ref(),
+                activation_confirmation.as_ref(),
             ),
             operation @ (BrokerOperation::通知一覧
             | BrokerOperation::通知既読

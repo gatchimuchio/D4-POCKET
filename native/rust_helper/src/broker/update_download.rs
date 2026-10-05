@@ -1084,7 +1084,6 @@ mod tests {
                 .send()
                 .await
         });
-        server.join().unwrap();
         let response = response.unwrap();
         let result = runtime.block_on(async {
             receive_package(
@@ -1099,6 +1098,7 @@ mod tests {
             )
             .await
         });
+        server.join().unwrap();
         assert_eq!(result, Err(DownloadError::DigestMismatch));
         assert_eq!(
             std::fs::read(path.join(&final_name)).unwrap(),

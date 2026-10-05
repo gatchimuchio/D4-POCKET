@@ -4,7 +4,7 @@ use cap_fs_ext::{
     DirExt, FollowSymlinks, MetadataExt as CapMetadataExt, OpenOptionsFollowExt, OsMetadataExt as _,
 };
 use cap_std::fs::{Dir, OpenOptions};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::io::Read;
@@ -17,7 +17,7 @@ const MAX_ACTIVE_VERSION_BYTES: u64 = 4096;
 const MAX_PRODUCT_MANIFEST_BYTES: u64 = 64 * 1024;
 const MAX_LAUNCHER_BYTES: u64 = 256 * 1024 * 1024;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct ActiveVersionRecord {
     version: u32,
@@ -111,6 +111,134 @@ pub(crate) fn resolve_active_version_launcher(
     Ok(launcher_path)
 }
 
+/// 完全検証済みstageから固定root Bootstrapperと有効版recordをBroker所有capabilityで公開する。
+/// active recordは一時fileを同期した後、同じroot内renameで置換する。
+pub(crate) fn activate_staged_version(
+    product_root: &Dir,
+    versions: &Dir,
+    product_version: &str,
+    app_id: &str,
+    audit_store_id: &str,
+    package_sha256: &str,
+    temporary_suffix: &str,
+) -> Result<(), BootstrapperError> {
+    if !valid_product_version(product_version)
+        || !valid_sha256(package_sha256)
+        || temporary_suffix.len() != 32
+        || !temporary_suffix
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return Err(BootstrapperError("active_version_record_invalid"));
+    }
+    let root_metadata = product_root
+        .dir_metadata()
+        .map_err(|_| BootstrapperError("installed_product_root_unavailable"))?;
+    if !root_metadata.is_dir() || is_cap_reparse_point(&root_metadata) {
+        return Err(BootstrapperError("installed_product_root_invalid"));
+    }
+    let root_device = CapMetadataExt::dev(&root_metadata);
+    let versions_entry = product_root
+        .symlink_metadata("versions")
+        .map_err(|_| BootstrapperError("active_version_directory_unavailable"))?;
+    let versions_metadata = versions
+        .dir_metadata()
+        .map_err(|_| BootstrapperError("active_version_directory_invalid"))?;
+    if !versions_entry.is_dir()
+        || is_cap_reparse_point(&versions_entry)
+        || !versions_metadata.is_dir()
+        || is_cap_reparse_point(&versions_metadata)
+        || !same_cap_file(&versions_entry, &versions_metadata)
+        || CapMetadataExt::dev(&versions_metadata) != root_device
+    {
+        return Err(BootstrapperError("active_version_directory_invalid"));
+    }
+
+    let stage_name = format!("{product_version}-{package_sha256}");
+    let stage = open_existing_directory(versions, &stage_name, root_device)?;
+    let launcher_sha256 = hash_regular_file(&stage, VERSIONED_LAUNCHER, MAX_LAUNCHER_BYTES)?;
+    let product_manifest_sha256 =
+        hash_regular_file(&stage, PRODUCT_MANIFEST, MAX_PRODUCT_MANIFEST_BYTES)?;
+
+    match product_root.symlink_metadata(VERSIONED_LAUNCHER) {
+        Ok(metadata) => {
+            if !metadata.is_file() || metadata.len() == 0 || is_cap_reparse_point(&metadata) {
+                return Err(BootstrapperError("installed_bootstrapper_invalid"));
+            }
+            hash_regular_file(product_root, VERSIONED_LAUNCHER, MAX_LAUNCHER_BYTES)?;
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            stage
+                .hard_link(VERSIONED_LAUNCHER, product_root, VERSIONED_LAUNCHER)
+                .map_err(|_| BootstrapperError("installed_bootstrapper_create_failed"))?;
+            let source = stage
+                .symlink_metadata(VERSIONED_LAUNCHER)
+                .map_err(|_| BootstrapperError("installed_bootstrapper_invalid"))?;
+            let installed = product_root
+                .symlink_metadata(VERSIONED_LAUNCHER)
+                .map_err(|_| BootstrapperError("installed_bootstrapper_invalid"))?;
+            if !source.is_file()
+                || !installed.is_file()
+                || is_cap_reparse_point(&source)
+                || is_cap_reparse_point(&installed)
+                || !same_cap_file(&source, &installed)
+            {
+                return Err(BootstrapperError("installed_bootstrapper_invalid"));
+            }
+        }
+        Err(_) => return Err(BootstrapperError("installed_bootstrapper_invalid")),
+    }
+
+    let record = ActiveVersionRecord {
+        version: 1,
+        product: "D4 Pocket".to_owned(),
+        app_id: app_id.to_owned(),
+        audit_store_id: audit_store_id.to_owned(),
+        product_version: product_version.to_owned(),
+        package_sha256: package_sha256.to_owned(),
+        launcher_sha256,
+        product_manifest_sha256,
+    };
+    let bytes = serde_json::to_vec(&record)
+        .map_err(|_| BootstrapperError("active_version_record_serialize_failed"))?;
+    let temporary_name = format!("active_version.{temporary_suffix}.tmp");
+    let mut options = OpenOptions::new();
+    options
+        .write(true)
+        .create_new(true)
+        .follow(FollowSymlinks::No);
+    let mut temporary = product_root
+        .open_with(&temporary_name, &options)
+        .map_err(|_| BootstrapperError("active_version_temporary_create_failed"))?;
+    if std::io::Write::write_all(&mut temporary, &bytes).is_err() || temporary.sync_all().is_err() {
+        drop(temporary);
+        let _ = product_root.remove_file(&temporary_name);
+        return Err(BootstrapperError("active_version_temporary_write_failed"));
+    }
+    drop(temporary);
+
+    match product_root.symlink_metadata(ACTIVE_VERSION_FILE) {
+        Ok(metadata) if metadata.is_file() && !is_cap_reparse_point(&metadata) => {}
+        Ok(_) => {
+            let _ = product_root.remove_file(&temporary_name);
+            return Err(BootstrapperError("active_version_file_invalid"));
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(_) => {
+            let _ = product_root.remove_file(&temporary_name);
+            return Err(BootstrapperError("active_version_file_invalid"));
+        }
+    }
+    if product_root
+        .rename(&temporary_name, product_root, ACTIVE_VERSION_FILE)
+        .is_err()
+    {
+        let _ = product_root.remove_file(&temporary_name);
+        return Err(BootstrapperError("active_version_record_publish_failed"));
+    }
+    Ok(())
+}
+
 fn read_regular_file(
     directory: &Dir,
     name: &str,
@@ -134,7 +262,7 @@ fn read_regular_file(
         return Err(BootstrapperError("active_version_file_changed"));
     }
     let mut bytes = Vec::with_capacity(opened.len() as usize);
-    let mut limited = file.by_ref().take(max_bytes.saturating_add(1));
+    let mut limited = Read::by_ref(&mut file).take(max_bytes.saturating_add(1));
     limited
         .read_to_end(&mut bytes)
         .map_err(|_| BootstrapperError("active_version_file_read_failed"))?;
@@ -261,7 +389,11 @@ fn valid_sha256(value: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::resolve_active_version_launcher;
+    use super::{
+        activate_staged_version, resolve_active_version_launcher, ACTIVE_VERSION_FILE,
+        VERSIONED_LAUNCHER,
+    };
+    use cap_std::fs::Dir;
     use serde_json::json;
     use sha2::{Digest, Sha256};
     use std::fs;
@@ -327,6 +459,78 @@ mod tests {
             )
             .unwrap()
         );
+        fs::remove_dir_all(local).unwrap();
+    }
+
+    #[test]
+    fn broker_activation_publishes_record_atomically_and_places_root_bootstrapper_once() {
+        let (local, root) = fixture("activate-first");
+        fs::remove_file(root.join(ACTIVE_VERSION_FILE)).unwrap();
+        fs::remove_file(root.join(VERSIONED_LAUNCHER)).unwrap();
+        let root_dir = Dir::open_ambient_dir(&root, cap_std::ambient_authority()).unwrap();
+        let versions_dir =
+            Dir::open_ambient_dir(root.join("versions"), cap_std::ambient_authority()).unwrap();
+        let package_hash = "a".repeat(64);
+
+        activate_staged_version(
+            &root_dir,
+            &versions_dir,
+            "1.2.3",
+            APP_ID,
+            AUDIT_ID,
+            &package_hash,
+            "0123456789abcdef0123456789abcdef",
+        )
+        .unwrap();
+        assert_eq!(
+            resolve_active_version_launcher(&local, APP_ID, AUDIT_ID).unwrap(),
+            fs::canonicalize(
+                root.join("versions")
+                    .join(format!("1.2.3-{package_hash}"))
+                    .join(VERSIONED_LAUNCHER)
+            )
+            .unwrap()
+        );
+        assert_eq!(
+            fs::read(root.join(VERSIONED_LAUNCHER)).unwrap(),
+            b"fixed version launcher"
+        );
+        assert!(!root
+            .join("active_version.0123456789abcdef0123456789abcdef.tmp")
+            .exists());
+
+        drop(versions_dir);
+        drop(root_dir);
+        fs::remove_dir_all(local).unwrap();
+    }
+
+    #[test]
+    fn broker_activation_preserves_existing_bootstrapper_and_replaces_active_record() {
+        let (local, root) = fixture("activate-replace");
+        let root_dir = Dir::open_ambient_dir(&root, cap_std::ambient_authority()).unwrap();
+        let versions_dir =
+            Dir::open_ambient_dir(root.join("versions"), cap_std::ambient_authority()).unwrap();
+        activate_staged_version(
+            &root_dir,
+            &versions_dir,
+            "1.2.3",
+            APP_ID,
+            AUDIT_ID,
+            &"a".repeat(64),
+            "fedcba9876543210fedcba9876543210",
+        )
+        .unwrap();
+        assert_eq!(
+            fs::read(root.join(VERSIONED_LAUNCHER)).unwrap(),
+            b"bootstrapper launcher"
+        );
+        resolve_active_version_launcher(&local, APP_ID, AUDIT_ID).unwrap();
+        assert!(!root
+            .join("active_version.fedcba9876543210fedcba9876543210.tmp")
+            .exists());
+
+        drop(versions_dir);
+        drop(root_dir);
         fs::remove_dir_all(local).unwrap();
     }
 

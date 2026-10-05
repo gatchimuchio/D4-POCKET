@@ -3009,8 +3009,8 @@
       "release_tracks": ["windows_v1"],
       "blocks_release": true,
       "blocks_windows_technical_complete": true,
-      "reason": "C12のnative Owner確認付きpackage downloadに加え、2026-10-06にBroker test経路から署名済みpackageをKnown Folder由来の固定per-user version directoryへ未起動状態でstageするconsumerを実装した。native Owner確認、現在candidate／App ID／Audit Store ID／destination再照合、durable intent／completion Audit、同じ署名packageとのhash一致を条件とした途中stage再開はfixtureで確認した。ただしInstaller／Uninstaller、active version切替、Start Menu、process起動、installed productでの実crash／電源断後Recovery、Rollbackの実証は未成立。Windows DNS ClientとTLS配布元経路はhelper／loopback fixtureの範囲に限られる。正式package identity／signing identityは別のOwner Finalization blockerとして分離する。",
-      "required_action": "試験用識別子によるインストール／アンインストール、現行版／スタートメニュー切替、同一ボリューム内更新処理、正式導入製品の強制終了／電源断後の再起動復旧、旧版復帰を契約・否定試験・隔離Windows実測へ接続する。実配布元からの取得／改変検出／修復と、正式導入製品の起動／旧版復帰を検証し、ソースと生成物の識別情報へ証拠を結合する。正式発行者・署名識別情報はWindows技術完了後の別blockerで扱う。",
+      "reason": "C12のnative Owner確認付きpackage download、未起動version stagingに加え、2026-10-06にBroker fixtureから独立native Owner確認・候補／identity／固定destination再照合・durable Audit付き有効版record writer、初回root Bootstrapper配置、atomic record replaceを接続した。既存stageを元の署名packageに対してread-onlyで再照合する。これらはfixture証拠であり、Installer／Uninstaller、installed next-launch、Start Menu、installed crash／電源断Recovery、Rollbackの製品成立は未実証。Windows DNS ClientとTLS配布元経路もhelper／loopback fixtureの範囲に限られる。正式package identity／signing identityは別のOwner Finalization blockerとして分離する。",
+      "required_action": "試験用識別子によるInstaller／Uninstaller、固定rootからの通常起動とStart Menu登録／切替、同一volume更新、正式導入製品の強制終了／電源断後の再起動復旧、旧版復帰を契約・negative試験・隔離Windows実測へ接続する。実配布元からの取得／改変検出／修復と、導入から次回起動／rollbackまでの製品経路をsource／artifact identityへ結合して検証する。正式発行者・署名識別情報はWindows技術完了後の別blockerで扱う。",
       "broker_signed_version_staging_consumer": {
         "date": "2026-10-06",
         "evidence_sources": ["FIXTURE", "LIVE_RUNTIME"],
@@ -3029,6 +3029,21 @@
           "native_ui": "別Win32 dialog childにおける実MessageBox表示・No／Yes選択を検証。これはbroker consumer統合のLIVE_RUNTIMEではなく、UI提示部分だけのLIVE_RUNTIME。"
         },
         "scope_limit": "Broker consumerとpartial-stage再開の統合試験はRust Broker test fixture。Win32 native Owner dialogだけはLIVE_RUNTIME。正式installed product、実配布元、別user profile、実process crash／電源断後のRecovery、active version切替、process launch、Start Menu、Rollback、release readinessを証明しない。release blockerを維持する。"
+      },
+      "broker_active_version_activation": {
+        "date": "2026-10-06",
+        "evidence_source": "FIXTURE",
+        "validation": {
+          "activation_bootstrapper_tests": "cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib broker_activation_ -- --test-threads=1: 2 passed。",
+          "broker_activation_integration": "cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib native_owner_apply_stages_exact_signed_package_without_activation_or_overwrite -- --test-threads=1: activation＋stage-only分離fixtureは前回実行1 passed。"
+        },
+        "observations": {
+          "authority": "stage operationのconfirmationでは切替できず、独立Native Owner confirmation、現在candidate／identity／destination再照合、durable intent／completion Auditを要求する。",
+          "stage": "署名package全体と既存stage全byte／inventoryをread-onlyで再照合し、不一致stageを修復・削除しない。",
+          "publication": "初回root Bootstrapper placementとactive_version.jsonのatomic replaceをfixtureで検証。既存Bootstrapperは上書きしない。",
+          "scope": "有効版recordを公開するまで。process起動、Start Menu、Rollback、installed next-launchは実施しない。"
+        },
+        "scope_limit": "Rust fixture証拠のみ。installed productの切替・起動やWindows LIVE_RUNTIMEを証明せず、P11 release blockerを維持する。"
       },
       "update_candidate_package_binding": {
         "date": "2026-09-30",

@@ -8264,6 +8264,7 @@ def test_agent_task_owner_confirmation_wait_uses_native_operation_timeout() -> l
         "MCP切断",
         "MCP Tool実行",
         "更新download要求",
+        "更新有効版切替要求",
         "AgentTaskWorkspacePermissionGrant",
         "AgentTaskOwnerApprovalGrant",
         "AgentTask結果表示承認",

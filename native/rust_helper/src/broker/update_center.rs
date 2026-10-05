@@ -36,6 +36,7 @@ const OP_CHECK: &str = "更新確認";
 const OP_VERIFY: &str = "更新署名検査";
 const OP_DOWNLOAD: &str = "更新download要求";
 const OP_APPLY: &str = "更新適用要求";
+const OP_ACTIVATE: &str = "更新有効版切替要求";
 const OP_DEFER: &str = "更新延期";
 const OP_ROLLBACK: &str = "更新rollback要求";
 
@@ -56,6 +57,21 @@ pub(crate) struct UpdateDownloadConfirmation {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct UpdateApplyConfirmation {
     pub(crate) download: UpdateDownloadConfirmation,
+    pub(crate) app_id: String,
+    pub(crate) audit_store_id: String,
+    pub(crate) version_directory: PathBuf,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct UpdateActivationConfirmation {
+    pub(crate) update_id: String,
+    pub(crate) candidate_hash: String,
+    pub(crate) package_sha256: String,
+    pub(crate) package_size_bytes: u64,
+    pub(crate) offered_version: String,
+    pub(crate) channel: String,
+    pub(crate) summary: String,
+    pub(crate) payload_hash: String,
     pub(crate) app_id: String,
     pub(crate) audit_store_id: String,
     pub(crate) version_directory: PathBuf,
@@ -496,6 +512,7 @@ pub(super) fn dispatch(
     owner_confirmation: OwnerConfirmationSource,
     download_confirmation: Option<&UpdateDownloadConfirmation>,
     apply_confirmation: Option<&UpdateApplyConfirmation>,
+    activation_confirmation: Option<&UpdateActivationConfirmation>,
 ) -> BrokerResponse {
     poll_download_completion(broker);
     match operation.as_str() {
@@ -511,6 +528,7 @@ pub(super) fn dispatch(
             owner_confirmation,
             download_confirmation,
             None,
+            None,
         ),
         OP_APPLY => execution_request(
             broker,
@@ -521,6 +539,18 @@ pub(super) fn dispatch(
             owner_confirmation,
             None,
             apply_confirmation,
+            None,
+        ),
+        OP_ACTIVATE => execution_request(
+            broker,
+            OP_ACTIVATE,
+            payload,
+            request_id,
+            payload_hash,
+            owner_confirmation,
+            None,
+            None,
+            activation_confirmation,
         ),
         OP_DEFER => defer(broker, payload, request_id, payload_hash),
         OP_ROLLBACK => execution_request(
@@ -530,6 +560,7 @@ pub(super) fn dispatch(
             request_id,
             payload_hash,
             owner_confirmation,
+            None,
             None,
             None,
         ),
@@ -837,6 +868,7 @@ fn execution_request(
     owner_confirmation: OwnerConfirmationSource,
     download_confirmation: Option<&UpdateDownloadConfirmation>,
     apply_confirmation: Option<&UpdateApplyConfirmation>,
+    activation_confirmation: Option<&UpdateActivationConfirmation>,
 ) -> BrokerResponse {
     let request: UpdateIDRequest = match serde_json::from_value::<UpdateIDRequest>(payload.clone())
     {
@@ -1158,6 +1190,17 @@ fn execution_request(
             hash,
             owner_confirmation,
             apply_confirmation,
+        );
+    }
+    if operation == OP_ACTIVATE {
+        return activate_verified_staged_package(
+            broker,
+            &request,
+            &current_record,
+            request_id,
+            hash,
+            owner_confirmation,
+            activation_confirmation,
         );
     }
     suspended(
@@ -1573,6 +1616,424 @@ fn apply_verified_package(
             shutdown_requested: broker.shutdown_requested,
         };
     }
+}
+
+fn activate_verified_staged_package(
+    broker: &mut Broker,
+    request: &UpdateIDRequest,
+    record: &UpdateRecord,
+    request_id: &str,
+    payload_hash: &str,
+    owner_confirmation: OwnerConfirmationSource,
+    confirmation: Option<&UpdateActivationConfirmation>,
+) -> BrokerResponse {
+    if owner_confirmation != OwnerConfirmationSource::DesktopNativeConfirmation {
+        return reject(
+            broker,
+            request_id,
+            OP_ACTIVATE,
+            "desktop_native_owner_confirmation_required",
+            "有効版の切替には独立したRust Desktop native Owner確認が必要",
+            payload_hash,
+        );
+    }
+    let Some(confirmation) = confirmation else {
+        return reject(
+            broker,
+            request_id,
+            OP_ACTIVATE,
+            "update_activation_confirmation_missing",
+            "切替対象と固定導入先を表示したnative確認記録がない",
+            payload_hash,
+        );
+    };
+    let Some((app_id, audit_store_id)) = broker.desktop_product_identity.clone() else {
+        return reject(
+            broker,
+            request_id,
+            OP_ACTIVATE,
+            "update_install_product_identity_missing",
+            "製品App／Audit Store identityを検証できないため有効化しない",
+            payload_hash,
+        );
+    };
+    let Some(package_sha256) = record.candidate.package_sha256.as_deref() else {
+        return reject(
+            broker,
+            request_id,
+            OP_ACTIVATE,
+            "update_package_binding_required",
+            "署名済みpackage digestがない",
+            payload_hash,
+        );
+    };
+    let Some(package_bytes) = record.candidate.package_size_bytes else {
+        return reject(
+            broker,
+            request_id,
+            OP_ACTIVATE,
+            "update_package_binding_required",
+            "署名済みpackage byte長がない",
+            payload_hash,
+        );
+    };
+    if confirmation.update_id != record.candidate.update_id
+        || confirmation.candidate_hash != record.candidate_hash
+        || confirmation.package_sha256 != package_sha256
+        || confirmation.package_size_bytes != package_bytes
+        || confirmation.offered_version != record.candidate.offered_version
+        || confirmation.channel != record.candidate.channel
+        || confirmation.summary != record.candidate.summary
+        || confirmation.payload_hash != payload_hash
+        || confirmation.app_id != app_id
+        || confirmation.audit_store_id != audit_store_id
+    {
+        return reject(
+            broker,
+            request_id,
+            OP_ACTIVATE,
+            "update_activation_confirmation_stale",
+            "native Owner確認後に候補、製品identity、または要求が変化した",
+            payload_hash,
+        );
+    }
+
+    #[cfg(not(windows))]
+    {
+        let _ = (request, record, confirmation);
+        return suspended(
+            broker,
+            OP_ACTIVATE,
+            request_id,
+            json!({"版": VERSION, "更新ID": request.update_id, "候補hash": request.candidate_hash, "有効化": "suspended", "復旧ID": "recover-update-activation-platform", "証拠種別": EVIDENCE_SOURCE_INTERNAL_STATE}),
+            payload_hash,
+            "Windows Known Folderと固定root capabilityがないため有効版を切り替えない",
+        );
+    }
+
+    #[cfg(windows)]
+    {
+        #[cfg(test)]
+        let local_app_data = broker
+            .desktop_product_install_local_app_data
+            .clone()
+            .or_else(|| super::product_install::current_user_local_app_data().ok());
+        #[cfg(not(test))]
+        let local_app_data = super::product_install::current_user_local_app_data().ok();
+        let Some(local_app_data) = local_app_data else {
+            return reject(
+                broker,
+                request_id,
+                OP_ACTIVATE,
+                "product_install_known_folder_unavailable",
+                "Windows Known Folderから固定導入rootを導出できない",
+                payload_hash,
+            );
+        };
+        let plan = match super::product_install::plan_product_install(
+            &local_app_data,
+            &app_id,
+            &record.candidate.offered_version,
+            package_sha256,
+        ) {
+            Ok(plan) => plan,
+            Err(_) => {
+                return reject(
+                    broker,
+                    request_id,
+                    OP_ACTIVATE,
+                    "product_install_plan_invalid",
+                    "Brokerが切替対象の固定導入先を導出できない",
+                    payload_hash,
+                )
+            }
+        };
+        if plan.version_directory != confirmation.version_directory {
+            return reject(
+                broker,
+                request_id,
+                OP_ACTIVATE,
+                "update_activation_destination_stale",
+                "native Owner確認に表示したversion directoryが現在のKnown Folder計画と異なる",
+                payload_hash,
+            );
+        }
+        let Some(stage_name) = plan
+            .version_directory
+            .file_name()
+            .and_then(|name| name.to_str())
+        else {
+            return reject(
+                broker,
+                request_id,
+                OP_ACTIVATE,
+                "product_install_stage_invalid",
+                "content-addressed version directory名が不正",
+                payload_hash,
+            );
+        };
+        if !broker.state_store.persistence_ready() {
+            return suspended(
+                broker,
+                OP_ACTIVATE,
+                request_id,
+                json!({"版": VERSION, "更新ID": request.update_id, "候補hash": request.candidate_hash, "有効化": "suspended", "復旧ID": "recover-update-activation-audit", "証拠種別": EVIDENCE_SOURCE_INTERNAL_STATE}),
+                payload_hash,
+                "永続Auditが利用できないため有効版を切り替えない",
+            );
+        }
+        let package_directory = match broker.state_store.open_update_package_directory() {
+            Ok(Some(directory)) => directory,
+            _ => {
+                return reject(
+                    broker,
+                    request_id,
+                    OP_ACTIVATE,
+                    "update_package_store_unavailable",
+                    "Broker固定download package directoryを開けない",
+                    payload_hash,
+                )
+            }
+        };
+        let package_name = format!("{package_sha256}.pkg");
+        let mut options = OpenOptions::new();
+        options.read(true).follow(FollowSymlinks::No);
+        let mut package = match package_directory.open_with(&package_name, &options) {
+            Ok(package) => package,
+            Err(_) => {
+                return reject(
+                    broker,
+                    request_id,
+                    OP_ACTIVATE,
+                    "update_package_missing",
+                    "署名済みdigest名のdownload packageがない",
+                    payload_hash,
+                )
+            }
+        };
+        let package_metadata = match package.metadata() {
+            Ok(metadata)
+                if metadata.is_file()
+                    && metadata.file_attributes() & 0x400 == 0
+                    && metadata.len() == package_bytes =>
+            {
+                metadata
+            }
+            _ => {
+                return reject(
+                    broker,
+                    request_id,
+                    OP_ACTIVATE,
+                    "update_package_file_invalid",
+                    "download packageの通常file属性または署名済みbyte長が一致しない",
+                    payload_hash,
+                )
+            }
+        };
+        let (root_path, product_root) =
+            match super::product_install::open_existing_product_root(&local_app_data, &app_id) {
+                Ok(root) => root,
+                Err(_) => {
+                    return reject(
+                        broker,
+                        request_id,
+                        OP_ACTIVATE,
+                        "product_install_root_unavailable",
+                        "固定製品rootがないため有効版を切り替えない",
+                        payload_hash,
+                    )
+                }
+            };
+        if root_path != plan.root {
+            return reject(
+                broker,
+                request_id,
+                OP_ACTIVATE,
+                "product_install_root_mismatch",
+                "Known Folder由来の製品rootが導入計画と一致しない",
+                payload_hash,
+            );
+        }
+        let (versions_path, versions) =
+            match super::product_install::open_existing_product_versions_directory(
+                &local_app_data,
+                &app_id,
+            ) {
+                Ok(versions) => versions,
+                Err(_) => {
+                    return reject(
+                        broker,
+                        request_id,
+                        OP_ACTIVATE,
+                        "product_install_versions_unavailable",
+                        "既存の固定versions directoryがないため有効版を切り替えない",
+                        payload_hash,
+                    )
+                }
+            };
+        if plan.version_directory.parent() != Some(versions_path.as_path()) {
+            return reject(
+                broker,
+                request_id,
+                OP_ACTIVATE,
+                "product_install_versions_mismatch",
+                "導入計画の親とBroker versions capabilityが一致しない",
+                payload_hash,
+            );
+        }
+
+        let intent_reason = format!(
+            "Capability=product.install.activate_version Permission=現在の署名候補・App ID・version・package digestから固定導出した有効版record一回限定 Approval=切替対象を表示した独立Rust Desktop native Owner確認 AuditEvent=切替前意図を永続化 RecoveryAction=stageとpackageの全byte／inventoryを読取専用再検証し、失敗時はactive recordを変更しない。process起動・Start Menu変更・rollbackは行わない。candidate={} version={} package_sha256={} bytes={}",
+            record.candidate.update_id,
+            record.candidate.offered_version,
+            package_sha256,
+            package_bytes
+        );
+        let intent = match broker.append_audit(
+            request_id,
+            OP_ACTIVATE,
+            "queued",
+            &intent_reason,
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
+        ) {
+            Ok(event) => event,
+            Err(_) => {
+                return broker.audit_store_failed_response(
+                    request_id,
+                    OP_ACTIVATE,
+                    "update_activation_audit_failed",
+                    "有効版切替前Auditを確定できない",
+                )
+            }
+        };
+        let info = match crate::product_package::verify_staged_package_into_directory(
+            &mut package,
+            package_metadata.len(),
+            Some(package_sha256),
+            &versions,
+            stage_name,
+            crate::product_package::ProductPackageExpectation {
+                product_version: Some(&record.candidate.offered_version),
+                app_id: &app_id,
+                audit_store_id: &audit_store_id,
+            },
+        ) {
+            Ok(info) => info,
+            Err(error) => {
+                return activation_failed(
+                    broker,
+                    request_id,
+                    payload_hash,
+                    error.0,
+                    "署名済みpackageと既存version stageが完全一致しないため切替を拒否",
+                )
+            }
+        };
+        let mut suffix_bytes = [0u8; 16];
+        if getrandom::getrandom(&mut suffix_bytes).is_err() {
+            return activation_failed(
+                broker,
+                request_id,
+                payload_hash,
+                "active_version_nonce_failed",
+                "有効版recordの一時名を安全に生成できず切替を拒否",
+            );
+        }
+        if let Err(error) = crate::product_bootstrapper::activate_staged_version(
+            &product_root,
+            &versions,
+            &info.product_version,
+            &app_id,
+            &audit_store_id,
+            package_sha256,
+            &hex::encode(suffix_bytes),
+        ) {
+            return activation_failed(
+                broker,
+                request_id,
+                payload_hash,
+                error.0,
+                "固定root Bootstrapperまたは有効版recordを安全に公開できず切替を拒否",
+            );
+        }
+        let completion = broker.append_audit(
+            &format!("{request_id}:complete"),
+            OP_ACTIVATE,
+            "completed",
+            &format!("Capability=product.install.activate_version Permission=現在の署名候補と完全検証済み固定stageだけを有効版recordへ設定 Approval=独立したRust Desktop native Owner確認 AuditEvent=固定root Bootstrapper配置状態と有効版recordのatomic公開を記録 RecoveryAction=有効版recordは次回起動時にBootstrapperがidentity・version・package／launcher／manifest hashを再照合する。process起動・Start Menu変更・rollbackはしない。version={} package_sha256={} file_count={} total_bytes={} intent_audit_id={}", info.product_version, package_sha256, info.file_count, info.total_file_bytes, intent.event_id),
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
+        );
+        let completion = match completion {
+            Ok(event) => event,
+            Err(_) => {
+                return broker.audit_store_failed_response(
+                    request_id,
+                    OP_ACTIVATE,
+                    "update_activation_audit_failed",
+                    "有効版record公開後の完了Auditを確定できない。再起動・起動成立は主張しない",
+                )
+            }
+        };
+        return BrokerResponse {
+            request_id: request_id.to_owned(),
+            operation: OP_ACTIVATE.to_owned(),
+            status: BrokerStatus::Accepted,
+            evidence_source: EVIDENCE_SOURCE_INTERNAL_STATE.to_owned(),
+            audit_event_id: completion.event_id,
+            error: None,
+            health: None,
+            body: Some(json!({
+                "版": VERSION,
+                "更新ID": request.update_id,
+                "候補hash": request.candidate_hash,
+                "有効化": "active_version_recorded",
+                "起動": "not_started",
+                "Start Menu": "unchanged",
+                "file数": info.file_count,
+                "total_bytes": info.total_file_bytes,
+                "開始Audit ID": intent.event_id,
+                "証拠種別": EVIDENCE_SOURCE_INTERNAL_STATE,
+            })),
+            shutdown_requested: broker.shutdown_requested,
+        };
+    }
+}
+
+fn activation_failed(
+    broker: &mut Broker,
+    request_id: &str,
+    payload_hash: &str,
+    failure_code: &str,
+    message: &str,
+) -> BrokerResponse {
+    if broker
+        .append_audit(
+            &format!("{request_id}:failed"),
+            OP_ACTIVATE,
+            "failed",
+            &format!("Capability=product.install.activate_version Permission=固定製品root内の有効版recordだけ Approval=独立Rust Desktop native Owner確認 AuditEvent=有効版切替失敗を記録 RecoveryAction=既存active recordとstageを自動削除・修復せず、署名packageと固定rootを再検証。failure_code={failure_code}"),
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
+        )
+        .is_err()
+    {
+        return broker.audit_store_failed_response(
+            request_id,
+            OP_ACTIVATE,
+            "update_activation_audit_failed",
+            "有効版切替失敗のAuditを確定できない",
+        );
+    }
+    reject(
+        broker,
+        request_id,
+        OP_ACTIVATE,
+        failure_code,
+        message,
+        payload_hash,
+    )
 }
 
 fn verify_candidate(
@@ -2591,6 +3052,32 @@ mod tests {
             })
             .to_string()
         };
+        let activation_confirmation = UpdateActivationConfirmation {
+            update_id: "update-apply".into(),
+            candidate_hash: payload["候補hash"].as_str().unwrap().into(),
+            package_sha256: digest.clone(),
+            package_size_bytes: package.len() as u64,
+            offered_version: "1.1.0".into(),
+            channel: "stable".into(),
+            summary: "安全更新".into(),
+            payload_hash: payload_hash.clone(),
+            app_id: INSTALL_APP_ID.into(),
+            audit_store_id: INSTALL_AUDIT_ID.into(),
+            version_directory: target.clone(),
+        };
+        let activation_envelope = |request_id: &str| {
+            json!({
+                "request_id": request_id,
+                "session_id": "session-1",
+                "operation": OP_ACTIVATE,
+                "payload_hash": payload_hash,
+                "nonce": format!("{request_id}-nonce"),
+                "issued_at": BrokerRequestEnvelope::current_issued_at(),
+                "metadata": {"client": "desktop_flutter"},
+                "payload": payload,
+            })
+            .to_string()
+        };
         let normal_ipc = call(&mut broker, BrokerOperation::更新適用要求, payload.clone());
         assert_eq!(normal_ipc.status, BrokerStatus::Rejected);
         assert_eq!(
@@ -2666,7 +3153,7 @@ mod tests {
         let repeated = broker.desktop_owner_operation_json_with_update_confirmation(
             &envelope("desktop-update-apply-replay"),
             None,
-            Some(confirmation),
+            Some(confirmation.clone()),
         );
         assert_eq!(repeated.status, BrokerStatus::Accepted);
         assert_eq!(
@@ -2677,6 +3164,131 @@ mod tests {
         assert_eq!(
             std::fs::read(target.join("app").join("gui_shell_desktop.exe")).unwrap(),
             b"d"
+        );
+
+        let normal_activation = call(
+            &mut broker,
+            BrokerOperation::更新有効版切替要求,
+            payload.clone(),
+        );
+        assert_eq!(normal_activation.status, BrokerStatus::Rejected);
+        assert_eq!(
+            normal_activation.error.unwrap().code,
+            "desktop_native_owner_confirmation_required"
+        );
+        let apply_confirmation_does_not_authorize_activation = broker
+            .desktop_owner_operation_json_with_update_confirmations(
+                &activation_envelope("desktop-update-activation-no-reuse"),
+                None,
+                Some(confirmation.clone()),
+                None,
+            );
+        assert_eq!(
+            apply_confirmation_does_not_authorize_activation
+                .error
+                .unwrap()
+                .code,
+            "update_activation_confirmation_missing"
+        );
+
+        let mut stale_activation = activation_confirmation.clone();
+        stale_activation.version_directory = install_root.join("attacker-controlled");
+        let stale = broker.desktop_owner_operation_json_with_update_confirmations(
+            &activation_envelope("desktop-update-activation-stale"),
+            None,
+            None,
+            Some(stale_activation),
+        );
+        assert_eq!(stale.status, BrokerStatus::Rejected);
+        assert_eq!(
+            stale.error.unwrap().code,
+            "update_activation_destination_stale"
+        );
+        assert!(!install_root
+            .join("Programs")
+            .join("D4 Pocket")
+            .join(INSTALL_APP_ID)
+            .join("active_version.json")
+            .exists());
+
+        let staged_executable = target.join("app/gui_shell_desktop.exe");
+        std::fs::write(&staged_executable, b"x").unwrap();
+        let changed_stage = broker.desktop_owner_operation_json_with_update_confirmations(
+            &activation_envelope("desktop-update-activation-stage-tampered"),
+            None,
+            None,
+            Some(activation_confirmation.clone()),
+        );
+        assert_eq!(changed_stage.status, BrokerStatus::Rejected);
+        assert_eq!(
+            changed_stage.error.unwrap().code,
+            "package_stage_existing_file_mismatch"
+        );
+        assert_eq!(std::fs::read(&staged_executable).unwrap(), b"x");
+        let product_root = install_root
+            .join("Programs")
+            .join("D4 Pocket")
+            .join(INSTALL_APP_ID);
+        assert!(!product_root.join("active_version.json").exists());
+        std::fs::write(&staged_executable, b"d").unwrap();
+
+        let activated = broker.desktop_owner_operation_json_with_update_confirmations(
+            &activation_envelope("desktop-update-activation"),
+            None,
+            None,
+            Some(activation_confirmation.clone()),
+        );
+        assert_eq!(activated.status, BrokerStatus::Accepted);
+        assert_eq!(
+            activated.body.as_ref().unwrap()["有効化"],
+            "active_version_recorded"
+        );
+        assert_eq!(activated.body.as_ref().unwrap()["起動"], "not_started");
+        assert_eq!(activated.body.as_ref().unwrap()["Start Menu"], "unchanged");
+        assert!(product_root
+            .join("gui_shell_desktop_launcher.exe")
+            .is_file());
+        let selected_launcher = crate::product_bootstrapper::resolve_active_version_launcher(
+            &install_root,
+            INSTALL_APP_ID,
+            INSTALL_AUDIT_ID,
+        )
+        .unwrap();
+        assert_eq!(
+            selected_launcher,
+            std::fs::canonicalize(target.join("gui_shell_desktop_launcher.exe")).unwrap()
+        );
+        let active_record: Value = serde_json::from_slice(
+            &std::fs::read(product_root.join("active_version.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(active_record["product_version"], "1.1.0");
+        assert!(broker.audit_events().iter().any(|event| {
+            event.request_id == "desktop-update-activation"
+                && event.operation == OP_ACTIVATE
+                && event.decision == "queued"
+        }));
+        assert!(broker.audit_events().iter().any(|event| {
+            event.request_id == "desktop-update-activation:complete"
+                && event.operation == OP_ACTIVATE
+                && event.decision == "completed"
+        }));
+
+        let activated_again = broker.desktop_owner_operation_json_with_update_confirmations(
+            &activation_envelope("desktop-update-activation-replay"),
+            None,
+            None,
+            Some(activation_confirmation),
+        );
+        assert_eq!(activated_again.status, BrokerStatus::Accepted);
+        assert_eq!(
+            crate::product_bootstrapper::resolve_active_version_launcher(
+                &install_root,
+                INSTALL_APP_ID,
+                INSTALL_AUDIT_ID,
+            )
+            .unwrap(),
+            selected_launcher
         );
         drop(broker);
         std::fs::remove_dir_all(root).unwrap();

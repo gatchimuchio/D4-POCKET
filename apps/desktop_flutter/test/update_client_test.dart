@@ -43,6 +43,18 @@ class _UpdateTransport implements BrokerTransport {
         },
       };
     }
+    if (operation == '更新有効版切替要求') {
+      return {
+        'status': 'accepted',
+        'body': {
+          '版': 1,
+          '有効化': 'active_version_recorded',
+          '起動': 'not_started',
+          'Start Menu': 'unchanged',
+          '証拠種別': 'INTERNAL_STATE',
+        },
+      };
+    }
     return {
       'status': 'accepted',
       'body': {'版': 1, '実行状態': 'suspended'},
@@ -135,6 +147,12 @@ void main() {
     );
     expect(apply['導入状態'], 'version_staged');
     expect(apply['有効化'], 'suspended');
+    final activation = await client.requestActivation(
+      updateId: 'update-1',
+      candidateHash: 'sha256:${'a' * 64}',
+    );
+    expect(activation['有効化'], 'active_version_recorded');
+    expect(activation['起動'], 'not_started');
     await client.defer(
       updateId: 'update-1',
       candidateHash: 'sha256:${'a' * 64}',
@@ -149,8 +167,14 @@ void main() {
       '更新署名検査',
       '更新download要求',
       '更新適用要求',
+      '更新有効版切替要求',
       '更新延期',
       '更新rollback要求',
     ]);
+    expect(transport.payloads[4], {
+      '版': 1,
+      '更新ID': 'update-1',
+      '候補hash': 'sha256:${'a' * 64}',
+    });
   });
 }
