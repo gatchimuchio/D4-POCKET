@@ -3,7 +3,11 @@
 更新日: 2026-10-05
 工程正本: ユーザー提示「D4 Pocket / GUI-Shell 統合実装仕様書 rev5」「統合開発工程表 rev5」「Codex実装指示書 rev5」
 現行phase: `P2 Multi-Agent Compare` (`OPEN`; rev5実装指示書では`R3`)
-基準Repository状態: `main` / `d9fc9d60c08c0ed9064d316bf5102eaf7001c591`（作業開始時にlocal `main`と`origin/main`一致、working tree cleanを確認）
+基準Repository状態: rev5文書同期commit `39dd3f4bc7aafe350ca94fce9392095f1064d2bc`。その後の実装・検証状態は本書末尾の更新履歴を参照。
+
+## 正本の選び方
+
+常にユーザーが現在提示した最新版の仕様書・工程表・実装指示書と、そこへ同期したリポジトリ内の現行進捗を正本とする。旧版文書は、明示的に現行正本へ採用されない限り、履歴・補助証拠としてのみ使う。旧版の状態や要求を現行状態へ推定転記しない。
 
 ## 1. 工程方針
 
@@ -31,7 +35,7 @@ Rust Broker、Authority、Permission、Approval、Audit、Runtime／Workspace登
 
 | P2受入れ条件 | 状態 | 現在確認できた実装 |
 | --- | --- | --- |
-| Agent A／Bを独立instanceとして用意 | OPEN | Agent登録・Session機構は存在するが、Compare用A/Bの生成は未接続 |
+| Agent A／Bを独立instanceとして用意 | OPEN | Agent Centerに複数Runtime／Workspace登録を保持し、登録ごとのSession開始を追加。2 SessionのCompare run結合は未接続 |
 | 同一Taskを独立Workspace／Session／Taskへ投入 | OPEN | 単一Session用Agent Task APIが存在。Compare orchestrationなし |
 | 2つのTaskを同時実行 | OPEN | Compare単位の並行起動・取消制御なし |
 | result／diff／tests／duration／failure／resource／Auditの比較表示 | OPEN | `AgentComparisonProjection`は識別子重複等の事前projectionだけ。実Task結果の比較ではない |
@@ -41,7 +45,9 @@ Rust Broker、Authority、Permission、Approval、Audit、Runtime／Workspace登
 
 P2は一回の正常CompareがD4 Pocket UIから成立し、基本的なAgent間取り違えがないことを確認した時点で閉じ、直ちにP3へ進む。選択・適用でもOwnerのAuthority、Workspace Permission、Task Approval、Auditを省略しない。比較時にAuthorityを共有・移送しない。
 
-直近の実装作業は、現行単一Task／Session／Workspace登録契約を確認し、2つのCodex instance identityを既存Broker境界の内側で識別できるP2 Contractと比較run状態を設計すること。既存の`AgentComparisonProjection`を実比較完了へ読み替えない。
+2026-10-05の実装更新: Agent CenterはBroker起動中に複数のRuntime／Workspace登録を保持し、それぞれの登録から別Sessionを開始できる。Session一覧に実在し一意に照合できるactive entryだけをTask操作対象とし、mock/local snapshotは比較へ入れない。登録だけではPermission／Approvalを生成しない。検証はDesktop Flutter Analyzerと全test suiteでPASS。これは独立2-SessionのCompare Task実行・差分投影・結果選択・適用の成立を意味しない。
+
+次は現行BrokerのTask／Workspace契約を使い、2 Sessionへ同一Taskを個別事前検査し、各々の独立Permission／Approvalを維持したまま同時起動するCompare runを接続する。既存の`AgentComparisonProjection`を実比較完了へ読み替えない。
 
 ## 3. 後続製品工程
 

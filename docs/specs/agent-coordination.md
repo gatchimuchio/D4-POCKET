@@ -1,5 +1,7 @@
 # Agent比較・Handoffの境界付き契約
 
+> 現行製品工程と実装状況の正本は`docs/REV5_PRODUCT_PROGRESS.md`およびユーザー提示の最新rev5文書である。本書中の過去状態・未接続記述は履歴スナップショットとして扱い、現在の受入れ状態を上書きしない。2026-10-05時点でDesktop Agent Centerは複数Runtime／WorkspaceのBroker内登録と、登録ごとのSession開始に対応した。登録はAuthorityを生成せず、実Compare runは未接続である。
+
 ## 目的
 
 D4 Pocketは複数Agentの結果を比較し、必要に応じて別Agentへ作業を引き継ぐ。ただし、Agentの変更は権限の変更ではない。この文書は、実Agentの起動経路が未接続でも先に固定できる、安全な投影境界を定義する。

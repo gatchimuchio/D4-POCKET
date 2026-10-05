@@ -711,6 +711,83 @@ void main() {
     expect(find.text('登録Workspaceで対話Sessionを開始'), findsOneWidget);
   });
 
+  testWidgets('Agent CenterはCompare用に異なるRuntimeとWorkspaceを複数登録状態として保持する',
+      (WidgetTester tester) async {
+    Map<String, Object?> registrationResponse(
+            String runtime, String workspace) =>
+        _brokerAcceptedBody('AgentCLI実行系作業領域登録', {
+          'runtime_id': runtime,
+          'workspace_id': workspace,
+          'registration_lifetime': 'broker_process',
+          'task_execution': 'unsupported',
+          'permission_generated': false,
+          'approval_generated': false,
+          'credential_value_accepted': false,
+        });
+
+    final transport = _FakeBrokerTransport([
+      _brokerHealthResponse(),
+      _brokerHostCapabilityResponse(),
+      _brokerHostListResponse(),
+      _brokerAdapterListResponse(),
+      _brokerAgentAdapterListResponse(),
+      _brokerDialogueSessionListResponse(),
+      _brokerAcceptedBody('normalize_payload', {'quarantined': false}),
+      _brokerAcceptedBody('content_projection', {'redacted_payload': {}}),
+      _brokerAcceptedBody('approval_edit', {'ok': false}),
+      _brokerCommandSuspendedResponse(),
+      registrationResponse('codex-agent-a', 'workspace-agent-a'),
+      registrationResponse('codex-agent-b', 'workspace-agent-b'),
+    ]);
+    final client = await ShellCoreClient.product(transport: transport);
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: AgentCenter(client: client)),
+    ));
+
+    Future<void> register(String runtime, String workspace, String root) async {
+      await tester.tap(find.text('登録を開始'));
+      await tester.pumpAndSettle();
+      final fields = find.byType(TextFormField);
+      await tester.enterText(fields.at(0), runtime);
+      await tester.enterText(fields.at(1), r'C:\Tools\Codex\codex.exe');
+      await tester.enterText(fields.at(2), workspace);
+      await tester.enterText(fields.at(3), root);
+      await tester.enterText(fields.at(4), '.env');
+      await tester.tap(find.text('native Owner確認へ進む'));
+      await tester.pumpAndSettle();
+    }
+
+    await register('codex-agent-a', 'workspace-agent-a', r'C:\d4-test\agent-a');
+    await register('codex-agent-b', 'workspace-agent-b', r'C:\d4-test\agent-b');
+    await register(
+      'codex-agent-a',
+      'workspace-agent-c',
+      r'C:\d4-test\agent-c',
+    );
+
+    expect(find.text('Broker内登録: codex-agent-a'), findsOneWidget);
+    expect(find.text('Broker内登録: codex-agent-b'), findsOneWidget);
+    expect(find.text('登録Workspaceで対話Sessionを開始'), findsNWidgets(2));
+    expect(
+      find.text('同一RuntimeまたはWorkspaceを比較用に重複登録できません。'),
+      findsOneWidget,
+    );
+    final requests = transport.requests
+        .where((request) => request['operation'] == 'AgentCLI実行系作業領域登録')
+        .map((request) => request['payload']! as Map)
+        .toList();
+    expect(requests.map((request) => request['runtime_id']).toSet(),
+        {'codex-agent-a', 'codex-agent-b'});
+    expect(requests.map((request) => request['workspace_id']).toSet(),
+        {'workspace-agent-a', 'workspace-agent-b'});
+    expect(requests, hasLength(2));
+    expect(
+        requests.every((request) =>
+            !request.containsKey('permission') &&
+            !request.containsKey('approval_id')),
+        isTrue);
+  });
+
   testWidgets('Agent CenterはSession結合後のTask unsupportedを事前検査しgrantへ進まない',
       (WidgetTester tester) async {
     const sessionId = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';

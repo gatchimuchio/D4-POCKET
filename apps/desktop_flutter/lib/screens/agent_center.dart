@@ -51,7 +51,10 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
   final Map<String, String> _taskPreflightStatus = {};
   final Map<String, _AgentTaskUiState> _agentTasks = {};
   late List<AgentSessionRecord> _sessions;
-  _CodexRegistrationInput? _registered;
+  final List<_CodexRegistrationInput> _registrations = [];
+
+  _CodexRegistrationInput? get _registered =>
+      _registrations.isEmpty ? null : _registrations.last;
 
   @override
   void initState() {
@@ -104,6 +107,13 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
       builder: (context) => const _CodexRegistrationDialog(),
     );
     if (!mounted || input == null) return;
+    if (_registrations.any((registered) =>
+        registered.runtimeId == input.runtimeId ||
+        registered.workspaceId == input.workspaceId)) {
+      setState(
+          () => _registrationStatus = '同一RuntimeまたはWorkspaceを比較用に重複登録できません。');
+      return;
+    }
     final transport = widget.client.brokerTransport;
     if (transport == null) {
       setState(() => _registrationStatus = 'Broker接続がないため登録を停止しました。');
@@ -150,10 +160,9 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
           return;
         }
         setState(() {
-          _agentTasks.clear();
-          _registered = input.withTaskExecutionStatus(
+          _registrations.add(input.withTaskExecutionStatus(
             body['task_execution']! as String,
-          );
+          ));
           _registrationStatus =
               'Broker起動中だけ登録しました。Task実行能力: ${body['task_execution']}。';
         });
@@ -174,8 +183,9 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _startRegisteredSession() async {
-    final registration = _registered;
+  Future<void> _startRegisteredSession(
+      [_CodexRegistrationInput? requestedRegistration]) async {
+    final registration = requestedRegistration ?? _registered;
     final transport = widget.client.brokerTransport;
     if (registration == null || transport == null) return;
     setState(() {
@@ -212,12 +222,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
 
   Future<void> _inspectTask(AgentSessionRecord session) async {
     final transport = widget.client.brokerTransport;
-    final registration = _registered;
-    if (transport == null ||
-        registration == null ||
-        session.agentRuntimeId != registration.runtimeId ||
-        session.workspace != registration.workspaceId ||
-        session.status != '利用中') {
+    if (transport == null || !_sessionAvailable(session)) {
       return;
     }
     final instruction = await showDialog<String>(
@@ -257,12 +262,20 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
   }
 
   bool _sessionStillMatchesRegistration(AgentSessionRecord session) {
-    final registration = _registered;
-    return registration != null &&
-        session.status == '利用中' &&
-        session.agentRuntimeId == registration.runtimeId &&
-        session.workspace == registration.workspaceId;
+    return _sessionAvailable(session);
   }
+
+  bool _sessionAvailable(AgentSessionRecord session) =>
+      session.status == '利用中' &&
+      session.workspace.trim().isNotEmpty &&
+      _sessions
+              .where((current) =>
+                  current.sessionId == session.sessionId &&
+                  current.agentRuntimeId == session.agentRuntimeId &&
+                  current.workspace == session.workspace &&
+                  current.status == session.status)
+              .length ==
+          1;
 
   bool _taskSessionStillMatches(
     AgentSessionRecord session,
@@ -629,19 +642,20 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
                   const SizedBox(height: 8),
                   Text(_registrationStatus!),
                 ],
-                if (_registered != null) ...[
+                for (final registration in _registrations) ...[
                   const SizedBox(height: 8),
                   SectionList(
-                    title: '今回のBroker内登録',
+                    title: 'Broker内登録: ${registration.runtimeId}',
                     rows: [
-                      '実行系ID: ${_registered!.runtimeId}',
-                      '作業領域ID: ${_registered!.workspaceId}',
-                      'Task実行: ${_registered!.taskExecutionStatus}',
+                      '作業領域ID: ${registration.workspaceId}',
+                      'Task実行: ${registration.taskExecutionStatus}',
                       'Permission／Approval／Credential: 生成なし',
                     ],
                   ),
                   OutlinedButton(
-                    onPressed: _sessionPending ? null : _startRegisteredSession,
+                    onPressed: _sessionPending
+                        ? null
+                        : () => _startRegisteredSession(registration),
                     child: Text(_sessionPending
                         ? 'Broker Session開始待ち'
                         : '登録Workspaceで対話Sessionを開始'),
@@ -773,9 +787,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
                 const Text(
                   'Capability表示だけでは権限になりません。Task実行には現在のWorkspace PermissionとTaskごとの別Owner ApprovalをBrokerが再検証します。',
                 ),
-                if (_registered != null &&
-                    session.agentRuntimeId == _registered!.runtimeId &&
-                    session.workspace == _registered!.workspaceId) ...[
+                if (_sessionAvailable(session)) ...[
                   OutlinedButton(
                     onPressed: _taskPreflightSession == session.sessionId
                         ? null
