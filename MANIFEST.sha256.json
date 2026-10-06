@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "a39daca8a0cbe08e0a5f0766874463b00f078433fa82d0f5d1d8413ad0cc12cd"
+      "sha256": "f9dcd241597773c4d56bf95f7fbfc37599904e6236517b4b6af33acccb4d206d"
     },
     {
       "path": "SECURITY.md",
@@ -1244,7 +1244,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "a7bea9a58af41b1ac26977a4992d44a3488690af58f59933f0682d2d1f560df5"
+      "sha256": "4ceb7e1140e027e4507ebf356ad561452ffa175b4c319926b32755b3359d42b3"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1512,7 +1512,7 @@
     },
     {
       "path": "docs/specs/update-center.md",
-      "sha256": "bf7a574aac6e41ca9152d4d5662b9952ea1de1c800d9936889c7b1baa1599330"
+      "sha256": "af9ee79d27c790321da47f10f6c5d592bce146fab12832fd87b1321f8194a15c"
     },
     {
       "path": "docs/specs/windows-desktop-launcher.md",
@@ -1520,7 +1520,7 @@
     },
     {
       "path": "docs/specs/windows-product-package.md",
-      "sha256": "66630eca53ecc8d6ae27a529dbb920606d400840f1f0da11fd31863a0fdcb60b"
+      "sha256": "f7b111210ecf9ae844e9434fa3b9a153d6854713a39e83eced33513d21606826"
     },
     {
       "path": "docs/specs/windows-protection.md",

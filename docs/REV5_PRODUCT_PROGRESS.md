@@ -2,7 +2,7 @@
 
 更新日: 2026-10-06
 工程正本: ユーザー提示「D4 Pocket / GUI-Shell 統合実装仕様書 rev5」「統合開発工程表 rev5」「Codex実装指示書 rev5」
-現行phase: `P11 Windows Productization` (`OPEN`)。`P10 Module Selection / Pruning`は2026-10-05にrev5 Product Build受入れを閉鎖。`P9 Standalone Export`、`P8 GUI-Shell Compose`、`P7 A2A / Host / Adapter`、`P6 Credential / MCP`、`P5 Workspace / History / Evaluation`も同日に閉鎖済み。
+現行phase: `P12 Product Integration` (`OPEN`)。`P11 Windows Productization`は2026-10-06にrev5 Product Build受入れを閉鎖。`P10 Module Selection / Pruning`は2026-10-05に閉鎖し、`P9 Standalone Export`、`P8 GUI-Shell Compose`、`P7 A2A / Host / Adapter`、`P6 Credential / MCP`、`P5 Workspace / History / Evaluation`も同日に閉鎖済み。
 基準Repository状態: rev5文書同期commit `39dd3f4bc7aafe350ca94fce9392095f1064d2bc`。その後の実装・検証状態は本書末尾の更新履歴を参照。
 
 ## 正本の選び方
@@ -223,9 +223,17 @@ Windows Computer Useはこの2個目の同名Flutter windowをtargetable window�
 
 P9 portable bundleのWindows再起動時、Computer Use helperは同名製品windowを対象可能な窓として返さなかった。process path／parentは対象bundleを識別できたが、視覚的な画面確認は主張しない。P10の機能受入れはcompile-time define、製品build記録、Widget試験の範囲で閉じる。AOT／binaryの意味上の除去、Rust／第三者依存の除去、サイズ、cold startup、実行時resource、最終統合製品上の再確認は`docs/FINAL_QA_QUEUE.md`と既存release blockerへ送る。`binary_pruning_verified=false`は維持する。現行phaseは直ちにP11 Windows Productizationとする。
 
-### P11 Windows製品化 — OPEN
+### P11 Windows製品化 — CLOSED（rev5製品機能受入れ）
 
-現行P11では、署名package staging、有効版record／Start Menu登録、およびBrokerが記録した直前版へのRollbackを独立native Owner確認付きでBroker fixture経路へ接続した。Rollbackは両候補を現在trustで再検証し、active recordだけをatomic toggleする。version-local launcherのSetup Doctor向けinstalled-path照合、初回Install／導入済みUpdateを区別するUI、同一download候補確認後だけ行えるstage操作に加え、Broker固定trust配布元から署名検証済み更新候補catalogを取得する通常UI操作を接続した。UninstallerのSettings要求からBroker native Owner確認・durable Audit・一回ticket・終了後固定root削除helperまで実装し、Windows fixtureで固定製品root／一致するshortcutだけの除去と利用者data保持を確認した。欠損した固定root起動器／Start Menu shortcutだけを補う限定修復、および有効版payload内の欠損fileだけを同一署名packageから補う限定Repairを既存Broker操作へ接続した。後者は既存fileのbyte不一致を拒否し、active recordや実行processは変更しない。ただし両修復ともBroker／Flutter fixtureの範囲で、導入済み製品での連続実行は未実証であり、破損payload byteやactive recordを置換する完全なRepairではない。正式Installer、installed product全体経路、完全Repair、crash／電源断Recoveryは未成立でありP11はOPEN。
+P11のInstaller entryは、P9 portable ZIPをbootstrapとしてD4 Pocketを起動し、製品内Update CenterからBroker所有trustで検証されたpackageをdownloadして初回Installする経路と定義した。別個のMSI／Setup.exeや署名済みrelease artifactを作成したとは主張しない。利用者のInstall操作はRust Brokerのnative Owner確認、固定product root、durable Audit、active version record、Start Menu登録、終了後の導入版起動引継ぎを通る。Uninstaller、first-run／Setup Doctor、Update、Rollback、固定root／payload欠損の限定Repair、version表示も既存製品経路へ接続済み。
+
+閉鎖根拠は、現行作業でのFlutter `settings_install_flow_test.dart`／`settings_compose_test.dart`／`update_client_test.dart` 17件PASS、変更Dart 3 fileの解析PASS、Rust focused `update_download_requires_current_native_confirmation_and_runs_as_bounded_job`・`native_owner_apply_stages_exact_signed_package_without_activation_or_overwrite`・`portable_activation_requests_installed_launch_only_after_accepted_record_switch`各1件PASS、および既存progressに記録したUninstaller／Repair／first-run／Setup Doctorの局所testとcompile証拠。Brokerのstage・active version切替・Rollbackは同じfixture test内で、Downloadとportable起動引継ぎも独立したRust testで成立する。Schema 161／157／208、Conformance 236 checks、Manifest、Release GateもPASS。
+
+これは有限なProduct Build機能受入れであり、Feature Complete、別profile installed LIVE_RUNTIME全経路、standalone MSI／Setup.exe、正式署名／Publisher identity、production update trust、crash／電源断の網羅、完全Repair、release readinessを意味しない。全機能の一本化はP12、広いinstalled／failure／formal evidenceはFeature Complete後のQ工程と既存release blockerで扱う。これらを理由にP11を再開しない。
+
+### P12 製品全体統合 — OPEN
+
+rev5工程表の15段階の正常利用scenarioを、D4 Pocketの一つの製品経路として接続する。既にCLOSEDのP2〜P11の局所条件を再実装・再試験せず、未接続の交点だけを埋める。最初の統合blockはInstall後の起動／first-runからRuntime登録へ進み、以後Provider／Model、Agent／Workspace、Task、Compare、Handoff、History／Diff、MCP、Compose／Export、Update、normal exitの順に接続する。実資格・実課金・外部副作用は使わず、通常Owner操作待ちにせず、決定的test identityを利用する。
 
 #### 2026-10-06 P11 Exportから製品Update trust設定への接続
 
