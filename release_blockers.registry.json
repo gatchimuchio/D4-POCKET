@@ -3009,7 +3009,7 @@
       "release_tracks": ["windows_v1"],
       "blocks_release": true,
       "blocks_windows_technical_complete": true,
-      "current_rev5_status": "2026-10-06 rev5 P11: Settingsからnative Owner確認・既存Brokerへ入り、durable intent Audit、一回ticket、終了後固定root finalizerによるproduct root／一致shortcut削除と保持dataを実装。欠損した固定root Bootstrapper／固定Start Menu shortcutだけを補う限定Repairも、現在trust・active record・identity・pathと展開stageから再構成したD4PKG01 digestの照合後に復元する経路として接続し、Rust fixture／Flutter対象test／Windows Debug buildで局所成立。正式Installer、installed product全体を通すInstall／Uninstaller／Repair LIVE_RUNTIME、全payload・破損active record復旧、crash／電源断 Recoveryは未成立。",
+      "current_rev5_status": "2026-10-06 rev5 P11: Settingsからnative Owner確認・既存Brokerへ入り、durable intent Audit、一回ticket、終了後固定root finalizerによるproduct root／一致shortcut削除と保持dataを実装。欠損した固定root Bootstrapper／固定Start Menu shortcutだけを補う限定Repairに加え、有効versionの欠損payload fileだけを同一trust済みpackageから補う限定Repairを既存Broker applyへ接続した。既存内容のbyte mismatchは拒否し、active record／process／別versionを変更しない。後者はCargo／Flutter fixture証拠のみ。正式Installer、installed product全体を通すInstall／Uninstaller／Repair LIVE_RUNTIME、破損payload byte・active record復旧、crash／電源断 Recoveryは未成立。",
       "reason": "C12のnative Owner確認付きpackage download、未起動version stagingに加え、2026-10-06にBroker fixtureから独立native Owner確認・候補／identity／固定destination再照合・durable Audit付き有効版record writer、初回root Bootstrapper配置、atomic record replace、固定root Bootstrapperを指すStart Menu shortcutのcreate-only登録を接続した。同target再実行と既存別target競合の非上書きもfixtureで検証した。さらにBroker記録の直前版へのRollbackを独立Owner確認・現行trust再検証・durable Audit付きで接続し、1.1.0から1.0.0へのtoggle fixture、stale対象／通常IPC拒否、stage保持、Start Menu不変更を確認した。2026-10-06には欠損した固定root Bootstrapper／shortcutだけを補う限定Repairも追加し、stage全体から再構成したD4PKG01 outer digestが現在trust済み候補と一致しない場合は復元しない。これらはfixture証拠であり、Installer／Uninstaller、installed next-launch、installed crash／電源断Recovery、installed product上のRollback／Repairの成立は未実証。Windows DNS ClientとTLS配布元経路もhelper／loopback fixtureの範囲に限られる。正式package identity／signing identityは別のOwner Finalization blockerとして分離する。",
       "required_action": "試験用識別子によるInstaller／Uninstaller、installed productからの固定root通常起動とStart Menu shortcut連結、同一volume更新、正式導入製品の強制終了／電源断後の再起動復旧、旧版復帰を契約・negative試験・隔離Windows実測へ接続する。実配布元からの取得／改変検出／修復と、導入から次回起動／rollbackまでの製品経路をsource／artifact identityへ結合して検証する。正式発行者・署名識別情報はWindows技術完了後の別blockerで扱う。",
       "broker_signed_version_staging_consumer": {
@@ -3092,6 +3092,24 @@
           "scope_and_failure": "復元対象は欠損した固定root Bootstrapperと固定Start Menu shortcutのみ。既存競合は上書きせず拒否し、tampered stageでは両entryを作らない。version payload、active record、Credential、設定、Workspace、Audit Storeは変更しない。"
         },
         "scope_limit": "Rust Broker fixture、Flutter test、Windows Debug compileの証拠。正式Installer、installed productからの連続LIVE_RUNTIME、全payload／active recordのRepair、crash／電源断後のRecovery、release readinessは証明しない。P11 Windows distribution release blockerを維持する。"
+      },
+      "broker_active_payload_repair": {
+        "date": "2026-10-06",
+        "evidence_source": "FIXTURE",
+        "validation": {
+          "broker_apply_repair": "cargo test --locked --manifest-path native/rust_helper/Cargo.toml native_owner_apply_stages_exact_signed_package_without_activation_or_overwrite -- --test-threads=1: 1 passed。active versionの欠損fileを現行署名packageから回復し、同一長の改変byteを拒否して未上書きで保持することを確認。",
+          "flutter_tests": "ASCII scratch上のflutter test --no-pub test/update_client_test.dart test/settings_install_flow_test.dart: 13 passed。",
+          "flutter_analysis": "ASCII scratch上で変更Dart 4 fileをflutter analyze --no-pubで解析: No issues found。",
+          "windows_debug_build": "ASCII scratch上のflutter build windows --debug --no-pub --dart-define=GUI_SHELL_PRODUCT_VERSION=1.2.3: PASS、Debug executable生成。MSB8029 Temp intermediate-directory warnings。",
+          "dart_format": "変更Dart 4 fileのdart format --output=none --set-exit-if-changed: 変更なし。",
+          "rust_format": "変更Rust file全体のrustfmt --checkは既存の隣接未整形箇所を含み終了値1。広域整形はせず、変更を含むfocused Cargo testはPASS。"
+        },
+        "observations": {
+          "authority_and_audit": "Settingsは現在active candidateと完全一致する署名済みdownloadだけを許可し、native Owner確認付きの既存Broker更新適用要求へ接続する。Brokerは実行時のtrust／candidate／hash／長さ／destinationを再検証し、durable intent／result Auditを記録する。",
+          "integrity": "packageと一致する既存byteのみ再利用し、不足file／byteを補う。既存fileの同一長改変byteは拒否され、上書きされない。active record、launcher resolution、Start Menu、processは変更されない。",
+          "fixture_adjustment": "初回の異長tamperはinvalid-file検査で拒否されたため、同一長の異なるbyteへ試験入力を変更し、対象のmismatch拒否経路を検証した。"
+        },
+        "scope_limit": "Broker／Flutter FIXTURE証拠のみ。installed productのLIVE_RUNTIME、破損payload byteの置換、active record再構築、Installerを含む連続経路、crash／電源断Recovery、release readinessは証明しない。P11 Windows distribution release blockerを維持する。"
       },
       "update_candidate_package_binding": {
         "date": "2026-09-30",

@@ -1,6 +1,6 @@
 # GUI Shell ロードマップ
 
-2026-10-06 rev5 P11追補: 欠損した固定root Bootstrapper／固定Start Menu shortcutだけを復元する限定RepairをSettingsとBrokerへ接続した。実装は現在trust・active record・製品identity・固定pathを照合し、展開stage全体からD4PKG01 package digestを再構成して信頼済み候補と一致した場合だけ復元する。Windows Rust fixtureとFlutter UI test／Debug buildはPASS。これは全payload・破損active recordの復旧やinstalled productの連続LIVE_RUNTIME証拠ではなく、完全Repair、Installer、installed end-to-end、crash／電源断Recoveryは未成立。P11はOPENを維持し、現行詳細は`docs/REV5_PRODUCT_PROGRESS.md`を参照する。
+2026-10-06 rev5 P11追補: 欠損した固定root Bootstrapper／固定Start Menu shortcutだけを復元する限定Repairに続き、有効版payload内の欠損fileを同一の現在trust済みpackageから補う限定Repairを既存Broker applyへ接続した。既存fileの内容不一致は拒否し、上書きしない。Cargo focused integration test 1件、Flutter対象test 13件、変更Dart解析、Windows Debug build PASS（MSB8029 Temp中間directory warning）。証拠はBroker／UI fixtureとcompileであり、全payload・破損active recordの復旧やinstalled productの連続LIVE_RUNTIMEを示さない。完全Repair、Installer、installed end-to-end、crash／電源断Recoveryは未成立。P11はOPENを維持し、現行詳細は`docs/REV5_PRODUCT_PROGRESS.md`を参照する。
 
 状態: D4 Pocket / GUI-Shell統合rev5 Product-First工程で開発中。現行の製品phaseと実装状況は`docs/REV5_PRODUCT_PROGRESS.md`、最終統合後へ送る検査項目は`docs/FINAL_QA_QUEUE.md`を正本とする。旧R2 Agent TaskはPRODUCT BUILD上`FUNCTIONALLY ESTABLISHED`、rev5 P1は`DONE FOR PRODUCT BUILD`であり、R2-A〜Hの深掘りを次phase開始gateにしない。Technical Completeおよび正式releaseは未成立。
 

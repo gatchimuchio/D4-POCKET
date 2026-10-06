@@ -5595,6 +5595,60 @@ mod tests {
                 && event.decision == "completed"
         }));
 
+        // 有効版のRepairは同じ現在trust packageを再検証し、欠損fileだけを復元する。
+        // 既存fileの変更は上書きせず拒否し、active recordは切り替えない。
+        std::fs::write(&package_path, &package).unwrap();
+        let repair_file = target.join("app/data/app.so");
+        std::fs::remove_file(&repair_file).unwrap();
+        let repaired_active_stage = broker.desktop_owner_operation_json_with_update_confirmation(
+            &envelope("desktop-active-version-repair"),
+            None,
+            Some(confirmation.clone()),
+        );
+        assert_eq!(repaired_active_stage.status, BrokerStatus::Accepted);
+        assert_eq!(
+            repaired_active_stage.body.as_ref().unwrap()["導入状態"],
+            "version_staged"
+        );
+        assert_eq!(repaired_active_stage.body.as_ref().unwrap()["再開"], true);
+        assert_eq!(std::fs::read(&repair_file).unwrap(), b"a");
+        assert_eq!(
+            crate::product_bootstrapper::active_version_snapshot(
+                &install_root,
+                INSTALL_APP_ID,
+                INSTALL_AUDIT_ID,
+            )
+            .unwrap()
+            .current
+            .product_version,
+            "1.1.0"
+        );
+        assert!(broker.audit_events().iter().any(|event| {
+            event.request_id == "desktop-active-version-repair:complete"
+                && event.operation == OP_APPLY
+                && event.decision == "completed"
+        }));
+
+        std::fs::write(&repair_file, b"x").unwrap();
+        let mismatched_active_stage =
+            broker.desktop_owner_operation_json_with_update_confirmation(
+                &envelope("desktop-active-version-repair-mismatch"),
+                None,
+                Some(confirmation.clone()),
+            );
+        assert_eq!(mismatched_active_stage.status, BrokerStatus::Rejected);
+        assert_eq!(
+            mismatched_active_stage.error.as_ref().unwrap().code,
+            "package_stage_existing_file_mismatch"
+        );
+        assert_eq!(std::fs::read(&repair_file).unwrap(), b"x");
+        assert!(broker.audit_events().iter().any(|event| {
+            event.request_id == "desktop-active-version-repair-mismatch:failed"
+                && event.operation == OP_APPLY
+                && event.decision == "failed"
+        }));
+        std::fs::write(&repair_file, b"a").unwrap();
+
         let rollback_payload = payload.clone();
         let rollback_payload_hash =
             crate::broker::protocol::canonical_payload_hash(Some(&rollback_payload));

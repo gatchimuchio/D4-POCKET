@@ -1,6 +1,6 @@
 # Windows製品Package
 
-状態: P11のpackage format／reader、Broker統治の未起動version staging、および独立した有効版record／Start Menu shortcut切替fixture経路。Broker記録の直前版Rollbackも別のfixture経路で成立済み。本書の範囲はInstaller、installed next-launch／Rollback、正式配布の成立を意味しない。
+状態: P11のpackage format／reader、Broker統治の未起動version staging、有効版record／Start Menu shortcut切替fixture経路、および署名済みpackageに基づく有効版payloadの限定Repair fixtureが成立済み。Broker記録の直前版Rollbackも別のfixture経路で成立済み。本書の範囲はInstaller、installed next-launch／Rollback、正式配布の成立を意味しない。
 
 ## 1. 責任境界
 
@@ -18,7 +18,7 @@ package reader自体はBrokerの署名検証、Owner確認、Permission、Approv
 
 導入・更新のversion stagingは既存Brokerだけが実行する。通常IPC、Owner資格のみの要求、Flutter／manifest／package metadataは導入権限を生成できず、native Owner確認がない要求は拒否する。native確認対象は現在trustで検証された候補の版、channel、package hash／byte長、App ID、Audit Store ID、Known Folder由来の固定導入先であり、Brokerが実行直前に候補・identity・destinationを再照合する。Brokerはdurable Audit storeが利用可能な場合だけintentを先に確定し、その後でLocalAppData配下にcapability directoryを作成し、packageを展開する。
 
-本consumerが行うのはcontent-addressedな未起動version directoryの作成だけである。Start Menu変更、active version選択、process起動、旧version削除、Uninstaller、Repair UIは行わない。process crash／電源断の後に同じpackageをOwner確認付きで再適用すると、既存fileがpackage byte列のprefixと一致する範囲だけを再利用し、未完byteを追記して完了できる。完全stageへの再要求も全fileとinventoryを再照合する。相違byte、不正属性、reparse point、package外entryはfail-closedで拒否し、既存stageを変更・削除しない。これはRust Broker fixture上の部分stage／再要求testであり、実installed product process crash／電源断のLIVE_RUNTIME証拠ではない。active versionのinstalled起動、installed product経路のRollback、Installer／Uninstaller、完全なRepair UIはP11未完了のまま。欠損した固定root Bootstrapper／Start Menu shortcutだけの限定修復は`docs/specs/update-center.md`に定義する。Broker記録の直前版Rollback fixtureも同書に定義する。standalone Setupからfilesystem／registryへ直接作用する経路は設けない。
+本consumerが行うのはcontent-addressedな未起動version directoryの作成だけである。Start Menu変更、active version選択、process起動、旧version削除、Uninstallerは行わない。process crash／電源断の後に同じpackageをOwner確認付きで再適用すると、既存fileがpackage byte列のprefixと一致する範囲だけを再利用し、未完byteを追記して完了できる。完全stageへの再要求も全fileとinventoryを再照合する。相違byte、不正属性、reparse point、package外entryはfail-closedで拒否し、既存stageを変更・削除しない。これはRust Broker fixture上の部分stage／再要求testであり、実installed product process crash／電源断のLIVE_RUNTIME証拠ではない。active versionのinstalled起動、installed product経路のRollback、Installer／Uninstaller、完全なRepair UIはP11未完了のまま。欠損した固定root Bootstrapper／Start Menu shortcutだけの限定修復と、有効版directory内の欠損payload fileだけを同じ署名済みpackageから補う限定Repairは`docs/specs/update-center.md`に定義する。後者は既存Brokerの`更新適用要求`を再利用し、現在の有効候補・download・trust・Owner確認を再検証する。既存fileのbyte不一致、active recordの再構築、別版への切替は行わず拒否する。これらはBroker fixtureの証拠で、installed productのLIVE_RUNTIME証拠ではない。Broker記録の直前版Rollback fixtureも同書に定義する。standalone Setupからfilesystem／registryへ直接作用する経路は設けない。
 
 ## 3. 製品版表示
 

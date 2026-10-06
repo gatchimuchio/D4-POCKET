@@ -177,6 +177,66 @@ void main() {
     );
   });
 
+  test('有効版修復はdownload済みの現在trust候補にだけ許可する', () {
+    const packageHash =
+        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    expect(
+      UpdateClient.canRepairActiveVersion(
+        alreadyActive: true,
+        downloaded: true,
+        operationInProgress: false,
+        signatureStatus: 'verified',
+        packageSha256: packageHash,
+        packageSize: 1024,
+      ),
+      isTrue,
+    );
+    expect(
+      UpdateClient.canRepairActiveVersion(
+        alreadyActive: false,
+        downloaded: true,
+        operationInProgress: false,
+        signatureStatus: 'verified',
+        packageSha256: packageHash,
+        packageSize: 1024,
+      ),
+      isFalse,
+    );
+    expect(
+      UpdateClient.canRepairActiveVersion(
+        alreadyActive: true,
+        downloaded: false,
+        operationInProgress: false,
+        signatureStatus: 'verified',
+        packageSha256: packageHash,
+        packageSize: 1024,
+      ),
+      isFalse,
+    );
+    expect(
+      UpdateClient.canRepairActiveVersion(
+        alreadyActive: true,
+        downloaded: true,
+        operationInProgress: true,
+        signatureStatus: 'verified',
+        packageSha256: packageHash,
+        packageSize: 1024,
+      ),
+      isFalse,
+    );
+    expect(
+      UpdateClient.canRepairActiveVersion(
+        alreadyActive: true,
+        downloaded: true,
+        operationInProgress: false,
+        signatureStatus: 'verification_stale',
+        packageSha256: packageHash,
+        packageSize: 1024,
+      ),
+      isFalse,
+    );
+  });
+
   test('Install／Update有効化はstageとBroker状態が揃うまで要求できない', () {
     const packageHash =
         'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';

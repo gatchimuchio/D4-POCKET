@@ -892,6 +892,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         !_updateOperationInProgress &&
         !isAlreadyActive &&
         !isRollbackTarget;
+    final canRepair = UpdateClient.canRepairActiveVersion(
+      alreadyActive: isAlreadyActive,
+      downloaded: downloadedForUpdate,
+      operationInProgress: _updateOperationInProgress,
+      signatureStatus: update['署名状態'],
+      packageSha256: packageSha256,
+      packageSize: packageSize,
+    );
     final rollbackCurrent = rollbackState?['現在版'];
     final canRollback = rollbackState?['状態'] == 'available' &&
         !_updateOperationInProgress &&
@@ -932,7 +940,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: Text(downloadedForUpdate ? '取得済み' : 'download'),
           ),
           TextButton(
-            onPressed: canApply
+            onPressed: canApply || canRepair
                 ? () => _runUpdateRequest(
                       () async {
                         final body = await client.requestApply(
@@ -945,10 +953,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         }
                         return body;
                       },
-                      '署名済みpackageを未起動versionとして固定導入先へ展開しました。Start Menu切替・process起動・rollbackは別操作です。',
+                      isAlreadyActive
+                          ? '現在の有効版を署名済みpackageと照合しました。不足fileだけを復元し、不一致fileは上書きせず拒否します。有効版recordとprocessは変更していません。'
+                          : '署名済みpackageを未起動versionとして固定導入先へ展開しました。Start Menu切替・process起動・rollbackは別操作です。',
                     )
                 : null,
-            child: const Text('未起動版へ展開'),
+            child: Text(isAlreadyActive ? '有効版を修復' : '未起動版へ展開'),
           ),
           TextButton(
             onPressed: canRequestActivation && !_updateOperationInProgress

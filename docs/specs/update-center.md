@@ -1,6 +1,6 @@
 # 更新センター
 
-状態: Broker固定HTTPS配布元からの署名済み候補一覧取得、C12 package download、未起動version staging、別Owner確認によるactive version record／Start Menu shortcut切替、およびBrokerが記録した直前版へのRollbackを接続。Settingsからnative Owner確認を伴う固定起動項目の限定修復も接続した。UIは初回導入と導入済み更新をBroker状態から区別し、download完了後だけ未起動版展開操作を有効化する。process起動は行わない。これらはBroker fixtureまでであり、installed product経路の証拠は別途必要。完全な製品payload RepairとUninstallerは`docs/specs/windows-desktop-launcher.md`に定義する。
+状態: Broker固定HTTPS配布元からの署名済み候補一覧取得、C12 package download、未起動version staging、別Owner確認によるactive version record／Start Menu shortcut切替、およびBrokerが記録した直前版へのRollbackを接続。Settingsからnative Owner確認を伴う固定起動項目の限定修復と、現行trustで一致した署名packageによる有効版payloadの限定修復も接続した。UIは初回導入と導入済み更新をBroker状態から区別し、download完了後だけ展開・修復操作を有効化する。process起動は行わない。これらはBroker fixtureまでであり、installed product経路の証拠は別途必要。破損payload／active recordの置換・再構築とUninstallerは`docs/specs/windows-desktop-launcher.md`に定義する。
 
 更新センターは、更新候補の表示、Broker所有信頼設定によるEd25519署名検査、更新適用の要求、延期、rollback要求を扱う。更新候補自身の公開鍵、MCP metadata、Profile、履歴、UI stateは信頼源ではない。
 
@@ -64,9 +64,17 @@ Rollbackは有効版recordだけを変更する。process起動、実行中proce
 
 Flutterは一覧表示と要求送信だけを担当し、filesystem、process、network、credential、privileged IPCを直接扱わない。
 
+### 有効版payloadの限定修復
+
+SettingsはBroker更新一覧で`現在版`と一致する署名検証済みcandidateに限り、同一candidate・package SHA-256のdownload完了後に「有効版を修復」を表示する。この操作は新しい権限経路を作らず、既存の`更新適用要求`へ同じ更新ID／candidate hashを送り、毎回Rust Desktopの独立native Owner確認、Brokerの現在trust／package digest／固定導入先再照合、intent／completion Auditを通す。
+
+Brokerは現行active versionのcontent-addressed stageへ既存の再開readerを適用する。欠損fileを作成し、署名packageと一致する既存byte prefixだけを残りbyte追記で完成する。既存byteの不一致、過長file、reparse point、余分なentryは上書き・削除せず拒否する。成功してもactive version record、Start Menu、起動中processは変更しない。完全一致時も全file／inventoryを再検査する。
+
+この限定修復は欠損payload／正しいbyte prefixの復元であり、内容が改変されたfileの置換、破損active recordの再構築、異なるpackageへの自動切替ではない。後者はfail-closedとし、Recovery／installed product全体経路の証拠が得られるまでは完全Repairを主張しない。
+
 ### 初回導入／更新UI状態
 
-Brokerの更新一覧は、現行候補との照合に成功したactive version descriptorを、Rollback先がまだない初回導入後も`現在版`へ投影する。recordなしの`unavailable + 現在版=null`だけを初回Install候補として表示し、active versionがある場合はUpdate操作、状態が`unknown`なら有効版切替を無効化する。未起動版展開は、現在のdownload jobが同じ更新ID・候補hash・package SHA-256で`downloaded`の場合だけUIから要求可能とする。有効版切替は同候補のstage要求が`version_staged`で受理された後だけ画面内で有効化する。この画面内stage印は表示制御だけでAuthorityではなく、Brokerは各要求時に署名、package内容、stage、固定導入先、Owner確認を再検証する。download job／画面内stage印はprocess内状態なので、再起動後は再download・冪等stage要求でBrokerが既存package／stageを再検証してから進む。
+Brokerの更新一覧は、現行候補との照合に成功したactive version descriptorを、Rollback先がまだない初回導入後も`現在版`へ投影する。recordなしの`unavailable + 現在版=null`だけを初回Install候補として表示し、active versionがある場合はUpdate／限定Repair操作、状態が`unknown`なら有効版切替を無効化する。未起動版展開と限定Repairは、現在のdownload jobが同じ更新ID・候補hash・package SHA-256で`downloaded`の場合だけUIから要求可能とする。有効版切替は同候補のstage要求が`version_staged`で受理された後だけ画面内で有効化する。この画面内stage印は表示制御だけでAuthorityではなく、Brokerは各要求時に署名、package内容、stage、固定導入先、Owner確認を再検証する。download job／画面内stage印はprocess内状態なので、再起動後は再download・冪等stage要求でBrokerが既存package／stageを再検証してから進む。
 
 Update Centerの状態変更操作は同時に一件だけ実行する。要求中はdownload、stage、active version切替、延期、rollback、Uninstall、catalog取得を無効化し、二重送信を防ぐ。Brokerの初回Install切替応答が`Accepted`で`起動=after_current_exit`を示す場合だけ、Flutterは登録済み版を起動するための必須終了を要求する。これは初回Installに限る通常終了経路で、導入済み版からのUpdate、Rollback、拒否応答へ拡張しない。Rust起動器は正常終了後、Broker停止・process終了・instance lock解放を待ち、固定product rootのactive record、launcher、package layoutを再検証してから導入版を限定環境で起動する。終了が拒否された／失敗した場合、active version recordとStart Menu登録が既に成立した事実を更新失敗と誤表示せず、画面を操作可能に戻してStart Menuからの起動を案内する。UIの終了応答や画面内stateは起動許可・Authorityを生成しない。
 

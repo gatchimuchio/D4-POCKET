@@ -25,6 +25,23 @@ class UpdateClient {
       value['候補hash'] == candidateHash &&
       value['package_sha256'] == packageSha256;
 
+  static bool canRepairActiveVersion({
+    required bool alreadyActive,
+    required bool downloaded,
+    required bool operationInProgress,
+    required Object? signatureStatus,
+    required Object? packageSha256,
+    required Object? packageSize,
+  }) =>
+      alreadyActive &&
+      downloaded &&
+      !operationInProgress &&
+      signatureStatus == 'verified' &&
+      packageSha256 is String &&
+      RegExp(r'^[a-f0-9]{64}$').hasMatch(packageSha256) &&
+      packageSize is num &&
+      packageSize > 0;
+
   static bool canChangeActiveVersion(Map<String, Object?>? rollbackState) =>
       rollbackState?['状態'] == 'available' ||
       rollbackState?['状態'] == 'unavailable';

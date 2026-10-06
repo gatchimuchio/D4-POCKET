@@ -68,6 +68,48 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('現在の有効版は同一署名packageから修復し、再起動や版切替を要求しない', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final transport = _InstallFlowTransport(installed: true);
+    final exitRequests = <ui.AppExitType>[];
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SettingsScreen(
+          client: ShellCoreClient.mock(transport: transport),
+          requestApplicationExit: (exitType) async {
+            exitRequests.add(exitType);
+            return ui.AppExitResponse.cancel;
+          },
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    final repairButton = find.text('有効版を修復');
+    await tester.ensureVisible(repairButton);
+    await tester.tap(repairButton);
+    await tester.pumpAndSettle();
+
+    expect(
+      transport.operations.where((operation) => operation == '更新適用要求'),
+      hasLength(1),
+    );
+    expect(transport.operations, isNot(contains('更新有効版切替要求')));
+    expect(transport.operations, isNot(contains('更新rollback要求')));
+    expect(exitRequests, isEmpty);
+    expect(
+      find.textContaining('現在の有効版を署名済みpackageと照合しました。'),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Uninstall中は状態変更を直列化し、終了拒否時は未削除と案内する', (
     tester,
   ) async {

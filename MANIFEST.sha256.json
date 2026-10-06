@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "461fd7aa254051a790280497ca82ef5599ba57f69463237bfdeb6c673118de2d"
+      "sha256": "44d822db9ddc112e6182402aa6de575156774e81d56d532ee2bcf78270723197"
     },
     {
       "path": "SECURITY.md",
@@ -288,7 +288,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/settings.dart",
-      "sha256": "87740076423151df6174c796aedbaff147f359310f12c7de2228b79da60d99f3"
+      "sha256": "9aba24f8673a3ba463881f987e37539c4a7e758404f7958c59717f7c9590d774"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/setup_doctor.dart",
@@ -392,7 +392,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/update_client.dart",
-      "sha256": "45fd8266ee06f4162a1f1eee2347e9f4cb30420864a78c2cebc1dad0926e84cd"
+      "sha256": "5150a12a9e6fd6b108d04b1aca0f15391508ba94be1806ec7b3b41ac33c3d4ae"
     },
     {
       "path": "apps/desktop_flutter/lib/services/windows_tray_client.dart",
@@ -652,7 +652,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/settings_install_flow_test.dart",
-      "sha256": "3dc0decd5b816b2e2ba3488d3bc63520b110d6be436d17576f7d5dc077b3d68d"
+      "sha256": "1c891511b3cb38cacd17242e2aa2bfded107df875ef30246d599ff17c0579955"
     },
     {
       "path": "apps/desktop_flutter/test/support/test_broker_tcp_transport.dart",
@@ -660,7 +660,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/update_client_test.dart",
-      "sha256": "9ff2a17342e9d15fc31c88a73e3036103312b09e1bec99419468a702fa901466"
+      "sha256": "fef629933aebb598725746815557958e3388493d15c6964943efe39e59e0f72b"
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
@@ -1244,7 +1244,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "3db313a1dbd47cd0368beefddbe6eb7777624ae5e27a6f2ccf30da79eaea5614"
+      "sha256": "d45c1200354c4013a97fa57f756165b608680c6c8eedb64fe05c432f8f2ec55c"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1512,7 +1512,7 @@
     },
     {
       "path": "docs/specs/update-center.md",
-      "sha256": "0a317d037a7bd0956ef206bd9465f5b95d22aebfa3f056334d642b9777b33bb5"
+      "sha256": "7d6df792bdb00d154261cd10c894eb25f73446db4200e51dbfd9eb6208806e54"
     },
     {
       "path": "docs/specs/windows-desktop-launcher.md",
@@ -1520,7 +1520,7 @@
     },
     {
       "path": "docs/specs/windows-product-package.md",
-      "sha256": "e10fd344a52c5ecb64cfe667be778bfe5e0c6af7f5e14638acb96f025e06edc1"
+      "sha256": "66630eca53ecc8d6ae27a529dbb920606d400840f1f0da11fd31863a0fdcb60b"
     },
     {
       "path": "docs/specs/windows-protection.md",
@@ -3352,7 +3352,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "eed50474f9b85220cc21097ab524b2b01c3d401feca02de36b5fa48ac97585e7"
+      "sha256": "9576ac733c3afecc56401dc36df402648e3dc28203758889faa2d970033e7341"
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
@@ -3952,7 +3952,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "ad20b3e8422e5a6b2d9f5de9133cd1e607475e790856146eb9b9c33437779bc8"
+      "sha256": "bae63946c90809c210c0554dc3b1f8f2800801911df30cac0565b1d12401f800"
     },
     {
       "path": "requirements-dev.txt",
