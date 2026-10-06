@@ -1066,6 +1066,77 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('DashboardからMCP Toolを明示確認後にBrokerへ要求しhash receiptを表示する',
+      (WidgetTester tester) async {
+    final transport = _McpToolP12IntegrationTransport();
+    await tester.pumpWidget(
+      GuiShellDesktopApp(client: ShellCoreClient.mock(transport: transport)),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      transport.operations.where((operation) => operation.startsWith('MCP')),
+      isEmpty,
+    );
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.control);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.shift);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.shift);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.control);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'MCP');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('MCP接続'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('MCP接続センター').hitTestable(), findsOneWidget);
+    final listButton = find.byKey(const ValueKey('mcp-load-connections'));
+    await tester.ensureVisible(listButton);
+    await tester.tap(listButton);
+    await tester.pumpAndSettle();
+    expect(find.text('P12試験MCP'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Tool一覧：1件'));
+    await tester.tap(find.text('Tool一覧：1件'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('p12-fixture-tool'));
+    await tester.tap(find.text('確認して実行'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).last, '{"query":"P12"}');
+    await tester.tap(find.text('入力内容を確認'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('"query": "P12"'), findsOneWidget);
+    expect(
+      transport.operations.where((operation) => operation.startsWith('MCP')),
+      ['MCP接続一覧'],
+    );
+    await tester.tap(find.text('Windows確認へ進む'));
+    await tester.pumpAndSettle();
+
+    expect(
+      transport.operations.where((operation) => operation.startsWith('MCP')),
+      ['MCP接続一覧', 'MCP Tool実行'],
+    );
+    expect(
+      transport.requests.last,
+      {
+        'operation': 'MCP Tool実行',
+        'payload': {
+          '版': 1,
+          '操作': '実行',
+          'ServerID': 'p12-mcp-fixture',
+          'ToolID': transport.toolId,
+          '名前': 'p12-fixture-tool',
+          'arguments': {'query': 'P12'},
+        },
+      },
+    );
+    expect(find.textContaining('result hash: sha256:'), findsOneWidget);
+    expect(find.textContaining('fixture-secret-result'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('全体検索からCompose、コマンドからExportへ進み同一ManifestをBrokerへ渡す',
       (WidgetTester tester) async {
     final transport = _ComposeExportNavigationTransport();
@@ -1147,6 +1218,43 @@ void main() {
     );
     expect(
         find.textContaining('fixture://d4-pocket/export.json'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('DashboardからUpdate Centerを開き既存Brokerで候補一覧を読む',
+      (WidgetTester tester) async {
+    final transport = _UpdateCenterNavigationTransport();
+    await tester.pumpWidget(
+      GuiShellDesktopApp(client: ShellCoreClient.mock(transport: transport)),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      transport.operations.where((operation) => operation == '更新一覧'),
+      isEmpty,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('open-product-setup')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('更新センター').hitTestable(), findsOneWidget);
+    expect(find.text('署名検査済みの更新候補はありません。'), findsOneWidget);
+    expect(
+      transport.operations.where((operation) => operation == '更新一覧'),
+      ['更新一覧'],
+    );
+    expect(
+      transport.requests.singleWhere(
+        (request) => request['operation'] == '更新一覧',
+      ),
+      {
+        'operation': '更新一覧',
+        'payload': const {'版': 1},
+      },
+    );
+    expect(
+      transport.operations,
+      isNot(contains('更新候補取得')),
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -3584,6 +3692,105 @@ class _McpNavigationTransport implements BrokerTransport {
   }
 }
 
+class _McpToolP12IntegrationTransport implements BrokerTransport {
+  final operations = <String>[];
+  final requests = <Map<String, Object?>>[];
+  final toolId = 'tool-${List<String>.filled(142, 'a').join()}';
+
+  @override
+  Future<Map<String, Object?>> request(
+    String operation, {
+    Map<String, Object?>? payload,
+  }) async {
+    operations.add(operation);
+    requests.add({'operation': operation, 'payload': payload});
+    if (operation == 'MCP接続一覧') {
+      return {
+        'operation': operation,
+        'status': 'accepted',
+        'evidence_source': 'INTERNAL_STATE',
+        'body': {
+          '版': 1,
+          'MCP接続一覧': [
+            {
+              '版': 1,
+              '契約種別': 'MCP外部概念射影',
+              'Server': {
+                'server_id': 'p12-mcp-fixture',
+                '表示名': 'P12試験MCP',
+              },
+              'Transport': {'kind': 'stdio'},
+              'Tool': [
+                {
+                  'tool_id': toolId,
+                  'name': 'p12-fixture-tool',
+                  'description_summary': '',
+                  'input_schema_hash':
+                      'sha256:${List<String>.filled(64, 'b').join()}',
+                  'risk': 'unknown',
+                  'status': {
+                    'status': 'supported',
+                    'reason': 'fixture内の形状確認だけを表す',
+                  },
+                },
+              ],
+              'Resource': <Object?>[],
+              'Prompt': <Object?>[],
+              'Credential ref': <String, Object?>{},
+              'Trust': <String, Object?>{},
+              'Capability diff': <String, Object?>{},
+              '権限生成': 'なし',
+              '公開範囲': 'metadata_only',
+              '証拠種別': 'INTERNAL_STATE',
+              '接続状態': 'connected',
+              '能力ID': 'mcp.connection.connect',
+              '権限ID': 'permission.mcp.connection.connect',
+              '承認状態': 'owner_control_approved',
+              '復旧ID': 'recover-mcp-connection',
+              '接続監査ID': 'fixture-mcp-list-audit',
+              '実行状態': 'ready',
+            },
+          ],
+          '件数': 1,
+          '公開範囲': 'metadata_only',
+          '証拠種別': 'INTERNAL_STATE',
+        },
+      };
+    }
+    if (operation == 'MCP Tool実行') {
+      return {
+        'operation': operation,
+        'status': 'accepted',
+        // 実Broker receiptのwire形状を模すだけのfixtureであり、LIVE_RUNTIME証拠ではない。
+        'evidence_source': 'LIVE_RUNTIME',
+        'body': {
+          '版': 1,
+          '契約種別': 'MCP Tool実行receipt',
+          'ServerID': payload!['ServerID'],
+          'ToolID': payload['ToolID'],
+          '名前': payload['名前'],
+          'arguments_hash': 'sha256:${List<String>.filled(64, 'a').join()}',
+          'result_hash': 'sha256:${List<String>.filled(64, 'c').join()}',
+          'Tool error': false,
+          'content_count': 1,
+          'content_types': ['text'],
+          '接続状態': 'connected',
+          '能力ID': 'mcp.tool.call',
+          '権限ID': 'permission.mcp.tool.call.one_shot',
+          '承認状態': 'native_owner_confirmed',
+          '承認監査ID': 'fixture-mcp-tool-approval',
+          '復旧ID': 'inspect-mcp-tool-side-effect',
+          '権限生成': 'Broker内一回限りPermissionを消費',
+          '公開範囲': 'hash_only',
+          '証拠種別': 'LIVE_RUNTIME',
+          '監査ID': 'fixture-mcp-tool-audit',
+        },
+      };
+    }
+    throw BrokerClientException('P12 fixtureでは未対応の要求です: $operation');
+  }
+}
+
 class _ComposeExportNavigationTransport implements BrokerTransport {
   final operations = <String>[];
   final requests = <Map<String, Object?>>[];
@@ -3625,6 +3832,48 @@ class _ComposeExportNavigationTransport implements BrokerTransport {
       };
     }
     throw BrokerClientException('fixtureでは未対応の要求です: $operation');
+  }
+}
+
+class _UpdateCenterNavigationTransport implements BrokerTransport {
+  final operations = <String>[];
+  final requests = <Map<String, Object?>>[];
+
+  @override
+  Future<Map<String, Object?>> request(
+    String operation, {
+    Map<String, Object?>? payload,
+  }) async {
+    operations.add(operation);
+    requests.add({'operation': operation, 'payload': payload});
+    if (operation != '更新一覧') {
+      throw BrokerClientException('fixtureでは未対応の要求です: $operation');
+    }
+    return {
+      'request_id': 'fixture-update-list',
+      'operation': operation,
+      'status': 'accepted',
+      'evidence_source': 'FIXTURE',
+      'audit_event_id': 'fixture-update-list-audit',
+      'error': null,
+      'body': {
+        '版': 1,
+        '更新一覧': <Object?>[],
+        '件数': 0,
+        '署名信頼設定': 'unconfigured',
+        'download実行': 'suspended',
+        'download_job': null,
+        '適用実行': 'suspended',
+        'rollback実行': 'suspended',
+        'rollback状態': {
+          '状態': 'unavailable',
+          '現在版': null,
+          '対象版': null,
+        },
+        '証拠種別': 'FIXTURE',
+      },
+      'shutdown_requested': false,
+    };
   }
 }
 

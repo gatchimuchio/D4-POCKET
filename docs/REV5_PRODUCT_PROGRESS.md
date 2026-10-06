@@ -2,7 +2,7 @@
 
 更新日: 2026-10-07
 工程正本: ユーザー提示「D4 Pocket / GUI-Shell 統合実装仕様書 rev5」「統合開発工程表 rev5」「Codex実装指示書 rev5」
-現行phase: `P12 Product Integration` (`OPEN`)。`P11 Windows Productization`は2026-10-06にrev5 Product Build受入れを閉鎖。`P10 Module Selection / Pruning`は2026-10-05に閉鎖し、`P9 Standalone Export`、`P8 GUI-Shell Compose`、`P7 A2A / Host / Adapter`、`P6 Credential / MCP`、`P5 Workspace / History / Evaluation`も同日に閉鎖済み。
+現行phase: `Q0 Final QA Freeze` (`OPEN`)。`P12 Product Integration`は2026-10-07にrev5 Product Build受入れを閉鎖し、Windows `FEATURE COMPLETE`とした。`P11 Windows Productization`は2026-10-06にProduct Build受入れを閉鎖。旧phaseは履歴扱いで、現行release gateは別台帳に保持する。
 基準Repository状態: rev5文書同期commit `39dd3f4bc7aafe350ca94fce9392095f1064d2bc`。その後の実装・検証状態は本書末尾の更新履歴を参照。
 
 ## 正本の選び方
@@ -231,7 +231,7 @@ P11のInstaller entryは、P9 portable ZIPをbootstrapとしてD4 Pocketを起�
 
 これは有限なProduct Build機能受入れであり、Feature Complete、別profile installed LIVE_RUNTIME全経路、standalone MSI／Setup.exe、正式署名／Publisher identity、production update trust、crash／電源断の網羅、完全Repair、release readinessを意味しない。全機能の一本化はP12、広いinstalled／failure／formal evidenceはFeature Complete後のQ工程と既存release blockerで扱う。これらを理由にP11を再開しない。
 
-### P12 製品全体統合 — OPEN
+### P12 製品全体統合 — CLOSED（Windows FEATURE COMPLETE）
 
 rev5工程表の15段階の正常利用scenarioを、D4 Pocketの一つの製品経路として接続する。既にCLOSEDのP2〜P11の局所条件を再実装・再試験せず、未接続の交点だけを埋める。最初の統合blockはInstall後の起動／first-runからRuntime登録へ進み、以後Provider／Model、Agent／Workspace、Task、Compare、Handoff、History／Diff、MCP、Compose／Export、Update、normal exitの順に接続する。実資格・実課金・外部副作用は使わず、通常Owner操作待ちにせず、決定的test identityを利用する。
 
@@ -282,6 +282,28 @@ Desktop Shellは履歴画面を開いたとき、既に接続済みの`ShellCore
 全体検索の「GUI Shell構成」から既存Settingsの構成Manifest面へ、コマンドパレットの「独立Appを書き出す」からWindows書出し面へ直接移動できる導線を追加した。Settings画面は各対象見出しへscrollし、Broker未接続時にも対象面と操作不能理由を表示する。ComposeとExportは既存の同じManifest draft関数と`ShellCoreClient.brokerTransport`を使用し、Export要求の`compose_manifest`がCompose要求payloadと一致することを一つの製品Widget試験で確認する。P8／P9のCompose・Export機能、Manifest契約、権限、native Owner確認、Broker実装は変更していない。
 
 検証: `flutter test test/widget_test.dart --plain-name '全体検索からCompose、コマンドからExportへ進み同一ManifestをBrokerへ渡す'` 1件PASS。ASCII一時worktreeを作り、変更4 Dart fileを再現して`flutter pub get --enforce-lockfile`後に実行した。Fake BrokerはCompose Manifestを受け付け、Export要求とfixture Receiptを返す`FIXTURE`であり、native Owner確認、実Broker、実Manifest file作成、installed Product、独立App生成を証明しない。試験開発中に候補textのFinderが入力文字と競合した2回の失敗を記録し、Text widget predicateへ限定後にPASSした。Schema 161／正常例157／負例208、Conformance 236 checks、manual workflow checkはPASS。Mobile全体`flutter analyze --no-pub`は`No issues found!`。Desktop全体解析は変更外`agent_center.dart`の既存deprecated API情報5件で終了値1。変更file限定`dart analyze`はAnalysis Server shutdown時にDart perf cache pathを削除できずWindows OS error 1920で結果未確定。`dart format`と`git diff --check`はPASS。日本語strict監査は今回差分のfindingなし、旧rev3／rev4履歴と未変更CLI診断文の既存3 findingsで終了値1。ManifestとWindows v1 Release Gateは文書同期後に再実行する。P12はOPENを維持し、次は既存Update／通常終了経路の接続へ進む。
+
+#### P12接続単位9: DashboardからUpdate Centerへの接続 — 完了
+
+製品Dashboardの「インストール・更新センターを開く」導線からSettingsのUpdate Centerへ移動し、明示的に画面を開いた後だけ既存Broker transportで更新一覧を読む経路を接続した。初回Shell表示では一覧要求を送らず、遷移後に`更新一覧`を1回だけ送り、`{'版': 1}` payloadと空の候補一覧を表示する。Fake Brokerの応答はtrust未設定、download／apply／rollback停止の`FIXTURE`であり、候補取得・署名検証・download・install・updateを実行しない。
+
+検証: `flutter test test/widget_test.dart --plain-name 'DashboardからUpdate Centerを開き既存Brokerで候補一覧を読む'` 1件PASS。OneDrive上のcheckoutではFlutterがignored `macos/Flutter/ephemeral/Packages/.packages`を削除できず、試験開始前に停止したため、既存ASCII一時checkout上で現行testを実行しPASSした。これはFake Brokerによる`FIXTURE`証拠で、実Broker、installed product、実配布元、署名済み候補、Owner確認、実更新は示さない。P11 Update機能を再試験せず、P12はOPENを維持して最後のnormal exit接続へ進む。
+
+#### P12接続単位10: MCP Toolの製品経路 — 完了
+
+Dashboardの全体検索からMCP接続センターへ移動し、明示的な一覧取得、metadata-only Tool選択、arguments全文確認、Windows確認へ進む操作、既存Broker transportへの`MCP Tool実行`要求、result hash／content type／Audit IDだけのreceipt表示までをWidgetで接続した。Tool result本文・credential・PermissionはFlutterへ返さない。実Broker/native Owner確認の認可経路やP6 MCP contractは変更していない。
+
+検証: `flutter test test/widget_test.dart --plain-name 'DashboardからMCP Toolを明示確認後にBrokerへ要求しhash receiptを表示する'` 1件PASS。起動時にはMCP操作を送らず、一覧取得とTool実行だけを明示要求し、Tool実行は引数確認前には発行されない。Fake BrokerはClientのaccepted receipt形式に合わせて`LIVE_RUNTIME` wire fieldを返すが、実際の証拠分類は`FIXTURE`であり、実stdio MCP process、Windows native Owner dialog、外部Tool副作用、実Auditを示さない。試験初回では起動時のprofile／notification等の非MCP要求も同じtransportに記録されるため、初期期待をMCP operationだけの評価へ修正し、対象testはPASSした。P6 CLOSED機能を再試験していない。
+
+#### P12接続単位11: Windows native trayからのnormal exit — 完了
+
+現行Windows Runnerのnative tray「終了」項目からFlutter Runnerを終了する経路を確認した。対象Debug binaryは2026-10-06T15:50:05Z生成、SHA-256 `68ad367d0d6053ea44e179d5dce9dc53b5ee5795889879178f0858aa658550a0`、source commit `eaea63b52a5a4c35c44117b50b7979dbc2c57024`由来。PID-bound test runはtray context menuの「終了」を選択し、対象processがexit code 0で終了した。別のUI helperが起動していた同一artifactの試験processも同じ経路で終了させた。
+
+証拠区分は`LIVE_RUNTIME`だが範囲はDebug Flutter Runnerのnative tray／window lifecycleに限る。Rust LauncherのBroker finish、最終Audit、installed productでの起動・終了は実証していない。これらの横断・installed検証はFinal QAへ送る。正常終了以外のprocess failure matrixはここで拡張しない。
+
+#### P12受入れ判定 — CLOSED
+
+P11で閉鎖したInstall／Update機能を再実装せず、P12でDashboard／Agent Center／Settings／既存Broker transportの接続を15段階の正常利用scenarioへ揃えた。Task、Compare、Handoff、History／Diff、MCP Tool、Compose／Export、Updateの製品UI経路はfocused `FIXTURE` integration test、最後のtray正常終了はDebug Runnerの`LIVE_RUNTIME`で成立したため、2026-10-07にProduct Build上のWindows `FEATURE COMPLETE`とする。15段階を一回のinstalled-product LIVE_RUNTIME試験で通したとは主張しない。installed end-to-end、実MCP／Provider、署名済みUpdate、正式証拠と広範なfailure／security／long-run検査はQ1以降および既存release blockerで扱い、P12を再開しない。次工程は`Q0 Final QA Freeze`。
 
 ## P11作業履歴（以下の記録は当時の状態。現行状態は上記CLOSEDが正本）
 

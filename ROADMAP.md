@@ -1,6 +1,6 @@
 # GUI Shell ロードマップ
 
-2026-10-06 rev5現行工程: P11 Windows ProductizationはProduct Build受入れをCLOSED、P12 Product IntegrationをOPENとする。P11 InstallerはP9 portable ZIPをbootstrapとした製品内Update Centerの初回Installとして実装・局所検証済みで、standalone MSI／Setup.exeや正式配布を主張しない。P12では現行工程表の15段階を一つの正常利用scenarioへ接続する。詳細は`docs/REV5_PRODUCT_PROGRESS.md`。
+2026-10-07 rev5現行工程: P2〜P12 Product BuildをCLOSEDし、Windows `FEATURE COMPLETE`へ到達した。現行phaseはQ0 Final QA Freeze（OPEN）。P11 Installer／P12の15段階はProduct Build機能・接続の受入れであり、installed product全経路、正式配布、release readinessを主張しない。Q0ではP12 closure commitをQA対象として固定し、詳細な証拠境界は`docs/REV5_PRODUCT_PROGRESS.md`と`docs/FINAL_QA_QUEUE.md`を参照する。
 
 2026-10-06 rev5 P12接続単位1: first-run設定とSetup Doctor取得後、Dashboardから既存Agent CenterのCodex／Workspace登録UIへ進む導線を追加。Dashboard遷移Widget 1件と既存登録UI／Broker要求Widget 1件、変更Dart解析・形式確認、Schema 161／157／208、Conformance 236 checksがPASS。Fake Brokerによる`FIXTURE`証拠で、installed製品・native Owner dialog・実Codex起動を示さない。
 
@@ -17,6 +17,14 @@
 2026-10-07 rev5 P12接続単位7: 全体検索／コマンドパレットのMCP項目から設定内MCP接続センターへ直接移動し、既存Shell BrokerTransportで操作者が明示した接続一覧取得を行うWidget統合を追加。Broker未接続時もMCPセンターの見出しと非実行状態を保つ。新bridge、接続開始、Tool実行、Owner確認回避は追加しない。Fake Brokerによる`FIXTURE`証拠。P6 CLOSED本体を再試験せず、次はCompose／Export接続。
 
 2026-10-07 rev5 P12接続単位8: 全体検索からCompose設定、コマンドパレットからWindows Export設定へ直接移動し、両方が同じManifest draftと既存Broker transportを使う製品Widget接続を追加。Compose payloadとExport要求内Manifestの一致をFake Brokerの`FIXTURE`で確認。実Broker／native Owner確認／実Manifest file生成／独立App buildは示さない。P8／P9 CLOSED本体は再試験せず、P12はOPENを維持してUpdate／通常終了接続へ進む。
+
+2026-10-07 rev5 P12接続単位9: DashboardからUpdate Centerを開き、初回Shell表示では照会せず、画面遷移後だけ既存Broker transportへ`更新一覧`を1回送るWidget統合を追加。Fake Brokerで`{'版': 1}`、空一覧、未設定trust、download／apply／rollback停止を確認した`FIXTURE`証拠。OneDrive Cloud Files上のFlutter testは起動前にephemeral `.packages`削除で停止し、既存ASCII一時checkout上の対象testはPASS。実配布元／署名済み候補／実更新／installed productは示さない。P11 Update機能は再試験せず、次はnormal exit接続。
+
+2026-10-07 rev5 P12接続単位10: Dashboard検索からMCP接続センターへ進み、metadata-only一覧、Tool／arguments確認、既存Broker transportへの`MCP Tool実行`、hash-only receipt表示までをWidgetで接続。focused test PASS。Broker receipt wire shapeはfixtureであり、real stdio／native Owner確認／外部作用は示さない。
+
+2026-10-07 rev5 P12接続単位11: Debug Flutter Runnerのnative tray context menu「終了」をPID-boundで選択し、process終了code 0をLIVE_RUNTIMEで確認。対象binary SHA-256 `68ad367d0d6053ea44e179d5dce9dc53b5ee5795889879178f0858aa658550a0`。Rust Launcher／Broker finish／final Audit／installed productはこの証拠の範囲外。
+
+2026-10-07 rev5 P12受入れ: P11で成立したInstall／Update機能を再試験せず、15段階の正常利用機能を一つのDesktop Shellと既存Broker接続面へ統合。focused fixture seamsとnative Debug Runner正常終了を確認しP12をCLOSED、Windows `FEATURE COMPLETE`とする。これは一回のinstalled product end-to-end LIVE_RUNTIME証明ではない。次はQ0 Final QA Freeze、QA対象はP12 closure commit。Q1以降で広い横断・installed・failure・security・long-run検査を行い、既存release blockerは保持する。
 
 2026-10-06 rev5 P11追補: portable製品のLIVE_RUNTIME確認では、未選択のSettingsをIndexedStackが起動時にmountし、その`initState`からUpdate一覧Broker IPCを先行発行していた。初期表示時に通信失敗を観測した一方、後の明示的な候補取得は未設定trustによりBrokerが正しく拒否し、その後の一覧読取はacceptedとなった。製品画面を選択した時だけ一覧を読むよう変更し、非選択中0回／選択時1回のFlutter回帰testを追加。対象test 17件、変更Dart解析、Schema 161／157／208、Conformance 236 checks PASS。strict日本語監査は今回変更外のrev3／rev4履歴とCodex CLI診断文の既存3 findingsで終了値1、今回変更fileのfindingはない。修正後のWindows LIVE_RUNTIME再実行は未実施。この修正を含むP11 Product Buildは閉鎖済み。
 
