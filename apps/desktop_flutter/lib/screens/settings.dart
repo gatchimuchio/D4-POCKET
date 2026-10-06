@@ -25,11 +25,13 @@ class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
     super.key,
     required this.client,
+    this.active = true,
     this.requestApplicationExit,
     this.focusUpdateCenterRequest = 0,
   });
 
   final ShellCoreClient client;
+  final bool active;
   final Future<ui.AppExitResponse> Function(ui.AppExitType)?
       requestApplicationExit;
   final int focusUpdateCenterRequest;
@@ -122,6 +124,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void didUpdateWidget(covariant SettingsScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!oldWidget.active && widget.active) {
+      _updatesFuture = _updateClient?.list();
+    }
     if (oldWidget.focusUpdateCenterRequest != widget.focusUpdateCenterRequest) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final targetContext = _updateCenterKey.currentContext;
@@ -155,7 +160,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ? null
         : UpdateClient(widget.client.brokerTransport!);
     _refreshProfiles();
-    _updatesFuture = _updateClient?.list();
+    _updatesFuture = widget.active ? _updateClient?.list() : null;
   }
 
   @override

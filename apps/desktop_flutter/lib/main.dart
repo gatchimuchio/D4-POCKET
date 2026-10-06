@@ -410,6 +410,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
       EvidenceCenter(client: widget.client),
       SettingsScreen(
         client: widget.client,
+        active: selectedIndex == 11,
         focusUpdateCenterRequest: _updateCenterFocusRequest,
       ),
       if (_dialogueVisited)

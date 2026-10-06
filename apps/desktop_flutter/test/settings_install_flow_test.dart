@@ -8,6 +8,41 @@ import 'package:gui_shell_desktop/services/shell_core_client.dart';
 import 'package:gui_shell_ui/runtime_dialogue_client.dart' show BrokerTransport;
 
 void main() {
+  testWidgets('非選択中はBroker一覧を読まず、設定を開いた時に一度だけ読む', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final transport = _InstallFlowTransport();
+    Widget screen({required bool active}) => MaterialApp(
+          home: Scaffold(
+            body: SettingsScreen(
+              client: ShellCoreClient.mock(transport: transport),
+              active: active,
+            ),
+          ),
+        );
+
+    await tester.pumpWidget(screen(active: false));
+    await tester.pumpAndSettle();
+    expect(
+      transport.operations.where((operation) => operation == '更新一覧'),
+      isEmpty,
+    );
+
+    await tester.pumpWidget(screen(active: true));
+    await tester.pumpAndSettle();
+    expect(
+      transport.operations.where((operation) => operation == '更新一覧'),
+      hasLength(1),
+    );
+    expect(find.textContaining('信頼設定=configured'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('portable初回InstallはBroker登録後に終了を要求し、拒否時は復旧案内する', (
     tester,
   ) async {
