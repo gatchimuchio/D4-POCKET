@@ -338,14 +338,25 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('first-runからProvider／Model設定後に登録AgentのTaskを完了する',
+  testWidgets('first-runから登録Agent Taskを完了しHandoffを受信側へ接続する',
       (WidgetTester tester) async {
     const sessionId = 'c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1';
+    const targetSessionId = 'f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4';
     const taskId = 'd2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2';
     const instructionHash =
         'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
     const resultHash =
         'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    const resultSummary = 'P12で承認済み結果を受信Taskへ渡す';
+    final approvedResult = jsonEncode({
+      'result_summary': resultSummary,
+      'artifacts': [
+        {'name': 'note.md', 'content': 'Agent申告artifact'}
+      ],
+      'changed_files': ['note.md'],
+      'diff': '+# Agent申告diff',
+      'test_result': 'Agent申告test結果（独立検証なし）',
+    });
     tester.view.physicalSize = const Size(1200, 1000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -357,6 +368,16 @@ void main() {
       _brokerHostListResponse(),
       _brokerAdapterListResponse(),
       _brokerAgentAdapterListResponse(),
+      _brokerDialogueSessionListResponse(sessions: [
+        {
+          '対話セッションID': targetSessionId,
+          '実行系ID': 'codex-p12-target',
+          '状態': '利用中',
+          '作成監査ID': 'audit-p12-target-session',
+          '作業領域ID': 'workspace-p12-target',
+          '作業領域結合監査ID': 'audit-p12-target-workspace',
+        },
+      ]),
       _brokerAcceptedBody('normalize_payload', {'quarantined': false}),
       _brokerAcceptedBody('content_projection', {'redacted_payload': {}}),
       _brokerAcceptedBody('approval_edit', {'ok': false}),
@@ -381,6 +402,14 @@ void main() {
         '状態': '利用中',
       }),
       _brokerDialogueSessionListResponse(sessions: [
+        {
+          '対話セッションID': targetSessionId,
+          '実行系ID': 'codex-p12-target',
+          '状態': '利用中',
+          '作成監査ID': 'audit-p12-target-session',
+          '作業領域ID': 'workspace-p12-target',
+          '作業領域結合監査ID': 'audit-p12-target-workspace',
+        },
         {
           '対話セッションID': sessionId,
           '実行系ID': 'codex-p12-synthetic',
@@ -456,6 +485,32 @@ void main() {
         'result_hash': resultHash,
         'result_content_available': true,
       }),
+      _brokerAcceptedBody('AgentTask結果表示承認', {
+        'task_id': taskId,
+        'result_hash': resultHash,
+        'content_visibility': 'full',
+        'approval_id': 'a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5',
+        'expires_at_epoch_seconds': 1900000000,
+        'use_limit': 1,
+        'uses_remaining': 1,
+      }),
+      _brokerAcceptedBody('AgentTask結果取得', {
+        'task_id': taskId,
+        'result_hash': resultHash,
+        'content_visibility': 'full',
+        'projection': {'result_hash': resultHash, 'text': approvedResult},
+      }),
+      _brokerAcceptedBody('Agent作業要求検査', {
+        '版': 1,
+        '状態': '要求検査済み',
+        '実行状態': '未実行',
+        'Permission状態': '未付与',
+        'Approval状態': '未取得',
+        '実行系ID': 'codex-p12-target',
+        '対話セッションID': targetSessionId,
+        '作業領域ID': 'workspace-p12-target',
+        '指示hash': instructionHash,
+      }),
     ]);
     final client = await ShellCoreClient.product(transport: transport);
     expect(client.mode, 'broker');
@@ -515,11 +570,17 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text(sessionId), findsOneWidget);
 
-    final preflightButton = find.text('Task実行能力を事前検査（実行なし）');
+    final preflightButton = find.text('Task実行能力を事前検査（実行なし）').last;
     await tester.ensureVisible(preflightButton);
     await tester.tap(preflightButton);
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextFormField), 'rev5 P12 統合Task');
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextFormField),
+      ),
+      'rev5 P12 統合Task',
+    );
     await tester.tap(find.text('Broker事前検査'));
     await tester.pumpAndSettle();
 
@@ -539,6 +600,72 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Task状態: completed'), findsOneWidget);
     expect(find.textContaining(resultHash), findsOneWidget);
+
+    final visibility = find.byKey(
+      const ValueKey('agent-task-visibility-$sessionId'),
+    );
+    await tester.ensureVisible(visibility);
+    await tester.tap(visibility);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('full').last);
+    await tester.pumpAndSettle();
+    final showResult = find.byKey(
+      const ValueKey('agent-task-show-result-$sessionId'),
+    );
+    await tester.ensureVisible(showResult);
+    await tester.tap(showResult);
+    await tester.pumpAndSettle();
+    expect(find.textContaining(resultSummary), findsOneWidget);
+
+    final previewHandoff = find.byKey(
+      const ValueKey('preview-agent-handoff'),
+    );
+    await tester.ensureVisible(previewHandoff);
+    expect(tester.widget<OutlinedButton>(previewHandoff).onPressed, isNotNull);
+    await tester.tap(previewHandoff);
+    await tester.pumpAndSettle();
+    final handoffPreview = tester.widget<SelectableText>(
+      find.byKey(const ValueKey('agent-handoff-preview')),
+    );
+    final handoff = jsonDecode(handoffPreview.data!) as Map<String, Object?>;
+    expect(handoff['source_session_id'], sessionId);
+    expect(handoff['target_session_id'], targetSessionId);
+    expect(handoff['approved_result_hash'], resultHash);
+    expect(handoff['authority_reassessment_required'], isTrue);
+    expect(handoff['permission_reused'], isFalse);
+    expect(handoff['approval_reused'], isFalse);
+    expect(handoff['credential_included'], isFalse);
+    expect(handoff['hidden_context_included'], isFalse);
+
+    await tester.tap(find.byKey(const ValueKey('prepare-agent-handoff')));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Handoff内容を新規Taskとして事前検査しました。PermissionとApprovalは移送されていません。'),
+      findsOneWidget,
+    );
+    final handoffPreflight = transport.requests.singleWhere(
+      (request) =>
+          request['operation'] == 'Agent作業要求検査' &&
+          ((request['payload']! as Map)['session_id'] == targetSessionId),
+    );
+    final handoffInstruction =
+        (handoffPreflight['payload']! as Map)['instruction'] as String;
+    expect(handoffInstruction, contains(resultHash));
+    expect(handoffInstruction, contains('"permission_reused":false'));
+    expect(handoffInstruction, contains('"approval_reused":false'));
+    expect(handoffInstruction, contains('"credential_included":false'));
+    expect(
+      transport.requests.where((request) =>
+          request['operation'] == 'AgentTaskWorkspacePermissionGrant' &&
+          ((request['payload']! as Map)['session_id'] == targetSessionId)),
+      isEmpty,
+    );
+    expect(
+      transport.requests.where((request) =>
+          request['operation'] == 'AgentTaskOwnerApprovalGrant' &&
+          ((request['payload']! as Map)['session_id'] == targetSessionId)),
+      isEmpty,
+    );
     expect(
       transport.operations,
       containsAllInOrder([
@@ -549,6 +676,9 @@ void main() {
         'AgentTaskOwnerApprovalGrant',
         'AgentTask実行',
         'AgentTask状態',
+        'AgentTask結果表示承認',
+        'AgentTask結果取得',
+        'Agent作業要求検査',
       ]),
     );
     expect(tester.takeException(), isNull);

@@ -259,6 +259,12 @@ first-run後のDashboardからAgent Centerへ進み、既存のProvider／Model�
 
 検証: `flutter test --no-pub --no-test-assets --dart-define=GUI_SHELL_PRODUCT_VERSION=1.2.3 --plain-name "DashboardからCompare候補を選び独立Broker事前検査へ接続する" test/widget_test.dart` 1件PASS。Fake Brokerが返す2件のSessionを用いた`FIXTURE`であり、実Codex並行実行、Permission／Approval発行、Task実行・結果比較の新しい証拠ではない。P12はOPENを維持し、次はHandoff接続へ進む。
 
+#### P12接続単位5: 完了Taskから受信SessionへのHandoff接続 — 完了
+
+DashboardからAgent Centerへ進み、Provider／ModelとRuntime／Workspace登録、Session開始、通常Taskの完了、Task結果の`full` Content Exposure表示を経て、Handoff公開packageを別Runtime／Workspaceの未使用受信Sessionへ新規Taskとして事前検査する一本のWidget経路を確認した。Handoff packageは元Task／Sessionと承認済みresult hashに結合し、authority再評価を要求、Permission／Approval／Credential／hidden context非継承を固定する。受信側はTask事前検査のみ行い、新しいPermission／Approvalは未付与のまま。
+
+検証: `flutter test --no-pub --no-test-assets --dart-define=GUI_SHELL_PRODUCT_VERSION=1.2.3 --plain-name "first-runから登録Agent Taskを完了しHandoffを受信側へ接続する" test/widget_test.dart` 1件PASS。OneDrive上の元worktreeではFlutterがmacOS／iOSのignored `ephemeral/Packages/.packages` Cloud Files reparse pointを削除できない旨を出したが、対象testの終了値は0。ASCII一時worktreeへ同じ変更testを複製したFlutter解析は対象Widget `No issues found!`、Mobile全体`No issues found!`。Desktop全体解析は今回未変更の`agent_center.dart`に既存deprecated API info 5件があり終了値1。日本語pathの元worktreeからのFlutter解析はCloud Files cleanup失敗で完了しなかった。`dart format --output=none --set-exit-if-changed test/widget_test.dart`は変更なし。Schema 161／正常例157／負例208、Conformance 236 checksがPASS。`tooling/日本語基底監査.py --strict`は変更対象にfindingなし、履歴／未変更CLI診断文の既存3 findingsにより全体終了値1。Manifest 1180 filesとWindows v1 Release Gate、`git diff --check`はPASS。Fake Brokerの合成Task、full結果承認／投影、受信Sessionを使った`FIXTURE`であり、表示操作はnative Owner dialogを実演せず、実Codex間転送、実Workspace書込み、installed製品を証明しない。P3 CLOSEDのHandoff処理やnegative testは再実装・再試験していない。P12はOPENを維持し、次はHistory／Diff接続へ進む。
+
 ## P11作業履歴（以下の記録は当時の状態。現行状態は上記CLOSEDが正本）
 
 #### 2026-10-06 P11 Exportから製品Update trust設定への接続
