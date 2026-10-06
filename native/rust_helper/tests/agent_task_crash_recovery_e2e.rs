@@ -5,6 +5,7 @@ use gui_shell_rust_helper::broker::{
     BrokerCredentialRole, BrokerEndpoint, BrokerPersistentStore, BrokerRequestEnvelope,
 };
 use serde_json::{json, Value};
+use std::collections::HashSet;
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
@@ -12,6 +13,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use winsafe::{co, HPROCESSLIST};
 
 const RUNTIME_ID: &str = "r2-crash-codex";
 const WORKSPACE_ID: &str = "r2-crash-workspace";
@@ -118,7 +120,9 @@ impl Fixture {
         let stdout = child.stdout.take().expect("応答器の標準出力を取得");
         let mut stdout = BufReader::new(stdout);
         let mut ready = String::new();
-        stdout.read_line(&mut ready).expect("応答器の起動通知を読む");
+        stdout
+            .read_line(&mut ready)
+            .expect("応答器の起動通知を読む");
         assert_eq!(
             ready.trim(),
             format!("READY {}", self.responses_port),
@@ -243,7 +247,10 @@ impl Fixture {
         writeln!(stdin, "stop").expect("fixture停止要求");
         stdin.flush().expect("fixture停止要求flush");
         drop(stdin);
-        let mut stdout = self.responses_stdout.take().expect("応答器の標準出力を取得");
+        let mut stdout = self
+            .responses_stdout
+            .take()
+            .expect("応答器の標準出力を取得");
         let deadline = Instant::now() + Duration::from_secs(15);
         let mut evidence = None;
         loop {
@@ -330,6 +337,98 @@ fn only_scratch(workspace: &Path) -> Option<PathBuf> {
         .map(|entry| entry.path())
         .collect::<Vec<_>>();
     (paths.len() == 1).then(|| paths[0].clone())
+}
+
+fn process_ids() -> HashSet<u32> {
+    let mut snapshot = HPROCESSLIST::CreateToolhelp32Snapshot(co::TH32CS::SNAPPROCESS, None)
+        .expect("process一覧snapshot");
+    snapshot
+        .iter_processes()
+        .map(|entry| entry.expect("process一覧entry").th32ProcessID)
+        .collect()
+}
+
+fn normalized_windows_path(path: &str) -> String {
+    let path = path.replace('/', "\\");
+    path.strip_prefix("\\\\?\\")
+        .unwrap_or(&path)
+        .to_ascii_lowercase()
+}
+
+fn newly_spawned_codex_root(
+    broker_pid: u32,
+    executable: &Path,
+    before_task: &HashSet<u32>,
+) -> Vec<u32> {
+    let expected_path = fs::canonicalize(executable)
+        .expect("Codex CLI実行体の完全path")
+        .to_string_lossy()
+        .into_owned();
+    let expected_name = executable
+        .file_name()
+        .expect("Codex CLI file名")
+        .to_string_lossy()
+        .into_owned();
+    let mut snapshot = HPROCESSLIST::CreateToolhelp32Snapshot(co::TH32CS::SNAPPROCESS, None)
+        .expect("Codex起動後process一覧snapshot");
+    snapshot
+        .iter_processes()
+        .filter_map(|entry| {
+            let entry = entry.expect("Codex起動後process一覧entry");
+            let pid = entry.th32ProcessID;
+            if pid == 0
+                || entry.th32ParentProcessID != broker_pid
+                || before_task.contains(&pid)
+                || !entry.szExeFile().eq_ignore_ascii_case(&expected_name)
+            {
+                return None;
+            }
+            let process = winsafe::HPROCESS::OpenProcess(
+                co::PROCESS::QUERY_LIMITED_INFORMATION
+                    | co::PROCESS::SYNCHRONIZE
+                    | co::PROCESS::TERMINATE,
+                false,
+                pid,
+            )
+            .ok()?;
+            let actual_path = process
+                .QueryFullProcessImageName(co::PROCESS_NAME::WIN32)
+                .ok()?;
+            (normalized_windows_path(&actual_path) == normalized_windows_path(&expected_path))
+                .then_some(pid)
+        })
+        .collect()
+}
+
+fn terminate_codex_root(pid: u32, executable: &Path) {
+    let process = winsafe::HPROCESS::OpenProcess(
+        co::PROCESS::QUERY_LIMITED_INFORMATION | co::PROCESS::SYNCHRONIZE | co::PROCESS::TERMINATE,
+        false,
+        pid,
+    )
+    .expect("特定済みCodex root processを開く");
+    let actual_path = process
+        .QueryFullProcessImageName(co::PROCESS_NAME::WIN32)
+        .expect("Codex rootの完全pathを再照合");
+    let expected_path = fs::canonicalize(executable)
+        .expect("Codex CLI実行体の完全path")
+        .to_string_lossy()
+        .into_owned();
+    assert_eq!(
+        normalized_windows_path(&actual_path),
+        normalized_windows_path(&expected_path),
+        "停止対象が今回指定されたCodex CLI実行体と一致"
+    );
+    process
+        .TerminateProcess(0xD4)
+        .expect("今回のCodex root processだけを異常終了");
+    assert_eq!(
+        process
+            .WaitForSingleObject(Some(5_000))
+            .expect("Codex root process終了待ち"),
+        co::WAIT::OBJECT_0,
+        "Codex root process終了を確認"
+    );
 }
 
 #[test]
@@ -530,4 +629,203 @@ fn broker_kill_during_active_codex_task_stops_descendants_recovers_scratch_and_d
         only_scratch(&fixture.workspace).is_none(),
         "再起動後にTask scratchが残らない"
     );
+}
+
+#[test]
+#[ignore = "Windows上でr2-e2e Brokerを維持したまま実Codex rootを異常終了し、子孫停止とTask回復を確認するときに実行する"]
+fn codex_root_crash_keeps_broker_alive_stops_descendants_recovers_task_and_does_not_reuse_approval()
+{
+    let codex = std::env::var_os("GUI_SHELL_CODEX_TASK_CRASH_E2E_CLI")
+        .map(PathBuf::from)
+        .expect("GUI_SHELL_CODEX_TASK_CRASH_E2E_CLIにCodex CLI絶対pathを設定");
+    let mut fixture = Fixture::new(codex.clone());
+    let normal = fixture.normal().clone();
+    let started = send_request(
+        &normal,
+        "対話開始",
+        json!({"実行系ID":RUNTIME_ID,"作業領域ID":WORKSPACE_ID}),
+    );
+    assert_eq!(started["status"], "accepted", "{started}");
+    let session_id = started["body"]["対話セッションID"]
+        .as_str()
+        .expect("対話セッション識別子")
+        .to_owned();
+    let task = json!({
+        "agent_runtime_id": RUNTIME_ID,
+        "session_id": session_id,
+        "workspace_id": WORKSPACE_ID,
+        "instruction": TASK_INSTRUCTION,
+    });
+    let permission = json!({
+        "agent_runtime_id": RUNTIME_ID,
+        "session_id": session_id,
+        "workspace_id": WORKSPACE_ID,
+    });
+    let granted = send_request(
+        fixture.owner(),
+        "AgentTaskWorkspacePermissionGrant",
+        permission.clone(),
+    );
+    assert_eq!(granted["status"], "accepted", "{granted}");
+    let approved = send_request(fixture.owner(), "AgentTaskOwnerApprovalGrant", task.clone());
+    assert_eq!(approved["status"], "accepted", "{approved}");
+    let processes_before_task = process_ids();
+    let broker_pid = fixture.broker.as_ref().expect("仲介処理系の実行状態").id();
+    let task_started = send_request(&normal, "AgentTask実行", task.clone());
+    assert_eq!(task_started["status"], "accepted", "{task_started}");
+    assert_eq!(task_started["body"]["status"], "running", "{task_started}");
+    let task_id = task_started["body"]["task_id"]
+        .as_str()
+        .expect("作業要求識別子")
+        .to_owned();
+
+    let deadline = Instant::now() + Duration::from_secs(75);
+    let heartbeat = fixture.workspace.join("broker-real-codex-heartbeat.txt");
+    let (root_pid, heartbeat_before_active) = loop {
+        if fs::metadata(&heartbeat).is_ok() && only_scratch(&fixture.workspace).is_some() {
+            let candidates = newly_spawned_codex_root(broker_pid, &codex, &processes_before_task);
+            if !candidates.is_empty() {
+                assert_eq!(
+                    candidates.len(),
+                    1,
+                    "今回のBrokerが起動したCodex rootは一意"
+                );
+                let heartbeat_length = fs::metadata(&heartbeat)
+                    .expect("実MxC child heartbeat")
+                    .len();
+                break (candidates[0], heartbeat_length);
+            }
+        }
+        assert!(Instant::now() < deadline, "実Codex rootとheartbeat検出期限");
+        thread::sleep(Duration::from_millis(50));
+    };
+    thread::sleep(Duration::from_millis(250));
+    let active_heartbeat = fs::metadata(&heartbeat)
+        .expect("実MxC child heartbeat")
+        .len();
+    assert!(
+        active_heartbeat > heartbeat_before_active,
+        "Codex root crash前にMxC child heartbeatが実際に進行"
+    );
+    let active_status = send_request(&normal, "AgentTask状態", json!({"task_id": task_id}));
+    assert_eq!(
+        active_status["body"]["status"], "running",
+        "{active_status}"
+    );
+    terminate_codex_root(root_pid, &codex);
+
+    let mut previous_heartbeat = fs::metadata(&heartbeat)
+        .expect("Codex root crash直後のMxC child heartbeat")
+        .len();
+    let heartbeat_deadline = Instant::now() + Duration::from_secs(20);
+    let child_heartbeat_stopped = loop {
+        assert!(
+            Instant::now() < heartbeat_deadline,
+            "Codex root crash後のMxC child heartbeat停止期限超過; last_length={previous_heartbeat}"
+        );
+        thread::sleep(Duration::from_millis(350));
+        let current_heartbeat = fs::metadata(&heartbeat)
+            .expect("Codex root crash後のMxC child heartbeat")
+            .len();
+        if current_heartbeat == previous_heartbeat {
+            break true;
+        }
+        previous_heartbeat = current_heartbeat;
+    };
+    assert!(
+        child_heartbeat_stopped,
+        "Codex root crash後にMxC childが停止"
+    );
+
+    let mut terminal_status = Value::Null;
+    let recovery_deadline = Instant::now() + Duration::from_secs(20);
+    while Instant::now() < recovery_deadline {
+        assert!(
+            fixture
+                .broker
+                .as_mut()
+                .expect("Codex crash後もBrokerが存続")
+                .try_wait()
+                .expect("Broker状態確認")
+                .is_none(),
+            "Codex root crashがBroker processへ波及しない"
+        );
+        terminal_status = send_request(&normal, "AgentTask状態", json!({"task_id": task_id}));
+        if terminal_status["body"]["status"] != "running" {
+            break;
+        }
+        thread::sleep(Duration::from_millis(50));
+    }
+    assert_eq!(
+        terminal_status["body"]["status"], "failed",
+        "{terminal_status}"
+    );
+    assert!(
+        only_scratch(&fixture.workspace).is_none(),
+        "Codex root crash後にD4-owned Task scratchを回収"
+    );
+    assert!(
+        !fixture
+            .workspace
+            .join("D4P_CRASH_TASK_COMPLETED.txt")
+            .exists(),
+        "異常終了TaskはWorkspace完了markerを書かない"
+    );
+
+    let new_permission = send_request(
+        fixture.owner(),
+        "AgentTaskWorkspacePermissionGrant",
+        permission,
+    );
+    assert_eq!(new_permission["status"], "accepted", "{new_permission}");
+    let approval_reuse = send_request(&normal, "AgentTask実行", task);
+    assert_eq!(
+        approval_reuse["status"], "rejected",
+        "Codex crashで消費済みのApprovalをPermission再発行だけで再利用しない: {approval_reuse}"
+    );
+
+    fixture.stop_broker();
+    let evidence = fixture.finish_responses();
+    assert_eq!(
+        evidence["expected_request_shape"],
+        "tool_call_without_result"
+    );
+    assert_eq!(
+        evidence["tool_call_sent"], true,
+        "偽APIがCodex tool callを受信"
+    );
+    assert_eq!(
+        evidence["tool_result_received"], false,
+        "停止後にtool resultが戻らない"
+    );
+    assert_eq!(evidence["workspace_marker_exists"], false);
+    let audit_text =
+        fs::read_to_string(fixture.store.join("audit.jsonl")).expect("Codex異常終了後の監査記録");
+    assert!(
+        !audit_text.contains(TASK_INSTRUCTION),
+        "Task本文をAuditへ保存しない"
+    );
+    let (_, persisted) =
+        BrokerPersistentStore::open_or_create(&fixture.store, "codex-crash-verify")
+            .expect("永続Audit chain再検証");
+    let terminal_event = persisted
+        .audit_log
+        .events()
+        .iter()
+        .find(|event| {
+            event.request_id == task_id
+                && event.reason.starts_with("AgentTask履歴:")
+                && event.reason.contains("\"stage\":\"terminal\"")
+                && event.evidence_source == "INTERNAL_STATE"
+        })
+        .expect("Codex crash後のterminal Audit");
+    let terminal_record: Value = serde_json::from_str(
+        terminal_event
+            .reason
+            .strip_prefix("AgentTask履歴:")
+            .expect("Task履歴Audit prefix"),
+    )
+    .expect("terminal Task履歴Audit JSON");
+    assert_eq!(terminal_record["status"], "failed");
+    assert_eq!(terminal_record["failure_class"], "通信失敗");
 }
