@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "b4160d89d92e426ce1afa5f13188fcc761d8daf3a07854010336aa66eef4b70e"
+      "sha256": "461fd7aa254051a790280497ca82ef5599ba57f69463237bfdeb6c673118de2d"
     },
     {
       "path": "SECURITY.md",
@@ -3952,7 +3952,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "82eadc85132e12912bb4a0a9c6ff0c0d5c3ac6ab3a175a2215bbd8773bc833f7"
+      "sha256": "ad20b3e8422e5a6b2d9f5de9133cd1e607475e790856146eb9b9c33437779bc8"
     },
     {
       "path": "requirements-dev.txt",

@@ -3009,8 +3009,8 @@
       "release_tracks": ["windows_v1"],
       "blocks_release": true,
       "blocks_windows_technical_complete": true,
-      "current_rev5_status": "2026-10-06 rev5 P11: Settingsからnative Owner確認・既存Brokerへ入り、durable intent Audit、一回ticket、終了後固定root finalizerによるproduct root／一致shortcut削除と保持dataを実装。Rust fixture、Schema／Conformance、Flutter対象test、Windows Debug buildで局所成立。正式Installerとinstalled product全体を通すUninstaller LIVE_RUNTIME、Repair、crash／電源断 Recoveryは未成立。",
-      "reason": "C12のnative Owner確認付きpackage download、未起動version stagingに加え、2026-10-06にBroker fixtureから独立native Owner確認・候補／identity／固定destination再照合・durable Audit付き有効版record writer、初回root Bootstrapper配置、atomic record replace、固定root Bootstrapperを指すStart Menu shortcutのcreate-only登録を接続した。同target再実行と既存別target競合の非上書きもfixtureで検証した。さらにBroker記録の直前版へのRollbackを独立Owner確認・現行trust再検証・durable Audit付きで接続し、1.1.0から1.0.0へのtoggle fixture、stale対象／通常IPC拒否、stage保持、Start Menu不変更を確認した。これらはfixture証拠であり、Installer／Uninstaller、installed next-launch、installed crash／電源断Recovery、installed product上のRollbackの成立は未実証。Windows DNS ClientとTLS配布元経路もhelper／loopback fixtureの範囲に限られる。正式package identity／signing identityは別のOwner Finalization blockerとして分離する。",
+      "current_rev5_status": "2026-10-06 rev5 P11: Settingsからnative Owner確認・既存Brokerへ入り、durable intent Audit、一回ticket、終了後固定root finalizerによるproduct root／一致shortcut削除と保持dataを実装。欠損した固定root Bootstrapper／固定Start Menu shortcutだけを補う限定Repairも、現在trust・active record・identity・pathと展開stageから再構成したD4PKG01 digestの照合後に復元する経路として接続し、Rust fixture／Flutter対象test／Windows Debug buildで局所成立。正式Installer、installed product全体を通すInstall／Uninstaller／Repair LIVE_RUNTIME、全payload・破損active record復旧、crash／電源断 Recoveryは未成立。",
+      "reason": "C12のnative Owner確認付きpackage download、未起動version stagingに加え、2026-10-06にBroker fixtureから独立native Owner確認・候補／identity／固定destination再照合・durable Audit付き有効版record writer、初回root Bootstrapper配置、atomic record replace、固定root Bootstrapperを指すStart Menu shortcutのcreate-only登録を接続した。同target再実行と既存別target競合の非上書きもfixtureで検証した。さらにBroker記録の直前版へのRollbackを独立Owner確認・現行trust再検証・durable Audit付きで接続し、1.1.0から1.0.0へのtoggle fixture、stale対象／通常IPC拒否、stage保持、Start Menu不変更を確認した。2026-10-06には欠損した固定root Bootstrapper／shortcutだけを補う限定Repairも追加し、stage全体から再構成したD4PKG01 outer digestが現在trust済み候補と一致しない場合は復元しない。これらはfixture証拠であり、Installer／Uninstaller、installed next-launch、installed crash／電源断Recovery、installed product上のRollback／Repairの成立は未実証。Windows DNS ClientとTLS配布元経路もhelper／loopback fixtureの範囲に限られる。正式package identity／signing identityは別のOwner Finalization blockerとして分離する。",
       "required_action": "試験用識別子によるInstaller／Uninstaller、installed productからの固定root通常起動とStart Menu shortcut連結、同一volume更新、正式導入製品の強制終了／電源断後の再起動復旧、旧版復帰を契約・negative試験・隔離Windows実測へ接続する。実配布元からの取得／改変検出／修復と、導入から次回起動／rollbackまでの製品経路をsource／artifact identityへ結合して検証する。正式発行者・署名識別情報はWindows技術完了後の別blockerで扱う。",
       "broker_signed_version_staging_consumer": {
         "date": "2026-10-06",
@@ -3074,6 +3074,24 @@
           "cleanup": "finalizer自身のTemp内一時directory cleanupは未成立でFQ-P11-UNINSTALL-FINALIZER-CLEANUPへ移送。"
         },
         "scope_limit": "FIXTURE／compile証拠。正式Installerから導入したproductのnative確認から削除までの連続LIVE_RUNTIME、別user profile、Repair、crash／電源断後のinstalled Recovery、release readinessを証明しない。Windows distribution release blockerは維持する。"
+      },
+      "broker_missing_launch_entry_repair": {
+        "date": "2026-10-06",
+        "evidence_source": "FIXTURE",
+        "validation": {
+          "broker_repair_integration": "cargo test --locked --manifest-path native/rust_helper/Cargo.toml product_launch_repair_restores_only_missing_entries_after_current_trust_and_owner_confirmation: 1 passed。通常IPC拒否、stale Owner確認拒否、非launcher stage payload改変拒否、欠損Bootstrapper／shortcut復元、active record不変、Audit、冪等再要求、既存競合非上書きを確認。",
+          "staged_package_digest": "cargo test --locked --manifest-path native/rust_helper/Cargo.toml staged_tree_reconstructs_signed_package_digest_and_rejects_payload_changes: 1 passed。変更payloadと余分なentryを現在trust済みpackage digestへ照合する前に拒否。",
+          "native_owner_confirmation": "cargo test --locked --manifest-path native/rust_helper/Cargo.toml product_repair_confirmation_limits_repair_to_missing_launch_entries: 1 passed。native確認表示を欠損起動項目の復元だけに限定。",
+          "flutter_and_windows_compile": "Flutter settings_install_flow_test.dart／update_client_test.dart 11 passed、変更Dart限定analyzeとflutter build windows --debug PASS。OneDrive日本語pathでのanalyzer LSP parse errorと--no-test-assets時のshader欠落はASCII scratch／通常test asset生成で再実行しPASS。Debug buildはMSB8029警告あり。",
+          "repository_checks": "Schema 161／normal example 157／negative fixture 208、Conformance 236 checks、Manifest 1179 files、release_gate_check.py、git diff --check PASS。Rust Release build PASS、未変更minidora.rs dead_code warning 2件。product_package.rsのrustfmt --check PASS。",
+          "japanese_audit": "strict監査は終了値1、既存3 findingsはdocs/REV3_PROGRESS.md、docs/REV4_ACCEPTANCE_LEDGER.md、未変更native/rust_helper/src/adapters/codex_cli.rsのみ。今回変更fileのfinding 0件。変更Rust file全体のrustfmt --checkは既存の隣接未整形箇所を含み終了値1。"
+        },
+        "observations": {
+          "authority": "Settings操作はRust Desktop native Owner確認を通り、既存認証Brokerへ到達する。Brokerは現在trust、active version、候補／製品identity、Known Folder由来root／shortcut、request hashを再照合し、永続intent Audit後だけ処理する。",
+          "integrity": "active record内の自己申告hashを単独で信頼せず、no-follow stage inventoryと固定D4PKG01 manifest／file bytesからouter SHA-256を再構成し、現在trust済み候補package digestと一致させる。",
+          "scope_and_failure": "復元対象は欠損した固定root Bootstrapperと固定Start Menu shortcutのみ。既存競合は上書きせず拒否し、tampered stageでは両entryを作らない。version payload、active record、Credential、設定、Workspace、Audit Storeは変更しない。"
+        },
+        "scope_limit": "Rust Broker fixture、Flutter test、Windows Debug compileの証拠。正式Installer、installed productからの連続LIVE_RUNTIME、全payload／active recordのRepair、crash／電源断後のRecovery、release readinessは証明しない。P11 Windows distribution release blockerを維持する。"
       },
       "update_candidate_package_binding": {
         "date": "2026-09-30",
