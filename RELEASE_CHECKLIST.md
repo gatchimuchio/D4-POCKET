@@ -1,5 +1,13 @@
 # リリースチェックリスト
 
+## rev5 Final QA既知制約（2026-10-07）
+
+- item: Desktop Flutter analyzerのdeprecated API情報
+  classification: known_limitation
+  reason: Flutter 3.44.0の全体解析は`apps/desktop_flutter/lib/screens/agent_center.dart`の`RadioListTile.groupValue/onChanged`と`DropdownButtonFormField.value`に関するdeprecated API info 5件でexit 1。Desktop全204 Widget testとWindows Release compileは成功し、この診断によるruntime failureは観測していない。
+  required_action: 現行Flutterが当該APIを削除する前に`RadioGroup`／`initialValue`へ移行し、Desktop analyzerを再実行する。
+  blocks_release: no
+
 ## rev2の現在証拠（2026-09-10）
 
 以下の旧Desktop v1.0記録は過去の基準面を含む。現行owner rev2ではMobile・端末連携・Android・Apple補助buildも作業対象であり、旧post_v1_scopeを理由に未完了を除外しない。現在の要求別監査は `docs/REV2_PROGRESS.md`、Mobile状態は `MOBILE_STATUS.md` を参照する。

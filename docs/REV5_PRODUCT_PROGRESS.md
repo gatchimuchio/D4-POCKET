@@ -2,7 +2,7 @@
 
 更新日: 2026-10-07
 工程正本: ユーザー提示「D4 Pocket / GUI-Shell 統合実装仕様書 rev5」「統合開発工程表 rev5」「Codex実装指示書 rev5」
-現行phase: `Q1 Codex Comprehensive QA` (`OPEN`)。`Q0 QA Freeze`は2026-10-07に閉鎖し、QA対象製品commit `ab746d4b33b003761f5ddcef60a88afa97132a40`を固定した。`P12 Product Integration`はrev5 Product Build受入れを閉鎖し、Windows `FEATURE COMPLETE`とした。`P11 Windows Productization`は2026-10-06にProduct Build受入れを閉鎖。旧phaseは履歴扱いで、現行release gateは別台帳に保持する。
+現行phase: `Q2 Fault / Recovery` (`OPEN`)。`Q0 QA Freeze`は製品commit `ab746d4b33b003761f5ddcef60a88afa97132a40`を固定して閉鎖、`Q1 Codex Comprehensive QA`は2026-10-07に閉鎖した。`P12 Product Integration`はrev5 Product Build受入れを閉鎖し、Windows `FEATURE COMPLETE`とした。`P11 Windows Productization`は2026-10-06にProduct Build受入れを閉鎖。旧phaseは履歴扱いで、現行release gateは別台帳に保持する。
 初期rev5文書同期commit: `39dd3f4bc7aafe350ca94fce9392095f1064d2bc`。凍結commitとその後のQA記録は本書末尾の更新履歴を参照。
 
 ## 正本の選び方
@@ -12,6 +12,14 @@
 ## Q0 QA Freeze — CLOSED
 
 2026-10-07、P12 Product Build受入れcommit `ab746d4b33b003761f5ddcef60a88afa97132a40`をFinal QA対象製品状態として固定した。対象commitは`main`へpush済みで、Q0記録時点のremote `main`と一致。対象はWindows Feature Complete製品構成であり、release-readyや正式配布可能状態を意味しない。以後のQ1〜Q7 evidenceはこの凍結commitを対象とし、製品コード修正が必要になった場合は修正commitを新たなQA候補として明示し、対象を再凍結する。
+
+## Q1 Codex Comprehensive QA — CLOSED
+
+2026-10-07、凍結製品のAgent Task／Compare／Handoff／Workspace／MCP／Provider／Host／Export／Installer／Update／Rollback横断を既存全Rust targetとDesktop／Mobile Flutter testで確認した。`cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets --no-fail-fast -- --test-threads=1`最終runはexit 0: Rust lib 499 passed／12 ignored、bin 10 passed、Broker IPC 10 passed、その他hash／checkpoint／保護保管／Workspace integration 26 passed、production Agent Task E2E 1 ignored（総計545 passed／13 ignored／0 failed）。Ignoredは明示的な実Agent／Owner-dialogue専用testで、production Agent Taskの一般Release capabilityを有効にしない。
+
+Desktop `flutter test --no-pub --dart-define=GUI_SHELL_PRODUCT_VERSION=1.2.3`は204 passed、Mobile `flutter test --no-pub`は21 passed。OneDrive日本語pathからMobile analyzerを起動した初回はLSP JSON `FormatException`で停止したため、同一sourceのASCII一時checkoutで`flutter analyze --no-pub`を実行し`No issues found`を確認した。Desktop analyzerはexit 1で、既存`agent_center.dart`のFlutter 3.44 deprecated API info 5件だけを報告。これをknown limitationとして`RELEASE_CHECKLIST.md`に分類し、現行APIが削除される前にRadioGroup／initialValueへ移行する。Desktop Release buildは同じsource-equivalent一時checkoutで成功し、実行artifact SHA-256 `731da778f1c61e2d6597162876b79e604503ea511199f3d7ef94cc479919709d`、size 162304 bytes。Temporary output directory由来のMSB8029 warning 7件を記録。これはcompile evidenceであり、installed product、formal provenance、配布可能性の証拠ではない。
+
+Q1初回Rust runで既知localhost fixtureのConnectionReset 3件、次runでA2A fixture 1件を観測したが、該当fixture単独testはPASSし、fixture競合の後の`--no-fail-fast`全target runは0 failureで完了した。これは間欠test fixture揺らぎを解消した証拠ではないため`FQ-TEST-LOOPBACK`へ保持し、Q2 network/fault調査で扱う。installed end-to-end、実Provider資格、正式証拠、Q2以降の障害／Recovery、release blockersは未成立のまま維持する。
 
 ## 1. 工程方針
 

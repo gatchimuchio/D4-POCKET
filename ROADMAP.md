@@ -1,6 +1,6 @@
 # GUI Shell ロードマップ
 
-2026-10-07 rev5現行工程: P2〜P12 Product BuildをCLOSEDし、Windows `FEATURE COMPLETE`へ到達した。Q0 QA FreezeはP12 closure commit `ab746d4b33b003761f5ddcef60a88afa97132a40`を対象に閉鎖し、現行phaseはQ1 Codex Comprehensive QA（OPEN）。P11 Installer／P12の15段階はProduct Build機能・接続の受入れであり、installed product全経路、正式配布、release readinessを主張しない。詳細な証拠境界は`docs/REV5_PRODUCT_PROGRESS.md`と`docs/FINAL_QA_QUEUE.md`を参照する。
+2026-10-07 rev5現行工程: P2〜P12 Product BuildをCLOSEDし、Windows `FEATURE COMPLETE`へ到達した。Q0 QA Freezeは製品commit `ab746d4b33b003761f5ddcef60a88afa97132a40`を対象に閉鎖、Q1 Codex Comprehensive QAも閉鎖し、現行phaseはQ2 Fault / Recovery（OPEN）。P11 Installer／P12の15段階はProduct Build機能・接続の受入れであり、installed product全経路、正式配布、release readinessを主張しない。詳細な証拠境界は`docs/REV5_PRODUCT_PROGRESS.md`と`docs/FINAL_QA_QUEUE.md`を参照する。
 
 2026-10-06 rev5 P12接続単位1: first-run設定とSetup Doctor取得後、Dashboardから既存Agent CenterのCodex／Workspace登録UIへ進む導線を追加。Dashboard遷移Widget 1件と既存登録UI／Broker要求Widget 1件、変更Dart解析・形式確認、Schema 161／157／208、Conformance 236 checksがPASS。Fake Brokerによる`FIXTURE`証拠で、installed製品・native Owner dialog・実Codex起動を示さない。
 

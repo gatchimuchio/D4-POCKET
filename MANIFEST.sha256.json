@@ -160,11 +160,11 @@
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "75db0f7de8237a0620a5bf452d826148f6af0e14be029bab9e35999392196267"
+      "sha256": "c8496ad4a181e3b8bf32d8feed80d006d681d314d5e4a7f318dc4f401e4aec60"
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "9e68e1058e935a2ae341a28d45d7d79d418c12a643f9d2e2f01105e3b3447a3c"
+      "sha256": "63d7be5433da0867ecfaff66f4c81ba2baa38fa4f0b35dc8f823db3927f1fde2"
     },
     {
       "path": "SECURITY.md",
@@ -1188,7 +1188,7 @@
     },
     {
       "path": "docs/FINAL_QA_QUEUE.md",
-      "sha256": "384f7e20855c33e94b742bf34aeb0fba232b34d77aa55487ae46bc5c8941e5e3"
+      "sha256": "3396c950ac82cc1b0ac9ccb19cf150fb7688125700af1d0c02994f3c2685debf"
     },
     {
       "path": "docs/FIRST_RUN.md",
@@ -1244,7 +1244,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "3b89c660b9d157b55e80ec6415b0474fed393bbbe886ca840ce730de5ab42a73"
+      "sha256": "662a3e665aa89ea54573431567ec94039d1f1d037417b4e0d74365d855441fef"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",

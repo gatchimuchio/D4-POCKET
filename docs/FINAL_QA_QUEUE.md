@@ -1,6 +1,6 @@
 # D4 Pocket 最終品質保証項目（`FINAL_QA_QUEUE`）
 
-状態: `Q1 ACTIVE`（Feature Complete済み。Q0凍結完了）
+状態: `Q2 ACTIVE`（Q0／Q1完了）
 工程正本: ユーザー提示「D4 Pocket / GUI-Shell rev5 Product-First / Final-QA Separation」
 現行製品phase: `docs/REV5_PRODUCT_PROGRESS.md`
 
@@ -9,10 +9,19 @@
 | 段階 | 状態 | 対象／証拠 |
 | --- | --- | --- |
 | Q0 QA Freeze | CLOSED（2026-10-07） | Final QA対象製品commit `ab746d4b33b003761f5ddcef60a88afa97132a40`。`main`へpushしremote HEAD一致を確認 |
-| Q1 Codex Comprehensive QA | OPEN | 凍結commitを基準にAgent Task／Compare／Handoff／Workspace／MCP／Provider／Host／Export／Installer／Update／Rollbackを横断検査 |
-| Q2–Q7 | QUEUED | 各前段階の閉鎖後に開始 |
+| Q1 Codex Comprehensive QA | CLOSED（2026-10-07） | 凍結commitを基準に全Rust target、Desktop／Mobile Flutter全test、Schema／Conformance、Windows Release compile |
+| Q2 Fault / Recovery | OPEN | crash／kill／deadline／cancel／stale／replay／partial write／corruption／orphan／Broker・frontend・network・provider failure |
+| Q3–Q7 | QUEUED | 各前段階の閉鎖後に開始 |
 
 製品コード変更が必要な場合、該当QA所見を証拠化して局所修正し、修正済み製品を新しいQA候補commitとして明示する。以後のQA結果を旧凍結commitへ誤って帰属させず、更新対象を再凍結する。Q0凍結はrelease readinessを意味せず、既存release blockerを変更しない。
+
+## Q1 Codex Comprehensive QA — CLOSED（2026-10-07）
+
+凍結製品commit `ab746d4b33b003761f5ddcef60a88afa97132a40`の横断回帰はRust全target 545 passed／13明示ignored、Desktop Flutter 204 passed、Mobile Flutter 21 passed。Schema 161／157／208、Conformance 236 checks、manual workflow check、Manifest、Windows v1 Release GateもPASS。ignoredのAgent Task production E2Eは`task_execution`の現行fail-closed gateを検査する専用testで、一般Release capabilityの対応済み証拠ではない。
+
+Desktop Flutter Release compile成功（Flutter 3.44.0、binary SHA-256 `731da778f1c61e2d6597162876b79e604503ea511199f3d7ef94cc479919709d`、162304 bytes）。source-equivalent ASCII一時checkout上のcompileであり、formal provenance／installed product evidenceではない。`MSB8029`が一時出力directory由来で7件。Desktop analyzerはdeprecated API info 5件でexit 1、`RELEASE_CHECKLIST.md`にnon-blocking `known_limitation`として記録。Mobile analyzerはASCII一時checkoutで`No issues found`。
+
+Rust初回・再runでA2A／Update TLS loopback fixtureの間欠failureを観測した後、対象単独testがPASSし、逐次`--no-fail-fast`全targetが0 failureで終了した。fixture root causeは確定していないので`FQ-TEST-LOOPBACK`として保持し、Q2のnetwork failure investigationへ引き継ぐ。Q1の完了はinstalled／formal evidence、全failure matrix、release readinessを意味しない。
 
 ## 1. 運用規則
 
