@@ -370,6 +370,45 @@ fn send_request(endpoint: &BrokerEndpoint, operation: &str, payload: Value) -> V
     serde_json::from_str(&response).expect("IPC応答JSON")
 }
 
+fn send_same_request_twice(
+    endpoint: &BrokerEndpoint,
+    operation: &str,
+    payload: Value,
+) -> (Value, Value, String) {
+    static NEXT_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+    let request_id = format!(
+        "r2-crash-e2e-replay-{}",
+        NEXT_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    );
+    let payload_hash = sha256_tagged(payload.to_string().as_bytes());
+    let request = json!({
+        "request_id": request_id,
+        "session_id": endpoint.session_id,
+        "operation": operation,
+        "payload_hash": payload_hash,
+        "nonce": format!("{request_id}-nonce"),
+        "issued_at": BrokerRequestEnvelope::current_issued_at(),
+        "metadata": {"client": "r2_active_task_crash_recovery_e2e"},
+        "payload": payload,
+    })
+    .to_string();
+    let send = || {
+        let mut stream = TcpStream::connect((endpoint.host.as_str(), endpoint.port))
+            .expect("認証済みloopback IPC再送接続");
+        stream
+            .set_read_timeout(Some(Duration::from_secs(15)))
+            .expect("IPC再送応答期限");
+        write!(stream, "{}\n{}\n", endpoint.session_secret, request)
+            .expect("同一IPC request envelope再送");
+        let mut response = String::new();
+        BufReader::new(stream)
+            .read_line(&mut response)
+            .expect("IPC再送応答読取");
+        serde_json::from_str(&response).expect("IPC再送応答JSON")
+    };
+    (send(), send(), request_id)
+}
+
 fn only_scratch(workspace: &Path) -> Option<PathBuf> {
     let paths = scratch_directories(workspace).ok()?;
     (paths.len() == 1).then(|| paths[0].clone())
@@ -551,9 +590,15 @@ fn run_active_task_interruption_e2e(codex: PathBuf, interruption: ActiveTaskInte
 
     let processes_before_task = process_ids();
     let broker_pid = fixture.broker.as_ref().expect("Brokerプロセス").id();
-    let started = send_request(&normal, "AgentTask実行", task.clone());
+    let (started, replayed_start, replay_request_id) =
+        send_same_request_twice(&normal, "AgentTask実行", task.clone());
     assert_eq!(started["status"], "accepted", "{started}");
     assert_eq!(started["body"]["status"], "running", "{started}");
+    assert_eq!(replayed_start["status"], "rejected", "{replayed_start}");
+    assert_eq!(
+        replayed_start["error"]["code"], "broker_replay_detected",
+        "同じrequest ID／nonceのAgentTask再送を拒否: {replayed_start}"
+    );
     let task_id = started["body"]["task_id"]
         .as_str()
         .expect("AgentTask識別子")
@@ -702,6 +747,12 @@ fn run_active_task_interruption_e2e(codex: PathBuf, interruption: ActiveTaskInte
     .expect("terminal Task履歴Audit JSON");
     assert_eq!(terminal_record["status"], expected_status);
     assert_eq!(terminal_record["failure_class"], expected_failure_class);
+    assert!(persisted.audit_log.events().iter().any(|event| {
+        event.request_id == replay_request_id
+            && event.operation == "AgentTask実行"
+            && event.decision == "rejected"
+            && event.reason == "broker_replay_detected"
+    }));
     if cancellation {
         assert!(persisted.audit_log.events().iter().any(|event| {
             event.operation.contains("取消要求") || event.reason.contains("取消要求")

@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "a58a6c566bfd7bbc4f844517c6d8c9541f416c987860768179604bbcca79fe58"
+      "sha256": "66c24cd2457f4de7bf9b4118cdec195414c5da5e5d1305a8ab97f373781b6dac"
     },
     {
       "path": "SECURITY.md",
@@ -1188,7 +1188,7 @@
     },
     {
       "path": "docs/FINAL_QA_QUEUE.md",
-      "sha256": "ac6363db82b2dfcb3cd39b0d15ffc1e84b59e129bbb44f233e0bc02c0ab5de95"
+      "sha256": "d06a6dcd5ab6930f6d11042af021d8c9e33850287bb4b4182206b87851e76781"
     },
     {
       "path": "docs/FIRST_RUN.md",
@@ -1244,7 +1244,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "dc7b74cb23fe62028eccd8785e9b41d48f846435119420a263e1d63e45f912ee"
+      "sha256": "09086fba142ce5c84ea288c6c0076e32608f308bd507bb4e70be61405d4876fc"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -3448,7 +3448,7 @@
     },
     {
       "path": "native/rust_helper/tests/agent_task_crash_recovery_e2e.rs",
-      "sha256": "8940b05a4dc8d6843be4dcc9f3a3c0df0b4ce20001b145caa5d3e5ebc956dc90"
+      "sha256": "e786ee6f4a775afa209fde036a5c21b93458f9558f1ec0eb948c6e5680fed47d"
     },
     {
       "path": "native/rust_helper/tests/agent_task_production_e2e.rs",

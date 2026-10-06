@@ -67,6 +67,8 @@ Windows hosted補助run #41は`workflow_dispatch`による手動実行でcommit 
 
 同差分のfeature-enabled全target Rust試験は499 passed／1 failed／12 ignoredで終了値101。唯一の失敗は既知loopback競合項目`broker::a2a_center::tests::owner接続をBrokerで受理し通常IPC一覧へbounded射影する`のAgent Card応答接続resetで、同一testの単独再実行は1 passed。これは`FQ-TEST-LOOPBACK`を解消せず、根因も確定しない。featureなし／`r2-e2e`ありの全target compile check、Provider 503 E2E、既存4 failure E2E、Rust bin／Broker IPC test、Schema／ConformanceはPASS。Q2 acceptance行とrelease gateは変更しない。
 
+2026-10-07 Q2 active AgentTaskのIPC request replay拒否 — 限定LIVE_RUNTIME: cancel／deadline／Provider failureの3実Agent E2Eで、同じAgentTask request envelope（request ID／nonce／payloadを含む同一JSON）を認証済みloopback IPCへ2回送る。初回は`running`として受理し、再送は`broker_replay_detected`で拒否され、その拒否AuditがBroker永続store再読込後も同一request ID／operation／decision／reasonで残ることを確認した。各caseで実Codex rootは一意、5本のactive-task interruption E2E（Broker kill、Codex root crash、cancel、deadline、Provider 503）は合計5 passed／0 failed。Owner grantとResponses APIは`FIXTURE`、process／Broker／IPC観測は限定`LIVE_RUNTIME`。このtest-only変更はstale IPC／消費済みApprovalの既存検査を置き換えず、Q2 queue全体を閉じない。通常Release `task_execution=unsupported`とrelease gateを維持する。検証: `cargo +1.95.0 check --locked --offline --features r2-e2e --test agent_task_crash_recovery_e2e --manifest-path native/rust_helper/Cargo.toml` PASS、対象ignored E2E 5件 PASS、Rust 1.95.0 scoped rustfmt PASS。全Rust all-target testはこのtest-only差分では再実行しておらず、先行runのloopback A2A failureは`FQ-TEST-LOOPBACK`として未解決のまま保持する。
+
 ## 1. 工程方針
 
 rev5は、完成前の製品機能開発と、Feature Complete後の最終品質保証を分離する。旧R2 Agent TaskはPRODUCT BUILD上`FUNCTIONALLY ESTABLISHED`、P1は`DONE FOR PRODUCT BUILD`とする。R2で得た実Task・Permission／Approval・Audit・Workspace境界等の証拠は保持する。R2-A〜Hの追加探索・出荷級の再確認はP2以降を止めず、必要なものを`docs/FINAL_QA_QUEUE.md`へ送る。
