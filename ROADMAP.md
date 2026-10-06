@@ -2,7 +2,7 @@
 
 2026-10-07 rev5現行工程: P12 Windows `FEATURE COMPLETE`後のため`FINAL_QA_MODE`。Q0 QA FreezeとQ1 Codex Comprehensive QAは完了し、現行phaseはQ2 Fault / Recovery（ACTIVE）。旧R2 Agent Taskの未消化crash／deadline／recovery所見をQ2で検証する。P2 Compare（実装指示書のR3）とP3 Handoff（同R4）はCLOSEDのまま再訪しない。Windows Feature Completeは正式配布・release readinessを意味しない。詳細は`docs/REV5_PRODUCT_PROGRESS.md`と`docs/FINAL_QA_QUEUE.md`。
 
-2026-10-07 Q2記録: Broker crash回復とCodex root異常終了の局所試験、およびloopback fixture調査結果は`docs/REV5_PRODUCT_PROGRESS.md`と`docs/FINAL_QA_QUEUE.md`に記録されている。これらはQ2の部分証拠であり、Q2全体を閉じない。通常Release `task_execution=unsupported`およびrelease gateは維持する。
+2026-10-07 Q2記録: 実Codex／MxCを使うBroker crash、Codex root crash、active Task cancel、deadlineの4局所LIVE_RUNTIME試験と逐次Rust全target 545 passed／0 failed／13 ignoredを確認した。限定条件と未成立範囲は`docs/REV5_PRODUCT_PROGRESS.md`および`docs/FINAL_QA_QUEUE.md`に記録する。Q2全体は継続し、通常Release `task_execution=unsupported`およびrelease gateを維持する。
 
 2026-10-06 rev5 P12接続単位1: first-run設定とSetup Doctor取得後、Dashboardから既存Agent CenterのCodex／Workspace登録UIへ進む導線を追加。Dashboard遷移Widget 1件と既存登録UI／Broker要求Widget 1件、変更Dart解析・形式確認、Schema 161／157／208、Conformance 236 checksがPASS。Fake Brokerによる`FIXTURE`証拠で、installed製品・native Owner dialog・実Codex起動を示さない。
 

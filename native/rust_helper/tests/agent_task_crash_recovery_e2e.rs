@@ -4,7 +4,7 @@ use gui_shell_rust_helper::audit_hash::sha256_tagged;
 use gui_shell_rust_helper::broker::{
     BrokerCredentialRole, BrokerEndpoint, BrokerPersistentStore, BrokerRequestEnvelope,
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashSet;
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
@@ -13,14 +13,14 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use winsafe::{co, HPROCESSLIST};
+use winsafe::{HPROCESSLIST, co};
 
 const RUNTIME_ID: &str = "r2-crash-codex";
 const WORKSPACE_ID: &str = "r2-crash-workspace";
-const TASK_INSTRUCTION: &str =
-    "D4P_CRASH_TASK_SENTINEL: perform only the bounded synthetic probe supplied by the local test API";
+const TASK_INSTRUCTION: &str = "D4P_CRASH_TASK_SENTINEL: perform only the bounded synthetic probe supplied by the local test API";
 const BROKER_EXE: &str = env!("CARGO_BIN_EXE_gui_shell_rust_helper");
 const RESPONSES_EXE: &str = env!("CARGO_BIN_EXE_gui_shell_r2_e2e_responses");
+const R2_E2E_TASK_EXECUTION_LIMIT_ENV: &str = "GUI_SHELL_R2_E2E_TASK_EXECUTION_LIMIT_MS";
 
 struct Fixture {
     root: PathBuf,
@@ -36,10 +36,24 @@ struct Fixture {
     responses_stdin: Option<ChildStdin>,
     responses_stdout: Option<BufReader<ChildStdout>>,
     generation: u32,
+    task_execution_limit_ms: Option<u64>,
+    expected_responses_shape: &'static str,
 }
 
 impl Fixture {
     fn new(codex: PathBuf) -> Self {
+        Self::new_with_settings(codex, None, "--expect-cancellation")
+    }
+
+    fn with_deadline(codex: PathBuf, milliseconds: u64) -> Self {
+        Self::new_with_settings(codex, Some(milliseconds), "--expect-deadline")
+    }
+
+    fn new_with_settings(
+        codex: PathBuf,
+        task_execution_limit_ms: Option<u64>,
+        expected_responses_shape: &'static str,
+    ) -> Self {
         assert!(codex.is_absolute() && codex.is_file(), "Codex CLIの実file");
         assert!(
             !codex.to_string_lossy().contains('='),
@@ -100,6 +114,8 @@ impl Fixture {
             responses_stdin: None,
             responses_stdout: None,
             generation: 0,
+            task_execution_limit_ms,
+            expected_responses_shape,
         };
         fixture.start_responses();
         fixture.start_broker();
@@ -110,7 +126,7 @@ impl Fixture {
         let mut child = Command::new(RESPONSES_EXE)
             .arg(&self.workspace)
             .arg(self.responses_port.to_string())
-            .arg("--expect-cancellation")
+            .arg(self.expected_responses_shape)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
@@ -156,7 +172,8 @@ impl Fixture {
         let suffix = self.generation;
         let session_file = self.root.join(format!("normal-{suffix}.json"));
         let owner_file = self.root.join(format!("owner-{suffix}.json"));
-        let child = Command::new(BROKER_EXE)
+        let mut command = Command::new(BROKER_EXE);
+        command
             .args(["broker-server", "--store-dir"])
             .arg(&self.store)
             .arg("--session-file")
@@ -175,13 +192,16 @@ impl Fixture {
                 "GUI_SHELL_R2_E2E_RESPONSES_PORT",
                 self.responses_port.to_string(),
             )
+            .env_remove(R2_E2E_TASK_EXECUTION_LIMIT_ENV)
             .env_remove("OPENAI_API_KEY")
             .env_remove("CODEX_API_KEY")
             .env_remove("ANTHROPIC_API_KEY")
             .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .expect("r2-e2e Broker process起動");
+            .stderr(Stdio::null());
+        if let Some(milliseconds) = self.task_execution_limit_ms {
+            command.env(R2_E2E_TASK_EXECUTION_LIMIT_ENV, milliseconds.to_string());
+        }
+        let child = command.spawn().expect("r2-e2e Broker process起動");
         self.broker = Some(child);
         self.normal = None;
         self.owner = None;
@@ -231,13 +251,14 @@ impl Fixture {
         let endpoint = self.normal().clone();
         let response = send_request(&endpoint, "shutdown", Value::Null);
         assert_eq!(response["status"], "accepted", "{response}");
-        assert!(self
-            .broker
-            .take()
-            .expect("仲介処理系の終了を待つ")
-            .wait()
-            .expect("Broker正常終了待ち")
-            .success());
+        assert!(
+            self.broker
+                .take()
+                .expect("仲介処理系の終了を待つ")
+                .wait()
+                .expect("Broker正常終了待ち")
+                .success()
+        );
         self.normal = None;
         self.owner = None;
     }
@@ -252,7 +273,7 @@ impl Fixture {
             .take()
             .expect("応答器の標準出力を取得");
         let deadline = Instant::now() + Duration::from_secs(15);
-        let mut evidence = None;
+        let mut evidence: Option<Value> = None;
         loop {
             let mut line = String::new();
             assert!(Instant::now() < deadline, "loopback fixture終了期限");
@@ -264,14 +285,31 @@ impl Fixture {
                 evidence = Some(serde_json::from_str(json).expect("応答器の検証記録JSONを解析"));
             }
         }
-        assert!(self
+        let evidence = evidence.expect("応答器の検証記録");
+        let status = self
             .responses
             .take()
             .expect("応答器processを取得")
             .wait()
-            .expect("fixture終了待ち")
-            .success());
-        evidence.expect("応答器の検証記録")
+            .expect("fixture終了待ち");
+        assert!(
+            status.success(),
+            "loopback fixture終了code={:?}; expected_shape={}; requests={}; tool_offered={}; tool_call_sent={}; tool_result_received={}; repeated_rejections={}; invalid_bodies={}; write_failures={}; incomplete={}; blocked_external={}; workspace_marker={}; boundary_valid={}",
+            status.code(),
+            evidence["expected_request_shape"],
+            evidence["requests"],
+            evidence["tool_offered"],
+            evidence["tool_call_sent"],
+            evidence["tool_result_received"],
+            evidence["repeated_tool_call_rejections"],
+            evidence["invalid_bodies"],
+            evidence["response_write_failures"],
+            evidence["incomplete_requests"],
+            evidence["blocked_external_requests"],
+            evidence["workspace_marker_exists"],
+            evidence["workspace_boundary_fixtures_valid_after_task"],
+        );
+        evidence
     }
 }
 
@@ -329,14 +367,21 @@ fn send_request(endpoint: &BrokerEndpoint, operation: &str, payload: Value) -> V
 }
 
 fn only_scratch(workspace: &Path) -> Option<PathBuf> {
-    let entries = fs::read_dir(workspace).ok()?;
-    let paths = entries
-        .filter_map(Result::ok)
-        .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_dir()))
-        .filter(|entry| entry.file_name().to_string_lossy().starts_with(".d4p-tmp-"))
-        .map(|entry| entry.path())
-        .collect::<Vec<_>>();
+    let paths = scratch_directories(workspace).ok()?;
     (paths.len() == 1).then(|| paths[0].clone())
+}
+
+fn scratch_directories(workspace: &Path) -> std::io::Result<Vec<PathBuf>> {
+    let mut paths = Vec::new();
+    for entry in fs::read_dir(workspace)? {
+        let entry = entry?;
+        if entry.file_type()?.is_dir()
+            && entry.file_name().to_string_lossy().starts_with(".d4p-tmp-")
+        {
+            paths.push(entry.path());
+        }
+    }
+    Ok(paths)
 }
 
 fn process_ids() -> HashSet<u32> {
@@ -346,6 +391,294 @@ fn process_ids() -> HashSet<u32> {
         .iter_processes()
         .map(|entry| entry.expect("process一覧entry").th32ProcessID)
         .collect()
+}
+
+fn process_tree_ids(root_pid: u32) -> HashSet<u32> {
+    let mut snapshot = HPROCESSLIST::CreateToolhelp32Snapshot(co::TH32CS::SNAPPROCESS, None)
+        .expect("子孫プロセス一覧のスナップショットを作成");
+    let parent_by_pid = snapshot
+        .iter_processes()
+        .map(|entry| {
+            let entry = entry.expect("子孫プロセス一覧の要素を取得");
+            (entry.th32ProcessID, entry.th32ParentProcessID)
+        })
+        .collect::<Vec<_>>();
+    let mut descendants = HashSet::new();
+    descendants.insert(root_pid);
+    loop {
+        let previous_len = descendants.len();
+        for (pid, parent_pid) in &parent_by_pid {
+            if descendants.contains(parent_pid) {
+                descendants.insert(*pid);
+            }
+        }
+        if descendants.len() == previous_len {
+            return descendants;
+        }
+    }
+}
+
+fn wait_for_process_tree_exit(processes: &HashSet<u32>, timeout: Duration) {
+    let deadline = Instant::now() + timeout;
+    loop {
+        let live = process_ids();
+        let survivors = processes.intersection(&live).copied().collect::<Vec<_>>();
+        if survivors.is_empty() {
+            return;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "AgentTask終端後にprocess treeが残る: {survivors:?}"
+        );
+        thread::sleep(Duration::from_millis(100));
+    }
+}
+
+struct ActiveTaskObservation {
+    heartbeat: PathBuf,
+    scratch: PathBuf,
+    process_tree: HashSet<u32>,
+}
+
+fn wait_for_active_codex_task(
+    fixture: &Fixture,
+    normal: &BrokerEndpoint,
+    task_id: &str,
+    broker_pid: u32,
+    codex: &Path,
+    processes_before_task: &HashSet<u32>,
+    activation_timeout: Duration,
+) -> ActiveTaskObservation {
+    let deadline = Instant::now() + activation_timeout;
+    let heartbeat = fixture.workspace.join("broker-real-codex-heartbeat.txt");
+    let report_path = fixture.workspace.join("broker-real-codex-temp-report.json");
+    loop {
+        if let (Some(scratch), Ok(metadata)) =
+            (only_scratch(&fixture.workspace), fs::metadata(&heartbeat))
+        {
+            let report = fs::read(&report_path)
+                .ok()
+                .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok());
+            if report
+                .as_ref()
+                .is_some_and(|value| value["stage"] == "temp_checked")
+            {
+                let roots = newly_spawned_codex_root(broker_pid, codex, processes_before_task);
+                if !roots.is_empty() {
+                    assert_eq!(roots.len(), 1, "今回のBrokerが起動したCodex rootは一意");
+                    let process_tree = process_tree_ids(roots[0]);
+                    if process_tree.len() >= 2 {
+                        let before = metadata.len();
+                        thread::sleep(Duration::from_millis(250));
+                        let heartbeat_length = fs::metadata(&heartbeat)
+                            .expect("稼働中MxCの継続記録を取得")
+                            .len();
+                        assert!(
+                            heartbeat_length > before,
+                            "中断要求前に実MxC child heartbeatが継続"
+                        );
+                        let state =
+                            send_request(normal, "AgentTask状態", json!({"task_id":task_id}));
+                        assert_eq!(state["body"]["status"], "running", "{state}");
+                        return ActiveTaskObservation {
+                            heartbeat,
+                            scratch,
+                            process_tree,
+                        };
+                    }
+                }
+            }
+        }
+        assert!(
+            Instant::now() < deadline,
+            "active Codex/MxC Task検出期限超過"
+        );
+        thread::sleep(Duration::from_millis(50));
+    }
+}
+
+const E2E_DEADLINE_MS: u64 = 20_000;
+
+fn run_active_task_interruption_e2e(codex: PathBuf, deadline: bool) {
+    let mut fixture = if deadline {
+        Fixture::with_deadline(codex.clone(), E2E_DEADLINE_MS)
+    } else {
+        Fixture::new(codex.clone())
+    };
+    let normal = fixture.normal().clone();
+    let session = send_request(
+        &normal,
+        "対話開始",
+        json!({"実行系ID":RUNTIME_ID,"作業領域ID":WORKSPACE_ID}),
+    );
+    assert_eq!(session["status"], "accepted", "{session}");
+    let session_id = session["body"]["対話セッションID"]
+        .as_str()
+        .expect("Agentセッション識別子")
+        .to_owned();
+    let task = json!({
+        "agent_runtime_id": RUNTIME_ID,
+        "session_id": session_id,
+        "workspace_id": WORKSPACE_ID,
+        "instruction": TASK_INSTRUCTION,
+    });
+    let permission = json!({
+        "agent_runtime_id": RUNTIME_ID,
+        "session_id": session_id,
+        "workspace_id": WORKSPACE_ID,
+    });
+    let granted = send_request(
+        fixture.owner(),
+        "AgentTaskWorkspacePermissionGrant",
+        permission.clone(),
+    );
+    assert_eq!(granted["status"], "accepted", "{granted}");
+    let approved = send_request(fixture.owner(), "AgentTaskOwnerApprovalGrant", task.clone());
+    assert_eq!(approved["status"], "accepted", "{approved}");
+
+    let processes_before_task = process_ids();
+    let broker_pid = fixture.broker.as_ref().expect("Brokerプロセス").id();
+    let started = send_request(&normal, "AgentTask実行", task.clone());
+    assert_eq!(started["status"], "accepted", "{started}");
+    assert_eq!(started["body"]["status"], "running", "{started}");
+    let task_id = started["body"]["task_id"]
+        .as_str()
+        .expect("AgentTask識別子")
+        .to_owned();
+    let active = wait_for_active_codex_task(
+        &fixture,
+        &normal,
+        &task_id,
+        broker_pid,
+        &codex,
+        &processes_before_task,
+        Duration::from_millis(if deadline {
+            E2E_DEADLINE_MS - 5_000
+        } else {
+            50_000
+        }),
+    );
+
+    if !deadline {
+        let cancellation = send_request(&normal, "AgentTask取消", json!({"task_id":task_id}));
+        assert_eq!(cancellation["status"], "accepted", "{cancellation}");
+        assert_eq!(
+            cancellation["body"]["status"], "running",
+            "要求受理だけではprocess群の終了前にterminal化しない"
+        );
+    }
+
+    let expected_status = if deadline { "failed" } else { "cancelled" };
+    let expected_failure_class = if deadline { "期限超過" } else { "取消" };
+    let terminal_deadline = Instant::now()
+        + Duration::from_millis(if deadline {
+            E2E_DEADLINE_MS + 30_000
+        } else {
+            30_000
+        });
+    let terminal = loop {
+        let state = send_request(&normal, "AgentTask状態", json!({"task_id":task_id}));
+        if state["body"]["status"] != "running" {
+            break state;
+        }
+        assert!(
+            Instant::now() < terminal_deadline,
+            "AgentTask terminal期限超過"
+        );
+        thread::sleep(Duration::from_millis(100));
+    };
+    assert_eq!(terminal["body"]["status"], expected_status, "{terminal}");
+    assert!(terminal["body"].get("result_hash").is_none());
+    wait_for_process_tree_exit(&active.process_tree, Duration::from_secs(20));
+    let stopped_heartbeat_length = fs::metadata(&active.heartbeat)
+        .expect("process tree終了後のMxC heartbeat")
+        .len();
+    thread::sleep(Duration::from_millis(350));
+    assert_eq!(
+        fs::metadata(&active.heartbeat)
+            .expect("terminal後のMxC heartbeat")
+            .len(),
+        stopped_heartbeat_length,
+        "AgentTask terminal後に実MxC child heartbeatが停止"
+    );
+    assert!(
+        !active.scratch.exists(),
+        "terminal後にWorkspaceTaskScratchを回収"
+    );
+    assert!(
+        scratch_directories(&fixture.workspace)
+            .expect("Workspace scratch一覧")
+            .is_empty(),
+        "terminal後にBroker-owned scratch directoryが残らない"
+    );
+    assert!(
+        !fixture
+            .workspace
+            .join("broker-real-codex-marker.txt")
+            .exists(),
+        "中断Taskは完了markerを書かない"
+    );
+
+    let renewed_permission = send_request(
+        fixture.owner(),
+        "AgentTaskWorkspacePermissionGrant",
+        permission,
+    );
+    assert_eq!(
+        renewed_permission["status"], "accepted",
+        "{renewed_permission}"
+    );
+    let replay = send_request(&normal, "AgentTask実行", task);
+    assert_eq!(
+        replay["status"], "rejected",
+        "新しいWorkspace Permissionだけでは中断Taskの消費済みApprovalを再利用しない: {replay}"
+    );
+
+    fixture.stop_broker();
+    let evidence = fixture.finish_responses();
+    assert_eq!(
+        evidence["expected_request_shape"],
+        "tool_call_without_result"
+    );
+    assert_eq!(evidence["tool_call_sent"], true);
+    assert_eq!(evidence["tool_result_received"], false);
+    assert_eq!(evidence["workspace_marker_exists"], false);
+    assert_eq!(
+        evidence["workspace_boundary_fixtures_valid_after_task"],
+        true
+    );
+
+    let audit_text =
+        fs::read_to_string(fixture.store.join("audit.jsonl")).expect("中断Taskのfile-backed Audit");
+    assert!(!audit_text.contains(TASK_INSTRUCTION));
+    assert!(!audit_text.contains("synthetic-secret-content-never-returned"));
+    let (_, persisted) =
+        BrokerPersistentStore::open_or_create(&fixture.store, "active-task-interruption-verify")
+            .expect("中断後のAudit chain読戻し");
+    let terminal_event = persisted
+        .audit_log
+        .events()
+        .iter()
+        .find(|event| {
+            event.request_id == task_id
+                && event.reason.starts_with("AgentTask履歴:")
+                && event.reason.contains("\"stage\":\"terminal\"")
+        })
+        .expect("中断Task terminal Audit");
+    let terminal_record: Value = serde_json::from_str(
+        terminal_event
+            .reason
+            .strip_prefix("AgentTask履歴:")
+            .expect("Task履歴Audit prefix"),
+    )
+    .expect("terminal Task履歴Audit JSON");
+    assert_eq!(terminal_record["status"], expected_status);
+    assert_eq!(terminal_record["failure_class"], expected_failure_class);
+    if !deadline {
+        assert!(persisted.audit_log.events().iter().any(|event| {
+            event.operation.contains("取消要求") || event.reason.contains("取消要求")
+        }));
+    }
 }
 
 fn normalized_windows_path(path: &str) -> String {
@@ -432,9 +765,27 @@ fn terminate_codex_root(pid: u32, executable: &Path) {
 }
 
 #[test]
+#[ignore = "Windows上で認証済みBroker IPCから実Codex/MxC Taskを取消し、子孫停止とscratch回収を確認するときに実行する"]
+fn owner_cancellation_of_active_codex_task_stops_descendants_and_recovers_scratch() {
+    let codex = std::env::var_os("GUI_SHELL_CODEX_TASK_CRASH_E2E_CLI")
+        .map(PathBuf::from)
+        .expect("GUI_SHELL_CODEX_TASK_CRASH_E2E_CLIにCodex CLI絶対pathを設定");
+    run_active_task_interruption_e2e(codex, false);
+}
+
+#[test]
+#[ignore = "Windows上で実Codex/MxC Taskをdeadlineで停止し、子孫停止とscratch回収を確認するときに実行する"]
+fn deadline_of_active_codex_task_stops_descendants_and_recovers_scratch() {
+    let codex = std::env::var_os("GUI_SHELL_CODEX_TASK_CRASH_E2E_CLI")
+        .map(PathBuf::from)
+        .expect("GUI_SHELL_CODEX_TASK_CRASH_E2E_CLIにCodex CLI絶対pathを設定");
+    run_active_task_interruption_e2e(codex, true);
+}
+
+#[test]
 #[ignore = "Windows上でr2-e2e Broker processを強制終了し、実Codex/MxCの停止と再起動回復を確認するときに実行する"]
-fn broker_kill_during_active_codex_task_stops_descendants_recovers_scratch_and_does_not_reuse_approval(
-) {
+fn broker_kill_during_active_codex_task_stops_descendants_recovers_scratch_and_does_not_reuse_approval()
+ {
     let codex = std::env::var_os("GUI_SHELL_CODEX_TASK_CRASH_E2E_CLI")
         .map(PathBuf::from)
         .expect("GUI_SHELL_CODEX_TASK_CRASH_E2E_CLIにCodex CLI絶対pathを設定");

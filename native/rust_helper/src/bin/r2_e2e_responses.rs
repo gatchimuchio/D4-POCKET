@@ -111,7 +111,11 @@ fn main() -> ExitCode {
         eprintln!("余分な引数を受理しない");
         return ExitCode::from(2);
     }
-    let server = match fixture::CodexLoopbackResponses::start_on(workspace, port) {
+    let server = match if expected_request_shape == ExpectedRequestShape::ToolCallWithoutResult {
+        fixture::CodexLoopbackResponses::start_on_with_extended_tool_wait(workspace, port)
+    } else {
+        fixture::CodexLoopbackResponses::start_on(workspace, port)
+    } {
         Ok(server) => server,
         Err(_) => {
             eprintln!("localhost偽Responses APIを起動できない");
@@ -159,8 +163,8 @@ fn main() -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::{
-        evidence_matches_expected_request_shape, workspace_boundary_fixtures_valid,
-        ExpectedRequestShape,
+        ExpectedRequestShape, evidence_matches_expected_request_shape,
+        workspace_boundary_fixtures_valid,
     };
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};

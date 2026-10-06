@@ -1,4 +1,4 @@
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{Shutdown, TcpListener, TcpStream};
 use std::path::Path;
@@ -65,7 +65,15 @@ impl CodexLoopbackResponses {
     }
 
     pub(crate) fn start_on(workspace: &Path, port: u16) -> std::io::Result<Self> {
-        Self::start_with_probe(workspace, port, None)
+        Self::start_with_probe(workspace, port, None, false)
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn start_on_with_extended_tool_wait(
+        workspace: &Path,
+        port: u16,
+    ) -> std::io::Result<Self> {
+        Self::start_with_probe(workspace, port, None, true)
     }
 
     pub(crate) fn start_requiring_authorization(
@@ -73,13 +81,19 @@ impl CodexLoopbackResponses {
         authorization_header: &str,
         secret_canary: &str,
     ) -> std::io::Result<Self> {
-        Self::start_with_probe(workspace, 0, Some((authorization_header, secret_canary)))
+        Self::start_with_probe(
+            workspace,
+            0,
+            Some((authorization_header, secret_canary)),
+            false,
+        )
     }
 
     fn start_with_probe(
         workspace: &Path,
         port: u16,
         authentication: Option<(&str, &str)>,
+        extended_tool_wait: bool,
     ) -> std::io::Result<Self> {
         let listener = TcpListener::bind(("127.0.0.1", port))?;
         listener.set_nonblocking(true)?;
@@ -117,7 +131,7 @@ impl CodexLoopbackResponses {
             blocked_connect_other: AtomicUsize::new(0),
             blocked_non_local_requests: AtomicUsize::new(0),
             blocked_unhandled_local_requests: AtomicUsize::new(0),
-            command: Mutex::new(synthetic_workspace_probe()),
+            command: Mutex::new(synthetic_workspace_probe(extended_tool_wait)),
             workspace: workspace_text,
             expected_authorization_hash: authentication
                 .map(|(bearer, _)| crate::audit_hash::sha256_tagged(bearer.as_bytes())),
@@ -373,8 +387,15 @@ impl Drop for CodexLoopbackResponses {
 }
 
 // TEMP書込み結果は個別に記録する。許可scopeを確認した後の独立したWorkspace／secret境界試験は、TEMP失敗だけでは省略しない。
-fn synthetic_workspace_probe() -> String {
-    synthetic_workspace_probe_script()
+fn synthetic_workspace_probe(extended_tool_wait: bool) -> String {
+    let script = synthetic_workspace_probe_script();
+    if !extended_tool_wait {
+        return script;
+    }
+
+    const SHORT_WAIT: &str = "$waitLimit=1200; $extendedWaitMarker=Join-Path $workspace 'broker-real-codex-task-extended-supervision'; if(Test-Path -LiteralPath $extendedWaitMarker -PathType Leaf){$waitLimit=40000}; ";
+    assert!(script.contains(SHORT_WAIT), "tool wait fixtureの既定script");
+    script.replacen(SHORT_WAIT, "$waitLimit=40000; ", 1)
 }
 
 fn synthetic_workspace_probe_script() -> String {
@@ -393,10 +414,10 @@ fn synthetic_workspace_probe_script() -> String {
         "if($tempWrite -eq 'failed'){Write-Output ('D4P_R2_TEMP_ERROR_KIND_'+$tempErrorFingerprint)}; ",
         "Write-Output ('D4P_R2_TEMP_WRITE_'+$tempWrite); Write-Output ('D4P_R2_TEMP_STEP_'+$tempStep); ",
         "$tempState=@{stage='temp_checked';temp=$env:TEMP;tmp=$env:TMP;marker_name=$tempMarkerName;temp_matches_workspace_scratch=$tempMatches;tmp_matches_workspace_scratch=$tmpMatches;temp_scope=$tempScope;temp_write=$tempWrite;temp_step=$tempStep;temp_directory_create=$tempDirectoryCreate;temp_retry_write=$tempRetryWrite}|ConvertTo-Json -Compress; Set-Content -LiteralPath $tempReport -Value $tempState -NoNewline -ErrorAction Stop; ",
-        "$continue=Join-Path $workspace 'broker-real-codex-task-continue'; $heartbeat=Join-Path $workspace 'broker-real-codex-heartbeat.txt'; [IO.File]::WriteAllText($heartbeat,'started'); $continued=$false; ",
+        "$continue=Join-Path $workspace 'broker-real-codex-task-continue'; $heartbeat=Join-Path $workspace 'broker-real-codex-heartbeat.txt'; Set-Content -LiteralPath $heartbeat -Value 'started' -NoNewline; $continued=$false; ",
         // 通常fixtureは短時間に保ち、明示した試験markerがある場合だけBrokerの900秒期限を越えて待機する。
         "$waitLimit=1200; $extendedWaitMarker=Join-Path $workspace 'broker-real-codex-task-extended-supervision'; if(Test-Path -LiteralPath $extendedWaitMarker -PathType Leaf){$waitLimit=40000}; ",
-        "for($attempt=0;$attempt -lt $waitLimit;$attempt++){if(Test-Path -LiteralPath $continue -PathType Leaf){$continued=$true;break}; [IO.File]::AppendAllText($heartbeat,'x'); Start-Sleep -Milliseconds 25}; if(-not $continued){exit 44}; ",
+        "for($attempt=0;$attempt -lt $waitLimit;$attempt++){if(Test-Path -LiteralPath $continue -PathType Leaf){$continued=$true;break}; Add-Content -LiteralPath $heartbeat -Value 'x' -NoNewline; Start-Sleep -Milliseconds 25}; if(-not $continued){exit 44}; ",
         "$secretDenied=$false; try { Get-Content -LiteralPath (Join-Path $workspace 'private\\credential-backup.txt') -Raw -ErrorAction Stop | Out-Null } catch { $secretDenied=$true }; ",
         "if (-not $secretDenied) { exit 41 }; $outside=Split-Path -Parent $workspace; ",
         // AppContainerでは親directoryの可視性自体が拒否され得る。fixtureの存在はhost側で確認し、childはreadを直接試す。
@@ -847,9 +868,8 @@ fn handle_request(mut stream: TcpStream, port: u16, state: &State) {
                     } else if name.eq_ignore_ascii_case("host") {
                         host = value.trim().to_ascii_lowercase();
                     } else if name.eq_ignore_ascii_case("authorization") {
-                        authorization_hash = Some(crate::audit_hash::sha256_tagged(
-                            value.trim().as_bytes(),
-                        ));
+                        authorization_hash =
+                            Some(crate::audit_hash::sha256_tagged(value.trim().as_bytes()));
                     }
                 }
             }
@@ -878,7 +898,9 @@ fn handle_request(mut stream: TcpStream, port: u16, state: &State) {
         if authorization_hash.as_deref() == Some(expected) {
             state.authorized_requests.fetch_add(1, Ordering::SeqCst);
         } else {
-            state.authorization_rejections.fetch_add(1, Ordering::SeqCst);
+            state
+                .authorization_rejections
+                .fetch_add(1, Ordering::SeqCst);
             let _ = respond(&mut stream, 401, "application/json", b"{}");
             return;
         }
@@ -917,9 +939,10 @@ fn handle_request(mut stream: TcpStream, port: u16, state: &State) {
         state.credential_canary_hash.as_deref(),
         (state.credential_canary_length > 0).then_some(state.credential_canary_length),
     ) {
-        if body.windows(canary_length).any(|window| {
-            crate::audit_hash::sha256_tagged(window) == expected
-        }) {
+        if body
+            .windows(canary_length)
+            .any(|window| crate::audit_hash::sha256_tagged(window) == expected)
+        {
             state
                 .credential_canary_observations
                 .fetch_add(1, Ordering::SeqCst);
@@ -1274,7 +1297,7 @@ mod tests {
 
     #[test]
     fn synthetic_probe_path_construction_uses_shell_compatible_path_cmdlets() {
-        let command = synthetic_workspace_probe();
+        let command = synthetic_workspace_probe(false);
         let probe = synthetic_workspace_probe_script();
         assert_eq!(command, probe);
         assert!(command.len() < 5_800, "MxC commandを実行可能長内に保つ");
@@ -1458,7 +1481,9 @@ mod tests {
         assert!(!diagnostic.to_string().contains("C:\\\\Users"));
         assert!(!diagnostic.to_string().contains("private.txt"));
 
-        let temp_output = json!("D4P_R2_TEMP_STEP_temp_cleanup\nD4P_R2_TEMP_SCOPE_mxc_appcontainer\nD4P_R2_TEMP_WRITE_failed\nD4P_R2_TEMP_DIRECTORY_EXISTS_AFTER_WRITE_false\nD4P_R2_TEMP_DIRECTORY_CREATE_created\nD4P_R2_TEMP_RETRY_WRITE_passed\nD4P_R2_TEMP_CLEANUP_marker_and_created_directory_removed\nD4P_R2_TEMP_ERROR_KIND_access_denied\nD4P_R2_TEMP_INITIAL_WRITE_ERROR_io_failure\nC:\\Users\\example\\private synthetic-secret-content");
+        let temp_output = json!(
+            "D4P_R2_TEMP_STEP_temp_cleanup\nD4P_R2_TEMP_SCOPE_mxc_appcontainer\nD4P_R2_TEMP_WRITE_failed\nD4P_R2_TEMP_DIRECTORY_EXISTS_AFTER_WRITE_false\nD4P_R2_TEMP_DIRECTORY_CREATE_created\nD4P_R2_TEMP_RETRY_WRITE_passed\nD4P_R2_TEMP_CLEANUP_marker_and_created_directory_removed\nD4P_R2_TEMP_ERROR_KIND_access_denied\nD4P_R2_TEMP_INITIAL_WRITE_ERROR_io_failure\nC:\\Users\\example\\private synthetic-secret-content"
+        );
         let temp_diagnostic = safe_tool_output_diagnostic(&temp_output);
         assert_eq!(temp_diagnostic["temp_step"], "temp_cleanup");
         assert_eq!(temp_diagnostic["temp_scope"], "mxc_appcontainer");
@@ -1475,9 +1500,11 @@ mod tests {
         );
         assert_eq!(temp_diagnostic["temp_error_fingerprint"], "access_denied");
         assert_eq!(temp_diagnostic["temp_initial_write_error"], "io_failure");
-        assert!(!temp_diagnostic
-            .to_string()
-            .contains("synthetic-secret-content"));
+        assert!(
+            !temp_diagnostic
+                .to_string()
+                .contains("synthetic-secret-content")
+        );
         assert!(!temp_diagnostic.to_string().contains("C:\\\\Users"));
 
         let launch_failure = safe_tool_output_diagnostic(&json!({
@@ -1485,9 +1512,11 @@ mod tests {
             "exit_code": -2147450747,
         }));
         assert_eq!(launch_failure["error_category"], "hostfxr起動失敗");
-        assert!(!launch_failure
-            .to_string()
-            .contains("PowerShell host failed"));
+        assert!(
+            !launch_failure
+                .to_string()
+                .contains("PowerShell host failed")
+        );
     }
 
     #[test]
