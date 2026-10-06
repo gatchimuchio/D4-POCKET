@@ -31,6 +31,9 @@ pub struct BrokerServerConfig {
     pub mobile_bind: Option<String>,
     pub workspace_config: Option<PathBuf>,
     pub protected_store_dir: Option<PathBuf>,
+    /// local-only r2-e2eのTask Permission／Approval fixture。通常buildには含めない。
+    #[cfg(feature = "r2-e2e")]
+    pub r2_e2e_synthetic_owner_confirmation: bool,
     /// Rust Desktop起動器が固定runtime隣接pathを渡す製品内ProtectedStore。
     /// owner起動設定の任意ProtectedStoreとは別経路で、資格・権限を生成しない。
     pub desktop_protected_store_dir: Option<PathBuf>,
@@ -56,6 +59,8 @@ impl BrokerServerConfig {
             mobile_bind: None,
             workspace_config: None,
             protected_store_dir: None,
+            #[cfg(feature = "r2-e2e")]
+            r2_e2e_synthetic_owner_confirmation: false,
             desktop_protected_store_dir: None,
             desktop_package_layout_verified: false,
             desktop_install_path_verified: false,
@@ -577,6 +582,15 @@ fn handle_stream(
         Err(IpcLineError::Io(message)) => return Err(BrokerServerError::new(message)),
     };
 
+    #[cfg(feature = "r2-e2e")]
+    let response = if owner && config.r2_e2e_synthetic_owner_confirmation {
+        broker.r2_e2e_synthetic_owner_operation_json(&request_json)
+    } else if owner {
+        broker.owner要求処理(&request_json)
+    } else {
+        broker.handle_json(&request_json)
+    };
+    #[cfg(not(feature = "r2-e2e"))]
     let response = if owner {
         broker.owner要求処理(&request_json)
     } else {

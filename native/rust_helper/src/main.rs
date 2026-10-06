@@ -121,6 +121,8 @@ fn maybe_run_broker_server() -> Option<i32> {
     let mut mobile_bind = None;
     let mut workspace_config = None;
     let mut protected_store_dir = None;
+    #[cfg(feature = "r2-e2e")]
+    let mut r2_e2e_synthetic_owner_confirmation = false;
 
     while let Some(argument) = args.next() {
         match argument.as_str() {
@@ -165,6 +167,14 @@ fn maybe_run_broker_server() -> Option<i32> {
                     return Some(2);
                 }
                 development_lifecycle_fixture_enabled = true;
+            }
+            #[cfg(feature = "r2-e2e")]
+            "--r2-e2e-synthetic-owner-confirmation" => {
+                if r2_e2e_synthetic_owner_confirmation {
+                    eprintln!("r2-e2e synthetic Owner fixtureの重複指定を拒否");
+                    return Some(2);
+                }
+                r2_e2e_synthetic_owner_confirmation = true;
             }
             "--store-dir" => {
                 let Some(value) = args.next() else {
@@ -231,6 +241,18 @@ fn maybe_run_broker_server() -> Option<i32> {
     config.mobile_bind = mobile_bind;
     config.workspace_config = workspace_config;
     config.protected_store_dir = protected_store_dir;
+    #[cfg(feature = "r2-e2e")]
+    {
+        if r2_e2e_synthetic_owner_confirmation
+            && (config.owner_session_file.is_none()
+                || config.workspace_config.is_none()
+                || config.codex_runtimes.is_empty())
+        {
+            eprintln!("r2-e2e synthetic Owner fixtureにはOwner file、Workspace設定、Codex Runtimeが必要");
+            return Some(2);
+        }
+        config.r2_e2e_synthetic_owner_confirmation = r2_e2e_synthetic_owner_confirmation;
+    }
 
     match run_loopback_server(config) {
         Ok(()) => Some(0),

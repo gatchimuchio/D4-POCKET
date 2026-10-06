@@ -393,10 +393,10 @@ fn synthetic_workspace_probe_script() -> String {
         "if($tempWrite -eq 'failed'){Write-Output ('D4P_R2_TEMP_ERROR_KIND_'+$tempErrorFingerprint)}; ",
         "Write-Output ('D4P_R2_TEMP_WRITE_'+$tempWrite); Write-Output ('D4P_R2_TEMP_STEP_'+$tempStep); ",
         "$tempState=@{stage='temp_checked';temp=$env:TEMP;tmp=$env:TMP;marker_name=$tempMarkerName;temp_matches_workspace_scratch=$tempMatches;tmp_matches_workspace_scratch=$tmpMatches;temp_scope=$tempScope;temp_write=$tempWrite;temp_step=$tempStep;temp_directory_create=$tempDirectoryCreate;temp_retry_write=$tempRetryWrite}|ConvertTo-Json -Compress; Set-Content -LiteralPath $tempReport -Value $tempState -NoNewline -ErrorAction Stop; ",
-        "$continue=Join-Path $workspace 'broker-real-codex-task-continue'; $continued=$false; ",
+        "$continue=Join-Path $workspace 'broker-real-codex-task-continue'; $heartbeat=Join-Path $workspace 'broker-real-codex-heartbeat.txt'; [IO.File]::WriteAllText($heartbeat,'started'); $continued=$false; ",
         // 通常fixtureは短時間に保ち、明示した試験markerがある場合だけBrokerの900秒期限を越えて待機する。
         "$waitLimit=1200; $extendedWaitMarker=Join-Path $workspace 'broker-real-codex-task-extended-supervision'; if(Test-Path -LiteralPath $extendedWaitMarker -PathType Leaf){$waitLimit=40000}; ",
-        "for($attempt=0;$attempt -lt $waitLimit;$attempt++){if(Test-Path -LiteralPath $continue -PathType Leaf){$continued=$true;break}; Start-Sleep -Milliseconds 25}; if(-not $continued){exit 44}; ",
+        "for($attempt=0;$attempt -lt $waitLimit;$attempt++){if(Test-Path -LiteralPath $continue -PathType Leaf){$continued=$true;break}; [IO.File]::AppendAllText($heartbeat,'x'); Start-Sleep -Milliseconds 25}; if(-not $continued){exit 44}; ",
         "$secretDenied=$false; try { Get-Content -LiteralPath (Join-Path $workspace 'private\\credential-backup.txt') -Raw -ErrorAction Stop | Out-Null } catch { $secretDenied=$true }; ",
         "if (-not $secretDenied) { exit 41 }; $outside=Split-Path -Parent $workspace; ",
         // AppContainerでは親directoryの可視性自体が拒否され得る。fixtureの存在はhost側で確認し、childはreadを直接試す。

@@ -385,6 +385,8 @@ pub(super) fn export(
     };
     let confirmation_reason = match owner_confirmation {
         OwnerConfirmationSource::DesktopNativeConfirmation => "OwnerがRust Desktop起動器のネイティブ確認でpayload hashを確認して明示許可。新規Manifest fileを固定Export directoryに作成し、file hashをAuditEventへ結合。実行可能App、binary pruning、build、installer、署名は未実行。Credential、Permission、Approval、Audit chainは継承しない",
+        #[cfg(feature = "r2-e2e")]
+        OwnerConfirmationSource::R2E2ESyntheticOwner => "Task専用synthetic Owner fixtureは書出しを許可しない",
         OwnerConfirmationSource::OwnerCredential => "Owner制御資格による書出し操作を受理。新規Manifest fileを固定Export directoryに作成し、file hashをAuditEventへ結合。実行可能App、binary pruning、build、installer、署名は未実行。Credential、Permission、Approval、Audit chainは継承しない",
         OwnerConfirmationSource::NotOwner => "Owner制御がない書出し要求を拒否すべき経路へ到達した",
     };

@@ -1188,7 +1188,7 @@
     },
     {
       "path": "docs/FINAL_QA_QUEUE.md",
-      "sha256": "af97c6f12fe0dd2e58bd496f515c3c91e5cab6d290fcfd0d70b98b3ee08746d6"
+      "sha256": "cba08c4357a10ce45c27f0a98621233b9787273aac15ddf4384f4f74defb8a65"
     },
     {
       "path": "docs/FIRST_RUN.md",
@@ -1244,7 +1244,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "29b4753e43067dd2197d118681962c975502b0528f683f1af0888620a1bcf7c4"
+      "sha256": "3b42d01238dc4a0c37a6bba82871259f8d44563e660ab20a844a14ad37005b19"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -3192,7 +3192,7 @@
     },
     {
       "path": "native/rust_helper/src/bin/r2_e2e_responses.rs",
-      "sha256": "74d2ba955d33038a852b47fd50679f728a4bcc8a2b843b70583394f13ec2a7f2"
+      "sha256": "6f8d8de82f63ad0c7527c9ad3fa3dec74093cb456832c3f76c9bb66f5fe13f6a"
     },
     {
       "path": "native/rust_helper/src/broker/a2a_center.rs",
@@ -3280,7 +3280,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/export_center.rs",
-      "sha256": "9467d1abec04fa6c30b3049c3efed702e716f4f9d04b15333a4fc48e45c60c7e"
+      "sha256": "69f877723db30537a8f7ef7476e68819330702248ac0a10f3d931a58cf85d329"
     },
     {
       "path": "native/rust_helper/src/broker/history_access.rs",
@@ -3296,7 +3296,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/ipc_server.rs",
-      "sha256": "f845ceb0cb15d9c453d0450e08dfbceef2d7837b0bbb8de13e3e62843f384dd6"
+      "sha256": "eba080435fbd82591900269e777a482527fe543db40379fb0132563f0f3a2620"
     },
     {
       "path": "native/rust_helper/src/broker/json_input.rs",
@@ -3328,7 +3328,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "18b4eefaf1ba0d14181eca152f3bddcd6e9796690faa02ec83c7dfe0a461280f"
+      "sha256": "2955a80ab0ba0e1a4dfd05eff559d13827480b0333fbf2209d71b2c55fdc4756"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -3336,7 +3336,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/replay.rs",
-      "sha256": "b25c28ed8703d66a912b3a17011ee83f02c6195bfb6211cecded671c396139eb"
+      "sha256": "0f28d5ad362add15fc9302a2dc0d784342a2df5a23273066ef542395a3dba5e8"
     },
     {
       "path": "native/rust_helper/src/broker/runtime_lifecycle.rs",
@@ -3404,7 +3404,7 @@
     },
     {
       "path": "native/rust_helper/src/main.rs",
-      "sha256": "cf3d3715a12c9077b0f6e7c936e430e2e2cd2e4417062f4d4b9e552b26969917"
+      "sha256": "80b61b3a68199f536d10f9267ba29621721258f99a562541c8d7641bbaf02ff8"
     },
     {
       "path": "native/rust_helper/src/mcp.rs",
@@ -3484,7 +3484,7 @@
     },
     {
       "path": "native/rust_helper/tests/support/codex_loopback_responses.rs",
-      "sha256": "82533341ee280d22c8e13dcf0f33a5d8cac117c65052c91fc7f1b1d43bfe147a"
+      "sha256": "f95ecd804e8101cad8dfb5d4258fe76ab27588fefa77e197c72171592ccb2f2d"
     },
     {
       "path": "native/rust_helper/tests/unit/agent_task_fixture_fs.rs",

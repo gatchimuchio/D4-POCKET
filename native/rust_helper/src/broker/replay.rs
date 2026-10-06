@@ -134,6 +134,7 @@ impl Broker {
             BrokerOperation::対話開始,
             &start,
             false,
+            EVIDENCE_SOURCE_INTERNAL_STATE,
             &sha256_tagged(start.to_string().as_bytes()),
         );
         if started.status != BrokerStatus::Accepted {
@@ -150,6 +151,7 @@ impl Broker {
             BrokerOperation::対話送信,
             &send,
             false,
+            EVIDENCE_SOURCE_INTERNAL_STATE,
             &sha256_tagged(send.to_string().as_bytes()),
         );
         if created.status != BrokerStatus::Accepted {

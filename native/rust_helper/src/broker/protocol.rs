@@ -769,6 +769,36 @@ pub(crate) enum OwnerConfirmationSource {
     NotOwner,
     OwnerCredential,
     DesktopNativeConfirmation,
+    #[cfg(feature = "r2-e2e")]
+    R2E2ESyntheticOwner,
+}
+
+impl OwnerConfirmationSource {
+    fn permits_agent_task_owner_operation(
+        self,
+        _operation: Option<&BrokerOperation>,
+    ) -> bool {
+        match self {
+            Self::DesktopNativeConfirmation => true,
+            #[cfg(feature = "r2-e2e")]
+            Self::R2E2ESyntheticOwner => matches!(
+                _operation,
+                Some(
+                    BrokerOperation::AgentTaskWorkspacePermissionGrant
+                        | BrokerOperation::AgentTaskOwnerApprovalGrant
+                )
+            ),
+            Self::NotOwner | Self::OwnerCredential => false,
+        }
+    }
+
+    fn audit_evidence_source(self) -> &'static str {
+        #[cfg(feature = "r2-e2e")]
+        if self == Self::R2E2ESyntheticOwner {
+            return "FIXTURE";
+        }
+        EVIDENCE_SOURCE_INTERNAL_STATE
+    }
 }
 
 impl BrokerRequestEnvelope {
@@ -1726,6 +1756,70 @@ impl Broker {
         }
     }
 
+    /// r2-e2eだけで使用するTask Permission／Approval fixture。
+    /// 合成Ownerは固定二操作以外へ権限を広げず、監査証拠もFIXTUREに固定する。
+    #[cfg(feature = "r2-e2e")]
+    pub(crate) fn r2_e2e_synthetic_owner_operation_json(
+        &mut self,
+        input: &str,
+    ) -> BrokerResponse {
+        let envelope = match BrokerRequestEnvelope::from_json_str(input) {
+            Ok(envelope) => envelope,
+            Err(_) => {
+                return self.reject_with_payload_hash(
+                    "r2-e2e-synthetic-owner-request",
+                    "unknown",
+                    "r2_e2e_synthetic_owner_request_invalid",
+                    "r2-e2e synthetic Owner fixture要求が不正",
+                    true,
+                    &sha256_tagged(input.as_bytes()),
+                )
+            }
+        };
+        let request_id = envelope
+            .request_id
+            .as_deref()
+            .unwrap_or("r2-e2e-synthetic-owner-request")
+            .to_owned();
+        let operation = envelope
+            .operation
+            .as_ref()
+            .map(BrokerOperation::as_str)
+            .unwrap_or("unknown")
+            .to_owned();
+        let payload_hash = envelope.payload_hash.as_deref().unwrap_or("unknown").to_owned();
+        let operation_is_allowlisted = matches!(
+            envelope.operation.as_ref(),
+            Some(
+                BrokerOperation::AgentTaskWorkspacePermissionGrant
+                    | BrokerOperation::AgentTaskOwnerApprovalGrant
+            )
+        );
+        let metadata_is_fixture = envelope.metadata.len() == 1
+            && envelope.metadata[0].key == "client"
+            && envelope.metadata[0].value == "r2_e2e_synthetic_owner";
+        if !operation_is_allowlisted
+            || envelope.session_id.as_deref() != Some(self.session_id.as_str())
+            || !metadata_is_fixture
+        {
+            return self.reject_with_payload_hash(
+                &request_id,
+                &operation,
+                "r2_e2e_synthetic_owner_request_invalid",
+                "r2-e2e synthetic Owner fixtureの固定Task allowlist外要求を拒否",
+                true,
+                &payload_hash,
+            );
+        }
+        self.処理_with_export_confirmation(
+            envelope,
+            true,
+            OwnerConfirmationSource::R2E2ESyntheticOwner,
+            None,
+            None,
+        )
+    }
+
     pub(crate) fn update_download_tick(&mut self) {
         super::update_center::poll_download_completion(self);
     }
@@ -1959,7 +2053,9 @@ impl Broker {
             || envelope.operation == Some(BrokerOperation::MCPTool実行)
             || envelope.operation == Some(BrokerOperation::A2A接続)
         {
-            if export_confirmation != OwnerConfirmationSource::DesktopNativeConfirmation {
+            if !export_confirmation
+                .permits_agent_task_owner_operation(envelope.operation.as_ref())
+            {
                 return self.reject_with_payload_hash(
                     &request_id,
                     &operation,
@@ -2451,6 +2547,7 @@ impl Broker {
                 operation,
                 envelope.payload.as_ref().unwrap_or(&Value::Null),
                 owner,
+                export_confirmation.audit_evidence_source(),
                 &payload_hash,
             ),
             operation @ (BrokerOperation::対話内容承認
@@ -3378,7 +3475,14 @@ impl Broker {
                             let operation: BrokerOperation =
                                 serde_json::from_value(Value::String(op.into()))
                                     .map_err(|_| "操作不正")?;
-                            self.対話要求処理(id, operation, &r.内容, false, &hash)
+                            self.対話要求処理(
+                                id,
+                                operation,
+                                &r.内容,
+                                false,
+                                EVIDENCE_SOURCE_INTERNAL_STATE,
+                                &hash,
+                            )
                         }
                     };
                     if response.status != BrokerStatus::Accepted {
@@ -4331,6 +4435,7 @@ impl Broker {
         operation: BrokerOperation,
         payload: &Value,
         owner: bool,
+        audit_evidence_source: &str,
         payload_hash: &str,
     ) -> BrokerResponse {
         if !self.state_store.persistence_ready() {
@@ -4379,7 +4484,7 @@ impl Broker {
             operation.as_str(),
             "received",
             "対話操作を受信",
-            EVIDENCE_SOURCE_INTERNAL_STATE,
+            audit_evidence_source,
             payload_hash,
         );
         let mut last_event = match initial {
@@ -4434,14 +4539,19 @@ impl Broker {
         let scratch_journal = self.agent_task_scratch.clone();
         let broker = std::cell::RefCell::new(&mut *self);
         let mut audit = |reason: &str, id: &str, hash: &str| {
+            let audit_reason = if audit_evidence_source == "FIXTURE" {
+                reason.replace("native Owner確認", "synthetic Owner fixture")
+            } else {
+                reason.to_owned()
+            };
             let event = broker
                 .borrow_mut()
                 .append_audit(
                     id,
                     operation.as_str(),
                     "recorded",
-                    reason,
-                    EVIDENCE_SOURCE_INTERNAL_STATE,
+                    &audit_reason,
+                    audit_evidence_source,
                     hash,
                 )
                 .map_err(|_| 対話失敗::監査失敗)?;
@@ -4492,7 +4602,7 @@ impl Broker {
                 request_id: request_id.into(),
                 operation: operation.as_str().into(),
                 status: BrokerStatus::Accepted,
-                evidence_source: EVIDENCE_SOURCE_INTERNAL_STATE.into(),
+                evidence_source: audit_evidence_source.into(),
                 audit_event_id: last_event,
                 error: None,
                 health: None,

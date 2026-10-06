@@ -2,6 +2,10 @@
 #[path = "../../tests/support/codex_loopback_responses.rs"]
 mod fixture;
 
+mod audit_hash {
+    pub(crate) use gui_shell_rust_helper::audit_hash::*;
+}
+
 use serde_json::json;
 use std::fs;
 use std::io::{self, BufRead, Write};
