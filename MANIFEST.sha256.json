@@ -1512,11 +1512,11 @@
     },
     {
       "path": "docs/specs/windows-desktop-launcher.md",
-      "sha256": "8272a5ce5eac7779889b79d815dab1fa2e3b609847a2ce431fa483730480ef23"
+      "sha256": "8ec13ff403de986e078e5d90cffe6e0692c96e6b3eb921e7ad547eec30a6d555"
     },
     {
       "path": "docs/specs/windows-product-package.md",
-      "sha256": "6c8ea0234120d1d946b019feb4775f37585c75eb6ebfce996db92da4bf4d62f9"
+      "sha256": "fe986229a8881013f5d5254036665fa3b4e76cee428853a86efbf8bf4cb486f7"
     },
     {
       "path": "docs/specs/windows-protection.md",

@@ -1,6 +1,6 @@
 # Windows Desktop起動管理
 
-状態: Desktop起動基盤の責任契約。P11有効版切替とStart Menu shortcut登録はBroker fixtureへ接続済みで、installed product evidenceではない。
+状態: Desktop起動基盤の責任契約。P11有効版切替、Start Menu shortcut登録、Broker記録の直前版RollbackはBroker fixtureへ接続済みで、installed product evidenceではない。
 
 ## 1. 目的と範囲
 
@@ -36,7 +36,7 @@ broker/gui_shell_rust_helper.exe
 
 製品別起動器binaryがKnown Folder由来の固定root直下にある場合だけ、起動器は`active_version.json`をBootstrapper記録として読み、同一App ID／Audit Store ID、製品版から導出した固定`versions/<version>-<package hash>`、version-local launcherとProduct Manifestのhash、通常package layoutを確認する。path入力やcommand引数は受け付けず、記録・directory・fileをno-followで確認し、hash不一致、reparse、未知field、重複JSON、必要file欠損はfail-closedとする。portable bundleとversion-local起動器は従来どおりsibling配置を使う。
 
-Bootstrapperは環境をOS実行allowlistに絞り、Known Folder APIで得た`LOCALAPPDATA`を明示して、固定version-local起動器だけを起動する。recordは実行権限や配布元trustを生成しない。version-local起動器が既存Rust Brokerを起動し、通常のBroker lifecycle／Audit経路へ進む。有効版recordの生成・切替はstage操作と別のBroker／native Owner操作であり、stage操作のApprovalを流用しない。Broker fixtureはrecord writer、未配置時のroot Bootstrapper配置、atomic record replace、および固定root Bootstrapperを指すStart Menu shortcutのcreate-only登録まで接続した。同targetへの再実行と既存別targetとの競合非上書きを検証済み。installed productでの次回起動、通常Installer経路、Start Menuを含むinstalled productの`LIVE_RUNTIME`は未成立である。
+Bootstrapperは環境をOS実行allowlistに絞り、Known Folder APIで得た`LOCALAPPDATA`を明示して、固定version-local起動器だけを起動する。recordは実行権限や配布元trustを生成しない。version-local起動器が既存Rust Brokerを起動し、通常のBroker lifecycle／Audit経路へ進む。有効版recordの生成・切替はstage操作と別のBroker／native Owner操作であり、stage操作のApprovalを流用しない。Broker fixtureはrecord writer、未配置時のroot Bootstrapper配置、atomic record replace、および固定root Bootstrapperを指すStart Menu shortcutのcreate-only登録まで接続した。同targetへの再実行と既存別targetとの競合非上書きを検証済み。直前版Rollbackも`docs/specs/update-center.md`に定義する独立Broker／native Owner操作としてfixture検証済みである。installed productでの次回起動、通常Installer経路、Start Menuを含むinstalled productの`LIVE_RUNTIME`は未成立である。
 
 Flutterは`gui_shell/broker` MethodChannelで要求JSONだけをWindows Runnerへ渡し、Rust起動器が当該Flutter child PIDを照合したPID照合済み名前付きpipe経由で既存の認証付きloopback Brokerへrelayする。Dartからのendpoint file、secret、Socket、networkへの直接アクセスやfallbackはない。別bridge、FFI、privileged IPC、任意command、任意executable、Flutterからのprocess管理を追加しない。Brokerは権限を判断し、起動器はprocess lifecycleと境界付きrelayを管理する。
 

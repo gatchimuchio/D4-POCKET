@@ -1,6 +1,6 @@
 # Windows製品Package
 
-状態: P11のpackage format／reader、Broker統治の未起動version staging、および独立した有効版record／Start Menu shortcut切替fixture経路。Installer、installed next-launch、Rollback、正式配布の成立を意味しない。
+状態: P11のpackage format／reader、Broker統治の未起動version staging、および独立した有効版record／Start Menu shortcut切替fixture経路。Broker記録の直前版Rollbackも別のfixture経路で成立済み。本書の範囲はInstaller、installed next-launch／Rollback、正式配布の成立を意味しない。
 
 ## 1. 責任境界
 
@@ -18,7 +18,7 @@ package reader自体はBrokerの署名検証、Owner確認、Permission、Approv
 
 導入・更新のversion stagingは既存Brokerだけが実行する。通常IPC、Owner資格のみの要求、Flutter／manifest／package metadataは導入権限を生成できず、native Owner確認がない要求は拒否する。native確認対象は現在trustで検証された候補の版、channel、package hash／byte長、App ID、Audit Store ID、Known Folder由来の固定導入先であり、Brokerが実行直前に候補・identity・destinationを再照合する。Brokerはdurable Audit storeが利用可能な場合だけintentを先に確定し、その後でLocalAppData配下にcapability directoryを作成し、packageを展開する。
 
-本consumerが行うのはcontent-addressedな未起動version directoryの作成だけである。Start Menu変更、active version選択、process起動、旧version削除、rollback、Uninstaller、Repair UIは行わない。process crash／電源断の後に同じpackageをOwner確認付きで再適用すると、既存fileがpackage byte列のprefixと一致する範囲だけを再利用し、未完byteを追記して完了できる。完全stageへの再要求も全fileとinventoryを再照合する。相違byte、不正属性、reparse point、package外entryはfail-closedで拒否し、既存stageを変更・削除しない。これはRust Broker fixture上の部分stage／再要求testであり、実installed product process crash／電源断のLIVE_RUNTIME証拠ではない。active version、起動、Rollback、Installer／Uninstaller、Repair UIとinstalled product経路はP11未完了のまま。standalone Setupからfilesystem／registryへ直接作用する経路は設けない。
+本consumerが行うのはcontent-addressedな未起動version directoryの作成だけである。Start Menu変更、active version選択、process起動、旧version削除、Uninstaller、Repair UIは行わない。process crash／電源断の後に同じpackageをOwner確認付きで再適用すると、既存fileがpackage byte列のprefixと一致する範囲だけを再利用し、未完byteを追記して完了できる。完全stageへの再要求も全fileとinventoryを再照合する。相違byte、不正属性、reparse point、package外entryはfail-closedで拒否し、既存stageを変更・削除しない。これはRust Broker fixture上の部分stage／再要求testであり、実installed product process crash／電源断のLIVE_RUNTIME証拠ではない。active versionのinstalled起動、installed product経路のRollback、Installer／Uninstaller、Repair UIはP11未完了のまま。Broker記録の直前版Rollback fixtureは`docs/specs/update-center.md`に定義する。standalone Setupからfilesystem／registryへ直接作用する経路は設けない。
 
 ## 3. 製品版表示
 
@@ -39,7 +39,7 @@ manifestのfile一覧はASCII Windows-safe relative pathのcase-insensitive昇�
 
 ## 5. 適合確認
 
-packagerのPython ConformanceとRust readerのunit testは、形式・hash・path containment・製品identity・Authority非継承を検査する。Broker apply fixtureはnative Owner由来の一回限り確認context、現在candidate／製品identity／destination再照合、package tamper拒否、durable intent／completion Audit、version staging、再適用時の非上書きを検査する。Win32 Owner UI試験はRust起動器が作る確認文と実MessageBoxの表示・No／Yes結果を検査する。これらは別user profileからのinstalled product、実配布元経由のdownload、Installer、active version／Start Menu切替、crash後stage Recovery、Rollback、正式Releaseの証拠ではない。
+packagerのPython ConformanceとRust readerのunit testは、形式・hash・path containment・製品identity・Authority非継承を検査する。Broker apply fixtureはnative Owner由来の一回限り確認context、現在candidate／製品identity／destination再照合、package tamper拒否、durable intent／completion Audit、version staging、再適用時の非上書きを検査する。Win32 Owner UI試験はRust起動器が作る確認文と実MessageBoxの表示・No／Yes結果を検査する。これらは別user profileからのinstalled product、実配布元経由のdownload、Installer、active version／Start Menu切替、crash後stage Recovery、installed product経路のRollback、正式Releaseの証拠ではない。Broker fixture上の一世代Rollbackは`docs/specs/update-center.md`の別経路で検証済み。
 
 ## 6. 製品導入先の固定規則
 
@@ -51,7 +51,7 @@ P11の導入先は、管理者権限を要求しない現在利用者単位と�
 
 `App ID`、製品版、package SHA-256は検証済みpackage／現在のBroker trustから得る。Flutter、Setup UI、update候補は導入先pathを指定しない。異なるApp ID、製品版、package digestは別のversion directoryになる。導入先が同一volumeであることを要求し、既存version directoryを上書きしない。
 
-Windows Broker consumerはKnown Folder APIの現在利用者`LocalAppData`から固定`versions` directoryをcapabilityで開き、同一volumeと非reparse directory identityを検証して、署名済みpackageのversion directoryを新規作成する。展開前intent Auditが失敗した場合はinstall directoryを作成しない。package全体と内包fileの検証が成功した場合だけ`version_staged`を返し、永続Auditへ完了記録する。Audit storeは既存のidentity別`%LOCALAPPDATA%/D4Pocket/apps/<App ID>/stores/<Audit Store ID>`に残し、製品payloadの削除・更新と混同しない。Machine-wide registry、elevation、利用者指定の任意install pathはこのP11基本経路に含めない。なお、固定path／fixture上のconsumer接続はinstalled productの起動、別user profile隔離、process cleanup、起動失敗Recovery、Rollbackを意味しない。
+Windows Broker consumerはKnown Folder APIの現在利用者`LocalAppData`から固定`versions` directoryをcapabilityで開き、同一volumeと非reparse directory identityを検証して、署名済みpackageのversion directoryを新規作成する。展開前intent Auditが失敗した場合はinstall directoryを作成しない。package全体と内包fileの検証が成功した場合だけ`version_staged`を返し、永続Auditへ完了記録する。Audit storeは既存のidentity別`%LOCALAPPDATA%/D4Pocket/apps/<App ID>/stores/<Audit Store ID>`に残し、製品payloadの削除・更新と混同しない。Machine-wide registry、elevation、利用者指定の任意install pathはこのP11基本経路に含めない。なお、固定path／fixture上のconsumer接続はinstalled productの起動、別user profile隔離、process cleanup、起動失敗Recovery、installed product経路のRollbackを意味しない。
 
 ## 7. 有効版記録と固定root Bootstrapper
 
@@ -63,4 +63,4 @@ Bootstrapperはroot直下の`active_version.json`を最大4 KiB、`versions` dir
 
 Brokerにはstageとは独立した`更新有効版切替要求`があり、独立native Owner確認、現在候補／identity／固定導入先／Start Menu先の再照合、永続intent／completion Auditを経て、既存stageを元の署名packageとread-onlyで全byte／inventory照合する。一致した場合のみ、固定root Bootstrapperを未配置時に一度配置し、`active_version.json`を同一root内renameで原子的に公開し、Bootstrapperを指す現在利用者向けStart Menu shortcutをcreate-onlyで登録する。同じtargetへの再実行は冪等で、既存の別target shortcutは上書きせず拒否する。これらをRust fixtureで確認する。
 
-このfixture接続はinstalled productの起動成立を意味しない。初回Installer／Uninstaller、通常の次回process起動、Rollback、crash／電源断後のinstalled Recoveryおよびrelease evidenceは未成立のままで、P11 blockerを維持する。切替応答は有効版recordとStart Menu shortcutの公開までであり、その場でprocessを起動しない。
+このfixture接続はinstalled productの起動成立を意味しない。初回Installer／Uninstaller、通常の次回process起動、installed product経路のRollback、crash／電源断後のinstalled Recoveryおよびrelease evidenceは未成立のままで、P11 blockerを維持する。切替応答は有効版recordとStart Menu shortcutの公開までであり、その場でprocessを起動しない。
