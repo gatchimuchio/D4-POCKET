@@ -51,6 +51,11 @@ class UpdateClient {
   static bool isFirstInstall(Map<String, Object?>? rollbackState) =>
       rollbackState?['状態'] == 'unavailable' && rollbackState?['現在版'] == null;
 
+  static bool shouldLaunchInstalledVersionAfterExit(
+    Map<String, Object?> body,
+  ) =>
+      body['起動'] == 'after_current_exit';
+
   static String activationActionLabel(
     Map<String, Object?>? rollbackState, {
     required bool alreadyActive,

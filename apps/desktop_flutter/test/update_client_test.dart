@@ -107,6 +107,22 @@ void main() {
     );
   });
 
+  test('導入済み版への切替要求はRust起動器の明示応答時だけ終了する', () {
+    expect(
+      UpdateClient.shouldLaunchInstalledVersionAfterExit(
+        {'起動': 'after_current_exit'},
+      ),
+      isTrue,
+    );
+    for (final body in <Map<String, Object?>>[
+      {'起動': 'not_started'},
+      {'起動': 'unknown'},
+      {},
+    ]) {
+      expect(UpdateClient.shouldLaunchInstalledVersionAfterExit(body), isFalse);
+    }
+  });
+
   test('未起動版へ展開できるのは同じdownload済み候補だけ', () {
     final packageSha256 = List.filled(64, 'a').join();
     final downloaded = {

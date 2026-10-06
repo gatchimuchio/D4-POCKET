@@ -1871,10 +1871,32 @@ fn mcp_argument_contains_sensitive_field(value: &Value) -> bool {
     }
 }
 
+#[cfg(test)]
 fn relay_channel_frame_with_owner_operations<F>(
     frame: gui_shell_windows_broker_channel::PipeFrame,
     endpoint: &BrokerEndpoint,
     owner_operations: Option<&mpsc::SyncSender<DesktopOwnerOperationRequest>>,
+    confirm_owner_operation: F,
+) -> Option<Vec<u8>>
+where
+    F: FnMut(&DesktopOwnerOperationSummary) -> bool,
+{
+    relay_channel_frame_with_product_launch(
+        frame,
+        endpoint,
+        owner_operations,
+        false,
+        None,
+        confirm_owner_operation,
+    )
+}
+
+fn relay_channel_frame_with_product_launch<F>(
+    frame: gui_shell_windows_broker_channel::PipeFrame,
+    endpoint: &BrokerEndpoint,
+    owner_operations: Option<&mpsc::SyncSender<DesktopOwnerOperationRequest>>,
+    allow_installed_launch_after_exit: bool,
+    launch_installed_after_exit: Option<&AtomicBool>,
     mut confirm_owner_operation: F,
 ) -> Option<Vec<u8>>
 where
@@ -1906,14 +1928,22 @@ where
                         };
                         owner_operations
                             .send(DesktopOwnerOperationRequest {
-                                request_json,
+                                request_json: request_json.clone(),
                                 download_confirmation,
                                 apply_confirmation,
                                 activation_confirmation,
                                 reply,
                             })
                             .ok()?;
-                        let response = response.recv().ok()?;
+                        let mut response = response.recv().ok()?;
+                        if let Some(launch_installed_after_exit) = launch_installed_after_exit {
+                            mark_installed_launch_after_activation(
+                                &request_json,
+                                &mut response,
+                                allow_installed_launch_after_exit,
+                                launch_installed_after_exit,
+                            );
+                        }
                         return response.to_json_string().ok().map(String::into_bytes);
                     }
                 }
@@ -1925,6 +1955,42 @@ where
         }
     };
     relay_normalized_channel_request(&request, endpoint)
+}
+
+fn mark_installed_launch_after_activation(
+    request_json: &str,
+    response: &mut crate::broker::protocol::BrokerResponse,
+    allow_installed_launch_after_exit: bool,
+    launch_installed_after_exit: &AtomicBool,
+) {
+    if !allow_installed_launch_after_exit
+        || response.status != crate::broker::protocol::BrokerStatus::Accepted
+        || response.body.as_ref().is_none_or(|body| {
+            body.get("有効化").and_then(Value::as_str) != Some("active_version_recorded")
+        })
+    {
+        return;
+    }
+    let Ok(request) = BrokerRequestEnvelope::from_json_str(request_json) else {
+        return;
+    };
+    if request.request_id.as_deref() != Some(response.request_id.as_str())
+        || !matches!(
+            request.operation.as_ref(),
+            Some(BrokerOperation::更新有効版切替要求)
+        )
+        || response.operation != "更新有効版切替要求"
+    {
+        return;
+    }
+    let Some(body) = response.body.as_mut().and_then(Value::as_object_mut) else {
+        return;
+    };
+    body.insert(
+        "起動".to_string(),
+        Value::String("after_current_exit".to_string()),
+    );
+    launch_installed_after_exit.store(true, Ordering::Release);
 }
 
 fn relay_normalized_channel_request(request: &[u8], endpoint: &BrokerEndpoint) -> Option<Vec<u8>> {
@@ -2295,7 +2361,7 @@ fn owner_confirmation_text_for_identity(
                 )
             } else {
                 format!(
-                    "署名済みD4 Pocketの未起動版を有効版へ切り替え、Start Menuへ登録しますか？\n\n更新ID: {}\n提供版: {}\nchannel: {}\n署名済みpackage SHA-256: {}\n署名済みbyte長: {}\nApp ID: {}\nAudit Store ID: {}\n固定version directory: {}\nStart Menu shortcut登録先: {}\n内容概要: {}\n\nこの操作はRust Desktop起動器が現在のBroker候補とKnown Folderから表示内容を作成し、Brokerが実行直前にtrust・署名・package全体・stage内file／directory inventory・製品identity・固定root・Start Menu先を再検証します。有効版recordを固定root内でatomicに置換し、初回だけ検証済みstageからroot Bootstrapperをcreate-onlyで配置します。Start Menu shortcutは固定root Bootstrapperを指します。stageと旧versionは保持します。切替成功後、同じhash・byte長のdownload済みpackage fileだけをBrokerのcacheから除去します。process起動や実行中processの変更は行いません。選択版の起動は次回の固定root Bootstrapper起動時です。操作intentと結果をdurable Auditへ記録します。\n\npayload hash:\n{}",
+                    "署名済みD4 Pocketの未起動版を有効版へ切り替え、Start Menuへ登録しますか？\n\n更新ID: {}\n提供版: {}\nchannel: {}\n署名済みpackage SHA-256: {}\n署名済みbyte長: {}\nApp ID: {}\nAudit Store ID: {}\n固定version directory: {}\nStart Menu shortcut登録先: {}\n内容概要: {}\n\nこの操作はRust Desktop起動器が現在のBroker候補とKnown Folderから表示内容を作成し、Brokerが実行直前にtrust・署名・package全体・stage内file／directory inventory・製品identity・固定root・Start Menu先を再検証します。有効版recordを固定root内でatomicに置換し、初回だけ検証済みstageからroot Bootstrapperをcreate-onlyで配置します。Start Menu shortcutは固定root Bootstrapperを指します。stageと旧versionは保持します。切替成功後、同じhash・byte長のdownload済みpackage fileだけをBrokerのcacheから除去します。portable起動元からInstallした場合は、この画面を正常終了した後に導入済み版を起動します。導入済み版から更新する場合、現在processは変更せず次回起動時に反映します。操作intentと結果をdurable Auditへ記録します。\n\npayload hash:\n{}",
                     owner_confirmation_value(&confirmation.update_id),
                     owner_confirmation_value(&confirmation.offered_version),
                     owner_confirmation_value(&confirmation.channel),
@@ -2367,6 +2433,8 @@ fn run_channel_server(
     endpoint: RelayEndpoint,
     expected_client_pid: Arc<AtomicU32>,
     shutdown: Arc<AtomicBool>,
+    installed_path_verified: bool,
+    launch_installed_after_exit: Arc<AtomicBool>,
     ready: mpsc::SyncSender<()>,
     owner_operations: mpsc::SyncSender<DesktopOwnerOperationRequest>,
     product_identity: Option<ProductRuntimeIdentity>,
@@ -2379,10 +2447,12 @@ fn run_channel_server(
         endpoint.0.max_request_bytes,
         MAX_RESPONSE_BYTES,
         |frame| {
-            relay_channel_frame_with_owner_operations(
+            relay_channel_frame_with_product_launch(
                 frame,
                 &endpoint.0,
                 Some(&owner_operations),
+                !installed_path_verified && product_identity.is_some(),
+                Some(&launch_installed_after_exit),
                 |summary| confirm_owner_operation(summary, product_identity.as_ref()),
             )
         },
@@ -2394,6 +2464,7 @@ fn run_channel_server(
 
 struct RunningBroker {
     shutdown: Arc<AtomicBool>,
+    launch_installed_after_exit: Arc<AtomicBool>,
     server: Option<JoinHandle<Result<(), BrokerServerError>>>,
     channel_server: Option<JoinHandle<Result<(), BrokerServerError>>>,
     channel_pipe_name: String,
@@ -2425,6 +2496,7 @@ impl RunningBroker {
         prepare_session_paths(&session_file)?;
 
         let shutdown = Arc::new(AtomicBool::new(false));
+        let launch_installed_after_exit = Arc::new(AtomicBool::new(false));
         let thread_shutdown = Arc::clone(&shutdown);
         let mut config = BrokerServerConfig::new(store_dir, session_file.clone());
         config.desktop_protected_store_dir = Some(protected_store_dir);
@@ -2509,6 +2581,7 @@ impl RunningBroker {
             };
         let frontend_pid = Arc::new(AtomicU32::new(0));
         let channel_shutdown = Arc::clone(&shutdown);
+        let channel_launch_installed_after_exit = Arc::clone(&launch_installed_after_exit);
         let channel_expected_pid = Arc::clone(&frontend_pid);
         let (channel_ready_tx, channel_ready_rx) = mpsc::sync_channel(1);
         let channel_name_for_thread = channel_pipe_name.clone();
@@ -2522,6 +2595,8 @@ impl RunningBroker {
                     relay_endpoint,
                     channel_expected_pid,
                     channel_shutdown,
+                    installed_path_verified,
+                    channel_launch_installed_after_exit,
                     channel_ready_tx,
                     owner_operation_tx,
                     channel_product_identity,
@@ -2555,6 +2630,7 @@ impl RunningBroker {
         }
         Ok(Self {
             shutdown,
+            launch_installed_after_exit,
             server: Some(server),
             channel_server: Some(channel_server),
             channel_pipe_name,
@@ -2570,6 +2646,10 @@ impl RunningBroker {
                 .channel_server
                 .as_ref()
                 .is_none_or(JoinHandle::is_finished)
+    }
+
+    fn should_launch_installed_after_exit(&self) -> bool {
+        self.launch_installed_after_exit.load(Ordering::Acquire)
     }
 
     fn finish(&mut self) -> Result<(), DesktopLaunchError> {
@@ -2793,7 +2873,7 @@ pub fn run() -> Result<(), DesktopLaunchError> {
             )
         })?;
     let runtime_dir = runtime_directory_with_identity(&local_app_data, product_identity.as_ref())?;
-    let _instance_lock = acquire_instance_lock(&runtime_dir)?;
+    let instance_lock = acquire_instance_lock(&runtime_dir)?;
     // 固定root Bootstrapperが選んだ版別fileだけをinstalled起動としてBrokerへ伝える。
     // portable起動、record不整合、別identityは従来どおりunknownのままにする。
     let installed_path_verified = product_identity.as_ref().is_some_and(|identity| {
@@ -2808,10 +2888,11 @@ pub fn run() -> Result<(), DesktopLaunchError> {
         &runtime_dir,
         true,
         installed_path_verified,
-        product_identity,
+        product_identity.clone(),
     )?;
 
     let frontend_result = launch_frontend(&layout, &broker);
+    let launch_installed_after_exit = broker.should_launch_installed_after_exit();
     let broker_result = broker.finish();
     broker_result?;
     let status = frontend_result?;
@@ -2821,12 +2902,113 @@ pub fn run() -> Result<(), DesktopLaunchError> {
             "D4 Pocketが正常に終了しませんでした。",
         ));
     }
+    if launch_installed_after_exit {
+        let identity = product_identity.as_ref().ok_or_else(|| {
+            DesktopLaunchError::new(
+                "PRODUCT_IDENTITY_UNAVAILABLE",
+                "D4 Pocketの導入identityを確認できません。",
+            )
+        })?;
+        let installed_launcher = crate::product_bootstrapper::resolve_active_version_launcher(
+            &local_app_data,
+            &identity.app_id,
+            &identity.audit_store_id,
+        )
+        .map_err(|error| {
+            DesktopLaunchError::new(
+                error.0,
+                "インストールは完了しましたが、導入済み版を確認できません。Start Menuから起動してください。",
+            )
+        })?;
+        resolve_package_layout(&installed_launcher)?;
+        drop(instance_lock);
+        launch_active_product_version(&installed_launcher, &local_app_data)?;
+    }
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn activation_response() -> crate::broker::protocol::BrokerResponse {
+        crate::broker::protocol::BrokerResponse {
+            request_id: "request-install".to_string(),
+            operation: "更新有効版切替要求".to_string(),
+            status: crate::broker::protocol::BrokerStatus::Accepted,
+            evidence_source: "INTERNAL_STATE".to_string(),
+            audit_event_id: "audit-install".to_string(),
+            error: None,
+            health: None,
+            body: Some(json!({"有効化": "active_version_recorded", "起動": "not_started"})),
+            shutdown_requested: false,
+        }
+    }
+
+    #[test]
+    fn portable_activation_requests_installed_launch_only_after_accepted_record_switch() {
+        let request = r#"{"request_id":"request-install","operation":"更新有効版切替要求"}"#;
+        let launch = AtomicBool::new(false);
+        let mut response = activation_response();
+
+        mark_installed_launch_after_activation(request, &mut response, true, &launch);
+
+        assert!(launch.load(Ordering::Acquire));
+        assert_eq!(response.body.unwrap()["起動"], "after_current_exit");
+    }
+
+    #[test]
+    fn ineligible_activation_and_nonactivation_responses_do_not_request_relaunch() {
+        let launch = AtomicBool::new(false);
+        let mut installed_response = activation_response();
+        mark_installed_launch_after_activation(
+            r#"{"request_id":"request-install","operation":"更新有効版切替要求"}"#,
+            &mut installed_response,
+            false,
+            &launch,
+        );
+        assert!(!launch.load(Ordering::Acquire));
+        assert_eq!(installed_response.body.unwrap()["起動"], "not_started");
+
+        let mut rollback_response = activation_response();
+        mark_installed_launch_after_activation(
+            r#"{"request_id":"request-install","operation":"更新rollback要求"}"#,
+            &mut rollback_response,
+            true,
+            &launch,
+        );
+        assert!(!launch.load(Ordering::Acquire));
+
+        let mut failed_response = activation_response();
+        failed_response.status = crate::broker::protocol::BrokerStatus::Rejected;
+        mark_installed_launch_after_activation(
+            r#"{"request_id":"request-install","operation":"更新有効版切替要求"}"#,
+            &mut failed_response,
+            true,
+            &launch,
+        );
+        assert!(!launch.load(Ordering::Acquire));
+
+        let mut stale_response = activation_response();
+        stale_response.request_id = "request-stale".to_string();
+        mark_installed_launch_after_activation(
+            r#"{"request_id":"request-install","operation":"更新有効版切替要求"}"#,
+            &mut stale_response,
+            true,
+            &launch,
+        );
+        assert!(!launch.load(Ordering::Acquire));
+
+        let mut mismatched_operation_response = activation_response();
+        mismatched_operation_response.operation = "別操作".to_string();
+        mark_installed_launch_after_activation(
+            r#"{"request_id":"request-install","operation":"更新有効版切替要求"}"#,
+            &mut mismatched_operation_response,
+            true,
+            &launch,
+        );
+        assert!(!launch.load(Ordering::Acquire));
+    }
 
     #[test]
     fn broker_failure_codes_exit_without_dialog() {
@@ -7148,20 +7330,22 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
-    fn update_activation_confirmation_describes_fixed_target_and_no_immediate_launch() {
+    fn update_activation_confirmation_describes_fixed_target_and_install_launch_transition() {
         let prompt = owner_confirmation_text(&update_activation_owner_confirmation_fixture());
         for visible in [
             "1.2.3",
             "stable",
             "固定version directory:",
             "atomic",
-            "次回の固定root Bootstrapper起動時",
             "Start Menu",
             "Start Menu shortcut登録先:",
             "Start Menu shortcutは固定root Bootstrapperを指します",
             "同じhash・byte長のdownload済みpackage fileだけをBrokerのcacheから除去",
             "stageと旧versionは保持",
-            "process",
+            "portable起動元からInstallした場合",
+            "画面を正常終了した後",
+            "導入済み版を起動",
+            "現在processは変更せず次回起動時に反映",
             "payload hash:",
         ] {
             assert!(

@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../models/generated_contracts.dart';
 import '../services/ai_edit_client.dart';
@@ -757,7 +759,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Text('更新センター', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 4),
               Text(
-                '信頼設定=${body['署名信頼設定'] ?? 'unknown'}。downloadは直接HTTPS接続のみ（system proxy・自動retryなし）で、Rust Desktopの確認が必要です。download完了後に未起動版へ展開し、初回は「インストール」、導入済みなら「更新を有効化」します。別のRust Desktop確認後にpackageとstage全体を再検証し、有効版recordと固定root Bootstrapperを指すStart Menu shortcutを登録します。製品起動はStart Menuから行い、有効版切替は次回起動時に反映されます。切替成功後は検証済みdownload packageだけをBroker cacheから除去し、stageと旧versionは保持します。rollbackはBroker記録の直前版へ有効版recordだけを戻します。',
+                '信頼設定=${body['署名信頼設定'] ?? 'unknown'}。downloadは直接HTTPS接続のみ（system proxy・自動retryなし）で、Rust Desktopの確認が必要です。download完了後に未起動版へ展開し、初回は「インストール」、導入済みなら「更新を有効化」します。別のRust Desktop確認後にpackageとstage全体を再検証し、有効版recordと固定root Bootstrapperを指すStart Menu shortcutを登録します。portable起動元から初回Installした場合は画面を正常終了して導入済み版へ切り替え、導入済み版からの更新は次回起動時に反映します。切替成功後は検証済みdownload packageだけをBroker cacheから除去し、stageと旧versionは保持します。rollbackはBroker記録の直前版へ有効版recordだけを戻します。',
               ),
               if (downloadJob != null) ...[
                 const SizedBox(height: 4),
@@ -863,7 +865,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       alreadyActive: isAlreadyActive,
     );
     final activationSuccess = UpdateClient.isFirstInstall(rollbackState)
-        ? 'D4 Pocketを固定導入先へインストールし、Start Menuへ登録しました。Start Menuから起動してください。'
+        ? 'D4 Pocketを固定導入先へインストールし、Start Menuへ登録しました。'
         : '有効版を切り替え、Start Menuへ登録しました。選択版は次回起動時に使用します。';
     return ListTile(
       contentPadding: EdgeInsets.zero,
@@ -985,22 +987,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
     Future<Map<String, Object?>> Function() request,
     String success,
   ) async {
+    var handoffToInstalledVersion = false;
     try {
       final body = await request();
-      final state = body['実行状態']?.toString();
-      if (body['download package cleanup'] == 'pending') {
-        _setUpdateMessage(
-          '$success package cache清掃は保留中です。stageと有効版recordは維持しています。',
-        );
+      handoffToInstalledVersion =
+          UpdateClient.shouldLaunchInstalledVersionAfterExit(body);
+      if (handoffToInstalledVersion) {
+        await _completeInitialInstallHandoff();
       } else {
-        _setUpdateMessage(
-          state == 'suspended' ? '$success Brokerは実行を保留しました。' : success,
-        );
+        final state = body['実行状態']?.toString();
+        if (body['download package cleanup'] == 'pending') {
+          _setUpdateMessage(
+            '$success package cache清掃は保留中です。stageと有効版recordは維持しています。',
+          );
+        } else {
+          _setUpdateMessage(
+            state == 'suspended' ? '$success Brokerは実行を保留しました。' : success,
+          );
+        }
       }
     } catch (error) {
       _setUpdateMessage('更新操作失敗: $error');
     }
-    _loadUpdates();
+    if (!handoffToInstalledVersion) _loadUpdates();
+  }
+
+  Future<void> _completeInitialInstallHandoff() async {
+    _setUpdateMessage('インストールが完了しました。導入済み版を起動します。');
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+    if (mounted) {
+      await ServicesBinding.instance.exitApplication(ui.AppExitType.required);
+    }
   }
 
   void _setUpdateMessage(String message) {

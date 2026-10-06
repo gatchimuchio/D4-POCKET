@@ -39,6 +39,8 @@
 
 2026-10-06 P11初回Install／Update導線検証: `cargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1`は474 passed／2 failed／12 ignored。失敗は`a2a::tests::loopback_HTTPからAgent_Cardを取得してmetadata_onlyへ射影する`と`adapters::minidora::tests::ContentLength付きJSONだけを期限内に取得する`で、各focused再実行は1 passed。今回のBroker update projection／package install UI差分との因果は観測されず、既存`FQ-TEST-LOOPBACK`の最終統合試験で確認し、現phaseはblockしない。
 
+2026-10-06 P11 portable起点Install起動遷移検証: `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`のRust library suiteは484 passed／1 failed／12 ignoredとなり、既知`broker::update_download::tests::local_tls_server_repairs_only_after_verified_package_bytes`がWindows loopback TLSの`ConnectionReset`／`InvalidContentType`で失敗してCargoがnonzero終了した。後続targetのPASSは主張しない。失敗箇所は今回の変更file外で、既存`FQ-TEST-LOOPBACK`に属するためP11受入れをblockしない。最終統合後に既存queueの対象として再確認する。
+
 ## 3. Final QA段階
 
 | 段階 | 対象 | 開始条件 |

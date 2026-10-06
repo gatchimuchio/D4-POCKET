@@ -2837,7 +2837,7 @@ fn activate_verified_staged_package(
             &format!("{request_id}:complete"),
             OP_ACTIVATE,
             "completed",
-            &format!("Capability=product.install.activate_version Permission=現在の署名候補と完全検証済み固定stageだけを有効版recordへ設定し固定Start Menu shortcutを登録 Approval=独立したRust Desktop native Owner確認 AuditEvent=固定root Bootstrapper配置、有効版recordのatomic公開、Start Menu shortcutの登録完了を記録 RecoveryAction=次回の固定root起動時にBootstrapperがidentity・version・package／launcher／manifest hashを再照合する。Shortcutは固定root Bootstrapperを指す。processは起動せずrollbackもしない。version={} package_sha256={} file_count={} total_bytes={} Start_Menu=registered intent_audit_id={}", info.product_version, package_sha256, info.file_count, info.total_file_bytes, intent.event_id),
+            &format!("Capability=product.install.activate_version; portable起動元ではproduct.runtime.launchを続行 Permission=現在の署名候補と完全検証済み固定stageだけを有効版recordへ設定し固定Start Menu shortcutを登録 Approval=独立Rust Desktop native Owner確認。portableからのInstall後に導入済み版を起動することを確認画面へ明示 AuditEvent=固定root Bootstrapper配置、有効版recordのatomic公開、Start Menu shortcut登録を記録 RecoveryAction=起動が成立しなければ有効版recordとstageを保持しStart Menuから再試行。installed Broker startupが起動を記録 version={} package_sha256={} file_count={} total_bytes={} Start_Menu=registered intent_audit_id={}", info.product_version, package_sha256, info.file_count, info.total_file_bytes, intent.event_id),
             EVIDENCE_SOURCE_INTERNAL_STATE,
             payload_hash,
         );

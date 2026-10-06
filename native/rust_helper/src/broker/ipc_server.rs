@@ -180,7 +180,11 @@ fn run_loopback_server_inner(
     }
 
     if shutdown.is_some() {
-        let reason = "Capability=desktop.launch Permission=固定Desktop起動器のlifecycleのみ Approval=通常画面起動のためOwner承認不要・privileged actionは非承認 RecoveryAction=失敗時は起動器管理Brokerを停止し未変更endpointだけを整理してstoreを保持";
+        let reason = if config.desktop_install_path_verified {
+            "Capability=desktop.launch product.runtime.launch Permission=Rust起動器が有効版recordと導入先launcherを照合した現在版のみ Approval=Start Menuからの通常起動、portableからの初回Install後は別途native Owner確認済みの有効版切替 RecoveryAction=画面起動失敗時は有効版recordを保持しStart Menuから再試行。Brokerは実行状態をLIVE_RUNTIMEで記録"
+        } else {
+            "Capability=desktop.launch Permission=固定Desktop起動器のlifecycleのみ Approval=通常画面起動のためOwner承認不要・privileged actionは非承認 RecoveryAction=失敗時は起動器管理Brokerを停止し未変更endpointだけを整理してstoreを保持"
+        };
         let payload_hash = crate::audit_hash::sha256_tagged(b"gui-shell-desktop-launcher:start:v1");
         broker
             .append_audit(
