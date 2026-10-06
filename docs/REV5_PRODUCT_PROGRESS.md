@@ -2,7 +2,7 @@
 
 更新日: 2026-10-07
 工程正本: ユーザー提示「D4 Pocket / GUI-Shell 統合実装仕様書 rev5」「統合開発工程表 rev5」「Codex実装指示書 rev5」
-現行mode: `PRODUCT_BUILD_MODE`（2026-10-07の最新ユーザー指示）。旧R2 Agent Taskは`FUNCTIONALLY ESTABLISHED`で、crash／deadline／recovery等の追加QAは現行作業ではない。P2 Compare（実装指示書上のR3）とP3 Handoff（同R4）は現行rev5 Product BuildでCLOSED、P4〜P12も受入れ済み。Q0／Q1の結果とQ2の所見は履歴・Final QA Queueに保持するが、Q2をactive工程として継続せず、Final QAへ自動遷移しない。`P12 Product Integration`のWindows `FEATURE COMPLETE`記録と現行release gateは維持する。
+現行mode: `FINAL_QA_MODE`。P12 Product IntegrationのWindows `FEATURE COMPLETE`受入れ後であり、最新rev5実装指示§23に従ってFinal QAへ移行した。Q0 QA FreezeとQ1 Codex Comprehensive QAは完了、現行phaseはQ2 Fault / Recovery (`ACTIVE`)。旧R2 Agent TaskはProduct Build上`FUNCTIONALLY ESTABLISHED`だが、Final QA queueのcancel／deadline／crash等はQ2で実証する。P2 Compare（実装指示書上のR3）とP3 Handoff（同R4）はCLOSEDのまま再訪しない。Windows Feature Completeは正式配布・release readinessを意味せず、通常Release `task_execution=unsupported`と既存release gateを維持する。
 初期rev5文書同期commit: `39dd3f4bc7aafe350ca94fce9392095f1064d2bc`。凍結commitとその後のQA記録は本書末尾の更新履歴を参照。
 
 ## 正本の選び方
@@ -11,9 +11,9 @@
 
 ## 最新rev5指示による工程整理（2026-10-07）
 
-最新ユーザー提示の実装指示は現在modeを`PRODUCT_BUILD_MODE`と明示し、旧R2-A〜HをProduct Buildの必須gateにせず、追加crash／deadline／recovery調査をFinal QA Queueへ送る。したがって本書の後続Q2記録は過去に実行した検査の証拠であり、現在の作業命令ではない。`docs/FINAL_QA_QUEUE.md`の項目状態はFinal QA開始後の引継ぎ情報として保持する。
+P12がWindows `FEATURE COMPLETE`としてCLOSEDであるため、rev5実装指示§23に従いFinal QAへ移行する。前回のcommit `8d98626`では「現在modeがProduct Build」と書かれた§2だけを読み、Feature Complete後の§23を適用せず`DEFERRED`と誤記した。本修正はその工程status誤りだけを直し、過去のQ0／Q1結果、Q2試験結果、P2／P3のCLOSED状態を変更しない。
 
-工程表のP2 Compareは実装指示書のR3、P3 HandoffはR4に対応する。本書で両者を既にCLOSEDとしているため、閉鎖済み機能を再実装・再検査しない。Q0／Q1／Q2の記録を削除・改変せず、最新modeとの違いだけを本節と先頭statusで明示する。通常Release `task_execution`はfail-closedのまま維持し、正式release claimへ昇格しない。
+工程表のP2 Compareは実装指示書のR3、P3 HandoffはR4に対応する。本書で両者をCLOSEDとしているため再実装・再検査しない。Q0 Freezeは製品commit `ab746d4b33b003761f5ddcef60a88afa97132a40`を維持する。後続Rust差分はrustfmt変更、test-only変更、`r2-e2e` feature限定fixtureに分類し、Q1／Q2 evidenceには個別の実行commitと証拠範囲を記録する。通常Release `task_execution`はfail-closedのまま維持し、正式release claimへ昇格しない。
 
 ## Q0 品質保証凍結 — 完了
 
@@ -27,7 +27,7 @@ Desktop `flutter test --no-pub --dart-define=GUI_SHELL_PRODUCT_VERSION=1.2.3`は
 
 Q1初回Rust runで既知localhost fixtureのConnectionReset 3件、次runでA2A fixture 1件を観測したが、該当fixture単独testはPASSし、fixture競合の後の`--no-fail-fast`全target runは0 failureで完了した。これは間欠test fixture揺らぎを解消した証拠ではないため`FQ-TEST-LOOPBACK`へ保持し、Q2 network/fault調査で扱う。installed end-to-end、実Provider資格、正式証拠、Q2以降の障害／Recovery、release blockersは未成立のまま維持する。
 
-## Q2 障害・復旧 — 旧検査記録（現行工程ではない）
+## Q2 障害・復旧 — 進行中
 
 2026-10-07の最初のQ2検査単位では、実Codex CLI `0.160.0`を資格情報なしのloopback偽Responses APIへ接続するignored LIVE_RUNTIME testを修正・実行した。Task完了、MxC実行中TEMP markerのBroker親可読、CLI終了後markerの不在、取消後のterminal化、child heartbeat停止、取消後marker不在、Broker管理WorkspaceTaskScratch不在を確認し、修正後のtestは1 passed。実Network model／資格情報は使っていない。MxC／Owner／Audit以外はtest fixtureのin-process Brokerと合成Owner callbackであり、installed Flutter→native Owner→production IPC、永続Audit、deadline／crash recoveryを証明しない。TEMPの観測はこのchild markerの範囲だけで、外部component内の物理削除保証ではない。
 

@@ -1,6 +1,6 @@
 # D4 Pocket 最終品質保証項目（`FINAL_QA_QUEUE`）
 
-状態: `DEFERRED`（最新ユーザー指示は`PRODUCT_BUILD_MODE`。Q0／Q1／Q2記録は保持し、Final QA作業は開始しない）
+状態: `Q2 ACTIVE`（P12 Feature Complete後にFinal QAへ移行。Q0／Q1完了）
 工程正本: ユーザー提示「D4 Pocket / GUI-Shell rev5 Product-First / Final-QA Separation」
 現行製品phase: `docs/REV5_PRODUCT_PROGRESS.md`
 
@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | Q0 品質保証凍結 | 完了（2026-10-07） | Final QA対象製品commit `ab746d4b33b003761f5ddcef60a88afa97132a40`。`main`へpushしremote HEAD一致を確認 |
 | Q1 Codex横断品質検査 | 完了（2026-10-07） | 凍結commitを基準に全Rust target、Desktop／Mobile Flutter全test、Schema／Conformance、Windows Release compile |
-| Q2 障害・復旧 | 保留（Final QA Queue） | 既存Q2所見を保持。最新指示により追加検査を停止し、現行Product Buildの作業対象にしない |
+| Q2 障害・復旧 | 進行中 | crash／kill／deadline／cancel／stale／replay／partial write／corruption／process orphan／Broker・frontend・network・provider failureを検証 |
 | Q3–Q7 後続品質保証 | 待機中 | 各前段階の閉鎖後に開始 |
 
 製品コード変更が必要な場合、該当QA所見を証拠化して局所修正し、修正済み製品を新しいQA候補commitとして明示する。以後のQA結果を旧凍結commitへ誤って帰属させず、更新対象を再凍結する。Q0凍結はrelease readinessを意味せず、既存release blockerを変更しない。
@@ -25,13 +25,13 @@ Rust初回・再runでA2A／Update TLS loopback fixtureの間欠failureを観測
 
 ## 1. 運用規則
 
-この一覧は、製品開発中にAcceptance外の最終保証作業を追加して現phaseを延長しないための移送先である。queue中の項目は現在の製品phaseのblockerではない。Feature Complete後、rev5で定めるFinal QA工程として現行統合製品に対して実行する。
+この一覧はProduct Build中にAcceptance外の最終保証作業を追加して現phaseを延長しないための移送先である。Product Build中はqueue項目を同phaseのblockerにしない。Feature Complete後はrev5のFinal QA工程としてQ0〜Q7を実行し、該当するqueue項目を現行QA phaseのAcceptanceとして扱う。
 
 安全・Authority・Permission・Approval・Audit・Recovery・secret境界はFinal QAまで無効化・迂回しない。既存証拠と過去のFAILは履歴として参照するが、異なる製品状態に対する現行試験結果へ昇格しない。MxC、OS、Provider等の外部component内部完全性をD4 Pocketの保証へ取り込まない。
 
 ## 2. 検査項目
 
-| 識別子 | 最終統合状態で確認する範囲 | 由来 | 現在phaseをblockするか |
+| 識別子 | 最終統合状態で確認する範囲 | 由来 | Product Buildをblockするか |
 | --- | --- | --- | --- |
 | FQ-R2-A | Task cancel／deadline後のprocess群停止、Recovery、旧Authority非再利用 | rev4 R2-A受入れの最終製品回帰 | いいえ |
 | FQ-R2-B | Codex／Broker／Launcher異常終了後のprocess群停止、Recovery、旧Approval非再利用 | rev4 R2-B未完了条件・障害履歴 | いいえ |
