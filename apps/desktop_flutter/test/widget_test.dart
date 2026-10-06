@@ -1066,6 +1066,90 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('全体検索からCompose、コマンドからExportへ進み同一ManifestをBrokerへ渡す',
+      (WidgetTester tester) async {
+    final transport = _ComposeExportNavigationTransport();
+    await tester.pumpWidget(
+      GuiShellDesktopApp(client: ShellCoreClient.mock(transport: transport)),
+    );
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.control);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.shift);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.shift);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.control);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is TextField && widget.decoration?.labelText == '全体検索',
+      ),
+      'GUI Shell構成',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('GUI Shell構成').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('GUI Shell構成').hitTestable(), findsOneWidget);
+    final runtimeIds = find.byKey(const ValueKey('compose-runtime-ids'));
+    await tester.ensureVisible(runtimeIds);
+    await tester.enterText(runtimeIds, 'fixture-runtime');
+    final agentIds = find.byKey(const ValueKey('compose-agent-ids'));
+    await tester.ensureVisible(agentIds);
+    await tester.enterText(agentIds, 'fixture-agent');
+    final composeButton = find.byKey(const ValueKey('compose-manifest-button'));
+    await tester.ensureVisible(composeButton);
+    await tester.tap(composeButton);
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.control);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyK);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.control);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is TextField && widget.decoration?.labelText == 'コマンドパレット',
+      ),
+      '独立Appを書き出す',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byWidgetPredicate(
+        (widget) => widget is Text && widget.data == '独立Appを書き出す',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('GUI Shell Windows書出し').hitTestable(), findsOneWidget);
+    final exportButton = find.byKey(const ValueKey('compose-export-button'));
+    await tester.ensureVisible(exportButton);
+    await tester.tap(exportButton);
+    await tester.pumpAndSettle();
+
+    final composeRequest = transport.requests.singleWhere(
+      (request) => request['operation'] == 'GUI Shell構成',
+    );
+    final exportRequest = transport.requests.singleWhere(
+      (request) => request['operation'] == 'GUI Shell書出し',
+    );
+    final composedManifest = composeRequest['payload']! as Map<String, Object?>;
+    final exportPayload = exportRequest['payload']! as Map<String, Object?>;
+    expect(composedManifest['runtime_ids'], ['fixture-runtime']);
+    expect(composedManifest['agent_ids'], ['fixture-agent']);
+    expect(exportPayload['compose_manifest'], composedManifest);
+    expect(
+      transport.operations.where(
+        (operation) =>
+            operation == 'GUI Shell構成' || operation == 'GUI Shell書出し',
+      ),
+      ['GUI Shell構成', 'GUI Shell書出し'],
+    );
+    expect(
+        find.textContaining('fixture://d4-pocket/export.json'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Desktop UX統合が既存画面を論理グループで絞り込む', (WidgetTester tester) async {
     await tester.pumpWidget(const GuiShellDesktopApp());
 
@@ -3497,6 +3581,50 @@ class _McpNavigationTransport implements BrokerTransport {
       },
       'shutdown_requested': false,
     };
+  }
+}
+
+class _ComposeExportNavigationTransport implements BrokerTransport {
+  final operations = <String>[];
+  final requests = <Map<String, Object?>>[];
+
+  @override
+  Future<Map<String, Object?>> request(
+    String operation, {
+    Map<String, Object?>? payload,
+  }) async {
+    operations.add(operation);
+    requests.add({'operation': operation, 'payload': payload});
+    if (operation == 'GUI Shell構成') {
+      return {
+        'request_id': 'fixture-compose',
+        'operation': operation,
+        'status': 'accepted',
+        'evidence_source': 'FIXTURE',
+        'audit_event_id': 'fixture-compose-audit',
+        'error': null,
+        'body': {'compose_manifest': payload},
+        'shutdown_requested': false,
+      };
+    }
+    if (operation == 'GUI Shell書出し') {
+      return {
+        'request_id': 'fixture-export',
+        'operation': operation,
+        'status': 'accepted',
+        'evidence_source': 'FIXTURE',
+        'audit_event_id': 'fixture-export-audit',
+        'error': null,
+        'body': {
+          'manifest_file': {
+            'path': 'fixture://d4-pocket/export.json',
+            'temporary_file_status': 'cleaned',
+          },
+        },
+        'shutdown_requested': false,
+      };
+    }
+    throw BrokerClientException('fixtureでは未対応の要求です: $operation');
   }
 }
 

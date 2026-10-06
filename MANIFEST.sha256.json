@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "1e976256654c4affa2c15ba42c9349397c5032daef62bfb6757c8684b9014442"
+      "sha256": "2efc6e29e24870c3f6796023aaf85b454b01b0517924f9bcd123b4b41809b483"
     },
     {
       "path": "SECURITY.md",
@@ -200,7 +200,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
-      "sha256": "29b3e3528212ef24273658b2321df08443a63906d5fc3b4a96c53f9563dd8766"
+      "sha256": "c627192e0092018d6dc05a0a46911cd187af03e63e3eebc5e1a52899592100ce"
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
@@ -288,7 +288,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/settings.dart",
-      "sha256": "b88a1c3962520357df3985361cc6ebc95e30da04c33b3c779da28244c104f2b8"
+      "sha256": "a661a9a2b02bef221ad0b7f8ead25eb1e23747b232c191522f23b683fc937534"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/setup_doctor.dart",
@@ -352,7 +352,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/global_search_index.dart",
-      "sha256": "9f53932b184dc0e54cb97b2a19440effd1a85be9892a5ffeebdd649cd29607de"
+      "sha256": "5e6e05233e156acfbf44ff489d987f4ce85b3aee55f11fb731d24d917377b371"
     },
     {
       "path": "apps/desktop_flutter/lib/services/mcp_connection_client.dart",
@@ -664,7 +664,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "d90e649b80f058cc16030a9501f94748cf297268e789e42caafa0f86bf404226"
+      "sha256": "89a67656bcbcbbe35ae9a725f7ff93575be9f47981334f475a9ff8b50c087dc3"
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
@@ -1244,7 +1244,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "5fddba96ca44c87fb15f05cb39ab8cd339b2741394c9ab93d1bd4761f75715ae"
+      "sha256": "f39e40e5fc04c98e880b82c37f7453c21c04933e4f63667c3a3c97ec5babe40d"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",

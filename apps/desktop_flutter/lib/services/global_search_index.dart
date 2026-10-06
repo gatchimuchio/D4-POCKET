@@ -169,6 +169,14 @@ class GlobalSearchIndex {
     for (final surface in const [
       ('エージェント', 'エージェントセンター', 'エージェントの表示面', 'agent-surface', 5),
       ('MCP', 'MCP接続', '設定のMCP接続面', 'mcp-surface', 11),
+      ('構成', 'GUI Shell構成', 'Manifest作成・Previewの設定面', 'compose-surface', 11),
+      (
+        '書出し',
+        'GUI Shell Windows書出し',
+        '独立Manifest file作成の設定面',
+        'export-surface',
+        11
+      ),
       ('評価', '評価ラボ', '評価の表示面', 'evaluation-surface', 14),
       ('通知', '通知センター', '通知の表示面', 'notification-surface', 16),
     ]) {

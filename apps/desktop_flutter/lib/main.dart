@@ -251,6 +251,8 @@ class _ShellHomePageState extends State<ShellHomePage> {
   bool _dialogueVisited = false;
   int _updateCenterFocusRequest = 0;
   int _mcpCenterFocusRequest = 0;
+  int _composeCenterFocusRequest = 0;
+  int _exportCenterFocusRequest = 0;
   _ShellViewMode viewMode = _ShellViewMode.ownerUse;
   _ShellNavigationGroup navigationGroup = _ShellNavigationGroup.all;
   late final WindowsTrayClient _trayClient;
@@ -417,6 +419,8 @@ class _ShellHomePageState extends State<ShellHomePage> {
         active: selectedIndex == 11,
         focusUpdateCenterRequest: _updateCenterFocusRequest,
         focusMcpCenterRequest: _mcpCenterFocusRequest,
+        focusComposeCenterRequest: _composeCenterFocusRequest,
+        focusExportCenterRequest: _exportCenterFocusRequest,
       ),
       if (_dialogueVisited)
         RuntimeDialogueScreen(readOnly: viewMode == _ShellViewMode.demo)
@@ -805,6 +809,22 @@ class _ShellHomePageState extends State<ShellHomePage> {
     });
   }
 
+  void _openComposeCenter() {
+    setState(() {
+      selectedIndex = 11;
+      navigationGroup = _ShellNavigationGroup.settings;
+      _composeCenterFocusRequest++;
+    });
+  }
+
+  void _openExportCenter() {
+    setState(() {
+      selectedIndex = 11;
+      navigationGroup = _ShellNavigationGroup.settings;
+      _exportCenterFocusRequest++;
+    });
+  }
+
   void _openAgentSetup() => _selectPage(5);
 
   void _setNavigationGroup(_ShellNavigationGroup group) {
@@ -863,7 +883,17 @@ class _ShellHomePageState extends State<ShellHomePage> {
     if (selected.title == 'MCP接続') {
       _openMcpCenter();
     } else {
-      _selectPage(selected.pageIndex);
+      switch (selected.focusTarget) {
+        case _SettingsFocusTarget.compose:
+          _openComposeCenter();
+          break;
+        case _SettingsFocusTarget.export:
+          _openExportCenter();
+          break;
+        case null:
+          _selectPage(selected.pageIndex);
+          break;
+      }
     }
     setState(() {
       if (selected.viewMode != null) {
@@ -889,7 +919,17 @@ class _ShellHomePageState extends State<ShellHomePage> {
     if (selected.recordId == 'mcp-surface') {
       _openMcpCenter();
     } else {
-      _selectPage(selected.pageIndex);
+      switch (selected.recordId) {
+        case 'compose-surface':
+          _openComposeCenter();
+          break;
+        case 'export-surface':
+          _openExportCenter();
+          break;
+        default:
+          _selectPage(selected.pageIndex);
+          break;
+      }
     }
   }
 
@@ -1010,6 +1050,22 @@ class _ShellHomePageState extends State<ShellHomePage> {
         icon: Icons.extension_outlined,
         keywords: 'MCP 接続 道具 資源 提示',
       ),
+      const _CommandEntry(
+        title: '構成Manifest作成',
+        subtitle: 'GUI Shell構成Manifest作成・Previewを開く',
+        pageIndex: 11,
+        icon: Icons.account_tree_outlined,
+        keywords: 'GUI Shell 構成 Compose Manifest Preview',
+        focusTarget: _SettingsFocusTarget.compose,
+      ),
+      const _CommandEntry(
+        title: '独立Appを書き出す',
+        subtitle: 'GUI Shell Windows書出し面を開く',
+        pageIndex: 11,
+        icon: Icons.file_download_outlined,
+        keywords: 'GUI Shell Windows Export 独立 App 書出し',
+        focusTarget: _SettingsFocusTarget.export,
+      ),
       if (kGuiShellModuleNotifications)
         const _CommandEntry(
           title: '通知表示',
@@ -1095,6 +1151,8 @@ enum _ShellNavigationGroup {
   }
 }
 
+enum _SettingsFocusTarget { compose, export }
+
 class _ShellPageEntry {
   const _ShellPageEntry(this.index, this.label, this.icon, this.group);
 
@@ -1113,6 +1171,7 @@ class _CommandEntry {
     required this.keywords,
     this.copyText,
     this.viewMode,
+    this.focusTarget,
   });
 
   final String title;
@@ -1122,6 +1181,7 @@ class _CommandEntry {
   final String keywords;
   final String? copyText;
   final _ShellViewMode? viewMode;
+  final _SettingsFocusTarget? focusTarget;
 
   bool matches(String query) {
     final normalized = query.trim().toLowerCase();

@@ -29,6 +29,8 @@ class SettingsScreen extends StatefulWidget {
     this.requestApplicationExit,
     this.focusUpdateCenterRequest = 0,
     this.focusMcpCenterRequest = 0,
+    this.focusComposeCenterRequest = 0,
+    this.focusExportCenterRequest = 0,
   });
 
   final ShellCoreClient client;
@@ -37,6 +39,8 @@ class SettingsScreen extends StatefulWidget {
       requestApplicationExit;
   final int focusUpdateCenterRequest;
   final int focusMcpCenterRequest;
+  final int focusComposeCenterRequest;
+  final int focusExportCenterRequest;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -44,6 +48,8 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final GlobalKey _updateCenterKey = GlobalKey();
+  final GlobalKey _composeCenterKey = GlobalKey();
+  final GlobalKey _exportCenterKey = GlobalKey();
   final Set<String> _selectedExportModules =
       Set<String>.of(guiShellOptionalExportModules.keys);
   final Set<String> _stagedUpdateCandidates = <String>{};
@@ -130,17 +136,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _updatesFuture = _updateClient?.list();
     }
     if (oldWidget.focusUpdateCenterRequest != widget.focusUpdateCenterRequest) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        final targetContext = _updateCenterKey.currentContext;
-        if (!mounted || targetContext == null) return;
-        Scrollable.ensureVisible(
-          targetContext,
-          alignment: 0.08,
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOutCubic,
-        );
-      });
+      _focusSettingsSection(_updateCenterKey);
     }
+    if (oldWidget.focusComposeCenterRequest !=
+        widget.focusComposeCenterRequest) {
+      _focusSettingsSection(_composeCenterKey);
+    }
+    if (oldWidget.focusExportCenterRequest != widget.focusExportCenterRequest) {
+      _focusSettingsSection(_exportCenterKey);
+    }
+  }
+
+  void _focusSettingsSection(GlobalKey key) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final targetContext = key.currentContext;
+      if (!mounted || targetContext == null) return;
+      Scrollable.ensureVisible(
+        targetContext,
+        alignment: 0.08,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+      );
+    });
   }
 
   @override
@@ -269,16 +286,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _composePanel() {
     final client = _composeClient;
     if (client == null) {
-      return const BorderedPanel(
-        child: Text(
-            'GUI Shell構成: Broker接続がないためManifestを生成できません。local snapshotは構成権限の根拠ではありません。'),
+      return BorderedPanel(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('GUI Shell構成',
+                key: _composeCenterKey,
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 4),
+            const Text(
+                'Broker接続がないためManifestを生成できません。local snapshotは構成権限の根拠ではありません。'),
+          ],
+        ),
       );
     }
     return BorderedPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('GUI Shell構成', style: Theme.of(context).textTheme.titleMedium),
+          Text('GUI Shell構成',
+              key: _composeCenterKey,
+              style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
           const Text(
             'Runtime、Agent、Tool、MCP、Theme、Capability、SettingsをManifestへまとめます。build、独立App identity、Credential、Permission、Approval、Audit chainは生成・継承しません。',
@@ -524,8 +552,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _exportPanel() {
     final client = _exportClient;
     if (client == null) {
-      return const BorderedPanel(
-        child: Text('GUI Shell Windows書出し: Broker接続がないため操作できません。'),
+      return BorderedPanel(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('GUI Shell Windows書出し',
+                key: _exportCenterKey,
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 4),
+            const Text('Broker接続がないため操作できません。'),
+          ],
+        ),
       );
     }
     return BorderedPanel(
@@ -533,6 +570,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('GUI Shell Windows書出し',
+              key: _exportCenterKey,
               style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
           const Text(
