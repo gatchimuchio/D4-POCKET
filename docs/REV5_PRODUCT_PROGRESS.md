@@ -253,6 +253,12 @@ first-run後のDashboardからAgent Centerへ進み、既存のProvider／Model�
 
 検証: `flutter test --no-pub --no-test-assets --dart-define=GUI_SHELL_PRODUCT_VERSION=1.2.3 --plain-name "first-runからProvider／Model設定後に登録AgentのTaskを完了する" test/widget_test.dart` 1件PASS。Fake Brokerは合成Runtime／Workspace／Session／Taskと合成grantを返す。Clientはsession binding、Permission／Approval receipt、Task recordを要求へ照合し、試験は操作順とcompleted/result hashを確認する。証拠種別は`FIXTURE`で、native Owner dialog、自動承認、実Codex／Provider実行、Taskの実Workspace書込み、installed製品を証明しない。P12はOPENを維持し、次はCompare接続へ進む。
 
+#### P12接続単位4: DashboardからCompare事前検査への接続 — 完了
+
+製品AppのDashboardからAgent Centerへ遷移し、Broker Session一覧由来の異なるRuntime／Workspace／SessionをCompare候補として表示・選択、同一Task本文で2件のBroker事前検査要求を行う交点をWidgetで確認した。両要求が各Session／Workspaceへ独立に結合し、Permission／Approval状態を共有しないことを応答投影で確認する。Compare UIの候補／事前検査接続が対象であり、CLOSED済みP2 Compareの同時実行、結果選択、negative試験は再実行しない。
+
+検証: `flutter test --no-pub --no-test-assets --dart-define=GUI_SHELL_PRODUCT_VERSION=1.2.3 --plain-name "DashboardからCompare候補を選び独立Broker事前検査へ接続する" test/widget_test.dart` 1件PASS。Fake Brokerが返す2件のSessionを用いた`FIXTURE`であり、実Codex並行実行、Permission／Approval発行、Task実行・結果比較の新しい証拠ではない。P12はOPENを維持し、次はHandoff接続へ進む。
+
 ## P11作業履歴（以下の記録は当時の状態。現行状態は上記CLOSEDが正本）
 
 #### 2026-10-06 P11 Exportから製品Update trust設定への接続

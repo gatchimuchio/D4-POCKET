@@ -554,6 +554,132 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('DashboardからCompare候補を選び独立Broker事前検査へ接続する',
+      (WidgetTester tester) async {
+    const sessionA = 'a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1';
+    const sessionB = 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2';
+    const instructionHash =
+        'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const instruction = 'P12 Compare合成Task';
+    final transport = _FakeBrokerTransport([
+      _brokerHealthResponse(),
+      _brokerHostCapabilityResponse(),
+      _brokerHostListResponse(),
+      _brokerAdapterListResponse(),
+      _brokerAgentAdapterListResponse(),
+      _brokerDialogueSessionListResponse(sessions: [
+        {
+          '対話セッションID': sessionA,
+          '実行系ID': 'codex-p12-agent-a',
+          '状態': '利用中',
+          '作成監査ID': 'audit-p12-session-a',
+          '作業領域ID': 'workspace-p12-agent-a',
+          '作業領域結合監査ID': 'audit-p12-workspace-a',
+        },
+        {
+          '対話セッションID': sessionB,
+          '実行系ID': 'codex-p12-agent-b',
+          '状態': '利用中',
+          '作成監査ID': 'audit-p12-session-b',
+          '作業領域ID': 'workspace-p12-agent-b',
+          '作業領域結合監査ID': 'audit-p12-workspace-b',
+        },
+      ]),
+      _brokerAcceptedBody('normalize_payload', {'quarantined': false}),
+      _brokerAcceptedBody('content_projection', {'redacted_payload': {}}),
+      _brokerAcceptedBody('approval_edit', {'ok': false}),
+      _brokerCommandSuspendedResponse(),
+      _brokerAcceptedBody('プロファイル一覧', {}),
+      _brokerAcceptedBody('通知一覧', {}),
+      _brokerAcceptedBody('観測一覧', {}),
+      _brokerAcceptedBody('観測一覧', {}),
+      _brokerAcceptedBody('A2A接続一覧', {}),
+      for (final session in [
+        (sessionA, 'codex-p12-agent-a', 'workspace-p12-agent-a'),
+        (sessionB, 'codex-p12-agent-b', 'workspace-p12-agent-b'),
+      ])
+        _brokerAcceptedBody('Agent作業要求検査', {
+          '版': 1,
+          '状態': '要求検査済み',
+          '実行状態': '未実行',
+          'Permission状態': '未付与',
+          'Approval状態': '未取得',
+          '実行系ID': session.$2,
+          '対話セッションID': session.$1,
+          '作業領域ID': session.$3,
+          '指示hash': instructionHash,
+        }),
+    ]);
+    final client = await ShellCoreClient.product(transport: transport);
+
+    await tester.pumpWidget(GuiShellDesktopApp(client: client));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('open-agent-setup')));
+    await tester.pumpAndSettle();
+
+    final compareA = find.byKey(const ValueKey('compare-agent-a-session'));
+    final compareB = find.byKey(const ValueKey('compare-agent-b-session'));
+    expect(tester.widget<DropdownButton<String>>(compareA).value, sessionA);
+    expect(tester.widget<DropdownButton<String>>(compareB).value, sessionB);
+    expect(
+      find.text(
+          '独立した2 Sessionを選択済みです。同じTaskの事前検査後、各Permission／Approvalを個別に取得します。'),
+      findsOneWidget,
+    );
+
+    final prepare = find.byKey(const ValueKey('prepare-agent-comparison'));
+    await tester.ensureVisible(prepare);
+    expect(tester.widget<OutlinedButton>(prepare).onPressed, isNotNull);
+    await tester.tap(prepare);
+    await tester.pumpAndSettle();
+    final instructionField = find.descendant(
+      of: find.byType(AlertDialog),
+      matching: find.byType(TextFormField),
+    );
+    await tester.enterText(instructionField, instruction);
+    await tester.tap(find.text('両Agentを事前検査'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+          '同じTask本文を別Sessionで検査しました。各AgentのWorkspace PermissionとTask Approvalを個別に行ってください。'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Agent A Permission／Approval: 未付与 / 未取得'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Agent B Permission／Approval: 未付与 / 未取得'),
+      findsOneWidget,
+    );
+    final preflightRequests = transport.requests
+        .where((request) => request['operation'] == 'Agent作業要求検査')
+        .map((request) => request['payload']! as Map)
+        .toList();
+    expect(preflightRequests, hasLength(2));
+    expect(
+      preflightRequests.map((request) => request['session_id']).toSet(),
+      {sessionA, sessionB},
+    );
+    expect(
+      preflightRequests.map((request) => request['workspace_id']).toSet(),
+      {'workspace-p12-agent-a', 'workspace-p12-agent-b'},
+    );
+    expect(
+      preflightRequests.map((request) => request['instruction']).toSet(),
+      {instruction},
+    );
+    expect(
+      transport.operations,
+      isNot(contains('AgentTaskWorkspacePermissionGrant')),
+    );
+    expect(
+        transport.operations, isNot(contains('AgentTaskOwnerApprovalGrant')));
+    expect(transport.operations, isNot(contains('AgentTask実行')));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('状態バーが段階Bの所有者利用とリリース未主張を表示する', (WidgetTester tester) async {
     await tester.pumpWidget(
       MaterialApp(
