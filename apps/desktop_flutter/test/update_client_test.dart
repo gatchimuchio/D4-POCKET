@@ -68,6 +68,128 @@ class _UpdateTransport implements BrokerTransport {
 }
 
 void main() {
+  test('Install操作は既知の未導入状態だけに表示する', () {
+    expect(
+      UpdateClient.isFirstInstall({
+        '状態': 'unavailable',
+        '現在版': null,
+        '対象版': null,
+      }),
+      isTrue,
+    );
+    expect(
+      UpdateClient.activationActionLabel(
+        {'状態': 'unavailable', '現在版': null},
+        alreadyActive: false,
+      ),
+      'インストール',
+    );
+    expect(
+      UpdateClient.activationActionLabel(
+        {
+          '状態': 'unavailable',
+          '現在版': {'提供版': '1.0.0'}
+        },
+        alreadyActive: false,
+      ),
+      '更新を有効化',
+    );
+    expect(
+      UpdateClient.activationActionLabel(
+        {'状態': 'unknown', '現在版': null},
+        alreadyActive: false,
+      ),
+      '導入状態不明',
+    );
+    expect(
+      UpdateClient.canChangeActiveVersion({'状態': 'unknown'}),
+      isFalse,
+    );
+  });
+
+  test('未起動版へ展開できるのは同じdownload済み候補だけ', () {
+    final packageSha256 = List.filled(64, 'a').join();
+    final downloaded = {
+      '状態': 'downloaded',
+      '更新ID': 'update-1',
+      '候補hash': 'sha256:abc',
+      'package_sha256': packageSha256,
+    };
+    expect(
+      UpdateClient.matchesDownloadedCandidate(
+        downloaded,
+        updateId: 'update-1',
+        candidateHash: 'sha256:abc',
+        packageSha256: packageSha256,
+      ),
+      isTrue,
+    );
+    expect(
+      UpdateClient.matchesDownloadedCandidate(
+        downloaded,
+        updateId: 'update-2',
+        candidateHash: 'sha256:abc',
+        packageSha256: packageSha256,
+      ),
+      isFalse,
+    );
+    expect(
+      UpdateClient.matchesDownloadedCandidate(
+        {...downloaded, '候補hash': 'sha256:stale'},
+        updateId: 'update-1',
+        candidateHash: 'sha256:abc',
+        packageSha256: packageSha256,
+      ),
+      isFalse,
+    );
+  });
+
+  test('Install／Update有効化はstageとBroker状態が揃うまで要求できない', () {
+    const packageHash =
+        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    final freshInstall = <String, Object?>{
+      '状態': 'unavailable',
+      '現在版': null,
+      '対象版': null,
+    };
+    expect(
+      UpdateClient.canRequestActivation(
+        rollbackState: freshInstall,
+        staged: false,
+        alreadyActive: false,
+        rollbackTarget: false,
+        signatureStatus: 'verified',
+        packageSha256: packageHash,
+        packageSize: 1024,
+      ),
+      isFalse,
+    );
+    expect(
+      UpdateClient.canRequestActivation(
+        rollbackState: freshInstall,
+        staged: true,
+        alreadyActive: false,
+        rollbackTarget: false,
+        signatureStatus: 'verified',
+        packageSha256: packageHash,
+        packageSize: 1024,
+      ),
+      isTrue,
+    );
+    expect(
+      UpdateClient.canRequestActivation(
+        rollbackState: {'状態': 'unknown'},
+        staged: true,
+        alreadyActive: false,
+        rollbackTarget: false,
+        signatureStatus: 'verified',
+        packageSha256: packageHash,
+        packageSize: 1024,
+      ),
+      isFalse,
+    );
+  });
+
   test('署名状態は現在trustの再検証意味を日本語表示する', () {
     expect(
       UpdateClient.signatureStatusLabel('verified'),

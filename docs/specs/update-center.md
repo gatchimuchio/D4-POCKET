@@ -1,6 +1,6 @@
 # 更新センター
 
-状態: C12 download、署名済みpackageの未起動version staging、別Owner確認によるactive version record／Start Menu shortcut切替、およびBrokerが記録した直前版へのRollbackをBroker／native Owner経路へ接続。process起動は行わない。RollbackはBroker fixtureで成立し、installed product経路の証拠は別途必要。
+状態: C12 download、署名済みpackageの未起動version staging、別Owner確認によるactive version record／Start Menu shortcut切替、およびBrokerが記録した直前版へのRollbackをBroker／native Owner経路へ接続。UIは初回導入と導入済み更新をBroker状態から区別し、download完了後だけ未起動版展開操作を有効化する。process起動は行わない。RollbackはBroker fixtureで成立し、installed product経路の証拠は別途必要。
 
 更新センターは、更新候補の表示、Broker所有信頼設定によるEd25519署名検査、更新適用の要求、延期、rollback要求を扱う。更新候補自身の公開鍵、MCP metadata、Profile、履歴、UI stateは信頼源ではない。
 
@@ -55,6 +55,10 @@ Brokerは永続Auditを利用できる場合に限り、展開前の`queued`を�
 Rollbackは有効版recordだけを変更する。process起動、実行中processの変更、stage／package／旧版の削除、Start Menu shortcutの変更を行わず、選択版は次回の固定root Bootstrapper起動時に使われる。開始・完了／失敗をAuditし、native Owner確認を更新stage／有効化の確認と共有しない。現状の証拠はRust Broker／Bootstrapper fixtureとdesktop native-confirmation境界までであり、正式installed product／実配布元連結のLIVE_RUNTIME証拠ではない。
 
 Flutterは一覧表示と要求送信だけを担当し、filesystem、process、network、credential、privileged IPCを直接扱わない。
+
+### 初回導入／更新UI状態
+
+Brokerの更新一覧は、現行候補との照合に成功したactive version descriptorを、Rollback先がまだない初回導入後も`現在版`へ投影する。recordなしの`unavailable + 現在版=null`だけを初回Install候補として表示し、active versionがある場合はUpdate操作、状態が`unknown`なら有効版切替を無効化する。未起動版展開は、現在のdownload jobが同じ更新ID・候補hash・package SHA-256で`downloaded`の場合だけUIから要求可能とする。有効版切替は同候補のstage要求が`version_staged`で受理された後だけ画面内で有効化する。この画面内stage印は表示制御だけでAuthorityではなく、Brokerは各要求時に署名、package内容、stage、固定導入先、Owner確認を再検証する。download job／画面内stage印はprocess内状態なので、再起動後は再download・冪等stage要求でBrokerが既存package／stageを再検証してから進む。Install／Update切替後もprocessはその場で起動せず、Start Menuの固定Bootstrapperから次回起動する。
 
 ## 検証対象
 

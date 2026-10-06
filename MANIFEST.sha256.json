@@ -288,7 +288,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/settings.dart",
-      "sha256": "5696cf0d74c9ae79dc48c324e3b1221e5a83c27863ec6efc60742d08a2cab8d9"
+      "sha256": "f06f8fb69caf111bdae6fc89bad7dfa9505ec1f235fbd23792afbbfcea6523ac"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/setup_doctor.dart",
@@ -392,7 +392,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/update_client.dart",
-      "sha256": "9406c5bee5359c68bcc9969fb745a1b58a67b382c7409e477414c76d4d78a4c5"
+      "sha256": "26d4f1379236f4efc5eff5fb3ba19787f492d5ad975618ea216126a9e6dd7066"
     },
     {
       "path": "apps/desktop_flutter/lib/services/windows_tray_client.dart",
@@ -656,7 +656,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/update_client_test.dart",
-      "sha256": "a9f94d5fe7db3a0e1af0d5627874b21dcd4c957c457a7b089aaeb32c56bd6280"
+      "sha256": "84b5d48116ae90d09799bd3a1a75792e9914265866869e6bf70186cf0e527e66"
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
@@ -1184,7 +1184,7 @@
     },
     {
       "path": "docs/FINAL_QA_QUEUE.md",
-      "sha256": "2c6a61e4efd2dc6d1d62b86c3ec4af920d3c6e1a92ad9f511d028a29e8e7a697"
+      "sha256": "e2ed1d668138f5018731287add3323e2cf5a178dfe39e12b598d14d758f9ee63"
     },
     {
       "path": "docs/FIRST_RUN.md",
@@ -1240,7 +1240,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "b74d0930a5f335a9061cffdcc25926b4eb2dcf267ab1efec3e0b10b0d15f2118"
+      "sha256": "1f179556f5e4bf4300f21cdffda0bca490ab67b9f298e28d12fcc856d1eb69d1"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1508,7 +1508,7 @@
     },
     {
       "path": "docs/specs/update-center.md",
-      "sha256": "c739b6cdc789fb181c76405519ab770ef72b0b985615247da0fd8a3920213a24"
+      "sha256": "2e60c96cef49a00127fa55ead16fa244ca072435b18138386252531c4a2f9fbd"
     },
     {
       "path": "docs/specs/windows-desktop-launcher.md",
@@ -3340,7 +3340,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "d8f8572b0f1166a7b0ac55696d9eeffa0947ebbf5a006ff1d4b8a8d0d01546c9"
+      "sha256": "890d9df7b03aa4457ba0ccb70908cff061a451e6bb7caa56dc4327adaad6e119"
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",

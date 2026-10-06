@@ -13,6 +13,54 @@ class UpdateClient {
         _ => '不明',
       };
 
+  static bool matchesDownloadedCandidate(
+    Object? value, {
+    required String updateId,
+    required String candidateHash,
+    required String packageSha256,
+  }) =>
+      value is Map &&
+      value['状態'] == 'downloaded' &&
+      value['更新ID'] == updateId &&
+      value['候補hash'] == candidateHash &&
+      value['package_sha256'] == packageSha256;
+
+  static bool canChangeActiveVersion(Map<String, Object?>? rollbackState) =>
+      rollbackState?['状態'] == 'available' ||
+      rollbackState?['状態'] == 'unavailable';
+
+  static bool canRequestActivation({
+    required Map<String, Object?>? rollbackState,
+    required bool staged,
+    required bool alreadyActive,
+    required bool rollbackTarget,
+    required Object? signatureStatus,
+    required Object? packageSha256,
+    required Object? packageSize,
+  }) =>
+      staged &&
+      !alreadyActive &&
+      !rollbackTarget &&
+      canChangeActiveVersion(rollbackState) &&
+      signatureStatus == 'verified' &&
+      packageSha256 is String &&
+      RegExp(r'^[a-f0-9]{64}$').hasMatch(packageSha256) &&
+      packageSize is num &&
+      packageSize > 0;
+
+  static bool isFirstInstall(Map<String, Object?>? rollbackState) =>
+      rollbackState?['状態'] == 'unavailable' && rollbackState?['現在版'] == null;
+
+  static String activationActionLabel(
+    Map<String, Object?>? rollbackState, {
+    required bool alreadyActive,
+  }) {
+    if (alreadyActive) return '現在の有効版';
+    if (isFirstInstall(rollbackState)) return 'インストール';
+    if (canChangeActiveVersion(rollbackState)) return '更新を有効化';
+    return '導入状態不明';
+  }
+
   static String packageSourceLabel(Object? value) {
     if (value is! Map) return '配布元状態不明';
     final status = value['状態'];

@@ -29,6 +29,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final Set<String> _selectedExportModules =
       Set<String>.of(guiShellOptionalExportModules.keys);
+  final Set<String> _stagedUpdateCandidates = <String>{};
   final TextEditingController _searchController = TextEditingController();
   bool _modifiedOnly = false;
   bool _authorityOnly = false;
@@ -755,7 +756,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Text('更新センター', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 4),
               Text(
-                '信頼設定=${body['署名信頼設定'] ?? 'unknown'}。downloadは直接HTTPS接続のみ（system proxy・自動retryなし）で、Rust Desktopの確認が必要です。適用要求は署名済みpackageを固定version directoryへ未起動状態で展開します。有効版切替は別のRust Desktop確認後にpackageとstage全体を再検証し、有効版recordと固定root Bootstrapperを指すStart Menu shortcutを登録します。切替成功後は検証済みのdownload packageだけをBroker cacheから除去し、stageと旧versionは保持します。rollbackはBroker記録の直前版へ有効版recordだけを戻し、次回起動時に適用します。',
+                '信頼設定=${body['署名信頼設定'] ?? 'unknown'}。downloadは直接HTTPS接続のみ（system proxy・自動retryなし）で、Rust Desktopの確認が必要です。download完了後に未起動版へ展開し、初回は「インストール」、導入済みなら「更新を有効化」します。別のRust Desktop確認後にpackageとstage全体を再検証し、有効版recordと固定root Bootstrapperを指すStart Menu shortcutを登録します。製品起動はStart Menuから行い、有効版切替は次回起動時に反映されます。切替成功後は検証済みdownload packageだけをBroker cacheから除去し、stageと旧versionは保持します。rollbackはBroker記録の直前版へ有効版recordだけを戻します。',
               ),
               if (downloadJob != null) ...[
                 const SizedBox(height: 4),
@@ -813,8 +814,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ? '$packageSize bytes'
         : 'byte長不明';
     final jobState = downloadJob?['状態'];
-    final jobUpdateId = downloadJob?['更新ID'];
-    final alreadyDownloaded = jobState == 'downloaded';
+    final downloadedForUpdate = UpdateClient.matchesDownloadedCandidate(
+      downloadJob,
+      updateId: updateId,
+      candidateHash: candidateHash,
+      packageSha256: packageSha256 ?? '',
+    );
     final downloadBusy =
         jobState == 'downloading' || jobState == 'audit_failed';
     final sourceConfigured =
@@ -823,7 +828,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         update['署名状態'] == 'verified' &&
         sourceConfigured &&
         !downloadBusy &&
-        !alreadyDownloaded;
+        !downloadedForUpdate;
     final activeVersion = rollbackState?['現在版'];
     final rollbackVersion = rollbackState?['対象版'];
     final isAlreadyActive = activeVersion is Map &&
@@ -832,12 +837,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final isRollbackTarget = rollbackVersion is Map &&
         rollbackVersion['更新ID'] == updateId &&
         rollbackVersion['候補hash'] == candidateHash;
-    final canRequestActivation = !isAlreadyActive &&
-        !isRollbackTarget &&
-        update['署名状態'] == 'verified' &&
-        RegExp(r'^[a-f0-9]{64}$').hasMatch(packageSha256 ?? '') &&
-        packageSize is num &&
-        packageSize > 0;
+    final canRequestActivation = UpdateClient.canRequestActivation(
+      rollbackState: rollbackState,
+      staged: _stagedUpdateCandidates.contains('$updateId|$candidateHash'),
+      alreadyActive: isAlreadyActive,
+      rollbackTarget: isRollbackTarget,
+      signatureStatus: update['署名状態'],
+      packageSha256: packageSha256,
+      packageSize: packageSize,
+    );
+    final canApply =
+        downloadedForUpdate && !isAlreadyActive && !isRollbackTarget;
     final rollbackCurrent = rollbackState?['現在版'];
     final canRollback = rollbackState?['状態'] == 'available' &&
         rollbackCurrent is Map &&
@@ -845,6 +855,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         rollbackCurrent['候補hash'] == candidateHash &&
         update['署名状態'] == 'verified' &&
         update['rollback可能'] == true;
+    final activationLabel = UpdateClient.activationActionLabel(
+      rollbackState,
+      alreadyActive: isAlreadyActive,
+    );
+    final activationSuccess = UpdateClient.isFirstInstall(rollbackState)
+        ? 'D4 Pocketを固定導入先へインストールし、Start Menuへ登録しました。Start Menuから起動してください。'
+        : '有効版を切り替え、Start Menuへ登録しました。選択版は次回起動時に使用します。';
     return ListTile(
       contentPadding: EdgeInsets.zero,
       title: Text('${update['提供版'] ?? ''} ($updateId)'),
@@ -867,19 +884,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       'download jobを開始しました。取得状態は一覧を更新して確認できます。',
                     )
                 : null,
-            child: Text(alreadyDownloaded && jobUpdateId == updateId
-                ? '取得済み'
-                : 'download'),
+            child: Text(downloadedForUpdate ? '取得済み' : 'download'),
           ),
           TextButton(
-            onPressed: () => _runUpdateRequest(
-              () => client.requestApply(
-                updateId: updateId,
-                candidateHash: candidateHash,
-              ),
-              '署名済みpackageを未起動versionとして固定導入先へ展開しました。Start Menu切替・process起動・rollbackはsuspendedです。',
-            ),
-            child: const Text('適用要求'),
+            onPressed: canApply
+                ? () => _runUpdateRequest(
+                      () async {
+                        final body = await client.requestApply(
+                          updateId: updateId,
+                          candidateHash: candidateHash,
+                        );
+                        if (body['導入状態'] == 'version_staged') {
+                          setState(() => _stagedUpdateCandidates
+                              .add('$updateId|$candidateHash'));
+                        }
+                        return body;
+                      },
+                      '署名済みpackageを未起動versionとして固定導入先へ展開しました。Start Menu切替・process起動・rollbackは別操作です。',
+                    )
+                : null,
+            child: const Text('未起動版へ展開'),
           ),
           TextButton(
             onPressed: canRequestActivation
@@ -888,10 +912,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         updateId: updateId,
                         candidateHash: candidateHash,
                       ),
-                      '有効版recordを切り替え、固定root Bootstrapperを指すStart Menu shortcutを登録しました。検証済みdownload package cacheだけを除去し、stageと旧版は保持しています。次回の固定root起動時に選択版を使用します。process起動は行っていません。',
+                      '$activationSuccess 検証済みdownload package cacheだけを除去し、stageと旧versionは保持しています。processはこの場で起動していません。',
                     )
                 : null,
-            child: Text(isAlreadyActive ? '現在の有効版' : '有効版へ切替'),
+            child: Text(activationLabel),
           ),
           TextButton(
             onPressed: () => _runUpdateRequest(

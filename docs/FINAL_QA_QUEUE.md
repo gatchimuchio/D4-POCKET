@@ -37,6 +37,8 @@
 
 2026-10-06 P11 Rollback検証時: 集約Rust全targetの中間回で既存`broker::dialogue::broker_codex_loopback_support::tests::failed_tool_result_is_not_replayed_as_another_exec_command`がHTTP response header到達前のOS `ConnectionReset`で失敗した。focused再実行は1 passed、対象名を保持した後続all-targetsはlib 476 passed／0 failed／12 ignored、全体522 passed／0 failed／13 ignored。別中間回の`broker_ipc` targetも9 passed／1 failedを観測したが、同じ後続all-targetsで10 passed／0 failed。根因は確認できず、P11 Broker Rollback差分との因果も観測されない。HTTP loopback不安定性は既存`FQ-TEST-LOOPBACK`の最終統合時確認へ残し、現phaseをblockしない。
 
+2026-10-06 P11初回Install／Update導線検証: `cargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1`は474 passed／2 failed／12 ignored。失敗は`a2a::tests::loopback_HTTPからAgent_Cardを取得してmetadata_onlyへ射影する`と`adapters::minidora::tests::ContentLength付きJSONだけを期限内に取得する`で、各focused再実行は1 passed。今回のBroker update projection／package install UI差分との因果は観測されず、既存`FQ-TEST-LOOPBACK`の最終統合試験で確認し、現phaseはblockしない。
+
 ## 3. Final QA段階
 
 | 段階 | 対象 | 開始条件 |

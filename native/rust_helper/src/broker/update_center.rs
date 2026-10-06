@@ -658,16 +658,21 @@ fn rollback_state_projection(broker: &Broker) -> Value {
             }
             Err(_) => return json!({"状態": "unknown", "現在版": null, "対象版": null}),
         };
-        let Some(previous) = snapshot.previous else {
+        if !rollback_descriptor_matches_candidate(broker, &snapshot.current) {
             return json!({
-                "状態": "unavailable",
+                "状態": "unknown",
                 "現在版": null,
                 "対象版": null,
             });
+        }
+        let Some(previous) = snapshot.previous else {
+            return json!({
+                "状態": "unavailable",
+                "現在版": rollback_descriptor_projection(&snapshot.current),
+                "対象版": null,
+            });
         };
-        if !rollback_descriptor_matches_candidate(broker, &snapshot.current)
-            || !rollback_descriptor_matches_candidate(broker, &previous)
-        {
+        if !rollback_descriptor_matches_candidate(broker, &previous) {
             return json!({
                 "状態": "unknown",
                 "現在版": null,
@@ -3722,6 +3727,10 @@ mod tests {
             .status,
             BrokerStatus::Accepted
         );
+        let first_install_state = rollback_state_projection(&broker);
+        assert_eq!(first_install_state["状態"], "unavailable");
+        assert_eq!(first_install_state["現在版"]["提供版"], "1.0.0");
+        assert!(first_install_state["対象版"].is_null());
         let package_directory = broker
             .state_store
             .open_update_package_directory()
