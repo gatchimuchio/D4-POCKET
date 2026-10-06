@@ -338,7 +338,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('first-run後の概要からBroker統治Runtime登録へ進める',
+  testWidgets('first-runからProvider／Modelを設定してBroker統治登録へ進める',
       (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1200, 1000);
     tester.view.devicePixelRatio = 1;
@@ -355,6 +355,20 @@ void main() {
       _brokerAcceptedBody('content_projection', {'redacted_payload': {}}),
       _brokerAcceptedBody('approval_edit', {'ok': false}),
       _brokerCommandSuspendedResponse(),
+      _brokerAcceptedBody('プロファイル一覧', {}),
+      _brokerAcceptedBody('通知一覧', {}),
+      _brokerAcceptedBody('観測一覧', {}),
+      _brokerAcceptedBody('観測一覧', {}),
+      _brokerAcceptedBody('A2A接続一覧', {}),
+      _brokerAcceptedBody('AgentCLI実行系作業領域登録', {
+        'runtime_id': 'codex-p12-synthetic',
+        'workspace_id': 'workspace-p12-synthetic',
+        'registration_lifetime': 'broker_process',
+        'task_execution': 'unsupported',
+        'permission_generated': false,
+        'approval_generated': false,
+        'credential_value_accepted': false,
+      }),
     ]);
     final client = await ShellCoreClient.product(transport: transport);
     expect(client.mode, 'broker');
@@ -371,6 +385,44 @@ void main() {
     expect(transport.operations, contains('初回設定取得'));
     expect(transport.operations, contains('Setup Doctor報告取得'));
     expect(transport.operations, isNot(contains('AgentCLI実行系作業領域登録')));
+
+    await tester.tap(find.text('登録を開始'));
+    await tester.pumpAndSettle();
+    expect(find.text('OpenAI（Codex CLI経由・現在の実装経路）'), findsOneWidget);
+
+    final fields = find.byType(TextFormField);
+    await tester.enterText(fields.at(0), 'model-p12-synthetic');
+    await tester.enterText(fields.at(1), 'codex-p12-synthetic');
+    await tester.enterText(fields.at(2), r'C:\Tools\Codex\codex.exe');
+    await tester.enterText(fields.at(3), 'workspace-p12-synthetic');
+    await tester.enterText(fields.at(4), r'C:\d4-p12-synthetic-workspace');
+    await tester.tap(find.text('native Owner確認へ進む'));
+    await tester.pumpAndSettle();
+
+    final registrationRequest = transport.requests.singleWhere(
+      (request) => request['operation'] == 'AgentCLI実行系作業領域登録',
+    );
+    final registrationResponse = transport.returnedResponses.singleWhere(
+      (response) => response['operation'] == 'AgentCLI実行系作業領域登録',
+    );
+    expect(registrationResponse['status'], 'accepted');
+    final registration = registrationRequest['payload']! as Map;
+    expect(registration['provider_model_selection'], {
+      'version': 1,
+      'provider_id': 'openai_codex_cli',
+      'model_id': 'model-p12-synthetic',
+      'authentication_source': 'codex_cli_managed',
+      'automatic_fallback': false,
+    });
+    expect(registration['runtime_id'], 'codex-p12-synthetic');
+    expect(registration['workspace_id'], 'workspace-p12-synthetic');
+    expect(registration['workspace_root'], r'C:\d4-p12-synthetic-workspace');
+    expect(registration.containsKey('permission'), isFalse);
+    expect(registration.containsKey('approval_id'), isFalse);
+    expect(find.textContaining('Broker起動中だけ登録しました'), findsOneWidget);
+    expect(find.textContaining('OpenAI（Codex CLI経由） / model-p12-synthetic'),
+        findsOneWidget);
+    expect(find.text('登録Workspaceで対話Sessionを開始'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

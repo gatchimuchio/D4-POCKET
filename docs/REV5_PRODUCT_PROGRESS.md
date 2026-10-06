@@ -239,7 +239,13 @@ rev5工程表の15段階の正常利用scenarioを、D4 Pocketの一つの製品
 
 Dashboardに、first-run後の次の操作として既存Agent Centerを開く明示導線を追加した。Runtime／Workspace登録のBroker要求、native Owner確認、Permission、Task Approvalの実装は変更せず、FlutterはBroker未接続時に登録を実行しない。製品modeのFake Brokerで初回設定取得・Setup Doctor取得後にAgent Centerへ遷移するWidget試験と、既存のCodex登録UIが指定値だけをBrokerへ送りpermission／approval fieldを送らないWidget試験を個別に実行した。
 
-検証: Dashboard遷移と既存登録UIのfocused Flutter Widget test各1件PASS（`--no-pub --no-test-assets --dart-define=GUI_SHELL_PRODUCT_VERSION=1.2.3`）。`flutter analyze --no-pub lib/main.dart lib/screens/dashboard.dart test/widget_test.dart`は3項目No issues found（日本語を含むOneDrive pathでLSP messageが壊れたため一時drive aliasから実行）。`dart format lib/main.dart lib/screens/dashboard.dart test/widget_test.dart`は変更なし。Schema 161／正常例157／負例208、Conformance 236 checks PASS。試験証拠は`FIXTURE`であり、実installed product、native Owner dialog、実Codex processの証拠ではない。次はProvider／Model設定へ進む。
+検証: Dashboard遷移と既存登録UIのfocused Flutter Widget test各1件PASS（`--no-pub --no-test-assets --dart-define=GUI_SHELL_PRODUCT_VERSION=1.2.3`）。`flutter analyze --no-pub lib/main.dart lib/screens/dashboard.dart test/widget_test.dart`は3項目No issues found（日本語を含むOneDrive pathでLSP messageが壊れたため一時drive aliasから実行）。`dart format lib/main.dart lib/screens/dashboard.dart test/widget_test.dart`は変更なし。Schema 161／正常例157／負例208、Conformance 236 checks PASS。試験証拠は`FIXTURE`であり、実installed product、native Owner dialog、実Codex processの証拠ではない。当時の次工程Provider／Modelは接続単位2で確認済み。
+
+#### P12接続単位2: first-runからProvider／ModelとRuntime／Workspace登録 — 完了
+
+DashboardからAgent Centerへ進み、既存登録画面でProvider／Modelを設定し、Runtime／Workspace登録要求まで到達する製品経路Widgetを追加した。P4でCLOSED済みのProvider／Model選択実装は変更せず、`openai_codex_cli`、合成模型ID、Runtime ID、Workspace ID／rootが同じBroker登録要求へ結合される接続だけを確認する。Permission／Approvalを登録payloadへ追加しない。P12の現行フォームはRuntime／Agent Adapter／Workspace登録を一つにまとめるため、独立したProvider CenterやWorkspace pickerは追加していない。
+
+検証: `flutter test --no-pub --no-test-assets --dart-define=GUI_SHELL_PRODUCT_VERSION=1.2.3 --plain-name "first-runからProvider／Modelを設定してBroker統治登録へ進める" test/widget_test.dart` 1件PASS。Dashboard first-run設定・Setup Doctor取得から登録画面へ進み、明示したUI操作後にFake Brokerが受理する要求のProvider／Model、Runtime、Workspace bindingとAuthority field不在を確認した。試験応答は`FIXTURE`であり、画面上のOwner確認遷移は実native dialogではなく、実Codex CLI／Provider呼出し・installed productを証明しない。P4の既存条件は再試験していない。次は同じ製品経路から登録Agent Sessionを開始し、normal Agent Taskへ接続する。
 
 ## P11作業履歴（以下の記録は当時の状態。現行状態は上記CLOSEDが正本）
 

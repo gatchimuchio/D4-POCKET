@@ -2,7 +2,9 @@
 
 2026-10-06 rev5現行工程: P11 Windows ProductizationはProduct Build受入れをCLOSED、P12 Product IntegrationをOPENとする。P11 InstallerはP9 portable ZIPをbootstrapとした製品内Update Centerの初回Installとして実装・局所検証済みで、standalone MSI／Setup.exeや正式配布を主張しない。P12では現行工程表の15段階を一つの正常利用scenarioへ接続する。詳細は`docs/REV5_PRODUCT_PROGRESS.md`。
 
-2026-10-06 rev5 P12接続単位1: first-run設定とSetup Doctor取得後、Dashboardから既存Agent CenterのCodex／Workspace登録UIへ進む導線を追加。Dashboard遷移Widget 1件と既存登録UI／Broker要求Widget 1件、変更Dart解析・形式確認、Schema 161／157／208、Conformance 236 checksがPASS。Fake Brokerによる`FIXTURE`証拠で、installed製品・native Owner dialog・実Codex起動を示さない。P12はOPENを維持し、次のProvider／Model接続へ進む。
+2026-10-06 rev5 P12接続単位1: first-run設定とSetup Doctor取得後、Dashboardから既存Agent CenterのCodex／Workspace登録UIへ進む導線を追加。Dashboard遷移Widget 1件と既存登録UI／Broker要求Widget 1件、変更Dart解析・形式確認、Schema 161／157／208、Conformance 236 checksがPASS。Fake Brokerによる`FIXTURE`証拠で、installed製品・native Owner dialog・実Codex起動を示さない。
+
+2026-10-06 rev5 P12接続単位2: first-run／Setup Doctor後のDashboard導線からAgent Centerを開き、Provider／Modelを設定してRuntime／Workspace登録要求まで進むWidget統合を追加。合成値とFake Brokerでprovider/model、runtime、workspaceの束縛とAuthority field不在を確認。`FIXTURE`証拠で、native Owner dialog、実Codex、installed製品の成立は示さない。P2〜P11のCLOSED機能は再実装せず、P12はOPENを維持して登録Session／Agent Task接続へ進む。
 
 2026-10-06 rev5 P11追補: portable製品のLIVE_RUNTIME確認では、未選択のSettingsをIndexedStackが起動時にmountし、その`initState`からUpdate一覧Broker IPCを先行発行していた。初期表示時に通信失敗を観測した一方、後の明示的な候補取得は未設定trustによりBrokerが正しく拒否し、その後の一覧読取はacceptedとなった。製品画面を選択した時だけ一覧を読むよう変更し、非選択中0回／選択時1回のFlutter回帰testを追加。対象test 17件、変更Dart解析、Schema 161／157／208、Conformance 236 checks PASS。strict日本語監査は今回変更外のrev3／rev4履歴とCodex CLI診断文の既存3 findingsで終了値1、今回変更fileのfindingはない。修正後のWindows LIVE_RUNTIME再実行は未実施。この修正を含むP11 Product Buildは閉鎖済み。
 
