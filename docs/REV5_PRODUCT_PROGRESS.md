@@ -265,6 +265,12 @@ DashboardからAgent Centerへ進み、Provider／ModelとRuntime／Workspace登
 
 検証: `flutter test --no-pub --no-test-assets --dart-define=GUI_SHELL_PRODUCT_VERSION=1.2.3 --plain-name "first-runから登録Agent Taskを完了しHandoffを受信側へ接続する" test/widget_test.dart` 1件PASS。OneDrive上の元worktreeではFlutterがmacOS／iOSのignored `ephemeral/Packages/.packages` Cloud Files reparse pointを削除できない旨を出したが、対象testの終了値は0。ASCII一時worktreeへ同じ変更testを複製したFlutter解析は対象Widget `No issues found!`、Mobile全体`No issues found!`。Desktop全体解析は今回未変更の`agent_center.dart`に既存deprecated API info 5件があり終了値1。日本語pathの元worktreeからのFlutter解析はCloud Files cleanup失敗で完了しなかった。`dart format --output=none --set-exit-if-changed test/widget_test.dart`は変更なし。Schema 161／正常例157／負例208、Conformance 236 checksがPASS。`tooling/日本語基底監査.py --strict`は変更対象にfindingなし、履歴／未変更CLI診断文の既存3 findingsにより全体終了値1。Manifest 1180 filesとWindows v1 Release Gate、`git diff --check`はPASS。Fake Brokerの合成Task、full結果承認／投影、受信Sessionを使った`FIXTURE`であり、表示操作はnative Owner dialogを実演せず、実Codex間転送、実Workspace書込み、installed製品を証明しない。P3 CLOSEDのHandoff処理やnegative testは再実装・再試験していない。P12はOPENを維持し、次はHistory／Diff接続へ進む。
 
+#### P12接続単位6: Task結果から履歴／Workspace差分面への接続 — 完了
+
+Desktop Shellは履歴画面を開いたとき、既に接続済みの`ShellCoreClient`が保持するBrokerTransportを既存`HistoryClient`へ渡す。BrokerTransportがない診断起動時は従来の接続処理を残す。Agent Centerの完了Taskからfull Content Exposureで得たAgent申告の`changed_files`／`diff`／`test_result`を同一利用scenarioで確認し、履歴画面では独立した現在の履歴閲覧GrantでTask記録、result hash、監査参照だけを読む。履歴にはTask本文・過去Permission／Approval／Credentialを復元せず、画面からAgent Centerへ戻ると別Broker承認・baselineを使うWorkspace Inspectorで作業領域差分を見る案内を保つ。Task結果のAgent申告とWorkspaceの独立観測を同一視しない。
+
+検証: `flutter test --no-pub --dart-define=GUI_SHELL_PRODUCT_VERSION=1.2.3 --plain-name "first-runから登録Agent Taskを完了しHandoffと履歴へ接続する" test/widget_test.dart` 1件PASS。ASCII一時worktreeでlockfileどおり依存解決後に実行し、変更Flutter 2 fileの`flutter analyze`は`No issues found!`。Desktop全体解析は未変更`agent_center.dart`の既存deprecated API info 5件で終了値1、Mobile全体は`No issues found!`。一時検証の初回`--no-pub`では無視対象`.dart_tool`がなくtestを起動できず、`--no-test-assets`実行ではInk shaderが不足した。通常のtest asset生成へ切替後、重複表示されるNavigation／IndexedStack文言をtestが1件と仮定していた二箇所を修正し最終PASSした。Schema 161／正常例157／負例208、Conformance 236 checksはPASS。strict日本語監査は今回変更fileにfindingなし、旧rev3／rev4履歴と未変更Codex CLI診断文の既存3 findingsにより終了値1。Manifest 1180 filesとWindows v1 Release GateはPASS。試験はFake Brokerの`FIXTURE`で、履歴Grantは既存の現在承認を返す応答でありOwner UI、実Broker、実Agent、Workspaceの実差分・installed製品証拠ではない。P5 CLOSEDのHistory／Workspace Inspector本体・negative試験は再実装していない。P12はOPENを維持し、次はMCP接続へ進む。
+
 ## P11作業履歴（以下の記録は当時の状態。現行状態は上記CLOSEDが正本）
 
 #### 2026-10-06 P11 Exportから製品Update trust設定への接続

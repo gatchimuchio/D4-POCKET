@@ -338,7 +338,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('first-runから登録Agent Taskを完了しHandoffを受信側へ接続する',
+  testWidgets('first-runから登録Agent Taskを完了しHandoffと履歴へ接続する',
       (WidgetTester tester) async {
     const sessionId = 'c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1';
     const targetSessionId = 'f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4';
@@ -348,6 +348,27 @@ void main() {
     const resultHash =
         'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
     const resultSummary = 'P12で承認済み結果を受信Taskへ渡す';
+    const historyApprovalId = '77777777777777777777777777777777';
+    final historyGrant = <String, Object?>{
+      'approval_id': historyApprovalId,
+      'runtime_id': 'codex-p12-synthetic',
+      'expires_at': DateTime.now().millisecondsSinceEpoch ~/ 1000 + 240,
+    };
+    Map<String, Object?> historyResponse(
+      String operation,
+      Map<String, Object?> body,
+    ) =>
+        {
+          'request_id': 'test-$operation',
+          'operation': operation,
+          'status': 'accepted',
+          'evidence_source': 'INTERNAL_STATE',
+          'audit_event_id': 'audit-$operation',
+          'error': null,
+          'health': null,
+          'body': body,
+          'shutdown_requested': false,
+        };
     final approvedResult = jsonEncode({
       'result_summary': resultSummary,
       'artifacts': [
@@ -511,6 +532,68 @@ void main() {
         '作業領域ID': 'workspace-p12-target',
         '指示hash': instructionHash,
       }),
+      historyResponse('対話履歴閲覧状態', {
+        'grant': historyGrant,
+        'page': null,
+      }),
+      historyResponse('対話履歴閲覧', {
+        'grant': historyGrant,
+        'page': {
+          'version': 1,
+          'entries': const <Object?>[],
+          'next_cursor': 0,
+          'has_more': false,
+          'head_hash': null,
+        },
+      }),
+      historyResponse('対話履歴閲覧状態', {
+        'grant': historyGrant,
+        'page': null,
+      }),
+      historyResponse('対話履歴閲覧状態', {
+        'grant': historyGrant,
+        'page': null,
+      }),
+      historyResponse('対話履歴閲覧状態', {
+        'grant': historyGrant,
+        'page': null,
+      }),
+      historyResponse('AgentTask履歴閲覧', {
+        'grant': historyGrant,
+        'task_page': {
+          'version': 1,
+          'entries': [
+            {
+              'audit_event_id': 'task-history-complete',
+              'event_hash':
+                  'sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+              'record': {
+                'version': 1,
+                'task_id': taskId,
+                'runtime_id': 'codex-p12-synthetic',
+                'session_id': sessionId,
+                'workspace_id': 'workspace-p12-synthetic',
+                'instruction_hash': instructionHash,
+                'status': 'completed',
+                'created_at': 1900000000,
+                'updated_at': 1900000001,
+                'result_hash': resultHash,
+                'failure_class': null,
+                'start_audit_event_id': 'task-start-p12-history',
+                'latest_audit_event_id': 'task-history-complete',
+              },
+            },
+          ],
+          'next_cursor': 1,
+          'has_more': false,
+          'head_hash':
+              'sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
+        },
+      }),
+      historyResponse('対話履歴閲覧状態', {
+        'grant': historyGrant,
+        'page': null,
+      }),
     ]);
     final client = await ShellCoreClient.product(transport: transport);
     expect(client.mode, 'broker');
@@ -616,6 +699,16 @@ void main() {
     await tester.tap(showResult);
     await tester.pumpAndSettle();
     expect(find.textContaining(resultSummary), findsOneWidget);
+    final projectedResult = jsonDecode(
+      tester
+          .widget<SelectableText>(
+            find.byKey(const ValueKey('agent-task-result-text')),
+          )
+          .data!,
+    ) as Map<String, Object?>;
+    expect(projectedResult['changed_files'], ['note.md']);
+    expect(projectedResult['diff'], '+# Agent申告diff');
+    expect(projectedResult['test_result'], 'Agent申告test結果（独立検証なし）');
 
     final previewHandoff = find.byKey(
       const ValueKey('preview-agent-handoff'),
@@ -666,6 +759,36 @@ void main() {
           ((request['payload']! as Map)['session_id'] == targetSessionId)),
       isEmpty,
     );
+    final navigation =
+        tester.widget<NavigationRail>(find.byType(NavigationRail));
+    navigation.onDestinationSelected!(13);
+    await tester.pumpAndSettle();
+    expect(find.text('実行履歴'), findsWidgets);
+    await tester.tap(find.text('Agent Task履歴'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Agent Taskの過去状態です。'), findsOneWidget);
+    final historyEntry = find.byKey(const ValueKey('agent-task-$taskId'));
+    expect(historyEntry, findsOneWidget);
+    await tester.ensureVisible(historyEntry);
+    await tester.tap(historyEntry);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('結果hash: $resultHash'), findsOneWidget);
+    expect(find.textContaining('Authorityは復元しません。'), findsOneWidget);
+
+    tester
+        .widget<NavigationRail>(find.byType(NavigationRail))
+        .onDestinationSelected!(5);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('別のWorkspace承認と基準点'), findsWidgets);
+    final historyRequest = transport.requests.singleWhere(
+      (request) => request['operation'] == 'AgentTask履歴閲覧',
+    );
+    expect(
+        (historyRequest['payload']! as Map)['approval_id'], historyApprovalId);
+    expect((historyRequest['payload']! as Map)['query'], {
+      'after': 0,
+      'limit': 50,
+    });
     expect(
       transport.operations,
       containsAllInOrder([
@@ -679,6 +802,13 @@ void main() {
         'AgentTask結果表示承認',
         'AgentTask結果取得',
         'Agent作業要求検査',
+        '対話履歴閲覧状態',
+        '対話履歴閲覧',
+        '対話履歴閲覧状態',
+        '対話履歴閲覧状態',
+        '対話履歴閲覧状態',
+        'AgentTask履歴閲覧',
+        '対話履歴閲覧状態',
       ]),
     );
     expect(tester.takeException(), isNull);

@@ -4,6 +4,7 @@ import 'dart:ui' show PlatformDispatcher;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/services.dart';
+import 'package:gui_shell_ui/gui_shell_ui.dart' show HistoryClient;
 
 import 'models/generated_contracts.dart';
 import 'screens/approval_center.dart';
@@ -381,6 +382,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
   @override
   Widget build(BuildContext context) {
     final snapshot = widget.client.getSnapshot();
+    final historyTransport = widget.client.brokerTransport;
     _dialogueVisited = _dialogueVisited || selectedIndex == 12;
     final pages = [
       Dashboard(
@@ -421,7 +423,10 @@ class _ShellHomePageState extends State<ShellHomePage> {
       if (kGuiShellModuleHistory &&
           selectedIndex == 13 &&
           viewMode == _ShellViewMode.ownerUse)
-        const HistoryScreen()
+        HistoryScreen(
+          client:
+              historyTransport == null ? null : HistoryClient(historyTransport),
+        )
       else
         const SizedBox.shrink(),
       if (kGuiShellModuleEvaluationLab)
