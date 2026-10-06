@@ -1,6 +1,6 @@
 # D4 Pocket / GUI-Shell rev5 Product-First 進捗
 
-更新日: 2026-10-06
+更新日: 2026-10-07
 工程正本: ユーザー提示「D4 Pocket / GUI-Shell 統合実装仕様書 rev5」「統合開発工程表 rev5」「Codex実装指示書 rev5」
 現行phase: `P12 Product Integration` (`OPEN`)。`P11 Windows Productization`は2026-10-06にrev5 Product Build受入れを閉鎖。`P10 Module Selection / Pruning`は2026-10-05に閉鎖し、`P9 Standalone Export`、`P8 GUI-Shell Compose`、`P7 A2A / Host / Adapter`、`P6 Credential / MCP`、`P5 Workspace / History / Evaluation`も同日に閉鎖済み。
 基準Repository状態: rev5文書同期commit `39dd3f4bc7aafe350ca94fce9392095f1064d2bc`。その後の実装・検証状態は本書末尾の更新履歴を参照。
@@ -270,6 +270,12 @@ DashboardからAgent Centerへ進み、Provider／ModelとRuntime／Workspace登
 Desktop Shellは履歴画面を開いたとき、既に接続済みの`ShellCoreClient`が保持するBrokerTransportを既存`HistoryClient`へ渡す。BrokerTransportがない診断起動時は従来の接続処理を残す。Agent Centerの完了Taskからfull Content Exposureで得たAgent申告の`changed_files`／`diff`／`test_result`を同一利用scenarioで確認し、履歴画面では独立した現在の履歴閲覧GrantでTask記録、result hash、監査参照だけを読む。履歴にはTask本文・過去Permission／Approval／Credentialを復元せず、画面からAgent Centerへ戻ると別Broker承認・baselineを使うWorkspace Inspectorで作業領域差分を見る案内を保つ。Task結果のAgent申告とWorkspaceの独立観測を同一視しない。
 
 検証: `flutter test --no-pub --dart-define=GUI_SHELL_PRODUCT_VERSION=1.2.3 --plain-name "first-runから登録Agent Taskを完了しHandoffと履歴へ接続する" test/widget_test.dart` 1件PASS。ASCII一時worktreeでlockfileどおり依存解決後に実行し、変更Flutter 2 fileの`flutter analyze`は`No issues found!`。Desktop全体解析は未変更`agent_center.dart`の既存deprecated API info 5件で終了値1、Mobile全体は`No issues found!`。一時検証の初回`--no-pub`では無視対象`.dart_tool`がなくtestを起動できず、`--no-test-assets`実行ではInk shaderが不足した。通常のtest asset生成へ切替後、重複表示されるNavigation／IndexedStack文言をtestが1件と仮定していた二箇所を修正し最終PASSした。Schema 161／正常例157／負例208、Conformance 236 checksはPASS。strict日本語監査は今回変更fileにfindingなし、旧rev3／rev4履歴と未変更Codex CLI診断文の既存3 findingsにより終了値1。Manifest 1180 filesとWindows v1 Release GateはPASS。試験はFake Brokerの`FIXTURE`で、履歴Grantは既存の現在承認を返す応答でありOwner UI、実Broker、実Agent、Workspaceの実差分・installed製品証拠ではない。P5 CLOSEDのHistory／Workspace Inspector本体・negative試験は再実装していない。P12はOPENを維持し、次はMCP接続へ進む。
+
+#### P12接続単位7: MCP接続センターへの製品導線 — 完了
+
+全体検索のMCP結果とコマンドパレットのMCP接続項目から、設定画面の先頭ではなく既存MCP接続センターへ直接移動する経路を接続した。MCPセンター見出しを基準に両親Scroll領域へ表示位置を合わせ、同じ`ShellCoreClient.brokerTransport`を使って、操作者が明示した「接続一覧を取得」だけを既存`McpConnectionClient`へ送る。Broker未接続時も同じ見出しと取得不能理由を表示する。MCP接続開始、Tool実行、Credential選択・操作、native Owner確認、Broker権限経路は変更していない。
+
+検証: `flutter test --no-pub --dart-define=GUI_SHELL_PRODUCT_VERSION=1.2.3 --plain-name "MCP検索とコマンドからMCP欄へ移動し同じBroker transportで一覧を読む" test/widget_test.dart` 1件PASS。ASCII一時worktreeで`flutter pub get --enforce-lockfile`後に実行。Fake Brokerの`FIXTURE`で、検索／コマンド両導線のMCPセンター表示、Brokerへの一覧要求と`{'版': 1}` payloadを確認し、MCP接続／切断／Tool実行を発行しないことを確認した。元のOneDrive checkoutではFlutterがignored `build/unit_test_assets`を削除できずtestを開始できなかったため、一時worktreeで同じ変更ファイルを再現して検証した。Schema 161／正常例157／負例208、Conformance 236 checks、Manifest 1180 files、Windows v1 Release Gate、`git diff --check`はPASS。Mobile全体`flutter analyze --no-pub`は`No issues found!`。Desktop全体解析は未変更`agent_center.dart`のdeprecated API情報5件のみで終了値1。変更Flutter fileの`dart analyze`再試行はユーザーprofileのDart perf cache削除OS error 1920でAnalysis Serverが停止し結果未確定。strict日本語監査は今回変更fileにfindingなし、旧rev3／rev4履歴と未変更Codex CLI診断文の既存3 findingsにより終了値1。これは実Broker／Owner dialog／stdio child／installed製品の証拠ではない。P6 CLOSEDのMCP契約・権限・Credential試験は再実行していない。P12はOPENを維持し、次はCompose／Export接続。
 
 ## P11作業履歴（以下の記録は当時の状態。現行状態は上記CLOSEDが正本）
 

@@ -28,6 +28,7 @@ class SettingsScreen extends StatefulWidget {
     this.active = true,
     this.requestApplicationExit,
     this.focusUpdateCenterRequest = 0,
+    this.focusMcpCenterRequest = 0,
   });
 
   final ShellCoreClient client;
@@ -35,6 +36,7 @@ class SettingsScreen extends StatefulWidget {
   final Future<ui.AppExitResponse> Function(ui.AppExitType)?
       requestApplicationExit;
   final int focusUpdateCenterRequest;
+  final int focusMcpCenterRequest;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -230,7 +232,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             '危険または権限関連の設定には、操作者確認用の印を付けます。',
           ],
         ),
-        McpConnectionCenterPanel(transport: widget.client.brokerTransport),
+        McpConnectionCenterPanel(
+          transport: widget.client.brokerTransport,
+          focusRequest: widget.focusMcpCenterRequest,
+        ),
         _profilePanel(),
         _composePanel(),
         _exportPanel(),

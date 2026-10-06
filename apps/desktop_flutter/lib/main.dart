@@ -250,6 +250,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
   int selectedIndex = 0;
   bool _dialogueVisited = false;
   int _updateCenterFocusRequest = 0;
+  int _mcpCenterFocusRequest = 0;
   _ShellViewMode viewMode = _ShellViewMode.ownerUse;
   _ShellNavigationGroup navigationGroup = _ShellNavigationGroup.all;
   late final WindowsTrayClient _trayClient;
@@ -415,6 +416,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
         client: widget.client,
         active: selectedIndex == 11,
         focusUpdateCenterRequest: _updateCenterFocusRequest,
+        focusMcpCenterRequest: _mcpCenterFocusRequest,
       ),
       if (_dialogueVisited)
         RuntimeDialogueScreen(readOnly: viewMode == _ShellViewMode.demo)
@@ -795,6 +797,14 @@ class _ShellHomePageState extends State<ShellHomePage> {
     });
   }
 
+  void _openMcpCenter() {
+    setState(() {
+      selectedIndex = 11;
+      navigationGroup = _ShellNavigationGroup.settings;
+      _mcpCenterFocusRequest++;
+    });
+  }
+
   void _openAgentSetup() => _selectPage(5);
 
   void _setNavigationGroup(_ShellNavigationGroup group) {
@@ -850,7 +860,11 @@ class _ShellHomePageState extends State<ShellHomePage> {
         return;
       }
     }
-    _selectPage(selected.pageIndex);
+    if (selected.title == 'MCP接続') {
+      _openMcpCenter();
+    } else {
+      _selectPage(selected.pageIndex);
+    }
     setState(() {
       if (selected.viewMode != null) {
         viewMode = selected.viewMode!;
@@ -872,7 +886,11 @@ class _ShellHomePageState extends State<ShellHomePage> {
       ),
     );
     if (selected == null || !mounted) return;
-    _selectPage(selected.pageIndex);
+    if (selected.recordId == 'mcp-surface') {
+      _openMcpCenter();
+    } else {
+      _selectPage(selected.pageIndex);
+    }
   }
 
   List<_CommandEntry> _commandEntries(

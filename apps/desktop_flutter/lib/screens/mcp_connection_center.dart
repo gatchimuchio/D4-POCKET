@@ -7,9 +7,14 @@ import '../services/mcp_connection_client.dart';
 import 'shared.dart';
 
 class McpConnectionCenterPanel extends StatefulWidget {
-  const McpConnectionCenterPanel({super.key, required this.transport});
+  const McpConnectionCenterPanel({
+    super.key,
+    required this.transport,
+    this.focusRequest = 0,
+  });
 
   final BrokerTransport? transport;
+  final int focusRequest;
 
   @override
   State<McpConnectionCenterPanel> createState() =>
@@ -17,6 +22,7 @@ class McpConnectionCenterPanel extends StatefulWidget {
 }
 
 class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
+  final GlobalKey _titleKey = GlobalKey();
   final _serverIdController = TextEditingController();
   final _executableController = TextEditingController();
   final _workspaceController = TextEditingController();
@@ -42,6 +48,23 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
   }
 
   @override
+  void didUpdateWidget(covariant McpConnectionCenterPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.focusRequest != widget.focusRequest) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final targetContext = _titleKey.currentContext;
+        if (!mounted || targetContext == null) return;
+        Scrollable.ensureVisible(
+          targetContext,
+          alignment: 0.12,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+        );
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _serverIdController.dispose();
     _executableController.dispose();
@@ -55,8 +78,19 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
   Widget build(BuildContext context) {
     final client = _client;
     if (client == null) {
-      return const BorderedPanel(
-        child: Text('MCP接続センター: Broker接続がないため一覧を取得できません。'),
+      return BorderedPanel(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'MCP接続センター',
+              key: _titleKey,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 4),
+            const Text('Broker接続がないため一覧を取得できません。'),
+          ],
+        ),
       );
     }
     return BorderedPanel(
@@ -64,7 +98,11 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('MCP接続センター', style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              'MCP接続センター',
+              key: _titleKey,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: 4),
             const Text(
               'Brokerが保持するstdio接続のmetadataだけを表示します。MCP metadataは信頼・権限ではありません。切断はWindows native Owner確認の後にBrokerが実行します。',
@@ -239,6 +277,7 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
             ],
             const SizedBox(height: 8),
             OutlinedButton.icon(
+              key: const ValueKey('mcp-load-connections'),
               onPressed: _loading ||
                       _connecting ||
                       _disconnectingServerId != null ||

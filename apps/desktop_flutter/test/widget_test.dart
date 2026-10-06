@@ -1009,6 +1009,63 @@ void main() {
     expect(find.text('設定'), findsWidgets);
   });
 
+  testWidgets('MCP検索とコマンドからMCP欄へ移動し同じBroker transportで一覧を読む',
+      (WidgetTester tester) async {
+    final transport = _McpNavigationTransport();
+    await tester.pumpWidget(
+      GuiShellDesktopApp(client: ShellCoreClient.mock(transport: transport)),
+    );
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.control);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.shift);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.shift);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.control);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'MCP');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('MCP接続'));
+    await tester.pumpAndSettle();
+
+    final listButton = find.byKey(const ValueKey('mcp-load-connections'));
+    expect(find.text('MCP接続センター').hitTestable(), findsOneWidget);
+    await tester.ensureVisible(listButton);
+    await tester.tap(listButton);
+    await tester.pumpAndSettle();
+    expect(find.text('Brokerが保持するMCP接続はありません。'), findsOneWidget);
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.control);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyK);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.control);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is TextField && widget.decoration?.labelText == 'コマンドパレット',
+      ),
+      'MCP接続',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('MCP接続一覧とOwner確認付き切断を開く'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('MCP接続センター').hitTestable(), findsOneWidget);
+    expect(
+      transport.operations.where((operation) => operation.startsWith('MCP')),
+      ['MCP接続一覧'],
+    );
+    expect(
+      transport.requests.singleWhere(
+        (request) => (request['operation']! as String).startsWith('MCP'),
+      ),
+      {
+        'operation': 'MCP接続一覧',
+        'payload': const {'版': 1},
+      },
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Desktop UX統合が既存画面を論理グループで絞り込む', (WidgetTester tester) async {
     await tester.pumpWidget(const GuiShellDesktopApp());
 
@@ -3407,6 +3464,39 @@ class _FailingBrokerTransport implements BrokerTransport {
     Map<String, Object?>? payload,
   }) {
     throw BrokerClientException(message);
+  }
+}
+
+class _McpNavigationTransport implements BrokerTransport {
+  final operations = <String>[];
+  final requests = <Map<String, Object?>>[];
+
+  @override
+  Future<Map<String, Object?>> request(
+    String operation, {
+    Map<String, Object?>? payload,
+  }) async {
+    operations.add(operation);
+    requests.add({'operation': operation, 'payload': payload});
+    if (operation != 'MCP接続一覧') {
+      throw BrokerClientException('fixtureでは未対応の要求です: $operation');
+    }
+    return {
+      'request_id': 'fixture-mcp-list',
+      'operation': 'MCP接続一覧',
+      'status': 'accepted',
+      'evidence_source': 'INTERNAL_STATE',
+      'audit_event_id': 'audit-mcp-list',
+      'error': null,
+      'body': {
+        '版': 1,
+        'MCP接続一覧': <Object?>[],
+        '件数': 0,
+        '公開範囲': 'metadata_only',
+        '証拠種別': 'INTERNAL_STATE',
+      },
+      'shutdown_requested': false,
+    };
   }
 }
 
