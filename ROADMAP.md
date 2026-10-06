@@ -2,6 +2,8 @@
 
 2026-10-07 rev5現行工程: P2〜P12 Product BuildをCLOSEDし、Windows `FEATURE COMPLETE`へ到達した。Q0 QA Freezeは製品commit `ab746d4b33b003761f5ddcef60a88afa97132a40`を対象に閉鎖、Q1 Codex Comprehensive QAも閉鎖し、現行phaseはQ2 Fault / Recovery（OPEN）。P11 Installer／P12の15段階はProduct Build機能・接続の受入れであり、installed product全経路、正式配布、release readinessを主張しない。詳細な証拠境界は`docs/REV5_PRODUCT_PROGRESS.md`と`docs/FINAL_QA_QUEUE.md`を参照する。
 
+2026-10-07 Q2追補: Brokerライブラリを使う試験子プロセスを強制終了し、別Broker実体の起動登録で永続scratchの限定回収、中断Taskの監査記録、回復監査記録を確認する対象Rust試験は1件PASS。これは`FIXTURE`で、製品Brokerサーバー／IPC、導入済み製品、過去Approvalの非再利用、子孫プロセス停止は示さない。TLS loopback試験fixtureへのIPv4固定／`accept-loop`案は30回中6失敗、別診断10回中3失敗で改善せず破棄。原因未特定のため最終品質保証待ち一覧でOPENを維持し、Q2継続、通常Release `task_execution=unsupported`およびrelease gateを維持する。詳細は`docs/REV5_PRODUCT_PROGRESS.md`。
+
 2026-10-06 rev5 P12接続単位1: first-run設定とSetup Doctor取得後、Dashboardから既存Agent CenterのCodex／Workspace登録UIへ進む導線を追加。Dashboard遷移Widget 1件と既存登録UI／Broker要求Widget 1件、変更Dart解析・形式確認、Schema 161／157／208、Conformance 236 checksがPASS。Fake Brokerによる`FIXTURE`証拠で、installed製品・native Owner dialog・実Codex起動を示さない。
 
 2026-10-06 rev5 P12接続単位2: first-run／Setup Doctor後のDashboard導線からAgent Centerを開き、Provider／Modelを設定してRuntime／Workspace登録要求まで進むWidget統合を追加。合成値とFake Brokerでprovider/model、runtime、workspaceの束縛とAuthority field不在を確認。`FIXTURE`証拠で、native Owner dialog、実Codex、installed製品の成立は示さない。P2〜P11のCLOSED機能は再実装せず、P12はOPENを維持して登録Session／Agent Task接続へ進む。

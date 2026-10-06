@@ -71,6 +71,10 @@ Rust初回・再runでA2A／Update TLS loopback fixtureの間欠failureを観測
 
 同整形commit `97c30fac8eb7d51fcaa3b341877c4a93f5ad84c8`に対するWindows手動補助検査 #40は全工程成功（実行17分20秒／全体17分24秒、実行環境`win25-vs2026/20260925.250.1`、Rust 1.95.0）。Rust全対象試験は13集計欄の合計で成功545件／失敗0件／明示除外13件。Release Broker生成も成功し、SHA-256は`4390f8c7a248c655d9bdcc7070f893e3eb0b0cf56c9408ef3a8e045e8427de46`。Broker実行体を独立起動した通常IPC簡易試験は、非合成収集器v6を使って成功し、認証済みloopback IPC、永続保存先の準備完了、通常Task権限付与の拒否2件、再起動後の再送拒否、新しい正常状態、強制停止時のfail-closed、session fileの削除を観測した。実行環境内の検査物後片付けと作業tree清掃も成功し、成果物のuploadはない（[run #40](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37507251175)）。これは同commitにおけるWindows全対象試験と独立Broker簡易試験の証拠に限られ、導入済みDesktop製品、OS側Owner操作、実Agent Task、正式release証拠、release readinessを証明しない。ローカルで再現したloopback fixture失敗との原因差は確定していないため`FQ-TEST-LOOPBACK`はOPENのままとし、通常Release `task_execution=unsupported`および既存release gateを変更しない。
 
+2026-10-07 Q2追加証拠: 別プロセスのBrokerライブラリ試験を強制終了し、別Broker実体の起動登録で永続scratch領域のbinding照合回収・中断Taskの監査記録・回復監査記録を確認するfocused Rust testは1 passed／0 failed（`cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml --lib broker::protocol::tests::broker強制終了後の別process起動登録で永続scratchを監査付き回収する -- --exact --nocapture --test-threads=1`）。これは`FIXTURE`であり、製品broker-server／IPC、導入済み製品、Approval再利用防止、子孫プロセス停止の実証ではない。`FQ-R2-B`／`FQ-R2-F`は閉じない。
+
+同日、TLS fixture不安定性を減らす試験限定IPv4化／accept-loop案は、focused TLS test 30回中6回失敗、追加診断10回中3回失敗で改善せず、採用せず破棄した。根因は未特定である。これは製品コード修正ではなく、`FQ-TEST-LOOPBACK`をOPENのまま保持する。
+
 ## 3. Final QA段階
 
 | 段階 | 対象 | 開始条件 |
