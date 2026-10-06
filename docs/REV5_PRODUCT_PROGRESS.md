@@ -41,6 +41,8 @@ Q1初回Rust runで既知localhost fixtureのConnectionReset 3件、次runでA2A
 
 同日、`FQ-TEST-LOOPBACK`の原因切分けとしてUpdate Download TLS test fixtureだけを一時変更し、接続先をIPv4へ固定して接続resetを拒否するaccept loopを追加した。focused TLS testの反復は30回中6失敗、別diagnostic反復は10回中3失敗となり、改善・原因確定に至らなかった。追加したplaintext-probe試験は1回通過したが、この変更は検証用に限り、失敗を隠す可能性があるため採用せず全て破棄した。working treeはcleanへ復帰。`FQ-TEST-LOOPBACK`はOPENのまま扱い、製品原因／host原因のいずれとも断定しない。
 
+Windows hosted補助run #41は`workflow_dispatch`による手動実行でcommit `2bb50217c02fcf6dd6cf757c43f126c6a2f1f1f8`（当時の`main`先端と同一）を検証し、全体10分59秒で全工程が成功した。workflow指定Rust sourceの書式検査、Rust全target 13集計欄（545件成功／0件失敗／13件除外）、Broker実行体のRelease build、Broker独立起動と通常IPCの簡易疎通確認、実行環境内の検査用一時物の後片付け、作業tree清掃確認がすべて成功。生成物のアップロードなし（[run #41](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37518774824)）。これは当該commitのWindows hosted Rust検査／Broker簡易疎通確認の証拠であり、導入済み製品、実Agent Task、正式リリース証拠、リリース可能性の証明ではない。ローカルで観測したloopback fixture failureの根因は未確定のため`FQ-TEST-LOOPBACK`はOPENのまま維持し、`task_execution=unsupported`、既存release gate、`release_ready=false`を変更しない。検証用branch `codex/q2-windows-rust-2026-10-07`は対象commitが`main`と同一であることを照合後、local／remote双方から削除した。
+
 文書同期後の統合確認`python -X utf8 tooling/validate_all.py --python-only --desktop-platform=windows`は終了値1。登録済み10検査のうち、Schema 161／157／208、Conformance 236、`manifest_check`、`release_gate_check`、`packaging_portability_check`、`release_smoke`、`evidence_bundle`、`release_runtime_assertions`、`final_development_audit`の9件は合格し、`japanese_base_audit`のみ既知指摘により終了値1となった。既知指摘は旧履歴`docs/REV3_PROGRESS.md`と`docs/REV4_ACCEPTANCE_LEDGER.md`、現行source `native/rust_helper/src/adapters/codex_cli.rs`に各1件。今回更新した`ROADMAP.md`、本書、`docs/FINAL_QA_QUEUE.md`に新規指摘はない。旧履歴は変更せず、Q2とrelease gateの状態も変更しない。
 
 ## 1. 工程方針

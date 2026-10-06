@@ -75,6 +75,8 @@ Rust初回・再runでA2A／Update TLS loopback fixtureの間欠failureを観測
 
 同日、TLS fixture不安定性を減らす試験限定IPv4化／accept-loop案は、focused TLS test 30回中6回失敗、追加診断10回中3回失敗で改善せず、採用せず破棄した。根因は未特定である。これは製品コード修正ではなく、`FQ-TEST-LOOPBACK`をOPENのまま保持する。
 
+2026-10-07 Windows hosted補助run #41: `workflow_dispatch`による手動実行でcommit `2bb50217c02fcf6dd6cf757c43f126c6a2f1f1f8`（当時の`main`先端と同一）を検証し、全体10分59秒で全工程が成功した。workflow指定Rust sourceの書式検査、Rust全target 13集計欄（545件成功／0件失敗／13件除外）、Broker実行体のRelease build、Broker独立起動と通常IPCの簡易疎通確認、実行環境内の検査用一時物の後片付け、作業tree清掃確認がすべて成功。生成物のアップロードなし（[run #41](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37518774824)）。証拠は対象commitのWindows hosted Rust検査／Broker簡易疎通確認に限られ、導入済み製品、実Agent Task、正式リリース証拠、リリース可能性を証明しない。ローカルloopback fixture failureとの根因差は未確定なので`FQ-TEST-LOOPBACK`はOPENのままとし、通常Release `task_execution=unsupported`およびrelease gateを変更しない。対象commitが既に`main`と同一だったため統合は不要であり、検証用branchはlocal／remote双方から削除済み。
+
 ## 3. Final QA段階
 
 | 段階 | 対象 | 開始条件 |
