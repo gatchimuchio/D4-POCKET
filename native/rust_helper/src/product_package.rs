@@ -7,7 +7,7 @@ use cap_fs_ext::{DirExt, FollowSymlinks, OpenOptionsFollowExt};
 #[cfg(windows)]
 use cap_std::fs::MetadataExt as CapMetadataExt;
 use cap_std::fs::{Dir, OpenOptions};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use std::fs::{self, File};
@@ -55,7 +55,7 @@ enum StageMode {
     Verify,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct PackageManifest {
     version: u32,
@@ -66,7 +66,7 @@ struct PackageManifest {
     files: Vec<PackageFile>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct PackageFile {
     path: String,
@@ -191,6 +191,276 @@ pub(crate) fn verify_staged_package_into_directory<R: Read>(
         StageMode::Verify,
     )
     .map(|(info, _)| info)
+}
+
+/// 展開済みstageからD4PKG01を決定的に再構成し、署名候補に結合した外側digestを照合する。
+/// 完全なpackage cacheが存在しないinstalled pathの限定修復で使用する。
+pub(crate) fn verify_staged_product_package_hash(
+    stage: &Dir,
+    expected: ProductPackageExpectation<'_>,
+    expected_package_sha256: &str,
+) -> Result<ProductPackageInfo, ProductPackageError> {
+    if !valid_sha256(expected_package_sha256) {
+        return Err(err("package_outer_hash_invalid"));
+    }
+    let stage_metadata = stage
+        .dir_metadata()
+        .map_err(|_| err("package_stage_invalid"))?;
+    if !stage_metadata.is_dir() || is_cap_reparse_point(&stage_metadata) {
+        return Err(err("package_stage_invalid"));
+    }
+    let root_device = cap_fs_ext::MetadataExt::dev(&stage_metadata);
+    let mut paths = collect_staged_file_paths(stage, root_device)?;
+    paths.sort_by_key(|path| path.to_ascii_lowercase());
+
+    let mut files = Vec::with_capacity(paths.len());
+    let mut total_file_bytes = 0u64;
+    let mut product_manifest_bytes = None;
+    for path in paths {
+        validate_path(&path)?;
+        let (byte_length, sha256, contents) = hash_staged_file(stage, &path)?;
+        total_file_bytes = total_file_bytes
+            .checked_add(byte_length)
+            .ok_or_else(|| err("package_total_size_overflow"))?;
+        if total_file_bytes > MAX_PACKAGE_BYTES {
+            return Err(err("package_size_invalid"));
+        }
+        if path == "product_manifest.json" {
+            if byte_length > MAX_PRODUCT_MANIFEST_BYTES {
+                return Err(err("package_product_manifest_size_invalid"));
+            }
+            product_manifest_bytes = Some(contents);
+        }
+        files.push(PackageFile {
+            path,
+            byte_length,
+            sha256,
+        });
+    }
+
+    let manifest = PackageManifest {
+        version: 1,
+        product: "D4 Pocket".to_owned(),
+        product_version: expected
+            .product_version
+            .ok_or_else(|| err("package_product_version_unavailable"))?
+            .to_owned(),
+        app_id: expected.app_id.to_owned(),
+        audit_store_id: expected.audit_store_id.to_owned(),
+        files,
+    };
+    validate_manifest(&manifest, &expected)?;
+    let product_manifest = product_manifest_bytes
+        .as_deref()
+        .ok_or_else(|| err("package_required_file_missing"))?;
+    validate_product_manifest(product_manifest, &expected)?;
+    let manifest_bytes =
+        serde_json::to_vec(&manifest).map_err(|_| err("package_manifest_serialize_failed"))?;
+    let manifest_length =
+        u32::try_from(manifest_bytes.len()).map_err(|_| err("package_manifest_size_invalid"))?;
+    if manifest_bytes.is_empty() || manifest_length > MAX_MANIFEST_BYTES {
+        return Err(err("package_manifest_size_invalid"));
+    }
+    if 12u64
+        .checked_add(manifest_length as u64)
+        .and_then(|length| length.checked_add(total_file_bytes))
+        .is_none_or(|length| length > MAX_PACKAGE_BYTES)
+    {
+        return Err(err("package_size_invalid"));
+    }
+
+    let mut package_digest = Sha256::new();
+    package_digest.update(MAGIC);
+    package_digest.update(manifest_length.to_le_bytes());
+    package_digest.update(&manifest_bytes);
+    for entry in &manifest.files {
+        hash_staged_file_into(stage, entry, &mut package_digest)?;
+    }
+    validate_stage_tree(stage, &manifest.files)?;
+    if hex::encode(package_digest.finalize()) != expected_package_sha256 {
+        return Err(err("package_outer_hash_mismatch"));
+    }
+    Ok(ProductPackageInfo {
+        product_version: manifest.product_version,
+        app_id: manifest.app_id,
+        audit_store_id: manifest.audit_store_id,
+        file_count: manifest.files.len(),
+        total_file_bytes,
+    })
+}
+
+fn collect_staged_file_paths(
+    root: &Dir,
+    root_device: u64,
+) -> Result<Vec<String>, ProductPackageError> {
+    let mut files = Vec::new();
+    let mut pending = vec![(
+        root.try_clone()
+            .map_err(|_| err("package_stage_unreadable"))?,
+        String::new(),
+    )];
+    while let Some((current, prefix)) = pending.pop() {
+        for entry in current
+            .read_dir(".")
+            .map_err(|_| err("package_stage_unreadable"))?
+        {
+            let entry = entry.map_err(|_| err("package_stage_unreadable"))?;
+            let name = entry
+                .file_name()
+                .into_string()
+                .map_err(|_| err("package_stage_entry_invalid"))?;
+            let path = if prefix.is_empty() {
+                name.clone()
+            } else {
+                format!("{prefix}/{name}")
+            };
+            validate_path(&path)?;
+            let before = current
+                .symlink_metadata(&name)
+                .map_err(|_| err("package_stage_entry_invalid"))?;
+            if is_cap_reparse_point(&before) {
+                return Err(err("package_stage_reparse_point"));
+            }
+            if before.is_dir() {
+                let child = current
+                    .open_dir_nofollow(&name)
+                    .map_err(|_| err("package_stage_entry_invalid"))?;
+                let after = child
+                    .dir_metadata()
+                    .map_err(|_| err("package_stage_entry_invalid"))?;
+                if !after.is_dir()
+                    || is_cap_reparse_point(&after)
+                    || !same_cap_file(&before, &after)
+                    || cap_fs_ext::MetadataExt::dev(&after) != root_device
+                {
+                    return Err(err("package_stage_entry_changed"));
+                }
+                pending.push((child, path));
+            } else if before.is_file() {
+                files.push(path);
+                if files.len() > MAX_FILES {
+                    return Err(err("package_file_count_invalid"));
+                }
+            } else {
+                return Err(err("package_stage_entry_invalid"));
+            }
+        }
+    }
+    Ok(files)
+}
+
+fn hash_staged_file(root: &Dir, path: &str) -> Result<(u64, String, Vec<u8>), ProductPackageError> {
+    let (parent, name) = open_package_parent(root, path)?;
+    let before = parent
+        .symlink_metadata(name)
+        .map_err(|_| err("package_stage_file_unavailable"))?;
+    if !before.is_file() || is_cap_reparse_point(&before) || before.len() > MAX_PACKAGE_BYTES {
+        return Err(err("package_stage_file_invalid"));
+    }
+    let mut options = OpenOptions::new();
+    options.read(true).follow(FollowSymlinks::No);
+    let mut file = parent
+        .open_with(name, &options)
+        .map_err(|_| err("package_stage_file_invalid"))?;
+    let opened = file
+        .metadata()
+        .map_err(|_| err("package_stage_file_invalid"))?;
+    if !opened.is_file() || is_cap_reparse_point(&opened) || !same_cap_file(&before, &opened) {
+        return Err(err("package_stage_file_changed"));
+    }
+    let capture = path == "product_manifest.json";
+    if capture && opened.len() > MAX_PRODUCT_MANIFEST_BYTES {
+        return Err(err("package_product_manifest_size_invalid"));
+    }
+    let mut contents = if capture {
+        Vec::with_capacity(opened.len() as usize)
+    } else {
+        Vec::new()
+    };
+    let mut hasher = Sha256::new();
+    let mut total = 0u64;
+    let mut buffer = [0u8; COPY_BUFFER_BYTES];
+    loop {
+        let count = file
+            .read(&mut buffer)
+            .map_err(|_| err("package_stage_file_read_failed"))?;
+        if count == 0 {
+            break;
+        }
+        total = total
+            .checked_add(count as u64)
+            .ok_or_else(|| err("package_total_size_overflow"))?;
+        if total > MAX_PACKAGE_BYTES {
+            return Err(err("package_size_invalid"));
+        }
+        hasher.update(&buffer[..count]);
+        if capture {
+            contents.extend_from_slice(&buffer[..count]);
+        }
+    }
+    let after = parent
+        .symlink_metadata(name)
+        .map_err(|_| err("package_stage_file_changed"))?;
+    if !same_cap_file(&opened, &after) || opened.len() != total || after.len() != total {
+        return Err(err("package_stage_file_changed"));
+    }
+    Ok((total, hex::encode(hasher.finalize()), contents))
+}
+
+fn hash_staged_file_into(
+    root: &Dir,
+    entry: &PackageFile,
+    package_digest: &mut Sha256,
+) -> Result<(), ProductPackageError> {
+    let (parent, name) = open_package_parent(root, &entry.path)?;
+    let before = parent
+        .symlink_metadata(name)
+        .map_err(|_| err("package_stage_file_unavailable"))?;
+    if !before.is_file() || is_cap_reparse_point(&before) || before.len() != entry.byte_length {
+        return Err(err("package_stage_file_invalid"));
+    }
+    let mut options = OpenOptions::new();
+    options.read(true).follow(FollowSymlinks::No);
+    let mut file = parent
+        .open_with(name, &options)
+        .map_err(|_| err("package_stage_file_invalid"))?;
+    let opened = file
+        .metadata()
+        .map_err(|_| err("package_stage_file_invalid"))?;
+    if !opened.is_file() || is_cap_reparse_point(&opened) || !same_cap_file(&before, &opened) {
+        return Err(err("package_stage_file_changed"));
+    }
+    let mut file_digest = Sha256::new();
+    let mut total = 0u64;
+    let mut buffer = [0u8; COPY_BUFFER_BYTES];
+    loop {
+        let count = file
+            .read(&mut buffer)
+            .map_err(|_| err("package_stage_file_read_failed"))?;
+        if count == 0 {
+            break;
+        }
+        total = total
+            .checked_add(count as u64)
+            .ok_or_else(|| err("package_total_size_overflow"))?;
+        if total > entry.byte_length {
+            return Err(err("package_stage_file_changed"));
+        }
+        package_digest.update(&buffer[..count]);
+        file_digest.update(&buffer[..count]);
+    }
+    let after = parent
+        .symlink_metadata(name)
+        .map_err(|_| err("package_stage_file_changed"))?;
+    if total != entry.byte_length
+        || hex::encode(file_digest.finalize()) != entry.sha256
+        || !same_cap_file(&opened, &after)
+        || opened.len() != total
+        || after.len() != total
+    {
+        return Err(err("package_stage_file_changed"));
+    }
+    Ok(())
 }
 
 fn extract_verified_package_into_directory_mode<R: Read>(
@@ -885,9 +1155,20 @@ mod tests {
     fn package_with(files: Vec<(&str, &[u8])>) -> Vec<u8> {
         let entries: Vec<_> = files
             .iter()
-            .map(|(path, bytes)| json!({"path": path, "byte_length": bytes.len(), "sha256": hex::encode(Sha256::digest(bytes))}))
+            .map(|(path, bytes)| PackageFile {
+                path: (*path).to_owned(),
+                byte_length: bytes.len() as u64,
+                sha256: hex::encode(Sha256::digest(bytes)),
+            })
             .collect();
-        let manifest = json!({"version": 1, "product": "D4 Pocket", "product_version": "1.2.3", "app_id": APP, "audit_store_id": AUDIT, "files": entries});
+        let manifest = PackageManifest {
+            version: 1,
+            product: "D4 Pocket".to_owned(),
+            product_version: "1.2.3".to_owned(),
+            app_id: APP.to_owned(),
+            audit_store_id: AUDIT.to_owned(),
+            files: entries,
+        };
         let raw = serde_json::to_vec(&manifest).unwrap();
         let mut output = MAGIC.to_vec();
         output.extend_from_slice(&(raw.len() as u32).to_le_bytes());
@@ -1282,6 +1563,57 @@ mod tests {
 
         drop(directory);
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn staged_tree_reconstructs_signed_package_digest_and_rejects_payload_changes() {
+        let bytes = package_with(files_for_test());
+        let package_sha256 = hex::encode(Sha256::digest(&bytes));
+        let package_path = write_temp(&bytes, "stage-package-digest");
+        let parent_path = package_path.parent().unwrap();
+        let parent = Dir::open_ambient_dir(parent_path, cap_std::ambient_authority()).unwrap();
+        extract_verified_package_into_directory(
+            std::io::Cursor::new(bytes.clone()),
+            bytes.len() as u64,
+            Some(&package_sha256),
+            &parent,
+            "stage",
+            expectation(Some("1.2.3")),
+        )
+        .unwrap();
+        let stage = parent.open_dir("stage").unwrap();
+        let verified =
+            verify_staged_product_package_hash(&stage, expectation(Some("1.2.3")), &package_sha256)
+                .unwrap();
+        assert_eq!(verified.file_count, 7);
+
+        let payload = parent_path.join("stage/app/data/app.so");
+        fs::write(&payload, b"tampered package payload").unwrap();
+        assert_eq!(
+            verify_staged_product_package_hash(
+                &stage,
+                expectation(Some("1.2.3")),
+                &package_sha256,
+            )
+            .unwrap_err()
+            .0,
+            "package_outer_hash_mismatch"
+        );
+        fs::write(&payload, b"a").unwrap();
+        fs::write(parent_path.join("stage/app/unexpected.bin"), b"extra").unwrap();
+        assert_eq!(
+            verify_staged_product_package_hash(
+                &stage,
+                expectation(Some("1.2.3")),
+                &package_sha256,
+            )
+            .unwrap_err()
+            .0,
+            "package_outer_hash_mismatch"
+        );
+        drop(stage);
+        drop(parent);
+        fs::remove_dir_all(parent_path).unwrap();
     }
 
     #[test]

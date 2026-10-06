@@ -1106,7 +1106,7 @@ def test_update_center_contract_and_execution_boundary() -> list[str]:
         errors.append("更新実行状態とBroker由来rollback先projectionが一致しない")
     for name in ("ipc_request", "ipc_response"):
         operations = load_schema(f"{name}.schema.json")["properties"]["operation"]["enum"]
-        for operation in ("更新一覧", "更新候補取得", "更新確認", "更新署名検査", "更新download要求", "更新適用要求", "更新延期", "更新rollback要求", "製品アンインストール要求"):
+        for operation in ("更新一覧", "更新候補取得", "更新確認", "更新署名検査", "更新download要求", "更新適用要求", "更新延期", "更新rollback要求", "製品起動項目修復要求", "製品アンインストール要求"):
             if operation not in operations:
                 errors.append(f"{name}に更新操作がない: {operation}")
     update_center = (RUST_HELPER / "src" / "broker" / "update_center.rs").read_text(
@@ -8338,6 +8338,7 @@ def test_agent_task_owner_confirmation_wait_uses_native_operation_timeout() -> l
         "MCP Tool実行",
         "更新download要求",
         "更新有効版切替要求",
+        "製品起動項目修復要求",
         "製品アンインストール要求",
         "AgentTaskWorkspacePermissionGrant",
         "AgentTaskOwnerApprovalGrant",

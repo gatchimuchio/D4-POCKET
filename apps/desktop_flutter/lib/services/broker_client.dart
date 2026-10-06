@@ -21,6 +21,7 @@ const _nativeOwnerConfirmationOperations = <String>{
   'MCP Tool実行',
   '更新download要求',
   '更新有効版切替要求',
+  '製品起動項目修復要求',
   '製品アンインストール要求',
   'AgentTaskWorkspacePermissionGrant',
   'AgentTaskOwnerApprovalGrant',

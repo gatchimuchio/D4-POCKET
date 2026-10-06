@@ -790,6 +790,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 OutlinedButton.icon(
                   onPressed: _updateOperationInProgress
                       ? null
+                      : () => _requestProductRepair(client),
+                  icon: const Icon(Icons.build_circle_outlined),
+                  label: const Text('起動項目を修復'),
+                ),
+                const Text(
+                  '現行版が検証できる場合に、欠損した固定root起動器とStart Menu shortcutだけを復元します。破損した版本体や有効版記録は上書きしません。',
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: _updateOperationInProgress
+                      ? null
                       : () => _requestProductUninstall(client),
                   icon: const Icon(Icons.delete_outline),
                   label: const Text('D4 Pocketをアンインストール'),
@@ -1106,6 +1117,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     }
     if (!applicationExitAccepted) _loadUpdates();
+  }
+
+  Future<void> _requestProductRepair(UpdateClient client) async {
+    if (_updateOperationInProgress) return;
+    setState(() => _updateOperationInProgress = true);
+    try {
+      final body = await client.requestProductRepair();
+      final state = body['状態'];
+      if (state != 'product_launch_entries_repaired' && state != 'unchanged') {
+        throw const BrokerClientException('起動項目修復の完了状態を確認できません');
+      }
+      final restored = <String>[
+        if (body['起動器復元'] == true) '固定root起動器',
+        if (body['Start Menu復元'] == true) 'Start Menu shortcut',
+      ];
+      _setUpdateMessage(restored.isEmpty
+          ? '固定root起動器とStart Menu shortcutは既に有効です。変更はありません。'
+          : '${restored.join('、')}を復元しました。版本体と利用者dataは変更していません。');
+    } catch (error) {
+      _setUpdateMessage('起動項目を修復できませんでした。既存のfileは上書きしていません: $error');
+    } finally {
+      if (mounted) {
+        setState(() => _updateOperationInProgress = false);
+      }
+    }
+    _loadUpdates();
   }
 
   void _setUpdateMessage(String message) {

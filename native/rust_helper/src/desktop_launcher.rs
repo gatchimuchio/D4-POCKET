@@ -183,6 +183,10 @@ enum DesktopOwnerOperationSummary {
         confirmation: crate::broker::update_center::UpdateActivationConfirmation,
         payload_hash: String,
     },
+    ProductRepair {
+        confirmation: crate::broker::update_center::ProductRepairConfirmation,
+        payload_hash: String,
+    },
     ProductUninstall {
         payload_hash: String,
     },
@@ -356,6 +360,12 @@ struct UpdateActivationOwnerRequest {
     update_id: String,
     #[serde(rename = "候補hash")]
     candidate_hash: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ProductRepairOwnerRequest {
+    version: u64,
 }
 
 fn valid_update_identifier(value: &str) -> bool {
@@ -1324,9 +1334,18 @@ fn relay_channel_frame(
     relay_channel_frame_with_owner_operations(frame, endpoint, None, |_| false)
 }
 
+#[cfg(test)]
 fn owner_operation_candidate(
     input: &[u8],
     endpoint: &BrokerEndpoint,
+) -> Option<(String, DesktopOwnerOperationSummary)> {
+    owner_operation_candidate_with_product_identity(input, endpoint, None)
+}
+
+fn owner_operation_candidate_with_product_identity(
+    input: &[u8],
+    endpoint: &BrokerEndpoint,
+    product_identity: Option<&ProductRuntimeIdentity>,
 ) -> Option<(String, DesktopOwnerOperationSummary)> {
     if input.len() > endpoint.max_request_bytes {
         return None;
@@ -1571,6 +1590,20 @@ fn owner_operation_candidate(
                 return None;
             }
             DesktopOwnerOperationSummary::ProductUninstall { payload_hash }
+        }
+        BrokerOperation::製品起動項目修復要求 => {
+            let request: ProductRepairOwnerRequest =
+                serde_json::from_value(payload.clone()).ok()?;
+            if request.version != 1 {
+                return None;
+            }
+            let identity = product_identity?;
+            let confirmation =
+                current_product_repair_confirmation(identity, &payload_hash, endpoint)?;
+            DesktopOwnerOperationSummary::ProductRepair {
+                confirmation,
+                payload_hash,
+            }
         }
         BrokerOperation::AgentTaskWorkspacePermissionGrant => {
             let request: AgentTaskWorkspacePermissionRequest =
@@ -1923,7 +1956,13 @@ where
     let request = match frame {
         gui_shell_windows_broker_channel::PipeFrame::Line(bytes) => {
             if let Some(owner_operations) = owner_operations {
-                if let Some((request_json, summary)) = owner_operation_candidate(&bytes, endpoint) {
+                if let Some((request_json, summary)) =
+                    owner_operation_candidate_with_product_identity(
+                        &bytes,
+                        endpoint,
+                        product_identity,
+                    )
+                {
                     if confirm_owner_operation(&summary) {
                         let (reply, response) = mpsc::sync_channel(1);
                         let download_confirmation = match &summary {
@@ -1956,6 +1995,12 @@ where
                             ),
                             _ => None,
                         };
+                        let product_repair_confirmation = match &summary {
+                            DesktopOwnerOperationSummary::ProductRepair {
+                                confirmation, ..
+                            } => Some(confirmation.clone()),
+                            _ => None,
+                        };
                         owner_operations
                             .send(DesktopOwnerOperationRequest {
                                 request_json: request_json.clone(),
@@ -1963,6 +2008,7 @@ where
                                 apply_confirmation,
                                 activation_confirmation,
                                 product_uninstall_confirmation,
+                                product_repair_confirmation,
                                 reply,
                             })
                             .ok()?;
@@ -2022,6 +2068,72 @@ fn current_product_uninstall_confirmation(
             payload_hash: payload_hash.to_owned(),
         },
     )
+}
+
+fn current_product_repair_confirmation(
+    identity: &ProductRuntimeIdentity,
+    payload_hash: &str,
+    endpoint: &BrokerEndpoint,
+) -> Option<crate::broker::update_center::ProductRepairConfirmation> {
+    let listing_payload = json!({"版": 1});
+    let mut nonce = [0u8; 16];
+    getrandom::getrandom(&mut nonce).ok()?;
+    let request_id = format!("desktop-product-repair-preflight-{}", hex::encode(nonce));
+    let preflight = json!({
+        "request_id": request_id,
+        "session_id": endpoint.session_id,
+        "operation": "更新一覧",
+        "payload_hash": canonical_payload_hash(Some(&listing_payload)),
+        "nonce": format!("desktop-product-repair-preflight-nonce-{}", hex::encode(nonce)),
+        "issued_at": BrokerRequestEnvelope::current_issued_at(),
+        "metadata": {"client": "desktop_flutter"},
+        "payload": listing_payload,
+    });
+    let response = relay_normalized_channel_request(&preflight.to_string().into_bytes(), endpoint)?;
+    let response: Value = serde_json::from_slice(&response).ok()?;
+    if response["request_id"] != request_id
+        || response["operation"] != "更新一覧"
+        || response["status"] != "accepted"
+    {
+        return None;
+    }
+    let current = &response["body"]["rollback状態"]["現在版"];
+    let update_id = current["更新ID"].as_str()?;
+    let candidate_hash = current["候補hash"].as_str()?;
+    let product_version = current["提供版"].as_str()?;
+    let package_sha256 = current["package_sha256"].as_str()?;
+    if !valid_update_identifier(update_id)
+        || !is_tagged_sha256(candidate_hash)
+        || product_version.is_empty()
+        || product_version.len() > 64
+        || package_sha256.len() != 64
+        || !package_sha256
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return None;
+    }
+    let local_app_data = crate::broker::product_install::current_user_local_app_data().ok()?;
+    let start_menu = crate::broker::product_install::current_user_start_menu_directory().ok()?;
+    Some(crate::broker::update_center::ProductRepairConfirmation {
+        app_id: identity.app_id.clone(),
+        audit_store_id: identity.audit_store_id.clone(),
+        update_id: update_id.to_owned(),
+        candidate_hash: candidate_hash.to_owned(),
+        product_version: product_version.to_owned(),
+        package_sha256: package_sha256.to_owned(),
+        product_root: crate::broker::product_install::product_install_root(
+            &local_app_data,
+            &identity.app_id,
+        )
+        .ok()?,
+        start_menu_shortcut_path: crate::broker::product_install::plan_start_menu_shortcut(
+            &start_menu,
+            &identity.app_id,
+        )
+        .ok()?,
+        payload_hash: payload_hash.to_owned(),
+    })
 }
 
 fn capture_product_uninstall_ticket(
@@ -2506,6 +2618,19 @@ fn owner_confirmation_text_for_identity(
                 "D4 Pocketをアンインストールしますか？\n\n削除対象: {root}\nStart Menu: D4 Pocketの固定shortcut\n保持: Credential／設定／Workspace／Audit Store（%LOCALAPPDATA%\\D4Pocket\\apps配下）\n\n画面を正常終了した後、Rust helperが固定導入rootとこのshortcutだけを削除します。保持する利用者データは削除しません。削除前意図と完了結果をAuditへ記録します。\n\npayload hash:\n{payload_hash}"
             )
         }
+        DesktopOwnerOperationSummary::ProductRepair {
+            confirmation,
+            payload_hash,
+        } => format!(
+            "D4 Pocketの固定起動項目を修復しますか？\n\n現行版: {}\npackage SHA-256: {}\n固定導入root: {}\nStart Menu shortcut: {}\n\nBrokerは現在の署名trust、active recordを再照合し、現行stage全体からpackage SHA-256を再構成して表示値と照合します。欠損した固定root BootstrapperとStart Menu shortcutだけを復元します。既存file、版本体、active record、利用者dataは上書きせず、download・version切替・process起動もしません。package hash不一致、既存Bootstrapper不一致、stage破損は修復せずfail-closedで停止します。意図と結果をAuditへ記録します。\n\npayload hash:\n{}",
+            owner_confirmation_value(&confirmation.product_version),
+            confirmation.package_sha256,
+            owner_confirmation_value(&confirmation.product_root.display().to_string()),
+            owner_confirmation_value(
+                &confirmation.start_menu_shortcut_path.display().to_string()
+            ),
+            payload_hash
+        ),
         DesktopOwnerOperationSummary::RegressionCaseDelete {
             summary,
             payload_hash,
@@ -7786,6 +7911,32 @@ mod tests {
     }
 
     #[cfg(windows)]
+    fn product_repair_owner_confirmation_fixture() -> DesktopOwnerOperationSummary {
+        DesktopOwnerOperationSummary::ProductRepair {
+            confirmation: crate::broker::update_center::ProductRepairConfirmation {
+                app_id: "d4-pocket-app-11111111111111111111111111111111".into(),
+                audit_store_id: "audit-store-22222222222222222222222222222222".into(),
+                update_id: "update-test".into(),
+                candidate_hash:
+                    "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
+                product_version: "1.2.3".into(),
+                package_sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                    .into(),
+                product_root: PathBuf::from(
+                    r"C:\Users\test\AppData\Local\Programs\D4 Pocket\d4-pocket-app-11111111111111111111111111111111",
+                ),
+                start_menu_shortcut_path: PathBuf::from(
+                    r"C:\Users\test\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\D4 Pocket\D4 Pocket.lnk",
+                ),
+                payload_hash:
+                    "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".into(),
+            },
+            payload_hash: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+                .into(),
+        }
+    }
+
+    #[cfg(windows)]
     fn update_rollback_owner_confirmation_fixture() -> DesktopOwnerOperationSummary {
         let mut summary = update_activation_owner_confirmation_fixture();
         if let DesktopOwnerOperationSummary::UpdateActivation { confirmation, .. } = &mut summary {
@@ -7796,8 +7947,7 @@ mod tests {
                         "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
                             .into(),
                     package_sha256:
-                        "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
-                            .into(),
+                        "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".into(),
                     offered_version: "1.1.0".into(),
                     version_directory: PathBuf::from(
                         r"C:\Users\test\AppData\Local\Programs\D4 Pocket\d4-pocket-app-11111111111111111111111111111111\versions\1.1.0-dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
@@ -7857,6 +8007,31 @@ mod tests {
             );
         }
         assert!(!prompt.contains("updates.example"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn product_repair_confirmation_limits_repair_to_missing_launch_entries() {
+        let prompt = owner_confirmation_text(&product_repair_owner_confirmation_fixture());
+        for visible in [
+            "現行版: 1.2.3",
+            "package SHA-256:",
+            "package SHA-256を再構成",
+            "固定導入root:",
+            "Start Menu shortcut:",
+            "欠損した固定root BootstrapperとStart Menu shortcutだけ",
+            "版本体、active record、利用者dataは上書きせず",
+            "package hash不一致",
+            "stage破損は修復せずfail-closed",
+            "Auditへ記録",
+            "payload hash:",
+        ] {
+            assert!(
+                prompt.contains(visible),
+                "Owner confirmation missing {visible}"
+            );
+        }
+        assert!(!prompt.contains("credential"));
     }
 
     #[cfg(windows)]

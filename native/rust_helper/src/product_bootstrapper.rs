@@ -305,6 +305,87 @@ pub(crate) fn active_version_snapshot(
     })
 }
 
+/// Brokerが再照合した現行stageから、欠損している固定root Bootstrapperだけを復元する。
+/// 既存file、active record、version-local payloadは上書きしない。
+pub(crate) fn restore_missing_root_bootstrapper(
+    local_app_data: &Path,
+    expected_app_id: &str,
+    expected_audit_store_id: &str,
+    expected_current: &ActiveVersionDescriptor,
+) -> Result<bool, BootstrapperError> {
+    let snapshot = active_version_snapshot(
+        local_app_data,
+        expected_app_id,
+        expected_audit_store_id,
+    )?;
+    if &snapshot.current != expected_current {
+        return Err(BootstrapperError("active_version_record_changed"));
+    }
+    let (_, product_root) =
+        crate::broker::product_install::open_existing_product_root(local_app_data, expected_app_id)
+            .map_err(|_| BootstrapperError("installed_product_root_unavailable"))?;
+    let root_metadata = product_root
+        .dir_metadata()
+        .map_err(|_| BootstrapperError("installed_product_root_unavailable"))?;
+    if !root_metadata.is_dir() || is_cap_reparse_point(&root_metadata) {
+        return Err(BootstrapperError("installed_product_root_invalid"));
+    }
+    let root_device = CapMetadataExt::dev(&root_metadata);
+    let versions = open_existing_directory(&product_root, "versions", root_device)?;
+    let stage_name = format!(
+        "{}-{}",
+        expected_current.product_version, expected_current.package_sha256
+    );
+    let stage = open_existing_directory(&versions, &stage_name, root_device)?;
+    validate_descriptor_stage(&versions, expected_current, root_device)?;
+    crate::product_package::verify_staged_product_package_hash(
+        &stage,
+        crate::product_package::ProductPackageExpectation {
+            product_version: Some(&expected_current.product_version),
+            app_id: expected_app_id,
+            audit_store_id: expected_audit_store_id,
+        },
+        &expected_current.package_sha256,
+    )
+    .map_err(|_| BootstrapperError("active_version_package_mismatch"))?;
+
+    match product_root.symlink_metadata(VERSIONED_LAUNCHER) {
+        Ok(metadata) => {
+            if !metadata.is_file() || is_cap_reparse_point(&metadata) {
+                return Err(BootstrapperError("installed_bootstrapper_invalid"));
+            }
+            let digest = hash_regular_file(&product_root, VERSIONED_LAUNCHER, MAX_LAUNCHER_BYTES)?;
+            if digest != expected_current.launcher_sha256 {
+                return Err(BootstrapperError("installed_bootstrapper_mismatch"));
+            }
+            Ok(false)
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            stage
+                .hard_link(VERSIONED_LAUNCHER, &product_root, VERSIONED_LAUNCHER)
+                .map_err(|_| BootstrapperError("installed_bootstrapper_create_failed"))?;
+            let source = stage
+                .symlink_metadata(VERSIONED_LAUNCHER)
+                .map_err(|_| BootstrapperError("active_version_launcher_invalid"))?;
+            let installed = product_root
+                .symlink_metadata(VERSIONED_LAUNCHER)
+                .map_err(|_| BootstrapperError("installed_bootstrapper_invalid"))?;
+            if !source.is_file()
+                || !installed.is_file()
+                || is_cap_reparse_point(&source)
+                || is_cap_reparse_point(&installed)
+                || !same_cap_file(&source, &installed)
+                || hash_regular_file(&product_root, VERSIONED_LAUNCHER, MAX_LAUNCHER_BYTES)?
+                    != expected_current.launcher_sha256
+            {
+                return Err(BootstrapperError("installed_bootstrapper_invalid"));
+            }
+            Ok(true)
+        }
+        Err(_) => Err(BootstrapperError("installed_bootstrapper_invalid")),
+    }
+}
+
 pub(crate) fn toggle_previous_active_version(
     product_root: &Dir,
     versions: &Dir,

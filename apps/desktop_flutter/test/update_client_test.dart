@@ -66,6 +66,17 @@ class _UpdateTransport implements BrokerTransport {
         'body': {'版': 1, '状態': 'uninstall_authorized'},
       };
     }
+    if (operation == '製品起動項目修復要求') {
+      return {
+        'status': 'accepted',
+        'body': {
+          '版': 1,
+          '状態': 'product_launch_entries_repaired',
+          '起動器復元': true,
+          'Start Menu復元': true,
+        },
+      };
+    }
     return {
       'status': 'accepted',
       'body': {'版': 1, '実行状態': 'suspended'},
@@ -315,6 +326,8 @@ void main() {
     await client.fetchCandidates();
     final uninstall = await client.requestUninstall();
     expect(uninstall['状態'], 'uninstall_authorized');
+    final repair = await client.requestProductRepair();
+    expect(repair['状態'], 'product_launch_entries_repaired');
     expect(transport.operations, [
       '更新一覧',
       '更新署名検査',
@@ -325,6 +338,7 @@ void main() {
       '更新rollback要求',
       '更新候補取得',
       '製品アンインストール要求',
+      '製品起動項目修復要求',
     ]);
     expect(transport.payloads[4], {
       '版': 1,
@@ -333,5 +347,6 @@ void main() {
     });
     expect(transport.payloads[7], {'版': 1});
     expect(transport.payloads[8], {'版': 1});
+    expect(transport.payloads[9], {'版': 1});
   });
 }

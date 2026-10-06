@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -117,12 +118,50 @@ void main() {
     expect(tester.widget<OutlinedButton>(uninstallButton).onPressed, isNotNull);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('起動項目修復はBrokerへ一度だけ要求し、修復結果を表示する', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final repairGate = Completer<void>();
+    final transport = _InstallFlowTransport(
+      installed: true,
+      repairGate: repairGate,
+    );
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body:
+            SettingsScreen(client: ShellCoreClient.mock(transport: transport)),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    final repairButton = find.widgetWithText(OutlinedButton, '起動項目を修復');
+    await tester.ensureVisible(repairButton);
+    await tester.tap(repairButton);
+    await tester.pump();
+    expect(tester.widget<OutlinedButton>(repairButton).onPressed, isNull);
+    await tester.tap(repairButton, warnIfMissed: false);
+    expect(
+      transport.operations.where((operation) => operation == '製品起動項目修復要求'),
+      hasLength(1),
+    );
+    repairGate.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('固定root起動器を復元しました。版本体と利用者dataは変更していません。'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 class _InstallFlowTransport implements BrokerTransport {
-  _InstallFlowTransport({this.installed = false});
+  _InstallFlowTransport({this.installed = false, this.repairGate});
 
   final bool installed;
+  final Completer<void>? repairGate;
 
   static const _packageHash =
       'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -211,6 +250,19 @@ class _InstallFlowTransport implements BrokerTransport {
       return {
         'status': 'accepted',
         'body': {'版': 1, '状態': 'uninstall_authorized'},
+      };
+    }
+    if (operation == '製品起動項目修復要求') {
+      await repairGate?.future;
+      return {
+        'status': 'accepted',
+        'body': {
+          '版': 1,
+          '状態': 'product_launch_entries_repaired',
+          '起動器復元': true,
+          'Start Menu復元': false,
+          '証拠種別': 'LIVE_RUNTIME',
+        },
       };
     }
     return {

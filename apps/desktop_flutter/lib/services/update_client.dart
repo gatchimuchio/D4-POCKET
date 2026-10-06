@@ -196,6 +196,9 @@ class UpdateClient {
   Future<Map<String, Object?>> requestUninstall() =>
       _request('製品アンインストール要求', const {'版': 1});
 
+  Future<Map<String, Object?>> requestProductRepair() =>
+      _request('製品起動項目修復要求', const {'版': 1});
+
   Future<Map<String, Object?>> _request(
     String operation,
     Map<String, Object?> payload,

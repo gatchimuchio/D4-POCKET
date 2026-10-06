@@ -41,6 +41,7 @@ const OP_APPLY: &str = "更新適用要求";
 const OP_ACTIVATE: &str = "更新有効版切替要求";
 const OP_DEFER: &str = "更新延期";
 const OP_ROLLBACK: &str = "更新rollback要求";
+const OP_PRODUCT_REPAIR: &str = "製品起動項目修復要求";
 const OP_UNINSTALL: &str = "製品アンインストール要求";
 const OP_UNINSTALL_STARTED: &str = "製品アンインストール開始";
 const OP_UNINSTALL_COMPLETED: &str = "製品アンインストール完了";
@@ -89,6 +90,19 @@ pub(crate) struct UpdateActivationConfirmation {
 pub(crate) struct ProductUninstallConfirmation {
     pub(crate) app_id: String,
     pub(crate) audit_store_id: String,
+    pub(crate) product_root: PathBuf,
+    pub(crate) start_menu_shortcut_path: PathBuf,
+    pub(crate) payload_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ProductRepairConfirmation {
+    pub(crate) app_id: String,
+    pub(crate) audit_store_id: String,
+    pub(crate) update_id: String,
+    pub(crate) candidate_hash: String,
+    pub(crate) product_version: String,
+    pub(crate) package_sha256: String,
     pub(crate) product_root: PathBuf,
     pub(crate) start_menu_shortcut_path: PathBuf,
     pub(crate) payload_hash: String,
@@ -550,6 +564,7 @@ pub(super) fn dispatch(
     apply_confirmation: Option<&UpdateApplyConfirmation>,
     activation_confirmation: Option<&UpdateActivationConfirmation>,
     product_uninstall_confirmation: Option<&ProductUninstallConfirmation>,
+    product_repair_confirmation: Option<&ProductRepairConfirmation>,
 ) -> BrokerResponse {
     poll_download_completion(broker);
     match operation.as_str() {
@@ -601,6 +616,14 @@ pub(super) fn dispatch(
             None,
             None,
             activation_confirmation,
+        ),
+        OP_PRODUCT_REPAIR => repair_product_launch_entries(
+            broker,
+            payload,
+            request_id,
+            payload_hash,
+            owner_confirmation,
+            product_repair_confirmation,
         ),
         OP_UNINSTALL => request_product_uninstall(
             broker,
@@ -781,6 +804,344 @@ fn request_product_uninstall(
         body: Some(json!({"版": VERSION, "状態": "uninstall_authorized", "ticket": ticket})),
         shutdown_requested: broker.shutdown_requested,
     }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ProductRepairRequest {
+    #[serde(rename = "版")]
+    version: u64,
+}
+
+#[cfg(windows)]
+fn repair_product_launch_entries(
+    broker: &mut Broker,
+    payload: &Value,
+    request_id: &str,
+    payload_hash: &str,
+    owner_confirmation: OwnerConfirmationSource,
+    confirmation: Option<&ProductRepairConfirmation>,
+) -> BrokerResponse {
+    let request: ProductRepairRequest =
+        match serde_json::from_value::<ProductRepairRequest>(payload.clone()) {
+            Ok(request) if request.version == VERSION => request,
+            _ => {
+                return reject(
+                    broker,
+                    request_id,
+                    OP_PRODUCT_REPAIR,
+                    "product_repair_request_invalid",
+                    "製品起動項目修復要求の構造が不正",
+                    payload_hash,
+                )
+            }
+        };
+    let _ = request;
+    if owner_confirmation != OwnerConfirmationSource::DesktopNativeConfirmation {
+        return reject(
+            broker,
+            request_id,
+            OP_PRODUCT_REPAIR,
+            "desktop_native_owner_confirmation_required",
+            "製品起動項目の修復にはRust Desktop native Owner確認が必要",
+            payload_hash,
+        );
+    }
+    let Some((app_id, audit_store_id)) = broker.desktop_product_identity.clone() else {
+        return reject(
+            broker,
+            request_id,
+            OP_PRODUCT_REPAIR,
+            "product_identity_unavailable",
+            "製品identityを確認できない",
+            payload_hash,
+        );
+    };
+    let Some(confirmation) = confirmation else {
+        return reject(
+            broker,
+            request_id,
+            OP_PRODUCT_REPAIR,
+            "product_repair_confirmation_missing",
+            "現行版と固定起動先を示したnative確認記録がない",
+            payload_hash,
+        );
+    };
+
+    #[cfg(windows)]
+    let paths = (|| {
+        #[cfg(test)]
+        let local_app_data = broker
+            .desktop_product_install_local_app_data
+            .clone()
+            .or_else(|| super::product_install::current_user_local_app_data().ok())?;
+        #[cfg(not(test))]
+        let local_app_data = super::product_install::current_user_local_app_data().ok()?;
+        #[cfg(test)]
+        let start_menu = broker
+            .desktop_product_start_menu_directory
+            .clone()
+            .or_else(|| super::product_install::current_user_start_menu_directory().ok())?;
+        #[cfg(not(test))]
+        let start_menu = super::product_install::current_user_start_menu_directory().ok()?;
+        let root = super::product_install::product_install_root(&local_app_data, &app_id).ok()?;
+        let shortcut =
+            super::product_install::plan_start_menu_shortcut(&start_menu, &app_id).ok()?;
+        Some((local_app_data, start_menu, root, shortcut))
+    })();
+    #[cfg(not(windows))]
+    let paths: Option<(PathBuf, PathBuf, PathBuf, PathBuf)> = None;
+
+    let Some((local_app_data, start_menu, expected_root, expected_shortcut)) = paths else {
+        return reject(
+            broker,
+            request_id,
+            OP_PRODUCT_REPAIR,
+            "product_repair_platform_unavailable",
+            "Windows Known Folderから固定導入先を確認できない",
+            payload_hash,
+        );
+    };
+    let snapshot =
+        match crate::product_bootstrapper::active_version_snapshot(
+            &local_app_data,
+            &app_id,
+            &audit_store_id,
+        ) {
+            Ok(snapshot) => snapshot,
+            Err(error) => return reject(
+                broker,
+                request_id,
+                OP_PRODUCT_REPAIR,
+                error.0,
+                "現行active recordまたはversion-local launcherを安全に検証できないため修復しない",
+                payload_hash,
+            ),
+        };
+    let current = &snapshot.current;
+    if !rollback_descriptor_matches_candidate(broker, current)
+        || confirmation.app_id != app_id
+        || confirmation.audit_store_id != audit_store_id
+        || confirmation.update_id != current.update_id
+        || confirmation.candidate_hash != current.candidate_hash
+        || confirmation.product_version != current.product_version
+        || confirmation.package_sha256 != current.package_sha256
+        || confirmation.product_root != expected_root
+        || confirmation.start_menu_shortcut_path != expected_shortcut
+        || confirmation.payload_hash != payload_hash
+    {
+        return reject(
+            broker,
+            request_id,
+            OP_PRODUCT_REPAIR,
+            "product_repair_confirmation_stale",
+            "native Owner確認後にtrust、現行版、製品identityまたは固定pathが変化した",
+            payload_hash,
+        );
+    }
+    if !broker.state_store.persistence_ready() {
+        return suspended(
+            broker,
+            OP_PRODUCT_REPAIR,
+            request_id,
+            json!({"版": VERSION, "状態": "suspended", "復旧ID": "recover-product-launch-repair-audit", "証拠種別": EVIDENCE_SOURCE_INTERNAL_STATE}),
+            payload_hash,
+            "永続Auditを確定できないため起動項目を修復しない",
+        );
+    }
+    let existing_shortcut = match std::fs::symlink_metadata(&expected_shortcut) {
+        Ok(_) => true,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
+        Err(_) => {
+            return product_repair_failed(
+                broker,
+                request_id,
+                payload_hash,
+                "product_start_menu_shortcut_unavailable",
+                "Start Menu shortcutの状態を安全に確認できないため修復しない",
+            )
+        }
+    };
+    let intent = match broker.append_audit(
+        request_id,
+        OP_PRODUCT_REPAIR,
+        "queued",
+        &format!("Capability=product.install.repair_launch_entries Permission=現在trustで再検証したactive versionのmissing root Bootstrapperと固定Start Menu shortcutだけを復元し、既存file・version payload・active recordを上書きしない Approval=現行版と固定pathを表示した独立Rust Desktop native Owner確認 AuditEvent=修復前意図を永続化 RecoveryAction=不一致または失敗時は既存状態を保持し、原因確認後に新しいOwner確認から再要求 version={} package_sha256={}", current.product_version, current.package_sha256),
+        "LIVE_RUNTIME",
+        payload_hash,
+    ) {
+        Ok(event) => event,
+        Err(_) => {
+            return broker.audit_store_failed_response(
+                request_id,
+                OP_PRODUCT_REPAIR,
+                "product_repair_audit_failed",
+                "修復前Auditを確定できないため変更しない",
+            )
+        }
+    };
+
+    let bootstrapper_restored = match crate::product_bootstrapper::restore_missing_root_bootstrapper(
+        &local_app_data,
+        &app_id,
+        &audit_store_id,
+        current,
+    ) {
+        Ok(restored) => restored,
+        Err(error) => {
+            return product_repair_failed(
+                broker,
+                request_id,
+                payload_hash,
+                error.0,
+                "現行stageから固定root起動器を安全に復元できないため、状態を上書きせず停止した",
+            )
+        }
+    };
+    let root_path =
+        match super::product_install::open_existing_product_root(&local_app_data, &app_id) {
+            Ok((path, _)) if path == expected_root => path,
+            _ => {
+                return product_repair_failed(
+                    broker,
+                    request_id,
+                    payload_hash,
+                    "product_install_root_changed",
+                    "修復中に固定製品rootが変化したため停止した",
+                )
+            }
+        };
+    let _registered_shortcut = match super::product_install::register_start_menu_shortcut(
+        &local_app_data,
+        &start_menu,
+        &app_id,
+        &root_path,
+    ) {
+        Ok(path) if path == expected_shortcut => path,
+        Ok(_) => {
+            return product_repair_failed(
+                broker,
+                request_id,
+                payload_hash,
+                "product_start_menu_published_path_mismatch",
+                "Start Menu shortcutの公開先が確認済み固定pathと一致しない",
+            )
+        }
+        Err(error) => {
+            return product_repair_failed(
+                broker,
+                request_id,
+                payload_hash,
+                error.0,
+                "固定Start Menu shortcutを安全に復元できないため停止した",
+            )
+        }
+    };
+    let repaired = bootstrapper_restored || !existing_shortcut;
+    let completion = match broker.append_audit(
+        &format!("{request_id}:complete"),
+        OP_PRODUCT_REPAIR,
+        if repaired { "completed" } else { "unchanged" },
+        &format!("Capability=product.install.repair_launch_entries Permission=現行signed active versionと固定pathに一致するlaunch entryだけ Approval=独立Rust Desktop native Owner確認 AuditEvent=起動器復元={} shortcut復元={} intent_audit_id={} RecoveryAction=修復済みentryは維持し、版本体・設定・Credential・Workspace・Audit Storeは変更しない", bootstrapper_restored, !existing_shortcut, intent.event_id),
+        "LIVE_RUNTIME",
+        payload_hash,
+    ) {
+        Ok(event) => event,
+        Err(_) => {
+            return broker.audit_store_failed_response(
+                request_id,
+                OP_PRODUCT_REPAIR,
+                "product_repair_audit_failed",
+                "修復後の完了Auditを確定できない。起動状態を再確認してください",
+            )
+        }
+    };
+    BrokerResponse {
+        request_id: request_id.to_owned(),
+        operation: OP_PRODUCT_REPAIR.to_owned(),
+        status: BrokerStatus::Accepted,
+        evidence_source: "LIVE_RUNTIME".to_owned(),
+        audit_event_id: completion.event_id,
+        error: None,
+        health: None,
+        body: Some(json!({
+            "版": VERSION,
+            "状態": if repaired { "product_launch_entries_repaired" } else { "unchanged" },
+            "起動器復元": bootstrapper_restored,
+            "Start Menu復元": !existing_shortcut,
+            "開始Audit ID": intent.event_id,
+            "証拠種別": "LIVE_RUNTIME",
+        })),
+        shutdown_requested: broker.shutdown_requested,
+    }
+}
+
+#[cfg(windows)]
+fn product_repair_failed(
+    broker: &mut Broker,
+    request_id: &str,
+    payload_hash: &str,
+    failure_code: &str,
+    message: &str,
+) -> BrokerResponse {
+    if broker
+        .append_audit(
+            &format!("{request_id}:failed"),
+            OP_PRODUCT_REPAIR,
+            "failed",
+            &format!("Capability=product.install.repair_launch_entries Permission=現行signed active versionの欠損launch entryだけ Approval=独立Rust Desktop native Owner確認 AuditEvent=起動項目修復失敗を記録 RecoveryAction=既存file・version payload・active recordを上書きせず、原因確認後に新しいOwner確認から再要求 failure_code={failure_code}"),
+            "LIVE_RUNTIME",
+            payload_hash,
+        )
+        .is_err()
+    {
+        return broker.audit_store_failed_response(
+            request_id,
+            OP_PRODUCT_REPAIR,
+            "product_repair_audit_failed",
+            "起動項目修復失敗のAuditを確定できない",
+        );
+    }
+    reject(
+        broker,
+        request_id,
+        OP_PRODUCT_REPAIR,
+        failure_code,
+        message,
+        payload_hash,
+    )
+}
+
+#[cfg(not(windows))]
+fn repair_product_launch_entries(
+    broker: &mut Broker,
+    payload: &Value,
+    request_id: &str,
+    payload_hash: &str,
+    _owner_confirmation: OwnerConfirmationSource,
+    _confirmation: Option<&ProductRepairConfirmation>,
+) -> BrokerResponse {
+    if !matches!(
+        serde_json::from_value::<ProductRepairRequest>(payload.clone()),
+        Ok(request) if request.version == VERSION
+    ) {
+        return reject(
+            broker,
+            request_id,
+            OP_PRODUCT_REPAIR,
+            "product_repair_request_invalid",
+            "製品起動項目修復要求の構造が不正",
+            payload_hash,
+        );
+    }
+    reject(
+        broker,
+        request_id,
+        OP_PRODUCT_REPAIR,
+        "product_repair_platform_unavailable",
+        "固定導入先の起動項目修復はWindowsでのみ利用できる",
+        payload_hash,
+    )
 }
 
 impl Broker {
@@ -3777,22 +4138,18 @@ mod tests {
         let entries: Vec<_> = files
             .iter()
             .map(|(path, bytes)| {
-                json!({
-                    "path": path,
-                    "byte_length": bytes.len(),
-                    "sha256": hex::encode(Sha256::digest(bytes)),
-                })
+                format!(
+                    r#"{{"path":"{path}","byte_length":{},"sha256":"{}"}}"#,
+                    bytes.len(),
+                    hex::encode(Sha256::digest(bytes)),
+                )
             })
             .collect();
-        let manifest = serde_json::to_vec(&json!({
-            "version": 1,
-            "product": "D4 Pocket",
-            "product_version": product_version,
-            "app_id": INSTALL_APP_ID,
-            "audit_store_id": INSTALL_AUDIT_ID,
-            "files": entries,
-        }))
-        .unwrap();
+        let manifest = format!(
+            r#"{{"version":1,"product":"D4 Pocket","product_version":"{product_version}","app_id":"{INSTALL_APP_ID}","audit_store_id":"{INSTALL_AUDIT_ID}","files":[{}]}}"#,
+            entries.join(","),
+        )
+        .into_bytes();
         let mut package = b"D4PKG01\n".to_vec();
         package.extend_from_slice(&(manifest.len() as u32).to_le_bytes());
         package.extend_from_slice(&manifest);
@@ -3980,6 +4337,234 @@ mod tests {
         request.payload = Some(payload);
         request.refresh_payload_hash();
         broker.handle(request)
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn product_launch_repair_restores_only_missing_entries_after_current_trust_and_owner_confirmation(
+    ) {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "d4p-product-repair-{}-{unique}",
+            std::process::id()
+        ));
+        let store_root = root.join("broker-store");
+        let install_root = root.join("local-app-data");
+        let start_menu_root = root.join("start-menu");
+        std::fs::create_dir_all(&install_root).unwrap();
+        std::fs::create_dir_all(&start_menu_root).unwrap();
+        let install_root = std::fs::canonicalize(&install_root).unwrap();
+        let start_menu_root = std::fs::canonicalize(&start_menu_root).unwrap();
+        let package = install_test_package();
+        let digest = hex::encode(Sha256::digest(&package));
+        let (trust, candidate, _) = trust_and_candidate_pair_for_packages(&package, &package);
+        let candidate_value = serde_json::to_value(&candidate).unwrap();
+        let candidate_hash =
+            crate::broker::protocol::canonical_payload_hash(Some(&candidate_value));
+        let mut broker = Broker::new_persistent("session-1", &store_root).unwrap();
+        broker.update_trust = Some(trust);
+        broker
+            .set_desktop_product_identity(INSTALL_APP_ID.into(), INSTALL_AUDIT_ID.into())
+            .unwrap();
+        broker.set_desktop_product_install_local_app_data(install_root.clone());
+        broker.set_desktop_product_start_menu_directory(start_menu_root.clone());
+        assert_eq!(
+            call(
+                &mut broker,
+                BrokerOperation::更新確認,
+                json!({"版": 1, "候補": [candidate]})
+            )
+            .status,
+            BrokerStatus::Accepted
+        );
+
+        let (_, versions) = super::super::product_install::open_product_versions_directory(
+            &install_root,
+            INSTALL_APP_ID,
+        )
+        .unwrap();
+        let stage_name = format!("1.1.0-{digest}");
+        crate::product_package::extract_verified_package_into_directory(
+            std::io::Cursor::new(package.as_slice()),
+            package.len() as u64,
+            Some(&digest),
+            &versions,
+            &stage_name,
+            crate::product_package::ProductPackageExpectation {
+                product_version: Some("1.1.0"),
+                app_id: INSTALL_APP_ID,
+                audit_store_id: INSTALL_AUDIT_ID,
+            },
+        )
+        .unwrap();
+        let (product_root_path, product_root) =
+            super::super::product_install::open_existing_product_root(
+                &install_root,
+                INSTALL_APP_ID,
+            )
+            .unwrap();
+        crate::product_bootstrapper::activate_staged_version(
+            &product_root,
+            &versions,
+            "1.1.0",
+            INSTALL_APP_ID,
+            INSTALL_AUDIT_ID,
+            &digest,
+            &candidate.update_id,
+            &candidate_hash,
+            "0123456789abcdef0123456789abcdef",
+        )
+        .unwrap();
+        drop(versions);
+        drop(product_root);
+
+        let payload = json!({"版": VERSION});
+        let payload_hash = crate::broker::protocol::canonical_payload_hash(Some(&payload));
+        let active = crate::product_bootstrapper::active_version_snapshot(
+            &install_root,
+            INSTALL_APP_ID,
+            INSTALL_AUDIT_ID,
+        )
+        .unwrap()
+        .current;
+        let active_record_bytes =
+            std::fs::read(product_root_path.join("active_version.json")).unwrap();
+        let shortcut = super::super::product_install::plan_start_menu_shortcut(
+            &start_menu_root,
+            INSTALL_APP_ID,
+        )
+        .unwrap();
+        let mut confirmation = ProductRepairConfirmation {
+            app_id: INSTALL_APP_ID.into(),
+            audit_store_id: INSTALL_AUDIT_ID.into(),
+            update_id: active.update_id.clone(),
+            candidate_hash: active.candidate_hash.clone(),
+            product_version: active.product_version.clone(),
+            package_sha256: active.package_sha256.clone(),
+            product_root: product_root_path.clone(),
+            start_menu_shortcut_path: shortcut.clone(),
+            payload_hash: payload_hash.clone(),
+        };
+        let bootstrapper = product_root_path.join("gui_shell_desktop_launcher.exe");
+        std::fs::remove_file(&bootstrapper).unwrap();
+
+        let normal_ipc = call(
+            &mut broker,
+            BrokerOperation::製品起動項目修復要求,
+            payload.clone(),
+        );
+        assert_eq!(normal_ipc.status, BrokerStatus::Rejected);
+        assert_eq!(
+            normal_ipc.error.unwrap().code,
+            "desktop_native_owner_confirmation_required"
+        );
+        assert!(!bootstrapper.exists());
+
+        confirmation.product_root = root.join("attacker-controlled");
+        let stale = repair_product_launch_entries(
+            &mut broker,
+            &payload,
+            "product-repair-stale",
+            &payload_hash,
+            OwnerConfirmationSource::DesktopNativeConfirmation,
+            Some(&confirmation),
+        );
+        assert_eq!(stale.status, BrokerStatus::Rejected);
+        assert_eq!(
+            stale.error.unwrap().code,
+            "product_repair_confirmation_stale"
+        );
+        assert!(!bootstrapper.exists());
+
+        confirmation.product_root = product_root_path.clone();
+        let staged_payload = install_root
+            .join("Programs")
+            .join("D4 Pocket")
+            .join(INSTALL_APP_ID)
+            .join("versions")
+            .join(&stage_name)
+            .join("app/data/app.so");
+        let staged_payload_bytes = std::fs::read(&staged_payload).unwrap();
+        std::fs::write(&staged_payload, b"tampered installed payload").unwrap();
+        let tampered_stage = repair_product_launch_entries(
+            &mut broker,
+            &payload,
+            "product-repair-tampered-stage",
+            &payload_hash,
+            OwnerConfirmationSource::DesktopNativeConfirmation,
+            Some(&confirmation),
+        );
+        assert_eq!(tampered_stage.status, BrokerStatus::Rejected);
+        assert_eq!(
+            tampered_stage.error.unwrap().code,
+            "active_version_package_mismatch"
+        );
+        assert!(!bootstrapper.exists());
+        assert!(!shortcut.exists());
+        std::fs::write(&staged_payload, staged_payload_bytes).unwrap();
+
+        let repaired = repair_product_launch_entries(
+            &mut broker,
+            &payload,
+            "product-repair-current",
+            &payload_hash,
+            OwnerConfirmationSource::DesktopNativeConfirmation,
+            Some(&confirmation),
+        );
+        assert_eq!(repaired.status, BrokerStatus::Accepted);
+        assert_eq!(repaired.evidence_source, "LIVE_RUNTIME");
+        assert_eq!(repaired.body.as_ref().unwrap()["起動器復元"], true);
+        assert_eq!(repaired.body.as_ref().unwrap()["Start Menu復元"], true);
+        assert!(bootstrapper.is_file());
+        assert!(shortcut.is_file());
+        assert_eq!(
+            std::fs::read(product_root_path.join("active_version.json")).unwrap(),
+            active_record_bytes
+        );
+        assert!(broker.audit_events().iter().any(|event| {
+            event.request_id == "product-repair-current:complete"
+                && event.operation == OP_PRODUCT_REPAIR
+                && event.decision == "completed"
+                && event.evidence_source == "LIVE_RUNTIME"
+        }));
+
+        let unchanged = repair_product_launch_entries(
+            &mut broker,
+            &payload,
+            "product-repair-idempotent",
+            &payload_hash,
+            OwnerConfirmationSource::DesktopNativeConfirmation,
+            Some(&confirmation),
+        );
+        assert_eq!(unchanged.status, BrokerStatus::Accepted);
+        assert_eq!(unchanged.body.as_ref().unwrap()["状態"], "unchanged");
+        assert_eq!(unchanged.body.as_ref().unwrap()["起動器復元"], false);
+        assert_eq!(unchanged.body.as_ref().unwrap()["Start Menu復元"], false);
+
+        std::fs::remove_file(&bootstrapper).unwrap();
+        std::fs::write(&bootstrapper, b"conflicting launcher").unwrap();
+        let conflict = repair_product_launch_entries(
+            &mut broker,
+            &payload,
+            "product-repair-conflict",
+            &payload_hash,
+            OwnerConfirmationSource::DesktopNativeConfirmation,
+            Some(&confirmation),
+        );
+        assert_eq!(conflict.status, BrokerStatus::Rejected);
+        assert_eq!(
+            conflict.error.unwrap().code,
+            "installed_bootstrapper_mismatch"
+        );
+        assert_eq!(
+            std::fs::read(&bootstrapper).unwrap(),
+            b"conflicting launcher"
+        );
+        drop(broker);
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[cfg(windows)]

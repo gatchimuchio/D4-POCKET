@@ -233,11 +233,11 @@
     },
     {
       "path": "docs/specs/windows-desktop-launcher.md",
-      "責任": "Windows Desktop起動器のportable／固定installed root入口、Broker lifecycle、active version Bootstrapper読取、native Owner確認付きUninstallerの固定root／一致shortcut削除と保持data境界、ユーザー保存・cleanup、未成立の配布工程境界"
+      "責任": "Windows Desktop起動器のportable／固定installed root入口、Broker lifecycle、active version Bootstrapper読取、native Owner確認付き欠損launch entryの限定修復とUninstallerの固定root／一致shortcut操作、保持data境界、ユーザー保存・cleanup、未成立の配布工程境界"
     },
     {
       "path": "docs/specs/windows-product-package.md",
-      "責任": "D4PKG01製品package、有効版記録、固定root Bootstrapperの境界とreader検証範囲、Installer／Update writer未接続の明示"
+      "責任": "D4PKG01製品package、有効版記録、固定root Bootstrapperの境界とreader検証範囲、限定launch-entry repairとの分離、Installer／Update writer未接続の明示"
     },
     {
       "path": "specs/gui_shell_module_catalog.json",
@@ -389,7 +389,7 @@
     },
     {
       "path": "docs/specs/update-center.md",
-      "責任": "C11/C12 更新候補の正本化、Broker所有Ed25519署名検査、永続一覧、Broker trust由来の配布先表示、延期、native Owner確認に結合したbounded HTTPS package取得、実byte長・SHA-256照合、Audit／Recovery、install／process／rollbackのsuspended境界"
+      "責任": "C11/C12 更新候補の正本化、Broker所有Ed25519署名検査、永続一覧、Broker trust由来の配布先表示、延期、native Owner確認に結合したbounded HTTPS package取得、実byte長・SHA-256照合、限定launch-entry repair、Audit／Recovery、installed Repairを含む未成立範囲"
     },
     {
       "path": "docs/specs/notification-center.md",

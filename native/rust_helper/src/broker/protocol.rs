@@ -538,6 +538,8 @@ pub enum BrokerOperation {
     更新延期,
     #[serde(rename = "更新rollback要求")]
     更新rollback要求,
+    #[serde(rename = "製品起動項目修復要求")]
+    製品起動項目修復要求,
     #[serde(rename = "製品アンインストール要求")]
     製品アンインストール要求,
     #[serde(rename = "通知一覧")]
@@ -703,6 +705,7 @@ impl BrokerOperation {
             BrokerOperation::更新有効版切替要求 => "更新有効版切替要求",
             BrokerOperation::更新延期 => "更新延期",
             BrokerOperation::更新rollback要求 => "更新rollback要求",
+            BrokerOperation::製品起動項目修復要求 => "製品起動項目修復要求",
             BrokerOperation::製品アンインストール要求 => "製品アンインストール要求",
             BrokerOperation::通知一覧 => "通知一覧",
             BrokerOperation::通知既読 => "通知既読",
@@ -1762,6 +1765,7 @@ impl Broker {
             apply_confirmation,
             activation_confirmation,
             None,
+            None,
         )
     }
 
@@ -1772,6 +1776,7 @@ impl Broker {
         apply_confirmation: Option<super::update_center::UpdateApplyConfirmation>,
         activation_confirmation: Option<super::update_center::UpdateActivationConfirmation>,
         product_uninstall_confirmation: Option<super::update_center::ProductUninstallConfirmation>,
+        product_repair_confirmation: Option<super::update_center::ProductRepairConfirmation>,
     ) -> BrokerResponse {
         let envelope = match BrokerRequestEnvelope::from_json_str(input) {
             Ok(envelope) => envelope,
@@ -1824,6 +1829,7 @@ impl Broker {
                     | BrokerOperation::更新適用要求
                     | BrokerOperation::更新有効版切替要求
                     | BrokerOperation::更新rollback要求
+                    | BrokerOperation::製品起動項目修復要求
                     | BrokerOperation::製品アンインストール要求
             )
         );
@@ -1848,6 +1854,7 @@ impl Broker {
             apply_confirmation,
             activation_confirmation,
             product_uninstall_confirmation,
+            product_repair_confirmation,
         )
     }
 
@@ -1885,6 +1892,7 @@ impl Broker {
             apply_confirmation,
             None,
             None,
+            None,
         )
     }
 
@@ -1897,6 +1905,7 @@ impl Broker {
         apply_confirmation: Option<super::update_center::UpdateApplyConfirmation>,
         activation_confirmation: Option<super::update_center::UpdateActivationConfirmation>,
         product_uninstall_confirmation: Option<super::update_center::ProductUninstallConfirmation>,
+        product_repair_confirmation: Option<super::update_center::ProductRepairConfirmation>,
     ) -> BrokerResponse {
         self.端末期限処理();
         let request_id = envelope
@@ -2378,6 +2387,7 @@ impl Broker {
             | BrokerOperation::更新有効版切替要求
             | BrokerOperation::更新延期
             | BrokerOperation::更新rollback要求
+            | BrokerOperation::製品起動項目修復要求
             | BrokerOperation::製品アンインストール要求) => super::update_center::dispatch(
                 self,
                 operation,
@@ -2389,6 +2399,7 @@ impl Broker {
                 apply_confirmation.as_ref(),
                 activation_confirmation.as_ref(),
                 product_uninstall_confirmation.as_ref(),
+                product_repair_confirmation.as_ref(),
             ),
             operation @ (BrokerOperation::通知一覧
             | BrokerOperation::通知既読

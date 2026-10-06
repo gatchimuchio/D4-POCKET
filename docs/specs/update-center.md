@@ -1,6 +1,6 @@
 # 更新センター
 
-状態: Broker固定HTTPS配布元からの署名済み候補一覧取得、C12 package download、未起動version staging、別Owner確認によるactive version record／Start Menu shortcut切替、およびBrokerが記録した直前版へのRollbackを接続。UIは初回導入と導入済み更新をBroker状態から区別し、download完了後だけ未起動版展開操作を有効化する。process起動は行わない。RollbackはBroker fixtureで成立し、installed product経路の証拠は別途必要。Uninstallerの既存Broker／native Owner／起動器連携は`docs/specs/windows-desktop-launcher.md`に定義する。
+状態: Broker固定HTTPS配布元からの署名済み候補一覧取得、C12 package download、未起動version staging、別Owner確認によるactive version record／Start Menu shortcut切替、およびBrokerが記録した直前版へのRollbackを接続。Settingsからnative Owner確認を伴う固定起動項目の限定修復も接続した。UIは初回導入と導入済み更新をBroker状態から区別し、download完了後だけ未起動版展開操作を有効化する。process起動は行わない。これらはBroker fixtureまでであり、installed product経路の証拠は別途必要。完全な製品payload RepairとUninstallerは`docs/specs/windows-desktop-launcher.md`に定義する。
 
 更新センターは、更新候補の表示、Broker所有信頼設定によるEd25519署名検査、更新適用の要求、延期、rollback要求を扱う。更新候補自身の公開鍵、MCP metadata、Profile、履歴、UI stateは信頼源ではない。
 
@@ -16,7 +16,7 @@
 
 ## Broker経路
 
-通常認証済みBroker IPCから`更新一覧`、`更新候補取得`、`更新署名検査`、`更新確認`、`更新延期`、`更新download要求`、`更新適用要求`、`更新rollback要求`をRust Update Centerへ送る。`更新候補取得`はBroker所有の固定配布元から一覧を取得し、候補を署名検証してから既存候補状態へ登録する。新規候補はContract版2とし、候補metadataに配布package全体の小文字hex SHA-256と正確なbyte長（1〜4 GiB）を必須化する。`更新確認`は候補metadataから決定的な署名対象byteを再構成し、package SHA-256・byte長を含む同じbyte列をBroker所有`update_trust.json`のEd25519公開鍵とfingerprintで検査する。署名対象byteと候補fieldが一致した候補だけを`updates.json`へatomic writeする。package位置や実行commandを候補から受け取らない。
+通常認証済みBroker IPCから`更新一覧`、`更新候補取得`、`更新署名検査`、`更新確認`、`更新延期`、`更新download要求`、`更新適用要求`、`更新rollback要求`、`製品起動項目修復要求`をRust Update Centerへ送る。`更新候補取得`はBroker所有の固定配布元から一覧を取得し、候補を署名検証してから既存候補状態へ登録する。新規候補はContract版2とし、候補metadataに配布package全体の小文字hex SHA-256と正確なbyte長（1〜4 GiB）を必須化する。`更新確認`は候補metadataから決定的な署名対象byteを再構成し、package SHA-256・byte長を含む同じbyte列をBroker所有`update_trust.json`のEd25519公開鍵とfingerprintで検査する。署名対象byteと候補fieldが一致した候補だけを`updates.json`へatomic writeする。package位置や実行commandを候補から受け取らない。
 
 信頼設定がない、署名対象byteが一致しない、署名者fingerprintが不一致、署名が不正な候補は、利用可能な更新として保存しない。更新一覧の`署名信頼設定`は`configured`または`unconfigured`を返し、取得不能を0へ置換しない。
 
@@ -47,6 +47,12 @@ Brokerは永続Auditを利用できる場合に限り、展開前の`queued`を�
 `更新有効版切替要求`は`更新適用要求`と別operation・別native Owner確認である。Brokerは現在の候補署名／trust、package digest／byte長、製品identity、Known Folder由来の固定導入先、Start Menu先、永続Auditを再検証し、既存stageを署名packageとread-onlyで全byte／inventory照合する。完全一致時だけ、固定root Bootstrapperの初回配置（未配置の場合）と`active_version.json`の一時file同期後の同一root内renameを行い、そのBootstrapperを指す現在利用者向けStart Menu shortcutをcreate-onlyで登録する。同じtargetのshortcutは冪等に再利用し、別targetとの競合は上書きせず拒否する。切替完了Audit後は、確認画面に明示した上で、同一content-addressed package cache fileを期待byte長・SHA-256とfile identity照合後に限り除去する。展開済みstage、現行版、rollback用旧版は削除しない。清掃失敗または事前Audit失敗時はpackageを保持してpendingとして返す。stage操作の確認を切替許可として再利用しない。
 
 応答は`active_version_recorded`と`Start Menu=registered`であり、process起動、旧版削除は行わない。次回の固定root Bootstrapper起動が選択版を再検証して起動する契約への接続である。現在の証拠はBroker Rust fixtureでのactive record／shortcut登録、同一target再試行、競合非上書きとBootstrapper reader試験までに限られる。installed product上の次回起動、正式Installer、実配布元download連結、installed product経路のRollbackは未成立であり、P11を閉じない。Uninstallerは`docs/specs/windows-desktop-launcher.md`に分離して定義し、installed product全体の削除evidenceは未取得。
+
+### 固定起動項目の限定修復
+
+Settingsの`製品起動項目修復要求`は、通常Broker IPCからの同名operationを拒否し、Rust Desktop起動器が現行版情報とKnown Folder由来の固定root／Start Menu先を取得してnative Owner確認を表示する。Owner確認後もBrokerは現在trustでactive descriptorを再検証し、App／Audit Store identity、版、候補hash、package SHA-256、固定path、要求hashを照合する。active recordとversion-local launcher／Product Manifestの記録済みhashを検証できない場合は修復しない。
+
+この限定処理が復元するのは、欠損した固定root `gui_shell_desktop_launcher.exe`と固定Start Menu shortcutだけである。active record内hashだけを根拠にしないよう、Brokerは展開済みstageのfile inventory／hashから固定D4PKG01 manifestを決定的に再構成し、package全体SHA-256を現在trustで検証した候補へ照合する。version-local launcher／Product Manifest hashもactive descriptorと再照合する。root Bootstrapperはpackage digest一致後に欠損時だけ現行stageからhard linkで作成し、既存root fileがhash不一致・reparse等なら上書きしない。shortcutは既存targetが固定root Bootstrapperと一致する場合だけ再利用し、別targetや不正entryは拒否する。intent／成功／失敗をdurable Auditへ記録し、通常IPC、古いOwner確認、異なる要求hashでは実行しない。版payloadの復元・再取得、active recordの再構築、利用者dataの修復、process起動は行わない。現在の検証範囲はWindows上のBroker／filesystem fixtureとOwner確認文・UI接続であり、正式installed productからの実行証拠ではない。完全な製品RepairはP11未完了である。
 
 ### Broker記録の直前版へのRollback
 

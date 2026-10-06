@@ -102,6 +102,7 @@ pub(crate) struct DesktopOwnerOperationRequest {
     pub download_confirmation: Option<super::update_center::UpdateDownloadConfirmation>,
     pub apply_confirmation: Option<super::update_center::UpdateApplyConfirmation>,
     pub activation_confirmation: Option<super::update_center::UpdateActivationConfirmation>,
+    pub product_repair_confirmation: Option<super::update_center::ProductRepairConfirmation>,
     pub product_uninstall_confirmation:
         Option<super::update_center::ProductUninstallConfirmation>,
     pub reply: SyncSender<BrokerResponse>,
@@ -428,6 +429,7 @@ fn run_loopback_server_inner(
                     request.apply_confirmation,
                     request.activation_confirmation,
                     request.product_uninstall_confirmation,
+                    request.product_repair_confirmation,
                 );
                 let _ = request.reply.send(response);
             }
