@@ -33,3 +33,15 @@ Brokerが生成するApp IDは`d4-pocket-app-`に小文字hex 32桁を続けた�
 公開前にArtifact inventoryへ結合したCredential scanを全runtime artifact fileへ実行する。既知のAWS／GitHub／Google／Slack token形式、秘密鍵PEM marker、Credentialらしい固定file名を検出した場合はbuild公開を停止する。検査後にinventoryを再計算し、検査中のartifact差替えを拒否する。自己参照を避けるためbuild evidence file自体はartifact inventoryとscan対象から除く。検査は有限の既知pattern集合だけを対象にし、未知形式、暗号化、分割、変換された秘密の不存在を証明しない。
 
 build evidenceは`INTERNAL_STATE`で、Owner／source authority未検証、Credential値の明示投入なし、限定pattern scan結果、runtime Manifest未消費、製品起動未検証、binary pruning未検証、未署名、Installer未開始、正式配布主張なしを固定する。scan status `passed_known_patterns`をCredential不存在や安全性の保証へ読み替えない。したがってこのbuild pathはGUI-Shell approval、runtime Manifest consumption、Credential不存在、独立Runtime／Audit store、実製品安全Core保持、性能、installed `LIVE_RUNTIME`を証明しない。OwnerのYes操作、署名鍵、formal app identity、Installer／更新／rollback経路は行わない。実desktop起動、別Windows profileでのformal evidence、Credential／authority内容監査、pruning positive／negative testと計測、正式配布は`release_blocker`として継続する。
+
+## 利用者向けportable ZIP
+
+`tooling/package_windows_portable.py`は、検証済みWindows Export bundleを、展開用root `D4 Pocket/`を持つ標準ZIPへ梱包する開発専用build/release pathである。例:
+
+```powershell
+python -X utf8 tooling/package_windows_portable.py --source-dir C:\build\d4-pocket-bundle --output C:\dist\D4-Pocket.zip
+```
+
+toolはExport build receiptと全runtime artifact inventory／hash／限定Credential scanを再検証し、cleanな`main`／`origin/main`一致、およびreceiptのsource commit・現在の製品版との一致を要求する。ZIPには検証済みpayload、byte-for-byteのbuild receipt、日本語の`はじめに.txt`を格納する。ZIP entry名、件数、byte長、SHA-256、CRCを公開前に読み戻して検証し、入力inventoryが作成中に変化していないことを再照合する。既存ZIPは上書きせず、出力はRepository／OneDrive／入力bundleの外へ限定する。
+
+このZIPは未署名かつ正式配布物ではない。build receiptは`INTERNAL_STATE`のbuild記録であり、Owner承認、署名、credential不存在、製品起動、Installer、Update、Rollback、Repairを証明しない。利用者はZIPを全体展開して隣接構成を保ち、`gui_shell_desktop_launcher.exe`を起動する。Windowsの保護機能が起動を拒否した場合は、保護設定を弱めず中止する。これは利用可能なportable成果物を組み立てる手段であり、P11の基本Download／Install／Launch／Update／Rollback受入れやP11全体を単独で閉じない。`D4PKG01`は引き続きBroker更新経路のpackage形式であり、このZIPとは別契約である。

@@ -148,15 +148,50 @@ jobs:
               $evidence.artifact_tree_sha256 -notmatch '^[0-9a-f]{64}$') {
             throw 'bounded artifact scan or inventory evidence is invalid'
           }
+          $portableZip = Join-Path $env:RUNNER_TEMP 'D4-Pocket-portable-fixture.zip'
+          if (Test-Path -LiteralPath $portableZip) {
+            throw 'portable ZIP output already exists; refusing overwrite'
+          }
+          $zipSummaryLines = python -X utf8 tooling/package_windows_portable.py `
+            --source-dir $bundle `
+            --output $portableZip
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $zipSummary = ($zipSummaryLines -join "`n") | ConvertFrom-Json
+          if (-not (Test-Path -LiteralPath $portableZip -PathType Leaf) -or
+              $zipSummary.portable_zip_created -ne $true -or
+              $zipSummary.source_commit -ne $env:GITHUB_SHA -or
+              $zipSummary.signed -ne $false -or
+              $zipSummary.formal_distribution_claimed -ne $false -or
+              $zipSummary.standalone_app_verified -ne $false) {
+            throw 'portable ZIP evidence scope or source identity is unexpected'
+          }
+          $zipHash = (Get-FileHash -LiteralPath $portableZip -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($zipHash -ne $zipSummary.archive_sha256) {
+            throw 'portable ZIP SHA-256 does not match the packager receipt'
+          }
+          Remove-Item -LiteralPath Env:GIT_CONFIG_COUNT -ErrorAction SilentlyContinue
+          Remove-Item -LiteralPath Env:GIT_CONFIG_KEY_0 -ErrorAction SilentlyContinue
+          Remove-Item -LiteralPath Env:GIT_CONFIG_VALUE_0 -ErrorAction SilentlyContinue
           @(
             "- Rust: ``$env:GUI_SHELL_EXPORT_RUSTC_VERSION`` / ``$env:GUI_SHELL_EXPORT_CARGO_VERSION``."
             "- Flutter commit: ``$env:GUI_SHELL_EXPORT_FLUTTER_COMMIT``; framework: ``$($evidence.toolchain.flutter)``; Dart: ``$($evidence.toolchain.dart)``."
             "- Export build: ``passed``; evidence source: ``INTERNAL_STATE``; fixture input only."
             "- Artifact inventory: ``$($evidence.artifact_files.Count)`` files, ``$($evidence.artifact_total_bytes)`` bytes, tree SHA-256 ``$($evidence.artifact_tree_sha256)``."
+            "- Portable ZIP: ``passed``; entries: ``$($zipSummary.file_count)``; compressed bytes: ``$($zipSummary.archive_bytes)``; SHA-256: ``$zipHash``."
             '- Credential scan: zero findings for the implemented known-pattern set only; not proof of general credential absence.'
             '- Signed: no; standalone app verified: no; installer: not started; launch: not verified; distribution claimed: no.'
-            '- Artifact upload: none. The hosted runner workspace is ephemeral.'
+            '- The ZIP, bundle, and staged fixture Manifest remain only in the ephemeral runner workspace and are removed with the job; no artifact upload occurs.'
           ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          foreach ($path in @($portableZip, $bundle, $manifestPath)) {
+            $resolved = [IO.Path]::GetFullPath($path)
+            $runnerRoot = [IO.Path]::GetFullPath($env:RUNNER_TEMP).TrimEnd('\') + '\'
+            if (-not $resolved.StartsWith($runnerRoot, [StringComparison]::OrdinalIgnoreCase)) {
+              throw "temporary Export output escaped RUNNER_TEMP: $resolved"
+            }
+            if (Test-Path -LiteralPath $resolved) {
+              Remove-Item -LiteralPath $resolved -Recurse -Force
+            }
+          }
       - name: source working treeがcleanなことを確認
         shell: pwsh
         run: |

@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -101,6 +102,7 @@ from tooling.export_windows_product import (
 )
 import tooling.export_windows_product as windows_export
 import tooling.package_windows_product as windows_product_package
+import tooling.package_windows_portable as windows_portable_package
 
 REQUIRED_SCHEMA_NAMES = {
     "workspace_diff",
@@ -9997,7 +9999,88 @@ def test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative() ->
         good["audit_store_id"] = source_manifest["manifest"]["audit_store"]["store_id"]
         good["rust_compile_time_identity"]["app_id"] = good["app_id"]
         good["rust_compile_time_identity"]["audit_store_id"] = good["audit_store_id"]
+        product_version = product_version_from_source(ROOT)
+        good["flutter_build_arguments"].append(
+            f"--dart-define=GUI_SHELL_PRODUCT_VERSION={product_version}"
+        )
         validate_build_evidence(good, bundle)
+
+        receipt_path = bundle / windows_export.RECEIPT_NAME
+        receipt_raw = (json.dumps(good, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+        receipt_path.write_bytes(receipt_raw)
+        portable_zip = Path(temporary) / "D4 Pocket portable.zip"
+        original_portable_sys = windows_portable_package.sys
+        original_portable_clean_source = windows_portable_package._require_clean_source
+        original_portable_version = windows_portable_package.product_version_from_source
+        try:
+            windows_portable_package.sys = type("WindowsTestHost", (), {"platform": "win32"})()
+            windows_portable_package._require_clean_source = lambda: good["source_commit"]
+            windows_portable_package.product_version_from_source = lambda _source: product_version
+            portable_result = windows_portable_package.build_export_portable_zip(bundle, portable_zip)
+            with windows_portable_package.zipfile.ZipFile(portable_zip, "r") as archive:
+                zip_names = set(archive.namelist())
+                expected_names = {
+                    f"{windows_portable_package.PORTABLE_ROOT}/{record['path']}"
+                    for record in good["artifact_files"]
+                } | {
+                    f"{windows_portable_package.PORTABLE_ROOT}/{windows_export.RECEIPT_NAME}",
+                    f"{windows_portable_package.PORTABLE_ROOT}/{windows_portable_package.GUIDE_NAME}",
+                }
+                if zip_names != expected_names or archive.testzip() is not None:
+                    errors.append("portable ZIPのroot／全payload／Receipt／guideが正確に一致しない")
+                if archive.read(
+                    f"{windows_portable_package.PORTABLE_ROOT}/{windows_export.RECEIPT_NAME}"
+                ) != receipt_raw:
+                    errors.append("portable ZIPが検証済みbuild receiptをbyte-for-byte保持しない")
+                guide = archive.read(
+                    f"{windows_portable_package.PORTABLE_ROOT}/{windows_portable_package.GUIDE_NAME}"
+                ).decode("utf-8")
+                if "保護設定を変更せず" not in guide or "正式配布物ではありません" not in guide:
+                    errors.append("portable guideが未署名／セキュリティ保護の注意を明示しない")
+            if (
+                portable_result["signed"]
+                or portable_result["formal_distribution_claimed"]
+                or portable_result["standalone_app_verified"]
+                or portable_result["archive_sha256"] != hashlib.sha256(portable_zip.read_bytes()).hexdigest()
+            ):
+                errors.append("portable ZIPの結果が未署名／非正式配布／未起動を正確に保持しない")
+        except (OSError, ValueError, KeyError, zipfile.BadZipFile) as exc:
+            errors.append(f"有効なExport bundleからportable ZIPを作成・再検証できない: {exc}")
+        finally:
+            windows_portable_package.sys = original_portable_sys
+            windows_portable_package._require_clean_source = original_portable_clean_source
+            windows_portable_package.product_version_from_source = original_portable_version
+
+        try:
+            windows_portable_package._resolve_output_file(portable_zip, bundle)
+            errors.append("既存portable ZIP outputの上書きを拒否しない")
+        except ValueError:
+            pass
+        try:
+            windows_portable_package._resolve_output_file(bundle / "inside.zip", bundle)
+            errors.append("input bundle内へのportable ZIP outputを拒否しない")
+        except ValueError:
+            pass
+
+        tampered = bundle / "app" / "flutter_windows.dll"
+        original_tampered = tampered.read_bytes()
+        tampered.write_bytes(original_tampered + b"changed")
+        tampered_output = Path(temporary) / "tampered.zip"
+        try:
+            windows_portable_package.sys = type("WindowsTestHost", (), {"platform": "win32"})()
+            windows_portable_package._require_clean_source = lambda: good["source_commit"]
+            windows_portable_package.product_version_from_source = lambda _source: product_version
+            windows_portable_package.build_export_portable_zip(bundle, tampered_output)
+            errors.append("receipt inventoryと異なるbundleからportable ZIPを作成できる")
+        except ValueError:
+            pass
+        finally:
+            windows_portable_package.sys = original_portable_sys
+            windows_portable_package._require_clean_source = original_portable_clean_source
+            windows_portable_package.product_version_from_source = original_portable_version
+            tampered.write_bytes(original_tampered)
+        if tampered_output.exists():
+            errors.append("不一致bundle拒否時にportable ZIP outputが残る")
 
         probe = bundle / "app" / "data" / "flutter_assets" / "credential-probe.bin"
         probe.write_bytes(
@@ -10554,6 +10637,13 @@ def 手動補助の起動境界を検査する() -> list[str]:
         (格納先 / "automatic.yaml").write_text("on: push", encoding="utf-8")
         if not 手動補助一覧検査(ルート):
             不整合.append("実ファイル経路で自動起動が見逃された")
+    export_workflow = (ROOT / ".github" / "workflows" / "windows-manual-export-build.yml").read_text(encoding="utf-8")
+    if "python -X utf8 tooling/package_windows_portable.py" not in export_workflow:
+        不整合.append("手動Windows Export workflowが検証済みportable ZIPを生成しない")
+    if "actions/upload-artifact" in export_workflow:
+        不整合.append("Windows Export workflowが一時fixture ZIPを外部artifactとして残す")
+    if not any(token in export_workflow for token in ("'on': workflow_dispatch", '"on": workflow_dispatch', "on: workflow_dispatch")):
+        不整合.append("portable ZIP補助がworkflow_dispatch限定ではない")
     return 不整合
 
 

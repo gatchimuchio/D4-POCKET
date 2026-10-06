@@ -80,7 +80,7 @@
     },
     {
       "path": ".github/workflows/windows-manual-export-build.yml",
-      "sha256": "69d1cecf1c68c8e80eb2634cfe66b3b741067de37f36991354c2f177111a6138"
+      "sha256": "652109cc5b3a8ee04f88a39112d803e344946b0c8ad5b1bb49caa64ee9d165f2"
     },
     {
       "path": ".github/workflows/windows-manual-rust-validation.yml",
@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "44d822db9ddc112e6182402aa6de575156774e81d56d532ee2bcf78270723197"
+      "sha256": "000e19fd82d1da9cdf1abe95aa1824035063a278b9c8fed6d16a19b85bbf4b2c"
     },
     {
       "path": "SECURITY.md",
@@ -1244,7 +1244,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "d45c1200354c4013a97fa57f756165b608680c6c8eedb64fe05c432f8f2ec55c"
+      "sha256": "75871ce4e3b7426aba66ebe890d59115184361ef3d0a944ed465c88d36774b8f"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1428,7 +1428,7 @@
     },
     {
       "path": "docs/specs/gui-shell-export.md",
-      "sha256": "2a3a83f4f89aeff3269db6baa698468ede7f37635f1eba78bd6d24398cc48975"
+      "sha256": "f40777d0c9dc4ed3fa18b3eb2ef5a9d40c1d86f29c9ebb0a01f81e57302c641e"
     },
     {
       "path": "docs/specs/gui-shell-module-pruning.md",
@@ -4652,7 +4652,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "475d2c3f78c6b07922200e7369a40089a9aae9ed2560b1411e9a5ee667cb9a0f"
+      "sha256": "50552a5a6a4301b79e3ab4a184d22bd1161c35be4ae18ddf27d00e3c244b8335"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
@@ -4713,6 +4713,10 @@
     {
       "path": "tooling/minidora_live_check.py",
       "sha256": "3f40c96eeb4e5912301454424aa06fab54b155f77c819cf21482073aa1750242"
+    },
+    {
+      "path": "tooling/package_windows_portable.py",
+      "sha256": "834761cce3533a730ab4e4d1ed9d7184d7d914d5142d3a3fab25294a0d807984"
     },
     {
       "path": "tooling/package_windows_product.py",
