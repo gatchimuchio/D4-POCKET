@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "88353c2ac5fc932adbb23d95feaba55d017329bf5e865c51e8629d126840234d"
+      "sha256": "dcea5cf4a111073b019a9b00601c1e0baca89d83a2fe152c6c5660643d5dc586"
     },
     {
       "path": "SECURITY.md",
@@ -664,7 +664,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "ebd6eac0f7a32e703c58814324a9ea171f3a9694eedba2bf5dbf3734c08e019e"
+      "sha256": "0090aacf7a1ac30d8637fdc502212124e91eeb33d5e242ce347d5047c0ff139f"
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
@@ -1244,7 +1244,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "b17a27341f34f9eb4e1ad513afecf273f0adda4ce4bdcb4d2e63b27a6063bdd8"
+      "sha256": "db83e30e5a65fb6ac2580cfd6e8ded97df542e4a8f71a249de71d946b488f7a4"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",

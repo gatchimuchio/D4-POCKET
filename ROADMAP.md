@@ -6,6 +6,8 @@
 
 2026-10-06 rev5 P12接続単位2: first-run／Setup Doctor後のDashboard導線からAgent Centerを開き、Provider／Modelを設定してRuntime／Workspace登録要求まで進むWidget統合を追加。合成値とFake Brokerでprovider/model、runtime、workspaceの束縛とAuthority field不在を確認。`FIXTURE`証拠で、native Owner dialog、実Codex、installed製品の成立は示さない。P2〜P11のCLOSED機能は再実装せず、P12はOPENを維持して登録Session／Agent Task接続へ進む。
 
+2026-10-06 rev5 P12接続単位3: 同じfirst-run製品Widget経路を登録Agent Session開始とAgent Task完了まで接続。Fake Broker／合成identityでRuntime・Session・Workspace結合、Workspace Permissionと一回Task Approvalの分離、Task状態`running`→`completed`を検査した`FIXTURE`証拠。実Codex、native Owner dialog、通常Release capability昇格の証拠ではない。P1は再開せず、P12はOPENを維持してCompareへ進む。
+
 2026-10-06 rev5 P11追補: portable製品のLIVE_RUNTIME確認では、未選択のSettingsをIndexedStackが起動時にmountし、その`initState`からUpdate一覧Broker IPCを先行発行していた。初期表示時に通信失敗を観測した一方、後の明示的な候補取得は未設定trustによりBrokerが正しく拒否し、その後の一覧読取はacceptedとなった。製品画面を選択した時だけ一覧を読むよう変更し、非選択中0回／選択時1回のFlutter回帰testを追加。対象test 17件、変更Dart解析、Schema 161／157／208、Conformance 236 checks PASS。strict日本語監査は今回変更外のrev3／rev4履歴とCodex CLI診断文の既存3 findingsで終了値1、今回変更fileのfindingはない。修正後のWindows LIVE_RUNTIME再実行は未実施。この修正を含むP11 Product Buildは閉鎖済み。
 
 2026-10-06 rev5 P11追補: SettingsのWindows Export詳細欄から製品Update用Ed25519公開鍵／HTTPS配布元を任意設定できるようにし、Broker validation、native Owner確認表示、Receipt hash結合Manifestへ接続した。秘密鍵は扱わず、未設定時の製品Updateはfail-closed。Rust対象16件・自動native Owner確認E2E 1件・Flutter対象7件、Schema 161、Conformance 236、Release Gate、Windows Debug buildがPASS。Analyzerは先行実行でNo issuesを確認したが、再試行はAnalysis Server shutdown時のOS error 1920で未完了。Windows Debug buildは追跡外CMake cacheの旧`Z:/apps/...`参照を同一checkoutへの一時drive aliasで解消して完了し、MSB8028 warning 3件を記録。aliasは解除済み。設定したManifestからの製品Release build、実配布、installed updateは未実証。InstallerとP11は未完了。

@@ -338,8 +338,14 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('first-runからProvider／Modelを設定してBroker統治登録へ進める',
+  testWidgets('first-runからProvider／Model設定後に登録AgentのTaskを完了する',
       (WidgetTester tester) async {
+    const sessionId = 'c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1';
+    const taskId = 'd2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2';
+    const instructionHash =
+        'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const resultHash =
+        'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
     tester.view.physicalSize = const Size(1200, 1000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -364,10 +370,91 @@ void main() {
         'runtime_id': 'codex-p12-synthetic',
         'workspace_id': 'workspace-p12-synthetic',
         'registration_lifetime': 'broker_process',
-        'task_execution': 'unsupported',
+        'task_execution': 'supported',
         'permission_generated': false,
         'approval_generated': false,
         'credential_value_accepted': false,
+      }),
+      _brokerAcceptedBody('対話開始', {
+        '対話セッションID': sessionId,
+        '実行系ID': 'codex-p12-synthetic',
+        '状態': '利用中',
+      }),
+      _brokerDialogueSessionListResponse(sessions: [
+        {
+          '対話セッションID': sessionId,
+          '実行系ID': 'codex-p12-synthetic',
+          '状態': '利用中',
+          '作成監査ID': 'audit-p12-session-created',
+          '作業領域ID': 'workspace-p12-synthetic',
+          '作業領域結合監査ID': 'audit-p12-workspace-bound',
+        },
+      ]),
+      _brokerAcceptedBody('Agent作業要求検査', {
+        '版': 1,
+        '状態': '要求検査済み',
+        '実行状態': '未実行',
+        'Permission状態': '未付与',
+        'Approval状態': '未取得',
+        '実行系ID': 'codex-p12-synthetic',
+        '対話セッションID': sessionId,
+        '作業領域ID': 'workspace-p12-synthetic',
+        '指示hash': instructionHash,
+      }),
+      _brokerAcceptedBody('AgentTaskWorkspacePermissionGrant', {
+        'permission_id': 'e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3',
+        'agent_runtime_id': 'codex-p12-synthetic',
+        'session_id': sessionId,
+        'workspace_id': 'workspace-p12-synthetic',
+        'workspace_registration_hash':
+            'sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+        'operation': 'agent_task.execute',
+        'scope': 'session_workspace_once',
+        'decision': 'allow',
+        'source': 'owner',
+        'expires_at_epoch_seconds': 1900000000,
+        'use_limit': 1,
+        'uses_remaining': 1,
+        'status': 'active',
+      }),
+      _brokerAcceptedBody('AgentTaskOwnerApprovalGrant', {
+        '状態': 'Owner Approval発行済み',
+        '実行状態': '未実行',
+        '実行系ID': 'codex-p12-synthetic',
+        '対話セッションID': sessionId,
+        '作業領域ID': 'workspace-p12-synthetic',
+        '指示hash': instructionHash,
+        '実行条件hash': resultHash,
+        '適用ポリシー': 'gui-shell-agent-task-sandbox-v1-max-runtime-900s',
+        'expires_at_epoch_seconds': 1900000000,
+        'use_limit': 1,
+        'uses_remaining': 1,
+        'status': 'issued_unconsumed',
+      }),
+      _brokerAcceptedBody('AgentTask実行', {
+        'task_id': taskId,
+        'record_version': 2,
+        'agent_runtime_id': 'codex-p12-synthetic',
+        'session_id': sessionId,
+        'workspace_id': 'workspace-p12-synthetic',
+        'description': 'Agent作業Task（結果本文とWorkspace差分は別の権限経路）',
+        'instruction_hash': instructionHash,
+        'status': 'running',
+        'audit_event_id': 'audit-p12-task-start',
+        'result_content_available': false,
+      }),
+      _brokerAcceptedBody('AgentTask状態', {
+        'task_id': taskId,
+        'record_version': 2,
+        'agent_runtime_id': 'codex-p12-synthetic',
+        'session_id': sessionId,
+        'workspace_id': 'workspace-p12-synthetic',
+        'description': 'Agent作業Task（結果本文とWorkspace差分は別の権限経路）',
+        'instruction_hash': instructionHash,
+        'status': 'completed',
+        'audit_event_id': 'audit-p12-task-complete',
+        'result_hash': resultHash,
+        'result_content_available': true,
       }),
     ]);
     final client = await ShellCoreClient.product(transport: transport);
@@ -423,6 +510,47 @@ void main() {
     expect(find.textContaining('OpenAI（Codex CLI経由） / model-p12-synthetic'),
         findsOneWidget);
     expect(find.text('登録Workspaceで対話Sessionを開始'), findsOneWidget);
+
+    await tester.tap(find.text('登録Workspaceで対話Sessionを開始'));
+    await tester.pumpAndSettle();
+    expect(find.text(sessionId), findsOneWidget);
+
+    final preflightButton = find.text('Task実行能力を事前検査（実行なし）');
+    await tester.ensureVisible(preflightButton);
+    await tester.tap(preflightButton);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField), 'rev5 P12 統合Task');
+    await tester.tap(find.text('Broker事前検査'));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Workspace PermissionのOwner確認'));
+    await tester.tap(find.text('Workspace PermissionのOwner確認'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Task一回ApprovalのOwner確認'));
+    await tester.tap(find.text('Task一回ApprovalのOwner確認'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Taskを一回実行'));
+    await tester.tap(find.text('Taskを一回実行'));
+    await tester.pumpAndSettle();
+    expect(find.text('Task状態: running'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Task状態を更新'));
+    await tester.tap(find.text('Task状態を更新'));
+    await tester.pumpAndSettle();
+    expect(find.text('Task状態: completed'), findsOneWidget);
+    expect(find.textContaining(resultHash), findsOneWidget);
+    expect(
+      transport.operations,
+      containsAllInOrder([
+        'AgentCLI実行系作業領域登録',
+        '対話開始',
+        'Agent作業要求検査',
+        'AgentTaskWorkspacePermissionGrant',
+        'AgentTaskOwnerApprovalGrant',
+        'AgentTask実行',
+        'AgentTask状態',
+      ]),
+    );
     expect(tester.takeException(), isNull);
   });
 

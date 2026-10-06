@@ -247,6 +247,12 @@ DashboardからAgent Centerへ進み、既存登録画面でProvider／Modelを�
 
 検証: `flutter test --no-pub --no-test-assets --dart-define=GUI_SHELL_PRODUCT_VERSION=1.2.3 --plain-name "first-runからProvider／Modelを設定してBroker統治登録へ進める" test/widget_test.dart` 1件PASS。Dashboard first-run設定・Setup Doctor取得から登録画面へ進み、明示したUI操作後にFake Brokerが受理する要求のProvider／Model、Runtime、Workspace bindingとAuthority field不在を確認した。試験応答は`FIXTURE`であり、画面上のOwner確認遷移は実native dialogではなく、実Codex CLI／Provider呼出し・installed productを証明しない。P4の既存条件は再試験していない。次は同じ製品経路から登録Agent Sessionを開始し、normal Agent Taskへ接続する。
 
+#### P12接続単位3: 登録Agent Sessionから通常Agent Task完了 — 完了
+
+first-run後のDashboardからAgent Centerへ進み、既存のProvider／Model設定、Runtime／Workspace登録を経て、登録Workspaceへ結合したAgent Sessionを開始する。そのSessionへ通常Task UIから要求し、Broker事前検査、Workspace Permission、Task一回Approvalを個別要求し、`running`から`completed`のTask status／result hashを表示するまで、一本のWidget経路で接続した。P1でCLOSEDのTask機能は再実装せず、通常Releaseの`task_execution=unsupported`やrelease gateも変更しない。試験内の`task_execution=supported`応答は、Task UI経路を通すためのFake Broker fixtureに限定する。
+
+検証: `flutter test --no-pub --no-test-assets --dart-define=GUI_SHELL_PRODUCT_VERSION=1.2.3 --plain-name "first-runからProvider／Model設定後に登録AgentのTaskを完了する" test/widget_test.dart` 1件PASS。Fake Brokerは合成Runtime／Workspace／Session／Taskと合成grantを返す。Clientはsession binding、Permission／Approval receipt、Task recordを要求へ照合し、試験は操作順とcompleted/result hashを確認する。証拠種別は`FIXTURE`で、native Owner dialog、自動承認、実Codex／Provider実行、Taskの実Workspace書込み、installed製品を証明しない。P12はOPENを維持し、次はCompare接続へ進む。
+
 ## P11作業履歴（以下の記録は当時の状態。現行状態は上記CLOSEDが正本）
 
 #### 2026-10-06 P11 Exportから製品Update trust設定への接続
