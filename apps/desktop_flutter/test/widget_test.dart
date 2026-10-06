@@ -315,6 +315,29 @@ void main() {
     expect(find.textContaining('完成製品リリース: 未主張'), findsOneWidget);
   });
 
+  testWidgets('概要から導入・更新センターへ直行できる', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1200, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const GuiShellDesktopApp());
+    await tester.pumpAndSettle();
+
+    final openSetup = find.byKey(const ValueKey('open-product-setup'));
+    expect(openSetup, findsOneWidget);
+    await tester.tap(openSetup);
+    await tester.pumpAndSettle();
+
+    final updateCenterUnavailable =
+        find.textContaining('更新センター: Broker接続がないため操作できません。');
+    expect(updateCenterUnavailable, findsOneWidget);
+    final updateCenterRect = tester.getRect(updateCenterUnavailable);
+    expect(updateCenterRect.top, lessThan(1000));
+    expect(updateCenterRect.bottom, greaterThan(0));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('状態バーが段階Bの所有者利用とリリース未主張を表示する', (WidgetTester tester) async {
     await tester.pumpWidget(
       MaterialApp(

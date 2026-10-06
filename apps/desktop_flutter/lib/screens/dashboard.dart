@@ -4,9 +4,14 @@ import '../services/shell_core_client.dart';
 import 'shared.dart';
 
 class Dashboard extends StatelessWidget {
-  const Dashboard({super.key, required this.client});
+  const Dashboard({
+    super.key,
+    required this.client,
+    this.onOpenProductSetup,
+  });
 
   final ShellCoreClient client;
+  final VoidCallback? onOpenProductSetup;
 
   @override
   Widget build(BuildContext context) {
@@ -18,6 +23,28 @@ class Dashboard extends StatelessWidget {
       title: '概要',
       evidenceTitle: 'Dashboard',
       children: [
+        BorderedPanel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'D4 Pocketの導入・更新',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Windowsへの初回導入や更新は、署名済み候補をBrokerが検証する更新センターから行えます。候補取得は明示操作、導入・更新の承認はRustの確認画面で行います。',
+              ),
+              const SizedBox(height: 8),
+              FilledButton.icon(
+                key: const ValueKey('open-product-setup'),
+                onPressed: onOpenProductSetup,
+                icon: const Icon(Icons.install_desktop_outlined),
+                label: const Text('インストール・更新センターを開く'),
+              ),
+            ],
+          ),
+        ),
         SectionList(
           title: '段階状態',
           rows: [

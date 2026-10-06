@@ -248,6 +248,7 @@ class ShellHomePage extends StatefulWidget {
 class _ShellHomePageState extends State<ShellHomePage> {
   int selectedIndex = 0;
   bool _dialogueVisited = false;
+  int _updateCenterFocusRequest = 0;
   _ShellViewMode viewMode = _ShellViewMode.ownerUse;
   _ShellNavigationGroup navigationGroup = _ShellNavigationGroup.all;
   late final WindowsTrayClient _trayClient;
@@ -382,7 +383,10 @@ class _ShellHomePageState extends State<ShellHomePage> {
     final snapshot = widget.client.getSnapshot();
     _dialogueVisited = _dialogueVisited || selectedIndex == 12;
     final pages = [
-      Dashboard(client: widget.client),
+      Dashboard(
+        client: widget.client,
+        onOpenProductSetup: _openProductSetup,
+      ),
       if (kGuiShellModuleSetupDoctor)
         SetupDoctor(client: widget.client)
       else
@@ -404,7 +408,10 @@ class _ShellHomePageState extends State<ShellHomePage> {
       RecoveryCenter(client: widget.client),
       ProblemsPanel(client: widget.client),
       EvidenceCenter(client: widget.client),
-      SettingsScreen(client: widget.client),
+      SettingsScreen(
+        client: widget.client,
+        focusUpdateCenterRequest: _updateCenterFocusRequest,
+      ),
       if (_dialogueVisited)
         RuntimeDialogueScreen(readOnly: viewMode == _ShellViewMode.demo)
       else
@@ -771,6 +778,14 @@ class _ShellHomePageState extends State<ShellHomePage> {
     };
     if (!mounted) return;
     _selectPage(index);
+  }
+
+  void _openProductSetup() {
+    setState(() {
+      selectedIndex = 11;
+      navigationGroup = _ShellNavigationGroup.settings;
+      _updateCenterFocusRequest++;
+    });
   }
 
   void _setNavigationGroup(_ShellNavigationGroup group) {

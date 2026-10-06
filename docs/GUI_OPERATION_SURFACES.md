@@ -75,8 +75,8 @@ GUI-ShellのGUI堅牢化では、権限をFlutterへ移さず、実証済みの�
 - item: Problems Panel and Evidence Center
   classification: required_for_v1
   status: implemented
-  evidence: Dashboardはrelease blocker、problem、evidence statusを描画し、Setup Doctorはinstalled-path evidenceを描画する。
-  authority_boundary: 機械検証済みのWindows installed-path evidenceがなければ、evidence表示はrelease readinessを満たさない。
+  evidence: Dashboardはrelease blocker、problem、evidence statusを描画し、Setup Doctorはinstalled-path evidenceを描画する。Windows製品の導入・更新カードから設定内Update Centerの位置へ移動できる。
+  authority_boundary: 導入・更新カードは画面遷移だけを行い、候補取得、file操作、Permission、Approval、Authorityを起動しない。機械検証済みのWindows installed-path evidenceがなければ、evidence表示はrelease readinessを満たさない。
 
 - item: Status Bar
   classification: required_for_v1

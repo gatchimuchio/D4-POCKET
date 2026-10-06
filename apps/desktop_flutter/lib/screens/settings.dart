@@ -26,17 +26,20 @@ class SettingsScreen extends StatefulWidget {
     super.key,
     required this.client,
     this.requestApplicationExit,
+    this.focusUpdateCenterRequest = 0,
   });
 
   final ShellCoreClient client;
   final Future<ui.AppExitResponse> Function(ui.AppExitType)?
       requestApplicationExit;
+  final int focusUpdateCenterRequest;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  final GlobalKey _updateCenterKey = GlobalKey();
   final Set<String> _selectedExportModules =
       Set<String>.of(guiShellOptionalExportModules.keys);
   final Set<String> _stagedUpdateCandidates = <String>{};
@@ -114,6 +117,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _editInstructionController.dispose();
     _editTargetPathController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant SettingsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.focusUpdateCenterRequest != widget.focusUpdateCenterRequest) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final targetContext = _updateCenterKey.currentContext;
+        if (!mounted || targetContext == null) return;
+        Scrollable.ensureVisible(
+          targetContext,
+          alignment: 0.08,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+        );
+      });
+    }
   }
 
   @override
@@ -210,7 +230,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _composePanel(),
         _exportPanel(),
         _aiEditPanel(),
-        _updatePanel(),
+        KeyedSubtree(key: _updateCenterKey, child: _updatePanel()),
         if (filtered.isEmpty)
           const EmptyStatePanel(
             title: '一致する設定なし',
