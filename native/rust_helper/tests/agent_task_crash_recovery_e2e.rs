@@ -4,7 +4,7 @@ use gui_shell_rust_helper::audit_hash::sha256_tagged;
 use gui_shell_rust_helper::broker::{
     BrokerCredentialRole, BrokerEndpoint, BrokerPersistentStore, BrokerRequestEnvelope,
 };
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::collections::HashSet;
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use winsafe::{HPROCESSLIST, co};
+use winsafe::{co, HPROCESSLIST};
 
 const RUNTIME_ID: &str = "r2-crash-codex";
 const WORKSPACE_ID: &str = "r2-crash-workspace";
@@ -154,6 +154,18 @@ impl Fixture {
     }
 
     fn start_broker(&mut self) {
+        let (child, session_file, owner_file) = self.spawn_broker_process(Stdio::null());
+        self.broker = Some(child);
+        self.normal = None;
+        self.owner = None;
+        let normal = self.wait_for_endpoint(&session_file);
+        let owner = self.wait_for_endpoint(&owner_file);
+        assert_ne!(normal.session_secret, owner.session_secret);
+        self.normal = Some(normal);
+        self.owner = Some(owner);
+    }
+
+    fn spawn_broker_process(&mut self, stderr: Stdio) -> (Child, PathBuf, PathBuf) {
         self.generation += 1;
         let generation_root = self
             .root
@@ -201,19 +213,52 @@ impl Fixture {
             .env_remove("CODEX_API_KEY")
             .env_remove("ANTHROPIC_API_KEY")
             .stdout(Stdio::null())
-            .stderr(Stdio::null());
+            .stderr(stderr);
         if let Some(milliseconds) = self.task_execution_limit_ms {
             command.env(R2_E2E_TASK_EXECUTION_LIMIT_ENV, milliseconds.to_string());
         }
         let child = command.spawn().expect("r2-e2e Broker process起動");
-        self.broker = Some(child);
+        (child, session_file, owner_file)
+    }
+
+    fn start_broker_expect_failure(&mut self, diagnostic_fragment: &str) {
+        let (mut child, session_file, owner_file) = self.spawn_broker_process(Stdio::piped());
+        let deadline = Instant::now() + Duration::from_secs(15);
+        loop {
+            if child
+                .try_wait()
+                .expect("破損journal起動Broker状態")
+                .is_some()
+            {
+                break;
+            }
+            if Instant::now() >= deadline {
+                let _ = child.kill();
+                let output = child
+                    .wait_with_output()
+                    .expect("期限超過Broker process回収");
+                panic!(
+                    "破損journalでBrokerが期限内にfail-closedしない: status={:?}; stderr={}",
+                    output.status,
+                    String::from_utf8_lossy(&output.stderr)
+                );
+            }
+            thread::sleep(Duration::from_millis(25));
+        }
+        let output = child
+            .wait_with_output()
+            .expect("fail-closed Broker process回収");
+        assert!(!output.status.success(), "破損journalでBroker起動を拒否");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            stderr.contains(diagnostic_fragment),
+            "journal認証failureを報告: {stderr}"
+        );
+        assert!(!session_file.exists(), "通常IPC endpointを生成しない");
+        assert!(!owner_file.exists(), "Owner IPC endpointを生成しない");
+        self.broker = None;
         self.normal = None;
         self.owner = None;
-        let normal = self.wait_for_endpoint(&session_file);
-        let owner = self.wait_for_endpoint(&owner_file);
-        assert_ne!(normal.session_secret, owner.session_secret);
-        self.normal = Some(normal);
-        self.owner = Some(owner);
     }
 
     fn wait_for_endpoint(&mut self, path: &Path) -> BrokerEndpoint {
@@ -255,14 +300,13 @@ impl Fixture {
         let endpoint = self.normal().clone();
         let response = send_request(&endpoint, "shutdown", Value::Null);
         assert_eq!(response["status"], "accepted", "{response}");
-        assert!(
-            self.broker
-                .take()
-                .expect("仲介処理系の終了を待つ")
-                .wait()
-                .expect("Broker正常終了待ち")
-                .success()
-        );
+        assert!(self
+            .broker
+            .take()
+            .expect("仲介処理系の終了を待つ")
+            .wait()
+            .expect("Broker正常終了待ち")
+            .success());
         self.normal = None;
         self.owner = None;
     }
@@ -425,6 +469,29 @@ fn scratch_directories(workspace: &Path) -> std::io::Result<Vec<PathBuf>> {
         }
     }
     Ok(paths)
+}
+
+fn tamper_scratch_journal_state(path: &Path) -> Vec<u8> {
+    let before = fs::read(path).expect("active Task scratch journalを読む");
+    let mut envelope: Value = serde_json::from_slice(&before).expect("署名付きjournal JSON");
+    let original_hmac = envelope["hmac"]
+        .as_str()
+        .expect("journal HMAC項目")
+        .to_owned();
+    let entries = envelope["state"]["entries"]
+        .as_array_mut()
+        .expect("稼働中scratch journal項目一覧");
+    assert_eq!(entries.len(), 1, "active Taskのscratch journal entryは一件");
+    entries[0]["task_id"] = json!("tampered-task-scope");
+    assert_eq!(
+        envelope["hmac"].as_str(),
+        Some(original_hmac.as_str()),
+        "改変では元のHMACを再生成しない"
+    );
+    let tampered = serde_json::to_vec(&envelope).expect("改変journalをserialize");
+    assert_ne!(before, tampered, "journal stateを実際に改変");
+    fs::write(path, &tampered).expect("HMAC不一致journalを保存");
+    tampered
 }
 
 fn process_ids() -> HashSet<u32> {
@@ -872,8 +939,8 @@ fn provider_http_503_after_active_codex_task_stops_descendants_and_recovers_scra
 
 #[test]
 #[ignore = "Windows上でr2-e2e Broker processを強制終了し、実Codex/MxCの停止と再起動回復を確認するときに実行する"]
-fn broker_kill_during_active_codex_task_stops_descendants_recovers_scratch_and_does_not_reuse_approval()
- {
+fn broker_kill_during_active_codex_task_stops_descendants_recovers_scratch_and_does_not_reuse_approval(
+) {
     let codex = std::env::var_os("GUI_SHELL_CODEX_TASK_CRASH_E2E_CLI")
         .map(PathBuf::from)
         .expect("GUI_SHELL_CODEX_TASK_CRASH_E2E_CLIにCodex CLI絶対pathを設定");
@@ -1068,6 +1135,105 @@ fn broker_kill_during_active_codex_task_stops_descendants_recovers_scratch_and_d
         only_scratch(&fixture.workspace).is_none(),
         "再起動後にTask scratchが残らない"
     );
+}
+
+#[test]
+#[ignore = "Windows上で実Agent Task後の改竄scratch journalに対するBroker fail-closedを確認するときに実行する"]
+fn tampered_scratch_journal_blocks_broker_restart_and_preserves_orphan_scratch() {
+    let codex = std::env::var_os("GUI_SHELL_CODEX_TASK_CRASH_E2E_CLI")
+        .map(PathBuf::from)
+        .expect("GUI_SHELL_CODEX_TASK_CRASH_E2E_CLIにCodex CLI絶対pathを設定");
+    let mut fixture = Fixture::new(codex.clone());
+    let normal = fixture.normal().clone();
+    let started = send_request(
+        &normal,
+        "対話開始",
+        json!({"実行系ID":RUNTIME_ID,"作業領域ID":WORKSPACE_ID}),
+    );
+    assert_eq!(started["status"], "accepted", "{started}");
+    let session_id = started["body"]["対話セッションID"]
+        .as_str()
+        .expect("Agent対話Session識別子")
+        .to_owned();
+    let task = json!({
+        "agent_runtime_id": RUNTIME_ID,
+        "session_id": session_id,
+        "workspace_id": WORKSPACE_ID,
+        "instruction": TASK_INSTRUCTION,
+    });
+    let permission = send_request(
+        fixture.owner(),
+        "AgentTaskWorkspacePermissionGrant",
+        json!({
+            "agent_runtime_id": RUNTIME_ID,
+            "session_id": session_id,
+            "workspace_id": WORKSPACE_ID,
+        }),
+    );
+    assert_eq!(permission["status"], "accepted", "{permission}");
+    let approval = send_request(fixture.owner(), "AgentTaskOwnerApprovalGrant", task.clone());
+    assert_eq!(approval["status"], "accepted", "{approval}");
+
+    let processes_before_task = process_ids();
+    let broker_pid = fixture.broker.as_ref().expect("Broker実体").id();
+    let task_started = send_request(&normal, "AgentTask実行", task);
+    assert_eq!(task_started["status"], "accepted", "{task_started}");
+    assert_eq!(task_started["body"]["status"], "running", "{task_started}");
+    let task_id = task_started["body"]["task_id"]
+        .as_str()
+        .expect("Agent Task識別子")
+        .to_owned();
+    let active = wait_for_active_codex_task(
+        &fixture,
+        &normal,
+        &task_id,
+        broker_pid,
+        &codex,
+        &processes_before_task,
+        Duration::from_secs(75),
+    );
+
+    fixture.kill_broker();
+    wait_for_process_tree_exit(&active.process_tree, Duration::from_secs(15));
+    let stopped_heartbeat = fs::metadata(&active.heartbeat)
+        .expect("Broker終了後のheartbeat")
+        .len();
+    thread::sleep(Duration::from_millis(350));
+    assert_eq!(
+        fs::metadata(&active.heartbeat)
+            .expect("停止確認後heartbeat")
+            .len(),
+        stopped_heartbeat,
+        "Broker kill後にCodex／MxC process群が停止"
+    );
+    assert!(active.scratch.is_dir(), "Broker停止後の孤立scratchを保持");
+
+    let journal_path = fixture.store.join("agent_task_scratch_recovery.json");
+    let tampered_journal = tamper_scratch_journal_state(&journal_path);
+    fixture.start_broker_expect_failure("Agent Task scratch回復記録の認証に失敗");
+
+    assert!(
+        active.scratch.is_dir(),
+        "改竄journal時に孤立scratchを削除しない"
+    );
+    assert_eq!(
+        fs::read(&journal_path).expect("fail-closed後のjournal"),
+        tampered_journal,
+        "Broker起動失敗時に改竄journalを上書きしない"
+    );
+    assert!(
+        active.process_tree.is_disjoint(&process_ids()),
+        "失敗したBroker再起動後もCodex／MxC process群は不在"
+    );
+
+    let evidence = fixture.finish_responses();
+    assert_eq!(
+        evidence["expected_request_shape"],
+        "tool_call_without_result"
+    );
+    assert_eq!(evidence["tool_call_sent"], true);
+    assert_eq!(evidence["tool_result_received"], false);
+    assert_eq!(evidence["workspace_marker_exists"], false);
 }
 
 #[test]
