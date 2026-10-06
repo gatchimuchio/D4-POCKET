@@ -20,6 +20,7 @@ struct State {
     header_read_failures: AtomicUsize,
     post_requests: AtomicUsize,
     response_post_attempts: AtomicUsize,
+    provider_failure_responses: AtomicUsize,
     invalid_post_bodies: AtomicUsize,
     response_write_failures: AtomicUsize,
     response_bytes_written: AtomicUsize,
@@ -35,6 +36,7 @@ struct State {
     repeated_tool_call_rejections: AtomicUsize,
     tool_call_count: AtomicUsize,
     active_tool_call_id: Mutex<Option<String>>,
+    fail_after_tool_result: AtomicBool,
     blocked_connect_requests: AtomicUsize,
     blocked_connect_openai: AtomicUsize,
     blocked_connect_chatgpt: AtomicUsize,
@@ -110,6 +112,7 @@ impl CodexLoopbackResponses {
             header_read_failures: AtomicUsize::new(0),
             post_requests: AtomicUsize::new(0),
             response_post_attempts: AtomicUsize::new(0),
+            provider_failure_responses: AtomicUsize::new(0),
             invalid_post_bodies: AtomicUsize::new(0),
             response_write_failures: AtomicUsize::new(0),
             response_bytes_written: AtomicUsize::new(0),
@@ -125,6 +128,7 @@ impl CodexLoopbackResponses {
             repeated_tool_call_rejections: AtomicUsize::new(0),
             tool_call_count: AtomicUsize::new(0),
             active_tool_call_id: Mutex::new(None),
+            fail_after_tool_result: AtomicBool::new(false),
             blocked_connect_requests: AtomicUsize::new(0),
             blocked_connect_openai: AtomicUsize::new(0),
             blocked_connect_chatgpt: AtomicUsize::new(0),
@@ -230,6 +234,13 @@ impl CodexLoopbackResponses {
             .unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
     }
 
+    #[allow(dead_code)]
+    pub(crate) fn fail_after_tool_result(&self) {
+        self.state
+            .fail_after_tool_result
+            .store(true, Ordering::SeqCst);
+    }
+
     pub(crate) fn accepted_connections(&self) -> usize {
         self.state.accepted_connections.load(Ordering::SeqCst)
     }
@@ -274,6 +285,11 @@ impl CodexLoopbackResponses {
 
     pub(crate) fn response_post_attempts(&self) -> usize {
         self.state.response_post_attempts.load(Ordering::SeqCst)
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn provider_failure_responses(&self) -> usize {
+        self.state.provider_failure_responses.load(Ordering::SeqCst)
     }
 
     pub(crate) fn invalid_post_bodies(&self) -> usize {
@@ -1059,6 +1075,23 @@ fn handle_request(mut stream: TcpStream, port: u16, state: &State) {
                 }
             }
         }
+    }
+    if tool_result_received && state.fail_after_tool_result.load(Ordering::SeqCst) {
+        if respond(
+            &mut stream,
+            503,
+            "application/json",
+            br#"{"error":"synthetic_provider_unavailable"}"#,
+        )
+        .is_ok()
+        {
+            state
+                .provider_failure_responses
+                .fetch_add(1, Ordering::SeqCst);
+        } else {
+            state.response_write_failures.fetch_add(1, Ordering::SeqCst);
+        }
+        return;
     }
     let response_id = format!("resp_d4p_broker_task_{request_number}");
     let mut events = vec![

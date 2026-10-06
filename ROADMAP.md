@@ -4,6 +4,8 @@
 
 2026-10-07 Q2記録: 実Codex／MxCを使うBroker crash、Codex root crash、active Task cancel、deadlineの4局所LIVE_RUNTIME試験と逐次Rust全target 545 passed／0 failed／13 ignoredを確認した。限定条件と未成立範囲は`docs/REV5_PRODUCT_PROGRESS.md`および`docs/FINAL_QA_QUEUE.md`に記録する。Q2全体は継続し、通常Release `task_execution=unsupported`およびrelease gateを維持する。
 
+2026-10-07 Q2追補: localhost偽Responses APIが実tool result後にHTTP 503を返す実Codex／MxC active-task failure試験は1 passedし、他のBroker kill／Codex root crash／cancel／deadlineと合わせて5試験PASS。feature-enabled Rust全targetは499 passed／1 failed／12 ignoredで終了し、唯一のA2A Agent Card loopback接続失敗は同一test単独再実行でPASSした。根因未確定の`FQ-TEST-LOOPBACK`はOPENのまま。詳細は現行rev5進捗とFinal QA queueを正本として参照する。
+
 2026-10-06 rev5 P12接続単位1: first-run設定とSetup Doctor取得後、Dashboardから既存Agent CenterのCodex／Workspace登録UIへ進む導線を追加。Dashboard遷移Widget 1件と既存登録UI／Broker要求Widget 1件、変更Dart解析・形式確認、Schema 161／157／208、Conformance 236 checksがPASS。Fake Brokerによる`FIXTURE`証拠で、installed製品・native Owner dialog・実Codex起動を示さない。
 
 2026-10-06 rev5 P12接続単位2: first-run／Setup Doctor後のDashboard導線からAgent Centerを開き、Provider／Modelを設定してRuntime／Workspace登録要求まで進むWidget統合を追加。合成値とFake Brokerでprovider/model、runtime、workspaceの束縛とAuthority field不在を確認。`FIXTURE`証拠で、native Owner dialog、実Codex、installed製品の成立は示さない。P2〜P11のCLOSED機能は再実装せず、P12はOPENを維持して登録Session／Agent Task接続へ進む。

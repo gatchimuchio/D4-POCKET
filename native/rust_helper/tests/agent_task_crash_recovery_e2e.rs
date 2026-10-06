@@ -49,6 +49,10 @@ impl Fixture {
         Self::new_with_settings(codex, Some(milliseconds), "--expect-deadline")
     }
 
+    fn with_provider_failure(codex: PathBuf) -> Self {
+        Self::new_with_settings(codex, None, "--expect-provider-failure")
+    }
+
     fn new_with_settings(
         codex: PathBuf,
         task_execution_limit_ms: Option<u64>,
@@ -499,11 +503,20 @@ fn wait_for_active_codex_task(
 
 const E2E_DEADLINE_MS: u64 = 20_000;
 
-fn run_active_task_interruption_e2e(codex: PathBuf, deadline: bool) {
-    let mut fixture = if deadline {
-        Fixture::with_deadline(codex.clone(), E2E_DEADLINE_MS)
-    } else {
-        Fixture::new(codex.clone())
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ActiveTaskInterruption {
+    OwnerCancellation,
+    Deadline,
+    ProviderFailure,
+}
+
+fn run_active_task_interruption_e2e(codex: PathBuf, interruption: ActiveTaskInterruption) {
+    let deadline = interruption == ActiveTaskInterruption::Deadline;
+    let cancellation = interruption == ActiveTaskInterruption::OwnerCancellation;
+    let mut fixture = match interruption {
+        ActiveTaskInterruption::OwnerCancellation => Fixture::new(codex.clone()),
+        ActiveTaskInterruption::Deadline => Fixture::with_deadline(codex.clone(), E2E_DEADLINE_MS),
+        ActiveTaskInterruption::ProviderFailure => Fixture::with_provider_failure(codex.clone()),
     };
     let normal = fixture.normal().clone();
     let session = send_request(
@@ -559,7 +572,7 @@ fn run_active_task_interruption_e2e(codex: PathBuf, deadline: bool) {
         }),
     );
 
-    if !deadline {
+    if cancellation {
         let cancellation = send_request(&normal, "AgentTask取消", json!({"task_id":task_id}));
         assert_eq!(cancellation["status"], "accepted", "{cancellation}");
         assert_eq!(
@@ -568,8 +581,11 @@ fn run_active_task_interruption_e2e(codex: PathBuf, deadline: bool) {
         );
     }
 
-    let expected_status = if deadline { "failed" } else { "cancelled" };
-    let expected_failure_class = if deadline { "期限超過" } else { "取消" };
+    let (expected_status, expected_failure_class) = match interruption {
+        ActiveTaskInterruption::OwnerCancellation => ("cancelled", "取消"),
+        ActiveTaskInterruption::Deadline => ("failed", "期限超過"),
+        ActiveTaskInterruption::ProviderFailure => ("failed", "通信失敗"),
+    };
     let terminal_deadline = Instant::now()
         + Duration::from_millis(if deadline {
             E2E_DEADLINE_MS + 30_000
@@ -636,12 +652,24 @@ fn run_active_task_interruption_e2e(codex: PathBuf, deadline: bool) {
 
     fixture.stop_broker();
     let evidence = fixture.finish_responses();
-    assert_eq!(
-        evidence["expected_request_shape"],
+    let expected_request_shape = if interruption == ActiveTaskInterruption::ProviderFailure {
+        "tool_result_provider_failure"
+    } else {
         "tool_call_without_result"
-    );
+    };
+    assert_eq!(evidence["expected_request_shape"], expected_request_shape);
     assert_eq!(evidence["tool_call_sent"], true);
-    assert_eq!(evidence["tool_result_received"], false);
+    assert_eq!(
+        evidence["tool_result_received"],
+        interruption == ActiveTaskInterruption::ProviderFailure
+    );
+    assert_eq!(
+        evidence["provider_failure_responses"]
+            .as_u64()
+            .unwrap_or_default()
+            >= 1,
+        interruption == ActiveTaskInterruption::ProviderFailure
+    );
     assert_eq!(evidence["workspace_marker_exists"], false);
     assert_eq!(
         evidence["workspace_boundary_fixtures_valid_after_task"],
@@ -674,7 +702,7 @@ fn run_active_task_interruption_e2e(codex: PathBuf, deadline: bool) {
     .expect("terminal Task履歴Audit JSON");
     assert_eq!(terminal_record["status"], expected_status);
     assert_eq!(terminal_record["failure_class"], expected_failure_class);
-    if !deadline {
+    if cancellation {
         assert!(persisted.audit_log.events().iter().any(|event| {
             event.operation.contains("取消要求") || event.reason.contains("取消要求")
         }));
@@ -770,7 +798,7 @@ fn owner_cancellation_of_active_codex_task_stops_descendants_and_recovers_scratc
     let codex = std::env::var_os("GUI_SHELL_CODEX_TASK_CRASH_E2E_CLI")
         .map(PathBuf::from)
         .expect("GUI_SHELL_CODEX_TASK_CRASH_E2E_CLIにCodex CLI絶対pathを設定");
-    run_active_task_interruption_e2e(codex, false);
+    run_active_task_interruption_e2e(codex, ActiveTaskInterruption::OwnerCancellation);
 }
 
 #[test]
@@ -779,7 +807,16 @@ fn deadline_of_active_codex_task_stops_descendants_and_recovers_scratch() {
     let codex = std::env::var_os("GUI_SHELL_CODEX_TASK_CRASH_E2E_CLI")
         .map(PathBuf::from)
         .expect("GUI_SHELL_CODEX_TASK_CRASH_E2E_CLIにCodex CLI絶対pathを設定");
-    run_active_task_interruption_e2e(codex, true);
+    run_active_task_interruption_e2e(codex, ActiveTaskInterruption::Deadline);
+}
+
+#[test]
+#[ignore = "Windows上で隔離Responses APIのHTTP 503後に実Codex Taskが失敗・回復することを確認するときに実行する"]
+fn provider_http_503_after_active_codex_task_stops_descendants_and_recovers_scratch() {
+    let codex = std::env::var_os("GUI_SHELL_CODEX_TASK_CRASH_E2E_CLI")
+        .map(PathBuf::from)
+        .expect("GUI_SHELL_CODEX_TASK_CRASH_E2E_CLIにCodex CLI絶対pathを設定");
+    run_active_task_interruption_e2e(codex, ActiveTaskInterruption::ProviderFailure);
 }
 
 #[test]

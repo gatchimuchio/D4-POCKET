@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "82b0e1dc90adc723e4f5a81afede5aa79edc797cc005fd7bc4dcd26b5dcf6b05"
+      "sha256": "a58a6c566bfd7bbc4f844517c6d8c9541f416c987860768179604bbcca79fe58"
     },
     {
       "path": "SECURITY.md",
@@ -1188,7 +1188,7 @@
     },
     {
       "path": "docs/FINAL_QA_QUEUE.md",
-      "sha256": "17af480591a9d3635b7d77af25887ba2db835d44a4fe22bf4d2173534daaa4ff"
+      "sha256": "ac6363db82b2dfcb3cd39b0d15ffc1e84b59e129bbb44f233e0bc02c0ab5de95"
     },
     {
       "path": "docs/FIRST_RUN.md",
@@ -1244,7 +1244,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "b2f30f9aa01257cc56acc78af9f0d713199d8010b849393d80e59c587922b8c9"
+      "sha256": "dc7b74cb23fe62028eccd8785e9b41d48f846435119420a263e1d63e45f912ee"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -3192,7 +3192,7 @@
     },
     {
       "path": "native/rust_helper/src/bin/r2_e2e_responses.rs",
-      "sha256": "7ba34f2f661194b7018444a03f027b64abab9991d7717c0b99de728c55e28b1e"
+      "sha256": "6f2b51037f77da9d225bb17d27685eaa2e676c4626b0af4b0bcd04ef0f1b052d"
     },
     {
       "path": "native/rust_helper/src/broker/a2a_center.rs",
@@ -3448,7 +3448,7 @@
     },
     {
       "path": "native/rust_helper/tests/agent_task_crash_recovery_e2e.rs",
-      "sha256": "57f8775fda4b0ef39a27f8cffaf60e839dcbe27eef1e34af94089e90d5265847"
+      "sha256": "8940b05a4dc8d6843be4dcc9f3a3c0df0b4ce20001b145caa5d3e5ebc956dc90"
     },
     {
       "path": "native/rust_helper/tests/agent_task_production_e2e.rs",
@@ -3488,7 +3488,7 @@
     },
     {
       "path": "native/rust_helper/tests/support/codex_loopback_responses.rs",
-      "sha256": "a678670cd81a6ec80438cbc64a1bb06a5c583f1fcf327c6ea69e47309e8c00da"
+      "sha256": "82cbaefeb1e4b53061aa52d326626ee7c3672413ba46ac10ad651b529ae52bdf"
     },
     {
       "path": "native/rust_helper/tests/unit/agent_task_fixture_fs.rs",

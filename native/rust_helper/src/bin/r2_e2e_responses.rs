@@ -36,6 +36,7 @@ fn workspace_boundary_fixtures_valid(workspace: &Path) -> bool {
 enum ExpectedRequestShape {
     CompletedToolWrite,
     ToolCallWithoutResult,
+    ToolResultProviderFailure,
 }
 
 fn evidence_matches_expected_request_shape(
@@ -58,6 +59,18 @@ fn evidence_matches_expected_request_shape(
                 && evidence["tool_result_received"] == false
                 && evidence["workspace_marker_exists"] == false
                 && evidence["expected_request_shape"] == "tool_call_without_result"
+        }
+        ExpectedRequestShape::ToolResultProviderFailure => {
+            common
+                && evidence["requests"]
+                    .as_u64()
+                    .is_some_and(|count| count >= 2)
+                && evidence["tool_result_received"] == true
+                && evidence["provider_failure_responses"]
+                    .as_u64()
+                    .is_some_and(|count| count >= 1)
+                && evidence["workspace_marker_exists"] == false
+                && evidence["expected_request_shape"] == "tool_result_provider_failure"
         }
         ExpectedRequestShape::CompletedToolWrite => {
             common
@@ -102,8 +115,11 @@ fn main() -> ExitCode {
         Some(value) if value == "--expect-deadline" || value == "--expect-cancellation" => {
             ExpectedRequestShape::ToolCallWithoutResult
         }
+        Some(value) if value == "--expect-provider-failure" => {
+            ExpectedRequestShape::ToolResultProviderFailure
+        }
         Some(_) => {
-            eprintln!("任意指定モードは--expect-deadlineまたは--expect-cancellationだけを受理する");
+            eprintln!("任意指定モードを確認できない");
             return ExitCode::from(2);
         }
     };
@@ -111,17 +127,25 @@ fn main() -> ExitCode {
         eprintln!("余分な引数を受理しない");
         return ExitCode::from(2);
     }
-    let server = match if expected_request_shape == ExpectedRequestShape::ToolCallWithoutResult {
-        fixture::CodexLoopbackResponses::start_on_with_extended_tool_wait(workspace, port)
-    } else {
-        fixture::CodexLoopbackResponses::start_on(workspace, port)
-    } {
+    let server_result = match expected_request_shape {
+        ExpectedRequestShape::ToolCallWithoutResult => {
+            fixture::CodexLoopbackResponses::start_on_with_extended_tool_wait(workspace, port)
+        }
+        ExpectedRequestShape::CompletedToolWrite
+        | ExpectedRequestShape::ToolResultProviderFailure => {
+            fixture::CodexLoopbackResponses::start_on(workspace, port)
+        }
+    };
+    let server = match server_result {
         Ok(server) => server,
         Err(_) => {
             eprintln!("localhost偽Responses APIを起動できない");
             return ExitCode::FAILURE;
         }
     };
+    if expected_request_shape == ExpectedRequestShape::ToolResultProviderFailure {
+        server.fail_after_tool_result();
+    }
     println!("READY {}", server.port());
     if io::stdout().flush().is_err() {
         return ExitCode::FAILURE;
@@ -135,12 +159,14 @@ fn main() -> ExitCode {
         "expected_request_shape": match expected_request_shape {
             ExpectedRequestShape::CompletedToolWrite => "completed_tool_write",
             ExpectedRequestShape::ToolCallWithoutResult => "tool_call_without_result",
+            ExpectedRequestShape::ToolResultProviderFailure => "tool_result_provider_failure",
         },
         "requests": server.post_requests(),
         "models": server.model_list_requests(),
         "tool_offered": server.tool_was_offered(),
         "tool_call_sent": server.tool_call_was_sent(),
         "tool_result_received": server.tool_result_was_received(),
+        "provider_failure_responses": server.provider_failure_responses(),
         "tool_output_diagnostics": server.tool_output_diagnostics(),
         "repeated_tool_call_rejections": server.repeated_tool_call_rejections(),
         "invalid_bodies": server.invalid_post_bodies(),
@@ -245,6 +271,43 @@ mod tests {
         assert!(!evidence_matches_expected_request_shape(
             &wrong_shape,
             ExpectedRequestShape::ToolCallWithoutResult
+        ));
+    }
+
+    #[test]
+    fn provider_failure_requires_tool_result_503_and_no_workspace_completion_marker() {
+        let valid = serde_json::json!({
+            "expected_request_shape": "tool_result_provider_failure",
+            "requests": 2,
+            "tool_offered": true,
+            "tool_call_sent": true,
+            "tool_result_received": true,
+            "provider_failure_responses": 1,
+            "repeated_tool_call_rejections": 0,
+            "invalid_bodies": 0,
+            "response_write_failures": 0,
+            "incomplete_requests": 0,
+            "blocked_external_requests": 0,
+            "workspace_marker_exists": false,
+            "workspace_boundary_fixtures_valid_after_task": true
+        });
+        assert!(evidence_matches_expected_request_shape(
+            &valid,
+            ExpectedRequestShape::ToolResultProviderFailure
+        ));
+
+        let mut no_provider_failure = valid.clone();
+        no_provider_failure["provider_failure_responses"] = serde_json::json!(0);
+        assert!(!evidence_matches_expected_request_shape(
+            &no_provider_failure,
+            ExpectedRequestShape::ToolResultProviderFailure
+        ));
+
+        let mut workspace_write = valid;
+        workspace_write["workspace_marker_exists"] = serde_json::json!(true);
+        assert!(!evidence_matches_expected_request_shape(
+            &workspace_write,
+            ExpectedRequestShape::ToolResultProviderFailure
         ));
     }
 
