@@ -2,12 +2,16 @@
 
 更新日: 2026-10-07
 工程正本: ユーザー提示「D4 Pocket / GUI-Shell 統合実装仕様書 rev5」「統合開発工程表 rev5」「Codex実装指示書 rev5」
-現行phase: `Q0 Final QA Freeze` (`OPEN`)。`P12 Product Integration`は2026-10-07にrev5 Product Build受入れを閉鎖し、Windows `FEATURE COMPLETE`とした。`P11 Windows Productization`は2026-10-06にProduct Build受入れを閉鎖。旧phaseは履歴扱いで、現行release gateは別台帳に保持する。
-基準Repository状態: rev5文書同期commit `39dd3f4bc7aafe350ca94fce9392095f1064d2bc`。その後の実装・検証状態は本書末尾の更新履歴を参照。
+現行phase: `Q1 Codex Comprehensive QA` (`OPEN`)。`Q0 QA Freeze`は2026-10-07に閉鎖し、QA対象製品commit `ab746d4b33b003761f5ddcef60a88afa97132a40`を固定した。`P12 Product Integration`はrev5 Product Build受入れを閉鎖し、Windows `FEATURE COMPLETE`とした。`P11 Windows Productization`は2026-10-06にProduct Build受入れを閉鎖。旧phaseは履歴扱いで、現行release gateは別台帳に保持する。
+初期rev5文書同期commit: `39dd3f4bc7aafe350ca94fce9392095f1064d2bc`。凍結commitとその後のQA記録は本書末尾の更新履歴を参照。
 
 ## 正本の選び方
 
 常にユーザーが現在提示した最新版の仕様書・工程表・実装指示書と、そこへ同期したリポジトリ内の現行進捗を正本とする。旧版文書は、明示的に現行正本へ採用されない限り、履歴・補助証拠としてのみ使う。旧版の状態や要求を現行状態へ推定転記しない。
+
+## Q0 QA Freeze — CLOSED
+
+2026-10-07、P12 Product Build受入れcommit `ab746d4b33b003761f5ddcef60a88afa97132a40`をFinal QA対象製品状態として固定した。対象commitは`main`へpush済みで、Q0記録時点のremote `main`と一致。対象はWindows Feature Complete製品構成であり、release-readyや正式配布可能状態を意味しない。以後のQ1〜Q7 evidenceはこの凍結commitを対象とし、製品コード修正が必要になった場合は修正commitを新たなQA候補として明示し、対象を再凍結する。
 
 ## 1. 工程方針
 

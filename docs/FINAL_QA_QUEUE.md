@@ -1,8 +1,18 @@
 # D4 Pocket 最終品質保証項目（`FINAL_QA_QUEUE`）
 
-状態: `QUEUED`（Feature Complete前は実施・拡張しない）
+状態: `Q1 ACTIVE`（Feature Complete済み。Q0凍結完了）
 工程正本: ユーザー提示「D4 Pocket / GUI-Shell rev5 Product-First / Final-QA Separation」
 現行製品phase: `docs/REV5_PRODUCT_PROGRESS.md`
+
+## 0. 現在の凍結・進行状態
+
+| 段階 | 状態 | 対象／証拠 |
+| --- | --- | --- |
+| Q0 QA Freeze | CLOSED（2026-10-07） | Final QA対象製品commit `ab746d4b33b003761f5ddcef60a88afa97132a40`。`main`へpushしremote HEAD一致を確認 |
+| Q1 Codex Comprehensive QA | OPEN | 凍結commitを基準にAgent Task／Compare／Handoff／Workspace／MCP／Provider／Host／Export／Installer／Update／Rollbackを横断検査 |
+| Q2–Q7 | QUEUED | 各前段階の閉鎖後に開始 |
+
+製品コード変更が必要な場合、該当QA所見を証拠化して局所修正し、修正済み製品を新しいQA候補commitとして明示する。以後のQA結果を旧凍結commitへ誤って帰属させず、更新対象を再凍結する。Q0凍結はrelease readinessを意味せず、既存release blockerを変更しない。
 
 ## 1. 運用規則
 
