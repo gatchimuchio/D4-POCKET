@@ -31,6 +31,10 @@ Q1初回Rust runで既知localhost fixtureのConnectionReset 3件、次runでA2A
 
 この検査単位はTask cancellation／scratch処理の限定LIVE_RUNTIME・FIXTURE evidenceとtest assertion修正を記録するもので、FQ-R2-A/B/Fを閉じない。production installed path、deadline／Codex・Broker・Launcher crash回復、Approval非再利用、durable Audit、OneDrive／NTFS統合境界、result projection、通常Release capabilityは引き続きQ2以降の未成立範囲である。通常Release `task_execution=unsupported`とrelease gateは変更しない。
 
+2026-10-07 Windows hosted Rust補助検査の初回run #39は`workflow_dispatch`でcommit `de3be16e808ba42ea39d0456046cb4e1f5c355a4`をWindows runner `win25-vs2026/20260925.250.1`／Rust 1.95.0上で実行したが、Rust試験開始前の整形gateがexit 1となり、全target試験・Release helper build・IPC smokeは未実行だった（[run #39](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37505161510)）。workflowが明示検査する8 fileのうち、`codex_cli.rs`、`dialogue.rs`、`desktop_launcher.rs`、`fake_codex_cli.rs`に現行Rust 1.95.0の整形差分があったため、この4 fileだけを同版`rustfmt`で機械整形した。workflow指定と同一の8 file整形検査は全てPASS。これは検査入口を通す書式統一であり、Task／loopback挙動や`FQ-TEST-LOOPBACK`の合否を証明しない。整形済みbranchのWindows再検査結果を別途記録する。
+
+整形後、同じ実Codex CLI限定LIVE_RUNTIME testをWindows上で再実行した。最初の呼出しはtest必須環境変数を欠き、test body開始前に失敗した。絶対pathのCodex CLIを指定した正しい呼出しは24.65秒で1 passedとなり、前記のTask／TEMP／cancel／scratch観測を再現した。これは前記の同じ限定範囲を補強するだけで、installed productやQ2全体の完了証拠ではない。
+
 ## 1. 工程方針
 
 rev5は、完成前の製品機能開発と、Feature Complete後の最終品質保証を分離する。旧R2 Agent TaskはPRODUCT BUILD上`FUNCTIONALLY ESTABLISHED`、P1は`DONE FOR PRODUCT BUILD`とする。R2で得た実Task・Permission／Approval・Audit・Workspace境界等の証拠は保持する。R2-A〜Hの追加探索・出荷級の再確認はP2以降を止めず、必要なものを`docs/FINAL_QA_QUEUE.md`へ送る。

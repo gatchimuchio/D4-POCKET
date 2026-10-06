@@ -67,6 +67,8 @@ Rust初回・再runでA2A／Update TLS loopback fixtureの間欠failureを観測
 
 同sourceの`cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets --no-fail-fast -- --test-threads=1`はexit 101。Rust library 496 passed／3 failed／12 ignored、他targetは全PASS（総計542 passed／3 failed／12 ignored）。失敗はCodex loopback fixtureのConnectionReset 1件とUpdate Download TLS fixtureのWSA 10054／ConnectionReset 2件。TLS focused 17件は初回PASS後、2件の反復でround 2に再発し、単一test反復ではround 10にTLS `InvalidContentType`とserver-side ConnectionResetを再発した。根本原因は未確定のため`FQ-TEST-LOOPBACK`はOPEN。Q2のcancel／deadline／crash installed-product Acceptanceは未成立であり、FQ-R2-A/B/Fを閉じない。通常Release `task_execution=unsupported`、既存release blocker、`release_ready=false`は維持。
 
+2026-10-07 Windows hosted補助run #39（commit `de3be16e808ba42ea39d0456046cb4e1f5c355a4`）はWindows runner上のrustfmt gateで失敗し、Rust全target試験へ到達しなかった（[run #39](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37505161510)）。既存のformat差分を検査対象4 fileだけでRust 1.95.0により整形し、workflow対象8 fileの整形確認は通過した。run #39はloopback fixtureの成否について証拠を与えない。次のworkflow_dispatch再実行で得る結果も、その正確なcommitに対するWindows runner上の試験証拠としてのみ扱う。`FQ-TEST-LOOPBACK`は根因未確定のままOPEN。
+
 ## 3. Final QA段階
 
 | 段階 | 対象 | 開始条件 |

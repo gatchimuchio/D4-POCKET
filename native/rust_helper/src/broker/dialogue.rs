@@ -314,9 +314,11 @@ impl AgentAdapterMetadata {
                 "unknown",
             ]
             .contains(&metadata.authentication.method.as_str())
-            || metadata.authentication.status.as_deref().is_some_and(|status| {
-                !["supported", "unsupported", "unknown"].contains(&status)
-            })
+            || metadata
+                .authentication
+                .status
+                .as_deref()
+                .is_some_and(|status| !["supported", "unsupported", "unknown"].contains(&status))
             || metadata.authentication.secret_value_present
             || metadata.host_requirements.platforms.is_empty()
             || metadata.host_requirements.platforms.len() > 8
@@ -1211,9 +1213,7 @@ impl 対話制御 {
         scratch_journal: Option<super::agent_task_scratch::AgentTaskScratchJournal>,
         監査: &mut 監査器<'_>,
     ) -> Result<Value, 対話失敗> {
-        let mut 資格情報なし = |_: &str, _: &str, _: &str, _: &str| {
-            Err(対話失敗::権限拒否)
-        };
+        let mut 資格情報なし = |_: &str, _: &str, _: &str, _: &str| Err(対話失敗::権限拒否);
         self.操作_作業領域結合済み_scratch_提供元資格情報付き(
             操作,
             値,
@@ -2132,7 +2132,7 @@ impl 対話制御 {
                 let adapter = Arc::clone(
                     self.実行系
                         .get(&work.要求.実行系ID)
-                    .ok_or(対話失敗::実行系不在)?,
+                        .ok_or(対話失敗::実行系不在)?,
                 );
                 let provider_credential = adapter
                     .provider_credential_binding()
@@ -2535,10 +2535,7 @@ impl 対話制御 {
                 }
                 Err(error) => ("failed", None, None, Some(error)),
             };
-            let task = self
-                .agent_tasks
-                .get(&task_id)
-                .ok_or(対話失敗::要求不正)?;
+            let task = self.agent_tasks.get(&task_id).ok_or(対話失敗::要求不正)?;
             let terminal_record = super::execution_history::AgentTaskHistoryAuditRecord {
                 version: 1,
                 stage: "terminal".into(),
@@ -3379,10 +3376,7 @@ mod tests {
             .expect("有効Permission／Approval後に資格情報を解決してTaskを開始");
         assert_eq!(resolver_calls.load(Ordering::SeqCst), 1);
         assert_eq!(started["status"], "running");
-        let task_id = started["task_id"]
-            .as_str()
-            .expect("Task識別子")
-            .to_owned();
+        let task_id = started["task_id"].as_str().expect("Task識別子").to_owned();
         let mut state = Value::Null;
         for _ in 0..50 {
             state = AgentTask操作(&mut c, "AgentTask状態", json!({"task_id": task_id}), false)

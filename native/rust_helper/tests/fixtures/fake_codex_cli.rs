@@ -78,8 +78,12 @@ fn main() {
         {
             process::exit(52);
         }
-        println!(r#"{{"type":"thread.started","thread_id":"01a0cd58-c4fc-7221-8d25-dc52d12ba3fd"}}"#);
-        println!(r#"{{"type":"item.completed","item":{{"id":"item_0","type":"agent_message","text":"fixture-provider-credential-bound"}}}}"#);
+        println!(
+            r#"{{"type":"thread.started","thread_id":"01a0cd58-c4fc-7221-8d25-dc52d12ba3fd"}}"#
+        );
+        println!(
+            r#"{{"type":"item.completed","item":{{"id":"item_0","type":"agent_message","text":"fixture-provider-credential-bound"}}}}"#
+        );
         println!(r#"{{"type":"turn.completed"}}"#);
         return;
     }

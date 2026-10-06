@@ -1566,7 +1566,10 @@ mod tests {
         assert!(args
             .windows(2)
             .any(|pair| pair == ["--model", "model-fixture-v1"]));
-        assert_eq!(args.iter().filter(|arg| arg.as_str() == "--model").count(), 1);
+        assert_eq!(
+            args.iter().filter(|arg| arg.as_str() == "--model").count(),
+            1
+        );
         assert!(build_codex_command_with_model(
             Path::new(r"C:\codex.exe"),
             Path::new(r"C:\workspace"),
@@ -1609,12 +1612,13 @@ mod tests {
             None,
         )
         .expect("Broker資格情報付きの固定CLI command");
-        let key_is_environment_only = command
-            .get_envs()
-            .any(|(name, value)| {
-                name == "OPENAI_API_KEY" && value == Some(std::ffi::OsStr::new(canary))
-            });
-        assert!(key_is_environment_only, "合成keyはCodex親processのAPI key環境値に限る");
+        let key_is_environment_only = command.get_envs().any(|(name, value)| {
+            name == "OPENAI_API_KEY" && value == Some(std::ffi::OsStr::new(canary))
+        });
+        assert!(
+            key_is_environment_only,
+            "合成keyはCodex親processのAPI key環境値に限る"
+        );
         let args: Vec<_> = command
             .get_args()
             .map(|arg| arg.to_string_lossy().to_string())
@@ -1625,7 +1629,10 @@ mod tests {
                 "shell_environment_policy.exclude=[\"OPENAI_API_KEY\",\"CODEX_API_KEY\",\"CODEX_ACCESS_TOKEN\"]",
             ]
         });
-        assert!(excludes_provider_keys, "Codex tool shellから全Provider key sourceを除外する");
+        assert!(
+            excludes_provider_keys,
+            "Codex tool shellから全Provider key sourceを除外する"
+        );
         assert!(
             args.iter().all(|argument| !argument.contains(canary)),
             "秘密値をCLI argumentへ載せない"
@@ -2770,12 +2777,8 @@ exit 0
         let identity = crate::broker::workspace_root::pin_workspace_path(&workspace)
             .expect("登録Workspace identity")
             .identity;
-        let adapter = CodexCliAdapter::new_with_model(
-            &executable,
-            &workspace,
-            "model-fixture-v1",
-        )
-        .expect("偽CLIがModel指定interfaceを公開する");
+        let adapter = CodexCliAdapter::new_with_model(&executable, &workspace, "model-fixture-v1")
+            .expect("偽CLIがModel指定interfaceを公開する");
         let context = scratch_context(identity);
         let completed = adapter.AgentTask実行(
             "Provider / Model選択のfixture Task",
@@ -2867,11 +2870,7 @@ exit 0
             Some("11111111111111111111111111111111"),
         )
         .expect("実Codex CLIの固定interface");
-        adapter.use_test_loopback_responses_api_with_auth(
-            server.port(),
-            codex_home,
-            true,
-        );
+        adapter.use_test_loopback_responses_api_with_auth(server.port(), codex_home, true);
         let identity = crate::broker::workspace_root::pin_workspace_path(&workspace)
             .expect("合成Workspace identity")
             .identity;
@@ -2884,7 +2883,10 @@ exit 0
             Some(zeroize::Zeroizing::new(synthetic_key.as_bytes().to_vec())),
         );
 
-        assert!(server.authorized_requests() >= 1, "Codex CLIがBearer認証を送る");
+        assert!(
+            server.authorized_requests() >= 1,
+            "Codex CLIがBearer認証を送る"
+        );
         assert_eq!(server.authorization_rejections(), 0);
         assert_eq!(result, Ok("合成試験Taskが完了しました".into()));
         assert_eq!(server.credential_canary_observations(), 0);
