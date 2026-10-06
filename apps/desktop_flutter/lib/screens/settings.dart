@@ -22,9 +22,15 @@ const guiShellProductVersion = String.fromEnvironment(
 );
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key, required this.client});
+  const SettingsScreen({
+    super.key,
+    required this.client,
+    this.requestApplicationExit,
+  });
 
   final ShellCoreClient client;
+  final Future<ui.AppExitResponse> Function(ui.AppExitType)?
+      requestApplicationExit;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -62,6 +68,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String? _aiEditReceipt;
   String? _updateMessage;
   bool _checkingUpdateCatalog = false;
+  bool _updateOperationInProgress = false;
   final TextEditingController _composeIdController =
       TextEditingController(text: 'd4-pocket-local');
   final TextEditingController _composeNameController =
@@ -770,7 +777,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
               const SizedBox(height: 8),
               OutlinedButton.icon(
-                onPressed: _checkingUpdateCatalog ? null : _fetchUpdateCatalog,
+                onPressed: _checkingUpdateCatalog || _updateOperationInProgress
+                    ? null
+                    : _fetchUpdateCatalog,
                 icon: const Icon(Icons.refresh),
                 label: Text(
                   _checkingUpdateCatalog ? '候補取得中' : '配布元から候補取得',
@@ -779,7 +788,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               if (installedProduct) ...[
                 const SizedBox(height: 8),
                 OutlinedButton.icon(
-                  onPressed: () => _requestProductUninstall(client),
+                  onPressed: _updateOperationInProgress
+                      ? null
+                      : () => _requestProductUninstall(client),
                   icon: const Icon(Icons.delete_outline),
                   label: const Text('D4 Pocketをアンインストール'),
                 ),
@@ -846,6 +857,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final canDownload = downloadAvailable &&
         update['署名状態'] == 'verified' &&
         sourceConfigured &&
+        !_updateOperationInProgress &&
         !downloadBusy &&
         !downloadedForUpdate;
     final activeVersion = rollbackState?['現在版'];
@@ -865,10 +877,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       packageSha256: packageSha256,
       packageSize: packageSize,
     );
-    final canApply =
-        downloadedForUpdate && !isAlreadyActive && !isRollbackTarget;
+    final canApply = downloadedForUpdate &&
+        !_updateOperationInProgress &&
+        !isAlreadyActive &&
+        !isRollbackTarget;
     final rollbackCurrent = rollbackState?['現在版'];
     final canRollback = rollbackState?['状態'] == 'available' &&
+        !_updateOperationInProgress &&
         rollbackCurrent is Map &&
         rollbackCurrent['更新ID'] == updateId &&
         rollbackCurrent['候補hash'] == candidateHash &&
@@ -925,7 +940,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: const Text('未起動版へ展開'),
           ),
           TextButton(
-            onPressed: canRequestActivation
+            onPressed: canRequestActivation && !_updateOperationInProgress
                 ? () => _runUpdateRequest(
                       () => client.requestActivation(
                         updateId: updateId,
@@ -937,17 +952,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: Text(activationLabel),
           ),
           TextButton(
-            onPressed: () => _runUpdateRequest(
-              () => client.defer(
-                updateId: updateId,
-                candidateHash: candidateHash,
-                deferredUntil: DateTime.now()
-                    .toUtc()
-                    .add(const Duration(days: 1))
-                    .toIso8601String(),
-              ),
-              '更新を延期しました。',
-            ),
+            onPressed: _updateOperationInProgress
+                ? null
+                : () => _runUpdateRequest(
+                      () => client.defer(
+                        updateId: updateId,
+                        candidateHash: candidateHash,
+                        deferredUntil: DateTime.now()
+                            .toUtc()
+                            .add(const Duration(days: 1))
+                            .toIso8601String(),
+                      ),
+                      '更新を延期しました。',
+                    ),
             child: const Text('延期'),
           ),
           if (canRollback)
@@ -968,8 +985,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _fetchUpdateCatalog() async {
     final client = _updateClient;
-    if (client == null) return;
-    setState(() => _checkingUpdateCatalog = true);
+    if (client == null || _updateOperationInProgress) return;
+    setState(() {
+      _checkingUpdateCatalog = true;
+      _updateOperationInProgress = true;
+    });
     try {
       final result = await client.fetchCandidates();
       final state = result['状態'];
@@ -985,6 +1005,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (mounted) {
         setState(() {
           _checkingUpdateCatalog = false;
+          _updateOperationInProgress = false;
           _updatesFuture = client.list();
         });
       }
@@ -993,21 +1014,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _loadUpdates() {
     final client = _updateClient;
-    if (client == null) return;
-    setState(() => _updatesFuture = client.list());
+    if (!mounted || client == null) return;
+    setState(() {
+      _updatesFuture = client.list();
+    });
   }
 
   Future<void> _runUpdateRequest(
     Future<Map<String, Object?>> Function() request,
     String success,
   ) async {
+    if (_updateOperationInProgress) return;
+    setState(() => _updateOperationInProgress = true);
+    var initialInstallAccepted = false;
     var handoffToInstalledVersion = false;
     try {
       final body = await request();
-      handoffToInstalledVersion =
-          UpdateClient.shouldLaunchInstalledVersionAfterExit(body);
-      if (handoffToInstalledVersion) {
-        await _completeInitialInstallHandoff();
+      if (UpdateClient.shouldLaunchInstalledVersionAfterExit(body)) {
+        initialInstallAccepted = true;
+        handoffToInstalledVersion = await _completeInitialInstallHandoff();
+        if (!handoffToInstalledVersion) {
+          _setUpdateMessage(
+            'インストール済み版は登録されましたが、画面を終了できませんでした。Start Menuから起動してください。',
+          );
+        }
       } else {
         final state = body['実行状態']?.toString();
         if (body['download package cleanup'] == 'pending') {
@@ -1021,35 +1051,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
         }
       }
     } catch (error) {
-      _setUpdateMessage('更新操作失敗: $error');
+      _setUpdateMessage(initialInstallAccepted
+          ? 'インストール済み版は登録されましたが、切替のための画面終了に失敗しました。Start Menuから起動してください。'
+          : '更新操作失敗: $error');
+    } finally {
+      if (mounted && !handoffToInstalledVersion) {
+        setState(() => _updateOperationInProgress = false);
+      }
     }
     if (!handoffToInstalledVersion) _loadUpdates();
   }
 
-  Future<void> _completeInitialInstallHandoff() async {
+  Future<bool> _completeInitialInstallHandoff() async {
     _setUpdateMessage('インストールが完了しました。導入済み版を起動します。');
     await Future<void>.delayed(const Duration(milliseconds: 600));
-    if (mounted) {
-      await ServicesBinding.instance.exitApplication(ui.AppExitType.required);
-    }
+    final response = await (widget.requestApplicationExit?.call(
+          ui.AppExitType.required,
+        ) ??
+        ServicesBinding.instance.exitApplication(ui.AppExitType.required));
+    return response == ui.AppExitResponse.exit;
   }
 
   Future<void> _requestProductUninstall(UpdateClient client) async {
+    if (_updateOperationInProgress) return;
+    setState(() => _updateOperationInProgress = true);
+    var uninstallAuthorized = false;
+    var applicationExitAccepted = false;
     try {
       final body = await client.requestUninstall();
       if (body['状態'] != 'uninstall_authorized') {
         throw const BrokerClientException('アンインストール許可を確認できません');
       }
+      uninstallAuthorized = true;
       _setUpdateMessage(
           'Rust Brokerが削除意図をAuditへ記録しました。画面を終了して固定導入先を削除します。利用者データは保持されます。');
       await Future<void>.delayed(const Duration(milliseconds: 500));
-      if (mounted) {
-        await ServicesBinding.instance.exitApplication(ui.AppExitType.required);
+      final response = await (widget.requestApplicationExit?.call(
+            ui.AppExitType.required,
+          ) ??
+          ServicesBinding.instance.exitApplication(ui.AppExitType.required));
+      applicationExitAccepted = response == ui.AppExitResponse.exit;
+      if (!applicationExitAccepted) {
+        _setUpdateMessage(
+          'アプリの終了がキャンセルされました。製品fileはまだ削除されていません。再度アンインストールを要求してください。',
+        );
       }
     } catch (error) {
-      _setUpdateMessage('アンインストール要求に失敗しました: $error');
-      _loadUpdates();
+      _setUpdateMessage(uninstallAuthorized
+          ? '削除許可は記録されましたが、アプリを終了できませんでした。製品fileはまだ削除されていません。再度アンインストールを要求してください。'
+          : 'アンインストール要求に失敗しました: $error');
+    } finally {
+      if (mounted && !applicationExitAccepted) {
+        setState(() => _updateOperationInProgress = false);
+      }
     }
+    if (!applicationExitAccepted) _loadUpdates();
   }
 
   void _setUpdateMessage(String message) {
