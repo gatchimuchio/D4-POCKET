@@ -125,6 +125,36 @@ pub(crate) fn resolve_active_version_launcher(
     Ok(launcher_path)
 }
 
+/// 固定rootの有効版recordが現在の実行fileを選択している場合だけ導入済み起動と認める。
+pub(crate) fn is_active_version_launcher(
+    launcher: &Path,
+    local_app_data: &Path,
+    expected_app_id: &str,
+    expected_audit_store_id: &str,
+) -> bool {
+    let Ok(active_launcher) =
+        resolve_active_version_launcher(local_app_data, expected_app_id, expected_audit_store_id)
+    else {
+        return false;
+    };
+    let Ok(launcher) = fs::canonicalize(launcher) else {
+        return false;
+    };
+    canonical_paths_equal(&launcher, &active_launcher)
+}
+
+fn canonical_paths_equal(left: &Path, right: &Path) -> bool {
+    #[cfg(windows)]
+    {
+        left.to_string_lossy()
+            .eq_ignore_ascii_case(&right.to_string_lossy())
+    }
+    #[cfg(not(windows))]
+    {
+        left == right
+    }
+}
+
 /// 完全検証済みstageから固定root Bootstrapperと有効版recordをBroker所有capabilityで公開する。
 /// active recordは一時fileを同期した後、同じroot内renameで置換する。
 pub(crate) fn activate_staged_version(
@@ -616,8 +646,9 @@ fn valid_sha256(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        activate_staged_version, active_version_snapshot, resolve_active_version_launcher,
-        toggle_previous_active_version, ACTIVE_VERSION_FILE, VERSIONED_LAUNCHER,
+        activate_staged_version, active_version_snapshot, is_active_version_launcher,
+        resolve_active_version_launcher, toggle_previous_active_version, ACTIVE_VERSION_FILE,
+        VERSIONED_LAUNCHER,
     };
     use cap_std::fs::Dir;
     use serde_json::json;
@@ -685,6 +716,29 @@ mod tests {
             )
             .unwrap()
         );
+        assert!(is_active_version_launcher(
+            &result, &local, APP_ID, AUDIT_ID
+        ));
+        assert!(!is_active_version_launcher(
+            &root.join(VERSIONED_LAUNCHER),
+            &local,
+            APP_ID,
+            AUDIT_ID
+        ));
+        assert!(!is_active_version_launcher(
+            &result,
+            &local,
+            APP_ID,
+            "other-audit-store"
+        ));
+        let unrelated_launcher = local.join("unrelated-launcher.exe");
+        fs::write(&unrelated_launcher, b"not the selected product version").unwrap();
+        assert!(!is_active_version_launcher(
+            &unrelated_launcher,
+            &local,
+            APP_ID,
+            AUDIT_ID
+        ));
         fs::remove_dir_all(local).unwrap();
     }
 

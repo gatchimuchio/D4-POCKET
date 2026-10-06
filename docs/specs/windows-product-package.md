@@ -59,7 +59,7 @@ Windows Broker consumerはKnown Folder APIの現在利用者`LocalAppData`から
 
 Bootstrapperはroot直下の`active_version.json`を最大4 KiB、`versions` directoryと選択版をno-follow capabilityで読み、同一volume／file identity／非reparse条件を確認する。記録は`specs/d4_pocket_active_version.schema.json`に従い、version、product、App ID、Audit Store ID、製品版、package hash、version-local launcher hash、Product Manifest hashだけを含む。実行pathは受け取らない。有効版directory名は製品版とpackage hashから固定導出し、起動前にlauncherとProduct Manifestのhashを照合し、通常package layoutも再検証する。
 
-この記録は起動対象の選択情報であり、配布元trust、Permission、Approval、Capabilityを作らない。Bootstrapperは受信引数を転送せず、環境をOS用allowlistへ絞り、`LOCALAPPDATA`はKnown Folder API由来値へ固定してからversion-local launcherを起動する。起動後のBroker lifecycle／Auditはversion-local launcherの現行契約に従う。記録欠損・identity不一致・JSON重複／未知field・version path不正・hash不一致・reparse・required payload欠損は、UIやBrokerを起動せず固定codeで失敗する。
+この記録は起動対象の選択情報であり、配布元trust、Permission、Approval、Capabilityを作らない。Bootstrapperは受信引数を転送せず、環境をOS用allowlistへ絞り、`LOCALAPPDATA`はKnown Folder API由来値へ固定してからversion-local launcherを起動する。version-local launcher自身もactive recordを再読込し、現在の実行fileがその記録で選ばれたhash検証済みlauncherと一致する場合に限り、Brokerへinstalled-path検証結果を渡す。これはSetup Doctorのpath観測専用でAuthorityを増やさない。portable配置、別identity、record不整合では`unknown`とする。記録欠損・identity不一致・JSON重複／未知field・version path不正・hash不一致・reparse・required payload欠損は、UIやBrokerを起動せず固定codeで失敗する。
 
 Brokerにはstageとは独立した`更新有効版切替要求`があり、独立native Owner確認、現在候補／identity／固定導入先／Start Menu先の再照合、永続intent／completion Auditを経て、既存stageを元の署名packageとread-onlyで全byte／inventory照合する。一致した場合のみ、固定root Bootstrapperを未配置時に一度配置し、`active_version.json`を同一root内renameで原子的に公開し、Bootstrapperを指す現在利用者向けStart Menu shortcutをcreate-onlyで登録する。同じtargetへの再実行は冪等で、既存の別target shortcutは上書きせず拒否する。これらをRust fixtureで確認する。
 

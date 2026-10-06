@@ -2794,9 +2794,22 @@ pub fn run() -> Result<(), DesktopLaunchError> {
         })?;
     let runtime_dir = runtime_directory_with_identity(&local_app_data, product_identity.as_ref())?;
     let _instance_lock = acquire_instance_lock(&runtime_dir)?;
-    // package構成の検証はinstalled rootの由来確認とは別の証拠である。
-    // P11のBroker統治Installerが未接続のため、installed証拠はまだ渡さない。
-    let mut broker = RunningBroker::start(&runtime_dir, true, false, product_identity)?;
+    // 固定root Bootstrapperが選んだ版別fileだけをinstalled起動としてBrokerへ伝える。
+    // portable起動、record不整合、別identityは従来どおりunknownのままにする。
+    let installed_path_verified = product_identity.as_ref().is_some_and(|identity| {
+        crate::product_bootstrapper::is_active_version_launcher(
+            &launcher_exe,
+            &local_app_data,
+            &identity.app_id,
+            &identity.audit_store_id,
+        )
+    });
+    let mut broker = RunningBroker::start(
+        &runtime_dir,
+        true,
+        installed_path_verified,
+        product_identity,
+    )?;
 
     let frontend_result = launch_frontend(&layout, &broker);
     let broker_result = broker.finish();
