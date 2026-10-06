@@ -41,6 +41,10 @@ const OP_APPLY: &str = "更新適用要求";
 const OP_ACTIVATE: &str = "更新有効版切替要求";
 const OP_DEFER: &str = "更新延期";
 const OP_ROLLBACK: &str = "更新rollback要求";
+const OP_UNINSTALL: &str = "製品アンインストール要求";
+const OP_UNINSTALL_STARTED: &str = "製品アンインストール開始";
+const OP_UNINSTALL_COMPLETED: &str = "製品アンインストール完了";
+const OP_UNINSTALL_FAILED: &str = "製品アンインストール失敗";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct UpdateDownloadConfirmation {
@@ -79,6 +83,15 @@ pub(crate) struct UpdateActivationConfirmation {
     pub(crate) version_directory: PathBuf,
     pub(crate) start_menu_shortcut_path: PathBuf,
     pub(crate) rollback_target: Option<UpdateRollbackTargetConfirmation>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ProductUninstallConfirmation {
+    pub(crate) app_id: String,
+    pub(crate) audit_store_id: String,
+    pub(crate) product_root: PathBuf,
+    pub(crate) start_menu_shortcut_path: PathBuf,
+    pub(crate) payload_hash: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -536,6 +549,7 @@ pub(super) fn dispatch(
     download_confirmation: Option<&UpdateDownloadConfirmation>,
     apply_confirmation: Option<&UpdateApplyConfirmation>,
     activation_confirmation: Option<&UpdateActivationConfirmation>,
+    product_uninstall_confirmation: Option<&ProductUninstallConfirmation>,
 ) -> BrokerResponse {
     poll_download_completion(broker);
     match operation.as_str() {
@@ -588,6 +602,14 @@ pub(super) fn dispatch(
             None,
             activation_confirmation,
         ),
+        OP_UNINSTALL => request_product_uninstall(
+            broker,
+            payload,
+            request_id,
+            payload_hash,
+            owner_confirmation,
+            product_uninstall_confirmation,
+        ),
         _ => broker.reject_with_payload_hash(
             request_id,
             operation.as_str(),
@@ -596,6 +618,283 @@ pub(super) fn dispatch(
             true,
             payload_hash,
         ),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ProductUninstallRequest {
+    #[serde(rename = "版")]
+    version: u64,
+}
+
+fn request_product_uninstall(
+    broker: &mut Broker,
+    payload: &Value,
+    request_id: &str,
+    payload_hash: &str,
+    owner_confirmation: OwnerConfirmationSource,
+    confirmation: Option<&ProductUninstallConfirmation>,
+) -> BrokerResponse {
+    let request: ProductUninstallRequest = match serde_json::from_value::<ProductUninstallRequest>(payload.clone()) {
+        Ok(request) if request.version == VERSION => request,
+        _ => {
+            return reject(
+                broker,
+                request_id,
+                OP_UNINSTALL,
+                "product_uninstall_request_invalid",
+                "製品アンインストール要求の構造が不正",
+                payload_hash,
+            )
+        }
+    };
+    let _ = request;
+    if owner_confirmation != OwnerConfirmationSource::DesktopNativeConfirmation
+        || !broker.desktop_install_path_verified
+    {
+        return reject(
+            broker,
+            request_id,
+            OP_UNINSTALL,
+            "desktop_native_owner_confirmation_required",
+            "導入済み製品の削除にはRust Desktop起動器のnative Owner確認が必要",
+            payload_hash,
+        );
+    }
+    let Some((app_id, audit_store_id)) = broker.desktop_product_identity.as_ref() else {
+        return reject(
+            broker,
+            request_id,
+            OP_UNINSTALL,
+            "product_identity_unavailable",
+            "導入済み製品identityを確認できない",
+            payload_hash,
+        );
+    };
+    let Some(confirmation) = confirmation else {
+        return reject(
+            broker,
+            request_id,
+            OP_UNINSTALL,
+            "product_uninstall_confirmation_missing",
+            "固定導入先と保持する利用者データを示したnative確認記録がない",
+            payload_hash,
+        );
+    };
+
+    #[cfg(windows)]
+    let expected_paths = (|| {
+        #[cfg(test)]
+        let local_app_data = broker
+            .desktop_product_install_local_app_data
+            .clone()
+            .or_else(|| super::product_install::current_user_local_app_data().ok())?;
+        #[cfg(not(test))]
+        let local_app_data = super::product_install::current_user_local_app_data().ok()?;
+        #[cfg(test)]
+        let start_menu = broker
+            .desktop_product_start_menu_directory
+            .clone()
+            .or_else(|| super::product_install::current_user_start_menu_directory().ok())?;
+        #[cfg(not(test))]
+        let start_menu = super::product_install::current_user_start_menu_directory().ok()?;
+        let root = super::product_install::product_install_root(&local_app_data, app_id).ok()?;
+        let shortcut = super::product_install::plan_start_menu_shortcut(&start_menu, app_id).ok()?;
+        Some((local_app_data, root, shortcut))
+    })();
+    #[cfg(not(windows))]
+    let expected_paths: Option<(PathBuf, PathBuf, PathBuf)> = None;
+
+    let Some((local_app_data, expected_root, expected_shortcut)) = expected_paths else {
+        return reject(
+            broker,
+            request_id,
+            OP_UNINSTALL,
+            "product_uninstall_platform_unavailable",
+            "Windows Known Folderから固定導入先を確認できない",
+            payload_hash,
+        );
+    };
+    let root_is_present = super::product_install::open_existing_product_root(&local_app_data, app_id)
+        .is_ok();
+    if !root_is_present
+        || confirmation.app_id != *app_id
+        || confirmation.audit_store_id != *audit_store_id
+        || confirmation.product_root != expected_root
+        || confirmation.start_menu_shortcut_path != expected_shortcut
+        || confirmation.payload_hash != payload_hash
+    {
+        return reject(
+            broker,
+            request_id,
+            OP_UNINSTALL,
+            "product_uninstall_confirmation_stale",
+            "native Owner確認後に固定導入先または製品identityが変化した",
+            payload_hash,
+        );
+    }
+
+    let mut ticket_bytes = [0u8; 32];
+    if getrandom::getrandom(&mut ticket_bytes).is_err() {
+        return reject(
+            broker,
+            request_id,
+            OP_UNINSTALL,
+            "product_uninstall_ticket_failed",
+            "一回限りの削除ticketを生成できない",
+            payload_hash,
+        );
+    }
+    let ticket = hex::encode(ticket_bytes);
+    ticket_bytes.fill(0);
+    let ticket_hash = sha256_tagged(ticket.as_bytes());
+    let reason = format!(
+        "Capability=product.install.uninstall Permission=Known Folderから再導出した固定導入rootと同じ起動先のStart Menu shortcutだけ Approval=導入済み製品identity・固定root・保持データを示した独立Rust Desktop native Owner確認 AuditEvent=削除前意図を永続化 RecoveryAction=終了後helperがBroker ticketを再照合し、AppDataのruntime・Credential・Audit Storeを保持する。失敗後は新しいnative Owner確認から再要求する 製品ID={app_id} 監査保存先ID={audit_store_id} ticket_sha256={ticket_hash}"
+    );
+    let event = match broker.append_audit(
+        request_id,
+        OP_UNINSTALL,
+        "accepted",
+        &reason,
+        "LIVE_RUNTIME",
+        payload_hash,
+    ) {
+        Ok(event) => event,
+        Err(_) => {
+            return broker.audit_store_failed_response(
+                request_id,
+                OP_UNINSTALL,
+                "product_uninstall_audit_failed",
+                "削除前の監査を確定できないため、製品を削除しない",
+            )
+        }
+    };
+    BrokerResponse {
+        request_id: request_id.to_string(),
+        operation: OP_UNINSTALL.to_string(),
+        status: BrokerStatus::Accepted,
+        evidence_source: "LIVE_RUNTIME".to_string(),
+        audit_event_id: event.event_id,
+        error: None,
+        health: None,
+        body: Some(json!({"版": VERSION, "状態": "uninstall_authorized", "ticket": ticket})),
+        shutdown_requested: broker.shutdown_requested,
+    }
+}
+
+impl Broker {
+    /// Durable Auditに結び付いた一回限りのuninstall ticketを検証し、開始記録を確定する。
+    pub(crate) fn begin_product_uninstall_finalization(
+        &mut self,
+        ticket: &str,
+    ) -> Result<String, &'static str> {
+        if ticket.len() != 64
+            || !ticket
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        {
+            return Err("product_uninstall_ticket_invalid");
+        }
+        let ticket_hash = sha256_tagged(ticket.as_bytes());
+        let Some((app_id, audit_store_id)) = self.desktop_product_identity.as_ref() else {
+            return Err("product_identity_unavailable");
+        };
+        let identity_marker = format!("製品ID={app_id} 監査保存先ID={audit_store_id}");
+        let ticket_marker = format!("ticket_sha256={ticket_hash}");
+        let authorized = self.audit_events().iter().any(|event| {
+            event.operation == OP_UNINSTALL
+                && event.decision == "accepted"
+                && event.reason.contains(&identity_marker)
+                && event.reason.contains(&ticket_marker)
+        });
+        if !authorized {
+            return Err("product_uninstall_ticket_unrecognized");
+        }
+        if self.audit_events().iter().any(|event| {
+            matches!(
+                event.operation.as_str(),
+                OP_UNINSTALL_STARTED | OP_UNINSTALL_FAILED | OP_UNINSTALL_COMPLETED
+            ) && event.reason.contains(&ticket_marker)
+        }) {
+            return Err("product_uninstall_ticket_replayed");
+        }
+        let request_id = format!("uninstall-finalizer:{}:started", &ticket_hash[7..23]);
+        self.append_audit(
+            &request_id,
+            OP_UNINSTALL_STARTED,
+            "started",
+            &format!(
+                "Capability=product.install.uninstall Permission=Brokerが発行した未使用ticketと固定製品identity Approval=先行するnative Owner確認 AuditEvent=終了後削除処理の開始を永続記録 RecoveryAction=このticketの再利用は禁止し、再試行は新しいnative Owner確認を要求する ticket_sha256={ticket_hash} {identity_marker}"
+            ),
+            "LIVE_RUNTIME",
+            &ticket_hash,
+        )
+        .map_err(|_| "product_uninstall_audit_failed")?;
+        Ok(ticket_hash)
+    }
+
+    /// 成功・失敗ともticketを消費し、再試行には新しいOwner確認を要求する。
+    pub(crate) fn finish_product_uninstall_finalization(
+        &mut self,
+        ticket_hash: &str,
+        success: bool,
+        failure_code: Option<&str>,
+    ) -> Result<(), &'static str> {
+        if ticket_hash.len() != 71 || !ticket_hash.starts_with("sha256:") {
+            return Err("product_uninstall_ticket_hash_invalid");
+        }
+        let Some((app_id, audit_store_id)) = self.desktop_product_identity.as_ref() else {
+            return Err("product_identity_unavailable");
+        };
+        let ticket_marker = format!("ticket_sha256={ticket_hash}");
+        let identity_marker = format!("製品ID={app_id} 監査保存先ID={audit_store_id}");
+        let has_authorization = self.audit_events().iter().any(|event| {
+            event.operation == OP_UNINSTALL
+                && event.decision == "accepted"
+                && event.reason.contains(&identity_marker)
+                && event.reason.contains(&ticket_marker)
+        });
+        let has_started = self.audit_events().iter().any(|event| {
+            event.operation == OP_UNINSTALL_STARTED && event.reason.contains(&ticket_marker)
+        });
+        let has_terminal = self.audit_events().iter().any(|event| {
+            matches!(
+                event.operation.as_str(),
+                OP_UNINSTALL_FAILED | OP_UNINSTALL_COMPLETED
+            )
+                && event.reason.contains(&ticket_marker)
+        });
+        if !has_authorization || !has_started || has_terminal {
+            return Err("product_uninstall_ticket_not_pending");
+        }
+        let (operation, decision, recovery) = if success {
+            (
+                OP_UNINSTALL_COMPLETED,
+                "completed",
+                "固定導入rootと同一targetのshortcutだけを除去し、利用者dataとAudit Storeを保持",
+            )
+        } else {
+            (
+                OP_UNINSTALL_FAILED,
+                "failed",
+                "残存fileを保持し、新しいnative Owner確認を経た再要求を許可",
+            )
+        };
+        let detail = failure_code.unwrap_or("none");
+        let request_id = format!("uninstall-finalizer:{}:{decision}", &ticket_hash[7..23]);
+        self.append_audit(
+            &request_id,
+            operation,
+            decision,
+            &format!(
+                "Capability=product.install.uninstall Permission=固定導入rootと同一targetのStart Menu entryだけ Approval=先行する独立native Owner確認 AuditEvent=終了後処理 {decision} RecoveryAction={recovery} failure_code={detail} {identity_marker} {ticket_marker}"
+            ),
+            "LIVE_RUNTIME",
+            ticket_hash,
+        )
+        .map_err(|_| "product_uninstall_audit_failed")?;
+        Ok(())
     }
 }
 
@@ -3377,7 +3676,9 @@ fn valid_hash(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::broker::protocol::{Broker, BrokerOperation, BrokerRequestEnvelope, BrokerStatus};
+    use crate::broker::protocol::{
+        Broker, BrokerOperation, BrokerRequestEnvelope, BrokerStatus, OwnerConfirmationSource,
+    };
     use ring::{
         rand::SystemRandom,
         signature::{Ed25519KeyPair, KeyPair},
@@ -3679,6 +3980,178 @@ mod tests {
         request.payload = Some(payload);
         request.refresh_payload_hash();
         broker.handle(request)
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn product_uninstall_requires_owner_and_consumes_durable_ticket_once() {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "d4p-uninstall-broker-{}-{unique}",
+            std::process::id()
+        ));
+        let store_root = root.join("broker-store");
+        let local_app_data = root.join("local-app-data");
+        let start_menu = root.join("start-menu");
+        let product_root = super::super::product_install::product_install_root(
+            &local_app_data,
+            INSTALL_APP_ID,
+        )
+        .unwrap();
+        std::fs::create_dir_all(&product_root).unwrap();
+        std::fs::write(
+            product_root.join("gui_shell_desktop_launcher.exe"),
+            b"synthetic bootstrapper",
+        )
+        .unwrap();
+        std::fs::create_dir_all(&start_menu).unwrap();
+
+        let mut broker = Broker::new_persistent("uninstall-test", &store_root).unwrap();
+        broker
+            .set_desktop_product_identity(INSTALL_APP_ID.into(), INSTALL_AUDIT_ID.into())
+            .unwrap();
+        broker.set_desktop_product_install_local_app_data(local_app_data.clone());
+        broker.set_desktop_product_start_menu_directory(start_menu.clone());
+        broker.set_desktop_setup_doctor_runtime_evidence(true, true, true);
+        let payload = json!({"版": VERSION});
+        let payload_hash = crate::broker::protocol::canonical_payload_hash(Some(&payload));
+        let confirmation = ProductUninstallConfirmation {
+            app_id: INSTALL_APP_ID.into(),
+            audit_store_id: INSTALL_AUDIT_ID.into(),
+            product_root,
+            start_menu_shortcut_path: super::super::product_install::plan_start_menu_shortcut(
+                &start_menu,
+                INSTALL_APP_ID,
+            )
+            .unwrap(),
+            payload_hash: payload_hash.clone(),
+        };
+
+        let denied = super::request_product_uninstall(
+            &mut broker,
+            &payload,
+            "uninstall-owner-denied",
+            &payload_hash,
+            OwnerConfirmationSource::OwnerCredential,
+            Some(&confirmation),
+        );
+        assert_eq!(denied.status, BrokerStatus::Rejected);
+        assert_eq!(
+            denied.error.as_ref().map(|error| error.code.as_str()),
+            Some("desktop_native_owner_confirmation_required")
+        );
+
+        let first = super::request_product_uninstall(
+            &mut broker,
+            &payload,
+            "uninstall-owner-accepted-1",
+            &payload_hash,
+            OwnerConfirmationSource::DesktopNativeConfirmation,
+            Some(&confirmation),
+        );
+        assert_eq!(first.status, BrokerStatus::Accepted);
+        let first_ticket = first.body.as_ref().unwrap()["ticket"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        assert_eq!(first_ticket.len(), 64);
+        let audit_json = serde_json::to_string(broker.audit_events()).unwrap();
+        assert!(!audit_json.contains(&first_ticket));
+        assert!(audit_json.contains(&sha256_tagged(first_ticket.as_bytes())));
+        assert_eq!(
+            broker.begin_product_uninstall_finalization("not-a-valid-ticket"),
+            Err("product_uninstall_ticket_invalid")
+        );
+        assert_eq!(
+            broker.begin_product_uninstall_finalization(&"b".repeat(64)),
+            Err("product_uninstall_ticket_unrecognized")
+        );
+        let first_hash = sha256_tagged(first_ticket.as_bytes());
+        assert_eq!(
+            broker.finish_product_uninstall_finalization(&first_hash, true, None),
+            Err("product_uninstall_ticket_not_pending")
+        );
+        assert_eq!(
+            broker.begin_product_uninstall_finalization(&first_ticket),
+            Ok(first_hash.clone())
+        );
+        assert_eq!(
+            broker.finish_product_uninstall_finalization(
+                &first_hash,
+                false,
+                Some("synthetic_remove_failure"),
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            broker.begin_product_uninstall_finalization(&first_ticket),
+            Err("product_uninstall_ticket_replayed")
+        );
+
+        let second = super::request_product_uninstall(
+            &mut broker,
+            &payload,
+            "uninstall-owner-accepted-2",
+            &payload_hash,
+            OwnerConfirmationSource::DesktopNativeConfirmation,
+            Some(&confirmation),
+        );
+        assert_eq!(second.status, BrokerStatus::Accepted);
+        let second_ticket = second.body.as_ref().unwrap()["ticket"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        broker
+            .begin_product_uninstall_finalization(&second_ticket)
+            .unwrap();
+
+        drop(broker);
+        let mut reopened = Broker::new_persistent("uninstall-test-reopen", &store_root).unwrap();
+        reopened
+            .set_desktop_product_identity(INSTALL_APP_ID.into(), INSTALL_AUDIT_ID.into())
+            .unwrap();
+        assert_eq!(
+            reopened.begin_product_uninstall_finalization(&second_ticket),
+            Err("product_uninstall_ticket_replayed")
+        );
+        reopened.set_desktop_product_install_local_app_data(local_app_data.clone());
+        reopened.set_desktop_product_start_menu_directory(start_menu.clone());
+        reopened.set_desktop_setup_doctor_runtime_evidence(true, true, true);
+        let retry = super::request_product_uninstall(
+            &mut reopened,
+            &payload,
+            "uninstall-owner-accepted-after-crash",
+            &payload_hash,
+            OwnerConfirmationSource::DesktopNativeConfirmation,
+            Some(&confirmation),
+        );
+        assert_eq!(retry.status, BrokerStatus::Accepted);
+        let retry_ticket = retry.body.as_ref().unwrap()["ticket"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        let retry_hash = reopened
+            .begin_product_uninstall_finalization(&retry_ticket)
+            .unwrap();
+        assert_eq!(
+            reopened.finish_product_uninstall_finalization(&retry_hash, true, None),
+            Ok(())
+        );
+
+        drop(reopened);
+        let mut verified = Broker::new_persistent("uninstall-test-final-reopen", &store_root).unwrap();
+        verified
+            .set_desktop_product_identity(INSTALL_APP_ID.into(), INSTALL_AUDIT_ID.into())
+            .unwrap();
+        assert_eq!(
+            verified.begin_product_uninstall_finalization(&retry_ticket),
+            Err("product_uninstall_ticket_replayed")
+        );
+        drop(verified);
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

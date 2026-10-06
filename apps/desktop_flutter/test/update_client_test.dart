@@ -60,6 +60,12 @@ class _UpdateTransport implements BrokerTransport {
         },
       };
     }
+    if (operation == '製品アンインストール要求') {
+      return {
+        'status': 'accepted',
+        'body': {'版': 1, '状態': 'uninstall_authorized'},
+      };
+    }
     return {
       'status': 'accepted',
       'body': {'版': 1, '実行状態': 'suspended'},
@@ -307,6 +313,8 @@ void main() {
       candidateHash: 'sha256:${'a' * 64}',
     );
     await client.fetchCandidates();
+    final uninstall = await client.requestUninstall();
+    expect(uninstall['状態'], 'uninstall_authorized');
     expect(transport.operations, [
       '更新一覧',
       '更新署名検査',
@@ -316,6 +324,7 @@ void main() {
       '更新延期',
       '更新rollback要求',
       '更新候補取得',
+      '製品アンインストール要求',
     ]);
     expect(transport.payloads[4], {
       '版': 1,
@@ -323,5 +332,6 @@ void main() {
       '候補hash': 'sha256:${'a' * 64}',
     });
     expect(transport.payloads[7], {'版': 1});
+    expect(transport.payloads[8], {'版': 1});
   });
 }

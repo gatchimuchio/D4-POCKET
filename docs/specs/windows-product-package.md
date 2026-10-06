@@ -63,4 +63,4 @@ Bootstrapperはroot直下の`active_version.json`を最大4 KiB、`versions` dir
 
 Brokerにはstageとは独立した`更新有効版切替要求`があり、独立native Owner確認、現在候補／identity／固定導入先／Start Menu先の再照合、永続intent／completion Auditを経て、既存stageを元の署名packageとread-onlyで全byte／inventory照合する。一致した場合のみ、固定root Bootstrapperを未配置時に一度配置し、`active_version.json`を同一root内renameで原子的に公開し、Bootstrapperを指す現在利用者向けStart Menu shortcutをcreate-onlyで登録する。同じtargetへの再実行は冪等で、既存の別target shortcutは上書きせず拒否する。これらをRust fixtureで確認する。
 
-このfixture接続はinstalled productの起動成立を意味しない。初回Installer／Uninstaller、通常の次回process起動、installed product経路のRollback、crash／電源断後のinstalled Recoveryおよびrelease evidenceは未成立のままで、P11 blockerを維持する。切替応答は有効版recordとStart Menu shortcutの公開までであり、その場でprocessを起動しない。
+このfixture接続はinstalled productの起動成立を意味しない。初回Installer、通常の次回process起動、installed product経路のRollback、crash／電源断後のinstalled Recoveryおよびrelease evidenceは未成立のままで、P11 blockerを維持する。Uninstallerの固定root／一致shortcut削除は`docs/specs/windows-desktop-launcher.md`に定義・実装済みだが、installed product全体の連続実行証拠は未取得である。切替応答は有効版recordとStart Menu shortcutの公開までであり、その場でprocessを起動しない。

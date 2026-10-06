@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "be160e9867cdb251eeceb06add4aef43b215fb0a69a489da590805cf4fc8365a"
+      "sha256": "b4160d89d92e426ce1afa5f13188fcc761d8daf3a07854010336aa66eef4b70e"
     },
     {
       "path": "SECURITY.md",
@@ -288,7 +288,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/settings.dart",
-      "sha256": "d30235159dc51d6a853251577931baf84f0d71d84dff0aedef6efe8d2033a0f0"
+      "sha256": "8fa9ac5ac7cd31bc1d1b3b55b0e935df5f1d4bed855a29ae978523433b74b760"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/setup_doctor.dart",
@@ -336,7 +336,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/broker_client.dart",
-      "sha256": "9fbbab722b62c40c45818ef324c390541907b227372728deb9246eaf7c8a9827"
+      "sha256": "a972da45bc131e5d4a67ee6f952382b63483faade6a093881b7e19404675b4a8"
     },
     {
       "path": "apps/desktop_flutter/lib/services/compose_client.dart",
@@ -392,7 +392,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/update_client.dart",
-      "sha256": "b75f1ee352a8554b3b2176b8905614c0df5740d7917d743374ef2772d8d174db"
+      "sha256": "e19b5c8db00be6db8ed952d20d314be7463b38bb037448cff0e42cc7d6640a56"
     },
     {
       "path": "apps/desktop_flutter/lib/services/windows_tray_client.dart",
@@ -656,7 +656,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/update_client_test.dart",
-      "sha256": "72d1befdd8d9d53d6a21e7e31d7e53b540c4cfe3ef8a3f7f38e899d961dfce61"
+      "sha256": "bb7e5e3ddd2684b7895f8747f20c0b2baaca9de339e2f98db07b999ca7a3473a"
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
@@ -716,7 +716,7 @@
     },
     {
       "path": "apps/desktop_flutter/windows/runner/broker_pipe_controller.cpp",
-      "sha256": "ee164cc8f12c6cefb0ec8ee382932e49a84425b4093048821ca61cec5749b7c2"
+      "sha256": "1486bfa9ad67aa0a81b10e2c5ce255a140316ba17c0f2bce36b7b01228676ae3"
     },
     {
       "path": "apps/desktop_flutter/windows/runner/broker_pipe_controller.h",
@@ -1184,7 +1184,7 @@
     },
     {
       "path": "docs/FINAL_QA_QUEUE.md",
-      "sha256": "43b36480bb52b7536289a6057848f56ef6c8df952081cf58fd90f064d824c17c"
+      "sha256": "77cfe5502a235ebfcb6a2881bacb1571908c22423b55dd0c4a524bad5d8013b2"
     },
     {
       "path": "docs/FIRST_RUN.md",
@@ -1240,7 +1240,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "caef319cc9789639d03d23cf61f15ae48fb03d9d4ad442bb49a71f12532876e2"
+      "sha256": "62dd184ff837b6e94b6c890fdb7f060d2a61e07947ef421e4fb3286e8f6b63dc"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1508,15 +1508,15 @@
     },
     {
       "path": "docs/specs/update-center.md",
-      "sha256": "37009aa8459808e53f370e0cda2161e2d716939b03aceeda9e65144d2e29d63b"
+      "sha256": "dc3043a19c8c916d245f968806b65aa54499bfdd07737636f55c2c1040d5ad97"
     },
     {
       "path": "docs/specs/windows-desktop-launcher.md",
-      "sha256": "a150a4f953ec8ebebd2460f0da21cc389876938fd6e79943d4863d740a41e3a2"
+      "sha256": "3ec1ab8ca57c8cb69568f2e591f5a08680ef95fd2c740ddb3e2ebf62aef6699c"
     },
     {
       "path": "docs/specs/windows-product-package.md",
-      "sha256": "306a8bcda2078ebb60805eb2678b4c089eac0b0f15bd688f787fd94fb23a2b14"
+      "sha256": "672a11ca6fe320d0380a5766ccfcbc7a120374a06596fcad0f5beef6f6be35de"
     },
     {
       "path": "docs/specs/windows-protection.md",
@@ -3292,7 +3292,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/ipc_server.rs",
-      "sha256": "b1be56e188746422f7def61d897921eabee712a35a8624dafe6f370bbfb441fc"
+      "sha256": "b5326388e4a3344f41af92aba46a8e3f032bb3e61162e571b7db4d973a73f5a6"
     },
     {
       "path": "native/rust_helper/src/broker/json_input.rs",
@@ -3316,7 +3316,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/product_install.rs",
-      "sha256": "1e1c8f5c0dd1d6a685e02947bdf9c9594e4950d3ff288736f84a75492171d86b"
+      "sha256": "e797a6af8fa3d76d2daf4eb87b98bd7a6d21a557223c2a8b53b1b4a2d06f2fee"
     },
     {
       "path": "native/rust_helper/src/broker/profile_center.rs",
@@ -3324,7 +3324,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "76c7d906a05812e6c531dc82079cab899905eded0ed6eeaea594c4582108894e"
+      "sha256": "859106fdfb0ca101ba04b313f78ff0d1d4c181e5cbda559dacefedb07a348a72"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -3348,7 +3348,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "51b82de41d81e3a012862c3080f83c6e8c6e8ab81f185b631c0ed9f3adfdfcba"
+      "sha256": "f2713bcd9b6d3c8ea9fb87fde0b9557c5da7af493eab0ba51a94313c29fa61de"
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
@@ -3376,7 +3376,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "db20584e5edcfc53621f6e969fe18694ca92006f4fc6c3f65fda35078bbe722c"
+      "sha256": "bcf590d90a21babb67d1ccdbfa69316a5583cc062e3e40f2e735acb0bf53ed77"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -3948,7 +3948,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "e0e9c344f85baf6d19aa76da67aacace75d9eb1e2490c9c5a90bb8ccd506268b"
+      "sha256": "82eadc85132e12912bb4a0a9c6ff0c0d5c3ac6ab3a175a2215bbd8773bc833f7"
     },
     {
       "path": "requirements-dev.txt",
@@ -4296,11 +4296,11 @@
     },
     {
       "path": "specs/ipc_request.schema.json",
-      "sha256": "940868f23c1801bfe669ff4b2cf433847aafd3b519047954018d760f2c498346"
+      "sha256": "2a4987c0d133349813368ef79e72e4811893e14973d0c299d803c0927f42d14d"
     },
     {
       "path": "specs/ipc_response.schema.json",
-      "sha256": "b5ea0da2c15b14f884c1befa82d11a7729438cdb842ec0152718bea7a0b011df"
+      "sha256": "2565c2595a0602031d05385f225b91338e97fcdca58f37aabb2731e98979bf0a"
     },
     {
       "path": "specs/mcp_connection.schema.json",
@@ -4648,7 +4648,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "8aa1f691364eee8e94d30207e983769ff69b9080058b5a5a36be009d01761146"
+      "sha256": "21d5e3806aabec03bd3637a242c3d6b25836dd049cf73e046f1d32ca31d7d9b1"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
@@ -4772,7 +4772,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "6ee48de6747daba0d4d70694181c99764095d414de0a64d1b5cffa4635bb105f"
+      "sha256": "34d0e3c8d6107ffc501b4120b2a44c878ee4edd378d9022817ce84bf0f720941"
     }
   ]
 }

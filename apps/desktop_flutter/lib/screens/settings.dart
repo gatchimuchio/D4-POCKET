@@ -3,6 +3,8 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:gui_shell_ui/runtime_dialogue_client.dart'
+    show BrokerClientException;
 
 import '../models/generated_contracts.dart';
 import '../services/ai_edit_client.dart';
@@ -753,6 +755,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           final rollbackState = body['rollback状態'] is Map
               ? Map<String, Object?>.from(body['rollback状態']! as Map)
               : null;
+          final installedProduct = rollbackState?['現在版'] is Map;
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -773,6 +776,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _checkingUpdateCatalog ? '候補取得中' : '配布元から候補取得',
                 ),
               ),
+              if (installedProduct) ...[
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: () => _requestProductUninstall(client),
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Text('D4 Pocketをアンインストール'),
+                ),
+                const Text(
+                  '製品fileと一致するStart Menu shortcutを削除します。Credential・設定・Workspace・Audit Storeは保持します。',
+                ),
+              ],
               if (_updateMessage != null) ...[
                 const SizedBox(height: 8),
                 Text(_updateMessage!),
@@ -1017,6 +1031,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await Future<void>.delayed(const Duration(milliseconds: 600));
     if (mounted) {
       await ServicesBinding.instance.exitApplication(ui.AppExitType.required);
+    }
+  }
+
+  Future<void> _requestProductUninstall(UpdateClient client) async {
+    try {
+      final body = await client.requestUninstall();
+      if (body['状態'] != 'uninstall_authorized') {
+        throw const BrokerClientException('アンインストール許可を確認できません');
+      }
+      _setUpdateMessage(
+          'Rust Brokerが削除意図をAuditへ記録しました。画面を終了して固定導入先を削除します。利用者データは保持されます。');
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      if (mounted) {
+        await ServicesBinding.instance.exitApplication(ui.AppExitType.required);
+      }
+    } catch (error) {
+      _setUpdateMessage('アンインストール要求に失敗しました: $error');
+      _loadUpdates();
     }
   }
 

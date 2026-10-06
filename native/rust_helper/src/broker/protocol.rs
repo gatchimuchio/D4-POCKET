@@ -538,6 +538,8 @@ pub enum BrokerOperation {
     更新延期,
     #[serde(rename = "更新rollback要求")]
     更新rollback要求,
+    #[serde(rename = "製品アンインストール要求")]
+    製品アンインストール要求,
     #[serde(rename = "通知一覧")]
     通知一覧,
     #[serde(rename = "通知既読")]
@@ -701,6 +703,7 @@ impl BrokerOperation {
             BrokerOperation::更新有効版切替要求 => "更新有効版切替要求",
             BrokerOperation::更新延期 => "更新延期",
             BrokerOperation::更新rollback要求 => "更新rollback要求",
+            BrokerOperation::製品アンインストール要求 => "製品アンインストール要求",
             BrokerOperation::通知一覧 => "通知一覧",
             BrokerOperation::通知既読 => "通知既読",
             BrokerOperation::通知破棄 => "通知破棄",
@@ -967,7 +970,7 @@ pub struct Broker {
     agent_task_scratch: Option<super::agent_task_scratch::AgentTaskScratchJournal>,
     pub(super) desktop_export_root: Option<(std::path::PathBuf, cap_std::fs::Dir)>,
     desktop_package_layout_verified: bool,
-    desktop_install_path_verified: bool,
+    pub(super) desktop_install_path_verified: bool,
     pub(super) desktop_product_identity: Option<(String, String)>,
     #[cfg(test)]
     pub(super) desktop_product_install_local_app_data: Option<PathBuf>,
@@ -1745,12 +1748,30 @@ impl Broker {
         )
     }
 
+    #[cfg(test)]
     pub(crate) fn desktop_owner_operation_json_with_update_confirmations(
         &mut self,
         input: &str,
         download_confirmation: Option<super::update_center::UpdateDownloadConfirmation>,
         apply_confirmation: Option<super::update_center::UpdateApplyConfirmation>,
         activation_confirmation: Option<super::update_center::UpdateActivationConfirmation>,
+    ) -> BrokerResponse {
+        self.desktop_owner_operation_json_with_all_confirmations(
+            input,
+            download_confirmation,
+            apply_confirmation,
+            activation_confirmation,
+            None,
+        )
+    }
+
+    pub(crate) fn desktop_owner_operation_json_with_all_confirmations(
+        &mut self,
+        input: &str,
+        download_confirmation: Option<super::update_center::UpdateDownloadConfirmation>,
+        apply_confirmation: Option<super::update_center::UpdateApplyConfirmation>,
+        activation_confirmation: Option<super::update_center::UpdateActivationConfirmation>,
+        product_uninstall_confirmation: Option<super::update_center::ProductUninstallConfirmation>,
     ) -> BrokerResponse {
         let envelope = match BrokerRequestEnvelope::from_json_str(input) {
             Ok(envelope) => envelope,
@@ -1803,6 +1824,7 @@ impl Broker {
                     | BrokerOperation::更新適用要求
                     | BrokerOperation::更新有効版切替要求
                     | BrokerOperation::更新rollback要求
+                    | BrokerOperation::製品アンインストール要求
             )
         );
         if !operation_is_allowlisted
@@ -1825,6 +1847,7 @@ impl Broker {
             download_confirmation,
             apply_confirmation,
             activation_confirmation,
+            product_uninstall_confirmation,
         )
     }
 
@@ -1861,6 +1884,7 @@ impl Broker {
             download_confirmation,
             apply_confirmation,
             None,
+            None,
         )
     }
 
@@ -1872,6 +1896,7 @@ impl Broker {
         download_confirmation: Option<super::update_center::UpdateDownloadConfirmation>,
         apply_confirmation: Option<super::update_center::UpdateApplyConfirmation>,
         activation_confirmation: Option<super::update_center::UpdateActivationConfirmation>,
+        product_uninstall_confirmation: Option<super::update_center::ProductUninstallConfirmation>,
     ) -> BrokerResponse {
         self.端末期限処理();
         let request_id = envelope
@@ -2352,7 +2377,8 @@ impl Broker {
             | BrokerOperation::更新適用要求
             | BrokerOperation::更新有効版切替要求
             | BrokerOperation::更新延期
-            | BrokerOperation::更新rollback要求) => super::update_center::dispatch(
+            | BrokerOperation::更新rollback要求
+            | BrokerOperation::製品アンインストール要求) => super::update_center::dispatch(
                 self,
                 operation,
                 envelope.payload.as_ref().unwrap_or(&Value::Null),
@@ -2362,6 +2388,7 @@ impl Broker {
                 download_confirmation.as_ref(),
                 apply_confirmation.as_ref(),
                 activation_confirmation.as_ref(),
+                product_uninstall_confirmation.as_ref(),
             ),
             operation @ (BrokerOperation::通知一覧
             | BrokerOperation::通知既読

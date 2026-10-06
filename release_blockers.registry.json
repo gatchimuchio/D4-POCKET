@@ -3009,6 +3009,7 @@
       "release_tracks": ["windows_v1"],
       "blocks_release": true,
       "blocks_windows_technical_complete": true,
+      "current_rev5_status": "2026-10-06 rev5 P11: Settingsからnative Owner確認・既存Brokerへ入り、durable intent Audit、一回ticket、終了後固定root finalizerによるproduct root／一致shortcut削除と保持dataを実装。Rust fixture、Schema／Conformance、Flutter対象test、Windows Debug buildで局所成立。正式Installerとinstalled product全体を通すUninstaller LIVE_RUNTIME、Repair、crash／電源断 Recoveryは未成立。",
       "reason": "C12のnative Owner確認付きpackage download、未起動version stagingに加え、2026-10-06にBroker fixtureから独立native Owner確認・候補／identity／固定destination再照合・durable Audit付き有効版record writer、初回root Bootstrapper配置、atomic record replace、固定root Bootstrapperを指すStart Menu shortcutのcreate-only登録を接続した。同target再実行と既存別target競合の非上書きもfixtureで検証した。さらにBroker記録の直前版へのRollbackを独立Owner確認・現行trust再検証・durable Audit付きで接続し、1.1.0から1.0.0へのtoggle fixture、stale対象／通常IPC拒否、stage保持、Start Menu不変更を確認した。これらはfixture証拠であり、Installer／Uninstaller、installed next-launch、installed crash／電源断Recovery、installed product上のRollbackの成立は未実証。Windows DNS ClientとTLS配布元経路もhelper／loopback fixtureの範囲に限られる。正式package identity／signing identityは別のOwner Finalization blockerとして分離する。",
       "required_action": "試験用識別子によるInstaller／Uninstaller、installed productからの固定root通常起動とStart Menu shortcut連結、同一volume更新、正式導入製品の強制終了／電源断後の再起動復旧、旧版復帰を契約・negative試験・隔離Windows実測へ接続する。実配布元からの取得／改変検出／修復と、導入から次回起動／rollbackまでの製品経路をsource／artifact identityへ結合して検証する。正式発行者・署名識別情報はWindows技術完了後の別blockerで扱う。",
       "broker_signed_version_staging_consumer": {
@@ -3051,6 +3052,28 @@
           "scope": "active version record、Start Menu shortcut、Broker fixture内の一世代Rollbackまで。installed productのnext-launch、Installer／Uninstaller、process起動、installed product経路のRollbackは実施しない。"
         },
         "scope_limit": "active version record／Start Menu shortcut／1世代RollbackはRust fixture証拠のみ。installed productの導入・切替・起動・RollbackやWindows LIVE_RUNTIMEを証明せず、P11 release blockerを維持する。"
+      },
+      "broker_product_uninstaller_implementation": {
+        "date": "2026-10-06",
+        "evidence_source": "FIXTURE",
+        "validation": {
+          "focused_uninstaller": "cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib uninstall_ -- --test-threads=1: 5 passed。",
+          "release_build": "cargo build --locked --release --manifest-path native/rust_helper/Cargo.toml: PASS。未変更minidora.rsにdead_code warning 2件。",
+          "repository_integrity": "tooling/manifest.py --writeで1178 fileを更新後、--check PASS。tooling/release_gate_check.py PASS。git diff --check PASS。Dart形式確認は変更対象3 file、0変更。",
+          "schema_and_conformance": "Schema 161／正常例157／negative 208 PASS。Uninstaller正本・実装結合checkを含むConformance 236 checks PASS。",
+          "flutter_target_test": "flutter test --no-pub --no-test-assets --dart-define=GUI_SHELL_PRODUCT_VERSION=1.2.3 test/update_client_test.dart: 8 passed。",
+          "desktop_and_mobile_analysis": "変更対象Dart 3 fileの静的解析PASS。Mobile全体の静的解析PASS。Desktop全体の静的解析は終了値1で、未変更agent_center.dart内の廃止予定API案内5件のみ。",
+          "japanese_base_audit": "厳格監査は全体終了値1。検出した3 findingsは今回変更file外のdocs/REV3_PROGRESS.md、docs/REV4_ACCEPTANCE_LEDGER.md、native/rust_helper/src/adapters/codex_cli.rsに限られ、今回変更fileのfindingは0件。",
+          "windows_debug_build": "flutter build windows --debug --no-pub --dart-define=GUI_SHELL_PRODUCT_VERSION=1.2.3: PASS。MSB8028 intermediate directory sharing warning。",
+          "full_rust_suite": "cargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1: 489 passed／1 failed／12 ignored。差分外の既知A2A loopback fixtureが1件失敗し、focused再実行は1 passed。"
+        },
+        "observations": {
+          "authority": "Settings要求は既存PID-bound pipe／Rust起動器のnative Owner確認／既存Brokerへ限定。確認・installed path・埋込みidentity・Known Folder固定先・payload hashを照合し、durable削除intentの後に一回ticketを発行する。",
+          "finalization": "ticketはFlutter応答から除かれstdinでfinalizerへ渡す。Launcher終了を待ち、既存Audit Storeへ削除開始／完了／失敗を記録し、固定App ID product rootと一致するshortcutだけを削除する。Credential／設定／Workspace／Audit Storeは保持する。",
+          "fixture": "Rust fixtureはOwner確認境界、一回ticket、開始後失敗／再起動後のticket非再利用、固定rootとshortcut削除、保持data、shortcut競合時のroot保全を確認する。",
+          "cleanup": "finalizer自身のTemp内一時directory cleanupは未成立でFQ-P11-UNINSTALL-FINALIZER-CLEANUPへ移送。"
+        },
+        "scope_limit": "FIXTURE／compile証拠。正式Installerから導入したproductのnative確認から削除までの連続LIVE_RUNTIME、別user profile、Repair、crash／電源断後のinstalled Recovery、release readinessを証明しない。Windows distribution release blockerは維持する。"
       },
       "update_candidate_package_binding": {
         "date": "2026-09-30",

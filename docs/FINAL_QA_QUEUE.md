@@ -25,6 +25,7 @@
 | FQ-R2-TEMP | MxC／Windows TEMPの観測と責任境界。D4-owned scratch保証と混同しない。外部componentの物理削除をD4の保証条件にしない | rev3/rev4の観測履歴 | いいえ |
 | FQ-MODULE-PRUNING | P10の機能除外を最終統合製品で再確認し、hash固定artifactにおける画面／共有symbolの意味上の除去、安全Core保持、Rust／第三者Module除去、cold startup、実行時resourceを測定する | rev5 P10は機能除外のみ受入れ。binary・起動・resource評価をFinal QAへ移送 | いいえ |
 | FQ-TEST-LOOPBACK | P4検証時のA2A／Codex接続fixtureに加え、P6全Rust試験でもCodex loopbackとUpdate Downloadのlocal TLS fixtureでOS error 10054 / `ConnectionReset`を観測。`failed_tool_result_is_not_replayed_as_another_exec_command`と`local_tls_server_repairs_only_after_verified_package_bytes`は単独再実行で成功した一方、`failed_replacement_keeps_the_existing_corrupt_package_unchanged`は単独でも同じ接続切断を再現。2026-10-05のP7 A2A全target試験では444件中435成功／2失敗／7 ignored。Codex loopback fixtureは単独再実行で成功、TLS修復fixtureは単独でも`InvalidContentType`とOS error 10054を再現。さらにP7 Adapter Manifest単位の`cargo test --locked -- --test-threads=1`は443成功／2失敗／9 ignoredで、このCodex loopback testとTLS修復testがConnectionResetしたが、両方とも個別再実行では各1件成功した。すべてP7 Adapter差分外である。Feature Complete後にWindowsで一括再実行し、fixture server／clientの切断競合を確認する。現行P7 acceptanceを阻止しない | 2026-10-05 P4／P6／P7検証 | いいえ |
+| FQ-P11-UNINSTALL-FINALIZER-CLEANUP | Uninstaller成功時のランダム一時directory内finalizer executable／directoryの残存を解消し、削除失敗時の保持・回復も最終統合Windows製品上で確認する。現行実装は製品rootと一致shortcutを削除するが、finalizer自身の一時copy cleanupは未成立 | P11 Uninstaller実装時のcode inspection | いいえ |
 | FQ-INTEGRATED | rev5で定めるQ0–Q7最終品質保証 | `rev5 Final QA` | いいえ |
 
 2026-10-06追補: `cargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1`は449 passed／1 failed／9 ignored。失敗は`a2a::tests::loopback_HTTPからAgent_Cardを取得してmetadata_onlyへ射影する`の応答期限超過で、同testの単独再実行は1 passed。並列全試験では同A2A fixtureとUpdate Download TLS fixtureの2件が失敗し、逐次実行でTLS fixtureはPASSした。fixture server／client競合の根本原因は未確定で、最終統合後の全Rust試験として再確認する。現phaseはblockしない。
@@ -40,6 +41,8 @@
 2026-10-06 P11初回Install／Update導線検証: `cargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1`は474 passed／2 failed／12 ignored。失敗は`a2a::tests::loopback_HTTPからAgent_Cardを取得してmetadata_onlyへ射影する`と`adapters::minidora::tests::ContentLength付きJSONだけを期限内に取得する`で、各focused再実行は1 passed。今回のBroker update projection／package install UI差分との因果は観測されず、既存`FQ-TEST-LOOPBACK`の最終統合試験で確認し、現phaseはblockしない。
 
 2026-10-06 P11 portable起点Install起動遷移検証: `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`のRust library suiteは484 passed／1 failed／12 ignoredとなり、既知`broker::update_download::tests::local_tls_server_repairs_only_after_verified_package_bytes`がWindows loopback TLSの`ConnectionReset`／`InvalidContentType`で失敗してCargoがnonzero終了した。後続targetのPASSは主張しない。失敗箇所は今回の変更file外で、既存`FQ-TEST-LOOPBACK`に属するためP11受入れをblockしない。最終統合後に既存queueの対象として再確認する。
+
+2026-10-06 P11 Uninstaller実装確認: 逐次Rust全lib suiteは489 passed／1 failed／12 ignored。唯一の失敗は既知A2A loopback fixtureで、単独再実行は1 passed。今回のUninstaller focused Rust test 5件とRust Release buildはPASS。loopback fixtureの最終統合後確認は本queueに保持し、P11 Uninstallerの局所成立をblockしない。
 
 ## 3. Final QA段階
 

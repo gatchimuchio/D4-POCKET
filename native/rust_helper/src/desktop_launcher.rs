@@ -5,16 +5,17 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, ExitStatus};
+use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use std::sync::{mpsc, Arc};
+use std::sync::{mpsc, Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 use crate::audit_hash::sha256_tagged;
 use serde::Deserialize;
 use serde_json::{json, Value};
-use zeroize::Zeroize;
+use sha2::{Digest, Sha256};
+use zeroize::{Zeroize, Zeroizing};
 
 use crate::broker::export_center::{self, OwnerConfirmationSummary as ExportConfirmationSummary};
 #[cfg(test)]
@@ -180,6 +181,9 @@ enum DesktopOwnerOperationSummary {
     },
     UpdateActivation {
         confirmation: crate::broker::update_center::UpdateActivationConfirmation,
+        payload_hash: String,
+    },
+    ProductUninstall {
         payload_hash: String,
     },
 }
@@ -1560,6 +1564,14 @@ fn owner_operation_candidate(
                 payload_hash,
             }
         }
+        BrokerOperation::製品アンインストール要求 => {
+            if payload.as_object().is_none_or(|object| {
+                object.len() != 1 || object.get("版") != Some(&Value::from(1))
+            }) {
+                return None;
+            }
+            DesktopOwnerOperationSummary::ProductUninstall { payload_hash }
+        }
         BrokerOperation::AgentTaskWorkspacePermissionGrant => {
             let request: AgentTaskWorkspacePermissionRequest =
                 serde_json::from_value(payload.clone()).ok()?;
@@ -1887,6 +1899,9 @@ where
         owner_operations,
         false,
         None,
+        false,
+        None,
+        None,
         confirm_owner_operation,
     )
 }
@@ -1897,6 +1912,9 @@ fn relay_channel_frame_with_product_launch<F>(
     owner_operations: Option<&mpsc::SyncSender<DesktopOwnerOperationRequest>>,
     allow_installed_launch_after_exit: bool,
     launch_installed_after_exit: Option<&AtomicBool>,
+    installed_path_verified: bool,
+    product_identity: Option<&ProductRuntimeIdentity>,
+    uninstall_ticket: Option<&Mutex<Option<String>>>,
     mut confirm_owner_operation: F,
 ) -> Option<Vec<u8>>
 where
@@ -1926,16 +1944,39 @@ where
                             } => Some(confirmation.clone()),
                             _ => None,
                         };
+                        let product_uninstall_confirmation = match &summary {
+                            DesktopOwnerOperationSummary::ProductUninstall { payload_hash }
+                                if installed_path_verified => product_identity.and_then(
+                                |identity| {
+                                    current_product_uninstall_confirmation(
+                                        identity,
+                                        payload_hash,
+                                    )
+                                },
+                            ),
+                            _ => None,
+                        };
                         owner_operations
                             .send(DesktopOwnerOperationRequest {
                                 request_json: request_json.clone(),
                                 download_confirmation,
                                 apply_confirmation,
                                 activation_confirmation,
+                                product_uninstall_confirmation,
                                 reply,
                             })
                             .ok()?;
                         let mut response = response.recv().ok()?;
+                        if matches!(summary, DesktopOwnerOperationSummary::ProductUninstall { .. })
+                            && response.status
+                                == crate::broker::protocol::BrokerStatus::Accepted
+                            && !capture_product_uninstall_ticket(
+                                &mut response,
+                                uninstall_ticket?,
+                            )
+                        {
+                            return None;
+                        }
                         if let Some(launch_installed_after_exit) = launch_installed_after_exit {
                             mark_installed_launch_after_activation(
                                 &request_json,
@@ -1955,6 +1996,76 @@ where
         }
     };
     relay_normalized_channel_request(&request, endpoint)
+}
+
+fn current_product_uninstall_confirmation(
+    identity: &ProductRuntimeIdentity,
+    payload_hash: &str,
+) -> Option<crate::broker::update_center::ProductUninstallConfirmation> {
+    let local_app_data = crate::broker::product_install::current_user_local_app_data().ok()?;
+    let start_menu = crate::broker::product_install::current_user_start_menu_directory().ok()?;
+    Some(
+        crate::broker::update_center::ProductUninstallConfirmation {
+            app_id: identity.app_id.clone(),
+            audit_store_id: identity.audit_store_id.clone(),
+            product_root: crate::broker::product_install::product_install_root(
+                &local_app_data,
+                &identity.app_id,
+            )
+            .ok()?,
+            start_menu_shortcut_path:
+                crate::broker::product_install::plan_start_menu_shortcut(
+                    &start_menu,
+                    &identity.app_id,
+                )
+                .ok()?,
+            payload_hash: payload_hash.to_owned(),
+        },
+    )
+}
+
+fn capture_product_uninstall_ticket(
+    response: &mut crate::broker::protocol::BrokerResponse,
+    ticket_slot: &Mutex<Option<String>>,
+) -> bool {
+    use crate::broker::protocol::BrokerStatus;
+
+    if response.operation != "製品アンインストール要求"
+        || response.status != BrokerStatus::Accepted
+    {
+        return false;
+    }
+    let Some(body) = response.body.as_mut().and_then(Value::as_object_mut) else {
+        return false;
+    };
+    let Some(mut ticket) = body
+        .remove("ticket")
+        .and_then(|value| value.as_str().map(str::to_owned))
+    else {
+        return false;
+    };
+    if ticket.len() != 64
+        || !ticket
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        ticket.zeroize();
+        return false;
+    }
+    let Ok(mut slot) = ticket_slot.lock() else {
+        ticket.zeroize();
+        return false;
+    };
+    if slot.is_some() {
+        ticket.zeroize();
+        return false;
+    }
+    *slot = Some(ticket);
+    body.insert(
+        "状態".to_string(),
+        Value::String("uninstall_authorized".to_string()),
+    );
+    true
 }
 
 fn mark_installed_launch_after_activation(
@@ -2376,6 +2487,25 @@ fn owner_confirmation_text_for_identity(
                 )
             }
         },
+        DesktopOwnerOperationSummary::ProductUninstall { payload_hash } => {
+            let root = product_identity
+                .and_then(|identity| {
+                    crate::broker::product_install::current_user_local_app_data()
+                        .ok()
+                        .and_then(|local_app_data| {
+                            crate::broker::product_install::product_install_root(
+                                &local_app_data,
+                                &identity.app_id,
+                            )
+                            .ok()
+                        })
+                })
+                .map(|path| path.display().to_string())
+                .unwrap_or_else(|| "導入先を確認できません".to_string());
+            format!(
+                "D4 Pocketをアンインストールしますか？\n\n削除対象: {root}\nStart Menu: D4 Pocketの固定shortcut\n保持: Credential／設定／Workspace／Audit Store（%LOCALAPPDATA%\\D4Pocket\\apps配下）\n\n画面を正常終了した後、Rust helperが固定導入rootとこのshortcutだけを削除します。保持する利用者データは削除しません。削除前意図と完了結果をAuditへ記録します。\n\npayload hash:\n{payload_hash}"
+            )
+        }
         DesktopOwnerOperationSummary::RegressionCaseDelete {
             summary,
             payload_hash,
@@ -2435,6 +2565,7 @@ fn run_channel_server(
     shutdown: Arc<AtomicBool>,
     installed_path_verified: bool,
     launch_installed_after_exit: Arc<AtomicBool>,
+    uninstall_ticket: Arc<Mutex<Option<String>>>,
     ready: mpsc::SyncSender<()>,
     owner_operations: mpsc::SyncSender<DesktopOwnerOperationRequest>,
     product_identity: Option<ProductRuntimeIdentity>,
@@ -2453,6 +2584,9 @@ fn run_channel_server(
                 Some(&owner_operations),
                 !installed_path_verified && product_identity.is_some(),
                 Some(&launch_installed_after_exit),
+                installed_path_verified,
+                product_identity.as_ref(),
+                Some(&uninstall_ticket),
                 |summary| confirm_owner_operation(summary, product_identity.as_ref()),
             )
         },
@@ -2465,6 +2599,7 @@ fn run_channel_server(
 struct RunningBroker {
     shutdown: Arc<AtomicBool>,
     launch_installed_after_exit: Arc<AtomicBool>,
+    uninstall_ticket: Arc<Mutex<Option<String>>>,
     server: Option<JoinHandle<Result<(), BrokerServerError>>>,
     channel_server: Option<JoinHandle<Result<(), BrokerServerError>>>,
     channel_pipe_name: String,
@@ -2497,6 +2632,7 @@ impl RunningBroker {
 
         let shutdown = Arc::new(AtomicBool::new(false));
         let launch_installed_after_exit = Arc::new(AtomicBool::new(false));
+        let uninstall_ticket = Arc::new(Mutex::new(None));
         let thread_shutdown = Arc::clone(&shutdown);
         let mut config = BrokerServerConfig::new(store_dir, session_file.clone());
         config.desktop_protected_store_dir = Some(protected_store_dir);
@@ -2582,6 +2718,7 @@ impl RunningBroker {
         let frontend_pid = Arc::new(AtomicU32::new(0));
         let channel_shutdown = Arc::clone(&shutdown);
         let channel_launch_installed_after_exit = Arc::clone(&launch_installed_after_exit);
+        let channel_uninstall_ticket = Arc::clone(&uninstall_ticket);
         let channel_expected_pid = Arc::clone(&frontend_pid);
         let (channel_ready_tx, channel_ready_rx) = mpsc::sync_channel(1);
         let channel_name_for_thread = channel_pipe_name.clone();
@@ -2597,6 +2734,7 @@ impl RunningBroker {
                     channel_shutdown,
                     installed_path_verified,
                     channel_launch_installed_after_exit,
+                    channel_uninstall_ticket,
                     channel_ready_tx,
                     owner_operation_tx,
                     channel_product_identity,
@@ -2631,6 +2769,7 @@ impl RunningBroker {
         Ok(Self {
             shutdown,
             launch_installed_after_exit,
+            uninstall_ticket,
             server: Some(server),
             channel_server: Some(channel_server),
             channel_pipe_name,
@@ -2650,6 +2789,10 @@ impl RunningBroker {
 
     fn should_launch_installed_after_exit(&self) -> bool {
         self.launch_installed_after_exit.load(Ordering::Acquire)
+    }
+
+    fn take_product_uninstall_ticket(&self) -> Option<String> {
+        self.uninstall_ticket.lock().ok()?.take()
     }
 
     fn finish(&mut self) -> Result<(), DesktopLaunchError> {
@@ -2684,6 +2827,12 @@ impl RunningBroker {
 impl Drop for RunningBroker {
     fn drop(&mut self) {
         let _ = self.finish();
+        if let Ok(mut ticket) = self.uninstall_ticket.lock() {
+            if let Some(ticket) = ticket.as_mut() {
+                ticket.zeroize();
+            }
+            *ticket = None;
+        }
     }
 }
 
@@ -2798,6 +2947,290 @@ fn launch_active_product_version(
     Ok(())
 }
 
+const FINALIZE_UNINSTALL_ARGUMENT: &str = "--finalize-product-uninstall";
+
+fn sha256_file(path: &Path) -> Result<String, DesktopLaunchError> {
+    let mut file = File::open(path).map_err(|_| {
+        DesktopLaunchError::new("UNINSTALL_HELPER_SOURCE_UNAVAILABLE", "削除処理を準備できません。")
+    })?;
+    let mut digest = Sha256::new();
+    let mut buffer = [0u8; 64 * 1024];
+    loop {
+        let read = file.read(&mut buffer).map_err(|_| {
+            DesktopLaunchError::new("UNINSTALL_HELPER_SOURCE_UNAVAILABLE", "削除処理を準備できません。")
+        })?;
+        if read == 0 {
+            break;
+        }
+        digest.update(&buffer[..read]);
+    }
+    Ok(hex::encode(digest.finalize()))
+}
+
+fn stage_uninstall_finalizer(source: &Path) -> Result<(PathBuf, PathBuf), DesktopLaunchError> {
+    let temporary_root = std::env::temp_dir();
+    let metadata = fs::symlink_metadata(&temporary_root).map_err(|_| {
+        DesktopLaunchError::new("UNINSTALL_TEMP_UNAVAILABLE", "一時削除処理を安全に準備できません。")
+    })?;
+    if !metadata.is_dir() || metadata.file_type().is_symlink() || is_reparse_point(&metadata) {
+        return Err(DesktopLaunchError::new(
+            "UNINSTALL_TEMP_INVALID",
+            "一時削除処理の保存先が安全な通常folderではありません。",
+        ));
+    }
+    let temporary_root = fs::canonicalize(temporary_root).map_err(|_| {
+        DesktopLaunchError::new("UNINSTALL_TEMP_UNAVAILABLE", "一時削除処理を安全に準備できません。")
+    })?;
+    let mut suffix = [0u8; 16];
+    getrandom::getrandom(&mut suffix).map_err(|_| {
+        DesktopLaunchError::new("UNINSTALL_HELPER_ID_FAILED", "一時削除処理を安全に準備できません。")
+    })?;
+    let helper_directory = temporary_root.join(format!("D4Pocket-Uninstall-{}", hex::encode(suffix)));
+    fs::create_dir(&helper_directory).map_err(|_| {
+        DesktopLaunchError::new("UNINSTALL_HELPER_STAGE_FAILED", "一時削除処理を安全に準備できません。")
+    })?;
+    let stage_result = (|| {
+        let directory_metadata = fs::symlink_metadata(&helper_directory).map_err(|_| {
+            DesktopLaunchError::new("UNINSTALL_HELPER_STAGE_FAILED", "一時削除処理を安全に準備できません。")
+        })?;
+        let canonical_directory = fs::canonicalize(&helper_directory).map_err(|_| {
+            DesktopLaunchError::new("UNINSTALL_HELPER_STAGE_FAILED", "一時削除処理を安全に準備できません。")
+        })?;
+        if !directory_metadata.is_dir()
+            || is_reparse_point(&directory_metadata)
+            || !canonical_directory.starts_with(&temporary_root)
+        {
+            return Err(DesktopLaunchError::new(
+                "UNINSTALL_HELPER_STAGE_INVALID",
+                "一時削除処理のfolder identityを検証できません。",
+            ));
+        }
+        let helper_path = canonical_directory.join("d4p_uninstall_finalizer.exe");
+        let source_hash = sha256_file(source)?;
+        let copy_result = (|| {
+            let mut source_file = File::open(source).map_err(|_| ())?;
+            let mut target_file = OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&helper_path)
+                .map_err(|_| ())?;
+            std::io::copy(&mut source_file, &mut target_file).map_err(|_| ())?;
+            target_file.sync_all().map_err(|_| ())?;
+            Ok::<(), ()>(())
+        })();
+        if copy_result.is_err()
+            || sha256_file(source).ok().as_deref() != Some(source_hash.as_str())
+            || sha256_file(&helper_path).ok().as_deref() != Some(source_hash.as_str())
+        {
+            return Err(DesktopLaunchError::new(
+                "UNINSTALL_HELPER_COPY_INVALID",
+                "一時削除処理の実行fileを検証できません。",
+            ));
+        }
+        Ok((canonical_directory, helper_path))
+    })();
+    if stage_result.is_err() {
+        let _ = fs::remove_dir_all(&helper_directory);
+    }
+    stage_result
+}
+
+fn spawn_uninstall_finalizer(
+    launcher_path: &Path,
+    ticket: Zeroizing<String>,
+) -> Result<(), DesktopLaunchError> {
+    let (helper_directory, helper_path) = stage_uninstall_finalizer(launcher_path)?;
+    let inherited = filtered_frontend_environment(std::env::vars_os());
+    let mut command = Command::new(&helper_path);
+    command
+        .arg(FINALIZE_UNINSTALL_ARGUMENT)
+        .env_clear()
+        .envs(inherited)
+        .current_dir(&helper_directory)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null());
+    let mut helper = command.spawn().map_err(|_| {
+        let _ = fs::remove_dir_all(&helper_directory);
+        DesktopLaunchError::new("UNINSTALL_HELPER_START_FAILED", "製品削除の後処理を開始できません。")
+    })?;
+    let mut handoff = format!("{}\n{}\n", ticket.as_str(), std::process::id());
+    let Some(mut helper_stdin) = helper.stdin.take() else {
+        let _ = helper.kill();
+        let _ = helper.wait();
+        let _ = fs::remove_dir_all(&helper_directory);
+        return Err(DesktopLaunchError::new(
+            "UNINSTALL_HELPER_HANDOFF_FAILED",
+            "製品削除の後処理へ安全に引き渡せません。",
+        ));
+    };
+    let write_result = helper_stdin.write_all(handoff.as_bytes());
+    drop(helper_stdin);
+    handoff.zeroize();
+    if write_result.is_err() {
+        let _ = helper.kill();
+        let _ = helper.wait();
+        let _ = fs::remove_dir_all(&helper_directory);
+        return Err(DesktopLaunchError::new(
+            "UNINSTALL_HELPER_HANDOFF_FAILED",
+            "製品削除の後処理へ安全に引き渡せません。",
+        ));
+    }
+    let mut ready = String::new();
+    let Some(stdout) = helper.stdout.take() else {
+        let _ = helper.kill();
+        let _ = helper.wait();
+        let _ = fs::remove_dir_all(&helper_directory);
+        return Err(DesktopLaunchError::new(
+            "UNINSTALL_HELPER_NOT_READY",
+            "製品削除の後処理が起動できません。",
+        ));
+    };
+    let mut ready_result = BufReader::new(stdout);
+    if ready_result.read_line(&mut ready).is_err() || ready != "READY\n" {
+        let _ = helper.kill();
+        let _ = helper.wait();
+        let _ = fs::remove_dir_all(&helper_directory);
+        return Err(DesktopLaunchError::new(
+            "UNINSTALL_HELPER_NOT_READY",
+            "製品削除の後処理が起動できません。製品は変更していません。",
+        ));
+    }
+    Ok(())
+}
+
+fn open_launcher_process(
+    process_id: u32,
+) -> Result<
+    winsafe::guard::CloseHandleGuard<winsafe::HPROCESS>,
+    DesktopLaunchError,
+> {
+    use winsafe::co;
+
+    if process_id == 0 || process_id == std::process::id() {
+        return Err(DesktopLaunchError::new(
+            "UNINSTALL_PARENT_INVALID",
+            "製品削除の起動元を検証できません。",
+        ));
+    }
+    winsafe::HPROCESS::OpenProcess(co::PROCESS::SYNCHRONIZE, false, process_id).map_err(|_| {
+        DesktopLaunchError::new("UNINSTALL_PARENT_UNAVAILABLE", "D4 Pocketの終了を確認できません。")
+    })
+}
+
+fn wait_for_launcher_exit(process: &winsafe::HPROCESS) -> Result<(), DesktopLaunchError> {
+    process.WaitForSingleObject(None).map_err(|_| {
+        DesktopLaunchError::new("UNINSTALL_PARENT_WAIT_FAILED", "D4 Pocketの終了を確認できません。")
+    })?;
+    Ok(())
+}
+
+fn existing_runtime_store(
+    local_app_data: &Path,
+    identity: &ProductRuntimeIdentity,
+) -> Result<PathBuf, DesktopLaunchError> {
+    let runtime_dir = runtime_directory_with_identity(local_app_data, Some(identity))?;
+    let store_dir = runtime_dir.join("store");
+    let metadata = fs::symlink_metadata(&store_dir).map_err(|_| {
+        DesktopLaunchError::new("UNINSTALL_AUDIT_STORE_UNAVAILABLE", "Audit Storeを確認できないため、製品を削除しません。")
+    })?;
+    if !metadata.is_dir() || metadata.file_type().is_symlink() || is_reparse_point(&metadata) {
+        return Err(DesktopLaunchError::new(
+            "UNINSTALL_AUDIT_STORE_INVALID",
+            "Audit Storeを安全に開けないため、製品を削除しません。",
+        ));
+    }
+    fs::canonicalize(store_dir).map_err(|_| {
+        DesktopLaunchError::new("UNINSTALL_AUDIT_STORE_UNAVAILABLE", "Audit Storeを確認できないため、製品を削除しません。")
+    })
+}
+
+fn run_product_uninstall_finalizer() -> Result<(), DesktopLaunchError> {
+    let mut input = String::new();
+    std::io::stdin()
+        .lock()
+        .take(256)
+        .read_to_string(&mut input)
+        .map_err(|_| DesktopLaunchError::new("UNINSTALL_TICKET_UNAVAILABLE", "削除許可ticketを読み取れません。"))?;
+    let (ticket, parent_id, has_extra_line) = {
+        let mut lines = input.lines();
+        let ticket = lines.next().unwrap_or_default().to_owned();
+        let parent_id = lines
+            .next()
+            .and_then(|value| value.parse::<u32>().ok())
+            .filter(|value| *value != 0);
+        (ticket, parent_id, lines.next().is_some())
+    };
+    input.zeroize();
+    let ticket = Zeroizing::new(ticket);
+    if has_extra_line || ticket.is_empty() {
+        return Err(DesktopLaunchError::new(
+            "UNINSTALL_TICKET_INVALID",
+            "削除許可ticketを検証できません。製品は変更していません。",
+        ));
+    }
+    let parent = open_launcher_process(parent_id.ok_or_else(|| {
+        DesktopLaunchError::new("UNINSTALL_PARENT_INVALID", "製品削除の起動元を検証できません。")
+    })?)?;
+    let mut stdout = std::io::stdout().lock();
+    stdout.write_all(b"READY\n").map_err(|_| {
+        DesktopLaunchError::new("UNINSTALL_HELPER_READY_FAILED", "製品削除の後処理を起動できません。")
+    })?;
+    stdout.flush().map_err(|_| {
+        DesktopLaunchError::new("UNINSTALL_HELPER_READY_FAILED", "製品削除の後処理を起動できません。")
+    })?;
+    wait_for_launcher_exit(&parent)?;
+
+    let identity = compiled_product_runtime_identity()?.ok_or_else(|| {
+        DesktopLaunchError::new("PRODUCT_IDENTITY_UNAVAILABLE", "製品identityがありません。製品は変更していません。")
+    })?;
+    let local_app_data = crate::broker::product_install::current_user_local_app_data().map_err(|_| {
+        DesktopLaunchError::new("USER_DATA_ROOT_UNAVAILABLE", "Windowsのユーザー保存先を確認できません。製品は変更していません。")
+    })?;
+    let start_menu = crate::broker::product_install::current_user_start_menu_directory().map_err(|_| {
+        DesktopLaunchError::new("START_MENU_UNAVAILABLE", "Start Menu保存先を確認できません。製品は変更していません。")
+    })?;
+    let store_dir = existing_runtime_store(&local_app_data, &identity)?;
+    let mut broker = crate::broker::Broker::new_persistent(
+        &format!("uninstall-finalizer-{}", std::process::id()),
+        &store_dir,
+    )
+    .map_err(|_| {
+        DesktopLaunchError::new("UNINSTALL_AUDIT_UNAVAILABLE", "Audit chainを検証できません。製品は変更していません。")
+    })?;
+    broker
+        .set_desktop_product_identity(identity.app_id.clone(), identity.audit_store_id.clone())
+        .map_err(|_| DesktopLaunchError::new("PRODUCT_IDENTITY_INVALID", "製品identityを検証できません。"))?;
+    let ticket_hash = broker
+        .begin_product_uninstall_finalization(&ticket)
+        .map_err(|_| {
+            DesktopLaunchError::new("UNINSTALL_TICKET_REJECTED", "削除許可ticketが無効、期限外、または使用済みです。製品は変更していません。")
+        })?;
+    match crate::broker::product_install::remove_installed_product(
+        &local_app_data,
+        &start_menu,
+        &identity.app_id,
+    ) {
+        Ok(()) => broker
+            .finish_product_uninstall_finalization(&ticket_hash, true, None)
+            .map_err(|_| {
+                DesktopLaunchError::new("UNINSTALL_COMPLETION_AUDIT_FAILED", "製品削除後のAuditを確定できません。保持データを保存し、再導入前にAudit Storeを確認してください。")
+            })?,
+        Err(error) => {
+            let _ = broker.finish_product_uninstall_finalization(
+                &ticket_hash,
+                false,
+                Some(error.0),
+            );
+            return Err(DesktopLaunchError::new(
+                "UNINSTALL_REMOVE_FAILED",
+                "固定導入先またはStart Menu entryを安全に削除できませんでした。保持データは変更していません。",
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn filtered_frontend_environment(
     inherited: impl IntoIterator<Item = (OsString, OsString)>,
 ) -> Vec<(OsString, OsString)> {
@@ -2825,7 +3258,23 @@ fn configure_frontend_environment(
 }
 
 pub fn run() -> Result<(), DesktopLaunchError> {
-    if std::env::args_os().len() != 1 {
+    let mut arguments = std::env::args_os();
+    let _program = arguments.next();
+    match arguments.next() {
+        Some(argument)
+            if argument == FINALIZE_UNINSTALL_ARGUMENT && arguments.next().is_none() =>
+        {
+            return run_product_uninstall_finalizer();
+        }
+        None => {}
+        _ => {
+            return Err(DesktopLaunchError::new(
+                "UNSUPPORTED_ARGUMENTS",
+                "この起動方法では追加のcommandやpathを指定できません。",
+            ));
+        }
+    }
+    if arguments.next().is_some() {
         return Err(DesktopLaunchError::new(
             "UNSUPPORTED_ARGUMENTS",
             "この起動方法では追加のcommandやpathを指定できません。",
@@ -2894,6 +3343,9 @@ pub fn run() -> Result<(), DesktopLaunchError> {
     let frontend_result = launch_frontend(&layout, &broker);
     let launch_installed_after_exit = broker.should_launch_installed_after_exit();
     let broker_result = broker.finish();
+    let uninstall_ticket = broker
+        .take_product_uninstall_ticket()
+        .map(Zeroizing::new);
     broker_result?;
     let status = frontend_result?;
     if !status.success() {
@@ -2901,6 +3353,11 @@ pub fn run() -> Result<(), DesktopLaunchError> {
             "FRONTEND_EXIT_FAILED",
             "D4 Pocketが正常に終了しませんでした。",
         ));
+    }
+    if let Some(ticket) = uninstall_ticket {
+        spawn_uninstall_finalizer(&launcher_exe, ticket)?;
+        drop(instance_lock);
+        return Ok(());
     }
     if launch_installed_after_exit {
         let identity = product_identity.as_ref().ok_or_else(|| {
@@ -2943,6 +3400,52 @@ mod tests {
             body: Some(json!({"有効化": "active_version_recorded", "起動": "not_started"})),
             shutdown_requested: false,
         }
+    }
+
+    #[test]
+    fn uninstall_ticket_is_removed_before_the_flutter_response_is_serialized() {
+        let ticket = "a".repeat(64);
+        let mut response = crate::broker::protocol::BrokerResponse {
+            request_id: "request-uninstall".to_string(),
+            operation: "製品アンインストール要求".to_string(),
+            status: crate::broker::protocol::BrokerStatus::Accepted,
+            evidence_source: "LIVE_RUNTIME".to_string(),
+            audit_event_id: "audit-uninstall".to_string(),
+            error: None,
+            health: None,
+            body: Some(json!({"版": 1, "状態": "uninstall_authorized", "ticket": ticket})),
+            shutdown_requested: false,
+        };
+        let slot = Mutex::new(None);
+
+        assert!(capture_product_uninstall_ticket(&mut response, &slot));
+        assert!(response.body.as_ref().unwrap().get("ticket").is_none());
+        assert!(!response.to_json_string().unwrap().contains(&ticket));
+        assert_eq!(slot.lock().unwrap().as_deref(), Some(ticket.as_str()));
+    }
+
+    #[test]
+    fn uninstall_owner_confirmation_names_fixed_root_and_preserved_user_data() {
+        let request = desktop_owner_request(
+            "製品アンインストール要求",
+            "uninstall-owner-summary",
+            "uninstall-owner-summary-nonce",
+            json!({"版": 1}),
+        );
+        let (_, summary) = owner_operation_candidate(request.to_string().as_bytes(), &endpoint())
+            .expect("製品削除要求はnative Owner確認を要求する");
+        let identity = ProductRuntimeIdentity {
+            app_id: "d4-pocket-app-11111111111111111111111111111111".into(),
+            audit_store_id: "audit-store-22222222222222222222222222222222".into(),
+        };
+        let prompt = owner_confirmation_text_for_identity(&summary, Some(&identity));
+
+        assert!(prompt.contains("D4 Pocketをアンインストールしますか？"));
+        assert!(prompt.contains(&identity.app_id));
+        assert!(prompt.contains("Start Menu"));
+        assert!(prompt.contains("Credential／設定／Workspace／Audit Store"));
+        assert!(prompt.contains("画面を正常終了した後"));
+        assert!(!prompt.contains("ticket"));
     }
 
     #[test]

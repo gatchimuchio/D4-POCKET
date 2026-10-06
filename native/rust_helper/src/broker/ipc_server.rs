@@ -102,6 +102,8 @@ pub(crate) struct DesktopOwnerOperationRequest {
     pub download_confirmation: Option<super::update_center::UpdateDownloadConfirmation>,
     pub apply_confirmation: Option<super::update_center::UpdateApplyConfirmation>,
     pub activation_confirmation: Option<super::update_center::UpdateActivationConfirmation>,
+    pub product_uninstall_confirmation:
+        Option<super::update_center::ProductUninstallConfirmation>,
     pub reply: SyncSender<BrokerResponse>,
 }
 
@@ -420,11 +422,12 @@ fn run_loopback_server_inner(
         broker.端末期限処理();
         if let Some(owner_operations) = &owner_operations {
             if let Ok(request) = owner_operations.try_recv() {
-                let response = broker.desktop_owner_operation_json_with_update_confirmations(
+                let response = broker.desktop_owner_operation_json_with_all_confirmations(
                     &request.request_json,
                     request.download_confirmation,
                     request.apply_confirmation,
                     request.activation_confirmation,
+                    request.product_uninstall_confirmation,
                 );
                 let _ = request.reply.send(response);
             }

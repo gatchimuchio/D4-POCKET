@@ -1,10 +1,10 @@
 # Windows Desktop起動管理
 
-状態: Desktop起動基盤の責任契約。P11有効版切替、Start Menu shortcut登録、Broker記録の直前版RollbackはBroker fixtureへ接続済みで、installed product evidenceではない。
+状態: Desktop起動基盤の責任契約。P11有効版切替、Start Menu shortcut登録、Broker記録の直前版Rollback、native Owner確認付きUninstallerは実装・fixture接続済み。installed product全体の導入・起動・削除を通したevidenceではない。
 
 ## 1. 目的と範囲
 
-通常利用者がterminal、PowerShell、Python、Rust、Flutter、Gitを起動せず、配置済みのDesktopアプリを開始・終了できるWindows起動経路を定める。本書が対象とするのはアプリ起動中のBroker管理であり、Installer、正式配布、更新、rollbackの完成を意味しない。
+通常利用者がterminal、PowerShell、Python、Rust、Flutter、Gitを起動せず、配置済みのDesktopアプリを開始・終了できるWindows起動経路を定める。本書はアプリ起動中のBroker管理と、既存Broker／起動器を使う製品Uninstallerの終了後処理を扱う。正式Installer、正式配布、installed product全体でのUpdate／Rollback完成を意味しない。
 
 製品名は`D4 Pocket`、既存Repositoryと実装基盤は`GUI-Shell`のままとする。正式なpackage identity、signing identity、Publisher、配布storeはOwnerが指定するまで設定しない。
 
@@ -65,6 +65,14 @@ Flutterは`gui_shell/broker` MethodChannelで要求JSONだけをWindows Runner�
 - UI終了時の停止は同一Rust process内の管理通知であり、Flutterからのshutdown IPCやOwner資格を使わない。Brokerは既存の短いIPC timeoutと最長10msのidle loop周期で停止を確認する。
 - endpointは停止後、起動時に読んだbyte列と現在fileが一致するときだけ削除する。差し替わったfileは削除せず、失敗として操作者へ示す。起動器終了時のcleanup失敗を成功へ読み替えない。
 
+### 製品アンインストール
+
+SettingsからのUninstaller要求は、通常IPCやFlutterの自己申告だけでは実行できない。Rust起動器は既存のoperation別native Owner確認を表示し、Brokerはinstalled-path evidence、埋込みApp／Audit Store identity、Known Folderから再導出した固定product root／Start Menu先、確認対象payload hashを再照合する。確認がない、情報が古い、identityまたは固定先が一致しない場合は拒否する。
+
+Brokerは削除意図をdurable Auditへ確定した後、一回限りticketを起動器へ返す。起動器はticketをFlutter応答から除き、画面と起動器Brokerが正常終了した後に限り、現在の起動器binaryとhash一致するfinalizerをランダム名の一時directoryへcopyしてhashを再確認する。ticketはcommand argument、environment、Audit本文へ置かず、stdinでfinalizerへ渡す。finalizerは起動元processの終了を待ち、Known Folder、製品identity、既存Audit Storeを再導出・検証し、ticketの未使用状態と永続Auditを確認してから固定App IDのproduct rootと、そのrootを指す一致済みStart Menu shortcutだけを削除する。Credential、設定、Workspace、AppData内のAudit Storeは削除しない。
+
+finalizer開始後の失敗・再起動では同ticketを再利用できず、新たなnative Owner確認が必要。削除対象やshortcutに競合がある場合は上書き・別target削除をせず、開始／失敗を可能な限りAuditし、fail-closedで停止する。fixtureでは固定rootと一致shortcutの削除、保持dataの維持、shortcut競合時の製品root保全、ticketの一回性を検証した。現在の証拠は局所Rust fixtureとWindows compileまでで、正式Installerからの導入済みproduct全体を通した`LIVE_RUNTIME`実行ではない。finalizer用の一時copy残存を含むcleanup確認は最終統合QAで扱う。
+
 ## 5. 失敗と復旧
 
 起動不能時はWindowsのGUI error dialogで固定error codeと日本語復旧案内を示す。session secret、endpoint JSON、credential、audit raw payload、filesystem pathをdialogやlogへ含めない。Broker停止中はFlutterをそのまま操作させず、起動器が自身のFlutter childだけを終了する。
@@ -77,8 +85,8 @@ Rust単体試験は固定配置検査、endpoint拒否条件、同一起動lock�
 
 - item: 正式配布物の導入・削除、取得から導入・起動まで、署名付き更新、以前の版への復旧
   classification: release_blocker
-  reason: 本変更はstaged配置からのGUI起動とBroker lifecycle管理だけを扱う。
-  required_action: 正式配布identity、署名条件、更新信頼、失敗復旧、導入先実測を含むP11/P12の各contractと実製品検証を完成する。
+  reason: Uninstallerの固定root削除機能は実装済みだが、Installerからの導入とinstalled product全体を通した実測、正式配布・署名、更新失敗復旧は未成立。
+  required_action: P11/P12のInstaller・Update・Rollback contractを実装し、同一の試験用製品artifactを使って導入から起動・削除までを接続する。正式Publisher／署名条件はOwner Finalizationで扱う。
   blocks_release: yes
 - item: Windows installed productの由来・可視画面・Setup Doctor・監査anchor証拠
   classification: release_blocker

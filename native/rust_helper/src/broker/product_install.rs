@@ -418,6 +418,94 @@ pub(crate) fn register_start_menu_shortcut(
     Ok(shortcut_path)
 }
 
+/// 固定導入rootと、そこを指すことを再確認したStart Menu shortcutだけを除去する。
+/// AppDataのruntime／Audit Storeはこの関数の対象に含めない。
+#[cfg(windows)]
+pub(crate) fn remove_installed_product(
+    local_app_data: &Path,
+    start_menu_directory: &Path,
+    app_id: &str,
+) -> Result<(), ProductInstallPlanError> {
+    let (product_root, _) = open_existing_product_root(local_app_data, app_id)?;
+    let expected_launcher = product_root.join("gui_shell_desktop_launcher.exe");
+
+    let start_menu_shortcut = plan_start_menu_shortcut(start_menu_directory, app_id)?;
+    let start_menu_root = std::fs::canonicalize(start_menu_directory)
+        .map_err(|_| ProductInstallPlanError("product_start_menu_directory_unavailable"))?;
+    let start_menu = Dir::open_ambient_dir(&start_menu_root, cap_std::ambient_authority())
+        .map_err(|_| ProductInstallPlanError("product_start_menu_directory_unavailable"))?;
+    let start_menu_metadata = start_menu
+        .dir_metadata()
+        .map_err(|_| ProductInstallPlanError("product_start_menu_directory_invalid"))?;
+    if !start_menu_metadata.is_dir() || is_cap_reparse_point(&start_menu_metadata) {
+        return Err(ProductInstallPlanError(
+            "product_start_menu_directory_invalid",
+        ));
+    }
+    let start_menu_device = CapMetadataExt::dev(&start_menu_metadata);
+    if let Some(programs) = open_existing_optional_child_directory(
+        &start_menu,
+        START_MENU_PROGRAMS_DIRECTORY,
+        start_menu_device,
+    )? {
+        if let Some(product_shortcuts) = open_existing_optional_child_directory(
+            &programs,
+            START_MENU_PRODUCT_DIRECTORY,
+            start_menu_device,
+        )? {
+            match product_shortcuts.symlink_metadata(START_MENU_SHORTCUT_FILE) {
+                Ok(metadata) => {
+                    if !metadata.is_file()
+                        || is_cap_reparse_point(&metadata)
+                        || metadata.len() == 0
+                        || metadata.len() > MAX_START_MENU_SHORTCUT_BYTES
+                    {
+                        return Err(ProductInstallPlanError(
+                            "product_start_menu_shortcut_conflict",
+                        ));
+                    }
+                    verify_existing_start_menu_shortcut(
+                        &product_shortcuts,
+                        &start_menu_shortcut,
+                        &expected_launcher,
+                    )?;
+                    product_shortcuts
+                        .remove_file(START_MENU_SHORTCUT_FILE)
+                        .map_err(|_| {
+                            ProductInstallPlanError("product_start_menu_shortcut_remove_failed")
+                        })?;
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(_) => {
+                    return Err(ProductInstallPlanError(
+                        "product_start_menu_shortcut_unavailable",
+                    ));
+                }
+            }
+            let _ = programs.remove_dir(START_MENU_PRODUCT_DIRECTORY);
+        }
+    }
+
+    let local_app_data = std::fs::canonicalize(local_app_data)
+        .map_err(|_| ProductInstallPlanError("product_install_local_app_data_unavailable"))?;
+    let local_root = Dir::open_ambient_dir(&local_app_data, cap_std::ambient_authority())
+        .map_err(|_| ProductInstallPlanError("product_install_local_app_data_unavailable"))?;
+    let local_metadata = local_root
+        .dir_metadata()
+        .map_err(|_| ProductInstallPlanError("product_install_local_app_data_invalid"))?;
+    if !local_metadata.is_dir() || is_cap_reparse_point(&local_metadata) {
+        return Err(ProductInstallPlanError(
+            "product_install_local_app_data_invalid",
+        ));
+    }
+    let local_device = CapMetadataExt::dev(&local_metadata);
+    let programs = open_existing_child_directory(&local_root, INSTALL_DIRECTORY, local_device)?;
+    let products = open_existing_child_directory(&programs, PRODUCT_DIRECTORY, local_device)?;
+    products
+        .remove_dir_all(app_id)
+        .map_err(|_| ProductInstallPlanError("product_install_remove_failed"))
+}
+
 #[cfg(windows)]
 fn verify_existing_start_menu_shortcut(
     product_directory: &Dir,
@@ -579,6 +667,20 @@ fn open_existing_child_directory(
         return Err(ProductInstallPlanError("product_install_directory_invalid"));
     }
     Ok(opened)
+}
+
+fn open_existing_optional_child_directory(
+    parent: &Dir,
+    name: &str,
+    root_device: u64,
+) -> Result<Option<Dir>, ProductInstallPlanError> {
+    match parent.symlink_metadata(name) {
+        Ok(_) => open_existing_child_directory(parent, name, root_device).map(Some),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(_) => Err(ProductInstallPlanError(
+            "product_install_directory_unavailable",
+        )),
+    }
 }
 
 fn open_or_create_child_directory(
@@ -996,6 +1098,100 @@ mod tests {
             "product_start_menu_shortcut_conflict"
         );
         assert_eq!(std::fs::read(&shortcut).unwrap(), original_bytes);
+        std::fs::remove_dir_all(scratch).unwrap();
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn uninstall_removes_only_fixed_product_and_matching_shortcut() {
+        let scratch = std::env::temp_dir().join(format!(
+            "d4p-uninstall-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let local_app_data = scratch.join("Local");
+        let start_menu = scratch.join("StartMenu");
+        let product_root = local_app_data
+            .join("Programs")
+            .join("D4 Pocket")
+            .join(APP_ID);
+        let retained_store = local_app_data
+            .join("D4Pocket")
+            .join("apps")
+            .join(APP_ID)
+            .join("stores")
+            .join("audit-store-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        std::fs::create_dir_all(product_root.join("versions")).unwrap();
+        std::fs::create_dir_all(&retained_store).unwrap();
+        std::fs::create_dir_all(&start_menu).unwrap();
+        std::fs::write(
+            product_root.join("gui_shell_desktop_launcher.exe"),
+            b"fixture bootstrapper",
+        )
+        .unwrap();
+        std::fs::write(retained_store.join("audit.jsonl"), b"retained audit").unwrap();
+        let shortcut = super::register_start_menu_shortcut(
+            &local_app_data,
+            &start_menu,
+            APP_ID,
+            &product_root,
+        )
+        .unwrap();
+
+        super::remove_installed_product(&local_app_data, &start_menu, APP_ID).unwrap();
+
+        assert!(!product_root.exists());
+        assert!(!shortcut.exists());
+        assert_eq!(
+            std::fs::read(retained_store.join("audit.jsonl")).unwrap(),
+            b"retained audit"
+        );
+        std::fs::remove_dir_all(scratch).unwrap();
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn uninstall_conflicting_shortcut_preserves_product_root() {
+        let scratch = std::env::temp_dir().join(format!(
+            "d4p-uninstall-conflict-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let local_app_data = scratch.join("Local");
+        let start_menu = scratch.join("StartMenu");
+        let product_root = local_app_data
+            .join("Programs")
+            .join("D4 Pocket")
+            .join(APP_ID);
+        let shortcut_directory = start_menu.join("Programs").join("D4 Pocket");
+        std::fs::create_dir_all(&product_root).unwrap();
+        std::fs::create_dir_all(&shortcut_directory).unwrap();
+        std::fs::create_dir_all(&start_menu).unwrap();
+        std::fs::write(
+            product_root.join("gui_shell_desktop_launcher.exe"),
+            b"fixture bootstrapper",
+        )
+        .unwrap();
+        let unrelated = scratch.join("unrelated.exe");
+        std::fs::write(&unrelated, b"unrelated target").unwrap();
+        let shortcut = shortcut_directory.join("D4 Pocket.lnk");
+        super::save_shell_link(&shortcut, &unrelated).unwrap();
+        let original = std::fs::read(&shortcut).unwrap();
+
+        assert_eq!(
+            super::remove_installed_product(&local_app_data, &start_menu, APP_ID)
+                .unwrap_err()
+                .0,
+            "product_start_menu_shortcut_conflict"
+        );
+        assert!(product_root.exists());
+        assert_eq!(std::fs::read(shortcut).unwrap(), original);
         std::fs::remove_dir_all(scratch).unwrap();
     }
 

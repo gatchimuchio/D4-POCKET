@@ -1106,7 +1106,7 @@ def test_update_center_contract_and_execution_boundary() -> list[str]:
         errors.append("更新実行状態とBroker由来rollback先projectionが一致しない")
     for name in ("ipc_request", "ipc_response"):
         operations = load_schema(f"{name}.schema.json")["properties"]["operation"]["enum"]
-        for operation in ("更新一覧", "更新候補取得", "更新確認", "更新署名検査", "更新download要求", "更新適用要求", "更新延期", "更新rollback要求"):
+        for operation in ("更新一覧", "更新候補取得", "更新確認", "更新署名検査", "更新download要求", "更新適用要求", "更新延期", "更新rollback要求", "製品アンインストール要求"):
             if operation not in operations:
                 errors.append(f"{name}に更新操作がない: {operation}")
     update_center = (RUST_HELPER / "src" / "broker" / "update_center.rs").read_text(
@@ -3160,6 +3160,8 @@ def test_windows_stage_uses_terminal_free_native_launcher() -> list[str]:
     broker_smoke = (INSTALLER / "windows" / "collect_broker_smoke.ps1").read_text(encoding="utf-8")
     launcher = (ROOT / "native" / "rust_helper" / "src" / "desktop_launcher.rs").read_text(encoding="utf-8")
     broker_server = (ROOT / "native" / "rust_helper" / "src" / "broker" / "ipc_server.rs").read_text(encoding="utf-8")
+    product_install = (ROOT / "native" / "rust_helper" / "src" / "broker" / "product_install.rs").read_text(encoding="utf-8")
+    update_center = (ROOT / "native" / "rust_helper" / "src" / "broker" / "update_center.rs").read_text(encoding="utf-8")
     launcher_doc = (ROOT / "docs" / "specs" / "windows-desktop-launcher.md").read_text(encoding="utf-8")
     broker_channel_doc = (ROOT / "docs" / "specs" / "desktop-broker-channel.md").read_text(encoding="utf-8")
     regression_case_doc = (ROOT / "docs" / "specs" / "regression-case.md").read_text(encoding="utf-8")
@@ -3239,6 +3241,29 @@ def test_windows_stage_uses_terminal_free_native_launcher() -> list[str]:
     ):
         if token not in launcher_doc:
             errors.append(f"Windows起動仕様にExport runtime identity境界がない: {token}")
+    for token in (
+        "### 製品アンインストール",
+        "Brokerは削除意図をdurable Auditへ確定した後、一回限りticketを起動器へ返す",
+        "Credential、設定、Workspace、AppData内のAudit Storeは削除しない",
+        "finalizer開始後の失敗・再起動では同ticketを再利用できず",
+        "finalizer用の一時copy残存を含むcleanup確認は最終統合QAで扱う",
+    ):
+        if token not in launcher_doc:
+            errors.append(f"Windows Uninstaller正本に必要な境界がない: {token}")
+    uninstall_sources = launcher + broker_server + product_install + update_center
+    for token in (
+        "stage_uninstall_finalizer(",
+        "run_product_uninstall_finalizer(",
+        "begin_product_uninstall_finalization(",
+        "remove_installed_product(",
+        "uninstall_ticket_is_removed_before_the_flutter_response_is_serialized",
+        "uninstall_owner_confirmation_names_fixed_root_and_preserved_user_data",
+        "product_uninstall_requires_owner_and_consumes_durable_ticket_once",
+        "uninstall_removes_only_fixed_product_and_matching_shortcut",
+        "uninstall_conflicting_shortcut_preserves_product_root",
+    ):
+        if token not in uninstall_sources:
+            errors.append(f"Windows Uninstallerの実装・正常／境界試験が欠落: {token}")
     for token in (
         "%LOCALAPPDATA%\\GUI-Shell\\broker\\desktop\\store",
         "%LOCALAPPDATA%\\D4Pocket\\apps\\<App ID>\\stores\\<Audit store ID>\\store",
@@ -8313,6 +8338,7 @@ def test_agent_task_owner_confirmation_wait_uses_native_operation_timeout() -> l
         "MCP Tool実行",
         "更新download要求",
         "更新有効版切替要求",
+        "製品アンインストール要求",
         "AgentTaskWorkspacePermissionGrant",
         "AgentTaskOwnerApprovalGrant",
         "AgentTask結果表示承認",

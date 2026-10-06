@@ -233,7 +233,7 @@
     },
     {
       "path": "docs/specs/windows-desktop-launcher.md",
-      "責任": "Windows Desktop起動器のportable／固定installed root入口、Broker lifecycle、active version Bootstrapper読取、ユーザー保存・cleanup、未成立の配布工程境界"
+      "責任": "Windows Desktop起動器のportable／固定installed root入口、Broker lifecycle、active version Bootstrapper読取、native Owner確認付きUninstallerの固定root／一致shortcut削除と保持data境界、ユーザー保存・cleanup、未成立の配布工程境界"
     },
     {
       "path": "docs/specs/windows-product-package.md",
