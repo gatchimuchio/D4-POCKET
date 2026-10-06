@@ -338,6 +338,42 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('first-run後の概要からBroker統治Runtime登録へ進める',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1200, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final transport = _FakeBrokerTransport([
+      _brokerHealthResponse(),
+      _brokerHostCapabilityResponse(),
+      _brokerHostListResponse(),
+      _brokerAdapterListResponse(),
+      _brokerAgentAdapterListResponse(),
+      _brokerAcceptedBody('normalize_payload', {'quarantined': false}),
+      _brokerAcceptedBody('content_projection', {'redacted_payload': {}}),
+      _brokerAcceptedBody('approval_edit', {'ok': false}),
+      _brokerCommandSuspendedResponse(),
+    ]);
+    final client = await ShellCoreClient.product(transport: transport);
+    expect(client.mode, 'broker');
+    expect(client.initialUiConfiguration.locale, 'ja-JP');
+
+    await tester.pumpWidget(GuiShellDesktopApp(client: client));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('open-agent-setup')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('エージェントセンター'), findsWidgets);
+    expect(find.text('Codex実行系と作業領域'), findsOneWidget);
+    expect(find.text('登録を開始'), findsOneWidget);
+    expect(transport.operations, contains('初回設定取得'));
+    expect(transport.operations, contains('Setup Doctor報告取得'));
+    expect(transport.operations, isNot(contains('AgentCLI実行系作業領域登録')));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('状態バーが段階Bの所有者利用とリリース未主張を表示する', (WidgetTester tester) async {
     await tester.pumpWidget(
       MaterialApp(

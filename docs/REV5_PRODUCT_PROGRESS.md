@@ -235,6 +235,14 @@ P11のInstaller entryは、P9 portable ZIPをbootstrapとしてD4 Pocketを起�
 
 rev5工程表の15段階の正常利用scenarioを、D4 Pocketの一つの製品経路として接続する。既にCLOSEDのP2〜P11の局所条件を再実装・再試験せず、未接続の交点だけを埋める。最初の統合blockはInstall後の起動／first-runからRuntime登録へ進み、以後Provider／Model、Agent／Workspace、Task、Compare、Handoff、History／Diff、MCP、Compose／Export、Update、normal exitの順に接続する。実資格・実課金・外部副作用は使わず、通常Owner操作待ちにせず、決定的test identityを利用する。
 
+#### P12接続単位1: first-runからRuntime／Agent登録UI — 完了
+
+Dashboardに、first-run後の次の操作として既存Agent Centerを開く明示導線を追加した。Runtime／Workspace登録のBroker要求、native Owner確認、Permission、Task Approvalの実装は変更せず、FlutterはBroker未接続時に登録を実行しない。製品modeのFake Brokerで初回設定取得・Setup Doctor取得後にAgent Centerへ遷移するWidget試験と、既存のCodex登録UIが指定値だけをBrokerへ送りpermission／approval fieldを送らないWidget試験を個別に実行した。
+
+検証: Dashboard遷移と既存登録UIのfocused Flutter Widget test各1件PASS（`--no-pub --no-test-assets --dart-define=GUI_SHELL_PRODUCT_VERSION=1.2.3`）。`flutter analyze --no-pub lib/main.dart lib/screens/dashboard.dart test/widget_test.dart`は3項目No issues found（日本語を含むOneDrive pathでLSP messageが壊れたため一時drive aliasから実行）。`dart format lib/main.dart lib/screens/dashboard.dart test/widget_test.dart`は変更なし。Schema 161／正常例157／負例208、Conformance 236 checks PASS。試験証拠は`FIXTURE`であり、実installed product、native Owner dialog、実Codex processの証拠ではない。次はProvider／Model設定へ進む。
+
+## P11作業履歴（以下の記録は当時の状態。現行状態は上記CLOSEDが正本）
+
 #### 2026-10-06 P11 Exportから製品Update trust設定への接続
 
 SettingsのWindows書出し詳細欄から、製品Update用のEd25519公開鍵DERとchannel別HTTPS配布元を任意設定できるようにした。Flutterは公開値だけをBroker要求へ渡す。Rust BrokerはSPKI形式、channel重複、配布元URLを検証し、fingerprintを算出してversion 2 trustへ正規化する。native Owner確認にはfingerprintとchannelごとの完全な配布元URLを表示し、完了後に限りExport Manifestへtrustを記録する。既存ReceiptはManifest fileの長さ・hashを結合する。空欄時は従来どおりtrust未設定のManifestとなり、製品Updateはfail-closedを保つ。秘密署名鍵を入力、表示、保存する欄はない。

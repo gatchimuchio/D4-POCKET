@@ -8,10 +8,12 @@ class Dashboard extends StatelessWidget {
     super.key,
     required this.client,
     this.onOpenProductSetup,
+    this.onOpenAgentSetup,
   });
 
   final ShellCoreClient client;
   final VoidCallback? onOpenProductSetup;
+  final VoidCallback? onOpenAgentSetup;
 
   @override
   Widget build(BuildContext context) {
@@ -41,6 +43,28 @@ class Dashboard extends StatelessWidget {
                 onPressed: onOpenProductSetup,
                 icon: const Icon(Icons.install_desktop_outlined),
                 label: const Text('インストール・更新センターを開く'),
+              ),
+            ],
+          ),
+        ),
+        BorderedPanel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '次の準備: 実行系と作業領域',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                '起動後はAgentと作業領域を登録して利用を始めます。登録はRust Brokerのnative Owner確認を通り、PermissionとTask Approvalは別に判断されます。',
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                key: const ValueKey('open-agent-setup'),
+                onPressed: onOpenAgentSetup,
+                icon: const Icon(Icons.smart_toy_outlined),
+                label: const Text('実行系・Agent管理を開く'),
               ),
             ],
           ),

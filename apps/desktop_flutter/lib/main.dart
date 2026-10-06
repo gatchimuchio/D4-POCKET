@@ -386,6 +386,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
       Dashboard(
         client: widget.client,
         onOpenProductSetup: _openProductSetup,
+        onOpenAgentSetup: _openAgentSetup,
       ),
       if (kGuiShellModuleSetupDoctor)
         SetupDoctor(client: widget.client)
@@ -788,6 +789,8 @@ class _ShellHomePageState extends State<ShellHomePage> {
       _updateCenterFocusRequest++;
     });
   }
+
+  void _openAgentSetup() => _selectPage(5);
 
   void _setNavigationGroup(_ShellNavigationGroup group) {
     final pageEntries = _pageEntries()
