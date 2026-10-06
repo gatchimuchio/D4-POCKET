@@ -1240,7 +1240,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "76c69c83e7a4d35e52d8c62a28b604d3575edc5db126d28213f42414df90823e"
+      "sha256": "7fc8c1a0c05e7e3778df68a5275e3e4d21b8c770bc363ac9828c57dbd9deef86"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -2687,6 +2687,10 @@
       "sha256": "0119d883ba0af3ce10d5a17172fbf3294c636b441ba8192075ff88db96935682"
     },
     {
+      "path": "examples/contracts/invalid/update_catalog.invalid.json",
+      "sha256": "e8d6f58ec9a69fb3f9bf4d9b48d5db6cec7b0024d72f337640622bb63f72e1c3"
+    },
+    {
       "path": "examples/contracts/invalid/update_download_job_path_leak.invalid.json",
       "sha256": "aba0454abe6aef74a1f182cb5ba079578ed1f500af1b9940f8767a642964a5b6"
     },
@@ -3013,6 +3017,10 @@
     {
       "path": "examples/contracts/update_candidate.valid.json",
       "sha256": "7b5a1665e768f0e57aea09c45434881ad4a35467a12f0f5ef1cabffc85f77aeb"
+    },
+    {
+      "path": "examples/contracts/update_catalog.valid.json",
+      "sha256": "e6d1f98b406d2f6db417426b4aa767d5f1aeeb278ffb03a16986fecc4192afba"
     },
     {
       "path": "examples/contracts/update_download_job.valid.json",
@@ -4561,6 +4569,10 @@
     {
       "path": "specs/update_candidate.schema.json",
       "sha256": "436cbcb277dcd1641988a6a327051cda1ba7faef149565d00c0946d73dba82d2"
+    },
+    {
+      "path": "specs/update_catalog.schema.json",
+      "sha256": "48fd399e14842060a925b6fcad737f9418c0f78b1c6302f82769d59f1ef22374"
     },
     {
       "path": "specs/update_download_job.schema.json",
