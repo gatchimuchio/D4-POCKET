@@ -24,7 +24,13 @@ class ExportClient {
     required Map<String, Object?> composeManifest,
     String distributionChannel = 'local',
     List<String>? optionalModuleIds,
+    String? updatePublicKeyDerHex,
+    String? updatePackageSourceUrl,
+    String updatePackageSourceChannel = 'stable',
   }) async {
+    final updateTrustConfigured =
+        (updatePublicKeyDerHex?.trim().isNotEmpty ?? false) ||
+            (updatePackageSourceUrl?.trim().isNotEmpty ?? false);
     final response = await _transport.request(
       'GUI Shell書出し',
       payload: {
@@ -37,6 +43,16 @@ class ExportClient {
         if (optionalModuleIds != null)
           'module_selection': {
             'optional_module_ids': optionalModuleIds,
+          },
+        if (updateTrustConfigured)
+          'update_trust': {
+            'public_key_der_hex': updatePublicKeyDerHex?.trim() ?? '',
+            'package_sources': [
+              {
+                'channel': updatePackageSourceChannel,
+                'base_url': updatePackageSourceUrl?.trim() ?? '',
+              },
+            ],
           },
       },
     );

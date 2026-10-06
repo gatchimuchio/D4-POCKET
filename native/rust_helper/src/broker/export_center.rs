@@ -8,6 +8,7 @@
 use super::compose_center;
 use super::dialogue::識別子生成;
 use super::protocol::{Broker, BrokerResponse, BrokerStatus, OwnerConfirmationSource, EVIDENCE_SOURCE_INTERNAL_STATE};
+use super::update_center::{self, UpdatePackageSource, UpdateTrust};
 use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
 use cap_std::fs::{Dir, OpenOptions};
 use serde::Deserialize;
@@ -55,6 +56,14 @@ struct ExportRequest {
     export_mode: String,
     distribution_channel: String,
     module_selection: Option<ModuleSelection>,
+    update_trust: Option<ExportUpdateTrustInput>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ExportUpdateTrustInput {
+    public_key_der_hex: String,
+    package_sources: Vec<UpdatePackageSource>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -93,7 +102,14 @@ pub(crate) struct OwnerConfirmationSummary {
     pub export_id: String,
     pub distribution_channel: String,
     pub optional_module_count: usize,
+    pub update_trust: Option<UpdateTrustConfirmationSummary>,
     pub payload_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct UpdateTrustConfirmationSummary {
+    pub public_key_fingerprint: String,
+    pub package_source_details: Vec<String>,
 }
 
 /// Owner dialogへ渡す表示情報をBrokerと同じContract検査から作る。
@@ -118,11 +134,22 @@ pub(crate) fn owner_confirmation_summary(payload: &Value, payload_hash: &str) ->
         .as_array()
         .ok_or_else(|| "書出しModule計画を確認できない".to_string())?
         .len();
+    let update_trust = normalize_update_trust(request.update_trust.as_ref())?.map(|trust| {
+        UpdateTrustConfirmationSummary {
+            public_key_fingerprint: trust.public_key_fingerprint,
+            package_source_details: trust
+                .package_sources
+                .iter()
+                .map(|source| format!("{}: {}", source.channel, source.base_url))
+                .collect(),
+        }
+    });
     Ok(OwnerConfirmationSummary {
         display_name: safe_display_name,
         export_id: request.export_id,
         distribution_channel: request.distribution_channel,
         optional_module_count,
+        update_trust,
         payload_hash: payload_hash.to_string(),
     })
 }
@@ -152,6 +179,19 @@ pub(super) fn export(
                 request_id,
                 OPERATION,
                 "gui_shell_export_invalid",
+                &reason,
+                true,
+                payload_hash,
+            )
+        }
+    };
+    let update_trust = match normalize_update_trust(request.update_trust.as_ref()) {
+        Ok(trust) => trust,
+        Err(reason) => {
+            return broker.reject_with_payload_hash(
+                request_id,
+                OPERATION,
+                "gui_shell_export_update_trust_invalid",
                 &reason,
                 true,
                 payload_hash,
@@ -241,12 +281,28 @@ pub(super) fn export(
         "inheritance_policy": {"authority": "none", "permission": "none", "approval": "none", "credential": "none", "audit_chain": "none"},
         "module_plan": module_plan.receipt
     });
-    let manifest_document = json!({
+    let mut manifest_document = json!({
         "version": VERSION,
         "product": "D4 Pocket",
         "export_id": request.export_id.clone(),
         "manifest": export_manifest
     });
+    if let Some(update_trust) = update_trust {
+        let normalized = match serde_json::to_value(update_trust) {
+            Ok(value) => value,
+            Err(_) => {
+                return broker.reject_with_payload_hash(
+                    request_id,
+                    OPERATION,
+                    "gui_shell_export_serialize_failed",
+                    "更新trust設定を正規化できない",
+                    true,
+                    payload_hash,
+                )
+            }
+        };
+        manifest_document["update_trust"] = normalized;
+    }
     let manifest_bytes = match serde_json::to_vec_pretty(&manifest_document) {
         Ok(mut bytes) => {
             bytes.push(b'\n');
@@ -689,7 +745,44 @@ fn catalog_matches_fixed_modules(catalog: &ModuleCatalog) -> bool {
         && configured_required_ids.as_slice() == REQUIRED_MODULE_IDS.as_slice()
 }
 
+fn normalize_update_trust(
+    input: Option<&ExportUpdateTrustInput>,
+) -> Result<Option<UpdateTrust>, String> {
+    let Some(input) = input else {
+        return Ok(None);
+    };
+    if input.public_key_der_hex.len() != 88
+        || !input
+            .public_key_der_hex
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        || input.package_sources.is_empty()
+    {
+        return Err("更新trustは小文字hexのEd25519公開鍵と配布元が必要".to_string());
+    }
+    let der = hex::decode(&input.public_key_der_hex)
+        .map_err(|_| "更新trust公開鍵の形式が不正".to_string())?;
+    let public_key = crate::checkpoint::public_key(&der)
+        .map_err(|_| "更新trustにはEd25519 SPKI公開鍵が必要".to_string())?;
+    let trust = UpdateTrust {
+        version: 2,
+        algorithm: "Ed25519".to_string(),
+        public_key_der_hex: input.public_key_der_hex.clone(),
+        public_key_fingerprint: crate::audit_hash::sha256_tagged(public_key),
+        package_sources: input.package_sources.clone(),
+    };
+    update_center::validate_trust(&trust)
+        .map_err(|_| "更新trustのchannelまたはHTTPS配布元が不正".to_string())?;
+    Ok(Some(trust))
+}
+
 fn parse_request(value: &Value) -> Result<ExportRequest, String> {
+    if value
+        .as_object()
+        .is_some_and(|object| object.contains_key("update_trust") && value["update_trust"].is_null())
+    {
+        return Err("update_trustは省略するか、有効な設定objectを指定する".to_string());
+    }
     let request: ExportRequest = serde_json::from_value(value.clone())
         .map_err(|_| "GUI Shell書出しの構造が不正または禁止fieldがある".to_string())?;
     if request.version != VERSION
@@ -716,6 +809,16 @@ mod tests {
     use super::*;
     use crate::broker::protocol::{Broker, BrokerOperation, BrokerRequestEnvelope, BrokerStatus};
     use std::fs;
+
+    fn update_trust_input() -> Value {
+        json!({
+            "public_key_der_hex": "302a300506032b6570032100d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+            "package_sources": [{
+                "channel": "stable",
+                "base_url": "https://updates.example.com/d4-pocket/stable"
+            }]
+        })
+    }
 
     fn manifest() -> Value {
         json!({
@@ -908,6 +1011,63 @@ mod tests {
 
         request_payload["module_selection"] = json!({"optional_module_ids": ["shell.unknown"]});
         assert!(owner_confirmation_summary(&request_payload, "sha256:invalid").is_err());
+    }
+
+    #[test]
+    fn 更新trustはBroker検証後にManifestへ固定しOwner確認summaryへfingerprintと配布元を示す() {
+        let mut request_payload = payload();
+        request_payload["update_trust"] = update_trust_input();
+        let summary = owner_confirmation_summary(
+            &request_payload,
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        )
+        .unwrap();
+        let trust_summary = summary.update_trust.unwrap();
+        assert_eq!(
+            trust_summary.package_source_details,
+            vec!["stable: https://updates.example.com/d4-pocket/stable"]
+        );
+        assert!(trust_summary.public_key_fingerprint.starts_with("sha256:"));
+
+        let mut broker = Broker::new("session-1");
+        let export_root = configure_export_root(&mut broker, "update-trust");
+        let request_json = desktop_owner_request(&mut broker, request_payload);
+        let response = broker.desktop_owner_operation_json(&request_json);
+        assert_eq!(response.status, BrokerStatus::Accepted);
+        let body = response.body.unwrap();
+        let manifest_path = body["manifest_file"]["path"].as_str().unwrap();
+        let manifest: Value =
+            serde_json::from_slice(&fs::read(manifest_path).unwrap()).unwrap();
+        assert_eq!(manifest["update_trust"]["版"], 2);
+        assert_eq!(manifest["update_trust"]["algorithm"], "Ed25519");
+        assert_eq!(
+            manifest["update_trust"]["public_key_fingerprint"],
+            trust_summary.public_key_fingerprint
+        );
+        assert_eq!(
+            manifest["update_trust"]["package_sources"][0]["base_url"],
+            "https://updates.example.com/d4-pocket/stable"
+        );
+        drop(broker);
+        fs::remove_dir_all(export_root).unwrap();
+    }
+
+    #[test]
+    fn 不正な更新trustと危険な配布元はExport前に拒否する() {
+        let mut null_trust = payload();
+        null_trust["update_trust"] = Value::Null;
+        assert!(owner_confirmation_summary(&null_trust, "sha256:invalid").is_err());
+
+        let mut malformed_key = payload();
+        malformed_key["update_trust"] = update_trust_input();
+        malformed_key["update_trust"]["public_key_der_hex"] = Value::from("not-a-key");
+        assert!(owner_confirmation_summary(&malformed_key, "sha256:invalid").is_err());
+
+        let mut unsafe_source = payload();
+        unsafe_source["update_trust"] = update_trust_input();
+        unsafe_source["update_trust"]["package_sources"][0]["base_url"] =
+            Value::from("https://user@updates.example.com/d4-pocket/stable");
+        assert!(owner_confirmation_summary(&unsafe_source, "sha256:invalid").is_err());
     }
 
     #[test]

@@ -48,6 +48,47 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('更新trustの片方だけではExport要求を送らない', (tester) async {
+    tester.view.physicalSize = const Size(800, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final transport = _ComposeScreenTransport();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SettingsScreen(
+            client: ShellCoreClient.mock(transport: transport),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final trustPanel = find.byKey(
+      const ValueKey('export-update-trust-advanced'),
+    );
+    await tester.ensureVisible(trustPanel);
+    await tester.tap(trustPanel);
+    await tester.pumpAndSettle();
+    await _enter(
+      tester,
+      'export-update-public-key',
+      '302a300506032b6570032100d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a',
+    );
+    await _tap(tester, 'compose-export-button');
+
+    expect(
+      transport.requests
+          .where((request) => request['operation'] == 'GUI Shell書出し'),
+      isEmpty,
+    );
+    expect(
+      find.text('更新trustを設定する場合は、公開鍵とHTTPS配布元の両方を入力してください。'),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'Compose画面が選択をManifest、Preview、Module plan、編集提案へつなぐ',
     (tester) async {
@@ -121,6 +162,22 @@ void main() {
       await tester.tap(historyModule);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull, reason: 'Module選択');
+      final trustPanel = find.byKey(
+        const ValueKey('export-update-trust-advanced'),
+      );
+      await tester.ensureVisible(trustPanel);
+      await tester.tap(trustPanel);
+      await tester.pumpAndSettle();
+      await _enter(
+        tester,
+        'export-update-public-key',
+        '302a300506032b6570032100d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a',
+      );
+      await _enter(
+        tester,
+        'export-update-source',
+        'https://updates.example.com/d4-pocket/stable',
+      );
       await _tap(tester, 'compose-export-button');
       final export = transport.lastPayload('GUI Shell書出し');
       final moduleSelection = export['module_selection'] as Map;
@@ -128,6 +185,16 @@ void main() {
           moduleSelection['optional_module_ids'] as List<dynamic>;
       expect(selectedModules, isNot(contains('shell.history')));
       expect(export['compose_manifest'], compose);
+      expect(export['update_trust'], {
+        'public_key_der_hex':
+            '302a300506032b6570032100d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a',
+        'package_sources': [
+          {
+            'channel': 'stable',
+            'base_url': 'https://updates.example.com/d4-pocket/stable',
+          },
+        ],
+      });
 
       await _tap(tester, 'compose-ai-edit-button');
       final proposal = transport.lastPayload('GUI Shell編集提案');

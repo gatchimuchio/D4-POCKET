@@ -38,6 +38,31 @@ void main() {
     expect(receipt['permission_inherited'], isFalse);
   });
 
+  test('Exportは公開更新trustだけをBrokerへ送り秘密鍵欄を作らない', () async {
+    final transport = _FakeExportTransport({
+      'status': 'accepted',
+      'body': {'authority_strip': true},
+    });
+    await ExportClient(transport).export(
+      exportId: 'export-settings',
+      composeManifest: const {'version': 1, 'output_mode': 'manifest_only'},
+      updatePublicKeyDerHex:
+          '302a300506032b6570032100d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a',
+      updatePackageSourceUrl: 'https://updates.example.com/d4-pocket/stable',
+      updatePackageSourceChannel: 'stable',
+    );
+
+    final trust = transport.payload?['update_trust'] as Map;
+    expect(trust['public_key_der_hex'], startsWith('302a300506032b6570032100'));
+    expect(trust['package_sources'], [
+      {
+        'channel': 'stable',
+        'base_url': 'https://updates.example.com/d4-pocket/stable',
+      },
+    ]);
+    expect(trust.containsKey('private_key'), isFalse);
+  });
+
   test('GUI Shell Windows書出しの拒否を成功へ昇格しない', () async {
     final transport = _FakeExportTransport({
       'status': 'rejected',

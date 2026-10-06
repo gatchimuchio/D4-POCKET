@@ -1,5 +1,7 @@
 # GUI Shell ロードマップ
 
+2026-10-06 rev5 P11追補: SettingsのWindows Export詳細欄から製品Update用Ed25519公開鍵／HTTPS配布元を任意設定できるようにし、Broker validation、native Owner確認表示、Receipt hash結合Manifestへ接続した。秘密鍵は扱わず、未設定時の製品Updateはfail-closed。Rust対象16件・自動native Owner確認E2E 1件・Flutter対象7件、Schema 161、Conformance 236、Release Gate、Windows Debug buildがPASS。Analyzerは先行実行でNo issuesを確認したが、再試行はAnalysis Server shutdown時のOS error 1920で未完了。Windows Debug buildは追跡外CMake cacheの旧`Z:/apps/...`参照を同一checkoutへの一時drive aliasで解消して完了し、MSB8028 warning 3件を記録。aliasは解除済み。設定したManifestからの製品Release build、実配布、installed updateは未実証。InstallerとP11は未完了。
+
 2026-10-06 rev5 P11追補: 欠損した固定root Bootstrapper／固定Start Menu shortcutだけを復元する限定Repairに続き、有効版payload内の欠損fileを同一の現在trust済みpackageから補う限定Repairを既存Broker applyへ接続した。既存fileの内容不一致は拒否し、上書きしない。Cargo focused integration test 1件、Flutter対象test 13件、変更Dart解析、Windows Debug build PASS（MSB8029 Temp中間directory warning）。証拠はBroker／UI fixtureとcompileであり、全payload・破損active recordの復旧やinstalled productの連続LIVE_RUNTIMEを示さない。完全Repair、Installer、installed end-to-end、crash／電源断Recoveryは未成立。P11はOPENを維持し、現行詳細は`docs/REV5_PRODUCT_PROGRESS.md`を参照する。
 
 状態: D4 Pocket / GUI-Shell統合rev5 Product-First工程で開発中。現行の製品phaseと実装状況は`docs/REV5_PRODUCT_PROGRESS.md`、最終統合後へ送る検査項目は`docs/FINAL_QA_QUEUE.md`を正本とする。旧R2 Agent TaskはPRODUCT BUILD上`FUNCTIONALLY ESTABLISHED`、rev5 P1は`DONE FOR PRODUCT BUILD`であり、R2-A〜Hの深掘りを次phase開始gateにしない。Technical Completeおよび正式releaseは未成立。

@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "0044ca3d48768683e7cf093a53f29419b2916efa45f3a324f1193d780f553b2b"
+      "sha256": "a4f21b72aa4903af8a5c40d3905dec74557dfa71767a303c041bfd9be986ba34"
     },
     {
       "path": "SECURITY.md",
@@ -288,7 +288,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/settings.dart",
-      "sha256": "9aba24f8673a3ba463881f987e37539c4a7e758404f7958c59717f7c9590d774"
+      "sha256": "84053a79c6bd1634321c1302eeafb416aa82f52e66520684d7ae452155d2537a"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/setup_doctor.dart",
@@ -348,7 +348,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/export_client.dart",
-      "sha256": "12cab7f6e62d39bba62d36a62389e78a3d5a5bc816cee3ef519a159a6c8027e0"
+      "sha256": "d6705c0b1eba49f47a85b06b775e6db511c3948bb3a692210eb2074daf7fce46"
     },
     {
       "path": "apps/desktop_flutter/lib/services/global_search_index.dart",
@@ -600,7 +600,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/export_client_test.dart",
-      "sha256": "4b530ab9900e5cba65c2ab2ee43b7dbfeba262a8bcbf5e91b82136561d2b58e2"
+      "sha256": "eead91ed17b3517ef66abf76fcd15f1bee6cdb2d6063a2700b469423527a7d42"
     },
     {
       "path": "apps/desktop_flutter/test/global_search_index_test.dart",
@@ -648,7 +648,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/settings_compose_test.dart",
-      "sha256": "32bfc173325d0beda2df386b5eb67c783eccb0f0afdf67031c3cff9fd5332011"
+      "sha256": "d7d21f8569de3182816cbe0d05833b6f8d3c239192acb4b8d7cfb5102d0640b1"
     },
     {
       "path": "apps/desktop_flutter/test/settings_install_flow_test.dart",
@@ -1244,7 +1244,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "f89f456ae6482435fcc921c888212084625e4ebccbcfd8686d198aab859e8589"
+      "sha256": "3ea8465e4487e63a6b70875b557127341f4378563667194428e9e7e4ca0b4d2a"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1428,7 +1428,7 @@
     },
     {
       "path": "docs/specs/gui-shell-export.md",
-      "sha256": "77ef9fefa78640eca75e798fa1f377447488f1232d0045e9d13f25954ac96ea5"
+      "sha256": "375fee5c6bb4f443920fa1478f4c33a15e90dc524a8eb6b7b8967425598b245d"
     },
     {
       "path": "docs/specs/gui-shell-module-pruning.md",
@@ -3280,7 +3280,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/export_center.rs",
-      "sha256": "6f431e54261230a2dd2a51d1c2992c6b18f762d2fa9fc7ac7f69a497ac301d7b"
+      "sha256": "9467d1abec04fa6c30b3049c3efed702e716f4f9d04b15333a4fc48e45c60c7e"
     },
     {
       "path": "native/rust_helper/src/broker/history_access.rs",
@@ -3352,7 +3352,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "5bc4998c5a9cb1f7b8ce967871122d1943611825021eea83e252d8c35382bf86"
+      "sha256": "41e858d549b1d429eb5f49cbbe3d341c1fd8fc89f345e9d965668ca88cf68f1f"
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
@@ -3380,7 +3380,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "0b6a0ea5c00b085e733a7c2d5d63730a6aa2fe630553f136c00971a6010f3b10"
+      "sha256": "e8b49d992959398c11f105e2c435c3ffecbb228023ec22e3fb0d1502204ab2cf"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -4236,7 +4236,7 @@
     },
     {
       "path": "specs/gui_shell_export.schema.json",
-      "sha256": "b6ff71f67988f36295eb99187db4c58ecf676e0ae5ab65d2fed26b307ebe8063"
+      "sha256": "ea9934117b97a6bda292f0236d3df5c663f02fa4260543e2ae755a764b392b88"
     },
     {
       "path": "specs/gui_shell_export_manifest.schema.json",

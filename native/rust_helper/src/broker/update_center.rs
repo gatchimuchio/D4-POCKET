@@ -3834,7 +3834,7 @@ fn validate_record(record: &UpdateRecord) -> Result<(), String> {
     Ok(())
 }
 
-fn validate_trust(trust: &UpdateTrust) -> Result<(), String> {
+pub(super) fn validate_trust(trust: &UpdateTrust) -> Result<(), String> {
     let mut channels = BTreeSet::new();
     let sources_valid = match trust.version {
         1 => trust.package_sources.is_empty(),

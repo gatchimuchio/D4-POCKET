@@ -2291,11 +2291,19 @@ fn owner_confirmation_text_for_identity(
                 ),
             };
             format!(
-                "このGUI Shell構成のWindows向け独立Manifest file作成を許可しますか？\n\nアプリ名: {}\nExport ID: {}\n配布channel: {}\n選択任意Module数: {}\n保存先: {}\n\nこの操作はBroker監査へ記録されます。実行可能App、Module除去、build、Installer、署名は作成しません。Credential、Permission、Approval、Audit chainは継承しません。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
+                "このGUI Shell構成のWindows向け独立Manifest file作成を許可しますか？\n\nアプリ名: {}\nExport ID: {}\n配布channel: {}\n選択任意Module数: {}\n更新trust: {}\n保存先: {}\n\nこの操作はBroker監査へ記録されます。実行可能App、Module除去、build、Installer、署名は作成しません。Credential、Permission、Approval、Audit chainは継承しません。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
                 summary.display_name,
                 summary.export_id,
                 summary.distribution_channel,
                 summary.optional_module_count,
+                summary.update_trust.as_ref().map_or_else(
+                    || "未設定（製品Updateはfail-closed）".to_string(),
+                    |trust| format!(
+                        "Ed25519公開鍵fingerprint: {} / HTTPS配布元: {}",
+                        trust.public_key_fingerprint,
+                        trust.package_source_details.join("; ")
+                    )
+                ),
                 export_path,
                 summary.payload_hash
             )
@@ -3736,6 +3744,8 @@ mod tests {
                     "export_id": summary.export_id,
                     "distribution_channel": summary.distribution_channel,
                     "optional_module_count": summary.optional_module_count,
+                    "update_trust_fingerprint": summary.update_trust.as_ref().map(|trust| trust.public_key_fingerprint.clone()),
+                    "update_package_sources": summary.update_trust.as_ref().map(|trust| trust.package_source_details.clone()).unwrap_or_default(),
                     "payload_hash": summary.payload_hash
                 },
                 "confirm": confirm
@@ -4409,6 +4419,8 @@ mod tests {
                 export_id: String,
                 distribution_channel: String,
                 optional_module_count: usize,
+                update_trust_fingerprint: Option<String>,
+                update_package_sources: Vec<String>,
                 payload_hash: String,
             },
             AgentTaskWorkspacePermission {
@@ -4520,12 +4532,20 @@ mod tests {
                 export_id,
                 distribution_channel,
                 optional_module_count,
+                update_trust_fingerprint,
+                update_package_sources,
                 payload_hash,
             } => DesktopOwnerOperationSummary::GuiShellExport(ExportConfirmationSummary {
                 display_name,
                 export_id,
                 distribution_channel,
                 optional_module_count,
+                update_trust: update_trust_fingerprint.map(|public_key_fingerprint| {
+                    crate::broker::export_center::UpdateTrustConfirmationSummary {
+                        public_key_fingerprint,
+                        package_source_details: update_package_sources,
+                    }
+                }),
                 payload_hash,
             }),
             TestSummary::AgentTaskWorkspacePermission {
@@ -6482,6 +6502,12 @@ mod tests {
             export_id: "export-test".into(),
             distribution_channel: "local".into(),
             optional_module_count: 1,
+            update_trust: Some(crate::broker::export_center::UpdateTrustConfirmationSummary {
+                public_key_fingerprint: format!("sha256:{}", "b".repeat(64)),
+                package_source_details: vec![
+                    "stable: https://updates.example.com/d4-pocket/stable".into(),
+                ],
+            }),
             payload_hash: format!("sha256:{}", "a".repeat(64)),
         });
         let text = owner_confirmation_text_for_identity(&summary, Some(&identity));
@@ -6490,6 +6516,13 @@ mod tests {
             identity.app_id, identity.audit_store_id
         )));
         assert!(!text.contains(r"%LOCALAPPDATA%\GUI-Shell\broker\desktop\exports"));
+        assert!(text.contains(&format!(
+            "Ed25519公開鍵fingerprint: sha256:{}",
+            "b".repeat(64)
+        )));
+        assert!(text.contains(
+            "HTTPS配布元: stable: https://updates.example.com/d4-pocket/stable"
+        ));
         assert!(owner_confirmation_text(&summary)
             .contains(r"%LOCALAPPDATA%\GUI-Shell\broker\desktop\exports"));
     }

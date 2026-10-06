@@ -24,6 +24,22 @@
           "items": {"enum": ["shell.setup_doctor", "shell.history", "shell.evaluation_lab", "shell.host_capabilities", "shell.notifications", "shell.observability", "shell.trace_inspector", "shell.host_operations"]}
         }
       }
+    },
+    "update_trust": {
+      "type": "object",
+      "required": ["public_key_der_hex", "package_sources"],
+      "additionalProperties": false,
+      "properties": {
+        "public_key_der_hex": { "type": "string", "pattern": "^[a-f0-9]{88}$" },
+        "package_sources": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": {
+            "$ref": "update_trust.schema.json#/properties/package_sources/items"
+          }
+        }
+      }
     }
   }
 }

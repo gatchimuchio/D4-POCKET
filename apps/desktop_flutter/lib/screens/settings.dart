@@ -83,6 +83,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       TextEditingController();
   final TextEditingController _composeCapabilityRequirementsController =
       TextEditingController(text: 'runtime.read\nagent.metadata');
+  final TextEditingController _exportUpdatePublicKeyController =
+      TextEditingController();
+  final TextEditingController _exportUpdateSourceController =
+      TextEditingController();
+  String _exportUpdateChannel = 'stable';
   String _composeThemeMode = 'system';
   String _composeDensity = 'comfortable';
   String _composeContentVisibility = 'summary';
@@ -104,6 +109,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _composeToolIdsController.dispose();
     _composeMcpIdsController.dispose();
     _composeCapabilityRequirementsController.dispose();
+    _exportUpdatePublicKeyController.dispose();
+    _exportUpdateSourceController.dispose();
     _editInstructionController.dispose();
     _editTargetPathController.dispose();
     super.dispose();
@@ -501,6 +508,63 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const Text(
               '切出し対象の任意画面をManifest計画へ記録できます。権限・承認・監査・復旧などの必須境界は常に保持します。Owner確認後、独立Manifest fileを固定保存先へ作成します。画面選択は計画だけで、実binaryからの除去や実行可能App、build、Installer、署名は行いません。Credential・Permission・Approval・Audit chainは継承しません。キャンセルはBrokerに拒否として監査記録されます。'),
           const SizedBox(height: 8),
+          ExpansionTile(
+            key: const ValueKey('export-update-trust-advanced'),
+            tilePadding: EdgeInsets.zero,
+            title: const Text('更新署名trust（上級者向け）'),
+            subtitle: const Text('空欄なら未構成。公開鍵とHTTPS配布元はnative Owner確認へ表示します。'),
+            children: [
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                    '秘密署名鍵は入力しません。公開鍵trustはExport Manifestと製品Brokerへ固定されます。'),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                key: const ValueKey('export-update-public-key'),
+                controller: _exportUpdatePublicKeyController,
+                minLines: 1,
+                maxLines: 2,
+                autocorrect: false,
+                enableSuggestions: false,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  labelText: 'Ed25519 SPKI公開鍵（DER、小文字hex）',
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                key: const ValueKey('export-update-source'),
+                controller: _exportUpdateSourceController,
+                autocorrect: false,
+                enableSuggestions: false,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  labelText: 'HTTPS配布元base URL',
+                  hintText: 'https://updates.example.com/d4-pocket/stable',
+                ),
+              ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                key: const ValueKey('export-update-channel'),
+                initialValue: _exportUpdateChannel,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  labelText: '配布channel',
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'stable', child: Text('stable')),
+                  DropdownMenuItem(value: 'beta', child: Text('beta')),
+                  DropdownMenuItem(value: 'nightly', child: Text('nightly')),
+                ],
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() => _exportUpdateChannel = value);
+                  }
+                },
+              ),
+            ],
+          ),
           Text('任意画面', style: Theme.of(context).textTheme.titleSmall),
           for (final entry in guiShellOptionalExportModules.entries)
             CheckboxListTile(
@@ -548,6 +612,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _runExport(ExportClient client) async {
+    final updatePublicKeyDerHex = _exportUpdatePublicKeyController.text.trim();
+    final updatePackageSourceUrl = _exportUpdateSourceController.text.trim();
+    if (updatePublicKeyDerHex.isNotEmpty != updatePackageSourceUrl.isNotEmpty) {
+      _setExportMessage('更新trustを設定する場合は、公開鍵とHTTPS配布元の両方を入力してください。');
+      return;
+    }
     setState(() {
       _exportInProgress = true;
       _exportMessage = 'Rust起動器の確認画面で許可またはキャンセルしてください。';
@@ -557,6 +627,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         exportId: 'settings-windows-export',
         composeManifest: _composeManifest(),
         optionalModuleIds: _selectedExportModules.toList()..sort(),
+        updatePublicKeyDerHex: updatePublicKeyDerHex,
+        updatePackageSourceUrl: updatePackageSourceUrl,
+        updatePackageSourceChannel: _exportUpdateChannel,
       );
       _exportReceipt = exportJson(receipt);
       final manifestFile = receipt['manifest_file'];
