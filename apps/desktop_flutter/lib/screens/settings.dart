@@ -746,13 +746,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ? Map<String, Object?>.from(body['download_job']! as Map)
               : null;
           final downloadAvailable = body['download実行'] == 'available';
+          final rollbackState = body['rollback状態'] is Map
+              ? Map<String, Object?>.from(body['rollback状態']! as Map)
+              : null;
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('更新センター', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 4),
               Text(
-                '信頼設定=${body['署名信頼設定'] ?? 'unknown'}。downloadは直接HTTPS接続のみ（system proxy・自動retryなし）で、Rust Desktopの確認が必要です。適用要求は署名済みpackageを固定version directoryへ未起動状態で展開します。有効版切替は別のRust Desktop確認後にpackageとstage全体を再検証し、有効版recordと固定root Bootstrapperを指すStart Menu shortcutを登録します。切替だけではprocessを起動せず、旧版削除やrollbackもしません。',
+                '信頼設定=${body['署名信頼設定'] ?? 'unknown'}。downloadは直接HTTPS接続のみ（system proxy・自動retryなし）で、Rust Desktopの確認が必要です。適用要求は署名済みpackageを固定version directoryへ未起動状態で展開します。有効版切替は別のRust Desktop確認後にpackageとstage全体を再検証し、有効版recordと固定root Bootstrapperを指すStart Menu shortcutを登録します。切替成功後は検証済みのdownload packageだけをBroker cacheから除去し、stageと旧versionは保持します。rollbackはBroker記録の直前版へ有効版recordだけを戻し、次回起動時に適用します。',
               ),
               if (downloadJob != null) ...[
                 const SizedBox(height: 4),
@@ -781,6 +784,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     update,
                     downloadAvailable: downloadAvailable,
                     downloadJob: downloadJob,
+                    rollbackState: rollbackState,
                   ),
             ],
           );
@@ -794,6 +798,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     Map<String, Object?> update, {
     required bool downloadAvailable,
     required Map<String, Object?>? downloadJob,
+    required Map<String, Object?>? rollbackState,
   }) {
     final updateId = update['更新ID']?.toString() ?? '';
     final candidateHash = update['候補hash']?.toString() ?? '';
@@ -819,10 +824,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
         sourceConfigured &&
         !downloadBusy &&
         !alreadyDownloaded;
-    final canRequestActivation = update['署名状態'] == 'verified' &&
+    final activeVersion = rollbackState?['現在版'];
+    final rollbackVersion = rollbackState?['対象版'];
+    final isAlreadyActive = activeVersion is Map &&
+        activeVersion['更新ID'] == updateId &&
+        activeVersion['候補hash'] == candidateHash;
+    final isRollbackTarget = rollbackVersion is Map &&
+        rollbackVersion['更新ID'] == updateId &&
+        rollbackVersion['候補hash'] == candidateHash;
+    final canRequestActivation = !isAlreadyActive &&
+        !isRollbackTarget &&
+        update['署名状態'] == 'verified' &&
         RegExp(r'^[a-f0-9]{64}$').hasMatch(packageSha256 ?? '') &&
         packageSize is num &&
         packageSize > 0;
+    final rollbackCurrent = rollbackState?['現在版'];
+    final canRollback = rollbackState?['状態'] == 'available' &&
+        rollbackCurrent is Map &&
+        rollbackCurrent['更新ID'] == updateId &&
+        rollbackCurrent['候補hash'] == candidateHash &&
+        update['署名状態'] == 'verified' &&
+        update['rollback可能'] == true;
     return ListTile(
       contentPadding: EdgeInsets.zero,
       title: Text('${update['提供版'] ?? ''} ($updateId)'),
@@ -866,10 +888,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         updateId: updateId,
                         candidateHash: candidateHash,
                       ),
-                      '有効版recordを切り替え、固定root Bootstrapperを指すStart Menu shortcutを登録しました。次回の固定root起動時に選択版を使用します。process起動・旧版削除・rollbackは行っていません。',
+                      '有効版recordを切り替え、固定root Bootstrapperを指すStart Menu shortcutを登録しました。検証済みdownload package cacheだけを除去し、stageと旧版は保持しています。次回の固定root起動時に選択版を使用します。process起動は行っていません。',
                     )
                 : null,
-            child: const Text('有効版へ切替'),
+            child: Text(isAlreadyActive ? '現在の有効版' : '有効版へ切替'),
           ),
           TextButton(
             onPressed: () => _runUpdateRequest(
@@ -885,16 +907,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             child: const Text('延期'),
           ),
-          if (update['rollback可能'] == true)
+          if (canRollback)
             TextButton(
               onPressed: () => _runUpdateRequest(
                 () => client.requestRollback(
                   updateId: updateId,
                   candidateHash: candidateHash,
                 ),
-                'rollback要求を記録しました（実行はsuspended）。',
+                '直前に有効化した版へ戻しました。有効版切替は次回の固定root起動時に反映されます。process起動・file削除はしていません。',
               ),
-              child: const Text('rollback要求'),
+              child: const Text('直前版へ戻す'),
             ),
         ],
       ),
@@ -916,8 +938,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final body = await request();
       final state = body['実行状態']?.toString();
-      _setUpdateMessage(
-          state == 'suspended' ? '$success Brokerは実行を保留しました。' : success);
+      if (body['download package cleanup'] == 'pending') {
+        _setUpdateMessage(
+          '$success package cache清掃は保留中です。stageと有効版recordは維持しています。',
+        );
+      } else {
+        _setUpdateMessage(
+          state == 'suspended' ? '$success Brokerは実行を保留しました。' : success,
+        );
+      }
     } catch (error) {
       _setUpdateMessage('更新操作失敗: $error');
     }

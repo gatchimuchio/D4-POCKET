@@ -1,6 +1,6 @@
 # 更新センター
 
-状態: C12 download、署名済みpackageの未起動version staging、および別Owner確認によるactive version record／Start Menu shortcut切替をBroker／native Owner経路へ接続。process起動／rollbackは未接続。
+状態: C12 download、署名済みpackageの未起動version staging、別Owner確認によるactive version record／Start Menu shortcut切替、およびBrokerが記録した直前版へのRollbackをBroker／native Owner経路へ接続。process起動は行わない。RollbackはBroker fixtureで成立し、installed product経路の証拠は別途必要。
 
 更新センターは、更新候補の表示、Broker所有信頼設定によるEd25519署名検査、更新適用の要求、延期、rollback要求を扱う。更新候補自身の公開鍵、MCP metadata、Profile、履歴、UI stateは信頼源ではない。
 
@@ -42,9 +42,17 @@ Brokerは永続Auditを利用できる場合に限り、展開前の`queued`を�
 
 ### 有効版recordの独立切替
 
-`更新有効版切替要求`は`更新適用要求`と別operation・別native Owner確認である。Brokerは現在の候補署名／trust、package digest／byte長、製品identity、Known Folder由来の固定導入先、Start Menu先、永続Auditを再検証し、既存stageを署名packageとread-onlyで全byte／inventory照合する。完全一致時だけ、固定root Bootstrapperの初回配置（未配置の場合）と`active_version.json`の一時file同期後の同一root内renameを行い、そのBootstrapperを指す現在利用者向けStart Menu shortcutをcreate-onlyで登録する。同じtargetのshortcutは冪等に再利用し、別targetとの競合は上書きせず拒否する。stage操作の確認を切替許可として再利用しない。
+`更新有効版切替要求`は`更新適用要求`と別operation・別native Owner確認である。Brokerは現在の候補署名／trust、package digest／byte長、製品identity、Known Folder由来の固定導入先、Start Menu先、永続Auditを再検証し、既存stageを署名packageとread-onlyで全byte／inventory照合する。完全一致時だけ、固定root Bootstrapperの初回配置（未配置の場合）と`active_version.json`の一時file同期後の同一root内renameを行い、そのBootstrapperを指す現在利用者向けStart Menu shortcutをcreate-onlyで登録する。同じtargetのshortcutは冪等に再利用し、別targetとの競合は上書きせず拒否する。切替完了Audit後は、確認画面に明示した上で、同一content-addressed package cache fileを期待byte長・SHA-256とfile identity照合後に限り除去する。展開済みstage、現行版、rollback用旧版は削除しない。清掃失敗または事前Audit失敗時はpackageを保持してpendingとして返す。stage操作の確認を切替許可として再利用しない。
 
-応答は`active_version_recorded`と`Start Menu=registered`であり、process起動、旧版削除、rollbackは行わない。次回の固定root Bootstrapper起動が選択版を再検証して起動する契約への接続である。現在の証拠はBroker Rust fixtureでのactive record／shortcut登録、同一target再試行、競合非上書きとBootstrapper reader試験までに限られる。installed product上の次回起動、Installer／Uninstaller、実配布元download連結、Rollbackは未成立であり、P11を閉じない。
+応答は`active_version_recorded`と`Start Menu=registered`であり、process起動、旧版削除は行わない。次回の固定root Bootstrapper起動が選択版を再検証して起動する契約への接続である。現在の証拠はBroker Rust fixtureでのactive record／shortcut登録、同一target再試行、競合非上書きとBootstrapper reader試験までに限られる。installed product上の次回起動、Installer／Uninstaller、実配布元download連結、installed product経路のRollbackは未成立であり、P11を閉じない。
+
+### Broker記録の直前版へのRollback
+
+有効版recordは現行版と、直前に別途Owner確認で有効化された一版だけを保持する。各descriptorは更新ID・現在trustで再検証する候補hash・版・署名package hash・stage内launcher／Product Manifest hashへ結合する。旧形式recordに候補結合がない場合は起動互換を維持するが、そのrecordをrollback先として扱わない。
+
+`更新rollback要求`は現在版候補を要求識別子として使い、Brokerがactive recordから直前版を導出する。Rust Desktop起動器はBrokerの一覧から現行版と対象版を取り直してnative Owner確認へ表示する。Brokerは実行直前にOwner確認hash、現在版record、現行・対象候補の現在trust／署名hash、App／Audit identity、Known Folder固定root、両stageのhashを再照合する。対象が欠落・未知・staleならfail-closedで拒否する。成功時はAudit intent確定後に単一active recordを同一root内renameで切り替え、前版／現行版を一世代toggle可能な形で保持する。
+
+Rollbackは有効版recordだけを変更する。process起動、実行中processの変更、stage／package／旧版の削除、Start Menu shortcutの変更を行わず、選択版は次回の固定root Bootstrapper起動時に使われる。開始・完了／失敗をAuditし、native Owner確認を更新stage／有効化の確認と共有しない。現状の証拠はRust Broker／Bootstrapper fixtureとdesktop native-confirmation境界までであり、正式installed product／実配布元連結のLIVE_RUNTIME証拠ではない。
 
 Flutterは一覧表示と要求送信だけを担当し、filesystem、process、network、credential、privileged IPCを直接扱わない。
 
@@ -54,7 +62,7 @@ Flutterは一覧表示と要求送信だけを担当し、filesystem、process�
 - Broker所有trustによるEd25519検証、署名対象の正本byte一致、package全体のSHA-256・正確なbyte長への署名結合
 - 更新一覧の取得元projectionが現在trustで検証済みの候補とBroker所有sourceだけから導出され、未設定・未適格候補にURLを返さないこと
 - 信頼設定未構成、署名不正、現在trust変更、永続候補content／hash改変、未知field、malformed stateのfail-closed
-- 更新候補の永続化・再読込、延期のAudit、download／applyのnative Owner境界、署名packageのversion staging、rollbackのsuspended応答
+- 更新候補の永続化・再読込、延期のAudit、download／apply／activation／rollbackの独立native Owner境界、署名packageのversion staging、Broker記録の直前版toggleとAudit
 - Windows DNS Clientの実callback、A／AAAA応答、明示cancel、有限deadlineとtimeout後のcancel、およびcancel／期限の事前判定
 - 同一digest破損regular fileの分類、検証済みpackage後の原子的repair、非regular entry拒否、digest failure時の旧file保持、Broker `recovered` Audit
 - Broker所有update trust版1互換、版2の配布元構造・起動時検証、設定読込の上限・重複field拒否

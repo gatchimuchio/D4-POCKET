@@ -1,9 +1,9 @@
-//! C11/C12 更新センターのBroker経路。
+//! C11/C12 更新センターと、P11 Windows製品化用のBroker consumer経路。
 //!
-//! 更新候補の表示・署名検査・延期・適用要求を扱う。候補に含まれる公開鍵、
-//! metadata、Profile、履歴は信頼源にならない。署名鍵はBroker所有の永続設定
-//! だけから読み、downloadだけをnative Owner確認付きのbounded workerへ接続する。
-//! install / process / rollbackは未接続でsuspendedとする。
+//! 更新候補の表示・署名検査・延期・download・未起動版stage・有効版record切替・
+//! Broker記録に基づくrollbackを扱う。候補に含まれる公開鍵、metadata、Profile、
+//! 履歴は信頼源にならない。署名鍵はBroker所有の永続設定だけから読み、実製品への
+//! install／通常起動／installed rollback証拠は別のWindows product gateで扱う。
 #![allow(non_snake_case)]
 
 use super::protocol::{
@@ -76,6 +76,16 @@ pub(crate) struct UpdateActivationConfirmation {
     pub(crate) audit_store_id: String,
     pub(crate) version_directory: PathBuf,
     pub(crate) start_menu_shortcut_path: PathBuf,
+    pub(crate) rollback_target: Option<UpdateRollbackTargetConfirmation>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct UpdateRollbackTargetConfirmation {
+    pub(crate) update_id: String,
+    pub(crate) candidate_hash: String,
+    pub(crate) package_sha256: String,
+    pub(crate) offered_version: String,
+    pub(crate) version_directory: PathBuf,
 }
 
 #[derive(Debug, Clone)]
@@ -563,7 +573,7 @@ pub(super) fn dispatch(
             owner_confirmation,
             None,
             None,
-            None,
+            activation_confirmation,
         ),
         _ => broker.reject_with_payload_hash(
             request_id,
@@ -593,6 +603,8 @@ fn list(broker: &mut Broker, payload: &Value, request_id: &str, hash: &str) -> B
         .values()
         .map(|value| project_update_record(value, trust))
         .collect();
+    let rollback = rollback_state_projection(broker);
+    let rollback_available = rollback["状態"] == "available";
     accepted(
         broker,
         OP_LIST,
@@ -605,12 +617,101 @@ fn list(broker: &mut Broker, payload: &Value, request_id: &str, hash: &str) -> B
             "download実行": if broker.state_store.persistence_ready() { "available" } else { "suspended" },
             "download_job": broker.update_download.projection(),
             "適用実行": "suspended",
-            "rollback実行": "suspended",
+            "rollback実行": if rollback_available { "available" } else { "suspended" },
+            "rollback状態": rollback,
             "証拠種別": EVIDENCE_SOURCE_INTERNAL_STATE,
         }),
         hash,
-        "更新候補一覧を返却。実行系操作はsuspended",
+        "Brokerの現在状態から更新候補とdownload／適用／rollback可否を返却",
     )
+}
+
+fn rollback_state_projection(broker: &Broker) -> Value {
+    #[cfg(not(windows))]
+    {
+        let _ = broker;
+        return json!({"状態": "unknown", "現在版": null, "対象版": null});
+    }
+    #[cfg(windows)]
+    {
+        let Some((app_id, audit_store_id)) = broker.desktop_product_identity.as_ref() else {
+            return json!({"状態": "unknown", "現在版": null, "対象版": null});
+        };
+        #[cfg(test)]
+        let local_app_data = broker
+            .desktop_product_install_local_app_data
+            .clone()
+            .or_else(|| super::product_install::current_user_local_app_data().ok());
+        #[cfg(not(test))]
+        let local_app_data = super::product_install::current_user_local_app_data().ok();
+        let Some(local_app_data) = local_app_data else {
+            return json!({"状態": "unknown", "現在版": null, "対象版": null});
+        };
+        let snapshot = match crate::product_bootstrapper::active_version_snapshot(
+            &local_app_data,
+            app_id,
+            audit_store_id,
+        ) {
+            Ok(snapshot) => snapshot,
+            Err(error) if error.0 == "active_version_file_unavailable" => {
+                return json!({"状態": "unavailable", "現在版": null, "対象版": null});
+            }
+            Err(_) => return json!({"状態": "unknown", "現在版": null, "対象版": null}),
+        };
+        let Some(previous) = snapshot.previous else {
+            return json!({
+                "状態": "unavailable",
+                "現在版": null,
+                "対象版": null,
+            });
+        };
+        if !rollback_descriptor_matches_candidate(broker, &snapshot.current)
+            || !rollback_descriptor_matches_candidate(broker, &previous)
+        {
+            return json!({
+                "状態": "unknown",
+                "現在版": null,
+                "対象版": null,
+            });
+        }
+        json!({
+            "状態": "available",
+            "現在版": rollback_descriptor_projection(&snapshot.current),
+            "対象版": rollback_descriptor_projection(&previous),
+        })
+    }
+}
+
+#[cfg(windows)]
+fn rollback_descriptor_matches_candidate(
+    broker: &Broker,
+    descriptor: &crate::product_bootstrapper::ActiveVersionDescriptor,
+) -> bool {
+    let Some(value) = broker.updates.get(&descriptor.update_id) else {
+        return false;
+    };
+    let Ok(record) = serde_json::from_value::<UpdateRecord>(value.clone()) else {
+        return false;
+    };
+    let Ok(verified) = verify_candidate(broker, record.candidate.clone()) else {
+        return false;
+    };
+    verified.candidate_hash == descriptor.candidate_hash
+        && verified.signature_status == "verified"
+        && verified.candidate.offered_version == descriptor.product_version
+        && verified.candidate.package_sha256.as_deref()
+            == Some(descriptor.package_sha256.as_str())
+}
+
+fn rollback_descriptor_projection(
+    descriptor: &crate::product_bootstrapper::ActiveVersionDescriptor,
+) -> Value {
+    json!({
+        "更新ID": descriptor.update_id,
+        "候補hash": descriptor.candidate_hash,
+        "提供版": descriptor.product_version,
+        "package_sha256": descriptor.package_sha256,
+    })
 }
 
 fn project_update_record(value: &Value, trust: Option<&UpdateTrust>) -> Value {
@@ -1204,6 +1305,17 @@ fn execution_request(
             activation_confirmation,
         );
     }
+    if operation == OP_ROLLBACK {
+        return rollback_active_version(
+            broker,
+            &request,
+            &current_record,
+            request_id,
+            hash,
+            owner_confirmation,
+            activation_confirmation,
+        );
+    }
     suspended(
         broker,
         operation,
@@ -1211,6 +1323,430 @@ fn execution_request(
         json!({"版": VERSION, "更新ID": request.update_id, "候補hash": request.candidate_hash, "実行状態": "suspended", "復旧ID": "recover-update-execution", "証拠種別": EVIDENCE_SOURCE_INTERNAL_STATE}),
         hash,
         "外部download、install、process、rollback実行経路は未接続のためsuspended",
+    )
+}
+
+#[cfg(windows)]
+fn rollback_active_version(
+    broker: &mut Broker,
+    request: &UpdateIDRequest,
+    current_record: &UpdateRecord,
+    request_id: &str,
+    payload_hash: &str,
+    owner_confirmation: OwnerConfirmationSource,
+    confirmation: Option<&UpdateActivationConfirmation>,
+) -> BrokerResponse {
+    if owner_confirmation != OwnerConfirmationSource::DesktopNativeConfirmation {
+        return reject(
+            broker,
+            request_id,
+            OP_ROLLBACK,
+            "desktop_native_owner_confirmation_required",
+            "有効版rollbackには独立したRust Desktop native Owner確認が必要",
+            payload_hash,
+        );
+    }
+    let Some(confirmation) = confirmation else {
+        return reject(
+            broker,
+            request_id,
+            OP_ROLLBACK,
+            "update_rollback_confirmation_missing",
+            "現在版とrollback先をBroker状態から表示したnative確認記録がない",
+            payload_hash,
+        );
+    };
+    let Some(target_confirmation) = confirmation.rollback_target.as_ref() else {
+        return reject(
+            broker,
+            request_id,
+            OP_ROLLBACK,
+            "update_rollback_target_missing",
+            "rollback先のBroker確認記録がない",
+            payload_hash,
+        );
+    };
+    if !current_record.candidate.rollback_available
+        || confirmation.update_id != request.update_id
+        || confirmation.candidate_hash != request.candidate_hash
+        || confirmation.update_id != current_record.candidate.update_id
+        || confirmation.candidate_hash != current_record.candidate_hash
+        || confirmation.package_sha256
+            != current_record
+                .candidate
+                .package_sha256
+                .as_deref()
+                .unwrap_or_default()
+        || confirmation.offered_version != current_record.candidate.offered_version
+        || confirmation.payload_hash != payload_hash
+    {
+        return reject(
+            broker,
+            request_id,
+            OP_ROLLBACK,
+            "update_rollback_confirmation_stale",
+            "Owner確認後に現在候補またはpayloadが変化した",
+            payload_hash,
+        );
+    }
+    let Some((app_id, audit_store_id)) = broker.desktop_product_identity.clone() else {
+        return reject(
+            broker,
+            request_id,
+            OP_ROLLBACK,
+            "update_install_product_identity_missing",
+            "製品App／Audit Store identityを検証できないためrollbackしない",
+            payload_hash,
+        );
+    };
+    if confirmation.app_id != app_id || confirmation.audit_store_id != audit_store_id {
+        return reject(
+            broker,
+            request_id,
+            OP_ROLLBACK,
+            "update_rollback_identity_stale",
+            "native Owner確認の製品identityが現在のBroker identityと異なる",
+            payload_hash,
+        );
+    }
+    #[cfg(test)]
+    let local_app_data = broker
+        .desktop_product_install_local_app_data
+        .clone()
+        .or_else(|| super::product_install::current_user_local_app_data().ok());
+    #[cfg(not(test))]
+    let local_app_data = super::product_install::current_user_local_app_data().ok();
+    let Some(local_app_data) = local_app_data else {
+        return reject(
+            broker,
+            request_id,
+            OP_ROLLBACK,
+            "product_install_root_unavailable",
+            "現在利用者のKnown Folderを導出できないためrollbackしない",
+            payload_hash,
+        );
+    };
+    let snapshot = match crate::product_bootstrapper::active_version_snapshot(
+        &local_app_data,
+        &app_id,
+        &audit_store_id,
+    ) {
+        Ok(snapshot) => snapshot,
+        Err(error) => {
+            return reject(
+                broker,
+                request_id,
+                OP_ROLLBACK,
+                error.0,
+                "有効版recordまたはstageを安全に検証できないためrollbackしない",
+                payload_hash,
+            )
+        }
+    };
+    let Some(previous) = snapshot.previous.as_ref() else {
+        return reject(
+            broker,
+            request_id,
+            OP_ROLLBACK,
+            "active_version_rollback_unavailable",
+            "Brokerが記録した直前の有効版がない",
+            payload_hash,
+        );
+    };
+    if !rollback_descriptor_matches_candidate(broker, &snapshot.current)
+        || !rollback_descriptor_matches_candidate(broker, previous)
+        || snapshot.current.update_id != current_record.candidate.update_id
+        || snapshot.current.candidate_hash != current_record.candidate_hash
+        || target_confirmation.update_id != previous.update_id
+        || target_confirmation.candidate_hash != previous.candidate_hash
+        || target_confirmation.package_sha256 != previous.package_sha256
+        || target_confirmation.offered_version != previous.product_version
+    {
+        return reject(
+            broker,
+            request_id,
+            OP_ROLLBACK,
+            "update_rollback_target_stale",
+            "現在の有効版・直前版・署名候補が確認画面から変化した",
+            payload_hash,
+        );
+    }
+    #[cfg(test)]
+    let current_plan = super::product_install::plan_product_install(
+        &local_app_data,
+        &app_id,
+        &snapshot.current.product_version,
+        &snapshot.current.package_sha256,
+    );
+    #[cfg(not(test))]
+    let current_plan = super::product_install::plan_current_user_product_install(
+        &app_id,
+        &snapshot.current.product_version,
+        &snapshot.current.package_sha256,
+    );
+    let current_plan = match current_plan {
+        Ok(plan) => plan,
+        Err(_) => {
+            return reject(
+                broker,
+                request_id,
+                OP_ROLLBACK,
+                "product_install_plan_invalid",
+                "Brokerが現行版の固定導入先を導出できない",
+                payload_hash,
+            )
+        }
+    };
+    if current_plan.version_directory != confirmation.version_directory {
+        return reject(
+            broker,
+            request_id,
+            OP_ROLLBACK,
+            "update_rollback_current_destination_stale",
+            "Owner確認に表示した現行版stageがKnown Folder由来のstageと異なる",
+            payload_hash,
+        );
+    }
+    #[cfg(test)]
+    let plan = super::product_install::plan_product_install(
+        &local_app_data,
+        &app_id,
+        &previous.product_version,
+        &previous.package_sha256,
+    );
+    #[cfg(not(test))]
+    let plan = super::product_install::plan_current_user_product_install(
+        &app_id,
+        &previous.product_version,
+        &previous.package_sha256,
+    );
+    let plan = match plan {
+        Ok(plan) => plan,
+        Err(_) => {
+            return reject(
+                broker,
+                request_id,
+                OP_ROLLBACK,
+                "product_install_plan_invalid",
+                "Brokerがrollback先の固定導入先を導出できない",
+                payload_hash,
+            )
+        }
+    };
+    if plan.version_directory != target_confirmation.version_directory {
+        return reject(
+            broker,
+            request_id,
+            OP_ROLLBACK,
+            "update_rollback_destination_stale",
+            "Owner確認に表示したrollback先がKnown Folder由来のstageと異なる",
+            payload_hash,
+        );
+    }
+    if !broker.state_store.persistence_ready() {
+        return suspended(
+            broker,
+            OP_ROLLBACK,
+            request_id,
+            json!({"版": VERSION, "更新ID": request.update_id, "候補hash": request.candidate_hash, "状態": "suspended", "復旧ID": "recover-update-rollback-audit", "証拠種別": EVIDENCE_SOURCE_INTERNAL_STATE}),
+            payload_hash,
+            "永続Auditが利用できないため有効版をrollbackしない",
+        );
+    }
+    let (root_path, product_root) =
+        match super::product_install::open_existing_product_root(&local_app_data, &app_id) {
+            Ok(root) => root,
+            Err(_) => {
+                return reject(
+                    broker,
+                    request_id,
+                    OP_ROLLBACK,
+                    "product_install_root_unavailable",
+                    "既存の固定製品rootがないためrollbackしない",
+                    payload_hash,
+                )
+            }
+        };
+    if root_path != plan.root {
+        return reject(
+            broker,
+            request_id,
+            OP_ROLLBACK,
+            "product_install_root_mismatch",
+            "Known Folder由来の製品rootがrollback計画と一致しない",
+            payload_hash,
+        );
+    }
+    let (versions_path, versions) =
+        match super::product_install::open_existing_product_versions_directory(
+            &local_app_data,
+            &app_id,
+        ) {
+            Ok(versions) => versions,
+            Err(_) => {
+                return reject(
+                    broker,
+                    request_id,
+                    OP_ROLLBACK,
+                    "product_install_versions_unavailable",
+                    "固定versions directoryがないためrollbackしない",
+                    payload_hash,
+                )
+            }
+        };
+    if plan.version_directory.parent() != Some(versions_path.as_path()) {
+        return reject(
+            broker,
+            request_id,
+            OP_ROLLBACK,
+            "product_install_versions_mismatch",
+            "rollback先の親がBroker versions capabilityと一致しない",
+            payload_hash,
+        );
+    }
+    let intent = match broker.append_audit(
+        request_id,
+        OP_ROLLBACK,
+        "queued",
+        &format!("Capability=product.install.rollback_version Permission=Brokerが過去に有効化した署名済み版recordの切替だけ Approval=現行版と直前版を表示した独立Rust Desktop native Owner確認 AuditEvent=有効版record切替前の意図を永続化 RecoveryAction=両候補を現在trustで再検証し、stage hashを照合。process起動・file削除は行わない current_version={} current_package_sha256={} target_version={} target_package_sha256={}", snapshot.current.product_version, snapshot.current.package_sha256, previous.product_version, previous.package_sha256),
+        EVIDENCE_SOURCE_INTERNAL_STATE,
+        payload_hash,
+    ) {
+        Ok(event) => event,
+        Err(_) => {
+            return broker.audit_store_failed_response(
+                request_id,
+                OP_ROLLBACK,
+                "update_rollback_audit_failed",
+                "rollback前Auditを確定できない",
+            )
+        }
+    };
+    let mut suffix_bytes = [0u8; 16];
+    if getrandom::getrandom(&mut suffix_bytes).is_err() {
+        return rollback_failed(
+            broker,
+            request_id,
+            payload_hash,
+            "active_version_nonce_failed",
+            "rollback recordの一時名を生成できない",
+        );
+    }
+    let restored = crate::product_bootstrapper::toggle_previous_active_version(
+        &product_root,
+        &versions,
+        &app_id,
+        &audit_store_id,
+        &snapshot.current.update_id,
+        &snapshot.current.candidate_hash,
+        &previous.update_id,
+        &previous.candidate_hash,
+        &hex::encode(suffix_bytes),
+    );
+    let restored = match restored {
+        Ok(restored) => restored,
+        Err(error) => {
+            return rollback_failed(
+                broker,
+                request_id,
+                payload_hash,
+                error.0,
+                "有効版recordを変更できずrollbackを完了しない",
+            )
+        }
+    };
+    let completion = match broker.append_audit(
+        &format!("{request_id}:complete"),
+        OP_ROLLBACK,
+        "completed",
+        &format!("Capability=product.install.rollback_version Permission=有効版recordだけを直前の署名済みstageへatomic切替 Approval=独立Rust Desktop native Owner確認 AuditEvent=rollback完了を記録 RecoveryAction=Bootstrapperは次回起動時に有効版recordとstage hashを再検証する。process起動・file削除・Start Menu変更なし current_version={} target_version={} intent_audit_id={}", snapshot.current.product_version, restored.product_version, intent.event_id),
+        EVIDENCE_SOURCE_INTERNAL_STATE,
+        payload_hash,
+    ) {
+        Ok(event) => event,
+        Err(_) => {
+            return broker.audit_store_failed_response(
+                request_id,
+                OP_ROLLBACK,
+                "update_rollback_audit_failed",
+                "rollback後の完了Auditを確定できない。record状態を再確認する",
+            )
+        }
+    };
+    BrokerResponse {
+        request_id: request_id.to_owned(),
+        operation: OP_ROLLBACK.to_owned(),
+        status: BrokerStatus::Accepted,
+        evidence_source: EVIDENCE_SOURCE_INTERNAL_STATE.to_owned(),
+        audit_event_id: completion.event_id,
+        error: None,
+        health: None,
+        body: Some(json!({
+            "版": VERSION,
+            "rollback": "active_version_restored",
+            "現行版": snapshot.current.product_version,
+            "復元版": restored.product_version,
+            "起動": "not_started",
+            "削除": "none",
+            "開始Audit ID": intent.event_id,
+            "証拠種別": EVIDENCE_SOURCE_INTERNAL_STATE,
+        })),
+        shutdown_requested: broker.shutdown_requested,
+    }
+}
+
+#[cfg(not(windows))]
+fn rollback_active_version(
+    broker: &mut Broker,
+    request: &UpdateIDRequest,
+    _current_record: &UpdateRecord,
+    request_id: &str,
+    payload_hash: &str,
+    _owner_confirmation: OwnerConfirmationSource,
+    _confirmation: Option<&UpdateActivationConfirmation>,
+) -> BrokerResponse {
+    suspended(
+        broker,
+        OP_ROLLBACK,
+        request_id,
+        json!({"版": VERSION, "更新ID": request.update_id, "候補hash": request.candidate_hash, "状態": "suspended", "証拠種別": EVIDENCE_SOURCE_INTERNAL_STATE}),
+        payload_hash,
+        "Windows製品root以外では有効版rollbackを実行しない",
+    )
+}
+
+fn rollback_failed(
+    broker: &mut Broker,
+    request_id: &str,
+    payload_hash: &str,
+    failure_code: &str,
+    message: &str,
+) -> BrokerResponse {
+    if broker
+        .append_audit(
+            &format!("{request_id}:failed"),
+            OP_ROLLBACK,
+            "failed",
+            &format!("Capability=product.install.rollback_version Permission=固定製品root内の有効版recordだけ Approval=独立Rust Desktop native Owner確認 AuditEvent=rollback失敗を記録 RecoveryAction=stageと既存recordを削除せず、現在の署名候補・root・有効版を再照合 failure_code={failure_code}"),
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
+        )
+        .is_err()
+    {
+        return broker.audit_store_failed_response(
+            request_id,
+            OP_ROLLBACK,
+            "update_rollback_audit_failed",
+            "rollback失敗のAuditを確定できない",
+        );
+    }
+    reject(
+        broker,
+        request_id,
+        OP_ROLLBACK,
+        failure_code,
+        message,
+        payload_hash,
     )
 }
 
@@ -1991,6 +2527,8 @@ fn activate_verified_staged_package(
             &app_id,
             &audit_store_id,
             package_sha256,
+            &record.candidate.update_id,
+            &record.candidate_hash,
             &hex::encode(suffix_bytes),
         ) {
             return activation_failed(
@@ -2047,6 +2585,46 @@ fn activate_verified_staged_package(
                 )
             }
         };
+        let package_cleanup_intent = broker.append_audit(
+            &format!("{request_id}:package-cleanup"),
+            "更新package保管領域清掃",
+            "queued",
+            &format!("Capability=product.update.package_cleanup Permission=完全検証stageが有効版recordへ登録済みの同一content-addressed package fileだけ Approval=有効版切替の独立Rust Desktop native Owner確認 AuditEvent=削除前意図を確定 RecoveryAction=Broker固定store内の期待byte長・SHA-256一致を再検査し、不一致なら保持 package_sha256={} package_bytes={} activation_audit_id={}", package_sha256, package_bytes, completion.event_id),
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
+        );
+        drop(package);
+        let package_cleanup_result = match package_cleanup_intent {
+            Ok(intent) => match crate::broker::update_download::remove_verified_package(
+                &package_directory,
+                package_sha256,
+                package_bytes,
+            ) {
+                Ok(removed) => broker
+                    .append_audit(
+                        &format!("{request_id}:package-cleanup:complete"),
+                        "更新package保管領域清掃",
+                        "completed",
+                        &format!("Capability=product.update.package_cleanup Permission=検証済みstaged packageをcontent-addressed filenameとbyte長・SHA-256一致後だけ除去 Approval=有効版切替Owner確認済み AuditEvent=stage／active record完了後のdownload重複file cleanupを記録 RecoveryAction=version stageは保持し、rollback先の実行可能stageとして再検証可能 removed={removed} package_sha256={} intent_audit_id={}", package_sha256, intent.event_id),
+                        EVIDENCE_SOURCE_INTERNAL_STATE,
+                        payload_hash,
+                    )
+                    .map(|event| Some(event.event_id))
+                    .unwrap_or(None),
+                Err(error) => {
+                    let _ = broker.append_audit(
+                        &format!("{request_id}:package-cleanup:failed"),
+                        "更新package保管領域清掃",
+                        "failed",
+                        &format!("Capability=product.update.package_cleanup Permission=期待hash／byte長が一致するdownload packageだけ Approval=有効版切替Owner確認済み AuditEvent=cleanup失敗を記録 RecoveryAction=有効版recordとstageを維持し、packageを削除せず更新package保管状態を再確認。error_class={error:?}"),
+                        EVIDENCE_SOURCE_INTERNAL_STATE,
+                        payload_hash,
+                    );
+                    None
+                }
+            },
+            Err(_) => None,
+        };
         return BrokerResponse {
             request_id: request_id.to_owned(),
             operation: OP_ACTIVATE.to_owned(),
@@ -2062,6 +2640,7 @@ fn activate_verified_staged_package(
                 "有効化": "active_version_recorded",
                 "起動": "not_started",
                 "Start Menu": "registered",
+                "download package cleanup": if package_cleanup_result.is_some() { "completed" } else { "pending" },
                 "file数": info.file_count,
                 "total_bytes": info.total_file_bytes,
                 "開始Audit ID": intent.event_id,
@@ -2554,6 +3133,10 @@ mod tests {
     const INSTALL_AUDIT_ID: &str = "audit-store-22222222222222222222222222222222";
 
     fn install_test_package() -> Vec<u8> {
+        install_test_package_for_version("1.1.0")
+    }
+
+    fn install_test_package_for_version(product_version: &str) -> Vec<u8> {
         let product_manifest = serde_json::to_vec(&json!({
             "version": 1,
             "product": "D4 Pocket",
@@ -2597,7 +3180,7 @@ mod tests {
         let manifest = serde_json::to_vec(&json!({
             "version": 1,
             "product": "D4 Pocket",
-            "product_version": "1.1.0",
+            "product_version": product_version,
             "app_id": INSTALL_APP_ID,
             "audit_store_id": INSTALL_AUDIT_ID,
             "files": entries,
@@ -2612,7 +3195,10 @@ mod tests {
         package
     }
 
-    fn trust_and_candidate_for_package(package: &[u8]) -> (UpdateTrust, UpdateCandidateDocument) {
+    fn trust_and_candidate_pair_for_packages(
+        current_package: &[u8],
+        previous_package: &[u8],
+    ) -> (UpdateTrust, UpdateCandidateDocument, UpdateCandidateDocument) {
         let key = Ed25519KeyPair::generate_pkcs8(&SystemRandom::new()).unwrap();
         let pair = Ed25519KeyPair::from_pkcs8(key.as_ref()).unwrap();
         let der = [
@@ -2621,21 +3207,41 @@ mod tests {
         .into_iter()
         .chain(pair.public_key().as_ref().iter().copied())
         .collect::<Vec<_>>();
-        let digest = hex::encode(Sha256::digest(package));
-        let signed = serde_json::to_vec(&SignedManifest {
-            version: CANDIDATE_VERSION,
-            update_id: "update-apply",
-            current_version: "1.0.0",
-            offered_version: "1.1.0",
-            channel: "stable",
-            summary: "安全更新",
-            package_sha256: &digest,
-            package_size_bytes: package.len() as u64,
-            rollback_available: true,
-        })
-        .unwrap();
         let fingerprint = sha256_tagged(pair.public_key().as_ref());
-        let signature = pair.sign(&signed);
+        let sign_candidate = |package: &[u8],
+                              update_id: &'static str,
+                              current_version: &'static str,
+                              offered_version: &'static str,
+                              summary: &'static str| {
+            let digest = hex::encode(Sha256::digest(package));
+            let signed = serde_json::to_vec(&SignedManifest {
+                version: CANDIDATE_VERSION,
+                update_id,
+                current_version,
+                offered_version,
+                channel: "stable",
+                summary,
+                package_sha256: &digest,
+                package_size_bytes: package.len() as u64,
+                rollback_available: true,
+            })
+            .unwrap();
+            let signature = pair.sign(&signed);
+            UpdateCandidateDocument {
+                version: CANDIDATE_VERSION,
+                update_id: update_id.into(),
+                current_version: current_version.into(),
+                offered_version: offered_version.into(),
+                channel: "stable".into(),
+                summary: summary.into(),
+                package_sha256: Some(digest),
+                package_size_bytes: Some(package.len() as u64),
+                signed_bytes_hex: hex::encode(signed),
+                signature_hex: hex::encode(signature.as_ref()),
+                signer_fingerprint: fingerprint.clone(),
+                rollback_available: true,
+            }
+        };
         (
             UpdateTrust {
                 version: TRUST_VERSION,
@@ -2644,20 +3250,20 @@ mod tests {
                 public_key_fingerprint: fingerprint.clone(),
                 package_sources: Vec::new(),
             },
-            UpdateCandidateDocument {
-                version: CANDIDATE_VERSION,
-                update_id: "update-apply".into(),
-                current_version: "1.0.0".into(),
-                offered_version: "1.1.0".into(),
-                channel: "stable".into(),
-                summary: "安全更新".into(),
-                package_sha256: Some(digest),
-                package_size_bytes: Some(package.len() as u64),
-                signed_bytes_hex: hex::encode(signed),
-                signature_hex: hex::encode(signature.as_ref()),
-                signer_fingerprint: fingerprint,
-                rollback_available: true,
-            },
+            sign_candidate(
+                current_package,
+                "update-apply",
+                "1.0.0",
+                "1.1.0",
+                "安全更新",
+            ),
+            sign_candidate(
+                previous_package,
+                "update-previous",
+                "0.9.0",
+                "1.0.0",
+                "直前版",
+            ),
         )
     }
 
@@ -2990,7 +3596,7 @@ mod tests {
     }
 
     #[test]
-    fn rollback_remains_suspended_and_apply_rejects_without_native_owner_confirmation() {
+    fn rollback_and_apply_reject_without_native_owner_confirmation() {
         let (trust, candidate) = trust_and_candidate();
         let candidate_value = serde_json::to_value(&candidate).unwrap();
         let candidate_hash =
@@ -3021,14 +3627,14 @@ mod tests {
             BrokerOperation::更新rollback要求,
             json!({"版": 1, "更新ID": "update-1", "候補hash": candidate_hash}),
         );
-        assert_eq!(rollback.status, BrokerStatus::Suspended);
+        assert_eq!(rollback.status, BrokerStatus::Rejected);
         assert_eq!(
             rollback.error.as_ref().map(|error| error.code.as_str()),
-            Some("update_execution_suspended")
+            Some("desktop_native_owner_confirmation_required")
         );
         let event = broker.audit_events().last().unwrap();
         assert_eq!(event.operation, OP_ROLLBACK);
-        assert_eq!(event.decision, "suspended");
+        assert_eq!(event.decision, "rejected");
         assert_eq!(rollback.audit_event_id, event.event_id);
     }
 
@@ -3049,11 +3655,18 @@ mod tests {
         let install_root = std::fs::canonicalize(&install_root).unwrap();
         let start_menu_root = std::fs::canonicalize(&start_menu_root).unwrap();
         let package = install_test_package();
+        let previous_package = install_test_package_for_version("1.0.0");
         let digest = hex::encode(Sha256::digest(&package));
-        let (trust, candidate) = trust_and_candidate_for_package(&package);
+        let previous_digest = hex::encode(Sha256::digest(&previous_package));
+        let (trust, candidate, previous_candidate) =
+            trust_and_candidate_pair_for_packages(&package, &previous_package);
         let candidate_value = serde_json::to_value(&candidate).unwrap();
         let candidate_hash =
             crate::broker::protocol::canonical_payload_hash(Some(&candidate_value));
+        let previous_candidate_value = serde_json::to_value(&previous_candidate).unwrap();
+        let previous_candidate_hash = crate::broker::protocol::canonical_payload_hash(Some(
+            &previous_candidate_value,
+        ));
         let mut broker = Broker::new_persistent("session-1", &store_root).unwrap();
         broker.update_trust = Some(trust);
         broker
@@ -3061,11 +3674,50 @@ mod tests {
             .unwrap();
         broker.set_desktop_product_install_local_app_data(install_root.clone());
         broker.set_desktop_product_start_menu_directory(start_menu_root.clone());
+        let (previous_versions_path, previous_versions) =
+            super::super::product_install::open_product_versions_directory(
+                &install_root,
+                INSTALL_APP_ID,
+            )
+            .unwrap();
+        let previous_stage_name = format!("1.0.0-{previous_digest}");
+        crate::product_package::extract_verified_package_into_directory(
+            std::io::Cursor::new(previous_package.as_slice()),
+            previous_package.len() as u64,
+            Some(&previous_digest),
+            &previous_versions,
+            &previous_stage_name,
+            crate::product_package::ProductPackageExpectation {
+                product_version: Some("1.0.0"),
+                app_id: INSTALL_APP_ID,
+                audit_store_id: INSTALL_AUDIT_ID,
+            },
+        )
+        .unwrap();
+        let (previous_root_path, previous_product_root) =
+            super::super::product_install::open_existing_product_root(
+                &install_root,
+                INSTALL_APP_ID,
+            )
+            .unwrap();
+        assert_eq!(previous_root_path, previous_versions_path.parent().unwrap());
+        crate::product_bootstrapper::activate_staged_version(
+            &previous_product_root,
+            &previous_versions,
+            "1.0.0",
+            INSTALL_APP_ID,
+            INSTALL_AUDIT_ID,
+            &previous_digest,
+            "update-previous",
+            &previous_candidate_hash,
+            "11111111111111111111111111111111",
+        )
+        .unwrap();
         assert_eq!(
             call(
                 &mut broker,
                 BrokerOperation::更新確認,
-                json!({"版": 1, "候補": [candidate]})
+                json!({"版": 1, "候補": [candidate, previous_candidate]})
             )
             .status,
             BrokerStatus::Accepted
@@ -3144,6 +3796,7 @@ mod tests {
                 INSTALL_APP_ID,
             )
             .unwrap(),
+            rollback_target: None,
         };
         let activation_envelope = |request_id: &str| {
             json!({
@@ -3284,12 +3937,17 @@ mod tests {
             stale.error.unwrap().code,
             "update_activation_destination_stale"
         );
-        assert!(!install_root
-            .join("Programs")
-            .join("D4 Pocket")
-            .join(INSTALL_APP_ID)
-            .join("active_version.json")
-            .exists());
+        assert_eq!(
+            crate::product_bootstrapper::active_version_snapshot(
+                &install_root,
+                INSTALL_APP_ID,
+                INSTALL_AUDIT_ID,
+            )
+            .unwrap()
+            .current
+            .product_version,
+            "1.0.0"
+        );
 
         let mut stale_start_menu_confirmation = activation_confirmation.clone();
         stale_start_menu_confirmation.start_menu_shortcut_path =
@@ -3305,12 +3963,17 @@ mod tests {
             stale_start_menu.error.unwrap().code,
             "update_activation_start_menu_stale"
         );
-        assert!(!install_root
-            .join("Programs")
-            .join("D4 Pocket")
-            .join(INSTALL_APP_ID)
-            .join("active_version.json")
-            .exists());
+        assert_eq!(
+            crate::product_bootstrapper::active_version_snapshot(
+                &install_root,
+                INSTALL_APP_ID,
+                INSTALL_AUDIT_ID,
+            )
+            .unwrap()
+            .current
+            .product_version,
+            "1.0.0"
+        );
 
         let staged_executable = target.join("app/gui_shell_desktop.exe");
         std::fs::write(&staged_executable, b"x").unwrap();
@@ -3330,7 +3993,17 @@ mod tests {
             .join("Programs")
             .join("D4 Pocket")
             .join(INSTALL_APP_ID);
-        assert!(!product_root.join("active_version.json").exists());
+        assert_eq!(
+            crate::product_bootstrapper::active_version_snapshot(
+                &install_root,
+                INSTALL_APP_ID,
+                INSTALL_AUDIT_ID,
+            )
+            .unwrap()
+            .current
+            .product_version,
+            "1.0.0"
+        );
         std::fs::write(&staged_executable, b"d").unwrap();
 
         let activated = broker.desktop_owner_operation_json_with_update_confirmations(
@@ -3346,6 +4019,11 @@ mod tests {
         );
         assert_eq!(activated.body.as_ref().unwrap()["起動"], "not_started");
         assert_eq!(activated.body.as_ref().unwrap()["Start Menu"], "registered");
+        assert_eq!(
+            activated.body.as_ref().unwrap()["download package cleanup"],
+            "completed"
+        );
+        assert!(!package_path.exists());
         assert!(activation_confirmation.start_menu_shortcut_path.is_file());
         assert!(product_root
             .join("gui_shell_desktop_launcher.exe")
@@ -3365,6 +4043,15 @@ mod tests {
         )
         .unwrap();
         assert_eq!(active_record["product_version"], "1.1.0");
+        assert_eq!(active_record["previous"]["product_version"], "1.0.0");
+        assert!(target.is_dir());
+        assert!(install_root
+            .join("Programs")
+            .join("D4 Pocket")
+            .join(INSTALL_APP_ID)
+            .join("versions")
+            .join(&previous_stage_name)
+            .is_dir());
         let shortcut_bytes =
             std::fs::read(&activation_confirmation.start_menu_shortcut_path).unwrap();
         assert!(broker.audit_events().iter().any(|event| {
@@ -3378,26 +4065,125 @@ mod tests {
                 && event.decision == "completed"
         }));
 
-        let activated_again = broker.desktop_owner_operation_json_with_update_confirmations(
-            &activation_envelope("desktop-update-activation-replay"),
+        let rollback_payload = payload.clone();
+        let rollback_payload_hash =
+            crate::broker::protocol::canonical_payload_hash(Some(&rollback_payload));
+        let rollback_envelope = |request_id: &str| {
+            json!({
+                "request_id": request_id,
+                "session_id": "session-1",
+                "operation": OP_ROLLBACK,
+                "payload_hash": rollback_payload_hash,
+                "nonce": format!("{request_id}-nonce"),
+                "issued_at": BrokerRequestEnvelope::current_issued_at(),
+                "metadata": {"client": "desktop_flutter"},
+                "payload": rollback_payload,
+            })
+            .to_string()
+        };
+        let normal_rollback = call(
+            &mut broker,
+            BrokerOperation::更新rollback要求,
+            rollback_payload.clone(),
+        );
+        assert_eq!(normal_rollback.status, BrokerStatus::Rejected);
+        assert_eq!(
+            normal_rollback.error.unwrap().code,
+            "desktop_native_owner_confirmation_required"
+        );
+        let previous_plan = super::super::product_install::plan_product_install(
+            &install_root,
+            INSTALL_APP_ID,
+            "1.0.0",
+            &previous_digest,
+        )
+        .unwrap();
+        let mut rollback_confirmation = activation_confirmation.clone();
+        rollback_confirmation.rollback_target = Some(UpdateRollbackTargetConfirmation {
+            update_id: "update-previous".into(),
+            candidate_hash: previous_candidate_hash.clone(),
+            package_sha256: previous_digest.clone(),
+            offered_version: "1.0.0".into(),
+            version_directory: previous_plan.version_directory,
+        });
+        let mut stale_rollback = rollback_confirmation.clone();
+        stale_rollback
+            .rollback_target
+            .as_mut()
+            .unwrap()
+            .version_directory = install_root.join("attacker-controlled");
+        let stale = broker.desktop_owner_operation_json_with_update_confirmations(
+            &rollback_envelope("desktop-update-rollback-stale"),
             None,
             None,
-            Some(activation_confirmation.clone()),
+            Some(stale_rollback),
         );
-        assert_eq!(activated_again.status, BrokerStatus::Accepted);
+        assert_eq!(stale.status, BrokerStatus::Rejected);
         assert_eq!(
-            std::fs::read(&activation_confirmation.start_menu_shortcut_path).unwrap(),
-            shortcut_bytes
+            stale.error.unwrap().code,
+            "update_rollback_destination_stale"
         );
+        let rolled_back = broker.desktop_owner_operation_json_with_update_confirmations(
+            &rollback_envelope("desktop-update-rollback"),
+            None,
+            None,
+            Some(rollback_confirmation),
+        );
+        assert_eq!(rolled_back.status, BrokerStatus::Accepted);
         assert_eq!(
-            crate::product_bootstrapper::resolve_active_version_launcher(
+            rolled_back.body.as_ref().unwrap()["rollback"],
+            "active_version_restored"
+        );
+        assert_eq!(rolled_back.body.as_ref().unwrap()["現行版"], "1.1.0");
+        assert_eq!(rolled_back.body.as_ref().unwrap()["復元版"], "1.0.0");
+        assert_eq!(
+            crate::product_bootstrapper::active_version_snapshot(
                 &install_root,
                 INSTALL_APP_ID,
                 INSTALL_AUDIT_ID,
             )
-            .unwrap(),
-            selected_launcher
+            .unwrap()
+            .current
+            .update_id,
+            "update-previous"
         );
+        let rollback_launcher = crate::product_bootstrapper::resolve_active_version_launcher(
+            &install_root,
+            INSTALL_APP_ID,
+            INSTALL_AUDIT_ID,
+        )
+        .unwrap();
+        assert_eq!(
+            rollback_launcher,
+            std::fs::canonicalize(
+                install_root
+                    .join("Programs")
+                    .join("D4 Pocket")
+                    .join(INSTALL_APP_ID)
+                    .join("versions")
+                    .join(previous_stage_name)
+                    .join("gui_shell_desktop_launcher.exe")
+            )
+            .unwrap()
+        );
+        assert!(target.is_dir());
+        assert!(broker.audit_events().iter().any(|event| {
+            event.request_id == "desktop-update-rollback"
+                && event.operation == OP_ROLLBACK
+                && event.decision == "queued"
+        }));
+        assert!(broker.audit_events().iter().any(|event| {
+            event.request_id == "desktop-update-rollback:complete"
+                && event.operation == OP_ROLLBACK
+                && event.decision == "completed"
+        }));
+        assert_eq!(
+            std::fs::read(&activation_confirmation.start_menu_shortcut_path).unwrap(),
+            shortcut_bytes
+        );
+        assert_ne!(selected_launcher, rollback_launcher);
+        drop(previous_product_root);
+        drop(previous_versions);
         drop(broker);
         std::fs::remove_dir_all(root).unwrap();
     }

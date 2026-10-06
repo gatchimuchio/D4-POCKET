@@ -1799,6 +1799,7 @@ impl Broker {
                     | BrokerOperation::更新download要求
                     | BrokerOperation::更新適用要求
                     | BrokerOperation::更新有効版切替要求
+                    | BrokerOperation::更新rollback要求
             )
         );
         if !operation_is_allowlisted

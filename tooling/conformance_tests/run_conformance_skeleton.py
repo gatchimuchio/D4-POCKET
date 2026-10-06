@@ -1073,8 +1073,29 @@ def test_update_center_contract_and_execution_boundary() -> list[str]:
     current_stale_receipt = dict(receipt)
     current_stale_receipt["署名状態"] = "verification_stale"
     errors.extend(validate_instance(current_stale_receipt, load_schema("update_receipt.schema.json")))
-    if listing["download実行"] not in ("available", "suspended") or listing["適用実行"] != "suspended" or listing["rollback実行"] != "suspended":
-        errors.append("更新実行可能状態または適用／rollbackのsuspended境界が不正")
+    rollback_available = listing["rollback状態"]["状態"] == "available"
+    available_without_descriptors = copy.deepcopy(listing)
+    available_without_descriptors["rollback実行"] = "available"
+    available_without_descriptors["rollback状態"]["状態"] = "available"
+    if validate_instance(available_without_descriptors, update_list_schema) == []:
+        errors.append("更新一覧が対象版のないrollback available状態を受理した")
+    unavailable_with_descriptor = copy.deepcopy(listing)
+    unavailable_with_descriptor["rollback状態"]["現在版"] = {
+        "更新ID": "update-1",
+        "候補hash": "sha256:" + "a" * 64,
+        "提供版": "1.1.0",
+        "package_sha256": "b" * 64,
+    }
+    if validate_instance(unavailable_with_descriptor, update_list_schema) == []:
+        errors.append("更新一覧がrollback不可状態で版descriptorを露出した")
+    if (
+        listing["download実行"] not in ("available", "suspended")
+        or listing["適用実行"] != "suspended"
+        or listing["rollback実行"] != ("available" if rollback_available else "suspended")
+        or (rollback_available and (listing["rollback状態"]["現在版"] is None or listing["rollback状態"]["対象版"] is None))
+        or (not rollback_available and (listing["rollback状態"]["現在版"] is not None or listing["rollback状態"]["対象版"] is not None))
+    ):
+        errors.append("更新実行状態とBroker由来rollback先projectionが一致しない")
     for name in ("ipc_request", "ipc_response"):
         operations = load_schema(f"{name}.schema.json")["properties"]["operation"]["enum"]
         for operation in ("更新一覧", "更新確認", "更新署名検査", "更新download要求", "更新適用要求", "更新延期", "更新rollback要求"):
@@ -6832,7 +6853,7 @@ def test_update_download_transport_is_broker_owned_and_bounded() -> list[str]:
     ).split("#[cfg(test)]", 1)[0]
     center = (RUST_HELPER / "src" / "broker" / "update_center.rs").read_text(
         encoding="utf-8"
-    ).split("#[cfg(test)]", 1)[0]
+    ).split("#[cfg(test)]\nmod tests", 1)[0]
     required_download = (
         "parse_source_url(url_text)?",
         "resolve_public_addresses(host,443,cancel,deadline)?",

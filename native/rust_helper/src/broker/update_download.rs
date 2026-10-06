@@ -1,6 +1,6 @@
 //! 現在のBroker trustと署名済み更新recordから再導出した入力だけで、HTTPS packageを取得する。
 
-use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
+use cap_fs_ext::{FollowSymlinks, MetadataExt as CapMetadataExt, OpenOptionsFollowExt};
 use cap_std::fs::{Dir, MetadataExt, OpenOptions};
 use reqwest::header::{ACCEPT_ENCODING, CONTENT_ENCODING, CONTENT_LENGTH, TRANSFER_ENCODING};
 use reqwest::{redirect, retry, Certificate, Client, Response, StatusCode, Url};
@@ -145,6 +145,73 @@ pub(crate) fn ensure_package_storage_room(
         return Ok(());
     }
     Err(DownloadError::Storage)
+}
+
+pub(crate) fn remove_verified_package(
+    directory: &Dir,
+    expected_sha256: &str,
+    expected_bytes: u64,
+) -> Result<bool, DownloadError> {
+    if !valid_sha256(expected_sha256) || expected_bytes == 0 || expected_bytes > MAX_PACKAGE_BYTES {
+        return Err(DownloadError::InvalidRequest);
+    }
+    let name = format!("{expected_sha256}.pkg");
+    let before = match directory.symlink_metadata(&name) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(_) => return Err(DownloadError::Storage),
+    };
+    if !before.is_file() || before.file_attributes() & 0x400 != 0 || before.len() != expected_bytes {
+        return Err(DownloadError::Storage);
+    }
+    let mut options = OpenOptions::new();
+    options.read(true).follow(FollowSymlinks::No);
+    let mut file = directory
+        .open_with(&name, &options)
+        .map_err(|_| DownloadError::Storage)?;
+    let opened = file.metadata().map_err(|_| DownloadError::Storage)?;
+    if !opened.is_file()
+        || opened.file_attributes() & 0x400 != 0
+        || !same_file_identity(&before, &opened)
+        || opened.len() != expected_bytes
+    {
+        return Err(DownloadError::Storage);
+    }
+    let mut hasher = Sha256::new();
+    let mut total = 0u64;
+    let mut buffer = [0u8; COPY_BUFFER_BYTES];
+    loop {
+        let read = file.read(&mut buffer).map_err(|_| DownloadError::Storage)?;
+        if read == 0 {
+            break;
+        }
+        total = total.checked_add(read as u64).ok_or(DownloadError::Storage)?;
+        if total > expected_bytes {
+            return Err(DownloadError::SizeMismatch);
+        }
+        hasher.update(&buffer[..read]);
+    }
+    if total != expected_bytes || hex::encode(hasher.finalize()) != expected_sha256 {
+        return Err(DownloadError::DigestMismatch);
+    }
+    let after = directory
+        .symlink_metadata(&name)
+        .map_err(|_| DownloadError::Storage)?;
+    if !after.is_file()
+        || after.file_attributes() & 0x400 != 0
+        || !same_file_identity(&opened, &after)
+        || after.len() != expected_bytes
+    {
+        return Err(DownloadError::Storage);
+    }
+    drop(file);
+    directory.remove_file(&name).map_err(|_| DownloadError::Storage)?;
+    Ok(true)
+}
+
+fn same_file_identity(left: &cap_std::fs::Metadata, right: &cap_std::fs::Metadata) -> bool {
+    let inode = left.ino();
+    inode != 0 && left.dev() == right.dev() && inode == right.ino()
 }
 
 pub(crate) fn download_package<F>(
@@ -874,6 +941,36 @@ mod tests {
         assert_eq!(
             ensure_package_storage_room(&directory, &"a".repeat(64), bytes.len() as u64),
             Err(DownloadError::Storage)
+        );
+        drop(directory);
+        std::fs::remove_dir_all(path).unwrap();
+    }
+
+    #[test]
+    fn package_cleanup_removes_only_the_exact_verified_content_addressed_file() {
+        let path = temporary_directory("update-package-cleanup");
+        let directory = Dir::open_ambient_dir(&path, cap_std::ambient_authority()).unwrap();
+        let bytes = b"verified staged package";
+        let digest = hex::encode(Sha256::digest(bytes));
+        let package_path = path.join(format!("{digest}.pkg"));
+        std::fs::write(&package_path, bytes).unwrap();
+        assert_eq!(
+            remove_verified_package(&directory, &digest, (bytes.len() + 1) as u64),
+            Err(DownloadError::Storage)
+        );
+        assert_eq!(
+            remove_verified_package(&directory, &"a".repeat(64), bytes.len() as u64),
+            Ok(false)
+        );
+        assert!(package_path.exists());
+        assert_eq!(
+            remove_verified_package(&directory, &digest, bytes.len() as u64),
+            Ok(true)
+        );
+        assert!(!package_path.exists());
+        assert_eq!(
+            remove_verified_package(&directory, &digest, bytes.len() as u64),
+            Ok(false)
         );
         drop(directory);
         std::fs::remove_dir_all(path).unwrap();

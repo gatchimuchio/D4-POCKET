@@ -35,6 +35,8 @@
 
 2026-10-06 P11 Broker version-staging consumer回帰: `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`はRust lib test 469件中456 passed／3 failed／10 ignored。A2A loopbackと`failed_replacement_keeps_the_existing_corrupt_package_unchanged`は各単独再実行でPASS。`local_tls_server_repairs_only_after_verified_package_bytes`は単独でもOS error 10054／`ConnectionReset`で失敗し、root cause未確定。すべて既存`FQ-TEST-LOOPBACK`のlocalhost fixture問題で、今回のversion staging差分との因果は観測されていない。現行P11 blockerへ追加せず、最終統合後の全Rust試験で再確認する。
 
+2026-10-06 P11 Rollback検証時: 集約Rust全targetの中間回で既存`broker::dialogue::broker_codex_loopback_support::tests::failed_tool_result_is_not_replayed_as_another_exec_command`がHTTP response header到達前のOS `ConnectionReset`で失敗した。focused再実行は1 passed、対象名を保持した後続all-targetsはlib 476 passed／0 failed／12 ignored、全体522 passed／0 failed／13 ignored。別中間回の`broker_ipc` targetも9 passed／1 failedを観測したが、同じ後続all-targetsで10 passed／0 failed。根因は確認できず、P11 Broker Rollback差分との因果も観測されない。HTTP loopback不安定性は既存`FQ-TEST-LOOPBACK`の最終統合時確認へ残し、現phaseをblockしない。
+
 ## 3. Final QA段階
 
 | 段階 | 対象 | 開始条件 |

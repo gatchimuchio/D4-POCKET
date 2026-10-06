@@ -3,7 +3,7 @@
   "$id": "https://example.invalid/gui-shell/schemas/update_list.schema.json",
   "title": "更新一覧（UpdateList）",
   "type": "object",
-  "required": ["版", "更新一覧", "件数", "署名信頼設定", "download実行", "download_job", "適用実行", "rollback実行", "証拠種別"],
+  "required": ["版", "更新一覧", "件数", "署名信頼設定", "download実行", "download_job", "適用実行", "rollback実行", "rollback状態", "証拠種別"],
   "additionalProperties": false,
   "properties": {
     "版": { "const": 1 },
@@ -27,7 +27,69 @@
       ]
     },
     "適用実行": { "const": "suspended" },
-    "rollback実行": { "const": "suspended" },
+    "rollback実行": { "enum": ["available", "suspended"] },
+    "rollback状態": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["状態", "現在版", "対象版"],
+          "additionalProperties": false,
+          "properties": {
+            "状態": { "const": "available" },
+            "現在版": { "$ref": "#/$defs/rollback_version" },
+            "対象版": { "$ref": "#/$defs/rollback_version" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["状態", "現在版", "対象版"],
+          "additionalProperties": false,
+          "properties": {
+            "状態": { "enum": ["unavailable", "unknown"] },
+            "現在版": { "type": "null" },
+            "対象版": { "type": "null" }
+          }
+        }
+      ]
+    },
     "証拠種別": { "const": "INTERNAL_STATE" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "rollback状態": { "properties": { "状態": { "const": "available" } } }
+        }
+      },
+      "then": { "properties": { "rollback実行": { "const": "available" } } }
+    },
+    {
+      "if": {
+        "properties": {
+          "rollback状態": { "properties": { "状態": { "enum": ["unavailable", "unknown"] } } }
+        }
+      },
+      "then": {
+        "properties": {
+          "rollback実行": { "const": "suspended" },
+          "rollback状態": {
+            "properties": { "現在版": { "type": "null" }, "対象版": { "type": "null" } }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "rollback_version": {
+      "type": "object",
+      "required": ["更新ID", "候補hash", "提供版", "package_sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "更新ID": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,128}$" },
+        "候補hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "提供版": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "package_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    }
   }
 }

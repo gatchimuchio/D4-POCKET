@@ -532,6 +532,7 @@ fn current_update_activation_confirmation(
     request: &UpdateActivationOwnerRequest,
     payload_hash: &str,
     endpoint: &BrokerEndpoint,
+    for_rollback: bool,
 ) -> Option<crate::broker::update_center::UpdateActivationConfirmation> {
     let apply_request = UpdateApplyOwnerRequest {
         version: request.version,
@@ -542,7 +543,7 @@ fn current_update_activation_confirmation(
     let start_menu_shortcut_path =
         crate::broker::product_install::plan_current_user_start_menu_shortcut(&apply.app_id)
             .ok()?;
-    Some(crate::broker::update_center::UpdateActivationConfirmation {
+    let mut confirmation = crate::broker::update_center::UpdateActivationConfirmation {
         update_id: apply.download.update_id,
         candidate_hash: apply.download.candidate_hash,
         package_sha256: apply.download.package_sha256,
@@ -555,6 +556,78 @@ fn current_update_activation_confirmation(
         audit_store_id: apply.audit_store_id,
         version_directory: apply.version_directory,
         start_menu_shortcut_path,
+        rollback_target: None,
+    };
+    if for_rollback {
+        confirmation.rollback_target = current_update_rollback_target(
+            request,
+            &confirmation,
+            endpoint,
+        );
+        confirmation.rollback_target.as_ref()?;
+    }
+    Some(confirmation)
+}
+
+fn current_update_rollback_target(
+    request: &UpdateActivationOwnerRequest,
+    current: &crate::broker::update_center::UpdateActivationConfirmation,
+    endpoint: &BrokerEndpoint,
+) -> Option<crate::broker::update_center::UpdateRollbackTargetConfirmation> {
+    let listing_payload = json!({"版": 1});
+    let mut nonce = [0u8; 16];
+    getrandom::getrandom(&mut nonce).ok()?;
+    let preflight = json!({
+        "request_id": format!("desktop-update-rollback-preflight-{}", hex::encode(nonce)),
+        "session_id": endpoint.session_id,
+        "operation": "更新一覧",
+        "payload_hash": canonical_payload_hash(Some(&listing_payload)),
+        "nonce": format!("desktop-update-rollback-preflight-nonce-{}", hex::encode(nonce)),
+        "issued_at": BrokerRequestEnvelope::current_issued_at(),
+        "metadata": {"client": "desktop_flutter"},
+        "payload": listing_payload,
+    });
+    let response = relay_normalized_channel_request(preflight.to_string().as_bytes(), endpoint)?;
+    let response: Value = serde_json::from_slice(&response).ok()?;
+    if response["operation"] != "更新一覧" || response["status"] != "accepted" {
+        return None;
+    }
+    let rollback = &response["body"]["rollback状態"];
+    let active = &rollback["現在版"];
+    let target = &rollback["対象版"];
+    if rollback["状態"] != "available"
+        || active["更新ID"] != request.update_id
+        || active["候補hash"] != request.candidate_hash
+        || active["提供版"] != current.offered_version
+        || active["package_sha256"] != current.package_sha256
+    {
+        return None;
+    }
+    let update_id = target["更新ID"].as_str()?;
+    let candidate_hash = target["候補hash"].as_str()?;
+    let offered_version = target["提供版"].as_str()?;
+    let package_sha256 = target["package_sha256"].as_str()?;
+    if !valid_update_identifier(update_id)
+        || !is_tagged_sha256(candidate_hash)
+        || package_sha256.len() != 64
+        || !package_sha256
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return None;
+    }
+    let plan = crate::broker::product_install::plan_current_user_product_install(
+        &current.app_id,
+        offered_version,
+        package_sha256,
+    )
+    .ok()?;
+    Some(crate::broker::update_center::UpdateRollbackTargetConfirmation {
+        update_id: update_id.to_owned(),
+        candidate_hash: candidate_hash.to_owned(),
+        package_sha256: package_sha256.to_owned(),
+        offered_version: offered_version.to_owned(),
+        version_directory: plan.version_directory,
     })
 }
 
@@ -1465,7 +1538,23 @@ fn owner_operation_candidate(
                 return None;
             }
             let confirmation =
-                current_update_activation_confirmation(&request, &payload_hash, endpoint)?;
+                current_update_activation_confirmation(&request, &payload_hash, endpoint, false)?;
+            DesktopOwnerOperationSummary::UpdateActivation {
+                confirmation,
+                payload_hash,
+            }
+        }
+        BrokerOperation::更新rollback要求 => {
+            let request: UpdateActivationOwnerRequest =
+                serde_json::from_value(payload.clone()).ok()?;
+            if request.version != 1
+                || !valid_update_identifier(&request.update_id)
+                || !is_tagged_sha256(&request.candidate_hash)
+            {
+                return None;
+            }
+            let confirmation =
+                current_update_activation_confirmation(&request, &payload_hash, endpoint, true)?;
             DesktopOwnerOperationSummary::UpdateActivation {
                 confirmation,
                 payload_hash,
@@ -2191,20 +2280,36 @@ fn owner_confirmation_text_for_identity(
         DesktopOwnerOperationSummary::UpdateActivation {
             confirmation,
             payload_hash,
-        } => format!(
-            "署名済みD4 Pocketの未起動版を有効版へ切り替え、Start Menuへ登録しますか？\n\n更新ID: {}\n提供版: {}\nchannel: {}\n署名済みpackage SHA-256: {}\n署名済みbyte長: {}\nApp ID: {}\nAudit Store ID: {}\n固定version directory: {}\nStart Menu shortcut登録先: {}\n内容概要: {}\n\nこの操作はRust Desktop起動器が現在のBroker候補とKnown Folderから表示内容を作成し、Brokerが実行直前にtrust・署名・package全体・stage内file／directory inventory・製品identity・固定root・Start Menu先を再検証します。有効版recordを固定root内でatomicに置換し、初回だけ検証済みstageからroot Bootstrapperをcreate-onlyで配置します。Start Menu shortcutは固定root Bootstrapperを指します。processは起動せず、現在実行中process・旧versionを変更／削除せず、rollbackもしません。切替後の起動は次回の固定root Bootstrapper起動時です。操作intentと結果をdurable Auditへ記録します。\n\npayload hash:\n{}",
-            owner_confirmation_value(&confirmation.update_id),
-            owner_confirmation_value(&confirmation.offered_version),
-            owner_confirmation_value(&confirmation.channel),
-            confirmation.package_sha256,
-            confirmation.package_size_bytes,
-            owner_confirmation_value(&confirmation.app_id),
-            owner_confirmation_value(&confirmation.audit_store_id),
-            owner_confirmation_value(&confirmation.version_directory.display().to_string()),
-            owner_confirmation_value(&confirmation.start_menu_shortcut_path.display().to_string()),
-            owner_confirmation_value(&confirmation.summary),
-            payload_hash
-        ),
+        } => {
+            if let Some(target) = confirmation.rollback_target.as_ref() {
+                format!(
+                    "D4 Pocketの有効版を直前に有効化した版へ戻しますか？\n\n現在の有効版: {}\n現在版package SHA-256: {}\nrollback先の版: {}\nrollback先package SHA-256: {}\nApp ID: {}\nAudit Store ID: {}\nrollback先version directory: {}\n\nRust起動器はBrokerの現在有効版recordと直前版を表示しています。Brokerは実行時に両候補の現在trust／署名hash、製品identity、既知フォルダー由来の固定root、stage内launcher／manifest hashを再検証します。変更するのは有効版recordだけです。process起動、現在実行中processの変更、file削除、Start Menu変更は行わず、選択版は次回の固定root Bootstrapper起動時に使われます。intentと結果をdurable Auditへ記録します。\n\npayload hash:\n{}",
+                    owner_confirmation_value(&confirmation.offered_version),
+                    confirmation.package_sha256,
+                    owner_confirmation_value(&target.offered_version),
+                    target.package_sha256,
+                    owner_confirmation_value(&confirmation.app_id),
+                    owner_confirmation_value(&confirmation.audit_store_id),
+                    owner_confirmation_value(&target.version_directory.display().to_string()),
+                    payload_hash
+                )
+            } else {
+                format!(
+                    "署名済みD4 Pocketの未起動版を有効版へ切り替え、Start Menuへ登録しますか？\n\n更新ID: {}\n提供版: {}\nchannel: {}\n署名済みpackage SHA-256: {}\n署名済みbyte長: {}\nApp ID: {}\nAudit Store ID: {}\n固定version directory: {}\nStart Menu shortcut登録先: {}\n内容概要: {}\n\nこの操作はRust Desktop起動器が現在のBroker候補とKnown Folderから表示内容を作成し、Brokerが実行直前にtrust・署名・package全体・stage内file／directory inventory・製品identity・固定root・Start Menu先を再検証します。有効版recordを固定root内でatomicに置換し、初回だけ検証済みstageからroot Bootstrapperをcreate-onlyで配置します。Start Menu shortcutは固定root Bootstrapperを指します。stageと旧versionは保持します。切替成功後、同じhash・byte長のdownload済みpackage fileだけをBrokerのcacheから除去します。process起動や実行中processの変更は行いません。選択版の起動は次回の固定root Bootstrapper起動時です。操作intentと結果をdurable Auditへ記録します。\n\npayload hash:\n{}",
+                    owner_confirmation_value(&confirmation.update_id),
+                    owner_confirmation_value(&confirmation.offered_version),
+                    owner_confirmation_value(&confirmation.channel),
+                    confirmation.package_sha256,
+                    confirmation.package_size_bytes,
+                    owner_confirmation_value(&confirmation.app_id),
+                    owner_confirmation_value(&confirmation.audit_store_id),
+                    owner_confirmation_value(&confirmation.version_directory.display().to_string()),
+                    owner_confirmation_value(&confirmation.start_menu_shortcut_path.display().to_string()),
+                    owner_confirmation_value(&confirmation.summary),
+                    payload_hash
+                )
+            }
+        },
         DesktopOwnerOperationSummary::RegressionCaseDelete {
             summary,
             payload_hash,
@@ -2998,6 +3103,13 @@ mod tests {
                     "audit_store_id": confirmation.audit_store_id,
                     "version_directory": confirmation.version_directory,
                     "start_menu_shortcut_path": confirmation.start_menu_shortcut_path,
+                    "rollback_target": confirmation.rollback_target.as_ref().map(|target| json!({
+                        "update_id": target.update_id,
+                        "candidate_hash": target.candidate_hash,
+                        "package_sha256": target.package_sha256,
+                        "offered_version": target.offered_version,
+                        "version_directory": target.version_directory,
+                    })),
                 },
                 "confirm": confirm
             }),
@@ -3459,6 +3571,14 @@ mod tests {
             "child process markerが一致しない"
         );
         #[derive(Deserialize)]
+        struct TestRollbackTarget {
+            update_id: String,
+            candidate_hash: String,
+            package_sha256: String,
+            offered_version: String,
+            version_directory: PathBuf,
+        }
+        #[derive(Deserialize)]
         #[serde(tag = "kind", rename_all = "snake_case")]
         enum TestSummary {
             GuiShellExport {
@@ -3555,6 +3675,7 @@ mod tests {
                 audit_store_id: String,
                 version_directory: PathBuf,
                 start_menu_shortcut_path: PathBuf,
+                rollback_target: Option<TestRollbackTarget>,
             },
         }
         #[derive(Deserialize)]
@@ -3741,6 +3862,7 @@ mod tests {
                 audit_store_id,
                 version_directory,
                 start_menu_shortcut_path,
+                rollback_target,
             } => DesktopOwnerOperationSummary::UpdateActivation {
                 confirmation: crate::broker::update_center::UpdateActivationConfirmation {
                     update_id,
@@ -3755,6 +3877,15 @@ mod tests {
                     audit_store_id,
                     version_directory,
                     start_menu_shortcut_path,
+                    rollback_target: rollback_target.map(|target| {
+                        crate::broker::update_center::UpdateRollbackTargetConfirmation {
+                            update_id: target.update_id,
+                            candidate_hash: target.candidate_hash,
+                            package_sha256: target.package_sha256,
+                            offered_version: target.offered_version,
+                            version_directory: target.version_directory,
+                        }
+                    }),
                 },
                 payload_hash,
             },
@@ -6949,10 +7080,34 @@ mod tests {
                 start_menu_shortcut_path: PathBuf::from(
                     r"C:\Users\test\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\D4 Pocket\D4 Pocket.lnk",
                 ),
+                rollback_target: None,
             },
             payload_hash: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
                 .into(),
         }
+    }
+
+    #[cfg(windows)]
+    fn update_rollback_owner_confirmation_fixture() -> DesktopOwnerOperationSummary {
+        let mut summary = update_activation_owner_confirmation_fixture();
+        if let DesktopOwnerOperationSummary::UpdateActivation { confirmation, .. } = &mut summary {
+            confirmation.rollback_target = Some(
+                crate::broker::update_center::UpdateRollbackTargetConfirmation {
+                    update_id: "update-previous".into(),
+                    candidate_hash:
+                        "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+                            .into(),
+                    package_sha256:
+                        "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+                            .into(),
+                    offered_version: "1.1.0".into(),
+                    version_directory: PathBuf::from(
+                        r"C:\Users\test\AppData\Local\Programs\D4 Pocket\d4-pocket-app-11111111111111111111111111111111\versions\1.1.0-dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+                    ),
+                },
+            );
+        }
+        summary
     }
 
     #[cfg(windows)]
@@ -6991,6 +7146,8 @@ mod tests {
             "Start Menu",
             "Start Menu shortcut登録先:",
             "Start Menu shortcutは固定root Bootstrapperを指します",
+            "同じhash・byte長のdownload済みpackage fileだけをBrokerのcacheから除去",
+            "stageと旧versionは保持",
             "process",
             "payload hash:",
         ] {
@@ -7000,6 +7157,30 @@ mod tests {
             );
         }
         assert!(!prompt.contains("updates.example"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn update_rollback_confirmation_names_both_versions_and_limits_the_action() {
+        let prompt = owner_confirmation_text(&update_rollback_owner_confirmation_fixture());
+        for visible in [
+            "現在の有効版: 1.2.3",
+            "rollback先の版: 1.1.0",
+            "rollback先version directory:",
+            "両候補の現在trust／署名hash",
+            "有効版recordだけ",
+            "次回の固定root Bootstrapper起動時",
+            "process起動",
+            "file削除",
+            "payload hash:",
+        ] {
+            assert!(
+                prompt.contains(visible),
+                "Rollback Owner confirmation missing {visible}"
+            );
+        }
+        assert!(!prompt.contains("Start Menu shortcut登録先:"));
+        assert!(!prompt.contains("credential"));
     }
 
     #[cfg(windows)]
@@ -7025,6 +7206,15 @@ mod tests {
             false,
             Some("Rollback実行")
         ));
+        assert!(automate_native_owner_confirmation(&summary, true, None));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "対話型Windows desktopで実Win32 Rollback Owner dialogを制御自動操作する"]
+    fn update_rollback_native_confirmation_has_an_independent_yes_no_dialog() {
+        let summary = update_rollback_owner_confirmation_fixture();
+        assert!(!automate_native_owner_confirmation(&summary, false, None));
         assert!(automate_native_owner_confirmation(&summary, true, None));
     }
 }

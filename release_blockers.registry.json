@@ -3009,7 +3009,7 @@
       "release_tracks": ["windows_v1"],
       "blocks_release": true,
       "blocks_windows_technical_complete": true,
-      "reason": "C12のnative Owner確認付きpackage download、未起動version stagingに加え、2026-10-06にBroker fixtureから独立native Owner確認・候補／identity／固定destination再照合・durable Audit付き有効版record writer、初回root Bootstrapper配置、atomic record replace、固定root Bootstrapperを指すStart Menu shortcutのcreate-only登録を接続した。同target再実行と既存別target競合の非上書きもfixtureで検証した。これらはfixture証拠であり、Installer／Uninstaller、installed next-launch、installed crash／電源断Recovery、Rollbackの製品成立は未実証。Windows DNS ClientとTLS配布元経路もhelper／loopback fixtureの範囲に限られる。正式package identity／signing identityは別のOwner Finalization blockerとして分離する。",
+      "reason": "C12のnative Owner確認付きpackage download、未起動version stagingに加え、2026-10-06にBroker fixtureから独立native Owner確認・候補／identity／固定destination再照合・durable Audit付き有効版record writer、初回root Bootstrapper配置、atomic record replace、固定root Bootstrapperを指すStart Menu shortcutのcreate-only登録を接続した。同target再実行と既存別target競合の非上書きもfixtureで検証した。さらにBroker記録の直前版へのRollbackを独立Owner確認・現行trust再検証・durable Audit付きで接続し、1.1.0から1.0.0へのtoggle fixture、stale対象／通常IPC拒否、stage保持、Start Menu不変更を確認した。これらはfixture証拠であり、Installer／Uninstaller、installed next-launch、installed crash／電源断Recovery、installed product上のRollbackの成立は未実証。Windows DNS ClientとTLS配布元経路もhelper／loopback fixtureの範囲に限られる。正式package identity／signing identityは別のOwner Finalization blockerとして分離する。",
       "required_action": "試験用識別子によるInstaller／Uninstaller、installed productからの固定root通常起動とStart Menu shortcut連結、同一volume更新、正式導入製品の強制終了／電源断後の再起動復旧、旧版復帰を契約・negative試験・隔離Windows実測へ接続する。実配布元からの取得／改変検出／修復と、導入から次回起動／rollbackまでの製品経路をsource／artifact identityへ結合して検証する。正式発行者・署名識別情報はWindows技術完了後の別blockerで扱う。",
       "broker_signed_version_staging_consumer": {
         "date": "2026-10-06",
@@ -3038,6 +3038,7 @@
           "start_menu_shortcut_tests": "cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib broker::product_install::tests -- --test-threads=1: 8 passed。Shortcut作成・target照合・冪等再試行・競合非上書きを含む。",
           "broker_activation_integration": "cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib broker::update_center::tests::native_owner_apply_stages_exact_signed_package_without_activation_or_overwrite -- --test-threads=1: stale shortcut先拒否、有効版record／Start Menu shortcut登録と再試行 fixture 1 passed。",
           "native_owner_activation_dialog": "cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib desktop_launcher::tests::update_activation_native_confirmation_has_an_independent_yes_no_dialog -- --ignored --test-threads=1: 1 passed。実Win32 dialogを自動操作しNo／Yesを確認。",
+          "rollback_fixture": "Rust Broker統合fixtureで1.1.0から記録済み1.0.0へRollbackし、stale対象／通常IPCを拒否、active recordだけを切替え、stage保持／Start Menu不変更、Audit、成功後の正確なcontent-addressed package cache cleanupを確認。broker::update_center::tests 15件、product_bootstrapper::tests 8件、package cleanup 1件がPASS。desktop_launcher::tests::update_rollback_native_confirmation_has_an_independent_yes_no_dialogを--ignoredで明示実行し1件PASS。Flutter update UI 4件、最終all-targets Rust suiteは522 passed／0 failed／13 ignored、Schema 160／157／207、Conformance 236 checks、Rust Release buildもPASS。中間集約回ではCodex loopback ConnectionReset（focused／最終全target再実行はPASS）とbroker_ipc 9／10（最終10／10）を観測し、前者は既存FQ-TEST-LOOPBACK、いずれもP11差分との因果未観測。全crate rustfmt checkは既存未整形差分により失敗。",
           "latest_all_target_validation": "2026-10-06 `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`: 517 passed／0 failed／12 ignored。",
           "desktop_update_test": "OneDrive Cloud Files placeholderがproject build cache削除を拒否したためC:\\d4p-p11-flutter-test-20261006のlocal isolated copyで `flutter test --no-pub test/update_client_test.dart`: 4 passed。"
         },
@@ -3046,9 +3047,10 @@
           "stage": "署名package全体と既存stage全byte／inventoryをread-onlyで再照合し、不一致stageを修復・削除しない。",
           "publication": "初回root Bootstrapper placement、active_version.jsonのatomic replace、Start Menu shortcutの固定root target登録をfixtureで検証。既存Bootstrapperは上書きしない。",
           "start_menu": "Known Folder計画先をnative確認とBrokerで再照合し、create-only登録、同一target再実行、既存別target shortcutの非上書きをWindows Rust fixtureで確認。",
-          "scope": "active version recordとStart Menu shortcutをfixtureで公開するまで。installed productのnext-launch、Installer／Uninstaller、process起動、Rollbackは実施しない。"
+          "rollback": "Broker記録の直前版だけを対象に、独立native Owner確認、現行trust／署名hash／App・Audit identity／固定root／stageの再検証後、durable intent／completion Auditでactive recordを一世代toggleする。stale対象と通常IPCを拒否し、stageとStart Menuを変更しない。",
+          "scope": "active version record、Start Menu shortcut、Broker fixture内の一世代Rollbackまで。installed productのnext-launch、Installer／Uninstaller、process起動、installed product経路のRollbackは実施しない。"
         },
-        "scope_limit": "active version record／Start Menu shortcutはRust fixture証拠のみ。installed productの導入・切替・起動やWindows LIVE_RUNTIMEを証明せず、P11 release blockerを維持する。"
+        "scope_limit": "active version record／Start Menu shortcut／1世代RollbackはRust fixture証拠のみ。installed productの導入・切替・起動・RollbackやWindows LIVE_RUNTIMEを証明せず、P11 release blockerを維持する。"
       },
       "update_candidate_package_binding": {
         "date": "2026-09-30",

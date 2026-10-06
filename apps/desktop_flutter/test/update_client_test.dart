@@ -25,6 +25,11 @@ class _UpdateTransport implements BrokerTransport {
           'download_job': null,
           '適用実行': 'suspended',
           'rollback実行': 'suspended',
+          'rollback状態': {
+            '状態': 'unavailable',
+            '現在版': null,
+            '対象版': null,
+          },
           '証拠種別': 'INTERNAL_STATE',
         },
       };
