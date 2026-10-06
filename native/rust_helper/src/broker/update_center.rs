@@ -46,6 +46,11 @@ const OP_UNINSTALL: &str = "製品アンインストール要求";
 const OP_UNINSTALL_STARTED: &str = "製品アンインストール開始";
 const OP_UNINSTALL_COMPLETED: &str = "製品アンインストール完了";
 const OP_UNINSTALL_FAILED: &str = "製品アンインストール失敗";
+const EMBEDDED_PRODUCT_APP_ID: Option<&str> = option_env!("GUI_SHELL_PRODUCT_APP_ID");
+const EMBEDDED_PRODUCT_AUDIT_STORE_ID: Option<&str> =
+    option_env!("GUI_SHELL_PRODUCT_AUDIT_STORE_ID");
+const EMBEDDED_PRODUCT_UPDATE_TRUST_JSON: Option<&str> =
+    option_env!("GUI_SHELL_UPDATE_TRUST_JSON");
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct UpdateDownloadConfirmation {
@@ -519,6 +524,70 @@ pub(super) fn load_persistent_trust(
     })?;
     validate_trust(&trust).map_err(BrokerStoreError::MalformedUpdateTrust)?;
     Ok(Some(trust))
+}
+
+pub(super) fn load_effective_persistent_trust(
+    store: &BrokerPersistentStore,
+) -> Result<Option<UpdateTrust>, BrokerStoreError> {
+    resolve_build_update_trust(
+        EMBEDDED_PRODUCT_APP_ID,
+        EMBEDDED_PRODUCT_AUDIT_STORE_ID,
+        EMBEDDED_PRODUCT_UPDATE_TRUST_JSON,
+        || load_persistent_trust(store),
+    )
+}
+
+fn resolve_build_update_trust(
+    app_id: Option<&str>,
+    audit_store_id: Option<&str>,
+    embedded_json: Option<&str>,
+    load_persistent: impl FnOnce() -> Result<Option<UpdateTrust>, BrokerStoreError>,
+) -> Result<Option<UpdateTrust>, BrokerStoreError> {
+    match (app_id, audit_store_id, embedded_json) {
+        (None, None, None) => load_persistent(),
+        (Some(app_id), Some(audit_store_id), embedded_json) => {
+            if !valid_product_identity(app_id, "d4-pocket-app-")
+                || !valid_product_identity(audit_store_id, "audit-store-")
+            {
+                return Err(BrokerStoreError::MalformedUpdateTrust(
+                    "製品build identityが不正である".to_string(),
+                ));
+            }
+            let Some(raw) = embedded_json else {
+                // 製品構成では、変更可能な永続保存値を更新の信頼元にしない。
+                return Ok(None);
+            };
+            if raw.len() > 8 * 1024 {
+                return Err(BrokerStoreError::MalformedUpdateTrust(
+                    "製品buildの更新trustがsize上限を超過した".to_string(),
+                ));
+            }
+            let trust: UpdateTrust = serde_json::from_str(raw).map_err(|_| {
+                BrokerStoreError::MalformedUpdateTrust(
+                    "製品buildの更新trust構造が不正である".to_string(),
+                )
+            })?;
+            validate_trust(&trust).map_err(BrokerStoreError::MalformedUpdateTrust)?;
+            if trust.version != TRUST_VERSION || trust.package_sources.is_empty() {
+                return Err(BrokerStoreError::MalformedUpdateTrust(
+                    "製品buildの更新trustは版2公開鍵と配布元を必要とする".to_string(),
+                ));
+            }
+            Ok(Some(trust))
+        }
+        _ => Err(BrokerStoreError::MalformedUpdateTrust(
+            "製品build identityまたは更新trustのcompile-time設定が不完全である".to_string(),
+        )),
+    }
+}
+
+fn valid_product_identity(value: &str, prefix: &str) -> bool {
+    value.strip_prefix(prefix).is_some_and(|suffix| {
+        suffix.len() == 32
+            && suffix
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    })
 }
 
 fn decode_state(state: &Value) -> Result<BTreeMap<String, Value>, String> {
@@ -4233,6 +4302,88 @@ mod tests {
                 "直前版",
             ),
         )
+    }
+
+    fn configured_product_trust() -> UpdateTrust {
+        let (mut trust, _) = trust_and_candidate();
+        trust.package_sources = vec![UpdatePackageSource {
+            channel: "stable".into(),
+            base_url: "https://updates.example.invalid/d4/stable".into(),
+        }];
+        trust
+    }
+
+    #[test]
+    fn product_build_uses_embedded_update_trust_and_never_loads_editable_store_trust() {
+        let embedded = configured_product_trust();
+        let persisted = configured_product_trust();
+        assert_ne!(embedded, persisted);
+        let embedded_json = serde_json::to_string(&embedded).unwrap();
+        let mut persistent_store_read = false;
+        let resolved = resolve_build_update_trust(
+            Some(INSTALL_APP_ID),
+            Some(INSTALL_AUDIT_ID),
+            Some(&embedded_json),
+            || {
+                persistent_store_read = true;
+                Ok(Some(persisted))
+            },
+        )
+        .unwrap();
+        assert_eq!(resolved, Some(embedded));
+        assert!(!persistent_store_read);
+    }
+
+    #[test]
+    fn product_build_without_embedded_trust_ignores_persistent_trust() {
+        let mut persistent_store_read = false;
+        let resolved = resolve_build_update_trust(
+            Some(INSTALL_APP_ID),
+            Some(INSTALL_AUDIT_ID),
+            None,
+            || {
+                persistent_store_read = true;
+                Ok(Some(configured_product_trust()))
+            },
+        )
+        .unwrap();
+        assert_eq!(resolved, None);
+        assert!(!persistent_store_read);
+    }
+
+    #[test]
+    fn generic_broker_keeps_persistent_update_trust_compatibility() {
+        let persisted = configured_product_trust();
+        let resolved =
+            resolve_build_update_trust(None, None, None, || Ok(Some(persisted.clone()))).unwrap();
+        assert_eq!(resolved, Some(persisted));
+    }
+
+    #[test]
+    fn malformed_or_incomplete_product_update_trust_fails_closed() {
+        let valid_json = serde_json::to_string(&configured_product_trust()).unwrap();
+        for (app_id, audit_id, embedded_json) in [
+            (Some(INSTALL_APP_ID), None, None),
+            (Some("invalid-app-id"), Some(INSTALL_AUDIT_ID), None),
+            (Some(INSTALL_APP_ID), Some(INSTALL_AUDIT_ID), Some("{")),
+            (Some(INSTALL_APP_ID), Some(INSTALL_AUDIT_ID), Some("{}")),
+        ] {
+            assert!(
+                resolve_build_update_trust(app_id, audit_id, embedded_json, || Ok(None)).is_err()
+            );
+        }
+
+        let mut no_source_trust = configured_product_trust();
+        no_source_trust.package_sources.clear();
+        let no_source_json = serde_json::to_string(&no_source_trust).unwrap();
+        assert!(resolve_build_update_trust(
+            Some(INSTALL_APP_ID),
+            Some(INSTALL_AUDIT_ID),
+            Some(&no_source_json),
+            || Ok(None)
+        )
+        .is_err());
+        assert!(resolve_build_update_trust(None, None, Some(&valid_json), || Ok(None)).is_err());
     }
 
     #[test]

@@ -2,13 +2,13 @@
 
 状態: Broker固定HTTPS配布元からの署名済み候補一覧取得、C12 package download、未起動version staging、別Owner確認によるactive version record／Start Menu shortcut切替、およびBrokerが記録した直前版へのRollbackを接続。Settingsからnative Owner確認を伴う固定起動項目の限定修復と、現行trustで一致した署名packageによる有効版payloadの限定修復も接続した。UIは初回導入と導入済み更新をBroker状態から区別し、download完了後だけ展開・修復操作を有効化する。process起動は行わない。これらはBroker fixtureまでであり、installed product経路の証拠は別途必要。破損payload／active recordの置換・再構築とUninstallerは`docs/specs/windows-desktop-launcher.md`に定義する。
 
-更新センターは、更新候補の表示、Broker所有信頼設定によるEd25519署名検査、更新適用の要求、延期、rollback要求を扱う。更新候補自身の公開鍵、MCP metadata、Profile、履歴、UI stateは信頼源ではない。
+更新センターは、更新候補の表示、Broker所有信頼設定によるEd25519署名検査、更新適用の要求、延期、rollback要求を扱う。更新候補自身の公開鍵、MCP metadata、Profile、履歴、UI stateは信頼源ではない。汎用GUI Shellでは従来どおりBroker永続trustを読む。D4 Pocket製品buildではExport Manifest fileの任意`update_trust`をRust compile-timeへ固定し、製品Brokerは編集可能な永続`update_trust.json`をtrust根拠として読まない。製品buildにtrustがなければ未構成を維持する。秘密署名鍵はbundleへ含めない。
 
 ## Broker所有の配布元設定
 
-`update_trust.json`版1は後方互換の署名検査専用形式として読み取る。版2は署名公開鍵・fingerprintに加えて、Broker所有の`package_sources`を持てる。各要素は`channel`と`base_url`だけであり、channelは`stable`、`beta`、`nightly`のいずれか、登録数は最大3、同じchannelを複数登録しない。この一意性はJSON SchemaとBroker起動時検証の両方で強制する。新規初期設定は未構成の版2で、公開鍵未設定時は配布元も空でなければならない。版1に配布元fieldを追加することはできない。
+`update_trust.json`版1は汎用Brokerの後方互換・署名検査専用形式として読み取る。版2は署名公開鍵・fingerprintに加えて、Broker所有の`package_sources`を持てる。各要素は`channel`と`base_url`だけであり、channelは`stable`、`beta`、`nightly`のいずれか、登録数は最大3、同じchannelを複数登録しない。この一意性はJSON SchemaとBroker起動時検証の両方で強制する。新規初期設定は未構成の版2で、公開鍵未設定時は配布元も空でなければならない。版1に配布元fieldを追加することはできない。製品Manifestの`update_trust`は版2、公開鍵・fingerprint必須、かつ配布元1件以上を要する。
 
-`base_url`は`https://`、小文字ASCIIの複数label DNS host、明示portなし、ASCII unreserved path segmentからなる固定形式だけを受け入れる。userinfo、query、fragment、backslash、percent-encoding、IP literal、`localhost`、空／末尾slash／`.`／`..` path segment、大文字hostは拒否する。設定は重複JSON fieldを拒否して8 KiB以内で読み、Broker起動時に再検証する。
+`base_url`は`https://`、小文字ASCIIの複数label DNS host、明示portなし、ASCII unreserved path segmentからなる固定形式だけを受け入れる。userinfo、query、fragment、backslash、percent-encoding、IP literal、`localhost`、空／末尾slash／`.`／`..` path segment、大文字hostは拒否する。汎用Brokerの永続設定は重複JSON fieldを拒否して8 KiB以内で読み、Broker起動時に再検証する。製品buildのcompile-time設定も同じ意味検査に加え、版2および配布元1件以上を要求する。
 
 配布元の候補一覧は、Update Centerの明示操作からBrokerだけが`base_url + "/updates.json"`へHTTPS GETする。Flutterは通信せず、候補URLも指定しない。取得はTLS証明書／hostname検証を使い、redirect、system proxy、自動retry、圧縮responseを無効化し、DNS結果をglobal addressに限定して接続先を固定する。HTTP応答はstatus 200と一個のContent-Lengthを要求し、各一覧は64 KiB以内、一回の全配布元取得は合計30秒以内にboundedする。候補一覧Schemaは版1の`版`／`候補`だけを許可する。各候補のEd25519署名を現在のBroker trustで個別検証し、候補channelが配布元channelと一致し、更新IDが一覧間で重複しない場合に限って永続候補へmergeする。一配布元でも取得・構造・署名検証に失敗した場合は今回の更新を一切保存せず、既存候補を保持する。配布元未構成時は外部通信をせず`unconfigured`を返す。Capabilityは読み取り専用の`更新候補取得`、PermissionはBroker所有trustに固定された`package_sources`とHTTPS／public-address境界、Approvalは利用者の明示操作による公開metadata取得では`not_required`（package download／Installは別途native Owner確認）とする。Auditは配布元件数・一覧byte hash・候補件数だけを記録し、本文や資格情報は保存しない。失敗時のRecoveryActionは既存候補の保持、固定配布元／trust状態の確認、および利用者による明示再試行である。package download／InstallのApprovalを生成・流用しない。
 

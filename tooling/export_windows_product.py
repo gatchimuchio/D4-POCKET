@@ -144,6 +144,35 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _update_trust_summary(manifest_file: dict[str, Any]) -> dict[str, Any]:
+    update_trust = manifest_file.get("update_trust")
+    if update_trust is None:
+        return {
+            "source": "not_configured",
+            "configured": False,
+            "public_key_fingerprint": None,
+            "package_source_count": 0,
+        }
+    try:
+        key_der = bytes.fromhex(update_trust["public_key_der_hex"])
+    except (TypeError, ValueError):
+        raise ValueError("製品update trustの公開鍵DERが不正") from None
+    ed25519_spki_prefix = bytes.fromhex("302a300506032b6570032100")
+    if (
+        len(key_der) != 44
+        or key_der[:12] != ed25519_spki_prefix
+        or update_trust["public_key_fingerprint"]
+        != f"sha256:{hashlib.sha256(key_der[12:]).hexdigest()}"
+    ):
+        raise ValueError("製品update trustのEd25519公開鍵／fingerprintが一致しない")
+    return {
+        "source": "schema_validated_manifest",
+        "configured": True,
+        "public_key_fingerprint": update_trust["public_key_fingerprint"],
+        "package_source_count": len(update_trust["package_sources"]),
+    }
+
+
 def _is_reparse_point(metadata: os.stat_result) -> bool:
     return bool(getattr(metadata, "st_file_attributes", 0) & 0x400)
 
@@ -250,6 +279,7 @@ def validate_export_inputs(
         raise ValueError("Export ReceiptがSchemaに適合しない")
     if manifest_errors:
         raise ValueError("Export Manifest fileがSchemaに適合しない")
+    _update_trust_summary(manifest_file)
 
     stored = receipt["manifest_file"]
     exported = receipt["export_manifest"]
@@ -529,6 +559,22 @@ def validate_build_evidence(evidence: dict[str, Any], artifact_root: Path) -> No
         or tree_hash != evidence["artifact_tree_sha256"]
     ):
         raise ValueError("Export build evidenceとportable bundle file inventoryが一致しない")
+    product_manifest = _parse_json_bytes(
+        _read_regular_file(
+            artifact_root / "product_manifest.json", MAX_MANIFEST_BYTES, "製品Manifest"
+        )
+    )
+    if validate_instance(product_manifest, _schema(MANIFEST_SCHEMA.name)):
+        raise ValueError("bundle内の製品Manifestが現行Schemaに適合しない")
+    if (
+        product_manifest["manifest"]["app_identity"]["app_id"] != evidence["app_id"]
+        or product_manifest["manifest"]["audit_store"]["store_id"]
+        != evidence["audit_store_id"]
+    ):
+        raise ValueError("bundle内Manifest identityがbuild evidenceと一致しない")
+    expected_update_trust = _update_trust_summary(product_manifest)
+    if evidence["rust_compile_time_update_trust"] != expected_update_trust:
+        raise ValueError("Rust compile-time update trustがExport Manifestと一致しない")
     credential_scan = _scan_credential_inventory(
         artifact_root, artifact_files, total_bytes, tree_hash
     )
@@ -703,13 +749,19 @@ def build_portable_bundle(
                 "--bin",
                 "gui_shell_desktop_launcher",
             ]
-            rust_environment = _build_child_environment(
-                {
-                    "CARGO_HOME": str(temporary_root / "g"),
-                    "GUI_SHELL_PRODUCT_APP_ID": app_id,
-                    "GUI_SHELL_PRODUCT_AUDIT_STORE_ID": audit_store_id,
-                }
-            )
+            rust_overrides = {
+                "CARGO_HOME": str(temporary_root / "g"),
+                "GUI_SHELL_PRODUCT_APP_ID": app_id,
+                "GUI_SHELL_PRODUCT_AUDIT_STORE_ID": audit_store_id,
+            }
+            if "update_trust" in manifest_file:
+                rust_overrides["GUI_SHELL_UPDATE_TRUST_JSON"] = json.dumps(
+                    manifest_file["update_trust"],
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+            rust_environment = _build_child_environment(rust_overrides)
             subprocess.run([cargo, *rust_arguments], cwd=source_root, env=rust_environment, check=True)
             helper_exe = target_dir / "release" / "gui_shell_rust_helper.exe"
             launcher_exe = target_dir / "release" / "gui_shell_desktop_launcher.exe"
@@ -786,6 +838,7 @@ def build_portable_bundle(
                 "app_id": app_id,
                 "audit_store_id": audit_store_id,
             },
+            "rust_compile_time_update_trust": _update_trust_summary(manifest_file),
             "build_duration_ms": elapsed_ms,
             "runtime_storage_root_template": "%LOCALAPPDATA%\\D4Pocket\\apps\\<App ID>\\stores\\<Audit store ID>",
             "portable_bundle_assembled": True,

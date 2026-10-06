@@ -24,6 +24,7 @@
     "flutter_build_arguments",
     "rust_build_arguments",
     "rust_compile_time_identity",
+    "rust_compile_time_update_trust",
     "build_duration_ms",
     "runtime_storage_root_template",
     "portable_bundle_assembled",
@@ -146,6 +147,36 @@
         "app_id": { "type": "string", "pattern": "^d4-pocket-app-[0-9a-f]{32}$" },
         "audit_store_id": { "type": "string", "pattern": "^audit-store-[0-9a-f]{32}$" }
       }
+    },
+    "rust_compile_time_update_trust": {
+      "type": "object",
+      "required": ["source", "configured", "public_key_fingerprint", "package_source_count"],
+      "additionalProperties": false,
+      "properties": {
+        "source": { "enum": ["schema_validated_manifest", "not_configured"] },
+        "configured": { "type": "boolean" },
+        "public_key_fingerprint": { "type": ["string", "null"], "pattern": "^sha256:[a-f0-9]{64}$" },
+        "package_source_count": { "type": "integer", "minimum": 0, "maximum": 3 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "configured": { "const": true } }, "required": ["configured"] },
+          "then": {
+            "properties": {
+              "source": { "const": "schema_validated_manifest" },
+              "public_key_fingerprint": { "type": "string" },
+              "package_source_count": { "minimum": 1 }
+            }
+          },
+          "else": {
+            "properties": {
+              "source": { "const": "not_configured" },
+              "public_key_fingerprint": { "type": "null" },
+              "package_source_count": { "const": 0 }
+            }
+          }
+        }
+      ]
     },
     "build_duration_ms": { "type": "integer", "minimum": 0 },
     "runtime_storage_root_template": { "const": "%LOCALAPPDATA%\\D4Pocket\\apps\\<App ID>\\stores\\<Audit store ID>" },

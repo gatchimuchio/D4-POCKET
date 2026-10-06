@@ -9858,6 +9858,7 @@ def test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative() ->
         "GITHUB_TOKEN": "secret-marker",
         "AWS_SECRET_ACCESS_KEY": "secret-marker",
         "GUI_SHELL_PRODUCT_APP_ID": "inherited-product-id",
+        "GUI_SHELL_UPDATE_TRUST_JSON": "inherited-update-trust",
         "CARGO_HOME": "credential-bearing-user-cache",
     }
     flutter_environment = _build_child_environment(
@@ -9878,6 +9879,7 @@ def test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative() ->
             "CARGO_HOME": "isolated-cargo-home",
             "GUI_SHELL_PRODUCT_APP_ID": "d4-pocket-app-" + "1" * 32,
             "GUI_SHELL_PRODUCT_AUDIT_STORE_ID": "audit-store-" + "2" * 32,
+            "GUI_SHELL_UPDATE_TRUST_JSON": '{"test":true}',
         },
         inherited=inherited,
     )
@@ -9885,10 +9887,21 @@ def test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative() ->
         rust_environment.get("CARGO_HOME") != "isolated-cargo-home"
         or rust_environment.get("GUI_SHELL_PRODUCT_APP_ID") != "d4-pocket-app-" + "1" * 32
         or rust_environment.get("GUI_SHELL_PRODUCT_AUDIT_STORE_ID") != "audit-store-" + "2" * 32
+        or rust_environment.get("GUI_SHELL_UPDATE_TRUST_JSON") != '{"test":true}'
         or "GITHUB_TOKEN" in rust_environment
         or "AWS_SECRET_ACCESS_KEY" in rust_environment
     ):
-        errors.append("Rust build childへcredential環境を残すか、compile-time identityを分離しない")
+        errors.append("Rust build childへcredential環境を残すか、compile-time product identity／trustを分離しない")
+    no_trust_environment = _build_child_environment(
+        {
+            "CARGO_HOME": "isolated-cargo-home",
+            "GUI_SHELL_PRODUCT_APP_ID": "d4-pocket-app-" + "1" * 32,
+            "GUI_SHELL_PRODUCT_AUDIT_STORE_ID": "audit-store-" + "2" * 32,
+        },
+        inherited=inherited,
+    )
+    if "GUI_SHELL_UPDATE_TRUST_JSON" in no_trust_environment:
+        errors.append("未構成Productへ親環境のupdate trustを継承する")
 
     with tempfile.TemporaryDirectory(prefix="d4b-") as temporary:
         temporary_root = Path(temporary)
@@ -9938,6 +9951,59 @@ def test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative() ->
     manifest_raw = source_manifest_path.read_bytes()
     source_receipt = load_contract_fixture("gui_shell_export_receipt.valid.json")
     receipt_raw = (CONTRACT_EXAMPLES / "gui_shell_export_receipt.valid.json").read_bytes()
+    test_public_key = bytes.fromhex(
+        "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"
+    )
+    configured_trust = {
+        "版": 2,
+        "algorithm": "Ed25519",
+        "public_key_der_hex": (
+            bytes.fromhex("302a300506032b6570032100") + test_public_key
+        ).hex(),
+        "public_key_fingerprint": "sha256:" + hashlib.sha256(test_public_key).hexdigest(),
+        "package_sources": [
+            {"channel": "stable", "base_url": "https://updates.example.invalid/d4/stable"}
+        ],
+    }
+    configured_manifest = copy.deepcopy(source_manifest)
+    configured_manifest["update_trust"] = configured_trust
+    configured_manifest_raw = json.dumps(
+        configured_manifest, ensure_ascii=False, separators=(",", ":")
+    ).encode("utf-8")
+    configured_receipt = copy.deepcopy(source_receipt)
+    configured_receipt["manifest_file"]["byte_length"] = len(configured_manifest_raw)
+    configured_receipt["manifest_file"]["sha256"] = (
+        "sha256:" + hashlib.sha256(configured_manifest_raw).hexdigest()
+    )
+    try:
+        validate_export_inputs(
+            json.dumps(configured_receipt, ensure_ascii=False).encode("utf-8"),
+            configured_manifest_raw,
+        )
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        errors.append(f"Schema適合する製品update trustをExport build入力へ結合できない: {exc}")
+    bad_trust_manifest = copy.deepcopy(configured_manifest)
+    bad_trust_manifest["update_trust"]["package_sources"] = []
+    if not validate_instance(bad_trust_manifest, load_schema("gui_shell_export_manifest.schema.json")):
+        errors.append("配布元なしの製品update trustをExport Manifest Schemaが拒否しない")
+    bad_trust_receipt = copy.deepcopy(configured_receipt)
+    bad_fingerprint_manifest = copy.deepcopy(configured_manifest)
+    bad_fingerprint_manifest["update_trust"]["public_key_fingerprint"] = "sha256:" + "0" * 64
+    bad_fingerprint_raw = json.dumps(
+        bad_fingerprint_manifest, ensure_ascii=False, separators=(",", ":")
+    ).encode("utf-8")
+    bad_trust_receipt["manifest_file"]["byte_length"] = len(bad_fingerprint_raw)
+    bad_trust_receipt["manifest_file"]["sha256"] = (
+        "sha256:" + hashlib.sha256(bad_fingerprint_raw).hexdigest()
+    )
+    try:
+        validate_export_inputs(
+            json.dumps(bad_trust_receipt, ensure_ascii=False).encode("utf-8"),
+            bad_fingerprint_raw,
+        )
+        errors.append("Ed25519公開鍵とfingerprintが不一致のExport Manifestを受理する")
+    except ValueError:
+        pass
     try:
         validate_export_inputs(receipt_raw, manifest_raw)
     except (OSError, ValueError, KeyError, TypeError) as exc:
@@ -10004,6 +10070,43 @@ def test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative() ->
             f"--dart-define=GUI_SHELL_PRODUCT_VERSION={product_version}"
         )
         validate_build_evidence(good, bundle)
+
+        product_manifest_path = bundle / "product_manifest.json"
+        configured_summary = {
+            "source": "schema_validated_manifest",
+            "configured": True,
+            "public_key_fingerprint": configured_trust["public_key_fingerprint"],
+            "package_source_count": 1,
+        }
+        configured_good = copy.deepcopy(good)
+        configured_good["rust_compile_time_update_trust"] = configured_summary
+        product_manifest_path.write_bytes(configured_manifest_raw)
+        configured_good["source_manifest_sha256"] = hashlib.sha256(
+            configured_manifest_raw
+        ).hexdigest()
+        (
+            configured_good["artifact_files"],
+            configured_good["artifact_total_bytes"],
+            configured_good["artifact_tree_sha256"],
+        ) = _artifact_inventory(bundle)
+        configured_good["credential_artifact_scan"] = scan_credential_artifacts(
+            bundle, expected_tree_sha256=configured_good["artifact_tree_sha256"]
+        )
+        configured_good["authority_boundary"]["credential_artifact_scan_status"] = (
+            configured_good["credential_artifact_scan"]["status"]
+        )
+        try:
+            validate_build_evidence(configured_good, bundle)
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            errors.append(f"compile-time update trustのManifest／evidence結合が成立しない: {exc}")
+        forged_trust_evidence = copy.deepcopy(configured_good)
+        forged_trust_evidence["rust_compile_time_update_trust"]["package_source_count"] = 0
+        try:
+            validate_build_evidence(forged_trust_evidence, bundle)
+            errors.append("Manifestと異なるcompile-time update trust evidenceを受理する")
+        except ValueError:
+            pass
+        product_manifest_path.write_bytes(manifest_raw)
 
         receipt_path = bundle / windows_export.RECEIPT_NAME
         receipt_raw = (json.dumps(good, ensure_ascii=False, indent=2) + "\n").encode("utf-8")

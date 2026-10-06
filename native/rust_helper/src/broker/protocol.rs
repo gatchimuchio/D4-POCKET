@@ -1052,7 +1052,8 @@ impl Broker {
             super::agent_task_scratch::AgentTaskScratchJournal::open(persistent_store.clone())?;
         let profiles = super::profile_center::load_persistent_profiles(&persistent_store)?;
         let updates = super::update_center::load_persistent_updates(&persistent_store)?;
-        let update_trust = super::update_center::load_persistent_trust(&persistent_store)?;
+        let update_trust =
+            super::update_center::load_effective_persistent_trust(&persistent_store)?;
         let notification_states =
             super::notification_center::load_persistent_states(&persistent_store)?;
         let a2a_connections = super::a2a_center::load_persistent_connections(&persistent_store)?;

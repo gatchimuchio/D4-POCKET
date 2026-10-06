@@ -46,6 +46,12 @@
     "app_id": "d4-pocket-app-11111111111111111111111111111111",
     "audit_store_id": "audit-store-22222222222222222222222222222222"
   },
+  "rust_compile_time_update_trust": {
+    "source": "not_configured",
+    "configured": false,
+    "public_key_fingerprint": null,
+    "package_source_count": 0
+  },
   "build_duration_ms": 127000,
   "runtime_storage_root_template": "%LOCALAPPDATA%\\D4Pocket\\apps\\<App ID>\\stores\\<Audit store ID>",
   "portable_bundle_assembled": true,
