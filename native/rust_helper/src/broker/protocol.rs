@@ -522,6 +522,8 @@ pub enum BrokerOperation {
     GuiShell書出し,
     #[serde(rename = "更新一覧")]
     更新一覧,
+    #[serde(rename = "更新候補取得")]
+    更新候補取得,
     #[serde(rename = "更新確認")]
     更新確認,
     #[serde(rename = "更新署名検査")]
@@ -691,6 +693,7 @@ impl BrokerOperation {
             BrokerOperation::GuiShell編集提案 => "GUI Shell編集提案",
             BrokerOperation::GuiShell書出し => "GUI Shell書出し",
             BrokerOperation::更新一覧 => "更新一覧",
+            BrokerOperation::更新候補取得 => "更新候補取得",
             BrokerOperation::更新確認 => "更新確認",
             BrokerOperation::更新署名検査 => "更新署名検査",
             BrokerOperation::更新download要求 => "更新download要求",
@@ -2342,6 +2345,7 @@ impl Broker {
                 &payload_hash,
             ),
             operation @ (BrokerOperation::更新一覧
+            | BrokerOperation::更新候補取得
             | BrokerOperation::更新確認
             | BrokerOperation::更新署名検査
             | BrokerOperation::更新download要求

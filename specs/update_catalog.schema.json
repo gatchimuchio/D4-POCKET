@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/update_catalog.schema.json",
+  "title": "署名更新候補一覧（UpdateCatalog）",
+  "description": "Brokerが固定HTTPS配布元から取得するbounded候補一覧。候補ごとのEd25519署名をBroker trustで個別検証する。",
+  "type": "object",
+  "required": ["版", "候補"],
+  "additionalProperties": false,
+  "properties": {
+    "版": { "const": 1 },
+    "候補": {
+      "type": "array",
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": { "$ref": "update_candidate.schema.json" }
+    }
+  }
+}

@@ -57,6 +57,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String? _aiEditMessage;
   String? _aiEditReceipt;
   String? _updateMessage;
+  bool _checkingUpdateCatalog = false;
   final TextEditingController _composeIdController =
       TextEditingController(text: 'd4-pocket-local');
   final TextEditingController _composeNameController =
@@ -116,7 +117,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ? null
         : UpdateClient(widget.client.brokerTransport!);
     _refreshProfiles();
-    _refreshUpdates();
+    _updatesFuture = _updateClient?.list();
   }
 
   @override
@@ -764,9 +765,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
               const SizedBox(height: 8),
               OutlinedButton.icon(
-                onPressed: _refreshUpdates,
+                onPressed: _checkingUpdateCatalog ? null : _fetchUpdateCatalog,
                 icon: const Icon(Icons.refresh),
-                label: const Text('更新一覧を確認'),
+                label: Text(
+                  _checkingUpdateCatalog ? '候補取得中' : '配布元から候補取得',
+                ),
               ),
               if (_updateMessage != null) ...[
                 const SizedBox(height: 8),
@@ -947,12 +950,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _refreshUpdates() {
+  Future<void> _fetchUpdateCatalog() async {
     final client = _updateClient;
     if (client == null) return;
-    setState(() {
-      _updatesFuture = client.list();
-    });
+    setState(() => _checkingUpdateCatalog = true);
+    try {
+      final result = await client.fetchCandidates();
+      final state = result['状態'];
+      final count = result['候補件数'];
+      _setUpdateMessage(
+        state == 'unconfigured'
+            ? 'Brokerに署名済み配布元が構成されていません。'
+            : 'Brokerが署名検証済み候補を取得しました（${count ?? 0}件）。',
+      );
+    } catch (error) {
+      _setUpdateMessage('更新候補の取得に失敗しました: $error');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _checkingUpdateCatalog = false;
+          _updatesFuture = client.list();
+        });
+      }
+    }
+  }
+
+  void _loadUpdates() {
+    final client = _updateClient;
+    if (client == null) return;
+    setState(() => _updatesFuture = client.list());
   }
 
   Future<void> _runUpdateRequest(
@@ -974,7 +1000,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (error) {
       _setUpdateMessage('更新操作失敗: $error');
     }
-    _refreshUpdates();
+    _loadUpdates();
   }
 
   void _setUpdateMessage(String message) {

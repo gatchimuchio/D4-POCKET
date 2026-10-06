@@ -30,8 +30,10 @@ const TRUST_VERSION: u64 = 2;
 const CANDIDATE_VERSION: u64 = 2;
 const MAX_UPDATES: usize = 64;
 const MAX_MANIFEST_BYTES: usize = 64 * 1024;
+const MAX_CATALOG_CANDIDATES: usize = 64;
 const MAX_PACKAGE_BYTES: u64 = 4 * 1024 * 1024 * 1024;
 const OP_LIST: &str = "更新一覧";
+const OP_FETCH_CATALOG: &str = "更新候補取得";
 const OP_CHECK: &str = "更新確認";
 const OP_VERIFY: &str = "更新署名検査";
 const OP_DOWNLOAD: &str = "更新download要求";
@@ -272,6 +274,7 @@ fn download_error_code(error: &super::update_download::DownloadError) -> &'stati
         E::RedirectOrUnexpectedStatus => "update_download_response_rejected",
         E::InvalidHeaders => "update_download_headers_invalid",
         E::SizeMismatch => "update_download_size_mismatch",
+        E::DocumentTooLarge => "update_download_size_mismatch",
         E::DigestMismatch => "update_download_digest_mismatch",
         E::Cancelled => "update_download_cancelled",
         E::TimedOut => "update_download_timeout",
@@ -415,6 +418,15 @@ struct CheckRequest {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+struct UpdateCatalogDocument {
+    #[serde(rename = "版")]
+    version: u64,
+    #[serde(rename = "候補")]
+    candidates: Vec<UpdateCandidateDocument>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct UpdateIDRequest {
     #[serde(rename = "版")]
     version: u64,
@@ -528,6 +540,7 @@ pub(super) fn dispatch(
     poll_download_completion(broker);
     match operation.as_str() {
         OP_LIST => list(broker, payload, request_id, payload_hash),
+        OP_FETCH_CATALOG => fetch_catalog(broker, payload, request_id, payload_hash),
         OP_CHECK => check(broker, payload, request_id, payload_hash),
         OP_VERIFY => verify(broker, payload, request_id, payload_hash),
         OP_DOWNLOAD => execution_request(
@@ -583,6 +596,256 @@ pub(super) fn dispatch(
             true,
             payload_hash,
         ),
+    }
+}
+
+fn fetch_catalog(
+    broker: &mut Broker,
+    payload: &Value,
+    request_id: &str,
+    hash: &str,
+) -> BrokerResponse {
+    fetch_catalog_with(broker, payload, request_id, hash, |url, deadline| {
+        super::update_download::fetch_update_catalog(url, MAX_MANIFEST_BYTES, deadline)
+    })
+}
+
+fn fetch_catalog_with<F>(
+    broker: &mut Broker,
+    payload: &Value,
+    request_id: &str,
+    hash: &str,
+    mut fetch: F,
+) -> BrokerResponse
+where
+    F: FnMut(&str, std::time::Instant) -> Result<Vec<u8>, super::update_download::DownloadError>,
+{
+    if payload != &json!({"版": VERSION}) {
+        return reject_catalog(
+            broker,
+            request_id,
+            "update_catalog_request_invalid",
+            "候補取得要求は版だけを受け付ける",
+            hash,
+        );
+    }
+    let Some(trust) = broker.update_trust.clone() else {
+        return reject_catalog(
+            broker,
+            request_id,
+            "update_trust_unconfigured",
+            "Broker所有の更新署名trustが未構成",
+            hash,
+        );
+    };
+    if let Err(reason) = validate_trust(&trust) {
+        return reject_catalog(broker, request_id, "update_trust_invalid", &reason, hash);
+    }
+    if trust.package_sources.is_empty() {
+        return accepted(
+            broker,
+            OP_FETCH_CATALOG,
+            request_id,
+            json!({"版": VERSION, "状態": "unconfigured", "配布元件数": 0, "候補件数": 0, "証拠種別": EVIDENCE_SOURCE_INTERNAL_STATE}),
+            hash,
+            &catalog_audit_reason("Broker trustに候補配布元がないため外部通信を実行しない"),
+        );
+    }
+
+    let deadline = std::time::Instant::now() + super::update_download::CATALOG_TIMEOUT;
+    let mut records = Vec::new();
+    let mut seen_ids = BTreeSet::new();
+    let mut catalog_hashes = Vec::new();
+    let mut total_bytes = 0usize;
+    for source in &trust.package_sources {
+        let url = format!("{}/updates.json", source.base_url);
+        let bytes = match fetch(&url, deadline) {
+            Ok(bytes) if !bytes.is_empty() && bytes.len() <= MAX_MANIFEST_BYTES => bytes,
+            Ok(_) => {
+                return reject_catalog(
+                    broker,
+                    request_id,
+                    "update_catalog_size_invalid",
+                    "候補一覧のbyte長が上限外",
+                    hash,
+                )
+            }
+            Err(error) => {
+                let (code, reason) = catalog_download_error(&error);
+                return reject_catalog(broker, request_id, code, reason, hash);
+            }
+        };
+        total_bytes = match total_bytes.checked_add(bytes.len()) {
+            Some(total) if total <= MAX_MANIFEST_BYTES * 3 => total,
+            _ => {
+                return reject_catalog(
+                    broker,
+                    request_id,
+                    "update_catalog_total_size_invalid",
+                    "候補一覧の合計byte長が上限外",
+                    hash,
+                )
+            }
+        };
+        let catalog_hash = sha256_tagged(&bytes);
+        catalog_hashes.push(catalog_hash);
+        let raw = match std::str::from_utf8(&bytes) {
+            Ok(raw) => raw,
+            Err(_) => {
+                return reject_catalog(
+                    broker,
+                    request_id,
+                    "update_catalog_encoding_invalid",
+                    "候補一覧がUTF-8ではない",
+                    hash,
+                )
+            }
+        };
+        let document: UpdateCatalogDocument =
+            match super::json_input::read_unique::<UpdateCatalogDocument>(raw) {
+                Ok(document)
+                    if document.version == VERSION
+                        && document.candidates.len() <= MAX_CATALOG_CANDIDATES =>
+                {
+                    document
+                }
+                _ => {
+                    return reject_catalog(
+                        broker,
+                        request_id,
+                        "update_catalog_invalid",
+                        "候補一覧の構造または版が不正",
+                        hash,
+                    )
+                }
+            };
+        for candidate in document.candidates {
+            if candidate.channel != source.channel || !seen_ids.insert(candidate.update_id.clone())
+            {
+                return reject_catalog(
+                    broker,
+                    request_id,
+                    "update_catalog_candidate_conflict",
+                    "候補channelまたは更新IDが配布元と一致しない",
+                    hash,
+                );
+            }
+            match verify_candidate(broker, candidate) {
+                Ok(record) => records.push(record),
+                Err((code, reason)) => {
+                    return reject_catalog(broker, request_id, code, reason, hash)
+                }
+            }
+        }
+    }
+    if records.len() > MAX_UPDATES {
+        return reject_catalog(
+            broker,
+            request_id,
+            "update_catalog_limit_exceeded",
+            "候補一覧の総件数上限を超過",
+            hash,
+        );
+    }
+    let previous = broker.updates.clone();
+    for record in &records {
+        broker.updates.insert(
+            record.candidate.update_id.clone(),
+            serde_json::to_value(record).unwrap_or(Value::Null),
+        );
+    }
+    if broker.updates.len() > MAX_UPDATES {
+        broker.updates = previous;
+        return reject_catalog(
+            broker,
+            request_id,
+            "update_catalog_limit_exceeded",
+            "保存済み候補を含む件数上限を超過",
+            hash,
+        );
+    }
+    if persist(broker).is_err() {
+        broker.updates = previous;
+        return broker.audit_store_failed_response(
+            request_id,
+            OP_FETCH_CATALOG,
+            "update_catalog_persistence_failed",
+            &catalog_audit_reason(
+                "候補永続化に失敗。既存候補は保持した。Audit／永続storeを確認してから明示再試行",
+            ),
+        );
+    }
+    let catalog_hashes = catalog_hashes.join(",");
+    accepted_external(
+        broker,
+        OP_FETCH_CATALOG,
+        request_id,
+        json!({"版": VERSION, "状態": "updated", "配布元件数": trust.package_sources.len(), "候補件数": records.len(), "証拠種別": "EXTERNAL_EVIDENCE"}),
+        hash,
+        &catalog_audit_reason(&format!(
+            "Broker固定HTTPS配布元から署名検証済み候補を取得し永続化 catalog_hashes={} candidates={}",
+            catalog_hashes, records.len()
+        )),
+    )
+}
+
+fn catalog_audit_reason(detail: &str) -> String {
+    format!(
+        "Capability=更新候補取得 Permission=Broker所有trust.package_sourcesに固定されたchannel別HTTPS配布元 Approval=明示操作によるread-only公開metadata取得はnot_required。package download／Installは別native Owner確認 AuditEvent=配布元件数・catalog hash・候補件数だけ RecoveryAction=失敗時は既存候補を保持し、trust／配布元を修正後に明示再試行 detail={detail}"
+    )
+}
+
+fn reject_catalog(
+    broker: &mut Broker,
+    request_id: &str,
+    code: &str,
+    detail: &str,
+    hash: &str,
+) -> BrokerResponse {
+    reject(
+        broker,
+        request_id,
+        OP_FETCH_CATALOG,
+        code,
+        &catalog_audit_reason(detail),
+        hash,
+    )
+}
+
+fn catalog_download_error(
+    error: &super::update_download::DownloadError,
+) -> (&'static str, &'static str) {
+    use super::update_download::DownloadError;
+    match error {
+        DownloadError::InvalidRequest => ("update_catalog_source_invalid", "固定候補URLが不正"),
+        DownloadError::NameResolution => {
+            ("update_catalog_dns_failed", "候補配布元の名前解決に失敗")
+        }
+        DownloadError::NonPublicAddress => (
+            "update_catalog_address_blocked",
+            "許可されない配布元addressを拒否",
+        ),
+        DownloadError::Network => ("update_catalog_network_failed", "候補配布元HTTPS通信に失敗"),
+        DownloadError::RedirectOrUnexpectedStatus => (
+            "update_catalog_response_rejected",
+            "候補配布元のstatusまたはredirectを拒否",
+        ),
+        DownloadError::InvalidHeaders => (
+            "update_catalog_headers_invalid",
+            "候補一覧のHTTP headerが不正",
+        ),
+        DownloadError::SizeMismatch | DownloadError::DocumentTooLarge => {
+            ("update_catalog_size_invalid", "候補一覧のbyte長が不正")
+        }
+        DownloadError::TimedOut => ("update_catalog_timeout", "候補取得期限を超過"),
+        DownloadError::Cancelled => ("update_catalog_cancelled", "候補取得を中断"),
+        DownloadError::ResolverBusy | DownloadError::DnsCancellationFailed => (
+            "update_catalog_dns_failed",
+            "候補配布元の名前解決を完了できない",
+        ),
+        DownloadError::DigestMismatch | DownloadError::Storage => {
+            ("update_catalog_failed", "候補取得処理を完了できない")
+        }
     }
 }
 
@@ -704,8 +967,7 @@ fn rollback_descriptor_matches_candidate(
     verified.candidate_hash == descriptor.candidate_hash
         && verified.signature_status == "verified"
         && verified.candidate.offered_version == descriptor.product_version
-        && verified.candidate.package_sha256.as_deref()
-            == Some(descriptor.package_sha256.as_str())
+        && verified.candidate.package_sha256.as_deref() == Some(descriptor.package_sha256.as_str())
 }
 
 fn rollback_descriptor_projection(
@@ -2993,6 +3255,45 @@ fn accepted(
     }
 }
 
+fn accepted_external(
+    broker: &mut Broker,
+    operation: &str,
+    request_id: &str,
+    body: Value,
+    hash: &str,
+    reason: &str,
+) -> BrokerResponse {
+    let event = match broker.append_audit(
+        request_id,
+        operation,
+        "accepted",
+        reason,
+        "EXTERNAL_EVIDENCE",
+        hash,
+    ) {
+        Ok(event) => event,
+        Err(_) => {
+            return broker.audit_store_failed_response(
+                request_id,
+                operation,
+                "update_audit_append_failed",
+                "更新操作の監査を確定できない",
+            )
+        }
+    };
+    BrokerResponse {
+        request_id: request_id.to_string(),
+        operation: operation.to_string(),
+        status: BrokerStatus::Accepted,
+        evidence_source: "EXTERNAL_EVIDENCE".to_string(),
+        audit_event_id: event.event_id,
+        error: None,
+        health: None,
+        body: Some(body),
+        shutdown_requested: broker.shutdown_requested,
+    }
+}
+
 fn suspended(
     broker: &mut Broker,
     operation: &str,
@@ -3203,7 +3504,11 @@ mod tests {
     fn trust_and_candidate_pair_for_packages(
         current_package: &[u8],
         previous_package: &[u8],
-    ) -> (UpdateTrust, UpdateCandidateDocument, UpdateCandidateDocument) {
+    ) -> (
+        UpdateTrust,
+        UpdateCandidateDocument,
+        UpdateCandidateDocument,
+    ) {
         let key = Ed25519KeyPair::generate_pkcs8(&SystemRandom::new()).unwrap();
         let pair = Ed25519KeyPair::from_pkcs8(key.as_ref()).unwrap();
         let der = [
@@ -3387,6 +3692,165 @@ mod tests {
         );
         assert_eq!(response.status, BrokerStatus::Rejected);
         assert_eq!(response.error.unwrap().code, "update_trust_unconfigured");
+    }
+
+    #[test]
+    fn trusted_catalog_fetch_persists_only_signature_verified_channel_candidates() {
+        let (mut trust, candidate) = trust_and_candidate();
+        trust.package_sources = vec![UpdatePackageSource {
+            channel: "stable".into(),
+            base_url: "https://updates.example.invalid/d4/stable".into(),
+        }];
+        let mut broker = Broker::new("session-1");
+        broker.update_trust = Some(trust);
+        let bytes = serde_json::to_vec(&json!({"版": VERSION, "候補": [candidate]})).unwrap();
+        let request_hash = sha256_tagged(b"update-catalog-fetch");
+        let response = fetch_catalog_with(
+            &mut broker,
+            &json!({"版": VERSION}),
+            "catalog-fetch-test",
+            &request_hash,
+            |url, _deadline| {
+                assert_eq!(
+                    url,
+                    "https://updates.example.invalid/d4/stable/updates.json"
+                );
+                Ok(bytes.clone())
+            },
+        );
+
+        assert_eq!(response.status, BrokerStatus::Accepted);
+        assert_eq!(response.evidence_source, "EXTERNAL_EVIDENCE");
+        assert_eq!(response.body.as_ref().unwrap()["候補件数"], 1);
+        assert_eq!(broker.updates.len(), 1);
+        assert_eq!(broker.updates["update-1"]["署名状態"], "verified");
+        let event = broker.audit_events().last().unwrap();
+        assert_eq!(event.evidence_source, "EXTERNAL_EVIDENCE");
+        assert!(event.reason.contains("catalog_hashes=sha256:"));
+        assert!(event.reason.contains("Capability=更新候補取得"));
+        assert!(event
+            .reason
+            .contains("Permission=Broker所有trust.package_sources"));
+        assert!(event.reason.contains("Approval=明示操作"));
+        assert!(event
+            .reason
+            .contains("RecoveryAction=失敗時は既存候補を保持"));
+    }
+
+    #[test]
+    fn invalid_catalog_candidate_does_not_replace_existing_verified_candidate() {
+        let (mut trust, candidate) = trust_and_candidate();
+        trust.package_sources = vec![UpdatePackageSource {
+            channel: "stable".into(),
+            base_url: "https://updates.example.invalid/d4/stable".into(),
+        }];
+        let mut broker = Broker::new("session-1");
+        broker.update_trust = Some(trust);
+        let existing = call(
+            &mut broker,
+            BrokerOperation::更新確認,
+            json!({"版": VERSION, "候補": [candidate.clone()]}),
+        );
+        assert_eq!(existing.status, BrokerStatus::Accepted);
+        let previous = broker.updates.clone();
+
+        let mut forged = candidate.clone();
+        forged.signature_hex = "00".repeat(64);
+        let bytes = serde_json::to_vec(&json!({"版": VERSION, "候補": [forged]})).unwrap();
+        let response = fetch_catalog_with(
+            &mut broker,
+            &json!({"版": VERSION}),
+            "catalog-forged-test",
+            &sha256_tagged(b"update-catalog-forged"),
+            |_, _deadline| Ok(bytes.clone()),
+        );
+
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        let error = response.error.unwrap();
+        assert_eq!(error.code, "update_signature_invalid");
+        assert!(error
+            .message
+            .contains("RecoveryAction=失敗時は既存候補を保持"));
+        assert_eq!(broker.updates, previous);
+        assert_eq!(
+            broker.audit_events().last().unwrap().reason,
+            "update_signature_invalid"
+        );
+
+        let mut mismatched_channel = candidate;
+        mismatched_channel.channel = "beta".into();
+        let bytes =
+            serde_json::to_vec(&json!({"版": VERSION, "候補": [mismatched_channel]})).unwrap();
+        let response = fetch_catalog_with(
+            &mut broker,
+            &json!({"版": VERSION}),
+            "catalog-channel-mismatch-test",
+            &sha256_tagged(b"update-catalog-channel-mismatch"),
+            |_, _deadline| Ok(bytes.clone()),
+        );
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(
+            response.error.unwrap().code,
+            "update_catalog_candidate_conflict"
+        );
+        assert_eq!(broker.updates, previous);
+    }
+
+    #[test]
+    fn all_catalog_sources_share_one_operation_deadline() {
+        let (mut trust, candidate) = trust_and_candidate();
+        trust.package_sources = vec![
+            UpdatePackageSource {
+                channel: "stable".into(),
+                base_url: "https://updates.example.invalid/d4/stable".into(),
+            },
+            UpdatePackageSource {
+                channel: "beta".into(),
+                base_url: "https://updates.example.invalid/d4/beta".into(),
+            },
+        ];
+        let mut broker = Broker::new("session-1");
+        broker.update_trust = Some(trust);
+        let bytes = serde_json::to_vec(&json!({"版": VERSION, "候補": [candidate]})).unwrap();
+        let mut seen_deadline = None;
+        let response = fetch_catalog_with(
+            &mut broker,
+            &json!({"版": VERSION}),
+            "catalog-shared-deadline-test",
+            &sha256_tagged(b"update-catalog-shared-deadline"),
+            |url, deadline| {
+                if let Some(first) = seen_deadline {
+                    assert_eq!(deadline, first);
+                } else {
+                    seen_deadline = Some(deadline);
+                }
+                if url.ends_with("/stable/updates.json") {
+                    Ok(bytes.clone())
+                } else {
+                    Err(super::super::update_download::DownloadError::TimedOut)
+                }
+            },
+        );
+
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(response.error.unwrap().code, "update_catalog_timeout");
+        assert!(broker.updates.is_empty());
+    }
+
+    #[test]
+    fn catalog_fetch_without_configured_source_does_not_call_network() {
+        let (trust, _) = trust_and_candidate();
+        let mut broker = Broker::new("session-1");
+        broker.update_trust = Some(trust);
+        let response = fetch_catalog_with(
+            &mut broker,
+            &json!({"版": VERSION}),
+            "catalog-unconfigured-test",
+            &sha256_tagged(b"update-catalog-unconfigured"),
+            |_, _deadline| panic!("未構成配布元では通信しない"),
+        );
+        assert_eq!(response.status, BrokerStatus::Accepted);
+        assert_eq!(response.body.as_ref().unwrap()["状態"], "unconfigured");
     }
 
     #[test]
@@ -3669,9 +4133,8 @@ mod tests {
         let candidate_hash =
             crate::broker::protocol::canonical_payload_hash(Some(&candidate_value));
         let previous_candidate_value = serde_json::to_value(&previous_candidate).unwrap();
-        let previous_candidate_hash = crate::broker::protocol::canonical_payload_hash(Some(
-            &previous_candidate_value,
-        ));
+        let previous_candidate_hash =
+            crate::broker::protocol::canonical_payload_hash(Some(&previous_candidate_value));
         let mut broker = Broker::new_persistent("session-1", &store_root).unwrap();
         broker.update_trust = Some(trust);
         broker

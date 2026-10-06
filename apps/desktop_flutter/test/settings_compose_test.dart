@@ -5,6 +5,49 @@ import 'package:gui_shell_desktop/services/shell_core_client.dart';
 import 'package:gui_shell_ui/runtime_dialogue_client.dart' show BrokerTransport;
 
 void main() {
+  testWidgets('更新センターからBrokerへ配布元候補取得を要求し一覧を更新する', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final transport = _ComposeScreenTransport();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SettingsScreen(
+            client: ShellCoreClient.mock(transport: transport),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final fetchButton = find.text('配布元から候補取得');
+    await tester.ensureVisible(fetchButton);
+    await tester.tap(fetchButton);
+    await tester.pumpAndSettle();
+
+    expect(
+        transport.requests.where((request) => request['operation'] == '更新候補取得'),
+        hasLength(1));
+    expect(
+      transport.lastPayload('更新候補取得'),
+      {'版': 1},
+    );
+    expect(
+      transport.requests.where((request) => request['operation'] == '更新一覧'),
+      hasLength(2),
+      reason: '候補取得後にBrokerの保存済み一覧を読み直す',
+    );
+    expect(
+      find.text('Brokerが署名検証済み候補を取得しました（2件）。'),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'Compose画面が選択をManifest、Preview、Module plan、編集提案へつなぐ',
     (tester) async {
@@ -142,6 +185,10 @@ class _ComposeScreenTransport implements BrokerTransport {
     final body = switch (operation) {
       'プロファイル一覧' => <String, Object?>{'Profiles': <Object?>[]},
       '更新一覧' => <String, Object?>{'更新一覧': <Object?>[]},
+      '更新候補取得' => <String, Object?>{
+          '状態': 'updated',
+          '候補件数': 2,
+        },
       'GUI Shell構成' => <String, Object?>{
           'compose_manifest': payload,
           'build_status': 'not_started',

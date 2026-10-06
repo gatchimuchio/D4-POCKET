@@ -1,6 +1,6 @@
 # 更新センター
 
-状態: C12 download、署名済みpackageの未起動version staging、別Owner確認によるactive version record／Start Menu shortcut切替、およびBrokerが記録した直前版へのRollbackをBroker／native Owner経路へ接続。UIは初回導入と導入済み更新をBroker状態から区別し、download完了後だけ未起動版展開操作を有効化する。process起動は行わない。RollbackはBroker fixtureで成立し、installed product経路の証拠は別途必要。
+状態: Broker固定HTTPS配布元からの署名済み候補一覧取得、C12 package download、未起動version staging、別Owner確認によるactive version record／Start Menu shortcut切替、およびBrokerが記録した直前版へのRollbackを接続。UIは初回導入と導入済み更新をBroker状態から区別し、download完了後だけ未起動版展開操作を有効化する。process起動は行わない。RollbackはBroker fixtureで成立し、installed product経路の証拠は別途必要。
 
 更新センターは、更新候補の表示、Broker所有信頼設定によるEd25519署名検査、更新適用の要求、延期、rollback要求を扱う。更新候補自身の公開鍵、MCP metadata、Profile、履歴、UI stateは信頼源ではない。
 
@@ -10,11 +10,13 @@
 
 `base_url`は`https://`、小文字ASCIIの複数label DNS host、明示portなし、ASCII unreserved path segmentからなる固定形式だけを受け入れる。userinfo、query、fragment、backslash、percent-encoding、IP literal、`localhost`、空／末尾slash／`.`／`..` path segment、大文字hostは拒否する。設定は重複JSON fieldを拒否して8 KiB以内で読み、Broker起動時に再検証する。
 
+配布元の候補一覧は、Update Centerの明示操作からBrokerだけが`base_url + "/updates.json"`へHTTPS GETする。Flutterは通信せず、候補URLも指定しない。取得はTLS証明書／hostname検証を使い、redirect、system proxy、自動retry、圧縮responseを無効化し、DNS結果をglobal addressに限定して接続先を固定する。HTTP応答はstatus 200と一個のContent-Lengthを要求し、各一覧は64 KiB以内、一回の全配布元取得は合計30秒以内にboundedする。候補一覧Schemaは版1の`版`／`候補`だけを許可する。各候補のEd25519署名を現在のBroker trustで個別検証し、候補channelが配布元channelと一致し、更新IDが一覧間で重複しない場合に限って永続候補へmergeする。一配布元でも取得・構造・署名検証に失敗した場合は今回の更新を一切保存せず、既存候補を保持する。配布元未構成時は外部通信をせず`unconfigured`を返す。Capabilityは読み取り専用の`更新候補取得`、PermissionはBroker所有trustに固定された`package_sources`とHTTPS／public-address境界、Approvalは利用者の明示操作による公開metadata取得では`not_required`（package download／Installは別途native Owner確認）とする。Auditは配布元件数・一覧byte hash・候補件数だけを記録し、本文や資格情報は保存しない。失敗時のRecoveryActionは既存候補の保持、固定配布元／trust状態の確認、および利用者による明示再試行である。package download／InstallのApprovalを生成・流用しない。
+
 取得先は、現在のBroker trustで署名・候補hashを再検証できた版2候補に限り、署名済み`channel`と一致するBroker所有sourceを一つ選んで`base_url + "/" + update_id + ".pkg"`から決定する。Brokerは更新一覧の各候補へ`取得元`を射影し、配布元がある場合だけ`状態=configured`と導出URLを返す。該当配布元がない場合は`unconfigured`、候補が旧版・未検証・trust不整合の場合は`ineligible`とし、いずれもURLを返さない。Flutterまたは候補からURL／pathを受け取らず、署名済みchannelは配布元選択値に限りAuthorityを与えない。この一覧情報は`INTERNAL_STATE`の表示専用であり、Capability、Permission、Approval、ネットワーク作用を生成しない。
 
 ## Broker経路
 
-通常認証済みBroker IPCから`更新一覧`、`更新署名検査`、`更新確認`、`更新延期`、`更新download要求`、`更新適用要求`、`更新rollback要求`をRust Update Centerへ送る。新規候補はContract版2とし、候補metadataに配布package全体の小文字hex SHA-256と正確なbyte長（1〜4 GiB）を必須化する。`更新確認`は候補metadataから決定的な署名対象byteを再構成し、package SHA-256・byte長を含む同じbyte列をBroker所有`update_trust.json`のEd25519公開鍵とfingerprintで検査する。署名対象byteと候補fieldが一致した候補だけを`updates.json`へatomic writeする。package位置や実行commandを候補から受け取らない。
+通常認証済みBroker IPCから`更新一覧`、`更新候補取得`、`更新署名検査`、`更新確認`、`更新延期`、`更新download要求`、`更新適用要求`、`更新rollback要求`をRust Update Centerへ送る。`更新候補取得`はBroker所有の固定配布元から一覧を取得し、候補を署名検証してから既存候補状態へ登録する。新規候補はContract版2とし、候補metadataに配布package全体の小文字hex SHA-256と正確なbyte長（1〜4 GiB）を必須化する。`更新確認`は候補metadataから決定的な署名対象byteを再構成し、package SHA-256・byte長を含む同じbyte列をBroker所有`update_trust.json`のEd25519公開鍵とfingerprintで検査する。署名対象byteと候補fieldが一致した候補だけを`updates.json`へatomic writeする。package位置や実行commandを候補から受け取らない。
 
 信頼設定がない、署名対象byteが一致しない、署名者fingerprintが不一致、署名が不正な候補は、利用可能な更新として保存しない。更新一覧の`署名信頼設定`は`configured`または`unconfigured`を返し、取得不能を0へ置換しない。
 

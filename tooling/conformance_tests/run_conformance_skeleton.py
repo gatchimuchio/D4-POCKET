@@ -163,6 +163,7 @@ REQUIRED_SCHEMA_NAMES = {
     "diagnostic",
     "update",
     "update_candidate",
+    "update_catalog",
     "update_receipt",
     "update_list",
     "update_trust",
@@ -288,6 +289,7 @@ BROKER_REQUIRED_SCHEMAS = {
     "profile_receipt.schema.json",
     "profile_list.schema.json",
     "update_candidate.schema.json",
+    "update_catalog.schema.json",
     "update_receipt.schema.json",
     "update_list.schema.json",
     "update_download_job.schema.json",
@@ -941,12 +943,18 @@ def test_update_policy_unsigned_rejection_uses_taxonomy() -> list[str]:
 def test_update_center_contract_and_execution_boundary() -> list[str]:
     errors = []
     candidate = load_contract_fixture("update_candidate.valid.json")
+    catalog = load_contract_fixture("update_catalog.valid.json")
     receipt = load_contract_fixture("update_receipt.valid.json")
     listing = load_contract_fixture("update_list.valid.json")
     trust = load_contract_fixture("update_trust.valid.json")
     download_job = load_contract_fixture("update_download_job.valid.json")
-    for name, value in (("update_candidate", candidate), ("update_receipt", receipt), ("update_list", listing), ("update_trust", trust)):
+    for name, value in (("update_candidate", candidate), ("update_catalog", catalog), ("update_receipt", receipt), ("update_list", listing), ("update_trust", trust)):
         errors.extend(validate_instance(value, load_schema(f"{name}.schema.json")))
+    if validate_instance(
+        load_contract_fixture("invalid/update_catalog.invalid.json"),
+        load_schema("update_catalog.schema.json"),
+    ) == []:
+        errors.append("署名更新候補一覧が未知の配布pathを受け入れた")
     update_list_schema = load_schema("update_list.schema.json")
     missing_download_job = copy.deepcopy(listing)
     missing_download_job.pop("download_job", None)
@@ -1098,9 +1106,24 @@ def test_update_center_contract_and_execution_boundary() -> list[str]:
         errors.append("更新実行状態とBroker由来rollback先projectionが一致しない")
     for name in ("ipc_request", "ipc_response"):
         operations = load_schema(f"{name}.schema.json")["properties"]["operation"]["enum"]
-        for operation in ("更新一覧", "更新確認", "更新署名検査", "更新download要求", "更新適用要求", "更新延期", "更新rollback要求"):
+        for operation in ("更新一覧", "更新候補取得", "更新確認", "更新署名検査", "更新download要求", "更新適用要求", "更新延期", "更新rollback要求"):
             if operation not in operations:
                 errors.append(f"{name}に更新操作がない: {operation}")
+    update_center = (RUST_HELPER / "src" / "broker" / "update_center.rs").read_text(
+        encoding="utf-8"
+    )
+    for token in (
+        'const OP_FETCH_CATALOG: &str = "更新候補取得"',
+        "fn fetch_catalog_with<",
+        "fn catalog_audit_reason(",
+        "Capability=更新候補取得",
+        "Permission=Broker所有trust.package_sources",
+        "Approval=明示操作によるread-only公開metadata取得はnot_required",
+        "AuditEvent=配布元件数・catalog hash・候補件数だけ",
+        "RecoveryAction=失敗時は既存候補を保持",
+    ):
+        if token not in update_center:
+            errors.append(f"更新候補取得のBroker／Authority／Recovery contractがない: {token}")
     return errors
 
 
@@ -6863,7 +6886,7 @@ def test_update_download_transport_is_broker_owned_and_bounded() -> list[str]:
         ".no_proxy()",
         ".redirect(redirect::Policy::none())",
         ".retry(retry::never())",
-        ".timeout(MAX_DOWNLOAD_TIME)",
+        ".timeout(timeout)",
         ".read_timeout(READ_TIMEOUT)",
         ".resolve_to_addrs(host, addresses)",
         "validate_response_headers(response.headers(), expected_bytes)?",
@@ -6874,6 +6897,10 @@ def test_update_download_transport_is_broker_owned_and_bounded() -> list[str]:
         "PackageDisposition::RepairedCorrupt",
         ".rename(temporary_name, directory, final_name)",
         "fn package_entry_is_replaceable(",
+        "build_download_client(host, &addresses, &[], MAX_DOWNLOAD_TIME)?",
+        "let remaining = deadline.saturating_duration_since(std::time::Instant::now());",
+        "if remaining.is_zero()",
+        "build_download_client(host, &addresses, &[], remaining)?",
     )
     errors = [
         f"Broker download transportの必須境界がない: {token}"

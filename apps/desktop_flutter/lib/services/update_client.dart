@@ -128,6 +128,9 @@ class UpdateClient {
     return _acceptedBody(response, '更新一覧');
   }
 
+  Future<Map<String, Object?>> fetchCandidates() =>
+      _request('更新候補取得', const {'版': 1});
+
   Future<Map<String, Object?>> verify(
     Map<String, Object?> candidate,
   ) =>

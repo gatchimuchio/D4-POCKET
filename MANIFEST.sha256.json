@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "21a8a3b84b80df5c8de7fb9917f54aedbffd5983359745a7f50c2e43a250cc6e"
+      "sha256": "91c8093c64c1504b1601e6f374755ae5bb5f4d6a7a3ad58f1659d7a51ea353aa"
     },
     {
       "path": "SECURITY.md",
@@ -288,7 +288,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/settings.dart",
-      "sha256": "f06f8fb69caf111bdae6fc89bad7dfa9505ec1f235fbd23792afbbfcea6523ac"
+      "sha256": "95c061a0c13fbbb4423be99e0b29f0d8023cd2bb39bb87060bf6a3866d83f2e1"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/setup_doctor.dart",
@@ -392,7 +392,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/update_client.dart",
-      "sha256": "26d4f1379236f4efc5eff5fb3ba19787f492d5ad975618ea216126a9e6dd7066"
+      "sha256": "27bfc6c1ed5fd6b42868b4635eae0b1ecb4813709fc131b3269a5ca97b1217c5"
     },
     {
       "path": "apps/desktop_flutter/lib/services/windows_tray_client.dart",
@@ -648,7 +648,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/settings_compose_test.dart",
-      "sha256": "9756821afd5f2eb6a6515bf5c6bd69d644867807c5096b33dfad11c951145c32"
+      "sha256": "32bfc173325d0beda2df386b5eb67c783eccb0f0afdf67031c3cff9fd5332011"
     },
     {
       "path": "apps/desktop_flutter/test/support/test_broker_tcp_transport.dart",
@@ -656,7 +656,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/update_client_test.dart",
-      "sha256": "84b5d48116ae90d09799bd3a1a75792e9914265866869e6bf70186cf0e527e66"
+      "sha256": "a8ef4b376521030f43c43a37778593ae3de0cb2754acb69944c8bbc14a57ec74"
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
@@ -1240,7 +1240,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "1f179556f5e4bf4300f21cdffda0bca490ab67b9f298e28d12fcc856d1eb69d1"
+      "sha256": "76c69c83e7a4d35e52d8c62a28b604d3575edc5db126d28213f42414df90823e"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1508,7 +1508,7 @@
     },
     {
       "path": "docs/specs/update-center.md",
-      "sha256": "2e60c96cef49a00127fa55ead16fa244ca072435b18138386252531c4a2f9fbd"
+      "sha256": "37009aa8459808e53f370e0cda2161e2d716939b03aceeda9e65144d2e29d63b"
     },
     {
       "path": "docs/specs/windows-desktop-launcher.md",
@@ -3316,7 +3316,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "bd52de786ae9f673ec61aa222588ff82ef68267043479a86d06a95a5e5ff7443"
+      "sha256": "76c7d906a05812e6c531dc82079cab899905eded0ed6eeaea594c4582108894e"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -3340,11 +3340,11 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "890d9df7b03aa4457ba0ccb70908cff061a451e6bb7caa56dc4327adaad6e119"
+      "sha256": "9fc8154bd68b3ddf73bf40c79ca957508903f5b166a2241f7bcc41ae6a91f1b1"
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
-      "sha256": "53e82df8067ee8c3168ce4f2762b45bd241b9a21e0e8e6902cfc90ec4fc6b6ed"
+      "sha256": "b64ae01dd1e01659ac20b081cb3ff925637dfd4133d3ebed8fbca646896254df"
     },
     {
       "path": "native/rust_helper/src/broker/update_download/windows_dns.rs",
@@ -4288,11 +4288,11 @@
     },
     {
       "path": "specs/ipc_request.schema.json",
-      "sha256": "e00f834969fbf4ced9011e7164699d128eabea497bb94f500ac6d3d3f416450c"
+      "sha256": "940868f23c1801bfe669ff4b2cf433847aafd3b519047954018d760f2c498346"
     },
     {
       "path": "specs/ipc_response.schema.json",
-      "sha256": "931bc8ebd9f82c5b48fabf1a57aa13d67d972e95aa2710d562ac6499bba9d25e"
+      "sha256": "b5ea0da2c15b14f884c1befa82d11a7729438cdb842ec0152718bea7a0b011df"
     },
     {
       "path": "specs/mcp_connection.schema.json",
@@ -4636,7 +4636,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "013f7e8ea762fbdcee647ace218f77994c97b622a7be7e29877021f2d8f9607c"
+      "sha256": "8aa1f691364eee8e94d30207e983769ff69b9080058b5a5a36be009d01761146"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",

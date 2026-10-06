@@ -18,7 +18,9 @@ use std::time::Duration;
 mod windows_dns;
 
 const MAX_PACKAGE_BYTES: u64 = 4 * 1024 * 1024 * 1024;
+const MAX_CATALOG_BYTES: usize = 64 * 1024;
 const MAX_DOWNLOAD_TIME: Duration = Duration::from_secs(24 * 60 * 60);
+pub(crate) const CATALOG_TIMEOUT: Duration = Duration::from_secs(30);
 const READ_TIMEOUT: Duration = Duration::from_secs(60);
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(20);
 const DNS_RESOLUTION_TIMEOUT: Duration = Duration::from_secs(15);
@@ -61,6 +63,7 @@ pub(crate) enum DownloadError {
     TimedOut,
     ResolverBusy,
     DnsCancellationFailed,
+    DocumentTooLarge,
     Storage,
 }
 
@@ -161,7 +164,8 @@ pub(crate) fn remove_verified_package(
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
         Err(_) => return Err(DownloadError::Storage),
     };
-    if !before.is_file() || before.file_attributes() & 0x400 != 0 || before.len() != expected_bytes {
+    if !before.is_file() || before.file_attributes() & 0x400 != 0 || before.len() != expected_bytes
+    {
         return Err(DownloadError::Storage);
     }
     let mut options = OpenOptions::new();
@@ -185,7 +189,9 @@ pub(crate) fn remove_verified_package(
         if read == 0 {
             break;
         }
-        total = total.checked_add(read as u64).ok_or(DownloadError::Storage)?;
+        total = total
+            .checked_add(read as u64)
+            .ok_or(DownloadError::Storage)?;
         if total > expected_bytes {
             return Err(DownloadError::SizeMismatch);
         }
@@ -205,7 +211,9 @@ pub(crate) fn remove_verified_package(
         return Err(DownloadError::Storage);
     }
     drop(file);
-    directory.remove_file(&name).map_err(|_| DownloadError::Storage)?;
+    directory
+        .remove_file(&name)
+        .map_err(|_| DownloadError::Storage)?;
     Ok(true)
 }
 
@@ -248,7 +256,7 @@ where
     }
     let host = url.host_str().ok_or(DownloadError::InvalidRequest)?;
     let addresses = resolve_public_addresses(host, 443, cancel, deadline)?;
-    let client = build_download_client(host, &addresses, &[])?;
+    let client = build_download_client(host, &addresses, &[], MAX_DOWNLOAD_TIME)?;
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -271,6 +279,40 @@ where
             &mut progress,
         )
         .await
+    })
+}
+
+pub(crate) fn fetch_update_catalog(
+    url_text: &str,
+    max_bytes: usize,
+    deadline: std::time::Instant,
+) -> Result<Vec<u8>, DownloadError> {
+    if max_bytes == 0 || max_bytes > MAX_CATALOG_BYTES {
+        return Err(DownloadError::InvalidRequest);
+    }
+    if std::time::Instant::now() >= deadline {
+        return Err(DownloadError::TimedOut);
+    }
+    let url = parse_source_url(url_text)?;
+    let host = url.host_str().ok_or(DownloadError::InvalidRequest)?;
+    let addresses = resolve_public_addresses(host, 443, &AtomicBool::new(false), deadline)?;
+    let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+    if remaining.is_zero() {
+        return Err(DownloadError::TimedOut);
+    }
+    let client = build_download_client(host, &addresses, &[], remaining)?;
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|_| DownloadError::Network)?;
+    runtime.block_on(async {
+        let response = client
+            .get(url)
+            .header(ACCEPT_ENCODING, "identity")
+            .send()
+            .await
+            .map_err(map_reqwest_error)?;
+        receive_bounded_document(response, max_bytes, deadline).await
     })
 }
 
@@ -299,6 +341,7 @@ fn build_download_client(
     host: &str,
     addresses: &[SocketAddr],
     additional_roots: &[Certificate],
+    timeout: Duration,
 ) -> Result<Client, DownloadError> {
     let mut builder = Client::builder()
         .https_only(true)
@@ -306,7 +349,7 @@ fn build_download_client(
         .redirect(redirect::Policy::none())
         .retry(retry::never())
         .connect_timeout(CONNECT_TIMEOUT)
-        .timeout(MAX_DOWNLOAD_TIME)
+        .timeout(timeout)
         .read_timeout(READ_TIMEOUT)
         .resolve_to_addrs(host, addresses)
         .http1_only();
@@ -314,6 +357,56 @@ fn build_download_client(
         builder = builder.add_root_certificate(certificate.clone());
     }
     builder.build().map_err(|_| DownloadError::Network)
+}
+
+async fn receive_bounded_document(
+    mut response: Response,
+    max_bytes: usize,
+    deadline: std::time::Instant,
+) -> Result<Vec<u8>, DownloadError> {
+    if response.status() != StatusCode::OK {
+        return Err(DownloadError::RedirectOrUnexpectedStatus);
+    }
+    let declared_bytes = response
+        .headers()
+        .get(CONTENT_LENGTH)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse::<usize>().ok());
+    if response.headers().get_all(CONTENT_LENGTH).iter().count() != 1
+        || response.headers().get(TRANSFER_ENCODING).is_some()
+        || response.headers().get(CONTENT_ENCODING).is_some()
+    {
+        return Err(DownloadError::InvalidHeaders);
+    }
+    let declared_bytes = declared_bytes.ok_or(DownloadError::InvalidHeaders)?;
+    if declared_bytes == 0 || declared_bytes > max_bytes {
+        return Err(DownloadError::DocumentTooLarge);
+    }
+    let mut bytes = Vec::with_capacity(declared_bytes);
+    loop {
+        if std::time::Instant::now() >= deadline {
+            return Err(DownloadError::TimedOut);
+        }
+        let chunk = response.chunk().await.map_err(map_reqwest_error)?;
+        let Some(chunk) = chunk else {
+            break;
+        };
+        if bytes
+            .len()
+            .checked_add(chunk.len())
+            .is_none_or(|total| total > max_bytes || total > declared_bytes)
+        {
+            return Err(DownloadError::DocumentTooLarge);
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+    if bytes.len() != declared_bytes {
+        return Err(DownloadError::SizeMismatch);
+    }
+    if std::time::Instant::now() >= deadline {
+        return Err(DownloadError::TimedOut);
+    }
+    Ok(bytes)
 }
 
 async fn receive_package<F>(
@@ -1064,7 +1157,11 @@ mod tests {
         std::fs::remove_dir_all(path).unwrap();
     }
 
-    fn local_tls_endpoint(bytes: &'static [u8]) -> (Client, Url, thread::JoinHandle<()>) {
+    fn local_tls_endpoint(
+        path: &'static str,
+        bytes: &'static [u8],
+        timeout: Duration,
+    ) -> (Client, Url, thread::JoinHandle<()>) {
         let certified = rcgen::generate_simple_self_signed(vec!["localhost".to_string()]).unwrap();
         let server_config = rustls::ServerConfig::builder()
             .with_no_client_auth()
@@ -1099,7 +1196,11 @@ mod tests {
                     assert!(request.len() <= 16 * 1024);
                 }
             }
-            assert!(request.starts_with("GET /update.pkg HTTP/1.1\r\n"));
+            let request_target = request
+                .lines()
+                .next()
+                .and_then(|line| line.split_whitespace().nth(1));
+            assert_eq!(request_target, Some(path), "要求先は固定catalog path");
             write!(
                 tls,
                 "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
@@ -1112,16 +1213,76 @@ mod tests {
             let _ = tls.flush();
         });
         let root = Certificate::from_der(certified.cert.der().as_ref()).unwrap();
-        let client = build_download_client("localhost", &[address], &[root]).unwrap();
-        let url = Url::parse(&format!("https://localhost:{}/update.pkg", address.port())).unwrap();
+        let client = build_download_client("localhost", &[address], &[root], timeout).unwrap();
+        let url = Url::parse(&format!("https://localhost:{}{path}", address.port())).unwrap();
         (client, url, server)
+    }
+
+    #[test]
+    fn bounded_catalog_fetch_accepts_small_https_document() {
+        let bytes = r#"{"版":1,"候補":[]}"#.as_bytes();
+        let (client, url, server) = local_tls_endpoint("/updates.json", bytes, CATALOG_TIMEOUT);
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let result = runtime.block_on(async {
+            let response = client
+                .get(url)
+                .header(ACCEPT_ENCODING, "identity")
+                .send()
+                .await
+                .unwrap();
+            receive_bounded_document(
+                response,
+                MAX_CATALOG_BYTES,
+                std::time::Instant::now() + CATALOG_TIMEOUT,
+            )
+            .await
+        });
+        server.join().unwrap();
+        assert_eq!(result.unwrap(), bytes);
+    }
+
+    #[test]
+    fn bounded_catalog_fetch_rejects_declared_document_over_limit() {
+        let bytes = b"oversized";
+        let (client, url, server) = local_tls_endpoint("/updates.json", bytes, CATALOG_TIMEOUT);
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let result = runtime.block_on(async {
+            let response = client
+                .get(url)
+                .header(ACCEPT_ENCODING, "identity")
+                .send()
+                .await
+                .unwrap();
+            receive_bounded_document(response, 4, std::time::Instant::now() + CATALOG_TIMEOUT).await
+        });
+        server.join().unwrap();
+        assert_eq!(result, Err(DownloadError::DocumentTooLarge));
+    }
+
+    #[test]
+    fn catalog_fetch_rejects_expired_operation_deadline_before_dns() {
+        let deadline = std::time::Instant::now() - Duration::from_secs(1);
+        assert_eq!(
+            fetch_update_catalog(
+                "https://updates.example.invalid/d4/stable/updates.json",
+                MAX_CATALOG_BYTES,
+                deadline,
+            ),
+            Err(DownloadError::TimedOut),
+        );
     }
 
     #[test]
     fn local_tls_server_repairs_only_after_verified_package_bytes() {
         let bytes = b"locally served signed package";
         let digest = hex::encode(Sha256::digest(bytes));
-        let (client, url, server) = local_tls_endpoint(bytes);
+        let (client, url, server) = local_tls_endpoint("/update.pkg", bytes, CATALOG_TIMEOUT);
         let path = temporary_directory("update-local-tls");
         let directory = Dir::open_ambient_dir(&path, cap_std::ambient_authority()).unwrap();
         std::fs::write(path.join(format!("{digest}.pkg")), vec![b'x'; bytes.len()]).unwrap();
@@ -1163,7 +1324,8 @@ mod tests {
         let response_bytes = b"wrong-content";
         let trusted_bytes = b"right-content";
         let trusted_digest = hex::encode(Sha256::digest(trusted_bytes));
-        let (client, url, server) = local_tls_endpoint(response_bytes);
+        let (client, url, server) =
+            local_tls_endpoint("/update.pkg", response_bytes, CATALOG_TIMEOUT);
         let path = temporary_directory("update-package-repair-failed-transfer");
         let directory = Dir::open_ambient_dir(&path, cap_std::ambient_authority()).unwrap();
         let final_name = format!("{trusted_digest}.pkg");

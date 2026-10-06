@@ -290,6 +290,7 @@ void main() {
       updateId: 'update-1',
       candidateHash: 'sha256:${'a' * 64}',
     );
+    await client.fetchCandidates();
     expect(transport.operations, [
       '更新一覧',
       '更新署名検査',
@@ -298,11 +299,13 @@ void main() {
       '更新有効版切替要求',
       '更新延期',
       '更新rollback要求',
+      '更新候補取得',
     ]);
     expect(transport.payloads[4], {
       '版': 1,
       '更新ID': 'update-1',
       '候補hash': 'sha256:${'a' * 64}',
     });
+    expect(transport.payloads[7], {'版': 1});
   });
 }
