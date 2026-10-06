@@ -8,14 +8,14 @@
 
 | 段階 | 状態 | 対象／証拠 |
 | --- | --- | --- |
-| Q0 QA Freeze | CLOSED（2026-10-07） | Final QA対象製品commit `ab746d4b33b003761f5ddcef60a88afa97132a40`。`main`へpushしremote HEAD一致を確認 |
-| Q1 Codex Comprehensive QA | CLOSED（2026-10-07） | 凍結commitを基準に全Rust target、Desktop／Mobile Flutter全test、Schema／Conformance、Windows Release compile |
-| Q2 Fault / Recovery | OPEN | crash／kill／deadline／cancel／stale／replay／partial write／corruption／orphan／Broker・frontend・network・provider failure |
-| Q3–Q7 | QUEUED | 各前段階の閉鎖後に開始 |
+| Q0 品質保証凍結 | 完了（2026-10-07） | Final QA対象製品commit `ab746d4b33b003761f5ddcef60a88afa97132a40`。`main`へpushしremote HEAD一致を確認 |
+| Q1 Codex横断品質検査 | 完了（2026-10-07） | 凍結commitを基準に全Rust target、Desktop／Mobile Flutter全test、Schema／Conformance、Windows Release compile |
+| Q2 障害・復旧 | 進行中 | 異常終了／強制停止／実行期限超過／取消／古い要求／再送／部分書込／保管破損／孤立プロセス／仲介処理・画面・通信・提供元の障害 |
+| Q3–Q7 後続品質保証 | 待機中 | 各前段階の閉鎖後に開始 |
 
 製品コード変更が必要な場合、該当QA所見を証拠化して局所修正し、修正済み製品を新しいQA候補commitとして明示する。以後のQA結果を旧凍結commitへ誤って帰属させず、更新対象を再凍結する。Q0凍結はrelease readinessを意味せず、既存release blockerを変更しない。
 
-## Q1 Codex Comprehensive QA — CLOSED（2026-10-07）
+## Q1 Codex横断品質検査 — 完了（2026-10-07）
 
 凍結製品commit `ab746d4b33b003761f5ddcef60a88afa97132a40`の横断回帰はRust全target 545 passed／13明示ignored、Desktop Flutter 204 passed、Mobile Flutter 21 passed。Schema 161／157／208、Conformance 236 checks、manual workflow check、Manifest、Windows v1 Release GateもPASS。ignoredのAgent Task production E2Eは`task_execution`の現行fail-closed gateを検査する専用testで、一般Release capabilityの対応済み証拠ではない。
 
@@ -62,6 +62,10 @@ Rust初回・再runでA2A／Update TLS loopback fixtureの間欠failureを観測
 2026-10-06 P11 portable起点Install起動遷移検証: `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`のRust library suiteは484 passed／1 failed／12 ignoredとなり、既知`broker::update_download::tests::local_tls_server_repairs_only_after_verified_package_bytes`がWindows loopback TLSの`ConnectionReset`／`InvalidContentType`で失敗してCargoがnonzero終了した。後続targetのPASSは主張しない。失敗箇所は今回の変更file外で、既存`FQ-TEST-LOOPBACK`に属するためP11受入れをblockしない。最終統合後に既存queueの対象として再確認する。
 
 2026-10-06 P11 Uninstaller実装確認: 逐次Rust全lib suiteは489 passed／1 failed／12 ignored。唯一の失敗は既知A2A loopback fixtureで、単独再実行は1 passed。今回のUninstaller focused Rust test 5件とRust Release buildはPASS。loopback fixtureの最終統合後確認は本queueに保持し、P11 Uninstallerの局所成立をblockしない。
+
+2026-10-07 Q2初回検査: 実Codex CLI `0.160.0`を資格情報なしのloopback偽Responses APIへ接続するignored LIVE_RUNTIME testは、Task完了／取消、MxC child中のTEMP marker観測と終了後の不在、child heartbeat停止、Broker管理WorkspaceTaskScratch cleanupまで進んだ。旧表示名Audit assertionが現行`AgentTask履歴:`構造化記録と不一致で失敗したため、同testを構造化Task ID／stage／status照合へ修正し、再実行1 passed。これは実CLI／MxC childの限定LIVE_RUNTIMEとin-process Broker・合成Owner／Audit fixtureの範囲であり、installed production IPC／durable Audit／deadline／crash回復の証拠ではない。別途、Broker control→fake Codex cancellation／deadline／descendant停止testは1 passed、`AgentTaskScratchJournal` focused testsは8 passed（いずれもFIXTURE）。
+
+同sourceの`cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets --no-fail-fast -- --test-threads=1`はexit 101。Rust library 496 passed／3 failed／12 ignored、他targetは全PASS（総計542 passed／3 failed／12 ignored）。失敗はCodex loopback fixtureのConnectionReset 1件とUpdate Download TLS fixtureのWSA 10054／ConnectionReset 2件。TLS focused 17件は初回PASS後、2件の反復でround 2に再発し、単一test反復ではround 10にTLS `InvalidContentType`とserver-side ConnectionResetを再発した。根本原因は未確定のため`FQ-TEST-LOOPBACK`はOPEN。Q2のcancel／deadline／crash installed-product Acceptanceは未成立であり、FQ-R2-A/B/Fを閉じない。通常Release `task_execution=unsupported`、既存release blocker、`release_ready=false`は維持。
 
 ## 3. Final QA段階
 

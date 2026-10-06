@@ -9,17 +9,27 @@
 
 常にユーザーが現在提示した最新版の仕様書・工程表・実装指示書と、そこへ同期したリポジトリ内の現行進捗を正本とする。旧版文書は、明示的に現行正本へ採用されない限り、履歴・補助証拠としてのみ使う。旧版の状態や要求を現行状態へ推定転記しない。
 
-## Q0 QA Freeze — CLOSED
+## Q0 品質保証凍結 — 完了
 
 2026-10-07、P12 Product Build受入れcommit `ab746d4b33b003761f5ddcef60a88afa97132a40`をFinal QA対象製品状態として固定した。対象commitは`main`へpush済みで、Q0記録時点のremote `main`と一致。対象はWindows Feature Complete製品構成であり、release-readyや正式配布可能状態を意味しない。以後のQ1〜Q7 evidenceはこの凍結commitを対象とし、製品コード修正が必要になった場合は修正commitを新たなQA候補として明示し、対象を再凍結する。
 
-## Q1 Codex Comprehensive QA — CLOSED
+## Q1 Codex横断品質検査 — 完了
 
 2026-10-07、凍結製品のAgent Task／Compare／Handoff／Workspace／MCP／Provider／Host／Export／Installer／Update／Rollback横断を既存全Rust targetとDesktop／Mobile Flutter testで確認した。`cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets --no-fail-fast -- --test-threads=1`最終runはexit 0: Rust lib 499 passed／12 ignored、bin 10 passed、Broker IPC 10 passed、その他hash／checkpoint／保護保管／Workspace integration 26 passed、production Agent Task E2E 1 ignored（総計545 passed／13 ignored／0 failed）。Ignoredは明示的な実Agent／Owner-dialogue専用testで、production Agent Taskの一般Release capabilityを有効にしない。
 
 Desktop `flutter test --no-pub --dart-define=GUI_SHELL_PRODUCT_VERSION=1.2.3`は204 passed、Mobile `flutter test --no-pub`は21 passed。OneDrive日本語pathからMobile analyzerを起動した初回はLSP JSON `FormatException`で停止したため、同一sourceのASCII一時checkoutで`flutter analyze --no-pub`を実行し`No issues found`を確認した。Desktop analyzerはexit 1で、既存`agent_center.dart`のFlutter 3.44 deprecated API info 5件だけを報告。これをknown limitationとして`RELEASE_CHECKLIST.md`に分類し、現行APIが削除される前にRadioGroup／initialValueへ移行する。Desktop Release buildは同じsource-equivalent一時checkoutで成功し、実行artifact SHA-256 `731da778f1c61e2d6597162876b79e604503ea511199f3d7ef94cc479919709d`、size 162304 bytes。Temporary output directory由来のMSB8029 warning 7件を記録。これはcompile evidenceであり、installed product、formal provenance、配布可能性の証拠ではない。
 
 Q1初回Rust runで既知localhost fixtureのConnectionReset 3件、次runでA2A fixture 1件を観測したが、該当fixture単独testはPASSし、fixture競合の後の`--no-fail-fast`全target runは0 failureで完了した。これは間欠test fixture揺らぎを解消した証拠ではないため`FQ-TEST-LOOPBACK`へ保持し、Q2 network/fault調査で扱う。installed end-to-end、実Provider資格、正式証拠、Q2以降の障害／Recovery、release blockersは未成立のまま維持する。
+
+## Q2 障害・復旧 — 進行中
+
+2026-10-07の最初のQ2検査単位では、実Codex CLI `0.160.0`を資格情報なしのloopback偽Responses APIへ接続するignored LIVE_RUNTIME testを修正・実行した。Task完了、MxC実行中TEMP markerのBroker親可読、CLI終了後markerの不在、取消後のterminal化、child heartbeat停止、取消後marker不在、Broker管理WorkspaceTaskScratch不在を確認し、修正後のtestは1 passed。実Network model／資格情報は使っていない。MxC／Owner／Audit以外はtest fixtureのin-process Brokerと合成Owner callbackであり、installed Flutter→native Owner→production IPC、永続Audit、deadline／crash recoveryを証明しない。TEMPの観測はこのchild markerの範囲だけで、外部component内の物理削除保証ではない。
+
+同じsourceのBroker control→fake Codex fixtureは1 passedで、正常終了／cancel／deadline後に子孫processが稼働を継続しないこと、cancel／deadline terminal後にWorkspaceTaskScratchを残さないことを確認した。永続`AgentTaskScratchJournal`のfocused testは8 passedで、再起動後の一致scratch回収、不一致／identity変更時の保持、journal改竄拒否を確認した。これらは`FIXTURE` evidenceである。
+
+現行sourceの全target逐次実行`cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets --no-fail-fast -- --test-threads=1`はexit 101。Rust library 511件は496 passed／3 failed／12 ignored、他targetは全て成功し、全体は542 passed／3 failed／12 ignored。失敗はCodex loopback responseのConnectionReset 1件とUpdate Download TLS fixtureのWSA 10054／ConnectionReset 2件で、失敗時にHTTP応答本文0／22514 byte、またはTLS request送信失敗を観測した。Update Download focused 17件は初回PASSしたが、同2件の反復ではround 2に再発し、単一testの反復ではround 10に`InvalidContentType`とserver側ConnectionResetを再発した。fixture root causeは未確定で、Q2 network failure項目`FQ-TEST-LOOPBACK`はOPENのまま維持する。loopback不安定性を製品故障とも環境だけの問題とも断定せず、影響のない製品コード変更で隠さない。
+
+この検査単位はTask cancellation／scratch処理の限定LIVE_RUNTIME・FIXTURE evidenceとtest assertion修正を記録するもので、FQ-R2-A/B/Fを閉じない。production installed path、deadline／Codex・Broker・Launcher crash回復、Approval非再利用、durable Audit、OneDrive／NTFS統合境界、result projection、通常Release capabilityは引き続きQ2以降の未成立範囲である。通常Release `task_execution=unsupported`とrelease gateは変更しない。
 
 ## 1. 工程方針
 

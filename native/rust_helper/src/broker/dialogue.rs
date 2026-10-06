@@ -4589,17 +4589,26 @@ mod tests {
             );
         }
         drop(audit);
-        assert!(audit_events.iter().any(|(operation, _, _)| {
-            operation == "Agent Task実行開始（Permission／Owner Approval一回消費）"
-        }));
-        assert!(audit_events.iter().any(|(operation, _, _)| {
-            operation == "Agent Task完了（結果本文非保存・hashのみ）"
-        }));
+        let has_task_audit = |expected_task_id: &str, stage: &str, status: &str| {
+            audit_events.iter().any(|(operation, task_id, _)| {
+                task_id == expected_task_id
+                    && operation
+                        .strip_prefix(super::super::execution_history::AGENT_TASK_HISTORY_PREFIX)
+                        .and_then(|body| serde_json::from_str::<Value>(body).ok())
+                        .map(|record| {
+                            record["stage"] == stage
+                                && record["status"] == status
+                                && record["task_id"] == expected_task_id
+                        })
+                        .unwrap_or(false)
+            })
+        };
+        assert!(has_task_audit(task_id, "start", "running"));
+        assert!(has_task_audit(task_id, "terminal", "completed"));
+        assert!(has_task_audit(cancel_task_id, "start", "running"));
+        assert!(has_task_audit(cancel_task_id, "terminal", "cancelled"));
         assert!(audit_events.iter().any(|(operation, id, _)| {
             operation.contains("取消要求") && id == cancel_task_id
-        }));
-        assert!(audit_events.iter().any(|(operation, id, _)| {
-            operation.contains("失敗・取消") && id == cancel_task_id
         }));
         assert!(!format!("{audit_events:?}").contains(instruction));
         assert!(!format!("{audit_events:?}").contains(cancel_instruction));

@@ -1188,7 +1188,7 @@
     },
     {
       "path": "docs/FINAL_QA_QUEUE.md",
-      "sha256": "3396c950ac82cc1b0ac9ccb19cf150fb7688125700af1d0c02994f3c2685debf"
+      "sha256": "10e154921fb50f74706ce2fd12f9dba8b7675bedbda544b19da288b3158f77fc"
     },
     {
       "path": "docs/FIRST_RUN.md",
@@ -1244,7 +1244,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "662a3e665aa89ea54573431567ec94039d1f1d037417b4e0d74365d855441fef"
+      "sha256": "817e4e1980ce8d5d1ea3b7580c8683711643f326ea7416d652b645d014070bb9"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -3264,7 +3264,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/dialogue.rs",
-      "sha256": "d419c287b25c3243ee75596f4a8aaff5cb1a4ec53768d977c91a3c83dc8f79d5"
+      "sha256": "d318fe0c59a9b1fa3f4524fb3013ae2dac894874b08d51e44fdc6957da1aa6ca"
     },
     {
       "path": "native/rust_helper/src/broker/evaluation_control.rs",
