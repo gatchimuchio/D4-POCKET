@@ -651,6 +651,10 @@
       "sha256": "32bfc173325d0beda2df386b5eb67c783eccb0f0afdf67031c3cff9fd5332011"
     },
     {
+      "path": "apps/desktop_flutter/test/settings_install_flow_test.dart",
+      "sha256": "2fafdcffe1b0bdb125215e63b689ecfb4468224d5c4acbaa6d7fb971f041a756"
+    },
+    {
       "path": "apps/desktop_flutter/test/support/test_broker_tcp_transport.dart",
       "sha256": "416a707b5ad438622b5b4a969284eb91e9f0111b61e61dbb00cb3f2716cb6afd"
     },
