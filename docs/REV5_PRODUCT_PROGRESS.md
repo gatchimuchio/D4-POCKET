@@ -2,12 +2,18 @@
 
 更新日: 2026-10-07
 工程正本: ユーザー提示「D4 Pocket / GUI-Shell 統合実装仕様書 rev5」「統合開発工程表 rev5」「Codex実装指示書 rev5」
-現行phase: `Q2 Fault / Recovery` (`OPEN`)。`Q0 QA Freeze`は製品commit `ab746d4b33b003761f5ddcef60a88afa97132a40`を固定して閉鎖、`Q1 Codex Comprehensive QA`は2026-10-07に閉鎖した。`P12 Product Integration`はrev5 Product Build受入れを閉鎖し、Windows `FEATURE COMPLETE`とした。`P11 Windows Productization`は2026-10-06にProduct Build受入れを閉鎖。旧phaseは履歴扱いで、現行release gateは別台帳に保持する。
+現行mode: `PRODUCT_BUILD_MODE`（2026-10-07の最新ユーザー指示）。旧R2 Agent Taskは`FUNCTIONALLY ESTABLISHED`で、crash／deadline／recovery等の追加QAは現行作業ではない。P2 Compare（実装指示書上のR3）とP3 Handoff（同R4）は現行rev5 Product BuildでCLOSED、P4〜P12も受入れ済み。Q0／Q1の結果とQ2の所見は履歴・Final QA Queueに保持するが、Q2をactive工程として継続せず、Final QAへ自動遷移しない。`P12 Product Integration`のWindows `FEATURE COMPLETE`記録と現行release gateは維持する。
 初期rev5文書同期commit: `39dd3f4bc7aafe350ca94fce9392095f1064d2bc`。凍結commitとその後のQA記録は本書末尾の更新履歴を参照。
 
 ## 正本の選び方
 
 常にユーザーが現在提示した最新版の仕様書・工程表・実装指示書と、そこへ同期したリポジトリ内の現行進捗を正本とする。旧版文書は、明示的に現行正本へ採用されない限り、履歴・補助証拠としてのみ使う。旧版の状態や要求を現行状態へ推定転記しない。
+
+## 最新rev5指示による工程整理（2026-10-07）
+
+最新ユーザー提示の実装指示は現在modeを`PRODUCT_BUILD_MODE`と明示し、旧R2-A〜HをProduct Buildの必須gateにせず、追加crash／deadline／recovery調査をFinal QA Queueへ送る。したがって本書の後続Q2記録は過去に実行した検査の証拠であり、現在の作業命令ではない。`docs/FINAL_QA_QUEUE.md`の項目状態はFinal QA開始後の引継ぎ情報として保持する。
+
+工程表のP2 Compareは実装指示書のR3、P3 HandoffはR4に対応する。本書で両者を既にCLOSEDとしているため、閉鎖済み機能を再実装・再検査しない。Q0／Q1／Q2の記録を削除・改変せず、最新modeとの違いだけを本節と先頭statusで明示する。通常Release `task_execution`はfail-closedのまま維持し、正式release claimへ昇格しない。
 
 ## Q0 品質保証凍結 — 完了
 
@@ -21,7 +27,7 @@ Desktop `flutter test --no-pub --dart-define=GUI_SHELL_PRODUCT_VERSION=1.2.3`は
 
 Q1初回Rust runで既知localhost fixtureのConnectionReset 3件、次runでA2A fixture 1件を観測したが、該当fixture単独testはPASSし、fixture競合の後の`--no-fail-fast`全target runは0 failureで完了した。これは間欠test fixture揺らぎを解消した証拠ではないため`FQ-TEST-LOOPBACK`へ保持し、Q2 network/fault調査で扱う。installed end-to-end、実Provider資格、正式証拠、Q2以降の障害／Recovery、release blockersは未成立のまま維持する。
 
-## Q2 障害・復旧 — 進行中
+## Q2 障害・復旧 — 旧検査記録（現行工程ではない）
 
 2026-10-07の最初のQ2検査単位では、実Codex CLI `0.160.0`を資格情報なしのloopback偽Responses APIへ接続するignored LIVE_RUNTIME testを修正・実行した。Task完了、MxC実行中TEMP markerのBroker親可読、CLI終了後markerの不在、取消後のterminal化、child heartbeat停止、取消後marker不在、Broker管理WorkspaceTaskScratch不在を確認し、修正後のtestは1 passed。実Network model／資格情報は使っていない。MxC／Owner／Audit以外はtest fixtureのin-process Brokerと合成Owner callbackであり、installed Flutter→native Owner→production IPC、永続Audit、deadline／crash recoveryを証明しない。TEMPの観測はこのchild markerの範囲だけで、外部component内の物理削除保証ではない。
 

@@ -1,6 +1,6 @@
 # D4 Pocket 最終品質保証項目（`FINAL_QA_QUEUE`）
 
-状態: `Q2 ACTIVE`（Q0／Q1完了）
+状態: `DEFERRED`（最新ユーザー指示は`PRODUCT_BUILD_MODE`。Q0／Q1／Q2記録は保持し、Final QA作業は開始しない）
 工程正本: ユーザー提示「D4 Pocket / GUI-Shell rev5 Product-First / Final-QA Separation」
 現行製品phase: `docs/REV5_PRODUCT_PROGRESS.md`
 
@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | Q0 品質保証凍結 | 完了（2026-10-07） | Final QA対象製品commit `ab746d4b33b003761f5ddcef60a88afa97132a40`。`main`へpushしremote HEAD一致を確認 |
 | Q1 Codex横断品質検査 | 完了（2026-10-07） | 凍結commitを基準に全Rust target、Desktop／Mobile Flutter全test、Schema／Conformance、Windows Release compile |
-| Q2 障害・復旧 | 進行中 | 異常終了／強制停止／実行期限超過／取消／古い要求／再送／部分書込／保管破損／孤立プロセス／仲介処理・画面・通信・提供元の障害 |
+| Q2 障害・復旧 | 保留（Final QA Queue） | 既存Q2所見を保持。最新指示により追加検査を停止し、現行Product Buildの作業対象にしない |
 | Q3–Q7 後続品質保証 | 待機中 | 各前段階の閉鎖後に開始 |
 
 製品コード変更が必要な場合、該当QA所見を証拠化して局所修正し、修正済み製品を新しいQA候補commitとして明示する。以後のQA結果を旧凍結commitへ誤って帰属させず、更新対象を再凍結する。Q0凍結はrelease readinessを意味せず、既存release blockerを変更しない。
