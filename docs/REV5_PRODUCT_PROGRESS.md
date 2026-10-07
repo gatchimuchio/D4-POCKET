@@ -45,6 +45,8 @@
 
 [run 37612168584](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37612168584)、commit `e9da6dc0f8a353be1b9c83003acca3dd71899ba1`で実スクロール・dialog遷移・text field取得まで到達。AX treeには入力欄 `{{193,322.5},{638,166}}` とsubmitが存在したが、native欄の`click()`はnot hittableでFAILした。固定Flutter sourceはnative編集欄をFlutterView背面へ置くため、入力欄が窓内にあることを確認し、その中央への通常coordinate clickへ変更する。UI stateやBroker要求への注入は行わない。artifact `11478294105`、SHA-256 `ba3eff2497cc49e81c580eaec25bbc119f67206c12cbd5b052ed44b4f1bb72d0`を照合済み。Owner確認そのものは引き続き未到達。
 
+[run 37613082451](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37613082451)、commit `5c56b47a27941069ee3e32fea4ff4592f7cfd996`で入力欄へのclickと合成Manifestの入力まで到達したが、dialog内submitの`click()`もnot hittableでFAIL。観測されたボタンframe `{{654,547},{178,33}}`を窓内確認し、同じ通常coordinate clickへ揃える。OS確認の選択・Broker受理はまだ未成立であり、製品を変更せず試験操作だけを修正する。
+
 #### macOS Desktop通常Broker接続 — CLOSED（Product Build、2026-10-07）
 
 開始時のmacOS Runnerには`gui_shell/broker`登録がなく、Flutterの通常起動から実Brokerへ到達しなかった。本有限単位を、同梱Rust helperへの匿名pipe、既存認証Broker normal経路、初回設定等の製品bootstrap、正常終了へ限定した。Apple App Sandboxを継承し、Flutter／Runnerへ資格を渡さない。Owner専用操作・Windows固有操作は現状の拒否を保持し、macOS全機能完成とは扱わない。責任と未成立範囲は`docs/specs/macos-desktop-channel.md`。手動Actionsの独立`macos_product`を使い、iOS／AndroidのCLOSED試験は起動していない。

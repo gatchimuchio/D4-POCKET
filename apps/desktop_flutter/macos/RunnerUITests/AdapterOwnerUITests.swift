@@ -77,6 +77,8 @@ final class AdapterOwnerUITests: XCTestCase {
     ]
     let data = try JSONSerialization.data(withJSONObject: value, options: [.sortedKeys])
     app.typeText(String(data: data, encoding: .utf8)!)
-    app.buttons["native Owner確認へ"].click()
+    let submit = app.buttons["native Owner確認へ"]
+    XCTAssertTrue(app.windows.firstMatch.frame.contains(submit.frame))
+    submit.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
   }
 }
