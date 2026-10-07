@@ -35,7 +35,7 @@ final class AdapterOwnerUITests: XCTestCase {
     let select = app.buttons["OSで作業領域を選択"]
     XCTAssertTrue(select.exists)
     // Flutterのscroll後のAX frameは1pxのままだった。実際の画面の可視文字へclickする。
-    try clickWorkspaceSelection(app)
+    try clickWorkspaceSelection(app, allowInitialFallback: true)
     let chooser = try WorkspacePanelUI(app: app)
     if !chooser.waitForButton("Cancel", timeout: 15) {
       let image = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
@@ -50,26 +50,30 @@ final class AdapterOwnerUITests: XCTestCase {
     }
     try chooser.press("Cancel")
     app.activate()
-    XCTAssertTrue(element(app, "OS選択を取り消しました。入力は変更していません。").waitForExistence(timeout: 10))
+    XCTAssertTrue(workspaceMessage(app, "OS選択を取り消しました。入力は変更していません。").waitForExistence(timeout: 10))
     XCTAssertEqual(fields[4].value as? String, "/previous-input")
     try clickWorkspaceSelection(app)
     XCTAssertTrue(chooser.waitForButton("作業領域を選択", timeout: 15))
     try chooser.enterFolder(outside)
     XCTAssertTrue(chooser.waitForButton("作業領域を選択", timeout: 10))
     try chooser.press("作業領域を選択"); app.activate()
-    XCTAssertTrue(element(app, "OS選択済み（起動中のみ）。登録・Permission・Approvalは別です。").waitForExistence(timeout: 10))
+    XCTAssertTrue(workspaceMessage(app, "OS選択済み（起動中のみ）。登録・Permission・Approvalは別です。").waitForExistence(timeout: 10))
     XCTAssertEqual(fields[4].value as? String, outside)
-    XCTAssertFalse(element(app, "Broker内登録: macos-os-selected-codex").exists)
+    XCTAssertFalse(workspaceMessage(app, "Broker内登録: macos-os-selected-codex").exists)
     let submit = app.buttons["native Owner確認へ進む"]
     submit.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
     approve(notice)
-    XCTAssertTrue(element(app, "Broker内登録: macos-os-selected-codex").waitForExistence(timeout: 20))
+    XCTAssertTrue(workspaceMessage(app, "Broker内登録: macos-os-selected-codex").waitForExistence(timeout: 20))
     print("D4_MACOS_WORKSPACE_OS_SELECTION_PASS")
     app.typeKey("q", modifierFlags: .command)
     XCTAssertTrue(app.wait(for: .notRunning, timeout: 10))
   }
 
-  private func clickWorkspaceSelection(_ app: XCUIApplication) throws {
+  private func workspaceMessage(_ app: XCUIApplication, _ label: String) -> XCUIElement {
+    app.staticTexts.matching(NSPredicate(format: "label == %@ OR value == %@", label, label)).firstMatch
+  }
+
+  private func clickWorkspaceSelection(_ app: XCUIApplication, allowInitialFallback: Bool = false) throws {
     // 秘密path欄への入力直後は選択buttonがviewport外だった。通常の本文scrollで表示する。
     app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.65))
       .scroll(byDeltaX: 0, deltaY: -180)
@@ -87,15 +91,16 @@ final class AdapterOwnerUITests: XCTestCase {
     let matches = (request.results ?? []).filter {
       guard let text = $0.topCandidates(1).first?.string else { return false }
       // 小さい日本語buttonの途中の漢字はVisionで欠落し得る。固有の接頭ラベルで一意に束縛する。
-      return text.folding(options: [.caseInsensitive, .widthInsensitive], locale: Locale(identifier: "ja_JP"))
-        .replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "0s", with: "os").contains("osで")
+      let normalized = text.folding(options: [.caseInsensitive, .widthInsensitive], locale: Locale(identifier: "ja_JP"))
+        .replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "0s", with: "os")
+      return normalized.contains("os") && (normalized.contains("作業") || normalized.contains("領域"))
     }
     guard matches.count == 1 else {
       print("D4_WORKSPACE_BUTTON_OCR_COUNT \(request.results?.count ?? 0) matches=\(matches.count)")
       // 固定runnerの800px製品窓・検査済み6欄入力後の保存映像でボタン中央を確認した。
       // 最初のclickだけ。OS選択結果やBroker返答は注入せず通常mouse入力を送る。
       // 取消後は投影が増えてlayoutが変わるため、このfallbackを使わない。
-      if !element(app, "OS選択を取り消しました。入力は変更していません。").exists {
+      if allowInitialFallback {
         let window = app.windows.firstMatch
         guard abs(window.frame.width - 800) <= 1 else {
           throw failure("観測済み製品窓の幅と一致しない")
