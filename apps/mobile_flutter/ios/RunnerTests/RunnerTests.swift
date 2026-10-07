@@ -361,9 +361,11 @@ class NativeDeviceLinkProductTests: XCTestCase {
       let deviceID = String(message[range])
       stage = "native_invitation"
       var invitationJSON = try bridge(port: port, request: deviceID)
+      stage = "invitation_validation"
       let invitation = try DeviceLinkCredential.invitation(invitationJSON, expectedDeviceID: deviceID)
       field.text = invitationJSON
       invitationJSON.removeAll(keepingCapacity: false)
+      stage = "invitation_submit"
       try activate("招待を確認")
       stage = "host_confirmation"
       try waitUntil { self.alert()?.title == "接続先を照合" }
@@ -448,11 +450,25 @@ class NativeDeviceLinkProductTests: XCTestCase {
 
   private func activate(_ label: String) throws {
     // Drawerの選択項目はbutton traitを持たない。表示labelと実activation結果で選ぶ。
-    try waitUntil {
-      for target in self.objects() where self.labelMatches(target, label) {
-        if !target.accessibilityTraits.contains(.notEnabled) && target.accessibilityActivate() { return true }
+    do {
+      try waitUntil {
+        for target in self.objects() where self.labelMatches(target, label) {
+          if target.accessibilityTraits.contains(.notEnabled) { continue }
+          if target.accessibilityActivate() { return true }
+          // UIKitの通常controlは登録済みactionへ送る。handler／serviceを直接呼ばない。
+          if let control = target as? UIControl, control.isEnabled,
+             control.allControlEvents.contains(.touchUpInside) {
+            control.sendActions(for: .touchUpInside)
+            return true
+          }
+        }
+        return false
       }
-      return false
+    } catch {
+      // class名だけを記録し、label・value・field内容・UI treeは出力しない。
+      let names = Set(objects().filter { labelMatches($0, label) }.map { String(describing: type(of: $0)) })
+      for name in names.sorted().prefix(8) { print("D4_IOS_PRODUCT_DIAG class=\(name)") }
+      throw error
     }
     RunLoop.current.run(until: Date().addingTimeInterval(0.4))
   }
