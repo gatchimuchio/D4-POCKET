@@ -46,9 +46,11 @@ final class AdapterOwnerUITests: XCTestCase {
     XCTAssertEqual(XCTWaiter.wait(for: [available], timeout: 10), .completed)
     // 初期800x600窓ではRuntime情報の下にあるため、実際のスクロールで表示する。
     for _ in 0..<8 {
-      if install.isHittable { break }
+      // Flutterは画面外のボタンも高さ1pxのAX要素とし、isHittableがtrueになり得る。
+      if install.frame.height >= 30 && install.isHittable { break }
       app.windows.firstMatch.scroll(byDeltaX: 0, deltaY: -250)
     }
+    XCTAssertGreaterThanOrEqual(install.frame.height, 30)
     XCTAssertTrue(install.isHittable)
     install.click()
     // Flutter 3.44 macOSは編集欄をNSTextFieldとして公開する。
