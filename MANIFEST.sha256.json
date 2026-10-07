@@ -156,7 +156,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "abb4891bb9ad3e9015ca7ba0e7df7b9a4661db195f9de2ab7b6e91a30ac128b5"
+      "sha256": "84ad88e3f5176189bb6d230ae4b66b42bce4fa77663f0bc8c66f222514b7d04b"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -1244,7 +1244,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "7b5c5fdb16872129b344e3c33a94bde67213cc72a0499f12e3629dc55db779d4"
+      "sha256": "6ab91e35aceebb6f6f55cf88b9f6f10f8236773fecad6898c11123e7d801555a"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",

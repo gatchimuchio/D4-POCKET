@@ -237,8 +237,7 @@ cd native/rust_helper      && cargo test
 cd apps/desktop_flutter    && flutter analyze
 ~~~
 
-Mobile Flutter は <code>post_v1_scope</code> であり、owner が明示的に含めない限り v1.0 product release gate の対象外である。
-現在のowner rev2指示ではMobileを明示的に含めているため、`--include-mobile-release`を使用する。Dart製品clientのTLS・実対話は検証済みだが、iOSのbuild・Android/iOSのOS安全保管・実機lifecycleの未成立は`release_blocker`として扱う。Android開発APK/AABの生成と構造検証は確認した。詳細は`apps/mobile_flutter/README.md`と`docs/REV2_PROGRESS.md`に記録する。
+Mobile は現行rev5のP13 Product Build対象である。iOS Simulatorのbuild・native XCTestとAndroidの解析・Flutter／native test・Debug APK buildがPASSし、Android APKはAPI 35 Emulatorでinstall後にMainActivityの起動まで確認した。物理端末、実端末の安全保管、Desktop Rust Brokerとのnative実TLS／Device Link、配布identityは未成立で、P13とMobile release blockerを維持する。現行状態と証拠範囲は[rev5製品進捗](docs/REV5_PRODUCT_PROGRESS.md)を正本とする。
 
 一括 reporter を使う場合:
 
@@ -305,7 +304,7 @@ tooling/    schema_check · conformance_tests · broker_parity · ...
 
 ## 📊 製品状態と履歴
 
-現行工程はD4 Pocket / GUI-Shell rev5の`PRODUCT_BUILD_MODE`である。P2 Multi-Agent Compare、P3 Agent Handoff、Windows側P12 Product IntegrationはProduct Build受入れを閉じており、現在は独立trackのP13 Mobile／Non-Windowsを進めている。iOS SimulatorのFlutter解析・21件のFlutter test・Simulator build・native XCTest 8件は手動Actions run #22で成功した。Androidも現行sourceでFlutter解析・21件のFlutter test・Debug APK build・native unit testが成功した。いずれも物理端末、Desktop Rust Brokerとのnative実TLS、公開配布を証明しない。Windows Feature Completeは達成済みだが、通常Release `task_execution=unsupported`、`release_ready=false`を維持し、Final QAは現行modeの指示により延期中である。現行phaseと証拠範囲は[rev5製品進捗](docs/REV5_PRODUCT_PROGRESS.md)、Final QAの過去記録は[Final QA Queue](docs/FINAL_QA_QUEUE.md)を参照する。
+現行工程はD4 Pocket / GUI-Shell rev5の`PRODUCT_BUILD_MODE`である。P2 Multi-Agent Compare、P3 Agent Handoff、Windows側P12 Product IntegrationはProduct Build受入れを閉じており、現在は独立trackのP13 Mobile／Non-Windowsを進めている。iOS SimulatorのFlutter解析・21件のFlutter test・Simulator build・native XCTest 8件は手動Actions run #22で成功した。Androidも現行sourceでFlutter解析・21件のFlutter test・Debug APK build・native unit testに成功し、API 35 Emulator上でAPK起動まで確認した。いずれも物理端末、Desktop Rust Brokerとのnative実TLS、公開配布を証明しない。Windows Feature Completeは達成済みだが、通常Release `task_execution=unsupported`、`release_ready=false`を維持し、Final QAは現行modeの指示により延期中である。現行phaseと証拠範囲は[rev5製品進捗](docs/REV5_PRODUCT_PROGRESS.md)、Final QAの過去記録は[Final QA Queue](docs/FINAL_QA_QUEUE.md)を参照する。
 
 ### 2026-09-29 の履歴
 

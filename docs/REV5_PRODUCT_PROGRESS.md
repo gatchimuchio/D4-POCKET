@@ -31,7 +31,9 @@ Androidの実装・検証履歴は維持し、Android実機試験の凍結を尊
 
 commit `54229000aa50896af37e5f8d391d9a7997b52e6f`を対象にFlutter 3.44.0で`flutter analyze --no-pub`（No issues）、`flutter test --no-pub --reporter expanded`（21件PASS）を実行した。OneDrive checkout内の`flutter build apk --debug --no-pub`は既存`build/app/intermediates/assets/debug/mergeDebugAssets`の削除で停止したため、権限やtracked sourceを変更せず、同じcommitの隔離detached worktreeで`flutter pub get`とAPK buildを再実行し成功した。APKは146,353,505 bytes、SHA-256 `9292d825a140c31c4eb504084940a7b2a0b3da792c5f9c83c9502c5b12613e6b`。同worktreeで`android/gradlew.bat :app:testDebugUnitTest`も`BUILD SUCCESSFUL`。Gradle／Android SDKのKotlin DSLおよびSDK XML互換warningは出たがbuild失敗ではない。
 
-これは現行Android sourceの解析・Flutter test・Debug compile・native unit testに限る。APKのemulator起動、Android実機、Keystore実OS挙動、Desktop Rust Brokerとの実TLS・Device Link、配布identityを証明しない。OneDrive checkout内build出力の削除失敗原因は未確定であり、環境設定を変更せずisolated worktreeを使った。Android実機試験凍結とP13／Mobile release blockerは維持する。
+同じAPKをWindows Android Emulator 37.2.12上のAndroid 15／API 35 Google APIs x86_64 AVD（WHPX）へinstallし、`adb install -r`が`Success`を返した。Launcher intentを1件送り、`dumpsys activity activities`で`com.example.gui_shell_mobile/.MainActivity`が`topResumedActivity`であることを確認した。起動直後の`logcat -d -t 400 -s AndroidRuntime:E Flutter:E`には該当error entryがなかった。AVD／Android user homeは`%LOCALAPPDATA%\Temp\d4p-p13-emulator-7ab8a06`配下に隔離し、repository外に置いた。これはAndroid Emulator上の製品APK起動に対する`LIVE_RUNTIME` smokeである。
+
+この証拠はAndroid Emulator上での起動までに限る。物理Android端末、実端末Keystore／OS安全保管、Desktop Rust Brokerとの実TLS・Device Link、配布identityを証明しない。OneDrive checkout内build出力の削除失敗原因は未確定であり、環境設定を変更せずisolated worktreeを使った。Android実機試験凍結とP13／Mobile release blockerは維持する。
 
 ## Q0 品質保証凍結 — 完了（過去のFinal QA記録）
 
