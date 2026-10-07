@@ -85,7 +85,8 @@ final class AdapterOwnerUITests: XCTestCase {
     try VNImageRequestHandler(cgImage: pixels).perform([request])
     let matches = (request.results ?? []).filter {
       guard let text = $0.topCandidates(1).first?.string else { return false }
-      return text.contains("OS") && text.contains("作業領域") && text.contains("選択")
+      // 小さい日本語buttonの途中の漢字はVisionで欠落し得る。固有の接頭ラベルで一意に束縛する。
+      return text.replacingOccurrences(of: " ", with: "").hasPrefix("OSで")
     }
     guard matches.count == 1 else { throw failure("画面上のOS選択buttonを一意に確認できない") }
     let box = matches[0].boundingBox
