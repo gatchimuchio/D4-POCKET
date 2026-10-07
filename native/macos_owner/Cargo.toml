@@ -5,6 +5,11 @@ edition = "2021"
 license = "Apache-2.0"
 publish = false
 
+[features]
+default = []
+# 選択画面の製品FAILを局所化する開発専用の固定段階診断。資格・本文を出力しない。
+workspace-ui-diagnostic = []
+
 [target.'cfg(target_os = "macos")'.dependencies]
 core-foundation = "=0.10.1"
 core-foundation-sys = "=0.8.7"

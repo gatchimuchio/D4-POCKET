@@ -15,6 +15,11 @@ final class BrokerProcessChannel {
   private var pending = 0
   private var closeCallbacks = [(Bool) -> Void]()
   private var graceful = true
+  #if DEBUG && D4_MACOS_OWNER_UI_TEST
+  private let nativeDiagnostic = Pipe()
+  private var nativeDiagnosticBuffer = Data()
+  private let nativeDiagnosticLock = NSLock()
+  #endif
   #if DEBUG
   private var bootstrap = Set<String>()
   private(set) var productBootstrapObserved = false
@@ -40,10 +45,39 @@ final class BrokerProcessChannel {
       worker.standardInput = requests
       worker.standardOutput = responses
       worker.standardError = FileHandle.nullDevice
+      #if DEBUG && D4_MACOS_OWNER_UI_TEST
+      worker.standardError = nativeDiagnostic
+      nativeDiagnostic.fileHandleForReading.readabilityHandler = { [weak self] handle in
+        let data = (try? handle.read(upToCount: 4096)) ?? Data()
+        guard let self else { return }
+        if data.isEmpty { handle.readabilityHandler = nil; return }
+        self.nativeDiagnosticLock.lock()
+        defer { self.nativeDiagnosticLock.unlock() }
+        guard self.nativeDiagnosticBuffer.count + data.count <= 8192 else {
+          self.nativeDiagnosticBuffer.removeAll()
+          return
+        }
+        self.nativeDiagnosticBuffer.append(data)
+        while let newline = self.nativeDiagnosticBuffer.firstIndex(of: 0x0A) {
+          let line = String(data: self.nativeDiagnosticBuffer[..<newline], encoding: .utf8) ?? ""
+          self.nativeDiagnosticBuffer.removeSubrange(...newline)
+          let stages = ["main_thread_checked", "application_created", "launch_completed", "panel_created", "modal_entered", "modal_returned"]
+          for stage in stages where line == "D4_WORKSPACE_NATIVE_STAGE " + stage {
+            NSLog("D4_WORKSPACE_NATIVE_STAGE %@", stage)
+          }
+          for exception in ["NSInternalInconsistencyException", "NSInvalidArgumentException"] where line.contains(exception) {
+            NSLog("D4_WORKSPACE_NATIVE_EXCEPTION %@", exception)
+          }
+        }
+      }
+      #endif
       worker.terminationHandler = { [weak self] process in
         DispatchQueue.main.async {
           guard let self else { return }
           self.available = false
+          #if DEBUG && D4_MACOS_OWNER_UI_TEST
+          NSLog("D4_WORKSPACE_NATIVE_EXIT %d", process.terminationStatus)
+          #endif
           let completed = self.closing && self.graceful && process.terminationStatus == 0
           let callbacks = self.closeCallbacks
           self.closeCallbacks.removeAll()

@@ -16,6 +16,8 @@ Brokerは当該操作だけを`MacOSWorkspaceSelection`という別の内部sour
 
 ## 外部APIと未成立範囲
 
+native終了の局所診断に限り、開発専用`workspace-ui-diagnostic`を手動UI試験へ明示適用する。通常helperは診断なしで先にbuildし、UI試験用helperだけにmain thread確認／AppKit生成／起動完了／panel生成／modal前後の固定6段階を出す。Swiftは明示Debug試験flag内の匿名stderr pipeで最大8KiBの未完行だけをmemoryへ保持し、完全一致の段階と既知例外名だけをOS logへ投影する。raw stderr、path、秘密、任意errorは記録しない。AppKit／IPC／Authorityの処理やOS保護設定を代替しない。元のFAILはhelperのJSON非応答と終了、既存のnull stderrでは終了箇所が不明なことが必要理由で、原因確定後にfeature／pipe／観測logを撤去し、通常helperでAcceptanceを確認する。
+
 helperのstdin処理は`NSApplication::run`を使用しないため、OS chooserを最初に開く時だけmain threadで`finishLaunching`し、表示時に`activate`する。これはAppKitの表示lifecycleであり、Authorityやsandbox範囲を変更しない。[Appleの起動完了API](https://developer.apple.com/documentation/appkit/nsapplication/finishlaunching())と固定bindingを確認した。UI試験は外部AXの資格を要求せず、公開合成画面の文字認識とXCTestの通常入力を使う。明示Debug試験flagの固定応答分類／helper終了値は診断だけで、通常buildに含めず、原因確定・Acceptance成立後に撤去する。
 
 失敗分類はnativeの固定enumだけをBrokerの既存拒否codeへ結合する。main thread、表示開始、URL、path、その他native失敗を区別し、raw error・path・秘密をcodeやmessageへ追加しない。未登録・入力保持・自動再送なしは全分類で同じ。通常IPCやOwner資格からこの分類sourceを生成できず、失敗codeはAuthorityではない。

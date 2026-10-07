@@ -72,7 +72,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "e205ef97105ea621655bf62114c01fa84f296b437e3477b0deb8fc74b9065b0f"
+      "sha256": "1cfb52f2e8a1cf5954d69365723c26c67c7e5c10772c9115ad62f1632f05738e"
     },
     {
       "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
@@ -524,7 +524,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/BrokerProcessChannel.swift",
-      "sha256": "217ca56bcc299a566f1b4abbb89ebee223f4d5fd71f62c0b6af28b9e55822fd5"
+      "sha256": "750820de8bba588aa742211a3befcc514563c76c83a2fd55cdb7c1fe8546ce5f"
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/Configs/AppInfo.xcconfig",
@@ -1272,7 +1272,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "be63070ae4e054547e646dd7485eca8215e1dd48076eff9fcf76c5de447e08f9"
+      "sha256": "0cf6ae57ae0b429245db51e4c2f5bfdcc01f1a961a44d1cb2ecde2fdf2293464"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1488,7 +1488,7 @@
     },
     {
       "path": "docs/specs/macos-workspace-selection.md",
-      "sha256": "82b3aeb02f6886a80a2d52f8f08620daeabaa383c9738f8c21efd8e81a9b012a"
+      "sha256": "aa29835c871aa3796c40478eb12be87e1ec904d74e10467f5733b4e1c3ebdf46"
     },
     {
       "path": "docs/specs/mcp-connection-center.md",
@@ -3164,11 +3164,11 @@
     },
     {
       "path": "native/macos_owner/Cargo.toml",
-      "sha256": "cf2b59e4593da756aa91714d73ade24e6c14b7bcac589fb4a8f868fe82622baa"
+      "sha256": "498c6f67fb485c260f73f5a3486a16015a3626913b39cc186565831c981395e1"
     },
     {
       "path": "native/macos_owner/src/lib.rs",
-      "sha256": "c23db71d8c97f15ea5ab329cccdc887fa209aecc09365edcd84902a2410c785a"
+      "sha256": "40db8b22c482689a06d32b21c9788db3ba424a019075608c9cb38b1d98a7895d"
     },
     {
       "path": "native/process_supervision/Cargo.lock",
@@ -3192,7 +3192,7 @@
     },
     {
       "path": "native/rust_helper/Cargo.toml",
-      "sha256": "9be683ed6eca3bc1205bd7e5942669955cea4ce6d57e37487c820d6964c05ada"
+      "sha256": "8ea8cef43e0f5e72015129f48e666107b00aacaea2d7c37c79abc738b82aea54"
     },
     {
       "path": "native/rust_helper/README.md",

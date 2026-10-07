@@ -7,6 +7,14 @@ pub const TITLE: &str = "D4 Pocket — 今回の操作を確認";
 pub const DENY: &str = "承認しない";
 pub const APPROVE: &str = "今回の操作を承認";
 
+#[cfg(target_os = "macos")]
+macro_rules! selection_ui_stage {
+    ($label:literal) => {
+        #[cfg(all(target_os = "macos", feature = "workspace-ui-diagnostic"))]
+        eprintln!(concat!("D4_WORKSPACE_NATIVE_STAGE ", $label));
+    };
+}
+
 /// OSが選択したfolderへの起動中access。D4のPermission／Approvalではない。
 pub struct SelectedWorkspace {
     path: std::path::PathBuf,
@@ -38,7 +46,9 @@ pub fn select_workspace() -> Result<Option<SelectedWorkspace>, &'static str> {
         use objc2_app_kit::{NSApplication, NSApplicationActivationPolicy, NSOpenPanel};
         use objc2_foundation::NSString;
         let mtm = MainThreadMarker::new().ok_or("OS選択をmain threadで開始できません")?;
+        selection_ui_stage!("main_thread_checked");
         let app = NSApplication::sharedApplication(mtm);
+        selection_ui_stage!("application_created");
         if !app.setActivationPolicy(NSApplicationActivationPolicy::Accessory) {
             return Err("OS選択の表示を開始できません");
         }
@@ -47,7 +57,9 @@ pub fn select_workspace() -> Result<Option<SelectedWorkspace>, &'static str> {
         static APPKIT_LAUNCH: std::sync::Once = std::sync::Once::new();
         APPKIT_LAUNCH.call_once(|| app.finishLaunching());
         app.activate();
+        selection_ui_stage!("launch_completed");
         let panel = NSOpenPanel::openPanel(mtm);
+        selection_ui_stage!("panel_created");
         panel.setTitle(Some(&NSString::from_str("D4 Pocket — 作業領域のOS選択")));
         panel.setPrompt(Some(&NSString::from_str("作業領域を選択")));
         panel.setMessage(Some(&NSString::from_str(
@@ -58,7 +70,10 @@ pub fn select_workspace() -> Result<Option<SelectedWorkspace>, &'static str> {
         panel.setAllowsMultipleSelection(false);
         panel.setResolvesAliases(false);
         panel.setCanCreateDirectories(false);
-        if panel.runModal() != 1 {
+        selection_ui_stage!("modal_entered");
+        let response = panel.runModal();
+        selection_ui_stage!("modal_returned");
+        if response != 1 {
             return Ok(None);
         }
         let url = panel.URL().ok_or("OS選択にURLがありません")?;
