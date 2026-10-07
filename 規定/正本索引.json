@@ -348,6 +348,10 @@
       "責任": "C23 Desktopの運用・安全・開発・設定グループ、既存20画面保持、Navigation表示整理、権限非生成境界"
     },
     {
+      "path": "docs/specs/macos-desktop-channel.md",
+      "責任": "macOS製品画面と同梱Rust helperの匿名pipe、既存normal Brokerへの接続、sandbox継承、秘密非公開、正常終了、Owner機能未移植の境界"
+    },
+    {
       "path": "docs/specs/mobile-surface.md",
       "責任": "C24 Mobileの選択的状態投影、Workspace ID選択・Agent対話要求、Device Link・Approval・非権限境界"
     },

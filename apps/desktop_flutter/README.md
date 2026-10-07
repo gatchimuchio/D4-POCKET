@@ -27,10 +27,12 @@ Dartの画面最上位で [`SemanticsBinding.instance.ensureSemantics()`](https:
 
 ## macOS開発構成
 
-Flutter 3.44.0の標準macOS projectを追加した。App Sandboxを保持し、既存の認証付きloopback brokerへの接続にnetwork.clientを指定する。Debug/Profileのnetwork.serverとJITはFlutter標準の開発用設定であり、Releaseには追加しない。広域file accessやowner資格の読取権限は追加しない。通常資格fileはapp container内に明示配置する必要があり、外部pathを設定するだけではSandbox外の読取を許可しない。
+Flutter 3.44.0のmacOS Runnerは同梱Rust helperを匿名pipe経由で使用する。Flutter／RunnerはBroker資格を読み取らず、Rustが既存認証loopback Brokerへ中継する。App Sandboxを保持し、helperへsandboxを継承する。network.clientとBrokerのloopback listen用network.serverを明示し、JITはDebug/Profileだけ。広域file access、任意helper・command指定、Owner資格読取権限は追加しない。有限接続単位と現行結果は`docs/specs/macos-desktop-channel.md`と`docs/REV5_PRODUCT_PROGRESS.md`を参照する。
+
+開発buildは先に`cargo +1.95.0 build --locked --manifest-path native/rust_helper/Cargo.toml --bin gui_shell_macos_broker`を実行し、その後`flutter build macos --debug`で同梱する。ReleaseはRust側にも`--release`を指定する。Xcodeは同じprofileの固定helperを同梱し、欠損時はbuildを失敗させる。end userがRustやterminalを用意する経路ではない。
 
 - item: macOS実機のbroker資格配置・起動・配布
   classification: release_blocker
-  reason: 標準projectと補助buildは実機のcontainer内資格配置・対話・署名を証明しない。bundle identifierは開発用である。
-  required_action: Mac実機で資格配置と実対話を確認し、正式識別子・署名・配布手順を確定する。
+  reason: 通常Broker接続を実装中。Owner専用操作・Credentials・Task・Windows固有製品機能のmacOS移植、異常終了後の起動lock復旧、正式署名・配布は未成立。bundle identifierは開発用である。
+  required_action: P13の製品接続から順に不足を実装する。通常接続の成功をmacOS全機能完成へ昇格せず、最終QAと正式identity／配布を別途成立させる。
   blocks_release: yes

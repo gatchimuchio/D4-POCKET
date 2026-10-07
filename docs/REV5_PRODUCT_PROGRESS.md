@@ -17,6 +17,14 @@
 
 ## P13 Mobile / Non-Windows — 現行track
 
+#### macOS Desktop通常Broker接続 — IMPLEMENTING（2026-10-07）
+
+現行macOS Runnerには`gui_shell/broker`登録がなく、Flutterの通常起動から実Brokerへ到達しない。次の有限単位を、同梱Rust helperへの匿名pipe、既存認証Broker normal経路、初回設定等の製品bootstrap、正常終了へ限定する。Apple App Sandboxを継承し、Flutter／Runnerへ資格を渡さない。Owner専用操作・Windows固有操作は現状の拒否を保持し、macOS全機能完成とは扱わない。責任と未成立範囲は`docs/specs/macos-desktop-channel.md`。手動Actionsの独立`macos_product`を使い、iOS／AndroidのCLOSED試験を起動しない。
+
+初回Rust対象試験は2件中1件PASS／1件FAIL。normal資格で許可される既存`shutdown`をOwner専用と誤ったtestの前提が原因で、Owner専用の`作業領域承認`と正確な拒否codeへ修正する。Broker本体の権限規則は変更しない。
+
+修正後のWindows `cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1`はlibrary 501 passed／1 failed／12 ignored。新規macOS接続test 2件はPASS。失敗は変更外の`bounded_catalog_fetch_rejects_declared_document_over_limit`でTLS fixtureのOS 10054／InvalidContentType、既存`FQ-TEST-LOOPBACK`範囲に保持する。library失敗後の他targetは未実行であり、Rust全数PASSとは扱わない。Schema 161／157／208、Conformance 236件、Manifest 1192件、`git diff --check`はPASS。厳格日本語監査は既存4 file／15 findingsによりexit 1、今回の追加fileにfindingはない。Mac側のbuild／正常経路は手動Actionsで確認するまで未成立。
+
 #### iOS製品UI／native service／基本lifecycle — CLOSED（Product Build、2026-10-07）
 
 有限Acceptanceは、新規専用Simulator上の製品Flutter画面からnative招待画面・接続先確認・既存serviceへ進み、実Broker結合、Runtime表示、OSによるbackground／復帰、製品画面での離脱を一度成立させること。現行harnessは標準XCUITestで画面を操作する。招待だけは明示的なSimulator試験buildの`D4_IOS_PRODUCT_TEST`内でnative secure fieldへ渡し、Flutter／shell／環境変数／UI操作logへ秘密を渡さない。service直接呼出し・foreground偽装・承認迂回をしない。通常buildでは試験入力helperと起動呼出しをcompileから除外し、同flagを付けた物理端末buildはcompile errorにする。`--ios-product-ui`は新規製品接続試験だけを選択し、CLOSEDの部品試験を再実行しない。物理端末、網羅的lifecycle timing、Final QAは本単位へ追加しない。

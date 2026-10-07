@@ -16,6 +16,8 @@ pub mod filesystem;
 pub mod workspace_diff;
 pub mod workspace_reader;
 pub mod ipc;
+#[cfg(any(target_os = "macos", test))]
+pub mod macos_desktop_worker;
 pub mod network;
 pub mod process;
 pub mod update_verification;

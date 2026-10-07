@@ -1,5 +1,7 @@
 # GUI Shell ロードマップ
 
+P13 macOS通常Broker接続: native Runnerに未接続の`gui_shell/broker`を、sandbox継承する同梱Rust helperと既存認証Brokerへ接続する。製品bootstrap・通常要求・正常終了が今回の有限単位。Owner操作・Windows機能の全移植・正式配布は別範囲。手動`apple-manual-build.yml`の`macos_product`で補助検証し、CLOSED済みMobile接続を再試験しない。
+
 P13 iOS製品接続はCLOSED: 手動Actions [run 37592632518](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37592632518)、commit `1188ed96439a56b698f0bca52f0ab4466b115aa8`で、Flutter画面→native招待／確認→既存service→実Broker、Runtime表示・HOME復帰・画面からの離脱がXCUITest 1件でPASS。秘密入力helperはSimulator試験buildだけへ限定し、通常buildには含めない。Owner側の招待・結合回収と専用Simulator削除も確認した。次はP13の残る製品機能差分。Android／iOSのCLOSED基本接続を再試験せず、物理端末・正式配布・最終QAは別gateに保持する。詳細は`docs/REV5_PRODUCT_PROGRESS.md`。
 
 P13 iOS native部品の実Broker接続はCLOSED: `apple-manual-build.yml`の`ios_mobile`手動Actions [run 37584511577](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37584511577)、commit `599359be236962498f93842ec66145339290380f`でSwift TLS／Keychainの結合・再読・Runtime取得・離脱・失効済み資格拒否・誤pin拒否がPASS。日本語Broker error codeを誤拒否する不具合を局所修正し、native XCTest 10件／Flutter test 21件／Mobile解析／Simulator buildが成功した。招待秘密はnative専用loopback受渡し内に閉じる。次はiOS製品UI・native service・基本lifecycleの接続。物理端末やrelease readinessは主張しない。詳細と過去FAILは`docs/REV5_PRODUCT_PROGRESS.md`。
