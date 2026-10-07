@@ -35,6 +35,12 @@ final class DeviceLinkTLSClient {
   private var active: [ObjectIdentifier: NWConnection] = [:]
   private let queue = DispatchQueue(label: "org.gatchimuchio.gui-shell.device-link.tls", qos: .utility)
 
+  static func isValidErrorCode(_ code: String) -> Bool {
+    (1...96).contains(code.utf8.count) && code.unicodeScalars.allSatisfy {
+      CharacterSet.alphanumerics.contains($0) || "_.-".unicodeScalars.contains($0)
+    }
+  }
+
   func cancelAll() {
     lock.lock()
     let connections = Array(active.values)
@@ -187,8 +193,7 @@ final class DeviceLinkTLSClient {
       let expected: Set<String> = ["code", "message", "recoverable", "audit_event_required", "fail_closed"]
       guard Set(errorObject.keys) == expected,
             let code = errorObject["code"] as? String,
-            (1...96).contains(code.utf8.count),
-            code.utf8.allSatisfy({ (65...90).contains($0) || (97...122).contains($0) || (48...57).contains($0) || [45, 46, 95].contains($0) }) else {
+            Self.isValidErrorCode(code) else {
         throw DeviceLinkTransportError.failed
       }
     }

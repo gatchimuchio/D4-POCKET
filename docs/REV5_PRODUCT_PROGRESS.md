@@ -25,6 +25,8 @@ Androidの実装・検証履歴は維持し、Android実機試験の凍結を尊
 
 今回のharness追加後、Python 2 fileの`py_compile`、Schema 161／157／208、Conformance 236件、手動workflow限定検査、`git diff --check`はPASS。OneDrive日本語path上のDesktop／Mobile `flutter analyze --no-pub`は双方ともLSP JSONの`FormatException: Unterminated string`でanalysis serverがexit 255となり、CLIはexit 1だった。既知のhost-local解析制約として失敗を保持し、今回Swiftのcompile成功とは扱わない。Dart／production Swiftは変更していない。現行Mobile解析と新規native XCTestの実接続は手動macOS runnerで確認する。
 
+手動Actions [run 37583469599](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37583469599)（`db76d9c10dbc44e0908dcf8ed0621e3c819e9f11`）ではmacOS Rust build、Mobile解析・21 Flutter test、Simulator build、既存8 XCTestはPASSし、新規native接続試験は最後の`revoked_credential`でFAILした。先行する結合・Keychain再読・Runtime一覧・離脱までは到達した。Brokerの既存拒否codeは`端末要求拒否`だが、iOS側だけがASCIIに限定していたため、正しい拒否応答を不正frameとして扱っていた。文字・数字と`_.-`、UTF-8長1〜96 byteの限定検査へ局所修正し、空白・制御文字・長さ超過を引き続き拒否する。単体testと同じ実接続試験で修正を確認する。拒否をacceptedに変換せず、自由文errorや資格をUIへ渡さない。
+
 #### iOS Simulator build／native XCTest — 局所検証PASS（2026-10-07）
 
 手動Actions run [#22](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37558500619)はcommit `b6dbf10c4ea8b34e103b8826f2d23f25930d8ca9`で完了した。macOS 15.7.9／Xcode 16.4、iPhone 16 Pro／iOS 18.5 Simulator上で、Flutter 3.44.0のMobile analyze（問題なし）、Flutter test 21件、iOS Simulator build、native XCTest 8件（8 passed／0 failed）がPASSした。Keychain試験はThisDeviceOnly属性、保存・再読・削除、version 1から2へのmigrationを確認した。XCTestはproduction identityを使わず、Simulator専用ad-hoc identity `-`で署名した。Workflowが明示した`FAKETEAMID.com.example.guiShellMobile`はtest用の生成identifierであり、配布署名ではない。

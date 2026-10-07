@@ -1064,7 +1064,7 @@
     },
     {
       "path": "apps/mobile_flutter/ios/Runner/DeviceLinkTLSClient.swift",
-      "sha256": "309da977b8349ddf27725ff96775eb13baf1e09ced79e700df8dadca1d2bab6d"
+      "sha256": "30eb94ca965dbf5eeb4e92b7059234d795e9ada7a13795bfa452c46300fcb7ab"
     },
     {
       "path": "apps/mobile_flutter/ios/Runner/Info.plist",
@@ -1084,7 +1084,7 @@
     },
     {
       "path": "apps/mobile_flutter/ios/RunnerTests/RunnerTests.swift",
-      "sha256": "d7609f2afcf6447eb0824d7b798ef054732b7cfc2b744434f0d521d8bb405fc2"
+      "sha256": "9fd9ba828505f28c4a0df56f021a7c63d5ec0bacebb6a1c55b90cb7be2c1de94"
     },
     {
       "path": "apps/mobile_flutter/lib/main.dart",
@@ -1252,7 +1252,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "fe49c1e3f131ecb3d886778b35b0681069122b1875d9837bd903e522c2737324"
+      "sha256": "6bf5a9eb1210a193cf1586acd2b9806c6c85ab12617bfe1e80cb6e4892cede0a"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1400,7 +1400,7 @@
     },
     {
       "path": "docs/specs/device-link.md",
-      "sha256": "0826b8a79f0d30596176df4c3fbe3859ba5336514b34a2db3fad4a16605bf0a5"
+      "sha256": "a88ed106bdcdb68c9e447eaf410780db031a7dd5790d827b755842fb895a5a6f"
     },
     {
       "path": "docs/specs/evaluation-lab.md",

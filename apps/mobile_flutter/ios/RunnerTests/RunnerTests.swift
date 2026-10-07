@@ -17,6 +17,14 @@ class RunnerTests: XCTestCase {
     XCTAssertNoThrow(try DeviceLinkStrictJSON.parseObject("{\"key\":1,\"other\":[true,null]}", maximumBytes: 128))
   }
 
+  func testErrorCodeAcceptsJapaneseBrokerIdentifierAndRejectsInvalidText() {
+    XCTAssertTrue(DeviceLinkTLSClient.isValidErrorCode("端末要求拒否"))
+    XCTAssertTrue(DeviceLinkTLSClient.isValidErrorCode("broker_audit_append_failed"))
+    for invalid in ["", "端末 要求拒否", "端末要求拒否\n", "<code>", String(repeating: "拒", count: 33)] {
+      XCTAssertFalse(DeviceLinkTLSClient.isValidErrorCode(invalid))
+    }
+  }
+
   func testInvitationParsingBindsHostDeviceAndExpiry() throws {
     let deviceID = try XCTUnwrap(randomHex(byteCount: 16))
     let invitation: [String: Any] = [

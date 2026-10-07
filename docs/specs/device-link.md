@@ -10,6 +10,8 @@ iOS Simulator buildとnative XCTestは、手動Actions run [#22](https://github.
 
 ## 対象と責任
 
+nativeが受け取るBrokerのerror codeは、既存の日本語識別子（例: `端末要求拒否`）を含む文字・数字と`_`、`.`、`-`に限定する。iOSではUTF-8長1〜96 byteを保ち、空文字・空白・制御文字・超過値を拒否する。codeは失敗識別用の限定metadataであり、Authorityや成功へ変換しない。自由文messageは従来どおりFlutterへ渡さない。
+
 端末招待は、Desktopのownerが指定した端末を一回だけ結合するための期限付き資格である。端末結合資格は、そのDesktop起動世代と端末に結合する通常操作資格である。HostIDはDesktopの起動世代を、証明書hashは暗号化接続先の公開証明書を識別する。接続先Hostとportは到達先であり、それだけで信頼や権限を生じない。
 
 経路は Mobile → 暗号化端末連携 → Desktop Rust broker → Shell Core → Adapter → Runtime とする。Mobileへloopback資格やowner制御資格を渡さない。端末資格はowner承認、汎用command、任意URL送信、Permission変更、監査確定を許可しない。Runtimeへの送信は既存の要求hashへのowner承認を引き続き必要とする。
