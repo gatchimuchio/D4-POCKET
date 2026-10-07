@@ -564,7 +564,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/RunnerUITests/AdapterOwnerUITests.swift",
-      "sha256": "bde0de59c0b0ad82b47fd29e18b5be96c652773ddd538d19472dfad949639b5d"
+      "sha256": "74ed0551e76cb0a67f2e7b1e6ad2fb16462f4dbcbb1fffff138a8b9c10fd492b"
     },
     {
       "path": "apps/desktop_flutter/pubspec.lock",
@@ -676,7 +676,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "de761facd546f2be25c6da95eca3b4b76389fdf4f84df93599dac5889d2ab985"
+      "sha256": "bd166dbe89bd993d85fed16c618fe1cf3b5ddd1b91df18faf79dbb380e117430"
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
@@ -1272,7 +1272,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "8148b8d826746d2651552a5ce2655167172c12ea278d98b08310556f36c1e101"
+      "sha256": "0185f36a915f40b5a81e4da7e0d3479234373044058753e6ac4725dc77f63bad"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",

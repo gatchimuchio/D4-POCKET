@@ -34,9 +34,9 @@ final class AdapterOwnerUITests: XCTestCase {
     }
     let select = app.buttons["OSで作業領域を選択"]
     XCTAssertTrue(select.exists)
-    // 通常keyboard traversalで画面内に移動した製品ボタンを使う。
-    app.typeKey(XCUIKeyboardKey.tab.rawValue, modifierFlags: [])
-    app.typeKey(" ", modifierFlags: [])
+    // 試験のTab／Spaceではbuttonを開始できなかった。可視の製品buttonを直接clickする。
+    reveal(app, select)
+    select.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
     let chooser = try WorkspacePanelUI()
     if !chooser.waitForButton("Cancel", timeout: 15) {
       let image = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
