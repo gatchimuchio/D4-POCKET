@@ -3296,6 +3296,42 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('起動後のAdapter一覧に表示されたrecordを現在hashへ束縛して操作する',
+      (WidgetTester tester) async {
+    final list = _brokerAdapterListInternalResponse();
+    final body = list['body']! as Map<String, Object?>;
+    final record = (body['Adapter一覧']! as List).single as Map<String, Object?>;
+    record['Adapter ID'] = 'ui_fixture_adapter';
+    final transport = _FakeBrokerTransport([
+      ..._shellCoreProductBootstrapResponses(),
+      _brokerAdapterManifestMutationResponse('導入', 'ui_fixture_adapter'),
+      list,
+      _brokerAdapterSuspendedResponse(),
+    ]);
+    final client = await ShellCoreClient.product(transport: transport);
+    expect(client.snapshot.adapterCatalog.any((a) => a.adapterId == 'ui_fixture_adapter'), isFalse);
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: RuntimeCenter(client: client))));
+    final install = find.byKey(const ValueKey('adapter-manifest-install'));
+    await tester.ensureVisible(install);
+    await tester.tap(install);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('adapter-manifest-json-input')),
+        jsonEncode(_adapterManifestFixture()));
+    await tester.tap(find.byKey(const ValueKey('adapter-manifest-submit')));
+    await tester.pumpAndSettle();
+    final verify = find.byKey(const ValueKey('adapter-ui_fixture_adapter-検証'));
+    await tester.ensureVisible(verify);
+    await tester.pumpAndSettle();
+    await tester.tap(verify);
+    await tester.pumpAndSettle();
+    expect(transport.requests.last['operation'], 'アダプター検証');
+    expect(transport.requests.last['payload'], {
+      '版': 1, '操作': '検証', 'Adapter ID': 'ui_fixture_adapter', 'Adapter hash': record['hash'],
+    });
+    expect(find.textContaining('owner_reapproval_required'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   test('不正なブローカー応答で製品クライアントが閉鎖側へ失敗する', () async {
     final client = await ShellCoreClient.product(
       transport: _FakeBrokerTransport([

@@ -59,8 +59,9 @@ jobs:
           set -euo pipefail
           flutter pub get 2>&1 | tee ../../evidence/desktop-pub-get.txt
           if [ '${{ inputs.target }}' = 'macos_adapter_lifecycle' ]; then
-            dart analyze lib/services/broker_client.dart test/broker_client_payload_hash_test.dart 2>&1 | tee ../../evidence/adapter-dart-analyze.txt
+            dart analyze lib/services/broker_client.dart lib/services/shell_core_client.dart lib/screens/runtime_center.dart test/broker_client_payload_hash_test.dart test/widget_test.dart 2>&1 | tee ../../evidence/adapter-dart-analyze.txt
             flutter test --no-pub test/broker_client_payload_hash_test.dart --plain-name 'native Owner確認のBroker操作はFlutter待機時間を共有する' 2>&1 | tee ../../evidence/adapter-timeout-test.txt
+            flutter test --no-pub test/widget_test.dart --plain-name '起動後のAdapter一覧に表示されたrecordを現在hashへ束縛して操作する' 2>&1 | tee ../../evidence/adapter-fresh-catalog-test.txt
           fi
           flutter build macos --debug --no-pub 2>&1 | tee ../../evidence/macos-build.txt
       - name: 製品bootstrapとBroker終了

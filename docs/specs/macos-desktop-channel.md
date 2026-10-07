@@ -32,6 +32,8 @@ Owner確認・Credentials・Task実行・Windows固有Install／Updateは本接�
 
 Rustは操作名、Adapter ID、現在Adapter hash、要求hashを確認画面へ結合する。未知field、Manifest混入、操作不一致、不正ID／hashは確認候補にならない。承認後もBrokerが現行record、hash、署名と状態条件を再評価する。承認による署名Trust、Permission、Task Approvalの生成はない。作用はcatalogとAuditだけで、外部artifact／processには作用しない。
 
+Flutterは画面で最後に取得・選択したrecordのIDとhashを要求へ渡す。起動時snapshotだけに固定すると、起動後に導入・更新したrecordを操作できない。選択metadataは要求対象を固定するだけで、現在性・Authority・署名を証明しない。Brokerの再検査で古いhashは拒否される。
+
 SwiftとFlutterの待機期限は当該5操作も305秒とし、既存の上限300秒のOS確認を待てるようにする。期限を延ばしてもAuthorityは生成せず、取消・失敗・期限超過は非承認のまま。通常要求は従来どおり5秒である。
 
 有限Acceptance: 実Broker経路で拒否時不変、署名不正・未検証有効化拒否、無効化・隔離・削除とAudit、古いrecord hash・不正payload拒否を確認する。macOS製品画面から5操作を実OS確認へ接続し、結果を表示する。署名検証・有効化の正の状態遷移は既存Broker署名試験の直接依存確認を使い、macOS製品でのTrust導入成功とは扱わない。通常macOS helperにはTrust設定の製品入口が未接続のため、Trust未設定／不正署名の拒否を保持する。この追加機能・正式署名配布は`release_blocker`として別単位へ残し、現在のOwner接続試験を拡大しない。

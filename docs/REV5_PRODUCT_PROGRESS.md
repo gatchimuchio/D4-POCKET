@@ -27,6 +27,10 @@
 
 Schema 161／157／208はPASS。初回Conformanceは待機操作の期待集合不足でFAIL（Windows Runnerは既に5操作を含んでいた）。Flutterの305秒対象と期待集合へ5操作を追加し、Conformance 236件はPASS。Windows transportの実装は変更していない。厳格日本語監査は変更外の既存4 file／15 findingsでFAIL、Desktop／Mobileの`flutter analyze --no-pub`は日本語pathでLSP FormatException／server exit 255／CLI exit 1。これら既存`release_blocker`は保持し、変更したDartの検査とMac build／UIは専用手動Actionsで行う。
 
+初回手動Actions [run 37627578133](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37627578133)、commit `ec48769d8e36ecf47de0393604649c75677d3b3e`はRust対象・Dart解析／待機試験・通常buildがPASS、状態管理UIがFAIL。新規Adapter導入後の「検証」を押してもOwner画面に到達しなかった。画面は新しいcatalogを表示する一方、`manageAdapter`は起動時snapshotだけを検索しており、新規recordを拒否していた。画面で選択したrecordのID／hashへ操作要求を束縛し、Brokerの現行hash・Owner・署名再評価は維持する。導入CLOSED条件は破壊されておらず再開しない。artifact `11484996544`、SHA-256 `3ad1d5f2f6c15d9086ec04a8d1bfc7e903e4c55784269c952200ed3bbb005f9c`を照合して保存した。helper残留なし／runner source cleanも確認したが、正常終了UIの証拠とは扱わない。
+
+修正後の「起動後のAdapter一覧に表示されたrecordを現在hashへ束縛して操作する」Widget回帰試験は、同一sourceのASCII一時複製で1件PASS。専用test identityの一覧更新→選択→要求ID／hash→Broker非承認receipt表示を確認した`FIXTURE`である。局所`dart analyze`は終了処理でDart perf file削除のOS 1920／SERVER_ERRORとなり、成功扱いしない。Mac手動Actionsの変更Dart解析で補助検証し、ローカル解析環境の既存release blockerは保持する。
+
 #### macOS Rust Owner確認・Adapter導入／更新 — CLOSED（Product Build、2026-10-07）
 
 成功commit `0729f07437f308c71c1f4dc694e62016ea58ad3e`の手動Actions [run 37623944221](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37623944221)はPASS。macOS 15.7.9 arm64（Apple Virtual Machine）／Xcode 16.4／Rust 1.95.0／Flutter 3.44.0で、製品UI→既存MethodChannel／匿名pipe→Rust検査→OS Owner確認→既存Broker receiver→catalog登録→製品表示を通した。OS画面で最初に「承認しない」を選ぶと未登録を維持し、次の新規要求で「今回の操作を承認」を選ぶと登録が表示された。XCUITest 1 passed／0 failed／0 skipped、38.953秒。Command-Qで通常終了し、helper残留なし・runner追跡source cleanを確認した。

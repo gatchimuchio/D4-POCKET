@@ -311,8 +311,11 @@ class _RuntimeCenterState extends State<RuntimeCenter>
   ) async {
     setState(() => _adapterBusy.add(adapter.adapterId));
     try {
-      final result =
-          await widget.client.manageAdapter(adapter.adapterId, operation);
+      final result = await widget.client.manageAdapter(
+        adapter.adapterId,
+        operation,
+        selectedAdapter: adapter,
+      );
       if (!mounted) return;
       var refreshMessage = '';
       if (result.status == 'accepted') {

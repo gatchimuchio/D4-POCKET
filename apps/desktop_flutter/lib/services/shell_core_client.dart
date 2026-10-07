@@ -289,13 +289,20 @@ class ShellCoreClient {
 
   Future<AdapterManagementResult> manageAdapter(
     String adapterId,
-    String operation,
-  ) async {
-    final adapter = snapshot.adapterCatalog.where(
+    String operation, {
+    AdapterCatalogRecord? selectedAdapter,
+  }) async {
+    final initial = snapshot.adapterCatalog.where(
       (item) => item.adapterId == adapterId,
     );
-    if (adapter.isEmpty) {
-      throw BrokerClientException('未登録Adapterへ操作できません: $adapterId');
+    // 起動後に導入・更新したrecordは画面が最後に取得した値へ束縛する。
+    // 選択metadataはAuthorityではなく、Brokerが現在hashと状態を再評価する。
+    final adapter = selectedAdapter ?? (initial.isEmpty ? null : initial.first);
+    if (adapter == null ||
+        adapter.adapterId != adapterId ||
+        !_isRuntimeIdentifier(adapterId) ||
+        !RegExp(r'^sha256:[a-f0-9]{64}$').hasMatch(adapter.hash)) {
+      throw const BrokerClientException('選択AdapterのIDまたはhashが不正です');
     }
     if (operation == '導入' || operation == '更新') {
       return const AdapterManagementResult(
@@ -315,8 +322,8 @@ class ShellCoreClient {
         status: 'suspended',
         operation: operation,
         adapterId: adapterId,
-        managementState: adapter.first.managementState,
-        verificationState: adapter.first.verificationStatus,
+        managementState: adapter.managementState,
+        verificationState: adapter.verificationStatus,
         auditId: 'not-audited',
         recoveryId: 'recover-adapter-management',
         message: 'Broker接続がないためAdapter操作を停止しました。',
@@ -338,8 +345,8 @@ class ShellCoreClient {
       payload: {
         '版': 1,
         '操作': operation,
-        'Adapter ID': adapter.first.adapterId,
-        'Adapter hash': adapter.first.hash,
+        'Adapter ID': adapter.adapterId,
+        'Adapter hash': adapter.hash,
       },
     );
     final body = response['body'] is Map
@@ -351,9 +358,9 @@ class ShellCoreClient {
       operation: response['operation']?.toString() ?? brokerOperation,
       adapterId: body['Adapter ID']?.toString() ?? adapterId,
       managementState:
-          body['管理状態']?.toString() ?? adapter.first.managementState,
+          body['管理状態']?.toString() ?? adapter.managementState,
       verificationState:
-          body['検証状態']?.toString() ?? adapter.first.verificationStatus,
+          body['検証状態']?.toString() ?? adapter.verificationStatus,
       auditId: response['audit_event_id']?.toString() ??
           body['監査ID']?.toString() ??
           '',

@@ -72,7 +72,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "6043576bc0846481be7d7593e196fb662b0e350a5565c8ef9b66a5b7aaeb4e97"
+      "sha256": "e8f1b16c42460272c4107cb8c1f3873c0f9e32b4c310a33c45f462b2aadd75da"
     },
     {
       "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
@@ -280,7 +280,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/runtime_center.dart",
-      "sha256": "38f8598805825ea4f9a41fbe0701560847036eb697531f1d120be19e5aea70e1"
+      "sha256": "6fadeb700eb6e2e85e3d86957101f443fe9f1d5a81522adfd6ffdf6e3595b017"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/runtime_dialogue.dart",
@@ -388,7 +388,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/shell_core_client.dart",
-      "sha256": "76a35086eee55a0c85032f9f66feb6091fea67e1d4750fffa88de519db6f0897"
+      "sha256": "73391fa16dbdaacd3afad7b2f645b1a2c4e083e0010382fadb7545e728556b2b"
     },
     {
       "path": "apps/desktop_flutter/lib/services/update_client.dart",
@@ -676,7 +676,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "6a4ca9660ce600e1e1015f28d70b508c6a6ee5642f05c63f435cf338fc442c53"
+      "sha256": "d28ed6319769b547298af92dc328a524813438b9ac289b99485bdbbe28b11538"
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
@@ -1272,7 +1272,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "63ddab6d9b8a88e2fa2256aa691bee68290cbe73faad8c431dd21b857d394718"
+      "sha256": "5ec4f84ff980b8c29dbf559dafa1e19d33db0f235df9113891a32e6587a91dab"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1484,7 +1484,7 @@
     },
     {
       "path": "docs/specs/macos-desktop-channel.md",
-      "sha256": "86bf18835d9b4e01423030588aae1ceb4a1dced85aaa83518de46a623e480ae9"
+      "sha256": "529c0679bc42df06607679016d072d8aa8038856ff56d9345141670189584fd8"
     },
     {
       "path": "docs/specs/mcp-connection-center.md",
