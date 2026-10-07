@@ -37,3 +37,5 @@ Swiftは当該二操作のtransport待機だけを305秒とし、判断は所有
 FFI例外の局所レビュー: CFStringは呼出し終了まで保持し、optional URLはNULL、出力flagは非承認で初期化する。整数return code成功と明示alternate responseと単調時刻期限を全て必要とする。raw pointerを外へ返さず、コールバックや共有可変状態を作らない。外部参照は[Apple API](https://developer.apple.com/documentation/corefoundation/cfusernotificationdisplayalert(_:_:_:_:_:_:_:_:_:_:_:))と[固定binding](https://docs.rs/core-foundation-sys/0.8.7/core_foundation_sys/user_notification/index.html)。
 
 有限Acceptanceは、実Brokerでの導入・更新と永続catalog、拒否時不変、replay／session注入／不正hash拒否、macOSのOS確認画面・期限の動作を対象とする。fixtureとnative操作の証拠を分離する。通常接続を再証明する追加試験や全Adapter機能の最終QAは行わない。
+
+UI試験はdevelopment専用XCTestで、Flutter 3.44の既存OSアクセシビリティ属性を対象appへ要求してから操作する。理由は初回XCUITestで初期要素が取得不能だったためで、承認や製品dataを注入する経路ではない。[固定FlutterEngine実装](https://github.com/flutter/flutter/blob/3.44.0/engine/src/flutter/shell/platform/darwin/macos/framework/Source/FlutterEngine.mm)が当該通知を消費する。標準XCTestだけで接続可能になった場合はこの明示要求を除去できる。初期診断は新規runnerの入力前だけに限定し、要求本文や資格を出力しない。

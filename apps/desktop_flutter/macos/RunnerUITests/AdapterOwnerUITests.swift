@@ -1,4 +1,6 @@
 import XCTest
+import AppKit
+import ApplicationServices
 
 final class AdapterOwnerUITests: XCTestCase {
   func testProductAdapterOwnerDenialAndInstall() throws {
@@ -7,8 +9,18 @@ final class AdapterOwnerUITests: XCTestCase {
     continueAfterFailure = false
     app.launch()
     defer { app.terminate() }
+    // Flutter 3.44の既存OSアクセシビリティ接続を要求する。製品状態・承認は変更しない。
+    let process = try XCTUnwrap(NSRunningApplication.runningApplications(withBundleIdentifier: "com.example.guiShellDesktop").first)
+    let accessible = AXUIElementCreateApplication(process.processIdentifier)
+    let accessibility = AXUIElementSetAttributeValue(accessible, "AXEnhancedUserInterface" as CFString, kCFBooleanTrue)
+    print("D4_MACOS_ACCESSIBILITY result=\(accessibility.rawValue)")
     let runtime = element(app, "実行系")
-    XCTAssertTrue(runtime.waitForExistence(timeout: 20))
+    let ready = runtime.waitForExistence(timeout: 20)
+    if !ready {
+      // 新規runner・入力前だけ。公開初期画面を使い、Owner要求本文や秘密は出力しない。
+      print("D4_MACOS_INITIAL \(app.debugDescription)")
+    }
+    XCTAssertTrue(ready)
     runtime.click()
     try presentManifest(app)
     let deny = notice.buttons["承認しない"]
@@ -27,7 +39,7 @@ final class AdapterOwnerUITests: XCTestCase {
   }
 
   private func element(_ app: XCUIApplication, _ label: String) -> XCUIElement {
-    app.descendants(matching: .any).matching(NSPredicate(format: "label == %@ OR label BEGINSWITH %@", label, label + "\n")).firstMatch
+    app.descendants(matching: .any).matching(NSPredicate(format: "label == %@ OR label BEGINSWITH %@ OR value == %@", label, label + "\n", label)).firstMatch
   }
 
   private func presentManifest(_ app: XCUIApplication) throws {

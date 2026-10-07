@@ -25,6 +25,8 @@
 
 修正後のOwner対象Rust統合1件とmacOS確認crateの入力拒否1件はWindowsでPASS。必須`cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1`はlibrary 503 passed／1 failed／12 ignored。失敗は変更外のUpdate Download TLS fixture `local_tls_server_repairs_only_after_verified_package_bytes`のOS 10054で、既存`FQ-TEST-LOOPBACK`へ保持する。後続targetはlibrary失敗で未実行。Schema 161／157／208、Conformance 236、Manifest 1197、差分検査はPASS。厳格日本語監査は既存4 file／15 findingsでexit 1。Desktop／Mobile `flutter analyze --no-pub`は既知の日本語path環境でLSP FormatException／analysis server exit 255／CLI exit 1。全体PASSとせず、Mac製品経路は手動Actionsで確認する。
 
+初回Mac [run 37602624819](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37602624819)、commit `1bf2e2c772367dc03f1c1c605b9cefa3b9d4589d`はRust確認crate 2件（実OS期限切れ拒否含む）、Broker対象1件、同梱製品buildがPASS。XCUITestは初期「実行系」要素を取得できず1件FAIL、helper残留なし。Flutter固定3.44 sourceがOSの`AXEnhancedUserInterface`通知からsemanticsを有効にするため、試験側から当該appの既存アクセシビリティ接続を要求し、要素のlabel／value差を扱う。製品codeは変更せず、初期画面の限定診断で接続不能を隠さない。OS確認への到達はまだ未成立。
+
 #### macOS Desktop通常Broker接続 — CLOSED（Product Build、2026-10-07）
 
 開始時のmacOS Runnerには`gui_shell/broker`登録がなく、Flutterの通常起動から実Brokerへ到達しなかった。本有限単位を、同梱Rust helperへの匿名pipe、既存認証Broker normal経路、初回設定等の製品bootstrap、正常終了へ限定した。Apple App Sandboxを継承し、Flutter／Runnerへ資格を渡さない。Owner専用操作・Windows固有操作は現状の拒否を保持し、macOS全機能完成とは扱わない。責任と未成立範囲は`docs/specs/macos-desktop-channel.md`。手動Actionsの独立`macos_product`を使い、iOS／AndroidのCLOSED試験は起動していない。
