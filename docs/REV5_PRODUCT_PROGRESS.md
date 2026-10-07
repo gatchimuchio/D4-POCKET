@@ -25,6 +25,10 @@
 
 Schema 161／正常例157／負例208とmanual workflow検査、diff検査はPASS。厳格日本語監査は既存の変更外4 file／15 findingsでFAIL（今回差分にfindingなし）。Desktop／Mobileの`flutter analyze --no-pub`は既知の日本語path上のLSP FormatExceptionで失敗した。既存release blockerを維持し、変更Dart解析／試験とMac実行は専用手動Actionsで補助する。Rust全体／Conformanceは実行中で、PASSとはまだ記録しない。
 
+その後Conformance 236件／Manifest 1197件／Release GateはPASS。必須Rust全体は505 passed／1 failed／12 ignored（後続target未実行）。変更外の既知`local_tls_server_repairs_only_after_verified_package_bytes`がOS 10054／TLS InvalidContentTypeでFAILし、同一test単独再実行は1件PASS。既存`FQ-TEST-LOOPBACK`と同分類へ保持し、全体PASSや根因解消とは扱わない。共有した登録検査の既存直接依存3試験は全体run内でPASS。
+
+初回Mac手動Actions [run 37633822477](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37633822477)、commit `51fdf224b15138f41bdf4342a12aef2c9111468a`はRust対象／helper build、変更Dart解析・transport試験、通常Mac build、CLI固定package／version確認がPASS。UIは登録form表示後の模型欄検索でAX全要素value評価がtimeoutしてFAIL。保存画像でformと模型欄の実在を確認し、試験の探索を固定formのtext field順へ限定する。製品要求や権限検査は変えない。helper残留なし・専用CLI／Workspace回収を確認。artifact `11487758142`、SHA-256 `6c9f60e3aed54dd588782fc964f3957b65c0f58f92891cfcf2198fc8b4ec6d81`を照合しignored領域に保存した。実CLI hashは`16593cc2f422d5f398a8e40f550ebbaf1245392528957be342c295920a300704`、版は0.159.2。製品Owner確認・登録は未到達である。
+
 #### macOS既存Adapter状態管理のOwner接続 — CLOSED（Product Build、2026-10-07）
 
 成功commit `7c4219f5202402ad574e81b81e32d6eb02c82cd9`の手動Actions [run 37629357493](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37629357493)で有限AcceptanceがPASS。macOS 15.7.9 arm64／Apple Virtual Machine／Xcode 16.4、固定Flutter 3.44.0／Rust 1.95.0。製品UI→Rust所有OS確認→既存Brokerで、検証要求の不正署名拒否、有効化要求の未検証拒否、無効化・隔離・削除の受理と画面表示、Command-Q正常終了をXCUITest 1件（46.676秒）で確認した。helper残留なし・runner source clean。導入は新しい状態管理試験の準備であり、旧CLOSED試験は選択していない。

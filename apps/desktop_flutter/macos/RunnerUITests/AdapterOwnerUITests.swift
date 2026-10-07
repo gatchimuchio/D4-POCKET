@@ -16,17 +16,19 @@ final class AdapterOwnerUITests: XCTestCase {
       XCTAssertTrue(start.waitForExistence(timeout: 10))
       reveal(app, start)
       start.click()
-      for (label, value) in [
+      for (index, entry) in [
         ("模型識別子", "test-model"),
         ("実行系ID（Runtime ID）", "macos-product-codex"),
         ("Codex CLI実行fileの絶対path", fixture + "/codex"),
         ("作業領域ID（Workspace ID）", "macos-product-workspace"),
         ("Workspace rootの絶対path", fixture + "/workspace"),
         ("除外する秘密path（相対path、1行に1件）", "private.env")
-      ] {
-        let field = element(app, label)
-        XCTAssertTrue(field.waitForExistence(timeout: 10), label)
+      ].enumerated() {
+        let (label, value) = entry
+        // 全AX要素のvalue検索はFlutter編集欄でtimeoutした。固定formの入力順に限定する。
+        let field = app.textFields.element(boundBy: index)
         reveal(app, field)
+        XCTAssertTrue(field.exists, label)
         field.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
         app.typeKey("a", modifierFlags: .command)
         app.typeText(value)
@@ -60,7 +62,7 @@ final class AdapterOwnerUITests: XCTestCase {
 
   private func reveal(_ app: XCUIApplication, _ target: XCUIElement) {
     for _ in 0..<10 {
-      if target.frame.height >= 30 && app.windows.firstMatch.frame.contains(target.frame) { break }
+      if target.exists && target.frame.height >= 30 && app.windows.firstMatch.frame.contains(target.frame) { break }
       app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.65))
         .scroll(byDeltaX: 0, deltaY: -180)
     }
