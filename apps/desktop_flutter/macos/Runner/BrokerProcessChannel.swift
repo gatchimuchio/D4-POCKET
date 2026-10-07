@@ -168,7 +168,7 @@ final class BrokerProcessChannel {
         }
       } catch { output = nil }
       let reply = output
-      if selectionCode == 2 {
+      if operation == "作業領域OS選択" && selectionCode != 0 {
         let object = reply?.data(using: .utf8).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
         if object?["status"] as? String != "accepted" {
           DispatchQueue.main.sync { d4WorkspaceReleaseLast() }

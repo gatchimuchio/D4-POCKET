@@ -10776,7 +10776,8 @@ def test_macos_workspace_selection_is_native_scoped_and_non_authoritative() -> l
             errors.append("OS chooser用の限定entitlementがない")
     native = (ROOT / "native/macos_owner/src/workspace_transport.rs").read_text(encoding="utf-8")
     runner = (DESKTOP_FLUTTER / "macos/Runner/BrokerProcessChannel.swift").read_text(encoding="utf-8")
-    for token in ("d4_workspace_select_and_write", "is_fifo()", "F_SETNOSIGPIPE", "NativeSelection", "bookmark.zeroize()"):
+    for token in ("d4_workspace_select_and_write", "is_fifo()", "F_SETNOSIGPIPE", "NativeSelection", "bookmark.zeroize()",
+                  "beginSheetModalForWindow_completionHandler", "generation != generation", "added_latest", "pending.borrow_mut().take()"):
         if token not in native:
             errors.append(f"親Rust OS選択の限定配送・回収接続がない: {token}")
     for token in ('object["native_workspace_selection"] != nil', "d4WorkspaceReleaseAll()", "d4WorkspaceReleaseLast()"):

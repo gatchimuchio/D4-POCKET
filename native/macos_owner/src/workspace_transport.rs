@@ -71,11 +71,18 @@ pub struct PrivateFrame {
 }
 
 #[cfg(target_os = "macos")]
+#[derive(Default)]
+struct ScopeState {
+    scopes: Vec<super::SelectedWorkspace>,
+    added_latest: bool,
+    generation: u64,
+}
+#[cfg(target_os = "macos")]
 thread_local! {
-    static SCOPES: std::cell::RefCell<Vec<super::SelectedWorkspace>> = const { std::cell::RefCell::new(Vec::new()) };
+    static SCOPES: std::cell::RefCell<ScopeState> = std::cell::RefCell::new(ScopeState::default());
 }
 
-/// 0=配送失敗、1=scopeなしで配送済み、2=選択scopeを保持して配送済み。承認値ではない。
+/// 0=開始失敗、1=非同期OS選択開始。配送・承認・権限の成功値ではない。
 ///
 /// # Safety（安全な呼出し前提）
 /// 固定Runnerが保持する公開要求byte列を長さ分保持し、同じhelperへの有効pipe fdを渡す。
@@ -86,8 +93,6 @@ pub unsafe extern "C" fn d4_workspace_select_and_write(
     length: usize,
     fd: i32,
 ) -> i32 {
-    use objc2_foundation::{NSDataBase64EncodingOptions, NSURLBookmarkCreationOptions};
-    use std::io::Write;
     use std::os::{
         fd::{AsRawFd, BorrowedFd},
         unix::fs::FileTypeExt,
@@ -102,7 +107,7 @@ pub unsafe extern "C" fn d4_workspace_select_and_write(
     }
     // SAFETY: 固定Swift呼出しのwithUnsafeBytesが同期終了までbyte列を保持する。
     let input = unsafe { std::slice::from_raw_parts(bytes, length) };
-    if !public_candidate(input) || SCOPES.with(|v| v.borrow().len() >= 8) {
+    if !public_candidate(input) || SCOPES.with(|v| v.borrow().scopes.len() >= 8) {
         return 0;
     }
     // SAFETY: 固定Runner所有pipeを閉じず、複製fdの所有権だけを使う。普通fileは拒否する。
@@ -110,7 +115,7 @@ pub unsafe extern "C" fn d4_workspace_select_and_write(
     let Ok(owned) = borrowed.try_clone_to_owned() else {
         return 0;
     };
-    let mut pipe = std::fs::File::from(owned);
+    let pipe = std::fs::File::from(owned);
     if !pipe.metadata().is_ok_and(|m| m.file_type().is_fifo()) {
         return 0;
     }
@@ -118,7 +123,52 @@ pub unsafe extern "C" fn d4_workspace_select_and_write(
     if unsafe { libc::fcntl(pipe.as_raw_fd(), F_SETNOSIGPIPE, 1) } != 0 {
         return 0;
     }
-    let selection = super::select_workspace();
+    let Ok(panel) = super::workspace_panel() else {
+        return 0;
+    };
+    let Some(mtm) = objc2::MainThreadMarker::new() else {
+        return 0;
+    };
+    let Some(window) = objc2_app_kit::NSApplication::sharedApplication(mtm).mainWindow() else {
+        return 0;
+    };
+    let Ok(request_json) = std::str::from_utf8(input) else {
+        return 0;
+    };
+    let generation = SCOPES.with(|v| {
+        let mut state = v.borrow_mut();
+        state.added_latest = false;
+        state.generation
+    });
+    // pointerは保存せず公開要求と複製pipeだけを所有する。callbackは一度しか配送できない。
+    let pending = std::cell::RefCell::new(Some((request_json.to_owned(), pipe)));
+    let completed_panel = panel.clone();
+    let handler = block2::RcBlock::new(move |response: isize| {
+        let Some((request, pipe)) = pending.borrow_mut().take() else {
+            return;
+        };
+        if objc2::MainThreadMarker::new().is_none()
+            || SCOPES.with(|v| v.borrow().generation != generation)
+        {
+            return;
+        }
+        completed_panel.orderOut(None);
+        let selection = super::selected_workspace(&completed_panel, response);
+        deliver_selection(request, pipe, selection);
+    });
+    // 同期runModal／入れ子run loopを使わず、通常GUI windowのsheetで完了を受ける。
+    panel.beginSheetModalForWindow_completionHandler(&window, &handler);
+    1
+}
+
+#[cfg(target_os = "macos")]
+fn deliver_selection(
+    request_json: String,
+    mut pipe: std::fs::File,
+    selection: Result<Option<super::SelectedWorkspace>, &'static str>,
+) {
+    use objc2_foundation::{NSDataBase64EncodingOptions, NSURLBookmarkCreationOptions};
+    use std::io::Write;
     let mut selected = None;
     let (state, bookmark) = match selection {
         Ok(Some(scope)) => {
@@ -130,13 +180,15 @@ pub unsafe extern "C" fn d4_workspace_select_and_write(
                     None,
                 )
             else {
-                return 0;
+                // bookmark生成失敗も固定分類として同じBrokerへ送る。
+                return deliver_selection(request_json, pipe, Err("OS bookmark生成が未成立"));
             };
-            let token = data
+            let mut token = data
                 .base64EncodedStringWithOptions(NSDataBase64EncodingOptions::empty())
                 .to_string();
             if token.len() > 24 * 1024 {
-                return 0;
+                token.zeroize();
+                return deliver_selection(request_json, pipe, Err("OS bookmark上限超過"));
             }
             selected = Some(scope);
             ("selected", Some(token))
@@ -144,18 +196,15 @@ pub unsafe extern "C" fn d4_workspace_select_and_write(
         Ok(None) => ("cancelled", None),
         Err(_) => ("failed_native", None),
     };
-    let Ok(request_json) = std::str::from_utf8(input) else {
-        return 0;
-    };
     let private = PrivateFrame {
         native_workspace_selection: NativeSelection {
-            request_json: request_json.to_owned(),
+            request_json,
             selection_status: state.into(),
             bookmark,
         },
     };
     let Ok(mut serialized) = serde_json::to_vec(&private).map(zeroize::Zeroizing::new) else {
-        return 0;
+        return;
     };
     serialized.push(b'\n');
     if serialized.len() >= 65536
@@ -164,13 +213,14 @@ pub unsafe extern "C" fn d4_workspace_select_and_write(
             .and_then(|_| pipe.flush())
             .is_err()
     {
-        return 0;
+        return;
     }
     if let Some(scope) = selected {
-        SCOPES.with(|v| v.borrow_mut().push(scope));
-        2
-    } else {
-        1
+        SCOPES.with(|v| {
+            let mut state = v.borrow_mut();
+            state.scopes.push(scope);
+            state.added_latest = true;
+        });
     }
 }
 
@@ -180,7 +230,11 @@ pub unsafe extern "C" fn d4_workspace_select_and_write(
 pub extern "C" fn d4_workspace_release_last() {
     if objc2::MainThreadMarker::new().is_some() {
         SCOPES.with(|v| {
-            v.borrow_mut().pop();
+            let mut state = v.borrow_mut();
+            if state.added_latest {
+                state.scopes.pop();
+                state.added_latest = false;
+            }
         });
     }
 }
@@ -189,7 +243,12 @@ pub extern "C" fn d4_workspace_release_last() {
 #[cfg(target_os = "macos")]
 pub extern "C" fn d4_workspace_release_all() {
     if objc2::MainThreadMarker::new().is_some() {
-        SCOPES.with(|v| v.borrow_mut().clear());
+        SCOPES.with(|v| {
+            let mut state = v.borrow_mut();
+            state.generation = state.generation.wrapping_add(1);
+            state.scopes.clear();
+            state.added_latest = false;
+        });
     }
 }
 

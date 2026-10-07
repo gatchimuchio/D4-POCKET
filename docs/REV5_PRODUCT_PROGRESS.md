@@ -19,6 +19,10 @@
 
 #### macOS 作業領域のOS選択 — IMPLEMENTING（Product Build、2026-10-08）
 
+手動Actions [run 37700727198](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37700727198)、commit `904b20a333db18c73662a9b793f3b5b1b6fbe5d0`は通常Mac build、native公開入力1件、Broker境界4件、Dart対象検査／2試験、後片付けがPASS。親GUIの実OS chooser表示とCancelクリックを観測したが、直後のFlutter投影取得でXCTest snapshot timeoutとなりUI試験152.831秒でFAILした。保存映像ではchooserが閉じ、main threadのstackshotは通常event待機、XCTest側はsnapshot待機だった。同期modalが原因と確定したとは扱わない。artifact `11518135074`、SHA-256 `58da45daee5d70a12af99e8cd03bd3182b6a6acdcbdaa63ad1510e4a58dc3572`を照合した。親Rust chooserを通常windowの公開sheet completionへ変更し、入れ子run loopを除く。非同期callbackは一回配送・借用pointer非保持・終了世代照合とし、拒否時は当該scopeだけを解放する。有限条件とAuthorityは変えず、次の製品試験まで未成立を保持する。
+
+sheet方式修正後の必須Windows Rust全体は504 passed／5 failed／12 ignoredでFAIL。既存Codex loopback応答headerとUpdate Download TLS 4件のConnectionReset／OS 10054であり、変更外Final QAの`release_blocker`履歴を保持する。全体PASS・根因解消・製品regression確定へ昇格しない。Desktop／Mobileの`flutter analyze --no-pub`は既知のLSP FormatException／server exit 255で各exit 1（ignored logは33／19）。Schema、Conformance 237件、native 2件、Manifest、diff検査はPASS。Mac専用の公開completion接続の実動作は次の手動runnerで確認する。
+
 手動Actions [run 37700257310](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37700257310)、commit `85f3085cfa0915328e27001e602275dfabb345fb`はMac型検査でFAIL。固定libcにDarwinの`F_SETNOSIGPIPE`識別子が未収録、`runModal`の`NSApplication` feature不足、NSData allocationの`AnyThread` import不足を観測した。Apple公開headerの値73を局所定義し、必要なfeature／traitだけを補う。OS policy・Authority・Acceptanceは変更せず、UI未実行の結果を成功へ昇格しない。
 
 手動Actions [run 37696395012](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37696395012)、commit `d58e09b8437f5d59825531584c9b2261c9cb7b1e`はUI試験50.919秒でFAIL。固定分類は`objc_null_return`とRust panicを示し、AppKit起動完了後のNSOpenPanel factoryがNULLを返してhelperを101で終了したことを確認した。entitlement拒否自体を観測したとは扱わない。artifact `11515368725`、SHA-256 `c0ad0642bc4981a984bad3ae6e6a339a90c475edd4a6ed8d674e07aafdc4bd75`を照合した。通常build／対象Rust／Dart／後片付けはPASS。

@@ -1,4 +1,4 @@
-//! Rust所有の期限付きmacOS確認画面。要求や資格を受け取らず、明示選択だけを返す。
+//! Rust所有のmacOS確認UIとOS作業領域選択。公開要求の配送だけを扱い、D4権限を生成しない。
 #![deny(unsafe_op_in_unsafe_fn)]
 
 use std::time::Duration;
@@ -35,57 +35,61 @@ impl Drop for SelectedWorkspace {
     }
 }
 
-/// Main threadでOS chooserを開く。bookmark、credential、任意初期pathを受け取らない。
-pub fn select_workspace() -> Result<Option<SelectedWorkspace>, &'static str> {
-    #[cfg(target_os = "macos")]
-    {
-        use objc2::{msg_send, ClassType, MainThreadMarker};
-        use objc2_app_kit::NSOpenPanel;
-        use objc2_foundation::NSString;
-        let _mtm = MainThreadMarker::new().ok_or("OS選択をmain threadで開始できません")?;
-        // SAFETY: 固定NSOpenPanel factoryをmain threadで呼ぶ。実観測のNULLをOptionで拒否し、
-        // 既存bindingのnonnull panicで製品processを終了させない。ABIとretain規則は同じ。
-        let panel: Option<objc2::rc::Retained<NSOpenPanel>> =
-            unsafe { msg_send![NSOpenPanel::class(), openPanel] };
-        let panel = panel.ok_or("OS選択の表示を開始できません")?;
-        panel.setTitle(Some(&NSString::from_str("D4 Pocket — 作業領域のOS選択")));
-        panel.setPrompt(Some(&NSString::from_str("作業領域を選択")));
-        panel.setMessage(Some(&NSString::from_str(
-            "この選択はOSの起動中accessだけです。D4の登録・Permission・Approvalは別に必要です。",
-        )));
-        panel.setCanChooseFiles(false);
-        panel.setCanChooseDirectories(true);
-        panel.setAllowsMultipleSelection(false);
-        panel.setResolvesAliases(false);
-        panel.setCanCreateDirectories(false);
-        let response = panel.runModal();
-        if response != 1 {
-            return Ok(None);
-        }
-        let url = panel.URL().ok_or("OS選択にURLがありません")?;
-        let mut selected = SelectedWorkspace {
-            path: std::path::PathBuf::new(),
-            url,
-        };
-        selected.path = selected
-            .url
-            .path()
-            .ok_or("OS選択のpathが不正です")?
-            .to_string()
-            .into();
-        let path = selected
-            .path
-            .to_str()
-            .ok_or("OS選択のpathを表示できません")?;
-        if !selected.path.is_absolute() || path.len() > 1024 || path.chars().any(char::is_control) {
-            return Err("OS選択のpath範囲が不正です");
-        }
-        Ok(Some(selected))
+/// Main threadでOS chooserを構成する。bookmark、credential、任意初期pathを受け取らない。
+#[cfg(target_os = "macos")]
+fn workspace_panel() -> Result<objc2::rc::Retained<objc2_app_kit::NSOpenPanel>, &'static str> {
+    use objc2::{msg_send, ClassType, MainThreadMarker};
+    use objc2_app_kit::NSOpenPanel;
+    use objc2_foundation::NSString;
+    let _mtm = MainThreadMarker::new().ok_or("OS選択をmain threadで開始できません")?;
+    // SAFETY: 固定NSOpenPanel factoryをmain threadで呼ぶ。実観測のNULLをOptionで拒否し、
+    // 既存bindingのnonnull panicで製品processを終了させない。ABIとretain規則は同じ。
+    let panel: Option<objc2::rc::Retained<NSOpenPanel>> =
+        unsafe { msg_send![NSOpenPanel::class(), openPanel] };
+    let panel = panel.ok_or("OS選択の表示を開始できません")?;
+    panel.setTitle(Some(&NSString::from_str("D4 Pocket — 作業領域のOS選択")));
+    panel.setPrompt(Some(&NSString::from_str("作業領域を選択")));
+    panel.setMessage(Some(&NSString::from_str(
+        "この選択はOSの起動中accessだけです。D4の登録・Permission・Approvalは別に必要です。",
+    )));
+    panel.setCanChooseFiles(false);
+    panel.setCanChooseDirectories(true);
+    panel.setAllowsMultipleSelection(false);
+    panel.setResolvesAliases(false);
+    panel.setCanCreateDirectories(false);
+    Ok(panel)
+}
+
+#[cfg(target_os = "macos")]
+fn selected_workspace(
+    panel: &objc2_app_kit::NSOpenPanel,
+    response: isize,
+) -> Result<Option<SelectedWorkspace>, &'static str> {
+    if response == 0 {
+        return Ok(None);
     }
-    #[cfg(not(target_os = "macos"))]
-    {
-        Err("このplatformのOS選択は未対応です")
+    if response != 1 {
+        return Err("OS選択の表示を開始できません");
     }
+    let url = panel.URL().ok_or("OS選択にURLがありません")?;
+    let mut selected = SelectedWorkspace {
+        path: std::path::PathBuf::new(),
+        url,
+    };
+    selected.path = selected
+        .url
+        .path()
+        .ok_or("OS選択のpathが不正です")?
+        .to_string()
+        .into();
+    let path = selected
+        .path
+        .to_str()
+        .ok_or("OS選択のpathを表示できません")?;
+    if !selected.path.is_absolute() || path.len() > 1024 || path.chars().any(char::is_control) {
+        return Err("OS選択のpath範囲が不正です");
+    }
+    Ok(Some(selected))
 }
 
 /// 起動中のnative間OS bookmarkだけを解決する。D4権限・登録を生成しない。

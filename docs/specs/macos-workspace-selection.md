@@ -12,9 +12,9 @@
 
 ## 公開入力とnative接続
 
-Flutterは既存`gui_shell/broker`へ`macos_workspace_selection.schema.json`のversion-only要求を送る。固定RunnerはFlutter入力に`native_workspace_selection`があれば拒否する。OS選択時だけ、公開要求byte列と同じhelperへの既存匿名pipe fdを固定C ABIへ渡す。ABIはRust所有chooserとOS scopeの配送・解放だけであり、Broker資格、署名検証、Approval token、command dispatch、Audit確定を持たない。Swiftへ返す整数は配送・scope保持の分類で、承認boolや権限ではない。
+Flutterは既存`gui_shell/broker`へ`macos_workspace_selection.schema.json`のversion-only要求を送る。固定RunnerはFlutter入力に`native_workspace_selection`があれば拒否する。OS選択時だけ、公開要求byte列と同じhelperへの既存匿名pipe fdを固定C ABIへ渡す。ABIはRust所有chooserとOS scopeの配送・解放だけであり、Broker資格、署名検証、Approval token、command dispatch、Audit確定を持たない。Swiftへ返す整数は非同期選択を開始できたかだけで、配送成功・承認bool・権限ではない。
 
-親Rust部品はmain thread、公開要求の厳密形状、version-only payload、固定client、byte／ID長、pipe種別、scope上限を検査する。chooserは単一folder、alias解決・folder生成なしで、UIから初期pathを受け取らない。OS選択で得たURLのimplicit bookmarkを生成し、元の公開要求文字列とselected／cancelledをprivate frameへ結合し、既存pipeだけへ直接書く。bookmark本文をSwift／Dartへ返さず、永続保存・log・trace・Audit・snapshot・test artifactへ出さない。親は最大8件のURLだけを保持し、拒否時に直前scope、helper停止後に全scopeを終了する。
+親Rust部品はmain thread、公開要求の厳密形状、version-only payload、固定client、byte／ID長、pipe種別、scope上限を検査する。chooserは単一folder、alias解決・folder生成なしで、UIから初期pathを受け取らない。通常GUI windowの公開sheet completion APIで開始し、同期modal／入れ子run loopを使わない。callbackは公開要求の所有copyと複製pipeだけを保持し、借用pointerを保存せず、一回だけ配送する。OS選択で得たURLのimplicit bookmarkを生成し、元の公開要求文字列とselected／cancelledをprivate frameへ結合し、既存pipeだけへ直接書く。bookmark本文をSwift／Dartへ返さず、永続保存・log・trace・Audit・snapshot・test artifactへ出さない。親は最大8件のURLだけを保持し、拒否時には当該要求が追加したscopeだけを解放する。取消は以前のscopeを削除しない。helper停止後に全scopeを終了し、停止前に開始した遅延callbackの配送・scope追加も世代照合で拒否する。
 
 子Rust helperはprivate frameを厳密にparseし、元の公開要求の重複field、hash、時刻、client、session注入、nonceを既存検査で再評価する。scopeは最大8件、nonceは最大64件、frameは64KiB未満。OS bookmarkは24KiB以内、native URL resolverはUI禁止・stale拒否・絶対UTF-8 path／1024byte／control文字拒否で解決する。[Appleのprocess間アクセス規約](https://developer.apple.com/documentation/security/accessing-files-from-the-macos-app-sandbox?language=objc)に従い、implicit bookmarkを起動中だけ使い、同じURLのscopeを終了する。scope実値をBrokerへ渡さず、元要求hashと公開pathの内部投影だけをprocess内receiverへ渡す。private frameとbookmark文字列は処理後に消去する。再送・restartアクセス復元はない。
 
