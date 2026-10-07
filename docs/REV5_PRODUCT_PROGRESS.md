@@ -19,13 +19,15 @@
 
 #### iOS製品UI／native service／基本lifecycle — IMPLEMENTING（2026-10-07）
 
-有限Acceptanceは、新規専用Simulator上の製品Flutter画面からnative招待画面・接続先確認・既存serviceへ進み、実Broker結合、Runtime表示、OSによるbackground／復帰、製品画面での離脱を一度成立させること。招待入力だけをhosted XCTest内のnative secure fieldへ直接渡し、Flutter／shell／環境変数／UI操作logへ秘密を渡さない。画面操作には公開accessibility actionを使い、service method直接呼出し・foreground偽装・承認迂回をしない。試験コードはRunnerTests target内に閉じ、通常製品へ試験bridgeを追加しない。既存の部品試験はCLOSEDのため、今回の`--ios-product-ui`では新規製品接続試験だけを選択する。物理端末、網羅的lifecycle timing、Final QAは本単位へ追加しない。
+有限Acceptanceは、新規専用Simulator上の製品Flutter画面からnative招待画面・接続先確認・既存serviceへ進み、実Broker結合、Runtime表示、OSによるbackground／復帰、製品画面での離脱を一度成立させること。現行harnessは標準XCUITestで画面を操作する。招待だけは明示的なSimulator試験buildの`D4_IOS_PRODUCT_TEST`内でnative secure fieldへ渡し、Flutter／shell／環境変数／UI操作logへ秘密を渡さない。service直接呼出し・foreground偽装・承認迂回をしない。通常buildでは試験入力helperと起動呼出しをcompileから除外し、同flagを付けた物理端末buildはcompile errorにする。`--ios-product-ui`は新規製品接続試験だけを選択し、CLOSEDの部品試験を再実行しない。物理端末、網羅的lifecycle timing、Final QAは本単位へ追加しない。
 
 初回手動Actions [run 37587096021](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37587096021)、commit `3f4d0f709125e771d105fc1bcba5cb13b29991f8`ではRust build、Mobile解析・21試験、Simulator buildは成功したが、XCTest sourceで非Optionalな`FlutterEngine`にoptional chainingを使ったためcompile失敗し、製品接続testは未実行だった。公開型に合わせた1行修正を行う。製品sourceは変更していない。ローカルSchema 161／157／208、Conformance 236、手動workflow限定・Manifest検査はPASS。厳格日本語監査は変更対象外4 file／15 findingsでexit 1を保持する。
 
 次の[run 37587678571](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37587678571)、commit `c8326aa283c17a0053d7cd5a64445b57c4351e5f`はcompile成功、製品XCTest 1件が`initial_screen`でFAIL。FlutterのNavigationDrawer sourceは選択項目にbutton traitを付けておらず、harnessのbutton限定検索とは不一致だった。label一致と公開`accessibilityActivate`の結果による操作へ修正し、初期段階もroot／semantics／Keychain／navigationへ分けた。UIの操作可能性や製品成立をまだPASSとは扱わない。
 
 [run 37588613274](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37588613274)、commit `cdcd0baa3fe8d0e5008807fc2f1cda737246a36c`は画面遷移・native招待画面起動まで到達し、`native_invitation`でFAILした。招待受信／形式検査／確認操作を別段階へ分け、UIKit controlの既存登録actionを送る公開経路と、操作失敗時のclass名だけの限定診断を追加する。service・承認・秘密保管の直接書換えは行わない。
+
+[run 37589607834](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37589607834)、commit `27a57ae2f09a7aadaf37b837a8b7e4d621f2b0fc`で招待受信・形式検証まで進み、`invitation_submit`でFAIL。hosted XCTestのin-process accessibility呼出しではUIKit確認操作を成立させられなかったため、この試験経路と診断を撤去し、標準RunnerUITests targetへ置き換える。招待秘密を`typeText`の操作logへ出さないため、native入力helperだけを明示Simulator試験buildへ限定する。通常製品の新しい操作能力・Authority・credential経路ではない。確認ボタン、HOME、製品復帰、離脱はXCUITest自身が操作する。このharnessはdevelopment専用として保持し、UIKitの通常UI testだけで秘密を安全に入力可能になった場合に補助入力部分を除去できる。
 
 #### iOS native TLS／Keychainと実Brokerの接続 — CLOSED（Product Build、2026-10-07）
 

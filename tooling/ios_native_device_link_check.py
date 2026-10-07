@@ -9,7 +9,6 @@ import socket
 import subprocess
 import sys
 import threading
-import time
 import uuid
 
 from tooling.minidora_live_check import ROOT, 成功
@@ -71,35 +70,6 @@ def 検証(owner, binary, root, simulator, derived_data, result_bundle, product_
                     raise RuntimeError("owner_output_boundary")
                 issued["secret"] = secret
                 connection.sendall(json.dumps(invitation, ensure_ascii=False, separators=(",", ":")).encode("utf-8") + b"\n")
-            if product_ui:
-                # 次の接続は固定の非秘密制御語だけ。OSから実際にbackground／復帰させる。
-                while not stop.is_set():
-                    try:
-                        control, _ = listener.accept()
-                        break
-                    except socket.timeout:
-                        continue
-                else:
-                    return
-                with control:
-                    control.settimeout(10)
-                    request = bytearray()
-                    while len(request) < 32 and not request.endswith(b"\n"):
-                        data = control.recv(32 - len(request))
-                        if not data:
-                            break
-                        request.extend(data)
-                    if request != b"background\n":
-                        raise RuntimeError("lifecycle_request")
-                    control.sendall(b"ok\n")
-                time.sleep(0.5)
-                for app_id in ("com.apple.mobilesafari", "com.example.guiShellMobile"):
-                    launched = subprocess.run(["xcrun", "simctl", "launch", simulator, app_id],
-                                              capture_output=True, timeout=20)
-                    if launched.returncode:
-                        raise RuntimeError("lifecycle_launch")
-                    time.sleep(2)
-                issued["lifecycle"] = True
         except Exception as error:
             if not stop.is_set():
                 bridge_errors.append(type(error).__name__)
@@ -119,7 +89,10 @@ def 検証(owner, binary, root, simulator, derived_data, result_bundle, product_
                    "-resultBundlePath", str(result_bundle), "CODE_SIGNING_ALLOWED=YES",
                    "CODE_SIGNING_REQUIRED=YES", "CODE_SIGN_IDENTITY=-", "CODE_SIGN_STYLE=Manual"]
         if product_ui:
-            command.append("-only-testing:RunnerTests/NativeDeviceLinkProductTests")
+            command.extend(["-only-testing:RunnerUITests/DeviceLinkProductUITests",
+                            "SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) D4_IOS_PRODUCT_TEST"])
+        else:
+            command.append("-skip-testing:RunnerUITests")
         process = subprocess.Popen(command, env=env, cwd=ROOT, stdout=subprocess.PIPE,
                                    stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace",
                                    start_new_session=True)
@@ -142,9 +115,6 @@ def 検証(owner, binary, root, simulator, derived_data, result_bundle, product_
             match = re.search(marker + r"_FAIL ([a-z_]+)", output)
             if match:
                 stage = match.group(1)
-                for line in output.splitlines():
-                    if re.fullmatch(r"D4_IOS_PRODUCT_DIAG class=[A-Za-z0-9_.]{1,128}", line):
-                        print(line)
             elif not issued:
                 # 秘密が未発行のcompile／起動失敗だけをboundedに表示する。
                 diagnostics = [line for line in output.splitlines() if "error:" in line or "failed" in line][-12:]
@@ -152,8 +122,6 @@ def 検証(owner, binary, root, simulator, derived_data, result_bundle, product_
             raise RuntimeError("native_test_failed")
         if bridge_errors or not secret or bridge.is_alive():
             raise RuntimeError("invitation_bridge_failed")
-        if product_ui and not issued.get("lifecycle"):
-            raise RuntimeError("lifecycle_not_observed")
         stage = "owner_revocation"
         state = 成功(owner, "端末一覧", {})
         for key in ("招待", "結合"):
@@ -192,7 +160,7 @@ def 検証(owner, binary, root, simulator, derived_data, result_bundle, product_
         raise RuntimeError(f"iOS native端末連携の失敗: 段階={failure[0]}、分類={failure[1]}")
     if product_ui:
         return {"result": "PASS", "evidence_source": "LIVE_RUNTIME",
-                "target": "iOS Simulator製品UIのaccessibility操作",
+                "target": "iOS Simulator製品UIのXCUITest操作",
                 "product_pair_native_confirmation": "PASS", "runtime_projection": "PASS",
                 "os_background_resume": "PASS", "product_disconnect": "PASS",
                 "owner_revocation": "PASS",

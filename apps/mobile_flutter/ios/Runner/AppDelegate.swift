@@ -17,6 +17,9 @@ import UIKit
     let service = DeviceLinkNativeService()
     deviceLinkService = service
     service.install(messenger: engineBridge.applicationRegistrar.messenger())
+#if D4_IOS_PRODUCT_TEST
+    DeviceLinkProductTestInput.install()
+#endif
   }
 
   override func applicationWillTerminate(_ application: UIApplication) {
