@@ -17,7 +17,19 @@
 
 ## P13 Mobile / Non-Windows — 現行track
 
-#### macOS Agent CLI／Workspace起動中登録 — VALIDATING（登録入力試験の局所修正）
+#### macOS Agent CLI／Workspace起動中登録 — CLOSED（Product Build、2026-10-08）
+
+有限Acceptanceはcommit `c2ef88d6f11babdb6846ed332003c50dd6adc2f0`の手動Actions [run 37664507377](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37664507377)でPASS。macOS 15.7.9 arm64／Apple Virtual Machine／Xcode 16.4、固定Flutter 3.44.0／Rust 1.95.0。製品Agent Centerで6欄を入力・照合し、Rust所有OS確認の拒否時は登録されず、承認後は既存Brokerが実Codex CLI 0.159.2の固定probeとAPFS Workspace検査を行い、登録recordと`Task実行能力: unsupported`を表示した。製品XCUITest 1 passed／0 failed／0 skipped、44.570秒。Command-Q終了、helper残留なし、runner source clean、専用CLI／空Workspace回収もPASS。
+
+同runの実行commandは`cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib macos_desktop_worker::tests::owner_agent_registration_ -- --test-threads=1`（1件）、helper build、変更Dart 2 file解析（No issues）、`flutter test --no-pub test/broker_client_payload_hash_test.dart`（7件）、試験表示flagを含まない通常`flutter build macos --debug --no-pub`、`xcodebuild test ... -only-testing:RunnerUITests/AdapterOwnerUITests/testProductAgentRegistration`。XCTestだけは既存`D4_MACOS_OWNER_UI_TEST`表示flag付きであり、通常Release全体や正式署名の証拠へ昇格しない。OS確認・登録は限定`LIVE_RUNTIME`、Rust Owner callback／合成CLIの否定・Audit検査は`FIXTURE`として区別する。
+
+実CodexのSHA-256は`16593cc2f422d5f398a8e40f550ebbaf1245392528957be342c295920a300704`。artifact `11503460098`（76960 bytes、remote期限2026-10-10T18:13:53Z）をignored `release_evidence/p13-macos-registration-c2ef88d.zip`へ保存し、SHA-256 `d4b8689c90ad780f2a38fddefec8a6eae480e9e4c16a81135924a8cf1440ad8c`をGitHub digestと照合した。成功した正確なcommitだけをmainへfast-forward・pushし、remote HEAD一致を確認。検証branchはlocal／remote双方から回収した。2世代remote backup tagは`65fde55dd57479b91afe37ae6e21e44576779288`と`515081f024e3ade49a79486e270caa4509519dd2`、本単位のrollbackは前者。
+
+本単位をCLOSEDとし、追加fixture・証拠強化・文書修正目的で再実行しない。Mac Credential保管、sandbox外選択、CLI配布UI、Task実行、正式配布はP13後続と既存`release_blocker`へ保持する。Permission・Approval・Credential・Agent trustを登録から生成せず、通常Release `task_execution=unsupported`、`release_ready=false`を維持する。ローカル必須Rust全体の既知FAIL、日本語監査の変更外指摘、Flutter LSP制約は下記の記録どおりで、今回の対象PASSへ読み替えない。
+
+##### 検証履歴（閉鎖前）
+
+以下は変更・失敗履歴であり、当時の「現在」「未統合」「再開条件」を含め、上記の閉鎖状態を上書きしない。
 
 手動Actions [run 37662923774](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37662923774)、commit `64009defe2e77518dfe1514f822aad7480e3f2f7`は模型欄の入力値一致までPASSした。続く実行系欄は、videoではscroll後に全面表示されているが、XCTestの束縛AX frameが初期の21pxのままでFAIL（23.669秒）。固定フォームの通常Tab移動（認証方式2項目を通って実行系欄、以後は各入力欄）へ限定して、古い座標への依存を除去する。6欄のAX identityと各入力値照合は維持し、製品focusや状態を直接設定しない。対象build／試験と後片付けはPASS。artifact `11502206558`、SHA-256 `071f6d36c01a605146b452ddcd91f7689db8234cc17848fc4a7f96b98312eb92`を照合して保存した。初回downloadの外部`ServerBusyEgress`は再取得で解消し、製品failureへ分類しない。
 
