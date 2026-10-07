@@ -524,7 +524,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/BrokerProcessChannel.swift",
-      "sha256": "750820de8bba588aa742211a3befcc514563c76c83a2fd55cdb7c1fe8546ce5f"
+      "sha256": "97f62a6c151ae4d01d75ec73f2d23df7a11aebc0087a5b760953e2e5d7b8073a"
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/Configs/AppInfo.xcconfig",
@@ -1272,7 +1272,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "0cf6ae57ae0b429245db51e4c2f5bfdcc01f1a961a44d1cb2ecde2fdf2293464"
+      "sha256": "462a2fa803eab2b4ce6ea76e432747a8914e5f09ab2b7e8b716a0c7fcd8187fd"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1488,7 +1488,7 @@
     },
     {
       "path": "docs/specs/macos-workspace-selection.md",
-      "sha256": "aa29835c871aa3796c40478eb12be87e1ec904d74e10467f5733b4e1c3ebdf46"
+      "sha256": "2e4b10bf35e619d8ad6ba88094c3266b849a17b7836b5fe458d3f4b7199696a3"
     },
     {
       "path": "docs/specs/mcp-connection-center.md",

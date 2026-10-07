@@ -48,6 +48,7 @@ final class BrokerProcessChannel {
       #if DEBUG && D4_MACOS_OWNER_UI_TEST
       worker.standardError = nativeDiagnostic
       nativeDiagnostic.fileHandleForReading.readabilityHandler = { [weak self] handle in
+        guard #available(macOS 10.15.4, *) else { handle.readabilityHandler = nil; return }
         let data = (try? handle.read(upToCount: 4096)) ?? Data()
         guard let self else { return }
         if data.isEmpty { handle.readabilityHandler = nil; return }
