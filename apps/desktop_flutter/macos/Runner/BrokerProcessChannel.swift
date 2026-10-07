@@ -1,6 +1,7 @@
 import Cocoa
 import Darwin
 import FlutterMacOS
+import os.log
 
 /// 固定同梱helperへのtransport。資格・権限・Owner判断を保持しない。
 final class BrokerProcessChannel {
@@ -127,7 +128,7 @@ final class BrokerProcessChannel {
       if let manifest = payload["Manifest"] as? [String: Any] {
         observedShape += " manifestCount=\(manifest.count) \(shape(manifest, ["版", "Adapter ID", "Runtime ID", "発行者", "source", "version", "transport", "Content Exposure", "要求Capability", "許可差分", "既知の危険", "互換性", "authority_strip", "signed_manifest", "署名対象", "署名", "署名者fingerprint"]))"
       }
-      NSApp.windows.first?.title = "D4_MACOS_OWNER_SHAPE " + observedShape
+      os_log("D4_MACOS_OWNER_SHAPE %{public}@", log: .default, type: .error, observedShape)
     }
     #endif
     let timeout = operation == "アダプター導入" || operation == "アダプター更新" ? 305 : 5

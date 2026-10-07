@@ -55,6 +55,8 @@
 
 [run 37618440784](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37618440784)、commit `3040b0e93e23d4fb736b32b6ba06c840b9a7489a`は同じ構造拒否でFAIL。artifact `11480138893`、SHA-256 `115e231d91fadc29c104d894660e2f98a8b1f9f36fdc61d2e0047083ce33a6ca`を照合。画像上の型診断はroot 3 field・操作名一致・版integerを示したが、XCTestで窓titleのlabelを読んだ値は空だった。観測済みtitleをAX valueから読むよう試験側を訂正し、製品の拒否を変更しない。
 
+[run 37619551427](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37619551427)、commit `62b7495429ee72428e035e9e30fd5c2f87a0f577`も同じ構造拒否でFAIL。Flutterの窓AX valueも空であり、型情報の取得手段として不適切だった。窓title改変を撤去し、同じ明示Debug UI試験flag内で既知fieldの型情報だけをOS標準logへ出す。workflowは固定診断prefixに限定して読み取る。製品要求・Owner選択・本文には触れず、診断の撤去条件も維持する。
+
 #### macOS Desktop通常Broker接続 — CLOSED（Product Build、2026-10-07）
 
 開始時のmacOS Runnerには`gui_shell/broker`登録がなく、Flutterの通常起動から実Brokerへ到達しなかった。本有限単位を、同梱Rust helperへの匿名pipe、既存認証Broker normal経路、初回設定等の製品bootstrap、正常終了へ限定した。Apple App Sandboxを継承し、Flutter／Runnerへ資格を渡さない。Owner専用操作・Windows固有操作は現状の拒否を保持し、macOS全機能完成とは扱わない。責任と未成立範囲は`docs/specs/macos-desktop-channel.md`。手動Actionsの独立`macos_product`を使い、iOS／AndroidのCLOSED試験は起動していない。

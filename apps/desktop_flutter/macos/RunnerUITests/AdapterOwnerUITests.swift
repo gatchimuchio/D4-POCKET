@@ -24,7 +24,6 @@ final class AdapterOwnerUITests: XCTestCase {
     let ownerVisible = deny.waitForExistence(timeout: 15)
     if !ownerVisible {
       // 専用runner・合成公開Manifestだけの試験。UIの既存拒否理由を観測する。
-      print("D4_MACOS_OWNER_SHAPE \(String(describing: app.windows.firstMatch.value).prefix(2048))")
       let status = app.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "macos_owner_fixture:")).firstMatch
       if status.exists, let message = status.value as? String {
         print("D4_MACOS_OWNER_FAILURE \(message.prefix(1024))")
