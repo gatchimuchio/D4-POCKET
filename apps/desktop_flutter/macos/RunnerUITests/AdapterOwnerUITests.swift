@@ -67,6 +67,9 @@ final class AdapterOwnerUITests: XCTestCase {
   }
 
   private func clickWorkspaceSelection(_ app: XCUIApplication) throws {
+    // 秘密path欄への入力直後は選択buttonがviewport外だった。通常の本文scrollで表示する。
+    app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.65))
+      .scroll(byDeltaX: 0, deltaY: -180)
     let image = XCUIScreen.main.screenshot().image
     var proposed = CGRect(origin: .zero, size: image.size)
     guard let pixels = image.cgImage(forProposedRect: &proposed, context: nil, hints: nil) else {
