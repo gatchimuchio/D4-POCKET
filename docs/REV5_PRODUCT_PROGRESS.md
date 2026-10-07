@@ -1,6 +1,6 @@
 # D4 Pocket / GUI-Shell rev5 Product-First 進捗
 
-更新日: 2026-10-07
+更新日: 2026-10-08
 工程正本: ユーザー提示「D4 Pocket / GUI-Shell 統合実装仕様書 rev5」「統合開発工程表 rev5」「Codex実装指示書 rev5」
 現行mode: `PRODUCT_BUILD_MODE`（最新版rev5実装指示§2）。Windows側P12 `FEATURE COMPLETE`はCLOSEDのまま保持し、Mobile／Non-Windowsは独立するP13 trackとして構築する。P2 CompareとP3 HandoffもCLOSEDのまま再訪しない。Q0／Q1／Q2に記録済みのQA実行結果は履歴証拠として保持するが、Final QA queueは現在の作業schedulerではなく、追加QAは開始・継続しない。通常Release `task_execution=unsupported`と既存release gateを維持する。
 初期rev5文書同期commit: `39dd3f4bc7aafe350ca94fce9392095f1064d2bc`。凍結commitとその後のQA記録は本書末尾の更新履歴を参照。
@@ -17,11 +17,15 @@
 
 ## P13 Mobile / Non-Windows — 現行track
 
-#### macOS Agent CLI／Workspace起動中登録 — VALIDATING（Mac runner外部待ち）
+#### macOS Agent CLI／Workspace起動中登録 — VALIDATING（登録入力試験の局所修正）
+
+2026-10-08再開: 手動Actions [run 37659178592](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37659178592)、commit `56dfb3e9f6b1f4771a4b0919a89d15663fab7134`はMac runner上で実行された。請求設定を変更しておらず、以前のjob起動拒否はこのrunでは発生していない。Rust対象1件／helper build、固定実Codex準備、変更Dart解析／transport 7件、通常Mac buildはPASS。製品UIは23.058秒でFAILし、初期AX表示を待たずにscrollしたため模型欄ではなく実行系欄へ入力し、次の欄で試験側の高さ30px仮定に失敗した。videoで`codex-localtest-model`を確認した。表示後の6入力欄をAX identityへ一度だけ束縛し、入力欄の正の面積・既定値除去・入力値一致を確認するharnessへ局所修正する。製品要求・Authority境界は変更しない。
+
+同runのhelper残留なし／runner source clean／専用CLI・Workspace回収はPASS。artifact `11498929704`、SHA-256 `63e9787fc91c1c07f2b4adde76ed00dbfdb2be3fa901b1a6b7f61b647fb0ab1c`を照合しignored領域へ保存した。Owner確認と登録結果表示はまだ未到達で、AcceptanceをCLOSEDにしない。以下のjob拒否と初回FAILは履歴として保持する。
 
 現在の差分は検証branch `codex/macos-agent-registration-verify`へ保存し、mainへ未統合。初回の製品UI入力欄探索FAILを修正した`bb9a57bb0113ee04f47dc38c4583ee4acf63a5a4`の手動Actions [run 37635033580](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37635033580)は、job開始前にGitHub側で拒否された。check annotationは「recent account payments have failed or your spending limit needs to be increased」。どちらかの原因を断定せず、請求／利用上限設定を変更しない。同Repositoryのself-hosted runnerは0件。step未開始・artifactなしで、修正後UIのPASS／FAIL証拠ではない。
 
-再開条件はMac検証環境の利用回復。上記branchで同じ有限UI条件を確認し、PASSした正確なcommitだけをmainへfast-forward・push・remote照合してから検証branchを回収する。追加QAや新しい製品Acceptanceを作らない。main／rollback pointは`65fde55dd57479b91afe37ae6e21e44576779288`、backup-mainも同値、backup-main-prevは`515081f024e3ade49a79486e270caa4509519dd2`でremote tagを照合済み。現単位をCLOSEDとせず、通常Release能力と既存release blockersを維持する。
+再開時点でMac検証環境の利用を確認した。上記branchで同じ有限UI条件を確認し、PASSした正確なcommitだけをmainへfast-forward・push・remote照合してから検証branchを回収する。追加QAや新しい製品Acceptanceを作らない。main／rollback pointは`65fde55dd57479b91afe37ae6e21e44576779288`、backup-mainも同値、backup-main-prevは`515081f024e3ade49a79486e270caa4509519dd2`でremote tagを照合済み。現単位をCLOSEDとせず、通常Release能力と既存release blockersを維持する。
 
 既存Agent Centerの登録要求をRust所有OS確認と既存Brokerへ接続する。有限Acceptanceは`docs/specs/macos-desktop-channel.md`。権限取得・Task実行・sandbox外へのaccessを追加せず、既存登録境界を共有する。手動Actionsの`macos_agent_registration`で、固定版実Codexのinterface確認と製品UI登録を実行する。既CLOSEDのAdapter／Mobile／Windows条件を再試験しない。
 

@@ -28,7 +28,7 @@ Owner確認・Credentials・Task実行・Windows固有Install／Updateは本接�
 
 ## Owner追加契約 — Agent CLI／Workspace起動中登録
 
-状態: VALIDATING。初回の入力欄探索FAILを修正後、手動Actions run 37635033580がGitHub請求／利用上限の理由でjob開始前に拒否されたため、製品UIのAcceptanceは未成立。既存`AgentCLI実行系作業領域登録`とSchemaを再利用し、Runtime／Workspace ID、CLI絶対path、Workspace root、秘密path除外、Provider／Modelを要求hashとともにRust所有OS確認へ表示する。入力構造の検査はBrokerと同じ実装を共有し、未知field、未知Adapter、相対root、不正秘密path、Broker資格情報保管庫の未対応参照は確認候補へ昇格しない。既存のWindows入口・Task能力判定は変更しない。
+状態: VALIDATING。2026-10-08の手動Actions run 37659178592は実行されたが、登録入力harnessでFAILし製品UIのAcceptanceは未成立。局所修正と過去FAILは`docs/REV5_PRODUCT_PROGRESS.md`へ保持する。既存`AgentCLI実行系作業領域登録`とSchemaを再利用し、Runtime／Workspace ID、CLI絶対path、Workspace root、秘密path除外、Provider／Modelを要求hashとともにRust所有OS確認へ表示する。入力構造の検査はBrokerと同じ実装を共有し、未知field、未知Adapter、相対root、不正秘密path、Broker資格情報保管庫の未対応参照は確認候補へ昇格しない。既存のWindows入口・Task能力判定は変更しない。
 
 承認後だけ既存BrokerがAPFS rootのnofollow・物理identity・Broker内部領域との非重複を検査し、既存Adapterの`--version`と`exec --help`を起動する。OS App Sandboxは継承したまま、アクセス不能・CLI不正・重複登録・Audit失敗は既存拒否へ通す。CLIの固定引数検査であり、外部実行fileの無害性を保証しない。登録は最大8件のprocess内状態、Task／Provider通信は開始せず、Credential・Trust・Permission・Approvalを生成しない。Owner確認最大300秒と既存2回の5秒probeを区別し、Broker結果は15秒、transportは320秒まで待つ。期限超過時に自動再送しない。
 

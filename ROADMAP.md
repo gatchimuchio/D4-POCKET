@@ -1,6 +1,6 @@
 # GUI Shell ロードマップ
 
-P13現行差分: macOS Agent CLI／Workspace起動中登録はVALIDATING。Rust対象・変更Dart解析／7試験・通常Mac buildはPASS、初回UI入力欄探索FAILの修正後はGitHub請求／利用上限によるjob起動拒否（run 37635033580）で試験未実行。差分は`codex/macos-agent-registration-verify`に保全し、mainへ未統合。有限Acceptanceは`docs/specs/macos-desktop-channel.md`、進捗は`docs/REV5_PRODUCT_PROGRESS.md`。利用回復後に手動Actions `macos_agent_registration`で同条件を確認する。Task実行・sandbox外選択・Credential保管・正式配布は別単位へ保持する。
+P13現行差分: macOS Agent CLI／Workspace起動中登録はVALIDATING。2026-10-08の手動Actions run 37659178592は実行され、Rust対象・変更Dart解析／7試験・通常Mac buildはPASS。UIは入力欄の表示待ちとindex束縛の誤りでFAILし、AX identity固定と入力照合へ局所修正する。差分は`codex/macos-agent-registration-verify`に保全し、mainへ未統合。有限Acceptanceは`docs/specs/macos-desktop-channel.md`、進捗と過去FAILは`docs/REV5_PRODUCT_PROGRESS.md`。Task実行・sandbox外選択・Credential保管・正式配布は別単位へ保持する。
 
 P13 macOS既存Adapter状態管理のOwner接続はCLOSED: commit `7c4219f5202402ad574e81b81e32d6eb02c82cd9`、手動Actions [run 37629357493](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37629357493)で5操作の実OS確認、署名不正／未検証有効化の拒否、無効化・隔離・削除の表示、通常終了がPASS。起動後に取得したrecordのID／hashを要求へ結合する修正もWidget回帰で確認した。Rust対象1件、Dart解析、Flutter対象2件、通常Mac buildがPASS。製品Trust設定・外部artifact作用・Credentials／Agent／Workspace・正式配布は未成立の別gateへ保持し、P13の次の製品差分へ進む。導入・更新、通常接続、MobileのCLOSED条件は再開しない。
 
