@@ -110,15 +110,11 @@ final class DeviceLinkTLSClient {
     guard canSend(), !credential.isExpired() else { throw DeviceLinkTransportError.failed }
 
     let sent = DeviceLinkResultLatch<Void>()
-    connection.send(content: wire, contentContext: .defaultMessage, isComplete: true) { result in
-      switch result {
-      case .contentProcessed(let error):
-        if error == nil { sent.resolve(.success(())) }
-        else { sent.resolve(.failure(DeviceLinkTransportError.failed)) }
-      @unknown default:
-        sent.resolve(.failure(DeviceLinkTransportError.failed))
-      }
-    }
+    connection.send(content: wire, contentContext: .defaultMessage, isComplete: true,
+                    completion: .contentProcessed { error in
+      if error == nil { sent.resolve(.success(())) }
+      else { sent.resolve(.failure(DeviceLinkTransportError.failed)) }
+    })
     try sent.wait(until: deadline)
     guard canSend(), !credential.isExpired() else { throw DeviceLinkTransportError.failed }
     let frame = try receiveSingleFrame(connection, deadline: deadline, canSend: canSend)
