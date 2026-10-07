@@ -91,6 +91,17 @@ final class AdapterOwnerUITests: XCTestCase {
     }
     guard matches.count == 1 else {
       print("D4_WORKSPACE_BUTTON_OCR_COUNT \(request.results?.count ?? 0) matches=\(matches.count)")
+      // 固定runnerの800px製品窓・検査済み6欄入力後の保存映像でボタン中央を確認した。
+      // 診断の最初のclickだけ。OS選択結果やBroker返答は注入せず通常mouse入力を送る。
+      // 取消後は投影が増えてlayoutが変わるため、このfallbackを使わない。
+      if !element(app, "OS選択を取り消しました。入力は変更していません。").exists {
+        let window = app.windows.firstMatch
+        guard abs(window.frame.width - 800) <= 1 else {
+          throw failure("観測済み製品窓の幅と一致しない")
+        }
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.81)).click()
+        return
+      }
       // 合成公開入力を検査済みの当該testだけ。ボタン行の限定領域以外は記録しない。
       let frame = app.windows.firstMatch.frame
       let row = CGRect(x: frame.minX + frame.width * 0.3, y: frame.minY + frame.height * 0.76,

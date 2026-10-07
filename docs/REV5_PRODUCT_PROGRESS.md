@@ -19,6 +19,8 @@
 
 #### macOS 作業領域のOS選択 — IMPLEMENTING（Product Build、2026-10-08）
 
+手動Actions [run 37693823144](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37693823144)、commit `4d13e3d7b80ff999eac2f3172d54f5c26ec4f75e`はUI試験24.822秒でclick前の文字認識がFAIL。固定native診断は未到達で、終了根因は未確定。artifact `11514184088`、SHA-256 `0642ddf51eff0300b65b99cf234c9388ea25859c74ff06df97673e9988e8d47d`を照合した。保存videoの21秒frameは選択buttonを製品窓内に示すため、最初の診断clickだけを観測済み800px窓のbutton中央へ通常XCTest入力で送る。取消後のlayoutには適用せず、原因取得後に撤去する。通常build／対象Rust／Dart／後片付けはPASS、Acceptanceとmainは未変更。
+
 手動Actions [run 37691846258](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37691846258)、commit `07ab9ec115ba75819666215c201a21af4f0a1bfb`は一時診断のSwift buildでFAIL。固定SDKでは`FileHandle.read(upToCount:)`がmacOS 10.15.4以降なのに、既存deployment target 10.15の可用性guardが欠落していた。診断だけを公開APIの可用性guard内に限定し、製品の最低OSやfilesystem／sandbox policyを変更しない。UIは未実行でnative終了段階は未取得。通常build／対象Rust／Dart／後片付けはPASS。artifact `11513548353`、SHA-256 `f390c53251463c262231b7775534f53aad8f465dce8b981ccf3dbe955f0eb07f`を照合・保存した。
 
 一時診断追加後のWindows必須Rust全体は503 passed／6 failed／12 ignoredでFAIL。変更外のA2A読取1件、既存Update Download TLS 4件のOS 10054に加え、MCP stdio fixtureのdirectory削除にOS 32（他process使用中）を観測した。Mac専用の診断featureは既定無効で、当該Windows作用経路は変更していない。`release_blocker`である既存Final QAへ失敗履歴を送るが、fixture lockの根因解消・製品regression確定・全体PASSはいずれも主張しない。独立native crateのWindows入力拒否1件はPASS。
