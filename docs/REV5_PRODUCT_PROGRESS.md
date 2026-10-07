@@ -17,7 +17,15 @@
 
 ## P13 Mobile / Non-Windows — 現行track
 
-#### macOS既存Adapter状態管理 — VALIDATING（Product Build、2026-10-07）
+#### macOS既存Adapter状態管理のOwner接続 — CLOSED（Product Build、2026-10-07）
+
+成功commit `7c4219f5202402ad574e81b81e32d6eb02c82cd9`の手動Actions [run 37629357493](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37629357493)で有限AcceptanceがPASS。macOS 15.7.9 arm64／Apple Virtual Machine／Xcode 16.4、固定Flutter 3.44.0／Rust 1.95.0。製品UI→Rust所有OS確認→既存Brokerで、検証要求の不正署名拒否、有効化要求の未検証拒否、無効化・隔離・削除の受理と画面表示、Command-Q正常終了をXCUITest 1件（46.676秒）で確認した。helper残留なし・runner source clean。導入は新しい状態管理試験の準備であり、旧CLOSED試験は選択していない。
+
+同runでRust対象1件、変更Dart 5 fileの`dart analyze`、Owner待機期限test 1件、起動後catalog操作のWidget回帰test 1件、通常`flutter build macos --debug --no-pub`もPASS。macOS実操作は限定`LIVE_RUNTIME`。Rust Owner callbackとWidget応答は`FIXTURE`で、署名検証／有効化の正の状態遷移は既存Broker署名testの直接依存結果だけに限定する。UI試験は明示Debug表示用semantics flag付きであり、通常Releaseの全機能や製品Trust設定、外部artifact実行を証明しない。
+
+artifact `11486335093`（255161 bytes、有効期限2026-10-10T13:36:53Z）をignored `release_evidence/p13-macos-adapter-7c4219f.zip`へ保存し、SHA-256 `23fa9afeb17bfdf089118a320fe003571fce66accd826d81b0d7f578794b4158`をGitHub digestと照合した。既存release blockers、通常Release `task_execution=unsupported`、`release_ready=false`は維持する。次はP13の残る製品機能であり、このOwner接続へ追加の証拠強化を要求しない。以下のFAILと修正履歴は保持する。
+
+ローカルの従来Adapter非承認表示testもASCII複製で1件PASS。複製`C:\Users\ohira\AppData\Local\Temp\d4p-adapter-ui-feb74a8c27d44c7d9eafb68dd5dafd0a`は試験後の正確なpath確認付き削除が実行ポリシーで拒否され、製品外に残った。削除を迂回しない。これは開発環境の`known_limitation`であり、製品への同梱物・新しいrelease blockerではない。元のコードの複製とbuild成果物は再生成可能である。
 
 検証・有効化・無効化・隔離・削除の既存ボタンをRust所有OS確認とBrokerへ接続する。導入・更新CLOSED条件を再開せず、catalog・Audit内の作用だけを扱う。既存Schemaを再利用し、対象ID／hash／要求hashを束縛する。署名Trust未設定または不正なAdapterは有効化しない。有限Acceptanceは`docs/specs/macos-desktop-channel.md`。手動Actionsの専用targetを使い、既CLOSEDのUI試験を選択しない。macOS製品Trust設定・Credentials／Agent／Workspace・正式配布・Final QAは別の`release_blocker`範囲へ保持する。
 

@@ -252,10 +252,19 @@
         "artifact_expires_at": "2026-10-10T12:54:31Z"
       },
       "macos_adapter_lifecycle_evidence": {
-        "status": "VALIDATING",
+        "status": "CLOSED",
         "contract": "docs/specs/macos-desktop-channel.md",
+        "source_commit": "7c4219f5202402ad574e81b81e32d6eb02c82cd9",
+        "run_url": "https://github.com/gatchimuchio/GUI-Shell/actions/runs/37629357493",
         "trigger": "workflow_dispatch",
         "target": "macos_adapter_lifecycle",
+        "evidence_source": "LIVE_RUNTIME",
+        "validation": "macOS製品UIから5操作の実OS確認、不正署名と未検証有効化の拒否、無効化・隔離・削除の画面表示、通常終了をXCUITest 1件でPASS。Rust対象1件、Dart解析5 file、Flutter対象2件、通常Debug buildもPASS。helper残留なし、runner source clean。",
+        "component_evidence_source": "FIXTURE",
+        "component_scope": "RustのOwner選択とWidgetのBroker応答は合成。UI試験には明示Debug表示用semantics flagを使用。正の署名検証／有効化は既存Broker署名testの範囲であり、Mac製品Trust設定成功とは扱わない。",
+        "artifact_id": "11486335093",
+        "artifact_sha256": "23fa9afeb17bfdf089118a320fe003571fce66accd826d81b0d7f578794b4158",
+        "artifact_expires_at": "2026-10-10T13:36:53Z",
         "scope_limit": "既存Adapter検証・有効化・無効化・隔離・削除のOwner接続だけ。署名未検証は有効化拒否を維持。macOS製品Trust設定・外部artifact作用・通常Release・正式配布・Final QAのrelease blockerは維持する。"
       },
       "r2_bounded_exit_gate": {
