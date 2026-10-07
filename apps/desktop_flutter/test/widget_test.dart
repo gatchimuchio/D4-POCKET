@@ -2,8 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart'
-    show debugDefaultTargetPlatformOverride, TargetPlatform;
+import 'package:flutter/foundation.dart' show TargetPlatform;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gui_shell_desktop/main.dart';
@@ -37,8 +36,6 @@ String _testSessionId(String character) => List.filled(32, character).join();
 
 void main() {
   testWidgets('macOS作業領域OS選択は取消で入力保持し投影だけを反映する', (tester) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
-    addTearDown(() => debugDefaultTargetPlatformOverride = null);
     Map<String, Object?> projection(String state, String? root,
             {bool approval = false}) =>
         {
@@ -89,7 +86,7 @@ void main() {
     expect(transport.operations,
         isNot(contains('AgentTaskWorkspacePermissionGrant')));
     expect(tester.takeException(), isNull);
-  });
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
   Finder findSurfaceSemanticsIdentifier(String label) {
     final identifier = surfaceSemanticsIdentifier(label);
     return find.byWidgetPredicate(

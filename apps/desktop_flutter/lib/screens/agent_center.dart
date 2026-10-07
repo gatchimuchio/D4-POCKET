@@ -2066,9 +2066,10 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
         throw const BrokerClientException('OS選択結果が不正です');
       }
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(() =>
             _workspaceSelectionMessage = 'OS選択が成立していません。入力を保持し、自動再送しません。');
+      }
     } finally {
       if (mounted) setState(() => _workspaceSelectionPending = false);
     }
