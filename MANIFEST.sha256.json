@@ -72,7 +72,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "f5749e5e4c91a6c2fcf52ac90b4ec29e1556727b9f75e0ac26e064a80db53cb7"
+      "sha256": "028f993e09058503134b0f9e465d977921b3ac92a8b74f26fbd6f3253059954a"
     },
     {
       "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
@@ -108,7 +108,7 @@
     },
     {
       "path": "CLAIM.md",
-      "sha256": "994f1ce15ce11099b11e308cc1e3abb66fb01110987d8a0b1a100b99b297eb77"
+      "sha256": "096495747dcd655952ec0a8be5b89647035911f66cf8df79d2f4d2d55d46d57e"
     },
     {
       "path": "COMPATIBILITY_MATRIX.md",
@@ -160,11 +160,11 @@
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "27b95a2ff0b35c126a77a8bf1de743d8750b7ac56904d89226fe65dd01a294aa"
+      "sha256": "4987a330aaa6bb143f7825e351cddd0c082a1b1b9c797f2ed2101b9727357419"
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "1364cf2f39d91850be14050a5efe40429ac7aef304bd86b44d72371840e2118c"
+      "sha256": "16f712b00c2405f0fb719ae735ed2cd781efd67de06c9c3866cef56a82c1d2e8"
     },
     {
       "path": "SECURITY.md",
@@ -784,7 +784,7 @@
     },
     {
       "path": "apps/mobile_flutter/README.md",
-      "sha256": "59082fb1aef0c8e23c8ad820826e84665d0b00b47c161a2c19c9d76284cf6288"
+      "sha256": "8c49ba4f276f682442969a346684a70a37a07b8d5af5740c7444fc458a69b0ef"
     },
     {
       "path": "apps/mobile_flutter/android/.gitignore",
@@ -1244,7 +1244,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "5343f42f9b39041808c12bdce47006e07b62440efd8ee0f4ca56ee17cba353d2"
+      "sha256": "5eb31da56254ca2963ee7cbdf385037c02bf5cde721980552440ff7e3b83792e"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",

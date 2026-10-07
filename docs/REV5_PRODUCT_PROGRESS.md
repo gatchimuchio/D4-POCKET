@@ -17,7 +17,7 @@
 
 ## P13 Mobile / Non-Windows — 現行track
 
-Androidの実装・検証履歴は維持し、Android実機試験の凍結を尊重する。iOSにはSwift Device Link handler、ThisDeviceOnly Keychain保管、TLS client、strict JSON処理、native XCTestが実装されている一方、READMEには未実装との古い記述が残っていた。Windows hostではApple toolchainを実行できないため、Product Build上必要な確認として、workflow_dispatch限定のMac検証をP13の局所build／testに使う。これはiOS Simulator buildとnative XCTestに限り、実端末・実Broker接続・配布・Final QAの証拠へ昇格させない。
+Androidの実装・検証履歴は維持し、Android実機試験の凍結を尊重する。iOSにはSwift Device Link handler、ThisDeviceOnly Keychain保管、TLS client、strict JSON処理、native XCTestが実装されている一方、READMEには未実装との古い記述が残っていた。Windows hostではApple toolchainを実行できないため、既存の`.github/workflows/apple-manual-build.yml`へ独立`ios_mobile` jobを設け、P13の局所build／testに使う。これはiOS Simulator buildとnative XCTestに限り、実端末・実Broker接続・配布・Final QAの証拠へ昇格させない。
 
 ## Q0 品質保証凍結 — 完了（過去のFinal QA記録）
 
