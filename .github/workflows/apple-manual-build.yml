@@ -14,6 +14,7 @@ name: Apple platform 手動補助build
           - macos_owner
           - macos_adapter_lifecycle
           - macos_agent_registration
+          - macos_workspace_selection
         default: all
         required: true
 
@@ -22,7 +23,7 @@ permissions:
 
 jobs:
   macos-product:
-    if: ${{ inputs.target == 'macos_product' || inputs.target == 'macos_owner' || inputs.target == 'macos_adapter_lifecycle' || inputs.target == 'macos_agent_registration' }}
+    if: ${{ inputs.target == 'macos_product' || inputs.target == 'macos_owner' || inputs.target == 'macos_adapter_lifecycle' || inputs.target == 'macos_agent_registration' || inputs.target == 'macos_workspace_selection' }}
     runs-on: macos-15
     timeout-minutes: 30
     steps:
@@ -52,11 +53,13 @@ jobs:
             filter='macos_desktop_worker::tests::owner_adapter_lifecycle'
           elif [ '${{ inputs.target }}' = 'macos_agent_registration' ]; then
             filter='macos_desktop_worker::tests::owner_agent_registration_'
+          elif [ '${{ inputs.target }}' = 'macos_workspace_selection' ]; then
+            filter='macos_workspace_selection::tests::'
           fi
           cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib "$filter" -- --test-threads=1 2>&1 | tee evidence/macos-rust-test.txt
           cargo +1.95.0 build --locked --manifest-path native/rust_helper/Cargo.toml --bin gui_shell_macos_broker 2>&1 | tee evidence/macos-rust-build.txt
       - name: 固定版実Codexとsandbox内の合成Workspaceを準備
-        if: inputs.target == 'macos_agent_registration'
+        if: inputs.target == 'macos_agent_registration' || inputs.target == 'macos_workspace_selection'
         shell: bash
         run: |
           set -euo pipefail
@@ -65,6 +68,10 @@ jobs:
           fixture="$HOME/Library/Containers/com.example.guiShellDesktop/Data/d4-registration-fixture"
           test ! -e "$fixture"
           mkdir -p "$fixture/workspace" "$RUNNER_TEMP/d4-codex-package"
+          if [ '${{ inputs.target }}' = 'macos_workspace_selection' ]; then
+            test ! -e /Users/runner/d4-os-selected-workspace
+            mkdir /Users/runner/d4-os-selected-workspace
+          fi
           curl --fail --location --output "$RUNNER_TEMP/d4-codex-package/package.tgz" https://registry.npmjs.org/@openai/codex/-/codex-0.159.2-darwin-arm64.tgz
           digest="$(openssl dgst -sha512 -binary "$RUNNER_TEMP/d4-codex-package/package.tgz" | openssl base64 -A)"
           test "$digest" = '7SPaPFU0tdqapQ5VEgrF+wb+p9dxfWfLMXMKZMRKoWPn/tLMajlMjYBBnu8o6VtaVH2DHQ6kpnp5TMkv5bqvrg=='
@@ -89,6 +96,11 @@ jobs:
             dart analyze lib/services/broker_client.dart test/broker_client_payload_hash_test.dart 2>&1 | tee ../../evidence/registration-dart-analyze.txt
             flutter test --no-pub test/broker_client_payload_hash_test.dart 2>&1 | tee ../../evidence/registration-transport-test.txt
           fi
+          if [ '${{ inputs.target }}' = 'macos_workspace_selection' ]; then
+            dart analyze lib/services/broker_client.dart lib/screens/agent_center.dart test/broker_client_payload_hash_test.dart test/widget_test.dart 2>&1 | tee ../../evidence/workspace-dart-analyze.txt
+            flutter test --no-pub test/broker_client_payload_hash_test.dart --plain-name 'OS選択はOwner承認集合を増やさず限定native待機を使う' 2>&1 | tee ../../evidence/workspace-timeout-test.txt
+            flutter test --no-pub test/widget_test.dart --plain-name 'macOS作業領域OS選択は取消で入力保持し投影だけを反映する' 2>&1 | tee ../../evidence/workspace-projection-test.txt
+          fi
           flutter build macos --debug --no-pub 2>&1 | tee ../../evidence/macos-build.txt
       - name: 製品bootstrapとBroker終了
         shell: bash
@@ -105,6 +117,9 @@ jobs:
           elif [ '${{ inputs.target }}' = 'macos_agent_registration' ]; then
             target=RunnerUITests/AdapterOwnerUITests/testProductAgentRegistration
             extra=('SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG D4_MACOS_OWNER_UI_TEST')
+          elif [ '${{ inputs.target }}' = 'macos_workspace_selection' ]; then
+            target=RunnerUITests/AdapterOwnerUITests/testProductWorkspaceOSSelection
+            extra=('SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG D4_MACOS_OWNER_UI_TEST')
           fi
           xcodebuild test -project apps/desktop_flutter/macos/Runner.xcodeproj -scheme Runner \
             -destination 'platform=macOS' -parallel-testing-enabled NO \
@@ -118,7 +133,7 @@ jobs:
           set -euo pipefail
           if [ -d "$RUNNER_TEMP/macos-product-tests.xcresult" ]; then
             xcrun xcresulttool get test-results summary --path "$RUNNER_TEMP/macos-product-tests.xcresult" | tee evidence/macos-native-summary.json
-            if [ '${{ inputs.target }}' = 'macos_owner' ] || [ '${{ inputs.target }}' = 'macos_adapter_lifecycle' ] || [ '${{ inputs.target }}' = 'macos_agent_registration' ]; then
+            if [ '${{ inputs.target }}' = 'macos_owner' ] || [ '${{ inputs.target }}' = 'macos_adapter_lifecycle' ] || [ '${{ inputs.target }}' = 'macos_agent_registration' ] || [ '${{ inputs.target }}' = 'macos_workspace_selection' ]; then
               xcrun xcresulttool export attachments --path "$RUNNER_TEMP/macos-product-tests.xcresult" --output-path evidence/macos-ui-attachments
             fi
           fi
@@ -131,7 +146,7 @@ jobs:
           git diff --cached --exit-code -- apps/desktop_flutter
           test -z "$(git status --porcelain --untracked-files=all -- apps/desktop_flutter)"
       - name: 登録検証用RuntimeとWorkspaceを回収
-        if: always() && inputs.target == 'macos_agent_registration'
+        if: always() && (inputs.target == 'macos_agent_registration' || inputs.target == 'macos_workspace_selection')
         shell: bash
         run: |
           set -euo pipefail
@@ -143,6 +158,11 @@ jobs:
           fi
           if [ -f "$fixture/codex" ]; then rm "$fixture/codex"; fi
           if [ -d "$fixture" ]; then rmdir "$fixture"; fi
+          if [ '${{ inputs.target }}' = 'macos_workspace_selection' ] && [ -d /Users/runner/d4-os-selected-workspace ]; then
+            test ! -L /Users/runner/d4-os-selected-workspace
+            test -z "$(find /Users/runner/d4-os-selected-workspace -mindepth 1 -print -quit)"
+            rmdir /Users/runner/d4-os-selected-workspace
+          fi
       - name: 限定証拠を保存
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

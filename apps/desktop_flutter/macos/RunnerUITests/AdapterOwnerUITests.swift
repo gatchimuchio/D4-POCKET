@@ -1,6 +1,75 @@
 import XCTest
 
 final class AdapterOwnerUITests: XCTestCase {
+  func testProductWorkspaceOSSelection() throws {
+    let app = XCUIApplication()
+    let chooser = XCUIApplication(bundleIdentifier: "com.apple.appkit.xpc.openAndSavePanelService")
+    let notice = XCUIApplication(bundleIdentifier: "com.apple.UserNotificationCenter")
+    continueAfterFailure = false
+    app.launch()
+    defer { app.terminate() }
+    let center = element(app, "エージェント")
+    XCTAssertTrue(center.waitForExistence(timeout: 20)); center.click()
+    let start = app.buttons["登録を開始"]
+    XCTAssertTrue(start.waitForExistence(timeout: 10)); reveal(app, start); start.click()
+    XCTAssertTrue(app.textFields.firstMatch.waitForExistence(timeout: 10))
+    let fields = app.textFields.allElementsBoundByAccessibilityElement
+    XCTAssertEqual(fields.count, 6)
+    let cli = "/Users/runner/Library/Containers/com.example.guiShellDesktop/Data/d4-registration-fixture/codex"
+    let outside = "/Users/runner/d4-os-selected-workspace"
+    let values = ["test-model", "macos-os-selected-codex", cli,
+                  "macos-os-selected-workspace", "/previous-input", "private.env"]
+    for (index, value) in values.enumerated() {
+      if index == 0 {
+        reveal(app, fields[0])
+        fields[0].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+      } else {
+        for _ in 0..<(index == 1 ? 3 : 1) { app.typeKey(XCUIKeyboardKey.tab.rawValue, modifierFlags: []) }
+      }
+      app.typeKey("a", modifierFlags: .command)
+      app.typeKey(XCUIKeyboardKey.delete.rawValue, modifierFlags: [])
+      app.typeText(value)
+      XCTAssertEqual(fields[index].value as? String, value)
+    }
+    let select = app.buttons["OSで作業領域を選択"]
+    XCTAssertTrue(select.exists)
+    // 通常keyboard traversalで画面内に移動した製品ボタンを使う。
+    app.typeKey(XCUIKeyboardKey.tab.rawValue, modifierFlags: [])
+    app.typeKey(" ", modifierFlags: [])
+    let cancel = chooser.buttons["Cancel"]
+    if !cancel.waitForExistence(timeout: 15) {
+      let image = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+      image.name = "D4-workspace-chooser-missing"; image.lifetime = .keepAlways; add(image)
+      print("D4_WORKSPACE_CHOOSER_APP \(app.debugDescription)")
+      print("D4_WORKSPACE_CHOOSER_REMOTE \(chooser.debugDescription)")
+      XCTFail("Rust所有OS chooserを観測できない")
+    }
+    cancel.click()
+    app.activate()
+    XCTAssertTrue(element(app, "OS選択を取り消しました。入力は変更していません。").waitForExistence(timeout: 10))
+    XCTAssertEqual(fields[4].value as? String, "/previous-input")
+    select.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+    XCTAssertTrue(chooser.buttons["作業領域を選択"].waitForExistence(timeout: 15))
+    chooser.typeKey("g", modifierFlags: [.command, .shift])
+    XCTAssertTrue(chooser.textFields.firstMatch.waitForExistence(timeout: 10))
+    chooser.typeText(outside)
+    chooser.typeKey(XCUIKeyboardKey.return.rawValue, modifierFlags: [])
+    let choose = chooser.buttons["作業領域を選択"]
+    let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: choose)
+    XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 10), .completed)
+    choose.click(); app.activate()
+    XCTAssertTrue(element(app, "OS選択済み（起動中のみ）。登録・Permission・Approvalは別です。").waitForExistence(timeout: 10))
+    XCTAssertEqual(fields[4].value as? String, outside)
+    XCTAssertFalse(element(app, "Broker内登録: macos-os-selected-codex").exists)
+    let submit = app.buttons["native Owner確認へ進む"]
+    submit.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+    approve(notice)
+    XCTAssertTrue(element(app, "Broker内登録: macos-os-selected-codex").waitForExistence(timeout: 20))
+    print("D4_MACOS_WORKSPACE_OS_SELECTION_PASS")
+    app.typeKey("q", modifierFlags: .command)
+    XCTAssertTrue(app.wait(for: .notRunning, timeout: 10))
+  }
+
   func testProductAgentRegistration() throws {
     let app = XCUIApplication()
     let notice = XCUIApplication(bundleIdentifier: "com.apple.UserNotificationCenter")

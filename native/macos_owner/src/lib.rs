@@ -7,6 +7,81 @@ pub const TITLE: &str = "D4 Pocket — 今回の操作を確認";
 pub const DENY: &str = "承認しない";
 pub const APPROVE: &str = "今回の操作を承認";
 
+/// OSが選択したfolderへの起動中access。D4のPermission／Approvalではない。
+pub struct SelectedWorkspace {
+    path: std::path::PathBuf,
+    #[cfg(target_os = "macos")]
+    url: objc2::rc::Retained<objc2_foundation::NSURL>,
+}
+
+impl AsRef<std::path::Path> for SelectedWorkspace {
+    fn as_ref(&self) -> &std::path::Path {
+        &self.path
+    }
+}
+
+#[cfg(target_os = "macos")]
+impl Drop for SelectedWorkspace {
+    fn drop(&mut self) {
+        // Open panelはOSがscopeを開始する。保持した同じURLで一度だけ終了する。
+        unsafe {
+            self.url.stopAccessingSecurityScopedResource();
+        }
+    }
+}
+
+/// Main threadでOS chooserを開く。bookmark、credential、任意初期pathを受け取らない。
+pub fn select_workspace() -> Result<Option<SelectedWorkspace>, &'static str> {
+    #[cfg(target_os = "macos")]
+    {
+        use objc2::MainThreadMarker;
+        use objc2_app_kit::{NSApplication, NSApplicationActivationPolicy, NSOpenPanel};
+        use objc2_foundation::NSString;
+        let mtm = MainThreadMarker::new().ok_or("OS選択をmain threadで開始できません")?;
+        let app = NSApplication::sharedApplication(mtm);
+        if !app.setActivationPolicy(NSApplicationActivationPolicy::Accessory) {
+            return Err("OS選択の表示を開始できません");
+        }
+        let panel = NSOpenPanel::openPanel(mtm);
+        panel.setTitle(&NSString::from_str("D4 Pocket — 作業領域のOS選択"));
+        panel.setPrompt(&NSString::from_str("作業領域を選択"));
+        panel.setMessage(&NSString::from_str(
+            "この選択はOSの起動中accessだけです。D4の登録・Permission・Approvalは別に必要です。",
+        ));
+        panel.setCanChooseFiles(false);
+        panel.setCanChooseDirectories(true);
+        panel.setAllowsMultipleSelection(false);
+        panel.setResolvesAliases(false);
+        panel.setCanCreateDirectories(false);
+        if panel.runModal() != 1 {
+            return Ok(None);
+        }
+        let url = panel.URL().ok_or("OS選択にURLがありません")?;
+        let mut selected = SelectedWorkspace {
+            path: std::path::PathBuf::new(),
+            url,
+        };
+        selected.path = selected
+            .url
+            .path()
+            .ok_or("OS選択のpathが不正です")?
+            .to_string()
+            .into();
+        let path = selected
+            .path
+            .to_str()
+            .ok_or("OS選択のpathを表示できません")?;
+        if !selected.path.is_absolute() || path.len() > 1024 || path.chars().any(char::is_control) {
+            return Err("OS選択のpath範囲が不正です");
+        }
+        Ok(Some(selected))
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        Err("このplatformのOS選択は未対応です")
+    }
+}
+
 /// 既定ボタン、取消、期限超過、OS失敗は全て非承認。
 pub fn confirm(summary: &str, timeout: Duration) -> bool {
     if summary.is_empty()

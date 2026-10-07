@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/macos_workspace_selection_receipt.schema.json",
+  "title": "macOS作業領域OS選択投影（MacOSWorkspaceSelectionReceipt）",
+  "description": "BrokerのINTERNAL_STATE投影。OSアクセス・Owner承認・Workspace登録・Permission・Approvalを同一視しない。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "selection_status", "workspace_root", "selection_request_hash", "scope_lifetime", "permission_generated", "approval_generated", "registration_generated"],
+  "properties": {
+    "version": {"const": 1},
+    "selection_status": {"enum": ["selected", "cancelled"]},
+    "workspace_root": {"oneOf": [{"type": "null"}, {"type": "string", "pattern": "^/", "maxLength": 1024}]},
+    "selection_request_hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "scope_lifetime": {"const": "broker_process"},
+    "permission_generated": {"const": false},
+    "approval_generated": {"const": false},
+    "registration_generated": {"const": false}
+  },
+  "allOf": [{"if": {"properties": {"selection_status": {"const": "cancelled"}}}, "then": {"properties": {"workspace_root": {"type": "null"}}}, "else": {"properties": {"workspace_root": {"type": "string"}}}}]
+}

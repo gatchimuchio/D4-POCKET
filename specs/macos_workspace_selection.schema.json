@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/macos_workspace_selection.schema.json",
+  "title": "macOS作業領域OS選択要求（MacOSWorkspaceSelection）",
+  "description": "Rust所有OS chooserへの要求。path・bookmark・Permission・ApprovalをUIから受け取らない。OSのアクセスとD4の権限を分離する。",
+  "type": "object",
+  "required": ["version"],
+  "additionalProperties": false,
+  "properties": {"version": {"const": 1}}
+}

@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart'
+    show debugDefaultTargetPlatformOverride, TargetPlatform;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gui_shell_desktop/main.dart';
@@ -34,6 +36,60 @@ const _requiredSurfaceSemanticsLabels = [
 String _testSessionId(String character) => List.filled(32, character).join();
 
 void main() {
+  testWidgets('macOS作業領域OS選択は取消で入力保持し投影だけを反映する', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    Map<String, Object?> projection(String state, String? root,
+            {bool approval = false}) =>
+        {
+          ..._brokerAcceptedBody('作業領域OS選択', {
+            'version': 1,
+            'selection_status': state,
+            'workspace_root': root,
+            'selection_request_hash': brokerPayloadHash({'version': 1}),
+            'scope_lifetime': 'broker_process',
+            'permission_generated': false,
+            'approval_generated': approval,
+            'registration_generated': false,
+          }),
+          'evidence_source': 'INTERNAL_STATE',
+        };
+    final transport = _FakeBrokerTransport([
+      ..._shellCoreProductBootstrapResponses(),
+      projection('cancelled', null),
+      projection('selected', '/public-project'),
+      projection('selected', '/injected-root', approval: true),
+    ]);
+    final client = await ShellCoreClient.product(transport: transport);
+    await tester.pumpWidget(
+        MaterialApp(home: Scaffold(body: AgentCenter(client: client))));
+    await tester.tap(find.text('登録を開始'));
+    await tester.pumpAndSettle();
+    final root = find.byType(TextFormField).at(4);
+    await tester.enterText(root, '/previous-input');
+    final select = find.byKey(const ValueKey('macos-select-workspace'));
+    for (final expected in [
+      '/previous-input',
+      '/public-project',
+      '/public-project'
+    ]) {
+      await tester.ensureVisible(select);
+      await tester.tap(select);
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextFormField>(root).controller!.text, expected);
+    }
+    expect(find.text('OS選択が成立していません。入力を保持し、自動再送しません。'), findsOneWidget);
+    final selections =
+        transport.requests.where((r) => r['operation'] == '作業領域OS選択').toList();
+    expect(selections.length, 3);
+    for (final request in selections) {
+      expect(request['payload'], {'version': 1});
+    }
+    expect(transport.operations, isNot(contains('AgentCLI実行系作業領域登録')));
+    expect(transport.operations,
+        isNot(contains('AgentTaskWorkspacePermissionGrant')));
+    expect(tester.takeException(), isNull);
+  });
   Finder findSurfaceSemanticsIdentifier(String label) {
     final identifier = surfaceSemanticsIdentifier(label);
     return find.byWidgetPredicate(
@@ -3309,13 +3365,18 @@ void main() {
       _brokerAdapterSuspendedResponse(),
     ]);
     final client = await ShellCoreClient.product(transport: transport);
-    expect(client.snapshot.adapterCatalog.any((a) => a.adapterId == 'ui_fixture_adapter'), isFalse);
-    await tester.pumpWidget(MaterialApp(home: Scaffold(body: RuntimeCenter(client: client))));
+    expect(
+        client.snapshot.adapterCatalog
+            .any((a) => a.adapterId == 'ui_fixture_adapter'),
+        isFalse);
+    await tester.pumpWidget(
+        MaterialApp(home: Scaffold(body: RuntimeCenter(client: client))));
     final install = find.byKey(const ValueKey('adapter-manifest-install'));
     await tester.ensureVisible(install);
     await tester.tap(install);
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const ValueKey('adapter-manifest-json-input')),
+    await tester.enterText(
+        find.byKey(const ValueKey('adapter-manifest-json-input')),
         jsonEncode(_adapterManifestFixture()));
     await tester.tap(find.byKey(const ValueKey('adapter-manifest-submit')));
     await tester.pumpAndSettle();
@@ -3326,7 +3387,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(transport.requests.last['operation'], 'アダプター検証');
     expect(transport.requests.last['payload'], {
-      '版': 1, '操作': '検証', 'Adapter ID': 'ui_fixture_adapter', 'Adapter hash': record['hash'],
+      '版': 1,
+      '操作': '検証',
+      'Adapter ID': 'ui_fixture_adapter',
+      'Adapter hash': record['hash'],
     });
     expect(find.textContaining('owner_reapproval_required'), findsOneWidget);
     expect(tester.takeException(), isNull);

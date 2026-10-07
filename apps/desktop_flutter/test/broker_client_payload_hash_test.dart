@@ -47,6 +47,10 @@ void main() {
     expect(brokerRequestTimeoutForOperation('AgentCLI実行系作業領域登録'),
         const Duration(seconds: 320));
   });
+  test('OS選択はOwner承認集合を増やさず限定native待機を使う', () {
+    expect(brokerRequestTimeoutForOperation('作業領域OS選択'),
+        const Duration(seconds: 305));
+  });
 
   test('payload_hash matches the Rust broker null payload vector', () {
     expect(

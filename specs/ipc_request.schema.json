@@ -38,6 +38,7 @@
         "ホスト能力",
         "Agent一覧",
         "AgentCLI実行系作業領域登録",
+        "作業領域OS選択",
         "Agent作業要求検査",
         "AgentTaskWorkspacePermissionGrant",
         "AgentTaskOwnerApprovalGrant",

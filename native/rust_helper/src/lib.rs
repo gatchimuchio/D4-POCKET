@@ -20,6 +20,8 @@ pub mod ipc;
 pub mod macos_desktop_worker;
 #[cfg(any(target_os = "macos", test))]
 mod macos_desktop_owner;
+#[cfg(any(target_os = "macos", test))]
+mod macos_workspace_selection;
 pub mod network;
 pub mod process;
 pub mod update_verification;

@@ -1,5 +1,7 @@
 # GUI Shell ロードマップ
 
+P13 macOS作業領域OS選択をIMPLEMENTING。責任正本は`docs/specs/macos-workspace-selection.md`。OS chooserでsandbox外folderを選ぶ製品入口を既存Rust／Broker経路へ結合し、OSアクセスとD4の登録・Permission・Approvalを分離する。`macos_workspace_selection`手動Actionsで新しい差分だけを検証する。CLOSEDの登録／Adapter／Mobile条件は再開しない。
+
 P13 macOS Agent CLI／Workspace起動中登録はCLOSED（Product Build、2026-10-08）。commit `c2ef88d6f11babdb6846ed332003c50dd6adc2f0`の手動Actions [run 37664507377](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37664507377)で製品UI入力、Rust所有OS拒否／承認、実Codex CLI登録、Task非対応の表示、通常終了とfixture回収がPASS。Rust対象1件・変更Dart解析／7試験・通常Mac buildもPASS。成功commitをmainへ統合・push・remote照合し、検証branchをlocal／remote双方で回収した。有限Acceptanceは`docs/specs/macos-desktop-channel.md`、証拠範囲と過去FAILは`docs/REV5_PRODUCT_PROGRESS.md`。次はP13の未接続製品機能であり、本CLOSED条件を追加証拠目的で再実行しない。Task実行・sandbox外選択・Credential保管・正式配布は既存`release_blocker`へ保持する。
 
 P13 macOS既存Adapter状態管理のOwner接続はCLOSED: commit `7c4219f5202402ad574e81b81e32d6eb02c82cd9`、手動Actions [run 37629357493](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37629357493)で5操作の実OS確認、署名不正／未検証有効化の拒否、無効化・隔離・削除の表示、通常終了がPASS。起動後に取得したrecordのID／hashを要求へ結合する修正もWidget回帰で確認した。Rust対象1件、Dart解析、Flutter対象2件、通常Mac buildがPASS。製品Trust設定・外部artifact作用・Credentials／Agent／Workspace・正式配布は未成立の別gateへ保持し、P13の次の製品差分へ進む。導入・更新、通常接続、MobileのCLOSED条件は再開しない。

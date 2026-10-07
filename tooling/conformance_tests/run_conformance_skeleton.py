@@ -10755,6 +10755,28 @@ def 手動補助の起動境界を検査する() -> list[str]:
     return 不整合
 
 
+def test_macos_workspace_selection_is_native_scoped_and_non_authoritative() -> list[str]:
+    schema = json.loads((SPECS / "macos_workspace_selection.schema.json").read_text(encoding="utf-8"))
+    errors = []
+    if validate_instance({"version": 1}, schema, "workspace-selection"):
+        errors.append("OS選択の正規要求が拒否される")
+    for key in ("workspace_root", "bookmark", "permission", "approval"):
+        if not validate_instance({"version": 1, key: "injected"}, schema, "workspace-selection"):
+            errors.append(f"OS選択要求でUIの権限・pathが受理される: {key}")
+    protocol = (RUST_HELPER / "src/broker/protocol.rs").read_text(encoding="utf-8")
+    worker = (RUST_HELPER / "src/macos_workspace_selection.rs").read_text(encoding="utf-8")
+    for text, tokens in ((protocol, ("MacOSWorkspaceSelection", "macos_os_selection_required", '"registration_generated":false')),
+                         (worker, ("SCOPE_LIMIT: usize = 8", "seen.len() >= 64", '"selection_request_hash"', '"workspace_root"'))):
+        for token in tokens:
+            if token not in text.replace('"registration_generated": false', '"registration_generated":false'):
+                errors.append(f"OS選択の境界接続がない: {token}")
+    for name in ("DebugProfile", "Release"):
+        entitlements = (DESKTOP_FLUTTER / f"macos/Runner/{name}.entitlements").read_text(encoding="utf-8")
+        if "com.apple.security.files.user-selected.read-write" not in entitlements:
+            errors.append("OS chooser用の限定entitlementがない")
+    return errors
+
+
 def test_setup_doctor_public_bind_warning_exists() -> list[str]:
     from installer.setup_doctor import setup_doctor_report
 
@@ -11073,6 +11095,7 @@ def main() -> int:
         test_json_persistence_reports_corrupt_audit_jsonl,
         test_platform_hardening_configuration_exists,
         手動補助の起動境界を検査する,
+        test_macos_workspace_selection_is_native_scoped_and_non_authoritative,
         test_setup_doctor_public_bind_warning_exists,
         test_desktop_setup_doctor_ui_does_not_require_development_toolchains,
         test_broker_parity_startup_timeout_allows_local_cold_build,

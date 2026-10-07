@@ -157,6 +157,10 @@ fn serve(
             )
         })?;
     let mut owned_session = Zeroizing::new(Vec::new());
+    #[cfg(target_os = "macos")]
+    let mut workspace_scopes = Vec::new();
+    #[cfg(target_os = "macos")]
+    let mut workspace_selection_nonces = std::collections::BTreeSet::new();
     let result = (|| {
         ready_rx
             .recv_timeout(Duration::from_secs(15))
@@ -181,14 +185,25 @@ fn serve(
             let Some(frame) = read_frame(input, REQUEST_LIMIT)? else {
                 break;
             };
-            let response = match super::macos_desktop_owner::dispatch(
+            #[cfg(target_os = "macos")]
+            let selection = super::macos_workspace_selection::dispatch(
                 &frame,
                 &endpoint.0,
                 &owner_tx,
-                confirm,
-            )? {
-                Some(response) => response,
-                None => relay(&normalize(&frame, &endpoint.0.session_id), &endpoint.0)?,
+                &mut workspace_scopes,
+                &mut workspace_selection_nonces,
+                &mut gui_shell_macos_owner::select_workspace,
+            )?;
+            #[cfg(not(target_os = "macos"))]
+            let selection: Option<Vec<u8>> = None;
+            let response = if let Some(response) = selection {
+                response
+            } else {
+                match super::macos_desktop_owner::dispatch(&frame, &endpoint.0, &owner_tx, confirm)?
+                {
+                    Some(response) => response,
+                    None => relay(&normalize(&frame, &endpoint.0.session_id), &endpoint.0)?,
+                }
             };
             output.write_all(&response)?;
             output.write_all(b"\n")?;
@@ -198,6 +213,8 @@ fn serve(
     })();
     shutdown.store(true, Ordering::Release);
     let stopped = server.join().map_err(|_| failure())?.map_err(|_| failure());
+    #[cfg(target_os = "macos")]
+    drop(workspace_scopes);
     let cleanup = if !owned_session.is_empty() {
         let current = Zeroizing::new(fs::read(&session)?);
         if *current == *owned_session {

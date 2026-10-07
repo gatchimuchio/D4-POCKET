@@ -17,6 +17,16 @@
 
 ## P13 Mobile / Non-Windows — 現行track
 
+#### macOS 作業領域のOS選択 — IMPLEMENTING（Product Build、2026-10-08）
+
+現在のSchema／正常例／負例は163／159／210 PASS、対象Rust 3件PASS。以下の全体FAILは履歴として保持する。
+
+有限Acceptanceは`docs/specs/macos-workspace-selection.md`。取消時の入力保持、実OS chooserによるsandbox外folder選択／投影、別個のOwner確認後の既存Broker登録、UI path／Authority注入拒否を一単位で施工する。選択はOS user-selected accessであり、D4のPermission／Approval／登録ではない。手動Actionsの`macos_workspace_selection`だけでMacを検証し、CLOSEDの登録／Adapter／Mobile試験は選択しない。sandbox外CLI実行・restart access・Credential・正式配布・Final QAはこの単位へ追加しない。
+
+ローカル検証: Schema 162／正常例158／負例209、Conformance 237 checks PASS。必須`cargo test --locked --manifest-path native/rust_helper/Cargo.toml`は505 passed／4 failed／12 ignoredでFAIL。変更外のA2A loopback読取と3つの既存HTTPS fixtureが応答読取／OS 10054／InvalidContentTypeで失敗した。局所切分けではA2A 1 PASS、update_download群16 PASS／1 FAILで、`failed_replacement_keeps_the_existing_corrupt_package_unchanged`の既存TLS失敗が残る。対象新規試験の成功や全体PASSへ読み替えず、既存Final QAのloopback検査課題へ保持する。変更がMac専用OS選択へ限定され、これらの作用経路を変更していないことを差分で確認した。
+
+Desktop／Mobileの必須`flutter analyze`は両方exit 1。OneDrive上の既存ephemeral `Packages/.packages`をFlutterが削除できず解析を開始できなかった。回避のため製品sandbox／filesystemを変更せず、変更Dartの解析・投影試験・通常Mac buildを手動Mac runnerで実行する。release gateとdiff検査はPASS。strict日本語監査の変更外の指摘は保持し、新規文書の英語link labelだけを日本語へ修正した。正式配布／最終QAは既存`release_blocker`のまま。
+
 #### macOS Agent CLI／Workspace起動中登録 — CLOSED（Product Build、2026-10-08）
 
 有限Acceptanceはcommit `c2ef88d6f11babdb6846ed332003c50dd6adc2f0`の手動Actions [run 37664507377](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37664507377)でPASS。macOS 15.7.9 arm64／Apple Virtual Machine／Xcode 16.4、固定Flutter 3.44.0／Rust 1.95.0。製品Agent Centerで6欄を入力・照合し、Rust所有OS確認の拒否時は登録されず、承認後は既存Brokerが実Codex CLI 0.159.2の固定probeとAPFS Workspace検査を行い、登録recordと`Task実行能力: unsupported`を表示した。製品XCUITest 1 passed／0 failed／0 skipped、44.570秒。Command-Q終了、helper残留なし、runner source clean、専用CLI／空Workspace回収もPASS。

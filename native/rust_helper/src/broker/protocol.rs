@@ -505,6 +505,8 @@ pub enum BrokerOperation {
     AgentTask取消,
     #[serde(rename = "AgentCLI実行系作業領域登録")]
     AgentCLI実行系作業領域登録,
+    #[serde(rename = "作業領域OS選択")]
+    作業領域OS選択,
     #[serde(rename = "評価Dataset登録")]
     評価Dataset登録,
     #[serde(rename = "回帰Case登録")]
@@ -717,6 +719,7 @@ impl BrokerOperation {
             BrokerOperation::AgentTask状態 => "AgentTask状態",
             BrokerOperation::AgentTask取消 => "AgentTask取消",
             BrokerOperation::AgentCLI実行系作業領域登録 => "AgentCLI実行系作業領域登録",
+            BrokerOperation::作業領域OS選択 => "作業領域OS選択",
             BrokerOperation::評価Dataset登録 => "評価Dataset登録",
             BrokerOperation::回帰Case登録 => "回帰Case登録",
             BrokerOperation::回帰Case一覧 => "回帰Case一覧",
@@ -826,6 +829,8 @@ pub(crate) enum OwnerConfirmationSource {
     NotOwner,
     OwnerCredential,
     DesktopNativeConfirmation,
+    // private receiver由来のOS選択投影だけ。Owner／Task許可へ使用しない。
+    MacOSWorkspaceSelection,
     #[cfg(feature = "r2-e2e")]
     R2E2ESyntheticOwner,
 }
@@ -845,7 +850,7 @@ impl OwnerConfirmationSource {
                         | BrokerOperation::AgentTaskOwnerApprovalGrant
                 )
             ),
-            Self::NotOwner | Self::OwnerCredential => false,
+            Self::NotOwner | Self::OwnerCredential | Self::MacOSWorkspaceSelection => false,
         }
     }
 
@@ -1928,6 +1933,7 @@ impl Broker {
                     | BrokerOperation::アダプター削除
                     | BrokerOperation::アダプター更新
                     | BrokerOperation::AgentCLI実行系作業領域登録
+                    | BrokerOperation::作業領域OS選択
                     | BrokerOperation::AgentTaskWorkspacePermissionGrant
                     | BrokerOperation::AgentTaskOwnerApprovalGrant
                     | BrokerOperation::AgentTask結果表示承認
@@ -1957,10 +1963,12 @@ impl Broker {
                 payload_hash,
             );
         }
+        let workspace_selection = envelope.operation == Some(BrokerOperation::作業領域OS選択);
         self.処理_with_export_and_activation_confirmation(
             envelope,
-            true,
-            OwnerConfirmationSource::DesktopNativeConfirmation,
+            !workspace_selection,
+            if workspace_selection { OwnerConfirmationSource::MacOSWorkspaceSelection }
+                else { OwnerConfirmationSource::DesktopNativeConfirmation },
             download_confirmation,
             apply_confirmation,
             activation_confirmation,
@@ -2081,6 +2089,15 @@ impl Broker {
                     envelope.payload_hash.as_deref().unwrap_or("unknown"),
                 );
             }
+        }
+
+        if envelope.operation == Some(BrokerOperation::作業領域OS選択)
+            && (!cfg!(any(target_os="macos", test)) || !self.desktop_package_layout_verified
+                || export_confirmation != OwnerConfirmationSource::MacOSWorkspaceSelection)
+        {
+            return self.reject_with_payload_hash(&request_id, &operation,
+                "macos_os_selection_required", "OS選択投影は同梱macOS Rust helperの限定経路だけで取得できます",
+                true, envelope.payload_hash.as_deref().unwrap_or("unknown"));
         }
 
         if envelope.operation == Some(BrokerOperation::AgentCLI実行系作業領域登録)
@@ -2216,6 +2233,29 @@ impl Broker {
         }
 
         match envelope.operation.unwrap() {
+            BrokerOperation::作業領域OS選択 => {
+                #[derive(Deserialize)]
+                #[serde(deny_unknown_fields)]
+                struct Selection { version:u8, selection_status:String,
+                    workspace_root:Option<String>, selection_request_hash:String }
+                let selection = envelope.payload.as_ref().filter(|v|
+                    v.as_object().is_some_and(|v| v.len() == 4 && v.contains_key("workspace_root"))).and_then(|v|
+                    serde_json::from_value::<Selection>(v.clone()).ok());
+                let Some(selection) = selection.filter(|s| s.version == 1
+                    && is_tagged_sha256(&s.selection_request_hash)
+                    && ((s.selection_status == "cancelled" && s.workspace_root.is_none())
+                        || (s.selection_status == "selected" && s.workspace_root.as_deref().is_some_and(|p|
+                            p.starts_with('/') && p.len() <= 1024 && !p.chars().any(char::is_control)))))
+                else { return self.reject_with_payload_hash(&request_id, &operation,
+                    "macos_os_selection_failed", "OS選択または選択結果の検査に失敗しました。登録・再送は行いません",
+                    true, &payload_hash); };
+                self.accept_body_with_evidence(&request_id, BrokerOperation::作業領域OS選択,
+                    serde_json::json!({"version":1,"selection_status":selection.selection_status,
+                        "workspace_root":selection.workspace_root,"selection_request_hash":selection.selection_request_hash,
+                        "scope_lifetime":"broker_process", "permission_generated":false,
+                        "approval_generated":false,"registration_generated":false}),
+                    EVIDENCE_SOURCE_INTERNAL_STATE, &payload_hash)
+            }
             BrokerOperation::AgentCLI実行系作業領域登録 => self
                 .agent_cli_runtime_workspace_registration(
                     &request_id,

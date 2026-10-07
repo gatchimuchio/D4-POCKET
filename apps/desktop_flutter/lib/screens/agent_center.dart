@@ -1,13 +1,15 @@
 import 'dart:async';
-import 'dart:convert' show jsonEncode;
+import 'dart:convert' show jsonEncode, utf8;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
 
 import '../models/generated_contracts.dart';
 import '../services/agent_task_client.dart';
 import '../services/agent_handoff.dart';
 import '../services/broker_client.dart'
-    show BrokerClientException, BrokerTransport;
+    show BrokerClientException, BrokerTransport, brokerPayloadHash;
 import '../services/mcp_connection_client.dart'
     show McpConnectionClient, McpCredentialSummary;
 import '../services/runtime_dialogue_client.dart' show RuntimeDialogueClient;
@@ -2005,6 +2007,72 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
   String _authenticationSource = 'codex_cli_managed';
   String? _credentialId;
   Future<List<McpCredentialSummary>>? _providerCredentials;
+  bool _workspaceSelectionPending = false;
+  String? _workspaceSelectionMessage;
+
+  Future<void> _selectWorkspace() async {
+    final transport = widget.transport;
+    if (transport == null || _workspaceSelectionPending) return;
+    setState(() {
+      _workspaceSelectionPending = true;
+      _workspaceSelectionMessage = null;
+    });
+    try {
+      final response =
+          await transport.request('作業領域OS選択', payload: {'version': 1});
+      if (!mounted) return;
+      final body = response['body'];
+      const keys = {
+        'version',
+        'selection_status',
+        'workspace_root',
+        'selection_request_hash',
+        'scope_lifetime',
+        'permission_generated',
+        'approval_generated',
+        'registration_generated'
+      };
+      if (response['operation'] != '作業領域OS選択' ||
+          response['status'] != 'accepted' ||
+          response['evidence_source'] != 'INTERNAL_STATE' ||
+          response['audit_event_id'] is! String ||
+          (response['audit_event_id'] as String).isEmpty ||
+          body is! Map ||
+          body.length != keys.length ||
+          body.keys.any((k) => !keys.contains(k)) ||
+          body['version'] != 1 ||
+          body['scope_lifetime'] != 'broker_process' ||
+          body['permission_generated'] != false ||
+          body['approval_generated'] != false ||
+          body['registration_generated'] != false ||
+          body['selection_request_hash'] != brokerPayloadHash({'version': 1})) {
+        throw const BrokerClientException('OS選択応答を検査できません');
+      }
+      final root = body['workspace_root'];
+      if (body['selection_status'] == 'cancelled' && root == null) {
+        setState(
+            () => _workspaceSelectionMessage = 'OS選択を取り消しました。入力は変更していません。');
+      } else if (body['selection_status'] == 'selected' &&
+          root is String &&
+          root.startsWith('/') &&
+          utf8.encode(root).length <= 1024 &&
+          !root.codeUnits.any((c) => c < 32 || (c >= 127 && c <= 159))) {
+        setState(() {
+          _workspaceRoot.text = root;
+          _workspaceSelectionMessage =
+              'OS選択済み（起動中のみ）。登録・Permission・Approvalは別です。';
+        });
+      } else {
+        throw const BrokerClientException('OS選択結果が不正です');
+      }
+    } catch (_) {
+      if (mounted)
+        setState(() =>
+            _workspaceSelectionMessage = 'OS選択が成立していません。入力を保持し、自動再送しません。');
+    } finally {
+      if (mounted) setState(() => _workspaceSelectionPending = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -2143,6 +2211,17 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
                       hintText: '.env\nsecrets',
                     ),
                   ),
+                  if (defaultTargetPlatform == TargetPlatform.macOS)
+                    OutlinedButton.icon(
+                      key: const ValueKey('macos-select-workspace'),
+                      onPressed:
+                          _workspaceSelectionPending ? null : _selectWorkspace,
+                      icon: const Icon(Icons.folder_open),
+                      label: Text(
+                          _workspaceSelectionPending ? 'OS選択中' : 'OSで作業領域を選択'),
+                    ),
+                  if (_workspaceSelectionMessage != null)
+                    Text(_workspaceSelectionMessage!),
                 ],
               ),
             ),
@@ -2154,8 +2233,9 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
             child: const Text('キャンセル'),
           ),
           FilledButton(
-            onPressed: _authenticationSource == 'broker_credential_vault' &&
-                    _providerCredentials == null
+            onPressed: _workspaceSelectionPending ||
+                    (_authenticationSource == 'broker_credential_vault' &&
+                        _providerCredentials == null)
                 ? null
                 : () {
                     if (!_formKey.currentState!.validate()) return;
