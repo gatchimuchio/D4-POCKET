@@ -42,6 +42,12 @@ commit `599359be236962498f93842ec66145339290380f`の手動Actions [run 375845115
 
 ## リリース阻害項目
 
+### iOS製品UI接続の開発用試験
+
+上記iOS commandへ`--ios-product-ui`を付けると、RunnerTests内の製品接続testだけを選択する。対象は`D4PocketNativeProduct-`で始まる新規専用Simulatorに限定し、通常端末の資格を操作しない。Flutterの公開semantics／iOS accessibility actionで画面を操作し、招待だけをnative XCTestから既存secure fieldへ入力する。製品serviceやforeground状態の直接書換えはしない。hostはSafari起動と製品復帰によって実際のOS lifecycleを発生させる。試験用の資格・招待・Keychain項目を回収し、Simulatorの停止・削除は呼出側が行う。
+
+手動Actionsの`target=ios_product_ui`がこの専用Simulatorを作成・回収する。既存の`ios_mobile`は部品試験として保持するが、CLOSEDした部品の証拠強化のためには実行しない。製品試験の失敗時もUI tree・入力・例外本文を記録せず、固定stageだけを出す。
+
 - item: iOS端末連携のnative実行時統合
   classification: release_blocker
   reason: Simulator上のSwift TLS／Keychainと実Broker接続は成立したが、製品UI・native確認dialog・OS lifecycle・物理端末の統合証拠ではない。

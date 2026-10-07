@@ -1,5 +1,7 @@
 # GUI Shell ロードマップ
 
+P13 iOS製品接続: 新規専用SimulatorでFlutter画面→native招待／確認→既存service→実Brokerを通し、Runtime表示・OS background復帰・画面からの離脱までを一度確認する。`apple-manual-build.yml`の手動`ios_product_ui`範囲だけを使い、CLOSEDの部品接続・Android経路を繰り返さない。秘密はnative XCTest内のsecure fieldへ限定し、製品へ試験専用bridgeを追加しない。
+
 P13 iOS native部品の実Broker接続はCLOSED: `apple-manual-build.yml`の`ios_mobile`手動Actions [run 37584511577](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37584511577)、commit `599359be236962498f93842ec66145339290380f`でSwift TLS／Keychainの結合・再読・Runtime取得・離脱・失効済み資格拒否・誤pin拒否がPASS。日本語Broker error codeを誤拒否する不具合を局所修正し、native XCTest 10件／Flutter test 21件／Mobile解析／Simulator buildが成功した。招待秘密はnative専用loopback受渡し内に閉じる。次はiOS製品UI・native service・基本lifecycleの接続。物理端末やrelease readinessは主張しない。詳細と過去FAILは`docs/REV5_PRODUCT_PROGRESS.md`。
 
 P13 Android native基本経路はCLOSED: `android-manual-emulator.yml`の手動Actions [run 37580429609](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37580429609)、commit `0ca5dfa84dc1ca68ca8f01bae8ca456e1a9a12ba`で製品UI→native Device Link→実Rust Brokerの結合・Keystore・Runtime表示・HOME復帰・切断と誤pin拒否がPASS。Windows host側の終端欠落の根因を断定せず、Android実機凍結・release gateを維持する。追加証拠目的で再試験しない。現行結果と履歴は`docs/REV5_PRODUCT_PROGRESS.md`。

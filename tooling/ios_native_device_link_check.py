@@ -9,12 +9,13 @@ import socket
 import subprocess
 import sys
 import threading
+import time
 import uuid
 
 from tooling.minidora_live_check import ROOT, 成功
 
 
-def 検証(owner, binary, root, simulator, derived_data, result_bundle):
+def 検証(owner, binary, root, simulator, derived_data, result_bundle, product_ui=False):
     if sys.platform != "darwin" or not re.fullmatch(r"[A-Fa-f0-9-]{36}", simulator or ""):
         raise RuntimeError("iOS native試験は明示指定したmacOS Simulator専用")
     devices = json.loads(subprocess.check_output(
@@ -23,6 +24,8 @@ def 検証(owner, binary, root, simulator, derived_data, result_bundle):
                for device in entries if device.get("udid") == simulator and device.get("isAvailable")]
     if len(matches) != 1:
         raise RuntimeError("指定したiOS Simulatorが利用不能")
+    if product_ui and not matches[0].get("name", "").startswith("D4PocketNativeProduct-"):
+        raise RuntimeError("製品UI試験は新規作成した専用Simulatorだけを対象とする")
 
     listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     listener.bind(("127.0.0.1", 0))
@@ -68,6 +71,35 @@ def 検証(owner, binary, root, simulator, derived_data, result_bundle):
                     raise RuntimeError("owner_output_boundary")
                 issued["secret"] = secret
                 connection.sendall(json.dumps(invitation, ensure_ascii=False, separators=(",", ":")).encode("utf-8") + b"\n")
+            if product_ui:
+                # 次の接続は固定の非秘密制御語だけ。OSから実際にbackground／復帰させる。
+                while not stop.is_set():
+                    try:
+                        control, _ = listener.accept()
+                        break
+                    except socket.timeout:
+                        continue
+                else:
+                    return
+                with control:
+                    control.settimeout(10)
+                    request = bytearray()
+                    while len(request) < 32 and not request.endswith(b"\n"):
+                        data = control.recv(32 - len(request))
+                        if not data:
+                            break
+                        request.extend(data)
+                    if request != b"background\n":
+                        raise RuntimeError("lifecycle_request")
+                    control.sendall(b"ok\n")
+                time.sleep(0.5)
+                for app_id in ("com.apple.mobilesafari", "com.example.guiShellMobile"):
+                    launched = subprocess.run(["xcrun", "simctl", "launch", simulator, app_id],
+                                              capture_output=True, timeout=20)
+                    if launched.returncode:
+                        raise RuntimeError("lifecycle_launch")
+                    time.sleep(2)
+                issued["lifecycle"] = True
         except Exception as error:
             if not stop.is_set():
                 bridge_errors.append(type(error).__name__)
@@ -78,12 +110,16 @@ def 検証(owner, binary, root, simulator, derived_data, result_bundle):
     try:
         bridge.start()
         # AppleのTEST_RUNNER_転送に非秘密portだけを渡す。招待・端末資格はnative socket内に限定する。
-        env = dict(os.environ, TEST_RUNNER_D4_IOS_NATIVE_BRIDGE_PORT=str(listener.getsockname()[1]))
+        env = dict(os.environ)
+        port_key = "TEST_RUNNER_D4_IOS_PRODUCT_BRIDGE_PORT" if product_ui else "TEST_RUNNER_D4_IOS_NATIVE_BRIDGE_PORT"
+        env[port_key] = str(listener.getsockname()[1])
         command = ["xcodebuild", "test", "-project", str(ROOT / "apps/mobile_flutter/ios/Runner.xcodeproj"),
                    "-scheme", "Runner", "-destination", f"platform=iOS Simulator,id={simulator}",
                    "-parallel-testing-enabled", "NO", "-derivedDataPath", str(derived_data),
                    "-resultBundlePath", str(result_bundle), "CODE_SIGNING_ALLOWED=YES",
                    "CODE_SIGNING_REQUIRED=YES", "CODE_SIGN_IDENTITY=-", "CODE_SIGN_STYLE=Manual"]
+        if product_ui:
+            command.append("-only-testing:RunnerTests/NativeDeviceLinkProductTests")
         process = subprocess.Popen(command, env=env, cwd=ROOT, stdout=subprocess.PIPE,
                                    stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace",
                                    start_new_session=True)
@@ -101,8 +137,9 @@ def 検証(owner, binary, root, simulator, derived_data, result_bundle):
         secret = issued.get("secret")
         if secret and secret in output:
             raise RuntimeError("invitation_output_boundary")
-        if process.returncode or "D4_IOS_NATIVE_LIVE_PASS" not in output or "** TEST SUCCEEDED **" not in output:
-            match = re.search(r"D4_IOS_NATIVE_LIVE_FAIL ([a-z_]+)", output)
+        marker = "D4_IOS_PRODUCT" if product_ui else "D4_IOS_NATIVE_LIVE"
+        if process.returncode or marker + "_PASS" not in output or "** TEST SUCCEEDED **" not in output:
+            match = re.search(marker + r"_FAIL ([a-z_]+)", output)
             if match:
                 stage = match.group(1)
             elif not issued:
@@ -112,6 +149,8 @@ def 検証(owner, binary, root, simulator, derived_data, result_bundle):
             raise RuntimeError("native_test_failed")
         if bridge_errors or not secret or bridge.is_alive():
             raise RuntimeError("invitation_bridge_failed")
+        if product_ui and not issued.get("lifecycle"):
+            raise RuntimeError("lifecycle_not_observed")
         stage = "owner_revocation"
         state = 成功(owner, "端末一覧", {})
         for key in ("招待", "結合"):
@@ -148,6 +187,14 @@ def 検証(owner, binary, root, simulator, derived_data, result_bundle):
             failure = ("bridge_cleanup", "RuntimeError")
     if failure:
         raise RuntimeError(f"iOS native端末連携の失敗: 段階={failure[0]}、分類={failure[1]}")
+    if product_ui:
+        return {"result": "PASS", "evidence_source": "LIVE_RUNTIME",
+                "target": "iOS Simulator製品UIのaccessibility操作",
+                "product_pair_native_confirmation": "PASS", "runtime_projection": "PASS",
+                "os_background_resume": "PASS", "product_disconnect": "PASS",
+                "owner_revocation": "PASS",
+                "secret_scan": "招待秘密はXCTest出力・Broker log・durable Auditに不存在",
+                "scope": "新規専用Simulatorの基本製品経路。物理端末・全lifecycle timing・正式配布は未検証。"}
     return {"result": "PASS", "evidence_source": "LIVE_RUNTIME", "target": "iOS Simulator native XCTest",
             "native_tls_pair": "PASS", "keychain_store_readback_delete": "PASS",
             "wrong_certificate_pin_rejected": "PASS", "existing_broker_runtime_query": "PASS",

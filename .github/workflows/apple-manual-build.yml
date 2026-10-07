@@ -9,6 +9,7 @@ name: Apple platform 手動補助build
         options:
           - all
           - ios_mobile
+          - ios_product_ui
         default: all
         required: true
 
@@ -91,7 +92,7 @@ jobs:
           if-no-files-found: error
 
   ios-mobile-validation:
-    if: ${{ inputs.target == 'all' || inputs.target == 'ios_mobile' }}
+    if: ${{ inputs.target == 'all' || inputs.target == 'ios_mobile' || inputs.target == 'ios_product_ui' }}
     runs-on: macos-15
     timeout-minutes: 35
     steps:
@@ -135,7 +136,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          simulator_id="$(xcrun simctl list devices available | sed -nE 's/.*iPhone[^()]*\(([A-Fa-f0-9-]{36})\).*/\1/p' | head -n 1)"
+          if [ '${{ inputs.target }}' = 'ios_product_ui' ]; then
+            simulator_id="$(xcrun simctl create 'D4PocketNativeProduct-${{ github.run_id }}' com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro com.apple.CoreSimulator.SimRuntime.iOS-18-5)"
+          else
+            simulator_id="$(xcrun simctl list devices available | sed -nE 's/.*iPhone[^()]*\(([A-Fa-f0-9-]{36})\).*/\1/p' | head -n 1)"
+          fi
           test -n "$simulator_id"
           printf '%s\n' "$simulator_id" | tee evidence/ios-simulator-selected.txt
 
@@ -154,11 +159,16 @@ jobs:
         run: |
           set -euo pipefail
           simulator_id="$(<evidence/ios-simulator-selected.txt)"
+          product_args=()
+          if [ '${{ inputs.target }}' = 'ios_product_ui' ]; then
+            product_args+=(--ios-product-ui)
+          fi
           python3 tooling/minidora_live_check.py \
             --reference "$RUNNER_TEMP/minidora-reference" \
             --ios-simulator "$simulator_id" \
             --ios-derived-data "$RUNNER_TEMP/gui-shell-ios-native-tests" \
             --ios-result-bundle "$RUNNER_TEMP/gui-shell-ios-native-tests.xcresult" \
+            "${product_args[@]}" \
             2>&1 | tee evidence/ios-native-test.txt
 
       - name: XCTest結果要約
@@ -183,6 +193,9 @@ jobs:
           if [ -s evidence/ios-simulator-selected.txt ]; then
             simulator_id="$(<evidence/ios-simulator-selected.txt)"
             xcrun simctl shutdown "$simulator_id" || true
+            if [ '${{ inputs.target }}' = 'ios_product_ui' ]; then
+              xcrun simctl delete "$simulator_id"
+            fi
           fi
 
       - name: 追跡sourceの不変を確認

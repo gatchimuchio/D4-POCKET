@@ -72,7 +72,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "16e11a94616ac628529e72657e169b07f5578d75cd090bfde8f8fa151916b430"
+      "sha256": "993638dd471244d740f2d6b2a8d316ce74d5608653a9e6f05a5fce75b81ba194"
     },
     {
       "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "291497a4c79db2be6299f17f37791bbbe12a4ff3c9198b1ca5b2c83c3c8e8f11"
+      "sha256": "498889eef83e13e45ba0098b022df8204ad694829c41f219a91bd973f743131e"
     },
     {
       "path": "SECURITY.md",
@@ -784,7 +784,7 @@
     },
     {
       "path": "apps/mobile_flutter/README.md",
-      "sha256": "76a165c7fd8d0e7c99c96342dd555b983cc395de3caaf9cb9a8df9acf3b8ff7a"
+      "sha256": "701c32e260569900772d3607350a3a059425560977639ecb4e781ad50d6fd382"
     },
     {
       "path": "apps/mobile_flutter/android/.gitignore",
@@ -1084,7 +1084,7 @@
     },
     {
       "path": "apps/mobile_flutter/ios/RunnerTests/RunnerTests.swift",
-      "sha256": "9fd9ba828505f28c4a0df56f021a7c63d5ec0bacebb6a1c55b90cb7be2c1de94"
+      "sha256": "15d98d252c75b93ab8df6d3f40c436496f5625b7fd449479d64b7e31250a2c3d"
     },
     {
       "path": "apps/mobile_flutter/lib/main.dart",
@@ -1252,7 +1252,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "8ed5e04786e332fd5aba825f21515ff9a1364e42bfea9966c323704286866081"
+      "sha256": "d332fc9b08df0cc9f2b9ca35f4fb7163523d1b9d840e873c8d9cc3ac9410c4cf"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -4716,7 +4716,7 @@
     },
     {
       "path": "tooling/ios_native_device_link_check.py",
-      "sha256": "c6f0bbaf1439f3b2d06d1f951a91ecc9fc472bb864b221c6b5deb1d3935feef5"
+      "sha256": "b68c58ce6fa33d1a9de4fa4652059c16fb52b541681dab73059a02b745fcfb5d"
     },
     {
       "path": "tooling/long_run_validation.py",
@@ -4732,7 +4732,7 @@
     },
     {
       "path": "tooling/minidora_live_check.py",
-      "sha256": "b8561029ffb36abcc91dbfa45976152f160de9d286a16a4669ee61c45680d6de"
+      "sha256": "7daa9b71dc12bea520f68d7a63e239fd45b29f8a7eab2d90b8093296b4ae24e1"
     },
     {
       "path": "tooling/package_windows_portable.py",

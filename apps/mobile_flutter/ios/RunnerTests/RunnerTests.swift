@@ -314,6 +314,184 @@ class NativeDeviceLinkLiveTests: XCTestCase {
   }
 }
 
+// 製品画面を公開accessibility actionから操作する。serviceのprivate状態・承認を迂回しない。
+@MainActor
+class NativeDeviceLinkProductTests: XCTestCase {
+  func testProductPairRuntimeResumeAndDisconnect() throws {
+#if targetEnvironment(simulator)
+    guard let rawPort = ProcessInfo.processInfo.environment["D4_IOS_PRODUCT_BRIDGE_PORT"],
+          let port = UInt16(rawPort), port > 0 else {
+      throw XCTSkip("新規専用Simulatorの製品接続harnessからだけ実行する")
+    }
+    var stage = "initial_screen"
+    let store = DeviceLinkNativeStore()
+    var observedBackground = false
+    var observedResume = false
+    let center = NotificationCenter.default
+    let background = center.addObserver(forName: UIApplication.willResignActiveNotification,
+                                        object: nil, queue: .main) { _ in observedBackground = true }
+    let resume = center.addObserver(forName: UIApplication.didBecomeActiveNotification,
+                                    object: nil, queue: .main) { _ in
+      if observedBackground { observedResume = true }
+    }
+    defer {
+      center.removeObserver(background)
+      center.removeObserver(resume)
+      // harnessは新規専用Simulatorだけを許可する。通常端末の保管へ到達しない。
+      do { try store.removeForTest() }
+      catch { XCTFail("D4_IOS_PRODUCT_FAIL keychain_cleanup") }
+    }
+    do {
+      try waitUntil { self.rootController() is FlutterViewController }
+      (rootController() as? FlutterViewController)?.engine?.ensureSemanticsEnabled()
+      try waitUntil { self.hasLabel("D4 Pocket・概要") }
+      try require(try store.loadOrCreate().credential == nil)
+      try navigate("接続先")
+      stage = "open_native_dialog"
+      try activate("native画面で招待を入力して端末結合")
+      try waitUntil { self.alert()?.title == "端末を結合" }
+      guard let dialog = alert(), let field = dialog.textFields?.first,
+            field.isSecureTextEntry, let message = dialog.message,
+            let range = message.range(of: "[a-f0-9]{32}", options: .regularExpression) else {
+        throw DeviceLinkTransportError.failed
+      }
+      let deviceID = String(message[range])
+      stage = "native_invitation"
+      var invitationJSON = try bridge(port: port, request: deviceID)
+      let invitation = try DeviceLinkCredential.invitation(invitationJSON, expectedDeviceID: deviceID)
+      field.text = invitationJSON
+      invitationJSON.removeAll(keepingCapacity: false)
+      try activate("招待を確認")
+      stage = "host_confirmation"
+      try waitUntil { self.alert()?.title == "接続先を照合" }
+      let details = alert()?.message ?? ""
+      try require(details.contains(invitation.hostID) && details.contains(invitation.certificateHash))
+      try activate("一致を確認して結合")
+      stage = "pair_complete"
+      try waitUntil { self.hasLabel("Desktop端末資格を確認し、ThisDeviceOnly Keychainへ保存を再読しました。") }
+      try require(try store.loadOrCreate().credential != nil)
+      stage = "runtime_projection"
+      try navigate("実行系")
+      try waitUntil { self.hasLabel("left") && self.hasLabel("right") }
+      stage = "os_background_resume"
+      try require(try bridge(port: port, request: "background") == "ok")
+      try waitUntil(timeout: 35) { observedBackground && observedResume && UIApplication.shared.applicationState == .active }
+      try waitUntil { self.hasLabel("left") && self.hasLabel("right") }
+      stage = "product_disconnect"
+      try navigate("設定")
+      try activate("Desktopの結合を解除して端末資格を削除")
+      try waitUntil { self.hasLabel("Desktop側の結合解除と端末内資格の削除を確認しました。送信済み処理の停止は保証しません。") }
+      try require(try store.loadOrCreate().credential == nil)
+      print("D4_IOS_PRODUCT_PASS")
+    } catch {
+      // UI tree・field・例外本文を出さず、非秘密の固定段階だけを記録する。
+      XCTFail("D4_IOS_PRODUCT_FAIL \(stage)")
+    }
+#else
+    throw XCTSkip("物理端末はこのharnessの対象外")
+#endif
+  }
+
+  private func require(_ condition: Bool) throws {
+    if !condition { throw DeviceLinkTransportError.failed }
+  }
+
+  private func waitUntil(timeout: TimeInterval = 20, _ condition: () -> Bool) throws {
+    let deadline = Date().addingTimeInterval(timeout)
+    while !condition() {
+      guard Date() < deadline else { throw DeviceLinkTransportError.failed }
+      RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+    }
+  }
+
+  private func rootController() -> UIViewController? {
+    UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+      .flatMap(\.windows).first(where: \.isKeyWindow)?.rootViewController
+  }
+
+  private func alert() -> UIAlertController? {
+    var controller = rootController()
+    while let presented = controller?.presentedViewController { controller = presented }
+    return controller as? UIAlertController
+  }
+
+  private func objects() -> [NSObject] {
+    var pending: [NSObject] = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+      .flatMap(\.windows)
+    var seen = Set<ObjectIdentifier>()
+    var result = [NSObject]()
+    while let object = pending.popLast(), result.count < 4096 {
+      guard seen.insert(ObjectIdentifier(object)).inserted else { continue }
+      result.append(object)
+      if let view = object as? UIView { pending.append(contentsOf: view.subviews) }
+      if let elements = object.accessibilityElements { pending.append(contentsOf: elements.compactMap { $0 as? NSObject }) }
+      let count = object.accessibilityElementCount()
+      if count > 0 && count <= 512 {
+        for index in 0..<count {
+          if let child = object.accessibilityElement(at: index) as? NSObject { pending.append(child) }
+        }
+      }
+    }
+    return result
+  }
+
+  private func labelMatches(_ object: NSObject, _ label: String) -> Bool {
+    (object.accessibilityLabel ?? "").components(separatedBy: "\n").contains(label)
+  }
+
+  private func hasLabel(_ label: String) -> Bool {
+    objects().contains { labelMatches($0, label) }
+  }
+
+  private func activate(_ label: String) throws {
+    var target: NSObject?
+    try waitUntil {
+      target = self.objects().first { self.labelMatches($0, label) && $0.accessibilityTraits.contains(.button) }
+      return target != nil
+    }
+    try require(target?.accessibilityActivate() == true)
+    RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+  }
+
+  private func navigate(_ destination: String) throws {
+    try activate("Open navigation menu")
+    try activate(destination)
+    try waitUntil { self.hasLabel("D4 Pocket・\(destination)") }
+  }
+
+  private func bridge(port: UInt16, request: String) throws -> String {
+    guard let endpoint = NWEndpoint.Port(rawValue: port) else { throw DeviceLinkTransportError.failed }
+    let connection = NWConnection(host: "127.0.0.1", port: endpoint, using: .tcp)
+    let result = NativeInvitationResult()
+    var buffer = Data()
+    func receive() {
+      connection.receive(minimumIncompleteLength: 1, maximumLength: 8192) { data, _, complete, error in
+        guard error == nil else { result.finish(nil); return }
+        if let data { buffer.append(data) }
+        guard buffer.count <= 8193 else { result.finish(nil); return }
+        if let newline = buffer.firstIndex(of: 0x0A) {
+          guard buffer.index(after: newline) == buffer.endIndex else { result.finish(nil); return }
+          result.finish(String(data: buffer[..<newline], encoding: .utf8))
+        } else if complete { result.finish(nil) }
+        else { receive() }
+      }
+    }
+    connection.stateUpdateHandler = { state in
+      switch state {
+      case .ready:
+        connection.send(content: Data((request + "\n").utf8), completion: .contentProcessed { error in
+          if error == nil { receive() } else { result.finish(nil) }
+        })
+      case .failed, .cancelled: result.finish(nil)
+      default: break
+      }
+    }
+    connection.start(queue: DispatchQueue(label: "org.gatchimuchio.gui-shell.test.product"))
+    defer { connection.forceCancel() }
+    return try result.wait()
+  }
+}
+
 private final class NativeInvitationResult {
   private let lock = NSLock()
   private let semaphore = DispatchSemaphore(value: 0)

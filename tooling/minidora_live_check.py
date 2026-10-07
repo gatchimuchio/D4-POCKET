@@ -221,7 +221,7 @@ def 小数資源観測正本化相互運用(endpoint):
 
 
 def 検証(reference, binary, dart_client=False, mobile_client=False, android_native=False, android_serial="emulator-5554",
-         ios_simulator=None, ios_derived_data=None, ios_result_bundle=None):
+         ios_simulator=None, ios_derived_data=None, ios_result_bundle=None, ios_product_ui=False):
     head = subprocess.check_output(["git", "-C", str(reference), "rev-parse", "HEAD"], text=True).strip()
     if head != REFERENCE:
         raise RuntimeError("MINIDORA参照commitが固定点と異なる")
@@ -298,7 +298,7 @@ server.serve_forever()
                     from tooling.ios_native_device_link_check import 検証 as iOSNative検証
                     return {"result": "PASS", "evidence_source": "LIVE_RUNTIME", "reference_commit": head,
                             "ios_native_device_link": iOSNative検証(owner, binary, root, ios_simulator,
-                                                                 ios_derived_data, ios_result_bundle)}
+                                                                 ios_derived_data, ios_result_bundle, ios_product_ui)}
                 # P13のnative単独指定ではMobileの基本製品経路だけを実行する。
                 # 既存MINIDORA総合検査は既存flag／複合指定に残し、CLOSED条件を再試験しない。
                 if android_native and not (dart_client or mobile_client):
@@ -849,14 +849,17 @@ def main():
     parser.add_argument("--ios-simulator")
     parser.add_argument("--ios-derived-data", type=Path)
     parser.add_argument("--ios-result-bundle", type=Path)
+    parser.add_argument("--ios-product-ui", action="store_true")
     parser.add_argument("--binary", type=Path, default=ROOT / "native/rust_helper/target/debug" / ("gui_shell_rust_helper.exe" if os.name == "nt" else "gui_shell_rust_helper"))
     args = parser.parse_args()
+    if args.ios_product_ui and not args.ios_simulator:
+        parser.error("製品UI試験には専用iOS Simulatorを明示する")
     if args.ios_simulator and (sys.platform != "darwin" or not args.ios_derived_data or not args.ios_result_bundle
                               or args.android_native or args.dart_client or args.mobile_client):
         parser.error("iOS nativeはmacOS上で専用Simulator・derived-data・result-bundleを指定して単独実行する")
     print(json.dumps(検証(args.reference.resolve(), args.binary.resolve(), args.dart_client, args.mobile_client,
                            args.android_native, args.android_serial, args.ios_simulator,
-                           args.ios_derived_data, args.ios_result_bundle), ensure_ascii=False, indent=2))
+                           args.ios_derived_data, args.ios_result_bundle, args.ios_product_ui), ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":
