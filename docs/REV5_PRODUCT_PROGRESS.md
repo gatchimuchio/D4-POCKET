@@ -19,6 +19,8 @@
 
 #### macOS Agent CLI／Workspace起動中登録 — VALIDATING（登録入力試験の局所修正）
 
+手動Actions [run 37661491163](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37661491163)、commit `4c52dc9fa3bce8619176a222f572caebdd8eed3b`では6欄のAX identity束縛と模型欄クリックまで成立し、`field.typeText`が「Neither element nor any descendant has keyboard focus」でFAIL（17.885秒）。videoは模型欄の実cursorを示し、固定Flutter engineの`FlutterTextInputSemanticsObject.mm`はAX用NSTextFieldと別のFlutterTextInputPlugin editorを使っている。文字は既存のapp key入力へ送り、同じ欄の既定値除去・入力値照合を保持する。scroll前の表示待ちと固定identityは維持し、内容領域でclipされた3px／21pxの欄を操作しないよう可視高さ30pxを要求する。製品sourceやfocusを注入しない。その他のbuild／対象試験・helper残留なし・source clean・fixture回収はPASS。artifact `11500857378`、SHA-256 `513eb829d2da6574134e5515555ae11f4f61c8218fa0a2642a1e708b82426700`を照合して保存した。
+
 2026-10-08再開: 手動Actions [run 37659178592](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37659178592)、commit `56dfb3e9f6b1f4771a4b0919a89d15663fab7134`はMac runner上で実行された。請求設定を変更しておらず、以前のjob起動拒否はこのrunでは発生していない。Rust対象1件／helper build、固定実Codex準備、変更Dart解析／transport 7件、通常Mac buildはPASS。製品UIは23.058秒でFAILし、初期AX表示を待たずにscrollしたため模型欄ではなく実行系欄へ入力し、次の欄で試験側の高さ30px仮定に失敗した。videoで`codex-localtest-model`を確認した。表示後の6入力欄をAX identityへ一度だけ束縛し、入力欄の正の面積・既定値除去・入力値一致を確認するharnessへ局所修正する。製品要求・Authority境界は変更しない。
 
 同runのhelper残留なし／runner source clean／専用CLI・Workspace回収はPASS。artifact `11498929704`、SHA-256 `63e9787fc91c1c07f2b4adde76ed00dbfdb2be3fa901b1a6b7f61b647fb0ab1c`を照合しignored領域へ保存した。Owner確認と登録結果表示はまだ未到達で、AcceptanceをCLOSEDにしない。以下のjob拒否と初回FAILは履歴として保持する。

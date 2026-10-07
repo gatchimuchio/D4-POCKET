@@ -33,10 +33,11 @@ final class AdapterOwnerUITests: XCTestCase {
         reveal(app, field)
         XCTAssertTrue(field.exists, label)
         field.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
-        field.typeKey("a", modifierFlags: .command)
-        field.typeKey(XCUIKeyboardKey.delete.rawValue, modifierFlags: [])
+        // Flutter editorはAX TextFieldの子ではない。実際の窓へkeyを送り欄の値で照合する。
+        app.typeKey("a", modifierFlags: .command)
+        app.typeKey(XCUIKeyboardKey.delete.rawValue, modifierFlags: [])
         XCTAssertEqual(field.value as? String, "", label + "の既定値除去")
-        field.typeText(value)
+        app.typeText(value)
         XCTAssertEqual(field.value as? String, value, label + "の入力照合")
       }
       let submit = app.buttons["native Owner確認へ進む"]
@@ -69,11 +70,11 @@ final class AdapterOwnerUITests: XCTestCase {
   private func reveal(_ app: XCUIApplication, _ target: XCUIElement) {
     XCTAssertTrue(target.waitForExistence(timeout: 10))
     for _ in 0..<10 {
-      if target.frame.height > 0 && app.windows.firstMatch.frame.contains(target.frame) { break }
+      if target.frame.height >= 30 && app.windows.firstMatch.frame.contains(target.frame) { break }
       app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.65))
         .scroll(byDeltaX: 0, deltaY: -180)
     }
-    XCTAssertGreaterThan(target.frame.height, 0)
+    XCTAssertGreaterThanOrEqual(target.frame.height, 30)
     XCTAssertTrue(app.windows.firstMatch.frame.contains(target.frame))
   }
 
