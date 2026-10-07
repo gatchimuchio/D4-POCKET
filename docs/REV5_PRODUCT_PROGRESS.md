@@ -57,6 +57,8 @@
 
 [run 37619551427](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37619551427)、commit `62b7495429ee72428e035e9e30fd5c2f87a0f577`も同じ構造拒否でFAIL。Flutterの窓AX valueも空であり、型情報の取得手段として不適切だった。窓title改変を撤去し、同じ明示Debug UI試験flag内で既知fieldの型情報だけをOS標準logへ出す。workflowは固定診断prefixに限定して読み取る。製品要求・Owner選択・本文には触れず、診断の撤去条件も維持する。
 
+[run 37620401839](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37620401839)、commit `cad35a686c373c9442b9c1e70ee6b2b06c5c60f1`のOS logではroot 3 field・操作一致・Manifest 17 fieldが取得でき、全既知fieldの大分類は一致した。構造拒否は継続している。次は全payload値が合成公開fixtureと等しい場合に限り、JSON envelopeから切り出したpayloadを再parse・再照合して送信byte表現を一時観測する。任意入力・envelope・資格を記録せず、fixtureの署名は全0固定の公開値である。Owner確認前の拒否が解消した証拠はまだない。
+
 #### macOS Desktop通常Broker接続 — CLOSED（Product Build、2026-10-07）
 
 開始時のmacOS Runnerには`gui_shell/broker`登録がなく、Flutterの通常起動から実Brokerへ到達しなかった。本有限単位を、同梱Rust helperへの匿名pipe、既存認証Broker normal経路、初回設定等の製品bootstrap、正常終了へ限定した。Apple App Sandboxを継承し、Flutter／Runnerへ資格を渡さない。Owner専用操作・Windows固有操作は現状の拒否を保持し、macOS全機能完成とは扱わない。責任と未成立範囲は`docs/specs/macos-desktop-channel.md`。手動Actionsの独立`macos_product`を使い、iOS／AndroidのCLOSED試験は起動していない。

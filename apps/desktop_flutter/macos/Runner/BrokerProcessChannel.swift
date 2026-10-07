@@ -129,6 +129,33 @@ final class BrokerProcessChannel {
         observedShape += " manifestCount=\(manifest.count) \(shape(manifest, ["版", "Adapter ID", "Runtime ID", "発行者", "source", "version", "transport", "Content Exposure", "要求Capability", "許可差分", "既知の危険", "互換性", "authority_strip", "signed_manifest", "署名対象", "署名", "署名者fingerprint"]))"
       }
       os_log("D4_MACOS_OWNER_SHAPE %{public}@", log: .default, type: .error, observedShape)
+      let fixture: [String: Any] = [
+        "版": 1, "Adapter ID": "macos_owner_fixture", "Runtime ID": "macos_owner_runtime",
+        "発行者": "macOS製品試験", "source": "owner_manifest", "version": "1.0.0",
+        "transport": "mock", "Content Exposure": "redacted", "要求Capability": ["runtime.read"],
+        "許可差分": ["none"], "既知の危険": ["試験用metadata"], "互換性": "compatible",
+        "authority_strip": true, "signed_manifest": true, "署名対象": "7b",
+        "署名": String(repeating: "0", count: 128), "署名者fingerprint": "sha256:" + String(repeating: "0", count: 64)
+      ]
+      let expected: [String: Any] = ["版": 1, "操作": "導入", "Manifest": fixture]
+      let exactFixture = NSDictionary(dictionary: payload).isEqual(to: expected)
+      os_log("D4_MACOS_OWNER_SHAPE fixtureMatched=%{public}@", log: .default, type: .error, String(exactFixture))
+      if !exactFixture, let manifest = payload["Manifest"] as? [String: Any] {
+        let mismatches = fixture.keys.sorted().filter { key in
+          !NSDictionary(dictionary: [key: manifest[key] ?? NSNull()])
+            .isEqual(to: [key: fixture[key]!])
+        }
+        os_log("D4_MACOS_OWNER_SHAPE fixtureMismatch=%{public}@", log: .default, type: .error, mismatches.joined(separator: ","))
+      }
+      // 全値が公開fixtureと一致したpayload末尾だけ。envelope・任意入力は記録しない。
+      if exactFixture, let marker = frame.range(of: ",\"payload\":"), frame.last == "}" {
+        let suffix = String(frame[marker.upperBound...].dropLast())
+        if let data = suffix.data(using: .utf8),
+           let value = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           NSDictionary(dictionary: value).isEqual(to: expected) {
+          os_log("D4_MACOS_OWNER_SHAPE fixtureWire=%{public}@", log: .default, type: .error, suffix)
+        }
+      }
     }
     #endif
     let timeout = operation == "アダプター導入" || operation == "アダプター更新" ? 305 : 5
