@@ -524,7 +524,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/BrokerProcessChannel.swift",
-      "sha256": "b020efd5311be36caeba7394003b759162dbd2ce81ab8e6a1ae3e1acc5b27c38"
+      "sha256": "227a59c65e7469dd092998657de762b2890ec854a2f55781c9df42b1c9d3acbe"
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/Configs/AppInfo.xcconfig",
@@ -1268,7 +1268,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "96c855a6dea38651e5d436ff640f1cda46b537b9920d29051f45d2d03739843b"
+      "sha256": "721c71d9ba96b35429a995fa72ccc55bde659d32db385e7d6c3c32373cb08518"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",

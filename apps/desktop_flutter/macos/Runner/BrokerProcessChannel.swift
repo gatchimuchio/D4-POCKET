@@ -1,4 +1,5 @@
 import Cocoa
+import Darwin
 import FlutterMacOS
 
 /// 固定同梱helperへのtransport。資格・権限・Owner判断を保持しない。
@@ -48,6 +49,12 @@ final class BrokerProcessChannel {
       }
       try worker.run()
       launched = true
+      try requests.fileHandleForReading.close()
+      try responses.fileHandleForWriting.close()
+      guard fcntl(requests.fileHandleForWriting.fileDescriptor, F_SETNOSIGPIPE, 1) == 0 else {
+        worker.terminate()
+        return
+      }
       available = true
     } catch {
       available = false
@@ -91,11 +98,23 @@ final class BrokerProcessChannel {
       guard let self else { return }
       var output: String?
       do {
-        try self.requests.fileHandleForWriting.write(contentsOf: Data((frame + "\n").utf8))
+        let bytes = Data((frame + "\n").utf8)
+        try bytes.withUnsafeBytes { raw in
+          var sent = 0
+          while sent < raw.count {
+            let count = Darwin.write(self.requests.fileHandleForWriting.fileDescriptor, raw.baseAddress!.advanced(by: sent), raw.count - sent)
+            if count < 0 && errno == EINTR { continue }
+            guard count > 0 else { throw PipeFailure.closed }
+            sent += count
+          }
+        }
         var buffer = Data()
+        var chunk = [UInt8](repeating: 0, count: 4096)
         while buffer.count <= 4 * 1024 * 1024 {
-          guard let bytes = try self.responses.fileHandleForReading.read(upToCount: 4096), !bytes.isEmpty else { break }
-          buffer.append(bytes)
+          let count = Darwin.read(self.responses.fileHandleForReading.fileDescriptor, &chunk, chunk.count)
+          if count < 0 && errno == EINTR { continue }
+          guard count > 0 else { break }
+          buffer.append(contentsOf: chunk.prefix(count))
           if let newline = buffer.firstIndex(of: 0x0A) {
             guard buffer.index(after: newline) == buffer.endIndex, buffer.count <= 4 * 1024 * 1024 else { break }
             output = String(data: buffer[..<newline], encoding: .utf8)
@@ -123,3 +142,5 @@ final class BrokerProcessChannel {
     }
   }
 }
+
+private enum PipeFailure: Error { case closed }

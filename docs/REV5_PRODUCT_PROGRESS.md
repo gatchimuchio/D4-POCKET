@@ -25,6 +25,8 @@
 
 修正後のWindows `cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1`はlibrary 501 passed／1 failed／12 ignored。新規macOS接続test 2件はPASS。失敗は変更外の`bounded_catalog_fetch_rejects_declared_document_over_limit`でTLS fixtureのOS 10054／InvalidContentType、既存`FQ-TEST-LOOPBACK`範囲に保持する。library失敗後の他targetは未実行であり、Rust全数PASSとは扱わない。Schema 161／157／208、Conformance 236件、Manifest 1192件、`git diff --check`はPASS。厳格日本語監査は既存4 file／15 findingsによりexit 1、今回の追加fileにfindingはない。Mac側のbuild／正常経路は手動Actionsで確認するまで未成立。
 
+初回手動Actions [run 37596139461](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37596139461)、commit `5b6e1c9d34f8d364454bcb657adf9f2a5645a09d`ではMac上のRust対象2試験とhelper buildがPASS。Swiftの`write(contentsOf:)`／`read(upToCount:)`がmacOS 10.15.4以上を要求し、既存最低OS設定に対してcompile FAILとなった。最低OSを引き上げずDarwin pipe I/Oへ修正し、EINTR、書込切断、上限、親側の不要pipe端のcloseを扱う。native製品試験は未実行。この間のDesktop／Mobile `flutter analyze --no-pub`は既知のOneDrive日本語pathでLSP JSON FormatException、analysis server exit 255／CLI exit 1となり、host-local制約として保持した。生成された今回のcrash log 2 fileは回収済みで、製品sourceへ回避策を追加しない。
+
 #### iOS製品UI／native service／基本lifecycle — CLOSED（Product Build、2026-10-07）
 
 有限Acceptanceは、新規専用Simulator上の製品Flutter画面からnative招待画面・接続先確認・既存serviceへ進み、実Broker結合、Runtime表示、OSによるbackground／復帰、製品画面での離脱を一度成立させること。現行harnessは標準XCUITestで画面を操作する。招待だけは明示的なSimulator試験buildの`D4_IOS_PRODUCT_TEST`内でnative secure fieldへ渡し、Flutter／shell／環境変数／UI操作logへ秘密を渡さない。service直接呼出し・foreground偽装・承認迂回をしない。通常buildでは試験入力helperと起動呼出しをcompileから除外し、同flagを付けた物理端末buildはcompile errorにする。`--ios-product-ui`は新規製品接続試験だけを選択し、CLOSEDの部品試験を再実行しない。物理端末、網羅的lifecycle timing、Final QAは本単位へ追加しない。
