@@ -1272,7 +1272,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "3a5f07f8833b67bc39985540813fcb7f74f224eb731af41c40b8b3eb3f939092"
+      "sha256": "4aa6ab5b87e8b9b365f3d87721367ca6974f7cd86fc1ea3bc7bbc181b380a7cf"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -3164,11 +3164,11 @@
     },
     {
       "path": "native/macos_owner/Cargo.toml",
-      "sha256": "53fa7e803a7144ef2d8ba642d9e1ced1ea3632cb1df141e2f9729d404c40dd9d"
+      "sha256": "cf2b59e4593da756aa91714d73ade24e6c14b7bcac589fb4a8f868fe82622baa"
     },
     {
       "path": "native/macos_owner/src/lib.rs",
-      "sha256": "808328764c1a30f81078e9061203fff5114f3a907119380e7d714dbdede520d2"
+      "sha256": "a62bd492c1d41050805309f4ad3d1cfb17d91c596977a7942a7a6407e2cf76ca"
     },
     {
       "path": "native/process_supervision/Cargo.lock",

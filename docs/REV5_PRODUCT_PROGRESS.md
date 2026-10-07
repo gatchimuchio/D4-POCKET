@@ -21,6 +21,8 @@
 
 現在のSchema／正常例／負例は163／159／210 PASS、対象Rust 3件PASS。以下の全体FAILは履歴として保持する。
 
+手動Actions [run 37671678735](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37671678735)、commit `06cd2257a688424c23de227775c585bf17a9978d`は新規native crateの型検査でFAIL。固定bindingの`NSApplicationActivationPolicy`が`NSRunningApplication` featureに束縛されており、NSSavePanelのtitle／prompt／message引数は`Option<&NSString>`だった。必要なfeatureとnullable引数だけを修正する。Mac実動作の成功は未取得、mainは変更前を保持し、runner後片付けはPASS。
+
 有限Acceptanceは`docs/specs/macos-workspace-selection.md`。取消時の入力保持、実OS chooserによるsandbox外folder選択／投影、別個のOwner確認後の既存Broker登録、UI path／Authority注入拒否を一単位で施工する。選択はOS user-selected accessであり、D4のPermission／Approval／登録ではない。手動Actionsの`macos_workspace_selection`だけでMacを検証し、CLOSEDの登録／Adapter／Mobile試験は選択しない。sandbox外CLI実行・restart access・Credential・正式配布・Final QAはこの単位へ追加しない。
 
 ローカル検証: Schema 162／正常例158／負例209、Conformance 237 checks PASS。必須`cargo test --locked --manifest-path native/rust_helper/Cargo.toml`は505 passed／4 failed／12 ignoredでFAIL。変更外のA2A loopback読取と3つの既存HTTPS fixtureが応答読取／OS 10054／InvalidContentTypeで失敗した。局所切分けではA2A 1 PASS、update_download群16 PASS／1 FAILで、`failed_replacement_keeps_the_existing_corrupt_package_unchanged`の既存TLS失敗が残る。対象新規試験の成功や全体PASSへ読み替えず、既存Final QAのloopback検査課題へ保持する。変更がMac専用OS選択へ限定され、これらの作用経路を変更していないことを差分で確認した。

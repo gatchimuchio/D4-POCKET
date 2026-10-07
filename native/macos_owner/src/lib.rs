@@ -43,11 +43,11 @@ pub fn select_workspace() -> Result<Option<SelectedWorkspace>, &'static str> {
             return Err("OS選択の表示を開始できません");
         }
         let panel = NSOpenPanel::openPanel(mtm);
-        panel.setTitle(&NSString::from_str("D4 Pocket — 作業領域のOS選択"));
-        panel.setPrompt(&NSString::from_str("作業領域を選択"));
-        panel.setMessage(&NSString::from_str(
+        panel.setTitle(Some(&NSString::from_str("D4 Pocket — 作業領域のOS選択")));
+        panel.setPrompt(Some(&NSString::from_str("作業領域を選択")));
+        panel.setMessage(Some(&NSString::from_str(
             "この選択はOSの起動中accessだけです。D4の登録・Permission・Approvalは別に必要です。",
-        ));
+        )));
         panel.setCanChooseFiles(false);
         panel.setCanChooseDirectories(true);
         panel.setAllowsMultipleSelection(false);
