@@ -80,6 +80,8 @@ jobs:
             xcrun xcresulttool get test-results summary --path "$RUNNER_TEMP/macos-product-tests.xcresult" | tee evidence/macos-native-summary.json
             if [ '${{ inputs.target }}' = 'macos_owner' ]; then
               xcrun xcresulttool export attachments --path "$RUNNER_TEMP/macos-product-tests.xcresult" --output-path evidence/macos-ui-attachments
+              # 新規runnerの合成試験だけ。OS拒否を製品失敗と切り分ける限定診断。
+              /usr/bin/log show --last 5m --style compact --predicate 'eventMessage CONTAINS "gui_shell_macos_broker" AND (eventMessage CONTAINS "deny" OR eventMessage CONTAINS "denied")' > evidence/macos-owner-os-denial.txt
             fi
           fi
           if pgrep -x gui_shell_macos_broker > evidence/remaining-helper-pids.txt; then
