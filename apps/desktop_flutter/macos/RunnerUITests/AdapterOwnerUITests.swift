@@ -30,9 +30,17 @@ final class AdapterOwnerUITests: XCTestCase {
       ].enumerated() {
         let (label, value) = entry
         let field = fields[index]
-        reveal(app, field)
+        if index == 0 {
+          reveal(app, field)
+          field.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+        } else {
+          // 模型欄の次は認証方式の2 RadioListTile、その後は残る入力欄の順。
+          // scroll後のAX frameが古いままなので、製品の通常focus traversalを使う。
+          for _ in 0..<(index == 1 ? 3 : 1) {
+            app.typeKey(XCUIKeyboardKey.tab.rawValue, modifierFlags: [])
+          }
+        }
         XCTAssertTrue(field.exists, label)
-        field.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
         // Flutter editorはAX TextFieldの子ではない。実際の窓へkeyを送り欄の値で照合する。
         app.typeKey("a", modifierFlags: .command)
         app.typeKey(XCUIKeyboardKey.delete.rawValue, modifierFlags: [])
