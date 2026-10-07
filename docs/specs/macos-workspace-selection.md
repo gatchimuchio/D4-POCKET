@@ -16,6 +16,8 @@ Brokerは当該操作だけを`MacOSWorkspaceSelection`という別の内部sour
 
 ## 外部APIと未成立範囲
 
+一時stderr診断は固定bindingの既知文言をNULL返却／method不在／返却型・引数型のencoding不一致／OS entitlement拒否／Rust panicの定数へ分類するだけで、元文言、値、path、stackを記録しない。helperの101終了を根因確定とせず、固定段階・分類を併せて局所修正を選ぶ。
+
 診断のbounded読取APIだけはmacOS 10.15.4以降の可用性guard内で使う。通常製品の最低OSは変更しない。[Apple DTSの同種事例](https://developer.apple.com/forums/thread/735493)には、parentのuser-selected entitlementだけではinherit childのopen/save panelが拒否される例がある。これは責任配置を確認する外部参考であり、現行runの終了根因は固定段階診断が得られるまで未確定とする。helperへ追加entitlementを混ぜる、sandboxを無効にする、通常Brokerを迂回する回避は行わない。
 
 native終了の局所診断に限り、開発専用`workspace-ui-diagnostic`を手動UI試験へ明示適用する。通常helperは診断なしで先にbuildし、UI試験用helperだけにmain thread確認／AppKit生成／起動完了／panel生成／modal前後の固定6段階を出す。Swiftは明示Debug試験flag内の匿名stderr pipeで最大8KiBの未完行だけをmemoryへ保持し、完全一致の段階と既知例外名だけをOS logへ投影する。raw stderr、path、秘密、任意errorは記録しない。AppKit／IPC／Authorityの処理やOS保護設定を代替しない。元のFAILはhelperのJSON非応答と終了、既存のnull stderrでは終了箇所が不明なことが必要理由で、原因確定後にfeature／pipe／観測logを撤去し、通常helperでAcceptanceを確認する。

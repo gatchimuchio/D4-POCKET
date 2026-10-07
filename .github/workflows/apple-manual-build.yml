@@ -134,7 +134,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ '${{ inputs.target }}' = 'macos_workspace_selection' ]; then
-            /usr/bin/log show --last 10m --style compact --predicate 'process == "gui_shell_desktop" AND (eventMessage BEGINSWITH "D4_WORKSPACE_NATIVE_OUTCOME " OR eventMessage BEGINSWITH "D4_WORKSPACE_NATIVE_STAGE " OR eventMessage BEGINSWITH "D4_WORKSPACE_NATIVE_EXCEPTION " OR eventMessage BEGINSWITH "D4_WORKSPACE_NATIVE_EXIT ")' > evidence/workspace-native-outcome.txt
+            /usr/bin/log show --last 10m --style compact --predicate 'process == "gui_shell_desktop" AND (eventMessage BEGINSWITH "D4_WORKSPACE_NATIVE_OUTCOME " OR eventMessage BEGINSWITH "D4_WORKSPACE_NATIVE_STAGE " OR eventMessage BEGINSWITH "D4_WORKSPACE_NATIVE_EXCEPTION " OR eventMessage BEGINSWITH "D4_WORKSPACE_NATIVE_PANIC " OR eventMessage BEGINSWITH "D4_WORKSPACE_NATIVE_EXIT ")' > evidence/workspace-native-outcome.txt
             selection_audit=/Users/runner/Library/Containers/com.example.guiShellDesktop/Data/Library/Application\ Support/D4Pocket/macos-broker/store/audit.jsonl
             if [ -f "$selection_audit" ] && [ ! -L "$selection_audit" ]; then
               test "$(stat -f%z "$selection_audit")" -lt 4194304

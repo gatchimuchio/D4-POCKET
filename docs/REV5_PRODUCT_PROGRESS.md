@@ -19,6 +19,8 @@
 
 #### macOS 作業領域のOS選択 — IMPLEMENTING（Product Build、2026-10-08）
 
+手動Actions [run 37695306118](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37695306118)、commit `5b5784c5bee7b0610cbaeec4c7cb306808aa2703`はUI試験46.439秒でFAIL。実click後の固定診断はmain thread／AppKit生成／起動完了まで到達し、panel生成前にhelperが101で終了した。OS拒否かbindingのpanicかはまだ断定せず、既存のmemory内stderr投影にNULL返却／method署名／entitlement拒否／Rust panicの固定分類だけを追加する。artifact `11515093394`、SHA-256 `e6d93ef20214f9d5af0399f92b0e9910a96a3b92dd054c47bc01e303e02deca2`を照合した。通常build／対象Rust／Dart／後片付けはPASS。現在条件の原因特定であり、新規Acceptance・CLOSED試験・sandbox例外を追加しない。
+
 手動Actions [run 37693823144](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37693823144)、commit `4d13e3d7b80ff999eac2f3172d54f5c26ec4f75e`はUI試験24.822秒でclick前の文字認識がFAIL。固定native診断は未到達で、終了根因は未確定。artifact `11514184088`、SHA-256 `0642ddf51eff0300b65b99cf234c9388ea25859c74ff06df97673e9988e8d47d`を照合した。保存videoの21秒frameは選択buttonを製品窓内に示すため、最初の診断clickだけを観測済み800px窓のbutton中央へ通常XCTest入力で送る。取消後のlayoutには適用せず、原因取得後に撤去する。通常build／対象Rust／Dart／後片付けはPASS、Acceptanceとmainは未変更。
 
 手動Actions [run 37691846258](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37691846258)、commit `07ab9ec115ba75819666215c201a21af4f0a1bfb`は一時診断のSwift buildでFAIL。固定SDKでは`FileHandle.read(upToCount:)`がmacOS 10.15.4以降なのに、既存deployment target 10.15の可用性guardが欠落していた。診断だけを公開APIの可用性guard内に限定し、製品の最低OSやfilesystem／sandbox policyを変更しない。UIは未実行でnative終了段階は未取得。通常build／対象Rust／Dart／後片付けはPASS。artifact `11513548353`、SHA-256 `f390c53251463c262231b7775534f53aad8f465dce8b981ccf3dbe955f0eb07f`を照合・保存した。

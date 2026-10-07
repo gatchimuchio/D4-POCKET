@@ -69,6 +69,19 @@ final class BrokerProcessChannel {
           for exception in ["NSInternalInconsistencyException", "NSInvalidArgumentException"] where line.contains(exception) {
             NSLog("D4_WORKSPACE_NATIVE_EXCEPTION %@", exception)
           }
+          // 固定bindingの既知panic／OS拒否だけを分類し、本文や任意panicを記録しない。
+          for (needle, code) in [
+            ("unexpected NULL returned", "objc_null_return"),
+            ("invalid message send", "objc_method_signature"),
+            ("method not found", "objc_method_missing"),
+            ("expected return to have type code", "objc_return_encoding"),
+            ("expected argument at index", "objc_argument_encoding"),
+            ("failed entitlements check", "os_entitlement"),
+            ("missing the User Selected", "os_entitlement"),
+            ("panicked at", "rust_panic")
+          ] where line.contains(needle) {
+            NSLog("D4_WORKSPACE_NATIVE_PANIC %@", code)
+          }
         }
       }
       #endif
