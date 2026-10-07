@@ -343,7 +343,7 @@ class NativeDeviceLinkProductTests: XCTestCase {
     }
     do {
       try waitUntil { self.rootController() is FlutterViewController }
-      (rootController() as? FlutterViewController)?.engine?.ensureSemanticsEnabled()
+      (rootController() as? FlutterViewController)?.engine.ensureSemanticsEnabled()
       try waitUntil { self.hasLabel("D4 Pocket・概要") }
       try require(try store.loadOrCreate().credential == nil)
       try navigate("接続先")

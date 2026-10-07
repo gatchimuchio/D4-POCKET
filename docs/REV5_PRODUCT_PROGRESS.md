@@ -21,6 +21,8 @@
 
 有限Acceptanceは、新規専用Simulator上の製品Flutter画面からnative招待画面・接続先確認・既存serviceへ進み、実Broker結合、Runtime表示、OSによるbackground／復帰、製品画面での離脱を一度成立させること。招待入力だけをhosted XCTest内のnative secure fieldへ直接渡し、Flutter／shell／環境変数／UI操作logへ秘密を渡さない。画面操作には公開accessibility actionを使い、service method直接呼出し・foreground偽装・承認迂回をしない。試験コードはRunnerTests target内に閉じ、通常製品へ試験bridgeを追加しない。既存の部品試験はCLOSEDのため、今回の`--ios-product-ui`では新規製品接続試験だけを選択する。物理端末、網羅的lifecycle timing、Final QAは本単位へ追加しない。
 
+初回手動Actions [run 37587096021](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37587096021)、commit `3f4d0f709125e771d105fc1bcba5cb13b29991f8`ではRust build、Mobile解析・21試験、Simulator buildは成功したが、XCTest sourceで非Optionalな`FlutterEngine`にoptional chainingを使ったためcompile失敗し、製品接続testは未実行だった。公開型に合わせた1行修正を行う。製品sourceは変更していない。ローカルSchema 161／157／208、Conformance 236、手動workflow限定・Manifest検査はPASS。厳格日本語監査は変更対象外4 file／15 findingsでexit 1を保持する。
+
 #### iOS native TLS／Keychainと実Brokerの接続 — CLOSED（Product Build、2026-10-07）
 
 今回の有限単位は、Simulator native XCTestから既存Swift `DeviceLinkTLSClient`／`DeviceLinkNativeStore`を実Rust Brokerへ接続し、招待結合、Keychain保存・再読、Runtime一覧、離脱・失効を成立させること。誤pin拒否も確認する。試験用Ownerは既存Broker制御経路で一時招待を発行し、専用loopback listenerからnative test内へだけ渡す。公開する環境変数はlistener portだけとし、招待・端末資格をDart、shell引数、環境変数、診断、artifactへ含めない。これはdevelopment専用harnessで、production通信やAuthorityを追加しない。製品Flutter UIの操作・native確認dialog・OS lifecycle・物理端末は別の未成立範囲として保持し、この接続単位の成功へ含めない。既存8 XCTestは変更test targetの直接依存検査として維持し、Android CLOSED経路を再実行しない。macOSがlocalにないため既存`apple-manual-build.yml`の`ios_mobile`手動起動で補助検証する。
