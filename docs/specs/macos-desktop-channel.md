@@ -28,6 +28,8 @@ Owner確認・Credentials・Task実行・Windows固有Install／Updateは本接�
 
 ## Owner追加契約 — Adapter導入・更新
 
+UI試験の合成Manifestは、日本語意味を保持したJSON Unicode escapeのASCII表記で`typeText`へ渡す。Macの文字入力経路で`既`／`署`が互換漢字へ変化し、見た目とSwiftの辞書比較では同等でもRust契約のfield名と一致しない失敗を観測したためである。変換は試験入力だけであり、製品側で入力key・署名対象・hashを無言に正本化するものではない。通常のJSON parserと厳密なBroker検査を通す。型／本文の一時診断は原因特定後に撤去した。
+
 通常接続のCLOSEDを維持し、次の製品差分としてAdapterの導入・更新を追加する。受信要求は権限ではない。Rust helperが現行envelopeのsession注入禁止、時刻、metadata、hash、既存Adapter Manifest検査を行い、表示用に検査されたsummaryだけをOS確認画面へ渡す。画面は既定「承認しない」、明示「今回の操作を承認」の二択、上限300秒。取消・期限超過・未知応答・OS失敗は非承認である。
 
 承認後は確認した同一要求だけを既存Brokerのprocess内Owner receiverへ渡し、既存のfreshness／replay／hash／Authority／監査／永続化を再評価する。資格fileを生成・公開せず、Swift／Flutterの入力や過去の確認から承認を作らない。非承認・対象外・入力不正は通常Brokerの拒否・監査へ通す。要求の自動再送をしない。Adapter metadata登録は外部code起動、署名trust、Permission、Task Approvalではない。WorkspaceやCredentials等へ本allowlistを転用しない。

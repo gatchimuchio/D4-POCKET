@@ -90,7 +90,14 @@ final class AdapterOwnerUITests: XCTestCase {
       "署名": String(repeating: "0", count: 128), "署名者fingerprint": "sha256:" + String(repeating: "0", count: 64)
     ]
     let data = try JSONSerialization.data(withJSONObject: value, options: [.sortedKeys])
-    app.typeText(String(data: data, encoding: .utf8)!)
+    // typeText経路で「既」「署」が互換漢字へ変化した。JSONの意味を保ち、
+    // 入力文字だけをASCIIのUnicode escapeへ固定する。製品の正本化は変更しない。
+    let json = String(data: data, encoding: .utf8)!
+    let asciiJSON = json.utf16.map { unit in
+      unit < 0x80 ? String(UnicodeScalar(Int(unit))!) : String(format: "\\u%04x", Int(unit))
+    }.joined()
+    XCTAssertTrue(asciiJSON.utf8.allSatisfy { $0 < 0x80 })
+    app.typeText(asciiJSON)
     let submit = app.buttons["native Owner確認へ"]
     XCTAssertTrue(app.windows.firstMatch.frame.contains(submit.frame))
     submit.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()

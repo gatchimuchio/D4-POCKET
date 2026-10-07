@@ -80,7 +80,6 @@ jobs:
             xcrun xcresulttool get test-results summary --path "$RUNNER_TEMP/macos-product-tests.xcresult" | tee evidence/macos-native-summary.json
             if [ '${{ inputs.target }}' = 'macos_owner' ]; then
               xcrun xcresulttool export attachments --path "$RUNNER_TEMP/macos-product-tests.xcresult" --output-path evidence/macos-ui-attachments
-              /usr/bin/log show --last 5m --style compact --predicate 'eventMessage BEGINSWITH "D4_MACOS_OWNER_SHAPE "' | tee evidence/macos-owner-shape.txt
             fi
           fi
           if pgrep -x gui_shell_macos_broker > evidence/remaining-helper-pids.txt; then

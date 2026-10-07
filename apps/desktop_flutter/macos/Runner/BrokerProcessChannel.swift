@@ -1,7 +1,6 @@
 import Cocoa
 import Darwin
 import FlutterMacOS
-import os.log
 
 /// 固定同梱helperへのtransport。資格・権限・Owner判断を保持しない。
 final class BrokerProcessChannel {
@@ -114,50 +113,6 @@ final class BrokerProcessChannel {
     // 待機期限の分類だけ。承認の判定・返信はRustのOS確認画面が所有する。
     let envelope = frame.data(using: .utf8).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
     let operation = envelope?["operation"] as? String
-    #if DEBUG && D4_MACOS_OWNER_UI_TEST
-    if operation == "アダプター導入", let payload = envelope?["payload"] as? [String: Any] {
-      // 未成立の合成UI試験の型だけを観測する。本文・署名・資格は記録しない。
-      func shape(_ fields: [String: Any], _ names: [String]) -> String {
-        names.map { key in
-          guard let value = fields[key] else { return key + "=missing" }
-          if let number = value as? NSNumber { return key + "=number:" + String(cString: number.objCType) }
-          return key + "=" + String(describing: type(of: value))
-        }.joined(separator: ",")
-      }
-      var observedShape = "rootCount=\(payload.count) operationValid=\(payload["操作"] as? String == "導入") \(shape(payload, ["版", "操作", "Manifest"]))"
-      if let manifest = payload["Manifest"] as? [String: Any] {
-        observedShape += " manifestCount=\(manifest.count) \(shape(manifest, ["版", "Adapter ID", "Runtime ID", "発行者", "source", "version", "transport", "Content Exposure", "要求Capability", "許可差分", "既知の危険", "互換性", "authority_strip", "signed_manifest", "署名対象", "署名", "署名者fingerprint"]))"
-      }
-      os_log("D4_MACOS_OWNER_SHAPE %{public}@", log: .default, type: .error, observedShape)
-      let fixture: [String: Any] = [
-        "版": 1, "Adapter ID": "macos_owner_fixture", "Runtime ID": "macos_owner_runtime",
-        "発行者": "macOS製品試験", "source": "owner_manifest", "version": "1.0.0",
-        "transport": "mock", "Content Exposure": "redacted", "要求Capability": ["runtime.read"],
-        "許可差分": ["none"], "既知の危険": ["試験用metadata"], "互換性": "compatible",
-        "authority_strip": true, "signed_manifest": true, "署名対象": "7b",
-        "署名": String(repeating: "0", count: 128), "署名者fingerprint": "sha256:" + String(repeating: "0", count: 64)
-      ]
-      let expected: [String: Any] = ["版": 1, "操作": "導入", "Manifest": fixture]
-      let exactFixture = NSDictionary(dictionary: payload).isEqual(to: expected)
-      os_log("D4_MACOS_OWNER_SHAPE fixtureMatched=%{public}@", log: .default, type: .error, String(exactFixture))
-      if !exactFixture, let manifest = payload["Manifest"] as? [String: Any] {
-        let mismatches = fixture.keys.sorted().filter { key in
-          !NSDictionary(dictionary: [key: manifest[key] ?? NSNull()])
-            .isEqual(to: [key: fixture[key]!])
-        }
-        os_log("D4_MACOS_OWNER_SHAPE fixtureMismatch=%{public}@", log: .default, type: .error, mismatches.joined(separator: ","))
-      }
-      // 全値が公開fixtureと一致したpayload末尾だけ。envelope・任意入力は記録しない。
-      if exactFixture, let marker = frame.range(of: ",\"payload\":"), frame.last == "}" {
-        let suffix = String(frame[marker.upperBound...].dropLast())
-        if let data = suffix.data(using: .utf8),
-           let value = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           NSDictionary(dictionary: value).isEqual(to: expected) {
-          os_log("D4_MACOS_OWNER_SHAPE fixtureWire=%{public}@", log: .default, type: .error, suffix)
-        }
-      }
-    }
-    #endif
     let timeout = operation == "アダプター導入" || operation == "アダプター更新" ? 305 : 5
     DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(timeout)) { complete(nil) }
     queue.async { [weak self] in
