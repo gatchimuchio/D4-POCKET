@@ -38,4 +38,4 @@ FFI例外の局所レビュー: CFStringは呼出し終了まで保持し、opti
 
 有限Acceptanceは、実Brokerでの導入・更新と永続catalog、拒否時不変、replay／session注入／不正hash拒否、macOSのOS確認画面・期限の動作を対象とする。fixtureとnative操作の証拠を分離する。通常接続を再証明する追加試験や全Adapter機能の最終QAは行わない。
 
-UI試験はdevelopment専用XCTestで、Flutter 3.44の既存OSアクセシビリティ属性を対象appへ要求してから操作する。理由は初回XCUITestで初期要素が取得不能だったためで、承認や製品dataを注入する経路ではない。[固定FlutterEngine実装](https://github.com/flutter/flutter/blob/3.44.0/engine/src/flutter/shell/platform/darwin/macos/framework/Source/FlutterEngine.mm)が当該通知を消費する。標準XCTestだけで接続可能になった場合はこの明示要求を除去できる。初期診断は新規runnerの入力前だけに限定し、要求本文や資格を出力しない。
+UI試験はdevelopment専用XCTest。初回XCTestではFlutter内部の要素がなく、外部AX接続要求もOSに拒否されたため、Debugかつ`D4_MACOS_OWNER_UI_TEST`の明示試験buildだけで表示用semanticsを有効にする。[固定FlutterEngine実装](https://github.com/flutter/flutter/blob/3.44.0/engine/src/flutter/shell/platform/darwin/macos/framework/Source/FlutterEngine.mm)が受けるアクセシビリティ通知だけを使い、Broker要求・Owner選択・資格・永続状態へ注入しない。通常buildには通知をcompileしない。OS保護設定の変更や秘密入力fallbackも行わない。標準XCTestだけでsemanticsが接続可能になった時点でこの表示補助を除去できる。通常製品buildは別途確認し、UI操作証拠が試験表示flag付きであることを明記する。

@@ -27,6 +27,8 @@
 
 初回Mac [run 37602624819](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37602624819)、commit `1bf2e2c772367dc03f1c1c605b9cefa3b9d4589d`はRust確認crate 2件（実OS期限切れ拒否含む）、Broker対象1件、同梱製品buildがPASS。XCUITestは初期「実行系」要素を取得できず1件FAIL、helper残留なし。Flutter固定3.44 sourceがOSの`AXEnhancedUserInterface`通知からsemanticsを有効にするため、試験側から当該appの既存アクセシビリティ接続を要求し、要素のlabel／value差を扱う。製品codeは変更せず、初期画面の限定診断で接続不能を隠さない。OS確認への到達はまだ未成立。
 
+次の[run 37603945218](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37603945218)、commit `4626c551b0fe67a22405556ba5a5f8b4da638f23`もRust／製品buildはPASS、UIは初期要素取得でFAIL。診断ではnative窓だけが存在しFlutter子要素がなく、外部AX APIは`-25211`で拒否された。無効だった外部AX要求と初期tree診断を撤去し、明示Debug試験buildに表示用semantics有効化だけを追加する。通常製品のAuthority／資格／Owner確認への変更やOS保護設定変更はしない。試験表示補助の責任・除去条件・証拠範囲はmacOS接続contractへ記録する。
+
 #### macOS Desktop通常Broker接続 — CLOSED（Product Build、2026-10-07）
 
 開始時のmacOS Runnerには`gui_shell/broker`登録がなく、Flutterの通常起動から実Brokerへ到達しなかった。本有限単位を、同梱Rust helperへの匿名pipe、既存認証Broker normal経路、初回設定等の製品bootstrap、正常終了へ限定した。Apple App Sandboxを継承し、Flutter／Runnerへ資格を渡さない。Owner専用操作・Windows固有操作は現状の拒否を保持し、macOS全機能完成とは扱わない。責任と未成立範囲は`docs/specs/macos-desktop-channel.md`。手動Actionsの独立`macos_product`を使い、iOS／AndroidのCLOSED試験は起動していない。
