@@ -564,7 +564,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/RunnerUITests/AdapterOwnerUITests.swift",
-      "sha256": "ac2a2548386e0f6b5c0a12ae7093739604da823a966f5449f5dbffcbeffa0597"
+      "sha256": "bfc76b141fb1c3b3945ed7dd4ce9e7be812edfb90b04a51486113268481c9b18"
     },
     {
       "path": "apps/desktop_flutter/pubspec.lock",
@@ -1272,7 +1272,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "dc4df14e9707d26eb0ccc47c5c9e5d11ede1e6bf114360533175bac17f1cb028"
+      "sha256": "f5b6f3c0a1ab5bf7bd32ac8ebeb56c31101d207a4c99f062d1dc8141b73f8e3f"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
