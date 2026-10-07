@@ -323,7 +323,7 @@ class NativeDeviceLinkProductTests: XCTestCase {
           let port = UInt16(rawPort), port > 0 else {
       throw XCTSkip("新規専用Simulatorの製品接続harnessからだけ実行する")
     }
-    var stage = "initial_screen"
+    var stage = "initial_root"
     let store = DeviceLinkNativeStore()
     var observedBackground = false
     var observedResume = false
@@ -344,8 +344,11 @@ class NativeDeviceLinkProductTests: XCTestCase {
     do {
       try waitUntil { self.rootController() is FlutterViewController }
       (rootController() as? FlutterViewController)?.engine.ensureSemanticsEnabled()
+      stage = "initial_semantics"
       try waitUntil { self.hasLabel("D4 Pocket・概要") }
+      stage = "initial_keychain"
       try require(try store.loadOrCreate().credential == nil)
+      stage = "initial_navigation"
       try navigate("接続先")
       stage = "open_native_dialog"
       try activate("native画面で招待を入力して端末結合")
@@ -444,12 +447,13 @@ class NativeDeviceLinkProductTests: XCTestCase {
   }
 
   private func activate(_ label: String) throws {
-    var target: NSObject?
+    // Drawerの選択項目はbutton traitを持たない。表示labelと実activation結果で選ぶ。
     try waitUntil {
-      target = self.objects().first { self.labelMatches($0, label) && $0.accessibilityTraits.contains(.button) }
-      return target != nil
+      for target in self.objects() where self.labelMatches(target, label) {
+        if !target.accessibilityTraits.contains(.notEnabled) && target.accessibilityActivate() { return true }
+      }
+      return false
     }
-    try require(target?.accessibilityActivate() == true)
     RunLoop.current.run(until: Date().addingTimeInterval(0.4))
   }
 
