@@ -61,6 +61,10 @@
 
 [run 37621652477](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37621652477)、commit `9664cb24b147ff3a4d1544193584b4a33956d3e3`のwire観測で原因を確定した。macOS `typeText`を経由した日本語keyが、`既`（U+65E2）から`既`（U+FA42）、`署`（U+7F72）から`署`（U+FA5A）へ変化していた。Swift／Foundationの辞書等価比較ではfixture一致となる一方、Rustの厳密なfield名では未知field／必須field欠落となる。root／Manifestの版tokenは整数1で、OS確認失敗・数値型不一致ではなかった。試験側のJSON入力だけをUTF-16単位のUnicode escapeへ変換してASCIIで入力する。日本語keyの意味と既存UI操作は保持し、製品の署名・hash・Schema検査や未知key拒否は変更しない。一時的なSwift型／wire log、重複fixture、workflow診断を全て撤去した。修正後のOS確認と登録の成否は次の対象runで判定する。
 
+Unicode keyの原因証拠artifact `11481784642`をignored `release_evidence/p13-macos-owner-9664cb2.zip`へ保存し、SHA-256 `a4564eb08915ef570d3fdf6856588d688e54dd345771f6ec8f97caf62112c7a4`を照合した。保存logをPythonでparseし、field名にU+FA42／U+FA5Aが実在することも確認した。
+
+[run 37623072404](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37623072404)、commit `89e8764ff99361bbe6cab382b69e498cdcc6b09b`では入力構造拒否が解消し、OS確認dialogが出現した。XCTestの「承認しない」がdialogとTouch Barの同名2要素へ一致してclick FAILとなったため、検索を実dialog内へ限定する。画面未承認のまま試験が中断し、runnerの残留helper回収stepもexit 1だった。正常終了の証拠とはせず、実承認・登録・正常終了は次のrunで判定する。
+
 #### macOS Desktop通常Broker接続 — CLOSED（Product Build、2026-10-07）
 
 開始時のmacOS Runnerには`gui_shell/broker`登録がなく、Flutterの通常起動から実Brokerへ到達しなかった。本有限単位を、同梱Rust helperへの匿名pipe、既存認証Broker normal経路、初回設定等の製品bootstrap、正常終了へ限定した。Apple App Sandboxを継承し、Flutter／Runnerへ資格を渡さない。Owner専用操作・Windows固有操作は現状の拒否を保持し、macOS全機能完成とは扱わない。責任と未成立範囲は`docs/specs/macos-desktop-channel.md`。手動Actionsの独立`macos_product`を使い、iOS／AndroidのCLOSED試験は起動していない。

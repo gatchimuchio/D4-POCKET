@@ -20,7 +20,8 @@ final class AdapterOwnerUITests: XCTestCase {
     XCTAssertTrue(ready)
     runtime.click()
     try presentManifest(app)
-    let deny = notice.buttons["承認しない"]
+    // OSはTouch Barにも同名ボタンを出す。実際の確認dialog内だけを操作する。
+    let deny = notice.dialogs.firstMatch.buttons["承認しない"]
     let ownerVisible = deny.waitForExistence(timeout: 15)
     if !ownerVisible {
       // 専用runner・合成公開Manifestだけの試験。UIの既存拒否理由を観測する。
@@ -39,7 +40,7 @@ final class AdapterOwnerUITests: XCTestCase {
     deny.click()
     XCTAssertTrue(element(app, "Adapter catalogなし").waitForExistence(timeout: 10))
     try presentManifest(app)
-    let approve = notice.buttons["今回の操作を承認"]
+    let approve = notice.dialogs.firstMatch.buttons["今回の操作を承認"]
     XCTAssertTrue(approve.waitForExistence(timeout: 15))
     approve.click()
     XCTAssertTrue(element(app, "Adapter管理 / アダプター台帳: macos_owner_fixture").waitForExistence(timeout: 15))
