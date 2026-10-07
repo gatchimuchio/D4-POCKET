@@ -47,6 +47,8 @@
 
 [run 37613082451](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37613082451)、commit `5c56b47a27941069ee3e32fea4ff4592f7cfd996`で入力欄へのclickと合成Manifestの入力まで到達したが、dialog内submitの`click()`もnot hittableでFAIL。観測されたボタンframe `{{654,547},{178,33}}`を窓内確認し、同じ通常coordinate clickへ揃える。OS確認の選択・Broker受理はまだ未成立であり、製品を変更せず試験操作だけを修正する。
 
+[run 37614000665](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37614000665)、commit `59b42ea9c323784913311490636200c4d88c1f8b`で入力・submit・dialog閉鎖まで成立したが、OS確認ボタン不存在でFAIL。artifact `11478912301`、SHA-256 `a4dbb06139f61fe9fc0ecb1151e874fd17b73289815a6aaa0c34893d815b3594`を照合し、画面記録でOS確認が表示されていないことを確認した。入力受理・Broker拒否・OS表示を切り分けるため、同じ合成試験の失敗時に限り既存製品UIの拒否理由と全画面を記録する。確認不能を承認へ変えるfallbackやOS保護設定変更はしない。
+
 #### macOS Desktop通常Broker接続 — CLOSED（Product Build、2026-10-07）
 
 開始時のmacOS Runnerには`gui_shell/broker`登録がなく、Flutterの通常起動から実Brokerへ到達しなかった。本有限単位を、同梱Rust helperへの匿名pipe、既存認証Broker normal経路、初回設定等の製品bootstrap、正常終了へ限定した。Apple App Sandboxを継承し、Flutter／Runnerへ資格を渡さない。Owner専用操作・Windows固有操作は現状の拒否を保持し、macOS全機能完成とは扱わない。責任と未成立範囲は`docs/specs/macos-desktop-channel.md`。手動Actionsの独立`macos_product`を使い、iOS／AndroidのCLOSED試験は起動していない。

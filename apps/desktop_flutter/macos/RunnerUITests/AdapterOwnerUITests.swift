@@ -21,7 +21,16 @@ final class AdapterOwnerUITests: XCTestCase {
     runtime.click()
     try presentManifest(app)
     let deny = notice.buttons["承認しない"]
-    XCTAssertTrue(deny.waitForExistence(timeout: 15))
+    let ownerVisible = deny.waitForExistence(timeout: 15)
+    if !ownerVisible {
+      // 専用runner・合成公開Manifestだけの試験。UIの既存拒否理由を観測する。
+      print("D4_MACOS_OWNER_FAILURE \(app.debugDescription)")
+      let screen = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+      screen.name = "D4-macOS-owner-missing"
+      screen.lifetime = .keepAlways
+      add(screen)
+    }
+    XCTAssertTrue(ownerVisible)
     deny.click()
     XCTAssertTrue(element(app, "Adapter catalogなし").waitForExistence(timeout: 10))
     try presentManifest(app)
