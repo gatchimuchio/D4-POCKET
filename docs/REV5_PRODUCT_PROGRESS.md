@@ -45,6 +45,10 @@ Windows hostのAPI 35 Emulatorでは、製品起動を妨げるSystem UIのANR d
 
 局所互換修正後、Windowsの`cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1`はcompile成功、library 497 passed／3 failed／12 ignored。変更箇所のpackage保管・一致hash削除・修復・非通常file拒否・create-only公開の5件はPASSした。全体の失敗はA2A Agent Card読取1件とUpdate TLS fixtureのConnectionReset（OS 10054）2件で、既存`FQ-TEST-LOOPBACK`の対象に残す。全Rust PASSとは報告せず、library失敗後の他targetも未実行として区別する。Schema 161／157／208、Conformance 236件はPASS。Mobile analyzeはNo issues、Desktop analyzeは依存取得後に既存deprecated info 5件だけで終了値1（既存known limitation）。
 
+手動Actions [run 37579840231](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37579840231)（`da0b95172a7c79ae8c3fe82bdd1855f45636f6a8`）では、前記metadataのcompile errorは解消したが、Windows専用`ActiveVersionDescriptor`を参照する投影関数の`cfg(windows)`漏れ1件が残り、Android試験は未実行だった。既存Windows専用呼出元と同じ条件へ投影関数を限定し、非Windowsへ更新適用能力を追加しない。
+
+条件分岐修正後の`cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml --lib broker::update_center::tests:: -- --test-threads=1`は25 passed／0 failed。Schema 161／157／208とConformance 236件もPASSした。先の全library試験で記録した3失敗をこの対象試験の成功で上書きしない。
+
 ## Q0 品質保証凍結 — 完了（過去のFinal QA記録）
 
 2026-10-07、P12 Product Build受入れcommit `ab746d4b33b003761f5ddcef60a88afa97132a40`をFinal QA対象製品状態として固定した。対象commitは`main`へpush済みで、Q0記録時点のremote `main`と一致。対象はWindows Feature Complete製品構成であり、release-readyや正式配布可能状態を意味しない。以後のQ1〜Q7 evidenceはこの凍結commitを対象とし、製品コード修正が必要になった場合は修正commitを新たなQA候補として明示し、対象を再凍結する。

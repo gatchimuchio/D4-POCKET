@@ -1252,7 +1252,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "5d9c7168695a4b175602b5e462b80c2dfa02c6cb6c0e4088778fe8fbe996c764"
+      "sha256": "aea73f471faad645f1b1548fadbc0abed0a25479f7b186929b0cc0a2e4099b12"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -3364,7 +3364,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "41e858d549b1d429eb5f49cbbe3d341c1fd8fc89f345e9d965668ca88cf68f1f"
+      "sha256": "4aaabb8e9f3a8c139933ac018ed09364bd8d6cbeb2a3ca075b07a3ef8d862726"
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",

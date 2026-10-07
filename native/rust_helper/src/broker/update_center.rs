@@ -1699,6 +1699,7 @@ fn rollback_descriptor_matches_candidate(
         && verified.candidate.package_sha256.as_deref() == Some(descriptor.package_sha256.as_str())
 }
 
+#[cfg(windows)]
 fn rollback_descriptor_projection(
     descriptor: &crate::product_bootstrapper::ActiveVersionDescriptor,
 ) -> Value {
