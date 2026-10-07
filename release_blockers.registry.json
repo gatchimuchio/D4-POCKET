@@ -3358,7 +3358,17 @@
         "artifact_sha256": "9888bd0c3bb84b9f936cbc7131b3282796847ec474d2befd5a151c0dce696694",
         "artifact_expires_at": "2026-10-10T07:02:09Z"
       },
-      "required_action": "招待・資格をDart／debug VM／表示／error／log／trace／artifactへ通さずiOS製品UI・native service・基本lifecycleの未成立統合を進める。Workspace選択・対話ID結合、拒否・失効・background停止の最終platform保証はFinal QAで検証する。Android基本正常経路とiOS native部品接続を証拠強化だけのために再開しない。実機証拠はowner指示に従いAndroid凍結解除後に取得する。in-place Android buildが必要な場合はACL管理者の判断を得る。端末内local_recovery_auditはDesktop AuditEventへ昇格させない。production identityと各platformのrelease evidenceは別途維持する。"
+      "ios_product_ui_evidence": {
+        "source_commit": "1188ed96439a56b698f0bca52f0ab4466b115aa8",
+        "run_url": "https://github.com/gatchimuchio/GUI-Shell/actions/runs/37592632518",
+        "evidence_source": "LIVE_RUNTIME",
+        "validation": "iPhone 16 Pro／iOS 18.5専用SimulatorでFlutter画面→native招待／接続先確認→既存service→実Broker、資格保管再読、Runtime表示、HOME復帰、設定画面からの離脱がPASS。XCUITest 1 passed／0 failed／0 skipped。Owner側招待・結合不存在、招待秘密の出力不存在、専用Simulator停止・削除を確認。Rust build、Mobile解析、Flutter test 21件、通常Simulator buildもPASS。",
+        "scope_limit": "基本製品接続単位はCLOSED。接続試験はSimulator専用入力flag付きbuildであり、通常Release・物理端末・全lifecycle timing・正式配布の証拠ではない。先行reason／部品証拠の未成立記載は当時の範囲であり、現在の基本製品経路成立を上書きしない。Mobile release blockerは保持。",
+        "artifact_id": "11468904894",
+        "artifact_sha256": "90ff1cce5a16d6fe24eee97ea01906a9f9acb1b8c13dc32b196d4018621bffc0",
+        "artifact_expires_at": "2026-10-10T08:20:41Z"
+      },
+      "required_action": "P13の残る製品機能差分を進める。Workspace選択・対話ID結合、拒否・失効・background停止の最終platform保証はFinal QAで検証する。Android／iOSのCLOSED基本製品経路を証拠強化だけのために再開しない。実機証拠はowner指示に従いAndroid凍結解除後に取得する。in-place Android buildが必要な場合はACL管理者の判断を得る。端末内local_recovery_auditはDesktop AuditEventへ昇格させない。production identityと各platformのrelease evidenceは別途維持する。"
     }
   ]
 }

@@ -17,7 +17,7 @@
 
 ## P13 Mobile / Non-Windows — 現行track
 
-#### iOS製品UI／native service／基本lifecycle — IMPLEMENTING（2026-10-07）
+#### iOS製品UI／native service／基本lifecycle — CLOSED（Product Build、2026-10-07）
 
 有限Acceptanceは、新規専用Simulator上の製品Flutter画面からnative招待画面・接続先確認・既存serviceへ進み、実Broker結合、Runtime表示、OSによるbackground／復帰、製品画面での離脱を一度成立させること。現行harnessは標準XCUITestで画面を操作する。招待だけは明示的なSimulator試験buildの`D4_IOS_PRODUCT_TEST`内でnative secure fieldへ渡し、Flutter／shell／環境変数／UI操作logへ秘密を渡さない。service直接呼出し・foreground偽装・承認迂回をしない。通常buildでは試験入力helperと起動呼出しをcompileから除外し、同flagを付けた物理端末buildはcompile errorにする。`--ios-product-ui`は新規製品接続試験だけを選択し、CLOSEDの部品試験を再実行しない。物理端末、網羅的lifecycle timing、Final QAは本単位へ追加しない。
 
@@ -30,6 +30,16 @@
 [run 37589607834](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37589607834)、commit `27a57ae2f09a7aadaf37b837a8b7e4d621f2b0fc`で招待受信・形式検証まで進み、`invitation_submit`でFAIL。hosted XCTestのin-process accessibility呼出しではUIKit確認操作を成立させられなかったため、この試験経路と診断を撤去し、標準RunnerUITests targetへ置き換える。招待秘密を`typeText`の操作logへ出さないため、native入力helperだけを明示Simulator試験buildへ限定する。通常製品の新しい操作能力・Authority・credential経路ではない。確認ボタン、HOME、製品復帰、離脱はXCUITest自身が操作する。このharnessはdevelopment専用として保持し、UIKitの通常UI testだけで秘密を安全に入力可能になった場合に補助入力部分を除去できる。
 
 XCUITestへ切り替えた[run 37591398458](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37591398458)、commit `d8e30d246f9c85de9af6ce7b2a92b4f081c31e30`は通常Simulator buildと試験構成のcompile・起動が成功したが、`initial_screen`で1件FAIL。Flutter見出しの要素種別をstaticTextへ固定した検索をlabel基準へ揃え、初期header／navigation段階を分離した。招待発行前に限り固定4 labelの存在・型・操作可否だけを出力し、画面tree・入力値は記録しない。
+
+修正commit `1188ed96439a56b698f0bca52f0ab4466b115aa8`の手動Actions [run 37592632518](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37592632518)はPASS。macOS 15.7.9／Xcode 16.4、iPhone 16 Pro／iOS 18.5の新規専用Simulatorで、Flutter画面からnative招待入力・接続先確認・既存Swift service・実Rust Brokerを通し、資格保管再読、Runtime left／right表示、HOMEによるbackgroundと製品復帰、設定画面からの離脱まで成立した。XCUITest 1 passed／0 failed／0 skipped、実行時間44.289秒。Owner側の招待・結合不存在、招待秘密がXCTest出力・Broker log・durable Auditにないことも確認した。Rust Broker build、Mobile解析（No issues）、Flutter test 21件、試験入力helperを含まない通常Simulator buildが成功した。CLOSEDの部品試験は実行していない。
+
+正確な実行経路は`python3 tooling/minidora_live_check.py --reference <固定MINIDORA checkout> --ios-simulator <専用UUID> --ios-derived-data <専用directory> --ios-result-bundle <専用xcresult> --ios-product-ui`からの`xcodebuild test -only-testing:RunnerUITests/DeviceLinkProductUITests`。MINIDORA参照は`3400a3bb68b37efa1dc14ee8aaa28fda779bf1f8`。証拠は試験入力flag付きSimulator buildの基本製品経路に限る`LIVE_RUNTIME`であり、通常Release、物理端末、網羅的lifecycle／障害、正式配布を証明しない。Authority・Approval・秘密保管・通信の製品経路は変更していない。
+
+artifact ID `11468904894`、SHA-256 `90ff1cce5a16d6fe24eee97ea01906a9f9acb1b8c13dc32b196d4018621bffc0`、remote保存期限2026-10-10T08:20:41Z。同hashのZIPをGit対象外`release_evidence/p13-ios-product-1188ed9.zip`へ保存し、要約とPASS内容を照合した。runner追跡source差分なし、Broker招待・結合回収、専用Simulator停止・削除が成功した。成功した正確なsource commitを`main`へfast-forward・pushし、remote HEAD一致を確認した。変更前rollbackは`9ed7e71e1e77be00cc71cb65a06e8f134504240f`、前世代は`b268add4a40ed1095902fc6bd056e0a52fd0d22c`。
+
+この有限AcceptanceをCLOSEDとし、証拠強化のために再実行しない。P13の残る製品機能差分へ進む。Mobile実機／正式identityとFinal QAの`release_blocker`、Android実機凍結、通常Release `task_execution=unsupported`、`release_ready=false`を保持する。過去のFAILを消去せず、文書同期のためのruntime再試験もしない。
+
+閉鎖文書の局所検査は`python -X utf8 tooling/schema_check/check_schemas.py`（161 schema／157正常例／208負例）、`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`（236件）、`python -X utf8 tooling/release_gate_check.py --release-track windows_v1`、Manifest 1187件、`git diff --check`がPASS。厳格日本語監査の既存4 file／15 findingsは変更外の最終QA `release_blocker`として保持する。Rust製品codeとDartは本単位で変更しておらず、Rust全数・Desktop解析・物理端末試験は再実行対象に追加していない。
 
 #### iOS native TLS／Keychainと実Brokerの接続 — CLOSED（Product Build、2026-10-07）
 

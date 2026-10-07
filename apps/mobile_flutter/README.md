@@ -6,7 +6,7 @@ Mobileは共通UIをFlutterで描画し、Device Linkの端末識別子・招待
 
 - Androidには固定MethodChannel、native招待画面、Android Keystoreで暗号化した資格保管、証明書hash固定TLS、有限timeout、Activity lifecycleからのbackground socket停止を実装した。API 35 Emulatorで製品UIから実Rust Brokerへの結合・Runtime表示・HOME復帰・切断が成立した。物理端末でのTLS・Keystore動作は未検証。
 - Flutterへ返す接続状態は閉じたprojectionであり、端末ID・Host・招待・資格・secretを含めない。通常操作は既存Desktop Rust Brokerを通る。
-- iOSにはSwift製Device Link channel handler、ThisDeviceOnly Keychain保管、証明書hash固定TLS client、厳格JSON検証、native XCTestが実装済みで、implicit Flutter engineへ登録される。Simulator native XCTestから実Rust BrokerへのTLS結合・Runtime取得・離脱・失効拒否とKeychain保存・再読・削除が成立した。製品UI・native確認dialog・OS lifecycle・実端末の証拠とは区別する。現行結果は`docs/REV5_PRODUCT_PROGRESS.md`を参照する。
+- iOSにはSwift製Device Link channel handler、ThisDeviceOnly Keychain保管、証明書hash固定TLS client、厳格JSON検証、native XCTestが実装済みで、implicit Flutter engineへ登録される。Simulatorの部品接続に加え、製品Flutter UI→native招待／確認→実Rust Broker、Runtime表示、HOME復帰、画面からの離脱がXCUITestで成立した。試験入力flag付きSimulatorの証拠であり、通常Release・実端末・正式配布とは区別する。現行結果は`docs/REV5_PRODUCT_PROGRESS.md`を参照する。
 - 過去のdebug VM integration driverは招待をDartへ渡していたため廃止した。Androidは招待入力・保管・TLSをnative側に保つinstrumentation harnessで基本製品経路を確認した。iOSも秘密をDart、log、artifactへ渡さないnative harnessから実Brokerへの部品接続を確認した。
 
 ## ローカル確認
@@ -46,17 +46,19 @@ commit `599359be236962498f93842ec66145339290380f`の手動Actions [run 375845115
 
 手動Actionsの`target=ios_product_ui`がこの専用Simulatorを作成・回収する。既存の`ios_mobile`は部品試験として保持するが、CLOSEDした部品の証拠強化のためには実行しない。製品試験の失敗は固定stageで識別し、招待実値をUI runnerへ返さない。
 
+commit `1188ed96439a56b698f0bca52f0ab4466b115aa8`の手動Actions [run 37592632518](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37592632518)で基本製品経路がPASS（XCUITest 1 passed／0 failed／0 skipped）。招待・結合の回収、秘密出力の不存在、専用Simulator停止・削除も確認した。この有限単位はCLOSED。通常Simulator build・Mobile解析・Flutter test 21件も成功したが、製品接続試験自体は専用入力flag付きであり、通常Releaseの証明へ読み替えない。
+
 ## リリース阻害項目
 
-- item: iOS端末連携のnative実行時統合
+- item: iOS端末連携の最終platform保証
   classification: release_blocker
-  reason: Simulator上のSwift TLS／Keychainと実Broker接続は成立したが、製品UI・native確認dialog・OS lifecycle・物理端末の統合証拠ではない。
-  required_action: 秘密をFlutter／debug VM／log／artifactへ渡さず製品UI・native service・基本lifecycleを接続し、最終品質保証で必要な実機証拠を取得する。Android実機試験はowner指示の凍結を維持する。
+  reason: Simulator上の製品UI・native確認・実Broker接続・HOME復帰・離脱は成立したが、通常Release・物理端末・全lifecycle timingの証拠ではない。
+  required_action: 最終品質保証で必要なplatform境界・実機証拠を取得する。基本経路は再開せず、Android実機試験はowner指示の凍結を維持する。
   blocks_release: yes
 - item: Android/iOS Device Linkの実動作証拠
   classification: release_blocker
-  reason: Android Emulatorのnative製品経路とiOS Simulatorのnative部品接続は実Brokerへ到達したが、物理端末とiOS製品UI／lifecycle統合は未成立。Android実機試験は凍結中。
-  required_action: iOSの未成立統合を進め、最終品質保証で必要なplatform境界を検証する。Android実機凍結の解除後に実機証拠を取得し、Emulatorの成功で代替しない。
+  reason: Android EmulatorとiOS Simulatorの基本製品経路は実Brokerへ到達したが、物理端末の安全保管・通信・lifecycleは未成立。Android実機試験は凍結中。
+  required_action: 最終品質保証で必要なplatform境界を検証する。Android実機凍結の解除後に実機証拠を取得し、Emulator／Simulatorの成功で代替しない。
   blocks_release: yes
 - item: 公開配布の識別子と署名
   classification: release_blocker
