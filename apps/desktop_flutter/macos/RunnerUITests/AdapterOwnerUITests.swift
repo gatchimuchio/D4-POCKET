@@ -57,13 +57,15 @@ final class AdapterOwnerUITests: XCTestCase {
     install.click()
     // Flutter 3.44 macOSは編集欄をNSTextFieldとして公開する。
     // 全要素のvalueを評価せず、このdialogで唯一の編集欄だけを取得する。
+    let input = app.textFields.firstMatch
+    XCTAssertTrue(input.waitForExistence(timeout: 10))
+    XCTAssertTrue(app.windows.firstMatch.frame.contains(input.frame))
     let screen = XCTAttachment(screenshot: app.screenshot())
     screen.name = "D4-macOS-manifest-entry"
     screen.lifetime = .keepAlways
     add(screen)
-    let input = app.textFields.firstMatch
-    XCTAssertTrue(input.waitForExistence(timeout: 10))
-    input.click()
+    // native編集欄はFlutterViewの背面に置かれる。取得した入力欄中央へ通常clickを送る。
+    input.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
     // 合成公開Manifestのみ。秘密・実署名鍵・外部作用を含まない。
     let value: [String: Any] = [
       "版": 1, "Adapter ID": "macos_owner_fixture", "Runtime ID": "macos_owner_runtime",
