@@ -2,7 +2,7 @@
 
 ## 目的と有限単位
 
-P13のmacOS画面は`gui_shell/broker`未登録のため、通常起動時に実Brokerへ到達しない。既存Flutter clientの要求を同梱Rust helperへ結合し、実Brokerの初回設定・health等の通常要求と正常終了を成立させる。これはmacOS移植の接続単位であり、Windows製品機能の全移植・Owner確認・正式配布の完成ではない。
+P13で未接続だったmacOS画面の`gui_shell/broker`を同梱Rust helperへ結合し、実Brokerの初回設定・health等の通常要求と正常終了を成立させる。これはmacOS移植の接続単位であり、Windows製品機能の全移植・Owner確認・正式配布の完成ではない。有限Acceptanceは手動Actions run 37598578513でCLOSED。正確な証拠範囲は`docs/REV5_PRODUCT_PROGRESS.md`を参照する。
 
 ## 責任
 

@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "b4323eb08ddcccc6a141d8af7f5eadb55ea172aa70edc5cef02cbbc562217898"
+      "sha256": "f4504f9ce5d9d68ab11f376b9482b4f6d6e5f61a45dcf8b67df70720b7f097f6"
     },
     {
       "path": "SECURITY.md",
@@ -192,7 +192,7 @@
     },
     {
       "path": "apps/desktop_flutter/README.md",
-      "sha256": "e66f4fe452503d8a84d60a4a8b74210c4db8bcfc35f2ba9f79d3481e4eddf5d0"
+      "sha256": "77b68c248b274549aba7281909d2e920171323bde360cf64958093cc65a249a9"
     },
     {
       "path": "apps/desktop_flutter/analysis_options.yaml",
@@ -1268,7 +1268,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "a471ab1074e6c70d3dc9e033ed02477ac621837c9969cd469215bedfb5faafd4"
+      "sha256": "49161121f80347b1208be87776a450ea19da688945503eb0e2b8e1932729c0cf"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1480,7 +1480,7 @@
     },
     {
       "path": "docs/specs/macos-desktop-channel.md",
-      "sha256": "8d5202c498d617bc93797233995968099d8ef25b31ff8983d72c065e53f5c95b"
+      "sha256": "977d33be7885e632c910b319690fbd244ddd59314f0587797bbe3a63e78ed5f1"
     },
     {
       "path": "docs/specs/mcp-connection-center.md",
@@ -3996,7 +3996,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "593cf2d63090c064a2b5c4ef373e888d94541f23899026f40ad29cebe74ce1cc"
+      "sha256": "b05583ab7e26590ee2d94b7c7096c3214cb487690286e4a6d5c6f86e929c6857"
     },
     {
       "path": "requirements-dev.txt",

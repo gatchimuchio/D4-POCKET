@@ -31,8 +31,8 @@ Flutter 3.44.0のmacOS Runnerは同梱Rust helperを匿名pipe経由で使用す
 
 開発buildは先に`cargo +1.95.0 build --locked --manifest-path native/rust_helper/Cargo.toml --bin gui_shell_macos_broker`を実行し、その後`flutter build macos --debug`で同梱する。ReleaseはRust側にも`--release`を指定する。Xcodeは同じprofileの固定helperを同梱し、欠損時はbuildを失敗させる。end userがRustやterminalを用意する経路ではない。
 
-- item: macOS実機のbroker資格配置・起動・配布
+- item: macOSの残る製品機能・復旧・正式配布
   classification: release_blocker
-  reason: 通常Broker接続を実装中。Owner専用操作・Credentials・Task・Windows固有製品機能のmacOS移植、異常終了後の起動lock復旧、正式署名・配布は未成立。bundle identifierは開発用である。
+  reason: 通常Broker接続・初回設定・正常終了は手動Actions run 37598578513で成立した。Owner専用操作・Credentials・Task・Windows固有製品機能のmacOS移植、異常終了後の起動lock復旧、正式署名・配布は未成立。bundle identifierは開発用である。
   required_action: P13の製品接続から順に不足を実装する。通常接続の成功をmacOS全機能完成へ昇格せず、最終QAと正式identity／配布を別途成立させる。
   blocks_release: yes

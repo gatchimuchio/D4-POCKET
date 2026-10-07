@@ -17,9 +17,9 @@
 
 ## P13 Mobile / Non-Windows — 現行track
 
-#### macOS Desktop通常Broker接続 — IMPLEMENTING（2026-10-07）
+#### macOS Desktop通常Broker接続 — CLOSED（Product Build、2026-10-07）
 
-現行macOS Runnerには`gui_shell/broker`登録がなく、Flutterの通常起動から実Brokerへ到達しない。次の有限単位を、同梱Rust helperへの匿名pipe、既存認証Broker normal経路、初回設定等の製品bootstrap、正常終了へ限定する。Apple App Sandboxを継承し、Flutter／Runnerへ資格を渡さない。Owner専用操作・Windows固有操作は現状の拒否を保持し、macOS全機能完成とは扱わない。責任と未成立範囲は`docs/specs/macos-desktop-channel.md`。手動Actionsの独立`macos_product`を使い、iOS／AndroidのCLOSED試験を起動しない。
+開始時のmacOS Runnerには`gui_shell/broker`登録がなく、Flutterの通常起動から実Brokerへ到達しなかった。本有限単位を、同梱Rust helperへの匿名pipe、既存認証Broker normal経路、初回設定等の製品bootstrap、正常終了へ限定した。Apple App Sandboxを継承し、Flutter／Runnerへ資格を渡さない。Owner専用操作・Windows固有操作は現状の拒否を保持し、macOS全機能完成とは扱わない。責任と未成立範囲は`docs/specs/macos-desktop-channel.md`。手動Actionsの独立`macos_product`を使い、iOS／AndroidのCLOSED試験は起動していない。
 
 初回Rust対象試験は2件中1件PASS／1件FAIL。normal資格で許可される既存`shutdown`をOwner専用と誤ったtestの前提が原因で、Owner専用の`作業領域承認`と正確な拒否codeへ修正する。Broker本体の権限規則は変更しない。
 
@@ -28,6 +28,14 @@
 初回手動Actions [run 37596139461](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37596139461)、commit `5b6e1c9d34f8d364454bcb657adf9f2a5645a09d`ではMac上のRust対象2試験とhelper buildがPASS。Swiftの`write(contentsOf:)`／`read(upToCount:)`がmacOS 10.15.4以上を要求し、既存最低OS設定に対してcompile FAILとなった。最低OSを引き上げずDarwin pipe I/Oへ修正し、EINTR、書込切断、上限、親側の不要pipe端のcloseを扱う。native製品試験は未実行。この間のDesktop／Mobile `flutter analyze --no-pub`は既知のOneDrive日本語pathでLSP JSON FormatException、analysis server exit 255／CLI exit 1となり、host-local制約として保持した。生成された今回のcrash log 2 fileは回収済みで、製品sourceへ回避策を追加しない。
 
 次の手動Actions [run 37597211261](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37597211261)、commit `7f756250c5d290eafc1afd4a01ba961c1f7bf171`はRust対象2件と製品buildがPASS、native XCTestは1 passed／1 failed。製品bootstrap待機が20秒で失敗し、終了assertionは通過した。code確認ではmacOS helperが固定package配置検査を行わず、Brokerの`初回設定取得`が未初期化で拒否される未接続を確認した。Rust側で固定bundle配置を検査して既存の非権限UI設定初期化へ接続し、対象試験へ初回設定取得を追加する。bootstrap観測はDebugだけへ限定し、固定操作名だけを失敗診断へ使う。Owner資格・承認経路は追加しない。
+
+修正commit `a388e1d648536ce6f45ede48bc7d3a453075f6a7`の手動Actions [run 37598578513](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37598578513)はPASS。macOS 15.7.9 arm64（Apple Virtual Machine）／Xcode 16.4／Flutter 3.44.0／Rust 1.95.0で、製品Debug appにRust helperを同梱し、Flutter起動要求→native匿名pipe→実Brokerの初期11操作とhelper正常終了を確認した。native XCTest 2 passed／0 failed／0 skipped、接続test自体1.811秒。Rust対象3件もPASSし、normal Brokerの初回設定、session注入・replay・Owner操作拒否、frame上限、起動lock競合、固定配置不足の拒否を確認。helper残留なしと対象source cleanを確認した。これはhosted Mac上の実製品bootstrap／transportの限定`LIVE_RUNTIME`であり、画面全機能の操作・Owner確認・実Agent・通常Release・正式配布の証拠ではない。
+
+artifact `11471778223`（期限2026-10-10T09:11:45Z）のSHA-256 `73cb24fbaa9bcf70bdd5cb14121a22db81b4ae54f7dace117783ade0e60f6888`をローカル保存物と照合した。保存先はignored `release_evidence/p13-macos-product-a388e1d.zip`。成功した正確なcode commitを`main`へfast-forward・pushしremote HEAD一致を確認した。復旧点は`codex/backup-main=91107dec2ab5ef606b26dd6276b60756ab0a6c84`、前世代`codex/backup-main-prev=9ed7e71e1e77be00cc71cb65a06e8f134504240f`で、remoteは同名tag。検証用branchは文書同期後にlocal／remoteとも回収する。
+
+今回修正後のローカル必須Rust全体はlibrary 501 passed／2 failed／12 ignored。変更外のUpdate Download TLS fixture `bounded_catalog_fetch_rejects_declared_document_over_limit`、`local_tls_server_repairs_only_after_verified_package_bytes`がOS 10054／InvalidContentTypeで失敗し、既存`FQ-TEST-LOOPBACK`の未解決履歴に保持する。他targetはlibrary失敗により未実行。対象3件、Schema 161／157／208、Conformance 236、Manifest 1192と差分形式検査はPASS。既知の全体Rust失敗・日本語監査指摘・ローカルFlutter LSP制約を全体PASSへ読み替えない。
+
+次はP13の残る製品機能差分で、macOS Owner確認・Credentials・Agent／Workspace・Taskのplatform対応は`release_blocker`として残る。今回CLOSEDした通常接続を追加証拠目的で再開しない。起動lockの異常終了後Recovery、正式identity／署名／配布、全platformの最終品質保証も別gateであり、通常Release `task_execution=unsupported`、`release_ready=false`を変更しない。
 
 #### iOS製品UI／native service／基本lifecycle — CLOSED（Product Build、2026-10-07）
 

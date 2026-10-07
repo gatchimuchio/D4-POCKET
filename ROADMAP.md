@@ -1,6 +1,6 @@
 # GUI Shell ロードマップ
 
-P13 macOS通常Broker接続: native Runnerに未接続の`gui_shell/broker`を、sandbox継承する同梱Rust helperと既存認証Brokerへ接続する。製品bootstrap・通常要求・正常終了が今回の有限単位。Owner操作・Windows機能の全移植・正式配布は別範囲。手動`apple-manual-build.yml`の`macos_product`で補助検証し、CLOSED済みMobile接続を再試験しない。
+P13 macOS通常Broker接続はCLOSED: commit `a388e1d648536ce6f45ede48bc7d3a453075f6a7`、手動Actions [run 37598578513](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37598578513)で製品Flutter bootstrap→sandbox継承する同梱Rust helper→既存認証Brokerの初期11操作と正常終了がPASS。native XCTest 2件／Rust対象3件、source cleanとhelper終了を確認。次はP13の残るOwner操作・Agent／Workspace等のplatform機能差分。通常Release／正式配布／Final QAへ成功を拡大せず、CLOSED済みmacOS通常接続とMobile接続を再試験しない。
 
 P13 iOS製品接続はCLOSED: 手動Actions [run 37592632518](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37592632518)、commit `1188ed96439a56b698f0bca52f0ab4466b115aa8`で、Flutter画面→native招待／確認→既存service→実Broker、Runtime表示・HOME復帰・画面からの離脱がXCUITest 1件でPASS。秘密入力helperはSimulator試験buildだけへ限定し、通常buildには含めない。Owner側の招待・結合回収と専用Simulator削除も確認した。次はP13の残る製品機能差分。Android／iOSのCLOSED基本接続を再試験せず、物理端末・正式配布・最終QAは別gateに保持する。詳細は`docs/REV5_PRODUCT_PROGRESS.md`。
 
