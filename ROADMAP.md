@@ -1,5 +1,7 @@
 # GUI Shell ロードマップ
 
+P13 macOS既存Adapter状態管理はVALIDATING。対象は検証・有効化・無効化・隔離・削除のRust所有Owner確認接続。既存Brokerの署名・hash・状態判定は維持し、未検証有効化を拒否する。手動Actions `macos_adapter_lifecycle`でこの差分だけを検証する。導入・更新、通常接続、MobileのCLOSED条件は再開しない。有限Acceptanceは`docs/specs/macos-desktop-channel.md`。
+
 P13 macOS Owner確認・Adapter導入／更新はCLOSED: commit `0729f07437f308c71c1f4dc694e62016ea58ad3e`、手動Actions [run 37623944221](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37623944221)で製品UIから実OS確認の拒否・承認・catalog登録・通常終了がPASS。実Brokerの導入／更新・永続化・replay／session注入／不正hash拒否も対象試験でPASS。通常Release能力・他Owner操作・正式配布へ成功を拡大しない。次はP13の残る製品差分であり、この有限単位・通常接続・MobileのCLOSED範囲を追加証拠目的で再試験しない。
 
 P13 macOS通常Broker接続はCLOSED: commit `a388e1d648536ce6f45ede48bc7d3a453075f6a7`、手動Actions [run 37598578513](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37598578513)で製品Flutter bootstrap→sandbox継承する同梱Rust helper→既存認証Brokerの初期11操作と正常終了がPASS。native XCTest 2件／Rust対象3件、source cleanとhelper終了を確認。次はP13の残るOwner操作・Agent／Workspace等のplatform機能差分。通常Release／正式配布／Final QAへ成功を拡大せず、CLOSED済みmacOS通常接続とMobile接続を再試験しない。

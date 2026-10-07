@@ -1,6 +1,58 @@
 import XCTest
 
 final class AdapterOwnerUITests: XCTestCase {
+  func testProductAdapterLifecycle() throws {
+    let app = XCUIApplication()
+    let notice = XCUIApplication(bundleIdentifier: "com.apple.UserNotificationCenter")
+    continueAfterFailure = false
+    app.launch()
+    defer { app.terminate() }
+    let runtime = element(app, "実行系")
+    XCTAssertTrue(runtime.waitForExistence(timeout: 20))
+    runtime.click()
+    // 新しい状態管理試験の前提だけを用意する。導入Acceptanceの再試験ではない。
+    try presentManifest(app)
+    approve(notice)
+    XCTAssertTrue(element(app, "Adapter管理 / アダプター台帳: macos_owner_fixture").waitForExistence(timeout: 15))
+    for (operation, result) in [
+      ("検証", "rejected / 署名対象がmanifestの正本byteと一致しない"),
+      ("有効化", "rejected / 署名検証済みAdapterだけを有効化できる"),
+      ("無効化", "管理: disabled / 有効: inactive"),
+      ("隔離", "管理: quarantined / 有効: blocked")
+    ] {
+      manage(app, notice, operation)
+      let projection = app.staticTexts.matching(NSPredicate(format: "value CONTAINS %@ OR label CONTAINS %@", result, result)).firstMatch
+      XCTAssertTrue(projection.waitForExistence(timeout: 10), operation)
+    }
+    manage(app, notice, "削除")
+    XCTAssertTrue(element(app, "Adapter catalogなし").waitForExistence(timeout: 10))
+    print("D4_MACOS_ADAPTER_LIFECYCLE_PASS")
+    app.typeKey("q", modifierFlags: .command)
+    XCTAssertTrue(app.wait(for: .notRunning, timeout: 10))
+  }
+
+  private func approve(_ notice: XCUIApplication) {
+    let button = notice.dialogs.firstMatch.buttons["今回の操作を承認"]
+    XCTAssertTrue(button.waitForExistence(timeout: 15))
+    button.click()
+  }
+
+  private func manage(_ app: XCUIApplication, _ notice: XCUIApplication, _ operation: String) {
+    let button = app.buttons["アダプター" + operation]
+    XCTAssertTrue(button.waitForExistence(timeout: 10))
+    let available = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: button)
+    XCTAssertEqual(XCTWaiter.wait(for: [available], timeout: 10), .completed)
+    for _ in 0..<8 {
+      if button.frame.height >= 30 && button.isHittable { break }
+      app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.7))
+        .scroll(byDeltaX: 0, deltaY: -250)
+    }
+    XCTAssertGreaterThanOrEqual(button.frame.height, 30)
+    XCTAssertTrue(button.isHittable)
+    button.click()
+    approve(notice)
+  }
+
   func testProductAdapterOwnerDenialAndInstall() throws {
     let app = XCUIApplication()
     let notice = XCUIApplication(bundleIdentifier: "com.apple.UserNotificationCenter")

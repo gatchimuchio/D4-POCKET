@@ -35,15 +35,23 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
     }
     let operation = envelope.operation?.as_str().strip_prefix("アダプター")?;
     let payload = envelope.payload.as_ref()?;
-    let summary = adapter_center::owner_manifest_confirmation_summary(operation, payload)?;
-    let text = format!(
+    let text = if let Some(summary) = adapter_center::owner_confirmation_summary(operation, payload)
+    {
+        format!(
+            "Adapter {}をこのBrokerのcatalogへ要求します。\nAdapter: {}\n現在Adapter hash: {}\n要求hash: {}\n\nBrokerが現在のrecord、hash、署名と状態条件を再評価します。外部codeの起動・Permission・Approval・Credential・trustの付与は行いません。削除はcatalogのrecordだけが対象です。",
+            summary.operation, summary.adapter_id, summary.adapter_hash, hash,
+        )
+    } else {
+        let summary = adapter_center::owner_manifest_confirmation_summary(operation, payload)?;
+        format!(
         "Adapter {}をこのBrokerのcatalogへ登録します。\nAdapter: {}\nRuntime: {}\n発行者: {}\n版: {}\n接続: {}\n内容露出: {}\n要求Capability: {}\n許可差分（要求のみ）: {}\n既知の危険: {}\n互換性: {}\n署名者: {}\n署名対象hash: {}\n現在Adapter hash: {}\n要求hash: {}\n\n外部codeの起動・Permission・Approval・Credential・trustの付与は行いません。署名の検証・有効化は別操作です。",
         summary.operation, summary.adapter_id, summary.runtime_id, summary.publisher,
         summary.adapter_version, summary.transport, summary.content_exposure,
         summary.requested_capabilities.join(" / "), summary.permission_diff.join(" / "),
         summary.known_risks.join(" / "), summary.compatibility, summary.signer_fingerprint,
         summary.signed_bytes_hash, summary.current_adapter_hash.as_deref().unwrap_or("新規"), hash,
-    );
+        )
+    };
     let normalized = super::macos_desktop_worker::normalize(frame, &endpoint.session_id);
     Some(Candidate {
         request: String::from_utf8(normalized).ok()?,

@@ -12,6 +12,7 @@ name: Apple platform 手動補助build
           - ios_product_ui
           - macos_product
           - macos_owner
+          - macos_adapter_lifecycle
         default: all
         required: true
 
@@ -20,7 +21,7 @@ permissions:
 
 jobs:
   macos-product:
-    if: ${{ inputs.target == 'macos_product' || inputs.target == 'macos_owner' }}
+    if: ${{ inputs.target == 'macos_product' || inputs.target == 'macos_owner' || inputs.target == 'macos_adapter_lifecycle' }}
     runs-on: macos-15
     timeout-minutes: 30
     steps:
@@ -46,6 +47,8 @@ jobs:
           if [ '${{ inputs.target }}' = 'macos_owner' ]; then
             filter='macos_desktop_worker::tests::owner_adapter_roundtrip'
             cargo +1.95.0 test --locked --manifest-path native/macos_owner/Cargo.toml 2>&1 | tee evidence/macos-owner-native.txt
+          elif [ '${{ inputs.target }}' = 'macos_adapter_lifecycle' ]; then
+            filter='macos_desktop_worker::tests::owner_adapter_lifecycle'
           fi
           cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib "$filter" -- --test-threads=1 2>&1 | tee evidence/macos-rust-test.txt
           cargo +1.95.0 build --locked --manifest-path native/rust_helper/Cargo.toml --bin gui_shell_macos_broker 2>&1 | tee evidence/macos-rust-build.txt
@@ -55,6 +58,10 @@ jobs:
         run: |
           set -euo pipefail
           flutter pub get 2>&1 | tee ../../evidence/desktop-pub-get.txt
+          if [ '${{ inputs.target }}' = 'macos_adapter_lifecycle' ]; then
+            dart analyze lib/services/broker_client.dart test/broker_client_payload_hash_test.dart 2>&1 | tee ../../evidence/adapter-dart-analyze.txt
+            flutter test --no-pub test/broker_client_payload_hash_test.dart --plain-name 'native Owner確認のBroker操作はFlutter待機時間を共有する' 2>&1 | tee ../../evidence/adapter-timeout-test.txt
+          fi
           flutter build macos --debug --no-pub 2>&1 | tee ../../evidence/macos-build.txt
       - name: 製品bootstrapとBroker終了
         shell: bash
@@ -63,7 +70,10 @@ jobs:
           target=RunnerTests
           extra=()
           if [ '${{ inputs.target }}' = 'macos_owner' ]; then
-            target=RunnerUITests
+            target=RunnerUITests/AdapterOwnerUITests/testProductAdapterOwnerDenialAndInstall
+            extra=('SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG D4_MACOS_OWNER_UI_TEST')
+          elif [ '${{ inputs.target }}' = 'macos_adapter_lifecycle' ]; then
+            target=RunnerUITests/AdapterOwnerUITests/testProductAdapterLifecycle
             extra=('SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG D4_MACOS_OWNER_UI_TEST')
           fi
           xcodebuild test -project apps/desktop_flutter/macos/Runner.xcodeproj -scheme Runner \
@@ -78,7 +88,7 @@ jobs:
           set -euo pipefail
           if [ -d "$RUNNER_TEMP/macos-product-tests.xcresult" ]; then
             xcrun xcresulttool get test-results summary --path "$RUNNER_TEMP/macos-product-tests.xcresult" | tee evidence/macos-native-summary.json
-            if [ '${{ inputs.target }}' = 'macos_owner' ]; then
+            if [ '${{ inputs.target }}' = 'macos_owner' ] || [ '${{ inputs.target }}' = 'macos_adapter_lifecycle' ]; then
               xcrun xcresulttool export attachments --path "$RUNNER_TEMP/macos-product-tests.xcresult" --output-path evidence/macos-ui-attachments
             fi
           fi

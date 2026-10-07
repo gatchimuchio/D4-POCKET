@@ -359,6 +359,106 @@ mod tests {
     }
 
     #[test]
+    fn owner_adapter_lifecycle_拒否と現在条件を保持して状態管理する() {
+        let mut random = [0u8; 16];
+        getrandom::getrandom(&mut random).unwrap();
+        let root = std::env::temp_dir().join(format!("d4p-macos-adapter-{}", hex::encode(random)));
+        fs::create_dir(&root).unwrap();
+        let install: Value = serde_json::from_str(include_str!(
+            "../../../examples/contracts/adapter_management_request.valid.json"
+        ))
+        .unwrap();
+        let adapter_hash =
+            crate::broker::protocol::canonical_payload_hash(Some(&install["Manifest"]));
+        let payload = |operation: &str| {
+            json!({
+                "版": 1, "操作": operation, "Adapter ID": install["Manifest"]["Adapter ID"],
+                "Adapter hash": adapter_hash,
+            })
+        };
+        let request = |id: &str, operation: &str, payload: Value| {
+            json!({
+                "request_id": id, "nonce": id, "operation": operation,
+                "issued_at": BrokerRequestEnvelope::current_issued_at(),
+                "payload_hash": crate::broker::protocol::canonical_payload_hash(Some(&payload)),
+                "metadata": {"client": "desktop_flutter"}, "payload": payload,
+            })
+        };
+        let mut stale = payload("隔離");
+        stale["Adapter hash"] = format!("sha256:{}", "0".repeat(64)).into();
+        let mut injected = payload("隔離");
+        injected["approval"] = true.into();
+        let frames = [
+            request("setup", "アダプター導入", install.clone()),
+            request("denied", "アダプター無効化", payload("無効化")),
+            request("unchanged", "アダプター一覧", json!({"版":1})),
+            request("verify", "アダプター検証", payload("検証")),
+            request("enable", "アダプター有効化", payload("有効化")),
+            request("disable", "アダプター無効化", payload("無効化")),
+            request("stale", "アダプター隔離", stale),
+            request("injected", "アダプター隔離", injected),
+            request("mismatch", "アダプター検証", payload("無効化")),
+            request("quarantine", "アダプター隔離", payload("隔離")),
+            request("remove", "アダプター削除", payload("削除")),
+            request("empty", "アダプター一覧", json!({"版":1})),
+        ];
+        let bytes = frames.iter().map(|v| format!("{v}\n")).collect::<String>();
+        let mut output = Vec::new();
+        let mut confirmations = 0;
+        serve(
+            &root,
+            &VerifiedBundle,
+            &mut io::Cursor::new(bytes),
+            &mut output,
+            &mut |summary| {
+                confirmations += 1;
+                assert!(summary.contains("要求hash: sha256:"));
+                if confirmations > 1 {
+                    assert!(summary.contains("Adapter: mock_local_llm_adapter"));
+                    assert!(summary.contains("現在Adapter hash: sha256:"));
+                }
+                confirmations != 2
+            },
+        )
+        .unwrap();
+        let replies: Vec<Value> = String::from_utf8(output)
+            .unwrap()
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        assert_eq!(replies.len(), frames.len());
+        assert_eq!(replies[0]["status"], "accepted");
+        assert_eq!(replies[1]["status"], "suspended");
+        assert_eq!(
+            replies[2]["body"]["Adapter一覧"][0]["管理状態"],
+            "installed"
+        );
+        assert_eq!(
+            replies[3]["error"]["code"],
+            "adapter_signed_payload_mismatch"
+        );
+        assert_eq!(replies[4]["error"]["code"], "adapter_transition_denied");
+        assert_eq!(replies[5]["body"]["管理状態"], "disabled");
+        assert_eq!(replies[6]["error"]["code"], "adapter_stale");
+        for reply in &replies[7..9] {
+            assert_ne!(reply["status"], "accepted");
+        }
+        assert_eq!(replies[9]["body"]["管理状態"], "quarantined");
+        assert_eq!(replies[10]["body"]["管理状態"], "removed");
+        assert!(replies[11]["body"]["Adapter一覧"]
+            .as_array()
+            .unwrap()
+            .is_empty());
+        assert_eq!(confirmations, 8);
+        let audit = fs::read_to_string(root.join("store/audit.jsonl")).unwrap();
+        for operation in ["検証", "有効化", "無効化", "隔離", "削除"] {
+            assert!(audit.contains(&format!("アダプター{operation}")));
+        }
+        assert!(!root.join("normal-session.json").exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn owner_adapter_roundtrip_denial_install_update_replay_and_injection() {
         let mut random = [0u8; 16];
         getrandom::getrandom(&mut random).unwrap();

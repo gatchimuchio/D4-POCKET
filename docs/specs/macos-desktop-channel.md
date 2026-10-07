@@ -26,6 +26,18 @@ Rustは自身の実行pathから`.app/Contents/MacOS`、固定名app／helper、
 
 Owner確認・Credentials・Task実行・Windows固有Install／Updateは本接続からsupportedへ昇格しない。macOS製品全体と正式署名・配布は`release_blocker`のまま。crash timing／長時間／網羅的alias等はFinal QAへ送り、基本接続Acceptanceを拡張しない。
 
+## Owner追加契約 — 既存Adapterの状態管理
+
+状態: VALIDATING。P13の有限単位として、既存の検証・有効化・無効化・隔離・削除ボタンをRust所有OS確認から既存Brokerへ接続する。導入・更新のCLOSEDを再開しない。要求Schemaは既存`adapter_management_request.schema.json`のままとし、公開Contractを増やさない。
+
+Rustは操作名、Adapter ID、現在Adapter hash、要求hashを確認画面へ結合する。未知field、Manifest混入、操作不一致、不正ID／hashは確認候補にならない。承認後もBrokerが現行record、hash、署名と状態条件を再評価する。承認による署名Trust、Permission、Task Approvalの生成はない。作用はcatalogとAuditだけで、外部artifact／processには作用しない。
+
+SwiftとFlutterの待機期限は当該5操作も305秒とし、既存の上限300秒のOS確認を待てるようにする。期限を延ばしてもAuthorityは生成せず、取消・失敗・期限超過は非承認のまま。通常要求は従来どおり5秒である。
+
+有限Acceptance: 実Broker経路で拒否時不変、署名不正・未検証有効化拒否、無効化・隔離・削除とAudit、古いrecord hash・不正payload拒否を確認する。macOS製品画面から5操作を実OS確認へ接続し、結果を表示する。署名検証・有効化の正の状態遷移は既存Broker署名試験の直接依存確認を使い、macOS製品でのTrust導入成功とは扱わない。通常macOS helperにはTrust設定の製品入口が未接続のため、Trust未設定／不正署名の拒否を保持する。この追加機能・正式署名配布は`release_blocker`として別単位へ残し、現在のOwner接続試験を拡大しない。
+
+検証環境は手動Actionsの`macos_adapter_lifecycle`のみ。旧導入試験は選択せず、新しい状態操作の準備としてだけ合成Manifestを登録する。UI試験は下記と同じ明示Debug表示補助を使い、通常buildと区別する。
+
 ## Owner追加契約 — Adapter導入・更新
 
 状態: 有限Acceptanceはcommit `0729f07437f308c71c1f4dc694e62016ea58ad3e`、手動Actions run `37623944221`でCLOSED。製品UIの拒否・承認・導入・通常終了、実Brokerの導入／更新・永続化・否定条件、実OS期限切れ非承認を確認した。証拠classと試験表示flagの範囲は`docs/REV5_PRODUCT_PROGRESS.md`へ記録する。他Owner操作や通常Release全機能の完了を意味しない。

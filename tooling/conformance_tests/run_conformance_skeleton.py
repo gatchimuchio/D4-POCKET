@@ -8351,6 +8351,11 @@ def test_agent_task_owner_confirmation_wait_uses_native_operation_timeout() -> l
         "AgentCLI実行系作業領域登録",
         "アダプター導入",
         "アダプター更新",
+        "アダプター検証",
+        "アダプター有効化",
+        "アダプター無効化",
+        "アダプター隔離",
+        "アダプター削除",
     )
     owner_set_match = re.search(
         r"const _nativeOwnerConfirmationOperations = <String>\{(.*?)\};",

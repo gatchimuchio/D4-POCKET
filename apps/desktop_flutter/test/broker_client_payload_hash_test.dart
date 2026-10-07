@@ -25,6 +25,11 @@ void main() {
       '作業領域失効',
       '作業領域全体基準点保存',
       'AgentCLI実行系作業領域登録',
+      'アダプター検証',
+      'アダプター有効化',
+      'アダプター無効化',
+      'アダプター隔離',
+      'アダプター削除',
     ]) {
       expect(
         brokerRequestTimeoutForOperation(operation),

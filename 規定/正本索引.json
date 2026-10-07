@@ -349,7 +349,7 @@
     },
     {
       "path": "docs/specs/macos-desktop-channel.md",
-      "責任": "macOS製品画面と同梱Rust helperの匿名pipe、既存Broker接続、sandbox継承、秘密非公開、正常終了、Rust所有Owner確認とAdapter導入・更新の限定契約"
+      "責任": "macOS製品画面と同梱Rust helperの匿名pipe、既存Broker接続、sandbox継承、秘密非公開、正常終了、Rust所有Owner確認とAdapter catalog導入・更新・状態管理の限定契約"
     },
     {
       "path": "docs/specs/mobile-surface.md",

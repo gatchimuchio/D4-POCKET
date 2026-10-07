@@ -17,6 +17,16 @@
 
 ## P13 Mobile / Non-Windows — 現行track
 
+#### macOS既存Adapter状態管理 — VALIDATING（Product Build、2026-10-07）
+
+検証・有効化・無効化・隔離・削除の既存ボタンをRust所有OS確認とBrokerへ接続する。導入・更新CLOSED条件を再開せず、catalog・Audit内の作用だけを扱う。既存Schemaを再利用し、対象ID／hash／要求hashを束縛する。署名Trust未設定または不正なAdapterは有効化しない。有限Acceptanceは`docs/specs/macos-desktop-channel.md`。手動Actionsの専用targetを使い、既CLOSEDのUI試験を選択しない。macOS製品Trust設定・Credentials／Agent／Workspace・正式配布・Final QAは別の`release_blocker`範囲へ保持する。
+
+ローカル対象`cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml --lib macos_desktop_worker::tests::owner_adapter_lifecycle -- --test-threads=1`は1件PASS。実Brokerと永続Auditを通し、Owner拒否時不変、不正署名・未検証有効化拒否、無効化・隔離・削除、古いhash・追加field・操作不一致拒否を確認した。Owner選択は合成callbackの`FIXTURE`で、Mac画面成立の証拠ではない。
+
+必須Rust全体`cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1`はlibrary 504 passed／1 failed／12 ignored。変更外の`failed_tool_result_is_not_replayed_as_another_exec_command`でHTTP本文途中のConnectionReset（received=0／expected=23278）を観測し、同一test単独再実行はPASS。既存`FQ-TEST-LOOPBACK`へ記録し、全体PASSや原因解消とは扱わない。library失敗で後続targetは未実行。直接依存の`broker_owned_signature_verification_is_required_before_enable`は同じ全体runでPASS。
+
+Schema 161／157／208はPASS。初回Conformanceは待機操作の期待集合不足でFAIL（Windows Runnerは既に5操作を含んでいた）。Flutterの305秒対象と期待集合へ5操作を追加し、Conformance 236件はPASS。Windows transportの実装は変更していない。厳格日本語監査は変更外の既存4 file／15 findingsでFAIL、Desktop／Mobileの`flutter analyze --no-pub`は日本語pathでLSP FormatException／server exit 255／CLI exit 1。これら既存`release_blocker`は保持し、変更したDartの検査とMac build／UIは専用手動Actionsで行う。
+
 #### macOS Rust Owner確認・Adapter導入／更新 — CLOSED（Product Build、2026-10-07）
 
 成功commit `0729f07437f308c71c1f4dc694e62016ea58ad3e`の手動Actions [run 37623944221](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37623944221)はPASS。macOS 15.7.9 arm64（Apple Virtual Machine）／Xcode 16.4／Rust 1.95.0／Flutter 3.44.0で、製品UI→既存MethodChannel／匿名pipe→Rust検査→OS Owner確認→既存Broker receiver→catalog登録→製品表示を通した。OS画面で最初に「承認しない」を選ぶと未登録を維持し、次の新規要求で「今回の操作を承認」を選ぶと登録が表示された。XCUITest 1 passed／0 failed／0 skipped、38.953秒。Command-Qで通常終了し、helper残留なし・runner追跡source cleanを確認した。

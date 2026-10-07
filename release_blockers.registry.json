@@ -251,6 +251,13 @@
         "artifact_sha256": "c337857b41899ac5b41e26b6bbc2402f859ad58a101060fea1273cbd245374d8",
         "artifact_expires_at": "2026-10-10T12:54:31Z"
       },
+      "macos_adapter_lifecycle_evidence": {
+        "status": "VALIDATING",
+        "contract": "docs/specs/macos-desktop-channel.md",
+        "trigger": "workflow_dispatch",
+        "target": "macos_adapter_lifecycle",
+        "scope_limit": "既存Adapter検証・有効化・無効化・隔離・削除のOwner接続だけ。署名未検証は有効化拒否を維持。macOS製品Trust設定・外部artifact作用・通常Release・正式配布・Final QAのrelease blockerは維持する。"
+      },
       "r2_bounded_exit_gate": {
         "version": 2,
         "phase_acceptance_policy": {

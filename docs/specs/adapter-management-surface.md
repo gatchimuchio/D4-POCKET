@@ -18,6 +18,8 @@ Desktop Runtime Center
 
 ### Desktop既存record操作のnative Owner経路
 
+macOSは`docs/specs/macos-desktop-channel.md`の限定契約に従い、継承匿名pipe→Rust所有OS確認→同じBroker Owner receiverへ接続する。対象IDとhashの再検査、署名未検証の有効化拒否、catalog内作用を維持する。以下のWindows transportをmacOSへ流用しない。
+
 Desktop Runtime Centerからの`検証`、`有効化`、`無効化`、`隔離`、`削除`は、通常IPCだけでは状態変更しない。Windows Flutter RunnerのPID結合named pipeからRust Desktop起動器へ要求を送り、起動器が操作、Adapter ID、現在hash、payload hashをnative Owner dialogに表示する。承認後だけ、同じ要求をBrokerのOwner操作queueへ渡す。Brokerは処理直前に現在のrecord、hash、状態条件を再照合し、結果をAuditへ記録する。Windows Runnerの確認応答待ち時間はこの5操作に限って延長する。
 
 native dialogの拒否は状態を変更せず、通常Broker経路の`Suspended` receiptとAuditで終わる。承認はOwner明示操作の記録であり、Permission、Approval、Credential、Trustを生成しない。5操作が変更するのはBroker内catalogだけで、外部file、process、既存process、Runtime実行状態には作用しない。Manifestの`導入`と`更新`は、次節の別のDesktop接続単位で扱う。
