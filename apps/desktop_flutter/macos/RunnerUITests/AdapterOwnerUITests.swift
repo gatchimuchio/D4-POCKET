@@ -81,14 +81,29 @@ final class AdapterOwnerUITests: XCTestCase {
     let request = VNRecognizeTextRequest()
     request.recognitionLevel = .accurate
     request.recognitionLanguages = ["ja-JP", "en-US"]
-    request.usesLanguageCorrection = false
+    request.usesLanguageCorrection = true
+    request.customWords = ["OSで作業領域を選択"]
     try VNImageRequestHandler(cgImage: pixels).perform([request])
     let matches = (request.results ?? []).filter {
       guard let text = $0.topCandidates(1).first?.string else { return false }
       // 小さい日本語buttonの途中の漢字はVisionで欠落し得る。固有の接頭ラベルで一意に束縛する。
-      return text.replacingOccurrences(of: " ", with: "").hasPrefix("OSで")
+      return text.replacingOccurrences(of: " ", with: "").contains("OSで")
     }
-    guard matches.count == 1 else { throw failure("画面上のOS選択buttonを一意に確認できない") }
+    guard matches.count == 1 else {
+      print("D4_WORKSPACE_BUTTON_OCR_COUNT \(request.results?.count ?? 0) matches=\(matches.count)")
+      // 合成公開入力を検査済みの当該testだけ。ボタン行の限定領域以外は記録しない。
+      let frame = app.windows.firstMatch.frame
+      let row = CGRect(x: frame.minX + frame.width * 0.3, y: frame.minY + frame.height * 0.76,
+                       width: frame.width * 0.4, height: frame.height * 0.09)
+      for observation in (request.results ?? []).prefix(128) {
+        let box = observation.boundingBox
+        let point = CGPoint(x: box.midX * image.size.width, y: (1 - box.midY) * image.size.height)
+        if row.contains(point), let text = observation.topCandidates(1).first?.string {
+          print("D4_WORKSPACE_BUTTON_ROW_OCR " + String(text.prefix(80)))
+        }
+      }
+      throw failure("画面上のOS選択buttonを一意に確認できない")
+    }
     let box = matches[0].boundingBox
     let point = CGPoint(x: box.midX * image.size.width, y: (1 - box.midY) * image.size.height)
     let window = app.windows.firstMatch
@@ -367,7 +382,8 @@ private final class WorkspacePanelUI {
     let request = VNRecognizeTextRequest()
     request.recognitionLevel = .accurate
     request.recognitionLanguages = ["ja-JP", "en-US"]
-    request.usesLanguageCorrection = false
+    request.usesLanguageCorrection = true
+    request.customWords = [title]
     try VNImageRequestHandler(cgImage: pixels).perform([request])
     let matches = (request.results ?? []).filter { $0.topCandidates(1).first?.string == title }
     guard matches.count == 1 else { return nil }

@@ -19,6 +19,8 @@
 
 #### macOS 作業領域のOS選択 — IMPLEMENTING（Product Build、2026-10-08）
 
+手動Actions [run 37688120883](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37688120883)、commit `7ba96736a85121b97402b3165224a21766a99bcb`もUI試験24.037秒、click前の文字認識でFAIL。先の「途中の漢字が欠落した」という説明は認識結果を未取得の推定で、原因確定ではなかった。識別子だけの再変更を続けず、Appleの公開APIで言語補正／製品の既知ラベル語彙を有効化し、再失敗時は合成画面のボタン行だけの認識結果を観測する。入力欄・画面全体・任意errorを診断へ追加せず、原因確定後に一時診断を撤去する。artifact `11511754157`、SHA-256 `29cec9f3b33cd9f7e7033237e0f4d3fdc15edf97c3b85e54278a5a6c8fbacbf1`を照合・保存した。対象Rust／Dart／通常build／後片付けはPASS。native起動修正と有限Acceptanceは未成立のまま。
+
 手動Actions [run 37686729916](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37686729916)、commit `3eb60e35fab26e5d25d355526232ea42a938d7fc`はUI試験24.952秒でFAIL。保存videoの22秒frameにはOS選択buttonが可視だが、Visionの途中の漢字全一致条件でclick前に失敗した。試験だけを固有接頭ラベル「OSで」の一意な可視文字へ束縛し、製品・Authority・Acceptanceを変更しない。native起動修正の成否は未取得。artifact `11511962024`、SHA-256 `1604925c90fecb5019a1bee54e1ce77f724cd1c0b89f2facc4e3fe49469198e8`を照合・保存した。対象Rust／Dart／通常build／後片付けはPASS。Windows Desktop／Mobileの必須`flutter analyze --no-pub`は既知のLSP入力FormatException／server exit 255でexit 1。厳格日本語監査は変更外5 files／17 findingsでFAIL。各全体FAILは履歴・Final QAへ保持し、対象Mac製品PASSへ混同しない。
 
 手動Actions [run 37684486166](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37684486166)、commit `17d858e2d5ea069dcdf1d3e13f8036f2039a8673`はUI試験41.015秒でFAIL。既存Audit fileの当該操作抽出は0件で、Brokerの選択Audit確定まで到達していない。nativeの固定失敗codeは取得できず、失敗原因を断定しない。artifact `11511250307`、SHA-256 `5e0ec03f7b746b013a8bbaa10b633018bcc6d20a6c85c36a4129b15171a15ac6`を照合・保存した。AppKit通常起動を通らないhelperの初回起動完了／表示activationを補い、資格が拒否された直接AX操作を公開画面認識／XCTest通常入力へ置換する。明示Debug試験flagだけで固定応答分類とhelper終了値を観測し、原因確定後に撤去する。境界・有限Acceptanceは変更せず、次の製品試験が成立するまでmainへ統合しない。
