@@ -19,7 +19,11 @@
 
 #### macOS 作業領域のOS選択 — IMPLEMENTING（Product Build、2026-10-08）
 
+手動Actions [run 37684486166](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37684486166)、commit `17d858e2d5ea069dcdf1d3e13f8036f2039a8673`はUI試験41.015秒でFAIL。既存Audit fileの当該操作抽出は0件で、Brokerの選択Audit確定まで到達していない。nativeの固定失敗codeは取得できず、失敗原因を断定しない。artifact `11511250307`、SHA-256 `5e0ec03f7b746b013a8bbaa10b633018bcc6d20a6c85c36a4129b15171a15ac6`を照合・保存した。AppKit通常起動を通らないhelperの初回起動完了／表示activationを補い、資格が拒否された直接AX操作を公開画面認識／XCTest通常入力へ置換する。明示Debug試験flagだけで固定応答分類とhelper終了値を観測し、原因確定後に撤去する。境界・有限Acceptanceは変更せず、次の製品試験が成立するまでmainへ統合しない。
+
 現在のSchema／正常例／負例は163／159／210 PASS、対象Rust 3件PASS。以下の全体FAILは履歴として保持する。
+
+AppKit起動修正後のWindows必須Rust全体は505 passed／4 failed／12 ignoredでFAIL。変更外のA2A loopback 2件と既存Update Download TLS 2件に応答読取／timeout／OS 10054が残る。既存`FQ-TEST-LOOPBACK`へ保持し、全体PASSとはしない。独立native crateのWindows入力拒否1件はPASSで、AppKit実動作はMac専用試験へ限定する。
 
 手動Actions [run 37671678735](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37671678735)、commit `06cd2257a688424c23de227775c585bf17a9978d`は新規native crateの型検査でFAIL。固定bindingの`NSApplicationActivationPolicy`が`NSRunningApplication` featureに束縛されており、NSSavePanelのtitle／prompt／message引数は`Option<&NSString>`だった。必要なfeatureとnullable引数だけを修正する。Mac実動作の成功は未取得、mainは変更前を保持し、runner後片付けはPASS。
 

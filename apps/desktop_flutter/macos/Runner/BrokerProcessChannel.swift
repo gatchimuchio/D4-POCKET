@@ -146,6 +146,17 @@ final class BrokerProcessChannel {
         }
       } catch { output = nil }
       let reply = output
+      #if DEBUG && D4_MACOS_OWNER_UI_TEST
+      if operation == "作業領域OS選択" {
+        // 合成UI試験だけの固定分類。本文・path・資格・任意errorを出力しない。
+        let object = reply?.data(using: .utf8).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+        let status = object?["status"] as? String
+        let decision = ["accepted", "rejected", "suspended"].contains(status ?? "") ? status! : "no_valid_reply"
+        let running = self.worker.isRunning
+        let exit = running ? "running" : String(self.worker.terminationStatus)
+        NSLog("D4_WORKSPACE_NATIVE_OUTCOME decision=%@ helper=%@", decision, exit)
+      }
+      #endif
       DispatchQueue.main.async { complete(reply) }
     }
   }

@@ -72,7 +72,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "582ef8107060341266e39d1000464935f2f1aab6e260bc1bfcd2cba39761b37c"
+      "sha256": "e205ef97105ea621655bf62114c01fa84f296b437e3477b0deb8fc74b9065b0f"
     },
     {
       "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
@@ -524,7 +524,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/BrokerProcessChannel.swift",
-      "sha256": "885ad1169d51c47031a201fb5b5e4eb4e56f7a360d532fcc2dbb283d2c9ae228"
+      "sha256": "217ca56bcc299a566f1b4abbb89ebee223f4d5fd71f62c0b6af28b9e55822fd5"
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/Configs/AppInfo.xcconfig",
@@ -564,7 +564,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/RunnerUITests/AdapterOwnerUITests.swift",
-      "sha256": "99167e3ba412ea6e160703f7819c94f3cf26f3d29093e2f246503632b8728e3b"
+      "sha256": "fc69e1a06f2317c081ba6d1b2179bb70a3599e4235ad93fcac3299e5b7506001"
     },
     {
       "path": "apps/desktop_flutter/pubspec.lock",
@@ -1272,7 +1272,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "d4eed5d303a833c9a354ea0441f43d1d00f1d8e95f9db955a7df43951c83b4d1"
+      "sha256": "6285da0ebbf62bcd558a8b97c9efac03f2fdd9e33e45284f6ccb66456ddb6277"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1488,7 +1488,7 @@
     },
     {
       "path": "docs/specs/macos-workspace-selection.md",
-      "sha256": "77c88cac3307013abfc6821b1cc885cedac1d8e199014137da50c1ca4495205c"
+      "sha256": "82b3aeb02f6886a80a2d52f8f08620daeabaa383c9738f8c21efd8e81a9b012a"
     },
     {
       "path": "docs/specs/mcp-connection-center.md",
@@ -3168,7 +3168,7 @@
     },
     {
       "path": "native/macos_owner/src/lib.rs",
-      "sha256": "a62bd492c1d41050805309f4ad3d1cfb17d91c596977a7942a7a6407e2cf76ca"
+      "sha256": "c23db71d8c97f15ea5ab329cccdc887fa209aecc09365edcd84902a2410c785a"
     },
     {
       "path": "native/process_supervision/Cargo.lock",

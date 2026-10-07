@@ -1,6 +1,5 @@
 import XCTest
 import AppKit
-import ApplicationServices
 import Vision
 
 final class AdapterOwnerUITests: XCTestCase {
@@ -37,7 +36,7 @@ final class AdapterOwnerUITests: XCTestCase {
     XCTAssertTrue(select.exists)
     // Flutterのscroll後のAX frameは1pxのままだった。実際の画面の可視文字へclickする。
     try clickWorkspaceSelection(app)
-    let chooser = try WorkspacePanelUI()
+    let chooser = try WorkspacePanelUI(app: app)
     if !chooser.waitForButton("Cancel", timeout: 15) {
       let image = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
       image.name = "D4-workspace-chooser-missing"; image.lifetime = .keepAlways; add(image)
@@ -56,7 +55,7 @@ final class AdapterOwnerUITests: XCTestCase {
     try clickWorkspaceSelection(app)
     XCTAssertTrue(chooser.waitForButton("作業領域を選択", timeout: 15))
     try chooser.enterFolder(outside)
-    XCTAssertTrue(chooser.waitForButton("作業領域を選択", timeout: 10, enabled: true))
+    XCTAssertTrue(chooser.waitForButton("作業領域を選択", timeout: 10))
     try chooser.press("作業領域を選択"); app.activate()
     XCTAssertTrue(element(app, "OS選択済み（起動中のみ）。登録・Permission・Approvalは別です。").waitForExistence(timeout: 10))
     XCTAssertEqual(fields[4].value as? String, outside)
@@ -338,12 +337,12 @@ final class AdapterOwnerUITests: XCTestCase {
   }
 }
 
-/// 試験専用の公開OS操作。同梱helperのPIDへ束縛し、Broker入力・返答を代替しない。
+/// 公開画面とXCTestの通常入力だけを使う。外部AX資格を要求せず、Broker応答を代替しない。
 private final class WorkspacePanelUI {
   private let process: NSRunningApplication
-  private let root: AXUIElement
+  private let app: XCUIApplication
 
-  init() throws {
+  init(app: XCUIApplication) throws {
     let deadline = Date().addingTimeInterval(15)
     var candidates = [NSRunningApplication]()
     repeat {
@@ -355,87 +354,53 @@ private final class WorkspacePanelUI {
     } while Date() < deadline
     guard candidates.count == 1 else { throw failure("同梱helperのPIDを一意に確認できない") }
     process = candidates[0]
-    root = AXUIElementCreateApplication(process.processIdentifier)
-    AXUIElementSetMessagingTimeout(root, 1)
+    self.app = app
   }
 
-  private func attribute(_ node: AXUIElement, _ name: String) -> CFTypeRef? {
-    var value: CFTypeRef?
-    guard AXUIElementCopyAttributeValue(node, name as CFString, &value) == .success else { return nil }
-    return value
-  }
-
-  private func nodes() -> [AXUIElement] {
-    var pending = [root], visited = [AXUIElement]()
-    while !pending.isEmpty && visited.count < 512 {
-      let node = pending.removeFirst()
-      if visited.contains(where: { CFEqual($0, node) }) { continue }
-      visited.append(node)
-      for name in [kAXChildrenAttribute, kAXWindowsAttribute] {
-        if let children = attribute(node, name) as? [AXUIElement] { pending.append(contentsOf: children.prefix(512)) }
-      }
+  private func buttonPoint(_ title: String) throws -> CGPoint? {
+    let image = XCUIScreen.main.screenshot().image
+    var proposed = CGRect(origin: .zero, size: image.size)
+    guard let pixels = image.cgImage(forProposedRect: &proposed, context: nil, hints: nil) else {
+      throw failure("OS chooserの画面を取得できない")
     }
-    return visited
+    let request = VNRecognizeTextRequest()
+    request.recognitionLevel = .accurate
+    request.recognitionLanguages = ["ja-JP", "en-US"]
+    request.usesLanguageCorrection = false
+    try VNImageRequestHandler(cgImage: pixels).perform([request])
+    let matches = (request.results ?? []).filter { $0.topCandidates(1).first?.string == title }
+    guard matches.count == 1 else { return nil }
+    let box = matches[0].boundingBox
+    return CGPoint(x: box.midX * image.size.width, y: (1 - box.midY) * image.size.height)
   }
 
-  private func button(_ title: String, enabled: Bool) -> AXUIElement? {
-    nodes().first {
-      attribute($0, kAXRoleAttribute) as? String == kAXButtonRole &&
-        attribute($0, kAXTitleAttribute) as? String == title &&
-        (!enabled || attribute($0, kAXEnabledAttribute) as? Bool == true)
-    }
-  }
-
-  func waitForButton(_ title: String, timeout: TimeInterval, enabled: Bool = false) -> Bool {
+  func waitForButton(_ title: String, timeout: TimeInterval) -> Bool {
     let deadline = Date().addingTimeInterval(timeout)
     repeat {
-      if button(title, enabled: enabled) != nil { return true }
+      if (try? buttonPoint(title)) != nil { return true }
       RunLoop.current.run(until: Date().addingTimeInterval(0.1))
     } while Date() < deadline
     return false
   }
 
   func press(_ title: String) throws {
-    guard let target = button(title, enabled: true),
-          AXUIElementPerformAction(target, kAXPressAction as CFString) == .success else {
+    guard let point = try buttonPoint(title) else {
       throw failure("OS chooserの可視ボタンを操作できない: " + title)
     }
-  }
-
-  private func key(_ code: CGKeyCode, flags: CGEventFlags = []) throws {
-    guard let down = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: true),
-          let up = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: false) else {
-      throw failure("OS keyboard eventを生成できない")
-    }
-    down.flags = flags; up.flags = flags
-    down.postToPid(process.processIdentifier); up.postToPid(process.processIdentifier)
+    let window = app.windows.firstMatch
+    window.coordinate(withNormalizedOffset: .zero)
+      .withOffset(CGVector(dx: point.x - window.frame.minX, dy: point.y - window.frame.minY)).click()
   }
 
   func enterFolder(_ path: String) throws {
     guard process.activate(options: [.activateIgnoringOtherApps]) else { throw failure("OS chooserを前面にできない") }
-    try key(5, flags: [.maskCommand, .maskShift]) // ANSI G: OSの「folderへ移動」。
-    let deadline = Date().addingTimeInterval(10)
-    var field: AXUIElement?
-    repeat {
-      field = nodes().first {
-        attribute($0, kAXRoleAttribute) as? String == kAXTextFieldRole &&
-          attribute($0, kAXFocusedAttribute) as? Bool == true
-      }
-      if field != nil { break }
-      RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-    } while Date() < deadline
-    guard let field, AXUIElementSetAttributeValue(field, kAXValueAttribute as CFString, path as CFString) == .success,
-          attribute(field, kAXValueAttribute) as? String == path else {
-      throw failure("OSのfolder入力欄へ合成公開pathを入力できない")
-    }
-    try key(36) // ReturnでOSの移動を確定。選択は別の可視ボタンで行う。
+    app.typeKey("g", modifierFlags: [.command, .shift])
+    app.typeText(path)
+    app.typeKey(XCUIKeyboardKey.return.rawValue, modifierFlags: [])
   }
 
   var description: String {
-    var role: CFTypeRef?
-    let status = AXUIElementCopyAttributeValue(root, kAXRoleAttribute as CFString, &role)
-    return "PID=\(process.processIdentifier) AX=\(status.rawValue) trusted=\(AXIsProcessTrusted())\n" +
-      nodes().map { "\(attribute($0, kAXRoleAttribute) as? String ?? "?"):\(attribute($0, kAXTitleAttribute) as? String ?? "")" }.joined(separator: "\n")
+    "PID=\(process.processIdentifier) running=\(!process.isTerminated) active=\(process.isActive)"
   }
 }
 

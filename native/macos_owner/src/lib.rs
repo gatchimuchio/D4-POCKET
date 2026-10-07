@@ -42,6 +42,11 @@ pub fn select_workspace() -> Result<Option<SelectedWorkspace>, &'static str> {
         if !app.setActivationPolicy(NSApplicationActivationPolicy::Accessory) {
             return Err("OS選択の表示を開始できません");
         }
+        // helperはstdin loopを持ちNSApplication::runを呼ばないため、AppKitの起動を明示完了する。
+        // main thread限定で一回だけ。表示上のactivationはPermission／Approvalを生成しない。
+        static APPKIT_LAUNCH: std::sync::Once = std::sync::Once::new();
+        APPKIT_LAUNCH.call_once(|| app.finishLaunching());
+        app.activate();
         let panel = NSOpenPanel::openPanel(mtm);
         panel.setTitle(Some(&NSString::from_str("D4 Pocket — 作業領域のOS選択")));
         panel.setPrompt(Some(&NSString::from_str("作業領域を選択")));
