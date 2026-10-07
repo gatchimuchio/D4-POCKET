@@ -33,6 +33,8 @@
 
 起動後通知の[run 37605913898](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37605913898)、commit `e43e6ad2e44dae155aa9cf5f7200e2ad4a3e0f73`も初期要素取得FAILとなり、通知時点だけでは解消しなかった。通常buildと試験buildのbundle IDが同一なため、XCTestはID検索ではなく既定の試験対象appを起動するように限定する。初期失敗時のみ新規runner・入力前の画面画像とtreeを記録し、起動先／描画状態の推測を避ける。後片付けは各runで成功しているが、Owner画面のAcceptanceは未成立のまま。
 
+既定target起動の[run 37606764030](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37606764030)、commit `67d30ac86099793e94e5fbf61c6ac87d95cecc1d`も初期要素がなく、画像を`/tmp`へ書く試験処理もOSに拒否された。標準XCTest runnerのsandboxは維持し、画像はXCTAttachmentへ変更する。入力前の固定bootstrap完了件数だけを試験窓titleへ投影し、Broker接続と表示補助のどちらが未成立かを区別する。製品状態・要求本文・秘密は診断へ出さず、通常buildはこの表示を含まない。
+
 #### macOS Desktop通常Broker接続 — CLOSED（Product Build、2026-10-07）
 
 開始時のmacOS Runnerには`gui_shell/broker`登録がなく、Flutterの通常起動から実Brokerへ到達しなかった。本有限単位を、同梱Rust helperへの匿名pipe、既存認証Broker normal経路、初回設定等の製品bootstrap、正常終了へ限定した。Apple App Sandboxを継承し、Flutter／Runnerへ資格を渡さない。Owner専用操作・Windows固有操作は現状の拒否を保持し、macOS全機能完成とは扱わない。責任と未成立範囲は`docs/specs/macos-desktop-channel.md`。手動Actionsの独立`macos_product`を使い、iOS／AndroidのCLOSED試験は起動していない。

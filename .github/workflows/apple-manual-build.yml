@@ -76,11 +76,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ -f /tmp/d4p-macos-owner-initial.png ]; then
-            mv /tmp/d4p-macos-owner-initial.png evidence/macos-owner-initial.png
-          fi
           if [ -d "$RUNNER_TEMP/macos-product-tests.xcresult" ]; then
             xcrun xcresulttool get test-results summary --path "$RUNNER_TEMP/macos-product-tests.xcresult" | tee evidence/macos-native-summary.json
+            if [ '${{ inputs.target }}' = 'macos_owner' ]; then
+              xcrun xcresulttool export attachments --path "$RUNNER_TEMP/macos-product-tests.xcresult" --output-path evidence/macos-ui-attachments --only-failures
+            fi
           fi
           if pgrep -x gui_shell_macos_broker > evidence/remaining-helper-pids.txt; then
             while read -r pid; do kill -TERM "$pid"; done < evidence/remaining-helper-pids.txt

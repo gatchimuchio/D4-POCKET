@@ -12,7 +12,10 @@ final class AdapterOwnerUITests: XCTestCase {
     if !ready {
       // 新規runnerの入力前画面だけ。起動先や描画不能の診断を推測で補わない。
       print("D4_MACOS_INITIAL \(app.debugDescription)")
-      try app.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: "/tmp/d4p-macos-owner-initial.png"), options: .atomic)
+      let screen = XCTAttachment(screenshot: app.screenshot())
+      screen.name = "D4-macOS-initial"
+      screen.lifetime = .keepAlways
+      add(screen)
     }
     XCTAssertTrue(ready)
     runtime.click()
