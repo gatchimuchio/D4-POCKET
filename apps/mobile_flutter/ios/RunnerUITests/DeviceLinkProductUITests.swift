@@ -11,7 +11,9 @@ final class DeviceLinkProductUITests: XCTestCase {
     defer { app.terminate() }
     do {
       app.launch()
-      try check(app.staticTexts["D4 Pocket・概要"].waitForExistence(timeout: 20))
+      stage = "initial_header"
+      try check(element(app, "D4 Pocket・概要").waitForExistence(timeout: 20))
+      stage = "initial_navigation"
       try navigate(app, "接続先")
       stage = "open_native_dialog"
       try tap(app.buttons["native画面で招待を入力して端末結合"])
@@ -24,7 +26,7 @@ final class DeviceLinkProductUITests: XCTestCase {
       try check(app.alerts["接続先を照合"].waitForExistence(timeout: 10))
       try tap(app.alerts.buttons["一致を確認して結合"])
       stage = "pair_complete"
-      try check(app.staticTexts["Desktop端末資格を確認し、ThisDeviceOnly Keychainへ保存を再読しました。"].waitForExistence(timeout: 20))
+      try check(element(app, "Desktop端末資格を確認し、ThisDeviceOnly Keychainへ保存を再読しました。").waitForExistence(timeout: 20))
       stage = "runtime_projection"
       try navigate(app, "実行系")
       try runtimeVisible(app)
@@ -37,9 +39,17 @@ final class DeviceLinkProductUITests: XCTestCase {
       stage = "product_disconnect"
       try navigate(app, "設定")
       try tap(app.buttons["Desktopの結合を解除して端末資格を削除"])
-      try check(app.staticTexts["Desktop側の結合解除と端末内資格の削除を確認しました。送信済み処理の停止は保証しません。"].waitForExistence(timeout: 20))
+      try check(element(app, "Desktop側の結合解除と端末内資格の削除を確認しました。送信済み処理の停止は保証しません。").waitForExistence(timeout: 20))
       print("D4_IOS_PRODUCT_PASS")
     } catch {
+      if stage.hasPrefix("initial_") {
+        // 招待発行前の固定labelだけを観測。UI treeやvalueは出さない。
+        for (index, label) in ["D4 Pocket・概要", "Open navigation menu", "接続先", "D4 Pocket・接続先"].enumerated() {
+          let item = element(app, label)
+          let exists = item.exists
+          print("D4_IOS_PRODUCT_INITIAL \(index) exists=\(exists) type=\(exists ? item.elementType.rawValue : 0) enabled=\(exists && item.isEnabled) visible=\(exists && item.isHittable)")
+        }
+      }
       XCTFail("D4_IOS_PRODUCT_FAIL \(stage)")
     }
   }
@@ -56,15 +66,19 @@ final class DeviceLinkProductUITests: XCTestCase {
 
   private func navigate(_ app: XCUIApplication, _ destination: String) throws {
     try tap(app.buttons["Open navigation menu"])
-    let item = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@ OR label BEGINSWITH %@", destination, destination + "\n")).firstMatch
+    let item = element(app, destination)
     if item.exists && !item.isHittable { app.swipeUp() }
     try tap(item)
-    try check(app.staticTexts["D4 Pocket・\(destination)"].waitForExistence(timeout: 10))
+    try check(element(app, "D4 Pocket・\(destination)").waitForExistence(timeout: 10))
+  }
+
+  private func element(_ app: XCUIApplication, _ label: String) -> XCUIElement {
+    app.descendants(matching: .any).matching(NSPredicate(format: "label == %@ OR label BEGINSWITH %@", label, label + "\n")).firstMatch
   }
 
   private func runtimeVisible(_ app: XCUIApplication) throws {
     for name in ["left", "right"] {
-      let item = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@ OR label BEGINSWITH %@", name, name + "\n")).firstMatch
+      let item = element(app, name)
       try check(item.waitForExistence(timeout: 20))
     }
   }

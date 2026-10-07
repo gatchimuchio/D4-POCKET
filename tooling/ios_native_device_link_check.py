@@ -115,6 +115,10 @@ def 検証(owner, binary, root, simulator, derived_data, result_bundle, product_
             match = re.search(marker + r"_FAIL ([a-z_]+)", output)
             if match:
                 stage = match.group(1)
+                if not issued:
+                    for line in output.splitlines():
+                        if re.fullmatch(r"D4_IOS_PRODUCT_INITIAL [0-3] exists=(true|false) type=[0-9]+ enabled=(true|false) visible=(true|false)", line):
+                            print(line)
             elif not issued:
                 # 秘密が未発行のcompile／起動失敗だけをboundedに表示する。
                 diagnostics = [line for line in output.splitlines() if "error:" in line or "failed" in line][-12:]
