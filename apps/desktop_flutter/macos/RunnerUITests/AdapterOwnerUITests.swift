@@ -1,6 +1,7 @@
 import XCTest
 import AppKit
 import ApplicationServices
+import Vision
 
 final class AdapterOwnerUITests: XCTestCase {
   func testProductWorkspaceOSSelection() throws {
@@ -34,9 +35,8 @@ final class AdapterOwnerUITests: XCTestCase {
     }
     let select = app.buttons["OSで作業領域を選択"]
     XCTAssertTrue(select.exists)
-    // 試験のTab／Spaceではbuttonを開始できなかった。可視の製品buttonを直接clickする。
-    reveal(app, select)
-    select.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+    // Flutterのscroll後のAX frameは1pxのままだった。実際の画面の可視文字へclickする。
+    try clickWorkspaceSelection(app)
     let chooser = try WorkspacePanelUI()
     if !chooser.waitForButton("Cancel", timeout: 15) {
       let image = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
@@ -49,7 +49,7 @@ final class AdapterOwnerUITests: XCTestCase {
     app.activate()
     XCTAssertTrue(element(app, "OS選択を取り消しました。入力は変更していません。").waitForExistence(timeout: 10))
     XCTAssertEqual(fields[4].value as? String, "/previous-input")
-    select.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+    try clickWorkspaceSelection(app)
     XCTAssertTrue(chooser.waitForButton("作業領域を選択", timeout: 15))
     try chooser.enterFolder(outside)
     XCTAssertTrue(chooser.waitForButton("作業領域を選択", timeout: 10, enabled: true))
@@ -64,6 +64,30 @@ final class AdapterOwnerUITests: XCTestCase {
     print("D4_MACOS_WORKSPACE_OS_SELECTION_PASS")
     app.typeKey("q", modifierFlags: .command)
     XCTAssertTrue(app.wait(for: .notRunning, timeout: 10))
+  }
+
+  private func clickWorkspaceSelection(_ app: XCUIApplication) throws {
+    let image = XCUIScreen.main.screenshot().image
+    var proposed = CGRect(origin: .zero, size: image.size)
+    guard let pixels = image.cgImage(forProposedRect: &proposed, context: nil, hints: nil) else {
+      throw failure("公開合成試験の画面を取得できない")
+    }
+    let request = VNRecognizeTextRequest()
+    request.recognitionLevel = .accurate
+    request.recognitionLanguages = ["ja-JP", "en-US"]
+    request.usesLanguageCorrection = false
+    try VNImageRequestHandler(cgImage: pixels).perform([request])
+    let matches = (request.results ?? []).filter {
+      guard let text = $0.topCandidates(1).first?.string else { return false }
+      return text.contains("OS") && text.contains("作業領域") && text.contains("選択")
+    }
+    guard matches.count == 1 else { throw failure("画面上のOS選択buttonを一意に確認できない") }
+    let box = matches[0].boundingBox
+    let point = CGPoint(x: box.midX * image.size.width, y: (1 - box.midY) * image.size.height)
+    let window = app.windows.firstMatch
+    guard window.frame.contains(point) else { throw failure("OS選択buttonが製品窓の外にある") }
+    window.coordinate(withNormalizedOffset: .zero)
+      .withOffset(CGVector(dx: point.x - window.frame.minX, dy: point.y - window.frame.minY)).click()
   }
 
   func testProductAgentRegistration() throws {
@@ -401,7 +425,10 @@ private final class WorkspacePanelUI {
   }
 
   var description: String {
-    nodes().map { "\(attribute($0, kAXRoleAttribute) as? String ?? "?"):\(attribute($0, kAXTitleAttribute) as? String ?? "")" }.joined(separator: "\n")
+    var role: CFTypeRef?
+    let status = AXUIElementCopyAttributeValue(root, kAXRoleAttribute as CFString, &role)
+    return "PID=\(process.processIdentifier) AX=\(status.rawValue) trusted=\(AXIsProcessTrusted())\n" +
+      nodes().map { "\(attribute($0, kAXRoleAttribute) as? String ?? "?"):\(attribute($0, kAXTitleAttribute) as? String ?? "")" }.joined(separator: "\n")
   }
 }
 

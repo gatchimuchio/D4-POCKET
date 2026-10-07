@@ -29,6 +29,8 @@
 
 手動Actions [run 37676368839](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37676368839)、commit `b10ebd229de797324fee2053e3fb8f3a12a732d3`はUI試験40.523秒でFAIL。同梱helperのPIDは取得したがOS panelを観測できなかった。保存画面は秘密path欄のcaretとenabledの選択buttonを示し、試験のTab／Spaceはbuttonを開始していなかった。画面内の実buttonを直接clickするよう局所修正する。Mac対象Rust／Dart／通常buildと後片付けはPASS。artifact `11506364641`のSHA-256 `d1cf0bc59207635f5a655811742bb2cd4dc3a808a3e42e8863a124b5646a58a4`を照合しignored領域へ保存した。OS選択の成立へ読み替えず、mainは変更前を保持する。
 
+手動Actions [run 37677877954](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37677877954)、commit `0c3d9723eae43706ac2f0799a7a07a5f30d4b37b`はUI試験36.622秒でFAIL。スクロール後も選択buttonのAX frameが高さ1pxのままで、click前の試験可視性assertionに失敗した。合成公開入力だけの画面をApple Visionで認識し、一意なOS選択buttonの可視文字中央を通常clickする試験専用処理へ修正する。画面文字・座標以外を製品へ渡さず、Broker／Authority境界は変更しない。対象Rust／Dart／通常buildと後片付けはPASS。実OS選択はまだ未到達で、Acceptanceとmainは未変更。
+
 有限Acceptanceは`docs/specs/macos-workspace-selection.md`。取消時の入力保持、実OS chooserによるsandbox外folder選択／投影、別個のOwner確認後の既存Broker登録、UI path／Authority注入拒否を一単位で施工する。選択はOS user-selected accessであり、D4のPermission／Approval／登録ではない。手動Actionsの`macos_workspace_selection`だけでMacを検証し、CLOSEDの登録／Adapter／Mobile試験は選択しない。sandbox外CLI実行・restart access・Credential・正式配布・Final QAはこの単位へ追加しない。
 
 ローカル検証: Schema 162／正常例158／負例209、Conformance 237 checks PASS。必須`cargo test --locked --manifest-path native/rust_helper/Cargo.toml`は505 passed／4 failed／12 ignoredでFAIL。変更外のA2A loopback読取と3つの既存HTTPS fixtureが応答読取／OS 10054／InvalidContentTypeで失敗した。局所切分けではA2A 1 PASS、update_download群16 PASS／1 FAILで、`failed_replacement_keeps_the_existing_corrupt_package_unchanged`の既存TLS失敗が残る。対象新規試験の成功や全体PASSへ読み替えず、既存Final QAのloopback検査課題へ保持する。変更がMac専用OS選択へ限定され、これらの作用経路を変更していないことを差分で確認した。
