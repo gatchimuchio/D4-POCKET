@@ -27,6 +27,12 @@ Androidの実装・検証履歴は維持し、Android実機試験の凍結を尊
 
 これはSimulator上の`LIVE_RUNTIME`証拠であり、物理iOS端末、実端末Keychain、Desktop Rust Brokerとのnative LIVE_RUNTIME TLS、端末lifecycle、公開配布、release readinessを証明しない。P13とMobile release blockerはOPENのまま維持する。
 
+#### Android current-source build／test — 局所検証PASS（2026-10-07）
+
+commit `54229000aa50896af37e5f8d391d9a7997b52e6f`を対象にFlutter 3.44.0で`flutter analyze --no-pub`（No issues）、`flutter test --no-pub --reporter expanded`（21件PASS）を実行した。OneDrive checkout内の`flutter build apk --debug --no-pub`は既存`build/app/intermediates/assets/debug/mergeDebugAssets`の削除で停止したため、権限やtracked sourceを変更せず、同じcommitの隔離detached worktreeで`flutter pub get`とAPK buildを再実行し成功した。APKは146,353,505 bytes、SHA-256 `9292d825a140c31c4eb504084940a7b2a0b3da792c5f9c83c9502c5b12613e6b`。同worktreeで`android/gradlew.bat :app:testDebugUnitTest`も`BUILD SUCCESSFUL`。Gradle／Android SDKのKotlin DSLおよびSDK XML互換warningは出たがbuild失敗ではない。
+
+これは現行Android sourceの解析・Flutter test・Debug compile・native unit testに限る。APKのemulator起動、Android実機、Keystore実OS挙動、Desktop Rust Brokerとの実TLS・Device Link、配布identityを証明しない。OneDrive checkout内build出力の削除失敗原因は未確定であり、環境設定を変更せずisolated worktreeを使った。Android実機試験凍結とP13／Mobile release blockerは維持する。
+
 ## Q0 品質保証凍結 — 完了（過去のFinal QA記録）
 
 2026-10-07、P12 Product Build受入れcommit `ab746d4b33b003761f5ddcef60a88afa97132a40`をFinal QA対象製品状態として固定した。対象commitは`main`へpush済みで、Q0記録時点のremote `main`と一致。対象はWindows Feature Complete製品構成であり、release-readyや正式配布可能状態を意味しない。以後のQ1〜Q7 evidenceはこの凍結commitを対象とし、製品コード修正が必要になった場合は修正commitを新たなQA候補として明示し、対象を再凍結する。

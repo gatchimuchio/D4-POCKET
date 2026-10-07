@@ -305,7 +305,7 @@ tooling/    schema_check · conformance_tests · broker_parity · ...
 
 ## 📊 製品状態と履歴
 
-現行工程はD4 Pocket / GUI-Shell rev5の`PRODUCT_BUILD_MODE`である。P2 Multi-Agent Compare、P3 Agent Handoff、Windows側P12 Product IntegrationはProduct Build受入れを閉じており、現在は独立trackのP13 Mobile／Non-Windowsを進めている。iOS SimulatorのFlutter解析・21件のFlutter test・Simulator build・native XCTest 8件は手動Actions run #22で成功したが、物理端末、Desktop Rust Brokerとのnative実TLS、公開配布を証明しない。Windows Feature Completeは達成済みだが、通常Release `task_execution=unsupported`、`release_ready=false`を維持し、Final QAは現行modeの指示により延期中である。現行phaseと証拠範囲は[rev5製品進捗](docs/REV5_PRODUCT_PROGRESS.md)、Final QAの過去記録は[Final QA Queue](docs/FINAL_QA_QUEUE.md)を参照する。
+現行工程はD4 Pocket / GUI-Shell rev5の`PRODUCT_BUILD_MODE`である。P2 Multi-Agent Compare、P3 Agent Handoff、Windows側P12 Product IntegrationはProduct Build受入れを閉じており、現在は独立trackのP13 Mobile／Non-Windowsを進めている。iOS SimulatorのFlutter解析・21件のFlutter test・Simulator build・native XCTest 8件は手動Actions run #22で成功した。Androidも現行sourceでFlutter解析・21件のFlutter test・Debug APK build・native unit testが成功した。いずれも物理端末、Desktop Rust Brokerとのnative実TLS、公開配布を証明しない。Windows Feature Completeは達成済みだが、通常Release `task_execution=unsupported`、`release_ready=false`を維持し、Final QAは現行modeの指示により延期中である。現行phaseと証拠範囲は[rev5製品進捗](docs/REV5_PRODUCT_PROGRESS.md)、Final QAの過去記録は[Final QA Queue](docs/FINAL_QA_QUEUE.md)を参照する。
 
 ### 2026-09-29 の履歴
 
