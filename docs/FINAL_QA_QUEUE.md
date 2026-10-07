@@ -81,6 +81,8 @@ Rust初回・再runでA2A／Update TLS loopback fixtureの間欠failureを観測
 
 2026-10-07 Q2同一Workspace内の並行Task scratch分離: Windows focused test `adapters::codex_cli::tests::同一Workspaceの並行Taskはscratchとcleanupを分離する`は1 passed／0 failed。production `CodexCliAdapter::AgentTask`が共有journal上で異なるTask IDの二つの並行fixture CLIを実行し、異なるWorkspaceTaskScratchの同時存在、A終端後にA scratchのみ削除されB scratchが残ること、B終端後の全scratch cleanupを確認した。Adapterとscratch処理はproduction code、CLIは`FIXTURE`であり、実Codex／Compare UI／installed product／Agent内部状態を証明しない。このため`FQ-R2-C`はOPENのまま維持する。
 
+同差分のAdapter直接回帰`cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml --lib adapters::codex_cli::tests:: -- --test-threads=1`は23 passed／0 failed／2 ignored。Task scratch cleanup、期限後の子孫停止、secret／hardlink拒否、Model／Provider境界を含む同moduleのtest群はPASS。ignored 2件は実Codex CLIを使う明示試験で今回実行していない。これはfixture／Adapter層の回帰で、`FQ-R2-C`のinstalled product／実Agent間隔離の受入れではない。
+
 ## 3. Final QA段階
 
 | 段階 | 対象 | 開始条件 |

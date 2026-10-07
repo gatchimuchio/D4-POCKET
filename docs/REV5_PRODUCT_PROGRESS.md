@@ -77,6 +77,8 @@ Windows hosted補助run #41は`workflow_dispatch`による手動実行でcommit 
 
 2026-10-07 Q2並行Task scratch分離 — Adapter経路FIXTURE: Windows `adapters::codex_cli::tests::同一Workspaceの並行Taskはscratchとcleanupを分離する`は1 passed。異なるTask IDを持つ二つの同時`CodexCliAdapter::AgentTask`へ同一Workspaceと共有journalを与え、別scratch directory／agent識別marker、Agent A完了時のAだけのcleanupとB scratch保持、Agent B完了後の両scratch不在を確認した。production Adapter／WorkspaceTaskScratch処理を通るがCLIはtest fixtureであり、実Codex／Compare UI／installed product／Broker IPC／agent内部状態の分離保証ではない。したがって`FQ-R2-C`はOPENのまま。検証: focused Rust test 1件、Rust 1.95 scoped format、`git diff --check`、Schema 161／157／208、Conformance 236、Manifest 1182 files、Windows v1 Release Gate check。strict日本語監査は3 findingsでexit 1（旧rev3／rev4履歴文書と、変更外の既存Codex CLI PowerShell診断文字列`$ErrorActionPreference='Stop'`）；今回追加したtest／fixture／文書にfindingなし。通常Release capabilityとrelease gateは変更しない。
 
+同じ並行scratch差分の直接依存回帰: `cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml --lib adapters::codex_cli::tests:: -- --test-threads=1`は23 passed／0 failed／2 ignored。Taskのscratch creation／drop cleanup、期限超過後の子孫停止、secret／hardlink拒否、Model／Provider境界を含むAdapter test群を逐次確認した。ignored 2件は明示的な実Codex CLI資格・隔離検証で、今回実行していない。fixture suiteはQ2-Cのinstalled／実Agent間隔離証拠ではなく、`FQ-R2-C`をOPENのままとする。
+
 ## 1. 工程方針
 
 rev5は、完成前の製品機能開発と、Feature Complete後の最終品質保証を分離する。旧R2 Agent TaskはPRODUCT BUILD上`FUNCTIONALLY ESTABLISHED`、P1は`DONE FOR PRODUCT BUILD`とする。R2で得た実Task・Permission／Approval・Audit・Workspace境界等の証拠は保持する。R2-A〜Hの追加探索・出荷級の再確認はP2以降を止めず、必要なものを`docs/FINAL_QA_QUEUE.md`へ送る。
