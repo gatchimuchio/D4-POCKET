@@ -79,6 +79,8 @@ Rust初回・再runでA2A／Update TLS loopback fixtureの間欠failureを観測
 
 2026-10-07 Q2 Launcher異常終了のprocess cleanup部分: Windows focused test `desktop_launcher::tests::launcher_crash_stops_frontend_and_descendants`を4回実行し各1 passed。test harness owner内でproduction `launch_frontend`を呼び、test-only frontendと孫processの起動後にownerを強制終了すると、両processが5秒以内に停止した。実process／Job Object観測は限定`LIVE_RUNTIME`、frontend／Broker workerは`FIXTURE`。Launcher crash時の画面process群停止を確認しただけで、active Task recovery、durable Audit、installed product、Approval非再利用を示さない。したがって`FQ-R2-B`／`FQ-R2-F`はOPENのまま維持する。
 
+2026-10-07 Q2同一Workspace内の並行Task scratch分離: Windows focused test `adapters::codex_cli::tests::同一Workspaceの並行Taskはscratchとcleanupを分離する`は1 passed／0 failed。production `CodexCliAdapter::AgentTask`が共有journal上で異なるTask IDの二つの並行fixture CLIを実行し、異なるWorkspaceTaskScratchの同時存在、A終端後にA scratchのみ削除されB scratchが残ること、B終端後の全scratch cleanupを確認した。Adapterとscratch処理はproduction code、CLIは`FIXTURE`であり、実Codex／Compare UI／installed product／Agent内部状態を証明しない。このため`FQ-R2-C`はOPENのまま維持する。
+
 ## 3. Final QA段階
 
 | 段階 | 対象 | 開始条件 |

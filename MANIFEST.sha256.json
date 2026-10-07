@@ -1188,7 +1188,7 @@
     },
     {
       "path": "docs/FINAL_QA_QUEUE.md",
-      "sha256": "f4425223bf56d137b8e97cf9db8548ccb3b3ce71e9964c45c7584c499c01b8ce"
+      "sha256": "ffe76de0364eb7a1e4dddb555f20ca74d4df25702ac68d6b8c14ac0b11158b6b"
     },
     {
       "path": "docs/FIRST_RUN.md",
@@ -1244,7 +1244,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "dbbf316d442ff732294abe2322eb8ed3105791711fb2515a5eed5aa81ae31be9"
+      "sha256": "340b810536645b94ab94e60745dd14d72c6fdd75d95659b0d01576330bf7b55a"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -3164,7 +3164,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
-      "sha256": "10ee0c7dbb452117199699fe8040936b9d651e091f9fc60977db4d13edeae94f"
+      "sha256": "b216a255866ff67624b2a44c01998710f4a323ea0de7b33b42bd699355b4ee5c"
     },
     {
       "path": "native/rust_helper/src/adapters/mcp_stdio.rs",
@@ -3472,7 +3472,7 @@
     },
     {
       "path": "native/rust_helper/tests/fixtures/fake_codex_cli.rs",
-      "sha256": "fff7a9f27910a59ef01e634a8db9cb5f73efa1db61f2b447935b07f8d4bd4a0b"
+      "sha256": "5766397cc107f70852695f72360a8e47890323e4264d4b21fe9e96c5a0ce2749"
     },
     {
       "path": "native/rust_helper/tests/protected_data.rs",

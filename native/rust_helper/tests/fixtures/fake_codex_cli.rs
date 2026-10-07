@@ -104,14 +104,42 @@ fn main() {
         thread::sleep(Duration::from_secs(30));
         return;
     }
-    if fs::write(scratch.join("fixture-canary"), b"fixture-only").is_err() {
+    let task_isolation = match instruction.strip_prefix("FIXTURE_TASK_ISOLATION ") {
+        Some(value) => {
+            let mut fields = value.split_whitespace();
+            let Some(label @ ("agent-a" | "agent-b")) = fields.next() else {
+                process::exit(53);
+            };
+            let Some(delay_ms) = fields.next().and_then(|value| value.parse::<u64>().ok()) else {
+                process::exit(53);
+            };
+            if fields.next().is_some() || !(100..=10_000).contains(&delay_ms) {
+                process::exit(53);
+            }
+            Some((label.to_owned(), delay_ms))
+        }
+        None => None,
+    };
+    let canary = task_isolation.as_ref().map_or_else(
+        || b"fixture-only".to_vec(),
+        |(label, _)| label.as_bytes().to_vec(),
+    );
+    if fs::write(scratch.join("fixture-canary"), canary).is_err() {
         process::exit(47);
+    }
+    if let Some((_, delay_ms)) = &task_isolation {
+        thread::sleep(Duration::from_millis(*delay_ms));
     }
 
     println!(r#"{{"type":"thread.started","thread_id":"01a0cd58-c4fc-7221-8d25-dc52d12ba3fd"}}"#);
-    let task_result = model_id.map_or_else(
-        || "fixture-task-completed".to_owned(),
-        |model| format!("fixture-task-completed:{model}"),
+    let task_result = task_isolation.as_ref().map_or_else(
+        || {
+            model_id.map_or_else(
+                || "fixture-task-completed".to_owned(),
+                |model| format!("fixture-task-completed:{model}"),
+            )
+        },
+        |(label, _)| format!("fixture-task-completed:{label}"),
     );
     println!(
         r#"{{"type":"item.completed","item":{{"id":"item_0","type":"agent_message","text":"{task_result}"}}}}"#

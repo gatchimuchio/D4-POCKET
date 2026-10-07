@@ -2767,6 +2767,118 @@ exit 0
 
     #[cfg(windows)]
     #[test]
+    fn 同一Workspaceの並行Taskはscratchとcleanupを分離する() {
+        use std::sync::{Arc, Barrier};
+
+        let root = codex_cli_fixture::FixtureTempDirectory::create();
+        let fixture_directory = root.path().join("fixture");
+        let workspace = root.path().join("workspace");
+        fs::create_dir(&fixture_directory).expect("偽CLI用領域");
+        fs::create_dir(&workspace).expect("登録作業領域");
+        let executable = codex_cli_fixture::compile_fake_codex_cli(&fixture_directory);
+        let identity = crate::broker::workspace_root::pin_workspace_path(&workspace)
+            .expect("登録Workspace identity")
+            .identity;
+        let mut context_a = scratch_context(identity);
+        context_a.task_id = "task-isolation-agent-a".into();
+        let mut context_b = context_a.clone();
+        context_b.task_id = "task-isolation-agent-b".into();
+        let adapter_a =
+            CodexCliAdapter::new(&executable, &workspace).expect("Agent A偽CLI Adapter");
+        let adapter_b =
+            CodexCliAdapter::new(&executable, &workspace).expect("Agent B偽CLI Adapter");
+        let start = Arc::new(Barrier::new(3));
+
+        std::thread::scope(|scope| {
+            let start_a = Arc::clone(&start);
+            let task_a = scope.spawn(move || {
+                start_a.wait();
+                adapter_a.AgentTask実行(
+                    "FIXTURE_TASK_ISOLATION agent-a 3000",
+                    &AtomicBool::new(false),
+                    Instant::now() + Duration::from_secs(15),
+                    Some(context_a),
+                )
+            });
+            let start_b = Arc::clone(&start);
+            let task_b = scope.spawn(move || {
+                start_b.wait();
+                adapter_b.AgentTask実行(
+                    "FIXTURE_TASK_ISOLATION agent-b 7000",
+                    &AtomicBool::new(false),
+                    Instant::now() + Duration::from_secs(15),
+                    Some(context_b),
+                )
+            });
+            start.wait();
+
+            let list_scratch = || {
+                fs::read_dir(&workspace)
+                    .expect("作業領域内を列挙")
+                    .filter_map(Result::ok)
+                    .map(|entry| entry.path())
+                    .filter(|path| {
+                        path.file_name()
+                            .is_some_and(|name| name.to_string_lossy().starts_with(".d4p-tmp-"))
+                    })
+                    .collect::<Vec<_>>()
+            };
+            let deadline = Instant::now() + Duration::from_secs(5);
+            let concurrent_scratch = loop {
+                let paths = list_scratch();
+                let both_agents_started = paths.len() == 2
+                    && paths
+                        .iter()
+                        .all(|path| fs::read_to_string(path.join("fixture-canary")).is_ok());
+                if both_agents_started {
+                    break paths;
+                }
+                assert!(
+                    Instant::now() < deadline,
+                    "2 Taskのscratch内にAgent別markerが同時に存在"
+                );
+                std::thread::sleep(Duration::from_millis(10));
+            };
+            let path_for = |label: &str| {
+                concurrent_scratch
+                    .iter()
+                    .find(|path| {
+                        fs::read_to_string(path.join("fixture-canary"))
+                            .is_ok_and(|value| value == label)
+                    })
+                    .cloned()
+                    .unwrap_or_else(|| panic!("{label}専用scratchを確認"))
+            };
+            let scratch_a = path_for("agent-a");
+            let scratch_b = path_for("agent-b");
+            assert_ne!(scratch_a, scratch_b, "異なるTaskは別scratchを使う");
+
+            assert_eq!(
+                task_a.join().expect("Agent A Task process終了"),
+                Ok("fixture-task-completed:agent-a".into())
+            );
+            assert_eq!(
+                list_scratch(),
+                vec![scratch_b.clone()],
+                "Agent A終端cleanup後もAgent B scratchだけが存続"
+            );
+            assert_eq!(
+                fs::read_to_string(scratch_b.join("fixture-canary"))
+                    .expect("Agent B scratch識別marker"),
+                "agent-b"
+            );
+            assert_eq!(
+                task_b.join().expect("Agent B Task process終了"),
+                Ok("fixture-task-completed:agent-b".into())
+            );
+            assert!(list_scratch().is_empty(), "両Task終端後にscratchが残らない");
+        });
+
+        codex_cli_fixture::assert_no_workspace_task_scratch(&workspace);
+    }
+
+    #[cfg(windows)]
+    #[test]
     fn 選択Modelが偽CodexCLIのTask実行へ届く() {
         let root = codex_cli_fixture::FixtureTempDirectory::create();
         let fixture_directory = root.path().join("fixture");
