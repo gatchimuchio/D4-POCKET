@@ -19,6 +19,8 @@
 
 #### macOS 作業領域のOS選択 — IMPLEMENTING（Product Build、2026-10-08）
 
+手動Actions [run 37702884899](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37702884899)、commit `7b3cbb860cfc78bb3db6db5edc03c7fb31b8fdc3`は通常Mac build、native公開入力1件、Broker境界4件、Dart対象検査／2試験、後片付けPASS。親GUIのOS sheetは表示したが、App全体の同名button queryがTouch Bar側Cancelを返し、XCTestがclick不可と明示してUI試験29.036秒でFAILした。製品の応答・Authorityは変えず、試験queryを実window配下だけへ限定する。artifact `11518721677`、SHA-256 `bc6c6f5b6fc7997e5ce288a1f970c1bf343cc8cb1b697dc5cf218c14ecf3eaf4`を照合した。取消後投影・選択／登録の有限条件は次の実行まで未成立。
+
 手動Actions [run 37700727198](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37700727198)、commit `904b20a333db18c73662a9b793f3b5b1b6fbe5d0`は通常Mac build、native公開入力1件、Broker境界4件、Dart対象検査／2試験、後片付けがPASS。親GUIの実OS chooser表示とCancelクリックを観測したが、直後のFlutter投影取得でXCTest snapshot timeoutとなりUI試験152.831秒でFAILした。保存映像ではchooserが閉じ、main threadのstackshotは通常event待機、XCTest側はsnapshot待機だった。同期modalが原因と確定したとは扱わない。artifact `11518135074`、SHA-256 `58da45daee5d70a12af99e8cd03bd3182b6a6acdcbdaa63ad1510e4a58dc3572`を照合した。親Rust chooserを通常windowの公開sheet completionへ変更し、入れ子run loopを除く。非同期callbackは一回配送・借用pointer非保持・終了世代照合とし、拒否時は当該scopeだけを解放する。有限条件とAuthorityは変えず、次の製品試験まで未成立を保持する。
 
 sheet方式修正後の必須Windows Rust全体は504 passed／5 failed／12 ignoredでFAIL。既存Codex loopback応答headerとUpdate Download TLS 4件のConnectionReset／OS 10054であり、変更外Final QAの`release_blocker`履歴を保持する。全体PASS・根因解消・製品regression確定へ昇格しない。Desktop／Mobileの`flutter analyze --no-pub`は既知のLSP FormatException／server exit 255で各exit 1（ignored logは33／19）。Schema、Conformance 237件、native 2件、Manifest、diff検査はPASS。Mac専用の公開completion接続の実動作は次の手動runnerで確認する。

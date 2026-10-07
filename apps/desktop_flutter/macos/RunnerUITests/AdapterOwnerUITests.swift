@@ -375,7 +375,8 @@ private final class WorkspacePanelUI {
 
   private func button(_ title: String) -> XCUIElement {
     // 同じ製品processの実AppKit panel。Flutterの日本語取消buttonとは別のnative英語Cancel。
-    app.buttons.matching(identifier: title).firstMatch
+    // App全体のqueryは同名Touch Bar buttonを先に返す。実window配下だけを操作する。
+    app.windows.buttons.matching(identifier: title).firstMatch
   }
 
   func waitForButton(_ title: String, timeout: TimeInterval) -> Bool {
