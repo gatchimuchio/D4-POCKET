@@ -3,13 +3,13 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 
-use cap_fs_ext::OsMetadataExt as _;
 use cap_std::fs::Dir;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::audit_hash::hmac_sha256_tagged;
 use crate::broker::audit::{BrokerAuditEvent, BrokerAuditLog};
+use crate::broker::product_install::is_cap_reparse_point;
 
 const REPLAY_NONCE_RETENTION_SECONDS: i64 = 24 * 60 * 60;
 const MAX_REPLAY_NONCE_RECORDS: usize = 100_000;
@@ -251,7 +251,7 @@ impl BrokerPersistentStore {
         let metadata = root.symlink_metadata("update_packages").map_err(|error| {
             BrokerStoreError::Io(format!("更新package directoryを検査できない: {error}"))
         })?;
-        if !metadata.is_dir() || metadata.file_attributes() & 0x400 != 0 {
+        if !metadata.is_dir() || is_cap_reparse_point(&metadata) {
             return Err(BrokerStoreError::Io(
                 "更新package directoryが通常directoryではない".to_string(),
             ));

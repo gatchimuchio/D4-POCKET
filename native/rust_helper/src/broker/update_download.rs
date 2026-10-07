@@ -1,7 +1,7 @@
 //! 現在のBroker trustと署名済み更新recordから再導出した入力だけで、HTTPS packageを取得する。
 
 use cap_fs_ext::{FollowSymlinks, MetadataExt as CapMetadataExt, OpenOptionsFollowExt};
-use cap_std::fs::{Dir, MetadataExt, OpenOptions};
+use cap_std::fs::{Dir, OpenOptions};
 use reqwest::header::{ACCEPT_ENCODING, CONTENT_ENCODING, CONTENT_LENGTH, TRANSFER_ENCODING};
 use reqwest::{redirect, retry, Certificate, Client, Response, StatusCode, Url};
 use sha2::{Digest, Sha256};
@@ -12,6 +12,8 @@ use std::net::ToSocketAddrs;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
+
+use super::product_install::is_cap_reparse_point;
 
 #[cfg(windows)]
 #[path = "update_download/windows_dns.rs"]
@@ -135,7 +137,7 @@ pub(crate) fn ensure_package_storage_room(
             .open_with(name.as_ref(), &options)
             .map_err(|_| DownloadError::Storage)?;
         let metadata = file.metadata().map_err(|_| DownloadError::Storage)?;
-        if !metadata.is_file() || metadata.file_attributes() & 0x400 != 0 {
+        if !metadata.is_file() || is_cap_reparse_point(&metadata) {
             return Err(DownloadError::Storage);
         }
         package_bytes = package_bytes
@@ -164,8 +166,7 @@ pub(crate) fn remove_verified_package(
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
         Err(_) => return Err(DownloadError::Storage),
     };
-    if !before.is_file() || before.file_attributes() & 0x400 != 0 || before.len() != expected_bytes
-    {
+    if !before.is_file() || is_cap_reparse_point(&before) || before.len() != expected_bytes {
         return Err(DownloadError::Storage);
     }
     let mut options = OpenOptions::new();
@@ -175,7 +176,7 @@ pub(crate) fn remove_verified_package(
         .map_err(|_| DownloadError::Storage)?;
     let opened = file.metadata().map_err(|_| DownloadError::Storage)?;
     if !opened.is_file()
-        || opened.file_attributes() & 0x400 != 0
+        || is_cap_reparse_point(&opened)
         || !same_file_identity(&before, &opened)
         || opened.len() != expected_bytes
     {
@@ -204,7 +205,7 @@ pub(crate) fn remove_verified_package(
         .symlink_metadata(&name)
         .map_err(|_| DownloadError::Storage)?;
     if !after.is_file()
-        || after.file_attributes() & 0x400 != 0
+        || is_cap_reparse_point(&after)
         || !same_file_identity(&opened, &after)
         || after.len() != expected_bytes
     {
@@ -218,8 +219,10 @@ pub(crate) fn remove_verified_package(
 }
 
 fn same_file_identity(left: &cap_std::fs::Metadata, right: &cap_std::fs::Metadata) -> bool {
-    let inode = left.ino();
-    inode != 0 && left.dev() == right.dev() && inode == right.ino()
+    let inode = CapMetadataExt::ino(left);
+    inode != 0
+        && CapMetadataExt::dev(left) == CapMetadataExt::dev(right)
+        && inode == CapMetadataExt::ino(right)
 }
 
 pub(crate) fn download_package<F>(
@@ -546,7 +549,7 @@ fn package_entry_is_replaceable(directory: &Dir, file_name: &str) -> Result<bool
         Err(_) => return Err(DownloadError::Storage),
     };
     let metadata = file.metadata().map_err(|_| DownloadError::Storage)?;
-    if !metadata.is_file() || metadata.file_attributes() & 0x400 != 0 {
+    if !metadata.is_file() || is_cap_reparse_point(&metadata) {
         return Err(DownloadError::Storage);
     }
     Ok(true)
@@ -571,7 +574,7 @@ fn verify_existing_package(
         Err(_) => return Err(DownloadError::Storage),
     };
     let metadata = file.metadata().map_err(|_| DownloadError::Storage)?;
-    if !metadata.is_file() || metadata.file_attributes() & 0x400 != 0 {
+    if !metadata.is_file() || is_cap_reparse_point(&metadata) {
         return Err(DownloadError::Storage);
     }
     if metadata.len() != expected_bytes {
@@ -1035,6 +1038,43 @@ mod tests {
             ensure_package_storage_room(&directory, &"a".repeat(64), bytes.len() as u64),
             Err(DownloadError::Storage)
         );
+        drop(directory);
+        std::fs::remove_dir_all(path).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn unix更新保管先とpackageのsymbolic_linkを拒否する() {
+        use std::os::unix::fs::symlink;
+
+        let path = temporary_directory("update-link-boundary");
+        let outside = path.join("outside");
+        std::fs::create_dir(&outside).unwrap();
+        let (store, _) = crate::broker::store::BrokerPersistentStore::open_or_create(
+            &path.join("store"),
+            "update-link-test",
+        )
+        .unwrap();
+        symlink(&outside, store.root().join("update_packages")).unwrap();
+        assert!(store.open_update_package_directory().is_err());
+
+        let bytes = b"package";
+        let digest = hex::encode(Sha256::digest(bytes));
+        let target = outside.join("original");
+        std::fs::write(&target, bytes).unwrap();
+        let packages = path.join("packages");
+        std::fs::create_dir(&packages).unwrap();
+        symlink(&target, packages.join(format!("{digest}.pkg"))).unwrap();
+        let directory = Dir::open_ambient_dir(&packages, cap_std::ambient_authority()).unwrap();
+        assert_eq!(
+            ensure_package_storage_room(&directory, &digest, bytes.len() as u64),
+            Err(DownloadError::Storage)
+        );
+        assert_eq!(
+            remove_verified_package(&directory, &digest, bytes.len() as u64),
+            Err(DownloadError::Storage)
+        );
+        assert_eq!(std::fs::read(&target).unwrap(), bytes);
         drop(directory);
         std::fs::remove_dir_all(path).unwrap();
     }

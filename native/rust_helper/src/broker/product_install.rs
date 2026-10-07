@@ -730,7 +730,7 @@ fn open_or_create_child_directory(
     Ok(opened)
 }
 
-fn is_cap_reparse_point(metadata: &cap_std::fs::Metadata) -> bool {
+pub(super) fn is_cap_reparse_point(metadata: &cap_std::fs::Metadata) -> bool {
     #[cfg(windows)]
     {
         metadata.file_attributes() & 0x400 != 0

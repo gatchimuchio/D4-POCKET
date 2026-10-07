@@ -41,6 +41,10 @@ P13の不足である製品Flutter UI→Android native招待画面／Keystore→
 
 Windows hostのAPI 35 Emulatorでは、製品起動を妨げるSystem UIのANR dialogを観測し、待機操作で解消した。その後の試験は結合／端末確認のBroker受理まで進んだが、応答frameの終端改行を受け取らずEOFとなる例があり、nativeの厳格読取りが拒否した。診断は隔離worktreeだけで処理段階・件数・固定例外分類を記録し、秘密・本文を出さず、診断変更は撤去した。欠落箇所の根因は未確定であり、Android正常経路PASSや製品regressionの断定はしない。Windows host経路との切分けのため、既存`android-manual-emulator.yml`へ同じnative試験を追加し、手動ActionsのUbuntu／Android Emulator上で補助検証する。自動trigger・正式identity・物理端末は使わない。P13とMobile release blockerはOPENのまま。
 
+手動Actions [run 37578711893](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37578711893)は検証commit `7c5cd76f082ede0ee085c13aa72b634b9ecb61fe`のLinux Rust buildで停止し、Android試験は未実行だった。更新package保管処理がWindows専用`file_attributes`を無条件で使用し、Unixでは同名`MetadataExt`の`ino`／`dev`も競合していた。既存platform別link検査を共用し、portable traitを明示する局所修正を行う。Windowsのreparse拒否を保持し、Unixではsymbolic linkの保管先／packageを拒否する対象試験を追加する。これはP13を実行可能にする互換修正であり、UpdateのCLOSED Acceptanceを再開して機能拡張するものではない。
+
+局所互換修正後、Windowsの`cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1`はcompile成功、library 497 passed／3 failed／12 ignored。変更箇所のpackage保管・一致hash削除・修復・非通常file拒否・create-only公開の5件はPASSした。全体の失敗はA2A Agent Card読取1件とUpdate TLS fixtureのConnectionReset（OS 10054）2件で、既存`FQ-TEST-LOOPBACK`の対象に残す。全Rust PASSとは報告せず、library失敗後の他targetも未実行として区別する。Schema 161／157／208、Conformance 236件はPASS。Mobile analyzeはNo issues、Desktop analyzeは依存取得後に既存deprecated info 5件だけで終了値1（既存known limitation）。
+
 ## Q0 品質保証凍結 — 完了（過去のFinal QA記録）
 
 2026-10-07、P12 Product Build受入れcommit `ab746d4b33b003761f5ddcef60a88afa97132a40`をFinal QA対象製品状態として固定した。対象commitは`main`へpush済みで、Q0記録時点のremote `main`と一致。対象はWindows Feature Complete製品構成であり、release-readyや正式配布可能状態を意味しない。以後のQ1〜Q7 evidenceはこの凍結commitを対象とし、製品コード修正が必要になった場合は修正commitを新たなQA候補として明示し、対象を再凍結する。

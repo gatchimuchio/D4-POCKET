@@ -68,7 +68,7 @@
     },
     {
       "path": ".github/workflows/android-manual-emulator.yml",
-      "sha256": "1f4b4ff0bc1ac49513d02fabd0a4fca82b6b023d6f5e486407025cd0337c81bf"
+      "sha256": "dba94da8fcff4bb68976eb88aee3d6e01cc8b06bf4d510faff68e0099b7cb958"
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
@@ -1252,7 +1252,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "791732bc7cbecd3f39003bc40e5d608c126167e7e201c0128c331a8f7123064b"
+      "sha256": "5d9c7168695a4b175602b5e462b80c2dfa02c6cb6c0e4088778fe8fbe996c764"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -3332,7 +3332,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/product_install.rs",
-      "sha256": "e797a6af8fa3d76d2daf4eb87b98bd7a6d21a557223c2a8b53b1b4a2d06f2fee"
+      "sha256": "35166e8c20e76be83f957ce4b723822b5063b26fad44225781553d1f8e11d11c"
     },
     {
       "path": "native/rust_helper/src/broker/profile_center.rs",
@@ -3360,7 +3360,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/store.rs",
-      "sha256": "7f8553780a7ea09f3cea55ad1a9dd515017028e583099edcafc655a78485b777"
+      "sha256": "6cdae5cf0373f750cf3b24154d5b87a97a02366252e15f613703c5e017fadca3"
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
@@ -3368,7 +3368,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
-      "sha256": "b64ae01dd1e01659ac20b081cb3ff925637dfd4133d3ebed8fbca646896254df"
+      "sha256": "54e5416e3619dd95dd95bb31fe982b4fa17d0d7ba2fc1b8393489cd367d2993d"
     },
     {
       "path": "native/rust_helper/src/broker/update_download/windows_dns.rs",
