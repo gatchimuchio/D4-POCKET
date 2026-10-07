@@ -6,7 +6,7 @@ Mobileは共通UIをFlutterで描画し、Device Linkの端末識別子・招待
 
 - Androidには固定MethodChannel、native招待画面、Android Keystoreで暗号化した資格保管、証明書hash固定TLS、有限timeout、Activity lifecycleからのbackground socket停止を実装した。Kotlin compile、unit test、debug APK/AAB buildは成功したが、実TLS・Keystoreの実端末動作は未検証。
 - Flutterへ返す接続状態は閉じたprojectionであり、端末ID・Host・招待・資格・secretを含めない。通常操作は既存Desktop Rust Brokerを通る。
-- iOSのnative Device Link handlerは未実装。channel未登録時はFlutterがfail-closedする。iOS build成功を接続機能の証明にしない。
+- iOSにはSwift製Device Link channel handler、ThisDeviceOnly Keychain保管、証明書hash固定TLS client、厳格JSON検証、native XCTestが実装済みで、implicit Flutter engineへ登録される。Simulator build／XCTestの現行source検証状況は`docs/REV5_PRODUCT_PROGRESS.md`を参照する。Simulator buildやunit testは、Brokerへの実TLS接続・実端末動作の証拠ではない。
 - 過去のdebug VM integration driverは招待をDartへ渡していたため廃止した。新しいLIVE_RUNTIME試験は、招待入力・保管・TLSをnative側に保ち、秘密をDart、log、artifactへ渡さないplatform test harnessが成立するまで実行しない。
 
 ## ローカル確認
@@ -18,16 +18,16 @@ flutter test --no-pub --reporter expanded
 flutter build apk --debug --no-pub
 ```
 
-Android実機のinstall・launch・結合・保管・復帰検証は2026-09-11のowner指示で凍結中。凍結は合格証拠ではない。iOSはWindows上でbuildできず、Apple platformの手動補助workflowはbuildのみである。
+Android実機のinstall・launch・結合・保管・復帰検証は2026-09-11のowner指示で凍結中。凍結は合格証拠ではない。Windows上でiOS buildはできないため、`.github/workflows/ios-manual-mobile-validation.yml`を`workflow_dispatch`限定のMac補助として使い、Flutter iOS Simulator buildとiOS native XCTestを検証する。このworkflowは実端末、Brokerとの実TLS接続、production identity、release readinessを証明しない。
 
 `tooling/minidora_live_check.py --mobile-client` は開発用Python clientでRust Device Link wire pathを検証する。Mobile製品native channel、OS安全保管、実機lifecycleの証拠ではない。
 
 ## リリース阻害項目
 
-- item: iOS Device Link native経路
+- item: iOS端末連携のnative実行時統合
   classification: release_blocker
-  reason: iOSはKeychain・TLS・native channel handlerが未実装。
-  required_action: Androidと同じ境界を満たすSwift handlerとKeychain保管を実装し、Mac上でbuild・試験する。
+  reason: Swift handler・Keychain・TLS clientは実装されているが、現行sourceのMac Simulator build／XCTestとBrokerに対するnative LIVE_RUNTIME接続が未確認。
+  required_action: 手動Mac補助検証で現行sourceをbuild・試験し、その後、秘密をFlutterへ渡さないplatform-native harnessでDesktop Rust BrokerへのTLS接続・拒否・失効・background停止を検証する。
   blocks_release: yes
 - item: Android/iOS Device Linkの実動作証拠
   classification: release_blocker

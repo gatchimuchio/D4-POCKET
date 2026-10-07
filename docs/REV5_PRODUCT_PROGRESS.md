@@ -2,24 +2,28 @@
 
 更新日: 2026-10-07
 工程正本: ユーザー提示「D4 Pocket / GUI-Shell 統合実装仕様書 rev5」「統合開発工程表 rev5」「Codex実装指示書 rev5」
-現行mode: `FINAL_QA_MODE`。P12 Product IntegrationのWindows `FEATURE COMPLETE`受入れ後であり、最新rev5実装指示§23に従ってFinal QAへ移行した。Q0 QA FreezeとQ1 Codex Comprehensive QAは完了、現行phaseはQ2 Fault / Recovery (`ACTIVE`)。旧R2 Agent TaskはProduct Build上`FUNCTIONALLY ESTABLISHED`だが、Final QA queueのcancel／deadline／crash等はQ2で実証する。P2 Compare（実装指示書上のR3）とP3 Handoff（同R4）はCLOSEDのまま再訪しない。Windows Feature Completeは正式配布・release readinessを意味せず、通常Release `task_execution=unsupported`と既存release gateを維持する。
+現行mode: `PRODUCT_BUILD_MODE`（最新版rev5実装指示§2）。Windows側P12 `FEATURE COMPLETE`はCLOSEDのまま保持し、Mobile／Non-Windowsは独立するP13 trackとして構築する。P2 CompareとP3 HandoffもCLOSEDのまま再訪しない。Q0／Q1／Q2に記録済みのQA実行結果は履歴証拠として保持するが、Final QA queueは現在の作業schedulerではなく、追加QAは開始・継続しない。通常Release `task_execution=unsupported`と既存release gateを維持する。
 初期rev5文書同期commit: `39dd3f4bc7aafe350ca94fce9392095f1064d2bc`。凍結commitとその後のQA記録は本書末尾の更新履歴を参照。
 
 ## 正本の選び方
 
 常にユーザーが現在提示した最新版の仕様書・工程表・実装指示書と、そこへ同期したリポジトリ内の現行進捗を正本とする。旧版文書は、明示的に現行正本へ採用されない限り、履歴・補助証拠としてのみ使う。旧版の状態や要求を現行状態へ推定転記しない。
 
-## 最新rev5指示による工程整理（2026-10-07）
+## 現行rev5指示による工程整理（2026-10-07）
 
-P12がWindows `FEATURE COMPLETE`としてCLOSEDであるため、rev5実装指示§23に従いFinal QAへ移行する。前回のcommit `8d98626`では「現在modeがProduct Build」と書かれた§2だけを読み、Feature Complete後の§23を適用せず`DEFERRED`と誤記した。本修正はその工程status誤りだけを直し、過去のQ0／Q1結果、Q2試験結果、P2／P3のCLOSED状態を変更しない。
+最新版rev5実装指示§2が現在modeを`PRODUCT_BUILD_MODE`と明示しているため、P13 Mobile／Non-Windowsの製品構築を続ける。§23のFinal QA移行条件は、現行の明示modeを自己判断で上書きする許可ではない。P12 Windows Feature Complete、P2／P3のCLOSED状態、Q0／Q1の結果、Q2に蓄積した試験結果と過去FAILは変更せず、Final QAは別の現行指示があるまで延期する。
 
-工程表のP2 Compareは実装指示書のR3、P3 HandoffはR4に対応する。本書で両者をCLOSEDとしているため再実装・再検査しない。Q0 Freezeは製品commit `ab746d4b33b003761f5ddcef60a88afa97132a40`を維持する。後続Rust差分はrustfmt変更、test-only変更、`r2-e2e` feature限定fixtureに分類し、Q1／Q2 evidenceには個別の実行commitと証拠範囲を記録する。通常Release `task_execution`はfail-closedのまま維持し、正式release claimへ昇格しない。
+旧進捗文書に残る「P12 Feature Complete後にFinal QAへ移行済み」という記載は、その時点の判断履歴として保持するが、最新版の明示modeに反する現在状態の根拠にはしない。工程表P2 Compareは実装指示書R3、P3 HandoffはR4に対応し、両者はCLOSEDのため再実装・再検査しない。通常Release `task_execution`はfail-closedのまま維持する。
 
-## Q0 品質保証凍結 — 完了
+## P13 Mobile / Non-Windows — 現行track
+
+Androidの実装・検証履歴は維持し、Android実機試験の凍結を尊重する。iOSにはSwift Device Link handler、ThisDeviceOnly Keychain保管、TLS client、strict JSON処理、native XCTestが実装されている一方、READMEには未実装との古い記述が残っていた。Windows hostではApple toolchainを実行できないため、Product Build上必要な確認として、workflow_dispatch限定のMac検証をP13の局所build／testに使う。これはiOS Simulator buildとnative XCTestに限り、実端末・実Broker接続・配布・Final QAの証拠へ昇格させない。
+
+## Q0 品質保証凍結 — 完了（過去のFinal QA記録）
 
 2026-10-07、P12 Product Build受入れcommit `ab746d4b33b003761f5ddcef60a88afa97132a40`をFinal QA対象製品状態として固定した。対象commitは`main`へpush済みで、Q0記録時点のremote `main`と一致。対象はWindows Feature Complete製品構成であり、release-readyや正式配布可能状態を意味しない。以後のQ1〜Q7 evidenceはこの凍結commitを対象とし、製品コード修正が必要になった場合は修正commitを新たなQA候補として明示し、対象を再凍結する。
 
-## Q1 Codex横断品質検査 — 完了
+## Q1 Codex横断品質検査 — 完了（過去のFinal QA記録）
 
 2026-10-07、凍結製品のAgent Task／Compare／Handoff／Workspace／MCP／Provider／Host／Export／Installer／Update／Rollback横断を既存全Rust targetとDesktop／Mobile Flutter testで確認した。`cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets --no-fail-fast -- --test-threads=1`最終runはexit 0: Rust lib 499 passed／12 ignored、bin 10 passed、Broker IPC 10 passed、その他hash／checkpoint／保護保管／Workspace integration 26 passed、production Agent Task E2E 1 ignored（総計545 passed／13 ignored／0 failed）。Ignoredは明示的な実Agent／Owner-dialogue専用testで、production Agent Taskの一般Release capabilityを有効にしない。
 
@@ -27,7 +31,9 @@ Desktop `flutter test --no-pub --dart-define=GUI_SHELL_PRODUCT_VERSION=1.2.3`は
 
 Q1初回Rust runで既知localhost fixtureのConnectionReset 3件、次runでA2A fixture 1件を観測したが、該当fixture単独testはPASSし、fixture競合の後の`--no-fail-fast`全target runは0 failureで完了した。これは間欠test fixture揺らぎを解消した証拠ではないため`FQ-TEST-LOOPBACK`へ保持し、Q2 network/fault調査で扱う。installed end-to-end、実Provider資格、正式証拠、Q2以降の障害／Recovery、release blockersは未成立のまま維持する。
 
-## Q2 障害・復旧 — 進行中
+## Q2 障害・復旧 — 過去の検証記録（現行modeでは延期）
+
+以下は2026-10-07までに実行した当時のQ2検証履歴である。観測結果と範囲は保持するが、現行Product Buildのactive taskや完了条件として扱わない。
 
 2026-10-07の最初のQ2検査単位では、実Codex CLI `0.160.0`を資格情報なしのloopback偽Responses APIへ接続するignored LIVE_RUNTIME testを修正・実行した。Task完了、MxC実行中TEMP markerのBroker親可読、CLI終了後markerの不在、取消後のterminal化、child heartbeat停止、取消後marker不在、Broker管理WorkspaceTaskScratch不在を確認し、修正後のtestは1 passed。実Network model／資格情報は使っていない。MxC／Owner／Audit以外はtest fixtureのin-process Brokerと合成Owner callbackであり、installed Flutter→native Owner→production IPC、永続Audit、deadline／crash recoveryを証明しない。TEMPの観測はこのchild markerの範囲だけで、外部component内の物理削除保証ではない。
 

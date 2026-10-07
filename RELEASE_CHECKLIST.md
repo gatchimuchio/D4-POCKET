@@ -43,8 +43,8 @@ Windows-first product path と LLM-readable substrate の demonstration path を
 - item: D4 Pocket rev2 Mobile Device Link Flutter境界が未成立
   classification: release_blocker
   registry_id: rev2_mobile_flutter_native_device_link_boundary
-  reason: Dart直接経路は廃止し、Android Kotlin unit testとAPK/AAB buildはPASSしたが、実OS保管・実TLS・lifecycleの証拠がなく、iOS native handlerは未実装。さらにMobile Device LinkにWorkspace選択面がないため、Agent Adapterの対話開始はWorkspace未指定としてBrokerが拒否する。Schema／fixture／unit test／buildだけではproduction経路の成立を証明しない。
-  required_action: iOS native招待UI・Keychain・TLS経路を実装する。秘密をDart/debug VM/log/artifactへ渡さないtest harnessでBroker到達・拒否・失効・background停止を検証する。Workspace識別子の開示範囲と選択をnative Device Link境界内で定義・検証し、Brokerが登録Runtime対応を再照合するまでMobile Agent startを有効化しない。
+  reason: Dart直接経路は廃止し、Android Kotlin／iOS Swiftのnative招待・Keychain／Keystore・TLS経路とnative Workspace選択面を実装済み。ただし現行iOS sourceのMac Simulator build／XCTest、実OS保管・実TLS・lifecycle、Brokerとのnative LIVE_RUNTIME接続は未確認。過去Dart経路やfixtureだけではproduction経路の成立を証明しない。
+  required_action: workflow_dispatch限定のMac補助でiOS現行sourceをbuild・試験する。その後、秘密をDart/debug VM/log/artifactへ渡さないnative harnessでBroker到達・拒否・失効・background停止を検証し、Workspace識別子の限定開示とBrokerのRuntime再照合を確認する。実機凍結・実機証拠・正式配布gateは別途維持する。
   blocks_release: yes
 
 - item: D4 Pocket 更新取得のDNS期限・破損package Recovery・installed updateが未成立

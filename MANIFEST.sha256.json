@@ -108,7 +108,7 @@
     },
     {
       "path": "CLAIM.md",
-      "sha256": "2c9621089a3215df9db95f91f4e39dbbbde51fb87c9fa72cb31ec22296d9051f"
+      "sha256": "994f1ce15ce11099b11e308cc1e3abb66fb01110987d8a0b1a100b99b297eb77"
     },
     {
       "path": "COMPATIBILITY_MATRIX.md",
@@ -160,11 +160,11 @@
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "c8496ad4a181e3b8bf32d8feed80d006d681d314d5e4a7f318dc4f401e4aec60"
+      "sha256": "27b95a2ff0b35c126a77a8bf1de743d8750b7ac56904d89226fe65dd01a294aa"
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "66c24cd2457f4de7bf9b4118cdec195414c5da5e5d1305a8ab97f373781b6dac"
+      "sha256": "1364cf2f39d91850be14050a5efe40429ac7aef304bd86b44d72371840e2118c"
     },
     {
       "path": "SECURITY.md",
@@ -784,7 +784,7 @@
     },
     {
       "path": "apps/mobile_flutter/README.md",
-      "sha256": "c500a8aa1cf90ce75d3e7a0028cdec2aa9bb093b50c2b2c617d7e64792c73263"
+      "sha256": "59082fb1aef0c8e23c8ad820826e84665d0b00b47c161a2c19c9d76284cf6288"
     },
     {
       "path": "apps/mobile_flutter/android/.gitignore",
@@ -1188,7 +1188,7 @@
     },
     {
       "path": "docs/FINAL_QA_QUEUE.md",
-      "sha256": "b0ec8bcfb2c936095b9ebf9e663dfdc2d824397a2c98af7e4ba68b6462f72762"
+      "sha256": "4a898562f374e78bb521bed5c221dbf5e69017b8d2f4926090d9ffe4ffab6d84"
     },
     {
       "path": "docs/FIRST_RUN.md",
@@ -1244,7 +1244,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "2f40efd9f222c39217ea2cc7e2ba2ce0a682d064a62b1c1b4c9ceecb84092f7e"
+      "sha256": "5343f42f9b39041808c12bdce47006e07b62440efd8ee0f4ca56ee17cba353d2"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",

@@ -1,0 +1,114 @@
+name: iOS Mobile 手動補助検証
+
+'on': workflow_dispatch
+
+permissions:
+  contents: read
+
+jobs:
+  ios-mobile-validation:
+    runs-on: macos-15
+    timeout-minutes: 35
+    steps:
+      - name: 対象commitを取得
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: 実行環境と対象を記録
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          {
+            git rev-parse HEAD
+            uname -a
+            sw_vers
+            xcodebuild -version
+            xcrun simctl list devices available
+          } | tee evidence/environment.txt
+
+      - name: 固定Flutterを導入
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch 3.44.0 https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          test "$(git -C "$RUNNER_TEMP/flutter" rev-parse HEAD)" = 559ffa3f75e7402d65a8def9c28389a9b2e6fe42
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/flutter/bin/flutter" --version | tee evidence/flutter.txt
+
+      - name: iOS Simulatorを選択
+        shell: bash
+        run: |
+          set -euo pipefail
+          simulator_id="$(xcrun simctl list devices available | sed -nE 's/.*iPhone[^()]*\(([A-Fa-f0-9-]{36})\).*/\1/p' | head -n 1)"
+          test -n "$simulator_id"
+          printf '%s\n' "$simulator_id" | tee evidence/ios-simulator-selected.txt
+
+      - name: Flutter Mobile解析・試験・iOS build
+        working-directory: apps/mobile_flutter
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter pub get 2>&1 | tee ../../evidence/mobile-pub-get.txt
+          flutter analyze --no-pub 2>&1 | tee ../../evidence/mobile-analyze.txt
+          flutter test --no-pub --reporter expanded 2>&1 | tee ../../evidence/mobile-test.txt
+          flutter build ios --simulator --debug --no-pub 2>&1 | tee ../../evidence/ios-simulator-build.txt
+
+      - name: iOS native XCTest
+        shell: bash
+        run: |
+          set -euo pipefail
+          simulator_id="$(<evidence/ios-simulator-selected.txt)"
+          xcodebuild test \
+            -project apps/mobile_flutter/ios/Runner.xcodeproj \
+            -scheme Runner \
+            -destination "platform=iOS Simulator,id=$simulator_id" \
+            -parallel-testing-enabled NO \
+            -derivedDataPath "$RUNNER_TEMP/gui-shell-ios-native-tests" \
+            -resultBundlePath "$RUNNER_TEMP/gui-shell-ios-native-tests.xcresult" \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee evidence/ios-native-test.txt
+
+      - name: XCTest結果要約
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          result_path="$RUNNER_TEMP/gui-shell-ios-native-tests.xcresult"
+          if [ -d "$result_path" ]; then
+            xcrun xcresulttool get test-results summary --path "$result_path" \
+              | tee evidence/ios-native-test-summary.json
+          else
+            printf '%s\n' 'XCTest result bundle was not created.' \
+              | tee evidence/ios-native-test-summary.txt
+          fi
+
+      - name: Simulatorを終了
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -s evidence/ios-simulator-selected.txt ]; then
+            simulator_id="$(<evidence/ios-simulator-selected.txt)"
+            xcrun simctl shutdown "$simulator_id" || true
+          fi
+
+      - name: 追跡sourceの不変を確認
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git status --short --untracked-files=all -- apps/mobile_flutter \
+            | tee evidence/mobile-working-tree.txt
+          git diff --exit-code -- apps/mobile_flutter
+          git diff --cached --exit-code -- apps/mobile_flutter
+          test -z "$(git status --porcelain --untracked-files=all -- apps/mobile_flutter)"
+
+      - name: 限定証拠を保存
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: ios-mobile-validation-${{ github.sha }}
+          path: evidence/
+          retention-days: 3
+          if-no-files-found: error
