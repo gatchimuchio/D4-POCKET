@@ -1,4 +1,4 @@
-name: Android手動補助build・仮想端末起動確認
+name: Android手動補助build・native Device Link LIVE_RUNTIME
 
 'on': workflow_dispatch
 
@@ -73,7 +73,7 @@ jobs:
           df -B1 "$ANDROID_AVD_HOME" > evidence/emulator-disk-before.txt
           "$ANDROID_HOME/emulator/emulator" -list-avds | tee evidence/configured-avds.txt
           grep -Fx gui_shell_native_test evidence/configured-avds.txt
-      - name: Flutter検査・Android build・仮想端末起動を確認
+      - name: Flutter検査・Android build・native Device Link製品経路を確認
         shell: bash
         run: |
           set -euo pipefail
@@ -126,6 +126,7 @@ jobs:
           done
           cd ../..
           python3 tooling/minidora_live_check.py --reference "$RUNNER_TEMP/minidora-reference" --mobile-client 2>&1 | tee evidence/device-link-rust-live-test.txt
+          python3 tooling/minidora_live_check.py --reference "$RUNNER_TEMP/minidora-reference" --android-native --android-serial emulator-5554 2>&1 | tee evidence/android-native-device-link-live-test.txt
       - name: 追跡差分を検査
         shell: bash
         run: |

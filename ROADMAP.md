@@ -1,5 +1,7 @@
 # GUI Shell ロードマップ
 
+P13 Android native補助検証: `android-manual-emulator.yml`の手動起動限定で、製品UI→native Device Link→実Rust Brokerの基本経路を追加検証する。Windows hostでのTLS終端欠落観測を別環境で切り分ける目的に限定し、既存検査・Android実機凍結・release gateを維持する。現行結果は`docs/REV5_PRODUCT_PROGRESS.md`へ記録する。
+
 2026-10-07 rev5現行工程: 最新版実装指示§2により`PRODUCT_BUILD_MODE`を継続。Windows P12 `FEATURE COMPLETE`とP2 Compare／P3 HandoffのCLOSED状態は維持し、P13 Mobile／Non-Windowsを独立trackとして進める。Q0／Q1／Q2の既存記録は履歴証拠として保持するがFinal QA queueは延期中であり、現在の開発作業を止めない。通常Release `task_execution=unsupported`、release gate、`release_ready=false`を維持する。現況とP13作業は`docs/REV5_PRODUCT_PROGRESS.md`、Final QA記録は`docs/FINAL_QA_QUEUE.md`。
 
 P13 iOS局所検証: 手動Actions run [#22](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37558500619)、commit `b6dbf10c4ea8b34e103b8826f2d23f25930d8ca9`でFlutter analyze・21 test・iOS Simulator build・native XCTest 8件がPASSした。XCTestはproduction identityを使わないSimulator ad-hoc署名で実行した。これはP13 Product Buildのtargeted build/testで、物理端末、実Broker接続、配布、Final QAの証拠ではない。前段failureと範囲は`docs/REV5_PRODUCT_PROGRESS.md`に保持する。

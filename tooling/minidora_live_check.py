@@ -220,7 +220,7 @@ def 小数資源観測正本化相互運用(endpoint):
     }
 
 
-def 検証(reference, binary, dart_client=False, mobile_client=False):
+def 検証(reference, binary, dart_client=False, mobile_client=False, android_native=False, android_serial="emulator-5554"):
     head = subprocess.check_output(["git", "-C", str(reference), "rev-parse", "HEAD"], text=True).strip()
     if head != REFERENCE:
         raise RuntimeError("MINIDORA参照commitが固定点と異なる")
@@ -263,6 +263,8 @@ Path(sys.argv[1]).write_text(json.dumps({"port":server.server_port}),encoding="u
 server.serve_forever()
 '''
     processes = []
+    android_native_result = "未実行"
+    mobile_python_result = "未実行"
     with tempfile.TemporaryDirectory(prefix="gui-shell-minidora-live-") as directory:
         root = Path(directory)
         with (root / "process.log").open("w", encoding="utf-8") as log:
@@ -279,12 +281,29 @@ server.serve_forever()
                 vault = root / "protected"
                 vault.mkdir()
                 protected_args = ["--protected-store-dir", str(vault)] if os.name == "nt" else []
+                mobile_port = None
+                if mobile_client or android_native:
+                    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+                        probe.bind(("127.0.0.1", 0))
+                        mobile_port = probe.getsockname()[1]
                 broker = subprocess.Popen([str(binary), "broker-server", "--store-dir", str(root / "store"),
                     "--session-file", str(normal_file), "--owner-session-file", str(owner_file), *protected_args,
-                    "--minidora-runtime", f"left={addresses[0]}", "--minidora-runtime", f"right={addresses[1]}", *(["--mobile-bind", "127.0.0.1:0"] if mobile_client else [])], cwd=root, stdout=log, stderr=log)
+                    "--minidora-runtime", f"left={addresses[0]}", "--minidora-runtime", f"right={addresses[1]}",
+                    *(["--mobile-bind", f"127.0.0.1:{mobile_port}"] if mobile_client or android_native else [])], cwd=root, stdout=log, stderr=log)
                 processes.append(broker)
                 normal = 接続資格確認(file待機(normal_file, broker), "normal")
                 owner = 接続資格確認(file待機(owner_file, broker), "owner")
+                # P13のnative単独指定ではMobileの基本製品経路だけを実行する。
+                # 既存MINIDORA総合検査は既存flag／複合指定に残し、CLOSED条件を再試験しない。
+                if android_native and not (dart_client or mobile_client):
+                    from tooling.device_link_live_check import AndroidNative検証
+                    return {
+                        "result": "PASS",
+                        "evidence_source": "LIVE_RUNTIME",
+                        "reference_commit": head,
+                        "android_native_device_link": AndroidNative検証(owner, binary, root, mobile_port, android_serial),
+                        "scope": "Android Emulatorのnative Device Link基本製品経路。既存MINIDORA総合検査とは独立。",
+                    }
                 assert 操作(normal, "対話承認待ち", {})["status"] == "rejected"
                 assert 成功(normal, "実行系列挙", {})["実行系"] == ["left", "right"]
                 decimal_hash_interop = 小数資源観測正本化相互運用(normal)
@@ -430,7 +449,11 @@ server.serve_forever()
                     }
                 if mobile_client:
                     from tooling.device_link_live_check import 検証 as 端末検証
-                    assert 端末検証(normal, owner, binary, root) == "PASS"
+                    mobile_python_result = 端末検証(normal, owner, binary, root)
+                    assert mobile_python_result == "PASS"
+                if android_native:
+                    from tooling.device_link_live_check import AndroidNative検証
+                    android_native_result = AndroidNative検証(owner, binary, root, mobile_port, android_serial)
                 if dart_client:
                     dart = shutil.which("dart")
                     if dart is None:
@@ -780,7 +803,9 @@ server.serve_forever()
                         "runtime_startup": [json.loads((root / f"runtime-{i}.json.startup.json").read_text(encoding="utf-8")) for i in range(2)],
                         "tested": ["実API二実行系", "owner CLI承認", "通常資格拒否", "表示分離", "trace照合", "保留", "片側失敗", "両失敗", "実履歴の状態整合", "実履歴の条件検索", "結果証跡の要求・応答・完了監査照合", "新承認による実再実行と分岐", "現在承認による通常IPC履歴閲覧と失効", "監査chain再読取"],
                         "dart_product_client": "PASS" if dart_client else "未実行",
-                        "mobile_tls_path": "PASS" if mobile_client else "未実行",
+                        "mobile_tls_path": "PASS" if mobile_client or android_native else "未実行",
+                        "mobile_python_wire_path": mobile_python_result,
+                        "android_native_device_link": android_native_result,
                         "protected_content_save": "PASS" if os.name == "nt" else "未対応拒否を確認",
                         "protected_content_delete": "PASS" if os.name == "nt" else "未実行",
                         "protected_state_after_forced_process_exit": "PASS" if os.name == "nt" else "未実行",
@@ -813,9 +838,12 @@ def main():
     parser.add_argument("--reference", type=Path, required=True)
     parser.add_argument("--dart-client", action="store_true")
     parser.add_argument("--mobile-client", action="store_true")
+    parser.add_argument("--android-native", action="store_true")
+    parser.add_argument("--android-serial", default="emulator-5554")
     parser.add_argument("--binary", type=Path, default=ROOT / "native/rust_helper/target/debug" / ("gui_shell_rust_helper.exe" if os.name == "nt" else "gui_shell_rust_helper"))
     args = parser.parse_args()
-    print(json.dumps(検証(args.reference.resolve(), args.binary.resolve(), args.dart_client, args.mobile_client), ensure_ascii=False, indent=2))
+    print(json.dumps(検証(args.reference.resolve(), args.binary.resolve(), args.dart_client, args.mobile_client,
+                           args.android_native, args.android_serial), ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

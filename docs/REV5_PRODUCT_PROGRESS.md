@@ -35,6 +35,12 @@ commit `54229000aa50896af37e5f8d391d9a7997b52e6f`を対象にFlutter 3.44.0で`f
 
 この証拠はAndroid Emulator上での起動までに限る。物理Android端末、実端末Keystore／OS安全保管、Desktop Rust Brokerとの実TLS・Device Link、配布identityを証明しない。OneDrive checkout内build出力の削除失敗原因は未確定であり、環境設定を変更せずisolated worktreeを使った。Android実機試験凍結とP13／Mobile release blockerは維持する。
 
+#### Android native Device Link製品経路 — 検証中（2026-10-07）
+
+P13の不足である製品Flutter UI→Android native招待画面／Keystore→実Rust Brokerの基本経路を、専用EmulatorのAndroidJUnitRunnerから操作するharnessを追加した。招待は隔離Brokerのtest Ownerが発行し、native instrumentation専用のloopback接続で受け渡す。Dart、debug VM、shell引数、環境変数、一般logへ資格を流さない。`--android-native`単独指定は結合・Runtime表示・HOMEからの復帰・切断と基本的な誤pin拒否だけを対象とし、既存MINIDORA総合検査を繰り返さない。既存`--mobile-client`のPython wire検査は保持する。
+
+Windows hostのAPI 35 Emulatorでは、製品起動を妨げるSystem UIのANR dialogを観測し、待機操作で解消した。その後の試験は結合／端末確認のBroker受理まで進んだが、応答frameの終端改行を受け取らずEOFとなる例があり、nativeの厳格読取りが拒否した。診断は隔離worktreeだけで処理段階・件数・固定例外分類を記録し、秘密・本文を出さず、診断変更は撤去した。欠落箇所の根因は未確定であり、Android正常経路PASSや製品regressionの断定はしない。Windows host経路との切分けのため、既存`android-manual-emulator.yml`へ同じnative試験を追加し、手動ActionsのUbuntu／Android Emulator上で補助検証する。自動trigger・正式identity・物理端末は使わない。P13とMobile release blockerはOPENのまま。
+
 ## Q0 品質保証凍結 — 完了（過去のFinal QA記録）
 
 2026-10-07、P12 Product Build受入れcommit `ab746d4b33b003761f5ddcef60a88afa97132a40`をFinal QA対象製品状態として固定した。対象commitは`main`へpush済みで、Q0記録時点のremote `main`と一致。対象はWindows Feature Complete製品構成であり、release-readyや正式配布可能状態を意味しない。以後のQ1〜Q7 evidenceはこの凍結commitを対象とし、製品コード修正が必要になった場合は修正commitを新たなQA候補として明示し、対象を再凍結する。

@@ -22,6 +22,14 @@ Android実機のinstall・launch・結合・保管・復帰検証は2026-09-11�
 
 `tooling/minidora_live_check.py --mobile-client` は開発用Python clientでRust Device Link wire pathを検証する。Mobile製品native channel、OS安全保管、実機lifecycleの証拠ではない。
 
+### Android native製品経路の開発用試験
+
+`tooling/minidora_live_check.py --android-native --android-serial emulator-5554 --reference <固定MINIDORA checkout>`は、AndroidJUnitRunnerから製品Flutter画面を操作し、native招待画面・Android Keystore・既存TLS・実Rust Brokerを通す。専用AVD `gui_shell_native_test`かつ`ro.kernel.qemu=1`だけを対象とし、物理端末では実行しない。先に同じsourceでdebug APKをbuildする。試験用APKはhelperが`:app:assembleDebugAndroidTest`で生成する。日本語pathをAndroid Gradle Pluginが拒否する場合は、sourceを変更せずASCIIの隔離worktreeでbuildする。
+
+招待は、隔離Brokerのtest Ownerが発行した一時資格をhost loopbackからnative instrumentationだけへ渡す。shell引数・環境変数・Flutter・debug VM・出力artifactへ秘密を通さない。試験は誤pin拒否、結合、Runtime表示、HOMEからの復帰、製品画面での結合解除を確認し、Ownerの端末一覧と照合する。終了時は試験用招待・結合、ADB reverse、専用AVD内の製品／試験APKを回収する。専用AVDを止めるのは呼出元の責任とする。
+
+証拠はEmulator上の基本製品経路に限定する。物理端末・配布identity・background通信の全timing・網羅的障害試験は証明しない。手動Actionsでも同じnative試験を追加実行でき、既存Python wire検査は独立して保持する。実行結果と未成立条件は`docs/REV5_PRODUCT_PROGRESS.md`を正本とする。
+
 ## リリース阻害項目
 
 - item: iOS端末連携のnative実行時統合
