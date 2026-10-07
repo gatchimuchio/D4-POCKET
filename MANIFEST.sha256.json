@@ -524,7 +524,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/BrokerProcessChannel.swift",
-      "sha256": "227a59c65e7469dd092998657de762b2890ec854a2f55781c9df42b1c9d3acbe"
+      "sha256": "aa2ca5e64a530c3e36f4aff67c5b01f83e89b7bc815978f314cbf118e71cc81e"
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/Configs/AppInfo.xcconfig",
@@ -560,7 +560,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/RunnerTests/RunnerTests.swift",
-      "sha256": "e49e6f77d5faee686555aa3fed81ca61b39f8543b15181113bd7e71bcef979b5"
+      "sha256": "51865552ae7b2c1f9e63abd4d37ee6c5c63daf218823fa75dd18a06bdb1a5caf"
     },
     {
       "path": "apps/desktop_flutter/pubspec.lock",
@@ -1268,7 +1268,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "721c71d9ba96b35429a995fa72ccc55bde659d32db385e7d6c3c32373cb08518"
+      "sha256": "a471ab1074e6c70d3dc9e033ed02477ac621837c9969cd469215bedfb5faafd4"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1480,7 +1480,7 @@
     },
     {
       "path": "docs/specs/macos-desktop-channel.md",
-      "sha256": "b4fa58049520603c000053538f1956479e0cc56068fd06f45f8c3a461519f4e4"
+      "sha256": "8d5202c498d617bc93797233995968099d8ef25b31ff8983d72c065e53f5c95b"
     },
     {
       "path": "docs/specs/mcp-connection-center.md",
@@ -3440,7 +3440,7 @@
     },
     {
       "path": "native/rust_helper/src/macos_desktop_worker.rs",
-      "sha256": "3943eb9cfe58daa19195d9a17a8f38597e89768d7c0fd8488bcb0bc4e8b9dc04"
+      "sha256": "f7d2f863c280cd874f26f456e737e305a7e62436b0b3f26a3e23f50d13b6dae4"
     },
     {
       "path": "native/rust_helper/src/main.rs",

@@ -15,8 +15,11 @@ final class BrokerProcessChannel {
   private var pending = 0
   private var closeCallbacks = [(Bool) -> Void]()
   private var graceful = true
+  #if DEBUG
   private var bootstrap = Set<String>()
   private(set) var productBootstrapObserved = false
+  var completedBootstrapOperations: [String] { bootstrap.sorted() }
+  #endif
 
   init(messenger: FlutterBinaryMessenger) {
     channel = FlutterMethodChannel(name: "gui_shell/broker", binaryMessenger: messenger)
@@ -81,6 +84,7 @@ final class BrokerProcessChannel {
         result(Self.failure())
         return
       }
+      #if DEBUG
       if let data = response.data(using: .utf8),
          let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
          let operation = object["operation"] as? String {
@@ -91,6 +95,7 @@ final class BrokerProcessChannel {
         }
         self.productBootstrapObserved = initial.isSubset(of: self.bootstrap)
       }
+      #endif
       result(response)
     }
     DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(5)) { complete(nil) }

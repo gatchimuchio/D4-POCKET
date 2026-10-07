@@ -20,7 +20,7 @@ class RunnerTests: XCTestCase {
     }
     wait(for: [ready], timeout: 20)
     timer.invalidate()
-    XCTAssertTrue(channel.productBootstrapObserved)
+    XCTAssertTrue(channel.productBootstrapObserved, "完了した固定操作: \(channel.completedBootstrapOperations)")
     let stopped = expectation(description: "Brokerの正常終了とAudit確定")
     channel.close { success in
       XCTAssertTrue(success)

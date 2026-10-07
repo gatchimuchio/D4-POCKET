@@ -26,6 +26,7 @@ pub fn run() -> io::Result<()> {
     if std::env::args_os().len() != 1 {
         return Err(failure());
     }
+    let bundle = verify_bundle(&std::env::current_exe()?)?;
     let home = PathBuf::from(std::env::var_os("HOME").ok_or_else(failure)?);
     if !home.is_absolute() || !home.is_dir() {
         return Err(failure());
@@ -35,7 +36,48 @@ pub fn run() -> io::Result<()> {
         &home,
         &["Library", "Application Support", "D4Pocket", "macos-broker"],
     )?;
-    serve(&root, &mut io::stdin().lock(), &mut io::stdout().lock())
+    serve(
+        &root,
+        &bundle,
+        &mut io::stdin().lock(),
+        &mut io::stdout().lock(),
+    )
+}
+
+/// 固定bundle配置の検査結果。署名・配布identity・Owner承認を表さない。
+struct VerifiedBundle;
+
+fn verify_bundle(helper: &Path) -> io::Result<VerifiedBundle> {
+    if !helper.is_absolute()
+        || helper.file_name().and_then(|v| v.to_str()) != Some("gui_shell_macos_broker")
+    {
+        return Err(failure());
+    }
+    let macos = helper.parent().ok_or_else(failure)?;
+    let contents = macos.parent().ok_or_else(failure)?;
+    let bundle = contents.parent().ok_or_else(failure)?;
+    if macos.file_name().and_then(|v| v.to_str()) != Some("MacOS")
+        || contents.file_name().and_then(|v| v.to_str()) != Some("Contents")
+        || bundle.extension().and_then(|v| v.to_str()) != Some("app")
+    {
+        return Err(failure());
+    }
+    let canonical_bundle = bundle.canonicalize()?;
+    for name in [
+        "Info.plist",
+        "MacOS/gui_shell_desktop",
+        "MacOS/gui_shell_macos_broker",
+    ] {
+        let path = contents.join(name);
+        let metadata = fs::symlink_metadata(&path)?;
+        if !metadata.is_file()
+            || metadata.file_type().is_symlink()
+            || !path.canonicalize()?.starts_with(&canonical_bundle)
+        {
+            return Err(failure());
+        }
+    }
+    Ok(VerifiedBundle)
 }
 
 #[cfg(target_os = "macos")]
@@ -88,7 +130,12 @@ impl Drop for NormalEndpoint {
     }
 }
 
-fn serve(root: &Path, input: &mut impl BufRead, output: &mut impl Write) -> io::Result<()> {
+fn serve(
+    root: &Path,
+    _bundle: &VerifiedBundle,
+    input: &mut impl BufRead,
+    output: &mut impl Write,
+) -> io::Result<()> {
     let _lock = RunLock::acquire(root)?;
     let session = root.join("normal-session.json");
     if session.try_exists()? || session.with_extension("json.tmp").try_exists()? {
@@ -96,7 +143,8 @@ fn serve(root: &Path, input: &mut impl BufRead, output: &mut impl Write) -> io::
     }
     let shutdown = Arc::new(AtomicBool::new(false));
     let stop = Arc::clone(&shutdown);
-    let config = BrokerServerConfig::new(root.join("store"), session.clone());
+    let mut config = BrokerServerConfig::new(root.join("store"), session.clone());
+    config.desktop_package_layout_verified = true;
     let (ready_tx, ready_rx) = mpsc::sync_channel(1);
     let server = thread::Builder::new()
         .name("macos-security-broker".into())
@@ -214,26 +262,38 @@ mod tests {
         let health = request("macos-health", "health");
         let mut injected = request("macos-injected", "health");
         injected["session_id"] = "owner".into();
+        let mut first_run = request("macos-first-run", "初回設定取得");
+        let first_run_payload = json!({"version": 1});
+        first_run["payload_hash"] =
+            crate::broker::protocol::canonical_payload_hash(Some(&first_run_payload)).into();
+        first_run["payload"] = first_run_payload;
         let frames = [
             health.clone(),
             health,
             injected,
             request("macos-owner", "作業領域承認"),
+            first_run,
         ];
         let bytes = frames
             .iter()
             .map(|frame| format!("{frame}\n"))
             .collect::<String>();
         let mut output = Vec::new();
-        serve(&root, &mut io::Cursor::new(bytes), &mut output).unwrap();
+        serve(
+            &root,
+            &VerifiedBundle,
+            &mut io::Cursor::new(bytes),
+            &mut output,
+        )
+        .unwrap();
         let replies: Vec<Value> = String::from_utf8(output)
             .unwrap()
             .lines()
             .map(|line| serde_json::from_str(line).unwrap())
             .collect();
-        assert_eq!(replies.len(), 4);
+        assert_eq!(replies.len(), 5);
         assert_eq!(replies[0]["status"], "accepted");
-        for reply in &replies[1..] {
+        for reply in &replies[1..4] {
             assert_ne!(reply["status"], "accepted");
         }
         assert_eq!(replies[1]["error"]["code"], "broker_replay_detected");
@@ -241,6 +301,8 @@ mod tests {
             replies[3]["error"]["code"],
             "desktop_native_owner_confirmation_required"
         );
+        assert_eq!(replies[4]["status"], "accepted");
+        assert!(root.join("store/first_run_configuration.json").is_file());
         assert!(!root.join("normal-session.json").exists());
         assert!(!root.join("running.lock").exists());
         let audit = fs::read_to_string(root.join("store/audit.jsonl")).unwrap();
@@ -262,5 +324,22 @@ mod tests {
         assert!(RunLock::acquire(&root).is_err());
         drop(lock);
         fs::remove_dir(root).unwrap();
+    }
+
+    #[test]
+    fn bundle_layout_requires_the_fixed_app_and_helper() {
+        let mut random = [0u8; 16];
+        getrandom::getrandom(&mut random).unwrap();
+        let root = std::env::temp_dir().join(format!("d4p-macos-bundle-{}", hex::encode(random)));
+        let contents = root.join("D4Pocket.app/Contents");
+        fs::create_dir_all(contents.join("MacOS")).unwrap();
+        let helper = contents.join("MacOS/gui_shell_macos_broker");
+        fs::write(&helper, b"synthetic helper").unwrap();
+        fs::write(contents.join("Info.plist"), b"synthetic plist").unwrap();
+        assert!(verify_bundle(&helper).is_err());
+        fs::write(contents.join("MacOS/gui_shell_desktop"), b"synthetic app").unwrap();
+        assert!(verify_bundle(&helper).is_ok());
+        assert!(verify_bundle(&contents.join("MacOS/other")).is_err());
+        fs::remove_dir_all(root).unwrap();
     }
 }

@@ -27,6 +27,8 @@
 
 初回手動Actions [run 37596139461](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37596139461)、commit `5b6e1c9d34f8d364454bcb657adf9f2a5645a09d`ではMac上のRust対象2試験とhelper buildがPASS。Swiftの`write(contentsOf:)`／`read(upToCount:)`がmacOS 10.15.4以上を要求し、既存最低OS設定に対してcompile FAILとなった。最低OSを引き上げずDarwin pipe I/Oへ修正し、EINTR、書込切断、上限、親側の不要pipe端のcloseを扱う。native製品試験は未実行。この間のDesktop／Mobile `flutter analyze --no-pub`は既知のOneDrive日本語pathでLSP JSON FormatException、analysis server exit 255／CLI exit 1となり、host-local制約として保持した。生成された今回のcrash log 2 fileは回収済みで、製品sourceへ回避策を追加しない。
 
+次の手動Actions [run 37597211261](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37597211261)、commit `7f756250c5d290eafc1afd4a01ba961c1f7bf171`はRust対象2件と製品buildがPASS、native XCTestは1 passed／1 failed。製品bootstrap待機が20秒で失敗し、終了assertionは通過した。code確認ではmacOS helperが固定package配置検査を行わず、Brokerの`初回設定取得`が未初期化で拒否される未接続を確認した。Rust側で固定bundle配置を検査して既存の非権限UI設定初期化へ接続し、対象試験へ初回設定取得を追加する。bootstrap観測はDebugだけへ限定し、固定操作名だけを失敗診断へ使う。Owner資格・承認経路は追加しない。
+
 #### iOS製品UI／native service／基本lifecycle — CLOSED（Product Build、2026-10-07）
 
 有限Acceptanceは、新規専用Simulator上の製品Flutter画面からnative招待画面・接続先確認・既存serviceへ進み、実Broker結合、Runtime表示、OSによるbackground／復帰、製品画面での離脱を一度成立させること。現行harnessは標準XCUITestで画面を操作する。招待だけは明示的なSimulator試験buildの`D4_IOS_PRODUCT_TEST`内でnative secure fieldへ渡し、Flutter／shell／環境変数／UI操作logへ秘密を渡さない。service直接呼出し・foreground偽装・承認迂回をしない。通常buildでは試験入力helperと起動呼出しをcompileから除外し、同flagを付けた物理端末buildはcompile errorにする。`--ios-product-ui`は新規製品接続試験だけを選択し、CLOSEDの部品試験を再実行しない。物理端末、網羅的lifecycle timing、Final QAは本単位へ追加しない。
