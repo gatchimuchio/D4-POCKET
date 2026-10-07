@@ -152,7 +152,10 @@ jobs:
             -parallel-testing-enabled NO \
             -derivedDataPath "$RUNNER_TEMP/gui-shell-ios-native-tests" \
             -resultBundlePath "$RUNNER_TEMP/gui-shell-ios-native-tests.xcresult" \
-            CODE_SIGNING_ALLOWED=NO 2>&1 | tee evidence/ios-native-test.txt
+            CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGNING_REQUIRED=YES \
+            CODE_SIGN_IDENTITY=- \
+            CODE_SIGN_STYLE=Manual 2>&1 | tee evidence/ios-native-test.txt
 
       - name: XCTest結果要約
         if: always()

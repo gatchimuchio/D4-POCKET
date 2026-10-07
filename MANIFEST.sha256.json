@@ -72,7 +72,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "028f993e09058503134b0f9e465d977921b3ac92a8b74f26fbd6f3253059954a"
+      "sha256": "491ebbd6fbb51f95ab5c5afd8ea8fe1f8683f1eb295491c0428897b468330a2d"
     },
     {
       "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
