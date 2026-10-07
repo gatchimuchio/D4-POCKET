@@ -72,7 +72,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "723db11cb590d6e78da33415100aeec738a11d96693f7d628c80ad75b991101f"
+      "sha256": "a56c338c8bbf26e6434b8f233767d584cf984bb878f6e475b5be0579ef1f01f7"
     },
     {
       "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
@@ -564,7 +564,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/RunnerUITests/AdapterOwnerUITests.swift",
-      "sha256": "d87a4a99a015d5568801f249aae3f1ef6b2858327f2d397eefbd88228e94e27a"
+      "sha256": "dbc903650d0053626d0baf0dc7c09e13b1193383952d9ec23ecd709d620a2c25"
     },
     {
       "path": "apps/desktop_flutter/pubspec.lock",
@@ -1272,7 +1272,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "1eaa4f6daff08176ba2c9169872a83dda31e65354094a58eac7c1e0368cd18b6"
+      "sha256": "fd87098e213602c6e3801921bc2147ec699a0494055fccee6e7f061d1b1a2de4"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",

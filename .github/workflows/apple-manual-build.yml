@@ -76,6 +76,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          if [ -f /tmp/d4p-macos-owner-initial.png ]; then
+            mv /tmp/d4p-macos-owner-initial.png evidence/macos-owner-initial.png
+          fi
           if [ -d "$RUNNER_TEMP/macos-product-tests.xcresult" ]; then
             xcrun xcresulttool get test-results summary --path "$RUNNER_TEMP/macos-product-tests.xcresult" | tee evidence/macos-native-summary.json
           fi

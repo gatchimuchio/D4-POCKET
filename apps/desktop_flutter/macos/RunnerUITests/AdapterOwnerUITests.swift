@@ -2,13 +2,19 @@ import XCTest
 
 final class AdapterOwnerUITests: XCTestCase {
   func testProductAdapterOwnerDenialAndInstall() throws {
-    let app = XCUIApplication(bundleIdentifier: "com.example.guiShellDesktop")
+    let app = XCUIApplication()
     let notice = XCUIApplication(bundleIdentifier: "com.apple.UserNotificationCenter")
     continueAfterFailure = false
     app.launch()
     defer { app.terminate() }
     let runtime = element(app, "実行系")
-    XCTAssertTrue(runtime.waitForExistence(timeout: 20))
+    let ready = runtime.waitForExistence(timeout: 20)
+    if !ready {
+      // 新規runnerの入力前画面だけ。起動先や描画不能の診断を推測で補わない。
+      print("D4_MACOS_INITIAL \(app.debugDescription)")
+      try app.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: "/tmp/d4p-macos-owner-initial.png"), options: .atomic)
+    }
+    XCTAssertTrue(ready)
     runtime.click()
     try presentManifest(app)
     let deny = notice.buttons["承認しない"]
