@@ -192,7 +192,7 @@ final class DeviceLinkNativeService {
     let current = currentState()
     guard !current.pairing, current.foreground, !current.disposed else { throw DeviceLinkTransportError.failed }
     let state = try store.loadOrCreate()
-    guard let raw = state.credential else { return localSnapshot() }
+    guard let raw = state.credential else { return try localSnapshot() }
     let credential = try DeviceLinkCredential.stored(raw, expectedDeviceID: state.deviceID)
     guard !credential.isExpired() else { throw DeviceLinkTransportError.failed }
     let reply = try transport.exchange(credential, operation: "端末離脱", payload: [:],
