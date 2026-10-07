@@ -25,6 +25,8 @@
 
 手動Actions [run 37672536704](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37672536704)、commit `a3d4c0fcb32a7ee7e063edf5bfb17ae192a3cd20`はMac対象Rust 3件とhelper buildがPASS。Dart型errorはなく、変更外のdeprecated info 5件と新規catchのbrace info 1件を観測し、後者だけを修正した。待機時間testもPASSした。投影testのassertion後、手動platform overrideがFlutter bindingの終了不変条件に反してFAILしたため、標準`TargetPlatformVariant`へ修正する。製品build／OS UIは未実行、runner source cleanとfixture回収はPASS。Product authorityの変更や検査の弱体化は行わない。
 
+手動Actions [run 37673927495](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37673927495)、commit `ffc133c81e66318d3a8833f2c6ab6da38969ef3f`はMac対象Rust 3件、helper build、変更Dart解析（既存info 5件のみ）、待機時間／投影の2試験、通常Mac buildがPASS。UI試験は起動前にOS XPCサービスを通常appとして解決できずFAILした。試験専用の公開AX APIで固定同梱helper executableのPIDへ束縛し、実OS panelのボタン／folder入力を操作する。Broker入力／返答やOS選択結果を注入せず、製品の境界は変更しない。runner後片付けとfixture回収はPASS、実OS選択の成立はまだ未取得。
+
 有限Acceptanceは`docs/specs/macos-workspace-selection.md`。取消時の入力保持、実OS chooserによるsandbox外folder選択／投影、別個のOwner確認後の既存Broker登録、UI path／Authority注入拒否を一単位で施工する。選択はOS user-selected accessであり、D4のPermission／Approval／登録ではない。手動Actionsの`macos_workspace_selection`だけでMacを検証し、CLOSEDの登録／Adapter／Mobile試験は選択しない。sandbox外CLI実行・restart access・Credential・正式配布・Final QAはこの単位へ追加しない。
 
 ローカル検証: Schema 162／正常例158／負例209、Conformance 237 checks PASS。必須`cargo test --locked --manifest-path native/rust_helper/Cargo.toml`は505 passed／4 failed／12 ignoredでFAIL。変更外のA2A loopback読取と3つの既存HTTPS fixtureが応答読取／OS 10054／InvalidContentTypeで失敗した。局所切分けではA2A 1 PASS、update_download群16 PASS／1 FAILで、`failed_replacement_keeps_the_existing_corrupt_package_unchanged`の既存TLS失敗が残る。対象新規試験の成功や全体PASSへ読み替えず、既存Final QAのloopback検査課題へ保持する。変更がMac専用OS選択へ限定され、これらの作用経路を変更していないことを差分で確認した。
