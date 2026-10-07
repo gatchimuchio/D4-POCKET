@@ -237,6 +237,20 @@
         "artifact_sha256": "73cb24fbaa9bcf70bdd5cb14121a22db81b4ae54f7dace117783ade0e60f6888",
         "artifact_expires_at": "2026-10-10T09:11:45Z"
       },
+      "macos_owner_adapter_evidence": {
+        "status": "CLOSED",
+        "source_commit": "0729f07437f308c71c1f4dc694e62016ea58ad3e",
+        "run_url": "https://github.com/gatchimuchio/GUI-Shell/actions/runs/37623944221",
+        "trigger": "workflow_dispatch",
+        "evidence_source": "LIVE_RUNTIME",
+        "validation": "macOS製品UIから実OS Owner確認の拒否・承認・Adapter catalog導入・通常終了をXCUITest 1件でPASS。確認crate 2件、実Broker対象1件、通常Debug製品buildもPASS。helper残留なし、runner source clean。",
+        "component_evidence_source": "FIXTURE",
+        "component_scope": "Rust対象試験のOwner選択は合成callback。実Brokerの導入／更新・永続catalog・拒否不変・replay／session注入／不正hash拒否を確認し、OS選択の証拠とは分離する。",
+        "scope_limit": "UI試験はDebug表示用semantics flag付き。有限Owner／Adapter接続だけを閉鎖し、macOS全機能・他Owner操作・Credentials／Agent Task・通常Release・正式配布・Final QAのrelease blockerは維持する。",
+        "artifact_id": "11482839193",
+        "artifact_sha256": "c337857b41899ac5b41e26b6bbc2402f859ad58a101060fea1273cbd245374d8",
+        "artifact_expires_at": "2026-10-10T12:54:31Z"
+      },
       "r2_bounded_exit_gate": {
         "version": 2,
         "phase_acceptance_policy": {

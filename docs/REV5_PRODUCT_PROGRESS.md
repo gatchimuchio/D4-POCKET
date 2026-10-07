@@ -17,7 +17,15 @@
 
 ## P13 Mobile / Non-Windows — 現行track
 
-#### macOS Rust Owner確認・Adapter導入／更新 — IMPLEMENTING（2026-10-07）
+#### macOS Rust Owner確認・Adapter導入／更新 — CLOSED（Product Build、2026-10-07）
+
+成功commit `0729f07437f308c71c1f4dc694e62016ea58ad3e`の手動Actions [run 37623944221](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37623944221)はPASS。macOS 15.7.9 arm64（Apple Virtual Machine）／Xcode 16.4／Rust 1.95.0／Flutter 3.44.0で、製品UI→既存MethodChannel／匿名pipe→Rust検査→OS Owner確認→既存Broker receiver→catalog登録→製品表示を通した。OS画面で最初に「承認しない」を選ぶと未登録を維持し、次の新規要求で「今回の操作を承認」を選ぶと登録が表示された。XCUITest 1 passed／0 failed／0 skipped、38.953秒。Command-Qで通常終了し、helper残留なし・runner追跡source cleanを確認した。
+
+同runの`cargo +1.95.0 test --locked --manifest-path native/macos_owner/Cargo.toml`は2件PASS（入力拒否、実OS期限切れ非承認）。`cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib macos_desktop_worker::tests::owner_adapter_roundtrip -- --test-threads=1`は1件PASS（実Broker導入／更新・永続catalog、非承認時不変、replay／session注入／不正hash拒否）。後者のOwner選択は合成callbackであり、画面証拠は前記XCUITestに限定する。`flutter build macos --debug --no-pub`は通常の試験表示flagなしでPASS。UI検査の`xcodebuild test ... -only-testing:RunnerUITests SWIFT_ACTIVE_COMPILATION_CONDITIONS='DEBUG D4_MACOS_OWNER_UI_TEST'`だけは既述の表示用semantics補助を含む。秘密・Authority・UI要求の迂回は追加していない。
+
+artifact `11482839193`（remote期限2026-10-10T12:54:31Z）をignored `release_evidence/p13-macos-owner-0729f07.zip`へ保存し、SHA-256 `c337857b41899ac5b41e26b6bbc2402f859ad58a101060fea1273cbd245374d8`を照合した。成功した正確なcommitを`main`へfast-forward・pushし、remote HEAD一致を確認した。rollback point／backup-mainは`2d5c74af31bf0a09c2f3d30f6553064771f16a39`、前世代は`91107dec2ab5ef606b26dd6276b60756ab0a6c84`、remoteは同名tag。検証branchは本閉鎖記録の同期後にlocal／remoteとも回収する。
+
+証拠はhosted Macの限定`LIVE_RUNTIME`と上記callback試験の範囲だけ。macOS全機能、他Owner操作、Credentials／Agent Task、通常Release／正式署名配布、Final QAは`release_blocker`として保持する。変更外のローカルRust TLS fixture failure・既存日本語監査指摘・Flutter LSP制約も解消したと扱わない。新しい仮説的riskをこのCLOSED単位へ追加せず、次のP13製品差分へ進む。以下は実装・失敗・修正の履歴である。
 
 通常接続CLOSED後の不足であるOwner確認を、Rust所有OS確認→既存Broker process内receiverへ接続する。最初の実作用は既存Adapter catalog導入／更新。Flutter／SwiftへAuthorityを移さず、非承認と不正入力はnormal拒否・Auditへ通す。固定hashと現在envelopeを再評価し、通常Release Task能力・正式配布・他Owner操作を昇格しない。有限AcceptanceとFFI局所レビューは`docs/specs/macos-desktop-channel.md`。macOSがないため手動Actionsの専用Owner検査を使い、既CLOSEDの通常bootstrapを再試験しない。
 

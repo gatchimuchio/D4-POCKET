@@ -28,6 +28,8 @@ Owner確認・Credentials・Task実行・Windows固有Install／Updateは本接�
 
 ## Owner追加契約 — Adapter導入・更新
 
+状態: 有限Acceptanceはcommit `0729f07437f308c71c1f4dc694e62016ea58ad3e`、手動Actions run `37623944221`でCLOSED。製品UIの拒否・承認・導入・通常終了、実Brokerの導入／更新・永続化・否定条件、実OS期限切れ非承認を確認した。証拠classと試験表示flagの範囲は`docs/REV5_PRODUCT_PROGRESS.md`へ記録する。他Owner操作や通常Release全機能の完了を意味しない。
+
 UI試験の合成Manifestは、日本語意味を保持したJSON Unicode escapeのASCII表記で`typeText`へ渡す。Macの文字入力経路で`既`／`署`が互換漢字へ変化し、見た目とSwiftの辞書比較では同等でもRust契約のfield名と一致しない失敗を観測したためである。変換は試験入力だけであり、製品側で入力key・署名対象・hashを無言に正本化するものではない。通常のJSON parserと厳密なBroker検査を通す。型／本文の一時診断は原因特定後に撤去した。
 
 通常接続のCLOSEDを維持し、次の製品差分としてAdapterの導入・更新を追加する。受信要求は権限ではない。Rust helperが現行envelopeのsession注入禁止、時刻、metadata、hash、既存Adapter Manifest検査を行い、表示用に検査されたsummaryだけをOS確認画面へ渡す。画面は既定「承認しない」、明示「今回の操作を承認」の二択、上限300秒。取消・期限超過・未知応答・OS失敗は非承認である。
