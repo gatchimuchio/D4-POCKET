@@ -147,7 +147,7 @@ def 検証(owner, binary, root, simulator, derived_data, result_bundle):
         if bridge.is_alive() and failure is None:
             failure = ("bridge_cleanup", "RuntimeError")
     if failure:
-        raise RuntimeError(f"iOS native Device Link failed at {failure[0]} ({failure[1]})")
+        raise RuntimeError(f"iOS native端末連携の失敗: 段階={failure[0]}、分類={failure[1]}")
     return {"result": "PASS", "evidence_source": "LIVE_RUNTIME", "target": "iOS Simulator native XCTest",
             "native_tls_pair": "PASS", "keychain_store_readback_delete": "PASS",
             "wrong_certificate_pin_rejected": "PASS", "existing_broker_runtime_query": "PASS",

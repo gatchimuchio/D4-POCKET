@@ -17,15 +17,23 @@
 
 ## P13 Mobile / Non-Windows — 現行track
 
-#### iOS native TLS／Keychainと実Brokerの接続 — VALIDATING（2026-10-07）
+#### iOS native TLS／Keychainと実Brokerの接続 — CLOSED（Product Build、2026-10-07）
 
 今回の有限単位は、Simulator native XCTestから既存Swift `DeviceLinkTLSClient`／`DeviceLinkNativeStore`を実Rust Brokerへ接続し、招待結合、Keychain保存・再読、Runtime一覧、離脱・失効を成立させること。誤pin拒否も確認する。試験用Ownerは既存Broker制御経路で一時招待を発行し、専用loopback listenerからnative test内へだけ渡す。公開する環境変数はlistener portだけとし、招待・端末資格をDart、shell引数、環境変数、診断、artifactへ含めない。これはdevelopment専用harnessで、production通信やAuthorityを追加しない。製品Flutter UIの操作・native確認dialog・OS lifecycle・物理端末は別の未成立範囲として保持し、この接続単位の成功へ含めない。既存8 XCTestは変更test targetの直接依存検査として維持し、Android CLOSED経路を再実行しない。macOSがlocalにないため既存`apple-manual-build.yml`の`ios_mobile`手動起動で補助検証する。
 
-Androidの実装・検証履歴は維持し、Android実機試験の凍結を尊重する。iOSにはSwift Device Link handler、ThisDeviceOnly Keychain保管、TLS client、strict JSON処理、native XCTestが実装されている。Windows hostではApple toolchainを実行できないため、既存の`.github/workflows/apple-manual-build.yml`に独立`ios_mobile` jobを設け、P13の局所build／testに使う。これはiOS Simulator buildとnative XCTestに限り、実端末・実Broker接続・配布・Final QAの証拠へ昇格させない。
+Androidの実装・検証履歴は維持し、Android実機試験の凍結を尊重する。iOSにはSwift Device Link handler、ThisDeviceOnly Keychain保管、TLS client、strict JSON処理、native XCTestが実装されている。Windows hostではApple toolchainを実行できないため、既存の`.github/workflows/apple-manual-build.yml`の独立`ios_mobile` jobをP13の局所build／testに使った。今回の実Broker接続はSimulator内のnative部品を通す範囲に限定し、製品UI全体・実端末・配布・Final QAの証拠へ昇格させない。
 
-今回のharness追加後、Python 2 fileの`py_compile`、Schema 161／157／208、Conformance 236件、手動workflow限定検査、`git diff --check`はPASS。OneDrive日本語path上のDesktop／Mobile `flutter analyze --no-pub`は双方ともLSP JSONの`FormatException: Unterminated string`でanalysis serverがexit 255となり、CLIはexit 1だった。既知のhost-local解析制約として失敗を保持し、今回Swiftのcompile成功とは扱わない。Dart／production Swiftは変更していない。現行Mobile解析と新規native XCTestの実接続は手動macOS runnerで確認する。
+今回のharness追加後、Python 2 fileの`py_compile`、Schema 161／157／208、Conformance 236件、手動workflow限定検査、`git diff --check`はPASS。OneDrive日本語path上のDesktop／Mobile `flutter analyze --no-pub`は双方ともLSP JSONの`FormatException: Unterminated string`でanalysis serverがexit 255となり、CLIはexit 1だった。既知のhost-local解析制約として失敗を保持し、今回Swiftのcompile成功とは扱わない。この初回harness追加ではDart／production Swiftは変更しておらず、続く実接続FAILに対して下記Swift局所修正を行った。
 
 手動Actions [run 37583469599](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37583469599)（`db76d9c10dbc44e0908dcf8ed0621e3c819e9f11`）ではmacOS Rust build、Mobile解析・21 Flutter test、Simulator build、既存8 XCTestはPASSし、新規native接続試験は最後の`revoked_credential`でFAILした。先行する結合・Keychain再読・Runtime一覧・離脱までは到達した。Brokerの既存拒否codeは`端末要求拒否`だが、iOS側だけがASCIIに限定していたため、正しい拒否応答を不正frameとして扱っていた。文字・数字と`_.-`、UTF-8長1〜96 byteの限定検査へ局所修正し、空白・制御文字・長さ超過を引き続き拒否する。単体testと同じ実接続試験で修正を確認する。拒否をacceptedに変換せず、自由文errorや資格をUIへ渡さない。
+
+修正commit `599359be236962498f93842ec66145339290380f`の手動Actions [run 37584511577](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37584511577)はPASS。macOS 15.7.9／Xcode 16.4、iPhone 16 Pro／iOS 18.5 SimulatorでRust 1.95.0 Broker build、Mobile `flutter analyze --no-pub`（No issues）、`flutter test --no-pub --reporter expanded`（21件）、`flutter build ios --simulator --debug --no-pub`が成功した。上記`tooling/minidora_live_check.py --ios-simulator ... --ios-derived-data ... --ios-result-bundle ...`から実行したnative XCTestは10 passed／0 failed／0 skipped。新規実接続1件、既存8件、日本語error code正常・不正境界1件を含む。実Brokerへの結合、Keychain保存・再読・削除、Runtime取得、離脱、失効済み資格の拒否、誤pin拒否、Owner側の招待・結合不存在を確認した。MINIDORA参照は`3400a3bb68b37efa1dc14ee8aaa28fda779bf1f8`に固定。招待秘密がXCTest出力・Broker log・durable Auditに含まれないことも確認した。この有限接続単位をCLOSEDとし、追加証拠目的では再実行しない。
+
+証拠はSimulator native部品から実Rust Brokerへ接続した`LIVE_RUNTIME`であり、Flutter画面・native確認dialog・OS lifecycle・物理端末の成立を示さない。artifact ID `11465318529`、SHA-256 `9888bd0c3bb84b9f936cbc7131b3282796847ec474d2befd5a151c0dce696694`、remote保存期限2026-10-10T07:02:09Z。同hashのZIPをGit対象外の`release_evidence/p13-ios-native-599359b.zip`に保存した。runner追跡source差分なし、Simulator終了step成功、test KeychainとBroker招待・結合の回収を確認した。失敗runのartifact ID `11466056894`と局所LSP失敗は履歴として保持する。
+
+main反映後の文書同期では、`python -X utf8 tooling/schema_check/check_schemas.py`（161 schema／157正常例／208負例）、`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`（236件）、`python -X utf8 tooling/release_gate_check.py --release-track windows_v1`、Manifest 1185件、`git diff --check`がPASSした。`python -X utf8 tooling/日本語基底監査.py --strict`は初回16 findingsでFAIL。今回追加した開発用helperの失敗診断1行だけを日本語化し、Python 2 fileの`py_compile`と再監査を実行した。残る15 findingsは変更対象外の旧rev3／rev4履歴各1、既存Codex CLI診断1、Android開発helper診断12で、全体exit 1を保持する（最終strict監査の`release_blocker`。現在のiOS部品接続Acceptanceは再開しない）。成功run後の実行経路変更はなく、診断文言と文書だけの更新に対するruntime再試験は行わない。失敗run・PASS runの対象commitを混同しない。
+
+P13／Mobile `release_blocker`、通常Release `task_execution=unsupported`、`release_ready=false`は維持する。次のProduct Build単位はiOS製品UI・native service・基本lifecycleの接続であり、CLOSEDしたtransport部品を再証明するための追加fixtureや最終QAを開始しない。物理端末・配布identity・網羅的platform保証は既存release gateとして別管理する。
 
 #### iOS Simulator build／native XCTest — 局所検証PASS（2026-10-07）
 

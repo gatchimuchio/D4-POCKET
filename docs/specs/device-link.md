@@ -6,7 +6,9 @@
 
 ## 現在状態（2026-10-07）
 
-iOS Simulator buildとnative XCTestは、手動Actions run [#22](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37558500619)、commit `b6dbf10c4ea8b34e103b8826f2d23f25930d8ca9`でPASSした。Flutter analyze、21件のFlutter test、Simulator build、8件のnative XCTest（8 passed／0 failed）を確認した。Keychain項目のThisDeviceOnly保護、保存・読戻し・削除、旧version stateのmigrationをSimulator上で検査した。test用ad-hoc署名であり、production identity・物理端末・実Broker接続・実機lifecycleの証拠ではない。これらの範囲と失敗履歴は`docs/REV5_PRODUCT_PROGRESS.md`に記録する。native Rust Brokerへの`LIVE_RUNTIME`接続と実機証拠は未成立である。
+iOSの手動Actions [run 37584511577](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37584511577)、commit `599359be236962498f93842ec66145339290380f`で、Simulator native XCTestから既存Swift TLS／Keychainと実Rust Brokerへの結合、資格保存・再読・削除、Runtime取得、離脱・失効済み資格拒否、誤pin拒否がPASSした。native XCTest 10件（10 passed／0 failed／0 skipped）、Flutter analyze、Flutter test 21件、Simulator buildも成功。test用ad-hoc署名による部品接続の`LIVE_RUNTIME`であり、製品Flutter UI・native確認dialog・OS lifecycle・production identity・物理端末の証拠ではない。Androidの基本製品経路はrun 37580429609でCLOSED。次はiOS製品UI／native service／基本lifecycleの未成立部分であり、Mobile release blockerは保持する。
+
+先行run [#22](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37558500619)、commit `b6dbf10c4ea8b34e103b8826f2d23f25930d8ca9`のSimulator build／8 XCTestはその時点の履歴として保持する。KeychainのThisDeviceOnly属性・旧version migration等の結果と、今回の初回runの日本語error code失敗／修正は`docs/REV5_PRODUCT_PROGRESS.md`に記録する。過去の未成立記載を現在状態へ転記しない。
 
 ## 対象と責任
 

@@ -6,8 +6,8 @@ Mobileは共通UIをFlutterで描画し、Device Linkの端末識別子・招待
 
 - Androidには固定MethodChannel、native招待画面、Android Keystoreで暗号化した資格保管、証明書hash固定TLS、有限timeout、Activity lifecycleからのbackground socket停止を実装した。API 35 Emulatorで製品UIから実Rust Brokerへの結合・Runtime表示・HOME復帰・切断が成立した。物理端末でのTLS・Keystore動作は未検証。
 - Flutterへ返す接続状態は閉じたprojectionであり、端末ID・Host・招待・資格・secretを含めない。通常操作は既存Desktop Rust Brokerを通る。
-- iOSにはSwift製Device Link channel handler、ThisDeviceOnly Keychain保管、証明書hash固定TLS client、厳格JSON検証、native XCTestが実装済みで、implicit Flutter engineへ登録される。Simulator build／XCTestの現行source検証状況は`docs/REV5_PRODUCT_PROGRESS.md`を参照する。Simulator buildやunit testは、Brokerへの実TLS接続・実端末動作の証拠ではない。
-- 過去のdebug VM integration driverは招待をDartへ渡していたため廃止した。Androidは招待入力・保管・TLSをnative側に保つinstrumentation harnessで基本製品経路を確認した。iOSも秘密をDart、log、artifactへ渡さないnative harnessから実Brokerへ接続する。
+- iOSにはSwift製Device Link channel handler、ThisDeviceOnly Keychain保管、証明書hash固定TLS client、厳格JSON検証、native XCTestが実装済みで、implicit Flutter engineへ登録される。Simulator native XCTestから実Rust BrokerへのTLS結合・Runtime取得・離脱・失効拒否とKeychain保存・再読・削除が成立した。製品UI・native確認dialog・OS lifecycle・実端末の証拠とは区別する。現行結果は`docs/REV5_PRODUCT_PROGRESS.md`を参照する。
+- 過去のdebug VM integration driverは招待をDartへ渡していたため廃止した。Androidは招待入力・保管・TLSをnative側に保つinstrumentation harnessで基本製品経路を確認した。iOSも秘密をDart、log、artifactへ渡さないnative harnessから実Brokerへの部品接続を確認した。
 
 ## ローカル確認
 
@@ -18,7 +18,7 @@ flutter test --no-pub --reporter expanded
 flutter build apk --debug --no-pub
 ```
 
-Android実機のinstall・launch・結合・保管・復帰検証は2026-09-11のowner指示で凍結中。凍結は合格証拠ではない。Windows上でiOS buildはできないため、`.github/workflows/apple-manual-build.yml`の`ios_mobile`手動範囲でFlutter iOS Simulator buildとiOS native XCTestを検証する。このworkflowは実端末、Brokerとの実TLS接続、production identity、release readinessを証明しない。
+Android実機のinstall・launch・結合・保管・復帰検証は2026-09-11のowner指示で凍結中。凍結は合格証拠ではない。Windows上でiOS buildはできないため、`.github/workflows/apple-manual-build.yml`の`ios_mobile`手動範囲でFlutter iOS Simulator buildと実Brokerへ接続するiOS native XCTestを検証する。このworkflowは製品UI全体、実端末、production identity、release readinessを証明しない。
 
 `tooling/minidora_live_check.py --mobile-client` は開発用Python clientでRust Device Link wire pathを検証する。Mobile製品native channel、OS安全保管、実機lifecycleの証拠ではない。
 
@@ -38,17 +38,19 @@ macOSで`tooling/minidora_live_check.py --reference <固定MINIDORA checkout> --
 
 一時招待はnative test専用loopback受渡し内に限定する。[Appleの環境変数転送規約](https://developer.apple.com/documentation/xcode/environment-variable-reference)に従う`TEST_RUNNER_`には非秘密のportだけを渡す。XCTestは資格値・応答本文・例外本文をassertionへ表示せず、固定stageだけを失敗出力する。test用Keychain、Broker招待・結合、listenerを終了時に回収する。これはtransport／保管部品の実接続であり、Flutter UI操作・native確認dialog・OS lifecycle・物理端末の証拠ではない。実行結果は現行rev5進捗を参照する。
 
+commit `599359be236962498f93842ec66145339290380f`の手動Actions [run 37584511577](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37584511577)で上記部品接続がPASSし、この単位はCLOSED。日本語Broker error codeの互換修正を含むnative XCTest 10件、Flutter test 21件、Mobile解析、Simulator buildが成功した。次は製品UI・native service・基本lifecycleの未成立部分を接続し、部品の証拠強化を開始条件にしない。
+
 ## リリース阻害項目
 
 - item: iOS端末連携のnative実行時統合
   classification: release_blocker
-  reason: 現行iOS sourceのSimulator buildとnative XCTest 8件は手動run #22でPASSした。これはSimulator内のKeychain試験に限り、物理端末・Desktop Rust Brokerへのnative LIVE_RUNTIME接続・TLS・lifecycleを証明しない。
-  required_action: 秘密をFlutter／debug VM／log／artifactへ渡さないplatform-native harnessでDesktop Rust BrokerへのTLS接続・拒否・失効・background停止を検証し、iOS実機証拠を取得する。Android実機試験はowner指示の凍結を維持する。
+  reason: Simulator上のSwift TLS／Keychainと実Broker接続は成立したが、製品UI・native確認dialog・OS lifecycle・物理端末の統合証拠ではない。
+  required_action: 秘密をFlutter／debug VM／log／artifactへ渡さず製品UI・native service・基本lifecycleを接続し、最終品質保証で必要な実機証拠を取得する。Android実機試験はowner指示の凍結を維持する。
   blocks_release: yes
 - item: Android/iOS Device Linkの実動作証拠
   classification: release_blocker
-  reason: Android Emulatorのnative製品経路は実Brokerへの結合・Keystore・Runtime表示・HOME復帰・切断を確認したが、物理端末とiOS実Broker接続は未成立。Android実機試験は凍結中。
-  required_action: iOS native実Broker接続を成立させ、最終品質保証で必要なplatform境界を検証する。Android実機凍結の解除後に実機証拠を取得し、Emulatorの成功で代替しない。
+  reason: Android Emulatorのnative製品経路とiOS Simulatorのnative部品接続は実Brokerへ到達したが、物理端末とiOS製品UI／lifecycle統合は未成立。Android実機試験は凍結中。
+  required_action: iOSの未成立統合を進め、最終品質保証で必要なplatform境界を検証する。Android実機凍結の解除後に実機証拠を取得し、Emulatorの成功で代替しない。
   blocks_release: yes
 - item: 公開配布の識別子と署名
   classification: release_blocker

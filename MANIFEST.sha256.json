@@ -156,7 +156,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "482e77eb397cdfadf1366eb339453685cf783b29e100da702715207d70a75cb8"
+      "sha256": "1501314d9fa8417591ff62f4488c399efb6b71ab3dd9488a6f2b6ccaa9a04300"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "41816c243a46babece1e03195a3eb5e6e73408f154fb13f10ccd1d588fbb13a9"
+      "sha256": "291497a4c79db2be6299f17f37791bbbe12a4ff3c9198b1ca5b2c83c3c8e8f11"
     },
     {
       "path": "SECURITY.md",
@@ -784,7 +784,7 @@
     },
     {
       "path": "apps/mobile_flutter/README.md",
-      "sha256": "78c1842baac7d0c9adef77ff8bb12ff012043b3c18809a7c272f0972a69df5af"
+      "sha256": "76a165c7fd8d0e7c99c96342dd555b983cc395de3caaf9cb9a8df9acf3b8ff7a"
     },
     {
       "path": "apps/mobile_flutter/android/.gitignore",
@@ -1252,7 +1252,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "6bf5a9eb1210a193cf1586acd2b9806c6c85ab12617bfe1e80cb6e4892cede0a"
+      "sha256": "8ed5e04786e332fd5aba825f21515ff9a1364e42bfea9966c323704286866081"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1400,7 +1400,7 @@
     },
     {
       "path": "docs/specs/device-link.md",
-      "sha256": "a88ed106bdcdb68c9e447eaf410780db031a7dd5790d827b755842fb895a5a6f"
+      "sha256": "0fc9890332e35dac0d268b69a4013fad7ae005fae1b880fdc3fc7e82de6e1651"
     },
     {
       "path": "docs/specs/evaluation-lab.md",
@@ -3968,7 +3968,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "e393dd9217e9da8e4bb5c4e78ea2189384e5a48639029bb2c5f34bd0112821cc"
+      "sha256": "ee7bb45e8b73e766ec85a50b93c97e3c461d36d231d359e4991a0d5e7c4d00f9"
     },
     {
       "path": "requirements-dev.txt",
@@ -4716,7 +4716,7 @@
     },
     {
       "path": "tooling/ios_native_device_link_check.py",
-      "sha256": "2bdd2a60bd3824c3ef9014d9d88ee419c5d65aba4997013ccc0ee7aafa7ca041"
+      "sha256": "c6f0bbaf1439f3b2d06d1f951a91ecc9fc472bb864b221c6b5deb1d3935feef5"
     },
     {
       "path": "tooling/long_run_validation.py",

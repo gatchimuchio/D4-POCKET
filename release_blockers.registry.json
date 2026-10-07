@@ -3348,7 +3348,17 @@
       "blocks_release": true,
       "blocks_windows_technical_complete": false,
       "reason": "旧Dart経路は廃止済み。Android Kotlin／iOS SwiftのOS側処理と端末内local_recovery_audit契約・読取画面を追加した。iOS native sourceは手動Actions run #22（commit b6dbf10）でFlutter analyze、Flutter test 21件、iPhone 16 Pro／iOS 18.5 Simulator build、native XCTest 8件（8 passed／0 failed）がPASSした。XCTestはproduction identityを使わずad-hoc署名identity '-'を使用した。前段run #19／#20のSwift compile failure、#21のCODE_SIGNING_ALLOWED=NOによるerrSecMissingEntitlement failureは履歴として保持し、#22で修正済み。現行Android／共有UI source 117 fileを照合したfresh Temp copyでcleanup除外なしのclean・unit test・APK buildが成功し、JUnit 8件が通過した。元OneDrive workspaceのignored build outputには削除deny ACLが継承されるhost-local limitationが残り、ACLは変更していない。2026-10-07の手動Actions run 37580429609（commit 0ca5dfa84dc1ca68ca8f01bae8ca456e1a9a12ba）では、Android API 35 Emulatorの製品UIからnative招待・Keystore・TLSを経た実Rust Brokerへの結合、Runtime表示、HOME復帰、切断・失効、誤pin拒否がPASSした。これはAndroid基本経路のLIVE_RUNTIME証拠であり、物理端末のKeychain／Keystore・TLS・全lifecycleやiOS native実Broker接続を証明しない。端末内記録の証拠種別はINTERNAL_STATEであり、Desktop Brokerの監査記録・失効・本人性を証明しない。旧Dart経路や前回版Androidの成功は今回の境界証拠ではない。2026-09-27、登録Workspace選択をnative Device Linkの空payload要求・ID／Runtime ID限定応答としてRust／Flutter／Android native testへ追加し、ASCII検証copyでAndroid unit testと3面のFlutter analyzeを確認した。Flutter analyzeのOneDrive日本語path上のLSP失敗はhost-local検証制約である。",
-      "required_action": "招待・資格をDart／debug VM／表示／error／log／trace／artifactへ通さずiOS native実Broker接続を成立させる。Workspace選択・対話ID結合、拒否・失効・background停止の最終platform保証はFinal QAで検証する。Android基本正常経路を証拠強化だけのために再開しない。実機証拠はowner指示に従いAndroid凍結解除後に取得する。in-place Android buildが必要な場合はACL管理者の判断を得る。端末内local_recovery_auditはDesktop AuditEventへ昇格させない。production identityと各platformのrelease evidenceは別途維持する。"
+      "ios_native_component_evidence": {
+        "source_commit": "599359be236962498f93842ec66145339290380f",
+        "run_url": "https://github.com/gatchimuchio/GUI-Shell/actions/runs/37584511577",
+        "evidence_source": "LIVE_RUNTIME",
+        "validation": "iPhone 16 Pro／iOS 18.5 Simulatorのnative XCTestから既存Swift TLS／Keychainを実Rust Brokerへ接続。結合、保存・再読・削除、Runtime取得、離脱、失効済み資格拒否、誤pin拒否がPASS。native XCTest 10 passed／0 failed／0 skipped、Flutter test 21件、Mobile解析、Simulator buildもPASS。日本語error codeのASCII限定による初回失敗は局所修正し、履歴を保持。",
+        "scope_limit": "native部品の実接続単位はCLOSED。製品Flutter UI・native確認dialog・OS lifecycle・物理端末・正式配布の証拠ではなく、Mobile release blockerを解消しない。reason内の先行run #22等は当時の履歴であり、現在の部品接続成立を上書きしない。",
+        "artifact_id": "11465318529",
+        "artifact_sha256": "9888bd0c3bb84b9f936cbc7131b3282796847ec474d2befd5a151c0dce696694",
+        "artifact_expires_at": "2026-10-10T07:02:09Z"
+      },
+      "required_action": "招待・資格をDart／debug VM／表示／error／log／trace／artifactへ通さずiOS製品UI・native service・基本lifecycleの未成立統合を進める。Workspace選択・対話ID結合、拒否・失効・background停止の最終platform保証はFinal QAで検証する。Android基本正常経路とiOS native部品接続を証拠強化だけのために再開しない。実機証拠はowner指示に従いAndroid凍結解除後に取得する。in-place Android buildが必要な場合はACL管理者の判断を得る。端末内local_recovery_auditはDesktop AuditEventへ昇格させない。production identityと各platformのrelease evidenceは別途維持する。"
     }
   ]
 }

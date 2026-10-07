@@ -237,7 +237,7 @@ cd native/rust_helper      && cargo test
 cd apps/desktop_flutter    && flutter analyze
 ~~~
 
-Mobile は現行rev5のP13 Product Build対象である。AndroidはAPI 35 Emulator上で製品UIからnative招待・Keystore・TLSを経た実Rust Brokerへの結合、Runtime表示、HOME復帰、切断がPASSした。iOSはSimulator buildとnative XCTest 8件まで成立し、native実Broker接続は次の対象である。物理端末、実端末の安全保管、配布identityは未成立で、P13とMobile release blockerを維持する。現行状態と証拠範囲は[rev5製品進捗](docs/REV5_PRODUCT_PROGRESS.md)を正本とする。
+Mobile は現行rev5のP13 Product Build対象である。AndroidはAPI 35 Emulator上で製品UIからnative招待・Keystore・TLSを経た実Rust Brokerへの結合、Runtime表示、HOME復帰、切断がPASSした。iOSはSimulator内のSwift TLS／Keychainから実Rust Brokerへの結合・Runtime取得・離脱・失効拒否が成立し、native XCTest 10件がPASSした。次はiOS製品UI・native service・基本lifecycleの接続であり、部品接続の成功と混同しない。物理端末、実端末の安全保管、配布identityは未成立で、P13とMobile release blockerを維持する。現行状態と証拠範囲は[rev5製品進捗](docs/REV5_PRODUCT_PROGRESS.md)を正本とする。
 
 一括 reporter を使う場合:
 
@@ -304,7 +304,7 @@ tooling/    schema_check · conformance_tests · broker_parity · ...
 
 ## 📊 製品状態と履歴
 
-現行工程はD4 Pocket / GUI-Shell rev5の`PRODUCT_BUILD_MODE`である。P2 Multi-Agent Compare、P3 Agent Handoff、Windows側P12 Product IntegrationはProduct Build受入れを閉じており、現在は独立trackのP13 Mobile／Non-Windowsを進めている。iOS SimulatorのFlutter解析・21件のFlutter test・Simulator build・native XCTest 8件は手動Actions run #22で成功した。Androidは手動Actions run 37580429609でFlutter解析・21件のFlutter test・Debug APK/AAB buildに加え、製品UI→native招待／Keystore／TLS→実Rust Brokerの基本経路がPASSし、この単位はCLOSED。次はiOS native実Broker接続を進める。物理端末・公開配布の証拠ではない。Windows Feature Completeは達成済みだが、通常Release `task_execution=unsupported`、`release_ready=false`を維持し、Final QAは現行modeの指示により延期中である。現行phaseと証拠範囲は[rev5製品進捗](docs/REV5_PRODUCT_PROGRESS.md)、Final QAの過去記録は[Final QA Queue](docs/FINAL_QA_QUEUE.md)を参照する。
+現行工程はD4 Pocket / GUI-Shell rev5の`PRODUCT_BUILD_MODE`である。P2 Multi-Agent Compare、P3 Agent Handoff、Windows側P12 Product IntegrationはProduct Build受入れを閉じており、現在は独立trackのP13 Mobile／Non-Windowsを進めている。iOSは手動Actions run 37584511577でFlutter解析・21件のFlutter test・Simulator build・実Broker接続を含むnative XCTest 10件が成功し、Swift TLS／Keychainの部品接続単位をCLOSEDとした。Androidは手動Actions run 37580429609でFlutter解析・21件のFlutter test・Debug APK/AAB buildに加え、製品UI→native招待／Keystore／TLS→実Rust Brokerの基本経路がPASSし、この単位はCLOSED。次はiOS製品UI・native service・基本lifecycleの接続を進める。物理端末・公開配布の証拠ではない。Windows Feature Completeは達成済みだが、通常Release `task_execution=unsupported`、`release_ready=false`を維持し、Final QAは現行modeの指示により延期中である。現行phaseと証拠範囲は[rev5製品進捗](docs/REV5_PRODUCT_PROGRESS.md)、Final QAの過去記録は[Final QA Queue](docs/FINAL_QA_QUEUE.md)を参照する。
 
 ### 2026-09-29 の履歴
 
