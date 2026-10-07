@@ -17,7 +17,13 @@
 
 ## P13 Mobile / Non-Windows — 現行track
 
+#### iOS native TLS／Keychainと実Brokerの接続 — VALIDATING（2026-10-07）
+
+今回の有限単位は、Simulator native XCTestから既存Swift `DeviceLinkTLSClient`／`DeviceLinkNativeStore`を実Rust Brokerへ接続し、招待結合、Keychain保存・再読、Runtime一覧、離脱・失効を成立させること。誤pin拒否も確認する。試験用Ownerは既存Broker制御経路で一時招待を発行し、専用loopback listenerからnative test内へだけ渡す。公開する環境変数はlistener portだけとし、招待・端末資格をDart、shell引数、環境変数、診断、artifactへ含めない。これはdevelopment専用harnessで、production通信やAuthorityを追加しない。製品Flutter UIの操作・native確認dialog・OS lifecycle・物理端末は別の未成立範囲として保持し、この接続単位の成功へ含めない。既存8 XCTestは変更test targetの直接依存検査として維持し、Android CLOSED経路を再実行しない。macOSがlocalにないため既存`apple-manual-build.yml`の`ios_mobile`手動起動で補助検証する。
+
 Androidの実装・検証履歴は維持し、Android実機試験の凍結を尊重する。iOSにはSwift Device Link handler、ThisDeviceOnly Keychain保管、TLS client、strict JSON処理、native XCTestが実装されている。Windows hostではApple toolchainを実行できないため、既存の`.github/workflows/apple-manual-build.yml`に独立`ios_mobile` jobを設け、P13の局所build／testに使う。これはiOS Simulator buildとnative XCTestに限り、実端末・実Broker接続・配布・Final QAの証拠へ昇格させない。
+
+今回のharness追加後、Python 2 fileの`py_compile`、Schema 161／157／208、Conformance 236件、手動workflow限定検査、`git diff --check`はPASS。OneDrive日本語path上のDesktop／Mobile `flutter analyze --no-pub`は双方ともLSP JSONの`FormatException: Unterminated string`でanalysis serverがexit 255となり、CLIはexit 1だった。既知のhost-local解析制約として失敗を保持し、今回Swiftのcompile成功とは扱わない。Dart／production Swiftは変更していない。現行Mobile解析と新規native XCTestの実接続は手動macOS runnerで確認する。
 
 #### iOS Simulator build／native XCTest — 局所検証PASS（2026-10-07）
 

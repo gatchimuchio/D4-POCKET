@@ -122,6 +122,15 @@ jobs:
           echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
           "$RUNNER_TEMP/flutter/bin/flutter" --version | tee evidence/flutter.txt
 
+      - name: iOS native接続用Rust Brokerと参照Runtimeを準備
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.95.0 --profile minimal
+          cargo +1.95.0 build --locked --manifest-path native/rust_helper/Cargo.toml 2>&1 | tee evidence/ios-broker-build.txt
+          git clone https://github.com/gatchimuchio/NOTNN-LLM-MINIDORA.git "$RUNNER_TEMP/minidora-reference"
+          git -C "$RUNNER_TEMP/minidora-reference" checkout --detach 3400a3bb68b37efa1dc14ee8aaa28fda779bf1f8
+
       - name: iOS Simulatorを選択
         shell: bash
         run: |
@@ -140,22 +149,17 @@ jobs:
           flutter test --no-pub --reporter expanded 2>&1 | tee ../../evidence/mobile-test.txt
           flutter build ios --simulator --debug --no-pub 2>&1 | tee ../../evidence/ios-simulator-build.txt
 
-      - name: iOS native XCTest
+      - name: iOS native XCTest・実Broker接続
         shell: bash
         run: |
           set -euo pipefail
           simulator_id="$(<evidence/ios-simulator-selected.txt)"
-          xcodebuild test \
-            -project apps/mobile_flutter/ios/Runner.xcodeproj \
-            -scheme Runner \
-            -destination "platform=iOS Simulator,id=$simulator_id" \
-            -parallel-testing-enabled NO \
-            -derivedDataPath "$RUNNER_TEMP/gui-shell-ios-native-tests" \
-            -resultBundlePath "$RUNNER_TEMP/gui-shell-ios-native-tests.xcresult" \
-            CODE_SIGNING_ALLOWED=YES \
-            CODE_SIGNING_REQUIRED=YES \
-            CODE_SIGN_IDENTITY=- \
-            CODE_SIGN_STYLE=Manual 2>&1 | tee evidence/ios-native-test.txt
+          python3 tooling/minidora_live_check.py \
+            --reference "$RUNNER_TEMP/minidora-reference" \
+            --ios-simulator "$simulator_id" \
+            --ios-derived-data "$RUNNER_TEMP/gui-shell-ios-native-tests" \
+            --ios-result-bundle "$RUNNER_TEMP/gui-shell-ios-native-tests.xcresult" \
+            2>&1 | tee evidence/ios-native-test.txt
 
       - name: XCTest結果要約
         if: always()

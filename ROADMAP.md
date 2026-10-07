@@ -1,5 +1,7 @@
 # GUI Shell ロードマップ
 
+P13 iOS native接続補助検証: `apple-manual-build.yml`の`ios_mobile`手動起動で、既存Swift TLS／Keychainと実Rust Brokerの結合・Runtime取得・離脱をnative XCTestから確認する。招待秘密はnative専用loopback受渡し内に閉じる。製品UI操作・OS lifecycle・物理端末の完成主張へ広げず、結果は現行rev5進捗へ記録する。
+
 P13 Android native基本経路はCLOSED: `android-manual-emulator.yml`の手動Actions [run 37580429609](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37580429609)、commit `0ca5dfa84dc1ca68ca8f01bae8ca456e1a9a12ba`で製品UI→native Device Link→実Rust Brokerの結合・Keystore・Runtime表示・HOME復帰・切断と誤pin拒否がPASS。Windows host側の終端欠落の根因を断定せず、Android実機凍結・release gateを維持する。追加証拠目的で再試験せず、次はiOS native実Broker接続へ進む。現行結果と履歴は`docs/REV5_PRODUCT_PROGRESS.md`。
 
 2026-10-07 rev5現行工程: 最新版実装指示§2により`PRODUCT_BUILD_MODE`を継続。Windows P12 `FEATURE COMPLETE`とP2 Compare／P3 HandoffのCLOSED状態は維持し、P13 Mobile／Non-Windowsを独立trackとして進める。Q0／Q1／Q2の既存記録は履歴証拠として保持するがFinal QA queueは延期中であり、現在の開発作業を止めない。通常Release `task_execution=unsupported`、release gate、`release_ready=false`を維持する。現況とP13作業は`docs/REV5_PRODUCT_PROGRESS.md`、Final QA記録は`docs/FINAL_QA_QUEUE.md`。

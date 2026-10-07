@@ -2,6 +2,7 @@ import Flutter
 import UIKit
 import XCTest
 import Security
+import Network
 @testable import Runner
 
 class RunnerTests: XCTestCase {
@@ -190,5 +191,142 @@ class RunnerTests: XCTestCase {
     var bytes = [UInt8](repeating: 0, count: byteCount)
     guard SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) == errSecSuccess else { return nil }
     return bytes.map { String(format: "%02x", $0) }.joined()
+  }
+}
+
+// 実Brokerとの接続だけを検証する。Flutter UI／native確認dialog／OS lifecycleの証拠ではない。
+class NativeDeviceLinkLiveTests: XCTestCase {
+  func testNativeTLSAndKeychainUseRealBroker() throws {
+#if targetEnvironment(simulator)
+    guard let rawPort = ProcessInfo.processInfo.environment["D4_IOS_NATIVE_BRIDGE_PORT"],
+          let port = UInt16(rawPort), port > 0 else {
+      throw XCTSkip("専用native接続harnessからだけ実行する")
+    }
+    let store = DeviceLinkNativeStore(service: "org.gatchimuchio.gui-shell.native-live.\(UUID().uuidString)")
+    let transport = DeviceLinkTLSClient()
+    defer {
+      transport.cancelAll()
+      do { try store.removeForTest() }
+      catch { XCTFail("D4_IOS_NATIVE_LIVE_FAIL keychain_cleanup") }
+    }
+    var stage = "keychain_initial"
+    do {
+      let initial = try store.loadOrCreate()
+      try require(initial.credential == nil)
+      stage = "invitation_bridge"
+      let raw = try receiveInvitation(port: port, deviceID: initial.deviceID)
+      let invitation = try DeviceLinkCredential.invitation(raw, expectedDeviceID: initial.deviceID)
+      stage = "wrong_pin"
+      let wrongHash = String(repeating: "0", count: 64)
+      try require(invitation.certificateHash != wrongHash)
+      let wrongPin = DeviceLinkCredential(
+        hostID: invitation.hostID, host: invitation.host, port: invitation.port,
+        certificateHash: wrongHash, deviceID: invitation.deviceID,
+        expiresAt: invitation.expiresAt, credentialID: invitation.credentialID,
+        secret: invitation.secret)
+      var rejected = false
+      do {
+        _ = try transport.exchange(wrongPin, operation: "端末結合", payload: [:],
+                                   canSend: { true }, allowCredentialResponse: true)
+      } catch { rejected = true }
+      try require(rejected)
+      stage = "pair"
+      let response = try transport.exchange(invitation, operation: "端末結合", payload: [:],
+                                            canSend: { true }, allowCredentialResponse: true)
+      try require(response["status"] as? String == "accepted")
+      guard let body = response["body"] as? [String: Any] else { throw DeviceLinkTransportError.failed }
+      let paired = try DeviceLinkCredential.paired(body, invitation: invitation)
+      stage = "keychain_readback"
+      _ = try store.storeCredential(paired)
+      guard let stored = try store.loadOrCreate().credential else { throw DeviceLinkTransportError.failed }
+      let reloaded = try DeviceLinkCredential.stored(stored, expectedDeviceID: initial.deviceID)
+      try require(reloaded == paired)
+      stage = "confirm"
+      let confirmed = try transport.exchange(reloaded, operation: "端末確認", payload: [:], canSend: { true })
+      try require(confirmed["status"] as? String == "accepted")
+      stage = "runtime_list"
+      try DeviceLinkPayloadPolicy.validate("実行系列挙", payload: [:])
+      let runtime = try transport.exchange(reloaded, operation: "実行系列挙", payload: [:], canSend: { true })
+      try require(runtime["status"] as? String == "accepted")
+      let runtimes = (runtime["body"] as? [String: Any])?["実行系"] as? [String]
+      try require(runtimes == ["left", "right"])
+      stage = "disconnect"
+      let disconnected = try transport.exchange(reloaded, operation: "端末離脱", payload: [:], canSend: { true })
+      try require(disconnected["status"] as? String == "accepted")
+      _ = try store.deleteCredential()
+      try require(try store.loadOrCreate().credential == nil)
+      stage = "revoked_credential"
+      let revoked = try transport.exchange(reloaded, operation: "端末確認", payload: [:], canSend: { true })
+      try require(revoked["status"] as? String == "rejected")
+      print("D4_IOS_NATIVE_LIVE_PASS")
+    } catch {
+      // assertionのactual/expectedや例外本文に資格値を出さない。
+      XCTFail("D4_IOS_NATIVE_LIVE_FAIL \(stage)")
+    }
+#else
+    throw XCTSkip("物理端末をこのharnessの対象にしない")
+#endif
+  }
+
+  private func require(_ condition: Bool) throws {
+    if !condition { throw DeviceLinkTransportError.failed }
+  }
+
+  private func receiveInvitation(port: UInt16, deviceID: String) throws -> String {
+    guard let endpointPort = NWEndpoint.Port(rawValue: port) else { throw DeviceLinkTransportError.failed }
+    let connection = NWConnection(host: "127.0.0.1", port: endpointPort, using: .tcp)
+    let result = NativeInvitationResult()
+    let queue = DispatchQueue(label: "org.gatchimuchio.gui-shell.test.invitation")
+    var buffer = Data()
+    func receive() {
+      connection.receive(minimumIncompleteLength: 1, maximumLength: 8192) { data, _, complete, error in
+        guard error == nil else { result.finish(nil); return }
+        if let data { buffer.append(data) }
+        guard buffer.count <= 8193 else { result.finish(nil); return }
+        if let newline = buffer.firstIndex(of: 0x0A) {
+          guard buffer.index(after: newline) == buffer.endIndex else { result.finish(nil); return }
+          result.finish(String(data: buffer[..<newline], encoding: .utf8))
+        } else if complete { result.finish(nil) }
+        else { receive() }
+      }
+    }
+    connection.stateUpdateHandler = { state in
+      switch state {
+      case .ready:
+        connection.send(content: Data((deviceID + "\n").utf8), completion: .contentProcessed { error in
+          if error == nil { receive() } else { result.finish(nil) }
+        })
+      case .failed, .cancelled: result.finish(nil)
+      default: break
+      }
+    }
+    connection.start(queue: queue)
+    defer { connection.forceCancel() }
+    return try result.wait()
+  }
+}
+
+private final class NativeInvitationResult {
+  private let lock = NSLock()
+  private let semaphore = DispatchSemaphore(value: 0)
+  private var finished = false
+  private var value: String?
+
+  func finish(_ value: String?) {
+    lock.lock()
+    guard !finished else { lock.unlock(); return }
+    finished = true
+    self.value = value
+    lock.unlock()
+    semaphore.signal()
+  }
+
+  func wait() throws -> String {
+    guard semaphore.wait(timeout: .now() + .seconds(20)) == .success else { throw DeviceLinkTransportError.failed }
+    lock.lock()
+    let result = value
+    lock.unlock()
+    guard let result else { throw DeviceLinkTransportError.failed }
+    return result
   }
 }
