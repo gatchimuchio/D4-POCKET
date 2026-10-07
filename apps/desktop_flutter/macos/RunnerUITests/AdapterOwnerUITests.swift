@@ -48,7 +48,9 @@ final class AdapterOwnerUITests: XCTestCase {
     for _ in 0..<8 {
       // Flutterは画面外のボタンも高さ1pxのAX要素とし、isHittableがtrueになり得る。
       if install.frame.height >= 30 && install.isHittable { break }
-      app.windows.firstMatch.scroll(byDeltaX: 0, deltaY: -250)
+      // Windowの既定hit pointはtitle barだったため、観測済み本文領域へ送る。
+      app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.7))
+        .scroll(byDeltaX: 0, deltaY: -250)
     }
     XCTAssertGreaterThanOrEqual(install.frame.height, 30)
     XCTAssertTrue(install.isHittable)

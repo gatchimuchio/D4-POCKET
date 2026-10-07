@@ -41,6 +41,8 @@
 
 [run 37610479903](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37610479903)、commit `c94a548399dada3a97a47614a27db28366039a47`ではquery timeoutがなくなり、入力欄不存在でFAIL。保存画像とAX treeにより、実際にはdialogは開いておらず、導入ボタンが画面外で高さ1pxに切り詰められたまま`isHittable=true`になっていたと分かった。前runの「dialog表示後」は推測であり、実操作成立の証拠ではなかった。試験をボタンの表示高30px以上まで実スクロールする条件へ修正する。artifact `11478151399`、SHA-256 `95c2383dc18bbd566ebbdb38c03739a34c2ce289a5a127c731879c349087cedb`を照合済み。Rust対象・通常build・runner後片付けは成功、Owner確認は未到達。
 
+[run 37611271939](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37611271939)、commit `2dbf5ea544444c0786bad7b275f7d5118f2cd164`は導入ボタンの表示高1pxを検出してFAIL。XCTestの保存eventを読むと、Windowの既定scroll位置は本文ではなくtitle bar `(182, 65)` だった。画像・AX frameで確認した本文の相対位置へ標準XCUICoordinate scrollを送るよう修正する。artifact `11477987787`、SHA-256 `f28d8bde101fe7ad7bf8c9fddc20923a0f6bd5028303e7c7fa1dd7902bb35600`を照合済み。製品の操作・権限経路は変更せず、OS確認Acceptanceは未成立を保持する。
+
 #### macOS Desktop通常Broker接続 — CLOSED（Product Build、2026-10-07）
 
 開始時のmacOS Runnerには`gui_shell/broker`登録がなく、Flutterの通常起動から実Brokerへ到達しなかった。本有限単位を、同梱Rust helperへの匿名pipe、既存認証Broker normal経路、初回設定等の製品bootstrap、正常終了へ限定した。Apple App Sandboxを継承し、Flutter／Runnerへ資格を渡さない。Owner専用操作・Windows固有操作は現状の拒否を保持し、macOS全機能完成とは扱わない。責任と未成立範囲は`docs/specs/macos-desktop-channel.md`。手動Actionsの独立`macos_product`を使い、iOS／AndroidのCLOSED試験は起動していない。
