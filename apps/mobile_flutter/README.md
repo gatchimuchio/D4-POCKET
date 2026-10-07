@@ -4,10 +4,10 @@ Mobileは共通UIをFlutterで描画し、Device Linkの端末識別子・招待
 
 ## 現在の実装範囲
 
-- Androidには固定MethodChannel、native招待画面、Android Keystoreで暗号化した資格保管、証明書hash固定TLS、有限timeout、Activity lifecycleからのbackground socket停止を実装した。Kotlin compile、unit test、debug APK/AAB buildは成功したが、実TLS・Keystoreの実端末動作は未検証。
+- Androidには固定MethodChannel、native招待画面、Android Keystoreで暗号化した資格保管、証明書hash固定TLS、有限timeout、Activity lifecycleからのbackground socket停止を実装した。API 35 Emulatorで製品UIから実Rust Brokerへの結合・Runtime表示・HOME復帰・切断が成立した。物理端末でのTLS・Keystore動作は未検証。
 - Flutterへ返す接続状態は閉じたprojectionであり、端末ID・Host・招待・資格・secretを含めない。通常操作は既存Desktop Rust Brokerを通る。
 - iOSにはSwift製Device Link channel handler、ThisDeviceOnly Keychain保管、証明書hash固定TLS client、厳格JSON検証、native XCTestが実装済みで、implicit Flutter engineへ登録される。Simulator build／XCTestの現行source検証状況は`docs/REV5_PRODUCT_PROGRESS.md`を参照する。Simulator buildやunit testは、Brokerへの実TLS接続・実端末動作の証拠ではない。
-- 過去のdebug VM integration driverは招待をDartへ渡していたため廃止した。新しいLIVE_RUNTIME試験は、招待入力・保管・TLSをnative側に保ち、秘密をDart、log、artifactへ渡さないplatform test harnessが成立するまで実行しない。
+- 過去のdebug VM integration driverは招待をDartへ渡していたため廃止した。Androidは招待入力・保管・TLSをnative側に保つinstrumentation harnessで基本製品経路を確認した。iOSも秘密をDart、log、artifactへ渡さないnative harnessから実Brokerへ接続する。
 
 ## ローカル確認
 
@@ -30,6 +30,8 @@ Android実機のinstall・launch・結合・保管・復帰検証は2026-09-11�
 
 証拠はEmulator上の基本製品経路に限定する。物理端末・配布identity・background通信の全timing・網羅的障害試験は証明しない。手動Actionsでも同じnative試験を追加実行でき、既存Python wire検査は独立して保持する。実行結果と未成立条件は`docs/REV5_PRODUCT_PROGRESS.md`を正本とする。
 
+commit `0ca5dfa84dc1ca68ca8f01bae8ca456e1a9a12ba`の手動Actions [run 37580429609](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37580429609)で上記基本経路と誤pin拒否がPASSした。このProduct Build単位はCLOSEDであり、追加の証拠強化を次工程の条件にしない。
+
 ## リリース阻害項目
 
 - item: iOS端末連携のnative実行時統合
@@ -39,8 +41,8 @@ Android実機のinstall・launch・結合・保管・復帰検証は2026-09-11�
   blocks_release: yes
 - item: Android/iOS Device Linkの実動作証拠
   classification: release_blocker
-  reason: Kotlin unit testとAPK/AAB buildは実OS保管、実TLS、結合、失効、background lifecycleを証明しない。Android実機試験は凍結中。
-  required_action: 秘密をDartへ露出しないnative test harnessで各platformのOS保管・接続・失効・background復帰を検証し、Android実機凍結の解除後に実機証拠を取得する。
+  reason: Android Emulatorのnative製品経路は実Brokerへの結合・Keystore・Runtime表示・HOME復帰・切断を確認したが、物理端末とiOS実Broker接続は未成立。Android実機試験は凍結中。
+  required_action: iOS native実Broker接続を成立させ、最終品質保証で必要なplatform境界を検証する。Android実機凍結の解除後に実機証拠を取得し、Emulatorの成功で代替しない。
   blocks_release: yes
 - item: 公開配布の識別子と署名
   classification: release_blocker

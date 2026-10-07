@@ -35,7 +35,7 @@ commit `54229000aa50896af37e5f8d391d9a7997b52e6f`を対象にFlutter 3.44.0で`f
 
 この証拠はAndroid Emulator上での起動までに限る。物理Android端末、実端末Keystore／OS安全保管、Desktop Rust Brokerとの実TLS・Device Link、配布identityを証明しない。OneDrive checkout内build出力の削除失敗原因は未確定であり、環境設定を変更せずisolated worktreeを使った。Android実機試験凍結とP13／Mobile release blockerは維持する。
 
-#### Android native Device Link製品経路 — 検証中（2026-10-07）
+#### Android native Device Link基本製品経路 — CLOSED（Product Build、2026-10-07）
 
 P13の不足である製品Flutter UI→Android native招待画面／Keystore→実Rust Brokerの基本経路を、専用EmulatorのAndroidJUnitRunnerから操作するharnessを追加した。招待は隔離Brokerのtest Ownerが発行し、native instrumentation専用のloopback接続で受け渡す。Dart、debug VM、shell引数、環境変数、一般logへ資格を流さない。`--android-native`単独指定は結合・Runtime表示・HOMEからの復帰・切断と基本的な誤pin拒否だけを対象とし、既存MINIDORA総合検査を繰り返さない。既存`--mobile-client`のPython wire検査は保持する。
 
@@ -48,6 +48,12 @@ Windows hostのAPI 35 Emulatorでは、製品起動を妨げるSystem UIのANR d
 手動Actions [run 37579840231](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37579840231)（`da0b95172a7c79ae8c3fe82bdd1855f45636f6a8`）では、前記metadataのcompile errorは解消したが、Windows専用`ActiveVersionDescriptor`を参照する投影関数の`cfg(windows)`漏れ1件が残り、Android試験は未実行だった。既存Windows専用呼出元と同じ条件へ投影関数を限定し、非Windowsへ更新適用能力を追加しない。
 
 条件分岐修正後の`cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml --lib broker::update_center::tests:: -- --test-threads=1`は25 passed／0 failed。Schema 161／157／208とConformance 236件もPASSした。先の全library試験で記録した3失敗をこの対象試験の成功で上書きしない。
+
+手動Actions [run 37580429609](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37580429609)は、commit `0ca5dfa84dc1ca68ca8f01bae8ca456e1a9a12ba`をUbuntu 24.04／Android 15 API 35 Emulatorで実行してPASSした。`cargo +1.95.0 build --locked --manifest-path native/rust_helper/Cargo.toml`、追加したUnix symbolic link拒否試験1件、Mobile `flutter analyze --no-pub`（No issues）、`flutter test --no-pub --reporter expanded`（21件）、debug APK／AAB build、APK install／起動、既存Python wire検査が成功した。`python3 tooling/minidora_live_check.py --reference "$RUNNER_TEMP/minidora-reference" --android-native --android-serial emulator-5554`では、製品Flutter UI→native招待画面→Keystore／証明書pin付きTLS→実Rust Brokerの結合、登録Runtime left／rightの表示、HOMEからの復帰、製品画面での切断、Broker側結合・招待の不存在が成立した。誤pin拒否、招待秘密がinstrumentation出力・Broker log・durable Auditにないことも確認した。正常試験1件の`LIVE_RUNTIME`証拠としてこの基本経路をCLOSEDとし、強化目的の再実行は行わない。Android／Flutterのproduction経路は変更していない。
+
+証拠artifact ID `11464788270`、SHA-256 `facb70155cc4c2c04739e8f330517b9d89223c5e23eb8accdd5a0ed243c0fc10`。remote保存期限は2026-10-10T06:29:36Zで、同hashのZIPをGit対象外の`release_evidence/p13-android-native-0ca5dfa.zip`にも保存した。runnerの追跡差分なし、Emulator停止を確認した。ローカル試験の招待・結合・APK・ADB reverseは回収済みで、Emulatorも停止済み。一方、診断用ASCII worktree・参照clone・一時AVD directoryの削除commandは実行側policyに拒否され、これらの停止済み作業資材は残っている（`known_limitation`、製品releaseを阻害しない。削除権限を迂回しない）。診断用source差分は撤去済みで、未配布の診断buildを製品証拠へ使用しない。
+
+Windows host側で観測した終端欠落の根因、物理端末、iOS native実Broker接続、全lifecycle timing、配布identity、release readinessはこのPASSから推論しない。既存Mobile `release_blocker`、Android実機凍結、通常Release `task_execution=unsupported`、`release_ready=false`を維持する。次はP13のiOS native実Broker接続の不足だけを施工する。
 
 ## Q0 品質保証凍結 — 完了（過去のFinal QA記録）
 

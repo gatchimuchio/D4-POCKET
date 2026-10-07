@@ -1,6 +1,6 @@
 # GUI Shell ロードマップ
 
-P13 Android native補助検証: `android-manual-emulator.yml`の手動起動限定で、製品UI→native Device Link→実Rust Brokerの基本経路を追加検証する。Windows hostでのTLS終端欠落観測を別環境で切り分ける目的に限定し、既存検査・Android実機凍結・release gateを維持する。現行結果は`docs/REV5_PRODUCT_PROGRESS.md`へ記録する。
+P13 Android native基本経路はCLOSED: `android-manual-emulator.yml`の手動Actions [run 37580429609](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37580429609)、commit `0ca5dfa84dc1ca68ca8f01bae8ca456e1a9a12ba`で製品UI→native Device Link→実Rust Brokerの結合・Keystore・Runtime表示・HOME復帰・切断と誤pin拒否がPASS。Windows host側の終端欠落の根因を断定せず、Android実機凍結・release gateを維持する。追加証拠目的で再試験せず、次はiOS native実Broker接続へ進む。現行結果と履歴は`docs/REV5_PRODUCT_PROGRESS.md`。
 
 2026-10-07 rev5現行工程: 最新版実装指示§2により`PRODUCT_BUILD_MODE`を継続。Windows P12 `FEATURE COMPLETE`とP2 Compare／P3 HandoffのCLOSED状態は維持し、P13 Mobile／Non-Windowsを独立trackとして進める。Q0／Q1／Q2の既存記録は履歴証拠として保持するがFinal QA queueは延期中であり、現在の開発作業を止めない。通常Release `task_execution=unsupported`、release gate、`release_ready=false`を維持する。現況とP13作業は`docs/REV5_PRODUCT_PROGRESS.md`、Final QA記録は`docs/FINAL_QA_QUEUE.md`。
 
