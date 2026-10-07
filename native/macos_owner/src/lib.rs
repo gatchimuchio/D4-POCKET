@@ -91,7 +91,7 @@ pub fn select_workspace() -> Result<Option<SelectedWorkspace>, &'static str> {
 /// 起動中のnative間OS bookmarkだけを解決する。D4権限・登録を生成しない。
 #[cfg(target_os = "macos")]
 pub fn resolve_workspace_bookmark(bookmark: &str) -> Result<SelectedWorkspace, &'static str> {
-    use objc2::{runtime::Bool, ClassType};
+    use objc2::{runtime::Bool, AnyThread};
     use objc2_foundation::{
         NSData, NSDataBase64DecodingOptions, NSString, NSURLBookmarkResolutionOptions, NSURL,
     };

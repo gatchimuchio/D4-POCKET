@@ -18,5 +18,5 @@ libc = "=0.2.186"
 core-foundation = "=0.10.1"
 core-foundation-sys = "=0.8.7"
 objc2 = "=0.6.5"
-objc2-app-kit = { version = "=0.3.2", default-features = false, features = ["std", "NSResponder", "NSOpenPanel", "NSPanel", "NSSavePanel", "NSWindow"] }
+objc2-app-kit = { version = "=0.3.2", default-features = false, features = ["std", "NSApplication", "NSResponder", "NSOpenPanel", "NSPanel", "NSSavePanel", "NSWindow"] }
 objc2-foundation = { version = "=0.3.2", default-features = false, features = ["std", "NSString", "NSURL", "NSData", "NSArray", "NSError"] }

@@ -19,6 +19,8 @@
 
 #### macOS 作業領域のOS選択 — IMPLEMENTING（Product Build、2026-10-08）
 
+手動Actions [run 37700257310](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37700257310)、commit `85f3085cfa0915328e27001e602275dfabb345fb`はMac型検査でFAIL。固定libcにDarwinの`F_SETNOSIGPIPE`識別子が未収録、`runModal`の`NSApplication` feature不足、NSData allocationの`AnyThread` import不足を観測した。Apple公開headerの値73を局所定義し、必要なfeature／traitだけを補う。OS policy・Authority・Acceptanceは変更せず、UI未実行の結果を成功へ昇格しない。
+
 手動Actions [run 37696395012](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37696395012)、commit `d58e09b8437f5d59825531584c9b2261c9cb7b1e`はUI試験50.919秒でFAIL。固定分類は`objc_null_return`とRust panicを示し、AppKit起動完了後のNSOpenPanel factoryがNULLを返してhelperを101で終了したことを確認した。entitlement拒否自体を観測したとは扱わない。artifact `11515368725`、SHA-256 `c0ad0642bc4981a984bad3ae6e6a339a90c475edd4a6ed8d674e07aafdc4bd75`を照合した。通常build／対象Rust／Dart／後片付けはPASS。
 
 現在の修正はchooserだけを通常GUI親processの固定Rust UIへ移し、既存private pipeでimplicit OS bookmarkを子helperへ渡す。Flutter／Swiftへscope実値を返さず、Broker・Owner資格・Permission・Approval・Auditは独立helperのまま。AGENTSと責任正本へこの限定UI ABI、NULL拒否、scope上限・解放・非永続化、元公開要求の再評価を明記した。一時診断と子AppKit起動補助は撤去する。有限Acceptanceは変更せず、次の通常helper製品試験までmainへ統合しない。

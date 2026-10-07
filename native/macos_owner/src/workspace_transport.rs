@@ -5,6 +5,11 @@ use zeroize::Zeroize;
 const VERSION_ONLY_HASH: &str =
     "sha256:2430f1a2ad2982d0067885488a4c89e21ad1d7c83b115ba8f1b20acc88dfaea8";
 
+// 固定libc版に未収録のDarwin公開fcntl識別子。OS headerの値だけを局所射影する。
+// https://github.com/apple-oss-distributions/xnu/blob/main/bsd/sys/fcntl.h
+#[cfg(target_os = "macos")]
+const F_SETNOSIGPIPE: libc::c_int = 73;
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Version {
@@ -110,7 +115,7 @@ pub unsafe extern "C" fn d4_workspace_select_and_write(
         return 0;
     }
     // SAFETY: 自分が所有する複製pipe fdだけ。helper停止時のSIGPIPEでGUIを終了させない。
-    if unsafe { libc::fcntl(pipe.as_raw_fd(), libc::F_SETNOSIGPIPE, 1) } != 0 {
+    if unsafe { libc::fcntl(pipe.as_raw_fd(), F_SETNOSIGPIPE, 1) } != 0 {
         return 0;
     }
     let selection = super::select_workspace();
