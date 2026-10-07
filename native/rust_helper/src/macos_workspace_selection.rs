@@ -70,7 +70,12 @@ pub(super) fn dispatch<T: AsRef<Path>>(
             ("selected", Some(scope))
         }
         Ok(None) => ("cancelled", None),
-        _ => ("failed", None),
+        Err("OS選択をmain threadで開始できません") => ("failed_main_thread", None),
+        Err("OS選択の表示を開始できません") => ("failed_display", None),
+        Err("OS選択にURLがありません") => ("failed_url", None),
+        Err("OS選択のpathが不正です" | "OS選択のpathを表示できません" | "OS選択のpath範囲が不正です")
+        | Ok(Some(_)) => ("failed_path", None),
+        _ => ("failed_native", None),
     };
     request["session_id"] = json!(endpoint.session_id);
     request["payload"] = json!({
@@ -228,6 +233,16 @@ mod tests {
                 .status,
             BrokerStatus::Rejected
         );
+        let mut failed = request.clone();
+        failed["nonce"] = json!("failed-display-nonce");
+        failed["payload"]["selection_status"] = json!("failed_display");
+        failed["payload"]["workspace_root"] = Value::Null;
+        failed["payload_hash"] = json!(canonical_payload_hash(Some(&failed["payload"])));
+        let response = broker.desktop_owner_operation_json(&failed.to_string());
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        let error = response.error.unwrap();
+        assert_eq!(error.code, "macos_os_selection_display");
+        assert!(error.fail_closed);
         let audit = serde_json::to_string(broker.audit_events()).unwrap();
         assert!(!audit.contains("external-fixture-workspace"));
     }

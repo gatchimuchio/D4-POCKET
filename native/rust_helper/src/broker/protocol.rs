@@ -2241,6 +2241,21 @@ impl Broker {
                 let selection = envelope.payload.as_ref().filter(|v|
                     v.as_object().is_some_and(|v| v.len() == 4 && v.contains_key("workspace_root"))).and_then(|v|
                     serde_json::from_value::<Selection>(v.clone()).ok());
+                if let Some(s) = selection.as_ref().filter(|s| s.version == 1
+                    && is_tagged_sha256(&s.selection_request_hash) && s.workspace_root.is_none()) {
+                    let code = match s.selection_status.as_str() {
+                        "failed_main_thread" => Some("macos_os_selection_main_thread"),
+                        "failed_display" => Some("macos_os_selection_display"),
+                        "failed_url" => Some("macos_os_selection_url"),
+                        "failed_path" => Some("macos_os_selection_path"),
+                        "failed_native" => Some("macos_os_selection_native"),
+                        _ => None,
+                    };
+                    if let Some(code) = code { return self.reject_with_payload_hash(
+                        &request_id, &operation, code,
+                        "native OS選択を開始または確定できません。入力を保持し、登録・再送しません",
+                        true, &payload_hash); }
+                }
                 let Some(selection) = selection.filter(|s| s.version == 1
                     && is_tagged_sha256(&s.selection_request_hash)
                     && ((s.selection_status == "cancelled" && s.workspace_root.is_none())

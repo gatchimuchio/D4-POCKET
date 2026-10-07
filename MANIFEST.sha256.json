@@ -212,7 +212,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/agent_center.dart",
-      "sha256": "ea8e98ab66f8ee545a48884355ad61210e77648ba8e7897c052fa171db5f6f82"
+      "sha256": "53312d79ef2861034a488854f0b36fae44dde1991dd7c49c6e08a0eb699c2903"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/approval_center.dart",
@@ -564,7 +564,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/RunnerUITests/AdapterOwnerUITests.swift",
-      "sha256": "3627ee340ba7d4f9b5071c19cd96f50e60be01870cca4c00768a22c65a0da699"
+      "sha256": "99167e3ba412ea6e160703f7819c94f3cf26f3d29093e2f246503632b8728e3b"
     },
     {
       "path": "apps/desktop_flutter/pubspec.lock",
@@ -676,7 +676,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "bd166dbe89bd993d85fed16c618fe1cf3b5ddd1b91df18faf79dbb380e117430"
+      "sha256": "e134a7d956e403eba0219f907de0a1ba5f73c60edfc6396b87309c1fbb9c6e75"
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
@@ -1272,7 +1272,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "70b811b150743dd39734e280526207edbd352568a8ec49a0d6040a985143ed75"
+      "sha256": "8f3ba4bcf5df00410ef7d17b1f4c16469989a4dd5a94755719d734ad7610a22b"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1488,7 +1488,7 @@
     },
     {
       "path": "docs/specs/macos-workspace-selection.md",
-      "sha256": "afb3e8dd26a9cc349fb6eb18e0995d6e3ab5afdfcfbb1d04176d9c25f0bddbb8"
+      "sha256": "77c88cac3307013abfc6821b1cc885cedac1d8e199014137da50c1ca4495205c"
     },
     {
       "path": "docs/specs/mcp-connection-center.md",
@@ -3400,7 +3400,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "87dcbd7345044dd5379f6e98edd1dde46cb77582cf31dc42a2cb0cf8314efc5d"
+      "sha256": "aed33f776018be065588adfd8cf2dff5ba9e5a694a3dd33be11d47c394f5b8b9"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -3484,7 +3484,7 @@
     },
     {
       "path": "native/rust_helper/src/macos_workspace_selection.rs",
-      "sha256": "711b7fea7dbb71d31e7d510ea5d1d56bc5c5224cb81c5bf6ebd98fb9c947d39d"
+      "sha256": "055f8bb5788ac6acd2bfe9d3f732d08738f9fb8c460a523ea6ccc3dea3662ecc"
     },
     {
       "path": "native/rust_helper/src/main.rs",

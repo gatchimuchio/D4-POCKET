@@ -55,6 +55,16 @@ void main() {
       projection('cancelled', null),
       projection('selected', '/public-project'),
       projection('selected', '/injected-root', approval: true),
+      {
+        ..._brokerAcceptedBody('作業領域OS選択', {}),
+        'status': 'rejected',
+        'evidence_source': 'INTERNAL_STATE',
+        'error': {
+          'code': 'macos_os_selection_display',
+          'message': 'synthetic-private-error'
+        },
+        'body': null,
+      },
     ]);
     final client = await ShellCoreClient.product(transport: transport);
     await tester.pumpWidget(
@@ -75,9 +85,18 @@ void main() {
       expect(tester.widget<TextFormField>(root).controller!.text, expected);
     }
     expect(find.text('OS選択が成立していません。入力を保持し、自動再送しません。'), findsOneWidget);
+    await tester.ensureVisible(select);
+    await tester.tap(select);
+    await tester.pumpAndSettle();
+    expect(
+        tester.widget<TextFormField>(root).controller!.text, '/public-project');
+    expect(
+        find.text('macos_os_selection_display: OS選択が成立していません。入力を保持し、自動再送しません。'),
+        findsOneWidget);
+    expect(find.textContaining('synthetic-private-error'), findsNothing);
     final selections =
         transport.requests.where((r) => r['operation'] == '作業領域OS選択').toList();
-    expect(selections.length, 3);
+    expect(selections.length, 4);
     for (final request in selections) {
       expect(request['payload'], {'version': 1});
     }

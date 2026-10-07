@@ -33,6 +33,10 @@
 
 手動Actions [run 37679355859](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37679355859)、commit `c752d85371ca934e6deaa9c6a69a09041d962f3f`はUI試験24.760秒でFAIL。保存videoの20秒frameで、最終欄入力後の選択buttonがviewport外にあることを確認した。通常本文scrollを一回行ってから既存の画面認識／clickへ進める。対象build／試験と後片付けはPASS。artifact `11509007869`、SHA-256 `0a98019a3cb5d32f296e51b394215e9c49cfb42c8437719bade60aac52c3d2d9`を照合してignored領域へ保存した。Broker・Owner処理は変更せず、OS選択の成立はまだ未取得。
 
+手動Actions [run 37680593751](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37680593751)、commit `13cc445fbee173dda69ce1cdbf841e7e777c8057`はUI試験45.071秒でFAIL。画面認識後のclickは実button中央へ到達したが、画面は「OS選択が成立していません」を返した。直接AXはtrusted=false／CannotCompleteで、その結果だけからchooser内部を断定しない。nativeの固定失敗分類を既存Broker拒否codeへ結合し、秘密・path・raw errorを露出せず原因を区別する。artifact `11507844827`、SHA-256 `618c9b469af0f878a6d6b1d36201bac74f4a70d0721e62435585dbf43da6922b`を照合・保存した。通常build／対象試験／後片付けはPASS。実OS選択の有限条件は未成立で、mainは変更前のまま。
+
+固定失敗分類の局所修正後、対象Rust 3件とSchema 163／正常例159／負例210、Conformance 237件がPASS。必須Rust全体は505 passed／4 failed／12 ignoredでFAIL。今回の失敗は変更外のMINIDORA Content-Length読取、Codex loopback応答header読取、bounded catalog上限、既存TLS repairで、通信失敗／ConnectionReset／OS 10054を観測した。既存`FQ-TEST-LOOPBACK`と同分類へ保持し、全体PASSや根因解消とは扱わない。対象Mac操作はWindowsのこれらの通信経路を変更しない。
+
 有限Acceptanceは`docs/specs/macos-workspace-selection.md`。取消時の入力保持、実OS chooserによるsandbox外folder選択／投影、別個のOwner確認後の既存Broker登録、UI path／Authority注入拒否を一単位で施工する。選択はOS user-selected accessであり、D4のPermission／Approval／登録ではない。手動Actionsの`macos_workspace_selection`だけでMacを検証し、CLOSEDの登録／Adapter／Mobile試験は選択しない。sandbox外CLI実行・restart access・Credential・正式配布・Final QAはこの単位へ追加しない。
 
 ローカル検証: Schema 162／正常例158／負例209、Conformance 237 checks PASS。必須`cargo test --locked --manifest-path native/rust_helper/Cargo.toml`は505 passed／4 failed／12 ignoredでFAIL。変更外のA2A loopback読取と3つの既存HTTPS fixtureが応答読取／OS 10054／InvalidContentTypeで失敗した。局所切分けではA2A 1 PASS、update_download群16 PASS／1 FAILで、`failed_replacement_keeps_the_existing_corrupt_package_unchanged`の既存TLS失敗が残る。対象新規試験の成功や全体PASSへ読み替えず、既存Final QAのloopback検査課題へ保持する。変更がMac専用OS選択へ限定され、これらの作用経路を変更していないことを差分で確認した。

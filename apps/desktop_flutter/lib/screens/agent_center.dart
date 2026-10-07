@@ -2017,10 +2017,30 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
       _workspaceSelectionPending = true;
       _workspaceSelectionMessage = null;
     });
+    String? failureCode;
     try {
       final response =
           await transport.request('作業領域OS選択', payload: {'version': 1});
       if (!mounted) return;
+      const failureCodes = {
+        'macos_os_selection_required',
+        'macos_os_selection_failed',
+        'macos_os_selection_main_thread',
+        'macos_os_selection_display',
+        'macos_os_selection_url',
+        'macos_os_selection_path',
+        'macos_os_selection_native',
+      };
+      final error = response['error'];
+      if (response['operation'] == '作業領域OS選択' &&
+          response['status'] == 'rejected' &&
+          response['evidence_source'] == 'INTERNAL_STATE' &&
+          response['audit_event_id'] is String &&
+          (response['audit_event_id'] as String).isNotEmpty &&
+          error is Map &&
+          failureCodes.contains(error['code'])) {
+        failureCode = error['code'] as String;
+      }
       final body = response['body'];
       const keys = {
         'version',
@@ -2067,8 +2087,8 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
       }
     } catch (_) {
       if (mounted) {
-        setState(() =>
-            _workspaceSelectionMessage = 'OS選択が成立していません。入力を保持し、自動再送しません。');
+        setState(() => _workspaceSelectionMessage =
+            '${failureCode == null ? '' : '$failureCode: '}OS選択が成立していません。入力を保持し、自動再送しません。');
       }
     } finally {
       if (mounted) setState(() => _workspaceSelectionPending = false);

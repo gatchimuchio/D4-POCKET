@@ -43,6 +43,10 @@ final class AdapterOwnerUITests: XCTestCase {
       image.name = "D4-workspace-chooser-missing"; image.lifetime = .keepAlways; add(image)
       print("D4_WORKSPACE_CHOOSER_APP \(app.debugDescription)")
       print("D4_WORKSPACE_CHOOSER_NATIVE \(chooser.description)")
+      app.activate()
+      app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.65))
+        .scroll(byDeltaX: 0, deltaY: -180)
+      print("D4_WORKSPACE_SELECTION_FAILURE \(app.debugDescription)")
       XCTFail("Rust所有OS chooserを観測できない")
     }
     try chooser.press("Cancel")
