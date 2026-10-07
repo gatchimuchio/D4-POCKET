@@ -51,7 +51,13 @@ final class AdapterOwnerUITests: XCTestCase {
     }
     XCTAssertTrue(install.isHittable)
     install.click()
-    let input = element(app, "Adapter定義書（JSON）")
+    // Flutter 3.44 macOSは編集欄をNSTextFieldとして公開する。
+    // 全要素のvalueを評価せず、このdialogで唯一の編集欄だけを取得する。
+    let screen = XCTAttachment(screenshot: app.screenshot())
+    screen.name = "D4-macOS-manifest-entry"
+    screen.lifetime = .keepAlways
+    add(screen)
+    let input = app.textFields.firstMatch
     XCTAssertTrue(input.waitForExistence(timeout: 10))
     input.click()
     // 合成公開Manifestのみ。秘密・実署名鍵・外部作用を含まない。
