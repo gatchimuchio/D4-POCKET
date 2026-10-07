@@ -51,6 +51,8 @@
 
 [run 37615419157](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37615419157)、commit `7aa1d0d0f551c1800a2242688686a2696971054e`もOS確認ボタン不存在でFAIL。artifact `11479865081`、SHA-256 `a4db0bf10b916510bda97748a0af85fe23918208667d363fb06040fa29b6cb19`を照合した。入力snapshotのJSON全564文字・署名128文字は意図した合成Manifestと一致する。製品UIにはAdapter ID付き処理結果があるがtree表示で本文が省略されていたため、既存status値を最大1024文字だけ読み取る。専用runnerの当該helperに対するOS拒否logも限定取得し、原因未確定のまま製品やsandboxを変更しない。Rust確認crate 2件・実Broker対象1件・通常製品buildはPASS、Owner製品経路は未成立のまま。
 
+[run 37617227763](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37617227763)、commit `8259281cd15e33509b1418599e9a1806d128cc79`の既存UI結果は`rejected / Adapter管理要求の構造または操作名が不正 / broker-audit-23`だった。確認画面より前の入力構造拒否であり、OS sandbox失敗という仮説は採用しない。artifact `11480881994`、SHA-256 `4a8ccf8ef30f99d847eb5b798e57bd6e3b4511c09dd3592e33daed930e96769d`を照合。native入力snapshotは前回と同じ完全なJSONだが、Flutter controllerから送られた要求との差は未確認。不要なOS log取得を撤去し、明示Debug UI試験flag内だけで既知fieldの存在・型・件数と操作名一致を一時観測する。本文・署名・資格は出力せず、原因確定後にこの型観測を撤去する。通常製品の要求と判断経路は変更しない。
+
 #### macOS Desktop通常Broker接続 — CLOSED（Product Build、2026-10-07）
 
 開始時のmacOS Runnerには`gui_shell/broker`登録がなく、Flutterの通常起動から実Brokerへ到達しなかった。本有限単位を、同梱Rust helperへの匿名pipe、既存認証Broker normal経路、初回設定等の製品bootstrap、正常終了へ限定した。Apple App Sandboxを継承し、Flutter／Runnerへ資格を渡さない。Owner専用操作・Windows固有操作は現状の拒否を保持し、macOS全機能完成とは扱わない。責任と未成立範囲は`docs/specs/macos-desktop-channel.md`。手動Actionsの独立`macos_product`を使い、iOS／AndroidのCLOSED試験は起動していない。

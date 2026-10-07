@@ -113,6 +113,23 @@ final class BrokerProcessChannel {
     // 待機期限の分類だけ。承認の判定・返信はRustのOS確認画面が所有する。
     let envelope = frame.data(using: .utf8).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
     let operation = envelope?["operation"] as? String
+    #if DEBUG && D4_MACOS_OWNER_UI_TEST
+    if operation == "アダプター導入", let payload = envelope?["payload"] as? [String: Any] {
+      // 未成立の合成UI試験の型だけを観測する。本文・署名・資格は記録しない。
+      func shape(_ fields: [String: Any], _ names: [String]) -> String {
+        names.map { key in
+          guard let value = fields[key] else { return key + "=missing" }
+          if let number = value as? NSNumber { return key + "=number:" + String(cString: number.objCType) }
+          return key + "=" + String(describing: type(of: value))
+        }.joined(separator: ",")
+      }
+      var observedShape = "rootCount=\(payload.count) operationValid=\(payload["操作"] as? String == "導入") \(shape(payload, ["版", "操作", "Manifest"]))"
+      if let manifest = payload["Manifest"] as? [String: Any] {
+        observedShape += " manifestCount=\(manifest.count) \(shape(manifest, ["版", "Adapter ID", "Runtime ID", "発行者", "source", "version", "transport", "Content Exposure", "要求Capability", "許可差分", "既知の危険", "互換性", "authority_strip", "signed_manifest", "署名対象", "署名", "署名者fingerprint"]))"
+      }
+      NSApp.windows.first?.title = "D4_MACOS_OWNER_SHAPE " + observedShape
+    }
+    #endif
     let timeout = operation == "アダプター導入" || operation == "アダプター更新" ? 305 : 5
     DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(timeout)) { complete(nil) }
     queue.async { [weak self] in
