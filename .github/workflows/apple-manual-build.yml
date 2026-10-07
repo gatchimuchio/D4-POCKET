@@ -13,6 +13,7 @@ name: Apple platform 手動補助build
           - macos_product
           - macos_owner
           - macos_adapter_lifecycle
+          - macos_agent_registration
         default: all
         required: true
 
@@ -21,7 +22,7 @@ permissions:
 
 jobs:
   macos-product:
-    if: ${{ inputs.target == 'macos_product' || inputs.target == 'macos_owner' || inputs.target == 'macos_adapter_lifecycle' }}
+    if: ${{ inputs.target == 'macos_product' || inputs.target == 'macos_owner' || inputs.target == 'macos_adapter_lifecycle' || inputs.target == 'macos_agent_registration' }}
     runs-on: macos-15
     timeout-minutes: 30
     steps:
@@ -49,9 +50,30 @@ jobs:
             cargo +1.95.0 test --locked --manifest-path native/macos_owner/Cargo.toml 2>&1 | tee evidence/macos-owner-native.txt
           elif [ '${{ inputs.target }}' = 'macos_adapter_lifecycle' ]; then
             filter='macos_desktop_worker::tests::owner_adapter_lifecycle'
+          elif [ '${{ inputs.target }}' = 'macos_agent_registration' ]; then
+            filter='macos_desktop_worker::tests::owner_agent_registration_'
           fi
           cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib "$filter" -- --test-threads=1 2>&1 | tee evidence/macos-rust-test.txt
           cargo +1.95.0 build --locked --manifest-path native/rust_helper/Cargo.toml --bin gui_shell_macos_broker 2>&1 | tee evidence/macos-rust-build.txt
+      - name: 固定版実Codexとsandbox内の合成Workspaceを準備
+        if: inputs.target == 'macos_agent_registration'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = arm64
+          test "$HOME" = /Users/runner
+          fixture="$HOME/Library/Containers/com.example.guiShellDesktop/Data/d4-registration-fixture"
+          test ! -e "$fixture"
+          mkdir -p "$fixture/workspace" "$RUNNER_TEMP/d4-codex-package"
+          curl --fail --location --output "$RUNNER_TEMP/d4-codex-package/package.tgz" https://registry.npmjs.org/@openai/codex/-/codex-0.159.2-darwin-arm64.tgz
+          digest="$(openssl dgst -sha512 -binary "$RUNNER_TEMP/d4-codex-package/package.tgz" | openssl base64 -A)"
+          test "$digest" = '7SPaPFU0tdqapQ5VEgrF+wb+p9dxfWfLMXMKZMRKoWPn/tLMajlMjYBBnu8o6VtaVH2DHQ6kpnp5TMkv5bqvrg=='
+          tar -xzf "$RUNNER_TEMP/d4-codex-package/package.tgz" -C "$RUNNER_TEMP/d4-codex-package"
+          cli="$(find "$RUNNER_TEMP/d4-codex-package/package" -type f -name codex)"
+          test -f "$cli"
+          cp "$cli" "$fixture/codex"
+          chmod 755 "$fixture/codex"
+          { "$fixture/codex" --version; shasum -a 256 "$fixture/codex"; "$fixture/codex" exec --help; } > evidence/codex-registration-interface.txt
       - name: 同梱helper付きmacOS製品build
         working-directory: apps/desktop_flutter
         shell: bash
@@ -62,6 +84,10 @@ jobs:
             dart analyze lib/services/broker_client.dart lib/services/shell_core_client.dart lib/screens/runtime_center.dart test/broker_client_payload_hash_test.dart test/widget_test.dart 2>&1 | tee ../../evidence/adapter-dart-analyze.txt
             flutter test --no-pub test/broker_client_payload_hash_test.dart --plain-name 'native Owner確認のBroker操作はFlutter待機時間を共有する' 2>&1 | tee ../../evidence/adapter-timeout-test.txt
             flutter test --no-pub test/widget_test.dart --plain-name '起動後のAdapter一覧に表示されたrecordを現在hashへ束縛して操作する' 2>&1 | tee ../../evidence/adapter-fresh-catalog-test.txt
+          fi
+          if [ '${{ inputs.target }}' = 'macos_agent_registration' ]; then
+            dart analyze lib/services/broker_client.dart test/broker_client_payload_hash_test.dart 2>&1 | tee ../../evidence/registration-dart-analyze.txt
+            flutter test --no-pub test/broker_client_payload_hash_test.dart 2>&1 | tee ../../evidence/registration-transport-test.txt
           fi
           flutter build macos --debug --no-pub 2>&1 | tee ../../evidence/macos-build.txt
       - name: 製品bootstrapとBroker終了
@@ -76,6 +102,9 @@ jobs:
           elif [ '${{ inputs.target }}' = 'macos_adapter_lifecycle' ]; then
             target=RunnerUITests/AdapterOwnerUITests/testProductAdapterLifecycle
             extra=('SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG D4_MACOS_OWNER_UI_TEST')
+          elif [ '${{ inputs.target }}' = 'macos_agent_registration' ]; then
+            target=RunnerUITests/AdapterOwnerUITests/testProductAgentRegistration
+            extra=('SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG D4_MACOS_OWNER_UI_TEST')
           fi
           xcodebuild test -project apps/desktop_flutter/macos/Runner.xcodeproj -scheme Runner \
             -destination 'platform=macOS' -parallel-testing-enabled NO \
@@ -89,7 +118,7 @@ jobs:
           set -euo pipefail
           if [ -d "$RUNNER_TEMP/macos-product-tests.xcresult" ]; then
             xcrun xcresulttool get test-results summary --path "$RUNNER_TEMP/macos-product-tests.xcresult" | tee evidence/macos-native-summary.json
-            if [ '${{ inputs.target }}' = 'macos_owner' ] || [ '${{ inputs.target }}' = 'macos_adapter_lifecycle' ]; then
+            if [ '${{ inputs.target }}' = 'macos_owner' ] || [ '${{ inputs.target }}' = 'macos_adapter_lifecycle' ] || [ '${{ inputs.target }}' = 'macos_agent_registration' ]; then
               xcrun xcresulttool export attachments --path "$RUNNER_TEMP/macos-product-tests.xcresult" --output-path evidence/macos-ui-attachments
             fi
           fi
@@ -101,6 +130,19 @@ jobs:
           git diff --exit-code -- apps/desktop_flutter
           git diff --cached --exit-code -- apps/desktop_flutter
           test -z "$(git status --porcelain --untracked-files=all -- apps/desktop_flutter)"
+      - name: 登録検証用RuntimeとWorkspaceを回収
+        if: always() && inputs.target == 'macos_agent_registration'
+        shell: bash
+        run: |
+          set -euo pipefail
+          fixture=/Users/runner/Library/Containers/com.example.guiShellDesktop/Data/d4-registration-fixture
+          test ! -L "$fixture"
+          if [ -d "$fixture/workspace" ]; then
+            test -z "$(find "$fixture/workspace" -mindepth 1 -print -quit)"
+            rmdir "$fixture/workspace"
+          fi
+          if [ -f "$fixture/codex" ]; then rm "$fixture/codex"; fi
+          if [ -d "$fixture" ]; then rmdir "$fixture"; fi
       - name: 限定証拠を保存
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

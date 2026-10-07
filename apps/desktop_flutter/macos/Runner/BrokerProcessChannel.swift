@@ -115,7 +115,7 @@ final class BrokerProcessChannel {
     let operation = envelope?["operation"] as? String
     let ownerOperations: Set<String> = ["アダプター導入", "アダプター更新", "アダプター検証",
       "アダプター有効化", "アダプター無効化", "アダプター隔離", "アダプター削除"]
-    let timeout = ownerOperations.contains(operation ?? "") ? 305 : 5
+    let timeout = operation == "AgentCLI実行系作業領域登録" ? 320 : (ownerOperations.contains(operation ?? "") ? 305 : 5)
     DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(timeout)) { complete(nil) }
     queue.async { [weak self] in
       guard let self else { return }

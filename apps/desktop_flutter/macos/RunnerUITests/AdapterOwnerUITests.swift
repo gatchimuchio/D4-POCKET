@@ -1,6 +1,73 @@
 import XCTest
 
 final class AdapterOwnerUITests: XCTestCase {
+  func testProductAgentRegistration() throws {
+    let app = XCUIApplication()
+    let notice = XCUIApplication(bundleIdentifier: "com.apple.UserNotificationCenter")
+    continueAfterFailure = false
+    app.launch()
+    defer { app.terminate() }
+    let center = element(app, "エージェント")
+    XCTAssertTrue(center.waitForExistence(timeout: 20))
+    center.click()
+    let fixture = "/Users/runner/Library/Containers/com.example.guiShellDesktop/Data/d4-registration-fixture"
+    for approveRegistration in [false, true] {
+      let start = app.buttons["登録を開始"]
+      XCTAssertTrue(start.waitForExistence(timeout: 10))
+      reveal(app, start)
+      start.click()
+      for (label, value) in [
+        ("模型識別子", "test-model"),
+        ("実行系ID（Runtime ID）", "macos-product-codex"),
+        ("Codex CLI実行fileの絶対path", fixture + "/codex"),
+        ("作業領域ID（Workspace ID）", "macos-product-workspace"),
+        ("Workspace rootの絶対path", fixture + "/workspace"),
+        ("除外する秘密path（相対path、1行に1件）", "private.env")
+      ] {
+        let field = element(app, label)
+        XCTAssertTrue(field.waitForExistence(timeout: 10), label)
+        reveal(app, field)
+        field.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+        app.typeKey("a", modifierFlags: .command)
+        app.typeText(value)
+      }
+      let submit = app.buttons["native Owner確認へ進む"]
+      XCTAssertTrue(submit.exists)
+      submit.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+      let decision = notice.dialogs.firstMatch.buttons[approveRegistration ? "今回の操作を承認" : "承認しない"]
+      if !decision.waitForExistence(timeout: 15) {
+        let screen = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screen.name = "D4-macOS-registration-missing"; screen.lifetime = .keepAlways; add(screen)
+        print("D4_MACOS_REGISTRATION_UI \(app.debugDescription)")
+        XCTFail("登録Owner確認が表示されない")
+      }
+      decision.click()
+      if !approveRegistration {
+        XCTAssertTrue(element(app, "Codex実行系とWorkspaceの登録はRust Desktopのnative Owner確認だけで許可します").waitForExistence(timeout: 10))
+        XCTAssertFalse(element(app, "Broker内登録: macos-product-codex").exists)
+      }
+    }
+    let registered = element(app, "Broker内登録: macos-product-codex")
+    if !registered.waitForExistence(timeout: 20) {
+      print("D4_MACOS_REGISTRATION_RESULT \(app.debugDescription)")
+      XCTFail("実Codex登録が成立しない")
+    }
+    XCTAssertTrue(element(app, "Broker起動中だけ登録しました。Task実行能力: unsupported。").exists)
+    print("D4_MACOS_AGENT_REGISTRATION_PASS")
+    app.typeKey("q", modifierFlags: .command)
+    XCTAssertTrue(app.wait(for: .notRunning, timeout: 10))
+  }
+
+  private func reveal(_ app: XCUIApplication, _ target: XCUIElement) {
+    for _ in 0..<10 {
+      if target.frame.height >= 30 && app.windows.firstMatch.frame.contains(target.frame) { break }
+      app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.65))
+        .scroll(byDeltaX: 0, deltaY: -180)
+    }
+    XCTAssertGreaterThanOrEqual(target.frame.height, 30)
+    XCTAssertTrue(app.windows.firstMatch.frame.contains(target.frame))
+  }
+
   func testProductAdapterLifecycle() throws {
     let app = XCUIApplication()
     let notice = XCUIApplication(bundleIdentifier: "com.apple.UserNotificationCenter")

@@ -24,7 +24,6 @@ void main() {
       '作業領域承認',
       '作業領域失効',
       '作業領域全体基準点保存',
-      'AgentCLI実行系作業領域登録',
       'アダプター検証',
       'アダプター有効化',
       'アダプター無効化',
@@ -42,6 +41,11 @@ void main() {
         const Duration(seconds: 5),
       );
     }
+  });
+
+  test('Agent登録はnative確認と二つの期限付きCLI probeを待つ', () {
+    expect(brokerRequestTimeoutForOperation('AgentCLI実行系作業領域登録'),
+        const Duration(seconds: 320));
   });
 
   test('payload_hash matches the Rust broker null payload vector', () {

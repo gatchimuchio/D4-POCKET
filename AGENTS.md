@@ -297,7 +297,7 @@ LLMはGUI Shell contractの第一級の実装・統合consumerだが、権限源
 - Windows Desktop Broker要求に限り、Flutterの`MethodChannel('gui_shell/broker')`からWindows Runnerへ要求JSON文字列だけを渡し、Rust起動器が生成した名前付きpipeで同じ起動器のFlutter child PIDを照合してから既存認証Brokerへrelayする経路を許可する。このMethodChannelとRunnerは権限判断・資格保持・endpoint探索を行わず、新しいAuthority経路ではない。Dart direct Socket/file/credential access、Runnerによる認可、PID照合なしのpipe接続、既存Brokerを迂回するfallbackは禁止する
 - オーナーが明示要求しない限り、GUI Shellの利便性のためにBLUE-TANUKI実装を変更してはならない
 - macOS Desktopでは同じ`gui_shell/broker`要求をnative Runnerから同梱Rust helperの継承匿名pipeへ渡す。helperはApp Sandboxを継承し、既存認証Brokerのnormal経路だけへ中継する。Flutter／RunnerへBroker資格を渡さず、Owner専用操作はBrokerが拒否する。任意helper指定、任意command、資格file探索、sandbox無効化、別Authority経路は禁止する。責任正本は`docs/specs/macos-desktop-channel.md`。
-- macOSのAdapter導入・更新・検証・有効化・無効化・隔離・削除に限り、Rust helperが要求とhashを検査し、Rust所有の期限付きOS確認画面で明示承認された同一要求を既存Brokerのprocess内Owner receiverへ渡す。既存record操作は対象IDと現在hashも束縛し、署名検証・状態遷移はBrokerが再評価する。Flutter／Runnerから承認boolやOwner資格を受け付けず、Adapter catalog以外のOwner操作へ広げない。責任正本は`docs/specs/macos-desktop-channel.md`のOwner追加契約。
+- macOSのAdapter導入・更新・検証・有効化・無効化・隔離・削除、およびAgent CLI実行系／Workspaceの起動中登録に限り、Rust helperが要求とhashを検査し、Rust所有の期限付きOS確認画面で明示承認された同一要求を既存Brokerのprocess内Owner receiverへ渡す。既存record操作は対象IDと現在hashも束縛し、署名検証・状態遷移はBrokerが再評価する。Agent登録は既存CLI probe・APFS root／保護領域検査を使い、sandbox権限・Task能力・Credential・Permission・Approvalを生成しない。Flutter／Runnerから承認boolやOwner資格を受け付けず、この明示集合以外のOwner操作へ広げない。責任正本は`docs/specs/macos-desktop-channel.md`のOwner追加契約。
 
 ### 14. 境界の意味
 

@@ -153,7 +153,7 @@
     },
     {
       "path": "specs/agent_cli_runtime_workspace_registration.schema.json",
-      "責任": "Windows Desktop native Owner確認後のCLI Adapter・Workspace起動中登録要求。Credential値やTask権限を含まない"
+      "責任": "Windows／macOS Desktop native Owner確認後のCLI Adapter・Workspace起動中登録要求。Credential値やTask権限を含まない"
     },
     {
       "path": "specs/agent_task.schema.json",
@@ -349,7 +349,7 @@
     },
     {
       "path": "docs/specs/macos-desktop-channel.md",
-      "責任": "macOS製品画面と同梱Rust helperの匿名pipe、既存Broker接続、sandbox継承、秘密非公開、正常終了、Rust所有Owner確認とAdapter catalog導入・更新・状態管理の限定契約"
+      "責任": "macOS製品画面と同梱Rust helperの匿名pipe、既存Broker接続、sandbox継承、秘密非公開、正常終了、Rust所有Owner確認、Adapter catalog管理とAgent CLI／Workspace起動中登録の限定契約"
     },
     {
       "path": "docs/specs/mobile-surface.md",

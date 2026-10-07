@@ -8,6 +8,7 @@ use std::time::Duration;
 struct Candidate {
     request: String,
     summary: String,
+    response_timeout: Duration,
 }
 
 fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
@@ -33,16 +34,24 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
     if envelope.payload_hash.as_deref() != Some(&hash) {
         return None;
     }
-    let operation = envelope.operation?.as_str().strip_prefix("アダプター")?;
+    let operation = envelope.operation?.as_str();
     let payload = envelope.payload.as_ref()?;
-    let text = if let Some(summary) = adapter_center::owner_confirmation_summary(operation, payload)
+    let registration = operation == "AgentCLI実行系作業領域登録";
+    let text = if registration {
+        let summary = crate::broker::protocol::macos_agent_registration_summary(payload)?;
+        format!("{summary}\n要求hash: {hash}")
+    } else if let Some(summary) =
+        adapter_center::owner_confirmation_summary(operation.strip_prefix("アダプター")?, payload)
     {
         format!(
             "Adapter {}をこのBrokerのcatalogへ要求します。\nAdapter: {}\n現在Adapter hash: {}\n要求hash: {}\n\nBrokerが現在のrecord、hash、署名と状態条件を再評価します。外部codeの起動・Permission・Approval・Credential・trustの付与は行いません。削除はcatalogのrecordだけが対象です。",
             summary.operation, summary.adapter_id, summary.adapter_hash, hash,
         )
     } else {
-        let summary = adapter_center::owner_manifest_confirmation_summary(operation, payload)?;
+        let summary = adapter_center::owner_manifest_confirmation_summary(
+            operation.strip_prefix("アダプター")?,
+            payload,
+        )?;
         format!(
         "Adapter {}をこのBrokerのcatalogへ登録します。\nAdapter: {}\nRuntime: {}\n発行者: {}\n版: {}\n接続: {}\n内容露出: {}\n要求Capability: {}\n許可差分（要求のみ）: {}\n既知の危険: {}\n互換性: {}\n署名者: {}\n署名対象hash: {}\n現在Adapter hash: {}\n要求hash: {}\n\n外部codeの起動・Permission・Approval・Credential・trustの付与は行いません。署名の検証・有効化は別操作です。",
         summary.operation, summary.adapter_id, summary.runtime_id, summary.publisher,
@@ -56,6 +65,8 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
     Some(Candidate {
         request: String::from_utf8(normalized).ok()?,
         summary: text,
+        // 登録は既存5秒probeを2回実行する。OS確認300秒とは別の限定待機。
+        response_timeout: Duration::from_secs(if registration { 15 } else { 4 }),
     })
 }
 
@@ -85,7 +96,7 @@ pub(super) fn dispatch(
         })
         .map_err(|_| std::io::Error::other("Owner操作のBroker配送が不能"))?;
     let response = response
-        .recv_timeout(Duration::from_secs(4))
+        .recv_timeout(candidate.response_timeout)
         .map_err(|_| std::io::Error::other("Owner操作の応答が未確定。再送しない"))?;
     Ok(Some(
         response

@@ -254,10 +254,110 @@ fn relay(request: &[u8], endpoint: &BrokerEndpoint) -> io::Result<Vec<u8>> {
 }
 
 #[cfg(test)]
+#[path = "../tests/unit/codex_cli_fixture.rs"]
+#[allow(dead_code)]
+mod registration_fixture;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::broker::protocol::BrokerRequestEnvelope;
     use serde_json::{json, Value};
+
+    #[test]
+    fn owner_agent_registration_登録だけを承認しtask権限を生成しない() {
+        let temp = registration_fixture::FixtureTempDirectory::create();
+        let root = temp.path().to_path_buf();
+        #[cfg(unix)]
+        let root = root.canonicalize().unwrap();
+        let broker = root.join("broker");
+        let workspace = root.join("workspace");
+        fs::create_dir(&broker).unwrap();
+        fs::create_dir(&workspace).unwrap();
+        let cli = registration_fixture::compile_fake_codex_cli(&root);
+        let payload = json!({
+            "version": 1, "adapter_id": "codex-cli", "runtime_id": "macos-agent",
+            "workspace_id": "macos-workspace", "cli_path": cli, "workspace_root": workspace,
+            "secret_paths": ["private-canary.env"],
+            "provider_model_selection": {"version": 1, "provider_id": "openai_codex_cli",
+                "model_id": "test-model", "authentication_source": "codex_cli_managed",
+                "automatic_fallback": false}
+        });
+        let request = |id: &str, operation: &str, payload: Value| {
+            json!({
+                "request_id": id, "nonce": id, "issued_at": BrokerRequestEnvelope::current_issued_at(),
+                "operation": operation, "metadata": {"client":"desktop_flutter"},
+                "payload_hash": crate::broker::protocol::canonical_payload_hash(Some(&payload)), "payload":payload,
+            })
+        };
+        let registration = |id: &str, payload| request(id, "AgentCLI実行系作業領域登録", payload);
+        let mut injected = payload.clone();
+        injected["approval"] = true.into();
+        let mut unknown = payload.clone();
+        unknown["adapter_id"] = "unknown-cli".into();
+        let mut missing = payload.clone();
+        missing["runtime_id"] = "missing-agent".into();
+        missing["workspace_id"] = "missing-workspace".into();
+        missing["cli_path"] = root.join("missing-cli").to_str().unwrap().into();
+        let mut protected = missing.clone();
+        protected["workspace_root"] = broker.to_str().unwrap().into();
+        let mut malformed = payload.clone();
+        malformed["secret_paths"] = json!(["../outside"]);
+        let frames = [
+            registration("denied", payload.clone()),
+            request("empty", "作業領域一覧", json!({})),
+            registration("accepted", payload.clone()),
+            request("registered", "作業領域一覧", json!({})),
+            registration("duplicate", payload),
+            registration("injection", injected),
+            registration("unknown", unknown),
+            registration("missing", missing),
+            registration("protected", protected),
+            registration("malformed", malformed),
+        ];
+        let input = frames.iter().map(|v| format!("{v}\n")).collect::<String>();
+        let mut output = Vec::new();
+        let mut confirmations = 0;
+        serve(
+            &broker,
+            &VerifiedBundle,
+            &mut io::Cursor::new(input),
+            &mut output,
+            &mut |summary| {
+                confirmations += 1;
+                assert!(summary.contains("Task実行能力はunsupported"));
+                assert!(summary.contains("要求hash: sha256:"));
+                assert!(summary.contains("private-canary.env"));
+                confirmations != 1
+            },
+        )
+        .unwrap();
+        let replies: Vec<Value> = String::from_utf8(output)
+            .unwrap()
+            .lines()
+            .map(|s| serde_json::from_str(s).unwrap())
+            .collect();
+        assert_eq!(replies.len(), frames.len());
+        assert_eq!(
+            replies[0]["error"]["code"],
+            "desktop_native_owner_confirmation_required"
+        );
+        assert_eq!(replies[1]["body"]["作業領域"], json!([]));
+        assert_eq!(replies[2]["status"], "accepted", "{}", replies[2]);
+        assert_eq!(replies[2]["body"]["task_execution"], "unsupported");
+        assert_eq!(replies[2]["body"]["permission_generated"], false);
+        assert_eq!(replies[2]["body"]["approval_generated"], false);
+        assert_eq!(replies[3]["body"]["作業領域"].as_array().unwrap().len(), 1);
+        for reply in &replies[4..] {
+            assert_ne!(reply["status"], "accepted", "{reply}");
+        }
+        assert_eq!(confirmations, 5);
+        assert_eq!(fs::read_dir(&workspace).unwrap().count(), 0);
+        let audit = fs::read_to_string(broker.join("store/audit.jsonl")).unwrap();
+        assert!(audit.contains("AgentCLI実行系作業領域登録"));
+        assert!(!audit.contains("private-canary.env"));
+        assert!(!audit.contains(workspace.to_str().unwrap()));
+    }
 
     #[test]
     fn normal_broker_roundtrip_rejects_injection_replay_and_owner_and_closes() {

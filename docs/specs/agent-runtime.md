@@ -43,6 +43,8 @@ Agent Taskの要求検査・Permission／Approval・実行を扱う各Broker操�
 
 ## Windows Desktop起動中のAgent CLI実行系とWorkspace登録
 
+以下はWindows経路の責任を定める。同じ登録要求のmacOS入口・APFS検査・App Sandbox内アクセス・Owner確認・限定Acceptanceは[macOS Desktop接続](macos-desktop-channel.md)のAgent CLI／Workspace追加契約を正本とする。Windows実行隔離・Credential保管・Task能力をMacへ自動継承しない。
+
 Desktop Agent CenterからのCLI登録要求は`AgentCLI実行系作業領域登録`だけを使い、要求Schemaは`agent_cli_runtime_workspace_registration.schema.json`に従う。要求の`adapter_id`はAdapter層の明示対応表で解決し、Broker Coreは製品固有Adapterを直接生成しない。FlutterはAdapter選択と識別子・絶対path・秘密path除外指定を入力／表示するだけで、file／process／Credentialへ直接アクセスしない。Rust起動器はPID-bound既存pipeを通った要求から固定fieldだけを読み、Adapter ID、Runtime ID、CLI実行file、Workspace ID／root、秘密path除外をWindows native default-No Owner確認へ表示する。通常資格、UI state、metadataから登録やAuthorityを作らない。
 
 OwnerがYesを選んだ後だけ、Adapter層は対応する実物CLI interfaceを検査し、BrokerはWindows rootのnofollow・NTFS・実体identity、Broker store／資格／ProtectedStoreとの重複、AdapterとWorkspaceのroot identity一致、secret除外pathを検証する。CLI probeはstdinを閉じ、stderrを破棄し、出力上限と実行期限を適用し、環境を許可listに制限する。入力にCredential値はなく、probeはTask、Model要求、Workspace変更を開始しない。登録はBroker process内の揮発状態だけで、永続設定へ書かず、終了時に消える。件数は起動中最大8件、Workspace registryの既存上限は16件とする。

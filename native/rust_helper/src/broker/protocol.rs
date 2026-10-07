@@ -67,6 +67,63 @@ struct AgentCliRuntimeWorkspaceRegistration {
     provider_model_selection: crate::adapters::ProviderModelSelection,
 }
 
+impl AgentCliRuntimeWorkspaceRegistration {
+    fn is_valid(&self) -> bool {
+        let request = self;
+        let workspace_id_valid = !request.workspace_id.is_empty()
+            && request.workspace_id.len() <= 128
+            && request.workspace_id.bytes().all(|byte| {
+                byte.is_ascii_alphanumeric() || b"_.-".contains(&byte)
+            });
+        let secret_paths_valid = request.secret_paths.len() <= 16
+            && request.secret_paths.iter().all(|path| {
+                !path.is_empty()
+                    && path.len() <= 256
+                    && !path.chars().any(char::is_control)
+                    && !Path::new(path).is_absolute()
+                    && !path.split(['/', '\\']).any(|part| part == ".." || part == ".")
+            })
+            && request.secret_paths.iter().collect::<std::collections::BTreeSet<_>>().len()
+                == request.secret_paths.len();
+        request.version == 1
+            && !request.adapter_id.is_empty()
+            && request.adapter_id.len() <= 128
+            && request.adapter_id.bytes().all(|byte| {
+                byte.is_ascii_lowercase() || byte.is_ascii_digit() || b"-_.".contains(&byte)
+            })
+            && crate::adapters::supports_cli_adapter(&request.adapter_id)
+            && 実行系ID妥当(&request.runtime_id)
+            && workspace_id_valid
+            && !request.cli_path.is_empty()
+            && !request.workspace_root.is_empty()
+            && request.cli_path.len() <= 1024
+            && request.workspace_root.len() <= 1024
+            && !request.cli_path.chars().any(char::is_control)
+            && !request.workspace_root.chars().any(char::is_control)
+            && secret_paths_valid
+            && request.provider_model_selection.is_valid()
+            && Path::new(&request.cli_path).is_absolute()
+            && Path::new(&request.workspace_root).is_absolute()
+    }
+}
+
+/// 構造確認済みの登録範囲だけを表示する。承認・Trust・実体確認は生成しない。
+#[cfg(any(target_os = "macos", test))]
+pub(crate) fn macos_agent_registration_summary(payload: &Value) -> Option<String> {
+    let request: AgentCliRuntimeWorkspaceRegistration =
+        serde_json::from_value(payload.clone()).ok()?;
+    if !request.is_valid() || request.provider_model_selection.credential_id().is_some() {
+        return None;
+    }
+    let scope = crate::adapters::cli_adapter_confirmation_scope(&request.adapter_id)?;
+    Some(format!(
+        "Agent CLI実行系とWorkspaceを、このBroker起動中だけ登録します。\nAdapter: {}\nRuntime: {}\nCLI実行file: {}\nCLI検査範囲: {}\nWorkspace ID: {}\nWorkspace root: {}\n除外する秘密path: {}\n提供元／模型: {} / {}\n認証方式: Codex CLI管理設定（登録時は認証しません）\n\nOwner承認後にCLI probe processを起動し、APFS rootとBroker内部領域との非重複を検査します。App Sandboxの外へ権限を広げません。アクセス不能時は登録を拒否します。Task・模型要求・Workspace変更は行わず、Permission・Approval・Trust・Credentialを生成しません。Task実行能力はunsupportedのままです。登録は終了時に消えます。",
+        request.adapter_id, request.runtime_id, request.cli_path, scope, request.workspace_id,
+        request.workspace_root, request.secret_paths.join(" / "),
+        request.provider_model_selection.provider_id, request.provider_model_selection.model_id,
+    ))
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct 実行系資源観測指定 {
@@ -1315,48 +1372,7 @@ impl Broker {
                     )
                 }
             };
-        let workspace_id_valid = !request.workspace_id.is_empty()
-            && request.workspace_id.len() <= 128
-            && request
-                .workspace_id
-                .bytes()
-                .all(|byte| byte.is_ascii_alphanumeric() || b"_.-".contains(&byte));
-        let secret_paths_valid = request.secret_paths.len() <= 16
-            && request.secret_paths.iter().all(|path| {
-                !path.is_empty()
-                    && path.len() <= 256
-                    && !path.chars().any(char::is_control)
-                    && !Path::new(path).is_absolute()
-                    && !path
-                        .split(['/', '\\'])
-                        .any(|part| part == ".." || part == ".")
-            })
-            && request
-                .secret_paths
-                .iter()
-                .collect::<std::collections::BTreeSet<_>>()
-                .len()
-                == request.secret_paths.len();
-        if request.version != 1
-            || request.adapter_id.is_empty()
-            || request.adapter_id.len() > 128
-            || !request.adapter_id.bytes().all(|byte| {
-                byte.is_ascii_lowercase() || byte.is_ascii_digit() || b"-_.".contains(&byte)
-            })
-            || !crate::adapters::supports_cli_adapter(&request.adapter_id)
-            || !実行系ID妥当(&request.runtime_id)
-            || !workspace_id_valid
-            || request.cli_path.is_empty()
-            || request.workspace_root.is_empty()
-            || request.cli_path.len() > 1024
-            || request.workspace_root.len() > 1024
-            || request.cli_path.chars().any(char::is_control)
-            || request.workspace_root.chars().any(char::is_control)
-            || !secret_paths_valid
-            || !request.provider_model_selection.is_valid()
-            || !Path::new(&request.cli_path).is_absolute()
-            || !Path::new(&request.workspace_root).is_absolute()
-        {
+        if !request.is_valid() {
             return self.reject_with_payload_hash(
                 request_id,
                 operation,
@@ -1397,7 +1413,7 @@ impl Broker {
                 request_id,
                 operation,
                 "desktop_runtime_registration_unavailable",
-                "検証済みWindows Desktop起動器のBrokerだけが登録できます",
+                "検証済みDesktop配置と保護領域を持つBrokerだけが登録できます",
                 true,
                 payload_hash,
             );

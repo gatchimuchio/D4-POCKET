@@ -17,6 +17,14 @@
 
 ## P13 Mobile / Non-Windows — 現行track
 
+#### macOS Agent CLI／Workspace起動中登録 — IMPLEMENTING
+
+既存Agent Centerの登録要求をRust所有OS確認と既存Brokerへ接続する。有限Acceptanceは`docs/specs/macos-desktop-channel.md`。権限取得・Task実行・sandbox外へのaccessを追加せず、既存登録境界を共有する。手動Actionsの`macos_agent_registration`で、固定版実Codexのinterface確認と製品UI登録を実行する。既CLOSEDのAdapter／Mobile／Windows条件を再試験しない。
+
+ローカル対象Rust試験は初回、非承認時の期待を`suspended`と誤記してFAIL。既存Brokerの`desktop_native_owner_confirmation_required`拒否へtest oracleを修正し、製品拒否を変更せず1件PASSした。Owner callbackとCLIは合成`FIXTURE`。非承認時の未登録、承認後の登録・Task非対応・Permission／Approval未生成、重複・Authority field・未知Adapter・不正秘密path・保護root・CLI不在の拒否、Workspace未変更、Audit非露出を確認した。Mac画面成立・実Codex成立はまだ主張しない。
+
+Schema 161／正常例157／負例208とmanual workflow検査、diff検査はPASS。厳格日本語監査は既存の変更外4 file／15 findingsでFAIL（今回差分にfindingなし）。Desktop／Mobileの`flutter analyze --no-pub`は既知の日本語path上のLSP FormatExceptionで失敗した。既存release blockerを維持し、変更Dart解析／試験とMac実行は専用手動Actionsで補助する。Rust全体／Conformanceは実行中で、PASSとはまだ記録しない。
+
 #### macOS既存Adapter状態管理のOwner接続 — CLOSED（Product Build、2026-10-07）
 
 成功commit `7c4219f5202402ad574e81b81e32d6eb02c82cd9`の手動Actions [run 37629357493](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37629357493)で有限AcceptanceがPASS。macOS 15.7.9 arm64／Apple Virtual Machine／Xcode 16.4、固定Flutter 3.44.0／Rust 1.95.0。製品UI→Rust所有OS確認→既存Brokerで、検証要求の不正署名拒否、有効化要求の未検証拒否、無効化・隔離・削除の受理と画面表示、Command-Q正常終了をXCUITest 1件（46.676秒）で確認した。helper残留なし・runner source clean。導入は新しい状態管理試験の準備であり、旧CLOSED試験は選択していない。

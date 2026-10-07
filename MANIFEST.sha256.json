@@ -72,7 +72,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "e8f1b16c42460272c4107cb8c1f3873c0f9e32b4c310a33c45f462b2aadd75da"
+      "sha256": "0ec9da81573984a406d7b84aa8e7f331f73f220f39045ff04b30e8f1958beffc"
     },
     {
       "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
@@ -92,7 +92,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "b9004a764a0525da8b672d95a6cb31f2d125ab891b3dc40aa3d8be55ed35a144"
+      "sha256": "d19a3be5d45c121d422c25a8edd9f43a945f267db61e35b683311b0f37457bd5"
     },
     {
       "path": "AUDIT.md",
@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "f7a3cb39411e283d06fdfd2c406056573c416894239f876d70be2942a397516e"
+      "sha256": "470a2884b0b524e14c477274a7dbbd7687363a2cb0714adc5d5e133b19c72371"
     },
     {
       "path": "SECURITY.md",
@@ -336,7 +336,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/broker_client.dart",
-      "sha256": "ba6ea1322bd15fe471d42dead4106b4ab6d783b32571a5e6d340f6c792fbdf8b"
+      "sha256": "6623f373798642a9761542bb17cb5d42d1d57fd397d8df0a09eeb01ab0c7eacf"
     },
     {
       "path": "apps/desktop_flutter/lib/services/compose_client.dart",
@@ -524,7 +524,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/BrokerProcessChannel.swift",
-      "sha256": "3024d958c0e794dd35cf810ef26eeb911649ec5db5abde1056d66d63146ccb44"
+      "sha256": "5bcf80f85e76269114de1f8f593c846ee6a691e7f36c39480725f93372b3d663"
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/Configs/AppInfo.xcconfig",
@@ -564,7 +564,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/RunnerUITests/AdapterOwnerUITests.swift",
-      "sha256": "933398b77999a76c8f5eae32e6928a9889895ee4577a8cef03dc641f2e7cee7d"
+      "sha256": "050a62e7a385e044974884ecd65b3796824db69ee6279e368639fc1611c8a29e"
     },
     {
       "path": "apps/desktop_flutter/pubspec.lock",
@@ -596,7 +596,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/broker_client_payload_hash_test.dart",
-      "sha256": "6940af101fab5fd21052829d6d21693b4f4e2d61e2332bf2a911e6ea75ac987e"
+      "sha256": "63e28317a4c2d6b8751d8e49617fa2755a72085fb081b11fdda624de19a7caca"
     },
     {
       "path": "apps/desktop_flutter/test/c27_performance_validation_test.dart",
@@ -1272,7 +1272,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "f48a2d2823fbbfb7e877a88c705bb37b7f68b81d0b66c86a1bc614fa0c9c1c05"
+      "sha256": "be84af273739c7786aa0c7dcf03fee35f1e7aaf1ef2521a196723f3469cf6d3e"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1380,7 +1380,7 @@
     },
     {
       "path": "docs/specs/agent-runtime.md",
-      "sha256": "8c150311a68af07b1c93f37ae4114310bb63f4696486d151380dbd1dd23cc908"
+      "sha256": "47e9fceb30a34808582e21201fab93cba27d7bec0209a68a48c48ca73aaedcee"
     },
     {
       "path": "docs/specs/agent-task-history.md",
@@ -1484,7 +1484,7 @@
     },
     {
       "path": "docs/specs/macos-desktop-channel.md",
-      "sha256": "00adb78a70ef2bd9fee10d42a710cee0820c244a593accb4246e7b00881751dd"
+      "sha256": "cc175883c964e35f13985ca487f8cda077f2eaaed86ff5558b219e3d93b30dda"
     },
     {
       "path": "docs/specs/mcp-connection-center.md",
@@ -3380,7 +3380,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "2955a80ab0ba0e1a4dfd05eff559d13827480b0333fbf2209d71b2c55fdc4756"
+      "sha256": "6bd34febd2eb1f6c97ce758247c4b5c3fc3279ac20511f37e1e3e88bc785865e"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -3456,11 +3456,11 @@
     },
     {
       "path": "native/rust_helper/src/macos_desktop_owner.rs",
-      "sha256": "7bafe24e3347a337fc0e8fd445f741e01415f292eabc14ce7be6268a4e12d5ea"
+      "sha256": "5cb1f3a7c61cdd3f77067f3924f3480c78b47e64a052a60bd2fb362f4bed6d1e"
     },
     {
       "path": "native/rust_helper/src/macos_desktop_worker.rs",
-      "sha256": "bd0ea220cc56c736a8ba7c43a51fe87fd6ced35a662ccee21ad0c5a0d854d672"
+      "sha256": "a67711c867e73b67fc35c6c46341fbc740195fd9be67dcbee99493adc10b6f85"
     },
     {
       "path": "native/rust_helper/src/main.rs",
@@ -4848,7 +4848,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "65eaf104e1cbaa0b2e32b3b2814f505ed47e6328e9aa57e3a34c32f455b451c1"
+      "sha256": "779e8010287a91b9269280a1cc3f45b9949c77508262a8ea5865d2c2724865f9"
     }
   ]
 }
