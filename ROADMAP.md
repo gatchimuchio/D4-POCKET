@@ -1,6 +1,6 @@
 # GUI Shell ロードマップ
 
-P13現行差分: macOS Agent CLI／Workspace起動中登録をIMPLEMENTING。既存Agent Center→Rust OS確認→既存Brokerの登録・CLI probe・APFS範囲検査へ接続する。有限Acceptanceは`docs/specs/macos-desktop-channel.md`、進捗は`docs/REV5_PRODUCT_PROGRESS.md`。Macがlocalにないため手動Actions `macos_agent_registration`を使い、固定版実Codex・合成Workspaceで限定検証する。Task実行・sandbox外選択・Credential保管・正式配布は別単位へ保持する。
+P13現行差分: macOS Agent CLI／Workspace起動中登録はVALIDATING。Rust対象・変更Dart解析／7試験・通常Mac buildはPASS、初回UI入力欄探索FAILの修正後はGitHub請求／利用上限によるjob起動拒否（run 37635033580）で試験未実行。差分は`codex/macos-agent-registration-verify`に保全し、mainへ未統合。有限Acceptanceは`docs/specs/macos-desktop-channel.md`、進捗は`docs/REV5_PRODUCT_PROGRESS.md`。利用回復後に手動Actions `macos_agent_registration`で同条件を確認する。Task実行・sandbox外選択・Credential保管・正式配布は別単位へ保持する。
 
 P13 macOS既存Adapter状態管理のOwner接続はCLOSED: commit `7c4219f5202402ad574e81b81e32d6eb02c82cd9`、手動Actions [run 37629357493](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37629357493)で5操作の実OS確認、署名不正／未検証有効化の拒否、無効化・隔離・削除の表示、通常終了がPASS。起動後に取得したrecordのID／hashを要求へ結合する修正もWidget回帰で確認した。Rust対象1件、Dart解析、Flutter対象2件、通常Mac buildがPASS。製品Trust設定・外部artifact作用・Credentials／Agent／Workspace・正式配布は未成立の別gateへ保持し、P13の次の製品差分へ進む。導入・更新、通常接続、MobileのCLOSED条件は再開しない。
 

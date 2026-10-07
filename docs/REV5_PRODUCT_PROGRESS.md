@@ -17,7 +17,11 @@
 
 ## P13 Mobile / Non-Windows — 現行track
 
-#### macOS Agent CLI／Workspace起動中登録 — IMPLEMENTING
+#### macOS Agent CLI／Workspace起動中登録 — VALIDATING（Mac runner外部待ち）
+
+現在の差分は検証branch `codex/macos-agent-registration-verify`へ保存し、mainへ未統合。初回の製品UI入力欄探索FAILを修正した`bb9a57bb0113ee04f47dc38c4583ee4acf63a5a4`の手動Actions [run 37635033580](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37635033580)は、job開始前にGitHub側で拒否された。check annotationは「recent account payments have failed or your spending limit needs to be increased」。どちらかの原因を断定せず、請求／利用上限設定を変更しない。同Repositoryのself-hosted runnerは0件。step未開始・artifactなしで、修正後UIのPASS／FAIL証拠ではない。
+
+再開条件はMac検証環境の利用回復。上記branchで同じ有限UI条件を確認し、PASSした正確なcommitだけをmainへfast-forward・push・remote照合してから検証branchを回収する。追加QAや新しい製品Acceptanceを作らない。main／rollback pointは`65fde55dd57479b91afe37ae6e21e44576779288`、backup-mainも同値、backup-main-prevは`515081f024e3ade49a79486e270caa4509519dd2`でremote tagを照合済み。現単位をCLOSEDとせず、通常Release能力と既存release blockersを維持する。
 
 既存Agent Centerの登録要求をRust所有OS確認と既存Brokerへ接続する。有限Acceptanceは`docs/specs/macos-desktop-channel.md`。権限取得・Task実行・sandbox外へのaccessを追加せず、既存登録境界を共有する。手動Actionsの`macos_agent_registration`で、固定版実Codexのinterface確認と製品UI登録を実行する。既CLOSEDのAdapter／Mobile／Windows条件を再試験しない。
 
