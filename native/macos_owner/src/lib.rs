@@ -3,17 +3,14 @@
 
 use std::time::Duration;
 
+#[cfg(any(target_os = "macos", test))]
+mod workspace_transport;
+#[cfg(target_os = "macos")]
+pub use workspace_transport::PrivateFrame;
+
 pub const TITLE: &str = "D4 Pocket — 今回の操作を確認";
 pub const DENY: &str = "承認しない";
 pub const APPROVE: &str = "今回の操作を承認";
-
-#[cfg(target_os = "macos")]
-macro_rules! selection_ui_stage {
-    ($label:literal) => {
-        #[cfg(all(target_os = "macos", feature = "workspace-ui-diagnostic"))]
-        eprintln!(concat!("D4_WORKSPACE_NATIVE_STAGE ", $label));
-    };
-}
 
 /// OSが選択したfolderへの起動中access。D4のPermission／Approvalではない。
 pub struct SelectedWorkspace {
@@ -42,24 +39,15 @@ impl Drop for SelectedWorkspace {
 pub fn select_workspace() -> Result<Option<SelectedWorkspace>, &'static str> {
     #[cfg(target_os = "macos")]
     {
-        use objc2::MainThreadMarker;
-        use objc2_app_kit::{NSApplication, NSApplicationActivationPolicy, NSOpenPanel};
+        use objc2::{msg_send, ClassType, MainThreadMarker};
+        use objc2_app_kit::NSOpenPanel;
         use objc2_foundation::NSString;
-        let mtm = MainThreadMarker::new().ok_or("OS選択をmain threadで開始できません")?;
-        selection_ui_stage!("main_thread_checked");
-        let app = NSApplication::sharedApplication(mtm);
-        selection_ui_stage!("application_created");
-        if !app.setActivationPolicy(NSApplicationActivationPolicy::Accessory) {
-            return Err("OS選択の表示を開始できません");
-        }
-        // helperはstdin loopを持ちNSApplication::runを呼ばないため、AppKitの起動を明示完了する。
-        // main thread限定で一回だけ。表示上のactivationはPermission／Approvalを生成しない。
-        static APPKIT_LAUNCH: std::sync::Once = std::sync::Once::new();
-        APPKIT_LAUNCH.call_once(|| app.finishLaunching());
-        app.activate();
-        selection_ui_stage!("launch_completed");
-        let panel = NSOpenPanel::openPanel(mtm);
-        selection_ui_stage!("panel_created");
+        let _mtm = MainThreadMarker::new().ok_or("OS選択をmain threadで開始できません")?;
+        // SAFETY: 固定NSOpenPanel factoryをmain threadで呼ぶ。実観測のNULLをOptionで拒否し、
+        // 既存bindingのnonnull panicで製品processを終了させない。ABIとretain規則は同じ。
+        let panel: Option<objc2::rc::Retained<NSOpenPanel>> =
+            unsafe { msg_send![NSOpenPanel::class(), openPanel] };
+        let panel = panel.ok_or("OS選択の表示を開始できません")?;
         panel.setTitle(Some(&NSString::from_str("D4 Pocket — 作業領域のOS選択")));
         panel.setPrompt(Some(&NSString::from_str("作業領域を選択")));
         panel.setMessage(Some(&NSString::from_str(
@@ -70,9 +58,7 @@ pub fn select_workspace() -> Result<Option<SelectedWorkspace>, &'static str> {
         panel.setAllowsMultipleSelection(false);
         panel.setResolvesAliases(false);
         panel.setCanCreateDirectories(false);
-        selection_ui_stage!("modal_entered");
         let response = panel.runModal();
-        selection_ui_stage!("modal_returned");
         if response != 1 {
             return Ok(None);
         }
@@ -100,6 +86,57 @@ pub fn select_workspace() -> Result<Option<SelectedWorkspace>, &'static str> {
     {
         Err("このplatformのOS選択は未対応です")
     }
+}
+
+/// 起動中のnative間OS bookmarkだけを解決する。D4権限・登録を生成しない。
+#[cfg(target_os = "macos")]
+pub fn resolve_workspace_bookmark(bookmark: &str) -> Result<SelectedWorkspace, &'static str> {
+    use objc2::{runtime::Bool, ClassType};
+    use objc2_foundation::{
+        NSData, NSDataBase64DecodingOptions, NSString, NSURLBookmarkResolutionOptions, NSURL,
+    };
+    if bookmark.is_empty() || bookmark.len() > 24 * 1024 {
+        return Err("OS選択のpath範囲が不正です");
+    }
+    let data = NSData::initWithBase64EncodedString_options(
+        NSData::alloc(),
+        &NSString::from_str(bookmark),
+        NSDataBase64DecodingOptions::empty(),
+    )
+    .ok_or("OS選択のpathが不正です")?;
+    let mut stale = Bool::NO;
+    // SAFETY: NSDataを保持し、staleは同期呼出し中有効。UIを禁止しimplicit scopeを解決する。
+    let url = unsafe {
+        NSURL::URLByResolvingBookmarkData_options_relativeToURL_bookmarkDataIsStale_error(
+            &data,
+            NSURLBookmarkResolutionOptions::WithoutUI,
+            None,
+            &mut stale,
+        )
+    }
+    .map_err(|_| "OS選択のpathが不正です")?;
+    let mut scope = SelectedWorkspace {
+        path: std::path::PathBuf::new(),
+        url,
+    };
+    if stale.as_bool() {
+        return Err("OS選択のpathが不正です");
+    }
+    scope.path = scope
+        .url
+        .path()
+        .ok_or("OS選択のpathが不正です")?
+        .to_string()
+        .into();
+    if !scope.path.is_absolute()
+        || scope
+            .path
+            .to_str()
+            .is_none_or(|p| p.len() > 1024 || p.chars().any(char::is_control))
+    {
+        return Err("OS選択のpath範囲が不正です");
+    }
+    Ok(scope)
 }
 
 /// 既定ボタン、取消、期限超過、OS失敗は全て非承認。

@@ -19,6 +19,16 @@
 
 #### macOS 作業領域のOS選択 — IMPLEMENTING（Product Build、2026-10-08）
 
+手動Actions [run 37696395012](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37696395012)、commit `d58e09b8437f5d59825531584c9b2261c9cb7b1e`はUI試験50.919秒でFAIL。固定分類は`objc_null_return`とRust panicを示し、AppKit起動完了後のNSOpenPanel factoryがNULLを返してhelperを101で終了したことを確認した。entitlement拒否自体を観測したとは扱わない。artifact `11515368725`、SHA-256 `c0ad0642bc4981a984bad3ae6e6a339a90c475edd4a6ed8d674e07aafdc4bd75`を照合した。通常build／対象Rust／Dart／後片付けはPASS。
+
+現在の修正はchooserだけを通常GUI親processの固定Rust UIへ移し、既存private pipeでimplicit OS bookmarkを子helperへ渡す。Flutter／Swiftへscope実値を返さず、Broker・Owner資格・Permission・Approval・Auditは独立helperのまま。AGENTSと責任正本へこの限定UI ABI、NULL拒否、scope上限・解放・非永続化、元公開要求の再評価を明記した。一時診断と子AppKit起動補助は撤去する。有限Acceptanceは変更せず、次の通常helper製品試験までmainへ統合しない。
+
+責任配置修正後のローカル対象はnative公開入力・private形状を含む2件とBroker境界3件PASS。Schema 163／正常例159／負例210、Conformance 237、Manifest 1207、手動workflow限定検査、release gate、diff検査もPASS。初回Manifest checkは新規fileのstage前とlock更新途中に実行して不一致を報告し、追跡対象を確定した再生成後にPASSした。新規native unsafeの説明だけ日本語へ同期し、厳格日本語監査の変更外17 findingsは保持する。
+
+必須`cargo test --locked --manifest-path native/rust_helper/Cargo.toml`は506 passed／3 failed／12 ignoredでFAIL。変更外のCodex loopback応答header読取と既存HTTPS catalog 2件のOS 10054で、全体PASSや根因解消とは扱わず既存Final QAの`release_blocker`履歴へ保持する。Desktop／Mobileの`flutter analyze --no-pub`も既知の日本語path上のLSP FormatException／server exit 255で各exit 1（ignored logは32／18）。OS UI部品のMac build・実行は手動runnerの未成立条件であり、Windows上の対象PASSから推定しない。
+
+lock更新時の`cargo generate-lockfile --offline --manifest-path native/rust_helper/Cargo.toml`はoffline indexのyoke-derive yanked版選択でFAILし、既存Root lockは変更されなかった。既存lockを使う`cargo check --offline`で新規native部品の依存一覧だけを更新しPASSした。独立native lockのlibcは元の0.2.186へ固定して、不要な全体依存更新を残さない。
+
 手動Actions [run 37695306118](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37695306118)、commit `5b5784c5bee7b0610cbaeec4c7cb306808aa2703`はUI試験46.439秒でFAIL。実click後の固定診断はmain thread／AppKit生成／起動完了まで到達し、panel生成前にhelperが101で終了した。OS拒否かbindingのpanicかはまだ断定せず、既存のmemory内stderr投影にNULL返却／method署名／entitlement拒否／Rust panicの固定分類だけを追加する。artifact `11515093394`、SHA-256 `e6d93ef20214f9d5af0399f92b0e9910a96a3b92dd054c47bc01e303e02deca2`を照合した。通常build／対象Rust／Dart／後片付けはPASS。現在条件の原因特定であり、新規Acceptance・CLOSED試験・sandbox例外を追加しない。
 
 手動Actions [run 37693823144](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37693823144)、commit `4d13e3d7b80ff999eac2f3172d54f5c26ec4f75e`はUI試験24.822秒でclick前の文字認識がFAIL。固定native診断は未到達で、終了根因は未確定。artifact `11514184088`、SHA-256 `0642ddf51eff0300b65b99cf234c9388ea25859c74ff06df97673e9988e8d47d`を照合した。保存videoの21秒frameは選択buttonを製品窓内に示すため、最初の診断clickだけを観測済み800px窓のbutton中央へ通常XCTest入力で送る。取消後のlayoutには適用せず、原因取得後に撤去する。通常build／対象Rust／Dart／後片付けはPASS、Acceptanceとmainは未変更。

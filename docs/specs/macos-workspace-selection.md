@@ -2,32 +2,32 @@
 
 ## 意味と有限Acceptance
 
-状態: IMPLEMENTING（P13 Product Build）。「作業領域OS選択」はOS chooserで選んだfolderの公開pathを表示するcontrol操作であり、Workspace登録・Permission・Approval・Credential・Agent trustではない。有限条件は取消時の入力保持、OS選択pathの画面反映、その選択folderを既存Owner確認／Broker登録へ渡すhappy pathと、UI由来のpath・bookmark・Authority注入の拒否だけ。CLIはsandbox内の既存実行系を使い、CLOSEDの登録機能は新しい選択機能の直接依存としてのみ使用する。
+状態: IMPLEMENTING（P13 Product Build）。OS chooserで選んだfolderの公開pathを表示するcontrol操作であり、Workspace登録・Permission・Approval・Credential・Agent trustではない。取消時の入力保持、実OS選択pathの画面反映、別個のOwner確認後の既存Broker登録、UI由来のpath／bookmark／Authority注入拒否、正常終了時のscope回収を有限条件とする。CLIはsandbox内の既存実行系を使う。CLOSED登録機能は新しい選択機能の直接依存としてだけ使う。
 
-## 接続と境界
+## 観測した失敗と責任配置の修正
 
-既存`gui_shell/broker` → 固定Runner → 匿名pipe → 同梱Rust helperを再利用する。公開入力は`macos_workspace_selection.schema.json`の`version=1`だけ。Rustがenvelope、現在時刻、hash、client、session注入禁止を検査してからmain threadのNSOpenPanelを開く。選択は単一folder、alias解決・folder生成なし。bookmark・秘密・任意初期pathを受け取らない。parent appにOS chooser用`com.apple.security.files.user-selected.read-write`を追加するが、sandboxを無効化せずhelperのinherit-only規則も変更しない。
+手動Actions run 37696395012で、main thread／AppKit起動完了後のNSOpenPanel factoryがNULLを返し、nonnullの固定bindingがpanicしてhelperを101で終了した。OS entitlement拒否そのものは未観測であり、終了値だけから断定しない。[Apple DTSの同種事例](https://developer.apple.com/forums/thread/735493)はNSTask childでGUI chooserを使う配置を推奨していない。[Appleのsandbox規約](https://developer.apple.com/library/archive/documentation/Miscellaneous/Reference/EntitlementKeyReference/Chapters/EnablingAppSandbox.html)はinherit helperへの追加entitlementを認めず、後から選択した動的アクセスはstatic inheritanceで渡らないと明示する。
 
-OSが選んだURLはRustだけが最大8件保持する。再送は禁止、選択nonceは最大64件、transportは305秒を超えれば既存fail-closed終了になる。OS選択後、同一要求に選択結果と元の要求hashを結合し、内部payloadを再hashして既存process内receiverへ渡す。元入力は公開version-only要求として固定され、元hashをAudit対象の内部payloadへ結合する。この投影変換は明示的なnative normalizationであり、FlutterによるAuthority編集ではない。
+従って子helperへentitlementを足す回避をせず、通常GUI lifecycleとuser-selected entitlementを持つ親process内の固定Rust UI部品へchooserだけを移す。NULLはnative境界でOptionとして拒否し、成功扱いしない。独立Rust Broker、Owner確認、資格・署名・Approval・Auditの責任は変更しない。これは実際のfactory失敗に対する恒久的なOS責任配置であり、失敗を隠すalternate Brokerではない。一時のAppKit起動補助、診断feature、stderr pipe／log分類は撤去する。
 
-Brokerは当該操作だけを`MacOSWorkspaceSelection`という別の内部sourceで処理する。これはOwner承認sourceではなく、Task Permission／Approvalに使えない。通常IPC・Owner資格・UI metadataからこのsourceを作れず、受信結果は厳密な形状、scope期限、pathの表示上限を検査する。選択結果のAudit確定後だけURLを保持し、失敗・拒否時はscopeを終了する。終了時はBrokerを先に停止し、保持URLを解放する。再起動にbookmarkやOSアクセスを継承しない。
+## 公開入力とnative接続
 
-応答はBroker経由の`INTERNAL_STATE`投影であり、path・selected/cancelled・元hash・起動中期限・`permission_generated=false`・`approval_generated=false`・`registration_generated=false`だけを返す。Auditには選択path本文を保存せず、正本化した内部payload hashを結合する。OS chooserによる実アクセスはMac製品試験が観測し、投影の構造確認だけから保証しない。選択はまだ登録でないため、保護領域・APFS物理identity・secret除外・CLI probeは既存登録の別個のOwner確認後にBrokerが再評価する。
+Flutterは既存`gui_shell/broker`へ`macos_workspace_selection.schema.json`のversion-only要求を送る。固定RunnerはFlutter入力に`native_workspace_selection`があれば拒否する。OS選択時だけ、公開要求byte列と同じhelperへの既存匿名pipe fdを固定C ABIへ渡す。ABIはRust所有chooserとOS scopeの配送・解放だけであり、Broker資格、署名検証、Approval token、command dispatch、Audit確定を持たない。Swiftへ返す整数は配送・scope保持の分類で、承認boolや権限ではない。
 
-## 外部APIと未成立範囲
+親Rust部品はmain thread、公開要求の厳密形状、version-only payload、固定client、byte／ID長、pipe種別、scope上限を検査する。chooserは単一folder、alias解決・folder生成なしで、UIから初期pathを受け取らない。OS選択で得たURLのimplicit bookmarkを生成し、元の公開要求文字列とselected／cancelledをprivate frameへ結合し、既存pipeだけへ直接書く。bookmark本文をSwift／Dartへ返さず、永続保存・log・trace・Audit・snapshot・test artifactへ出さない。親は最大8件のURLだけを保持し、拒否時に直前scope、helper停止後に全scopeを終了する。
 
-一時stderr診断は固定bindingの既知文言をNULL返却／method不在／返却型・引数型のencoding不一致／OS entitlement拒否／Rust panicの定数へ分類するだけで、元文言、値、path、stackを記録しない。helperの101終了を根因確定とせず、固定段階・分類を併せて局所修正を選ぶ。
+子Rust helperはprivate frameを厳密にparseし、元の公開要求の重複field、hash、時刻、client、session注入、nonceを既存検査で再評価する。scopeは最大8件、nonceは最大64件、frameは64KiB未満。OS bookmarkは24KiB以内、native URL resolverはUI禁止・stale拒否・絶対UTF-8 path／1024byte／control文字拒否で解決する。[Appleのprocess間アクセス規約](https://developer.apple.com/documentation/security/accessing-files-from-the-macos-app-sandbox?language=objc)に従い、implicit bookmarkを起動中だけ使い、同じURLのscopeを終了する。scope実値をBrokerへ渡さず、元要求hashと公開pathの内部投影だけをprocess内receiverへ渡す。private frameとbookmark文字列は処理後に消去する。再送・restartアクセス復元はない。
 
-診断のbounded読取APIだけはmacOS 10.15.4以降の可用性guard内で使う。通常製品の最低OSは変更しない。[Apple DTSの同種事例](https://developer.apple.com/forums/thread/735493)には、parentのuser-selected entitlementだけではinherit childのopen/save panelが拒否される例がある。これは責任配置を確認する外部参考であり、現行runの終了根因は固定段階診断が得られるまで未確定とする。helperへ追加entitlementを混ぜる、sandboxを無効にする、通常Brokerを迂回する回避は行わない。
+## AuthorityとContent Exposure
 
-native終了の局所診断に限り、開発専用`workspace-ui-diagnostic`を手動UI試験へ明示適用する。通常helperは診断なしで先にbuildし、UI試験用helperだけにmain thread確認／AppKit生成／起動完了／panel生成／modal前後の固定6段階を出す。Swiftは明示Debug試験flag内の匿名stderr pipeで最大8KiBの未完行だけをmemoryへ保持し、完全一致の段階と既知例外名だけをOS logへ投影する。raw stderr、path、秘密、任意errorは記録しない。AppKit／IPC／Authorityの処理やOS保護設定を代替しない。元のFAILはhelperのJSON非応答と終了、既存のnull stderrでは終了箇所が不明なことが必要理由で、原因確定後にfeature／pipe／観測logを撤去し、通常helperでAcceptanceを確認する。
+Brokerの`MacOSWorkspaceSelection` sourceはOwner sourceではない。通常IPC、Owner資格、UI metadataからこのsourceを作れず、Task Permission／Approval／登録を生成しない。Brokerは厳密4fieldの内部投影と元hashを検査し、Audit確定後にだけ8fieldの非秘密投影を返す。親／子のOS scope保持はこの起動中だけで、拒否時は解放する。終了はBroker停止→子scope解放→helper終了→親scope解放の順。
 
-helperのstdin処理は`NSApplication::run`を使用しないため、OS chooserを最初に開く時だけmain threadで`finishLaunching`し、表示時に`activate`する。これはAppKitの表示lifecycleであり、Authorityやsandbox範囲を変更しない。[Appleの起動完了API](https://developer.apple.com/documentation/appkit/nsapplication/finishlaunching())と固定bindingを確認した。UI試験は外部AXの資格を要求せず、公開合成画面の文字認識とXCTestの通常入力を使う。明示Debug試験flagの固定応答分類／helper終了値は診断だけで、通常buildに含めず、原因確定・Acceptance成立後に撤去する。
+応答は`INTERNAL_STATE`で、path、selected／cancelled、元hash、`scope_lifetime=broker_process`、Permission／Approval／registrationが未生成であることだけを表す。Auditにはpathやbookmark本文を保存せず、正本化した内部投影hashを結合する。CONFIG／構造試験だけからOS実アクセスを保証しない。保護領域、APFS identity、secret除外、CLI probe、登録可否は、その後の別個Owner確認と既存Brokerが再評価する。
 
-失敗分類はnativeの固定enumだけをBrokerの既存拒否codeへ結合する。main thread、表示開始、URL、path、その他native失敗を区別し、raw error・path・秘密をcodeやmessageへ追加しない。未登録・入力保持・自動再送なしは全分類で同じ。通常IPCやOwner資格からこの分類sourceを生成できず、失敗codeはAuthorityではない。
+作用対応: CapabilityはOS folder選択、OS Permissionは明示選択URL、D4 Task Approvalは別、AuditはBrokerの選択投影hash、Recoveryは取消・不正・配送／監査失敗で非登録のままscope終了。raw native errorは露出せず、既存の固定拒否codeを使う。UI／Adapter／runtime metadataから権限を生成しない。
 
-作用対応: CapabilityはmacOSのuser-selected folder選択、OS Permissionはその場で選択したURL、OSの明示選択はD4 Task Approvalとは別、AuditはBrokerによる選択投影hashの記録、Recoveryは取消・不正・配送／監査失敗で非登録のままscopeを終了すること。画面は非秘密pathだけを投影し、登録後のfilesystem作用は既存Workspace Permission／Task Approvalへ従う。
+## 検証と残存範囲
 
-[Appleのsandboxファイルアクセス規約](https://developer.apple.com/documentation/security/accessing-files-from-the-macos-app-sandbox)は、open panelのURLにOSがscopeを開始し、終了時に同じURLの`stopAccessingSecurityScopedResource`を要求する。Rust native境界に固定`objc2 0.6.5`、`objc2-app-kit 0.3.2`、`objc2-foundation 0.3.2`を追加し、AppKit main-thread markerを必要とする。Coreのunsafe禁止は維持する。OS URL解放のFFIだけが独立native crate内の局所unsafeであり、pointerやscope実値はDartへ渡さない。
+native公開入力／private形状の正常・負例、既存Brokerの否定・replay・非権限投影、Dart取消／投影、通常Mac build、対象製品XCUITestを使う。実OS panelは親製品processの公開XCTest APIで取消・folder入力・選択を操作し、OS結果やBroker返答を注入しない。既存Debug表示flagは試験の表示補助だけで、通常Release証拠とは分離する。
 
-Appleはuser-selected entitlementだけでsandbox外programを実行できるとはしていない。本単位は外部CLI起動・CLI配布を実装しない。選択WorkspaceへのTask実行、restart access、Credential、正式署名・配布、最終QAは既存`release_blocker`とP13後続へ保持する。通常Release `task_execution=unsupported`と`release_ready=false`を変更しない。
+`release_blocker`: 選択WorkspaceへのTask実行、restart access、Credential、正式署名・配布、最終QAはP13後続／既存release gateへ保持する。sandbox外CLI実行・CLI配布を本単位へ追加しない。通常Release `task_execution=unsupported`、`release_ready=false`は維持する。

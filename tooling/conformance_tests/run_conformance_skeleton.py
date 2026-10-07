@@ -10774,6 +10774,16 @@ def test_macos_workspace_selection_is_native_scoped_and_non_authoritative() -> l
         entitlements = (DESKTOP_FLUTTER / f"macos/Runner/{name}.entitlements").read_text(encoding="utf-8")
         if "com.apple.security.files.user-selected.read-write" not in entitlements:
             errors.append("OS chooser用の限定entitlementがない")
+    native = (ROOT / "native/macos_owner/src/workspace_transport.rs").read_text(encoding="utf-8")
+    runner = (DESKTOP_FLUTTER / "macos/Runner/BrokerProcessChannel.swift").read_text(encoding="utf-8")
+    for token in ("d4_workspace_select_and_write", "is_fifo()", "F_SETNOSIGPIPE", "NativeSelection", "bookmark.zeroize()"):
+        if token not in native:
+            errors.append(f"親Rust OS選択の限定配送・回収接続がない: {token}")
+    for token in ('object["native_workspace_selection"] != nil', "d4WorkspaceReleaseAll()", "d4WorkspaceReleaseLast()"):
+        if token not in runner:
+            errors.append(f"OS選択transportのprivate入力拒否・回収接続がない: {token}")
+    if "workspace-ui-diagnostic" in (ROOT / "native/rust_helper/Cargo.toml").read_text(encoding="utf-8"):
+        errors.append("原因特定済みのOS選択診断featureが残っている")
     return errors
 
 

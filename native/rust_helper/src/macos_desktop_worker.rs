@@ -185,14 +185,15 @@ fn serve(
             let Some(frame) = read_frame(input, REQUEST_LIMIT)? else {
                 break;
             };
+            // private OS bookmarkを上限内のmemoryだけで処理し、処理後に消去する。
+            let frame = Zeroizing::new(frame);
             #[cfg(target_os = "macos")]
-            let selection = super::macos_workspace_selection::dispatch(
+            let selection = super::macos_workspace_selection::dispatch_native(
                 &frame,
                 &endpoint.0,
                 &owner_tx,
                 &mut workspace_scopes,
                 &mut workspace_selection_nonces,
-                &mut gui_shell_macos_owner::select_workspace,
             )?;
             #[cfg(not(target_os = "macos"))]
             let selection: Option<Vec<u8>> = None;
@@ -257,7 +258,7 @@ pub(super) fn normalize(input: &[u8], session_id: &str) -> Vec<u8> {
     serde_json::to_vec(&value).unwrap_or_else(|_| input.to_vec())
 }
 
-fn relay(request: &[u8], endpoint: &BrokerEndpoint) -> io::Result<Vec<u8>> {
+pub(super) fn relay(request: &[u8], endpoint: &BrokerEndpoint) -> io::Result<Vec<u8>> {
     let address = SocketAddr::from((Ipv4Addr::LOCALHOST, endpoint.port));
     let mut socket = TcpStream::connect_timeout(&address, IO_TIMEOUT)?;
     socket.set_read_timeout(Some(IO_TIMEOUT))?;

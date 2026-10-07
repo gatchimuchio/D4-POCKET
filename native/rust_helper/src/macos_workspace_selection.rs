@@ -12,6 +12,63 @@ use std::time::Duration;
 const OPERATION: &str = "作業領域OS選択";
 const SCOPE_LIMIT: usize = 8;
 
+/// 固定RunnerのRust UI部品だけが既存pipeへ書くprivate frame。UI入力はRunnerが拒否する。
+#[cfg(target_os = "macos")]
+pub(super) fn dispatch_native(
+    frame: &[u8],
+    endpoint: &BrokerEndpoint,
+    sender: &SyncSender<DesktopOwnerOperationRequest>,
+    scopes: &mut Vec<gui_shell_macos_owner::SelectedWorkspace>,
+    seen: &mut BTreeSet<String>,
+) -> io::Result<Option<Vec<u8>>> {
+    let private: gui_shell_macos_owner::PrivateFrame = match serde_json::from_slice(frame) {
+        Ok(value) => value,
+        Err(_) => {
+            let Ok(value) = serde_json::from_slice::<Value>(frame) else {
+                return Ok(None);
+            };
+            if value.get("native_workspace_selection").is_none() {
+                return Ok(None);
+            }
+            return Err(io::Error::other("OS選択のprivate形状が不正"));
+        }
+    };
+    let selection = &private.native_workspace_selection;
+    if candidate(selection.request_json.as_bytes(), endpoint).is_none() {
+        return Err(io::Error::other("OS選択の元要求が不正"));
+    }
+    let mut choose = || match (
+        selection.selection_status.as_str(),
+        selection.bookmark.as_deref(),
+    ) {
+        ("selected", Some(bookmark)) => {
+            gui_shell_macos_owner::resolve_workspace_bookmark(bookmark).map(Some)
+        }
+        ("cancelled", None) => Ok(None),
+        ("failed_native", None) => Err("native OS選択が未成立"),
+        _ => Err("OS選択のpathが不正です"),
+    };
+    let response = dispatch(
+        selection.request_json.as_bytes(),
+        endpoint,
+        sender,
+        scopes,
+        seen,
+        &mut choose,
+    )?;
+    match response {
+        Some(response) => Ok(Some(response)),
+        None => {
+            // replay／上限の否定だけを通常Brokerへ渡す。private bookmarkを転送しない。
+            let public = super::macos_desktop_worker::normalize(
+                selection.request_json.as_bytes(),
+                &endpoint.session_id,
+            );
+            super::macos_desktop_worker::relay(&public, endpoint).map(Some)
+        }
+    }
+}
+
 fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Value> {
     if frame.len() >= endpoint.max_request_bytes {
         return None;
@@ -73,7 +130,11 @@ pub(super) fn dispatch<T: AsRef<Path>>(
         Err("OS選択をmain threadで開始できません") => ("failed_main_thread", None),
         Err("OS選択の表示を開始できません") => ("failed_display", None),
         Err("OS選択にURLがありません") => ("failed_url", None),
-        Err("OS選択のpathが不正です" | "OS選択のpathを表示できません" | "OS選択のpath範囲が不正です")
+        Err(
+            "OS選択のpathが不正です"
+            | "OS選択のpathを表示できません"
+            | "OS選択のpath範囲が不正です",
+        )
         | Ok(Some(_)) => ("failed_path", None),
         _ => ("failed_native", None),
     };
@@ -115,6 +176,61 @@ pub(super) fn dispatch<T: AsRef<Path>>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn workspace_native_frame_cannot_become_owner_or_accept_injected_fields() {
+        let endpoint = BrokerEndpoint {
+            host: "127.0.0.1".into(),
+            port: 1,
+            transport: "authenticated_loopback_tcp".into(),
+            session_id: "native-selection".into(),
+            session_secret: "fixture-only".into(),
+            credential_role: crate::broker::BrokerCredentialRole::Normal,
+            max_request_bytes: 65536,
+        };
+        let request = json!({"request_id":"selection", "operation":OPERATION, "nonce":"selection",
+            "issued_at":BrokerRequestEnvelope::current_issued_at(), "metadata":{"client":"desktop_flutter"},
+            "payload":{"version":1}, "payload_hash":canonical_payload_hash(Some(&json!({"version":1})))});
+        let (sender, _receiver) = mpsc::sync_channel(1);
+        let mut scopes = Vec::new();
+        let mut seen = BTreeSet::new();
+        assert!(dispatch_native(
+            request.to_string().as_bytes(),
+            &endpoint,
+            &sender,
+            &mut scopes,
+            &mut seen
+        )
+        .unwrap()
+        .is_none());
+        let mut injected = json!({"native_workspace_selection":{"request_json":request.to_string(),
+            "selection_status":"cancelled", "bookmark":null, "approval":true}});
+        assert!(dispatch_native(
+            injected.to_string().as_bytes(),
+            &endpoint,
+            &sender,
+            &mut scopes,
+            &mut seen
+        )
+        .is_err());
+        let mut owner = request;
+        owner["operation"] = json!("AgentTaskOwnerApprovalGrant");
+        injected["native_workspace_selection"]
+            .as_object_mut()
+            .unwrap()
+            .remove("approval");
+        injected["native_workspace_selection"]["request_json"] = json!(owner.to_string());
+        assert!(dispatch_native(
+            injected.to_string().as_bytes(),
+            &endpoint,
+            &sender,
+            &mut scopes,
+            &mut seen
+        )
+        .is_err());
+        assert!(scopes.is_empty());
+        assert!(seen.is_empty());
+    }
     #[test]
     fn workspace_selection_cancel_is_audited_and_never_replayed() {
         let endpoint = BrokerEndpoint {

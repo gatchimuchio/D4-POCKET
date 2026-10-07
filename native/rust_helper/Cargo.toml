@@ -8,7 +8,6 @@ license = "Apache-2.0"
 default = []
 # Local-only integrated R2 test build. Never use for product distribution.
 r2-e2e = []
-workspace-ui-diagnostic = ["gui_shell_macos_owner/workspace-ui-diagnostic"]
 
 [lib]
 name = "gui_shell_rust_helper"

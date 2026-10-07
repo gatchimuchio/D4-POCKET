@@ -46,7 +46,7 @@ final class AdapterOwnerUITests: XCTestCase {
       app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.65))
         .scroll(byDeltaX: 0, deltaY: -180)
       print("D4_WORKSPACE_SELECTION_FAILURE \(app.debugDescription)")
-      XCTFail("Rust所有OS chooserを観測できない")
+      XCTFail("親GUI内Rust所有OS chooserを観測できない")
     }
     try chooser.press("Cancel")
     app.activate()
@@ -87,12 +87,13 @@ final class AdapterOwnerUITests: XCTestCase {
     let matches = (request.results ?? []).filter {
       guard let text = $0.topCandidates(1).first?.string else { return false }
       // 小さい日本語buttonの途中の漢字はVisionで欠落し得る。固有の接頭ラベルで一意に束縛する。
-      return text.replacingOccurrences(of: " ", with: "").contains("OSで")
+      return text.folding(options: [.caseInsensitive, .widthInsensitive], locale: Locale(identifier: "ja_JP"))
+        .replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "0s", with: "os").contains("osで")
     }
     guard matches.count == 1 else {
       print("D4_WORKSPACE_BUTTON_OCR_COUNT \(request.results?.count ?? 0) matches=\(matches.count)")
       // 固定runnerの800px製品窓・検査済み6欄入力後の保存映像でボタン中央を確認した。
-      // 診断の最初のclickだけ。OS選択結果やBroker返答は注入せず通常mouse入力を送る。
+      // 最初のclickだけ。OS選択結果やBroker返答は注入せず通常mouse入力を送る。
       // 取消後は投影が増えてlayoutが変わるため、このfallbackを使わない。
       if !element(app, "OS選択を取り消しました。入力は変更していません。").exists {
         let window = app.windows.firstMatch
@@ -366,69 +367,37 @@ final class AdapterOwnerUITests: XCTestCase {
 
 /// 公開画面とXCTestの通常入力だけを使う。外部AX資格を要求せず、Broker応答を代替しない。
 private final class WorkspacePanelUI {
-  private let process: NSRunningApplication
   private let app: XCUIApplication
 
   init(app: XCUIApplication) throws {
-    let deadline = Date().addingTimeInterval(15)
-    var candidates = [NSRunningApplication]()
-    repeat {
-      candidates = NSWorkspace.shared.runningApplications.filter {
-        $0.executableURL?.path.hasSuffix("/gui_shell_desktop.app/Contents/MacOS/gui_shell_macos_broker") == true
-      }
-      if candidates.count == 1 { break }
-      RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-    } while Date() < deadline
-    guard candidates.count == 1 else { throw failure("同梱helperのPIDを一意に確認できない") }
-    process = candidates[0]
     self.app = app
   }
 
-  private func buttonPoint(_ title: String) throws -> CGPoint? {
-    let image = XCUIScreen.main.screenshot().image
-    var proposed = CGRect(origin: .zero, size: image.size)
-    guard let pixels = image.cgImage(forProposedRect: &proposed, context: nil, hints: nil) else {
-      throw failure("OS chooserの画面を取得できない")
-    }
-    let request = VNRecognizeTextRequest()
-    request.recognitionLevel = .accurate
-    request.recognitionLanguages = ["ja-JP", "en-US"]
-    request.usesLanguageCorrection = true
-    request.customWords = [title]
-    try VNImageRequestHandler(cgImage: pixels).perform([request])
-    let matches = (request.results ?? []).filter { $0.topCandidates(1).first?.string == title }
-    guard matches.count == 1 else { return nil }
-    let box = matches[0].boundingBox
-    return CGPoint(x: box.midX * image.size.width, y: (1 - box.midY) * image.size.height)
+  private func button(_ title: String) -> XCUIElement {
+    // 同じ製品processの実AppKit panel。Flutterの日本語取消buttonとは別のnative英語Cancel。
+    app.buttons.matching(identifier: title).firstMatch
   }
 
   func waitForButton(_ title: String, timeout: TimeInterval) -> Bool {
-    let deadline = Date().addingTimeInterval(timeout)
-    repeat {
-      if (try? buttonPoint(title)) != nil { return true }
-      RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-    } while Date() < deadline
-    return false
+    button(title).waitForExistence(timeout: timeout)
   }
 
   func press(_ title: String) throws {
-    guard let point = try buttonPoint(title) else {
+    let target = button(title)
+    guard target.exists, target.isEnabled else {
       throw failure("OS chooserの可視ボタンを操作できない: " + title)
     }
-    let window = app.windows.firstMatch
-    window.coordinate(withNormalizedOffset: .zero)
-      .withOffset(CGVector(dx: point.x - window.frame.minX, dy: point.y - window.frame.minY)).click()
+    target.click()
   }
 
   func enterFolder(_ path: String) throws {
-    guard process.activate(options: [.activateIgnoringOtherApps]) else { throw failure("OS chooserを前面にできない") }
     app.typeKey("g", modifierFlags: [.command, .shift])
     app.typeText(path)
     app.typeKey(XCUIKeyboardKey.return.rawValue, modifierFlags: [])
   }
 
   var description: String {
-    "PID=\(process.processIdentifier) running=\(!process.isTerminated) active=\(process.isActive)"
+    "native panelは親GUI process所有"
   }
 }
 

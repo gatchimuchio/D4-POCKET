@@ -298,7 +298,7 @@ LLMはGUI Shell contractの第一級の実装・統合consumerだが、権限源
 - オーナーが明示要求しない限り、GUI Shellの利便性のためにBLUE-TANUKI実装を変更してはならない
 - macOS Desktopでは同じ`gui_shell/broker`要求をnative Runnerから同梱Rust helperの継承匿名pipeへ渡す。helperはApp Sandboxを継承し、既存認証Brokerのnormal経路だけへ中継する。Flutter／RunnerへBroker資格を渡さず、Owner専用操作はBrokerが拒否する。任意helper指定、任意command、資格file探索、sandbox無効化、別Authority経路は禁止する。責任正本は`docs/specs/macos-desktop-channel.md`。
 - macOSのAdapter導入・更新・検証・有効化・無効化・隔離・削除、およびAgent CLI実行系／Workspaceの起動中登録に限り、Rust helperが要求とhashを検査し、Rust所有の期限付きOS確認画面で明示承認された同一要求を既存Brokerのprocess内Owner receiverへ渡す。既存record操作は対象IDと現在hashも束縛し、署名検証・状態遷移はBrokerが再評価する。Agent登録は既存CLI probe・APFS root／保護領域検査を使い、sandbox権限・Task能力・Credential・Permission・Approvalを生成しない。Flutter／Runnerから承認boolやOwner資格を受け付けず、この明示集合以外のOwner操作へ広げない。責任正本は`docs/specs/macos-desktop-channel.md`のOwner追加契約。
-- macOSの作業領域OS選択はRust所有NSOpenPanelだけを使い、OS user-selected accessをRust内で起動中保持する。既存匿名pipe／process内receiverを使うが、Brokerは選択投影だけを別sourceで処理し、Owner承認・Permission・Approval・登録へ昇格させない。UIからpath・bookmark・scopeを受け取らず、終了時に同じOS URLのaccessを終了する。sandbox外CLI実行へ拡張しない。責任正本は`docs/specs/macos-workspace-selection.md`。
+- macOSの作業領域OS選択は、通常GUI親processに静的同梱するRust UI部品のNSOpenPanelだけを使う。固定C ABIはversion-only公開要求と既存helperへのpipe fdを受け、OS scope実値をそのprivate pipeだけへ書く。Flutter／Swiftへbookmark・scope実値を返さず、Flutter入力のprivate frameをRunnerが拒否する。Rust helperはOS bookmarkを起動中だけ解決し、既存Brokerは選択投影だけを別sourceで処理する。このUI専用FFIへBroker資格、署名検証、Approval token、外部command dispatch、Audit確定を移してはならない。Owner承認・Permission・Approval・登録は引き続き別個の独立Broker経路で再評価する。UIからpath・bookmark・scopeを受け取らず、拒否・終了時は各Rust processが同じOS URLのaccessを終了する。sandboxを無効化せず、helperのinherit-onlyを保持し、scopeを永続化せず、sandbox外CLI実行へ拡張しない。責任正本は`docs/specs/macos-workspace-selection.md`。
 
 ### 14. 境界の意味
 

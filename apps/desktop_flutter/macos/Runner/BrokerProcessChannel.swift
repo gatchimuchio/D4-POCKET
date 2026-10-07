@@ -2,6 +2,13 @@ import Cocoa
 import Darwin
 import FlutterMacOS
 
+// 固定Rust OS UI。公開要求と同じhelperへのpipe fdだけ。OS tokenはSwiftへ返さない。
+private func d4WorkspaceSelectAndWrite(_ bytes: UnsafePointer<UInt8>, _ count: Int, _ fd: Int32) -> Int32 {
+  d4_workspace_select_and_write(bytes, count, fd)
+}
+private func d4WorkspaceReleaseLast() { d4_workspace_release_last() }
+private func d4WorkspaceReleaseAll() { d4_workspace_release_all() }
+
 /// 固定同梱helperへのtransport。資格・権限・Owner判断を保持しない。
 final class BrokerProcessChannel {
   private let channel: FlutterMethodChannel
@@ -15,11 +22,6 @@ final class BrokerProcessChannel {
   private var pending = 0
   private var closeCallbacks = [(Bool) -> Void]()
   private var graceful = true
-  #if DEBUG && D4_MACOS_OWNER_UI_TEST
-  private let nativeDiagnostic = Pipe()
-  private var nativeDiagnosticBuffer = Data()
-  private let nativeDiagnosticLock = NSLock()
-  #endif
   #if DEBUG
   private var bootstrap = Set<String>()
   private(set) var productBootstrapObserved = false
@@ -33,6 +35,9 @@ final class BrokerProcessChannel {
       guard call.method == "request" else { result(FlutterMethodNotImplemented); return }
       guard let frame = call.arguments as? String, !frame.contains("\n"), !frame.contains("\r"),
             frame.utf8.count < 64 * 1024 else { result(Self.failure()); return }
+      if let data = frame.data(using: .utf8),
+         let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+         object["native_workspace_selection"] != nil { result(Self.failure()); return }
       self.request(frame, result: result)
     }
     do {
@@ -45,53 +50,11 @@ final class BrokerProcessChannel {
       worker.standardInput = requests
       worker.standardOutput = responses
       worker.standardError = FileHandle.nullDevice
-      #if DEBUG && D4_MACOS_OWNER_UI_TEST
-      worker.standardError = nativeDiagnostic
-      nativeDiagnostic.fileHandleForReading.readabilityHandler = { [weak self] handle in
-        guard #available(macOS 10.15.4, *) else { handle.readabilityHandler = nil; return }
-        let data = (try? handle.read(upToCount: 4096)) ?? Data()
-        guard let self else { return }
-        if data.isEmpty { handle.readabilityHandler = nil; return }
-        self.nativeDiagnosticLock.lock()
-        defer { self.nativeDiagnosticLock.unlock() }
-        guard self.nativeDiagnosticBuffer.count + data.count <= 8192 else {
-          self.nativeDiagnosticBuffer.removeAll()
-          return
-        }
-        self.nativeDiagnosticBuffer.append(data)
-        while let newline = self.nativeDiagnosticBuffer.firstIndex(of: 0x0A) {
-          let line = String(data: self.nativeDiagnosticBuffer[..<newline], encoding: .utf8) ?? ""
-          self.nativeDiagnosticBuffer.removeSubrange(...newline)
-          let stages = ["main_thread_checked", "application_created", "launch_completed", "panel_created", "modal_entered", "modal_returned"]
-          for stage in stages where line == "D4_WORKSPACE_NATIVE_STAGE " + stage {
-            NSLog("D4_WORKSPACE_NATIVE_STAGE %@", stage)
-          }
-          for exception in ["NSInternalInconsistencyException", "NSInvalidArgumentException"] where line.contains(exception) {
-            NSLog("D4_WORKSPACE_NATIVE_EXCEPTION %@", exception)
-          }
-          // 固定bindingの既知panic／OS拒否だけを分類し、本文や任意panicを記録しない。
-          for (needle, code) in [
-            ("unexpected NULL returned", "objc_null_return"),
-            ("invalid message send", "objc_method_signature"),
-            ("method not found", "objc_method_missing"),
-            ("expected return to have type code", "objc_return_encoding"),
-            ("expected argument at index", "objc_argument_encoding"),
-            ("failed entitlements check", "os_entitlement"),
-            ("missing the User Selected", "os_entitlement"),
-            ("panicked at", "rust_panic")
-          ] where line.contains(needle) {
-            NSLog("D4_WORKSPACE_NATIVE_PANIC %@", code)
-          }
-        }
-      }
-      #endif
       worker.terminationHandler = { [weak self] process in
         DispatchQueue.main.async {
           guard let self else { return }
           self.available = false
-          #if DEBUG && D4_MACOS_OWNER_UI_TEST
-          NSLog("D4_WORKSPACE_NATIVE_EXIT %d", process.terminationStatus)
-          #endif
+          d4WorkspaceReleaseAll()
           let completed = self.closing && self.graceful && process.terminationStatus == 0
           let callbacks = self.closeCallbacks
           self.closeCallbacks.removeAll()
@@ -168,15 +131,26 @@ final class BrokerProcessChannel {
     queue.async { [weak self] in
       guard let self else { return }
       var output: String?
+      var selectionCode: Int32 = 0
       do {
-        let bytes = Data((frame + "\n").utf8)
-        try bytes.withUnsafeBytes { raw in
-          var sent = 0
-          while sent < raw.count {
-            let count = Darwin.write(self.requests.fileHandleForWriting.fileDescriptor, raw.baseAddress!.advanced(by: sent), raw.count - sent)
-            if count < 0 && errno == EINTR { continue }
-            guard count > 0 else { throw PipeFailure.closed }
-            sent += count
+        if operation == "作業領域OS選択" {
+          selectionCode = DispatchQueue.main.sync {
+            let bytes = Array(frame.utf8)
+            return bytes.withUnsafeBufferPointer { raw in
+              d4WorkspaceSelectAndWrite(raw.baseAddress!, raw.count, self.requests.fileHandleForWriting.fileDescriptor)
+            }
+          }
+          guard selectionCode != 0 else { throw PipeFailure.closed }
+        } else {
+          let bytes = Data((frame + "\n").utf8)
+          try bytes.withUnsafeBytes { raw in
+            var sent = 0
+            while sent < raw.count {
+              let count = Darwin.write(self.requests.fileHandleForWriting.fileDescriptor, raw.baseAddress!.advanced(by: sent), raw.count - sent)
+              if count < 0 && errno == EINTR { continue }
+              guard count > 0 else { throw PipeFailure.closed }
+              sent += count
+            }
           }
         }
         var buffer = Data()
@@ -194,17 +168,12 @@ final class BrokerProcessChannel {
         }
       } catch { output = nil }
       let reply = output
-      #if DEBUG && D4_MACOS_OWNER_UI_TEST
-      if operation == "作業領域OS選択" {
-        // 合成UI試験だけの固定分類。本文・path・資格・任意errorを出力しない。
+      if selectionCode == 2 {
         let object = reply?.data(using: .utf8).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
-        let status = object?["status"] as? String
-        let decision = ["accepted", "rejected", "suspended"].contains(status ?? "") ? status! : "no_valid_reply"
-        let running = self.worker.isRunning
-        let exit = running ? "running" : String(self.worker.terminationStatus)
-        NSLog("D4_WORKSPACE_NATIVE_OUTCOME decision=%@ helper=%@", decision, exit)
+        if object?["status"] as? String != "accepted" {
+          DispatchQueue.main.sync { d4WorkspaceReleaseLast() }
+        }
       }
-      #endif
       DispatchQueue.main.async { complete(reply) }
     }
   }
