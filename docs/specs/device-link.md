@@ -1,6 +1,12 @@
 # 端末連携の意味正本
 
+## 2026-09-25時点の状態記録（履歴）
+
 状態: Rustの暗号化端末経路とowner制御は実装済み。Android KotlinとiOS Swiftのnative経路、端末内回復記録の保存・読み取り実装を追加した。Flutter test 16件・analyzeは成功。現行Android／共有UI source 117 fileのhash一致を確認したfresh Temp copyでGradle clean・unit test・debug APK buildが成功し、JUnit 8件はすべて成功した。APKは146,311,641 bytes、SHA-256 `2D40701A90A518261D5E9E7E5E96AADF036D1A78354B9181B0E001E9A6632129`。元OneDrive workspaceのignored build outputは継承ACLの削除denyにより通常cleanup／resource packagingが失敗する。sourceやACLは変更せずTemp copyで検証したhost-localなknown limitationである。iOS native handlerとSimulator XCTestはApple toolchainによるcompile／testが未確認。通信不能時の端末内だけの削除はOS保護状態内へ最大32件の非権威回復記録を同時保存し、Flutterは限定された情報を読み取り表示するが、Desktop Rust Brokerの監査連鎖とは別である。nativeから同じRust Brokerへ到達する`LIVE_RUNTIME`試験、実機の安全保管・lifecycle証拠も未成立である。過去のDart TLS実行証拠を現在のFlutter境界適合証拠へ読み替えない。契約試験・native単体試験・Simulator buildは実機証拠とは区別する。
+
+## 現在状態（2026-10-07）
+
+iOS Simulator buildとnative XCTestは、手動Actions run [#22](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37558500619)、commit `b6dbf10c4ea8b34e103b8826f2d23f25930d8ca9`でPASSした。Flutter analyze、21件のFlutter test、Simulator build、8件のnative XCTest（8 passed／0 failed）を確認した。Keychain項目のThisDeviceOnly保護、保存・読戻し・削除、旧version stateのmigrationをSimulator上で検査した。test用ad-hoc署名であり、production identity・物理端末・実Broker接続・実機lifecycleの証拠ではない。これらの範囲と失敗履歴は`docs/REV5_PRODUCT_PROGRESS.md`に記録する。native Rust Brokerへの`LIVE_RUNTIME`接続と実機証拠は未成立である。
 
 ## 対象と責任
 
@@ -82,8 +88,8 @@ Schemaとconformanceは招待・保管資格・要求の構造と禁止操作を
 
 - item: native Device Linkの実機・統合検証
   classification: release_blocker
-  reason: Androidの現行sourceはfresh Temp copyでcleanup除外なしのclean・unit test・APK buildが成功し、JUnit 8件が通過した。元OneDrive workspaceのignored outputは継承ACLによりcleanupとresource packagingが拒否されるhost-local limitationであり、ACLは変更していない。Android build成功もnative Rust Broker経路・OS保管・実TLS・失効・background lifecycleを証明しない。iOS native sourceはあるがApple toolchainのcompile／XCTest未実行。Android実機検証はowner指示で凍結中。
-  required_action: Apple workflow_dispatchでiOS compile／XCTestを検証する。招待秘密をFlutter／debug VM／log／artifactへ露出させないplatform-native LIVE_RUNTIME harnessを用意し、凍結解除後に各platformの実機結合・対話・失効・lifecycleを測定する。in-place Android buildが必要な場合はACL管理者の判断を得る。端末内回復記録はDesktop Broker AuditEventと区別する。
+  reason: iOS Simulator buildとnative XCTest 8件は2026-10-07の手動run #22でPASSしたが、Simulator証拠は物理端末のKeychain／TLS／lifecycleを証明しない。Androidの現行sourceはfresh Temp copyでclean・unit test・APK buildが成功しJUnit 8件が通過した一方、Android実機試験はowner指示で凍結中。両platformともDesktop Rust Brokerへのnative LIVE_RUNTIME接続、失効・background停止、実端末証拠は未成立。OneDrive内Android ignored outputの削除deny ACLはhost-local limitationとして維持し、ACLは変更していない。
+  required_action: 招待秘密をFlutter／debug VM／log／artifactへ露出させないplatform-native LIVE_RUNTIME harnessで、同じDesktop Rust BrokerへのTLS接続・拒否・失効・background停止とWorkspace識別子の限定開示を検証する。Android実機は凍結解除後に、iOSを含む物理端末証拠を別途取得する。in-place Android buildが必要な場合だけACL管理者の判断を得る。端末内回復記録はDesktop Broker AuditEventと区別する。
   blocks_release: yes
 
 技術接続の一次資料: [rustlsのserver設定](https://docs.rs/rustls/latest/rustls/server/struct.ServerConfig.html)。これは暗号化機構のAPI資料でありGUI Shellの権限源ではない。

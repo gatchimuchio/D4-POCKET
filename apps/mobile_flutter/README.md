@@ -26,8 +26,8 @@ Android実機のinstall・launch・結合・保管・復帰検証は2026-09-11�
 
 - item: iOS端末連携のnative実行時統合
   classification: release_blocker
-  reason: Swift handler・Keychain・TLS clientは実装されているが、現行sourceのMac Simulator build／XCTestとBrokerに対するnative LIVE_RUNTIME接続が未確認。
-  required_action: 手動Mac補助検証で現行sourceをbuild・試験し、その後、秘密をFlutterへ渡さないplatform-native harnessでDesktop Rust BrokerへのTLS接続・拒否・失効・background停止を検証する。
+  reason: 現行iOS sourceのSimulator buildとnative XCTest 8件は手動run #22でPASSした。これはSimulator内のKeychain試験に限り、物理端末・Desktop Rust Brokerへのnative LIVE_RUNTIME接続・TLS・lifecycleを証明しない。
+  required_action: 秘密をFlutter／debug VM／log／artifactへ渡さないplatform-native harnessでDesktop Rust BrokerへのTLS接続・拒否・失効・background停止を検証し、iOS実機証拠を取得する。Android実機試験はowner指示の凍結を維持する。
   blocks_release: yes
 - item: Android/iOS Device Linkの実動作証拠
   classification: release_blocker

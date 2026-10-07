@@ -17,7 +17,15 @@
 
 ## P13 Mobile / Non-Windows — 現行track
 
-Androidの実装・検証履歴は維持し、Android実機試験の凍結を尊重する。iOSにはSwift Device Link handler、ThisDeviceOnly Keychain保管、TLS client、strict JSON処理、native XCTestが実装されている一方、READMEには未実装との古い記述が残っていた。Windows hostではApple toolchainを実行できないため、既存の`.github/workflows/apple-manual-build.yml`へ独立`ios_mobile` jobを設け、P13の局所build／testに使う。これはiOS Simulator buildとnative XCTestに限り、実端末・実Broker接続・配布・Final QAの証拠へ昇格させない。
+Androidの実装・検証履歴は維持し、Android実機試験の凍結を尊重する。iOSにはSwift Device Link handler、ThisDeviceOnly Keychain保管、TLS client、strict JSON処理、native XCTestが実装されている。Windows hostではApple toolchainを実行できないため、既存の`.github/workflows/apple-manual-build.yml`に独立`ios_mobile` jobを設け、P13の局所build／testに使う。これはiOS Simulator buildとnative XCTestに限り、実端末・実Broker接続・配布・Final QAの証拠へ昇格させない。
+
+#### iOS Simulator build／native XCTest — 局所検証PASS（2026-10-07）
+
+手動Actions run [#22](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37558500619)はcommit `b6dbf10c4ea8b34e103b8826f2d23f25930d8ca9`で完了した。macOS 15.7.9／Xcode 16.4、iPhone 16 Pro／iOS 18.5 Simulator上で、Flutter 3.44.0のMobile analyze（問題なし）、Flutter test 21件、iOS Simulator build、native XCTest 8件（8 passed／0 failed）がPASSした。Keychain試験はThisDeviceOnly属性、保存・再読・削除、version 1から2へのmigrationを確認した。XCTestはproduction identityを使わず、Simulator専用ad-hoc identity `-`で署名した。Workflowが明示した`FAKETEAMID.com.example.guiShellMobile`はtest用の生成identifierであり、配布署名ではない。
+
+証拠artifact ID `11456131236`、SHA-256 `2fdeb352fd5af5f2226b595cb9d58c6ae26bb95ac6465c2168da57f4aa281513`（2026-10-10に期限切れ）。run #19（`c6de882`）は`try`漏れ、run #20（`986349b`）は`NWConnection.SendCompletion`呼出形式でcompile失敗した。run #21（`7889109`）はSimulator buildがPASSした一方、署名無効化による`errSecMissingEntitlement (-34018)`でKeychain XCTest 2件が失敗した。run #22ではad-hoc Simulator署名へ修正して全8件がPASSした。これらの履歴を消去・上書きしない。
+
+これはSimulator上の`LIVE_RUNTIME`証拠であり、物理iOS端末、実端末Keychain、Desktop Rust Brokerとのnative LIVE_RUNTIME TLS、端末lifecycle、公開配布、release readinessを証明しない。P13とMobile release blockerはOPENのまま維持する。
 
 ## Q0 品質保証凍結 — 完了（過去のFinal QA記録）
 
@@ -506,7 +514,7 @@ portable製品のLIVE_RUNTIME確認で、未選択のSettingsが`IndexedStack`�
 
 ## 3. 後続製品工程
 
-P2 Multi-Agent Compare、P3 Handoff、P4 Provider / Model Center、P5 Workspace / History / Evaluation、P6 Credential / MCP、P7 A2A / Host / Adapter、P8 GUI-Shell Compose、P9 Standalone Export、P10 Module Selection / PruningはProduct Build受入れを閉鎖した。現行はP11 Windows Productization。続いてP12 Product Integrationを進める。P12の統合経路成立をWindows Feature Completeとし、その後にQ0〜Q7 Final QAへ移る。P13 Mobile / Non-WindowsはWindows Feature Completeを止めず別trackとして扱う。Owner Finalizationではproduction Publisher／signing identity、production Audit key、不可逆な事業判断、Final GOだけをOwnerへ戻す。
+P2 Multi-Agent Compare、P3 Handoff、P4 Provider / Model Center、P5 Workspace / History / Evaluation、P6 Credential / MCP、P7 A2A / Host / Adapter、P8 GUI-Shell Compose、P9 Standalone Export、P10 Module Selection / Pruning、P11 Windows Productization、P12 Product IntegrationはProduct Build受入れを閉鎖し、Windows `FEATURE COMPLETE`を維持する。最新版実装指示§2により現在は`PRODUCT_BUILD_MODE`でP13 Mobile / Non-Windowsを独立trackとして進める。Q0〜Q7 Final QA記録は履歴として保持し、現行schedulerにはしない。Owner Finalizationではproduction Publisher／signing identity、production Audit key、不可逆な事業判断、Final GOだけをOwnerへ戻す。
 
 ## 4. 関連正本
 

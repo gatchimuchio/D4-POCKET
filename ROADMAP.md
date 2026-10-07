@@ -2,7 +2,7 @@
 
 2026-10-07 rev5現行工程: 最新版実装指示§2により`PRODUCT_BUILD_MODE`を継続。Windows P12 `FEATURE COMPLETE`とP2 Compare／P3 HandoffのCLOSED状態は維持し、P13 Mobile／Non-Windowsを独立trackとして進める。Q0／Q1／Q2の既存記録は履歴証拠として保持するがFinal QA queueは延期中であり、現在の開発作業を止めない。通常Release `task_execution=unsupported`、release gate、`release_ready=false`を維持する。現況とP13作業は`docs/REV5_PRODUCT_PROGRESS.md`、Final QA記録は`docs/FINAL_QA_QUEUE.md`。
 
-P13 iOS局所検証: Windows hostにApple toolchainがないため、既存`.github/workflows/apple-manual-build.yml`の`workflow_dispatch`入力`target=ios_mobile`で、固定FlutterによるiOS Simulator build／native XCTestを単独実施する。これはP13 Product Buildのtargeted build/testで、Final QA、実端末、実Broker接続、配布証拠の代替ではない。
+P13 iOS局所検証: 手動Actions run [#22](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37558500619)、commit `b6dbf10c4ea8b34e103b8826f2d23f25930d8ca9`でFlutter analyze・21 test・iOS Simulator build・native XCTest 8件がPASSした。XCTestはproduction identityを使わないSimulator ad-hoc署名で実行した。これはP13 Product Buildのtargeted build/testで、物理端末、実Broker接続、配布、Final QAの証拠ではない。前段failureと範囲は`docs/REV5_PRODUCT_PROGRESS.md`に保持する。
 
 過去の2026-10-07 Q2記録: 実Codex／MxCを使うBroker crash、Codex root crash、active Task cancel、deadlineの4局所LIVE_RUNTIME試験と逐次Rust全target 545 passed／0 failed／13 ignoredを確認した。限定条件と未成立範囲は`docs/REV5_PRODUCT_PROGRESS.md`および`docs/FINAL_QA_QUEUE.md`に記録する。この結果は履歴証拠として保持し、現行Product Buildを置き換えない。
 
