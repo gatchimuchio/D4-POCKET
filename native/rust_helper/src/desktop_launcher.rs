@@ -4179,6 +4179,187 @@ mod tests {
         path
     }
 
+    #[cfg(all(windows, feature = "r2-e2e"))]
+    const LAUNCHER_CRASH_OWNER_ROOT_ENV: &str = "GUI_SHELL_R2_E2E_LAUNCHER_OWNER_ROOT";
+    #[cfg(all(windows, feature = "r2-e2e"))]
+    const LAUNCHER_CRASH_FRONTEND_EXE_ENV: &str = "GUI_SHELL_R2_E2E_LAUNCHER_FRONTEND_EXE";
+
+    #[cfg(all(windows, feature = "r2-e2e"))]
+    struct LauncherCrashOwner(Option<Child>);
+
+    #[cfg(all(windows, feature = "r2-e2e"))]
+    impl Drop for LauncherCrashOwner {
+        fn drop(&mut self) {
+            if let Some(owner) = self.0.as_mut() {
+                if owner.try_wait().ok().flatten().is_none() {
+                    let _ = owner.kill();
+                    let _ = owner.wait();
+                }
+            }
+        }
+    }
+
+    #[cfg(all(windows, feature = "r2-e2e"))]
+    fn launcher_crash_frontend_path() -> PathBuf {
+        let test_binary = std::env::current_exe().expect("Rust試験実行file");
+        test_binary
+            .parent()
+            .and_then(Path::parent)
+            .expect("Cargo出力directory")
+            .join("gui_shell_r2_e2e_frontend.exe")
+    }
+
+    #[cfg(all(windows, feature = "r2-e2e"))]
+    #[test]
+    #[ignore = "Windows上でproduction launch_frontend経路のLauncher異常終了後に画面process群が停止することを確認するときに実行する"]
+    fn launcher_crash_stops_frontend_and_descendants() {
+        let root = test_root("launcher-crash-process-tree");
+        let app_dir = root.join("app");
+        fs::create_dir(&app_dir).expect("frontend試験directory");
+        let frontend_exe = launcher_crash_frontend_path();
+        assert!(
+            frontend_exe.is_file(),
+            "r2-e2e専用frontend binaryがbuild済み"
+        );
+
+        let test_binary = std::env::current_exe().expect("Rust試験実行file");
+        let mut command = Command::new(test_binary);
+        command
+            .env_clear()
+            .args([
+                "--exact",
+                "desktop_launcher::tests::launcher_crash_owner_fixture",
+                "--ignored",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .env(LAUNCHER_CRASH_OWNER_ROOT_ENV, &app_dir)
+            .env(LAUNCHER_CRASH_FRONTEND_EXE_ENV, &frontend_exe)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        for name in ["SystemRoot", "WINDIR", "TEMP", "TMP"] {
+            if let Some(value) = std::env::var_os(name) {
+                command.env(name, value);
+            }
+        }
+        let mut owner = LauncherCrashOwner(Some(
+            command.spawn().expect("隔離Launcher owner process起動"),
+        ));
+
+        let frontend_marker = app_dir.join("frontend.started");
+        let descendant_id_marker = app_dir.join("descendant.pid");
+        let descendant_marker = app_dir.join("descendant.started");
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !(frontend_marker.is_file()
+            && descendant_id_marker.is_file()
+            && descendant_marker.is_file())
+        {
+            assert!(
+                Instant::now() < deadline,
+                "Launcher ownerがfrontendとJob内孫processを起動しない"
+            );
+            assert!(
+                owner.0.as_mut().unwrap().try_wait().unwrap().is_none(),
+                "process tree観測前にLauncher ownerが終了"
+            );
+            thread::sleep(Duration::from_millis(10));
+        }
+
+        let frontend_pid = fs::read_to_string(&frontend_marker)
+            .expect("画面process識別子")
+            .parse::<u32>()
+            .expect("画面process識別子形式");
+        let descendant_pid = fs::read_to_string(&descendant_id_marker)
+            .expect("子孫process識別子")
+            .parse::<u32>()
+            .expect("子孫process識別子形式");
+        assert_eq!(
+            fs::read_to_string(&descendant_marker)
+                .expect("descendant起動marker")
+                .parse::<u32>()
+                .expect("descendant起動marker形式"),
+            descendant_pid,
+            "Job内孫processの起動identity"
+        );
+        assert_ne!(frontend_pid, std::process::id());
+        assert_ne!(descendant_pid, std::process::id());
+        let frontend = open_launcher_process(frontend_pid).expect("frontend process待機handle");
+        let descendant =
+            open_launcher_process(descendant_pid).expect("descendant process待機handle");
+
+        owner
+            .0
+            .as_mut()
+            .unwrap()
+            .kill()
+            .expect("Launcher owner強制終了");
+        let _ = owner.0.as_mut().unwrap().wait();
+        owner.0 = None;
+
+        let frontend_stopped = frontend
+            .WaitForSingleObject(Some(5_000))
+            .expect("frontend process終了待ち")
+            == winsafe::co::WAIT::OBJECT_0;
+        let descendant_stopped = descendant
+            .WaitForSingleObject(Some(5_000))
+            .expect("descendant process終了待ち")
+            == winsafe::co::WAIT::OBJECT_0;
+        if !frontend_stopped || !descendant_stopped {
+            // Fixture自身にも有限寿命がある。assertion失敗時にprocessを無期限残留させない。
+            let _ = frontend.WaitForSingleObject(Some(15_000));
+            let _ = descendant.WaitForSingleObject(Some(15_000));
+        }
+        assert!(
+            frontend_stopped,
+            "Launcher異常終了後5秒以内にfrontendが停止"
+        );
+        assert!(
+            descendant_stopped,
+            "Launcher異常終了後5秒以内にfrontend descendantが停止"
+        );
+        fs::remove_dir_all(root).expect("Launcher異常終了試験の一時directory片付け");
+    }
+
+    #[cfg(all(windows, feature = "r2-e2e"))]
+    #[test]
+    #[ignore = "launcher_crash_stops_frontend_and_descendantsから起動する専用owner process fixture"]
+    fn launcher_crash_owner_fixture() {
+        let Some(root) = std::env::var_os(LAUNCHER_CRASH_OWNER_ROOT_ENV).map(PathBuf::from) else {
+            return;
+        };
+        let frontend_exe = std::env::var_os(LAUNCHER_CRASH_FRONTEND_EXE_ENV)
+            .map(PathBuf::from)
+            .expect("試験用frontend実行file");
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let start_worker = |shutdown: Arc<AtomicBool>| {
+            thread::spawn(move || {
+                while !shutdown.load(Ordering::Acquire) {
+                    thread::sleep(Duration::from_millis(10));
+                }
+                Ok(())
+            })
+        };
+        let frontend_pid = Arc::new(AtomicU32::new(0));
+        let broker = RunningBroker {
+            shutdown: Arc::clone(&shutdown),
+            launch_installed_after_exit: Arc::new(AtomicBool::new(false)),
+            uninstall_ticket: Arc::new(Mutex::new(None)),
+            server: Some(start_worker(Arc::clone(&shutdown))),
+            channel_server: Some(start_worker(Arc::clone(&shutdown))),
+            channel_pipe_name: r"\\.\pipe\D4Pocket-R2-E2E-Launcher-Crash".to_owned(),
+            frontend_pid,
+            session_file: root.join("unused-session.json"),
+            session_bytes: Vec::new(),
+        };
+        let layout = PackageLayout {
+            app_dir: root,
+            app_exe: frontend_exe,
+        };
+        let result = launch_frontend(&layout, &broker);
+        panic!("試験frontendが有限寿命前に終了: {result:?}");
+    }
+
     #[cfg(windows)]
     #[test]
     #[ignore = "対話型Windows desktopで実Win32 Owner dialogを制御自動操作する"]

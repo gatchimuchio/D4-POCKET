@@ -73,6 +73,8 @@ Windows hosted補助run #41は`workflow_dispatch`による手動実行でcommit 
 
 同差分の統合`python -X utf8 tooling/validate_all.py --python-only --desktop-platform=windows`は10登録検査中9件がPASSし、終了値1の唯一の検査は厳格日本語監査だった。findingは変更外の`docs/REV3_PROGRESS.md`、`docs/REV4_ACCEPTANCE_LEDGER.md`、未変更`native/rust_helper/src/adapters/codex_cli.rs`に各1件で、今回差分由来のfindingはない。Schema、Conformance 236 checks、Manifest、Release Gate、packaging portability、release smoke、evidence bundle、release runtime assertions、final development auditはPASS。通常Release `task_execution=unsupported`と`release_ready=false`は維持する。
 
+2026-10-07 Q2 Launcher異常終了時の画面process群停止 — 限定LIVE_RUNTIME: ignored test `desktop_launcher::tests::launcher_crash_stops_frontend_and_descendants`はWindowsで4回連続PASS。隔離owner process内でproduction `launch_frontend`を実行し、test-only frontendと孫processをJob Objectへ登録した後、ownerを強制終了。frontendと孫processの両方が5秒以内に終了し、試験後にfixture process／directoryの残留なし。process tree停止とproduction `launch_frontend`接続は`LIVE_RUNTIME`、fake frontendとBroker workerは`FIXTURE`。これはLauncher crash時の画面子孫停止だけを確認し、active Agent Task、Broker永続Audit／Recovery、installed product、Launcher自体を含むTask全体の復旧を証明しない。`FQ-R2-B`／`FQ-R2-F`はOPENのまま、通常Release `task_execution=unsupported`とrelease gateを維持する。検証: feature-enabled／featureなしのRust全target `cargo check`、focused crash E2E 4回、scoped Rust format、`git diff --check`、Schema 161／157／208、Conformance 236、Manifest、Windows release gate check。strict日本語監査は既存の変更対象外3指摘により全体exit 1だが、今回変更したsource／文書にfindingなし。
+
 ## 1. 工程方針
 
 rev5は、完成前の製品機能開発と、Feature Complete後の最終品質保証を分離する。旧R2 Agent TaskはPRODUCT BUILD上`FUNCTIONALLY ESTABLISHED`、P1は`DONE FOR PRODUCT BUILD`とする。R2で得た実Task・Permission／Approval・Audit・Workspace境界等の証拠は保持する。R2-A〜Hの追加探索・出荷級の再確認はP2以降を止めず、必要なものを`docs/FINAL_QA_QUEUE.md`へ送る。

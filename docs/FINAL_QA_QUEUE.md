@@ -77,6 +77,8 @@ Rust初回・再runでA2A／Update TLS loopback fixtureの間欠failureを観測
 
 2026-10-07 Windows hosted補助run #41: `workflow_dispatch`による手動実行でcommit `2bb50217c02fcf6dd6cf757c43f126c6a2f1f1f8`（当時の`main`先端と同一）を検証し、全体10分59秒で全工程が成功した。workflow指定Rust sourceの書式検査、Rust全target 13集計欄（545件成功／0件失敗／13件除外）、Broker実行体のRelease build、Broker独立起動と通常IPCの簡易疎通確認、実行環境内の検査用一時物の後片付け、作業tree清掃確認がすべて成功。生成物のアップロードなし（[run #41](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37518774824)）。証拠は対象commitのWindows hosted Rust検査／Broker簡易疎通確認に限られ、導入済み製品、実Agent Task、正式リリース証拠、リリース可能性を証明しない。ローカルloopback fixture failureとの根因差は未確定なので`FQ-TEST-LOOPBACK`はOPENのままとし、通常Release `task_execution=unsupported`およびrelease gateを変更しない。対象commitが既に`main`と同一だったため統合は不要であり、検証用branchはlocal／remote双方から削除済み。
 
+2026-10-07 Q2 Launcher異常終了のprocess cleanup部分: Windows focused test `desktop_launcher::tests::launcher_crash_stops_frontend_and_descendants`を4回実行し各1 passed。test harness owner内でproduction `launch_frontend`を呼び、test-only frontendと孫processの起動後にownerを強制終了すると、両processが5秒以内に停止した。実process／Job Object観測は限定`LIVE_RUNTIME`、frontend／Broker workerは`FIXTURE`。Launcher crash時の画面process群停止を確認しただけで、active Task recovery、durable Audit、installed product、Approval非再利用を示さない。したがって`FQ-R2-B`／`FQ-R2-F`はOPENのまま維持する。
+
 ## 3. Final QA段階
 
 | 段階 | 対象 | 開始条件 |

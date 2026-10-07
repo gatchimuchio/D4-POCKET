@@ -18,6 +18,11 @@ name = "gui_shell_r2_e2e_responses"
 path = "src/bin/r2_e2e_responses.rs"
 required-features = ["r2-e2e"]
 
+[[bin]]
+name = "gui_shell_r2_e2e_frontend"
+path = "src/bin/r2_e2e_frontend.rs"
+required-features = ["r2-e2e"]
+
 [dependencies]
 getrandom = "0.2"
 sha2 = "0.10"
