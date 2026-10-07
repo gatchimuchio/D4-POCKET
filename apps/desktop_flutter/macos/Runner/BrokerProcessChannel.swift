@@ -78,9 +78,6 @@ final class BrokerProcessChannel {
       finished = true
       self.pending -= 1
       guard let response else {
-        #if DEBUG && D4_MACOS_OWNER_UI_TEST
-        NSApp.windows.compactMap { $0 as? MainFlutterWindow }.first?.title = "D4 Pocket 試験: Broker応答不能"
-        #endif
         self.available = false
         self.graceful = false
         if self.worker.isRunning { self.worker.terminate() }
@@ -98,7 +95,6 @@ final class BrokerProcessChannel {
         }
         #if D4_MACOS_OWNER_UI_TEST
         let becameReady = !self.productBootstrapObserved && initial.isSubset(of: self.bootstrap)
-        NSApp.windows.compactMap { $0 as? MainFlutterWindow }.first?.title = "D4 Pocket 試験: 初期応答 \(self.bootstrap.count)/11"
         #endif
         self.productBootstrapObserved = initial.isSubset(of: self.bootstrap)
         #if D4_MACOS_OWNER_UI_TEST

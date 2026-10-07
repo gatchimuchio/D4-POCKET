@@ -72,7 +72,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "f9157304d05c9ff9d471f7481683a47fccd6ab723ccfa3e2380c141fc427840a"
+      "sha256": "26fffb77f8fd4af4c9dabc55ed6d4cfc4e13de9235db208f0ee4dfd7722ab9d3"
     },
     {
       "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
@@ -524,7 +524,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/BrokerProcessChannel.swift",
-      "sha256": "4911b84a1091771ae4adab3765457982ee0dfdc889525fdf80a2eea4133450ad"
+      "sha256": "d6af7d39ffecb4666e0f317f2d01c3b4ca4ee619b8f07a347d8442bed592dc09"
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/Configs/AppInfo.xcconfig",
@@ -564,7 +564,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/RunnerUITests/AdapterOwnerUITests.swift",
-      "sha256": "83f0c4c601201c4fca8da2d29cab84deee638d12da134967d0da03dc80438736"
+      "sha256": "492feb57de5b12bc8c564b18bdf371641ca1b2d19f6051cb95b97fb3fad49051"
     },
     {
       "path": "apps/desktop_flutter/pubspec.lock",
@@ -1272,7 +1272,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "7b8bf3857b11ac49139e38815a689fa37108c46901030c3490eda0773ab087ec"
+      "sha256": "4b4b53620577c122181277eeea145433046b8b1c65d891b3dc847bad4540b7b6"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",

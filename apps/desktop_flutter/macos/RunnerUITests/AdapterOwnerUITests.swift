@@ -36,7 +36,7 @@ final class AdapterOwnerUITests: XCTestCase {
   }
 
   private func element(_ app: XCUIApplication, _ label: String) -> XCUIElement {
-    app.descendants(matching: .any).matching(NSPredicate(format: "label == %@ OR label BEGINSWITH %@ OR value == %@", label, label + "\n", label)).firstMatch
+    app.descendants(matching: .any).matching(NSPredicate(format: "label == %@ OR label BEGINSWITH %@ OR value == %@ OR value BEGINSWITH %@", label, label + "\n", label, label + "\n")).firstMatch
   }
 
   private func presentManifest(_ app: XCUIApplication) throws {
@@ -44,6 +44,12 @@ final class AdapterOwnerUITests: XCTestCase {
     XCTAssertTrue(install.waitForExistence(timeout: 10))
     let available = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: install)
     XCTAssertEqual(XCTWaiter.wait(for: [available], timeout: 10), .completed)
+    // 初期800x600窓ではRuntime情報の下にあるため、実際のスクロールで表示する。
+    for _ in 0..<8 {
+      if install.isHittable { break }
+      app.windows.firstMatch.scroll(byDeltaX: 0, deltaY: -250)
+    }
+    XCTAssertTrue(install.isHittable)
     install.click()
     let input = element(app, "Adapter定義書（JSON）")
     XCTAssertTrue(input.waitForExistence(timeout: 10))

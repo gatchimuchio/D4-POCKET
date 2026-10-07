@@ -35,6 +35,8 @@
 
 既定target起動の[run 37606764030](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37606764030)、commit `67d30ac86099793e94e5fbf61c6ac87d95cecc1d`も初期要素がなく、画像を`/tmp`へ書く試験処理もOSに拒否された。標準XCTest runnerのsandboxは維持し、画像はXCTAttachmentへ変更する。入力前の固定bootstrap完了件数だけを試験窓titleへ投影し、Broker接続と表示補助のどちらが未成立かを区別する。製品状態・要求本文・秘密は診断へ出さず、通常buildはこの表示を含まない。
 
+[run 37607914073](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37607914073)、commit `2975d9e5dd483050d05d28e227793ea6ad950972`の診断で、初期応答11/11とFlutterの全画面要素が存在することを確認。残る失敗は検索側が`value: 実行系\nタブ: 4/21`を完全一致で探したためだった。valueにも改行区切りの接頭一致を適用し、不要になった窓title診断を撤去する。artifact `11476530090`をignored `release_evidence/p13-macos-owner-2975d9e.zip`へ保存し、SHA-256 `c37bd515c79f3383ebd32e21499b0601777945255bce1754cca3c1bfa53e6834`を照合済み。画像の`--only-failures` exportは手動添付を除外していたため、当該合成UI試験の添付を通常exportする。Owner操作そのものはまだ未到達であり、PASSとはしない。
+
 #### macOS Desktop通常Broker接続 — CLOSED（Product Build、2026-10-07）
 
 開始時のmacOS Runnerには`gui_shell/broker`登録がなく、Flutterの通常起動から実Brokerへ到達しなかった。本有限単位を、同梱Rust helperへの匿名pipe、既存認証Broker normal経路、初回設定等の製品bootstrap、正常終了へ限定した。Apple App Sandboxを継承し、Flutter／Runnerへ資格を渡さない。Owner専用操作・Windows固有操作は現状の拒否を保持し、macOS全機能完成とは扱わない。責任と未成立範囲は`docs/specs/macos-desktop-channel.md`。手動Actionsの独立`macos_product`を使い、iOS／AndroidのCLOSED試験は起動していない。

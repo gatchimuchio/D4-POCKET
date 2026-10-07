@@ -79,7 +79,7 @@ jobs:
           if [ -d "$RUNNER_TEMP/macos-product-tests.xcresult" ]; then
             xcrun xcresulttool get test-results summary --path "$RUNNER_TEMP/macos-product-tests.xcresult" | tee evidence/macos-native-summary.json
             if [ '${{ inputs.target }}' = 'macos_owner' ]; then
-              xcrun xcresulttool export attachments --path "$RUNNER_TEMP/macos-product-tests.xcresult" --output-path evidence/macos-ui-attachments --only-failures
+              xcrun xcresulttool export attachments --path "$RUNNER_TEMP/macos-product-tests.xcresult" --output-path evidence/macos-ui-attachments
             fi
           fi
           if pgrep -x gui_shell_macos_broker > evidence/remaining-helper-pids.txt; then
