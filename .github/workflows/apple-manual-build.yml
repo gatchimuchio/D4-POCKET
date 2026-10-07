@@ -131,6 +131,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          if [ '${{ inputs.target }}' = 'macos_workspace_selection' ]; then
+            selection_audit=/Users/runner/Library/Containers/com.example.guiShellDesktop/Data/Library/Application\ Support/D4Pocket/macos-broker/store/audit.jsonl
+            if [ -f "$selection_audit" ] && [ ! -L "$selection_audit" ]; then
+              test "$(stat -f%z "$selection_audit")" -lt 4194304
+              jq -c 'select(.operation == "作業領域OS選択") | {decision: (if .decision == "accepted" or .decision == "rejected" or .decision == "suspended" then .decision else "unknown" end), code: (if (.reason | test("^macos_os_selection_[a-z_]{1,64}$")) then .reason else "other" end)}' "$selection_audit" | tee evidence/workspace-native-code.jsonl
+            else
+              printf '%s\n' 'OS選択の診断元Auditがありません'
+            fi
+          fi
           if [ -d "$RUNNER_TEMP/macos-product-tests.xcresult" ]; then
             xcrun xcresulttool get test-results summary --path "$RUNNER_TEMP/macos-product-tests.xcresult" | tee evidence/macos-native-summary.json
             if [ '${{ inputs.target }}' = 'macos_owner' ] || [ '${{ inputs.target }}' = 'macos_adapter_lifecycle' ] || [ '${{ inputs.target }}' = 'macos_agent_registration' ] || [ '${{ inputs.target }}' = 'macos_workspace_selection' ]; then

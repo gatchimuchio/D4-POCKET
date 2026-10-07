@@ -37,6 +37,8 @@
 
 固定失敗分類の局所修正後、対象Rust 3件とSchema 163／正常例159／負例210、Conformance 237件がPASS。必須Rust全体は505 passed／4 failed／12 ignoredでFAIL。今回の失敗は変更外のMINIDORA Content-Length読取、Codex loopback応答header読取、bounded catalog上限、既存TLS repairで、通信失敗／ConnectionReset／OS 10054を観測した。既存`FQ-TEST-LOOPBACK`と同分類へ保持し、全体PASSや根因解消とは扱わない。対象Mac操作はWindowsのこれらの通信経路を変更しない。
 
+手動Actions [run 37682694157](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37682694157)、commit `451ce6ee7c9c0ef12083d2b928f5b13f9ae65fa3`はUI試験43.732秒でFAIL。親app AXがDisabledのため投影codeも読めず、native failureか試験の観測制約かをまだ断定しない。手動runnerの既存Audit fileから当該操作の判定とallowlist固定codeだけを取得する診断を追加する。秘密鍵・資格・path・raw contentを取得せず、chain／HMAC再検算や完成証拠には使わない。対象Rust／変更Dartの2試験／通常build、source cleanとfixture回収はPASS。artifact `11510581633`のSHA-256 `3644e44582766cd441490b92509330c0c07adf9b697f6c27ead510d6f7b57ebd`を照合・保存した。有限Acceptanceとmainは未変更。
+
 有限Acceptanceは`docs/specs/macos-workspace-selection.md`。取消時の入力保持、実OS chooserによるsandbox外folder選択／投影、別個のOwner確認後の既存Broker登録、UI path／Authority注入拒否を一単位で施工する。選択はOS user-selected accessであり、D4のPermission／Approval／登録ではない。手動Actionsの`macos_workspace_selection`だけでMacを検証し、CLOSEDの登録／Adapter／Mobile試験は選択しない。sandbox外CLI実行・restart access・Credential・正式配布・Final QAはこの単位へ追加しない。
 
 ローカル検証: Schema 162／正常例158／負例209、Conformance 237 checks PASS。必須`cargo test --locked --manifest-path native/rust_helper/Cargo.toml`は505 passed／4 failed／12 ignoredでFAIL。変更外のA2A loopback読取と3つの既存HTTPS fixtureが応答読取／OS 10054／InvalidContentTypeで失敗した。局所切分けではA2A 1 PASS、update_download群16 PASS／1 FAILで、`failed_replacement_keeps_the_existing_corrupt_package_unchanged`の既存TLS失敗が残る。対象新規試験の成功や全体PASSへ読み替えず、既存Final QAのloopback検査課題へ保持する。変更がMac専用OS選択へ限定され、これらの作用経路を変更していないことを差分で確認した。

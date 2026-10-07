@@ -72,7 +72,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "bae8265739d77bcf757e1cbfd30933e0b6824bd2b421f1d909fb922a42d2e6e3"
+      "sha256": "582ef8107060341266e39d1000464935f2f1aab6e260bc1bfcd2cba39761b37c"
     },
     {
       "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
@@ -1272,7 +1272,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "8f3ba4bcf5df00410ef7d17b1f4c16469989a4dd5a94755719d734ad7610a22b"
+      "sha256": "d4eed5d303a833c9a354ea0441f43d1d00f1d8e95f9db955a7df43951c83b4d1"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
