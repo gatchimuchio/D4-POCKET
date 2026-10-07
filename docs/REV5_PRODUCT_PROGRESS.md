@@ -29,6 +29,8 @@
 
 次の[run 37603945218](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37603945218)、commit `4626c551b0fe67a22405556ba5a5f8b4da638f23`もRust／製品buildはPASS、UIは初期要素取得でFAIL。診断ではnative窓だけが存在しFlutter子要素がなく、外部AX APIは`-25211`で拒否された。無効だった外部AX要求と初期tree診断を撤去し、明示Debug試験buildに表示用semantics有効化だけを追加する。通常製品のAuthority／資格／Owner確認への変更やOS保護設定変更はしない。試験表示補助の責任・除去条件・証拠範囲はmacOS接続contractへ記録する。
 
+表示補助初版の[run 37604950948](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37604950948)、commit `90fe144f624daadf6701b0353a7c02bb818391d8`もbuild成功／初期要素取得FAIL。固定Flutter sourceではEngine起動が`viewWillAppear`にあり、windowの`awakeFromNib`からの通知はEngine起動前に届く可能性がある。通知を既存の初期Broker要求完了後へ移し、起動済みEngineに一回だけ接続する。この原因仮説の成否は再試験で確認し、通常要求・Owner経路は変更しない。
+
 #### macOS Desktop通常Broker接続 — CLOSED（Product Build、2026-10-07）
 
 開始時のmacOS Runnerには`gui_shell/broker`登録がなく、Flutterの通常起動から実Brokerへ到達しなかった。本有限単位を、同梱Rust helperへの匿名pipe、既存認証Broker normal経路、初回設定等の製品bootstrap、正常終了へ限定した。Apple App Sandboxを継承し、Flutter／Runnerへ資格を渡さない。Owner専用操作・Windows固有操作は現状の拒否を保持し、macOS全機能完成とは扱わない。責任と未成立範囲は`docs/specs/macos-desktop-channel.md`。手動Actionsの独立`macos_product`を使い、iOS／AndroidのCLOSED試験は起動していない。

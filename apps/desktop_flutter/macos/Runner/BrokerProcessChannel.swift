@@ -93,7 +93,19 @@ final class BrokerProcessChannel {
         if initial.contains(operation), object["status"] as? String == expected {
           self.bootstrap.insert(operation)
         }
+        #if D4_MACOS_OWNER_UI_TEST
+        let becameReady = !self.productBootstrapObserved && initial.isSubset(of: self.bootstrap)
+        #endif
         self.productBootstrapObserved = initial.isSubset(of: self.bootstrap)
+        #if D4_MACOS_OWNER_UI_TEST
+        if becameReady {
+          // Dartの初期要求完了によりEngine起動後だと分かる時点で表示補助を一回だけ接続する。
+          // 要求、Owner選択、資格は変更しない。通常buildには含めない。
+          NotificationCenter.default.post(
+            name: NSNotification.Name("NSApplicationDidChangeAccessibilityEnhancedUserInterfaceNotification"),
+            object: nil, userInfo: ["AXEnhancedUserInterface": true])
+        }
+        #endif
       }
       #endif
       result(response)
