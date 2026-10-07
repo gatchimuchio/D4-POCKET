@@ -3191,6 +3191,10 @@
       "sha256": "b3a0f13960ee323a46fd9bbd00a3c3d751ce26525a602b15c7b9d7db8060e7a6"
     },
     {
+      "path": "native/rust_helper/src/bin/r2_e2e_frontend.rs",
+      "sha256": "052ddc8ad18b8b829add8fe23f5565fec140e06b27079b5c134ee64d3b52e488"
+    },
+    {
       "path": "native/rust_helper/src/bin/r2_e2e_responses.rs",
       "sha256": "6f2b51037f77da9d225bb17d27685eaa2e676c4626b0af4b0bcd04ef0f1b052d"
     },
