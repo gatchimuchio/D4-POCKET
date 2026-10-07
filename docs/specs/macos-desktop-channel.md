@@ -8,7 +8,7 @@ P13で未接続だったmacOS画面の`gui_shell/broker`を同梱Rust helperへ�
 
 Flutter → 固定MethodChannel → native Runner → 起動時に作る匿名pipe → 同梱Rust helper → 既存認証loopback Broker → 既存handler。
 
-Runnerは固定bundle内のhelper一個を引数なしで起動し、要求JSONと応答JSONだけを運ぶ。資格、endpoint、Audit、Permission、Approvalを読み取らず決定しない。環境はOSが与えたsandbox HOMEと一時保存先だけ。Rustは固定HOME配下の専用0700保存先、create-only起動lock、normal資格を所有する。入力session_idは既存Windows中継と同じ拒否用fieldを付加し、既存Brokerのvalidation／replay／Auditへ通す。Owner資格とOwner操作receiverは作らない。通常要求の可否はBrokerが判定し、Runnerがread-only能力やAuthorityを自己生成しない。
+Runnerは固定bundle内のhelper一個を引数なしで起動し、要求JSONと応答JSONだけを運ぶ。資格、endpoint、Audit、Permission、Approvalを読み取らず決定しない。環境はOSが与えたsandbox HOMEと一時保存先だけ。Rustは固定HOME配下の専用0700保存先、create-only起動lock、normal資格を所有する。入力session_idは既存Windows中継と同じ拒否用fieldを付加し、既存Brokerのvalidation／replay／Auditへ通す。通常接続のCLOSED単位ではOwner資格とOwner操作receiverを作らなかった。現在の追加receiverは本書後段のOwner追加契約だけに限定し、Owner資格fileは引き続き作らない。通常要求の可否はBrokerが判定し、Runnerがread-only能力やAuthorityを自己生成しない。
 
 Rustは自身の実行pathから`.app/Contents/MacOS`、固定名app／helper、Info.plistの通常file・bundle内配置を確認してから、既存Brokerの初回UI設定初期化を有効にする。これは配置検査だけで、正式署名・install identity・Owner承認を証明しない。native試験の固定bootstrap操作観測はDebugだけへcompileし、要求本文・応答本文・秘密を記録しない。
 
@@ -25,3 +25,15 @@ Rustは自身の実行pathから`.app/Contents/MacOS`、固定名app／helper、
 対象Rust試験は実Brokerの通常応答、session注入・replay・Owner操作拒否、正常EOF終了、起動lock競合を確認する。native XCTestは製品窓のchannelから実helperへ要求し、応答とhelper正常終了を確認する。fixture／component証拠と製品画面投影を区別する。
 
 Owner確認・Credentials・Task実行・Windows固有Install／Updateは本接続からsupportedへ昇格しない。macOS製品全体と正式署名・配布は`release_blocker`のまま。crash timing／長時間／網羅的alias等はFinal QAへ送り、基本接続Acceptanceを拡張しない。
+
+## Owner追加契約 — Adapter導入・更新
+
+通常接続のCLOSEDを維持し、次の製品差分としてAdapterの導入・更新を追加する。受信要求は権限ではない。Rust helperが現行envelopeのsession注入禁止、時刻、metadata、hash、既存Adapter Manifest検査を行い、表示用に検査されたsummaryだけをOS確認画面へ渡す。画面は既定「承認しない」、明示「今回の操作を承認」の二択、上限300秒。取消・期限超過・未知応答・OS失敗は非承認である。
+
+承認後は確認した同一要求だけを既存Brokerのprocess内Owner receiverへ渡し、既存のfreshness／replay／hash／Authority／監査／永続化を再評価する。資格fileを生成・公開せず、Swift／Flutterの入力や過去の確認から承認を作らない。非承認・対象外・入力不正は通常Brokerの拒否・監査へ通す。要求の自動再送をしない。Adapter metadata登録は外部code起動、署名trust、Permission、Task Approvalではない。WorkspaceやCredentials等へ本allowlistを転用しない。
+
+Swiftは当該二操作のtransport待機だけを305秒とし、判断は所有しない。Rust coreはunsafe禁止を維持する。OS FFIは独立`native/macos_owner`の同期`CFUserNotificationDisplayAlert`一呼出しへ限定する。既存lock内のcore-foundation 0.10.1／core-foundation-sys 0.8.7を明示固定し、新runtimeやscriptを追加しない。
+
+FFI例外の局所レビュー: CFStringは呼出し終了まで保持し、optional URLはNULL、出力flagは非承認で初期化する。整数return code成功と明示alternate responseと単調時刻期限を全て必要とする。raw pointerを外へ返さず、コールバックや共有可変状態を作らない。外部参照は[Apple API](https://developer.apple.com/documentation/corefoundation/cfusernotificationdisplayalert(_:_:_:_:_:_:_:_:_:_:_:))と[固定binding](https://docs.rs/core-foundation-sys/0.8.7/core_foundation_sys/user_notification/index.html)。
+
+有限Acceptanceは、実Brokerでの導入・更新と永続catalog、拒否時不変、replay／session注入／不正hash拒否、macOSのOS確認画面・期限の動作を対象とする。fixtureとnative操作の証拠を分離する。通常接続を再証明する追加試験や全Adapter機能の最終QAは行わない。

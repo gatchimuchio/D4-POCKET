@@ -1,5 +1,5 @@
 //! 同梱macOS helper。匿名pipeはtransportだけで、権限判断は既存認証Brokerへ残す。
-use crate::broker::ipc_server::run_loopback_server_cancellable;
+use crate::broker::ipc_server::run_loopback_server_cancellable_with_owner_operations;
 use crate::broker::{BrokerCredentialRole, BrokerEndpoint, BrokerServerConfig};
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufRead, BufReader, Read, Write};
@@ -41,6 +41,7 @@ pub fn run() -> io::Result<()> {
         &bundle,
         &mut io::stdin().lock(),
         &mut io::stdout().lock(),
+        &mut |summary| gui_shell_macos_owner::confirm(summary, Duration::from_secs(300)),
     )
 }
 
@@ -135,6 +136,7 @@ fn serve(
     _bundle: &VerifiedBundle,
     input: &mut impl BufRead,
     output: &mut impl Write,
+    confirm: &mut impl FnMut(&str) -> bool,
 ) -> io::Result<()> {
     let _lock = RunLock::acquire(root)?;
     let session = root.join("normal-session.json");
@@ -146,9 +148,14 @@ fn serve(
     let mut config = BrokerServerConfig::new(root.join("store"), session.clone());
     config.desktop_package_layout_verified = true;
     let (ready_tx, ready_rx) = mpsc::sync_channel(1);
+    let (owner_tx, owner_rx) = mpsc::sync_channel(1);
     let server = thread::Builder::new()
         .name("macos-security-broker".into())
-        .spawn(move || run_loopback_server_cancellable(config, stop, ready_tx))?;
+        .spawn(move || {
+            run_loopback_server_cancellable_with_owner_operations(
+                config, stop, ready_tx, owner_rx, None,
+            )
+        })?;
     let mut owned_session = Zeroizing::new(Vec::new());
     let result = (|| {
         ready_rx
@@ -174,8 +181,15 @@ fn serve(
             let Some(frame) = read_frame(input, REQUEST_LIMIT)? else {
                 break;
             };
-            let request = normalize(&frame, &endpoint.0.session_id);
-            let response = relay(&request, &endpoint.0)?;
+            let response = match super::macos_desktop_owner::dispatch(
+                &frame,
+                &endpoint.0,
+                &owner_tx,
+                confirm,
+            )? {
+                Some(response) => response,
+                None => relay(&normalize(&frame, &endpoint.0.session_id), &endpoint.0)?,
+            };
             output.write_all(&response)?;
             output.write_all(b"\n")?;
             output.flush()?;
@@ -211,7 +225,7 @@ fn read_frame(input: &mut impl BufRead, limit: usize) -> io::Result<Option<Vec<u
     Ok(Some(frame))
 }
 
-fn normalize(input: &[u8], session_id: &str) -> Vec<u8> {
+pub(super) fn normalize(input: &[u8], session_id: &str) -> Vec<u8> {
     let Ok(mut value) = serde_json::from_slice::<serde_json::Value>(input) else {
         return input.to_vec();
     };
@@ -284,6 +298,7 @@ mod tests {
             &VerifiedBundle,
             &mut io::Cursor::new(bytes),
             &mut output,
+            &mut |_| false,
         )
         .unwrap();
         let replies: Vec<Value> = String::from_utf8(output)
@@ -340,6 +355,86 @@ mod tests {
         fs::write(contents.join("MacOS/gui_shell_desktop"), b"synthetic app").unwrap();
         assert!(verify_bundle(&helper).is_ok());
         assert!(verify_bundle(&contents.join("MacOS/other")).is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn owner_adapter_roundtrip_denial_install_update_replay_and_injection() {
+        let mut random = [0u8; 16];
+        getrandom::getrandom(&mut random).unwrap();
+        let root = std::env::temp_dir().join(format!("d4p-macos-owner-{}", hex::encode(random)));
+        fs::create_dir(&root).unwrap();
+        let payload: Value = serde_json::from_str(include_str!(
+            "../../../examples/contracts/adapter_management_request.valid.json"
+        ))
+        .unwrap();
+        let request = |id: &str, operation: &str, payload: Value| {
+            json!({
+                "request_id": id, "nonce": id, "operation": operation,
+                "issued_at": BrokerRequestEnvelope::current_issued_at(),
+                "payload_hash": crate::broker::protocol::canonical_payload_hash(Some(&payload)),
+                "metadata": {"client": "desktop_flutter"}, "payload": payload,
+            })
+        };
+        let denied = request("macos-denied", "アダプター導入", payload.clone());
+        let installed = request("macos-install", "アダプター導入", payload.clone());
+        let mut updated_payload = payload.clone();
+        updated_payload["操作"] = "更新".into();
+        updated_payload["Adapter hash"] =
+            crate::broker::protocol::canonical_payload_hash(Some(&payload["Manifest"])).into();
+        updated_payload["Manifest"]["version"] = "1.1.0".into();
+        let updated = request("macos-update", "アダプター更新", updated_payload);
+        let mut injected = request("macos-owner-injected", "アダプター導入", payload.clone());
+        injected["session_id"] = "owner".into();
+        let mut bad_hash = request("macos-owner-bad-hash", "アダプター導入", payload);
+        bad_hash["payload_hash"] = format!("sha256:{}", "0".repeat(64)).into();
+        let bytes = [
+            denied,
+            request("macos-empty", "アダプター一覧", json!({"版":1})),
+            installed.clone(),
+            installed,
+            updated,
+            injected,
+            bad_hash,
+        ]
+        .iter()
+        .map(|v| format!("{v}\n"))
+        .collect::<String>();
+        let mut output = Vec::new();
+        let mut confirmations = 0;
+        serve(
+            &root,
+            &VerifiedBundle,
+            &mut io::Cursor::new(bytes),
+            &mut output,
+            &mut |summary| {
+                confirmations += 1;
+                assert!(summary.contains("要求hash: sha256:"));
+                confirmations != 1
+            },
+        )
+        .unwrap();
+        let replies: Vec<Value> = String::from_utf8(output)
+            .unwrap()
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        assert_ne!(replies[0]["status"], "accepted");
+        assert_eq!(
+            replies[1]["body"]["Adapter一覧"].as_array().unwrap().len(),
+            0
+        );
+        assert_eq!(replies[2]["status"], "accepted");
+        assert_eq!(replies[3]["error"]["code"], "broker_replay_detected");
+        assert_eq!(replies[4]["status"], "accepted");
+        assert_ne!(replies[5]["status"], "accepted");
+        assert_ne!(replies[6]["status"], "accepted");
+        assert_eq!(confirmations, 4);
+        let catalog = fs::read_to_string(root.join("store/adapters.json")).unwrap();
+        assert!(catalog.contains("1.1.0"));
+        let audit = fs::read_to_string(root.join("store/audit.jsonl")).unwrap();
+        assert!(audit.contains("アダプター更新"));
+        assert!(!audit.contains("GUI-Shell開発fixture"));
         fs::remove_dir_all(root).unwrap();
     }
 }

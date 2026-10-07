@@ -18,6 +18,8 @@ pub mod workspace_reader;
 pub mod ipc;
 #[cfg(any(target_os = "macos", test))]
 pub mod macos_desktop_worker;
+#[cfg(any(target_os = "macos", test))]
+mod macos_desktop_owner;
 pub mod network;
 pub mod process;
 pub mod update_verification;

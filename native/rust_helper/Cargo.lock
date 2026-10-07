@@ -492,6 +492,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "gui_shell_macos_owner"
+version = "0.1.0"
+dependencies = [
+ "core-foundation",
+ "core-foundation-sys",
+]
+
+[[package]]
 name = "gui_shell_process_supervision"
 version = "0.1.0"
 dependencies = [
@@ -505,6 +513,7 @@ dependencies = [
  "cap-fs-ext",
  "cap-std",
  "getrandom 0.2.17",
+ "gui_shell_macos_owner",
  "gui_shell_process_supervision",
  "gui_shell_windows_broker_channel",
  "gui_shell_windows_dns",

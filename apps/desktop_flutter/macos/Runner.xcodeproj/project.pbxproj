@@ -21,6 +21,7 @@
 /* End PBXAggregateTarget section */
 
 /* Begin PBXBuildFile section */
+		D4E000000000000000000004 /* AdapterOwnerUITests.swift */ = {isa = PBXBuildFile; fileRef = D4E000000000000000000003; };
 		D4D000000000000000000001 /* BrokerProcessChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4D000000000000000000002 /* BrokerProcessChannel.swift */; };
 		331C80D8294CF71000263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C80D7294CF71000263BE5 /* RunnerTests.swift */; };
 		335BBD1B22A9A15E00E9071D /* GeneratedPluginRegistrant.swift in Sources */ = {isa = PBXBuildFile; fileRef = 335BBD1A22A9A15E00E9071D /* GeneratedPluginRegistrant.swift */; };
@@ -62,6 +63,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		D4E000000000000000000003 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunnerUITests/AdapterOwnerUITests.swift; sourceTree = "<group>"; };
+		D4E000000000000000000005 = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = RunnerUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D4D000000000000000000002 /* BrokerProcessChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrokerProcessChannel.swift; sourceTree = "<group>"; };
 		331C80D5294CF71000263BE5 /* RunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		331C80D7294CF71000263BE5 /* RunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunnerTests.swift; sourceTree = "<group>"; };
@@ -125,6 +128,7 @@
 		33CC10E42044A3C60003C045 = {
 			isa = PBXGroup;
 			children = (
+				D4E000000000000000000003,
 				33FAB671232836740065AC1E /* Runner */,
 				33CEB47122A05771004F2AC0 /* Flutter */,
 				331C80D6294CF71000263BE5 /* RunnerTests */,
@@ -136,6 +140,7 @@
 		33CC10EE2044A3C60003C045 /* Products */ = {
 			isa = PBXGroup;
 			children = (
+				D4E000000000000000000005,
 				33CC10ED2044A3C60003C045 /* gui_shell_desktop.app */,
 				331C80D5294CF71000263BE5 /* RunnerTests.xctest */,
 			);
@@ -189,6 +194,17 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		D4E000000000000000000001 /* RunnerUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D4E000000000000000000006;
+			buildPhases = (D4E000000000000000000002,);
+			buildRules = ();
+			dependencies = (D4E00000000000000000000A,);
+			name = RunnerUITests;
+			productName = RunnerUITests;
+			productReference = D4E000000000000000000005;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		331C80D4294CF70F00263BE5 /* RunnerTests */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 331C80DE294CF71000263BE5 /* Build configuration list for PBXNativeTarget "RunnerTests" */;
@@ -242,6 +258,7 @@
 				LastUpgradeCheck = 1510;
 				ORGANIZATIONNAME = "";
 				TargetAttributes = {
+					D4E000000000000000000001 = {CreatedOnToolsVersion = 16.4; TestTargetID = 33CC10EC2044A3C60003C045; };
 					331C80D4294CF70F00263BE5 = {
 						CreatedOnToolsVersion = 14.0;
 						TestTargetID = 33CC10EC2044A3C60003C045;
@@ -278,6 +295,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
+				D4E000000000000000000001 /* RunnerUITests */,
 				33CC10EC2044A3C60003C045 /* Runner */,
 				331C80D4294CF70F00263BE5 /* RunnerTests */,
 				33CC111A2044C6BA0003C045 /* Flutter Assemble */,
@@ -357,6 +375,7 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		D4E000000000000000000002 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (D4E000000000000000000004,); runOnlyForDeploymentPostprocessing = 0; };
 		331C80D1294CF70F00263BE5 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -379,6 +398,7 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		D4E00000000000000000000A = {isa = PBXTargetDependency; target = 33CC10EC2044A3C60003C045; targetProxy = 331C80D9294CF71000263BE5; };
 		331C80DA294CF71000263BE5 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 33CC10EC2044A3C60003C045 /* Runner */;
@@ -404,6 +424,9 @@
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
+		D4E000000000000000000007 = {isa = XCBuildConfiguration; buildSettings = {GENERATE_INFOPLIST_FILE = YES; PRODUCT_BUNDLE_IDENTIFIER = com.example.guiShellDesktop.RunnerUITests; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 5.0; TEST_TARGET_NAME = Runner; }; name = Debug; };
+		D4E000000000000000000008 = {isa = XCBuildConfiguration; buildSettings = {GENERATE_INFOPLIST_FILE = YES; PRODUCT_BUNDLE_IDENTIFIER = com.example.guiShellDesktop.RunnerUITests; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 5.0; TEST_TARGET_NAME = Runner; }; name = Release; };
+		D4E000000000000000000009 = {isa = XCBuildConfiguration; buildSettings = {GENERATE_INFOPLIST_FILE = YES; PRODUCT_BUNDLE_IDENTIFIER = com.example.guiShellDesktop.RunnerUITests; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 5.0; TEST_TARGET_NAME = Runner; }; name = Profile; };
 		331C80DB294CF71000263BE5 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -685,6 +708,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		D4E000000000000000000006 = {isa = XCConfigurationList; buildConfigurations = (D4E000000000000000000007,D4E000000000000000000008,D4E000000000000000000009,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
 		331C80DE294CF71000263BE5 /* Build configuration list for PBXNativeTarget "RunnerTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

@@ -98,7 +98,11 @@ final class BrokerProcessChannel {
       #endif
       result(response)
     }
-    DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(5)) { complete(nil) }
+    // 待機期限の分類だけ。承認の判定・返信はRustのOS確認画面が所有する。
+    let envelope = frame.data(using: .utf8).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+    let operation = envelope?["operation"] as? String
+    let timeout = operation == "アダプター導入" || operation == "アダプター更新" ? 305 : 5
+    DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(timeout)) { complete(nil) }
     queue.async { [weak self] in
       guard let self else { return }
       var output: String?

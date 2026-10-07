@@ -1,0 +1,10 @@
+[package]
+name = "gui_shell_macos_owner"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "=0.10.1"
+core-foundation-sys = "=0.8.7"
