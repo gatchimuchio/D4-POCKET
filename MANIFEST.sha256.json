@@ -156,7 +156,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "c87029c877d163d969c998060365b58803da01495e8bfc5d90b4db7bbed9985c"
+      "sha256": "ee383c0022d433fc43d9a25cba43b773e21f743b7ba0fe363e741135affd4e6c"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "ccf03dc3e912f5d88f392391e1fed54da8263c6e8e32fed74aac9ac9d2c2663d"
+      "sha256": "d35f4e52f97b22f05383371c53324b663ad3e23f9ac690a631610664925fa20d"
     },
     {
       "path": "SECURITY.md",
@@ -1280,7 +1280,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "e1984d81c9a3da11b20a4fd929a2e757d824ade18a42317b217a6da1adc1e47a"
+      "sha256": "8a2f340e2dcdd419baf48c4aa00b10eecf6275e1c35c2b1d77e60551836066cb"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1416,7 +1416,7 @@
     },
     {
       "path": "docs/specs/credential-vault.md",
-      "sha256": "228b3851ec555506a910dac29b7c04a93e8ec3c2d0650d405114d26fdf909920"
+      "sha256": "9e66d51e63e404cc8306317b5cd7fab54010438f85cab58c10f43f75ab789e6f"
     },
     {
       "path": "docs/specs/desktop-broker-channel.md",
@@ -1508,7 +1508,7 @@
     },
     {
       "path": "docs/specs/macos-mcp-credential-binding.md",
-      "sha256": "f90fd707bffea7705d0db3f0fb22a25a6118067905b87e9fd279a8f4898e3c18"
+      "sha256": "f8b27d8220732a6490f14583fd21b334adb423f9d514cb3e4f1dd9332623b5dc"
     },
     {
       "path": "docs/specs/macos-workspace-selection.md",
@@ -1516,11 +1516,11 @@
     },
     {
       "path": "docs/specs/mcp-connection-center.md",
-      "sha256": "cc8f6d97f8fa48bf3e83abe6f84b7a0e9eb353fd0fbbbaa66eb8aa24036d4ada"
+      "sha256": "c5f11d4f4d2cbc3143e899fe2be572514d981b56324b01e39c101c32828c85d7"
     },
     {
       "path": "docs/specs/mcp-contract.md",
-      "sha256": "37fb8888e3c262f88b74d9a3482e67550f7c8649568cc9b50e854ec7c3f56072"
+      "sha256": "80183767e6e3a1eab2e150bd31fbf70483a2dd9f008f01a83bba8209c29548c0"
     },
     {
       "path": "docs/specs/mobile-surface.md",
@@ -4120,7 +4120,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "9c6aaad95ac943259fa7ad6f4feb0b0fd21f4ed5ac7638d3bac86f2e620dc36b"
+      "sha256": "d2922da7f7bc94e6a5712589c2a371bf3ddaed7a3c3171230d3b2dd8f3a7d777"
     },
     {
       "path": "requirements-dev.txt",

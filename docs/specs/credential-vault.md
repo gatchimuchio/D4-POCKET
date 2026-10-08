@@ -6,7 +6,7 @@
 
 この契約で接続済みの範囲は、owner control経路からの新規追加、通常IPCからの安全なmetadata一覧、Windows MCP stdio接続への限定利用、およびnative Owner確認付き論理失効である。Runtime一般、Agent、Tool、A2Aへの注入、更新、暗号文の物理削除、接続先変更、物理削除Recoveryは未接続であり、未完成のまま保管庫完成とは扱わない。
 
-P13のMac登録・Keychain保管・論理失効の現在範囲は`macos-credential-vault.md`のCLOSED受入れを正本とする。本書のC9当時のWindows限定・Keychain未接続は履歴である。Mac MCPへの追加consumerは`macos-mcp-credential-binding.md`（IMPLEMENTING）へ限定し、公開ID参照・別個native確認・現在recordの再照合から対象stdio環境一つへ結合する。Provider／Agent／A2A注入や正式配布へ成立を拡大しない。
+P13のMac登録・Keychain保管・論理失効の現在範囲は`macos-credential-vault.md`のCLOSED受入れを正本とする。本書のC9当時のWindows限定・Keychain未接続は履歴である。Mac MCPへの追加consumerは`macos-mcp-credential-binding.md`（CLOSED）へ限定し、公開ID参照・別個native確認・現在recordの再照合から対象stdio環境一つへ結合する。Provider／Agent／A2A注入や正式配布へ成立を拡大しない。
 
 ## 登録境界
 

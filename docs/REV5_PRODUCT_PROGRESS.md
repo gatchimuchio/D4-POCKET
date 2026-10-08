@@ -17,9 +17,13 @@
 
 ## P13 Mobile / Non-Windows — 現行track
 
-#### macOS MCP資格情報結合 — IMPLEMENTING（Product Build、2026-10-08）
+#### macOS MCP資格情報結合 — CLOSED（Product Build、2026-10-08）
 
-次のOPEN製品差分は、Keychain保管済みIDを対象MCP stdioの既存native確認／Brokerへ接続するconsumer。有限契約は`docs/specs/macos-mcp-credential-binding.md`。公開metadata選択・現用途／対象／失効／暗号文照合・短命Rust内受渡し・使用Audit／最終使用時刻を施工する。Provider／Agent／A2A、秘密読出しAPI、新bridgeを追加せず、既存CLOSED機能の再検査やFinal QAを開始しない。
+有限受入れMAC-MCP-CRED-1〜4を閉鎖。source `96beb4142ceca818273582716e843424f863bb30`、[手動run 37787435817](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37787435817)で公開ID参照・別個native Owner確認・現在Keychain recordから対象stdioへ実受渡し・公開使用時刻・hash-only Toolを前提として通し、残件の別個Owner切断→一覧解消→Command-Q→helper／MCP残留0・fixture回収がPASS。XCUITest 1 passed／0 failed／0 skipped、135.655秒。使用accepted Auditは1件、Tool approved／consumed started／hash-only acceptedも各1件。通常Mac buildはPASS。先行CLOSED条件と保管庫／資格情報なしMCPを追加証拠目的で再試験しない。
+
+artifact `11555820430`、SHA-256 `68c424db87f28468781892308ac358a8a5a9c3c1683305692195fe03e12643a0`を実byteへ照合。成功sourceをmainへ統合・push・remote一致確認後、一時branchを双方回収。2世代remote backup tagは`codex/backup-main`=`96beb4142ceca818273582716e843424f863bb30`、`codex/backup-main-prev`=`4fd0e17dc9f0b83345778897b07af4057334e2b3`、本consumer全体のrollbackは後者。有限契約・根因・過去FAILは`docs/specs/macos-mcp-credential-binding.md`。Windows全Rustexit 0・資格情報直接7件・新Mac Keychain直接1件・対象Widget／直接Windows回帰2件・Mac対象Dart解析・Schema 166／正常162／否定213・Conformance 241がPASS。ローカルFlutter解析の既知環境FAILと日本語監査5 file／17 findingsは履歴として保持する。
+
+対象Serverへの現在条件再評価を既存Brokerが所有し、UIは公開metadataだけ。秘密値・承認bool・新bridgeを追加せず、Windows形式・App Sandboxを保持する。実作用はnative Debug合成秘密／test identityによる有限`LIVE_RUNTIME`、公開参照・投影・否定は`FIXTURE`。Provider／Agent／A2A、物理削除、正式identity／配布、第三者内部保証、Final QAへ拡大せず、通常Release `task_execution=unsupported`、`release_ready=false`を保持する。次はP13のOPEN製品差分だけで、このCLOSED条件を再訪しない。
 
 #### macOS MCP接続・Tool実行・切断 — CLOSED（Product Build、2026-10-08）
 

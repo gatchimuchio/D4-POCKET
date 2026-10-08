@@ -1,6 +1,6 @@
 # macOS MCP資格情報結合
 
-状態: IMPLEMENTING（P13 Product Build、2026-10-08）。正本は最新版rev5、`docs/REV5_PRODUCT_PROGRESS.md`と本有限契約。資格情報登録・保管・失効と資格情報なしMCPのCLOSED受入れを再構築しない。
+状態: CLOSED（P13 Product Build、2026-10-08）。正本は最新版rev5、`docs/REV5_PRODUCT_PROGRESS.md`と本有限契約。資格情報登録・保管・失効と資格情報なしMCPのCLOSED受入れを再構築しない。MAC-MCP-CRED-1〜4がPASSし、本有限単位を閉鎖した。
 
 ## 対象と責任
 
@@ -21,13 +21,23 @@ Rust helperの別個native Owner確認は同一要求hash、実行file、Workspa
 | MAC-MCP-CRED-1 | 製品metadata選択・公開参照要求・別個native確認の委譲説明 | CLOSED | source a51d005／run 37770724707の実選択・別個native承認・接続receipt、共有Owner summary直接試験 |
 | MAC-MCP-CRED-2 | 現record／Keychain照合、対象stdio実受渡し、使用Audit・公開最終使用時刻 | CLOSED | source 5e850ae／run 37772178891の実接続、正の使用時刻表示、使用accepted Audit 1件・実Tool receipt、先行実Keychain直接試験 |
 | MAC-MCP-CRED-3 | 未承認・対象／用途／失効／不安全な環境変数・秘密注入を拒否、秘密非公開 | CLOSED | Windows資格情報直接7件／必須全Rust、run 37767646092のMac現在対象・失効・不安全環境・Audit非漏洩直接試験1件、Conformance 241、既存native Owner gate・公開注入否定のCLOSED証拠 |
-| MAC-MCP-CRED-4 | 対象build／直接依存試験、正常切断・終了・所有process／試験資産回収 | OPEN | 未取得 |
+| MAC-MCP-CRED-4 | 対象build／直接依存試験、正常切断・終了・所有process／試験資産回収 | CLOSED | source 96beb4142ceca818273582716e843424f863bb30／run 37787435817、通常build、別個Owner切断・一覧解消・Command-Q・helper／MCP残留0・fixture回収。UI 1 PASS／0 FAIL、135.655秒 |
 
 専用手動Actions `macos_mcp_credential_binding`で実Keychainと合成stdio Serverを接続する。既存native Debug fixtureが秘密を生成し、XCTestは秘密を入力・読取・コピーしない。Serverは受信値を内部照合し固定の非秘密結果だけを返す。秘密入力を含むxcresult attachment／動画／画面／全階層dumpをexportしない。登録・接続・Tool・切断は結合の必要な前提／後片付けで、CLOSED条件の強化証拠にしない。正常一回と新consumerの直接境界だけで閉じる。
 
 未対応拒否はconsumer導入前の範囲。本追加契約がnative確認・現record・対象へ限定する。通常資格／参照単独・metadataからの作用拒否は維持する。通常Release `task_execution=unsupported`、`release_ready=false`を保持する。追加fault matrix・正式更新時のKeychain ACL継続・Formal Evidenceは後続／Final QAへ残す。
 
+## 閉鎖証拠
+
+source `96beb4142ceca818273582716e843424f863bb30`、[手動run 37787435817](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37787435817)、trigger=`workflow_dispatch`、target=`macos_mcp_credential_binding`、`mcp_product_only=true`。macOS 15.7.9 arm64／Apple Virtual Machine／Xcode 16.4、Flutter 3.44.0／Rust 1.95.0。新consumerに必要な登録・公開ID選択・別個Owner確認・実Keychainからのstdio受渡し・公開使用時刻・実Tool hash-only結果を前提として通し、残件の別個Owner切断→接続一覧解消→Command-Q終了→helper／MCP残留0・fixture回収・source cleanがPASS。XCUITest 1 passed／0 failed／0 skipped、135.655秒。通常Mac buildと、使用accepted Audit 1件・Tool approved／consumed started／hash-only accepted各1件、MCP切断acceptedの投影もPASS。CLOSED-1〜3の証拠は再利用し、追加検査しない。
+
+artifact `11555820430`（72062 bytes）、SHA-256 `68c424db87f28468781892308ac358a8a5a9c3c1683305692195fe03e12643a0`を実byteへ照合した。成功sourceをmainへfast-forward・pushしremote HEAD一致を確認。一時検証branchをlocal／remote双方から削除した。文書同期前の2世代remote tagは`codex/backup-main`=`96beb4142ceca818273582716e843424f863bb30`、`codex/backup-main-prev`=`4fd0e17dc9f0b83345778897b07af4057334e2b3`。本consumer変更前のrollback pointは後者。
+
+証拠分類は実Keychain／所有stdio／別個native確認／製品UI／正常終了の有限`LIVE_RUNTIME`、新公開参照・投影・否定は`FIXTURE`。native Debug合成秘密とad-hoc test identityの範囲であり、production Credential・署名／配布・一般Vendor互換・第三者内部完全性・Final QAの保証ではない。通常Release `task_execution=unsupported`、`release_ready=false`と既存gateを保持する。ローカルFlutter解析障害・既存日本語監査指摘・過去FAILを下記履歴のまま保持する。次はP13のOPEN製品差分だけ。
+
 ## 検証履歴
+
+以下のFAIL・「OPEN」「未成立」は閉鎖前の観測履歴であり、上記CLOSED状態を上書きしない。
 
 Windowsの`cargo check --locked --manifest-path native/rust_helper/Cargo.toml --lib`と直接依存の資格情報7件はPASS。必須全Rust `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --no-fail-fast -- --test-threads=1`はexit 0でPASS。対象Flutter2件は追跡sourceとSHA-256を照合した既存ASCII試験複製でPASS。初回複製commandは相対source pathを誤って古いsourceを試験したため、そのPASSは本変更の証拠として不採用。絶対pathと全対象byte一致を確認して対象試験を実行した。
 

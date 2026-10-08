@@ -313,6 +313,22 @@
         "artifact_sha256": "38266fe6d8779acc3e6f5b23b6fb73b8df3ce8384997816ba74bfbefdf738194",
         "scope_limit": "現在Catalog／Schema・一回実行・hash-only・所有POSIX group正常停止だけ。Credential注入、Mac Task、別group離脱／crash保証、一般Vendor互換、正式identity／配布、Final QAは後続／既存gate。通常Release task_execution=unsupported、release_ready=falseと既存解析環境FAIL／監査指摘／過去全Rust FAILを保持する。"
       },
+      "macos_mcp_credential_binding_evidence": {
+        "status": "CLOSED",
+        "contract": "docs/specs/macos-mcp-credential-binding.md",
+        "source_commit": "96beb4142ceca818273582716e843424f863bb30",
+        "run_url": "https://github.com/gatchimuchio/D4-POCKET/actions/runs/37787435817",
+        "trigger": "workflow_dispatch",
+        "target": "macos_mcp_credential_binding",
+        "evidence_source": "LIVE_RUNTIME",
+        "validation": "公開ID選択・別個native Owner確認・現在Keychainから対象stdioへ実受渡し・公開使用時刻・使用Auditを前提として通し、別個Owner切断・接続解消・Command-Q・helper／MCP残留0・fixture回収をPASS。XCUITest 1 passed／0 failed／0 skipped、135.655秒。通常Mac build、使用accepted Audit 1件、Tool approved／consumed started／hash-only accepted各1件、切断acceptedがPASS。",
+        "closed_evidence_reused": "MAC-MCP-CRED-1〜3の先行source／runは有限契約を参照。Windows全Rustexit 0・資格情報直接7件・Mac実Keychain直接1件・対象Widget／Windows局所回帰2件・対象Mac Dart解析がPASS。保管庫・資格情報なしMCPのCLOSED条件は再訪しない。",
+        "component_evidence_source": "FIXTURE",
+        "component_scope": "native Debug合成秘密・ad-hoc identityによる有限製品受入れ。公開metadata・用途／対象／失効／環境変数／秘密注入否定とFlutter投影は合成入力。秘密値はRust内だけで、UI承認bool・公開ID・metadataをAuthorityにしない。",
+        "artifact_id": "11555820430",
+        "artifact_sha256": "68c424db87f28468781892308ac358a8a5a9c3c1683305692195fe03e12643a0",
+        "scope_limit": "対象MCP stdioだけへの資格情報結合の有限単位。Provider／Agent／A2A、物理削除、第三者内部保証、正式identity／配布、Final QAへ拡大しない。通常Release task_execution=unsupported、release_ready=false、既存Flutter解析環境FAIL／日本語監査指摘／過去FAILは保持する。"
+      },
       "r2_bounded_exit_gate": {
         "version": 2,
         "phase_acceptance_policy": {
