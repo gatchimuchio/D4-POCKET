@@ -297,6 +297,22 @@
         "artifact_sha256": "3aea639a1fb42cac021bd3410aa58f3712da5bd005671755ec8540fdaaea6ce6",
         "scope_limit": "登録・保管・公開一覧・論理失効の有限単位だけ。Provider／MCP注入、Task、物理削除、正式署名・配布、Final QAと通常Release task_execution=unsupported、release_ready=falseを保持する。Windows全Rustの変更外2 FAIL・Flutter解析障害・日本語監査指摘は履歴のまま保持する。"
       },
+      "macos_mcp_center_evidence": {
+        "status": "CLOSED",
+        "contract": "docs/specs/macos-mcp-center.md",
+        "source_commit": "f472e8ce63e8e890b1e3db5fa8a3da58181a4f5a",
+        "run_url": "https://github.com/gatchimuchio/D4-POCKET/actions/runs/37763440541",
+        "trigger": "workflow_dispatch",
+        "target": "macos_mcp_center",
+        "evidence_source": "LIVE_RUNTIME",
+        "validation": "製品UIの引数全文確認、別個native Owner、実stdio Tool、hash-only結果、一回Permission・Audit、別個Owner切断と一覧解消、Command-Q終了。XCUITest 1 passed／0 failed、98.939秒。通常Mac build、Tool approved／consumed started／hash-only accepted各1件、本文Audit不保存、helper／MCP残留0・fixture回収・source cleanがPASS。",
+        "closed_evidence_reused": "接続／metadataはsource 075312eのrun 37752807608。正常group停止・Mac境界3件・Dart3件／解析・通常buildはsource 94ea619のrun 37749059105。Windows直接依存18件と局所receipt回帰を含む全Rust560 PASS。CLOSED条件の再試験はしない。",
+        "component_evidence_source": "FIXTURE",
+        "component_scope": "合成公開stdio Server／ad-hoc identity／AX表示flagの有限製品受入れ。秘密・Authority注入拒否とFlutter投影は合成入力。native確認から既存Brokerへ接続し、UI承認bool・Owner資格単独・metadataをAuthorityにしない。",
+        "artifact_id": "11542924821",
+        "artifact_sha256": "38266fe6d8779acc3e6f5b23b6fb73b8df3ce8384997816ba74bfbefdf738194",
+        "scope_limit": "現在Catalog／Schema・一回実行・hash-only・所有POSIX group正常停止だけ。Credential注入、Mac Task、別group離脱／crash保証、一般Vendor互換、正式identity／配布、Final QAは後続／既存gate。通常Release task_execution=unsupported、release_ready=falseと既存解析環境FAIL／監査指摘／過去全Rust FAILを保持する。"
+      },
       "r2_bounded_exit_gate": {
         "version": 2,
         "phase_acceptance_policy": {

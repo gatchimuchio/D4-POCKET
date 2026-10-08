@@ -156,7 +156,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "3a962680f44f90b713928fa435ab45673b52156b032f024712d5241dff582017"
+      "sha256": "c87029c877d163d969c998060365b58803da01495e8bfc5d90b4db7bbed9985c"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "1af070cc63c99aa1bd684a5316b25f504b1ed45d231063dd62776e2034586f52"
+      "sha256": "9eb0fa88cd0ab726a40bf22405d33c3ccb9ce6abb81ea71ce3e8d18aa960332f"
     },
     {
       "path": "SECURITY.md",
@@ -1280,7 +1280,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "20c9973232289c9710f86c40cf1ae7c4d4a5bc3aa7aa2f2f583ea9c000efc5f3"
+      "sha256": "c1cf32eef68704f01bbb024af0ae91c4376c437277cd26391e89335527dae97e"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1504,7 +1504,7 @@
     },
     {
       "path": "docs/specs/macos-mcp-center.md",
-      "sha256": "034ae075bc472e4376ab1e0d71c6024c9852ac1f0374af4c1e3da9fbde4e2fdc"
+      "sha256": "56fd583a885b15d0d3aa6843a775794536266778c4dfa9dc0aedf6b8ab5fe2b7"
     },
     {
       "path": "docs/specs/macos-workspace-selection.md",
@@ -4116,7 +4116,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "1a9b306eaa1664ab89b364906c4968093907d839e3168c03023632f0378014d2"
+      "sha256": "9c6aaad95ac943259fa7ad6f4feb0b0fd21f4ed5ac7638d3bac86f2e620dc36b"
     },
     {
       "path": "requirements-dev.txt",

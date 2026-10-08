@@ -1,6 +1,6 @@
 # macOS MCP接続・Tool実行・切断
 
-状態: IMPLEMENTING（P13 Product Build）。現行正本はrev5、`docs/REV5_PRODUCT_PROGRESS.md`と本有限契約。Windows MCP・Mac資格情報保管・CLI／Workspace選択のCLOSED条件を再訪しない。
+状態: CLOSED（P13 Product Build、2026-10-08）。現行正本はrev5、`docs/REV5_PRODUCT_PROGRESS.md`と本有限契約。Windows MCP・Mac資格情報保管・CLI／Workspace選択のCLOSED条件を再訪しない。
 
 ## 意味と責任
 
@@ -21,8 +21,8 @@ Rustの`Command::process_group(0)`で新childを独立process groupへ置く。g
 | ID | 条件 | 状態 | 証拠 |
 | --- | --- | --- | --- |
 | MAC-MCP-1 | native Owner拒否→未接続、承認→実stdio discovery／metadata一覧 | CLOSED | source 075312e、run 37752807608で当該段階PASS |
-| MAC-MCP-2 | 現Tool／Schema再照合、一回Permission・Audit、hash-only実呼出し表示 | FAIL | source 8e5efaa、run 37762114010の既定JSON消去失敗を試験側で局所修正中 |
-| MAC-MCP-3 | 別個Owner切断、所有group停止・記録解消、通常終了 | OPEN | 未取得 |
+| MAC-MCP-2 | 現Tool／Schema再照合、一回Permission・Audit、hash-only実呼出し表示 | CLOSED | source f472e8c、run 37763440541の実Tool／hash-only表示、一回消費AuditがPASS |
+| MAC-MCP-3 | 別個Owner切断、所有group停止・記録解消、通常終了 | CLOSED | 同run native切断、一覧解消、Command-Q、helper／MCP残留0・fixture回収がPASS |
 | MAC-MCP-4 | normal／Owner資格単独、session・Authority／秘密注入、configured Credentialの拒否 | CLOSED | source 94ea619、run 37749059105の対象3件／共有Windows18件PASS |
 | MAC-MCP-5 | 対象test、通常Mac build、Windows直接依存回帰 | CLOSED | 同run対象解析・Flutter3件・通常build PASS、Windows18件PASS |
 
@@ -30,7 +30,21 @@ Rustの`Command::process_group(0)`で新childを独立process groupへ置く。g
 
 通常Release `task_execution=unsupported`、`release_ready=false`を保持する。正式署名・配布・production鍵・Final GOは別関門であり、開発を止めない。
 
+## 閉鎖証拠
+
+source `f472e8ce63e8e890b1e3db5fa8a3da58181a4f5a`、手動Actions [run 37763440541](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37763440541)、`target=macos_mcp_center`／`mcp_product_only=true`で残件だけPASS。macOS 15.7.9 arm64／Apple Virtual Machine／Xcode 16.4、Rust 1.95.0／Flutter 3.44.0。`xcodebuild test ... -only-testing:RunnerUITests/AdapterOwnerUITests/testProductMacMcpToolAndDisconnect`は1 passed／0 failed／0 skipped、98.939秒。通常helper／native部品／Mac製品buildもPASS。既存Debug表示flagはnative確認のAX表示だけで、Owner承認・Brokerの評価を置換しない。
+
+製品UIから現在Toolを選択、実引数の空欄／完全一致と全文確認、別個native Owner確認、実stdio `tools/call`、result hash表示・結果本文非公開を確認。実file-backed AuditはToolのapproved／started（consumed=true）／accepted（hash-only receipt）各1件。公開引数・結果本文のAudit不保存、別個native Owner切断と接続一覧解消、Command-Q終了、helper／MCP process残留0、専用fixture／Workspace回収、runner source cleanまでPASS。これは所有groupと合成公開stdio Serverを使った有限`LIVE_RUNTIME`であり、一般Vendor互換、正式配布、crash／離脱group保証へ拡大しない。境界・Flutter投影の合成試験は`FIXTURE`。
+
+artifact `11542924821`（70132 bytes）、SHA-256 `38266fe6d8779acc3e6f5b23b6fb73b8df3ce8384997816ba74bfbefdf738194`を実byteへ照合し、ignored `release_evidence/p13-macos-mcp-f472e8c/`へ保存。成功sourceをmainへfast-forward・push・remote HEAD照合後、一時`codex/macos-mcp-verify`をlocal／remote双方で削除した。2世代backupは`codex/backup-main`=`f472e8ce63e8e890b1e3db5fa8a3da58181a4f5a`、`codex/backup-main-prev`=`a2f9cba48553de33d5ae4b73e0796dc4ec1a5437`（remoteは同名tag）。製品変更前rollbackは後者、閉鎖文書前rollbackは前者。
+
+共有接続receiptの`REGRESSION_REOPENED`は原因・再現assert・Windows全Rust560 PASSとMac実receipt表示で解消しCLOSED。入力route重複も局所／直接依存各1 PASSと今回実MacのTool作用成立でCLOSED。強化証拠の再試験は行わない。ローカル最終Schema 166／正常例162／負例213、Conformance 240、Manifest 1227、手動workflow限定・release gate・diff checkはPASS。Manifest再生成前のgate不一致と必須両app解析の既知LSP環境FAIL、日本語監査17 findings、過去全Rust FAILを履歴として保持し、この有限PASSで上書きしない。
+
+次はP13のOPEN製品差分だけ。Provider／MCP Credential注入、Mac Task、正式identity／配布とFinal QAは後続／既存release gate。外部component内部の完全性や追加fixtureを本条件へ取り込まない。
+
 ## 検証履歴（閉鎖前）
+
+以下のFAIL・当時の未成立状態は履歴であり、上記CLOSED状態を上書きしない。
 
 2026-10-08のWindows局所検査: Schema 166／正常例162／負例213、Conformance 240、Manifest 1227、手動workflow限定検査、release gate、diff checkはPASS。`cargo check --locked --manifest-path native/rust_helper/Cargo.toml --lib`、新Owner境界2件、共有MCP直接依存18件はPASS。必須全Rust `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --no-fail-fast -- --test-threads=1`はlibrary targetがFAIL（exit 1）であり、全体PASSとはしない。既存Final QAの全Rust失敗履歴を上書きせず、今回のMac有限Acceptanceとは分離する。
 

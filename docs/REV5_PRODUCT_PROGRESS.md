@@ -17,9 +17,13 @@
 
 ## P13 Mobile / Non-Windows — 現行track
 
-#### macOS MCP接続・Tool実行・切断 — IMPLEMENTING（Product Build、2026-10-08）
+#### macOS MCP接続・Tool実行・切断 — CLOSED（Product Build、2026-10-08）
 
-既存stdio client／Brokerの接続・metadata一覧・一回Tool実行・hash-only結果・明示切断をMac native Ownerへ接続する。有限受入れは`docs/specs/macos-mcp-center.md`のMAC-MCP-1〜5だけ。新Protocol／別bridge／Credential注入を追加せず、App Sandbox・現在Catalog／Schema再照合・一回Permission・Audit・結果不明時の隔離を保持する。所有process groupの正常停止と製品経路を確認し、Windows Job Objectの全子孫／crash保証はMacへ転用しない。追加fault／別group離脱／Formal EvidenceはFinal QA／既存platform関門へ残す。CLOSED済みCredential／CLI／Workspace／Mobileの試験は選択しない。
+有限受入れMAC-MCP-1〜5を閉鎖。接続・metadata表示はsource `075312e`のrun 37752807608、境界／対象buildはsource `94ea619`のrun 37749059105の既存PASSを保持し、再訪しない。残件のsource `f472e8ce63e8e890b1e3db5fa8a3da58181a4f5a`、[run 37763440541](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37763440541)で製品UIの公開JSON確認→別個native Owner確認→実stdio Tool→hash-only表示、一回Permission／Audit、別個Owner切断→接続解消→Command-Q→helper／MCP残留0・fixture回収がPASS。XCUITest 1 passed／0 failed、98.939秒。通常Mac製品buildもPASS。実Auditのapproved／consumed started／hash-only acceptedは各1件、本文不保存。App Sandboxと既存Brokerを保持する。
+
+artifact `11542924821`、SHA-256 `38266fe6d8779acc3e6f5b23b6fb73b8df3ce8384997816ba74bfbefdf738194`を実byteへ照合し、成功sourceをmainへfast-forward・push・remote照合、一時branchをlocal／remote双方で回収した。2世代remote backup tagは`codex/backup-main`=`f472e8ce63e8e890b1e3db5fa8a3da58181a4f5a`、`codex/backup-main-prev`=`a2f9cba48553de33d5ae4b73e0796dc4ec1a5437`。有限契約・source mapping・過去FAILは`docs/specs/macos-mcp-center.md`。共有receipt分類の局所regressionとTool入力route重複は修正・対象証拠取得でCLOSED。Windows必須全Rust560 PASS、局所Schema／Conformance 240／Manifest 1227／手動workflow／gateがPASS。必須Flutter解析の既知LSP環境FAIL・日本語監査指摘・過去全Rust FAILは履歴として保持する。
+
+作用は合成公開Serverとad-hoc identityの有限`LIVE_RUNTIME`、投影／入力境界は`FIXTURE`。所有process groupの正常停止だけを保証し、Windows Job Objectの全子孫／crash保証、別group離脱、一般Vendor互換、正式配布へ転用しない。Credential注入・Mac Task・正式identity／配布はP13後続／既存gate、追加fault／Formal Evidenceは延期中Final QA。通常Release `task_execution=unsupported`、`release_ready=false`を保持する。次はP13のOPEN製品差分だけで、CLOSED済み本条件・Credential／CLI／Workspace／Mobileを再試験しない。
 
 #### macOS 資格情報保管庫 — CLOSED（Product Build、2026-10-08）
 

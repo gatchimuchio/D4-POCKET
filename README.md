@@ -344,6 +344,7 @@ Public review snapshot として tag を付けた GitHub Release は、完成製
 - 🧪 **公開 proof pack の境界。** 公開 Windows proof pack には、実測 Windows installed-path evidence に由来する redacted review copy が含まれる。これらは canonical release evidence ではなく、この公開 repository 上の完成製品 release blocker を解消しない。
 - ⚠️ **Windows-first。** Linux validation は development slice であり、最終的な product proof ではない。macOS、iOS、Androidの実機とWindows installed productの現行証拠は別関門であり、supportedまたはrelease proofとして宣伝してはならない。
 - ✅ **P13 Mac資格情報の有限製品受入れはCLOSED。** native秘密入力・別個Owner確認・Keychain登録・公開metadata一覧・論理失効・通常終了が[手動検収run](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37742214244)でPASS。Debug合成秘密とtest identityの範囲であり、Provider／MCP注入・Task・正式配布・最終QAへ拡大しない。契約と過去FAILは[macOS資格情報保管庫](docs/specs/macos-credential-vault.md)を参照。
+- ✅ **P13 Mac MCP接続・Tool・切断の有限製品受入れはCLOSED。** 既存Broker／native Owner経由の実stdio Tool、hash-only表示、一回消費Audit、明示切断・通常終了・process回収が[手動検収run](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37763440541)でPASS。合成公開Serverとtest identityの範囲。Credential注入・離脱group／crash保証・正式配布へ拡大しない。[有限契約と過去FAIL](docs/specs/macos-mcp-center.md)を参照。
 - ⚠️ この基盤作業は、権限を持たない task に対して統制された LLM-readable extension behavior を限定的に実証する。public standard への採用、広範な第三者 interoperability、installed-product behavior は証明しない。
 
 repository 文書にある未完了項目は、すべて <code>release_blocker</code> / <code>post_v1_scope</code> / <code>known_limitation</code> に分類する。[CLAIM.md](CLAIM.md) と [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) を参照すること。
