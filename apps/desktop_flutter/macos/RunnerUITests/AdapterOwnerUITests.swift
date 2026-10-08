@@ -72,11 +72,12 @@ final class AdapterOwnerUITests: XCTestCase {
     guard !app.sheets.firstMatch.exists, !app.secureTextFields.firstMatch.exists else {
       throw failure("秘密入力終了前に公開状態を取得しない")
     }
+    app.activate()
     for attempt in 0..<8 {
       Thread.sleep(forTimeInterval: 0.6)
       // 製品窓だけ。画像・認識文字を保存・添付・出力しない。
       let window = app.windows.firstMatch
-      let image = window.screenshot().image
+      let image = app.screenshot().image
       var proposed = CGRect(origin: .zero, size: image.size)
       guard let pixels = image.cgImage(forProposedRect: &proposed, context: nil, hints: nil) else {
         throw failure("公開資格情報状態の画面を取得できない")
@@ -84,7 +85,7 @@ final class AdapterOwnerUITests: XCTestCase {
       let request = VNRecognizeTextRequest()
       request.recognitionLevel = .accurate
       request.recognitionLanguages = ["ja-JP", "en-US"]
-      request.customWords = ["api_key", "有効", "失効"]
+      request.customWords = ["api_key", "有効", "失効", "資格情報を失効"]
       try VNImageRequestHandler(cgImage: pixels).perform([request])
       let hits = (request.results ?? []).filter {
         guard let text = $0.topCandidates(1).first?.string else { return false }
@@ -96,11 +97,16 @@ final class AdapterOwnerUITests: XCTestCase {
       guard hits.count <= 1 else {
         throw failure("公開資格情報状態を一意に確認できない: " + status)
       }
+      let buttons = (request.results ?? []).filter {
+        guard let action else { return false }
+        return $0.topCandidates(1).first?.string.replacingOccurrences(of: " ", with: "") == action
+      }
+      if action != nil {
+        // 公開状態／操作の件数とgeometryだけ。認識文字・ID・入力値は出さない。
+        print("D4_CREDENTIAL_PUBLIC_ACTION_OBSERVATION \(attempt) row=\(hits.count) action=\(buttons.count) window=\(window.frame) image=\(image.size)")
+      }
       if let row = hits.first {
-        guard let action else { return }
-        let buttons = (request.results ?? []).filter {
-          $0.topCandidates(1).first?.string.replacingOccurrences(of: " ", with: "") == action
-        }
+        guard action != nil else { return }
         guard buttons.count <= 1 else { throw failure("公開失効操作を一意に確認できない") }
         if let button = buttons.first {
           let box = button.boundingBox

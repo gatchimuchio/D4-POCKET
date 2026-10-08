@@ -70,4 +70,6 @@ run `37733367206`／source `3a0579b`は登録・metadata一覧と実表示の`ap
 
 run `37735176741`／source `2a421cc`は対象Dart解析・4 Widget試験、通常build、公開登録・有効状態がPASSし、失効buttonのAX名も取得できた。AX frameが高さ1pxのままのため、可視確認で42.359秒のFAIL。既存失効buttonを名前が読めるTextButtonへ変更し、秘密入力の終了後だけ、製品窓の公開状態と同じ行にある日本語操作名を一意に照合して通常mouse clickする。AX名の存在確認・状態確認・別個Owner確認・失効結果を保持し、1px frameをclick座標へ使わない。画像・認識文字を保存・添付・出力せず、GUI state／Broker応答／Ownerを直接設定しない。artifact `11531049345`のSHA-256 `4407122315b532c7f93ff367eaaf03b9caf0b14588ed3c97bb36fd4511a8ddaf`を照合した。後片付けPASS、有限Acceptance全体は未成立。
 
+run `37736125289`／source `0f09323`は通常build・対象解析／試験・登録／一覧がPASS。Window screenshotへ変更した公開状態／操作の同時照合が未成立で69.679秒のFAILとなった。状態自体か操作文字か撮影対象のどこが原因かは未確定。先に状態照合が成立したApp screenshotへ戻し、通常activateで製品を前面に置く。秘密入力終了後の状態／操作の件数とwindow／image geometryだけを最大8件記録し、文字・ID・入力値・画像を出さない。artifact `11532460461`のSHA-256 `eef80d7f5274b0b1d6f47eeb14eb4de9c57d915b725fc0521ad02fbc126710e9`を照合した。helper回収PASS、失効・終了を未成立のまま保持する。
+
 `release_blocker`: MacでのProvider／MCP注入、正式署名identity・配布、Final QA。通常Release `task_execution=unsupported`、`release_ready=false`を保持する。秘密値の表示、保管方式fallback、Windowsの保存形式migrationを本単位の便宜で追加しない。
