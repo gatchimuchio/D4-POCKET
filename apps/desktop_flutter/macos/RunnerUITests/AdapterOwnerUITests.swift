@@ -77,6 +77,11 @@ final class AdapterOwnerUITests: XCTestCase {
     app.typeKey("a", modifierFlags: .command)
     app.typeKey(XCUIKeyboardKey.delete.rawValue, modifierFlags: [])
     app.typeText("{\"text\":\"macos-public-input\"}")
+    // 通常TabでOSの編集を確定してから、公開JSONだけをAX値で照合する。
+    app.typeKey(XCUIKeyboardKey.tab.rawValue, modifierFlags: [])
+    let publicInput = app.textFields.matching(NSPredicate(
+      format: "value == %@", "{\"text\":\"macos-public-input\"}")).firstMatch
+    XCTAssertTrue(publicInput.waitForExistence(timeout: 5))
     try mcpPublicText(app, "入力内容を確認", click: true, scroll: false)
     let toolConfirmation = app.buttons["Mac確認へ進む"]
     XCTAssertTrue(toolConfirmation.waitForExistence(timeout: 10))
