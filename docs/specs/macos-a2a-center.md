@@ -16,7 +16,7 @@
 
 | ID | 条件 | 状態 | 証拠 |
 | --- | --- | --- | --- |
-| MAC-A2A-1 | 現要求のnative Owner入口、拒否・hash／session／承認注入否定 | OPEN | 新入口の直接境界試験 |
+| MAC-A2A-1 | 現要求のnative Owner入口、拒否・hash／session／承認注入否定 | CLOSED | Windows直接1件・Mac source 5a7294f／run 37794151100直接1件PASS |
 | MAC-A2A-2 | 製品UI→別個native確認→既存Broker→実loopback取得→metadata-only／未審査表示・URI消去・Audit | OPEN | 専用手動Mac製品試験 |
 | MAC-A2A-3 | 対象build・直接依存試験、Command-Q正常終了、helper／専用fixture回収 | OPEN | 対象検査と同じ有限製品試験 |
 
@@ -25,6 +25,8 @@
 通常Release `task_execution=unsupported`、`release_ready=false`を保持する。追加fixture、強化証拠、fault matrix、Formal Evidenceは本受入れへ追加しない。PASSした条件を直ちにCLOSEDとする。
 
 ## 検証履歴
+
+source `5a7294f4d345fbd45c66327c59a11e25ea90b810`、[run 37794151100](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37794151100)は新native入口直接1件、通常native／Mac build、変更Dart解析、待機試験とURI消去Widget各1件がPASS。MAC-A2A-1をCLOSED。製品UIは検索候補のprefix文字を重複検出し、22.014秒でFAIL。接続・native拒否に未到達なのでAudit受入れは未成立、helper／fixture残留0・source cleanはPASS。artifact `11558500960`（73138 bytes）、SHA-256 `504e5815d131af29e74eaae84441080e2c03a0385dcdd6d1f5771de86be59b91`を実byteへ照合。検索候補のA2A接続だけを完全一致に限定する局所locator修正を行い、`a2a_product_only=true`で残件の製品操作だけを再実行する。CLOSED直接境界・成立済み投影は再試験しない。通常buildは試験App生成の前提で、強化証拠にしない。
 
 最初の手動run 37793767655（source a854b49）はUI実行前のnative準備中に中止した。新規証拠gateのshell否定を`set -e`だけへ任せず、Audit本文混入・process残存時に明示終了値1とする局所修正のためで、製品受入れPASS／FAIL証拠へ転用しない。
 

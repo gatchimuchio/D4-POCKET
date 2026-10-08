@@ -360,7 +360,7 @@ final class AdapterOwnerUITests: XCTestCase {
       try VNImageRequestHandler(cgImage: pixels).perform([request])
       let boxes: [VNRectangleObservation] = try (request.results ?? []).compactMap { observation in
         for candidate in observation.topCandidates(3) {
-          if ["切断", "MCP接続"].contains(label) {
+          if ["切断", "MCP接続", "A2A接続"].contains(label) {
             let text = candidate.string.components(separatedBy: .whitespacesAndNewlines).joined()
             if text != label { continue }
           }

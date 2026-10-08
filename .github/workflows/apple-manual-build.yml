@@ -27,6 +27,11 @@ name: Apple platform 手動補助build
         type: boolean
         default: false
         required: false
+      a2a_product_only:
+        description: Mac A2AのCLOSED直接境界・投影を再試験せず製品UI残件だけ
+        type: boolean
+        default: false
+        required: false
 
 permissions:
   contents: read
@@ -48,7 +53,9 @@ jobs:
           mkdir -p evidence
           { git rev-parse HEAD; sw_vers; xcodebuild -version; } > evidence/environment.txt
           rustup toolchain install 1.95.0 --profile minimal
-          cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib macos_a2a_ -- --test-threads=1 2>&1 | tee evidence/a2a-owner-test.txt
+          if [ '${{ inputs.a2a_product_only }}' != 'true' ]; then
+            cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib macos_a2a_ -- --test-threads=1 2>&1 | tee evidence/a2a-owner-test.txt
+          fi
           cargo +1.95.0 build --locked --manifest-path native/rust_helper/Cargo.toml --bin gui_shell_macos_broker --example macos_a2a_fixture 2>&1 | tee evidence/broker-fixture-build.txt
           cargo +1.95.0 build --locked --manifest-path native/macos_owner/Cargo.toml --lib 2>&1 | tee evidence/native-normal-build.txt
       - name: 対象Flutterと有限Mac製品経路
@@ -60,9 +67,11 @@ jobs:
           export PATH="$RUNNER_TEMP/flutter/bin:$PATH"
           cd apps/desktop_flutter
           flutter pub get 2>&1 | tee ../../evidence/pub-get.txt
-          dart analyze lib/services/broker_client.dart test/broker_client_payload_hash_test.dart 2>&1 | tee ../../evidence/dart-analyze.txt
-          flutter test --no-pub test/broker_client_payload_hash_test.dart --plain-name 'Mac A2AはOwner確認と既存HTTP取得の有限待機だけを共有する' 2>&1 | tee ../../evidence/timeout-test.txt
-          flutter test --no-pub test/a2a_connection_center_test.dart --plain-name '画面はmetadataとpending reviewを表示し接続URIを残さない' 2>&1 | tee ../../evidence/a2a-projection-test.txt
+          if [ '${{ inputs.a2a_product_only }}' != 'true' ]; then
+            dart analyze lib/services/broker_client.dart test/broker_client_payload_hash_test.dart 2>&1 | tee ../../evidence/dart-analyze.txt
+            flutter test --no-pub test/broker_client_payload_hash_test.dart --plain-name 'Mac A2AはOwner確認と既存HTTP取得の有限待機だけを共有する' 2>&1 | tee ../../evidence/timeout-test.txt
+            flutter test --no-pub test/a2a_connection_center_test.dart --plain-name '画面はmetadataとpending reviewを表示し接続URIを残さない' 2>&1 | tee ../../evidence/a2a-projection-test.txt
+          fi
           flutter build macos --debug --no-pub 2>&1 | tee ../../evidence/macos-normal-build.txt
           cd ../..
           fixture="$PWD/native/rust_helper/target/debug/examples/macos_a2a_fixture"
