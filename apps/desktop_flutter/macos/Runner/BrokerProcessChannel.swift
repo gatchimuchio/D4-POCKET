@@ -37,7 +37,7 @@ final class BrokerProcessChannel {
             frame.utf8.count < 64 * 1024 else { result(Self.failure()); return }
       if let data = frame.data(using: .utf8),
          let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-         object["native_workspace_selection"] != nil { result(Self.failure()); return }
+         (object["native_workspace_selection"] != nil || object["native_credential_input"] != nil) { result(Self.failure()); return }
       self.request(frame, result: result)
     }
     do {
@@ -127,14 +127,23 @@ final class BrokerProcessChannel {
     let ownerOperations: Set<String> = ["アダプター導入", "アダプター更新", "アダプター検証",
       "アダプター有効化", "アダプター無効化", "アダプター隔離", "アダプター削除"]
     let osSelection = operation == "作業領域OS選択" || operation == "AgentCLI実行fileOS選択"
-    let timeout = operation == "AgentCLI実行系作業領域登録" ? 320 : (osSelection || ownerOperations.contains(operation ?? "") ? 305 : 5)
+    let credentialInput = operation == "資格情報登録"
+    let timeout = credentialInput ? 610 : (operation == "AgentCLI実行系作業領域登録" ? 320 : (operation == "資格情報失効" || osSelection || ownerOperations.contains(operation ?? "") ? 305 : 5))
     DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(timeout)) { complete(nil) }
     queue.async { [weak self] in
       guard let self else { return }
       var output: String?
       var selectionCode: Int32 = 0
       do {
-        if osSelection {
+        if credentialInput {
+          let code = DispatchQueue.main.sync {
+            let bytes = Array(frame.utf8)
+            return bytes.withUnsafeBufferPointer { raw in
+              d4_credential_input_and_write(raw.baseAddress!, raw.count, self.requests.fileHandleForWriting.fileDescriptor)
+            }
+          }
+          guard code != 0 else { throw PipeFailure.closed }
+        } else if osSelection {
           selectionCode = DispatchQueue.main.sync {
             let bytes = Array(frame.utf8)
             return bytes.withUnsafeBufferPointer { raw in

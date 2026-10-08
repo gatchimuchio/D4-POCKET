@@ -40,6 +40,38 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
     let text = if registration {
         let summary = crate::broker::protocol::macos_agent_registration_summary(payload)?;
         format!("{summary}\n要求hash: {hash}")
+    } else if operation == "資格情報失効" {
+        let p = payload.as_object()?;
+        let fields = [
+            "版",
+            "資格情報ID",
+            "用途",
+            "接続対象",
+            "暗号文hash",
+            "作成監査ID",
+        ];
+        let text = |s: &str| !s.is_empty() && s.len() <= 256 && !s.chars().any(char::is_control);
+        let id = p.get("資格情報ID")?.as_str()?;
+        let ciphertext_hash = p.get("暗号文hash")?.as_str()?;
+        if p.len() != fields.len()
+            || !fields.iter().all(|f| p.contains_key(*f))
+            || p.get("版")? != &serde_json::json!(1)
+            || id.len() != 32
+            || !id
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+            || ciphertext_hash.len() != 71
+            || !ciphertext_hash.starts_with("sha256:")
+            || !["用途", "接続対象", "作成監査ID"].iter().all(|f| {
+                p.get(*f)
+                    .and_then(serde_json::Value::as_str)
+                    .is_some_and(text)
+            })
+        {
+            return None;
+        }
+        format!("資格情報を論理失効します。取消できません。\nID: {id}\n用途: {}\n接続対象: {}\n暗号文hash: {ciphertext_hash}\n作成監査ID: {}\n要求hash: {hash}\nBrokerが現在metadataを再照合します。秘密値は表示・物理削除しません。",
+            p["用途"].as_str()?, p["接続対象"].as_str()?, p["作成監査ID"].as_str()?)
     } else if let Some(summary) =
         adapter_center::owner_confirmation_summary(operation.strip_prefix("アダプター")?, payload)
     {

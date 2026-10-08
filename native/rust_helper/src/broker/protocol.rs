@@ -1829,6 +1829,8 @@ impl Broker {
         let metadata_is_fixture = envelope.metadata.len() == 1
             && envelope.metadata[0].key == "client"
             && envelope.metadata[0].value == "r2_e2e_synthetic_owner";
+        let operation_is_allowlisted = operation_is_allowlisted
+            || (cfg!(target_os = "macos") && envelope.operation == Some(BrokerOperation::資格情報登録));
         if !operation_is_allowlisted
             || envelope.session_id.as_deref() != Some(self.session_id.as_str())
             || !metadata_is_fixture

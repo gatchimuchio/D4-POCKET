@@ -161,6 +161,8 @@ fn serve(
     let mut workspace_scopes = Vec::new();
     #[cfg(target_os = "macos")]
     let mut workspace_selection_nonces = std::collections::BTreeSet::new();
+    #[cfg(target_os = "macos")]
+    let mut credential_input_nonces = std::collections::BTreeSet::new();
     let result = (|| {
         ready_rx
             .recv_timeout(Duration::from_secs(15))
@@ -187,6 +189,10 @@ fn serve(
             };
             // private OS bookmarkを上限内のmemoryだけで処理し、処理後に消去する。
             let frame = Zeroizing::new(frame);
+            #[cfg(target_os = "macos")]
+            if let Some(response) = super::macos_credential_input::dispatch_native(&frame, &endpoint.0, &owner_tx, &mut credential_input_nonces, confirm)? {
+                output.write_all(&response)?; output.write_all(b"\n")?; output.flush()?; continue;
+            }
             #[cfg(target_os = "macos")]
             let selection = super::macos_workspace_selection::dispatch_native(
                 &frame,

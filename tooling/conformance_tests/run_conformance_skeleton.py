@@ -10897,6 +10897,18 @@ def test_c28_harness_regressions_are_registered() -> list[str]:
     return ["C28資格file cleanupの有限再試行testが失敗: " + details]
 
 
+def test_macos_credential_public_input_is_metadata_only() -> list[str]:
+    schema = load_schema("macos_credential_input.schema.json")
+    sample = {"版": 1, "資格情報ID": "a" * 32, "用途": "mcp_transport", "接続対象": "server", "種類": "api_key"}
+    errors = []
+    if validate_instance(sample, schema):
+        errors.append("Mac資格情報の公開metadataが拒否された")
+    for field in ("秘密値", "Approval", "Permission", "保管方式", "登録者種別", "登録経路"):
+        if not validate_instance({**sample, field: "injected"}, schema):
+            errors.append(f"Mac資格情報の公開要求に注入できる: {field}")
+    return errors
+
+
 def main() -> int:
     tests = [
         test_required_docs_exist,
@@ -11131,6 +11143,7 @@ def main() -> int:
         手動補助の起動境界を検査する,
         test_macos_workspace_selection_is_native_scoped_and_non_authoritative,
         test_macos_agent_cli_selection_is_non_authoritative,
+        test_macos_credential_public_input_is_metadata_only,
         test_setup_doctor_public_bind_warning_exists,
         test_desktop_setup_doctor_ui_does_not_require_development_toolchains,
         test_broker_parity_startup_timeout_allows_local_cold_build,

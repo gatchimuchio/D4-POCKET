@@ -40,13 +40,15 @@ const _nativeOwnerConfirmationOperations = <String>{
 };
 
 Duration brokerRequestTimeoutForOperation(String operation) =>
-    (operation == '作業領域OS選択' || operation == 'AgentCLI実行fileOS選択')
-        ? const Duration(seconds: 305)
-        : operation == 'AgentCLI実行系作業領域登録'
-            ? const Duration(seconds: 320)
-            : _nativeOwnerConfirmationOperations.contains(operation)
-                ? const Duration(seconds: 305)
-                : const Duration(seconds: 5);
+    operation == '資格情報登録'
+        ? const Duration(seconds: 610)
+        : (operation == '作業領域OS選択' || operation == 'AgentCLI実行fileOS選択')
+            ? const Duration(seconds: 305)
+            : operation == 'AgentCLI実行系作業領域登録'
+                ? const Duration(seconds: 320)
+                : _nativeOwnerConfirmationOperations.contains(operation)
+                    ? const Duration(seconds: 305)
+                    : const Duration(seconds: 5);
 
 class BrokerClient implements BrokerTransport {
   BrokerClient._(this._channel);

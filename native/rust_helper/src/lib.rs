@@ -22,6 +22,8 @@ pub mod macos_desktop_worker;
 mod macos_desktop_owner;
 #[cfg(any(target_os = "macos", test))]
 mod macos_workspace_selection;
+#[cfg(target_os = "macos")]
+mod macos_credential_input;
 pub mod network;
 pub mod process;
 pub mod update_verification;

@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:gui_shell_ui/runtime_dialogue_client.dart' show BrokerTransport;
 
@@ -129,6 +131,20 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
               ),
             ),
             const SizedBox(height: 8),
+            if (defaultTargetPlatform == TargetPlatform.macOS) ...[
+              OutlinedButton.icon(
+                key: const ValueKey('macos-native-credential-register'),
+                onPressed:
+                    _loading || _connecting || _revokingCredentialId != null
+                        ? null
+                        : () => _registerMacCredential(client),
+                icon: const Icon(Icons.lock_outline),
+                label: const Text('native入力で資格情報を登録'),
+              ),
+              const Text(
+                  'Mac Keychainへ登録・一覧・論理失効だけを行います。秘密値はFlutterへ渡しません。MCPへの注入は未対応です。'),
+              const SizedBox(height: 8),
+            ],
             TextField(
               controller: _executableController,
               enabled: !_connecting &&
@@ -451,6 +467,38 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
           _message = 'MCP接続一覧を取得できません。Broker状態とAuditを確認してください。';
         });
       }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _registerMacCredential(McpConnectionClient client) async {
+    final target = _serverIdController.text;
+    final random = Random.secure();
+    // 非秘密の新規record識別子。保存先・権限・Owner資格ではない。
+    final id = List.generate(
+            16, (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0'))
+        .join();
+    setState(() {
+      _loading = true;
+      _message = 'native秘密入力と別個Owner確認を待っています。';
+    });
+    try {
+      await client.registerMacNativeCredential(
+          credentialId: id, targetServerId: target);
+      final entries = await client.listCredentials(targetServerId: target);
+      if (mounted)
+        setState(() {
+          _credentials = entries;
+          _credentialTargetServerId = target;
+          _selectedCredentialId = null;
+          _message = 'Keychain登録後のmetadataを取得しました。秘密値は取得していません。';
+        });
+    } on Object {
+      if (mounted)
+        setState(() {
+          _message = '資格情報登録は未成立です。取消・拒否・期限または保管状態を確認してください。自動再送しません。';
+        });
     } finally {
       if (mounted) setState(() => _loading = false);
     }

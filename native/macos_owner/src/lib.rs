@@ -10,7 +10,7 @@ pub use workspace_transport::PrivateFrame;
 #[cfg(any(target_os = "macos", test))]
 mod credential_input;
 #[cfg(target_os = "macos")]
-pub use credential_input::{CredentialPrivateFrame, valid_credential_input};
+pub use credential_input::{valid_credential_input, CredentialPrivateFrame};
 
 pub const TITLE: &str = "D4 Pocket — 今回の操作を確認";
 pub const DENY: &str = "承認しない";

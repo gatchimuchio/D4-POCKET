@@ -5,3 +5,4 @@
 int32_t d4_workspace_select_and_write(const uint8_t * _Nonnull bytes, size_t count, int32_t pipe_fd);
 void d4_workspace_release_last(void);
 void d4_workspace_release_all(void);
+int32_t d4_credential_input_and_write(const uint8_t * _Nonnull bytes, size_t count, int32_t pipe_fd);

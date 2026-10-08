@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 native/rust_helper/target/
 native/macos_owner/target/
+native/macos_keychain/target/
 native/process_supervision/target/
 native/windows_dns/target/
 native/windows_broker_channel/target/

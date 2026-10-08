@@ -935,8 +935,8 @@ impl Broker {
 }
 
 fn parse_registration(payload: &Value) -> Result<Registration, &'static str> {
-    let registration: Registration = serde_json::from_value(payload.clone())
-        .map_err(|_| "資格情報登録payloadの構造が不正です")?;
+    let registration: Registration =
+        Registration::deserialize(payload).map_err(|_| "資格情報登録payloadの構造が不正です")?;
     if registration.version != VERSION
         || registration.operation != "追加"
         || registration.storage != STORAGE_NAME

@@ -431,7 +431,7 @@ fn run_loopback_server_inner(
         }
         broker.端末期限処理();
         if let Some(owner_operations) = &owner_operations {
-            if let Ok(request) = owner_operations.try_recv() {
+            if let Ok(mut request) = owner_operations.try_recv() {
                 let response = broker.desktop_owner_operation_json_with_all_confirmations(
                     &request.request_json,
                     request.download_confirmation,
@@ -440,6 +440,8 @@ fn run_loopback_server_inner(
                     request.product_uninstall_confirmation,
                     request.product_repair_confirmation,
                 );
+                // native資格情報登録を含むprivate要求本文を応答後に消去する。
+                zeroize::Zeroize::zeroize(&mut request.request_json);
                 let _ = request.reply.send(response);
             }
         }

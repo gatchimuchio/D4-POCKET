@@ -10,7 +10,7 @@
 
 資格情報保存先は、登録・保管対象の点検・許可済み内部読取・新規登録失敗時の回収だけを担う。Permission、Approval、用途・相手への委譲可否、Auditは既存Brokerが所有する。Windows DPAPIの保存形式・検査・権限は変更しない。macOSの保管方式は`macos_keychain`で、既存receiptの`暗号文hash`を平文やKeychain参照のhashへ読み替えない。
 
-macOSでは既存ringのAES-256-GCMで秘密値を暗号化し、鍵と暗号文を別のKeychain itemに保存する。暗号文へversion・nonce・用途／対象IDを結合し、公開receiptは実暗号文のhashだけを返す。KeychainのserviceはRustが検証したBroker storeごとの名前空間、accountは固定の資格情報IDと鍵／暗号文の区別へ限定する。外部payloadからservice、access group、保管先を受け付けず、他App／Audit storeのitemを探索しない。
+macOSでは既存ringのAES-256-GCMで秘密値を暗号化し、鍵と暗号文を別のKeychain itemに保存する。暗号文へversion・nonceを格納し、名前空間／資格情報IDを認証対象へ結合する。用途／接続対象と実暗号文hashは既存Audit recordへ一体で結合する。公開receiptは実暗号文のhashだけを返す。KeychainのserviceはRustが検証したBroker storeごとの名前空間、accountは固定の資格情報IDと鍵／暗号文の区別へ限定する。外部payloadからservice、access group、保管先を受け付けず、他App／Audit storeのitemを探索しない。
 
 OS呼出しは独立Rust部品に限定する。[Apple SecItem API](https://developer.apple.com/documentation/security/adding-a-password-to-the-keychain)と[Data Protection Keychain](https://developer.apple.com/documentation/technotes/tn3137-on-mac-keychains)を使い、同期なし・ThisDeviceOnly・追加専用・重複拒否・無言fallbackなしとする。OS拒否や保管不整合は固定分類でfail-closed。平文、鍵、OSの詳細errorをlogへ出さない。新規登録の途中失敗は今回作成したitemだけを回収し、回収失敗はRecoveryが必要な未成立状態にする。
 
@@ -25,5 +25,9 @@ Flutterは非秘密metadataだけを送る。通常GUI親processの固定Rust UI
 ## 検証範囲
 
 ローカルは既存Windows保存先の直接依存回帰、新公開payload・秘密／Authority注入拒否、Widget投影を対象とする。手動Actions `macos_credential_vault`でKeychain実API、通常Mac build、製品native入力・別個確認・一覧・失効・終了を検証する。合成秘密値はnative試験内で生成し、CLI引数・環境変数・XCTest入力log・動画・artifactへ渡さない。
+
+native入力は16 KiB・300秒以内、別個Owner確認も300秒以内に限定し、元要求のBroker freshness windowは更新しない。合成native入力を用いる`credential-ui-fixture`はDebug専用で、通常buildには含めない。
+
+検証履歴: 初回手動run `37716975012`／source `c5c0f7b`は新しいMac dependencyのlock更新漏れでbuild前FAIL。Keychain実APIの成功・失敗の証拠ではない。lockを更新して同一検証branchで再試験する。
 
 `release_blocker`: MacでのProvider／MCP注入、正式署名identity・配布、Final QA。通常Release `task_execution=unsupported`、`release_ready=false`を保持する。秘密値の表示、保管方式fallback、Windowsの保存形式migrationを本単位の便宜で追加しない。
