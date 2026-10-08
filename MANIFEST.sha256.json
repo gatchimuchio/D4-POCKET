@@ -72,7 +72,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "b63aa594429d10a285d78eb075864b79b244a8a852e8cd2b26194601b3dbb112"
+      "sha256": "7eb4e7a8163034e620e678a67e74c6f4efa63c2529260108c20e61ad7017b636"
     },
     {
       "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
@@ -568,7 +568,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/RunnerUITests/AdapterOwnerUITests.swift",
-      "sha256": "d96d35be8d92d19470fc57c8303cef4d76f0887c028486a0b278c8013d0f719f"
+      "sha256": "60fb36e1da59c65ab837534b1dfa91a62538aa4ef26b21e39ecfd89b68d08f5c"
     },
     {
       "path": "apps/desktop_flutter/pubspec.lock",
@@ -1504,7 +1504,7 @@
     },
     {
       "path": "docs/specs/macos-mcp-center.md",
-      "sha256": "d9f06870d09ed4a42d204a2014d3b70a172adc1cdb1daeb46eca073943b61e74"
+      "sha256": "e81b6011b220c58aed2a5680f92122afdd2de266749ed1ec87d82ad0339f7492"
     },
     {
       "path": "docs/specs/macos-workspace-selection.md",

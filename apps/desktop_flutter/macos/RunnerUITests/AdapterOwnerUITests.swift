@@ -88,7 +88,8 @@ final class AdapterOwnerUITests: XCTestCase {
       try VNImageRequestHandler(cgImage: pixels).perform([request])
       let boxes: [VNRectangleObservation] = try (request.results ?? []).compactMap { observation in
         for candidate in observation.topCandidates(3) {
-          if label == "切断" && candidate.string.trimmingCharacters(in: .whitespacesAndNewlines) != label { continue }
+          if ["切断", "MCP接続"].contains(label)
+              && candidate.string.components(separatedBy: .whitespacesAndNewlines).joined() != label { continue }
           if let range = candidate.string.range(of: label),
              let box = try candidate.boundingBox(for: range) { return box }
         }

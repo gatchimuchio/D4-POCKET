@@ -20,6 +20,11 @@ name: Apple platform 手動補助build
           - macos_mcp_center
         default: all
         required: true
+      mcp_product_only:
+        description: Mac MCPの境界と対象buildがCLOSED後は製品UI残件だけ
+        type: boolean
+        default: false
+        required: false
 
 permissions:
   contents: read
@@ -41,8 +46,10 @@ jobs:
           mkdir -p evidence
           { git rev-parse HEAD; sw_vers; xcodebuild -version; } > evidence/environment.txt
           rustup toolchain install 1.95.0 --profile minimal
-          cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib macos_owned_group_ -- --test-threads=1 2>&1 | tee evidence/group-runtime-test.txt
-          cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib macos_mcp_ -- --test-threads=1 2>&1 | tee evidence/mcp-owner-boundary-test.txt
+          if [ '${{ inputs.mcp_product_only }}' != 'true' ]; then
+            cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib macos_owned_group_ -- --test-threads=1 2>&1 | tee evidence/group-runtime-test.txt
+            cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib macos_mcp_ -- --test-threads=1 2>&1 | tee evidence/mcp-owner-boundary-test.txt
+          fi
           cargo +1.95.0 build --locked --manifest-path native/rust_helper/Cargo.toml --bin gui_shell_macos_broker --example macos_mcp_fixture 2>&1 | tee evidence/broker-fixture-build.txt
           cargo +1.95.0 build --locked --manifest-path native/macos_owner/Cargo.toml --lib 2>&1 | tee evidence/native-normal-build.txt
           test "$HOME" = /Users/runner
@@ -60,9 +67,11 @@ jobs:
           export PATH="$RUNNER_TEMP/flutter/bin:$PATH"
           cd apps/desktop_flutter
           flutter pub get 2>&1 | tee ../../evidence/pub-get.txt
-          dart analyze lib/services/broker_client.dart lib/services/mcp_connection_client.dart lib/screens/mcp_connection_center.dart test/broker_client_payload_hash_test.dart test/mcp_connection_center_test.dart 2>&1 | tee ../../evidence/dart-analyze.txt
-          flutter test --no-pub test/broker_client_payload_hash_test.dart --plain-name 'Mac MCPだけはOwner確認とstdio処理の有限待機を共有する' 2>&1 | tee ../../evidence/timeout-test.txt
-          flutter test --no-pub test/mcp_connection_center_test.dart --plain-name 'Mac MCP' 2>&1 | tee ../../evidence/projection-test.txt
+          if [ '${{ inputs.mcp_product_only }}' != 'true' ]; then
+            dart analyze lib/services/broker_client.dart lib/services/mcp_connection_client.dart lib/screens/mcp_connection_center.dart test/broker_client_payload_hash_test.dart test/mcp_connection_center_test.dart 2>&1 | tee ../../evidence/dart-analyze.txt
+            flutter test --no-pub test/broker_client_payload_hash_test.dart --plain-name 'Mac MCPだけはOwner確認とstdio処理の有限待機を共有する' 2>&1 | tee ../../evidence/timeout-test.txt
+            flutter test --no-pub test/mcp_connection_center_test.dart --plain-name 'Mac MCP' 2>&1 | tee ../../evidence/projection-test.txt
+          fi
           flutter build macos --debug --no-pub 2>&1 | tee ../../evidence/macos-normal-build.txt
           cd ../..
           xcodebuild test -project apps/desktop_flutter/macos/Runner.xcodeproj -scheme Runner \

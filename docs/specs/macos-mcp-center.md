@@ -23,8 +23,8 @@ Rustの`Command::process_group(0)`で新childを独立process groupへ置く。g
 | MAC-MCP-1 | native Owner拒否→未接続、承認→実stdio discovery／metadata一覧 | OPEN | 未取得 |
 | MAC-MCP-2 | 現Tool／Schema再照合、一回Permission・Audit、hash-only実呼出し表示 | OPEN | 未取得 |
 | MAC-MCP-3 | 別個Owner切断、所有group停止・記録解消、通常終了 | OPEN | 未取得 |
-| MAC-MCP-4 | normal／Owner資格単独、session・Authority／秘密注入、configured Credentialの拒否 | OPEN | 未取得 |
-| MAC-MCP-5 | 対象test、通常Mac build、Windows直接依存回帰 | OPEN | 未取得 |
+| MAC-MCP-4 | normal／Owner資格単独、session・Authority／秘密注入、configured Credentialの拒否 | CLOSED | source 94ea619、run 37749059105の対象3件／共有Windows18件PASS |
+| MAC-MCP-5 | 対象test、通常Mac build、Windows直接依存回帰 | CLOSED | 同run対象解析・Flutter3件・通常build PASS、Windows18件PASS |
 
 合成Rust stdio Serverとad-hoc test identityを手動Actions `macos_mcp_center`で使用する。秘密入力や資格情報の再登録を行わず、CLOSED試験を選択しない。正常製品経路一回と対象境界で閉じ、長時間・fault matrix・Formal Evidenceを追加しない。source／build／対象試験／happy path／Authority結果だけを記録する。
 
@@ -35,3 +35,5 @@ Rustの`Command::process_group(0)`で新childを独立process groupへ置く。g
 2026-10-08のWindows局所検査: Schema 166／正常例162／負例213、Conformance 240、Manifest 1227、手動workflow限定検査、release gate、diff checkはPASS。`cargo check --locked --manifest-path native/rust_helper/Cargo.toml --lib`、新Owner境界2件、共有MCP直接依存18件はPASS。必須全Rust `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --no-fail-fast -- --test-threads=1`はlibrary targetがFAIL（exit 1）であり、全体PASSとはしない。既存Final QAの全Rust失敗履歴を上書きせず、今回のMac有限Acceptanceとは分離する。
 
 必須両appの`flutter analyze --no-pub`は通常checkoutの既知LSP FormatException／server exit 255でFAIL。sourceだけを複製した既存ASCII一時checkoutでも対象`dart analyze`がperf witness file削除不能／server shutdownでFAILした。回避をproductionへ追加せず、Macの対象解析へ送る。ASCII上の新Mac接続／投影2件、待機1件はPASS。投影test初回はdebug platform変数の復元時点が遅くFAILし、test body終了前へ復元を移して対象だけ修正した。静的日本語監査の新fixture診断1指摘は修正済み、残り既存5 file／17指摘はFAILのまま。全体rustfmt checkの既存広範差分は一括整形せず保持する。Mac実process group・native UIの有限条件は専用手動Actionsまで未成立。
+
+source `94ea61991060a2d47760e44c259225d2077222b9`、手動Actions [run 37749059105](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37749059105)はgroup実停止1件、Mac Owner対象3件、対象Dart解析、Flutter3件、通常Mac buildがPASS。MAC-MCP-4／5はCLOSED。製品UIは検索候補`MCP接続`のsubstringが複数に一致して21.095秒でFAILし、接続前に終了した。候補全文一致へ試験だけ局所修正する。artifact `11537058410`（76906 bytes）、SHA-256 `4ca0d1d36e2d14a47063e9dfc72c61149c34afc3721f636d66223692a5dafc7c`を実byteへ照合済み。以後の`mcp_product_only=true`はMAC-MCP-1〜3だけを検証し、4／5の試験を再訪しない。新runner上のcompileは製品UI試験の前提準備であり、成立済み条件の代替証拠を増やす目的ではない。
