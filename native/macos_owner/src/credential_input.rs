@@ -201,7 +201,7 @@ pub unsafe extern "C" fn d4_credential_input_and_write(
             }
         }
     });
-    alert.beginSheetModalForWindow_completionHandler(&window, &handler);
+    alert.beginSheetModalForWindow_completionHandler(&window, Some(&handler));
     1
 }
 

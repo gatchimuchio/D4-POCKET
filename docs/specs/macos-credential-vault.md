@@ -30,4 +30,6 @@ native入力は16 KiB・300秒以内、別個Owner確認も300秒以内に限定
 
 検証履歴: 初回手動run `37716975012`／source `c5c0f7b`は新しいMac dependencyのlock更新漏れでbuild前FAIL。Keychain実APIの成功・失敗の証拠ではない。lockを更新して同一検証branchで再試験する。
 
+run `37717772590`／source `a28625c`はNSAlertのcallback型がOptionである点の不一致でcompile FAIL。OS動作の失敗とは扱わず、実際の固定bindingに合わせて局所修正する。
+
 `release_blocker`: MacでのProvider／MCP注入、正式署名identity・配布、Final QA。通常Release `task_execution=unsupported`、`release_ready=false`を保持する。秘密値の表示、保管方式fallback、Windowsの保存形式migrationを本単位の便宜で追加しない。
