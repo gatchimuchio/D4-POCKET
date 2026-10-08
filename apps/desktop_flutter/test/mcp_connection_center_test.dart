@@ -2,6 +2,7 @@ import 'dart:ui' show SemanticsAction, SemanticsFlag;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gui_shell_desktop/screens/mcp_connection_center.dart';
 import 'package:gui_shell_desktop/services/mcp_connection_client.dart';
@@ -615,6 +616,52 @@ void main() {
     expect(find.textContaining('result hash: sha256:'), findsOneWidget);
     expect(find.textContaining('SECRET_RESULT_MARKER'), findsNothing);
     expect(find.textContaining('needle'), findsNothing);
+  });
+
+  testWidgets('Mac MCP Toolの入力確認は小さい製品窓でも画面を破壊しない', (tester) async {
+    final semantics = tester.ensureSemantics();
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    tester.view.physicalSize = const Size(800, 600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final transport = _McpTransport();
+    await tester.pumpWidget(MaterialApp(
+      locale: const Locale('ja', 'JP'),
+      supportedLocales: const [Locale('ja', 'JP')],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      theme: ThemeData(useMaterial3: true, visualDensity: VisualDensity.compact),
+      home: Scaffold(body: McpConnectionCenterPanel(transport: transport)),
+    ));
+    await tester.ensureVisible(find.text('接続一覧を取得'));
+    await tester.tap(find.text('接続一覧を取得'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Tool一覧：1件'));
+    await tester.tap(find.text('Tool一覧：1件'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('確認して実行'));
+    await tester.tap(find.text('確認して実行'));
+    await tester.pumpAndSettle();
+    final editor = find.byType(TextField).last;
+    await tester.tap(editor);
+    await tester.enterText(editor, '{"text":"macos-public-input"}');
+    await tester.tap(find.text('入力内容を確認'));
+    await tester.pump();
+    // 入力routeの終了中に確認routeを重ねず、秘密なしの本文を順に確認する。
+    expect(find.byType(AlertDialog).evaluate().length, lessThanOrEqualTo(1));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.textContaining('"text": "macos-public-input"'), findsOneWidget);
+    expect(transport.operations, ['MCP接続一覧']);
+    await tester.tap(find.text('Mac確認へ進む'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(transport.operations, ['MCP接続一覧', 'MCP Tool実行']);
+    expect(find.textContaining('result hash: sha256:'), findsOneWidget);
+    expect(find.textContaining('SECRET_RESULT_MARKER'), findsNothing);
+    semantics.dispose();
+    debugDefaultTargetPlatformOverride = null;
   });
 
   testWidgets('Desktop panelは秘密値を求めず接続設定をBrokerへ送る', (tester) async {

@@ -72,6 +72,7 @@ jobs:
             flutter test --no-pub test/broker_client_payload_hash_test.dart --plain-name 'Mac MCPだけはOwner確認とstdio処理の有限待機を共有する' 2>&1 | tee ../../evidence/timeout-test.txt
             flutter test --no-pub test/mcp_connection_center_test.dart --plain-name 'Mac MCP' 2>&1 | tee ../../evidence/projection-test.txt
           fi
+          flutter test --no-pub test/mcp_connection_center_test.dart --plain-name 'Mac MCP Toolの入力確認' 2>&1 | tee ../../evidence/tool-dialog-regression.txt
           flutter build macos --debug --no-pub 2>&1 | tee ../../evidence/macos-normal-build.txt
           cd ../..
           mcp_test=testProductMacMcpCenter

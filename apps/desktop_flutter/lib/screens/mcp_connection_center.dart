@@ -620,11 +620,27 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
     McpConnectionSummary connection,
     McpToolSummary tool,
   ) async {
+    Future<T?> showToolStep<T>(WidgetBuilder builder) async {
+      final navigator = Navigator.of(context, rootNavigator: true);
+      final route = DialogRoute<T>(
+        context: context,
+        builder: builder,
+        themes: InheritedTheme.capture(from: context, to: navigator.context),
+        barrierColor: DialogTheme.of(context).barrierColor ??
+            Theme.of(context).dialogTheme.barrierColor ??
+            Colors.black54,
+        traversalEdgeBehavior: TraversalEdgeBehavior.closedLoop,
+      );
+      final result = await navigator.push(route);
+      // popの通知では入力widgetがまだ残る。OS確認へ進む前にroute終了を待つ。
+      await route.completed;
+      return result;
+    }
+
     final controller = TextEditingController(text: '{}');
     try {
-      final raw = await showDialog<String>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
+      final raw = await showToolStep<String>(
+        (dialogContext) => AlertDialog(
           title: Text('${tool.name} のarguments'),
           content: SizedBox(
             width: 560,
@@ -679,9 +695,8 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
         return;
       }
       final preview = const JsonEncoder.withIndent('  ').convert(arguments);
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
+      final confirmed = await showToolStep<bool>(
+        (dialogContext) => AlertDialog(
           title: const Text('送信する引数を確認'),
           content: SizedBox(
             width: 560,

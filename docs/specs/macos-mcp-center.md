@@ -21,7 +21,7 @@ Rustの`Command::process_group(0)`で新childを独立process groupへ置く。g
 | ID | 条件 | 状態 | 証拠 |
 | --- | --- | --- | --- |
 | MAC-MCP-1 | native Owner拒否→未接続、承認→実stdio discovery／metadata一覧 | CLOSED | source 075312e、run 37752807608で当該段階PASS |
-| MAC-MCP-2 | 現Tool／Schema再照合、一回Permission・Audit、hash-only実呼出し表示 | OPEN | 未取得 |
+| MAC-MCP-2 | 現Tool／Schema再照合、一回Permission・Audit、hash-only実呼出し表示 | FAIL | source 46e13e9、run 37754461227の入力route切替失敗を局所修正中 |
 | MAC-MCP-3 | 別個Owner切断、所有group停止・記録解消、通常終了 | OPEN | 未取得 |
 | MAC-MCP-4 | normal／Owner資格単独、session・Authority／秘密注入、configured Credentialの拒否 | CLOSED | source 94ea619、run 37749059105の対象3件／共有Windows18件PASS |
 | MAC-MCP-5 | 対象test、通常Mac build、Windows直接依存回帰 | CLOSED | 同run対象解析・Flutter3件・通常build PASS、Windows18件PASS |
@@ -45,3 +45,9 @@ source `357432b06e7fb712aab6a2a9e4b18f38f68ba656`、[run 37750370848](https://gi
 同局所修正後の必須Windows全Rustは560 passed／0 failed／13 ignored（exit 0）。接続receiptの実stdio回帰assertを含む。Schema 166／正常例162／負例213、Conformance 240もPASS。先行全RustのFAILや既存Final QAの間欠的失敗を消さず、このPASSをその根因修正の証拠へ流用しない。MacのMAC-MCP-1〜3は製品UI確認まで未成立。
 
 source `075312e497c2d0595cf4266597cf635f389ef7f0`、[run 37752807608](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37752807608)でnative拒否／承認、実discovery、接続receiptと実metadataの製品表示がPASSし、MAC-MCP-1をCLOSED。Tool JSON入力まで進んだが、公開文字照合で`Mac確認へ進む`を取得できず104.566秒でFAIL。artifact `11539326003`（70412 bytes）、SHA-256 `f1bbe931c5330900fbc0f33ba1d247f71b941a0b22263ce7420ea6e558e45a91`を実byteへ照合。Toolの同じ可視buttonをAX identity／window frameで照合するよう試験だけ修正する。以後は`testProductMacMcpToolAndDisconnect`でMAC-MCP-2／3だけを検査し、接続は前提準備として一回承認、CLOSEDした拒否・metadata条件を再試験しない。失敗時だけ合成公開画面を製品窓へ限定して診断し、秘密入力／実資格は含めない。
+
+source `46e13e901bd1770c202d19406503e41d6fc1b736`、[run 37754461227](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37754461227)は93.332秒でFAIL。artifact `11539623266`（11635213 bytes）、SHA-256 `f3aa55dc1980fed3e5913dbf147e4402a6b0a2c83fe0a2193d4c85b793135ec2`を実byteへ照合した。合成公開画面の動画／AXを読むと、確認buttonの認識問題ではなく、入力dialogを閉じた直後のFlutter `_dependents.isEmpty` assertionで製品画面が回復不能表示へ移っていた。通常widget試験で同assertionを再現したとは主張しない。日本語・800×600・Mac投影・Semantics有効の局所試験では、入力route終了前に確認routeが重なり2 dialogになることをFAILで観測した。
+
+入力／確認の2段階だけをFlutter標準`DialogRoute`へ接続し、`pop`通知ではなく`route.completed`（animation・overlay撤去完了）を待つ。任意sleep、検査抑制、秘密／Owner確認迂回は使わない。入力controllerの破棄と次のUI／native確認の順序だけを明示する恒久的UI lifecycle修正であり、Broker payload・Permission・Auditを変更しない。元の2段階UI導入commitは`04a5bbb4`。実Macの失敗がこの修正で解消するかは、MAC-MCP-2／3の残件runで判定する。既存CLOSED条件の再試験や外部Flutter内部の完全性調査へ広げない。
+
+上記route重複の局所試験は修正前FAIL（2 dialog）、修正後1件PASS、共有Windowsの既存Tool確認直接依存1件もPASS。Mac assertion自体の再現・根因完全証明とは分ける。新試験の初稿では未提供matcherとSemanticsHandleの終了時点を誤りFAILし、提供済みmatcher／test body内解放へ修正した。mandatory両app解析は既知日本語checkoutのLSP FormatException／exit 255で引き続きFAIL、製品への環境回避は追加しない。
