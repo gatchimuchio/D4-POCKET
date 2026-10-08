@@ -72,7 +72,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "249b6ceb559027c55f0d45e855c3f4c08af6911be68734608a9f46e184ca3a45"
+      "sha256": "bc062347ccbd4872ea6e3410c94f9055764bffb6e6cefc8cf97f7bf3b9dfea0c"
     },
     {
       "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
@@ -256,7 +256,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/mcp_connection_center.dart",
-      "sha256": "6375f95f8cbfa6e3f8bd3c8ec73a969201d0de5f77df745d5f4655096ca9a58c"
+      "sha256": "650af6dca034d3ff6efcba8f24d3f24a014674c502d26cdfa61f69c7d3811ce3"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/notifications.dart",
@@ -568,7 +568,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/RunnerUITests/AdapterOwnerUITests.swift",
-      "sha256": "57cd5ae957bc9c1bdeb397926bd9808c7f18dcf0e0a4077df5f98a50ea034146"
+      "sha256": "a76602dda2940065a26a36d28f70ba661c2c2b65cad4475dcca0c7f50be42805"
     },
     {
       "path": "apps/desktop_flutter/pubspec.lock",
@@ -636,7 +636,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/mcp_connection_center_test.dart",
-      "sha256": "a1c74f7a59424cfb2953906947e2aed0826f1cc1445eb5c9cec7749e88df8a28"
+      "sha256": "47a816b6eaf9a58fce360adf55b3590823fa4b5ab61589aec02e5f7f10b4b5c7"
     },
     {
       "path": "apps/desktop_flutter/test/module_pruning_test.dart",
@@ -1504,7 +1504,7 @@
     },
     {
       "path": "docs/specs/macos-mcp-center.md",
-      "sha256": "666682522fb977bf154a155b2193b09d564ba61c6282014b4ca8d204b79af492"
+      "sha256": "9468142aab7c83fc3c82452a8be8fb944c9f89ae1cb9660200095a2a65dc5781"
     },
     {
       "path": "docs/specs/macos-workspace-selection.md",

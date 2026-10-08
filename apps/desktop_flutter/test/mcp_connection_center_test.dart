@@ -644,11 +644,6 @@ void main() {
     await tester.tap(find.text('確認して実行'));
     await tester.pumpAndSettle();
     final editor = find.byType(TextField).last;
-    final input = tester.widget<TextField>(editor);
-    expect(input.autocorrect, isFalse);
-    expect(input.enableSuggestions, isFalse);
-    expect(input.smartQuotesType, SmartQuotesType.disabled);
-    expect(input.smartDashesType, SmartDashesType.disabled);
     await tester.tap(editor);
     await tester.enterText(editor, '{"text":"macos-public-input"}');
     await tester.tap(find.text('入力内容を確認'));

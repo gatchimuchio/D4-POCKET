@@ -73,15 +73,15 @@ final class AdapterOwnerUITests: XCTestCase {
     if verifyConnection { try mcpPublicText(app, "Mac MCP試験Server") }
     try mcpPublicText(app, "Tool一覧", click: true)
     try mcpPublicText(app, "確認して実行", click: true)
-    try mcpPublicText(app, "JSON形式のobject", click: true, scroll: false)
+    try mcpPublicText(app, "JSON形式のobject", scroll: false)
+    let argumentEditor = app.textFields.matching(NSPredicate(format: "value == %@", "{}")).firstMatch
+    XCTAssertTrue(argumentEditor.waitForExistence(timeout: 5))
+    XCTAssertTrue(app.windows.firstMatch.frame.contains(argumentEditor.frame))
+    argumentEditor.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
     app.typeKey("a", modifierFlags: .command)
     app.typeKey(XCUIKeyboardKey.delete.rawValue, modifierFlags: [])
-    app.typeText("{\"text\":\"macos-public-input\"}")
-    // 通常TabでOSの編集を確定してから、公開JSONだけをAX値で照合する。
-    app.typeKey(XCUIKeyboardKey.tab.rawValue, modifierFlags: [])
-    let publicInput = app.textFields.matching(NSPredicate(
-      format: "value == %@", "{\"text\":\"macos-public-input\"}")).firstMatch
-    XCTAssertTrue(publicInput.waitForExistence(timeout: 5))
+    argumentEditor.typeText("{\"text\":\"macos-public-input\"}")
+    XCTAssertEqual(argumentEditor.value as? String, "{\"text\":\"macos-public-input\"}")
     try mcpPublicText(app, "入力内容を確認", click: true, scroll: false)
     let toolConfirmation = app.buttons["Mac確認へ進む"]
     XCTAssertTrue(toolConfirmation.waitForExistence(timeout: 10))

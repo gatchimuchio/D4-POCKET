@@ -652,10 +652,6 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
                 const SizedBox(height: 8),
                 TextField(
                   controller: controller,
-                  autocorrect: false,
-                  enableSuggestions: false,
-                  smartQuotesType: SmartQuotesType.disabled,
-                  smartDashesType: SmartDashesType.disabled,
                   minLines: 5,
                   maxLines: 14,
                   decoration: const InputDecoration(
