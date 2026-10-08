@@ -51,11 +51,11 @@ final class AdapterOwnerUITests: XCTestCase {
       XCTFail("Keychain登録と公開metadata一覧の成立を確認できない")
       return
     }
-    XCTAssertTrue(credentialMessage(app, "api_key ・ 有効").exists)
+    XCTAssertTrue(credentialStatus(app, "有効").waitForExistence(timeout: 10))
     let revoke = app.buttons["資格情報を失効"]
     XCTAssertTrue(revoke.waitForExistence(timeout: 10)); reveal(app, revoke); revoke.click()
     approve(notice)
-    XCTAssertTrue(credentialMessage(app, "api_key ・ 失効").waitForExistence(timeout: 15))
+    XCTAssertTrue(credentialStatus(app, "失効").waitForExistence(timeout: 15))
     print("D4_MACOS_CREDENTIAL_VAULT_PRODUCT_PASS")
     app.typeKey("q", modifierFlags: .command)
     XCTAssertTrue(app.wait(for: .notRunning, timeout: 10))
@@ -65,6 +65,12 @@ final class AdapterOwnerUITests: XCTestCase {
     // 取消後の全階層AX queryはtimeoutとなった。公開状態文の要素種別だけを照合する。
     app.staticTexts.matching(NSPredicate(format: "label == %@ OR value == %@ OR label BEGINSWITH %@",
                                         label, label, label + "\n")).firstMatch
+  }
+
+  private func credentialStatus(_ app: XCUIApplication, _ status: String) -> XCUIElement {
+    // ListTileはtitle／subtitleをまとめたgroupで、状態文のStaticTextとは別。
+    // 値や全階層を評価せず、公開titleを持つgroupのlabelだけに束縛する。
+    app.otherElements.matching(NSPredicate(format: "label BEGINSWITH %@", "api_key ・ " + status)).firstMatch
   }
 
   private func clickCredentialPublicText(_ app: XCUIApplication, _ label: String, scroll: Bool) throws {

@@ -60,4 +60,6 @@ run `37728913821`／source `c5d36fd`は取消後の未成立投影、二度目�
 
 通常Owner gate修正のローカル検証: 新gate 1件と資格情報直接依存7件はPASS。Windowsの`r2-e2e` feature付き新gate試験も1件PASSし、試験専用Ownerの登録拒否を確認した。Macは通常featureだけの新gate試験と製品操作を次の手動runnerで確認する。新試験の初回compileは存在しない通常処理method名でFAILし、既存`handle`へ修正した。対象試験と全体試験の同時実行では同じtest exeへのlinkがLNK1104でFAILし、全体試験終了後の対象再実行で解消した。環境保護や製品codeで回避しない。必須Windows全Rustは556 PASS／2 FAIL／13 ignored、変更外A2A応答読取failureとCodex loopback途中ConnectionReset（ignored `release_evidence/p13-macos-credential-windows-owner-fix.txt`）。既存Final QAの`release_blocker`履歴へ残し、全体PASSや根因解消へ読み替えない。Schema 166／正常162／負例213、Conformance 239、手動起動限定・Manifest・差分検査はPASS。
 
+run `37731078599`／source `92b3bba`は新しい通常Mac Owner gate試験、実Keychain API、native公開境界・Dart 3件・通常buildがPASS。製品UIでは取消→未成立投影→native秘密入力→別個Owner承認→登録成功文まで成立。既存Auditの固定診断は取消を`credential_owner_required`、登録・一覧を`accepted`と記録した。ListTileの公開状態titleをStaticTextとして取得できず37.174秒でFAIL。状態titleを持つgroupのlabelだけへ試験を限定し、値・全階層・秘密入力を取得しない。論理失効・通常終了を含む有限Acceptance全体は未成立のまま保持する。artifact `11530361014`のSHA-256 `53347c0c6d42e8f0db8a50f7be8efa31f5954011433540111394f41767ea65a6`を照合した。helper回収PASS、製品source・Authority・保存方式は変更しない。
+
 `release_blocker`: MacでのProvider／MCP注入、正式署名identity・配布、Final QA。通常Release `task_execution=unsupported`、`release_ready=false`を保持する。秘密値の表示、保管方式fallback、Windowsの保存形式migrationを本単位の便宜で追加しない。

@@ -568,7 +568,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/RunnerUITests/AdapterOwnerUITests.swift",
-      "sha256": "4bad0b529d81b6e406b7eaa02a2cf93222cd36ab78aedc7a9e7e5b437ef84550"
+      "sha256": "5cc14badb19afc63018f447bc93b1cd152adf6351ac6ecab1d867e304cf6f517"
     },
     {
       "path": "apps/desktop_flutter/pubspec.lock",
@@ -1496,7 +1496,7 @@
     },
     {
       "path": "docs/specs/macos-credential-vault.md",
-      "sha256": "82eb738f9168b66b882f3b4ba471956288f4cc8551ee076f1413716172425ffc"
+      "sha256": "272cf4f102926c7e1233c96707ee3099f9bcf7285f60ea297055205d187818b2"
     },
     {
       "path": "docs/specs/macos-desktop-channel.md",
