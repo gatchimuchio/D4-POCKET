@@ -40,4 +40,6 @@ run `37718454089`／source `8b91a57`はMac compile成立後、Keychain追加実A
 
 run `37719651894`／source `a5ff90f`は固定user Keychainの実API試験1件、native公開境界1件、新Dart解析・3試験がPASS。通常Mac buildでSwiftのsync overloadがVoidを推論してcompile FAIL。既存OS選択と同じInt32返り値へ型を固定し、入力・Owner・Brokerの挙動は変更しない。製品経路はまだ未成立である。最終sourceのWindows全Rustは555 PASS／2 FAIL／13 ignored、変更外Update HTTPS試験のConnectionResetであり、全体PASSへ読み替えない。日本語厳格監査は既存5 files／17 findingsを保持し、本変更の新規負債は解消した。
 
+run `37720338833`／source `8ffd3d5`は通常Mac buildまでPASS。XCUITestは初期focusでCtrl+Kが届かず、palette入力の存在確認で16.615秒のFAIL。秘密入力・Owner・登録には未到達であり、製品保存のfailureと混同しない。試験だけを既存の公開palette buttonによる通常mouse操作へ修正する。
+
 `release_blocker`: MacでのProvider／MCP注入、正式署名identity・配布、Final QA。通常Release `task_execution=unsupported`、`release_ready=false`を保持する。秘密値の表示、保管方式fallback、Windowsの保存形式migrationを本単位の便宜で追加しない。

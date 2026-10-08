@@ -9,7 +9,9 @@ final class AdapterOwnerUITests: XCTestCase {
     continueAfterFailure = false
     app.launch(); defer { app.terminate() }
     XCTAssertTrue(element(app, "エージェント").waitForExistence(timeout: 20))
-    app.typeKey("k", modifierFlags: .control)
+    // 初期focusでCtrl+Kが届かなかった実観測に対し、通常の公開buttonから開く。
+    let palette = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "コマンドパレット")).firstMatch
+    XCTAssertTrue(palette.waitForExistence(timeout: 10)); palette.click()
     let search = app.textFields.firstMatch
     XCTAssertTrue(search.waitForExistence(timeout: 10)); search.click(); search.typeText("MCP接続")
     let result = element(app, "MCP接続")
