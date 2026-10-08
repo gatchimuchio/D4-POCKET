@@ -9,17 +9,20 @@ final class AdapterOwnerUITests: XCTestCase {
     continueAfterFailure = false
     app.launch(); defer { app.terminate() }
     XCTAssertTrue(element(app, "エージェント").waitForExistence(timeout: 20))
-    // 初期focusでCtrl+Kが届かなかった実観測に対し、通常の公開buttonから開く。
-    let palette = element(app, "コマンドパレットを開く（Ctrl+KまたはCtrl+P）")
-    if !palette.waitForExistence(timeout: 10) {
-      // 秘密入力前の公開button名だけ。入力値・秘密欄・全階層dumpを出さない。
-      let names = app.buttons.allElementsBoundByAccessibilityElement.prefix(40).map {
-        String(("\($0.label)|\($0.value as? String ?? "")").prefix(256))
-      }
-      print("D4_CREDENTIAL_PUBLIC_NAV \(names)")
-      XCTFail("初期画面の公開paletteを識別できない")
+    // コンパクト表示の2 iconがAX名なしだった実観測。公開groupの左、同じ行の
+    // palette→全体検索という現行Row順序と実frameから通常mouse入力する。
+    let group = element(app, "操作グループ選択")
+    XCTAssertTrue(group.waitForExistence(timeout: 10))
+    let toolbar = app.buttons.allElementsBoundByAccessibilityElement.filter {
+      $0.frame.height >= 24 && app.windows.firstMatch.frame.contains($0.frame)
+        && abs($0.frame.midY - group.frame.midY) < 4 && $0.frame.maxX < group.frame.minX
+    }.sorted { $0.frame.minX < $1.frame.minX }
+    guard toolbar.count == 2 else {
+      // 秘密入力前の公開button名・frameだけ。入力値や全階層dumpは出さない。
+      print("D4_CREDENTIAL_PUBLIC_NAV \(app.buttons.allElementsBoundByAccessibilityElement.prefix(40).map { "\($0.label)|\($0.frame)" })")
+      throw failure("公開toolbarの2 iconを一意に確認できない")
     }
-    palette.click()
+    toolbar[0].click()
     let search = app.textFields.firstMatch
     XCTAssertTrue(search.waitForExistence(timeout: 10)); search.click(); search.typeText("MCP接続")
     let result = element(app, "MCP接続")

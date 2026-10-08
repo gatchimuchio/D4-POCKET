@@ -44,4 +44,6 @@ run `37720338833`／source `8ffd3d5`は通常Mac buildまでPASS。XCUITestは�
 
 run `37721120599`／source `d6609f2`は部品試験・解析・通常Mac buildがPASS、初期palette buttonのlabel限定queryで20.483秒のFAIL。秘密入力前であり、既存のlabel／value共通照合へ試験queryを変更し、未識別時だけ公開button名を最大40件記録する。入力値・秘密欄・全階層dumpは記録しない。
 
+run `37722143281`／source `36c72e4`は通常Mac buildまでPASS、palette未識別で20.095秒のFAIL。限定診断により、コンパクト表示のicon buttonはAX名なし、操作groupは`操作グループ選択`として取得できることを観測した。現行Rowのpalette→全体検索→groupという固定順序と、実frameの同一行・可視・2件一致を照合して通常mouse入力する試験へ変更する。曖昧なら停止し、秘密入力前の公開button名・frameだけを記録する。GUI stateやBroker要求を直接設定しない。
+
 `release_blocker`: MacでのProvider／MCP注入、正式署名identity・配布、Final QA。通常Release `task_execution=unsupported`、`release_ready=false`を保持する。秘密値の表示、保管方式fallback、Windowsの保存形式migrationを本単位の便宜で追加しない。
