@@ -62,11 +62,13 @@ final class AdapterOwnerUITests: XCTestCase {
     try chooser.press("作業領域を選択"); app.activate()
     XCTAssertTrue(workspaceMessage(app, "OS選択済み（起動中のみ）。登録・Permission・Approvalは別です。").waitForExistence(timeout: 10))
     try assertCurrentWorkspaceInput(app, outside)
-    XCTAssertFalse(workspaceMessage(app, "Broker内登録: macos-os-selected-codex").exists)
+    XCTAssertFalse(workspaceMessage(app, "Broker起動中だけ登録しました。Task実行能力: unsupported。").exists)
     let submit = app.buttons["native Owner確認へ進む"]
     submit.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
     approve(notice)
-    XCTAssertTrue(workspaceMessage(app, "Broker内登録: macos-os-selected-codex").waitForExistence(timeout: 20))
+    // SectionListの見出しはheader Semanticsを持つ。通常の状態文のStaticText queryと区別する。
+    XCTAssertTrue(element(app, "Broker内登録: macos-os-selected-codex").waitForExistence(timeout: 20))
+    XCTAssertTrue(workspaceMessage(app, "作業領域ID: macos-os-selected-workspace").exists)
     print("D4_MACOS_WORKSPACE_OS_SELECTION_PASS")
     app.typeKey("q", modifierFlags: .command)
     XCTAssertTrue(app.wait(for: .notRunning, timeout: 10))
