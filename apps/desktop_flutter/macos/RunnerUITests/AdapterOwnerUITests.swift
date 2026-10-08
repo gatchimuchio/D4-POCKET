@@ -80,10 +80,7 @@ final class AdapterOwnerUITests: XCTestCase {
       XCTAssertTrue(credentialMessage(app,
         "Keychain登録後のmetadataを取得しました。秘密値は取得していません。").waitForExistence(timeout: 15))
       try mcpPublicText(app, "使用しない", click: true)
-      let credential = app.staticTexts.matching(NSPredicate(
-        format: "label MATCHES %@ OR value MATCHES %@", "api_key\\s*・\\s*[a-f0-9]{32}", "api_key\\s*・\\s*[a-f0-9]{32}")).firstMatch
-      XCTAssertTrue(credential.waitForExistence(timeout: 10))
-      credential.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+      try clickMcpPublicCredentialChoice(app)
       try mcpPublicText(app, "子processへ渡す環境変数名", click: true)
       app.typeText("MCP_API_KEY")
     }
@@ -137,6 +134,50 @@ final class AdapterOwnerUITests: XCTestCase {
     print("D4_MACOS_MCP_PRODUCT_PASS")
     app.typeKey("q", modifierFlags: .command)
     XCTAssertTrue(app.wait(for: .notRunning, timeout: 10))
+  }
+
+  private func clickMcpPublicCredentialChoice(_ app: XCUIApplication) throws {
+    // 登録完了後の公開選択肢だけ。AX StaticText queryが未成立だったため可視行を識別する。
+    guard !app.sheets.firstMatch.exists, !app.secureTextFields.firstMatch.exists else {
+      throw failure("秘密入力終了前に公開選択肢を取得しない")
+    }
+    let window = app.windows.firstMatch
+    for _ in 0..<3 {
+      Thread.sleep(forTimeInterval: 0.6)
+      let frame = window.frame
+      let image = XCUIScreen.main.screenshot().image
+      var proposed = CGRect(origin: .zero, size: image.size)
+      guard let screen = image.cgImage(forProposedRect: &proposed, context: nil, hints: nil),
+            CGRect(origin: .zero, size: image.size).contains(frame),
+            let pixels = screen.cropping(to: CGRect(
+              x: frame.minX * CGFloat(screen.width) / image.size.width,
+              y: frame.minY * CGFloat(screen.height) / image.size.height,
+              width: frame.width * CGFloat(screen.width) / image.size.width,
+              height: frame.height * CGFloat(screen.height) / image.size.height).integral) else {
+        throw failure("公開選択肢を製品窓へ限定できない")
+      }
+      let request = VNRecognizeTextRequest()
+      request.recognitionLevel = .accurate; request.recognitionLanguages = ["ja-JP", "en-US"]
+      request.customWords = ["api_key"]
+      try VNImageRequestHandler(cgImage: pixels).perform([request])
+      let rows = (request.results ?? []).filter { observation in
+        observation.topCandidates(3).contains { candidate in
+          let text = candidate.string.lowercased().components(separatedBy: .whitespacesAndNewlines)
+            .joined().replacingOccurrences(of: "_", with: "")
+            .replacingOccurrences(of: "・", with: "").replacingOccurrences(of: "•", with: "")
+          return text.range(of: "^apikey[a-f0-9]{32}$", options: .regularExpression) != nil
+        }
+      }
+      guard rows.count <= 1 else { throw failure("公開資格情報選択肢が一意でない") }
+      if let row = rows.first {
+        let point = CGPoint(x: frame.minX + row.boundingBox.midX * frame.width,
+                            y: frame.minY + (1 - row.boundingBox.midY) * frame.height)
+        window.coordinate(withNormalizedOffset: .zero)
+          .withOffset(CGVector(dx: point.x - frame.minX, dy: point.y - frame.minY)).click()
+        return
+      }
+    }
+    throw failure("公開資格情報選択肢を観測できない")
   }
 
   private func mcpPublicText(_ app: XCUIApplication, _ label: String, click: Bool = false,

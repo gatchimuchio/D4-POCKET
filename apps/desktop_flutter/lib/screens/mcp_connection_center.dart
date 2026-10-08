@@ -580,7 +580,8 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
         ];
         _message = '接続receiptを受理しました。表示はBroker内部状態であり、TrustやTool実行を示しません。';
       });
-      if (_selectedCredentialId != null) {
+      if (defaultTargetPlatform == TargetPlatform.macOS &&
+          _selectedCredentialId != null) {
         try {
           final credentials =
               await client.listCredentials(targetServerId: connection.serverId);

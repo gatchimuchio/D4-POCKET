@@ -36,3 +36,9 @@ Windowsの`cargo check --locked --manifest-path native/rust_helper/Cargo.toml --
 同期後Conformance 241件はPASS。日本語基底監査strictは変更前と同じ5 files／17 findingsでexit 1を保持し、この変更で新規指摘はない。広域の既存指摘修正やFinal QAは本consumerの工程へ持ち込まない。
 
 source `62f0583f19a57da076bff3c511b493dfd00a17cf`、手動[run 37767646092](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37767646092)は実Keychain直接試験1件・対象Flutter2件・対象解析・通常Mac buildでPASSした。製品UIは登録buttonのAX click後にnative入力画面を確認できず67.536秒でFAIL。秘密attachmentはexportしていない。artifact `11546961580`、SHA-256 `7848265c13d375084fb7db1495514b11b19422b3df511b634da52b4a391365db`を実byteへ照合。入力後scrollを伴うbutton操作を既存の公開可視文字clickへ統一し、失敗時は固定公開状態の有無だけを記録する。原因確定前の操作修正であり製品成立はまだ主張しない。Audit不足で同stepの後片付けまで到達しなかったため、回収を独立always stepへ分離する。既存PASS済みのKeychain／対象Widgetは同sourceの証拠を再利用し、再runはUI残件だけを処理する。
+
+source `d8a1efc770f947b213af01b5f482a9609fbad697`、[run 37769130630](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37769130630)はnative入力・別個Owner承認・Keychain登録・metadata一覧までPASS。続く公開選択肢のStaticText queryが未成立で88.082秒でFAILした。artifact `11547013659`、SHA-256 `1164e2bdc0fbb59c708c45deae354e302ad5d022b492318985c7af8d6c60dc5b`を実byteへ照合。独立always回収はPASS。登録後・秘密欄不在の公開選択行（種類と32桁ID）だけを既存と同じ可視OCR方式で操作する。秘密画像・階層dumpは保存しない。
+
+`REGRESSION_REOPENED`（共有UIの直接依存のみ）: 原因commit `62f0583`の接続後使用時刻再取得がWindowsにも追加`資格情報一覧`を送り、既存`Desktop panelは対象Credential metadataと環境変数名だけを接続要求へ送る`が期待2要求／実際3要求でFAILした。破壊された条件はWindowsの既存公開要求順序。期待値を弱めずMac consumerだけに再取得を限定し、当該Windows試験と直接依存のMac選択Widgetの2件はPASS。Windows機能全体・CLOSED済みTool等は再開しない。
+
+同じ現sourceとSHA-256を照合したASCII試験複製の対象`dart analyze`も、Analysis Serverの終了処理で`AppData/Local/Dart/perf/12312`を削除できないOS error 1920によりexit 1となった。製品解析PASSではなくhost環境FAILとして保持し、変更した共有Dartの対象解析だけを次のMac runで実施する。SDK／OSへの回避や追加product blockerは作らない。

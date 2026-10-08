@@ -70,9 +70,11 @@ jobs:
           export PATH="$RUNNER_TEMP/flutter/bin:$PATH"
           cd apps/desktop_flutter
           flutter pub get 2>&1 | tee ../../evidence/pub-get.txt
-          if [ '${{ inputs.target }}' = 'macos_mcp_credential_binding' ] && [ '${{ inputs.mcp_product_only }}' != 'true' ]; then
+          if [ '${{ inputs.target }}' = 'macos_mcp_credential_binding' ]; then
             dart analyze lib/services/mcp_connection_client.dart lib/screens/mcp_connection_center.dart test/mcp_connection_center_test.dart 2>&1 | tee ../../evidence/dart-binding-analyze.txt
-            flutter test --no-pub test/mcp_connection_center_test.dart --name 'Mac MCP(接続|投影)' 2>&1 | tee ../../evidence/credential-binding-projection-test.txt
+            if [ '${{ inputs.mcp_product_only }}' != 'true' ]; then
+              flutter test --no-pub test/mcp_connection_center_test.dart --name 'Mac MCP(接続|投影)' 2>&1 | tee ../../evidence/credential-binding-projection-test.txt
+            fi
           elif [ '${{ inputs.mcp_product_only }}' != 'true' ]; then
             dart analyze lib/services/broker_client.dart lib/services/mcp_connection_client.dart lib/screens/mcp_connection_center.dart test/broker_client_payload_hash_test.dart test/mcp_connection_center_test.dart 2>&1 | tee ../../evidence/dart-analyze.txt
             flutter test --no-pub test/broker_client_payload_hash_test.dart --plain-name 'Mac MCPだけはOwner確認とstdio処理の有限待機を共有する' 2>&1 | tee ../../evidence/timeout-test.txt
