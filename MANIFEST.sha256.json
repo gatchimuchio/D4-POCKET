@@ -72,7 +72,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "424b262758b0ab4a302fdbbdafbfad1f61ee9eaae396483cfb92389675603c4a"
+      "sha256": "e31901677e5c349001d6edda974646e7199dd4e72676cf90c9d59edc0e2f54f3"
     },
     {
       "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
@@ -88,11 +88,11 @@
     },
     {
       "path": ".gitignore",
-      "sha256": "7725e846a267e1149d7bf844feba1bb237ff13eb60e6e1778a8948d3647098d2"
+      "sha256": "be3a71b30ae62b9e0ba1e2df3ba6630e2bd1f0feca309425ce1f76994753e1f3"
     },
     {
       "path": "AGENTS.md",
-      "sha256": "1f77a2f27f1b75546113e57febcaa47b8dceb0e10a70712d0a1a26d56902c69e"
+      "sha256": "d118d3330900644689480ae46bb17edeee1a3086d4848fd6a4d8875a7040f32f"
     },
     {
       "path": "AUDIT.md",
@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "00cd3091539d48aa517771c7508c1419808201d7040dd5ce673a6468139733b0"
+      "sha256": "39e0bc92fa3af9a383b342b2ae3113b62aa5360eb077818a47bd43e6697c7be4"
     },
     {
       "path": "SECURITY.md",
@@ -256,7 +256,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/mcp_connection_center.dart",
-      "sha256": "e93856fcc25e92d9d5530e20084886272dc7d6f87e7f2ce1a74311fc6c2cf669"
+      "sha256": "f3c5d61f4abb6e68cae9940fbda3420e3e9aa1e49ad77c62b91485bed2b7e9ec"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/notifications.dart",
@@ -336,7 +336,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/broker_client.dart",
-      "sha256": "9c3013bf1aaa4e1bfa5a5d857a6f0fb1c978292c6d91cef3c09cd5db97451df0"
+      "sha256": "e946da0edead326783030d6e00a60d90d30a7a64ae6b64a07432052f54d6554c"
     },
     {
       "path": "apps/desktop_flutter/lib/services/compose_client.dart",
@@ -356,7 +356,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/mcp_connection_client.dart",
-      "sha256": "768ef3d7d1a7007910bcd23110e3108fad35c831534e1630f3eaedfeb17c0772"
+      "sha256": "af88d7518cd9299699f3b58970b7e0daa655d7546955c1c0bfd5808f313b2c6d"
     },
     {
       "path": "apps/desktop_flutter/lib/services/notification_client.dart",
@@ -524,7 +524,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/BrokerProcessChannel.swift",
-      "sha256": "258d165b73b8fea29b1f66ca8445703600811c998ef3a8c4e2fb37c684a11d03"
+      "sha256": "f7a7f246d8fd8e517f2b446735c863b349926604ba2b2d421f22ce5f287e068c"
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/Configs/AppInfo.xcconfig",
@@ -544,7 +544,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/D4WorkspaceUI.h",
-      "sha256": "4eb9479cf579a8a80e6256a8d8431d677bb89d56e9380975832e2c4225847400"
+      "sha256": "74e7780543cd5ab197096dabc97b1f91303ed61e013a65ef4b68ed4719122b28"
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/DebugProfile.entitlements",
@@ -568,7 +568,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/RunnerUITests/AdapterOwnerUITests.swift",
-      "sha256": "e6cae5e6da4f6bb63dfc0dc67a1f4a8349ef7a5d26a957fec16e7ebbbc0eea48"
+      "sha256": "cf9a5d51f8b8f52b1d85980fdca5b956a2549ddf1c2231bd882bd8bd5156a3f8"
     },
     {
       "path": "apps/desktop_flutter/pubspec.lock",
@@ -629,6 +629,10 @@
     {
       "path": "apps/desktop_flutter/test/history_screen_test.dart",
       "sha256": "f2ef19e0128177464044834a0f20a21ac5c0fe05ab5484e63fa6aaaf4e13856f"
+    },
+    {
+      "path": "apps/desktop_flutter/test/macos_credential_vault_test.dart",
+      "sha256": "c86fad9965632607f74a18f2dedc27c199414d4334811819539f3bdc0fe0f35f"
     },
     {
       "path": "apps/desktop_flutter/test/mcp_connection_center_test.dart",
@@ -1276,7 +1280,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "14efe65f3061095430b90d329b5ed69c65db801afa90ead2bb680c6eead0a236"
+      "sha256": "1892926eeba5d951550f9d69617738f54b07a4e060d84b0b549dba12c71a723f"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1489,6 +1493,10 @@
     {
       "path": "docs/specs/macos-agent-cli-selection.md",
       "sha256": "828505a99d4ee0d86010f6c7f2a0070c0b956ac1fc5ff29277468aca55e16c9c"
+    },
+    {
+      "path": "docs/specs/macos-credential-vault.md",
+      "sha256": "2e282c9ed0bba50e632b79d9d2cc3c5321729333c14e3df28851c5595deea81e"
     },
     {
       "path": "docs/specs/macos-desktop-channel.md",
@@ -2371,6 +2379,10 @@
       "sha256": "ca1d52e4863d0a4753c4cf22647489e5ed0d802abfc90b8a37dcecc7fdc4ffbf"
     },
     {
+      "path": "examples/contracts/invalid/macos_credential_input.invalid.json",
+      "sha256": "10c4b62b7c27b07c3eb8335a77dbc6953775d87c394109c84c9a06f7a28a7090"
+    },
+    {
       "path": "examples/contracts/invalid/macos_workspace_selection.invalid.json",
       "sha256": "19bf17b31f473938691c5a101bdb86076edba52a9fc84d309f650dde59fcb7d4"
     },
@@ -2815,6 +2827,10 @@
       "sha256": "5d36f763b406ee3366c8def0c62f9bc4e3a86f59806851af2c68996f17dc8644"
     },
     {
+      "path": "examples/contracts/macos_credential_input.valid.json",
+      "sha256": "dc6fb357f956db73fff4f19c169ce4b74eb4f010af23f624b4e160e682ad84be"
+    },
+    {
       "path": "examples/contracts/macos_workspace_selection.valid.json",
       "sha256": "50208d78350a7a160dec59a82df1499b6ca7da33e54c5eb11c97e342118e68bb"
     },
@@ -3183,16 +3199,32 @@
       "sha256": "ec978bf34124838309ac0c9402bef11f183386502e96c739a8302d9a6bb530e6"
     },
     {
+      "path": "native/macos_keychain/Cargo.lock",
+      "sha256": "d85070e7cfb252b07aff6777cf3d55a05caf1eb97e761c8644a44729a9d357d7"
+    },
+    {
+      "path": "native/macos_keychain/Cargo.toml",
+      "sha256": "369545b7d7cd0205e1f1b74b91656fb0527a3a463df6aaeaa7714ac63d8ac4bd"
+    },
+    {
+      "path": "native/macos_keychain/src/lib.rs",
+      "sha256": "91d8e98dbf0600dce9268570310b388381a3c7ddc4f31968b759f39f187b77e4"
+    },
+    {
       "path": "native/macos_owner/Cargo.lock",
-      "sha256": "6f4d24037c29b4b71034f07d33941e46b0833c09539a553107aa12da6ac32321"
+      "sha256": "f557e3f2173265d29e5d78c7516185308d641adf79d2f320ec4b6acd45420c81"
     },
     {
       "path": "native/macos_owner/Cargo.toml",
-      "sha256": "833ac7e7f16515f26bea5be477041188483b27c9e90644aff8a8731a55d12569"
+      "sha256": "ef4629dbed410cb88043d380a5a682dc6cb951dfdb521031d5c1a3dcf06d4e7f"
+    },
+    {
+      "path": "native/macos_owner/src/credential_input.rs",
+      "sha256": "8a34ad815870cf826b29a9015255e74a5a56356a331b316f4e21c537aedceb2d"
     },
     {
       "path": "native/macos_owner/src/lib.rs",
-      "sha256": "4bdbd3dcd75d4d9d18c2b2664ac1251b75914234d3fe7f8f67b2d2a8e5c49232"
+      "sha256": "be89ded8a913ca5c72daa590f17af42cedf45d8018ff9d3cca542dca4769210d"
     },
     {
       "path": "native/macos_owner/src/workspace_transport.rs",
@@ -3216,11 +3248,11 @@
     },
     {
       "path": "native/rust_helper/Cargo.lock",
-      "sha256": "104fd0ae74a96ea8d497382e40db0a313dfddbc551780c657a9df65ea269ecd6"
+      "sha256": "42603cc58f07a538fb3a08ef7632c0340ba862362a4ef36071e49279d52055a1"
     },
     {
       "path": "native/rust_helper/Cargo.toml",
-      "sha256": "9be683ed6eca3bc1205bd7e5942669955cea4ce6d57e37487c820d6964c05ada"
+      "sha256": "d8f91ce3c8ffc21114ea0a37c4bc75fed0a8cc794f54e238387cd8fd23c61f8f"
     },
     {
       "path": "native/rust_helper/README.md",
@@ -3351,8 +3383,12 @@
       "sha256": "8af4b315688dc7563f89a75f24b73125dbdab57d37632a12ec6d02d1128659de"
     },
     {
+      "path": "native/rust_helper/src/broker/credential_storage.rs",
+      "sha256": "91a31260e65df14dac18d4479d67c9b0a7f57ba7a0a524eefc7709f42e8685dc"
+    },
+    {
       "path": "native/rust_helper/src/broker/credential_vault.rs",
-      "sha256": "ba9767bf7737e8068d8156c15bdc3feb84964874ed5c5da37c073fd2a8b15883"
+      "sha256": "135bcf14ba01545cf12a52b34c2270425cf73f17cbc80235645e46d5a96c91b1"
     },
     {
       "path": "native/rust_helper/src/broker/device_link.rs",
@@ -3396,7 +3432,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/ipc_server.rs",
-      "sha256": "eba080435fbd82591900269e777a482527fe543db40379fb0132563f0f3a2620"
+      "sha256": "1cb515b26e1ba00a1d7996d8d35a050f467d9dbae7b6e45ee76b8a9c5e363caf"
     },
     {
       "path": "native/rust_helper/src/broker/json_input.rs",
@@ -3408,7 +3444,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/mod.rs",
-      "sha256": "6b06c9ea3b0d59ffe05484957ac7c6906c5bf9bb62f3f62b2f75f0a30b051bbe"
+      "sha256": "ffbf3f2cca1b82da79ce84ec57021dba36655cb0861f7f6b06b84d5f28179211"
     },
     {
       "path": "native/rust_helper/src/broker/notification_center.rs",
@@ -3428,7 +3464,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "cc6e38e964c3325761f288d8e35e556a21caa492f065adb7f3ca797efce31db4"
+      "sha256": "d14d7a36288a1d203183df969009ce7b9c050658ec5a77c8df1761ed85ef3014"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -3500,15 +3536,19 @@
     },
     {
       "path": "native/rust_helper/src/lib.rs",
-      "sha256": "cdb6e5537939ebe9019119c2ef361b8a2e96c77f1a3edbef1d43c9a9077e29de"
+      "sha256": "a88e3faa37f601e179b825d5244e28005feb7996a63c9596111b1376f265d42d"
+    },
+    {
+      "path": "native/rust_helper/src/macos_credential_input.rs",
+      "sha256": "08d3dcf5ca79139419b22e7981685c15567bf64481ed0f8d5163120fbfdab396"
     },
     {
       "path": "native/rust_helper/src/macos_desktop_owner.rs",
-      "sha256": "5cb1f3a7c61cdd3f77067f3924f3480c78b47e64a052a60bd2fb362f4bed6d1e"
+      "sha256": "3c7304db750fcbdd225ab4afe923fb9e55ac5ec500dcfc01074b778420132997"
     },
     {
       "path": "native/rust_helper/src/macos_desktop_worker.rs",
-      "sha256": "dce21489155314c04c5186bc1b7bde61971f8e23f5560f4883d00378c622a9bc"
+      "sha256": "d476931511c8c856516f27244745f855f1523c0cd33655941d0267d57a30d6fd"
     },
     {
       "path": "native/rust_helper/src/macos_workspace_selection.rs",
@@ -4248,11 +4288,11 @@
     },
     {
       "path": "specs/credential_receipt.schema.json",
-      "sha256": "46c883c987a3c1acbb41d8385bbcc478d49a764976f8e9c64d6f84516a43e8cf"
+      "sha256": "01102dae7fa1868bb06957a73c0efda34d18c1106e826297651b46fce0e067c1"
     },
     {
       "path": "specs/credential_registration.schema.json",
-      "sha256": "0afe529c73ab951c9429070860f2531e80672801a2e77e1ccdf3d57b04b01bf7"
+      "sha256": "bf1c6a13f9d1331bc7702501403f14e2d6dd37a996da798c6fae03ffdd9f8b54"
     },
     {
       "path": "specs/credential_revocation_request.schema.json",
@@ -4429,6 +4469,10 @@
     {
       "path": "specs/macos_agent_cli_selection_receipt.schema.json",
       "sha256": "9db2d6a0fd6297d7ecdb28d2562220e22e178a98359a82fc42da46b8e94c5e84"
+    },
+    {
+      "path": "specs/macos_credential_input.schema.json",
+      "sha256": "9763eb6767c9e221c4924e83586488a3669628910d9eccdde1e9b9a1043017c4"
     },
     {
       "path": "specs/macos_workspace_selection.schema.json",
@@ -4784,7 +4828,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "c7af35373c267709db04bbabd33a735605002887ca3a3395b7d6181cc5591683"
+      "sha256": "01a65f6f8de5661834dfa4cadac4a538cb4f6fc58403f2ad01ecb16ae59c5dc3"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
@@ -4880,7 +4924,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "7ec2be8a5670637f6008f004dde5c83a92b17575c532a2c71b64fb03e53c79a8"
+      "sha256": "ccb0f9eb1c21a429e01c8bbd4fff02c44c4b225805a9f766594522e4476b3321"
     },
     {
       "path": "tooling/shell_snapshot.py",
@@ -4916,7 +4960,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "e5083632b99a9be21388ebd0e798f39272630008dc5ac0970049f9f1c61aec2c"
+      "sha256": "4e68d80afa759fe17b6c2938c3a731ac8115921f66fef9119bcb566b9190deb5"
     }
   ]
 }

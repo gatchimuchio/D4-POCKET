@@ -38,4 +38,6 @@ run `37718076742`／source `a07db57`はBrokerが要求するDebug trait不足で
 
 run `37718454089`／source `8b91a57`はMac compile成立後、Keychain追加実APIでFAIL。秘密を出さない固定OS拒否分類を追加して根因を特定する。Data Protection Keychainは[Apple TN3137](https://developer.apple.com/documentation/technotes/tn3137-on-mac-keychains)上、provisioning profileで認可された署名entitlementとapp-like構造を必要とする。現在の同梱helperは独立CLIであるため、実OS分類を確認してこの実装選択と現行構造の適合を再評価する。無署名を成功へ昇格したり、fake entitlementやOS保護の変更で回避したりしない。
 
+run `37719651894`／source `a5ff90f`は固定user Keychainの実API試験1件、native公開境界1件、新Dart解析・3試験がPASS。通常Mac buildでSwiftのsync overloadがVoidを推論してcompile FAIL。既存OS選択と同じInt32返り値へ型を固定し、入力・Owner・Brokerの挙動は変更しない。製品経路はまだ未成立である。最終sourceのWindows全Rustは555 PASS／2 FAIL／13 ignored、変更外Update HTTPS試験のConnectionResetであり、全体PASSへ読み替えない。日本語厳格監査は既存5 files／17 findingsを保持し、本変更の新規負債は解消した。
+
 `release_blocker`: MacでのProvider／MCP注入、正式署名identity・配布、Final QA。通常Release `task_execution=unsupported`、`release_ready=false`を保持する。秘密値の表示、保管方式fallback、Windowsの保存形式migrationを本単位の便宜で追加しない。

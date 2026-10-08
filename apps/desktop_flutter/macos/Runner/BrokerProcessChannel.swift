@@ -136,7 +136,7 @@ final class BrokerProcessChannel {
       var selectionCode: Int32 = 0
       do {
         if credentialInput {
-          let code = DispatchQueue.main.sync {
+          let code: Int32 = DispatchQueue.main.sync {
             let bytes = Array(frame.utf8)
             return bytes.withUnsafeBufferPointer { raw in
               d4_credential_input_and_write(raw.baseAddress!, raw.count, self.requests.fileHandleForWriting.fileDescriptor)
