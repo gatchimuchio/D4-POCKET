@@ -125,16 +125,9 @@ final class AdapterOwnerUITests: XCTestCase {
     XCTAssertTrue(receipt.waitForExistence(timeout: 15))
     XCTAssertFalse(app.staticTexts.matching(NSPredicate(
       format: "label CONTAINS %@ OR value CONTAINS %@", "macos-mcp-public-result", "macos-mcp-public-result")).firstMatch.exists)
-    // 公開画像で探索が後続のExport設定まで進んだと確認。既存検索でMCP先頭へ戻す。
+    // 公開画像とAX縦位置が不一致だった。新consumerは可視Server行から切断を操作する。
     do {
       if credentialBinding {
-        // 初回AX elementはrebuildで失効した実観測。現行UI定義済みの通常shortcutを使う。
-        app.typeKey("f", modifierFlags: [.control, .shift])
-        let searchAgain = app.textFields.firstMatch
-        XCTAssertTrue(searchAgain.waitForExistence(timeout: 10))
-        searchAgain.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
-        app.typeText("MCP")
-        try mcpPublicText(app, "MCP接続", click: true, scroll: false)
         try clickMcpCredentialDisconnect(app)
       } else {
         try mcpPublicText(app, "切断", click: true, scrollUp: true)
@@ -166,7 +159,8 @@ final class AdapterOwnerUITests: XCTestCase {
   }
 
   private func clickMcpCredentialDisconnect(_ app: XCUIApplication) throws {
-    // AX上に存在しても1pxなら画面外。検索で復帰したMCP面から実可視frameを確認する。
+    // 現行ListTileの既知trailing buttonの横位置と、可視の合成Server名の縦位置を結合する。
+    // 公開画像でAX縦位置が更新されない実観測。AXだけを可視性の証拠にしない。
     guard !app.sheets.firstMatch.exists, !app.secureTextFields.firstMatch.exists else {
       throw failure("秘密入力中に切断を操作しない")
     }
@@ -175,17 +169,44 @@ final class AdapterOwnerUITests: XCTestCase {
     for attempt in 0..<10 {
       Thread.sleep(forTimeInterval: 0.6)
       let window = app.windows.firstMatch
+      let windowFrame = window.frame
+      let image = XCUIScreen.main.screenshot().image
+      var proposed = CGRect(origin: .zero, size: image.size)
+      guard let screen = image.cgImage(forProposedRect: &proposed, context: nil, hints: nil),
+            CGRect(origin: .zero, size: image.size).contains(windowFrame),
+            let pixels = screen.cropping(to: CGRect(
+              x: windowFrame.minX * CGFloat(screen.width) / image.size.width,
+              y: windowFrame.minY * CGFloat(screen.height) / image.size.height,
+              width: windowFrame.width * CGFloat(screen.width) / image.size.width,
+              height: windowFrame.height * CGFloat(screen.height) / image.size.height).integral) else {
+        throw failure("切断対象の公開Server行を製品窓へ限定できない")
+      }
+      let request = VNRecognizeTextRequest()
+      request.recognitionLevel = .accurate; request.recognitionLanguages = ["ja-JP", "en-US"]
+      request.customWords = ["Mac MCP試験Server"]
+      try VNImageRequestHandler(cgImage: pixels).perform([request])
+      let rows: [VNRectangleObservation] = try (request.results ?? []).compactMap { observation in
+        for candidate in observation.topCandidates(3) {
+          if let range = candidate.string.range(of: "Mac MCP試験Server"),
+             let box = try candidate.boundingBox(for: range) { return box }
+        }
+        return nil
+      }
+      guard rows.count <= 1 else { throw failure("切断対象の公開Server行が一意でない") }
       let frame = button.frame
-      if frame.height >= 24 && frame.width >= 40 && window.frame.contains(frame) {
-        button.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+      if let row = rows.first?.boundingBox {
+        guard frame.width >= 40, frame.minX > windowFrame.midX,
+              frame.maxX <= windowFrame.maxX else { throw failure("既知切断buttonの横位置が不正") }
+        window.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(
+          dx: frame.midX - windowFrame.minX, dy: (1 - row.midY) * windowFrame.height)).click()
         return
       }
       if attempt < 9 {
         window.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.65))
-          .scroll(byDeltaX: 0, deltaY: -180)
+          .scroll(byDeltaX: 0, deltaY: frame.midY < windowFrame.midY ? 180 : -180)
       }
     }
-    throw failure("MCP面から切断buttonの可視frameを確認できない")
+    throw failure("切断対象の公開Server行を確認できない")
   }
 
   private func mcpPublicCredentialRow(_ app: XCUIApplication, selection: Bool) throws {
