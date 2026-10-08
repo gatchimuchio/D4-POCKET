@@ -12,7 +12,7 @@ pub const TITLE: &str = "D4 Pocket — 今回の操作を確認";
 pub const DENY: &str = "承認しない";
 pub const APPROVE: &str = "今回の操作を承認";
 
-/// OSが選択したfolderへの起動中access。D4のPermission／Approvalではない。
+/// OSが選択したfolder／単一CLI fileへの起動中access。D4のPermission／Approvalではない。
 pub struct SelectedWorkspace {
     path: std::path::PathBuf,
     #[cfg(target_os = "macos")]
@@ -37,7 +37,9 @@ impl Drop for SelectedWorkspace {
 
 /// Main threadでOS chooserを構成する。bookmark、credential、任意初期pathを受け取らない。
 #[cfg(target_os = "macos")]
-fn workspace_panel() -> Result<objc2::rc::Retained<objc2_app_kit::NSOpenPanel>, &'static str> {
+fn selection_panel(
+    cli: bool,
+) -> Result<objc2::rc::Retained<objc2_app_kit::NSOpenPanel>, &'static str> {
     use objc2::{msg_send, ClassType, MainThreadMarker};
     use objc2_app_kit::NSOpenPanel;
     use objc2_foundation::NSString;
@@ -47,13 +49,21 @@ fn workspace_panel() -> Result<objc2::rc::Retained<objc2_app_kit::NSOpenPanel>, 
     let panel: Option<objc2::rc::Retained<NSOpenPanel>> =
         unsafe { msg_send![NSOpenPanel::class(), openPanel] };
     let panel = panel.ok_or("OS選択の表示を開始できません")?;
-    panel.setTitle(Some(&NSString::from_str("D4 Pocket — 作業領域のOS選択")));
-    panel.setPrompt(Some(&NSString::from_str("作業領域を選択")));
+    panel.setTitle(Some(&NSString::from_str(if cli {
+        "D4 Pocket — CLI実行fileのOS選択"
+    } else {
+        "D4 Pocket — 作業領域のOS選択"
+    })));
+    panel.setPrompt(Some(&NSString::from_str(if cli {
+        "CLI fileを選択"
+    } else {
+        "作業領域を選択"
+    })));
     panel.setMessage(Some(&NSString::from_str(
         "この選択はOSの起動中accessだけです。D4の登録・Permission・Approvalは別に必要です。",
     )));
-    panel.setCanChooseFiles(false);
-    panel.setCanChooseDirectories(true);
+    panel.setCanChooseFiles(cli);
+    panel.setCanChooseDirectories(!cli);
     panel.setAllowsMultipleSelection(false);
     panel.setResolvesAliases(false);
     panel.setCanCreateDirectories(false);

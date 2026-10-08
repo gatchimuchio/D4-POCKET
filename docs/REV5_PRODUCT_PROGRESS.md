@@ -17,6 +17,14 @@
 
 ## P13 Mobile / Non-Windows — 現行track
 
+#### macOS Agent CLI実行fileのOS選択 — IMPLEMENTING（Product Build、2026-10-08）
+
+現在の未接続製品差分はsandbox外の既存CLI fileの明示OS選択。有限Acceptanceは`docs/specs/macos-agent-cli-selection.md`。選択・公開path反映後に、既存の別個native Owner確認とBroker probeを直接依存として使用する。Workspace／登録／MobileのCLOSED条件は再開せず、download・Task・Credential・正式配布・最終QAを本単位へ取り込まない。通常Release能力と既存release gateを保持する。
+
+局所検査: Schema 165／正常例161／負例212、Conformance 238件、新CLI Broker 2試験とnative公開入力1試験はPASS。新CLI待機／投影のFlutter 2試験はASCII一時checkoutでPASS。通常checkoutのFlutter testは既存`build/unit_test_assets`削除不能、両appの必須`flutter analyze --no-pub`は既知の日本語path LSP FormatException／server exit 255でexit 1（ignored logは34／20）。一時checkoutは追跡済みDesktop／shared sourceをbuild outputなしで複製したdev-only試験環境であり、installed／正式製品証拠へ昇格しない。厳格日本語監査は変更外の既存5 file／17 findingsでFAIL、現在追加した意味・code・Schemaにはfindingなし。初回Schemaは新負例のSchema登録不足、Rust compileは非Owner sourceのExport match未追加でFAILし、両方を局所修正した。Manifest再生成前のrelease gate不一致も成功へ読み替えない。Mac製品の有限Acceptanceは専用手動Actionsまで未成立。
+
+必須Windows `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --no-fail-fast -- --test-threads=1`は555 passed／2 failed／13 ignoredでexit 101。変更外のA2A接続／Codex loopback HTTP応答headerでConnectionResetを観測し、根因未解消の既存Final QA `release_blocker`へ履歴を保持する。追加反復・fixture強化を開始せず、全体PASSとは報告しない。ASCII上の対象Dart解析はexit 0、既存deprecated API info 5件のみ。Manifest再生成後のcheck、手動workflow限定検査、Windows v1 release gate、diff checkはPASS。Mac CLI選択の実動作は次の専用手動runnerで確認する。
+
 #### macOS 作業領域のOS選択 — CLOSED（Product Build、2026-10-08）
 
 有限Acceptanceはcommit `af8f55b9b46e1aa95d8a080e4972376bff4045ee`の手動Actions [run 37709224596](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37709224596)でPASS。macOS 15.7.9 arm64／Apple Virtual Machine／Xcode 16.4、固定Flutter 3.44.0／Rust 1.95.0。製品Agent Centerから親Rust所有OS sheetを取消し、入力`/previous-input`保持を通常Copyで照合。二度目の実OS選択でsandbox外folder `/Users/runner/d4-os-selected-workspace`を選び、公開path投影と実入力内容を確認した。OS選択だけでは登録されず、別個のnative Owner確認後に既存Brokerが実Codex CLIを検査してRuntime／Workspace登録recordを表示した。Command-Q終了、helper残留なし、runner source clean、専用CLI／内外Workspace回収までPASS。XCUITest 1 passed／0 failed／0 skipped、38.398秒。

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/macos_agent_cli_selection_receipt.schema.json",
+  "title": "macOS Agent CLI実行fileのOS選択投影（MacOSAgentCLISelectionReceipt）",
+  "description": "起動中のOS file選択投影。登録・Permission・Approval・CLI実行の保証ではない。",
+  "type": "object", "additionalProperties": false,
+  "required": ["version", "selection_status", "cli_path", "selection_request_hash", "scope_lifetime", "permission_generated", "approval_generated", "registration_generated"],
+  "properties": {
+    "version": {"const": 1},
+    "selection_status": {"enum": ["selected", "cancelled"]},
+    "cli_path": {"oneOf": [{"type": "null"}, {"type": "string", "pattern": "^/[^\u0000-\u001f\u007f-\u009f]+$", "maxLength": 1024}]},
+    "selection_request_hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "scope_lifetime": {"const": "broker_process"},
+    "permission_generated": {"const": false}, "approval_generated": {"const": false}, "registration_generated": {"const": false}
+  },
+  "allOf": [{"if": {"properties": {"selection_status": {"const": "cancelled"}}}, "then": {"properties": {"cli_path": {"type": "null"}}}, "else": {"properties": {"cli_path": {"type": "string"}}}}]
+}

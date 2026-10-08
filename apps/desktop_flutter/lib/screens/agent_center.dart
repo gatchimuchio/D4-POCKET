@@ -2010,9 +2010,11 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
   bool _workspaceSelectionPending = false;
   String? _workspaceSelectionMessage;
 
-  Future<void> _selectWorkspace() async {
+  Future<void> _selectWorkspace({bool cli = false}) async {
     final transport = widget.transport;
     if (transport == null || _workspaceSelectionPending) return;
+    final operation = cli ? 'AgentCLI実行fileOS選択' : '作業領域OS選択';
+    final pathKey = cli ? 'cli_path' : 'workspace_root';
     setState(() {
       _workspaceSelectionPending = true;
       _workspaceSelectionMessage = null;
@@ -2020,7 +2022,7 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
     String? failureCode;
     try {
       final response =
-          await transport.request('作業領域OS選択', payload: {'version': 1});
+          await transport.request(operation, payload: {'version': 1});
       if (!mounted) return;
       const failureCodes = {
         'macos_os_selection_required',
@@ -2032,7 +2034,7 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
         'macos_os_selection_native',
       };
       final error = response['error'];
-      if (response['operation'] == '作業領域OS選択' &&
+      if (response['operation'] == operation &&
           response['status'] == 'rejected' &&
           response['evidence_source'] == 'INTERNAL_STATE' &&
           response['audit_event_id'] is String &&
@@ -2042,17 +2044,17 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
         failureCode = error['code'] as String;
       }
       final body = response['body'];
-      const keys = {
+      final keys = {
         'version',
         'selection_status',
-        'workspace_root',
+        pathKey,
         'selection_request_hash',
         'scope_lifetime',
         'permission_generated',
         'approval_generated',
         'registration_generated'
       };
-      if (response['operation'] != '作業領域OS選択' ||
+      if (response['operation'] != operation ||
           response['status'] != 'accepted' ||
           response['evidence_source'] != 'INTERNAL_STATE' ||
           response['audit_event_id'] is! String ||
@@ -2068,7 +2070,7 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
           body['selection_request_hash'] != brokerPayloadHash({'version': 1})) {
         throw const BrokerClientException('OS選択応答を検査できません');
       }
-      final root = body['workspace_root'];
+      final root = body[pathKey];
       if (body['selection_status'] == 'cancelled' && root == null) {
         setState(
             () => _workspaceSelectionMessage = 'OS選択を取り消しました。入力は変更していません。');
@@ -2078,7 +2080,7 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
           utf8.encode(root).length <= 1024 &&
           !root.codeUnits.any((c) => c < 32 || (c >= 127 && c <= 159))) {
         setState(() {
-          _workspaceRoot.text = root;
+          (cli ? _cliPath : _workspaceRoot).text = root;
           _workspaceSelectionMessage =
               'OS選択済み（起動中のみ）。登録・Permission・Approvalは別です。';
         });
@@ -2243,6 +2245,15 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
                     ),
                   if (_workspaceSelectionMessage != null)
                     Text(_workspaceSelectionMessage!),
+                  if (defaultTargetPlatform == TargetPlatform.macOS)
+                    OutlinedButton.icon(
+                      key: const ValueKey('macos-select-agent-cli'),
+                      onPressed: _workspaceSelectionPending
+                          ? null
+                          : () => _selectWorkspace(cli: true),
+                      icon: const Icon(Icons.file_open),
+                      label: const Text('OSでCLI実行fileを選択'),
+                    ),
                 ],
               ),
             ),

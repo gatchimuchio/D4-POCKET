@@ -72,7 +72,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "d9a33bc3f8278f274c0e17ebca503d3bd120027c84937453cedda34169c5b126"
+      "sha256": "424b262758b0ab4a302fdbbdafbfad1f61ee9eaae396483cfb92389675603c4a"
     },
     {
       "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
@@ -92,7 +92,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "583554e2ad8279fd0e923a457d9583f7dbe1b4f4002d1bc4999a4da8fc2c778d"
+      "sha256": "1f77a2f27f1b75546113e57febcaa47b8dceb0e10a70712d0a1a26d56902c69e"
     },
     {
       "path": "AUDIT.md",
@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "ff130a3f6afa9ccaaf7fe147a67ccd115c3f2477c9d9da30b0606eff8197353b"
+      "sha256": "c66ecde36986cebb7d50aad72101172e18172b0cc4cf31888727753f58940c18"
     },
     {
       "path": "SECURITY.md",
@@ -212,7 +212,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/agent_center.dart",
-      "sha256": "53312d79ef2861034a488854f0b36fae44dde1991dd7c49c6e08a0eb699c2903"
+      "sha256": "a1e64c07ff17317efe6df613d275521ea8077fad59a52955c2a45d750de79d74"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/approval_center.dart",
@@ -336,7 +336,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/broker_client.dart",
-      "sha256": "4bdcafe0278370c2aee2b9abc2e95051b2b6082b738b2099ea2e39b720b4ae6a"
+      "sha256": "9c3013bf1aaa4e1bfa5a5d857a6f0fb1c978292c6d91cef3c09cd5db97451df0"
     },
     {
       "path": "apps/desktop_flutter/lib/services/compose_client.dart",
@@ -524,7 +524,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/BrokerProcessChannel.swift",
-      "sha256": "e61b506d63d05538e855b9cfc0f37b43cfad2184a8d8d71ae0563816fe448b0c"
+      "sha256": "258d165b73b8fea29b1f66ca8445703600811c998ef3a8c4e2fb37c684a11d03"
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/Configs/AppInfo.xcconfig",
@@ -568,7 +568,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/RunnerUITests/AdapterOwnerUITests.swift",
-      "sha256": "d4c8feaa036fe728ae7c532cfba67065b91f3699f91dd9465fad9d9122a8a79c"
+      "sha256": "ebfb7f002b86f1ce0dd5d03f254c236fddf424d582c80048de153cb8c8df89dc"
     },
     {
       "path": "apps/desktop_flutter/pubspec.lock",
@@ -600,7 +600,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/broker_client_payload_hash_test.dart",
-      "sha256": "6f8a6800f01448729cabf86d721bf3d932a6bd5212c905f6fac87de8c3deca8e"
+      "sha256": "51c8c4cbdca9c37c3a8584ca40f428389de707e28097a3efe96305b0bb8830c3"
     },
     {
       "path": "apps/desktop_flutter/test/c27_performance_validation_test.dart",
@@ -680,7 +680,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "e134a7d956e403eba0219f907de0a1ba5f73c60edfc6396b87309c1fbb9c6e75"
+      "sha256": "8264774f152a613e8f7d1d9b2c133b28f45384b8ccb1393281c3c4ba106af68d"
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
@@ -1276,7 +1276,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "3ffc4b0c3db5fdaf21247c55b212d516d2de2b9cabafb1fa4f4236813cb51cb2"
+      "sha256": "18e47346976dc53a8e3b1f583b89441b3b22e90d6cf00658590e7ae86ea66471"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1485,6 +1485,10 @@
     {
       "path": "docs/specs/long-run-validation.md",
       "sha256": "0a696f44b913b0515f8a2cb8ca388e8c1ae98b449cf7575174b4ebc74a4c96a3"
+    },
+    {
+      "path": "docs/specs/macos-agent-cli-selection.md",
+      "sha256": "c01b81949f10c6a58c8e869b308a85d31ee7c627ed00bb8b271a1b6bc7965a15"
     },
     {
       "path": "docs/specs/macos-desktop-channel.md",
@@ -2359,6 +2363,14 @@
       "sha256": "93754e3aa24f2a09c261578ffe2a91fe85485412bf79877d6fc29f23436137b1"
     },
     {
+      "path": "examples/contracts/invalid/macos_agent_cli_selection.invalid.json",
+      "sha256": "861f6b480617366c8f87a64f8cc0af07a0f65c6ac5ae89acc505a9e71ca90b53"
+    },
+    {
+      "path": "examples/contracts/invalid/macos_agent_cli_selection_receipt.invalid.json",
+      "sha256": "ca1d52e4863d0a4753c4cf22647489e5ed0d802abfc90b8a37dcecc7fdc4ffbf"
+    },
+    {
       "path": "examples/contracts/invalid/macos_workspace_selection.invalid.json",
       "sha256": "19bf17b31f473938691c5a101bdb86076edba52a9fc84d309f650dde59fcb7d4"
     },
@@ -2795,6 +2807,14 @@
       "sha256": "5ffd41b39164d193e66182250f594c01b0ebf50a990c6bfe34bbb1d0aa44dcfa"
     },
     {
+      "path": "examples/contracts/macos_agent_cli_selection.valid.json",
+      "sha256": "50208d78350a7a160dec59a82df1499b6ca7da33e54c5eb11c97e342118e68bb"
+    },
+    {
+      "path": "examples/contracts/macos_agent_cli_selection_receipt.valid.json",
+      "sha256": "5d36f763b406ee3366c8def0c62f9bc4e3a86f59806851af2c68996f17dc8644"
+    },
+    {
       "path": "examples/contracts/macos_workspace_selection.valid.json",
       "sha256": "50208d78350a7a160dec59a82df1499b6ca7da33e54c5eb11c97e342118e68bb"
     },
@@ -3172,11 +3192,11 @@
     },
     {
       "path": "native/macos_owner/src/lib.rs",
-      "sha256": "7cbebde665dc768749e3fadb3708c85654b433ff1f1592e65f54a05f00cc6e7d"
+      "sha256": "4bdbd3dcd75d4d9d18c2b2664ac1251b75914234d3fe7f8f67b2d2a8e5c49232"
     },
     {
       "path": "native/macos_owner/src/workspace_transport.rs",
-      "sha256": "5689221b26d9cf6711c76bbb89e815f13e957e1505f0ada3c88cf2b919132d4d"
+      "sha256": "32f9095a4e488d587f07ff910f1d651b891290c7b86b4a635ea05ae522abff0d"
     },
     {
       "path": "native/process_supervision/Cargo.lock",
@@ -3360,7 +3380,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/export_center.rs",
-      "sha256": "4b8f0d03eafe1220bb7977e64473a564a3d82cb5f6387f62bd42a5660b9b3f78"
+      "sha256": "98119556675aeb334a9bb608ce796b02c8e23de93e4c1159d74d148456f8087e"
     },
     {
       "path": "native/rust_helper/src/broker/history_access.rs",
@@ -3408,7 +3428,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "aed33f776018be065588adfd8cf2dff5ba9e5a694a3dd33be11d47c394f5b8b9"
+      "sha256": "cc6e38e964c3325761f288d8e35e556a21caa492f065adb7f3ca797efce31db4"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -3492,7 +3512,7 @@
     },
     {
       "path": "native/rust_helper/src/macos_workspace_selection.rs",
-      "sha256": "21fe7574a518c8f7bd605e5fa16a30ee5dd4199cefdb8108737045f822ba8cf7"
+      "sha256": "5ebeae75b9652162730bb564cfe00b8fd6025c59ea700a4eb5bba765fbb8c984"
     },
     {
       "path": "native/rust_helper/src/main.rs",
@@ -4396,11 +4416,19 @@
     },
     {
       "path": "specs/ipc_request.schema.json",
-      "sha256": "f83e02d981508babe90e6774104c4908687f37215f4743452730e26d261460bd"
+      "sha256": "3dfdd2bd38fd881d856cce251e3d967c0525f55117a48a10ed3fabe307e6b4c3"
     },
     {
       "path": "specs/ipc_response.schema.json",
-      "sha256": "9fbfeb25497ddb413c75c763116b31f64fc628cd856153b12931b09d933fd69b"
+      "sha256": "0b4168b36363ecdd766b7b55bbedf2cc3eb17347ba5f72d0ab6b963b2085394e"
+    },
+    {
+      "path": "specs/macos_agent_cli_selection.schema.json",
+      "sha256": "39467beb91cea3b8b63c88663ee03dd9cff8ba7ff31a3f7daef89c2fc32f7c09"
+    },
+    {
+      "path": "specs/macos_agent_cli_selection_receipt.schema.json",
+      "sha256": "9db2d6a0fd6297d7ecdb28d2562220e22e178a98359a82fc42da46b8e94c5e84"
     },
     {
       "path": "specs/macos_workspace_selection.schema.json",
@@ -4756,7 +4784,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "1272129d9884bc0de6d397171dff1ecac06f9d2a8a744ebbd019da593407ecee"
+      "sha256": "c7af35373c267709db04bbabd33a735605002887ca3a3395b7d6181cc5591683"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
@@ -4852,7 +4880,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "44eef7334d547185d5681a187c263d594e0f669d240ecde229e4e9cfa154b298"
+      "sha256": "7ec2be8a5670637f6008f004dde5c83a92b17575c532a2c71b64fb03e53c79a8"
     },
     {
       "path": "tooling/shell_snapshot.py",
@@ -4888,7 +4916,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "779e8010287a91b9269280a1cc3f45b9949c77508262a8ea5865d2c2724865f9"
+      "sha256": "e5083632b99a9be21388ebd0e798f39272630008dc5ac0970049f9f1c61aec2c"
     }
   ]
 }

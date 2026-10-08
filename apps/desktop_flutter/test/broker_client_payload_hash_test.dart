@@ -51,6 +51,10 @@ void main() {
     expect(brokerRequestTimeoutForOperation('作業領域OS選択'),
         const Duration(seconds: 305));
   });
+  test('CLI実行file OS選択は登録とは別の限定native待機を使う', () {
+    expect(brokerRequestTimeoutForOperation('AgentCLI実行fileOS選択'),
+        const Duration(seconds: 305));
+  });
 
   test('payload_hash matches the Rust broker null payload vector', () {
     expect(

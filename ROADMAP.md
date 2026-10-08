@@ -1,5 +1,7 @@
 # GUI Shell ロードマップ
 
+P13 macOS Agent CLI実行fileのOS選択をIMPLEMENTING。sandbox外の既存CLIを利用者が明示選択する製品接続差分だけを実装する。有限Acceptanceは`docs/specs/macos-agent-cli-selection.md`。手動Actions `macos_agent_cli_selection`で必要なMac build／基本製品経路を確認し、既存Workspace／登録／MobileのCLOSEDは再開しない。選択は登録・Task Authorityではなく、別個Owner確認・Broker probe・通常Release能力の拒否を維持する。
+
 P13 macOS作業領域OS選択はCLOSED（Product Build、2026-10-08）。commit `af8f55b9b46e1aa95d8a080e4972376bff4045ee`の手動Actions [run 37709224596](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37709224596)で取消／入力保持、実OS chooserのsandbox外folder選択／path投影、別個Owner確認後のBroker登録、Command-Q終了・helper／fixture回収までPASS。Rust対象5件、Dart対象解析／2試験、通常Mac buildもPASS。責任正本は`docs/specs/macos-workspace-selection.md`、証拠範囲と過去FAILは`docs/REV5_PRODUCT_PROGRESS.md`。OSアクセスとD4のPermission／Approvalを分離し、通常Release能力・正式配布へ成功を拡大しない。次はP13のOPEN製品差分だけを進め、CLOSEDの選択／登録／Adapter／Mobile条件は再開しない。
 
 P13 macOS Agent CLI／Workspace起動中登録はCLOSED（Product Build、2026-10-08）。commit `c2ef88d6f11babdb6846ed332003c50dd6adc2f0`の手動Actions [run 37664507377](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37664507377)で製品UI入力、Rust所有OS拒否／承認、実Codex CLI登録、Task非対応の表示、通常終了とfixture回収がPASS。Rust対象1件・変更Dart解析／7試験・通常Mac buildもPASS。成功commitをmainへ統合・push・remote照合し、検証branchをlocal／remote双方で回収した。有限Acceptanceは`docs/specs/macos-desktop-channel.md`、証拠範囲と過去FAILは`docs/REV5_PRODUCT_PROGRESS.md`。次はP13の未接続製品機能であり、本CLOSED条件を追加証拠目的で再実行しない。Task実行・Credential保管・正式配布は既存`release_blocker`へ保持し、sandbox外folderのOS選択は上記CLOSED単位を参照する。

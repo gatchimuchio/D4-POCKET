@@ -3,6 +3,96 @@ import AppKit
 import Vision
 
 final class AdapterOwnerUITests: XCTestCase {
+  func testProductAgentCLIOSSelection() throws {
+    let app = XCUIApplication()
+    let notice = XCUIApplication(bundleIdentifier: "com.apple.UserNotificationCenter")
+    continueAfterFailure = false
+    app.launch()
+    defer { app.terminate() }
+    let center = element(app, "エージェント")
+    XCTAssertTrue(center.waitForExistence(timeout: 20)); center.click()
+    let start = app.buttons["登録を開始"]
+    XCTAssertTrue(start.waitForExistence(timeout: 10)); reveal(app, start); start.click()
+    XCTAssertTrue(app.textFields.firstMatch.waitForExistence(timeout: 10))
+    let fields = app.textFields.allElementsBoundByAccessibilityElement
+    XCTAssertEqual(fields.count, 6)
+    let workspace = "/Users/runner/Library/Containers/com.example.guiShellDesktop/Data/d4-registration-fixture/workspace"
+    let cli = "/Users/runner/d4-os-selected-cli"
+    let values = ["test-model", "macos-selected-cli", "/previous-cli",
+                  "macos-cli-workspace", workspace, "private.env"]
+    for (index, value) in values.enumerated() {
+      if index == 0 {
+        reveal(app, fields[0])
+        fields[0].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+      } else {
+        for _ in 0..<(index == 1 ? 3 : 1) { app.typeKey(XCUIKeyboardKey.tab.rawValue, modifierFlags: []) }
+      }
+      app.typeKey("a", modifierFlags: .command)
+      app.typeKey(XCUIKeyboardKey.delete.rawValue, modifierFlags: [])
+      app.typeText(value)
+      XCTAssertEqual(fields[index].value as? String, value)
+    }
+    // 既存6入力のfocus順を維持し、Workspace buttonの次の新CLI buttonへ通常Tabで進む。
+    for _ in 0..<2 { app.typeKey(XCUIKeyboardKey.tab.rawValue, modifierFlags: []) }
+    app.typeKey(" ", modifierFlags: [])
+    let chooser = try WorkspacePanelUI(app: app)
+    XCTAssertTrue(chooser.waitForButton("Cancel", timeout: 15))
+    try chooser.press("Cancel"); app.activate()
+    XCTAssertTrue(workspaceMessage(app, "OS選択を取り消しました。入力は変更していません。").waitForExistence(timeout: 10))
+    // Rustが取消を返した実入力値を公開合成フォームの通常Copyで確認する。
+    try assertCurrentCLIInput(app, "/previous-cli")
+    // CLI入力→Workspace ID→root→secret path→Workspace button→CLI button。
+    for _ in 0..<5 { app.typeKey(XCUIKeyboardKey.tab.rawValue, modifierFlags: []) }
+    app.typeKey(" ", modifierFlags: [])
+    XCTAssertTrue(chooser.waitForButton("CLI fileを選択", timeout: 15))
+    try chooser.enterFolder(cli)
+    try chooser.press("CLI fileを選択"); app.activate()
+    XCTAssertTrue(workspaceMessage(app, "OS選択済み（起動中のみ）。登録・Permission・Approvalは別です。").waitForExistence(timeout: 10))
+    try assertCurrentCLIInput(app, cli)
+    XCTAssertFalse(workspaceMessage(app, "Broker起動中だけ登録しました。Task実行能力: unsupported。").exists)
+    let submit = app.buttons["native Owner確認へ進む"]
+    submit.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+    approve(notice)
+    XCTAssertTrue(element(app, "Broker内登録: macos-selected-cli").waitForExistence(timeout: 20))
+    XCTAssertTrue(workspaceMessage(app, "作業領域ID: macos-cli-workspace").exists)
+    print("D4_MACOS_AGENT_CLI_OS_SELECTION_PASS")
+    app.typeKey("q", modifierFlags: .command)
+    XCTAssertTrue(app.wait(for: .notRunning, timeout: 10))
+  }
+
+  private func assertCurrentCLIInput(_ app: XCUIApplication, _ expected: String) throws {
+    // 全6欄は公開合成値のみ。secret入力・資格・他画面へCopyを広げない。
+    // CLI欄まで通常scrollで戻し、既知公開ラベルだけを認識する。
+    app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.65))
+      .scroll(byDeltaX: 0, deltaY: 150)
+    let image = XCUIScreen.main.screenshot().image
+    var proposed = CGRect(origin: .zero, size: image.size)
+    guard let pixels = image.cgImage(forProposedRect: &proposed, context: nil, hints: nil) else {
+      throw failure("CLIの公開入力画面を取得できない")
+    }
+    let request = VNRecognizeTextRequest()
+    request.recognitionLevel = .accurate
+    request.recognitionLanguages = ["ja-JP", "en-US"]
+    try VNImageRequestHandler(cgImage: pixels).perform([request])
+    let labels = (request.results ?? []).filter {
+      guard let text = $0.topCandidates(1).first?.string else { return false }
+      let normalized = text.folding(options: [.caseInsensitive, .widthInsensitive], locale: Locale(identifier: "ja_JP"))
+        .replacingOccurrences(of: " ", with: "")
+      return normalized.contains("codexcli") && normalized.contains("path")
+    }
+    guard labels.count == 1 else { throw failure("CLI入力の可視ラベルを一意に確認できない") }
+    let box = labels[0].boundingBox
+    let point = CGPoint(x: box.midX * image.size.width, y: (1 - box.minY) * image.size.height + 14)
+    let window = app.windows.firstMatch
+    guard window.frame.contains(point) else { throw failure("CLI入力欄が製品窓の外にある") }
+    window.coordinate(withNormalizedOffset: .zero)
+      .withOffset(CGVector(dx: point.x - window.frame.minX, dy: point.y - window.frame.minY)).click()
+    NSPasteboard.general.clearContents()
+    defer { NSPasteboard.general.clearContents() }
+    app.typeKey("a", modifierFlags: .command); app.typeKey("c", modifierFlags: .command)
+    XCTAssertEqual(NSPasteboard.general.string(forType: .string), expected, "実CLI入力内容")
+  }
+
   func testProductWorkspaceOSSelection() throws {
     let app = XCUIApplication()
     let notice = XCUIApplication(bundleIdentifier: "com.apple.UserNotificationCenter")
@@ -131,7 +221,7 @@ final class AdapterOwnerUITests: XCTestCase {
       // 小さい日本語buttonの途中の漢字はVisionで欠落し得る。固有の接頭ラベルで一意に束縛する。
       let normalized = text.folding(options: [.caseInsensitive, .widthInsensitive], locale: Locale(identifier: "ja_JP"))
         .replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "0s", with: "os")
-      return normalized.hasPrefix("os") && normalized.hasSuffix("選択")
+      return normalized.hasPrefix("os") && normalized.hasSuffix("選択") && !normalized.contains("cli")
     }
     guard matches.count == 1 else {
       print("D4_WORKSPACE_BUTTON_OCR_COUNT \(request.results?.count ?? 0) matches=\(matches.count)")

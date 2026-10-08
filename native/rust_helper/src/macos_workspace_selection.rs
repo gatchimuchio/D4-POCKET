@@ -10,6 +10,7 @@ use std::sync::mpsc::{self, SyncSender};
 use std::time::Duration;
 
 const OPERATION: &str = "作業領域OS選択";
+const CLI_OPERATION: &str = "AgentCLI実行fileOS選択";
 const SCOPE_LIMIT: usize = 8;
 
 /// 固定RunnerのRust UI部品だけが既存pipeへ書くprivate frame。UI入力はRunnerが拒否する。
@@ -34,15 +35,23 @@ pub(super) fn dispatch_native(
         }
     };
     let selection = &private.native_workspace_selection;
-    if candidate(selection.request_json.as_bytes(), endpoint).is_none() {
+    let Some(request) = candidate(selection.request_json.as_bytes(), endpoint) else {
         return Err(io::Error::other("OS選択の元要求が不正"));
-    }
+    };
+    let cli = request["operation"] == CLI_OPERATION;
     let mut choose = || match (
         selection.selection_status.as_str(),
         selection.bookmark.as_deref(),
     ) {
         ("selected", Some(bookmark)) => {
-            gui_shell_macos_owner::resolve_workspace_bookmark(bookmark).map(Some)
+            let scope = gui_shell_macos_owner::resolve_workspace_bookmark(bookmark)?;
+            if cli
+                && !std::fs::symlink_metadata(scope.as_ref())
+                    .is_ok_and(|m| m.is_file() && !m.file_type().is_symlink())
+            {
+                return Err("OS選択のpathが不正です");
+            }
+            Ok(Some(scope))
         }
         ("cancelled", None) => Ok(None),
         ("failed_native", None) => Err("native OS選択が未成立"),
@@ -75,7 +84,7 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Value> {
     }
     let text = std::str::from_utf8(frame).ok()?;
     let envelope = BrokerRequestEnvelope::from_json_str(text).ok()?;
-    if envelope.operation?.as_str() != OPERATION
+    if !matches!(envelope.operation?.as_str(), OPERATION | CLI_OPERATION)
         || envelope.session_id.is_some()
         || !envelope
             .request_id
@@ -117,6 +126,11 @@ pub(super) fn dispatch<T: AsRef<Path>>(
         return Ok(None);
     }
     let original_hash = request["payload_hash"].clone();
+    let path_key = if request["operation"] == CLI_OPERATION {
+        "cli_path"
+    } else {
+        "workspace_root"
+    };
     let selection = choose();
     let (state, selected) = match selection {
         Ok(Some(scope))
@@ -141,7 +155,7 @@ pub(super) fn dispatch<T: AsRef<Path>>(
     request["session_id"] = json!(endpoint.session_id);
     request["payload"] = json!({
         "version":1, "selection_status":state,
-        "workspace_root": selected.as_ref().and_then(|s| s.as_ref().to_str()),
+        (path_key): selected.as_ref().and_then(|s| s.as_ref().to_str()),
         "selection_request_hash": original_hash,
     });
     request["payload_hash"] = json!(canonical_payload_hash(Some(&request["payload"])));
@@ -176,6 +190,135 @@ pub(super) fn dispatch<T: AsRef<Path>>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn cli_selection_broker_boundary_projection_and_cancel() {
+        use crate::broker::{Broker, BrokerStatus};
+        let mut broker = Broker::new("cli-selection-session");
+        broker.set_desktop_setup_doctor_runtime_evidence(true, false, true);
+        let payload = json!({"version":1,"selection_status":"selected",
+            "cli_path":"/public-cli/codex", "selection_request_hash":canonical_payload_hash(Some(&json!({"version":1})))});
+        let request = json!({"request_id":"cli-selection", "operation":CLI_OPERATION,
+            "session_id":"cli-selection-session", "nonce":"cli-selection-nonce",
+            "issued_at":BrokerRequestEnvelope::current_issued_at(), "metadata":{"client":"desktop_flutter"},
+            "payload_hash":canonical_payload_hash(Some(&payload)), "payload":payload});
+        assert_eq!(
+            broker.handle_json(&request.to_string()).status,
+            BrokerStatus::Rejected
+        );
+        assert_eq!(
+            broker.owner要求処理(&request.to_string()).status,
+            BrokerStatus::Rejected
+        );
+        let selected = broker.desktop_owner_operation_json(&request.to_string());
+        assert_eq!(selected.status, BrokerStatus::Accepted);
+        let body = selected.body.unwrap();
+        assert_eq!(body["cli_path"], "/public-cli/codex");
+        assert!(body.get("workspace_root").is_none());
+        for key in [
+            "permission_generated",
+            "approval_generated",
+            "registration_generated",
+        ] {
+            assert_eq!(body[key], false);
+        }
+        assert_eq!(
+            broker
+                .desktop_owner_operation_json(&request.to_string())
+                .status,
+            BrokerStatus::Rejected
+        );
+        let mut cancel = request.clone();
+        cancel["nonce"] = json!("cli-cancel");
+        cancel["payload"]["selection_status"] = json!("cancelled");
+        cancel["payload"]["cli_path"] = Value::Null;
+        cancel["payload_hash"] = json!(canonical_payload_hash(Some(&cancel["payload"])));
+        assert_eq!(
+            broker
+                .desktop_owner_operation_json(&cancel.to_string())
+                .status,
+            BrokerStatus::Accepted
+        );
+        for field in ["approval", "bookmark", "workspace_root"] {
+            let mut injected = cancel.clone();
+            injected["nonce"] = json!(format!("cli-{field}"));
+            injected["payload"][field] = json!("injected");
+            injected["payload_hash"] = json!(canonical_payload_hash(Some(&injected["payload"])));
+            assert_eq!(
+                broker
+                    .desktop_owner_operation_json(&injected.to_string())
+                    .status,
+                BrokerStatus::Rejected
+            );
+        }
+        let audit = serde_json::to_string(broker.audit_events()).unwrap();
+        assert!(!audit.contains("public-cli"));
+        assert!(!audit.contains("bookmark"));
+    }
+
+    #[test]
+    fn cli_selection_dispatch_is_bound_to_operation_and_not_replayed() {
+        let endpoint = BrokerEndpoint {
+            host: "127.0.0.1".into(),
+            port: 1,
+            transport: "authenticated_loopback_tcp".into(),
+            session_id: "cli-dispatch".into(),
+            session_secret: "fixture-only".into(),
+            credential_role: crate::broker::BrokerCredentialRole::Normal,
+            max_request_bytes: 65536,
+        };
+        let base = json!({"request_id":"cli", "operation":CLI_OPERATION, "nonce":"cli-dispatch",
+            "issued_at":BrokerRequestEnvelope::current_issued_at(), "metadata":{"client":"desktop_flutter"},
+            "payload":{"version":1}, "payload_hash":canonical_payload_hash(Some(&json!({"version":1})))});
+        assert!(candidate(base.to_string().as_bytes(), &endpoint).is_some());
+        for key in ["cli_path", "bookmark", "mode", "approval"] {
+            let mut injected = base.clone();
+            injected["payload"][key] = json!("injected");
+            injected["payload_hash"] = json!(canonical_payload_hash(Some(&injected["payload"])));
+            assert!(candidate(injected.to_string().as_bytes(), &endpoint).is_none());
+        }
+        let (sender, receiver) = mpsc::sync_channel::<DesktopOwnerOperationRequest>(1);
+        let worker = std::thread::spawn(move || {
+            let mut broker = crate::broker::Broker::new("cli-dispatch");
+            broker.set_desktop_setup_doctor_runtime_evidence(true, false, true);
+            let message = receiver.recv().unwrap();
+            let response = broker.desktop_owner_operation_json(&message.request_json);
+            message.reply.send(response).unwrap();
+        });
+        let mut scopes = Vec::<std::path::PathBuf>::new();
+        let mut seen = BTreeSet::new();
+        let mut calls = 0;
+        let mut choose = || {
+            calls += 1;
+            Ok(None)
+        };
+        let frame = base.to_string();
+        let response = dispatch(
+            frame.as_bytes(),
+            &endpoint,
+            &sender,
+            &mut scopes,
+            &mut seen,
+            &mut choose,
+        )
+        .unwrap()
+        .unwrap();
+        let response: Value = serde_json::from_slice(&response).unwrap();
+        assert_eq!(response["body"]["selection_status"], "cancelled");
+        assert!(response["body"]["cli_path"].is_null());
+        assert!(dispatch(
+            frame.as_bytes(),
+            &endpoint,
+            &sender,
+            &mut scopes,
+            &mut seen,
+            &mut choose
+        )
+        .unwrap()
+        .is_none());
+        assert_eq!(calls, 1);
+        assert!(scopes.is_empty());
+        worker.join().unwrap();
+    }
     #[test]
     #[cfg(target_os = "macos")]
     fn workspace_native_frame_cannot_become_owner_or_accept_injected_fields() {

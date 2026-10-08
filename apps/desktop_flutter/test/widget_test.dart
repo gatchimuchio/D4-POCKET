@@ -34,6 +34,60 @@ const _requiredSurfaceSemanticsLabels = [
 String _testSessionId(String character) => List.filled(32, character).join();
 
 void main() {
+  testWidgets('macOS CLI実行fileのOS選択は入力だけへ投影し登録を開始しない', (tester) async {
+    Map<String, Object?> projection(String state, String? path,
+            {bool approval = false}) =>
+        {
+          ..._brokerAcceptedBody('AgentCLI実行fileOS選択', {
+            'version': 1,
+            'selection_status': state,
+            'cli_path': path,
+            'selection_request_hash': brokerPayloadHash({'version': 1}),
+            'scope_lifetime': 'broker_process',
+            'permission_generated': false,
+            'approval_generated': approval,
+            'registration_generated': false,
+          }),
+          'evidence_source': 'INTERNAL_STATE',
+        };
+    final transport = _FakeBrokerTransport([
+      ..._shellCoreProductBootstrapResponses(),
+      projection('cancelled', null),
+      projection('selected', '/public-cli/codex'),
+      projection('selected', '/injected-cli', approval: true),
+    ]);
+    final client = await ShellCoreClient.product(transport: transport);
+    await tester.pumpWidget(
+        MaterialApp(home: Scaffold(body: AgentCenter(client: client))));
+    await tester.tap(find.text('登録を開始'));
+    await tester.pumpAndSettle();
+    final cli = find.byType(TextFormField).at(2);
+    await tester.enterText(cli, '/previous-cli');
+    final select = find.byKey(const ValueKey('macos-select-agent-cli'));
+    for (final expected in [
+      '/previous-cli',
+      '/public-cli/codex',
+      '/public-cli/codex'
+    ]) {
+      await tester.ensureVisible(select);
+      await tester.tap(select);
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextFormField>(cli).controller!.text, expected);
+    }
+    expect(find.text('OS選択が成立していません。入力を保持し、自動再送しません。'), findsOneWidget);
+    final selections = transport.requests
+        .where((r) => r['operation'] == 'AgentCLI実行fileOS選択')
+        .toList();
+    expect(selections.length, 3);
+    for (final request in selections) {
+      expect(request['payload'], {'version': 1});
+    }
+    expect(transport.operations, isNot(contains('AgentCLI実行系作業領域登録')));
+    expect(transport.operations,
+        isNot(contains('AgentTaskWorkspacePermissionGrant')));
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
   testWidgets('macOS作業領域OS選択は取消で入力保持し投影だけを反映する', (tester) async {
     Map<String, Object?> projection(String state, String? root,
             {bool approval = false}) =>

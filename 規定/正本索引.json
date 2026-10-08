@@ -352,6 +352,10 @@
       "責任": "macOS製品画面と同梱Rust helperの匿名pipe、既存Broker接続、sandbox継承、秘密非公開、正常終了、Rust所有Owner確認、Adapter catalog管理とAgent CLI／Workspace起動中登録の限定契約"
     },
     {
+      "path": "docs/specs/macos-agent-cli-selection.md",
+      "責任": "P13 CLI実行fileのOS選択、既存private pipeによる非公開scope輸送、公開path投影と別個Owner登録の分離、有限製品受入れ"
+    },
+    {
       "path": "docs/specs/mobile-surface.md",
       "責任": "C24 Mobileの選択的状態投影、Workspace ID選択・Agent対話要求、Device Link・Approval・非権限境界"
     },

@@ -10788,6 +10788,29 @@ def test_macos_workspace_selection_is_native_scoped_and_non_authoritative() -> l
     return errors
 
 
+def test_macos_agent_cli_selection_is_non_authoritative() -> list[str]:
+    errors = []
+    request_schema = json.loads((SPECS / "macos_agent_cli_selection.schema.json").read_text(encoding="utf-8"))
+    receipt_schema = json.loads((SPECS / "macos_agent_cli_selection_receipt.schema.json").read_text(encoding="utf-8"))
+    if validate_instance({"version": 1}, request_schema, "cli-selection"):
+        errors.append("CLIの正規OS選択要求が拒否される")
+    for key in ("cli_path", "bookmark", "approval", "permission", "mode"):
+        if not validate_instance({"version": 1, key: "injected"}, request_schema, "cli-selection"):
+            errors.append(f"CLI OS選択がUIのpath・権限・modeを受け取る: {key}")
+    receipt = json.loads((ROOT / "examples/contracts/macos_agent_cli_selection_receipt.valid.json").read_text(encoding="utf-8"))
+    if validate_instance(receipt, receipt_schema, "cli-receipt"):
+        errors.append("CLI選択の非権限投影が拒否される")
+    for key in ("approval_generated", "permission_generated", "registration_generated"):
+        if not validate_instance({**receipt, key: True}, receipt_schema, "cli-receipt"):
+            errors.append(f"CLI選択が権限・登録を生成する: {key}")
+    if not validate_instance({**receipt, "cli_path": "/bad\npath"}, receipt_schema, "cli-receipt"):
+        errors.append("CLI投影が制御文字を許す")
+    protocol = (RUST_HELPER / "src/broker/protocol.rs").read_text(encoding="utf-8")
+    if "MacOSAgentCLISelection" not in protocol or "AgentCLI実行fileOS選択" not in protocol:
+        errors.append("CLI OS選択の独立sourceとBroker操作が接続されていない")
+    return errors
+
+
 def test_setup_doctor_public_bind_warning_exists() -> list[str]:
     from installer.setup_doctor import setup_doctor_report
 
@@ -11107,6 +11130,7 @@ def main() -> int:
         test_platform_hardening_configuration_exists,
         手動補助の起動境界を検査する,
         test_macos_workspace_selection_is_native_scoped_and_non_authoritative,
+        test_macos_agent_cli_selection_is_non_authoritative,
         test_setup_doctor_public_bind_warning_exists,
         test_desktop_setup_doctor_ui_does_not_require_development_toolchains,
         test_broker_parity_startup_timeout_allows_local_cold_build,

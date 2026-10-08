@@ -38,8 +38,10 @@ fn public_candidate(bytes: &[u8]) -> bool {
     let Ok(value) = serde_json::from_slice::<PublicRequest>(bytes) else {
         return false;
     };
-    value.operation == "作業領域OS選択"
-        && value.payload.version == 1
+    matches!(
+        value.operation.as_str(),
+        "作業領域OS選択" | "AgentCLI実行fileOS選択"
+    ) && value.payload.version == 1
         && value.metadata.client == "desktop_flutter"
         && !value.request_id.is_empty()
         && value.request_id.len() <= 256
@@ -123,7 +125,10 @@ pub unsafe extern "C" fn d4_workspace_select_and_write(
     if unsafe { libc::fcntl(pipe.as_raw_fd(), F_SETNOSIGPIPE, 1) } != 0 {
         return 0;
     }
-    let Ok(panel) = super::workspace_panel() else {
+    // modeは検査済み公開操作名にだけ結合する。private frameやUIの別fieldで変更できない。
+    let cli = serde_json::from_slice::<PublicRequest>(input)
+        .is_ok_and(|v| v.operation == "AgentCLI実行fileOS選択");
+    let Ok(panel) = super::selection_panel(cli) else {
         return 0;
     };
     let Some(mtm) = objc2::MainThreadMarker::new() else {
@@ -255,6 +260,32 @@ pub extern "C" fn d4_workspace_release_all() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn cli_public_selection_accepts_only_version_and_fixed_operation() {
+        let base = serde_json::json!({"request_id":"public","operation":"AgentCLI実行fileOS選択", "nonce":"nonce",
+            "issued_at":"2026-10-08T00:00:00Z","metadata":{"client":"desktop_flutter"},
+            "payload":{"version":1},"payload_hash":VERSION_ONLY_HASH});
+        assert!(public_candidate(base.to_string().as_bytes()));
+        for key in [
+            "cli_path",
+            "workspace_root",
+            "bookmark",
+            "mode",
+            "approval",
+            "permission",
+        ] {
+            let mut value = base.clone();
+            value["payload"][key] = serde_json::json!("injected");
+            assert!(!public_candidate(value.to_string().as_bytes()));
+        }
+        let mut value = base.clone();
+        value["operation"] = serde_json::json!("AgentTaskOwnerApprovalGrant");
+        assert!(!public_candidate(value.to_string().as_bytes()));
+        let duplicated =
+            base.to_string()
+                .replacen("\"version\":1", "\"version\":1,\"version\":1", 1);
+        assert!(!public_candidate(duplicated.as_bytes()));
+    }
     #[test]
     fn public_selection_has_no_path_bookmark_or_authority() {
         let base = serde_json::json!({"request_id":"public","operation":"作業領域OS選択", "nonce":"nonce",

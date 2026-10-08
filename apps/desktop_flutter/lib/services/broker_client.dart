@@ -40,7 +40,7 @@ const _nativeOwnerConfirmationOperations = <String>{
 };
 
 Duration brokerRequestTimeoutForOperation(String operation) =>
-    operation == '作業領域OS選択'
+    (operation == '作業領域OS選択' || operation == 'AgentCLI実行fileOS選択')
         ? const Duration(seconds: 305)
         : operation == 'AgentCLI実行系作業領域登録'
             ? const Duration(seconds: 320)

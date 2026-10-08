@@ -126,14 +126,15 @@ final class BrokerProcessChannel {
     let operation = envelope?["operation"] as? String
     let ownerOperations: Set<String> = ["アダプター導入", "アダプター更新", "アダプター検証",
       "アダプター有効化", "アダプター無効化", "アダプター隔離", "アダプター削除"]
-    let timeout = operation == "AgentCLI実行系作業領域登録" ? 320 : (operation == "作業領域OS選択" || ownerOperations.contains(operation ?? "") ? 305 : 5)
+    let osSelection = operation == "作業領域OS選択" || operation == "AgentCLI実行fileOS選択"
+    let timeout = operation == "AgentCLI実行系作業領域登録" ? 320 : (osSelection || ownerOperations.contains(operation ?? "") ? 305 : 5)
     DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(timeout)) { complete(nil) }
     queue.async { [weak self] in
       guard let self else { return }
       var output: String?
       var selectionCode: Int32 = 0
       do {
-        if operation == "作業領域OS選択" {
+        if osSelection {
           selectionCode = DispatchQueue.main.sync {
             let bytes = Array(frame.utf8)
             return bytes.withUnsafeBufferPointer { raw in
@@ -168,7 +169,7 @@ final class BrokerProcessChannel {
         }
       } catch { output = nil }
       let reply = output
-      if operation == "作業領域OS選択" && selectionCode != 0 {
+      if osSelection && selectionCode != 0 {
         let object = reply?.data(using: .utf8).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
         if object?["status"] as? String != "accepted" {
           DispatchQueue.main.sync { d4WorkspaceReleaseLast() }

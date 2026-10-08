@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/macos_agent_cli_selection.schema.json",
+  "title": "macOS Agent CLI実行fileのOS選択要求（MacOSAgentCLISelection）",
+  "description": "既存Rust OS chooserへのversion-only要求。UIのpath・bookmark・Authorityを受け取らず、processを起動しない。",
+  "type": "object", "required": ["version"], "additionalProperties": false,
+  "properties": {"version": {"const": 1}}
+}
