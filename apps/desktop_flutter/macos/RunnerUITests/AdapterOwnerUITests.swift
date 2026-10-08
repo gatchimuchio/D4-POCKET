@@ -43,7 +43,10 @@ final class AdapterOwnerUITests: XCTestCase {
       $0.frame.height >= 20 && app.windows.firstMatch.frame.contains($0.frame)
     }
     XCTAssertFalse(current.isEmpty)
-    XCTAssertFalse(current.contains { ($0.value as? String ?? "").contains("127.0.0.1:34101") })
+    let values = current.compactMap { $0.value as? String }
+    XCTAssertEqual(values.count, current.count)
+    XCTAssertTrue(values.contains(""))
+    XCTAssertFalse(values.contains { $0.contains("127.0.0.1:34101") })
     print("D4_MACOS_A2A_PRODUCT_PASS")
     app.typeKey("q", modifierFlags: .command)
     XCTAssertTrue(app.wait(for: .notRunning, timeout: 10))

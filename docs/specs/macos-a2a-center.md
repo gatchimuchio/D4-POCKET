@@ -26,6 +26,8 @@
 
 ## 検証履歴
 
+source 91b303eのrun 37797262060はUI開始前のnative準備中に中止した。URI消去の検収でAX値取得不能を空文字へ補完しないよう、実String取得・実空文字・公開URI不在を同時に要求するharness修正を先に行う。入力値のlog／dumpは出さず、既定のURI消去条件を正しく判定するための修正で、受入れ条件は増やさない。
+
 実native拒否・拒否Auditはsource b7a20d8で成立済みのMAC-A2A-1証拠を使用し、後続UI runでは再試験しない。残件では別個native承認・取得をURI消去と終了へ進む前提として通すだけとし、現在runのAudit gateは受理1件を確認する。拒否の既存証拠を削除・弱体化しない。
 
 source `b7a20d8597cb5f45020a37739ad880a609b63334`、[run 37795697040](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37795697040)は検索・公開入力・実native拒否／別個承認・Broker実取得・成功receipt・Card名・未審査表示まで成立。fixture一回取得、拒否／受理Audit、本文非保存、通常build、helper／fixture回収はPASS。製品UIはその後のhash文字のOCR探索で95.267秒FAIL。hashは未審査行より前にあるのに下方向へ探索する順序だった。hash投影だけを既知public prefixのAX要素で確認してから未審査行へ進むよう局所修正し、残るURI消去・通常終了を検収する。artifact `11558672214`（70013 bytes）、SHA-256 `20daae25df77f41383baf1c95217eeb94e6dcdc1c915980d3b78366005769e9d`を実byteへ照合。MAC-A2A-1のnative実拒否証拠を本runへ結合し、CLOSED境界・投影を追加試験しない。
