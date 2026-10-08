@@ -136,7 +136,10 @@ jobs:
             if [ -n "$public_png" ]; then
               test "$(basename "$public_png")" = d4-mcp-public-disconnect.png
               public_parent=$(cd "$(dirname "$public_png")" && pwd -P)
-              case "$public_parent" in /private/var/folders/*) ;; *) exit 1 ;; esac
+              case "$public_parent" in
+                /Users/runner/Library/Containers/com.example.guiShellDesktop.RunnerUITests.xctrunner/Data/tmp) ;;
+                *) exit 1 ;;
+              esac
               test -f "$public_png" && test ! -L "$public_png"
               test "$(stat -f%z "$public_png")" -lt 1048576
               cp "$public_png" evidence/mcp-credential-public-disconnect.png

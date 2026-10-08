@@ -72,7 +72,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "b9d594e349498b5a43481f6e133e8a7ccbde5d1adaf98bb799128ad4a46e55cf"
+      "sha256": "44eaa56c71c8ae643202d52b1efc882cdc4072e557a5e376d7e1ae85d8835a41"
     },
     {
       "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
@@ -1508,7 +1508,7 @@
     },
     {
       "path": "docs/specs/macos-mcp-credential-binding.md",
-      "sha256": "580668243e5a5937fd1b83a257dc2f1986c61b36ff42cad72c987da6093d011d"
+      "sha256": "dad2e61adfca3fe3aa228448d3bf8acb42cba146d3a9b8cd51a336304ebce9d8"
     },
     {
       "path": "docs/specs/macos-workspace-selection.md",
