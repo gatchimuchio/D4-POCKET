@@ -130,7 +130,19 @@ final class AdapterOwnerUITests: XCTestCase {
       try mcpPublicText(app, "切断", click: true, scrollUp: !credentialBinding,
                         allowDisconnectIcon: credentialBinding)
     } catch {
-      if credentialBinding { try? saveMcpPublicDisconnectWindow(app) }
+      if credentialBinding {
+        let disconnect = app.buttons["切断"]
+        print("D4_PUBLIC_DISCONNECT_AX_EXISTS \(disconnect.exists)")
+        if disconnect.exists { print("D4_PUBLIC_DISCONNECT_AX_FRAME \(disconnect.frame)") }
+        for label in ["Mac確認へ進む", "入力内容を確認", "閉じる"] {
+          print("D4_PUBLIC_DIALOG_BUTTON \(label) \(app.buttons[label].exists)")
+        }
+        do { try saveMcpPublicDisconnectWindow(app) }
+        catch {
+          let issue = error as NSError
+          print("D4_PUBLIC_DISCONNECT_CAPTURE_FAILURE \(issue.domain == NSCocoaErrorDomain ? "filesystem" : "capture") \(issue.code)")
+        }
+      }
       throw error
     }
     approve(notice); app.activate()
@@ -212,9 +224,14 @@ final class AdapterOwnerUITests: XCTestCase {
             height: frame.height * CGFloat(screen.height) / image.size.height).integral),
           let png = NSBitmapImageRep(cgImage: pixels).representation(using: .png, properties: [:]),
           png.count < 1048576 else { throw failure("公開製品窓を限定保存できない") }
-    try png.write(to: URL(fileURLWithPath:
-      "/Users/runner/Library/Containers/com.example.guiShellDesktop/Data/d4-mcp-fixture/disconnect-public.png"),
-      options: .withoutOverwriting)
+    // UITest processが他app containerへ書く経路を使わず、sourceから固定したdev artifactへ保存。
+    guard #filePath.hasSuffix("/apps/desktop_flutter/macos/RunnerUITests/AdapterOwnerUITests.swift") else {
+      throw failure("試験sourceから公開artifact位置を固定できない")
+    }
+    var root = URL(fileURLWithPath: #filePath)
+    for _ in 0..<5 { root.deleteLastPathComponent() }
+    try png.write(to: root.appendingPathComponent("evidence/mcp-credential-public-disconnect.png"),
+                  options: .withoutOverwriting)
   }
 
   private func mcpPublicText(_ app: XCUIApplication, _ label: String, click: Bool = false,

@@ -131,11 +131,9 @@ jobs:
           fi
           fixture=/Users/runner/Library/Containers/com.example.guiShellDesktop/Data/d4-mcp-fixture
           test ! -L "$fixture"
-          if [ '${{ inputs.target }}' = 'macos_mcp_credential_binding' ] && [ -f "$fixture/disconnect-public.png" ]; then
-            test ! -L "$fixture/disconnect-public.png"
-            test "$(stat -f%z "$fixture/disconnect-public.png")" -lt 1048576
-            cp "$fixture/disconnect-public.png" evidence/mcp-credential-public-disconnect.png
-            rm "$fixture/disconnect-public.png"
+          if [ '${{ inputs.target }}' = 'macos_mcp_credential_binding' ] && [ -f evidence/mcp-credential-public-disconnect.png ]; then
+            test ! -L evidence/mcp-credential-public-disconnect.png
+            test "$(stat -f%z evidence/mcp-credential-public-disconnect.png)" -lt 1048576
           fi
           if [ -d "$fixture/workspace" ]; then
             test -z "$(find "$fixture/workspace" -mindepth 1 -print -quit)"
