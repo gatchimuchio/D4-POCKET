@@ -52,4 +52,6 @@ run `37724269791`／source `c603df8`はpaletteを開き検索keyを送るまで�
 
 run `37725337534`／source `e2d4965`はASCII検索後も全階層snapshot timeoutで130.288秒のFAIL。複雑predicateだけが原因という仮定を撤回する。既存Manifest試験が扱うFlutterView背面のnative editorへ実座標clickしてから通常keyを送り、候補選択だけは既存CLI試験のVision方式を秘密入力前の公開文字に限定して使用する。画像を保存・添付・出力せず、候補が一意かつ製品窓内でなければ停止する。製品要求・秘密値・Owner確認を代替しない。
 
+run `37726668234`／source `e046a0e`は公開MCP候補の画面照合とclickまで成立。サーバー識別子のnative editorをlabel queryで取得できず、21.633秒でFAILした。秘密入力前の公開ラベルを画面から一意に取得し、通常scroll／mouseで公開IDを入力する試験へ変更する。Keychain実API・対象境界・通常build・後片付けはPASS、製品登録は未到達であり未成立を保持する。artifact `11527987964`のSHA-256 `0a4a263ca3e42863e467c80535d84265a54f84631908ae279505b076d1cceffb`を照合した。証拠取得時の認証拒否はRepository移転のredirectで、現行repository IDへ直接要求して解消した。製品要求・Authority・有限条件は変更しない。
+
 `release_blocker`: MacでのProvider／MCP注入、正式署名identity・配布、Final QA。通常Release `task_execution=unsupported`、`release_ready=false`を保持する。秘密値の表示、保管方式fallback、Windowsの保存形式migrationを本単位の便宜で追加しない。

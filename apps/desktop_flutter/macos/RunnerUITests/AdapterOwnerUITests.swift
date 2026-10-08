@@ -29,10 +29,10 @@ final class AdapterOwnerUITests: XCTestCase {
     search.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
     app.typeText("MCP")
     // 検索後の全階層AX queryが停止したため、秘密入力前の公開候補だけを画面で確認。
-    try clickCredentialPublicCandidate(app)
-    let server = app.textFields.matching(NSPredicate(format: "label CONTAINS %@", "サーバー識別子")).firstMatch
-    XCTAssertTrue(server.waitForExistence(timeout: 10)); reveal(app, server)
-    server.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+    try clickCredentialPublicText(app, "MCP接続", scroll: false)
+    // native editorのlabel queryでは欄を取得できなかった。秘密入力前の可視ラベルと
+    // 実画面位置を照合し、通常mouse入力だけで公開server IDを入力する。
+    try clickCredentialPublicText(app, "サーバー識別子", scroll: true)
     app.typeText("macos-vault-fixture")
     let input = app.buttons["native入力で資格情報を登録"]
     XCTAssertTrue(input.waitForExistence(timeout: 10)); reveal(app, input); input.click()
@@ -56,28 +56,36 @@ final class AdapterOwnerUITests: XCTestCase {
     XCTAssertTrue(app.wait(for: .notRunning, timeout: 10))
   }
 
-  private func clickCredentialPublicCandidate(_ app: XCUIApplication) throws {
+  private func clickCredentialPublicText(_ app: XCUIApplication, _ label: String, scroll: Bool) throws {
     // この呼出しはnative秘密入力前だけ。画像を保存・添付・出力しない。
-    Thread.sleep(forTimeInterval: 0.6)
-    let image = XCUIScreen.main.screenshot().image
-    var proposed = CGRect(origin: .zero, size: image.size)
-    guard let pixels = image.cgImage(forProposedRect: &proposed, context: nil, hints: nil) else {
-      throw failure("公開command候補の画面を取得できない")
+    for attempt in 0..<(scroll ? 8 : 1) {
+      Thread.sleep(forTimeInterval: 0.6)
+      let image = XCUIScreen.main.screenshot().image
+      var proposed = CGRect(origin: .zero, size: image.size)
+      guard let pixels = image.cgImage(forProposedRect: &proposed, context: nil, hints: nil) else {
+        throw failure("公開入力画面を取得できない")
+      }
+      let request = VNRecognizeTextRequest()
+      request.recognitionLevel = .accurate
+      request.recognitionLanguages = ["ja-JP", "en-US"]
+      try VNImageRequestHandler(cgImage: pixels).perform([request])
+      let hits = (request.results ?? []).filter {
+        $0.topCandidates(1).first?.string.replacingOccurrences(of: " ", with: "") == label
+      }
+      if hits.isEmpty && scroll && attempt < 7 {
+        app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.65))
+          .scroll(byDeltaX: 0, deltaY: -180)
+        continue
+      }
+      guard hits.count == 1 else { throw failure("公開ラベルを一意に確認できない: " + label) }
+      let box = hits[0].boundingBox
+      let point = CGPoint(x: box.midX * image.size.width, y: (1 - box.midY) * image.size.height)
+      let window = app.windows.firstMatch
+      guard window.frame.contains(point) else { throw failure("公開入力が製品窓の外にある") }
+      window.coordinate(withNormalizedOffset: .zero)
+        .withOffset(CGVector(dx: point.x - window.frame.minX, dy: point.y - window.frame.minY)).click()
+      return
     }
-    let request = VNRecognizeTextRequest()
-    request.recognitionLevel = .accurate
-    request.recognitionLanguages = ["ja-JP", "en-US"]
-    try VNImageRequestHandler(cgImage: pixels).perform([request])
-    let hits = (request.results ?? []).filter {
-      $0.topCandidates(1).first?.string.replacingOccurrences(of: " ", with: "") == "MCP接続"
-    }
-    guard hits.count == 1 else { throw failure("公開MCP command候補を一意に確認できない") }
-    let box = hits[0].boundingBox
-    let point = CGPoint(x: box.midX * image.size.width, y: (1 - box.midY) * image.size.height)
-    let window = app.windows.firstMatch
-    guard window.frame.contains(point) else { throw failure("公開候補が製品窓の外にある") }
-    window.coordinate(withNormalizedOffset: .zero)
-      .withOffset(CGVector(dx: point.x - window.frame.minX, dy: point.y - window.frame.minY)).click()
   }
 
   func testProductAgentCLIOSSelection() throws {
