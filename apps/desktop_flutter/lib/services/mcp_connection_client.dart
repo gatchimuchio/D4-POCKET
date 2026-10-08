@@ -349,6 +349,7 @@ class McpConnectionClient {
     required McpCredentialSummary credential,
   }) async {
     if (!_validCredentialId(credential.credentialId) ||
+        !const {'windows_dpapi', 'macos_keychain'}.contains(credential.storage) ||
         credential.status != '有効' ||
         credential.purpose.isEmpty ||
         credential.purpose.length > 256 ||

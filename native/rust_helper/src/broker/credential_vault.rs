@@ -497,6 +497,11 @@ impl Broker {
         let ciphertext_hash =
             match store.登録(&registration.credential_id, registration.secret.as_bytes()) {
                 Ok(value) => value,
+                #[cfg(target_os = "macos")]
+                Err(super::credential_storage::保存失敗::署名identity未成立) => {
+                    return self.reject_with_payload_hash(request_id, OPERATION,
+                        "credential_platform_identity_required", "Keychainの署名identityが未成立。秘密値を別方式へfallbackせず保管を停止しました", true, payload_hash)
+                }
                 Err(super::credential_storage::保存失敗::回収未成立) => return self
                     .reject_with_payload_hash(
                     request_id,

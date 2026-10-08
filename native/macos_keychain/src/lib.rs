@@ -7,6 +7,7 @@ pub enum Error {
     Duplicate,
     Missing,
     Unavailable,
+    IdentityRequired,
 }
 
 #[derive(Clone, Copy)]
@@ -94,6 +95,7 @@ mod os {
             0 => Ok(()),
             -25299 => Err(Error::Duplicate),
             -25300 => Err(Error::Missing),
+            -34018 => Err(Error::IdentityRequired),
             _ => Err(Error::Unavailable),
         }
     }

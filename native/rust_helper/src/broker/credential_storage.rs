@@ -1,10 +1,13 @@
 //! 資格情報保存先だけを分離する。Permission、Approval、用途、Auditは保管庫に残す。
 use zeroize::Zeroizing;
 
+#[derive(Debug)]
 pub(super) enum 保存失敗 {
     保管拒否,
     #[cfg_attr(windows, allow(dead_code))]
     回収未成立,
+    #[cfg(target_os = "macos")]
+    署名identity未成立,
 }
 
 pub(super) trait 資格情報保存先 {
@@ -96,7 +99,6 @@ mod tests {
         let secret = Zeroizing::new(random.to_vec());
         let hash = store
             .登録(id, &secret)
-            .map_err(|_| "Keychain追加未成立")
             .expect("Keychain実API追加");
         struct Cleanup<'a>(&'a MacOSCredentialStore, &'a str, &'a str);
         impl Drop for Cleanup<'_> {
@@ -163,7 +165,7 @@ impl 資格情報保存先 for MacOSCredentialStore {
     fn 登録(&self, id: &str, plaintext: &[u8]) -> Result<String, 保存失敗> {
         use gui_shell_macos_keychain::Part;
         use ring::aead::{Aad, LessSafeKey, Nonce, UnboundKey, AES_256_GCM};
-        let rejected = |_| 保存失敗::保管拒否;
+        let rejected = |e| match e { gui_shell_macos_keychain::Error::IdentityRequired => 保存失敗::署名identity未成立, _ => 保存失敗::保管拒否 };
         if plaintext.is_empty() || plaintext.len() > 65536 {
             return Err(保存失敗::保管拒否);
         }

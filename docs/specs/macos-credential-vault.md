@@ -34,4 +34,6 @@ run `37717772590`／source `a28625c`はNSAlertのcallback型がOptionである�
 
 run `37718076742`／source `a07db57`はBrokerが要求するDebug trait不足でcompile FAIL。保存先のDebugには固定部品名だけを返し、item・秘密・鍵を出さない。ローカル新Dart 3試験はplatform override復元時点のtest-only不一致を修正してPASS。通常checkoutの両Flutter analyzeは既存LSP FormatException／server exit 255、ASCII解析もDart perf fileのOS error 1920で未成立。Windows全Rustは556 PASS／1 FAIL／13 ignored（A2A、変更外）で、全体PASSへ読み替えない。
 
+run `37718454089`／source `8b91a57`はMac compile成立後、Keychain追加実APIでFAIL。秘密を出さない固定OS拒否分類を追加して根因を特定する。Data Protection Keychainは[Apple TN3137](https://developer.apple.com/documentation/technotes/tn3137-on-mac-keychains)上、provisioning profileで認可された署名entitlementとapp-like構造を必要とする。現在の同梱helperは独立CLIであるため、実OS分類を確認してこの実装選択と現行構造の適合を再評価する。無署名を成功へ昇格したり、fake entitlementやOS保護の変更で回避したりしない。
+
 `release_blocker`: MacでのProvider／MCP注入、正式署名identity・配布、Final QA。通常Release `task_execution=unsupported`、`release_ready=false`を保持する。秘密値の表示、保管方式fallback、Windowsの保存形式migrationを本単位の便宜で追加しない。

@@ -83,7 +83,7 @@ pub struct CredentialPrivateFrame {
     pub native_credential_input: NativeInput,
 }
 
-/// # Safety
+/// # Safety（安全な呼出し前提）
 /// 固定Runnerが同期中公開byte列と同じhelperへのpipe fdを保持する。秘密・Approvalを返さない。
 #[cfg(target_os = "macos")]
 #[no_mangle]
