@@ -24,11 +24,19 @@ final class AdapterOwnerUITests: XCTestCase {
     }
     toolbar[0].click()
     let search = app.textFields.firstMatch
-    XCTAssertTrue(search.waitForExistence(timeout: 10)); search.click(); search.typeText("MCP接続")
-    let result = element(app, "MCP接続")
-    XCTAssertTrue(result.waitForExistence(timeout: 10)); result.click()
+    XCTAssertTrue(search.waitForExistence(timeout: 10))
+    // 現行paletteはautofocus。AXのisHittable偽値に依存せず通常keyを送る。
+    app.typeText("MCP接続")
+    // 同じ文字を持つ検索editorは候補にしない。公開command entryだけを選ぶ。
+    let result = app.descendants(matching: .any).matching(NSPredicate(
+      format: "(label BEGINSWITH %@ OR value BEGINSWITH %@) AND elementType != %@",
+      "MCP接続", "MCP接続", NSNumber(value: XCUIElement.ElementType.textField.rawValue))).firstMatch
+    XCTAssertTrue(result.waitForExistence(timeout: 10))
+    result.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
     let server = app.textFields.matching(NSPredicate(format: "label CONTAINS %@", "サーバー識別子")).firstMatch
-    XCTAssertTrue(server.waitForExistence(timeout: 10)); reveal(app, server); server.click(); server.typeText("macos-vault-fixture")
+    XCTAssertTrue(server.waitForExistence(timeout: 10)); reveal(app, server)
+    server.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+    app.typeText("macos-vault-fixture")
     let input = app.buttons["native入力で資格情報を登録"]
     XCTAssertTrue(input.waitForExistence(timeout: 10)); reveal(app, input); input.click()
     let cancel = app.sheets.buttons["取消"].firstMatch
