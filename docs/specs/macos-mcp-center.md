@@ -20,7 +20,7 @@ Rustの`Command::process_group(0)`で新childを独立process groupへ置く。g
 
 | ID | 条件 | 状態 | 証拠 |
 | --- | --- | --- | --- |
-| MAC-MCP-1 | native Owner拒否→未接続、承認→実stdio discovery／metadata一覧 | OPEN | 未取得 |
+| MAC-MCP-1 | native Owner拒否→未接続、承認→実stdio discovery／metadata一覧 | CLOSED | source 075312e、run 37752807608で当該段階PASS |
 | MAC-MCP-2 | 現Tool／Schema再照合、一回Permission・Audit、hash-only実呼出し表示 | OPEN | 未取得 |
 | MAC-MCP-3 | 別個Owner切断、所有group停止・記録解消、通常終了 | OPEN | 未取得 |
 | MAC-MCP-4 | normal／Owner資格単独、session・Authority／秘密注入、configured Credentialの拒否 | CLOSED | source 94ea619、run 37749059105の対象3件／共有Windows18件PASS |
@@ -43,3 +43,5 @@ source `357432b06e7fb712aab6a2a9e4b18f38f68ba656`、[run 37750370848](https://gi
 `REGRESSION_REOPENED`の局所対象は共有MCP接続receiptのSchema適合だけ。原因commit `5d45baa2e2d7a156b1439a6ad0834cd0817c492b`が外部発見metadataの`LIVE_RUNTIME`を接続receipt内へ残し、外側の`INTERNAL_STATE`、現行Schemaのconst、Flutter受入れと不整合だった。破壊条件はMAC-MCP-1の製品metadata表示／`mcp_connection_receipt.schema.json`。既存Windows実stdio testへ当該assertを追加して0 passed／1 failed（left LIVE_RUNTIME、right INTERNAL_STATE）を再現した。Brokerで保存済みmetadataへ正しく分類し、UI／Schema検査を緩めない。MAC-MCP-4／5や他CLOSED工程全体を再開しない。検査追加の理由は観測済み契約破壊であり、証拠強化ではない。
 
 同局所修正後の必須Windows全Rustは560 passed／0 failed／13 ignored（exit 0）。接続receiptの実stdio回帰assertを含む。Schema 166／正常例162／負例213、Conformance 240もPASS。先行全RustのFAILや既存Final QAの間欠的失敗を消さず、このPASSをその根因修正の証拠へ流用しない。MacのMAC-MCP-1〜3は製品UI確認まで未成立。
+
+source `075312e497c2d0595cf4266597cf635f389ef7f0`、[run 37752807608](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37752807608)でnative拒否／承認、実discovery、接続receiptと実metadataの製品表示がPASSし、MAC-MCP-1をCLOSED。Tool JSON入力まで進んだが、公開文字照合で`Mac確認へ進む`を取得できず104.566秒でFAIL。artifact `11539326003`（70412 bytes）、SHA-256 `f1bbe931c5330900fbc0f33ba1d247f71b941a0b22263ce7420ea6e558e45a91`を実byteへ照合。Toolの同じ可視buttonをAX identity／window frameで照合するよう試験だけ修正する。以後は`testProductMacMcpToolAndDisconnect`でMAC-MCP-2／3だけを検査し、接続は前提準備として一回承認、CLOSEDした拒否・metadata条件を再試験しない。失敗時だけ合成公開画面を製品窓へ限定して診断し、秘密入力／実資格は含めない。

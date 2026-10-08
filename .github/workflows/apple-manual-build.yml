@@ -74,9 +74,11 @@ jobs:
           fi
           flutter build macos --debug --no-pub 2>&1 | tee ../../evidence/macos-normal-build.txt
           cd ../..
+          mcp_test=testProductMacMcpCenter
+          if [ '${{ inputs.mcp_product_only }}' = 'true' ]; then mcp_test=testProductMacMcpToolAndDisconnect; fi
           xcodebuild test -project apps/desktop_flutter/macos/Runner.xcodeproj -scheme Runner \
             -destination 'platform=macOS' -parallel-testing-enabled NO \
-            -only-testing:RunnerUITests/AdapterOwnerUITests/testProductMacMcpCenter \
+            -only-testing:"RunnerUITests/AdapterOwnerUITests/$mcp_test" \
             -derivedDataPath "$RUNNER_TEMP/macos-mcp-tests" -resultBundlePath "$RUNNER_TEMP/macos-mcp-tests.xcresult" \
             CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual 'SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG D4_MACOS_OWNER_UI_TEST' 2>&1 | tee evidence/mcp-product-ui-test.txt
       - name: 有限Auditと後片付け
@@ -86,6 +88,9 @@ jobs:
           set -euo pipefail
           if [ -d "$RUNNER_TEMP/macos-mcp-tests.xcresult" ]; then
             xcrun xcresulttool get test-results summary --path "$RUNNER_TEMP/macos-mcp-tests.xcresult" > evidence/native-summary.json
+            if jq -e '.failedTests > 0' evidence/native-summary.json > /dev/null; then
+              xcrun xcresulttool export attachments --path "$RUNNER_TEMP/macos-mcp-tests.xcresult" --output-path evidence/mcp-public-failure
+            fi
           fi
           mcp_audit=/Users/runner/Library/Containers/com.example.guiShellDesktop/Data/Library/Application\ Support/D4Pocket/macos-broker/store/audit.jsonl
           if [ -f "$mcp_audit" ] && [ ! -L "$mcp_audit" ]; then

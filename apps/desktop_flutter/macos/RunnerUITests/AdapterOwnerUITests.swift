@@ -4,10 +4,38 @@ import Vision
 
 final class AdapterOwnerUITests: XCTestCase {
   func testProductMacMcpCenter() throws {
+    try productMacMcpFlow(verifyConnection: true)
+  }
+
+  func testProductMacMcpToolAndDisconnect() throws {
+    try productMacMcpFlow(verifyConnection: false)
+  }
+
+  private func productMacMcpFlow(verifyConnection: Bool) throws {
     let app = XCUIApplication()
     let notice = XCUIApplication(bundleIdentifier: "com.apple.UserNotificationCenter")
     continueAfterFailure = false
-    app.launch(); defer { app.terminate() }
+    app.launch()
+    defer {
+      // この試験は合成公開Server／引数だけ。failureの可視状態を製品窓に限定する。
+      if (testRun?.failureCount ?? 0) > 0, !app.secureTextFields.firstMatch.exists {
+        let window = app.windows.firstMatch
+        let frame = window.frame
+        let image = XCUIScreen.main.screenshot().image
+        var proposed = CGRect(origin: .zero, size: image.size)
+        if let screen = image.cgImage(forProposedRect: &proposed, context: nil, hints: nil),
+           CGRect(origin: .zero, size: image.size).contains(frame),
+           let pixels = screen.cropping(to: CGRect(
+             x: frame.minX * CGFloat(screen.width) / image.size.width,
+             y: frame.minY * CGFloat(screen.height) / image.size.height,
+             width: frame.width * CGFloat(screen.width) / image.size.width,
+             height: frame.height * CGFloat(screen.height) / image.size.height).integral) {
+          let attachment = XCTAttachment(image: NSImage(cgImage: pixels, size: frame.size))
+          attachment.name = "D4-MCP-public-failure"; attachment.lifetime = .keepAlways; add(attachment)
+        }
+      }
+      app.terminate()
+    }
     XCTAssertTrue(element(app, "エージェント").waitForExistence(timeout: 20))
     let group = element(app, "操作グループ選択")
     XCTAssertTrue(group.waitForExistence(timeout: 10))
@@ -32,15 +60,17 @@ final class AdapterOwnerUITests: XCTestCase {
       app.typeText(value)
     }
     try mcpPublicText(app, "MCP接続を開始", click: true)
-    let deny = notice.dialogs.firstMatch.buttons["承認しない"]
-    XCTAssertTrue(deny.waitForExistence(timeout: 15)); deny.click(); app.activate()
-    XCTAssertTrue(credentialMessage(app,
-      "MCP接続は確定していません。native Owner確認とBroker状態を確認してください。").waitForExistence(timeout: 10))
-    try mcpPublicText(app, "MCP接続を開始", click: true, scroll: false)
+    if verifyConnection {
+      let deny = notice.dialogs.firstMatch.buttons["承認しない"]
+      XCTAssertTrue(deny.waitForExistence(timeout: 15)); deny.click(); app.activate()
+      XCTAssertTrue(credentialMessage(app,
+        "MCP接続は確定していません。native Owner確認とBroker状態を確認してください。").waitForExistence(timeout: 10))
+      try mcpPublicText(app, "MCP接続を開始", click: true, scroll: false)
+    }
     approve(notice); app.activate()
     XCTAssertTrue(credentialMessage(app,
       "接続receiptを受理しました。表示はBroker内部状態であり、TrustやTool実行を示しません。").waitForExistence(timeout: 15))
-    try mcpPublicText(app, "Mac MCP試験Server")
+    if verifyConnection { try mcpPublicText(app, "Mac MCP試験Server") }
     try mcpPublicText(app, "Tool一覧", click: true)
     try mcpPublicText(app, "確認して実行", click: true)
     try mcpPublicText(app, "JSON形式のobject", click: true, scroll: false)
@@ -48,7 +78,10 @@ final class AdapterOwnerUITests: XCTestCase {
     app.typeKey(XCUIKeyboardKey.delete.rawValue, modifierFlags: [])
     app.typeText("{\"text\":\"macos-public-input\"}")
     try mcpPublicText(app, "入力内容を確認", click: true, scroll: false)
-    try mcpPublicText(app, "Mac確認へ進む", click: true, scroll: false)
+    let toolConfirmation = app.buttons["Mac確認へ進む"]
+    XCTAssertTrue(toolConfirmation.waitForExistence(timeout: 10))
+    XCTAssertTrue(app.windows.firstMatch.frame.contains(toolConfirmation.frame))
+    toolConfirmation.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
     approve(notice); app.activate()
     let receipt = app.staticTexts.matching(NSPredicate(
       format: "label CONTAINS %@ OR value CONTAINS %@", "result hash: sha256:", "result hash: sha256:")).firstMatch
