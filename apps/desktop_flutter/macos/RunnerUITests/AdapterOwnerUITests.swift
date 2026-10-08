@@ -3,6 +3,41 @@ import AppKit
 import Vision
 
 final class AdapterOwnerUITests: XCTestCase {
+  func testProductCredentialVault() throws {
+    let app = XCUIApplication()
+    let notice = XCUIApplication(bundleIdentifier: "com.apple.UserNotificationCenter")
+    continueAfterFailure = false
+    app.launch(); defer { app.terminate() }
+    XCTAssertTrue(element(app, "エージェント").waitForExistence(timeout: 20))
+    app.typeKey("k", modifierFlags: .control)
+    let search = app.textFields.firstMatch
+    XCTAssertTrue(search.waitForExistence(timeout: 10)); search.click(); search.typeText("MCP接続")
+    let result = element(app, "MCP接続")
+    XCTAssertTrue(result.waitForExistence(timeout: 10)); result.click()
+    let server = app.textFields.matching(NSPredicate(format: "label CONTAINS %@", "サーバー識別子")).firstMatch
+    XCTAssertTrue(server.waitForExistence(timeout: 10)); reveal(app, server); server.click(); server.typeText("macos-vault-fixture")
+    let input = app.buttons["native入力で資格情報を登録"]
+    XCTAssertTrue(input.waitForExistence(timeout: 10)); reveal(app, input); input.click()
+    let cancel = app.sheets.buttons["取消"].firstMatch
+    XCTAssertTrue(cancel.waitForExistence(timeout: 10)); cancel.click()
+    XCTAssertTrue(element(app, "資格情報登録は未成立です。取消・拒否・期限または保管状態を確認してください。自動再送しません。").waitForExistence(timeout: 10))
+    reveal(app, input); input.click()
+    let proceed = app.sheets.buttons["入力して確認へ"].firstMatch
+    XCTAssertTrue(proceed.waitForExistence(timeout: 10))
+    // 合成秘密はRust Debug fixtureで生成済み。値をXCTestから入力・読取・出力しない。
+    XCTAssertTrue(app.secureTextFields.firstMatch.exists); proceed.click()
+    approve(notice)
+    XCTAssertTrue(element(app, "Keychain登録後のmetadataを取得しました。秘密値は取得していません。").waitForExistence(timeout: 15))
+    XCTAssertTrue(element(app, "api_key ・ 有効").exists)
+    let revoke = app.buttons["資格情報を失効"]
+    XCTAssertTrue(revoke.waitForExistence(timeout: 10)); reveal(app, revoke); revoke.click()
+    approve(notice)
+    XCTAssertTrue(element(app, "api_key ・ 失効").waitForExistence(timeout: 15))
+    print("D4_MACOS_CREDENTIAL_VAULT_PRODUCT_PASS")
+    app.typeKey("q", modifierFlags: .command)
+    XCTAssertTrue(app.wait(for: .notRunning, timeout: 10))
+  }
+
   func testProductAgentCLIOSSelection() throws {
     let app = XCUIApplication()
     let notice = XCUIApplication(bundleIdentifier: "com.apple.UserNotificationCenter")

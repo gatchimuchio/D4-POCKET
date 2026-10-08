@@ -139,6 +139,13 @@ pub(super) struct MacOSCredentialStore {
 }
 
 #[cfg(target_os = "macos")]
+impl std::fmt::Debug for MacOSCredentialStore {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MacOSCredentialStore").finish_non_exhaustive()
+    }
+}
+
+#[cfg(target_os = "macos")]
 impl MacOSCredentialStore {
     pub(super) fn new(namespace: String) -> Result<Self, ()> {
         Ok(Self {

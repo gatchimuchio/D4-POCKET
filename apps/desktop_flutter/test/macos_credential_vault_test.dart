@@ -82,24 +82,28 @@ void main() {
   });
   testWidgets('Mac画面はnative入力を起動し秘密入力widgetを作らない', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
-    addTearDown(() => debugDefaultTargetPlatformOverride = null);
-    final transport = _Transport();
-    await tester.pumpWidget(MaterialApp(
-        home: Scaffold(body: McpConnectionCenterPanel(transport: transport))));
-    await tester.enterText(find.byType(TextField).first, 'test-server');
-    final button =
-        find.byKey(const ValueKey('macos-native-credential-register'));
-    await tester.ensureVisible(button);
-    await tester.tap(button);
-    await tester.pumpAndSettle();
-    expect(transport.payloads.first!.keys.toSet(),
-        {'版', '資格情報ID', '用途', '接続対象', '種類'});
-    expect(find.textContaining('Keychain登録後のmetadata'), findsOneWidget);
-    expect(
-        find
-            .byType(TextField)
-            .evaluate()
-            .any((e) => (e.widget as TextField).obscureText),
-        isFalse);
+    try {
+      final transport = _Transport();
+      await tester.pumpWidget(MaterialApp(
+          home:
+              Scaffold(body: McpConnectionCenterPanel(transport: transport))));
+      await tester.enterText(find.byType(TextField).first, 'test-server');
+      final button =
+          find.byKey(const ValueKey('macos-native-credential-register'));
+      await tester.ensureVisible(button);
+      await tester.tap(button);
+      await tester.pumpAndSettle();
+      expect(transport.payloads.first!.keys.toSet(),
+          {'版', '資格情報ID', '用途', '接続対象', '種類'});
+      expect(find.textContaining('Keychain登録後のmetadata'), findsOneWidget);
+      expect(
+          find
+              .byType(TextField)
+              .evaluate()
+              .any((e) => (e.widget as TextField).obscureText),
+          isFalse);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
   });
 }

@@ -32,4 +32,6 @@ native入力は16 KiB・300秒以内、別個Owner確認も300秒以内に限定
 
 run `37717772590`／source `a28625c`はNSAlertのcallback型がOptionである点の不一致でcompile FAIL。OS動作の失敗とは扱わず、実際の固定bindingに合わせて局所修正する。
 
+run `37718076742`／source `a07db57`はBrokerが要求するDebug trait不足でcompile FAIL。保存先のDebugには固定部品名だけを返し、item・秘密・鍵を出さない。ローカル新Dart 3試験はplatform override復元時点のtest-only不一致を修正してPASS。通常checkoutの両Flutter analyzeは既存LSP FormatException／server exit 255、ASCII解析もDart perf fileのOS error 1920で未成立。Windows全Rustは556 PASS／1 FAIL／13 ignored（A2A、変更外）で、全体PASSへ読み替えない。
+
 `release_blocker`: MacでのProvider／MCP注入、正式署名identity・配布、Final QA。通常Release `task_execution=unsupported`、`release_ready=false`を保持する。秘密値の表示、保管方式fallback、Windowsの保存形式migrationを本単位の便宜で追加しない。
