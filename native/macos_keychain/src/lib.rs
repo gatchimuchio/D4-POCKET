@@ -54,6 +54,7 @@ fn hex(value: &str, length: usize) -> bool {
 mod os {
     use super::*;
     use core_foundation::{
+        array::CFArray,
         base::{CFType, TCFType},
         boolean::CFBoolean,
         data::CFData,
@@ -61,6 +62,7 @@ mod os {
         string::CFString,
     };
     use core_foundation_sys::{
+        array::CFArrayRef,
         base::{CFGetTypeID, CFRelease, CFTypeRef},
         data::{CFDataGetTypeID, CFDataRef},
         dictionary::CFDictionaryRef,
@@ -75,8 +77,7 @@ mod os {
         static kSecClassGenericPassword: CFStringRef;
         static kSecAttrService: CFStringRef;
         static kSecAttrAccount: CFStringRef;
-        static kSecAttrAccessible: CFStringRef;
-        static kSecAttrAccessibleWhenUnlockedThisDeviceOnly: CFStringRef;
+        static kSecAttrAccess: CFStringRef;
         static kSecAttrSynchronizable: CFStringRef;
         static kSecUseDataProtectionKeychain: CFStringRef;
         static kSecUseAuthenticationUI: CFStringRef;
@@ -86,6 +87,15 @@ mod os {
         static kSecReturnAttributes: CFStringRef;
         static kSecMatchLimit: CFStringRef;
         static kSecMatchLimitOne: CFStringRef;
+        static kSecUseKeychain: CFStringRef;
+        static kSecMatchSearchList: CFStringRef;
+        fn SecKeychainCopyDefault(result: *mut CFTypeRef) -> i32;
+        fn SecKeychainSetUserInteractionAllowed(allowed: u8) -> i32;
+        fn SecAccessCreate(
+            description: CFStringRef,
+            trusted: CFArrayRef,
+            result: *mut CFTypeRef,
+        ) -> i32;
         fn SecItemAdd(query: CFDictionaryRef, result: *mut CFTypeRef) -> i32;
         fn SecItemCopyMatching(query: CFDictionaryRef, result: *mut CFTypeRef) -> i32;
         fn SecItemDelete(query: CFDictionaryRef) -> i32;
@@ -104,11 +114,25 @@ mod os {
         unsafe { CFType::wrap_under_get_rule(value.cast()) }
     }
     impl Store {
-        fn pairs(&self, id: &str, part: Part) -> Result<Vec<(CFType, CFType)>, Error> {
+        fn pairs(
+            &self,
+            id: &str,
+            part: Part,
+            adding: bool,
+        ) -> Result<Vec<(CFType, CFType)>, Error> {
             let account = self.account(id, part)?;
             // SAFETY: 固定Security定数だけを読み、queryは各同期呼出し中保持する。
-            Ok(unsafe {
-                vec![
+            unsafe {
+                // Broker専用processのKeychain UIだけを禁止し、locked／ACL拒否をfail-closedにする。
+                // D4 native Owner確認UIの方針・選択を変更するAPIではない。
+                status(SecKeychainSetUserInteractionAllowed(0))?;
+                let mut keychain = ptr::null();
+                status(SecKeychainCopyDefault(&mut keychain))?;
+                if keychain.is_null() {
+                    return Err(Error::Unavailable);
+                }
+                let keychain = CFType::wrap_under_create_rule(keychain);
+                let mut pairs = vec![
                     (symbol(kSecClass), symbol(kSecClassGenericPassword)),
                     (
                         symbol(kSecAttrService),
@@ -121,14 +145,39 @@ mod os {
                     ),
                     (
                         symbol(kSecUseDataProtectionKeychain),
-                        CFBoolean::true_value().as_CFType(),
+                        CFBoolean::false_value().as_CFType(),
                     ),
                     (
                         symbol(kSecUseAuthenticationUI),
                         symbol(kSecUseAuthenticationUIFail),
                     ),
-                ]
-            })
+                ];
+                if adding {
+                    pairs.push((symbol(kSecUseKeychain), keychain));
+                    // trustedlist=nilはApple契約上「呼出し元Appだけ」。空配列・全App許可ではない。
+                    let description = CFString::new("D4 Pocket 資格情報");
+                    let mut access = ptr::null();
+                    status(SecAccessCreate(
+                        description.as_concrete_TypeRef(),
+                        ptr::null(),
+                        &mut access,
+                    ))?;
+                    if access.is_null() {
+                        return Err(Error::Unavailable);
+                    }
+                    pairs.push((
+                        symbol(kSecAttrAccess),
+                        CFType::wrap_under_create_rule(access),
+                    ));
+                } else {
+                    // OS全search listへ広げず、同じuserの現在default Keychain一つだけ。
+                    pairs.push((
+                        symbol(kSecMatchSearchList),
+                        CFArray::from_CFTypes(&[keychain]).as_CFType(),
+                    ));
+                }
+                Ok(pairs)
+            }
         }
         pub fn add(&self, id: &str, part: Part, bytes: &[u8]) -> Result<(), Error> {
             if bytes.is_empty()
@@ -137,13 +186,9 @@ mod os {
             {
                 return Err(Error::Invalid);
             }
-            let mut pairs = self.pairs(id, part)?;
+            let mut pairs = self.pairs(id, part, true)?;
             // SAFETY: 不変のOS定数。CFDataは同期呼出しまで生存し、OSが自身の値を保管する。
             unsafe {
-                pairs.push((
-                    symbol(kSecAttrAccessible),
-                    symbol(kSecAttrAccessibleWhenUnlockedThisDeviceOnly),
-                ));
                 pairs.push((
                     symbol(kSecValueData),
                     CFData::from_buffer(bytes).as_CFType(),
@@ -153,7 +198,7 @@ mod os {
             }
         }
         pub fn read(&self, id: &str, part: Part) -> Result<Zeroizing<Vec<u8>>, Error> {
-            let mut pairs = self.pairs(id, part)?;
+            let mut pairs = self.pairs(id, part, false)?;
             // SAFETY: queryは同期呼出し中有効、create-ruleの結果は一回だけ解放する。
             unsafe {
                 pairs.push((symbol(kSecMatchLimit), symbol(kSecMatchLimitOne)));
@@ -183,7 +228,7 @@ mod os {
             }
         }
         pub fn exists(&self, id: &str, part: Part) -> Result<bool, Error> {
-            let mut pairs = self.pairs(id, part)?;
+            let mut pairs = self.pairs(id, part, false)?;
             // SAFETY: 属性だけを返す固定query。秘密値を読まず、所有結果を一回解放する。
             unsafe {
                 pairs.push((symbol(kSecMatchLimit), symbol(kSecMatchLimitOne)));
@@ -206,7 +251,7 @@ mod os {
         }
         /// exact service/account/partだけ。呼出し側の対象確認・Audit・回収責任を代替しない。
         pub fn delete(&self, id: &str, part: Part) -> Result<(), Error> {
-            let query = CFDictionary::from_CFType_pairs(&self.pairs(id, part)?);
+            let query = CFDictionary::from_CFType_pairs(&self.pairs(id, part, false)?);
             // SAFETY: 同期呼出し中queryを保持。固定名前空間の完全一致対象だけを削除する。
             unsafe { status(SecItemDelete(query.as_concrete_TypeRef())) }
         }

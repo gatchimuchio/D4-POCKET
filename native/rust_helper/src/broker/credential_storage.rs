@@ -97,9 +97,7 @@ mod tests {
         let store = MacOSCredentialStore::new(namespace.clone()).unwrap();
         let id = &namespace[..32];
         let secret = Zeroizing::new(random.to_vec());
-        let hash = store
-            .登録(id, &secret)
-            .expect("Keychain実API追加");
+        let hash = store.登録(id, &secret).expect("Keychain実API追加");
         struct Cleanup<'a>(&'a MacOSCredentialStore, &'a str, &'a str);
         impl Drop for Cleanup<'_> {
             fn drop(&mut self) {
@@ -143,7 +141,8 @@ pub(super) struct MacOSCredentialStore {
 #[cfg(target_os = "macos")]
 impl std::fmt::Debug for MacOSCredentialStore {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("MacOSCredentialStore").finish_non_exhaustive()
+        f.debug_struct("MacOSCredentialStore")
+            .finish_non_exhaustive()
     }
 }
 
@@ -165,7 +164,12 @@ impl 資格情報保存先 for MacOSCredentialStore {
     fn 登録(&self, id: &str, plaintext: &[u8]) -> Result<String, 保存失敗> {
         use gui_shell_macos_keychain::Part;
         use ring::aead::{Aad, LessSafeKey, Nonce, UnboundKey, AES_256_GCM};
-        let rejected = |e| match e { gui_shell_macos_keychain::Error::IdentityRequired => 保存失敗::署名identity未成立, _ => 保存失敗::保管拒否 };
+        let rejected = |e| match e {
+            gui_shell_macos_keychain::Error::IdentityRequired => {
+                保存失敗::署名identity未成立
+            }
+            _ => 保存失敗::保管拒否,
+        };
         if plaintext.is_empty() || plaintext.len() > 65536 {
             return Err(保存失敗::保管拒否);
         }

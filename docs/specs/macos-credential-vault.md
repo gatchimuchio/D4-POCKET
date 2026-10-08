@@ -12,7 +12,9 @@
 
 macOSでは既存ringのAES-256-GCMで秘密値を暗号化し、鍵と暗号文を別のKeychain itemに保存する。暗号文へversion・nonceを格納し、名前空間／資格情報IDを認証対象へ結合する。用途／接続対象と実暗号文hashは既存Audit recordへ一体で結合する。公開receiptは実暗号文のhashだけを返す。KeychainのserviceはRustが検証したBroker storeごとの名前空間、accountは固定の資格情報IDと鍵／暗号文の区別へ限定する。外部payloadからservice、access group、保管先を受け付けず、他App／Audit storeのitemを探索しない。
 
-OS呼出しは独立Rust部品に限定する。[Apple SecItem API](https://developer.apple.com/documentation/security/adding-a-password-to-the-keychain)と[Data Protection Keychain](https://developer.apple.com/documentation/technotes/tn3137-on-mac-keychains)を使い、同期なし・ThisDeviceOnly・追加専用・重複拒否・無言fallbackなしとする。OS拒否や保管不整合は固定分類でfail-closed。平文、鍵、OSの詳細errorをlogへ出さない。新規登録の途中失敗は今回作成したitemだけを回収し、回収失敗はRecoveryが必要な未成立状態にする。
+OS呼出しは独立Rust部品に限定する。[Apple SecItem API](https://developer.apple.com/documentation/security/adding-a-password-to-the-keychain)でmacOSの現在user default Keychainを明示選択する。追加はそのKeychainだけ、読取・点検・回収も同じdefault一つをsearch listに固定し、任意Keychain path・全search list・任意Appのitemを対象にしない。[SecAccessCreate](https://developer.apple.com/documentation/security/secaccesscreate(_:_:_:))のtrustedlist=nilで、秘密の読取は呼出し元Appだけへ限定する。同期なし・追加専用・重複拒否・無言fallbackなし。Broker専用processのKeychain UIを許可せず、locked／ACL拒否は固定分類でfail-closedとし、通常のD4 native Owner確認を代替しない。平文、鍵、OSの詳細errorをlogへ出さない。新規登録の途中失敗は今回作成したitemだけを回収し、回収失敗はRecoveryが必要な未成立状態にする。
+
+選択修正の理由: run `37719156673`／source `1c519d0`でData Protection Keychainが`署名identity未成立`を返した。Apple TN3137上、この保存先にはprofile認可されたentitlementとapp-like構造が必要だが、現行製品のBrokerは独立CLIである。正式署名・profileを機能開発の条件にした最初の選択を撤回し、CLIにも対応するuser Keychainと呼出し元App ACLを固定採用する。これは試験だけのalternate backendや実行時fallbackではなく、現行Mac製品の明示保存契約である。`ThisDeviceOnly`を主張せず、Windows DPAPI・Authority・Owner確認・Audit・秘密非公開は変更しない。安定した正式signerと更新後のKeychain ACL継続は既存署名／配布Release Gateへ残す。
 
 ## 製品経路とAuthority
 
