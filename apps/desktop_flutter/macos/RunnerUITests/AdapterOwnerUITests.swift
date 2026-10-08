@@ -38,22 +38,28 @@ final class AdapterOwnerUITests: XCTestCase {
     XCTAssertTrue(input.waitForExistence(timeout: 10)); reveal(app, input); input.click()
     let cancel = app.sheets.buttons["取消"].firstMatch
     XCTAssertTrue(cancel.waitForExistence(timeout: 10)); cancel.click()
-    XCTAssertTrue(element(app, "資格情報登録は未成立です。取消・拒否・期限または保管状態を確認してください。自動再送しません。").waitForExistence(timeout: 10))
+    XCTAssertTrue(credentialMessage(app, "資格情報登録は未成立です。取消・拒否・期限または保管状態を確認してください。自動再送しません。").waitForExistence(timeout: 10))
     reveal(app, input); input.click()
     let proceed = app.sheets.buttons["入力して確認へ"].firstMatch
     XCTAssertTrue(proceed.waitForExistence(timeout: 10))
     // 合成秘密はRust Debug fixtureで生成済み。値をXCTestから入力・読取・出力しない。
     XCTAssertTrue(app.secureTextFields.firstMatch.exists); proceed.click()
     approve(notice)
-    XCTAssertTrue(element(app, "Keychain登録後のmetadataを取得しました。秘密値は取得していません。").waitForExistence(timeout: 15))
-    XCTAssertTrue(element(app, "api_key ・ 有効").exists)
+    XCTAssertTrue(credentialMessage(app, "Keychain登録後のmetadataを取得しました。秘密値は取得していません。").waitForExistence(timeout: 15))
+    XCTAssertTrue(credentialMessage(app, "api_key ・ 有効").exists)
     let revoke = app.buttons["資格情報を失効"]
     XCTAssertTrue(revoke.waitForExistence(timeout: 10)); reveal(app, revoke); revoke.click()
     approve(notice)
-    XCTAssertTrue(element(app, "api_key ・ 失効").waitForExistence(timeout: 15))
+    XCTAssertTrue(credentialMessage(app, "api_key ・ 失効").waitForExistence(timeout: 15))
     print("D4_MACOS_CREDENTIAL_VAULT_PRODUCT_PASS")
     app.typeKey("q", modifierFlags: .command)
     XCTAssertTrue(app.wait(for: .notRunning, timeout: 10))
+  }
+
+  private func credentialMessage(_ app: XCUIApplication, _ label: String) -> XCUIElement {
+    // 取消後の全階層AX queryはtimeoutとなった。公開状態文の要素種別だけを照合する。
+    app.staticTexts.matching(NSPredicate(format: "label == %@ OR value == %@ OR label BEGINSWITH %@",
+                                        label, label, label + "\n")).firstMatch
   }
 
   private func clickCredentialPublicText(_ app: XCUIApplication, _ label: String, scroll: Bool) throws {
