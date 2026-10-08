@@ -51,14 +51,14 @@ final class AdapterOwnerUITests: XCTestCase {
     try chooser.press("Cancel")
     app.activate()
     XCTAssertTrue(workspaceMessage(app, "OS選択を取り消しました。入力は変更していません。").waitForExistence(timeout: 10))
-    assertCurrentWorkspaceInput(app, "/previous-input")
+    try assertCurrentWorkspaceInput(app, "/previous-input")
     try clickWorkspaceSelection(app)
     XCTAssertTrue(chooser.waitForButton("作業領域を選択", timeout: 15))
     try chooser.enterFolder(outside)
     XCTAssertTrue(chooser.waitForButton("作業領域を選択", timeout: 10))
     try chooser.press("作業領域を選択"); app.activate()
     XCTAssertTrue(workspaceMessage(app, "OS選択済み（起動中のみ）。登録・Permission・Approvalは別です。").waitForExistence(timeout: 10))
-    assertCurrentWorkspaceInput(app, outside)
+    try assertCurrentWorkspaceInput(app, outside)
     XCTAssertFalse(workspaceMessage(app, "Broker内登録: macos-os-selected-codex").exists)
     let submit = app.buttons["native Owner確認へ進む"]
     submit.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
@@ -73,12 +73,37 @@ final class AdapterOwnerUITests: XCTestCase {
     app.staticTexts.matching(NSPredicate(format: "label == %@ OR value == %@", label, label)).firstMatch
   }
 
-  private func assertCurrentWorkspaceInput(_ app: XCUIApplication, _ expected: String) {
-    // sheet終了・Flutter再構築後は保存済みAX要素を使わない。この試験のroot値は他の5欄に存在しない。
-    // 現在のTextFieldに完全一致する値を一意に要求し、画面表示だけで入力保持を成功扱いしない。
-    let current = app.textFields.matching(NSPredicate(format: "value == %@", expected))
-    XCTAssertTrue(current.firstMatch.waitForExistence(timeout: 10), "現在のWorkspace入力値")
-    XCTAssertEqual(current.count, 1, "Workspace値は合成試験の6欄で一意")
+  private func assertCurrentWorkspaceInput(_ app: XCUIApplication, _ expected: String) throws {
+    // native sheet後はAX値が画面の値と一致しなかった。公開ラベルを確認して実入力欄へmouse入力する。
+    // このtestは全6欄を公開合成値だけに固定済み。実credentialや他の画面へcopy操作を広げない。
+    let image = XCUIScreen.main.screenshot().image
+    var proposed = CGRect(origin: .zero, size: image.size)
+    guard let pixels = image.cgImage(forProposedRect: &proposed, context: nil, hints: nil) else {
+      throw failure("公開合成試験の入力画面を取得できない")
+    }
+    let request = VNRecognizeTextRequest()
+    request.recognitionLevel = .accurate
+    request.recognitionLanguages = ["ja-JP", "en-US"]
+    try VNImageRequestHandler(cgImage: pixels).perform([request])
+    let labels = (request.results ?? []).filter {
+      guard let text = $0.topCandidates(1).first?.string else { return false }
+      let normalized = text.folding(options: [.caseInsensitive, .widthInsensitive], locale: Locale(identifier: "ja_JP"))
+        .replacingOccurrences(of: " ", with: "")
+      return normalized.contains("workspaceroot") && normalized.contains("path")
+    }
+    guard labels.count == 1 else { throw failure("Workspace入力の可視ラベルを一意に確認できない") }
+    let box = labels[0].boundingBox
+    // ラベル直下の通常editor行。確認済み製品フォームの14px余白を使い、値を設定しない。
+    let point = CGPoint(x: box.midX * image.size.width, y: (1 - box.minY) * image.size.height + 14)
+    let window = app.windows.firstMatch
+    guard window.frame.contains(point) else { throw failure("Workspace入力欄が製品窓の外にある") }
+    window.coordinate(withNormalizedOffset: .zero)
+      .withOffset(CGVector(dx: point.x - window.frame.minX, dy: point.y - window.frame.minY)).click()
+    NSPasteboard.general.clearContents()
+    defer { NSPasteboard.general.clearContents() }
+    app.typeKey("a", modifierFlags: .command)
+    app.typeKey("c", modifierFlags: .command)
+    XCTAssertEqual(NSPasteboard.general.string(forType: .string), expected, "実Workspace入力内容")
   }
 
   private func clickWorkspaceSelection(_ app: XCUIApplication, allowInitialFallback: Bool = false) throws {
@@ -101,7 +126,7 @@ final class AdapterOwnerUITests: XCTestCase {
       // 小さい日本語buttonの途中の漢字はVisionで欠落し得る。固有の接頭ラベルで一意に束縛する。
       let normalized = text.folding(options: [.caseInsensitive, .widthInsensitive], locale: Locale(identifier: "ja_JP"))
         .replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "0s", with: "os")
-      return normalized.contains("os") && (normalized.contains("作業") || normalized.contains("領域"))
+      return normalized.hasPrefix("os") && normalized.contains("選")
     }
     guard matches.count == 1 else {
       print("D4_WORKSPACE_BUTTON_OCR_COUNT \(request.results?.count ?? 0) matches=\(matches.count)")
