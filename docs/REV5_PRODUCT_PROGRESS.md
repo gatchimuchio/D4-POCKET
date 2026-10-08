@@ -19,6 +19,8 @@
 
 #### macOS 作業領域のOS選択 — IMPLEMENTING（Product Build、2026-10-08）
 
+手動Actions [run 37704913641](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37704913641)、commit `49df8f5966f53108b9536248da20915840ffefe9`は通常build／対象Rust／Dart／後片付けPASS。実Cancelと取消のStaticText投影は成立したが、sheet前に束縛した入力AX要素の値が`pr`となり、入力保持の照合でUI試験35.486秒FAIL。保存映像では取消後のWorkspace欄が`/previous-input`のままであり、製品入力の変化を確定したとは扱わない。現在のTextField値を完全一致・一意性で取得し直し、取消後と選択後の双方で実入力を照合する。製品挙動・Authority・有限Acceptanceは変更しない。artifact `11518894295`、SHA-256 `759d43468033f44d7ab04e68a5210fd7f1101b139113abd2047112f28fac7fbd`を照合した。
+
 手動Actions [run 37703835204](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37703835204)、commit `5f0c40f4d4d56a5df87915a6bb2e10b18d15d3b4`は通常build／対象Rust／Dart／後片付けPASS。UIはOCR初回match 0後、fallback内のApp全体`Any`＋label／value queryでsnapshot timeoutとなり、chooser開始前に145.955秒でFAILした。従って当該停止をnative chooser内部の失敗とは扱わない。初回fallbackの可否を試験の段階引数で明示し、当該UI状態文だけはStaticTextのqueryへ限定する。OCRは既知labelのOS＋作業／領域語へ一意に束縛し、結果やBroker返答の注入はしない。artifact `11518808441`、SHA-256 `5e5bbc059361b1a9afb4231f34ebe2e033b96fb320a12bcee192c3725025267c`を照合した。製品の権限境界と有限Acceptanceは未変更。
 
 手動Actions [run 37702884899](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37702884899)、commit `7b3cbb860cfc78bb3db6db5edc03c7fb31b8fdc3`は通常Mac build、native公開入力1件、Broker境界4件、Dart対象検査／2試験、後片付けPASS。親GUIのOS sheetは表示したが、App全体の同名button queryがTouch Bar側Cancelを返し、XCTestがclick不可と明示してUI試験29.036秒でFAILした。製品の応答・Authorityは変えず、試験queryを実window配下だけへ限定する。artifact `11518721677`、SHA-256 `bc6c6f5b6fc7997e5ce288a1f970c1bf343cc8cb1b697dc5cf218c14ecf3eaf4`を照合した。取消後投影・選択／登録の有限条件は次の実行まで未成立。

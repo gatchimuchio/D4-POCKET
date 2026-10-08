@@ -51,14 +51,14 @@ final class AdapterOwnerUITests: XCTestCase {
     try chooser.press("Cancel")
     app.activate()
     XCTAssertTrue(workspaceMessage(app, "OS選択を取り消しました。入力は変更していません。").waitForExistence(timeout: 10))
-    XCTAssertEqual(fields[4].value as? String, "/previous-input")
+    assertCurrentWorkspaceInput(app, "/previous-input")
     try clickWorkspaceSelection(app)
     XCTAssertTrue(chooser.waitForButton("作業領域を選択", timeout: 15))
     try chooser.enterFolder(outside)
     XCTAssertTrue(chooser.waitForButton("作業領域を選択", timeout: 10))
     try chooser.press("作業領域を選択"); app.activate()
     XCTAssertTrue(workspaceMessage(app, "OS選択済み（起動中のみ）。登録・Permission・Approvalは別です。").waitForExistence(timeout: 10))
-    XCTAssertEqual(fields[4].value as? String, outside)
+    assertCurrentWorkspaceInput(app, outside)
     XCTAssertFalse(workspaceMessage(app, "Broker内登録: macos-os-selected-codex").exists)
     let submit = app.buttons["native Owner確認へ進む"]
     submit.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
@@ -71,6 +71,14 @@ final class AdapterOwnerUITests: XCTestCase {
 
   private func workspaceMessage(_ app: XCUIApplication, _ label: String) -> XCUIElement {
     app.staticTexts.matching(NSPredicate(format: "label == %@ OR value == %@", label, label)).firstMatch
+  }
+
+  private func assertCurrentWorkspaceInput(_ app: XCUIApplication, _ expected: String) {
+    // sheet終了・Flutter再構築後は保存済みAX要素を使わない。この試験のroot値は他の5欄に存在しない。
+    // 現在のTextFieldに完全一致する値を一意に要求し、画面表示だけで入力保持を成功扱いしない。
+    let current = app.textFields.matching(NSPredicate(format: "value == %@", expected))
+    XCTAssertTrue(current.firstMatch.waitForExistence(timeout: 10), "現在のWorkspace入力値")
+    XCTAssertEqual(current.count, 1, "Workspace値は合成試験の6欄で一意")
   }
 
   private func clickWorkspaceSelection(_ app: XCUIApplication, allowInitialFallback: Bool = false) throws {
