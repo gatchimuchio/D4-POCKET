@@ -1,6 +1,6 @@
 # D4 Pocket / GUI-Shell rev5 Product-First 進捗
 
-更新日: 2026-10-08
+更新日: 2026-10-09
 工程正本: ユーザー提示「D4 Pocket / GUI-Shell 統合実装仕様書 rev5」「統合開発工程表 rev5」「Codex実装指示書 rev5」
 現行mode: `PRODUCT_BUILD_MODE`（最新版rev5実装指示§2）。Windows側P12 `FEATURE COMPLETE`はCLOSEDのまま保持し、Mobile／Non-Windowsは独立するP13 trackとして構築する。P2 CompareとP3 HandoffもCLOSEDのまま再訪しない。Q0／Q1／Q2に記録済みのQA実行結果は履歴証拠として保持するが、Final QA queueは現在の作業schedulerではなく、追加QAは開始・継続しない。通常Release `task_execution=unsupported`と既存release gateを維持する。
 初期rev5文書同期commit: `39dd3f4bc7aafe350ca94fce9392095f1064d2bc`。凍結commitとその後のQA記録は本書末尾の更新履歴を参照。
@@ -17,9 +17,13 @@
 
 ## P13 Mobile / Non-Windows — 現行track
 
-#### macOS A2A接続センター — IMPLEMENTING
+#### macOS A2A接続センター — CLOSED（Product Build、2026-10-09）
 
-既存製品画面・A2A取得／投影は存在するが、Mac native Owner入口が`A2A接続`を受け付けないため新規接続は通常Brokerで拒否される。有限契約`docs/specs/macos-a2a-center.md`のMAC-A2A-1〜3を正本とし、同一要求native確認→既存Broker→loopback Card取得→metadata-only／未審査表示・URI消去・Auditと正常終了だけを接続する。手動Actions `macos_a2a_center`は対象build・新入口直接否定・有限製品試験だけ。CLOSED済みMCP／資格情報／登録／Mobileは再訪せず、通常Release能力・release gateを保持する。
+有限契約`docs/specs/macos-a2a-center.md`のMAC-A2A-1〜3を閉鎖。source `10d7b0ee6a4199fdddc11605f1641856f99127d7`、[手動run 37797680275](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37797680275)で公開入力→別個native Owner→既存Broker→loopback Card一回取得→metadata-only／未審査・hash表示→URI実消去→Command-Q正常終了がPASS。UI 1 passed／0 failed／0 skipped、43.667秒。受理Audit 1件、URI／Card本文不保存、helper／fixture残留0・source clean・通常buildもPASS。先行native境界・対象解析／Widgetと、source b7a20d8の実native拒否／拒否AuditはCLOSED証拠を再利用した。
+
+artifact `11559657002`、SHA-256 `604a5c5fcf2fd591230194d0ca48c2c6e6afd9ad02d6744bf12879b583ba5239`を実byteへ照合。成功sourceをmainへ統合・push・remote照合し、一時branchを双方回収。2世代remote tagは`codex/backup-main`=`10d7b0ee6a4199fdddc11605f1641856f99127d7`、`codex/backup-main-prev`=`f1dd1657212101c23069b68038e50a0150b268bb`、全単位rollbackは後者。Windows／Mac新入口各1件、Mac対象解析・待機／投影Widget各1件、Schema 166／162／213、Conformance 242がPASS。全Rust libの既知Codex loopback ConnectionReset、ローカルFlutter LSP障害、日本語strict 5 file／17 findingsと過去UI FAILは契約履歴・既存Final QA分類へ保持し、成功へ書換えない。
+
+有限`LIVE_RUNTIME`は合成公開Card／ad-hoc identityの入口・取得・投影・正常終了だけ。Trust・Credential・Task・権限を生成せず、App Sandboxと既存Brokerを維持する。一般Vendor・外部host・正式配布・Final QAへ拡大せず、通常Release `task_execution=unsupported`、`release_ready=false`を保持する。次はP13のOPEN製品差分だけ。本条件と他CLOSED製品単位を追加証拠目的で再訪しない。
 
 #### macOS MCP資格情報結合 — CLOSED（Product Build、2026-10-08）
 

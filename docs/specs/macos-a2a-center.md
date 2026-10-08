@@ -1,6 +1,6 @@
 # macOS A2A接続センター
 
-状態: IMPLEMENTING（P13 Product Build）。正本は最新版rev5と`docs/REV5_PRODUCT_PROGRESS.md`。既存A2A契約・Windows製品受入れ・Mac通常接続はCLOSEDのまま再訪しない。
+状態: CLOSED（P13 Product Build、2026-10-09）。正本は最新版rev5と`docs/REV5_PRODUCT_PROGRESS.md`。MAC-A2A-1〜3がPASSしたため閉鎖する。既存A2A契約・Windows製品受入れ・Mac通常接続はCLOSEDのまま再訪しない。
 
 ## 意味と責任
 
@@ -16,15 +16,25 @@
 
 | ID | 条件 | 状態 | 証拠 |
 | --- | --- | --- | --- |
-| MAC-A2A-1 | 現要求のnative Owner入口、拒否・hash／session／承認注入否定 | CLOSED | Windows直接1件・Mac source 5a7294f／run 37794151100直接1件PASS |
-| MAC-A2A-2 | 製品UI→別個native確認→既存Broker→実loopback取得→metadata-only／未審査表示・URI消去・Audit | OPEN | 専用手動Mac製品試験 |
-| MAC-A2A-3 | 対象build・直接依存試験、Command-Q正常終了、helper／専用fixture回収 | OPEN | 対象検査と同じ有限製品試験 |
+| MAC-A2A-1 | 現要求のnative Owner入口、拒否・hash／session／承認注入否定 | CLOSED | Windows直接1件・Mac source 5a7294f／run 37794151100直接1件PASS。実native拒否／拒否Auditはb7a20d8／run 37795697040 |
+| MAC-A2A-2 | 製品UI→別個native確認→既存Broker→実loopback取得→metadata-only／未審査表示・URI消去・Audit | CLOSED | source 10d7b0e／run 37797680275。実String・空文字・URI不在、Card名／hash／未審査表示、受理Audit 1件 |
+| MAC-A2A-3 | 対象build・直接依存試験、Command-Q正常終了、helper／専用fixture回収 | CLOSED | 同run UI 1 PASS／0 FAIL／0 skip、43.667秒。通常build・残留0・source clean。先行境界／解析／Widget PASSを再利用 |
 
 新入口の直接正常／否定と製品正常一回・native拒否だけで閉じる。専用`workflow_dispatch` target=`macos_a2a_center`は、固定の公開Agent Cardを返す開発専用Rust fixture、通常Mac Debug build、通常XCTest入力を使用する。秘密・実Provider・署名鍵を使用しない。fixtureはIPv4 loopbackだけへlistenし、要求上限と期限を持ち、一回応答後に終了する。証拠は受入れ用の限定Audit投影と対象logだけ。これは合成Card／ad-hoc identityによる有限`LIVE_RUNTIME`で、一般外部Agentの信頼・Task実行・正式配布・Final QAを証明しない。
 
 通常Release `task_execution=unsupported`、`release_ready=false`を保持する。追加fixture、強化証拠、fault matrix、Formal Evidenceは本受入れへ追加しない。PASSした条件を直ちにCLOSEDとする。
 
-## 検証履歴
+## 閉鎖証拠
+
+source `10d7b0ee6a4199fdddc11605f1641856f99127d7`、[手動run 37797680275](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37797680275)、trigger=`workflow_dispatch`、target=`macos_a2a_center`、`a2a_product_only=true`。macOS 15.7.9 arm64／Apple Virtual Machine／Xcode 16.4、Rust 1.95.0／Flutter 3.44.0。公開入力→別個native Owner→既存Broker→固定loopback Card一回取得→metadata-only／未審査・endpoint hash表示→URI実消去→Command-Q正常終了がPASS。XCUITest 1 passed／0 failed／0 skipped、43.667秒。実入力欄のString・空文字・公開URI不在を確認し、値をlog／dumpへ出さない。受理Audit 1件、URI／Card本文不保存、helper／fixture残留PID fileは双方0 byte、source cleanと通常buildもPASS。native拒否と先行解析／WidgetのCLOSED証拠を再利用し、追加試験しない。
+
+artifact `11559657002`（69782 bytes）、SHA-256 `604a5c5fcf2fd591230194d0ca48c2c6e6afd9ad02d6744bf12879b583ba5239`を実byteへ照合。ignored保存先=`release_evidence/p13-macos-a2a-10d7b0e/artifact/`。成功した正確なsourceをmainへfast-forward・push・remote照合後、一時branchを双方回収。2世代remote tagは`codex/backup-main`=`10d7b0ee6a4199fdddc11605f1641856f99127d7`、`codex/backup-main-prev`=`f1dd1657212101c23069b68038e50a0150b268bb`、全単位rollbackは後者。
+
+実native確認・Broker・取得・製品UI・終了は合成Card／ad-hoc identityの有限`LIVE_RUNTIME`。直接入力否定・Card本文・Widgetは`FIXTURE`、Schema／Conformance／手動起動限定は`CONFIG`。Trust／Credential／Task／権限を生成せず、App Sandboxと既存Brokerを維持する。一般Vendor、外部host／TLS、正式identity／配布、Final QAへ転用しない。通常Release `task_execution=unsupported`、`release_ready=false`と既存release blockerを保持し、次はP13のOPEN製品差分だけ。
+
+検証command: `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib macos_a2a_ -- --test-threads=1`（Windows 1 PASS）、Mac同commandに`+1.95.0`（1 PASS）、`cargo check --locked --manifest-path native/rust_helper/Cargo.toml --example macos_a2a_fixture`（PASS）、`python -X utf8 tooling/schema_check/check_schemas.py`（166／162／213 PASS）、`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`（242 PASS）。Mac対象解析／Widget／通常build／XCTest commandは同sourceの専用workflowに固定する。Windows必須`cargo test --locked --manifest-path native/rust_helper/Cargo.toml --no-fail-fast -- --test-threads=1`はlib FAIL、他target PASS。短縮lib再確認は514 PASS／1 FAIL／12 ignored、既知loopback対象だけの再実行はPASSだが全体FAILを上書きしない。両appの`flutter analyze --no-pub`、`python -X utf8 tooling/日本語基底監査.py --strict`の既存FAILも下記履歴に保持する。追加QAを開始しない。
+
+## 検証履歴（当時の状態）
 
 source 91b303eのrun 37797262060はUI開始前のnative準備中に中止した。URI消去の検収でAX値取得不能を空文字へ補完しないよう、実String取得・実空文字・公開URI不在を同時に要求するharness修正を先に行う。入力値のlog／dumpは出さず、既定のURI消去条件を正しく判定するための修正で、受入れ条件は増やさない。
 

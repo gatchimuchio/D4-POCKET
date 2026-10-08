@@ -329,6 +329,23 @@
         "artifact_sha256": "68c424db87f28468781892308ac358a8a5a9c3c1683305692195fe03e12643a0",
         "scope_limit": "対象MCP stdioだけへの資格情報結合の有限単位。Provider／Agent／A2A、物理削除、第三者内部保証、正式identity／配布、Final QAへ拡大しない。通常Release task_execution=unsupported、release_ready=false、既存Flutter解析環境FAIL／日本語監査指摘／過去FAILは保持する。"
       },
+      "macos_a2a_center_evidence": {
+        "status": "CLOSED",
+        "contract": "docs/specs/macos-a2a-center.md",
+        "source_commit": "10d7b0ee6a4199fdddc11605f1641856f99127d7",
+        "run_url": "https://github.com/gatchimuchio/D4-POCKET/actions/runs/37797680275",
+        "trigger": "workflow_dispatch",
+        "target": "macos_a2a_center",
+        "a2a_product_only": true,
+        "evidence_source": "LIVE_RUNTIME",
+        "validation": "製品公開入力・別個native Owner・既存Broker・loopback Card一回取得・metadata-only未審査／hash表示・URI実消去・Command-Q終了。UI 1 passed／0 failed／0 skipped、43.667秒。受理Audit 1件、URI／Card本文不保存、helper／fixture残留0・source clean・通常buildがPASS。",
+        "closed_evidence_reused": "Windows／Mac新入口直接各1件、source 5a7294fの対象解析・待機／投影Widget各1件、source b7a20d8の実native拒否・拒否Audit。CLOSED条件を再訪しない。",
+        "component_evidence_source": "FIXTURE",
+        "component_scope": "合成公開Agent Card・ad-hoc identity・試験表示flagの有限製品経路。宣言metadataからTrust／Permission／Approval／Credentialを生成しない。",
+        "artifact_id": "11559657002",
+        "artifact_sha256": "604a5c5fcf2fd591230194d0ca48c2c6e6afd9ad02d6744bf12879b583ba5239",
+        "scope_limit": "loopback HTTP Card取得とmetadata-only投影の有限単位だけ。外部host／TLS、Task／Message／Artifact／Stream、Credential、一般Vendor、正式配布／Final QAは後続・既存gate。通常Release task_execution=unsupported、release_ready=falseと全Rust既知loopback FAIL・Flutter解析環境FAIL・日本語監査指摘・過去UI FAILを保持する。"
+      },
       "r2_bounded_exit_gate": {
         "version": 2,
         "phase_acceptance_policy": {

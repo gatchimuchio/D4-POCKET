@@ -156,7 +156,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "ee383c0022d433fc43d9a25cba43b773e21f743b7ba0fe363e741135affd4e6c"
+      "sha256": "da8d1527e216fc29627e11a7c72f44f95b4f9b5bd2907b472d043fdcf34b3bef"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "0cf255b73eb62f137718f73f1200810d48e6363a4e1f66e344b11e6b0c53c69c"
+      "sha256": "7594ea2cfc5e2d83f7e37225a68c6634d36733d1d14b8c7fbe47173ed3a72b03"
     },
     {
       "path": "SECURITY.md",
@@ -1224,7 +1224,7 @@
     },
     {
       "path": "docs/FINAL_QA_QUEUE.md",
-      "sha256": "4a898562f374e78bb521bed5c221dbf5e69017b8d2f4926090d9ffe4ffab6d84"
+      "sha256": "03ff3fe83ebcbcdc651cbcfd39d9419ea80c51486eefe086f1cd94bc02bb7c31"
     },
     {
       "path": "docs/FIRST_RUN.md",
@@ -1280,7 +1280,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "8dbce29d5bc599ff377c1e30d55c8a61479535891282798623b9ba39e161d3fb"
+      "sha256": "d4fb7ef8e486ba374cee71f06832db6b4c33fe6f875b65b658f4dd7ecb4b4546"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1492,7 +1492,7 @@
     },
     {
       "path": "docs/specs/macos-a2a-center.md",
-      "sha256": "85a8ec0bf6980fb3ee43cce0568e6eca4ed1b483205249f58dd7cb6be7185d1c"
+      "sha256": "7183315de518a866f08ac2694ee284cf27b2d0a308941d921868085db2485a8e"
     },
     {
       "path": "docs/specs/macos-agent-cli-selection.md",
@@ -4128,7 +4128,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "d2922da7f7bc94e6a5712589c2a371bf3ddaed7a3c3171230d3b2dd8f3a7d777"
+      "sha256": "a6d7d74d36af90cf106dcd4c6f34febe48f3674dbb9dd9c6569690be8d125201"
     },
     {
       "path": "requirements-dev.txt",
