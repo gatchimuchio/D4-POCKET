@@ -26,4 +26,8 @@
 
 ## 検証履歴
 
+最初の手動run 37793767655（source a854b49）はUI実行前のnative準備中に中止した。新規証拠gateのshell否定を`set -e`だけへ任せず、Audit本文混入・process残存時に明示終了値1とする局所修正のためで、製品受入れPASS／FAIL証拠へ転用しない。
+
+失敗libを短縮出力で再確認すると514 passed／1 failed／12 ignored。差分外の既知`failed_tool_result_is_not_replayed_as_another_exec_command`がHTTP応答途中のConnectionReset（expected 23274、received 0）で失敗し、同testだけの再実行は1 passed。根因未確定の既存`FQ-TEST-LOOPBACK`へ属し、本A2A入口の受入れ条件を破壊する証拠ではない。全Rust FAIL履歴を保持し、fixture安定性の探索・修正は延期中Final QAへ残す。
+
 2026-10-08: Windows上の新Owner入口直接試験1件、専用fixtureの`cargo check --example macos_a2a_fixture`、Schema 166／正常162／否定213、Conformance 242と手動起動限定検査がPASS。必須全Rust実行はlib targetがFAIL、他targetはPASSし、失敗libの原因確認を継続する。成功と書換えない。ローカルDesktop／Mobileの`flutter analyze --no-pub`は既知の日本語pathを含むLSP frame解釈障害（FormatException、server exit 255）でFAIL。変更Dartの形式はPASS、Mac上の対象解析と製品試験は未実行。日本語strict監査は既存5 file／17 findingsのみでFAIL、新規findingなし。manifest未再生成時のgate hash不一致は生成同期後にPASSし、編集終了時に再同期する。

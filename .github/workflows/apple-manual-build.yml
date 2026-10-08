@@ -92,7 +92,7 @@ jobs:
           a2a_audit=/Users/runner/Library/Containers/com.example.guiShellDesktop/Data/Library/Application\ Support/D4Pocket/macos-broker/store/audit.jsonl
           test -f "$a2a_audit" && test ! -L "$a2a_audit"
           test "$(stat -f%z "$a2a_audit")" -lt 4194304
-          ! grep -q -e 'http://127.0.0.1:34101' -e 'Mac A2A fixture' -e 'Public test declaration only' "$a2a_audit"
+          if grep -q -e 'http://127.0.0.1:34101' -e 'Mac A2A fixture' -e 'Public test declaration only' "$a2a_audit"; then exit 1; fi
           jq -sc 'map(select(.operation == "A2A接続" or .operation == "A2A接続一覧")) | .[-32:][] | {operation: .operation, decision: .decision, code: (if (.reason | test("^[a-z_]{1,80}$")) then .reason else "bounded_receipt" end)}' "$a2a_audit" > evidence/a2a-audit-projection.jsonl
           jq -se 'map(select(.operation == "A2A接続")) | (map(select(.decision == "rejected")) | length) >= 1 and (map(select(.decision == "accepted")) | length) == 1' "$a2a_audit" > evidence/a2a-audit-acceptance.txt
       - name: 所有試験資産の回収確認
@@ -100,8 +100,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ! pgrep -x gui_shell_macos_broker > evidence/remaining-helper-pids.txt
-          ! pgrep -f '^.*/native/rust_helper/target/debug/examples/macos_a2a_fixture$' > evidence/remaining-fixture-pids.txt
+          if pgrep -x gui_shell_macos_broker > evidence/remaining-helper-pids.txt; then exit 1; fi
+          if pgrep -f '^.*/native/rust_helper/target/debug/examples/macos_a2a_fixture$' > evidence/remaining-fixture-pids.txt; then exit 1; fi
           git diff --exit-code -- apps/desktop_flutter
       - name: 限定証拠を保存
         if: always()
