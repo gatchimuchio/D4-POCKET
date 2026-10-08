@@ -134,6 +134,9 @@ final class AdapterOwnerUITests: XCTestCase {
         let disconnect = app.buttons["切断"]
         print("D4_PUBLIC_DISCONNECT_AX_EXISTS \(disconnect.exists)")
         if disconnect.exists { print("D4_PUBLIC_DISCONNECT_AX_FRAME \(disconnect.frame)") }
+        let scrollViews = app.scrollViews.containing(.button, identifier: "切断")
+          .allElementsBoundByAccessibilityElement
+        print("D4_PUBLIC_DISCONNECT_SCROLL_FRAMES \(scrollViews.prefix(4).map { $0.frame })")
         for label in ["Mac確認へ進む", "入力内容を確認", "閉じる"] {
           print("D4_PUBLIC_DIALOG_BUTTON \(label) \(app.buttons[label].exists)")
         }
@@ -224,14 +227,10 @@ final class AdapterOwnerUITests: XCTestCase {
             height: frame.height * CGFloat(screen.height) / image.size.height).integral),
           let png = NSBitmapImageRep(cgImage: pixels).representation(using: .png, properties: [:]),
           png.count < 1048576 else { throw failure("公開製品窓を限定保存できない") }
-    // UITest processが他app containerへ書く経路を使わず、sourceから固定したdev artifactへ保存。
-    guard #filePath.hasSuffix("/apps/desktop_flutter/macos/RunnerUITests/AdapterOwnerUITests.swift") else {
-      throw failure("試験sourceから公開artifact位置を固定できない")
-    }
-    var root = URL(fileURLWithPath: #filePath)
-    for _ in 0..<5 { root.deleteLastPathComponent() }
-    try png.write(to: root.appendingPathComponent("evidence/mcp-credential-public-disconnect.png"),
-                  options: .withoutOverwriting)
+    // UITest自身のsandbox一時領域だけ。固定の公開PNGを新規作成し、path以外をlogへ出さない。
+    let destination = FileManager.default.temporaryDirectory.appendingPathComponent("d4-mcp-public-disconnect.png")
+    try png.write(to: destination, options: .withoutOverwriting)
+    print("D4_PUBLIC_DISCONNECT_IMAGE_PATH \(destination.path)")
   }
 
   private func mcpPublicText(_ app: XCUIApplication, _ label: String, click: Bool = false,

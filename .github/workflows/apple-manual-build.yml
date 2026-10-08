@@ -131,9 +131,17 @@ jobs:
           fi
           fixture=/Users/runner/Library/Containers/com.example.guiShellDesktop/Data/d4-mcp-fixture
           test ! -L "$fixture"
-          if [ '${{ inputs.target }}' = 'macos_mcp_credential_binding' ] && [ -f evidence/mcp-credential-public-disconnect.png ]; then
-            test ! -L evidence/mcp-credential-public-disconnect.png
-            test "$(stat -f%z evidence/mcp-credential-public-disconnect.png)" -lt 1048576
+          if [ '${{ inputs.target }}' = 'macos_mcp_credential_binding' ]; then
+            public_png=$(sed -n 's/^D4_PUBLIC_DISCONNECT_IMAGE_PATH //p' evidence/mcp-product-ui-test.txt | head -1)
+            if [ -n "$public_png" ]; then
+              test "$(basename "$public_png")" = d4-mcp-public-disconnect.png
+              public_parent=$(cd "$(dirname "$public_png")" && pwd -P)
+              case "$public_parent" in /private/var/folders/*) ;; *) exit 1 ;; esac
+              test -f "$public_png" && test ! -L "$public_png"
+              test "$(stat -f%z "$public_png")" -lt 1048576
+              cp "$public_png" evidence/mcp-credential-public-disconnect.png
+              rm "$public_png"
+            fi
           fi
           if [ -d "$fixture/workspace" ]; then
             test -z "$(find "$fixture/workspace" -mindepth 1 -print -quit)"
