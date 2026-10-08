@@ -10,8 +10,16 @@ final class AdapterOwnerUITests: XCTestCase {
     app.launch(); defer { app.terminate() }
     XCTAssertTrue(element(app, "エージェント").waitForExistence(timeout: 20))
     // 初期focusでCtrl+Kが届かなかった実観測に対し、通常の公開buttonから開く。
-    let palette = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "コマンドパレット")).firstMatch
-    XCTAssertTrue(palette.waitForExistence(timeout: 10)); palette.click()
+    let palette = element(app, "コマンドパレットを開く（Ctrl+KまたはCtrl+P）")
+    if !palette.waitForExistence(timeout: 10) {
+      // 秘密入力前の公開button名だけ。入力値・秘密欄・全階層dumpを出さない。
+      let names = app.buttons.allElementsBoundByAccessibilityElement.prefix(40).map {
+        String(("\($0.label)|\($0.value as? String ?? "")").prefix(256))
+      }
+      print("D4_CREDENTIAL_PUBLIC_NAV \(names)")
+      XCTFail("初期画面の公開paletteを識別できない")
+    }
+    palette.click()
     let search = app.textFields.firstMatch
     XCTAssertTrue(search.waitForExistence(timeout: 10)); search.click(); search.typeText("MCP接続")
     let result = element(app, "MCP接続")

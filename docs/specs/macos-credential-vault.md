@@ -42,4 +42,6 @@ run `37719651894`／source `a5ff90f`は固定user Keychainの実API試験1件、
 
 run `37720338833`／source `8ffd3d5`は通常Mac buildまでPASS。XCUITestは初期focusでCtrl+Kが届かず、palette入力の存在確認で16.615秒のFAIL。秘密入力・Owner・登録には未到達であり、製品保存のfailureと混同しない。試験だけを既存の公開palette buttonによる通常mouse操作へ修正する。
 
+run `37721120599`／source `d6609f2`は部品試験・解析・通常Mac buildがPASS、初期palette buttonのlabel限定queryで20.483秒のFAIL。秘密入力前であり、既存のlabel／value共通照合へ試験queryを変更し、未識別時だけ公開button名を最大40件記録する。入力値・秘密欄・全階層dumpは記録しない。
+
 `release_blocker`: MacでのProvider／MCP注入、正式署名identity・配布、Final QA。通常Release `task_execution=unsupported`、`release_ready=false`を保持する。秘密値の表示、保管方式fallback、Windowsの保存形式migrationを本単位の便宜で追加しない。
