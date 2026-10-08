@@ -126,7 +126,13 @@ final class AdapterOwnerUITests: XCTestCase {
     XCTAssertFalse(app.staticTexts.matching(NSPredicate(
       format: "label CONTAINS %@ OR value CONTAINS %@", "macos-mcp-public-result", "macos-mcp-public-result")).firstMatch.exists)
     // 資格情報metadataがある場合、receiptより下の接続cardへ進む。既存資格情報なし試験は維持。
-    try mcpPublicText(app, "切断", click: true, scrollUp: !credentialBinding)
+    do {
+      try mcpPublicText(app, "切断", click: true, scrollUp: !credentialBinding,
+                        allowDisconnectIcon: credentialBinding)
+    } catch {
+      if credentialBinding { try? saveMcpPublicDisconnectWindow(app) }
+      throw error
+    }
     approve(notice); app.activate()
     XCTAssertTrue(credentialMessage(app, "Brokerが保持するMCP接続はありません。").waitForExistence(timeout: 15))
     print("D4_MACOS_MCP_PRODUCT_PASS")
@@ -188,8 +194,32 @@ final class AdapterOwnerUITests: XCTestCase {
     throw failure(selection ? "公開資格情報選択肢を観測できない" : "公開最終使用時刻を観測できない")
   }
 
+  private func saveMcpPublicDisconnectWindow(_ app: XCUIApplication) throws {
+    // この呼出しは資格情報使用・公開使用時刻・hash-only Tool receiptを確認した後だけ。
+    // 入力値は公開fixture、秘密欄／native sheetはない。録画・全画面・階層は保存しない。
+    guard !app.sheets.firstMatch.exists, !app.secureTextFields.firstMatch.exists else {
+      throw failure("秘密入力が残る画面を保存しない")
+    }
+    let frame = app.windows.firstMatch.frame
+    let image = XCUIScreen.main.screenshot().image
+    var proposed = CGRect(origin: .zero, size: image.size)
+    guard let screen = image.cgImage(forProposedRect: &proposed, context: nil, hints: nil),
+          CGRect(origin: .zero, size: image.size).contains(frame),
+          let pixels = screen.cropping(to: CGRect(
+            x: frame.minX * CGFloat(screen.width) / image.size.width,
+            y: frame.minY * CGFloat(screen.height) / image.size.height,
+            width: frame.width * CGFloat(screen.width) / image.size.width,
+            height: frame.height * CGFloat(screen.height) / image.size.height).integral),
+          let png = NSBitmapImageRep(cgImage: pixels).representation(using: .png, properties: [:]),
+          png.count < 1048576 else { throw failure("公開製品窓を限定保存できない") }
+    try png.write(to: URL(fileURLWithPath:
+      "/Users/runner/Library/Containers/com.example.guiShellDesktop/Data/d4-mcp-fixture/disconnect-public.png"),
+      options: .withoutOverwriting)
+  }
+
   private func mcpPublicText(_ app: XCUIApplication, _ label: String, click: Bool = false,
-                             scroll: Bool = true, scrollUp: Bool = false) throws {
+                             scroll: Bool = true, scrollUp: Bool = false,
+                             allowDisconnectIcon: Bool = false) throws {
     // 合成公開Server／引数だけ。画面を保存せず、実windowの文字範囲boxへ通常mouse入力する。
     guard !app.secureTextFields.firstMatch.exists else { throw failure("秘密入力を撮影しない") }
     for attempt in 0..<8 {
@@ -213,8 +243,11 @@ final class AdapterOwnerUITests: XCTestCase {
       try VNImageRequestHandler(cgImage: pixels).perform([request])
       let boxes: [VNRectangleObservation] = try (request.results ?? []).compactMap { observation in
         for candidate in observation.topCandidates(3) {
-          if ["切断", "MCP接続"].contains(label)
-              && candidate.string.components(separatedBy: .whitespacesAndNewlines).joined() != label { continue }
+          if ["切断", "MCP接続"].contains(label) {
+            let text = candidate.string.components(separatedBy: .whitespacesAndNewlines).joined()
+            if text != label && !(allowDisconnectIcon && label == "切断"
+              && text.count <= 4 && text.contains(label)) { continue }
+          }
           if let range = candidate.string.range(of: label),
              let box = try candidate.boundingBox(for: range) { return box }
         }
