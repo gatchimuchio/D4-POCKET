@@ -62,4 +62,6 @@ run `37728913821`／source `c5d36fd`は取消後の未成立投影、二度目�
 
 run `37731078599`／source `92b3bba`は新しい通常Mac Owner gate試験、実Keychain API、native公開境界・Dart 3件・通常buildがPASS。製品UIでは取消→未成立投影→native秘密入力→別個Owner承認→登録成功文まで成立。既存Auditの固定診断は取消を`credential_owner_required`、登録・一覧を`accepted`と記録した。ListTileの公開状態titleをStaticTextとして取得できず37.174秒でFAIL。状態titleを持つgroupのlabelだけへ試験を限定し、値・全階層・秘密入力を取得しない。論理失効・通常終了を含む有限Acceptance全体は未成立のまま保持する。artifact `11530361014`のSHA-256 `53347c0c6d42e8f0db8a50f7be8efa31f5954011433540111394f41767ea65a6`を照合した。helper回収PASS、製品source・Authority・保存方式は変更しない。
 
+run `37732126321`／source `8062109`も登録・一覧が既存Auditでaccepted、UI登録成功文まで成立。状態titleのgroup queryも取得できず38.453秒でFAILし、groupとして取得可能という推定を撤回する。metadata-only成功後、native sheet／秘密入力欄の不存在を確認した場合だけ、製品窓の公開状態titleを画像認識で一意に照合する試験へ変更する。画像・認識文字を保存・添付・出力せず、秘密入力中や他Appの画面は取得しない。通常scrollによる実表示だけを使い、Broker応答・Owner・秘密値を代替しない。前段の公開入力用画像認識とは責任を分離する。artifact `11530351705`のSHA-256 `ee85c8ab3c4ceaaec2267f1027e1ffaf96a570ecca983b64ef233a81d13e5043`を照合した。helper回収PASS、論理失効・通常終了を含む全体Acceptanceは未成立。
+
 `release_blocker`: MacでのProvider／MCP注入、正式署名identity・配布、Final QA。通常Release `task_execution=unsupported`、`release_ready=false`を保持する。秘密値の表示、保管方式fallback、Windowsの保存形式migrationを本単位の便宜で追加しない。
