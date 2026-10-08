@@ -80,7 +80,7 @@ final class AdapterOwnerUITests: XCTestCase {
       XCTAssertTrue(credentialMessage(app,
         "Keychain登録後のmetadataを取得しました。秘密値は取得していません。").waitForExistence(timeout: 15))
       try mcpPublicText(app, "使用しない", click: true)
-      try clickMcpPublicCredentialChoice(app)
+      try mcpPublicCredentialRow(app, selection: true)
       try mcpPublicText(app, "子processへ渡す環境変数名", click: true)
       app.typeText("MCP_API_KEY")
     }
@@ -96,10 +96,7 @@ final class AdapterOwnerUITests: XCTestCase {
     XCTAssertTrue(credentialMessage(app,
       "接続receiptを受理しました。表示はBroker内部状態であり、TrustやTool実行を示しません。").waitForExistence(timeout: 15))
     if credentialBinding {
-      let used = app.staticTexts.matching(NSPredicate(
-        format: "label CONTAINS %@ OR value CONTAINS %@", "最終使用時刻:", "最終使用時刻:")).firstMatch
-      XCTAssertTrue(used.waitForExistence(timeout: 10))
-      XCTAssertFalse((used.label).contains("未使用"))
+      try mcpPublicCredentialRow(app, selection: false)
     }
     if verifyConnection { try mcpPublicText(app, "Mac MCP試験Server") }
     try mcpPublicText(app, "Tool一覧", click: true)
@@ -136,13 +133,13 @@ final class AdapterOwnerUITests: XCTestCase {
     XCTAssertTrue(app.wait(for: .notRunning, timeout: 10))
   }
 
-  private func clickMcpPublicCredentialChoice(_ app: XCUIApplication) throws {
-    // 登録完了後の公開選択肢だけ。AX StaticText queryが未成立だったため可視行を識別する。
+  private func mcpPublicCredentialRow(_ app: XCUIApplication, selection: Bool) throws {
+    // 登録完了後の公開選択肢／使用時刻だけ。未成立だったAX queryに代えて可視行を識別する。
     guard !app.sheets.firstMatch.exists, !app.secureTextFields.firstMatch.exists else {
       throw failure("秘密入力終了前に公開選択肢を取得しない")
     }
     let window = app.windows.firstMatch
-    for _ in 0..<3 {
+    for attempt in 0..<(selection ? 3 : 8) {
       Thread.sleep(forTimeInterval: 0.6)
       let frame = window.frame
       let image = XCUIScreen.main.screenshot().image
@@ -158,26 +155,36 @@ final class AdapterOwnerUITests: XCTestCase {
       }
       let request = VNRecognizeTextRequest()
       request.recognitionLevel = .accurate; request.recognitionLanguages = ["ja-JP", "en-US"]
-      request.customWords = ["api_key"]
+      request.customWords = [selection ? "api_key" : "最終使用時刻"]
       try VNImageRequestHandler(cgImage: pixels).perform([request])
       let rows = (request.results ?? []).filter { observation in
         observation.topCandidates(3).contains { candidate in
-          let text = candidate.string.lowercased().components(separatedBy: .whitespacesAndNewlines)
+          let text = candidate.string.folding(options: [.caseInsensitive, .widthInsensitive],
+                                               locale: Locale(identifier: "ja_JP"))
+            .components(separatedBy: .whitespacesAndNewlines)
             .joined().replacingOccurrences(of: "_", with: "")
             .replacingOccurrences(of: "・", with: "").replacingOccurrences(of: "•", with: "")
-          return text.range(of: "^apikey[a-f0-9]{32}$", options: .regularExpression) != nil
+          if selection { return text.range(of: "^apikey[a-f0-9]{32}$", options: .regularExpression) != nil }
+          return text.range(of: "^最終使用時刻:[0-9]{1,16}$", options: .regularExpression) != nil
+            && (Int64(text.replacingOccurrences(of: "最終使用時刻:", with: "")) ?? 0) > 0
         }
       }
       guard rows.count <= 1 else { throw failure("公開資格情報選択肢が一意でない") }
       if let row = rows.first {
-        let point = CGPoint(x: frame.minX + row.boundingBox.midX * frame.width,
-                            y: frame.minY + (1 - row.boundingBox.midY) * frame.height)
-        window.coordinate(withNormalizedOffset: .zero)
-          .withOffset(CGVector(dx: point.x - frame.minX, dy: point.y - frame.minY)).click()
+        if selection {
+          let point = CGPoint(x: frame.minX + row.boundingBox.midX * frame.width,
+                              y: frame.minY + (1 - row.boundingBox.midY) * frame.height)
+          window.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: point.x - frame.minX, dy: point.y - frame.minY)).click()
+        } else { print("D4_MACOS_MCP_CREDENTIAL_PUBLIC_USE_PASS") }
         return
       }
+      if !selection && attempt < 7 {
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.65))
+          .scroll(byDeltaX: 0, deltaY: 180)
+      }
     }
-    throw failure("公開資格情報選択肢を観測できない")
+    throw failure(selection ? "公開資格情報選択肢を観測できない" : "公開最終使用時刻を観測できない")
   }
 
   private func mcpPublicText(_ app: XCUIApplication, _ label: String, click: Bool = false,

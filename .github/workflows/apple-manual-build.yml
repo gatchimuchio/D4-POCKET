@@ -70,11 +70,9 @@ jobs:
           export PATH="$RUNNER_TEMP/flutter/bin:$PATH"
           cd apps/desktop_flutter
           flutter pub get 2>&1 | tee ../../evidence/pub-get.txt
-          if [ '${{ inputs.target }}' = 'macos_mcp_credential_binding' ]; then
+          if [ '${{ inputs.target }}' = 'macos_mcp_credential_binding' ] && [ '${{ inputs.mcp_product_only }}' != 'true' ]; then
             dart analyze lib/services/mcp_connection_client.dart lib/screens/mcp_connection_center.dart test/mcp_connection_center_test.dart 2>&1 | tee ../../evidence/dart-binding-analyze.txt
-            if [ '${{ inputs.mcp_product_only }}' != 'true' ]; then
-              flutter test --no-pub test/mcp_connection_center_test.dart --name 'Mac MCP(接続|投影)' 2>&1 | tee ../../evidence/credential-binding-projection-test.txt
-            fi
+            flutter test --no-pub test/mcp_connection_center_test.dart --name 'Mac MCP(接続|投影)' 2>&1 | tee ../../evidence/credential-binding-projection-test.txt
           elif [ '${{ inputs.mcp_product_only }}' != 'true' ]; then
             dart analyze lib/services/broker_client.dart lib/services/mcp_connection_client.dart lib/screens/mcp_connection_center.dart test/broker_client_payload_hash_test.dart test/mcp_connection_center_test.dart 2>&1 | tee ../../evidence/dart-analyze.txt
             flutter test --no-pub test/broker_client_payload_hash_test.dart --plain-name 'Mac MCPだけはOwner確認とstdio処理の有限待機を共有する' 2>&1 | tee ../../evidence/timeout-test.txt
@@ -109,11 +107,11 @@ jobs:
             test "$(stat -f%z "$mcp_audit")" -lt 4194304
             ! grep -q -e macos-public-input -e macos-mcp-public-result "$mcp_audit"
             jq -sc 'map(select(.operation == "MCP接続" or .operation == "MCP Tool実行" or .operation == "MCP切断")) | .[-64:][] | {operation: .operation, decision: .decision, code: (if (.reason | test("^[a-z_]{1,80}$")) then .reason else "bounded_receipt" end)}' "$mcp_audit" > evidence/mcp-audit-projection.jsonl
-            jq -se 'map(select(.operation == "MCP Tool実行")) | (map(select(.decision == "approved")) | length) == 1 and (map(select(.decision == "started" and (.reason | contains("consumed=true")))) | length) == 1 and (map(select(.decision == "accepted" and (.reason | contains("hash-only receipt")))) | length) == 1' "$mcp_audit" > evidence/tool-audit-acceptance.txt
             if [ '${{ inputs.target }}' = 'macos_mcp_credential_binding' ]; then
               jq -se 'map(select(.operation == "MCP Credential使用" and .decision == "accepted")) | length == 1' "$mcp_audit" > evidence/credential-use-acceptance.txt
               jq -sc 'map(select(.operation == "MCP Credential使用")) | .[-16:][] | {operation: .operation, decision: .decision}' "$mcp_audit" > evidence/credential-use-projection.jsonl
             fi
+            jq -se 'map(select(.operation == "MCP Tool実行")) | (map(select(.decision == "approved")) | length) == 1 and (map(select(.decision == "started" and (.reason | contains("consumed=true")))) | length) == 1 and (map(select(.decision == "accepted" and (.reason | contains("hash-only receipt")))) | length) == 1' "$mcp_audit" > evidence/tool-audit-acceptance.txt
           else
             exit 1
           fi

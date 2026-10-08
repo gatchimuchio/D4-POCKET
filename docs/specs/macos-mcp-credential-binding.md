@@ -18,7 +18,7 @@ Rust helperの別個native Owner確認は同一要求hash、実行file、Workspa
 
 | ID | 条件 | 状態 | 証拠 |
 | --- | --- | --- | --- |
-| MAC-MCP-CRED-1 | 製品metadata選択・公開参照要求・別個native確認の委譲説明 | OPEN | 未取得 |
+| MAC-MCP-CRED-1 | 製品metadata選択・公開参照要求・別個native確認の委譲説明 | CLOSED | source a51d005／run 37770724707の実選択・別個native承認・接続receipt、共有Owner summary直接試験 |
 | MAC-MCP-CRED-2 | 現record／Keychain照合、対象stdio実受渡し、使用Audit・公開最終使用時刻 | OPEN | 未取得 |
 | MAC-MCP-CRED-3 | 未承認・対象／用途／失効／不安全な環境変数・秘密注入を拒否、秘密非公開 | OPEN | 未取得 |
 | MAC-MCP-CRED-4 | 対象build／直接依存試験、正常切断・終了・所有process／試験資産回収 | OPEN | 未取得 |
@@ -42,3 +42,5 @@ source `d8a1efc770f947b213af01b5f482a9609fbad697`、[run 37769130630](https://gi
 `REGRESSION_REOPENED`（共有UIの直接依存のみ）: 原因commit `62f0583`の接続後使用時刻再取得がWindowsにも追加`資格情報一覧`を送り、既存`Desktop panelは対象Credential metadataと環境変数名だけを接続要求へ送る`が期待2要求／実際3要求でFAILした。破壊された条件はWindowsの既存公開要求順序。期待値を弱めずMac consumerだけに再取得を限定し、当該Windows試験と直接依存のMac選択Widgetの2件はPASS。Windows機能全体・CLOSED済みTool等は再開しない。
 
 同じ現sourceとSHA-256を照合したASCII試験複製の対象`dart analyze`も、Analysis Serverの終了処理で`AppData/Local/Dart/perf/12312`を削除できないOS error 1920によりexit 1となった。製品解析PASSではなくhost環境FAILとして保持し、変更した共有Dartの対象解析だけを次のMac runで実施する。SDK／OSへの回避や追加product blockerは作らない。
+
+source `a51d0052ea7d111fd902495fd3880c9fa47a0303`、[run 37770724707](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37770724707)で公開IDの実選択・環境変数指定・別個native承認・資格情報付き実stdio接続receiptまで成立し、MAC-MCP-CRED-1をCLOSEDとする。続く最終使用時刻のStaticText queryが未成立で100.880秒でFAIL。対象Dart解析・通常Mac build・独立always回収はPASS。artifact `11547912264`、SHA-256 `f1018a59c864b1256e5077d4f21680808b989dba59ba698c64cd1e2a0eeaf4a4`を照合した。登録済み公開metadata内の正のUnixMillis表示だけを同じ可視文字方式で確認する。次の正常一回は残る使用時刻／Tool／終了の結合に必要な前提として通し、CLOSED確認の追加証拠にしない。資格情報使用Audit投影をTool完了判定より先に出し、後続UI失敗でも既成立の使用記録を隠さない。
