@@ -19,8 +19,8 @@ Rust helperの別個native Owner確認は同一要求hash、実行file、Workspa
 | ID | 条件 | 状態 | 証拠 |
 | --- | --- | --- | --- |
 | MAC-MCP-CRED-1 | 製品metadata選択・公開参照要求・別個native確認の委譲説明 | CLOSED | source a51d005／run 37770724707の実選択・別個native承認・接続receipt、共有Owner summary直接試験 |
-| MAC-MCP-CRED-2 | 現record／Keychain照合、対象stdio実受渡し、使用Audit・公開最終使用時刻 | OPEN | 未取得 |
-| MAC-MCP-CRED-3 | 未承認・対象／用途／失効／不安全な環境変数・秘密注入を拒否、秘密非公開 | OPEN | 未取得 |
+| MAC-MCP-CRED-2 | 現record／Keychain照合、対象stdio実受渡し、使用Audit・公開最終使用時刻 | CLOSED | source 5e850ae／run 37772178891の実接続、正の使用時刻表示、使用accepted Audit 1件・実Tool receipt、先行実Keychain直接試験 |
+| MAC-MCP-CRED-3 | 未承認・対象／用途／失効／不安全な環境変数・秘密注入を拒否、秘密非公開 | CLOSED | Windows資格情報直接7件／必須全Rust、run 37767646092のMac現在対象・失効・不安全環境・Audit非漏洩直接試験1件、Conformance 241、既存native Owner gate・公開注入否定のCLOSED証拠 |
 | MAC-MCP-CRED-4 | 対象build／直接依存試験、正常切断・終了・所有process／試験資産回収 | OPEN | 未取得 |
 
 専用手動Actions `macos_mcp_credential_binding`で実Keychainと合成stdio Serverを接続する。既存native Debug fixtureが秘密を生成し、XCTestは秘密を入力・読取・コピーしない。Serverは受信値を内部照合し固定の非秘密結果だけを返す。秘密入力を含むxcresult attachment／動画／画面／全階層dumpをexportしない。登録・接続・Tool・切断は結合の必要な前提／後片付けで、CLOSED条件の強化証拠にしない。正常一回と新consumerの直接境界だけで閉じる。
@@ -44,3 +44,5 @@ source `d8a1efc770f947b213af01b5f482a9609fbad697`、[run 37769130630](https://gi
 同じ現sourceとSHA-256を照合したASCII試験複製の対象`dart analyze`も、Analysis Serverの終了処理で`AppData/Local/Dart/perf/12312`を削除できないOS error 1920によりexit 1となった。製品解析PASSではなくhost環境FAILとして保持し、変更した共有Dartの対象解析だけを次のMac runで実施する。SDK／OSへの回避や追加product blockerは作らない。
 
 source `a51d0052ea7d111fd902495fd3880c9fa47a0303`、[run 37770724707](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37770724707)で公開IDの実選択・環境変数指定・別個native承認・資格情報付き実stdio接続receiptまで成立し、MAC-MCP-CRED-1をCLOSEDとする。続く最終使用時刻のStaticText queryが未成立で100.880秒でFAIL。対象Dart解析・通常Mac build・独立always回収はPASS。artifact `11547912264`、SHA-256 `f1018a59c864b1256e5077d4f21680808b989dba59ba698c64cd1e2a0eeaf4a4`を照合した。登録済み公開metadata内の正のUnixMillis表示だけを同じ可視文字方式で確認する。次の正常一回は残る使用時刻／Tool／終了の結合に必要な前提として通し、CLOSED確認の追加証拠にしない。資格情報使用Audit投影をTool完了判定より先に出し、後続UI失敗でも既成立の使用記録を隠さない。
+
+source `5e850aeb62e8338f9a907025e7bf706e1ba5413a`、[run 37772178891](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37772178891)で正の公開使用時刻、対象stdio実受渡し、実Toolのhash-only receiptが成立。使用accepted Auditは1件、Toolのapproved／consumed started／hash-only acceptedも各1件でAudit判定PASS。MAC-MCP-CRED-2／3をCLOSEDとし、既存直接試験・境界証拠を再利用する。終了前の切断可視文字探索だけが上方向8回で未成立となり156.708秒でFAIL。切断はconnection card headerにあり、追加Credential metadataを持つ今回の試験だけ下方向へ探索する。通常build／Audit／独立always回収はPASS。artifact `11548688377`、SHA-256 `69144d90059acc6ea3152d43dc2564f0984930faf497204d5064b48a124507f0`を照合。残るMAC-MCP-CRED-4の通常切断・quitだけを検収し、CLOSED条件は正常利用の前提として通す。

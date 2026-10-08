@@ -125,7 +125,8 @@ final class AdapterOwnerUITests: XCTestCase {
     XCTAssertTrue(receipt.waitForExistence(timeout: 15))
     XCTAssertFalse(app.staticTexts.matching(NSPredicate(
       format: "label CONTAINS %@ OR value CONTAINS %@", "macos-mcp-public-result", "macos-mcp-public-result")).firstMatch.exists)
-    try mcpPublicText(app, "切断", click: true, scrollUp: true)
+    // 資格情報metadataがある場合、receiptより下の接続cardへ進む。既存資格情報なし試験は維持。
+    try mcpPublicText(app, "切断", click: true, scrollUp: !credentialBinding)
     approve(notice); app.activate()
     XCTAssertTrue(credentialMessage(app, "Brokerが保持するMCP接続はありません。").waitForExistence(timeout: 15))
     print("D4_MACOS_MCP_PRODUCT_PASS")
