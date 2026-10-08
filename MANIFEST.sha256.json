@@ -1504,7 +1504,7 @@
     },
     {
       "path": "docs/specs/macos-mcp-center.md",
-      "sha256": "e81b6011b220c58aed2a5680f92122afdd2de266749ed1ec87d82ad0339f7492"
+      "sha256": "cc4a2d739f6792367fa755f784baf0b8c5d31c88f8ef38c54c567d664520b10d"
     },
     {
       "path": "docs/specs/macos-workspace-selection.md",
@@ -3448,7 +3448,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/mcp_center.rs",
-      "sha256": "04852d7d3749150b8d883833e531fcfde48eff3524eca5c9e13c6a62cae7375f"
+      "sha256": "629241fd8ec3e7429994fe4ec8f3ca8672bd08c49598037ab105871675d32453"
     },
     {
       "path": "native/rust_helper/src/broker/mod.rs",

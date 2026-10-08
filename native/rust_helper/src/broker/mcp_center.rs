@@ -288,6 +288,8 @@ pub(super) fn connect(
     };
     {
         let object = projection.as_object_mut().expect("MCP projectionはobject");
+        // 発見時の外部metadataではなく、Brokerが保存する接続receiptへ分類する。
+        object.insert("証拠種別".to_string(), Value::String(EVIDENCE_SOURCE_INTERNAL_STATE.to_string()));
         object.insert(
             "接続状態".to_string(),
             Value::String("connected".to_string()),
@@ -1275,6 +1277,8 @@ echo {"jsonrpc":"2.0","id":3,"result":{"resultType":"complete","content":[{"type
         let connected = broker_test_operation(&mut broker, BrokerOperation::MCP接続, connect, true);
         assert_eq!(connected.status, BrokerStatus::Accepted, "{connected:?}");
         assert_eq!(connected.evidence_source, EVIDENCE_SOURCE_INTERNAL_STATE);
+        assert_eq!(connected.body.as_ref().unwrap()["証拠種別"], EVIDENCE_SOURCE_INTERNAL_STATE,
+            "接続receiptは現行SchemaとUIが要求する保存済みmetadataの証拠種別へ射影する");
         let connect_json = serde_json::to_string(&connected).expect("接続応答を直列化");
         assert!(!connect_json.contains(SECRET));
         assert_eq!(
