@@ -41,6 +41,7 @@ jobs:
           { git rev-parse HEAD; sw_vers; xcodebuild -version; } > evidence/environment.txt
           rustup toolchain install 1.95.0 --profile minimal
           cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib credential_storage::tests:: -- --test-threads=1 2>&1 | tee evidence/keychain-runtime-test.txt
+          cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib macos_credential_registration_is_bound_to_real_desktop_owner_gate -- --test-threads=1 2>&1 | tee evidence/credential-owner-gate-test.txt
       - name: 秘密入力の固定native境界と製品build
         shell: bash
         run: |
@@ -70,6 +71,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          credential_audit=/Users/runner/Library/Containers/com.example.guiShellDesktop/Data/Library/Application\ Support/D4Pocket/macos-broker/store/audit.jsonl
+          if [ -f "$credential_audit" ] && [ ! -L "$credential_audit" ]; then
+            test "$(stat -f%z "$credential_audit")" -lt 4194304
+            # 拒否原因の診断だけ。秘密・record本文・hash・IDをartifactへ出さない。
+            jq -sc 'map(select(.operation == "資格情報登録" or .operation == "資格情報一覧" or .operation == "資格情報失効")) | .[-64:][] | {operation: .operation, decision: (if .decision == "received" or .decision == "accepted" or .decision == "rejected" or .decision == "suspended" then .decision else "unknown" end), code: (if (.reason | test("^(credential|broker|desktop_owner)_[a-z_]{1,64}$")) then .reason elif (.reason | startswith("資格情報記録:") or startswith("資格情報失効記録:")) then "metadata_recorded" else "other" end)}' "$credential_audit" > evidence/credential-native-code.jsonl
+          fi
           if [ -d "$RUNNER_TEMP/macos-credential-tests.xcresult" ]; then
             xcrun xcresulttool get test-results summary --path "$RUNNER_TEMP/macos-credential-tests.xcresult" > evidence/native-summary.json
           fi

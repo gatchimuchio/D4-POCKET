@@ -1829,8 +1829,6 @@ impl Broker {
         let metadata_is_fixture = envelope.metadata.len() == 1
             && envelope.metadata[0].key == "client"
             && envelope.metadata[0].value == "r2_e2e_synthetic_owner";
-        let operation_is_allowlisted = operation_is_allowlisted
-            || (cfg!(target_os = "macos") && envelope.operation == Some(BrokerOperation::資格情報登録));
         if !operation_is_allowlisted
             || envelope.session_id.as_deref() != Some(self.session_id.as_str())
             || !metadata_is_fixture
@@ -1963,6 +1961,9 @@ impl Broker {
                     | BrokerOperation::製品アンインストール要求
             )
         );
+        // native秘密入力と別個Owner確認を通ったMac登録だけ。試験専用Ownerへ追加しない。
+        let operation_is_allowlisted = operation_is_allowlisted
+            || (cfg!(target_os = "macos") && envelope.operation == Some(BrokerOperation::資格情報登録));
         if !operation_is_allowlisted
             || envelope.session_id.as_deref() != Some(self.session_id.as_str())
             || !metadata_is_desktop
@@ -5853,6 +5854,47 @@ mod tests {
             "session-1",
             parse_issued_at_epoch_seconds("2026-06-01T00:00:30Z").unwrap(),
         )
+    }
+
+    #[test]
+    #[cfg(any(windows, target_os = "macos"))]
+    fn macos_credential_registration_is_bound_to_real_desktop_owner_gate() {
+        let baseline = BrokerRequestEnvelope::health("credential-gate", "credential-gate-nonce");
+        let request = json!({
+            "request_id": baseline.request_id,
+            "session_id": "session-1",
+            "operation": "資格情報登録",
+            "payload": {"版": 1},
+            "payload_hash": canonical_payload_hash(Some(&json!({"版": 1}))),
+            "nonce": baseline.nonce,
+            "issued_at": baseline.issued_at,
+            "metadata": {"client": "desktop_flutter"}
+        });
+        let normal = test_broker().handle(
+            BrokerRequestEnvelope::from_json_str(&request.to_string()).unwrap(),
+        );
+        assert_eq!(normal.error.unwrap().code, "credential_owner_required");
+        let confirmed = test_broker().desktop_owner_operation_json(&request.to_string());
+        assert_eq!(confirmed.error.unwrap().code,
+            if cfg!(target_os = "macos") {
+                "broker_persistence_unavailable"
+            } else {
+                "desktop_owner_operation_invalid"
+            }
+        );
+        for field in ["session_id", "metadata"] {
+            let mut injected = request.clone();
+            injected[field] = Value::Null;
+            let denied = test_broker().desktop_owner_operation_json(&injected.to_string());
+            assert_eq!(denied.error.unwrap().code, "desktop_owner_operation_invalid");
+        }
+        #[cfg(feature = "r2-e2e")]
+        {
+            let mut injected = request;
+            injected["metadata"] = json!({"client": "r2_e2e_synthetic_owner"});
+            let denied = test_broker().r2_e2e_synthetic_owner_operation_json(&injected.to_string());
+            assert_eq!(denied.error.unwrap().code, "r2_e2e_synthetic_owner_request_invalid");
+        }
     }
 
     fn codex_registration_request(request_id: &str, nonce: &str) -> BrokerRequestEnvelope {

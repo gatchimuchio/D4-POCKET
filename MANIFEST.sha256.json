@@ -72,7 +72,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "e31901677e5c349001d6edda974646e7199dd4e72676cf90c9d59edc0e2f54f3"
+      "sha256": "4257edb39d34d0110c358fb50fcaddd276a5b8f8666e6ceaafcd7ba11aa40312"
     },
     {
       "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
@@ -568,7 +568,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/RunnerUITests/AdapterOwnerUITests.swift",
-      "sha256": "5db646804e4bd49297632c4a9c4672b706c2bcb2689d6269040ed8c376e71ce9"
+      "sha256": "4bad0b529d81b6e406b7eaa02a2cf93222cd36ab78aedc7a9e7e5b437ef84550"
     },
     {
       "path": "apps/desktop_flutter/pubspec.lock",
@@ -1496,7 +1496,7 @@
     },
     {
       "path": "docs/specs/macos-credential-vault.md",
-      "sha256": "0033022d580cf3bfa1a779b7c21e18d244167bad773b4d6b98b6ad413b53095d"
+      "sha256": "82eb738f9168b66b882f3b4ba471956288f4cc8551ee076f1413716172425ffc"
     },
     {
       "path": "docs/specs/macos-desktop-channel.md",
@@ -3464,7 +3464,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "d14d7a36288a1d203183df969009ce7b9c050658ec5a77c8df1761ed85ef3014"
+      "sha256": "3a9bbde0540ca7b4e82945f5bcbfb879385a2ab4adf58e2bc5177812befc15c2"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
