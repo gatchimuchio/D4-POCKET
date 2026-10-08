@@ -2,7 +2,7 @@
 
 ## 意味と有限Acceptance
 
-状態: IMPLEMENTING（P13 Product Build）。OS chooserで選んだfolderの公開pathを表示するcontrol操作であり、Workspace登録・Permission・Approval・Credential・Agent trustではない。取消時の入力保持、実OS選択pathの画面反映、別個のOwner確認後の既存Broker登録、UI由来のpath／bookmark／Authority注入拒否、正常終了時のscope回収を有限条件とする。CLIはsandbox内の既存実行系を使う。CLOSED登録機能は新しい選択機能の直接依存としてだけ使う。
+状態: CLOSED（P13 Product Build、2026-10-08）。OS chooserで選んだfolderの公開pathを表示するcontrol操作であり、Workspace登録・Permission・Approval・Credential・Agent trustではない。取消時の入力保持、実OS選択pathの画面反映、別個のOwner確認後の既存Broker登録、UI由来のpath／bookmark／Authority注入拒否、正常終了時のscope回収を有限条件とする。CLIはsandbox内の既存実行系を使う。CLOSED登録機能は新しい選択機能の直接依存としてだけ使う。commit `af8f55b9b46e1aa95d8a080e4972376bff4045ee`の[手動Actions run 37709224596](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37709224596)で対象Rust・Dart・通常Mac buildと製品XCUITest 1件がPASSし、正常終了／fixture回収まで成立した。証拠範囲と過去FAILは`docs/REV5_PRODUCT_PROGRESS.md`に保持し、CLOSED条件を追加証拠目的で再実行しない。
 
 ## 観測した失敗と責任配置の修正
 

@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "07f0b6404e34b715325630db80c9f2452c22206ab1ea4db6767a81f1437224f8"
+      "sha256": "ff130a3f6afa9ccaaf7fe147a67ccd115c3f2477c9d9da30b0606eff8197353b"
     },
     {
       "path": "SECURITY.md",
@@ -1276,7 +1276,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "aa6116396fceace3b8fc45d61402dbfc1457164d4e90f6363747f72ea82b35a9"
+      "sha256": "3ffc4b0c3db5fdaf21247c55b212d516d2de2b9cabafb1fa4f4236813cb51cb2"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1492,7 +1492,7 @@
     },
     {
       "path": "docs/specs/macos-workspace-selection.md",
-      "sha256": "df51a4124fa32b98b1089a5a2543a6f81cb29892f051e9e3dca111cadd596e3d"
+      "sha256": "9827425b53ddf782c339012c30bda30a220b280e2612b407d58cae766faa9ec8"
     },
     {
       "path": "docs/specs/mcp-connection-center.md",

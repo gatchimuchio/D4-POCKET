@@ -17,7 +17,19 @@
 
 ## P13 Mobile / Non-Windows — 現行track
 
-#### macOS 作業領域のOS選択 — IMPLEMENTING（Product Build、2026-10-08）
+#### macOS 作業領域のOS選択 — CLOSED（Product Build、2026-10-08）
+
+有限Acceptanceはcommit `af8f55b9b46e1aa95d8a080e4972376bff4045ee`の手動Actions [run 37709224596](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37709224596)でPASS。macOS 15.7.9 arm64／Apple Virtual Machine／Xcode 16.4、固定Flutter 3.44.0／Rust 1.95.0。製品Agent Centerから親Rust所有OS sheetを取消し、入力`/previous-input`保持を通常Copyで照合。二度目の実OS選択でsandbox外folder `/Users/runner/d4-os-selected-workspace`を選び、公開path投影と実入力内容を確認した。OS選択だけでは登録されず、別個のnative Owner確認後に既存Brokerが実Codex CLIを検査してRuntime／Workspace登録recordを表示した。Command-Q終了、helper残留なし、runner source clean、専用CLI／内外Workspace回収までPASS。XCUITest 1 passed／0 failed／0 skipped、38.398秒。
+
+対象commandは`cargo +1.95.0 test --locked --manifest-path native/macos_owner/Cargo.toml --lib workspace_transport::tests::`（1件）、`cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib macos_workspace_selection::tests:: -- --test-threads=1`（4件）、通常helper／native staticlib build、変更Dart 4 file解析、OS選択待機／投影のFlutter 2試験、試験表示flagなしの`flutter build macos --debug --no-pub`、`xcodebuild test ... -only-testing:RunnerUITests/AdapterOwnerUITests/testProductWorkspaceOSSelection`で全PASS。UIのみ既存`D4_MACOS_OWNER_UI_TEST`表示flag付き。OS選択・別個Owner確認・Broker登録・終了は有限`LIVE_RUNTIME`、入力／注入否定と投影試験は`FIXTURE`。既存Audit選択判定2件acceptedは読取のみで、chain／HMAC再検算やFormal Evidenceを追加しない。
+
+artifact `11521306066`（78848 bytes）をignored `release_evidence/p13-macos-selection-af8f55b.zip`へ保存し、SHA-256 `b84b24a233d155b72605805b2d44310ee0ca72fc57c216a88582b5e446f9d04d`をGitHub digestと照合した。成功した正確なcommitをmainへfast-forward・pushし、remote HEAD一致を確認。2世代remote backup tagは`codex/backup-main`=`21c2d56a4a91262fbcb1c2ca4af3400b75fcb11b`、`codex/backup-main-prev`=`65fde55dd57479b91afe37ae6e21e44576779288`。本単位のrollbackは前者。検証branchはlocal／remote双方で回収済み。
+
+本有限単位をCLOSEDとし、追加fixture・強い証拠・表現修正のため再実行しない。OS scopeとD4のAuthorityを分離し、bookmarkはFlutter／Swift／Auditへ出さず起動中だけ保持する。通常Release `task_execution=unsupported`、`release_ready=false`は維持。選択WorkspaceでのAgent Task、Credential保管、sandbox外CLI導入、正式配布と最終QAはP13後続／既存`release_blocker`。変更外の必須Windows Rust全体FAIL、ローカルFlutter解析の既知制約、日本語監査の変更外指摘は下記履歴のまま保持し、対象PASSへ読み替えない。次はP13のOPEN製品差分だけを進める。
+
+##### 検証履歴（閉鎖前）
+
+以下のFAIL、当時の「現在」「未統合」は履歴であり、上記CLOSED状態を上書きしない。
 
 手動Actions [run 37708183066](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37708183066)、commit `f65ee668364f36651857865bc77ad2ccbd2f9a41`は取消／実入力保持、実OS folder選択、公開path投影／実入力照合、別個のnative Owner確認までPASS。映像はBroker登録recordと選択Workspace IDを示すが、登録見出しのStaticText queryが見つからず63.188秒でFAILした。見出しは既存SectionListのheader Semanticsであり、CLOSED登録試験の既存見出しqueryを直接依存として再利用する。選択前後の状態文queryとは分離し、登録前は通常の登録成功文の不存在、登録後はRuntime見出しとWorkspace IDを照合する。正常終了を含む試験全体のPASSまではCLOSEDにしない。通常build／対象Rust／Dart／後片付けPASS、OS選択の既存Audit判定2件accepted。artifact `11520613157`、SHA-256 `8359ffba7e59a60bb6dbcfffa0d00f2812d73414dc99b43d923e72ab11c12efc`を照合した。製品source・Authority・有限Acceptanceは未変更。
 
@@ -99,7 +111,7 @@ Desktop／Mobileの必須`flutter analyze`は両方exit 1。OneDrive上の既存
 
 実CodexのSHA-256は`16593cc2f422d5f398a8e40f550ebbaf1245392528957be342c295920a300704`。artifact `11503460098`（76960 bytes、remote期限2026-10-10T18:13:53Z）をignored `release_evidence/p13-macos-registration-c2ef88d.zip`へ保存し、SHA-256 `d4b8689c90ad780f2a38fddefec8a6eae480e9e4c16a81135924a8cf1440ad8c`をGitHub digestと照合した。成功した正確なcommitだけをmainへfast-forward・pushし、remote HEAD一致を確認。検証branchはlocal／remote双方から回収した。2世代remote backup tagは`65fde55dd57479b91afe37ae6e21e44576779288`と`515081f024e3ade49a79486e270caa4509519dd2`、本単位のrollbackは前者。
 
-本単位をCLOSEDとし、追加fixture・証拠強化・文書修正目的で再実行しない。Mac Credential保管、sandbox外選択、CLI配布UI、Task実行、正式配布はP13後続と既存`release_blocker`へ保持する。Permission・Approval・Credential・Agent trustを登録から生成せず、通常Release `task_execution=unsupported`、`release_ready=false`を維持する。ローカル必須Rust全体の既知FAIL、日本語監査の変更外指摘、Flutter LSP制約は下記の記録どおりで、今回の対象PASSへ読み替えない。
+本単位をCLOSEDとし、追加fixture・証拠強化・文書修正目的で再実行しない。Mac Credential保管、CLI配布UI、Task実行、正式配布はP13後続と既存`release_blocker`へ保持する。sandbox外folderのOS選択は上記の独立CLOSED単位を参照し、登録時点の未成立範囲から現行状態を推定しない。Permission・Approval・Credential・Agent trustを登録から生成せず、通常Release `task_execution=unsupported`、`release_ready=false`を維持する。ローカル必須Rust全体の既知FAIL、日本語監査の変更外指摘、Flutter LSP制約は下記の記録どおりで、今回の対象PASSへ読み替えない。
 
 ##### 検証履歴（閉鎖前）
 
