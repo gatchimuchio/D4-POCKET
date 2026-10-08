@@ -47,7 +47,7 @@ jobs:
           mkdir -p evidence
           { git rev-parse HEAD; sw_vers; xcodebuild -version; } > evidence/environment.txt
           rustup toolchain install 1.95.0 --profile minimal
-          if [ '${{ inputs.target }}' = 'macos_mcp_credential_binding' ]; then
+          if [ '${{ inputs.target }}' = 'macos_mcp_credential_binding' ] && [ '${{ inputs.mcp_product_only }}' != 'true' ]; then
             cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib macos_mcp_binding_ -- --test-threads=1 2>&1 | tee evidence/credential-binding-test.txt
           elif [ '${{ inputs.mcp_product_only }}' != 'true' ]; then
             cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib macos_owned_group_ -- --test-threads=1 2>&1 | tee evidence/group-runtime-test.txt
@@ -70,7 +70,7 @@ jobs:
           export PATH="$RUNNER_TEMP/flutter/bin:$PATH"
           cd apps/desktop_flutter
           flutter pub get 2>&1 | tee ../../evidence/pub-get.txt
-          if [ '${{ inputs.target }}' = 'macos_mcp_credential_binding' ]; then
+          if [ '${{ inputs.target }}' = 'macos_mcp_credential_binding' ] && [ '${{ inputs.mcp_product_only }}' != 'true' ]; then
             dart analyze lib/services/mcp_connection_client.dart lib/screens/mcp_connection_center.dart test/mcp_connection_center_test.dart 2>&1 | tee ../../evidence/dart-binding-analyze.txt
             flutter test --no-pub test/mcp_connection_center_test.dart --name 'Mac MCP(接続|投影)' 2>&1 | tee ../../evidence/credential-binding-projection-test.txt
           elif [ '${{ inputs.mcp_product_only }}' != 'true' ]; then
@@ -91,7 +91,7 @@ jobs:
             -only-testing:"RunnerUITests/AdapterOwnerUITests/$mcp_test" \
             -derivedDataPath "$RUNNER_TEMP/macos-mcp-tests" -resultBundlePath "$RUNNER_TEMP/macos-mcp-tests.xcresult" \
             CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual 'SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG D4_MACOS_OWNER_UI_TEST' 2>&1 | tee evidence/mcp-product-ui-test.txt
-      - name: 有限Auditと後片付け
+      - name: 有限Audit
         if: always()
         shell: bash
         run: |
@@ -115,13 +115,19 @@ jobs:
           else
             exit 1
           fi
+      - name: 所有processとfixtureを回収
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          remaining=0
           if pgrep -x gui_shell_macos_broker > evidence/remaining-helper-pids.txt; then
             while read -r pid; do kill -TERM "$pid"; done < evidence/remaining-helper-pids.txt
-            exit 1
+            remaining=1
           fi
           if pgrep -x mcp-server > evidence/remaining-mcp-pids.txt; then
             while read -r pid; do kill -TERM "$pid"; done < evidence/remaining-mcp-pids.txt
-            exit 1
+            remaining=1
           fi
           fixture=/Users/runner/Library/Containers/com.example.guiShellDesktop/Data/d4-mcp-fixture
           test ! -L "$fixture"
@@ -132,6 +138,7 @@ jobs:
           if [ -f "$fixture/mcp-server" ] && [ ! -L "$fixture/mcp-server" ]; then rm "$fixture/mcp-server"; fi
           if [ -d "$fixture" ]; then rmdir "$fixture"; fi
           git diff --exit-code -- apps/desktop_flutter
+          test "$remaining" = 0
       - name: 限定証拠を保存
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

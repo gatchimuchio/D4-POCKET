@@ -66,10 +66,15 @@ final class AdapterOwnerUITests: XCTestCase {
     if credentialBinding {
       try mcpPublicText(app, "起動引数", click: true)
       app.typeText("--require-credential")
-      let register = app.buttons["native入力で資格情報を登録"]
-      XCTAssertTrue(register.waitForExistence(timeout: 10)); reveal(app, register); register.click()
+      // AX click後にnative入力が未観測だった。引数欄より上の公開buttonを可視文字で操作する。
+      try mcpPublicText(app, "native入力で資格情報を登録", click: true, scrollUp: true)
       let proceed = app.sheets.buttons["入力して確認へ"].firstMatch
-      XCTAssertTrue(proceed.waitForExistence(timeout: 10))
+      guard proceed.waitForExistence(timeout: 10) else {
+        // 固定の公開状態文の有無だけ。秘密欄・画像・全階層を診断へ出さない。
+        print("D4_MCP_CREDENTIAL_INPUT_WAIT \(credentialMessage(app, "native秘密入力と別個Owner確認を待っています。").exists)")
+        print("D4_MCP_CREDENTIAL_INPUT_REJECT \(credentialMessage(app, "資格情報登録は未成立です。取消・拒否・期限または保管状態を確認してください。自動再送しません。").exists)")
+        throw failure("対象資格情報のnative入力画面を確認できない")
+      }
       // 合成秘密は既存Rust Debug fixture内だけ。値・秘密欄snapshotを読み取らない。
       proceed.click(); approve(notice); app.activate()
       XCTAssertTrue(credentialMessage(app,

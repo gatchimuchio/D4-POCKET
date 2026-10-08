@@ -34,3 +34,5 @@ Windowsの`cargo check --locked --manifest-path native/rust_helper/Cargo.toml --
 初回Conformanceは資格情報Vault内の旧`Purpose::Credential`token位置が移りFAIL。検査を削除せず、実際のplatform保存先内の同tokenとVaultからの保存先／読取接続の双方へ検査責任を同期する。必須Desktop／Mobile `flutter analyze --no-pub`は日本語checkoutの既知LSP FormatException／analysis server exit 255で各exit 1。ignored logは`release_evidence/p13-macos-mcp-credential-*-analyze.txt`。環境FAILをPASSへ読み替えず、対象Mac解析へ送る。製品への回避を追加しない。Mac実受渡しと製品結合は専用手動runまでOPEN。
 
 同期後Conformance 241件はPASS。日本語基底監査strictは変更前と同じ5 files／17 findingsでexit 1を保持し、この変更で新規指摘はない。広域の既存指摘修正やFinal QAは本consumerの工程へ持ち込まない。
+
+source `62f0583f19a57da076bff3c511b493dfd00a17cf`、手動[run 37767646092](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37767646092)は実Keychain直接試験1件・対象Flutter2件・対象解析・通常Mac buildでPASSした。製品UIは登録buttonのAX click後にnative入力画面を確認できず67.536秒でFAIL。秘密attachmentはexportしていない。artifact `11546961580`、SHA-256 `7848265c13d375084fb7db1495514b11b19422b3df511b634da52b4a391365db`を実byteへ照合。入力後scrollを伴うbutton操作を既存の公開可視文字clickへ統一し、失敗時は固定公開状態の有無だけを記録する。原因確定前の操作修正であり製品成立はまだ主張しない。Audit不足で同stepの後片付けまで到達しなかったため、回収を独立always stepへ分離する。既存PASS済みのKeychain／対象Widgetは同sourceの証拠を再利用し、再runはUI残件だけを処理する。
