@@ -26,11 +26,9 @@ final class AdapterOwnerUITests: XCTestCase {
     let search = app.textFields.firstMatch
     XCTAssertTrue(search.waitForExistence(timeout: 10))
     // 現行paletteはautofocus。AXのisHittable偽値に依存せず通常keyを送る。
-    app.typeText("MCP接続")
-    // 同じ文字を持つ検索editorは候補にしない。公開command entryだけを選ぶ。
-    let result = app.descendants(matching: .any).matching(NSPredicate(
-      format: "(label BEGINSWITH %@ OR value BEGINSWITH %@) AND elementType != %@",
-      "MCP接続", "MCP接続", NSNumber(value: XCUIElement.ElementType.textField.rawValue))).firstMatch
+    app.typeText("MCP")
+    // 検索editorと候補の文字を分け、既存の単純な公開label/value照合を使う。
+    let result = element(app, "MCP接続")
     XCTAssertTrue(result.waitForExistence(timeout: 10))
     result.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
     let server = app.textFields.matching(NSPredicate(format: "label CONTAINS %@", "サーバー識別子")).firstMatch

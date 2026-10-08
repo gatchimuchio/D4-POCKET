@@ -48,4 +48,6 @@ run `37722143281`／source `36c72e4`は通常Mac buildまでPASS、palette未識
 
 run `37723289904`／source `72451dc`はpaletteの2 icon照合と通常clickが成立。検索TextFieldは実frameを持つがAX hit判定が偽となり、clickで15.189秒のFAIL。現行paletteのautofocusへ通常keyを送り、公開result／server欄は既存フォーム試験と同じ実frameのmouse操作を使う。入力内容の直接設定、秘密値の読取、Owner／Broker挙動の変更は行わない。
 
+run `37724269791`／source `c603df8`はpaletteを開き検索keyを送るまで成立。elementTypeを含む全階層predicateの評価中にsnapshot timeoutとなり132.270秒のFAIL。原因は未確定であり、複雑predicateを除去し、ASCII `MCP`検索と既存の単純な候補label／value照合へ局所変更する。秘密入力・登録には未到達で、未成立をPASSへ昇格しない。
+
 `release_blocker`: MacでのProvider／MCP注入、正式署名identity・配布、Final QA。通常Release `task_execution=unsupported`、`release_ready=false`を保持する。秘密値の表示、保管方式fallback、Windowsの保存形式migrationを本単位の便宜で追加しない。
