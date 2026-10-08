@@ -79,6 +79,7 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
   @override
   Widget build(BuildContext context) {
     final client = _client;
+    final macOS = defaultTargetPlatform == TargetPlatform.macOS;
     if (client == null) {
       return BorderedPanel(
         child: Column(
@@ -106,16 +107,18 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 4),
-            const Text(
-              'Brokerが保持するstdio接続のmetadataだけを表示します。MCP metadataは信頼・権限ではありません。切断はWindows native Owner確認の後にBrokerが実行します。',
+            Text(
+              'Brokerが保持するstdio接続のmetadataだけを表示します。MCP metadataは信頼・権限ではありません。切断は${macOS ? 'Mac' : 'Windows'} native Owner確認の後にBrokerが実行します。',
             ),
             const SizedBox(height: 12),
-            const Text(
-              'Tool実行はWindows native Owner確認を毎回要求し、結果本文ではなくhash receiptだけを返します。実行前にJSON argumentsを確認してください。秘密値をargumentsへ入力しないでください。Agentへの結果引渡しとResource／Prompt本文取得は未対応です。',
+            Text(
+              'Tool実行は${macOS ? 'Mac' : 'Windows'} native Owner確認を毎回要求し、結果本文ではなくhash receiptだけを返します。実行前にJSON argumentsを確認してください。秘密値をargumentsへ入力しないでください。Agentへの結果引渡しとResource／Prompt本文取得は未対応です。',
             ),
             const SizedBox(height: 8),
-            const Text(
-              'MCP CredentialはFlutterへ入力しません。登録済みmetadataから対象Server専用のものを選びます。選択すると値を対象Server processへ渡し、そのprocessは読み取り・外部送信できます。Windows Job Objectはsandboxではありません。',
+            Text(
+              macOS
+                  ? 'Mac MCPは資格情報を注入しません。App Sandboxを継承し、明示切断はD4所有process groupだけを停止します。別groupへ離脱したprocessや外部副作用の復旧は保証しません。'
+                  : 'MCP CredentialはFlutterへ入力しません。登録済みmetadataから対象Server専用のものを選びます。選択すると値を対象Server processへ渡し、そのprocessは読み取り・外部送信できます。Windows Job Objectはsandboxではありません。',
             ),
             const SizedBox(height: 8),
             TextField(
@@ -217,7 +220,7 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
                           '${credential.kind} ・ ${credential.credentialId}'),
                     ),
                 ],
-                onChanged: _connecting || _loading
+                onChanged: macOS || _connecting || _loading
                     ? null
                     : (value) => setState(() {
                           _selectedCredentialId = value;
@@ -578,8 +581,8 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
       });
     } on Object {
       if (mounted) {
-        setState(() => _message =
-            'MCP接続は確定していません。Windows native Owner確認とBroker状態を確認してください。');
+        setState(() =>
+            _message = 'MCP接続は確定していません。native Owner確認とBroker状態を確認してください。');
       }
     } finally {
       if (mounted) setState(() => _connecting = false);
@@ -689,7 +692,7 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
                 Text('接続先MCP識別子: ${connection.serverId}'),
                 Text('Tool名・ID: ${tool.name} (${tool.toolId})'),
                 const SizedBox(height: 8),
-                const Text('以下の全文を確認してください。次にWindows native Owner確認が表示されます。'),
+                const Text('以下の全文を確認してください。次にnative Owner確認が表示されます。'),
                 const SizedBox(height: 8),
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxHeight: 300),
@@ -713,7 +716,9 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
             ),
             FilledButton(
               onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Windows確認へ進む'),
+              child: Text(defaultTargetPlatform == TargetPlatform.macOS
+                  ? 'Mac確認へ進む'
+                  : 'Windows確認へ進む'),
             ),
           ],
         ),

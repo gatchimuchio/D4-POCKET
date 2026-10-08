@@ -49,7 +49,7 @@ Schema検証済みの`status=supported`はToolの実行可能性、Permission、
 
 現行Rust実装のTool IDは`tool-`に続く142桁の小文字16進数である。呼出し要求はこの形だけを受け付け、Brokerが現在Catalog内のIDと名前の完全一致を再検査する。
 
-Rust Brokerは、Windows Desktopのdefault No native Owner確認を通過した`MCP Tool実行`だけを受け付ける。通常IPC、Owner資格だけの要求、Agent／LLM要求から直接実行しない。確認対象は現在接続中のServer ID、Catalog内のTool ID／名前、引数objectの件数とhash、Broker要求hashである。引数本文はDesktop画面で操作者が確認し、native確認では表示しない。Tool危険度は`unknown`として毎回確認する。
+Rust Brokerは、Windows Desktopまたは`macos-mcp-center.md`に定めるMac Desktopのdefault No native Owner確認を通過した`MCP Tool実行`だけを受け付ける。通常IPC、Owner資格だけの要求、Agent／LLM要求から直接実行しない。確認対象は現在接続中のServer ID、Catalog内のTool ID／名前、引数objectの件数とhash、Broker要求hashである。引数本文はDesktop画面で操作者が確認し、native確認では表示しない。Tool危険度は`unknown`として毎回確認する。
 
 接続時のCredential利用は、Windows stdioに限定した別のOwner確認操作である。Flutterは検証付きnormal IPC一覧から、用途`mcp_transport`・対象Server ID・有効状態が一致するmetadataだけを選び、Credential IDと環境変数名を送る。Brokerは登録AuditとProtectedStoreのhashを照合し、target・purpose・状態の完全一致を再検証した後でのみ秘密値を読み出す。値はRustから対象childの指定環境変数へ渡し、Broker response、snapshot、Audit内容、error、log、traceへ出さない。許可環境変数名は予約OS名・`GUI_SHELL_*`と衝突してはならない。別Serverへの再利用、無効・欠落・改変Credential、環境変数名不正、永続Audit不在はprocess起動前にfail-closedとする。使用AuditにはID、target、変数名、時刻だけを記録する。対象Serverと子孫は秘密値を読取り・送信でき、Windows Job Objectはsandboxを提供しない。legacy protocol fallbackは同じ実行対象へCredentialを再度渡す可能性をOwner確認に表示する。
 
@@ -62,3 +62,5 @@ Tool出力本文は、text・image・audio・resource link・embedded resource�
 ## 実装範囲
 
 C8の作業単位はSchema、正常／負例fixture、Conformanceを追加した。C9はstdio discovery、connect、metadata list、Windows owner切断に加え、native Owner確認・一回Permission・Catalog preflight・stdio `tools/call`・hash-only result receiptをRust Broker経路へ接続する。Windows stdioへの限定Credential注入は別Owner確認・保管庫照合・Auditを経て接続する。Tool結果本文をAgentへ渡すContent Exposure経路、MCP以外のCredential注入、Resource／Prompt本文取得、Streamable HTTP、OAuth、外部MCP実物Test Harness、非Windows process群監督は未接続であり、`release_blocker`として保持する。
+
+P13のMac追加範囲は`macos-mcp-center.md`を責任正本とする。Credentialなしの接続／Tool／明示切断とD4所有process group停止だけを追加し、Windowsの全子孫・異常終了保証へ昇格しない。上記C9当時の非Windows未接続は履歴であり、Macの現在範囲は有限Acceptanceの証拠で判定する。Mac Credential注入、Agent引渡し、別group／crash保証はこの単位では未成立のまま保持する。

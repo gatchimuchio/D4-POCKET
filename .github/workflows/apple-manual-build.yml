@@ -17,6 +17,7 @@ name: Apple platform 手動補助build
           - macos_workspace_selection
           - macos_agent_cli_selection
           - macos_credential_vault
+          - macos_mcp_center
         default: all
         required: true
 
@@ -24,6 +25,93 @@ permissions:
   contents: read
 
 jobs:
+  macos-mcp:
+    if: ${{ inputs.target == 'macos_mcp_center' }}
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - name: 対象commitを取得
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: 所有group停止とOwner境界の対象試験
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          { git rev-parse HEAD; sw_vers; xcodebuild -version; } > evidence/environment.txt
+          rustup toolchain install 1.95.0 --profile minimal
+          cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib macos_owned_group_ -- --test-threads=1 2>&1 | tee evidence/group-runtime-test.txt
+          cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib macos_mcp_ -- --test-threads=1 2>&1 | tee evidence/mcp-owner-boundary-test.txt
+          cargo +1.95.0 build --locked --manifest-path native/rust_helper/Cargo.toml --bin gui_shell_macos_broker --example macos_mcp_fixture 2>&1 | tee evidence/broker-fixture-build.txt
+          cargo +1.95.0 build --locked --manifest-path native/macos_owner/Cargo.toml --lib 2>&1 | tee evidence/native-normal-build.txt
+          test "$HOME" = /Users/runner
+          fixture=/Users/runner/Library/Containers/com.example.guiShellDesktop/Data/d4-mcp-fixture
+          test ! -e "$fixture"
+          mkdir -p "$fixture/workspace"
+          cp native/rust_helper/target/debug/examples/macos_mcp_fixture "$fixture/mcp-server"
+          chmod 755 "$fixture/mcp-server"
+      - name: 通常Mac製品と対象Flutter投影を検証
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch 3.44.0 https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          test "$(git -C "$RUNNER_TEMP/flutter" rev-parse HEAD)" = 559ffa3f75e7402d65a8def9c28389a9b2e6fe42
+          export PATH="$RUNNER_TEMP/flutter/bin:$PATH"
+          cd apps/desktop_flutter
+          flutter pub get 2>&1 | tee ../../evidence/pub-get.txt
+          dart analyze lib/services/broker_client.dart lib/services/mcp_connection_client.dart lib/screens/mcp_connection_center.dart test/broker_client_payload_hash_test.dart test/mcp_connection_center_test.dart 2>&1 | tee ../../evidence/dart-analyze.txt
+          flutter test --no-pub test/broker_client_payload_hash_test.dart --plain-name 'Mac MCPだけはOwner確認とstdio処理の有限待機を共有する' 2>&1 | tee ../../evidence/timeout-test.txt
+          flutter test --no-pub test/mcp_connection_center_test.dart --plain-name 'Mac MCP' 2>&1 | tee ../../evidence/projection-test.txt
+          flutter build macos --debug --no-pub 2>&1 | tee ../../evidence/macos-normal-build.txt
+          cd ../..
+          xcodebuild test -project apps/desktop_flutter/macos/Runner.xcodeproj -scheme Runner \
+            -destination 'platform=macOS' -parallel-testing-enabled NO \
+            -only-testing:RunnerUITests/AdapterOwnerUITests/testProductMacMcpCenter \
+            -derivedDataPath "$RUNNER_TEMP/macos-mcp-tests" -resultBundlePath "$RUNNER_TEMP/macos-mcp-tests.xcresult" \
+            CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual 'SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG D4_MACOS_OWNER_UI_TEST' 2>&1 | tee evidence/mcp-product-ui-test.txt
+      - name: 有限Auditと後片付け
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -d "$RUNNER_TEMP/macos-mcp-tests.xcresult" ]; then
+            xcrun xcresulttool get test-results summary --path "$RUNNER_TEMP/macos-mcp-tests.xcresult" > evidence/native-summary.json
+          fi
+          mcp_audit=/Users/runner/Library/Containers/com.example.guiShellDesktop/Data/Library/Application\ Support/D4Pocket/macos-broker/store/audit.jsonl
+          if [ -f "$mcp_audit" ] && [ ! -L "$mcp_audit" ]; then
+            test "$(stat -f%z "$mcp_audit")" -lt 4194304
+            ! grep -q -e macos-public-input -e macos-mcp-public-result "$mcp_audit"
+            jq -sc 'map(select(.operation == "MCP接続" or .operation == "MCP Tool実行" or .operation == "MCP切断")) | .[-64:][] | {operation: .operation, decision: .decision, code: (if (.reason | test("^[a-z_]{1,80}$")) then .reason else "bounded_receipt" end)}' "$mcp_audit" > evidence/mcp-audit-projection.jsonl
+            jq -se 'map(select(.operation == "MCP Tool実行")) | (map(select(.decision == "approved")) | length) == 1 and (map(select(.decision == "started" and (.reason | contains("consumed=true")))) | length) == 1 and (map(select(.decision == "accepted" and (.reason | contains("hash-only receipt")))) | length) == 1' "$mcp_audit" > evidence/tool-audit-acceptance.txt
+          else
+            exit 1
+          fi
+          if pgrep -x gui_shell_macos_broker > evidence/remaining-helper-pids.txt; then
+            while read -r pid; do kill -TERM "$pid"; done < evidence/remaining-helper-pids.txt
+            exit 1
+          fi
+          if pgrep -x mcp-server > evidence/remaining-mcp-pids.txt; then
+            while read -r pid; do kill -TERM "$pid"; done < evidence/remaining-mcp-pids.txt
+            exit 1
+          fi
+          fixture=/Users/runner/Library/Containers/com.example.guiShellDesktop/Data/d4-mcp-fixture
+          test ! -L "$fixture"
+          if [ -d "$fixture/workspace" ]; then
+            test -z "$(find "$fixture/workspace" -mindepth 1 -print -quit)"
+            rmdir "$fixture/workspace"
+          fi
+          if [ -f "$fixture/mcp-server" ] && [ ! -L "$fixture/mcp-server" ]; then rm "$fixture/mcp-server"; fi
+          if [ -d "$fixture" ]; then rmdir "$fixture"; fi
+          git diff --exit-code -- apps/desktop_flutter
+      - name: 限定証拠を保存
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: macos-mcp-${{ github.sha }}
+          path: evidence/
+          retention-days: 3
+          if-no-files-found: error
   macos-credential:
     if: ${{ inputs.target == 'macos_credential_vault' }}
     runs-on: macos-15

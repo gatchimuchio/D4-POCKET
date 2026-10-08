@@ -1,5 +1,6 @@
 import 'dart:ui' show SemanticsAction, SemanticsFlag;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gui_shell_desktop/screens/mcp_connection_center.dart';
@@ -274,6 +275,61 @@ class _McpTransport implements BrokerTransport {
 }
 
 void main() {
+  test('Mac MCP接続は絶対pathとmissing参照だけを送り相対pathと注入を拒否する', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final transport = _McpTransport()..connected = false;
+    final client = McpConnectionClient(transport);
+    await client.connect(
+        serverId: 'mcp-fixture',
+        executable: '/fixture/server',
+        workspace: '/fixture/workspace',
+        argumentsText: '');
+    expect(transport.operations, ['MCP接続']);
+    expect(transport.payloads.single?['Credential ref'],
+        containsPair('status', 'missing'));
+    for (final executable in ['server', '/fixture/server']) {
+      await expectLater(
+          client.connect(
+              serverId: 'mcp-fixture',
+              executable: executable,
+              workspace: '/fixture/workspace',
+              argumentsText: '',
+              credentialId: executable.startsWith('/') ? 'a' * 32 : null,
+              credentialEnvironmentVariable:
+                  executable.startsWith('/') ? 'MCP_API_KEY' : null),
+          throwsA(isA<BrokerClientException>()));
+    }
+    expect(transport.operations, ['MCP接続']);
+  });
+  testWidgets('Mac MCP投影はnative確認・hash-only・限定groupと未対応注入を表示する',
+      (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    tester.view.physicalSize = const Size(1400, 2200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final transport = _McpTransport();
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+      body: McpConnectionCenterPanel(transport: transport),
+    )));
+    expect(find.textContaining('Mac native Owner確認'), findsNWidgets(2));
+    expect(find.textContaining('D4所有process group'), findsOneWidget);
+    await tester.enterText(find.byType(TextField).at(0), 'mcp-fixture');
+    await tester.tap(find.text('対象ServerのCredential metadata一覧を取得'));
+    await tester.pumpAndSettle();
+    expect(
+        tester
+            .widget<DropdownButtonFormField<String>>(
+                find.byKey(const ValueKey('mcp-credential-selection')))
+            .onChanged,
+        isNull);
+    expect(transport.operations, ['資格情報一覧']);
+    expect(find.textContaining('secret-marker'), findsNothing);
+    debugDefaultTargetPlatformOverride = null;
+  });
   test('MCP clientは接続設定を固定Broker payloadへ射影する', () async {
     final transport = _McpTransport()..connected = false;
     final connection = await McpConnectionClient(transport).connect(

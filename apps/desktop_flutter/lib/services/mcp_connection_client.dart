@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 
 import 'package:gui_shell_ui/runtime_dialogue_client.dart'
     show BrokerClientException, BrokerTransport;
@@ -184,8 +185,10 @@ class McpConnectionClient {
   }) async {
     final arguments = _arguments(argumentsText);
     if (!_validIdentifier(serverId) ||
-        !_validWindowsPath(executable) ||
-        !_validWindowsPath(workspace) ||
+        !_validDesktopPath(executable) ||
+        !_validDesktopPath(workspace) ||
+        (defaultTargetPlatform == TargetPlatform.macOS &&
+            credentialId != null) ||
         (credentialId == null) != (credentialEnvironmentVariable == null) ||
         (credentialId != null &&
             (!_validCredentialId(credentialId) ||
@@ -349,7 +352,8 @@ class McpConnectionClient {
     required McpCredentialSummary credential,
   }) async {
     if (!_validCredentialId(credential.credentialId) ||
-        !const {'windows_dpapi', 'macos_keychain'}.contains(credential.storage) ||
+        !const {'windows_dpapi', 'macos_keychain'}
+            .contains(credential.storage) ||
         credential.status != '有効' ||
         credential.purpose.isEmpty ||
         credential.purpose.length > 256 ||
@@ -896,11 +900,14 @@ class McpConnectionClient {
         !normalized.startsWith('GUI_SHELL_');
   }
 
-  bool _validWindowsPath(String value) =>
+  bool _validDesktopPath(String value) =>
       value.isNotEmpty &&
       utf8.encode(value).length <= 1024 &&
       !_containsControl(value) &&
-      RegExp(r'^(?:[A-Za-z]:[\\/]|\\\\[^\\/]+[\\/][^\\/]+)').hasMatch(value);
+      (defaultTargetPlatform == TargetPlatform.macOS
+          ? value.startsWith('/') && !value.startsWith('//')
+          : RegExp(r'^(?:[A-Za-z]:[\\/]|\\\\[^\\/]+[\\/][^\\/]+)')
+              .hasMatch(value));
 
   bool _containsControl(String value) => value.runes.any(
         (rune) => rune <= 0x1f || (rune >= 0x7f && rune <= 0x9f),

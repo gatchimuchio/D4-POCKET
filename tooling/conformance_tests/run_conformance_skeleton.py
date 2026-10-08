@@ -10909,6 +10909,21 @@ def test_macos_credential_public_input_is_metadata_only() -> list[str]:
     return errors
 
 
+def test_macos_mcp_native_scope_is_explicit() -> list[str]:
+    """CONFIG証拠。native実作用は専用手動Mac試験で別途確認する。"""
+    required = {
+        "docs/specs/macos-mcp-center.md": ["MAC-MCP-1", "MAC-MCP-5", "Credential", "process group"],
+        "native/rust_helper/src/macos_desktop_owner.rs": ["macos_owner_summary", "response_timeout", "payload_hash"],
+        "native/rust_helper/src/adapters/process_tree.rs": ["process_group(0)", "getpgid", "test_kill_process_group", "self.group = None"],
+        ".github/workflows/apple-manual-build.yml": ["macos_mcp_center", "testProductMacMcpCenter"],
+    }
+    errors = []
+    for path, tokens in required.items():
+        source = (ROOT / path).read_text(encoding="utf-8")
+        errors.extend(f"Mac MCP責任経路がない: {path}: {token}" for token in tokens if token not in source)
+    return errors
+
+
 def main() -> int:
     tests = [
         test_required_docs_exist,
@@ -11144,6 +11159,7 @@ def main() -> int:
         test_macos_workspace_selection_is_native_scoped_and_non_authoritative,
         test_macos_agent_cli_selection_is_non_authoritative,
         test_macos_credential_public_input_is_metadata_only,
+        test_macos_mcp_native_scope_is_explicit,
         test_setup_doctor_public_bind_warning_exists,
         test_desktop_setup_doctor_ui_does_not_require_development_toolchains,
         test_broker_parity_startup_timeout_allows_local_cold_build,

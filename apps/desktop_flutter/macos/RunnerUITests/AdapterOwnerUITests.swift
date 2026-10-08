@@ -3,6 +3,112 @@ import AppKit
 import Vision
 
 final class AdapterOwnerUITests: XCTestCase {
+  func testProductMacMcpCenter() throws {
+    let app = XCUIApplication()
+    let notice = XCUIApplication(bundleIdentifier: "com.apple.UserNotificationCenter")
+    continueAfterFailure = false
+    app.launch(); defer { app.terminate() }
+    XCTAssertTrue(element(app, "エージェント").waitForExistence(timeout: 20))
+    let group = element(app, "操作グループ選択")
+    XCTAssertTrue(group.waitForExistence(timeout: 10))
+    let toolbar = app.buttons.allElementsBoundByAccessibilityElement.filter {
+      $0.frame.height >= 24 && app.windows.firstMatch.frame.contains($0.frame)
+        && abs($0.frame.midY - group.frame.midY) < 4 && $0.frame.maxX < group.frame.minX
+    }.sorted { $0.frame.minX < $1.frame.minX }
+    guard toolbar.count == 2 else { throw failure("公開toolbarを一意に確認できない") }
+    toolbar[0].click()
+    let search = app.textFields.firstMatch
+    XCTAssertTrue(search.waitForExistence(timeout: 10))
+    search.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+    app.typeText("MCP")
+    try mcpPublicText(app, "MCP接続", click: true, scroll: false)
+    let fixture = "/Users/runner/Library/Containers/com.example.guiShellDesktop/Data/d4-mcp-fixture"
+    for (label, value) in [("サーバー識別子", "macos-mcp-fixture"),
+                           ("実行ファイルの絶対パス", fixture + "/mcp-server"),
+                           ("作業フォルダーの絶対パス", fixture + "/workspace")] {
+      try mcpPublicText(app, label, click: true)
+      app.typeKey("a", modifierFlags: .command)
+      app.typeKey(XCUIKeyboardKey.delete.rawValue, modifierFlags: [])
+      app.typeText(value)
+    }
+    try mcpPublicText(app, "MCP接続を開始", click: true)
+    let deny = notice.dialogs.firstMatch.buttons["承認しない"]
+    XCTAssertTrue(deny.waitForExistence(timeout: 15)); deny.click(); app.activate()
+    XCTAssertTrue(credentialMessage(app,
+      "MCP接続は確定していません。native Owner確認とBroker状態を確認してください。").waitForExistence(timeout: 10))
+    try mcpPublicText(app, "MCP接続を開始", click: true, scroll: false)
+    approve(notice); app.activate()
+    XCTAssertTrue(credentialMessage(app,
+      "接続receiptを受理しました。表示はBroker内部状態であり、TrustやTool実行を示しません。").waitForExistence(timeout: 15))
+    try mcpPublicText(app, "Mac MCP試験Server")
+    try mcpPublicText(app, "Tool一覧", click: true)
+    try mcpPublicText(app, "確認して実行", click: true)
+    try mcpPublicText(app, "JSON形式のobject", click: true, scroll: false)
+    app.typeKey("a", modifierFlags: .command)
+    app.typeKey(XCUIKeyboardKey.delete.rawValue, modifierFlags: [])
+    app.typeText("{\"text\":\"macos-public-input\"}")
+    try mcpPublicText(app, "入力内容を確認", click: true, scroll: false)
+    try mcpPublicText(app, "Mac確認へ進む", click: true, scroll: false)
+    approve(notice); app.activate()
+    let receipt = app.staticTexts.matching(NSPredicate(
+      format: "label CONTAINS %@ OR value CONTAINS %@", "result hash: sha256:", "result hash: sha256:")).firstMatch
+    XCTAssertTrue(receipt.waitForExistence(timeout: 15))
+    XCTAssertFalse(app.staticTexts.matching(NSPredicate(
+      format: "label CONTAINS %@ OR value CONTAINS %@", "macos-mcp-public-result", "macos-mcp-public-result")).firstMatch.exists)
+    try mcpPublicText(app, "切断", click: true, scrollUp: true)
+    approve(notice); app.activate()
+    XCTAssertTrue(credentialMessage(app, "Brokerが保持するMCP接続はありません。").waitForExistence(timeout: 15))
+    print("D4_MACOS_MCP_PRODUCT_PASS")
+    app.typeKey("q", modifierFlags: .command)
+    XCTAssertTrue(app.wait(for: .notRunning, timeout: 10))
+  }
+
+  private func mcpPublicText(_ app: XCUIApplication, _ label: String, click: Bool = false,
+                             scroll: Bool = true, scrollUp: Bool = false) throws {
+    // 合成公開Server／引数だけ。画面を保存せず、実windowの文字範囲boxへ通常mouse入力する。
+    guard !app.secureTextFields.firstMatch.exists else { throw failure("秘密入力を撮影しない") }
+    for attempt in 0..<8 {
+      Thread.sleep(forTimeInterval: 0.6)
+      let window = app.windows.firstMatch
+      let frame = window.frame
+      let image = XCUIScreen.main.screenshot().image
+      var proposed = CGRect(origin: .zero, size: image.size)
+      guard let screen = image.cgImage(forProposedRect: &proposed, context: nil, hints: nil),
+            CGRect(origin: .zero, size: image.size).contains(frame),
+            let pixels = screen.cropping(to: CGRect(
+              x: frame.minX * CGFloat(screen.width) / image.size.width,
+              y: frame.minY * CGFloat(screen.height) / image.size.height,
+              width: frame.width * CGFloat(screen.width) / image.size.width,
+              height: frame.height * CGFloat(screen.height) / image.size.height).integral) else {
+        throw failure("公開MCP画面を製品窓へ限定できない")
+      }
+      let request = VNRecognizeTextRequest()
+      request.recognitionLevel = .accurate; request.recognitionLanguages = ["ja-JP", "en-US"]
+      request.customWords = [label]
+      try VNImageRequestHandler(cgImage: pixels).perform([request])
+      let boxes: [VNRectangleObservation] = try (request.results ?? []).compactMap { observation in
+        for candidate in observation.topCandidates(3) {
+          if label == "切断" && candidate.string.trimmingCharacters(in: .whitespacesAndNewlines) != label { continue }
+          if let range = candidate.string.range(of: label),
+             let box = try candidate.boundingBox(for: range) { return box }
+        }
+        return nil
+      }
+      guard boxes.count <= 1 else { throw failure("公開MCP文字を一意に確認できない: " + label) }
+      if let box = boxes.first?.boundingBox {
+        if click {
+          window.coordinate(withNormalizedOffset: CGVector(dx: box.midX, dy: 1 - box.midY)).click()
+        }
+        return
+      }
+      if scroll && attempt < 7 {
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.65))
+          .scroll(byDeltaX: 0, deltaY: scrollUp ? 180 : -180)
+      }
+    }
+    throw failure("公開MCP文字を確認できない: " + label)
+  }
+
   func testProductCredentialVault() throws {
     let app = XCUIApplication()
     let notice = XCUIApplication(bundleIdentifier: "com.apple.UserNotificationCenter")

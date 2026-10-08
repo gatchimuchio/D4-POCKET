@@ -1,11 +1,26 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/services.dart';
 import 'package:gui_shell_desktop/services/broker_client.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('Mac MCPだけはOwner確認とstdio処理の有限待機を共有する', () {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    for (final operation in ['MCP接続', 'MCP切断', 'MCP Tool実行']) {
+      expect(brokerRequestTimeoutForOperation(operation),
+          const Duration(seconds: 335));
+    }
+    expect(brokerRequestTimeoutForOperation('MCP接続一覧'),
+        const Duration(seconds: 5));
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    expect(brokerRequestTimeoutForOperation('MCP接続'),
+        const Duration(seconds: 305));
+  });
 
   test('native Owner確認のBroker操作はFlutter待機時間を共有する', () {
     for (final operation in [

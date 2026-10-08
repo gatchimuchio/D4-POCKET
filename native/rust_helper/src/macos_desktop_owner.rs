@@ -40,6 +40,9 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
     let text = if registration {
         let summary = crate::broker::protocol::macos_agent_registration_summary(payload)?;
         format!("{summary}\n要求hash: {hash}")
+    } else if matches!(operation, "MCP接続" | "MCP切断" | "MCP Tool実行") {
+        let summary = crate::broker::mcp_center::macos_owner_summary(operation, payload)?;
+        format!("{summary}\n要求hash: {hash}")
     } else if operation == "資格情報失効" {
         let p = payload.as_object()?;
         let fields = [
@@ -98,7 +101,13 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
         request: String::from_utf8(normalized).ok()?,
         summary: text,
         // 登録は既存5秒probeを2回実行する。OS確認300秒とは別の限定待機。
-        response_timeout: Duration::from_secs(if registration { 15 } else { 4 }),
+        response_timeout: Duration::from_secs(if registration {
+            15
+        } else if matches!(operation, "MCP接続" | "MCP切断" | "MCP Tool実行") {
+            35
+        } else {
+            4
+        }),
     })
 }
 
@@ -136,4 +145,58 @@ pub(super) fn dispatch(
             .map_err(std::io::Error::other)?
             .into_bytes(),
     ))
+}
+
+#[cfg(test)]
+mod mcp_tests {
+    use super::*;
+    use crate::broker::ipc_server::BrokerCredentialRole;
+    use serde_json::{json, Value};
+
+    #[test]
+    fn macos_mcp_candidate_現在hashへ束縛し_ui承認とsession注入を拒否する() {
+        let endpoint = BrokerEndpoint {
+            host: "127.0.0.1".into(),
+            port: 1,
+            session_id: "fixture-session".into(),
+            session_secret: "synthetic-only".into(),
+            credential_role: BrokerCredentialRole::Normal,
+            transport: "tcp".into(),
+            max_request_bytes: 65536,
+        };
+        let payload = json!({"版":1,"操作":"切断","ServerID":"fixture-mcp"});
+        let frame = |payload: Value| {
+            json!({"request_id":"fixture-request","nonce":"fixture-nonce",
+            "issued_at":BrokerRequestEnvelope::current_issued_at(),"operation":"MCP切断",
+            "metadata":{"client":"desktop_flutter"},"payload_hash":canonical_payload_hash(Some(&payload)),"payload":payload})
+        };
+        let valid = frame(payload.clone());
+        let candidate_value = candidate(&serde_json::to_vec(&valid).unwrap(), &endpoint).unwrap();
+        assert!(candidate_value.summary.contains("fixture-mcp"));
+        assert!(candidate_value
+            .summary
+            .contains(valid["payload_hash"].as_str().unwrap()));
+        assert_eq!(candidate_value.response_timeout, Duration::from_secs(35));
+        for key in ["session_id", "approval"] {
+            let mut invalid = valid.clone();
+            invalid[key] = json!(true);
+            assert!(candidate(&serde_json::to_vec(&invalid).unwrap(), &endpoint).is_none());
+        }
+        let mut metadata = valid.clone();
+        metadata["metadata"]["authority"] = json!("owner");
+        assert!(candidate(&serde_json::to_vec(&metadata).unwrap(), &endpoint).is_none());
+        let mut mismatch = valid.clone();
+        mismatch["payload"]["ServerID"] = json!("other");
+        assert!(candidate(&serde_json::to_vec(&mismatch).unwrap(), &endpoint).is_none());
+        let (sender, receiver) = mpsc::sync_channel(1);
+        assert!(dispatch(
+            &serde_json::to_vec(&valid).unwrap(),
+            &endpoint,
+            &sender,
+            &mut |_| false
+        )
+        .unwrap()
+        .is_none());
+        assert!(receiver.try_recv().is_err());
+    }
 }

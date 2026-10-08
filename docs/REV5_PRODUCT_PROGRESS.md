@@ -17,6 +17,10 @@
 
 ## P13 Mobile / Non-Windows — 現行track
 
+#### macOS MCP接続・Tool実行・切断 — IMPLEMENTING（Product Build、2026-10-08）
+
+既存stdio client／Brokerの接続・metadata一覧・一回Tool実行・hash-only結果・明示切断をMac native Ownerへ接続する。有限受入れは`docs/specs/macos-mcp-center.md`のMAC-MCP-1〜5だけ。新Protocol／別bridge／Credential注入を追加せず、App Sandbox・現在Catalog／Schema再照合・一回Permission・Audit・結果不明時の隔離を保持する。所有process groupの正常停止と製品経路を確認し、Windows Job Objectの全子孫／crash保証はMacへ転用しない。追加fault／別group離脱／Formal EvidenceはFinal QA／既存platform関門へ残す。CLOSED済みCredential／CLI／Workspace／Mobileの試験は選択しない。
+
 #### macOS 資格情報保管庫 — CLOSED（Product Build、2026-10-08）
 
 source `e4a9f839d79221afb18751be9e79b0c641b3cfbc`、手動Actions [run 37742214244](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37742214244)で有限AcceptanceがPASS。製品native入力の取消・未登録表示、合成秘密入力・別個Owner確認・実Keychain登録、metadata-only一覧と有効表示、別個Owner確認後の論理失効・一覧更新・失効表示、Command-Q終了・helper回収を確認。XCUITest 1 passed／0 failed、70.482秒。Keychain実API・通常Owner gate・native公開境界各1件、対象Dart解析／Widget 4件、通常Mac buildと合成秘密fixtureを外した再buildもPASS。

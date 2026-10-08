@@ -1,5 +1,7 @@
 # GUI Shell ロードマップ
 
+P13 macOS MCP接続・Tool実行・切断をIMPLEMENTING。有限受入れは`docs/specs/macos-mcp-center.md`。既存stdio・Broker・native Ownerを使い、所有process groupの正常停止とhash-only結果を接続する。秘密注入、別bridge、既存CLOSED条件の再検査は行わない。手動Actions `macos_mcp_center`はローカルにないMac OS／製品経路の補助に限定し、通常Release能力・配布関門を保持する。
+
 P13 macOS資格情報保管庫はCLOSED（Product Build、2026-10-08）。source `e4a9f839d79221afb18751be9e79b0c641b3cfbc`、手動Actions [run 37742214244](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37742214244)でnative入力取消・未登録、別個Owner確認後のKeychain登録、metadata-only一覧、有効／失効表示、現metadata-bound Owner確認後の論理失効、Command-Q終了・helper回収がPASS。対象API／境界／Widgetと通常Mac build、合成秘密fixtureを外した再buildもPASS。成功sourceをmainへ統合・push・remote確認し、検証branchをlocal／remote双方で回収した。有限Acceptance・過去FAILは`docs/specs/macos-credential-vault.md`、進捗正本は`docs/REV5_PRODUCT_PROGRESS.md`。秘密値・Authority・Windows保存形式・通常Release能力は保持する。次はP13のOPEN製品差分だけ。Provider／MCP注入、Task、正式配布、Final QAは別関門に残し、本CLOSED条件を追加証拠目的で再試験しない。
 
 P13 macOS Agent CLI実行fileのOS選択はCLOSED（Product Build、2026-10-08）。commit `5e8982cce326b907b1be00282c291806f6141a76`の手動Actions [run 37713979077](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37713979077)で取消／実入力保持、sandbox外の実CLI file選択／path反映、別個Owner確認後のBroker probe／登録、Command-Q終了・helper／fixture回収がPASS。通常Mac build、Rust対象3件、Dart対象解析／2試験もPASS。有限Acceptanceは`docs/specs/macos-agent-cli-selection.md`、失敗履歴と証拠範囲は`docs/REV5_PRODUCT_PROGRESS.md`。成功sourceをmainへ統合・push・remote照合し、検証branchはlocal／remoteとも回収した。選択は登録・Task Authorityではなく、通常Release能力を保持する。次はP13の残る製品接続差分だけであり、CLOSED条件を証拠強化目的で再開しない。

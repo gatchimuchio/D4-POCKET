@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'package:gui_shell_ui/runtime_dialogue_client.dart'
@@ -40,15 +41,18 @@ const _nativeOwnerConfirmationOperations = <String>{
 };
 
 Duration brokerRequestTimeoutForOperation(String operation) =>
-    operation == '資格情報登録'
-        ? const Duration(seconds: 610)
-        : (operation == '作業領域OS選択' || operation == 'AgentCLI実行fileOS選択')
-            ? const Duration(seconds: 305)
-            : operation == 'AgentCLI実行系作業領域登録'
-                ? const Duration(seconds: 320)
-                : _nativeOwnerConfirmationOperations.contains(operation)
-                    ? const Duration(seconds: 305)
-                    : const Duration(seconds: 5);
+    defaultTargetPlatform == TargetPlatform.macOS &&
+            {'MCP接続', 'MCP切断', 'MCP Tool実行'}.contains(operation)
+        ? const Duration(seconds: 335)
+        : operation == '資格情報登録'
+            ? const Duration(seconds: 610)
+            : (operation == '作業領域OS選択' || operation == 'AgentCLI実行fileOS選択')
+                ? const Duration(seconds: 305)
+                : operation == 'AgentCLI実行系作業領域登録'
+                    ? const Duration(seconds: 320)
+                    : _nativeOwnerConfirmationOperations.contains(operation)
+                        ? const Duration(seconds: 305)
+                        : const Duration(seconds: 5);
 
 class BrokerClient implements BrokerTransport {
   BrokerClient._(this._channel);

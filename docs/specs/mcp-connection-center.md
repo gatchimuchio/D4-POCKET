@@ -50,7 +50,7 @@ Desktop設定のMCP接続センターは、サーバー識別子、Windows絶対
 
 一覧更新は利用者の明示操作で行い、Server ID、表示名、stdio種別、Tool／Resource／Prompt件数だけを表示する。Tool欄は展開操作でTool名、Tool ID、入力Schema hashを表示できる。Resource欄は名前、Resource ID、URI template hash、Prompt欄は名前、Prompt ID、引数Schema hashだけを表示できる。各IDとhashは外部metadataであり、実行権や信頼を示さない。Tool description／description_summary、入力Schema本文、Resource URI／本文、Prompt description／引数／本文は表示・取得しない。Tool危険度は`unknown`のまま示す。接続先、実行file、起動引数、Credential refは一覧へ表示しない。Tool呼出しは個別の入力確認とWindows native Owner確認が必要で、一覧取得だけでは呼び出さない。Resource／Prompt本文取得要求も送信しない。一覧の外側と格納済み接続projectionは`INTERNAL_STATE`であり、MCP Serverとの現在接続やTrustの保証へ昇格させない。
 
-Tool入力画面はJSON argumentsを操作者へ表示し、秘密値を入力しないよう警告する。native確認はServer ID、Tool ID／名前、top-level argument数、引数hash、request hashだけを示し、引数本文を表示しない。Ownerが確認を拒否した場合は送信しない。BrokerはWindows native確認経路以外からのTool呼出しを拒否する。`MCP Tool実行`はWindowsに限定し、非Windowsでは未対応として拒否する。
+Tool入力画面はJSON argumentsを操作者へ表示し、秘密値を入力しないよう警告する。native確認はServer ID、Tool ID／名前、top-level argument数、引数hash、request hashだけを示し、引数本文を表示しない。Ownerが確認を拒否した場合は送信しない。BrokerはWindowsまたは`macos-mcp-center.md`に定めるMac native確認経路以外からのTool呼出しを拒否する。他platformでは未対応として拒否する。
 
 成功・Tool実行errorのどちらも、Brokerは応答本文を保持・公開せず、結果hash、content件数／型、Tool側error flagだけを`hash_only`の`LIVE_RUNTIME` receiptに含める。Agentへの結果引渡し、全文表示、Resourceリンク追跡は行わない。結果本文はMCP Serverの未信頼dataであり、後続の安全redaction・Content Exposure contractが成立するまでBroker内にも保存しない。
 
@@ -58,7 +58,7 @@ Tool入力画面はJSON argumentsを操作者へ表示し、秘密値を入力�
 
 ownerは`MCP切断`で対象Server IDを明示できる。要求はowner controlだけで受け、未知field、未知Server、通常IPCからの切断は拒否する。Windows Job Objectのprocess群停止確認後に`LIVE_RUNTIME`の結果Auditを永続化し、その後に限ってBrokerの接続記録を消す。停止または結果Auditを確定できない場合は成功を返さず記録を保持する。停止済みだがAuditに失敗した場合は、ownerの明示再試行で停止を再確認して監査確定する。receipt／Auditに実行path、引数、workspace、Credential実値を含めない。切断はPermissionを生成しない。
 
-Desktop切断要求はFlutterから既存Broker channelへ送り、Windows Rust起動器が厳密な要求fieldを検査してからdefault Noのnative Owner確認を表示する。OwnerのYes後もBrokerが要求を再検証し、実process群停止・永続Audit・記録解消を行う。FlutterはOwner資格・session file・Approvalを保持しない。native確認処理が実行されない通常IPC・他platformではBrokerが拒否し、fallbackや自動再送を行わない。
+Desktop切断要求はFlutterから既存Broker channelへ送り、Windows Rust起動器または限定Mac Rust helperが厳密な要求fieldを検査してからdefault Noのnative Owner確認を表示する。OwnerのYes後もBrokerが要求を再検証し、所有する実process群停止・永続Audit・記録解消を行う。FlutterはOwner資格・session file・Approvalを保持しない。native確認処理が実行されない通常IPC・他platformではBrokerが拒否し、fallbackや自動再送を行わない。
 
 WindowsではMCP stdio Serverも既存のRust process群監督経路から起動する。childの初期threadを再開する前に専用Job Objectへ割り当て、Broker異常終了時のhandle closeでrootと子孫を停止する。root終了後に子孫が残っている場合もBrokerは接続一覧を返さず、終了を確認できない停止要求を成功扱いしない。この保証はWindows process群の範囲であり、MCP ServerのTrust、filesystem sandbox、credential安全性は証明しない。
 
@@ -72,7 +72,7 @@ WindowsではMCP stdio Serverも既存のRust process群監督経路から起動
 - `Credential available ≠ Server trusted`
 - Agent metadata、MCP metadata、履歴、Profile、Tool schemaから権限を生成しない。
 - Windows stdioを除くCredential実値の注入、AgentへのTool結果引渡し、Resource／Prompt実取得、Streamable HTTP、OAuth、Tool出力redaction／full content approvalは未接続である。
-- 非Windowsではprocess群停止を保証する既存監督がないため、`mcp_process_tree_supervision_unsupported`として`MCP切断`をfail-closedで拒否する。WindowsのJob Object試験を他OSのprocess群停止証拠へ流用しない。
+- Windows／Mac以外ではprocess群停止を保証する既存監督がないため、`mcp_process_tree_supervision_unsupported`として`MCP切断`をfail-closedで拒否する。WindowsのJob Object試験を他OSのprocess群停止証拠へ流用しない。
 - Windowsのfake MCP stdio child／descendant process fixtureはJob Objectによる起動・停止だけを検証する。外部MCP Serverの適合やinstalled product経路の証拠ではない。Windows以外のprocess群監督は別途検証を要する。
 - `server/discover`またはlegacy `initialize`の応答は、Serverが信頼済みまたは承認済みであることを証明しない。
 
@@ -81,3 +81,7 @@ WindowsではMCP stdio Serverも既存のRust process群監督経路から起動
 未知Server、応答id不一致、malformed JSON-RPC、authority／secret field、未処理pagination、応答timeout、child終了、必須Credentialの不足は接続または一覧を拒否する。`mcp_server_unavailable`と`mcp_timeout`を成功へ変換しない。
 
 Agentへ結果を渡すMCP Tool実行経路、Windows stdio以外のCredential実値注入、Tool結果のContent Exposure、外部MCP実物Test Harness、非Windows process群監督、installed product上のOwner Credential利用証拠が未成立であることは`release_blocker`である。操作者向けの一回限りWindows呼出しreceiptとstdio Credential injectionだけで、Agent統合、外部MCP全体、D4 Pocket全体または正式releaseの完成を主張しない。
+
+## Macの限定製品経路
+
+P13の現在範囲と有限Acceptanceは`macos-mcp-center.md`へ分離する。Mac絶対pathのCredentialなしstdioを、既存Rust helperの独立native Owner確認後にBrokerへ渡す。UIの資格情報選択は無効、configured参照はnative候補とBroker双方で拒否する。Toolは上記現在Schema・一回Permission・Audit・hash-onlyと同じ責任境界を使う。切断はD4所有POSIX process groupの不存在確認後だけ記録を消す。App Sandboxを継承し、Windows Job Objectの全子孫／Broker crash保証、別groupへ離脱した第三者内部、外部副作用をMacの停止成功へ含めない。追加fault／Formal Evidenceは既存Final QA／platform関門へ残す。

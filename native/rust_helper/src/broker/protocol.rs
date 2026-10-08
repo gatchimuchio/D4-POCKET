@@ -1961,9 +1961,10 @@ impl Broker {
                     | BrokerOperation::製品アンインストール要求
             )
         );
-        // native秘密入力と別個Owner確認を通ったMac登録だけ。試験専用Ownerへ追加しない。
+        // Mac登録／MCPの別個native Owner確認だけ。試験専用Ownerへ追加しない。
         let operation_is_allowlisted = operation_is_allowlisted
-            || (cfg!(target_os = "macos") && envelope.operation == Some(BrokerOperation::資格情報登録));
+            || (cfg!(target_os = "macos") && matches!(envelope.operation,
+                Some(BrokerOperation::資格情報登録 | BrokerOperation::MCP接続 | BrokerOperation::MCP切断)));
         if !operation_is_allowlisted
             || envelope.session_id.as_deref() != Some(self.session_id.as_str())
             || !metadata_is_desktop
@@ -2092,6 +2093,8 @@ impl Broker {
             || envelope.operation == Some(BrokerOperation::作業領域基準点保存)
             || envelope.operation == Some(BrokerOperation::作業領域全体基準点保存)
             || envelope.operation == Some(BrokerOperation::MCPTool実行)
+            || (cfg!(target_os = "macos") && matches!(envelope.operation,
+                Some(BrokerOperation::MCP接続 | BrokerOperation::MCP切断)))
             || envelope.operation == Some(BrokerOperation::A2A接続)
         {
             if !export_confirmation
@@ -5854,6 +5857,34 @@ mod tests {
             "session-1",
             parse_issued_at_epoch_seconds("2026-06-01T00:00:30Z").unwrap(),
         )
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn macos_mcp_operations_require_desktop_native_not_owner_credential() {
+        for operation in [BrokerOperation::MCP接続, BrokerOperation::MCP切断,
+                          BrokerOperation::MCPTool実行] {
+            let mut request = BrokerRequestEnvelope::health("mac-mcp", "mac-mcp-nonce");
+            request.operation = Some(operation.clone());
+            request.payload = Some(json!({"版": 1}));
+            request.refresh_payload_hash();
+            for source in [OwnerConfirmationSource::NotOwner,
+                           OwnerConfirmationSource::OwnerCredential] {
+                let denied = test_broker().処理_with_export_confirmation(
+                    request.clone(), source == OwnerConfirmationSource::OwnerCredential,
+                    source, None, None);
+                assert_eq!(denied.error.unwrap().code, "desktop_native_owner_confirmation_required");
+            }
+            request.session_id = Some("session-1".into());
+            request.metadata = vec![BrokerMetadata {key: "client".into(), value: "desktop_flutter".into()}];
+            request.metadata_present = true;
+            let confirmed = test_broker().desktop_owner_operation_json(
+                &json!({"request_id": request.request_id, "session_id": request.session_id,
+                    "operation": operation.as_str(), "nonce": request.nonce,
+                    "issued_at": request.issued_at, "payload_hash": request.payload_hash,
+                    "metadata":{"client":"desktop_flutter"}, "payload":request.payload}).to_string());
+            assert_eq!(confirmed.error.unwrap().code, "broker_persistence_unavailable");
+        }
     }
 
     #[test]
