@@ -74,12 +74,15 @@ final class AdapterOwnerUITests: XCTestCase {
     try mcpPublicText(app, "Tool一覧", click: true)
     try mcpPublicText(app, "確認して実行", click: true)
     try mcpPublicText(app, "JSON形式のobject", scroll: false)
-    let argumentEditor = app.textFields.matching(NSPredicate(format: "value == %@", "{}")).firstMatch
-    XCTAssertTrue(argumentEditor.waitForExistence(timeout: 5))
-    XCTAssertTrue(app.windows.firstMatch.frame.contains(argumentEditor.frame))
+    let argumentEditors = app.textFields.allElementsBoundByAccessibilityElement.filter {
+      $0.frame.height >= 100 && app.windows.firstMatch.frame.contains($0.frame)
+    }
+    guard argumentEditors.count == 1 else { throw failure("可視のMCP引数欄を一意に確認できない") }
+    let argumentEditor = argumentEditors[0]
     argumentEditor.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
     app.typeKey("a", modifierFlags: .command)
     app.typeKey(XCUIKeyboardKey.delete.rawValue, modifierFlags: [])
+    XCTAssertTrue((argumentEditor.value as? String ?? "").isEmpty)
     argumentEditor.typeText("{\"text\":\"macos-public-input\"}")
     XCTAssertEqual(argumentEditor.value as? String, "{\"text\":\"macos-public-input\"}")
     try mcpPublicText(app, "入力内容を確認", click: true, scroll: false)
