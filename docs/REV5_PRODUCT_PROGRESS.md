@@ -19,6 +19,8 @@
 
 #### macOS 作業領域のOS選択 — IMPLEMENTING（Product Build、2026-10-08）
 
+手動Actions [run 37707186514](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37707186514)、commit `e1dbcd1a4e5ac7662fde3b4ea1c00896a856de71`は実取消・取消投影・実Copyによる`/previous-input`保持までPASS。続くOCRはOS buttonではなく「OS選択を取り消しました」の表示文をclickし、二度目のchooserが開かず46.502秒でFAILした。映像とclick座標を照合した。入力保持を弱めず、確認済みWorkspace editor focusから秘密path欄・OS buttonへの通常Tab 2回とSpaceで選択を開始する。初回限定mouse操作は維持し、二度目用のOCR診断を撤去する。通常build／対象Rust／Dart／後片付けPASS。artifact `11520347232`、SHA-256 `8af3c5f4c1877f1a544f8811ba3a915a48f52eaa7bfe1aa178dde8f5d2626bf2`を照合した。製品source・Authority・有限Acceptanceは未変更。
+
 手動Actions [run 37706180593](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37706180593)、commit `92ca31ec6a101a2b7459637cc52d7fb7973ca6a2`も通常build／対象Rust／Dart／後片付けPASS。取消投影は成立したが、現在のTextField値queryにも`/previous-input`が存在せず、44.157秒でUI試験FAIL。映像は同じ入力値の保持を示すため、製品入力変化の確定・Acceptance成功へ読み替えない。公開合成6欄だけの当該試験で、可視Workspaceラベルへ束縛した実mouse入力と通常Copy操作により入力内容を照合する。Clipboardは前後で消去し、実Credential・他画面には適用しない。OS buttonの文字認識は一意な接頭OSと選択語へ限定し、日本語中間語の欠落に依存しない。artifact `11519881981`、SHA-256 `79f76fad0702cc9bceb1364178d74d400ff65fb870347f780c489f88844e2204`を照合した。製品source・Authority・有限Acceptanceは未変更。
 
 手動Actions [run 37704913641](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37704913641)、commit `49df8f5966f53108b9536248da20915840ffefe9`は通常build／対象Rust／Dart／後片付けPASS。実Cancelと取消のStaticText投影は成立したが、sheet前に束縛した入力AX要素の値が`pr`となり、入力保持の照合でUI試験35.486秒FAIL。保存映像では取消後のWorkspace欄が`/previous-input`のままであり、製品入力の変化を確定したとは扱わない。現在のTextField値を完全一致・一意性で取得し直し、取消後と選択後の双方で実入力を照合する。製品挙動・Authority・有限Acceptanceは変更しない。artifact `11518894295`、SHA-256 `759d43468033f44d7ab04e68a5210fd7f1101b139113abd2047112f28fac7fbd`を照合した。

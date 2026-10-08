@@ -35,7 +35,7 @@ final class AdapterOwnerUITests: XCTestCase {
     let select = app.buttons["OSで作業領域を選択"]
     XCTAssertTrue(select.exists)
     // Flutterのscroll後のAX frameは1pxのままだった。実際の画面の可視文字へclickする。
-    try clickWorkspaceSelection(app, allowInitialFallback: true)
+    try clickInitialWorkspaceSelection(app)
     let chooser = try WorkspacePanelUI(app: app)
     if !chooser.waitForButton("Cancel", timeout: 15) {
       let image = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
@@ -52,7 +52,10 @@ final class AdapterOwnerUITests: XCTestCase {
     app.activate()
     XCTAssertTrue(workspaceMessage(app, "OS選択を取り消しました。入力は変更していません。").waitForExistence(timeout: 10))
     try assertCurrentWorkspaceInput(app, "/previous-input")
-    try clickWorkspaceSelection(app)
+    // 直前の実CopyでWorkspace editorのfocusを確認済み。秘密path欄→OS buttonへ通常Tab移動する。
+    // 取消messageも「OS選択」で始まるため、その文字へのOCR clickを使わない。
+    for _ in 0..<2 { app.typeKey(XCUIKeyboardKey.tab.rawValue, modifierFlags: []) }
+    app.typeKey(" ", modifierFlags: [])
     XCTAssertTrue(chooser.waitForButton("作業領域を選択", timeout: 15))
     try chooser.enterFolder(outside)
     XCTAssertTrue(chooser.waitForButton("作業領域を選択", timeout: 10))
@@ -106,7 +109,7 @@ final class AdapterOwnerUITests: XCTestCase {
     XCTAssertEqual(NSPasteboard.general.string(forType: .string), expected, "実Workspace入力内容")
   }
 
-  private func clickWorkspaceSelection(_ app: XCUIApplication, allowInitialFallback: Bool = false) throws {
+  private func clickInitialWorkspaceSelection(_ app: XCUIApplication) throws {
     // 秘密path欄への入力直後は選択buttonがviewport外だった。通常の本文scrollで表示する。
     app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.65))
       .scroll(byDeltaX: 0, deltaY: -180)
@@ -126,33 +129,19 @@ final class AdapterOwnerUITests: XCTestCase {
       // 小さい日本語buttonの途中の漢字はVisionで欠落し得る。固有の接頭ラベルで一意に束縛する。
       let normalized = text.folding(options: [.caseInsensitive, .widthInsensitive], locale: Locale(identifier: "ja_JP"))
         .replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "0s", with: "os")
-      return normalized.hasPrefix("os") && normalized.contains("選")
+      return normalized.hasPrefix("os") && normalized.hasSuffix("選択")
     }
     guard matches.count == 1 else {
       print("D4_WORKSPACE_BUTTON_OCR_COUNT \(request.results?.count ?? 0) matches=\(matches.count)")
       // 固定runnerの800px製品窓・検査済み6欄入力後の保存映像でボタン中央を確認した。
       // 最初のclickだけ。OS選択結果やBroker返答は注入せず通常mouse入力を送る。
       // 取消後は投影が増えてlayoutが変わるため、このfallbackを使わない。
-      if allowInitialFallback {
-        let window = app.windows.firstMatch
-        guard abs(window.frame.width - 800) <= 1 else {
-          throw failure("観測済み製品窓の幅と一致しない")
-        }
-        window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.81)).click()
-        return
+      let window = app.windows.firstMatch
+      guard matches.isEmpty, abs(window.frame.width - 800) <= 1 else {
+        throw failure("初回の観測済み製品窓と一致しない、またはbutton候補が複数")
       }
-      // 合成公開入力を検査済みの当該testだけ。ボタン行の限定領域以外は記録しない。
-      let frame = app.windows.firstMatch.frame
-      let row = CGRect(x: frame.minX + frame.width * 0.3, y: frame.minY + frame.height * 0.76,
-                       width: frame.width * 0.4, height: frame.height * 0.09)
-      for observation in (request.results ?? []).prefix(128) {
-        let box = observation.boundingBox
-        let point = CGPoint(x: box.midX * image.size.width, y: (1 - box.midY) * image.size.height)
-        if row.contains(point), let text = observation.topCandidates(1).first?.string {
-          print("D4_WORKSPACE_BUTTON_ROW_OCR " + String(text.prefix(80)))
-        }
-      }
-      throw failure("画面上のOS選択buttonを一意に確認できない")
+      window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.81)).click()
+      return
     }
     let box = matches[0].boundingBox
     let point = CGPoint(x: box.midX * image.size.width, y: (1 - box.midY) * image.size.height)
