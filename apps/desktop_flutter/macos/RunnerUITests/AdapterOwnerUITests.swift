@@ -25,12 +25,11 @@ final class AdapterOwnerUITests: XCTestCase {
     toolbar[0].click()
     let search = app.textFields.firstMatch
     XCTAssertTrue(search.waitForExistence(timeout: 10))
-    // 現行paletteはautofocus。AXのisHittable偽値に依存せず通常keyを送る。
+    // 既存Manifest試験と同じ、FlutterView背面のnative編集欄の実位置へ通常click。
+    search.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
     app.typeText("MCP")
-    // 検索editorと候補の文字を分け、既存の単純な公開label/value照合を使う。
-    let result = element(app, "MCP接続")
-    XCTAssertTrue(result.waitForExistence(timeout: 10))
-    result.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+    // 検索後の全階層AX queryが停止したため、秘密入力前の公開候補だけを画面で確認。
+    try clickCredentialPublicCandidate(app)
     let server = app.textFields.matching(NSPredicate(format: "label CONTAINS %@", "サーバー識別子")).firstMatch
     XCTAssertTrue(server.waitForExistence(timeout: 10)); reveal(app, server)
     server.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
@@ -55,6 +54,30 @@ final class AdapterOwnerUITests: XCTestCase {
     print("D4_MACOS_CREDENTIAL_VAULT_PRODUCT_PASS")
     app.typeKey("q", modifierFlags: .command)
     XCTAssertTrue(app.wait(for: .notRunning, timeout: 10))
+  }
+
+  private func clickCredentialPublicCandidate(_ app: XCUIApplication) throws {
+    // この呼出しはnative秘密入力前だけ。画像を保存・添付・出力しない。
+    Thread.sleep(forTimeInterval: 0.6)
+    let image = XCUIScreen.main.screenshot().image
+    var proposed = CGRect(origin: .zero, size: image.size)
+    guard let pixels = image.cgImage(forProposedRect: &proposed, context: nil, hints: nil) else {
+      throw failure("公開command候補の画面を取得できない")
+    }
+    let request = VNRecognizeTextRequest()
+    request.recognitionLevel = .accurate
+    request.recognitionLanguages = ["ja-JP", "en-US"]
+    try VNImageRequestHandler(cgImage: pixels).perform([request])
+    let hits = (request.results ?? []).filter {
+      $0.topCandidates(1).first?.string.replacingOccurrences(of: " ", with: "") == "MCP接続"
+    }
+    guard hits.count == 1 else { throw failure("公開MCP command候補を一意に確認できない") }
+    let box = hits[0].boundingBox
+    let point = CGPoint(x: box.midX * image.size.width, y: (1 - box.midY) * image.size.height)
+    let window = app.windows.firstMatch
+    guard window.frame.contains(point) else { throw failure("公開候補が製品窓の外にある") }
+    window.coordinate(withNormalizedOffset: .zero)
+      .withOffset(CGVector(dx: point.x - window.frame.minX, dy: point.y - window.frame.minY)).click()
   }
 
   func testProductAgentCLIOSSelection() throws {

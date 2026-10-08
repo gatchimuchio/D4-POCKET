@@ -50,4 +50,6 @@ run `37723289904`／source `72451dc`はpaletteの2 icon照合と通常clickが�
 
 run `37724269791`／source `c603df8`はpaletteを開き検索keyを送るまで成立。elementTypeを含む全階層predicateの評価中にsnapshot timeoutとなり132.270秒のFAIL。原因は未確定であり、複雑predicateを除去し、ASCII `MCP`検索と既存の単純な候補label／value照合へ局所変更する。秘密入力・登録には未到達で、未成立をPASSへ昇格しない。
 
+run `37725337534`／source `e2d4965`はASCII検索後も全階層snapshot timeoutで130.288秒のFAIL。複雑predicateだけが原因という仮定を撤回する。既存Manifest試験が扱うFlutterView背面のnative editorへ実座標clickしてから通常keyを送り、候補選択だけは既存CLI試験のVision方式を秘密入力前の公開文字に限定して使用する。画像を保存・添付・出力せず、候補が一意かつ製品窓内でなければ停止する。製品要求・秘密値・Owner確認を代替しない。
+
 `release_blocker`: MacでのProvider／MCP注入、正式署名identity・配布、Final QA。通常Release `task_execution=unsupported`、`release_ready=false`を保持する。秘密値の表示、保管方式fallback、Windowsの保存形式migrationを本単位の便宜で追加しない。
