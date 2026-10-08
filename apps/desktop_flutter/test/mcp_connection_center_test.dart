@@ -1,3 +1,5 @@
+import 'dart:ui' show SemanticsAction, SemanticsFlag;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gui_shell_desktop/screens/mcp_connection_center.dart';
@@ -660,6 +662,17 @@ void main() {
     final revoke = find.byKey(const ValueKey(
         'mcp-credential-revoke-0123456789abcdef0123456789abcdef'));
     await tester.ensureVisible(revoke);
+    final semantics = tester.ensureSemantics();
+    try {
+      await tester.pumpAndSettle();
+      final revokeSemantics =
+          tester.getSemantics(find.bySemanticsLabel('資格情報を失効'));
+      expect(revokeSemantics.hasFlag(SemanticsFlag.isButton), isTrue);
+      expect(revokeSemantics.getSemanticsData().hasAction(SemanticsAction.tap),
+          isTrue);
+    } finally {
+      semantics.dispose();
+    }
     await tester.tap(revoke);
     await tester.pumpAndSettle();
 

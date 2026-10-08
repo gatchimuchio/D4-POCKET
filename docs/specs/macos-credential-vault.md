@@ -64,4 +64,8 @@ run `37731078599`／source `92b3bba`は新しい通常Mac Owner gate試験、実
 
 run `37732126321`／source `8062109`も登録・一覧が既存Auditでaccepted、UI登録成功文まで成立。状態titleのgroup queryも取得できず38.453秒でFAILし、groupとして取得可能という推定を撤回する。metadata-only成功後、native sheet／秘密入力欄の不存在を確認した場合だけ、製品窓の公開状態titleを画像認識で一意に照合する試験へ変更する。画像・認識文字を保存・添付・出力せず、秘密入力中や他Appの画面は取得しない。通常scrollによる実表示だけを使い、Broker応答・Owner・秘密値を代替しない。前段の公開入力用画像認識とは責任を分離する。artifact `11530351705`のSHA-256 `ee85c8ab3c4ceaaec2267f1027e1ffaf96a570ecca983b64ef233a81d13e5043`を照合した。helper回収PASS、論理失効・通常終了を含む全体Acceptanceは未成立。
 
+run `37733367206`／source `3a0579b`は登録・metadata一覧と実表示の`api_key ・ 有効`の一意照合までPASS。失効iconのAX名を取得できず56.895秒でFAILした。既存失効操作を独立Semantics nodeにし、button・日本語名を明示する。Tooltipの意味重複だけを除き、既存onPressed・無効状態・対象metadata・別個Owner確認は変更しない。既存Widget失効試験でbuttonと通常tap actionを確認し、未成立の失効・終了を同じ製品試験で続行する。artifact `11531031357`のSHA-256 `12a33f0c230ccc70bc4967b099e52c13e8dd210e69843229202afb3954d9d736`を照合した。helper回収PASS、有限Acceptance全体は未成立。
+
+失効表示の局所検証: 独立Semanticsの初回は名前とtap actionが別nodeとなり既存Widget試験でFAIL。MergeSemanticsで日本語名・button・既存tapを同じnodeに束縛した。次の試験は挙動成立後にSemanticsHandle回収時点でFAILし、試験内部のfinallyへ回収を移した。修正後、ASCII一時checkoutの既存失効Widget試験1件がPASSし、button／tap・対象metadata・一覧更新・秘密非表示を確認した（FIXTURE、installed証拠ではない）。両Flutter `analyze --no-pub`は既存LSP server exit 255でexit 1（ignored log `p13-macos-credential-semantics-desktop-analyze.txt`／`p13-macos-credential-semantics-mobile-analyze.txt`）。Manifestは検証中の局所編集で一度不一致を返し、再生成後のcheckでPASS。正常操作・Authority・公開状態確認条件を削除しない。
+
 `release_blocker`: MacでのProvider／MCP注入、正式署名identity・配布、Final QA。通常Release `task_execution=unsupported`、`release_ready=false`を保持する。秘密値の表示、保管方式fallback、Windowsの保存形式migrationを本単位の便宜で追加しない。

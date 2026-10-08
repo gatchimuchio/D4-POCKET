@@ -240,25 +240,36 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
                     '${credential.revokedAt == null ? '' : '\n失効時刻: ${credential.revokedAt}'}',
                   ),
                   trailing: credential.status == '有効'
-                      ? IconButton(
-                          key: ValueKey(
-                              'mcp-credential-revoke-${credential.credentialId}'),
-                          tooltip: '資格情報を失効',
-                          onPressed: _loading ||
-                                  _connecting ||
-                                  _revokingCredentialId != null ||
-                                  _disconnectingServerId != null ||
-                                  _callingToolServerId != null
-                              ? null
-                              : () => _revokeCredential(client, credential),
-                          icon: _revokingCredentialId == credential.credentialId
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child:
-                                      CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : const Icon(Icons.key_off_outlined),
+                      ? MergeSemantics(
+                          child: Semantics(
+                            button: true,
+                            label: '資格情報を失効',
+                            child: Tooltip(
+                              message: '資格情報を失効',
+                              excludeFromSemantics: true,
+                              child: IconButton(
+                                key: ValueKey(
+                                    'mcp-credential-revoke-${credential.credentialId}'),
+                                onPressed: _loading ||
+                                        _connecting ||
+                                        _revokingCredentialId != null ||
+                                        _disconnectingServerId != null ||
+                                        _callingToolServerId != null
+                                    ? null
+                                    : () =>
+                                        _revokeCredential(client, credential),
+                                icon: _revokingCredentialId ==
+                                        credential.credentialId
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2),
+                                      )
+                                    : const Icon(Icons.key_off_outlined),
+                              ),
+                            ),
+                          ),
                         )
                       : const Text('失効済み'),
                 ),
