@@ -128,7 +128,8 @@ final class AdapterOwnerUITests: XCTestCase {
     // 公開画像で探索が後続のExport設定まで進んだと確認。既存検索でMCP先頭へ戻す。
     do {
       if credentialBinding {
-        toolbar[0].click()
+        // 初回AX elementはrebuildで失効した実観測。現行UI定義済みの通常shortcutを使う。
+        app.typeKey("f", modifierFlags: [.control, .shift])
         let searchAgain = app.textFields.firstMatch
         XCTAssertTrue(searchAgain.waitForExistence(timeout: 10))
         searchAgain.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
