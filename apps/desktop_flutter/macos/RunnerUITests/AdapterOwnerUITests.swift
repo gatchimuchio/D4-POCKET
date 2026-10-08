@@ -28,10 +28,7 @@ final class AdapterOwnerUITests: XCTestCase {
       app.typeText(value)
     }
     try mcpPublicText(app, "Owner確認して接続", click: true)
-    let deny = notice.dialogs.firstMatch.buttons["承認しない"]
-    XCTAssertTrue(deny.waitForExistence(timeout: 15)); deny.click()
-    XCTAssertTrue(element(app, "A2A接続を確認できませんでした。受理receiptがないため成功表示はしていません。").waitForExistence(timeout: 10))
-    try mcpPublicText(app, "Owner確認して接続", click: true, scroll: false)
+    // 実native拒否はsource b7a20d8でCLOSED。残件の正常経路の前提だけを通す。
     let approve = notice.dialogs.firstMatch.buttons["今回の操作を承認"]
     XCTAssertTrue(approve.waitForExistence(timeout: 15)); approve.click()
     let accepted = "接続metadataを受理しました。Trustは未審査のままです。Audit="

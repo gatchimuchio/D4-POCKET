@@ -72,7 +72,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "98c2d78c8a4527e6dc894c007ca04c9efa3918b74c88713e421f7ee8706cfede"
+      "sha256": "05fd56f7e19e33c4cb2bdd5f7903b10c77757ddc518f5b0be6e879ea773a8d08"
     },
     {
       "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
@@ -568,7 +568,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/RunnerUITests/AdapterOwnerUITests.swift",
-      "sha256": "36ec15fb9e64b3e5eff4a7464c04a2aca00ea0de2e878b4de3a4275e1292ab1f"
+      "sha256": "14f8e1c377d2ce7fd58afeb8737a63993f2734b798f810d7b345d5faae5d81c4"
     },
     {
       "path": "apps/desktop_flutter/pubspec.lock",
@@ -1492,7 +1492,7 @@
     },
     {
       "path": "docs/specs/macos-a2a-center.md",
-      "sha256": "71c530a51bab1bae36726422098fe34c9ad0e358ea17b799d174eb9ef5f098a0"
+      "sha256": "73f11cf34789a6f6069018c61c97cdf36a060f08b7b0db732a6a04a524709a3b"
     },
     {
       "path": "docs/specs/macos-agent-cli-selection.md",
