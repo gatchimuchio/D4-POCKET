@@ -267,6 +267,21 @@
         "artifact_expires_at": "2026-10-10T13:36:53Z",
         "scope_limit": "既存Adapter検証・有効化・無効化・隔離・削除のOwner接続だけ。署名未検証は有効化拒否を維持。macOS製品Trust設定・外部artifact作用・通常Release・正式配布・Final QAのrelease blockerは維持する。"
       },
+      "macos_agent_cli_selection_evidence": {
+        "status": "CLOSED",
+        "contract": "docs/specs/macos-agent-cli-selection.md",
+        "source_commit": "5e8982cce326b907b1be00282c291806f6141a76",
+        "run_url": "https://github.com/gatchimuchio/GUI-Shell/actions/runs/37713979077",
+        "trigger": "workflow_dispatch",
+        "target": "macos_agent_cli_selection",
+        "evidence_source": "LIVE_RUNTIME",
+        "validation": "macOS製品UIの実OS file選択の取消・実入力保持、sandbox外の固定実Codex CLI選択・path反映、別個native Owner確認後のBroker登録、Command-Q終了。XCUITest 1 passed／0 failed、43.241秒。通常Mac build・Rust対象3件・Dart解析／2試験、helper／fixture回収がPASS。",
+        "component_evidence_source": "FIXTURE",
+        "component_scope": "公開path・bookmark・Authority注入拒否とFlutter投影は合成入力。UIは既存Debug表示flag付き。OS scopeは起動中のみ、選択から登録・Permission・Approval・Credential・Trustを生成しない。",
+        "artifact_id": "11523376996",
+        "artifact_sha256": "b28a3673fcedbcd8fea67d35c7852272f2c9e343d5767066620c349ad4beccc3",
+        "scope_limit": "CLIの明示OS選択の有限単位だけ。Mac Credential保管・CLI導入・Task・正式配布・Final QAの既存release blockerと通常Release task_execution=unsupported、release_ready=falseを保持する。"
+      },
       "r2_bounded_exit_gate": {
         "version": 2,
         "phase_acceptance_policy": {

@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "c66ecde36986cebb7d50aad72101172e18172b0cc4cf31888727753f58940c18"
+      "sha256": "00cd3091539d48aa517771c7508c1419808201d7040dd5ce673a6468139733b0"
     },
     {
       "path": "SECURITY.md",
@@ -1276,7 +1276,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "0a6b3dc421bf090f8969fefc2363e328da313c84887add780f21f534d2dd2b86"
+      "sha256": "14efe65f3061095430b90d329b5ed69c65db801afa90ead2bb680c6eead0a236"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1488,7 +1488,7 @@
     },
     {
       "path": "docs/specs/macos-agent-cli-selection.md",
-      "sha256": "c01b81949f10c6a58c8e869b308a85d31ee7c627ed00bb8b271a1b6bc7965a15"
+      "sha256": "828505a99d4ee0d86010f6c7f2a0070c0b956ac1fc5ff29277468aca55e16c9c"
     },
     {
       "path": "docs/specs/macos-desktop-channel.md",
@@ -4068,7 +4068,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "254a2e59929221db383985e9da17e129eacd1266becab0bfd7daa49352151cc0"
+      "sha256": "90f23be72b392c95d1a843f21c71393d8f5f1fc700bc411b47692329b1040576"
     },
     {
       "path": "requirements-dev.txt",

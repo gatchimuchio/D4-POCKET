@@ -1,6 +1,6 @@
 # GUI Shell ロードマップ
 
-P13 macOS Agent CLI実行fileのOS選択をIMPLEMENTING。sandbox外の既存CLIを利用者が明示選択する製品接続差分だけを実装する。有限Acceptanceは`docs/specs/macos-agent-cli-selection.md`。手動Actions `macos_agent_cli_selection`で必要なMac build／基本製品経路を確認し、既存Workspace／登録／MobileのCLOSEDは再開しない。選択は登録・Task Authorityではなく、別個Owner確認・Broker probe・通常Release能力の拒否を維持する。
+P13 macOS Agent CLI実行fileのOS選択はCLOSED（Product Build、2026-10-08）。commit `5e8982cce326b907b1be00282c291806f6141a76`の手動Actions [run 37713979077](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37713979077)で取消／実入力保持、sandbox外の実CLI file選択／path反映、別個Owner確認後のBroker probe／登録、Command-Q終了・helper／fixture回収がPASS。通常Mac build、Rust対象3件、Dart対象解析／2試験もPASS。有限Acceptanceは`docs/specs/macos-agent-cli-selection.md`、失敗履歴と証拠範囲は`docs/REV5_PRODUCT_PROGRESS.md`。成功sourceをmainへ統合・push・remote照合し、検証branchはlocal／remoteとも回収した。選択は登録・Task Authorityではなく、通常Release能力を保持する。次はP13の残る製品接続差分だけであり、CLOSED条件を証拠強化目的で再開しない。
 
 P13 macOS作業領域OS選択はCLOSED（Product Build、2026-10-08）。commit `af8f55b9b46e1aa95d8a080e4972376bff4045ee`の手動Actions [run 37709224596](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37709224596)で取消／入力保持、実OS chooserのsandbox外folder選択／path投影、別個Owner確認後のBroker登録、Command-Q終了・helper／fixture回収までPASS。Rust対象5件、Dart対象解析／2試験、通常Mac buildもPASS。責任正本は`docs/specs/macos-workspace-selection.md`、証拠範囲と過去FAILは`docs/REV5_PRODUCT_PROGRESS.md`。OSアクセスとD4のPermission／Approvalを分離し、通常Release能力・正式配布へ成功を拡大しない。次はP13のOPEN製品差分だけを進め、CLOSEDの選択／登録／Adapter／Mobile条件は再開しない。
 

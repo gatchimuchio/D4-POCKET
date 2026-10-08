@@ -17,7 +17,19 @@
 
 ## P13 Mobile / Non-Windows — 現行track
 
-#### macOS Agent CLI実行fileのOS選択 — IMPLEMENTING（Product Build、2026-10-08）
+#### macOS Agent CLI実行fileのOS選択 — CLOSED（Product Build、2026-10-08）
+
+有限Acceptanceはcommit `5e8982cce326b907b1be00282c291806f6141a76`の手動Actions [run 37713979077](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37713979077)でPASS。macOS 15.7.9 arm64／Apple Virtual Machine／Xcode 16.4、Flutter 3.44.0／Rust 1.95.0。製品Agent Centerから実OS file chooserを取消し、CLI実入力`/previous-cli`の保持を通常Copyで確認。二度目の選択でsandbox外の固定実Codex CLI `/Users/runner/d4-os-selected-cli`を選び、公開path投影と実入力内容を照合した。選択だけでは登録されず、別個のnative Owner確認後に既存BrokerがCLI probeを行いRuntime／Workspace登録結果を表示した。Command-Q終了、helper残留なし、runner source clean、専用CLI／Workspace回収までPASS。XCUITest 1 passed／0 failed／0 skipped、43.241秒。
+
+対象commandは`cargo +1.95.0 test --locked --manifest-path native/macos_owner/Cargo.toml --lib workspace_transport::tests::cli_public_selection_`（1件）、`cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib macos_workspace_selection::tests::cli_selection_ -- --test-threads=1`（2件）、通常helper／native staticlib build、変更Dart 4 file解析（exit 0、既存deprecated info 5件）、CLI選択待機／投影のFlutter 2試験、試験表示flagなしの`flutter build macos --debug --no-pub`、`xcodebuild test ... -only-testing:RunnerUITests/AdapterOwnerUITests/testProductAgentCLIOSSelection`でPASS。UIのみ既存Debug表示flag付き。OS選択・別個Owner確認・Broker登録・終了は有限`LIVE_RUNTIME`、入力注入否定とFlutter投影は`FIXTURE`。Audit chain／HMACの再検算、反復・Formal Evidenceを追加しない。
+
+artifact `11523376996`（78746 bytes）をignored `release_evidence/p13-macos-cli-5e8982c.zip`に保存し、SHA-256 `b28a3673fcedbcd8fea67d35c7852272f2c9e343d5767066620c349ad4beccc3`をGitHub digestと照合した。成功sourceをmainへfast-forward・pushしてremote HEADを確認。検証branchはlocal／remote双方で回収済み。2世代remote backup tagは`codex/backup-main`=`9bf082e67725491270bd1ae6c5dc4c505d1fa720`、`codex/backup-main-prev`=`21c2d56a4a91262fbcb1c2ca4af3400b75fcb11b`。本単位のrollbackは前者。
+
+本有限単位はCLOSED。選択でPermission／Approval／Credential／Trustを生成せず、秘密bookmarkをFlutter／Swift／Auditへ渡さない。通常Release `task_execution=unsupported`、`release_ready=false`を維持する。CLI導入・Mac Credential保管・Task・正式配布とFinal QAはP13後続／既存`release_blocker`。既存のWindows Rust全体FAIL、日本語監査指摘、ローカルFlutter環境制約は下記履歴のまま保持し、対象PASSで上書きしない。次はP13のOPEN製品差分であり、追加fixture・強化証拠・文書修正のため本条件を再試験しない。
+
+##### 検証履歴（閉鎖前）
+
+以下のFAIL、当時の「現在」「未統合」は履歴であり、上記CLOSED状態を上書きしない。
 
 現在の未接続製品差分はsandbox外の既存CLI fileの明示OS選択。有限Acceptanceは`docs/specs/macos-agent-cli-selection.md`。選択・公開path反映後に、既存の別個native Owner確認とBroker probeを直接依存として使用する。Workspace／登録／MobileのCLOSED条件は再開せず、download・Task・Credential・正式配布・最終QAを本単位へ取り込まない。通常Release能力と既存release gateを保持する。
 

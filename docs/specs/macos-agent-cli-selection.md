@@ -2,7 +2,7 @@
 
 ## 意味と有限Acceptance
 
-状態: IMPLEMENTING（P13 Product Build）。sandbox外の既存CLI実行fileをOS chooserで一個選び、その公開pathをAgent登録フォームへ反映する。download・導入・更新ではない。選択だけではprocessを起動せず、Runtime登録・Permission・Approval・Credential・Trustを生成しない。その後の別個native Owner確認と既存BrokerのCLI probeが登録可否を決める。
+状態: CLOSED（P13 Product Build）。commit `5e8982cce326b907b1be00282c291806f6141a76`の手動Actions [run 37713979077](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37713979077)で下記有限条件が成立した。sandbox外の既存CLI実行fileをOS chooserで一個選び、その公開pathをAgent登録フォームへ反映する。download・導入・更新ではない。選択だけではprocessを起動せず、Runtime登録・Permission・Approval・Credential・Trustを生成しない。その後の別個native Owner確認と既存BrokerのCLI probeが登録可否を決める。
 
 有限条件は取消時のCLI入力保持、通常fileの実OS選択と画面反映、別個Owner確認後の実Codex CLI probe／登録、公開入力へのpath・bookmark・Authority注入拒否、正常終了時のscope回収。既存Workspace選択／Agent登録のCLOSED条件は再検査せず、既存登録を直接依存として使う。Task、模型要求、認証、正式配布、全CLI互換性は対象外。
 
