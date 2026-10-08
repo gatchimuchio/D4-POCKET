@@ -216,6 +216,9 @@ class _McpTransport implements BrokerTransport {
       };
     }
     if (operation == 'MCP接続') {
+      if ((payload?['Credential ref'] as Map?)?['status'] == 'configured') {
+        credentialMetadata.first['最終使用時刻UnixMillis'] = 2000;
+      }
       connected = true;
       return {
         'status': 'accepted',
@@ -276,7 +279,7 @@ class _McpTransport implements BrokerTransport {
 }
 
 void main() {
-  test('Mac MCP接続は絶対pathとmissing参照だけを送り相対pathと注入を拒否する', () async {
+  test('Mac MCP接続は絶対pathと公開参照だけを送り相対pathと不安全な環境を拒否する', () async {
     debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
     final transport = _McpTransport()..connected = false;
@@ -298,13 +301,27 @@ void main() {
               argumentsText: '',
               credentialId: executable.startsWith('/') ? 'a' * 32 : null,
               credentialEnvironmentVariable:
-                  executable.startsWith('/') ? 'MCP_API_KEY' : null),
+                  executable.startsWith('/') ? 'PATH' : null),
           throwsA(isA<BrokerClientException>()));
     }
     expect(transport.operations, ['MCP接続']);
+    await client.connect(
+        serverId: 'mcp-fixture',
+        executable: '/fixture/server',
+        workspace: '/fixture/workspace',
+        argumentsText: '',
+        credentialId: 'a' * 32,
+        credentialEnvironmentVariable: 'MCP_API_KEY');
+    expect(transport.payloads.last?['Credential ref'], {
+      'credential_id': 'a' * 32,
+      'purpose': 'mcp_transport',
+      'target': 'mcp-fixture',
+      'required': true,
+      'status': 'configured',
+      'environment_variable': 'MCP_API_KEY',
+    });
   });
-  testWidgets('Mac MCP投影はnative確認・hash-only・限定groupと未対応注入を表示する',
-      (tester) async {
+  testWidgets('Mac MCP投影は公開ID選択だけをBrokerへ送り委譲範囲を表示する', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
     tester.view.physicalSize = const Size(1400, 2200);
@@ -312,6 +329,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final transport = _McpTransport();
+    transport.credentialMetadata.first['保管方式'] = 'macos_keychain';
     await tester.pumpWidget(MaterialApp(
         home: Scaffold(
       body: McpConnectionCenterPanel(transport: transport),
@@ -326,9 +344,27 @@ void main() {
             .widget<DropdownButtonFormField<String>>(
                 find.byKey(const ValueKey('mcp-credential-selection')))
             .onChanged,
-        isNull);
+        isNotNull);
     expect(transport.operations, ['資格情報一覧']);
     expect(find.textContaining('secret-marker'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('mcp-credential-selection')));
+    await tester.pumpAndSettle();
+    await tester
+        .tap(find.text('api_key ・ 0123456789abcdef0123456789abcdef').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).at(1), '/fixture/server');
+    await tester.enterText(find.byType(TextField).at(2), '/fixture/workspace');
+    await tester.enterText(find.byType(TextField).at(4), 'MCP_API_KEY');
+    await tester.tap(find.text('MCP接続を開始'));
+    await tester.pumpAndSettle();
+    expect(
+        transport.operations.where((operation) => operation == 'MCP接続').length,
+        1);
+    expect(
+        (transport.payloads.firstWhere((payload) => payload?['操作'] == '接続')?[
+            'Credential ref'] as Map)['credential_id'],
+        '0123456789abcdef0123456789abcdef');
+    expect(find.textContaining('最終使用時刻: 2000'), findsOneWidget);
     debugDefaultTargetPlatformOverride = null;
   });
   test('MCP clientは接続設定を固定Broker payloadへ射影する', () async {
@@ -631,7 +667,8 @@ void main() {
       locale: const Locale('ja', 'JP'),
       supportedLocales: const [Locale('ja', 'JP')],
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
-      theme: ThemeData(useMaterial3: true, visualDensity: VisualDensity.compact),
+      theme:
+          ThemeData(useMaterial3: true, visualDensity: VisualDensity.compact),
       home: Scaffold(body: McpConnectionCenterPanel(transport: transport)),
     ));
     await tester.ensureVisible(find.text('接続一覧を取得'));

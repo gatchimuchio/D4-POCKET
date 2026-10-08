@@ -364,6 +364,10 @@
       "責任": "P13 MacのMCP接続・Tool・切断、同一要求のnative Owner確認、既存Broker・所有process group・hash-only結果の有限受入れ"
     },
     {
+      "path": "docs/specs/macos-mcp-credential-binding.md",
+      "責任": "P13の対象MCP stdioだけへのKeychain資格情報結合。公開ID参照・同一要求native確認・現在用途／対象／失効／暗号文照合・使用Audit・秘密非公開"
+    },
+    {
       "path": "docs/specs/mobile-surface.md",
       "責任": "C24 Mobileの選択的状態投影、Workspace ID選択・Agent対話要求、Device Link・Approval・非権限境界"
     },

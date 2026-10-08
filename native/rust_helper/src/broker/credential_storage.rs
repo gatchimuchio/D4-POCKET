@@ -13,7 +13,6 @@ pub(super) enum 保存失敗 {
 pub(super) trait 資格情報保存先 {
     fn 登録(&self, id: &str, plaintext: &[u8]) -> Result<String, 保存失敗>;
     fn 点検(&self, id: &str) -> Result<Option<(String, u64)>, ()>;
-    #[cfg_attr(target_os = "macos", allow(dead_code))] // Mac秘密注入consumerは別の製品単位。
     fn 読取(&self, id: &str, hash: &str) -> Result<Zeroizing<Vec<u8>>, ()>;
     fn 新規破棄(&self, id: &str, hash: &str) -> bool;
 }

@@ -5703,8 +5703,11 @@ def 資格情報保管庫の契約と境界を検査する() -> list[str]:
     launcher = (RUST_HELPER / "src" / "desktop_launcher.rs").read_text(encoding="utf-8")
     owner_cli = (RUST_HELPER / "src" / "owner_cli.rs").read_text(encoding="utf-8")
     broker_client = (DESKTOP_FLUTTER / "lib" / "services" / "broker_client.dart").read_text(encoding="utf-8")
+    credential_storage = (RUST_HELPER / "src" / "broker" / "credential_storage.rs").read_text(encoding="utf-8")
     for token, source in (
-        ("Purpose::Credential", rust),
+        ("Purpose::Credential", credential_storage),
+        ("資格情報保存先()", rust),
+        (".読取", rust),
         ("credential_owner_required", rust),
         ("credential_normal_channel_required", rust),
         ("metadata_only", rust),
@@ -10924,6 +10927,23 @@ def test_macos_mcp_native_scope_is_explicit() -> list[str]:
     return errors
 
 
+def macos_mcp資格情報参照の公開境界を検査する() -> list[str]:
+    """CONFIG証拠。秘密の実受渡し・Owner確認は専用Mac実行で確認する。"""
+    schema = load_schema("mcp_connection.schema.json")
+    sample = {"版": 1, "操作": "接続", "ServerID": "mac-credential-server",
+              "実行file": "/fixture/server", "引数": [], "workspace": "/fixture/workspace",
+              "Transport": "stdio", "Credential ref": {"credential_id": "a" * 32,
+              "purpose": "mcp_transport", "target": "mac-credential-server", "required": True,
+              "status": "configured", "environment_variable": "MCP_API_KEY"}}
+    errors = []
+    if validate_instance(sample, schema):
+        errors.append("Mac MCPの公開資格情報参照が拒否された")
+    for field in ("秘密値", "Approval", "Permission", "保管先"):
+        if not validate_instance({**sample, field: "injected"}, schema):
+            errors.append(f"Mac MCP参照に非公開fieldを注入できる: {field}")
+    return errors
+
+
 def main() -> int:
     tests = [
         test_required_docs_exist,
@@ -11160,6 +11180,7 @@ def main() -> int:
         test_macos_agent_cli_selection_is_non_authoritative,
         test_macos_credential_public_input_is_metadata_only,
         test_macos_mcp_native_scope_is_explicit,
+        macos_mcp資格情報参照の公開境界を検査する,
         test_setup_doctor_public_bind_warning_exists,
         test_desktop_setup_doctor_ui_does_not_require_development_toolchains,
         test_broker_parity_startup_timeout_allows_local_cold_build,

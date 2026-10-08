@@ -51,6 +51,7 @@ class McpCredentialSummary {
     required this.ciphertextHash,
     required this.createdAuditId,
     this.storage = 'windows_dpapi',
+    this.lastUsedAt,
   });
 
   final String credentialId;
@@ -62,6 +63,7 @@ class McpCredentialSummary {
   final String ciphertextHash;
   final String createdAuditId;
   final String storage;
+  final int? lastUsedAt;
 }
 
 class McpConnectionSummary {
@@ -187,8 +189,6 @@ class McpConnectionClient {
     if (!_validIdentifier(serverId) ||
         !_validDesktopPath(executable) ||
         !_validDesktopPath(workspace) ||
-        (defaultTargetPlatform == TargetPlatform.macOS &&
-            credentialId != null) ||
         (credentialId == null) != (credentialEnvironmentVariable == null) ||
         (credentialId != null &&
             (!_validCredentialId(credentialId) ||
@@ -343,6 +343,7 @@ class McpConnectionClient {
         ciphertextHash: ciphertextHash,
         createdAuditId: createdAuditId,
         storage: entry['保管方式'] as String,
+        lastUsedAt: lastUsedAt as int?,
       );
     }).toList(growable: false);
     return List.unmodifiable(entries);
@@ -445,6 +446,7 @@ class McpConnectionClient {
       kind: kind,
       status: '失効',
       revokedAt: revokedAt,
+      lastUsedAt: lastUsedAt as int?,
       ciphertextHash: ciphertextHash,
       createdAuditId: createdAuditId,
       storage: credential.storage,

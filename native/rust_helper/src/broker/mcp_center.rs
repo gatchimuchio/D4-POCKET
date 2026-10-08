@@ -185,7 +185,7 @@ pub(super) fn connect(
 
     let mut credential_environment = Vec::new();
     if request.credential_ref.status == "configured" {
-        #[cfg(windows)]
+        #[cfg(any(windows, target_os = "macos"))]
         {
             let secret = match broker.資格情報MCP使用処理(
                 request_id,
@@ -196,7 +196,7 @@ pub(super) fn connect(
                 Ok(secret) => secret,
                 Err(response) => return response,
             };
-            let secret_value = match String::from_utf8(secret.as_bytes().to_vec()) {
+            let secret_value = match String::from_utf8(secret.as_slice().to_vec()) {
                 Ok(value) => zeroize::Zeroizing::new(value),
                 Err(error) => {
                     let _invalid_secret_bytes = zeroize::Zeroizing::new(error.into_bytes());
@@ -220,13 +220,13 @@ pub(super) fn connect(
                 secret_value,
             ));
         }
-        #[cfg(not(windows))]
+        #[cfg(not(any(windows, target_os = "macos")))]
         {
             return broker.reject_with_payload_hash(
                 request_id,
                 OP_CONNECT,
                 "credential_platform_unsupported",
-                "MCP Credential注入はWindows DPAPI環境だけに対応しています",
+                "MCP Credential注入には対応するDesktop保管先が必要です",
                 true,
                 payload_hash,
             );
@@ -243,7 +243,7 @@ pub(super) fn connect(
         Err(error) => return reject_mcp_error(broker, request_id, error, payload_hash),
     };
     if request.credential_ref.status == "configured" {
-        #[cfg(windows)]
+        #[cfg(any(windows, target_os = "macos"))]
         if broker
             .資格情報MCP使用確定処理(
                 request_id,
@@ -1119,6 +1119,10 @@ mod tests {
         reference["Credential ref"]["status"] = json!("configured");
         reference["Credential ref"]["required"] = json!(true);
         reference["Credential ref"]["environment_variable"] = json!("MCP_API_KEY");
+        let configured_summary = macos_owner_summary(OP_CONNECT, &reference).unwrap();
+        assert!(configured_summary.contains("MCP_API_KEY"));
+        assert!(configured_summary.contains("外部送信"));
+        reference["Credential ref"]["environment_variable"] = json!("PATH");
         assert!(macos_owner_summary(OP_CONNECT, &reference).is_none());
         let call = json!({"版":1,"操作":"実行","ServerID":"fixture-mcp-server",
             "ToolID": format!("tool-{}", "a".repeat(142)), "名前":"echo",
@@ -1463,9 +1467,13 @@ pub(crate) fn macos_owner_summary(operation: &str, payload: &Value) -> Option<St
     match operation {
         OP_CONNECT => {
             let request = parse_request(payload).ok()?;
-            if request.credential_ref.status != "missing" { return None; }
             let hash = super::protocol::canonical_payload_hash(Some(&serde_json::to_value(&request.arguments).ok()?));
-            Some(format!("このstdio Serverを起動して接続します。\nServer ID: {}\n実行file: {}\nWorkspace: {}\n引数: {}項目\n引数hash: {hash}\nCredential注入: なし\nApp Sandboxを継承し、所有process groupを明示切断します。外部Server metadataはTrust・Permissionではありません。引数本文はここへ表示しません。",
+            let credential = if request.credential_ref.status == "configured" {
+                format!("Credential ID: {}\n用途: mcp_transport\n対象: {}\n環境変数: {}\nこのServerと子孫は秘密値を読み取り・外部送信できます。版交渉の限定再起動でも同じ相手へ委譲します。Brokerが現在record・失効・暗号文を再検証します。参照はPermission／Approvalではありません。",
+                    request.credential_ref.credential_id, request.credential_ref.target,
+                    request.credential_ref.environment_variable.as_deref()?)
+            } else { "Credential注入: なし".to_owned() };
+            Some(format!("このstdio Serverを起動して接続します。\nServer ID: {}\n実行file: {}\nWorkspace: {}\n引数: {}項目\n引数hash: {hash}\n{credential}\nApp Sandboxを継承し、所有process groupを明示切断します。外部Server metadataはTrust・Permissionではありません。引数本文はここへ表示しません。",
                 request.server_id, request.executable, request.workspace, request.arguments.len()))
         },
         OP_DISCONNECT => {

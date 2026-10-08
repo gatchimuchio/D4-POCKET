@@ -17,6 +17,10 @@
 
 ## P13 Mobile / Non-Windows — 現行track
 
+#### macOS MCP資格情報結合 — IMPLEMENTING（Product Build、2026-10-08）
+
+次のOPEN製品差分は、Keychain保管済みIDを対象MCP stdioの既存native確認／Brokerへ接続するconsumer。有限契約は`docs/specs/macos-mcp-credential-binding.md`。公開metadata選択・現用途／対象／失効／暗号文照合・短命Rust内受渡し・使用Audit／最終使用時刻を施工する。Provider／Agent／A2A、秘密読出しAPI、新bridgeを追加せず、既存CLOSED機能の再検査やFinal QAを開始しない。
+
 #### macOS MCP接続・Tool実行・切断 — CLOSED（Product Build、2026-10-08）
 
 有限受入れMAC-MCP-1〜5を閉鎖。接続・metadata表示はsource `075312e`のrun 37752807608、境界／対象buildはsource `94ea619`のrun 37749059105の既存PASSを保持し、再訪しない。残件のsource `f472e8ce63e8e890b1e3db5fa8a3da58181a4f5a`、[run 37763440541](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37763440541)で製品UIの公開JSON確認→別個native Owner確認→実stdio Tool→hash-only表示、一回Permission／Audit、別個Owner切断→接続解消→Command-Q→helper／MCP残留0・fixture回収がPASS。XCUITest 1 passed／0 failed、98.939秒。通常Mac製品buildもPASS。実Auditのapproved／consumed started／hash-only acceptedは各1件、本文不保存。App Sandboxと既存Brokerを保持する。

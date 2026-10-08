@@ -1,5 +1,7 @@
 # MCP接続センター
 
+P13のMac製品接続は`macos-mcp-center.md`のCLOSED受入れを参照する。追加の公開資格情報ID選択・Keychainからの対象stdio結合は`macos-mcp-credential-binding.md`（IMPLEMENTING）の範囲に限定する。以下のC9 Windows経路は維持し、Macのprocess停止保証をWindows Job Objectと同一視しない。
+
 本書の外部wire仕様固定点は、公式MCP仕様2026-07-28版の[基本protocol](https://modelcontextprotocol.io/specification/2026-07-28/basic)と[Tools](https://modelcontextprotocol.io/specification/2026-07-28/server/tools)である。外部仕様はwire形式の根拠に限り、Authority、Permission、Approval、TrustはGUI-Shellの正本だけが定める。
 
 ## 対象

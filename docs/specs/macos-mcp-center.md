@@ -4,6 +4,8 @@
 
 ## 意味と責任
 
+本CLOSED受入れは資格情報なしの範囲。現在の資格情報結合consumerは追加契約`macos-mcp-credential-binding.md`で別個に実装・検収する。下記未対応記述・MAC-MCP-4のconfigured拒否は結合consumer導入前の範囲であり、元のCLOSED証拠を改変・再試験しない。通常資格／参照単独からAuthorityを生成しない境界は引き続き維持する。
+
 既存MCP stdio clientとBrokerの接続・catalog・一回Tool実行・切断を、Mac製品の別個native Owner確認へ接続する。新Protocolや別Authority bridgeを作らない。Flutter／Swiftは公開要求と表示・待機だけ、Rustが同一要求hashを確認し、既存Brokerが現在条件を再評価する。
 
 接続は実行file・Workspace・引数件数／hashを示す。ToolはServer／Tool ID・名前・引数件数／hashを示し、本文は事前の製品UIだけで確認する。切断はServer IDへ束縛する。既定拒否、取消／期限は不承認、自動再送なし。通常IPC・Owner資格単独・metadata・過去確認から作用を生成しない。

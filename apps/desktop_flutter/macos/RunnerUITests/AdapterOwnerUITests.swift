@@ -11,14 +11,18 @@ final class AdapterOwnerUITests: XCTestCase {
     try productMacMcpFlow(verifyConnection: false)
   }
 
-  private func productMacMcpFlow(verifyConnection: Bool) throws {
+  func testProductMacMcpCredentialBinding() throws {
+    try productMacMcpFlow(verifyConnection: false, credentialBinding: true)
+  }
+
+  private func productMacMcpFlow(verifyConnection: Bool, credentialBinding: Bool = false) throws {
     let app = XCUIApplication()
     let notice = XCUIApplication(bundleIdentifier: "com.apple.UserNotificationCenter")
     continueAfterFailure = false
     app.launch()
     defer {
       // この試験は合成公開Server／引数だけ。failureの可視状態を製品窓に限定する。
-      if (testRun?.failureCount ?? 0) > 0, !app.secureTextFields.firstMatch.exists {
+      if !credentialBinding, (testRun?.failureCount ?? 0) > 0, !app.secureTextFields.firstMatch.exists {
         let window = app.windows.firstMatch
         let frame = window.frame
         let image = XCUIScreen.main.screenshot().image
@@ -59,6 +63,25 @@ final class AdapterOwnerUITests: XCTestCase {
       app.typeKey(XCUIKeyboardKey.delete.rawValue, modifierFlags: [])
       app.typeText(value)
     }
+    if credentialBinding {
+      try mcpPublicText(app, "起動引数", click: true)
+      app.typeText("--require-credential")
+      let register = app.buttons["native入力で資格情報を登録"]
+      XCTAssertTrue(register.waitForExistence(timeout: 10)); reveal(app, register); register.click()
+      let proceed = app.sheets.buttons["入力して確認へ"].firstMatch
+      XCTAssertTrue(proceed.waitForExistence(timeout: 10))
+      // 合成秘密は既存Rust Debug fixture内だけ。値・秘密欄snapshotを読み取らない。
+      proceed.click(); approve(notice); app.activate()
+      XCTAssertTrue(credentialMessage(app,
+        "Keychain登録後のmetadataを取得しました。秘密値は取得していません。").waitForExistence(timeout: 15))
+      try mcpPublicText(app, "使用しない", click: true)
+      let credential = app.staticTexts.matching(NSPredicate(
+        format: "label MATCHES %@ OR value MATCHES %@", "api_key\\s*・\\s*[a-f0-9]{32}", "api_key\\s*・\\s*[a-f0-9]{32}")).firstMatch
+      XCTAssertTrue(credential.waitForExistence(timeout: 10))
+      credential.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+      try mcpPublicText(app, "子processへ渡す環境変数名", click: true)
+      app.typeText("MCP_API_KEY")
+    }
     try mcpPublicText(app, "MCP接続を開始", click: true)
     if verifyConnection {
       let deny = notice.dialogs.firstMatch.buttons["承認しない"]
@@ -70,6 +93,12 @@ final class AdapterOwnerUITests: XCTestCase {
     approve(notice); app.activate()
     XCTAssertTrue(credentialMessage(app,
       "接続receiptを受理しました。表示はBroker内部状態であり、TrustやTool実行を示しません。").waitForExistence(timeout: 15))
+    if credentialBinding {
+      let used = app.staticTexts.matching(NSPredicate(
+        format: "label CONTAINS %@ OR value CONTAINS %@", "最終使用時刻:", "最終使用時刻:")).firstMatch
+      XCTAssertTrue(used.waitForExistence(timeout: 10))
+      XCTAssertFalse((used.label).contains("未使用"))
+    }
     if verifyConnection { try mcpPublicText(app, "Mac MCP試験Server") }
     try mcpPublicText(app, "Tool一覧", click: true)
     try mcpPublicText(app, "確認して実行", click: true)

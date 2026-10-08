@@ -2,6 +2,8 @@
 
 ## 意味と有限Acceptance
 
+本CLOSED受入れは保管庫の登録・一覧・失効。MCPだけへの注入consumerは`macos-mcp-credential-binding.md`で別個に扱い、保管庫の試験を再訪しない。
+
 状態: CLOSED（P13 Product Build、2026-10-08）。既存の資格情報登録・公開一覧・論理失効を、macOS Keychainと製品のnative秘密入力へ接続した。Provider／MCPへの秘密注入、Task、物理削除、正式identity、最終QAは別単位。登録済みの秘密値をFlutterへ読み戻す機能は作らない。
 
 有限条件: native秘密入力の取消は未登録、別個Owner確認後の登録、metadata-only一覧、現在metadataに束縛したOwner確認後の論理失効、通常要求による登録・秘密読出し・承認注入の拒否、秘密値の画面・応答・Audit非露出、通常終了。正常経路一回と対象境界試験で閉じ、CLOSED済みCLI／Workspace／Mobile条件を再試験しない。

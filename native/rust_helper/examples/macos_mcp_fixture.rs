@@ -3,6 +3,13 @@ use serde_json::{json, Value};
 use std::io::{self, BufRead, Write};
 
 fn main() {
+    if std::env::args().any(|argument| argument == "--require-credential") {
+        // native内で生成・Keychain経由で渡す合成秘密を値非公開で確認する。
+        let credential = zeroize::Zeroizing::new(std::env::var("MCP_API_KEY").unwrap_or_default());
+        if credential.len() != 64 || !credential.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            std::process::exit(2);
+        }
+    }
     let input = io::stdin();
     let mut output = io::stdout().lock();
     for line in input.lock().lines() {

@@ -64,3 +64,5 @@ Tool出力本文は、text・image・audio・resource link・embedded resource�
 C8の作業単位はSchema、正常／負例fixture、Conformanceを追加した。C9はstdio discovery、connect、metadata list、Windows owner切断に加え、native Owner確認・一回Permission・Catalog preflight・stdio `tools/call`・hash-only result receiptをRust Broker経路へ接続する。Windows stdioへの限定Credential注入は別Owner確認・保管庫照合・Auditを経て接続する。Tool結果本文をAgentへ渡すContent Exposure経路、MCP以外のCredential注入、Resource／Prompt本文取得、Streamable HTTP、OAuth、外部MCP実物Test Harness、非Windows process群監督は未接続であり、`release_blocker`として保持する。
 
 P13のMac追加範囲は`macos-mcp-center.md`を責任正本とする。Credentialなしの接続／Tool／明示切断とD4所有process group停止だけを追加し、Windowsの全子孫・異常終了保証へ昇格しない。上記C9当時の非Windows未接続は履歴であり、Macの現在範囲は有限Acceptanceの証拠で判定する。Mac Credential注入、Agent引渡し、別group／crash保証はこの単位では未成立のまま保持する。
+
+追加のMac MCP資格情報結合は`macos-mcp-credential-binding.md`（IMPLEMENTING）の独立consumerとする。公開ID・用途・対象・環境変数名だけを既存wireへ送り、現在Keychain recordをBrokerが再評価する。上記資格情報なしMCPのCLOSED条件は再開せず、追加consumerの有限受入れだけで判定する。

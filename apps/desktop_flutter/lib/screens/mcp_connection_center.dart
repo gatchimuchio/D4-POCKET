@@ -117,7 +117,7 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
             const SizedBox(height: 8),
             Text(
               macOS
-                  ? 'Mac MCPは資格情報を注入しません。App Sandboxを継承し、明示切断はD4所有process groupだけを停止します。別groupへ離脱したprocessや外部副作用の復旧は保証しません。'
+                  ? 'Mac MCP Credentialは公開IDだけを選び、別個native確認後にBrokerが現在Keychain recordを照合して対象Serverへ渡します。Serverと子孫は秘密値を読み取り・外部送信できます。App Sandboxを継承し、明示切断はD4所有process groupだけを停止します。別groupへ離脱したprocessや外部副作用の復旧は保証しません。'
                   : 'MCP CredentialはFlutterへ入力しません。登録済みmetadataから対象Server専用のものを選びます。選択すると値を対象Server processへ渡し、そのprocessは読み取り・外部送信できます。Windows Job Objectはsandboxではありません。',
             ),
             const SizedBox(height: 8),
@@ -145,7 +145,7 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
                 label: const Text('native入力で資格情報を登録'),
               ),
               const Text(
-                  'Mac Keychainへ登録・一覧・論理失効だけを行います。秘密値はFlutterへ渡しません。MCPへの注入は未対応です。'),
+                  'Mac Keychainの登録・一覧・論理失効と、対象MCPへの結合を行います。秘密値はFlutterへ渡しません。結合は別個native確認とBrokerの現在record検証が必要です。'),
               const SizedBox(height: 8),
             ],
             TextField(
@@ -220,7 +220,7 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
                           '${credential.kind} ・ ${credential.credentialId}'),
                     ),
                 ],
-                onChanged: macOS || _connecting || _loading
+                onChanged: _connecting || _loading
                     ? null
                     : (value) => setState(() {
                           _selectedCredentialId = value;
@@ -240,6 +240,7 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
                   title: Text('${credential.kind} ・ ${credential.status}'),
                   subtitle: Text(
                     'ID: ${credential.credentialId}'
+                    '\n最終使用時刻: ${credential.lastUsedAt ?? '未使用'}'
                     '${credential.revokedAt == null ? '' : '\n失効時刻: ${credential.revokedAt}'}',
                   ),
                   trailing: credential.status == '有効'
@@ -579,6 +580,17 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
         ];
         _message = '接続receiptを受理しました。表示はBroker内部状態であり、TrustやTool実行を示しません。';
       });
+      if (_selectedCredentialId != null) {
+        try {
+          final credentials =
+              await client.listCredentials(targetServerId: connection.serverId);
+          if (mounted) setState(() => _credentials = credentials);
+        } on Object {
+          if (mounted)
+            setState(() => _message =
+                '接続receiptは受理済みですが、資格情報の使用時刻を再取得できません。Broker状態とAuditを確認してください。');
+        }
+      }
     } on Object {
       if (mounted) {
         setState(() =>

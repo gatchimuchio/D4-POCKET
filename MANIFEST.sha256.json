@@ -72,7 +72,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "bc062347ccbd4872ea6e3410c94f9055764bffb6e6cefc8cf97f7bf3b9dfea0c"
+      "sha256": "8fa4e3d0deef5d3c8f857c04df0deb67b7d4851df1c7130a1768b498b30ba461"
     },
     {
       "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
@@ -92,7 +92,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "730ea042700bda068a5f74c9794521b9760c7e77e4ae3c0de45df726731bd459"
+      "sha256": "fc3ad92d3a1412891e4a705ac32f820a66b25d2d321a6e7f1166930c19bab5b7"
     },
     {
       "path": "AUDIT.md",
@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "9eb0fa88cd0ab726a40bf22405d33c3ccb9ce6abb81ea71ce3e8d18aa960332f"
+      "sha256": "ccf03dc3e912f5d88f392391e1fed54da8263c6e8e32fed74aac9ac9d2c2663d"
     },
     {
       "path": "SECURITY.md",
@@ -256,7 +256,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/mcp_connection_center.dart",
-      "sha256": "650af6dca034d3ff6efcba8f24d3f24a014674c502d26cdfa61f69c7d3811ce3"
+      "sha256": "425f6c1404511f10354efd1c4408c0095ad5a2fd460f1aeb420fb6837e8889e6"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/notifications.dart",
@@ -356,7 +356,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/mcp_connection_client.dart",
-      "sha256": "b9dffb9eb0ff38d9a4cea419d903c5685c331cbf964ed12ee09eee845bae89a3"
+      "sha256": "b2f791b71edceb4e1fcc638f1f3445f5b3b446064e4df77dc79c2b4390628cf9"
     },
     {
       "path": "apps/desktop_flutter/lib/services/notification_client.dart",
@@ -568,7 +568,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/RunnerUITests/AdapterOwnerUITests.swift",
-      "sha256": "53f03841b430d232d02263a51d2486b174d8c46d7039dea232ac4cd84e705420"
+      "sha256": "2c312955fdc6035cf295f6e87439a867b897b68d0e66e401d882d1f73b7b5e0f"
     },
     {
       "path": "apps/desktop_flutter/pubspec.lock",
@@ -636,7 +636,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/mcp_connection_center_test.dart",
-      "sha256": "47a816b6eaf9a58fce360adf55b3590823fa4b5ab61589aec02e5f7f10b4b5c7"
+      "sha256": "91682bbc2ce5f88894b75a074c0a39ddf74499ff60d756cc269d40c99d3e9041"
     },
     {
       "path": "apps/desktop_flutter/test/module_pruning_test.dart",
@@ -1280,7 +1280,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "c1cf32eef68704f01bbb024af0ae91c4376c437277cd26391e89335527dae97e"
+      "sha256": "e1984d81c9a3da11b20a4fd929a2e757d824ade18a42317b217a6da1adc1e47a"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1416,7 +1416,7 @@
     },
     {
       "path": "docs/specs/credential-vault.md",
-      "sha256": "cec794fbb494b0706303f4fad44944187ae7846596de5068b1d4a2bfef272e5d"
+      "sha256": "228b3851ec555506a910dac29b7c04a93e8ec3c2d0650d405114d26fdf909920"
     },
     {
       "path": "docs/specs/desktop-broker-channel.md",
@@ -1496,7 +1496,7 @@
     },
     {
       "path": "docs/specs/macos-credential-vault.md",
-      "sha256": "5d2c9a99e582c32d8bf0082cafcc523a0beccfad70bc0b59b26fcbc114d9f5c9"
+      "sha256": "508874d67496d4dd69f8ee9efe8f81a798093e78930ee1861d02a95f3211d710"
     },
     {
       "path": "docs/specs/macos-desktop-channel.md",
@@ -1504,7 +1504,11 @@
     },
     {
       "path": "docs/specs/macos-mcp-center.md",
-      "sha256": "56fd583a885b15d0d3aa6843a775794536266778c4dfa9dc0aedf6b8ab5fe2b7"
+      "sha256": "36957da2f8d3561a0f26ed501da51058cca5ab32ab92b87827da044e17dea05f"
+    },
+    {
+      "path": "docs/specs/macos-mcp-credential-binding.md",
+      "sha256": "78ff807023462e6393a1168fb028a6559a65e1232ab42747b92533ec3efb36c8"
     },
     {
       "path": "docs/specs/macos-workspace-selection.md",
@@ -1512,11 +1516,11 @@
     },
     {
       "path": "docs/specs/mcp-connection-center.md",
-      "sha256": "01ec7323d82c8fb8ec54a0a0a6cb490791b154832fbef26a9f8e8990a5c37655"
+      "sha256": "cc8f6d97f8fa48bf3e83abe6f84b7a0e9eb353fd0fbbbaa66eb8aa24036d4ada"
     },
     {
       "path": "docs/specs/mcp-contract.md",
-      "sha256": "1d2f0e6b810182902d9a1882cfcfc280d82ba6f9a702159b8ee16cb2fe0ae654"
+      "sha256": "37fb8888e3c262f88b74d9a3482e67550f7c8649568cc9b50e854ec7c3f56072"
     },
     {
       "path": "docs/specs/mobile-surface.md",
@@ -3272,7 +3276,7 @@
     },
     {
       "path": "native/rust_helper/examples/macos_mcp_fixture.rs",
-      "sha256": "167767d3993ddf609ffb2db0d2d849f3fc596ad97819ddbef4a8cd05c95fe5ef"
+      "sha256": "b79fdc7722852f7a090e9ccea67744672fd459ac2ac4edc48353d349cd39848a"
     },
     {
       "path": "native/rust_helper/filesystem/README.md",
@@ -3392,11 +3396,11 @@
     },
     {
       "path": "native/rust_helper/src/broker/credential_storage.rs",
-      "sha256": "91a31260e65df14dac18d4479d67c9b0a7f57ba7a0a524eefc7709f42e8685dc"
+      "sha256": "b610e19749e24594832b6c52459bfb0447b924c45c4532bd0750daf160ca4928"
     },
     {
       "path": "native/rust_helper/src/broker/credential_vault.rs",
-      "sha256": "135bcf14ba01545cf12a52b34c2270425cf73f17cbc80235645e46d5a96c91b1"
+      "sha256": "4c21a531d3312632066b7136dd30d79220387a48a27059e1f7fcc933aa22ce51"
     },
     {
       "path": "native/rust_helper/src/broker/device_link.rs",
@@ -3448,7 +3452,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/mcp_center.rs",
-      "sha256": "629241fd8ec3e7429994fe4ec8f3ca8672bd08c49598037ab105871675d32453"
+      "sha256": "377782a9bf35051e2223f1616f12f90706eb765c163843fd567dc1c1b227d63e"
     },
     {
       "path": "native/rust_helper/src/broker/mod.rs",
@@ -4836,7 +4840,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "f57b890d9bd7b5084f9993eaa5b13e4f1a849f9264324450f57e80e93676211c"
+      "sha256": "36b128fcfceb59f535d259595feb7c71359046c74cc6b1a66513d467950150d8"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
@@ -4968,7 +4972,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "ebc7b7137f0af34162978ab1299faf92cbcd3e2fea4c1a22a9e8384f1d9d985f"
+      "sha256": "4acbb71f2289f2285f8bac1411584f63c57a85e3268a9381bf18386738a21209"
     }
   ]
 }

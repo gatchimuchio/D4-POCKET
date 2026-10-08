@@ -1,5 +1,7 @@
 # GUI Shell ロードマップ
 
+P13 macOS MCP資格情報結合をIMPLEMENTING。有限受入れは`docs/specs/macos-mcp-credential-binding.md`。既存保管庫・native確認・stdioを接続し、公開ID参照だけから現在recordを再評価して対象processへ委譲する。手動Actions `macos_mcp_credential_binding`でローカルにないMacの新consumerだけを検証し、秘密入力画像を保存しない。CLOSED済み登録／失効・資格情報なしMCPは再試験せず、通常Release能力と既存gateを保持する。
+
 P13 macOS MCP接続・Tool実行・切断はCLOSED（Product Build、2026-10-08）。有限受入れは`docs/specs/macos-mcp-center.md`。source `f472e8ce63e8e890b1e3db5fa8a3da58181a4f5a`、[run 37763440541](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37763440541)で残件の実stdio Tool／hash-only製品表示、一回Permission・Audit、別個native Owner切断、一覧解消、通常終了、helper／MCP残留0・fixture回収がPASS。XCUITest 1 passed／0 failed、98.939秒。接続・境界・対象buildの先行CLOSED証拠は再利用。成功sourceをmainへ統合・push・remote照合し、一時検証branchを双方回収した。Mac所有groupの正常停止だけを保証し、crash／別group離脱やWindows Job Object保証へ拡大しない。Credential注入・Mac Task・正式配布・Final QAは後続／既存gateへ残し、通常Release能力を保持する。次はP13のOPEN製品差分だけ。
 
 P13 macOS資格情報保管庫はCLOSED（Product Build、2026-10-08）。source `e4a9f839d79221afb18751be9e79b0c641b3cfbc`、手動Actions [run 37742214244](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37742214244)でnative入力取消・未登録、別個Owner確認後のKeychain登録、metadata-only一覧、有効／失効表示、現metadata-bound Owner確認後の論理失効、Command-Q終了・helper回収がPASS。対象API／境界／Widgetと通常Mac build、合成秘密fixtureを外した再buildもPASS。成功sourceをmainへ統合・push・remote確認し、検証branchをlocal／remote双方で回収した。有限Acceptance・過去FAILは`docs/specs/macos-credential-vault.md`、進捗正本は`docs/REV5_PRODUCT_PROGRESS.md`。秘密値・Authority・Windows保存形式・通常Release能力は保持する。次はP13のOPEN製品差分だけ。Provider／MCP注入、Task、正式配布、Final QAは別関門に残し、本CLOSED条件を追加証拠目的で再試験しない。
