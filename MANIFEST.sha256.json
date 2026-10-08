@@ -72,7 +72,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "98f322e8764444b6bcb01d332fcfa669caddf16fae28f140600abea52f975518"
+      "sha256": "dd54d4fecccc1cb1a31abac1cd7fea0613695ff4fe5bf2e1f77c839404ac5113"
     },
     {
       "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
@@ -568,7 +568,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/RunnerUITests/AdapterOwnerUITests.swift",
-      "sha256": "98ec1fd8b93540751d9ecca5c88c0237afe05850f1eef2e54a1ff4883048bca6"
+      "sha256": "5e29ab495e833767dca8a8b39b2407372f81e3e0799e8d7187ac06fce1285d5b"
     },
     {
       "path": "apps/desktop_flutter/pubspec.lock",
@@ -1496,7 +1496,7 @@
     },
     {
       "path": "docs/specs/macos-credential-vault.md",
-      "sha256": "3fd163bd8fb03bcdc95f247987dcb7f14b65322a0a46d056b5be59261fe33436"
+      "sha256": "35be2ebc7e6995a21c037664467a0ac90e4b652ad4bdb75a8f5d4da223012325"
     },
     {
       "path": "docs/specs/macos-desktop-channel.md",

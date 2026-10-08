@@ -81,6 +81,11 @@ jobs:
           if [ -d "$RUNNER_TEMP/macos-credential-tests.xcresult" ]; then
             xcrun xcresulttool get test-results summary --path "$RUNNER_TEMP/macos-credential-tests.xcresult" > evidence/native-summary.json
           fi
+          public_row="$RUNNER_TEMP/d4-credential-public-row.png"
+          if [ -f "$public_row" ] && [ ! -L "$public_row" ]; then
+            test "$(stat -f%z "$public_row")" -le 262144
+            cp "$public_row" evidence/credential-public-row.png
+          fi
           if pgrep -x gui_shell_macos_broker > evidence/remaining-helper-pids.txt; then
             while read -r pid; do kill -TERM "$pid"; done < evidence/remaining-helper-pids.txt
             exit 1

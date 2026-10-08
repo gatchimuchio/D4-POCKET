@@ -74,4 +74,8 @@ run `37736125289`／source `0f09323`は通常build・対象解析／試験・登
 
 run `37737228953`／source `9d1a730`は登録・一覧accepted、公開有効状態は試行2〜4で一意に認識したが、失効操作文字は8回とも0件で95.570秒のFAIL。App screenshotは1024×768、製品窓は(112,51,800,628)であり、App画像を窓だけと扱った仮定を撤回する。秘密入力終了後の実window boundsへ画像認識を切り取り、clickを同じ座標系へ束縛する。固定公開ラベルの空白・改行だけを正本化し、診断は件数・geometryと固定3断片の一致件数に限る。画像・認識文字・ID・秘密値を保存・出力しない。artifact `11532860512`のSHA-256 `7ae8caac870c9cc37b00ba6eaea23019767b2bc3c3352250a4c78504736f60d0`を照合した。helper回収PASS、失効・通常終了を含む有限Acceptanceは未成立であり、別fixture・追加安全条件へ拡張しない。
 
+run `37740859766`／source `1fe31c5`は窓内800×628の切り取りと公開有効状態の照合が成立したが、操作文字／固定断片は0件で77.725秒のFAIL。登録・一覧・対象試験・通常build・helper回収はPASS。artifact `11533539696`、SHA-256 `023fb009be8e317cede27aeaaf60789e4bbb6b9d820e9cc40d98a346765841b2`を照合した。失効操作の根因は未確定で、窓の切り取りだけでは解消しなかった。
+
+現在FAILの診断に限り、秘密入力欄／sheet不存在と既存Brokerのmetadata-only成功を確認した後、認識済み公開metadata行の上下32pxだけを一枚保存する。最大256 KiB、画面全体・他App・native秘密入力・xcresultの全attachments／映像をexportしない。公開資格情報IDは秘密値ではなく、Brokerが表示許可したmetadataの範囲に限る。従来の画像非保存方針のこの診断だけを明示変更する。推測的fixture追加ではなく現在の操作未成立の原因確認であり、原因解消時に診断出力を撤去する。操作の認識は[Appleの文字範囲box API](https://developer.apple.com/documentation/vision/vnrecognizedtext/boundingbox(for:))で固定操作文字だけの位置へ束縛し、対象状態の右・同じ行・一意性を維持する。画像から秘密値・承認を生成せず、通常mouse・native Owner・Brokerの製品経路は変更しない。
+
 `release_blocker`: MacでのProvider／MCP注入、正式署名identity・配布、Final QA。通常Release `task_execution=unsupported`、`release_ready=false`を保持する。秘密値の表示、保管方式fallback、Windowsの保存形式migrationを本単位の便宜で追加しない。

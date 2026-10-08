@@ -73,6 +73,7 @@ final class AdapterOwnerUITests: XCTestCase {
       throw failure("秘密入力終了前に公開状態を取得しない")
     }
     app.activate()
+    var publicDiagnosticWritten = false
     for attempt in 0..<8 {
       Thread.sleep(forTimeInterval: 0.6)
       // App screenshotも実測では画面全体だった。実window boundsで切り取り、
@@ -107,11 +108,15 @@ final class AdapterOwnerUITests: XCTestCase {
       guard hits.count <= 1 else {
         throw failure("公開資格情報状態を一意に確認できない: " + status)
       }
-      let buttons = (request.results ?? []).filter {
-        guard let action else { return false }
-        return $0.topCandidates(3).contains {
-          $0.string.components(separatedBy: .whitespacesAndNewlines).joined() == action
+      // Visionはiconを文字列の前へ含め得る。行全体でなく固定操作文字の
+      // 実boxを取得し、対象状態とのgeometry照合を保持する。
+      let buttons: [VNRectangleObservation] = try (request.results ?? []).compactMap { observation -> VNRectangleObservation? in
+        guard let action else { return nil }
+        for candidate in observation.topCandidates(3) {
+          if let range = candidate.string.range(of: action),
+             let box = try candidate.boundingBox(for: range) { return box }
         }
+        return nil
       }
       if action != nil {
         // 公開状態／操作の件数とgeometryだけ。認識文字・ID・入力値は出さない。
@@ -129,6 +134,7 @@ final class AdapterOwnerUITests: XCTestCase {
         guard buttons.count <= 1 else { throw failure("公開失効操作を一意に確認できない") }
         if let button = buttons.first {
           let box = button.boundingBox
+          print("D4_CREDENTIAL_PUBLIC_ACTION_GEOMETRY row=\(row.boundingBox) action=\(box)")
           // 公開状態と同じ行の可視操作だけ。AXが返した1px frameをclick位置に使わない。
           guard box.minX > row.boundingBox.maxX,
                 abs(box.midY - row.boundingBox.midY) * frame.height < 40 else {
@@ -136,6 +142,21 @@ final class AdapterOwnerUITests: XCTestCase {
           }
           window.coordinate(withNormalizedOffset: CGVector(dx: box.midX, dy: 1 - box.midY)).click()
           return
+        }
+        if !publicDiagnosticWritten {
+          // 現在FAILの根因診断一枚だけ。公開metadata行±32pxに限定し、
+          // native秘密欄・他App・画面全体は保存しない。公開IDは秘密値ではない。
+          let centerY = (1 - row.boundingBox.midY) * CGFloat(pixels.height)
+          let region = CGRect(x: row.boundingBox.minX * CGFloat(pixels.width),
+                              y: max(0, centerY - 32 * scaleY),
+                              width: CGFloat(pixels.width) * (1 - row.boundingBox.minX),
+                              height: 64 * scaleY)
+            .intersection(CGRect(x: 0, y: 0, width: CGFloat(pixels.width), height: CGFloat(pixels.height))).integral
+          guard let publicRow = pixels.cropping(to: region),
+                let data = NSBitmapImageRep(cgImage: publicRow).representation(using: .png, properties: [:]),
+                data.count <= 262144 else { throw failure("公開行の限定診断を生成できない") }
+          try data.write(to: URL(fileURLWithPath: "/Users/runner/work/_temp/d4-credential-public-row.png"), options: .atomic)
+          publicDiagnosticWritten = true
         }
       }
       guard attempt < 7 else { throw failure("公開資格情報状態と操作を確認できない: " + status) }
