@@ -21,7 +21,7 @@ Rustの`Command::process_group(0)`で新childを独立process groupへ置く。g
 | ID | 条件 | 状態 | 証拠 |
 | --- | --- | --- | --- |
 | MAC-MCP-1 | native Owner拒否→未接続、承認→実stdio discovery／metadata一覧 | CLOSED | source 075312e、run 37752807608で当該段階PASS |
-| MAC-MCP-2 | 現Tool／Schema再照合、一回Permission・Audit、hash-only実呼出し表示 | FAIL | source 46e13e9、run 37754461227の入力route切替失敗を局所修正中 |
+| MAC-MCP-2 | 現Tool／Schema再照合、一回Permission・Audit、hash-only実呼出し表示 | FAIL | source 8e5efaa、run 37762114010の既定JSON消去失敗を試験側で局所修正中 |
 | MAC-MCP-3 | 別個Owner切断、所有group停止・記録解消、通常終了 | OPEN | 未取得 |
 | MAC-MCP-4 | normal／Owner資格単独、session・Authority／秘密注入、configured Credentialの拒否 | CLOSED | source 94ea619、run 37749059105の対象3件／共有Windows18件PASS |
 | MAC-MCP-5 | 対象test、通常Mac build、Windows直接依存回帰 | CLOSED | 同run対象解析・Flutter3件・通常build PASS、Windows18件PASS |
@@ -59,3 +59,5 @@ source `c290ab49cbc25e9dfce804a060e541b2ee177c63`、[run 37758996444](https://gi
 撤去後のDart source／testは`f2c08f0`の既検証byteへ戻る。local Mac投影／Windows直接依存各1件とMac runnerのroute回帰1件PASSを再利用し、同じwidget試験を証拠強化目的で繰り返さない。回帰test自体は通常suiteへ残し、`mcp_product_only=true`の残件runからだけ外す。mandatory両app解析の同sourceの環境FAILもそのまま保持する。新変更の検証対象は公開AX focusとMAC-MCP-2／3の未成立製品経路だけ。
 
 source `93160fae8271e14c39afbbcd64c959895188da64`、[run 37760394393](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37760394393)は80.523秒でFAIL。artifact `11542885225`（10747977 bytes）、SHA-256 `dd5ffd5c926a5c166ff14126e5ed9607a0b8729fe661d2dae9d47c75affb1cff`を実byteへ照合した。未focusの可視TextField（高さ146）のAXに初期値がなく、値`{}`のqueryは未一致だった。可視window内の複数行TextFieldを一意に選び、値が変わっても同じAX elementへ束縛したまま通常focus／Select All／Deleteを実行する。空値を先に確認し、公開JSONの完全一致後だけ入力確認へ進む。製品source、Schema、Authority、有限Acceptanceは変更しない。
+
+source `8e5efaac5573e79f5482342f2a7cfdbafcef77dd`、[run 37762114010](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37762114010)は74.123秒で空欄確認がFAIL。artifact `11542578507`（9570856 bytes）、SHA-256 `963974da51f2c4ddb346e84ac59490e2400cf8885dd2250c4f6186e3416f4a67`を実byteへ照合した。同一AX欄へのfocusは成立したが、通常Command-A／Delete後の実値は`{`で、選択消去が成立していない。試験の既定公開object二文字だけを通常Right／Delete各二回で消し、空値と入力値の完全一致を維持する。JSON拒否や製品初期値を変更しない。Command-A内部原因の追究・一般編集UXは今回のTool作用受入れへ追加しない。

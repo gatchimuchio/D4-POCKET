@@ -80,8 +80,9 @@ final class AdapterOwnerUITests: XCTestCase {
     guard argumentEditors.count == 1 else { throw failure("可視のMCP引数欄を一意に確認できない") }
     let argumentEditor = argumentEditors[0]
     argumentEditor.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
-    app.typeKey("a", modifierFlags: .command)
-    app.typeKey(XCUIKeyboardKey.delete.rawValue, modifierFlags: [])
+    // 既定の公開objectは2文字。実Macで未成立だったSelect Allに依存しない。
+    for _ in 0..<2 { argumentEditor.typeKey(XCUIKeyboardKey.rightArrow.rawValue, modifierFlags: []) }
+    for _ in 0..<2 { argumentEditor.typeKey(XCUIKeyboardKey.delete.rawValue, modifierFlags: []) }
     XCTAssertTrue((argumentEditor.value as? String ?? "").isEmpty)
     argumentEditor.typeText("{\"text\":\"macos-public-input\"}")
     XCTAssertEqual(argumentEditor.value as? String, "{\"text\":\"macos-public-input\"}")
