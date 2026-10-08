@@ -72,4 +72,6 @@ run `37735176741`／source `2a421cc`は対象Dart解析・4 Widget試験、通�
 
 run `37736125289`／source `0f09323`は通常build・対象解析／試験・登録／一覧がPASS。Window screenshotへ変更した公開状態／操作の同時照合が未成立で69.679秒のFAILとなった。状態自体か操作文字か撮影対象のどこが原因かは未確定。先に状態照合が成立したApp screenshotへ戻し、通常activateで製品を前面に置く。秘密入力終了後の状態／操作の件数とwindow／image geometryだけを最大8件記録し、文字・ID・入力値・画像を出さない。artifact `11532460461`のSHA-256 `eef80d7f5274b0b1d6f47eeb14eb4de9c57d915b725fc0521ad02fbc126710e9`を照合した。helper回収PASS、失効・終了を未成立のまま保持する。
 
+run `37737228953`／source `9d1a730`は登録・一覧accepted、公開有効状態は試行2〜4で一意に認識したが、失効操作文字は8回とも0件で95.570秒のFAIL。App screenshotは1024×768、製品窓は(112,51,800,628)であり、App画像を窓だけと扱った仮定を撤回する。秘密入力終了後の実window boundsへ画像認識を切り取り、clickを同じ座標系へ束縛する。固定公開ラベルの空白・改行だけを正本化し、診断は件数・geometryと固定3断片の一致件数に限る。画像・認識文字・ID・秘密値を保存・出力しない。artifact `11532860512`のSHA-256 `7ae8caac870c9cc37b00ba6eaea23019767b2bc3c3352250a4c78504736f60d0`を照合した。helper回収PASS、失効・通常終了を含む有限Acceptanceは未成立であり、別fixture・追加安全条件へ拡張しない。
+
 `release_blocker`: MacでのProvider／MCP注入、正式署名identity・配布、Final QA。通常Release `task_execution=unsupported`、`release_ready=false`を保持する。秘密値の表示、保管方式fallback、Windowsの保存形式migrationを本単位の便宜で追加しない。

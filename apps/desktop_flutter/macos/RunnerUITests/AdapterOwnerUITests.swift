@@ -75,12 +75,22 @@ final class AdapterOwnerUITests: XCTestCase {
     app.activate()
     for attempt in 0..<8 {
       Thread.sleep(forTimeInterval: 0.6)
-      // 製品窓だけ。画像・認識文字を保存・添付・出力しない。
+      // App screenshotも実測では画面全体だった。実window boundsで切り取り、
+      // Visionの座標と通常mouseのwindow座標を同じ領域へ束縛する。
       let window = app.windows.firstMatch
-      let image = app.screenshot().image
+      let frame = window.frame
+      let image = XCUIScreen.main.screenshot().image
       var proposed = CGRect(origin: .zero, size: image.size)
-      guard let pixels = image.cgImage(forProposedRect: &proposed, context: nil, hints: nil) else {
+      guard let screen = image.cgImage(forProposedRect: &proposed, context: nil, hints: nil),
+            CGRect(origin: .zero, size: image.size).contains(frame) else {
         throw failure("公開資格情報状態の画面を取得できない")
+      }
+      let scaleX = CGFloat(screen.width) / image.size.width
+      let scaleY = CGFloat(screen.height) / image.size.height
+      let crop = CGRect(x: frame.minX * scaleX, y: frame.minY * scaleY,
+                        width: frame.width * scaleX, height: frame.height * scaleY).integral
+      guard let pixels = screen.cropping(to: crop) else {
+        throw failure("公開資格情報状態を製品窓へ限定できない")
       }
       let request = VNRecognizeTextRequest()
       request.recognitionLevel = .accurate
@@ -90,7 +100,7 @@ final class AdapterOwnerUITests: XCTestCase {
       let hits = (request.results ?? []).filter {
         guard let text = $0.topCandidates(1).first?.string else { return false }
         let normalized = text.folding(options: [.caseInsensitive, .widthInsensitive], locale: Locale(identifier: "ja_JP"))
-          .replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "_", with: "")
+          .components(separatedBy: .whitespacesAndNewlines).joined().replacingOccurrences(of: "_", with: "")
           .replacingOccurrences(of: "・", with: "").replacingOccurrences(of: "•", with: "")
         return normalized == "apikey" + status
       }
@@ -99,11 +109,20 @@ final class AdapterOwnerUITests: XCTestCase {
       }
       let buttons = (request.results ?? []).filter {
         guard let action else { return false }
-        return $0.topCandidates(1).first?.string.replacingOccurrences(of: " ", with: "") == action
+        return $0.topCandidates(3).contains {
+          $0.string.components(separatedBy: .whitespacesAndNewlines).joined() == action
+        }
       }
       if action != nil {
         // 公開状態／操作の件数とgeometryだけ。認識文字・ID・入力値は出さない。
-        print("D4_CREDENTIAL_PUBLIC_ACTION_OBSERVATION \(attempt) row=\(hits.count) action=\(buttons.count) window=\(window.frame) image=\(image.size)")
+        let fragments = ["資格情報", "資格情報を", "失効"].map { fragment in
+          (request.results ?? []).filter {
+            $0.topCandidates(3).contains {
+              $0.string.components(separatedBy: .whitespacesAndNewlines).joined() == fragment
+            }
+          }.count
+        }
+        print("D4_CREDENTIAL_PUBLIC_ACTION_OBSERVATION \(attempt) row=\(hits.count) action=\(buttons.count) fixedFragments=\(fragments) window=\(frame) croppedPixels=\(pixels.width)x\(pixels.height)")
       }
       if let row = hits.first {
         guard action != nil else { return }
@@ -112,7 +131,7 @@ final class AdapterOwnerUITests: XCTestCase {
           let box = button.boundingBox
           // 公開状態と同じ行の可視操作だけ。AXが返した1px frameをclick位置に使わない。
           guard box.minX > row.boundingBox.maxX,
-                abs(box.midY - row.boundingBox.midY) * image.size.height < 40 else {
+                abs(box.midY - row.boundingBox.midY) * frame.height < 40 else {
             throw failure("公開状態に対応する失効操作ではない")
           }
           window.coordinate(withNormalizedOffset: CGVector(dx: box.midX, dy: 1 - box.midY)).click()
