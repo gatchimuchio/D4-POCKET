@@ -2,7 +2,7 @@
 
 ## 意味と有限Acceptance
 
-状態: IMPLEMENTING（P13 Product Build）。既存の資格情報登録・公開一覧・論理失効を、macOS Keychainと製品のnative秘密入力へ接続する。Provider／MCPへの秘密注入、Task、物理削除、正式identity、最終QAは別単位。登録済みの秘密値をFlutterへ読み戻す機能は作らない。
+状態: CLOSED（P13 Product Build、2026-10-08）。既存の資格情報登録・公開一覧・論理失効を、macOS Keychainと製品のnative秘密入力へ接続した。Provider／MCPへの秘密注入、Task、物理削除、正式identity、最終QAは別単位。登録済みの秘密値をFlutterへ読み戻す機能は作らない。
 
 有限条件: native秘密入力の取消は未登録、別個Owner確認後の登録、metadata-only一覧、現在metadataに束縛したOwner確認後の論理失効、通常要求による登録・秘密読出し・承認注入の拒否、秘密値の画面・応答・Audit非露出、通常終了。正常経路一回と対象境界試験で閉じ、CLOSED済みCLI／Workspace／Mobile条件を再試験しない。
 
@@ -25,6 +25,31 @@ Flutterは非秘密metadataだけを送る。通常GUI親processの固定Rust UI
 作用対応: Capability=資格情報の登録／metadata一覧／論理失効、Permission=Broker固定Keychainの対象だけ、Approval=対象metadataに束縛したnative Owner確認、Audit=公開metadataと実暗号文hash、Recovery=入力取消・拒否は未登録、部分登録は今回分のみ回収して未成立を保持。論理失効は取消不可、秘密注入を許可しない。
 
 ## 検証範囲
+
+### 有限受入れ — CLOSED
+
+source `e4a9f839d79221afb18751be9e79b0c641b3cfbc`、手動Actions [run 37742214244](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37742214244)、`workflow_dispatch`／`macos_credential_vault`。macOS 15.7.9 arm64、Apple Virtual Machine、Xcode 16.4、Flutter 3.44.0／Rust 1.95.0。XCUITest `testProductCredentialVault`は1 passed／0 failed、70.482秒。
+
+| 条件 | 状態 | 証拠 |
+| --- | --- | --- |
+| native入力取消→未登録投影 | CLOSED | 製品sheetの取消と公開未成立表示、Auditの登録拒否 |
+| native秘密入力→別個Owner→Keychain登録 | CLOSED | 通常製品経路の成功表示、既存Auditの登録accepted |
+| metadata-only一覧と有効表示 | CLOSED | Broker一覧accepted、窓内の公開有効状態を一意照合 |
+| 現metadata-bound Owner→論理失効 | CLOSED | 可視操作の文字範囲boxから通常click、別個確認、失効accepted・一覧更新・公開失効表示 |
+| 通常資格・秘密／Authority注入拒否 | CLOSED | 通常Owner gate 1件、native公開境界1件、Dart対象3件。Windowsの直接依存7件とr2-e2e誤登録拒否も既記録PASS |
+| 実暗号文・名前空間と秘密非公開 | CLOSED | 実Keychain保存先1件、公開receiptへの秘密混入拒否、native入力の秘密値をDart／Swift／Auditへ返さない境界 |
+| 通常終了とhelper回収 | CLOSED | Command-Q→notRunning、残存helper 0 |
+| 通常build／公開失効操作 | CLOSED | 対象Dart解析・Widget 4件、通常Mac build、fixtureを外したRust UIと通常Mac再build |
+
+artifact `11534657376`（80617 bytes）、SHA-256 `3aea639a1fb42cac021bd3410aa58f3712da5bd005671755ec8540fdaaea6ce6`はGitHub digestとダウンロード実byteを照合済み。ignored保存先は`release_evidence/p13-macos-credential-e4a9f83/`。UI／Keychain／native Ownerの観測は`LIVE_RUNTIME`、runner結果とartifactは`EXTERNAL_EVIDENCE`、合成入力境界とWidgetは`FIXTURE`として分ける。Debug合成秘密fixture・ad-hoc test identity・表示用AX flagを使った有限製品受入れであり、production identity、配布、Mac Task、Provider／MCP注入の証拠ではない。
+
+全行一致0・固定操作文字範囲一致1という観測により、操作を独立したOCR行と仮定した試験queryが不適合だったことを確認した。文字範囲の実boxと状態行のgeometryから通常clickが成立した。前後文字を出力していないため、その内容やiconが原因だったことまでは断定しない。限定画像診断は本PASS runで生成されず、画像・artifactとも不存在を確認した。原因解消に伴い一時画像出力と件数／geometry診断を撤去し、正常確認・Owner・状態・終了のassertionは保持した。CLOSED条件をこの撤去や文書修正のため再試験しない。
+
+検証成功sourceをmainへfast-forwardし、push／remote HEADを確認して一時検証branchをlocal／remote双方で削除した。ローカル必須Schema 166／正常162／負例213、Conformance 239、手動起動限定、Manifest、diff検査はPASS。変更外のWindows全Rust 2 FAIL、日本語監査既存指摘、両Flutter analyzeの既知環境障害は以下の履歴を保持し、全体PASSへ読み替えない。次はP13のOPEN製品差分だけとし、追加fixture・強化証拠・最終QAのため本条件を再開しない。
+
+閉鎖文書の`python tooling/日本語基底監査.py --strict`初回は6 files／21 findingsでFAIL。今回追加した英語見出し・表列名の4件を日本語へ修正し、再実行は既存5 files／17 findingsのFAILを保持した。本単位の新規負債は0であり、既存指摘の修正やruntime再試験へ拡張しない。Windows v1 Release gateの静的検査はPASSだが、strict release・release readinessの成立ではない。
+
+### 検証履歴（閉鎖前）
 
 ローカルは既存Windows保存先の直接依存回帰、新公開payload・秘密／Authority注入拒否、Widget投影を対象とする。手動Actions `macos_credential_vault`でKeychain実API、通常Mac build、製品native入力・別個確認・一覧・失効・終了を検証する。合成秘密値はnative試験内で生成し、CLI引数・環境変数・XCTest入力log・動画・artifactへ渡さない。
 

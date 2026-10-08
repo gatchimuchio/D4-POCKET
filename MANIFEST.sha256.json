@@ -72,7 +72,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "dd54d4fecccc1cb1a31abac1cd7fea0613695ff4fe5bf2e1f77c839404ac5113"
+      "sha256": "98f322e8764444b6bcb01d332fcfa669caddf16fae28f140600abea52f975518"
     },
     {
       "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
@@ -156,7 +156,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "cf792758da86686668ee68fcd0673ec60756b9a68234a591cc92066f21171c88"
+      "sha256": "3a962680f44f90b713928fa435ab45673b52156b032f024712d5241dff582017"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "39e0bc92fa3af9a383b342b2ae3113b62aa5360eb077818a47bd43e6697c7be4"
+      "sha256": "d024cd9a489e550794c0084980f8762be4066b16f79eb0eabb07076ac5c0f26a"
     },
     {
       "path": "SECURITY.md",
@@ -568,7 +568,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/RunnerUITests/AdapterOwnerUITests.swift",
-      "sha256": "5e29ab495e833767dca8a8b39b2407372f81e3e0799e8d7187ac06fce1285d5b"
+      "sha256": "dd847afb5fdb8a9dd95e9fbf60337c3a35ee80fd5e960182d3cbf7ac226682eb"
     },
     {
       "path": "apps/desktop_flutter/pubspec.lock",
@@ -1280,7 +1280,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "1892926eeba5d951550f9d69617738f54b07a4e060d84b0b549dba12c71a723f"
+      "sha256": "b2bef5d216ee10f91972eba663f059e471f0c0adc1d257903321b300762844ea"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1496,7 +1496,7 @@
     },
     {
       "path": "docs/specs/macos-credential-vault.md",
-      "sha256": "35be2ebc7e6995a21c037664467a0ac90e4b652ad4bdb75a8f5d4da223012325"
+      "sha256": "5d2c9a99e582c32d8bf0082cafcc523a0beccfad70bc0b59b26fcbc114d9f5c9"
     },
     {
       "path": "docs/specs/macos-desktop-channel.md",
@@ -4108,7 +4108,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "90f23be72b392c95d1a843f21c71393d8f5f1fc700bc411b47692329b1040576"
+      "sha256": "1a9b306eaa1664ab89b364906c4968093907d839e3168c03023632f0378014d2"
     },
     {
       "path": "requirements-dev.txt",

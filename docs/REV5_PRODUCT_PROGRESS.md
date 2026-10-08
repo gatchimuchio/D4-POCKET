@@ -17,9 +17,11 @@
 
 ## P13 Mobile / Non-Windows — 現行track
 
-#### macOS 資格情報保管庫 — IMPLEMENTING（Product Build、2026-10-08）
+#### macOS 資格情報保管庫 — CLOSED（Product Build、2026-10-08）
 
-現行実装の`credential_vault`と`ProtectedStore`はWindows専用。P13の不足として、既存Brokerの登録・公開一覧・論理失効をKeychain保存先とnative秘密入力へ接続する。有限Acceptanceは`docs/specs/macos-credential-vault.md`。Windows保存形式を変更せず、秘密値をFlutter／Swiftへ返さない。別個Owner確認と既存Audit境界を保持し、Provider／MCP注入・Task・正式identity・配布・Final QAは後続／既存`release_blocker`へ残す。CLI／Workspace／MobileのCLOSED条件は再訪しない。
+source `e4a9f839d79221afb18751be9e79b0c641b3cfbc`、手動Actions [run 37742214244](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37742214244)で有限AcceptanceがPASS。製品native入力の取消・未登録表示、合成秘密入力・別個Owner確認・実Keychain登録、metadata-only一覧と有効表示、別個Owner確認後の論理失効・一覧更新・失効表示、Command-Q終了・helper回収を確認。XCUITest 1 passed／0 failed、70.482秒。Keychain実API・通常Owner gate・native公開境界各1件、対象Dart解析／Widget 4件、通常Mac buildと合成秘密fixtureを外した再buildもPASS。
+
+artifact `11534657376`、SHA-256 `3aea639a1fb42cac021bd3410aa58f3712da5bd005671755ec8540fdaaea6ce6`を実byteと照合し、成功sourceをmainへfast-forward・push・remote確認後、一時branchをlocal／remote双方で削除した。操作の文字範囲boxが成立したため一時診断を撤去し、追加再試験はしない。Authority・秘密非公開・Windows保存形式を保持する。有限契約と過去FAILは`docs/specs/macos-credential-vault.md`。通常Release `task_execution=unsupported`、`release_ready=false`を保持し、Provider／MCP注入・Task・正式identity・配布・Final QAはP13後続／既存`release_blocker`。既存のWindows全Rust FAIL、Flutter解析障害、日本語監査指摘を上書きしない。次はP13のOPEN製品差分だけであり、CLOSED済みCLI／Workspace／Mobile・本条件を証拠強化目的で再訪しない。
 
 #### macOS Agent CLI実行fileのOS選択 — CLOSED（Product Build、2026-10-08）
 

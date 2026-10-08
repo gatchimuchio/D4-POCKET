@@ -343,6 +343,7 @@ Public review snapshot として tag を付けた GitHub Release は、完成製
 - ⛔ **v1.0 product release はまだ主張していない。** active <code>release_blocker</code> は <code>release_blockers.registry.json</code> に正規化されている。内容は Windows installed-path provenance、first-run、Setup Doctor、Broker evidence、Audit anchor の external tamper-evidence proof、明示的な owner GO である。Rust Broker の production authority cutover に関する表現は、独立した registry blocker ではなく、Windows installed-path の Broker / Runtime evidence blocker を通じて表現する。
 - 🧪 **公開 proof pack の境界。** 公開 Windows proof pack には、実測 Windows installed-path evidence に由来する redacted review copy が含まれる。これらは canonical release evidence ではなく、この公開 repository 上の完成製品 release blocker を解消しない。
 - ⚠️ **Windows-first。** Linux validation は development slice であり、最終的な product proof ではない。macOS、iOS、Androidの実機とWindows installed productの現行証拠は別関門であり、supportedまたはrelease proofとして宣伝してはならない。
+- ✅ **P13 Mac資格情報の有限製品受入れはCLOSED。** native秘密入力・別個Owner確認・Keychain登録・公開metadata一覧・論理失効・通常終了が[手動検収run](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37742214244)でPASS。Debug合成秘密とtest identityの範囲であり、Provider／MCP注入・Task・正式配布・最終QAへ拡大しない。契約と過去FAILは[macOS資格情報保管庫](docs/specs/macos-credential-vault.md)を参照。
 - ⚠️ この基盤作業は、権限を持たない task に対して統制された LLM-readable extension behavior を限定的に実証する。public standard への採用、広範な第三者 interoperability、installed-product behavior は証明しない。
 
 repository 文書にある未完了項目は、すべて <code>release_blocker</code> / <code>post_v1_scope</code> / <code>known_limitation</code> に分類する。[CLAIM.md](CLAIM.md) と [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) を参照すること。
