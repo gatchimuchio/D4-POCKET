@@ -6,6 +6,8 @@ P13で未接続だったmacOS画面の`gui_shell/broker`を同梱Rust helperへ�
 
 ## 責任
 
+P13 A2A追加入口の責任正本は`macos-a2a-center.md`。既存同一要求native Owner receiverへ`A2A接続`だけを追加し、loopback Agent Cardのmetadata取得に限定する。通常transport・App Sandbox・資格非公開を変えず、Runnerはその待機315秒だけを分類する。既存CLOSED接続を再検証しない。
+
 Flutter → 固定MethodChannel → native Runner → 起動時に作る匿名pipe → 同梱Rust helper → 既存認証loopback Broker → 既存handler。
 
 Runnerは固定bundle内のhelper一個を引数なしで起動し、要求JSONと応答JSONだけを運ぶ。資格、endpoint、Audit、Permission、Approvalを読み取らず決定しない。環境はOSが与えたsandbox HOMEと一時保存先だけ。Rustは固定HOME配下の専用0700保存先、create-only起動lock、normal資格を所有する。入力session_idは既存Windows中継と同じ拒否用fieldを付加し、既存Brokerのvalidation／replay／Auditへ通す。通常接続のCLOSED単位ではOwner資格とOwner操作receiverを作らなかった。現在の追加receiverは本書後段のOwner追加契約だけに限定し、Owner資格fileは引き続き作らない。通常要求の可否はBrokerが判定し、Runnerがread-only能力やAuthorityを自己生成しない。

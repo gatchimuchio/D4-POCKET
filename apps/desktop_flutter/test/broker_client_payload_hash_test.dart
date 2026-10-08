@@ -8,6 +8,18 @@ import 'package:gui_shell_desktop/services/broker_client.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test('Mac A2AはOwner確認と既存HTTP取得の有限待機だけを共有する', () {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    expect(brokerRequestTimeoutForOperation('A2A接続'),
+        const Duration(seconds: 315));
+    expect(brokerRequestTimeoutForOperation('A2A接続一覧'),
+        const Duration(seconds: 5));
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    expect(brokerRequestTimeoutForOperation('A2A接続'),
+        const Duration(seconds: 305));
+  });
+
   test('Mac MCPだけはOwner確認とstdio処理の有限待機を共有する', () {
     debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);

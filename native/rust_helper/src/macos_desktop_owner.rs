@@ -40,6 +40,10 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
     let text = if registration {
         let summary = crate::broker::protocol::macos_agent_registration_summary(payload)?;
         format!("{summary}\n要求hash: {hash}")
+    } else if operation == "A2A接続" {
+        let (agent, target) =
+            crate::broker::a2a_center::owner_confirmation_summary(payload).ok()?;
+        format!("外部Agentの宣言情報だけを取得します。\nAgent ID: {agent}\n接続先: {target}\n要求hash: {hash}\n\nAgent Cardは未信頼metadataです。Trust・Task Permission・Approval・Credentialを生成せず、Task実行を行いません。Brokerが現在の要求と永続Auditを再評価します。")
     } else if matches!(operation, "MCP接続" | "MCP切断" | "MCP Tool実行") {
         let summary = crate::broker::mcp_center::macos_owner_summary(operation, payload)?;
         format!("{summary}\n要求hash: {hash}")
@@ -105,6 +109,9 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
             15
         } else if matches!(operation, "MCP接続" | "MCP切断" | "MCP Tool実行") {
             35
+        } else if operation == "A2A接続" {
+            // 既存の接続2秒＋読取5秒とAuditの有限待機。再送しない。
+            10
         } else {
             4
         }),
@@ -145,6 +152,95 @@ pub(super) fn dispatch(
             .map_err(std::io::Error::other)?
             .into_bytes(),
     ))
+}
+
+#[cfg(test)]
+mod a2a_tests {
+    use super::*;
+    use crate::broker::ipc_server::BrokerCredentialRole;
+    use serde_json::json;
+
+    #[test]
+    fn macos_a2a_同一要求だけを確認し未承認と権限注入を拒否する() {
+        let endpoint = BrokerEndpoint {
+            host: "127.0.0.1".into(),
+            port: 1,
+            session_id: "fixture-session".into(),
+            session_secret: "synthetic-only".into(),
+            credential_role: BrokerCredentialRole::Normal,
+            transport: "tcp".into(),
+            max_request_bytes: 65536,
+        };
+        let payload = json!({"版":1,"操作":"接続","AgentID":"mac-a2a-fixture",
+            "Agent Card URI":"http://127.0.0.1:34101/card", "protocol_version":"1.0",
+            "Transport":"http","Credential ref":{"credential_id":"00000000000000000000000000000000",
+                "purpose":"A2A接続","target":"mac-a2a-fixture","required":false,"status":"missing"}});
+        let valid = json!({"request_id":"fixture-request","nonce":"fixture-nonce",
+            "issued_at":BrokerRequestEnvelope::current_issued_at(),"operation":"A2A接続",
+            "metadata":{"client":"desktop_flutter"},"payload_hash":canonical_payload_hash(Some(&payload)),"payload":payload});
+        let bytes = serde_json::to_vec(&valid).unwrap();
+        let current = candidate(&bytes, &endpoint).unwrap();
+        assert!(current.summary.contains("mac-a2a-fixture"));
+        assert!(current.summary.contains("http://127.0.0.1:34101/card"));
+        assert!(current
+            .summary
+            .contains(valid["payload_hash"].as_str().unwrap()));
+        assert!(current.summary.contains("未信頼metadata"));
+        assert_eq!(current.response_timeout, Duration::from_secs(10));
+        let normalized: serde_json::Value = serde_json::from_str(&current.request).unwrap();
+        assert_eq!(normalized["payload"], valid["payload"]);
+        assert_eq!(normalized["session_id"], "fixture-session");
+        for key in ["session_id", "approval"] {
+            let mut invalid = valid.clone();
+            invalid[key] = json!(true);
+            assert!(candidate(&serde_json::to_vec(&invalid).unwrap(), &endpoint).is_none());
+        }
+        let mut invalid = valid.clone();
+        invalid["metadata"]["authority"] = json!("owner");
+        assert!(candidate(&serde_json::to_vec(&invalid).unwrap(), &endpoint).is_none());
+        let mut invalid = valid.clone();
+        invalid["payload"]["AgentID"] = json!("other");
+        assert!(candidate(&serde_json::to_vec(&invalid).unwrap(), &endpoint).is_none());
+        for field in ["Approval", "secret"] {
+            let mut invalid = valid.clone();
+            invalid["payload"][field] = json!("injected");
+            invalid["payload_hash"] = json!(canonical_payload_hash(Some(&invalid["payload"])));
+            assert!(candidate(&serde_json::to_vec(&invalid).unwrap(), &endpoint).is_none());
+        }
+        let mut invalid = valid.clone();
+        invalid["payload"]["Agent Card URI"] = json!("http://192.0.2.1/card");
+        invalid["payload_hash"] = json!(canonical_payload_hash(Some(&invalid["payload"])));
+        assert!(candidate(&serde_json::to_vec(&invalid).unwrap(), &endpoint).is_none());
+        let (sender, receiver) = mpsc::sync_channel(1);
+        assert!(dispatch(&bytes, &endpoint, &sender, &mut |_| false)
+            .unwrap()
+            .is_none());
+        assert!(receiver.try_recv().is_err());
+        // 実確認後に同じpayloadを既存receiverへ一回だけ配送する。
+        let worker = std::thread::spawn(move || {
+            let received: DesktopOwnerOperationRequest = receiver.recv().unwrap();
+            let request: serde_json::Value = serde_json::from_str(&received.request_json).unwrap();
+            assert_eq!(request["payload"], valid["payload"]);
+            received
+                .reply
+                .send(crate::broker::protocol::BrokerResponse {
+                    request_id: "fixture-request".into(),
+                    operation: "A2A接続".into(),
+                    status: crate::broker::protocol::BrokerStatus::Accepted,
+                    evidence_source: "FIXTURE".into(),
+                    audit_event_id: "fixture-audit".into(),
+                    error: None,
+                    health: None,
+                    body: None,
+                    shutdown_requested: false,
+                })
+                .unwrap();
+        });
+        assert!(dispatch(&bytes, &endpoint, &sender, &mut |_| true)
+            .unwrap()
+            .is_some());
+        worker.join().unwrap();
+    }
 }
 
 #[cfg(test)]

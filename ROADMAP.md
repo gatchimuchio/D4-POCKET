@@ -1,5 +1,7 @@
 # GUI Shell ロードマップ
 
+P13 macOS A2A接続をIMPLEMENTING。`docs/specs/macos-a2a-center.md`のMAC-A2A-1〜3だけを施工する。未接続native Owner入口を既存Brokerのloopback Agent Card取得・metadata-only未審査投影へ接続する。専用手動Actions `macos_a2a_center`は対象build／直接境界／製品正常・拒否・終了だけに限定。Credential／Task／外部host／正式配布／Final QAへ広げず、既存CLOSED条件は再訪しない。
+
 P13 macOS MCP資格情報結合はCLOSED（Product Build、2026-10-08）。有限受入れMAC-MCP-CRED-1〜4は`docs/specs/macos-mcp-credential-binding.md`。source `96beb4142ceca818273582716e843424f863bb30`、[run 37787435817](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37787435817)で対象Keychain→所有stdio・公開使用時刻・使用Auditを前提として通し、別個Owner切断・接続解消・Command-Q・helper／MCP残留0・fixture回収がPASS。UI 1 passed／0 failed、135.655秒。成功sourceをmainへ統合・push・remote照合し、一時branchを双方回収した。秘密はRust内だけ、既存Broker／App Sandbox／Windows形式を保持する。通常Release能力・正式配布・Final QAへ成功を拡大しない。次はP13のOPEN製品差分だけ。
 
 P13 macOS MCP接続・Tool実行・切断はCLOSED（Product Build、2026-10-08）。有限受入れは`docs/specs/macos-mcp-center.md`。source `f472e8ce63e8e890b1e3db5fa8a3da58181a4f5a`、[run 37763440541](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37763440541)で残件の実stdio Tool／hash-only製品表示、一回Permission・Audit、別個native Owner切断、一覧解消、通常終了、helper／MCP残留0・fixture回収がPASS。XCUITest 1 passed／0 failed、98.939秒。接続・境界・対象buildの先行CLOSED証拠は再利用。成功sourceをmainへ統合・push・remote照合し、一時検証branchを双方回収した。Mac所有groupの正常停止だけを保証し、crash／別group離脱やWindows Job Object保証へ拡大しない。Credential注入・Mac Task・正式配布・Final QAは後続／既存gateへ残し、通常Release能力を保持する。次はP13のOPEN製品差分だけ。

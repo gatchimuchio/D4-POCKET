@@ -129,7 +129,7 @@ final class BrokerProcessChannel {
     let mcpOperation = ["MCP接続", "MCP切断", "MCP Tool実行"].contains(operation ?? "")
     let osSelection = operation == "作業領域OS選択" || operation == "AgentCLI実行fileOS選択"
     let credentialInput = operation == "資格情報登録"
-    let timeout = credentialInput ? 610 : (mcpOperation ? 335 : (operation == "AgentCLI実行系作業領域登録" ? 320 : (operation == "資格情報失効" || osSelection || ownerOperations.contains(operation ?? "") ? 305 : 5)))
+    let timeout = credentialInput ? 610 : (mcpOperation ? 335 : (operation == "A2A接続" ? 315 : (operation == "AgentCLI実行系作業領域登録" ? 320 : (operation == "資格情報失効" || osSelection || ownerOperations.contains(operation ?? "") ? 305 : 5))))
     DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(timeout)) { complete(nil) }
     queue.async { [weak self] in
       guard let self else { return }

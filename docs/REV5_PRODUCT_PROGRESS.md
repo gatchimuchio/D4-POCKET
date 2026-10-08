@@ -17,6 +17,10 @@
 
 ## P13 Mobile / Non-Windows — 現行track
 
+#### macOS A2A接続センター — IMPLEMENTING
+
+既存製品画面・A2A取得／投影は存在するが、Mac native Owner入口が`A2A接続`を受け付けないため新規接続は通常Brokerで拒否される。有限契約`docs/specs/macos-a2a-center.md`のMAC-A2A-1〜3を正本とし、同一要求native確認→既存Broker→loopback Card取得→metadata-only／未審査表示・URI消去・Auditと正常終了だけを接続する。手動Actions `macos_a2a_center`は対象build・新入口直接否定・有限製品試験だけ。CLOSED済みMCP／資格情報／登録／Mobileは再訪せず、通常Release能力・release gateを保持する。
+
 #### macOS MCP資格情報結合 — CLOSED（Product Build、2026-10-08）
 
 有限受入れMAC-MCP-CRED-1〜4を閉鎖。source `96beb4142ceca818273582716e843424f863bb30`、[手動run 37787435817](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37787435817)で公開ID参照・別個native Owner確認・現在Keychain recordから対象stdioへ実受渡し・公開使用時刻・hash-only Toolを前提として通し、残件の別個Owner切断→一覧解消→Command-Q→helper／MCP残留0・fixture回収がPASS。XCUITest 1 passed／0 failed／0 skipped、135.655秒。使用accepted Auditは1件、Tool approved／consumed started／hash-only acceptedも各1件。通常Mac buildはPASS。先行CLOSED条件と保管庫／資格情報なしMCPを追加証拠目的で再試験しない。

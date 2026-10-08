@@ -3,6 +3,54 @@ import AppKit
 import Vision
 
 final class AdapterOwnerUITests: XCTestCase {
+  func testProductMacA2aCenter() throws {
+    let app = XCUIApplication()
+    let notice = XCUIApplication(bundleIdentifier: "com.apple.UserNotificationCenter")
+    continueAfterFailure = false
+    app.launch(); defer { app.terminate() }
+    XCTAssertTrue(element(app, "エージェント").waitForExistence(timeout: 20))
+    let group = element(app, "操作グループ選択")
+    XCTAssertTrue(group.waitForExistence(timeout: 10))
+    let toolbar = app.buttons.allElementsBoundByAccessibilityElement.filter {
+      $0.frame.height >= 24 && app.windows.firstMatch.frame.contains($0.frame)
+        && abs($0.frame.midY - group.frame.midY) < 4 && $0.frame.maxX < group.frame.minX
+    }.sorted { $0.frame.minX < $1.frame.minX }
+    guard toolbar.count == 2 else { throw failure("公開toolbarを一意に確認できない") }
+    toolbar[0].click()
+    let search = app.textFields.firstMatch
+    XCTAssertTrue(search.waitForExistence(timeout: 10))
+    search.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+    app.typeText("A2A")
+    try mcpPublicText(app, "A2A接続", click: true, scroll: false)
+    for (label, value) in [("Agent識別子", "mac-a2a-fixture"),
+                           ("Agent Card接続先URI", "http://127.0.0.1:34101/card")] {
+      try mcpPublicText(app, label, click: true)
+      app.typeText(value)
+    }
+    try mcpPublicText(app, "Owner確認して接続", click: true)
+    let deny = notice.dialogs.firstMatch.buttons["承認しない"]
+    XCTAssertTrue(deny.waitForExistence(timeout: 15)); deny.click()
+    XCTAssertTrue(element(app, "A2A接続を確認できませんでした。受理receiptがないため成功表示はしていません。").waitForExistence(timeout: 10))
+    try mcpPublicText(app, "Owner確認して接続", click: true, scroll: false)
+    let approve = notice.dialogs.firstMatch.buttons["今回の操作を承認"]
+    XCTAssertTrue(approve.waitForExistence(timeout: 15)); approve.click()
+    let accepted = "接続metadataを受理しました。Trustは未審査のままです。Audit="
+    XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@ OR value BEGINSWITH %@", accepted, accepted)).firstMatch.waitForExistence(timeout: 15))
+    try mcpPublicText(app, "Mac A2A fixture")
+    try mcpPublicText(app, "未審査（pending_review）")
+    try mcpPublicText(app, "接続先hash:")
+    // 公開URI欄だけを取得する。成功後に実入力が消えたことを確認する。
+    try mcpPublicText(app, "Agent Card接続先URI", click: true, scrollUp: true)
+    let current = app.textFields.allElementsBoundByAccessibilityElement.filter {
+      $0.frame.height >= 20 && app.windows.firstMatch.frame.contains($0.frame)
+    }
+    XCTAssertFalse(current.isEmpty)
+    XCTAssertFalse(current.contains { ($0.value as? String ?? "").contains("127.0.0.1:34101") })
+    print("D4_MACOS_A2A_PRODUCT_PASS")
+    app.typeKey("q", modifierFlags: .command)
+    XCTAssertTrue(app.wait(for: .notRunning, timeout: 10))
+  }
+
   func testProductMacMcpCenter() throws {
     try productMacMcpFlow(verifyConnection: true)
   }

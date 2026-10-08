@@ -19,6 +19,7 @@ name: Apple platform 手動補助build
           - macos_credential_vault
           - macos_mcp_center
           - macos_mcp_credential_binding
+          - macos_a2a_center
         default: all
         required: true
       mcp_product_only:
@@ -31,6 +32,85 @@ permissions:
   contents: read
 
 jobs:
+  macos-a2a:
+    if: ${{ inputs.target == 'macos_a2a_center' }}
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - name: 対象commitを取得
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: 新Owner入口と通常nativeを検証
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          { git rev-parse HEAD; sw_vers; xcodebuild -version; } > evidence/environment.txt
+          rustup toolchain install 1.95.0 --profile minimal
+          cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib macos_a2a_ -- --test-threads=1 2>&1 | tee evidence/a2a-owner-test.txt
+          cargo +1.95.0 build --locked --manifest-path native/rust_helper/Cargo.toml --bin gui_shell_macos_broker --example macos_a2a_fixture 2>&1 | tee evidence/broker-fixture-build.txt
+          cargo +1.95.0 build --locked --manifest-path native/macos_owner/Cargo.toml --lib 2>&1 | tee evidence/native-normal-build.txt
+      - name: 対象Flutterと有限Mac製品経路
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch 3.44.0 https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          test "$(git -C "$RUNNER_TEMP/flutter" rev-parse HEAD)" = 559ffa3f75e7402d65a8def9c28389a9b2e6fe42
+          export PATH="$RUNNER_TEMP/flutter/bin:$PATH"
+          cd apps/desktop_flutter
+          flutter pub get 2>&1 | tee ../../evidence/pub-get.txt
+          dart analyze lib/services/broker_client.dart test/broker_client_payload_hash_test.dart 2>&1 | tee ../../evidence/dart-analyze.txt
+          flutter test --no-pub test/broker_client_payload_hash_test.dart --plain-name 'Mac A2AはOwner確認と既存HTTP取得の有限待機だけを共有する' 2>&1 | tee ../../evidence/timeout-test.txt
+          flutter test --no-pub test/a2a_connection_center_test.dart --plain-name '画面はmetadataとpending reviewを表示し接続URIを残さない' 2>&1 | tee ../../evidence/a2a-projection-test.txt
+          flutter build macos --debug --no-pub 2>&1 | tee ../../evidence/macos-normal-build.txt
+          cd ../..
+          fixture="$PWD/native/rust_helper/target/debug/examples/macos_a2a_fixture"
+          test -f "$fixture" && test ! -L "$fixture"
+          "$fixture" > evidence/fixture-status.txt 2>&1 & fixture_pid=$!
+          trap 'if kill -0 "$fixture_pid" 2>/dev/null; then kill -TERM "$fixture_pid"; wait "$fixture_pid" || true; fi' EXIT
+          for attempt in {1..30}; do
+            if grep -Fxq D4_A2A_FIXTURE_READY evidence/fixture-status.txt; then break; fi
+            sleep 0.1
+          done
+          grep -Fxq D4_A2A_FIXTURE_READY evidence/fixture-status.txt
+          xcodebuild test -project apps/desktop_flutter/macos/Runner.xcodeproj -scheme Runner \
+            -destination 'platform=macOS' -parallel-testing-enabled NO \
+            -only-testing:RunnerUITests/AdapterOwnerUITests/testProductMacA2aCenter \
+            -derivedDataPath "$RUNNER_TEMP/macos-a2a-tests" -resultBundlePath "$RUNNER_TEMP/macos-a2a-tests.xcresult" \
+            CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual 'SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG D4_MACOS_OWNER_UI_TEST' 2>&1 | tee evidence/a2a-product-ui-test.txt
+          wait "$fixture_pid"
+          grep -Fxq D4_A2A_FIXTURE_SERVED_ONCE evidence/fixture-status.txt
+      - name: 限定Auditと終了状態
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -d "$RUNNER_TEMP/macos-a2a-tests.xcresult" ]; then
+            xcrun xcresulttool get test-results summary --path "$RUNNER_TEMP/macos-a2a-tests.xcresult" > evidence/native-summary.json
+          fi
+          a2a_audit=/Users/runner/Library/Containers/com.example.guiShellDesktop/Data/Library/Application\ Support/D4Pocket/macos-broker/store/audit.jsonl
+          test -f "$a2a_audit" && test ! -L "$a2a_audit"
+          test "$(stat -f%z "$a2a_audit")" -lt 4194304
+          ! grep -q -e 'http://127.0.0.1:34101' -e 'Mac A2A fixture' -e 'Public test declaration only' "$a2a_audit"
+          jq -sc 'map(select(.operation == "A2A接続" or .operation == "A2A接続一覧")) | .[-32:][] | {operation: .operation, decision: .decision, code: (if (.reason | test("^[a-z_]{1,80}$")) then .reason else "bounded_receipt" end)}' "$a2a_audit" > evidence/a2a-audit-projection.jsonl
+          jq -se 'map(select(.operation == "A2A接続")) | (map(select(.decision == "rejected")) | length) >= 1 and (map(select(.decision == "accepted")) | length) == 1' "$a2a_audit" > evidence/a2a-audit-acceptance.txt
+      - name: 所有試験資産の回収確認
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! pgrep -x gui_shell_macos_broker > evidence/remaining-helper-pids.txt
+          ! pgrep -f '^.*/native/rust_helper/target/debug/examples/macos_a2a_fixture$' > evidence/remaining-fixture-pids.txt
+          git diff --exit-code -- apps/desktop_flutter
+      - name: 限定証拠を保存
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: macos-a2a-${{ github.sha }}
+          path: evidence/
+          retention-days: 3
+          if-no-files-found: error
   macos-mcp:
     if: ${{ inputs.target == 'macos_mcp_center' || inputs.target == 'macos_mcp_credential_binding' }}
     runs-on: macos-15

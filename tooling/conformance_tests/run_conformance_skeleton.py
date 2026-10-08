@@ -10944,6 +10944,24 @@ def macos_mcp資格情報参照の公開境界を検査する() -> list[str]:
     return errors
 
 
+def macos_a2a接続の限定責任経路を検査する() -> list[str]:
+    """CONFIG証拠。新native入口の実作用は専用手動Mac試験で確認する。"""
+    required = {
+        "docs/specs/macos-a2a-center.md": ["MAC-A2A-1", "MAC-A2A-3", "metadata-only", "pending_review"],
+        "native/rust_helper/src/macos_desktop_owner.rs": ['operation == "A2A接続"', "a2a_center::owner_confirmation_summary", "macos_a2a_同一要求"],
+        "apps/desktop_flutter/macos/Runner/BrokerProcessChannel.swift": ['operation == "A2A接続" ? 315', "result(response)"],
+        ".github/workflows/apple-manual-build.yml": ["macos_a2a_center", "testProductMacA2aCenter", "D4_A2A_FIXTURE_SERVED_ONCE"],
+    }
+    errors = []
+    for path, tokens in required.items():
+        source = (ROOT / path).read_text(encoding="utf-8")
+        errors.extend(f"Mac A2A責任経路がない: {path}: {token}" for token in tokens if token not in source)
+    index = (ROOT / "規定/正本索引.json").read_text(encoding="utf-8")
+    if "docs/specs/macos-a2a-center.md" not in index:
+        errors.append("Mac A2A責任正本が索引にない")
+    return errors
+
+
 def main() -> int:
     tests = [
         test_required_docs_exist,
@@ -11181,6 +11199,7 @@ def main() -> int:
         test_macos_credential_public_input_is_metadata_only,
         test_macos_mcp_native_scope_is_explicit,
         macos_mcp資格情報参照の公開境界を検査する,
+        macos_a2a接続の限定責任経路を検査する,
         test_setup_doctor_public_bind_warning_exists,
         test_desktop_setup_doctor_ui_does_not_require_development_toolchains,
         test_broker_parity_startup_timeout_allows_local_cold_build,
