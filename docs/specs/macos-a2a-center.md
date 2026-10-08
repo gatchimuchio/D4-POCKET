@@ -26,6 +26,8 @@
 
 ## 検証履歴
 
+source `b7a20d8597cb5f45020a37739ad880a609b63334`、[run 37795697040](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37795697040)は検索・公開入力・実native拒否／別個承認・Broker実取得・成功receipt・Card名・未審査表示まで成立。fixture一回取得、拒否／受理Audit、本文非保存、通常build、helper／fixture回収はPASS。製品UIはその後のhash文字のOCR探索で95.267秒FAIL。hashは未審査行より前にあるのに下方向へ探索する順序だった。hash投影だけを既知public prefixのAX要素で確認してから未審査行へ進むよう局所修正し、残るURI消去・通常終了を検収する。artifact `11558672214`（70013 bytes）、SHA-256 `20daae25df77f41383baf1c95217eeb94e6dcdc1c915980d3b78366005769e9d`を実byteへ照合。MAC-A2A-1のnative実拒否証拠を本runへ結合し、CLOSED境界・投影を追加試験しない。
+
 source `5a7294f4d345fbd45c66327c59a11e25ea90b810`、[run 37794151100](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37794151100)は新native入口直接1件、通常native／Mac build、変更Dart解析、待機試験とURI消去Widget各1件がPASS。MAC-A2A-1をCLOSED。製品UIは検索候補のprefix文字を重複検出し、22.014秒でFAIL。接続・native拒否に未到達なのでAudit受入れは未成立、helper／fixture残留0・source cleanはPASS。artifact `11558500960`（73138 bytes）、SHA-256 `504e5815d131af29e74eaae84441080e2c03a0385dcdd6d1f5771de86be59b91`を実byteへ照合。検索候補のA2A接続だけを完全一致に限定する局所locator修正を行い、`a2a_product_only=true`で残件の製品操作だけを再実行する。CLOSED直接境界・成立済み投影は再試験しない。通常buildは試験App生成の前提で、強化証拠にしない。
 
 最初の手動run 37793767655（source a854b49）はUI実行前のnative準備中に中止した。新規証拠gateのshell否定を`set -e`だけへ任せず、Audit本文混入・process残存時に明示終了値1とする局所修正のためで、製品受入れPASS／FAIL証拠へ転用しない。

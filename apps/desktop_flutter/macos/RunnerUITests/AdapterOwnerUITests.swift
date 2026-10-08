@@ -37,8 +37,9 @@ final class AdapterOwnerUITests: XCTestCase {
     let accepted = "接続metadataを受理しました。Trustは未審査のままです。Audit="
     XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@ OR value BEGINSWITH %@", accepted, accepted)).firstMatch.waitForExistence(timeout: 15))
     try mcpPublicText(app, "Mac A2A fixture")
+    let hashPrefix = "接続先hash: sha256:"
+    XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@ OR value CONTAINS %@", hashPrefix, hashPrefix)).firstMatch.exists)
     try mcpPublicText(app, "未審査（pending_review）")
-    try mcpPublicText(app, "接続先hash:")
     // 公開URI欄だけを取得する。成功後に実入力が消えたことを確認する。
     try mcpPublicText(app, "Agent Card接続先URI", click: true, scrollUp: true)
     let current = app.textFields.allElementsBoundByAccessibilityElement.filter {

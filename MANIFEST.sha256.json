@@ -568,7 +568,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/RunnerUITests/AdapterOwnerUITests.swift",
-      "sha256": "55822c79cc38eaf3f9c1f45a2d62209e6e2b18dd742c401ca3a242a8c77217f5"
+      "sha256": "36ec15fb9e64b3e5eff4a7464c04a2aca00ea0de2e878b4de3a4275e1292ab1f"
     },
     {
       "path": "apps/desktop_flutter/pubspec.lock",
@@ -1492,7 +1492,7 @@
     },
     {
       "path": "docs/specs/macos-a2a-center.md",
-      "sha256": "da5da2b9b5ce1d70419cb02b54dddeb0806e75ecaf909ff1596b64332d431fb1"
+      "sha256": "71c530a51bab1bae36726422098fe34c9ad0e358ea17b799d174eb9ef5f098a0"
     },
     {
       "path": "docs/specs/macos-agent-cli-selection.md",
