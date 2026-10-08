@@ -156,7 +156,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "fc28d40ede61f854489c3863c8e48f63636e05ff03419968e84e36687810c8d4"
+      "sha256": "cf792758da86686668ee68fcd0673ec60756b9a68234a591cc92066f21171c88"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -568,7 +568,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/RunnerUITests/AdapterOwnerUITests.swift",
-      "sha256": "ebfb7f002b86f1ce0dd5d03f254c236fddf424d582c80048de153cb8c8df89dc"
+      "sha256": "e6cae5e6da4f6bb63dfc0dc67a1f4a8349ef7a5d26a957fec16e7ebbbc0eea48"
     },
     {
       "path": "apps/desktop_flutter/pubspec.lock",
@@ -1276,7 +1276,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "18e47346976dc53a8e3b1f583b89441b3b22e90d6cf00658590e7ae86ea66471"
+      "sha256": "0a6b3dc421bf090f8969fefc2363e328da313c84887add780f21f534d2dd2b86"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",

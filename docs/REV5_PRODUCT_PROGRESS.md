@@ -23,7 +23,11 @@
 
 局所検査: Schema 165／正常例161／負例212、Conformance 238件、新CLI Broker 2試験とnative公開入力1試験はPASS。新CLI待機／投影のFlutter 2試験はASCII一時checkoutでPASS。通常checkoutのFlutter testは既存`build/unit_test_assets`削除不能、両appの必須`flutter analyze --no-pub`は既知の日本語path LSP FormatException／server exit 255でexit 1（ignored logは34／20）。一時checkoutは追跡済みDesktop／shared sourceをbuild outputなしで複製したdev-only試験環境であり、installed／正式製品証拠へ昇格しない。厳格日本語監査は変更外の既存5 file／17 findingsでFAIL、現在追加した意味・code・Schemaにはfindingなし。初回Schemaは新負例のSchema登録不足、Rust compileは非Owner sourceのExport match未追加でFAILし、両方を局所修正した。Manifest再生成前のrelease gate不一致も成功へ読み替えない。Mac製品の有限Acceptanceは専用手動Actionsまで未成立。
 
-必須Windows `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --no-fail-fast -- --test-threads=1`は555 passed／2 failed／13 ignoredでexit 101。変更外のA2A接続／Codex loopback HTTP応答headerでConnectionResetを観測し、根因未解消の既存Final QA `release_blocker`へ履歴を保持する。追加反復・fixture強化を開始せず、全体PASSとは報告しない。ASCII上の対象Dart解析はexit 0、既存deprecated API info 5件のみ。Manifest再生成後のcheck、手動workflow限定検査、Windows v1 release gate、diff checkはPASS。Mac CLI選択の実動作は次の専用手動runnerで確認する。
+必須Windows `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --no-fail-fast -- --test-threads=1`は555 passed／2 failed／13 ignoredでexit 101。変更外のA2A接続は原因未確認、Codex loopbackではHTTP応答headerのConnectionResetを観測した。根因未解消の既存Final QA `release_blocker`へ履歴を保持する。追加反復・fixture強化を開始せず、全体PASSとは報告しない。ASCII上の対象Dart解析はexit 0、既存deprecated API info 5件のみ。Manifest再生成後のcheck、手動workflow限定検査、Windows v1 release gate、diff checkはPASS。
+
+手動Actions [run 37712765961](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37712765961)、commit `5c0a9456f0c2b3de10dd6d8f86c80ddad122d185`は通常Mac build、native公開入力1件、Broker境界2件、Dart対象解析／2試験、終了回収がPASS。製品UIで実OS file chooserの取消と取消投影を確認したが、実入力Copyのmouse位置が実行系ID欄となり31.270秒でFAILした。録画ではCLI欄の`/previous-cli`保持を確認し、scroll途中の画像座標とclick時の位置差を観測した。通常scroll終了を待ってから座標を読むよう試験だけを修正し、入力保持条件を削除しない。選択／登録／正常終了を含む有限Acceptance全体は未成立であり、mainへ統合しない。artifact `11522811889`（3540536 bytes）、SHA-256 `7bddbf10f64d5b2027aac2ed11c086f8028dc94b2f25e763c1b9de51350db5f7`をGitHub digestと照合した。製品source・Authority・有限条件は変更しない。
+
+開発用ASCII source copyの回収は検証済み絶対pathへの`Remove-Item -LiteralPath ... -Recurse -Force`がtool policyで実行前拒否された。削除は未成立であり、別shell等で迂回しない。製品経路外の`known_limitation`としてREADMEへ記録する。ignoredのActions証拠は意図的に保持する。
 
 #### macOS 作業領域のOS選択 — CLOSED（Product Build、2026-10-08）
 

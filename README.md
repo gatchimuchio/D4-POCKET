@@ -399,3 +399,11 @@ repository 文書にある未完了項目は、すべて <code>release_blocker</
   reason: 秘密鍵と結合資格を起動世代内に限定し、Desktop再起動で全招待・結合・未完了対話を失効させる。通信の再接続は有効期限内なら可能だが、Host再起動後の資格自動復元は行わない。
   required_action: Desktop再起動後はownerが新しい招待を発行しMobileで結合し直す。未完了要求を自動再送しない。
   blocks_release: no
+
+## P13開発用一時source copy
+
+- item: CLI投影の局所Flutter試験用ASCII copyの回収未確認
+  classification: known_limitation
+  reason: `C:\Users\ohira\AppData\Local\Temp\d4-cli-flutter-c2eac7a89629418b930ad182bed68e3a`は追跡済みDesktop／shared sourceのdev-only複製。試験終了後の検証済み絶対pathへの削除はtool policyで実行前に拒否され、別shell等では迂回していない。製品経路・配布物・Authority・Credentialには含めない。
+  required_action: 許可された通常の一時folder回収手段で当該copyだけを除去する。製品機能のAcceptanceを延長しない。
+  blocks_release: no

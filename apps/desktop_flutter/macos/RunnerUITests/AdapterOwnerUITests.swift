@@ -65,6 +65,8 @@ final class AdapterOwnerUITests: XCTestCase {
     // CLI欄まで通常scrollで戻し、既知公開ラベルだけを認識する。
     app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.65))
       .scroll(byDeltaX: 0, deltaY: 150)
+    // 録画でscroll途中の画像とclick時の位置差を観測した。通常UIの移動終了後に座標を読む。
+    Thread.sleep(forTimeInterval: 1)
     let image = XCUIScreen.main.screenshot().image
     var proposed = CGRect(origin: .zero, size: image.size)
     guard let pixels = image.cgImage(forProposedRect: &proposed, context: nil, hints: nil) else {
