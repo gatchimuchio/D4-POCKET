@@ -51,9 +51,9 @@ final class AdapterOwnerUITests: XCTestCase {
       XCTFail("Keychain登録と公開metadata一覧の成立を確認できない")
       return
     }
-    try assertCredentialStatus(app, "有効")
     let revoke = app.buttons["資格情報を失効"]
-    XCTAssertTrue(revoke.waitForExistence(timeout: 10)); reveal(app, revoke); revoke.click()
+    XCTAssertTrue(revoke.waitForExistence(timeout: 10))
+    try assertCredentialStatus(app, "有効", action: "資格情報を失効")
     approve(notice)
     try assertCredentialStatus(app, "失効")
     print("D4_MACOS_CREDENTIAL_VAULT_PRODUCT_PASS")
@@ -67,7 +67,7 @@ final class AdapterOwnerUITests: XCTestCase {
                                         label, label, label + "\n")).firstMatch
   }
 
-  private func assertCredentialStatus(_ app: XCUIApplication, _ status: String) throws {
+  private func assertCredentialStatus(_ app: XCUIApplication, _ status: String, action: String? = nil) throws {
     // Brokerのmetadata-only成功後だけ。native秘密入力が残っていれば画像を取得しない。
     guard !app.sheets.firstMatch.exists, !app.secureTextFields.firstMatch.exists else {
       throw failure("秘密入力終了前に公開状態を取得しない")
@@ -75,7 +75,8 @@ final class AdapterOwnerUITests: XCTestCase {
     for attempt in 0..<8 {
       Thread.sleep(forTimeInterval: 0.6)
       // 製品窓だけ。画像・認識文字を保存・添付・出力しない。
-      let image = app.screenshot().image
+      let window = app.windows.firstMatch
+      let image = window.screenshot().image
       var proposed = CGRect(origin: .zero, size: image.size)
       guard let pixels = image.cgImage(forProposedRect: &proposed, context: nil, hints: nil) else {
         throw failure("公開資格情報状態の画面を取得できない")
@@ -92,10 +93,27 @@ final class AdapterOwnerUITests: XCTestCase {
           .replacingOccurrences(of: "・", with: "").replacingOccurrences(of: "•", with: "")
         return normalized == "apikey" + status
       }
-      if hits.count == 1 { return }
-      guard hits.isEmpty, attempt < 7 else {
+      guard hits.count <= 1 else {
         throw failure("公開資格情報状態を一意に確認できない: " + status)
       }
+      if let row = hits.first {
+        guard let action else { return }
+        let buttons = (request.results ?? []).filter {
+          $0.topCandidates(1).first?.string.replacingOccurrences(of: " ", with: "") == action
+        }
+        guard buttons.count <= 1 else { throw failure("公開失効操作を一意に確認できない") }
+        if let button = buttons.first {
+          let box = button.boundingBox
+          // 公開状態と同じ行の可視操作だけ。AXが返した1px frameをclick位置に使わない。
+          guard box.minX > row.boundingBox.maxX,
+                abs(box.midY - row.boundingBox.midY) * image.size.height < 40 else {
+            throw failure("公開状態に対応する失効操作ではない")
+          }
+          window.coordinate(withNormalizedOffset: CGVector(dx: box.midX, dy: 1 - box.midY)).click()
+          return
+        }
+      }
+      guard attempt < 7 else { throw failure("公開資格情報状態と操作を確認できない: " + status) }
       app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.65))
         .scroll(byDeltaX: 0, deltaY: -180)
     }

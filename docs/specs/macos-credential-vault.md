@@ -68,4 +68,6 @@ run `37733367206`／source `3a0579b`は登録・metadata一覧と実表示の`ap
 
 失効表示の局所検証: 独立Semanticsの初回は名前とtap actionが別nodeとなり既存Widget試験でFAIL。MergeSemanticsで日本語名・button・既存tapを同じnodeに束縛した。次の試験は挙動成立後にSemanticsHandle回収時点でFAILし、試験内部のfinallyへ回収を移した。修正後、ASCII一時checkoutの既存失効Widget試験1件がPASSし、button／tap・対象metadata・一覧更新・秘密非表示を確認した（FIXTURE、installed証拠ではない）。両Flutter `analyze --no-pub`は既存LSP server exit 255でexit 1（ignored log `p13-macos-credential-semantics-desktop-analyze.txt`／`p13-macos-credential-semantics-mobile-analyze.txt`）。Manifestは検証中の局所編集で一度不一致を返し、再生成後のcheckでPASS。正常操作・Authority・公開状態確認条件を削除しない。
 
+run `37735176741`／source `2a421cc`は対象Dart解析・4 Widget試験、通常build、公開登録・有効状態がPASSし、失効buttonのAX名も取得できた。AX frameが高さ1pxのままのため、可視確認で42.359秒のFAIL。既存失効buttonを名前が読めるTextButtonへ変更し、秘密入力の終了後だけ、製品窓の公開状態と同じ行にある日本語操作名を一意に照合して通常mouse clickする。AX名の存在確認・状態確認・別個Owner確認・失効結果を保持し、1px frameをclick座標へ使わない。画像・認識文字を保存・添付・出力せず、GUI state／Broker応答／Ownerを直接設定しない。artifact `11531049345`のSHA-256 `4407122315b532c7f93ff367eaaf03b9caf0b14588ed3c97bb36fd4511a8ddaf`を照合した。後片付けPASS、有限Acceptance全体は未成立。
+
 `release_blocker`: MacでのProvider／MCP注入、正式署名identity・配布、Final QA。通常Release `task_execution=unsupported`、`release_ready=false`を保持する。秘密値の表示、保管方式fallback、Windowsの保存形式migrationを本単位の便宜で追加しない。
