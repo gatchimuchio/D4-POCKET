@@ -125,10 +125,19 @@ final class AdapterOwnerUITests: XCTestCase {
     XCTAssertTrue(receipt.waitForExistence(timeout: 15))
     XCTAssertFalse(app.staticTexts.matching(NSPredicate(
       format: "label CONTAINS %@ OR value CONTAINS %@", "macos-mcp-public-result", "macos-mcp-public-result")).firstMatch.exists)
-    // 資格情報metadataがある場合、receiptより下の接続cardへ進む。既存資格情報なし試験は維持。
+    // 公開画像で探索が後続のExport設定まで進んだと確認。既存検索でMCP先頭へ戻す。
     do {
-      try mcpPublicText(app, "切断", click: true, scrollUp: !credentialBinding,
-                        allowDisconnectIcon: credentialBinding)
+      if credentialBinding {
+        toolbar[0].click()
+        let searchAgain = app.textFields.firstMatch
+        XCTAssertTrue(searchAgain.waitForExistence(timeout: 10))
+        searchAgain.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+        app.typeText("MCP")
+        try mcpPublicText(app, "MCP接続", click: true, scroll: false)
+        try clickMcpCredentialDisconnect(app)
+      } else {
+        try mcpPublicText(app, "切断", click: true, scrollUp: true)
+      }
     } catch {
       if credentialBinding {
         let disconnect = app.buttons["切断"]
@@ -153,6 +162,29 @@ final class AdapterOwnerUITests: XCTestCase {
     print("D4_MACOS_MCP_PRODUCT_PASS")
     app.typeKey("q", modifierFlags: .command)
     XCTAssertTrue(app.wait(for: .notRunning, timeout: 10))
+  }
+
+  private func clickMcpCredentialDisconnect(_ app: XCUIApplication) throws {
+    // AX上に存在しても1pxなら画面外。検索で復帰したMCP面から実可視frameを確認する。
+    guard !app.sheets.firstMatch.exists, !app.secureTextFields.firstMatch.exists else {
+      throw failure("秘密入力中に切断を操作しない")
+    }
+    let button = app.buttons["切断"]
+    XCTAssertTrue(button.waitForExistence(timeout: 10))
+    for attempt in 0..<10 {
+      Thread.sleep(forTimeInterval: 0.6)
+      let window = app.windows.firstMatch
+      let frame = button.frame
+      if frame.height >= 24 && frame.width >= 40 && window.frame.contains(frame) {
+        button.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+        return
+      }
+      if attempt < 9 {
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.65))
+          .scroll(byDeltaX: 0, deltaY: -180)
+      }
+    }
+    throw failure("MCP面から切断buttonの可視frameを確認できない")
   }
 
   private func mcpPublicCredentialRow(_ app: XCUIApplication, selection: Bool) throws {
@@ -234,8 +266,7 @@ final class AdapterOwnerUITests: XCTestCase {
   }
 
   private func mcpPublicText(_ app: XCUIApplication, _ label: String, click: Bool = false,
-                             scroll: Bool = true, scrollUp: Bool = false,
-                             allowDisconnectIcon: Bool = false) throws {
+                             scroll: Bool = true, scrollUp: Bool = false) throws {
     // 合成公開Server／引数だけ。画面を保存せず、実windowの文字範囲boxへ通常mouse入力する。
     guard !app.secureTextFields.firstMatch.exists else { throw failure("秘密入力を撮影しない") }
     for attempt in 0..<8 {
@@ -261,8 +292,7 @@ final class AdapterOwnerUITests: XCTestCase {
         for candidate in observation.topCandidates(3) {
           if ["切断", "MCP接続"].contains(label) {
             let text = candidate.string.components(separatedBy: .whitespacesAndNewlines).joined()
-            if text != label && !(allowDisconnectIcon && label == "切断"
-              && text.count <= 4 && text.contains(label)) { continue }
+            if text != label { continue }
           }
           if let range = candidate.string.range(of: label),
              let box = try candidate.boundingBox(for: range) { return box }
