@@ -1,0 +1,29 @@
+# macOS 資格情報保管庫
+
+## 意味と有限Acceptance
+
+状態: IMPLEMENTING（P13 Product Build）。既存の資格情報登録・公開一覧・論理失効を、macOS Keychainと製品のnative秘密入力へ接続する。Provider／MCPへの秘密注入、Task、物理削除、正式identity、最終QAは別単位。登録済みの秘密値をFlutterへ読み戻す機能は作らない。
+
+有限条件: native秘密入力の取消は未登録、別個Owner確認後の登録、metadata-only一覧、現在metadataに束縛したOwner確認後の論理失効、通常要求による登録・秘密読出し・承認注入の拒否、秘密値の画面・応答・Audit非露出、通常終了。正常経路一回と対象境界試験で閉じ、CLOSED済みCLI／Workspace／Mobile条件を再試験しない。
+
+## 資格情報保存先
+
+資格情報保存先は、登録・保管対象の点検・許可済み内部読取・新規登録失敗時の回収だけを担う。Permission、Approval、用途・相手への委譲可否、Auditは既存Brokerが所有する。Windows DPAPIの保存形式・検査・権限は変更しない。macOSの保管方式は`macos_keychain`で、既存receiptの`暗号文hash`を平文やKeychain参照のhashへ読み替えない。
+
+macOSでは既存ringのAES-256-GCMで秘密値を暗号化し、鍵と暗号文を別のKeychain itemに保存する。暗号文へversion・nonce・用途／対象IDを結合し、公開receiptは実暗号文のhashだけを返す。KeychainのserviceはRustが検証したBroker storeごとの名前空間、accountは固定の資格情報IDと鍵／暗号文の区別へ限定する。外部payloadからservice、access group、保管先を受け付けず、他App／Audit storeのitemを探索しない。
+
+OS呼出しは独立Rust部品に限定する。[Apple SecItem API](https://developer.apple.com/documentation/security/adding-a-password-to-the-keychain)と[Data Protection Keychain](https://developer.apple.com/documentation/technotes/tn3137-on-mac-keychains)を使い、同期なし・ThisDeviceOnly・追加専用・重複拒否・無言fallbackなしとする。OS拒否や保管不整合は固定分類でfail-closed。平文、鍵、OSの詳細errorをlogへ出さない。新規登録の途中失敗は今回作成したitemだけを回収し、回収失敗はRecoveryが必要な未成立状態にする。
+
+## 製品経路とAuthority
+
+macOS資格情報native入力要求は`資格情報登録`の公開payloadであり、`版`・`資格情報ID`・`用途`・`接続対象`・`種類`だけを含む。公開Schemaは`specs/macos_credential_input.schema.json`。秘密値・Owner資格・保管先は公開要求に含めない。固定Rust UIが既存匿名pipeへ書く`native_credential_input`はRunnerが公開入力から拒否し、子Rustが元要求hash・nonce・期限を照合する。既存の完全登録payloadはこの照合と別個Owner確認を通った場合だけ内部生成する。
+
+Flutterは非秘密metadataだけを送る。通常GUI親processの固定Rust UIが秘密入力を受け、既存helperへのprivate pipeだけに渡す。Swift／Dartへ秘密値を返さず、公開frameからprivate入力を拒否する。秘密入力はOwner承認ではない。子Rust helperの別個期限付きOwner確認後、現在の要求・hash・IDを再評価して既存Brokerのprocess内receiverへ配送する。既存の登録・Audit確定・一覧・失効を再利用し、別Authority経路や資格探索を作らない。
+
+作用対応: Capability=資格情報の登録／metadata一覧／論理失効、Permission=Broker固定Keychainの対象だけ、Approval=対象metadataに束縛したnative Owner確認、Audit=公開metadataと実暗号文hash、Recovery=入力取消・拒否は未登録、部分登録は今回分のみ回収して未成立を保持。論理失効は取消不可、秘密注入を許可しない。
+
+## 検証範囲
+
+ローカルは既存Windows保存先の直接依存回帰、新公開payload・秘密／Authority注入拒否、Widget投影を対象とする。手動Actions `macos_credential_vault`でKeychain実API、通常Mac build、製品native入力・別個確認・一覧・失効・終了を検証する。合成秘密値はnative試験内で生成し、CLI引数・環境変数・XCTest入力log・動画・artifactへ渡さない。
+
+`release_blocker`: MacでのProvider／MCP注入、正式署名identity・配布、Final QA。通常Release `task_execution=unsupported`、`release_ready=false`を保持する。秘密値の表示、保管方式fallback、Windowsの保存形式migrationを本単位の便宜で追加しない。

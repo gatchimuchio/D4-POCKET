@@ -49,6 +49,7 @@ cap-fs-ext = "=4.0.3"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 gui_shell_macos_owner = { path = "../macos_owner" }
+gui_shell_macos_keychain = { path = "../macos_keychain" }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

@@ -156,6 +156,7 @@ REQUIRED = {
     "macos_workspace_selection_receipt.schema.json",
     "macos_agent_cli_selection.schema.json",
     "macos_agent_cli_selection_receipt.schema.json",
+    "macos_credential_input.schema.json",
     "provider_model_selection.schema.json",
     "agent_task_workspace_permission_request.schema.json",
     "agent_task_workspace_permission.schema.json",

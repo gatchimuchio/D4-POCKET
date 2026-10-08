@@ -19,5 +19,5 @@ block2 = "=0.6.2"
 core-foundation = "=0.10.1"
 core-foundation-sys = "=0.8.7"
 objc2 = "=0.6.5"
-objc2-app-kit = { version = "=0.3.2", default-features = false, features = ["std", "block2", "NSApplication", "NSResponder", "NSOpenPanel", "NSPanel", "NSSavePanel", "NSWindow"] }
-objc2-foundation = { version = "=0.3.2", default-features = false, features = ["std", "NSString", "NSURL", "NSData", "NSArray", "NSError"] }
+objc2-app-kit = { version = "=0.3.2", default-features = false, features = ["std", "block2", "NSApplication", "NSResponder", "NSOpenPanel", "NSPanel", "NSSavePanel", "NSWindow", "NSAlert", "NSSecureTextField", "NSTextField", "NSControl", "NSView", "NSButton"] }
+objc2-foundation = { version = "=0.3.2", default-features = false, features = ["std", "block2", "NSString", "NSURL", "NSData", "NSArray", "NSError", "NSTimer"] }

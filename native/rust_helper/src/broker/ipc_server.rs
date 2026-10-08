@@ -159,6 +159,10 @@ fn run_loopback_server_inner(
     let session_secret = random_hex(32)?;
     let mut broker = Broker::new_persistent(&session_id, &config.store_dir)
         .map_err(|error| BrokerServerError::new(error.message()))?;
+    #[cfg(target_os = "macos")]
+    if shutdown.is_some() && config.desktop_package_layout_verified && owner_operations.is_some() {
+        broker.macos資格情報保存先を初期化(&config.store_dir).map_err(BrokerServerError::new)?;
+    }
     if let Some((app_id, audit_store_id)) = config.desktop_product_identity.clone() {
         broker
             .set_desktop_product_identity(app_id, audit_store_id)

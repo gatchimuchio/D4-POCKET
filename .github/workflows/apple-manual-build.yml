@@ -16,6 +16,7 @@ name: Apple platform 手動補助build
           - macos_agent_registration
           - macos_workspace_selection
           - macos_agent_cli_selection
+          - macos_credential_vault
         default: all
         required: true
 
@@ -23,6 +24,31 @@ permissions:
   contents: read
 
 jobs:
+  macos-credential:
+    if: ${{ inputs.target == 'macos_credential_vault' }}
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - name: 対象commitを取得
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Keychain実APIとBroker保存先を検証
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          { git rev-parse HEAD; sw_vers; xcodebuild -version; } > evidence/environment.txt
+          rustup toolchain install 1.95.0 --profile minimal
+          cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib credential_storage::tests:: -- --test-threads=1 2>&1 | tee evidence/keychain-runtime-test.txt
+      - name: 限定証拠を保存
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: macos-credential-${{ github.sha }}
+          path: evidence/
+          retention-days: 3
+          if-no-files-found: error
   macos-product:
     if: ${{ inputs.target == 'macos_product' || inputs.target == 'macos_owner' || inputs.target == 'macos_adapter_lifecycle' || inputs.target == 'macos_agent_registration' || inputs.target == 'macos_workspace_selection' || inputs.target == 'macos_agent_cli_selection' }}
     runs-on: macos-15

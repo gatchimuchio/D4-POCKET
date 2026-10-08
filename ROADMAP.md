@@ -1,5 +1,7 @@
 # GUI Shell ロードマップ
 
+P13 macOS資格情報保管庫をIMPLEMENTING。Windows専用だった既存登録・公開一覧・論理失効を、Keychainとnative秘密入力へ接続する。有限Acceptanceは`docs/specs/macos-credential-vault.md`。手動Actions `macos_credential_vault`はローカルにないMac API／基本製品経路の補助に限定する。秘密値をFlutterへ渡さず、別個Owner確認・Broker判定・通常Release能力を保持する。CLI／Workspace／MobileのCLOSED条件、Provider／MCP注入、正式配布、最終QAはこの単位へ取り込まない。
+
 P13 macOS Agent CLI実行fileのOS選択はCLOSED（Product Build、2026-10-08）。commit `5e8982cce326b907b1be00282c291806f6141a76`の手動Actions [run 37713979077](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37713979077)で取消／実入力保持、sandbox外の実CLI file選択／path反映、別個Owner確認後のBroker probe／登録、Command-Q終了・helper／fixture回収がPASS。通常Mac build、Rust対象3件、Dart対象解析／2試験もPASS。有限Acceptanceは`docs/specs/macos-agent-cli-selection.md`、失敗履歴と証拠範囲は`docs/REV5_PRODUCT_PROGRESS.md`。成功sourceをmainへ統合・push・remote照合し、検証branchはlocal／remoteとも回収した。選択は登録・Task Authorityではなく、通常Release能力を保持する。次はP13の残る製品接続差分だけであり、CLOSED条件を証拠強化目的で再開しない。
 
 P13 macOS作業領域OS選択はCLOSED（Product Build、2026-10-08）。commit `af8f55b9b46e1aa95d8a080e4972376bff4045ee`の手動Actions [run 37709224596](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37709224596)で取消／入力保持、実OS chooserのsandbox外folder選択／path投影、別個Owner確認後のBroker登録、Command-Q終了・helper／fixture回収までPASS。Rust対象5件、Dart対象解析／2試験、通常Mac buildもPASS。責任正本は`docs/specs/macos-workspace-selection.md`、証拠範囲と過去FAILは`docs/REV5_PRODUCT_PROGRESS.md`。OSアクセスとD4のPermission／Approvalを分離し、通常Release能力・正式配布へ成功を拡大しない。次はP13のOPEN製品差分だけを進め、CLOSEDの選択／登録／Adapter／Mobile条件は再開しない。

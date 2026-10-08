@@ -356,6 +356,10 @@
       "責任": "P13 CLI実行fileのOS選択、既存private pipeによる非公開scope輸送、公開path投影と別個Owner登録の分離、有限製品受入れ"
     },
     {
+      "path": "docs/specs/macos-credential-vault.md",
+      "責任": "P13 native秘密入力、別個Owner確認、既存登録・一覧・失効、Keychain保存先と秘密非公開の有限受入れ"
+    },
+    {
       "path": "docs/specs/mobile-surface.md",
       "責任": "C24 Mobileの選択的状態投影、Workspace ID選択・Agent対話要求、Device Link・Approval・非権限境界"
     },

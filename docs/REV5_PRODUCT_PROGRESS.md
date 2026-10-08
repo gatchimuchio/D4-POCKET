@@ -17,6 +17,10 @@
 
 ## P13 Mobile / Non-Windows — 現行track
 
+#### macOS 資格情報保管庫 — IMPLEMENTING（Product Build、2026-10-08）
+
+現行実装の`credential_vault`と`ProtectedStore`はWindows専用。P13の不足として、既存Brokerの登録・公開一覧・論理失効をKeychain保存先とnative秘密入力へ接続する。有限Acceptanceは`docs/specs/macos-credential-vault.md`。Windows保存形式を変更せず、秘密値をFlutter／Swiftへ返さない。別個Owner確認と既存Audit境界を保持し、Provider／MCP注入・Task・正式identity・配布・Final QAは後続／既存`release_blocker`へ残す。CLI／Workspace／MobileのCLOSED条件は再訪しない。
+
 #### macOS Agent CLI実行fileのOS選択 — CLOSED（Product Build、2026-10-08）
 
 有限Acceptanceはcommit `5e8982cce326b907b1be00282c291806f6141a76`の手動Actions [run 37713979077](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37713979077)でPASS。macOS 15.7.9 arm64／Apple Virtual Machine／Xcode 16.4、Flutter 3.44.0／Rust 1.95.0。製品Agent Centerから実OS file chooserを取消し、CLI実入力`/previous-cli`の保持を通常Copyで確認。二度目の選択でsandbox外の固定実Codex CLI `/Users/runner/d4-os-selected-cli`を選び、公開path投影と実入力内容を照合した。選択だけでは登録されず、別個のnative Owner確認後に既存BrokerがCLI probeを行いRuntime／Workspace登録結果を表示した。Command-Q終了、helper残留なし、runner source clean、専用CLI／Workspace回収までPASS。XCUITest 1 passed／0 failed／0 skipped、43.241秒。

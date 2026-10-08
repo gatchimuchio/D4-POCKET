@@ -2,7 +2,7 @@
 //!
 //! このmoduleは秘密値をRuntime、Flutter、Audit reason、応答へ返さない。秘密値の
 //! MCP以外への注入、更新、物理削除、接続先変更は未接続に保つ。
-#![cfg(windows)]
+#![cfg(any(windows, target_os = "macos"))]
 #![allow(non_snake_case)]
 
 use super::*;
@@ -18,6 +18,10 @@ const MCP_USE_PREFIX: &str = "MCP資格情報使用:";
 const PROVIDER_USE_PREFIX: &str = "提供元資格情報使用:";
 const MAX_TEXT_BYTES: usize = 256;
 const MAX_SECRET_BYTES: usize = 65_536;
+#[cfg(windows)]
+const STORAGE_NAME: &str = "windows_dpapi";
+#[cfg(target_os = "macos")]
+const STORAGE_NAME: &str = "macos_keychain";
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -40,8 +44,14 @@ struct Registration {
     registrant: String,
     #[serde(rename = "登録経路")]
     route: String,
-    #[serde(rename = "秘密値")]
-    secret: String,
+    #[serde(rename = "秘密値", deserialize_with = "secret_string")]
+    secret: zeroize::Zeroizing<String>,
+}
+
+fn secret_string<'de, D: serde::Deserializer<'de>>(
+    value: D,
+) -> Result<zeroize::Zeroizing<String>, D::Error> {
+    String::deserialize(value).map(zeroize::Zeroizing::new)
 }
 
 #[derive(Deserialize)]
@@ -124,6 +134,7 @@ struct ProviderCredentialUseRecord {
     used_at: i64,
 }
 
+#[cfg(windows)]
 pub(super) enum ProviderCredentialUseFailure {
     Denied,
     Audit,
@@ -145,6 +156,7 @@ struct CredentialLedger {
 }
 
 impl Broker {
+    #[cfg(windows)]
     pub(super) fn 提供元資格情報参照確認(&self, credential_id: &str) -> bool {
         credential_ledger(&self.audit_log).is_ok_and(|ledger| {
             ledger.entries.iter().any(|entry| {
@@ -158,6 +170,7 @@ impl Broker {
         })
     }
 
+    #[cfg(windows)]
     pub(super) fn 提供元資格情報使用処理(
         &mut self,
         request_id: &str,
@@ -174,8 +187,8 @@ impl Broker {
         {
             return Err(ProviderCredentialUseFailure::Denied);
         }
-        let ledger = credential_ledger(&self.audit_log)
-            .map_err(|_| ProviderCredentialUseFailure::Audit)?;
+        let ledger =
+            credential_ledger(&self.audit_log).map_err(|_| ProviderCredentialUseFailure::Audit)?;
         let entry = ledger
             .entries
             .into_iter()
@@ -202,16 +215,10 @@ impl Broker {
         .map_err(|_| ProviderCredentialUseFailure::Audit)?;
 
         let secret = self
-            .protected_store
-            .as_ref()
-            .expect("ProtectedStore登録確認済み")
-            .read(
-                crate::protected_store::Purpose::Credential,
-                &entry.storage_id,
-                &entry.public.ciphertext_hash,
-            )
+            .資格情報保存先()
+            .expect("資格情報保存先の登録確認済み")
+            .読取(&entry.storage_id, &entry.public.ciphertext_hash)
             .map_err(|_| ProviderCredentialUseFailure::Denied)?;
-        let secret = zeroize::Zeroizing::new(secret.as_bytes().to_vec());
         if secret.is_empty()
             || std::str::from_utf8(&secret).is_err()
             || secret.iter().any(u8::is_ascii_control)
@@ -226,7 +233,8 @@ impl Broker {
             runtime_id: runtime_id.to_owned(),
             used_at: self.current_epoch_millis(),
         };
-        let encoded = serde_json::to_string(&record).map_err(|_| ProviderCredentialUseFailure::Audit)?;
+        let encoded =
+            serde_json::to_string(&record).map_err(|_| ProviderCredentialUseFailure::Audit)?;
         self.append_audit(
             request_id,
             OPERATION,
@@ -239,6 +247,7 @@ impl Broker {
         Ok(secret)
     }
 
+    #[cfg(windows)]
     pub(super) fn 資格情報MCP使用処理(
         &mut self,
         request_id: &str,
@@ -349,6 +358,7 @@ impl Broker {
         }
     }
 
+    #[cfg(windows)]
     pub(super) fn 資格情報MCP使用確定処理(
         &mut self,
         request_id: &str,
@@ -473,37 +483,40 @@ impl Broker {
             );
         }
 
-        if self.protected_store.is_none() {
+        if self.資格情報保存先().is_none() {
             return self.reject_with_payload_hash(
                 request_id,
                 OPERATION,
                 "credential_storage_unregistered",
-                "起動制御でWindows ProtectedStoreを登録してから再試行してください",
+                "起動制御でplatformの資格情報保存先を登録してから再試行してください",
                 true,
                 payload_hash,
             );
         }
-        let store = self
-            .protected_store
-            .as_ref()
-            .expect("ProtectedStore登録確認済み");
-        let ciphertext_hash = match store.create(
-            crate::protected_store::Purpose::Credential,
-            &registration.credential_id,
-            registration.secret.as_bytes(),
-        ) {
-            Ok(value) => value,
-            Err(_) => {
-                return self.reject_with_payload_hash(
+        let store = self.資格情報保存先().expect("資格情報保存先の登録確認済み");
+        let ciphertext_hash =
+            match store.登録(&registration.credential_id, registration.secret.as_bytes()) {
+                Ok(value) => value,
+                Err(super::credential_storage::保存失敗::回収未成立) => return self
+                    .reject_with_payload_hash(
                     request_id,
                     OPERATION,
-                    "credential_storage_failed",
-                    "既存または部分暗号文を再使用せず保管状態を確認してください",
+                    "credential_recovery_required",
+                    "新規Keychain itemの回収が未成立。再使用・再送せず保管状態を確認してください",
                     true,
                     payload_hash,
-                )
-            }
-        };
+                ),
+                Err(_) => {
+                    return self.reject_with_payload_hash(
+                        request_id,
+                        OPERATION,
+                        "credential_storage_failed",
+                        "既存または部分暗号文を再使用せず保管状態を確認してください",
+                        true,
+                        payload_hash,
+                    )
+                }
+            };
         let audit_id = self.audit_log.next_event_id();
         let public = PublicCredential {
             version: VERSION,
@@ -612,7 +625,7 @@ impl Broker {
                 payload_hash,
             );
         }
-        if self.protected_store.is_none() {
+        if self.資格情報保存先().is_none() {
             return self.reject_with_payload_hash(
                 request_id,
                 OPERATION,
@@ -657,15 +670,10 @@ impl Broker {
             );
         }
         let storage_error = {
-            let store = self
-                .protected_store
-                .as_ref()
-                .expect("ProtectedStore登録確認済み");
-            entries.iter().find_map(|entry| {
-                match store.inspect(
-                    crate::protected_store::Purpose::Credential,
-                    &entry.storage_id,
-                ) {
+            let store = self.資格情報保存先().expect("資格情報保存先の登録確認済み");
+            entries
+                .iter()
+                .find_map(|entry| match store.点検(&entry.storage_id) {
                     Ok(Some((hash, _))) if hash == entry.public.ciphertext_hash => None,
                     Ok(Some(_)) => Some((
                         "credential_storage_changed",
@@ -675,8 +683,7 @@ impl Broker {
                         "credential_storage_missing",
                         "資格情報暗号文の欠落または読取失敗を一覧へ変換しません",
                     )),
-                }
-            })
+                })
         };
         if let Some((code, message)) = storage_error {
             return self.reject_with_payload_hash(
@@ -922,19 +929,8 @@ impl Broker {
         storage_id: &str,
         ciphertext_hash: &str,
     ) -> bool {
-        self.protected_store
-            .as_ref()
-            .and_then(|store| {
-                store
-                    .prepare_delete(
-                        crate::protected_store::Purpose::Credential,
-                        storage_id,
-                        ciphertext_hash,
-                    )
-                    .ok()
-            })
-            .and_then(|prepared| prepared.commit().ok())
-            .is_some()
+        self.資格情報保存先()
+            .is_some_and(|store| store.新規破棄(storage_id, ciphertext_hash))
     }
 }
 
@@ -943,7 +939,7 @@ fn parse_registration(payload: &Value) -> Result<Registration, &'static str> {
         .map_err(|_| "資格情報登録payloadの構造が不正です")?;
     if registration.version != VERSION
         || registration.operation != "追加"
-        || registration.storage != "windows_dpapi"
+        || registration.storage != STORAGE_NAME
         || registration.registrant != "owner"
         || registration.route != "owner_control"
         || !hex_identifier(&registration.credential_id)
@@ -985,7 +981,7 @@ fn credential_ledger(log: &BrokerAuditLog) -> Result<CredentialLedger, ()> {
                         record.public.kind.as_str(),
                         "api_key" | "oauth" | "basic" | "ssh" | "custom"
                     )
-                    || record.public.storage != "windows_dpapi"
+                    || record.public.storage != STORAGE_NAME
                     || !super::protocol::is_tagged_sha256(&record.public.ciphertext_hash)
                 {
                     return Err(());
@@ -1089,7 +1085,7 @@ fn hex_identifier(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
-#[cfg(test)]
+#[cfg(all(test, windows))]
 mod tests {
     use super::*;
     use std::io::Read;
@@ -1326,12 +1322,12 @@ mod tests {
             Err(ProviderCredentialUseFailure::Denied)
         ));
         let secret = match broker.提供元資格情報使用処理(
-                "provider-use-approved-fixture",
-                "codex-runtime-fixture",
-                "openai_codex_cli",
-                &id,
-                &canonical_payload_hash(None),
-            ) {
+            "provider-use-approved-fixture",
+            "codex-runtime-fixture",
+            "openai_codex_cli",
+            &id,
+            &canonical_payload_hash(None),
+        ) {
             Ok(secret) => secret,
             Err(_) => panic!("一致する提供元だけがBroker内で短命復号"),
         };

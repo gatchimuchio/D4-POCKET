@@ -1061,6 +1061,8 @@ pub struct Broker {
     pub(super) observations: super::observation_center::ObservationCenter,
     #[cfg(windows)]
     pub(super) protected_store: Option<crate::protected_store::ProtectedStore>,
+    #[cfg(target_os = "macos")]
+    pub(super) macos_credential_store: Option<super::credential_storage::MacOSCredentialStore>,
     #[cfg(windows)]
     内容閲覧: super::content_access::ContentAccess,
     pub(super) shutdown_requested: bool,
@@ -1106,6 +1108,8 @@ impl Broker {
             observations: super::observation_center::ObservationCenter::default(),
             #[cfg(windows)]
             protected_store: None,
+            #[cfg(target_os = "macos")]
+            macos_credential_store: None,
             #[cfg(windows)]
             内容閲覧: Default::default(),
             shutdown_requested: false,
@@ -1186,6 +1190,8 @@ impl Broker {
             observations: super::observation_center::ObservationCenter::default(),
             #[cfg(windows)]
             protected_store: None,
+            #[cfg(target_os = "macos")]
+            macos_credential_store: None,
             #[cfg(windows)]
             内容閲覧: Default::default(),
             shutdown_requested: false,
@@ -2392,51 +2398,51 @@ impl Broker {
                 owner,
                 &payload_hash,
             ),
-            #[cfg(windows)]
+            #[cfg(any(windows, target_os = "macos"))]
             BrokerOperation::資格情報登録 => self.資格情報登録処理(
                 &request_id,
                 envelope.payload.as_ref().unwrap_or(&Value::Null),
                 owner,
                 &payload_hash,
             ),
-            #[cfg(not(windows))]
+            #[cfg(not(any(windows, target_os = "macos")))]
             BrokerOperation::資格情報登録 => self.reject_with_payload_hash(
                 &request_id,
                 "資格情報登録",
                 "credential_platform_unsupported",
-                "資格情報保管はWindows DPAPI環境だけに対応しています",
+                "このplatformの資格情報保存先は未対応です",
                 true,
                 &payload_hash,
             ),
-            #[cfg(windows)]
+            #[cfg(any(windows, target_os = "macos"))]
             BrokerOperation::資格情報一覧 => self.資格情報一覧処理(
                 &request_id,
                 envelope.payload.as_ref().unwrap_or(&Value::Null),
                 owner,
                 &payload_hash,
             ),
-            #[cfg(not(windows))]
+            #[cfg(not(any(windows, target_os = "macos")))]
             BrokerOperation::資格情報一覧 => self.reject_with_payload_hash(
                 &request_id,
                 "資格情報一覧",
                 "credential_platform_unsupported",
-                "資格情報保管はWindows DPAPI環境だけに対応しています",
+                "このplatformの資格情報保存先は未対応です",
                 true,
                 &payload_hash,
             ),
-            #[cfg(windows)]
+            #[cfg(any(windows, target_os = "macos"))]
             BrokerOperation::資格情報失効 => self.資格情報失効処理(
                 &request_id,
                 envelope.payload.as_ref().unwrap_or(&Value::Null),
                 owner,
                 &payload_hash,
             ),
-            #[cfg(not(windows))]
+            #[cfg(not(any(windows, target_os = "macos")))]
             BrokerOperation::資格情報失効 => self.reject_with_payload_hash(
                 &request_id,
                 "資格情報失効",
                 "credential_platform_unsupported",
-                "資格情報保管はWindows DPAPI環境だけに対応しています",
+                "このplatformの資格情報保存先は未対応です",
                 true,
                 &payload_hash,
             ),

@@ -7,8 +7,10 @@ pub mod authority;
 pub(crate) mod compose_center;
 #[cfg(any(windows, test))]
 pub(crate) mod content_access;
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 pub(crate) mod credential_vault;
+#[cfg(any(windows, target_os = "macos"))]
+pub(crate) mod credential_storage;
 pub(crate) mod device_link;
 pub(crate) mod device_transport;
 pub mod dialogue;
