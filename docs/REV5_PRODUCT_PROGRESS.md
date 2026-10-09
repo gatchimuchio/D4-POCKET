@@ -9,7 +9,8 @@
 
 ## P13後・B0全件観測／原因対応台帳（2026-10-09・進行中）
 
-現行集計（2026-10-10、#378765照合後）: B0は実行記録139件／原因対応119行。直接参照147件中133件を照合済み（原因対応表132件、`VALIDATION.txt` 1件）、14件未照合。直接参照なし56件中6件を別途照合、50件未照合。#378765はscroll後も同じOwner確認buttonがnot-hittable。Audit projection空、artifact画像なし、画面状態未確定。cleanup PASS・helper残留なし。B0 acceptance未判定を維持する。
+現行集計（2026-10-10、#378772照合後）: B0は実行記録140件／原因対応120行。直接参照147件中134件を照合済み（原因対応表133件、`VALIDATION.txt` 1件）、13件未照合。直接参照なし56件中6件を別途照合、50件未照合。#378772ではWorkspace承認Audit accepted後、長い成功文言のOCR照合でFAIL。read／diff／失効は未到達。画面状態は未確定、cleanup PASS。B0 acceptance未判定を維持する。
+履歴snapshot（2026-10-10、#378765照合後）: B0は実行記録139件／原因対応119行。直接参照147件中133件を照合済み（原因対応表132件、`VALIDATION.txt` 1件）、14件未照合。直接参照なし56件中6件を別途照合、50件未照合。#378765はscroll後も同じOwner確認buttonがnot-hittable。Audit projection空、artifact画像なし、画面状態未確定。cleanup PASS・helper残留なし。B0 acceptance未判定を維持する。
 履歴snapshot（2026-10-10、#378758照合後）: B0は実行記録138件／原因対応118行。直接参照147件中132件を照合済み（原因対応表131件、`VALIDATION.txt` 1件）、15件未照合。直接参照なし56件中6件を別途照合、50件未照合。#378758はOwner前のbutton hit-test失敗で製品XCTestがFAIL。Audit projection空、artifact画像なし、画面原因未確定。cleanup PASS・helper残留なし。後続#378765の証拠を本runへ遡及せず、CLOSED範囲を維持する。
 履歴snapshot（2026-10-10、#378749照合後）: B0は実行記録137件／原因対応117行。直接参照147件中131件を照合済み（原因対応表130件、`VALIDATION.txt` 1件）、16件未照合。直接参照なし56件中6件を別途照合、50件未照合。#378749はWorkspace永続Storeなしのtest fixtureによりBroker入口testが`broker_persistence_unavailable`でFAILし、製品UI未実行。後続でpersistent fixtureへ修正した。元runのFAILは履歴に保持し、B0 acceptance未判定を維持する。
 履歴snapshot（2026-10-10、#378711照合後）: B0は実行記録136件／原因対応116行。直接参照147件中130件を照合済み（原因対応表129件、`VALIDATION.txt` 1件）、17件未照合。直接参照なし56件中6件を別途照合、50件未照合。#378711は「Host切替」OCR候補重複で登録前に停止し、Host登録受入れ=false、Audit projectionは空。artifactに画像なし、cleanup未確認。検索語を「Host」へ変更した後続#378719のPASSを先行runへ遡及せず、B0 acceptance未判定を維持する。
