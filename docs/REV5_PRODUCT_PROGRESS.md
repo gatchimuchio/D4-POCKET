@@ -9,7 +9,7 @@
 
 ## P13後・B0全件観測／原因対応台帳（2026-10-09・進行中）
 
-現行集計（2026-10-10、#378772照合後）: B0は実行記録140件／原因対応120行。直接参照147件中134件を照合済み（原因対応表133件、`VALIDATION.txt` 1件）、13件未照合。直接参照なし56件中6件を別途照合、50件未照合。#378772ではWorkspace承認Audit accepted後、長い成功文言のOCR照合でFAIL。read／diff／失効は未到達。画面状態は未確定、cleanup PASS。B0 acceptance未判定を維持する。
+現行集計（2026-10-10、#378782照合後）: B0は実行記録141件／原因対応121行。直接参照147件中135件を照合済み（原因対応表134件、`VALIDATION.txt` 1件）、12件未照合。直接参照なし56件中6件を別途照合、50件未照合。#378782はWorkspace承認Audit accepted後、復帰時の`registration_refreshed`診断と一時的な成功文言OCR assertionが食い違い、line 505・78.947秒でFAIL。file read以降未到達。artifact `11593696229`は72775 bytes（SHA-256 `1d828ddad41b17d84f51c9afc4ef247a7b88b0d47805c5cfa42a6f2d8328414d`）、画像なし。cleanup PASS、helper／working tree記録は空。B0 acceptance未判定を維持する。
 履歴snapshot（2026-10-10、#378765照合後）: B0は実行記録139件／原因対応119行。直接参照147件中133件を照合済み（原因対応表132件、`VALIDATION.txt` 1件）、14件未照合。直接参照なし56件中6件を別途照合、50件未照合。#378765はscroll後も同じOwner確認buttonがnot-hittable。Audit projection空、artifact画像なし、画面状態未確定。cleanup PASS・helper残留なし。B0 acceptance未判定を維持する。
 履歴snapshot（2026-10-10、#378758照合後）: B0は実行記録138件／原因対応118行。直接参照147件中132件を照合済み（原因対応表131件、`VALIDATION.txt` 1件）、15件未照合。直接参照なし56件中6件を別途照合、50件未照合。#378758はOwner前のbutton hit-test失敗で製品XCTestがFAIL。Audit projection空、artifact画像なし、画面原因未確定。cleanup PASS・helper残留なし。後続#378765の証拠を本runへ遡及せず、CLOSED範囲を維持する。
 履歴snapshot（2026-10-10、#378749照合後）: B0は実行記録137件／原因対応117行。直接参照147件中131件を照合済み（原因対応表130件、`VALIDATION.txt` 1件）、16件未照合。直接参照なし56件中6件を別途照合、50件未照合。#378749はWorkspace永続Storeなしのtest fixtureによりBroker入口testが`broker_persistence_unavailable`でFAILし、製品UI未実行。後続でpersistent fixtureへ修正した。元runのFAILは履歴に保持し、B0 acceptance未判定を維持する。
@@ -63,7 +63,7 @@ source `4f7802b`／run `37876554147`は入口skip、通常build／解析PASS、�
 
 source `00af2c4`／run `37877200890`は登録前提通過・読取承認Audit accepted、長い承認成功文言のOCR照合でFAIL。短い一意部分へ照合を修正し、固定status codeだけの診断で残件を検収する。全文読取／diff／失効の完了はまだ未観測。
 
-source `5d927f9`／run `37878209622`は読取承認accepted後に`registration_refreshed`を観測、短い成功文言でもFAIL。既存lifecycleの復帰時再取得で成功文言が消えることをsourceと照合し、一時文言ではなく現在登録の公開読取、Broker内baselineの既存比較範囲読戻し、失効後の現在登録と本文消去で新試験を検収する。画面復帰境界・製品実装・Acceptanceは変更しない。診断用codeは除去する。
+source `5d927f9`／run `37878209622`はWorkspace承認Audit received／recorded／accepted各1件後、診断OCRが`registration_refreshed`を記録し、XCTest line 505の一時的な`現在のWorkspace読取Approval`照合が78.947秒でFAIL。artifact `11593696229`（72775 bytes、SHA-256 `1d828ddad41b17d84f51c9afc4ef247a7b88b0d47805c5cfa42a6f2d8328414d`）に画像なし。承認の成立は確認できるが、file read以降は未到達で画面表示欠落とOCR missも区別できない。成功文言assertionは復帰時の登録再取得状態を安定して表さないtest oracleとsource照合し、後続source `cc7d362`では現在登録Workspace／Broker baselineを読む試験へ移行。run #378797のbaseline failureは別事象として保持し、本runへ遡及しない。Rust／通常・製品build／解析とcleanup PASS、helper／working tree記録空。B0 acceptance未判定。
 
 source `cc7d362`／run `37879704542`は公開file本文表示・読取Audit acceptedまで成立、baselineのAX click後にnative確認が現れずFAIL（124.470秒）。当該操作の受信Auditもなく根因は未確定。新試験のbaseline操作だけを現在の可視button／enabled確認と通常mouse入力へ局所修正する。CLOSED入口・登録前提・生産経路・Authorityは変更せず、diff／失効／正常終了を未成立のまま残す。通常build／解析、helper 0・専用fixture回収はPASS。
 
