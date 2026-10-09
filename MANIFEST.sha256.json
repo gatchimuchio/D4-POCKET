@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "ceeef895e084f088305639b90d92ef58cd5bf211fa089d19ea4a4cb938a38184"
+      "sha256": "f1b56fd0834cb74863a137214447f901f93235aebe61feb35d2ae8039dc9b728"
     },
     {
       "path": "SECURITY.md",
@@ -1288,7 +1288,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "c59366492d9172046f6089b250215df3cba2db6aa2ce29b060e920ad62e78866"
+      "sha256": "105d17db0970ad6638d0262c5601edf60265aa01f81b333e7fd6e6d12df01410"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1528,7 +1528,7 @@
     },
     {
       "path": "docs/specs/macos-workspace-inspector.md",
-      "sha256": "b1c38ccddc436981ff44fa8a490c3ccc82e48d897912dc4653e41cbc61fe58b2"
+      "sha256": "62a45b21805d10c063da429edd18b4669b0d3ba577148941acf48541a14e27f5"
     },
     {
       "path": "docs/specs/macos-workspace-selection.md",

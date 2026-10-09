@@ -1,6 +1,6 @@
 # macOS Workspace Inspectorの内容露出入口
 
-状態: VALIDATING（P13 Product Build、2026-10-09）。現行rev5と`docs/REV5_PRODUCT_PROGRESS.md`に従う。
+状態: CLOSED（P13 Product Build、2026-10-09）。現行rev5と`docs/REV5_PRODUCT_PROGRESS.md`に従う。
 
 ## 意味と責任
 
@@ -17,8 +17,8 @@ Agent Centerで起動中に登録したWorkspaceを、既存Inspectorから明�
 | ID | 条件 | 状態 | 証拠 |
 | --- | --- | --- | --- |
 | MAC-INSPECT-1 | 3操作の同一要求native入口、session／authority／hash／不正表示範囲否定、拒否時未配送 | CLOSED | Windows候補1件・入口1件、Mac入口1件はsource `e031745`／run `37875821384`でPASS。再実行しない |
-| MAC-INSPECT-2 | Mac製品UIでfull読取確認→公開file表示→全体baseline確認→合成fixture変更→changed files／diff→失効確認・本文消去・Audit | FAIL | source `9882db8`で製品UI・cleanup pass、bounded Audit投影が64件目以降を落とし失効acceptedの判定FAIL。上限付き元Auditで判定する |
-| MAC-INSPECT-3 | 対象build／解析、通常終了、helper／専用fixture回収 | OPEN | 手動Actions `macos_workspace_inspector`だけ |
+| MAC-INSPECT-2 | Mac製品UIでfull読取確認→公開file表示→全体baseline確認→合成fixture変更→changed files／diff→失効確認・本文消去・Audit | CLOSED | source `66532cabb122c0386a18412ce21c0b0e70ae555f`／run `37888115049`でXCTest 1件PASS。公開file読取、baseline、合成変更、changed files／diff、失効accepted判定、本文消去、正常終了を確認 |
+| MAC-INSPECT-3 | 対象build／解析、通常終了、helper／専用fixture回収 | CLOSED | run `37888115049`の製品job全step PASS。対象Rust／Dart／製品build、通常終了、helper残留なし、専用fixture回収が成功 |
 
 公開合成fileとtest identityを使う。合成入力は`FIXTURE`、責任経路の静的確認は`CONFIG`、実native確認・Broker APFS読取・差分・正常終了は限定`LIVE_RUNTIME`。登録済み秘密canaryは本文・log・artifactへ出さない。本文は明示full後の公開fileだけを試験する。既存CLOSED試験、Alias／race／crash matrix、長時間、Formal Evidenceを再実行・追加せず、Acceptance外は延期中Final QA／既存gateへ送る。通常Release `task_execution=unsupported`、`release_ready=false`を保持し、PASS後は本単位をCLOSEDとして次へ進む。
 
@@ -55,5 +55,7 @@ Mac run [`37883933180`](https://github.com/gatchimuchio/D4-POCKET/actions/runs/3
 Mac run [`37885019903`](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37885019903)、source `2e2c27cca56e8f2011f495dd0649a423e162c433`は全体baseline受理まで成立したが、Workspace選択直後に比較範囲buttonが見つからずFAIL（102.006秒）。button未出現の原因、host fixture更新、比較範囲Broker要求の到達は証拠から確定できない。製品要求・表示・Authorityを変えず、既存buttonの出現を10秒待つ。差分・失効は引き続き未到達。artifact `11596630070`（72052 bytes）のSHA256=`15c9d78359233d87572bb09436840f3f8fb05e1a60893ccb5d2c7bea5020b30e`をbyte照合済み。通常build／解析・helper 0・fixture回収PASS。
 
 Mac run [`37885834795`](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37885834795)、source `9882db8b54eb373ce312697f64b7e8aba2bbcc52`のXCTestは1 passed／0 failed、132.299秒。公開file、baseline読戻し、changed files、public.txt diff、失効後本文消去、Command-Q後10秒以内の終了が成立したが、workflow総合はFAIL。証拠artifact `11596601400`（73768 bytes、SHA256=`57197e02e1188c7c16f60d67454115bd645b1628d03b46f38f9e7410473a1e03`）の匿名化Audit投影は、先頭64件制限により`作業領域失効`の`received`までで切れている。元Audit上で同操作がacceptedだったかは未確認。件数投影は64件上限のまま保持し、各操作のaccepted判定だけを既存上限4 MiB・symlink拒否済みの元Auditへ向ける。元Audit本文をartifact／logへ出さない。このworkflow判定を修正して再検収するまでMAC-INSPECT-2はFAILのまま。
+
+Mac run [`37888115049`](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37888115049)、手動`workflow_dispatch`、source `66532cabb122c0386a18412ce21c0b0e70ae555f`で`macos-product` job全stepがsuccess。製品XCTest 1件PASS（156.797秒）、通常Broker Rust試験／build、対象解析、同梱helper付きMac製品build、製品bootstrap、Audit受理判定、Command-Q正常終了、helper残留0、専用Runtime／Workspace fixture回収、clean source確認が成立した。bounded gateが確認した失効Audit accepted判定の範囲を超えて、raw Audit/HMACの完全性までは主張しない。artifact `11597516129`（74051 bytes）のGitHub SHA-256は`595638e9411469bd8436acd827b34fc05b2c9ad01567727fca9fe073172b4524`。合成公開file／test identityのProduct Build証拠であり、formal distribution・production identity・release readinessではない。通常Release `task_execution=unsupported`、`release_ready=false`を維持する。MAC-INSPECT-1〜3をCLOSEDとし、P13内のCLOSED条件を再訪しない。
 
 Mac run [`37886709355`](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37886709355)、source `69b05e65e027552a1f9b3afe491446e8aa118fad`は通常Rust build・製品build・対象Dart解析PASS。製品UIでは失効buttonの存在・enabledを確認し、画面上の文字位置を一度clickした後、15秒以内にnative Owner確認buttonを取得できずXCTest 1件FAIL（177.944秒、`approve`のassertion）。`結果と後片付けを確認`もAudit acceptance判定でFAILし、helper残留0・専用fixture回収はPASS。artifact `11597071486`（74041 bytes、SHA256=`02edf1aa8796a253f955703cc319b50d40ab05788e806f313dc96f4b7aae5677`）の表示投影は64件上限で後続Auditを含まず、元Audit本文も公開されていないため、失効要求の到達／acceptedを断定しない。同じ可視buttonの正確なAccessibility中心を一度だけclickする試験変更を行う。Acceptance・製品権限・native確認経路は変更せず、MAC-INSPECT-2はFAILを維持する。

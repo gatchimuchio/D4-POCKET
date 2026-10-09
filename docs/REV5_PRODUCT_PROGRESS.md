@@ -2,7 +2,7 @@
 
 更新日: 2026-10-09
 工程正本: ユーザー提示「D4 Pocket / GUI-Shell 統合実装仕様書 rev5」「統合開発工程表 rev5」「Codex実装指示書 rev5」
-現行mode: `PRODUCT_BUILD_MODE`（最新版rev5実装指示§2）。Windows側P12 `FEATURE COMPLETE`はCLOSEDのまま保持し、Mobile／Non-Windowsは独立するP13 trackとして構築する。P2 CompareとP3 HandoffもCLOSEDのまま再訪しない。Q0／Q1／Q2に記録済みのQA実行結果は履歴証拠として保持するが、Final QA queueは現在の作業schedulerではなく、追加QAは開始・継続しない。通常Release `task_execution=unsupported`と既存release gateを維持する。
+現行mode: `PRODUCT_BUILD_MODE`（最新版rev5実装指示§2）。Windows側P12 `FEATURE COMPLETE`、P2 Compare、P3 HandoffはCLOSEDのまま保持する。P13 Mobile／Non-Windows Product Buildは2026-10-09に有限Acceptanceをすべて閉鎖した。P13後の採用済みB0〜B6は各単位の明示施工指示が必要で、現時点では未着手。Q0〜Q7のFinal QA記録は履歴として保持し、別途開始条件が成立するまで現行schedulerにしない。通常Release `task_execution=unsupported`と既存release gateを維持する。
 初期rev5文書同期commit: `39dd3f4bc7aafe350ca94fce9392095f1064d2bc`。凍結commitとその後のQA記録は本書末尾の更新履歴を参照。
 
 2026-10-09の明示承認により、[緩衝基盤rev5補遺・QC基底改訂3点](緩衝基盤_rev5補遺_QC/採用記録.md)をP13後の追加正本として採用した。原文の未承認表記は作成時履歴として保存し、現在の承認・rev5原本取得・対照と文言差異を採用記録へ分離する。B0〜B6はOPEN・未着手であり、現在のP13へ割り込ませない。全工程QCという運用意味を採用しても、有限Acceptance・CLOSED・正式Q0〜Q7の開始条件・DEFERRED・release gateは維持する。採用を全施工委任へ昇格しない。
@@ -11,15 +11,15 @@
 
 常にユーザーが現在提示した最新版の仕様書・工程表・実装指示書と、そこへ同期したリポジトリ内の現行進捗を正本とする。旧版文書は、明示的に現行正本へ採用されない限り、履歴・補助証拠としてのみ使う。旧版の状態や要求を現行状態へ推定転記しない。
 
-## 現行rev5指示による工程整理（2026-10-07）
+## 現行rev5指示による工程整理（2026-10-09更新）
 
-最新版rev5実装指示§2が現在modeを`PRODUCT_BUILD_MODE`と明示しているため、P13 Mobile／Non-Windowsの製品構築を続ける。§23のFinal QA移行条件は、現行の明示modeを自己判断で上書きする許可ではない。P12 Windows Feature Complete、P2／P3のCLOSED状態、Q0／Q1の結果、Q2に蓄積した試験結果と過去FAILは変更せず、Final QAは別の現行指示があるまで延期する。
+最新版rev5実装指示§2が現在modeを`PRODUCT_BUILD_MODE`と明示している。P13 Mobile／Non-Windows Product Buildの有限受入れは2026-10-09に全件CLOSED。§23のFinal QA条件は現行modeの自己判断による上書き許可ではなく、既存Q0〜Q7記録は履歴として保持する。P13後の採用済みB0〜B6は各単位の明示施工指示を別途必要とするため、P13完了だけでは着手しない。P12 Windows Feature Complete、P2／P3のCLOSED状態、通常Release `task_execution=unsupported`を維持する。
 
 旧進捗文書に残る「P12 Feature Complete後にFinal QAへ移行済み」という記載は、その時点の判断履歴として保持するが、最新版の明示modeに反する現在状態の根拠にはしない。工程表P2 Compareは実装指示書R3、P3 HandoffはR4に対応し、両者はCLOSEDのため再実装・再検査しない。通常Release `task_execution`はfail-closedのまま維持する。
 
-## P13 Mobile / Non-Windows — 現行track
+## P13モバイル／非Windows製品構築 — 受入れ完了（2026-10-09）
 
-#### macOS Workspace Inspectorの内容露出入口 — VALIDATING（2026-10-09）
+#### macOS Workspace Inspectorの内容露出入口 — CLOSED（Product Build、2026-10-09）
 
 既存APFS取得器・内容露出・baseline／差分とInspectorは実装済みだが、Mac native Owner入口から読取承認・失効・全体baseline保存へ未接続である。`docs/specs/macos-workspace-inspector.md`の有限MAC-INSPECT-1〜3だけを施工する。3操作の同一要求確認・現在登録のBroker再照合、製品UIの公開file読取・差分・失効を一回確認する。登録／OS選択は実行前提だけでCLOSED条件を再検収せず、Task／書込／Credential／OS scope・Windows能力・通常Release claimを変更しない。
 
@@ -46,6 +46,10 @@ source `2e2c27c`／run `37885019903`はbaseline受理後、Workspace選択直後
 source `9882db8`／run `37885834795`はXCTest 1件PASS（132.299秒）。public fileの読取・全体baseline読戻し・差分一覧・diff・失効後本文消去・Command-Q正常終了、通常build／解析、helper 0、fixture回収が成立。一方、workflowの総合結果はFAIL。匿名化投影は先頭64件で切れ、失効の`received`以後の記録がなく、元Auditのaccepted状態は未確認。表示projectionは64件のまま保ち、accepted判定を上限付き元Auditへ向ける。再検収までMAC-INSPECT-2をCLOSEDにしない。
 
 source `69b05e6`／run `37886709355`は通常Rust／製品buildと対象Dart解析PASS、helper 0・専用fixture回収PASS。XCTestでは失効buttonの存在・enabledを確認して画面上の文字位置を一度clickしたが、15秒以内にnative Owner確認buttonが現れず`approve`でFAIL（177.944秒）。Audit acceptance gateもFAIL。表示投影は64件上限で失効後を含まず、元Audit本文も公開されていないため要求到達やacceptedを推定しない。Accessibility buttonのhittable確認後、そのbutton中心を一度clickする試験だけへ修正する。製品経路・権限・有限Acceptanceは変更せず、MAC-INSPECT-2をFAILのまま維持する。
+
+source `66532cabb122c0386a18412ce21c0b0e70ae555f`／[手動run `37888115049`](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37888115049)は`workflow_dispatch`で`macos-product` job全stepがsuccess。XCTest 1件PASS（156.797秒）。製品UIで公開fileのfull読取、baseline、合成fixture変更、changed files／diff、失効後本文消去、Command-Q正常終了が成立し、限定Audit gateは失効acceptedを確認した。通常Broker Rust試験／build、対象Dart解析、製品build／bootstrap、helper残留0、専用Runtime／Workspace fixture回収もPASS。artifact `11597516129`（74051 bytes）、SHA-256 `595638e9411469bd8436acd827b34fc05b2c9ad01567727fca9fe073172b4524`。raw Audit/HMAC全体の完全性はこのgateの主張範囲外。証拠は合成公開file／test identityのP13 Product Buildに限る。過去FAILは上記の履歴として保持し、成功へ書換えない。MAC-INSPECT-2／3をCLOSED、P13の最後の未成立単位を閉じた。通常Release `task_execution=unsupported`、`release_ready=false`を維持する。
+
+P13内にOPENの製品Acceptanceが残っていないことを現行進捗一覧で照合した。次の採用済み追加工程B0〜B6はP13後に位置するが、採用記録は各単位の明示施工指示を別途要求している。今回の検収記録だけでB0を着手済みへ変更せず、別の明示施工指示が確認されるまでOPEN・未着手のまま保持する。
 
 #### macOS Host登録の製品入口 — CLOSED（Product Build、2026-10-09）
 
@@ -894,7 +898,7 @@ portable製品のLIVE_RUNTIME確認で、未選択のSettingsが`IndexedStack`�
 
 ## 3. 後続製品工程
 
-P2 Multi-Agent Compare、P3 Handoff、P4 Provider / Model Center、P5 Workspace / History / Evaluation、P6 Credential / MCP、P7 A2A / Host / Adapter、P8 GUI-Shell Compose、P9 Standalone Export、P10 Module Selection / Pruning、P11 Windows Productization、P12 Product IntegrationはProduct Build受入れを閉鎖し、Windows `FEATURE COMPLETE`を維持する。最新版実装指示§2により現在は`PRODUCT_BUILD_MODE`でP13 Mobile / Non-Windowsを独立trackとして進める。Q0〜Q7 Final QA記録は履歴として保持し、現行schedulerにはしない。Owner Finalizationではproduction Publisher／signing identity、production Audit key、不可逆な事業判断、Final GOだけをOwnerへ戻す。
+P2 Multi-Agent Compare、P3 Handoff、P4 Provider / Model Center、P5 Workspace / History / Evaluation、P6 Credential / MCP、P7 A2A / Host / Adapter、P8 GUI-Shell Compose、P9 Standalone Export、P10 Module Selection / Pruning、P11 Windows Productization、P12 Product Integration、およびP13 Mobile / Non-WindowsはProduct Build受入れを閉鎖し、Windows `FEATURE COMPLETE`を維持する。P13後の追加工程B0〜B6は各単位の明示施工指示を確認後に着手する。Q0〜Q7 Final QA記録は履歴として保持し、現行schedulerにはしない。Owner Finalizationではproduction Publisher／signing identity、production Audit key、不可逆な事業判断、Final GOだけをOwnerへ戻す。
 
 ## 4. 関連正本
 
