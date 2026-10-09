@@ -9,7 +9,7 @@
 
 ## P13後・B0全件観測／原因対応台帳（2026-10-09・進行中）
 
-Actions APIから2026-05-25〜2026-10-09の356 runを取得し、203 failure / 226 failed jobs / 250 failed-step summariesを台帳化。失敗job logs 151件を取得し、75件はHTTP 410/404、step detailなし5 runを欠測として分離した。原因・修正・後続証拠までB0で再照合した事象は71 run（56 cause-response行）。既存直接参照147件のうち65 runは原因表へ結合済み、残る82件は個別内容のB0因果分類待ちであり、未記載や原因UNKNOWNとは扱わない。直接run参照なし56件のうち6件は別途ログ・コード・後続証拠から原因対応済み、50件は未照合。#376591／#376614／#376629は各XCUITest harnessの独立したfield取得・入力先・scroll後AX frame問題として分離し、既存CLOSED #376645を再実行せず後続証拠に使用した。類似step名やsource SHAだけから原因を推定しない。全Git patchと現行code/test responsibilityの照合も未完のため、B0 acceptanceを閉じずB1へ進まない。P13のCLOSED証拠は再実行せず、通常Release `task_execution=unsupported`、`release_ready=false`、Final QA DEFERREDを保持する。詳細は採用記録とB0の4成果物を参照。
+Actions APIから2026-05-25〜2026-10-09の356 runを取得し、203 failure / 226 failed jobs / 250 failed-step summariesを台帳化。失敗job logs 151件を取得し、75件はHTTP 410/404、step detailなし5 runを欠測として分離した。原因・修正・後続証拠までB0で再照合した事象は72 run（57 cause-response行）。既存直接参照147件のうち66 runはcause-response表または`VALIDATION.txt`へ照合済み、残る81件は個別内容のB0因果分類待ちであり、未記載や原因UNKNOWNとは扱わない。直接run参照なし56件のうち6件は別途ログ・コード・後続証拠から原因対応済み、50件は未照合。#376591／#376614／#376629は各XCUITest harnessの独立したfield取得・入力先・scroll後AX frame問題として分離し、既存CLOSED #376645を再実行せず後続証拠に使用した。#376716は固定AppKit binding feature/API型との不一致として修正commitと後続Rust stepを照合し、同じ後続runの別Flutter failureとは分離した。類似step名やsource SHAだけから原因を推定しない。全Git patchと現行code/test responsibilityの照合も未完のため、B0 acceptanceを閉じずB1へ進まない。P13のCLOSED証拠は再実行せず、通常Release `task_execution=unsupported`、`release_ready=false`、Final QA DEFERREDを保持する。詳細は採用記録とB0の4成果物を参照。
 
 ## 正本の選び方
 
@@ -179,7 +179,7 @@ lock更新時の`cargo generate-lockfile --offline --manifest-path native/rust_h
 
 AppKit起動修正後のWindows必須Rust全体は505 passed／4 failed／12 ignoredでFAIL。変更外のA2A loopback 2件と既存Update Download TLS 2件に応答読取／timeout／OS 10054が残る。既存`FQ-TEST-LOOPBACK`へ保持し、全体PASSとはしない。独立native crateのWindows入力拒否1件はPASSで、AppKit実動作はMac専用試験へ限定する。
 
-手動Actions [run 37671678735](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37671678735)、commit `06cd2257a688424c23de227775c585bf17a9978d`は新規native crateの型検査でFAIL。固定bindingの`NSApplicationActivationPolicy`が`NSRunningApplication` featureに束縛されており、NSSavePanelのtitle／prompt／message引数は`Option<&NSString>`だった。必要なfeatureとnullable引数だけを修正する。Mac実動作の成功は未取得、mainは変更前を保持し、runner後片付けはPASS。
+手動Actions [run 37671678735](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37671678735)、commit `06cd2257a688424c23de227775c585bf17a9978d`は新規native crateの型検査でFAIL。固定bindingの`NSApplicationActivationPolicy`が`NSRunningApplication` featureに束縛され、NSSavePanelのtitle／prompt／message引数は`Option<&NSString>`だった。`a3d4c0fcb32a7ee7e063edf5bfb17ae192a3cd20`で必要なfeatureとnullable引数だけを修正し、後続run #376725のRust対象3件とhelper build成功で修正範囲を確認した。同runの後続Flutter投影test failureは別事象として扱う。Mac実動作の成功は未取得、runner後片付けはPASS。
 
 手動Actions [run 37672536704](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37672536704)、commit `a3d4c0fcb32a7ee7e063edf5bfb17ae192a3cd20`はMac対象Rust 3件とhelper buildがPASS。Dart型errorはなく、変更外のdeprecated info 5件と新規catchのbrace info 1件を観測し、後者だけを修正した。待機時間testもPASSした。投影testのassertion後、手動platform overrideがFlutter bindingの終了不変条件に反してFAILしたため、標準`TargetPlatformVariant`へ修正する。製品build／OS UIは未実行、runner source cleanとfixture回収はPASS。Product authorityの変更や検査の弱体化は行わない。
 
