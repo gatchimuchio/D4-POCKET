@@ -23,6 +23,8 @@
 
 初回source `02886de`／手動run `37874900581`は、新しいBroker入口試験のメモリ専用fixtureが永続化gateで先に拒否されてFAIL。製品UIは未実行。既存永続Broker fixtureへ局所修正し、対象FAILだけを再検収する。過去FAILは責任仕様の検証履歴へ保持する。
 
+source `e031745`／run `37875821384`でMac入口1件・通常build・対象解析はPASSし、MAC-INSPECT-1をCLOSEDとした。UIは登録前提の画面外buttonでnot hittableとなりFAIL。可視位置へのscrollだけを修正し、次の製品残件runでは`inspector_product_only=true`として入口を再試験しない。
+
 #### macOS Host登録の製品入口 — CLOSED（Product Build、2026-10-09）
 
 有限契約`docs/specs/macos-host-registration.md`のMAC-HOST-1〜3を閉鎖。source `7220847bc775bec23f8088fc9d421209eb1ddc93`、[手動run 37871901769](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37871901769)で公開GUI入力→別個native Owner→既存Broker登録→通常一覧更新→起動後Hostの未審査表示・表示切替→Command-Q正常終了がPASS。XCTest 1 passed／0 failed／0 skipped、72.616秒。登録／切替の受理Audit各1件、helper残留0・source clean、対象Dart解析No issues・通常native／Mac buildもPASS。Windows新入口・Mac platform gate各1件と新Widget4件のCLOSED証拠を再利用し、`host_product_only=true`で再試験しなかった。

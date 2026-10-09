@@ -16,8 +16,8 @@ Agent Centerで起動中に登録したWorkspaceを、既存Inspectorから明�
 
 | ID | 条件 | 状態 | 証拠 |
 | --- | --- | --- | --- |
-| MAC-INSPECT-1 | 3操作の同一要求native入口、session／authority／hash／不正表示範囲否定、拒否時未配送 | OPEN | 新しい局所Rust試験とMac専用Broker入口 |
-| MAC-INSPECT-2 | Mac製品UIでfull読取確認→公開file表示→全体baseline確認→合成fixture変更→changed files／diff→失効確認・本文消去・Audit | OPEN | 一回の新製品XCTest。登録は前提だけで再検収しない |
+| MAC-INSPECT-1 | 3操作の同一要求native入口、session／authority／hash／不正表示範囲否定、拒否時未配送 | CLOSED | Windows候補1件・入口1件、Mac入口1件はsource `e031745`／run `37875821384`でPASS。再実行しない |
+| MAC-INSPECT-2 | Mac製品UIでfull読取確認→公開file表示→全体baseline確認→合成fixture変更→changed files／diff→失効確認・本文消去・Audit | FAIL | 新製品XCTestは登録前提の画面外buttonで停止。対象操作を局所修正 |
 | MAC-INSPECT-3 | 対象build／解析、通常終了、helper／専用fixture回収 | OPEN | 手動Actions `macos_workspace_inspector`だけ |
 
 公開合成fileとtest identityを使う。合成入力は`FIXTURE`、責任経路の静的確認は`CONFIG`、実native確認・Broker APFS読取・差分・正常終了は限定`LIVE_RUNTIME`。登録済み秘密canaryは本文・log・artifactへ出さない。本文は明示full後の公開fileだけを試験する。既存CLOSED試験、Alias／race／crash matrix、長時間、Formal Evidenceを再実行・追加せず、Acceptance外は延期中Final QA／既存gateへ送る。通常Release `task_execution=unsupported`、`release_ready=false`を保持し、PASS後は本単位をCLOSEDとして次へ進む。
@@ -35,3 +35,5 @@ Desktop／Mobileの必須`flutter analyze --no-pub`は既知の日本語path LSP
 初回Mac run [`37874900581`](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37874900581)、source `02886de7b3966c6c599fd59ab8a7dd6275b03c01`は新しいBroker入口試験でFAIL。メモリ専用`test_broker()`が`broker_persistence_unavailable`で先に拒否され、意図した未登録Workspace拒否へ届かなかった。製品不具合の観測ではなく試験fixtureの誤りとして、確認済み入口だけを既存`persistent_test_broker`へ局所修正する。通常要求のnative確認必須と未登録scope拒否の期待を維持する。build／製品UIは未実行。artifact `11592046788`のSHA256=`7b00fffcc2f75b0805727726bd17104c7e9018d42660ad26a39f18081e3e987c`、専用fixture cleanup成功、helper残留なし。対象FAILだけを再検収する。
 
 fixture修正後のWindows対象command `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib macos_workspace_inspector_broker入口 -- --test-threads=1`は1 PASS。Schema 166／162／213、Conformance 244、手動起動限定、Manifest 1234、差分検査もPASS。製品実装・Acceptance・既存全体FAILは変更しない。
+
+Mac run [`37875821384`](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37875821384)、source `e0317456e8a0b29b85b0885dcdb9c5f884a493cd`で新入口1件・Rust通常build・対象Dart解析・Mac製品buildはPASS、MAC-INSPECT-1をCLOSEDとする。UIは登録前提の`native Owner確認へ進む`buttonが画面外でnot hittableとなりFAIL（27.138秒）。既存`reveal`で可視位置へscrollしてから通常clickする対象試験だけを修正する。次runは`inspector_product_only=true`としてCLOSED入口を再実行しない。artifact `11591978581`のSHA256=`a5968e064f68bb2b69cd7abba563ffb429ddafffb9131b3616b178bd8dbe218a`をbyte照合済み。helper残留0・専用fixture回収成功、UI正常終了／内容露出の完了は未成立。

@@ -28,7 +28,8 @@ final class AdapterOwnerUITests: XCTestCase {
       app.typeKey("a", modifierFlags: .command); app.typeKey(XCUIKeyboardKey.delete.rawValue, modifierFlags: [])
       app.typeText(value); XCTAssertEqual(fields[index].value as? String, value)
     }
-    app.buttons["native Owner確認へ進む"].click(); approve(notice)
+    let register = app.buttons["native Owner確認へ進む"]
+    reveal(app, register); register.click(); approve(notice)
     XCTAssertTrue(element(app, "Broker内登録: macos-product-codex").waitForExistence(timeout: 20))
     try mcpPublicText(app, "作業領域インスペクタ")
     try mcpPublicText(app, "macos-product-workspace", click: true)
