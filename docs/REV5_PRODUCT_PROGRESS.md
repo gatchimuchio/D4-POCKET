@@ -2,10 +2,14 @@
 
 更新日: 2026-10-09
 工程正本: ユーザー提示「D4 Pocket / GUI-Shell 統合実装仕様書 rev5」「統合開発工程表 rev5」「Codex実装指示書 rev5」
-現行mode: `PRODUCT_BUILD_MODE`（最新版rev5実装指示§2）。Windows側P12 `FEATURE COMPLETE`、P2 Compare、P3 HandoffはCLOSEDのまま保持する。P13 Mobile／Non-Windows Product Buildは2026-10-09に有限Acceptanceをすべて閉鎖した。P13後の採用済みB0〜B6は各単位の明示施工指示が必要で、現時点では未着手。Q0〜Q7のFinal QA記録は履歴として保持し、別途開始条件が成立するまで現行schedulerにしない。通常Release `task_execution=unsupported`と既存release gateを維持する。
+現行mode: `PRODUCT_BUILD_MODE`（最新版rev5実装指示§2）。Windows側P12 `FEATURE COMPLETE`、P2 Compare、P3 HandoffはCLOSEDのまま保持する。P13 Mobile／Non-Windows Product Buildは2026-10-09に有限Acceptanceをすべて閉鎖した。ユーザーの「続行」により、P13後の追加工程B0をIMPLEMENTINGとして開始。基準mainは`29e2ce98156bd2e1f9bccf36f8ff9f4c9e0a8054`、Actions履歴356 run中failure 203件を全件台帳へ結合中で、B0 acceptanceは未判定。B1〜B6は未開始。Q0〜Q7のFinal QA記録は履歴として保持し、別途開始条件が成立するまで現行schedulerにしない。通常Release `task_execution=unsupported`と既存release gateを維持する。
 初期rev5文書同期commit: `39dd3f4bc7aafe350ca94fce9392095f1064d2bc`。凍結commitとその後のQA記録は本書末尾の更新履歴を参照。
 
-2026-10-09の明示承認により、[緩衝基盤rev5補遺・QC基底改訂3点](緩衝基盤_rev5補遺_QC/採用記録.md)をP13後の追加正本として採用した。原文の未承認表記は作成時履歴として保存し、現在の承認・rev5原本取得・対照と文言差異を採用記録へ分離する。B0〜B6はOPEN・未着手であり、現在のP13へ割り込ませない。全工程QCという運用意味を採用しても、有限Acceptance・CLOSED・正式Q0〜Q7の開始条件・DEFERRED・release gateは維持する。採用を全施工委任へ昇格しない。
+2026-10-09の明示承認により、[緩衝基盤rev5補遺・QC基底改訂3点](緩衝基盤_rev5補遺_QC/採用記録.md)をP13後の追加正本として採用した。原文の未承認表記は作成時履歴として保存し、現在の承認・rev5原本取得・対照と文言差異を採用記録へ分離する。P13完了後にB0の明示施工指示を受けてB0を開始し、[全件Actions台帳](緩衝基盤_rev5補遺_QC/B0_原因対応台帳.md)等の調査文書を作成中。B0 acceptance未判定、B1〜B6未開始。有限Acceptance・CLOSED・正式Q0〜Q7の開始条件・DEFERRED・release gateは維持する。採用を全施工委任に昇格しない。
+
+## P13後・B0全件観測／原因対応台帳（2026-10-09・進行中）
+
+Actions APIから2026-05-25〜2026-10-09の356 runを取得し、203 failure / 226 failed jobs / 250 failed-step summariesを台帳化。失敗job logs 151件を取得し、75件はHTTP 410/404、step detailなし5 runを欠測として分離した。原因・修正・後続証拠までB0で一対一に再照合した事象は7件。146件には既存文書・registryの直接run参照があるが、その内容はB0原因分類へまだ統合していないため、未記載や原因UNKNOWNとは扱わない。残る56件は直接run参照なしであり、うち6件は別途ログ・コード・後続証拠から原因対応済み、50件は未照合。類似step名やsource SHAだけから原因を推定しない。全Git patchと現行code/test responsibilityの照合も未完のため、B0 acceptanceを閉じずB1へ進まない。P13のCLOSED証拠は再実行せず、通常Release `task_execution=unsupported`、`release_ready=false`、Final QA DEFERREDを保持する。詳細は採用記録とB0の4成果物を参照。
 
 ## 正本の選び方
 
@@ -49,7 +53,7 @@ source `69b05e6`／run `37886709355`は通常Rust／製品buildと対象Dart解�
 
 source `66532cabb122c0386a18412ce21c0b0e70ae555f`／[手動run `37888115049`](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37888115049)は`workflow_dispatch`で`macos-product` job全stepがsuccess。XCTest 1件PASS（156.797秒）。製品UIで公開fileのfull読取、baseline、合成fixture変更、changed files／diff、失効後本文消去、Command-Q正常終了が成立し、限定Audit gateは失効acceptedを確認した。通常Broker Rust試験／build、対象Dart解析、製品build／bootstrap、helper残留0、専用Runtime／Workspace fixture回収もPASS。artifact `11597516129`（74051 bytes）、SHA-256 `595638e9411469bd8436acd827b34fc05b2c9ad01567727fca9fe073172b4524`。raw Audit/HMAC全体の完全性はこのgateの主張範囲外。証拠は合成公開file／test identityのP13 Product Buildに限る。過去FAILは上記の履歴として保持し、成功へ書換えない。MAC-INSPECT-2／3をCLOSED、P13の最後の未成立単位を閉じた。通常Release `task_execution=unsupported`、`release_ready=false`を維持する。
 
-P13内にOPENの製品Acceptanceが残っていないことを現行進捗一覧で照合した。次の採用済み追加工程B0〜B6はP13後に位置するが、採用記録は各単位の明示施工指示を別途要求している。今回の検収記録だけでB0を着手済みへ変更せず、別の明示施工指示が確認されるまでOPEN・未着手のまま保持する。
+P13内にOPENの製品Acceptanceが残っていないことを現行進捗一覧で照合した。この記録時点では、次の採用済み追加工程B0〜B6はP13後に位置し、採用記録が各単位の明示施工指示を別途要求していたため、このP13検収記録だけではB0を着手済みにしなかった。後日ユーザーからB0の続行指示があり、現在はB0をIMPLEMENTINGとして扱う（現況は本書冒頭の更新記録）。
 
 #### macOS Host登録の製品入口 — CLOSED（Product Build、2026-10-09）
 
