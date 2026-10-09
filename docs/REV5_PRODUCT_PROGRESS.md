@@ -9,7 +9,9 @@
 
 ## P13後・B0全件観測／原因対応台帳（2026-10-09・進行中）
 
-現行集計（2026-10-09、#377266統合後）: B0は107 run参照／87 cause-response行。直接参照147件中101件を照合済み（cause-response 100件、`VALIDATION.txt` 1件）、46件未統合。直接参照なし56件中6件を別途照合、50件未照合。#377266はserver-ID `TextField`のAX locator不一致を試験側の問題として照合し、`ce443b6`の公開文字Vision照合・通常scroll／clickを後続#377278で確認した。後続runはnative credential sheetの表示・取消まで進んだが、取消後に別のAX query timeoutとなった。資格情報入力・Owner・Broker登録は成立していない。B0 acceptanceは未判定。
+現行集計（2026-10-09、#377278統合後）: B0は108 run参照／88 cause-response行。直接参照147件中102件を照合済み（cause-response 101件、`VALIDATION.txt` 1件）、45件未統合。直接参照なし56件中6件を別途照合、50件未照合。#377278の取消後状態文検索でsnapshot timeoutとなった試験経路を`StaticText`限定へ変更し、後続#377289で取消状態確認を越えOwner確認経路の後まで進んだことを確認した。#377289は登録結果表示assertionで別途FAILしており、登録成立とは扱わない。B0 acceptanceは未判定。
+
+履歴snapshot（2026-10-09、#377266統合後）: B0は107 run参照／87 cause-response行。直接参照147件中101件を照合済み（cause-response 100件、`VALIDATION.txt` 1件）、46件未統合。直接参照なし56件中6件を別途照合、50件未照合。#377266はserver-ID `TextField`のAX locator不一致を試験側の問題として照合し、`ce443b6`の公開文字Vision照合・通常scroll／clickを後続#377278で確認した。後続runはnative credential sheetの表示・取消まで進んだが、取消後に別のAX query timeoutとなった。資格情報入力・Owner・Broker登録は成立していない。B0 acceptanceは未判定。
 
 次の累積段落は#377253統合後・#377266照合前の履歴snapshotである。現行件数と最新停止点は上記を優先する。
 
