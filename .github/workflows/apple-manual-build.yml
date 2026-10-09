@@ -600,7 +600,7 @@ jobs:
             test -f "$audit"; test ! -L "$audit"; test "$(stat -f%z "$audit")" -lt 4194304
             jq -s -c 'map(select(.operation == "作業領域承認" or .operation == "作業領域読取" or .operation == "作業領域全体基準点保存" or .operation == "作業領域変更一覧" or .operation == "作業領域差分" or .operation == "作業領域失効")) | .[0:64][] | {operation,decision}' "$audit" > evidence/inspector-audit-projection.jsonl
             for operation in 作業領域承認 作業領域読取 作業領域全体基準点保存 作業領域変更一覧 作業領域差分 作業領域失効; do
-              jq -s -e --arg operation "$operation" 'any(.[]; .operation == $operation and .decision == "accepted")' evidence/inspector-audit-projection.jsonl > /dev/null
+              jq -s -e --arg operation "$operation" 'any(.[]; .operation == $operation and .decision == "accepted")' "$audit" > /dev/null 2>&1
             done
           fi
       - name: 登録検証用RuntimeとWorkspaceを回収

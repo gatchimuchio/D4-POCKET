@@ -72,7 +72,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "c13f790986ec0e0c8dc8fbb90e22b60bf6cc8a0cc70fe2c0f2d791ffc33329a0"
+      "sha256": "0c3962312db994774565fe00cefca4b26f0443966d1be605fe8112f1aa13f22d"
     },
     {
       "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
@@ -1288,7 +1288,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "4c0c857547eeaf0f8e170b934c6f65584409dcdde3917643cc60b94c562b9648"
+      "sha256": "f0f9f2a5f0fd557d2d9189834b04717d21a695bb609f1dd508e0ceaa99d54904"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1528,7 +1528,7 @@
     },
     {
       "path": "docs/specs/macos-workspace-inspector.md",
-      "sha256": "7b4ce117b0be9725a71071fbdaddc4e938ef46b0c7d8285de68ecd8d22a523cd"
+      "sha256": "01a1adef7247b6120c45174bb1d79b582ad1aa9a23e8434dba9dce5436fcd348"
     },
     {
       "path": "docs/specs/macos-workspace-selection.md",

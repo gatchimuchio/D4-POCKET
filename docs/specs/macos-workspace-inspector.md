@@ -17,7 +17,7 @@ Agent Centerで起動中に登録したWorkspaceを、既存Inspectorから明�
 | ID | 条件 | 状態 | 証拠 |
 | --- | --- | --- | --- |
 | MAC-INSPECT-1 | 3操作の同一要求native入口、session／authority／hash／不正表示範囲否定、拒否時未配送 | CLOSED | Windows候補1件・入口1件、Mac入口1件はsource `e031745`／run `37875821384`でPASS。再実行しない |
-| MAC-INSPECT-2 | Mac製品UIでfull読取確認→公開file表示→全体baseline確認→合成fixture変更→changed files／diff→失効確認・本文消去・Audit | FAIL | source `2e2c27c`はWorkspace選択後すぐの検査時点で比較範囲buttonが未出現。原因を断定せず、button出現を10秒待つ |
+| MAC-INSPECT-2 | Mac製品UIでfull読取確認→公開file表示→全体baseline確認→合成fixture変更→changed files／diff→失効確認・本文消去・Audit | FAIL | source `9882db8`で製品UI・cleanup pass、bounded Audit投影が64件目以降を落とし失効acceptedの判定FAIL。上限付き元Auditで判定する |
 | MAC-INSPECT-3 | 対象build／解析、通常終了、helper／専用fixture回収 | OPEN | 手動Actions `macos_workspace_inspector`だけ |
 
 公開合成fileとtest identityを使う。合成入力は`FIXTURE`、責任経路の静的確認は`CONFIG`、実native確認・Broker APFS読取・差分・正常終了は限定`LIVE_RUNTIME`。登録済み秘密canaryは本文・log・artifactへ出さない。本文は明示full後の公開fileだけを試験する。既存CLOSED試験、Alias／race／crash matrix、長時間、Formal Evidenceを再実行・追加せず、Acceptance外は延期中Final QA／既存gateへ送る。通常Release `task_execution=unsupported`、`release_ready=false`を保持し、PASS後は本単位をCLOSEDとして次へ進む。
@@ -53,3 +53,5 @@ Mac run [`37882650318`](https://github.com/gatchimuchio/D4-POCKET/actions/runs/3
 Mac run [`37883933180`](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37883933180)、source `4975d33bbb7ddb927538bb04cac3552cbdbad627`はtmp書込を使わず変更一覧のbuttonへ到達したが、AX click後の受信Auditはなく、変更件数の表示待ちでFAIL（162.556秒）。基準点受理までは成立し、変更一覧要求の未到達理由とfixture更新成功は未確定。baselineで成立した既存の可視文字への通常click・enabled確認を、同じ新試験の変更一覧と直接続く失効buttonへ適用する。Acceptance・製品挙動・権限・worker範囲を変更しない。artifact `11595677268`（74191 bytes）のSHA256=`5b5999bf630b673fa01d067e6cc1dd035df27ac8a8c618b8751057e791fb742d`をbyte照合済み。通常build／解析・helper 0・fixture回収PASS、差分／失効／正常終了は未成立のまま保持する。
 
 Mac run [`37885019903`](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37885019903)、source `2e2c27cca56e8f2011f495dd0649a423e162c433`は全体baseline受理まで成立したが、Workspace選択直後に比較範囲buttonが見つからずFAIL（102.006秒）。button未出現の原因、host fixture更新、比較範囲Broker要求の到達は証拠から確定できない。製品要求・表示・Authorityを変えず、既存buttonの出現を10秒待つ。差分・失効は引き続き未到達。artifact `11596630070`（72052 bytes）のSHA256=`15c9d78359233d87572bb09436840f3f8fb05e1a60893ccb5d2c7bea5020b30e`をbyte照合済み。通常build／解析・helper 0・fixture回収PASS。
+
+Mac run [`37885834795`](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37885834795)、source `9882db8b54eb373ce312697f64b7e8aba2bbcc52`のXCTestは1 passed／0 failed、132.299秒。公開file、baseline読戻し、changed files、public.txt diff、失効後本文消去、Command-Q後10秒以内の終了が成立したが、workflow総合はFAIL。証拠artifact `11596601400`（73768 bytes、SHA256=`57197e02e1188c7c16f60d67454115bd645b1628d03b46f38f9e7410473a1e03`）の匿名化Audit投影は、先頭64件制限により`作業領域失効`の`received`までで切れている。元Audit上で同操作がacceptedだったかは未確認。件数投影は64件上限のまま保持し、各操作のaccepted判定だけを既存上限4 MiB・symlink拒否済みの元Auditへ向ける。元Audit本文をartifact／logへ出さない。このworkflow判定を修正して再検収するまでMAC-INSPECT-2はFAILのまま。
