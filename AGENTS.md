@@ -762,3 +762,7 @@ R2 Agent Taskは製品開発を続けるための機能が成立したものと�
 現行製品phaseとその状態は、最新Repositoryの`docs/REV5_PRODUCT_PROGRESS.md`を正本、`ROADMAP.md`を入口として確認する。過去の指示書にある「次に開始するphase」やphase番号を現在状態へ転記せず、進捗正本に記録された最新OPEN phaseとAcceptanceから続行する。現時点でCLOSEDの製品Acceptanceは、再現可能な回帰が該当条件を壊した場合だけ再開する。以後は最新rev5で定める残りの製品機能を順に完成し、Feature Complete後に限ってQ0〜Q7 Final QAを開始する。
 
 通常のOwner承認・入力を開発進行の待ち条件にしない。製品のAuthority境界は維持したうえで、テスト専用Owner identity、fixture、UI automation等の隔離された試験経路を用いる。production identity・鍵・不可逆な事業判断・Final GOなど、Owner本人にしか成立させられない事項だけをOwner待ちとして残す。実際のOwner確認画面を自動承認するために既存安全境界を迂回してはならない。
+
+### 30. 緩衝基盤rev5補遺と全工程QC
+
+2026-10-09に承認された追加正本3点とrev5原本対照・適用時期は`docs/緩衝基盤_rev5補遺_QC/採用記録.md`を参照する。QCを要求・設計・実装・検査・是正全体の品質成立原理として扱うが、工程内の有限Acceptanceと統合後の検査強度・開始条件の分離を維持する。現在のP13へ緩衝施工・全数調査を割り込ませず、CLOSEDや既存Q0〜Q7識別子・DEFERREDを変更しない。P13完了、追加B単位の明示施工指示、正式Q段階開始は別々に確認し、補遺採用だけから全施工・mode切替・Authorityを生成しない。補遺原文の作成時状態と現在の承認を混同せず、文言差異を無言で整合済みとせず採用記録へ保持する。

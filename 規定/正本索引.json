@@ -196,6 +196,22 @@
       "責任": "rev5 Product-First工程の現行phase、機能受入れ、過去phaseからの移送対応"
     },
     {
+      "path": "docs/緩衝基盤_rev5補遺_QC/採用記録.md",
+      "責任": "2026-10-09承認のP13後追加正本3点、原本hash、rev5原本対照、開始境界、未施工状態。現行P13やQ開始許可を上書きしない"
+    },
+    {
+      "path": "docs/緩衝基盤_rev5補遺_QC/実装仕様書.md",
+      "責任": "D4-BUF-SPEC-QC-20261009原文。緩衝基盤の全件観測・非権限実作用・全工程QC。現在の承認と適用範囲は同directoryの採用記録を参照"
+    },
+    {
+      "path": "docs/緩衝基盤_rev5補遺_QC/工程表.md",
+      "責任": "D4-BUF-PLAN-QC-20261009原文。P13後B0〜B6と既存Q0〜Q7への接続。現在の承認と未着手状態は同directoryの採用記録を参照"
+    },
+    {
+      "path": "docs/緩衝基盤_rev5補遺_QC/実装指示書.md",
+      "責任": "D4-BUF-INST-QC-20261009原文。追加工程の施工条件・境界・単位別指示。採用を全施工委任へ昇格せず同directoryの採用記録を参照"
+    },
+    {
       "path": "docs/FINAL_QA_QUEUE.md",
       "責任": "Feature Complete後に実施する最終統合品質保証の有限queue。製品開発phaseの進行条件にしない"
     },

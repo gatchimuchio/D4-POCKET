@@ -5,6 +5,8 @@
 現行mode: `PRODUCT_BUILD_MODE`（最新版rev5実装指示§2）。Windows側P12 `FEATURE COMPLETE`はCLOSEDのまま保持し、Mobile／Non-Windowsは独立するP13 trackとして構築する。P2 CompareとP3 HandoffもCLOSEDのまま再訪しない。Q0／Q1／Q2に記録済みのQA実行結果は履歴証拠として保持するが、Final QA queueは現在の作業schedulerではなく、追加QAは開始・継続しない。通常Release `task_execution=unsupported`と既存release gateを維持する。
 初期rev5文書同期commit: `39dd3f4bc7aafe350ca94fce9392095f1064d2bc`。凍結commitとその後のQA記録は本書末尾の更新履歴を参照。
 
+2026-10-09の明示承認により、[緩衝基盤rev5補遺・QC基底改訂3点](緩衝基盤_rev5補遺_QC/採用記録.md)をP13後の追加正本として採用した。原文の未承認表記は作成時履歴として保存し、現在の承認・rev5原本取得・対照と文言差異を採用記録へ分離する。B0〜B6はOPEN・未着手であり、現在のP13へ割り込ませない。全工程QCという運用意味を採用しても、有限Acceptance・CLOSED・正式Q0〜Q7の開始条件・DEFERRED・release gateは維持する。採用を全施工委任へ昇格しない。
+
 ## 正本の選び方
 
 常にユーザーが現在提示した最新版の仕様書・工程表・実装指示書と、そこへ同期したリポジトリ内の現行進捗を正本とする。旧版文書は、明示的に現行正本へ採用されない限り、履歴・補助証拠としてのみ使う。旧版の状態や要求を現行状態へ推定転記しない。
@@ -32,6 +34,8 @@ source `00af2c4`／run `37877200890`は登録前提通過・読取承認Audit ac
 source `5d927f9`／run `37878209622`は読取承認accepted後に`registration_refreshed`を観測、短い成功文言でもFAIL。既存lifecycleの復帰時再取得で成功文言が消えることをsourceと照合し、一時文言ではなく現在登録の公開読取、Broker内baselineの既存比較範囲読戻し、失効後の現在登録と本文消去で新試験を検収する。画面復帰境界・製品実装・Acceptanceは変更しない。診断用codeは除去する。
 
 source `cc7d362`／run `37879704542`は公開file本文表示・読取Audit acceptedまで成立、baselineのAX click後にnative確認が現れずFAIL（124.470秒）。当該操作の受信Auditもなく根因は未確定。新試験のbaseline操作だけを現在の可視button／enabled確認と通常mouse入力へ局所修正する。CLOSED入口・登録前提・生産経路・Authorityは変更せず、diff／失効／正常終了を未成立のまま残す。通常build／解析、helper 0・専用fixture回収はPASS。
+
+source `364798f`／run `37880815733`は全体baseline受理Auditと比較範囲の製品表示まで成立し、別app container内fixtureへのXCTest書込をOSが拒否してFAIL（107.860秒）。固定合成public fileの更新だけをhost所有の限定handshakeへ移す。製品の書込権・sandbox・Authority・Acceptanceは変えない。差分／失効／正常終了を残件として保持する。通常build／解析、helper 0・既存fixture回収はPASS。詳細とartifact byte照合は責任仕様へ記録する。
 
 #### macOS Host登録の製品入口 — CLOSED（Product Build、2026-10-09）
 

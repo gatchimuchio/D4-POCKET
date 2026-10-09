@@ -1,5 +1,7 @@
 # GUI Shell ロードマップ
 
+2026-10-09承認の[緩衝基盤rev5補遺・QC基底改訂](docs/緩衝基盤_rev5補遺_QC/採用記録.md)をP13完了後の追加正本として採用。全工程QCの意味、B0〜B6、原本保全・対照・文言差異を記録した。現行P13とCLOSED、正式Q段階のDEFERREDは維持する。採用は追加施工・mode切替・Owner GOではなく、各単位の明示施工指示を別に確認する。
+
 P13次単位: Mac Workspace Inspectorの未接続native確認入口を`docs/specs/macos-workspace-inspector.md`のMAC-INSPECT-1〜3で構築する。既存の読取承認・失効・全体baseline保存だけをBrokerへ結合し、公開file／差分の製品正常経路を一回確認する。Macがlocalにないため手動Actions `macos_workspace_inspector`だけを補助利用する。登録・OS選択・他CLOSED条件とFinal QAを再訪せず、Task／書込能力・通常Release claimを広げない。
 
 P13 macOS Host登録はCLOSED（Product Build、2026-10-09）。`docs/specs/macos-host-registration.md`の有限MAC-HOST-1〜3がPASS。source `7220847bc775bec23f8088fc9d421209eb1ddc93`、[run 37871901769](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37871901769)で公開入力→別個native Owner→既存Broker登録→一覧更新→起動後Hostの表示切替→Command-Q・helper残留0がPASS。UI 1 passed／0 failed、72.616秒。対象解析・通常buildもPASS、CLOSED境界／Widgetは再実行しない。成功sourceをmainへ統合・push・remote照合、一時branchを双方回収した。公開metadataの有限単位だけで、remote接続・Trust・Credential・Task・正式配布・Final QAへ広げず、通常Release能力を保持する。次はP13のOPEN製品差分だけ。
