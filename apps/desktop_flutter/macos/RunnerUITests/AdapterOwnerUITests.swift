@@ -56,15 +56,8 @@ final class AdapterOwnerUITests: XCTestCase {
     let scope = app.buttons["既存baselineの比較範囲を確認"]
     XCTAssertTrue(scope.exists); reveal(app, scope); scope.click()
     try mcpPublicText(app, "基準点に保存されたfile")
-    // 別appのcontainerを書き換えない。host所有fixtureの限定更新だけを試験制御へ要求する。
-    let signal = URL(fileURLWithPath: "/tmp/d4-workspace-inspector-fixture")
-    try Data("change-public-fixture\n".utf8).write(to: signal.appendingPathComponent("request"), options: .withoutOverwriting)
-    let done = signal.appendingPathComponent("done").path
-    for _ in 0..<50 {
-      if FileManager.default.fileExists(atPath: done) { break }
-      Thread.sleep(forTimeInterval: 0.2)
-    }
-    XCTAssertTrue(FileManager.default.fileExists(atPath: done), "host所有の合成公開file更新")
+    // hostは当該runのbaseline受理Audit後に固定合成fileだけを更新する。
+    // XCTestから別container／tmpへ書かず、以下の製品changed files／diffで更新を確認する。
     let changes = app.buttons["全体基準点の変更一覧"]
     XCTAssertTrue(changes.exists); reveal(app, changes); changes.click()
     try mcpPublicText(app, "変更 1件・変更なし 0件・secret除外 1件")

@@ -37,6 +37,8 @@ source `cc7d362`／run `37879704542`は公開file本文表示・読取Audit acce
 
 source `364798f`／run `37880815733`は全体baseline受理Auditと比較範囲の製品表示まで成立し、別app container内fixtureへのXCTest書込をOSが拒否してFAIL（107.860秒）。固定合成public fileの更新だけをhost所有の限定handshakeへ移す。製品の書込権・sandbox・Authority・Acceptanceは変えない。差分／失効／正常終了を残件として保持する。通常build／解析、helper 0・既存fixture回収はPASS。詳細とartifact byte照合は責任仕様へ記録する。
 
+source `19036e6`／run `37882650318`はtmp要求file作成もOSが拒否してFAIL（124.721秒）。通知fileを撤去し、読取り成立済みの当該runのbaseline受理Auditをhost側の合成fixture更新の順序信号だけへ使う。compileを含めたstep 220秒に対しworkerは10分上限とし、成功終了値を確認する。製品Authority・sandbox・有限条件は変えず、差分／失効／正常終了は未成立のまま。通常build／解析・helper 0・既存fixture回収PASS、結果検査FAILは保持する。採用済み補遺はこの検収sourceにも保存済みだが、成功sourceのmain統合まで完了扱いしない。
+
 #### macOS Host登録の製品入口 — CLOSED（Product Build、2026-10-09）
 
 有限契約`docs/specs/macos-host-registration.md`のMAC-HOST-1〜3を閉鎖。source `7220847bc775bec23f8088fc9d421209eb1ddc93`、[手動run 37871901769](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37871901769)で公開GUI入力→別個native Owner→既存Broker登録→通常一覧更新→起動後Hostの未審査表示・表示切替→Command-Q正常終了がPASS。XCTest 1 passed／0 failed／0 skipped、72.616秒。登録／切替の受理Audit各1件、helper残留0・source clean、対象Dart解析No issues・通常native／Mac buildもPASS。Windows新入口・Mac platform gate各1件と新Widget4件のCLOSED証拠を再利用し、`host_product_only=true`で再試験しなかった。

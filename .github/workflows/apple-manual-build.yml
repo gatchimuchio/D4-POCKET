@@ -531,44 +531,42 @@ jobs:
             extra=('SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG D4_MACOS_OWNER_UI_TEST')
             # 開発専用fixture制御。別app containerへのXCTest書込はOSが拒否した。
             # 固定合成public.txtだけをhostが更新し、製品の書込権・sandboxを変えない。
-            signal=/tmp/d4-workspace-inspector-fixture
-            test ! -e "$signal"; test ! -L "$signal"
-            mkdir -m 700 "$signal"
+            fixture_audit=/Users/runner/Library/Containers/com.example.guiShellDesktop/Data/Library/Application\ Support/D4Pocket/macos-broker/store/audit.jsonl
+            test ! -e "$fixture_audit"; test ! -L "$fixture_audit"
             (
-              for attempt in $(seq 1 900); do
-                if [ -f "$signal/request" ]; then
-                  test ! -L "$signal/request"
-                  test "$(cat "$signal/request")" = change-public-fixture
-                  fixture=/Users/runner/Library/Containers/com.example.guiShellDesktop/Data/d4-registration-fixture
-                  test -d "$fixture/workspace"; test ! -L "$fixture"; test ! -L "$fixture/workspace"
-                  test -f "$fixture/workspace/public.txt"; test ! -L "$fixture/workspace/public.txt"
-                  test "$(cat "$fixture/workspace/public.txt")" = D4_PUBLIC_BEFORE
-                  printf '%s\n' D4_PUBLIC_AFTER > "$fixture/workspace/public.txt"
-                  touch "$signal/done"
-                  exit 0
+              # xcodebuildのcompile時間も含めて上限10分。新しいUI通知／権限経路を作らない。
+              for attempt in $(seq 1 3000); do
+                if [ -f "$fixture_audit" ]; then
+                  test ! -L "$fixture_audit"; test "$(stat -f%z "$fixture_audit")" -lt 4194304
+                  if jq -s -e 'any(.[]; .operation == "作業領域全体基準点保存" and .decision == "accepted")' "$fixture_audit" > /dev/null 2>&1; then
+                    fixture=/Users/runner/Library/Containers/com.example.guiShellDesktop/Data/d4-registration-fixture
+                    test -d "$fixture/workspace"; test ! -L "$fixture"; test ! -L "$fixture/workspace"
+                    test -f "$fixture/workspace/public.txt"; test ! -L "$fixture/workspace/public.txt"
+                    test "$(cat "$fixture/workspace/public.txt")" = D4_PUBLIC_BEFORE
+                    printf '%s\n' D4_PUBLIC_AFTER > "$fixture/workspace/public.txt"
+                    exit 0
+                  fi
                 fi
                 sleep 0.2
               done
               exit 1
             ) &
             fixture_worker=$!
-            cleanup_fixture_signal() {
+            cleanup_fixture_worker() {
               if jobs -pr | grep -Fxq "$fixture_worker"; then kill -TERM "$fixture_worker"; fi
               wait "$fixture_worker" 2>/dev/null || true
-              test -d "$signal"; test ! -L "$signal"
-              for name in request done; do
-                test ! -L "$signal/$name"
-                if [ -f "$signal/$name" ]; then rm "$signal/$name"; fi
-              done
-              rmdir "$signal"
             }
-            trap cleanup_fixture_signal EXIT
+            trap cleanup_fixture_worker EXIT
           fi
           xcodebuild test -project apps/desktop_flutter/macos/Runner.xcodeproj -scheme Runner \
             -destination 'platform=macOS' -parallel-testing-enabled NO \
             -only-testing:"$target" -derivedDataPath "$RUNNER_TEMP/macos-product-tests" \
             -resultBundlePath "$RUNNER_TEMP/macos-product-tests.xcresult" \
             CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual "${extra[@]}" 2>&1 | tee evidence/macos-native-test.txt
+          if [ '${{ inputs.target }}' = 'macos_workspace_inspector' ]; then
+            wait "$fixture_worker"
+            trap - EXIT
+          fi
       - name: 結果と後片付けを確認
         if: always()
         shell: bash
@@ -598,8 +596,6 @@ jobs:
           git diff --cached --exit-code -- apps/desktop_flutter
           test -z "$(git status --porcelain --untracked-files=all -- apps/desktop_flutter)"
           if [ '${{ inputs.target }}' = 'macos_workspace_inspector' ]; then
-            test ! -e /tmp/d4-workspace-inspector-fixture
-            test ! -L /tmp/d4-workspace-inspector-fixture
             audit=/Users/runner/Library/Containers/com.example.guiShellDesktop/Data/Library/Application\ Support/D4Pocket/macos-broker/store/audit.jsonl
             test -f "$audit"; test ! -L "$audit"; test "$(stat -f%z "$audit")" -lt 4194304
             jq -s -c 'map(select(.operation == "作業領域承認" or .operation == "作業領域読取" or .operation == "作業領域全体基準点保存" or .operation == "作業領域変更一覧" or .operation == "作業領域差分" or .operation == "作業領域失効")) | .[0:64][] | {operation,decision}' "$audit" > evidence/inspector-audit-projection.jsonl
