@@ -1964,7 +1964,8 @@ impl Broker {
         // Mac登録／MCPの別個native Owner確認だけ。試験専用Ownerへ追加しない。
         let operation_is_allowlisted = operation_is_allowlisted
             || (cfg!(target_os = "macos") && matches!(envelope.operation,
-                Some(BrokerOperation::資格情報登録 | BrokerOperation::MCP接続 | BrokerOperation::MCP切断 | BrokerOperation::Host登録)));
+                Some(BrokerOperation::資格情報登録 | BrokerOperation::MCP接続 | BrokerOperation::MCP切断 | BrokerOperation::Host登録
+                    | BrokerOperation::作業領域承認 | BrokerOperation::作業領域失効 | BrokerOperation::作業領域全体基準点保存)));
         if !operation_is_allowlisted
             || envelope.session_id.as_deref() != Some(self.session_id.as_str())
             || !metadata_is_desktop
@@ -5873,6 +5874,23 @@ mod tests {
         assert_eq!(confirmed.error.unwrap().code, if cfg!(target_os="macos") {
             "broker_persistence_unavailable"
         } else { "desktop_owner_operation_invalid" });
+    }
+
+    #[test]
+    #[cfg(any(windows, target_os = "macos"))]
+    fn macos_workspace_inspector_broker入口は通常要求と未登録scopeを拒否する() {
+        for operation in ["作業領域承認", "作業領域失効", "作業領域全体基準点保存"] {
+            let mut payload = json!({"作業領域ID":"unregistered-workspace", "登録hash":format!("sha256:{}", "a".repeat(64))});
+            if operation == "作業領域承認" {payload["表示範囲"] = json!("full");}
+            let request = json!({"request_id":"mac-workspace-gate", "session_id":"session-1",
+                "nonce":"mac-workspace-nonce", "issued_at":"2026-06-01T00:00:30Z", "operation":operation,
+                "metadata":{"client":"desktop_flutter"}, "payload_hash":canonical_payload_hash(Some(&payload)), "payload":payload});
+            let normal = test_broker().handle(BrokerRequestEnvelope::from_json_str(&request.to_string()).unwrap());
+            assert_eq!(normal.error.unwrap().code, "desktop_native_owner_confirmation_required");
+            let confirmed = test_broker().desktop_owner_operation_json(&request.to_string());
+            assert_eq!(confirmed.error.unwrap().code, if cfg!(target_os="macos") {"作業領域拒否"} else {"desktop_owner_operation_invalid"});
+            assert!(confirmed.body.is_none());
+        }
     }
 
     #[test]

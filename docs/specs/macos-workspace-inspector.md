@@ -1,0 +1,33 @@
+# macOS Workspace Inspectorの内容露出入口
+
+状態: IMPLEMENTING（P13 Product Build、2026-10-09）。現行rev5と`docs/REV5_PRODUCT_PROGRESS.md`に従う。
+
+## 意味と責任
+
+Agent Centerで起動中に登録したWorkspaceを、既存Inspectorから明示した内容露出範囲で読む。既存`作業領域承認`／`作業領域失効`／`作業領域全体基準点保存`だけをMac Rust native Owner確認へ結合する。現在要求のID・nonce・時刻・client・payload hash、Workspace ID・登録hash・表示範囲を確認し、承認した同一要求だけを既存Broker process内receiverへ渡す。入力によるOwner bool、資格、任意operation、任意root／pathを追加しない。
+
+承認は現在登録に限定した5分の`workspace.inspect`読取Permission／Approvalであり、Task実行・書込・Credential・Agent trustを生成しない。既存Brokerが登録hash・現在登録・期限・root実体・secret除外・Auditを再評価する。`full`以外で全文を返さず、秘密除外は登録path境界であって一般的な秘密検出ではない。baselineは現在のfull承認下で上限付き既存取得器が読む。Workspaceあたり一つのBroker内baselineであり、Task固有成果やRecovery適用ではない。失効は読取grantとbaselineを破棄するだけでfileを書き換えない。
+
+既存`workspace_inspection_request.schema.json`／`workspace_inspection_response.schema.json`、`workspace_diff.schema.json`、Rust `WorkspaceRegistry`／`WorkspaceReader`、Flutter `WorkspaceClient`／`WorkspaceInspector`を消費する。新しいwire／保存形式、filesystem bridge、OS scope付与は作らない。通常読取は既存認証Brokerだけへ送る。登録／OS選択はCLOSEDのまま、今回の実行前提としてだけ使う。
+
+作用分類: control（native承認・失効・baseline保持）／runtime（既存bounded読取・差分投影）。Capability=`workspace.inspect`、Permission=`workspace.inspect.<approval_id>`、Approval=現在登録hash・内容露出範囲への独立native確認、Audit=既存workspace受信／recorded／accepted／rejected、Recovery=`workspace.reapprove`。OS確認300秒＋既存応答4秒、Swift／Flutter待機305秒。非承認・不正・期限・監査失敗・未確定を成功へ昇格せず、自動再送しない。App Sandbox・登録handle・Windows経路・通常Release能力を維持する。
+
+## 有限受入れ
+
+| ID | 条件 | 状態 | 証拠 |
+| --- | --- | --- | --- |
+| MAC-INSPECT-1 | 3操作の同一要求native入口、session／authority／hash／不正表示範囲否定、拒否時未配送 | OPEN | 新しい局所Rust試験とMac専用Broker入口 |
+| MAC-INSPECT-2 | Mac製品UIでfull読取確認→公開file表示→全体baseline確認→合成fixture変更→changed files／diff→失効確認・本文消去・Audit | OPEN | 一回の新製品XCTest。登録は前提だけで再検収しない |
+| MAC-INSPECT-3 | 対象build／解析、通常終了、helper／専用fixture回収 | OPEN | 手動Actions `macos_workspace_inspector`だけ |
+
+公開合成fileとtest identityを使う。合成入力は`FIXTURE`、責任経路の静的確認は`CONFIG`、実native確認・Broker APFS読取・差分・正常終了は限定`LIVE_RUNTIME`。登録済み秘密canaryは本文・log・artifactへ出さない。本文は明示full後の公開fileだけを試験する。既存CLOSED試験、Alias／race／crash matrix、長時間、Formal Evidenceを再実行・追加せず、Acceptance外は延期中Final QA／既存gateへ送る。通常Release `task_execution=unsupported`、`release_ready=false`を保持し、PASS後は本単位をCLOSEDとして次へ進む。
+
+## 検証履歴
+
+2026-10-09: Windowsの新native候補試験`cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib macos_workspace内容露出_ -- --test-threads=1`が1 PASS、新platform限定Broker試験も1 PASS。3操作の同一payload配送、未承認の未配送、session／authority／hash変更・任意root・不正表示範囲の否定、Broker拒否の保持を確認した。試験名のRust snake-case警告を局所修正し、挙動を変えない。Mac側の未登録scope再評価は専用runnerで取得する。
+
+必須`cargo test --locked --manifest-path native/rust_helper/Cargo.toml --no-fail-fast -- --test-threads=1 --format terse`はlib 518 PASS／1 FAIL／12 ignored、他target PASS。変更外`a2a::tests::loopback_HTTPからAgent_Cardを取得してmetadata_onlyへ射影する`が`a2a_connection_failed`／「A2A Agent Card応答を読めない」でFAIL。根因未確定として既存`FQ-TEST-LOOPBACK`へ保存し、全体FAILをPASSへ変更せず、同じ旧fixtureを追加再試験しない。
+
+Desktop／Mobileの必須`flutter analyze --no-pub`は既知の日本語path LSP `Unterminated string`／analysis server exit 255でFAIL。回避source／一時複製は追加せず、Mac対象解析を別環境証拠として取得する。Schema 166／正常162／否定213、Conformance 244、手動起動限定、Manifest 1234、release gate、差分改行検査はPASS。日本語strictは既存5 file／17 findingsでFAIL、新規0。release-ready・正式配布の検査を開始しない。
+
+編集前backupの最初の短いref指定`git push -f origin codex/backup-main-prev:refs/tags/codex/backup-main-prev codex/backup-main:refs/tags/codex/backup-main`はlocal branch／tagの同名refで曖昧なためFAIL。既存Git機構でsourceを`refs/heads/...`へ明示し、2世代remote tagを照合してから編集を開始した。rollback=`cfacc3fec8793b2a249fa5a4cc9b60437dcb5dec`、前世代=`7220847bc775bec23f8088fc9d421209eb1ddc93`。追加backup世代・別環境wrapper・安全設定変更はない。

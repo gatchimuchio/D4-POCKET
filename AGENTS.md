@@ -306,6 +306,8 @@ LLMはGUI Shell contractの第一級の実装・統合consumerだが、権限源
 
 macOSのHost登録は`docs/specs/macos-host-registration.md`の限定control経路とする。既存Host構造検査と同一要求hashをRust native Owner確認へ束縛し、承認された要求だけを既存Brokerへ渡す。公開metadata登録・一覧・表示切替に限り、remote接続、Trust、Permission、Approval、Credential、Task実行権限を生成しない。Flutter／Swift承認bool・任意Owner操作への拡大を禁止する。
 
+macOSのWorkspace読取承認・失効・全体baseline保存だけを`docs/specs/macos-workspace-inspector.md`の限定control経路へ追加する。Rust native確認は同一要求hash・Workspace ID・登録hash・内容露出範囲へ束縛し、現在登録・期限・secret境界・bounded読取・Auditを既存Brokerが再評価する。Task実行・書込・Credential・Agent trust・OS scopeを生成せず、Flutter／SwiftのOwner bool、任意root／path、別filesystem経路を追加しない。App SandboxとWindows経路を保持する。
+
 ### 14. 境界の意味
 
 #### Shell Core

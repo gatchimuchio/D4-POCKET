@@ -10981,6 +10981,24 @@ def macos_host登録の限定責任経路を検査する() -> list[str]:
     return errors
 
 
+def macos_workspace内容露出の限定責任経路を検査する() -> list[str]:
+    """CONFIG証拠。現在のnative確認・APFS読取・製品差分は専用正常試験で確認する。"""
+    required = {
+        "docs/specs/macos-workspace-inspector.md": ["MAC-INSPECT-1", "MAC-INSPECT-3", "Task", "secret"],
+        "native/rust_helper/src/macos_desktop_owner.rs": ["workspace::owner_confirmation_summary", "macos_workspace内容露出_同一要求"],
+        "native/rust_helper/src/broker/workspace.rs": ["owner_confirmation_summary", "Task実行・書込権は付与しません"],
+        "apps/desktop_flutter/macos/Runner/BrokerProcessChannel.swift": ["作業領域承認", "作業領域失効", "作業領域全体基準点保存"],
+        ".github/workflows/apple-manual-build.yml": ["macos_workspace_inspector", "testProductMacWorkspaceInspector"],
+    }
+    errors = []
+    for path, tokens in required.items():
+        source = (ROOT / path).read_text(encoding="utf-8")
+        errors.extend(f"Mac Workspace内容露出の責任経路がない: {path}: {token}" for token in tokens if token not in source)
+    if "docs/specs/macos-workspace-inspector.md" not in (ROOT / "規定/正本索引.json").read_text(encoding="utf-8"):
+        errors.append("Mac Workspace内容露出の責任正本が索引にない")
+    return errors
+
+
 def main() -> int:
     tests = [
         test_required_docs_exist,
@@ -11220,6 +11238,7 @@ def main() -> int:
         macos_mcp資格情報参照の公開境界を検査する,
         macos_a2a接続の限定責任経路を検査する,
         macos_host登録の限定責任経路を検査する,
+        macos_workspace内容露出の限定責任経路を検査する,
         test_setup_doctor_public_bind_warning_exists,
         test_desktop_setup_doctor_ui_does_not_require_development_toolchains,
         test_broker_parity_startup_timeout_allows_local_cold_build,

@@ -185,6 +185,36 @@ fn digest(value: &Value) -> String {
     sha256_tagged(value.to_string().as_bytes())
 }
 
+/// 現在要求の公開参照だけをnative確認へ射影する。登録・Permissionの採否はBrokerが所有する。
+#[cfg(any(test, target_os = "macos"))]
+pub(crate) fn owner_confirmation_summary(operation: &str, payload: &Value) -> Option<String> {
+    let (id, hash, detail) = match operation {
+        "作業領域承認" => {
+            let p: Approval = parse(payload).ok()?;
+            if !["none", "hash_only", "summary", "redacted", "full"].contains(&p.表示範囲.as_str()) {
+                return None;
+            }
+            let detail = format!("現在登録に限定した5分の読取許可を要求します。\n内容露出: {}\nfullは登録済みsecret除外以外の本文を画面へ返せます。一般的な秘密検出ではありません。", p.表示範囲);
+            (p.作業領域ID, p.登録hash, detail)
+        }
+        "作業領域失効" | "作業領域全体基準点保存" => {
+            let p: Revocation = parse(payload).ok()?;
+            let detail = if operation == "作業領域失効" {
+                "現在の読取許可とBroker内baselineを失効します。Workspace fileは変更・削除しません。"
+            } else {
+                "現在のfull読取許可で取得できる範囲だけを、上限付きのBroker内baselineへ保存します。既存baselineを置換します。secret除外を守り、Task固有成果やRecovery適用にはしません。"
+            };
+            (p.作業領域ID, p.登録hash, detail.to_owned())
+        }
+        _ => return None,
+    };
+    if !identifier(&id) || hash.len() != 71 || !hash.starts_with("sha256:")
+        || !hash[7..].bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
+        return None;
+    }
+    Some(format!("Workspace操作: {operation}\nWorkspace ID: {id}\n登録hash: {hash}\n{detail}\n\nBrokerが現在登録・期限・登録handle・secret境界・Auditを再評価します。Task実行・書込権は付与しません。Credential・Agent trust・OSアクセス範囲を生成しません。"))
+}
+
 impl WorkspaceRegistry {
     /// 指定Runtimeに属する現在登録だけから、内容・root path・Permissionを含まない結合参照を作る。
     pub(crate) fn dialogue_binding(

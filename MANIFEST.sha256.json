@@ -72,7 +72,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "103c1d585a45e5b6aac129b17886e567d0ffc0ed385fa91d73d76ecb6474cb70"
+      "sha256": "1e04eb7b858a1bd460833b911276672961e080b507dd108e0b96bfb0d0c4da46"
     },
     {
       "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
@@ -92,7 +92,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "c5c834a738da64d23c13648ba823a765268af048f179ad576f0fc361d97bb1d8"
+      "sha256": "98fbe2cd4b6f64cce09d298a984900573ee1ae9355238693105baaf53909c413"
     },
     {
       "path": "AUDIT.md",
@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "43ecfdb51f3d28a8d4ee87db9b7a5edb1ca0a5be60287187c7df6db5c99c76d6"
+      "sha256": "d1def37ff281b6ab6e2c6ba46c16466242dbbcadc9bd260ef0bf3dee5fa2214e"
     },
     {
       "path": "SECURITY.md",
@@ -528,7 +528,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/BrokerProcessChannel.swift",
-      "sha256": "9fa0c2a888dfcd6fbb0d877bbb870e11c0e56995a5e834f1973223421257d002"
+      "sha256": "0d631f1680dca4514e96794f168675d062fd9ca21a0a4710874fdfeb175fe19c"
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/Configs/AppInfo.xcconfig",
@@ -572,7 +572,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/RunnerUITests/AdapterOwnerUITests.swift",
-      "sha256": "289f7ab303bdc7600c05ae6bf131ef6d6a3298166127e462f5bfc3f4e6b491ba"
+      "sha256": "7f9b9dec48d071e689300f15f3fee49aa0833e6b9b357cbb3244d08cbe75fe12"
     },
     {
       "path": "apps/desktop_flutter/pubspec.lock",
@@ -1232,7 +1232,7 @@
     },
     {
       "path": "docs/FINAL_QA_QUEUE.md",
-      "sha256": "33b7acbe4349c0e1d95d26cc7f6c934d85edf80c682b5b9c4d7028d609337f8e"
+      "sha256": "5dab1faebcad58e39e6bce58db41b53d07c79ef8d969548bd744370dd99ffc5e"
     },
     {
       "path": "docs/FIRST_RUN.md",
@@ -1288,7 +1288,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "f895d1a69f71316595d5cfc7849dc8b20099e48e3418307b106951c619296f17"
+      "sha256": "6cd7aa5979dbac84a1af154c8bfb007fd0632d6fe2139973bf33a13716e27555"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1525,6 +1525,10 @@
     {
       "path": "docs/specs/macos-mcp-credential-binding.md",
       "sha256": "f8b27d8220732a6490f14583fd21b334adb423f9d514cb3e4f1dd9332623b5dc"
+    },
+    {
+      "path": "docs/specs/macos-workspace-inspector.md",
+      "sha256": "00ac1424f46cb8dac562147ea31b5c8f2ba9a98d9e765d88d6f2422decce1ce7"
     },
     {
       "path": "docs/specs/macos-workspace-selection.md",
@@ -3496,7 +3500,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "d79343d5e6d08c33a26871532484686eb28161d0fcf4eb63d3801225023da5dd"
+      "sha256": "13ca822861850d43a48b1d45b04e294616a1c35a4ad1a7949098cf322c50e789"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -3532,7 +3536,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/workspace.rs",
-      "sha256": "8118b0d12dfbcb5024c504edb852bb3b9615535f068cf5f69a556f451b9bb6a6"
+      "sha256": "f9016a970abfe176c0e3271a08160e4ee7a85f1e0dd11eb97c9a5b0e5614ee3d"
     },
     {
       "path": "native/rust_helper/src/broker/workspace_root.rs",
@@ -3576,7 +3580,7 @@
     },
     {
       "path": "native/rust_helper/src/macos_desktop_owner.rs",
-      "sha256": "db46805043b00ab05e2892fc503dd89ac1879fd8d7e185f3a6997b2178e0e6f9"
+      "sha256": "ac59107d07a8e30fa9cd5d8778d7f028916b020e66692cc28a5b31bfabb24c70"
     },
     {
       "path": "native/rust_helper/src/macos_desktop_worker.rs",
@@ -4860,7 +4864,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "256952a889bef1d912f6a451a3b17bd375d86ebcf6e15bab8b56d5422455e935"
+      "sha256": "489d6f33d62ea89b7a533db6f7d37a6533157f076e4e75c82d9b864a63d4208b"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
@@ -4992,7 +4996,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "2c993b19b1c88aeddadd99cbe240105e137629956f5befb2c5fbc3bfce369cb0"
+      "sha256": "132361ab0d80a45730f8c04424efcbf77dc5d71b4d9d7eb96e1942e4d9f6b63f"
     }
   ]
 }

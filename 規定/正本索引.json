@@ -376,6 +376,10 @@
       "責任": "P13 Mac公開Host metadata登録の同一要求native Owner入口、既存Broker registry・一覧更新・表示切替、権限非生成の有限受入れ"
     },
     {
+      "path": "docs/specs/macos-workspace-inspector.md",
+      "責任": "P13 Macの登録Workspace読取承認・失効・全体baseline保存を同一要求native確認と既存Brokerへ限定結合し、内容露出／APFS読取・差分を投影する有限受入れ"
+    },
+    {
       "path": "docs/specs/mobile-surface.md",
       "責任": "C24 Mobileの選択的状態投影、Workspace ID選択・Agent対話要求、Device Link・Approval・非権限境界"
     },

@@ -3,6 +3,68 @@ import AppKit
 import Vision
 
 final class AdapterOwnerUITests: XCTestCase {
+  func testProductMacWorkspaceInspector() throws {
+    let app = XCUIApplication()
+    let notice = XCUIApplication(bundleIdentifier: "com.apple.UserNotificationCenter")
+    continueAfterFailure = false
+    app.launch()
+    defer { app.terminate() }
+    let center = element(app, "エージェント")
+    XCTAssertTrue(center.waitForExistence(timeout: 20)); center.click()
+    let fixture = "/Users/runner/Library/Containers/com.example.guiShellDesktop/Data/d4-registration-fixture"
+    let start = app.buttons["登録を開始"]
+    XCTAssertTrue(start.waitForExistence(timeout: 10)); reveal(app, start); start.click()
+    XCTAssertTrue(app.textFields.firstMatch.waitForExistence(timeout: 10))
+    let fields = app.textFields.allElementsBoundByAccessibilityElement
+    XCTAssertEqual(fields.count, 6)
+    // 登録のCLOSED試験は再実行しない。新しい読取製品経路の固定公開前提だけを作る。
+    for (index, value) in ["test-model", "macos-product-codex", fixture + "/codex",
+                           "macos-product-workspace", fixture + "/workspace", "private.env"].enumerated() {
+      if index == 0 {
+        reveal(app, fields[index]); fields[index].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+      } else {
+        for _ in 0..<(index == 1 ? 3 : 1) { app.typeKey(XCUIKeyboardKey.tab.rawValue, modifierFlags: []) }
+      }
+      app.typeKey("a", modifierFlags: .command); app.typeKey(XCUIKeyboardKey.delete.rawValue, modifierFlags: [])
+      app.typeText(value); XCTAssertEqual(fields[index].value as? String, value)
+    }
+    app.buttons["native Owner確認へ進む"].click(); approve(notice)
+    XCTAssertTrue(element(app, "Broker内登録: macos-product-codex").waitForExistence(timeout: 20))
+    try mcpPublicText(app, "作業領域インスペクタ")
+    try mcpPublicText(app, "macos-product-workspace", click: true)
+    // 未承認時に本文を読まず、公開fileの表示範囲だけを明示選択する。
+    try mcpPublicText(app, "hash_only", click: true)
+    try mcpPublicText(app, "full", click: true, scroll: false)
+    let allow = app.buttons["native Owner確認でWorkspace読取を許可"]
+    XCTAssertTrue(allow.waitForExistence(timeout: 10)); reveal(app, allow); allow.click(); approve(notice)
+    try mcpPublicText(app, "現在のWorkspace読取Approvalを確認しました。Task実行権は付与していません。")
+    try mcpPublicText(app, "macos-product-workspace", click: true, scrollUp: true)
+    try mcpPublicText(app, "public.txt", click: true)
+    try mcpPublicText(app, "D4_PUBLIC_BEFORE")
+    let baseline = app.buttons["native Owner確認で比較baselineを保存"]
+    XCTAssertTrue(baseline.exists); reveal(app, baseline); baseline.click(); approve(notice)
+    try mcpPublicText(app, "Broker内の比較baselineを作成しました。Task実行・Workspace変更は行っていません。")
+    // UITest所有の合成公開fileだけを更新。Broker／製品へ書込権を注入しない。
+    let publicFile = URL(fileURLWithPath: fixture + "/workspace/public.txt")
+    XCTAssertEqual(try publicFile.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]).isRegularFile, true)
+    XCTAssertEqual(try publicFile.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink, false)
+    try Data("D4_PUBLIC_AFTER\n".utf8).write(to: publicFile)
+    let changes = app.buttons["baseline以降の変更file／差分を表示"]
+    XCTAssertTrue(changes.exists); reveal(app, changes); changes.click()
+    try mcpPublicText(app, "変更 1件・変更なし 0件・secret除外 1件")
+    try mcpPublicText(app, "public.txt", click: true)
+    try mcpPublicText(app, "D4_PUBLIC_BEFORE")
+    try mcpPublicText(app, "D4_PUBLIC_AFTER")
+    let revoke = app.buttons["native Owner確認でWorkspace読取を失効"]
+    XCTAssertTrue(revoke.exists); reveal(app, revoke); revoke.click(); approve(notice)
+    try mcpPublicText(app, "Workspace読取ApprovalとBroker baselineを失効しました。")
+    XCTAssertFalse(app.staticTexts["D4_PUBLIC_BEFORE"].exists)
+    XCTAssertFalse(app.staticTexts["D4_PUBLIC_AFTER"].exists)
+    print("D4_MACOS_WORKSPACE_INSPECTOR_PRODUCT_PASS")
+    app.typeKey("q", modifierFlags: .command)
+    XCTAssertTrue(app.wait(for: .notRunning, timeout: 10))
+  }
+
   func testProductMacHostRegistration() throws {
     let app = XCUIApplication()
     let notice = XCUIApplication(bundleIdentifier: "com.apple.UserNotificationCenter")
@@ -405,7 +467,7 @@ final class AdapterOwnerUITests: XCTestCase {
       try VNImageRequestHandler(cgImage: pixels).perform([request])
       let boxes: [VNRectangleObservation] = try (request.results ?? []).compactMap { observation in
         for candidate in observation.topCandidates(3) {
-          if ["切断", "MCP接続", "A2A接続", "Host切替"].contains(label) {
+          if ["切断", "MCP接続", "A2A接続", "Host切替", "macos-product-workspace", "hash_only", "full"].contains(label) {
             let text = candidate.string.components(separatedBy: .whitespacesAndNewlines).joined()
             if text != label { continue }
           }

@@ -1,5 +1,7 @@
 # GUI Shell ロードマップ
 
+P13次単位: Mac Workspace Inspectorの未接続native確認入口を`docs/specs/macos-workspace-inspector.md`のMAC-INSPECT-1〜3で構築する。既存の読取承認・失効・全体baseline保存だけをBrokerへ結合し、公開file／差分の製品正常経路を一回確認する。Macがlocalにないため手動Actions `macos_workspace_inspector`だけを補助利用する。登録・OS選択・他CLOSED条件とFinal QAを再訪せず、Task／書込能力・通常Release claimを広げない。
+
 P13 macOS Host登録はCLOSED（Product Build、2026-10-09）。`docs/specs/macos-host-registration.md`の有限MAC-HOST-1〜3がPASS。source `7220847bc775bec23f8088fc9d421209eb1ddc93`、[run 37871901769](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37871901769)で公開入力→別個native Owner→既存Broker登録→一覧更新→起動後Hostの表示切替→Command-Q・helper残留0がPASS。UI 1 passed／0 failed、72.616秒。対象解析・通常buildもPASS、CLOSED境界／Widgetは再実行しない。成功sourceをmainへ統合・push・remote照合、一時branchを双方回収した。公開metadataの有限単位だけで、remote接続・Trust・Credential・Task・正式配布・Final QAへ広げず、通常Release能力を保持する。次はP13のOPEN製品差分だけ。
 
 P13 macOS A2A接続はCLOSED（Product Build、2026-10-09）。`docs/specs/macos-a2a-center.md`のMAC-A2A-1〜3がPASS。source `10d7b0ee6a4199fdddc11605f1641856f99127d7`、[run 37797680275](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37797680275)で別個native Owner→既存Broker→loopback Card実取得→metadata-only未審査／hash表示→URI実消去→Command-Q・残留0・回収がPASS。UI 1 passed／0 failed／0 skipped、43.667秒。先行CLOSED境界／解析／投影／実拒否証拠を再利用。成功sourceをmainへ統合・push・remote照合、一時branchを双方回収した。合成Card／test identityの有限単位だけで、Credential／Task／外部host／正式配布／Final QAへ広げず、通常Release能力を保持する。次はP13のOPEN製品差分だけ。

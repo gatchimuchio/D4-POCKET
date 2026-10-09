@@ -17,6 +17,10 @@
 
 ## P13 Mobile / Non-Windows — 現行track
 
+#### macOS Workspace Inspectorの内容露出入口 — IMPLEMENTING（2026-10-09）
+
+既存APFS取得器・内容露出・baseline／差分とInspectorは実装済みだが、Mac native Owner入口から読取承認・失効・全体baseline保存へ未接続である。`docs/specs/macos-workspace-inspector.md`の有限MAC-INSPECT-1〜3だけを施工する。3操作の同一要求確認・現在登録のBroker再照合、製品UIの公開file読取・差分・失効を一回確認する。登録／OS選択は実行前提だけでCLOSED条件を再検収せず、Task／書込／Credential／OS scope・Windows能力・通常Release claimを変更しない。
+
 #### macOS Host登録の製品入口 — CLOSED（Product Build、2026-10-09）
 
 有限契約`docs/specs/macos-host-registration.md`のMAC-HOST-1〜3を閉鎖。source `7220847bc775bec23f8088fc9d421209eb1ddc93`、[手動run 37871901769](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37871901769)で公開GUI入力→別個native Owner→既存Broker登録→通常一覧更新→起動後Hostの未審査表示・表示切替→Command-Q正常終了がPASS。XCTest 1 passed／0 failed／0 skipped、72.616秒。登録／切替の受理Audit各1件、helper残留0・source clean、対象Dart解析No issues・通常native／Mac buildもPASS。Windows新入口・Mac platform gate各1件と新Widget4件のCLOSED証拠を再利用し、`host_product_only=true`で再試験しなかった。
