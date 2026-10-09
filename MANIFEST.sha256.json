@@ -1288,7 +1288,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "9e4889553d1fc27072008848f68e317401cca8a116b177283372e33ff319bb80"
+      "sha256": "4fc075a6e4f4b317e3e53a79326f166bb6b5c0339021219ad1a2cce65dca0b8e"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1648,11 +1648,11 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B0_\u539f\u56e0\u5bfe\u5fdc\u53f0\u5e33.md",
-      "sha256": "bd830c526d5326c133434c5e18ac112771382344ec93fc4b905b9174bd78e8e3"
+      "sha256": "413d8bd48b32a6c30d646f7b4061b2b3869178e55da68a5d5905277d6e39fccf"
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B0_\u53c2\u7167\u539f\u672c\u4e00\u89a7.md",
-      "sha256": "b8686dadcd2801a73b0b6e7b9a8408e095d9e22b442838b6be96fd1cace5acde"
+      "sha256": "ed06da04de442d01a9786c5e18b70f1da548d9a92be47604c2f3cc0e18da974b"
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B0_\u91cd\u8907\u5883\u754c\u56f3.md",
@@ -1672,7 +1672,7 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/\u63a1\u7528\u8a18\u9332.md",
-      "sha256": "e17bf869fc54d8613accc55e367fd238be9a44ba9ec7b23a21d1e86ba0938841"
+      "sha256": "ad25fae0258aecd29d2317ac6dc5d920410b42c2964d036117fca8e54ebc7641"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
