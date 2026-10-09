@@ -9,7 +9,7 @@
 
 ## P13後・B0全件観測／原因対応台帳（2026-10-09・進行中）
 
-Actions APIから2026-05-25〜2026-10-09の356 runを取得し、203 failure / 226 failed jobs / 250 failed-step summariesを台帳化。失敗job logs 151件を取得し、75件はHTTP 410/404、step detailなし5 runを欠測として分離した。原因・修正・後続証拠までB0で再照合した事象は57 run（48 cause-response行）。既存直接参照147件のうち51 runは原因表へ結合済み、残る96件は個別内容のB0因果分類待ちであり、未記載や原因UNKNOWNとは扱わない。直接run参照なし56件のうち6件は別途ログ・コード・後続証拠から原因対応済み、50件は未照合。類似step名やsource SHAだけから原因を推定しない。全Git patchと現行code/test responsibilityの照合も未完のため、B0 acceptanceを閉じずB1へ進まない。P13のCLOSED証拠は再実行せず、通常Release `task_execution=unsupported`、`release_ready=false`、Final QA DEFERREDを保持する。詳細は採用記録とB0の4成果物を参照。
+Actions APIから2026-05-25〜2026-10-09の356 runを取得し、203 failure / 226 failed jobs / 250 failed-step summariesを台帳化。失敗job logs 151件を取得し、75件はHTTP 410/404、step detailなし5 runを欠測として分離した。原因・修正・後続証拠までB0で再照合した事象は66 run（51 cause-response行）。既存直接参照147件のうち60 runは原因表へ結合済み、残る87件は個別内容のB0因果分類待ちであり、未記載や原因UNKNOWNとは扱わない。直接run参照なし56件のうち6件は別途ログ・コード・後続証拠から原因対応済み、50件は未照合。類似step名やsource SHAだけから原因を推定しない。全Git patchと現行code/test responsibilityの照合も未完のため、B0 acceptanceを閉じずB1へ進まない。P13のCLOSED証拠は再実行せず、通常Release `task_execution=unsupported`、`release_ready=false`、Final QA DEFERREDを保持する。詳細は採用記録とB0の4成果物を参照。
 
 ## 正本の選び方
 
@@ -257,7 +257,7 @@ artifact `11486335093`（255161 bytes、有効期限2026-10-10T13:36:53Z）をig
 
 Schema 161／157／208はPASS。初回Conformanceは待機操作の期待集合不足でFAIL（Windows Runnerは既に5操作を含んでいた）。Flutterの305秒対象と期待集合へ5操作を追加し、Conformance 236件はPASS。Windows transportの実装は変更していない。厳格日本語監査は変更外の既存4 file／15 findingsでFAIL、Desktop／Mobileの`flutter analyze --no-pub`は日本語pathでLSP FormatException／server exit 255／CLI exit 1。これら既存`release_blocker`は保持し、変更したDartの検査とMac build／UIは専用手動Actionsで行う。
 
-初回手動Actions [run 37627578133](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37627578133)、commit `ec48769d8e36ecf47de0393604649c75677d3b3e`はRust対象・Dart解析／待機試験・通常buildがPASS、状態管理UIがFAIL。新規Adapter導入後の「検証」を押してもOwner画面に到達しなかった。画面は新しいcatalogを表示する一方、`manageAdapter`は起動時snapshotだけを検索しており、新規recordを拒否していた。画面で選択したrecordのID／hashへ操作要求を束縛し、Brokerの現行hash・Owner・署名再評価は維持する。導入CLOSED条件は破壊されておらず再開しない。artifact `11484996544`、SHA-256 `3ad1d5f2f6c15d9086ec04a8d1bfc7e903e4c55784269c952200ed3bbb005f9c`を照合して保存した。helper残留なし／runner source cleanも確認したが、正常終了UIの証拠とは扱わない。
+初回手動Actions [run 37627578133](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37627578133)、commit `ec48769d8e36ecf47de0393604649c75677d3b3e`はRust対象・Dart解析／待機試験・通常buildがPASS、状態管理UIがFAIL。新規Adapter導入後の「検証」を押してもOwner画面に到達しなかった。画面は新しいcatalogを表示する一方、`manageAdapter`は起動時snapshotだけを検索しており、新規recordを拒否していた。commit `7c4219f5202402ad574e81b81e32d6eb02c82cd9`で画面が選択した現在catalogのrecordをID／hashに束縛して要求へ渡し、Brokerの現行hash・Owner・署名再評価は維持。後続手動Actions [run 37629357493](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37629357493)は`D4_MACOS_ADAPTER_LIFECYCLE_PASS`、XCUITest 1 passed／0 failed、OS確認を経た検証・有効化拒否・無効化・隔離・削除とCommand-Q正常終了がPASS。artifact `11486335093`、SHA-256 `23fa9afeb17bfdf089118a320fe003571fce66accd826d81b0d7f578794b4158`を確認した。ローカルwidget試験は選択recordの表示値・ID／hash束縛を確認するFIXTUREであり、権限源ではない。導入CLOSED条件は破壊されておらず再開しない。初回run artifact `11484996544`、SHA-256 `3ad1d5f2f6c15d9086ec04a8d1bfc7e903e4c55784269c952200ed3bbb005f9c`も保持する。
 
 修正後の「起動後のAdapter一覧に表示されたrecordを現在hashへ束縛して操作する」Widget回帰試験は、同一sourceのASCII一時複製で1件PASS。専用test identityの一覧更新→選択→要求ID／hash→Broker非承認receipt表示を確認した`FIXTURE`である。局所`dart analyze`は終了処理でDart perf file削除のOS 1920／SERVER_ERRORとなり、成功扱いしない。Mac手動Actionsの変更Dart解析で補助検証し、ローカル解析環境の既存release blockerは保持する。
 
