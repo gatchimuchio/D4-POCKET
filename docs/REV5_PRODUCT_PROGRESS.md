@@ -17,9 +17,11 @@
 
 ## P13 Mobile / Non-Windows — 現行track
 
-#### macOS Workspace Inspectorの内容露出入口 — IMPLEMENTING（2026-10-09）
+#### macOS Workspace Inspectorの内容露出入口 — VALIDATING（2026-10-09）
 
 既存APFS取得器・内容露出・baseline／差分とInspectorは実装済みだが、Mac native Owner入口から読取承認・失効・全体baseline保存へ未接続である。`docs/specs/macos-workspace-inspector.md`の有限MAC-INSPECT-1〜3だけを施工する。3操作の同一要求確認・現在登録のBroker再照合、製品UIの公開file読取・差分・失効を一回確認する。登録／OS選択は実行前提だけでCLOSED条件を再検収せず、Task／書込／Credential／OS scope・Windows能力・通常Release claimを変更しない。
+
+初回source `02886de`／手動run `37874900581`は、新しいBroker入口試験のメモリ専用fixtureが永続化gateで先に拒否されてFAIL。製品UIは未実行。既存永続Broker fixtureへ局所修正し、対象FAILだけを再検収する。過去FAILは責任仕様の検証履歴へ保持する。
 
 #### macOS Host登録の製品入口 — CLOSED（Product Build、2026-10-09）
 

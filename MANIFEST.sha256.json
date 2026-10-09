@@ -1288,7 +1288,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "6cd7aa5979dbac84a1af154c8bfb007fd0632d6fe2139973bf33a13716e27555"
+      "sha256": "fb54be1916b4f613e8e27e8b16aa3796785a50e7d1433bdb5f91c858bdacbacb"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1528,7 +1528,7 @@
     },
     {
       "path": "docs/specs/macos-workspace-inspector.md",
-      "sha256": "00ac1424f46cb8dac562147ea31b5c8f2ba9a98d9e765d88d6f2422decce1ce7"
+      "sha256": "7186db34deb9651656f7ab69769f36d87d72f7739f057777bf7e4c758fea3a55"
     },
     {
       "path": "docs/specs/macos-workspace-selection.md",
@@ -3500,7 +3500,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "13ca822861850d43a48b1d45b04e294616a1c35a4ad1a7949098cf322c50e789"
+      "sha256": "1ee61d0a1910db111d53cbc2c62d653d29796ef8c0d88a63401f8719a544b79b"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",

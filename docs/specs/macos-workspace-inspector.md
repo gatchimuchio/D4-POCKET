@@ -1,6 +1,6 @@
 # macOS Workspace Inspectorの内容露出入口
 
-状態: IMPLEMENTING（P13 Product Build、2026-10-09）。現行rev5と`docs/REV5_PRODUCT_PROGRESS.md`に従う。
+状態: VALIDATING（P13 Product Build、2026-10-09）。現行rev5と`docs/REV5_PRODUCT_PROGRESS.md`に従う。
 
 ## 意味と責任
 
@@ -31,3 +31,7 @@ Agent Centerで起動中に登録したWorkspaceを、既存Inspectorから明�
 Desktop／Mobileの必須`flutter analyze --no-pub`は既知の日本語path LSP `Unterminated string`／analysis server exit 255でFAIL。回避source／一時複製は追加せず、Mac対象解析を別環境証拠として取得する。Schema 166／正常162／否定213、Conformance 244、手動起動限定、Manifest 1234、release gate、差分改行検査はPASS。日本語strictは既存5 file／17 findingsでFAIL、新規0。release-ready・正式配布の検査を開始しない。
 
 編集前backupの最初の短いref指定`git push -f origin codex/backup-main-prev:refs/tags/codex/backup-main-prev codex/backup-main:refs/tags/codex/backup-main`はlocal branch／tagの同名refで曖昧なためFAIL。既存Git機構でsourceを`refs/heads/...`へ明示し、2世代remote tagを照合してから編集を開始した。rollback=`cfacc3fec8793b2a249fa5a4cc9b60437dcb5dec`、前世代=`7220847bc775bec23f8088fc9d421209eb1ddc93`。追加backup世代・別環境wrapper・安全設定変更はない。
+
+初回Mac run [`37874900581`](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37874900581)、source `02886de7b3966c6c599fd59ab8a7dd6275b03c01`は新しいBroker入口試験でFAIL。メモリ専用`test_broker()`が`broker_persistence_unavailable`で先に拒否され、意図した未登録Workspace拒否へ届かなかった。製品不具合の観測ではなく試験fixtureの誤りとして、確認済み入口だけを既存`persistent_test_broker`へ局所修正する。通常要求のnative確認必須と未登録scope拒否の期待を維持する。build／製品UIは未実行。artifact `11592046788`のSHA256=`7b00fffcc2f75b0805727726bd17104c7e9018d42660ad26a39f18081e3e987c`、専用fixture cleanup成功、helper残留なし。対象FAILだけを再検収する。
+
+fixture修正後のWindows対象command `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib macos_workspace_inspector_broker入口 -- --test-threads=1`は1 PASS。Schema 166／162／213、Conformance 244、手動起動限定、Manifest 1234、差分検査もPASS。製品実装・Acceptance・既存全体FAILは変更しない。

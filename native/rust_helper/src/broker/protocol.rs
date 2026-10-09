@@ -5887,7 +5887,9 @@ mod tests {
                 "metadata":{"client":"desktop_flutter"}, "payload_hash":canonical_payload_hash(Some(&payload)), "payload":payload});
             let normal = test_broker().handle(BrokerRequestEnvelope::from_json_str(&request.to_string()).unwrap());
             assert_eq!(normal.error.unwrap().code, "desktop_native_owner_confirmation_required");
-            let confirmed = test_broker().desktop_owner_operation_json(&request.to_string());
+            let store = temp_store_dir("macos-workspace-inspector-gate");
+            let confirmed = persistent_test_broker(&store).desktop_owner_operation_json(&request.to_string());
+            fs::remove_dir_all(&store).expect("Workspace入口fixtureを削除");
             assert_eq!(confirmed.error.unwrap().code, if cfg!(target_os="macos") {"作業領域拒否"} else {"desktop_owner_operation_invalid"});
             assert!(confirmed.body.is_none());
         }
