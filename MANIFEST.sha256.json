@@ -572,7 +572,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/RunnerUITests/AdapterOwnerUITests.swift",
-      "sha256": "5133557d77a100255ac9824609026a200d76bd0ab2d63b4ffc349b9d475cca51"
+      "sha256": "b012d5fd340492dac0a9407292b44123edeef584f8c33292eb0874c2777768af"
     },
     {
       "path": "apps/desktop_flutter/pubspec.lock",
@@ -1288,7 +1288,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "5a7635b9073ccb665bad89dd533c5ee26ba7a9d1b0d7e34050e2cb0a84695cd2"
+      "sha256": "d53aa03b5bdceb26caf1a9bf1d94a0d95519ef7889376589ee0c97e1f42c3c9a"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1528,7 +1528,7 @@
     },
     {
       "path": "docs/specs/macos-workspace-inspector.md",
-      "sha256": "6637da34a37fb6b1810fbdd8b74435b70105948db0bac1690f3d01baa77af244"
+      "sha256": "3f821319f8e400d2e3824ac3ce1d452bec89957b2582cf6799a28ff3351c834c"
     },
     {
       "path": "docs/specs/macos-workspace-selection.md",

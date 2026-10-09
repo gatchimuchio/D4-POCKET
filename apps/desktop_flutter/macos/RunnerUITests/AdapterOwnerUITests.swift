@@ -59,13 +59,22 @@ final class AdapterOwnerUITests: XCTestCase {
     // hostは当該runのbaseline受理Audit後に固定合成fileだけを更新する。
     // XCTestから別container／tmpへ書かず、以下の製品changed files／diffで更新を確認する。
     let changes = app.buttons["全体基準点の変更一覧"]
-    XCTAssertTrue(changes.exists); reveal(app, changes); changes.click()
+    XCTAssertTrue(changes.exists)
+    try mcpPublicText(app, "全体基準点の変更一覧", scrollUp: true)
+    let changesAvailable = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: changes)
+    XCTAssertEqual(XCTWaiter.wait(for: [changesAvailable], timeout: 10), .completed)
+    try mcpPublicText(app, "全体基準点の変更一覧", click: true, scroll: false)
     try mcpPublicText(app, "変更 1件・変更なし 0件・secret除外 1件")
     try mcpPublicText(app, "public.txt", click: true)
     try mcpPublicText(app, "D4_PUBLIC_BEFORE")
     try mcpPublicText(app, "D4_PUBLIC_AFTER")
     let revoke = app.buttons["native Owner確認でWorkspace読取を失効"]
-    XCTAssertTrue(revoke.exists); reveal(app, revoke); revoke.click(); approve(notice)
+    XCTAssertTrue(revoke.exists)
+    try mcpPublicText(app, "native Owner確認でWorkspace読取を失効", scrollUp: true)
+    let revokeAvailable = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: revoke)
+    XCTAssertEqual(XCTWaiter.wait(for: [revokeAvailable], timeout: 10), .completed)
+    try mcpPublicText(app, "native Owner確認でWorkspace読取を失効", click: true, scroll: false)
+    approve(notice)
     try mcpPublicText(app, "macos-product-workspace", click: true, scrollUp: true)
     XCTAssertFalse(app.buttons["native Owner確認でWorkspace読取を失効"].exists)
     XCTAssertFalse(app.buttons["native Owner確認で比較baselineを保存"].exists)
