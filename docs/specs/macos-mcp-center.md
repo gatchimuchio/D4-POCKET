@@ -56,7 +56,9 @@ source `94ea61991060a2d47760e44c259225d2077222b9`、手動`Actions` [run 3774905
 
 同runの監査・後片付けstepもFAIL。artifact内の`mcp-audit-projection.jsonl`は空、`tool-audit-acceptance.txt`は`false`。workflowは`set -euo pipefail`でこの監査判定をprocess確認・fixture回収より前に行うため、同runでは後段のhelper／MCP残留確認と専用fixture回収へ到達していない。よってこのrun単独では後片付けをPASSと記録しない。これは後続に成立したMAC-MCP-1〜3を再開する根拠ではなく、当時の失敗履歴である。以後の`mcp_product_only=true`はMAC-MCP-1〜3だけを検証し、4／5の試験を再訪しない。新runner上のcompileは製品画面試験の前提準備であり、成立済み条件の代替証拠を増やす目的ではない。
 
-source `357432b06e7fb712aab6a2a9e4b18f38f68ba656`、[run 37750370848](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37750370848)は検索選択が成立し、native Owner拒否・承認、実stdio discoveryとBroker接続accepted Auditまで到達したが、製品UIの接続receipt表示で65.363秒FAIL。artifact `11538585624`（68915 bytes）、SHA-256 `d7aaf2039409648f17e745fa19df8de28afb660f1d48bed0ba6d433621e43600`を実byteへ照合。
+source `357432b06e7fb712aab6a2a9e4b18f38f68ba656`、[run 37750370848](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37750370848)は部分一致を全文候補一致へ試験修正し、検索・native Owner拒否／承認・実stdio discovery・Broker接続`accepted`監査まで到達した。一方、XCTestの`credentialMessage`が接続receipt文を15秒以内に取得できず、65.363秒でFAIL。製品Dart sourceは同じ文を`_message`へ設定するが、このrunは画面上の描画欠落とアクセシビリティquery不一致を区別する証拠を含まない。Broker接続成功と製品画面assertion未成立を分ける。artifact `11538585624`（68915 bytes）、SHA-256 `d7aaf2039409648f17e745fa19df8de28afb660f1d48bed0ba6d433621e43600`を実byteへ照合。
+
+artifact内の監査投影は接続`rejected`／`received`／`accepted`の3行、Tool受入れ判定は`false`。同runの監査・後片付けstepは、このTool監査条件が満たされずFAILした。`set -euo pipefail`により後段のhelper／MCP残留確認とfixture回収へ到達していないため、当該runのcleanupは未確認である。これは後続にCLOSEDしたMAC-MCP-1〜3を再開する根拠ではなく、当時の失敗履歴として保持する。
 
 `REGRESSION_REOPENED`の局所対象は共有MCP接続receiptのSchema適合だけ。原因commit `5d45baa2e2d7a156b1439a6ad0834cd0817c492b`が外部発見metadataの`LIVE_RUNTIME`を接続receipt内へ残し、外側の`INTERNAL_STATE`、現行Schemaのconst、Flutter受入れと不整合だった。破壊条件はMAC-MCP-1の製品metadata表示／`mcp_connection_receipt.schema.json`。既存Windows実stdio testへ当該assertを追加して0 passed／1 failed（left LIVE_RUNTIME、right INTERNAL_STATE）を再現した。Brokerで保存済みmetadataへ正しく分類し、UI／Schema検査を緩めない。MAC-MCP-4／5や他CLOSED工程全体を再開しない。検査追加の理由は観測済み契約破壊であり、証拠強化ではない。
 
