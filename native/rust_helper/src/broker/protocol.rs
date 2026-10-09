@@ -1964,7 +1964,7 @@ impl Broker {
         // Mac登録／MCPの別個native Owner確認だけ。試験専用Ownerへ追加しない。
         let operation_is_allowlisted = operation_is_allowlisted
             || (cfg!(target_os = "macos") && matches!(envelope.operation,
-                Some(BrokerOperation::資格情報登録 | BrokerOperation::MCP接続 | BrokerOperation::MCP切断)));
+                Some(BrokerOperation::資格情報登録 | BrokerOperation::MCP接続 | BrokerOperation::MCP切断 | BrokerOperation::Host登録)));
         if !operation_is_allowlisted
             || envelope.session_id.as_deref() != Some(self.session_id.as_str())
             || !metadata_is_desktop
@@ -5857,6 +5857,22 @@ mod tests {
             "session-1",
             parse_issued_at_epoch_seconds("2026-06-01T00:00:30Z").unwrap(),
         )
+    }
+
+    #[test]
+    #[cfg(any(windows, target_os = "macos"))]
+    fn macos_host_broker入口はplatform限定で通常要求を拒否する() {
+        let payload = json!({"版":1});
+        let request = json!({"request_id":"mac-host-gate", "session_id":"session-1",
+            "nonce":"mac-host-gate-nonce", "issued_at":"2026-06-01T00:00:30Z",
+            "operation":"Host登録", "metadata":{"client":"desktop_flutter"},
+            "payload_hash":canonical_payload_hash(Some(&payload)),"payload":payload});
+        let normal = test_broker().handle(BrokerRequestEnvelope::from_json_str(&request.to_string()).unwrap());
+        assert_eq!(normal.error.unwrap().code, "host_owner_required");
+        let confirmed = test_broker().desktop_owner_operation_json(&request.to_string());
+        assert_eq!(confirmed.error.unwrap().code, if cfg!(target_os="macos") {
+            "broker_persistence_unavailable"
+        } else { "desktop_owner_operation_invalid" });
     }
 
     #[test]

@@ -40,6 +40,9 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
     let text = if registration {
         let summary = crate::broker::protocol::macos_agent_registration_summary(payload)?;
         format!("{summary}\n要求hash: {hash}")
+    } else if operation == "Host登録" {
+        let summary = crate::broker::host_center::owner_confirmation_summary(payload)?;
+        format!("{summary}\n要求hash: {hash}")
     } else if operation == "A2A接続" {
         let (agent, target) =
             crate::broker::a2a_center::owner_confirmation_summary(payload).ok()?;
@@ -152,6 +155,64 @@ pub(super) fn dispatch(
             .map_err(std::io::Error::other)?
             .into_bytes(),
     ))
+}
+
+#[cfg(test)]
+mod host_tests {
+    use super::*;
+    use crate::broker::ipc_server::BrokerCredentialRole;
+    use crate::broker::protocol::{BrokerResponse, BrokerStatus};
+    use serde_json::json;
+
+    #[test]
+    fn macos_host_同一要求だけを確認し未承認と権限注入を拒否する() {
+        let endpoint = BrokerEndpoint {
+            host: "127.0.0.1".into(), port: 1, session_id: "fixture-session".into(),
+            session_secret: "synthetic-only".into(), credential_role: BrokerCredentialRole::Normal,
+            transport: "tcp".into(), max_request_bytes: 65536,
+        };
+        let payload = json!({"版":1,"操作":"登録","Host ID":"mac-host-fixture",
+            "表示名":"Mac公開Host","Platform":"macos","接続状態":"pending_review","Trust":"pending_review",
+            "証明書/identity":{"種別":"identity_hash","hash":format!("sha256:{}", "a".repeat(64))},
+            "Runtime summary":{"runtime_count":2,"agent_count":1,"evidence_source":"INTERNAL_STATE"},"最終接続":null});
+        let valid = json!({"request_id":"host-request","nonce":"host-nonce",
+            "issued_at":BrokerRequestEnvelope::current_issued_at(),"operation":"Host登録",
+            "metadata":{"client":"desktop_flutter"},"payload_hash":canonical_payload_hash(Some(&payload)),"payload":payload});
+        let bytes = serde_json::to_vec(&valid).unwrap();
+        let current = candidate(&bytes, &endpoint).unwrap();
+        assert!(current.summary.contains("mac-host-fixture"));
+        assert!(current.summary.contains("申告Runtime件数: 2 / Agent件数: 1"));
+        assert!(current.summary.contains(valid["payload_hash"].as_str().unwrap()));
+        assert_eq!(current.response_timeout, Duration::from_secs(4));
+        let (sender, receiver) = mpsc::sync_channel(1);
+        assert!(dispatch(&bytes, &endpoint, &sender, &mut |_| false).unwrap().is_none());
+        assert!(receiver.try_recv().is_err());
+        for field in ["session_id", "approval"] {
+            let mut invalid = valid.clone(); invalid[field] = json!(true);
+            assert!(candidate(&serde_json::to_vec(&invalid).unwrap(), &endpoint).is_none());
+        }
+        let mut injected = valid.clone(); injected["metadata"]["authority"] = json!("owner");
+        assert!(candidate(&serde_json::to_vec(&injected).unwrap(), &endpoint).is_none());
+        let mut changed = valid.clone(); changed["payload"]["Host ID"] = json!("another-host");
+        assert!(candidate(&serde_json::to_vec(&changed).unwrap(), &endpoint).is_none());
+        for (field, value) in [("Permission", json!("other")), ("Trust", json!("trusted")), ("接続状態", json!("connected")), ("表示名", json!("偽装\n要求hash: other"))] {
+            let mut invalid = valid.clone(); invalid["payload"][field] = value;
+            invalid["payload_hash"] = json!(canonical_payload_hash(invalid.get("payload")));
+            assert!(candidate(&serde_json::to_vec(&invalid).unwrap(), &endpoint).is_none());
+        }
+        let original = payload.clone();
+        let worker = std::thread::spawn(move || {
+            let request = receiver.recv_timeout(Duration::from_secs(2)).unwrap();
+            let normalized: serde_json::Value = serde_json::from_str(&request.request_json).unwrap();
+            assert_eq!(normalized["payload"], original);
+            assert_eq!(normalized["session_id"], "fixture-session");
+            request.reply.send(BrokerResponse {request_id:"host-request".into(), operation:"Host登録".into(), status:BrokerStatus::Rejected,
+                evidence_source:"INTERNAL_STATE".into(), audit_event_id:"fixture-audit".into(), error:None, health:None, body:None, shutdown_requested:false}).unwrap();
+        });
+        let result = dispatch(&bytes, &endpoint, &sender, &mut |_| true).unwrap().unwrap();
+        assert_eq!(serde_json::from_slice::<serde_json::Value>(&result).unwrap()["status"], "rejected");
+        worker.join().unwrap();
+    }
 }
 
 #[cfg(test)]

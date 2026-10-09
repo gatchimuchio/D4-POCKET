@@ -304,6 +304,8 @@ LLMはGUI Shell contractの第一級の実装・統合consumerだが、権限源
 
 - macOSのA2A接続は`docs/specs/macos-a2a-center.md`の限定control経路とする。同一要求hashへ束縛したRust native Owner確認だけを既存Broker receiverへ渡し、既存IPv4 loopback HTTP Agent Card取得・metadata-only一覧を使用する。Credential注入・Task／Message／Artifact／Stream作用・Trust／権限生成へ広げず、Flutter／Swiftの承認bool・Owner資格・別Authority経路を追加しない。App Sandboxと既存Audit／Recovery／内容露出境界を保持する。
 
+macOSのHost登録は`docs/specs/macos-host-registration.md`の限定control経路とする。既存Host構造検査と同一要求hashをRust native Owner確認へ束縛し、承認された要求だけを既存Brokerへ渡す。公開metadata登録・一覧・表示切替に限り、remote接続、Trust、Permission、Approval、Credential、Task実行権限を生成しない。Flutter／Swift承認bool・任意Owner操作への拡大を禁止する。
+
 ### 14. 境界の意味
 
 #### Shell Core

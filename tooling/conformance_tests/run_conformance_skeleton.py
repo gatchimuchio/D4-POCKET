@@ -10962,6 +10962,25 @@ def macos_a2a接続の限定責任経路を検査する() -> list[str]:
     return errors
 
 
+def macos_host登録の限定責任経路を検査する() -> list[str]:
+    """CONFIG証拠。実native確認と製品操作は専用Mac正常経路だけで確認する。"""
+    required = {
+        "docs/specs/macos-host-registration.md": ["MAC-HOST-1", "MAC-HOST-3", "metadata", "申告"],
+        "native/rust_helper/src/macos_desktop_owner.rs": ['operation == "Host登録"', "host_center::owner_confirmation_summary", "macos_host_同一要求"],
+        "native/rust_helper/src/broker/host_center.rs": ["parse_request(payload).ok()?", "件数は実測ではありません"],
+        "apps/desktop_flutter/lib/services/host_registration_client.dart": ["Host登録", "Host一覧", "_count", "authority_strip", "pending_review"],
+        "apps/desktop_flutter/lib/screens/host_operation_center.dart": ["TargetPlatform.macOS", "client.refresh()", "selectedHost: host"],
+        ".github/workflows/apple-manual-build.yml": ["macos_host_registration", "testProductMacHostRegistration"],
+    }
+    errors = []
+    for path, tokens in required.items():
+        source = (ROOT / path).read_text(encoding="utf-8")
+        errors.extend(f"Mac Host責任経路がない: {path}: {token}" for token in tokens if token not in source)
+    if "docs/specs/macos-host-registration.md" not in (ROOT / "規定/正本索引.json").read_text(encoding="utf-8"):
+        errors.append("Mac Host責任正本が索引にない")
+    return errors
+
+
 def main() -> int:
     tests = [
         test_required_docs_exist,
@@ -11200,6 +11219,7 @@ def main() -> int:
         test_macos_mcp_native_scope_is_explicit,
         macos_mcp資格情報参照の公開境界を検査する,
         macos_a2a接続の限定責任経路を検査する,
+        macos_host登録の限定責任経路を検査する,
         test_setup_doctor_public_bind_warning_exists,
         test_desktop_setup_doctor_ui_does_not_require_development_toolchains,
         test_broker_parity_startup_timeout_allows_local_cold_build,

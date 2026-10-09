@@ -3,6 +3,49 @@ import AppKit
 import Vision
 
 final class AdapterOwnerUITests: XCTestCase {
+  func testProductMacHostRegistration() throws {
+    let app = XCUIApplication()
+    let notice = XCUIApplication(bundleIdentifier: "com.apple.UserNotificationCenter")
+    continueAfterFailure = false
+    app.launch(); defer { app.terminate() }
+    XCTAssertTrue(element(app, "エージェント").waitForExistence(timeout: 20))
+    let group = element(app, "操作グループ選択")
+    XCTAssertTrue(group.waitForExistence(timeout: 10))
+    let toolbar = app.buttons.allElementsBoundByAccessibilityElement.filter {
+      $0.frame.height >= 24 && app.windows.firstMatch.frame.contains($0.frame)
+        && abs($0.frame.midY - group.frame.midY) < 4 && $0.frame.maxX < group.frame.minX
+    }.sorted { $0.frame.minX < $1.frame.minX }
+    guard toolbar.count == 2 else { throw failure("公開toolbarを一意に確認できない") }
+    toolbar[0].click()
+    let search = app.textFields.firstMatch
+    XCTAssertTrue(search.waitForExistence(timeout: 10))
+    search.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+    app.typeText("Host切替")
+    try mcpPublicText(app, "Host切替", click: true, scroll: false)
+    try mcpPublicText(app, "Hostを登録", click: true)
+    for (label, value) in [("Host識別子", "mac-host-fixture"), ("Host表示名", "Mac公開Host"),
+                           ("公開identity hash", "sha256:" + String(repeating: "a", count: 64)),
+                           ("申告Runtime件数", "2"), ("申告Agent件数", "1")] {
+      try mcpPublicText(app, label, click: true)
+      app.typeText(value)
+    }
+    try mcpPublicText(app, "Owner確認して登録", click: true, scroll: false)
+    let approve = notice.dialogs.firstMatch.buttons["今回の操作を承認"]
+    XCTAssertTrue(approve.waitForExistence(timeout: 15)); approve.click()
+    let accepted = "Host metadataを登録しました。未審査のままです。Audit="
+    XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@ OR value BEGINSWITH %@", accepted, accepted)).firstMatch.waitForExistence(timeout: 15))
+    // 起動後の新規metadataに切り替える。Task実行先・remote接続ではない。
+    let switchButton = app.buttons["Host切替"]
+    XCTAssertTrue(switchButton.waitForExistence(timeout: 10)); reveal(app, switchButton); switchButton.click()
+    let switched = "Host切替を監査しました。監査ID="
+    XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@ OR value BEGINSWITH %@", switched, switched)).firstMatch.waitForExistence(timeout: 10))
+    try mcpPublicText(app, "現在の表示Host")
+    XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@ OR value CONTAINS %@", "承認=not_reused / 権限生成=なし", "承認=not_reused / 権限生成=なし")).firstMatch.exists)
+    print("D4_MACOS_HOST_PRODUCT_PASS")
+    app.typeKey("q", modifierFlags: .command)
+    XCTAssertTrue(app.wait(for: .notRunning, timeout: 10))
+  }
+
   func testProductMacA2aCenter() throws {
     let app = XCUIApplication()
     let notice = XCUIApplication(bundleIdentifier: "com.apple.UserNotificationCenter")
@@ -361,7 +404,7 @@ final class AdapterOwnerUITests: XCTestCase {
       try VNImageRequestHandler(cgImage: pixels).perform([request])
       let boxes: [VNRectangleObservation] = try (request.results ?? []).compactMap { observation in
         for candidate in observation.topCandidates(3) {
-          if ["切断", "MCP接続", "A2A接続"].contains(label) {
+          if ["切断", "MCP接続", "A2A接続", "Host切替"].contains(label) {
             let text = candidate.string.components(separatedBy: .whitespacesAndNewlines).joined()
             if text != label { continue }
           }

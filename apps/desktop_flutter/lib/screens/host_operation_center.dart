@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/generated_contracts.dart';
 import '../services/shell_core_client.dart';
+import '../services/host_registration_client.dart';
 import 'shared.dart';
 
 class HostOperationCenter extends StatefulWidget {
@@ -15,6 +17,7 @@ class HostOperationCenter extends StatefulWidget {
 
 class _HostOperationCenterState extends State<HostOperationCenter> {
   String? _activeHostId;
+  late List<HostRegistryRecord> _hosts;
   String? _candidateHostId;
   bool _busy = false;
   String _message = 'Hostを選択すると、表示コンテキストだけをBroker監査付きで切り替えます。';
@@ -23,6 +26,7 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
   void initState() {
     super.initState();
     final hosts = widget.client.getSnapshot().hosts;
+    _hosts = hosts;
     if (hosts.isNotEmpty) {
       _activeHostId = hosts.first.hostId;
       _candidateHostId = hosts.first.hostId;
@@ -32,13 +36,26 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
   @override
   Widget build(BuildContext context) {
     final snapshot = widget.client.getSnapshot();
-    final hosts = snapshot.hosts;
+    final hosts = _hosts;
     final selected = _findHost(hosts, _candidateHostId ?? _activeHostId);
     final active = _findHost(hosts, _activeHostId);
     return ShellPage(
       title: 'D4 Pocket Host操作面',
       evidenceTitle: 'Host Operation Center',
       children: [
+        if (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS)
+          BorderedPanel(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                const Text('公開metadataだけを登録します。remote接続やTrust・権限は生成しません。'),
+                FilledButton(
+                    onPressed: _busy || widget.client.brokerTransport == null
+                        ? null
+                        : _registerHost,
+                    child: const Text('Hostを登録')),
+                Text(_message),
+              ])),
         const BorderedPanel(
           child: Text(
             'Host一覧はRust Brokerのmetadata-only projectionです。'
@@ -81,7 +98,8 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
       _message = '${host.displayName} へのHost切替をBrokerへ要求しています。';
     });
     try {
-      final receipt = await widget.client.selectHost(host.hostId);
+      final receipt =
+          await widget.client.selectHost(host.hostId, selectedHost: host);
       if (!mounted) return;
       setState(() {
         _activeHostId = receipt.hostId;
@@ -98,6 +116,166 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
       });
     }
   }
+
+  Future<void> _registerHost() async {
+    final input = await showDialog<_HostInput>(
+        context: context, builder: (_) => const _HostRegistrationDialog());
+    if (input == null || !mounted) return;
+    setState(() {
+      _busy = true;
+      _message = '別個のnative確認後にHost metadataをBrokerへ要求します。';
+    });
+    try {
+      final transport = widget.client.brokerTransport;
+      if (transport == null) throw StateError('Broker未接続');
+      final client = HostRegistrationClient(transport);
+      final auditId = await client.register(
+          hostId: input.id,
+          displayName: input.name,
+          platform: input.platform,
+          identityHash: input.hash,
+          runtimeCount: input.runtimes,
+          agentCount: input.agents);
+      final hosts = await client.refresh();
+      if (!hosts.any((h) => h.hostId == input.id)) throw StateError('現在一覧で未確認');
+      if (!mounted) return;
+      setState(() {
+        _hosts = hosts;
+        _candidateHostId = input.id;
+        _message = 'Host metadataを登録しました。未審査のままです。Audit=$auditId';
+      });
+    } on Object {
+      if (mounted)
+        setState(() {
+          _message = 'Host登録または一覧更新は未成立です。Brokerの拒否・Auditを確認してください。自動再送しません。';
+        });
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+}
+
+class _HostInput {
+  const _HostInput(
+      this.id, this.name, this.platform, this.hash, this.runtimes, this.agents);
+  final String id, name, platform, hash;
+  final int runtimes, agents;
+}
+
+class _HostRegistrationDialog extends StatefulWidget {
+  const _HostRegistrationDialog();
+  @override
+  State<_HostRegistrationDialog> createState() =>
+      _HostRegistrationDialogState();
+}
+
+class _HostRegistrationDialogState extends State<_HostRegistrationDialog> {
+  final _form = GlobalKey<FormState>();
+  final _fields = <String, TextEditingController>{
+    for (final label in [
+      'Host識別子',
+      'Host表示名',
+      '公開identity hash',
+      '申告Runtime件数',
+      '申告Agent件数'
+    ])
+      label: TextEditingController(),
+  };
+  String _platform = 'macos';
+  @override
+  void dispose() {
+    for (final controller in _fields.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: const Text('公開Host metadata登録'),
+        content: SizedBox(
+            width: 480,
+            child: SingleChildScrollView(
+                child: Form(
+                    key: _form,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                            '秘密値・証明書実値・endpointは入力しないでください。件数は申告値であり実測ではありません。'),
+                        for (final entry in _fields.entries)
+                          Padding(
+                              padding: const EdgeInsets.only(top: 12),
+                              child: TextFormField(
+                                controller: entry.value,
+                                maxLength: entry.key == 'Host表示名' ? 256 : 128,
+                                decoration:
+                                    InputDecoration(labelText: entry.key),
+                                validator: (value) {
+                                  final text = value ?? '';
+                                  if (text.trim().isEmpty ||
+                                      text.runes.any((r) => r < 32 || r == 127))
+                                    return '公開値を入力してください';
+                                  if (entry.key == 'Host識別子' &&
+                                      !RegExp(r'^[A-Za-z0-9][A-Za-z0-9_.:-]*$')
+                                          .hasMatch(text))
+                                    return 'Host IDの形式が不正です';
+                                  if (entry.key == '公開identity hash' &&
+                                      (text.length != 71 ||
+                                          !RegExp(r'^sha256:[a-f0-9]{64}$')
+                                              .hasMatch(text)))
+                                    return 'sha256:に続く64桁の公開hashを入力してください';
+                                  if (entry.key.startsWith('申告')) {
+                                    final number = int.tryParse(text);
+                                    if (number == null ||
+                                        number < 0 ||
+                                        number > 256)
+                                      return '0〜256の申告件数を明示してください';
+                                  }
+                                  return null;
+                                },
+                              )),
+                        DropdownButtonFormField<String>(
+                            initialValue: _platform,
+                            decoration: const InputDecoration(
+                                labelText: '基盤（Platform）'),
+                            items: [
+                              for (final value in [
+                                'windows',
+                                'linux',
+                                'macos',
+                                'android',
+                                'ios',
+                                'unknown'
+                              ])
+                                DropdownMenuItem(
+                                    value: value, child: Text(value))
+                            ],
+                            onChanged: (value) {
+                              if (value != null)
+                                setState(() => _platform = value);
+                            }),
+                      ],
+                    )))),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context), child: const Text('取消')),
+          FilledButton(
+              onPressed: () {
+                if (!_form.currentState!.validate()) return;
+                Navigator.pop(
+                    context,
+                    _HostInput(
+                        _fields['Host識別子']!.text,
+                        _fields['Host表示名']!.text,
+                        _platform,
+                        _fields['公開identity hash']!.text,
+                        int.parse(_fields['申告Runtime件数']!.text),
+                        int.parse(_fields['申告Agent件数']!.text)));
+              },
+              child: const Text('Owner確認して登録'))
+        ],
+      );
 }
 
 class _HostOperationLayout extends StatelessWidget {

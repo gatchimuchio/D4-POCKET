@@ -136,6 +136,20 @@ fn parse_request(payload: &Value) -> Result<HostRegistrationRequest, String> {
     Ok(request)
 }
 
+/// 公開metadataだけを既存構造検査へ通し、同一native確認の説明を生成する。
+#[cfg(any(test, target_os = "macos"))]
+pub(crate) fn owner_confirmation_summary(payload: &Value) -> Option<String> {
+    let request = parse_request(payload).ok()?;
+    if request.display_name.chars().any(char::is_control) {
+        return None;
+    }
+    Some(format!(
+        "Host metadataを未審査で登録します。\nHost ID: {}\n表示名: {}\nPlatform: {}\nidentity hash: {}\n申告Runtime件数: {} / Agent件数: {}\n\n件数は実測ではありません。remote接続・Trust・Permission・Approval・Credential・Task実行権限を生成せず、表示切替だけを可能にします。Brokerが現在の重複・件数上限・永続Auditを再評価します。",
+        request.host_id, request.display_name, request.platform, request.identity.hash,
+        request.runtime_summary.runtime_count, request.runtime_summary.agent_count,
+    ))
+}
+
 fn parse_switch_request(payload: &Value) -> Result<HostSwitchRequest, String> {
     let request: HostSwitchRequest = serde_json::from_value(payload.clone())
         .map_err(|_| "Host切替payloadの構造が不正".to_string())?;

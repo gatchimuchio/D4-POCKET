@@ -17,6 +17,10 @@
 
 ## P13 Mobile / Non-Windows — 現行track
 
+#### macOS Host登録の製品入口 — VALIDATING（2026-10-09）
+
+有限契約`docs/specs/macos-host-registration.md`のMAC-HOST-1はWindows新native入口1件でCLOSED。新GUIは公開metadataだけを入力し、同一要求の別個native Owner確認を既存Brokerへ接続する。一覧更新と起動後に追加されたHostの表示切替を実装。ASCII作業複製上の新Dart正常／否定4試験がPASSした。MAC-HOST-2〜3のMac製品正常一回・対象解析／buildを手動Actions `macos_host_registration`へ固定して検収する。Windows Owner集合・remote接続・Trust・Credential・Task能力を変えず、CLOSED／延期中Final QAを再訪しない。過去FAIL・環境制約は有限契約へ保持する。
+
 #### macOS A2A接続センター — CLOSED（Product Build、2026-10-09）
 
 有限契約`docs/specs/macos-a2a-center.md`のMAC-A2A-1〜3を閉鎖。source `10d7b0ee6a4199fdddc11605f1641856f99127d7`、[手動run 37797680275](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37797680275)で公開入力→別個native Owner→既存Broker→loopback Card一回取得→metadata-only／未審査・hash表示→URI実消去→Command-Q正常終了がPASS。UI 1 passed／0 failed／0 skipped、43.667秒。受理Audit 1件、URI／Card本文不保存、helper／fixture残留0・source clean・通常buildもPASS。先行native境界・対象解析／Widgetと、source b7a20d8の実native拒否／拒否AuditはCLOSED証拠を再利用した。

@@ -72,7 +72,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "05fd56f7e19e33c4cb2bdd5f7903b10c77757ddc518f5b0be6e879ea773a8d08"
+      "sha256": "e04860fb3834493f0fd07377ceebeada11b24ed8e4d7c33a178da9443991a71c"
     },
     {
       "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
@@ -92,7 +92,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "e33f3bf7c7358122453e2e0b8f36328f6c99ced89c0cb6e44ca01478f5f6ff20"
+      "sha256": "c5c834a738da64d23c13648ba823a765268af048f179ad576f0fc361d97bb1d8"
     },
     {
       "path": "AUDIT.md",
@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "7594ea2cfc5e2d83f7e37225a68c6634d36733d1d14b8c7fbe47173ed3a72b03"
+      "sha256": "7e9617de96396514f764d528ad73f11d266b46bfcc9be7db17bd0e21502277c5"
     },
     {
       "path": "SECURITY.md",
@@ -252,7 +252,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/host_operation_center.dart",
-      "sha256": "ebd921e187289d07e03d7b54e172b544baa87cb64142180ed0a5ee0b11da723a"
+      "sha256": "5bc304eeb4f78e01175414d0b1354218f2d8271c42af4d558e95f1d18e97fab6"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/mcp_connection_center.dart",
@@ -336,7 +336,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/broker_client.dart",
-      "sha256": "fd8ff7114cfb371ebb1853cfc64de70394bcbdc5bd2e42699dc41454fb9f3c85"
+      "sha256": "5da016345424f6fefbaa550bab9b0e163e380a775d02c57b81b450bf8bf29d0f"
     },
     {
       "path": "apps/desktop_flutter/lib/services/compose_client.dart",
@@ -353,6 +353,10 @@
     {
       "path": "apps/desktop_flutter/lib/services/global_search_index.dart",
       "sha256": "5e6e05233e156acfbf44ff489d987f4ce85b3aee55f11fb731d24d917377b371"
+    },
+    {
+      "path": "apps/desktop_flutter/lib/services/host_registration_client.dart",
+      "sha256": "f58f8e4d25fcce7deb0ee976eeafa0e2ff2ff5971906ed68b992498ee9e2d1bd"
     },
     {
       "path": "apps/desktop_flutter/lib/services/mcp_connection_client.dart",
@@ -388,7 +392,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/shell_core_client.dart",
-      "sha256": "73391fa16dbdaacd3afad7b2f645b1a2c4e083e0010382fadb7545e728556b2b"
+      "sha256": "b71e690c1a8b7c6f98756bade03427b61cca7d4d0d24ffac40459deb1117eda6"
     },
     {
       "path": "apps/desktop_flutter/lib/services/update_client.dart",
@@ -524,7 +528,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/BrokerProcessChannel.swift",
-      "sha256": "78fe90999ac0d90657893e054b33760b06eb3c62fc224b8c98b37b99474eba2b"
+      "sha256": "9fa0c2a888dfcd6fbb0d877bbb870e11c0e56995a5e834f1973223421257d002"
     },
     {
       "path": "apps/desktop_flutter/macos/Runner/Configs/AppInfo.xcconfig",
@@ -568,7 +572,7 @@
     },
     {
       "path": "apps/desktop_flutter/macos/RunnerUITests/AdapterOwnerUITests.swift",
-      "sha256": "9493f8abc1a30483dc2b72cc7b1cbd6cf5b1ca55645c4dc7d1d887d332ec18b2"
+      "sha256": "5864906e7eb151e4f785b3c0158264ab8ecab2605cdf92c6daa79237746295dd"
     },
     {
       "path": "apps/desktop_flutter/pubspec.lock",
@@ -629,6 +633,10 @@
     {
       "path": "apps/desktop_flutter/test/history_screen_test.dart",
       "sha256": "f2ef19e0128177464044834a0f20a21ac5c0fe05ab5484e63fa6aaaf4e13856f"
+    },
+    {
+      "path": "apps/desktop_flutter/test/host_registration_test.dart",
+      "sha256": "85c002dc55a751ec48a72ed43a875fcf85f75a28a6c665ace8f94f162da0d23d"
     },
     {
       "path": "apps/desktop_flutter/test/macos_credential_vault_test.dart",
@@ -1224,7 +1232,7 @@
     },
     {
       "path": "docs/FINAL_QA_QUEUE.md",
-      "sha256": "03ff3fe83ebcbcdc651cbcfd39d9419ea80c51486eefe086f1cd94bc02bb7c31"
+      "sha256": "33b7acbe4349c0e1d95d26cc7f6c934d85edf80c682b5b9c4d7028d609337f8e"
     },
     {
       "path": "docs/FIRST_RUN.md",
@@ -1280,7 +1288,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "d4fb7ef8e486ba374cee71f06832db6b4c33fe6f875b65b658f4dd7ecb4b4546"
+      "sha256": "bd606272ee633202ef10a49e477d81a8e42892f0065811d614f7725c5a084a7f"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1505,6 +1513,10 @@
     {
       "path": "docs/specs/macos-desktop-channel.md",
       "sha256": "d9f400690cee8f474b5f8171535f88251ad46281e058287a2e3824936754eebe"
+    },
+    {
+      "path": "docs/specs/macos-host-registration.md",
+      "sha256": "4b2320de78f03e65749b9c3c9973caa2fe5c7179004deaccd06381fe171b98bc"
     },
     {
       "path": "docs/specs/macos-mcp-center.md",
@@ -3448,7 +3460,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/host_center.rs",
-      "sha256": "4cbf88711ae5860657e0ec0781b184661f9ab7d4ad9a1d7bc85d253bb8f59629"
+      "sha256": "83d6f55495dd3de11fbda3f931529ab443f9f6bf6295ef30c3291c9498b0a089"
     },
     {
       "path": "native/rust_helper/src/broker/ipc_server.rs",
@@ -3484,7 +3496,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "437b8a9f8460989408713c5c55b0ccc633149fa4338d97442f1cc06d7475d8c0"
+      "sha256": "d79343d5e6d08c33a26871532484686eb28161d0fcf4eb63d3801225023da5dd"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -3564,7 +3576,7 @@
     },
     {
       "path": "native/rust_helper/src/macos_desktop_owner.rs",
-      "sha256": "5a1b0d4ec83a25417dc7fbd49b23e7249041dbdad14ea1a130e6a61889eab953"
+      "sha256": "db46805043b00ab05e2892fc503dd89ac1879fd8d7e185f3a6997b2178e0e6f9"
     },
     {
       "path": "native/rust_helper/src/macos_desktop_worker.rs",
@@ -4848,7 +4860,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "4535dad54c1fa115fa8de4c32e95b57f46887c6de2f2cedf19a2e6366ea279b5"
+      "sha256": "256952a889bef1d912f6a451a3b17bd375d86ebcf6e15bab8b56d5422455e935"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
@@ -4980,7 +4992,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "f2052a1bf76d911b72bd7935436bd184556b6ea1d5b417f95e70e28e1bbdea30"
+      "sha256": "2c993b19b1c88aeddadd99cbe240105e137629956f5befb2c5fbc3bfce369cb0"
     }
   ]
 }

@@ -2,6 +2,8 @@
 
 状態: `DEFERRED`（最新版rev5実装指示§2の`PRODUCT_BUILD_MODE`に従い、Final QAは現在modeではない）
 
+2026-10-09 P13 Host作業時の必須検査履歴: 最終全Rustはlib 516 PASS／1 FAIL／12 ignored、他target PASS。変更外`bounded_catalog_fetch_rejects_declared_document_over_limit`がlocalhost TLSのOS error 10054／ConnectionResetでFAILし、単独再実行は1 PASS。根因未確定の既存`FQ-TEST-LOOPBACK`へ同分類で保存する。Hostのcurrent blockerへ追加せず、全体FAILを上書きせず、Final QAを開始しない。
+
 2026-10-09 P13 A2A作業時の必須検査履歴: 全Rust実行はlib target FAIL、他target PASS。短縮lib再確認は514 passed／1 failed／12 ignoredで、既存`failed_tool_result_is_not_replayed_as_another_exec_command`がHTTP応答途中のConnectionReset（expected 23274、received 0）。対象単独再実行は1 passed。根因未確定の既存`FQ-TEST-LOOPBACK`へ同分類で記録し、P13 A2A入口のregressionとは観測されない。全体FAILを成功へ書換えず、本記録だけを追加し、Final QA試験を開始しない。
 工程正本: ユーザー提示の最新版rev5仕様書・工程表・実装指示書。旧版および過去のphase記録は補助履歴として扱う。
 現行製品phase: `docs/REV5_PRODUCT_PROGRESS.md`

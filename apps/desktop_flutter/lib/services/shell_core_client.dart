@@ -244,8 +244,11 @@ class ShellCoreClient {
     );
   }
 
-  Future<HostSelectionRecord> selectHost(String hostId) async {
-    HostRegistryRecord? host;
+  Future<HostSelectionRecord> selectHost(String hostId,
+      {HostRegistryRecord? selectedHost}) async {
+    // 起動後に通常Broker一覧から取得したmetadataを選択できる。Authorityではない。
+    HostRegistryRecord? host =
+        selectedHost?.hostId == hostId ? selectedHost : null;
     for (final item in snapshot.hosts) {
       if (item.hostId == hostId) {
         host = item;
