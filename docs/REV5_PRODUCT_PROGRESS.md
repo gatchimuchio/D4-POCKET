@@ -9,7 +9,9 @@
 
 ## P13後・B0全件観測／原因対応台帳（2026-10-09・進行中）
 
-現行集計（2026-10-09、#377321統合後）: B0は111 run参照／91 cause-response行。直接参照147件中105件を照合済み（cause-response 104件、`VALIDATION.txt` 1件）、42件未統合。直接参照なし56件中6件を別途照合、50件未照合。#377310／#377321は登録・一覧のAudit受理後、公開状態titleをXCTestの`StaticText`／group queryで取得できなかった試験側のAX role不一致と照合し、後続の秘密入力後・製品窓限定OCRで有効状態表示を確認した。製品状態欠落とは分類しない。失効button・失効・通常終了を含む資格情報全体Acceptanceは未成立。B0 acceptanceは未判定。
+現行集計（2026-10-09、#377333統合後）: B0は112 run参照／92 cause-response行。直接参照147件中106件を照合済み（cause-response 105件、`VALIDATION.txt` 1件）、41件未統合。直接参照なし56件中6件を別途照合、50件未照合。#377310／#377321は公開状態titleのXCTest AX role不一致、#377333は失効IconButtonの製品Semanticsにbutton・操作名・tapが一体で公開されていなかった欠陥と分類。後続差分でSemanticsを修正し、Widget試験でrole／tapを確認した。#377351の1px frameと失効・通常終了は未成立の別event。資格情報全体AcceptanceとB0 acceptanceは未成立。
+
+履歴snapshot（2026-10-09、#377321統合後）: B0は111 run参照／91 cause-response行。直接参照147件中105件を照合済み（cause-response 104件、`VALIDATION.txt` 1件）、42件未統合。直接参照なし56件中6件を別途照合、50件未照合。#377310／#377321は登録・一覧のAudit受理後、公開状態titleをXCTestの`StaticText`／group queryで取得できなかった試験側のAX role不一致と照合し、後続の秘密入力後・製品窓限定OCRで有効状態表示を確認した。製品状態欠落とは分類しない。失効button・失効・通常終了を含む資格情報全体Acceptanceは未成立。B0 acceptanceは未判定。
 
 履歴snapshot（2026-10-09、#377310統合後）: B0は110 run参照／90 cause-response行。直接参照147件中104件を照合済み（cause-response 103件、`VALIDATION.txt` 1件）、43件未統合。直接参照なし56件中6件を別途照合、50件未照合。#377289は通常Desktop Owner gateへのallowlist接続漏れと確定し、`92b3bba`で修正。#377310は登録成功文・Audit受理後の状態title `StaticText` locator不一致であり、後続の試験限定変更と公開状態OCRで状態表示を確認したため、製品状態欠落とは分類しない。失効button・失効・通常終了を含む資格情報全体Acceptanceは未成立。B0 acceptanceは未判定。
 
