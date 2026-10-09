@@ -145,10 +145,11 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
         _message = 'Host metadataを登録しました。未審査のままです。Audit=$auditId';
       });
     } on Object {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _message = 'Host登録または一覧更新は未成立です。Brokerの拒否・Auditを確認してください。自動再送しません。';
         });
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -214,23 +215,28 @@ class _HostRegistrationDialogState extends State<_HostRegistrationDialog> {
                                 validator: (value) {
                                   final text = value ?? '';
                                   if (text.trim().isEmpty ||
-                                      text.runes.any((r) => r < 32 || r == 127))
+                                      text.runes
+                                          .any((r) => r < 32 || r == 127)) {
                                     return '公開値を入力してください';
+                                  }
                                   if (entry.key == 'Host識別子' &&
                                       !RegExp(r'^[A-Za-z0-9][A-Za-z0-9_.:-]*$')
-                                          .hasMatch(text))
+                                          .hasMatch(text)) {
                                     return 'Host IDの形式が不正です';
+                                  }
                                   if (entry.key == '公開identity hash' &&
                                       (text.length != 71 ||
                                           !RegExp(r'^sha256:[a-f0-9]{64}$')
-                                              .hasMatch(text)))
+                                              .hasMatch(text))) {
                                     return 'sha256:に続く64桁の公開hashを入力してください';
+                                  }
                                   if (entry.key.startsWith('申告')) {
                                     final number = int.tryParse(text);
                                     if (number == null ||
                                         number < 0 ||
-                                        number > 256)
+                                        number > 256) {
                                       return '0〜256の申告件数を明示してください';
+                                    }
                                   }
                                   return null;
                                 },
@@ -252,8 +258,9 @@ class _HostRegistrationDialogState extends State<_HostRegistrationDialog> {
                                     value: value, child: Text(value))
                             ],
                             onChanged: (value) {
-                              if (value != null)
+                              if (value != null) {
                                 setState(() => _platform = value);
+                              }
                             }),
                       ],
                     )))),

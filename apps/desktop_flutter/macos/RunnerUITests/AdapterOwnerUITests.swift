@@ -20,7 +20,8 @@ final class AdapterOwnerUITests: XCTestCase {
     let search = app.textFields.firstMatch
     XCTAssertTrue(search.waitForExistence(timeout: 10))
     search.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
-    app.typeText("Host切替")
+    // 検索欄の入力値と候補labelを同じ文字にしない。通常入力・可視候補だけ。
+    app.typeText("Host")
     try mcpPublicText(app, "Host切替", click: true, scroll: false)
     try mcpPublicText(app, "Hostを登録", click: true)
     for (label, value) in [("Host識別子", "mac-host-fixture"), ("Host表示名", "Mac公開Host"),
