@@ -41,6 +41,8 @@ source `19036e6`／run `37882650318`はtmp要求file作成もOSが拒否してFA
 
 source `4975d33`／run `37883933180`は変更一覧のAX click後に受信Auditがなく、件数表示待ちでFAIL（162.556秒）。理由を製品拒否やfixture更新成功へ推定せず、baselineで成立した可視文字・enabled確認・通常clickを新試験の変更一覧／失効に適用する。製品経路・有限条件は同一。通常build／解析・helper 0・fixture回収PASS、差分／失効／正常終了は未成立として残す。
 
+source `2e2c27c`／run `37885019903`はbaseline受理後、Workspace選択直後に比較範囲buttonがまだ見つからずFAIL（102.006秒）。理由やfixture更新の影響は確定できないため、同じUI要素の出現を10秒待つ。通常build／解析・helper 0・fixture回収PASS、差分／失効／正常終了は未成立。
+
 #### macOS Host登録の製品入口 — CLOSED（Product Build、2026-10-09）
 
 有限契約`docs/specs/macos-host-registration.md`のMAC-HOST-1〜3を閉鎖。source `7220847bc775bec23f8088fc9d421209eb1ddc93`、[手動run 37871901769](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37871901769)で公開GUI入力→別個native Owner→既存Broker登録→通常一覧更新→起動後Hostの未審査表示・表示切替→Command-Q正常終了がPASS。XCTest 1 passed／0 failed／0 skipped、72.616秒。登録／切替の受理Audit各1件、helper残留0・source clean、対象Dart解析No issues・通常native／Mac buildもPASS。Windows新入口・Mac platform gate各1件と新Widget4件のCLOSED証拠を再利用し、`host_product_only=true`で再試験しなかった。

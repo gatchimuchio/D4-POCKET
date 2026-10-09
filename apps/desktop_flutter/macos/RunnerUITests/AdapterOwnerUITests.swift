@@ -54,7 +54,7 @@ final class AdapterOwnerUITests: XCTestCase {
     // Broker内baselineを現在のfull grantで読み戻す。UIの古い承認応答を復元しない。
     try mcpPublicText(app, "macos-product-workspace", click: true, scrollUp: true)
     let scope = app.buttons["既存baselineの比較範囲を確認"]
-    XCTAssertTrue(scope.exists); reveal(app, scope); scope.click()
+    XCTAssertTrue(scope.waitForExistence(timeout: 10)); reveal(app, scope); scope.click()
     try mcpPublicText(app, "基準点に保存されたfile")
     // hostは当該runのbaseline受理Audit後に固定合成fileだけを更新する。
     // XCTestから別container／tmpへ書かず、以下の製品changed files／diffで更新を確認する。
