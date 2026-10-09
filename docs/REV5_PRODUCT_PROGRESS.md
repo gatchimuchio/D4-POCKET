@@ -9,7 +9,7 @@
 
 ## P13後・B0全件観測／原因対応台帳（2026-10-09・進行中）
 
-現行集計（2026-10-10、#377780照合後）: B0は実行記録129件／原因対応109行。直接参照147件中123件を照合済み（原因対応表122件、`VALIDATION.txt` 1件）、24件未照合。直接参照なし56件中6件を別途照合、50件未照合。#377721／#377737／#377758／#377780は資格使用Audit・hash-only Tool受入れ後に公開「切断」探索で156.708／181.197／151.392／131.092秒後に停止。#377780ではAX button存在と1px frame、既知dialog button不存在を観測したが、診断PNG書込は`NSCocoaErrorDomain` code 513で失敗しartifactにも画像なし。画面状態・locator missの内部原因は未確定で、製品切断故障とは分類しない。cleanupはPASSしhelper／MCP残留PIDは0件。後続#377803以降の画像・画面・PASSは別run証拠として扱い、#377780へ遡及転用しない。#377676のnative sheet／資格・MCP作用とcleanupは未確認のまま、CLOSED済み製品条件を再開せずB0 acceptance未判定を維持する。
+現行集計（2026-10-10、#377803照合後）: B0は実行記録130件／原因対応110行。直接参照147件中124件を照合済み（原因対応表123件、`VALIDATION.txt` 1件）、23件未照合。直接参照なし56件中6件を別途照合、50件未照合。#377721／#377737／#377758／#377780／#377803は資格使用Audit・hash-only Tool受入れ後の公開「切断」探索で131〜181秒台に停止した。#377780は診断PNG書込が`NSCocoaErrorDomain` code 513で失敗。#377803はbutton AX frame 1px・scroll祖先0件、XCTest tempへのPNG write後に回収側parent allowlistがpathを拒否し、cleanup stepもFAIL。artifactには画像がなく、残留process記録は0件だがfixture cleanup未確認。画面状態・locator miss内部原因は未確定で、製品切断故障とは分類しない。後続runの画像・画面・PASSは先行runへ遡及転用しない。#377676のnative sheet／資格・MCP作用とcleanupは未確認のまま、CLOSED済み製品条件を再開せずB0 acceptance未判定を維持する。
 
 履歴snapshot（2026-10-09、#377321統合後）: B0は111 run参照／91 cause-response行。直接参照147件中105件を照合済み（cause-response 104件、`VALIDATION.txt` 1件）、42件未統合。直接参照なし56件中6件を別途照合、50件未照合。#377310／#377321は登録・一覧のAudit受理後、公開状態titleをXCTestの`StaticText`／group queryで取得できなかった試験側のAX role不一致と照合し、後続の秘密入力後・製品窓限定OCRで有効状態表示を確認した。製品状態欠落とは分類しない。失効button・失効・通常終了を含む資格情報全体Acceptanceは未成立。B0 acceptanceは未判定。
 
