@@ -9,7 +9,7 @@
 
 ## P13後・B0全件観測／原因対応台帳（2026-10-09・進行中）
 
-Actions APIから2026-05-25〜2026-10-09の356 runを取得し、203 failure / 226 failed jobs / 250 failed-step summariesを台帳化。失敗job logs 151件を取得し、75件はHTTP 410/404、step detailなし5 runを欠測として分離した。原因・修正・後続証拠までB0で再照合した事象は26 run（22 cause-response行）。既存直接参照147件のうち20件は原因表へ結合済み、残る127件は個別内容のB0因果分類待ちであり、未記載や原因UNKNOWNとは扱わない。直接run参照なし56件のうち6件は別途ログ・コード・後続証拠から原因対応済み、50件は未照合。類似step名やsource SHAだけから原因を推定しない。全Git patchと現行code/test responsibilityの照合も未完のため、B0 acceptanceを閉じずB1へ進まない。P13のCLOSED証拠は再実行せず、通常Release `task_execution=unsupported`、`release_ready=false`、Final QA DEFERREDを保持する。詳細は採用記録とB0の4成果物を参照。
+Actions APIから2026-05-25〜2026-10-09の356 runを取得し、203 failure / 226 failed jobs / 250 failed-step summariesを台帳化。失敗job logs 151件を取得し、75件はHTTP 410/404、step detailなし5 runを欠測として分離した。原因・修正・後続証拠までB0で再照合した事象は30 run（26 cause-response行）。既存直接参照147件のうち24件は原因表へ結合済み、残る123件は個別内容のB0因果分類待ちであり、未記載や原因UNKNOWNとは扱わない。直接run参照なし56件のうち6件は別途ログ・コード・後続証拠から原因対応済み、50件は未照合。類似step名やsource SHAだけから原因を推定しない。全Git patchと現行code/test responsibilityの照合も未完のため、B0 acceptanceを閉じずB1へ進まない。P13のCLOSED証拠は再実行せず、通常Release `task_execution=unsupported`、`release_ready=false`、Final QA DEFERREDを保持する。詳細は採用記録とB0の4成果物を参照。
 
 ## 正本の選び方
 
