@@ -1644,15 +1644,15 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B0_\u4e0d\u8db3\u8a3c\u62e0\u4e00\u89a7.md",
-      "sha256": "4db2f8d6643c7873885e704bd8eda2b48695a4f5ac8b03f3d65a7b4db46d344d"
+      "sha256": "d72d541c403593814f6f3b43f43c3bc45d46f5313a54a921b10d501a8f283d59"
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B0_\u539f\u56e0\u5bfe\u5fdc\u53f0\u5e33.md",
-      "sha256": "bdcc0ad9ff6e9fb1542e76129c5833416aa6bfd0d8dab41a4da291beff374582"
+      "sha256": "28da85d56e6fb3edfaf213282046ff1aefbe89e84071ef9afa7747357aeec460"
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B0_\u53c2\u7167\u539f\u672c\u4e00\u89a7.md",
-      "sha256": "b1654d1fdcd2591eb30cae38a5cf12906e0955112907c4395116ec4ac819c03d"
+      "sha256": "1dfebefa3325fce8f8ce4bfabc0852a938b258b850f4c5b50f44266d3acdb1d1"
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B0_\u91cd\u8907\u5883\u754c\u56f3.md",
@@ -1672,7 +1672,7 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/\u63a1\u7528\u8a18\u9332.md",
-      "sha256": "e7e2435732091a722a49c15a50bccd6d66c11abef13ac0000e3344b2ed482221"
+      "sha256": "3904c6338d2c1d6776f031c5f1db3b99886cfa84c2d96dc4539c84041c67acf7"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
