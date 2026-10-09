@@ -31,6 +31,8 @@ source `00af2c4`／run `37877200890`は登録前提通過・読取承認Audit ac
 
 source `5d927f9`／run `37878209622`は読取承認accepted後に`registration_refreshed`を観測、短い成功文言でもFAIL。既存lifecycleの復帰時再取得で成功文言が消えることをsourceと照合し、一時文言ではなく現在登録の公開読取、Broker内baselineの既存比較範囲読戻し、失効後の現在登録と本文消去で新試験を検収する。画面復帰境界・製品実装・Acceptanceは変更しない。診断用codeは除去する。
 
+source `cc7d362`／run `37879704542`は公開file本文表示・読取Audit acceptedまで成立、baselineのAX click後にnative確認が現れずFAIL（124.470秒）。当該操作の受信Auditもなく根因は未確定。新試験のbaseline操作だけを現在の可視button／enabled確認と通常mouse入力へ局所修正する。CLOSED入口・登録前提・生産経路・Authorityは変更せず、diff／失効／正常終了を未成立のまま残す。通常build／解析、helper 0・専用fixture回収はPASS。
+
 #### macOS Host登録の製品入口 — CLOSED（Product Build、2026-10-09）
 
 有限契約`docs/specs/macos-host-registration.md`のMAC-HOST-1〜3を閉鎖。source `7220847bc775bec23f8088fc9d421209eb1ddc93`、[手動run 37871901769](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37871901769)で公開GUI入力→別個native Owner→既存Broker登録→通常一覧更新→起動後Hostの未審査表示・表示切替→Command-Q正常終了がPASS。XCTest 1 passed／0 failed／0 skipped、72.616秒。登録／切替の受理Audit各1件、helper残留0・source clean、対象Dart解析No issues・通常native／Mac buildもPASS。Windows新入口・Mac platform gate各1件と新Widget4件のCLOSED証拠を再利用し、`host_product_only=true`で再試験しなかった。

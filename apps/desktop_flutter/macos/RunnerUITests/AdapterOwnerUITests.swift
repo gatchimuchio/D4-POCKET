@@ -44,7 +44,13 @@ final class AdapterOwnerUITests: XCTestCase {
     try mcpPublicText(app, "public.txt", click: true)
     try mcpPublicText(app, "D4_PUBLIC_BEFORE")
     let baseline = app.buttons["native Owner確認で比較baselineを保存"]
-    XCTAssertTrue(baseline.exists); reveal(app, baseline); baseline.click(); approve(notice)
+    XCTAssertTrue(baseline.exists)
+    // 本文表示後のAX clickでは確認が開始しなかった。現在の可視buttonを通常clickする。
+    try mcpPublicText(app, "native Owner確認で比較baselineを保存", scrollUp: true)
+    let baselineAvailable = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: baseline)
+    XCTAssertEqual(XCTWaiter.wait(for: [baselineAvailable], timeout: 10), .completed)
+    try mcpPublicText(app, "native Owner確認で比較baselineを保存", click: true, scroll: false)
+    approve(notice)
     // Broker内baselineを現在のfull grantで読み戻す。UIの古い承認応答を復元しない。
     try mcpPublicText(app, "macos-product-workspace", click: true, scrollUp: true)
     let scope = app.buttons["既存baselineの比較範囲を確認"]
