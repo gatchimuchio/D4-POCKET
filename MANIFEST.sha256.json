@@ -1288,7 +1288,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "2cac53c521ea744b2e16ca09350b256ace9ef309078c4a54a9650cd691f4f9fb"
+      "sha256": "0d69d5bf4228905c4845c8e5c3107fba7c8a1a9be6101cfb233038a026d02661"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1520,7 +1520,7 @@
     },
     {
       "path": "docs/specs/macos-mcp-center.md",
-      "sha256": "1c2c11d2d4b48366da9b288fce57ae8301a53d54c7ab81928c8d88e873ef404a"
+      "sha256": "8afedd271f7101d92ddd20c536019aae6fe38d2c7b2f5e4c3b7abbd15ce40b9e"
     },
     {
       "path": "docs/specs/macos-mcp-credential-binding.md",
@@ -1648,11 +1648,11 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B0_\u539f\u56e0\u5bfe\u5fdc\u53f0\u5e33.md",
-      "sha256": "2f8001000c7128e597eeb657c667fe4cb203c97781f4adb314c933790f5778d7"
+      "sha256": "0c3e51e8766d5627d7b0104921331db4cd4545dd832aa3aa9d7def85a8b51c44"
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B0_\u53c2\u7167\u539f\u672c\u4e00\u89a7.md",
-      "sha256": "52b357e12ca91cebdc9cc853998b1e1fdfb282e784627a9aab3e9de9b3970353"
+      "sha256": "e90db87aac387dab8c0803fbd58deb26fed6bedf38e2944f8d90216f0458201b"
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B0_\u91cd\u8907\u5883\u754c\u56f3.md",
@@ -1672,7 +1672,7 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/\u63a1\u7528\u8a18\u9332.md",
-      "sha256": "be8d3c223e0a0e0a3cb70d362f430c8ac3842246bbeb0cdddf3f721563a0d9e7"
+      "sha256": "cfd5c748fc334683dc86bd874639b0795d6432dfe595eb12ee7001f746aff099"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
