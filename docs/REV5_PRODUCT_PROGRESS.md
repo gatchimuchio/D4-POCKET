@@ -9,7 +9,9 @@
 
 ## P13後・B0全件観測／原因対応台帳（2026-10-09・進行中）
 
-現行集計（2026-10-09、#377278統合後）: B0は108 run参照／88 cause-response行。直接参照147件中102件を照合済み（cause-response 101件、`VALIDATION.txt` 1件）、45件未統合。直接参照なし56件中6件を別途照合、50件未照合。#377278の取消後状態文検索でsnapshot timeoutとなった試験経路を`StaticText`限定へ変更し、後続#377289で取消状態確認を越えOwner確認経路の後まで進んだことを確認した。#377289は登録結果表示assertionで別途FAILしており、登録成立とは扱わない。B0 acceptanceは未判定。
+現行集計（2026-10-09、#377289統合後）: B0は109 run参照／89 cause-response行。直接参照147件中103件を照合済み（cause-response 102件、`VALIDATION.txt` 1件）、44件未統合。直接参照なし56件中6件を別途照合、50件未照合。#377289の登録成功文未取得は、通常Desktop Owner受信gateでなく`r2-e2e`専用Owner gateへ登録allowlistを誤追加していた製品経路の不整合と確定し、`92b3bba`で通常Owner gateへ修正、試験専用経路の誤拡大を撤去した。後続#377310は登録成功文とAuditの登録・一覧`accepted`を確認した後、公開状態titleの`StaticText`検索で別途FAIL。資格情報の論理失効・通常終了を含む全体Acceptanceは未成立。B0 acceptanceは未判定。
+
+履歴snapshot（2026-10-09、#377278統合後）: B0は108 run参照／88 cause-response行。直接参照147件中102件を照合済み（cause-response 101件、`VALIDATION.txt` 1件）、45件未統合。直接参照なし56件中6件を別途照合、50件未照合。#377278の取消後状態文検索でsnapshot timeoutとなった試験経路を`StaticText`限定へ変更し、後続#377289で取消状態確認を越えOwner確認経路の後まで進んだことを確認した。#377289は登録結果表示assertionで別途FAILしており、登録成立とは扱わない。B0 acceptanceは未判定。
 
 履歴snapshot（2026-10-09、#377266統合後）: B0は107 run参照／87 cause-response行。直接参照147件中101件を照合済み（cause-response 100件、`VALIDATION.txt` 1件）、46件未統合。直接参照なし56件中6件を別途照合、50件未照合。#377266はserver-ID `TextField`のAX locator不一致を試験側の問題として照合し、`ce443b6`の公開文字Vision照合・通常scroll／clickを後続#377278で確認した。後続runはnative credential sheetの表示・取消まで進んだが、取消後に別のAX query timeoutとなった。資格情報入力・Owner・Broker登録は成立していない。B0 acceptanceは未判定。
 
