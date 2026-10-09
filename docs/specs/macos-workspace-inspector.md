@@ -17,7 +17,7 @@ Agent Centerで起動中に登録したWorkspaceを、既存Inspectorから明�
 | ID | 条件 | 状態 | 証拠 |
 | --- | --- | --- | --- |
 | MAC-INSPECT-1 | 3操作の同一要求native入口、session／authority／hash／不正表示範囲否定、拒否時未配送 | CLOSED | Windows候補1件・入口1件、Mac入口1件はsource `e031745`／run `37875821384`でPASS。再実行しない |
-| MAC-INSPECT-2 | Mac製品UIでfull読取確認→公開file表示→全体baseline確認→合成fixture変更→changed files／diff→失効確認・本文消去・Audit | FAIL | 新製品XCTestは登録前提buttonのAX not hittableで停止。対象操作を局所修正 |
+| MAC-INSPECT-2 | Mac製品UIでfull読取確認→公開file表示→全体baseline確認→合成fixture変更→changed files／diff→失効確認・本文消去・Audit | FAIL | 読取承認はaccepted。長い成功文言のOCR照合で停止し、短い一意部分へ局所修正 |
 | MAC-INSPECT-3 | 対象build／解析、通常終了、helper／専用fixture回収 | OPEN | 手動Actions `macos_workspace_inspector`だけ |
 
 公開合成fileとtest identityを使う。合成入力は`FIXTURE`、責任経路の静的確認は`CONFIG`、実native確認・Broker APFS読取・差分・正常終了は限定`LIVE_RUNTIME`。登録済み秘密canaryは本文・log・artifactへ出さない。本文は明示full後の公開fileだけを試験する。既存CLOSED試験、Alias／race／crash matrix、長時間、Formal Evidenceを再実行・追加せず、Acceptance外は延期中Final QA／既存gateへ送る。通常Release `task_execution=unsupported`、`release_ready=false`を保持し、PASS後は本単位をCLOSEDとして次へ進む。
@@ -39,3 +39,5 @@ fixture修正後のWindows対象command `cargo test --locked --manifest-path nat
 Mac run [`37875821384`](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37875821384)、source `e0317456e8a0b29b85b0885dcdb9c5f884a493cd`で新入口1件・Rust通常build・対象Dart解析・Mac製品buildはPASS、MAC-INSPECT-1をCLOSEDとする。UIは登録前提の`native Owner確認へ進む`buttonが画面外でnot hittableとなりFAIL（27.138秒）。既存`reveal`で可視位置へscrollしてから通常clickする対象試験だけを修正する。次runは`inspector_product_only=true`としてCLOSED入口を再実行しない。artifact `11591978581`のSHA256=`a5968e064f68bb2b69cd7abba563ffb429ddafffb9131b3616b178bd8dbe218a`をbyte照合済み。helper残留0・専用fixture回収成功、UI正常終了／内容露出の完了は未成立。
 
 Mac run [`37876554147`](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37876554147)、source `4f7802b3cfeb704ab78114c1b09f22e82e69293c`はCLOSED入口をskipし、通常build／解析PASS。UIは同じ登録前提buttonでFAIL（28.801秒）。`reveal`後にAX frameが窓内でも`not hittable`となったため、先行runの「画面外」は原因として未確定である。既存登録試験の通常coordinate clickへ、この新試験の操作だけを揃える。App／native承認／Broker実装は変更しない。artifact `11593076178`のSHA256=`1d5b2ab1b8b5ac629eb8523d5c5aea9b3a4541c2f7917f05493fe97c56f3e7e0`をbyte照合済み。helper残留0・fixture回収成功。
+
+Mac run [`37877200890`](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37877200890)、source `00af2c418b6006d05d448fc35de97db8eb80d09b`は登録前提を通過し、読取承認Auditがreceived／recorded／accepted。UIは長い承認成功文言のOCR照合でFAIL（95.825秒）。改行に依存しない一意の短い成功部分へ照合を変更し、承認表示停止の診断を固定status codeだけへ限定する。まだ未観測の全文表示／baseline／diff／失効をPASSへ補完しない。artifact `11592956964`のSHA256=`d2db7029ce92c25bf723c44df95132b293e427c2409f0eddd33ac47104862950`をbyte照合済み。CLOSED入口skip、通常build／解析PASS、helper残留0・fixture回収成功。

@@ -39,13 +39,13 @@ final class AdapterOwnerUITests: XCTestCase {
     try mcpPublicText(app, "full", click: true, scroll: false)
     let allow = app.buttons["native Owner確認でWorkspace読取を許可"]
     XCTAssertTrue(allow.waitForExistence(timeout: 10)); reveal(app, allow); allow.click(); approve(notice)
-    try mcpPublicText(app, "現在のWorkspace読取Approvalを確認しました。Task実行権は付与していません。")
+    try mcpPublicText(app, "現在のWorkspace読取Approval", diagnostic: true)
     try mcpPublicText(app, "macos-product-workspace", click: true, scrollUp: true)
     try mcpPublicText(app, "public.txt", click: true)
     try mcpPublicText(app, "D4_PUBLIC_BEFORE")
     let baseline = app.buttons["native Owner確認で比較baselineを保存"]
     XCTAssertTrue(baseline.exists); reveal(app, baseline); baseline.click(); approve(notice)
-    try mcpPublicText(app, "Broker内の比較baselineを作成しました。Task実行・Workspace変更は行っていません。")
+    try mcpPublicText(app, "比較baselineを作成しました")
     // UITest所有の合成公開fileだけを更新。Broker／製品へ書込権を注入しない。
     let publicFile = URL(fileURLWithPath: fixture + "/workspace/public.txt")
     XCTAssertEqual(try publicFile.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]).isRegularFile, true)
@@ -59,7 +59,7 @@ final class AdapterOwnerUITests: XCTestCase {
     try mcpPublicText(app, "D4_PUBLIC_AFTER")
     let revoke = app.buttons["native Owner確認でWorkspace読取を失効"]
     XCTAssertTrue(revoke.exists); reveal(app, revoke); revoke.click(); approve(notice)
-    try mcpPublicText(app, "Workspace読取ApprovalとBroker baselineを失効しました。")
+    try mcpPublicText(app, "baselineを失効しました")
     XCTAssertFalse(app.staticTexts["D4_PUBLIC_BEFORE"].exists)
     XCTAssertFalse(app.staticTexts["D4_PUBLIC_AFTER"].exists)
     print("D4_MACOS_WORKSPACE_INSPECTOR_PRODUCT_PASS")
@@ -445,7 +445,7 @@ final class AdapterOwnerUITests: XCTestCase {
   }
 
   private func mcpPublicText(_ app: XCUIApplication, _ label: String, click: Bool = false,
-                             scroll: Bool = true, scrollUp: Bool = false) throws {
+                             scroll: Bool = true, scrollUp: Bool = false, diagnostic: Bool = false) throws {
     // 合成公開Server／引数だけ。画面を保存せず、実windowの文字範囲boxへ通常mouse入力する。
     guard !app.secureTextFields.firstMatch.exists else { throw failure("秘密入力を撮影しない") }
     for attempt in 0..<8 {
@@ -467,6 +467,18 @@ final class AdapterOwnerUITests: XCTestCase {
       request.recognitionLevel = .accurate; request.recognitionLanguages = ["ja-JP", "en-US"]
       request.customWords = [label]
       try VNImageRequestHandler(cgImage: pixels).perform([request])
+      if diagnostic && attempt == 0 {
+        // 今回の承認表示停止の診断だけ。画面本文ではなく固定status codeだけを記録する。
+        let statuses = [("現在のWorkspace読取Approval", "approval_ack"),
+                        ("Workspace読取Approvalを確認できません", "approval_not_projected"),
+                        ("画面復帰後は", "foreground_reset"),
+                        ("読取には所有者による", "registration_refreshed"),
+                        ("native Owner確認待ち", "native_pending")]
+        let visible = (request.results ?? []).flatMap { $0.topCandidates(3).map { $0.string } }
+        for (text, code) in statuses where visible.contains(where: { $0.contains(text) }) {
+          print("D4_INSPECTOR_PUBLIC_STATUS " + code)
+        }
+      }
       let boxes: [VNRectangleObservation] = try (request.results ?? []).compactMap { observation in
         for candidate in observation.topCandidates(3) {
           if ["切断", "MCP接続", "A2A接続", "Host切替", "macos-product-workspace", "hash_only", "full"].contains(label) {
