@@ -346,6 +346,23 @@
         "artifact_sha256": "604a5c5fcf2fd591230194d0ca48c2c6e6afd9ad02d6744bf12879b583ba5239",
         "scope_limit": "loopback HTTP Card取得とmetadata-only投影の有限単位だけ。外部host／TLS、Task／Message／Artifact／Stream、Credential、一般Vendor、正式配布／Final QAは後続・既存gate。通常Release task_execution=unsupported、release_ready=falseと全Rust既知loopback FAIL・Flutter解析環境FAIL・日本語監査指摘・過去UI FAILを保持する。"
       },
+      "macos_host_registration_evidence": {
+        "status": "CLOSED",
+        "contract": "docs/specs/macos-host-registration.md",
+        "source_commit": "7220847bc775bec23f8088fc9d421209eb1ddc93",
+        "run_url": "https://github.com/gatchimuchio/D4-POCKET/actions/runs/37871901769",
+        "trigger": "workflow_dispatch",
+        "target": "macos_host_registration",
+        "host_product_only": true,
+        "evidence_source": "LIVE_RUNTIME",
+        "validation": "公開GUI入力・別個Rust native Owner・既存Broker登録・通常一覧更新・起動後Host表示切替・Command-Q正常終了。XCTest 1 passed／0 failed／0 skipped、72.616秒。登録／切替の受理Audit各1件、helper残留0・source clean、対象Dart解析No issues・通常native／Mac buildがPASS。",
+        "closed_evidence_reused": "Windows新native入口1件とplatform限定Broker入口1件、新Widget4件。source 46e7380のrun 37871125858でMac Broker入口1件・Widget4件がPASS。成功runではCLOSED証拠を再実行しない。",
+        "component_evidence_source": "FIXTURE",
+        "component_scope": "公開合成Host metadata・ad-hoc identity・Debug表示補助の有限製品経路。申告件数を実測へ補完しない。",
+        "artifact_id": "11590738836",
+        "artifact_sha256": "612c61a8d71918b712c4692d6c53543de81be9c347d09a42e92c8485ab787c48",
+        "scope_limit": "公開metadata登録・一覧・表示切替だけ。remote接続・Trust・Permission・Approval・Credential・Task能力を生成しない。正式配布／Final QAへ拡大せず、通常Release task_execution=unsupported、release_ready=falseと既存全Rust loopback FAIL・Flutter解析環境FAIL・日本語監査指摘・過去UI FAILを保持する。"
+      },
       "r2_bounded_exit_gate": {
         "version": 2,
         "phase_acceptance_policy": {

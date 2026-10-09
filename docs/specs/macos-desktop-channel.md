@@ -6,6 +6,8 @@ P13で未接続だったmacOS画面の`gui_shell/broker`を同梱Rust helperへ�
 
 ## 責任
 
+P13 Host登録追加入口の責任正本は`macos-host-registration.md`。同一要求hashへ束縛したRust native Owner確認から既存Brokerへ接続し、公開metadata登録・通常一覧更新・表示切替だけに限定する。Runnerはその待機305秒だけを分類する。remote接続・Trust・Permission・Approval・Credential・Taskを生成せず、通常transport・App Sandbox・CLOSED条件を変更しない。有限製品受入れはrun 37871901769でCLOSED。
+
 P13 A2A追加入口の責任正本は`macos-a2a-center.md`。既存同一要求native Owner receiverへ`A2A接続`だけを追加し、loopback Agent Cardのmetadata取得に限定する。通常transport・App Sandbox・資格非公開を変えず、Runnerはその待機315秒だけを分類する。既存CLOSED接続を再検証しない。
 
 Flutter → 固定MethodChannel → native Runner → 起動時に作る匿名pipe → 同梱Rust helper → 既存認証loopback Broker → 既存handler。

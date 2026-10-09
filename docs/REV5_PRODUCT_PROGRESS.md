@@ -17,9 +17,13 @@
 
 ## P13 Mobile / Non-Windows — 現行track
 
-#### macOS Host登録の製品入口 — VALIDATING（2026-10-09）
+#### macOS Host登録の製品入口 — CLOSED（Product Build、2026-10-09）
 
-有限契約`docs/specs/macos-host-registration.md`のMAC-HOST-1はWindows新native入口1件でCLOSED。新GUIは公開metadataだけを入力し、同一要求の別個native Owner確認を既存Brokerへ接続する。一覧更新と起動後に追加されたHostの表示切替を実装。ASCII作業複製上の新Dart正常／否定4試験がPASSした。MAC-HOST-2〜3のMac製品正常一回・対象解析／buildを手動Actions `macos_host_registration`へ固定して検収する。Windows Owner集合・remote接続・Trust・Credential・Task能力を変えず、CLOSED／延期中Final QAを再訪しない。過去FAIL・環境制約は有限契約へ保持する。
+有限契約`docs/specs/macos-host-registration.md`のMAC-HOST-1〜3を閉鎖。source `7220847bc775bec23f8088fc9d421209eb1ddc93`、[手動run 37871901769](https://github.com/gatchimuchio/D4-POCKET/actions/runs/37871901769)で公開GUI入力→別個native Owner→既存Broker登録→通常一覧更新→起動後Hostの未審査表示・表示切替→Command-Q正常終了がPASS。XCTest 1 passed／0 failed／0 skipped、72.616秒。登録／切替の受理Audit各1件、helper残留0・source clean、対象Dart解析No issues・通常native／Mac buildもPASS。Windows新入口・Mac platform gate各1件と新Widget4件のCLOSED証拠を再利用し、`host_product_only=true`で再試験しなかった。
+
+artifact `11590738836`、SHA-256 `612c61a8d71918b712c4692d6c53543de81be9c347d09a42e92c8485ab787c48`を実byteへ照合。成功sourceをmainへfast-forward・push・remote照合し、一時branchを双方回収。2世代remote tagは`codex/backup-main`=`7220847bc775bec23f8088fc9d421209eb1ddc93`、`codex/backup-main-prev`=`8360e90e8fc074dbcbc6d37703a831f7ea3e7905`、全単位rollbackは後者。Schema 166／正常162／否定213、Conformance 243がPASS。Windows全Rustの変更外loopback FAIL（単独再実行PASS）、ローカルFlutter解析環境FAIL、日本語strict既存5 file／17 findings・新規0、初回製品検索FAILを契約／既存Final QA分類の履歴へ保持し、成功へ書換えない。
+
+公開合成metadata／ad-hoc identityの有限`LIVE_RUNTIME`。申告件数を実測へ補完せず、Host登録／表示切替はremote接続・Trust・Permission・Approval・Credential・Task能力を生成しない。Windows Owner集合とApp Sandboxを保持する。正式配布・Final QAへ拡大せず、通常Release `task_execution=unsupported`、`release_ready=false`を維持する。次はP13のOPEN製品差分だけ。本条件と他CLOSED単位を追加証拠目的で再訪しない。
 
 #### macOS A2A接続センター — CLOSED（Product Build、2026-10-09）
 
