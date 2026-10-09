@@ -1,6 +1,6 @@
 # D4 Pocket / GUI-Shell rev5 Product-First 進捗
 
-更新日: 2026-10-09
+更新日: 2026-10-10
 工程正本: ユーザー提示「D4 Pocket / GUI-Shell 統合実装仕様書 rev5」「統合開発工程表 rev5」「Codex実装指示書 rev5」
 現行mode: `PRODUCT_BUILD_MODE`（最新版rev5実装指示§2）。Windows側P12 `FEATURE COMPLETE`、P2 Compare、P3 HandoffはCLOSEDのまま保持する。P13 Mobile／Non-Windows Product Buildは2026-10-09に有限Acceptanceをすべて閉鎖した。ユーザーの「続行」により、P13後の追加工程B0をIMPLEMENTINGとして開始。基準mainは`29e2ce98156bd2e1f9bccf36f8ff9f4c9e0a8054`、Actions履歴356 run中failure 203件を全件台帳へ結合中で、B0 acceptanceは未判定。B1〜B6は未開始。Q0〜Q7のFinal QA記録は履歴として保持し、別途開始条件が成立するまで現行schedulerにしない。通常Release `task_execution=unsupported`と既存release gateを維持する。
 初期rev5文書同期commit: `39dd3f4bc7aafe350ca94fce9392095f1064d2bc`。凍結commitとその後のQA記録は本書末尾の更新履歴を参照。
@@ -9,7 +9,9 @@
 
 ## P13後・B0全件観測／原因対応台帳（2026-10-09・進行中）
 
-現行集計（2026-10-10、#377803照合後）: B0は実行記録130件／原因対応110行。直接参照147件中124件を照合済み（原因対応表123件、`VALIDATION.txt` 1件）、23件未照合。直接参照なし56件中6件を別途照合、50件未照合。#377721／#377737／#377758／#377780／#377803は資格使用Audit・hash-only Tool受入れ後の公開「切断」探索で131〜181秒台に停止した。#377780は診断PNG書込が`NSCocoaErrorDomain` code 513で失敗。#377803はbutton AX frame 1px・scroll祖先0件、XCTest tempへのPNG write後に回収側parent allowlistがpathを拒否し、cleanup stepもFAIL。artifactには画像がなく、残留process記録は0件だがfixture cleanup未確認。画面状態・locator miss内部原因は未確定で、製品切断故障とは分類しない。後続runの画像・画面・PASSは先行runへ遡及転用しない。#377676のnative sheet／資格・MCP作用とcleanupは未確認のまま、CLOSED済み製品条件を再開せずB0 acceptance未判定を維持する。
+現行集計（2026-10-10、#377818照合後）: B0は実行記録131件／原因対応111行。直接参照147件中125件を照合済み（原因対応表124件、`VALIDATION.txt` 1件）、22件未照合。直接参照なし56件中6件を別途照合、50件未照合。#377721／#377737／#377758／#377780／#377803／#377818はいずれもcredential-use／hash-only Tool receipt後の公開「切断」探索でXCTestがFAIL。#377818のartifact限定PNGは設定／GUI Shell Windows書出し面まで対象を通り越したことを示し、試験側navigation overshootを確認。通常build／Audit／所有process・fixture cleanupはPASS。#377803はこれと独立に回収path gateでFAILしfixture cleanup未確認、#377780は診断PNG writeが`NSCocoaErrorDomain` code 513で失敗した。後続runの証拠を先行runへ転用せず、#377676のnative sheet／credential／MCP作用とcleanup未確認も維持。製品切断故障とは分類せず、B0 acceptance未判定を継続する。
+
+履歴snapshot（2026-10-10、#377803照合後）: B0は実行記録130件／原因対応110行。直接参照147件中124件を照合済み（原因対応表123件、`VALIDATION.txt` 1件）、23件未照合。直接参照なし56件中6件を別途照合、50件未照合。#377721／#377737／#377758／#377780／#377803は資格使用Audit・hash-only Tool受入れ後の公開「切断」探索で131〜181秒台に停止した。#377780は診断PNG書込が`NSCocoaErrorDomain` code 513で失敗。#377803はbutton AX frame 1px・scroll祖先0件、XCTest tempへのPNG write後に回収側parent allowlistがpathを拒否し、cleanup stepもFAIL。artifactには画像がなく、残留process記録は0件だがfixture cleanup未確認。画面状態・locator miss内部原因は未確定で、製品切断故障とは分類しない。後続runの画像・画面・PASSは先行runへ遡及転用しない。#377676のnative sheet／資格・MCP作用とcleanupは未確認のまま、CLOSED済み製品条件を再開せずB0 acceptance未判定を維持する。
 
 履歴snapshot（2026-10-09、#377321統合後）: B0は111 run参照／91 cause-response行。直接参照147件中105件を照合済み（cause-response 104件、`VALIDATION.txt` 1件）、42件未統合。直接参照なし56件中6件を別途照合、50件未照合。#377310／#377321は登録・一覧のAudit受理後、公開状態titleをXCTestの`StaticText`／group queryで取得できなかった試験側のAX role不一致と照合し、後続の秘密入力後・製品窓限定OCRで有効状態表示を確認した。製品状態欠落とは分類しない。失効button・失効・通常終了を含む資格情報全体Acceptanceは未成立。B0 acceptanceは未判定。
 
