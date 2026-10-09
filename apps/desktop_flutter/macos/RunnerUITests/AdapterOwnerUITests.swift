@@ -39,19 +39,23 @@ final class AdapterOwnerUITests: XCTestCase {
     try mcpPublicText(app, "full", click: true, scroll: false)
     let allow = app.buttons["native Owner確認でWorkspace読取を許可"]
     XCTAssertTrue(allow.waitForExistence(timeout: 10)); reveal(app, allow); allow.click(); approve(notice)
-    try mcpPublicText(app, "現在のWorkspace読取Approval", diagnostic: true)
+    // native確認後の復帰は古い表示を破棄する。成功文言ではなく現在登録から読む。
     try mcpPublicText(app, "macos-product-workspace", click: true, scrollUp: true)
     try mcpPublicText(app, "public.txt", click: true)
     try mcpPublicText(app, "D4_PUBLIC_BEFORE")
     let baseline = app.buttons["native Owner確認で比較baselineを保存"]
     XCTAssertTrue(baseline.exists); reveal(app, baseline); baseline.click(); approve(notice)
-    try mcpPublicText(app, "比較baselineを作成しました")
+    // Broker内baselineを現在のfull grantで読み戻す。UIの古い承認応答を復元しない。
+    try mcpPublicText(app, "macos-product-workspace", click: true, scrollUp: true)
+    let scope = app.buttons["既存baselineの比較範囲を確認"]
+    XCTAssertTrue(scope.exists); reveal(app, scope); scope.click()
+    try mcpPublicText(app, "基準点に保存されたfile")
     // UITest所有の合成公開fileだけを更新。Broker／製品へ書込権を注入しない。
     let publicFile = URL(fileURLWithPath: fixture + "/workspace/public.txt")
     XCTAssertEqual(try publicFile.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]).isRegularFile, true)
     XCTAssertEqual(try publicFile.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink, false)
     try Data("D4_PUBLIC_AFTER\n".utf8).write(to: publicFile)
-    let changes = app.buttons["baseline以降の変更file／差分を表示"]
+    let changes = app.buttons["全体基準点の変更一覧"]
     XCTAssertTrue(changes.exists); reveal(app, changes); changes.click()
     try mcpPublicText(app, "変更 1件・変更なし 0件・secret除外 1件")
     try mcpPublicText(app, "public.txt", click: true)
@@ -59,7 +63,9 @@ final class AdapterOwnerUITests: XCTestCase {
     try mcpPublicText(app, "D4_PUBLIC_AFTER")
     let revoke = app.buttons["native Owner確認でWorkspace読取を失効"]
     XCTAssertTrue(revoke.exists); reveal(app, revoke); revoke.click(); approve(notice)
-    try mcpPublicText(app, "baselineを失効しました")
+    try mcpPublicText(app, "macos-product-workspace", click: true, scrollUp: true)
+    XCTAssertFalse(app.buttons["native Owner確認でWorkspace読取を失効"].exists)
+    XCTAssertFalse(app.buttons["native Owner確認で比較baselineを保存"].exists)
     XCTAssertFalse(app.staticTexts["D4_PUBLIC_BEFORE"].exists)
     XCTAssertFalse(app.staticTexts["D4_PUBLIC_AFTER"].exists)
     print("D4_MACOS_WORKSPACE_INSPECTOR_PRODUCT_PASS")
@@ -445,7 +451,7 @@ final class AdapterOwnerUITests: XCTestCase {
   }
 
   private func mcpPublicText(_ app: XCUIApplication, _ label: String, click: Bool = false,
-                             scroll: Bool = true, scrollUp: Bool = false, diagnostic: Bool = false) throws {
+                             scroll: Bool = true, scrollUp: Bool = false) throws {
     // 合成公開Server／引数だけ。画面を保存せず、実windowの文字範囲boxへ通常mouse入力する。
     guard !app.secureTextFields.firstMatch.exists else { throw failure("秘密入力を撮影しない") }
     for attempt in 0..<8 {
@@ -467,18 +473,6 @@ final class AdapterOwnerUITests: XCTestCase {
       request.recognitionLevel = .accurate; request.recognitionLanguages = ["ja-JP", "en-US"]
       request.customWords = [label]
       try VNImageRequestHandler(cgImage: pixels).perform([request])
-      if diagnostic && attempt == 0 {
-        // 今回の承認表示停止の診断だけ。画面本文ではなく固定status codeだけを記録する。
-        let statuses = [("現在のWorkspace読取Approval", "approval_ack"),
-                        ("Workspace読取Approvalを確認できません", "approval_not_projected"),
-                        ("画面復帰後は", "foreground_reset"),
-                        ("読取には所有者による", "registration_refreshed"),
-                        ("native Owner確認待ち", "native_pending")]
-        let visible = (request.results ?? []).flatMap { $0.topCandidates(3).map { $0.string } }
-        for (text, code) in statuses where visible.contains(where: { $0.contains(text) }) {
-          print("D4_INSPECTOR_PUBLIC_STATUS " + code)
-        }
-      }
       let boxes: [VNRectangleObservation] = try (request.results ?? []).compactMap { observation in
         for candidate in observation.topCandidates(3) {
           if ["切断", "MCP接続", "A2A接続", "Host切替", "macos-product-workspace", "hash_only", "full"].contains(label) {
