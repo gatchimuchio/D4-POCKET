@@ -1288,7 +1288,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "ef77ef51cf6860a63ae8d86c79c42a31b5b2924da0cd667f51adbffad7e25ec8"
+      "sha256": "3f78dc869656162de345cd833f81cefc8b6b8443e789c7bbba0b8adb9f574781"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1508,7 +1508,7 @@
     },
     {
       "path": "docs/specs/macos-credential-vault.md",
-      "sha256": "c1f9f7d099008e3389c7072000f1777c6befc5be5c558fbe0c6fbf9d359180ea"
+      "sha256": "67020a839cfd7243cf319754b78c82ceb20c851a6db03f6c1b4ab8338ef11af6"
     },
     {
       "path": "docs/specs/macos-desktop-channel.md",
@@ -1648,11 +1648,11 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B0_\u539f\u56e0\u5bfe\u5fdc\u53f0\u5e33.md",
-      "sha256": "04c0a3a1dbbca306231bd16bf6e5b909e9935e307d7e60452b0bf70e8c8d6b2a"
+      "sha256": "c7b8622e686db3d1d37c1d3f4ff4dfe1bf060c6b25e599da4dc24da03603a5b0"
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B0_\u53c2\u7167\u539f\u672c\u4e00\u89a7.md",
-      "sha256": "96ea81014777daf244e8b89a3cf00faa58c5212d0f9ab8563189235c0e2eb5ec"
+      "sha256": "164438f72fa517fba786eb074a4c2dd22a57ad12eade02df49199aa4769cc5ff"
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B0_\u91cd\u8907\u5883\u754c\u56f3.md",
@@ -1672,7 +1672,7 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/\u63a1\u7528\u8a18\u9332.md",
-      "sha256": "52b9237fb7f42da8015d413c7510fd077fb1a5a6d235384dca16124f524b05c3"
+      "sha256": "d7696ff67e920623161a2bab8f4b6e91dc15faf863f3a951c7eda656f8a3d428"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
