@@ -9,7 +9,7 @@
 
 ## P13後・B0全件観測／原因対応台帳（2026-10-09・進行中）
 
-Actions APIから2026-05-25〜2026-10-09の356 runを取得し、203 failure / 226 failed jobs / 250 failed-step summariesを台帳化。失敗job logs 151件を取得し、75件はHTTP 410/404、step detailなし5 runを欠測として分離した。原因・修正・後続証拠までB0で再照合した事象は66 run（51 cause-response行）。既存直接参照147件のうち60 runは原因表へ結合済み、残る87件は個別内容のB0因果分類待ちであり、未記載や原因UNKNOWNとは扱わない。直接run参照なし56件のうち6件は別途ログ・コード・後続証拠から原因対応済み、50件は未照合。類似step名やsource SHAだけから原因を推定しない。全Git patchと現行code/test responsibilityの照合も未完のため、B0 acceptanceを閉じずB1へ進まない。P13のCLOSED証拠は再実行せず、通常Release `task_execution=unsupported`、`release_ready=false`、Final QA DEFERREDを保持する。詳細は採用記録とB0の4成果物を参照。
+Actions APIから2026-05-25〜2026-10-09の356 runを取得し、203 failure / 226 failed jobs / 250 failed-step summariesを台帳化。失敗job logs 151件を取得し、75件はHTTP 410/404、step detailなし5 runを欠測として分離した。原因・修正・後続証拠までB0で再照合した事象は67 run（52 cause-response行）。既存直接参照147件のうち61 runは原因表へ結合済み、残る86件は個別内容のB0因果分類待ちであり、未記載や原因UNKNOWNとは扱わない。直接run参照なし56件のうち6件は別途ログ・コード・後続証拠から原因対応済み、50件は未照合。類似step名やsource SHAだけから原因を推定しない。全Git patchと現行code/test responsibilityの照合も未完のため、B0 acceptanceを閉じずB1へ進まない。P13のCLOSED証拠は再実行せず、通常Release `task_execution=unsupported`、`release_ready=false`、Final QA DEFERREDを保持する。詳細は採用記録とB0の4成果物を参照。
 
 ## 正本の選び方
 
@@ -237,7 +237,7 @@ Schema 161／正常例157／負例208とmanual workflow検査、diff検査はPAS
 
 その後Conformance 236件／Manifest 1197件／Release GateはPASS。必須Rust全体は505 passed／1 failed／12 ignored（後続target未実行）。変更外の既知`local_tls_server_repairs_only_after_verified_package_bytes`がOS 10054／TLS InvalidContentTypeでFAILし、同一test単独再実行は1件PASS。既存`FQ-TEST-LOOPBACK`と同分類へ保持し、全体PASSや根因解消とは扱わない。共有した登録検査の既存直接依存3試験は全体run内でPASS。
 
-初回Mac手動Actions [run 37633822477](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37633822477)、commit `51fdf224b15138f41bdf4342a12aef2c9111468a`はRust対象／helper build、変更Dart解析・transport試験、通常Mac build、CLI固定package／version確認がPASS。UIは登録form表示後の模型欄検索でAX全要素value評価がtimeoutしてFAIL。保存画像でformと模型欄の実在を確認し、試験の探索を固定formのtext field順へ限定する。製品要求や権限検査は変えない。helper残留なし・専用CLI／Workspace回収を確認。artifact `11487758142`、SHA-256 `6c9f60e3aed54dd588782fc964f3957b65c0f58f92891cfcf2198fc8b4ec6d81`を照合しignored領域に保存した。実CLI hashは`16593cc2f422d5f398a8e40f550ebbaf1245392528957be342c295920a300704`、版は0.159.2。製品Owner確認・登録は未到達である。
+初回Mac手動Actions [run 37633822477](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37633822477)、commit `51fdf224b15138f41bdf4342a12aef2c9111468a`はRust対象／helper build、変更Dart解析・transport試験、通常Mac build、CLI固定package／version確認がPASS。UIは登録form表示後にテストの全AX要素value検索が約122秒でtimeoutし、製品Owner確認へ未到達。保存画像でformと模型欄の実在を確認した。修正`bb9a57bb0113ee04f47dc38c4583ee4acf63a5a4`で探索を固定form内のtext field順へ限定し、後続の入力欄・Owner確認操作へ進行。最終の既存CLOSED手動Actions [run 37664507377](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37664507377)では拒否／承認・実Codex登録・`Task実行能力: unsupported`表示がPASS（XCUITest 1件、44.570秒）。初回run artifact `11487758142`、SHA-256 `6c9f60e3aed54dd588782fc964f3957b65c0f58f92891cfcf2198fc8b4ec6d81`を照合しignored領域に保存した。実CLI hashは`16593cc2f422d5f398a8e40f550ebbaf1245392528957be342c295920a300704`、版は0.159.2。製品Acceptanceの再実行はしていない。
 
 #### macOS既存Adapter状態管理のOwner接続 — CLOSED（Product Build、2026-10-07）
 
