@@ -1,6 +1,6 @@
 # GUI Shell ロードマップ
 
-現行追記（2026-10-11）: B3-M43まで局所受入。B0 cause-mapは153行中114行を機構・試験・残余・明示UNKNOWNへ分類、39行が未分類。#37778022707のAX 1pxと診断PNG code 513を、test観測／sandbox内診断出力の失敗として分離した。failure-time診断回収は未証明の残余として保持し、通常Release `task_execution=unsupported`、`release_ready=false`を維持する。詳細は[B3全原因・共通機構対応](docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md)。
+現行追記（2026-10-11）: B3-M44まで局所受入。B0 cause-mapは153行中115行を機構・試験・残余・明示UNKNOWNへ分類、38行が未分類。#37780315182の診断PNG回収path gate不一致を確認し、現在は実測UITest temp rootだけを許可する固定path gateと、後続#377818の実回収PASSを対応付けた。元runのfixture cleanup未確認は維持し、通常Release `task_execution=unsupported`、`release_ready=false`を維持する。詳細は[B3全原因・共通機構対応](docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md)。
 
 M33時点の集計詳細（M34追記前）:
 
