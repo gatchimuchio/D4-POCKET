@@ -105,6 +105,7 @@ import tooling.package_windows_product as windows_product_package
 import tooling.package_windows_portable as windows_portable_package
 
 REQUIRED_SCHEMA_NAMES = {
+    "buffer_intervention_record",
     "workspace_diff",
     "workspace_inspection_request",
     "workspace_startup",
@@ -585,6 +586,74 @@ def test_first_run_configuration_request_rejects_caller_paths_and_authority() ->
         return [f"初回設定取得要求の正常例が契約に適合しない: {errors}"]
     if validate_instance(invalid, schema) == []:
         return ["初回設定取得要求Schemaが任意pathを拒否しない"]
+    return []
+
+
+def test_buffer_intervention_record_is_non_authoritative_and_evidence_bound() -> list[str]:
+    schema = load_schema("buffer_intervention_record.schema.json")
+    valid = load_contract_fixture("buffer_intervention_record.valid.json")
+    invalid_authority = load_contract_fixture(
+        "invalid/buffer_intervention_record_authority.invalid.json"
+    )
+    invalid_unproven = load_contract_fixture(
+        "invalid/buffer_intervention_record_unproven_absorption.invalid.json"
+    )
+    errors = validate_instance(valid, schema)
+    if errors:
+        return [f"緩衝調停の正常な候補記録が契約に適合しない: {errors}"]
+    if validate_instance(invalid_authority, schema) == []:
+        return ["緩衝調停記録がAuthority field注入を拒否しない"]
+    if validate_instance(invalid_unproven, schema) == []:
+        return ["実作用・元Tool成功・独立照合なしの吸収成立をSchemaが拒否しない"]
+    candidate_with_action = copy.deepcopy(valid)
+    candidate_with_action["実作用"] = {
+        "作用参照": "evidence:action-1",
+        "作用種別": "環境識別固定",
+        "変更前状態hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "変更後状態hash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "復旧状態": "不要",
+    }
+    if validate_instance(candidate_with_action, schema) == []:
+        return ["候補のみの記録が実作用を併記して誤昇格できる"]
+    evidenced_absorption = copy.deepcopy(valid)
+    evidenced_absorption.update(
+        {
+            "判定": "吸収成立",
+            "理由コード": "独立照合済み",
+            "未解決": [],
+            "実作用": candidate_with_action["実作用"],
+            "元Tool結果": {
+                "状態": "成功",
+                "終了値": 0,
+                "結果hash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                "証拠参照": "evidence:tool-result-1",
+            },
+            "独立照合": {
+                "結果": "PASS",
+                "成功条件ID": "BUF-T02",
+                "証拠参照": "evidence:verify-1",
+            },
+            "比較証拠": {
+                "対照証拠参照": [
+                    "evidence:baseline-run-1",
+                    "evidence:mediated-run-1",
+                ],
+                "条件一致hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "要求意味一致": True,
+                "副作用照合": "PASS",
+            },
+        }
+    )
+    if validate_instance(evidenced_absorption, schema):
+        return ["実作用・元Tool成功・独立照合を持つ記録が契約に適合しない"]
+    incomplete_recovery = copy.deepcopy(evidenced_absorption)
+    incomplete_recovery["実作用"]["復旧状態"] = "未完了"
+    if validate_instance(incomplete_recovery, schema) == []:
+        return ["復旧未完了の作用が吸収成立として通過する"]
+    failed_side_effect_check = copy.deepcopy(evidenced_absorption)
+    failed_side_effect_check["比較証拠"]["副作用照合"] = "FAIL"
+    if validate_instance(failed_side_effect_check, schema) == []:
+        return ["副作用照合FAILの介入が吸収成立として通過する"]
     return []
 
 
@@ -11007,6 +11076,7 @@ def main() -> int:
         test_setup_doctor_report_schema_preserves_unknown_and_denies_authority,
         test_first_run_configuration_schema_is_fixed_and_non_authoritative,
         test_first_run_configuration_request_rejects_caller_paths_and_authority,
+        test_buffer_intervention_record_is_non_authoritative_and_evidence_bound,
         test_negative_contract_fixtures_cover_all_schemas,
         test_adapter_authority_strip_schema,
         test_inbound_authority_keys_are_stripped,

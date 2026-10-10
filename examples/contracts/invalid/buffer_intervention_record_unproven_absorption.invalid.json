@@ -1,0 +1,56 @@
+{
+  "版": 1,
+  "記録ID": "00000000000000000000000000000001",
+  "元要求": {
+    "TaskID": "task_00000000000000000000000000000001",
+    "HostID": "host_windows_test",
+    "WorkspaceID": "workspace_00000000000000000000000000000001",
+    "作業sourceCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "入力hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "Tool契約ID": "cargo.test.locked",
+    "Toolchain指紋hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "成功条件ID": "BUF-T02"
+  },
+  "干渉": [
+    {
+      "境界A": "Toolchain",
+      "境界B": "OS",
+      "根拠状態": "直接観測",
+      "品質要求ID": "BUF-R04",
+      "証拠参照": [
+        "evidence:b0-run-37553724749"
+      ]
+    }
+  ],
+  "調停案": {
+    "機構": "環境固定",
+    "前提ID": [
+      "toolchain.profile.current"
+    ],
+    "作用範囲": [
+      "環境識別固定"
+    ],
+    "期待条件ID": "BUF-T02",
+    "不可侵条件": [
+      "権限を生成しない",
+      "Approvalを作成・再利用しない",
+      "秘密値を露出しない",
+      "OS保護を迂回しない",
+      "元要求の意味を変更しない"
+    ],
+    "再確認指紋": {
+      "作業sourceCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "入力hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "Host指紋hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "Workspace snapshot hash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "Toolchain指紋hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    "復旧方針": "作用前停止"
+  },
+  "判定": "吸収成立",
+  "理由コード": "独立照合済み",
+  "未解決": [],
+  "証拠参照": [
+    "evidence:b0-run-37553724749"
+  ]
+}

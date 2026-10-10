@@ -39,6 +39,7 @@ REQUIRED = {
     "runtime_content_receipt.schema.json",
     "runtime_replay_response.schema.json",
     "runtime_result_evidence.schema.json",
+    "buffer_intervention_record.schema.json",
     "runtime_history_access.schema.json",
     "runtime_execution_history_page.schema.json",
     "runtime_execution_history.schema.json",

@@ -1,0 +1,603 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/buffer_intervention_record.schema.json",
+  "$comment": "B1設計QC用の非権限記録契約。B2で実在するconsumerと作用経路へ接続するまでは、製品runtimeの機能・権限・完了証拠ではない。",
+  "title": "緩衝調停の記録",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "版",
+    "記録ID",
+    "元要求",
+    "干渉",
+    "調停案",
+    "判定",
+    "理由コード",
+    "証拠参照"
+  ],
+  "properties": {
+    "版": {
+      "const": 1
+    },
+    "記録ID": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$"
+    },
+    "元要求": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "TaskID",
+        "HostID",
+        "WorkspaceID",
+        "作業sourceCommit",
+        "入力hash",
+        "Tool契約ID",
+        "Toolchain指紋hash",
+        "成功条件ID"
+      ],
+      "properties": {
+        "TaskID": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$"
+        },
+        "HostID": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$"
+        },
+        "WorkspaceID": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$"
+        },
+        "作業sourceCommit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "入力hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "Tool契約ID": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$"
+        },
+        "Toolchain指紋hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "成功条件ID": {
+          "type": "string",
+          "pattern": "^BUF-T[0-9]{2}$"
+        }
+      }
+    },
+    "干渉": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "境界A",
+          "境界B",
+          "根拠状態",
+          "品質要求ID",
+          "証拠参照"
+        ],
+        "properties": {
+          "境界A": {
+            "enum": [
+              "要求",
+              "UI",
+              "Broker",
+              "Adapter",
+              "Host",
+              "Workspace",
+              "Process",
+              "Toolchain",
+              "OS",
+              "filesystem",
+              "network",
+              "artifact",
+              "test harness",
+              "unknown"
+            ]
+          },
+          "境界B": {
+            "enum": [
+              "要求",
+              "UI",
+              "Broker",
+              "Adapter",
+              "Host",
+              "Workspace",
+              "Process",
+              "Toolchain",
+              "OS",
+              "filesystem",
+              "network",
+              "artifact",
+              "test harness",
+              "unknown"
+            ]
+          },
+          "根拠状態": {
+            "enum": [
+              "直接観測",
+              "履歴からの推定",
+              "未知"
+            ]
+          },
+          "品質要求ID": {
+            "type": "string",
+            "pattern": "^BUF-R0[1-9]$"
+          },
+          "証拠参照": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 16,
+            "items": {
+              "type": "string",
+              "maxLength": 144,
+              "pattern": "^evidence:[A-Za-z0-9][A-Za-z0-9_.:-]*$"
+            }
+          }
+        }
+      }
+    },
+    "調停案": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "機構",
+        "前提ID",
+        "作用範囲",
+        "期待条件ID",
+        "不可侵条件",
+        "再確認指紋",
+        "復旧方針"
+      ],
+      "properties": {
+        "機構": {
+          "enum": [
+            "変換",
+            "隔離",
+            "環境固定",
+            "状態調停",
+            "既存Toolchain機能の再利用",
+            "未介入"
+          ]
+        },
+        "前提ID": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": {
+            "type": "string",
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$"
+          }
+        },
+        "作用範囲": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": {
+            "enum": [
+              "読取観測",
+              "一時出力配置",
+              "環境識別固定",
+              "既存管理下の状態調停",
+              "可逆な表現変換",
+              "既存Toolchain機能"
+            ]
+          }
+        },
+        "期待条件ID": {
+          "type": "string",
+          "pattern": "^BUF-T[0-9]{2}$"
+        },
+        "不可侵条件": {
+          "const": [
+            "権限を生成しない",
+            "Approvalを作成・再利用しない",
+            "秘密値を露出しない",
+            "OS保護を迂回しない",
+            "元要求の意味を変更しない"
+          ]
+        },
+        "再確認指紋": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "作業sourceCommit",
+            "入力hash",
+            "Host指紋hash",
+            "Workspace状態hash",
+            "Toolchain指紋hash"
+          ],
+          "properties": {
+            "作業sourceCommit": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{40}$"
+            },
+            "入力hash": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            },
+            "Host指紋hash": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            },
+            "Workspace状態hash": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            },
+            "Toolchain指紋hash": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            }
+          }
+        },
+        "復旧方針": {
+          "enum": [
+            "作用前停止",
+            "限定清掃",
+            "変更前状態の復元",
+            "既存Recoveryへ委譲"
+          ]
+        }
+      }
+    },
+    "判定": {
+      "enum": [
+        "候補のみ",
+        "作用後未照合",
+        "吸収成立",
+        "未成立",
+        "未観測"
+      ]
+    },
+    "理由コード": {
+      "enum": [
+        "未評価",
+        "根拠不足",
+        "条件不一致",
+        "権限未成立",
+        "OS拒否",
+        "環境差異",
+        "意味非同等",
+        "作用失敗",
+        "元Tool失敗",
+        "副作用検出",
+        "証拠不在",
+        "未知原因",
+        "独立照合済み"
+      ]
+    },
+    "実作用": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "作用参照",
+        "作用種別",
+        "変更前状態hash",
+        "変更後状態hash",
+        "復旧状態"
+      ],
+      "properties": {
+        "作用参照": {
+          "type": "string",
+          "maxLength": 144,
+          "pattern": "^evidence:[A-Za-z0-9][A-Za-z0-9_.:-]*$"
+        },
+        "作用種別": {
+          "enum": [
+            "一時出力配置",
+            "環境識別固定",
+            "既存管理下の状態調停",
+            "可逆な表現変換",
+            "既存Toolchain機能"
+          ]
+        },
+        "変更前状態hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "変更後状態hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "復旧状態": {
+          "enum": [
+            "不要",
+            "完了",
+            "未完了"
+          ]
+        }
+      }
+    },
+    "元Tool結果": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "状態",
+        "終了値",
+        "結果hash",
+        "証拠参照"
+      ],
+      "properties": {
+        "状態": {
+          "enum": [
+            "成功",
+            "失敗"
+          ]
+        },
+        "終了値": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "結果hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "証拠参照": {
+          "type": "string",
+          "maxLength": 144,
+          "pattern": "^evidence:[A-Za-z0-9][A-Za-z0-9_.:-]*$"
+        }
+      }
+    },
+    "独立照合": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "結果",
+        "成功条件ID",
+        "証拠参照"
+      ],
+      "properties": {
+        "結果": {
+          "enum": [
+            "PASS",
+            "FAIL"
+          ]
+        },
+        "成功条件ID": {
+          "type": "string",
+          "pattern": "^BUF-T[0-9]{2}$"
+        },
+        "証拠参照": {
+          "type": "string",
+          "maxLength": 144,
+          "pattern": "^evidence:[A-Za-z0-9][A-Za-z0-9_.:-]*$"
+        }
+      }
+    },
+    "比較証拠": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "対照証拠参照",
+        "条件一致hash",
+        "要求意味一致",
+        "副作用照合"
+      ],
+      "properties": {
+        "対照証拠参照": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "string",
+            "maxLength": 144,
+            "pattern": "^evidence:[A-Za-z0-9][A-Za-z0-9_.:-]*$"
+          }
+        },
+        "条件一致hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "要求意味一致": {
+          "const": true
+        },
+        "副作用照合": {
+          "enum": [
+            "PASS",
+            "FAIL"
+          ]
+        }
+      }
+    },
+    "未解決": {
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "type": "string",
+        "enum": [
+          "根因未確定",
+          "同等性未証明",
+          "副作用未評価",
+          "OS条件不在",
+          "Tool実行未到達",
+          "証拠取得不能",
+          "別環境未検証"
+        ]
+      }
+    },
+    "証拠参照": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "type": "string",
+        "maxLength": 144,
+        "pattern": "^evidence:[A-Za-z0-9][A-Za-z0-9_.:-]*$"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "判定": {
+            "const": "候補のみ"
+          }
+        },
+        "required": [
+          "判定"
+        ]
+      },
+      "then": {
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "実作用"
+              ]
+            },
+            {
+              "required": [
+                "元Tool結果"
+              ]
+            },
+            {
+              "required": [
+                "独立照合"
+              ]
+            },
+            {
+              "required": [
+                "比較証拠"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "判定": {
+            "const": "作用後未照合"
+          }
+        },
+        "required": [
+          "判定"
+        ]
+      },
+      "then": {
+        "required": [
+          "実作用",
+          "元Tool結果"
+        ],
+        "not": {
+          "required": [
+            "独立照合"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "判定": {
+            "const": "吸収成立"
+          }
+        },
+        "required": [
+          "判定"
+        ]
+      },
+      "then": {
+        "required": [
+          "実作用",
+          "元Tool結果",
+          "独立照合",
+          "比較証拠"
+        ],
+        "properties": {
+          "理由コード": {
+            "const": "独立照合済み"
+          },
+          "元Tool結果": {
+            "properties": {
+              "状態": {
+                "const": "成功"
+              },
+              "終了値": {
+                "const": 0
+              }
+            },
+            "required": [
+              "状態",
+              "終了値"
+            ]
+          },
+          "独立照合": {
+            "properties": {
+              "結果": {
+                "const": "PASS"
+              }
+            },
+            "required": [
+              "結果"
+            ]
+          },
+          "実作用": {
+            "properties": {
+              "復旧状態": {
+                "enum": [
+                  "不要",
+                  "完了"
+                ]
+              }
+            },
+            "required": [
+              "復旧状態"
+            ]
+          },
+          "比較証拠": {
+            "properties": {
+              "要求意味一致": {
+                "const": true
+              },
+              "副作用照合": {
+                "const": "PASS"
+              }
+            },
+            "required": [
+              "要求意味一致",
+              "副作用照合"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "判定": {
+            "const": "未観測"
+          }
+        },
+        "required": [
+          "判定"
+        ]
+      },
+      "then": {
+        "not": {
+          "required": [
+            "独立照合"
+          ]
+        }
+      }
+    }
+  ]
+}
