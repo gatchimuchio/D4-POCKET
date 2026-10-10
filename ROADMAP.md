@@ -1,6 +1,6 @@
 # GUI Shell ロードマップ
 
-現行追記（2026-10-11）: B3-M46まで局所受入。B0 cause-mapは153行中117行を機構・試験・残余・明示UNKNOWNへ分類、36行が未分類。#37785132837は既に見えていたServer行に加えて不要な「MCP接続」文字を要求したtest locator gateと分類。現行testは可視Server行へ束縛する既存bounded helperを使う。別run #377874の切断PASSは既存証拠としてのみ参照し、元runの状態へ遡及しない。通常Release `task_execution=unsupported`、`release_ready=false`を維持する。詳細は[B3全原因・共通機構対応](docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md)。
+現行追記（2026-10-11）: B3-M47まで局所受入。B0 cause-mapは153行中118行を機構・試験・残余・明示UNKNOWNへ分類、35行が未分類。#37794151100はA2A接続のprefix OCR候補重複によるtest-only locator停止と分類。現行helperは当該labelを完全一致に限定し、後続#377956は別のhash locatorまで進行した。後続runの到達範囲を#377941へ遡及せず、通常Release `task_execution=unsupported`、`release_ready=false`を維持する。詳細は[B3全原因・共通機構対応](docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md)。
 
 M33時点の集計詳細（M34追記前）:
 
