@@ -1,6 +1,6 @@
 # GUI Shell ロードマップ
 
-現行追記（2026-10-11）: B3-M48まで局所受入。B0 cause-mapは153行中119行を機構・試験・残余・明示UNKNOWNへ分類、34行が未分類。#37795697040は画面順序より後ろ向きのhash OCR探索を行ったtest-only locator不一致と分類。現行XCTestは公開hash prefixをAX StaticTextで先に確認し、後続#377976でURI消去・正常終了までPASSした。後続証拠を#377956へ遡及せず、通常Release `task_execution=unsupported`、`release_ready=false`を維持する。詳細は[B3全原因・共通機構対応](docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md)。
+現行追記（2026-10-11）: B3-M49まで局所受入。B0 cause-mapは153行中120行を機構・試験・残余・明示UNKNOWNへ分類、33行が未分類。#37871125858は検索語と同じ「Host切替」候補を求めたためOCR候補が重複したtest-only locator停止と分類。後続testは検索語を「Host」へ変え、#378719でHost登録・表示切替・正常終了がPASSした。元runのcleanup未確認は維持し、通常Release `task_execution=unsupported`、`release_ready=false`を維持する。詳細は[B3全原因・共通機構対応](docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md)。
 
 M33時点の集計詳細（M34追記前）:
 
