@@ -472,6 +472,8 @@ void main() {
         'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
     const resultHash =
         'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    const bufferRecordHash =
+        'sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
     const resultSummary = 'P12で承認済み結果を受信Taskへ渡す';
     const historyApprovalId = '77777777777777777777777777777777';
     final historyGrant = <String, Object?>{
@@ -630,6 +632,12 @@ void main() {
         'audit_event_id': 'audit-p12-task-complete',
         'result_hash': resultHash,
         'result_content_available': true,
+        'buffer_intervention': {
+          'status': '作用後未照合',
+          'record_hash': bufferRecordHash,
+          'audit_event_id': 'audit-p12-buffer',
+          'content_visibility': 'hash_only',
+        },
       }),
       _brokerAcceptedBody('AgentTask結果表示承認', {
         'task_id': taskId,
@@ -808,6 +816,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Task状態: completed'), findsOneWidget);
     expect(find.textContaining(resultHash), findsOneWidget);
+    expect(find.text('緩衝調停: 作用後未照合（独立照合前）'), findsOneWidget);
+    expect(find.textContaining(bufferRecordHash), findsOneWidget);
+    expect(find.text('緩衝調停Audit: audit-p12-buffer'), findsOneWidget);
 
     final visibility = find.byKey(
       const ValueKey('agent-task-visibility-$sessionId'),

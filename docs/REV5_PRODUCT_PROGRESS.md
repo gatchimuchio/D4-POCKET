@@ -1,6 +1,8 @@
 # D4 Pocket / GUI-Shell rev5 Product-First 進捗
 
-最新状態（2026-10-11、B4-L1）: 調停記録契約を現行Broker境界に合わせてv2へ修正し、実Taskを受け付けたBroker session IDをHost識別に使う。Git非依存Workspaceのsource commit未取得は明示し、その状態では`吸収成立`へ昇格しない。Schema 167／正常例163／負例215、Conformance 245件がPASS。これは契約整備の局所受入であり、製品consumer・Agent Center接続は未成立。B4 OPEN、通常Release `task_execution=unsupported`、`release_ready=false`を維持する。詳細は[B4製品接続設計](緩衝基盤_rev5補遺_QC/B4_製品接続設計.md)。
+最新状態（2026-10-11、B4-L2）: Codex AdapterのWorkspaceTaskScratch観測をBrokerへ型付きで返し、Task／Workspace／Recovery bindingとroot identityを照合。Task成功時はBroker session ID・Workspace登録hash・Toolchain指紋を使ったv2調停記録、durable Audit、Task終端Audit参照、Agent Centerのhash-only表示へ接続した。実Codex CLIのloopback LIVE_RUNTIMEで正常・取消cleanupと外部通信0を確認し、Rust全体直列569 passed／0 failed／13 ignored、Flutter Agent Task client 14件・Agent Center widget 1件、Schema 167／163／215、Conformance 245 checksがPASS。不一致／Audit失敗はTask隔離、拒否AuditまたはAudit不能のfail-closed、本文非露出を確認。B4-L2 CLOSED、ただし単一のWindows Desktop IPC→Broker→実Codex→Agent Center製品経路は未接続のためB4 OPEN。通常Release `task_execution=unsupported`、`release_ready=false`を維持する。Analyzerは未変更箇所のdeprecated info 5件で終了値1、`cargo fmt --check`はRust treeの広範な形式差分で終了値1。一括formatはしない。詳細は[B4製品接続設計](緩衝基盤_rev5補遺_QC/B4_製品接続設計.md)。
+
+B4-L1受入状態（履歴）: 調停記録契約をv2へ整備し、実Broker session IDをHost識別に使う。Git非依存Workspaceのsource commit未取得を明示し、その状態では`吸収成立`へ昇格しない。B4-L1は契約整備だけの局所受入であり、この時点では製品consumer・Agent Center接続は未成立だった。
 
 更新日: 2026-10-11
 工程正本: ユーザー提示「D4 Pocket / GUI-Shell 統合実装仕様書 rev5」「統合開発工程表 rev5」「Codex実装指示書 rev5」

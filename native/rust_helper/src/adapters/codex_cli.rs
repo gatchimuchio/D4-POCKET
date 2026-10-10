@@ -7,7 +7,10 @@
 
 use super::process_tree;
 use crate::audit_hash::sha256_tagged;
-use crate::broker::dialogue::{実行系Adapter, 実行結果, 対話失敗, 対話要求};
+use crate::broker::dialogue::{
+    AgentTaskAdapterExecution, AgentTaskScratchObservation, 実行系Adapter, 実行結果, 対話失敗,
+    対話要求,
+};
 use cap_fs_ext::DirExt;
 use cap_std::fs::Dir;
 use serde_json::{json, Value};
@@ -261,17 +264,53 @@ impl CodexCliAdapter {
         context: Option<crate::broker::agent_task_scratch::AgentTaskScratchContext>,
         credential: Option<zeroize::Zeroizing<Vec<u8>>>,
     ) -> Result<String, 対話失敗> {
+        self.execute_agent_task_observed(instruction, cancel, deadline, context, credential)
+            .result
+    }
+
+    fn execute_agent_task_observed(
+        &self,
+        instruction: &str,
+        cancel: &AtomicBool,
+        deadline: Instant,
+        context: Option<crate::broker::agent_task_scratch::AgentTaskScratchContext>,
+        credential: Option<zeroize::Zeroizing<Vec<u8>>>,
+    ) -> AgentTaskAdapterExecution {
+        let failed = |error| AgentTaskAdapterExecution {
+            result: Err(error),
+            scratch: None,
+            tool_exit_code: None,
+        };
         if !self.AgentTask実行対応() {
-            return Err(対話失敗::AgentTask非対応);
+            return failed(対話失敗::AgentTask非対応);
         }
-        let context = context.ok_or(対話失敗::AgentTask非対応)?;
-        validate_task_secret_paths(
+        let Some(context) = context else {
+            return failed(対話失敗::AgentTask非対応);
+        };
+        if let Err(error) = validate_task_secret_paths(
             &self.workspace,
             self.workspace_identity,
             &context.secret_paths,
-        )?;
-        let mut scratch =
-            WorkspaceTaskScratch::create(&self.workspace, self.workspace_identity, &context)?;
+        ) {
+            return failed(error);
+        }
+        let mut scratch = match WorkspaceTaskScratch::create(
+            &self.workspace,
+            self.workspace_identity,
+            &context,
+        ) {
+            Ok(scratch) => scratch,
+            Err(error) => return failed(error),
+        };
+        let temp_environment = match TaskTemporaryEnvironment::bind(&self.workspace, scratch.path()) {
+            Ok(environment) => environment,
+            Err(error) => {
+                let _ = scratch.cleanup();
+                return failed(error);
+            }
+        };
+        let before_state_hash = temp_environment.before_state_hash.clone();
+        let after_state_hash = temp_environment.after_state_hash.clone();
         #[cfg(any(test, feature = "r2-e2e"))]
         let result = run_agent_task(
             &self.executable,
@@ -299,9 +338,28 @@ impl CodexCliAdapter {
             cancel,
             deadline,
         );
-        match scratch.cleanup() {
+        let tool_exit_code = result.as_ref().ok().map(|_| 0);
+        let cleanup_result = scratch.cleanup();
+        let cleanup_completed = cleanup_result.is_ok();
+        let result = match cleanup_result {
             Ok(()) => result,
             Err(error) => Err(error),
+        };
+        AgentTaskAdapterExecution {
+            result,
+            scratch: Some(AgentTaskScratchObservation {
+                task_id: context.task_id,
+                runtime_id: context.runtime_id,
+                workspace_id: context.workspace_id,
+                recovery_binding_hash: context.recovery_binding_hash,
+                root_identity: crate::broker::dialogue::AgentTaskWorkspaceIdentity::from_directory_identity(
+                    context.root_identity,
+                ),
+                before_state_hash,
+                after_state_hash,
+                cleanup_completed,
+            }),
+            tool_exit_code,
         }
     }
 
@@ -524,6 +582,17 @@ impl 実行系Adapter for CodexCliAdapter {
         self.execute_agent_task(instruction, cancel, deadline, context, credential)
     }
 
+    fn AgentTask実行観測付き資格情報付き(
+        &self,
+        instruction: &str,
+        cancel: &AtomicBool,
+        deadline: Instant,
+        context: Option<crate::broker::agent_task_scratch::AgentTaskScratchContext>,
+        credential: Option<zeroize::Zeroizing<Vec<u8>>>,
+    ) -> AgentTaskAdapterExecution {
+        self.execute_agent_task_observed(instruction, cancel, deadline, context, credential)
+    }
+
     fn 応答(
         &self,
         要求: &対話要求,
@@ -710,6 +779,8 @@ struct WorkspaceTaskScratch {
 struct TaskTemporaryEnvironment {
     host_path: PathBuf,
     codex_override: String,
+    before_state_hash: String,
+    after_state_hash: String,
 }
 
 impl TaskTemporaryEnvironment {
@@ -724,11 +795,32 @@ impl TaskTemporaryEnvironment {
             .replace('\\', "/");
         let encoded_path =
             serde_json::to_string(&codex_path).map_err(|_| 対話失敗::要求不正)?;
+        // 生pathはAdapter結果・Auditへ出さず、変更前後の状態hashだけを返す。
+        let before_state_hash = sha256_tagged(
+            format!(
+                "TEMP={:?}\0TMP={:?}",
+                env::var_os("TEMP").map(|value| value.to_string_lossy().into_owned()),
+                env::var_os("TMP").map(|value| value.to_string_lossy().into_owned())
+            )
+            .as_bytes(),
+        );
+        let after_state_hash = sha256_tagged(
+            format!(
+                "TEMP={}\0TMP={}\0CODEX_TEMP={}\0CODEX_TMP={}",
+                host_path.to_string_lossy(),
+                host_path.to_string_lossy(),
+                codex_path,
+                codex_path
+            )
+            .as_bytes(),
+        );
         Ok(Self {
             host_path,
             codex_override: format!(
                 "shell_environment_policy.set={{TEMP={encoded_path},TMP={encoded_path}}}"
             ),
+            before_state_hash,
+            after_state_hash,
         })
     }
 

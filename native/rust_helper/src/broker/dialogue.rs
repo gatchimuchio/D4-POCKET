@@ -144,6 +144,28 @@ pub trait 実行系Adapter: Send + Sync {
         }
         self.AgentTask実行(instruction, cancel, deadline, context)
     }
+    /// 実Taskの結果に、非権限のWorkspaceTaskScratch観測を添えてBrokerへ返す。
+    /// 既存Adapterは従来経路へ委譲し、観測なしとして扱う。
+    fn AgentTask実行観測付き資格情報付き(
+        &self,
+        instruction: &str,
+        cancel: &AtomicBool,
+        deadline: Instant,
+        context: Option<super::agent_task_scratch::AgentTaskScratchContext>,
+        credential: Option<zeroize::Zeroizing<Vec<u8>>>,
+    ) -> AgentTaskAdapterExecution {
+        AgentTaskAdapterExecution {
+            result: self.AgentTask実行資格情報付き(
+                instruction,
+                cancel,
+                deadline,
+                context,
+                credential,
+            ),
+            scratch: None,
+            tool_exit_code: None,
+        }
+    }
     /// OS資源観測のためにBrokerだけが読むloopback接続先。権限や操作対象を生成しない。
     fn 観測対象(&self) -> Option<SocketAddr> {
         None
@@ -517,7 +539,27 @@ struct AgentTask結果表示承認 {
 
 struct AgentTask受信結果 {
     result: Result<AgentTask本文, 対話失敗>,
+    scratch: Option<AgentTaskScratchObservation>,
+    tool_exit_code: Option<u8>,
     completed_at: Instant,
+}
+
+pub struct AgentTaskAdapterExecution {
+    pub(crate) result: Result<String, 対話失敗>,
+    pub(crate) scratch: Option<AgentTaskScratchObservation>,
+    pub(crate) tool_exit_code: Option<u8>,
+}
+
+#[derive(Clone)]
+pub(crate) struct AgentTaskScratchObservation {
+    pub(crate) task_id: String,
+    pub(crate) runtime_id: String,
+    pub(crate) workspace_id: String,
+    pub(crate) recovery_binding_hash: String,
+    pub(crate) root_identity: AgentTaskWorkspaceIdentity,
+    pub(crate) before_state_hash: String,
+    pub(crate) after_state_hash: String,
+    pub(crate) cleanup_completed: bool,
 }
 
 struct AgentTask作業 {
@@ -526,6 +568,10 @@ struct AgentTask作業 {
     session_id: String,
     workspace_id: String,
     workspace_root_identity: AgentTaskWorkspaceIdentity,
+    workspace_registration_hash: String,
+    recovery_binding_hash: String,
+    broker_session_id: Option<String>,
+    toolchain_fingerprint_hash: String,
     instruction_hash: String,
     request_hash: String,
     created_at_epoch_seconds: i64,
@@ -536,6 +582,9 @@ struct AgentTask作業 {
     result_body: Option<String>,
     result_expires_at: Option<Instant>,
     result_exposure_approval: Option<AgentTask結果表示承認>,
+    mediation_status: Option<String>,
+    mediation_record_hash: Option<String>,
+    mediation_audit_event_id: Option<String>,
     cancel: Arc<AtomicBool>,
     owner_cancel_requested_at: Option<Instant>,
     receiver: Option<mpsc::Receiver<AgentTask受信結果>>,
@@ -761,6 +810,7 @@ pub struct 対話制御 {
     失効セッション: BTreeSet<String>,
     agent_task_permissions: BTreeMap<String, AgentTaskWorkspacePermission記録>,
     agent_tasks: BTreeMap<String, AgentTask作業>,
+    broker_session_id: Option<String>,
 }
 impl std::fmt::Debug for 対話制御 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -841,6 +891,12 @@ pub(crate) fn 要求hash(要求: &対話要求) -> String {
 }
 
 impl 対話制御 {
+    pub(crate) fn for_broker_session(session_id: &str) -> Self {
+        let mut control = Self::default();
+        control.broker_session_id = Some(session_id.to_owned());
+        control
+    }
+
     /// owner保存制御だけが消費する。本文を通常IPCへ返すAPIではない。
     /// 評価隔離済み対話は評価専用ProtectedStoreから外へ移さないため拒否する。
     #[cfg(any(windows, test))]
@@ -1539,9 +1595,8 @@ impl 対話制御 {
                         .ok_or(対話失敗::実行系不在)?,
                 );
                 let metadata = adapter.agent_metadata().ok_or(対話失敗::実行系不在)?;
-                if !AgentAdapterMetadata::read(&metadata)?.task_execution_supported()
-                    || !adapter.AgentTask実行対応()
-                {
+                let adapter_metadata = AgentAdapterMetadata::read(&metadata)?;
+                if !adapter_metadata.task_execution_supported() || !adapter.AgentTask実行対応() {
                     return Err(対話失敗::AgentTask非対応);
                 }
                 let binding = 作業領域結合.ok_or(対話失敗::作業領域不在)?;
@@ -1575,6 +1630,23 @@ impl 対話制御 {
                     return Err(対話失敗::権限拒否);
                 }
                 let instruction_hash = sha256_tagged(request.instruction.as_bytes());
+                // Adapter metadataは権限に使わず、Task開始時点の識別値をBrokerがhash化する。
+                let toolchain_fingerprint_hash = sha256_tagged(
+                    serde_json::to_string(&json!({
+                        "adapter_id": adapter_metadata.adapter_id,
+                        "agent_id": adapter_metadata.agent_id,
+                        "provider_id": adapter_metadata.provider_id,
+                        "version": adapter_metadata.version,
+                        "model": adapter_metadata.model,
+                        "task_contract": "codex-cli.agent-task.v1",
+                    }))
+                    .map_err(|_| 対話失敗::応答不正)?
+                    .as_bytes(),
+                );
+                let workspace_registration_hash = binding.registration_hash().to_owned();
+                let recovery_binding_hash = binding.recovery_binding_hash().to_owned();
+                let workspace_root_identity = binding.root_identity();
+                let broker_session_id = self.broker_session_id.clone();
                 if !self.agent_task_owner_approval_is_active(
                     &request.session_id,
                     &request.agent_runtime_id,
@@ -1660,6 +1732,9 @@ impl 対話制御 {
                     result_hash: None,
                     failure_class: None,
                     start_audit_event_id: None,
+                    buffer_intervention_record_hash: None,
+                    buffer_intervention_status: None,
+                    buffer_intervention_audit_event_id: None,
                 };
                 let (start_reason, start_digest) =
                     super::execution_history::encode_agent_task_audit(&start_record)
@@ -1683,26 +1758,37 @@ impl 対話制御 {
                 let spawn_result = std::thread::Builder::new()
                     .name("AgentTask実行".into())
                     .spawn(move || {
-                        let result = if Instant::now() >= deadline {
-                            Err(対話失敗::期限超過)
+                        let execution = if Instant::now() >= deadline {
+                            AgentTaskAdapterExecution {
+                                result: Err(対話失敗::期限超過),
+                                scratch: None,
+                                tool_exit_code: None,
+                            }
                         } else if worker_cancel.load(Ordering::SeqCst) {
-                            Err(対話失敗::取消)
+                            AgentTaskAdapterExecution {
+                                result: Err(対話失敗::取消),
+                                scratch: None,
+                                tool_exit_code: None,
+                            }
                         } else {
-                            AgentTask結果hash化(
-                                adapter.AgentTask実行資格情報付き(
+                            adapter.AgentTask実行観測付き資格情報付き(
                                     &instruction,
                                     &worker_cancel,
                                     deadline,
                                     Some(execution_context),
                                     provider_credential,
-                                ),
+                                )
+                        };
+                        let result = AgentTask結果hash化(
+                                execution.result,
                                 &worker_cancel,
                                 deadline,
-                            )
-                        };
+                            );
                         let completed_at = Instant::now();
                         let _ = send.send(AgentTask受信結果 {
                             result,
+                            scratch: execution.scratch,
+                            tool_exit_code: execution.tool_exit_code,
                             completed_at,
                         });
                     });
@@ -1725,6 +1811,9 @@ impl 対話制御 {
                                 result_hash: None,
                                 failure_class: Some("通信失敗".into()),
                                 start_audit_event_id: Some(start_audit_id.clone()),
+                                buffer_intervention_record_hash: None,
+                                buffer_intervention_status: None,
+                                buffer_intervention_audit_event_id: None,
                             };
                         let (failure_reason, failure_hash) =
                             super::execution_history::encode_agent_task_audit(&failure_record)
@@ -1741,6 +1830,10 @@ impl 対話制御 {
                                         session_id: request.session_id,
                                         workspace_id: request.workspace_id,
                                         workspace_root_identity: binding.root_identity(),
+                                        workspace_registration_hash: workspace_registration_hash.clone(),
+                                        recovery_binding_hash: recovery_binding_hash.clone(),
+                                        broker_session_id: broker_session_id.clone(),
+                                        toolchain_fingerprint_hash: toolchain_fingerprint_hash.clone(),
                                         instruction_hash,
                                         request_hash: start_hash,
                                         created_at_epoch_seconds: 現在,
@@ -1751,6 +1844,9 @@ impl 対話制御 {
                                         result_body: None,
                                         result_expires_at: None,
                                         result_exposure_approval: None,
+                                        mediation_status: None,
+                                        mediation_record_hash: None,
+                                        mediation_audit_event_id: None,
                                         cancel,
                                         owner_cancel_requested_at: None,
                                         receiver: None,
@@ -1769,7 +1865,11 @@ impl 対話制御 {
                     runtime_id: request.agent_runtime_id,
                     session_id: request.session_id,
                     workspace_id: request.workspace_id,
-                    workspace_root_identity: binding.root_identity(),
+                    workspace_root_identity,
+                    workspace_registration_hash,
+                    recovery_binding_hash,
+                    broker_session_id,
+                    toolchain_fingerprint_hash,
                     instruction_hash,
                     request_hash: start_hash,
                     created_at_epoch_seconds: 現在,
@@ -1780,6 +1880,9 @@ impl 対話制御 {
                     result_body: None,
                     result_expires_at: None,
                     result_exposure_approval: None,
+                    mediation_status: None,
+                    mediation_record_hash: None,
+                    mediation_audit_event_id: None,
                     cancel,
                     owner_cancel_requested_at: None,
                     receiver,
@@ -2496,13 +2599,19 @@ impl 対話制御 {
                 }
                 let deadline = task.deadline;
                 match task.receiver.as_ref().map(mpsc::Receiver::try_recv) {
-                    Some(Ok(result)) => Some(AgentTask結果完了時刻検査(
-                        result.result,
-                        result.completed_at,
-                        task.owner_cancel_requested_at,
-                        deadline,
+                    Some(Ok(received)) => Some((
+                        AgentTask結果完了時刻検査(
+                            received.result,
+                            received.completed_at,
+                            task.owner_cancel_requested_at,
+                            deadline,
+                        ),
+                        received.scratch,
+                        received.tool_exit_code,
                     )),
-                    Some(Err(mpsc::TryRecvError::Disconnected)) => Some(Err(対話失敗::通信失敗)),
+                    Some(Err(mpsc::TryRecvError::Disconnected)) => {
+                        Some((Err(対話失敗::通信失敗), None, None))
+                    }
                     Some(Err(mpsc::TryRecvError::Empty)) | None => {
                         if Instant::now() >= deadline {
                             task.cancel.store(true, Ordering::SeqCst);
@@ -2511,7 +2620,7 @@ impl 対話制御 {
                     }
                 }
             };
-            let Some(result) = completed else {
+            let Some((result, scratch_observation, tool_exit_code)) = completed else {
                 continue;
             };
             let (status, result_hash, result_body, failure) = match result {
@@ -2536,6 +2645,115 @@ impl 対話制御 {
                 Err(error) => ("failed", None, None, Some(error)),
             };
             let task = self.agent_tasks.get(&task_id).ok_or(対話失敗::要求不正)?;
+            let mediation = if status == "completed" {
+                match (
+                    scratch_observation.as_ref(),
+                    tool_exit_code,
+                    result_hash.as_deref(),
+                ) {
+                    (Some(observation), Some(exit_code), Some(output_hash)) => {
+                        let evidence_body = {
+                            if !AgentTaskScratch観測一致(task, observation) {
+                                let Some(task) = self.agent_tasks.get_mut(&task_id) else {
+                                    return Err(対話失敗::要求不正);
+                                };
+                                AgentTask調停拒否時に隔離(
+                                    task,
+                                    "AgentTask調停観測拒否:binding_mismatch",
+                                    現在,
+                                    監査,
+                                )?;
+                                return Err(対話失敗::応答不正);
+                            }
+                            serde_json::to_string(&json!({
+                                "版": 1,
+                                "task_id": task.task_id,
+                                "runtime_id": task.runtime_id,
+                                "broker_session_id": task.broker_session_id,
+                                "workspace_id": task.workspace_id,
+                                "instruction_hash": task.instruction_hash,
+                                "result_hash": output_hash,
+                                "tool_exit_code": exit_code,
+                                "scratch_before_state_hash": observation.before_state_hash,
+                                "scratch_after_state_hash": observation.after_state_hash,
+                                "scratch_cleanup_completed": observation.cleanup_completed
+                            }))
+                            .map_err(|_| 対話失敗::監査失敗)?
+                        };
+                        let evidence_digest = sha256_tagged(evidence_body.as_bytes());
+                        let evidence_id = match 監査(
+                            &format!("AgentTask調停作用:{evidence_body}"),
+                            &task_id,
+                            &evidence_digest,
+                        ) {
+                            Ok(event_id) => event_id,
+                            Err(error) => {
+                                let Some(task) = self.agent_tasks.get_mut(&task_id) else {
+                                    return Err(対話失敗::要求不正);
+                                };
+                                task.cancel.store(true, Ordering::SeqCst);
+                                task.receiver = None;
+                                task.status = "quarantined";
+                                return Err(error);
+                            }
+                        };
+                        let record = {
+                            let task = self.agent_tasks.get(&task_id).ok_or(対話失敗::要求不正)?;
+                            AgentTask緩衝調停記録(
+                                task,
+                                observation,
+                                output_hash,
+                                exit_code,
+                                &evidence_id,
+                            )
+                        };
+                        let (record_body, record_hash) = match record {
+                            Ok(record) => record,
+                            Err(error) => {
+                                let Some(task) = self.agent_tasks.get_mut(&task_id) else {
+                                    return Err(対話失敗::要求不正);
+                                };
+                                task.cancel.store(true, Ordering::SeqCst);
+                                task.receiver = None;
+                                task.status = "quarantined";
+                                return Err(error);
+                            }
+                        };
+                        let record_audit_id = match 監査(
+                            &format!("緩衝調停記録:{record_body}"),
+                            &task_id,
+                            &record_hash,
+                        ) {
+                            Ok(event_id) => event_id,
+                            Err(error) => {
+                                let Some(task) = self.agent_tasks.get_mut(&task_id) else {
+                                    return Err(対話失敗::要求不正);
+                                };
+                                task.cancel.store(true, Ordering::SeqCst);
+                                task.receiver = None;
+                                task.status = "quarantined";
+                                return Err(error);
+                            }
+                        };
+                        Some(("作用後未照合".to_owned(), record_hash, record_audit_id))
+                    }
+                    (Some(_), _, _) => {
+                        let Some(task) = self.agent_tasks.get_mut(&task_id) else {
+                            return Err(対話失敗::要求不正);
+                        };
+                        AgentTask調停拒否時に隔離(
+                            task,
+                            "AgentTask調停観測拒否:tool_result_invalid",
+                            現在,
+                            監査,
+                        )?;
+                        return Err(対話失敗::応答不正);
+                    }
+                    (None, _, _) => None,
+                }
+            } else {
+                None
+            };
             let terminal_record = super::execution_history::AgentTaskHistoryAuditRecord {
                 version: 1,
                 stage: "terminal".into(),
@@ -2551,21 +2769,29 @@ impl 対話制御 {
                 result_hash: result_hash.clone(),
                 failure_class: failure.map(|error| error.分類().to_string()),
                 start_audit_event_id: Some(task.start_audit_event_id.clone()),
+                buffer_intervention_record_hash: mediation.as_ref().map(|(_, hash, _)| hash.clone()),
+                buffer_intervention_status: mediation.as_ref().map(|(status, _, _)| status.clone()),
+                buffer_intervention_audit_event_id: mediation
+                    .as_ref()
+                    .map(|(_, _, audit_id)| audit_id.clone()),
             };
             let (terminal_reason, event_hash) =
                 super::execution_history::encode_agent_task_audit(&terminal_record)
                     .map_err(|_| 対話失敗::監査失敗)?;
             let event_id = match 監査(&terminal_reason, &task_id, &event_hash) {
                 Ok(event_id) => event_id,
-                Err(error) => {
-                    let Some(task) = self.agent_tasks.get_mut(&task_id) else {
-                        return Err(対話失敗::要求不正);
-                    };
-                    task.cancel.store(true, Ordering::SeqCst);
-                    task.receiver = None;
-                    task.status = "quarantined";
-                    return Err(error);
-                }
+                            Err(error) => {
+                                let Some(task) = self.agent_tasks.get_mut(&task_id) else {
+                                    return Err(対話失敗::要求不正);
+                                };
+                                AgentTask調停拒否時に隔離(
+                                    task,
+                                    "AgentTask調停記録拒否:record_invalid",
+                                    現在,
+                                    監査,
+                                )?;
+                                return Err(error);
+                            }
             };
             let Some(task) = self.agent_tasks.get_mut(&task_id) else {
                 return Err(対話失敗::要求不正);
@@ -2580,6 +2806,11 @@ impl 対話制御 {
                 .map(|_| Instant::now() + AGENT_TASK_RESULT_BODY_TTL);
             task.result_exposure_approval = None;
             task.audit_event_id = event_id;
+            if let Some((mediation_status, record_hash, mediation_audit_id)) = mediation {
+                task.mediation_status = Some(mediation_status);
+                task.mediation_record_hash = Some(record_hash);
+                task.mediation_audit_event_id = Some(mediation_audit_id);
+            }
         }
         self.AgentTask結果本文回収();
         Ok(())
@@ -2618,6 +2849,170 @@ impl 対話制御 {
     }
 }
 
+fn AgentTaskScratch観測一致(
+    task: &AgentTask作業,
+    observation: &AgentTaskScratchObservation,
+) -> bool {
+    observation.task_id == task.task_id
+        && observation.runtime_id == task.runtime_id
+        && observation.workspace_id == task.workspace_id
+        && observation.recovery_binding_hash == task.recovery_binding_hash
+        && observation.root_identity == task.workspace_root_identity
+        && observation.cleanup_completed
+}
+
+fn AgentTask調停拒否時に隔離(
+    task: &mut AgentTask作業,
+    reason: &str,
+    現在: i64,
+    監査: &mut 監査器<'_>,
+) -> Result<(), 対話失敗> {
+    let audit_hash = sha256_tagged(format!("{reason}:{}", task.task_id).as_bytes());
+    task.cancel.store(true, Ordering::SeqCst);
+    task.receiver = None;
+    task.status = "quarantined";
+    let audit_id = 監査(reason, &task.task_id, &audit_hash)?;
+    task.audit_event_id = audit_id;
+    let terminal = super::execution_history::AgentTaskHistoryAuditRecord {
+        version: 1,
+        stage: "terminal".into(),
+        task_id: task.task_id.clone(),
+        runtime_id: task.runtime_id.clone(),
+        session_id: task.session_id.clone(),
+        workspace_id: task.workspace_id.clone(),
+        instruction_hash: task.instruction_hash.clone(),
+        request_hash: task.request_hash.clone(),
+        created_at: task.created_at_epoch_seconds,
+        status: "failed".into(),
+        updated_at: 現在.max(task.created_at_epoch_seconds),
+        result_hash: None,
+        failure_class: Some(対話失敗::応答不正.分類().to_string()),
+        start_audit_event_id: Some(task.start_audit_event_id.clone()),
+        buffer_intervention_record_hash: None,
+        buffer_intervention_status: None,
+        buffer_intervention_audit_event_id: None,
+    };
+    let (terminal_reason, terminal_hash) =
+        super::execution_history::encode_agent_task_audit(&terminal)
+            .map_err(|_| 対話失敗::監査失敗)?;
+    task.audit_event_id = 監査(&terminal_reason, &task.task_id, &terminal_hash)?;
+    Ok(())
+}
+
+fn AgentTask緩衝調停記録(
+    task: &AgentTask作業,
+    observation: &AgentTaskScratchObservation,
+    result_hash: &str,
+    tool_exit_code: u8,
+    evidence_event_id: &str,
+) -> Result<(String, String), 対話失敗> {
+    let broker_session_id = task
+        .broker_session_id
+        .as_deref()
+        .filter(|id| Agent作業要求識別子妥当(id))
+        .ok_or(対話失敗::要求不正)?;
+    let valid_hash = |value: &str| {
+        value.len() == 71
+            && value.starts_with("sha256:")
+            && value[7..]
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    };
+    let valid_id = |value: &str| {
+        !value.is_empty()
+            && value.len() <= 128
+            && value.as_bytes()[0].is_ascii_alphanumeric()
+            && value
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || b"_.:-".contains(&byte))
+    };
+    if !AgentTaskScratch観測一致(task, observation)
+        || tool_exit_code != 0
+        || !valid_hash(result_hash)
+        || !valid_hash(&observation.before_state_hash)
+        || !valid_hash(&observation.after_state_hash)
+        || !valid_hash(&task.workspace_registration_hash)
+        || !valid_hash(&task.toolchain_fingerprint_hash)
+        || !valid_id(evidence_event_id)
+    {
+        return Err(対話失敗::応答不正);
+    }
+    let evidence = format!("evidence:{evidence_event_id}");
+    let host_fingerprint = sha256_tagged(broker_session_id.as_bytes());
+    let record = json!({
+        "版": 2,
+        "記録ID": 識別子生成().map_err(|_| 対話失敗::要求不正)?,
+        "元要求": {
+            "TaskID": task.task_id,
+            "実行HostID": broker_session_id,
+            "実行Host識別方式": "broker_session_id",
+            "WorkspaceID": task.workspace_id,
+            "作業sourceCommit取得状態": "未取得",
+            "作業sourceCommit": null,
+            "作業sourceCommit未取得理由": "取得経路なし",
+            "入力hash": task.instruction_hash,
+            "Tool契約ID": "codex-cli.agent-task.v1",
+            "Toolchain指紋hash": task.toolchain_fingerprint_hash,
+            "成功条件ID": "BUF-T09"
+        },
+        "干渉": [{
+            "境界A": "Adapter",
+            "境界B": "Workspace",
+            "根拠状態": "直接観測",
+            "品質要求ID": "BUF-R05",
+            "証拠参照": [evidence]
+        }],
+        "調停案": {
+            "機構": "環境固定",
+            "前提ID": ["agent-task.workspace-task-scratch.v1"],
+            "作用範囲": ["環境識別固定", "一時出力配置"],
+            "期待条件ID": "BUF-T09",
+            "不可侵条件": [
+                "権限を生成しない",
+                "Approvalを作成・再利用しない",
+                "秘密値を露出しない",
+                "OS保護を迂回しない",
+                "元要求の意味を変更しない"
+            ],
+            "再確認指紋": {
+                "実行HostID": broker_session_id,
+                "実行Host識別方式": "broker_session_id",
+                "作業sourceCommit取得状態": "未取得",
+                "作業sourceCommit": null,
+                "作業sourceCommit未取得理由": "取得経路なし",
+                "入力hash": task.instruction_hash,
+                "Host指紋hash": host_fingerprint,
+                "Workspace登録hash": task.workspace_registration_hash,
+                "Toolchain指紋hash": task.toolchain_fingerprint_hash
+            },
+            "復旧方針": "限定清掃"
+        },
+        "判定": "作用後未照合",
+        "理由コード": "証拠不在",
+        "実作用": {
+            "作用参照": evidence,
+            "作用種別": "環境識別固定",
+            "変更前状態hash": observation.before_state_hash,
+            "変更後状態hash": observation.after_state_hash,
+            "復旧状態": "完了"
+        },
+        "元Tool結果": {
+            "状態": "成功",
+            "終了値": tool_exit_code,
+            "結果hash": result_hash,
+            "証拠参照": evidence
+        },
+        "未解決": ["同等性未証明"],
+        "証拠参照": [evidence]
+    });
+    let encoded = serde_json::to_string(&record).map_err(|_| 対話失敗::監査失敗)?;
+    if encoded.len() > 4096 {
+        return Err(対話失敗::応答不正);
+    }
+    let digest = sha256_tagged(encoded.as_bytes());
+    Ok((encoded, digest))
+}
+
 fn AgentTask状態射影(task: &AgentTask作業) -> Value {
     let mut projection = json!({
         "task_id": task.task_id,
@@ -2634,6 +3029,18 @@ fn AgentTask状態射影(task: &AgentTask作業) -> Value {
     });
     if let Some(result_hash) = &task.result_hash {
         projection["result_hash"] = json!(result_hash);
+    }
+    if let (Some(status), Some(record_hash), Some(audit_event_id)) = (
+        &task.mediation_status,
+        &task.mediation_record_hash,
+        &task.mediation_audit_event_id,
+    ) {
+        projection["buffer_intervention"] = json!({
+            "status": status,
+            "record_hash": record_hash,
+            "audit_event_id": audit_event_id,
+            "content_visibility": "hash_only"
+        });
     }
     projection
 }
@@ -3153,6 +3560,23 @@ mod tests {
                 .AgentTask実行(instruction, cancel, deadline, context)
         }
 
+        fn AgentTask実行観測付き資格情報付き(
+            &self,
+            instruction: &str,
+            cancel: &AtomicBool,
+            deadline: Instant,
+            context: Option<crate::broker::agent_task_scratch::AgentTaskScratchContext>,
+            credential: Option<zeroize::Zeroizing<Vec<u8>>>,
+        ) -> AgentTaskAdapterExecution {
+            self.inner.AgentTask実行観測付き資格情報付き(
+                instruction,
+                cancel,
+                deadline,
+                context,
+                credential,
+            )
+        }
+
         fn 応答(
             &self,
             request: &対話要求,
@@ -3254,6 +3678,132 @@ mod tests {
         c.操作_作業領域結合済み(op, &payload, owner, 100, binding, &mut |_, _, _| {
             Ok("fixture-bound-task-audit".into())
         })
+    }
+
+    fn 緩衝調停進捗fixture(
+        observation: AgentTaskScratchObservation,
+    ) -> (対話制御, String) {
+        let task_id = "buffer-task-fixture".to_owned();
+        let result_hash = sha256_tagged(b"buffer-task-result");
+        let now = Instant::now();
+        let (sender, receiver) = mpsc::channel();
+        sender
+            .send(AgentTask受信結果 {
+                result: Ok(AgentTask本文 {
+                    result_hash,
+                    text: "BUFFER_PRIVATE_SENTINEL".into(),
+                }),
+                scratch: Some(observation),
+                tool_exit_code: Some(0),
+                completed_at: now,
+            })
+            .expect("緩衝調停fixtureのworker結果を送る");
+        let task = AgentTask作業 {
+            task_id: task_id.clone(),
+            runtime_id: "runtime-fixture".into(),
+            session_id: "session-fixture".into(),
+            workspace_id: "workspace-fixture".into(),
+            workspace_root_identity: AgentTaskWorkspaceIdentity::new(1, 1),
+            workspace_registration_hash: sha256_tagged(b"workspace-registration"),
+            recovery_binding_hash: sha256_tagged(b"recovery-binding"),
+            broker_session_id: Some(
+                "broker-session-0123456789abcdef0123456789abcdef".into(),
+            ),
+            toolchain_fingerprint_hash: sha256_tagged(b"toolchain-fingerprint"),
+            instruction_hash: sha256_tagged(b"instruction"),
+            request_hash: sha256_tagged(b"request"),
+            created_at_epoch_seconds: 100,
+            start_audit_event_id: "broker-audit-start".into(),
+            status: "running",
+            audit_event_id: "broker-audit-start".into(),
+            result_hash: None,
+            result_body: None,
+            result_expires_at: None,
+            result_exposure_approval: None,
+            mediation_status: None,
+            mediation_record_hash: None,
+            mediation_audit_event_id: None,
+            cancel: Arc::new(AtomicBool::new(false)),
+            owner_cancel_requested_at: None,
+            receiver: Some(receiver),
+            created_at: now,
+            deadline: now + Duration::from_secs(60),
+        };
+        let mut control = 対話制御::for_broker_session(
+            "broker-session-0123456789abcdef0123456789abcdef",
+        );
+        control.agent_tasks.insert(task_id.clone(), task);
+        (control, task_id)
+    }
+
+    fn 緩衝調停観測fixture() -> AgentTaskScratchObservation {
+        AgentTaskScratchObservation {
+            task_id: "buffer-task-fixture".into(),
+            runtime_id: "runtime-fixture".into(),
+            workspace_id: "workspace-fixture".into(),
+            recovery_binding_hash: sha256_tagged(b"recovery-binding"),
+            root_identity: AgentTaskWorkspaceIdentity::new(1, 1),
+            before_state_hash: sha256_tagged(b"before-state"),
+            after_state_hash: sha256_tagged(b"after-state"),
+            cleanup_completed: true,
+        }
+    }
+
+    #[test]
+    fn 緩衝調停観測不一致はTaskを監査して隔離し本文を公開しない() {
+        let mut observation = 緩衝調停観測fixture();
+        observation.workspace_id = "workspace-forged".into();
+        let (mut control, task_id) = 緩衝調停進捗fixture(observation);
+        let mut audit_events = Vec::new();
+        let mut audit = |reason: &str, request_id: &str, hash: &str| {
+            audit_events.push((reason.to_owned(), request_id.to_owned(), hash.to_owned()));
+            Ok(format!("broker-audit-rejected-observation-{}", audit_events.len()))
+        };
+
+        assert!(matches!(
+            control.AgentTask進捗反映(101, &mut audit),
+            Err(対話失敗::応答不正)
+        ));
+        let task = control.agent_tasks.get(&task_id).expect("隔離Task");
+        assert_eq!(task.status, "quarantined");
+        assert!(task.cancel.load(Ordering::SeqCst));
+        assert!(task.result_hash.is_none());
+        assert!(task.result_body.is_none());
+        assert_eq!(task.audit_event_id, "broker-audit-rejected-observation-2");
+        assert_eq!(audit_events.len(), 2);
+        assert_eq!(audit_events[0].0, "AgentTask調停観測拒否:binding_mismatch");
+        assert_eq!(audit_events[0].1, task_id);
+        let terminal = audit_events[1]
+            .0
+            .strip_prefix(super::super::execution_history::AGENT_TASK_HISTORY_PREFIX)
+            .and_then(|body| serde_json::from_str::<Value>(body).ok())
+            .expect("失敗終端をAgent Task履歴へ記録");
+        assert_eq!(terminal["status"], "failed");
+        assert_eq!(terminal["failure_class"], "応答不正");
+        assert!(!format!("{audit_events:?}").contains("BUFFER_PRIVATE_SENTINEL"));
+    }
+
+    #[test]
+    fn 緩衝調停Audit不能時は完了投影せずTaskを隔離する() {
+        let (mut control, task_id) = 緩衝調停進捗fixture(緩衝調停観測fixture());
+        let mut audit = |reason: &str, _: &str, _: &str| {
+            if reason.starts_with("AgentTask調停作用:") {
+                Err(対話失敗::監査失敗)
+            } else {
+                Ok("broker-audit-fixture".into())
+            }
+        };
+
+        assert!(matches!(
+            control.AgentTask進捗反映(101, &mut audit),
+            Err(対話失敗::監査失敗)
+        ));
+        let task = control.agent_tasks.get(&task_id).expect("隔離Task");
+        assert_eq!(task.status, "quarantined");
+        assert!(task.cancel.load(Ordering::SeqCst));
+        assert!(task.result_hash.is_none());
+        assert!(task.result_body.is_none());
+        assert!(task.mediation_record_hash.is_none());
     }
 
     fn AgentTask要求(session_id: &str, instruction: &str) -> Value {
@@ -3972,7 +4522,9 @@ mod tests {
             .dialogue_binding(runtime_id, workspace_id)
             .expect("Brokerが登録WorkspaceへAdapterを結合");
 
-        let mut control = 対話制御::default();
+        let mut control = 対話制御::for_broker_session(
+            "broker-session-11111111111111111111111111111111",
+        );
         control
             .登録(
                 runtime_id,
@@ -4251,6 +4803,17 @@ mod tests {
             server.blocked_external_requests(),
             server.blocked_external_summary(),
         );
+        assert_eq!(
+            result["buffer_intervention"]["status"],
+            "作用後未照合",
+            "Agent Center向けprojectionは実作用を成功へ過剰昇格しない"
+        );
+        assert!(result["buffer_intervention"]["record_hash"]
+            .as_str()
+            .is_some_and(|hash| hash.starts_with("sha256:") && hash.len() == 71));
+        assert!(result["buffer_intervention"]["audit_event_id"]
+            .as_str()
+            .is_some_and(|id| id.starts_with("loopback-integration-audit-")));
         let temp_write = temp_report["temp_write"]
             .as_str()
             .expect("実MxC子プロセスTEMP書込み状態");
@@ -4583,6 +5146,28 @@ mod tests {
             );
         }
         drop(audit);
+        let mediation_record = audit_events
+            .iter()
+            .find_map(|(reason, request_id, _)| {
+                (request_id == task_id)
+                    .then(|| reason.strip_prefix("緩衝調停記録:"))
+                    .flatten()
+                    .and_then(|body| serde_json::from_str::<Value>(body).ok())
+            })
+            .expect("BrokerがTask束縛済み緩衝調停記録をAuditへ保存");
+        assert_eq!(mediation_record["判定"], "作用後未照合");
+        assert_eq!(
+            mediation_record["元要求"]["実行HostID"],
+            "broker-session-11111111111111111111111111111111"
+        );
+        assert_eq!(
+            mediation_record["元要求"]["作業sourceCommit取得状態"],
+            "未取得"
+        );
+        assert!(mediation_record["元要求"]["作業sourceCommit"].is_null());
+        let audit_snapshot = serde_json::to_string(&audit_events).unwrap();
+        assert!(!audit_snapshot.contains(instruction));
+        assert!(!audit_snapshot.contains(&workspace_path.to_string_lossy().to_string()));
         let has_task_audit = |expected_task_id: &str, stage: &str, status: &str| {
             audit_events.iter().any(|(operation, task_id, _)| {
                 task_id == expected_task_id
@@ -4658,7 +5243,9 @@ mod tests {
             .dialogue_binding(runtime_id, workspace_id)
             .expect("登録WorkspaceとのBroker結合");
 
-        let mut control = 対話制御::default();
+        let mut control = 対話制御::for_broker_session(
+            "broker-session-codex-fixture-1111111111111111",
+        );
         control
             .登録(
                 runtime_id,
@@ -4797,6 +5384,7 @@ mod tests {
             std::thread::sleep(Duration::from_millis(10));
         };
         assert_eq!(result["status"], "completed");
+        assert_eq!(result["buffer_intervention"]["status"], "作用後未照合");
         assert!(result["result_hash"]
             .as_str()
             .unwrap()
@@ -4897,6 +5485,7 @@ mod tests {
         };
         assert_eq!(cancelled["status"], "cancelled");
         assert!(cancelled.get("result_hash").is_none());
+        assert!(cancelled.get("buffer_intervention").is_none());
         let heartbeat_after_terminal = fixture.descendant_heartbeat_len();
         std::thread::sleep(Duration::from_millis(150));
         assert_eq!(
@@ -5029,6 +5618,28 @@ mod tests {
         assert!(audit_events
             .iter()
             .any(|event| event.0.contains("取消要求") && event.1 == cancel_task_id));
+        let terminal_audit = audit_events
+            .iter()
+            .find_map(|event| {
+                (event.1 == task_id)
+                    .then(|| {
+                        event
+                            .0
+                            .strip_prefix(super::super::execution_history::AGENT_TASK_HISTORY_PREFIX)
+                    })
+                    .flatten()
+                    .and_then(|body| serde_json::from_str::<Value>(body).ok())
+                    .filter(|record| record["stage"] == "terminal")
+            })
+            .expect("terminal Task Audit記録");
+        assert_eq!(terminal_audit["buffer_intervention_status"], "作用後未照合");
+        assert_eq!(
+            terminal_audit["buffer_intervention_record_hash"],
+            result["buffer_intervention"]["record_hash"]
+        );
+        assert!(terminal_audit["buffer_intervention_audit_event_id"]
+            .as_str()
+            .is_some_and(|id| id.starts_with("fixture-audit-")));
         let audit_text = serde_json::to_string(&audit_events).unwrap();
         assert!(!audit_text.contains(instruction));
         assert!(!audit_text.contains(&cancel_instruction));

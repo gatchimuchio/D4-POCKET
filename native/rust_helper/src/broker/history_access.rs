@@ -253,6 +253,9 @@ mod tests {
             result_hash: None,
             failure_class: None,
             start_audit_event_id: None,
+            buffer_intervention_record_hash: None,
+            buffer_intervention_status: None,
+            buffer_intervention_audit_event_id: None,
         };
         let (reason, digest) =
             super::super::execution_history::encode_agent_task_audit(&record).unwrap();

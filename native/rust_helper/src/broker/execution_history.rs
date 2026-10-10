@@ -26,6 +26,12 @@ pub(crate) struct AgentTaskHistoryAuditRecord {
     pub result_hash: Option<String>,
     pub failure_class: Option<String>,
     pub start_audit_event_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub buffer_intervention_record_hash: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub buffer_intervention_status: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub buffer_intervention_audit_event_id: Option<String>,
 }
 
 #[derive(Deserialize, Default)]
@@ -125,6 +131,28 @@ fn validate_agent_task_record(
         || !valid_hash(&record.request_hash)
         || record.created_at < 0
         || record.updated_at < record.created_at
+        || !matches!(
+            (
+                record.buffer_intervention_record_hash.as_deref(),
+                record.buffer_intervention_status.as_deref(),
+                record.buffer_intervention_audit_event_id.as_deref(),
+            ),
+            (None, None, None)
+                | (Some(_), Some("作用後未照合"), Some(_))
+        )
+        || record
+            .buffer_intervention_record_hash
+            .as_deref()
+            .is_some_and(|hash| !valid_hash(hash))
+        || record
+            .buffer_intervention_audit_event_id
+            .as_deref()
+            .is_some_and(|id| !valid_id(id))
+        || (record.stage == "start"
+            && (record.buffer_intervention_record_hash.is_some()
+                || record.buffer_intervention_status.is_some()
+                || record.buffer_intervention_audit_event_id.is_some()))
+        || (record.status != "completed" && record.buffer_intervention_record_hash.is_some())
     {
         return Err("Agent Task履歴metadataが不正");
     }
@@ -608,6 +636,9 @@ mod tests {
             result_hash: None,
             failure_class: None,
             start_audit_event_id: None,
+            buffer_intervention_record_hash: None,
+            buffer_intervention_status: None,
+            buffer_intervention_audit_event_id: None,
         }
     }
 

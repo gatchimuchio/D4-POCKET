@@ -73,6 +73,7 @@ class AgentTaskRecord {
     required this.auditEventId,
     this.resultHash,
     this.resultContentAvailable = false,
+    this.bufferIntervention,
   });
 
   final String taskId;
@@ -84,6 +85,19 @@ class AgentTaskRecord {
   final String auditEventId;
   final String? resultHash;
   final bool resultContentAvailable;
+  final AgentTaskBufferIntervention? bufferIntervention;
+}
+
+class AgentTaskBufferIntervention {
+  const AgentTaskBufferIntervention({
+    required this.status,
+    required this.recordHash,
+    required this.auditEventId,
+  });
+
+  final String status;
+  final String recordHash;
+  final String auditEventId;
 }
 
 class AgentTaskResultApproval {
@@ -434,7 +448,8 @@ class AgentTaskClient {
         body.keys.any((key) =>
             !requiredKeys.contains(key) &&
             key != 'result_hash' &&
-            key != 'result_content_available')) {
+            key != 'result_content_available' &&
+            key != 'buffer_intervention')) {
       throw const BrokerClientException('Agent Task状態recordのfieldが不正です');
     }
     final taskId = body['task_id'];
@@ -446,6 +461,38 @@ class AgentTaskClient {
     final auditId = body['audit_event_id'];
     final resultHash = body['result_hash'];
     final resultContentAvailable = body['result_content_available'];
+    AgentTaskBufferIntervention? bufferIntervention;
+    if (body.containsKey('buffer_intervention')) {
+      final raw = body['buffer_intervention'];
+      if (raw is! Map) {
+        throw const BrokerClientException('Agent Task調停projectionの形式が不正です');
+      }
+      final value = Map<String, Object?>.from(raw);
+      const mediationKeys = {
+        'status',
+        'record_hash',
+        'audit_event_id',
+        'content_visibility',
+      };
+      final mediationStatus = value['status'];
+      final recordHash = value['record_hash'];
+      final mediationAuditId = value['audit_event_id'];
+      if (value.keys.toSet().difference(mediationKeys).isNotEmpty ||
+          !mediationKeys.every(value.containsKey) ||
+          mediationStatus != '作用後未照合' ||
+          recordHash is! String ||
+          !_hash.hasMatch(recordHash) ||
+          mediationAuditId is! String ||
+          !_runtimeId.hasMatch(mediationAuditId) ||
+          value['content_visibility'] != 'hash_only') {
+        throw const BrokerClientException('Agent Task調停projectionの識別・範囲が不正です');
+      }
+      bufferIntervention = AgentTaskBufferIntervention(
+        status: mediationStatus as String,
+        recordHash: recordHash,
+        auditEventId: mediationAuditId,
+      );
+    }
     if (body['record_version'] != 2 ||
         body['description'] != 'Agent作業Task（結果本文とWorkspace差分は別の権限経路）' ||
         taskId is! String ||
@@ -485,6 +532,7 @@ class AgentTaskClient {
       auditEventId: auditId,
       resultHash: resultHash as String?,
       resultContentAvailable: resultContentAvailable,
+      bufferIntervention: bufferIntervention,
     );
   }
 

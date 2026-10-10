@@ -144,6 +144,63 @@ void main() {
     expect(transport.operations, ['AgentTask状態']);
   });
 
+  test('Task stateはhash-only緩衝調停projectionだけをAgent Centerへ通す', () async {
+    final record = _taskRecord('completed')
+      ..['result_hash'] = _resultHash
+      ..['buffer_intervention'] = {
+        'status': '作用後未照合',
+        'record_hash': _resultHash,
+        'audit_event_id': 'broker-audit-123',
+        'content_visibility': 'hash_only',
+      };
+    final transport = _FakeBrokerTransport([
+      _accepted('AgentTask状態', record),
+    ]);
+
+    final task = await AgentTaskClient(transport).state(_task);
+
+    expect(task.bufferIntervention?.status, '作用後未照合');
+    expect(task.bufferIntervention?.recordHash, _resultHash);
+    expect(task.bufferIntervention?.auditEventId, 'broker-audit-123');
+  });
+
+  test('Task stateは調停の成功昇格・全文露出・権限fieldを拒否する', () async {
+    final invalidProjections = [
+      {
+        'status': '吸収成立',
+        'record_hash': _resultHash,
+        'audit_event_id': 'broker-audit-123',
+        'content_visibility': 'hash_only',
+      },
+      {
+        'status': '作用後未照合',
+        'record_hash': _resultHash,
+        'audit_event_id': 'broker-audit-123',
+        'content_visibility': 'full',
+      },
+      {
+        'status': '作用後未照合',
+        'record_hash': _resultHash,
+        'audit_event_id': 'broker-audit-123',
+        'content_visibility': 'hash_only',
+        'permission': 'allow',
+      },
+    ];
+
+    for (final projection in invalidProjections) {
+      final transport = _FakeBrokerTransport([
+        _accepted('AgentTask状態', {
+          ..._taskRecord('completed'),
+          'buffer_intervention': projection,
+        }),
+      ]);
+      await expectLater(
+        AgentTaskClient(transport).state(_task),
+        throwsA(isA<BrokerClientException>()),
+      );
+    }
+  });
+
   test('結果表示はnative Owner Approvalと一回取得を分離しTask/hash/visibilityへ結合する',
       () async {
     final record = AgentTaskRecord(

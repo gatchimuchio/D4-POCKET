@@ -1089,7 +1089,7 @@ impl Broker {
             seen_nonces: HashMap::new(),
             audit_log: BrokerAuditLog::default(),
             authority_registry: BrokerAuthorityRegistry::production_default(),
-            対話: 対話制御::default(),
+            対話: 対話制御::for_broker_session(session_id),
             資源観測: RuntimeResourceRegistry::default(),
             ライフサイクル: RuntimeLifecycleRegistry::default(),
             評価: Default::default(),
@@ -1169,7 +1169,7 @@ impl Broker {
             seen_nonces: persistent_state.seen_nonces,
             audit_log: persistent_state.audit_log,
             authority_registry: BrokerAuthorityRegistry::production_default(),
-            対話: 対話制御::default(),
+            対話: 対話制御::for_broker_session(session_id),
             資源観測: RuntimeResourceRegistry::default(),
             ライフサイクル: RuntimeLifecycleRegistry::with_terminal_quarantines(
                 terminal_quarantines,
@@ -6322,6 +6322,9 @@ mod tests {
                 result_hash: None,
                 failure_class: None,
                 start_audit_event_id: None,
+                buffer_intervention_record_hash: None,
+                buffer_intervention_status: None,
+                buffer_intervention_audit_event_id: None,
             };
             let (reason, digest) =
                 super::super::execution_history::encode_agent_task_audit(&start).unwrap();
