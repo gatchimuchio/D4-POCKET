@@ -1,6 +1,6 @@
 # GUI Shell ロードマップ
 
-現行追記（2026-10-11）: B3-M44まで局所受入。B0 cause-mapは153行中115行を機構・試験・残余・明示UNKNOWNへ分類、38行が未分類。#37780315182の診断PNG回収path gate不一致を確認し、現在は実測UITest temp rootだけを許可する固定path gateと、後続#377818の実回収PASSを対応付けた。元runのfixture cleanup未確認は維持し、通常Release `task_execution=unsupported`、`release_ready=false`を維持する。詳細は[B3全原因・共通機構対応](docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md)。
+現行追記（2026-10-11）: B3-M45まで局所受入。B0 cause-mapは153行中116行を機構・試験・残余・明示UNKNOWNへ分類、37行が未分類。#37783606584の失敗はMCP／Tool操作後に古いtoolbar AX要素を再利用したtest-only停止と分類。現行XCTestは既存Ctrl+Shift+Fから検索へ戻り、後続#377851で次のlocatorまで到達したが、切断成功は未証明。通常Release `task_execution=unsupported`、`release_ready=false`を維持する。詳細は[B3全原因・共通機構対応](docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md)。
 
 M33時点の集計詳細（M34追記前）:
 
