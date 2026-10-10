@@ -2777,6 +2777,65 @@ exit 0
 
     #[cfg(windows)]
     #[test]
+    fn scratch削除失敗はTask失敗と回復記録を保ち解放後にRecoveryで回収する() {
+        use std::os::windows::fs::OpenOptionsExt;
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("時計")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "gui-shell-agent-task-scratch-cleanup-failure-{}-{nonce}",
+            std::process::id()
+        ));
+        let workspace = root.join("workspace");
+        std::fs::create_dir_all(&workspace).expect("Workspace試験root");
+        let identity = crate::broker::workspace_root::pin_workspace_path(&workspace)
+            .expect("Workspaceを固定")
+            .identity;
+        let context = scratch_context(identity);
+        let mut scratch = WorkspaceTaskScratch::create(&workspace, identity, &context)
+            .expect("Task scratchを作成");
+        let scratch_path = scratch.path().to_path_buf();
+        let locked_file_path = scratch_path.join("locked.tmp");
+        fs::write(&locked_file_path, b"cleanup failure fixture").expect("fileを作成");
+        let locked_file = std::fs::OpenOptions::new()
+            .read(true)
+            .share_mode(0)
+            .open(&locked_file_path)
+            .expect("delete shareを拒否するfile handle");
+
+        assert!(matches!(scratch.cleanup(), Err(対話失敗::通信失敗)));
+        assert!(scratch_path.exists(), "削除失敗を成功として扱わない");
+        assert!(
+            context.journal.has_pending_workspace("workspace-fixture"),
+            "cleanup失敗時はRecovery用journalを完了扱いしない"
+        );
+
+        drop(locked_file);
+        let workspace_dir = Dir::open_ambient_dir(&workspace, cap_std::ambient_authority())
+            .expect("Recovery用Workspace directoryを開く");
+        let outcomes = context.journal.recover_workspace(
+            &context.runtime_id,
+            &context.workspace_id,
+            &context.recovery_binding_hash,
+            &workspace_dir,
+            identity,
+        );
+        assert_eq!(
+            outcomes,
+            vec![crate::broker::agent_task_scratch::RecoveryOutcome::Removed]
+        );
+        assert!(!scratch_path.exists(), "Recovery後にscratchを回収");
+        assert!(!context.journal.has_pending_workspace("workspace-fixture"));
+        drop(workspace_dir);
+        drop(scratch);
+        std::fs::remove_dir_all(root).expect("試験rootを削除");
+    }
+
+    #[cfg(windows)]
+    #[test]
     fn workspace_task_tempはdrop時にもcleanupする() {
         use std::time::{SystemTime, UNIX_EPOCH};
 
