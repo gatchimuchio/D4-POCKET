@@ -1,6 +1,6 @@
 # GUI Shell ロードマップ
 
-現行追記（2026-10-11）: B3-M50まで局所受入。B0 cause-mapは153行中121行を機構・試験・残余・明示UNKNOWNへ分類、32行が未分類。#37874900581はWorkspace未登録scope試験に永続StoreなしのBroker fixtureを使い、意図した拒否判定前に`broker_persistence_unavailable`となったtest fixture不備。現行testは一時Store付きpersistent fixtureを使用し、#378758で該当入口testがPASSした。別の同run UI failureは独立causeとして保持し、通常Release `task_execution=unsupported`、`release_ready=false`を維持する。詳細は[B3全原因・共通機構対応](docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md)。
+現行追記（2026-10-11）: B3-M51まで局所受入。B0 cause-mapは153行中122行を機構・試験・残余・明示UNKNOWNへ分類、31行が未分類。#37875821384のOwner確認button hit-test失敗はartifact画像がなく、frameだけでは原因を特定できないUNKNOWNとして保持。後続の同一frame観測は別cause行、製品状態への遡及なし。通常Release `task_execution=unsupported`、`release_ready=false`を維持する。詳細は[B3全原因・共通機構対応](docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md)。
 
 M33時点の集計詳細（M34追記前）:
 
