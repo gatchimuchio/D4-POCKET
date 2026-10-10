@@ -705,6 +705,42 @@ struct WorkspaceTaskScratch {
     record_id: String,
 }
 
+/// Host側のCodex processとCodex sandbox内のTEMP/TMPを、同じTask専用scratchへ束縛する。
+/// Authorityを生成せず、Workspace外やWorkspace rootそのものを一時領域として受け付けない。
+struct TaskTemporaryEnvironment {
+    host_path: PathBuf,
+    codex_override: String,
+}
+
+impl TaskTemporaryEnvironment {
+    fn bind(workspace: &Path, scratch: &Path) -> Result<Self, 対話失敗> {
+        if !scratch.starts_with(workspace) || scratch == workspace {
+            return Err(対話失敗::要求不正);
+        }
+        let host_path = scratch.to_path_buf();
+        let codex_path = scratch
+            .to_str()
+            .ok_or(対話失敗::要求不正)?
+            .replace('\\', "/");
+        let encoded_path =
+            serde_json::to_string(&codex_path).map_err(|_| 対話失敗::要求不正)?;
+        Ok(Self {
+            host_path,
+            codex_override: format!(
+                "shell_environment_policy.set={{TEMP={encoded_path},TMP={encoded_path}}}"
+            ),
+        })
+    }
+
+    fn apply(self, command: &mut Command) {
+        command
+            .arg("-c")
+            .arg(self.codex_override)
+            .env("TEMP", &self.host_path)
+            .env("TMP", &self.host_path);
+    }
+}
+
 fn discard_unactivated_task_scratch(
     scratch_dir: Dir,
     context: &crate::broker::agent_task_scratch::AgentTaskScratchContext,
@@ -925,6 +961,9 @@ fn build_codex_command_with_model(
     if model_id.is_some_and(|model| !valid_model_id(model)) {
         return Err(対話失敗::要求不正);
     }
+    let task_temporary_environment = scratch
+        .map(|path| TaskTemporaryEnvironment::bind(workspace, path))
+        .transpose()?;
     let workspace_path = workspace.to_str().ok_or(対話失敗::要求不正)?;
     let mut task_command = command(executable, workspace);
     if let Some(credential) = provider_credential {
@@ -980,8 +1019,8 @@ fn build_codex_command_with_model(
             .env("RUST_LOG", "warn");
     }
     if matches!(sandbox, CodexSandbox::WorkspaceWrite) {
-        let scratch = scratch.ok_or(対話失敗::要求不正)?;
-        if !scratch.starts_with(workspace) || scratch == workspace {
+        // 作用先はBrokerがTask単位で予約したscratchだけ。ここでは認可しない。
+        if task_temporary_environment.is_none() {
             return Err(対話失敗::要求不正);
         }
         for setting in TASK_PERMISSION_PROFILE_PREFIX_OVERRIDES {
@@ -993,11 +1032,11 @@ fn build_codex_command_with_model(
         for setting in TASK_PERMISSION_PROFILE_SUFFIX_OVERRIDES {
             task_command.arg("-c").arg(setting);
         }
-        task_command
-            .arg("-c")
-            .arg(task_scratch_environment_override(scratch)?);
     } else if !secret_paths.is_empty() {
         return Err(対話失敗::要求不正);
+    }
+    if let Some(task_temporary_environment) = task_temporary_environment {
+        task_temporary_environment.apply(&mut task_command);
     }
     task_command.args(["exec", "--json", "--ephemeral", "--ignore-user-config"]);
     if let Some(model_id) = model_id {
@@ -1018,28 +1057,7 @@ fn build_codex_command_with_model(
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    if let Some(scratch) = scratch {
-        if !scratch.starts_with(workspace) || scratch == workspace {
-            return Err(対話失敗::要求不正);
-        }
-        let scratch_path = scratch.to_str().ok_or(対話失敗::要求不正)?;
-        task_command
-            .env("TEMP", scratch_path)
-            .env("TMP", scratch_path);
-    }
     Ok(task_command)
-}
-
-fn task_scratch_environment_override(scratch: &Path) -> Result<String, 対話失敗> {
-    let scratch_path = scratch
-        .to_str()
-        .ok_or(対話失敗::要求不正)?
-        .replace('\\', "/");
-    let encoded_path =
-        serde_json::to_string(&scratch_path).map_err(|_| 対話失敗::要求不正)?;
-    Ok(format!(
-        "shell_environment_policy.set={{TEMP={encoded_path},TMP={encoded_path}}}"
-    ))
 }
 
 fn task_filesystem_override(secret_paths: &[String]) -> Result<String, 対話失敗> {
@@ -1433,6 +1451,27 @@ mod tests {
         );
         assert_eq!(parse_jsonl(br#"{"type":"error"}"#), Err(対話失敗::通信失敗));
         assert_eq!(parse_jsonl(br#"not-json"#), Err(対話失敗::応答不正));
+    }
+
+    #[test]
+    fn Task一時環境緩衝はHostとCodex内のTEMP_TMPを同一scratchへ束縛する() {
+        let workspace = std::env::temp_dir().join("d4p-buffer-workspace");
+        let scratch = workspace.join(".d4p-tmp-task");
+        let binding = TaskTemporaryEnvironment::bind(&workspace, &scratch)
+            .expect("Task専用scratchへの一時環境束縛");
+        let encoded = serde_json::to_string(&scratch.to_string_lossy().replace('\\', "/"))
+            .expect("Codex設定pathをJSON encoding");
+        assert_eq!(binding.host_path, scratch);
+        assert_eq!(
+            binding.codex_override,
+            format!("shell_environment_policy.set={{TEMP={encoded},TMP={encoded}}}")
+        );
+        assert!(TaskTemporaryEnvironment::bind(&workspace, &workspace).is_err());
+        assert!(TaskTemporaryEnvironment::bind(
+            &workspace,
+            &std::env::temp_dir().join("d4p-buffer-other-workspace")
+        )
+        .is_err());
     }
 
     #[test]

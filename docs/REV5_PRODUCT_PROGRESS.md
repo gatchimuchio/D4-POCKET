@@ -2,7 +2,7 @@
 
 更新日: 2026-10-10
 工程正本: ユーザー提示「D4 Pocket / GUI-Shell 統合実装仕様書 rev5」「統合開発工程表 rev5」「Codex実装指示書 rev5」
-現行mode: `PRODUCT_BUILD_MODE`（最新版rev5実装指示§2）。Windows側P12 `FEATURE COMPLETE`、P2 Compare、P3 HandoffはCLOSEDのまま保持する。P13 Mobile／Non-Windows Product Buildは2026-10-09に有限Acceptanceを閉鎖。P13後の追加工程B0は2026-10-10に、取得可能な履歴範囲・欠測・原因対応・現行責任面を受入記録へ固定してCLOSEDとした。Actions snapshotは356 run／203 failure、失敗203件を一意に列挙し、190件を原因対応へ結合、13件をUNKNOWNとして保持。226 failed job logのうち151取得・75取得不能、legacy validationの個別job原因証拠10件不足も保持する。B0の不足証拠を解消済みとは扱わず、B1の設計入力として残す。B1は2026-10-10に設計・契約形状の範囲でCLOSED。次のOPEN工程はB2で、単一の実測対象を選び、既存Broker経路を通す有限な実作用を検証する。B1では`buffer_intervention_record.schema.json`と否定条件を追加したが、製品Runtime consumer・実操作・意味同等性は未成立のままB2へ送る。B0開始HEAD `29e2ce98156bd2e1f9bccf36f8ff9f4c9e0a8054`からB0受入HEAD `cff7dce99e805ec2eaa41d58a48363329084be37`まで124 commitに製品source path変更は0件。Q0〜Q7のFinal QA記録は履歴として保持し、別途開始条件が成立するまで現行schedulerにしない。通常Release `task_execution=unsupported`と既存release gateを維持する。
+現行mode: `PRODUCT_BUILD_MODE`（最新版rev5実装指示§2）。Windows側P12 `FEATURE COMPLETE`、P2 Compare、P3 HandoffはCLOSEDのまま保持する。P13 Mobile／Non-Windows Product Buildは2026-10-09に有限Acceptanceを閉鎖。P13後の追加工程B0は2026-10-10に、取得可能な履歴範囲・欠測・原因対応・現行責任面を受入記録へ固定してCLOSEDとした。Actions snapshotは356 run／203 failure、失敗203件を一意に列挙し、190件を原因対応へ結合、13件をUNKNOWNとして保持。226 failed job logのうち151取得・75取得不能、legacy validationの個別job原因証拠10件不足も保持する。B0の不足証拠を解消済みとは扱わず、B1の設計入力として残す。B1は2026-10-10に設計・契約形状の範囲でCLOSED。B2は、Task scratchをCodex CLIのTEMP/TMPへ束縛する実作用の縦断を実装中。[B2実行QC](緩衝基盤_rev5補遺_QC/B2_実行QC.md)に実Codex CLI／MxC Tool実行・result・正常／取消cleanupの局所PASSを記録した。全crate `cargo test`は未変更のlocalhost HTTPS update fixtureでFAIL（直列実行も1件FAIL、関連17件単独はPASS）。B2全体は未受入。B0開始HEAD `29e2ce98156bd2e1f9bccf36f8ff9f4c9e0a8054`からB0受入HEAD `cff7dce99e805ec2eaa41d58a48363329084be37`まで124 commitに製品source path変更は0件。Q0〜Q7のFinal QA記録は履歴として保持し、別途開始条件が成立するまで現行schedulerにしない。通常Release `task_execution=unsupported`と既存release gateを維持する。
 初期rev5文書同期commit: `39dd3f4bc7aafe350ca94fce9392095f1064d2bc`。凍結commitとその後のQA記録は本書末尾の更新履歴を参照。
 
 2026-10-09の明示承認により、[緩衝基盤rev5補遺・QC基底改訂3点](緩衝基盤_rev5補遺_QC/採用記録.md)をP13後の追加正本として採用した。原文の未承認表記は作成時履歴として保存し、現在の承認・rev5原本取得・対照と文言差異を採用記録へ分離する。B0は[受入記録](緩衝基盤_rev5補遺_QC/B0_参照原本一覧.md)に基づきCLOSED。13 run-level unknown、75取得不能job log、10 legacy job-level cause gapは未解決のまま保持する。B1は[設計QC記録](緩衝基盤_rev5補遺_QC/B1_設計QC.md)の設計・契約形状範囲でCLOSED。B2が次のOPEN工程で、製品作用は未実装・未証明。有限Acceptance・CLOSED・正式Q0〜Q7の開始条件・DEFERRED・release gateは維持し、補遺採用をOwner GOやrelease承認へ昇格しない。
@@ -10,6 +10,10 @@
 ## B1 成立原理・対案・責任境界（2026-10-10・CLOSED）
 
 [B1設計QC記録](緩衝基盤_rev5補遺_QC/B1_設計QC.md)で、B0の代表事象を「source/API契約」「OS拒否」「test harness環境」「実測状態・資源」「Cloud Files候補」等へ分け、無理な一原因統合を避けた。診断のみ、万能Hub、全Host固定、型付き非権限調停、既存Toolchain機能再利用を比較し、既存Brokerの現在権限を維持する型付き調停を設計原理として選定した。`buffer_intervention_record.schema.json`、正常例、Authority注入・根拠なし吸収の否定例をConformance経路へ接続。Schema check 167件／正常例163件／否定fixture 215件、Conformance 245 checksはPASS。production consumer、元Tool実行、同条件の実効果、Authority経路接続は未実施であり、B2の受入対象とする。`task_execution=unsupported`、`release_ready=false`、既存release gateは不変。
+
+## B2 Task一時環境媒介の縦断（IMPLEMENTING）
+
+[B2実行QC記録](緩衝基盤_rev5補遺_QC/B2_実行QC.md)の範囲で、Task scratchからHost側Codex CLIのTEMP/TMPとCodex sandbox環境設定を同一生成し、scope外を拒否する型付き媒介を実装。`cargo test --lib codex_cli::tests:: -- --nocapture`は24 passed／0 failed／2 ignored。実Codex CLI `0.162.0-alpha.2`とlocalhost試験APIを使う`LIVE_RUNTIME`統合testは1 passed／0 failed。BrokerのPermission・一回Approval、Codex tool実行、Workspace marker・result hash、secret／outside-write境界、通常・取消時scratch／TEMP marker cleanupを確認。試験AdapterのOwner許可と偽Responses APIはfixtureであり、native Owner UI、installed Product、通常Release能力の証拠へ昇格しない。全crate `cargo test`は未変更のlocalhost HTTPS update fixtureでFAIL（直列実行も1件FAIL、関連17件単独はPASS）。B2は未閉鎖で、残るB2否定経路をAcceptance Ledgerで確認する。`buffer_intervention_record`の通常製品consumer/UI接続はB4、matched comparisonはB5へ送る。R2／release blocker、`task_execution=unsupported`、`release_ready=false`は変更しない。
 
 ## P13後・B0全件観測／原因対応台帳（履歴snapshot開始 2026-10-09・CLOSED 2026-10-10）
 
