@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "4bcb4bca1b2813cd8498ff3946c9805dd161b1b3b13b2a442ba079661b60e65b"
+      "sha256": "8b1685d9288660997413b152f4b0bf1f7d4c5eae0bd959d9592d2cbde77a733a"
     },
     {
       "path": "SECURITY.md",
@@ -1288,7 +1288,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "494a8e82043942255141d51ff3dd4f1a20fad7bec6c719e2155ba8f5be004388"
+      "sha256": "1833de20f5d78894832e35e2ac26a2f28f59aad8467414359d8163ecc151355b"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1644,19 +1644,19 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B0_\u4e0d\u8db3\u8a3c\u62e0\u4e00\u89a7.md",
-      "sha256": "16d451d620be257acf30e262c2cc2b887ee59c4c97769e1797eac1beb84e6751"
+      "sha256": "c4586ea9b9600ea727922d897ca8dc0be4261fa87dd212817c676ebe3df6992a"
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B0_\u539f\u56e0\u5bfe\u5fdc\u53f0\u5e33.md",
-      "sha256": "5d40e049363bc09a9341b4e015d3b2f8e6d43f487b5115770230233540e2f228"
+      "sha256": "f01bfb5b7ea891c3116f4584b5d88bb719cb0b7ecaa955e8fbe1f5e7846903b2"
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B0_\u53c2\u7167\u539f\u672c\u4e00\u89a7.md",
-      "sha256": "c73a1edf875755364fbd898fb9faa882eac97e8a3b11ebe3378346df30e488b9"
+      "sha256": "a2c1e0d072f5cb1a0cd5aeb9b2fd72e4dbbc1ab191c18e0bad62647eccb9b4e2"
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B0_\u91cd\u8907\u5883\u754c\u56f3.md",
-      "sha256": "e9572d9f6c5ed49acd588d67a033005722e557290dbd31e774c585583a138d7e"
+      "sha256": "12644359edbf9002d99a57f223558e71e9b50db6af327c4779a80bfa972e65bc"
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/\u5b9f\u88c5\u4ed5\u69d8\u66f8.md",
@@ -1672,7 +1672,7 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/\u63a1\u7528\u8a18\u9332.md",
-      "sha256": "df6b6b28af17cdae5a8abc37a1ff8df4576f2ec63b1105def95f8a1e63071a81"
+      "sha256": "eaae669296f5687505beb9421fc0b778fe16fd9106e54aedf44723840d382177"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",

@@ -2,12 +2,12 @@
 
 更新日: 2026-10-10
 工程正本: ユーザー提示「D4 Pocket / GUI-Shell 統合実装仕様書 rev5」「統合開発工程表 rev5」「Codex実装指示書 rev5」
-現行mode: `PRODUCT_BUILD_MODE`（最新版rev5実装指示§2）。Windows側P12 `FEATURE COMPLETE`、P2 Compare、P3 HandoffはCLOSEDのまま保持する。P13 Mobile／Non-Windows Product Buildは2026-10-09に有限Acceptanceをすべて閉鎖した。ユーザーの「続行」により、P13後の追加工程B0をIMPLEMENTINGとして開始。この進捗snapshotの作業開始時HEADは`11ef600285b5ba91d8aac53da0870473da62154d`（943 commit、remote一致・clean）。B0開始時HEAD `29e2ce98156bd2e1f9bccf36f8ff9f4c9e0a8054`からこのHEADまでの121 commitは文書／manifestのみで、`native/`・`apps/`・`packages/`・`tooling/`・`.github/workflows/`の変更はない。このcommitも文書／manifestだけを更新し、製品source treeはB0開始時から不変。Actions取得snapshotは356 run／203 failureで、190 runは原因対応へ結合、13 runは未解明として保持。現行source責任一覧はmodule単位で更新したが、全fileのconsumer／test責任追跡とB0 acceptanceは未完了・未判定。B1〜B6は未開始。Q0〜Q7のFinal QA記録は履歴として保持し、別途開始条件が成立するまで現行schedulerにしない。通常Release `task_execution=unsupported`と既存release gateを維持する。
+現行mode: `PRODUCT_BUILD_MODE`（最新版rev5実装指示§2）。Windows側P12 `FEATURE COMPLETE`、P2 Compare、P3 HandoffはCLOSEDのまま保持する。P13 Mobile／Non-Windows Product Buildは2026-10-09に有限Acceptanceを閉鎖。P13後の追加工程B0は2026-10-10に、取得可能な履歴範囲・欠測・原因対応・現行責任面を受入記録へ固定してCLOSEDとした。Actions snapshotは356 run／203 failure、失敗203件を一意に列挙し、190件を原因対応へ結合、13件をUNKNOWNとして保持。226 failed job logのうち151取得・75取得不能、legacy validationの個別job原因証拠10件不足も保持する。B0の不足証拠を解消済みとは扱わず、B1の設計入力として残す。B1は次のOPEN工程で、緩衝の意味条件・実作用原理・代替案・責任境界を確定する。B0開始HEAD `29e2ce98156bd2e1f9bccf36f8ff9f4c9e0a8054`から受入時HEAD `cff7dce99e805ec2eaa41d58a48363329084be37`まで124 commitを確認し、実装・test・tooling・workflow path変更は0件。現行source責任一覧はmodule／事象関連traceを記録し、全file call graphを受入条件へ追加しない。Q0〜Q7のFinal QA記録は履歴として保持し、別途開始条件が成立するまで現行schedulerにしない。通常Release `task_execution=unsupported`と既存release gateを維持する。
 初期rev5文書同期commit: `39dd3f4bc7aafe350ca94fce9392095f1064d2bc`。凍結commitとその後のQA記録は本書末尾の更新履歴を参照。
 
-2026-10-09の明示承認により、[緩衝基盤rev5補遺・QC基底改訂3点](緩衝基盤_rev5補遺_QC/採用記録.md)をP13後の追加正本として採用した。原文の未承認表記は作成時履歴として保存し、現在の承認・rev5原本取得・対照と文言差異を採用記録へ分離する。P13完了後にB0の明示施工指示を受けてB0を開始し、[全件Actions台帳](緩衝基盤_rev5補遺_QC/B0_原因対応台帳.md)等の調査文書を作成中。B0 acceptance未判定、B1〜B6未開始。有限Acceptance・CLOSED・正式Q0〜Q7の開始条件・DEFERRED・release gateは維持する。採用を全施工委任に昇格しない。
+2026-10-09の明示承認により、[緩衝基盤rev5補遺・QC基底改訂3点](緩衝基盤_rev5補遺_QC/採用記録.md)をP13後の追加正本として採用した。原文の未承認表記は作成時履歴として保存し、現在の承認・rev5原本取得・対照と文言差異を採用記録へ分離する。B0は[受入記録](緩衝基盤_rev5補遺_QC/B0_参照原本一覧.md)に基づきCLOSED。13 run-level unknown、75取得不能job log、10 legacy job-level cause gapは未解決のまま保持する。B1〜B6の実作業は各工程の明示継続指示に従い、現時点の次工程はB1である。有限Acceptance・CLOSED・正式Q0〜Q7の開始条件・DEFERRED・release gateは維持し、補遺採用をOwner GOやrelease承認へ昇格しない。
 
-## P13後・B0全件観測／原因対応台帳（2026-10-09・進行中）
+## P13後・B0全件観測／原因対応台帳（履歴snapshot開始 2026-10-09・CLOSED 2026-10-10）
 
 履歴snapshot（2026-10-10、#377191追加照合後）: B0は実行記録151件／原因対応130行。直接参照147件中145件を照合済み（原因対応表144件、`VALIDATION.txt` 1件）、2件未照合。直接参照なし56件中6件を別途照合、50件未照合。#377191のData Protection Keychain追加testは固定分類「署名identity未成立」でFAIL。sourceのOSStatus mappingと後続#377196の実Keychain test PASSを照合したが、#377196全体は別Swift compile errorでFAILしたため分離する。#378867のWorkspace失効XCTestはOwner確認button未取得でFAILし、後続#378881を遡及しない。#367841/#367867はWindows Exportの`credential_assignment`検出でfail-closed、後続#367894はscan・source-cleanを含め成功したが、実secret／markerの区別と直接因果は未確定。B0 acceptance未判定を維持する。
 
