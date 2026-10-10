@@ -1,6 +1,6 @@
 # GUI Shell ロードマップ
 
-現行追記（2026-10-11）: B3-M37まで局所受入。B0 cause-mapは153行中108行を機構・試験・残余・明示UNKNOWNへ分類、45行が未分類。#37767646092はsheet不在とAX検索範囲不一致を分離できないため明示UNKNOWNとして保持。CLOSED済み製品試験は再実行せず、通常Release `task_execution=unsupported`、`release_ready=false`を維持。詳細は[B3全原因・共通機構対応](docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md)。
+現行追記（2026-10-11）: B3-M38まで局所受入。B0 cause-mapは153行中109行を機構・試験・残余・明示UNKNOWNへ分類、44行が未分類。#37769130630の公開Credential row `StaticText` query停止を、現行の製品窓限定OCR／通常click経路へ対応づけた。後続runの成功を元runへ遡及せず、通常Release `task_execution=unsupported`、`release_ready=false`を維持する。詳細は[B3全原因・共通機構対応](docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md)。
 
 M33時点の集計詳細（M34追記前）:
 
