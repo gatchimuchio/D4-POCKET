@@ -1,6 +1,6 @@
 # GUI Shell ロードマップ
 
-現行追記（2026-10-11）: B3-M45まで局所受入。B0 cause-mapは153行中116行を機構・試験・残余・明示UNKNOWNへ分類、37行が未分類。#37783606584の失敗はMCP／Tool操作後に古いtoolbar AX要素を再利用したtest-only停止と分類。現行XCTestは既存Ctrl+Shift+Fから検索へ戻り、後続#377851で次のlocatorまで到達したが、切断成功は未証明。通常Release `task_execution=unsupported`、`release_ready=false`を維持する。詳細は[B3全原因・共通機構対応](docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md)。
+現行追記（2026-10-11）: B3-M46まで局所受入。B0 cause-mapは153行中117行を機構・試験・残余・明示UNKNOWNへ分類、36行が未分類。#37785132837は既に見えていたServer行に加えて不要な「MCP接続」文字を要求したtest locator gateと分類。現行testは可視Server行へ束縛する既存bounded helperを使う。別run #377874の切断PASSは既存証拠としてのみ参照し、元runの状態へ遡及しない。通常Release `task_execution=unsupported`、`release_ready=false`を維持する。詳細は[B3全原因・共通機構対応](docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md)。
 
 M33時点の集計詳細（M34追記前）:
 
