@@ -1,6 +1,6 @@
 # GUI Shell ロードマップ
 
-現行追記（2026-10-11）: B3-M36まで局所受入。B0 cause-mapは153行中107行を機構・試験・残余・明示UNKNOWNへ分類、46行が未分類。#37760394393のAX value predicate不一致を、現行の可視TextField一意選択経路へ対応づけた。CLOSED済み製品試験は再実行せず、通常Release `task_execution=unsupported`、`release_ready=false`を維持。詳細は[B3全原因・共通機構対応](docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md)。
+現行追記（2026-10-11）: B3-M37まで局所受入。B0 cause-mapは153行中108行を機構・試験・残余・明示UNKNOWNへ分類、45行が未分類。#37767646092はsheet不在とAX検索範囲不一致を分離できないため明示UNKNOWNとして保持。CLOSED済み製品試験は再実行せず、通常Release `task_execution=unsupported`、`release_ready=false`を維持。詳細は[B3全原因・共通機構対応](docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md)。
 
 M33時点の集計詳細（M34追記前）:
 
