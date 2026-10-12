@@ -1,8 +1,28 @@
-# GUI Shell エージェント規約
+# D4Pocket エージェント実装・監査規定
 
-本書は、GUI Shellで作業するAIエージェントに対する、リポジトリ全体の作業規律を定める。
+本書はD4Pocket（旧GUI-Shell）のAI実装エージェントが守るリポジトリ共通規律である。BLUE-TANUKIのQE思想を開発方法論として採用する一方、D4Pocket固有の権限、安全、復旧、OS別証拠、Git運用を保持する。BLUE側のHDS-BRAIN実装、192小単位、別リポジトリの成果や書込み権限は移植しない。
 
 ## 第I部 共通基底規律
+
+### 0. QE品質工学の最上位原則・実行順序
+
+**QE（品質工学）が開発全体を包含し、全体設計→一気通貫BUILD→実物QC→対象別QA→独立したOwner最終判断へ接続する。** 現行ステージ名は`QE_DESIGN → QE_BUILD → SYSTEM_SHAPED → BUILD_COVERED → QE_QC → QE_QA → QE_RELEASE_REVIEW` とする。これは本案件の品質操作・工程配置であり、一般の規格名称を再定義するものではない。
+
+- `QE_DESIGN`：対象・目的・要求母集団・成立条件・干渉原理・責任・反例を先に確定する。
+- `QE_BUILD`：コード片やSchemaの数ではなく、producer→consumerの実接続を一気通貫で前進させる。
+- `SYSTEM_SHAPED`：限定された一仕事が、通常入口→現行Broker認可→元Toolの作用→結果→Audit／表示／帰還まで実際に通る。
+- `BUILD_COVERED`：全要求・機能・OS別consumerを照合し、`CODE_PRESENT`／`WIRED`／`BUILD_GAP`／`BLOCKED_AUTHORITY`を区別する。未接続の必須機能を隠さない。品質・公開の合格ではない。
+- `QE_QC`：結合済みの実物を全体検査し、不具合・根因・副作用・OS差・資源・性能・長期運転を観測する。必要な上流へ戻り、是正・同条件再試験を行う。
+- `QE_QA`：同一候補のQC証拠から、対象・機能・OS・版・条件ごとに`QA_SCOPED`／`QA_NOT_ESTABLISHED`／`OUT_OF_SCOPE`を判断する。
+- `QE_RELEASE_REVIEW`：正式出荷、鍵、署名、不可逆判断、Final GOはOwnerが独立して決める。
+
+**作業の切れ目と品質／Gitを閉じる単位を分離する。** 毎小タスクの開始・切替・再開時に、Ownerの最新指示、適用AGENTS.md、指定指示書、最新HEAD・remote・dirty差分、目的・作用・入出力・次consumerを再読する。これは目的ドリフトを減らすための再同期であって内部状態が消えた保証ではない。小単位では接続状態と残差を記録するだけでよく、関連する小単位を**BUILD_BATCH**へ束ねて必要な技術確認・Git保全・報告を閉じる。小単位のたびに全suite・QA判定・バックアップ回転・commit/pushを繰り返さない。
+
+**安全第一・堅牢性第二。** Authority、Permission、Approval、Credential、秘密、Audit、Recovery、Content Exposure、Workspace／Host、process監督、OS保護、非冪等外部作用の境界はBUILD中も常時維持し、当該変更の必要な否定試験・安全停止をその場で実施する。不成立なら危険な経路を無効化・隔離する。既存試験・リリースゲートの削除や恒久skipは許可しない。
+
+対象OSはWindows-firstの優先順位を維持した上で**Windows／macOS／Linux（Desktop）、Android／iOS（Mobile）**。Linux nativeは独立した製品対象であり、WSL Ubuntu、WSLg X11、headlessの開発用証拠をLinux nativeの導入・GUI・権限・配布・Waylandの完成へ転用しない。Linuxの追加要求`D4-QE-R13`と試験`D4-LNX-T01〜T08`、Linux専用`QEB-D4-LNX-01〜03`は2026-10-12再構成3文書v1.1の**正本候補**。対象範囲・施工着手・正式サポートは別途採否する。
+
+本§0、§19、§20、§25、§28〜31は採用済みの**QE施工方法**を優先して示す。既存のrev5原本、採用済み緩衝補遺（`BUF-R01〜R09`、`BUF-T01〜T24`）、製品契約、安全・release gate、過去のCLOSED／FAILは削除しない。従来文書に小単位ごとの全suite／個別QA／毎回Git閉包が残れば、その部分は旧施工方式の残差として別途文書同期し、今回の`AGENTS.md`だけの更新で他文書を改竄しない。安全上の強い条件は常に保持する。
 
 ### 1. 目的と規則優先順位
 
@@ -65,13 +85,13 @@
 
 GitHub Actions は、ローカルに存在しない OS の build、artifact 生成、重い検査・testの補助に限り、`workflow_dispatch` のみで使用できる。ownerは検査・test目的の手動Actions使用を許可しており、ローカル検証の不足を補うために必要な場合は、一時的な検証branchを作成・pushしてよい。branchは検査対象commitの固定に限り、PRや自動triggerを作らない。失敗時は同branch上で修正して再検査し、対象blockの検証が閉じたら、成功した正確なcommitを`main`へfast-forwardし、remote HEADを照合してから一時branchをlocal／remote双方で削除する。検査が失敗中のcommitを`main`へ統合しない。Actions結果は対象commit上で実行した検査だけの証拠であり、workflowは品質基準面ではなく、実機起動、製品完成、release readinessの証拠を代替しない。必要性、対象commit、trigger、結果、artifact、証明する範囲としない範囲を記録する。workflowを追加する場合はactive ROADMAPまたはphase instructionに目的を置き、local conformanceで手動起動限定を検査する。
 
-品質基準面は owner / Codex が実行する local validation、smoke、release verification、Windows 実機 evidence とする。Codex は要求から正常・境界・失敗・権限否定・回帰試験を導出して実行し、未試験を成功へ昇格しない。完成した作業単位ごとに試験、監査、commit、push、remote HEAD 確認を閉じてから次単位へ進む。検査の削除・弱体化には owner 承認を必須とし、Authority、Approval、Audit、Recovery、Content Exposure Boundary、owner GO、release gate を弱めない。
+品質基準面は owner / Codex が実行する local validation、smoke、release verification、Windows 実機 evidence とする。Codex は要求から正常・境界・失敗・権限否定・回帰試験を導出して実行し、未試験を成功へ昇格しない。小単位は目的と実consumerの再同期に使い、関連小単位を束ねたBUILD_BATCH末に必要な技術確認・監査・commit/push・remote HEAD照合を閉じる。全体QC・QAを各小単位へ前倒ししない。ただし安全重要変更の必要な否定・停止・復旧確認と既存release gateはその作用時に維持する。検査の削除・弱体化には owner 承認を必須とし、Authority、Approval、Audit、Recovery、Content Exposure Boundary、owner GO、release gate を弱めない。
 
 ### 4. 完成証拠規則
 
 完成の主張は証拠ではない。
 
-作業blockを完了と報告する前に、次を特定する。
+BUILD_BATCHまたは統治変更ブロックを完了と報告する前に、次を特定する。小単位は途中の接続状態・次consumerを記録し、完成を主張しない。
 
 - 実装した挙動
 - その挙動を実行するproduction、runtime、contract、validationの経路
@@ -84,13 +104,13 @@ GitHub Actions は、ローカルに存在しない OS の build、artifact 生�
 
 security-critical、authority-critical、audit-critical、recovery-critical、release-criticalな変更では、実際の統治経路が実行されたことを何の証拠が示すかを記載する。
 
-リポジトリ状態を変更する実装taskでは、オーナーがlocal-only、audit-only、review-only、no-commit、no-pushに明示限定しない限り、完成にはリポジトリ状態の閉包も必要である。
+変更を伴うBUILD_BATCHまたは統治変更ブロックは、オーナーがlocal-only、audit-only、review-only、no-commit、no-pushへ明示限定しない限り、Git閉包をもって完了する。小単位の再同期は別である。
 
-リポジトリ状態を変更するtaskは、次を満たすまで完了ではない。
+リポジトリ状態を変更したBUILD_BATCH／統治変更ブロックは、次を満たすまで完了ではない。
 
 - file編集前に、リポジトリの2世代backup規約で現在push済みのリポジトリ状態を保存する。
 - 意図した変更を実装し、taskの残骸を残さない。
-- 必須validationを実行し、正確な結果を把握する。
+- 該当QE段階で必要な技術確認と安全gateを実行し、成功・失敗・NOT_RUNを正確に把握する。
 - 意図した変更をすべて正確なmessageでcommitする。
 - 指定remote branchへcommitをpushする。
 - push先remote HEADが報告commitと一致することを確認する。
@@ -475,63 +495,47 @@ Approval編集はfield scopeを限定しなければならない。
 - 必要に応じてApprovalをvalidation requiredとしてmarkする
 - AuditEventをemitする
 
-### 19. コミット前の必須検証
+### 19. QE段階別の技術検査・QC・QA
 
-最低限、次を実行する。
+**QE_BUILDの小単位では**、構文・型、変更したproducer／consumer、必要build・限定smokeを確認し、全Rust／Flutter suite、全数Conformance、故障注入、耐久、個別QA票を一律には要求しない。Authority、Approval、Credential、秘密、Audit、Recovery、Content Exposure、process、OS／Workspace境界に影響する変更は必要な拒否・停止・回復の検査をその場で行う。不成立なら危険な実行経路は有効化しない。試験や安全gateの削除・恒久skipを禁止する。
+
+**BUILD_BATCH末では**対象の型／compile・build、関連test、実consumer短時間smoke、差分、日本語基底、変更に関係するSchema／Conformanceを検査する。契約変更は日本語意味正本→Schema→必要な否定・適合試験→実consumerの順に接続する。安全・出荷の必須gateがより強い検証を課す場合はそれを保持する。
+
+従来の検査コマンドは存続し、変更した範囲・OS・QE段階に応じて適用する。Schema／Conformanceに変更した場合はその検査を実施し、全機能候補に対する全面回帰はQE_QCで実施する。
 
 ```bash
 python tooling/schema_check/check_schemas.py
 python tooling/conformance_tests/run_conformance_skeleton.py
-```
-
-`python`が利用不能なら、次を実行する。
-
-```bash
-python3 tooling/schema_check/check_schemas.py
-python3 tooling/conformance_tests/run_conformance_skeleton.py
-```
-
-Rustが導入済みでRust helperを変更した場合は、次を実行する。
-
-```bash
 cd native/rust_helper && cargo test
-```
-
-WindowsでWindows DNS helper crateを変更した場合は、独立crateのnative API試験も実行する。
-
-```bash
 cd native/windows_dns && cargo test -- --test-threads=1
-```
-
-Flutterが導入済みでFlutter appを変更した場合は、次を実行する。
-
-```bash
 cd apps/desktop_flutter && flutter analyze
 cd apps/mobile_flutter && flutter analyze
 ```
 
-validationを実行できない場合は、理由を報告する。
+`python`不在なら`python3`を使用する。Windows固有の検証をLinuxに流用しない。実施したcommand、環境、exit、証拠class、未実施の`NOT_RUN`と理由を記録し、必要な証拠が欠ける成立状態をCLOSEDへ上げない。
 
-実際に成功していないvalidationを、成功したと主張してはならない。
+`BUILD_COVERED`の後、QE_QCで実物全体の正常・異常・安全・長時間・資源・性能・OS差・緩衝実作用と副作用を試験し、是正時には必要な上流まで戻って同条件で再試験する。QE_QAは候補版・OS・条件別の保証判定、Owner GOはさらに独立。既存`docs/FINAL_QA_QUEUE.md`のQ0〜Q7・FQ識別子と過去結果は保持し、正式Q段階の新規開始は明示modeと候補の指定がある場合のみ。Q0新候補凍結、Q1〜Q5実物検査、Q6同一候補証拠集約、対象別QE_QA、Q7 Owner判断を区別する。
+
+Linuxは`LINUX_NATIVE`／`LINUX_WSL_DEV`／`LINUX_WSLG_X11`／`LINUX_HEADLESS`を別証拠として扱い、distro・版・kernel・arch・X11/Wayland・権限・process監督・Linux配布／installed製品を個別に確認する。WSL／WSLgの成功をLinux nativeの製品合格とは呼ばない。
 
 ### 20. Git運用方針
 
 本リポジトリは、direct-main owner workflowを使用する。
 
-完了した各作業blockはcommitし、pushしなければならない。オーナーがcommitしない、またはpushしないと明示指示しない限り、完了したリポジトリ変更をlocal working treeだけに残さない。
+変更を伴うBUILD_BATCH／統治変更ブロックは、オーナーのlocal-only・no-commit・no-push明示限定がない限り、限定検証後にcommit・pushしてremoteを照合する。小単位の再同期ごとにGit世代回転やcommit/pushは行わない。
 
 標準workflow:
 
 1. `main`で作業する
 2. `main`への直接作業を標準とし、通常のfeature branchまたはpull requestはオーナーが明示要求しない限り作らない。前項のowner許可済み手動Actions検査に限り、一時`codex/`検証branchを例外として使用できる。検査対象commitを記録し、検証が閉じた後は成功した正確なcommitだけを`main`へfast-forwardし、remote HEAD確認後に一時branchをlocal／remote双方で削除する
-3. リポジトリ状態を変更するtaskでfile変更を開始する前に、`origin`をfetch / pruneし、`main`がcleanかつ`origin/main`と整合していることを確認する。不整合なら、編集前に解消するかblockerを報告する
-4. localの2世代backup pairをrotateし、現在push済みの変更前状態を保存する
+3. 変更するBUILD_BATCH／統治変更ブロックの編集前に、`origin`をfetch / pruneし、`main`がcleanかつ`origin/main`と整合し、他writerの差分がないことを確認する。不整合なら編集前に解消するかblockerを報告する
+4. BUILD_BATCH／統治変更ブロックの編集前に一度だけlocalの2世代backup pairをrotateし、現在push済みの変更前状態を保存する。小単位の切れ目ごとには回転しない
    - `codex/backup-main`が存在する場合、`codex/backup-main-prev`を`codex/backup-main`へforce-updateする
    - `codex/backup-main`を現在push済みの`main`へforce-updateする
 5. 2つのbackup世代をremote branchではなく、PR-neutralなremote tagとしてpushする
    - `git push -f origin codex/backup-main-prev:refs/tags/codex/backup-main-prev codex/backup-main:refs/tags/codex/backup-main`
-6. 境界付き実装と必須validationを行う
-7. 完了した作業blockを`main`へ直接commitする。手動Actions検証branchを使用した場合は、検証が成功した正確なcommitだけを`main`へfast-forwardする
+6. 境界付き実装と§19で該当するQE段階の技術確認・安全検証を行う。失敗とNOT_RUNは隠さない
+7. 完了したBUILD_BATCH／統治変更ブロックを`main`へ限定commitする。手動Actions検証branchでは必要な検証が成功した正確なcommitだけを`main`へfast-forwardする
 8. commitまたはfast-forward直後に`main`をpushする
 9. `git ls-remote origin refs/heads/main`がlocal `HEAD`と一致することを確認する
 10. remote backup tagの存在を確認してhashを記録する
@@ -573,7 +577,7 @@ Backup branchはlocal recovery refに限る。GitHubがpull request候補とし�
 
 ### 21. 完了報告とリリース関門分類
 
-完了したすべての変更報告に、次を含める。
+BUILD_BATCH／統治変更ブロックの完了報告は次を含める。小単位の途中報告は`QE_STAGE`・進んだ実consumer・次consumer・途中状態・最小技術確認・NOT_RUNを優先し、個別QA合格票を作らない。
 
 1. 概要
 2. 変更file
@@ -588,7 +592,7 @@ Backup branchはlocal recovery refに限る。GitHubがpull request候補とし�
 11. backup世代refとhash
 12. rollback point（復旧地点）
 
-validation結果は、どのcommandが成功、失敗、未実行かを明記しなければならない。
+validation結果は、どのcommandが成功、失敗、未実行かを明記しなければならない。QE_QCは実物・候補版・OS・根因・是正・再検査・副作用を、QE_QAは対象・版・OS・条件・証拠の`QA_SCOPED/QA_NOT_ESTABLISHED/OUT_OF_SCOPE`を報告する。
 
 本リポジトリで`release`は、完成した製品releaseを意味する。
 
@@ -697,29 +701,24 @@ Product UI完成をcontract完成として扱わない。
 
 衝突がある場合は、Shell Core authority boundary、Schema integrity、conformance coverage、operator safetyを保持する、より厳格な規則を選ぶ。
 
-### 25. 必須作業順序
+### 25. 毎タスクの再読とBUILD_BATCHの必須作業順序
 
-オーナーが明示的に別の指示をしない限り、次の順で作業する。
+1. **小単位を開始・切替・再開するたび**、Owner最新指示、適用AGENTS、指定指示書、現行仕様・工程・進捗を読み直す。過去会話・古いphase番号で現況を推定しない。
+2. 現在の`main`／remote HEADとdirty差分、他writer、関連code・contract・testを照合する。既存作業のreset／clean／revert／上書きを禁止する。
+3. 元目的、対象・非対象、入力・作用・出力、次consumer、対象OS／Host、観測結果、安全・停止条件を短く固定する。
+4. 基盤仕様`docs/specs/gui-shell-spec-v1.md`、該当`docs/specs/`、拡張標準、関連Schemaを必要範囲で読み、Shell Core／UI／Adapter／Rust helperの責任を維持する。
+5. 契約変更は意味正本→Schema→必要なConformance→実consumerへ接続する。技術的に継続を阻む欠陥は局所修正し、安全・権限・秘密の欠陥は直ちに修復・停止する。
+6. 小単位では`CODE_PRESENT/WIRED/BUILD_GAP/BLOCKED_AUTHORITY`を記録して次consumerへ進み、新しい切れ目で1へ戻る。小単位ごとの全suite／QC／QA／Git回転は行わない。
+7. 実接続が前進したBUILD_BATCH末だけ、§19の必要技術確認・安全検証、§20のD4固有2世代**remote tag**・限定commit/push・remote HEAD照合を行い、根拠・未実施・残差を報告する。
+8. `BUILD_COVERED`後に実物QE_QC、対象別QE_QA、Owner最終判断へ進む。ただし既存Q0〜Q7の新規開始、通常Release、Owner GOは別の明示条件とする。
 
-1. 最新版の現行仕様・工程表・実装指示書と現行進捗を確認し、phase、Acceptance、実状態を確定する。旧版は補助履歴としてのみ読む
-2. `docs/specs/gui-shell-spec-v1.md`を基盤仕様として確認し、現行最新版に置き換えられていない技術責任範囲に限って適用する
-3. 関連する`docs/specs/` contract文書を読む
-4. `docs/standards/gui-shell-extended-standard.md`を読む
-5. `specs/`配下の関連Schemaを読む
-6. Shell Core / UI / Adapter / Rust helperの境界を保持する
-7. contract変更時は実装前にSchemaを追加または更新する
-8. Product UIより前にconformance testを追加または更新する
-9. 最小かつ境界付きのcodeを実装する
-10. validationを実行する
-11. 正確な結果を報告する
-
-後続phaseの安全性、検査可能性、validation可能性を低下させる方法でlocal taskを最適化してはならない。
+後続の安全、検証可能性、正式出荷の根拠を弱める局所最適化を禁止する。
 
 ### 26. 現行指示・ROADMAP参照
 
 現行ROADMAPの正本は`ROADMAP.md`である。
 
-基盤の共通実装仕様は`docs/specs/gui-shell-spec-v1.md`である。同じ製品工程に対する仕様・工程表・実装指示書は、ユーザーが明示した最新版が現行正本となる。現在のrev5製品構築工程では、最新rev5指示と`docs/REV5_PRODUCT_PROGRESS.md`が現行phase・Acceptance・状態を決める。旧版は最新版で置き換えられていない基盤責任範囲または補助履歴に限って参照し、現行phaseを上書きしない。
+基盤の共通実装仕様は`docs/specs/gui-shell-spec-v1.md`である。同じ製品工程に対する仕様・工程表・実装指示書は、ユーザーが明示した最新版が現行正本となる。現在のrev5製品・緩衝基盤工程は、最新rev5指示、採用済み緩衝補遺と`docs/REV5_PRODUCT_PROGRESS.md`がphase・Acceptance・状態を決める。§0がQE施工方法を定め、2026-10-12のQE再構成3文書は別のOwner採用まで正本候補である。旧版は最新版で置き換えられていない基盤責任範囲または補助履歴に限って参照し、現行phaseを上書きしない。
 
 拡張標準は`docs/standards/gui-shell-extended-standard.md`である。
 
@@ -744,25 +743,31 @@ phase固有実装は、次を保持する。
 - Shell CoreのFlutterからの独立
 - BLUE-TANUKI reference runtimeのAdapter Boundary背後への隔離
 - 境界付きRust helper authority
-- Windows-first release evidenceとLinux development evidenceの分離
+- Windows-firstの検証優先順位を維持し、Linux native製品の証拠とWSL／WSLg／headless開発証拠を分離すること（Linuxを要求母集団から除外しない）
 - macOS host validationが成立するまでのmacOS known limitation処理
 
-### 28. 工程内Acceptanceと最終品質保証の分離
+### 28. QE_BUILD・実物QC・対象別QAの検査配置
 
-工程内Acceptanceは、その製品機能が開発を続けられる状態にあるかを確認する。製品全体の完成・release acceptanceとは分ける。必要な安全・Authority・Approval・Audit・Recovery・Content Exposure境界は常に維持するが、最終出荷級の全数回帰、長時間稼働、網羅的fault injection、性能、Formal Evidenceを未統合の機能へ前倒ししない。
+QEは要求・設計・実装・観測・是正を通じた上位思想である。小単位の有限Acceptanceは次の実装へ進めるための局所条件であり、製品全体の品質やreleaseを保証しない。実物がまだ結合していないQE_BUILDでは、実consumer接続と技術継続に必要な確認を優先し、全suite／長時間／網羅的fault injectionはBUILD_COVERED後のQE_QCへ配置する。ただし重大な安全・Authority・Permission・Approval・Audit・Recovery・secret・Content Exposureの確認は全段階で即時実施する。
 
-統合後の徹底検査は、現行rev5仕様が定めるFinal QA工程へ送る。必要な証拠がAcceptance Contractを満たしたら工程を閉じる。「さらに検査できる」ことだけを理由に同じ工程を延長しない。Acceptance外で見つけた事項は、現工程の機能成立・安全境界を直接破壊しない限りFinal QA、後続工程、release gate、既知制約のいずれかへ明記して移送する。
+実物QE_QCでは不具合の根因へ戻り、目的・設計・実装・試験器を必要に応じて是正して同条件で再試験する。QE_QAはQC証拠に基づく条件付き保証でありOwnerのFinal GOではない。既存`docs/FINAL_QA_QUEUE.md`、Q0〜Q7、FQ識別子、旧Q0/Q1履歴は保持し、現行`DEFERRED`を方法論の更新で解除しない。CLOSEDの工程は関係する再現可能な回帰がない限り再開せず、未観測・UNKNOWN・旧FAILを消さない。
 
-### 29. D4 Pocket rev5 製品構築先行運用
+### 29. rev5製品・B工程の現況と施工境界
 
-現行の工程順、Acceptance、進捗、Final QA移送先は`docs/REV5_PRODUCT_PROGRESS.md`、`docs/FINAL_QA_QUEUE.md`、`ROADMAP.md`およびユーザーが提示した最新rev5正本で確定する。`docs/REV4_ACCEPTANCE_LEDGER.md`とrev2/rev3進捗は履歴・証拠の出所として保持し、rev5の現行phaseを上書きしない。
+作業時には最新`docs/REV5_PRODUCT_PROGRESS.md`と明示Owner指示を読み直す。2026-10-12の照合時点ではP2 Compare／P3 Handoff／P12 Windows／P13 Mobile・Non-Windowsは局所CLOSED、B0〜B3はCLOSED、B4-L1／B4-L2は局所CLOSED、**B4全体はOPEN**である。B4は既存Windows Desktop IPC→Broker→実Codex→Agent Centerの単一製品縦断が未実証。B5/B6と新候補の正式Q0〜Q7は未完了、正式Q工程は`DEFERRED`。記録済みのB4-L2 test PASSはこの製品全体受入れに昇格させない。
 
-R2 Agent Taskは製品開発を続けるための機能が成立したものとして扱い、R2-A〜Hの追加探索・深掘りをR3以降の開始条件にしない。未実施または最終統合状態で再確認が必要な項目はFinal QA queueに残す。これはR2-A〜Hがすべて合格した、通常ReleaseのTask capabilityを昇格した、またはrelease-readyであるという主張ではない。明示されたRelease Gateと通常Releaseのfail-closed状態を保持する。
+CLOSEDを理由なく再施工しない。B4の実製品接続、Linux native追加BUILD_BATCH、B5/B6の緩衝自己適用・実物QC、正式Q0〜Q7はそれぞれ別の明示指示・受入条件が必要。Linux未実装をP13やWindows B4の局所完了記録へ遡及させない。B3の153原因対応行の分類を全原因の解消や全緩衝作用の実証と呼ばない。既存R2-A〜H、`FQ-TEST-LOOPBACK`、取得不能証拠の残余を維持する。
 
-現行製品phaseとその状態は、最新Repositoryの`docs/REV5_PRODUCT_PROGRESS.md`を正本、`ROADMAP.md`を入口として確認する。過去の指示書にある「次に開始するphase」やphase番号を現在状態へ転記せず、進捗正本に記録された最新OPEN phaseとAcceptanceから続行する。現時点でCLOSEDの製品Acceptanceは、再現可能な回帰が該当条件を壊した場合だけ再開する。以後は最新rev5で定める残りの製品機能を順に完成し、Feature Complete後に限ってQ0〜Q7 Final QAを開始する。
+通常Release `task_execution=unsupported`、`release_ready=false`、release blocker、正式なPublisher／署名／鍵／Owner GOは不変とする。
 
-通常のOwner承認・入力を開発進行の待ち条件にしない。製品のAuthority境界は維持したうえで、テスト専用Owner identity、fixture、UI automation等の隔離された試験経路を用いる。production identity・鍵・不可逆な事業判断・Final GOなど、Owner本人にしか成立させられない事項だけをOwner待ちとして残す。実際のOwner確認画面を自動承認するために既存安全境界を迂回してはならない。
+### 30. 緩衝基盤補遺とQEへの継承
 
-### 30. 緩衝基盤rev5補遺と全工程QC
+2026-10-09採用の緩衝基盤rev5補遺3点（`docs/緩衝基盤_rev5補遺_QC/`）とその採用記録は要求意味・旧結果の根拠として保持する。旧`BUF-R08`の「構想から実装・試験・是正まで品質責任を貫く」要求は、QEが全開発を包含する規律として引き継ぐ。QE_BUILD中にも安全・意味・責任を検証するが、全体実物の詳細なQE_QCと対象別QE_QAを小単位ごとに繰り返さない。
 
-2026-10-09に承認された追加正本3点とrev5原本対照・適用時期は`docs/緩衝基盤_rev5補遺_QC/採用記録.md`を参照する。QCを要求・設計・実装・検査・是正全体の品質成立原理として扱うが、工程内の有限Acceptanceと統合後の検査強度・開始条件の分離を維持する。現在のP13へ緩衝施工・全数調査を割り込ませず、CLOSEDや既存Q0〜Q7識別子・DEFERREDを変更しない。P13完了、追加B単位の明示施工指示、正式Q段階開始は別々に確認し、補遺採用だけから全施工・mode切替・Authorityを生成しない。補遺原文の作成時状態と現在の承認を混同せず、文言差異を無言で整合済みとせず採用記録へ保持する。
+緩衝基盤の本体は**合法な変換・隔離・環境固定・状態調停によって元Toolの実行を成立させること**であり、診断・エラー報告機能ではない。全ボトルネックを観測対象に残し、原因不明を成功にも吸収不能にも変えない。元Taskの目的達成条件と`BUF-T09`等の品質試験IDを別々に保持する。正式Q0〜Q7は未承認で開始しない。
+
+### 31. D4Pocket QEとLinux追加設計の採用境界
+
+2026-10-12作成のLinux明示改訂3点（D4Pocket QE統合実装仕様書／統合工程表／Codex QE施工指示書 v1.1）は、現時点では**未採用の詳細正本候補**である。本AGENTS.mdの更新はOwnerが許可した**本ファイルのQE方法論同期**のみであり、それだけで候補全文・新Linux工程・B4以降のコード変更・Actions実行・他リポジトリ変更・releaseを承認しない。次の委任があれば、rev5原本・採用済み補遺・現行進捗と逐条照合し、差分を安全に同期する。
+
+D4Pocket固有のremoteバックアップ正本は`refs/tags/codex/backup-main`と`refs/tags/codex/backup-main-prev`。BLUE側の`refs/heads`へ自動変更しない。D4の手動`workflow_dispatch`限定Actions運用、direct-main、単一writer、Shell Core／Broker authority、各OSの証拠区分を保持する。LinuxはWindows・macOSと並ぶ独立Desktop対象だが、native製品の実接続・導入・Release・保証が実証済みとは主張しない。既存試験・Release Gateを省略せず、作業開始時に現物と正本を再読する。
