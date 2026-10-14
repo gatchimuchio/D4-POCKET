@@ -1,78 +1,63 @@
-# GUI Shell クイックスタート
+# D4 Pocket — クイックスタート
 
-GUI Shell は現時点で release 強化用の骨格であり、製品 runtime ではない。クイックスタート経路は、製品主張より前に contract と conformance 骨格を検証する。
+D4 Pocketは開発中の汎用AI Runtime／Agent操作基盤です。以下は**ソースコードから実装・契約を検証するための手順**であり、正式出荷製品のインストール案内ではありません。
 
-## 前提条件
+- プロジェクト概要・技術的特徴：[README.md](README.md)
+- 最新工程と実測：[docs/REV5_PRODUCT_PROGRESS.md](docs/REV5_PRODUCT_PROGRESS.md)
+- 安全・権限・Git運用：[AGENTS.md](AGENTS.md)
+- 出荷判断：[RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md)
 
-- POSIX 類似 shell
-- `python` または `python3` として利用可能な Python
-- 任意: `native/rust_helper` 用の Rust
-- 任意: `apps/desktop_flutter` 用の Flutter
-- v1後の任意項目: `apps/mobile_flutter` 用の Flutter
+## 1. 最初の確認 — Contract / Conformance
 
-## 契約検証
-
-推奨 command:
+Python 3系を利用できる環境で、リポジトリのrootから次を実行します。
 
 ```bash
 python tooling/schema_check/check_schemas.py
 python tooling/conformance_tests/run_conformance_skeleton.py
 ```
 
-`python` が `PATH` にない場合の fallback:
+`python`が存在しない環境では`python3`に置き換えてください。これらは契約・fixture・Conformance経路を検査するもので、FlutterやRustのインストール、実機起動、製品Releaseの成立証拠ではありません。
 
-```bash
-python3 tooling/schema_check/check_schemas.py
-python3 tooling/conformance_tests/run_conformance_skeleton.py
-```
+**参考実績：** 2026年10月11日のB4-L2において、Schema 167件、正常例163件、否定fixture215件、Conformance 245 checksのPASSを記録しています。固定の期待出力値ではなく、検査対象commitと実行環境の実測結果を記録してください。
 
-成功時の想定出力:
+## 2. Rust / Flutterを検査する
 
-```text
-schema checkが合格: schema 26件、example 26件、negative fixture 28件
-conformance skeletonが合格: 141 件のcheck
-```
-
-## 段階Bの所有者起動
-
-局所の所有者操作 snapshot を生成し、厳格 release 検証を実行せずに desktop shell を起動する。
-
-```bash
-bash scripts/launch_owner_desktop.sh
-```
-
-native Windows では次を実行する。
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\launch_owner_desktop.ps1
-```
-
-この経路は段階Bの所有者局所操作用である。`release_evidence/windows_installed_smoke.json` を作成せず、release readiness を主張せず、実測済み Windows インストール先 release 証拠を満たさない。
-
-## 任意の Rust helper 検査
+それぞれのToolchainを用意した環境で実行します。
 
 ```bash
 cd native/rust_helper
 cargo test
 ```
 
-Rust helper には、broker envelope 検証と拒否 audit 用の現行 Rust Security Broker 骨格がある。権限移行と IPC 統合の証拠が成立するまで、実際の外部 command dispatch は無効である。
-
-## 任意の desktop Flutter 検査
-
 ```bash
 cd apps/desktop_flutter
 flutter analyze
 ```
 
-Flutter は交換可能な UI 層である。UI widget は操作者入力の収集と状態の描画をできるが、権限、permission、approval、audit、recovery の意味を定義してはならない。
+2026年10月11日のB4-L2ではRust直列test 569 passed / 0 failed / 13 ignoredを記録。一方、Flutter analyzerは既存deprecated info 5件、`cargo fmt --check`は既存の形式差分により終了値1を記録しています。これらの履歴を無言でPASSへ変換しないでください。現在の個別事実と必要な検証対象は[進捗](docs/REV5_PRODUCT_PROGRESS.md)を確認してください。
 
-Mobile Flutter は `post_v1_scope` である。所有者が明示的に範囲を変更しない限り、v1.0 release gate と CI 製品主張から除外する。
+Mobileはrev5のP13でAndroid Emulator／iOS Simulator等の有限受入を実施していますが、物理端末での正式保証・配布を意味しません。
 
-## 次の実装順序
+## 3. 開発時のOwner操作
 
-1. `docs/standards/gui-shell-extended-standard.md` を権限ある仕様として保つ。
-2. `specs/` 下の JSON Schema を拡張する。
-3. conformance test を追加または更新する。
-4. contract を生成または更新する。
-5. 主張文書を実際の検証証拠と整合させる。
+既存の局所Owner用ランチャーを使用する場合だけ、対応する環境で次を実行します。
+
+```bash
+bash scripts/launch_owner_desktop.sh
+```
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\launch_owner_desktop.ps1
+```
+
+これらは開発・診断用の起動経路であり、Installed-path最終証拠、署名済み配布物、Release readinessを生成しません。実行前に[AGENTS.md](AGENTS.md)、[CONFIG.md](CONFIG.md)、[セキュリティ方針](SECURITY.md)を確認してください。
+
+## 4. 判断を混同しない
+
+- **Schema適合**と**実Runtime作用**と**製品の安全な使用**は別の成立条件です。
+- Windowsの<code>FEATURE COMPLETE</code>は正式Releaseではありません。
+- P13 Mobile／Non-Windowsの有限Product Build受入は、実端末・署名・配布保証ではありません。
+- B4-L2の局所接続は成立していますが、Windows Desktop IPC → Broker → 実Codex → Agent Centerの単一製品経路はB4でOPENです。
+- 通常Releaseは<code>task_execution=unsupported</code>、<code>release_ready=false</code>。Human ownerの独立GOも未成立です。
+
+製品主張の射程は[CLAIM.md](CLAIM.md)、作業の現行状態は[進捗](docs/REV5_PRODUCT_PROGRESS.md)、歴史的な試験結果は[VALIDATION.txt](VALIDATION.txt)へ分離して確認します。
