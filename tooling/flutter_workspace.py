@@ -8,11 +8,71 @@ import stat
 import subprocess
 import tarfile
 import tempfile
+import time
 from pathlib import Path, PurePosixPath
 
 
 class FlutterWorkspaceError(RuntimeError):
     pass
+
+
+FLUTTER_TEMP_PREFIX = "d4f-"
+
+
+def _windows_extended_path(path: Path) -> Path:
+    absolute = os.path.abspath(os.fspath(path))
+    if absolute.startswith("\\\\?\\"):
+        return Path(absolute)
+    if absolute.startswith("\\\\"):
+        return Path("\\\\?\\UNC\\" + absolute[2:])
+    return Path("\\\\?\\" + absolute)
+
+
+def remove_temporary_tree_with_retry(
+    path: Path,
+    *,
+    remover=None,
+    sleeper=None,
+    max_retries: int = 20,
+) -> int:
+    remove_tree = remover or shutil.rmtree
+    sleep = sleeper or time.sleep
+    retryable_winerrors = {32, 33, 145}
+    retries = 0
+    if os.name == "nt":
+        path = _windows_extended_path(Path(path).resolve(strict=True))
+
+    def exists(target: Path) -> bool:
+        try:
+            target.lstat()
+        except FileNotFoundError:
+            return False
+        return True
+
+    def onerror(function, failed_path, error_info) -> None:
+        error = error_info[1]
+        target = Path(failed_path)
+        if (isinstance(error, FileNotFoundError) or getattr(error, "winerror", None) == 3) and not exists(target):
+            return
+        raise error
+
+    while True:
+        if not exists(path):
+            return retries
+        try:
+            remove_tree(path, onerror=onerror)
+        except OSError as error:
+            if (isinstance(error, FileNotFoundError) or getattr(error, "winerror", None) == 3) and not exists(path):
+                return retries
+            if getattr(error, "winerror", None) not in retryable_winerrors or retries >= max_retries:
+                raise
+            retries += 1
+            sleep(0.25)
+            continue
+
+        if not exists(path):
+            return retries
+        raise OSError(f"Flutter temporary workspaceがcleanup後も残っています: {path}")
 
 
 def _inside(path: Path, root: Path) -> bool:
@@ -209,10 +269,13 @@ class IsolatedFlutterWorkspace:
         self.environment: dict[str, str] = {}
         self._temporary: tempfile.TemporaryDirectory[str] | None = None
         self._expected_identity: str | None = None
+        self.cleanup_retry_count = 0
 
     def __enter__(self) -> IsolatedFlutterWorkspace:
         self._temporary = tempfile.TemporaryDirectory(
-            prefix="d4-pocket-flutter-validation-", dir=self.temp_parent
+            prefix=FLUTTER_TEMP_PREFIX,
+            dir=self.temp_parent,
+            ignore_cleanup_errors=True,
         )
         self.temporary_root = Path(self._temporary.name).resolve(strict=True)
         self.root = self.temporary_root / "source"
@@ -248,11 +311,13 @@ class IsolatedFlutterWorkspace:
             self._expected_identity = identity
             self._configure_environment()
             return self
-        except Exception:
-            self._temporary.cleanup()
+        except Exception as original_error:
+            try:
+                self._cleanup_temporary_root()
+            except Exception as cleanup_error:
+                original_error.add_note(f"snapshot作成失敗後のcleanupも失敗: {cleanup_error}")
             self._temporary = None
             self.root = None
-            self.temporary_root = None
             raise
 
     def _configure_environment(self) -> None:
@@ -280,9 +345,28 @@ class IsolatedFlutterWorkspace:
             self.root / "native" / "rust_helper" / "target"
         )
         environment["FLUTTER_SUPPRESS_ANALYTICS"] = "true"
+        gradle_options = environment.get("GRADLE_OPTS", "").strip()
+        environment["GRADLE_OPTS"] = f"{gradle_options} -Dorg.gradle.daemon=false".strip()
         self.environment = environment
         self.pub_cache_mode = cache_mode
         self.cargo_home_mode = cargo_home_mode
+
+    def _cleanup_temporary_root(self) -> int:
+        if self._temporary is not None:
+            self._temporary.cleanup()
+            self._temporary = None
+
+        if self.temporary_root is None:
+            return 0
+
+        try:
+            self.temporary_root.lstat()
+        except FileNotFoundError:
+            return 0
+
+        retries = remove_temporary_tree_with_retry(self.temporary_root)
+        self.cleanup_retry_count += retries + 1
+        return retries + 1
 
     def __exit__(self, exc_type, exc, traceback) -> bool:
         source_error: Exception | None = None
@@ -297,15 +381,10 @@ class IsolatedFlutterWorkspace:
                 source_error = state_error
 
         cleanup_error: Exception | None = None
-        if self._temporary is not None:
-            try:
-                self._temporary.cleanup()
-                if self.temporary_root is not None and self.temporary_root.exists():
-                    raise OSError("Flutter temporary workspaceがcleanup後も残っている")
-            except Exception as error:
-                cleanup_error = error
-            finally:
-                self._temporary = None
+        try:
+            self._cleanup_temporary_root()
+        except Exception as error:
+            cleanup_error = error
 
         if cleanup_error is not None:
             if source_error is not None:

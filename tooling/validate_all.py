@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import platform
 import shutil
+import stat
 import subprocess
 import sys
 import traceback
@@ -90,7 +92,12 @@ def current_desktop_platform() -> str:
     return "unknown"
 
 
-def build_steps(include_mobile_release: bool, desktop_platform: str, python_only: bool = False) -> list[ValidationStep]:
+def build_steps(
+    include_mobile_release: bool,
+    desktop_platform: str,
+    python_only: bool = False,
+    android_debug_build: bool = False,
+) -> list[ValidationStep]:
     steps = [
         ValidationStep(
             "japanese_base_audit",
@@ -234,7 +241,102 @@ def build_steps(include_mobile_release: bool, desktop_platform: str, python_only
     if not python_only:
         steps.append(ValidationStep("mobile_flutter_test", ["flutter", "test"],
             ROOT / "apps" / "mobile_flutter", "flutter"))
+    if android_debug_build:
+        steps.append(
+            ValidationStep(
+                "mobile_android_debug_build",
+                ["flutter", "build", "apk", "--debug"],
+                ROOT / "apps" / "mobile_flutter",
+                "flutter",
+                in_release_scope=False,
+                post_v1_reason="開発用Android debug APK build。実機動作、正式配布、release readinessの証拠ではない",
+            )
+        )
     return steps
+
+
+ANDROID_DEBUG_APK_RELATIVE_PATH = Path(
+    "apps/mobile_flutter/build/app/outputs/flutter-apk/app-debug.apk"
+)
+
+
+def capture_mobile_android_debug_artifact(result: dict, execution_root: Path) -> dict:
+    if result.get("status") != "passed":
+        return result
+
+    artifact = execution_root / ANDROID_DEBUG_APK_RELATIVE_PATH
+    try:
+        resolved_root = execution_root.resolve(strict=True)
+        resolved_artifact = artifact.resolve(strict=True)
+        resolved_artifact.relative_to(resolved_root)
+        metadata = artifact.lstat()
+        reparse_point = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+        if not stat.S_ISREG(metadata.st_mode) or getattr(metadata, "st_file_attributes", 0) & reparse_point:
+            raise OSError("APK成果物が通常のファイルではない、または隔離作業領域の所有下にない")
+
+        digest = hashlib.sha256()
+        with artifact.open("rb") as stream:
+            for block in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(block)
+    except (OSError, ValueError) as exc:
+        result.update(
+            {
+                "status": "failed",
+                "reason": f"開発用APK成果物の検証に失敗した: {exc.__class__.__name__}",
+                "required_action": "隔離作業領域内にAPK成果物が生成され、許可された格納先にあることを確認する。",
+                "artifact_evidence": {
+                    "status": "failed",
+                    "path": ANDROID_DEBUG_APK_RELATIVE_PATH.as_posix(),
+                },
+            }
+        )
+        return result
+
+    result["artifact_evidence"] = {
+        "status": "captured",
+        "path": ANDROID_DEBUG_APK_RELATIVE_PATH.as_posix(),
+        "size_bytes": metadata.st_size,
+        "sha256": digest.hexdigest(),
+    }
+    return result
+
+
+def validation_exit_code(
+    results: list[dict],
+    blockers: list[dict],
+    required_step_names: set[str] | None = None,
+) -> int:
+    required = required_step_names or set()
+    if blockers:
+        return 1
+    for result in results:
+        status = result.get("status")
+        if status == "failed" or (result.get("name") in required and status != "passed"):
+            return 1
+    return 0
+
+
+def select_flutter_validation_steps(
+    steps: list[ValidationStep],
+    android_debug_build_only: bool = False,
+) -> list[ValidationStep]:
+    if android_debug_build_only:
+        return [step for step in steps if step.name == "mobile_android_debug_build"]
+    return [step for step in steps if requires_isolated_flutter_workspace(step)]
+
+
+def mark_workspace_cleanup_failure(result: dict, error: Exception) -> None:
+    result["workspace_cleanup"] = "failed"
+    if result.get("status") == "passed":
+        result["status"] = "failed"
+        if result.get("classification") == "post_v1_scope":
+            result["blocks_release"] = "no"
+        else:
+            result["classification"] = "release_blocker"
+            result["blocks_release"] = "yes"
+        result["reason"] = "隔離Flutter作業領域の後片付けまたは元source同一性確認に失敗した"
+        result["required_action"] = "一時作業領域を保全し、後片付けまたは元source同一性の原因を解消する。"
+    result["stderr"] = (result.get("stderr", "") + f"\n{error.__class__.__name__}: {error}").strip()
 
 
 def platform_evidence_checks(desktop_platform: str, strict_release: bool = False) -> list[EvidenceCheck]:
@@ -539,9 +641,12 @@ def print_report(mode: str, desktop_platform: str, results: list[dict], evidence
             "pub_cache_mode",
             "cargo_home_mode",
             "workspace_cleanup",
+            "workspace_cleanup_retries",
         ):
             if result.get(key):
                 print(f"    {key}: {result[key]}")
+        for key, value in result.get("artifact_evidence", {}).items():
+            print(f"    artifact_{key}: {value}")
         if result["stdout"]:
             print("    stdout: |")
             for line in result["stdout"].splitlines():
@@ -595,14 +700,32 @@ def main() -> int:
     validation_scope.add_argument(
         "--flutter-only",
         action="store_true",
-        help="Flutter analyze/test/buildと必要なDesktop Rust helper buildだけを一時workspaceで実行する。",
+        help="Flutter analyze/testと選択したplatform build、必要なDesktop Rust helper buildを一時workspaceで実行する。",
+    )
+    parser.add_argument(
+        "--mobile-android-debug-build",
+        action="store_true",
+        help="flutter-onlyでAndroid debug APK buildだけを実行し、artifact hashを記録する。",
     )
     args = parser.parse_args()
 
+    if args.mobile_android_debug_build and not args.flutter_only:
+        parser.error("--mobile-android-debug-buildには--flutter-onlyが必要")
+    if args.mobile_android_debug_build and args.strict_release:
+        parser.error("開発用Android debug buildをstrict release検査へ混在できない")
+
     mode = "strict_release" if args.strict_release else ("flutter_only" if args.flutter_only else "development")
-    steps = build_steps(args.include_mobile_release, args.desktop_platform, args.python_only)
+    steps = build_steps(
+        args.include_mobile_release,
+        args.desktop_platform,
+        args.python_only,
+        android_debug_build=args.mobile_android_debug_build,
+    )
     if args.flutter_only:
-        steps = [step for step in steps if requires_isolated_flutter_workspace(step)]
+        steps = select_flutter_validation_steps(
+            steps,
+            android_debug_build_only=args.mobile_android_debug_build,
+        )
         if not steps:
             parser.error("選択されたplatformにFlutter stepがない")
 
@@ -671,6 +794,8 @@ def main() -> int:
                     pub_cache_mode=workspace.pub_cache_mode,
                     cargo_home_mode=workspace.cargo_home_mode,
                 )
+                if step.name == "mobile_android_debug_build" and workspace.root is not None:
+                    result = capture_mobile_android_debug_artifact(result, workspace.root)
                 isolated_results.append(result)
                 if step.name == "desktop_flutter_test_rust_helper_build":
                     desktop_helper_build = result
@@ -683,16 +808,11 @@ def main() -> int:
             workspace.__exit__(None, None, None)
             for result in isolated_results:
                 result["workspace_cleanup"] = "passed"
+                result["workspace_cleanup_retries"] = workspace.cleanup_retry_count
         except Exception as exc:
             for result in isolated_results:
-                result["workspace_cleanup"] = "failed"
-                if result.get("status") == "passed":
-                    result["status"] = "failed"
-                    result["classification"] = "release_blocker"
-                    result["blocks_release"] = "yes"
-                    result["reason"] = "isolated Flutter workspace cleanup or source identity verification failed"
-                    result["required_action"] = "temporary workspaceを保全し、cleanup／source identityの原因を解消する。"
-                result["stderr"] = (result.get("stderr", "") + f"\n{exc.__class__.__name__}: {exc}").strip()
+                result["workspace_cleanup_retries"] = workspace.cleanup_retry_count
+                mark_workspace_cleanup_failure(result, exc)
 
     evidence = platform_evidence_checks(args.desktop_platform, args.strict_release)
     blockers = [
@@ -713,7 +833,8 @@ def main() -> int:
             if check.classification == "release_blocker"
         )
     print_report(mode, args.desktop_platform, results, evidence, blockers)
-    return 1 if blockers else 0
+    required_step_names = {"mobile_android_debug_build"} if args.mobile_android_debug_build else set()
+    return validation_exit_code(results, blockers, required_step_names)
 
 
 if __name__ == "__main__":

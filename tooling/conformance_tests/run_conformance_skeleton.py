@@ -5,6 +5,7 @@ import io
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -67,14 +68,25 @@ from tooling.release_gate_check import (
 )
 from tooling.shell_snapshot import build_shell_snapshot
 from tooling.validate_all import (
+    ANDROID_DEBUG_APK_RELATIVE_PATH,
     ValidationStep,
     build_steps as build_validation_steps,
+    capture_mobile_android_debug_artifact,
     is_flutter_command,
+    mark_workspace_cleanup_failure,
     requires_isolated_flutter_workspace,
+    select_flutter_validation_steps,
     python_step,
     run_step,
+    validation_exit_code,
 )
-from tooling.flutter_workspace import FlutterWorkspaceError, IsolatedFlutterWorkspace, safe_flutter_temp_parent
+from tooling.flutter_workspace import (
+    FLUTTER_TEMP_PREFIX,
+    FlutterWorkspaceError,
+    IsolatedFlutterWorkspace,
+    remove_temporary_tree_with_retry,
+    safe_flutter_temp_parent,
+)
 from tooling.windows_release_evidence import validate_windows_release_evidence
 from tooling.broker_parity.run_authority_parity import DEFAULT_BROKER_START_TIMEOUT_SECONDS
 from tooling.build_module_pruned_windows import (
@@ -7903,6 +7915,8 @@ def test_flutter_validation_snapshot_preserves_source_and_cleans_outputs() -> li
                 if workspace.root is None or workspace.temporary_root is None:
                     errors.append("Flutter workspaceがrootを作成しなかった")
                 else:
+                    if not workspace.temporary_root.name.startswith(FLUTTER_TEMP_PREFIX):
+                        errors.append("Flutter temporary rootに短い専用prefixを使っていない")
                     if not workspace.root.is_relative_to(parent):
                         errors.append("Flutter source snapshotが指定temp parent外に作られた")
                     if workspace.root.is_relative_to(repository):
@@ -7925,6 +7939,8 @@ def test_flutter_validation_snapshot_preserves_source_and_cleans_outputs() -> li
                         value = workspace.environment.get(variable)
                         if value and not Path(value).is_relative_to(workspace.temporary_root):
                             errors.append(f"Flutter {variable}が一時領域外へ向いている")
+                    if "-Dorg.gradle.daemon=false" not in workspace.environment.get("GRADLE_OPTS", ""):
+                        errors.append("Flutter検証が長寿命Gradle daemonを無効化していない")
                     target_dir = workspace.environment.get("CARGO_TARGET_DIR")
                     if not target_dir or not Path(target_dir).is_relative_to(workspace.root):
                         errors.append("Rust target outputがisolated source snapshot内にない")
@@ -7940,6 +7956,235 @@ def test_flutter_validation_snapshot_preserves_source_and_cleans_outputs() -> li
             if snapshot_path is not None and snapshot_path.exists():
                 errors.append("Flutter validation後にtemporary workspaceが残った")
 
+    return errors
+
+
+def test_flutter_workspace_cleanup_retries_transient_windows_errors() -> list[str]:
+    errors = []
+    with tempfile.TemporaryDirectory(prefix="d4p-flutter-cleanup-retry-") as temporary:
+        root = Path(temporary) / "workspace"
+        root.mkdir()
+        (root / "generated.bin").write_bytes(b"temporary")
+        attempts = 0
+
+        def fail_once_then_remove(path: Path, *, onerror=None) -> None:
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                error = OSError("simulated directory-not-empty race")
+                error.winerror = 145
+                raise error
+            shutil.rmtree(path, onerror=onerror)
+
+        retries = remove_temporary_tree_with_retry(
+            root,
+            remover=fail_once_then_remove,
+            sleeper=lambda _delay: None,
+            max_retries=2,
+        )
+        if retries != 1 or attempts != 2 or root.exists():
+            errors.append("Windowsの一過性directory raceを1回の再試行で解消できなかった")
+
+    with tempfile.TemporaryDirectory(prefix="d4p-flutter-cleanup-gone-child-") as temporary:
+        root = Path(temporary) / "workspace"
+        root.mkdir()
+        (root / "remaining.bin").write_bytes(b"temporary")
+
+        def report_already_removed_child(path: Path, *, onerror=None) -> None:
+            missing = path / "already-removed.bin"
+            error = OSError("simulated concurrent child removal")
+            error.winerror = 3
+            if onerror is not None:
+                onerror(os.unlink, str(missing), (OSError, error, None))
+            shutil.rmtree(path, onerror=onerror)
+
+        retries = remove_temporary_tree_with_retry(
+            root,
+            remover=report_already_removed_child,
+            sleeper=lambda _delay: None,
+            max_retries=2,
+        )
+        if retries != 0 or root.exists():
+            errors.append("同時cleanupで既に消えたchild pathを誤って失敗扱いした")
+
+    with tempfile.TemporaryDirectory(prefix="d4p-flutter-cleanup-rewalk-") as temporary:
+        root = Path(temporary) / "workspace"
+        root.mkdir()
+        attempts = 0
+
+        def report_directory_not_empty(path: Path, *, onerror=None) -> None:
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                nested = path / "racing-directory"
+                nested.mkdir()
+                (nested / "late-child.bin").write_bytes(b"temporary")
+                error = OSError("simulated nested cleanup race")
+                error.winerror = 145
+                if onerror is not None:
+                    onerror(os.rmdir, str(nested), (OSError, error, None))
+                return
+            shutil.rmtree(path, onerror=onerror)
+
+        retries = remove_temporary_tree_with_retry(
+            root,
+            remover=report_directory_not_empty,
+            sleeper=lambda _delay: None,
+            max_retries=2,
+        )
+        if retries != 1 or attempts != 2 or root.exists():
+            errors.append("nested directory race後にrootから削除を再走査しなかった")
+
+    with tempfile.TemporaryDirectory(prefix="d4p-flutter-cleanup-fail-closed-") as temporary:
+        root = Path(temporary) / "workspace"
+        root.mkdir()
+
+        def always_fail(path: Path, *, onerror=None) -> None:
+            error = OSError("simulated persistent sharing violation")
+            error.winerror = 32
+            raise error
+
+        try:
+            remove_temporary_tree_with_retry(
+                root,
+                remover=always_fail,
+                sleeper=lambda _delay: None,
+                max_retries=2,
+            )
+        except OSError:
+            pass
+        else:
+            errors.append("継続するWindows cleanup failureを成功扱いした")
+        if not root.exists():
+            errors.append("継続失敗時にtemporary workspaceの残存を保持しなかった")
+    return errors
+
+
+def test_flutter_workspace_cleanup_supports_windows_long_paths() -> list[str]:
+    if os.name != "nt":
+        return []
+
+    errors = []
+    with tempfile.TemporaryDirectory(prefix="d4p-long-path-") as temporary:
+        root = Path(temporary) / "workspace"
+        current = Path("\\\\?\\" + str(root.resolve(strict=False)))
+        current.mkdir()
+        for index in range(7):
+            current /= f"segment-{index:02d}-{'x' * 26}"
+            current.mkdir()
+        generated_file = current / f"generated-{'y' * 190}.globals"
+        generated_file.write_bytes(b"extended length cleanup fixture")
+        if len(str(generated_file)) <= 260:
+            errors.append("Windows long-path cleanup fixtureが260文字を超えなかった")
+
+        remove_temporary_tree_with_retry(
+            root,
+            sleeper=lambda _delay: None,
+            max_retries=2,
+        )
+        if root.exists():
+            errors.append("260文字超のWindows temporary treeをcleanupできなかった")
+    return errors
+
+
+def test_mobile_android_debug_build_isolated_artifact_and_failure_propagation() -> list[str]:
+    errors = []
+    steps = build_validation_steps(False, "windows", android_debug_build=True)
+    android_steps = [step for step in steps if step.name == "mobile_android_debug_build"]
+    if len(android_steps) != 1:
+        return ["Android debug build選択が一意のvalidation stepを作らなかった"]
+
+    step = android_steps[0]
+    if step.command != ["flutter", "build", "apk", "--debug"]:
+        errors.append("Android debug build commandが固定された開発用APK commandではない")
+    if not requires_isolated_flutter_workspace(step):
+        errors.append("Android debug buildが一時source workspaceへrouteされない")
+    if step.in_release_scope:
+        errors.append("開発用Android debug buildをrelease gate scopeへ昇格した")
+    selected_steps = select_flutter_validation_steps(steps, android_debug_build_only=True)
+    if selected_steps != [step]:
+        errors.append("Android debug build単独検証が無関係なDesktop/Rust stepを実行対象へ含めた")
+
+    with tempfile.TemporaryDirectory(prefix="d4p-android-artifact-test-") as temporary:
+        root = Path(temporary)
+        artifact = root / ANDROID_DEBUG_APK_RELATIVE_PATH
+        artifact.parent.mkdir(parents=True)
+        artifact_bytes = b"synthetic-debug-apk"
+        artifact.write_bytes(artifact_bytes)
+        captured = capture_mobile_android_debug_artifact(
+            {
+                "name": "mobile_android_debug_build",
+                "status": "passed",
+                "classification": "post_v1_scope",
+                "blocks_release": "no",
+            },
+            root,
+        )
+        evidence = captured.get("artifact_evidence", {})
+        if captured.get("status") != "passed" or evidence.get("status") != "captured":
+            errors.append("isolated debug APK artifactをbounded evidenceへ記録しなかった")
+        if evidence.get("size_bytes") != len(artifact_bytes):
+            errors.append("debug APK evidenceのbyte長が実artifactと一致しない")
+        if evidence.get("sha256") != hashlib.sha256(artifact_bytes).hexdigest():
+            errors.append("debug APK evidence hashが実artifactと一致しない")
+
+    with tempfile.TemporaryDirectory(prefix="d4p-android-artifact-missing-test-") as temporary:
+        missing = capture_mobile_android_debug_artifact(
+            {
+                "name": "mobile_android_debug_build",
+                "status": "passed",
+                "classification": "post_v1_scope",
+                "blocks_release": "no",
+            },
+            Path(temporary),
+        )
+        if missing.get("status") != "failed":
+            errors.append("command成功後にAPK artifact欠落を検査失敗として扱わなかった")
+        if missing.get("classification") != "post_v1_scope" or missing.get("blocks_release") != "no":
+            errors.append("debug APKの開発検査失敗をrelease blockerへ誤分類した")
+
+    failed = [{"name": "mobile_android_debug_build", "status": "failed"}]
+    if validation_exit_code(failed, []) != 1:
+        errors.append("release scope外の実行失敗をvalidator終了値へ伝播しなかった")
+    not_run = [{"name": "mobile_android_debug_build", "status": "not_run"}]
+    if validation_exit_code(not_run, [], {"mobile_android_debug_build"}) != 1:
+        errors.append("明示選択したAndroid buildのnot_runを成功終了にした")
+    optional_not_run = [{"name": "optional_mobile_flutter", "status": "not_run"}]
+    if validation_exit_code(optional_not_run, []) != 0:
+        errors.append("未選択のpost-v1 stepを必須失敗へ誤昇格した")
+
+    debug_cleanup_failure = {
+        "name": "mobile_android_debug_build",
+        "status": "passed",
+        "classification": "post_v1_scope",
+        "blocks_release": "no",
+        "stderr": "",
+    }
+    mark_workspace_cleanup_failure(debug_cleanup_failure, OSError("simulated cleanup failure"))
+    if (
+        debug_cleanup_failure.get("status") != "failed"
+        or debug_cleanup_failure.get("classification") != "post_v1_scope"
+        or debug_cleanup_failure.get("blocks_release") != "no"
+        or debug_cleanup_failure.get("workspace_cleanup") != "failed"
+    ):
+        errors.append("開発用Android debug cleanup失敗をrelease blockerへ誤分類した")
+    if validation_exit_code([debug_cleanup_failure], []) != 1:
+        errors.append("開発用Android debug cleanup失敗がvalidation終了値へ伝播しなかった")
+
+    release_cleanup_failure = {
+        "name": "desktop_flutter_analyze",
+        "status": "passed",
+        "classification": "none",
+        "blocks_release": "no",
+        "stderr": "",
+    }
+    mark_workspace_cleanup_failure(release_cleanup_failure, OSError("simulated cleanup failure"))
+    if (
+        release_cleanup_failure.get("status") != "failed"
+        or release_cleanup_failure.get("classification") != "release_blocker"
+        or release_cleanup_failure.get("blocks_release") != "yes"
+    ):
+        errors.append("release scope内Flutter cleanup失敗をrelease blockerへ反映しなかった")
     return errors
 
 
@@ -8152,7 +8397,7 @@ def test_validation_reporter_exists() -> list[str]:
         return ["tooling/validate_all.pyが存在しない"]
     text = path.read_text(encoding="utf-8")
     errors = []
-    for token in ["schema_check", "conformance_skeleton", "manifest_check", "release_gate_check", "rust_helper_cargo_test", "desktop_flutter_analyze", "desktop_flutter_test", "desktop_flutter_build_linux", "mobile_flutter_analyze", "strict-release", "desktop-platform", "windows", "linux", "macos"]:
+    for token in ["schema_check", "conformance_skeleton", "manifest_check", "release_gate_check", "rust_helper_cargo_test", "desktop_flutter_analyze", "desktop_flutter_test", "desktop_flutter_build_linux", "mobile_flutter_analyze", "mobile_android_debug_build", "artifact_evidence", "validation_exit_code", "strict-release", "desktop-platform", "windows", "linux", "macos"]:
         if token not in text:
             errors.append(f"validate_all.pyにvalidation tokenがない: {token}")
     return errors
@@ -11442,6 +11687,9 @@ def main() -> int:
         test_desktop_flutter_product_baseline_chrome_exists,
         test_validate_all_uses_running_python_interpreter_for_python_steps,
         test_flutter_validation_snapshot_preserves_source_and_cleans_outputs,
+        test_flutter_workspace_cleanup_retries_transient_windows_errors,
+        test_flutter_workspace_cleanup_supports_windows_long_paths,
+        test_mobile_android_debug_build_isolated_artifact_and_failure_propagation,
         test_flutter_temp_parent_rejects_onedrive_and_flutter_filter_includes_prerequisites,
         test_validate_all_routes_execution_to_isolated_flutter_root,
         test_release_docs_declare_language_policy_runtime_blockers,

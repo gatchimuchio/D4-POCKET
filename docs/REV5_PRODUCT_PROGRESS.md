@@ -1,6 +1,6 @@
 # D4 Pocket / GUI-Shell rev5 Product-First 進捗
 
-最新状態（2026-10-18、B5自己適用継続）: B4はCLOSEDを維持。B5ではWindows Flutter検証をOneDrive外の一時source snapshotで実行する局所経路を施工し、現行dirty sourceでFlutter 7 checks、Schema 167／163／215、Conformance 248 checks、関連Desktop test 18件を確認した。元source fingerprint確認と一時領域cleanupもPASS。今回の回帰追加後はConformance 249件がPASS。過去のOneDrive長path警告とsource-exactな比較ではなく、同期serviceの復旧も未確認のため、B5 OPEN。製品出荷判定器の否定文誤検出を回帰試験付きで修正したが、通常Release `task_execution=unsupported`、`release_ready=false`とrelease blockerは維持する。詳細は[B5自己適用記録](緩衝基盤_rev5補遺_QC/B5_自己適用.md)と[B4製品接続設計](緩衝基盤_rev5補遺_QC/B4_製品接続設計.md)。
+最新状態（2026-10-18、B5自己適用継続）: B4はCLOSEDを維持。B5ではOneDrive外のWindows Flutter snapshot validationを施工し、Android debug `assembleDebug`を現行sourceから実行、APK生成とsnapshot cleanup（bounded retry 1回）までPASS。APK hash・source fingerprint・証拠限界は[B5自己適用記録](緩衝基盤_rev5補遺_QC/B5_自己適用.md)に記録した。Windows long-path cleanup回帰を含むConformance 252 checksもPASS。先行失敗runの一時rootは残存しており安全制約で削除していない。元OneDrive警告とのsource-exact比較・同期service復旧は未確認のためB5 OPEN。製品出荷判定器の否定文誤検出を回帰試験付きで修正したが、通常Release `task_execution=unsupported`、`release_ready=false`とrelease blockerは維持する。詳細は[B4製品接続設計](緩衝基盤_rev5補遺_QC/B4_製品接続設計.md)。
 
 ### 2026-10-18 開発用製品出荷判定の誤検出是正
 

@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "735a1ee21a220c92e57ec050c056a3a56d548b3c5136a66ccf3f1271ff779292"
+      "sha256": "237b55a294eb8202379311042a3cff9ed0bd95873f7bae74198e38f81e623319"
     },
     {
       "path": "SECURITY.md",
@@ -1288,7 +1288,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "9a79efe88b39014203fd314e5e399854fb5dbbdac6606c93977f1bde8796a9c0"
+      "sha256": "f1246ac6bf7a4fe5d6565c85807e4cc44f4043f8016d2bc6593b53bed0aabcb3"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1676,7 +1676,7 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B5_\u81ea\u5df1\u9069\u7528.md",
-      "sha256": "8750024f94740f0dbd75e45abdd3a4e2dbd5e1b9fb63d47e58a1c4558de48202"
+      "sha256": "6db2abb1cdee871d40f4a69ffcbef2414ed11fb3ed8483f0f88986b372338360"
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/\u5b9f\u88c5\u4ed5\u69d8\u66f8.md",
@@ -4932,7 +4932,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "e0dea3505bc6399ec78e58f565136f8ed9336750b4a54528c9dfbf33cb144267"
+      "sha256": "3cb29dd86068b5e64a0c09ad76bcec76c0c09f49fffca5b277dfed9fa9d819ed"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
@@ -4976,7 +4976,7 @@
     },
     {
       "path": "tooling/flutter_workspace.py",
-      "sha256": "b093245242abec68832e276dfba8372c8301af9910f9ec3abdf2c8db06960b39"
+      "sha256": "3bc1dcc568c2f2297c83bafe737bba4a4ffca32d4f2d7dd7939df64434bc9450"
     },
     {
       "path": "tooling/full_regression_validation.py",
@@ -5044,7 +5044,7 @@
     },
     {
       "path": "tooling/validate_all.py",
-      "sha256": "9ab30f01bc61fef8a54ccaa59c81e01f06cedf06d2a3a0ed578d6069f9bf3192"
+      "sha256": "7eaa196ba2d72db8af0a4a94bcd8e83e0d099947051b024541f2cd1e3f51792f"
     },
     {
       "path": "tooling/windows_dpapi_check.ps1",
