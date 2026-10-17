@@ -125,10 +125,16 @@ def scan_file(path: Path) -> list[str]:
 
 
 def release_claim_exists_without_classification(text: str) -> bool:
+    """完成製品の肯定的なrelease宣言だけを検出し、規則上の言及は除外する。"""
     lower = text.lower()
-    release_claim = re.search(r"\brelease\b", lower) and "completed product release" in lower
     blocker = "release_blocker" in lower
-    return bool(release_claim and blocker and "not yet a completed product release" not in lower)
+    affirmative_claim = re.search(
+        r"\b(?:is|are|was|were|has become|became|constitutes|represents)\s+"
+        r"(?:(?:now|officially|actually)\s+)*(?:a\s+|the\s+)?"
+        r"completed product release\b",
+        lower,
+    )
+    return bool(blocker and affirmative_claim)
 
 
 def macos_support_claim_errors(text: str) -> list[str]:

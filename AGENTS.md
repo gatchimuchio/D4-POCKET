@@ -754,9 +754,13 @@ QEは要求・設計・実装・観測・是正を通じた上位思想である
 
 ### 29. rev5製品・B工程の現況と施工境界
 
-作業時には最新`docs/REV5_PRODUCT_PROGRESS.md`と明示Owner指示を読み直す。2026-10-12の照合時点ではP2 Compare／P3 Handoff／P12 Windows／P13 Mobile・Non-Windowsは局所CLOSED、B0〜B3はCLOSED、B4-L1／B4-L2は局所CLOSED、**B4全体はOPEN**である。B4は既存Windows Desktop IPC→Broker→実Codex→Agent Centerの単一製品縦断が未実証。B5/B6と新候補の正式Q0〜Q7は未完了、正式Q工程は`DEFERRED`。記録済みのB4-L2 test PASSはこの製品全体受入れに昇格させない。
+作業時には最新`docs/REV5_PRODUCT_PROGRESS.md`、該当するAcceptance記録、明示Owner指示を読み直し、現行工程・次作業はそれらの現行状態を使う。以下の2026-10-12記述は履歴snapshotであり、現在の施工境界として使わない。
 
-CLOSEDを理由なく再施工しない。B4の実製品接続、Linux native追加BUILD_BATCH、B5/B6の緩衝自己適用・実物QC、正式Q0〜Q7はそれぞれ別の明示指示・受入条件が必要。Linux未実装をP13やWindows B4の局所完了記録へ遡及させない。B3の153原因対応行の分類を全原因の解消や全緩衝作用の実証と呼ばない。既存R2-A〜H、`FQ-TEST-LOOPBACK`、取得不能証拠の残余を維持する。
+履歴snapshot（2026-10-12）: P2 Compare／P3 Handoff／P12 Windows／P13 Mobile・Non-Windowsは局所CLOSED、B0〜B3はCLOSED、B4-L1／B4-L2は局所CLOSED、当時のB4全体はOPEN。B4統合製品経路は2026-10-17に限定Acceptanceを満たしてCLOSEDとなった。詳細は現行進捗とB4記録を参照する。
+
+現行の施工境界: 2026-10-17の現行進捗ではB4はCLOSED、B5はWindows Flutter検証snapshot隔離の初期単位を終えてOPEN。B5の次作業は現行B5記録の未成立条件から選び、OneDrive同期復旧や製品全体完成へ証拠を拡大しない。B4を再施工するのは再現可能なregressionが確認された場合に限る。Linux v1.1追加文書は未採用の正本候補として扱い、別途採用されるまでは工程開始根拠にしない。正式Q0〜Q7は`DEFERRED`を維持し、新候補の開始条件はその現行責任正本に従う。
+
+CLOSEDを理由なく再施工しない。Linux未実装をP13やWindows B4の局所完了記録へ遡及させない。B3の153原因対応行の分類を全原因の解消や全緩衝作用の実証と呼ばない。既存R2-A〜H、`FQ-TEST-LOOPBACK`、取得不能証拠の残余を維持する。
 
 通常Release `task_execution=unsupported`、`release_ready=false`、release blocker、正式なPublisher／署名／鍵／Owner GOは不変とする。
 

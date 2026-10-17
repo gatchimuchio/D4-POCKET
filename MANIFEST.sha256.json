@@ -92,7 +92,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "425f2ff01a86bff96e5f975a2545027723cadbbe64b097a51aaf6b533731ff73"
+      "sha256": "83a5a80e69a8ced0d61e4276f391357cfb365ce2f291814881e3a375512ad9d9"
     },
     {
       "path": "AUDIT.md",
@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "65faf98237b83ddee6d40371960173b8acd9147a445c4b5ef845f4948abcec10"
+      "sha256": "735a1ee21a220c92e57ec050c056a3a56d548b3c5136a66ccf3f1271ff779292"
     },
     {
       "path": "SECURITY.md",
@@ -1288,7 +1288,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "46526184ca557e66ea207ad94b38afcd3e9c41a98514c7ccce4d2917de5f25b4"
+      "sha256": "9a79efe88b39014203fd314e5e399854fb5dbbdac6606c93977f1bde8796a9c0"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -4208,7 +4208,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "567e5045553c62e826b7776a163bb1f263de0918ca1ace10471d61c6825225de"
+      "sha256": "d9a9e72ef0542b0b94f4f34d878b0a52a55dfffbbec821be69e4f31e0c1befb6"
     },
     {
       "path": "requirements-dev.txt",
@@ -4932,7 +4932,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "3ddf77014a2d9606187d943ff8594803c3185000806e99ab6cebf73671885c6d"
+      "sha256": "e0dea3505bc6399ec78e58f565136f8ed9336750b4a54528c9dfbf33cb144267"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
@@ -5020,7 +5020,7 @@
     },
     {
       "path": "tooling/release_gate_check.py",
-      "sha256": "595d675791fd4a53636e823ad3e33cc1c94bb057f12dbd0648e677d0e4dffdaf"
+      "sha256": "19005530667a91fa10a68376f992726ba39e814b52209b9ad95e5a791f50cfe2"
     },
     {
       "path": "tooling/release_runtime_assertions.py",

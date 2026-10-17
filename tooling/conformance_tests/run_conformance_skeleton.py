@@ -56,9 +56,11 @@ from tooling.release_gate_check import (
     BLOCKER_CAUSE_CATEGORIES,
     CURRENT_FACING_RELEASE_DOCS,
     RELEASE_TRACKS,
+    SCAN_FILES,
     blocker_cause_category_errors,
     blocker_scope_errors,
     release_blocker_doc_sync_errors,
+    release_claim_exists_without_classification,
     registry_blocker_names,
     unresolved_active_blockers,
     unresolved_windows_technical_complete_blockers,
@@ -3848,6 +3850,37 @@ def test_release_gate_scans_ipc_threat_model() -> list[str]:
     if "docs/security/IPC_THREAT_MODEL.md" not in text:
         return ["release_gate_check.pyがIPC threat modelのrelease blockerをscanしていない"]
     return []
+
+
+def test_release_claim_detection_ignores_nonclaims_and_keeps_positive_detection() -> list[str]:
+    errors: list[str] = []
+    current_release_docs = "\n".join(
+        (ROOT / relative).read_text(encoding="utf-8")
+        for relative in SCAN_FILES
+        if (ROOT / relative).exists()
+    )
+    if release_claim_exists_without_classification(current_release_docs):
+        errors.append("現行release文書の明示的な非claimを完成製品release claimとして誤検出する")
+
+    nonclaims = [
+        "This is not a completed product release. release_blocker",
+        "This is not yet a completed product release. release_blocker",
+        "A completed product release must not be claimed. release_blocker",
+        "Before claiming a completed product release, resolve the release_blocker",
+        "The manifest does not claim completed product release readiness. release_blocker",
+    ]
+    for text in nonclaims:
+        if release_claim_exists_without_classification(text):
+            errors.append(f"非claimを完成製品release claimとして誤検出する: {text}")
+
+    positive_claim = "This product is officially a completed product release. release_blocker"
+    if not release_claim_exists_without_classification(positive_claim):
+        errors.append("blockerが残る状態での明示的な完成製品release claimを検出しない")
+
+    mixed = "This is not a completed product release.\n" + positive_claim
+    if not release_claim_exists_without_classification(mixed):
+        errors.append("別文書の否定文が独立した肯定release claimを隠してしまう")
+    return errors
 
 
 def test_packaging_portability_checker_exists() -> list[str]:
@@ -11433,6 +11466,7 @@ def main() -> int:
         test_release_blocker_registry_controls_strict_release,
         test_release_facing_docs_sync_release_blockers_to_registry,
         test_release_gate_scans_ipc_threat_model,
+        test_release_claim_detection_ignores_nonclaims_and_keeps_positive_detection,
         test_packaging_portability_checker_exists,
         test_packaging_portability_subprocess_output_is_utf8_safe,
         test_packaging_portability_utf8_governance_allowlist_is_exact,

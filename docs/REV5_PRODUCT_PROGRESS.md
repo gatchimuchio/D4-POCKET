@@ -1,6 +1,24 @@
 # D4 Pocket / GUI-Shell rev5 Product-First 進捗
 
-最新状態（2026-10-17、B5自己適用の初期単位）: B4はCLOSEDを維持。B5ではWindows Flutter検証をOneDrive外の一時source snapshotで実行する局所経路を施工し、現行dirty sourceでFlutter 7 checks、Schema 167／163／215、Conformance 248 checks、関連Desktop test 18件を確認した。元source fingerprint確認と一時領域cleanupもPASS。過去のOneDrive長path警告とsource-exactな比較ではなく、同期serviceの復旧も未確認のため、B5 OPEN。通常Release `task_execution=unsupported`、`release_ready=false`、release blockerは維持。詳細は[B5自己適用記録](緩衝基盤_rev5補遺_QC/B5_自己適用.md)と[B4製品接続設計](緩衝基盤_rev5補遺_QC/B4_製品接続設計.md)。
+最新状態（2026-10-18、B5自己適用継続）: B4はCLOSEDを維持。B5ではWindows Flutter検証をOneDrive外の一時source snapshotで実行する局所経路を施工し、現行dirty sourceでFlutter 7 checks、Schema 167／163／215、Conformance 248 checks、関連Desktop test 18件を確認した。元source fingerprint確認と一時領域cleanupもPASS。今回の回帰追加後はConformance 249件がPASS。過去のOneDrive長path警告とsource-exactな比較ではなく、同期serviceの復旧も未確認のため、B5 OPEN。製品出荷判定器の否定文誤検出を回帰試験付きで修正したが、通常Release `task_execution=unsupported`、`release_ready=false`とrelease blockerは維持する。詳細は[B5自己適用記録](緩衝基盤_rev5補遺_QC/B5_自己適用.md)と[B4製品接続設計](緩衝基盤_rev5補遺_QC/B4_製品接続設計.md)。
+
+### 2026-10-18 開発用製品出荷判定の誤検出是正
+
+開発検査の製品出荷判定が、未完成状態を説明する否定文・必要条件・履歴上の言及まで、完成製品の肯定的な宣言として扱い、現行文書に対して誤って失敗していた。原因は、複数文書を連結した後に語句の共存だけを調べ、文の肯定・否定を確認していなかったこと。
+
+検出を肯定的な述語表現に限定し、走査対象の現行文書群、否定文、禁止文、条件文、肯定的な宣言、および別文書の否定文が肯定的な宣言を隠さないことをConformanceへ追加した。AGENTS.md §29の2026-10-12時点状態は履歴snapshotへ分離し、B4=CLOSED／B5=OPENの現行施工境界を現行進捗に結合した。`release_blockers.registry.json`の出荷不可理由も現行rev5仕様を参照する表現へ同期した。製品の出荷状態・blocker・Task capabilityは変更していない。
+
+検証結果:
+
+- `python -X utf8 tooling/manifest.py --check`：合格（1,252件）。
+- `python -X utf8 tooling/schema_check/check_schemas.py`：合格（schema 167件、正常例163件、否定例215件）。
+- `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：合格（249件）。
+- `python -X utf8 tooling/release_gate_check.py --release-track windows_v1`：合格。
+- `python -X utf8 tooling/release_gate_check.py --strict-release --release-track windows_v1`：未合格（既存の出荷阻害項目とOwner GO未成立。通常開発検査の合格を出荷可へ昇格させない）。
+- `python -X utf8 tooling/日本語基底監査.py --strict`：未合格（既存10 file／48 findings。今回変更したcodeに新規指摘なし）。
+- Python構文確認、対象Conformance回帰、`git diff --check`：合格。
+
+Rust／Flutter全試験群、installed product、実機、Actionsは本単位で再実行していない。これは製品出荷判定器と現行文書の整合修正であり、製品実行経路の受入れやB5完了を示さない。
 
 ### B5 初期局所単位 — Windows Flutter検証snapshot隔離（OPEN）
 

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "release_ready": false,
-  "release_ready_reason": "完成製品のreleaseには総合機能拡張rev1の全数完成証拠、対象platformの必要証拠、監査署名、正式配布条件、owner GOが必要。",
+  "release_ready_reason": "完成製品のreleaseには現行rev5製品仕様の全必須Acceptanceと対象platformの必要証拠、監査署名、正式配布条件、owner GOが必要。旧版の工程名や履歴記録だけではrelease readinessを満たさない。",
   "blockers": [
     {
       "name": "windows_evidence_provenance_isolation",
