@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "237b55a294eb8202379311042a3cff9ed0bd95873f7bae74198e38f81e623319"
+      "sha256": "254e9c6fa8636339f96192a4642ad86dd099e287e57a15d456e337cb385f5efa"
     },
     {
       "path": "SECURITY.md",
@@ -1288,7 +1288,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "f1246ac6bf7a4fe5d6565c85807e4cc44f4043f8016d2bc6593b53bed0aabcb3"
+      "sha256": "de0596aabf7ced6a76bb8016de81859a4f02bf6e86e25cb9bdda0fb1e7903747"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1676,7 +1676,7 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B5_\u81ea\u5df1\u9069\u7528.md",
-      "sha256": "6db2abb1cdee871d40f4a69ffcbef2414ed11fb3ed8483f0f88986b372338360"
+      "sha256": "dbb31a9275d0dbd19b4f3be57718a623a29494ced722315c62de09c0f31957ba"
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/\u5b9f\u88c5\u4ed5\u69d8\u66f8.md",
@@ -1692,7 +1692,7 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/\u63a1\u7528\u8a18\u9332.md",
-      "sha256": "e664c41611d5b2c514e3e7f89a690a758d2327e5da1c5fd3d92d98fcb58ae7c3"
+      "sha256": "aa0d0f7e74ca94e6e50a91692cc4acaa0ef30d57eba953724148878d34436f0a"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -4932,7 +4932,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "3cb29dd86068b5e64a0c09ad76bcec76c0c09f49fffca5b277dfed9fa9d819ed"
+      "sha256": "3e3d2010f780a62ff29175e3940d071379ae5933b8506cdc6991e2ccd1e041a0"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",

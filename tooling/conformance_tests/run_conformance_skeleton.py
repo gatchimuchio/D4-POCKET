@@ -8069,7 +8069,7 @@ def test_flutter_workspace_cleanup_supports_windows_long_paths() -> list[str]:
         root = Path(temporary) / "workspace"
         current = Path("\\\\?\\" + str(root.resolve(strict=False)))
         current.mkdir()
-        for index in range(7):
+        for index in range(4):
             current /= f"segment-{index:02d}-{'x' * 26}"
             current.mkdir()
         generated_file = current / f"generated-{'y' * 190}.globals"
@@ -8077,13 +8077,43 @@ def test_flutter_workspace_cleanup_supports_windows_long_paths() -> list[str]:
         if len(str(generated_file)) <= 260:
             errors.append("Windows long-path cleanup fixtureが260文字を超えなかった")
 
-        remove_temporary_tree_with_retry(
-            root,
-            sleeper=lambda _delay: None,
-            max_retries=2,
-        )
+        legacy_file = Path(str(generated_file)[4:])
+        legacy_lookup_error = None
+        try:
+            legacy_file.lstat()
+        except OSError as error:
+            legacy_lookup_error = error
+            if getattr(error, "winerror", None) not in {2, 3, 206}:
+                errors.append(f"通常pathの長path観測が想定外のWindows errorとなった: {error.winerror}")
+            try:
+                with os.scandir(legacy_file.parent) as entries:
+                    name_is_visible = any(entry.name == legacy_file.name for entry in entries)
+            except OSError:
+                name_is_visible = False
+            if not name_is_visible:
+                errors.append("通常pathの失敗を示すchild entryを親directoryから確認できなかった")
+
+        try:
+            generated_file.lstat()
+        except OSError as error:
+            errors.append(f"extended-length pathでfixture fileを読めなかった: {error}")
+
+        legacy_cleanup_error = None
+        try:
+            shutil.rmtree(root)
+        except OSError as error:
+            legacy_cleanup_error = error
+
+        if root.exists() and legacy_cleanup_error is None:
+            errors.append("通常path cleanupが成功を返したのにrootが残った")
+
         if root.exists():
-            errors.append("260文字超のWindows temporary treeをcleanupできなかった")
+            remove_temporary_tree_with_retry(root, sleeper=lambda _delay: None, max_retries=2)
+        if root.exists():
+            errors.append("通常path失敗後にextended-length cleanupでtemporary treeを回収できなかった")
+
+        if legacy_lookup_error is not None and legacy_cleanup_error is None:
+            errors.append("通常pathのlookup失敗とcleanup失敗の因果差を同一fixtureで観測できなかった")
     return errors
 
 
