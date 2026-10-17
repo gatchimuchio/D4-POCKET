@@ -10,7 +10,7 @@
 
 B4-L1受入状態（履歴）: 調停記録契約をv2へ整備し、実Broker session IDをHost識別に使う。Git非依存Workspaceのsource commit未取得を明示し、その状態では`吸収成立`へ昇格しない。B4-L1は契約整備だけの局所受入であり、この時点では製品consumer・Agent Center接続は未成立だった。
 
-更新日: 2026-10-11
+更新日: 2026-10-17
 工程正本: ユーザー提示「D4 Pocket / GUI-Shell 統合実装仕様書 rev5」「統合開発工程表 rev5」「Codex実装指示書 rev5」
 最新B3追記（2026-10-11）: M73まで局所受入、B0 cause-map 151/153行を分類、2行残。M70はlegacy validation 11 runのsetup-only jobと包括validatorのscope不整合を強いsource-history推定として分類し、個別inner check causeはUNKNOWNのまま保持した。M71は同一Rust crate treeを使う旧Ubuntu Actions 8 jobを証拠限界として`未成立／未知`へ分類した。failed job logはHTTP 410、artifactなしで、同一treeの保存済みlocal `cargo test` PASSや同一SHA後続成功はActions failureの根因を説明しない。別treeの#26840155393は対象外。M72はAndroid manual workflowの同一source SHA 3件について、API記録の`push` failureとjob/artifact/check-run 0件、source上の`workflow_dispatch`限定が食い違うrun-level UNKNOWNとして分類した。M73は#37636324822のmacOS job failureでstep 0、runner未割当、artifact 0、job log 404を確認できるが、失敗原因はUNKNOWN。M68の別runのrunner-admission警告と結合しない。現行作業では自動CIを再導入せず、過去欠測も成功へ昇格しない。
 状態訂正（2026-10-11、M74）: 最新は152/153原因対応行を分類済み、1行未分類。別Rust treeの#26840155393は追加`tests/broker_ipc.rs`を含むsource-exact PASSがなく、同一SHA後続成功もActions failureの原因証拠にしない。上記M73追記は履歴snapshot。

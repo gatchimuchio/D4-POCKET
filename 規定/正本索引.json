@@ -6,8 +6,8 @@
   "基底言語": "日本語",
   "他言語原則": "実務上やむを得ない外部接続に限り局所例外として原形を保持する",
   "対象リポジトリ": {
-    "名称": "GUI-Shell",
-    "リポジトリ": "https://github.com/gatchimuchio/GUI-Shell",
+    "名称": "D4 Pocket / GUI-Shell",
+    "リポジトリ": "https://github.com/gatchimuchio/D4-POCKET",
     "正本ブランチ": "main",
     "本索引成立前基準コミット": "56ef103717acba04c61244aaf29e6c8641729b6d"
   },
