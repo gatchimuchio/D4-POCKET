@@ -17,6 +17,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 from tooling.windows_release_evidence import validate_windows_release_evidence
+from tooling.flutter_workspace import FlutterWorkspaceError, IsolatedFlutterWorkspace
 
 
 @dataclass(frozen=True)
@@ -68,6 +69,14 @@ def resolve_step_command(command: list[str]) -> list[str]:
             resolved[0] = candidate
             break
     return resolved
+
+
+def is_flutter_command(command: list[str]) -> bool:
+    return bool(command) and Path(command[0]).name.casefold() == "flutter"
+
+
+def requires_isolated_flutter_workspace(step: ValidationStep) -> bool:
+    return is_flutter_command(step.command) or step.name == "desktop_flutter_test_rust_helper_build"
 
 
 def current_desktop_platform() -> str:
@@ -180,6 +189,21 @@ def build_steps(include_mobile_release: bool, desktop_platform: str, python_only
         ValidationStep("shared_flutter_analyze", ["flutter", "analyze"], ROOT / "packages" / "gui_shell_ui", "flutter"),
         ValidationStep("shared_flutter_test", ["flutter", "test"], ROOT / "packages" / "gui_shell_ui", "flutter"),
         ValidationStep("desktop_flutter_analyze", ["flutter", "analyze"], ROOT / "apps" / "desktop_flutter", "flutter"),
+        ValidationStep(
+            "desktop_flutter_test_rust_helper_build",
+            [
+                "cargo",
+                "build",
+                "--locked",
+                "--offline",
+                "--manifest-path",
+                "native/rust_helper/Cargo.toml",
+                "--bin",
+                "gui_shell_rust_helper",
+            ],
+            ROOT,
+            "cargo",
+        ),
         ValidationStep("desktop_flutter_test", ["flutter", "test"], ROOT / "apps" / "desktop_flutter", "flutter"),
     ])
     current = current_desktop_platform()
@@ -350,7 +374,18 @@ def classify_not_run(step: ValidationStep, strict_release: bool) -> tuple[str, s
     return ("release_blocker", "yes", f"{step.required_tool} が PATH 上に存在しない", f"release validation の前に {step.required_tool} を導入する。")
 
 
-def run_step(step: ValidationStep, strict_release: bool, desktop_platform: str) -> dict:
+def run_step(
+    step: ValidationStep,
+    strict_release: bool,
+    desktop_platform: str,
+    *,
+    execution_root: Path | None = None,
+    execution_environment: dict[str, str] | None = None,
+    source_commit: str | None = None,
+    source_sha256: str | None = None,
+    pub_cache_mode: str | None = None,
+    cargo_home_mode: str | None = None,
+) -> dict:
     step_command = resolve_step_command(step.command)
     if strict_release and step.name == "release_gate_check":
         step_command.append("--strict-release")
@@ -359,9 +394,57 @@ def run_step(step: ValidationStep, strict_release: bool, desktop_platform: str) 
         ):
             step_command.extend(["--release-track", "windows_v1"])
     command = " ".join(step_command)
+    execution_cwd = step.cwd
+    if execution_root is not None:
+        try:
+            relative_cwd = step.cwd.relative_to(ROOT)
+        except ValueError:
+            relative_cwd = None
+        if relative_cwd is None:
+            return {
+                "name": step.name,
+                "command": command,
+                "status": "not_run",
+                "classification": "release_blocker",
+                "blocks_release": "yes",
+                "reason": "Flutter validation working directory がsource root外にある",
+                "required_action": "source root内の検証対象だけをtemporary snapshotで実行する。",
+                "stdout": "",
+                "stderr": "",
+                "exit": "",
+            }
+        execution_cwd = execution_root / relative_cwd
+        if not execution_cwd.is_dir():
+            return {
+                "name": step.name,
+                "command": command,
+                "status": "not_run",
+                "classification": "release_blocker",
+                "blocks_release": "yes",
+                "reason": "isolated source snapshot内にFlutter project directoryがない",
+                "required_action": "snapshot作成対象とFlutter step working directoryを照合する。",
+                "stdout": "",
+                "stderr": "",
+                "exit": "",
+            }
+
+    def include_workspace_metadata(result: dict) -> dict:
+        if execution_root is not None:
+            result.update(
+                {
+                    "execution_workspace": "isolated_temporary_source",
+                    "source_commit": source_commit or "unknown",
+                    "source_sha256": source_sha256 or "unknown",
+                    "pub_cache_mode": pub_cache_mode or "unknown",
+                    "cargo_home_mode": cargo_home_mode or "unknown",
+                    "workspace_cleanup": "pending",
+                }
+            )
+        return result
+
     if step.required_tool and find_tool(step.required_tool) is None:
         classification, blocks_release, reason, required_action = classify_not_run(step, strict_release)
-        return {
+        return include_workspace_metadata({
             "name": step.name,
             "command": command,
             "status": "not_run",
@@ -372,22 +455,23 @@ def run_step(step: ValidationStep, strict_release: bool, desktop_platform: str) 
             "stdout": "",
             "stderr": "",
             "exit": "",
-        }
+        })
 
     try:
         completed = subprocess.run(
             step_command,
-            cwd=step.cwd,
+            cwd=execution_cwd,
             check=False,
             text=True,
             encoding="utf-8",
             errors="replace",
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            env=execution_environment,
         )
     except OSError as exc:
         classification, blocks_release, _, _ = classify_not_run(step, strict_release)
-        return {
+        return include_workspace_metadata({
             "name": step.name,
             "command": command,
             "command_array": step_command,
@@ -399,7 +483,7 @@ def run_step(step: ValidationStep, strict_release: bool, desktop_platform: str) 
             "stdout": "",
             "stderr": traceback.format_exc().rstrip(),
             "exit": "",
-        }
+        })
     passed = completed.returncode == 0
     if not step.in_release_scope:
         classification = "post_v1_scope"
@@ -420,7 +504,7 @@ def run_step(step: ValidationStep, strict_release: bool, desktop_platform: str) 
         else:
             reason = "validation command が失敗した"
             required_action = "失敗した validation command を修正して再実行する。"
-    return {
+    return include_workspace_metadata({
         "name": step.name,
         "command": command,
         "status": "passed" if passed else "failed",
@@ -431,7 +515,7 @@ def run_step(step: ValidationStep, strict_release: bool, desktop_platform: str) 
         "stdout": completed.stdout.rstrip(),
         "stderr": completed.stderr.rstrip(),
         "exit": str(completed.returncode),
-    }
+    })
 
 
 def print_report(mode: str, desktop_platform: str, results: list[dict], evidence: list[EvidenceCheck], blockers: list[dict]) -> None:
@@ -448,6 +532,16 @@ def print_report(mode: str, desktop_platform: str, results: list[dict], evidence
         print(f"    reason: {result['reason']}")
         if result["exit"]:
             print(f"    exit: {result['exit']}")
+        for key in (
+            "execution_workspace",
+            "source_commit",
+            "source_sha256",
+            "pub_cache_mode",
+            "cargo_home_mode",
+            "workspace_cleanup",
+        ):
+            if result.get(key):
+                print(f"    {key}: {result[key]}")
         if result["stdout"]:
             print("    stdout: |")
             for line in result["stdout"].splitlines():
@@ -492,18 +586,114 @@ def main() -> int:
         default="current",
         help="現在の host、指定した desktop target、または Windows/macOS/Linux desktop 全 scope を検証する。",
     )
-    parser.add_argument(
+    validation_scope = parser.add_mutually_exclusive_group()
+    validation_scope.add_argument(
         "--python-only",
         action="store_true",
         help="Rust と Flutter を別途検証する場合に、Python/core validation step だけを実行する。",
     )
+    validation_scope.add_argument(
+        "--flutter-only",
+        action="store_true",
+        help="Flutter analyze/test/buildと必要なDesktop Rust helper buildだけを一時workspaceで実行する。",
+    )
     args = parser.parse_args()
 
-    mode = "strict_release" if args.strict_release else "development"
-    results = [
-        run_step(step, args.strict_release, args.desktop_platform)
-        for step in build_steps(args.include_mobile_release, args.desktop_platform, args.python_only)
-    ]
+    mode = "strict_release" if args.strict_release else ("flutter_only" if args.flutter_only else "development")
+    steps = build_steps(args.include_mobile_release, args.desktop_platform, args.python_only)
+    if args.flutter_only:
+        steps = [step for step in steps if requires_isolated_flutter_workspace(step)]
+        if not steps:
+            parser.error("選択されたplatformにFlutter stepがない")
+
+    has_flutter = any(requires_isolated_flutter_workspace(step) for step in steps)
+    workspace: IsolatedFlutterWorkspace | None = None
+    workspace_error: Exception | None = None
+    if has_flutter:
+        candidate = IsolatedFlutterWorkspace(ROOT)
+        try:
+            workspace = candidate.__enter__()
+        except Exception as exc:
+            workspace_error = exc
+
+    results: list[dict] = []
+    isolated_results: list[dict] = []
+    desktop_helper_build: dict | None = None
+    for step in steps:
+        if requires_isolated_flutter_workspace(step):
+            if workspace is None:
+                classification = "release_blocker" if step.in_release_scope else "post_v1_scope"
+                blocks_release = "yes" if step.in_release_scope else "no"
+                result = {
+                    "name": step.name,
+                    "command": " ".join(resolve_step_command(step.command)),
+                    "status": "not_run",
+                    "classification": classification,
+                    "blocks_release": blocks_release,
+                    "reason": "isolated Flutter source workspaceを準備できず、OneDrive上での直接実行を拒否した",
+                    "required_action": "source/archive、temporary path、permissionの原因を修正して再実行する。",
+                    "stdout": "",
+                    "stderr": f"{workspace_error.__class__.__name__}: {workspace_error}" if workspace_error else "workspace unavailable",
+                    "exit": "",
+                    "execution_workspace": "not_available",
+                    "workspace_cleanup": "not_created",
+                }
+            elif step.name == "desktop_flutter_test" and desktop_helper_build is not None and desktop_helper_build.get("status") != "passed":
+                result = {
+                    "name": step.name,
+                    "command": " ".join(resolve_step_command(step.command)),
+                    "status": "not_run",
+                    "classification": "release_blocker" if step.in_release_scope else "post_v1_scope",
+                    "blocks_release": "yes" if step.in_release_scope else "no",
+                    "reason": "Desktop Flutter testのRust helper事前buildが成功していない",
+                    "required_action": "先行するdesktop_flutter_test_rust_helper_buildの失敗を解消してから再実行する。",
+                    "stdout": "",
+                    "stderr": "",
+                    "exit": "",
+                    "execution_workspace": "isolated_temporary_source",
+                    "source_commit": workspace.source_commit or "unknown",
+                    "source_sha256": workspace.source_sha256 or "unknown",
+                    "pub_cache_mode": workspace.pub_cache_mode or "unknown",
+                    "cargo_home_mode": workspace.cargo_home_mode or "unknown",
+                    "workspace_cleanup": "pending",
+                }
+                isolated_results.append(result)
+            else:
+                assert workspace.root is not None
+                result = run_step(
+                    step,
+                    args.strict_release,
+                    args.desktop_platform,
+                    execution_root=workspace.root,
+                    execution_environment=workspace.environment,
+                    source_commit=workspace.source_commit,
+                    source_sha256=workspace.source_sha256,
+                    pub_cache_mode=workspace.pub_cache_mode,
+                    cargo_home_mode=workspace.cargo_home_mode,
+                )
+                isolated_results.append(result)
+                if step.name == "desktop_flutter_test_rust_helper_build":
+                    desktop_helper_build = result
+            results.append(result)
+        else:
+            results.append(run_step(step, args.strict_release, args.desktop_platform))
+
+    if workspace is not None:
+        try:
+            workspace.__exit__(None, None, None)
+            for result in isolated_results:
+                result["workspace_cleanup"] = "passed"
+        except Exception as exc:
+            for result in isolated_results:
+                result["workspace_cleanup"] = "failed"
+                if result.get("status") == "passed":
+                    result["status"] = "failed"
+                    result["classification"] = "release_blocker"
+                    result["blocks_release"] = "yes"
+                    result["reason"] = "isolated Flutter workspace cleanup or source identity verification failed"
+                    result["required_action"] = "temporary workspaceを保全し、cleanup／source identityの原因を解消する。"
+                result["stderr"] = (result.get("stderr", "") + f"\n{exc.__class__.__name__}: {exc}").strip()
+
     evidence = platform_evidence_checks(args.desktop_platform, args.strict_release)
     blockers = [
         result

@@ -232,6 +232,10 @@
       "責任": "B4製品接続の現行実装観測、実行Host/source revision契約、Authority境界、局所受入と次の施工対象"
     },
     {
+      "path": "docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md",
+      "責任": "B5自己適用の現行作業・source/toolchain identity・実測・因果比較の限界とAcceptance残差"
+    },
+    {
       "path": "docs/FINAL_QA_QUEUE.md",
       "責任": "Feature Complete後に実施する最終統合品質保証の有限queue。製品開発phaseの進行条件にしない"
     },

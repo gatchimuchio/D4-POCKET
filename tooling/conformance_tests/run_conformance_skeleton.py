@@ -3,6 +3,7 @@ import copy
 import hashlib
 import io
 import json
+import os
 import re
 import subprocess
 import sys
@@ -66,9 +67,12 @@ from tooling.shell_snapshot import build_shell_snapshot
 from tooling.validate_all import (
     ValidationStep,
     build_steps as build_validation_steps,
+    is_flutter_command,
+    requires_isolated_flutter_workspace,
     python_step,
     run_step,
 )
+from tooling.flutter_workspace import FlutterWorkspaceError, IsolatedFlutterWorkspace, safe_flutter_temp_parent
 from tooling.windows_release_evidence import validate_windows_release_evidence
 from tooling.broker_parity.run_authority_parity import DEFAULT_BROKER_START_TIMEOUT_SECONDS
 from tooling.build_module_pruned_windows import (
@@ -487,6 +491,9 @@ def test_required_docs_exist() -> list[str]:
             for row in required_mappings
             if row not in mapping_text
         )
+    b5_record = ROOT / "docs" / "緩衝基盤_rev5補遺_QC" / "B5_自己適用.md"
+    if not b5_record.is_file():
+        errors.append("B5自己適用の現行記録が存在しない")
     return errors
 
 
@@ -7819,6 +7826,172 @@ def test_validate_all_uses_running_python_interpreter_for_python_steps() -> list
     return errors
 
 
+def test_flutter_validation_snapshot_preserves_source_and_cleans_outputs() -> list[str]:
+    errors = []
+    with tempfile.TemporaryDirectory(prefix="d4p-flutter-workspace-test-") as temporary:
+        parent = Path(temporary)
+        repository = parent / "source"
+        repository.mkdir()
+
+        def git(*arguments: str) -> subprocess.CompletedProcess:
+            result = subprocess.run(
+                ["git", "-C", str(repository), *arguments],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            if result.returncode != 0:
+                errors.append(
+                    "試験用Git操作が失敗しました: "
+                    + result.stderr.decode("utf-8", errors="replace")
+                )
+            return result
+
+        git("init", "--quiet")
+        git("config", "user.name", "D4 Pocket test")
+        git("config", "user.email", "d4-pocket-test@example.invalid")
+        git("config", "commit.gpgsign", "false")
+        (repository / ".gitignore").write_text("build/\n", encoding="utf-8")
+        (repository / "kept.txt").write_text("base\n", encoding="utf-8")
+        (repository / "deleted.txt").write_text("remove in working copy\n", encoding="utf-8")
+        git("add", "-A")
+        git("-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "fixture")
+
+        (repository / "kept.txt").write_text("modified working source\n", encoding="utf-8")
+        (repository / "deleted.txt").unlink()
+        (repository / "added.txt").write_text("untracked source\n", encoding="utf-8")
+        ignored_output = repository / "build" / "generated.txt"
+        ignored_output.parent.mkdir()
+        ignored_output.write_text("must not enter the source snapshot\n", encoding="utf-8")
+
+        workspace = IsolatedFlutterWorkspace(repository, temp_parent=parent)
+        try:
+            with workspace:
+                if workspace.root is None or workspace.temporary_root is None:
+                    errors.append("Flutter workspaceがrootを作成しなかった")
+                else:
+                    if not workspace.root.is_relative_to(parent):
+                        errors.append("Flutter source snapshotが指定temp parent外に作られた")
+                    if workspace.root.is_relative_to(repository):
+                        errors.append("Flutter source snapshotが元repository内に作られた")
+                    if (workspace.root / ".git").exists():
+                        errors.append("Flutter source snapshotへGit metadataが複製された")
+                    if (workspace.root / "kept.txt").read_text(encoding="utf-8") != "modified working source\n":
+                        errors.append("tracked dirty sourceがsnapshotへ反映されなかった")
+                    if (workspace.root / "deleted.txt").exists():
+                        errors.append("tracked deletionがsnapshotへ反映されなかった")
+                    if (workspace.root / "added.txt").read_text(encoding="utf-8") != "untracked source\n":
+                        errors.append("non-ignored untracked sourceがsnapshotへ反映されなかった")
+                    if (workspace.root / "build" / "generated.txt").exists():
+                        errors.append("ignored build outputがsnapshotへ混入した")
+                    if not workspace.source_sha256 or len(workspace.source_sha256) != 64:
+                        errors.append("source snapshot identityがSHA-256でない")
+                    if "APPDATA" in workspace.environment and not Path(workspace.environment["APPDATA"]).is_relative_to(workspace.temporary_root):
+                        errors.append("Flutter configが一時領域外へ向いている")
+                    for variable in ("TEMP", "TMP", "TMPDIR"):
+                        value = workspace.environment.get(variable)
+                        if value and not Path(value).is_relative_to(workspace.temporary_root):
+                            errors.append(f"Flutter {variable}が一時領域外へ向いている")
+                    target_dir = workspace.environment.get("CARGO_TARGET_DIR")
+                    if not target_dir or not Path(target_dir).is_relative_to(workspace.root):
+                        errors.append("Rust target outputがisolated source snapshot内にない")
+                    cargo_home = workspace.environment.get("CARGO_HOME")
+                    if not cargo_home:
+                        errors.append("Cargo homeがchild environmentへ固定されていない")
+                    elif Path(cargo_home).is_relative_to(workspace.root):
+                        errors.append("Cargo homeがsource snapshot内へ混入している")
+                snapshot_path = workspace.temporary_root
+        except Exception as exc:
+            errors.append(f"isolated Flutter workspace作成／cleanupが失敗: {exc}")
+        else:
+            if snapshot_path is not None and snapshot_path.exists():
+                errors.append("Flutter validation後にtemporary workspaceが残った")
+
+    return errors
+
+
+def test_flutter_temp_parent_rejects_onedrive_and_flutter_filter_includes_prerequisites() -> list[str]:
+    errors = []
+    with tempfile.TemporaryDirectory(prefix="d4p-flutter-temp-guard-") as temporary:
+        root = Path(temporary) / "repository"
+        root.mkdir()
+        cloud_root = Path(temporary) / "OneDrive"
+        cloud_root.mkdir()
+        cloud_temp = cloud_root / "Temp"
+        cloud_temp.mkdir()
+        previous = os.environ.get("OneDrive")
+        os.environ["OneDrive"] = str(cloud_root)
+        try:
+            try:
+                safe_flutter_temp_parent(root, cloud_temp)
+            except FlutterWorkspaceError:
+                pass
+            else:
+                errors.append("OneDrive配下をFlutter temporary parentとして拒否しなかった")
+        finally:
+            if previous is None:
+                os.environ.pop("OneDrive", None)
+            else:
+                os.environ["OneDrive"] = previous
+
+    steps = build_validation_steps(False, "windows")
+    flutter_steps = [step for step in steps if is_flutter_command(step.command)]
+    isolated_steps = [step for step in steps if requires_isolated_flutter_workspace(step)]
+    indirect_flutter = [step for step in steps if step.required_tool == "flutter" and not is_flutter_command(step.command)]
+    if not flutter_steps:
+        errors.append("validate_allがFlutter commandを分離対象として認識しなかった")
+    if "desktop_flutter_test_rust_helper_build" not in [step.name for step in isolated_steps]:
+        errors.append("desktop Flutter testのRust helper事前buildが隔離対象に含まれていない")
+    step_names = [step.name for step in isolated_steps]
+    if "desktop_flutter_test_rust_helper_build" in step_names and "desktop_flutter_test" in step_names:
+        if step_names.index("desktop_flutter_test_rust_helper_build") > step_names.index("desktop_flutter_test"):
+            errors.append("Desktop Flutter testより後にRust helper buildが配置されている")
+    if not indirect_flutter:
+        errors.append("testがFlutter実行commandとFlutter依存Python stepを区別できていない")
+    if any(is_flutter_command(step.command) for step in build_validation_steps(False, "windows", python_only=True)):
+        errors.append("--python-only相当のvalidationへFlutter commandが混入している")
+    return errors
+
+
+def test_validate_all_routes_execution_to_isolated_flutter_root() -> list[str]:
+    with tempfile.TemporaryDirectory(prefix="d4p-flutter-cwd-test-") as temporary:
+        execution_root = Path(temporary)
+        project = execution_root / "apps" / "desktop_flutter"
+        project.mkdir(parents=True)
+        environment = os.environ.copy()
+        environment["D4P_ISOLATED_EXECUTION_PROBE"] = "temporary-only"
+        step = ValidationStep(
+            "isolated_execution_probe",
+            [
+                sys.executable,
+                "-c",
+                "import os; print(os.getcwd()); print(os.environ['D4P_ISOLATED_EXECUTION_PROBE'])",
+            ],
+            ROOT / "apps" / "desktop_flutter",
+        )
+        result = run_step(
+            step,
+            strict_release=False,
+            desktop_platform="windows",
+            execution_root=execution_root,
+            execution_environment=environment,
+            source_commit="fixture-commit",
+            source_sha256="a" * 64,
+            pub_cache_mode="isolated_fixture",
+        )
+        expected_cwd = str(project)
+        errors = []
+        if result.get("status") != "passed":
+            errors.append("validate_allがisolated Flutter rootでprobe commandを実行できなかった")
+        if expected_cwd not in result.get("stdout", ""):
+            errors.append("Flutter stepのcwdがtemporary source snapshotへ切り替わらなかった")
+        if "temporary-only" not in result.get("stdout", ""):
+            errors.append("Flutter child processへisolated environmentが渡らなかった")
+        if result.get("source_commit") != "fixture-commit" or result.get("source_sha256") != "a" * 64:
+            errors.append("Flutter validation reportにsource provenanceが残らなかった")
+        return errors
+
+
 def test_desktop_flutter_exposes_operation_surfaces() -> list[str]:
     main = (DESKTOP_FLUTTER / "lib" / "main.dart").read_text(encoding="utf-8")
     dashboard = (DESKTOP_FLUTTER / "lib" / "screens" / "dashboard.dart").read_text(encoding="utf-8")
@@ -11235,6 +11408,9 @@ def main() -> int:
         test_desktop_flutter_exposes_individual_surface_semantics_identifiers,
         test_desktop_flutter_product_baseline_chrome_exists,
         test_validate_all_uses_running_python_interpreter_for_python_steps,
+        test_flutter_validation_snapshot_preserves_source_and_cleans_outputs,
+        test_flutter_temp_parent_rejects_onedrive_and_flutter_filter_includes_prerequisites,
+        test_validate_all_routes_execution_to_isolated_flutter_root,
         test_release_docs_declare_language_policy_runtime_blockers,
         test_blue_tanuki_adapter_runtime_output_validates_against_generic_schema,
         test_blue_tanuki_adapter_metadata_cannot_escalate_authority,

@@ -2176,31 +2176,37 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
                     child: Text('認証方式',
                         style: Theme.of(context).textTheme.titleSmall),
                   ),
-                  RadioListTile<String>(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Codex CLI管理設定'),
-                    subtitle: const Text('現在のCodex CLI認証を使用'),
-                    value: 'codex_cli_managed',
-                    groupValue: _authenticationSource,
-                    onChanged: (value) => setState(() {
-                      _authenticationSource = value!;
-                      _credentialId = null;
-                    }),
-                  ),
-                  RadioListTile<String>(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('D4 Pocket資格情報保管庫'),
-                    subtitle:
-                        const Text('登録済みOpenAI API keyをBrokerから参照（秘密値は表示しない）'),
-                    value: 'broker_credential_vault',
+                  RadioGroup<String>(
                     groupValue: _authenticationSource,
                     onChanged: (value) {
                       if (value == null) return;
                       setState(() {
                         _authenticationSource = value;
-                        _providerCredentials ??= _loadProviderCredentials();
+                        if (value == 'codex_cli_managed') {
+                          _credentialId = null;
+                        } else {
+                          _providerCredentials ??= _loadProviderCredentials();
+                        }
                       });
                     },
+                    child: const Column(
+                      children: [
+                        RadioListTile<String>(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text('Codex CLI管理設定'),
+                          subtitle: Text('現在のCodex CLI認証を使用'),
+                          value: 'codex_cli_managed',
+                        ),
+                        RadioListTile<String>(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text('D4 Pocket資格情報保管庫'),
+                          subtitle: Text(
+                            '登録済みOpenAI API keyをBrokerから参照（秘密値は表示しない）',
+                          ),
+                          value: 'broker_credential_vault',
+                        ),
+                      ],
+                    ),
                   ),
                   if (_authenticationSource == 'broker_credential_vault')
                     _providerCredentialSelector(),
@@ -2348,7 +2354,8 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
               ? _credentialId
               : null;
           return DropdownButtonFormField<String>(
-            value: selected,
+            key: ValueKey(selected),
+            initialValue: selected,
             decoration: const InputDecoration(
               labelText: '資格情報ID',
               helperText: '秘密値はBrokerから読み取り、画面には返しません。',

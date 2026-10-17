@@ -1,4 +1,4 @@
-import 'dart:ui' show SemanticsAction, SemanticsFlag;
+import 'dart:ui' show SemanticsAction;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -807,7 +807,7 @@ void main() {
       await tester.pumpAndSettle();
       final revokeSemantics =
           tester.getSemantics(find.bySemanticsLabel('資格情報を失効'));
-      expect(revokeSemantics.hasFlag(SemanticsFlag.isButton), isTrue);
+      expect(revokeSemantics.flagsCollection.isButton, isTrue);
       expect(revokeSemantics.getSemanticsData().hasAction(SemanticsAction.tap),
           isTrue);
     } finally {

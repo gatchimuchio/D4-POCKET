@@ -1,6 +1,10 @@
 # D4 Pocket / GUI-Shell rev5 Product-First 進捗
 
-最新状態（2026-10-17、B4統合製品経路）: staged Windows Desktop UIから既存IPC、Broker、実Codex CLI／MxC、Agent Centerまでの単一Task経路を確認し、有限受入によりB4全体をCLOSEDとした。Taskは`completed`、結果hash・調停record hash・Audit参照をbounded表示。Workspace PermissionとTask別Owner Approvalは独立して消費された。file-backed Audit 97件のevent chainとanchor HMACを再計算し整合を確認。調停状態は`作用後未照合`、MxC TEMP writeは失敗・cleanup未試行であり、成功へ読み替えない。実行は`r2-e2e` staged buildとlocalhost合成Responses APIに限定され、通常Release能力・installed provenanceの証拠ではない。次はB5（D4 Pocket自身の開発・試験への自己適用）を開始する。通常Release `task_execution=unsupported`、`release_ready=false`、release blockerは維持。詳細は[B4製品接続設計](緩衝基盤_rev5補遺_QC/B4_製品接続設計.md)。
+最新状態（2026-10-17、B5自己適用の初期単位）: B4はCLOSEDを維持。B5ではWindows Flutter検証をOneDrive外の一時source snapshotで実行する局所経路を施工し、現行dirty sourceでFlutter 7 checks、Schema 167／163／215、Conformance 248 checks、関連Desktop test 18件を確認した。元source fingerprint確認と一時領域cleanupもPASS。過去のOneDrive長path警告とsource-exactな比較ではなく、同期serviceの復旧も未確認のため、B5 OPEN。通常Release `task_execution=unsupported`、`release_ready=false`、release blockerは維持。詳細は[B5自己適用記録](緩衝基盤_rev5補遺_QC/B5_自己適用.md)と[B4製品接続設計](緩衝基盤_rev5補遺_QC/B4_製品接続設計.md)。
+
+### B5 初期局所単位 — Windows Flutter検証snapshot隔離（OPEN）
+
+[B5自己適用記録](緩衝基盤_rev5補遺_QC/B5_自己適用.md)に実装・検証と証拠限界を記録した。隔離snapshot経路はWindowsの現行dirty sourceでPASSしたが、OneDrive同期警告のsource-exact再現、介入なしとの因果比較、他OS、installed productは未成立。これはB5全体のAcceptanceではない。
 
 ### B4統合製品経路受入（CLOSED、2026-10-17）
 

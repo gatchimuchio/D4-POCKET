@@ -1,6 +1,6 @@
 # GUI Shell ロードマップ
 
-最新状態（2026-10-17、B4統合製品経路受入）: staged `r2-e2e` Windows Desktop buildから既存IPC、Broker、実Codex CLI／MxC、Agent CenterまでのTaskが`completed`となり、結果hashとbounded projectionを確認したためB4をCLOSED。file-backed Audit 97件のchain／anchor HMACは整合した。調停状態は`作用後未照合`、MxC TEMP書込みは失敗しcleanup未試行。通常Release・installed provenance・正式署名の証拠ではない。次はB5（D4 Pocket自身の開発・試験への自己適用）。通常Release `task_execution=unsupported`、`release_ready=false`、release blockerは維持する。詳細は[現行進捗](docs/REV5_PRODUCT_PROGRESS.md)と[B4製品接続設計](docs/緩衝基盤_rev5補遺_QC/B4_製品接続設計.md)。
+最新状態（2026-10-17、B5自己適用の初期単位）: B4はCLOSEDを維持。B5のWindows Flutter検証snapshot隔離を現行dirty sourceで施工・確認し、Flutter 7 checks、元source不変、snapshot cleanupがPASSした。OneDrive長path警告とのsource-exact比較や同期service復旧は未確認で、B5 OPEN。通常Release `task_execution=unsupported`、`release_ready=false`、release blockerは維持する。詳細は[現行進捗](docs/REV5_PRODUCT_PROGRESS.md)と[B5自己適用記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
 
 履歴snapshot（2026-10-11、B4-L2）: WorkspaceTaskScratch観測をCodex Adapter→Broker→durable Audit／Task履歴→Agent Centerのhash-only投影へ接続。Rust全体直列569 passed／0 failed／13 ignored、実Codex CLI loopback LIVE_RUNTIME 1 passed、Flutter Agent Task client 14件・Agent Center widget 1件、Schema 167／163／215、Conformance 245 checksがPASS。不一致・Audit失敗時の隔離と本文非露出もPASS。B4-L2 CLOSED。ただし既存Windows Desktop IPCからBroker・実Codex・Agent Centerまでの単一製品経路は未実証のため当時のB4はOPEN。通常Release `task_execution=unsupported`、`release_ready=false`を維持。Rust formatterの全体差分とFlutter analyzerの既存deprecated info 5件も当時の観測として保持する。詳細は[B4製品接続設計](docs/緩衝基盤_rev5補遺_QC/B4_製品接続設計.md)。
 

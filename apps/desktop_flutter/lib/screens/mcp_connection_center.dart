@@ -491,18 +491,20 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
       await client.registerMacNativeCredential(
           credentialId: id, targetServerId: target);
       final entries = await client.listCredentials(targetServerId: target);
-      if (mounted)
+      if (mounted) {
         setState(() {
           _credentials = entries;
           _credentialTargetServerId = target;
           _selectedCredentialId = null;
           _message = 'Keychain登録後のmetadataを取得しました。秘密値は取得していません。';
         });
+      }
     } on Object {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _message = '資格情報登録は未成立です。取消・拒否・期限または保管状態を確認してください。自動再送しません。';
         });
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -587,9 +589,10 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
               await client.listCredentials(targetServerId: connection.serverId);
           if (mounted) setState(() => _credentials = credentials);
         } on Object {
-          if (mounted)
+          if (mounted) {
             setState(() => _message =
                 '接続receiptは受理済みですが、資格情報の使用時刻を再取得できません。Broker状態とAuditを確認してください。');
+          }
         }
       }
     } on Object {
