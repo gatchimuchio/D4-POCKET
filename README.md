@@ -9,7 +9,7 @@ AIエージェントが高度になるほど、次に難しくなるのは「何
 
 [開発状況](docs/REV5_PRODUCT_PROGRESS.md) · [クイックスタート](QUICKSTART.md) · [アーキテクチャ仕様](docs/specs/gui-shell-spec-v1.md) · [責任境界](CLAIM.md) · [エージェント向け開発規則](AGENTS.md)
 
-> **開発中 — 製品リリース未宣言。** Windowsは機能実装の到達点を持ち、macOS・Android・iOSでも限定的な製品受入の証拠があります。一方、統合工程B4、正式配布・実機保証・最終QAは未完了です。2026年10月11日の観測を下の表に示します。
+> **開発中 — 製品リリース未宣言。** Windowsは機能実装の到達点を持ち、macOS・Android・iOSでも限定的な製品受入の証拠があります。B4のWindows Desktop統合経路は2026年10月17日に限定受入済みで、現在はB5自己適用QC、正式配布・実機保証・最終QAが未完了です。
 
 ## D4 Pocketが変えようとしていること
 
@@ -25,17 +25,17 @@ AIエージェントが高度になるほど、次に難しくなるのは「何
 
 ## 現在の到達点
 
-2026年10月11日までに記録された、対象と環境を限定した実装・検査の状態です。**工程のCLOSEDは正式な製品出荷の意味ではありません。**
+2026年10月17日までに記録された、対象と環境を限定した実装・検査の状態です。**工程のCLOSEDは正式な製品出荷の意味ではありません。**
 
 | 対象 | 現行の状態 | 成立していない範囲 |
 |---|---|---|
 | **Windows Desktop** | rev5のWindows側P12、Feature Completeの開発到達点 | installed-path最終証拠、正式Release、owner GO |
 | **Agent Compare / Handoff** | P2 Multi-Agent Compare、P3 Agent HandoffのProduct Build受入CLOSED | すべての実Agent・実環境での一般保証 |
 | **Mobile / Non-Windows** | P13の有限Product Build受入は2026-10-09にCLOSED。Android Emulator・iOS Simulator等の限定証拠を保持 | 物理端末保証、OS別の正式配布・署名・identity |
-| **緩衝基盤とAgent Task** | B0〜B3はCLOSED。B4-L2で実Codex CLI結果、調停記録、AuditとAgent Centerのhash-only投影まで局所接続 | **Windows Desktop IPC → Broker → 実Codex → Agent Center**の単一製品経路。B4全体はOPEN |
+| **緩衝基盤とAgent Task** | B0〜B4は有限Product Build受入CLOSED。2026-10-17にstaged Windows Desktop UI → IPC → Broker → 実Codex → Agent CenterのTask経路を確認。次はB5自己適用QC | 同一条件の自己適用比較、通常Release能力、正式配布・実機保証 |
 | **正式な出荷判断** | Release GateとOwner承認を独立に保持 | <code>task_execution=unsupported</code>、<code>release_ready=false</code> |
 
-B4-L2の記録済み検査では、Rust全体直列テスト **569 passed / 0 failed / 13 ignored**、Agent Task Flutter client 14件とAgent Center widget 1件、Schema **167件**・正常例 **163件**・否定fixture **215件**、Conformance **245 checks**を確認しています。これは**2026-10-11の開発環境における対象版の証拠**であり、このREADME更新時に再実行した値でも、インストール済み製品の保証でもありません。[観測範囲と残差](docs/REV5_PRODUCT_PROGRESS.md)を参照してください。
+B4-L2の記録済み検査では、Rust全体直列テスト **569 passed / 0 failed / 13 ignored**、Agent Task Flutter client 14件とAgent Center widget 1件、Schema **167件**・正常例 **163件**・否定fixture **215件**、Conformance **245 checks**を確認しています。これらは**2026-10-11の開発環境における対象版の証拠**であり、このREADME更新時に再実行した値でも、インストール済み製品の保証でもありません。10月17日のB4統合経路証拠も`r2-e2e` staged buildとlocalhost合成APIの範囲に限られ、通常Release能力やinstalled provenanceを示しません。[観測範囲と残差](docs/REV5_PRODUCT_PROGRESS.md)を参照してください。
 
 ## アーキテクチャ — 誰が何を決めるのか
 

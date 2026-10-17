@@ -57,7 +57,7 @@ powershell -ExecutionPolicy Bypass -File scripts\launch_owner_desktop.ps1
 - **Schema適合**と**実Runtime作用**と**製品の安全な使用**は別の成立条件です。
 - Windowsの<code>FEATURE COMPLETE</code>は正式Releaseではありません。
 - P13 Mobile／Non-Windowsの有限Product Build受入は、実端末・署名・配布保証ではありません。
-- B4-L2の局所接続は成立していますが、Windows Desktop IPC → Broker → 実Codex → Agent Centerの単一製品経路はB4でOPENです。
+- B4の有限製品経路受入は2026-10-17にCLOSEDです。対象は`r2-e2e` staged buildとlocalhost合成APIによる一経路であり、通常Release・installed provenance・緩衝作用の独立照合を意味しません。次工程はB5自己適用QCです。
 - 通常Releaseは<code>task_execution=unsupported</code>、<code>release_ready=false</code>。Human ownerの独立GOも未成立です。
 
 製品主張の射程は[CLAIM.md](CLAIM.md)、作業の現行状態は[進捗](docs/REV5_PRODUCT_PROGRESS.md)、歴史的な試験結果は[VALIDATION.txt](VALIDATION.txt)へ分離して確認します。

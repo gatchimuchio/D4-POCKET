@@ -1,6 +1,12 @@
 # D4 Pocket / GUI-Shell rev5 Product-First 進捗
 
-最新状態（2026-10-11、B4-L2）: Codex AdapterのWorkspaceTaskScratch観測をBrokerへ型付きで返し、Task／Workspace／Recovery bindingとroot identityを照合。Task成功時はBroker session ID・Workspace登録hash・Toolchain指紋を使ったv2調停記録、durable Audit、Task終端Audit参照、Agent Centerのhash-only表示へ接続した。実Codex CLIのloopback LIVE_RUNTIMEで正常・取消cleanupと外部通信0を確認し、Rust全体直列569 passed／0 failed／13 ignored、Flutter Agent Task client 14件・Agent Center widget 1件、Schema 167／163／215、Conformance 245 checksがPASS。不一致／Audit失敗はTask隔離、拒否AuditまたはAudit不能のfail-closed、本文非露出を確認。B4-L2 CLOSED、ただし単一のWindows Desktop IPC→Broker→実Codex→Agent Center製品経路は未接続のためB4 OPEN。通常Release `task_execution=unsupported`、`release_ready=false`を維持する。Analyzerは未変更箇所のdeprecated info 5件で終了値1、`cargo fmt --check`はRust treeの広範な形式差分で終了値1。一括formatはしない。詳細は[B4製品接続設計](緩衝基盤_rev5補遺_QC/B4_製品接続設計.md)。
+最新状態（2026-10-17、B4統合製品経路）: staged Windows Desktop UIから既存IPC、Broker、実Codex CLI／MxC、Agent Centerまでの単一Task経路を確認し、有限受入によりB4全体をCLOSEDとした。Taskは`completed`、結果hash・調停record hash・Audit参照をbounded表示。Workspace PermissionとTask別Owner Approvalは独立して消費された。file-backed Audit 97件のevent chainとanchor HMACを再計算し整合を確認。調停状態は`作用後未照合`、MxC TEMP writeは失敗・cleanup未試行であり、成功へ読み替えない。実行は`r2-e2e` staged buildとlocalhost合成Responses APIに限定され、通常Release能力・installed provenanceの証拠ではない。次はB5（D4 Pocket自身の開発・試験への自己適用）を開始する。通常Release `task_execution=unsupported`、`release_ready=false`、release blockerは維持。詳細は[B4製品接続設計](緩衝基盤_rev5補遺_QC/B4_製品接続設計.md)。
+
+### B4統合製品経路受入（CLOSED、2026-10-17）
+
+[B4製品接続設計](緩衝基盤_rev5補遺_QC/B4_製品接続設計.md)に、試験実行の識別情報、作業結果、調停記録、権限・終端監査、画面証拠と監査記録の照合結果を記録した。Windows Desktop画面から既存経路で作業を完了し、結果の限定表示と作業領域境界の合成検査を確認した。アプリ一時領域の書込み失敗、作業領域のソース変更番号未取得、通常製品版ではない試験条件は制約として保持する。B4の受入範囲をこれらの範囲外保証へ拡張しない。
+
+履歴snapshot（2026-10-11、B4-L2時点）: Codex AdapterのWorkspaceTaskScratch観測をBrokerへ型付きで返し、Task／Workspace／Recovery bindingとroot identityを照合。Task成功時はBroker session ID・Workspace登録hash・Toolchain指紋を使ったv2調停記録、durable Audit、Task終端Audit参照、Agent Centerのhash-only表示へ接続した。実Codex CLIのloopback LIVE_RUNTIMEで正常・取消cleanupと外部通信0を確認し、Rust全体直列569 passed／0 failed／13 ignored、Flutter Agent Task client 14件・Agent Center widget 1件、Schema 167／163／215、Conformance 245 checksがPASS。不一致／Audit失敗はTask隔離、拒否AuditまたはAudit不能のfail-closed、本文非露出を確認。B4-L2 CLOSED、統合製品経路受入前の時点ではB4 OPEN。Analyzerは未変更箇所のdeprecated info 5件で終了値1、`cargo fmt --check`はRust treeの広範な形式差分で終了値1。一括formatはしない。
 
 B4-L1受入状態（履歴）: 調停記録契約をv2へ整備し、実Broker session IDをHost識別に使う。Git非依存Workspaceのsource commit未取得を明示し、その状態では`吸収成立`へ昇格しない。B4-L1は契約整備だけの局所受入であり、この時点では製品consumer・Agent Center接続は未成立だった。
 
