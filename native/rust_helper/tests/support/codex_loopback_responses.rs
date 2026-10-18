@@ -347,7 +347,7 @@ impl CodexLoopbackResponses {
         .find_map(|(outcome, count)| (count.load(Ordering::SeqCst) > 0).then_some(outcome))
     }
 
-    fn wait_for_conflict_drain_before_client_drop(&self, budget: Duration) -> Option<&'static str> {
+    fn wait_for_conflict_drain_outcome(&self, budget: Duration) -> Option<&'static str> {
         let deadline = Instant::now() + budget;
         loop {
             if let Some(outcome) = self.conflict_drain_outcome() {
@@ -1500,8 +1500,8 @@ mod tests {
                             .peer_addr()
                             .map(|address| address.to_string())
                             .unwrap_or_else(|_| "unknown".to_owned());
-                        let server_drain_before_client_drop = server
-                            .wait_for_conflict_drain_before_client_drop(Duration::from_millis(250));
+                        let server_drain_before_client_drop =
+                            server.wait_for_conflict_drain_outcome(Duration::from_millis(250));
                         panic!(
                             "ConnectionReset前にHTTP応答headerが届かない; received_bytes={}; client={local}->{peer}; server_drain_before_client_drop={server_drain_before_client_drop:?}; accepted={}; incomplete=({}); posts={}; {}; response_writes=({})",
                             response.len(),
@@ -1623,6 +1623,13 @@ mod tests {
         assert!(server.tool_result_was_received());
         assert_eq!(server.repeated_tool_call_rejections(), 1);
         assert_eq!(server.post_requests(), 2);
+        assert!(
+            server
+                .wait_for_conflict_drain_outcome(Duration::from_secs(5))
+                .is_some(),
+            "409競合応答のfixture drainが5秒内に終わらない: {}",
+            server.response_write_summary()
+        );
         assert_eq!(
             server
                 .state
