@@ -29,10 +29,14 @@ cd native/rust_helper
 cargo test
 ```
 
+Flutter検査は、OneDrive上のsource treeへ`.dart_tool`や`build`を生成しないよう、`validate_all.py`の隔離snapshot経路を使います。例えばDesktop analyzeとtestはそれぞれ次のように対象を限定して実行できます。Desktop testには必要なRust helper buildも含まれます。
+
 ```bash
-cd apps/desktop_flutter
-flutter analyze
+python -X utf8 tooling/validate_all.py --flutter-step desktop_flutter_analyze --desktop-platform windows
+python -X utf8 tooling/validate_all.py --flutter-step desktop_flutter_test --desktop-platform windows
 ```
+
+対象限定実行はFlutter stepの結果を必須扱いし、未実行・失敗を成功へ変換しません。隔離対象は`validate_all.py`が定義するanalyze／test／buildに限られ、`flutter run`などの直接実行はこの保護経路を通りません。
 
 2026年10月11日のB4-L2ではRust直列test 569 passed / 0 failed / 13 ignoredを記録。一方、Flutter analyzerは既存deprecated info 5件、`cargo fmt --check`は既存の形式差分により終了値1を記録しています。これらの履歴を無言でPASSへ変換しないでください。現在の個別事実と必要な検証対象は[進捗](docs/REV5_PRODUCT_PROGRESS.md)を確認してください。
 

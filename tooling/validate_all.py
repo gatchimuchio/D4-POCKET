@@ -42,6 +42,18 @@ class EvidenceCheck:
     required_action: str
 
 
+FLUTTER_STEP_CHOICES = (
+    "shared_flutter_analyze",
+    "shared_flutter_test",
+    "desktop_flutter_analyze",
+    "desktop_flutter_test",
+    "desktop_flutter_build_linux",
+    "mobile_flutter_analyze",
+    "mobile_flutter_test",
+    "mobile_android_debug_build",
+)
+
+
 def python_step(script: str, *args: str) -> list[str]:
     return [sys.executable, script, *args]
 
@@ -319,9 +331,22 @@ def validation_exit_code(
 def select_flutter_validation_steps(
     steps: list[ValidationStep],
     android_debug_build_only: bool = False,
+    selected_step_name: str | None = None,
 ) -> list[ValidationStep]:
     if android_debug_build_only:
         return [step for step in steps if step.name == "mobile_android_debug_build"]
+    if selected_step_name is not None:
+        selected_names = {selected_step_name}
+        if selected_step_name == "desktop_flutter_test":
+            selected_names.add("desktop_flutter_test_rust_helper_build")
+        selected = [
+            step
+            for step in steps
+            if step.name in selected_names and requires_isolated_flutter_workspace(step)
+        ]
+        if not any(step.name == selected_step_name for step in selected):
+            return []
+        return selected
     return [step for step in steps if requires_isolated_flutter_workspace(step)]
 
 
@@ -666,6 +691,9 @@ def print_report(mode: str, desktop_platform: str, results: list[dict], evidence
             print(f"    reason: {check.reason}")
             print(f"    required_action: {check.required_action}")
     print("")
+    if mode == "flutter_step":
+        print("release_gate: 未評価")
+        return
     print("release_gate:")
     print(f"  status: {'fail' if blockers else 'pass'}")
     print("  blockers:")
@@ -702,6 +730,11 @@ def main() -> int:
         action="store_true",
         help="Flutter analyze/testと選択したplatform build、必要なDesktop Rust helper buildを一時workspaceで実行する。",
     )
+    validation_scope.add_argument(
+        "--flutter-step",
+        choices=FLUTTER_STEP_CHOICES,
+        help="指定したFlutter検証stepだけを一時source snapshot上で実行する。Desktop testはRust helper buildも含む。",
+    )
     parser.add_argument(
         "--mobile-android-debug-build",
         action="store_true",
@@ -709,25 +742,32 @@ def main() -> int:
     )
     args = parser.parse_args()
 
+    if args.flutter_step and args.strict_release:
+        parser.error("--flutter-stepは開発用の対象限定検査であり、--strict-releaseと併用できない")
+    if args.flutter_step and args.mobile_android_debug_build:
+        parser.error("--flutter-stepと--mobile-android-debug-buildは併用できない")
     if args.mobile_android_debug_build and not args.flutter_only:
         parser.error("--mobile-android-debug-buildには--flutter-onlyが必要")
     if args.mobile_android_debug_build and args.strict_release:
         parser.error("開発用Android debug buildをstrict release検査へ混在できない")
 
-    mode = "strict_release" if args.strict_release else ("flutter_only" if args.flutter_only else "development")
+    mode = "strict_release" if args.strict_release else (
+        "flutter_step" if args.flutter_step else ("flutter_only" if args.flutter_only else "development")
+    )
     steps = build_steps(
         args.include_mobile_release,
         args.desktop_platform,
         args.python_only,
-        android_debug_build=args.mobile_android_debug_build,
+        android_debug_build=args.mobile_android_debug_build or args.flutter_step == "mobile_android_debug_build",
     )
-    if args.flutter_only:
+    if args.flutter_only or args.flutter_step:
         steps = select_flutter_validation_steps(
             steps,
             android_debug_build_only=args.mobile_android_debug_build,
+            selected_step_name=args.flutter_step,
         )
         if not steps:
-            parser.error("選択されたplatformにFlutter stepがない")
+            parser.error("指定したFlutter stepが現在のplatformで利用できない")
 
     has_flutter = any(requires_isolated_flutter_workspace(step) for step in steps)
     workspace: IsolatedFlutterWorkspace | None = None
@@ -814,7 +854,11 @@ def main() -> int:
                 result["workspace_cleanup_retries"] = workspace.cleanup_retry_count
                 mark_workspace_cleanup_failure(result, exc)
 
-    evidence = platform_evidence_checks(args.desktop_platform, args.strict_release)
+    evidence = (
+        []
+        if args.flutter_step
+        else platform_evidence_checks(args.desktop_platform, args.strict_release)
+    )
     blockers = [
         result
         for result in results
@@ -833,7 +877,11 @@ def main() -> int:
             if check.classification == "release_blocker"
         )
     print_report(mode, args.desktop_platform, results, evidence, blockers)
-    required_step_names = {"mobile_android_debug_build"} if args.mobile_android_debug_build else set()
+    required_step_names = (
+        {step.name for step in steps}
+        if args.flutter_step
+        else ({"mobile_android_debug_build"} if args.mobile_android_debug_build else set())
+    )
     return validation_exit_code(results, blockers, required_step_names)
 
 

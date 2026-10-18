@@ -75,9 +75,11 @@ python tooling/conformance_tests/run_conformance_skeleton.py
 必要に応じてRust・Flutterの製品実装を別途検査します。
 
 ```bash
-cd native/rust_helper && cargo test
-cd apps/desktop_flutter && flutter analyze
+cargo test --manifest-path native/rust_helper/Cargo.toml
+python tooling/validate_all.py --flutter-step desktop_flutter_analyze --desktop-platform windows
 ```
+
+`--flutter-step`は指定したFlutter analyze／test／buildだけをOneDrive外の一時source snapshotで実行します。Desktop Flutter testでは先にRust helper buildも同じsnapshot内で行います。これは`validate_all.py`が列挙する検査の隔離経路であり、`flutter run`など任意のFlutter commandを隔離するものではありません。
 
 これらは**ソースからの開発・検証手順**であり、正式インストーラーの案内ではありません。環境差と既知の未解決検査は[現行進捗](docs/REV5_PRODUCT_PROGRESS.md)を正本とし、未実施テストをPASSと報告しません。[詳しい手順](QUICKSTART.md)を参照してください。
 

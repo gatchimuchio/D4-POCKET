@@ -74,6 +74,7 @@ from tooling.validate_all import (
     capture_mobile_android_debug_artifact,
     is_flutter_command,
     mark_workspace_cleanup_failure,
+    print_report,
     requires_isolated_flutter_workspace,
     select_flutter_validation_steps,
     python_step,
@@ -8261,6 +8262,57 @@ def test_flutter_temp_parent_rejects_onedrive_and_flutter_filter_includes_prereq
     return errors
 
 
+def test_validate_all_selects_one_flutter_step_and_required_prerequisite() -> list[str]:
+    steps = build_validation_steps(False, "windows")
+    selected_test = select_flutter_validation_steps(
+        steps,
+        selected_step_name="desktop_flutter_test",
+    )
+    selected_names = [step.name for step in selected_test]
+    expected = ["desktop_flutter_test_rust_helper_build", "desktop_flutter_test"]
+    errors = []
+    if selected_names != expected:
+        errors.append(
+            f"desktop Flutter testの対象限定選択がhelper前提を含まない／順序違い: {selected_names}"
+        )
+    if any(not requires_isolated_flutter_workspace(step) for step in selected_test):
+        errors.append("対象限定Flutter stepが隔離workspace経路を外れた")
+    if select_flutter_validation_steps(steps, selected_step_name="desktop_flutter_build_linux"):
+        errors.append("Windows hostで利用できないLinux build stepを選択できた")
+
+    android_steps = build_validation_steps(False, "windows", android_debug_build=True)
+    selected_android = select_flutter_validation_steps(
+        android_steps,
+        selected_step_name="mobile_android_debug_build",
+    )
+    if [step.name for step in selected_android] != ["mobile_android_debug_build"]:
+        errors.append("対象限定Android debug build選択が単独stepへ限定されていない")
+    if validation_exit_code(
+        [{"name": "mobile_flutter_analyze", "status": "not_run"}],
+        [],
+        {"mobile_flutter_analyze"},
+    ) != 1:
+        errors.append("対象限定stepのnot_runをexit code failureとして扱わない")
+    return errors
+
+
+def test_validate_all_targeted_flutter_report_does_not_claim_release_gate() -> list[str]:
+    previous_stdout = sys.stdout
+    captured = io.StringIO()
+    try:
+        sys.stdout = captured
+        print_report("flutter_step", "windows", [], [], [])
+    finally:
+        sys.stdout = previous_stdout
+    output = captured.getvalue()
+    errors = []
+    if "release_gate: 未評価" not in output:
+        errors.append("対象限定Flutter検査がrelease gateを評価済みと表示する")
+    if "release_gate:\n  status: pass" in output:
+        errors.append("対象限定Flutter検査が出荷判定PASSを表示する")
+    return errors
+
+
 def test_validate_all_routes_execution_to_isolated_flutter_root() -> list[str]:
     with tempfile.TemporaryDirectory(prefix="d4p-flutter-cwd-test-") as temporary:
         execution_root = Path(temporary)
@@ -11721,6 +11773,8 @@ def main() -> int:
         test_flutter_workspace_cleanup_supports_windows_long_paths,
         test_mobile_android_debug_build_isolated_artifact_and_failure_propagation,
         test_flutter_temp_parent_rejects_onedrive_and_flutter_filter_includes_prerequisites,
+        test_validate_all_selects_one_flutter_step_and_required_prerequisite,
+        test_validate_all_targeted_flutter_report_does_not_claim_release_gate,
         test_validate_all_routes_execution_to_isolated_flutter_root,
         test_release_docs_declare_language_policy_runtime_blockers,
         test_blue_tanuki_adapter_runtime_output_validates_against_generic_schema,

@@ -1,6 +1,8 @@
 # D4 Pocket / GUI-Shell rev5 Product-First 進捗
 
-最新状態（2026-10-18、B5自己適用継続）: B4はCLOSEDを維持。B5ではOneDrive外のWindows Flutter snapshot validationを施工し、Android debug `assembleDebug`を現行sourceから実行、APK生成とsnapshot cleanup（再試行1回）までPASS。同一439文字fixtureでは通常path lookup／cleanupが失敗し、extended-length cleanupが同一treeを回収する因果差を確認した。APK hash・source fingerprint・証拠限界は[B5自己適用記録](緩衝基盤_rev5補遺_QC/B5_自己適用.md)に記録。更新Conformance 252 checksで回帰を固定する。先行失敗runの一時rootは残存しており安全制約で削除していない。OneDrive同期serviceのsource-exact比較・復旧は未確認のためB5 OPEN。通常Release `task_execution=unsupported`、`release_ready=false`とrelease blockerは維持する。詳細は[B4製品接続設計](緩衝基盤_rev5補遺_QC/B4_製品接続設計.md)。
+最新状態（2026-10-18、B5自己適用継続）: B4はCLOSEDを維持。B5ではOneDrive外のWindows Flutter snapshot validationを施工し、Android debug `assembleDebug`を現行sourceから実行、APK生成とsnapshot cleanup（再試行1回）までPASS。同一439文字fixtureでは通常path lookup／cleanupが失敗し、extended-length cleanupが同一treeを回収する因果差を確認した。Flutter検査をsnapshotへ通す対象限定`--flutter-step`入口を追加し、README／QUICKSTARTの直接analyze案内を置換。Desktop analyze PASS（source commit `5defb14309d442ff2688e2d7d7bf75fd0dff5638`、実行時fingerprint `a5f88adb2bd3638c8e6383ef57098b7468eba99e4ad85cc0a49e32c33c585e1a`、106.9秒、cleanup PASS）、Conformance 254 checks PASS。APK hash・以前のsource fingerprint・証拠限界は[B5自己適用記録](緩衝基盤_rev5補遺_QC/B5_自己適用.md)に記録。先行失敗runの一時rootは残存しており安全制約で削除していない。OneDrive同期serviceのsource-exact比較・復旧は未確認のためB5 OPEN。通常Release `task_execution=unsupported`、`release_ready=false`とrelease blockerは維持する。詳細は[B4製品接続設計](緩衝基盤_rev5補遺_QC/B4製品接続設計.md)。
+
+対象限定Flutter検査の後続再測定（上記fingerprintを更新）: `desktop_flutter_analyze`はsource commit `5defb14309d442ff2688e2d7d7bf75fd0dff5638`、fingerprint `d88585b741244974cb1dcf0f26136eb7f02154bf405d6b148005d1c5c55fb7fc`でPASS（8.8秒、snapshot cleanup PASS）。出力の出荷判定は「未評価」。詳細と初回測定との区別は[B5自己適用記録](緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
 
 ### 2026-10-18 開発用製品出荷判定の誤検出是正
 
