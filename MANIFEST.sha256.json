@@ -5031,6 +5031,10 @@
       "sha256": "81208812c636f72ad8e0ea9b4682af311359228b27794768e4d9eea2ea4f45e6"
     },
     {
+      "path": "tooling/pktmon_packet_summary.ps1",
+      "sha256": "21203fe855a33668f4f89083ba81dcc24f9da26a50b260d55f09947c40985aa1"
+    },
+    {
       "path": "tooling/release_gate_check.py",
       "sha256": "19005530667a91fa10a68376f992726ba39e814b52209b9ad95e5a791f50cfe2"
     },
@@ -5053,6 +5057,10 @@
     {
       "path": "tooling/shell_snapshot.py",
       "sha256": "cb2c98f6f4d470e5a020d2668645aeb2bfd5827686e0fc8ad2ed71bfe1e4d105"
+    },
+    {
+      "path": "tooling/test_pktmon_packet_summary.ps1",
+      "sha256": "b02e0a3a5d6e1f3a83a790855e40b640e400ca718f449b423a63ed1c62f47ad1"
     },
     {
       "path": "tooling/ui_snapshot_tests/README.md",
