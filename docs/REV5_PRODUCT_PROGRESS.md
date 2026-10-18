@@ -4,6 +4,8 @@
 
 対象限定Flutter検査の後続再測定（上記fingerprintを更新）: `desktop_flutter_analyze`はsource commit `5defb14309d442ff2688e2d7d7bf75fd0dff5638`、fingerprint `d88585b741244974cb1dcf0f26136eb7f02154bf405d6b148005d1c5c55fb7fc`でPASS（8.8秒、snapshot cleanup PASS）。出力の出荷判定は「未評価」。詳細と初回測定との区別は[B5自己適用記録](緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
 
+対象限定Flutter testの後続実測: `desktop_flutter_test`はsource commit `d562588a67b64f4faddaba42053ded199de27c3d`、fingerprint `834ae65d0fae1704b1b35ab124b7c58f18b7b703c80123df843cf52a50e6ff78`で、Rust helper buildとFlutter test 224件がPASSし、snapshot cleanupもPASS。専用temp prefixの現在inventoryは1 rootで、関連build processは動作していないが、残存rootは削除していない。詳細は[B5自己適用記録](緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
+
 ### 2026-10-18 開発用製品出荷判定の誤検出是正
 
 開発検査の製品出荷判定が、未完成状態を説明する否定文・必要条件・履歴上の言及まで、完成製品の肯定的な宣言として扱い、現行文書に対して誤って失敗していた。原因は、複数文書を連結した後に語句の共存だけを調べ、文の肯定・否定を確認していなかったこと。
