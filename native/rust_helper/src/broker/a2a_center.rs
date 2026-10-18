@@ -946,32 +946,88 @@ mod tests {
         }))
         .expect("Agent Card JSON");
         let response_length = response_body.len();
-        let worker = thread::spawn(move || {
-            let (mut stream, _) = listener.accept().expect("Agent Card要求");
+        let worker = thread::spawn(move || -> Result<String, String> {
+            let (mut stream, peer) = listener
+                .accept()
+                .map_err(|error| format!("Agent Card要求受付失敗: {error}"))?;
+            let local = stream
+                .local_addr()
+                .map_err(|error| format!("Agent Card待受取得失敗: {error}"))?;
             // 全suite負荷時にもfixture serverがclient要求の到着前に閉じないようにする。
             stream
                 .set_read_timeout(Some(std::time::Duration::from_secs(10)))
-                .expect("要求読取期限");
+                .map_err(|error| {
+                    format!("peer={peer}; local={local}; read timeout設定失敗: {error}")
+                })?;
+            stream
+                .set_write_timeout(Some(std::time::Duration::from_secs(10)))
+                .map_err(|error| {
+                    format!("peer={peer}; local={local}; write timeout設定失敗: {error}")
+                })?;
             let mut request = Vec::new();
             let mut chunk = [0u8; 512];
             while !request.windows(4).any(|value| value == b"\r\n\r\n") {
-                let size = stream.read(&mut chunk).expect("要求読取");
-                assert!(size > 0);
+                let size = stream.read(&mut chunk).map_err(|error| {
+                    format!("peer={peer}; local={local}; HTTP要求読取失敗: {error}")
+                })?;
+                if size == 0 {
+                    return Err(format!(
+                        "peer={peer}; local={local}; header前に要求終了; received_bytes={}",
+                        request.len()
+                    ));
+                }
                 request.extend_from_slice(&chunk[..size]);
-                assert!(request.len() < 8192);
+                if request.len() >= 8192 {
+                    return Err(format!(
+                        "peer={peer}; local={local}; HTTP要求header上限超過; received_bytes={}",
+                        request.len()
+                    ));
+                }
             }
             let header = format!(
                 "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {response_length}\r\nConnection: close\r\n\r\n"
             );
             let mut response = header.into_bytes();
             response.extend_from_slice(&response_body);
-            stream.write_all(&response).expect("Agent Card応答");
-            stream.flush().expect("応答flush");
+            stream.write_all(&response).map_err(|error| {
+                format!(
+                    "peer={peer}; local={local}; 応答write_all失敗; response_bytes={}: {error}",
+                    response.len()
+                )
+            })?;
+            stream.flush().map_err(|error| {
+                format!(
+                    "peer={peer}; local={local}; 応答flush失敗; response_bytes={}: {error}",
+                    response.len()
+                )
+            })?;
             stream
                 .shutdown(std::net::Shutdown::Write)
-                .expect("応答側shutdown");
+                .map_err(|error| {
+                    format!("peer={peer}; local={local}; 応答shutdown失敗: {error}")
+                })?;
             let mut client_close = [0; 1];
-            assert_eq!(stream.read(&mut client_close).expect("相手側終了"), 0);
+            let peer_close = match stream.read(&mut client_close) {
+                Ok(0) => "peer_closed",
+                Err(error) if error.kind() == std::io::ErrorKind::ConnectionReset => {
+                    "reset_after_response"
+                }
+                Ok(size) => {
+                    return Err(format!(
+                        "peer={peer}; local={local}; 応答後の予期しないdata; bytes={size}"
+                    ));
+                }
+                Err(error) => {
+                    return Err(format!(
+                        "peer={peer}; local={local}; peer close観測失敗: {error}"
+                    ));
+                }
+            };
+            Ok(format!(
+                "peer={peer}; local={local}; request_bytes={}; response_bytes={}; response=written; peer_close={peer_close}",
+                request.len(),
+                response.len()
+            ))
         });
         let mut payload = valid_payload();
         payload["Agent Card URI"] =
@@ -983,7 +1039,12 @@ mod tests {
             true,
             "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         );
-        worker.join().expect("Agent Card試験worker");
+        let server_observation = worker.join().expect("Agent Card試験worker panic");
+        assert!(
+            server_observation.is_ok(),
+            "Agent Card fixture observation={server_observation:?}; Broker response={:?}",
+            connected.error
+        );
         assert_eq!(
             connected.status,
             BrokerStatus::Accepted,

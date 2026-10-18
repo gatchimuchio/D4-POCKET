@@ -264,10 +264,14 @@ fn http_get(endpoint: &Endpoint) -> Result<Vec<u8>, A2aError> {
             {
                 continue
             }
-            Err(_) => {
+            Err(error) => {
                 return Err(A2aError::new(
                     "a2a_connection_failed",
-                    "A2A Agent Card応答を読めない",
+                    format!(
+                        "A2A Agent Card応答を読めない: {:?}; stage=headers; received_bytes={}",
+                        error.kind(),
+                        bytes.len()
+                    ),
                 ))
             }
         }
@@ -378,10 +382,14 @@ fn http_get(endpoint: &Endpoint) -> Result<Vec<u8>, A2aError> {
             {
                 continue
             }
-            Err(_) => {
+            Err(error) => {
                 return Err(A2aError::new(
                     "a2a_connection_failed",
-                    "A2A Agent Card bodyを読めない",
+                    format!(
+                        "A2A Agent Card bodyを読めない: {:?}; stage=body; received_bytes={}",
+                        error.kind(),
+                        bytes.len()
+                    ),
                 ))
             }
         }
@@ -645,38 +653,98 @@ mod tests {
         let address = listener.local_addr().expect("接続先");
         let response_body = serde_json::to_vec(&card()).expect("Agent CardのJSON");
         let response_length = response_body.len();
-        let worker = thread::spawn(move || {
-            let (mut stream, _) = listener.accept().expect("Agent Card要求");
+        let worker = thread::spawn(move || -> Result<String, String> {
+            let (mut stream, peer) = listener
+                .accept()
+                .map_err(|error| format!("Agent Card要求受付失敗: {error}"))?;
+            let local = stream
+                .local_addr()
+                .map_err(|error| format!("Agent Card待受取得失敗: {error}"))?;
             // 全suite負荷時にもfixture serverがclient要求の到着前に閉じないようにする。
             stream
                 .set_read_timeout(Some(Duration::from_secs(10)))
-                .expect("要求読取期限");
+                .map_err(|error| {
+                    format!("peer={peer}; local={local}; 要求読取期限設定失敗: {error}")
+                })?;
+            stream
+                .set_write_timeout(Some(Duration::from_secs(10)))
+                .map_err(|error| {
+                    format!("peer={peer}; local={local}; 応答書込期限設定失敗: {error}")
+                })?;
             let mut request = Vec::new();
             let mut chunk = [0u8; 512];
             while !request.windows(4).any(|value| value == b"\r\n\r\n") {
-                let size = stream.read(&mut chunk).expect("要求読取");
-                assert!(size > 0, "header前に要求が終了");
+                let size = stream.read(&mut chunk).map_err(|error| {
+                    format!("peer={peer}; local={local}; 要求読取失敗: {error}")
+                })?;
+                if size == 0 {
+                    return Err(format!(
+                        "peer={peer}; local={local}; header前に要求終了; received_bytes={}",
+                        request.len()
+                    ));
+                }
                 request.extend_from_slice(&chunk[..size]);
-                assert!(request.len() < 8192, "要求header上限");
+                if request.len() >= 8192 {
+                    return Err(format!(
+                        "peer={peer}; local={local}; 要求header上限超過; received_bytes={}",
+                        request.len()
+                    ));
+                }
             }
             let header = format!(
                 "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {response_length}\r\nConnection: close\r\n\r\n"
             );
             let mut response = header.into_bytes();
             response.extend_from_slice(&response_body);
-            stream.write_all(&response).expect("Agent Card応答");
-            stream.flush().expect("応答flush");
+            stream.write_all(&response).map_err(|error| {
+                format!(
+                    "peer={peer}; local={local}; 応答write_all失敗; response_bytes={}: {error}",
+                    response.len()
+                )
+            })?;
+            stream.flush().map_err(|error| {
+                format!(
+                    "peer={peer}; local={local}; 応答flush失敗; response_bytes={}: {error}",
+                    response.len()
+                )
+            })?;
             stream
                 .shutdown(std::net::Shutdown::Write)
-                .expect("応答側shutdown");
+                .map_err(|error| {
+                    format!("peer={peer}; local={local}; 応答側shutdown失敗: {error}")
+                })?;
             let mut client_close = [0; 1];
-            assert_eq!(stream.read(&mut client_close).expect("相手側終了"), 0);
+            let peer_close = match stream.read(&mut client_close) {
+                Ok(0) => "peer_closed",
+                Err(error) if error.kind() == std::io::ErrorKind::ConnectionReset => {
+                    "reset_after_response"
+                }
+                Ok(size) => {
+                    return Err(format!(
+                        "peer={peer}; local={local}; 応答後の予期しないdata; bytes={size}"
+                    ));
+                }
+                Err(error) => {
+                    return Err(format!(
+                        "peer={peer}; local={local}; 応答後peer close観測失敗: {error}"
+                    ));
+                }
+            };
+            Ok(format!(
+                "peer={peer}; local={local}; request_bytes={}; response_bytes={}; response=written; peer_close={peer_close}",
+                request.len(),
+                response.len()
+            ))
         });
         let uri = format!("http://{address}/.well-known/agent-card.json");
         let projected = fetch_agent_card(&uri, "remote-agent-example", "1.0", &credential());
-        let worker_result = worker.join();
-        worker_result.expect("Agent Card試験worker");
-        let projected = projected.expect("loopback Agent Card射影");
+        let worker_result = worker.join().expect("Agent Card試験worker panic");
+        let server_observation = worker_result.unwrap_or_else(|error| {
+            panic!("Agent Card試験server失敗: {error}; client={projected:?}")
+        });
+        let projected = projected.unwrap_or_else(|error| {
+            panic!("loopback Agent Card射影失敗: {error:?}; server={server_observation}")
+        });
         assert_eq!(projected["証拠種別"], "LIVE_RUNTIME");
         assert_eq!(projected["公開範囲"], "metadata_only");
         assert_eq!(projected["Agent Card"]["origin"], "live_runtime");

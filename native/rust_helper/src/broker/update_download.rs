@@ -569,7 +569,7 @@ fn verify_existing_package(
     let mut file = match directory.open_with(&name, &options) {
         Ok(file) => file,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            return Ok(ExistingPackageState::Missing)
+            return Ok(ExistingPackageState::Missing);
         }
         Err(_) => return Err(DownloadError::Storage),
     };
@@ -1201,7 +1201,7 @@ mod tests {
         path: &'static str,
         bytes: &'static [u8],
         timeout: Duration,
-    ) -> (Client, Url, thread::JoinHandle<()>) {
+    ) -> (Client, Url, thread::JoinHandle<Result<String, String>>) {
         let certified = rcgen::generate_simple_self_signed(vec!["localhost".to_string()]).unwrap();
         let server_config = rustls::ServerConfig::builder()
             .with_no_client_auth()
@@ -1213,44 +1213,104 @@ mod tests {
             .unwrap();
         let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
         let address = listener.local_addr().unwrap();
-        let server = thread::spawn(move || {
-            let (stream, _) = listener.accept().unwrap();
+        let server = thread::spawn(move || -> Result<String, String> {
+            let (stream, peer) = listener
+                .accept()
+                .map_err(|error| format!("accept失敗: {error}"))?;
+            let local = stream
+                .local_addr()
+                .map_err(|error| format!("local_addr取得失敗: {error}"))?;
             stream
                 .set_read_timeout(Some(Duration::from_secs(10)))
-                .unwrap();
+                .map_err(|error| format!("read timeout設定失敗: {error}"))?;
             stream
                 .set_write_timeout(Some(Duration::from_secs(10)))
-                .unwrap();
+                .map_err(|error| format!("write timeout設定失敗: {error}"))?;
             let connection = rustls::ServerConnection::new(Arc::new(server_config)).unwrap();
             let mut tls = rustls::StreamOwned::new(connection, stream);
             let mut request = String::new();
+            let mut read_failure = None;
             {
                 let mut reader = BufReader::new(&mut tls);
                 loop {
                     let mut line = String::new();
-                    reader.read_line(&mut line).unwrap();
+                    if let Err(error) = reader.read_line(&mut line) {
+                        read_failure = Some(format!("{:?}: {error}", error.kind()));
+                        break;
+                    }
                     if line == "\r\n" || line.is_empty() {
                         break;
                     }
                     request.push_str(&line);
-                    assert!(request.len() <= 16 * 1024);
+                    if request.len() > 16 * 1024 {
+                        return Err(format!(
+                            "peer={peer}; local={local}; TLS要求header上限超過; bytes={}",
+                            request.len()
+                        ));
+                    }
                 }
+            }
+            if let Some(error) = read_failure {
+                return Err(format!(
+                    "peer={peer}; local={local}; tls_handshaking={}; request_bytes={}; read_error={error}",
+                    tls.conn.is_handshaking(),
+                    request.len()
+                ));
             }
             let request_target = request
                 .lines()
                 .next()
                 .and_then(|line| line.split_whitespace().nth(1));
-            assert_eq!(request_target, Some(path), "要求先は固定catalog path");
+            if request_target != Some(path) {
+                return Err(format!(
+                    "peer={peer}; local={local}; TLS要求先不一致; target={request_target:?}"
+                ));
+            }
             write!(
                 tls,
                 "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
                 bytes.len()
             )
-            .unwrap();
-            tls.write_all(bytes).unwrap();
-            tls.flush().unwrap();
+            .map_err(|error| {
+                format!("peer={peer}; local={local}; response header書込失敗: {error}")
+            })?;
+            tls.write_all(bytes).map_err(|error| {
+                format!("peer={peer}; local={local}; response body書込失敗: {error}")
+            })?;
+            tls.flush().map_err(|error| {
+                format!("peer={peer}; local={local}; response flush失敗: {error}")
+            })?;
             tls.conn.send_close_notify();
-            let _ = tls.flush();
+            tls.flush().map_err(|error| {
+                format!("peer={peer}; local={local}; close_notify flush失敗: {error}")
+            })?;
+            tls.sock
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .map_err(|error| {
+                    format!("peer={peer}; local={local}; drain timeout設定失敗: {error}")
+                })?;
+            let mut discarded = [0u8; 512];
+            let peer_close = loop {
+                match tls.read(&mut discarded) {
+                    Ok(0) => break "graceful_tls_close",
+                    Ok(read) => {
+                        return Err(format!(
+                            "peer={peer}; local={local}; response後に予期しないTLS data; bytes={read}"
+                        ));
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::ConnectionReset => {
+                        break "reset_after_response";
+                    }
+                    Err(error) => {
+                        return Err(format!(
+                            "peer={peer}; local={local}; response後peer close観測失敗: {error}"
+                        ));
+                    }
+                }
+            };
+            Ok(format!(
+                "peer={peer}; local={local}; response=written; peer_close={peer_close}"
+            ))
         });
         let root = Certificate::from_der(certified.cert.der().as_ref()).unwrap();
         let client = build_download_client("localhost", &[address], &[root], timeout).unwrap();
@@ -1280,7 +1340,7 @@ mod tests {
             )
             .await
         });
-        server.join().unwrap();
+        server.join().unwrap().unwrap();
         assert_eq!(result.unwrap(), bytes);
     }
 
@@ -1298,10 +1358,18 @@ mod tests {
                 .header(ACCEPT_ENCODING, "identity")
                 .send()
                 .await
-                .unwrap();
-            receive_bounded_document(response, 4, std::time::Instant::now() + CATALOG_TIMEOUT).await
+                .map_err(|error| format!("{error:?}"))?;
+            Ok::<_, String>(
+                receive_bounded_document(response, 4, std::time::Instant::now() + CATALOG_TIMEOUT)
+                    .await,
+            )
         });
-        server.join().unwrap();
+        let server_result = server.join().unwrap();
+        let result = result.unwrap_or_else(|error| {
+            panic!("TLS catalog要求失敗: client={error}; server={server_result:?}")
+        });
+        let server_observation = server_result.unwrap();
+        assert!(server_observation.contains("response=written"));
         assert_eq!(result, Err(DownloadError::DocumentTooLarge));
     }
 
@@ -1351,7 +1419,7 @@ mod tests {
                 .await
             })
             .unwrap();
-        server.join().unwrap();
+        server.join().unwrap().unwrap();
         assert_eq!(result.file_name, format!("{digest}.pkg"));
         assert_eq!(result.disposition, PackageDisposition::RepairedCorrupt);
         assert_eq!(std::fs::read(path.join(&result.file_name)).unwrap(), bytes);
@@ -1376,28 +1444,33 @@ mod tests {
             .enable_all()
             .build()
             .unwrap();
-        let response = runtime.block_on(async {
-            client
+        let result = runtime.block_on(async {
+            let response = client
                 .get(url)
                 .header(ACCEPT_ENCODING, "identity")
                 .send()
                 .await
-        });
-        let response = response.unwrap();
-        let result = runtime.block_on(async {
-            receive_package(
-                &directory,
-                response,
-                &trusted_digest,
-                trusted_bytes.len() as u64,
-                true,
-                &AtomicBool::new(false),
-                std::time::Instant::now() + Duration::from_secs(30),
-                &mut |_| {},
+                .map_err(|error| format!("{error:?}"))?;
+            Ok::<_, String>(
+                receive_package(
+                    &directory,
+                    response,
+                    &trusted_digest,
+                    trusted_bytes.len() as u64,
+                    true,
+                    &AtomicBool::new(false),
+                    std::time::Instant::now() + Duration::from_secs(30),
+                    &mut |_| {},
+                )
+                .await,
             )
-            .await
         });
-        server.join().unwrap();
+        let server_result = server.join().unwrap();
+        let result = result.unwrap_or_else(|error| {
+            panic!("TLS取得失敗: client={error}; server={server_result:?}")
+        });
+        let server_observation = server_result.unwrap();
+        assert!(server_observation.contains("response=written"));
         assert_eq!(result, Err(DownloadError::DigestMismatch));
         assert_eq!(
             std::fs::read(path.join(&final_name)).unwrap(),

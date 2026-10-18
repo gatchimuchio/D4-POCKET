@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "c811e7d98f2be9992adc047d0784de77f7d7666023f8fdc74803625cc57e2c3b"
+      "sha256": "8ba469bc830d2fe9a33a848967a4cdad37a28dffdbe502bfe2a6cdda054bf200"
     },
     {
       "path": "SECURITY.md",
@@ -1288,7 +1288,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "6afbecd8ffdc8ce91069c105b669f98de50a68f7ce7f8b76120229463527c408"
+      "sha256": "b5d52bf1ab18d5e493acfcb8e9a69c0d8af6c01ae81611ff6f19cafdc7f74cc9"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1676,7 +1676,7 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B5_\u81ea\u5df1\u9069\u7528.md",
-      "sha256": "abb85951d89d4d8d23b771bbc6fc11baaf1cc21d92c35b4ff0b106810ab623ab"
+      "sha256": "c899027b2fd1fe67f705f09241b249f5f02049000791fc57e284cb81f6e26fbe"
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/\u5b9f\u88c5\u4ed5\u69d8\u66f8.md",
@@ -1692,7 +1692,7 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/\u63a1\u7528\u8a18\u9332.md",
-      "sha256": "93c3e01e86ef63689515d9b194d29d8379d3262084b5d805e7085264c25ed61e"
+      "sha256": "c1cf651e5c580f6c7b8e70104052ec0b312af5ec094b91b72c8f29410443b5db"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -3384,7 +3384,7 @@
     },
     {
       "path": "native/rust_helper/src/a2a.rs",
-      "sha256": "d490bd114297904c4a846a8251fce43c64741c10d9c14426be194adac9ea36f8"
+      "sha256": "53d626db3f1697a95c8115edbf30846f15060e1f281363e9b66e1095623c9808"
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
@@ -3396,7 +3396,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/minidora.rs",
-      "sha256": "84756c85b38b7e7d2de59dd99b4589c7f733edad0675a5432452d517565e6260"
+      "sha256": "c644d355d46196684882b0151a5c26f4a61af9c7cd5f3ea133a125bbf2a49e59"
     },
     {
       "path": "native/rust_helper/src/adapters/mod.rs",
@@ -3428,7 +3428,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/a2a_center.rs",
-      "sha256": "144e0484c0188d682f3fb80653e307c1775ece9662346776610fdabb27543a03"
+      "sha256": "0264eac98e0e3d444345a5a3bb2318c4f39370e8c25b0837c0e1c66b0c99feae"
     },
     {
       "path": "native/rust_helper/src/broker/adapter_center.rs",
@@ -3592,7 +3592,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
-      "sha256": "54e5416e3619dd95dd95bb31fe982b4fa17d0d7ba2fc1b8393489cd367d2993d"
+      "sha256": "5ad0c0e92be4173538127ddabea468283136e69511f21f2b787f915bf0776cfa"
     },
     {
       "path": "native/rust_helper/src/broker/update_download/windows_dns.rs",

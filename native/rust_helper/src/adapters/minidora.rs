@@ -44,6 +44,19 @@ fn c28_io_diagnostic(route: &str, stage: &'static str, error: &std::io::Error) {
     c28_diagnostic(route, stage, &format!("{:?}", error.kind()));
 }
 
+fn c28_read_diagnostic(
+    route: &str,
+    stage: &'static str,
+    error: &std::io::Error,
+    received_bytes: usize,
+) {
+    c28_diagnostic(
+        route,
+        stage,
+        &format!("{:?}; received_bytes={received_bytes}", error.kind()),
+    );
+}
+
 pub struct MinidoraAdapter {
     接続先: SocketAddr,
 }
@@ -115,7 +128,7 @@ impl MinidoraAdapter {
                 Ok(n) => buffer.extend_from_slice(&chunk[..n]),
                 Err(e) if 待機可能(&e) => continue,
                 Err(error) => {
-                    c28_io_diagnostic(経路, "read_headers", &error);
+                    c28_read_diagnostic(経路, "read_headers", &error, buffer.len());
                     return Err(対話失敗::通信失敗);
                 }
             }
@@ -187,7 +200,7 @@ impl MinidoraAdapter {
                 Ok(n) => buffer.extend_from_slice(&chunk[..n]),
                 Err(e) if 待機可能(&e) => continue,
                 Err(error) => {
-                    c28_io_diagnostic(経路, "read_body", &error);
+                    c28_read_diagnostic(経路, "read_body", &error, buffer.len());
                     return Err(対話失敗::通信失敗);
                 }
             }
@@ -335,29 +348,93 @@ impl 実行系Adapter for MinidoraAdapter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn 一回応答(raw: Vec<u8>) -> (MinidoraAdapter, std::thread::JoinHandle<()>) {
+    fn 一回応答(
+        raw: Vec<u8>,
+    ) -> (
+        MinidoraAdapter,
+        std::thread::JoinHandle<Result<String, String>>,
+    ) {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let adapter = MinidoraAdapter::new(&listener.local_addr().unwrap().to_string()).unwrap();
-        let worker = std::thread::spawn(move || {
-            let (mut stream, _) = listener.accept().unwrap();
+        let worker = std::thread::spawn(move || -> Result<String, String> {
+            let (mut stream, peer) = listener
+                .accept()
+                .map_err(|error| format!("fixture accept失敗: {error}"))?;
+            let local = stream
+                .local_addr()
+                .map_err(|error| format!("fixture local_addr取得失敗: {error}"))?;
             // 全suite負荷時にもclientが要求を送る前にfixture serverが閉じないよう、
             // 試験用待受だけ十分な余裕を持たせる。production期限は変更しない。
             stream
                 .set_read_timeout(Some(Duration::from_secs(10)))
-                .unwrap();
+                .map_err(|error| {
+                    format!("peer={peer}; local={local}; read timeout設定失敗: {error}")
+                })?;
+            stream
+                .set_write_timeout(Some(Duration::from_secs(10)))
+                .map_err(|error| {
+                    format!("peer={peer}; local={local}; write timeout設定失敗: {error}")
+                })?;
             let mut request = Vec::new();
             let mut buffer = [0; 512];
             while !request.windows(4).any(|value| value == b"\r\n\r\n") {
-                let size = stream.read(&mut buffer).expect("HTTP要求読取");
-                assert!(size > 0, "header前に要求が終了");
+                let size = stream.read(&mut buffer).map_err(|error| {
+                    format!("peer={peer}; local={local}; HTTP要求読取失敗: {error}")
+                })?;
+                if size == 0 {
+                    return Err(format!(
+                        "peer={peer}; local={local}; header前に要求終了; received_bytes={}",
+                        request.len()
+                    ));
+                }
                 request.extend_from_slice(&buffer[..size]);
-                assert!(request.len() < 16 * 1024, "HTTP要求header上限");
+                if request.len() >= 16 * 1024 {
+                    return Err(format!(
+                        "peer={peer}; local={local}; HTTP要求header上限超過; received_bytes={}",
+                        request.len()
+                    ));
+                }
             }
-            let _ = stream.write_all(&raw);
-            let _ = stream.flush();
-            let _ = stream.shutdown(std::net::Shutdown::Write);
+            let response_bytes = raw.len();
+            let mut write_result = stream.write_all(&raw).map_err(|error| {
+                format!(
+                    "peer={peer}; local={local}; response write_all失敗; response_bytes={response_bytes}: {error}"
+                )
+            });
+            if write_result.is_ok() {
+                write_result = stream.flush().map_err(|error| {
+                    format!(
+                        "peer={peer}; local={local}; response flush失敗; response_bytes={response_bytes}: {error}"
+                    )
+                });
+            }
+            if write_result.is_ok() {
+                write_result = stream.shutdown(std::net::Shutdown::Write).map_err(|error| {
+                    format!("peer={peer}; local={local}; response shutdown失敗: {error}")
+                });
+            }
+            write_result?;
             let mut client_close = [0; 1];
-            let _ = stream.read(&mut client_close);
+            let peer_close = match stream.read(&mut client_close) {
+                Ok(0) => "peer_closed",
+                Err(error) if error.kind() == std::io::ErrorKind::ConnectionReset => {
+                    "reset_after_response"
+                }
+                Ok(size) => {
+                    return Err(format!(
+                        "peer={peer}; local={local}; response後の予期しないdata; bytes={size}"
+                    ));
+                }
+                Err(error) => {
+                    return Err(format!(
+                        "peer={peer}; local={local}; peer close観測失敗: {error}"
+                    ));
+                }
+            };
+            Ok(format!(
+                "peer={peer}; local={local}; request_bytes={}; response_bytes={response_bytes}; response=written; peer_close={peer_close}",
+                request.len()
+            ))
         });
         (adapter, worker)
     }
@@ -372,23 +449,30 @@ mod tests {
             "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nContent-Type: text/html\r\n\r\n{}",
         ] {
             let (a,w)=一回応答(raw.as_bytes().to_vec());
-            assert!(a.取得("/health",None,&AtomicBool::new(false),Instant::now()+Duration::from_secs(2)).is_err()); w.join().unwrap();
+            assert!(a.取得("/health",None,&AtomicBool::new(false),Instant::now()+Duration::from_secs(2)).is_err()); let _ = w.join().expect("HTTP試験用workerが異常終了");
         }
     }
     #[test]
     fn ContentLength付きJSONだけを期限内に取得する() {
         let (a,w)=一回応答(b"HTTP/1.0 200 OK\r\nContent-Length: 2\r\nContent-Type: application/json; charset=utf-8\r\n\r\n{}".to_vec());
-        assert_eq!(
-            a.取得(
-                "/health",
-                None,
-                &AtomicBool::new(false),
-                Instant::now() + Duration::from_secs(10)
-            )
-            .unwrap(),
-            b"{}"
+        let result = a.取得(
+            "/health",
+            None,
+            &AtomicBool::new(false),
+            Instant::now() + Duration::from_secs(10),
         );
-        w.join().unwrap();
+        let server_observation = w.join().expect("HTTP試験用workerが異常終了");
+        let body = result.unwrap_or_else(|error| {
+            panic!("Minidora Content-Length応答取得失敗: client={error:?}; server={server_observation:?}")
+        });
+        let server_observation = server_observation.unwrap_or_else(|error| {
+            panic!(
+                "Minidora fixture server失敗: {error}; client応答byte数={}",
+                body.len()
+            )
+        });
+        assert_eq!(body, b"{}");
+        assert!(server_observation.contains("response=written"));
         assert_eq!(
             a.取得(
                 "/health",
