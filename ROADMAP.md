@@ -1,5 +1,7 @@
 # GUI Shell ロードマップ
 
+後続追補（2026-10-18、BUF-T04）: current source commit `60f10fa`からWindows isolated snapshotでAndroid debug APK buildがPASS（Flutter 3.44.0、cleanup retry 1回後PASS）。これは開発用buildのみで、実機／配布／OneDrive同期serviceを証明しない。`BUF-T04`部分観測、B5 OPEN。詳細は[B5自己適用記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
+
 後続追補（2026-10-18）: 同一Rust test-support SHA `C5D7C52996FCC8A898B6F65C77A84963875890DB12A6D19CA1BB950ED64BF487`のOneDrive source／TEMP target parallel suiteは535件中523 passed／0 failed／12 ignored。本追補は下記の先行snapshotにある「最新suite」の数値だけを更新し、522／1 failed等のFAIL履歴を保持する。間欠failureの根因は未確定。`BUF-T05`／B5 OPEN、通常Release `task_execution=unsupported`、`release_ready=false`を維持。詳細は[B5自己適用記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
 
 最新状態（2026-10-18、B5自己適用継続）: B4はCLOSED、B5はOPEN。今回のtest-support診断差分（`codex_loopback_responses.rs` SHA-256 `C5D7C52996FCC8A898B6F65C77A84963875890DB12A6D19CA1BB950ED64BF487`）でRust 1.95.0整形、focused test、`r2-e2e` check、Conformance 254 checks、Manifest 1252 filesの検査はPASS。並列Rust library suiteは522 passed／1 failed／12 ignoredでMinidora Content-Length fixtureのfailureが残る。ConnectionResetの発生主体と共通根因は未確定で、`BUF-T05`／`FQ-TEST-LOOPBACK`はOPEN。以前のWindows手動Rust run [39096100428](https://github.com/gatchimuchio/D4-POCKET/actions/runs/39096100428)（対象commit `1ac291c`、569 passed／0 failed／13 ignored、Broker smoke／cleanup PASS）は今回のsource差分を検証したものではない。`BUF-T04` OneDrive source-exact比較、`BUF-T06` OS拒否policy帰属は未確定。`BUF-T23`は共有cache直後差分のみの部分観測である。通常Release `task_execution=unsupported`、`release_ready=false`、既存release blockerは維持する。詳細は[現行進捗](docs/REV5_PRODUCT_PROGRESS.md)と[B5自己適用記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
