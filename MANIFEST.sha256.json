@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "94c76d14cc9c596c1b023d48fdb631a65838db2796c36bb0499ecb0752110ae0"
+      "sha256": "fed5cf607a7d11b3b35dfaefd891130ae05ee1c570722e74fbcc76e39ab962c4"
     },
     {
       "path": "SECURITY.md",
@@ -1288,7 +1288,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "142213e9e375afc5d54ae8b7161c6e95857cadf5147f2c7ba7f22f6f494a0277"
+      "sha256": "deb247a65a75f462be09065c40c8ad25dc0481006ab31e7f7d86682b9a78bc85"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1692,7 +1692,7 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/\u63a1\u7528\u8a18\u9332.md",
-      "sha256": "a1802841f72b882409f30554edbfb3fb28aa66009556e4296a5c0b7481953344"
+      "sha256": "c4c64670935bdf3446208b685e0d91a94c8857c9674192406f4782ca008e3623"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
