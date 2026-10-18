@@ -1,6 +1,6 @@
 # GUI Shell ロードマップ
 
-後続追補（2026-10-18、BUF-T04 current-source path comparison）: `b046430`同一tracked Flutter sourceの45文字rootで日本語OneDrive pathはAndroid Gradle Pluginの非ASCII拒否、同長ASCII OneDrive pathはAPK build成功。ただしAPK／最長生成fileはShellで`同期保留中`となり、同期完了／失敗は未観測。検証copyは回収し、同source isolated snapshot buildも成功・cleanup PASS。画像の`flutter_secure_storage` pathは現sourceに存在せず、元source／command未特定のため`BUF-T04`は部分観測、B5 OPEN。詳細は[現行進捗](docs/REV5_PRODUCT_PROGRESS.md)と[B5自己適用記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
+後続追補（2026-10-18、BUF-T04 current-source path comparison）: `b046430`同一tracked Flutter sourceの45文字rootで日本語OneDrive pathはAndroid Gradle Pluginの非ASCII拒否、同長ASCII OneDrive pathはAPK build成功。ただしAPK／最長生成fileはShellで`同期保留中`となり、同期完了／失敗は未観測。検証copyは回収し、同source isolated snapshot buildも成功・cleanup PASS。画像の時刻（2026-09-23 15:10 JST）直前のGit candidate `2491428`には`flutter_secure_storage 11.0.0`があり画像pathと整合するが、当時の未commit差分・実commandは未確認。source-exact再現は未成立のため`BUF-T04`部分観測、B5 OPEN。詳細は[現行進捗](docs/REV5_PRODUCT_PROGRESS.md)と[B5自己適用記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
 
 後続追補（2026-10-18、現行main Windows Rust suite）: sourceは`main`／`origin/main`一致の`b38d4022627f6c163709960dff887f467b3ec153`。隔離Cargo runnerのWindows全target逐次suiteは569 passed／0 failed／13 ignored、既定並列lib suiteは521 passed／2 failed／12 ignored。A2A Center timeoutとUpdate TLSのWinsock 10054が再現したが、根因は未確定。Cargo一時targetは回収済み。`BUF-T05`／`FQ-TEST-LOOPBACK`／B5 OPEN、通常Release `task_execution=unsupported`、`release_ready=false`、既存blockerを維持する。詳細は[現行進捗](docs/REV5_PRODUCT_PROGRESS.md)と[B5自己適用記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
 
