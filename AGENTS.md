@@ -758,7 +758,7 @@ QEは要求・設計・実装・観測・是正を通じた上位思想である
 
 履歴snapshot（2026-10-12）: P2 Compare／P3 Handoff／P12 Windows／P13 Mobile・Non-Windowsは局所CLOSED、B0〜B3はCLOSED、B4-L1／B4-L2は局所CLOSED、当時のB4全体はOPEN。B4統合製品経路は2026-10-17に限定Acceptanceを満たしてCLOSEDとなった。詳細は現行進捗とB4記録を参照する。
 
-現行の施工境界: 2026-10-18の現行進捗ではB4はCLOSED、B5はOPEN。B5ではWindows Flutter検証snapshot隔離とAndroid debug buildが記録済みだが、`BUF-T04`は部分観測、`BUF-T05`／`BUF-T06`はOPENである。次作業は現行B5記録の未成立条件から選び、OneDrive同期復旧や製品全体完成へ証拠を拡大しない。B4を再施工するのは再現可能なregressionが確認された場合に限る。Linux v1.1追加文書は未採用の正本候補として扱い、別途採用されるまでは工程開始根拠にしない。正式Q0〜Q7は`DEFERRED`を維持し、新候補の開始条件はその現行責任正本に従う。
+現行の施工境界（2026-10-19）: B4はCLOSED、B5はOPEN。B5ではWindows Flutter検証snapshot隔離とAndroid debug buildが記録済みで、`BUF-T04`は部分観測、`BUF-T05`／`BUF-T06`はOPEN、`BUF-T23`は部分観測である。Windows hosted run #52は診断workflowのRust全target・Release Broker build・IPC smoke・capture cleanupを通したが、loopback RSTの方向・発生主体・根因は未確定で、B5完了の証拠ではない。次作業は現行B5記録の未成立条件から選び、OneDrive同期復旧や製品全体完成へ証拠を拡大しない。B4を再施工するのは再現可能なregressionが確認された場合に限る。Linux v1.1追加文書は未採用の正本候補として扱い、別途採用されるまでは工程開始根拠にしない。正式Q0〜Q7は`DEFERRED`を維持し、新候補の開始条件はその現行責任正本に従う。
 
 CLOSEDを理由なく再施工しない。Linux未実装をP13やWindows B4の局所完了記録へ遡及させない。B3の153原因対応行の分類を全原因の解消や全緩衝作用の実証と呼ばない。既存R2-A〜H、`FQ-TEST-LOOPBACK`、取得不能証拠の残余を維持する。
 
