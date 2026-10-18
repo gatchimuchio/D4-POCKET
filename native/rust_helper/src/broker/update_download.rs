@@ -1332,16 +1332,25 @@ mod tests {
                 .header(ACCEPT_ENCODING, "identity")
                 .send()
                 .await
-                .unwrap();
+                .map_err(|error| format!("更新一覧のHTTP要求失敗: {error:?}"))?;
             receive_bounded_document(
                 response,
                 MAX_CATALOG_BYTES,
                 std::time::Instant::now() + CATALOG_TIMEOUT,
             )
             .await
+            .map_err(|error| format!("更新一覧応答の読取り失敗: {error:?}"))
         });
-        server.join().unwrap().unwrap();
-        assert_eq!(result.unwrap(), bytes);
+        let server_result = server
+            .join()
+            .unwrap_or_else(|_| Err("TLS試験用server threadがpanicした".to_string()));
+        let result = result.unwrap_or_else(|client_error| {
+            panic!("更新一覧受信失敗: client={client_error}; server={server_result:?}")
+        });
+        let server_observation = server_result
+            .unwrap_or_else(|server_error| panic!("更新一覧TLS試験用server失敗: {server_error}"));
+        assert!(server_observation.contains("response=written"));
+        assert_eq!(result, bytes);
     }
 
     #[test]

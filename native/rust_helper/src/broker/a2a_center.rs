@@ -1048,7 +1048,7 @@ mod tests {
         assert_eq!(
             connected.status,
             BrokerStatus::Accepted,
-            "{:?}",
+            "Broker応答={:?}。Agent Card試験用serverの観測={server_observation:?}",
             connected.error
         );
         assert_eq!(

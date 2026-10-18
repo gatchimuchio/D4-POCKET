@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "1dc9950ef139937c74efdec6cd3a647bc49719401aeb619ff3b10f09ffb2e2ae"
+      "sha256": "e4e85bafa0dc488070044d9195f83ba0bd6fa5b39d7fe465f49135329140dc4e"
     },
     {
       "path": "SECURITY.md",
@@ -1288,7 +1288,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "a791ddfc00c5029dbc2daf6a878970afd265099c590431d5d958397e4f6db85b"
+      "sha256": "e2e5890cb33c3d9ade2e8bae147c30a5e5e16f524970ce580df1d2f08fc9fde9"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1676,7 +1676,7 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B5_\u81ea\u5df1\u9069\u7528.md",
-      "sha256": "499d598869d8dad819f622361840ca1e33b36bc623b9dab77d6441841f761bcb"
+      "sha256": "7b3f53481a77368eeffa1469cd4cf1c4fd0b1c8c179193fd3f0ef1cbbf621359"
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/\u5b9f\u88c5\u4ed5\u69d8\u66f8.md",
@@ -3428,7 +3428,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/a2a_center.rs",
-      "sha256": "0264eac98e0e3d444345a5a3bb2318c4f39370e8c25b0837c0e1c66b0c99feae"
+      "sha256": "c941a90e8218ef82697fc5cdf991f11ce1a5b8eaf7e6290e15d1462c624b3dce"
     },
     {
       "path": "native/rust_helper/src/broker/adapter_center.rs",
@@ -3592,7 +3592,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
-      "sha256": "5ad0c0e92be4173538127ddabea468283136e69511f21f2b787f915bf0776cfa"
+      "sha256": "d1558bc1b5b511754cf9f54e395395c4836c9e47aced45144296c8660e1c8598"
     },
     {
       "path": "native/rust_helper/src/broker/update_download/windows_dns.rs",
