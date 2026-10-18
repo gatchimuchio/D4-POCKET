@@ -236,14 +236,19 @@ fn http_get(endpoint: &Endpoint) -> Result<Vec<u8>, A2aError> {
     stream
         .flush()
         .map_err(|_| A2aError::new("a2a_connection_failed", "A2A Agent Card要求をflushできない"))?;
-    let deadline = Instant::now() + Duration::from_secs(5);
+    let response_started_at = Instant::now();
+    let deadline = response_started_at + Duration::from_secs(5);
     let mut bytes = Vec::new();
     let mut chunk = [0u8; 8192];
     let (body_start, body_length) = loop {
         if Instant::now() >= deadline {
             return Err(A2aError::new(
                 "a2a_timeout",
-                "A2A Agent Card応答が期限を超過",
+                format!(
+                    "A2A Agent Card応答が期限を超過; stage=headers; received_bytes={}; elapsed_ms={}",
+                    bytes.len(),
+                    response_started_at.elapsed().as_millis()
+                ),
             ));
         }
         match stream.read(&mut chunk) {
@@ -359,7 +364,12 @@ fn http_get(endpoint: &Endpoint) -> Result<Vec<u8>, A2aError> {
         if Instant::now() >= deadline {
             return Err(A2aError::new(
                 "a2a_timeout",
-                "A2A Agent Card bodyが期限を超過",
+                format!(
+                    "A2A Agent Card bodyが期限を超過; stage=body; received_bytes={}; expected_bytes={}; elapsed_ms={}",
+                    bytes.len().saturating_sub(body_start),
+                    body_length,
+                    response_started_at.elapsed().as_millis()
+                ),
             ));
         }
         let remaining = body_start + body_length - bytes.len();
@@ -654,9 +664,11 @@ mod tests {
         let response_body = serde_json::to_vec(&card()).expect("Agent CardのJSON");
         let response_length = response_body.len();
         let worker = thread::spawn(move || -> Result<String, String> {
+            let started_at = std::time::Instant::now();
             let (mut stream, peer) = listener
                 .accept()
                 .map_err(|error| format!("Agent Card要求受付失敗: {error}"))?;
+            let accepted_at = std::time::Instant::now();
             let local = stream
                 .local_addr()
                 .map_err(|error| format!("Agent Card待受取得失敗: {error}"))?;
@@ -691,6 +703,7 @@ mod tests {
                     ));
                 }
             }
+            let request_received_at = std::time::Instant::now();
             let header = format!(
                 "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {response_length}\r\nConnection: close\r\n\r\n"
             );
@@ -713,6 +726,7 @@ mod tests {
                 .map_err(|error| {
                     format!("peer={peer}; local={local}; 応答側shutdown失敗: {error}")
                 })?;
+            let response_written_at = std::time::Instant::now();
             let mut client_close = [0; 1];
             let peer_close = match stream.read(&mut client_close) {
                 Ok(0) => "peer_closed",
@@ -730,20 +744,29 @@ mod tests {
                     ));
                 }
             };
+            let peer_closed_at = std::time::Instant::now();
             Ok(format!(
-                "peer={peer}; local={local}; request_bytes={}; response_bytes={}; response=written; peer_close={peer_close}",
+                "peer={peer}; local={local}; request_bytes={}; response_bytes={}; response=written; peer_close={peer_close}; accepted_after_ms={}; request_received_after_ms={}; response_written_after_ms={}; peer_closed_after_ms={}",
                 request.len(),
-                response.len()
+                response.len(),
+                accepted_at.duration_since(started_at).as_millis(),
+                request_received_at.duration_since(started_at).as_millis(),
+                response_written_at.duration_since(started_at).as_millis(),
+                peer_closed_at.duration_since(started_at).as_millis()
             ))
         });
         let uri = format!("http://{address}/.well-known/agent-card.json");
+        let client_started_at = std::time::Instant::now();
         let projected = fetch_agent_card(&uri, "remote-agent-example", "1.0", &credential());
+        let client_elapsed_ms = client_started_at.elapsed().as_millis();
         let worker_result = worker.join().expect("Agent Card試験worker panic");
         let server_observation = worker_result.unwrap_or_else(|error| {
             panic!("Agent Card試験server失敗: {error}; client={projected:?}")
         });
         let projected = projected.unwrap_or_else(|error| {
-            panic!("loopback Agent Card射影失敗: {error:?}; server={server_observation}")
+            panic!(
+                "loopback Agent Card射影失敗: {error:?}; client_elapsed_ms={client_elapsed_ms}; server={server_observation}"
+            )
         });
         assert_eq!(projected["証拠種別"], "LIVE_RUNTIME");
         assert_eq!(projected["公開範囲"], "metadata_only");

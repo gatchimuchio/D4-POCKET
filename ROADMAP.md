@@ -1,5 +1,7 @@
 # GUI Shell ロードマップ
 
+後続追補（2026-10-18、BUF-T05 A2A timeout診断）: current `a2a.rs` SHA-256 `34D799942042AEF254ADA530BBCD8884468A91A5C59CC456A4E661C39375B253`に、HTTP期限を維持したstage／受信量／時刻診断を追加。既定並列library suiteは523 passed／0 failed／12 ignoredだが、直前sourceでのA2A timeoutはFAIL履歴として保持し根因未確定。`BUF-T05`／B5 OPEN、`task_execution=unsupported`、`release_ready=false`。詳細は[B5自己適用記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
+
 後続追補（2026-10-18、画像時刻直前の候補ソースによるAPK作成）: Git候補`2491428`をOneDriveの外にある一時作業領域へ複製し、Android用デバッグAPKを作成した。処理は`exit 0`、APKは155,922,298 bytes。`flutter_secure_storage`が生成したlambda形式のファイル名は画像と一致し、実RepositoryのOneDrive rootを基点に計算したpath長はUTF-16符号単位で407。候補ソースと画像のpath構造が整合する追加根拠だが、OneDrive同期失敗や2026-09-23当時の作業tree・実commandの再現ではないため、`BUF-T04`は部分観測のまま。詳細は[B5自己適用記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
 
 後続追補（2026-10-18、BUF-T04 current-source path comparison）: `b046430`同一tracked Flutter sourceの45文字rootで日本語OneDrive pathはAndroid Gradle Pluginの非ASCII拒否、同長ASCII OneDrive pathはAPK build成功。ただしAPK／最長生成fileはShellで`同期保留中`となり、同期完了／失敗は未観測。検証copyは回収し、同source isolated snapshot buildも成功・cleanup PASS。画像の時刻（2026-09-23 15:10 JST）直前のGit candidate `2491428`には`flutter_secure_storage 11.0.0`があり画像pathと整合するが、当時の未commit差分・実commandは未確認。source-exact再現は未成立のため`BUF-T04`部分観測、B5 OPEN。詳細は[現行進捗](docs/REV5_PRODUCT_PROGRESS.md)と[B5自己適用記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md)。

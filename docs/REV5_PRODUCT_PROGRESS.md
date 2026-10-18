@@ -1,5 +1,7 @@
 # D4 Pocket / GUI-Shell rev5 Product-First 進捗
 
+後続追補（2026-10-18、BUF-T05 A2A timeout診断）: `5e216a9`基準の並列Rust library suiteは522 passed／1 failed／12 ignoredで、A2A client timeout時もfixture serverは548-byte responseを書込みpeer closeを観測した。`a2a.rs`へtimeout stage・受信byte数・経過msとfixture時系列を追加後、同条件suiteは523 passed／0 failed／12 ignored。FAILは再現せず根因は未確定のまま保持。期限・network挙動は変更せず、B5／BUF-T05 OPEN、release状態不変。詳細は[B5自己適用記録](緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
+
 後続追補（2026-10-18、BUF-T04 historical candidate build）: 画像時刻直前のGit候補`24914284805588821f4a618d6c49d566825fafdb`をOneDrive外のisolated worktreeでAndroid debug buildし、Flutter 3.44.0／Dart 3.12.0／JDK 17.0.20.1でexit 0、APK 155,922,298 bytesを確認した。生成されたFlutter Secure Storageのsynthetic lambda file名は画像と一致し、実OneDrive rootへ投影したpath長は407 UTF-16 code units。OneDrive同期失敗の再現ではなく、当時のdirty source／実commandも不明なため`BUF-T04`部分観測・B5 OPENを維持する。詳細は[B5自己適用記録](緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
 
 後続追補（2026-10-18、BUF-T04 current-source path comparison）: `b046430`のtracked Flutter sourceを同じ45文字root長で比較。日本語OneDrive pathはAndroid Gradle Pluginの非ASCII path拒否でbuild前にFAILし、ASCII OneDrive pathは`flutter build apk --debug`がexit 0（APK 146,353,413 bytes）した一方、ShellはAPK／最長生成fileを`同期保留中`と表示した。同期完了／失敗は未観測。専用copyをOneDrive外へ移し`flutter clean`し、元Cloud Filesには触れていない。同じ`b046430`のisolated snapshot buildもexit 0、cleanup PASS（retry 1回）。画像の時刻（2026-09-23 15:10 JST）直前のGit candidate `2491428`には`flutter_secure_storage 11.0.0`が存在するため画像pathと整合するが、当時の未commit差分と実commandは不明で、source-exact再現・因果は未成立。`BUF-T04`部分観測、B5 OPEN、release gate unchanged。APK hash・source fingerprint・限界は[B5自己適用記録](緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
