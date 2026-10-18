@@ -5,12 +5,14 @@ use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 const MAX_REQUEST_BYTES: usize = 4 * 1024 * 1024;
 
 struct State {
     stop: AtomicBool,
+    accept_loop_errors: AtomicUsize,
+    accept_loop_last_error_code: AtomicUsize,
     accepted_connections: AtomicUsize,
     blocking_mode_failures: AtomicUsize,
     reader_clone_failures: AtomicUsize,
@@ -111,6 +113,8 @@ impl CodexLoopbackResponses {
         let workspace_text = workspace.to_string_lossy().into_owned();
         let state = Arc::new(State {
             stop: AtomicBool::new(false),
+            accept_loop_errors: AtomicUsize::new(0),
+            accept_loop_last_error_code: AtomicUsize::new(0),
             accepted_connections: AtomicUsize::new(0),
             blocking_mode_failures: AtomicUsize::new(0),
             reader_clone_failures: AtomicUsize::new(0),
@@ -189,7 +193,16 @@ impl CodexLoopbackResponses {
                     Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
                         thread::sleep(Duration::from_millis(5));
                     }
-                    Err(_) => break,
+                    Err(error) => {
+                        worker_state
+                            .accept_loop_errors
+                            .fetch_add(1, Ordering::SeqCst);
+                        worker_state.accept_loop_last_error_code.store(
+                            error.raw_os_error().unwrap_or(0).unsigned_abs() as usize,
+                            Ordering::SeqCst,
+                        );
+                        break;
+                    }
                 }
             }
         });
@@ -310,6 +323,41 @@ impl CodexLoopbackResponses {
 
     pub(crate) fn invalid_post_bodies(&self) -> usize {
         self.state.invalid_post_bodies.load(Ordering::SeqCst)
+    }
+
+    fn accept_loop_failure_summary(&self) -> String {
+        format!(
+            "accept_loop_errors={}, last_os_error={}",
+            self.state.accept_loop_errors.load(Ordering::SeqCst),
+            self.state
+                .accept_loop_last_error_code
+                .load(Ordering::SeqCst)
+        )
+    }
+
+    fn conflict_drain_outcome(&self) -> Option<&'static str> {
+        [
+            ("peer_closed", &self.state.conflict_drain_peer_closed),
+            ("connection_reset", &self.state.conflict_drain_reset),
+            ("timed_out", &self.state.conflict_drain_timeout),
+            ("would_block", &self.state.conflict_drain_would_block),
+            ("other_error", &self.state.conflict_drain_other_error),
+        ]
+        .into_iter()
+        .find_map(|(outcome, count)| (count.load(Ordering::SeqCst) > 0).then_some(outcome))
+    }
+
+    fn wait_for_conflict_drain_before_client_drop(&self, budget: Duration) -> Option<&'static str> {
+        let deadline = Instant::now() + budget;
+        loop {
+            if let Some(outcome) = self.conflict_drain_outcome() {
+                return Some(outcome);
+            }
+            if Instant::now() >= deadline {
+                return None;
+            }
+            thread::sleep(Duration::from_millis(2));
+        }
     }
 
     pub(crate) fn response_write_summary(&self) -> String {
@@ -1442,19 +1490,28 @@ mod tests {
             let size = match stream.read(&mut chunk) {
                 Ok(size) => size,
                 Err(error) if error.kind() == std::io::ErrorKind::ConnectionReset => {
-                    let header_end = response
-                        .windows(4)
-                        .position(|part| part == b"\r\n\r\n")
-                        .unwrap_or_else(|| {
-                            panic!(
-                                "ConnectionReset前にHTTP応答headerが届く; received_bytes={}; accepted={}; incomplete=({}); posts={}; response_writes=({})",
-                                response.len(),
-                                server.accepted_connections(),
-                                server.incomplete_request_summary(),
-                                server.post_requests(),
-                                server.response_write_summary(),
-                            )
-                        });
+                    let Some(header_end) = response.windows(4).position(|part| part == b"\r\n\r\n")
+                    else {
+                        let local = stream
+                            .local_addr()
+                            .map(|address| address.to_string())
+                            .unwrap_or_else(|_| "unknown".to_owned());
+                        let peer = stream
+                            .peer_addr()
+                            .map(|address| address.to_string())
+                            .unwrap_or_else(|_| "unknown".to_owned());
+                        let server_drain_before_client_drop = server
+                            .wait_for_conflict_drain_before_client_drop(Duration::from_millis(250));
+                        panic!(
+                            "ConnectionReset前にHTTP応答headerが届かない; received_bytes={}; client={local}->{peer}; server_drain_before_client_drop={server_drain_before_client_drop:?}; accepted={}; incomplete=({}); posts={}; {}; response_writes=({})",
+                            response.len(),
+                            server.accepted_connections(),
+                            server.incomplete_request_summary(),
+                            server.post_requests(),
+                            server.accept_loop_failure_summary(),
+                            server.response_write_summary(),
+                        );
+                    };
                     let header = String::from_utf8_lossy(&response[..header_end]);
                     let content_length = header
                         .lines()
@@ -1474,13 +1531,24 @@ mod tests {
                     );
                     return response;
                 }
-                Err(error) => panic!(
-                    "合成Responses応答を読む: {error}; accepted={}; incomplete=({}); posts={}; response_writes=({})",
-                    server.accepted_connections(),
-                    server.incomplete_request_summary(),
-                    server.post_requests(),
-                    server.response_write_summary(),
-                ),
+                Err(error) => {
+                    let local = stream
+                        .local_addr()
+                        .map(|address| address.to_string())
+                        .unwrap_or_else(|_| "unknown".to_owned());
+                    let peer = stream
+                        .peer_addr()
+                        .map(|address| address.to_string())
+                        .unwrap_or_else(|_| "unknown".to_owned());
+                    panic!(
+                        "合成Responses応答を読む: {error}; client={local}->{peer}; accepted={}; incomplete=({}); posts={}; {}; response_writes=({})",
+                        server.accepted_connections(),
+                        server.incomplete_request_summary(),
+                        server.post_requests(),
+                        server.accept_loop_failure_summary(),
+                        server.response_write_summary(),
+                    );
+                }
             };
             if size == 0 {
                 return response;
