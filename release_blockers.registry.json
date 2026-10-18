@@ -224,7 +224,7 @@
     },
     {
       "name": "comprehensive_extension_rev1_completion",
-      "current_rev5_status": "現行工程・Acceptanceはdocs/REV5_PRODUCT_PROGRESS.mdとROADMAP.mdが正本。PRODUCT_BUILD_MODEでP13 Mobile／Non-Windowsを継続し、P12 Windows FEATURE COMPLETEおよびP2／P3 CLOSEDを保持する。以下のr2_*、current_main_*、current_observation等は各当時の証拠履歴であり、現行schedulerではない。通常Release task_execution=unsupportedとrelease_ready=falseは維持する。",
+      "current_rev5_status": "現行工程・Acceptanceはdocs/REV5_PRODUCT_PROGRESS.mdとROADMAP.mdが正本。P13 Mobile／Non-Windowsは2026-10-09にCLOSED、P12 Windows FEATURE COMPLETE、P2／P3 CLOSED、B4 CLOSEDを保持し、現行工程はB5 OPEN。BUF-T04は部分観測、BUF-T05／BUF-T06はOPEN。以下のr2_*、current_main_*、current_observation等は各当時の証拠履歴であり、現行schedulerではない。通常Release task_execution=unsupportedとrelease_ready=falseは維持する。",
       "macos_product_connection_evidence": {
         "status": "CLOSED",
         "source_commit": "a388e1d648536ce6f45ede48bc7d3a453075f6a7",
