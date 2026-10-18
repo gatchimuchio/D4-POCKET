@@ -1,5 +1,7 @@
 # GUI Shell ロードマップ
 
+後続追補（2026-10-19、Update TLS失敗のscope切分け）: HEAD `f6eab54`で、先行全suite parallel run唯一の失敗だったpackage-repair testは単独1 passed／0 failed、同Update Download module 17 testsも8-threadで全PASS。隔離target cleanupを確認した。これはscope差の観測であり、全suite時のTLS `InvalidContentType`／10054 resetを解消・原因特定したものではない。B5／BUF-T05 OPEN、release状態不変。詳細は[B5記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
+
 後続追補（2026-10-19、HEAD `21978542` Windows Rust並列再確認）: 隔離runnerの`cargo test --all-targets -- --test-threads=8 --format terse`は`src/lib.rs` 535件中522 passed／1 failed／12 ignoredで終了。唯一の失敗はUpdate TLS package-repair fixtureのhandshake中`InvalidContentType`／Winsock 10054 reset。更新したDNS待機testは通過し、前runのCodex 409／MCP cleanupは今回再現しなかった。該当Codex test単独は1 passed。Cargoはlib failureで他targetを実行完了しておらず、隔離targetは回収済み。根因未確定のため`BUF-T05`／B5 OPEN、`task_execution=unsupported`、`release_ready=false`、既存release blockerを維持する。詳細は[B5記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
 
 後続追補（2026-10-19、BUF-T06 Active policy directory読取照合）: 非昇格shellからWindows Active directory内の`.cip` 8件を列挙しhashを取得。起動後Event 3099の4件中2件は同名policy fileのSHA-256と一致した。directory上のfile存在は全policy inventory／適用状態の証明ではなく、`CiTool -lp -json` Access Deniedと未確認範囲を維持する。設定変更・回避なし。`BUF-T06`部分観測／OPEN、B5 OPEN、release状態不変。全hashは[B5自己適用記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
