@@ -147,6 +147,8 @@ jobs:
               $captureLocationPushed = $true
               pktmon start --capture --comp all --type all --pkt-size 54 --file-size 64 --log-mode memory
               if ($LASTEXITCODE -ne 0) { throw 'loopback TCP RST captureを開始できない' }
+              Pop-Location
+              $captureLocationPushed = $false
               @(
                 'Pktmon capture: IPv4 127.0.0.1 TCP RST filter; packet limit 54 bytes; ETL/text are not uploaded and are removed after the test.'
               ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8

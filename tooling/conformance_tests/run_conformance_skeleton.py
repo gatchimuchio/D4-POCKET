@@ -11412,6 +11412,16 @@ def 手動補助の起動境界を検査する() -> list[str]:
         不整合.append("portable ZIP補助がworkflow_dispatch限定ではない")
 
     rust_workflow = (ROOT / ".github" / "workflows" / "windows-manual-rust-validation.yml").read_text(encoding="utf-8")
+    capture_start = rust_workflow.find("pktmon start --capture")
+    cargo_test = rust_workflow.find("cargo +1.95.0 test --locked --manifest-path")
+    capture_restore = rust_workflow.find("Pop-Location", capture_start)
+    capture_flag_reset = rust_workflow.find("$captureLocationPushed = $false", capture_start)
+    if not (
+        capture_start >= 0
+        and capture_start < capture_restore < cargo_test
+        and capture_start < capture_flag_reset < cargo_test
+    ):
+        不整合.append("Pktmon capture開始後、Rust試験前に作業directoryとcleanup状態を復元しない")
     for token in (
         "fetch-depth: 2",
         "git diff --name-only --diff-filter=ACMR $parent HEAD -- native/rust_helper",
