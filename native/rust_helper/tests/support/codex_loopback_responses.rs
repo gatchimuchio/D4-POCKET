@@ -23,7 +23,15 @@ struct State {
     provider_failure_responses: AtomicUsize,
     invalid_post_bodies: AtomicUsize,
     response_write_failures: AtomicUsize,
-    response_bytes_written: AtomicUsize,
+    sse_response_body_bytes: AtomicUsize,
+    conflict_response_attempts: AtomicUsize,
+    conflict_response_write_completed: AtomicUsize,
+    conflict_response_write_failures: AtomicUsize,
+    conflict_drain_peer_closed: AtomicUsize,
+    conflict_drain_reset: AtomicUsize,
+    conflict_drain_timeout: AtomicUsize,
+    conflict_drain_would_block: AtomicUsize,
+    conflict_drain_other_error: AtomicUsize,
     model_list_requests: AtomicUsize,
     tool_offered: AtomicBool,
     tool_call_sent: AtomicBool,
@@ -115,7 +123,15 @@ impl CodexLoopbackResponses {
             provider_failure_responses: AtomicUsize::new(0),
             invalid_post_bodies: AtomicUsize::new(0),
             response_write_failures: AtomicUsize::new(0),
-            response_bytes_written: AtomicUsize::new(0),
+            sse_response_body_bytes: AtomicUsize::new(0),
+            conflict_response_attempts: AtomicUsize::new(0),
+            conflict_response_write_completed: AtomicUsize::new(0),
+            conflict_response_write_failures: AtomicUsize::new(0),
+            conflict_drain_peer_closed: AtomicUsize::new(0),
+            conflict_drain_reset: AtomicUsize::new(0),
+            conflict_drain_timeout: AtomicUsize::new(0),
+            conflict_drain_would_block: AtomicUsize::new(0),
+            conflict_drain_other_error: AtomicUsize::new(0),
             model_list_requests: AtomicUsize::new(0),
             tool_offered: AtomicBool::new(false),
             tool_call_sent: AtomicBool::new(false),
@@ -298,9 +314,21 @@ impl CodexLoopbackResponses {
 
     pub(crate) fn response_write_summary(&self) -> String {
         format!(
-            "failures={}, body_bytes={}",
+            "応答失敗数={}, SSE本文byte数={}, 409競合応答=(試行数={}, 書込完了数={}, 書込失敗数={}, 相手終了数={}, 接続リセット数={}, 期限切れ数={}, 待機解除数={}, 排出その他失敗数={})",
             self.state.response_write_failures.load(Ordering::SeqCst),
-            self.state.response_bytes_written.load(Ordering::SeqCst),
+            self.state.sse_response_body_bytes.load(Ordering::SeqCst),
+            self.state.conflict_response_attempts.load(Ordering::SeqCst),
+            self.state
+                .conflict_response_write_completed
+                .load(Ordering::SeqCst),
+            self.state
+                .conflict_response_write_failures
+                .load(Ordering::SeqCst),
+            self.state.conflict_drain_peer_closed.load(Ordering::SeqCst),
+            self.state.conflict_drain_reset.load(Ordering::SeqCst),
+            self.state.conflict_drain_timeout.load(Ordering::SeqCst),
+            self.state.conflict_drain_would_block.load(Ordering::SeqCst),
+            self.state.conflict_drain_other_error.load(Ordering::SeqCst),
         )
     }
 
@@ -1282,15 +1310,42 @@ fn handle_request(mut stream: TcpStream, port: u16, state: &State) {
         state
             .repeated_tool_call_rejections
             .fetch_add(1, Ordering::SeqCst);
-        if respond(
+        state
+            .conflict_response_attempts
+            .fetch_add(1, Ordering::SeqCst);
+        match respond(
             &mut stream,
             409,
             "text/plain",
             b"synthetic tool result missing expected Workspace marker",
-        )
-        .is_err()
-        {
-            state.response_write_failures.fetch_add(1, Ordering::SeqCst);
+        ) {
+            Ok(drain_end) => {
+                state
+                    .conflict_response_write_completed
+                    .fetch_add(1, Ordering::SeqCst);
+                let counter = match drain_end {
+                    ResponseDrainEnd::PeerClosed => &state.conflict_drain_peer_closed,
+                    ResponseDrainEnd::ConnectionReset => &state.conflict_drain_reset,
+                    ResponseDrainEnd::TimedOut => &state.conflict_drain_timeout,
+                    ResponseDrainEnd::WouldBlock => &state.conflict_drain_would_block,
+                };
+                counter.fetch_add(1, Ordering::SeqCst);
+            }
+            Err(ResponseFailure::Write) => {
+                state
+                    .conflict_response_write_failures
+                    .fetch_add(1, Ordering::SeqCst);
+                state.response_write_failures.fetch_add(1, Ordering::SeqCst);
+            }
+            Err(ResponseFailure::Drain) => {
+                state
+                    .conflict_response_write_completed
+                    .fetch_add(1, Ordering::SeqCst);
+                state
+                    .conflict_drain_other_error
+                    .fetch_add(1, Ordering::SeqCst);
+                state.response_write_failures.fetch_add(1, Ordering::SeqCst);
+            }
         }
         return;
     }
@@ -1311,9 +1366,9 @@ fn handle_request(mut stream: TcpStream, port: u16, state: &State) {
         })
         .collect::<String>();
     match respond(&mut stream, 200, "text/event-stream", payload.as_bytes()) {
-        Ok(()) => {
+        Ok(_) => {
             state
-                .response_bytes_written
+                .sse_response_body_bytes
                 .fetch_add(payload.len(), Ordering::SeqCst);
         }
         Err(_) => {
@@ -1500,6 +1555,52 @@ mod tests {
         assert!(server.tool_result_was_received());
         assert_eq!(server.repeated_tool_call_rejections(), 1);
         assert_eq!(server.post_requests(), 2);
+        assert_eq!(
+            server
+                .state
+                .conflict_response_attempts
+                .load(Ordering::SeqCst),
+            1,
+            "{}",
+            server.response_write_summary()
+        );
+        assert_eq!(
+            server
+                .state
+                .conflict_response_write_completed
+                .load(Ordering::SeqCst),
+            1,
+            "{}",
+            server.response_write_summary()
+        );
+        assert_eq!(
+            server
+                .state
+                .conflict_response_write_failures
+                .load(Ordering::SeqCst),
+            0,
+            "{}",
+            server.response_write_summary()
+        );
+        assert_eq!(
+            server
+                .state
+                .conflict_drain_peer_closed
+                .load(Ordering::SeqCst)
+                + server.state.conflict_drain_reset.load(Ordering::SeqCst)
+                + server.state.conflict_drain_timeout.load(Ordering::SeqCst)
+                + server
+                    .state
+                    .conflict_drain_would_block
+                    .load(Ordering::SeqCst)
+                + server
+                    .state
+                    .conflict_drain_other_error
+                    .load(Ordering::SeqCst),
+            1,
+            "{}",
+            server.response_write_summary()
+        );
 
         drop(server);
         std::fs::remove_dir_all(workspace).expect("test専用Workspaceを削除");
@@ -1859,12 +1960,25 @@ fn block_connect(stream: &mut TcpStream, state: &State, target: &str) {
     let _ = respond(stream, 403, "text/plain", b"");
 }
 
+#[derive(Clone, Copy)]
+enum ResponseDrainEnd {
+    PeerClosed,
+    ConnectionReset,
+    TimedOut,
+    WouldBlock,
+}
+
+enum ResponseFailure {
+    Write,
+    Drain,
+}
+
 fn respond(
     stream: &mut TcpStream,
     status: u16,
     content_type: &str,
     body: &[u8],
-) -> std::io::Result<()> {
+) -> Result<ResponseDrainEnd, ResponseFailure> {
     let reason = match status {
         200 => "OK",
         400 => "Bad Request",
@@ -1877,27 +1991,27 @@ fn respond(
         "HTTP/1.0 {status} {reason}\r\ncontent-type: {content_type}\r\ncontent-length: {}\r\n\r\n",
         body.len()
     );
-    stream.write_all(headers.as_bytes())?;
-    stream.write_all(body)?;
-    stream.flush()?;
+    stream
+        .write_all(headers.as_bytes())
+        .map_err(|_| ResponseFailure::Write)?;
+    stream.write_all(body).map_err(|_| ResponseFailure::Write)?;
+    stream.flush().map_err(|_| ResponseFailure::Write)?;
     let _ = stream.shutdown(Shutdown::Write);
     let mut trailing = [0; 1024];
     loop {
         match stream.read(&mut trailing) {
-            Ok(0) => break,
+            Ok(0) => return Ok(ResponseDrainEnd::PeerClosed),
             Ok(_) => continue,
-            Err(error)
-                if matches!(
-                    error.kind(),
-                    std::io::ErrorKind::ConnectionReset
-                        | std::io::ErrorKind::TimedOut
-                        | std::io::ErrorKind::WouldBlock
-                ) =>
-            {
-                break;
+            Err(error) if error.kind() == std::io::ErrorKind::ConnectionReset => {
+                return Ok(ResponseDrainEnd::ConnectionReset);
             }
-            Err(error) => return Err(error),
+            Err(error) if error.kind() == std::io::ErrorKind::TimedOut => {
+                return Ok(ResponseDrainEnd::TimedOut);
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                return Ok(ResponseDrainEnd::WouldBlock);
+            }
+            Err(_) => return Err(ResponseFailure::Drain),
         }
     }
-    Ok(())
 }

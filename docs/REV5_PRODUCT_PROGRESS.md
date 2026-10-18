@@ -6,6 +6,8 @@ source commit追試（2026-10-18）: `mobile_android_debug_build`をsource commi
 
 ### BUF-T05 loopback追加観測（2026-10-18）
 
+診断追補: `codex_loopback_responses.rs`のtest-support計測を拡張し、409応答の書込完了と後続drain終端を区別した。最終file SHA-256は`49E12DFC95A3B969C09813D79E0673A6D7E5779023948CFFEBAC109813A39772`。focused Codex testは1 passed。base commit `91db3534d032ef8df7bfbde82abc6684509ddd42`のlib suiteは`518 passed / 5 failed / 12 ignored`。失敗はA2A loopback 1件、Minidora Content-Length fixture 1件、Codex loopback 1件、Update TLS fixture 2件。Codex failure時はserver側409書込完了1／drain peer EOF 1、client側はHTTP header受信0 byteのConnectionResetだった。この非対称観測だけではreset発生源を確定できず、他fixture失敗との共通根因も未確定。`BUF-T05`／`FQ-TEST-LOOPBACK`はOPENを維持する。正確なcommand・失敗名・範囲は[B5自己適用記録](緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
+
 test-support診断追加前のRust library suiteは並列`518 passed / 5 failed / 12 ignored`、逐次`521 passed / 2 failed / 12 ignored`。診断追加後のfocused Codex testは5回PASSした一方、並列suiteは`519 passed / 4 failed / 12 ignored`でCodex loopbackとUpdate TLS fixtureが再失敗した。Codex failure時にはserver側で2 POST／response write failure 0／記録body 23,282 bytes、client側受信0 byteを観測した。これはfailure境界の追加情報であり、reset発生主体やTLS失敗との共通根因は未確定。`FQ-TEST-LOOPBACK`／`BUF-T05`をOPENのままとし、製品コードのretry／timeoutやrelease gateは変更していない。詳細と正確な試験範囲は[B5自己適用記録](緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
 
 `BUF-T06`読み取り追補（2026-10-18）:
