@@ -11,6 +11,11 @@ name: Windows Rust manual validation
         options:
           - sequential
           - parallel
+      loopback_rst_capture:
+        description: Capture IPv4 loopback TCP RST packet headers during tests (no artifacts uploaded)
+        type: boolean
+        required: true
+        default: false
 
 permissions:
   contents: read
@@ -90,6 +95,7 @@ jobs:
       - name: Rust全targetを検査・試験
         env:
           RUST_TEST_MODE: ${{ inputs.rust_test_mode }}
+          LOOPBACK_RST_CAPTURE: ${{ inputs.loopback_rst_capture }}
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -113,8 +119,89 @@ jobs:
           cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           "Rust test mode: $mode" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
-          cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets @testArgs
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $captureEnabled = $env:LOOPBACK_RST_CAPTURE -eq 'true'
+          $captureName = "gui-shell-loopback-rst-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          $capturePath = Join-Path $env:RUNNER_TEMP "$captureName.etl"
+          $captureTextPath = Join-Path $env:RUNNER_TEMP "$captureName.txt"
+          $captureAttempted = $false
+          $filterTouched = $false
+          $testExit = 0
+          try {
+            if ($captureEnabled) {
+              if ((Test-Path -LiteralPath $capturePath) -or (Test-Path -LiteralPath $captureTextPath)) {
+                throw 'Pktmon診断の固定出力先が既に存在するため上書きしない'
+              }
+              # This job runs on a disposable hosted runner. Clear its ephemeral Pktmon filters
+              # so the capture cannot include traffic outside the requested loopback RST filter.
+              $filterTouched = $true
+              pktmon filter remove
+              if ($LASTEXITCODE -ne 0) { throw '一時runnerのPktmon filterを初期化できない' }
+              pktmon filter add $captureName -i 127.0.0.1 -t TCP RST
+              if ($LASTEXITCODE -ne 0) { throw 'loopback TCP RST filterを追加できない' }
+              $captureAttempted = $true
+              pktmon start --capture --comp all --type all --pkt-size 54 --file-name $capturePath --file-size 64 --log-mode memory
+              if ($LASTEXITCODE -ne 0) { throw 'loopback TCP RST captureを開始できない' }
+              @(
+                'Pktmon capture: IPv4 127.0.0.1 TCP RST filter; packet limit 54 bytes; ETL/text are not uploaded and are removed after the test.'
+              ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+            }
+            cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets @testArgs
+            $testExit = $LASTEXITCODE
+          } finally {
+            $cleanupErrors = @()
+            if ($captureAttempted) {
+              try {
+                pktmon stop
+                if ($LASTEXITCODE -ne 0) {
+                  $cleanupErrors += 'Pktmon captureを停止できない'
+                } elseif (Test-Path -LiteralPath $capturePath -PathType Leaf) {
+                  pktmon etl2txt $capturePath --out $captureTextPath --brief --no-ethernet
+                  if ($LASTEXITCODE -ne 0) {
+                    $cleanupErrors += 'Pktmon ETLをheader summaryへ変換できない'
+                  } else {
+                    try {
+                      $packetLines = @(Get-Content -LiteralPath $captureTextPath | Where-Object { $_ -match '127\.0\.0\.1' })
+                      "Pktmon loopback RST packet snapshots: $($packetLines.Count) (Pktmon may report one packet at multiple stack components)." | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+                      foreach ($line in ($packetLines | Select-Object -First 20)) {
+                        $line | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+                      }
+                      if ($packetLines.Count -gt 20) {
+                        'Pktmon packet summary truncated to 20 loopback snapshots.' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+                      }
+                    } catch {
+                      $cleanupErrors += "Pktmon header summaryを処理できない: $($_.Exception.Message)"
+                    }
+                  }
+                } else {
+                  $cleanupErrors += 'Pktmon capture outputが存在しない'
+                }
+              } catch {
+                $cleanupErrors += "Pktmon capture停止／変換処理に失敗: $($_.Exception.Message)"
+              }
+            }
+            if ($filterTouched) {
+              try {
+                pktmon filter remove
+                if ($LASTEXITCODE -ne 0) { $cleanupErrors += 'Pktmon filterを削除できない' }
+              } catch {
+                $cleanupErrors += "Pktmon filter削除に失敗: $($_.Exception.Message)"
+              }
+            }
+            foreach ($path in @($captureTextPath, $capturePath)) {
+              try {
+                if (Test-Path -LiteralPath $path) {
+                  Remove-Item -LiteralPath $path -Force
+                  if (Test-Path -LiteralPath $path) { $cleanupErrors += "Pktmon一時fileを回収できない: $path" }
+                }
+              } catch {
+                $cleanupErrors += "Pktmon一時fileを回収できない: $path ($($_.Exception.Message))"
+              }
+            }
+            if ($cleanupErrors.Count -gt 0) {
+              throw ($cleanupErrors -join '; ')
+            }
+          }
+          if ($testExit -ne 0) { exit $testExit }
 
       - name: Release Broker helperをbuild
         shell: pwsh

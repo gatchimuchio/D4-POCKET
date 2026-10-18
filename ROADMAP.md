@@ -1,5 +1,7 @@
 # GUI Shell ロードマップ
 
+後続追補（2026-10-19、BUF-T05 loopback RST診断入口）: Windows手動Rust検証workflowに任意の`loopback_rst_capture`を追加。既定OFFで、自動triggerやRust test対象を変えない。有効時は使い捨て`windows-2025` runner上で`127.0.0.1`のTCP RSTだけをPktmonで最大54-byte captureし、header summaryだけをrun summaryへ出す。ETL／textはuploadせず、test終了時にfilterと一時fileをcleanupする。目的はA2A／Update TLS間欠resetの送信方向を、実fixture失敗が再現した場合に限定観測すること。製品networking／timeout／retry／Authorityへ作用せず、PASS単発では`FQ-TEST-LOOPBACK`やB5を閉じない。
+
 後続追補（2026-10-19、BUF-T05 Update TLS fixture待機是正）: baseline `e247b0a`のWindows hosted parallel run #46で過大Content-Length拒否testがserver peer-close timeoutとなった。testはcurrent-thread Tokio `block_on`の終了後に同期joinしていたため、早期response拒否後のclient cleanupをruntimeが処理できない構造だった。検証branch commit `8c67b95`でfixture joinをruntime内`spawn_blocking`へ変更し、Update Download module 17 tests PASS、Windows hosted parallel全target 569/0/13、Release Broker build・IPC smoke・cleanup・clean-treeまでPASS（run #47）。#46 FAILは履歴保持し、他loopback原因は未確定のためB5／`FQ-TEST-LOOPBACK` OPEN、release state不変。詳細は[現行進捗](docs/REV5_PRODUCT_PROGRESS.md)と[B5自己適用記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
 
 後続追補（2026-10-18、BUF-T05 hosted scheduler比較準備）: Windows手動Rust検証workflowを`workflow_dispatch`限定のまま拡張し、同じ全target suiteをRust標準の並列実行または単一test threadで選べるようにする。既定は従来互換の逐次実行、不明modeは拒否する。目的はWindows Server 2025上のhost比較であり、自動CI、Windows保護設定、Rust test対象、Broker smoke／cleanupの範囲は変更しない。実行結果は当該commit・mode別に記録し、単発PASSで`FQ-TEST-LOOPBACK`を閉じない。B5／BUF-T05は引き続きOPEN。

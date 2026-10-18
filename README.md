@@ -9,7 +9,7 @@ AIエージェントが高度になるほど、次に難しくなるのは「何
 
 [開発状況](docs/REV5_PRODUCT_PROGRESS.md) · [クイックスタート](QUICKSTART.md) · [アーキテクチャ仕様](docs/specs/gui-shell-spec-v1.md) · [責任境界](CLAIM.md) · [エージェント向け開発規則](AGENTS.md)
 
-> **開発中 — 製品リリース未宣言。** Windowsは機能実装の到達点を持ち、macOS・Android・iOSでも限定的な製品受入の証拠があります。B4のWindows Desktop統合経路は2026年10月17日に限定受入済みです。2026年10月18日現在、B5自己適用QCはOPENで、Flutter検証snapshot隔離とAndroid debug buildを記録しています。OneDrive警告との因果比較・同期service復旧は未確認で、Rust loopback/TLS fixtureの間欠失敗とSmart App Control modeの未確定も残っています。正式配布・実機保証・最終QAも未完了です。
+> **開発中 — 製品リリース未宣言。** Windowsは機能実装の到達点を持ち、macOS・Android・iOSでも限定的な製品受入の証拠があります。B4のWindows Desktop統合経路は2026年10月17日に限定受入済みです。2026年10月19日現在、B5自己適用QCはOPENです。Windows hosted run #47ではUpdate TLS拒否test fixtureの待機欠陥を修正した後、Rust全target 569 passed／0 failed／13 ignoredとRelease Broker build・IPC smoke・cleanupがPASSしました。ただし、他のloopback/TLS間欠失敗の根因、OneDrive警告との因果比較・同期service復旧、Smart App Control modeの確定は未成立です。正式配布・実機保証・最終QAも未完了です。
 
 ## D4 Pocketが変えようとしていること
 
@@ -32,7 +32,7 @@ AIエージェントが高度になるほど、次に難しくなるのは「何
 | **Windows Desktop** | rev5のWindows側P12、Feature Completeの開発到達点 | installed-path最終証拠、正式Release、owner GO |
 | **Agent Compare / Handoff** | P2 Multi-Agent Compare、P3 Agent HandoffのProduct Build受入CLOSED | すべての実Agent・実環境での一般保証 |
 | **Mobile / Non-Windows** | P13の有限Product Build受入は2026-10-09にCLOSED。Android Emulator・iOS Simulator等の限定証拠を保持 | 物理端末保証、OS別の正式配布・署名・identity |
-| **緩衝基盤とAgent Task** | B0〜B4は有限Product Build受入CLOSED。B5はOPEN。Windows Flutter snapshotの7 checksとAndroid debug APKに加え、Windows Debug Desktopをisolated launcher経由で起動・正常終了し、`D4 Pocket` window titleとBroker processをLIVE_RUNTIME観測。起動だけでBroker要求／Taskは実行せずAuditは空。store誤検出をignore規則と回帰testで修正。`BUF-T04`は部分観測、`BUF-T05`／`BUF-T06`はOPEN。詳細は[B5記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md) | OneDrive警告とのsource-exact因果比較、同期service復旧、loopback/TLS fixtureの根因、現行SAC mode、通常Release能力、正式配布・実機保証 |
+| **緩衝基盤とAgent Task** | B0〜B4は有限Product Build受入CLOSED。B5はOPEN。Windows Debug Desktopの限定LIVE_RUNTIME起動・正常終了を記録し、2026-10-19のWindows hosted run #47ではUpdate TLS拒否test fixtureの待機修正後にRust全target 569／0／13とRelease Broker build・IPC smokeがPASS。これは他loopback failureの共通根因を示さない。`BUF-T04`は部分観測、`BUF-T05`／`BUF-T06`はOPEN。詳細は[B5記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md) | OneDrive警告とのsource-exact因果比較、同期service復旧、他loopback/TLS fixtureの根因、現行SAC mode、通常Release能力、正式配布・実機保証 |
 | **正式な出荷判断** | Release GateとOwner承認を独立に保持 | <code>task_execution=unsupported</code>、<code>release_ready=false</code> |
 
 B4-L2の記録済み検査では、Rust全体直列テスト **569 passed / 0 failed / 13 ignored**、Agent Task Flutter client 14件とAgent Center widget 1件、Schema **167件**・正常例 **163件**・否定fixture **215件**、Conformance **245 checks**を確認しています。これらは**2026-10-11の開発環境における対象版の証拠**であり、このREADME更新時に再実行した値でも、インストール済み製品の保証でもありません。10月17日のB4統合経路証拠も`r2-e2e` staged buildとlocalhost合成APIの範囲に限られ、通常Release能力やinstalled provenanceを示しません。[観測範囲と残差](docs/REV5_PRODUCT_PROGRESS.md)を参照してください。
