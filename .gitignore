@@ -1,4 +1,6 @@
 .gui-shell/
+# Local Broker runtime data (including the development audit key) is not source input.
+/.gui_shell/broker/store/
 __pycache__/
 *.pyc
 native/rust_helper/target/

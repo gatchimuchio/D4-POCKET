@@ -88,7 +88,7 @@
     },
     {
       "path": ".gitignore",
-      "sha256": "be3a71b30ae62b9e0ba1e2df3ba6630e2bd1f0feca309425ce1f76994753e1f3"
+      "sha256": "fa1237105be5f97b01dcdb0dac9c22467c60a99427e5889b6b8cecc82ff03006"
     },
     {
       "path": "AGENTS.md",
@@ -156,7 +156,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "d4208fe0c53261043985bd90e78437a25edd114c5a9bdf196dd4530f443556ef"
+      "sha256": "0bddadf04000cb86961b49800962c26fd48b5d661ad6adc7ed5eda910692941a"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "379812761c2e407a54b05a14aa534498d640a7987450b43dbd38640b7c466bc7"
+      "sha256": "e17c43ed9aaf658043620e8e648254c078050c40c23be3457695a273bdd0c8bf"
     },
     {
       "path": "SECURITY.md",
@@ -1288,7 +1288,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "343c5fc258248ccf062ca92ac9ad92c0428cff67b242910996d238117d3dbf94"
+      "sha256": "b1b9324cbf6171b5ccd05de70bcc2c417735515a3febf82b797c95dae11a6056"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1676,7 +1676,7 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B5_\u81ea\u5df1\u9069\u7528.md",
-      "sha256": "1230773eb7854a1c3503a3e2ff25a767c45fdca8f63f133cfb8f42d0b85d73c8"
+      "sha256": "abac7e9334dd8ec3a8ebcf290d607bad5c911c1d4653d039f3daf11c7f1b146c"
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/\u5b9f\u88c5\u4ed5\u69d8\u66f8.md",
@@ -4940,7 +4940,7 @@
     },
     {
       "path": "tooling/conformance_tests/test_owner_desktop_launcher.py",
-      "sha256": "0bad37b758889b05e5bf7b62c1f7d38ad592c7cefe26290be1ccb99f88dd1290"
+      "sha256": "23eced7e2c98fb39a328248e3941b7adea06e66ca538b201d2abb0bcd9a84289"
     },
     {
       "path": "tooling/conformance_tests/test_run_cargo_isolated.py",

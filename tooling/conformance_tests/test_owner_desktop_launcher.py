@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -69,6 +70,14 @@ class FakeProcess:
 
 
 class OwnerDesktopLauncherTests(unittest.TestCase):
+    def test_repository_broker_runtime_store_is_git_ignored(self) -> None:
+        result = subprocess.run(
+            ["git", "check-ignore", "--quiet", "--no-index", ".gui_shell/broker/store/audit_anchor.key"],
+            cwd=launcher.ROOT,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, "Broker永続storeをsource変更と誤認しないようignoreする")
+
     def test_run_uses_snapshot_targets_short_session_and_stops_broker_before_cleanup(self) -> None:
         with tempfile.TemporaryDirectory(prefix="d4p-launch-test-root-") as temporary:
             source_root = Path(temporary) / "repository"

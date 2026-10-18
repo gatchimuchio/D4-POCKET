@@ -1,5 +1,7 @@
 # GUI Shell ロードマップ
 
+後続追補（2026-10-18、Owner Desktop LIVE_RUNTIME起動）: `808c56e`を基準とするsource identity `9258a19a60d20a46e87729d17ccd7e6e02e109abfe6d276292f5d0de83f26183`でWindows Debug Desktopをisolated launcherから起動。`D4 Pocket` windowとBroker processを観測し、Flutter標準`q`終了後launcherはexit 0、snapshot cleanupとsource identity照合が成功した。初回runで見つかったBroker storeによるsource-change誤検出は、`.gitignore`と回帰testで是正。Auditは空でBroker要求／Agent Task／installed productの証拠ではない。B5 OPEN、release状態不変。詳細は[B5自己適用記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
+
 後続追補（2026-10-18、BUF-T05 A2A timeout診断）: current `a2a.rs` SHA-256 `34D799942042AEF254ADA530BBCD8884468A91A5C59CC456A4E661C39375B253`に、HTTP期限を維持したstage／受信量／時刻診断を追加。既定並列library suiteは523 passed／0 failed／12 ignoredだが、直前sourceでのA2A timeoutはFAIL履歴として保持し根因未確定。`BUF-T05`／B5 OPEN、`task_execution=unsupported`、`release_ready=false`。詳細は[B5自己適用記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
 
 後続追補（2026-10-18、画像時刻直前の候補ソースによるAPK作成）: Git候補`2491428`をOneDriveの外にある一時作業領域へ複製し、Android用デバッグAPKを作成した。処理は`exit 0`、APKは155,922,298 bytes。`flutter_secure_storage`が生成したlambda形式のファイル名は画像と一致し、実RepositoryのOneDrive rootを基点に計算したpath長はUTF-16符号単位で407。候補ソースと画像のpath構造が整合する追加根拠だが、OneDrive同期失敗や2026-09-23当時の作業tree・実commandの再現ではないため、`BUF-T04`は部分観測のまま。詳細は[B5自己適用記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
