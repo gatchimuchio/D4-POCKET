@@ -4939,6 +4939,10 @@
       "sha256": "463ca2a9e9e35be33c75c38d3fc63b4736a3c3987ba5015ff2e10ec18aca5488"
     },
     {
+      "path": "tooling/conformance_tests/test_owner_desktop_launcher.py",
+      "sha256": "0bad37b758889b05e5bf7b62c1f7d38ad592c7cefe26290be1ccb99f88dd1290"
+    },
+    {
       "path": "tooling/conformance_tests/test_run_cargo_isolated.py",
       "sha256": "a27404d30b843f84491539eeb989e13e120214d76b5933e4ec4c426ff37cb583"
     },
@@ -4989,6 +4993,10 @@
     {
       "path": "tooling/ios_native_device_link_check.py",
       "sha256": "310da7b5b63c41e38bb88ea04f21fa84b0f73088c9185566062c504cdbcb85c9"
+    },
+    {
+      "path": "tooling/launch_owner_desktop_isolated.py",
+      "sha256": "b1b7c97d373e77cbf7158ca9978a3556e58b47ffd1262e5e831e5662ced4545f"
     },
     {
       "path": "tooling/long_run_validation.py",
