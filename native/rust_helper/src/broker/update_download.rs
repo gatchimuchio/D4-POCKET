@@ -1373,7 +1373,10 @@ mod tests {
                     .await,
             )
         });
-        let server_result = server.join().unwrap();
+        let server_result = runtime
+            .block_on(async { tokio::task::spawn_blocking(move || server.join()).await })
+            .expect("TLS fixture join workerがpanicした")
+            .unwrap_or_else(|_| Err("TLS fixture server threadがpanicした".to_string()));
         let result = result.unwrap_or_else(|error| {
             panic!("TLS catalog要求失敗: client={error}; server={server_result:?}")
         });
