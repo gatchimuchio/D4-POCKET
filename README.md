@@ -81,7 +81,7 @@ python tooling/validate_all.py --flutter-step desktop_flutter_analyze --desktop-
 
 `run_cargo_isolated.py`はCargoの生成targetをRepository／OneDrive外の一時領域へ設定し、終了時に回収します。明示的な`--target-dir`とCargo `--config`は隔離を迂回し得るため拒否します。これはCargo targetの配置境界であり、`build.rs`等が別pathへ書く動作やCargo package cache全体をsandboxするものではありません。
 
-`--flutter-step`は指定したFlutter analyze／test／buildだけをOneDrive外の一時source snapshotで実行します。Desktop Flutter testでは先にRust helper buildも同じsnapshot内で行います。これは`validate_all.py`が列挙する検査の隔離経路であり、`flutter run`など任意のFlutter commandを隔離するものではありません。
+`--flutter-step`は指定したFlutter analyze／test／buildだけをOneDrive外の一時source snapshotで実行します。Owner用起動scriptも`tooling/launch_owner_desktop_isolated.py`を介し、Rust helper build、Flutter run、一時session fileを隔離snapshot内で扱います。任意に直接実行する`flutter run`等はこの隔離経路を通りません。snapshotは生成物を隔離する開発用機構で、Rust BrokerのAuthorityを代替しません。Broker永続storeは既存の開発データ互換性のため従来locationを維持します。
 
 これらは**ソースからの開発・検証手順**であり、正式インストーラーの案内ではありません。環境差と既知の未解決検査は[現行進捗](docs/REV5_PRODUCT_PROGRESS.md)を正本とし、未実施テストをPASSと報告しません。[詳しい手順](QUICKSTART.md)を参照してください。
 

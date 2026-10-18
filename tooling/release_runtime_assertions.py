@@ -255,18 +255,18 @@ def assert_flutter_does_not_spawn_python_product_path() -> RuntimeAssertion:
         return _fail(
             "flutter_product_path_does_not_spawn_python",
             "CONFIG",
-            "製品Flutterまたはowner launch pathがPython/process authority tokenを含む: " + "; ".join(findings),
-            "製品authority起動からPython process launchとsnapshot生成を除去する。",
+            "製品Flutterがprocess-spawn APIまたはproduct authority snapshot generatorを含む: " + "; ".join(findings),
+            "製品authority起動からDart process-spawn APIとproduct authority snapshot生成を除去する。",
         )
     return _pass(
         "flutter_product_path_does_not_spawn_python",
         "CONFIG",
-        "Desktop Flutter libとowner launch scriptはPython snapshot generatorの呼出しやDart process-spawn APIを含まない。",
-        "Pythonはtooling、local validation、schema validation、migration parityに限定する。",
+        "Desktop Flutter libにDart process-spawn APIはなく、owner launch scriptはproduct authority snapshot generatorを呼び出さない。",
+        "開発用source snapshotはnative Rust BrokerのAuthorityを変更しない隔離・起動経路に限定する。",
     )
 
 
-def assert_launch_scripts_start_broker_without_python_snapshot() -> RuntimeAssertion:
+def assert_launch_scripts_use_isolated_source_snapshot() -> RuntimeAssertion:
     scripts = [
         ROOT / "scripts" / "launch_owner_desktop.sh",
         ROOT / "scripts" / "launch_owner_desktop.ps1",
@@ -274,24 +274,39 @@ def assert_launch_scripts_start_broker_without_python_snapshot() -> RuntimeAsser
     errors: list[str] = []
     for path in scripts:
         text = path.read_text(encoding="utf-8")
-        for token in ["broker-server", "GUI_SHELL_BROKER_ENDPOINT_JSON"]:
-            if token not in text:
-                errors.append(f"{path.relative_to(ROOT).as_posix()} に{token}がない")
-        for token in ["shell_snapshot.py", "python tooling/", "python3 tooling/"]:
+        normalized = text.replace("\\", "/")
+        if "tooling/launch_owner_desktop_isolated.py" not in normalized:
+            errors.append(f"{path.relative_to(ROOT).as_posix()} がisolated developer launcherへ接続していない")
+        for token in ["cargo build", "flutter run", "shell_snapshot.py"]:
             if token in text:
                 errors.append(f"{path.relative_to(ROOT).as_posix()} が{token}を含む")
+    launcher = (ROOT / "tooling" / "launch_owner_desktop_isolated.py").read_text(encoding="utf-8")
+    for token in [
+        "IsolatedFlutterWorkspace(source_root)",
+        '"CARGO_TARGET_DIR"',
+        '"native" / "rust_helper" / "target"',
+        '"apps" / "desktop_flutter"',
+        '"flutter",',
+        '"run",',
+        '"--session-file"',
+        "workspace.temporary_root / \"broker_session.json\"",
+        "finally:",
+        "_stop_process(broker_process)",
+    ]:
+        if token not in launcher:
+            errors.append(f"isolated developer launcherに{token}がない")
     if errors:
         return _fail(
-            "owner_launch_path_starts_broker_without_python_snapshot",
+            "owner_launch_path_uses_isolated_source_snapshot",
             "CONFIG",
             "; ".join(errors),
-            "製品authority snapshotを生成せずにRust brokerを起動し、endpoint fileをFlutterへ渡す。",
+            "Cargo target、Flutter生成物、短期Broker sessionを一時source snapshotに閉じ、native Broker Authorityを維持する。",
         )
     return _pass(
-        "owner_launch_path_starts_broker_without_python_snapshot",
+        "owner_launch_path_uses_isolated_source_snapshot",
         "CONFIG",
-        "owner desktop launch scriptはPython snapshot生成を実行せず、gui_shell_rust_helper broker-serverを起動してGUI_SHELL_BROKER_ENDPOINT_JSONを渡す。",
-        "broker launchはlauncher/supervisor codeに保ち、Flutter authority logicから分離する。",
+        "Owner用launcherはIsolatedFlutterWorkspace内でCargo build、broker-server、Flutter runを実行し、短期session fileをsnapshotに限定する。",
+        "開発用snapshotは出力隔離だけを担い、Permission／Approval／Auditの決定は既存Rust Brokerへ残す。",
     )
 
 
@@ -467,7 +482,7 @@ def run_release_runtime_assertions() -> list[RuntimeAssertion]:
         assert_flutter_product_snapshot_does_not_promote_probe_state(),
         assert_flutter_models_do_not_default_evidence_to_passed(),
         assert_flutter_does_not_spawn_python_product_path(),
-        assert_launch_scripts_start_broker_without_python_snapshot(),
+        assert_launch_scripts_use_isolated_source_snapshot(),
         assert_no_ffi_or_direct_bridge_authority_path(),
         assert_broker_client_uses_runner_pipe_channel(),
         assert_broker_client_binds_payload_hash_to_payload(),

@@ -11570,6 +11570,20 @@ def test_isolated_cargo_runner_regressions_are_registered() -> list[str]:
     return ["Cargo target隔離・cleanupのtestが失敗: " + details]
 
 
+def test_isolated_owner_desktop_launcher_regressions_are_registered() -> list[str]:
+    result = subprocess.run(
+        [sys.executable, "-m", "unittest", "tooling.conformance_tests.test_owner_desktop_launcher"],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=30,
+    )
+    if result.returncode == 0:
+        return []
+    details = (result.stdout + result.stderr).decode("utf-8", errors="replace")[-4000:]
+    return ["Owner Desktop isolated launcherのtestが失敗: " + details]
+
+
 def test_developer_validation_entrypoints_use_isolated_paths() -> list[str]:
     errors = []
     for name in ("AGENTS.md", "README.md", "QUICKSTART.md"):
@@ -11589,6 +11603,21 @@ def test_developer_validation_entrypoints_use_isolated_paths() -> list[str]:
         errors.append("AGENTS.mdが隔離Desktop Flutter analyze入口を示していない")
     if "--flutter-step mobile_flutter_analyze" not in agents:
         errors.append("AGENTS.mdが隔離Mobile Flutter analyze入口を示していない")
+    for path in (ROOT / "scripts" / "launch_owner_desktop.ps1", ROOT / "scripts" / "launch_owner_desktop.sh"):
+        content = path.read_text(encoding="utf-8").replace("\\", "/")
+        if "tooling/launch_owner_desktop_isolated.py" not in content:
+            errors.append(f"{path.relative_to(ROOT).as_posix()}が隔離Owner起動入口を使っていない")
+        if "cargo build" in content or "flutter run" in content:
+            errors.append(f"{path.relative_to(ROOT).as_posix()}がOneDrive上で直接build/runする")
+    launcher = (ROOT / "tooling" / "launch_owner_desktop_isolated.py").read_text(encoding="utf-8")
+    for token in (
+        "IsolatedFlutterWorkspace(source_root)",
+        "workspace.temporary_root / \"broker_session.json\"",
+        "_stop_process(flutter_process, process_tree=True)",
+        "_stop_process(broker_process)",
+    ):
+        if token not in launcher:
+            errors.append(f"Owner起動用isolated launcherに必要な境界がない: {token}")
     return errors
 
 
@@ -11947,6 +11976,7 @@ def main() -> int:
         test_broker_parity_waits_after_process_kill,
         test_c28_harness_regressions_are_registered,
         test_isolated_cargo_runner_regressions_are_registered,
+        test_isolated_owner_desktop_launcher_regressions_are_registered,
         test_developer_validation_entrypoints_use_isolated_paths,
         test_desktop_agent_center_required_surface_exists,
     ]

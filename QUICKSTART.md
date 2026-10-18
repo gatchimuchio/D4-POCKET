@@ -37,7 +37,7 @@ python -X utf8 tooling/validate_all.py --flutter-step desktop_flutter_analyze --
 python -X utf8 tooling/validate_all.py --flutter-step desktop_flutter_test --desktop-platform windows
 ```
 
-対象限定実行はFlutter stepの結果を必須扱いし、未実行・失敗を成功へ変換しません。隔離対象は`validate_all.py`が定義するanalyze／test／buildに限られ、`flutter run`などの直接実行はこの保護経路を通りません。
+対象限定実行はFlutter stepの結果を必須扱いし、未実行・失敗を成功へ変換しません。検査は`validate_all.py`が定義するanalyze／test／buildを一時snapshot上で実行します。Owner用launcherも隔離起動scriptを使いますが、任意に直接実行する`flutter run`は保護経路を通りません。Broker永続storeは既存開発データを維持するため従来locationに残り、短期session fileとbuild生成物はsnapshot内で回収します。
 
 2026年10月11日のB4-L2ではRust直列test 569 passed / 0 failed / 13 ignoredを記録。一方、Flutter analyzerは既存deprecated info 5件、`cargo fmt --check`は既存の形式差分により終了値1を記録しています。これらの履歴を無言でPASSへ変換しないでください。現在の個別事実と必要な検証対象は[進捗](docs/REV5_PRODUCT_PROGRESS.md)を確認してください。
 

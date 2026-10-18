@@ -512,7 +512,7 @@ python -X utf8 tooling/validate_all.py --flutter-step desktop_flutter_analyze
 python -X utf8 tooling/validate_all.py --flutter-step mobile_flutter_analyze
 ```
 
-Cargoの既定targetがOneDrive／同期対象source配下へ出ないよう、Rust検査は`tooling/run_cargo_isolated.py`を使用する。同scriptは`CARGO_TARGET_DIR`をRepository／OneDrive外の検証済み一時領域へ固定し、終了時に回収する。明示`--target-dir`／Cargo `--config`は拒否する。Flutter analyze／test／buildは`tooling/validate_all.py --flutter-step`の隔離snapshot経路を使い、直接Flutter commandをOneDrive上のsourceで実行しない。これらはCargo targetと登録済みFlutter stepの出力場所を限定するもので、build scriptや他の任意processの全file書込みをsandboxするものではない。`python`不在なら`python3`を使用する。Windows固有の検証をLinuxに流用しない。実施したcommand、環境、exit、証拠class、未実施の`NOT_RUN`と理由を記録し、必要な証拠が欠ける成立状態をCLOSEDへ上げない。
+Cargoの既定targetがOneDrive／同期対象source配下へ出ないよう、Rust検査は`tooling/run_cargo_isolated.py`を使用する。同scriptは`CARGO_TARGET_DIR`をRepository／OneDrive外の検証済み一時領域へ固定し、終了時に回収する。明示`--target-dir`／Cargo `--config`は拒否する。Flutter analyze／test／buildは`tooling/validate_all.py --flutter-step`の隔離snapshot経路を使い、直接Flutter commandをOneDrive上のsourceで実行しない。Owner用Desktop起動は`tooling/launch_owner_desktop_isolated.py`を通し、Cargo target、Flutter生成物、短期Broker session fileを一時source snapshotへ閉じ、終了後に回収する。launcher内のBroker永続storeは既存開発データとの互換性のため従来locationを維持する。これらは登録済みcommandの出力場所を限定するもので、build scriptや他の任意processの全file書込みをsandboxするものではない。`python`不在なら`python3`を使用する。Windows固有の検証をLinuxに流用しない。実施したcommand、環境、exit、証拠class、未実施の`NOT_RUN`と理由を記録し、必要な証拠が欠ける成立状態をCLOSEDへ上げない。
 
 `BUILD_COVERED`の後、QE_QCで実物全体の正常・異常・安全・長時間・資源・性能・OS差・緩衝実作用と副作用を試験し、是正時には必要な上流まで戻って同条件で再試験する。QE_QAは候補版・OS・条件別の保証判定、Owner GOはさらに独立。既存`docs/FINAL_QA_QUEUE.md`のQ0〜Q7・FQ識別子と過去結果は保持し、正式Q段階の新規開始は明示modeと候補の指定がある場合のみ。Q0新候補凍結、Q1〜Q5実物検査、Q6同一候補証拠集約、対象別QE_QA、Q7 Owner判断を区別する。
 

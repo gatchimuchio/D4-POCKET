@@ -92,7 +92,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "14694921489a0517fe8e4334ff65aefe56b1669d95fc7939fe9083e15c3e9ae0"
+      "sha256": "2930769d128853add7c3a9a2b0d8d8c1e8a234acdfb4edf15f49646dd46ab8d7"
     },
     {
       "path": "AUDIT.md",
@@ -152,11 +152,11 @@
     },
     {
       "path": "QUICKSTART.md",
-      "sha256": "0ab544bea2f17f0e5d773a5751ee370856244bf90072613ca377cad3d0c9c812"
+      "sha256": "0012a76cf217a7e727ea403a3f0c8cfdee4827734a902db2c29c515c48693293"
     },
     {
       "path": "README.md",
-      "sha256": "68ef3d75b690ed43510b6ce4828dd013b52be01f40996fde98417c9d2b3c47f8"
+      "sha256": "d4208fe0c53261043985bd90e78437a25edd114c5a9bdf196dd4530f443556ef"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "e4e85bafa0dc488070044d9195f83ba0bd6fa5b39d7fe465f49135329140dc4e"
+      "sha256": "91715556397ee449cf8b570ff7cdad085581143ff990f5d04c063d6c09653c69"
     },
     {
       "path": "SECURITY.md",
@@ -1288,7 +1288,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "e2e5890cb33c3d9ade2e8bae147c30a5e5e16f524970ce580df1d2f08fc9fde9"
+      "sha256": "298efade4f55e581f3803efedc7054a904a7aa66cf04b1c6ce3bf10847899bf5"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1676,7 +1676,7 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B5_\u81ea\u5df1\u9069\u7528.md",
-      "sha256": "7b3f53481a77368eeffa1469cd4cf1c4fd0b1c8c179193fd3f0ef1cbbf621359"
+      "sha256": "b1e16700ba04b60d3a888d4e10c7f2755e0d6936321122746c967a5dbb7fb5de"
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/\u5b9f\u88c5\u4ed5\u69d8\u66f8.md",
@@ -4216,11 +4216,11 @@
     },
     {
       "path": "scripts/launch_owner_desktop.ps1",
-      "sha256": "0a47eacf60e86b11786026b29627ef96e59633ad7543f9d16b84fb0d4bdc8998"
+      "sha256": "dd84ff6801135beb6adca7978131139e31b3a3900b3c73a7d978573c5aa26c72"
     },
     {
       "path": "scripts/launch_owner_desktop.sh",
-      "sha256": "423bd50fbdf88093850f6286612cf333bc7167f802058ab0705b7232d086376b"
+      "sha256": "6fd3e9beb6e76fd258202d29268686425d2fe9577d733e921cf30260dbbb81a7"
     },
     {
       "path": "specs/a2a_connection.schema.json",
@@ -4932,7 +4932,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "67125b07f6e35685551630dace66578fb73f757bd9423559b830edee178e63e5"
+      "sha256": "2cec3c17589ec0e38404c3388e7513bb8a59b3db0f7a57ce3ed29cddfcb95d81"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
@@ -5028,7 +5028,7 @@
     },
     {
       "path": "tooling/release_runtime_assertions.py",
-      "sha256": "abc4d7c2845576a0182dbda9462360e502bfd62b9b680e05308084eb98793293"
+      "sha256": "fd646a775d01b8386c6c8d090b44df4cb6a4b3b420efed6afa52d91f997a2f6c"
     },
     {
       "path": "tooling/release_smoke.py",
