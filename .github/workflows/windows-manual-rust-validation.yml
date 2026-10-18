@@ -1,6 +1,16 @@
 name: Windows Rust manual validation
 
-'on': workflow_dispatch
+'on':
+  workflow_dispatch:
+    inputs:
+      rust_test_mode:
+        description: Rust tests run with the default parallel scheduler or one test thread
+        type: choice
+        required: true
+        default: sequential
+        options:
+          - sequential
+          - parallel
 
 permissions:
   contents: read
@@ -78,9 +88,19 @@ jobs:
             }
           }
       - name: Rust全targetを検査・試験
+        env:
+          RUST_TEST_MODE: ${{ inputs.rust_test_mode }}
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          $mode = $env:RUST_TEST_MODE
+          if ($mode -notin @('sequential', 'parallel')) {
+            throw "未対応のRust test mode: $mode"
+          }
+          $testArgs = @()
+          if ($mode -eq 'sequential') {
+            $testArgs = @('--', '--test-threads=1')
+          }
           $testTemp = Join-Path $env:RUNNER_TEMP 'gui-shell-test-temp'
           New-Item -ItemType Directory -Force -Path $testTemp | Out-Null
           if ($testTemp.Contains('~')) {
@@ -92,7 +112,8 @@ jobs:
           "Rust test TEMP/TMP: ``$testTemp``" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1
+          "Rust test mode: $mode" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets @testArgs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Release Broker helperをbuild

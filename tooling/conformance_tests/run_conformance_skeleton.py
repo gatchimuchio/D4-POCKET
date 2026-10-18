@@ -11427,6 +11427,20 @@ def 手動補助の起動境界を検査する() -> list[str]:
     ):
         if stale_path in rust_workflow:
             不整合.append(f"Windows Rust manual workflowが差分外Rust fileを固定検査している: {stale_path}")
+    for token in (
+        "rust_test_mode:",
+        "type: choice",
+        "default: sequential",
+        "- parallel",
+        "RUST_TEST_MODE: ${{ inputs.rust_test_mode }}",
+        "$mode = $env:RUST_TEST_MODE",
+        "if ($mode -notin @('sequential', 'parallel'))",
+        "$testArgs = @()",
+        "--test-threads=1",
+        "@testArgs",
+    ):
+        if token not in rust_workflow:
+            不整合.append(f"Windows Rust manual workflowに逐次／並列mode契約がない: {token}")
     return 不整合
 
 

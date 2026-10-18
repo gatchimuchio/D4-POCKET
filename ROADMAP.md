@@ -1,5 +1,7 @@
 # GUI Shell ロードマップ
 
+後続追補（2026-10-18、BUF-T05 hosted scheduler比較準備）: Windows手動Rust検証workflowを`workflow_dispatch`限定のまま拡張し、同じ全target suiteをRust標準の並列実行または単一test threadで選べるようにする。既定は従来互換の逐次実行、不明modeは拒否する。目的はWindows Server 2025上のhost比較であり、自動CI、Windows保護設定、Rust test対象、Broker smoke／cleanupの範囲は変更しない。実行結果は当該commit・mode別に記録し、単発PASSで`FQ-TEST-LOOPBACK`を閉じない。B5／BUF-T05は引き続きOPEN。
+
 後続追補（2026-10-18、Owner Desktop LIVE_RUNTIME起動）: `808c56e`を基準とするsource identity `9258a19a60d20a46e87729d17ccd7e6e02e109abfe6d276292f5d0de83f26183`でWindows Debug Desktopをisolated launcherから起動。`D4 Pocket` windowとBroker processを観測し、Flutter標準`q`終了後launcherはexit 0、snapshot cleanupとsource identity照合が成功した。初回runで見つかったBroker storeによるsource-change誤検出は、`.gitignore`と回帰testで是正。Auditは空でBroker要求／Agent Task／installed productの証拠ではない。B5 OPEN、release状態不変。詳細は[B5自己適用記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
 
 後続追補（2026-10-18、BUF-T05 A2A timeout診断）: current `a2a.rs` SHA-256 `34D799942042AEF254ADA530BBCD8884468A91A5C59CC456A4E661C39375B253`に、HTTP期限を維持したstage／受信量／時刻診断を追加。既定並列library suiteは523 passed／0 failed／12 ignoredだが、直前sourceでのA2A timeoutはFAIL履歴として保持し根因未確定。`BUF-T05`／B5 OPEN、`task_execution=unsupported`、`release_ready=false`。詳細は[B5自己適用記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
