@@ -11,6 +11,14 @@ name: Windows Rust manual validation
         options:
           - sequential
           - parallel
+      rust_test_repeats:
+        description: Repeat the full Rust test run for bounded intermittent-failure observation
+        type: choice
+        required: true
+        default: '1'
+        options:
+          - '1'
+          - '3'
       loopback_rst_capture:
         description: Capture IPv4 loopback TCP RST packet headers during tests (no artifacts uploaded)
         type: boolean
@@ -100,6 +108,7 @@ jobs:
       - name: Rust全targetを検査・試験
         env:
           RUST_TEST_MODE: ${{ inputs.rust_test_mode }}
+          RUST_TEST_REPEATS: ${{ inputs.rust_test_repeats }}
           LOOPBACK_RST_CAPTURE: ${{ inputs.loopback_rst_capture }}
         shell: pwsh
         run: |
@@ -107,6 +116,14 @@ jobs:
           $mode = $env:RUST_TEST_MODE
           if ($mode -notin @('sequential', 'parallel')) {
             throw "未対応のRust test mode: $mode"
+          }
+          $repeatCount = 0
+          if (-not [int]::TryParse($env:RUST_TEST_REPEATS, [ref]$repeatCount) -or
+              $repeatCount -notin @(1, 3)) {
+            throw "未対応のRust test repeat count: $env:RUST_TEST_REPEATS"
+          }
+          if ($repeatCount -gt 1 -and $env:LOOPBACK_RST_CAPTURE -ne 'true') {
+            throw '複数回のRust test実行にはloopback RST captureが必要'
           }
           $testArgs = @()
           if ($mode -eq 'sequential') {
@@ -124,6 +141,7 @@ jobs:
           cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           "Rust test mode: $mode" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          "Rust test repeats (maximum): $repeatCount" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           $captureEnabled = $env:LOOPBACK_RST_CAPTURE -eq 'true'
           $captureName = "gui-shell-loopback-rst-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
           $capturePath = Join-Path $env:RUNNER_TEMP 'PktMon.etl'
@@ -158,8 +176,15 @@ jobs:
                 'Pktmon capture: IPv4 127.0.0.1 TCP RST filter; packet limit 54 bytes; ETL/text are not uploaded and are removed after the test.'
               ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
             }
-            cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets @testArgs
-            $testExit = $LASTEXITCODE
+            for ($iteration = 1; $iteration -le $repeatCount; $iteration++) {
+              "Rust test iteration: $iteration/$repeatCount" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+              cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets @testArgs
+              $testExit = $LASTEXITCODE
+              if ($testExit -ne 0) {
+                "Rust test iterations stopped at failure $iteration/$repeatCount." | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+                break
+              }
+            }
           } finally {
             $cleanupErrors = @()
             if ($captureAttempted) {

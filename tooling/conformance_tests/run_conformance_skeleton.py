@@ -11458,6 +11458,20 @@ def 手動補助の起動境界を検査する() -> list[str]:
         if token not in rust_workflow:
             不整合.append(f"Windows Rust manual workflowに逐次／並列mode契約がない: {token}")
     for token in (
+        "rust_test_repeats:",
+        "default: '1'",
+        "- '1'",
+        "- '3'",
+        "RUST_TEST_REPEATS: ${{ inputs.rust_test_repeats }}",
+        "$repeatCount -notin @(1, 3)",
+        "$repeatCount -gt 1 -and $env:LOOPBACK_RST_CAPTURE -ne 'true'",
+        "for ($iteration = 1; $iteration -le $repeatCount; $iteration++)",
+        "Rust test iterations stopped at failure",
+        "break",
+    ):
+        if token not in rust_workflow:
+            不整合.append(f"Windows Rust manual workflowのbounded repeat契約がない: {token}")
+    for token in (
         "tooling\\test_pktmon_packet_summary.ps1",
         "tooling\\pktmon_packet_summary.ps1",
     ):
