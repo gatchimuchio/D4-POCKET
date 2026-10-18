@@ -84,7 +84,7 @@
     },
     {
       "path": ".github/workflows/windows-manual-rust-validation.yml",
-      "sha256": "e161c8103db2d5fa51b6e54e528bdd252ded2dc8e43eefdb0db7c1e99182d4f0"
+      "sha256": "e917c78328738e34bc4c53f512f69a2b5d0fd07e6b7e046b1534bd3456194a54"
     },
     {
       "path": ".gitignore",
@@ -4932,7 +4932,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "9dbd368c18c1e046b6f44ef3b3a0f12745f1d8aab047986fcc5ef9db9aae5a36"
+      "sha256": "85613f891bf05c8c5a9922754441f5f53bd9b52177ca8c5ca6fe27ff3beb842c"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",

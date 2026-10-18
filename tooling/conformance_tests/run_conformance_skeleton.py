@@ -11457,6 +11457,14 @@ def 手動補助の起動境界を検査する() -> list[str]:
     ):
         if token not in rust_workflow:
             不整合.append(f"Windows Rust manual workflowに逐次／並列mode契約がない: {token}")
+    for token in (
+        "tooling\\test_pktmon_packet_summary.ps1",
+        "tooling\\pktmon_packet_summary.ps1",
+    ):
+        if token not in rust_workflow:
+            不整合.append(f"Windows Rust manual workflowにPktmon parser接続がない: {token}")
+    if "Where-Object { $_ -match '127\\.0\\.0\\.1' }" in rust_workflow:
+        不整合.append("Pktmon診断がloopback IPを含むfilter／component metadataをpacketとして数える")
     return 不整合
 
 

@@ -74,6 +74,11 @@ jobs:
           "GUI_SHELL_BROKER_SMOKE_ROOT=$smokeRoot" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "GUI_SHELL_BROKER_SMOKE_MARKER=$marker" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "CARGO_TARGET_DIR=$env:CARGO_TARGET_DIR" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Pktmon packet summary parser fixture test
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & "$env:GITHUB_WORKSPACE\tooling\test_pktmon_packet_summary.ps1"
       - name: 変更Rust fileの整形を検査
         shell: pwsh
         run: |
@@ -172,14 +177,7 @@ jobs:
                     $cleanupErrors += 'Pktmon ETLをheader summaryへ変換できない'
                   } else {
                     try {
-                      $packetLines = @(Get-Content -LiteralPath $captureTextPath | Where-Object { $_ -match '127\.0\.0\.1' })
-                      "Pktmon loopback RST packet snapshots: $($packetLines.Count) (Pktmon may report one packet at multiple stack components)." | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
-                      foreach ($line in ($packetLines | Select-Object -First 20)) {
-                        $line | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
-                      }
-                      if ($packetLines.Count -gt 20) {
-                        'Pktmon packet summary truncated to 20 loopback snapshots.' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
-                      }
+                      & (Join-Path $env:GITHUB_WORKSPACE 'tooling\pktmon_packet_summary.ps1') -InputPath $captureTextPath -SummaryPath $env:GITHUB_STEP_SUMMARY
                     } catch {
                       $cleanupErrors += "Pktmon header summaryを処理できない: $($_.Exception.Message)"
                     }
