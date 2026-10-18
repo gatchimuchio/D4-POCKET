@@ -1,6 +1,6 @@
 # GUI Shell ロードマップ
 
-後続追補（2026-10-19、BUF-T06現起動policy／通常Rust実行）: Windows 11 Home build 26300でCode Integrity Enforcement modeと、現起動時event 3099 policy-load記録4件（Status 0）を観測した。現行source `bb7ad68d99a20d62f311c46f00a9581f25967a7f`のisolated Cargo経由focused Rust unit test 1件は通常実行でPASS（1/0/0、534 filtered）、その時間帯の3076／3077 eventは0件、temporary targetは回収済み。これは限定testの現在経路だけを証明し、全policy inventoryや過去拒否の解消は示さない。`CiTool -lp -json` Access Denied、他OS未確認を維持し、`BUF-T06`部分観測／OPEN、B5 OPEN、通常Release capability／release gate不変。詳細は[B5自己適用記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
+後続追補（2026-10-19、BUF-T06現起動policy／通常Rust実行）: Windows 11 Home build 26300でCode Integrity欄2（Enforcement）、Usermode Code Integrity欄0（Off）、現起動時event 3099 policy-load記録4件（Status 0）を観測した。現行source `bb7ad68d99a20d62f311c46f00a9581f25967a7f`のisolated Cargo経由focused Rust unit test 1件は通常実行でPASS（1/0/0、534 filtered）、その時間帯の3076／3077 eventは0件、temporary targetは回収済み。ただしtest成功をユーザーモード署名方針による許可実証とは扱わない。全policy inventoryや過去拒否の解消は未成立。`CiTool -lp -json` Access Denied、他OS未確認を維持し、`BUF-T06`部分観測／OPEN、B5 OPEN、通常Release capability／release gate不変。詳細は[B5自己適用記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
 
 後続追補（2026-10-19、BUF-T23 B5局所受入判定）: 既存の同一source／同一snapshot identityでのDesktop analyze 2回がPASSし、snapshot／process cleanupもPASS。共有Pub cacheの変化はrunごと135-byteの`active_roots`記録1件だけで、Pub公式layout上GC対象となる記録であるため、`BUF-T23`のB5局所AcceptanceをPASSと判定した。長期累積・GC頻度・複数project同時利用の8h／24h・資源検査は工程表Q4に残す。B5はOPEN、通常Release `task_execution=unsupported`、`release_ready=false`を維持する。詳細は[B5記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
 
