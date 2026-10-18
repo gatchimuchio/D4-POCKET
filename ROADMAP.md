@@ -1,5 +1,7 @@
 # GUI Shell ロードマップ
 
+後続追補（2026-10-19、BUF-T23同一source反復測定）: current `main`／`origin/main` `7504136f63e801f952a5dada9a33b9827aaaeac3`の同一source identityでDesktop Flutter analyzeを2回実行し、両方PASS（86.5秒／9.1秒）、snapshot cleanupもPASSした。共有Pub cacheでは各run 135-byteの`active_roots`記録が追加される。これはPub cache GC用のpackage-config記録であり、参照先のない記録はGC対象となる。cacheは手動編集せず、長期累積・同時利用影響は未測定のため`BUF-T23`部分観測、B5 OPENを維持する。詳細は[現行進捗](docs/REV5_PRODUCT_PROGRESS.md)と[B5自己適用記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
+
 後続追補（2026-10-19、BUF-T05自己接続RST試験のport照合）: implementation commit `61e3b93`でcapture中にpayloadを送らないTCP強制切断を行い、Pktmon解析器が使い捨て待受け先番号とRST flagをdecoded IPv4 tuple内で確認できなければstepを失敗させる診断を追加した。Windows local socketで`ConnectionReset`、解析器の正常／不在port／非RST fixture、manual workflow check、Conformance 257 checks、ManifestはPASS。初回assertionはexactly-one snapshotを仮定して失敗したが、Pktmon componentごとの重複観測を許す1件以上の照合へ修正し、再実行PASS。実装commitと証拠記録commit `2718010`は`main`にあり、一時branchは削除済み。GitHub dispatch機能が利用可能ツールになく、`gh`もなく、credentialを使うAPI呼出しは実行ポリシーに拒否されたためhosted captureは未実行。B5／BUF-T05 OPEN、release状態は不変。
 
 後続追補（2026-10-19、BUF-T06 CiTool一覧の読取り）: 現shellは非管理者で、読取り専用`CiTool.exe -lp -json`は`0x80070005`（Access Denied）で失敗。Code Integrity設定の変更・回避は行っていない。active policy一覧と`BUF-T06`は未成立のまま。
@@ -551,6 +553,8 @@ rev2の要求監査では、Mobile実機証拠・Mobile正式配布・Desktop起
 ~~~
 
 ## 0. 製品定義
+
+> **履歴範囲の注意（2026-10-19）:** 以下のv1.0 platform priority／`required_for_v1`記述は、当時のWindows-first release planとWSLg smokeを記録した履歴であり、現行Linux native製品対象のAcceptanceを定義しない。現行OS対象と証拠境界は`AGENTS.md` §0を参照する。WSL／WSLg／headless証拠をLinux native製品の導入・GUI・権限・配布・Wayland完成へ転用しない。Linux v1.1追加文書はOwner採否前の正本候補であり、正式工程・正式サポートを開始した扱いにしない。
 
 GUI Shell は、local Runtime、agent、tool、service を対象とする PC-first の AI Runtime／Agent Operation Shell であり、`LLM-readable application responsibility substrate`（LLM が読むアプリケーション責任基盤）である。
 

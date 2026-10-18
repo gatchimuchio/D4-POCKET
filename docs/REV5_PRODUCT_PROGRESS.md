@@ -1,5 +1,7 @@
 # D4 Pocket / GUI-Shell rev5 Product-First 進捗
 
+作業追補（2026-10-19、BUF-T23同一source反復測定）: current `main`／`origin/main` `7504136f63e801f952a5dada9a33b9827aaaeac3`の同一source identityでDesktop Flutter analyzeを2回実行し、両方PASS（86.5秒／9.1秒）、isolated snapshot cleanupもPASS。共有Pub cacheに各run 135-byteの`active_roots` recordが1件ずつ増加した。Pub公式cache layoutではこれはpackage config参照のGC bookkeepingで、参照config不在のrecordは`dart pub cache gc`が削除する。共有cacheは手動編集せず、GCも実行していない。`CARGO_HOME`差分・snapshot/process残存はなし。長期累積と同時利用影響は未測定のため`BUF-T23`部分観測、B5 OPEN、通常Release `task_execution=unsupported`、`release_ready=false`を維持する。詳細は[B5自己適用記録](緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
+
 作業追補（2026-10-19、BUF-T05自己接続RST試験の捕捉照合）: implementation commit `61e3b93`で任意のWindows手動workflow捕捉中にpayloadなしの自己接続TCP RSTを発生させ、使い捨て待受け先番号とRST flagがdecoded packet tupleへ現れた場合だけ解析器をPASSさせる診断を実装した。ローカルWindows socket APIの`ConnectionReset`、解析器の正常／不在port／非RST fixture、手動workflow検査、Conformance 257 checks、Manifest、`git diff --check`はPASS。strict日本語監査は既存負債12 files／51 findingsと同数。実装commitと証拠記録commit `2718010`は`main`へfast-forward済みで、一時検証branchは削除済み。GitHub dispatch機能が利用可能ツールになく、`gh`もなく、credentialを使う直接API呼出しは実行ポリシーに拒否されたため、hosted Pktmon捕捉は未実施・未検証。通常Release `task_execution=unsupported`、`release_ready=false`、B5 OPENは維持する。
 
 後続追補（2026-10-19、BUF-T06 CiTool方針一覧の読取り試行）: 現shellは非管理者で、読取り専用`CiTool.exe -lp -json`は`OperationResult=-2147024891`（`0x80070005`、Access Denied）となった。設定変更は行っていない。全policy inventoryを取得できず、Code Integrityの現在有効方針全体と`BUF-T06`は部分観測／OPENのまま。
