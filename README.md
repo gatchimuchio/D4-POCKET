@@ -32,7 +32,7 @@ AIエージェントが高度になるほど、次に難しくなるのは「何
 | **Windows Desktop** | rev5のWindows側P12、Feature Completeの開発到達点 | installed-path最終証拠、正式Release、owner GO |
 | **Agent Compare / Handoff** | P2 Multi-Agent Compare、P3 Agent HandoffのProduct Build受入CLOSED | すべての実Agent・実環境での一般保証 |
 | **Mobile / Non-Windows** | P13の有限Product Build受入は2026-10-09にCLOSED。Android Emulator・iOS Simulator等の限定証拠を保持 | 物理端末保証、OS別の正式配布・署名・identity |
-| **緩衝基盤とAgent Task** | B0〜B4は有限Product Build受入CLOSED。B5ではWindows Flutter検証をOneDrive外snapshotで実行し7 checks PASS。詳細は[B5記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md) | 過去OneDrive警告とのsource-exact因果比較、同期service復旧、通常Release能力、正式配布・実機保証 |
+| **緩衝基盤とAgent Task** | B0〜B4は有限Product Build受入CLOSED。B5ではWindows Flutter検証をOneDrive外snapshotで実行し7 checks PASS。現行commitでのAndroid開発用APK生成も同経路で確認。詳細は[B5記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md) | 過去OneDrive警告とのsource-exact因果比較、同期service復旧、通常Release能力、正式配布・実機保証 |
 | **正式な出荷判断** | Release GateとOwner承認を独立に保持 | <code>task_execution=unsupported</code>、<code>release_ready=false</code> |
 
 B4-L2の記録済み検査では、Rust全体直列テスト **569 passed / 0 failed / 13 ignored**、Agent Task Flutter client 14件とAgent Center widget 1件、Schema **167件**・正常例 **163件**・否定fixture **215件**、Conformance **245 checks**を確認しています。これらは**2026-10-11の開発環境における対象版の証拠**であり、このREADME更新時に再実行した値でも、インストール済み製品の保証でもありません。10月17日のB4統合経路証拠も`r2-e2e` staged buildとlocalhost合成APIの範囲に限られ、通常Release能力やinstalled provenanceを示しません。[観測範囲と残差](docs/REV5_PRODUCT_PROGRESS.md)を参照してください。

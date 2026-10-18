@@ -156,7 +156,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "c456ef583521ecdcd6b48036d791604612c9cf7dc54aadd6e8571adf1ae2ad1f"
+      "sha256": "70d42cb497dae1c26675450309dbc5be505de0cb78f0445af2a09c159e60e584"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "d9d6a5d0d138e73f723f052f75c4f07bc0c495d334ce75598f6e73ed8f069a6a"
+      "sha256": "ada3d53bbe21f0cd1ebb3e76d7f8f841e6b8025e70ec39de57e56977b3a40371"
     },
     {
       "path": "SECURITY.md",
@@ -1288,7 +1288,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "65740c3d388236bf35472b25d2bd508c46a1d2b48c0c63e5a9e92c27c42506b4"
+      "sha256": "b7000a2c310f574bc6f04f9267703b416c0487c3d4d6ff9b6efd32befced81d4"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1676,7 +1676,7 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B5_\u81ea\u5df1\u9069\u7528.md",
-      "sha256": "548d5e057c7bf10f7c78ad1d0a4e3325b62e6612cd95fd4a694988f3de5435ef"
+      "sha256": "0e0f33849227f697ecaecaf735fb933c16caad1b4b612ee72d81cd56bae22439"
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/\u5b9f\u88c5\u4ed5\u69d8\u66f8.md",
@@ -1692,7 +1692,7 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/\u63a1\u7528\u8a18\u9332.md",
-      "sha256": "aa0d0f7e74ca94e6e50a91692cc4acaa0ef30d57eba953724148878d34436f0a"
+      "sha256": "dc4735e392ec049a70b7ea80f4525b25834e915012a07ba5fe1c9c2b9eb4505a"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",

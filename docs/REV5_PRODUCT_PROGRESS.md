@@ -2,6 +2,8 @@
 
 最新状態（2026-10-18、B5自己適用継続）: B4はCLOSEDを維持。B5ではOneDrive外のWindows Flutter snapshot validationを施工し、Android debug `assembleDebug`を現行sourceから実行、APK生成とsnapshot cleanup（再試行1回）までPASS。同一439文字fixtureでは通常path lookup／cleanupが失敗し、extended-length cleanupが同一treeを回収する因果差を確認した。Flutter検査をsnapshotへ通す対象限定`--flutter-step`入口を追加し、README／QUICKSTARTの直接analyze案内を置換。Desktop analyze PASS（source commit `5defb14309d442ff2688e2d7d7bf75fd0dff5638`、実行時fingerprint `a5f88adb2bd3638c8e6383ef57098b7468eba99e4ad85cc0a49e32c33c585e1a`、106.9秒、cleanup PASS）、Conformance 254 checks PASS。APK hash・以前のsource fingerprint・証拠限界は[B5自己適用記録](緩衝基盤_rev5補遺_QC/B5_自己適用.md)に記録。先行失敗runの一時rootは残存しており安全制約で削除していない。OneDrive同期serviceのsource-exact比較・復旧は未確認のためB5 OPEN。通常Release `task_execution=unsupported`、`release_ready=false`とrelease blockerは維持する。詳細は[B4製品接続設計](緩衝基盤_rev5補遺_QC/B4製品接続設計.md)。
 
+現行HEAD追試（2026-10-18）: `mobile_android_debug_build`をsource commit `29b48a6bbdf17fe18345652310089f0ecae15b47`のisolated snapshot上で実行し、Gradle `assembleDebug` 286.2秒、APK SHA-256 `46d6888bffde6eba3ba45b7e69ab7b8873fe9ffdb2d2a320375133e99f2d55ac`、snapshot cleanup PASS（1 retry）。実機・installed product証拠ではない。SDK XML v4／processor v3上限warningは残るがbuildは成功。`BUF-T05` loopback根因と`BUF-T06` OS拒否非迂回は未実施／未解決のためOPENを維持する。
+
 対象限定Flutter検査の後続再測定（上記fingerprintを更新）: `desktop_flutter_analyze`はsource commit `5defb14309d442ff2688e2d7d7bf75fd0dff5638`、fingerprint `d88585b741244974cb1dcf0f26136eb7f02154bf405d6b148005d1c5c55fb7fc`でPASS（8.8秒、snapshot cleanup PASS）。出力の出荷判定は「未評価」。詳細と初回測定との区別は[B5自己適用記録](緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
 
 対象限定Flutter testの後続実測: `desktop_flutter_test`はsource commit `d562588a67b64f4faddaba42053ded199de27c3d`、fingerprint `834ae65d0fae1704b1b35ab124b7c58f18b7b703c80123df843cf52a50e6ff78`で、Rust helper buildとFlutter test 224件がPASSし、snapshot cleanupもPASS。専用temp prefixの現在inventoryは1 rootで、関連build processは動作していないが、残存rootは削除していない。詳細は[B5自己適用記録](緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
@@ -36,7 +38,7 @@ Rust／Flutter全試験群、installed product、実機、Actionsは本単位で
 
 B4-L1受入状態（履歴）: 調停記録契約をv2へ整備し、実Broker session IDをHost識別に使う。Git非依存Workspaceのsource commit未取得を明示し、その状態では`吸収成立`へ昇格しない。B4-L1は契約整備だけの局所受入であり、この時点では製品consumer・Agent Center接続は未成立だった。
 
-更新日: 2026-10-17
+更新日: 2026-10-18
 工程正本: ユーザー提示「D4 Pocket / GUI-Shell 統合実装仕様書 rev5」「統合開発工程表 rev5」「Codex実装指示書 rev5」
 最新B3追記（2026-10-11）: M73まで局所受入、B0 cause-map 151/153行を分類、2行残。M70はlegacy validation 11 runのsetup-only jobと包括validatorのscope不整合を強いsource-history推定として分類し、個別inner check causeはUNKNOWNのまま保持した。M71は同一Rust crate treeを使う旧Ubuntu Actions 8 jobを証拠限界として`未成立／未知`へ分類した。failed job logはHTTP 410、artifactなしで、同一treeの保存済みlocal `cargo test` PASSや同一SHA後続成功はActions failureの根因を説明しない。別treeの#26840155393は対象外。M72はAndroid manual workflowの同一source SHA 3件について、API記録の`push` failureとjob/artifact/check-run 0件、source上の`workflow_dispatch`限定が食い違うrun-level UNKNOWNとして分類した。M73は#37636324822のmacOS job failureでstep 0、runner未割当、artifact 0、job log 404を確認できるが、失敗原因はUNKNOWN。M68の別runのrunner-admission警告と結合しない。現行作業では自動CIを再導入せず、過去欠測も成功へ昇格しない。
 状態訂正（2026-10-11、M74）: 最新は152/153原因対応行を分類済み、1行未分類。別Rust treeの#26840155393は追加`tests/broker_ipc.rs`を含むsource-exact PASSがなく、同一SHA後続成功もActions failureの原因証拠にしない。上記M73追記は履歴snapshot。
