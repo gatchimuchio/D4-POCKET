@@ -23,7 +23,7 @@ try {
     ) | Set-Content -LiteralPath $inputPath -Encoding utf8
     Set-Content -LiteralPath $summaryPath -Value '' -Encoding utf8
 
-    & $formatter -InputPath $inputPath -SummaryPath $summaryPath
+    & $formatter -InputPath $inputPath -SummaryPath $summaryPath -ExpectedLoopbackPort 443
     $summary = Get-Content -LiteralPath $summaryPath -Raw
     if ($summary -notmatch 'snapshots \(capture filter: RST\): 3') {
         throw 'PktGroupId付きloopback TCP snapshotを正しく数えない'
@@ -39,6 +39,9 @@ try {
     }
     if ($summary -notmatch 'TCP, flags \[R\]') {
         throw 'RST-filtered packet headerを保持しない'
+    }
+    if ($summary -notmatch '自己接続RST試験の待受け先番号 443 を持つRST headerを[1-9][0-9]*件のtuple snapshotで確認しました。') {
+        throw '期待したsynthetic loopback RST portを確認しない'
     }
     if ($summary -notmatch 'PktNumber 2, Appearance 1, Direction Rx') {
         throw '受信方向snapshotを保持しない'
@@ -60,6 +63,30 @@ try {
     }
     if ($metadataOnlySummary -notmatch 'metadata alone is not packet evidence') {
         throw 'packet tupleがない場合の証拠限界を明示しない'
+    }
+    $missingProbeRejected = $false
+    try {
+        & $formatter -InputPath $inputPath -SummaryPath $summaryPath -ExpectedLoopbackPort 443
+    } catch {
+        $missingProbeRejected = $_.Exception.Message -match '自己接続RST試験の待受け先番号を持つRST headerがありません: 443'
+    }
+    if (!$missingProbeRejected) {
+        throw '期待したsynthetic probe packetがない場合に拒否しない'
+    }
+
+    @(
+        '[30]0000.0000::<DateTime> [Microsoft-Windows-PktMon] PktGroupId 14, PktNumber 1, Appearance 1, Direction Tx , Type IP , Component 39, Filter 1, OriginalSize 54, LoggedSize 54'
+        '    ip: 127.0.0.1.49152 > 127.0.0.1.443: TCP, flags [S], length 0'
+    ) | Set-Content -LiteralPath $inputPath -Encoding utf8
+    Set-Content -LiteralPath $summaryPath -Value '' -Encoding utf8
+    $nonRstProbeRejected = $false
+    try {
+        & $formatter -InputPath $inputPath -SummaryPath $summaryPath -ExpectedLoopbackPort 443
+    } catch {
+        $nonRstProbeRejected = $_.Exception.Message -match '自己接続RST試験の待受け先番号を持つRST headerがありません: 443'
+    }
+    if (!$nonRstProbeRejected) {
+        throw 'RSTではないpacketをprobe成功として扱う'
     }
 
     $manySnapshots = [System.Collections.Generic.List[string]]::new()

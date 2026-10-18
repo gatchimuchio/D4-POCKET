@@ -84,7 +84,7 @@
     },
     {
       "path": ".github/workflows/windows-manual-rust-validation.yml",
-      "sha256": "3b966295f4d387b0289065765379ed1e1dd9250f229765ec64e25a2c85dba192"
+      "sha256": "6a7ef1c10d2b07b2e11a9456733ab6f6a4efc6a3f99b96a431f563e85fdb0fca"
     },
     {
       "path": ".gitignore",
@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "a9446bec8b22a42f3509de81dd5169d36aab5f449cd1b60690db7612566cb2b4"
+      "sha256": "8bec4547e5754e4744cd47222fbe8616c2115e8a7c179dbab4136b4b07443b62"
     },
     {
       "path": "SECURITY.md",
@@ -1288,7 +1288,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "2cbc0723a5e6cdd2dda1b0c74affbda4e0c434f8afd03822c0cffcb210572172"
+      "sha256": "88537bb64e276634086e1fd0788f4f3487b87e4545056873624641373ecb1af0"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1676,7 +1676,7 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B5_\u81ea\u5df1\u9069\u7528.md",
-      "sha256": "615b53707b99fd535458b8bb4012be0f0291193b8a44624533c037911a3c50b3"
+      "sha256": "6cddd8c0b3dcae2fbe2b2530460a209e9ebc791379bf8fddce90d5e7c194abd8"
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/\u5b9f\u88c5\u4ed5\u69d8\u66f8.md",
@@ -4932,7 +4932,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "b81febe4633e5cc8b84d11972291e04d96232a0e3afb8ac6c58f3ab40c48bfa2"
+      "sha256": "068080c87e51fa1aed2751ce1f24861aa3815e74f7f4416a9e911788b4ceafe9"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
@@ -5032,7 +5032,11 @@
     },
     {
       "path": "tooling/pktmon_packet_summary.ps1",
-      "sha256": "21203fe855a33668f4f89083ba81dcc24f9da26a50b260d55f09947c40985aa1"
+      "sha256": "469faeb57c38252d9ce97e71a3ee2f255706ef708c8a6d71373fee3e65343cce"
+    },
+    {
+      "path": "tooling/probe_loopback_rst.ps1",
+      "sha256": "dab3b8e8d481112e417dfa32aad8a155d0abdf43e0af675e0cc3ee6aed2008d9"
     },
     {
       "path": "tooling/release_gate_check.py",
@@ -5060,7 +5064,7 @@
     },
     {
       "path": "tooling/test_pktmon_packet_summary.ps1",
-      "sha256": "b02e0a3a5d6e1f3a83a790855e40b640e400ca718f449b423a63ed1c62f47ad1"
+      "sha256": "289b74df583e36af42e7217a742028826e4a30f78491f5d0300249560d366b4b"
     },
     {
       "path": "tooling/ui_snapshot_tests/README.md",

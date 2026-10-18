@@ -150,6 +150,7 @@ jobs:
           $captureLocationPushed = $false
           $filterTouched = $false
           $testExit = 0
+          $probeListenerPort = 0
           try {
             if ($captureEnabled) {
               if ((Test-Path -LiteralPath $capturePath) -or (Test-Path -LiteralPath $captureTextPath)) {
@@ -172,6 +173,15 @@ jobs:
               if ($LASTEXITCODE -ne 0) { throw 'loopback TCP RST captureを開始できない' }
               Pop-Location
               $captureLocationPushed = $false
+              $probeScript = Join-Path $env:GITHUB_WORKSPACE 'tooling\probe_loopback_rst.ps1'
+              $probeJson = (& $probeScript | Out-String).Trim()
+              $probe = $probeJson | ConvertFrom-Json
+              if ($probe.status -ne 'reset_observed' -or
+                  $probe.listener_port -lt 1 -or $probe.listener_port -gt 65535) {
+                throw 'synthetic loopback RST probe did not observe the expected reset'
+              }
+              $probeListenerPort = [int]$probe.listener_port
+              "自己接続RST試験: 待受け先番号 $probeListenerPort で接続リセットを観測（送信payloadなし）." | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
               @(
                 'Pktmon capture: IPv4 127.0.0.1 TCP RST filter; packet limit 54 bytes; ETL/text are not uploaded and are removed after the test.'
               ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
@@ -202,7 +212,14 @@ jobs:
                     $cleanupErrors += 'Pktmon ETLをheader summaryへ変換できない'
                   } else {
                     try {
-                      & (Join-Path $env:GITHUB_WORKSPACE 'tooling\pktmon_packet_summary.ps1') -InputPath $captureTextPath -SummaryPath $env:GITHUB_STEP_SUMMARY
+                      $summaryArgs = @{
+                        InputPath = $captureTextPath
+                        SummaryPath = $env:GITHUB_STEP_SUMMARY
+                      }
+                      if ($probeListenerPort -gt 0) {
+                        $summaryArgs.ExpectedLoopbackPort = $probeListenerPort
+                      }
+                      & (Join-Path $env:GITHUB_WORKSPACE 'tooling\pktmon_packet_summary.ps1') @summaryArgs
                     } catch {
                       $cleanupErrors += "Pktmon header summaryを処理できない: $($_.Exception.Message)"
                     }

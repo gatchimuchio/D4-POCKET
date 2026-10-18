@@ -3,7 +3,9 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$InputPath,
     [Parameter(Mandatory = $true)]
-    [string]$SummaryPath
+    [string]$SummaryPath,
+    [ValidateRange(0, 65535)]
+    [int]$ExpectedLoopbackPort = 0
 )
 
 $ErrorActionPreference = 'Stop'
@@ -50,9 +52,31 @@ for ($i = 0; $i -lt $lines.Count; $i++) {
     })
 }
 
+$probeSnapshots = @()
+if ($ExpectedLoopbackPort -gt 0) {
+    $escapedPort = [regex]::Escape([string]$ExpectedLoopbackPort)
+    $probePortPattern = [regex]::new(
+        "127\.0\.0\.1[.:]\d{1,5}\s*>\s*127\.0\.0\.1[.:]$escapedPort\b|127\.0\.0\.1[.:]$escapedPort\s*>\s*127\.0\.0\.1[.:]\d{1,5}\b",
+        [System.Text.RegularExpressions.RegexOptions]::IgnoreCase -bor [System.Text.RegularExpressions.RegexOptions]::CultureInvariant
+    )
+    $probeRstPattern = [regex]::new(
+        '\bTCP\b.*\bflags\s+\[[^\]]*R[^\]]*\]',
+        [System.Text.RegularExpressions.RegexOptions]::IgnoreCase -bor [System.Text.RegularExpressions.RegexOptions]::CultureInvariant
+    )
+    $probeSnapshots = @($snapshots | Where-Object {
+        $probePortPattern.IsMatch($_.Packet) -and $probeRstPattern.IsMatch($_.Packet)
+    })
+    if ($probeSnapshots.Count -eq 0) {
+        throw "Pktmon解析結果に自己接続RST試験の待受け先番号を持つRST headerがありません: $ExpectedLoopbackPort"
+    }
+}
+
 "Pktmon IPv4 loopback TCP snapshots (capture filter: RST): $($snapshots.Count)" | Out-File -FilePath $SummaryPath -Append -Encoding utf8
 'Only PktGroupId/PktNumber/Appearance records followed by a decoded IPv4 TCP tuple are counted; filter and component catalogs are excluded.' | Out-File -FilePath $SummaryPath -Append -Encoding utf8
 'Snapshots may repeat one packet across stack components; correlate PktGroupId and PktNumber. The capture filter selects TCP RST.' | Out-File -FilePath $SummaryPath -Append -Encoding utf8
+if ($ExpectedLoopbackPort -gt 0) {
+    "自己接続RST試験の待受け先番号 $ExpectedLoopbackPort を持つRST headerを$($probeSnapshots.Count)件のtuple snapshotで確認しました。" | Out-File -FilePath $SummaryPath -Append -Encoding utf8
+}
 
 foreach ($snapshot in ($snapshots | Select-Object -First 20)) {
     $snapshot.Record | Out-File -FilePath $SummaryPath -Append -Encoding utf8

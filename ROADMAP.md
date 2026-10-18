@@ -1,5 +1,7 @@
 # GUI Shell ロードマップ
 
+作業中追補（2026-10-19、BUF-T05自己接続RST試験のport照合）: 検証branchでcapture中にpayloadを送らないTCP強制切断を行い、Pktmon解析器が使い捨て待受け先番号とRST flagをdecoded IPv4 tuple内で確認できなければstepを失敗させる診断を実装中。Windows local socketで`ConnectionReset`、解析器の正常／不在port／非RST fixture、manual workflow check、Conformance 257 checks、ManifestはPASS。初回assertionはexactly-one snapshotを仮定して失敗したが、Pktmon componentごとの重複観測を許す1件以上の照合へ修正し、再実行PASS。hosted captureは未実施のためPktmon捕捉能力は未確認。B5／BUF-T05 OPEN、release状態は不変。
+
 後続追補（2026-10-19、BUF-T05 loopback RST診断入口）: Windows手動Rust検証workflowに任意の`loopback_rst_capture`を追加。既定OFFで、自動triggerやRust test対象を変えない。有効時は使い捨て`windows-2025` runner上で`127.0.0.1`のTCP RSTだけをPktmonで最大54-byte captureし、header summaryだけをrun summaryへ出す。ETL／textはuploadせず、test終了時にfilterと一時fileをcleanupする。目的はA2A／Update TLS間欠resetの送信方向を、実fixture失敗が再現した場合に限定観測すること。製品networking／timeout／retry／Authorityへ作用せず、PASS単発では`FQ-TEST-LOOPBACK`やB5を閉じない。
 
 後続追補（2026-10-19、BUF-T05 run #52）: `28891f896072e764d0389d82bce382926f3a9bdd`を対象とした`workflow_dispatch` run [#52](https://github.com/gatchimuchio/D4-POCKET/actions/runs/39149599913)はsuccess。Rust全target 569 passed／0 failed／13 ignored、Release Broker build、通常IPC smoke、Pktmon capture cleanup、runner clean-treeがPASSした。Pktmonは`RUNNER_TEMP`内に出力され、293 formatted events／`No events lost`を記録。後続取得したjob summaryは3 snapshot entriesを表示したが、filter／componentの記録であり、実IP・port対やRST方向を特定できない。従って診断入口とcleanupの検査成功に限り、`FQ-TEST-LOOPBACK`／B5の根因解明・完了を示さない。失敗したrun #48〜#51は履歴として保持する。

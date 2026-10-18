@@ -11477,6 +11477,39 @@ def 手動補助の起動境界を検査する() -> list[str]:
     ):
         if token not in rust_workflow:
             不整合.append(f"Windows Rust manual workflowにPktmon parser接続がない: {token}")
+    for token in (
+        "tooling\\probe_loopback_rst.ps1",
+        "$probe.status -ne 'reset_observed'",
+        "$probeListenerPort = [int]$probe.listener_port",
+        "$summaryArgs.ExpectedLoopbackPort = $probeListenerPort",
+    ):
+        if token not in rust_workflow:
+            不整合.append(f"Windows Rust manual workflowにsynthetic RST capture probe接続がない: {token}")
+    probe_path = ROOT / "tooling/probe_loopback_rst.ps1"
+    if not probe_path.is_file():
+        不整合.append("Windows loopback RST probe scriptがない")
+    else:
+        probe = probe_path.read_text(encoding="utf-8")
+        for token in (
+            "IPAddress]::Loopback",
+            "ReceiveTimeout",
+            "LingerOption]::new($true, 0)",
+            "Close(0)",
+            "SocketErrorCode -ne [System.Net.Sockets.SocketError]::ConnectionReset",
+            "status = 'reset_observed'",
+        ):
+            if token not in probe:
+                不整合.append(f"synthetic loopback RST probeの限定・観測条件がない: {token}")
+    parser_path = ROOT / "tooling/pktmon_packet_summary.ps1"
+    parser_source = parser_path.read_text(encoding="utf-8")
+    for token in ("$probeRstPattern = [regex]::new(", r"flags\s+\[[^\]]*R"):
+        if token not in parser_source:
+            不整合.append(f"Pktmon parserが期待portに対するRST flagを照合しない: {token}")
+    parser_test_path = ROOT / "tooling/test_pktmon_packet_summary.ps1"
+    parser_test_source = parser_test_path.read_text(encoding="utf-8")
+    for token in ("TCP, flags [S]", "$nonRstProbeRejected"):
+        if token not in parser_test_source:
+            不整合.append(f"Pktmon parser testに非RST false-positive fixtureがない: {token}")
     if "Where-Object { $_ -match '127\\.0\\.0\\.1' }" in rust_workflow:
         不整合.append("Pktmon診断がloopback IPを含むfilter／component metadataをpacketとして数える")
     return 不整合
