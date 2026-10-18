@@ -24,7 +24,10 @@ UTF8_GOVERNANCE_PATH_ALLOWLIST = frozenset(
         "tooling/日本語基底監査.py",
     }
 )
-UTF8_GOVERNANCE_PATH_PREFIXES = ("docs/総合機能拡張_rev1/",)
+UTF8_GOVERNANCE_PATH_PREFIXES = (
+    "docs/総合機能拡張_rev1/",
+    "docs/緩衝基盤_rev5補遺_QC/",
+)
 
 
 def portable_path_errors(paths: list[Path]) -> list[str]:

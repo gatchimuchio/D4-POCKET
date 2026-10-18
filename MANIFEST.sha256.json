@@ -1288,7 +1288,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "1137c6d2aced53811c4479bf197f82350f70d14df048ffa8cd683905e208087a"
+      "sha256": "717e88cf819d1686be4e60bd935b91f34d8f8ce6693d0bc6ac9e1802f5c4ebfa"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1676,7 +1676,7 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B5_\u81ea\u5df1\u9069\u7528.md",
-      "sha256": "3a0aac3304263bef5eb4cdea1e665a06faef84687b37f82db1883f9cb05bc898"
+      "sha256": "7dbdf8463a976067dc6ad8d05e61aaa73b295b270d5818a5bf6399aca15c6d0b"
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/\u5b9f\u88c5\u4ed5\u69d8\u66f8.md",
@@ -4932,7 +4932,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "2c1a163b63f2b5b9004d58b517b692e3f51856a9cb562009b845e36db55f5b2a"
+      "sha256": "9caf0fe7f75f3af9f1272db49f2f054a56ec20f4eeb04613166cf7d44a8ec902"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
@@ -4940,7 +4940,7 @@
     },
     {
       "path": "tooling/conformance_tests/test_owner_desktop_launcher.py",
-      "sha256": "23eced7e2c98fb39a328248e3941b7adea06e66ca538b201d2abb0bcd9a84289"
+      "sha256": "dbe14457e0b986e4847b9f1be523416990afacaa91c46135cd8643cdcedfe5d8"
     },
     {
       "path": "tooling/conformance_tests/test_run_cargo_isolated.py",
@@ -5024,7 +5024,7 @@
     },
     {
       "path": "tooling/packaging_portability_check.py",
-      "sha256": "7e9d8a4d781b0587f5d450cf0b4cb772b0a481edb1c78fbda44c1e16a0864cbf"
+      "sha256": "f7821618d672be485c24c8e3937ca08d491b2b36ee1ea6709f9de559eacfe8ee"
     },
     {
       "path": "tooling/performance_validation.py",

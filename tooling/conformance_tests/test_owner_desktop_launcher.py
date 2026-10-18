@@ -71,6 +71,14 @@ class FakeProcess:
 
 class OwnerDesktopLauncherTests(unittest.TestCase):
     def test_repository_broker_runtime_store_is_git_ignored(self) -> None:
+        if not (launcher.ROOT / ".git").exists():
+            ignore_rules = (launcher.ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
+            self.assertIn(
+                "/.gui_shell/broker/store/",
+                ignore_rules,
+                "source archiveにもBroker永続storeの固定ignore規則を含める",
+            )
+            return
         result = subprocess.run(
             ["git", "check-ignore", "--quiet", "--no-index", ".gui_shell/broker/store/audit_anchor.key"],
             cwd=launcher.ROOT,

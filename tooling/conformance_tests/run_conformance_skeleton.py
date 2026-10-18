@@ -3907,6 +3907,7 @@ def test_packaging_portability_checker_exists() -> list[str]:
         for token in [
             "DEFAULT_SUBPROCESS_TIMEOUT_SECONDS = 120",
             "UTF8_GOVERNANCE_PATH_ALLOWLIST",
+            "UTF8_GOVERNANCE_PATH_PREFIXES",
             "timeout=timeout_seconds",
             "subprocess.TimeoutExpired",
             "が次の秒数後にタイムアウト",
@@ -6974,6 +6975,21 @@ def test_packaging_portability_utf8_governance_allowlist_is_exact() -> list[str]
             "rev1日本語文書pathが正本資料のallowlistから外れている: "
             + "; ".join(rev1_document_errors)
         )
+
+    qc_document_errors = portable_path_errors(
+        [ROOT / "docs" / "緩衝基盤_rev5補遺_QC" / "B5_自己適用.md"]
+    )
+    if qc_document_errors:
+        errors.append(
+            "採用済みQC記録のUTF-8 pathがallowlistから外れている: "
+            + "; ".join(qc_document_errors)
+        )
+
+    unregistered_qc_errors = portable_path_errors(
+        [ROOT / "docs" / "緩衝基盤_rev5補遺_QC_未登録" / "資料.md"]
+    )
+    if not unregistered_qc_errors:
+        errors.append("未登録のQC文書path prefixが許可された")
 
     unregistered_errors = portable_path_errors([ROOT / "規定" / "未登録規定.md"])
     if not unregistered_errors:
