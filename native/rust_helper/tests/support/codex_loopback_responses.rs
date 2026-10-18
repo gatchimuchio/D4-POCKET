@@ -1,4 +1,4 @@
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{Shutdown, TcpListener, TcpStream};
 use std::path::Path;
@@ -1643,11 +1643,9 @@ mod tests {
         );
         assert_eq!(temp_diagnostic["temp_error_fingerprint"], "access_denied");
         assert_eq!(temp_diagnostic["temp_initial_write_error"], "io_failure");
-        assert!(
-            !temp_diagnostic
-                .to_string()
-                .contains("synthetic-secret-content")
-        );
+        assert!(!temp_diagnostic
+            .to_string()
+            .contains("synthetic-secret-content"));
         assert!(!temp_diagnostic.to_string().contains("C:\\\\Users"));
 
         let launch_failure = safe_tool_output_diagnostic(&json!({
@@ -1655,11 +1653,9 @@ mod tests {
             "exit_code": -2147450747,
         }));
         assert_eq!(launch_failure["error_category"], "hostfxr起動失敗");
-        assert!(
-            !launch_failure
-                .to_string()
-                .contains("PowerShell host failed")
-        );
+        assert!(!launch_failure
+            .to_string()
+            .contains("PowerShell host failed"));
     }
 
     #[test]

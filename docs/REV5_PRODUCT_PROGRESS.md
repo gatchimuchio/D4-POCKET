@@ -10,6 +10,8 @@ source commit追試（2026-10-18）: `mobile_android_debug_build`をsource commi
 
 test-support診断追加前のRust library suiteは並列`518 passed / 5 failed / 12 ignored`、逐次`521 passed / 2 failed / 12 ignored`。診断追加後のfocused Codex testは5回PASSした一方、並列suiteは`519 passed / 4 failed / 12 ignored`でCodex loopbackとUpdate TLS fixtureが再失敗した。Codex failure時にはserver側で2 POST／response write failure 0／記録body 23,282 bytes、client側受信0 byteを観測した。これはfailure境界の追加情報であり、reset発生主体やTLS失敗との共通根因は未確定。`FQ-TEST-LOOPBACK`／`BUF-T05`をOPENのままとし、製品コードのretry／timeoutやrelease gateは変更していない。詳細と正確な試験範囲は[B5自己適用記録](緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
 
+Windows手動Rust検証run [39095186794](https://github.com/gatchimuchio/D4-POCKET/actions/runs/39095186794)は`7444ac4df157676b24d4cbf46c00bbfe3d155886`をcheckoutした後、試験前のrustfmt gateで未変更の固定対象fileが不整合となり失敗した。Rust suiteとBroker smokeは未実行。workflowを対象commitで変更されたRust fileだけを検査するよう修正した。Conformance 254 checks、変更fileのrustfmt、focused Codex testはローカルでPASSし、修正後のhosted再実行は未実施。`BUF-T05`／`FQ-TEST-LOOPBACK`はOPENを維持する。
+
 `BUF-T06`読み取り追補（2026-10-18）:
 
 - Windowsのコード整合性運用ログを過去30日分確認し、強制適用を示すイベント3077を102件観測。D4 PocketのCargo／Rust生成物に関係する記録を含み、最新は2026-09-29 11:17 JST。

@@ -84,7 +84,7 @@
     },
     {
       "path": ".github/workflows/windows-manual-rust-validation.yml",
-      "sha256": "f506f39ae80dda28e47a01bd560db378ddd4c84759e3af3df558a9926b9cbe07"
+      "sha256": "4581f1f586e4743487628c6ca9c2b0ed3fc43ecfa082904732e984d76b956f49"
     },
     {
       "path": ".gitignore",
@@ -1288,7 +1288,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "10ab6c8c8fc933dc7fcf4215ccf2e3347b9c6bc78c38a0a1c407d7a14031d687"
+      "sha256": "500bd69890a7e4ccb7978286b35c4227c4aca17746ac8dd1cb09d9b06c358f92"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1676,7 +1676,7 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B5_\u81ea\u5df1\u9069\u7528.md",
-      "sha256": "ae24017306e0648864fe32daa76e17347794f888219e853cc6d36f2001563750"
+      "sha256": "35f54c7c20b1a4830a358499de41b371310e8677f29e692c97c2a116d2d1d90d"
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/\u5b9f\u88c5\u4ed5\u69d8\u66f8.md",
@@ -3740,7 +3740,7 @@
     },
     {
       "path": "native/rust_helper/tests/support/codex_loopback_responses.rs",
-      "sha256": "49e12dfc95a3b969c09813d79e0673a6d7e5779023948cffebac109813a39772"
+      "sha256": "716f0bd670b68fded2f89c99d0fde9a427a32d14040a6f17a36ac7dfc523ef2f"
     },
     {
       "path": "native/rust_helper/tests/unit/agent_task_fixture_fs.rs",
@@ -4932,7 +4932,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "36fcbae919663e81b561a93b512dade11e5e065a4019dc5c692f6df0f48a0b32"
+      "sha256": "1e8321757c7eff3a57395e85348b1cbb22420fdcfc53593f519ba133873cba45"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",

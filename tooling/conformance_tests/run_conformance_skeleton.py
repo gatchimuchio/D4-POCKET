@@ -11394,6 +11394,23 @@ def 手動補助の起動境界を検査する() -> list[str]:
         不整合.append("Windows Export workflowが一時fixture ZIPを外部artifactとして残す")
     if not any(token in export_workflow for token in ("'on': workflow_dispatch", '"on": workflow_dispatch', "on: workflow_dispatch")):
         不整合.append("portable ZIP補助がworkflow_dispatch限定ではない")
+
+    rust_workflow = (ROOT / ".github" / "workflows" / "windows-manual-rust-validation.yml").read_text(encoding="utf-8")
+    for token in (
+        "fetch-depth: 2",
+        "git diff --name-only --diff-filter=ACMR $parent HEAD -- native/rust_helper",
+        "foreach ($file in $rustFiles)",
+        "rustfmt +1.95.0 --edition 2021 --config skip_children=true --check $file",
+    ):
+        if token not in rust_workflow:
+            不整合.append(f"Windows Rust manual workflowの変更file整形検査にtokenがない: {token}")
+    for stale_path in (
+        "native/rust_helper/src/mcp.rs",
+        "native/rust_helper/src/adapters/codex_cli.rs",
+        "native/rust_helper/tests/support/codex_loopback_responses.rs",
+    ):
+        if stale_path in rust_workflow:
+            不整合.append(f"Windows Rust manual workflowが差分外Rust fileを固定検査している: {stale_path}")
     return 不整合
 
 

@@ -18,6 +18,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+          fetch-depth: 2
       - name: 対象とWindows環境を記録
         shell: pwsh
         run: |
@@ -62,22 +63,20 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          rustfmt +1.95.0 --edition 2021 --config skip_children=true --check native/rust_helper/src/mcp.rs
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          rustfmt +1.95.0 --edition 2021 --config skip_children=true --check native/rust_helper/src/adapters/codex_cli.rs
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          rustfmt +1.95.0 --edition 2021 --config skip_children=true --check native/rust_helper/src/broker/dialogue.rs
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          rustfmt +1.95.0 --edition 2021 --config skip_children=true --check native/rust_helper/src/desktop_launcher.rs
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          rustfmt +1.95.0 --edition 2021 --config skip_children=true --check native/rust_helper/src/broker/update_download.rs
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          rustfmt +1.95.0 --edition 2021 --config skip_children=true --check native/rust_helper/tests/unit/agent_task_fixture_fs.rs
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          rustfmt +1.95.0 --edition 2021 --config skip_children=true --check native/rust_helper/tests/unit/codex_cli_fixture.rs
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          rustfmt +1.95.0 --edition 2021 --check native/rust_helper/tests/fixtures/fake_codex_cli.rs
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $parent = (git rev-parse HEAD^).Trim()
+          if ($LASTEXITCODE -ne 0) { throw '対象commitの親を取得できない' }
+          $rustFiles = @(git diff --name-only --diff-filter=ACMR $parent HEAD -- native/rust_helper)
+          if ($LASTEXITCODE -ne 0) { throw '対象commitの変更Rust fileを列挙できない' }
+          $rustFiles = @($rustFiles | Where-Object { $_.EndsWith('.rs', [StringComparison]::OrdinalIgnoreCase) })
+          if ($rustFiles.Count -eq 0) {
+            '対象commitに変更Rust fileはない。整形検査を省略。' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          } else {
+            "対象Rust file: $($rustFiles -join ', ')" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+            foreach ($file in $rustFiles) {
+              rustfmt +1.95.0 --edition 2021 --config skip_children=true --check $file
+              if ($LASTEXITCODE -ne 0) { throw "変更Rust fileの整形検査に失敗: $file" }
+            }
+          }
       - name: Rust全targetを検査・試験
         shell: pwsh
         run: |
