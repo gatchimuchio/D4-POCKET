@@ -11416,12 +11416,18 @@ def 手動補助の起動境界を検査する() -> list[str]:
     cargo_test = rust_workflow.find("cargo +1.95.0 test --locked --manifest-path")
     capture_restore = rust_workflow.find("Pop-Location", capture_start)
     capture_flag_reset = rust_workflow.find("$captureLocationPushed = $false", capture_start)
+    capture_stop = rust_workflow.find("pktmon stop", cargo_test)
+    cleanup_location_push = rust_workflow.find("Push-Location -LiteralPath $env:RUNNER_TEMP", cargo_test, capture_stop)
+    cleanup_flag_set = rust_workflow.find("$captureLocationPushed = $true", cleanup_location_push)
+    cleanup_location_pop = rust_workflow.find("Pop-Location", capture_stop)
     if not (
         capture_start >= 0
         and capture_start < capture_restore < cargo_test
         and capture_start < capture_flag_reset < cargo_test
+        and cargo_test < cleanup_location_push < capture_stop < cleanup_location_pop
+        and cleanup_location_push < cleanup_flag_set < capture_stop
     ):
-        不整合.append("Pktmon capture開始後、Rust試験前に作業directoryとcleanup状態を復元しない")
+        不整合.append("Pktmon capture開始／停止のTEMP作業directory境界がRust試験を挟んで正しく復元されない")
     for token in (
         "fetch-depth: 2",
         "git diff --name-only --diff-filter=ACMR $parent HEAD -- native/rust_helper",

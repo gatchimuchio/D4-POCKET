@@ -159,6 +159,10 @@ jobs:
             $cleanupErrors = @()
             if ($captureAttempted) {
               try {
+                if (!$captureLocationPushed) {
+                  Push-Location -LiteralPath $env:RUNNER_TEMP
+                  $captureLocationPushed = $true
+                }
                 pktmon stop
                 if ($LASTEXITCODE -ne 0) {
                   $cleanupErrors += 'Pktmon captureを停止できない'
