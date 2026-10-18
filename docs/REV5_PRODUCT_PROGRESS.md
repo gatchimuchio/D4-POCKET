@@ -1,6 +1,6 @@
 # D4 Pocket / GUI-Shell rev5 Product-First 進捗
 
-最新状態（2026-10-18、B5自己適用継続）: B4はCLOSED、B5はOPEN。既報のWindows Flutter snapshot上Android debug build／cleanup、Desktop analyze／testはPASS。Windows手動Rust run [39096100428](https://github.com/gatchimuchio/D4-POCKET/actions/runs/39096100428)は対象commit `1ac291c`で全target 569 passed／0 failed／13 ignored、`cargo check`、Release Broker build、通常IPC smoke、cleanupまでPASSしたが、現HEAD上の今回の変更を検証したrunではない。2026-10-18のRust library並列実行は診断変更後も521 passed／2 failed／12 ignoredで、MinidoraとCodex loopbackがConnectionReset（双方client受信0 byte）となり、根因不明のため`BUF-T05`／`FQ-TEST-LOOPBACK`はOPEN。直列は523 passed／0 failed／12 ignored。`BUF-T04`のOneDrive source-exact比較、`BUF-T06`の現行OS拒否policy帰属、`BUF-T23`の共有cacheを含む全資源影響は未確定。B5記録に残っていた専用TEMP snapshot `d4f-hyl53k2j`は実体と所有範囲を照合後、既存cleanup関数で回収（retry 0）。Conformance 254 checks、Manifest、Windows Release Gate checkは過去記録上PASS。通常Release `task_execution=unsupported`、`release_ready=false`、既存release blockerは維持する。詳細は[B5自己適用記録](緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
+最新状態（2026-10-18、B5自己適用継続）: B4はCLOSED、B5はOPEN。既報のWindows Flutter snapshot上Android debug build／cleanup、Desktop analyze／testはPASS。現HEAD `ebb69c2`のWindows Desktop analyzeもisolated snapshot上でPASSし、source fingerprint `830b247c…debe55`、snapshot cleanup PASSを確認した。Pub／Cargo cacheは共有・OneDrive外と分類されたが、cache書込み差分は採取しておらず`BUF-T23`は部分観測。Windows手動Rust run [39096100428](https://github.com/gatchimuchio/D4-POCKET/actions/runs/39096100428)は対象commit `1ac291c`で全target 569 passed／0 failed／13 ignored、`cargo check`、Release Broker build、通常IPC smoke、cleanupまでPASSしたが、現HEAD上の今回の変更を検証したrunではない。2026-10-18のRust library並列実行は診断変更後も521 passed／2 failed／12 ignoredで、MinidoraとCodex loopbackがConnectionReset（双方client受信0 byte）となり、根因不明のため`BUF-T05`／`FQ-TEST-LOOPBACK`はOPEN。直列は523 passed／0 failed／12 ignored。`BUF-T04`のOneDrive source-exact比較、`BUF-T06`の現行OS拒否policy帰属は未確定。B5記録に残っていた専用TEMP snapshot `d4f-hyl53k2j`は実体と所有範囲を照合後、既存cleanup関数で回収（retry 0）。Conformance 254 checks、Manifest、Windows Release Gate checkは過去記録上PASS。通常Release `task_execution=unsupported`、`release_ready=false`、既存release blockerは維持する。詳細は[B5自己適用記録](緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
 
 ### BUF-T05最新診断（2026-10-18）
 
@@ -8,6 +8,12 @@
 - 変更後の直列suiteは523 passed／0 failed／12 ignored（96.96秒）。別の変更後並列runではA2A loopbackとBroker A2A Centerを含む3件が失敗し、A2A fixtureは548 response bytesを書き終えてpeer closeを観測した。失敗するfixtureの組合せはrunごとに変化し、Reset発生主体は未特定。
 - Update TLS fixtureでは応答後のpeer closeをboundedに観測する変更後、直列1回・並列2回で該当failureを再観測しなかった。これはfixture lifecycleの候補説明であり、controlled A/Bの根因確定ではない。
 - PktMonは現shellでAccess Denied、dumpcap／Wireshark系capture toolは未導入。packet-level証拠は取得していない。製品retry／timeout、test assertion、test scheduling、Authority／Release gateは変更していない。
+
+### BUF-T23共有cache影響の限定観測（2026-10-18）
+
+- `python -X utf8 tooling/validate_all.py --flutter-step desktop_flutter_analyze --desktop-platform windows`を現HEAD `ebb69c2b45a5c8e86c79398c19cf5fb3109a6874`で実行。snapshot source fingerprintは`830b247ca245e685672a7ede8dada14ec854ea8410573956f84355f3f0debe55`、Desktop Flutter analyzeは81.0秒でPASS（No issues found）、snapshot cleanupもPASS。
+- 実行報告は`PUB_CACHE`と`CARGO_HOME`を`shared_outside_source_and_OneDrive`と分類。現processの環境では`PUB_CACHE`未指定のため`%LOCALAPPDATA%\Pub\Cache`へ、`CARGO_HOME`未指定のため`%USERPROFILE%\.cargo`へ解決し、いずれもsource／OneDrive外だった。`CARGO_TARGET_DIR`、Windows `APPDATA`／`TEMP`／`TMP`はsnapshot内へ固定。Desktop analyzeではRust buildを実行していない。
+- Flutter出力にはdependency解決／downloadの表示があったが、共有cacheの実際の変更file・byte差分を実行前後で記録していない。従って共有cacheが無変更だったとは主張せず、cache容量・長期増加・同時利用時の全resource影響は未確定とする。`BUF-T23`は部分観測のまま。
 
 source commit追試（2026-10-18）: `mobile_android_debug_build`をsource commit `29b48a6bbdf17fe18345652310089f0ecae15b47`のisolated snapshot上で実行し、Gradle `assembleDebug` 286.2秒、APK SHA-256 `46d6888bffde6eba3ba45b7e69ab7b8873fe9ffdb2d2a320375133e99f2d55ac`、snapshot cleanup PASS（1 retry）。実機・installed product証拠ではない。SDK XML v4／processor v3上限warningは残るがbuildは成功。`BUF-T05`ではRust library suiteの並列・逐次実行とも間欠fixture failureが残り、test-only診断追加後も根因未確定。`BUF-T06`のOS拒否非迂回は未解決。B5 OPENを維持する。詳細は[B5自己適用記録](緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
 
