@@ -121,9 +121,11 @@ jobs:
           "Rust test mode: $mode" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           $captureEnabled = $env:LOOPBACK_RST_CAPTURE -eq 'true'
           $captureName = "gui-shell-loopback-rst-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
-          $capturePath = Join-Path $env:RUNNER_TEMP "$captureName.etl"
+          $captureFileName = "$captureName.etl"
+          $capturePath = Join-Path $env:RUNNER_TEMP $captureFileName
           $captureTextPath = Join-Path $env:RUNNER_TEMP "$captureName.txt"
           $captureAttempted = $false
+          $captureLocationPushed = $false
           $filterTouched = $false
           $testExit = 0
           try {
@@ -139,7 +141,11 @@ jobs:
               pktmon filter add $captureName -i 127.0.0.1 -t TCP RST
               if ($LASTEXITCODE -ne 0) { throw 'loopback TCP RST filterを追加できない' }
               $captureAttempted = $true
-              pktmon start --capture --comp all --type all --pkt-size 54 --file-name $capturePath --file-size 64 --log-mode memory
+              # Pktmon's --file-name accepts a filename, not a path. Run it with RUNNER_TEMP as
+              # the current directory so its output stays outside the checkout.
+              Push-Location -LiteralPath $env:RUNNER_TEMP
+              $captureLocationPushed = $true
+              pktmon start --capture --comp all --type all --pkt-size 54 --file-name $captureFileName --file-size 64 --log-mode memory
               if ($LASTEXITCODE -ne 0) { throw 'loopback TCP RST captureを開始できない' }
               @(
                 'Pktmon capture: IPv4 127.0.0.1 TCP RST filter; packet limit 54 bytes; ETL/text are not uploaded and are removed after the test.'
@@ -185,6 +191,13 @@ jobs:
                 if ($LASTEXITCODE -ne 0) { $cleanupErrors += 'Pktmon filterを削除できない' }
               } catch {
                 $cleanupErrors += "Pktmon filter削除に失敗: $($_.Exception.Message)"
+              }
+            }
+            if ($captureLocationPushed) {
+              try {
+                Pop-Location
+              } catch {
+                $cleanupErrors += "Pktmon作業directoryを戻せない: $($_.Exception.Message)"
               }
             }
             foreach ($path in @($captureTextPath, $capturePath)) {
