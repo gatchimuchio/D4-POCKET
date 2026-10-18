@@ -1,5 +1,7 @@
 # GUI Shell ロードマップ
 
+後続追補（2026-10-19、HEAD `21978542` Windows Rust並列再確認）: 隔離runnerの`cargo test --all-targets -- --test-threads=8 --format terse`は`src/lib.rs` 535件中522 passed／1 failed／12 ignoredで終了。唯一の失敗はUpdate TLS package-repair fixtureのhandshake中`InvalidContentType`／Winsock 10054 reset。更新したDNS待機testは通過し、前runのCodex 409／MCP cleanupは今回再現しなかった。該当Codex test単独は1 passed。Cargoはlib failureで他targetを実行完了しておらず、隔離targetは回収済み。根因未確定のため`BUF-T05`／B5 OPEN、`task_execution=unsupported`、`release_ready=false`、既存release blockerを維持する。詳細は[B5記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
+
 後続追補（2026-10-19、BUF-T06 Active policy directory読取照合）: 非昇格shellからWindows Active directory内の`.cip` 8件を列挙しhashを取得。起動後Event 3099の4件中2件は同名policy fileのSHA-256と一致した。directory上のfile存在は全policy inventory／適用状態の証明ではなく、`CiTool -lp -json` Access Deniedと未確認範囲を維持する。設定変更・回避なし。`BUF-T06`部分観測／OPEN、B5 OPEN、release状態不変。全hashは[B5自己適用記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
 
 後続追補（2026-10-19、BUF-T06現起動policy／通常Rust実行）: Windows 11 Home build 26300でCode Integrity欄2（Enforcement）、Usermode Code Integrity欄0（Off）、現起動時event 3099 policy-load記録4件（Status 0）を観測した。現行source `bb7ad68d99a20d62f311c46f00a9581f25967a7f`のisolated Cargo経由focused Rust unit test 1件は通常実行でPASS（1/0/0、534 filtered）、その時間帯の3076／3077 eventは0件、temporary targetは回収済み。ただしtest成功をユーザーモード署名方針による許可実証とは扱わない。全policy inventoryや過去拒否の解消は未成立。`CiTool -lp -json` Access Denied、他OS未確認を維持し、`BUF-T06`部分観測／OPEN、B5 OPEN、通常Release capability／release gate不変。詳細は[B5自己適用記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
