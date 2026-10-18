@@ -1,5 +1,7 @@
 # GUI Shell ロードマップ
 
+後続追補（2026-10-18、現行main Windows Rust suite）: sourceは`main`／`origin/main`一致の`b38d4022627f6c163709960dff887f467b3ec153`。隔離Cargo runnerのWindows全target逐次suiteは569 passed／0 failed／13 ignored、既定並列lib suiteは521 passed／2 failed／12 ignored。A2A Center timeoutとUpdate TLSのWinsock 10054が再現したが、根因は未確定。Cargo一時targetは回収済み。`BUF-T05`／`FQ-TEST-LOOPBACK`／B5 OPEN、通常Release `task_execution=unsupported`、`release_ready=false`、既存blockerを維持する。詳細は[現行進捗](docs/REV5_PRODUCT_PROGRESS.md)と[B5自己適用記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
+
 後続追補（2026-10-18、Owner Desktop開発起動経路の出力隔離）: HEAD `6a3eb8e72bac52afd1a5c4f665d2a1dd30fe2bd8`／`origin/main`一致時点のdirty sourceで、Owner用Windows／Linux起動scriptをisolated source snapshot launcherへ接続した。Cargo target、Flutter生成物、短期session fileは一時領域へ置く。互換性維持のBroker永続storeはRepository配下に残る。launcher単体test 4件、Conformance 257 checks、CONFIG／FIXTUREのruntime assertion 12件、PowerShell parse、WSL上のbash構文、Windows PythonからのFlutter `.BAT --version`起動はPASS。実GUI、Linux native動作、OneDrive同期原因は未検証で、B5とrelease状態は変更しない。詳しくは[現行進捗](docs/REV5_PRODUCT_PROGRESS.md)。
 
 後続追補（2026-10-18、BUF-T05 isolated Rust suite）: `main`基準`4d937e7`上の診断付きRust library suiteは521 passed／2 failed／12 ignored。A2AとCodex loopbackでclient受信0 bytes／`ConnectionReset`、fixture側はresponse書込成功を観測。別runではUpdate TLS／Broker A2A Center fixtureが異なるfailureを示した。すべてCargo target隔離下で実行しTEMP cleanupを確認したが、reset origin・共通根因・元OneDrive警告との因果は未確定。`FQ-TEST-LOOPBACK`／B5 OPEN、通常Release gate unchanged。詳細は[B5自己適用記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
