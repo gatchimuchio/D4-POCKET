@@ -1390,7 +1390,16 @@ mod tests {
                     let header_end = response
                         .windows(4)
                         .position(|part| part == b"\r\n\r\n")
-                        .expect("ConnectionReset前にHTTP応答headerが届く");
+                        .unwrap_or_else(|| {
+                            panic!(
+                                "ConnectionReset前にHTTP応答headerが届く; received_bytes={}; accepted={}; incomplete=({}); posts={}; response_writes=({})",
+                                response.len(),
+                                server.accepted_connections(),
+                                server.incomplete_request_summary(),
+                                server.post_requests(),
+                                server.response_write_summary(),
+                            )
+                        });
                     let header = String::from_utf8_lossy(&response[..header_end]);
                     let content_length = header
                         .lines()

@@ -1288,7 +1288,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "b0584a2985b2439ffcf352b3f1ae106a3d32446d8d990ff80db305d3e45e97b1"
+      "sha256": "d90a3202f683747b0ef1651ad554827ff19629224a9f3e44e43e6948a0899a4e"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1676,7 +1676,7 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B5_\u81ea\u5df1\u9069\u7528.md",
-      "sha256": "a490d1365fa6281af1207b1cc58eb48e08deeaf8c50ce71e39bbe095ef2c83dc"
+      "sha256": "4898a5bc52637b537ed85c1f52ea70837eaa9ffb1dfcbd42ee5deb89ae8aada1"
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/\u5b9f\u88c5\u4ed5\u69d8\u66f8.md",
@@ -3740,7 +3740,7 @@
     },
     {
       "path": "native/rust_helper/tests/support/codex_loopback_responses.rs",
-      "sha256": "82cbaefeb1e4b53061aa52d326626ee7c3672413ba46ac10ad651b529ae52bdf"
+      "sha256": "84fb7e3866f8cea149192d06d3474a2c4560c0d5b92bdb9e3571c5a0cc5fc99a"
     },
     {
       "path": "native/rust_helper/tests/unit/agent_task_fixture_fs.rs",

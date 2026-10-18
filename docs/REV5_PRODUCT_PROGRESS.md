@@ -2,7 +2,11 @@
 
 最新状態（2026-10-18、B5自己適用継続）: B4はCLOSEDを維持。B5ではOneDrive外のWindows Flutter snapshot validationを施工し、Android debug `assembleDebug`を現行sourceから実行、APK生成とsnapshot cleanup（再試行1回）までPASS。同一439文字fixtureでは通常path lookup／cleanupが失敗し、extended-length cleanupが同一treeを回収する因果差を確認した。Flutter検査をsnapshotへ通す対象限定`--flutter-step`入口を追加し、README／QUICKSTARTの直接analyze案内を置換。Desktop analyze PASS（source commit `5defb14309d442ff2688e2d7d7bf75fd0dff5638`、実行時fingerprint `a5f88adb2bd3638c8e6383ef57098b7468eba99e4ad85cc0a49e32c33c585e1a`、106.9秒、cleanup PASS）、Conformance 254 checks PASS。APK hash・以前のsource fingerprint・証拠限界は[B5自己適用記録](緩衝基盤_rev5補遺_QC/B5_自己適用.md)に記録。先行失敗runの一時rootは残存しており安全制約で削除していない。OneDrive同期serviceのsource-exact比較・復旧は未確認のためB5 OPEN。通常Release `task_execution=unsupported`、`release_ready=false`とrelease blockerは維持する。詳細は[B4製品接続設計](緩衝基盤_rev5補遺_QC/B4製品接続設計.md)。
 
-source commit追試（2026-10-18）: `mobile_android_debug_build`をsource commit `29b48a6bbdf17fe18345652310089f0ecae15b47`のisolated snapshot上で実行し、Gradle `assembleDebug` 286.2秒、APK SHA-256 `46d6888bffde6eba3ba45b7e69ab7b8873fe9ffdb2d2a320375133e99f2d55ac`、snapshot cleanup PASS（1 retry）。実機・installed product証拠ではない。SDK XML v4／processor v3上限warningは残るがbuildは成功。`BUF-T05` loopback根因と`BUF-T06` OS拒否非迂回は未実施／未解決のためOPENを維持する。
+source commit追試（2026-10-18）: `mobile_android_debug_build`をsource commit `29b48a6bbdf17fe18345652310089f0ecae15b47`のisolated snapshot上で実行し、Gradle `assembleDebug` 286.2秒、APK SHA-256 `46d6888bffde6eba3ba45b7e69ab7b8873fe9ffdb2d2a320375133e99f2d55ac`、snapshot cleanup PASS（1 retry）。実機・installed product証拠ではない。SDK XML v4／processor v3上限warningは残るがbuildは成功。`BUF-T05`ではRust library suiteの並列・逐次実行とも間欠fixture failureが残り、test-only診断追加後も根因未確定。`BUF-T06`のOS拒否非迂回は未解決。B5 OPENを維持する。詳細は[B5自己適用記録](緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
+
+### BUF-T05 loopback追加観測（2026-10-18）
+
+test-support診断追加前のRust library suiteは並列`518 passed / 5 failed / 12 ignored`、逐次`521 passed / 2 failed / 12 ignored`。診断追加後のfocused Codex testは5回PASSした一方、並列suiteは`519 passed / 4 failed / 12 ignored`でCodex loopbackとUpdate TLS fixtureが再失敗した。Codex failure時にはserver側で2 POST／response write failure 0／記録body 23,282 bytes、client側受信0 byteを観測した。これはfailure境界の追加情報であり、reset発生主体やTLS失敗との共通根因は未確定。`FQ-TEST-LOOPBACK`／`BUF-T05`をOPENのままとし、製品コードのretry／timeoutやrelease gateは変更していない。詳細と正確な試験範囲は[B5自己適用記録](緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
 
 `BUF-T06`読み取り追補（2026-10-18）:
 
