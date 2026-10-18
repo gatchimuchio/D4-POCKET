@@ -11556,6 +11556,42 @@ def test_c28_harness_regressions_are_registered() -> list[str]:
     return ["C28資格file cleanupの有限再試行testが失敗: " + details]
 
 
+def test_isolated_cargo_runner_regressions_are_registered() -> list[str]:
+    result = subprocess.run(
+        [sys.executable, "-m", "unittest", "tooling.conformance_tests.test_run_cargo_isolated"],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=30,
+    )
+    if result.returncode == 0:
+        return []
+    details = (result.stdout + result.stderr).decode("utf-8", errors="replace")[-4000:]
+    return ["Cargo target隔離・cleanupのtestが失敗: " + details]
+
+
+def test_developer_validation_entrypoints_use_isolated_paths() -> list[str]:
+    errors = []
+    for name in ("AGENTS.md", "README.md", "QUICKSTART.md"):
+        content = (ROOT / name).read_text(encoding="utf-8")
+        if "tooling/run_cargo_isolated.py" not in content:
+            errors.append(f"{name}のRust検査入口がCargo target隔離runnerを案内していない")
+    agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    for direct_command in (
+        "cd native/rust_helper && cargo test",
+        "cd native/windows_dns && cargo test",
+        "cd apps/desktop_flutter && flutter analyze",
+        "cd apps/mobile_flutter && flutter analyze",
+    ):
+        if direct_command in agents:
+            errors.append(f"AGENTS.mdに同期対象内で生成物を作る直接検査例が残る: {direct_command}")
+    if "--flutter-step desktop_flutter_analyze" not in agents:
+        errors.append("AGENTS.mdが隔離Desktop Flutter analyze入口を示していない")
+    if "--flutter-step mobile_flutter_analyze" not in agents:
+        errors.append("AGENTS.mdが隔離Mobile Flutter analyze入口を示していない")
+    return errors
+
+
 def test_macos_credential_public_input_is_metadata_only() -> list[str]:
     schema = load_schema("macos_credential_input.schema.json")
     sample = {"版": 1, "資格情報ID": "a" * 32, "用途": "mcp_transport", "接続対象": "server", "種類": "api_key"}
@@ -11910,6 +11946,8 @@ def main() -> int:
         test_broker_parity_startup_timeout_allows_local_cold_build,
         test_broker_parity_waits_after_process_kill,
         test_c28_harness_regressions_are_registered,
+        test_isolated_cargo_runner_regressions_are_registered,
+        test_developer_validation_entrypoints_use_isolated_paths,
         test_desktop_agent_center_required_surface_exists,
     ]
     errors = []

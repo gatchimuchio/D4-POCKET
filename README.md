@@ -75,9 +75,11 @@ python tooling/conformance_tests/run_conformance_skeleton.py
 必要に応じてRust・Flutterの製品実装を別途検査します。
 
 ```bash
-cargo test --manifest-path native/rust_helper/Cargo.toml
+python -X utf8 tooling/run_cargo_isolated.py test --locked --offline --manifest-path native/rust_helper/Cargo.toml
 python tooling/validate_all.py --flutter-step desktop_flutter_analyze --desktop-platform windows
 ```
+
+`run_cargo_isolated.py`はCargoの生成targetをRepository／OneDrive外の一時領域へ設定し、終了時に回収します。明示的な`--target-dir`とCargo `--config`は隔離を迂回し得るため拒否します。これはCargo targetの配置境界であり、`build.rs`等が別pathへ書く動作やCargo package cache全体をsandboxするものではありません。
 
 `--flutter-step`は指定したFlutter analyze／test／buildだけをOneDrive外の一時source snapshotで実行します。Desktop Flutter testでは先にRust helper buildも同じsnapshot内で行います。これは`validate_all.py`が列挙する検査の隔離経路であり、`flutter run`など任意のFlutter commandを隔離するものではありません。
 

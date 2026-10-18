@@ -25,9 +25,10 @@ python tooling/conformance_tests/run_conformance_skeleton.py
 それぞれのToolchainを用意した環境で実行します。
 
 ```bash
-cd native/rust_helper
-cargo test
+python -X utf8 tooling/run_cargo_isolated.py test --locked --offline --manifest-path native/rust_helper/Cargo.toml
 ```
+
+Cargoの既定`target`はsourceの隣へ生成されます。OneDrive等の同期対象sourceでは生成先を安全な一時領域へ分離するため、この入口を使用してください。Cargoの終了値をそのまま返し、一時targetの回収に失敗した場合も成功扱いしません。隔離対象はCargo `target`であり、任意のbuild scriptや共有package cacheの書込みをsandboxするものではありません。
 
 Flutter検査は、OneDrive上のsource treeへ`.dart_tool`や`build`を生成しないよう、`validate_all.py`の隔離snapshot経路を使います。例えばDesktop analyzeとtestはそれぞれ次のように対象を限定して実行できます。Desktop testには必要なRust helper buildも含まれます。
 

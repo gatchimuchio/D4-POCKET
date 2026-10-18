@@ -188,6 +188,10 @@
       "責任": "契約適合と拒否経路の検証"
     },
     {
+      "path": "tooling/run_cargo_isolated.py",
+      "責任": "Rust開発検査のCargo targetをRepository／OneDrive外の検証済み一時領域へ束縛し、Cargo終了値を伝播して生成targetを回収する。任意build scriptの全file書込みをsandboxしない"
+    },
+    {
       "path": "ROADMAP.md",
       "責任": "rev5現行製品phaseへの入口、v1.0射程、release gate。履歴記録は現行状態を上書きしない"
     },

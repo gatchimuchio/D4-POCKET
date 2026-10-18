@@ -1,5 +1,7 @@
 # D4 Pocket / GUI-Shell rev5 Product-First 進捗
 
+後続追補（2026-10-18、Rust開発出力隔離）: 現Repositoryの`native/rust_helper/target`はOneDrive配下のMicrosoft reparse-point directoryとして観測された。README／QUICKSTART／AGENTSの直接`cargo test`入口を`tooling/run_cargo_isolated.py`へ置き換え、Cargo targetを検証済みOneDrive外一時領域へ固定し終了時に回収する。Rust 1.95.0の`check --all-targets --locked --offline`はこの入口からexit 0（2分07秒）で完了し、隔離target cleanupも成功した。これはRust全targetのcompile checkで、全test実行・OneDrive同期service復旧・任意build scriptの全書込み隔離を証明しない。B5と既存release gateは維持する。詳細は[B5自己適用記録](緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
+
 後続追補（2026-10-18、BUF-T04）: current source commit `60f10fa`からWindows isolated snapshotを用いたAndroid debug APK buildがPASS（Flutter 3.44.0、exit 0）。source fingerprint、APK hash、cleanup retry 1回、証拠範囲は[B5自己適用記録](緩衝基盤_rev5補遺_QC/B5_自己適用.md)。実機／配布／OneDrive同期serviceの証明ではなく、`BUF-T04`は部分観測。
 
 後続追補（2026-10-18）: 同一Rust test-support SHA `C5D7C52996FCC8A898B6F65C77A84963875890DB12A6D19CA1BB950ED64BF487`を使い、OneDrive source／TEMP targetのparallel suiteを追加実行。535件中523 passed／0 failed／12 ignored。本追補は下記の先行snapshotにある「最新suite」の数値だけを更新し、522／1 failed等のFAIL履歴を保持する。原因未確定のため`BUF-T05`／B5はOPEN。command・cleanup・証拠限界は[B5自己適用記録](緩衝基盤_rev5補遺_QC/B5_自己適用.md)。

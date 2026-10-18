@@ -92,7 +92,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "63ec3f99561bb695425927feaf6013253ec029c1bae8e14a8fc5abc42d48eda9"
+      "sha256": "14694921489a0517fe8e4334ff65aefe56b1669d95fc7939fe9083e15c3e9ae0"
     },
     {
       "path": "AUDIT.md",
@@ -152,11 +152,11 @@
     },
     {
       "path": "QUICKSTART.md",
-      "sha256": "81f14cc9ff66ac3b6f7f89f203c01c1a14ffd0c1845707dd8758ec5454d2e470"
+      "sha256": "0ab544bea2f17f0e5d773a5751ee370856244bf90072613ca377cad3d0c9c812"
     },
     {
       "path": "README.md",
-      "sha256": "00501258aed01a08eff584d92143948db04b6f2ae88eb61786c73e55856e29ed"
+      "sha256": "68ef3d75b690ed43510b6ce4828dd013b52be01f40996fde98417c9d2b3c47f8"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "70b11e3afe2f36ed30eca7c079490af92a1126b80219bc3d9d7e8bdd4e220c3e"
+      "sha256": "1dc9950ef139937c74efdec6cd3a647bc49719401aeb619ff3b10f09ffb2e2ae"
     },
     {
       "path": "SECURITY.md",
@@ -1288,7 +1288,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "6bca5eee1181ed29d1da7f41fe2b1e3a0a60e20287846fcccf8edf5aca459d3c"
+      "sha256": "a791ddfc00c5029dbc2daf6a878970afd265099c590431d5d958397e4f6db85b"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1676,7 +1676,7 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B5_\u81ea\u5df1\u9069\u7528.md",
-      "sha256": "9e8d7e22fad41eaf813d8b6e009ff45163dd31b2e02518908dc7ab872cf6ea89"
+      "sha256": "499d598869d8dad819f622361840ca1e33b36bc623b9dab77d6441841f761bcb"
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/\u5b9f\u88c5\u4ed5\u69d8\u66f8.md",
@@ -4932,11 +4932,15 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "1e8321757c7eff3a57395e85348b1cbb22420fdcfc53593f519ba133873cba45"
+      "sha256": "67125b07f6e35685551630dace66578fb73f757bd9423559b830edee178e63e5"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
       "sha256": "463ca2a9e9e35be33c75c38d3fc63b4736a3c3987ba5015ff2e10ec18aca5488"
+    },
+    {
+      "path": "tooling/conformance_tests/test_run_cargo_isolated.py",
+      "sha256": "a27404d30b843f84491539eeb989e13e120214d76b5933e4ec4c426ff37cb583"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
@@ -5031,6 +5035,10 @@
       "sha256": "f4140d0d03224b6115fa0e6c796b62d08b2d857d41dbf9d1dea7675b5243fe37"
     },
     {
+      "path": "tooling/run_cargo_isolated.py",
+      "sha256": "18fb17878da570c8b2bf07a7a0d424b8b68a0f9f1c8ba66d0b77730bfd1f5ac2"
+    },
+    {
       "path": "tooling/schema_check/check_schemas.py",
       "sha256": "942663df7746dbca845578e73d4ac24718c5430869755d02e99ebc21b2fea7b2"
     },
@@ -5068,7 +5076,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "9afd14a60b09b6ab85f2b6a7fef932423c9ab442c3486dfad34f83f14db755ac"
+      "sha256": "dcdc5d2e8ac6b5a787b2028b56d29f98fa8a7364ed828c3dfecd1b2e213bfc43"
     }
   ]
 }
