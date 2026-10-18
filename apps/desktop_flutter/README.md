@@ -29,7 +29,14 @@ Dartの画面最上位で [`SemanticsBinding.instance.ensureSemantics()`](https:
 
 Flutter 3.44.0のmacOS Runnerは同梱Rust helperを匿名pipe経由で使用する。Flutter／RunnerはBroker資格を読み取らず、Rustが既存認証loopback Brokerへ中継する。App Sandboxを保持し、helperへsandboxを継承する。network.clientとBrokerのloopback listen用network.serverを明示し、JITはDebug/Profileだけ。広域file access、任意helper・command指定、Owner資格読取権限は追加しない。有限接続単位と現行結果は`docs/specs/macos-desktop-channel.md`と`docs/REV5_PRODUCT_PROGRESS.md`を参照する。
 
-開発buildは先に`cargo +1.95.0 build --locked --manifest-path native/rust_helper/Cargo.toml --bin gui_shell_macos_broker`を実行し、その後`flutter build macos --debug`で同梱する。ReleaseはRust側にも`--release`を指定する。Xcodeは同じprofileの固定helperを同梱し、欠損時はbuildを失敗させる。end userがRustやterminalを用意する経路ではない。
+OneDrive等の同期対象にあるsource treeではCargo／Flutterを直接buildせず、repository rootから隔離入口を使ってanalyze／testする。
+
+```sh
+python3 -X utf8 tooling/validate_all.py --flutter-step desktop_flutter_analyze --desktop-platform current
+python3 -X utf8 tooling/validate_all.py --flutter-step desktop_flutter_test --desktop-platform current
+```
+
+macOS Runnerの実buildは`.github/workflows/apple-manual-build.yml`を`workflow_dispatch`で`macos_product` targetとして実行する。これは隔離されたmacOS runner上のbuild／test証拠で、配布artifactやrelease readinessではない。同期対象のlocal sourceから直接buildしない。Xcodeは固定profileのhelperを同梱し、欠損時はbuildを失敗させる。end userがRustやterminalを用意する経路ではない。
 
 - item: macOSの残る製品機能・復旧・正式配布
   classification: release_blocker

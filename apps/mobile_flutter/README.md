@@ -11,12 +11,15 @@ Mobileは共通UIをFlutterで描画し、Device Linkの端末識別子・招待
 
 ## ローカル確認
 
-```text
-flutter pub get
-flutter analyze --no-pub
-flutter test --no-pub --reporter expanded
-flutter build apk --debug --no-pub
+OneDrive等の同期対象にあるsource treeでFlutterを直接起動すると、`.dart_tool`や`build`の生成物まで同期対象になるため、リポジトリrootから隔離検証入口を使う。snapshot内で依存解決・検査・buildを行い、終了後に生成物を回収する。
+
+```powershell
+python -X utf8 tooling/validate_all.py --flutter-step mobile_flutter_analyze --desktop-platform current
+python -X utf8 tooling/validate_all.py --flutter-step mobile_flutter_test --desktop-platform current
+python -X utf8 tooling/validate_all.py --flutter-step mobile_android_debug_build --desktop-platform current
 ```
+
+この入口は開発用snapshotの検証であり、OneDrive同期serviceの復旧、実機動作、正式配布、release readinessを証明しない。同期対象sourceからFlutter CLIを直接実行して生成物を作らない。
 
 Android実機のinstall・launch・結合・保管・復帰検証は2026-09-11のowner指示で凍結中。凍結は合格証拠ではない。Windows上でiOS buildはできないため、`.github/workflows/apple-manual-build.yml`の`ios_mobile`手動範囲でFlutter iOS Simulator buildと実Brokerへ接続するiOS native XCTestを検証する。このworkflowは製品UI全体、実端末、production identity、release readinessを証明しない。
 

@@ -11584,6 +11584,31 @@ def test_isolated_owner_desktop_launcher_regressions_are_registered() -> list[st
     return ["Owner Desktop isolated launcherのtestが失敗: " + details]
 
 
+def _markdown_has_direct_flutter_or_cargo_validation_command(content: str) -> bool:
+    direct_command = re.compile(
+        r"^(?:(?:PS\s*>|\$|>)\s*)?(?:flutter|cargo)\s+(?:\+\S+\s+)?(?:pub|get|analyze|test|build|run|check)\b"
+    )
+    inline_commands = []
+    fenced_commands = []
+    fence_marker = None
+
+    for line in content.splitlines():
+        stripped = line.lstrip()
+        if fence_marker is None:
+            if stripped.startswith("```") or stripped.startswith("~~~"):
+                fence_marker = stripped[:3]
+                continue
+            inline_commands.extend(re.findall(r"(?<!`)`([^`\r\n]+)`(?!`)", line))
+            continue
+
+        if stripped.startswith(fence_marker) and stripped[len(fence_marker):].strip() == "":
+            fence_marker = None
+            continue
+        fenced_commands.append(line.strip())
+
+    return any(direct_command.match(command) for command in (*inline_commands, *fenced_commands))
+
+
 def test_developer_validation_entrypoints_use_isolated_paths() -> list[str]:
     errors = []
     for name in ("AGENTS.md", "README.md", "QUICKSTART.md"):
@@ -11603,6 +11628,39 @@ def test_developer_validation_entrypoints_use_isolated_paths() -> list[str]:
         errors.append("AGENTS.mdが隔離Desktop Flutter analyze入口を示していない")
     if "--flutter-step mobile_flutter_analyze" not in agents:
         errors.append("AGENTS.mdが隔離Mobile Flutter analyze入口を示していない")
+
+    mobile_readme = (ROOT / "apps" / "mobile_flutter" / "README.md").read_text(encoding="utf-8")
+    for token in (
+        "--flutter-step mobile_flutter_analyze",
+        "--flutter-step mobile_flutter_test",
+        "--flutter-step mobile_android_debug_build",
+    ):
+        if token not in mobile_readme:
+            errors.append(f"Mobile READMEがOneDrive外の隔離検証入口を案内していない: {token}")
+
+    desktop_readme = (ROOT / "apps" / "desktop_flutter" / "README.md").read_text(encoding="utf-8")
+    if "--flutter-step desktop_flutter_analyze" not in desktop_readme or "--flutter-step desktop_flutter_test" not in desktop_readme:
+        errors.append("Desktop READMEが隔離analyze／test入口を案内していない")
+    if "apple-manual-build.yml" not in desktop_readme or "macos_product" not in desktop_readme:
+        errors.append("Desktop READMEが同期対象外のmacOS build入口を案内していない")
+
+    windows_readme = (ROOT / "installer" / "windows" / "README.md").read_text(encoding="utf-8")
+    if "tooling/export_windows_product.py" not in windows_readme or "-ProductManifestJson" not in windows_readme:
+        errors.append("Windows staging READMEが隔離Product Exportと同一Manifestの経路を案内していない")
+
+    for label, content in (
+        ("Mobile README", mobile_readme),
+        ("Desktop README", desktop_readme),
+        ("Windows staging README", windows_readme),
+    ):
+        if _markdown_has_direct_flutter_or_cargo_validation_command(content):
+            errors.append(f"{label}に同期対象sourceで直接生成物を作るFlutter／Cargo commandが残っている")
+
+    if not _markdown_has_direct_flutter_or_cargo_validation_command("実行例: `flutter build windows --release`"):
+        errors.append("Conformanceがinline code中の直接build commandを検出できない")
+    if not _markdown_has_direct_flutter_or_cargo_validation_command("```powershell\ncargo +1.95.0 test --locked\n```"):
+        errors.append("Conformanceがversion指定Cargo commandをfenced code内で検出できない")
+
     for path in (ROOT / "scripts" / "launch_owner_desktop.ps1", ROOT / "scripts" / "launch_owner_desktop.sh"):
         content = path.read_text(encoding="utf-8").replace("\\", "/")
         if "tooling/launch_owner_desktop_isolated.py" not in content:

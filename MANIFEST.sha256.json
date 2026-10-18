@@ -192,7 +192,7 @@
     },
     {
       "path": "apps/desktop_flutter/README.md",
-      "sha256": "77b68c248b274549aba7281909d2e920171323bde360cf64958093cc65a249a9"
+      "sha256": "0807c45b3c65efefbd95412295cf8bf0d6e09bccea88a7335d734714f4995e55"
     },
     {
       "path": "apps/desktop_flutter/analysis_options.yaml",
@@ -812,7 +812,7 @@
     },
     {
       "path": "apps/mobile_flutter/README.md",
-      "sha256": "7c7a756ef486b65b9d3bb72e4383e04a553b6ad35e96150d5cd06eefd61df8c5"
+      "sha256": "e269ebf3572fbcec5c7392766cda52937905d11d3fdfdc5152d1e19317a3c1bd"
     },
     {
       "path": "apps/mobile_flutter/android/.gitignore",
@@ -1288,7 +1288,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "b1b9324cbf6171b5ccd05de70bcc2c417735515a3febf82b797c95dae11a6056"
+      "sha256": "229317e33368f54b898e07c938f074053ca0d78270aeae72cef3a658dc904406"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1676,7 +1676,7 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B5_\u81ea\u5df1\u9069\u7528.md",
-      "sha256": "abac7e9334dd8ec3a8ebcf290d607bad5c911c1d4653d039f3daf11c7f1b146c"
+      "sha256": "a4310411347dbd6d42c65123b0e821e78e42a2514731fe442b47df8ea99a35aa"
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/\u5b9f\u88c5\u4ed5\u69d8\u66f8.md",
@@ -3268,7 +3268,7 @@
     },
     {
       "path": "installer/windows/README.md",
-      "sha256": "bb0cadc9509a4615d4488245de66aa9f60f88948cfd8b7e97a31c16554d90267"
+      "sha256": "fa2918304dd47dbe9b109886cf36bfccbea012f3ae018200fdd0387f05917f70"
     },
     {
       "path": "installer/windows/collect_audit_anchor_proof.ps1",
@@ -4932,7 +4932,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "2cec3c17589ec0e38404c3388e7513bb8a59b3db0f7a57ce3ed29cddfcb95d81"
+      "sha256": "2c1a163b63f2b5b9004d58b517b692e3f51856a9cb562009b845e36db55f5b2a"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",

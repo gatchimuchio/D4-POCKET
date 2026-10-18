@@ -12,16 +12,28 @@ gui_shell_desktop_launcher.exe
 
 ## Buildとstaging
 
-Windows開発hostで実行する。
+Windowsでは、Brokerが発行したExport Receiptとそれに束縛されたManifestから、隔離build／Product Exportを行う。sourceはclean commitから一時snapshotへ展開され、Flutter／Cargo生成物はRepository／OneDrive外に置かれる。`--output-dir`には既存の親directory配下にある、Repository／OneDrive外の未作成directoryを指定する。
 
 ```powershell
-flutter build windows --release --no-pub
-cargo build --release --locked --manifest-path native\rust_helper\Cargo.toml --bin gui_shell_rust_helper --bin gui_shell_desktop_launcher
+$receipt = '<Broker Export Receipt JSON>'
+$manifest = '<Receiptに記録されたManifest file>'
+$bundle = '<RepositoryとOneDriveの外にある未作成出力directory>'
+$buildCommand = "python -X utf8 tooling/export_windows_product.py --receipt `"$receipt`" --manifest-file `"$manifest`" --output-dir `"$bundle`""
+
+python -X utf8 tooling/export_windows_product.py `
+  --receipt $receipt `
+  --manifest-file $manifest `
+  --output-dir $bundle
+
 .\installer\windows\stage_installed_app.ps1 `
-  -FlutterReleaseDir .\apps\desktop_flutter\build\windows\x64\runner\Release `
-  -BrokerHelperExe .\native\rust_helper\target\release\gui_shell_rust_helper.exe `
-  -DesktopLauncherExe .\native\rust_helper\target\release\gui_shell_desktop_launcher.exe
+  -FlutterReleaseDir (Join-Path $bundle 'app') `
+  -BrokerHelperExe (Join-Path $bundle 'broker\gui_shell_rust_helper.exe') `
+  -DesktopLauncherExe (Join-Path $bundle 'gui_shell_desktop_launcher.exe') `
+  -ProductManifestJson (Join-Path $bundle 'product_manifest.json') `
+  -BuildCommand $buildCommand
 ```
+
+同期対象source上でFlutterまたはCargoを直接buildしない。Export Receiptがない場合はstagingを代替手順で強行せず、Brokerの通常Export経路を先に成立させる。staging tool自体はDeveloper／release-evidence用で、正式installerではない。
 
 D4 Pocket Exportから作った起動器をstageするときは、同じExport artifactの`product_manifest.json`を`-ProductManifestJson`で渡す。stagerはManifestのApp ID／Audit store IDと起動器のcompile-time埋込値を照合し、製品固有の`%LOCALAPPDATA%\D4Pocket\apps\<App ID>\stores\<Audit store ID>`をruntime rootとして記録し、Manifestをbyte-preservingでstage rootへ複製する。compile-time identityがあるのにManifestがない場合、またはidentityが一致しない場合はstagingを拒否する。この照合はExport時の正本Schema検証を置き換えない。runtime Manifestを起動器が読み込むという意味ではなく、保存pathの証拠を一致させるためのstaging metadataである。Manifestを渡さないのは製品identity未埋込のgeneric GUI-Shell起動器に限る。
 
@@ -55,7 +67,7 @@ release検証器も旧形式のアンカー保護宣言だけでは受理しな�
 
 正本は `docs/specs/audit-checkpoint.md`。Collectorへ `-CheckpointBundle <directory> -TrustedHeadPath <owner公開継続性記録> -PreviousCheckpointBundle <直前bundleまたは->` を指定する。停止したbroker store、現在commitと一致するclean sourceから配置したappを対象とする。公開鍵fingerprintはRepositoryの `config/audit_signing_trust.json` に固定する。未設定は拒否する。
 
-release再検証は `GUI_SHELL_AUDIT_TRUSTED_HEAD` にowner管理の公開継続性記録のpathを指定する。これは秘密鍵ではない。証拠JSONが指定する過去floorを採用せず、現在のfileとRepository固定公開鍵をRustで再検証する。`cargo build --locked --manifest-path native/rust_helper/Cargo.toml` で現在の検証器を構築してから実行する。外部継続性記録をlocal証拠と一緒に巻き戻さない。
+release再検証は `GUI_SHELL_AUDIT_TRUSTED_HEAD` にowner管理の公開継続性記録のpathを指定する。これは秘密鍵ではない。証拠JSONが指定する過去floorを採用せず、現在のfileとRepository固定公開鍵をRustで再検証する。`python -X utf8 tooling/run_cargo_isolated.py +1.95.0 build --locked --manifest-path native/rust_helper/Cargo.toml` で現在の検証器を構築してから実行する。外部継続性記録をlocal証拠と一緒に巻き戻さない。
 
 署名bundleはcheckpoint.json、signature.bin、public-key.derで構成し、Collector出力にfingerprint、署名済みhash、previous hash、sequence、verification resultを保存する。秘密鍵は扱わない。ownerの手動コマンドは `docs/OFFLINE_SIGNING_OWNER.md` に記載する。
 
