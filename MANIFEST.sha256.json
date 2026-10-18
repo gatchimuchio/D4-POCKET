@@ -1288,7 +1288,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "b1ffd96dc6f70b2b0395bead41dfe52bbd435d162d2e097f43a1d8805342c799"
+      "sha256": "b9cdb35e03ca03570d2bda03e503cf37c45e0f760e263b6a57212f35990b21e2"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1676,7 +1676,7 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B5_\u81ea\u5df1\u9069\u7528.md",
-      "sha256": "e782a35e7cf8516466cd43b44ad9061fcb0dc65d2d424970c8c92559f1310e25"
+      "sha256": "44ae41f80a9ba49c4aaa1fddb203fca5866fa539bc0be7a66e56af09253876c6"
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/\u5b9f\u88c5\u4ed5\u69d8\u66f8.md",
@@ -3588,7 +3588,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "4aaabb8e9f3a8c139933ac018ed09364bd8d6cbeb2a3ca075b07a3ef8d862726"
+      "sha256": "bb698e42a34d211ba1bf0c684e236dda94722a50d0e8fba2b3d2d8ebbccc7bad"
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",

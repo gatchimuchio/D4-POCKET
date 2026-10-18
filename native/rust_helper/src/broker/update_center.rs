@@ -6086,11 +6086,17 @@ mod tests {
             event.operation == "更新download中断file復旧" && event.decision == "recovered"
         }));
 
-        for _ in 0..400 {
+        // Windowsの名前解決には15秒の期限があるため、失敗状態を確認するまで試験側にも有限の待機を設ける。
+        let failure_deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+        loop {
             broker.update_download_tick();
             if broker.update_download.projection()["状態"] != "downloading" {
                 break;
             }
+            assert!(
+                std::time::Instant::now() < failure_deadline,
+                "更新取得試験が20秒以内に終端状態へ到達しない"
+            );
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
         let job = broker.update_download.projection();
