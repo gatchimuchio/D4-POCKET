@@ -92,7 +92,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "732553710d1d98e882c9c3b85089f8c07bb348ee52e75bdd0b1c11dfccfba415"
+      "sha256": "bed0902deb84013c4764597c1981d65af0d0953d0e9afb0e79e0e4a40b295446"
     },
     {
       "path": "AUDIT.md",
@@ -156,7 +156,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "60e5f77777d015c1471f042f8c0bee1771ca798b5a6e113cfaec2fefc1be67c4"
+      "sha256": "ba32e816fc46d2abc78a1274cb015571f62e7ab74af292e95674ba06bcebc3ca"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "4aea0a05fa5e406c81b8528d3fe134ffff4db71ebf8e929d6deb732cdfb75762"
+      "sha256": "386ffd0683f867466e443dc25f3a56e669a4dc5831dcd5900c1ace6c0c00d115"
     },
     {
       "path": "SECURITY.md",
@@ -1288,7 +1288,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "41d7c3c23ef9516fa61961b32ad2e9f66502e19c06b22e9b94404025e231d268"
+      "sha256": "8b0660a8b26c6f52c50394f4804afd7005b16b837fbf3dc341e06796d52940ea"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1676,7 +1676,7 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B5_\u81ea\u5df1\u9069\u7528.md",
-      "sha256": "b642500a22011aa09350770e23967462ed7c1e0e786672ed0af11cfbd765790e"
+      "sha256": "8827a6809e2da7e5d2ac7c9dc46947a6bae73d23c703de8efea0b28df418e7ec"
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/\u5b9f\u88c5\u4ed5\u69d8\u66f8.md",

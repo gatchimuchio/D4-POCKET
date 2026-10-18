@@ -533,7 +533,7 @@ Linuxは`LINUX_NATIVE`／`LINUX_WSL_DEV`／`LINUX_WSLG_X11`／`LINUX_HEADLESS`�
    - `codex/backup-main`が存在する場合、`codex/backup-main-prev`を`codex/backup-main`へforce-updateする
    - `codex/backup-main`を現在push済みの`main`へforce-updateする
 5. 2つのbackup世代をremote branchではなく、PR-neutralなremote tagとしてpushする
-   - `git push -f origin codex/backup-main-prev:refs/tags/codex/backup-main-prev codex/backup-main:refs/tags/codex/backup-main`
+   - source branchは同名tagとの曖昧さを避け、必ず完全修飾する: `git push -f origin refs/heads/codex/backup-main-prev:refs/tags/codex/backup-main-prev refs/heads/codex/backup-main:refs/tags/codex/backup-main`
 6. 境界付き実装と§19で該当するQE段階の技術確認・安全検証を行う。失敗とNOT_RUNは隠さない
 7. 完了したBUILD_BATCH／統治変更ブロックを`main`へ限定commitする。手動Actions検証branchでは必要な検証が成功した正確なcommitだけを`main`へfast-forwardする
 8. commitまたはfast-forward直後に`main`をpushする

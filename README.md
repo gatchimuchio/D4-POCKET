@@ -9,7 +9,7 @@ AIエージェントが高度になるほど、次に難しくなるのは「何
 
 [開発状況](docs/REV5_PRODUCT_PROGRESS.md) · [クイックスタート](QUICKSTART.md) · [アーキテクチャ仕様](docs/specs/gui-shell-spec-v1.md) · [責任境界](CLAIM.md) · [エージェント向け開発規則](AGENTS.md)
 
-> **開発中 — 製品リリース未宣言。** Windowsは機能実装の到達点を持ち、macOS・Android・iOSにも対象を限定した受入証拠があります。B4のWindows Desktop統合経路は2026年10月17日に限定受入済み、B5自己適用QCはOPENです。Windows hosted run #54（固定source `5f4e810`）ではRust全target 569 passed／0 failed／13 ignoredを3回確認し、Release Broker build・通常IPC smoke・Pktmon cleanupもPASSしました。run #53／#54のdecoded loopback tupleは0件で、raw packet未保存のためRST根因は未確定です。後続commit `61e3b93`の自己接続RST probeはlocal検査のみで、hosted capture未確認です。`BUF-T04`／`BUF-T23`は部分観測、`BUF-T05`／`BUF-T06`はOPEN。通常Releaseは`task_execution=unsupported`、`release_ready=false`で、正式配布・実機保証・最終QAも未完了です。
+> **開発中 — 製品リリース未宣言。** Windowsは機能実装の到達点を持ち、macOS・Android・iOSにも対象を限定した受入証拠があります。B4のWindows Desktop統合経路は2026年10月17日に限定受入済み、B5自己適用QCはOPENです。Windows hosted run #54（固定source `5f4e810`）ではRust全target 569 passed／0 failed／13 ignoredを3回確認し、Release Broker build・通常IPC smoke・Pktmon cleanupもPASSしました。run #53／#54のdecoded loopback tupleは0件で、raw packet未保存のためRST根因は未確定です。後続commit `61e3b93`の自己接続RST probeはlocal検査のみで、hosted capture未確認です。`BUF-T04`は部分観測、`BUF-T05`／`BUF-T06`はOPEN、`BUF-T23`はB5局所受入済み（Q4長期／反復／資源検査は未実施）です。通常Releaseは`task_execution=unsupported`、`release_ready=false`で、正式配布・実機保証・最終QAも未完了です。
 
 ## D4 Pocketが変えようとしていること
 
@@ -32,7 +32,7 @@ AIエージェントが高度になるほど、次に難しくなるのは「何
 | **Windows Desktop** | rev5のWindows側P12、Feature Completeの開発到達点 | installed-path最終証拠、正式Release、owner GO |
 | **Agent Compare / Handoff** | P2 Multi-Agent Compare、P3 Agent HandoffのProduct Build受入CLOSED | すべての実Agent・実環境での一般保証 |
 | **Mobile / Non-Windows** | P13の有限Product Build受入は2026-10-09にCLOSED。Android Emulator・iOS Simulator等の限定証拠を保持 | 物理端末保証、OS別の正式配布・署名・identity |
-| **緩衝基盤とAgent Task** | B0〜B4は有限Product Build受入CLOSED。B5はOPEN。Windows hosted run #54はRust全target 569／0／13を3回PASSし、Release Broker build・通常IPC smoke・capture cleanupもPASS。run #53／#54のdecoded tupleは0件だが、raw packetがない証明ではなく、後続RST probe commit `61e3b93`のhosted検証も未実施。`BUF-T04`／`BUF-T23`は部分観測、`BUF-T05`／`BUF-T06`はOPEN。詳細は[B5記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md) | OneDrive警告との因果、loopback/TLS failureの根因、shared Pub cacheの長期累積・同時利用影響、現行SAC policy全体、通常Release能力、正式配布・実機保証 |
+| **緩衝基盤とAgent Task** | B0〜B4は有限Product Build受入CLOSED。B5はOPEN。Windows hosted run #54はRust全target 569／0／13を3回PASSし、Release Broker build・通常IPC smoke・capture cleanupもPASS。run #53／#54のdecoded tupleは0件だが、raw packetがない証明ではなく、後続RST probe commit `61e3b93`のhosted検証も未実施。`BUF-T04`は部分観測、`BUF-T05`／`BUF-T06`はOPEN、`BUF-T23`はB5局所受入済み。長期累積・同時利用等は工程表Q4に残す。詳細は[B5記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md) | OneDrive警告との因果、loopback/TLS failureの根因、Q4の長期／反復／資源影響、現行SAC policy全体、通常Release能力、正式配布・実機保証 |
 | **正式な出荷判断** | Release GateとOwner承認を独立に保持 | <code>task_execution=unsupported</code>、<code>release_ready=false</code> |
 
 B4-L2の記録済み検査では、Rust全体直列テスト **569 passed / 0 failed / 13 ignored**、Agent Task Flutter client 14件とAgent Center widget 1件、Schema **167件**・正常例 **163件**・否定fixture **215件**、Conformance **245 checks**を確認しています。これらは**2026-10-11の開発環境における対象版の証拠**であり、このREADME更新時に再実行した値でも、インストール済み製品の保証でもありません。10月17日のB4統合経路証拠も`r2-e2e` staged buildとlocalhost合成APIの範囲に限られ、通常Release能力やinstalled provenanceを示しません。[観測範囲と残差](docs/REV5_PRODUCT_PROGRESS.md)を参照してください。
