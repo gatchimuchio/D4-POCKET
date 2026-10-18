@@ -10,7 +10,17 @@ use std::time::{Duration, Instant};
 #[cfg(debug_assertions)]
 static C28_DIAGNOSTIC_LINES: std::sync::atomic::AtomicUsize =
     std::sync::atomic::AtomicUsize::new(0);
+#[cfg(any(debug_assertions, test))]
+static C28_DIAGNOSTIC_STARTED: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();
 const C28_DIAGNOSTIC_LIMIT: usize = 32;
+
+#[cfg(any(debug_assertions, test))]
+fn c28_elapsed_micros() -> u128 {
+    C28_DIAGNOSTIC_STARTED
+        .get_or_init(Instant::now)
+        .elapsed()
+        .as_micros()
+}
 
 fn c28_route_label(route: &str) -> &'static str {
     match route {
@@ -30,9 +40,10 @@ fn c28_diagnostic(route: &str, stage: &'static str, detail: &str) {
         return;
     }
     eprintln!(
-        "C28_RUNTIME_DIAGNOSTIC|{}|{}|{}",
+        "C28_RUNTIME_DIAGNOSTIC|{}|{}|elapsed_us={}|{}",
         c28_route_label(route),
         stage,
+        c28_elapsed_micros(),
         detail
     );
 }
@@ -360,6 +371,7 @@ mod tests {
             let (mut stream, peer) = listener
                 .accept()
                 .map_err(|error| format!("fixture accept失敗: {error}"))?;
+            let accept_us = c28_elapsed_micros();
             let local = stream
                 .local_addr()
                 .map_err(|error| format!("fixture local_addr取得失敗: {error}"))?;
@@ -395,6 +407,7 @@ mod tests {
                     ));
                 }
             }
+            let request_headers_complete_us = c28_elapsed_micros();
             let response_bytes = raw.len();
             let mut write_result = stream.write_all(&raw).map_err(|error| {
                 format!(
@@ -414,6 +427,7 @@ mod tests {
                 });
             }
             write_result?;
+            let response_write_shutdown_us = c28_elapsed_micros();
             let mut client_close = [0; 1];
             let peer_close = match stream.read(&mut client_close) {
                 Ok(0) => "peer_closed",
@@ -431,6 +445,14 @@ mod tests {
                     ));
                 }
             };
+            let peer_close_us = c28_elapsed_micros();
+            c28_diagnostic(
+                "/health",
+                "fixture_timing",
+                &format!(
+                    "accept_us={accept_us}; request_headers_complete_us={request_headers_complete_us}; response_write_shutdown_us={response_write_shutdown_us}; peer_close_us={peer_close_us}; peer_close={peer_close}"
+                ),
+            );
             Ok(format!(
                 "peer={peer}; local={local}; request_bytes={}; response_bytes={response_bytes}; response=written; peer_close={peer_close}",
                 request.len()

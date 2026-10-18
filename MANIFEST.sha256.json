@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "bb6c78cda166b39c0d735810f812c463c80534aaffeeb887e1eef3fb84bb71d1"
+      "sha256": "70b11e3afe2f36ed30eca7c079490af92a1126b80219bc3d9d7e8bdd4e220c3e"
     },
     {
       "path": "SECURITY.md",
@@ -1288,7 +1288,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "83059839c949b393a18de74da8871ae0ce941fd3d19b28d4075c3c0352d318fe"
+      "sha256": "6bca5eee1181ed29d1da7f41fe2b1e3a0a60e20287846fcccf8edf5aca459d3c"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1676,7 +1676,7 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B5_\u81ea\u5df1\u9069\u7528.md",
-      "sha256": "a98d0dd95ad113c35f80622653ae3eeeb6277ec0cdcc8d40095f5f04eb6fc3a9"
+      "sha256": "9e8d7e22fad41eaf813d8b6e009ff45163dd31b2e02518908dc7ab872cf6ea89"
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/\u5b9f\u88c5\u4ed5\u69d8\u66f8.md",
@@ -3396,7 +3396,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/minidora.rs",
-      "sha256": "c644d355d46196684882b0151a5c26f4a61af9c7cd5f3ea133a125bbf2a49e59"
+      "sha256": "0f6e2b311b90830b6b59189f4b4567ef27f40e343d8ecd64874ce6631f83165b"
     },
     {
       "path": "native/rust_helper/src/adapters/mod.rs",
