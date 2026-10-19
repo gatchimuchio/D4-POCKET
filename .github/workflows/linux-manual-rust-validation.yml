@@ -33,8 +33,15 @@ jobs:
           rustc +1.95.0 --version | tee -a "$RUNNER_TEMP/d4p-linux-rust-environment.txt"
           cargo +1.95.0 --version | tee -a "$RUNNER_TEMP/d4p-linux-rust-environment.txt"
           target_dir="$RUNNER_TEMP/d4p-linux-cargo-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          owner_data_home="$HOME/.local/share/d4p-linux-owner-xdg-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
           test ! -e "$target_dir"
+          test ! -e "$owner_data_home"
+          test ! -L "$HOME/.local"
+          test ! -L "$HOME/.local/share"
+          mkdir -p "$HOME/.local/share"
+          mkdir -m 0700 "$owner_data_home"
           printf 'CARGO_TARGET_DIR=%s\n' "$target_dir" >> "$GITHUB_ENV"
+          printf 'XDG_DATA_HOME=%s\n' "$owner_data_home" >> "$GITHUB_ENV"
           {
             printf '\n- Commit: `%s`\n' "$head"
             printf -- '- Runner image: `%s/%s`\n' "$ImageOS" "$ImageVersion"
@@ -103,3 +110,15 @@ jobs:
             rm -rf -- "$CARGO_TARGET_DIR"
           fi
           test ! -e "$CARGO_TARGET_DIR"
+          expected_owner_data_home="$HOME/.local/share/d4p-linux-owner-xdg-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          if [ "${XDG_DATA_HOME:-}" != "$expected_owner_data_home" ]; then
+            echo '一時XDG_DATA_HOMEがこのrunの正確な所有pathではない'
+            exit 1
+          fi
+          if [ -L "$XDG_DATA_HOME" ]; then
+            echo '一時XDG_DATA_HOME rootがsymlink'; exit 1
+          fi
+          if [ -e "$XDG_DATA_HOME" ]; then
+            rm -rf -- "$XDG_DATA_HOME"
+          fi
+          test ! -e "$XDG_DATA_HOME"
