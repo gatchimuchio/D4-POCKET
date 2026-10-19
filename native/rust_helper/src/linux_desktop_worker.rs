@@ -174,6 +174,8 @@ fn serve(
     let mut config = BrokerServerConfig::new(state.join("store"), session.clone());
     config.max_request_bytes = REQUEST_LIMIT;
     config.desktop_package_layout_verified = true;
+    config.desktop_product_identity =
+        crate::broker::update_center::embedded_product_identity().map_err(|_| failure())?;
     let (ready_tx, ready_rx) = mpsc::sync_channel(1);
     let (owner_tx, owner_rx) = mpsc::sync_channel(4);
     let server = thread::Builder::new()

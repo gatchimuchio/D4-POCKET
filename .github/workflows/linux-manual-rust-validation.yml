@@ -43,10 +43,22 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Rust整形
         shell: bash
-        run: rustfmt +1.95.0 --edition 2021 --check native/rust_helper/src/broker/product_install.rs
+        run: rustfmt +1.95.0 --edition 2021 --check native/rust_helper/src/broker/product_install.rs native/rust_helper/src/linux_desktop_worker.rs
       - name: Linux product install path tests
         shell: bash
         run: cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib broker::product_install::tests -- --test-threads=1
+      - name: Linux embedded product identity tests
+        shell: bash
+        env:
+          GUI_SHELL_PRODUCT_APP_ID: d4-pocket-app-11111111111111111111111111111111
+          GUI_SHELL_PRODUCT_AUDIT_STORE_ID: audit-store-22222222222222222222222222222222
+        run: cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib broker::update_center::tests::embedded_product_identity_requires_a_complete_valid_compile_time_pair -- --exact --test-threads=1
+      - name: Linux embedded product identity readback
+        shell: bash
+        env:
+          GUI_SHELL_PRODUCT_APP_ID: d4-pocket-app-11111111111111111111111111111111
+          GUI_SHELL_PRODUCT_AUDIT_STORE_ID: audit-store-22222222222222222222222222222222
+        run: cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib broker::update_center::tests::linux_embedded_product_identity_uses_compile_time_values -- --exact --test-threads=1
       - name: Linux Rust all-target compile
         shell: bash
         run: cargo +1.95.0 check --locked --all-targets --manifest-path native/rust_helper/Cargo.toml

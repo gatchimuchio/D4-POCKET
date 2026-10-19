@@ -581,6 +581,30 @@ fn resolve_build_update_trust(
     }
 }
 
+/// Linux製品helperへcompile-time build inputだけからidentityを渡す。
+/// 半端・不正なpairは拒否し、通常／開発buildでは両方省略できる。
+#[cfg(target_os = "linux")]
+pub(crate) fn embedded_product_identity() -> Result<Option<(String, String)>, &'static str> {
+    product_identity_from_build(EMBEDDED_PRODUCT_APP_ID, EMBEDDED_PRODUCT_AUDIT_STORE_ID)
+}
+
+#[cfg(any(target_os = "linux", test))]
+fn product_identity_from_build(
+    app_id: Option<&str>,
+    audit_store_id: Option<&str>,
+) -> Result<Option<(String, String)>, &'static str> {
+    match (app_id, audit_store_id) {
+        (None, None) => Ok(None),
+        (Some(app_id), Some(audit_store_id))
+            if valid_product_identity(app_id, "d4-pocket-app-")
+                && valid_product_identity(audit_store_id, "audit-store-") =>
+        {
+            Ok(Some((app_id.to_owned(), audit_store_id.to_owned())))
+        }
+        _ => Err("製品build identityが不完全または不正である"),
+    }
+}
+
 fn valid_product_identity(value: &str, prefix: &str) -> bool {
     value.strip_prefix(prefix).is_some_and(|suffix| {
         suffix.len() == 32
@@ -4385,6 +4409,33 @@ mod tests {
         )
         .is_err());
         assert!(resolve_build_update_trust(None, None, Some(&valid_json), || Ok(None)).is_err());
+    }
+
+    #[test]
+    fn embedded_product_identity_requires_a_complete_valid_compile_time_pair() {
+        let app_id = format!("d4-pocket-app-{}", "1".repeat(32));
+        let audit_id = format!("audit-store-{}", "2".repeat(32));
+        assert_eq!(
+            product_identity_from_build(Some(&app_id), Some(&audit_id)).unwrap(),
+            Some((app_id.clone(), audit_id.clone()))
+        );
+        assert_eq!(product_identity_from_build(None, None).unwrap(), None);
+        assert!(product_identity_from_build(Some(&app_id), None).is_err());
+        assert!(product_identity_from_build(None, Some(&audit_id)).is_err());
+        assert!(product_identity_from_build(Some("caller-selected"), Some(&audit_id)).is_err());
+        assert!(product_identity_from_build(Some(&app_id), Some("caller-selected")).is_err());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_embedded_product_identity_uses_compile_time_values() {
+        assert_eq!(
+            embedded_product_identity().unwrap(),
+            Some((
+                "d4-pocket-app-11111111111111111111111111111111".to_string(),
+                "audit-store-22222222222222222222222222222222".to_string()
+            ))
+        );
     }
 
     #[test]

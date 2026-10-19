@@ -32,6 +32,10 @@ Rust helperは、現在時刻・`desktop_flutter` client・payload hash・operat
 
 Agent TaskのOwner操作として、Workspace Permission発行、Task本文hash／実行条件hashへのApproval発行、完了結果表示Approvalを確認allowlistへ接続する。Permission確認にはRuntime／Session／Workspaceと限定scopeを、Task Approval確認にはRuntime／Session／Workspace、指示文字数と指示hashを、結果表示確認にはTask ID・結果hash・visibilityを表示する。Task本文・結果本文・Credential実値はRust確認文やRunner transportへ載せない。Brokerは操作時点のSession／Permission／Approval条件を再評価する。
 
+## Linux Brokerへの製品identity
+
+Linux Brokerは`GUI_SHELL_PRODUCT_APP_ID`と`GUI_SHELL_PRODUCT_AUDIT_STORE_ID`のcompile-time値だけを製品identityとして受け取る。両方未設定の開発buildはidentityなしで起動できるが、片方だけ、または`d4-pocket-app-`／`audit-store-`と32桁小文字16進suffixに一致しない値はBroker起動前にfail-closed拒否する。Flutter要求、environment、保存済みstateからidentityを選ばない。これはBrokerへのidentity配線であり、identityを生成・束縛するLinux製品exporter、installed provenance、Audit storeの配布／更新保証が成立した証拠ではない。
+
 Linux MCP接続／切断も同じGTK native Owner往復を使う。接続確認はServer ID、実行file、Workspace、引数hash、Credential ID／対象／環境変数名を示し、CredentialがあればServer processと子孫が読取・外部送信できることを警告する。LinuxはDesktop sandboxを付与しない。BrokerはLinux Secret Serviceの現在record・用途・対象・失効状態・暗号文hashとdurable Auditを照合してから、最小化したenvironmentでstdio childを起動する。childは独立process groupへ置き、明示切断時はそのgroup停止を確認する。group外へ離脱したprocess、Broker crash後のorphan cleanup、外部副作用は保証しない。これらの限界はnative確認に表示し、MCP接続からTrust／Permission／Approvalを生成しない。MCP Tool実行は現在Catalog／Schema、一回Permission、AuditをBrokerが再評価する。
 
 ## 作業領域folder選択

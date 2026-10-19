@@ -76,7 +76,7 @@
     },
     {
       "path": ".github/workflows/linux-manual-rust-validation.yml",
-      "sha256": "348b37c846091e9429bad79f994f3ad77af292bdf32c29cafe5f7813cc075883"
+      "sha256": "19e0c37d9df0e671a7efcc7cd11bdb672018018ee504c162194326c268603202"
     },
     {
       "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
@@ -1512,7 +1512,7 @@
     },
     {
       "path": "docs/specs/linux-desktop-channel.md",
-      "sha256": "23c22fa0bdbec658e7170ec700dd2254d4829d57c574d8a0ede0bfa72d847a96"
+      "sha256": "4c2c673f4c183c906ca9432be29c9f22533f1013fbe0adbcaac2c6505b3f1474"
     },
     {
       "path": "docs/specs/linux-workspace-selection.md",
@@ -3632,7 +3632,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "bb698e42a34d211ba1bf0c684e236dda94722a50d0e8fba2b3d2d8ebbccc7bad"
+      "sha256": "4e85385aa42640ca66f2c6fa50456b508644f873867fb5fc1a0071b5eaf42fbe"
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
@@ -3688,7 +3688,7 @@
     },
     {
       "path": "native/rust_helper/src/linux_desktop_worker.rs",
-      "sha256": "e529e4333812be4f973ef2ad4742ea1957f89328f1d2f1068f841fcb64059a3c"
+      "sha256": "24762f38591b099f5f51248a587fce88eded91b9453307a0ccde6b2b256b6a2f"
     },
     {
       "path": "native/rust_helper/src/linux_workspace_selection.rs",
