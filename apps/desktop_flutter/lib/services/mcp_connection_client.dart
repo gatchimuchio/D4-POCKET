@@ -123,6 +123,27 @@ class McpConnectionClient {
 
   Future<void> registerMacNativeCredential(
       {required String credentialId, required String targetServerId}) async {
+    await _registerNativeCredential(
+      credentialId: credentialId,
+      targetServerId: targetServerId,
+      expectedStorage: 'macos_keychain',
+    );
+  }
+
+  Future<void> registerLinuxNativeCredential(
+      {required String credentialId, required String targetServerId}) async {
+    await _registerNativeCredential(
+      credentialId: credentialId,
+      targetServerId: targetServerId,
+      expectedStorage: 'linux_secret_service',
+    );
+  }
+
+  Future<void> _registerNativeCredential({
+    required String credentialId,
+    required String targetServerId,
+    required String expectedStorage,
+  }) async {
     if (!_validCredentialId(credentialId) ||
         !_validIdentifier(targetServerId)) {
       throw const BrokerClientException('資格情報の公開metadataが不正です');
@@ -158,7 +179,7 @@ class McpConnectionClient {
         body['用途'] != 'mcp_transport' ||
         body['接続対象'] != targetServerId ||
         body['種類'] != 'api_key' ||
-        body['保管方式'] != 'macos_keychain' ||
+        body['保管方式'] != expectedStorage ||
         body['状態'] != '有効' ||
         body['作成時刻UnixMillis'] is! int ||
         (body['作成時刻UnixMillis'] as int) < 1 ||
@@ -317,7 +338,8 @@ class McpConnectionClient {
           kind is! String ||
           !const {'api_key', 'oauth', 'basic', 'ssh', 'custom'}
               .contains(kind) ||
-          !const {'windows_dpapi', 'macos_keychain'}.contains(entry['保管方式']) ||
+          !const {'windows_dpapi', 'macos_keychain', 'linux_secret_service'}
+              .contains(entry['保管方式']) ||
           !const {'有効', '失効'}.contains(entry['状態']) ||
           createdAt is! int ||
           createdAt < 1 ||
@@ -353,7 +375,7 @@ class McpConnectionClient {
     required McpCredentialSummary credential,
   }) async {
     if (!_validCredentialId(credential.credentialId) ||
-        !const {'windows_dpapi', 'macos_keychain'}
+        !const {'windows_dpapi', 'macos_keychain', 'linux_secret_service'}
             .contains(credential.storage) ||
         credential.status != '有効' ||
         credential.purpose.isEmpty ||

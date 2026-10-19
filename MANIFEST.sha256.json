@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "4d2cd39572c067f0094eb75c509ccc3831462ad03e55f395635142789c927f8e"
+      "sha256": "7c3f656c6586d8fdd14f5f218aaa041a6e1498e192776171129f1e28ef91530c"
     },
     {
       "path": "SECURITY.md",
@@ -256,7 +256,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/mcp_connection_center.dart",
-      "sha256": "297b022913ca602212306621042599a5e1b39d9b1eb547fb751121e7b6a7aefd"
+      "sha256": "70f471f771abee25a1ccdf74b5f0de70ecb90ab0819a8ccc284a266286382a07"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/notifications.dart",
@@ -360,7 +360,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/mcp_connection_client.dart",
-      "sha256": "b2f791b71edceb4e1fcc638f1f3445f5b3b446064e4df77dc79c2b4390628cf9"
+      "sha256": "64481dea77acd317445d3a355d4d9c0346af5d4ac3b323a8744e69fc52f819af"
     },
     {
       "path": "apps/desktop_flutter/lib/services/notification_client.dart",
@@ -436,7 +436,7 @@
     },
     {
       "path": "apps/desktop_flutter/linux/runner/broker_process_channel.cc",
-      "sha256": "dab32b1ec3c7840db368562a5f2b6b717e99daaad7c1e4d02b301149187b85c4"
+      "sha256": "ad0fe6fe382abb326da61731bf4fc9f2df64bd21eee4d61cebfcc904d3f9e4bc"
     },
     {
       "path": "apps/desktop_flutter/linux/runner/broker_process_channel.h",
@@ -1296,7 +1296,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "586532e0011f767ae8b638f9045388d92dfed8ece3f36bed4d4f2f787ff33aaa"
+      "sha256": "2de1f27da967d69f6b919b79c2feb47195420c708ec760a16db2bd0cbd01b7be"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1432,7 +1432,7 @@
     },
     {
       "path": "docs/specs/credential-vault.md",
-      "sha256": "9e66d51e63e404cc8306317b5cd7fab54010438f85cab58c10f43f75ab789e6f"
+      "sha256": "827be8b520a5af08b044143985aa360c65a48a05976dd5747e73144687680da3"
     },
     {
       "path": "docs/specs/desktop-broker-channel.md",
@@ -1504,7 +1504,7 @@
     },
     {
       "path": "docs/specs/linux-desktop-channel.md",
-      "sha256": "97fa698454b05b361eebc17e2500cfca4fe04732bb8b5dda44d50e89dff3bc65"
+      "sha256": "6e62cbba75b60d198e4c3d7f231cebd1cb6d2e97ca24e9d53163545a1e5479cb"
     },
     {
       "path": "docs/specs/long-run-validation.md",
@@ -3352,11 +3352,11 @@
     },
     {
       "path": "native/rust_helper/Cargo.lock",
-      "sha256": "42603cc58f07a538fb3a08ef7632c0340ba862362a4ef36071e49279d52055a1"
+      "sha256": "02610d8259989769664da162be82ad8aa92504860d498945e0af77bee5de6d8b"
     },
     {
       "path": "native/rust_helper/Cargo.toml",
-      "sha256": "926f736d3c2db4c8c045e0c1fc0de178a725366ec531b34d3009473ae86fb0d1"
+      "sha256": "b2d402f8bf1e3b1f9c4796cb52c8107e81eaf401826c97fa26b6d06dcba3b50f"
     },
     {
       "path": "native/rust_helper/README.md",
@@ -3416,7 +3416,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/process_tree.rs",
-      "sha256": "08ad22f5f0cf731afa0cd2e2d1094e5d9c944f4dd2797c3cb678b4c1a1674a67"
+      "sha256": "d72c950a70fb28f8ea1d52070bc395163cb25484b7612d8768af53166dae7bb6"
     },
     {
       "path": "native/rust_helper/src/audit_hash.rs",
@@ -3500,11 +3500,11 @@
     },
     {
       "path": "native/rust_helper/src/broker/credential_storage.rs",
-      "sha256": "b610e19749e24594832b6c52459bfb0447b924c45c4532bd0750daf160ca4928"
+      "sha256": "83aa5dee362b7ad922f840d16b36ff0a8eb7013ab9a565c8f3212240ccadf688"
     },
     {
       "path": "native/rust_helper/src/broker/credential_vault.rs",
-      "sha256": "4c21a531d3312632066b7136dd30d79220387a48a27059e1f7fcc933aa22ce51"
+      "sha256": "1944b45f46e2752392d45a69a1e2741a11d786e4bea7e763c01ad51e0af7d206"
     },
     {
       "path": "native/rust_helper/src/broker/device_link.rs",
@@ -3548,7 +3548,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/ipc_server.rs",
-      "sha256": "1cb515b26e1ba00a1d7996d8d35a050f467d9dbae7b6e45ee76b8a9c5e363caf"
+      "sha256": "eca8d7ba7bca271d3461ea8cdaa4c07252bfd750b5eac6e5980772e0b853701b"
     },
     {
       "path": "native/rust_helper/src/broker/json_input.rs",
@@ -3556,11 +3556,11 @@
     },
     {
       "path": "native/rust_helper/src/broker/mcp_center.rs",
-      "sha256": "601e8e8d47f17d6ee8f0eb8abf98282fa5f7828d36273c3e6fe5d4d99f782d99"
+      "sha256": "db71f07a130dd47aa5fe4955641acbfe841e68e97bd4cade0dfa3393a8c77fa3"
     },
     {
       "path": "native/rust_helper/src/broker/mod.rs",
-      "sha256": "ffbf3f2cca1b82da79ce84ec57021dba36655cb0861f7f6b06b84d5f28179211"
+      "sha256": "d32cda31096a1257b7fb59181767abbeec6787b97042377025aa709b43d1b829"
     },
     {
       "path": "native/rust_helper/src/broker/notification_center.rs",
@@ -3580,7 +3580,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "dc1f2c3369850d91c73c51304d24c932b9da76c6c85e15a9d7aac6d261aeea2f"
+      "sha256": "82ae3043647d39767fd0b7c5ed355f2d6d06a8834f9c93da9eafa46f4e91d9ff"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -3652,11 +3652,11 @@
     },
     {
       "path": "native/rust_helper/src/lib.rs",
-      "sha256": "07c213416be9472e9c6ccc46a2b8a0871455e10555f093912baf88c921e702e2"
+      "sha256": "deb2838a1449052c4d64a9c347e51a25e23cb57d7cc9797e5df3025582e05391"
     },
     {
       "path": "native/rust_helper/src/linux_desktop_worker.rs",
-      "sha256": "d564f551b3f3fe7a963d382bd657aacb86de14a1ef4218e8d4adcce70868ff02"
+      "sha256": "bc4aa0051f512fc48fceb4c1843c58685641cee3c6a29250cc884f057a87c4a8"
     },
     {
       "path": "native/rust_helper/src/macos_credential_input.rs",
@@ -3664,7 +3664,7 @@
     },
     {
       "path": "native/rust_helper/src/macos_desktop_owner.rs",
-      "sha256": "ebfc4f615843009a801ff2d19afe26b41531d7f7dae6e8c29e1c8092f1da2e50"
+      "sha256": "f58a445ddcac7d870f008601feb2cb75b6a8e2a03514d5618ac62b46a8489bfd"
     },
     {
       "path": "native/rust_helper/src/macos_desktop_worker.rs",
@@ -4228,7 +4228,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "ff15fbcf2d83e90c608d3a516e22b73d1ccd6d42d90251fd58edb574e2e8e056"
+      "sha256": "cd85c895d0f49eddee6df2165257e548d33f2aedd4a123df62e5bfa7ff419c0c"
     },
     {
       "path": "requirements-dev.txt",

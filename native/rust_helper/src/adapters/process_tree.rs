@@ -5,7 +5,7 @@ pub(super) struct SupervisedChild {
     pub(super) child: Child,
     #[cfg(windows)]
     job: gui_shell_process_supervision::Job,
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
     group: Option<rustix::process::Pid>,
 }
 
@@ -34,7 +34,7 @@ pub(super) fn spawn(mut command: Command) -> io::Result<SupervisedChild> {
         }
         Ok(SupervisedChild { child, job })
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
     {
         use std::os::unix::process::CommandExt;
         command.process_group(0);
@@ -55,7 +55,7 @@ pub(super) fn spawn(mut command: Command) -> io::Result<SupervisedChild> {
         }
         Ok(SupervisedChild { child, group })
     }
-    #[cfg(not(any(windows, target_os = "macos")))]
+    #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
     {
         command.spawn().map(|child| SupervisedChild { child })
     }
@@ -70,8 +70,8 @@ impl SupervisedChild {
     pub(super) fn stop_descendants(&mut self) -> io::Result<()> {
         #[cfg(windows)]
         self.job.terminate_and_wait()?;
-        #[cfg(target_os = "macos")]
-        self.terminate_mac_group()?;
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
+        self.terminate_unix_group()?;
         Ok(())
     }
 
@@ -82,11 +82,11 @@ impl SupervisedChild {
             self.child.wait()?;
             Ok(())
         }
-        #[cfg(target_os = "macos")]
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
         {
-            self.terminate_mac_group()
+            self.terminate_unix_group()
         }
-        #[cfg(not(any(windows, target_os = "macos")))]
+        #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
         {
             if self.child.try_wait()?.is_none() {
                 self.child.kill()?;
@@ -96,8 +96,8 @@ impl SupervisedChild {
         }
     }
 
-    #[cfg(target_os = "macos")]
-    fn terminate_mac_group(&mut self) -> io::Result<()> {
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    fn terminate_unix_group(&mut self) -> io::Result<()> {
         use rustix::process::{kill_process_group, test_kill_process_group, Signal};
         let Some(group) = self.group else {
             return Ok(());
@@ -137,13 +137,13 @@ impl Drop for SupervisedChild {
     }
 }
 
-#[cfg(all(test, target_os = "macos"))]
-mod macos_tests {
+#[cfg(all(test, any(target_os = "linux", target_os = "macos")))]
+mod unix_tests {
     use super::*;
     use std::process::Stdio;
 
     #[test]
-    fn macos_owned_group_stops_root_and_inherited_child() {
+    fn unix_owned_group_stops_root_and_inherited_child() {
         let nonce = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()

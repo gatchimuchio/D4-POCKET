@@ -7,31 +7,33 @@ pub(crate) mod product_bootstrapper;
 #[cfg(windows)]
 pub mod protected_store;
 
-pub mod audit_hash;
-pub mod checkpoint;
+pub(crate) mod a2a;
 pub mod adapters;
+pub mod audit_hash;
 pub mod broker;
+pub mod checkpoint;
 pub mod diagnostics;
 pub mod filesystem;
-pub mod workspace_diff;
-pub mod workspace_reader;
 pub mod ipc;
 #[cfg(target_os = "linux")]
+mod linux_credential_input;
+#[cfg(target_os = "linux")]
 pub mod linux_desktop_worker;
-#[cfg(any(target_os = "linux", target_os = "macos", test))]
-pub mod macos_desktop_worker;
-#[cfg(any(target_os = "linux", target_os = "macos", test))]
-mod macos_desktop_owner;
-#[cfg(any(target_os = "macos", test))]
-mod macos_workspace_selection;
 #[cfg(target_os = "macos")]
 mod macos_credential_input;
+#[cfg(any(target_os = "linux", target_os = "macos", test))]
+mod macos_desktop_owner;
+#[cfg(any(target_os = "linux", target_os = "macos", test))]
+pub mod macos_desktop_worker;
+#[cfg(any(target_os = "macos", test))]
+mod macos_workspace_selection;
+pub(crate) mod mcp;
 pub mod network;
 pub mod process;
-pub mod update_verification;
 pub mod product_package;
-pub(crate) mod mcp;
-pub(crate) mod a2a;
+pub mod update_verification;
+pub mod workspace_diff;
+pub mod workspace_reader;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Diagnostic {

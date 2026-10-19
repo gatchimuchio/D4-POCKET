@@ -72,18 +72,25 @@ impl AgentCliRuntimeWorkspaceRegistration {
         let request = self;
         let workspace_id_valid = !request.workspace_id.is_empty()
             && request.workspace_id.len() <= 128
-            && request.workspace_id.bytes().all(|byte| {
-                byte.is_ascii_alphanumeric() || b"_.-".contains(&byte)
-            });
+            && request
+                .workspace_id
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || b"_.-".contains(&byte));
         let secret_paths_valid = request.secret_paths.len() <= 16
             && request.secret_paths.iter().all(|path| {
                 !path.is_empty()
                     && path.len() <= 256
                     && !path.chars().any(char::is_control)
                     && !Path::new(path).is_absolute()
-                    && !path.split(['/', '\\']).any(|part| part == ".." || part == ".")
+                    && !path
+                        .split(['/', '\\'])
+                        .any(|part| part == ".." || part == ".")
             })
-            && request.secret_paths.iter().collect::<std::collections::BTreeSet<_>>().len()
+            && request
+                .secret_paths
+                .iter()
+                .collect::<std::collections::BTreeSet<_>>()
+                .len()
                 == request.secret_paths.len();
         request.version == 1
             && !request.adapter_id.is_empty()
@@ -840,10 +847,7 @@ pub(crate) enum OwnerConfirmationSource {
 }
 
 impl OwnerConfirmationSource {
-    fn permits_agent_task_owner_operation(
-        self,
-        _operation: Option<&BrokerOperation>,
-    ) -> bool {
+    fn permits_agent_task_owner_operation(self, _operation: Option<&BrokerOperation>) -> bool {
         match self {
             Self::DesktopNativeConfirmation => true,
             #[cfg(feature = "r2-e2e")]
@@ -854,7 +858,10 @@ impl OwnerConfirmationSource {
                         | BrokerOperation::AgentTaskOwnerApprovalGrant
                 )
             ),
-            Self::NotOwner | Self::OwnerCredential | Self::MacOSWorkspaceSelection | Self::MacOSAgentCLISelection => false,
+            Self::NotOwner
+            | Self::OwnerCredential
+            | Self::MacOSWorkspaceSelection
+            | Self::MacOSAgentCLISelection => false,
         }
     }
 
@@ -1063,6 +1070,8 @@ pub struct Broker {
     pub(super) protected_store: Option<crate::protected_store::ProtectedStore>,
     #[cfg(target_os = "macos")]
     pub(super) macos_credential_store: Option<super::credential_storage::MacOSCredentialStore>,
+    #[cfg(target_os = "linux")]
+    pub(super) linux_credential_store: Option<super::credential_storage::LinuxCredentialStore>,
     #[cfg(windows)]
     内容閲覧: super::content_access::ContentAccess,
     pub(super) shutdown_requested: bool,
@@ -1110,6 +1119,8 @@ impl Broker {
             protected_store: None,
             #[cfg(target_os = "macos")]
             macos_credential_store: None,
+            #[cfg(target_os = "linux")]
+            linux_credential_store: None,
             #[cfg(windows)]
             内容閲覧: Default::default(),
             shutdown_requested: false,
@@ -1192,6 +1203,8 @@ impl Broker {
             protected_store: None,
             #[cfg(target_os = "macos")]
             macos_credential_store: None,
+            #[cfg(target_os = "linux")]
+            linux_credential_store: None,
             #[cfg(windows)]
             内容閲覧: Default::default(),
             shutdown_requested: false,
@@ -1790,10 +1803,7 @@ impl Broker {
     /// r2-e2eだけで使用するTask Permission／Approval fixture。
     /// 合成Ownerは固定二操作以外へ権限を広げず、監査証拠もFIXTUREに固定する。
     #[cfg(feature = "r2-e2e")]
-    pub(crate) fn r2_e2e_synthetic_owner_operation_json(
-        &mut self,
-        input: &str,
-    ) -> BrokerResponse {
+    pub(crate) fn r2_e2e_synthetic_owner_operation_json(&mut self, input: &str) -> BrokerResponse {
         let envelope = match BrokerRequestEnvelope::from_json_str(input) {
             Ok(envelope) => envelope,
             Err(_) => {
@@ -1818,7 +1828,11 @@ impl Broker {
             .map(BrokerOperation::as_str)
             .unwrap_or("unknown")
             .to_owned();
-        let payload_hash = envelope.payload_hash.as_deref().unwrap_or("unknown").to_owned();
+        let payload_hash = envelope
+            .payload_hash
+            .as_deref()
+            .unwrap_or("unknown")
+            .to_owned();
         let operation_is_allowlisted = matches!(
             envelope.operation.as_ref(),
             Some(
@@ -1961,11 +1975,32 @@ impl Broker {
                     | BrokerOperation::製品アンインストール要求
             )
         );
-        // Mac登録／MCPの別個native Owner確認だけ。試験専用Ownerへ追加しない。
+        // Linux資格情報入力／Linux・MacのMCP操作／Mac限定操作の別個native Owner確認だけ。
+        // 試験専用Ownerへ追加しない。
         let operation_is_allowlisted = operation_is_allowlisted
-            || (cfg!(target_os = "macos") && matches!(envelope.operation,
-                Some(BrokerOperation::資格情報登録 | BrokerOperation::MCP接続 | BrokerOperation::MCP切断 | BrokerOperation::Host登録
-                    | BrokerOperation::作業領域承認 | BrokerOperation::作業領域失効 | BrokerOperation::作業領域全体基準点保存)));
+            || (cfg!(target_os = "linux")
+                && matches!(
+                    envelope.operation,
+                    Some(
+                        BrokerOperation::資格情報登録
+                            | BrokerOperation::MCP接続
+                            | BrokerOperation::MCP切断
+                    )
+                ));
+        let operation_is_allowlisted = operation_is_allowlisted
+            || (cfg!(target_os = "macos")
+                && matches!(
+                    envelope.operation,
+                    Some(
+                        BrokerOperation::資格情報登録
+                            | BrokerOperation::MCP接続
+                            | BrokerOperation::MCP切断
+                            | BrokerOperation::Host登録
+                            | BrokerOperation::作業領域承認
+                            | BrokerOperation::作業領域失効
+                            | BrokerOperation::作業領域全体基準点保存
+                    )
+                ));
         if !operation_is_allowlisted
             || envelope.session_id.as_deref() != Some(self.session_id.as_str())
             || !metadata_is_desktop
@@ -1980,8 +2015,12 @@ impl Broker {
             );
         }
         let selection_source = match envelope.operation {
-            Some(BrokerOperation::作業領域OS選択) => OwnerConfirmationSource::MacOSWorkspaceSelection,
-            Some(BrokerOperation::AgentCLI実行fileOS選択) => OwnerConfirmationSource::MacOSAgentCLISelection,
+            Some(BrokerOperation::作業領域OS選択) => {
+                OwnerConfirmationSource::MacOSWorkspaceSelection
+            }
+            Some(BrokerOperation::AgentCLI実行fileOS選択) => {
+                OwnerConfirmationSource::MacOSAgentCLISelection
+            }
             _ => OwnerConfirmationSource::DesktopNativeConfirmation,
         };
         self.処理_with_export_and_activation_confirmation(
@@ -2094,12 +2133,14 @@ impl Broker {
             || envelope.operation == Some(BrokerOperation::作業領域基準点保存)
             || envelope.operation == Some(BrokerOperation::作業領域全体基準点保存)
             || envelope.operation == Some(BrokerOperation::MCPTool実行)
-            || (cfg!(target_os = "macos") && matches!(envelope.operation,
-                Some(BrokerOperation::MCP接続 | BrokerOperation::MCP切断)))
+            || (cfg!(any(target_os = "linux", target_os = "macos"))
+                && matches!(
+                    envelope.operation,
+                    Some(BrokerOperation::MCP接続 | BrokerOperation::MCP切断)
+                ))
             || envelope.operation == Some(BrokerOperation::A2A接続)
         {
-            if !export_confirmation
-                .permits_agent_task_owner_operation(envelope.operation.as_ref())
+            if !export_confirmation.permits_agent_task_owner_operation(envelope.operation.as_ref())
             {
                 return self.reject_with_payload_hash(
                     &request_id,
@@ -2113,17 +2154,27 @@ impl Broker {
         }
 
         let required_selection_source = match envelope.operation {
-            Some(BrokerOperation::作業領域OS選択) => Some(OwnerConfirmationSource::MacOSWorkspaceSelection),
-            Some(BrokerOperation::AgentCLI実行fileOS選択) => Some(OwnerConfirmationSource::MacOSAgentCLISelection),
+            Some(BrokerOperation::作業領域OS選択) => {
+                Some(OwnerConfirmationSource::MacOSWorkspaceSelection)
+            }
+            Some(BrokerOperation::AgentCLI実行fileOS選択) => {
+                Some(OwnerConfirmationSource::MacOSAgentCLISelection)
+            }
             _ => None,
         };
         if required_selection_source.is_some()
-            && (!cfg!(any(target_os="macos", test)) || !self.desktop_package_layout_verified
+            && (!cfg!(any(target_os = "macos", test))
+                || !self.desktop_package_layout_verified
                 || Some(export_confirmation) != required_selection_source)
         {
-            return self.reject_with_payload_hash(&request_id, &operation,
-                "macos_os_selection_required", "OS選択投影は同梱macOS Rust helperの限定経路だけで取得できます",
-                true, envelope.payload_hash.as_deref().unwrap_or("unknown"));
+            return self.reject_with_payload_hash(
+                &request_id,
+                &operation,
+                "macos_os_selection_required",
+                "OS選択投影は同梱macOS Rust helperの限定経路だけで取得できます",
+                true,
+                envelope.payload_hash.as_deref().unwrap_or("unknown"),
+            );
         }
 
         if envelope.operation == Some(BrokerOperation::AgentCLI実行系作業領域登録)
@@ -2259,18 +2310,36 @@ impl Broker {
         }
 
         match envelope.operation.unwrap() {
-            selection_operation @ (BrokerOperation::作業領域OS選択 | BrokerOperation::AgentCLI実行fileOS選択) => {
-                let path_key = if selection_operation == BrokerOperation::AgentCLI実行fileOS選択 { "cli_path" } else { "workspace_root" };
+            selection_operation @ (BrokerOperation::作業領域OS選択
+            | BrokerOperation::AgentCLI実行fileOS選択) => {
+                let path_key = if selection_operation == BrokerOperation::AgentCLI実行fileOS選択
+                {
+                    "cli_path"
+                } else {
+                    "workspace_root"
+                };
                 #[derive(Deserialize)]
                 #[serde(deny_unknown_fields)]
-                struct Selection { version:u8, selection_status:String,
+                struct Selection {
+                    version: u8,
+                    selection_status: String,
                     #[serde(alias = "cli_path")]
-                    workspace_root:Option<String>, selection_request_hash:String }
-                let selection = envelope.payload.as_ref().filter(|v|
-                    v.as_object().is_some_and(|v| v.len() == 4 && v.contains_key(path_key))).and_then(|v|
-                    serde_json::from_value::<Selection>(v.clone()).ok());
-                if let Some(s) = selection.as_ref().filter(|s| s.version == 1
-                    && is_tagged_sha256(&s.selection_request_hash) && s.workspace_root.is_none()) {
+                    workspace_root: Option<String>,
+                    selection_request_hash: String,
+                }
+                let selection = envelope
+                    .payload
+                    .as_ref()
+                    .filter(|v| {
+                        v.as_object()
+                            .is_some_and(|v| v.len() == 4 && v.contains_key(path_key))
+                    })
+                    .and_then(|v| serde_json::from_value::<Selection>(v.clone()).ok());
+                if let Some(s) = selection.as_ref().filter(|s| {
+                    s.version == 1
+                        && is_tagged_sha256(&s.selection_request_hash)
+                        && s.workspace_root.is_none()
+                }) {
                     let code = match s.selection_status.as_str() {
                         "failed_main_thread" => Some("macos_os_selection_main_thread"),
                         "failed_display" => Some("macos_os_selection_display"),
@@ -2279,19 +2348,33 @@ impl Broker {
                         "failed_native" => Some("macos_os_selection_native"),
                         _ => None,
                     };
-                    if let Some(code) = code { return self.reject_with_payload_hash(
+                    if let Some(code) = code {
+                        return self.reject_with_payload_hash(
                         &request_id, &operation, code,
                         "native OS選択を開始または確定できません。入力を保持し、登録・再送しません",
-                        true, &payload_hash); }
+                        true, &payload_hash);
+                    }
                 }
-                let Some(selection) = selection.filter(|s| s.version == 1
-                    && is_tagged_sha256(&s.selection_request_hash)
-                    && ((s.selection_status == "cancelled" && s.workspace_root.is_none())
-                        || (s.selection_status == "selected" && s.workspace_root.as_deref().is_some_and(|p|
-                            p.starts_with('/') && p.len() <= 1024 && !p.chars().any(char::is_control)))))
-                else { return self.reject_with_payload_hash(&request_id, &operation,
-                    "macos_os_selection_failed", "OS選択または選択結果の検査に失敗しました。登録・再送は行いません",
-                    true, &payload_hash); };
+                let Some(selection) = selection.filter(|s| {
+                    s.version == 1
+                        && is_tagged_sha256(&s.selection_request_hash)
+                        && ((s.selection_status == "cancelled" && s.workspace_root.is_none())
+                            || (s.selection_status == "selected"
+                                && s.workspace_root.as_deref().is_some_and(|p| {
+                                    p.starts_with('/')
+                                        && p.len() <= 1024
+                                        && !p.chars().any(char::is_control)
+                                })))
+                }) else {
+                    return self.reject_with_payload_hash(
+                        &request_id,
+                        &operation,
+                        "macos_os_selection_failed",
+                        "OS選択または選択結果の検査に失敗しました。登録・再送は行いません",
+                        true,
+                        &payload_hash,
+                    );
+                };
                 self.accept_body_with_evidence(&request_id, selection_operation,
                     serde_json::json!({"version":1,"selection_status":selection.selection_status,
                         (path_key):selection.workspace_root,"selection_request_hash":selection.selection_request_hash,
@@ -2405,14 +2488,14 @@ impl Broker {
                 owner,
                 &payload_hash,
             ),
-            #[cfg(any(windows, target_os = "macos"))]
+            #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
             BrokerOperation::資格情報登録 => self.資格情報登録処理(
                 &request_id,
                 envelope.payload.as_ref().unwrap_or(&Value::Null),
                 owner,
                 &payload_hash,
             ),
-            #[cfg(not(any(windows, target_os = "macos")))]
+            #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
             BrokerOperation::資格情報登録 => self.reject_with_payload_hash(
                 &request_id,
                 "資格情報登録",
@@ -2421,14 +2504,14 @@ impl Broker {
                 true,
                 &payload_hash,
             ),
-            #[cfg(any(windows, target_os = "macos"))]
+            #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
             BrokerOperation::資格情報一覧 => self.資格情報一覧処理(
                 &request_id,
                 envelope.payload.as_ref().unwrap_or(&Value::Null),
                 owner,
                 &payload_hash,
             ),
-            #[cfg(not(any(windows, target_os = "macos")))]
+            #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
             BrokerOperation::資格情報一覧 => self.reject_with_payload_hash(
                 &request_id,
                 "資格情報一覧",
@@ -2437,14 +2520,14 @@ impl Broker {
                 true,
                 &payload_hash,
             ),
-            #[cfg(any(windows, target_os = "macos"))]
+            #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
             BrokerOperation::資格情報失効 => self.資格情報失効処理(
                 &request_id,
                 envelope.payload.as_ref().unwrap_or(&Value::Null),
                 owner,
                 &payload_hash,
             ),
-            #[cfg(not(any(windows, target_os = "macos")))]
+            #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
             BrokerOperation::資格情報失効 => self.reject_with_payload_hash(
                 &request_id,
                 "資格情報失効",
@@ -2584,19 +2667,21 @@ impl Broker {
             | BrokerOperation::更新延期
             | BrokerOperation::更新rollback要求
             | BrokerOperation::製品起動項目修復要求
-            | BrokerOperation::製品アンインストール要求) => super::update_center::dispatch(
-                self,
-                operation,
-                envelope.payload.as_ref().unwrap_or(&Value::Null),
-                &request_id,
-                &payload_hash,
-                export_confirmation,
-                download_confirmation.as_ref(),
-                apply_confirmation.as_ref(),
-                activation_confirmation.as_ref(),
-                product_uninstall_confirmation.as_ref(),
-                product_repair_confirmation.as_ref(),
-            ),
+            | BrokerOperation::製品アンインストール要求) => {
+                super::update_center::dispatch(
+                    self,
+                    operation,
+                    envelope.payload.as_ref().unwrap_or(&Value::Null),
+                    &request_id,
+                    &payload_hash,
+                    export_confirmation,
+                    download_confirmation.as_ref(),
+                    apply_confirmation.as_ref(),
+                    activation_confirmation.as_ref(),
+                    product_uninstall_confirmation.as_ref(),
+                    product_repair_confirmation.as_ref(),
+                )
+            }
             operation @ (BrokerOperation::通知一覧
             | BrokerOperation::通知既読
             | BrokerOperation::通知破棄
@@ -5868,63 +5953,104 @@ mod tests {
             "nonce":"mac-host-gate-nonce", "issued_at":"2026-06-01T00:00:30Z",
             "operation":"Host登録", "metadata":{"client":"desktop_flutter"},
             "payload_hash":canonical_payload_hash(Some(&payload)),"payload":payload});
-        let normal = test_broker().handle(BrokerRequestEnvelope::from_json_str(&request.to_string()).unwrap());
+        let normal = test_broker()
+            .handle(BrokerRequestEnvelope::from_json_str(&request.to_string()).unwrap());
         assert_eq!(normal.error.unwrap().code, "host_owner_required");
         let confirmed = test_broker().desktop_owner_operation_json(&request.to_string());
-        assert_eq!(confirmed.error.unwrap().code, if cfg!(target_os="macos") {
-            "broker_persistence_unavailable"
-        } else { "desktop_owner_operation_invalid" });
+        assert_eq!(
+            confirmed.error.unwrap().code,
+            if cfg!(target_os = "macos") {
+                "broker_persistence_unavailable"
+            } else {
+                "desktop_owner_operation_invalid"
+            }
+        );
     }
 
     #[test]
     #[cfg(any(windows, target_os = "macos"))]
     fn macos_workspace_inspector_broker入口は通常要求と未登録scopeを拒否する() {
-        for operation in ["作業領域承認", "作業領域失効", "作業領域全体基準点保存"] {
+        for operation in ["作業領域承認", "作業領域失効", "作業領域全体基準点保存"]
+        {
             let mut payload = json!({"作業領域ID":"unregistered-workspace", "登録hash":format!("sha256:{}", "a".repeat(64))});
-            if operation == "作業領域承認" {payload["表示範囲"] = json!("full");}
+            if operation == "作業領域承認" {
+                payload["表示範囲"] = json!("full");
+            }
             let request = json!({"request_id":"mac-workspace-gate", "session_id":"session-1",
                 "nonce":"mac-workspace-nonce", "issued_at":"2026-06-01T00:00:30Z", "operation":operation,
                 "metadata":{"client":"desktop_flutter"}, "payload_hash":canonical_payload_hash(Some(&payload)), "payload":payload});
-            let normal = test_broker().handle(BrokerRequestEnvelope::from_json_str(&request.to_string()).unwrap());
-            assert_eq!(normal.error.unwrap().code, "desktop_native_owner_confirmation_required");
+            let normal = test_broker()
+                .handle(BrokerRequestEnvelope::from_json_str(&request.to_string()).unwrap());
+            assert_eq!(
+                normal.error.unwrap().code,
+                "desktop_native_owner_confirmation_required"
+            );
             let store = temp_store_dir("macos-workspace-inspector-gate");
-            let confirmed = persistent_test_broker(&store).desktop_owner_operation_json(&request.to_string());
+            let confirmed =
+                persistent_test_broker(&store).desktop_owner_operation_json(&request.to_string());
             fs::remove_dir_all(&store).expect("Workspace入口fixtureを削除");
-            assert_eq!(confirmed.error.unwrap().code, if cfg!(target_os="macos") {"作業領域拒否"} else {"desktop_owner_operation_invalid"});
+            assert_eq!(
+                confirmed.error.unwrap().code,
+                if cfg!(target_os = "macos") {
+                    "作業領域拒否"
+                } else {
+                    "desktop_owner_operation_invalid"
+                }
+            );
             assert!(confirmed.body.is_none());
         }
     }
 
     #[test]
-    #[cfg(target_os = "macos")]
-    fn macos_mcp_operations_require_desktop_native_not_owner_credential() {
-        for operation in [BrokerOperation::MCP接続, BrokerOperation::MCP切断,
-                          BrokerOperation::MCPTool実行] {
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    fn desktop_mcp_operations_require_native_owner_not_owner_credential() {
+        for operation in [
+            BrokerOperation::MCP接続,
+            BrokerOperation::MCP切断,
+            BrokerOperation::MCPTool実行,
+        ] {
             let mut request = BrokerRequestEnvelope::health("mac-mcp", "mac-mcp-nonce");
             request.operation = Some(operation.clone());
             request.payload = Some(json!({"版": 1}));
             request.refresh_payload_hash();
-            for source in [OwnerConfirmationSource::NotOwner,
-                           OwnerConfirmationSource::OwnerCredential] {
+            for source in [
+                OwnerConfirmationSource::NotOwner,
+                OwnerConfirmationSource::OwnerCredential,
+            ] {
                 let denied = test_broker().処理_with_export_confirmation(
-                    request.clone(), source == OwnerConfirmationSource::OwnerCredential,
-                    source, None, None);
-                assert_eq!(denied.error.unwrap().code, "desktop_native_owner_confirmation_required");
+                    request.clone(),
+                    source == OwnerConfirmationSource::OwnerCredential,
+                    source,
+                    None,
+                    None,
+                );
+                assert_eq!(
+                    denied.error.unwrap().code,
+                    "desktop_native_owner_confirmation_required"
+                );
             }
             request.session_id = Some("session-1".into());
-            request.metadata = vec![BrokerMetadata {key: "client".into(), value: "desktop_flutter".into()}];
+            request.metadata = vec![BrokerMetadata {
+                key: "client".into(),
+                value: "desktop_flutter".into(),
+            }];
             request.metadata_present = true;
             let confirmed = test_broker().desktop_owner_operation_json(
                 &json!({"request_id": request.request_id, "session_id": request.session_id,
                     "operation": operation.as_str(), "nonce": request.nonce,
                     "issued_at": request.issued_at, "payload_hash": request.payload_hash,
-                    "metadata":{"client":"desktop_flutter"}, "payload":request.payload}).to_string());
-            assert_eq!(confirmed.error.unwrap().code, "broker_persistence_unavailable");
+                    "metadata":{"client":"desktop_flutter"}, "payload":request.payload})
+                .to_string(),
+            );
+            assert_eq!(
+                confirmed.error.unwrap().code,
+                "broker_persistence_unavailable"
+            );
         }
     }
 
     #[test]
-    #[cfg(any(windows, target_os = "macos"))]
+    #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
     fn macos_credential_registration_is_bound_to_real_desktop_owner_gate() {
         let baseline = BrokerRequestEnvelope::health("credential-gate", "credential-gate-nonce");
         let request = json!({
@@ -5937,13 +6063,13 @@ mod tests {
             "issued_at": baseline.issued_at,
             "metadata": {"client": "desktop_flutter"}
         });
-        let normal = test_broker().handle(
-            BrokerRequestEnvelope::from_json_str(&request.to_string()).unwrap(),
-        );
+        let normal = test_broker()
+            .handle(BrokerRequestEnvelope::from_json_str(&request.to_string()).unwrap());
         assert_eq!(normal.error.unwrap().code, "credential_owner_required");
         let confirmed = test_broker().desktop_owner_operation_json(&request.to_string());
-        assert_eq!(confirmed.error.unwrap().code,
-            if cfg!(target_os = "macos") {
+        assert_eq!(
+            confirmed.error.unwrap().code,
+            if cfg!(any(target_os = "linux", target_os = "macos")) {
                 "broker_persistence_unavailable"
             } else {
                 "desktop_owner_operation_invalid"
@@ -5953,14 +6079,20 @@ mod tests {
             let mut injected = request.clone();
             injected[field] = Value::Null;
             let denied = test_broker().desktop_owner_operation_json(&injected.to_string());
-            assert_eq!(denied.error.unwrap().code, "desktop_owner_operation_invalid");
+            assert_eq!(
+                denied.error.unwrap().code,
+                "desktop_owner_operation_invalid"
+            );
         }
         #[cfg(feature = "r2-e2e")]
         {
             let mut injected = request;
             injected["metadata"] = json!({"client": "r2_e2e_synthetic_owner"});
             let denied = test_broker().r2_e2e_synthetic_owner_operation_json(&injected.to_string());
-            assert_eq!(denied.error.unwrap().code, "r2_e2e_synthetic_owner_request_invalid");
+            assert_eq!(
+                denied.error.unwrap().code,
+                "r2_e2e_synthetic_owner_request_invalid"
+            );
         }
     }
 

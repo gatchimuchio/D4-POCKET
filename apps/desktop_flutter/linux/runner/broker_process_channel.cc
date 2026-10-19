@@ -22,6 +22,7 @@ constexpr size_t kOwnerPromptFrameLimit = kOwnerSummaryLimit * 2 + 64;
 constexpr size_t kOwnerChallengeLength = 32;
 constexpr unsigned int kMaxQueuedRequests = 16;
 constexpr auto kOwnerDialogTimeout = std::chrono::seconds(300);
+constexpr auto kCredentialDialogTimeout = std::chrono::seconds(300);
 
 bool is_lower_hex(char value) {
   return (value >= '0' && value <= '9') || (value >= 'a' && value <= 'f');
@@ -31,20 +32,31 @@ bool has_owner_protocol_prefix(const std::string& frame) {
   return frame.compare(0, 8, "D4OWNER1") == 0;
 }
 
-bool decode_owner_prompt(const std::string& frame, std::string* challenge,
-                         std::string* summary) {
-  constexpr char kPrefix[] = "D4OWNER1 ";
-  if (frame.compare(0, sizeof(kPrefix) - 1, kPrefix) != 0 ||
+bool has_credential_protocol_prefix(const std::string& frame) {
+  return frame.compare(0, 7, "D4CRED1") == 0;
+}
+
+void secure_clear(std::string* value) {
+  volatile unsigned char* bytes =
+      reinterpret_cast<volatile unsigned char*>(value->data());
+  for (size_t index = 0; index < value->size(); ++index) bytes[index] = 0;
+  value->clear();
+}
+
+bool decode_control_prompt(const std::string& frame, const char* prefix,
+                           std::string* challenge, std::string* summary) {
+  const std::string expected = std::string(prefix) + " ";
+  if (frame.compare(0, expected.size(), expected) != 0 ||
       frame.size() > kOwnerPromptFrameLimit) {
     return false;
   }
-  const size_t separator = frame.find(' ', sizeof(kPrefix) - 1);
+  const size_t separator = frame.find(' ', expected.size());
   if (separator == std::string::npos ||
-      separator - (sizeof(kPrefix) - 1) != kOwnerChallengeLength) {
+      separator - expected.size() != kOwnerChallengeLength) {
     return false;
   }
   const std::string candidate =
-      frame.substr(sizeof(kPrefix) - 1, separator - (sizeof(kPrefix) - 1));
+      frame.substr(expected.size(), separator - expected.size());
   if (!std::all_of(candidate.begin(), candidate.end(), is_lower_hex)) {
     return false;
   }
@@ -78,6 +90,17 @@ bool decode_owner_prompt(const std::string& frame, std::string* challenge,
   *challenge = candidate;
   *summary = std::move(decoded);
   return true;
+}
+
+bool decode_owner_prompt(const std::string& frame, std::string* challenge,
+                         std::string* summary) {
+  return decode_control_prompt(frame, "D4OWNER1", challenge, summary);
+}
+
+bool decode_credential_prompt(const std::string& frame,
+                              std::string* challenge,
+                              std::string* summary) {
+  return decode_control_prompt(frame, "D4CRED1", challenge, summary);
 }
 
 struct OwnerDialogState {
@@ -166,6 +189,165 @@ void destroy_owner_dialog_callback(gpointer data) {
   delete static_cast<std::shared_ptr<OwnerDialogState>*>(data);
 }
 
+struct CredentialDialogState {
+  CredentialDialogState(GtkWindow* owner_parent, std::string prompt_challenge,
+                        std::string prompt_summary)
+      : parent(owner_parent), challenge(std::move(prompt_challenge)),
+        summary(std::move(prompt_summary)) {}
+  ~CredentialDialogState() {
+    secure_clear(&reply);
+    if (parent != nullptr) g_object_unref(parent);
+  }
+
+  GtkWindow* parent;
+  const std::string challenge;
+  const std::string summary;
+  std::mutex mutex;
+  std::condition_variable ready;
+  std::atomic<bool> expired{false};
+  bool complete = false;
+  std::string reply;
+};
+
+struct CredentialDialogTimeout {
+  GtkDialog* dialog;
+  bool fired = false;
+};
+
+gboolean cancel_expired_credential_dialog(gpointer data) {
+  auto* timeout = static_cast<CredentialDialogTimeout*>(data);
+  timeout->fired = true;
+  gtk_dialog_response(timeout->dialog, GTK_RESPONSE_CANCEL);
+  return G_SOURCE_REMOVE;
+}
+
+std::string hex_encode(const unsigned char* bytes, size_t size) {
+  static constexpr char alphabet[] = "0123456789abcdef";
+  std::string encoded;
+  encoded.reserve(size * 2);
+  for (size_t index = 0; index < size; ++index) {
+    encoded.push_back(alphabet[bytes[index] >> 4]);
+    encoded.push_back(alphabet[bytes[index] & 0x0f]);
+  }
+  return encoded;
+}
+
+void finish_credential_dialog(
+    const std::shared_ptr<CredentialDialogState>& state,
+    std::string reply) {
+  {
+    std::lock_guard<std::mutex> lock(state->mutex);
+    state->reply = state->expired.load() ? std::string() : std::move(reply);
+    state->complete = true;
+  }
+  state->ready.notify_one();
+}
+
+gboolean show_credential_dialog_on_gtk_thread(gpointer data) {
+  auto state = *static_cast<std::shared_ptr<CredentialDialogState>*>(data);
+  if (state->expired.load()) {
+    finish_credential_dialog(state, {});
+    return G_SOURCE_REMOVE;
+  }
+  if (state->parent == nullptr || !GTK_IS_WINDOW(state->parent)) {
+    finish_credential_dialog(state, {});
+    return G_SOURCE_REMOVE;
+  }
+
+  GtkWidget* dialog = gtk_dialog_new_with_buttons(
+      "D4 Pocket 資格情報入力", state->parent,
+      static_cast<GtkDialogFlags>(GTK_DIALOG_MODAL |
+                                  GTK_DIALOG_DESTROY_WITH_PARENT),
+      "取消", GTK_RESPONSE_CANCEL, "入力して続行", GTK_RESPONSE_ACCEPT,
+      nullptr);
+  gtk_window_set_position(GTK_WINDOW(dialog), GTK_WIN_POS_CENTER_ON_PARENT);
+  gtk_window_set_default_size(GTK_WINDOW(dialog), 640, 360);
+  gtk_dialog_set_default_response(GTK_DIALOG(dialog), GTK_RESPONSE_CANCEL);
+  GtkWidget* content = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
+  GtkWidget* label = gtk_label_new(state->summary.c_str());
+  gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
+  gtk_label_set_line_wrap_mode(GTK_LABEL(label), PANGO_WRAP_WORD_CHAR);
+  gtk_label_set_xalign(GTK_LABEL(label), 0.0f);
+  gtk_label_set_yalign(GTK_LABEL(label), 0.0f);
+  gtk_box_pack_start(GTK_BOX(content), label, TRUE, TRUE, 12);
+  GtkWidget* entry = gtk_entry_new();
+  gtk_entry_set_visibility(GTK_ENTRY(entry), FALSE);
+  gtk_entry_set_max_length(GTK_ENTRY(entry), 16384);
+  gtk_entry_set_activates_default(GTK_ENTRY(entry), FALSE);
+  gtk_widget_set_tooltip_text(entry, "秘密値は表示されません");
+  gtk_box_pack_start(GTK_BOX(content), entry, FALSE, FALSE, 12);
+  if (state->expired.load()) {
+    gtk_widget_destroy(dialog);
+    finish_credential_dialog(state, {});
+    return G_SOURCE_REMOVE;
+  }
+  gtk_widget_show_all(dialog);
+  gtk_widget_grab_focus(entry);
+
+  CredentialDialogTimeout timeout{GTK_DIALOG(dialog), false};
+  const guint timeout_id = g_timeout_add_seconds(
+      static_cast<guint>(kCredentialDialogTimeout.count()),
+      cancel_expired_credential_dialog, &timeout);
+  const gint response = gtk_dialog_run(GTK_DIALOG(dialog));
+  if (!timeout.fired) g_source_remove(timeout_id);
+
+  std::string reply = "D4CRED1 " + state->challenge + " CANCELLED";
+  if (response == GTK_RESPONSE_ACCEPT) {
+    const gchar* value = gtk_entry_get_text(GTK_ENTRY(entry));
+    const size_t length = value == nullptr ? 0 : std::strlen(value);
+    bool valid = length > 0 && length <= 16384 &&
+                 g_utf8_validate(value, static_cast<gssize>(length), nullptr);
+    for (const gchar* cursor = value; valid && cursor != nullptr && *cursor;
+         cursor = g_utf8_next_char(cursor)) {
+      if (g_unichar_iscntrl(g_utf8_get_char(cursor))) valid = false;
+    }
+    if (valid) {
+      std::string encoded = hex_encode(
+          reinterpret_cast<const unsigned char*>(value), length);
+      reply = "D4CRED1 " + state->challenge + " ENTERED " + encoded;
+      secure_clear(&encoded);
+    } else {
+      reply = "D4CRED1 " + state->challenge + " INVALID";
+    }
+  }
+  gtk_entry_set_text(GTK_ENTRY(entry), "");
+  gtk_widget_destroy(dialog);
+  finish_credential_dialog(state, std::move(reply));
+  return G_SOURCE_REMOVE;
+}
+
+void destroy_credential_dialog_callback(gpointer data) {
+  delete static_cast<std::shared_ptr<CredentialDialogState>*>(data);
+}
+
+bool request_credential_input(GWeakRef* owner_parent,
+                              const std::string& challenge,
+                              const std::string& summary,
+                              std::string* reply) {
+  gpointer parent_ref = g_weak_ref_get(owner_parent);
+  if (parent_ref == nullptr) return false;
+  GObject* parent = G_OBJECT(parent_ref);
+  if (!GTK_IS_WINDOW(parent)) {
+    g_object_unref(parent);
+    return false;
+  }
+  auto state = std::make_shared<CredentialDialogState>(
+      GTK_WINDOW(parent), challenge, summary);
+  auto* callback_state = new std::shared_ptr<CredentialDialogState>(state);
+  g_idle_add_full(G_PRIORITY_DEFAULT, show_credential_dialog_on_gtk_thread,
+                  callback_state, destroy_credential_dialog_callback);
+  std::unique_lock<std::mutex> lock(state->mutex);
+  if (!state->ready.wait_for(lock, kCredentialDialogTimeout +
+                                      std::chrono::seconds(5),
+                             [&state] { return state->complete; })) {
+    state->expired.store(true);
+    return false;
+  }
+  if (state->reply.empty()) return false;
+  *reply = std::move(state->reply);
+  return true;
+}
+
 bool confirm_owner_operation(GWeakRef* owner_parent,
                              const std::string& summary) {
   gpointer parent_ref = g_weak_ref_get(owner_parent);
@@ -248,8 +430,38 @@ class BrokerContext {
         return false;
       }
       if (!has_owner_protocol_prefix(buffer)) {
-        *response = std::move(buffer);
-        return true;
+        if (!has_credential_protocol_prefix(buffer)) {
+          *response = std::move(buffer);
+          return true;
+        }
+        std::string challenge;
+        std::string summary;
+        if (!decode_credential_prompt(buffer, &challenge, &summary)) {
+          poison();
+          return false;
+        }
+        std::string reply;
+        if (!request_credential_input(&owner_parent_, challenge, summary,
+                                      &reply)) {
+          reply = "D4CRED1 " + challenge + " CANCELLED";
+        }
+        reply.push_back('\n');
+        const bool written_ok = g_output_stream_write_all(
+                                    stdin_pipe_, reply.data(), reply.size(),
+                                    &written, nullptr, &error) &&
+                                written == reply.size();
+        secure_clear(&reply);
+        if (!written_ok) {
+          g_clear_error(&error);
+          poison();
+          return false;
+        }
+        if (g_output_stream_flush(stdin_pipe_, nullptr, &error) == FALSE) {
+          g_clear_error(&error);
+          poison();
+          return false;
+        }
+        continue;
       }
 
       std::string challenge;
@@ -290,9 +502,11 @@ class BrokerContext {
       const size_t content_size = newline == nullptr
                                       ? static_cast<size_t>(read)
                                       : static_cast<size_t>(newline - chunk);
-      const size_t limit = frame->rfind("D4OWNER1", 0) == 0
-                               ? kOwnerPromptFrameLimit
-                               : kResponseLimit;
+      const size_t limit =
+          frame->rfind("D4OWNER1", 0) == 0 ||
+                  frame->rfind("D4CRED1", 0) == 0
+              ? kOwnerPromptFrameLimit
+              : kResponseLimit;
       if (content_size > limit - frame->size() ||
           std::memchr(chunk, '\r', content_size) != nullptr) {
         return false;

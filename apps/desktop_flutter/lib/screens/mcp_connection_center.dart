@@ -80,6 +80,8 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
   Widget build(BuildContext context) {
     final client = _client;
     final macOS = defaultTargetPlatform == TargetPlatform.macOS;
+    final linux = defaultTargetPlatform == TargetPlatform.linux;
+    final platformName = macOS ? 'Mac' : (linux ? 'Linux' : 'Windows');
     if (client == null) {
       return BorderedPanel(
         child: Column(
@@ -108,17 +110,19 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Brokerが保持するstdio接続のmetadataだけを表示します。MCP metadataは信頼・権限ではありません。切断は${macOS ? 'Mac' : 'Windows'} native Owner確認の後にBrokerが実行します。',
+              'Brokerが保持するstdio接続のmetadataだけを表示します。MCP metadataは信頼・権限ではありません。切断は$platformName native Owner確認の後にBrokerが実行します。',
             ),
             const SizedBox(height: 12),
             Text(
-              'Tool実行は${macOS ? 'Mac' : 'Windows'} native Owner確認を毎回要求し、結果本文ではなくhash receiptだけを返します。実行前にJSON argumentsを確認してください。秘密値をargumentsへ入力しないでください。Agentへの結果引渡しとResource／Prompt本文取得は未対応です。',
+              'Tool実行は$platformName native Owner確認を毎回要求し、結果本文ではなくhash receiptだけを返します。実行前にJSON argumentsを確認してください。秘密値をargumentsへ入力しないでください。Agentへの結果引渡しとResource／Prompt本文取得は未対応です。',
             ),
             const SizedBox(height: 8),
             Text(
               macOS
                   ? 'Mac MCP Credentialは公開IDだけを選び、別個native確認後にBrokerが現在Keychain recordを照合して対象Serverへ渡します。Serverと子孫は秘密値を読み取り・外部送信できます。App Sandboxを継承し、明示切断はD4所有process groupだけを停止します。別groupへ離脱したprocessや外部副作用の復旧は保証しません。'
-                  : 'MCP CredentialはFlutterへ入力しません。登録済みmetadataから対象Server専用のものを選びます。選択すると値を対象Server processへ渡し、そのprocessは読み取り・外部送信できます。Windows Job Objectはsandboxではありません。',
+                  : linux
+                      ? 'Linux CredentialはGTK native入力からSecret Serviceへ登録し、BrokerがOwner確認後に現在recordを照合してMCP processへ渡します。Serverと子孫は秘密値を読み取り・外部送信できます。Linux Desktop sandboxはありません。切断は検証した所有process groupだけを停止し、group離脱processやBroker crash後のcleanup、外部副作用の復旧は保証しません。'
+                      : 'MCP CredentialはFlutterへ入力しません。登録済みmetadataから対象Server専用のものを選びます。選択すると値を対象Server processへ渡し、そのprocessは読み取り・外部送信できます。Windows Job Objectはsandboxではありません。',
             ),
             const SizedBox(height: 8),
             TextField(
@@ -134,18 +138,21 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
               ),
             ),
             const SizedBox(height: 8),
-            if (defaultTargetPlatform == TargetPlatform.macOS) ...[
+            if (macOS || linux) ...[
               OutlinedButton.icon(
-                key: const ValueKey('macos-native-credential-register'),
+                key: ValueKey(linux
+                    ? 'linux-native-credential-register'
+                    : 'macos-native-credential-register'),
                 onPressed:
                     _loading || _connecting || _revokingCredentialId != null
                         ? null
-                        : () => _registerMacCredential(client),
+                        : () => _registerNativeCredential(client),
                 icon: const Icon(Icons.lock_outline),
                 label: const Text('native入力で資格情報を登録'),
               ),
-              const Text(
-                  'Mac Keychainの登録・一覧・論理失効と、対象MCPへの結合を行います。秘密値はFlutterへ渡しません。結合は別個native確認とBrokerの現在record検証が必要です。'),
+              Text(linux
+                  ? 'Linux Secret Service default collectionへ登録し、metadata一覧・論理失効を行います。秘密値はFlutterへ渡しません。Owner確認後にBrokerが現在recordを検証します。'
+                  : 'Mac Keychainの登録・一覧・論理失効と、対象MCPへの結合を行います。秘密値はFlutterへ渡しません。結合は別個native確認とBrokerの現在record検証が必要です。'),
               const SizedBox(height: 8),
             ],
             TextField(
@@ -476,7 +483,7 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
     }
   }
 
-  Future<void> _registerMacCredential(McpConnectionClient client) async {
+  Future<void> _registerNativeCredential(McpConnectionClient client) async {
     final target = _serverIdController.text;
     final random = Random.secure();
     // 非秘密の新規record識別子。保存先・権限・Owner資格ではない。
@@ -488,15 +495,22 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
       _message = 'native秘密入力と別個Owner確認を待っています。';
     });
     try {
-      await client.registerMacNativeCredential(
-          credentialId: id, targetServerId: target);
+      if (defaultTargetPlatform == TargetPlatform.linux) {
+        await client.registerLinuxNativeCredential(
+            credentialId: id, targetServerId: target);
+      } else {
+        await client.registerMacNativeCredential(
+            credentialId: id, targetServerId: target);
+      }
       final entries = await client.listCredentials(targetServerId: target);
       if (mounted) {
         setState(() {
           _credentials = entries;
           _credentialTargetServerId = target;
           _selectedCredentialId = null;
-          _message = 'Keychain登録後のmetadataを取得しました。秘密値は取得していません。';
+          _message = defaultTargetPlatform == TargetPlatform.linux
+              ? 'Linux Secret Service登録後のmetadataを取得しました。秘密値は取得していません。'
+              : 'Keychain登録後のmetadataを取得しました。秘密値は取得していません。';
         });
       }
     } on Object {
@@ -582,7 +596,8 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
         ];
         _message = '接続receiptを受理しました。表示はBroker内部状態であり、TrustやTool実行を示しません。';
       });
-      if (defaultTargetPlatform == TargetPlatform.macOS &&
+      if ((defaultTargetPlatform == TargetPlatform.macOS ||
+              defaultTargetPlatform == TargetPlatform.linux) &&
           _selectedCredentialId != null) {
         try {
           final credentials =
@@ -618,8 +633,9 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
       if (!mounted) return;
       await _loadCredentials(client);
       if (mounted) {
-        setState(() => _message =
-            'Credentialを論理失効しました。以後のMCP注入を拒否し、暗号文fileは別の物理削除操作まで保持します。');
+        setState(() => _message = defaultTargetPlatform == TargetPlatform.linux
+            ? 'Credentialを論理失効しました。以後の使用を拒否し、Secret Service itemは保持します。'
+            : 'Credentialを論理失効しました。以後のMCP注入を拒否し、保管データは別の物理削除操作まで保持します。');
       }
     } on Object {
       if (mounted) {
@@ -749,7 +765,9 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
               onPressed: () => Navigator.pop(dialogContext, true),
               child: Text(defaultTargetPlatform == TargetPlatform.macOS
                   ? 'Mac確認へ進む'
-                  : 'Windows確認へ進む'),
+                  : defaultTargetPlatform == TargetPlatform.linux
+                      ? 'Linux確認へ進む'
+                      : 'Windows確認へ進む'),
             ),
           ],
         ),

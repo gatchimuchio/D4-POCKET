@@ -1,9 +1,9 @@
 //! Linux Desktop同梱helper。秘密とBroker資格をRust内に保持し、既存Brokerだけへ中継する。
 use crate::broker::ipc_server::run_loopback_server_cancellable_with_owner_operations;
 use crate::broker::{BrokerCredentialRole, BrokerEndpoint, BrokerServerConfig};
+use crate::linux_credential_input::LinuxCredentialUi;
 use rustix::fs::{flock, FlockOperation};
 use std::fs::{self, File, OpenOptions};
-use std::io::{self, BufRead, BufReader, Read, Write};
 use std::net::{Ipv4Addr, SocketAddr, TcpStream};
 use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
@@ -13,6 +13,10 @@ use std::sync::{
 };
 use std::thread;
 use std::time::Duration;
+use std::{
+    collections::BTreeSet,
+    io::{self, BufRead, BufReader, Read, Write},
+};
 use zeroize::{Zeroize, Zeroizing};
 
 const REQUEST_LIMIT: usize = 64 * 1024;
@@ -206,24 +210,35 @@ fn serve(
         {
             return Err(failure());
         }
+        let mut seen_credential_nonces = BTreeSet::new();
         loop {
             let Some(frame) = read_frame(input, REQUEST_LIMIT)? else {
                 break;
             };
             let frame = Zeroizing::new(frame);
             let mut confirmation_error = None;
-            let owner_response = crate::macos_desktop_owner::dispatch(
+            let mut ui = LinuxNativeUi { input, output };
+            let owner_response = match crate::linux_credential_input::dispatch_native(
                 &frame,
                 &endpoint.0,
                 &owner_tx,
-                &mut |summary| match request_owner_confirmation(summary, input, output) {
-                    Ok(confirmed) => confirmed,
-                    Err(error) => {
-                        confirmation_error = Some(error);
-                        false
-                    }
-                },
-            )?;
+                &mut seen_credential_nonces,
+                &mut ui,
+            )? {
+                Some(response) => Some(response),
+                None => crate::macos_desktop_owner::dispatch(
+                    &frame,
+                    &endpoint.0,
+                    &owner_tx,
+                    &mut |summary| match ui.confirm_owner(summary) {
+                        Ok(confirmed) => confirmed,
+                        Err(error) => {
+                            confirmation_error = Some(error);
+                            false
+                        }
+                    },
+                )?,
+            };
             if let Some(error) = confirmation_error {
                 return Err(error);
             }
@@ -258,8 +273,8 @@ fn serve(
 /// GTK Runnerだけが返せる、一回限りの確認応答を現在のsummaryへ束縛する。
 fn request_owner_confirmation(
     summary: &str,
-    input: &mut impl BufRead,
-    output: &mut impl Write,
+    input: &mut (impl BufRead + ?Sized),
+    output: &mut (impl Write + ?Sized),
 ) -> io::Result<bool> {
     let mut challenge = [0_u8; 16];
     getrandom::getrandom(&mut challenge).map_err(|_| failure())?;
@@ -273,6 +288,37 @@ fn request_owner_confirmation(
         return Err(failure());
     };
     Ok(owner_confirmation_reply_is_yes(&reply, &challenge))
+}
+
+struct LinuxNativeUi<'a> {
+    input: &'a mut dyn BufRead,
+    output: &'a mut dyn Write,
+}
+
+impl crate::linux_credential_input::LinuxCredentialUi for LinuxNativeUi<'_> {
+    fn enter_secret(
+        &mut self,
+        challenge: &str,
+        summary: &str,
+    ) -> io::Result<Option<Zeroizing<String>>> {
+        let Some(prompt) = crate::linux_credential_input::input_prompt(challenge, summary) else {
+            return Ok(None);
+        };
+        self.output.write_all(prompt.as_bytes())?;
+        self.output.flush()?;
+        let Some(mut reply) =
+            read_frame(self.input, crate::linux_credential_input::INPUT_REPLY_LIMIT)?
+        else {
+            return Err(failure());
+        };
+        let secret = crate::linux_credential_input::input_reply_secret(&reply, challenge);
+        reply.zeroize();
+        Ok(secret)
+    }
+
+    fn confirm_owner(&mut self, summary: &str) -> io::Result<bool> {
+        request_owner_confirmation(summary, self.input, self.output)
+    }
 }
 
 fn owner_protocol_magic() -> &'static str {
@@ -359,7 +405,7 @@ fn valid_secret(value: &str) -> bool {
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 
-fn read_frame(input: &mut impl BufRead, limit: usize) -> io::Result<Option<Vec<u8>>> {
+fn read_frame(input: &mut (impl BufRead + ?Sized), limit: usize) -> io::Result<Option<Vec<u8>>> {
     let mut frame = Vec::new();
     let size = input
         .take(limit.saturating_add(2) as u64)

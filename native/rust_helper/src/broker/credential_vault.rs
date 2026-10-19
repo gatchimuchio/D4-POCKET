@@ -2,7 +2,7 @@
 //!
 //! このmoduleは秘密値をRuntime、Flutter、Audit reason、応答へ返さない。秘密値の
 //! MCP以外への注入、更新、物理削除、接続先変更は未接続に保つ。
-#![cfg(any(windows, target_os = "macos"))]
+#![cfg(any(windows, target_os = "linux", target_os = "macos"))]
 #![allow(non_snake_case)]
 
 use super::*;
@@ -22,6 +22,8 @@ const MAX_SECRET_BYTES: usize = 65_536;
 const STORAGE_NAME: &str = "windows_dpapi";
 #[cfg(target_os = "macos")]
 const STORAGE_NAME: &str = "macos_keychain";
+#[cfg(target_os = "linux")]
+const STORAGE_NAME: &str = "linux_secret_service";
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -506,7 +508,7 @@ impl Broker {
                     request_id,
                     OPERATION,
                     "credential_recovery_required",
-                    "新規Keychain itemの回収が未成立。再使用・再送せず保管状態を確認してください",
+                    "新規OS資格情報itemの回収が未成立。再使用・再送せず保管状態を確認してください",
                     true,
                     payload_hash,
                 )
@@ -1097,8 +1099,12 @@ mod macos_mcp_binding_tests {
 
     #[test]
     fn macos_mcp_binding_現在対象と失効を照合し_keychainから内部だけへ読む() {
-        let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
-        let root = std::env::temp_dir().join(format!("d4-mcp-credential-{}-{stamp}", std::process::id()));
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root =
+            std::env::temp_dir().join(format!("d4-mcp-credential-{}-{stamp}", std::process::id()));
         std::fs::create_dir(&root).unwrap();
         std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700)).unwrap();
         let vault = root.join("vault");
@@ -1111,27 +1117,55 @@ mod macos_mcp_binding_tests {
         let payload = json!({"版":1,"操作":"追加","資格情報ID":id,"用途":"mcp_transport",
             "接続対象":target,"種類":"api_key","保管方式":"macos_keychain",
             "登録者種別":"owner","登録経路":"owner_control","秘密値":secret});
-        let added = broker.資格情報登録処理("add", &payload, true, &canonical_payload_hash(Some(&payload)));
+        let added = broker.資格情報登録処理(
+            "add",
+            &payload,
+            true,
+            &canonical_payload_hash(Some(&payload)),
+        );
         assert_eq!(added.status, BrokerStatus::Accepted, "合成保管recordの準備");
         let public = added.body.unwrap();
         let hash = canonical_payload_hash(None);
-        assert!(broker.資格情報MCP使用処理("wrong-target", &id, "other-server", &hash).is_err());
-        let value = broker.資格情報MCP使用処理("correct-target", &id, target, &hash).unwrap();
-        assert!(value.as_slice() == secret.as_bytes(), "秘密値は内部照合だけ");
+        assert!(broker
+            .資格情報MCP使用処理("wrong-target", &id, "other-server", &hash)
+            .is_err());
+        let value = broker
+            .資格情報MCP使用処理("correct-target", &id, target, &hash)
+            .unwrap();
+        assert!(
+            value.as_slice() == secret.as_bytes(),
+            "秘密値は内部照合だけ"
+        );
         drop(value);
-        assert!(broker.資格情報MCP使用確定処理("bad-env", &id, target, "PATH", &hash).is_err());
-        broker.資格情報MCP使用確定処理("used", &id, target, "MCP_API_KEY", &hash).unwrap();
+        assert!(broker
+            .資格情報MCP使用確定処理("bad-env", &id, target, "PATH", &hash)
+            .is_err());
+        broker
+            .資格情報MCP使用確定処理("used", &id, target, "MCP_API_KEY", &hash)
+            .unwrap();
         let ledger = credential_ledger(&broker.audit_log).unwrap();
         assert!(ledger.last_use.get(&id).is_some());
         let revoke = json!({"版":1,"資格情報ID":id,"用途":"mcp_transport","接続対象":target,
             "暗号文hash":public["暗号文hash"],"作成監査ID":public["作成監査ID"]});
-        let revoked = broker.資格情報失効処理("revoke", &revoke, true, &canonical_payload_hash(Some(&revoke)));
+        let revoked = broker.資格情報失効処理(
+            "revoke",
+            &revoke,
+            true,
+            &canonical_payload_hash(Some(&revoke)),
+        );
         assert_eq!(revoked.status, BrokerStatus::Accepted);
-        assert!(broker.資格情報MCP使用処理("revoked", &id, target, &hash).is_err());
+        assert!(broker
+            .資格情報MCP使用処理("revoked", &id, target, &hash)
+            .is_err());
         let audit = serde_json::to_string(&broker.audit_events()).unwrap();
         assert!(!audit.contains(secret), "秘密をAuditへ出さない");
-        assert!(broker.資格情報保存先().unwrap().新規破棄(&id,
-            public["暗号文hash"].as_str().unwrap()), "この試験が作成したKeychain itemだけ回収");
+        assert!(
+            broker
+                .資格情報保存先()
+                .unwrap()
+                .新規破棄(&id, public["暗号文hash"].as_str().unwrap()),
+            "この試験が作成したKeychain itemだけ回収"
+        );
         drop(broker);
         std::fs::remove_dir_all(root).unwrap();
     }
@@ -1316,7 +1350,10 @@ mod tests {
                 &canonical_payload_hash(None),
             )
             .expect("対象と用途が一致するMCP接続だけが復号");
-        assert!(secret.as_slice() == secret_marker.as_bytes(), "対象Credentialの内部受渡し");
+        assert!(
+            secret.as_slice() == secret_marker.as_bytes(),
+            "対象Credentialの内部受渡し"
+        );
         broker
             .資格情報MCP使用確定処理(
                 "mcp-use-correct-target",

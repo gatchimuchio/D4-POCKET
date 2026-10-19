@@ -1,7 +1,7 @@
 //! C9 MCP接続センターのBroker経路。
 //!
 //! 現行単位はowner起動設定からstdio Serverを接続し、discoveryとTool/Resource/Prompt
-//! catalogを検証してmetadata-only receiptへ射影する。Tool実行とWindows stdio childへの
+//! catalogを検証してmetadata-only receiptへ射影する。Tool実行とDesktop stdio childへの
 //! Credential実値注入は、それぞれのnative Owner確認とBroker統治に限定する。OAuthと
 //! Streamable HTTPはこの単位では接続しない。
 #![allow(non_snake_case)]
@@ -185,7 +185,7 @@ pub(super) fn connect(
 
     let mut credential_environment = Vec::new();
     if request.credential_ref.status == "configured" {
-        #[cfg(any(windows, target_os = "macos"))]
+        #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
         {
             let secret = match broker.資格情報MCP使用処理(
                 request_id,
@@ -220,7 +220,7 @@ pub(super) fn connect(
                 secret_value,
             ));
         }
-        #[cfg(not(any(windows, target_os = "macos")))]
+        #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
         {
             return broker.reject_with_payload_hash(
                 request_id,
@@ -243,7 +243,7 @@ pub(super) fn connect(
         Err(error) => return reject_mcp_error(broker, request_id, error, payload_hash),
     };
     if request.credential_ref.status == "configured" {
-        #[cfg(any(windows, target_os = "macos"))]
+        #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
         if broker
             .資格情報MCP使用確定処理(
                 request_id,
@@ -289,7 +289,10 @@ pub(super) fn connect(
     {
         let object = projection.as_object_mut().expect("MCP projectionはobject");
         // 発見時の外部metadataではなく、Brokerが保存する接続receiptへ分類する。
-        object.insert("証拠種別".to_string(), Value::String(EVIDENCE_SOURCE_INTERNAL_STATE.to_string()));
+        object.insert(
+            "証拠種別".to_string(),
+            Value::String(EVIDENCE_SOURCE_INTERNAL_STATE.to_string()),
+        );
         object.insert(
             "接続状態".to_string(),
             Value::String("connected".to_string()),
@@ -485,7 +488,7 @@ pub(super) fn list(
     }
 }
 
-#[cfg(not(any(windows, target_os = "macos")))]
+#[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
 pub(super) fn call_tool(
     broker: &mut Broker,
     request_id: &str,
@@ -497,13 +500,13 @@ pub(super) fn call_tool(
         request_id,
         OP_TOOL_CALL,
         "mcp_tool_call_platform_unsupported",
-        "MCP Tool実行はWindows native Owner確認経路だけに対応しています",
+        "MCP Tool実行はDesktop native Owner確認経路だけに対応しています",
         true,
         payload_hash,
     )
 }
 
-#[cfg(any(windows, target_os = "macos"))]
+#[cfg(any(windows, target_os = "linux", target_os = "macos"))]
 pub(super) fn call_tool(
     broker: &mut Broker,
     request_id: &str,
@@ -783,7 +786,7 @@ pub(super) fn call_tool(
     }
 }
 
-#[cfg(any(windows, target_os = "macos"))]
+#[cfg(any(windows, target_os = "linux", target_os = "macos"))]
 fn quarantine(entry: &mut McpConnectionEntry) {
     entry.quarantined = true;
     entry.projection["接続状態"] = Value::String("quarantined".to_string());
@@ -862,7 +865,7 @@ pub(super) fn disconnect(
         );
     }
 
-    #[cfg(not(any(windows, target_os = "macos")))]
+    #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
     {
         return broker.reject_with_payload_hash(
             request_id,
@@ -874,7 +877,7 @@ pub(super) fn disconnect(
         );
     }
 
-    #[cfg(any(windows, target_os = "macos"))]
+    #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
     {
         let termination = broker
             .mcp_connections
@@ -1105,34 +1108,40 @@ mod tests {
     }
 
     #[test]
-    fn macos_mcp_owner_summary_接続範囲だけを表示し秘密と権限注入を拒否する() {
+    fn desktop_mcp_owner_summary_接続範囲だけを表示し秘密と権限注入を拒否する() {
         let mut payload = request(missing_reference());
         payload["引数"] = json!(["公開fixture引数"]);
-        let summary = macos_owner_summary(OP_CONNECT, &payload).unwrap();
+        let summary = desktop_owner_summary(OP_CONNECT, &payload).unwrap();
         assert!(summary.contains("fixture-mcp-server"));
         assert!(!summary.contains("公開fixture引数"));
         assert!(summary.contains("Credential注入: なし"));
         let mut extra = payload.clone();
         extra["approval"] = json!(true);
-        assert!(macos_owner_summary(OP_CONNECT, &extra).is_none());
+        assert!(desktop_owner_summary(OP_CONNECT, &extra).is_none());
         let mut reference = payload.clone();
         reference["Credential ref"]["status"] = json!("configured");
         reference["Credential ref"]["required"] = json!(true);
         reference["Credential ref"]["environment_variable"] = json!("MCP_API_KEY");
-        let configured_summary = macos_owner_summary(OP_CONNECT, &reference).unwrap();
+        let configured_summary = desktop_owner_summary(OP_CONNECT, &reference).unwrap();
         assert!(configured_summary.contains("MCP_API_KEY"));
         assert!(configured_summary.contains("外部送信"));
+        if cfg!(target_os = "linux") {
+            assert!(configured_summary.contains("LinuxではDesktop sandboxを付与しません"));
+            assert!(!configured_summary.contains("App Sandboxを継承"));
+        }
         reference["Credential ref"]["environment_variable"] = json!("PATH");
-        assert!(macos_owner_summary(OP_CONNECT, &reference).is_none());
+        assert!(desktop_owner_summary(OP_CONNECT, &reference).is_none());
         let call = json!({"版":1,"操作":"実行","ServerID":"fixture-mcp-server",
             "ToolID": format!("tool-{}", "a".repeat(142)), "名前":"echo",
             "arguments":{"text":"公開fixture本文"}});
-        let summary = macos_owner_summary(OP_TOOL_CALL, &call).unwrap();
+        let summary = desktop_owner_summary(OP_TOOL_CALL, &call).unwrap();
         assert!(!summary.contains("公開fixture本文"));
         assert!(summary.contains("一回Permission"));
         let stop = json!({"版":1,"操作":"切断","ServerID":"fixture-mcp-server"});
-        assert!(macos_owner_summary(OP_DISCONNECT, &stop).unwrap().contains("所有process group"));
-        assert!(macos_owner_summary("未知操作", &stop).is_none());
+        assert!(desktop_owner_summary(OP_DISCONNECT, &stop)
+            .unwrap()
+            .contains("所有process group"));
+        assert!(desktop_owner_summary("未知操作", &stop).is_none());
     }
 
     #[test]
@@ -1281,8 +1290,11 @@ echo {"jsonrpc":"2.0","id":3,"result":{"resultType":"complete","content":[{"type
         let connected = broker_test_operation(&mut broker, BrokerOperation::MCP接続, connect, true);
         assert_eq!(connected.status, BrokerStatus::Accepted, "{connected:?}");
         assert_eq!(connected.evidence_source, EVIDENCE_SOURCE_INTERNAL_STATE);
-        assert_eq!(connected.body.as_ref().unwrap()["証拠種別"], EVIDENCE_SOURCE_INTERNAL_STATE,
-            "接続receiptは現行SchemaとUIが要求する保存済みmetadataの証拠種別へ射影する");
+        assert_eq!(
+            connected.body.as_ref().unwrap()["証拠種別"],
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            "接続receiptは現行SchemaとUIが要求する保存済みmetadataの証拠種別へ射影する"
+        );
         let connect_json = serde_json::to_string(&connected).expect("接続応答を直列化");
         assert!(!connect_json.contains(SECRET));
         assert_eq!(
@@ -1463,29 +1475,38 @@ fn parse_tool_call_request(payload: &Value) -> Result<ToolCallRequest, McpError>
 
 /// Desktop native確認の公開表示。承認・catalog適合・実行資格は既存Brokerが別途再評価する。
 #[cfg(any(target_os = "linux", target_os = "macos", test))]
-pub(crate) fn macos_owner_summary(operation: &str, payload: &Value) -> Option<String> {
+pub(crate) fn desktop_owner_summary(operation: &str, payload: &Value) -> Option<String> {
     match operation {
         OP_CONNECT => {
             let request = parse_request(payload).ok()?;
-            let hash = super::protocol::canonical_payload_hash(Some(&serde_json::to_value(&request.arguments).ok()?));
+            let hash = super::protocol::canonical_payload_hash(Some(
+                &serde_json::to_value(&request.arguments).ok()?,
+            ));
             let credential = if request.credential_ref.status == "configured" {
                 format!("Credential ID: {}\n用途: mcp_transport\n対象: {}\n環境変数: {}\nこのServerと子孫は秘密値を読み取り・外部送信できます。版交渉の限定再起動でも同じ相手へ委譲します。Brokerが現在record・失効・暗号文を再検証します。参照はPermission／Approvalではありません。",
                     request.credential_ref.credential_id, request.credential_ref.target,
                     request.credential_ref.environment_variable.as_deref()?)
-            } else { "Credential注入: なし".to_owned() };
-            Some(format!("このstdio Serverを起動して接続します。\nServer ID: {}\n実行file: {}\nWorkspace: {}\n引数: {}項目\n引数hash: {hash}\n{credential}\nApp Sandboxを継承し、所有process groupを明示切断します。外部Server metadataはTrust・Permissionではありません。引数本文はここへ表示しません。",
+            } else {
+                "Credential注入: なし".to_owned()
+            };
+            let supervision = if cfg!(target_os = "linux") {
+                "LinuxではDesktop sandboxを付与しません。Brokerが最小化した環境で起動し、検証した所有process groupだけを停止します。group離脱processとBroker crash後のcleanupは保証しません。"
+            } else {
+                "App Sandboxを継承し、所有process groupを明示切断します。group離脱processとBroker crash後のcleanupは保証しません。"
+            };
+            Some(format!("このstdio Serverを起動して接続します。\nServer ID: {}\n実行file: {}\nWorkspace: {}\n引数: {}項目\n引数hash: {hash}\n{credential}\n{supervision} 外部Server metadataはTrust・Permissionではありません。引数本文はここへ表示しません。",
                 request.server_id, request.executable, request.workspace, request.arguments.len()))
-        },
+        }
         OP_DISCONNECT => {
             let request = parse_disconnect_request(payload).ok()?;
             Some(format!("このMCP Serverの所有process groupを停止して切断します。\nServer ID: {}\n現在接続と停止・AuditをBrokerが再評価します。第三者の別groupへの離脱や外部副作用の取消を保証しません。", request.server_id))
-        },
+        }
         OP_TOOL_CALL => {
             let request = parse_tool_call_request(payload).ok()?;
             let hash = super::protocol::canonical_payload_hash(Some(&request.arguments));
             Some(format!("このToolを現在Serverへ一回だけ実行します。\nServer ID: {}\nTool: {} ({})\n引数: {}項目\n引数hash: {hash}\n前画面のJSON argumentsを確認してください。秘密値を含めないでください。Brokerが現在Catalog／Schemaを再検査し、一回PermissionとAuditを確定します。結果本文は公開せずhashだけを返します。外部副作用は取消できず、結果不明時は隔離・自動再送なしです。",
                 request.server_id, request.name, request.tool_id, request.arguments.as_object()?.len()))
-        },
+        }
         _ => None,
     }
 }

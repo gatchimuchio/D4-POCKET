@@ -60,6 +60,11 @@ fn valid_sha256(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
+#[cfg(any(target_os = "linux", target_os = "macos", test))]
+fn macos_owner_summary(operation: &str, payload: &serde_json::Value) -> Option<String> {
+    crate::broker::mcp_center::desktop_owner_summary(operation, payload)
+}
+
 fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
     if frame.len() >= endpoint.max_request_bytes {
         return None;
@@ -150,7 +155,7 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
             crate::broker::a2a_center::owner_confirmation_summary(payload).ok()?;
         format!("外部Agentの宣言情報だけを取得します。\nAgent ID: {agent}\n接続先: {target}\n要求hash: {hash}\n\nAgent Cardは未信頼metadataです。Trust・Task Permission・Approval・Credentialを生成せず、Task実行を行いません。Brokerが現在の要求と永続Auditを再評価します。")
     } else if matches!(operation, "MCP接続" | "MCP切断" | "MCP Tool実行") {
-        let summary = crate::broker::mcp_center::macos_owner_summary(operation, payload)?;
+        let summary = macos_owner_summary(operation, payload)?;
         format!("{summary}\n要求hash: {hash}")
     } else if operation == "資格情報失効" {
         let p = payload.as_object()?;

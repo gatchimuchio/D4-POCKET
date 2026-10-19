@@ -108,8 +108,7 @@ pub(crate) struct DesktopOwnerOperationRequest {
     pub apply_confirmation: Option<super::update_center::UpdateApplyConfirmation>,
     pub activation_confirmation: Option<super::update_center::UpdateActivationConfirmation>,
     pub product_repair_confirmation: Option<super::update_center::ProductRepairConfirmation>,
-    pub product_uninstall_confirmation:
-        Option<super::update_center::ProductUninstallConfirmation>,
+    pub product_uninstall_confirmation: Option<super::update_center::ProductUninstallConfirmation>,
     pub reply: SyncSender<BrokerResponse>,
 }
 
@@ -161,7 +160,15 @@ fn run_loopback_server_inner(
         .map_err(|error| BrokerServerError::new(error.message()))?;
     #[cfg(target_os = "macos")]
     if shutdown.is_some() && config.desktop_package_layout_verified && owner_operations.is_some() {
-        broker.macos資格情報保存先を初期化(&config.store_dir).map_err(BrokerServerError::new)?;
+        broker
+            .macos資格情報保存先を初期化(&config.store_dir)
+            .map_err(BrokerServerError::new)?;
+    }
+    #[cfg(target_os = "linux")]
+    if shutdown.is_some() && config.desktop_package_layout_verified && owner_operations.is_some() {
+        broker
+            .linux資格情報保存先を初期化(&config.store_dir)
+            .map_err(BrokerServerError::new)?;
     }
     if let Some((app_id, audit_store_id)) = config.desktop_product_identity.clone() {
         broker
