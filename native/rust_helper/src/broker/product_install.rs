@@ -86,8 +86,8 @@ pub(crate) fn open_product_versions_directory(
         ));
     }
     #[cfg(target_os = "linux")]
-    if metadata.dev() != CapMetadataExt::dev(&root_metadata)
-        || metadata.ino() != CapMetadataExt::ino(&root_metadata)
+    if StdMetadataExt::dev(&metadata) != CapMetadataExt::dev(&root_metadata)
+        || StdMetadataExt::ino(&metadata) != CapMetadataExt::ino(&root_metadata)
     {
         return Err(ProductInstallPlanError(
             "product_install_local_app_data_invalid",
@@ -891,8 +891,8 @@ fn ensure_linux_data_home(path: &Path) -> Result<(), ProductInstallPlanError> {
     let opened_metadata = current
         .dir_metadata()
         .map_err(|_| ProductInstallPlanError("product_install_data_home_unavailable"))?;
-    if metadata.dev() != CapMetadataExt::dev(&opened_metadata)
-        || metadata.ino() != CapMetadataExt::ino(&opened_metadata)
+    if StdMetadataExt::dev(&metadata) != CapMetadataExt::dev(&opened_metadata)
+        || StdMetadataExt::ino(&metadata) != CapMetadataExt::ino(&opened_metadata)
     {
         return Err(ProductInstallPlanError("product_install_data_home_invalid"));
     }

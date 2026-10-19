@@ -3600,7 +3600,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/product_install.rs",
-      "sha256": "e0cc7e35ebfe69fc3057444e0223e7970af78a4472f6442103c20a754698159d"
+      "sha256": "136f1170b32d55d3f03e587bbc378692893647ee55d95363115437864cbfeac3"
     },
     {
       "path": "native/rust_helper/src/broker/profile_center.rs",
