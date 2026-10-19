@@ -133,8 +133,8 @@ fn open_export_directory(state: &Path) -> io::Result<(PathBuf, Dir)> {
         return Err(failure());
     }
 
-    let root = Dir::open_ambient_dir(&export_dir, cap_std::ambient_authority())
-        .map_err(|_| failure())?;
+    let root =
+        Dir::open_ambient_dir(&export_dir, cap_std::ambient_authority()).map_err(|_| failure())?;
     let opened = root.dir_metadata().map_err(|_| failure())?;
     if !opened.is_dir()
         || opened.file_type().is_symlink()

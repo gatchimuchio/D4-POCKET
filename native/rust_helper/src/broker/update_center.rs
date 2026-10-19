@@ -1,28 +1,30 @@
-//! C11/C12 更新センターと、P11 Windows製品化用のBroker consumer経路。
+//! C11/C12 更新センターと、Desktop製品更新のBroker consumer経路。
 //!
 //! 更新候補の表示・署名検査・延期・download・未起動版stage・有効版record切替・
 //! Broker記録に基づくrollbackを扱う。候補に含まれる公開鍵、metadata、Profile、
 //! 履歴は信頼源にならない。署名鍵はBroker所有の永続設定だけから読み、実製品への
-//! install／通常起動／installed rollback証拠は別のWindows product gateで扱う。
+//! install／通常起動／installed rollback証拠は対象OSのproduct gateで扱う。
 #![allow(non_snake_case)]
 
 use super::protocol::{
-    Broker, BrokerError, BrokerOperation, BrokerResponse, BrokerStatus,
-    EVIDENCE_SOURCE_INTERNAL_STATE, OwnerConfirmationSource,
+    Broker, BrokerError, BrokerOperation, BrokerResponse, BrokerStatus, OwnerConfirmationSource,
+    EVIDENCE_SOURCE_INTERNAL_STATE,
 };
 use super::store::{BrokerPersistentStore, BrokerStoreError};
 use crate::audit_hash::sha256_tagged;
-use crate::update_verification::{SignedUpdateCandidate, verify_signed_update_signature};
+use crate::update_verification::{verify_signed_update_signature, SignedUpdateCandidate};
 #[cfg(windows)]
 use cap_fs_ext::OsMetadataExt as _;
+#[cfg(target_os = "linux")]
+use cap_std::fs::MetadataExt as _;
 use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
 use cap_std::fs::OpenOptions;
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, mpsc};
+use std::sync::{mpsc, Arc};
 use std::thread::JoinHandle;
 
 const VERSION: u64 = 1;
@@ -1798,6 +1800,24 @@ fn project_package_source(
     })
 }
 
+/// Brokerが投影した署名済みcandidate sourceをOwner表示へ使う前に再検査する。
+pub(crate) fn validated_package_source_host(source_url: &str, update_id: &str) -> Option<String> {
+    let url = reqwest::Url::parse(source_url).ok()?;
+    let host = url.host_str()?;
+    if url.as_str() != source_url
+        || url.scheme() != "https"
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.port().is_some()
+        || url.query().is_some()
+        || url.fragment().is_some()
+        || !source_url.ends_with(&format!("/{update_id}.pkg"))
+    {
+        return None;
+    }
+    Some(host.to_owned())
+}
+
 fn current_candidate_verification(trust: Option<&UpdateTrust>, record: &UpdateRecord) -> bool {
     verify_candidate_with_trust(trust, record.candidate.clone())
         .is_ok_and(|current| current.candidate_hash == record.candidate_hash)
@@ -2782,6 +2802,36 @@ fn rollback_failed(
     )
 }
 
+fn download_package_metadata_matches(metadata: &cap_std::fs::Metadata, expected_bytes: u64) -> bool {
+    if !metadata.is_file() || metadata.len() != expected_bytes {
+        return false;
+    }
+    #[cfg(windows)]
+    {
+        metadata.file_attributes() & 0x400 == 0
+    }
+    #[cfg(target_os = "linux")]
+    {
+        metadata.nlink() == 1
+            && metadata.uid() == rustix::process::geteuid().as_raw()
+            && metadata.mode() & 0o022 == 0
+    }
+    #[cfg(not(any(windows, target_os = "linux")))]
+    {
+        false
+    }
+}
+
+#[cfg(windows)]
+fn native_product_package_platform() -> crate::product_package::ProductPackagePlatform {
+    crate::product_package::ProductPackagePlatform::Windows
+}
+
+#[cfg(target_os = "linux")]
+fn native_product_package_platform() -> crate::product_package::ProductPackagePlatform {
+    crate::product_package::ProductPackagePlatform::Linux
+}
+
 fn apply_verified_package(
     broker: &mut Broker,
     request: &UpdateIDRequest,
@@ -2863,7 +2913,7 @@ fn apply_verified_package(
         );
     }
 
-    #[cfg(not(windows))]
+    #[cfg(not(any(windows, target_os = "linux")))]
     {
         let _ = (request, record);
         return suspended(
@@ -2872,11 +2922,11 @@ fn apply_verified_package(
             request_id,
             json!({"版": VERSION, "更新ID": request.update_id, "候補hash": request.candidate_hash, "状態": "suspended", "復旧ID": "recover-update-install-platform", "証拠種別": EVIDENCE_SOURCE_INTERNAL_STATE}),
             payload_hash,
-            "固定install rootのWindows Known Folder経路がないためsuspended",
+            "このOSの固定install root経路がないためsuspended",
         );
     }
 
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "linux"))]
     {
         #[cfg(test)]
         let install_plan = broker
@@ -2924,7 +2974,7 @@ fn apply_verified_package(
                 request_id,
                 OP_APPLY,
                 "update_apply_destination_stale",
-                "native Owner確認に表示した固定導入先が現在のKnown Folder計画と異なる",
+                "native Owner確認に表示した固定導入先が現在のOS固定計画と異なる",
                 payload_hash,
             );
         }
@@ -2982,13 +3032,7 @@ fn apply_verified_package(
             }
         };
         let package_metadata = match package.metadata() {
-            Ok(metadata)
-                if metadata.is_file()
-                    && metadata.file_attributes() & 0x400 == 0
-                    && metadata.len() == package_bytes =>
-            {
-                metadata
-            }
+            Ok(metadata) if download_package_metadata_matches(&metadata, package_bytes) => metadata,
             _ => {
                 return reject(
                     broker,
@@ -3066,7 +3110,7 @@ fn apply_verified_package(
                     request_id,
                     OP_APPLY,
                     "product_install_root_unavailable",
-                    "Known Folder配下の固定導入先をcapabilityで開けない",
+                    "OS固定導入先をcapabilityで開けない",
                     payload_hash,
                 );
             }
@@ -3109,7 +3153,7 @@ fn apply_verified_package(
                 product_version: Some(&record.candidate.offered_version),
                 app_id: &app_id,
                 audit_store_id: &audit_store_id,
-                platform: crate::product_package::ProductPackagePlatform::Windows,
+                platform: native_product_package_platform(),
             },
         );
         let (info, resumed) = match extraction {
@@ -4265,6 +4309,61 @@ mod tests {
         package
     }
 
+    #[cfg(target_os = "linux")]
+    fn install_test_linux_package_for_version(product_version: &str) -> Vec<u8> {
+        let product_manifest = serde_json::to_vec(&json!({
+            "version": 1,
+            "product": "D4 Pocket",
+            "export_id": "export-linux-install-test",
+            "manifest": {
+                "app_identity": {"app_id": INSTALL_APP_ID},
+                "audit_store": {
+                    "store_id": INSTALL_AUDIT_ID,
+                    "chain_status": "new",
+                    "inherited": false
+                },
+                "inheritance_policy": {
+                    "authority": "none",
+                    "permission": "none",
+                    "approval": "none",
+                    "credential": "none",
+                    "audit_chain": "none"
+                }
+            }
+        }))
+        .unwrap();
+        let files: Vec<(&str, &[u8], u32)> = vec![
+            ("data/icudtl.dat", b"icu", 0o644),
+            ("gui_shell_desktop", b"runner", 0o755),
+            ("gui_shell_desktop_launcher", b"launcher", 0o755),
+            ("lib/libflutter_linux_gtk.so", b"flutter", 0o644),
+            ("libexec/gui_shell_linux_broker", b"broker", 0o755),
+            ("product_manifest.json", &product_manifest, 0o644),
+        ];
+        let entries: Vec<_> = files
+            .iter()
+            .map(|(path, bytes, mode)| {
+                format!(
+                    r#"{{"path":"{path}","byte_length":{},"sha256":"{}","mode":{mode}}}"#,
+                    bytes.len(),
+                    hex::encode(Sha256::digest(bytes)),
+                )
+            })
+            .collect();
+        let manifest = format!(
+            r#"{{"version":1,"product":"D4 Pocket","product_version":"{product_version}","app_id":"{INSTALL_APP_ID}","audit_store_id":"{INSTALL_AUDIT_ID}","target_platform":"linux","files":[{}]}}"#,
+            entries.join(","),
+        )
+        .into_bytes();
+        let mut package = b"D4PKG01\n".to_vec();
+        package.extend_from_slice(&(manifest.len() as u32).to_le_bytes());
+        package.extend_from_slice(&manifest);
+        for (_, bytes, _) in files {
+            package.extend_from_slice(bytes);
+        }
+        package
+    }
+
     fn trust_and_candidate_pair_for_packages(
         current_package: &[u8],
         previous_package: &[u8],
@@ -4497,6 +4596,27 @@ mod tests {
     }
 
     #[test]
+    fn package_source_host_is_https_and_bound_to_the_candidate() {
+        assert_eq!(
+            validated_package_source_host(
+                "https://updates.example.invalid/d4/stable/update-1.pkg",
+                "update-1"
+            ),
+            Some("updates.example.invalid".into())
+        );
+        for (source, update_id) in [
+            ("http://updates.example.invalid/d4/update-1.pkg", "update-1"),
+            ("https://user@updates.example.invalid/d4/update-1.pkg", "update-1"),
+            ("https://updates.example.invalid:443/d4/update-1.pkg", "update-1"),
+            ("https://updates.example.invalid/d4/update-1.pkg?x=1", "update-1"),
+            ("https://updates.example.invalid/d4/update-1.pkg#part", "update-1"),
+            ("https://updates.example.invalid/d4/update-2.pkg", "update-1"),
+        ] {
+            assert_eq!(validated_package_source_host(source, update_id), None, "{source}");
+        }
+    }
+
+    #[test]
     fn broker_loads_v2_package_sources_from_its_bounded_persistent_trust() {
         let unique = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -4550,6 +4670,199 @@ mod tests {
         request.payload = Some(payload);
         request.refresh_payload_hash();
         broker.handle(request)
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_native_owner_apply_stages_exact_signed_package_without_activation() {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "d4p-linux-update-apply-{}-{unique}",
+            std::process::id()
+        ));
+        let store_root = root.join("broker-store");
+        let install_root = root.join("xdg-data");
+        std::fs::create_dir_all(&install_root).unwrap();
+        let install_root = std::fs::canonicalize(&install_root).unwrap();
+        let package = install_test_linux_package_for_version("1.1.0");
+        let digest = hex::encode(Sha256::digest(&package));
+        let (trust, candidate, _) = trust_and_candidate_pair_for_packages(&package, &package);
+        let candidate_value = serde_json::to_value(&candidate).unwrap();
+        let candidate_hash =
+            crate::broker::protocol::canonical_payload_hash(Some(&candidate_value));
+        let mut broker = Broker::new_persistent("session-1", &store_root).unwrap();
+        broker.update_trust = Some(trust);
+        broker
+            .set_desktop_product_identity(INSTALL_APP_ID.into(), INSTALL_AUDIT_ID.into())
+            .unwrap();
+        broker.set_desktop_product_install_local_app_data(install_root.clone());
+        assert_eq!(
+            call(
+                &mut broker,
+                BrokerOperation::更新確認,
+                json!({"版": 1, "候補": [candidate]}),
+            )
+            .status,
+            BrokerStatus::Accepted
+        );
+        let package_directory = broker
+            .state_store
+            .open_update_package_directory()
+            .unwrap()
+            .unwrap();
+        drop(package_directory);
+        let package_path = store_root
+            .join("update_packages")
+            .join(format!("{digest}.pkg"));
+        std::fs::write(&package_path, &package).unwrap();
+
+        let payload = json!({
+            "版": 1,
+            "更新ID": "update-apply",
+            "候補hash": candidate_hash,
+        });
+        let payload_hash = crate::broker::protocol::canonical_payload_hash(Some(&payload));
+        let plan = super::super::product_install::plan_product_install(
+            &install_root,
+            INSTALL_APP_ID,
+            "1.1.0",
+            &digest,
+        )
+        .unwrap();
+        let target = plan.version_directory.clone();
+        let confirmation = UpdateApplyConfirmation {
+            download: UpdateDownloadConfirmation {
+                update_id: "update-apply".into(),
+                candidate_hash: payload["候補hash"].as_str().unwrap().into(),
+                source_url: String::new(),
+                package_sha256: digest.clone(),
+                package_size_bytes: package.len() as u64,
+                offered_version: "1.1.0".into(),
+                channel: "stable".into(),
+                summary: "安全更新".into(),
+                display_host: String::new(),
+                payload_hash: payload_hash.clone(),
+            },
+            app_id: INSTALL_APP_ID.into(),
+            audit_store_id: INSTALL_AUDIT_ID.into(),
+            version_directory: target.clone(),
+        };
+        let envelope = |request_id: &str| {
+            json!({
+                "request_id": request_id,
+                "session_id": "session-1",
+                "operation": OP_APPLY,
+                "payload_hash": payload_hash,
+                "nonce": format!("{request_id}-nonce"),
+                "issued_at": BrokerRequestEnvelope::current_issued_at(),
+                "metadata": {"client": "desktop_flutter"},
+                "payload": payload,
+            })
+            .to_string()
+        };
+        use std::os::unix::fs::PermissionsExt;
+
+        let normal_ipc = call(&mut broker, BrokerOperation::更新適用要求, payload.clone());
+        assert_eq!(normal_ipc.status, BrokerStatus::Rejected);
+        assert_eq!(
+            normal_ipc.error.unwrap().code,
+            "desktop_native_owner_confirmation_required"
+        );
+
+        let mut stale_confirmation = confirmation.clone();
+        stale_confirmation.version_directory = install_root.join("attacker-controlled");
+        let stale = broker.desktop_owner_operation_json_with_update_confirmation(
+            &envelope("linux-update-apply-stale"),
+            None,
+            Some(stale_confirmation),
+        );
+        assert_eq!(stale.status, BrokerStatus::Rejected);
+        assert_eq!(stale.error.unwrap().code, "update_apply_destination_stale");
+        assert!(!target.exists());
+
+        std::fs::set_permissions(&package_path, std::fs::Permissions::from_mode(0o664)).unwrap();
+        let writable_package = broker.desktop_owner_operation_json_with_update_confirmation(
+            &envelope("linux-update-apply-writable-package"),
+            None,
+            Some(confirmation.clone()),
+        );
+        assert_eq!(writable_package.status, BrokerStatus::Rejected);
+        assert_eq!(
+            writable_package.error.unwrap().code,
+            "update_package_file_invalid"
+        );
+        assert!(!target.exists());
+        std::fs::set_permissions(&package_path, std::fs::Permissions::from_mode(0o644)).unwrap();
+
+        let hard_link_path = store_root
+            .join("update_packages")
+            .join("package-hard-link-probe");
+        std::fs::hard_link(&package_path, &hard_link_path).unwrap();
+        let hard_linked_package = broker.desktop_owner_operation_json_with_update_confirmation(
+            &envelope("linux-update-apply-hard-linked-package"),
+            None,
+            Some(confirmation.clone()),
+        );
+        assert_eq!(hard_linked_package.status, BrokerStatus::Rejected);
+        assert_eq!(
+            hard_linked_package.error.unwrap().code,
+            "update_package_file_invalid"
+        );
+        assert!(!target.exists());
+        std::fs::remove_file(hard_link_path).unwrap();
+
+        let mut tampered_package = package.clone();
+        *tampered_package.last_mut().unwrap() ^= 1;
+        std::fs::write(&package_path, tampered_package).unwrap();
+        let tampered = broker.desktop_owner_operation_json_with_update_confirmation(
+            &envelope("linux-update-apply-tampered"),
+            None,
+            Some(confirmation.clone()),
+        );
+        assert_eq!(tampered.status, BrokerStatus::Rejected);
+        assert!(!target.exists());
+        assert!(broker.audit_events().iter().any(|event| {
+            event.request_id == "linux-update-apply-tampered:failed"
+                && event.operation == OP_APPLY
+                && event.decision == "failed"
+        }));
+
+        std::fs::write(&package_path, &package).unwrap();
+        let applied = broker.desktop_owner_operation_json_with_update_confirmation(
+            &envelope("linux-update-apply"),
+            None,
+            Some(confirmation),
+        );
+        assert_eq!(applied.status, BrokerStatus::Accepted, "{applied:?}");
+        assert_eq!(applied.body.as_ref().unwrap()["導入状態"], "version_staged");
+        assert_eq!(applied.body.as_ref().unwrap()["有効化"], "suspended");
+        assert_eq!(
+            std::fs::read(target.join("gui_shell_desktop")).unwrap(),
+            b"runner"
+        );
+        assert_eq!(
+            std::fs::metadata(target.join("gui_shell_desktop"))
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777,
+            0o755
+        );
+        assert!(!plan.root.join("active_version.json").exists());
+        assert!(broker
+            .audit_events()
+            .iter()
+            .any(|event| { event.operation == OP_APPLY && event.decision == "queued" }));
+        assert!(broker.audit_events().iter().any(|event| {
+            event.request_id == "linux-update-apply:complete"
+                && event.operation == OP_APPLY
+                && event.decision == "completed"
+        }));
+        drop(broker);
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[cfg(windows)]

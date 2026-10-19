@@ -18,7 +18,9 @@ containerは8-byte magic、little-endian 32-bit manifest長、UTF-8 JSON manifes
 
 Readerはpackage structure、製品版、固定identity、Product Manifestの新規identity／Authority非継承、file inventory／hash／modeを検査して、Owner操作を生成せず新規stageへ展開する。通常展開失敗時は今回作成したstageだけをcleanupする。Resumeは既存byte prefixとmodeの一致を必須とし、既存fileを上書き・削除しない。
 
-Linux Brokerの署名候補、compile-time App／Audit identity、固定XDG導入root、native Owner確認、durable Auditが一致して初めてproduct installation consumerへ接続できる。package stagingはactive-version切替、desktop entry、update、rollback、uninstall、installed product受入れを意味しない。これらのconsumerが未接続の間、Linux完全対応や`task_execution=supported`を主張しない。
+Linux Brokerの署名候補、compile-time App／Audit identity、固定XDG導入root、native Owner確認、durable Auditを再照合する導入consumerを既存Brokerへ接続する。更新適用はBrokerの現在candidate一覧に束縛したLinux native Owner確認を経て、承認時のみ同じ確認情報を既存Broker queueへ渡す。Brokerは署名済みdigestのdownload fileを再検証してLinux D4PKG01を未起動version directoryへstageし、開始／完了Auditを確定する。通常IPC、確認先差替、所有UID／hardlink／unsafe mode違反、package hash／内容不一致はfail-closedする。
+
+このstage接続はactive-version切替、desktop entry、起動、更新rollback、uninstall、source／toolchain provenance、Linux native installed product受入れを意味しない。Linux完全対応と`task_execution=supported`の判定には、これらを含む現行Release blockerの全残件を閉じる必要がある。WSL証拠をnative Linux acceptanceへ転用しない。
 
 ## 4. Linux製品package作成tool
 

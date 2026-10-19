@@ -50,6 +50,21 @@ jobs:
       - name: Linux versioned product bootstrapper tests
         shell: bash
         run: cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib product_bootstrapper::tests -- --test-threads=1
+      - name: Linux Broker native Owner package-stage test
+        shell: bash
+        env:
+          GUI_SHELL_PRODUCT_APP_ID: d4-pocket-app-11111111111111111111111111111111
+          GUI_SHELL_PRODUCT_AUDIT_STORE_ID: audit-store-22222222222222222222222222222222
+        run: cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib broker::update_center::tests::linux_native_owner_apply_stages_exact_signed_package_without_activation -- --exact --test-threads=1
+      - name: Linux native Owner confirmation binding test
+        shell: bash
+        env:
+          GUI_SHELL_PRODUCT_APP_ID: d4-pocket-app-11111111111111111111111111111111
+          GUI_SHELL_PRODUCT_AUDIT_STORE_ID: audit-store-22222222222222222222222222222222
+        run: cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib macos_desktop_owner::task_owner_tests::linux_update_apply_uses_current_broker_listing_and_native_owner_confirmation -- --exact --test-threads=1
+      - name: Broker validates candidate-bound package source for Owner display
+        shell: bash
+        run: cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib broker::update_center::tests::package_source_host_is_https_and_bound_to_the_candidate -- --exact --test-threads=1
       - name: Linux embedded product identity tests
         shell: bash
         env:

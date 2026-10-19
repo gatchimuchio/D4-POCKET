@@ -700,7 +700,7 @@ fn extract_inner<R: Read>(
             return Err(err("package_product_manifest_size_invalid"));
         }
         let (parent, file_name) = open_package_parent(destination, &entry.path, expected.platform)?;
-        let (mut output, existing_prefix_bytes) = match mode {
+        let (mut output, existing_prefix_bytes, file_created) = match mode {
             StageMode::Resume => {
                 let mut options = OpenOptions::new();
                 options.read(true).write(true).follow(FollowSymlinks::No);
@@ -715,7 +715,7 @@ fn extract_inner<R: Read>(
                         {
                             return Err(err("package_stage_existing_file_invalid"));
                         }
-                        (file, metadata.len())
+                        (file, metadata.len(), false)
                     }
                     Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
                         let mut options = OpenOptions::new();
@@ -728,6 +728,7 @@ fn extract_inner<R: Read>(
                                 .open_with(file_name, &options)
                                 .map_err(|_| err("package_file_create_failed"))?,
                             0,
+                            true,
                         )
                     }
                     Err(_) => return Err(err("package_stage_existing_file_invalid")),
@@ -748,7 +749,7 @@ fn extract_inner<R: Read>(
                 {
                     return Err(err("package_stage_existing_file_invalid"));
                 }
-                (file, metadata.len())
+                (file, metadata.len(), false)
             }
             StageMode::Create => {
                 let mut options = OpenOptions::new();
@@ -761,12 +762,13 @@ fn extract_inner<R: Read>(
                         .open_with(file_name, &options)
                         .map_err(|_| err("package_file_create_failed"))?,
                     0,
+                    true,
                 )
             }
         };
         if expected.platform == ProductPackagePlatform::Linux {
             let expected_mode = entry.mode.ok_or_else(|| err("package_file_mode_invalid"))?;
-            if mode == StageMode::Create {
+            if file_created {
                 set_linux_file_mode(&output, expected_mode)?;
             } else {
                 verify_linux_file_mode(&output, expected_mode)?;

@@ -76,7 +76,7 @@
     },
     {
       "path": ".github/workflows/linux-manual-rust-validation.yml",
-      "sha256": "54acb014858234ddfee1af1e64bc23c565c2b4f642b2437fefb1034bd0a7a38f"
+      "sha256": "3f53442a962810057b8fa9081af1e133017cbdd81771f947e0dc483f80c1e60a"
     },
     {
       "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
@@ -168,7 +168,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "635066c8377b53414118294a4844b5ec2bdcf60e59ba210d86571e8c0f358804"
+      "sha256": "1d79ce069bece66a4519db822f7cff01d566f85255b793a22f3f3ea89b4820ec"
     },
     {
       "path": "SECURITY.md",
@@ -1304,7 +1304,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "bbc3fbb1a67d0ee05ace149e6eec6637a7f27739479fd82f99a85cdb923765b2"
+      "sha256": "d6dfa685d8759ac3e672c88bb9f03c77f4c22a41dfa1a1606e1e6a81971c4e3a"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1516,7 +1516,7 @@
     },
     {
       "path": "docs/specs/linux-product-package.md",
-      "sha256": "0e8af60d2d52941d01143f704fa5fae45376988a8e6c226d778f412c73862910"
+      "sha256": "1fc6b78168dc9478952b1ec97c6f610aae1cff98409433b0dcb9d8f58b51d003"
     },
     {
       "path": "docs/specs/linux-workspace-selection.md",
@@ -3648,7 +3648,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "c19f0553d8224fc2243207ff77a2cbae0a2597755f38c58851558e15fbca228c"
+      "sha256": "7f76d4dd94dfee469e54e9ccbf077343889e094d326355bb170a48d7a99adac3"
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
@@ -3708,7 +3708,7 @@
     },
     {
       "path": "native/rust_helper/src/linux_desktop_worker.rs",
-      "sha256": "e24081ccb6b04449b40560e3b69711ff141d5cf38e7474c20f7a7c6c4c1f0187"
+      "sha256": "dec5dc4dbc7c5fe4cce143103ad736e44f590c8d6a3f6e18470648b400a762c6"
     },
     {
       "path": "native/rust_helper/src/linux_product_bundle.rs",
@@ -3724,7 +3724,7 @@
     },
     {
       "path": "native/rust_helper/src/macos_desktop_owner.rs",
-      "sha256": "1cc9b4e6959b8bff690a754b446edaa42f3e5333e7c841f94a53eb0984211be0"
+      "sha256": "43dc366ff19e6b8519ef44a232266d65fd8f901f071055a0b0ebc9c75dd836cd"
     },
     {
       "path": "native/rust_helper/src/macos_desktop_worker.rs",
@@ -3756,11 +3756,11 @@
     },
     {
       "path": "native/rust_helper/src/product_bootstrapper.rs",
-      "sha256": "68895e770aee9c6ba1e5d6a33214e1f020c78f1708cc1233480d6354c2afece0"
+      "sha256": "bbde880a971910490482d6e3a9c6ad23a07447b3c5601da30eec05e977098668"
     },
     {
       "path": "native/rust_helper/src/product_package.rs",
-      "sha256": "a98bbafd381197a7eb58f021fa053e84810c6748c0c100d3a55fb4f7d0c978fe"
+      "sha256": "819eb569187267555994afed1cee2e420b87a05da379f82880abfda1acc61a2c"
     },
     {
       "path": "native/rust_helper/src/protected_store.rs",
@@ -4288,7 +4288,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "b6358ea31a26dd8b38e76cafc044ef379da7d8ffa9fb372570787f372ca429ab"
+      "sha256": "736afcb0a12fdfcf585b7fededed6c5493c703548ac0d59c618f9b5f48ea15a9"
     },
     {
       "path": "requirements-dev.txt",
@@ -5107,6 +5107,10 @@
       "sha256": "7daa9b71dc12bea520f68d7a63e239fd45b29f8a7eab2d90b8093296b4ae24e1"
     },
     {
+      "path": "tooling/package_linux_product.py",
+      "sha256": "266f5dfed6c0f68ae6fb50415fd5757ffd95356417303b2822e68b931022be09"
+    },
+    {
       "path": "tooling/package_windows_portable.py",
       "sha256": "834761cce3533a730ab4e4d1ed9d7184d7d914d5142d3a3fab25294a0d807984"
     },
@@ -5157,6 +5161,10 @@
     {
       "path": "tooling/test_pktmon_packet_summary.ps1",
       "sha256": "eaaf9e68d6d8a676b97461a40010e3b2d2090d3605a103e1c241a43672dbf330"
+    },
+    {
+      "path": "tooling/tests/test_linux_product_package.py",
+      "sha256": "812b2d4f51cb91cd6599034da15dca2e3423ffa6f08a53c2b3987c143d1dda22"
     },
     {
       "path": "tooling/ui_snapshot_tests/README.md",

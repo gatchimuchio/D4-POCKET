@@ -9,6 +9,33 @@ struct Candidate {
     request: String,
     summary: String,
     response_timeout: Duration,
+    download_confirmation: Option<crate::broker::update_center::UpdateDownloadConfirmation>,
+    apply_confirmation: Option<crate::broker::update_center::UpdateApplyConfirmation>,
+}
+
+struct LinuxUpdateOwnerCandidate {
+    summary: String,
+    download_confirmation: Option<crate::broker::update_center::UpdateDownloadConfirmation>,
+    apply_confirmation: Option<crate::broker::update_center::UpdateApplyConfirmation>,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct UpdateOwnerRequest {
+    #[serde(rename = "版")]
+    version: u64,
+    #[serde(rename = "更新ID")]
+    update_id: String,
+    #[serde(rename = "候補hash")]
+    candidate_hash: String,
+}
+
+fn valid_update_id(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 128
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
 }
 
 #[derive(serde::Deserialize)]
@@ -60,6 +87,177 @@ fn valid_sha256(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
+fn linux_update_owner_candidate(
+    operation: &str,
+    payload: &serde_json::Value,
+    payload_hash: &str,
+    endpoint: &BrokerEndpoint,
+) -> Option<LinuxUpdateOwnerCandidate> {
+    #[cfg(target_os = "linux")]
+    {
+        if !matches!(operation, "更新download要求" | "更新適用要求") {
+            return None;
+        }
+        let request: UpdateOwnerRequest = serde_json::from_value(payload.clone()).ok()?;
+        if request.version != 1
+            || !valid_update_id(&request.update_id)
+            || !valid_sha256(&request.candidate_hash)
+        {
+            return None;
+        }
+        let (app_id, audit_store_id) =
+            crate::broker::update_center::embedded_product_identity().ok()??;
+        let listing_payload = serde_json::json!({"版": 1});
+        let mut nonce = [0_u8; 16];
+        getrandom::getrandom(&mut nonce).ok()?;
+        let nonce = hex::encode(nonce);
+        let preflight = serde_json::json!({
+            "request_id": format!("linux-update-preflight-{nonce}"),
+            "operation": "更新一覧",
+            "payload_hash": canonical_payload_hash(Some(&listing_payload)),
+            "nonce": format!("linux-update-preflight-nonce-{nonce}"),
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {"client": "desktop_flutter"},
+            "payload": listing_payload,
+        });
+        let mut preflight = serde_json::to_vec(&preflight).ok()?;
+        preflight = super::macos_desktop_worker::normalize(&preflight, &endpoint.session_id);
+        let response = super::macos_desktop_worker::relay(&preflight, endpoint).ok()?;
+        preflight.fill(0);
+        let response: serde_json::Value = serde_json::from_slice(&response).ok()?;
+        if response["operation"] != "更新一覧" || response["status"] != "accepted" {
+            return None;
+        }
+        let updates = response["body"]["更新一覧"].as_array()?;
+        let matching: Vec<&serde_json::Value> = updates
+            .iter()
+            .filter(|value| {
+                value["更新ID"] == request.update_id
+                    && value["候補hash"] == request.candidate_hash
+                    && value["署名状態"] == "verified"
+                    && value["版"] == 2
+            })
+            .collect();
+        let [record] = matching.as_slice() else {
+            return None;
+        };
+        let package_sha256 = record["package_sha256"].as_str()?;
+        if package_sha256.len() != 64
+            || !package_sha256
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        {
+            return None;
+        }
+        let package_size_bytes = record["package_size_bytes"].as_u64()?;
+        if package_size_bytes == 0 || package_size_bytes > 4 * 1024 * 1024 * 1024 {
+            return None;
+        }
+        let offered_version = record["提供版"].as_str()?;
+        let channel = record["channel"].as_str()?;
+        let summary = record["内容概要"].as_str()?;
+        let signer_fingerprint = record["署名者fingerprint"].as_str()?;
+        if offered_version.is_empty()
+            || offered_version.len() > 64
+            || !offered_version
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || b".+_-".contains(&byte))
+            || !["stable", "beta", "nightly"].contains(&channel)
+            || summary.is_empty()
+            || summary.chars().count() > 512
+            || summary.chars().any(char::is_control)
+            || !valid_sha256(signer_fingerprint)
+        {
+            return None;
+        }
+        let download = crate::broker::update_center::UpdateDownloadConfirmation {
+            update_id: request.update_id.clone(),
+            candidate_hash: request.candidate_hash.clone(),
+            source_url: String::new(),
+            package_sha256: package_sha256.to_owned(),
+            package_size_bytes,
+            offered_version: offered_version.to_owned(),
+            channel: channel.to_owned(),
+            summary: summary.to_owned(),
+            display_host: String::new(),
+            payload_hash: payload_hash.to_owned(),
+        };
+        let (summary, download_confirmation, apply_confirmation) = if operation
+            == "更新download要求"
+        {
+            let source = &record["取得元"];
+            if source["状態"] != "configured" {
+                return None;
+            }
+            let source_url = source["URL"].as_str()?;
+            let host = crate::broker::update_center::validated_package_source_host(
+                source_url,
+                &request.update_id,
+            )?;
+            let mut confirmation = download.clone();
+            confirmation.source_url = source_url.to_owned();
+            confirmation.display_host = host.to_owned();
+            (
+                format!(
+                        "Linux製品の署名検査済み更新packageを取得しますか？\n\n更新ID: {}\n提供版: {}\nchannel: {}\n署名者fingerprint: {}\n取得host: {}\npackage SHA-256: {}\nbyte長: {}\n概要: {}\n\n取得先は現在のBroker trustから導出しています。downloadのみを開始し、導入・有効化・Permission変更は行いません。\n要求hash: {}",
+                        request.update_id,
+                        offered_version,
+                        channel,
+                        signer_fingerprint,
+                        host,
+                        package_sha256,
+                        package_size_bytes,
+                        summary,
+                        payload_hash
+                    ),
+                Some(confirmation),
+                None,
+            )
+        } else {
+            let plan = crate::broker::product_install::plan_current_user_product_install(
+                &app_id,
+                offered_version,
+                package_sha256,
+            )
+            .ok()?;
+            let confirmation = crate::broker::update_center::UpdateApplyConfirmation {
+                download: download.clone(),
+                app_id: app_id.clone(),
+                audit_store_id: audit_store_id.clone(),
+                version_directory: plan.version_directory.clone(),
+            };
+            (
+                format!(
+                        "Linux製品の署名検査済みpackageを固定導入先へ展開しますか？\n\n更新ID: {}\n提供版: {}\nchannel: {}\n署名者fingerprint: {}\nApp ID: {}\nAudit Store ID: {}\npackage SHA-256: {}\nbyte長: {}\n固定version directory: {}\n概要: {}\n\nこれは未起動版のstageだけを作成します。有効版切替、desktop entry登録、process起動は行いません。失敗時は既存データを上書きしません。\n要求hash: {}",
+                        request.update_id,
+                        offered_version,
+                        channel,
+                        signer_fingerprint,
+                        app_id,
+                        audit_store_id,
+                        package_sha256,
+                        package_size_bytes,
+                        plan.version_directory.display(),
+                        summary,
+                        payload_hash
+                    ),
+                None,
+                Some(confirmation),
+            )
+        };
+        Some(LinuxUpdateOwnerCandidate {
+            summary,
+            download_confirmation,
+            apply_confirmation,
+        })
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = (operation, payload, payload_hash, endpoint);
+        None
+    }
+}
+
 #[cfg(any(target_os = "linux", target_os = "macos", test))]
 fn macos_owner_summary(operation: &str, payload: &serde_json::Value) -> Option<String> {
     crate::broker::mcp_center::desktop_owner_summary(operation, payload)
@@ -91,9 +289,15 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
     let operation = envelope.operation?.as_str();
     let payload = envelope.payload.as_ref()?;
     let registration = operation == "AgentCLI実行系作業領域登録";
+    let mut update_owner_candidate = None;
     let text = if registration {
         let summary = crate::broker::protocol::macos_agent_registration_summary(payload)?;
         format!("{summary}\n要求hash: {hash}")
+    } else if matches!(operation, "更新download要求" | "更新適用要求") {
+        let update = linux_update_owner_candidate(operation, payload, &hash, endpoint)?;
+        let summary = update.summary.clone();
+        update_owner_candidate = Some(update);
+        summary
     } else if operation == "AgentTaskWorkspacePermissionGrant" {
         let request: AgentTaskWorkspacePermissionRequest =
             serde_json::from_value(payload.clone()).ok()?;
@@ -240,6 +444,8 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
         // 登録は既存5秒probeを2回実行する。OS確認300秒とは別の限定待機。
         response_timeout: Duration::from_secs(if registration {
             15
+        } else if matches!(operation, "更新download要求" | "更新適用要求") {
+            20
         } else if matches!(operation, "MCP接続" | "MCP切断" | "MCP Tool実行") {
             35
         } else if operation == "A2A接続" {
@@ -248,6 +454,12 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
         } else {
             4
         }),
+        download_confirmation: update_owner_candidate
+            .as_ref()
+            .and_then(|update| update.download_confirmation.clone()),
+        apply_confirmation: update_owner_candidate
+            .as_ref()
+            .and_then(|update| update.apply_confirmation.clone()),
     })
 }
 
@@ -268,8 +480,8 @@ pub(super) fn dispatch(
     sender
         .try_send(DesktopOwnerOperationRequest {
             request_json: candidate.request,
-            download_confirmation: None,
-            apply_confirmation: None,
+            download_confirmation: candidate.download_confirmation,
+            apply_confirmation: candidate.apply_confirmation,
             activation_confirmation: None,
             product_repair_confirmation: None,
             product_uninstall_confirmation: None,
@@ -871,5 +1083,135 @@ mod task_owner_tests {
             "accepted"
         );
         worker.join().unwrap();
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_update_apply_uses_current_broker_listing_and_native_owner_confirmation() {
+        use std::io::{BufRead, BufReader, Write};
+        use std::net::TcpListener;
+
+        let (app_id, audit_store_id) = crate::broker::update_center::embedded_product_identity()
+            .expect("test build identity")
+            .expect("compile-time Linux test identity");
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let listener_thread = std::thread::spawn(move || {
+            for _ in 0..2 {
+                let (stream, _) = listener.accept().unwrap();
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(2)))
+                    .unwrap();
+                let mut reader = BufReader::new(stream);
+                let mut secret = String::new();
+                let mut frame = String::new();
+                reader.read_line(&mut secret).unwrap();
+                reader.read_line(&mut frame).unwrap();
+                assert_eq!(secret.trim_end(), "linux-owner-fixture-secret");
+                let request: Value = serde_json::from_str(&frame).unwrap();
+                assert_eq!(request["operation"], "更新一覧");
+                assert_eq!(request["session_id"], "linux-owner-fixture-session");
+                let response = json!({
+                    "operation": "更新一覧",
+                    "status": "accepted",
+                    "body": {
+                        "更新一覧": [{
+                            "版": 2,
+                            "更新ID": "linux-owner-update",
+                            "候補hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                            "署名状態": "verified",
+                            "package_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                            "package_size_bytes": 4096,
+                            "提供版": "1.1.0",
+                            "channel": "stable",
+                            "内容概要": "Linux stage update",
+                            "署名者fingerprint": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                            "取得元": {
+                                "状態": "configured",
+                                "URL": "https://updates.example.invalid/d4/stable/linux-owner-update.pkg"
+                            }
+                        }]
+                    }
+                });
+                let stream = reader.get_mut();
+                stream.write_all(response.to_string().as_bytes()).unwrap();
+                stream.write_all(b"\n").unwrap();
+                stream.flush().unwrap();
+            }
+        });
+        let endpoint = BrokerEndpoint {
+            host: "127.0.0.1".into(),
+            port,
+            session_id: "linux-owner-fixture-session".into(),
+            session_secret: "linux-owner-fixture-secret".into(),
+            credential_role: BrokerCredentialRole::Normal,
+            transport: "tcp".into(),
+            max_request_bytes: 65536,
+        };
+        let payload = json!({
+            "版": 1,
+            "更新ID": "linux-owner-update",
+            "候補hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        });
+        let valid = request("更新適用要求", payload.clone());
+        let bytes = serde_json::to_vec(&valid).unwrap();
+        let (sender, receiver) = mpsc::sync_channel::<DesktopOwnerOperationRequest>(1);
+        let mut declined_summary = String::new();
+        let declined = dispatch(&bytes, &endpoint, &sender, &mut |summary| {
+            declined_summary = summary.to_owned();
+            false
+        })
+        .unwrap();
+        assert!(declined.is_none(), "declined response must not be dispatched");
+        assert!(
+            !declined_summary.is_empty(),
+            "current Broker listing must produce a native confirmation"
+        );
+        assert!(receiver.try_recv().is_err());
+
+        let worker = std::thread::spawn(move || {
+            let operation = receiver.recv_timeout(Duration::from_secs(2)).unwrap();
+            let apply = operation
+                .apply_confirmation
+                .expect("Owner confirmation must carry a Broker-derived stage binding");
+            assert_eq!(apply.app_id, app_id);
+            assert_eq!(apply.audit_store_id, audit_store_id);
+            assert_eq!(apply.download.update_id, "linux-owner-update");
+            assert_eq!(apply.download.package_sha256, "b".repeat(64));
+            assert!(apply.version_directory.to_string_lossy().contains("1.1.0-"));
+            assert!(operation.download_confirmation.is_none());
+            let parsed: Value = serde_json::from_str(&operation.request_json).unwrap();
+            assert_eq!(parsed["payload"], payload);
+            assert_eq!(parsed["session_id"], "linux-owner-fixture-session");
+            operation
+                .reply
+                .send(BrokerResponse {
+                    request_id: "fixture-task-owner-request".into(),
+                    operation: "更新適用要求".into(),
+                    status: BrokerStatus::Accepted,
+                    evidence_source: "FIXTURE".into(),
+                    audit_event_id: "fixture-update-audit".into(),
+                    error: None,
+                    health: None,
+                    body: Some(json!({"導入状態":"version_staged"})),
+                    shutdown_requested: false,
+                })
+                .unwrap();
+        });
+        let response = dispatch(&bytes, &endpoint, &sender, &mut |summary| {
+            summary.contains("Linux製品")
+                && summary.contains("未起動版のstage")
+                && summary.contains(&valid["payload_hash"].as_str().unwrap())
+                && !summary.contains("linux-owner-fixture-secret")
+        })
+        .unwrap();
+        assert!(response.is_some(), "native confirmation mismatch: {declined_summary}");
+        let response = response.unwrap();
+        assert_eq!(
+            serde_json::from_slice::<Value>(&response).unwrap()["status"],
+            "accepted"
+        );
+        worker.join().unwrap();
+        listener_thread.join().unwrap();
     }
 }
