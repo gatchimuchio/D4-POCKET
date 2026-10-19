@@ -647,6 +647,10 @@
       "sha256": "85c002dc55a751ec48a72ed43a875fcf85f75a28a6c665ace8f94f162da0d23d"
     },
     {
+      "path": "apps/desktop_flutter/test/linux_credential_vault_test.dart",
+      "sha256": "a65fe77d3d18d3f4b31f92a992626f1760a947397e60f17055679d7983239e0f"
+    },
+    {
       "path": "apps/desktop_flutter/test/macos_credential_vault_test.dart",
       "sha256": "c86fad9965632607f74a18f2dedc27c199414d4334811819539f3bdc0fe0f35f"
     },
@@ -3653,6 +3657,10 @@
     {
       "path": "native/rust_helper/src/lib.rs",
       "sha256": "deb2838a1449052c4d64a9c347e51a25e23cb57d7cc9797e5df3025582e05391"
+    },
+    {
+      "path": "native/rust_helper/src/linux_credential_input.rs",
+      "sha256": "584749aa9494afcbc2045cfa2737aca82f5cb61f062748caa32c57633b2b7d5d"
     },
     {
       "path": "native/rust_helper/src/linux_desktop_worker.rs",
