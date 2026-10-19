@@ -113,7 +113,10 @@ pub(crate) struct ProductRepairConfirmation {
     pub(crate) product_version: String,
     pub(crate) package_sha256: String,
     pub(crate) product_root: PathBuf,
+    #[cfg(windows)]
     pub(crate) start_menu_shortcut_path: PathBuf,
+    #[cfg(target_os = "linux")]
+    pub(crate) linux_desktop_entry_path: PathBuf,
     pub(crate) payload_hash: String,
 }
 
@@ -1185,7 +1188,7 @@ fn repair_product_launch_entries(
     }
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "linux"))]
 fn product_repair_failed(
     broker: &mut Broker,
     request_id: &str,
@@ -1221,7 +1224,280 @@ fn product_repair_failed(
     )
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "linux")]
+fn repair_product_launch_entries(
+    broker: &mut Broker,
+    payload: &Value,
+    request_id: &str,
+    payload_hash: &str,
+    owner_confirmation: OwnerConfirmationSource,
+    confirmation: Option<&ProductRepairConfirmation>,
+) -> BrokerResponse {
+    if !matches!(
+        serde_json::from_value::<ProductRepairRequest>(payload.clone()),
+        Ok(request) if request.version == VERSION
+    ) {
+        return reject(
+            broker,
+            request_id,
+            OP_PRODUCT_REPAIR,
+            "product_repair_request_invalid",
+            "製品起動項目修復要求の構造が不正",
+            payload_hash,
+        );
+    }
+    if owner_confirmation != OwnerConfirmationSource::DesktopNativeConfirmation {
+        return reject(
+            broker,
+            request_id,
+            OP_PRODUCT_REPAIR,
+            "desktop_native_owner_confirmation_required",
+            "製品起動項目の修復にはRust GTK native Owner確認が必要",
+            payload_hash,
+        );
+    }
+    let Some((app_id, audit_store_id)) = broker.desktop_product_identity.clone() else {
+        return reject(
+            broker,
+            request_id,
+            OP_PRODUCT_REPAIR,
+            "product_identity_unavailable",
+            "製品identityを確認できない",
+            payload_hash,
+        );
+    };
+    let Some(confirmation) = confirmation else {
+        return reject(
+            broker,
+            request_id,
+            OP_PRODUCT_REPAIR,
+            "product_repair_confirmation_missing",
+            "現行版と固定XDG起動先を示したnative確認記録がない",
+            payload_hash,
+        );
+    };
+
+    #[cfg(test)]
+    let data_home = broker
+        .desktop_product_install_local_app_data
+        .clone()
+        .or_else(|| super::product_install::current_user_local_app_data().ok());
+    #[cfg(not(test))]
+    let data_home = super::product_install::current_user_local_app_data().ok();
+    let Some(data_home) = data_home else {
+        return reject(
+            broker,
+            request_id,
+            OP_PRODUCT_REPAIR,
+            "product_install_data_home_unavailable",
+            "現在利用者の固定XDG導入rootを確認できない",
+            payload_hash,
+        );
+    };
+    let expected_root = match super::product_install::product_install_root(&data_home, &app_id) {
+        Ok(path) => path,
+        Err(error) => {
+            return reject(
+                broker,
+                request_id,
+                OP_PRODUCT_REPAIR,
+                error.0,
+                "固定Linux製品rootを導出できないため修復しない",
+                payload_hash,
+            );
+        }
+    };
+    let expected_entry = match super::product_install::plan_linux_desktop_entry(&data_home, &app_id)
+    {
+        Ok(path) => path,
+        Err(error) => {
+            return reject(
+                broker,
+                request_id,
+                OP_PRODUCT_REPAIR,
+                error.0,
+                "固定XDG desktop entryを導出できないため修復しない",
+                payload_hash,
+            );
+        }
+    };
+    let snapshot = match crate::product_bootstrapper::active_version_snapshot(
+        &data_home,
+        &app_id,
+        &audit_store_id,
+    ) {
+        Ok(snapshot) => snapshot,
+        Err(error) => {
+            return reject(
+                broker,
+                request_id,
+                OP_PRODUCT_REPAIR,
+                error.0,
+                "現行active recordまたはsigned stageを安全に検証できないため修復しない",
+                payload_hash,
+            );
+        }
+    };
+    let current = &snapshot.current;
+    if !rollback_descriptor_matches_candidate(broker, current)
+        || confirmation.app_id != app_id
+        || confirmation.audit_store_id != audit_store_id
+        || confirmation.update_id != current.update_id
+        || confirmation.candidate_hash != current.candidate_hash
+        || confirmation.product_version != current.product_version
+        || confirmation.package_sha256 != current.package_sha256
+        || confirmation.product_root != expected_root
+        || confirmation.linux_desktop_entry_path != expected_entry
+        || confirmation.payload_hash != payload_hash
+    {
+        return reject(
+            broker,
+            request_id,
+            OP_PRODUCT_REPAIR,
+            "product_repair_confirmation_stale",
+            "native Owner確認後にtrust、現行版、製品identityまたは固定XDG pathが変化した",
+            payload_hash,
+        );
+    }
+    let (root_path, _) =
+        match super::product_install::open_existing_product_root(&data_home, &app_id) {
+            Ok(root) if root.0 == expected_root => root,
+            _ => {
+                return reject(
+                    broker,
+                    request_id,
+                    OP_PRODUCT_REPAIR,
+                    "product_install_root_unavailable",
+                    "固定Linux製品rootが存在しないか、導出先と一致しないため修復しない",
+                    payload_hash,
+                );
+            }
+        };
+    if !broker.state_store.persistence_ready() {
+        return suspended(
+            broker,
+            OP_PRODUCT_REPAIR,
+            request_id,
+            json!({"版": VERSION, "状態": "suspended", "復旧ID": "recover-product-launch-repair-audit", "証拠種別": EVIDENCE_SOURCE_INTERNAL_STATE}),
+            payload_hash,
+            "永続Auditを確定できないためLinux起動項目を修復しない",
+        );
+    }
+    let existing_entry = match std::fs::symlink_metadata(&expected_entry) {
+        Ok(_) => true,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
+        Err(_) => {
+            return product_repair_failed(
+                broker,
+                request_id,
+                payload_hash,
+                "product_desktop_entry_unavailable",
+                "XDG desktop entryの状態を安全に確認できないため修復しない",
+            );
+        }
+    };
+    let intent = match broker.append_audit(
+        request_id,
+        OP_PRODUCT_REPAIR,
+        "queued",
+        &format!("Capability=product.install.repair_launch_entries Permission=現在trustで再検証したactive Linux versionの欠損root launcherと固定XDG desktop entryだけを復元し、既存file・version payload・active recordを上書きしない Approval=現行版と固定XDG pathを表示した独立Rust GTK native Owner確認 AuditEvent=修復前意図を永続化 RecoveryAction=不一致または失敗時は既存状態を保持し、新しいOwner確認から再要求 version={} package_sha256={}", current.product_version, current.package_sha256),
+        "LIVE_RUNTIME",
+        payload_hash,
+    ) {
+        Ok(event) => event,
+        Err(_) => {
+            return broker.audit_store_failed_response(
+                request_id,
+                OP_PRODUCT_REPAIR,
+                "product_repair_audit_failed",
+                "修復前Auditを確定できないため変更しない",
+            )
+        }
+    };
+
+    let launcher_restored = match crate::product_bootstrapper::restore_missing_root_bootstrapper(
+        &data_home,
+        &app_id,
+        &audit_store_id,
+        current,
+    ) {
+        Ok(restored) => restored,
+        Err(error) => {
+            return product_repair_failed(
+                broker,
+                request_id,
+                payload_hash,
+                error.0,
+                "現行signed stageから固定root launcherを安全に復元できないため停止した",
+            );
+        }
+    };
+    let _registered_entry = match super::product_install::register_linux_desktop_entry(
+        &data_home,
+        &app_id,
+        &audit_store_id,
+        &root_path,
+    ) {
+        Ok(path) if path == expected_entry => path,
+        Ok(_) => {
+            return product_repair_failed(
+                broker,
+                request_id,
+                payload_hash,
+                "product_desktop_entry_published_path_mismatch",
+                "XDG desktop entryの公開先が確認済み固定pathと一致しない",
+            );
+        }
+        Err(error) => {
+            return product_repair_failed(
+                broker,
+                request_id,
+                payload_hash,
+                error.0,
+                "固定XDG desktop entryを安全に復元できないため停止した",
+            );
+        }
+    };
+    let repaired = launcher_restored || !existing_entry;
+    let completion = match broker.append_audit(
+        &format!("{request_id}:complete"),
+        OP_PRODUCT_REPAIR,
+        if repaired { "completed" } else { "unchanged" },
+        &format!("Capability=product.install.repair_launch_entries Permission=現行signed Linux active versionと固定XDG pathに一致するlaunch entryだけ Approval=独立Rust GTK native Owner確認 AuditEvent=root launcher復元={} desktop entry復元={} intent_audit_id={} RecoveryAction=修復済みentryは維持し、version payload・設定・Credential・Workspace・Audit Storeは変更しない", launcher_restored, !existing_entry, intent.event_id),
+        "LIVE_RUNTIME",
+        payload_hash,
+    ) {
+        Ok(event) => event,
+        Err(_) => {
+            return broker.audit_store_failed_response(
+                request_id,
+                OP_PRODUCT_REPAIR,
+                "product_repair_audit_failed",
+                "修復後の完了Auditを確定できない。Linux起動状態を再確認してください",
+            )
+        }
+    };
+    BrokerResponse {
+        request_id: request_id.to_owned(),
+        operation: OP_PRODUCT_REPAIR.to_owned(),
+        status: BrokerStatus::Accepted,
+        evidence_source: "LIVE_RUNTIME".to_owned(),
+        audit_event_id: completion.event_id,
+        error: None,
+        health: None,
+        body: Some(json!({
+            "版": VERSION,
+            "状態": if repaired { "product_launch_entries_repaired" } else { "unchanged" },
+            "起動器復元": launcher_restored,
+            "desktop entry復元": !existing_entry,
+            "開始Audit ID": intent.event_id,
+            "証拠種別": "LIVE_RUNTIME",
+        })),
+        shutdown_requested: broker.shutdown_requested,
+    }
+}
+
+#[cfg(not(any(windows, target_os = "linux")))]
 fn repair_product_launch_entries(
     broker: &mut Broker,
     payload: &Value,
@@ -1248,7 +1524,7 @@ fn repair_product_launch_entries(
         request_id,
         OP_PRODUCT_REPAIR,
         "product_repair_platform_unavailable",
-        "固定導入先の起動項目修復はWindowsでのみ利用できる",
+        "このOSでは製品起動項目修復を利用できない",
         payload_hash,
     )
 }
@@ -5881,6 +6157,249 @@ mod tests {
             b"conflicting launcher"
         );
         drop(broker);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_product_launch_repair_restores_only_missing_signed_launch_entries() {
+        use std::os::unix::fs::{MetadataExt, PermissionsExt};
+
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "d4p-linux-product-repair-{}-{unique}",
+            std::process::id()
+        ));
+        let store_root = root.join("broker-store");
+        let install_root = root.join("xdg-data");
+        std::fs::create_dir_all(&store_root).unwrap();
+        std::fs::create_dir_all(&install_root).unwrap();
+        let install_root = std::fs::canonicalize(install_root).unwrap();
+        let package = install_test_linux_package_for_version("1.1.0");
+        let previous_package = install_test_linux_package_for_version("1.0.0");
+        let digest = hex::encode(Sha256::digest(&package));
+        let (trust, candidate, previous_candidate) =
+            trust_and_candidate_pair_for_packages(&package, &previous_package);
+        let candidate_hash = crate::broker::protocol::canonical_payload_hash(Some(
+            &serde_json::to_value(&candidate).unwrap(),
+        ));
+        let mut broker = Broker::new_persistent("session-1", &store_root).unwrap();
+        broker.update_trust = Some(trust);
+        broker
+            .set_desktop_product_identity(INSTALL_APP_ID.into(), INSTALL_AUDIT_ID.into())
+            .unwrap();
+        broker.set_desktop_product_install_local_app_data(install_root.clone());
+        let candidates = call(
+            &mut broker,
+            BrokerOperation::更新確認,
+            json!({"版": 1, "候補": [candidate, previous_candidate]}),
+        );
+        assert_eq!(candidates.status, BrokerStatus::Accepted);
+
+        let (_, versions) = super::super::product_install::open_product_versions_directory(
+            &install_root,
+            INSTALL_APP_ID,
+        )
+        .unwrap();
+        let stage_name = format!("1.1.0-{digest}");
+        crate::product_package::extract_verified_package_into_directory(
+            std::io::Cursor::new(package.as_slice()),
+            package.len() as u64,
+            Some(&digest),
+            &versions,
+            &stage_name,
+            crate::product_package::ProductPackageExpectation {
+                product_version: Some("1.1.0"),
+                app_id: INSTALL_APP_ID,
+                audit_store_id: INSTALL_AUDIT_ID,
+                platform: crate::product_package::ProductPackagePlatform::Linux,
+            },
+        )
+        .unwrap();
+        let (product_root_path, product_root) =
+            super::super::product_install::open_existing_product_root(
+                &install_root,
+                INSTALL_APP_ID,
+            )
+            .unwrap();
+        crate::product_bootstrapper::activate_staged_version(
+            &product_root,
+            &versions,
+            "1.1.0",
+            INSTALL_APP_ID,
+            INSTALL_AUDIT_ID,
+            &digest,
+            &candidate.update_id,
+            &candidate_hash,
+            "0123456789abcdef0123456789abcdef",
+        )
+        .unwrap();
+        drop(product_root);
+        drop(versions);
+
+        let active = crate::product_bootstrapper::active_version_snapshot(
+            &install_root,
+            INSTALL_APP_ID,
+            INSTALL_AUDIT_ID,
+        )
+        .unwrap()
+        .current;
+        let active_record = std::fs::read(product_root_path.join("active_version.json")).unwrap();
+        let payload = json!({"版": VERSION});
+        let payload_hash = crate::broker::protocol::canonical_payload_hash(Some(&payload));
+        let entry_path =
+            super::super::product_install::plan_linux_desktop_entry(&install_root, INSTALL_APP_ID)
+                .unwrap();
+        let bootstrapper = product_root_path.join("gui_shell_desktop_launcher");
+        let staged_payload = product_root_path
+            .join("versions")
+            .join(&stage_name)
+            .join("data/icudtl.dat");
+        let mut confirmation = ProductRepairConfirmation {
+            app_id: INSTALL_APP_ID.into(),
+            audit_store_id: INSTALL_AUDIT_ID.into(),
+            update_id: active.update_id.clone(),
+            candidate_hash: active.candidate_hash.clone(),
+            product_version: active.product_version.clone(),
+            package_sha256: active.package_sha256.clone(),
+            product_root: product_root_path.clone(),
+            linux_desktop_entry_path: entry_path.clone(),
+            payload_hash: payload_hash.clone(),
+        };
+        let saved_payload = std::fs::read(&staged_payload).unwrap();
+        std::fs::remove_file(&bootstrapper).unwrap();
+
+        let normal_ipc = call(
+            &mut broker,
+            BrokerOperation::製品起動項目修復要求,
+            payload.clone(),
+        );
+        assert_eq!(normal_ipc.status, BrokerStatus::Rejected);
+        assert_eq!(
+            normal_ipc.error.unwrap().code,
+            "desktop_native_owner_confirmation_required"
+        );
+        assert!(!bootstrapper.exists());
+        assert!(!entry_path.exists());
+
+        confirmation.linux_desktop_entry_path = root.join("attacker.desktop");
+        let stale = repair_product_launch_entries(
+            &mut broker,
+            &payload,
+            "linux-product-repair-stale",
+            &payload_hash,
+            OwnerConfirmationSource::DesktopNativeConfirmation,
+            Some(&confirmation),
+        );
+        assert_eq!(stale.status, BrokerStatus::Rejected);
+        assert_eq!(
+            stale.error.unwrap().code,
+            "product_repair_confirmation_stale"
+        );
+        assert!(!bootstrapper.exists());
+        assert!(!entry_path.exists());
+        confirmation.linux_desktop_entry_path = entry_path.clone();
+
+        std::fs::write(&staged_payload, b"tampered signed package member").unwrap();
+        let tampered = repair_product_launch_entries(
+            &mut broker,
+            &payload,
+            "linux-product-repair-tampered-stage",
+            &payload_hash,
+            OwnerConfirmationSource::DesktopNativeConfirmation,
+            Some(&confirmation),
+        );
+        assert_eq!(tampered.status, BrokerStatus::Rejected);
+        assert_eq!(
+            tampered.error.unwrap().code,
+            "active_version_package_mismatch"
+        );
+        assert!(!bootstrapper.exists());
+        assert!(!entry_path.exists());
+        std::fs::write(&staged_payload, saved_payload).unwrap();
+
+        let repaired = repair_product_launch_entries(
+            &mut broker,
+            &payload,
+            "linux-product-repair-current",
+            &payload_hash,
+            OwnerConfirmationSource::DesktopNativeConfirmation,
+            Some(&confirmation),
+        );
+        assert_eq!(repaired.status, BrokerStatus::Accepted, "{repaired:?}");
+        assert_eq!(repaired.evidence_source, "LIVE_RUNTIME");
+        assert_eq!(repaired.body.as_ref().unwrap()["起動器復元"], true);
+        assert_eq!(repaired.body.as_ref().unwrap()["desktop entry復元"], true);
+        assert!(bootstrapper.is_file());
+        assert!(entry_path.is_file());
+        assert_eq!(
+            std::fs::read(product_root_path.join("active_version.json")).unwrap(),
+            active_record
+        );
+        assert_eq!(
+            std::fs::metadata(&entry_path).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        assert!(broker.audit_events().iter().any(|event| {
+            event.request_id == "linux-product-repair-current:complete"
+                && event.operation == OP_PRODUCT_REPAIR
+                && event.decision == "completed"
+                && event.evidence_source == "LIVE_RUNTIME"
+        }));
+
+        std::fs::remove_file(&entry_path).unwrap();
+        let launcher_metadata = std::fs::metadata(&bootstrapper).unwrap();
+        let entry_only = repair_product_launch_entries(
+            &mut broker,
+            &payload,
+            "linux-product-repair-entry-only",
+            &payload_hash,
+            OwnerConfirmationSource::DesktopNativeConfirmation,
+            Some(&confirmation),
+        );
+        assert_eq!(entry_only.status, BrokerStatus::Accepted);
+        assert_eq!(entry_only.body.as_ref().unwrap()["起動器復元"], false);
+        assert_eq!(entry_only.body.as_ref().unwrap()["desktop entry復元"], true);
+        assert_eq!(
+            std::fs::metadata(&bootstrapper).unwrap().ino(),
+            launcher_metadata.ino()
+        );
+
+        let unchanged = repair_product_launch_entries(
+            &mut broker,
+            &payload,
+            "linux-product-repair-idempotent",
+            &payload_hash,
+            OwnerConfirmationSource::DesktopNativeConfirmation,
+            Some(&confirmation),
+        );
+        assert_eq!(unchanged.status, BrokerStatus::Accepted);
+        assert_eq!(unchanged.body.as_ref().unwrap()["状態"], "unchanged");
+
+        let conflicting_entry = b"attacker-controlled desktop entry\n";
+        std::fs::write(&entry_path, conflicting_entry).unwrap();
+        let conflict = repair_product_launch_entries(
+            &mut broker,
+            &payload,
+            "linux-product-repair-conflict",
+            &payload_hash,
+            OwnerConfirmationSource::DesktopNativeConfirmation,
+            Some(&confirmation),
+        );
+        assert_eq!(conflict.status, BrokerStatus::Rejected);
+        assert_eq!(
+            conflict.error.unwrap().code,
+            "product_desktop_entry_conflict"
+        );
+        assert_eq!(std::fs::read(&entry_path).unwrap(), conflicting_entry);
+        assert!(broker.audit_events().iter().any(|event| {
+            event.request_id == "linux-product-repair-conflict:failed"
+                && event.operation == OP_PRODUCT_REPAIR
+                && event.decision == "failed"
+        }));
         std::fs::remove_dir_all(root).unwrap();
     }
 

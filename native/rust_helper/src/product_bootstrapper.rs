@@ -306,6 +306,7 @@ pub(crate) fn active_version_snapshot(
 
 /// Brokerが再照合した現行stageから、欠損している固定root Bootstrapperだけを復元する。
 /// 既存file、active record、version-local payloadは上書きしない。
+#[cfg(any(windows, target_os = "linux"))]
 pub(crate) fn restore_missing_root_bootstrapper(
     local_app_data: &Path,
     expected_app_id: &str,
@@ -334,13 +335,17 @@ pub(crate) fn restore_missing_root_bootstrapper(
     );
     let stage = open_existing_directory(&versions, &stage_name, root_device)?;
     validate_descriptor_stage(&versions, expected_current, root_device)?;
+    #[cfg(windows)]
+    let package_platform = crate::product_package::ProductPackagePlatform::Windows;
+    #[cfg(target_os = "linux")]
+    let package_platform = crate::product_package::ProductPackagePlatform::Linux;
     crate::product_package::verify_staged_product_package_hash(
         &stage,
         crate::product_package::ProductPackageExpectation {
             product_version: Some(&expected_current.product_version),
             app_id: expected_app_id,
             audit_store_id: expected_audit_store_id,
-            platform: crate::product_package::ProductPackagePlatform::Windows,
+            platform: package_platform,
         },
         &expected_current.package_sha256,
     )

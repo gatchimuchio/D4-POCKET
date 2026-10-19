@@ -12,6 +12,7 @@ struct Candidate {
     download_confirmation: Option<crate::broker::update_center::UpdateDownloadConfirmation>,
     apply_confirmation: Option<crate::broker::update_center::UpdateApplyConfirmation>,
     activation_confirmation: Option<crate::broker::update_center::UpdateActivationConfirmation>,
+    product_repair_confirmation: Option<crate::broker::update_center::ProductRepairConfirmation>,
 }
 
 struct LinuxUpdateOwnerCandidate {
@@ -19,6 +20,11 @@ struct LinuxUpdateOwnerCandidate {
     download_confirmation: Option<crate::broker::update_center::UpdateDownloadConfirmation>,
     apply_confirmation: Option<crate::broker::update_center::UpdateApplyConfirmation>,
     activation_confirmation: Option<crate::broker::update_center::UpdateActivationConfirmation>,
+}
+
+struct LinuxProductRepairOwnerCandidate {
+    summary: String,
+    confirmation: crate::broker::update_center::ProductRepairConfirmation,
 }
 
 #[derive(serde::Deserialize)]
@@ -30,6 +36,14 @@ struct UpdateOwnerRequest {
     update_id: String,
     #[serde(rename = "候補hash")]
     candidate_hash: String,
+}
+
+#[cfg(target_os = "linux")]
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LinuxProductRepairRequest {
+    #[serde(rename = "版")]
+    version: u64,
 }
 
 fn valid_update_id(value: &str) -> bool {
@@ -418,6 +432,107 @@ fn linux_update_owner_candidate(
     }
 }
 
+#[cfg(target_os = "linux")]
+fn linux_product_repair_owner_candidate(
+    payload: &serde_json::Value,
+    payload_hash: &str,
+    endpoint: &BrokerEndpoint,
+) -> Option<LinuxProductRepairOwnerCandidate> {
+    let request: LinuxProductRepairRequest = serde_json::from_value(payload.clone()).ok()?;
+    if request.version != 1 {
+        return None;
+    }
+    let (app_id, audit_store_id) =
+        crate::broker::update_center::embedded_product_identity().ok()??;
+    let listing_payload = serde_json::json!({"版": 1});
+    let mut nonce = [0_u8; 16];
+    getrandom::getrandom(&mut nonce).ok()?;
+    let nonce = hex::encode(nonce);
+    let request_id = format!("linux-product-repair-preflight-{nonce}");
+    let preflight = serde_json::json!({
+        "request_id": request_id,
+        "operation": "更新一覧",
+        "payload_hash": canonical_payload_hash(Some(&listing_payload)),
+        "nonce": format!("linux-product-repair-preflight-nonce-{nonce}"),
+        "issued_at": BrokerRequestEnvelope::current_issued_at(),
+        "metadata": {"client": "desktop_flutter"},
+        "payload": listing_payload,
+    });
+    let mut preflight = serde_json::to_vec(&preflight).ok()?;
+    preflight = super::macos_desktop_worker::normalize(&preflight, &endpoint.session_id);
+    let response = super::macos_desktop_worker::relay(&preflight, endpoint).ok()?;
+    preflight.fill(0);
+    let response: serde_json::Value = serde_json::from_slice(&response).ok()?;
+    if response["request_id"] != request_id
+        || response["operation"] != "更新一覧"
+        || response["status"] != "accepted"
+    {
+        return None;
+    }
+    let rollback = &response["body"]["rollback状態"];
+    if !matches!(rollback["状態"].as_str()?, "available" | "unavailable") {
+        return None;
+    }
+    let current = &rollback["現在版"];
+    let update_id = current["更新ID"].as_str()?;
+    let candidate_hash = current["候補hash"].as_str()?;
+    let product_version = current["提供版"].as_str()?;
+    let package_sha256 = current["package_sha256"].as_str()?;
+    if !valid_update_id(update_id)
+        || !valid_sha256(candidate_hash)
+        || product_version.is_empty()
+        || product_version.len() > 64
+        || !product_version
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || b".+_-".contains(&byte))
+        || package_sha256.len() != 64
+        || !package_sha256
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return None;
+    }
+    let updates = response["body"]["更新一覧"].as_array()?;
+    let matching: Vec<&serde_json::Value> = updates
+        .iter()
+        .filter(|record| {
+            record["版"] == 2
+                && record["更新ID"] == update_id
+                && record["候補hash"] == candidate_hash
+                && record["提供版"] == product_version
+                && record["package_sha256"] == package_sha256
+                && record["署名状態"] == "verified"
+        })
+        .collect();
+    let [_] = matching.as_slice() else {
+        return None;
+    };
+    let data_home = crate::broker::product_install::current_user_local_app_data().ok()?;
+    let product_root =
+        crate::broker::product_install::product_install_root(&data_home, &app_id).ok()?;
+    let desktop_entry_path =
+        crate::broker::product_install::plan_linux_desktop_entry(&data_home, &app_id).ok()?;
+    Some(LinuxProductRepairOwnerCandidate {
+        summary: format!(
+            "D4 PocketのLinux固定起動項目を修復しますか？\n\n現行署名済み版: {product_version}\n現行package SHA-256: {package_sha256}\nApp ID: {app_id}\nAudit Store ID: {audit_store_id}\n固定導入root: {}\n固定XDG desktop entry: {}\n\nBrokerは実行時に現在の署名trust、active record、stage全体と固定pathを再照合します。欠損したroot launcherとdesktop entryだけを復元し、既存file、版本体、active record、設定、Credential、Workspace、Audit Storeを上書き・削除しません。processも起動しません。競合または不一致はfail-closedで停止し、意図と結果をAuditへ記録します。\n\n要求hash: {}",
+            product_root.display(),
+            desktop_entry_path.display(),
+            payload_hash
+        ),
+        confirmation: crate::broker::update_center::ProductRepairConfirmation {
+            app_id,
+            audit_store_id,
+            update_id: update_id.to_owned(),
+            candidate_hash: candidate_hash.to_owned(),
+            product_version: product_version.to_owned(),
+            package_sha256: package_sha256.to_owned(),
+            product_root,
+            linux_desktop_entry_path: desktop_entry_path,
+            payload_hash: payload_hash.to_owned(),
+        },
+    })
+}
+
 #[cfg(any(target_os = "linux", target_os = "macos", test))]
 fn macos_owner_summary(operation: &str, payload: &serde_json::Value) -> Option<String> {
     crate::broker::mcp_center::desktop_owner_summary(operation, payload)
@@ -450,6 +565,7 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
     let payload = envelope.payload.as_ref()?;
     let registration = operation == "AgentCLI実行系作業領域登録";
     let mut update_owner_candidate = None;
+    let mut product_repair_confirmation = None;
     let text = if registration {
         let summary = crate::broker::protocol::macos_agent_registration_summary(payload)?;
         format!("{summary}\n要求hash: {hash}")
@@ -461,6 +577,18 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
         let summary = update.summary.clone();
         update_owner_candidate = Some(update);
         summary
+    } else if operation == "製品起動項目修復要求" {
+        #[cfg(target_os = "linux")]
+        {
+            let repair = linux_product_repair_owner_candidate(payload, &hash, endpoint)?;
+            let summary = repair.summary.clone();
+            product_repair_confirmation = Some(repair.confirmation);
+            summary
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            return None;
+        }
     } else if operation == "AgentTaskWorkspacePermissionGrant" {
         let request: AgentTaskWorkspacePermissionRequest =
             serde_json::from_value(payload.clone()).ok()?;
@@ -646,6 +774,7 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
         activation_confirmation: update_owner_candidate
             .as_ref()
             .and_then(|update| update.activation_confirmation.clone()),
+        product_repair_confirmation,
     })
 }
 
@@ -669,7 +798,7 @@ pub(super) fn dispatch(
             download_confirmation: candidate.download_confirmation,
             apply_confirmation: candidate.apply_confirmation,
             activation_confirmation: candidate.activation_confirmation,
-            product_repair_confirmation: None,
+            product_repair_confirmation: candidate.product_repair_confirmation,
             product_uninstall_confirmation: None,
             reply,
         })
@@ -1519,6 +1648,164 @@ mod task_owner_tests {
         })
         .unwrap()
         .expect("Owner confirmation should forward once");
+        assert_eq!(
+            serde_json::from_slice::<Value>(&response).unwrap()["status"],
+            "accepted"
+        );
+        worker.join().unwrap();
+        listener_thread.join().unwrap();
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_product_launch_repair_binds_current_signed_candidate_and_fixed_paths() {
+        use std::io::{BufRead, BufReader, Write};
+        use std::net::TcpListener;
+
+        let (app_id, audit_store_id) = crate::broker::update_center::embedded_product_identity()
+            .expect("試験build識別子の検査に成功する")
+            .expect("Linux用試験識別子が設定されている");
+        let install_root = crate::broker::product_install::current_user_local_app_data().unwrap();
+        let expected_root =
+            crate::broker::product_install::product_install_root(&install_root, &app_id).unwrap();
+        let expected_entry =
+            crate::broker::product_install::plan_linux_desktop_entry(&install_root, &app_id)
+                .unwrap();
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let listener_thread = std::thread::spawn(move || {
+            for _ in 0..2 {
+                let (stream, _) = listener.accept().unwrap();
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(2)))
+                    .unwrap();
+                let mut reader = BufReader::new(stream);
+                let mut secret = String::new();
+                let mut frame = String::new();
+                reader.read_line(&mut secret).unwrap();
+                reader.read_line(&mut frame).unwrap();
+                assert_eq!(secret.trim_end(), "linux-product-repair-fixture-secret");
+                let request: Value = serde_json::from_str(&frame).unwrap();
+                assert_eq!(request["operation"], "更新一覧");
+                assert_eq!(
+                    request["session_id"],
+                    "linux-product-repair-fixture-session"
+                );
+                let response = json!({
+                    "request_id": request["request_id"],
+                    "operation": "更新一覧",
+                    "status": "accepted",
+                    "body": {
+                        "更新一覧": [{
+                            "版": 2,
+                            "更新ID": "linux-product-repair-current",
+                            "候補hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                            "署名状態": "verified",
+                            "package_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                            "提供版": "1.1.0"
+                        }],
+                        "rollback状態": {
+                            "状態": "unavailable",
+                            "現在版": {
+                                "更新ID": "linux-product-repair-current",
+                                "候補hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                                "提供版": "1.1.0",
+                                "package_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                            }
+                        }
+                    }
+                });
+                let stream = reader.get_mut();
+                stream.write_all(response.to_string().as_bytes()).unwrap();
+                stream.write_all(b"\n").unwrap();
+                stream.flush().unwrap();
+            }
+        });
+        let endpoint = BrokerEndpoint {
+            host: "127.0.0.1".into(),
+            port,
+            session_id: "linux-product-repair-fixture-session".into(),
+            session_secret: "linux-product-repair-fixture-secret".into(),
+            credential_role: BrokerCredentialRole::Normal,
+            transport: "tcp".into(),
+            max_request_bytes: 65536,
+        };
+        let payload = json!({"版": 1});
+        let valid = request("製品起動項目修復要求", payload.clone());
+        let bytes = serde_json::to_vec(&valid).unwrap();
+        let (sender, receiver) = mpsc::sync_channel::<DesktopOwnerOperationRequest>(1);
+        let mut declined_summary = String::new();
+        assert!(dispatch(&bytes, &endpoint, &sender, &mut |summary| {
+            declined_summary = summary.to_owned();
+            false
+        })
+        .unwrap()
+        .is_none());
+        assert!(declined_summary.contains("1.1.0"));
+        assert!(declined_summary
+            .contains("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"));
+        assert!(declined_summary.contains(&expected_root.display().to_string()));
+        assert!(declined_summary.contains(&expected_entry.display().to_string()));
+        assert!(declined_summary.contains(valid["payload_hash"].as_str().unwrap()));
+        assert!(!declined_summary.contains("linux-product-repair-fixture-secret"));
+        assert!(receiver.try_recv().is_err());
+
+        let worker_root = expected_root.clone();
+        let worker_entry = expected_entry.clone();
+        let worker_payload = payload.clone();
+        let worker_payload_hash = valid["payload_hash"].as_str().unwrap().to_owned();
+        let worker = std::thread::spawn(move || {
+            let operation = receiver.recv_timeout(Duration::from_secs(2)).unwrap();
+            let confirmation = operation
+                .product_repair_confirmation
+                .expect("型付きRepair確認がBrokerへ届く");
+            assert_eq!(confirmation.app_id, app_id);
+            assert_eq!(confirmation.audit_store_id, audit_store_id);
+            assert_eq!(confirmation.update_id, "linux-product-repair-current");
+            assert_eq!(
+                confirmation.candidate_hash,
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            );
+            assert_eq!(confirmation.product_version, "1.1.0");
+            assert_eq!(confirmation.package_sha256, "b".repeat(64));
+            assert_eq!(confirmation.product_root, worker_root);
+            assert_eq!(confirmation.linux_desktop_entry_path, worker_entry);
+            assert_eq!(confirmation.payload_hash, worker_payload_hash);
+            assert!(operation.download_confirmation.is_none());
+            assert!(operation.apply_confirmation.is_none());
+            assert!(operation.activation_confirmation.is_none());
+            let normalized: Value = serde_json::from_str(&operation.request_json).unwrap();
+            assert_eq!(normalized["operation"], "製品起動項目修復要求");
+            assert_eq!(normalized["payload"], worker_payload);
+            assert_eq!(
+                normalized["session_id"],
+                "linux-product-repair-fixture-session"
+            );
+            operation
+                .reply
+                .send(BrokerResponse {
+                    request_id: "linux-product-repair-owner-fixture".into(),
+                    operation: "製品起動項目修復要求".into(),
+                    status: BrokerStatus::Accepted,
+                    evidence_source: "FIXTURE".into(),
+                    audit_event_id: "linux-product-repair-owner-audit-fixture".into(),
+                    error: None,
+                    health: None,
+                    body: Some(json!({"起動器復元": true, "desktop entry復元": true})),
+                    shutdown_requested: false,
+                })
+                .unwrap();
+            assert!(receiver.try_recv().is_err());
+        });
+        let response = dispatch(&bytes, &endpoint, &sender, &mut |summary| {
+            summary.contains("現行署名済み版: 1.1.0")
+                && summary.contains(&expected_root.display().to_string())
+                && summary.contains(&expected_entry.display().to_string())
+                && summary.contains(valid["payload_hash"].as_str().unwrap())
+                && !summary.contains("linux-product-repair-fixture-secret")
+        })
+        .unwrap()
+        .expect("一致するOwner確認だけを一度配送する");
         assert_eq!(
             serde_json::from_slice::<Value>(&response).unwrap()["status"],
             "accepted"

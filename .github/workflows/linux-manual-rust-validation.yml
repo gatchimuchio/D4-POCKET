@@ -75,6 +75,12 @@ jobs:
           GUI_SHELL_PRODUCT_APP_ID: d4-pocket-app-11111111111111111111111111111111
           GUI_SHELL_PRODUCT_AUDIT_STORE_ID: audit-store-22222222222222222222222222222222
         run: cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib macos_desktop_owner::task_owner_tests::linux_update_rollback_confirmation_binds_both_signed_versions_and_fixed_entry -- --exact --test-threads=1
+      - name: Linux native product launch Repair Broker and Owner tests
+        shell: bash
+        env:
+          GUI_SHELL_PRODUCT_APP_ID: d4-pocket-app-11111111111111111111111111111111
+          GUI_SHELL_PRODUCT_AUDIT_STORE_ID: audit-store-22222222222222222222222222222222
+        run: cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib linux_product_launch_repair -- --test-threads=1
       - name: Broker validates candidate-bound package source for Owner display
         shell: bash
         run: cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib broker::update_center::tests::package_source_host_is_https_and_bound_to_the_candidate -- --exact --test-threads=1
