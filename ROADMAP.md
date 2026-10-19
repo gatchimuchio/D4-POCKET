@@ -574,7 +574,7 @@ rev2の要求監査では、Mobile実機証拠・Mobile正式配布・Desktop起
 
 ## 0. 製品定義
 
-> **履歴範囲の注意（2026-10-19）:** 以下のv1.0 platform priority／`required_for_v1`記述は、当時のWindows-first release planとWSLg smokeを記録した履歴であり、現行Linux native製品対象のAcceptanceを定義しない。現行OS対象と証拠境界は`AGENTS.md` §0を参照する。WSL／WSLg／headless証拠をLinux native製品の導入・GUI・権限・配布・Wayland完成へ転用しない。Linux v1.1追加文書はOwner採否前の正本候補であり、正式工程・正式サポートを開始した扱いにしない。
+> **履歴範囲の注意（2026-10-19、Owner確認反映）:** 以下のv1.0 platform priority／`required_for_v1`記述は、当時のWindows-first release planとWSLg smokeを記録した履歴であり、現行Linux native製品対象のAcceptanceを定義しない。現行Linux nativeは完全対応が必須の独立製品対象で、製品機能・導入・GUI・権限境界・配布まで対応する。現行OS対象と証拠境界は`AGENTS.md` §0を参照する。WSL／WSLg／headless証拠をLinux native製品の導入・GUI・権限・配布・Wayland完成へ転用しない。Linux v1.1追加文書がOwner採否前の正本候補であることは、Linux対応を任意化・延期する意味ではない。候補文書が定める要求ID・詳細試験・QE作業分割の採否だけを別途扱う。
 
 GUI Shell は、local Runtime、agent、tool、service を対象とする PC-first の AI Runtime／Agent Operation Shell であり、`LLM-readable application responsibility substrate`（LLM が読むアプリケーション責任基盤）である。
 

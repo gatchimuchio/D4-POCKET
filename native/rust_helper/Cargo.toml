@@ -8,6 +8,8 @@ license = "Apache-2.0"
 default = []
 # Local-only integrated R2 test build. Never use for product distribution.
 r2-e2e = []
+# Linux Desktop-only bundled Broker bridge. Product runners opt in explicitly.
+linux-desktop-broker = []
 
 [lib]
 name = "gui_shell_rust_helper"
@@ -22,6 +24,10 @@ required-features = ["r2-e2e"]
 name = "gui_shell_r2_e2e_frontend"
 path = "src/bin/r2_e2e_frontend.rs"
 required-features = ["r2-e2e"]
+
+[[bin]]
+name = "gui_shell_linux_broker"
+path = "src/bin/gui_shell_linux_broker.rs"
 
 [dependencies]
 getrandom = "0.2"

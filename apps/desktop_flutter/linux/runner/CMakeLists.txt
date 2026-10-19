@@ -9,6 +9,7 @@ project(runner LANGUAGES CXX)
 add_executable(${BINARY_NAME}
   "main.cc"
   "my_application.cc"
+  "broker_process_channel.cc"
   "${FLUTTER_MANAGED_DIR}/generated_plugin_registrant.cc"
 )
 
@@ -24,3 +25,27 @@ target_link_libraries(${BINARY_NAME} PRIVATE flutter)
 target_link_libraries(${BINARY_NAME} PRIVATE PkgConfig::GTK)
 
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
+
+file(GLOB_RECURSE LINUX_BROKER_RUST_SOURCES CONFIGURE_DEPENDS
+  "${REPOSITORY_ROOT}/native/rust_helper/src/*.rs")
+add_custom_command(
+  OUTPUT "${LINUX_BROKER_HELPER}"
+  COMMAND ${CMAKE_COMMAND} -E make_directory
+    "${CMAKE_BINARY_DIR}/intermediates_do_not_run/libexec"
+  COMMAND ${CMAKE_COMMAND} -E env
+    "CARGO_TARGET_DIR=${CMAKE_BINARY_DIR}/linux_broker_cargo_target"
+    "${CARGO_EXECUTABLE}" build --locked --release
+    --manifest-path "${REPOSITORY_ROOT}/native/rust_helper/Cargo.toml"
+    --bin gui_shell_linux_broker --features linux-desktop-broker
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    "${CMAKE_BINARY_DIR}/linux_broker_cargo_target/release/gui_shell_linux_broker"
+    "${LINUX_BROKER_HELPER}"
+  DEPENDS
+    "${REPOSITORY_ROOT}/native/rust_helper/Cargo.toml"
+    "${REPOSITORY_ROOT}/native/rust_helper/Cargo.lock"
+    ${LINUX_BROKER_RUST_SOURCES}
+  WORKING_DIRECTORY "${REPOSITORY_ROOT}"
+  VERBATIM
+)
+add_custom_target(gui_shell_linux_broker DEPENDS "${LINUX_BROKER_HELPER}")
+add_dependencies(${BINARY_NAME} gui_shell_linux_broker)

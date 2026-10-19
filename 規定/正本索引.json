@@ -396,6 +396,10 @@
       "責任": "macOS製品画面と同梱Rust helperの匿名pipe、既存Broker接続、sandbox継承、秘密非公開、正常終了、Rust所有Owner確認、Adapter catalog管理とAgent CLI／Workspace起動中登録の限定契約"
     },
     {
+      "path": "docs/specs/linux-desktop-channel.md",
+      "責任": "Linux GTK Runnerから同梱Rust helper・既存authenticated Brokerへの固定stdio経路、bounded frame、秘密／資格非露出、fail-closed、およびLinux製品対応の未成立範囲"
+    },
+    {
       "path": "docs/specs/macos-agent-cli-selection.md",
       "責任": "P13 CLI実行fileのOS選択、既存private pipeによる非公開scope輸送、公開path投影と別個Owner登録の分離、有限製品受入れ"
     },

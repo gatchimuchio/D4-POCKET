@@ -36,6 +36,12 @@ AIエージェントが高度になるほど、次に難しくなるのは「何
 | **緩衝基盤とAgent Task** | B0〜B4は有限Product Build受入CLOSED。B5はOPEN。Windows hosted run #54はRust全target 569／0／13を3回PASSし、Release Broker build・通常IPC smoke・capture cleanupもPASS。run #53／#54のdecoded tupleは0件だが、raw packetがない証明ではなく、後続RST probe commit `61e3b93`のhosted検証も未実施。`BUF-T04`は部分観測、`BUF-T05`／`BUF-T06`はOPEN、`BUF-T23`はB5局所受入済み。長期累積・同時利用等は工程表Q4に残す。詳細は[B5記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md) | OneDrive警告との因果、loopback/TLS failureの根因、Q4の長期／反復／資源影響、現行SAC policy全体、通常Release能力、正式配布・実機保証 |
 | **正式な出荷判断** | Release GateとOwner承認を独立に保持 | <code>task_execution=unsupported</code>、<code>release_ready=false</code> |
 
+- item: Linux native full product support
+  classification: `release_blocker`
+  registry_id: linux_native_product_support
+  reason: Linux native Desktopは必須製品対象だが、現行の部分実装とWSLg開発smokeだけでは、installed製品・権限境界・復旧・配布の完全対応を受入れていない。
+  required_action: Linux nativeの全必須Desktop経路を実装し、X11／Wayland、Broker／Owner、資格情報、Workspace、Agent recovery、導入／更新／rollback／削除、provenanceを対象別に受入れる。
+
 B4-L2の記録済み検査では、Rust全体直列テスト **569 passed / 0 failed / 13 ignored**、Agent Task Flutter client 14件とAgent Center widget 1件、Schema **167件**・正常例 **163件**・否定fixture **215件**、Conformance **245 checks**を確認しています。これらは**2026-10-11の開発環境における対象版の証拠**であり、このREADME更新時に再実行した値でも、インストール済み製品の保証でもありません。10月17日のB4統合経路証拠も`r2-e2e` staged buildとlocalhost合成APIの範囲に限られ、通常Release能力やinstalled provenanceを示しません。[観測範囲と残差](docs/REV5_PRODUCT_PROGRESS.md)を参照してください。
 
 ## アーキテクチャ — 誰が何を決めるのか

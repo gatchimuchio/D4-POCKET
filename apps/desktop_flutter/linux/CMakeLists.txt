@@ -9,6 +9,10 @@ set(BINARY_NAME "gui_shell_desktop")
 # https://wiki.gnome.org/HowDoI/ChooseApplicationID
 set(APPLICATION_ID "com.example.gui_shell_desktop")
 
+get_filename_component(REPOSITORY_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../.." ABSOLUTE)
+set(LINUX_BROKER_HELPER
+  "${CMAKE_BINARY_DIR}/intermediates_do_not_run/libexec/gui_shell_linux_broker")
+
 # Explicitly opt in to modern CMake behaviors to avoid warnings with recent
 # versions of CMake.
 cmake_policy(SET CMP0063 NEW)
@@ -53,6 +57,7 @@ add_subdirectory(${FLUTTER_MANAGED_DIR})
 # System-level dependencies.
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GTK REQUIRED IMPORTED_TARGET gtk+-3.0)
+find_program(CARGO_EXECUTABLE cargo REQUIRED)
 
 # Application build; see runner/CMakeLists.txt.
 add_subdirectory("runner")
@@ -93,6 +98,8 @@ set(INSTALL_BUNDLE_LIB_DIR "${CMAKE_INSTALL_PREFIX}/lib")
 
 install(TARGETS ${BINARY_NAME} RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}"
   COMPONENT Runtime)
+install(PROGRAMS "${LINUX_BROKER_HELPER}"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/libexec" COMPONENT Runtime)
 
 install(FILES "${FLUTTER_ICU_DATA_FILE}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
   COMPONENT Runtime)

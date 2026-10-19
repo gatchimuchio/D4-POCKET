@@ -184,6 +184,19 @@
       "required_action": "インストール先のリリース実測証拠と厳格検証が合格した後に限り、所有者の明示GOを記録してください。"
     },
     {
+      "name": "linux_native_product_support",
+      "status": "unresolved",
+      "status_source": "manual",
+      "active": true,
+      "classification": "release_blocker",
+      "cause_category": "technical_blocker",
+      "release_tracks": ["non_windows"],
+      "blocks_release": true,
+      "blocks_windows_technical_complete": false,
+      "reason": "Linux native Desktopは完全対応が必須の独立製品対象だが、既存WSLg開発smokeと現在の部分的なBroker接続実装だけでは、Linux nativeの通常機能・権限境界・導入・更新・復旧・配布の製品経路を受入れていない。",
+      "required_action": "Linux nativeの全必須Desktop機能を現行Rust Brokerと安全境界へ接続し、Owner確認・資格情報・Workspace選択・Agent process監督／Recovery、X11／Wayland、Installer／Update／Rollback／Uninstallerを実装・検証する。対象Linux製品のinstalled pathとartifact provenanceを結合して受入れ、Linux Taskの停止・Recovery・Audit条件が成立するまでtask_execution=supportedへ昇格しない。"
+    },
+    {
       "name": "rev2_mobile_device_evidence",
       "status": "unresolved",
       "status_source": "manual",

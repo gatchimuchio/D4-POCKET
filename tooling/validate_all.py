@@ -377,19 +377,27 @@ def platform_evidence_checks(desktop_platform: str, strict_release: bool = False
             [
                 EvidenceCheck(
                     "linux_desktop_build_smoke",
-                    "passed",
-                    "none",
+                    "historical_development_smoke",
+                    "known_limitation",
                     "no",
-                    "Linux desktop build smoke は 2026-05-25 に合格した。",
-                    "開発・検証範囲の証拠として Linux build smoke の合格を維持する。",
+                    "2026-05-25のLinux build smokeは履歴上の開発証拠であり、現行Linux native製品buildやinstalled packageの受入証拠ではない。",
+                    "現行Linux native製品artifactを対象にbuild・install・runtime証拠を取得する。",
                 ),
                 EvidenceCheck(
                     "linux_desktop_launch_smoke",
-                    "passed",
-                    "none",
+                    "historical_development_smoke",
+                    "known_limitation",
                     "no",
-                    "Linux desktop launch smoke は WSLg 上で合格し、最初の window 証拠を記録済みである。これは有用な証拠だが、単独で最終的な Windows-first 製品証拠にはならない。",
-                    "Windows-first release 証拠を完成させる間も Linux launch smoke の合格を維持する。",
+                    "過去のWSLg起動は開発証拠であり、Linux native distroのGUI、権限、導入、Wayland、配布を証明しない。",
+                    "X11／Waylandを含むLinux native installed productの起動・権限・終了・回復を検証する。",
+                ),
+                EvidenceCheck(
+                    "linux_native_product_acceptance",
+                    "not_established",
+                    "release_blocker" if strict_release else "known_limitation",
+                    "yes" if strict_release else "no",
+                    "Linux nativeは完全対応が必須の独立製品対象だが、現行mainには全必須機能・installed path・配布の受入証拠がない。",
+                    "linux_native_product_support blockerの有限要求を実装し、Linux native対象のinstalled product evidenceで受入れる。",
                 ),
             ]
         )

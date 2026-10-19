@@ -3848,6 +3848,7 @@ def test_release_facing_docs_sync_release_blockers_to_registry() -> list[str]:
         "windows_broker_installed_smoke",
         "audit_anchor_external_tamper_evidence_proof",
         "owner_go",
+        "linux_native_product_support",
         "windows_distribution_identity",
     ]:
         if expected not in registry_names:

@@ -1,6 +1,8 @@
 # D4 Pocket / GUI-Shell rev5 Product-First 進捗
 
-製品対象の確認（2026-10-19）: Linux native Desktopは完全対応が必須の独立製品対象である。2026-10-12再構成3文書v1.1が採否前候補であることは、Linux対応を任意・延期対象にする意味ではなく、要求ID・詳細試験・QE作業分割の採否だけを保留している。現状のLinux native製品経路・導入・配布は未受入れであり、WSL／WSLg／headless証拠を代用しない。B5および通常Releaseの状態は変更しない。
+製品対象の確認（2026-10-19）: Linux native Desktopは完全対応が必須の独立製品対象である。2026-10-12再構成3文書v1.1が採否前候補であることは、Linux対応を任意・延期対象にする意味ではなく、要求ID・詳細試験・QE作業分割の採否だけを保留している。現状のLinux native製品経路・導入・配布は未受入れであり、WSL／WSLg／headless証拠を代用しない。B5および通常Releaseの状態は変更しない。Linuxの未成立状態は`release_blockers.registry.json`の`linux_native_product_support`として`non_windows` release blockerへ登録する。
+
+作業追補（2026-10-19、Linux通常Broker transport）: Linux nativeを必須製品対象として、GTK Runnerから固定同梱Rust helperを介し、既存Rust Brokerの通常認証経路へ接続するbounded transportを実装した。helperはRust所有session値、private runtime/state確認、flockによる単一起動、異常終了後の限定stale-session回収を担い、Flutter／GTKへ権限判断を移さない。検証は隔離Linux source snapshot上でRust Linux worker試験5件PASS、Flutter 3.44.0 `flutter build linux --release` PASS、Conformance 259 checks PASS、`rustfmt --check`／Manifest／`git diff --check` PASS、Windows release gate PASS。strict `non_windows` release gateは未解決`linux_native_product_support`および既存blockerによりFAILし、これはLinux製品受入れ未完了を正しく示す。buildはUbuntu-24.04 on WSLの開発証拠であり、Linux native実機のinstalled起動、X11／Wayland別動作、Owner／Credential／Workspace／Agent recovery、Installer／更新／rollback／削除の受入れではない。`task_execution=unsupported`、`release_ready=false`を維持する。
 
 作業追補（2026-10-19、旧運用文書の検査入口を現行化）: 非正本の`docs/OPERATING_MODEL.md`に残ったOneDrive上で直接Cargo／Flutterを実行する例を隔離runnerへ置き換えた。`docs/COMPLETION_STRATEGY_INSTRUCTION.md`は旧Phase Bの履歴資料と明示した。Conformanceへ再発検査を追加。現行B5／`task_execution=unsupported`／`release_ready=false`は不変。詳細は[ロードマップ](../ROADMAP.md)。
 
