@@ -20,7 +20,9 @@ Readerはpackage structure、製品版、固定identity、Product Manifestの新
 
 Linux Brokerの署名候補、compile-time App／Audit identity、固定XDG導入root、native Owner確認、durable Auditを再照合する導入consumerを既存Brokerへ接続する。更新適用はBrokerの現在candidate一覧に束縛したLinux native Owner確認を経て、承認時のみ同じ確認情報を既存Broker queueへ渡す。Brokerは署名済みdigestのdownload fileを再検証してLinux D4PKG01を未起動version directoryへstageし、開始／完了Auditを確定する。通常IPC、確認先差替、所有UID／hardlink／unsafe mode違反、package hash／内容不一致はfail-closedする。
 
-このstage接続はactive-version切替、desktop entry、起動、更新rollback、uninstall、Linux native installed product受入れを意味しない。Export builderのsource／toolchain／artifact provenanceは別節で定義する。Linux完全対応と`task_execution=supported`の判定には、installer lifecycleとnative acceptanceを含む現行Release blockerの全残件を閉じる必要がある。WSL証拠をnative Linux acceptanceへ転用しない。
+stage後の有効化は別の`更新有効版切替要求`で行う。Linux native Owner確認には現在のBroker candidate、compile-time App／Audit identity、固定version directory、固定XDG desktop entry pathを結合し、Brokerが現在のdata homeと両destinationを再導出して一致しなければ拒否する。成功時はstage全体を署名済みpackageへread-only照合し、既存Broker bootstrapperにactive-version recordを記録する。Brokerのactive-version resolverは現在recordとstage launcherを検証し、固定root launcherはfixed product root内のregular executableとしてowner／mode／link数を検査する。固定root launcherはversion切替後も維持し、per-user `.desktop` entryのExec／TryExecはこの固定root launcherを指す。既存entryは同一内容・owner・mode・link数の場合だけ再利用し、競合・symlinkは拒否する。queued／completed／failed Auditを残し、process起動はしない。通常IPC、stale path、stage／package改変はfail-closedする。
+
+これらはLinux targetのBroker／filesystem試験とWSL上の実装経路証拠であり、native desktop session上のinstalled GUI／desktop entry選択／実launcher起動、Update／Rollback／Uninstaller lifecycleの全体受入れを意味しない。Export builderのsource／toolchain／artifact provenanceは別節で定義する。Linux完全対応と`task_execution=supported`の判定にはinstaller lifecycleとnative acceptanceを含む現行Release blockerの全残件を閉じる必要がある。WSL証拠をnative Linux acceptanceへ転用しない。
 
 ## 4. Linux製品package作成tool
 

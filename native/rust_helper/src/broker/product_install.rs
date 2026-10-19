@@ -7,15 +7,14 @@
 #[cfg(windows)]
 use cap_fs_ext::OsMetadataExt as _;
 use cap_fs_ext::{DirExt, MetadataExt as CapMetadataExt};
-#[cfg(windows)]
-use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt as _};
+use cap_fs_ext::{FollowSymlinks, OpenOptionsExt as _, OpenOptionsFollowExt as _};
 use cap_std::fs::Dir;
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "linux"))]
 use cap_std::fs::OpenOptions;
 #[cfg(target_os = "linux")]
-use std::os::unix::fs::MetadataExt as StdMetadataExt;
+use std::io::{Read, Write};
 #[cfg(target_os = "linux")]
-use std::os::unix::fs::PermissionsExt;
+use std::os::unix::fs::{MetadataExt as StdMetadataExt, PermissionsExt};
 use std::path::{Component, Path, PathBuf};
 
 #[cfg(not(target_os = "linux"))]
@@ -27,6 +26,10 @@ const PRODUCT_DIRECTORY: &str = "D4 Pocket";
 #[cfg(target_os = "linux")]
 const PRODUCT_DIRECTORY: &str = "d4-pocket";
 const VERSIONS_DIRECTORY: &str = "versions";
+#[cfg(target_os = "linux")]
+const LINUX_DESKTOP_ENTRY_PREFIX: &str = "com.d4pocket.";
+#[cfg(target_os = "linux")]
+const MAX_LINUX_DESKTOP_ENTRY_BYTES: u64 = 16 * 1024;
 #[cfg(windows)]
 const START_MENU_PROGRAMS_DIRECTORY: &str = "Programs";
 #[cfg(windows)]
@@ -407,7 +410,7 @@ pub(crate) fn register_start_menu_shortcut(
         Err(_) => {
             return Err(ProductInstallPlanError(
                 "product_start_menu_shortcut_unavailable",
-            ))
+            ));
         }
     }
 
@@ -748,14 +751,14 @@ fn open_or_create_child_directory(
                 Err(_) => {
                     return Err(ProductInstallPlanError(
                         "product_install_directory_unavailable",
-                    ))
+                    ));
                 }
             }
         }
         Err(_) => {
             return Err(ProductInstallPlanError(
                 "product_install_directory_unavailable",
-            ))
+            ));
         }
     }
     let before_open = parent
@@ -956,6 +959,324 @@ pub(crate) fn plan_current_user_product_install(
     plan_product_install(&local_app_data, app_id, product_version, package_sha256)
 }
 
+/// 現在利用者のXDG applications directory内に置く固定desktop entryを計画する。
+/// pathはnative Owner summaryへ表示するだけで、この関数はdirectoryやfileを作成しない。
+#[cfg(target_os = "linux")]
+pub(crate) fn plan_current_user_linux_desktop_entry(
+    app_id: &str,
+) -> Result<PathBuf, ProductInstallPlanError> {
+    let data_home = current_user_local_app_data()?;
+    plan_linux_desktop_entry(&data_home, app_id)
+}
+
+#[cfg(target_os = "linux")]
+pub(crate) fn plan_linux_desktop_entry(
+    data_home: &Path,
+    app_id: &str,
+) -> Result<PathBuf, ProductInstallPlanError> {
+    validate_install_inputs(data_home, app_id)?;
+    let metadata = std::fs::symlink_metadata(data_home)
+        .map_err(|_| ProductInstallPlanError("product_install_data_home_unavailable"))?;
+    if !metadata.is_dir() || metadata.file_type().is_symlink() {
+        return Err(ProductInstallPlanError("product_install_data_home_invalid"));
+    }
+    validate_linux_data_home_metadata(&metadata)?;
+    let canonical = std::fs::canonicalize(data_home)
+        .map_err(|_| ProductInstallPlanError("product_install_data_home_unavailable"))?;
+    if canonical != data_home {
+        return Err(ProductInstallPlanError("product_install_data_home_invalid"));
+    }
+    let name = linux_desktop_entry_name(app_id)?;
+    Ok(canonical.join("applications").join(name))
+}
+
+/// 確認済みの固定product rootに対するper-user desktop entryをcreate-onlyで登録する。
+/// 既存entryは期待launcherを指し、内容・owner・mode・link数が一致する場合だけ再利用する。
+#[cfg(target_os = "linux")]
+pub(crate) fn register_linux_desktop_entry(
+    data_home: &Path,
+    app_id: &str,
+    audit_store_id: &str,
+    product_root: &Path,
+) -> Result<PathBuf, ProductInstallPlanError> {
+    let expected_root = product_install_root(data_home, app_id)?;
+    let expected_root = std::fs::canonicalize(expected_root)
+        .map_err(|_| ProductInstallPlanError("product_install_root_unavailable"))?;
+    let root_metadata = std::fs::symlink_metadata(product_root)
+        .map_err(|_| ProductInstallPlanError("product_install_root_unavailable"))?;
+    if !root_metadata.is_dir() || root_metadata.file_type().is_symlink() {
+        return Err(ProductInstallPlanError("product_install_root_invalid"));
+    }
+    let product_root = std::fs::canonicalize(product_root)
+        .map_err(|_| ProductInstallPlanError("product_install_root_unavailable"))?;
+    if product_root != expected_root {
+        return Err(ProductInstallPlanError("product_install_root_mismatch"));
+    }
+
+    let (opened_root_path, root) = open_existing_product_root(data_home, app_id)?;
+    if opened_root_path != product_root {
+        return Err(ProductInstallPlanError("product_install_root_mismatch"));
+    }
+    let root_metadata = root
+        .dir_metadata()
+        .map_err(|_| ProductInstallPlanError("product_install_root_invalid"))?;
+    let root_device = CapMetadataExt::dev(&root_metadata);
+    let launcher_name = "gui_shell_desktop_launcher";
+    let launcher_metadata = root
+        .symlink_metadata(launcher_name)
+        .map_err(|_| ProductInstallPlanError("installed_bootstrapper_unavailable"))?;
+    if !launcher_metadata.is_file()
+        || is_cap_reparse_point(&launcher_metadata)
+        || CapMetadataExt::dev(&launcher_metadata) != root_device
+        || launcher_metadata.len() == 0
+    {
+        return Err(ProductInstallPlanError("installed_bootstrapper_invalid"));
+    }
+    let launcher_path = product_root.join(launcher_name);
+    let launcher_os_metadata = std::fs::symlink_metadata(&launcher_path)
+        .map_err(|_| ProductInstallPlanError("installed_bootstrapper_invalid"))?;
+    crate::product_bootstrapper::resolve_active_version_launcher(data_home, app_id, audit_store_id)
+        .map_err(|_| ProductInstallPlanError("installed_bootstrapper_invalid"))?;
+    if !launcher_os_metadata.is_file()
+        || launcher_os_metadata.file_type().is_symlink()
+        || StdMetadataExt::uid(&launcher_os_metadata) != rustix::process::geteuid().as_raw()
+        || !(1..=2).contains(&StdMetadataExt::nlink(&launcher_os_metadata))
+        || StdMetadataExt::mode(&launcher_os_metadata) & 0o111 == 0
+        || StdMetadataExt::mode(&launcher_os_metadata) & 0o022 != 0
+        || StdMetadataExt::dev(&launcher_os_metadata) != CapMetadataExt::dev(&launcher_metadata)
+        || StdMetadataExt::ino(&launcher_os_metadata) != CapMetadataExt::ino(&launcher_metadata)
+    {
+        return Err(ProductInstallPlanError("installed_bootstrapper_invalid"));
+    }
+
+    let entry_path = plan_linux_desktop_entry(data_home, app_id)?;
+    let data_metadata = std::fs::symlink_metadata(data_home)
+        .map_err(|_| ProductInstallPlanError("product_install_data_home_unavailable"))?;
+    validate_linux_data_home_metadata(&data_metadata)?;
+    let data_home_dir = Dir::open_ambient_dir(data_home, cap_std::ambient_authority())
+        .map_err(|_| ProductInstallPlanError("product_install_data_home_unavailable"))?;
+    let opened_data_metadata = data_home_dir
+        .dir_metadata()
+        .map_err(|_| ProductInstallPlanError("product_install_data_home_invalid"))?;
+    if !opened_data_metadata.is_dir()
+        || is_cap_reparse_point(&opened_data_metadata)
+        || StdMetadataExt::dev(&data_metadata) != CapMetadataExt::dev(&opened_data_metadata)
+        || StdMetadataExt::ino(&data_metadata) != CapMetadataExt::ino(&opened_data_metadata)
+    {
+        return Err(ProductInstallPlanError("product_install_data_home_invalid"));
+    }
+    let applications = open_or_create_child_directory(
+        &data_home_dir,
+        "applications",
+        CapMetadataExt::dev(&opened_data_metadata),
+    )?;
+    let applications_metadata = applications
+        .dir_metadata()
+        .map_err(|_| ProductInstallPlanError("product_desktop_entry_directory_invalid"))?;
+    let applications_path = data_home.join("applications");
+    let applications_os_metadata = std::fs::symlink_metadata(&applications_path)
+        .map_err(|_| ProductInstallPlanError("product_desktop_entry_directory_invalid"))?;
+    if !applications_metadata.is_dir()
+        || is_cap_reparse_point(&applications_metadata)
+        || StdMetadataExt::uid(&applications_os_metadata) != rustix::process::geteuid().as_raw()
+        || StdMetadataExt::mode(&applications_os_metadata) & 0o022 != 0
+        || StdMetadataExt::dev(&applications_os_metadata)
+            != CapMetadataExt::dev(&applications_metadata)
+        || StdMetadataExt::ino(&applications_os_metadata)
+            != CapMetadataExt::ino(&applications_metadata)
+    {
+        return Err(ProductInstallPlanError(
+            "product_desktop_entry_directory_invalid",
+        ));
+    }
+
+    let expected = linux_desktop_entry_content(&launcher_path)?;
+    let entry_name = linux_desktop_entry_name(app_id)?;
+    match applications.symlink_metadata(&entry_name) {
+        Ok(_) => {
+            verify_linux_desktop_entry(&applications, &entry_path, &expected)?;
+            return Ok(entry_path);
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(_) => {
+            return Err(ProductInstallPlanError("product_desktop_entry_unavailable"));
+        }
+    }
+
+    let mut suffix = [0_u8; 16];
+    getrandom::getrandom(&mut suffix)
+        .map_err(|_| ProductInstallPlanError("product_desktop_entry_nonce_failed"))?;
+    let temporary_name = format!(".D4Pocket.{}.desktop.tmp", hex::encode(suffix));
+    let mut options = OpenOptions::new();
+    options
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .follow(FollowSymlinks::No)
+        .mode(0o600)
+        .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW);
+    let mut file = applications
+        .open_with(&temporary_name, &options)
+        .map_err(|_| ProductInstallPlanError("product_desktop_entry_temporary_create_failed"))?;
+    if let Err(_) = file.write_all(&expected).and_then(|_| file.sync_all()) {
+        let _ = applications.remove_file(&temporary_name);
+        return Err(ProductInstallPlanError(
+            "product_desktop_entry_write_failed",
+        ));
+    }
+    let temporary_metadata = match file.metadata() {
+        Ok(metadata) => metadata,
+        Err(_) => {
+            let _ = applications.remove_file(&temporary_name);
+            return Err(ProductInstallPlanError(
+                "product_desktop_entry_temporary_invalid",
+            ));
+        }
+    };
+    let temporary_os_metadata =
+        match std::fs::symlink_metadata(applications_path.join(&temporary_name)) {
+            Ok(metadata) => metadata,
+            Err(_) => {
+                let _ = applications.remove_file(&temporary_name);
+                return Err(ProductInstallPlanError(
+                    "product_desktop_entry_temporary_invalid",
+                ));
+            }
+        };
+    if !temporary_metadata.is_file()
+        || is_cap_reparse_point(&temporary_metadata)
+        || temporary_metadata.len() == 0
+        || temporary_metadata.len() > MAX_LINUX_DESKTOP_ENTRY_BYTES
+        || StdMetadataExt::uid(&temporary_os_metadata) != rustix::process::geteuid().as_raw()
+        || StdMetadataExt::nlink(&temporary_os_metadata) != 1
+        || StdMetadataExt::mode(&temporary_os_metadata) & 0o022 != 0
+        || StdMetadataExt::mode(&temporary_os_metadata) & 0o111 != 0
+        || StdMetadataExt::dev(&temporary_os_metadata) != CapMetadataExt::dev(&temporary_metadata)
+        || StdMetadataExt::ino(&temporary_os_metadata) != CapMetadataExt::ino(&temporary_metadata)
+    {
+        let _ = applications.remove_file(&temporary_name);
+        return Err(ProductInstallPlanError(
+            "product_desktop_entry_temporary_invalid",
+        ));
+    }
+    drop(file);
+
+    match applications.hard_link(&temporary_name, &applications, &entry_name) {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+            let _ = applications.remove_file(&temporary_name);
+            verify_linux_desktop_entry(&applications, &entry_path, &expected)?;
+            return Ok(entry_path);
+        }
+        Err(_) => {
+            let _ = applications.remove_file(&temporary_name);
+            return Err(ProductInstallPlanError(
+                "product_desktop_entry_publish_failed",
+            ));
+        }
+    }
+    applications
+        .remove_file(&temporary_name)
+        .map_err(|_| ProductInstallPlanError("product_desktop_entry_temporary_cleanup_failed"))?;
+    verify_linux_desktop_entry(&applications, &entry_path, &expected)?;
+    Ok(entry_path)
+}
+
+#[cfg(target_os = "linux")]
+fn linux_desktop_entry_name(app_id: &str) -> Result<String, ProductInstallPlanError> {
+    if !valid_identity(app_id) {
+        return Err(ProductInstallPlanError(
+            "product_install_app_identity_invalid",
+        ));
+    }
+    Ok(format!("{LINUX_DESKTOP_ENTRY_PREFIX}{app_id}.desktop"))
+}
+
+#[cfg(target_os = "linux")]
+fn linux_desktop_entry_content(launcher: &Path) -> Result<Vec<u8>, ProductInstallPlanError> {
+    if !launcher.is_absolute()
+        || launcher
+            .components()
+            .any(|component| matches!(component, Component::CurDir | Component::ParentDir))
+    {
+        return Err(ProductInstallPlanError(
+            "product_desktop_entry_launcher_invalid",
+        ));
+    }
+    let launcher = launcher.to_str().ok_or(ProductInstallPlanError(
+        "product_desktop_entry_launcher_invalid",
+    ))?;
+    let escaped = launcher
+        .chars()
+        .map(|character| match character {
+            '\\' => "\\\\".to_owned(),
+            '"' => "\\\"".to_owned(),
+            '`' => "\\`".to_owned(),
+            '$' => "\\$".to_owned(),
+            '%' => "%%".to_owned(),
+            _ => character.to_string(),
+        })
+        .collect::<String>();
+    Ok(format!(
+        "[Desktop Entry]\nType=Application\nName=D4 Pocket\nExec=\"{escaped}\"\nTryExec=\"{escaped}\"\nTerminal=false\nCategories=Utility;Development;\nStartupWMClass=d4-pocket\n"
+    )
+    .into_bytes())
+}
+
+#[cfg(target_os = "linux")]
+fn verify_linux_desktop_entry(
+    applications: &Dir,
+    entry_path: &Path,
+    expected: &[u8],
+) -> Result<(), ProductInstallPlanError> {
+    let entry_name = entry_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or(ProductInstallPlanError("product_desktop_entry_invalid"))?;
+    let before = applications
+        .symlink_metadata(entry_name)
+        .map_err(|_| ProductInstallPlanError("product_desktop_entry_unavailable"))?;
+    if !before.is_file()
+        || is_cap_reparse_point(&before)
+        || before.len() == 0
+        || before.len() > MAX_LINUX_DESKTOP_ENTRY_BYTES
+    {
+        return Err(ProductInstallPlanError("product_desktop_entry_invalid"));
+    }
+    let mut options = OpenOptions::new();
+    options
+        .read(true)
+        .follow(FollowSymlinks::No)
+        .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW);
+    let mut file = applications
+        .open_with(entry_name, &options)
+        .map_err(|_| ProductInstallPlanError("product_desktop_entry_invalid"))?;
+    let opened = file
+        .metadata()
+        .map_err(|_| ProductInstallPlanError("product_desktop_entry_invalid"))?;
+    let os_metadata = std::fs::symlink_metadata(entry_path)
+        .map_err(|_| ProductInstallPlanError("product_desktop_entry_invalid"))?;
+    if !opened.is_file()
+        || is_cap_reparse_point(&opened)
+        || !same_cap_file(&before, &opened)
+        || StdMetadataExt::uid(&os_metadata) != rustix::process::geteuid().as_raw()
+        || StdMetadataExt::nlink(&os_metadata) != 1
+        || StdMetadataExt::mode(&os_metadata) & 0o022 != 0
+        || StdMetadataExt::mode(&os_metadata) & 0o111 != 0
+        || StdMetadataExt::dev(&os_metadata) != CapMetadataExt::dev(&opened)
+        || StdMetadataExt::ino(&os_metadata) != CapMetadataExt::ino(&opened)
+    {
+        return Err(ProductInstallPlanError("product_desktop_entry_invalid"));
+    }
+    let mut actual = Vec::with_capacity(opened.len() as usize);
+    file.read_to_end(&mut actual)
+        .map_err(|_| ProductInstallPlanError("product_desktop_entry_invalid"))?;
+    if actual != expected {
+        return Err(ProductInstallPlanError("product_desktop_entry_conflict"));
+    }
+    Ok(())
+}
+
 /// OSが返した現在利用者のLocalAppDataと製品Manifest identityから、導入先を固定導出する。
 /// UI、manifest、更新候補から任意の保存pathを受け取らない。
 pub(crate) fn plan_product_install(
@@ -1016,7 +1337,7 @@ mod tests {
     use super::{
         open_existing_product_root, open_existing_product_versions_directory,
         open_product_versions_directory, plan_product_install, INSTALL_DIRECTORY,
-        PRODUCT_DIRECTORY,
+        PRODUCT_DIRECTORY, VERSIONS_DIRECTORY,
     };
     use std::path::Path;
 
@@ -1217,6 +1538,172 @@ mod tests {
         );
         std::fs::set_permissions(&data_home, std::fs::Permissions::from_mode(0o755)).unwrap();
         std::fs::remove_dir_all(scratch).unwrap();
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_desktop_entry_is_fixed_atomic_idempotent_and_conflict_safe() {
+        use super::{plan_linux_desktop_entry, register_linux_desktop_entry};
+        use cap_std::fs::Dir;
+        use std::os::unix::fs::{symlink, PermissionsExt};
+
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "d4 pocket%desktop-entry-{}-{unique}",
+            std::process::id()
+        ));
+        let data_home = root.join("xdg-data");
+        let product_root = data_home
+            .join(INSTALL_DIRECTORY)
+            .join(PRODUCT_DIRECTORY)
+            .join(APP_ID);
+        let product_version = "1.2.3";
+        let package_sha256 = "a".repeat(64);
+        let version_directory = product_root
+            .join(VERSIONS_DIRECTORY)
+            .join(format!("{product_version}-{package_sha256}"));
+        std::fs::create_dir_all(&version_directory).unwrap();
+        std::fs::write(
+            version_directory.join("gui_shell_desktop_launcher"),
+            b"#!/bin/sh\nexit 0\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(
+            version_directory.join("gui_shell_desktop_launcher"),
+            std::fs::Permissions::from_mode(0o755),
+        )
+        .unwrap();
+        std::fs::write(version_directory.join("product_manifest.json"), b"{}").unwrap();
+        let data_home = std::fs::canonicalize(data_home).unwrap();
+        let product_root = std::fs::canonicalize(product_root).unwrap();
+        let root_directory =
+            Dir::open_ambient_dir(&product_root, cap_std::ambient_authority()).unwrap();
+        let versions_directory = Dir::open_ambient_dir(
+            product_root.join(VERSIONS_DIRECTORY),
+            cap_std::ambient_authority(),
+        )
+        .unwrap();
+        crate::product_bootstrapper::activate_staged_version(
+            &root_directory,
+            &versions_directory,
+            product_version,
+            APP_ID,
+            "audit-store-22222222222222222222222222222222",
+            &package_sha256,
+            "linux-entry-test-update",
+            &format!("sha256:{}", "b".repeat(64)),
+            &"c".repeat(32),
+        )
+        .unwrap();
+        let next_version = "1.3.0";
+        let next_package_sha256 = "d".repeat(64);
+        let next_version_directory = product_root
+            .join(VERSIONS_DIRECTORY)
+            .join(format!("{next_version}-{next_package_sha256}"));
+        std::fs::create_dir_all(&next_version_directory).unwrap();
+        std::fs::write(
+            next_version_directory.join("gui_shell_desktop_launcher"),
+            b"#!/bin/sh\nexit 1\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(
+            next_version_directory.join("gui_shell_desktop_launcher"),
+            std::fs::Permissions::from_mode(0o755),
+        )
+        .unwrap();
+        std::fs::write(
+            next_version_directory.join("product_manifest.json"),
+            b"{\"v\":2}",
+        )
+        .unwrap();
+        crate::product_bootstrapper::activate_staged_version(
+            &root_directory,
+            &versions_directory,
+            next_version,
+            APP_ID,
+            "audit-store-22222222222222222222222222222222",
+            &next_package_sha256,
+            "linux-entry-test-update-2",
+            &format!("sha256:{}", "e".repeat(64)),
+            &"f".repeat(32),
+        )
+        .unwrap();
+        assert_eq!(
+            crate::product_bootstrapper::active_version_snapshot(
+                &data_home,
+                APP_ID,
+                "audit-store-22222222222222222222222222222222",
+            )
+            .unwrap()
+            .current
+            .product_version,
+            next_version
+        );
+        let planned = plan_linux_desktop_entry(&data_home, APP_ID).unwrap();
+        assert_eq!(
+            planned,
+            data_home
+                .join("applications")
+                .join(format!("com.d4pocket.{APP_ID}.desktop"))
+        );
+        assert!(!planned.parent().unwrap().exists());
+
+        let registered = register_linux_desktop_entry(
+            &data_home,
+            APP_ID,
+            "audit-store-22222222222222222222222222222222",
+            &product_root,
+        )
+        .unwrap();
+        assert_eq!(registered, planned);
+        let content = std::fs::read(&registered).unwrap();
+        let content = String::from_utf8(content).unwrap();
+        assert!(content.contains("Name=D4 Pocket\n"));
+        assert!(content.contains("Exec=\""));
+        assert!(content.contains("d4 pocket%%desktop-entry-"));
+        assert_eq!(
+            std::fs::metadata(&registered).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        assert_eq!(
+            register_linux_desktop_entry(
+                &data_home,
+                APP_ID,
+                "audit-store-22222222222222222222222222222222",
+                &product_root,
+            )
+            .unwrap(),
+            registered
+        );
+
+        std::fs::write(&registered, b"attacker-controlled desktop entry\n").unwrap();
+        assert_eq!(
+            register_linux_desktop_entry(
+                &data_home,
+                APP_ID,
+                "audit-store-22222222222222222222222222222222",
+                &product_root,
+            )
+            .unwrap_err()
+            .0,
+            "product_desktop_entry_conflict"
+        );
+        std::fs::remove_file(&registered).unwrap();
+        let target = root.join("attacker.desktop");
+        std::fs::write(&target, b"attacker target\n").unwrap();
+        symlink(&target, &registered).unwrap();
+        assert!(register_linux_desktop_entry(
+            &data_home,
+            APP_ID,
+            "audit-store-22222222222222222222222222222222",
+            &product_root,
+        )
+        .is_err());
+        assert_eq!(std::fs::read(target).unwrap(), b"attacker target\n");
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

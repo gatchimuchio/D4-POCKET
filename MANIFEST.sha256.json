@@ -1308,7 +1308,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "7e8fdb5cb5242a54bde690f7fa8468de1109143ba0ded0af707b33b1e10da43b"
+      "sha256": "2128e585aea77eea662804fa3822e10cb5077c8674125b6493aa9390f1842b78"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1520,7 +1520,7 @@
     },
     {
       "path": "docs/specs/linux-product-package.md",
-      "sha256": "b9a388d716aa5ed9b07cdb6078b4fa8e5399ec5fb259699a459616edb391e8c9"
+      "sha256": "3188025f4b02f8f15626c33e00c7bc3d92d0fdb2b6084dd68ceddbb0879f4bfb"
     },
     {
       "path": "docs/specs/linux-workspace-selection.md",
@@ -3632,7 +3632,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/product_install.rs",
-      "sha256": "136f1170b32d55d3f03e587bbc378692893647ee55d95363115437864cbfeac3"
+      "sha256": "aa39cff2a2a3b4b8d898013b79dcf83ea3ff11b49ec399f56bbebb65f047d073"
     },
     {
       "path": "native/rust_helper/src/broker/profile_center.rs",
@@ -3664,7 +3664,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "7f76d4dd94dfee469e54e9ccbf077343889e094d326355bb170a48d7a99adac3"
+      "sha256": "a3088a6b7ff887d97b952e3499511d556de4f0e4dc35fd8fc1931075072e5a46"
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
@@ -3740,7 +3740,7 @@
     },
     {
       "path": "native/rust_helper/src/macos_desktop_owner.rs",
-      "sha256": "43dc366ff19e6b8519ef44a232266d65fd8f901f071055a0b0ebc9c75dd836cd"
+      "sha256": "d2053329562147587d99b42dcbe5cd2ea155a1d2f4aef5449e376ff259bd58b4"
     },
     {
       "path": "native/rust_helper/src/macos_desktop_worker.rs",
@@ -4304,7 +4304,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "37bcfbee73b52921d60d02e960a8eb90e778a8684ccbc34066ebe4ff432b95b7"
+      "sha256": "9f1178f0fb54b57886aed09cd2a3994a41c41cc2745bebda1c9facb52ff39156"
     },
     {
       "path": "requirements-dev.txt",
