@@ -11741,6 +11741,31 @@ def test_linux_workspace_selection_is_native_and_non_authoritative() -> list[str
     return errors
 
 
+def test_linux_installer_is_required_release_scope() -> list[str]:
+    readme = (ROOT / "installer/linux/README.md").read_text(encoding="utf-8")
+    status = (ROOT / "INSTALLER_STATUS.md").read_text(encoding="utf-8")
+    registry = json.loads((ROOT / "release_blockers.registry.json").read_text(encoding="utf-8"))
+    blockers = registry.get("blockers", registry.get("release_blockers", []))
+    blocker = next(
+        (item for item in blockers if item.get("name") == "linux_native_product_support"),
+        None,
+    )
+    errors = []
+    for stale in ("classification: post_v1_scope", "blocks_release: no", "Linux は現在、開発・検証の局所範囲"):
+        if stale in readme:
+            errors.append(f"Linux installerを任意・非release対象へ降格する旧記述が残る: {stale}")
+    for required in ("release_blocker", "導入", "更新", "rollback", "uninstall", "X11", "Wayland"):
+        if required not in readme:
+            errors.append(f"Linux installer必須製品要求が記載されていない: {required}")
+    if "registry_id: linux_native_product_support" not in status or "blocks_release: yes" not in status:
+        errors.append("Installer statusがLinux native product release blockerへ接続されていない")
+    if blocker is None or blocker.get("blocks_release") is not True:
+        errors.append("Linux native product blockerがreleaseを遮断していない")
+    elif not all(token in blocker.get("required_action", "") for token in ("Installer", "Rollback", "Uninstaller")):
+        errors.append("Linux native product blockerのrequired_actionにinstaller lifecycleがない")
+    return errors
+
+
 def test_macos_agent_cli_selection_is_non_authoritative() -> list[str]:
     errors = []
     request_schema = json.loads((SPECS / "macos_agent_cli_selection.schema.json").read_text(encoding="utf-8"))
@@ -12330,6 +12355,7 @@ def main() -> int:
         手動補助の起動境界を検査する,
         test_macos_workspace_selection_is_native_scoped_and_non_authoritative,
         test_linux_workspace_selection_is_native_and_non_authoritative,
+        test_linux_installer_is_required_release_scope,
         test_macos_agent_cli_selection_is_non_authoritative,
         test_macos_credential_public_input_is_metadata_only,
         test_macos_mcp_native_scope_is_explicit,

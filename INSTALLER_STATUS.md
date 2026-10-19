@@ -48,11 +48,12 @@
   required_action: macOS installer 対応を主張する前に macOS 上で検証する。
   blocks_release: no
 
-- item: Linux packaged installer はrelease gate対象外
-  classification: known_limitation
-  reason: Linux は現在、開発・検証の局所範囲であり、Windows 優先の製品 release 対象ではない。
-  required_action: Linux build/smoke を開発に有用な状態に保ち、Linux 製品対応を主張する前に Linux installer 検証を追加する。
-  blocks_release: no
+- item: Linux native packaged installer／installed lifecycle が未完成
+  classification: release_blocker
+  registry_id: linux_native_product_support
+  reason: Linux native Desktopは完全対応が必須の独立製品対象。現行のLinux Release bundle buildやWSL試験だけでは、native installed productの導入・更新・rollback・uninstall、X11／Wayland、Authority境界と復旧を受け入れていない。
+  required_action: 対象distribution／architecture／desktop sessionを固定し、署名・provenanceを含むpackage、installed起動、更新・rollback・uninstall、失敗復旧、X11／WaylandのOwner確認とAuditをnative Linuxで受け入れる。具体的な不足は`release_blockers.registry.json`を正本とする。
+  blocks_release: yes
 
 ## 後続 QC
 
