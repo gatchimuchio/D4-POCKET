@@ -841,6 +841,7 @@ pub(crate) enum OwnerConfirmationSource {
     DesktopNativeConfirmation,
     // private receiver由来のOS選択投影だけ。Owner／Task許可へ使用しない。
     MacOSWorkspaceSelection,
+    LinuxWorkspaceSelection,
     MacOSAgentCLISelection,
     #[cfg(feature = "r2-e2e")]
     R2E2ESyntheticOwner,
@@ -861,6 +862,7 @@ impl OwnerConfirmationSource {
             Self::NotOwner
             | Self::OwnerCredential
             | Self::MacOSWorkspaceSelection
+            | Self::LinuxWorkspaceSelection
             | Self::MacOSAgentCLISelection => false,
         }
     }
@@ -2016,7 +2018,11 @@ impl Broker {
         }
         let selection_source = match envelope.operation {
             Some(BrokerOperation::作業領域OS選択) => {
-                OwnerConfirmationSource::MacOSWorkspaceSelection
+                if cfg!(target_os = "linux") {
+                    OwnerConfirmationSource::LinuxWorkspaceSelection
+                } else {
+                    OwnerConfirmationSource::MacOSWorkspaceSelection
+                }
             }
             Some(BrokerOperation::AgentCLI実行fileOS選択) => {
                 OwnerConfirmationSource::MacOSAgentCLISelection
@@ -2155,7 +2161,11 @@ impl Broker {
 
         let required_selection_source = match envelope.operation {
             Some(BrokerOperation::作業領域OS選択) => {
-                Some(OwnerConfirmationSource::MacOSWorkspaceSelection)
+                Some(if cfg!(target_os = "linux") {
+                    OwnerConfirmationSource::LinuxWorkspaceSelection
+                } else {
+                    OwnerConfirmationSource::MacOSWorkspaceSelection
+                })
             }
             Some(BrokerOperation::AgentCLI実行fileOS選択) => {
                 Some(OwnerConfirmationSource::MacOSAgentCLISelection)
@@ -2163,15 +2173,20 @@ impl Broker {
             _ => None,
         };
         if required_selection_source.is_some()
-            && (!cfg!(any(target_os = "macos", test))
+            && (!cfg!(any(target_os = "macos", target_os = "linux", test))
                 || !self.desktop_package_layout_verified
                 || Some(export_confirmation) != required_selection_source)
         {
+            let code = if cfg!(target_os = "linux") {
+                "linux_workspace_selection_required"
+            } else {
+                "macos_os_selection_required"
+            };
             return self.reject_with_payload_hash(
                 &request_id,
                 &operation,
-                "macos_os_selection_required",
-                "OS選択投影は同梱macOS Rust helperの限定経路だけで取得できます",
+                code,
+                "OS選択投影は同梱Desktop Rust helperの限定経路だけで取得できます",
                 true,
                 envelope.payload_hash.as_deref().unwrap_or("unknown"),
             );
@@ -2340,13 +2355,24 @@ impl Broker {
                         && is_tagged_sha256(&s.selection_request_hash)
                         && s.workspace_root.is_none()
                 }) {
-                    let code = match s.selection_status.as_str() {
-                        "failed_main_thread" => Some("macos_os_selection_main_thread"),
-                        "failed_display" => Some("macos_os_selection_display"),
-                        "failed_url" => Some("macos_os_selection_url"),
-                        "failed_path" => Some("macos_os_selection_path"),
-                        "failed_native" => Some("macos_os_selection_native"),
-                        _ => None,
+                    let code = if export_confirmation
+                        == OwnerConfirmationSource::LinuxWorkspaceSelection
+                    {
+                        match s.selection_status.as_str() {
+                            "failed_path" | "failed_native" => {
+                                Some("linux_workspace_selection_failed")
+                            }
+                            _ => None,
+                        }
+                    } else {
+                        match s.selection_status.as_str() {
+                            "failed_main_thread" => Some("macos_os_selection_main_thread"),
+                            "failed_display" => Some("macos_os_selection_display"),
+                            "failed_url" => Some("macos_os_selection_url"),
+                            "failed_path" => Some("macos_os_selection_path"),
+                            "failed_native" => Some("macos_os_selection_native"),
+                            _ => None,
+                        }
                     };
                     if let Some(code) = code {
                         return self.reject_with_payload_hash(
@@ -2366,19 +2392,33 @@ impl Broker {
                                         && !p.chars().any(char::is_control)
                                 })))
                 }) else {
+                    let code = if export_confirmation
+                        == OwnerConfirmationSource::LinuxWorkspaceSelection
+                    {
+                        "linux_workspace_selection_failed"
+                    } else {
+                        "macos_os_selection_failed"
+                    };
                     return self.reject_with_payload_hash(
                         &request_id,
                         &operation,
-                        "macos_os_selection_failed",
+                        code,
                         "OS選択または選択結果の検査に失敗しました。登録・再送は行いません",
                         true,
                         &payload_hash,
                     );
                 };
+                let scope_lifetime = if export_confirmation
+                    == OwnerConfirmationSource::LinuxWorkspaceSelection
+                {
+                    "none"
+                } else {
+                    "broker_process"
+                };
                 self.accept_body_with_evidence(&request_id, selection_operation,
                     serde_json::json!({"version":1,"selection_status":selection.selection_status,
                         (path_key):selection.workspace_root,"selection_request_hash":selection.selection_request_hash,
-                        "scope_lifetime":"broker_process", "permission_generated":false,
+                        "scope_lifetime":scope_lifetime, "permission_generated":false,
                         "approval_generated":false,"registration_generated":false}),
                     EVIDENCE_SOURCE_INTERNAL_STATE, &payload_hash)
             }

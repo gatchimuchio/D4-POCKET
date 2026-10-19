@@ -2019,6 +2019,7 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
   Future<void> _selectWorkspace({bool cli = false}) async {
     final transport = widget.transport;
     if (transport == null || _workspaceSelectionPending) return;
+    final linux = defaultTargetPlatform == TargetPlatform.linux;
     final operation = cli ? 'AgentCLI実行fileOS選択' : '作業領域OS選択';
     final pathKey = cli ? 'cli_path' : 'workspace_root';
     setState(() {
@@ -2038,6 +2039,8 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
         'macos_os_selection_url',
         'macos_os_selection_path',
         'macos_os_selection_native',
+        'linux_workspace_selection_required',
+        'linux_workspace_selection_failed',
       };
       final error = response['error'];
       if (response['operation'] == operation &&
@@ -2069,7 +2072,7 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
           body.length != keys.length ||
           body.keys.any((k) => !keys.contains(k)) ||
           body['version'] != 1 ||
-          body['scope_lifetime'] != 'broker_process' ||
+          body['scope_lifetime'] != (linux ? 'none' : 'broker_process') ||
           body['permission_generated'] != false ||
           body['approval_generated'] != false ||
           body['registration_generated'] != false ||
@@ -2087,8 +2090,9 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
           !root.codeUnits.any((c) => c < 32 || (c >= 127 && c <= 159))) {
         setState(() {
           (cli ? _cliPath : _workspaceRoot).text = root;
-          _workspaceSelectionMessage =
-              'OS選択済み（起動中のみ）。登録・Permission・Approvalは別です。';
+          _workspaceSelectionMessage = linux
+              ? 'OS選択済み（選択結果のみ）。登録・Permission・Approvalは別です。'
+              : 'OS選択済み（起動中のみ）。登録・Permission・Approvalは別です。';
         });
       } else {
         throw const BrokerClientException('OS選択結果が不正です');
@@ -2246,9 +2250,13 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
                       hintText: '.env\nsecrets',
                     ),
                   ),
-                  if (defaultTargetPlatform == TargetPlatform.macOS)
+                  if (defaultTargetPlatform == TargetPlatform.macOS ||
+                      defaultTargetPlatform == TargetPlatform.linux)
                     OutlinedButton.icon(
-                      key: const ValueKey('macos-select-workspace'),
+                      key: ValueKey(
+                          defaultTargetPlatform == TargetPlatform.linux
+                              ? 'linux-select-workspace'
+                              : 'macos-select-workspace'),
                       onPressed:
                           _workspaceSelectionPending ? null : _selectWorkspace,
                       icon: const Icon(Icons.folder_open),

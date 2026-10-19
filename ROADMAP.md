@@ -1,5 +1,7 @@
 # GUI Shell ロードマップ
 
+後続追補（2026-10-19、Linux必須対象の作業領域OS選択）: Linux GTK folder chooserをAgent Center→Rust helper→challenge-bound private reply→既存Broker専用sourceへ接続した。pathはAuditに残さず、選択自体からWorkspace登録／Authorityを生成しない。Linux専用Rust 4件、Flutter Linux Widget 1件、Conformance 260 checks、Schema 169件、Windows共有Rust check、WSL Ubuntu Release bundleがPASSし、ELF／依存とartifact hashを[現行進捗](docs/REV5_PRODUCT_PROGRESS.md)へ記録した。Linux native Desktopは完全対応必須であり、WSL証拠ではinstalled X11／Wayland受入れを代替しない。`linux_native_product_support` OPEN、通常Release `task_execution=unsupported`、`release_ready=false`を維持する。責任正本は[Linux作業領域OS選択](docs/specs/linux-workspace-selection.md)。
+
 後続追補（2026-10-19、Linux必須対象のCredential／MCP接続）: Linuxは任意platformではなく完全対応が必要な製品対象。GTK native秘密入力、Secret Service保存、Broker Owner確認付きMCP接続／切断／Tool実行と所有process group停止を配線した。Linux focused Rust／Flutter、Conformance 259 checks、Windows共有Rust check、WSL Linux Release bundleはPASS。WSLはLinux native installed acceptanceではないため、`linux_native_product_support` OPEN、通常Release `task_execution=unsupported`、`release_ready=false`を維持する。詳細とartifact hashは[現行進捗](docs/REV5_PRODUCT_PROGRESS.md)。
 
 後続追補（2026-10-19、旧運用文書の直接Flutter／Cargo実行例）: 非正本の`docs/OPERATING_MODEL.md`に同期対象source内で`cargo test`／`flutter analyze`を直接実行する旧例が残っていたため、現行の隔離runnerへ同期し、2世代backup refのbranch/tag曖昧性も除去した。`docs/COMPLETION_STRATEGY_INSTRUCTION.md`は旧履歴であることを明示した。Conformanceが両文書の誤用防止注記と安全な入口を検査する。現行B5状態とrelease gateは変更しない。

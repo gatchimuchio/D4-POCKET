@@ -159,6 +159,51 @@ void main() {
         isNot(contains('AgentTaskWorkspacePermissionGrant')));
     expect(tester.takeException(), isNull);
   }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+  testWidgets('Linux作業領域OS選択はnative結果だけを反映しAuthorityを生成しない', (tester) async {
+    final transport = _FakeBrokerTransport([
+      ..._shellCoreProductBootstrapResponses(),
+      {
+        ..._brokerAcceptedBody('作業領域OS選択', {
+          'version': 1,
+          'selection_status': 'selected',
+          'workspace_root': '/synthetic/linux-workspace',
+          'selection_request_hash': brokerPayloadHash({'version': 1}),
+          'scope_lifetime': 'none',
+          'permission_generated': false,
+          'approval_generated': false,
+          'registration_generated': false,
+        }),
+        'evidence_source': 'INTERNAL_STATE',
+      },
+    ]);
+    final client = await ShellCoreClient.product(transport: transport);
+    await tester.pumpWidget(
+        MaterialApp(home: Scaffold(body: AgentCenter(client: client))));
+    await tester.tap(find.text('登録を開始'));
+    await tester.pumpAndSettle();
+    final select = find.byKey(const ValueKey('linux-select-workspace'));
+    expect(select, findsOneWidget);
+    await tester.ensureVisible(select);
+    await tester.tap(select);
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<TextFormField>(find.byType(TextFormField).at(4))
+          .controller!
+          .text,
+      '/synthetic/linux-workspace',
+    );
+    expect(find.text('OS選択済み（選択結果のみ）。登録・Permission・Approvalは別です。'),
+        findsOneWidget);
+    final selection = transport.requests
+        .singleWhere((request) => request['operation'] == '作業領域OS選択');
+    expect(selection['payload'], {'version': 1});
+    expect(transport.operations,
+        isNot(contains('AgentTaskWorkspacePermissionGrant')));
+    expect(transport.operations, isNot(contains('AgentCLI実行系作業領域登録')));
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.linux));
+
   Finder findSurfaceSemanticsIdentifier(String label) {
     final identifier = surfaceSemanticsIdentifier(label);
     return find.byWidgetPredicate(

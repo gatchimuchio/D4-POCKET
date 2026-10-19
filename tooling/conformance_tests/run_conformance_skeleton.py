@@ -11697,6 +11697,50 @@ def test_macos_workspace_selection_is_native_scoped_and_non_authoritative() -> l
     return errors
 
 
+def test_linux_workspace_selection_is_native_and_non_authoritative() -> list[str]:
+    request_schema = json.loads((SPECS / "linux_workspace_selection.schema.json").read_text(encoding="utf-8"))
+    receipt_schema = json.loads((SPECS / "linux_workspace_selection_receipt.schema.json").read_text(encoding="utf-8"))
+    errors = []
+    request = {"version": 1}
+    if validate_instance(request, request_schema, "linux-workspace-selection"):
+        errors.append("Linux作業領域OS選択の正規要求が拒否される")
+    for key in ("workspace_root", "permission", "approval", "credential"):
+        if not validate_instance({**request, key: "injected"}, request_schema, "linux-workspace-selection"):
+            errors.append(f"Linux選択要求でUIが選択pathまたはAuthorityを注入できる: {key}")
+    receipt = {
+        "version": 1,
+        "selection_status": "selected",
+        "workspace_root": "/synthetic/linux-workspace",
+        "selection_request_hash": "sha256:" + "a" * 64,
+        "scope_lifetime": "none",
+        "permission_generated": False,
+        "approval_generated": False,
+        "registration_generated": False,
+    }
+    if validate_instance(receipt, receipt_schema, "linux-workspace-receipt"):
+        errors.append("Linuxの選択だけを表すBroker投影が拒否される")
+    for key in ("permission_generated", "approval_generated", "registration_generated"):
+        if validate_instance({**receipt, key: True}, receipt_schema, "linux-workspace-receipt") == []:
+            errors.append(f"Linux選択投影がAuthority／登録を生成する: {key}")
+    if validate_instance({**receipt, "scope_lifetime": "broker_process"}, receipt_schema, "linux-workspace-receipt") == []:
+        errors.append("Linux選択投影をOS scopeとして誤表示できる")
+
+    worker = (RUST_HELPER / "src/linux_workspace_selection.rs").read_text(encoding="utf-8")
+    protocol = (RUST_HELPER / "src/broker/protocol.rs").read_text(encoding="utf-8")
+    runner = (DESKTOP_FLUTTER / "linux/runner/broker_process_channel.cc").read_text(encoding="utf-8")
+    ui = (DESKTOP_FLUTTER / "lib/screens/agent_center.dart").read_text(encoding="utf-8")
+    for text, tokens in (
+        (worker, ("D4PICK1", "valid_challenge", "seen.len() >= 64")),
+        (protocol, ("LinuxWorkspaceSelection", '"scope_lifetime":scope_lifetime', '"linux_workspace_selection_required"')),
+        (runner, ("gtk_file_chooser_dialog_new", "GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER", "D4PICK1", "gtk_file_chooser_set_local_only")),
+        (ui, ("TargetPlatform.linux", "linux-select-workspace", "scope_lifetime")),
+    ):
+        for token in tokens:
+            if token not in text:
+                errors.append(f"Linuxのnative作業領域選択consumer接続がない: {token}")
+    return errors
+
+
 def test_macos_agent_cli_selection_is_non_authoritative() -> list[str]:
     errors = []
     request_schema = json.loads((SPECS / "macos_agent_cli_selection.schema.json").read_text(encoding="utf-8"))
@@ -12285,6 +12329,7 @@ def main() -> int:
         test_platform_hardening_configuration_exists,
         手動補助の起動境界を検査する,
         test_macos_workspace_selection_is_native_scoped_and_non_authoritative,
+        test_linux_workspace_selection_is_native_and_non_authoritative,
         test_macos_agent_cli_selection_is_non_authoritative,
         test_macos_credential_public_input_is_metadata_only,
         test_macos_mcp_native_scope_is_explicit,

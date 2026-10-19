@@ -23,6 +23,8 @@ constexpr size_t kOwnerChallengeLength = 32;
 constexpr unsigned int kMaxQueuedRequests = 16;
 constexpr auto kOwnerDialogTimeout = std::chrono::seconds(300);
 constexpr auto kCredentialDialogTimeout = std::chrono::seconds(300);
+constexpr auto kWorkspaceDialogTimeout = std::chrono::seconds(300);
+constexpr size_t kWorkspaceReplyLimit = 2 * 1024 + 128;
 
 bool is_lower_hex(char value) {
   return (value >= '0' && value <= '9') || (value >= 'a' && value <= 'f');
@@ -34,6 +36,10 @@ bool has_owner_protocol_prefix(const std::string& frame) {
 
 bool has_credential_protocol_prefix(const std::string& frame) {
   return frame.compare(0, 7, "D4CRED1") == 0;
+}
+
+bool has_workspace_picker_prefix(const std::string& frame) {
+  return frame.compare(0, 7, "D4PICK1") == 0;
 }
 
 void secure_clear(std::string* value) {
@@ -101,6 +107,21 @@ bool decode_credential_prompt(const std::string& frame,
                               std::string* challenge,
                               std::string* summary) {
   return decode_control_prompt(frame, "D4CRED1", challenge, summary);
+}
+
+bool decode_workspace_picker_prompt(const std::string& frame,
+                                    std::string* challenge) {
+  constexpr char kPrefix[] = "D4PICK1 ";
+  if (frame.size() != sizeof(kPrefix) - 1 + kOwnerChallengeLength ||
+      frame.compare(0, sizeof(kPrefix) - 1, kPrefix) != 0) {
+    return false;
+  }
+  const std::string candidate = frame.substr(sizeof(kPrefix) - 1);
+  if (!std::all_of(candidate.begin(), candidate.end(), is_lower_hex)) {
+    return false;
+  }
+  *challenge = candidate;
+  return true;
 }
 
 struct OwnerDialogState {
@@ -348,6 +369,149 @@ bool request_credential_input(GWeakRef* owner_parent,
   return true;
 }
 
+struct WorkspaceSelectionState {
+  WorkspaceSelectionState(GtkWindow* owner_parent, std::string picker_challenge)
+      : parent(owner_parent), challenge(std::move(picker_challenge)) {}
+  ~WorkspaceSelectionState() {
+    if (parent != nullptr) g_object_unref(parent);
+  }
+
+  GtkWindow* parent;
+  const std::string challenge;
+  std::mutex mutex;
+  std::condition_variable ready;
+  std::atomic<bool> expired{false};
+  bool complete = false;
+  std::string reply;
+};
+
+struct WorkspaceDialogTimeout {
+  GtkDialog* dialog;
+  bool fired = false;
+};
+
+gboolean fail_expired_workspace_dialog(gpointer data) {
+  auto* timeout = static_cast<WorkspaceDialogTimeout*>(data);
+  timeout->fired = true;
+  gtk_dialog_response(timeout->dialog, GTK_RESPONSE_CANCEL);
+  return G_SOURCE_REMOVE;
+}
+
+void finish_workspace_selection(
+    const std::shared_ptr<WorkspaceSelectionState>& state, std::string reply) {
+  {
+    std::lock_guard<std::mutex> lock(state->mutex);
+    state->reply = state->expired.load() ? std::string() : std::move(reply);
+    state->complete = true;
+  }
+  state->ready.notify_one();
+}
+
+gboolean show_workspace_selection_on_gtk_thread(gpointer data) {
+  auto state = *static_cast<std::shared_ptr<WorkspaceSelectionState>*>(data);
+  if (state->expired.load() || state->parent == nullptr ||
+      !GTK_IS_WINDOW(state->parent)) {
+    finish_workspace_selection(
+        state, "D4PICK1 " + state->challenge + " FAILED");
+    return G_SOURCE_REMOVE;
+  }
+
+  GtkWidget* dialog = gtk_file_chooser_dialog_new(
+      "D4 Pocket 作業領域の選択", state->parent,
+      GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER, "取消", GTK_RESPONSE_CANCEL,
+      "選択", GTK_RESPONSE_ACCEPT, nullptr);
+  gtk_window_set_position(GTK_WINDOW(dialog), GTK_WIN_POS_CENTER_ON_PARENT);
+  gtk_window_set_default_size(GTK_WINDOW(dialog), 800, 540);
+  gtk_dialog_set_default_response(GTK_DIALOG(dialog), GTK_RESPONSE_CANCEL);
+  gtk_file_chooser_set_local_only(GTK_FILE_CHOOSER(dialog), TRUE);
+  gtk_file_chooser_set_select_multiple(GTK_FILE_CHOOSER(dialog), FALSE);
+  gtk_file_chooser_set_create_folders(GTK_FILE_CHOOSER(dialog), FALSE);
+  if (state->expired.load()) {
+    gtk_widget_destroy(dialog);
+    finish_workspace_selection(
+        state, "D4PICK1 " + state->challenge + " FAILED");
+    return G_SOURCE_REMOVE;
+  }
+  gtk_widget_show_all(dialog);
+
+  WorkspaceDialogTimeout timeout{GTK_DIALOG(dialog), false};
+  const guint timeout_id = g_timeout_add_seconds(
+      static_cast<guint>(kWorkspaceDialogTimeout.count()),
+      fail_expired_workspace_dialog, &timeout);
+  const gint response = gtk_dialog_run(GTK_DIALOG(dialog));
+  if (!timeout.fired) g_source_remove(timeout_id);
+
+  std::string reply = "D4PICK1 " + state->challenge + " FAILED";
+  if (timeout.fired) {
+    reply = "D4PICK1 " + state->challenge + " FAILED";
+  } else if (response != GTK_RESPONSE_ACCEPT) {
+    reply = "D4PICK1 " + state->challenge + " CANCELLED";
+  } else {
+    gchar* filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
+    GError* error = nullptr;
+    gsize converted_length = 0;
+    gchar* utf8_path = filename == nullptr
+                           ? nullptr
+                           : g_filename_to_utf8(filename, -1, nullptr,
+                                                &converted_length, &error);
+    g_clear_error(&error);
+    if (utf8_path != nullptr && converted_length > 0 &&
+        converted_length <= 1024 &&
+        g_path_is_absolute(utf8_path) &&
+        g_utf8_validate(utf8_path, static_cast<gssize>(converted_length),
+                        nullptr)) {
+      bool valid = true;
+      for (const gchar* cursor = utf8_path;
+           valid && cursor < utf8_path + converted_length;
+           cursor = g_utf8_next_char(cursor)) {
+        valid = !g_unichar_iscntrl(g_utf8_get_char(cursor));
+      }
+      if (valid) {
+        const std::string path(utf8_path, converted_length);
+        const std::string encoded = hex_encode(
+            reinterpret_cast<const unsigned char*>(path.data()), path.size());
+        reply = "D4PICK1 " + state->challenge + " SELECTED " + encoded;
+      }
+    }
+    g_free(utf8_path);
+    g_free(filename);
+  }
+  gtk_widget_destroy(dialog);
+  finish_workspace_selection(state, std::move(reply));
+  return G_SOURCE_REMOVE;
+}
+
+void destroy_workspace_selection_callback(gpointer data) {
+  delete static_cast<std::shared_ptr<WorkspaceSelectionState>*>(data);
+}
+
+bool request_workspace_selection(GWeakRef* owner_parent,
+                                 const std::string& challenge,
+                                 std::string* reply) {
+  gpointer parent_ref = g_weak_ref_get(owner_parent);
+  if (parent_ref == nullptr) return false;
+  GObject* parent = G_OBJECT(parent_ref);
+  if (!GTK_IS_WINDOW(parent)) {
+    g_object_unref(parent);
+    return false;
+  }
+  auto state = std::make_shared<WorkspaceSelectionState>(
+      GTK_WINDOW(parent), challenge);
+  auto* callback_state = new std::shared_ptr<WorkspaceSelectionState>(state);
+  g_idle_add_full(G_PRIORITY_DEFAULT, show_workspace_selection_on_gtk_thread,
+                  callback_state, destroy_workspace_selection_callback);
+  std::unique_lock<std::mutex> lock(state->mutex);
+  if (!state->ready.wait_for(lock, kWorkspaceDialogTimeout +
+                                      std::chrono::seconds(5),
+                             [&state] { return state->complete; })) {
+    state->expired.store(true);
+    return false;
+  }
+  if (state->reply.empty()) return false;
+  *reply = std::move(state->reply);
+  return reply->size() <= kWorkspaceReplyLimit;
+}
+
 bool confirm_owner_operation(GWeakRef* owner_parent,
                              const std::string& summary) {
   gpointer parent_ref = g_weak_ref_get(owner_parent);
@@ -429,6 +593,29 @@ class BrokerContext {
         poison();
         return false;
       }
+      if (has_workspace_picker_prefix(buffer)) {
+        std::string challenge;
+        if (!decode_workspace_picker_prompt(buffer, &challenge)) {
+          poison();
+          return false;
+        }
+        std::string reply;
+        if (!request_workspace_selection(&owner_parent_, challenge, &reply)) {
+          reply = "D4PICK1 " + challenge + " FAILED";
+        }
+        reply.push_back('\n');
+        const bool written_ok = g_output_stream_write_all(
+                                    stdin_pipe_, reply.data(), reply.size(),
+                                    &written, nullptr, &error) &&
+                                written == reply.size();
+        if (!written_ok ||
+            g_output_stream_flush(stdin_pipe_, nullptr, &error) == FALSE) {
+          g_clear_error(&error);
+          poison();
+          return false;
+        }
+        continue;
+      }
       if (!has_owner_protocol_prefix(buffer)) {
         if (!has_credential_protocol_prefix(buffer)) {
           *response = std::move(buffer);
@@ -504,7 +691,8 @@ class BrokerContext {
                                       : static_cast<size_t>(newline - chunk);
       const size_t limit =
           frame->rfind("D4OWNER1", 0) == 0 ||
-                  frame->rfind("D4CRED1", 0) == 0
+                  frame->rfind("D4CRED1", 0) == 0 ||
+                  frame->rfind("D4PICK1", 0) == 0
               ? kOwnerPromptFrameLimit
               : kResponseLimit;
       if (content_size > limit - frame->size() ||

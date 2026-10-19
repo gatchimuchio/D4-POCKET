@@ -24,6 +24,7 @@ const RESPONSE_LIMIT: usize = 4 * 1024 * 1024;
 const OWNER_SUMMARY_LIMIT: usize = 16 * 1024;
 const OWNER_REPLY_LIMIT: usize = 128;
 const OWNER_PROMPT_LIMIT: usize = OWNER_SUMMARY_LIMIT * 2 + 64;
+const WORKSPACE_PICKER_REPLY_LIMIT: usize = 2 * 1024 + 128;
 const OWNER_PROTOCOL_MAGIC: [u8; 8] = [68, 52, 79, 87, 78, 69, 82, 49];
 const OWNER_REPLY_YES: [u8; 3] = [89, 69, 83];
 #[cfg(test)]
@@ -211,33 +212,45 @@ fn serve(
             return Err(failure());
         }
         let mut seen_credential_nonces = BTreeSet::new();
+        let mut seen_workspace_selection_nonces = BTreeSet::new();
         loop {
             let Some(frame) = read_frame(input, REQUEST_LIMIT)? else {
                 break;
             };
             let frame = Zeroizing::new(frame);
             let mut confirmation_error = None;
-            let mut ui = LinuxNativeUi { input, output };
-            let owner_response = match crate::linux_credential_input::dispatch_native(
+            let selection_response = crate::linux_workspace_selection::dispatch_native(
                 &frame,
                 &endpoint.0,
                 &owner_tx,
-                &mut seen_credential_nonces,
-                &mut ui,
-            )? {
-                Some(response) => Some(response),
-                None => crate::macos_desktop_owner::dispatch(
+                &mut seen_workspace_selection_nonces,
+                &mut |challenge| request_workspace_selection(challenge, input, output),
+            )?;
+            let owner_response = if selection_response.is_some() {
+                selection_response
+            } else {
+                let mut ui = LinuxNativeUi { input, output };
+                match crate::linux_credential_input::dispatch_native(
                     &frame,
                     &endpoint.0,
                     &owner_tx,
-                    &mut |summary| match ui.confirm_owner(summary) {
-                        Ok(confirmed) => confirmed,
-                        Err(error) => {
-                            confirmation_error = Some(error);
-                            false
-                        }
-                    },
-                )?,
+                    &mut seen_credential_nonces,
+                    &mut ui,
+                )? {
+                    Some(response) => Some(response),
+                    None => crate::macos_desktop_owner::dispatch(
+                        &frame,
+                        &endpoint.0,
+                        &owner_tx,
+                        &mut |summary| match ui.confirm_owner(summary) {
+                            Ok(confirmed) => confirmed,
+                            Err(error) => {
+                                confirmation_error = Some(error);
+                                false
+                            }
+                        },
+                    )?,
+                }
             };
             if let Some(error) = confirmation_error {
                 return Err(error);
@@ -268,6 +281,20 @@ fn serve(
         Ok(())
     };
     result.and(stopped).and(cleanup)
+}
+
+fn request_workspace_selection(
+    challenge: &str,
+    input: &mut (impl BufRead + ?Sized),
+    output: &mut (impl Write + ?Sized),
+) -> io::Result<crate::linux_workspace_selection::NativeSelection> {
+    let prompt = format!("D4PICK1 {challenge}\n");
+    output.write_all(prompt.as_bytes())?;
+    output.flush()?;
+    let Some(reply) = read_frame(input, WORKSPACE_PICKER_REPLY_LIMIT)? else {
+        return Err(failure());
+    };
+    crate::linux_workspace_selection::parse_picker_reply(challenge, &reply)
 }
 
 /// GTK Runnerだけが返せる、一回限りの確認応答を現在のsummaryへ束縛する。

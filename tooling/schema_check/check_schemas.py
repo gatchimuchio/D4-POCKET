@@ -155,6 +155,8 @@ REQUIRED = {
     "agent_cli_runtime_workspace_registration.schema.json",
     "macos_workspace_selection.schema.json",
     "macos_workspace_selection_receipt.schema.json",
+    "linux_workspace_selection.schema.json",
+    "linux_workspace_selection_receipt.schema.json",
     "macos_agent_cli_selection.schema.json",
     "macos_agent_cli_selection_receipt.schema.json",
     "macos_credential_input.schema.json",

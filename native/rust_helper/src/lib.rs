@@ -19,6 +19,8 @@ pub mod ipc;
 mod linux_credential_input;
 #[cfg(target_os = "linux")]
 pub mod linux_desktop_worker;
+#[cfg(target_os = "linux")]
+mod linux_workspace_selection;
 #[cfg(target_os = "macos")]
 mod macos_credential_input;
 #[cfg(any(target_os = "linux", target_os = "macos", test))]

@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "7c3f656c6586d8fdd14f5f218aaa041a6e1498e192776171129f1e28ef91530c"
+      "sha256": "6d2e8f03f06d395c1dd5763c1297b9d8e0a5991d233dfe8636143681eecbad59"
     },
     {
       "path": "SECURITY.md",
@@ -212,7 +212,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/agent_center.dart",
-      "sha256": "a6347e2d2fe3b10f858e0f4125e1ce27859096cff521f365a5ba0394c78da2e5"
+      "sha256": "5f07910592568502c82a5e100fb700cbb93b1ee9c9767bcae67a222d8d1b5462"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/approval_center.dart",
@@ -436,7 +436,7 @@
     },
     {
       "path": "apps/desktop_flutter/linux/runner/broker_process_channel.cc",
-      "sha256": "ad0fe6fe382abb326da61731bf4fc9f2df64bd21eee4d61cebfcc904d3f9e4bc"
+      "sha256": "8f9db5d3549fac0524a3ac51115d6f827f55a0526556f7e5e8161ca5414491ed"
     },
     {
       "path": "apps/desktop_flutter/linux/runner/broker_process_channel.h",
@@ -704,7 +704,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "da17e17ade0e879b2e89bdcd2f74167be32e7ee8f544328d4447ad13f435ec2e"
+      "sha256": "71a00efa5a04277d38a949d71df1911bb8a53508d6c640f81796dce7a3c6057a"
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
@@ -1300,7 +1300,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "2de1f27da967d69f6b919b79c2feb47195420c708ec760a16db2bd0cbd01b7be"
+      "sha256": "e0b0ba1bcc4fd18bc4c7708dba92712672444a4648796e944b2e16186c725fd6"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1508,7 +1508,7 @@
     },
     {
       "path": "docs/specs/linux-desktop-channel.md",
-      "sha256": "6e62cbba75b60d198e4c3d7f231cebd1cb6d2e97ca24e9d53163545a1e5479cb"
+      "sha256": "aca5a55f1dd6e20c4fd21ec5cd8cd5c7ec8d77462583e9ed0b7d1a4c4816ca59"
     },
     {
       "path": "docs/specs/long-run-validation.md",
@@ -3536,7 +3536,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/export_center.rs",
-      "sha256": "98119556675aeb334a9bb608ce796b02c8e23de93e4c1159d74d148456f8087e"
+      "sha256": "16ee1e69c2e613427440916a6d6c7625cab5744d44e30e190e0caf1d4b6d5598"
     },
     {
       "path": "native/rust_helper/src/broker/history_access.rs",
@@ -3584,7 +3584,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "82ae3043647d39767fd0b7c5ed355f2d6d06a8834f9c93da9eafa46f4e91d9ff"
+      "sha256": "8cd041e71f5ff21597300e5a6f350cf4a927132fcf6d6055d15d69e5f685892e"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -3656,7 +3656,7 @@
     },
     {
       "path": "native/rust_helper/src/lib.rs",
-      "sha256": "deb2838a1449052c4d64a9c347e51a25e23cb57d7cc9797e5df3025582e05391"
+      "sha256": "ee67954296996ae917735aeab2c492eb2946c35f3ca7df7c6550548fe621cbd0"
     },
     {
       "path": "native/rust_helper/src/linux_credential_input.rs",
@@ -3664,7 +3664,7 @@
     },
     {
       "path": "native/rust_helper/src/linux_desktop_worker.rs",
-      "sha256": "bc4aa0051f512fc48fceb4c1843c58685641cee3c6a29250cc884f057a87c4a8"
+      "sha256": "e529e4333812be4f973ef2ad4742ea1957f89328f1d2f1068f841fcb64059a3c"
     },
     {
       "path": "native/rust_helper/src/macos_credential_input.rs",
@@ -4960,7 +4960,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "a70a9699c33ede33bd11c09079f2d477e574946c9fd5994f1c8d31b06ce8b596"
+      "sha256": "92e0f7b083d3c394bf2988f0c6da2f005984a9284a684e79b72b68a62861795a"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
@@ -5084,7 +5084,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "942663df7746dbca845578e73d4ac24718c5430869755d02e99ebc21b2fea7b2"
+      "sha256": "74e6e6c1b41b695cb8c5abaeea703c02016f7420de1e8b78ced97c094a3b3fb4"
     },
     {
       "path": "tooling/shell_snapshot.py",
@@ -5124,7 +5124,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "bdb24c80675fc30deac778a241b84191ceb1218300175d3395cab793dc21dd57"
+      "sha256": "d984cc14496e3812603cd23fc37fc7b8324d57adba7df7fd3eb268a6b42fac0a"
     }
   ]
 }
