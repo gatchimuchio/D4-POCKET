@@ -92,7 +92,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "685e95a678b8fbc61cf30befba1df46e48707a90d7509713df464da095f492f2"
+      "sha256": "70ab9b284f833d3e84a6b60887b6e89018b08faf32b11fd2763c883c481d8769"
     },
     {
       "path": "AUDIT.md",
@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "ab13105d6b2724776d8eba90405ca4091f3487a3daf0e68d8edd2c75a88b4f65"
+      "sha256": "a2dbcb71260c9dc2c5ab3cd831327e0463cb21fcc1390ffc2af59f7d81afe9d4"
     },
     {
       "path": "SECURITY.md",
@@ -1288,7 +1288,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "9864c92a8255a752c6d020bbb59de41dc592f81bb14e30e6f44e47a9a2d9fa1b"
+      "sha256": "386f69eda551511f4c78efcead25ec0b62d5ee8318d66202028d83f296108de1"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1676,7 +1676,7 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B5_\u81ea\u5df1\u9069\u7528.md",
-      "sha256": "83b34a5bbe902c6166eb87d7a78e2f02171a03b53c212bdaf3132ba533caad2c"
+      "sha256": "e396a62b9c9b83a0c23ff639ed2eb8eca06f755d7f26586b79d541d7b283606a"
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/\u5b9f\u88c5\u4ed5\u69d8\u66f8.md",
