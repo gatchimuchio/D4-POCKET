@@ -1,8 +1,8 @@
 //! 固定installed rootの起動入口からBroker選択済み版を安全に解決する。
 
-use cap_fs_ext::{
-    DirExt, FollowSymlinks, MetadataExt as CapMetadataExt, OpenOptionsFollowExt, OsMetadataExt as _,
-};
+#[cfg(windows)]
+use cap_fs_ext::OsMetadataExt as _;
+use cap_fs_ext::{DirExt, FollowSymlinks, MetadataExt as CapMetadataExt, OpenOptionsFollowExt};
 use cap_std::fs::{Dir, OpenOptions};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -11,7 +11,10 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 const ACTIVE_VERSION_FILE: &str = "active_version.json";
+#[cfg(windows)]
 const VERSIONED_LAUNCHER: &str = "gui_shell_desktop_launcher.exe";
+#[cfg(target_os = "linux")]
+const VERSIONED_LAUNCHER: &str = "gui_shell_desktop_launcher";
 const PRODUCT_MANIFEST: &str = "product_manifest.json";
 const MAX_ACTIVE_VERSION_BYTES: u64 = 4096;
 const MAX_PRODUCT_MANIFEST_BYTES: u64 = 64 * 1024;
@@ -99,11 +102,7 @@ pub(crate) fn resolve_active_version_launcher(
     let versions = open_existing_directory(&root, "versions", root_device)?;
     let stage_name = format!("{}-{}", record.product_version, record.package_sha256);
     open_existing_directory(&versions, &stage_name, root_device)?;
-    validate_descriptor_stage(
-        &versions,
-        &descriptor_from_record(&record),
-        root_device,
-    )?;
+    validate_descriptor_stage(&versions, &descriptor_from_record(&record), root_device)?;
 
     let stage_path = product_root.join("versions").join(stage_name);
     let launcher_path = stage_path.join(VERSIONED_LAUNCHER);
@@ -313,11 +312,8 @@ pub(crate) fn restore_missing_root_bootstrapper(
     expected_audit_store_id: &str,
     expected_current: &ActiveVersionDescriptor,
 ) -> Result<bool, BootstrapperError> {
-    let snapshot = active_version_snapshot(
-        local_app_data,
-        expected_app_id,
-        expected_audit_store_id,
-    )?;
+    let snapshot =
+        active_version_snapshot(local_app_data, expected_app_id, expected_audit_store_id)?;
     if &snapshot.current != expected_current {
         return Err(BootstrapperError("active_version_record_changed"));
     }
@@ -492,7 +488,8 @@ fn read_existing_active_record(
 ) -> Result<Option<ActiveVersionRecord>, BootstrapperError> {
     match product_root.symlink_metadata(ACTIVE_VERSION_FILE) {
         Ok(metadata) if metadata.is_file() && !is_cap_reparse_point(&metadata) => {
-            let bytes = read_regular_file(product_root, ACTIVE_VERSION_FILE, MAX_ACTIVE_VERSION_BYTES)?;
+            let bytes =
+                read_regular_file(product_root, ACTIVE_VERSION_FILE, MAX_ACTIVE_VERSION_BYTES)?;
             serde_json::from_slice(&bytes)
                 .map(Some)
                 .map_err(|_| BootstrapperError("active_version_record_invalid"))
@@ -697,12 +694,26 @@ fn same_cap_file(left: &cap_std::fs::Metadata, right: &cap_std::fs::Metadata) ->
 }
 
 fn is_cap_reparse_point(metadata: &cap_std::fs::Metadata) -> bool {
-    metadata.file_attributes() & 0x400 != 0
+    #[cfg(windows)]
+    {
+        metadata.file_attributes() & 0x400 != 0
+    }
+    #[cfg(target_os = "linux")]
+    {
+        metadata.file_type().is_symlink()
+    }
 }
 
 fn is_reparse_point(metadata: &fs::Metadata) -> bool {
-    use std::os::windows::fs::MetadataExt;
-    metadata.file_attributes() & 0x400 != 0
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        metadata.file_attributes() & 0x400 != 0
+    }
+    #[cfg(target_os = "linux")]
+    {
+        metadata.file_type().is_symlink()
+    }
 }
 
 fn valid_product_version(value: &str) -> bool {
@@ -735,7 +746,6 @@ mod tests {
     use serde_json::json;
     use sha2::{Digest, Sha256};
     use std::fs;
-    use std::path::Path;
 
     const APP_ID: &str = "d4-pocket-app-11111111111111111111111111111111";
     const AUDIT_ID: &str = "audit-store-22222222222222222222222222222222";
@@ -749,22 +759,17 @@ mod tests {
                 .unwrap()
                 .as_nanos()
         ));
+        #[cfg(windows)]
         let root = local.join("Programs").join("D4 Pocket").join(APP_ID);
+        #[cfg(target_os = "linux")]
+        let root = local.join("apps").join("d4-pocket").join(APP_ID);
         let package_hash = "a".repeat(64);
         let version_dir = root.join("versions").join(format!("1.2.3-{package_hash}"));
         fs::create_dir_all(&version_dir).unwrap();
-        fs::write(
-            root.join("gui_shell_desktop_launcher.exe"),
-            b"bootstrapper launcher",
-        )
-        .unwrap();
+        fs::write(root.join(VERSIONED_LAUNCHER), b"bootstrapper launcher").unwrap();
         let launcher_bytes = b"fixed version launcher";
         let manifest_bytes = b"fixed product manifest";
-        fs::write(
-            version_dir.join("gui_shell_desktop_launcher.exe"),
-            launcher_bytes,
-        )
-        .unwrap();
+        fs::write(version_dir.join(VERSIONED_LAUNCHER), launcher_bytes).unwrap();
         fs::write(version_dir.join("product_manifest.json"), manifest_bytes).unwrap();
         let record = json!({
             "version": 1,
@@ -793,7 +798,7 @@ mod tests {
             fs::canonicalize(
                 root.join("versions")
                     .join(format!("1.2.3-{}", "a".repeat(64)))
-                    .join("gui_shell_desktop_launcher.exe")
+                    .join(VERSIONED_LAUNCHER)
             )
             .unwrap()
         );
@@ -812,7 +817,7 @@ mod tests {
             APP_ID,
             "other-audit-store"
         ));
-        let unrelated_launcher = local.join("unrelated-launcher.exe");
+        let unrelated_launcher = local.join("unrelated-launcher");
         fs::write(&unrelated_launcher, b"not the selected product version").unwrap();
         assert!(!is_active_version_launcher(
             &unrelated_launcher,
@@ -904,8 +909,8 @@ mod tests {
         let (local, root) = fixture("rollback-toggle");
         let root_dir = Dir::open_ambient_dir(&root, cap_std::ambient_authority()).unwrap();
         let versions_path = root.join("versions");
-        let versions_dir = Dir::open_ambient_dir(&versions_path, cap_std::ambient_authority())
-            .unwrap();
+        let versions_dir =
+            Dir::open_ambient_dir(&versions_path, cap_std::ambient_authority()).unwrap();
         let old_package_hash = "a".repeat(64);
         let old_candidate_hash = format!("sha256:{}", "b".repeat(64));
         activate_staged_version(
@@ -1097,6 +1102,7 @@ mod tests {
         fs::remove_dir_all(local).unwrap();
     }
 
+    #[cfg(windows)]
     #[test]
     fn active_version_rejects_stage_junction() {
         let (local, root) = fixture("junction");
@@ -1129,19 +1135,43 @@ mod tests {
         fs::remove_dir_all(local).unwrap();
     }
 
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn active_version_rejects_stage_symlink() {
+        let (local, root) = fixture("symlink");
+        let versions = root.join("versions");
+        let stage = versions.join(format!("1.2.3-{}", "a".repeat(64)));
+        let outside = local.join("outside-stage");
+        fs::remove_dir_all(&stage).unwrap();
+        fs::create_dir_all(&outside).unwrap();
+        std::os::unix::fs::symlink(&outside, &stage).unwrap();
+
+        assert_eq!(
+            resolve_active_version_launcher(&local, APP_ID, AUDIT_ID)
+                .unwrap_err()
+                .0,
+            "active_version_directory_invalid"
+        );
+        assert!(fs::read_dir(&outside).unwrap().next().is_none());
+
+        fs::remove_file(&stage).unwrap();
+        fs::remove_dir_all(local).unwrap();
+    }
+
     #[test]
     fn installed_entrypoint_recognition_is_fixed_to_identity_root() {
         let (local, root) = fixture("entrypoint");
         let local = fs::canonicalize(local).unwrap();
         assert!(super::is_fixed_installed_entrypoint(
-            &root.join("gui_shell_desktop_launcher.exe"),
+            &root.join(VERSIONED_LAUNCHER),
             &local,
             APP_ID,
         ));
+        let portable = local.join("portable").join(VERSIONED_LAUNCHER);
+        fs::create_dir_all(portable.parent().unwrap()).unwrap();
+        fs::write(&portable, b"portable launcher").unwrap();
         assert!(!super::is_fixed_installed_entrypoint(
-            Path::new("C:/portable/gui_shell_desktop_launcher.exe"),
-            &local,
-            APP_ID,
+            &portable, &local, APP_ID,
         ));
         fs::remove_dir_all(local).unwrap();
     }

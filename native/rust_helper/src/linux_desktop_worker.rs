@@ -61,8 +61,11 @@ pub fn run() -> io::Result<()> {
     )
 }
 
-/// Runnerとhelperが同じbundleに固定されることを確かめる。署名や配布identityの証明ではない。
-struct VerifiedBundle;
+/// Runner/helperの同一bundleと、存在する場合は固定版別起動器を確認する。
+/// 署名や配布identityの証明ではない。
+struct VerifiedBundle {
+    versioned_launcher: Option<PathBuf>,
+}
 
 fn verify_bundle(helper: &Path) -> io::Result<VerifiedBundle> {
     if !helper.is_absolute()
@@ -76,7 +79,10 @@ fn verify_bundle(helper: &Path) -> io::Result<VerifiedBundle> {
         return Err(failure());
     }
     let canonical_bundle = bundle.canonicalize()?;
-    for path in [bundle.join("gui_shell_desktop"), helper.to_path_buf()] {
+    for path in [
+        canonical_bundle.join("gui_shell_desktop"),
+        helper.to_path_buf(),
+    ] {
         let metadata = fs::symlink_metadata(&path)?;
         if !metadata.is_file()
             || metadata.file_type().is_symlink()
@@ -85,7 +91,44 @@ fn verify_bundle(helper: &Path) -> io::Result<VerifiedBundle> {
             return Err(failure());
         }
     }
-    Ok(VerifiedBundle)
+    let versioned_launcher = canonical_bundle.join("gui_shell_desktop_launcher");
+    let versioned_launcher = match fs::symlink_metadata(&versioned_launcher) {
+        Ok(metadata)
+            if metadata.is_file()
+                && !metadata.file_type().is_symlink()
+                && metadata.permissions().mode() & 0o111 != 0 =>
+        {
+            let path = versioned_launcher.canonicalize()?;
+            if !path.starts_with(&canonical_bundle) {
+                return Err(failure());
+            }
+            Some(path)
+        }
+        Ok(_) => return Err(failure()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+        Err(error) => return Err(error),
+    };
+    Ok(VerifiedBundle { versioned_launcher })
+}
+
+fn installed_product_path_verified(
+    bundle: &VerifiedBundle,
+    identity: Option<&(String, String)>,
+    local_app_data: Option<&Path>,
+) -> bool {
+    let (Some(launcher), Some((app_id, audit_store_id)), Some(local_app_data)) = (
+        bundle.versioned_launcher.as_deref(),
+        identity,
+        local_app_data,
+    ) else {
+        return false;
+    };
+    crate::product_bootstrapper::is_active_version_launcher(
+        launcher,
+        local_app_data,
+        app_id,
+        audit_store_id,
+    )
 }
 
 fn verify_owned_directory(path: &Path, private: bool) -> io::Result<PathBuf> {
@@ -161,7 +204,7 @@ impl Drop for NormalEndpoint {
 fn serve(
     state: &Path,
     runtime: &Path,
-    _bundle: &VerifiedBundle,
+    bundle: &VerifiedBundle,
     input: &mut impl BufRead,
     output: &mut impl Write,
 ) -> io::Result<()> {
@@ -174,8 +217,15 @@ fn serve(
     let mut config = BrokerServerConfig::new(state.join("store"), session.clone());
     config.max_request_bytes = REQUEST_LIMIT;
     config.desktop_package_layout_verified = true;
-    config.desktop_product_identity =
+    let product_identity =
         crate::broker::update_center::embedded_product_identity().map_err(|_| failure())?;
+    let product_data_home = crate::broker::product_install::current_user_local_app_data().ok();
+    config.desktop_install_path_verified = installed_product_path_verified(
+        bundle,
+        product_identity.as_ref(),
+        product_data_home.as_deref(),
+    );
+    config.desktop_product_identity = product_identity;
     let (ready_tx, ready_rx) = mpsc::sync_channel(1);
     let (owner_tx, owner_rx) = mpsc::sync_channel(4);
     let server = thread::Builder::new()
@@ -483,6 +533,124 @@ fn relay(request: &[u8], endpoint: &BrokerEndpoint) -> io::Result<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const PRODUCT_APP_ID: &str = "d4-pocket-app-11111111111111111111111111111111";
+    const PRODUCT_AUDIT_ID: &str = "audit-store-22222222222222222222222222222222";
+
+    fn unique_test_root(label: &str) -> PathBuf {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "d4-linux-bundle-{label}-{}-{nonce}",
+            std::process::id()
+        ))
+    }
+
+    #[test]
+    fn verified_bundle_accepts_only_regular_executable_versioned_launcher() {
+        use std::os::unix::fs::{symlink, PermissionsExt};
+
+        let root = unique_test_root("launcher");
+        let libexec = root.join("libexec");
+        fs::create_dir_all(&libexec).unwrap();
+        fs::write(root.join("gui_shell_desktop"), b"desktop runner").unwrap();
+        let helper = libexec.join("gui_shell_linux_broker");
+        fs::write(&helper, b"broker helper").unwrap();
+        let launcher = root.join("gui_shell_desktop_launcher");
+        fs::write(&launcher, b"versioned launcher").unwrap();
+        fs::set_permissions(&launcher, fs::Permissions::from_mode(0o755)).unwrap();
+
+        assert!(verify_bundle(&helper).unwrap().versioned_launcher.is_some());
+
+        fs::set_permissions(&launcher, fs::Permissions::from_mode(0o644)).unwrap();
+        assert!(verify_bundle(&helper).is_err());
+        fs::remove_file(&launcher).unwrap();
+        let outside = unique_test_root("outside-launcher");
+        fs::write(&outside, b"outside launcher").unwrap();
+        fs::set_permissions(&outside, fs::Permissions::from_mode(0o755)).unwrap();
+        symlink(&outside, &launcher).unwrap();
+        assert!(verify_bundle(&helper).is_err());
+
+        fs::remove_dir_all(&root).unwrap();
+        fs::remove_file(outside).unwrap();
+    }
+
+    #[test]
+    fn installed_path_verification_requires_the_active_version_and_identity() {
+        use cap_std::fs::Dir;
+        use std::os::unix::fs::PermissionsExt;
+
+        let local_app_data = unique_test_root("installed");
+        let product_root = local_app_data
+            .join("apps")
+            .join("d4-pocket")
+            .join(PRODUCT_APP_ID);
+        let package_hash = "a".repeat(64);
+        let version_root = product_root
+            .join("versions")
+            .join(format!("1.2.3-{package_hash}"));
+        let libexec = version_root.join("libexec");
+        fs::create_dir_all(&libexec).unwrap();
+        fs::write(version_root.join("gui_shell_desktop"), b"desktop runner").unwrap();
+        fs::write(libexec.join("gui_shell_linux_broker"), b"broker helper").unwrap();
+        fs::write(
+            version_root.join("product_manifest.json"),
+            b"product manifest",
+        )
+        .unwrap();
+        let launcher = version_root.join("gui_shell_desktop_launcher");
+        fs::write(&launcher, b"versioned launcher").unwrap();
+        fs::set_permissions(&launcher, fs::Permissions::from_mode(0o755)).unwrap();
+
+        let root_dir = Dir::open_ambient_dir(&product_root, cap_std::ambient_authority()).unwrap();
+        let versions_dir =
+            Dir::open_ambient_dir(product_root.join("versions"), cap_std::ambient_authority())
+                .unwrap();
+        crate::product_bootstrapper::activate_staged_version(
+            &root_dir,
+            &versions_dir,
+            "1.2.3",
+            PRODUCT_APP_ID,
+            PRODUCT_AUDIT_ID,
+            &package_hash,
+            "update-linux-installed-path",
+            &format!("sha256:{}", "c".repeat(64)),
+            "0123456789abcdef0123456789abcdef",
+        )
+        .unwrap();
+        drop(versions_dir);
+        drop(root_dir);
+
+        let bundle = verify_bundle(&libexec.join("gui_shell_linux_broker")).unwrap();
+        let identity = (PRODUCT_APP_ID.to_owned(), PRODUCT_AUDIT_ID.to_owned());
+        assert!(installed_product_path_verified(
+            &bundle,
+            Some(&identity),
+            Some(&local_app_data)
+        ));
+        assert!(!installed_product_path_verified(
+            &bundle,
+            Some(&identity),
+            Some(&local_app_data.join("other"))
+        ));
+        assert!(!installed_product_path_verified(
+            &bundle,
+            Some(&(
+                PRODUCT_APP_ID.to_owned(),
+                "audit-store-33333333333333333333333333333333".into()
+            )),
+            Some(&local_app_data)
+        ));
+        assert!(!installed_product_path_verified(
+            &bundle,
+            None,
+            Some(&local_app_data)
+        ));
+
+        fs::remove_dir_all(local_app_data).unwrap();
+    }
 
     #[test]
     fn channel_binds_only_the_rust_owned_session_and_rejects_caller_session() {

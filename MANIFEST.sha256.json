@@ -76,7 +76,7 @@
     },
     {
       "path": ".github/workflows/linux-manual-rust-validation.yml",
-      "sha256": "19e0c37d9df0e671a7efcc7cd11bdb672018018ee504c162194326c268603202"
+      "sha256": "75c447a1ef77759145f5662b84b6f2e2ee13c72d4ba8c8c7505d0398b095a807"
     },
     {
       "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
@@ -168,7 +168,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "be2f6c57da1523cff476859e3fbc00dfe209b4294a2b0dbf88298395f220ab26"
+      "sha256": "04145f19ffaf6b2fe593f28123d080c87bb769e2ed2b8713d1cec29d2e8286b1"
     },
     {
       "path": "SECURITY.md",
@@ -1304,7 +1304,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "4d5a4a5a18094cf4557781299a6deba6d352e47ca00fbf0706c04a7e70374c90"
+      "sha256": "3ce55c59e3010011125a98d499dc8992ad79dc4bd6e7b4818211664a3ae00f6e"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -3296,7 +3296,7 @@
     },
     {
       "path": "installer/linux/README.md",
-      "sha256": "d5a0b150eca9d339b09f450c6540eb6b9167713297078c86d99e8d0bb9f72519"
+      "sha256": "3a1cf8ee23cb49f8a11648286e6e44faa8378afa3de30da866705a62a889a437"
     },
     {
       "path": "installer/macos/README.md",
@@ -3680,7 +3680,7 @@
     },
     {
       "path": "native/rust_helper/src/lib.rs",
-      "sha256": "ee67954296996ae917735aeab2c492eb2946c35f3ca7df7c6550548fe621cbd0"
+      "sha256": "5024dbfb44d25023263fe47eba598433f8480ec6a8519e5e2a1e94fba9092d3e"
     },
     {
       "path": "native/rust_helper/src/linux_credential_input.rs",
@@ -3688,7 +3688,7 @@
     },
     {
       "path": "native/rust_helper/src/linux_desktop_worker.rs",
-      "sha256": "24762f38591b099f5f51248a587fce88eded91b9453307a0ccde6b2b256b6a2f"
+      "sha256": "e7536381e6f075cf48f1338f16ba37bf30c35f9f284f7dc2ce1c77c51dd33650"
     },
     {
       "path": "native/rust_helper/src/linux_workspace_selection.rs",
@@ -3732,7 +3732,7 @@
     },
     {
       "path": "native/rust_helper/src/product_bootstrapper.rs",
-      "sha256": "9f043f53d306047bcb1fd48537d15d9b7ec9698f8903c491dff1fb3ceec52160"
+      "sha256": "353619f63acb052486aeb12ea37487910419fe9784ecd87a15668b41d7890f7d"
     },
     {
       "path": "native/rust_helper/src/product_package.rs",

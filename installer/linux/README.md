@@ -4,7 +4,7 @@ Linux native DesktopはD4 Pocketの完全対応が必須の製品対象である
 
 現時点ではLinux packaged installer、installed product、更新・rollback・uninstallの一貫した製品経路は未完成であり、`release_blockers.registry.json`の`linux_native_product_support`がreleaseを遮断する。WSL／WSLg／headless上のbuildや試験は開発証拠であり、Linux native installed productの受入れへ代用しない。
 
-Linux Brokerには、versioned install rootをXDG_DATA_HOME（未設定時HOME/.local/share）から固定導出するRust基盤がある。これはまだBroker package staging／activationやdesktop entry、update／rollback／uninstallへ接続されておらず、installer完成を意味しない。
+Linux Brokerには、versioned install rootをXDG_DATA_HOME（未設定時HOME/.local/share）から固定導出し、compile-time App／Audit identityおよびBrokerが記録したactive versionと版別起動器の実行元を照合するRust基盤がある。focused Ubuntu-24.04 WSL試験とWindows互換試験は通過したが、Linux版launcher本体は未実装（Windows-only stub）であり、exporter／package staging・activation／desktop entry／update／rollback／uninstallへまだ一気通貫接続されていない。従ってLinux installer完成やinstalled product acceptanceを意味しない。
 
 ## 製品要件
 

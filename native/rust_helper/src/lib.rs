@@ -2,7 +2,7 @@
 
 #[cfg(windows)]
 pub mod desktop_launcher;
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "linux"))]
 pub(crate) mod product_bootstrapper;
 #[cfg(windows)]
 pub mod protected_store;
