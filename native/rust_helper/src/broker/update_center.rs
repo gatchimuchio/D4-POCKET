@@ -1659,12 +1659,12 @@ fn list(broker: &mut Broker, payload: &Value, request_id: &str, hash: &str) -> B
 }
 
 fn rollback_state_projection(broker: &Broker) -> Value {
-    #[cfg(not(windows))]
+    #[cfg(not(any(windows, target_os = "linux")))]
     {
         let _ = broker;
         return json!({"状態": "unknown", "現在版": null, "対象版": null});
     }
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "linux"))]
     {
         let Some((app_id, audit_store_id)) = broker.desktop_product_identity.as_ref() else {
             return json!({"状態": "unknown", "現在版": null, "対象版": null});
@@ -1719,7 +1719,7 @@ fn rollback_state_projection(broker: &Broker) -> Value {
     }
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "linux"))]
 fn rollback_descriptor_matches_candidate(
     broker: &Broker,
     descriptor: &crate::product_bootstrapper::ActiveVersionDescriptor,
@@ -1739,7 +1739,7 @@ fn rollback_descriptor_matches_candidate(
         && verified.candidate.package_sha256.as_deref() == Some(descriptor.package_sha256.as_str())
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "linux"))]
 fn rollback_descriptor_projection(
     descriptor: &crate::product_bootstrapper::ActiveVersionDescriptor,
 ) -> Value {
@@ -2381,7 +2381,7 @@ fn execution_request(
     )
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "linux"))]
 fn rollback_active_version(
     broker: &mut Broker,
     request: &UpdateIDRequest,
@@ -2562,6 +2562,37 @@ fn rollback_active_version(
             payload_hash,
         );
     }
+    #[cfg(target_os = "linux")]
+    {
+        #[cfg(test)]
+        let expected_entry =
+            super::product_install::plan_linux_desktop_entry(&local_app_data, &app_id);
+        #[cfg(not(test))]
+        let expected_entry = super::product_install::plan_current_user_linux_desktop_entry(&app_id);
+        let expected_entry = match expected_entry {
+            Ok(path) => path,
+            Err(_) => {
+                return reject(
+                    broker,
+                    request_id,
+                    OP_ROLLBACK,
+                    "product_desktop_entry_path_unavailable",
+                    "固定XDG desktop entry pathを導出できないためrollbackしない",
+                    payload_hash,
+                );
+            }
+        };
+        if expected_entry != confirmation.linux_desktop_entry_path {
+            return reject(
+                broker,
+                request_id,
+                OP_ROLLBACK,
+                "update_rollback_desktop_entry_stale",
+                "native Owner確認のdesktop entry pathが現在のXDG pathと異なる",
+                payload_hash,
+            );
+        }
+    }
     #[cfg(test)]
     let plan = super::product_install::plan_product_install(
         &local_app_data,
@@ -2714,7 +2745,7 @@ fn rollback_active_version(
         &format!("{request_id}:complete"),
         OP_ROLLBACK,
         "completed",
-        &format!("Capability=product.install.rollback_version Permission=有効版recordだけを直前の署名済みstageへatomic切替 Approval=独立Rust Desktop native Owner確認 AuditEvent=rollback完了を記録 RecoveryAction=Bootstrapperは次回起動時に有効版recordとstage hashを再検証する。process起動・file削除・Start Menu変更なし current_version={} target_version={} intent_audit_id={}", snapshot.current.product_version, restored.product_version, intent.event_id),
+        &format!("Capability=product.install.rollback_version Permission=有効版recordだけを直前の署名済みstageへatomic切替 Approval=独立Rust Desktop native Owner確認 AuditEvent=rollback完了を記録 RecoveryAction=Bootstrapperは次回起動時に有効版recordとstage hashを再検証する。process起動・file削除・固定desktop entry変更なし current_version={} target_version={} intent_audit_id={}", snapshot.current.product_version, restored.product_version, intent.event_id),
         EVIDENCE_SOURCE_INTERNAL_STATE,
         payload_hash,
     ) {
@@ -2750,7 +2781,7 @@ fn rollback_active_version(
     }
 }
 
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "linux")))]
 fn rollback_active_version(
     broker: &mut Broker,
     request: &UpdateIDRequest,
@@ -5099,7 +5130,7 @@ mod tests {
 
     #[cfg(target_os = "linux")]
     #[test]
-    fn linux_native_owner_apply_stages_exact_signed_package_without_activation() {
+    fn linux_native_owner_apply_activate_and_rollback_signed_packages() {
         let unique = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -5110,14 +5141,21 @@ mod tests {
         ));
         let store_root = root.join("broker-store");
         let install_root = root.join("xdg-data");
+        std::fs::create_dir_all(&store_root).unwrap();
         std::fs::create_dir_all(&install_root).unwrap();
         let install_root = std::fs::canonicalize(&install_root).unwrap();
         let package = install_test_linux_package_for_version("1.1.0");
+        let previous_package = install_test_linux_package_for_version("1.0.0");
         let digest = hex::encode(Sha256::digest(&package));
-        let (trust, candidate, _) = trust_and_candidate_pair_for_packages(&package, &package);
+        let previous_digest = hex::encode(Sha256::digest(&previous_package));
+        let (trust, candidate, previous_candidate) =
+            trust_and_candidate_pair_for_packages(&package, &previous_package);
         let candidate_value = serde_json::to_value(&candidate).unwrap();
         let candidate_hash =
             crate::broker::protocol::canonical_payload_hash(Some(&candidate_value));
+        let previous_candidate_value = serde_json::to_value(&previous_candidate).unwrap();
+        let previous_candidate_hash =
+            crate::broker::protocol::canonical_payload_hash(Some(&previous_candidate_value));
         let mut broker = Broker::new_persistent("session-1", &store_root).unwrap();
         broker.update_trust = Some(trust);
         broker
@@ -5128,11 +5166,65 @@ mod tests {
             call(
                 &mut broker,
                 BrokerOperation::更新確認,
-                json!({"版": 1, "候補": [candidate]}),
+                json!({"版": 1, "候補": [candidate.clone(), previous_candidate.clone()]}),
             )
             .status,
             BrokerStatus::Accepted
         );
+        let (_, previous_versions) =
+            super::super::product_install::open_product_versions_directory(
+                &install_root,
+                INSTALL_APP_ID,
+            )
+            .unwrap();
+        let previous_stage_name = format!("1.0.0-{previous_digest}");
+        crate::product_package::extract_verified_package_into_directory(
+            std::io::Cursor::new(previous_package.as_slice()),
+            previous_package.len() as u64,
+            Some(&previous_digest),
+            &previous_versions,
+            &previous_stage_name,
+            crate::product_package::ProductPackageExpectation {
+                product_version: Some("1.0.0"),
+                app_id: INSTALL_APP_ID,
+                audit_store_id: INSTALL_AUDIT_ID,
+                platform: crate::product_package::ProductPackagePlatform::Linux,
+            },
+        )
+        .unwrap();
+        let (_, previous_product_root) = super::super::product_install::open_existing_product_root(
+            &install_root,
+            INSTALL_APP_ID,
+        )
+        .unwrap();
+        crate::product_bootstrapper::activate_staged_version(
+            &previous_product_root,
+            &previous_versions,
+            "1.0.0",
+            INSTALL_APP_ID,
+            INSTALL_AUDIT_ID,
+            &previous_digest,
+            "update-previous",
+            &previous_candidate_hash,
+            "11111111111111111111111111111111",
+        )
+        .unwrap();
+        let seeded_rollback_state = rollback_state_projection(&broker);
+        assert_eq!(seeded_rollback_state["状態"], "unavailable");
+        assert_eq!(seeded_rollback_state["現在版"]["提供版"], "1.0.0");
+        let assert_previous_remains_active = || {
+            assert_eq!(
+                crate::product_bootstrapper::active_version_snapshot(
+                    &install_root,
+                    INSTALL_APP_ID,
+                    INSTALL_AUDIT_ID,
+                )
+                .unwrap()
+                .current
+                .product_version,
+                "1.0.0"
+            );
+        };
         let package_directory = broker
             .state_store
             .open_update_package_directory()
@@ -5276,7 +5368,7 @@ mod tests {
                 & 0o777,
             0o755
         );
-        assert!(!plan.root.join("active_version.json").exists());
+        assert_previous_remains_active();
         assert!(broker
             .audit_events()
             .iter()
@@ -5335,7 +5427,7 @@ mod tests {
             normal_activation.error.unwrap().code,
             "desktop_native_owner_confirmation_required"
         );
-        assert!(!plan.root.join("active_version.json").exists());
+        assert_previous_remains_active();
 
         let mut stale_confirmation = activation_confirmation.clone();
         stale_confirmation.linux_desktop_entry_path = install_root.join("attacker.desktop");
@@ -5350,7 +5442,7 @@ mod tests {
             stale_activation.error.unwrap().code,
             "update_activation_desktop_entry_stale"
         );
-        assert!(!plan.root.join("active_version.json").exists());
+        assert_previous_remains_active();
         assert!(!desktop_entry_path.exists());
 
         let mut stale_version_confirmation = activation_confirmation.clone();
@@ -5366,7 +5458,7 @@ mod tests {
             stale_version.error.unwrap().code,
             "update_activation_destination_stale"
         );
-        assert!(!plan.root.join("active_version.json").exists());
+        assert_previous_remains_active();
 
         let staged_executable = target.join("gui_shell_desktop");
         std::fs::write(&staged_executable, b"tampered").unwrap();
@@ -5381,7 +5473,7 @@ mod tests {
             changed_stage.error.unwrap().code,
             "package_stage_existing_file_invalid"
         );
-        assert!(!plan.root.join("active_version.json").exists());
+        assert_previous_remains_active();
         assert!(!desktop_entry_path.exists());
         std::fs::write(&staged_executable, b"runner").unwrap();
 
@@ -5389,7 +5481,7 @@ mod tests {
             &activation_envelope("linux-update-activation"),
             None,
             None,
-            Some(activation_confirmation),
+            Some(activation_confirmation.clone()),
         );
         assert_eq!(activated.status, BrokerStatus::Accepted, "{activated:?}");
         assert_eq!(
@@ -5424,6 +5516,141 @@ mod tests {
                 && event.decision == "completed"
         }));
         assert!(!package_path.exists());
+
+        let desktop_entry_before_rollback = std::fs::read(&desktop_entry_path).unwrap();
+        let rollback_payload_hash =
+            crate::broker::protocol::canonical_payload_hash(Some(&activation_payload));
+        let rollback_envelope = |request_id: &str| {
+            json!({
+                "request_id": request_id,
+                "session_id": "session-1",
+                "operation": OP_ROLLBACK,
+                "payload_hash": rollback_payload_hash,
+                "nonce": format!("{request_id}-nonce"),
+                "issued_at": BrokerRequestEnvelope::current_issued_at(),
+                "metadata": {"client": "desktop_flutter"},
+                "payload": activation_payload,
+            })
+            .to_string()
+        };
+        let normal_rollback = call(
+            &mut broker,
+            BrokerOperation::更新rollback要求,
+            activation_payload.clone(),
+        );
+        assert_eq!(normal_rollback.status, BrokerStatus::Rejected);
+        assert_eq!(
+            normal_rollback.error.unwrap().code,
+            "desktop_native_owner_confirmation_required"
+        );
+        let previous_plan = super::super::product_install::plan_product_install(
+            &install_root,
+            INSTALL_APP_ID,
+            "1.0.0",
+            &previous_digest,
+        )
+        .unwrap();
+        let mut rollback_confirmation = activation_confirmation.clone();
+        rollback_confirmation.payload_hash = rollback_payload_hash.clone();
+        rollback_confirmation.rollback_target = Some(UpdateRollbackTargetConfirmation {
+            update_id: "update-previous".into(),
+            candidate_hash: previous_candidate_hash,
+            package_sha256: previous_digest.clone(),
+            offered_version: "1.0.0".into(),
+            version_directory: previous_plan.version_directory,
+        });
+        let mut stale_entry_confirmation = rollback_confirmation.clone();
+        stale_entry_confirmation.linux_desktop_entry_path = install_root.join("wrong.desktop");
+        let stale_entry = broker.desktop_owner_operation_json_with_update_confirmations(
+            &rollback_envelope("linux-update-rollback-stale-entry"),
+            None,
+            None,
+            Some(stale_entry_confirmation),
+        );
+        assert_eq!(stale_entry.status, BrokerStatus::Rejected);
+        assert_eq!(
+            stale_entry.error.unwrap().code,
+            "update_rollback_desktop_entry_stale"
+        );
+        assert_eq!(
+            crate::product_bootstrapper::active_version_snapshot(
+                &install_root,
+                INSTALL_APP_ID,
+                INSTALL_AUDIT_ID,
+            )
+            .unwrap()
+            .current
+            .product_version,
+            "1.1.0"
+        );
+        let mut stale_target_confirmation = rollback_confirmation.clone();
+        stale_target_confirmation
+            .rollback_target
+            .as_mut()
+            .unwrap()
+            .candidate_hash = format!("sha256:{}", "f".repeat(64));
+        let stale_target = broker.desktop_owner_operation_json_with_update_confirmations(
+            &rollback_envelope("linux-update-rollback-stale-target"),
+            None,
+            None,
+            Some(stale_target_confirmation),
+        );
+        assert_eq!(stale_target.status, BrokerStatus::Rejected);
+        assert_eq!(
+            crate::product_bootstrapper::active_version_snapshot(
+                &install_root,
+                INSTALL_APP_ID,
+                INSTALL_AUDIT_ID,
+            )
+            .unwrap()
+            .current
+            .product_version,
+            "1.1.0"
+        );
+        let rolled_back = broker.desktop_owner_operation_json_with_update_confirmations(
+            &rollback_envelope("linux-update-rollback"),
+            None,
+            None,
+            Some(rollback_confirmation),
+        );
+        assert_eq!(
+            rolled_back.status,
+            BrokerStatus::Accepted,
+            "{rolled_back:?}"
+        );
+        assert_eq!(
+            rolled_back.body.as_ref().unwrap()["rollback"],
+            "active_version_restored"
+        );
+        assert_eq!(rolled_back.body.as_ref().unwrap()["現行版"], "1.1.0");
+        assert_eq!(rolled_back.body.as_ref().unwrap()["復元版"], "1.0.0");
+        assert_eq!(
+            crate::product_bootstrapper::active_version_snapshot(
+                &install_root,
+                INSTALL_APP_ID,
+                INSTALL_AUDIT_ID,
+            )
+            .unwrap()
+            .current
+            .update_id,
+            "update-previous"
+        );
+        assert_eq!(
+            std::fs::read(&desktop_entry_path).unwrap(),
+            desktop_entry_before_rollback
+        );
+        assert!(broker.audit_events().iter().any(|event| {
+            event.request_id == "linux-update-rollback"
+                && event.operation == OP_ROLLBACK
+                && event.decision == "queued"
+        }));
+        assert!(broker.audit_events().iter().any(|event| {
+            event.request_id == "linux-update-rollback:complete"
+                && event.operation == OP_ROLLBACK
+                && event.decision == "completed"
+        }));
+        drop(previous_product_root);
+        drop(previous_versions);
         drop(broker);
         std::fs::remove_dir_all(root).unwrap();
     }

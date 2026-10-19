@@ -80,7 +80,7 @@
     },
     {
       "path": ".github/workflows/linux-manual-rust-validation.yml",
-      "sha256": "3f53442a962810057b8fa9081af1e133017cbdd81771f947e0dc483f80c1e60a"
+      "sha256": "3d7b1307129f4c33a026acb5771688acf11daf41db3ce092e16e3c9f7b2ac403"
     },
     {
       "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
@@ -172,7 +172,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "4dd57784b67b7bcc1fd326688d59abd217d19238c51cf9a88df400a17948da4d"
+      "sha256": "78928f83f7ddf5ffca8d4640085097969e477e722e9f6f57cad353ed998e8769"
     },
     {
       "path": "SECURITY.md",
@@ -296,7 +296,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/settings.dart",
-      "sha256": "3b6026c7ef026c23463cb467d6fabb18b910104d0605abd04c0eacf71313d5fc"
+      "sha256": "abbf89274b49783856414f147d19ee688a5cfa39580084f6a35a146f28fa3dbe"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/setup_doctor.dart",
@@ -700,7 +700,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/settings_install_flow_test.dart",
-      "sha256": "927c2d8ad8f1d4eb5be16b9ffb68f133b95182afa56f256a4d7c8ab1d8c9e17f"
+      "sha256": "840e1e4cf551e9e04b1a23d37791d406971e03142435bef73f3a8078064e5663"
     },
     {
       "path": "apps/desktop_flutter/test/support/test_broker_tcp_transport.dart",
@@ -1308,7 +1308,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "2128e585aea77eea662804fa3822e10cb5077c8674125b6493aa9390f1842b78"
+      "sha256": "b5b38241377178fd25e76101e2f69e650604549887cb697c1abd991c0d3509c6"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1520,7 +1520,7 @@
     },
     {
       "path": "docs/specs/linux-product-package.md",
-      "sha256": "3188025f4b02f8f15626c33e00c7bc3d92d0fdb2b6084dd68ceddbb0879f4bfb"
+      "sha256": "01cab98286ffc7e2cc8db20cca5771ee280f36ef916ccaa08a4636970c0656a4"
     },
     {
       "path": "docs/specs/linux-workspace-selection.md",
@@ -3328,7 +3328,7 @@
     },
     {
       "path": "installer/linux/README.md",
-      "sha256": "6ab6372fda4e72a962e00122ebfb4a6308e1fdcda8202b1db1fd25980b5238e3"
+      "sha256": "0dfa677a756f2ff8fa09ffe7e7b8207917bda6b1cd2709715f36d09adfa2f72c"
     },
     {
       "path": "installer/macos/README.md",
@@ -3664,7 +3664,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "a3088a6b7ff887d97b952e3499511d556de4f0e4dc35fd8fc1931075072e5a46"
+      "sha256": "9a07e4feec5cb631dcccb321145edc63da3ab887a05b8673794b953204a0ac79"
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
@@ -3740,7 +3740,7 @@
     },
     {
       "path": "native/rust_helper/src/macos_desktop_owner.rs",
-      "sha256": "d2053329562147587d99b42dcbe5cd2ea155a1d2f4aef5449e376ff259bd58b4"
+      "sha256": "8d4762c78dbd34d850c546f20d14c386306c75ffde72898762f2988e836c5c83"
     },
     {
       "path": "native/rust_helper/src/macos_desktop_worker.rs",
@@ -4304,7 +4304,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "9f1178f0fb54b57886aed09cd2a3994a41c41cc2745bebda1c9facb52ff39156"
+      "sha256": "c87761fc888b2d153aacaeef2d89343477e81319ab9ae54c7ebfc41fd3f7faaf"
     },
     {
       "path": "requirements-dev.txt",

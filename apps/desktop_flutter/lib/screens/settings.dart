@@ -937,7 +937,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Text('更新センター', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 4),
               Text(
-                '信頼設定=${body['署名信頼設定'] ?? 'unknown'}。downloadは直接HTTPS接続のみ（system proxy・自動retryなし）で、Rust Desktopの確認が必要です。download完了後に未起動版へ展開し、初回は「インストール」、導入済みなら「更新を有効化」します。別のRust Desktop確認後にpackageとstage全体を再検証し、有効版recordと固定root Bootstrapperを指すStart Menu shortcutを登録します。portable起動元から初回Installした場合は画面を正常終了して導入済み版へ切り替え、導入済み版からの更新は次回起動時に反映します。切替成功後は検証済みdownload packageだけをBroker cacheから除去し、stageと旧versionは保持します。rollbackはBroker記録の直前版へ有効版recordだけを戻します。',
+                '信頼設定=${body['署名信頼設定'] ?? 'unknown'}。downloadは直接HTTPS接続のみ（system proxy・自動retryなし）で、Rust Desktopの確認が必要です。download完了後に未起動版へ展開し、初回は「インストール」、導入済みなら「更新を有効化」します。別のRust Desktop確認後にpackageとstage全体を再検証し、有効版recordと固定root Bootstrapperを指すOS起動項目を登録します。portable起動元から初回Installした場合は画面を正常終了して導入済み版へ切り替え、導入済み版からの更新は次回起動時に反映します。切替成功後は検証済みdownload packageだけをBroker cacheから除去し、stageと旧versionは保持します。rollbackはBroker記録の直前版へ有効版recordだけを戻します。',
               ),
               if (downloadJob != null) ...[
                 const SizedBox(height: 4),
@@ -963,7 +963,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   label: const Text('起動項目を修復'),
                 ),
                 const Text(
-                  '現行版が検証できる場合に、欠損した固定root起動器とStart Menu shortcutだけを復元します。破損した版本体や有効版記録は上書きしません。',
+                  '現行版が検証できる場合に、欠損した固定root起動器とOS起動項目だけを復元します。破損した版本体や有効版記録は上書きしません。',
                 ),
                 const SizedBox(height: 8),
                 OutlinedButton.icon(
@@ -974,7 +974,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   label: const Text('D4 Pocketをアンインストール'),
                 ),
                 const Text(
-                  '製品fileと一致するStart Menu shortcutを削除します。Credential・設定・Workspace・Audit Storeは保持します。',
+                  '製品fileと一致するOS起動項目を削除します。Credential・設定・Workspace・Audit Storeは保持します。',
                 ),
               ],
               if (_updateMessage != null) ...[
@@ -1081,8 +1081,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       alreadyActive: isAlreadyActive,
     );
     final activationSuccess = UpdateClient.isFirstInstall(rollbackState)
-        ? 'D4 Pocketを固定導入先へインストールし、Start Menuへ登録しました。'
-        : '有効版を切り替え、Start Menuへ登録しました。選択版は次回起動時に使用します。';
+        ? 'D4 Pocketを固定導入先へインストールし、OS起動項目へ登録しました。'
+        : '有効版を切り替え、OS起動項目へ登録しました。選択版は次回起動時に使用します。';
     return ListTile(
       contentPadding: EdgeInsets.zero,
       title: Text('${update['提供版'] ?? ''} ($updateId)'),
@@ -1123,7 +1123,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       },
                       isAlreadyActive
                           ? '現在の有効版を署名済みpackageと照合しました。不足fileだけを復元し、不一致fileは上書きせず拒否します。有効版recordとprocessは変更していません。'
-                          : '署名済みpackageを未起動versionとして固定導入先へ展開しました。Start Menu切替・process起動・rollbackは別操作です。',
+                          : '署名済みpackageを未起動versionとして固定導入先へ展開しました。OS起動項目切替・process起動・rollbackは別操作です。',
                     )
                 : null,
             child: Text(isAlreadyActive ? '有効版を修復' : '未起動版へ展開'),
@@ -1224,7 +1224,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         handoffToInstalledVersion = await _completeInitialInstallHandoff();
         if (!handoffToInstalledVersion) {
           _setUpdateMessage(
-            'インストール済み版は登録されましたが、画面を終了できませんでした。Start Menuから起動してください。',
+            'インストール済み版は登録されましたが、画面を終了できませんでした。固定起動項目から起動してください。',
           );
         }
       } else {
@@ -1241,7 +1241,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     } catch (error) {
       _setUpdateMessage(initialInstallAccepted
-          ? 'インストール済み版は登録されましたが、切替のための画面終了に失敗しました。Start Menuから起動してください。'
+          ? 'インストール済み版は登録されましたが、切替のための画面終了に失敗しました。固定起動項目から起動してください。'
           : '更新操作失敗: $error');
     } finally {
       if (mounted && !handoffToInstalledVersion) {
@@ -1308,10 +1308,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
       final restored = <String>[
         if (body['起動器復元'] == true) '固定root起動器',
-        if (body['Start Menu復元'] == true) 'Start Menu shortcut',
+        if (body['Start Menu復元'] == true) 'OS起動項目',
       ];
       _setUpdateMessage(restored.isEmpty
-          ? '固定root起動器とStart Menu shortcutは既に有効です。変更はありません。'
+          ? '固定root起動器とOS起動項目は既に有効です。変更はありません。'
           : '${restored.join('、')}を復元しました。版本体と利用者dataは変更していません。');
     } catch (error) {
       _setUpdateMessage('起動項目を修復できませんでした。既存のfileは上書きしていません: $error');

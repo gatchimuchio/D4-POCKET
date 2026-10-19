@@ -99,7 +99,7 @@ fn linux_update_owner_candidate(
     {
         if !matches!(
             operation,
-            "更新download要求" | "更新適用要求" | "更新有効版切替要求"
+            "更新download要求" | "更新適用要求" | "更新有効版切替要求" | "更新rollback要求"
         ) {
             return None;
         }
@@ -250,7 +250,7 @@ fn linux_update_owner_candidate(
                     Some(confirmation),
                     None,
                 )
-            } else {
+            } else if operation == "更新有効版切替要求" {
                 let plan = crate::broker::product_install::plan_current_user_product_install(
                     &app_id,
                     offered_version,
@@ -288,6 +288,115 @@ fn linux_update_owner_candidate(
                         plan.version_directory.display(),
                         desktop_entry_path.display(),
                         summary,
+                        payload_hash
+                    ),
+                    None,
+                    None,
+                    Some(confirmation),
+                )
+            } else {
+                let rollback = &response["body"]["rollback状態"];
+                if rollback["状態"] != "available"
+                    || rollback["現在版"]["更新ID"] != request.update_id
+                    || rollback["現在版"]["候補hash"] != request.candidate_hash
+                    || rollback["現在版"]["提供版"] != offered_version
+                    || rollback["現在版"]["package_sha256"] != package_sha256
+                    || record["rollback可能"] != true
+                {
+                    return None;
+                }
+                let target = &rollback["対象版"];
+                let target_update_id = target["更新ID"].as_str()?;
+                let target_candidate_hash = target["候補hash"].as_str()?;
+                let target_package_sha256 = target["package_sha256"].as_str()?;
+                let target_version = target["提供版"].as_str()?;
+                if !valid_update_id(target_update_id)
+                    || !valid_sha256(target_candidate_hash)
+                    || target_package_sha256.len() != 64
+                    || !target_package_sha256
+                        .bytes()
+                        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+                    || target_version.is_empty()
+                    || target_version.len() > 64
+                    || !target_version
+                        .bytes()
+                        .all(|byte| byte.is_ascii_alphanumeric() || b".+_-".contains(&byte))
+                {
+                    return None;
+                }
+                let target_records: Vec<&serde_json::Value> = updates
+                    .iter()
+                    .filter(|value| {
+                        value["更新ID"] == target_update_id
+                            && value["候補hash"] == target_candidate_hash
+                            && value["package_sha256"] == target_package_sha256
+                            && value["提供版"] == target_version
+                            && value["署名状態"] == "verified"
+                            && value["版"] == 2
+                    })
+                    .collect();
+                let [target_record] = target_records.as_slice() else {
+                    return None;
+                };
+                let target_signer = target_record["署名者fingerprint"].as_str()?;
+                if !valid_sha256(target_signer) {
+                    return None;
+                }
+                let current_plan =
+                    crate::broker::product_install::plan_current_user_product_install(
+                        &app_id,
+                        offered_version,
+                        package_sha256,
+                    )
+                    .ok()?;
+                let target_plan =
+                    crate::broker::product_install::plan_current_user_product_install(
+                        &app_id,
+                        target_version,
+                        target_package_sha256,
+                    )
+                    .ok()?;
+                let desktop_entry_path =
+                    crate::broker::product_install::plan_current_user_linux_desktop_entry(&app_id)
+                        .ok()?;
+                let confirmation = crate::broker::update_center::UpdateActivationConfirmation {
+                    update_id: request.update_id.clone(),
+                    candidate_hash: request.candidate_hash.clone(),
+                    package_sha256: package_sha256.to_owned(),
+                    package_size_bytes,
+                    offered_version: offered_version.to_owned(),
+                    channel: channel.to_owned(),
+                    summary: summary.to_owned(),
+                    payload_hash: payload_hash.to_owned(),
+                    app_id: app_id.clone(),
+                    audit_store_id: audit_store_id.clone(),
+                    version_directory: current_plan.version_directory.clone(),
+                    linux_desktop_entry_path: desktop_entry_path.clone(),
+                    rollback_target: Some(
+                        crate::broker::update_center::UpdateRollbackTargetConfirmation {
+                            update_id: target_update_id.to_owned(),
+                            candidate_hash: target_candidate_hash.to_owned(),
+                            package_sha256: target_package_sha256.to_owned(),
+                            offered_version: target_version.to_owned(),
+                            version_directory: target_plan.version_directory.clone(),
+                        },
+                    ),
+                };
+                (
+                    format!(
+                        "Linux製品を直前の署名済み有効版へrollbackしますか？\n\n現行版: {} ({})\n現行package SHA-256: {}\n署名者fingerprint: {}\n復元版: {} ({})\n復元package SHA-256: {}\n復元署名者fingerprint: {}\nApp ID: {}\nAudit Store ID: {}\n固定version directory: {}\n固定desktop entry: {}\n\nBrokerが両版の現在trustとactive recordを再検証します。有効版recordだけを切り替え、desktop entryやWorkspace／設定／Credentialは変更せず、processも起動しません。\n要求hash: {}",
+                        offered_version,
+                        request.update_id,
+                        package_sha256,
+                        signer_fingerprint,
+                        target_version,
+                        target_update_id,
+                        target_package_sha256,
+                        target_signer,
+                        app_id,
+                        audit_store_id,
+                        current_plan.version_directory.display(),
+                        desktop_entry_path.display(),
                         payload_hash
                     ),
                     None,
@@ -346,7 +455,7 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
         format!("{summary}\n要求hash: {hash}")
     } else if matches!(
         operation,
-        "更新download要求" | "更新適用要求" | "更新有効版切替要求"
+        "更新download要求" | "更新適用要求" | "更新有効版切替要求" | "更新rollback要求"
     ) {
         let update = linux_update_owner_candidate(operation, payload, &hash, endpoint)?;
         let summary = update.summary.clone();
@@ -517,7 +626,7 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
             15
         } else if matches!(
             operation,
-            "更新download要求" | "更新適用要求" | "更新有効版切替要求"
+            "更新download要求" | "更新適用要求" | "更新有効版切替要求" | "更新rollback要求"
         ) {
             20
         } else if matches!(operation, "MCP接続" | "MCP切断" | "MCP Tool実行") {
@@ -1410,6 +1519,194 @@ mod task_owner_tests {
         })
         .unwrap()
         .expect("Owner confirmation should forward once");
+        assert_eq!(
+            serde_json::from_slice::<Value>(&response).unwrap()["status"],
+            "accepted"
+        );
+        worker.join().unwrap();
+        listener_thread.join().unwrap();
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_update_rollback_confirmation_binds_both_signed_versions_and_fixed_entry() {
+        use std::io::{BufRead, BufReader, Write};
+        use std::net::TcpListener;
+
+        let (app_id, audit_store_id) = crate::broker::update_center::embedded_product_identity()
+            .expect("test build identity")
+            .expect("compile-time Linux test identity");
+        let current_hash =
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        let previous_hash =
+            "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
+        let current_package = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        let previous_package = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+        let current_update_id = "linux-owner-current";
+        let previous_update_id = "linux-owner-previous";
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let listener_thread = std::thread::spawn(move || {
+            for _ in 0..2 {
+                let (stream, _) = listener.accept().unwrap();
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(2)))
+                    .unwrap();
+                let mut reader = BufReader::new(stream);
+                let mut secret = String::new();
+                let mut frame = String::new();
+                reader.read_line(&mut secret).unwrap();
+                reader.read_line(&mut frame).unwrap();
+                assert_eq!(secret.trim_end(), "linux-owner-fixture-secret");
+                let request: Value = serde_json::from_str(&frame).unwrap();
+                assert_eq!(request["operation"], "更新一覧");
+                let response = json!({
+                    "operation": "更新一覧",
+                    "status": "accepted",
+                    "body": {
+                        "更新一覧": [
+                            {
+                                "版": 2,
+                                "更新ID": current_update_id,
+                                "候補hash": current_hash,
+                                "署名状態": "verified",
+                                "rollback可能": true,
+                                "package_sha256": current_package,
+                                "package_size_bytes": 4096,
+                                "提供版": "1.1.0",
+                                "channel": "stable",
+                                "内容概要": "current signed version",
+                                "署名者fingerprint": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+                            },
+                            {
+                                "版": 2,
+                                "更新ID": previous_update_id,
+                                "候補hash": previous_hash,
+                                "署名状態": "verified",
+                                "rollback可能": true,
+                                "package_sha256": previous_package,
+                                "package_size_bytes": 2048,
+                                "提供版": "1.0.0",
+                                "channel": "stable",
+                                "内容概要": "previous signed version",
+                                "署名者fingerprint": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                            }
+                        ],
+                        "rollback状態": {
+                            "状態": "available",
+                            "現在版": {
+                                "更新ID": current_update_id,
+                                "候補hash": current_hash,
+                                "提供版": "1.1.0",
+                                "package_sha256": current_package
+                            },
+                            "対象版": {
+                                "更新ID": previous_update_id,
+                                "候補hash": previous_hash,
+                                "提供版": "1.0.0",
+                                "package_sha256": previous_package
+                            }
+                        }
+                    }
+                });
+                let stream = reader.get_mut();
+                stream.write_all(response.to_string().as_bytes()).unwrap();
+                stream.write_all(b"\n").unwrap();
+                stream.flush().unwrap();
+            }
+        });
+        let endpoint = BrokerEndpoint {
+            host: "127.0.0.1".into(),
+            port,
+            session_id: "linux-owner-fixture-session".into(),
+            session_secret: "linux-owner-fixture-secret".into(),
+            credential_role: BrokerCredentialRole::Normal,
+            transport: "tcp".into(),
+            max_request_bytes: 65536,
+        };
+        let payload = json!({
+            "版": 1,
+            "更新ID": current_update_id,
+            "候補hash": current_hash
+        });
+        let valid = request("更新rollback要求", payload.clone());
+        let bytes = serde_json::to_vec(&valid).unwrap();
+        let current_plan = crate::broker::product_install::plan_current_user_product_install(
+            &app_id,
+            "1.1.0",
+            current_package,
+        )
+        .unwrap();
+        let previous_plan = crate::broker::product_install::plan_current_user_product_install(
+            &app_id,
+            "1.0.0",
+            previous_package,
+        )
+        .unwrap();
+        let planned_entry =
+            crate::broker::product_install::plan_current_user_linux_desktop_entry(&app_id).unwrap();
+        let (sender, receiver) = mpsc::sync_channel::<DesktopOwnerOperationRequest>(1);
+        let mut declined_summary = String::new();
+        assert!(dispatch(&bytes, &endpoint, &sender, &mut |summary| {
+            declined_summary = summary.to_owned();
+            false
+        })
+        .unwrap()
+        .is_none());
+        assert!(declined_summary.contains("復元版: 1.0.0"));
+        assert!(declined_summary.contains("1.1.0"));
+        assert!(declined_summary.contains(&valid["payload_hash"].as_str().unwrap()));
+        assert!(!declined_summary.contains("linux-owner-fixture-secret"));
+        assert!(receiver.try_recv().is_err());
+
+        let worker = std::thread::spawn(move || {
+            let operation = receiver.recv_timeout(Duration::from_secs(2)).unwrap();
+            let confirmation = operation
+                .activation_confirmation
+                .expect("rollback must carry a Broker-derived version binding");
+            assert_eq!(confirmation.app_id, app_id);
+            assert_eq!(confirmation.audit_store_id, audit_store_id);
+            assert_eq!(confirmation.update_id, current_update_id);
+            assert_eq!(
+                confirmation.version_directory,
+                current_plan.version_directory
+            );
+            assert_eq!(confirmation.linux_desktop_entry_path, planned_entry);
+            let target = confirmation.rollback_target.unwrap();
+            assert_eq!(target.update_id, previous_update_id);
+            assert_eq!(target.candidate_hash, previous_hash);
+            assert_eq!(target.package_sha256, previous_package);
+            assert_eq!(target.offered_version, "1.0.0");
+            assert_eq!(target.version_directory, previous_plan.version_directory);
+            assert!(operation.download_confirmation.is_none());
+            assert!(operation.apply_confirmation.is_none());
+            let normalized: Value = serde_json::from_str(&operation.request_json).unwrap();
+            assert_eq!(normalized["operation"], "更新rollback要求");
+            assert_eq!(normalized["payload"], payload);
+            operation
+                .reply
+                .send(BrokerResponse {
+                    request_id: "linux-owner-rollback-fixture".into(),
+                    operation: "更新rollback要求".into(),
+                    status: BrokerStatus::Accepted,
+                    evidence_source: "FIXTURE".into(),
+                    audit_event_id: "linux-owner-rollback-audit-fixture".into(),
+                    error: None,
+                    health: None,
+                    body: Some(json!({"rollback":"active_version_restored"})),
+                    shutdown_requested: false,
+                })
+                .unwrap();
+            assert!(receiver.try_recv().is_err());
+        });
+        let response = dispatch(&bytes, &endpoint, &sender, &mut |summary| {
+            summary.contains("署名済み有効版へrollback")
+                && summary.contains("固定desktop entry")
+                && summary.contains(&valid["payload_hash"].as_str().unwrap())
+                && !summary.contains("linux-owner-fixture-secret")
+        })
+        .unwrap()
+        .expect("matching native confirmation should be forwarded once");
         assert_eq!(
             serde_json::from_slice::<Value>(&response).unwrap()["status"],
             "accepted"
