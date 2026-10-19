@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "4c3663d2fb745013e1c6863cf72da3735b02af4fc2145ff198c46a666cf9f19e"
+      "sha256": "c46aa353e4dbb7bb76c2690b0277639c7ae6221028442111c05b2c27d8c0a383"
     },
     {
       "path": "SECURITY.md",
@@ -1300,7 +1300,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "46ec7ccb46795d3af87166f8ff6c1bd3b25339262068ff13fcd167eb43766b6a"
+      "sha256": "ab2a963c634a8fad706f885957d74ca05ac8e6ad8fcf7feec9de45f12e82a681"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1508,7 +1508,7 @@
     },
     {
       "path": "docs/specs/linux-desktop-channel.md",
-      "sha256": "aca5a55f1dd6e20c4fd21ec5cd8cd5c7ec8d77462583e9ed0b7d1a4c4816ca59"
+      "sha256": "23c22fa0bdbec658e7170ec700dd2254d4829d57c574d8a0ede0bfa72d847a96"
     },
     {
       "path": "docs/specs/linux-workspace-selection.md",
@@ -3292,7 +3292,7 @@
     },
     {
       "path": "installer/linux/README.md",
-      "sha256": "7a9c8588a847b374be6d7ef5ae2da0d7222ea1c8f9036dd142a0806cab508b14"
+      "sha256": "d5a0b150eca9d339b09f450c6540eb6b9167713297078c86d99e8d0bb9f72519"
     },
     {
       "path": "installer/macos/README.md",
@@ -3596,7 +3596,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/product_install.rs",
-      "sha256": "35166e8c20e76be83f957ce4b723822b5063b26fad44225781553d1f8e11d11c"
+      "sha256": "e0cc7e35ebfe69fc3057444e0223e7970af78a4472f6442103c20a754698159d"
     },
     {
       "path": "native/rust_helper/src/broker/profile_center.rs",
@@ -4992,7 +4992,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "0bea973ce5e26995e9b59785777733e4904fc71868368dfae82824e89401bf3f"
+      "sha256": "2f3e792b7892e4eafe1a958451289f4782ff731d8b25dba0da164e665ec45e7f"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",

@@ -1,6 +1,7 @@
-//! Windows製品の導入先をBroker所有の固定規則から導出する。
+//! Desktop製品の導入先をBroker所有の固定規則から導出する。
 //!
-//! 固定path計画、Broker専用のversions directory capability取得、Start Menu shortcut登録を行う。
+//! 固定path計画とBroker専用のversions directory capability取得を行う。
+//! WindowsではStart Menu shortcut登録も扱う。
 //! package展開、Permission／Approval／Auditは行わず、実作用はBroker consumerが統治する。
 
 #[cfg(windows)]
@@ -11,10 +12,20 @@ use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt as _};
 use cap_std::fs::Dir;
 #[cfg(windows)]
 use cap_std::fs::OpenOptions;
+#[cfg(target_os = "linux")]
+use std::os::unix::fs::MetadataExt as StdMetadataExt;
+#[cfg(target_os = "linux")]
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Component, Path, PathBuf};
 
+#[cfg(not(target_os = "linux"))]
 const INSTALL_DIRECTORY: &str = "Programs";
+#[cfg(target_os = "linux")]
+const INSTALL_DIRECTORY: &str = "apps";
+#[cfg(not(target_os = "linux"))]
 const PRODUCT_DIRECTORY: &str = "D4 Pocket";
+#[cfg(target_os = "linux")]
+const PRODUCT_DIRECTORY: &str = "d4-pocket";
 const VERSIONS_DIRECTORY: &str = "versions";
 #[cfg(windows)]
 const START_MENU_PROGRAMS_DIRECTORY: &str = "Programs";
@@ -34,7 +45,7 @@ pub(crate) struct ProductInstallPlan {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ProductInstallPlanError(pub(crate) &'static str);
 
-/// LocalAppData配下の固定install `versions` directoryをcapabilityで開く。
+/// 現在利用者の固定install `versions` directoryをcapabilityで開く。
 pub(crate) fn open_product_versions_directory(
     local_app_data: &Path,
     app_id: &str,
@@ -60,6 +71,8 @@ pub(crate) fn open_product_versions_directory(
             "product_install_local_app_data_invalid",
         ));
     }
+    #[cfg(target_os = "linux")]
+    validate_linux_data_home_metadata(&metadata)?;
     let local_app_data = std::fs::canonicalize(local_app_data)
         .map_err(|_| ProductInstallPlanError("product_install_local_app_data_unavailable"))?;
     let root = Dir::open_ambient_dir(&local_app_data, cap_std::ambient_authority())
@@ -68,6 +81,14 @@ pub(crate) fn open_product_versions_directory(
         .dir_metadata()
         .map_err(|_| ProductInstallPlanError("product_install_local_app_data_unavailable"))?;
     if !root_metadata.is_dir() || is_cap_reparse_point(&root_metadata) {
+        return Err(ProductInstallPlanError(
+            "product_install_local_app_data_invalid",
+        ));
+    }
+    #[cfg(target_os = "linux")]
+    if metadata.dev() != CapMetadataExt::dev(&root_metadata)
+        || metadata.ino() != CapMetadataExt::ino(&root_metadata)
+    {
         return Err(ProductInstallPlanError(
             "product_install_local_app_data_invalid",
         ));
@@ -174,13 +195,42 @@ fn validate_install_inputs(
     Ok(())
 }
 
-/// 製品経路ではOS Known Folder API以外からLocalAppDataを受け取らない。
+/// 製品経路ではOSの利用者領域規則以外から導入rootを受け取らない。
 #[cfg(windows)]
 pub(crate) fn open_current_user_product_versions_directory(
     app_id: &str,
 ) -> Result<(PathBuf, Dir), ProductInstallPlanError> {
     let local_app_data = current_user_local_app_data()?;
     open_product_versions_directory(Path::new(&local_app_data), app_id)
+}
+
+/// LinuxではXDG_DATA_HOME、未指定ならHOME/.local/shareを導入rootに使う。
+/// UIや更新manifestから任意pathを受け取らず、ディレクトリ作成はOwner確認後に行う。
+#[cfg(target_os = "linux")]
+pub(crate) fn current_user_local_app_data() -> Result<PathBuf, ProductInstallPlanError> {
+    let home = std::env::var_os("HOME")
+        .map(PathBuf::from)
+        .ok_or(ProductInstallPlanError("product_install_home_unavailable"))?;
+    let home_metadata = std::fs::symlink_metadata(&home)
+        .map_err(|_| ProductInstallPlanError("product_install_home_unavailable"))?;
+    if !home_metadata.is_dir() || home_metadata.file_type().is_symlink() {
+        return Err(ProductInstallPlanError("product_install_home_invalid"));
+    }
+    validate_linux_data_home_metadata(&home_metadata)
+        .map_err(|_| ProductInstallPlanError("product_install_home_invalid"))?;
+    let home = std::fs::canonicalize(home)
+        .map_err(|_| ProductInstallPlanError("product_install_home_unavailable"))?;
+    let xdg_data_home = std::env::var_os("XDG_DATA_HOME").map(PathBuf::from);
+    resolve_linux_data_home(&home, xdg_data_home.as_deref())
+}
+
+#[cfg(target_os = "linux")]
+pub(crate) fn open_current_user_product_versions_directory(
+    app_id: &str,
+) -> Result<(PathBuf, Dir), ProductInstallPlanError> {
+    let local_app_data = current_user_local_app_data()?;
+    ensure_linux_data_home(&local_app_data)?;
+    open_product_versions_directory(&local_app_data, app_id)
 }
 
 #[cfg(windows)]
@@ -759,8 +809,144 @@ fn is_reparse_point(_: &std::fs::Metadata) -> bool {
     false
 }
 
-/// Windows Known Folder APIが返す現在利用者LocalAppDataから導入先を計画する。
-#[cfg(windows)]
+#[cfg(target_os = "linux")]
+fn resolve_linux_data_home(
+    home: &Path,
+    configured: Option<&Path>,
+) -> Result<PathBuf, ProductInstallPlanError> {
+    if !home.is_absolute()
+        || home
+            .components()
+            .any(|component| matches!(component, Component::CurDir | Component::ParentDir))
+    {
+        return Err(ProductInstallPlanError("product_install_home_invalid"));
+    }
+    let path = configured
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| home.join(".local").join("share"));
+    if !path.is_absolute()
+        || path.components().any(|component| {
+            matches!(
+                component,
+                Component::CurDir | Component::ParentDir | Component::Prefix(_)
+            )
+        })
+    {
+        return Err(ProductInstallPlanError("product_install_data_home_invalid"));
+    }
+    Ok(path)
+}
+
+#[cfg(target_os = "linux")]
+fn validate_linux_data_home_metadata(
+    metadata: &std::fs::Metadata,
+) -> Result<(), ProductInstallPlanError> {
+    if metadata.uid() != rustix::process::geteuid().as_raw()
+        || metadata.permissions().mode() & 0o022 != 0
+    {
+        return Err(ProductInstallPlanError("product_install_data_home_invalid"));
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn ensure_linux_data_home(path: &Path) -> Result<(), ProductInstallPlanError> {
+    if !path.is_absolute()
+        || path.components().any(|component| {
+            matches!(
+                component,
+                Component::CurDir | Component::ParentDir | Component::Prefix(_)
+            )
+        })
+    {
+        return Err(ProductInstallPlanError("product_install_data_home_invalid"));
+    }
+    let mut current = Dir::open_ambient_dir("/", cap_std::ambient_authority())
+        .map_err(|_| ProductInstallPlanError("product_install_data_home_unavailable"))?;
+    for component in path.components() {
+        match component {
+            Component::RootDir => {}
+            Component::Normal(name) => {
+                let name = name
+                    .to_str()
+                    .ok_or(ProductInstallPlanError("product_install_data_home_invalid"))?;
+                current = open_or_create_absolute_child_directory(&current, name)?;
+            }
+            _ => {
+                return Err(ProductInstallPlanError("product_install_data_home_invalid"));
+            }
+        }
+    }
+    let metadata = std::fs::symlink_metadata(path)
+        .map_err(|_| ProductInstallPlanError("product_install_data_home_unavailable"))?;
+    if !metadata.is_dir() || metadata.file_type().is_symlink() {
+        return Err(ProductInstallPlanError("product_install_data_home_invalid"));
+    }
+    validate_linux_data_home_metadata(&metadata)?;
+    let canonical = std::fs::canonicalize(path)
+        .map_err(|_| ProductInstallPlanError("product_install_data_home_unavailable"))?;
+    if canonical != path {
+        return Err(ProductInstallPlanError("product_install_data_home_invalid"));
+    }
+    let opened_metadata = current
+        .dir_metadata()
+        .map_err(|_| ProductInstallPlanError("product_install_data_home_unavailable"))?;
+    if metadata.dev() != CapMetadataExt::dev(&opened_metadata)
+        || metadata.ino() != CapMetadataExt::ino(&opened_metadata)
+    {
+        return Err(ProductInstallPlanError("product_install_data_home_invalid"));
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn open_or_create_absolute_child_directory(
+    parent: &Dir,
+    name: &str,
+) -> Result<Dir, ProductInstallPlanError> {
+    match parent.symlink_metadata(name) {
+        Ok(metadata) if metadata.is_dir() && !is_cap_reparse_point(&metadata) => {}
+        Ok(_) => return Err(ProductInstallPlanError("product_install_data_home_invalid")),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            match parent.create_dir(name) {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+                Err(_) => {
+                    return Err(ProductInstallPlanError(
+                        "product_install_data_home_unavailable",
+                    ));
+                }
+            }
+        }
+        Err(_) => {
+            return Err(ProductInstallPlanError(
+                "product_install_data_home_unavailable",
+            ));
+        }
+    }
+    let before_open = parent
+        .symlink_metadata(name)
+        .map_err(|_| ProductInstallPlanError("product_install_data_home_invalid"))?;
+    if !before_open.is_dir() || is_cap_reparse_point(&before_open) {
+        return Err(ProductInstallPlanError("product_install_data_home_invalid"));
+    }
+    let opened = parent
+        .open_dir_nofollow(name)
+        .map_err(|_| ProductInstallPlanError("product_install_data_home_invalid"))?;
+    let after_open = opened
+        .dir_metadata()
+        .map_err(|_| ProductInstallPlanError("product_install_data_home_invalid"))?;
+    if !after_open.is_dir()
+        || is_cap_reparse_point(&after_open)
+        || !same_cap_file(&before_open, &after_open)
+    {
+        return Err(ProductInstallPlanError("product_install_data_home_invalid"));
+    }
+    Ok(opened)
+}
+
+/// OSの現在利用者領域規則から固定導入先を計画する。
+#[cfg(any(windows, target_os = "linux"))]
 pub(crate) fn plan_current_user_product_install(
     app_id: &str,
     product_version: &str,
@@ -829,25 +1015,33 @@ fn valid_product_version(value: &str) -> bool {
 mod tests {
     use super::{
         open_existing_product_root, open_existing_product_versions_directory,
-        open_product_versions_directory, plan_product_install,
+        open_product_versions_directory, plan_product_install, INSTALL_DIRECTORY,
+        PRODUCT_DIRECTORY,
     };
     use std::path::Path;
 
     const APP_ID: &str = "d4-pocket-app-11111111111111111111111111111111";
     const HASH: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
+    #[cfg(windows)]
+    fn test_local_app_data() -> &'static Path {
+        Path::new("C:/Users/test/AppData/Local")
+    }
+
+    #[cfg(not(windows))]
+    fn test_local_app_data() -> &'static Path {
+        Path::new("/home/test/.local/share")
+    }
+
     #[test]
     fn install_path_is_per_user_identity_and_content_bound() {
-        let plan = plan_product_install(
-            Path::new("C:/Users/test/AppData/Local"),
-            APP_ID,
-            "1.2.3",
-            HASH,
-        )
-        .unwrap();
+        let plan = plan_product_install(test_local_app_data(), APP_ID, "1.2.3", HASH).unwrap();
         assert_eq!(
             plan.root,
-            Path::new("C:/Users/test/AppData/Local/Programs/D4 Pocket").join(APP_ID)
+            test_local_app_data()
+                .join(INSTALL_DIRECTORY)
+                .join(PRODUCT_DIRECTORY)
+                .join(APP_ID)
         );
         assert_eq!(
             plan.version_directory,
@@ -872,15 +1066,15 @@ mod tests {
         assert_eq!(
             path,
             canonical_local_app_data
-                .join("Programs")
-                .join("D4 Pocket")
+                .join(INSTALL_DIRECTORY)
+                .join(PRODUCT_DIRECTORY)
                 .join(APP_ID)
                 .join("versions")
         );
         assert!(capability.dir_metadata().unwrap().is_dir());
         assert!(local_app_data
-            .join("Programs")
-            .join("D4 Pocket")
+            .join(INSTALL_DIRECTORY)
+            .join(PRODUCT_DIRECTORY)
             .join(APP_ID)
             .join("versions")
             .is_dir());
@@ -905,10 +1099,10 @@ mod tests {
                 .0,
             "product_install_directory_unavailable"
         );
-        assert!(!local_app_data.join("Programs").exists());
+        assert!(!local_app_data.join(INSTALL_DIRECTORY).exists());
         let product_root = local_app_data
-            .join("Programs")
-            .join("D4 Pocket")
+            .join(INSTALL_DIRECTORY)
+            .join(PRODUCT_DIRECTORY)
             .join(APP_ID);
         std::fs::create_dir_all(&product_root).unwrap();
         let (opened_path, capability) =
@@ -936,11 +1130,11 @@ mod tests {
                 .0,
             "product_install_directory_unavailable"
         );
-        assert!(!local_app_data.join("Programs").exists());
+        assert!(!local_app_data.join(INSTALL_DIRECTORY).exists());
 
         let product_root = local_app_data
-            .join("Programs")
-            .join("D4 Pocket")
+            .join(INSTALL_DIRECTORY)
+            .join(PRODUCT_DIRECTORY)
             .join(APP_ID);
         std::fs::create_dir_all(product_root.join("versions")).unwrap();
         let (versions_path, capability) =
@@ -956,6 +1150,75 @@ mod tests {
         std::fs::remove_dir_all(local_app_data).unwrap();
     }
 
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_data_home_follows_xdg_default_and_rejects_ambiguous_paths() {
+        use super::resolve_linux_data_home;
+
+        assert_eq!(
+            resolve_linux_data_home(Path::new("/home/test"), None).unwrap(),
+            Path::new("/home/test/.local/share")
+        );
+        assert_eq!(
+            resolve_linux_data_home(
+                Path::new("/home/test"),
+                Some(Path::new("/mnt/data/user-share"))
+            )
+            .unwrap(),
+            Path::new("/mnt/data/user-share")
+        );
+        assert_eq!(
+            resolve_linux_data_home(Path::new("relative"), None)
+                .unwrap_err()
+                .0,
+            "product_install_home_invalid"
+        );
+        for invalid in [Path::new("relative"), Path::new("/home/test/../shared")] {
+            assert_eq!(
+                resolve_linux_data_home(Path::new("/home/test"), Some(invalid))
+                    .unwrap_err()
+                    .0,
+                "product_install_data_home_invalid"
+            );
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_data_home_creation_is_nofollow_and_owner_private_from_group_writes() {
+        use super::ensure_linux_data_home;
+        use std::os::unix::fs::{symlink, PermissionsExt};
+
+        let scratch = std::env::temp_dir().join(format!(
+            "d4p-linux-product-data-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let data_home = scratch.join("nested").join("share");
+        ensure_linux_data_home(&data_home).unwrap();
+        assert!(data_home.is_dir());
+
+        let target = scratch.join("target");
+        std::fs::create_dir(&target).unwrap();
+        let link = scratch.join("link");
+        symlink(&target, &link).unwrap();
+        assert_eq!(
+            ensure_linux_data_home(&link).unwrap_err().0,
+            "product_install_data_home_invalid"
+        );
+
+        std::fs::set_permissions(&data_home, std::fs::Permissions::from_mode(0o777)).unwrap();
+        assert_eq!(
+            ensure_linux_data_home(&data_home).unwrap_err().0,
+            "product_install_data_home_invalid"
+        );
+        std::fs::set_permissions(&data_home, std::fs::Permissions::from_mode(0o755)).unwrap();
+        std::fs::remove_dir_all(scratch).unwrap();
+    }
+
     #[test]
     fn invalid_identity_path_version_and_digest_are_rejected() {
         assert_eq!(
@@ -965,36 +1228,31 @@ mod tests {
             "product_install_local_app_data_invalid"
         );
         assert_eq!(
-            plan_product_install(Path::new("C:/Users/test/../other"), APP_ID, "1.2.3", HASH)
-                .unwrap_err()
-                .0,
-            "product_install_local_app_data_invalid"
-        );
-        assert_eq!(
             plan_product_install(
-                Path::new("C:/Users/test/AppData/Local"),
-                "../../escape",
+                &test_local_app_data().join("..").join("other"),
+                APP_ID,
                 "1.2.3",
                 HASH
             )
             .unwrap_err()
             .0,
+            "product_install_local_app_data_invalid"
+        );
+        assert_eq!(
+            plan_product_install(test_local_app_data(), "../../escape", "1.2.3", HASH)
+                .unwrap_err()
+                .0,
             "product_install_app_identity_invalid"
         );
         assert_eq!(
-            plan_product_install(
-                Path::new("C:/Users/test/AppData/Local"),
-                APP_ID,
-                "../1.2.3",
-                HASH
-            )
-            .unwrap_err()
-            .0,
+            plan_product_install(test_local_app_data(), APP_ID, "../1.2.3", HASH)
+                .unwrap_err()
+                .0,
             "product_install_version_invalid"
         );
         assert_eq!(
             plan_product_install(
-                Path::new("C:/Users/test/AppData/Local"),
+                test_local_app_data(),
                 APP_ID,
                 "1.2.3",
                 "A".repeat(64).as_str()

@@ -11766,6 +11766,23 @@ def test_linux_installer_is_required_release_scope() -> list[str]:
     return errors
 
 
+def test_linux_rust_workflow_is_manual_and_scoped() -> list[str]:
+    workflow_path = ROOT / ".github/workflows/linux-manual-rust-validation.yml"
+    if workflow_path.is_symlink() or not workflow_path.is_file():
+        return ["Linux Rust検査用の通常file workflowがない"]
+    workflow = workflow_path.read_text(encoding="utf-8")
+    required = (
+        "runs-on: ubuntu-24.04",
+        "cargo +1.95.0 test --locked",
+        "broker::product_install::tests",
+        "cargo +1.95.0 check --locked --all-targets",
+        "Temporary target cleanup",
+        "native installed-product acceptance",
+    )
+    missing = [token for token in required if token not in workflow]
+    return [f"Linux Rust手動workflowに必須検査／scope／cleanupがない: {token}" for token in missing]
+
+
 def test_macos_agent_cli_selection_is_non_authoritative() -> list[str]:
     errors = []
     request_schema = json.loads((SPECS / "macos_agent_cli_selection.schema.json").read_text(encoding="utf-8"))
@@ -12356,6 +12373,7 @@ def main() -> int:
         test_macos_workspace_selection_is_native_scoped_and_non_authoritative,
         test_linux_workspace_selection_is_native_and_non_authoritative,
         test_linux_installer_is_required_release_scope,
+        test_linux_rust_workflow_is_manual_and_scoped,
         test_macos_agent_cli_selection_is_non_authoritative,
         test_macos_credential_public_input_is_metadata_only,
         test_macos_mcp_native_scope_is_explicit,

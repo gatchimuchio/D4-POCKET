@@ -44,6 +44,6 @@ Agent Centerの`作業領域OS選択`はversion-only要求だけを受け、GTK 
 
 ## 未接続のLinux製品面
 
-通常Broker transport、GTK native Owner確認、Linux Secret Service資格情報登録／MCP結合、native Workspace chooserのコード接続だけでLinux完全対応を主張しない。Linux native installed chooserのX11／Wayland実操作、Agent Taskのprocess監督とscratch／descendant cleanup・cancel／deadline／crash Recovery、Installer／更新／Rollback／Uninstaller、配布検証は未成立範囲として残す。資格情報入力・保管のfallbackはなく、Secret Serviceが利用不能・lockedなら失敗を維持する。未接続のOwner operationはBrokerのfail-closed拒否を維持する。
+通常Broker transport、GTK native Owner確認、Linux Secret Service資格情報登録／MCP結合、native Workspace chooserのコード接続だけでLinux完全対応を主張しない。RustにはXDG_DATA_HOMEからversioned install rootを固定導出する基盤があるが、Broker package staging／activation、desktop entry、更新／Rollback／Uninstallerへ未接続である。Linux native installed chooserのX11／Wayland実操作、Agent Taskのprocess監督とscratch／descendant cleanup・cancel／deadline／crash Recovery、Installer／更新／Rollback／Uninstaller、配布検証は未成立範囲として残す。資格情報入力・保管のfallbackはなく、Secret Serviceが利用不能・lockedなら失敗を維持する。未接続のOwner operationはBrokerのfail-closed拒否を維持する。
 
 通常起動では`task_execution=unsupported`を維持する。Linuxでのprocess descendant停止、scratch cleanup、Recoveryおよびdurable Auditが既存有限受入条件を満たすまで、WindowsのTask能力証拠をLinuxへ転用しない。
