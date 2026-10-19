@@ -28,6 +28,9 @@ try {
     if ($summary -notmatch 'snapshots \(capture filter: RST\): 3') {
         throw 'PktGroupId付きloopback TCP snapshotを正しく数えない'
     }
+    if ($summary -notmatch 'PktGroupId記録=5; 向き認識記録=5; 後続header行=5; IPv4/TCP tuple=4; loopback TCP tuple=3') {
+        throw 'packet record／header／decoded tupleの件数を分離して示さない'
+    }
     if ($summary -match 'Packet Filter 1|Property: Component') {
         throw 'filter／component metadataをpacket snapshotとして出力した'
     }
@@ -72,6 +75,34 @@ try {
     }
     if (!$missingProbeRejected) {
         throw '期待したsynthetic probe packetがない場合に拒否しない'
+    }
+    $metadataOnlySummary = Get-Content -LiteralPath $summaryPath -Raw
+    if ($metadataOnlySummary -notmatch 'PktGroupId記録=0; 向き認識記録=0; 後続header行=0; IPv4/TCP tuple=0; loopback TCP tuple=0' -or
+        $metadataOnlySummary -notmatch '待受け先番号 443 を持つRST headerは未検出です。') {
+        throw 'expected probe失敗前にsummaryの件数と不在状態を保存しない'
+    }
+
+    @(
+        '[30]0000.0000::<DateTime> [Microsoft-Windows-PktMon] PktGroupId 77, PktNumber 1, Appearance 1, Direction Tx , Type IP , Component 39, Filter 1, OriginalSize 54, LoggedSize 54'
+        'IPv4 source 127.0.0.1:49152 -> destination 127.0.0.1:443 TCP flags [R] secret=CANARY_DO_NOT_EMIT'
+    ) | Set-Content -LiteralPath $inputPath -Encoding utf8
+    Set-Content -LiteralPath $summaryPath -Value '' -Encoding utf8
+    $alternateFormatRejected = $false
+    $alternateFormatError = ''
+    try {
+        & $formatter -InputPath $inputPath -SummaryPath $summaryPath -ExpectedLoopbackPort 443
+    } catch {
+        $alternateFormatError = $_.Exception.Message
+        $alternateFormatRejected = $_.Exception.Message -match '自己接続RST試験の待受け先番号を持つRST headerがありません: 443'
+    }
+    if (!$alternateFormatRejected) {
+        throw '未対応tuple形式を成功として扱う'
+    }
+    $alternateFormatSummary = Get-Content -LiteralPath $summaryPath -Raw
+    if ($alternateFormatSummary -notmatch 'IPv4表記数=2, TCP=True, RSTflag=True, 区切り=arrow' -or
+        $alternateFormatSummary -match 'CANARY_DO_NOT_EMIT|127\.0\.0\.1|49152' -or
+        $alternateFormatError -match 'CANARY_DO_NOT_EMIT|127\.0\.0\.1|49152') {
+        throw '未対応headerの形状だけを保存せず、生packet行やpacket内IP／portをsummary／errorへ露出する'
     }
 
     @(

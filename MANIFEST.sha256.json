@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "6341134d5211d92607853a36139447293c618e8a5d412ef8d1ad6a5c465a35d5"
+      "sha256": "67442bcd0caf82c706b2b61db84f3a514336161a3dc5c218c9665211bc97c575"
     },
     {
       "path": "SECURITY.md",
@@ -1288,7 +1288,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "63dc0e13a7f4ebe883d1ad0db33954610c9ed8dc022cd3462b7704ce139e5561"
+      "sha256": "3ad4e630600e964fa2c0c80248cd5d9d27c0e140dc6792302a1e5803762054ca"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1676,7 +1676,7 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B5_\u81ea\u5df1\u9069\u7528.md",
-      "sha256": "31aef30787f400fba8865bbe5803c5b4f95ab653a930a71ac5bc58c0c158b8db"
+      "sha256": "22abae992a8e6599f2f12f517d0051185558e0ed825c5cbdfaa4eddb296bb21a"
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/\u5b9f\u88c5\u4ed5\u69d8\u66f8.md",
@@ -5032,7 +5032,7 @@
     },
     {
       "path": "tooling/pktmon_packet_summary.ps1",
-      "sha256": "469faeb57c38252d9ce97e71a3ee2f255706ef708c8a6d71373fee3e65343cce"
+      "sha256": "6aad9b07bbc347c906761f46d04f63e82ad13735103ef7994cfece22b52ced08"
     },
     {
       "path": "tooling/probe_loopback_rst.ps1",
@@ -5064,7 +5064,7 @@
     },
     {
       "path": "tooling/test_pktmon_packet_summary.ps1",
-      "sha256": "289b74df583e36af42e7217a742028826e4a30f78491f5d0300249560d366b4b"
+      "sha256": "eaaf9e68d6d8a676b97461a40010e3b2d2090d3605a103e1c241a43672dbf330"
     },
     {
       "path": "tooling/ui_snapshot_tests/README.md",
