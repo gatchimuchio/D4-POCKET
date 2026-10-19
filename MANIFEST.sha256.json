@@ -4992,7 +4992,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "0bea973ce5e26995e9b59785777733e4904fc71868368dfae82824e89401bf3f"
+      "sha256": "2f3e792b7892e4eafe1a958451289f4782ff731d8b25dba0da164e665ec45e7f"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
