@@ -1,6 +1,6 @@
 # Linux製品Package
 
-状態: Linux native必須製品対象の固定package目録／reader契約。Brokerの署名trust、Owner確認、導入consumer、配布物の受入れを代行しない。
+状態: Linux native必須製品対象の固定package producer／目録／reader契約。Brokerの署名trust、Owner確認、導入consumer、配布物の受入れを代行しない。
 
 ## 1. 役割と互換性
 
@@ -19,3 +19,11 @@ containerは8-byte magic、little-endian 32-bit manifest長、UTF-8 JSON manifes
 Readerはpackage structure、製品版、固定identity、Product Manifestの新規identity／Authority非継承、file inventory／hash／modeを検査して、Owner操作を生成せず新規stageへ展開する。通常展開失敗時は今回作成したstageだけをcleanupする。Resumeは既存byte prefixとmodeの一致を必須とし、既存fileを上書き・削除しない。
 
 Linux Brokerの署名候補、compile-time App／Audit identity、固定XDG導入root、native Owner確認、durable Auditが一致して初めてproduct installation consumerへ接続できる。package stagingはactive-version切替、desktop entry、update、rollback、uninstall、installed product受入れを意味しない。これらのconsumerが未接続の間、Linux完全対応や`task_execution=supported`を主張しない。
+
+## 4. Linux製品package作成tool
+
+tooling/package_linux_product.pyはLinux host専用の開発／build toolであり、既に生成されたLinux bundleを既存D4PKG01へ梱包する。入力には固定root／required file inventory、Linux targetのProduct Manifest、新規App／Audit identity、Authority非継承を要求し、許可外path、symlink、特殊file、hard link、ownerが読めないfile、setuid／setgid／sticky、group／other writeを拒否する。各source fileはnofollowで開き、inventory取得時とpackage作成時に同一device／inode／mode／size／timestampを再照合して、byte length／SHA-256の変化を拒否する。
+
+目録modeはD4所有executable三fileを0755、その他を0644へ固定する。package outputは新規fileとしてbundle／Repository／OneDriveの外へcreate-only公開する。既知Credential pattern scanも実行するが、これは列挙済み形式の検出に限られ、秘密不存在の一般証明ではない。
+
+このproducerはLinux binaryをbuildせず、source commit／toolchain provenanceを生成・検証せず、packageへ署名せず、Broker trust／Permission／Approval／導入を行わない。出力されたunsigned D4PKG01のdigestはBrokerの信頼済みcandidate検証へ別途結合する。Linux build／package evidence、署名candidate、Owner確認付きstage／activation、desktop entry、更新／rollback／削除とnative installed product受入れは別の必須工程であり、このtoolの成功で完了扱いしない。

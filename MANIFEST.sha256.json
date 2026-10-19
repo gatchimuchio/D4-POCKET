@@ -168,7 +168,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "9f104fb4a91c903a147a188c5db0576353a9fd00c57d4ed1047bcd9fe1aa4c91"
+      "sha256": "635066c8377b53414118294a4844b5ec2bdcf60e59ba210d86571e8c0f358804"
     },
     {
       "path": "SECURITY.md",
@@ -1304,7 +1304,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "42a7e1c50c92cdebd9275d0ed59dbfbfb826e690dfcb65dbc5c62f0d658860d5"
+      "sha256": "bbc3fbb1a67d0ee05ace149e6eec6637a7f27739479fd82f99a85cdb923765b2"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1516,7 +1516,7 @@
     },
     {
       "path": "docs/specs/linux-product-package.md",
-      "sha256": "fbefdae3bb33594e58056c712a4aa1e28eb67b1c27a6495a5821c57c540ca6e4"
+      "sha256": "0e8af60d2d52941d01143f704fa5fae45376988a8e6c226d778f412c73862910"
     },
     {
       "path": "docs/specs/linux-workspace-selection.md",
@@ -4288,7 +4288,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "582001efa522c966de2898de1d26b2ac00be855fea895ebd437bde13c4a6b48d"
+      "sha256": "b6358ea31a26dd8b38e76cafc044ef379da7d8ffa9fb372570787f372ca429ab"
     },
     {
       "path": "requirements-dev.txt",
@@ -5024,7 +5024,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "91bb5a795a541efc6b5432ddc4d37afbaafd4e0482b5123a893a396e79130a83"
+      "sha256": "82518c7c8a953ae21db9639f7465d6374506b90c4e761c67f29c1c426e6d0ba8"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",

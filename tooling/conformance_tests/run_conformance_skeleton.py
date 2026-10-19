@@ -10614,6 +10614,36 @@ def test_windows_product_package_writer_is_bounded_and_hash_bound() -> list[str]
     return errors
 
 
+def test_linux_product_package_writer_is_platform_bound_and_non_authoritative() -> list[str]:
+    errors: list[str] = []
+    writer_path = ROOT / "tooling" / "package_linux_product.py"
+    runtime_tests = ROOT / "tooling" / "tests" / "test_linux_product_package.py"
+    contract_path = ROOT / "docs" / "specs" / "linux-product-package.md"
+    if not writer_path.is_file() or not runtime_tests.is_file() or not contract_path.is_file():
+        return ["Linux product package producer／runtime test／contractが揃っていない"]
+    writer = writer_path.read_text(encoding="utf-8")
+    contract = contract_path.read_text(encoding="utf-8")
+    for token, label in (
+        ('sys.platform.startswith("linux")', "Linux host限定"),
+        ("target_platform", "Linux target binding"),
+        ("O_NOFOLLOW", "symlink拒否"),
+        ("scan_credential_artifacts", "known-pattern Credential scan"),
+        ("_verify_source_identity", "package作成中のsource再照合"),
+        ("os.link(", "output create-only公開"),
+        ('"signed": False', "未署名状態の明示"),
+        ('"installed_product_verified": False', "installed受入れとの分離"),
+    ):
+        if token not in writer:
+            errors.append(f"Linux product package producerが{label}境界を保持しない")
+    if "Linux host上でのみ" not in writer:
+        errors.append("Linux product package producerが実行host制約を明示しない")
+    if "D4PKG01" not in contract or "producer" not in contract:
+        errors.append("Linux package contractがproducer責任範囲を記載しない")
+    if "署名" not in contract or "installed product" not in contract:
+        errors.append("Linux package contractがtrust／installed acceptance境界を分離しない")
+    return errors
+
+
 def test_d4_pocket_active_version_record_is_fixed_and_path_free() -> list[str]:
     schema = load_schema("d4_pocket_active_version.schema.json")
     valid = load_contract_fixture("d4_pocket_active_version.valid.json")
@@ -12453,6 +12483,7 @@ def main() -> int:
         test_gui_shell_module_build_is_untrusted_ui_only_selection,
         test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative,
         test_windows_product_package_writer_is_bounded_and_hash_bound,
+        test_linux_product_package_writer_is_platform_bound_and_non_authoritative,
         test_d4_pocket_active_version_record_is_fixed_and_path_free,
         test_gui_shell_module_comparison_is_same_commit_and_non_authoritative,
         test_l3_bounded_reference_extension_uses_existing_contracts,
