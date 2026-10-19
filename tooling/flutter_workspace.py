@@ -40,7 +40,18 @@ def remove_temporary_tree_with_retry(
     retryable_winerrors = {32, 33, 145}
     retries = 0
     if os.name == "nt":
-        path = _windows_extended_path(Path(path).resolve(strict=True))
+        path = Path(path)
+        try:
+            metadata = path.lstat()
+        except FileNotFoundError:
+            return 0
+        reparse_point = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+        if getattr(metadata, "st_file_attributes", 0) & reparse_point:
+            raise OSError(
+                "Flutter temporary workspace rootがreparse pointのためcleanupを拒否した"
+            )
+        absolute_path = Path(os.path.abspath(os.fspath(path)))
+        path = _windows_extended_path(absolute_path)
 
     def exists(target: Path) -> bool:
         try:
@@ -90,7 +101,19 @@ def _known_onedrive_roots() -> list[Path]:
 
 def safe_flutter_temp_parent(source_root: Path, candidate: Path | None = None) -> Path:
     source = source_root.expanduser().resolve(strict=True)
-    parent = (candidate or Path(tempfile.gettempdir())).expanduser().resolve(strict=True)
+    candidate_parent = (candidate or Path(tempfile.gettempdir())).expanduser()
+    if os.name == "nt":
+        candidate_path = Path(os.path.abspath(os.fspath(candidate_parent)))
+        metadata = candidate_path.lstat()
+        reparse_point = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+        if getattr(metadata, "st_file_attributes", 0) & reparse_point:
+            raise FlutterWorkspaceError("一時配置先自体がreparse pointである")
+        parent = candidate_path.resolve(strict=True)
+        canonical_leaf = candidate_path.parent.resolve(strict=True) / candidate_path.name
+        if parent != canonical_leaf:
+            raise FlutterWorkspaceError("一時配置先の検査中にreparse pointへ変化した")
+    else:
+        parent = candidate_parent.resolve(strict=True)
     if not parent.is_dir():
         raise FlutterWorkspaceError("一時配置先がdirectoryではない")
     if _inside(parent, source):
@@ -277,10 +300,17 @@ class IsolatedFlutterWorkspace:
             dir=self.temp_parent,
             ignore_cleanup_errors=True,
         )
-        self.temporary_root = Path(self._temporary.name).resolve(strict=True)
-        self.root = self.temporary_root / "source"
-        self.root.mkdir()
         try:
+            self.temporary_root = Path(os.path.abspath(os.fspath(self._temporary.name)))
+            if os.name == "nt":
+                metadata = self.temporary_root.lstat()
+                reparse_point = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+                if getattr(metadata, "st_file_attributes", 0) & reparse_point:
+                    raise FlutterWorkspaceError(
+                        "Flutter temporary workspace rootがreparse pointのため使用を拒否した"
+                    )
+            self.root = self.temporary_root / "source"
+            self.root.mkdir()
             commit, identity, patch, untracked = _source_state(self.source_root)
             archive_path = self.temporary_root / "source.tar"
             _git(

@@ -8077,6 +8077,118 @@ def test_flutter_workspace_cleanup_retries_transient_windows_errors() -> list[st
     return errors
 
 
+def test_flutter_workspace_cleanup_refuses_reparse_root() -> list[str]:
+    if os.name != "nt":
+        return []
+
+    from types import SimpleNamespace
+    from unittest.mock import patch
+
+    errors = []
+    with tempfile.TemporaryDirectory(prefix="d4p-flutter-cleanup-reparse-") as temporary:
+        root = Path(temporary) / "workspace"
+        root.mkdir()
+        marker = root / "must-remain.txt"
+        marker.write_text("outside target must remain untouched", encoding="utf-8")
+        original_lstat = Path.lstat
+        original_resolve = Path.resolve
+        resolved_root = False
+        remove_attempts = []
+
+        def fake_lstat(path: Path):
+            if path == root:
+                return SimpleNamespace(st_file_attributes=0x400)
+            return original_lstat(path)
+
+        def track_resolve(path: Path, *args, **kwargs):
+            nonlocal resolved_root
+            if path == root:
+                resolved_root = True
+            return original_resolve(path, *args, **kwargs)
+
+        def record_remove(path: Path, *, onerror=None) -> None:
+            remove_attempts.append(path)
+
+        with patch.object(Path, "lstat", fake_lstat), patch.object(
+            Path, "resolve", track_resolve
+        ):
+            try:
+                remove_temporary_tree_with_retry(root, remover=record_remove)
+            except OSError as error:
+                if "reparse point" not in str(error):
+                    errors.append(f"reparse rootを想定理由で拒否しなかった: {error}")
+            else:
+                errors.append("Windows reparse rootをcleanup前に拒否しなかった")
+
+        if resolved_root:
+            errors.append("Windows reparse rootをresolveした")
+        if remove_attempts:
+            errors.append("Windows reparse rootへrecursive removerを実行した")
+        if not root.exists() or marker.read_text(encoding="utf-8") != "outside target must remain untouched":
+            errors.append("Windows reparse root拒否時にfixture内容が変化した")
+    return errors
+
+
+def test_flutter_workspace_rejects_reparse_root_before_use() -> list[str]:
+    if os.name != "nt":
+        return []
+
+    from types import SimpleNamespace
+    from unittest.mock import patch
+
+    errors = []
+    with tempfile.TemporaryDirectory(prefix="d4p-flutter-workspace-reparse-") as temporary:
+        parent = Path(temporary)
+        source = parent / "source"
+        source.mkdir()
+        temporary_root = parent / f"{FLUTTER_TEMP_PREFIX}fixture"
+        temporary_root.mkdir()
+        marker = temporary_root / "must-remain.txt"
+        marker.write_text("fixture remains untouched", encoding="utf-8")
+        cleanup_calls = []
+        fake_temporary_directory = SimpleNamespace(
+            name=str(temporary_root), cleanup=lambda: cleanup_calls.append(True)
+        )
+        original_lstat = Path.lstat
+        original_resolve = Path.resolve
+        resolved_root = False
+
+        def fake_lstat(path: Path):
+            if path == temporary_root:
+                return SimpleNamespace(st_file_attributes=0x400)
+            return original_lstat(path)
+
+        def track_resolve(path: Path, *args, **kwargs):
+            nonlocal resolved_root
+            if path == temporary_root:
+                resolved_root = True
+            return original_resolve(path, *args, **kwargs)
+
+        workspace = IsolatedFlutterWorkspace(source, temp_parent=parent)
+        with patch.object(
+            tempfile, "TemporaryDirectory", return_value=fake_temporary_directory
+        ), patch.object(Path, "lstat", fake_lstat), patch.object(
+            Path, "resolve", track_resolve
+        ):
+            try:
+                workspace.__enter__()
+            except FlutterWorkspaceError as error:
+                if "reparse point" not in str(error):
+                    errors.append(f"workspace rootを想定理由で拒否しなかった: {error}")
+            else:
+                errors.append("Windows reparse rootを使用前に拒否しなかった")
+
+        if resolved_root:
+            errors.append("Windows reparse rootをcanonical targetへresolveした")
+        if (temporary_root / "source").exists():
+            errors.append("Windows reparse root拒否前にsnapshot作成を開始した")
+        if marker.read_text(encoding="utf-8") != "fixture remains untouched":
+            errors.append("Windows reparse root拒否時に既存内容が変化した")
+        if len(cleanup_calls) != 1:
+            errors.append("workspace初期化失敗後に一時root cleanupを実施しなかった")
+    return errors
+
+
 def test_flutter_workspace_cleanup_supports_windows_long_paths() -> list[str]:
     if os.name != "nt":
         return []
@@ -8237,6 +8349,9 @@ def test_mobile_android_debug_build_isolated_artifact_and_failure_propagation() 
 
 def test_flutter_temp_parent_rejects_onedrive_and_flutter_filter_includes_prerequisites() -> list[str]:
     errors = []
+    from types import SimpleNamespace
+    from unittest.mock import patch
+
     with tempfile.TemporaryDirectory(prefix="d4p-flutter-temp-guard-") as temporary:
         root = Path(temporary) / "repository"
         root.mkdir()
@@ -8258,6 +8373,39 @@ def test_flutter_temp_parent_rejects_onedrive_and_flutter_filter_includes_prereq
                 os.environ.pop("OneDrive", None)
             else:
                 os.environ["OneDrive"] = previous
+
+    if os.name == "nt":
+        with tempfile.TemporaryDirectory(prefix="d4p-flutter-reparse-parent-") as temporary:
+            root = Path(temporary) / "repository"
+            root.mkdir()
+            alias = Path(temporary) / "temp-alias"
+            alias.mkdir()
+            original_lstat = Path.lstat
+            original_resolve = Path.resolve
+            resolved_alias = False
+
+            def fake_lstat(path: Path):
+                if path == alias:
+                    return SimpleNamespace(st_file_attributes=0x400)
+                return original_lstat(path)
+
+            def track_resolve(path: Path, *args, **kwargs):
+                nonlocal resolved_alias
+                if path == alias:
+                    resolved_alias = True
+                return original_resolve(path, *args, **kwargs)
+
+            with patch.object(Path, "lstat", fake_lstat), patch.object(
+                Path, "resolve", track_resolve
+            ):
+                try:
+                    safe_flutter_temp_parent(root, alias)
+                except FlutterWorkspaceError:
+                    pass
+                else:
+                    errors.append("resolve前のWindows reparse parentを拒否しなかった")
+            if resolved_alias:
+                errors.append("Windows reparse parentを検査前にresolveした")
 
     steps = build_validation_steps(False, "windows")
     flutter_steps = [step for step in steps if is_flutter_command(step.command)]
@@ -12011,6 +12159,8 @@ def main() -> int:
         test_validate_all_uses_running_python_interpreter_for_python_steps,
         test_flutter_validation_snapshot_preserves_source_and_cleans_outputs,
         test_flutter_workspace_cleanup_retries_transient_windows_errors,
+        test_flutter_workspace_cleanup_refuses_reparse_root,
+        test_flutter_workspace_rejects_reparse_root_before_use,
         test_flutter_workspace_cleanup_supports_windows_long_paths,
         test_mobile_android_debug_build_isolated_artifact_and_failure_propagation,
         test_flutter_temp_parent_rejects_onedrive_and_flutter_filter_includes_prerequisites,
