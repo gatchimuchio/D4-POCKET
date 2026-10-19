@@ -11640,6 +11640,7 @@ def 手動補助の起動境界を検査する() -> list[str]:
         for token in (
             "自己接続RST=未検出",
             "header形状: 記録=",
+            "テキスト形状: 行数=",
             "Pktmon要約に上限付き診断項目がありません",
             "diagnostics.Count -gt 24",
         ):

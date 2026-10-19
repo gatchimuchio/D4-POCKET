@@ -16,6 +16,10 @@ $countPattern = [regex]::new(
     '^Pktmon読取り件数: PktGroupId記録=(?<records>\d+); 向き認識記録=(?<directions>\d+); 後続header行=(?<headers>\d+); IPv4/TCP tuple=(?<tuples>\d+); loopback TCP tuple=(?<loopback>\d+)。$',
     [System.Text.RegularExpressions.RegexOptions]::CultureInvariant
 )
+$textShapePattern = [regex]::new(
+    '^Pktmonテキスト形状: 行数=(?<lines>\d+); PktGroupId行=(?<group>\d+); PktNumber行=(?<number>\d+); Appearance行=(?<appearance>\d+); Direction行=(?<direction>\d+); IPv4表記数=(?<ipv4>\d+); TCP標識行=(?<tcp>\d+); RST標識行=(?<rst>\d+)。$',
+    [System.Text.RegularExpressions.RegexOptions]::CultureInvariant
+)
 $missingProbePattern = [regex]::new(
     '^自己接続RST試験の待受け先番号 \d+ を持つRST headerは未検出です。$',
     [System.Text.RegularExpressions.RegexOptions]::CultureInvariant
@@ -31,6 +35,7 @@ $shapePattern = [regex]::new(
 
 $diagnostics = [System.Collections.Generic.List[string]]::new()
 $hasCounts = $false
+$hasTextShape = $false
 $hasProbeResult = $false
 foreach ($rawLine in Get-Content -LiteralPath $SummaryPath -ErrorAction Stop) {
     $line = $rawLine.Trim()
@@ -48,6 +53,15 @@ foreach ($rawLine in Get-Content -LiteralPath $SummaryPath -ErrorAction Stop) {
             "Pktmon記録数: records=$($match.Groups['records'].Value); 方向=$($match.Groups['directions'].Value); header=$($match.Groups['headers'].Value); IPv4/TCP tuple=$($match.Groups['tuples'].Value); loopback TCP tuple=$($match.Groups['loopback'].Value)"
         )
         $hasCounts = $true
+        continue
+    }
+
+    $match = $textShapePattern.Match($line)
+    if ($match.Success) {
+        $diagnostics.Add(
+            "テキスト形状: 行数=$($match.Groups['lines'].Value); PktGroupId=$($match.Groups['group'].Value); PktNumber=$($match.Groups['number'].Value); Appearance=$($match.Groups['appearance'].Value); Direction=$($match.Groups['direction'].Value); IPv4表記=$($match.Groups['ipv4'].Value); TCP標識=$($match.Groups['tcp'].Value); RST標識=$($match.Groups['rst'].Value)"
+        )
+        $hasTextShape = $true
         continue
     }
 
@@ -72,7 +86,7 @@ foreach ($rawLine in Get-Content -LiteralPath $SummaryPath -ErrorAction Stop) {
     }
 }
 
-if (!$hasCounts -or !$hasProbeResult -or $diagnostics.Count -gt 24) {
+if (!$hasCounts -or !$hasTextShape -or !$hasProbeResult -or $diagnostics.Count -gt 24) {
     throw 'Pktmon要約に上限付き診断項目がありません'
 }
 

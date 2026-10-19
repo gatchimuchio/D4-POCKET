@@ -28,12 +28,38 @@ $lines = @(Get-Content -LiteralPath $InputPath -ErrorAction Stop)
 $snapshots = [System.Collections.Generic.List[object]]::new()
 $unparsedHeaders = [System.Collections.Generic.List[object]]::new()
 $headerShapes = [System.Collections.Generic.List[object]]::new()
-$rawRecordMarkerCount = @($lines | Where-Object { $_ -match '\bPktGroupId\b' }).Count
+$rawRecordMarkerCount = 0
+$rawPacketNumberMarkerCount = 0
+$rawAppearanceMarkerCount = 0
+$rawDirectionMarkerCount = 0
+$rawIpv4LiteralCount = 0
+$rawTcpMarkerLineCount = 0
+$rawRstMarkerLineCount = 0
 $recognizedRecordCount = 0
 $packetHeaderLineCount = 0
 $decodedIpv4TcpTupleCount = 0
 
 for ($i = 0; $i -lt $lines.Count; $i++) {
+    $currentLine = $lines[$i]
+    if ($currentLine -match '\bPktGroupId\b') { $rawRecordMarkerCount++ }
+    if ($currentLine -match '\bPktNumber\b') { $rawPacketNumberMarkerCount++ }
+    if ($currentLine -match '\bAppearance\b') { $rawAppearanceMarkerCount++ }
+    if ($currentLine -match '\bDirection\s+(?:Rx|Tx)\b') { $rawDirectionMarkerCount++ }
+    $rawIpv4LiteralCount += [regex]::Matches(
+        $currentLine,
+        '(?<!\d)(?:\d{1,3}\.){3}\d{1,3}(?!\d)'
+    ).Count
+    if ([regex]::IsMatch($currentLine, '\bTCP\b', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)) {
+        $rawTcpMarkerLineCount++
+    }
+    if ([regex]::IsMatch(
+        $currentLine,
+        '\bRST\b|\bflags\s*\[[^\]]*R[^\]]*\]',
+        [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
+    )) {
+        $rawRstMarkerLineCount++
+    }
+
     $recordMatch = $recordPattern.Match($lines[$i])
     if (!$recordMatch.Success) { continue }
     $recognizedRecordCount++
@@ -149,6 +175,7 @@ $probeMissing = $ExpectedLoopbackPort -gt 0 -and $probeSnapshots.Count -eq 0
 
 "Pktmon IPv4 loopback TCP snapshots (capture filter: RST): $($snapshots.Count)" | Out-File -FilePath $SummaryPath -Append -Encoding utf8
 'Pktmon読取り件数: PktGroupId記録={0}; 向き認識記録={1}; 後続header行={2}; IPv4/TCP tuple={3}; loopback TCP tuple={4}。' -f $rawRecordMarkerCount, $recognizedRecordCount, $packetHeaderLineCount, $decodedIpv4TcpTupleCount, $snapshots.Count | Out-File -FilePath $SummaryPath -Append -Encoding utf8
+'Pktmonテキスト形状: 行数={0}; PktGroupId行={1}; PktNumber行={2}; Appearance行={3}; Direction行={4}; IPv4表記数={5}; TCP標識行={6}; RST標識行={7}。' -f $lines.Count, $rawRecordMarkerCount, $rawPacketNumberMarkerCount, $rawAppearanceMarkerCount, $rawDirectionMarkerCount, $rawIpv4LiteralCount, $rawTcpMarkerLineCount, $rawRstMarkerLineCount | Out-File -FilePath $SummaryPath -Append -Encoding utf8
 'Only PktGroupId/PktNumber/Appearance records followed by a decoded IPv4 TCP tuple are counted; filter and component catalogs are excluded.' | Out-File -FilePath $SummaryPath -Append -Encoding utf8
 'Snapshots may repeat one packet across stack components; correlate PktGroupId and PktNumber. The capture filter selects TCP RST.' | Out-File -FilePath $SummaryPath -Append -Encoding utf8
 if ($ExpectedLoopbackPort -gt 0) {

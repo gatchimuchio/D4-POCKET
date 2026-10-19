@@ -4996,7 +4996,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "a66434af2740651aa6ac7655130cb165bdb0cb2c3d5fbab031c3a90f397f9f9c"
+      "sha256": "23ee084b83f23c6f25d5941dc17ea2c7f81b2402604669ca4de62acc7954fd85"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
@@ -5028,7 +5028,7 @@
     },
     {
       "path": "tooling/emit_pktmon_safe_diagnostics.ps1",
-      "sha256": "195a9af2f19c6a802b5e4d0cafb8f80ab0339b70fd73345430d7b9b10616cc8e"
+      "sha256": "a81f22b085e05941bfe23209f9190f1121039a1235e119038b2b9b597ea67c8f"
     },
     {
       "path": "tooling/evaluation_contract_check.py",
@@ -5100,7 +5100,7 @@
     },
     {
       "path": "tooling/pktmon_packet_summary.ps1",
-      "sha256": "6aad9b07bbc347c906761f46d04f63e82ad13735103ef7994cfece22b52ced08"
+      "sha256": "524af7c3628f0f115371caa0e7e2c8b5260ef861dac5ac36a8e58b7aa51f83c2"
     },
     {
       "path": "tooling/probe_loopback_rst.ps1",
@@ -5132,7 +5132,7 @@
     },
     {
       "path": "tooling/test_pktmon_packet_summary.ps1",
-      "sha256": "232f36a0397e275b7b2757f7ce8ea3e9802b1760ee891bf88d637e943de2eb8e"
+      "sha256": "85917187cab48e5866d5bc317ed4683f0a0c6050a1acd165fbb48c2e606b9fa5"
     },
     {
       "path": "tooling/ui_snapshot_tests/README.md",

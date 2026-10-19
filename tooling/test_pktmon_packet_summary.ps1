@@ -130,6 +130,31 @@ try {
     }
 
     @(
+        'Event PktNumber 7 Appearance 1 Direction Tx: IPv4 source 127.0.0.1:49152 -> destination 127.0.0.1:443 TCP flags [R] secret=CANARY_DO_NOT_EMIT'
+    ) | Set-Content -LiteralPath $inputPath -Encoding utf8
+    Set-Content -LiteralPath $summaryPath -Value '' -Encoding utf8
+    $missingRecordRejected = $false
+    try {
+        & $formatter -InputPath $inputPath -SummaryPath $summaryPath -ExpectedLoopbackPort 443
+    } catch {
+        $missingRecordRejected = $_.Exception.Message -match '自己接続RST試験の待受け先番号を持つRST headerがありません: 443'
+    }
+    if (!$missingRecordRejected) {
+        throw 'record markerのないpacket状文字列をprobe packetとして受理する'
+    }
+    $shapeSummary = Get-Content -LiteralPath $summaryPath -Raw
+    if ($shapeSummary -notmatch 'PktGroupId行=0; PktNumber行=1; Appearance行=1; Direction行=1; IPv4表記数=2; TCP標識行=1; RST標識行=1' -or
+        $shapeSummary -match 'CANARY_DO_NOT_EMIT|127\.0\.0\.1|49152') {
+        throw 'record marker欠落時に非機微なtext形状countを保存しない、またはraw値を含む'
+    }
+    $safeMissingRecordDiagnostics = @(& $diagnosticReporter -SummaryPath $summaryPath)
+    $safeMissingRecordText = $safeMissingRecordDiagnostics -join "`n"
+    if ($safeMissingRecordText -notmatch 'テキスト形状: 行数=1; PktGroupId=0; PktNumber=1; Appearance=1; Direction=1; IPv4表記=2; TCP標識=1; RST標識=1' -or
+        $safeMissingRecordText -match '127\.0\.0\.1|49152|443|CANARY_DO_NOT_EMIT') {
+        throw 'record marker欠落時のbounded diagnosticが不足、またはraw値を含む'
+    }
+
+    @(
         '[30]0000.0000::<DateTime> [Microsoft-Windows-PktMon] PktGroupId 14, PktNumber 1, Appearance 1, Direction Tx , Type IP , Component 39, Filter 1, OriginalSize 54, LoggedSize 54'
         '    ip: 127.0.0.1.49152 > 127.0.0.1.443: TCP, flags [S], length 0'
     ) | Set-Content -LiteralPath $inputPath -Encoding utf8
