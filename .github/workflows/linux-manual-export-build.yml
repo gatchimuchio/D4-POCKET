@@ -1,0 +1,110 @@
+name: Linux manual Export build validation
+
+'on':
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-export-build-manual-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  export-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: 対象commitをclean checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: 隔離検証rootを作成
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_root="$RUNNER_TEMP/d4p-linux-export-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          test ! -e "$expected_root"
+          mkdir -m 700 -- "$expected_root"
+          printf 'D4P_EXPORT_ROOT=%s\n' "$expected_root" >> "$GITHUB_ENV"
+          printf 'D4P_FLUTTER_ROOT=%s/flutter\n' "$expected_root" >> "$GITHUB_ENV"
+          printf '%s/bin\n' "$expected_root/flutter" >> "$GITHUB_PATH"
+
+      - name: Linux Desktop build依存を導入
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            clang cmake ninja-build pkg-config libgtk-3-dev
+
+      - name: Flutter／Rust toolchainを固定
+        shell: bash
+        run: |
+          set -euo pipefail
+          head="$(git rev-parse HEAD)"
+          test "$head" = "$GITHUB_SHA"
+          case "$GITHUB_REF" in
+            refs/heads/main|refs/heads/codex/*) ;;
+            *) echo 'mainまたは検証用codex branch以外を拒否した'; exit 1 ;;
+          esac
+          git clone --depth 1 --branch 3.44.0 https://github.com/flutter/flutter.git "$D4P_FLUTTER_ROOT"
+          flutter_commit="$(git -C "$D4P_FLUTTER_ROOT" rev-parse HEAD)"
+          test "$flutter_commit" = 559ffa3f75e7402d65a8def9c28389a9b2e6fe42
+          rustup toolchain install 1.95.0 --profile minimal
+          rustup default 1.95.0
+          flutter precache --linux
+          flutter --version --machine
+          rustc --version
+          cargo --version
+          cmake --version | head -n 1
+          ninja --version
+          clang --version | head -n 1
+          {
+            printf '\n- Commit: `%s`\n' "$head"
+            printf -- '- Runner: `ubuntu-24.04` (`%s/%s`)\n' "$ImageOS" "$ImageVersion"
+            printf -- '- Flutter: `3.44.0` (`%s`)\n' "$flutter_commit"
+            printf -- '- Rust: `%s`\n' "$(rustc --version)"
+            printf -- '- Scope: Linux Release Export build／bundle／package／provenance; not installed-product acceptance.\n'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Broker-shaped non-authority fixtureからLinux Release build
+        shell: bash
+        run: |
+          set -euo pipefail
+          fixture_root="$D4P_EXPORT_ROOT/fixture"
+          output_root="$D4P_EXPORT_ROOT/output"
+          python3 tooling/tests/create_linux_export_fixture.py --output-dir "$fixture_root"
+          python3 tooling/export_linux_product.py \
+            --receipt "$fixture_root/d4_pocket_export_receipt.json" \
+            --manifest-file "$fixture_root/d4-pocket-app-11111111111111111111111111111111.json" \
+            --output-dir "$output_root" \
+            --allow-verification-branch
+          python3 -c 'import hashlib,json,pathlib,sys; root=pathlib.Path(sys.argv[1]); evidence=json.loads((root/"d4_pocket_linux_export_build.json").read_text()); package=root/"D4Pocket-linux.d4pkg"; assert evidence["target_platform"]=="linux"; assert evidence["source_commit"]==sys.argv[2]; assert evidence["signed"] is False and evidence["formal_distribution_claimed"] is False; assert evidence["package"]["installed_product_verified"] is False; assert evidence["package"]["sha256"]==hashlib.sha256(package.read_bytes()).hexdigest(); print(json.dumps({"source_commit":evidence["source_commit"],"artifact_tree_sha256":evidence["artifact_tree_sha256"],"package_sha256":evidence["package"]["sha256"],"signed":False,"installed_product_verified":False},separators=(",",":")))' "$output_root" "$(git rev-parse HEAD)" | tee "$D4P_EXPORT_ROOT/build-result.json"
+          {
+            printf '\n- Export evidence: `%s`\n' "$(cat "$output_root/d4_pocket_linux_export_build.json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["artifact_tree_sha256"])')"
+            printf -- '- Package hash: `%s`\n' "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["package"]["sha256"])' "$output_root/d4_pocket_linux_export_build.json")"
+            printf -- '- Fixture: synthetic Broker-shaped Receipt／Manifest; no Owner authority or credentials.\n'
+            printf -- '- Result: unsigned build/package only; installation, launch, formal distribution, and runtime Manifest consumption remain unverified.\n'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: build fixture／bundleを正確な一時rootから削除
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_root="$RUNNER_TEMP/d4p-linux-export-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          if [ -z "${D4P_EXPORT_ROOT:-}" ] || [ "$D4P_EXPORT_ROOT" != "$expected_root" ]; then
+            echo '一時rootがこのrunの正確な所有pathではない'
+            exit 1
+          fi
+          if [ -L "$D4P_EXPORT_ROOT" ]; then
+            echo '一時rootがsymlink'
+            exit 1
+          fi
+          if [ -e "$D4P_EXPORT_ROOT" ]; then
+            rm -rf -- "$D4P_EXPORT_ROOT"
+          fi
+          test ! -e "$D4P_EXPORT_ROOT"

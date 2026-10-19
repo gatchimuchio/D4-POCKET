@@ -75,6 +75,10 @@
       "sha256": "0c3962312db994774565fe00cefca4b26f0443966d1be605fe8112f1aa13f22d"
     },
     {
+      "path": ".github/workflows/linux-manual-export-build.yml",
+      "sha256": "6433636da4bc8dae4d4d4ac782ffe708d075187ec9309f8e69205e5b1eb4c51c"
+    },
+    {
       "path": ".github/workflows/linux-manual-rust-validation.yml",
       "sha256": "3f53442a962810057b8fa9081af1e133017cbdd81771f947e0dc483f80c1e60a"
     },
