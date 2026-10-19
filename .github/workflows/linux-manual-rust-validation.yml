@@ -37,9 +37,9 @@ jobs:
           printf 'CARGO_TARGET_DIR=%s\n' "$target_dir" >> "$GITHUB_ENV"
           {
             printf '\n- Commit: `%s`\n' "$head"
-            printf '- Runner image: `%s/%s`\n' "$ImageOS" "$ImageVersion"
-            printf '- Rust: `%s`\n' "$(rustc +1.95.0 --version)"
-            printf '- Scope: Linux compile/test supplement; not native installed-product acceptance.\n'
+            printf -- '- Runner image: `%s/%s`\n' "$ImageOS" "$ImageVersion"
+            printf -- '- Rust: `%s`\n' "$(rustc +1.95.0 --version)"
+            printf -- '- Scope: Linux compile/test supplement; not native installed-product acceptance.\n'
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Rust整形
         shell: bash
