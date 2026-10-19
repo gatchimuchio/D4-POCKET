@@ -14,7 +14,7 @@ Flutter MethodChannel(gui_shell/broker)
 ```
 
 - Runnerは`/proc/self/exe`から固定bundle相対helper pathを解決する。任意path、environment override、shell command、endpoint探索を受け付けない。
-- Runnerがhelperへ渡すenvironmentはHOME、XDG state/runtime、表示session、localeに限定し、credential-likeな親environmentを継承しない。
+- Launcherは検査済みbundleのFlutter画面だけを起動し、表示に必要なHOME、XDG directory、display session、localeだけを渡す。RunnerがBroker helperへ渡すenvironmentもHOME、XDG_DATA_HOME、XDG state/runtime、表示session、localeに限定し、credential-likeな親environmentを継承しない。
 - transportは一要求一応答のnewline frameとし、要求64 KiB、応答4 MiBを上限とする。Runnerは要求をboundedに直列化し、payload／秘密／Broker資格／endpointをlogへ出さない。
 - helperは同一bundleのRunnerと自身の固定配置を検査し、XDG private runtime／state下で既存Brokerだけを起動する。Brokerのsession secretはhelper memory内に限り、Credential／Permission／ApprovalをFlutterへ返さない。
 - helperはprivate runtime内の固定lock fileをPOSIX exclusive flockで保持する。helper crash後はOSがlockを解放するため、次回起動で同じlockを取得後に限り、所有者・mode・通常file・link数・sizeを検査して前回のsession／一時fileを回収する。不正なfileや同時起動はfail-closedとし、lock file自体はunlinkしない。
@@ -48,6 +48,6 @@ Agent Centerの`作業領域OS選択`はversion-only要求だけを受け、GTK 
 
 ## 未接続のLinux製品面
 
-通常Broker transport、GTK native Owner確認、Linux Secret Service資格情報登録／MCP結合、native Workspace chooserのコード接続だけでLinux完全対応を主張しない。RustにはXDG_DATA_HOMEからversioned install rootを固定導出する基盤があるが、Broker package staging／activation、desktop entry、更新／Rollback／Uninstallerへ未接続である。Linux native installed chooserのX11／Wayland実操作、Agent Taskのprocess監督とscratch／descendant cleanup・cancel／deadline／crash Recovery、Installer／更新／Rollback／Uninstaller、配布検証は未成立範囲として残す。資格情報入力・保管のfallbackはなく、Secret Serviceが利用不能・lockedなら失敗を維持する。未接続のOwner operationはBrokerのfail-closed拒否を維持する。
+通常Broker transport、GTK native Owner確認、Linux Secret Service資格情報登録／MCP結合、native Workspace chooserのコード接続だけでLinux完全対応を主張しない。Linux CMakeはFlutter runtime bundleへ`gui_shell_desktop_launcher`をbuild／installし、Rust launcherは固定bundle検査、compile-time identity、active-version record照合、環境allowlist、Frontend終了後の所有process-group cleanupを行う。これは起動binaryのbundle統合であり、Broker package staging／activation、desktop entry、更新／Rollback／Uninstallerの製品経路は未成立である。Linux native installed chooserのX11／Wayland実操作、Agent Taskのprocess監督とscratch／descendant cleanup・cancel／deadline／crash Recovery、Installer／更新／Rollback／Uninstaller、配布検証も未成立範囲として残す。資格情報入力・保管のfallbackはなく、Secret Serviceが利用不能・lockedなら失敗を維持する。未接続のOwner operationはBrokerのfail-closed拒否を維持する。
 
 通常起動では`task_execution=unsupported`を維持する。Linuxでのprocess descendant停止、scratch cleanup、Recoveryおよびdurable Auditが既存有限受入条件を満たすまで、WindowsのTask能力証拠をLinuxへ転用しない。

@@ -11741,6 +11741,66 @@ def test_linux_workspace_selection_is_native_and_non_authoritative() -> list[str
     return errors
 
 
+def test_linux_product_launcher_is_built_and_bundle_bound() -> list[str]:
+    binary_entry = (RUST_HELPER / "src/bin/gui_shell_desktop_launcher.rs").read_text(encoding="utf-8")
+    launcher = (RUST_HELPER / "src/linux_desktop_launcher.rs").read_text(encoding="utf-8")
+    bundle = (RUST_HELPER / "src/linux_product_bundle.rs").read_text(encoding="utf-8")
+    lib = (RUST_HELPER / "src/lib.rs").read_text(encoding="utf-8")
+    cargo = (RUST_HELPER / "Cargo.toml").read_text(encoding="utf-8")
+    cmake = (DESKTOP_FLUTTER / "linux/CMakeLists.txt").read_text(encoding="utf-8")
+    runner_cmake = (DESKTOP_FLUTTER / "linux/runner/CMakeLists.txt").read_text(encoding="utf-8")
+    runner = (DESKTOP_FLUTTER / "linux/runner/broker_process_channel.cc").read_text(encoding="utf-8")
+    errors = []
+
+    for text, tokens, label in (
+        (binary_entry, ('#[cfg(target_os = "linux")]', "linux_desktop_launcher::run()"), "Linux binary entry"),
+        (lib, ("pub mod linux_desktop_launcher;", "mod linux_product_bundle;"), "Rust module wiring"),
+        (cargo, ('name = "gui_shell_desktop_launcher"', 'path = "src/bin/gui_shell_desktop_launcher.rs"'), "Cargo binary target"),
+        (
+            launcher,
+            (
+                "linux_product_bundle::from_launcher",
+                "is_fixed_installed_entrypoint",
+                "resolve_active_version_launcher",
+                "is_active_version_launcher",
+                "FRONTEND_ENVIRONMENT_ALLOWLIST",
+                ".env_clear()",
+                ".process_group(0)",
+                "kill_process_group",
+                "frontend_exit_stops_a_remaining_owned_process_group",
+            ),
+            "launcher behavior",
+        ),
+        (bundle, ("gui_shell_desktop", "gui_shell_linux_broker", "symlink_metadata", "mode() & 0o111 == 0"), "bundle verification"),
+        (
+            cmake,
+            (
+                "D4_PRODUCT_APP_ID and D4_PRODUCT_AUDIT_STORE_ID must be set together",
+                "LINUX_DESKTOP_LAUNCHER",
+                'install(PROGRAMS "${LINUX_DESKTOP_LAUNCHER}"',
+            ),
+            "CMake product identity and launcher install",
+        ),
+        (
+            runner_cmake,
+            (
+                "LINUX_PRODUCT_IDENTITY_ENV",
+                "--bin gui_shell_linux_broker --bin gui_shell_desktop_launcher",
+                '"${LINUX_DESKTOP_LAUNCHER}"',
+            ),
+            "CMake Rust binary build",
+        ),
+        (runner, ('"XDG_DATA_HOME"',), "XDG product root environment"),
+    ):
+        for token in tokens:
+            if token not in text:
+                errors.append(f"Linux製品launcherの{label}接続が欠落: {token}")
+
+    if "Windows専用です" in binary_entry:
+        errors.append("Linux launcherがWindows専用stubのまま残っている")
+    return errors
+
+
 def test_linux_installer_is_required_release_scope() -> list[str]:
     readme = (ROOT / "installer/linux/README.md").read_text(encoding="utf-8")
     status = (ROOT / "INSTALLER_STATUS.md").read_text(encoding="utf-8")
@@ -12372,6 +12432,7 @@ def main() -> int:
         手動補助の起動境界を検査する,
         test_macos_workspace_selection_is_native_scoped_and_non_authoritative,
         test_linux_workspace_selection_is_native_and_non_authoritative,
+        test_linux_product_launcher_is_built_and_bundle_bound,
         test_linux_installer_is_required_release_scope,
         test_linux_rust_workflow_is_manual_and_scoped,
         test_macos_agent_cli_selection_is_non_authoritative,

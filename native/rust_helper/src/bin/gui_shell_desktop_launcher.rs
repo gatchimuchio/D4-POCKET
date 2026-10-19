@@ -18,8 +18,16 @@ fn main() {
     }
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "linux")]
 fn main() {
-    eprintln!("この起動器はWindows専用です。");
+    if let Err(error) = gui_shell_rust_helper::linux_desktop_launcher::run() {
+        eprintln!("D4 Pocketを起動できません: {error}");
+        std::process::exit(1);
+    }
+}
+
+#[cfg(not(any(windows, target_os = "linux")))]
+fn main() {
+    eprintln!("この起動器は現在のOSでは利用できません。");
     std::process::exit(2);
 }

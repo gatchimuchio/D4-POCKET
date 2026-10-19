@@ -29,6 +29,10 @@ required-features = ["r2-e2e"]
 name = "gui_shell_linux_broker"
 path = "src/bin/gui_shell_linux_broker.rs"
 
+[[bin]]
+name = "gui_shell_desktop_launcher"
+path = "src/bin/gui_shell_desktop_launcher.rs"
+
 [dependencies]
 getrandom = "0.2"
 sha2 = "0.10"

@@ -2,6 +2,7 @@
 use crate::broker::ipc_server::run_loopback_server_cancellable_with_owner_operations;
 use crate::broker::{BrokerCredentialRole, BrokerEndpoint, BrokerServerConfig};
 use crate::linux_credential_input::LinuxCredentialUi;
+use crate::linux_product_bundle::{self, VerifiedBundle};
 use rustix::fs::{flock, FlockOperation};
 use std::fs::{self, File, OpenOptions};
 use std::net::{Ipv4Addr, SocketAddr, TcpStream};
@@ -61,54 +62,8 @@ pub fn run() -> io::Result<()> {
     )
 }
 
-/// Runner/helperの同一bundleと、存在する場合は固定版別起動器を確認する。
-/// 署名や配布identityの証明ではない。
-struct VerifiedBundle {
-    versioned_launcher: Option<PathBuf>,
-}
-
 fn verify_bundle(helper: &Path) -> io::Result<VerifiedBundle> {
-    if !helper.is_absolute()
-        || helper.file_name().and_then(|v| v.to_str()) != Some("gui_shell_linux_broker")
-    {
-        return Err(failure());
-    }
-    let libexec = helper.parent().ok_or_else(failure)?;
-    let bundle = libexec.parent().ok_or_else(failure)?;
-    if libexec.file_name().and_then(|v| v.to_str()) != Some("libexec") {
-        return Err(failure());
-    }
-    let canonical_bundle = bundle.canonicalize()?;
-    for path in [
-        canonical_bundle.join("gui_shell_desktop"),
-        helper.to_path_buf(),
-    ] {
-        let metadata = fs::symlink_metadata(&path)?;
-        if !metadata.is_file()
-            || metadata.file_type().is_symlink()
-            || !path.canonicalize()?.starts_with(&canonical_bundle)
-        {
-            return Err(failure());
-        }
-    }
-    let versioned_launcher = canonical_bundle.join("gui_shell_desktop_launcher");
-    let versioned_launcher = match fs::symlink_metadata(&versioned_launcher) {
-        Ok(metadata)
-            if metadata.is_file()
-                && !metadata.file_type().is_symlink()
-                && metadata.permissions().mode() & 0o111 != 0 =>
-        {
-            let path = versioned_launcher.canonicalize()?;
-            if !path.starts_with(&canonical_bundle) {
-                return Err(failure());
-            }
-            Some(path)
-        }
-        Ok(_) => return Err(failure()),
-        Err(error) if error.kind() == io::ErrorKind::NotFound => None,
-        Err(error) => return Err(error),
-    };
-    Ok(VerifiedBundle { versioned_launcher })
+    linux_product_bundle::from_helper(helper)
 }
 
 fn installed_product_path_verified(
@@ -560,6 +515,12 @@ mod tests {
         fs::write(&helper, b"broker helper").unwrap();
         let launcher = root.join("gui_shell_desktop_launcher");
         fs::write(&launcher, b"versioned launcher").unwrap();
+        fs::set_permissions(
+            root.join("gui_shell_desktop"),
+            fs::Permissions::from_mode(0o755),
+        )
+        .unwrap();
+        fs::set_permissions(&helper, fs::Permissions::from_mode(0o755)).unwrap();
         fs::set_permissions(&launcher, fs::Permissions::from_mode(0o755)).unwrap();
 
         assert!(verify_bundle(&helper).unwrap().versioned_launcher.is_some());
@@ -595,6 +556,16 @@ mod tests {
         fs::create_dir_all(&libexec).unwrap();
         fs::write(version_root.join("gui_shell_desktop"), b"desktop runner").unwrap();
         fs::write(libexec.join("gui_shell_linux_broker"), b"broker helper").unwrap();
+        fs::set_permissions(
+            version_root.join("gui_shell_desktop"),
+            fs::Permissions::from_mode(0o755),
+        )
+        .unwrap();
+        fs::set_permissions(
+            libexec.join("gui_shell_linux_broker"),
+            fs::Permissions::from_mode(0o755),
+        )
+        .unwrap();
         fs::write(
             version_root.join("product_manifest.json"),
             b"product manifest",

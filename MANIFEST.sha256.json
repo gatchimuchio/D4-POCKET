@@ -76,7 +76,7 @@
     },
     {
       "path": ".github/workflows/linux-manual-rust-validation.yml",
-      "sha256": "75c447a1ef77759145f5662b84b6f2e2ee13c72d4ba8c8c7505d0398b095a807"
+      "sha256": "54acb014858234ddfee1af1e64bc23c565c2b4f642b2437fefb1034bd0a7a38f"
     },
     {
       "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
@@ -168,7 +168,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "04145f19ffaf6b2fe593f28123d080c87bb769e2ed2b8713d1cec29d2e8286b1"
+      "sha256": "667fdd47a87b8c125165bf82cd55650213b4d5d6a2f1d2413d42a0f2414e232d"
     },
     {
       "path": "SECURITY.md",
@@ -416,7 +416,7 @@
     },
     {
       "path": "apps/desktop_flutter/linux/CMakeLists.txt",
-      "sha256": "d8744f71ae7d557308a669fc49ecf13ac93d9908797fa4b1e00fb21a91e87369"
+      "sha256": "d113494f38c5dd3c29b1154b25104fd0a86fdb27566d01bceef6d1326a47ef54"
     },
     {
       "path": "apps/desktop_flutter/linux/flutter/CMakeLists.txt",
@@ -436,11 +436,11 @@
     },
     {
       "path": "apps/desktop_flutter/linux/runner/CMakeLists.txt",
-      "sha256": "e883b7f5e8fe0a0561204edbf429623e7288e706911548f83c0727139d856fce"
+      "sha256": "eb603f68b890a902cda30e579dd750701ba4ea4a5d196a175e9017408df35db8"
     },
     {
       "path": "apps/desktop_flutter/linux/runner/broker_process_channel.cc",
-      "sha256": "8f9db5d3549fac0524a3ac51115d6f827f55a0526556f7e5e8161ca5414491ed"
+      "sha256": "ce8a49e5f011977c0421f90c3a27b9d9c4bb9fd23b4c1a509afaa4591d6484ae"
     },
     {
       "path": "apps/desktop_flutter/linux/runner/broker_process_channel.h",
@@ -1304,7 +1304,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "3ce55c59e3010011125a98d499dc8992ad79dc4bd6e7b4818211664a3ae00f6e"
+      "sha256": "14161b168d42c4521ba3677d4591f1b0905c7a652f8c6ec8ae355c1f5aed0618"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1512,7 +1512,7 @@
     },
     {
       "path": "docs/specs/linux-desktop-channel.md",
-      "sha256": "4c2c673f4c183c906ca9432be29c9f22533f1013fbe0adbcaac2c6505b3f1474"
+      "sha256": "556be214eda752a004796e3ac48b7839c53d92377543719585bffd7f369d3d51"
     },
     {
       "path": "docs/specs/linux-workspace-selection.md",
@@ -3384,7 +3384,7 @@
     },
     {
       "path": "native/rust_helper/Cargo.toml",
-      "sha256": "b2d402f8bf1e3b1f9c4796cb52c8107e81eaf401826c97fa26b6d06dcba3b50f"
+      "sha256": "4018fa9e737c0ebc3820bd2ccb0a50127e9a013dde3cc017bc62f5cc008e86c8"
     },
     {
       "path": "native/rust_helper/README.md",
@@ -3452,7 +3452,7 @@
     },
     {
       "path": "native/rust_helper/src/bin/gui_shell_desktop_launcher.rs",
-      "sha256": "b3a0f13960ee323a46fd9bbd00a3c3d751ce26525a602b15c7b9d7db8060e7a6"
+      "sha256": "539a571d15c14906c2ae87cd4549ae8186b751456b9894cd941fe8ea2e8ac33d"
     },
     {
       "path": "native/rust_helper/src/bin/gui_shell_linux_broker.rs",
@@ -3680,15 +3680,23 @@
     },
     {
       "path": "native/rust_helper/src/lib.rs",
-      "sha256": "5024dbfb44d25023263fe47eba598433f8480ec6a8519e5e2a1e94fba9092d3e"
+      "sha256": "03270838d51a03522cd0660284406803c8ee772095e3c2925ae082d545123118"
     },
     {
       "path": "native/rust_helper/src/linux_credential_input.rs",
       "sha256": "584749aa9494afcbc2045cfa2737aca82f5cb61f062748caa32c57633b2b7d5d"
     },
     {
+      "path": "native/rust_helper/src/linux_desktop_launcher.rs",
+      "sha256": "afbe09ad5cda76cc5bfb8203f5b2a77332d0498473a423c9782cac7ad368b5bc"
+    },
+    {
       "path": "native/rust_helper/src/linux_desktop_worker.rs",
-      "sha256": "e7536381e6f075cf48f1338f16ba37bf30c35f9f284f7dc2ce1c77c51dd33650"
+      "sha256": "aab7ca3e207d23b93ae0b28cf47b1caa5d4cdd38620baabc9454df8da4dc4add"
+    },
+    {
+      "path": "native/rust_helper/src/linux_product_bundle.rs",
+      "sha256": "0130a2fd2c92d82dffac0e20b0a38c7a194614a9124c1cee251077550a7df10a"
     },
     {
       "path": "native/rust_helper/src/linux_workspace_selection.rs",
@@ -4996,7 +5004,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "2f3e792b7892e4eafe1a958451289f4782ff731d8b25dba0da164e665ec45e7f"
+      "sha256": "86b59b15d35efc84993c04e49fea603c63de4dfabc4c3cb986b88b178bb19b8b"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",

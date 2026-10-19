@@ -739,7 +739,8 @@ class BrokerContext {
                                       G_SUBPROCESS_FLAGS_STDOUT_PIPE |
                                       G_SUBPROCESS_FLAGS_STDERR_SILENCE));
     static const char* const allowed_environment[] = {
-        "HOME",          "XDG_RUNTIME_DIR", "XDG_STATE_HOME",
+        "HOME",          "XDG_DATA_HOME",   "XDG_RUNTIME_DIR",
+        "XDG_STATE_HOME",
         "DISPLAY",       "WAYLAND_DISPLAY", "DBUS_SESSION_BUS_ADDRESS",
         "XDG_SESSION_TYPE", "GDK_BACKEND",  "LANG",
         "LC_ALL",         "LC_CTYPE",       nullptr};

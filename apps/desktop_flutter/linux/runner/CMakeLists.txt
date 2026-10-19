@@ -29,17 +29,22 @@ target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 file(GLOB_RECURSE LINUX_BROKER_RUST_SOURCES CONFIGURE_DEPENDS
   "${REPOSITORY_ROOT}/native/rust_helper/src/*.rs")
 add_custom_command(
-  OUTPUT "${LINUX_BROKER_HELPER}"
+  OUTPUT "${LINUX_BROKER_HELPER}" "${LINUX_DESKTOP_LAUNCHER}"
   COMMAND ${CMAKE_COMMAND} -E make_directory
     "${CMAKE_BINARY_DIR}/intermediates_do_not_run/libexec"
   COMMAND ${CMAKE_COMMAND} -E env
     "CARGO_TARGET_DIR=${CMAKE_BINARY_DIR}/linux_broker_cargo_target"
+    ${LINUX_PRODUCT_IDENTITY_ENV}
     "${CARGO_EXECUTABLE}" build --locked --release
     --manifest-path "${REPOSITORY_ROOT}/native/rust_helper/Cargo.toml"
-    --bin gui_shell_linux_broker --features linux-desktop-broker
+    --bin gui_shell_linux_broker --bin gui_shell_desktop_launcher
+    --features linux-desktop-broker
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
     "${CMAKE_BINARY_DIR}/linux_broker_cargo_target/release/gui_shell_linux_broker"
     "${LINUX_BROKER_HELPER}"
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    "${CMAKE_BINARY_DIR}/linux_broker_cargo_target/release/gui_shell_desktop_launcher"
+    "${LINUX_DESKTOP_LAUNCHER}"
   DEPENDS
     "${REPOSITORY_ROOT}/native/rust_helper/Cargo.toml"
     "${REPOSITORY_ROOT}/native/rust_helper/Cargo.lock"
@@ -47,5 +52,6 @@ add_custom_command(
   WORKING_DIRECTORY "${REPOSITORY_ROOT}"
   VERBATIM
 )
-add_custom_target(gui_shell_linux_broker DEPENDS "${LINUX_BROKER_HELPER}")
+add_custom_target(gui_shell_linux_broker
+  DEPENDS "${LINUX_BROKER_HELPER}" "${LINUX_DESKTOP_LAUNCHER}")
 add_dependencies(${BINARY_NAME} gui_shell_linux_broker)

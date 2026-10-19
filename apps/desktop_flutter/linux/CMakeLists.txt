@@ -10,8 +10,32 @@ set(BINARY_NAME "gui_shell_desktop")
 set(APPLICATION_ID "com.example.gui_shell_desktop")
 
 get_filename_component(REPOSITORY_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../.." ABSOLUTE)
+set(D4_PRODUCT_APP_ID "" CACHE STRING "Compile-time D4 Pocket App ID for a product bundle")
+set(D4_PRODUCT_AUDIT_STORE_ID "" CACHE STRING "Compile-time D4 Pocket Audit store ID for a product bundle")
+set(LINUX_PRODUCT_IDENTITY_ENV)
+if(D4_PRODUCT_APP_ID STREQUAL "" AND NOT D4_PRODUCT_AUDIT_STORE_ID STREQUAL "")
+  message(FATAL_ERROR "D4_PRODUCT_APP_ID and D4_PRODUCT_AUDIT_STORE_ID must be set together")
+elseif(NOT D4_PRODUCT_APP_ID STREQUAL "" AND D4_PRODUCT_AUDIT_STORE_ID STREQUAL "")
+  message(FATAL_ERROR "D4_PRODUCT_APP_ID and D4_PRODUCT_AUDIT_STORE_ID must be set together")
+elseif(NOT D4_PRODUCT_APP_ID STREQUAL "")
+  string(REGEX REPLACE "^d4-pocket-app-" "" _d4_app_suffix "${D4_PRODUCT_APP_ID}")
+  string(REGEX REPLACE "^audit-store-" "" _d4_audit_suffix "${D4_PRODUCT_AUDIT_STORE_ID}")
+  string(LENGTH "${_d4_app_suffix}" _d4_app_suffix_length)
+  string(LENGTH "${_d4_audit_suffix}" _d4_audit_suffix_length)
+  if(NOT D4_PRODUCT_APP_ID MATCHES "^d4-pocket-app-[0-9a-f]+$"
+      OR NOT D4_PRODUCT_AUDIT_STORE_ID MATCHES "^audit-store-[0-9a-f]+$"
+      OR NOT _d4_app_suffix_length EQUAL 32
+      OR NOT _d4_audit_suffix_length EQUAL 32)
+    message(FATAL_ERROR "D4 product identity format is invalid")
+  endif()
+  list(APPEND LINUX_PRODUCT_IDENTITY_ENV
+    "GUI_SHELL_PRODUCT_APP_ID=${D4_PRODUCT_APP_ID}"
+    "GUI_SHELL_PRODUCT_AUDIT_STORE_ID=${D4_PRODUCT_AUDIT_STORE_ID}")
+endif()
 set(LINUX_BROKER_HELPER
   "${CMAKE_BINARY_DIR}/intermediates_do_not_run/libexec/gui_shell_linux_broker")
+set(LINUX_DESKTOP_LAUNCHER
+  "${CMAKE_BINARY_DIR}/intermediates_do_not_run/gui_shell_desktop_launcher")
 
 # Explicitly opt in to modern CMake behaviors to avoid warnings with recent
 # versions of CMake.
@@ -100,6 +124,8 @@ install(TARGETS ${BINARY_NAME} RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}"
   COMPONENT Runtime)
 install(PROGRAMS "${LINUX_BROKER_HELPER}"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/libexec" COMPONENT Runtime)
+install(PROGRAMS "${LINUX_DESKTOP_LAUNCHER}"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}" COMPONENT Runtime)
 
 install(FILES "${FLUTTER_ICU_DATA_FILE}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
   COMPONENT Runtime)
