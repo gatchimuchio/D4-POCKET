@@ -435,6 +435,14 @@
       "sha256": "e883b7f5e8fe0a0561204edbf429623e7288e706911548f83c0727139d856fce"
     },
     {
+      "path": "apps/desktop_flutter/linux/runner/broker_process_channel.cc",
+      "sha256": "a6f8eed79d91e47ee2c8f3230f3e8e1f14d66f5cdb7413cb09539cffaadb61aa"
+    },
+    {
+      "path": "apps/desktop_flutter/linux/runner/broker_process_channel.h",
+      "sha256": "e4bc6c8c5ddd5cb9b182902506d1cfd2df67809f0dadbca2a141b70eee056e62"
+    },
+    {
       "path": "apps/desktop_flutter/linux/runner/main.cc",
       "sha256": "ea23f7cdf74091d63bba29ef60486370b766157b848f0cfe62bd8b1c1695a0c1"
     },
@@ -1493,6 +1501,10 @@
     {
       "path": "docs/specs/host-registry.md",
       "sha256": "79415b64217ef82d50ac61700cdbe93703349acf3aeb57d42263039305a38d99"
+    },
+    {
+      "path": "docs/specs/linux-desktop-channel.md",
+      "sha256": "218a4bab4d72263f1d483cf5078c9e5343a47db18db39a6587cc22d350f5cfa4"
     },
     {
       "path": "docs/specs/long-run-validation.md",
@@ -3415,6 +3427,10 @@
       "sha256": "b3a0f13960ee323a46fd9bbd00a3c3d751ce26525a602b15c7b9d7db8060e7a6"
     },
     {
+      "path": "native/rust_helper/src/bin/gui_shell_linux_broker.rs",
+      "sha256": "301156b6eeb920c7e231bfc4ebb1e9d849a05c132d5a22202c1fc4638e8d945c"
+    },
+    {
       "path": "native/rust_helper/src/bin/gui_shell_macos_broker.rs",
       "sha256": "d46e95b3f96c36f89b9a6c1f235ef85d0ab007cea8699abaef574331b1a61537"
     },
@@ -3637,6 +3653,10 @@
     {
       "path": "native/rust_helper/src/lib.rs",
       "sha256": "4786bcf1d6a977e422859dc1371bd5d24ecd9e1b89a175d76fe9649ba76c4f56"
+    },
+    {
+      "path": "native/rust_helper/src/linux_desktop_worker.rs",
+      "sha256": "f94f59eae12af6e95af6de1047e21dab2f584f5189f95dea05ae35a9e380ecb1"
     },
     {
       "path": "native/rust_helper/src/macos_credential_input.rs",
