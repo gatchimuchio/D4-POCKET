@@ -758,7 +758,7 @@ QEは要求・設計・実装・観測・是正を通じた上位思想である
 
 履歴snapshot（2026-10-12）: P2 Compare／P3 Handoff／P12 Windows／P13 Mobile・Non-Windowsは局所CLOSED、B0〜B3はCLOSED、B4-L1／B4-L2は局所CLOSED、当時のB4全体はOPEN。B4統合製品経路は2026-10-17に限定Acceptanceを満たしてCLOSEDとなった。詳細は現行進捗とB4記録を参照する。
 
-現行の施工境界（2026-10-19）: B4はCLOSED、B5はOPEN。B5ではWindows Flutter検証snapshot隔離とAndroid debug buildが記録済みで、`BUF-T04`は部分観測、`BUF-T05`はOPEN、`BUF-T06`は全体OPEN（Windows非管理者Cargo checkの通常経路を局所確認、Apple signing／sandboxは未確認）、`BUF-T23`のB5局所AcceptanceはPASS（Q4の長期／反復／資源検査は未実施）である。検査対象source commit `7ef761b`の全target Cargo checkはOS保護変更なしでPASSし、詳細はB5自己適用記録にある。Windows hosted run #54は固定source commit `5f4e810ac358008d64c6981c6ce1e0a895c8e6b4`でRust全targetを3回実行し、各回569 passed／0 failed／13 ignored、Release Broker build／通常IPC smoke／capture cleanup／runner clean-treeまでPASSした。これは診断workflowの反復実行確認であり、Pktmon formatted event数はpacket数ではなく、loopback RSTの実packet・方向・発生主体・根因は未確定。B5完了の証拠ではない。次作業は現行B5記録の未成立条件から選び、OneDrive同期復旧や製品全体完成へ証拠を拡大しない。B4を再施工するのは再現可能なregressionが確認された場合に限る。Linux v1.1追加文書は未採用の正本候補として扱い、別途採用されるまでは工程開始根拠にしない。正式Q0〜Q7は`DEFERRED`を維持し、新候補の開始条件はその現行責任正本に従う。
+現行の施工境界（2026-10-19）: B4はCLOSED、B5はOPEN。B5ではWindows Flutter検証snapshot隔離とAndroid debug buildが記録済みで、`BUF-T04`は部分観測、`BUF-T05`はOPEN、`BUF-T06`は全体OPEN（Windows非管理者Cargo checkの通常経路を局所確認、Apple signing／sandboxは未確認）、`BUF-T23`のB5局所AcceptanceはPASS（Q4の長期／反復／資源検査は未実施）である。検査対象source commit `7ef761b`の全target Cargo checkはOS保護変更なしでPASSし、詳細はB5自己適用記録にある。Windows hosted run #54は固定source commit `5f4e810ac358008d64c6981c6ce1e0a895c8e6b4`でRust全targetを3回実行し、各回569 passed／0 failed／13 ignored、Release Broker build／通常IPC smoke／capture cleanup／runner clean-treeまでPASSした。これは診断workflowの反復実行確認であり、Pktmon formatted event数はpacket数ではなく、loopback RSTの実packet・方向・発生主体・根因は未確定。B5完了の証拠ではない。次作業は現行B5記録の未成立条件から選び、OneDrive同期復旧や製品全体完成へ証拠を拡大しない。B4を再施工するのは再現可能なregressionが確認された場合に限る。Linux native完全対応は必須製品要求であり、現行工程・実装はその要求に基づき進める。Linux v1.1追加文書の未採用状態は同文書の要求ID・詳細試験・QE作業分割を自動的に現行正本へしないという意味に限られ、Linux作業の開始や継続を止めない。正式Q0〜Q7は`DEFERRED`を維持し、新候補の開始条件はその現行責任正本に従う。
 
 CLOSEDを理由なく再施工しない。Linux未実装をP13やWindows B4の局所完了記録へ遡及させない。B3の153原因対応行の分類を全原因の解消や全緩衝作用の実証と呼ばない。既存R2-A〜H、`FQ-TEST-LOOPBACK`、取得不能証拠の残余を維持する。
 
@@ -772,6 +772,6 @@ CLOSEDを理由なく再施工しない。Linux未実装をP13やWindows B4の�
 
 ### 31. D4Pocket QEとLinux追加設計の採用境界
 
-2026-10-12作成のLinux明示改訂3点（D4Pocket QE統合実装仕様書／統合工程表／Codex QE施工指示書 v1.1）は、現時点では**未採用の詳細正本候補**である。本AGENTS.mdの更新はOwnerが許可した**本ファイルのQE方法論同期**のみであり、それだけで候補全文・新Linux工程・B4以降のコード変更・Actions実行・他リポジトリ変更・releaseを承認しない。次の委任があれば、rev5原本・採用済み補遺・現行進捗と逐条照合し、差分を安全に同期する。
+Linux nativeは完全対応が必須の独立Desktop製品対象であり、その実装・工程開始にLinux v1.1追加文書の採用を前提としない。2026-10-12作成のLinux明示改訂3点（D4Pocket QE統合実装仕様書／統合工程表／Codex QE施工指示書 v1.1）は、現時点では**要求ID・詳細試験・QE作業分割に関する未採用の詳細正本候補**であり、Linux対応自体の採否候補ではない。候補文書の具体的要求を拘束的なAcceptanceとして適用するかは別途管理し、採用済み正本・現行工程・Owner指示に基づくLinux製品作業は継続する。本AGENTS.mdの更新はOwnerが許可した**本ファイルのQE方法論同期**のみであり、それだけで候補全文・追加の詳細工程・他リポジトリ変更・releaseを承認しない。既存工程と現行進捗を照合し、Linux製品の必須要求を実装・受入れへ反映する。
 
 D4Pocket固有のremoteバックアップ正本は`refs/tags/codex/backup-main`と`refs/tags/codex/backup-main-prev`。BLUE側の`refs/heads`へ自動変更しない。D4の手動`workflow_dispatch`限定Actions運用、direct-main、単一writer、Shell Core／Broker authority、各OSの証拠区分を保持する。LinuxはWindows・macOSと並ぶ独立Desktop対象だが、native製品の実接続・導入・Release・保証が実証済みとは主張しない。既存試験・Release Gateを省略せず、作業開始時に現物と正本を再読する。

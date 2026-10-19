@@ -92,7 +92,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "0eb25df5c00b9b5297443a7cbdf532f29a9955ee0a356301f09f8f57560db6a1"
+      "sha256": "9d3d0831ad2c8ea1aa2408d8ae219fd6dbd27aa2eb5f623fa4d03b08ae733c36"
     },
     {
       "path": "AUDIT.md",
@@ -1296,7 +1296,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "298edb1f2092f912501870bcce6b9de3cfc85e251f642236f8f68d5bcc5a4615"
+      "sha256": "0575d9a418b3d4e7928ba541ce21015d1a2a8446e73c657f098a31460a55f5e0"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
