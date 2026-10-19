@@ -2,6 +2,8 @@
 
 状態基準日: 2026-05-26
 
+> **履歴資料:** この表は2026-05-26時点のGUI-Shell v1.0計画を記録するもので、現行の製品対象・Release Gateの正本ではない。現行ではLinux native Desktopの完全対応が必須であり、この表の「開発・検証区分」「blocks_release: no」は現行のLinux対応要求を示さない。最新の対象範囲と受入状態は`AGENTS.md`、`README.md`、`docs/REV5_PRODUCT_PROGRESS.md`を参照する。WSLgの起動証拠はLinux native製品受入れの代わりにならない。
+
 GUI-Shell v1.0はWindows優先である。Windowsを主要製品対象、Linuxを検証済みの開発・検証区分、macOSを未検証の移植予定対象とする。現在のLinuxホストでの検証はLinux上で合格できるが、それだけでは最終製品の証明にならない。
 
 GUI-Shell v1.0は検証済みのmacOS対応を主張しない。macOSホストで検証するまで、macOS対応をsupported、ready、completeとして広告してはならない。

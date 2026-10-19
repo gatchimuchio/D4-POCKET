@@ -20,7 +20,7 @@
 
 **安全第一・堅牢性第二。** Authority、Permission、Approval、Credential、秘密、Audit、Recovery、Content Exposure、Workspace／Host、process監督、OS保護、非冪等外部作用の境界はBUILD中も常時維持し、当該変更の必要な否定試験・安全停止をその場で実施する。不成立なら危険な経路を無効化・隔離する。既存試験・リリースゲートの削除や恒久skipは許可しない。
 
-対象OSはWindows-firstの優先順位を維持した上で**Windows／macOS／Linux（Desktop）、Android／iOS（Mobile）**。Linux nativeは独立した製品対象であり、WSL Ubuntu、WSLg X11、headlessの開発用証拠をLinux nativeの導入・GUI・権限・配布・Waylandの完成へ転用しない。Linuxの追加要求`D4-QE-R13`と試験`D4-LNX-T01〜T08`、Linux専用`QEB-D4-LNX-01〜03`は2026-10-12再構成3文書v1.1の**正本候補**。対象範囲・施工着手・正式サポートは別途採否する。
+対象OSはWindows-firstの優先順位を維持した上で**Windows／macOS／Linux（Desktop）、Android／iOS（Mobile）**。Linux nativeは独立した**必須の製品対象**であり、製品機能・導入・GUI・権限境界・配布まで完全対応する。Linux対応の対象可否や施工開始を、2026-10-12再構成3文書v1.1の採否待ちにしてはならない。Linuxの追加要求`D4-QE-R13`と試験`D4-LNX-T01〜T08`、Linux専用`QEB-D4-LNX-01〜03`は、要求ID・詳細試験・QE作業分割の**正本候補**にすぎず、その候補扱いはLinux製品対応の必須性を弱めない。WSL Ubuntu、WSLg X11、headlessの開発用証拠をLinux nativeの導入・GUI・権限・配布・Waylandの完成へ転用しない。現在のLinux製品受入状態は`docs/REV5_PRODUCT_PROGRESS.md`を参照する。
 
 本§0、§19、§20、§25、§28〜31は採用済みの**QE施工方法**を優先して示す。既存のrev5原本、採用済み緩衝補遺（`BUF-R01〜R09`、`BUF-T01〜T24`）、製品契約、安全・release gate、過去のCLOSED／FAILは削除しない。従来文書に小単位ごとの全suite／個別QA／毎回Git閉包が残れば、その部分は旧施工方式の残差として別途文書同期し、今回の`AGENTS.md`だけの更新で他文書を改竄しない。安全上の強い条件は常に保持する。
 

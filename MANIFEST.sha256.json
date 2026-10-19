@@ -92,7 +92,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "31a77311a1823402b38d31f7dd56cd4ca14b010aeef2a12454d73205cfafeed4"
+      "sha256": "0eb25df5c00b9b5297443a7cbdf532f29a9955ee0a356301f09f8f57560db6a1"
     },
     {
       "path": "AUDIT.md",
@@ -156,7 +156,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "b302730b2588a43770587d3645f769bce7168de90db9f03683190d28f177f637"
+      "sha256": "1ff84ff859d1c23a77a35b8b19fc1d50ac0591324aa999707bd9f78dd19bbdce"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -1228,7 +1228,7 @@
     },
     {
       "path": "docs/DESKTOP_PLATFORM_MATRIX.md",
-      "sha256": "215f748de603cf16f85706d54e69f5ccf677b152dde01630d6a9828814afd20d"
+      "sha256": "fa27d7b8279e8ccc231ad33ff265a9f26c7e0449a2dbd95331c76f73d6f84651"
     },
     {
       "path": "docs/FINAL_QA_QUEUE.md",
@@ -1288,7 +1288,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "e5842901b2ac4a177bbe39c82f2c4b914e71ccb0bb24d8f15770a83ed15b1e44"
+      "sha256": "5a06897896a877e9a087db3c00423b68a3ff15c6c628cfd50dc1b75702449b1e"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",

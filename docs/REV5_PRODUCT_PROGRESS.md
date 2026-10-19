@@ -1,5 +1,7 @@
 # D4 Pocket / GUI-Shell rev5 Product-First 進捗
 
+製品対象の確認（2026-10-19）: Linux native Desktopは完全対応が必須の独立製品対象である。2026-10-12再構成3文書v1.1が採否前候補であることは、Linux対応を任意・延期対象にする意味ではなく、要求ID・詳細試験・QE作業分割の採否だけを保留している。現状のLinux native製品経路・導入・配布は未受入れであり、WSL／WSLg／headless証拠を代用しない。B5および通常Releaseの状態は変更しない。
+
 作業追補（2026-10-19、旧運用文書の検査入口を現行化）: 非正本の`docs/OPERATING_MODEL.md`に残ったOneDrive上で直接Cargo／Flutterを実行する例を隔離runnerへ置き換えた。`docs/COMPLETION_STRATEGY_INSTRUCTION.md`は旧Phase Bの履歴資料と明示した。Conformanceへ再発検査を追加。現行B5／`task_execution=unsupported`／`release_ready=false`は不変。詳細は[ロードマップ](../ROADMAP.md)。
 
 作業追補（2026-10-19、BUF-T05のPktmon失敗診断保持）: `tooling/pktmon_packet_summary.ps1`が期待するRST header不在時にsummaryを書き込む前にthrowし、packet record／decoded tupleの区別と未解釈header形状が残らない欠陥を修正。失敗時も、方向・IPv4表記数・TCP/RST有無・区切り種別・行長だけを最大20件記録し、生packet行、packet内IP／port、payloadは出力しない。照合用の期待probe port（番号）は不在判定に表示する。別形式header fixtureのcanary非露出、fail-closed、PowerShell fixture、manual workflow check、Conformance 259 checks、manifest check、release gate checkはPASS。厳格日本語監査は12 files／51 findingsでFAIL。更新sourceのhosted captureは未実施のため、`BUF-T05`／B5／`FQ-TEST-LOOPBACK`はOPEN、reset根因と発生主体は未確定のまま。詳細は[B5自己適用記録](緩衝基盤_rev5補遺_QC/B5_自己適用.md)。
