@@ -24,7 +24,7 @@ stage後の有効化は別の`更新有効版切替要求`で行う。Linux nati
 
 Rollbackは別の`更新rollback要求`で行う。Linux native Owner確認はBrokerの現在一覧から得た現行版と直前版の双方について、署名candidate ID／hash、package digest、fixed version directory、および現在導出したXDG desktop entry pathを束縛する。Brokerは実行直前にtrust・active record・stage contents・固定pathを再検証し、active-version recordだけを直前の署名済み版へatomic切替する。通常IPC、Owner確認欠落、stale entry path、rollback対象の不一致を拒否し、開始／完了Auditを記録する。Rollback自体はprocessを起動せず、desktop entry、Workspace、設定、Credentialを変更・削除しない。このBroker／native Owner経路とLinux target fixture試験が接続済みであることは、Linux native installed lifecycle全体の受入れを意味しない。
 
-これらはLinux targetのBroker／filesystem試験とWSL上の実装経路証拠であり、native desktop session上のinstalled GUI／desktop entry選択／実launcher起動、Update／Rollback／Uninstaller lifecycleの全体受入れを意味しない。Export builderのsource／toolchain／artifact provenanceは別節で定義する。Linux完全対応と`task_execution=supported`の判定にはinstaller lifecycleとnative acceptanceを含む現行Release blockerの全残件を閉じる必要がある。WSL証拠をnative Linux acceptanceへ転用しない。
+これらはWSL上のLinux target Broker／filesystem fixture試験と、Ubuntu 24.04.5 `workflow_dispatch`上のRust compile／test証拠であり、native desktop session上のinstalled GUI／desktop entry選択／実launcher起動、Update／Rollback／Uninstaller lifecycle全体の受入れを意味しない。Export builderのsource／toolchain／artifact provenanceは別節で定義する。Linux完全対応と`task_execution=supported`の判定にはinstaller lifecycleとnative acceptanceを含む現行Release blockerの全残件を閉じる必要がある。WSL／Actions証拠をnative Linux acceptanceへ転用しない。
 
 ## 4. Linux製品package作成tool
 

@@ -172,7 +172,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "78928f83f7ddf5ffca8d4640085097969e477e722e9f6f57cad353ed998e8769"
+      "sha256": "11490e14244bc87d520731244927b5bbeda8c7afa89f21237ee0197b02d9fb97"
     },
     {
       "path": "SECURITY.md",
@@ -1308,7 +1308,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "b5b38241377178fd25e76101e2f69e650604549887cb697c1abd991c0d3509c6"
+      "sha256": "4df0b0ac5142f4d3930bdb36748c94bf9a7895500f3c2934f518e1ddfcd644d3"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1520,7 +1520,7 @@
     },
     {
       "path": "docs/specs/linux-product-package.md",
-      "sha256": "01cab98286ffc7e2cc8db20cca5771ee280f36ef916ccaa08a4636970c0656a4"
+      "sha256": "56a604ab558defa0e8ae577afe97013fa87f71ca95d26bd9dc0c79b93d6e183a"
     },
     {
       "path": "docs/specs/linux-workspace-selection.md",
@@ -3328,7 +3328,7 @@
     },
     {
       "path": "installer/linux/README.md",
-      "sha256": "0dfa677a756f2ff8fa09ffe7e7b8207917bda6b1cd2709715f36d09adfa2f72c"
+      "sha256": "b3884821b00bd0ca65107f3c4dba0918136354b7d65173129fc814f7dd35b07a"
     },
     {
       "path": "installer/macos/README.md",
@@ -4304,7 +4304,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "c87761fc888b2d153aacaeef2d89343477e81319ab9ae54c7ebfc41fd3f7faaf"
+      "sha256": "90f2cd244927f79c485984c46cbbc0742d87131a440c21b8c5ac70fac9b12b5e"
     },
     {
       "path": "requirements-dev.txt",
