@@ -3296,7 +3296,7 @@
     },
     {
       "path": "installer/linux/README.md",
-      "sha256": "3a1cf8ee23cb49f8a11648286e6e44faa8378afa3de30da866705a62a889a437"
+      "sha256": "a2f61b4c9461b65e32ced16188bf0c00f78d5f1056e2f072ea597b2d1713766a"
     },
     {
       "path": "installer/macos/README.md",
