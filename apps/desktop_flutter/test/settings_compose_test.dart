@@ -178,8 +178,10 @@ void main() {
         'export-update-source',
         'https://updates.example.com/d4-pocket/stable',
       );
+      await _select(tester, 'export-target-platform', 'Linux');
       await _tap(tester, 'compose-export-button');
       final export = transport.lastPayload('GUI Shell書出し');
+      expect(export['target_platform'], 'linux');
       final moduleSelection = export['module_selection'] as Map;
       final selectedModules =
           moduleSelection['optional_module_ids'] as List<dynamic>;

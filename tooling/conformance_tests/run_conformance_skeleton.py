@@ -10033,8 +10033,8 @@ def test_gui_shell_export_is_new_identity_and_non_inheriting() -> list[str]:
     errors.extend(validate_instance(request, request_schema))
     errors.extend(validate_instance(receipt, receipt_schema))
     errors.extend(validate_instance(manifest_file, manifest_file_schema))
-    if request.get("target_platform") != "windows" or request.get("export_mode") != "manifest_file":
-        errors.append("GUI Shell書出しがWindows Manifest file生成契約でない")
+    if request.get("target_platform") not in {"windows", "linux", "macos"} or request.get("export_mode") != "manifest_file":
+        errors.append("GUI Shell書出しの対象platformまたはManifest file契約が不正")
     if (
         receipt.get("build_status") != "not_started"
         or receipt.get("artifact_status") != "not_built"
@@ -10083,10 +10083,43 @@ def test_gui_shell_export_is_new_identity_and_non_inheriting() -> list[str]:
     ):
         errors.append("GUI Shell書出しが資格・権限・承認・監査chainを継承した")
     export_manifest = receipt.get("export_manifest", {})
+    if (
+        export_manifest.get("app_identity", {}).get("target_platform")
+        != request.get("target_platform")
+        or export_manifest.get("distribution_metadata", {}).get("target_platform")
+        != request.get("target_platform")
+    ):
+        errors.append("GUI Shell書出しのApp identityと配布対象が要求platformに一致しない")
     if export_manifest.get("audit_store", {}).get("inherited") is not False:
         errors.append("GUI Shell書出しの監査storeが新規化されていない")
     if not export_manifest.get("app_identity", {}).get("app_id"):
         errors.append("GUI Shell書出しの新規App identityが空である")
+    for platform in ("windows", "linux", "macos"):
+        platform_request = copy.deepcopy(request)
+        platform_receipt = copy.deepcopy(receipt)
+        platform_manifest_file = copy.deepcopy(manifest_file)
+        platform_request["target_platform"] = platform
+        platform_receipt["export_manifest"]["app_identity"]["target_platform"] = platform
+        platform_receipt["export_manifest"]["distribution_metadata"]["target_platform"] = platform
+        platform_manifest_file["manifest"]["app_identity"]["target_platform"] = platform
+        platform_manifest_file["manifest"]["distribution_metadata"]["target_platform"] = platform
+        if (
+            validate_instance(platform_request, request_schema)
+            or validate_instance(platform_receipt, receipt_schema)
+            or validate_instance(platform_manifest_file, manifest_file_schema)
+        ):
+            errors.append(f"GUI Shell書出しSchemaが対象platform {platform} を受理しない")
+        if (
+            platform_receipt["export_manifest"]["app_identity"]["target_platform"] != platform
+            or platform_receipt["export_manifest"]["distribution_metadata"]["target_platform"] != platform
+            or platform_manifest_file["manifest"]["app_identity"]["target_platform"] != platform
+            or platform_manifest_file["manifest"]["distribution_metadata"]["target_platform"] != platform
+        ):
+            errors.append(f"GUI Shell書出しReceiptとManifestが対象platform {platform} を保持しない")
+    unsupported_platform = copy.deepcopy(request)
+    unsupported_platform["target_platform"] = "android"
+    if not validate_instance(unsupported_platform, request_schema):
+        errors.append("GUI Shell書出しSchemaが未対応platformを拒否しない")
     for target_name, target, schema in (
         ("Receipt", receipt, receipt_schema),
         ("Manifest file", manifest_file, manifest_file_schema),

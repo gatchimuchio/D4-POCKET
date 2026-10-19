@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gui_shell_ui/runtime_dialogue_client.dart'
@@ -52,6 +54,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final GlobalKey _exportCenterKey = GlobalKey();
   final Set<String> _selectedExportModules =
       Set<String>.of(guiShellOptionalExportModules.keys);
+  String _exportTargetPlatform = defaultTargetPlatform == TargetPlatform.linux
+      ? 'linux'
+      : defaultTargetPlatform == TargetPlatform.macOS
+          ? 'macos'
+          : 'windows';
   final Set<String> _stagedUpdateCandidates = <String>{};
   final TextEditingController _searchController = TextEditingController();
   bool _modifiedOnly = false;
@@ -556,7 +563,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('GUI Shell Windows書出し',
+            Text('GUI Shell独立App書出し',
                 key: _exportCenterKey,
                 style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 4),
@@ -569,12 +576,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('GUI Shell Windows書出し',
+          Text('GUI Shell独立App書出し',
               key: _exportCenterKey,
               style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
           const Text(
-              '切出し対象の任意画面をManifest計画へ記録できます。権限・承認・監査・復旧などの必須境界は常に保持します。Owner確認後、独立Manifest fileを固定保存先へ作成します。画面選択は計画だけで、実binaryからの除去や実行可能App、build、Installer、署名は行いません。Credential・Permission・Approval・Audit chainは継承しません。キャンセルはBrokerに拒否として監査記録されます。'),
+              '切出し対象の任意画面をManifest計画へ記録できます。権限・承認・監査・復旧などの必須境界は常に保持します。対象platformを選び、Owner確認後に独立Manifest fileを固定保存先へ作成します。画面選択は計画だけで、実binaryからの除去や実行可能App、build、Installer、署名は行いません。Credential・Permission・Approval・Audit chainは継承しません。キャンセルはBrokerに拒否として監査記録されます。'),
+          DropdownButtonFormField<String>(
+            key: const ValueKey('export-target-platform'),
+            initialValue: _exportTargetPlatform,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              labelText: '切り出し先platform',
+            ),
+            items: const [
+              DropdownMenuItem(value: 'windows', child: Text('Windows')),
+              DropdownMenuItem(value: 'linux', child: Text('Linux')),
+              DropdownMenuItem(value: 'macos', child: Text('macOS')),
+            ],
+            onChanged: (value) {
+              if (value != null) {
+                setState(() => _exportTargetPlatform = value);
+              }
+            },
+          ),
+          const SizedBox(height: 8),
           const SizedBox(height: 8),
           ExpansionTile(
             key: const ValueKey('export-update-trust-advanced'),
@@ -663,7 +689,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   )
                 : const Icon(Icons.file_download_outlined),
             label: Text(_exportInProgress
-                ? 'Windows Owner確認を待っています'
+                ? 'native Owner確認を待っています'
                 : 'Owner確認してManifest fileを生成'),
           ),
           if (_exportMessage != null) ...[
@@ -692,8 +718,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
     try {
       final receipt = await client.export(
-        exportId: 'settings-windows-export',
+        exportId: 'settings-$_exportTargetPlatform-export',
         composeManifest: _composeManifest(),
+        targetPlatform: _exportTargetPlatform,
         optionalModuleIds: _selectedExportModules.toList()..sort(),
         updatePublicKeyDerHex: updatePublicKeyDerHex,
         updatePackageSourceUrl: updatePackageSourceUrl,
@@ -708,7 +735,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ? 'Manifest fileは保存されました: ${manifestPath ?? 'Receiptを確認してください'}。一時fileが残る可能性があります。配布せず、ReceiptのRecoveryActionに従ってください。実行可能App生成、binary除去、build、Installer、署名は未実行です。'
           : '独立Manifest fileを保存しました: ${manifestPath ?? '保存先はReceiptを確認してください'}。実行可能App生成、binary除去、build、Installer、署名は未実行です。');
     } catch (error) {
-      _setExportMessage('GUI Shell Windows書出しは受理されませんでした: $error');
+      _setExportMessage('GUI Shell独立App書出しは受理されませんでした: $error');
     } finally {
       if (mounted) setState(() => _exportInProgress = false);
     }

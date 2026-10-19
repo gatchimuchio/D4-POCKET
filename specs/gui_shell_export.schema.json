@@ -9,7 +9,7 @@
     "version": { "const": 1 },
     "export_id": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9._-]+$" },
     "compose_manifest": { "$ref": "gui_shell_compose.schema.json" },
-    "target_platform": { "const": "windows" },
+    "target_platform": { "enum": ["windows", "linux", "macos"] },
     "export_mode": { "const": "manifest_file" },
     "distribution_channel": { "enum": ["local", "installer_candidate"] },
     "module_selection": {

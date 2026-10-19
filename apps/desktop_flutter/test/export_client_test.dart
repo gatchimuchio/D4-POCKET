@@ -4,7 +4,7 @@ import 'package:gui_shell_ui/runtime_dialogue_client.dart'
     show BrokerClientException, BrokerTransport;
 
 void main() {
-  test('GUI Shell Windows書出しは新規identityと非継承Receiptを返す', () async {
+  test('GUI Shell書出しは新規identityと非継承Receiptを返す', () async {
     final transport = _FakeExportTransport({
       'status': 'accepted',
       'body': {
@@ -38,6 +38,20 @@ void main() {
     expect(receipt['permission_inherited'], isFalse);
   });
 
+  test('Linux向けExport targetをBroker要求へ保持する', () async {
+    final transport = _FakeExportTransport({
+      'status': 'accepted',
+      'body': {'authority_strip': true},
+    });
+    await ExportClient(transport).export(
+      exportId: 'export-linux',
+      composeManifest: const {'version': 1, 'output_mode': 'manifest_only'},
+      targetPlatform: 'linux',
+    );
+
+    expect(transport.payload?['target_platform'], 'linux');
+  });
+
   test('Exportは公開更新trustだけをBrokerへ送り秘密鍵欄を作らない', () async {
     final transport = _FakeExportTransport({
       'status': 'accepted',
@@ -63,7 +77,7 @@ void main() {
     expect(trust.containsKey('private_key'), isFalse);
   });
 
-  test('GUI Shell Windows書出しの拒否を成功へ昇格しない', () async {
+  test('GUI Shell書出しの拒否を成功へ昇格しない', () async {
     final transport = _FakeExportTransport({
       'status': 'rejected',
       'error': {'message': 'owner_required'},

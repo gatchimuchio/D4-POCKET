@@ -193,8 +193,8 @@
       "release_tracks": ["non_windows"],
       "blocks_release": true,
       "blocks_windows_technical_complete": false,
-      "reason": "Linux native Desktopは完全対応が必須の独立製品対象。現行開発sourceにはGTK Owner確認、Secret Service資格情報store、MCP接続・切断・Tool実行の限定経路とLinux Release bundle buildがあるが、WSL unit/build証拠だけではLinux native installed UIのOwner判断、通常機能・権限境界・導入・更新・復旧・配布の製品経路を受入れていない。",
-      "required_action": "Linux native installed productでOwner確認の肯定・拒否・閉じる・期限切れを既存Broker再評価／Auditまで検証し、Credential native input／Secret Service／MCP injection・revokeをinstalled経路で確認する。Workspace OS選択、Agent process監督・scratch／descendant cleanup・cancel／deadline／crash Recovery、X11／Wayland、Installer／Update／Rollback／Uninstallerも実装・検証する。対象Linux製品のinstalled pathとartifact provenanceを結合して受入れ、Linux Taskの停止・Recovery・Audit条件が成立するまでtask_execution=supportedへ昇格しない。"
+      "reason": "Linux native Desktopは完全対応が必須の独立製品対象。現行開発sourceにはGTK Owner確認、Secret Service資格情報store、MCP接続・切断・Tool実行、target選択付きManifest Exportと固定Broker保存先、およびLinux Release bundle buildがある。しかしManifest Exportは実行可能product/packageのproducerではなく、WSL unit/build evidenceだけではLinux native installed UIのOwner判断、通常機能・権限境界・導入・更新・復旧・配布の製品経路を受入れていない。",
+      "required_action": "Linux bundle/package producerと既存Broker install consumerを接続する。Linux native installed productでOwner確認の肯定・拒否・閉じる・期限切れを既存Broker再評価／Auditまで検証し、Credential native input／Secret Service／MCP injection・revokeをinstalled経路で確認する。Workspace OS選択、Agent process監督・scratch／descendant cleanup・cancel／deadline／crash Recovery、X11／Wayland、Installer／Update／Rollback／Uninstallerも実装・検証する。対象Linux製品のinstalled pathとartifact provenanceを結合して受入れ、Linux Taskの停止・Recovery・Audit条件が成立するまでtask_execution=supportedへ昇格しない。"
     },
     {
       "name": "rev2_mobile_device_evidence",

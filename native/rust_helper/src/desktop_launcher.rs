@@ -2272,6 +2272,8 @@ fn owner_confirmation_text_for_identity(
 ) -> String {
     match summary {
         DesktopOwnerOperationSummary::GuiShellExport(summary) => {
+            let target_platform = export_center::target_platform_label(&summary.target_platform)
+                .unwrap_or("不明");
             let export_path = match product_identity {
                 Some(identity) => format!(
                     r"%LOCALAPPDATA%\D4Pocket\apps\{}\stores\{}\exports\<新規App ID>.json",
@@ -2283,8 +2285,9 @@ fn owner_confirmation_text_for_identity(
                 ),
             };
             format!(
-                "このGUI Shell構成のWindows向け独立Manifest file作成を許可しますか？\n\nアプリ名: {}\nExport ID: {}\n配布channel: {}\n選択任意Module数: {}\n更新trust: {}\n保存先: {}\n\nこの操作はBroker監査へ記録されます。実行可能App、Module除去、build、Installer、署名は作成しません。Credential、Permission、Approval、Audit chainは継承しません。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
+                "このGUI Shell構成の独立Manifest file作成を許可しますか？\n\nアプリ名: {}\n対象platform: {}\nExport ID: {}\n配布channel: {}\n選択任意Module数: {}\n更新trust: {}\n保存先: {}\n\nこの操作はBroker監査へ記録されます。実行可能App、Module除去、build、Installer、署名は作成しません。Credential、Permission、Approval、Audit chainは継承しません。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
                 summary.display_name,
+                target_platform,
                 summary.export_id,
                 summary.distribution_channel,
                 summary.optional_module_count,
@@ -3800,6 +3803,7 @@ mod tests {
                     "kind": "gui_shell_export",
                     "display_name": summary.display_name,
                     "export_id": summary.export_id,
+                    "target_platform": summary.target_platform,
                     "distribution_channel": summary.distribution_channel,
                     "optional_module_count": summary.optional_module_count,
                     "update_trust_fingerprint": summary.update_trust.as_ref().map(|trust| trust.public_key_fingerprint.clone()),
@@ -4656,6 +4660,7 @@ mod tests {
             GuiShellExport {
                 display_name: String,
                 export_id: String,
+                target_platform: String,
                 distribution_channel: String,
                 optional_module_count: usize,
                 update_trust_fingerprint: Option<String>,
@@ -4769,6 +4774,7 @@ mod tests {
             TestSummary::GuiShellExport {
                 display_name,
                 export_id,
+                target_platform,
                 distribution_channel,
                 optional_module_count,
                 update_trust_fingerprint,
@@ -4777,6 +4783,7 @@ mod tests {
             } => DesktopOwnerOperationSummary::GuiShellExport(ExportConfirmationSummary {
                 display_name,
                 export_id,
+                target_platform,
                 distribution_channel,
                 optional_module_count,
                 update_trust: update_trust_fingerprint.map(|public_key_fingerprint| {
@@ -6739,6 +6746,7 @@ mod tests {
         let summary = DesktopOwnerOperationSummary::GuiShellExport(ExportConfirmationSummary {
             display_name: "独立構成".into(),
             export_id: "export-test".into(),
+            target_platform: "windows".into(),
             distribution_channel: "local".into(),
             optional_module_count: 1,
             update_trust: Some(
@@ -6764,6 +6772,7 @@ mod tests {
         assert!(text.contains("HTTPS配布元: stable: https://updates.example.com/d4-pocket/stable"));
         assert!(owner_confirmation_text(&summary)
             .contains(r"%LOCALAPPDATA%\GUI-Shell\broker\desktop\exports"));
+        assert!(owner_confirmation_text(&summary).contains("対象platform: Windows"));
     }
 
     #[test]

@@ -172,8 +172,8 @@ class GlobalSearchIndex {
       ('構成', 'GUI Shell構成', 'Manifest作成・Previewの設定面', 'compose-surface', 11),
       (
         '書出し',
-        'GUI Shell Windows書出し',
-        '独立Manifest file作成の設定面',
+        'GUI Shell独立App書出し',
+        'Windows／Linux／macOS向けManifest file作成の設定面',
         'export-surface',
         11
       ),

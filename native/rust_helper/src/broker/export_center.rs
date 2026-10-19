@@ -100,6 +100,7 @@ const MODULE_CATALOG_JSON: &str = include_str!("../../../../specs/gui_shell_modu
 pub(crate) struct OwnerConfirmationSummary {
     pub display_name: String,
     pub export_id: String,
+    pub target_platform: String,
     pub distribution_channel: String,
     pub optional_module_count: usize,
     pub update_trust: Option<UpdateTrustConfirmationSummary>,
@@ -110,6 +111,15 @@ pub(crate) struct OwnerConfirmationSummary {
 pub(crate) struct UpdateTrustConfirmationSummary {
     pub public_key_fingerprint: String,
     pub package_source_details: Vec<String>,
+}
+
+pub(crate) fn target_platform_label(platform: &str) -> Option<&'static str> {
+    match platform {
+        "windows" => Some("Windows"),
+        "linux" => Some("Linux"),
+        "macos" => Some("macOS"),
+        _ => None,
+    }
 }
 
 /// Owner dialogへ渡す表示情報をBrokerと同じContract検査から作る。
@@ -147,6 +157,7 @@ pub(crate) fn owner_confirmation_summary(payload: &Value, payload_hash: &str) ->
     Ok(OwnerConfirmationSummary {
         display_name: safe_display_name,
         export_id: request.export_id,
+        target_platform: request.target_platform,
         distribution_channel: request.distribution_channel,
         optional_module_count,
         update_trust,
@@ -271,13 +282,13 @@ pub(super) fn export(
     let mcp_connection_ids = manifest_value["mcp_connection_ids"].clone();
     let capability_requirements = manifest_value["capability_requirements"].clone();
     let export_manifest = json!({
-        "app_identity": {"app_id": app_id, "display_name": display_name, "target_platform": "windows"},
+        "app_identity": {"app_id": app_id, "display_name": display_name, "target_platform": request.target_platform.clone()},
         "audit_store": {"store_id": audit_store_id, "chain_status": "new", "inherited": false},
         "settings": settings,
         "runtime_manifest": {"runtime_ids": runtime_ids},
         "adapter_configuration": {"agent_ids": agent_ids, "tool_ids": tool_ids, "mcp_connection_ids": mcp_connection_ids},
         "capability_requirements": capability_requirements,
-        "distribution_metadata": {"target_platform": "windows", "artifact_status": "not_built", "installer_status": "not_started", "signed": false, "channel": request.distribution_channel},
+        "distribution_metadata": {"target_platform": request.target_platform.clone(), "artifact_status": "not_built", "installer_status": "not_started", "signed": false, "channel": request.distribution_channel},
         "inheritance_policy": {"authority": "none", "permission": "none", "approval": "none", "credential": "none", "audit_chain": "none"},
         "module_plan": module_plan.receipt
     });
@@ -794,7 +805,7 @@ fn parse_request(value: &Value) -> Result<ExportRequest, String> {
         .map_err(|_| "GUI Shell書出しの構造が不正または禁止fieldがある".to_string())?;
     if request.version != VERSION
         || !valid_identifier(&request.export_id)
-        || request.target_platform != "windows"
+        || !["windows", "linux", "macos"].contains(&request.target_platform.as_str())
         || request.export_mode != "manifest_file"
         || !["local", "installer_candidate"].contains(&request.distribution_channel.as_str())
     {
@@ -954,6 +965,8 @@ mod tests {
                 .all(|byte| { byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte) }));
         }
         assert_eq!(body["export_manifest"]["audit_store"]["inherited"], false);
+        assert_eq!(body["export_manifest"]["app_identity"]["target_platform"], "windows");
+        assert_eq!(body["export_manifest"]["distribution_metadata"]["target_platform"], "windows");
         assert_eq!(body["build_status"], "not_started");
         assert_eq!(body["manifest_file_status"], "written");
         assert_eq!(body["manifest_file"]["temporary_file_status"], "removed");
@@ -999,6 +1012,51 @@ mod tests {
     }
 
     #[test]
+    fn linux_windows_macos_export_targets_are_preserved_in_identity_receipt_and_manifest_file() {
+        for (index, platform) in ["windows", "linux", "macos"].into_iter().enumerate() {
+            let mut broker = Broker::new("session-1");
+            let export_root = configure_export_root(&mut broker, &format!("target-{platform}"));
+            let mut request_payload = payload();
+            request_payload["target_platform"] = Value::from(platform);
+            let request_json = desktop_owner_request(&mut broker, request_payload);
+            let response = broker.desktop_owner_operation_json(&request_json);
+            assert_eq!(response.status, BrokerStatus::Accepted, "{platform}");
+            let body = response.body.unwrap();
+            assert_eq!(
+                body["export_manifest"]["app_identity"]["target_platform"],
+                platform
+            );
+            assert_eq!(
+                body["export_manifest"]["distribution_metadata"]["target_platform"],
+                platform
+            );
+            let manifest_path = body["manifest_file"]["path"].as_str().unwrap();
+            let manifest_bytes = fs::read(manifest_path).unwrap();
+            assert_eq!(
+                crate::audit_hash::sha256_tagged(&manifest_bytes),
+                body["manifest_file"]["sha256"]
+            );
+            let manifest_file: Value = serde_json::from_slice(&manifest_bytes).unwrap();
+            assert_eq!(
+                manifest_file["manifest"]["app_identity"]["target_platform"],
+                platform
+            );
+            assert_eq!(
+                manifest_file["manifest"]["distribution_metadata"]["target_platform"],
+                platform
+            );
+            drop(broker);
+            fs::remove_dir_all(export_root).unwrap_or_else(|error| {
+                panic!("platform target {index} export cleanup failed: {error}")
+            });
+        }
+
+        let mut unsupported = payload();
+        unsupported["target_platform"] = Value::from("android");
+        assert!(parse_request(&unsupported).is_err());
+    }
+
+    #[test]
     fn Owner確認summaryはManifest検証済みの表示値とhashだけを返す() {
         let mut request_payload = payload();
         request_payload["compose_manifest"]["display_name"] =
@@ -1010,6 +1068,7 @@ mod tests {
         ).unwrap();
         assert_eq!(summary.display_name, "D4 Pocket危険名");
         assert_eq!(summary.export_id, "export-test");
+        assert_eq!(summary.target_platform, "windows");
         assert_eq!(summary.optional_module_count, 0);
         assert!(!summary.display_name.contains('\n'));
         assert!(!summary.display_name.contains('\u{202e}'));
@@ -1017,6 +1076,14 @@ mod tests {
         assert_eq!(summary.payload_hash.len(), 71);
 
         request_payload["module_selection"] = json!({"optional_module_ids": ["shell.unknown"]});
+        assert!(owner_confirmation_summary(&request_payload, "sha256:invalid").is_err());
+
+        request_payload["module_selection"] = json!({"optional_module_ids": []});
+        request_payload["target_platform"] = Value::from("linux");
+        let linux_summary = owner_confirmation_summary(&request_payload, "sha256:linux").unwrap();
+        assert_eq!(linux_summary.target_platform, "linux");
+        assert_eq!(target_platform_label(&linux_summary.target_platform), Some("Linux"));
+        request_payload["target_platform"] = Value::from("android");
         assert!(owner_confirmation_summary(&request_payload, "sha256:invalid").is_err());
     }
 

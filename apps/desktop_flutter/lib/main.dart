@@ -1060,10 +1060,10 @@ class _ShellHomePageState extends State<ShellHomePage> {
       ),
       const _CommandEntry(
         title: '独立Appを書き出す',
-        subtitle: 'GUI Shell Windows書出し面を開く',
+        subtitle: 'GUI Shell独立App書出し面を開く',
         pageIndex: 11,
         icon: Icons.file_download_outlined,
-        keywords: 'GUI Shell Windows Export 独立 App 書出し',
+        keywords: 'GUI Shell Windows Linux macOS Export 独立 App 書出し',
         focusTarget: _SettingsFocusTarget.export,
       ),
       if (kGuiShellModuleNotifications)

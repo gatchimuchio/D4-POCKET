@@ -147,6 +147,29 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
     ) {
         let summary = crate::broker::workspace::owner_confirmation_summary(operation, payload)?;
         format!("{summary}\n要求hash: {hash}")
+    } else if operation == "GUI Shell書出し" {
+        let summary = crate::broker::export_center::owner_confirmation_summary(payload, &hash).ok()?;
+        let target = crate::broker::export_center::target_platform_label(&summary.target_platform)?;
+        let update_trust = summary.update_trust.as_ref().map_or_else(
+            || "未設定（製品Updateはfail-closed）".to_string(),
+            |trust| {
+                format!(
+                    "Ed25519公開鍵fingerprint: {} / HTTPS配布元: {}",
+                    trust.public_key_fingerprint,
+                    trust.package_source_details.join("; ")
+                )
+            },
+        );
+        format!(
+            "GUI Shell構成から独立Manifest fileを作成します。\n\nアプリ名: {}\n対象platform: {}\nExport ID: {}\n配布channel: {}\n選択任意Module数: {}\n更新trust: {}\n保存先: 実行中Brokerの固定Export directory（要求pathから変更不可）\n\n実行可能App、Module除去、build、Installer、署名は作成しません。Credential、Permission、Approval、Audit chainは継承しません。\n要求hash: {}",
+            summary.display_name,
+            target,
+            summary.export_id,
+            summary.distribution_channel,
+            summary.optional_module_count,
+            update_trust,
+            summary.payload_hash
+        )
     } else if operation == "Host登録" {
         let summary = crate::broker::host_center::owner_confirmation_summary(payload)?;
         format!("{summary}\n要求hash: {hash}")
@@ -272,6 +295,109 @@ mod workspace_inspector_tests {
     use serde_json::json;
 
     #[test]
+    fn linux_and_macos_export_owner_confirmation_binds_linux_target_and_payload() {
+        let endpoint = BrokerEndpoint {
+            host: "127.0.0.1".into(),
+            port: 1,
+            session_id: "fixture-session".into(),
+            session_secret: "synthetic-only".into(),
+            credential_role: BrokerCredentialRole::Normal,
+            transport: "tcp".into(),
+            max_request_bytes: 65536,
+        };
+        let payload = json!({
+            "version": 1,
+            "export_id": "linux-export-fixture",
+            "compose_manifest": {
+                "version": 1,
+                "compose_id": "linux-fixture",
+                "display_name": "Linux fixture",
+                "runtime_ids": ["gui_shell_rust_broker"],
+                "agent_ids": [],
+                "tool_ids": [],
+                "mcp_connection_ids": [],
+                "theme": {"theme_id": "d4-pocket", "mode": "system"},
+                "capability_requirements": ["runtime.read"],
+                "settings": {"locale": "ja-JP", "density": "comfortable", "content_visibility": "summary"},
+                "inheritance_policy": {"authority": "none", "permission": "none", "approval": "none", "credential": "none", "audit_chain": "none"},
+                "output_mode": "manifest_only"
+            },
+            "target_platform": "linux",
+            "export_mode": "manifest_file",
+            "distribution_channel": "local"
+        });
+        let request = json!({
+            "request_id": "linux-export-request",
+            "nonce": "linux-export-nonce",
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "operation": "GUI Shell書出し",
+            "metadata": {"client": "desktop_flutter"},
+            "payload_hash": canonical_payload_hash(Some(&payload)),
+            "payload": payload
+        });
+        let bytes = serde_json::to_vec(&request).unwrap();
+        let candidate_value =
+            candidate(&bytes, &endpoint).expect("Linux export is an Owner operation");
+        assert!(candidate_value.summary.contains("対象platform: Linux"));
+        assert!(candidate_value.summary.contains("linux-export-fixture"));
+        assert!(candidate_value
+            .summary
+            .contains(request["payload_hash"].as_str().unwrap()));
+        assert!(candidate_value.summary.contains("固定Export directory"));
+        assert!(candidate_value
+            .summary
+            .contains("Permission、Approval、Audit chainは継承しません"));
+
+        let (sender, receiver) = mpsc::sync_channel(1);
+        assert!(dispatch(&bytes, &endpoint, &sender, &mut |_| false)
+            .unwrap()
+            .is_none());
+        assert!(receiver.try_recv().is_err());
+
+        let (sender, receiver) = mpsc::sync_channel::<DesktopOwnerOperationRequest>(1);
+        let worker = std::thread::spawn(move || {
+            let owner_request: DesktopOwnerOperationRequest =
+                receiver.recv_timeout(Duration::from_secs(2)).unwrap();
+            let normalized: serde_json::Value =
+                serde_json::from_str(&owner_request.request_json).unwrap();
+            assert_eq!(normalized["operation"], "GUI Shell書出し");
+            assert_eq!(normalized["payload"]["target_platform"], "linux");
+            owner_request
+                .reply
+                .send(BrokerResponse {
+                    request_id: "linux-export-request".into(),
+                    operation: "GUI Shell書出し".into(),
+                    status: BrokerStatus::Accepted,
+                    evidence_source: "INTERNAL_STATE".into(),
+                    audit_event_id: "fixture-audit".into(),
+                    error: None,
+                    health: None,
+                    body: Some(json!({"manifest_file_status":"written"})),
+                    shutdown_requested: false,
+                })
+                .unwrap();
+        });
+        let response = dispatch(&bytes, &endpoint, &sender, &mut |summary| {
+            summary.contains("対象platform: Linux")
+        })
+        .unwrap()
+        .unwrap();
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&response).unwrap()["status"],
+            "accepted"
+        );
+        worker.join().unwrap();
+
+        let mut modified = request.clone();
+        modified["payload"]["target_platform"] = json!("android");
+        modified["payload_hash"] = json!(canonical_payload_hash(modified.get("payload")));
+        assert!(candidate(&serde_json::to_vec(&modified).unwrap(), &endpoint).is_none());
+        modified = request;
+        modified["payload"]["target_platform"] = json!("windows");
+        assert!(candidate(&serde_json::to_vec(&modified).unwrap(), &endpoint).is_none());
+    }
+
+    #[test]
     fn macos_workspace内容露出_同一要求だけを確認し未承認と権限注入を拒否する() {
         let endpoint = BrokerEndpoint {
             host: "127.0.0.1".into(),
@@ -393,7 +519,7 @@ mod host_tests {
             .summary
             .contains(valid["payload_hash"].as_str().unwrap()));
         assert_eq!(current.response_timeout, Duration::from_secs(4));
-        let (sender, receiver) = mpsc::sync_channel(1);
+        let (sender, receiver) = mpsc::sync_channel::<DesktopOwnerOperationRequest>(1);
         assert!(dispatch(&bytes, &endpoint, &sender, &mut |_| false)
             .unwrap()
             .is_none());

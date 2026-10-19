@@ -22,6 +22,7 @@ class ExportClient {
   Future<Map<String, Object?>> export({
     required String exportId,
     required Map<String, Object?> composeManifest,
+    String targetPlatform = 'windows',
     String distributionChannel = 'local',
     List<String>? optionalModuleIds,
     String? updatePublicKeyDerHex,
@@ -37,7 +38,7 @@ class ExportClient {
         'version': 1,
         'export_id': exportId,
         'compose_manifest': composeManifest,
-        'target_platform': 'windows',
+        'target_platform': targetPlatform,
         'export_mode': 'manifest_file',
         'distribution_channel': distributionChannel,
         if (optionalModuleIds != null)

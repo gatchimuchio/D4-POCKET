@@ -1373,7 +1373,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('GUI Shell Windows書出し').hitTestable(), findsOneWidget);
+    expect(find.text('GUI Shell独立App書出し').hitTestable(), findsOneWidget);
     final exportButton = find.byKey(const ValueKey('compose-export-button'));
     await tester.ensureVisible(exportButton);
     await tester.tap(exportButton);
