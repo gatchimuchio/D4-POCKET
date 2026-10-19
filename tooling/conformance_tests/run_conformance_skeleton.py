@@ -11623,9 +11623,28 @@ def 手動補助の起動境界を検査する() -> list[str]:
     for token in (
         "tooling\\test_pktmon_packet_summary.ps1",
         "tooling\\pktmon_packet_summary.ps1",
+        "tooling\\emit_pktmon_safe_diagnostics.ps1",
     ):
         if token not in rust_workflow:
             不整合.append(f"Windows Rust manual workflowにPktmon parser接続がない: {token}")
+    parser_call = rust_workflow.find("tooling\\pktmon_packet_summary.ps1")
+    reporter_call = rust_workflow.find("tooling\\emit_pktmon_safe_diagnostics.ps1", parser_call)
+    cleanup_call = rust_workflow.find("foreach ($path in @($captureTextPath, $capturePath))", reporter_call)
+    if not (parser_call >= 0 and parser_call < reporter_call < cleanup_call):
+        不整合.append("Pktmonのsanitize済み診断を生capture cleanup前にjob logへ出さない")
+    reporter_path = ROOT / "tooling/emit_pktmon_safe_diagnostics.ps1"
+    if not reporter_path.is_file():
+        不整合.append("Pktmon sanitize済み診断reporterが存在しない")
+    else:
+        reporter = reporter_path.read_text(encoding="utf-8")
+        for token in (
+            "自己接続RST=未検出",
+            "header形状: 記録=",
+            "Pktmon要約に上限付き診断項目がありません",
+            "diagnostics.Count -gt 24",
+        ):
+            if token not in reporter:
+                不整合.append(f"Pktmon sanitize済みdiagnosticのbounded／fail-closed契約がない: {token}")
     for token in (
         "tooling\\probe_loopback_rst.ps1",
         "$probe.status -ne 'reset_observed'",

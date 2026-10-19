@@ -88,7 +88,7 @@
     },
     {
       "path": ".github/workflows/windows-manual-rust-validation.yml",
-      "sha256": "6a7ef1c10d2b07b2e11a9456733ab6f6a4efc6a3f99b96a431f563e85fdb0fca"
+      "sha256": "d1bd923fc910cf69b774b21677c1e9a7e0c64e52144b4bcd5d8a5d89078772eb"
     },
     {
       "path": ".gitignore",
@@ -4996,7 +4996,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "2f3e792b7892e4eafe1a958451289f4782ff731d8b25dba0da164e665ec45e7f"
+      "sha256": "a66434af2740651aa6ac7655130cb165bdb0cb2c3d5fbab031c3a90f397f9f9c"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
@@ -5025,6 +5025,10 @@
     {
       "path": "tooling/dialogue_contract_check.py",
       "sha256": "b2d454df0416ec23291a54b65905295139caa9659b41704eacaa4f6d064623f9"
+    },
+    {
+      "path": "tooling/emit_pktmon_safe_diagnostics.ps1",
+      "sha256": "195a9af2f19c6a802b5e4d0cafb8f80ab0339b70fd73345430d7b9b10616cc8e"
     },
     {
       "path": "tooling/evaluation_contract_check.py",
@@ -5128,7 +5132,7 @@
     },
     {
       "path": "tooling/test_pktmon_packet_summary.ps1",
-      "sha256": "eaaf9e68d6d8a676b97461a40010e3b2d2090d3605a103e1c241a43672dbf330"
+      "sha256": "232f36a0397e275b7b2757f7ce8ea3e9802b1760ee891bf88d637e943de2eb8e"
     },
     {
       "path": "tooling/ui_snapshot_tests/README.md",

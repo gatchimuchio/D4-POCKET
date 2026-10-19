@@ -230,6 +230,19 @@ jobs:
               } catch {
                 $cleanupErrors += "Pktmon capture停止／変換処理に失敗: $($_.Exception.Message)"
               }
+              try {
+                $diagnosticReporter = Join-Path $env:GITHUB_WORKSPACE 'tooling\emit_pktmon_safe_diagnostics.ps1'
+                $safeDiagnostics = @(& $diagnosticReporter -SummaryPath $env:GITHUB_STEP_SUMMARY)
+                if ($safeDiagnostics.Count -eq 0) {
+                  throw 'bounded diagnostics are empty'
+                }
+                Write-Output 'Pktmonの安全化済み診断（packet生データは省略）:'
+                foreach ($line in $safeDiagnostics) {
+                  Write-Output $line
+                }
+              } catch {
+                $cleanupErrors += 'Pktmonのbounded診断をjob logへ出力できない'
+              }
             }
             if ($filterTouched) {
               try {

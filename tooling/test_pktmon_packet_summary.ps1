@@ -4,6 +4,7 @@ $tempRoot = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath())
 $inputPath = Join-Path $tempRoot "d4-pktmon-summary-$token.txt"
 $summaryPath = Join-Path $tempRoot "d4-pktmon-summary-$token.md"
 $formatter = Join-Path $PSScriptRoot 'pktmon_packet_summary.ps1'
+$diagnosticReporter = Join-Path $PSScriptRoot 'emit_pktmon_safe_diagnostics.ps1'
 
 try {
     @(
@@ -52,6 +53,13 @@ try {
     if ($summary -match '192\.0\.2\.10|198\.51\.100\.5|UDP') {
         throw 'loopback外または非TCP recordを出力した'
     }
+    $safeMatchedDiagnostics = @(& $diagnosticReporter -SummaryPath $summaryPath)
+    $safeMatchedText = $safeMatchedDiagnostics -join "`n"
+    if ($safeMatchedDiagnostics.Count -gt 24 -or
+        $safeMatchedText -notmatch '自己接続RST=検出 tuple件数=3' -or
+        $safeMatchedText -match '127\.0\.0\.1|49152|443|PktGroupId\s+8444249301423149') {
+        throw 'job log用成功診断がboundedでなく、生packet値を含む'
+    }
 
     @(
         '[00]0000.0000::<DateTime> Packet Filter 1: IP-1=127.0.0.1, IP-2=0.0.0.0, Protocol=TCP, Port-1=0, Port-2=0, TCPFlags=RST'
@@ -81,6 +89,15 @@ try {
         $metadataOnlySummary -notmatch '待受け先番号 443 を持つRST headerは未検出です。') {
         throw 'expected probe失敗前にsummaryの件数と不在状態を保存しない'
     }
+    Add-Content -LiteralPath $summaryPath -Value 'PktGroupId 999 PktNumber 1; 127.0.0.1:49152 > 127.0.0.1:443; CANARY_DO_NOT_EMIT' -Encoding utf8
+    $safeMissingDiagnostics = @(& $diagnosticReporter -SummaryPath $summaryPath)
+    $safeMissingText = $safeMissingDiagnostics -join "`n"
+    if ($safeMissingDiagnostics.Count -gt 24 -or
+        $safeMissingText -notmatch 'Pktmonで確認したループバックTCP RST tuple件数=0' -or
+        $safeMissingText -notmatch '自己接続RST=未検出' -or
+        $safeMissingText -match '127\.0\.0\.1|49152|443|CANARY_DO_NOT_EMIT|PktGroupId\s+999') {
+        throw 'job log用Pktmon診断が不足・非bounded・または生packet値を含む'
+    }
 
     @(
         '[30]0000.0000::<DateTime> [Microsoft-Windows-PktMon] PktGroupId 77, PktNumber 1, Appearance 1, Direction Tx , Type IP , Component 39, Filter 1, OriginalSize 54, LoggedSize 54'
@@ -103,6 +120,13 @@ try {
         $alternateFormatSummary -match 'CANARY_DO_NOT_EMIT|127\.0\.0\.1|49152' -or
         $alternateFormatError -match 'CANARY_DO_NOT_EMIT|127\.0\.0\.1|49152') {
         throw '未対応headerの形状だけを保存せず、生packet行やpacket内IP／portをsummary／errorへ露出する'
+    }
+    Add-Content -LiteralPath $summaryPath -Value 'RAW 127.0.0.1:49152 -> 127.0.0.1:443 CANARY_DO_NOT_EMIT' -Encoding utf8
+    $safeShapeDiagnostics = @(& $diagnosticReporter -SummaryPath $summaryPath)
+    $safeShapeText = $safeShapeDiagnostics -join "`n"
+    if ($safeShapeText -notmatch 'header形状: 記録=1 向き=TX 判定=tuple_unrecognized IPv4表記数=2 TCP=True RSTflag=True 区切り=arrow' -or
+        $safeShapeText -match '127\.0\.0\.1|49152|443|CANARY_DO_NOT_EMIT|PktGroupId\s+77') {
+        throw 'job log用header形状診断がboundedでなく、生packet値を含む'
     }
 
     @(
