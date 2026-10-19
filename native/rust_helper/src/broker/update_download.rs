@@ -1410,28 +1410,35 @@ mod tests {
             .enable_all()
             .build()
             .unwrap();
-        let result = runtime
-            .block_on(async {
-                let response = client
-                    .get(url)
-                    .header(ACCEPT_ENCODING, "identity")
-                    .send()
-                    .await
-                    .unwrap();
-                receive_package(
-                    &directory,
-                    response,
-                    &digest,
-                    bytes.len() as u64,
-                    true,
-                    &AtomicBool::new(false),
-                    std::time::Instant::now() + Duration::from_secs(30),
-                    &mut |_| {},
-                )
+        let result = runtime.block_on(async {
+            let response = client
+                .get(url)
+                .header(ACCEPT_ENCODING, "identity")
+                .send()
                 .await
-            })
-            .unwrap();
-        server.join().unwrap().unwrap();
+                .map_err(|error| format!("TLS要求失敗: {error:?}"))?;
+            receive_package(
+                &directory,
+                response,
+                &digest,
+                bytes.len() as u64,
+                true,
+                &AtomicBool::new(false),
+                std::time::Instant::now() + Duration::from_secs(30),
+                &mut |_| {},
+            )
+            .await
+            .map_err(|error| format!("package受信失敗: {error:?}"))
+        });
+        let server_result = server
+            .join()
+            .unwrap_or_else(|_| Err("TLS fixture server threadがpanicした".to_string()));
+        let result = result.unwrap_or_else(|client_error| {
+            panic!("TLS package修復失敗: client={client_error}; server={server_result:?}")
+        });
+        let server_observation = server_result
+            .unwrap_or_else(|server_error| panic!("TLS fixture server失敗: {server_error}"));
+        assert!(server_observation.contains("response=written"));
         assert_eq!(result.file_name, format!("{digest}.pkg"));
         assert_eq!(result.disposition, PackageDisposition::RepairedCorrupt);
         assert_eq!(std::fs::read(path.join(&result.file_name)).unwrap(), bytes);
