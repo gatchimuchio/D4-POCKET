@@ -1,5 +1,5 @@
 //! Linux Desktop同梱helper。秘密とBroker資格をRust内に保持し、既存Brokerだけへ中継する。
-use crate::broker::ipc_server::run_loopback_server_cancellable;
+use crate::broker::ipc_server::run_loopback_server_cancellable_with_owner_operations;
 use crate::broker::{BrokerCredentialRole, BrokerEndpoint, BrokerServerConfig};
 use rustix::fs::{flock, FlockOperation};
 use std::fs::{self, File, OpenOptions};
@@ -17,6 +17,13 @@ use zeroize::{Zeroize, Zeroizing};
 
 const REQUEST_LIMIT: usize = 64 * 1024;
 const RESPONSE_LIMIT: usize = 4 * 1024 * 1024;
+const OWNER_SUMMARY_LIMIT: usize = 16 * 1024;
+const OWNER_REPLY_LIMIT: usize = 128;
+const OWNER_PROMPT_LIMIT: usize = OWNER_SUMMARY_LIMIT * 2 + 64;
+const OWNER_PROTOCOL_MAGIC: [u8; 8] = [68, 52, 79, 87, 78, 69, 82, 49];
+const OWNER_REPLY_YES: [u8; 3] = [89, 69, 83];
+#[cfg(test)]
+const OWNER_REPLY_NO: [u8; 2] = [78, 79];
 const IO_TIMEOUT: Duration = Duration::from_secs(4);
 
 fn failure() -> io::Error {
@@ -163,9 +170,14 @@ fn serve(
     config.max_request_bytes = REQUEST_LIMIT;
     config.desktop_package_layout_verified = true;
     let (ready_tx, ready_rx) = mpsc::sync_channel(1);
+    let (owner_tx, owner_rx) = mpsc::sync_channel(4);
     let server = thread::Builder::new()
         .name("linux-security-broker".into())
-        .spawn(move || run_loopback_server_cancellable(config, stop, ready_tx))?;
+        .spawn(move || {
+            run_loopback_server_cancellable_with_owner_operations(
+                config, stop, ready_tx, owner_rx, None,
+            )
+        })?;
     let mut owned_session = Zeroizing::new(Vec::new());
     let result = (|| {
         ready_rx
@@ -199,8 +211,29 @@ fn serve(
                 break;
             };
             let frame = Zeroizing::new(frame);
-            let request = normalize(&frame, &endpoint.0.session_id);
-            let response = relay(&request, &endpoint.0)?;
+            let mut confirmation_error = None;
+            let owner_response = crate::macos_desktop_owner::dispatch(
+                &frame,
+                &endpoint.0,
+                &owner_tx,
+                &mut |summary| match request_owner_confirmation(summary, input, output) {
+                    Ok(confirmed) => confirmed,
+                    Err(error) => {
+                        confirmation_error = Some(error);
+                        false
+                    }
+                },
+            )?;
+            if let Some(error) = confirmation_error {
+                return Err(error);
+            }
+            let response = match owner_response {
+                Some(response) => response,
+                None => {
+                    let request = Zeroizing::new(normalize(&frame, &endpoint.0.session_id));
+                    relay(&request, &endpoint.0)?
+                }
+            };
             output.write_all(&response)?;
             output.write_all(b"\n")?;
             output.flush()?;
@@ -220,6 +253,75 @@ fn serve(
         Ok(())
     };
     result.and(stopped).and(cleanup)
+}
+
+/// GTK Runnerだけが返せる、一回限りの確認応答を現在のsummaryへ束縛する。
+fn request_owner_confirmation(
+    summary: &str,
+    input: &mut impl BufRead,
+    output: &mut impl Write,
+) -> io::Result<bool> {
+    let mut challenge = [0_u8; 16];
+    getrandom::getrandom(&mut challenge).map_err(|_| failure())?;
+    let challenge = hex::encode(challenge);
+    let Some(prompt) = owner_confirmation_prompt(&challenge, summary) else {
+        return Ok(false);
+    };
+    output.write_all(prompt.as_bytes())?;
+    output.flush()?;
+    let Some(reply) = read_frame(input, OWNER_REPLY_LIMIT)? else {
+        return Err(failure());
+    };
+    Ok(owner_confirmation_reply_is_yes(&reply, &challenge))
+}
+
+fn owner_protocol_magic() -> &'static str {
+    std::str::from_utf8(&OWNER_PROTOCOL_MAGIC).expect("固定Owner protocolはASCIIである")
+}
+
+fn owner_reply_yes() -> &'static str {
+    std::str::from_utf8(&OWNER_REPLY_YES).expect("固定Owner応答はASCIIである")
+}
+
+#[cfg(test)]
+fn owner_reply_no() -> &'static str {
+    std::str::from_utf8(&OWNER_REPLY_NO).expect("固定Owner応答はASCIIである")
+}
+
+fn owner_confirmation_prompt(challenge: &str, summary: &str) -> Option<String> {
+    if challenge.len() != 32
+        || !challenge
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        || summary.is_empty()
+        || summary.len() > OWNER_SUMMARY_LIMIT
+        || summary.chars().any(|character| {
+            character == '\0' || (character.is_control() && character != '\n' && character != '\t')
+        })
+    {
+        None
+    } else {
+        let frame = format!(
+            "{} {challenge} {}\n",
+            owner_protocol_magic(),
+            hex::encode(summary)
+        );
+        (frame.len() <= OWNER_PROMPT_LIMIT).then_some(frame)
+    }
+}
+
+fn owner_confirmation_reply_is_yes(reply: &[u8], challenge: &str) -> bool {
+    let Ok(reply) = std::str::from_utf8(reply) else {
+        return false;
+    };
+    let mut fields = reply.split(' ');
+    matches!(
+        (fields.next(), fields.next(), fields.next(), fields.next()),
+        (Some(magic), Some(received), Some(decision), None)
+            if magic == owner_protocol_magic()
+                && decision == owner_reply_yes()
+                && received == challenge
+    )
 }
 
 /// exclusive process lock取得後だけ、前回crashが残した固定名の秘密fileを回収する。
@@ -341,6 +443,81 @@ mod tests {
         assert!(read_frame(&mut &b"{}\r\n"[..], 8).is_err());
         assert!(read_frame(&mut &b"1234\n"[..], 3).is_err());
         assert_eq!(read_frame(&mut &b""[..], 4).unwrap(), None);
+    }
+
+    #[test]
+    fn owner_confirmation_frame_is_bounded_encoded_and_challenge_bound() {
+        let challenge = "0123456789abcdef0123456789abcdef";
+        let summary = "Owner確認\nWorkspace ID: fixture";
+        let frame = owner_confirmation_prompt(challenge, summary).unwrap();
+        assert!(frame.starts_with(&format!("{} {challenge} ", owner_protocol_magic())));
+        assert!(!frame.contains(summary));
+        let encoded = frame
+            .trim_end_matches('\n')
+            .split_once(' ')
+            .unwrap()
+            .1
+            .split_once(' ')
+            .unwrap()
+            .1;
+        assert_eq!(hex::decode(encoded).unwrap(), summary.as_bytes());
+        assert!(frame.len() <= OWNER_PROMPT_LIMIT);
+        assert!(owner_confirmation_prompt("bad", summary).is_none());
+        assert!(
+            owner_confirmation_prompt(challenge, &"x".repeat(OWNER_SUMMARY_LIMIT + 1)).is_none()
+        );
+        assert!(owner_confirmation_prompt(challenge, "bad\rsummary").is_none());
+        assert!(owner_confirmation_prompt(challenge, "bad\0summary").is_none());
+    }
+
+    #[test]
+    fn owner_confirmation_accepts_only_matching_single_yes_reply() {
+        let challenge = "0123456789abcdef0123456789abcdef";
+        assert!(owner_confirmation_reply_is_yes(
+            format!(
+                "{} {challenge} {}",
+                owner_protocol_magic(),
+                owner_reply_yes()
+            )
+            .as_bytes(),
+            challenge
+        ));
+        assert!(!owner_confirmation_reply_is_yes(
+            format!(
+                "{} {challenge} {}",
+                owner_protocol_magic(),
+                owner_reply_no()
+            )
+            .as_bytes(),
+            challenge
+        ));
+        assert!(!owner_confirmation_reply_is_yes(
+            format!(
+                "{} ffffffffffffffffffffffffffffffff {}",
+                owner_protocol_magic(),
+                owner_reply_yes()
+            )
+            .as_bytes(),
+            challenge
+        ));
+        assert!(!owner_confirmation_reply_is_yes(
+            format!(
+                "{} {challenge} {} extra",
+                owner_protocol_magic(),
+                owner_reply_yes()
+            )
+            .as_bytes(),
+            challenge
+        ));
+        assert!(!owner_confirmation_reply_is_yes(
+            format!(
+                "{} {challenge} {}",
+                owner_protocol_magic(),
+                owner_reply_yes().to_ascii_lowercase()
+            )
+            .as_bytes(),
+            challenge
+        ));
     }
 
     #[test]

@@ -436,11 +436,11 @@
     },
     {
       "path": "apps/desktop_flutter/linux/runner/broker_process_channel.cc",
-      "sha256": "a6f8eed79d91e47ee2c8f3230f3e8e1f14d66f5cdb7413cb09539cffaadb61aa"
+      "sha256": "dab32b1ec3c7840db368562a5f2b6b717e99daaad7c1e4d02b301149187b85c4"
     },
     {
       "path": "apps/desktop_flutter/linux/runner/broker_process_channel.h",
-      "sha256": "e4bc6c8c5ddd5cb9b182902506d1cfd2df67809f0dadbca2a141b70eee056e62"
+      "sha256": "67e29a074348d8250449bd35be3a6b14138fb68a01ba4aa7a74df72c244429b2"
     },
     {
       "path": "apps/desktop_flutter/linux/runner/main.cc",
@@ -448,7 +448,7 @@
     },
     {
       "path": "apps/desktop_flutter/linux/runner/my_application.cc",
-      "sha256": "62ed055d2fc548950e2347cc241263c455e6a3820a0a2cc71dde2282c3cf215f"
+      "sha256": "5358bcb3c125443a5d05fac0291f76dca8d59b1608b73936258476692b91b514"
     },
     {
       "path": "apps/desktop_flutter/linux/runner/my_application.h",
@@ -1296,7 +1296,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "0575d9a418b3d4e7928ba541ce21015d1a2a8446e73c657f098a31460a55f5e0"
+      "sha256": "586532e0011f767ae8b638f9045388d92dfed8ece3f36bed4d4f2f787ff33aaa"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1504,7 +1504,7 @@
     },
     {
       "path": "docs/specs/linux-desktop-channel.md",
-      "sha256": "218a4bab4d72263f1d483cf5078c9e5343a47db18db39a6587cc22d350f5cfa4"
+      "sha256": "97fa698454b05b361eebc17e2500cfca4fe04732bb8b5dda44d50e89dff3bc65"
     },
     {
       "path": "docs/specs/long-run-validation.md",
@@ -3544,7 +3544,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/host_center.rs",
-      "sha256": "83d6f55495dd3de11fbda3f931529ab443f9f6bf6295ef30c3291c9498b0a089"
+      "sha256": "ef90be8290af3843ea19cf1af58c8542f929020d0584d59268f1017b3bab12de"
     },
     {
       "path": "native/rust_helper/src/broker/ipc_server.rs",
@@ -3556,7 +3556,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/mcp_center.rs",
-      "sha256": "377782a9bf35051e2223f1616f12f90706eb765c163843fd567dc1c1b227d63e"
+      "sha256": "601e8e8d47f17d6ee8f0eb8abf98282fa5f7828d36273c3e6fe5d4d99f782d99"
     },
     {
       "path": "native/rust_helper/src/broker/mod.rs",
@@ -3580,7 +3580,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "3b5fab95f5a15b74ed4a152f144b4eb89e333bd08f9c45ec286804d1671c553f"
+      "sha256": "dc1f2c3369850d91c73c51304d24c932b9da76c6c85e15a9d7aac6d261aeea2f"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -3616,7 +3616,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/workspace.rs",
-      "sha256": "f9016a970abfe176c0e3271a08160e4ee7a85f1e0dd11eb97c9a5b0e5614ee3d"
+      "sha256": "a048aa8a99e9c9c6ca305f9a5950e51af42a83f3b02ac7e0c5300647b53bffa5"
     },
     {
       "path": "native/rust_helper/src/broker/workspace_root.rs",
@@ -3652,11 +3652,11 @@
     },
     {
       "path": "native/rust_helper/src/lib.rs",
-      "sha256": "4786bcf1d6a977e422859dc1371bd5d24ecd9e1b89a175d76fe9649ba76c4f56"
+      "sha256": "07c213416be9472e9c6ccc46a2b8a0871455e10555f093912baf88c921e702e2"
     },
     {
       "path": "native/rust_helper/src/linux_desktop_worker.rs",
-      "sha256": "f94f59eae12af6e95af6de1047e21dab2f584f5189f95dea05ae35a9e380ecb1"
+      "sha256": "d564f551b3f3fe7a963d382bd657aacb86de14a1ef4218e8d4adcce70868ff02"
     },
     {
       "path": "native/rust_helper/src/macos_credential_input.rs",
@@ -3664,7 +3664,7 @@
     },
     {
       "path": "native/rust_helper/src/macos_desktop_owner.rs",
-      "sha256": "ac59107d07a8e30fa9cd5d8778d7f028916b020e66692cc28a5b31bfabb24c70"
+      "sha256": "ebfc4f615843009a801ff2d19afe26b41531d7f7dae6e8c29e1c8092f1da2e50"
     },
     {
       "path": "native/rust_helper/src/macos_desktop_worker.rs",
@@ -4228,7 +4228,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "310713a5d92a9a7fa011d4ae64d7a0f47cb7958f94b980b48bc8a9f861bed481"
+      "sha256": "ff15fbcf2d83e90c608d3a516e22b73d1ccd6d42d90251fd58edb574e2e8e056"
     },
     {
       "path": "requirements-dev.txt",
@@ -4952,7 +4952,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "5f46718083ca5538547a22f223e6eb89e91e904cea89e4972a7f26661768c063"
+      "sha256": "a70a9699c33ede33bd11c09079f2d477e574946c9fd5994f1c8d31b06ce8b596"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
@@ -5044,7 +5044,7 @@
     },
     {
       "path": "tooling/packaging_portability_check.py",
-      "sha256": "f7821618d672be485c24c8e3937ca08d491b2b36ee1ea6709f9de559eacfe8ee"
+      "sha256": "9c4741c1d1e1de225b9aa3f1c89a71ba55e65517c45ce2156e7cdcf509e4a0cf"
     },
     {
       "path": "tooling/performance_validation.py",

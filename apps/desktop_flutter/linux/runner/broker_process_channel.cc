@@ -5,6 +5,8 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <cstring>
 #include <memory>
 #include <mutex>
@@ -15,17 +17,194 @@ namespace {
 
 constexpr size_t kRequestLimit = 64 * 1024;
 constexpr size_t kResponseLimit = 4 * 1024 * 1024;
+constexpr size_t kOwnerSummaryLimit = 16 * 1024;
+constexpr size_t kOwnerPromptFrameLimit = kOwnerSummaryLimit * 2 + 64;
+constexpr size_t kOwnerChallengeLength = 32;
 constexpr unsigned int kMaxQueuedRequests = 16;
+constexpr auto kOwnerDialogTimeout = std::chrono::seconds(300);
+
+bool is_lower_hex(char value) {
+  return (value >= '0' && value <= '9') || (value >= 'a' && value <= 'f');
+}
+
+bool has_owner_protocol_prefix(const std::string& frame) {
+  return frame.compare(0, 8, "D4OWNER1") == 0;
+}
+
+bool decode_owner_prompt(const std::string& frame, std::string* challenge,
+                         std::string* summary) {
+  constexpr char kPrefix[] = "D4OWNER1 ";
+  if (frame.compare(0, sizeof(kPrefix) - 1, kPrefix) != 0 ||
+      frame.size() > kOwnerPromptFrameLimit) {
+    return false;
+  }
+  const size_t separator = frame.find(' ', sizeof(kPrefix) - 1);
+  if (separator == std::string::npos ||
+      separator - (sizeof(kPrefix) - 1) != kOwnerChallengeLength) {
+    return false;
+  }
+  const std::string candidate =
+      frame.substr(sizeof(kPrefix) - 1, separator - (sizeof(kPrefix) - 1));
+  if (!std::all_of(candidate.begin(), candidate.end(), is_lower_hex)) {
+    return false;
+  }
+  const std::string encoded = frame.substr(separator + 1);
+  if (encoded.empty() || encoded.size() % 2 != 0 ||
+      encoded.size() > kOwnerSummaryLimit * 2) {
+    return false;
+  }
+  std::string decoded;
+  decoded.reserve(encoded.size() / 2);
+  for (size_t index = 0; index < encoded.size(); index += 2) {
+    const int high = g_ascii_xdigit_value(encoded[index]);
+    const int low = g_ascii_xdigit_value(encoded[index + 1]);
+    if (high < 0 || low < 0 ||
+        (encoded[index] >= 'A' && encoded[index] <= 'F') ||
+        (encoded[index + 1] >= 'A' && encoded[index + 1] <= 'F')) {
+      return false;
+    }
+    const char byte = static_cast<char>((high << 4) | low);
+    if (byte == '\0' || byte == '\r' ||
+        (static_cast<unsigned char>(byte) < 0x20 && byte != '\n' &&
+         byte != '\t')) {
+      return false;
+    }
+    decoded.push_back(byte);
+  }
+  if (decoded.empty() ||
+      !g_utf8_validate(decoded.data(), decoded.size(), nullptr)) {
+    return false;
+  }
+  *challenge = candidate;
+  *summary = std::move(decoded);
+  return true;
+}
+
+struct OwnerDialogState {
+  explicit OwnerDialogState(GtkWindow* owner_parent, std::string text)
+      : parent(owner_parent), summary(std::move(text)) {}
+  ~OwnerDialogState() {
+    if (parent != nullptr) g_object_unref(parent);
+  }
+
+  GtkWindow* parent;
+  const std::string summary;
+  std::mutex mutex;
+  std::condition_variable ready;
+  std::atomic<bool> expired{false};
+  bool complete = false;
+  bool confirmed = false;
+};
+
+struct OwnerDialogTimeout {
+  GtkDialog* dialog;
+  bool fired = false;
+};
+
+gboolean reject_expired_owner_dialog(gpointer data) {
+  auto* timeout = static_cast<OwnerDialogTimeout*>(data);
+  timeout->fired = true;
+  gtk_dialog_response(timeout->dialog, GTK_RESPONSE_CANCEL);
+  return G_SOURCE_REMOVE;
+}
+
+void finish_owner_dialog(const std::shared_ptr<OwnerDialogState>& state,
+                         bool confirmed) {
+  {
+    std::lock_guard<std::mutex> lock(state->mutex);
+    state->confirmed = confirmed && !state->expired.load();
+    state->complete = true;
+  }
+  state->ready.notify_one();
+}
+
+gboolean show_owner_dialog_on_gtk_thread(gpointer data) {
+  auto state = *static_cast<std::shared_ptr<OwnerDialogState>*>(data);
+  if (state->expired.load()) {
+    finish_owner_dialog(state, false);
+    return G_SOURCE_REMOVE;
+  }
+
+  GtkWidget* dialog = gtk_dialog_new_with_buttons(
+      "D4 Pocket Owner確認", state->parent,
+      static_cast<GtkDialogFlags>(GTK_DIALOG_MODAL |
+                                  GTK_DIALOG_DESTROY_WITH_PARENT),
+      "拒否", GTK_RESPONSE_NO, "許可", GTK_RESPONSE_YES, nullptr);
+  gtk_window_set_position(GTK_WINDOW(dialog), GTK_WIN_POS_CENTER_ON_PARENT);
+  gtk_window_set_default_size(GTK_WINDOW(dialog), 680, 480);
+  gtk_dialog_set_default_response(GTK_DIALOG(dialog), GTK_RESPONSE_NO);
+  GtkWidget* content = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
+  GtkWidget* scroller = gtk_scrolled_window_new(nullptr, nullptr);
+  gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroller),
+                                 GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
+  GtkWidget* label = gtk_label_new(state->summary.c_str());
+  gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
+  gtk_label_set_line_wrap_mode(GTK_LABEL(label), PANGO_WRAP_WORD_CHAR);
+  gtk_label_set_xalign(GTK_LABEL(label), 0.0f);
+  gtk_label_set_yalign(GTK_LABEL(label), 0.0f);
+  gtk_container_add(GTK_CONTAINER(scroller), label);
+  gtk_container_add(GTK_CONTAINER(content), scroller);
+  if (state->expired.load()) {
+    gtk_widget_destroy(dialog);
+    finish_owner_dialog(state, false);
+    return G_SOURCE_REMOVE;
+  }
+  gtk_widget_show_all(dialog);
+
+  OwnerDialogTimeout timeout{GTK_DIALOG(dialog), false};
+  const guint timeout_id = g_timeout_add_seconds(
+      static_cast<guint>(kOwnerDialogTimeout.count()),
+      reject_expired_owner_dialog, &timeout);
+  const gint response = gtk_dialog_run(GTK_DIALOG(dialog));
+  if (!timeout.fired) g_source_remove(timeout_id);
+  gtk_widget_destroy(dialog);
+  finish_owner_dialog(state, response == GTK_RESPONSE_YES);
+  return G_SOURCE_REMOVE;
+}
+
+void destroy_owner_dialog_callback(gpointer data) {
+  delete static_cast<std::shared_ptr<OwnerDialogState>*>(data);
+}
+
+bool confirm_owner_operation(GWeakRef* owner_parent,
+                             const std::string& summary) {
+  gpointer parent_ref = g_weak_ref_get(owner_parent);
+  if (parent_ref == nullptr) return false;
+  GObject* parent = G_OBJECT(parent_ref);
+  if (!GTK_IS_WINDOW(parent)) {
+    g_object_unref(parent);
+    return false;
+  }
+  auto state = std::make_shared<OwnerDialogState>(GTK_WINDOW(parent), summary);
+  auto* callback_state = new std::shared_ptr<OwnerDialogState>(state);
+  // g_main_context_invoke may run inline on a worker that can acquire the
+  // context. An idle source is dispatched by the GTK main loop instead.
+  g_idle_add_full(G_PRIORITY_DEFAULT, show_owner_dialog_on_gtk_thread,
+                  callback_state, destroy_owner_dialog_callback);
+
+  std::unique_lock<std::mutex> lock(state->mutex);
+  if (!state->ready.wait_for(lock, kOwnerDialogTimeout +
+                                      std::chrono::seconds(5),
+                             [&state] { return state->complete; })) {
+    state->expired.store(true);
+    return false;
+  }
+  return state->confirmed;
+}
 
 class BrokerContext {
  public:
-  BrokerContext() : helper_path_(resolve_helper_path()) {}
+  explicit BrokerContext(GtkWindow* owner_parent)
+      : helper_path_(resolve_helper_path()) {
+    g_weak_ref_init(&owner_parent_, G_OBJECT(owner_parent));
+  }
 
   ~BrokerContext() {
     std::lock_guard<std::mutex> lock(mutex_);
     close_input();
     g_clear_object(&stdout_pipe_);
     g_clear_object(&process_);
+    g_weak_ref_clear(&owner_parent_);
   }
 
   bool ReserveRequest() {
@@ -61,40 +240,72 @@ class BrokerContext {
       return false;
     }
 
-    std::string buffer;
-    char chunk[4096];
     for (;;) {
-      const gssize read = g_input_stream_read(stdout_pipe_, chunk, sizeof(chunk),
-                                              nullptr, &error);
-      if (read <= 0) {
+      std::string buffer;
+      if (!read_helper_frame(&buffer, &error)) {
         g_clear_error(&error);
         poison();
         return false;
       }
-      const char* newline = static_cast<const char*>(
-          std::memchr(chunk, '\n', static_cast<size_t>(read)));
-      const size_t content_size = newline == nullptr
-                                      ? static_cast<size_t>(read)
-                                      : static_cast<size_t>(newline - chunk);
-      if (content_size > kResponseLimit - buffer.size() ||
-          std::memchr(chunk, '\r', content_size) != nullptr) {
+      if (!has_owner_protocol_prefix(buffer)) {
+        *response = std::move(buffer);
+        return true;
+      }
+
+      std::string challenge;
+      std::string summary;
+      if (!decode_owner_prompt(buffer, &challenge, &summary)) {
         poison();
         return false;
       }
-      buffer.append(chunk, content_size);
-      if (newline != nullptr) {
-        if (content_size + 1 != static_cast<size_t>(read) || buffer.empty() ||
-            !g_utf8_validate(buffer.data(), buffer.size(), nullptr)) {
-          poison();
-          return false;
-        }
-        *response = std::move(buffer);
-        return true;
+      const char* decision =
+          confirm_owner_operation(&owner_parent_, summary) ? "YES" : "NO";
+      const std::string reply =
+          "D4OWNER1 " + challenge + " " + decision + "\n";
+      if (!g_output_stream_write_all(stdin_pipe_, reply.data(), reply.size(),
+                                     &written, nullptr, &error) ||
+          written != reply.size()) {
+        g_clear_error(&error);
+        poison();
+        return false;
+      }
+      if (g_output_stream_flush(stdin_pipe_, nullptr, &error) == FALSE) {
+        g_clear_error(&error);
+        poison();
+        return false;
       }
     }
   }
 
  private:
+  bool read_helper_frame(std::string* frame, GError** error) {
+    frame->clear();
+    char chunk[4096];
+    for (;;) {
+      const gssize read = g_input_stream_read(stdout_pipe_, chunk, sizeof(chunk),
+                                              nullptr, error);
+      if (read <= 0) return false;
+      const char* newline = static_cast<const char*>(
+          std::memchr(chunk, '\n', static_cast<size_t>(read)));
+      const size_t content_size = newline == nullptr
+                                      ? static_cast<size_t>(read)
+                                      : static_cast<size_t>(newline - chunk);
+      const size_t limit = frame->rfind("D4OWNER1", 0) == 0
+                               ? kOwnerPromptFrameLimit
+                               : kResponseLimit;
+      if (content_size > limit - frame->size() ||
+          std::memchr(chunk, '\r', content_size) != nullptr) {
+        return false;
+      }
+      frame->append(chunk, content_size);
+      if (newline != nullptr) {
+        return content_size + 1 == static_cast<size_t>(read) &&
+               !frame->empty() &&
+               g_utf8_validate(frame->data(), frame->size(), nullptr);
+      }
+    }
+  }
+
   static std::string resolve_helper_path() {
     GError* error = nullptr;
     gchar* executable = g_file_read_link("/proc/self/exe", &error);
@@ -172,6 +383,7 @@ class BrokerContext {
   }
 
   const std::string helper_path_;
+  GWeakRef owner_parent_;
   std::mutex mutex_;
   std::atomic<unsigned int> in_flight_{0};
   GSubprocess* process_ = nullptr;
@@ -274,7 +486,8 @@ void shared_context_free(gpointer data) {
 
 }  // namespace
 
-void broker_process_channel_register(FlPluginRegistry* registry) {
+void broker_process_channel_register(FlPluginRegistry* registry,
+                                     GtkWindow* owner_parent) {
   FlPluginRegistrar* registrar = fl_plugin_registry_get_registrar_for_plugin(
       registry, "D4PocketBrokerProcessChannel");
   FlBinaryMessenger* messenger = fl_plugin_registrar_get_messenger(registrar);
@@ -284,7 +497,7 @@ void broker_process_channel_register(FlPluginRegistry* registry) {
   g_object_unref(codec);
 
   auto* context = new std::shared_ptr<BrokerContext>(
-      std::make_shared<BrokerContext>());
+      std::make_shared<BrokerContext>(owner_parent));
   fl_method_channel_set_method_call_handler(channel, request_method_call,
                                             context, shared_context_free);
   g_object_set_data_full(G_OBJECT(registry), "d4-pocket-linux-broker-channel",

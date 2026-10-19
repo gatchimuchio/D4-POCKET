@@ -18,9 +18,9 @@ pub mod workspace_reader;
 pub mod ipc;
 #[cfg(target_os = "linux")]
 pub mod linux_desktop_worker;
-#[cfg(any(target_os = "macos", test))]
+#[cfg(any(target_os = "linux", target_os = "macos", test))]
 pub mod macos_desktop_worker;
-#[cfg(any(target_os = "macos", test))]
+#[cfg(any(target_os = "linux", target_os = "macos", test))]
 mod macos_desktop_owner;
 #[cfg(any(target_os = "macos", test))]
 mod macos_workspace_selection;

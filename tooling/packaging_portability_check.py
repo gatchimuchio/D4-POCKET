@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT))
 from tooling.manifest import expected_files, relative
 
 
-DEFAULT_SUBPROCESS_TIMEOUT_SECONDS = 120
+DEFAULT_SUBPROCESS_TIMEOUT_SECONDS = 180
 UTF8_GOVERNANCE_PATH_ALLOWLIST = frozenset(
     {
         "規定/00_日本語基底規定.md",

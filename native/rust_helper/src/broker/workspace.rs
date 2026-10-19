@@ -185,8 +185,8 @@ fn digest(value: &Value) -> String {
     sha256_tagged(value.to_string().as_bytes())
 }
 
-/// 現在要求の公開参照だけをnative確認へ射影する。登録・Permissionの採否はBrokerが所有する。
-#[cfg(any(test, target_os = "macos"))]
+/// 現在要求の公開参照だけをDesktop native確認へ射影する。登録・Permissionの採否はBrokerが所有する。
+#[cfg(any(test, target_os = "linux", target_os = "macos"))]
 pub(crate) fn owner_confirmation_summary(operation: &str, payload: &Value) -> Option<String> {
     let (id, hash, detail) = match operation {
         "作業領域承認" => {

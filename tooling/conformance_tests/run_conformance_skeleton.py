@@ -3906,7 +3906,7 @@ def test_packaging_portability_checker_exists() -> list[str]:
     else:
         text = checker.read_text(encoding="utf-8")
         for token in [
-            "DEFAULT_SUBPROCESS_TIMEOUT_SECONDS = 120",
+            "DEFAULT_SUBPROCESS_TIMEOUT_SECONDS = 180",
             "UTF8_GOVERNANCE_PATH_ALLOWLIST",
             "UTF8_GOVERNANCE_PATH_PREFIXES",
             "timeout=timeout_seconds",

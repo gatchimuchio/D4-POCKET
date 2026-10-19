@@ -193,8 +193,8 @@
       "release_tracks": ["non_windows"],
       "blocks_release": true,
       "blocks_windows_technical_complete": false,
-      "reason": "Linux native Desktopは完全対応が必須の独立製品対象だが、既存WSLg開発smokeと現在の部分的なBroker接続実装だけでは、Linux nativeの通常機能・権限境界・導入・更新・復旧・配布の製品経路を受入れていない。",
-      "required_action": "Linux nativeの全必須Desktop機能を現行Rust Brokerと安全境界へ接続し、Owner確認・資格情報・Workspace選択・Agent process監督／Recovery、X11／Wayland、Installer／Update／Rollback／Uninstallerを実装・検証する。対象Linux製品のinstalled pathとartifact provenanceを結合して受入れ、Linux Taskの停止・Recovery・Audit条件が成立するまでtask_execution=supportedへ昇格しない。"
+      "reason": "Linux native Desktopは完全対応が必須の独立製品対象。dirty development sourceにはGTK Owner確認の限定経路とLinux Release bundle buildがあるが、WSL unit/build証拠だけではLinux native installed UIのOwner判断、通常機能・権限境界・導入・更新・復旧・配布の製品経路を受入れていない。",
+      "required_action": "Linux native installed productでOwner確認の肯定・拒否・閉じる・期限切れを既存Broker再評価／Auditまで検証し、Credential native input／vault、Workspace OS選択、Agent process監督・scratch／descendant cleanup・cancel／deadline／crash Recovery、X11／Wayland、Installer／Update／Rollback／Uninstallerを実装・検証する。対象Linux製品のinstalled pathとartifact provenanceを結合して受入れ、Linux Taskの停止・Recovery・Audit条件が成立するまでtask_execution=supportedへ昇格しない。"
     },
     {
       "name": "rev2_mobile_device_evidence",

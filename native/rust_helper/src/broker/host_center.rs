@@ -136,8 +136,8 @@ fn parse_request(payload: &Value) -> Result<HostRegistrationRequest, String> {
     Ok(request)
 }
 
-/// 公開metadataだけを既存構造検査へ通し、同一native確認の説明を生成する。
-#[cfg(any(test, target_os = "macos"))]
+/// 公開metadataだけを既存構造検査へ通し、同一Desktop native確認の説明を生成する。
+#[cfg(any(test, target_os = "linux", target_os = "macos"))]
 pub(crate) fn owner_confirmation_summary(payload: &Value) -> Option<String> {
     let request = parse_request(payload).ok()?;
     if request.display_name.chars().any(char::is_control) {

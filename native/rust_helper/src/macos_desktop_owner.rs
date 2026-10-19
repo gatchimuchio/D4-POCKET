@@ -1,4 +1,4 @@
-//! macOSの限定Owner入口。UIデータを承認へ昇格せず、既存Brokerへ現在要求を渡す。
+//! Desktopの限定Owner入口。UIデータを承認へ昇格せず、既存Brokerへ現在要求を渡す。
 use crate::broker::ipc_server::DesktopOwnerOperationRequest;
 use crate::broker::protocol::{canonical_payload_hash, request_issued_at_is_current};
 use crate::broker::{adapter_center, BrokerEndpoint, BrokerRequestEnvelope};
@@ -9,6 +9,55 @@ struct Candidate {
     request: String,
     summary: String,
     response_timeout: Duration,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AgentTaskWorkspacePermissionRequest {
+    agent_runtime_id: String,
+    session_id: String,
+    workspace_id: String,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AgentTaskOwnerApprovalRequest {
+    agent_runtime_id: String,
+    session_id: String,
+    workspace_id: String,
+    instruction: String,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AgentTaskResultExposureRequest {
+    task_id: String,
+    result_hash: String,
+    content_visibility: String,
+}
+
+fn valid_task_scope_identifier(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 128
+        && value.as_bytes()[0].is_ascii_alphanumeric()
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"._:-".contains(&byte))
+}
+
+fn valid_task_id(value: &str) -> bool {
+    value.len() == 32
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn valid_sha256(value: &str) -> bool {
+    value.len() == 71
+        && value.starts_with("sha256:")
+        && value[7..]
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
@@ -40,7 +89,57 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
     let text = if registration {
         let summary = crate::broker::protocol::macos_agent_registration_summary(payload)?;
         format!("{summary}\n要求hash: {hash}")
-    } else if matches!(operation, "作業領域承認" | "作業領域失効" | "作業領域全体基準点保存") {
+    } else if operation == "AgentTaskWorkspacePermissionGrant" {
+        let request: AgentTaskWorkspacePermissionRequest =
+            serde_json::from_value(payload.clone()).ok()?;
+        if !valid_task_scope_identifier(&request.agent_runtime_id)
+            || !valid_task_scope_identifier(&request.session_id)
+            || !valid_task_scope_identifier(&request.workspace_id)
+        {
+            return None;
+        }
+        format!(
+            "このAgent Sessionに限定した、一回限りのTask用Workspace Permissionを発行しますか？\n\nRuntime ID: {}\nSession ID: {}\nWorkspace ID: {}\n許可operation: agent_task.execute\n\nこの操作はTaskを実行・保存・変更しません。Task本文と実行条件を示す別個のOwner Approvalは必要です。許可はこのSessionとWorkspaceに束縛され、再利用できません。\n\n要求hash: {hash}",
+            request.agent_runtime_id, request.session_id, request.workspace_id
+        )
+    } else if operation == "AgentTaskOwnerApprovalGrant" {
+        let request: AgentTaskOwnerApprovalRequest =
+            serde_json::from_value(payload.clone()).ok()?;
+        if !valid_task_scope_identifier(&request.agent_runtime_id)
+            || !valid_task_scope_identifier(&request.session_id)
+            || !valid_task_scope_identifier(&request.workspace_id)
+            || request.instruction.trim().is_empty()
+            || request.instruction.chars().count() > 32_768
+        {
+            return None;
+        }
+        let instruction_hash = crate::audit_hash::sha256_tagged(request.instruction.as_bytes());
+        format!(
+            "このAgent Taskに一回限りのOwner Approvalを発行しますか？\n\nRuntime ID: {}\nSession ID: {}\nWorkspace ID: {}\n指示文字数: {}\n指示hash: {}\n実行上限: 最大15分\n\nCompose画面でTask本文を確認してから判断してください。この確認画面には本文を表示しません。Approvalは本文hashと現在の実行条件に束縛され、Permission・Credential・Trustを付与せず、Taskを実行しません。\n\n要求hash: {hash}",
+            request.agent_runtime_id,
+            request.session_id,
+            request.workspace_id,
+            request.instruction.chars().count(),
+            instruction_hash
+        )
+    } else if operation == "AgentTask結果表示承認" {
+        let request: AgentTaskResultExposureRequest =
+            serde_json::from_value(payload.clone()).ok()?;
+        if !valid_task_id(&request.task_id)
+            || !valid_sha256(&request.result_hash)
+            || !["none", "hash_only", "summary", "redacted", "full"]
+                .contains(&request.content_visibility.as_str())
+        {
+            return None;
+        }
+        format!(
+            "完了したAgent Taskの結果を一回だけ表示するApprovalを発行しますか？\n\nTask ID: {}\n確定結果hash: {}\nContent Exposure: {}\n\n`full`はAgent本文を表示し、秘密情報や危険な指示を含む可能性があります。表示前に範囲を確認してください。このApprovalはTask実行権・Workspace読取許可・Permission・Credential・Authorityを与えず、Auditへ本文を保存しません。\n\n要求hash: {hash}",
+            request.task_id, request.result_hash, request.content_visibility
+        )
+    } else if matches!(
+        operation,
+        "作業領域承認" | "作業領域失効" | "作業領域全体基準点保存"
+    ) {
         let summary = crate::broker::workspace::owner_confirmation_summary(operation, payload)?;
         format!("{summary}\n要求hash: {hash}")
     } else if operation == "Host登録" {
@@ -169,47 +268,86 @@ mod workspace_inspector_tests {
 
     #[test]
     fn macos_workspace内容露出_同一要求だけを確認し未承認と権限注入を拒否する() {
-        let endpoint = BrokerEndpoint { host:"127.0.0.1".into(), port:1,
-            session_id:"fixture-session".into(), session_secret:"synthetic-only".into(),
-            credential_role:BrokerCredentialRole::Normal, transport:"tcp".into(), max_request_bytes:65536 };
-        for operation in ["作業領域承認", "作業領域失効", "作業領域全体基準点保存"] {
+        let endpoint = BrokerEndpoint {
+            host: "127.0.0.1".into(),
+            port: 1,
+            session_id: "fixture-session".into(),
+            session_secret: "synthetic-only".into(),
+            credential_role: BrokerCredentialRole::Normal,
+            transport: "tcp".into(),
+            max_request_bytes: 65536,
+        };
+        for operation in ["作業領域承認", "作業領域失効", "作業領域全体基準点保存"]
+        {
             let mut payload = json!({"作業領域ID":"macos-product-workspace", "登録hash":format!("sha256:{}", "a".repeat(64))});
-            if operation == "作業領域承認" { payload["表示範囲"] = json!("full"); }
+            if operation == "作業領域承認" {
+                payload["表示範囲"] = json!("full");
+            }
             let valid = json!({"request_id":"workspace-request", "nonce":"workspace-nonce",
                 "issued_at":BrokerRequestEnvelope::current_issued_at(), "operation":operation,
                 "metadata":{"client":"desktop_flutter"}, "payload_hash":canonical_payload_hash(Some(&payload)), "payload":payload});
             let bytes = serde_json::to_vec(&valid).unwrap();
             let current = candidate(&bytes, &endpoint).unwrap();
             assert!(current.summary.contains("macos-product-workspace"));
-            assert!(current.summary.contains(valid["payload_hash"].as_str().unwrap()));
+            assert!(current
+                .summary
+                .contains(valid["payload_hash"].as_str().unwrap()));
             assert!(current.summary.contains("Task実行・書込権は付与しません"));
             let (sender, receiver) = mpsc::sync_channel(1);
-            assert!(dispatch(&bytes, &endpoint, &sender, &mut |_| false).unwrap().is_none());
+            assert!(dispatch(&bytes, &endpoint, &sender, &mut |_| false)
+                .unwrap()
+                .is_none());
             assert!(receiver.try_recv().is_err());
             for field in ["session_id", "approval"] {
-                let mut invalid = valid.clone(); invalid[field] = json!(true);
+                let mut invalid = valid.clone();
+                invalid[field] = json!(true);
                 assert!(candidate(&serde_json::to_vec(&invalid).unwrap(), &endpoint).is_none());
             }
-            let mut authority = valid.clone(); authority["metadata"]["authority"] = json!("owner");
+            let mut authority = valid.clone();
+            authority["metadata"]["authority"] = json!("owner");
             assert!(candidate(&serde_json::to_vec(&authority).unwrap(), &endpoint).is_none());
-            let mut changed = valid.clone(); changed["payload"]["作業領域ID"] = json!("another-workspace");
+            let mut changed = valid.clone();
+            changed["payload"]["作業領域ID"] = json!("another-workspace");
             assert!(candidate(&serde_json::to_vec(&changed).unwrap(), &endpoint).is_none());
-            for (field, value) in [("root", json!("/outside")), ("登録hash", json!("sha256:invalid")), ("表示範囲", json!("trusted"))] {
-                let mut invalid = valid.clone(); invalid["payload"][field] = value;
+            for (field, value) in [
+                ("root", json!("/outside")),
+                ("登録hash", json!("sha256:invalid")),
+                ("表示範囲", json!("trusted")),
+            ] {
+                let mut invalid = valid.clone();
+                invalid["payload"][field] = value;
                 invalid["payload_hash"] = json!(canonical_payload_hash(invalid.get("payload")));
                 assert!(candidate(&serde_json::to_vec(&invalid).unwrap(), &endpoint).is_none());
             }
             let original = payload.clone();
             let worker = std::thread::spawn(move || {
                 let request = receiver.recv_timeout(Duration::from_secs(2)).unwrap();
-                let normalized: serde_json::Value = serde_json::from_str(&request.request_json).unwrap();
+                let normalized: serde_json::Value =
+                    serde_json::from_str(&request.request_json).unwrap();
                 assert_eq!(normalized["payload"], original);
                 assert_eq!(normalized["session_id"], "fixture-session");
-                request.reply.send(BrokerResponse {request_id:"workspace-request".into(), operation:operation.into(), status:BrokerStatus::Rejected,
-                    evidence_source:"INTERNAL_STATE".into(), audit_event_id:"fixture-audit".into(), error:None, health:None, body:None, shutdown_requested:false}).unwrap();
+                request
+                    .reply
+                    .send(BrokerResponse {
+                        request_id: "workspace-request".into(),
+                        operation: operation.into(),
+                        status: BrokerStatus::Rejected,
+                        evidence_source: "INTERNAL_STATE".into(),
+                        audit_event_id: "fixture-audit".into(),
+                        error: None,
+                        health: None,
+                        body: None,
+                        shutdown_requested: false,
+                    })
+                    .unwrap();
             });
-            let response = dispatch(&bytes, &endpoint, &sender, &mut |_| true).unwrap().unwrap();
-            assert_eq!(serde_json::from_slice::<serde_json::Value>(&response).unwrap()["status"], "rejected");
+            let response = dispatch(&bytes, &endpoint, &sender, &mut |_| true)
+                .unwrap()
+                .unwrap();
+            assert_eq!(
+                serde_json::from_slice::<serde_json::Value>(&response).unwrap()["status"],
+                "rejected"
+            );
             worker.join().unwrap();
         }
     }
@@ -225,9 +363,13 @@ mod host_tests {
     #[test]
     fn macos_host_同一要求だけを確認し未承認と権限注入を拒否する() {
         let endpoint = BrokerEndpoint {
-            host: "127.0.0.1".into(), port: 1, session_id: "fixture-session".into(),
-            session_secret: "synthetic-only".into(), credential_role: BrokerCredentialRole::Normal,
-            transport: "tcp".into(), max_request_bytes: 65536,
+            host: "127.0.0.1".into(),
+            port: 1,
+            session_id: "fixture-session".into(),
+            session_secret: "synthetic-only".into(),
+            credential_role: BrokerCredentialRole::Normal,
+            transport: "tcp".into(),
+            max_request_bytes: 65536,
         };
         let payload = json!({"版":1,"操作":"登録","Host ID":"mac-host-fixture",
             "表示名":"Mac公開Host","Platform":"macos","接続状態":"pending_review","Trust":"pending_review",
@@ -239,36 +381,69 @@ mod host_tests {
         let bytes = serde_json::to_vec(&valid).unwrap();
         let current = candidate(&bytes, &endpoint).unwrap();
         assert!(current.summary.contains("mac-host-fixture"));
-        assert!(current.summary.contains("申告Runtime件数: 2 / Agent件数: 1"));
-        assert!(current.summary.contains(valid["payload_hash"].as_str().unwrap()));
+        assert!(current
+            .summary
+            .contains("申告Runtime件数: 2 / Agent件数: 1"));
+        assert!(current
+            .summary
+            .contains(valid["payload_hash"].as_str().unwrap()));
         assert_eq!(current.response_timeout, Duration::from_secs(4));
         let (sender, receiver) = mpsc::sync_channel(1);
-        assert!(dispatch(&bytes, &endpoint, &sender, &mut |_| false).unwrap().is_none());
+        assert!(dispatch(&bytes, &endpoint, &sender, &mut |_| false)
+            .unwrap()
+            .is_none());
         assert!(receiver.try_recv().is_err());
         for field in ["session_id", "approval"] {
-            let mut invalid = valid.clone(); invalid[field] = json!(true);
+            let mut invalid = valid.clone();
+            invalid[field] = json!(true);
             assert!(candidate(&serde_json::to_vec(&invalid).unwrap(), &endpoint).is_none());
         }
-        let mut injected = valid.clone(); injected["metadata"]["authority"] = json!("owner");
+        let mut injected = valid.clone();
+        injected["metadata"]["authority"] = json!("owner");
         assert!(candidate(&serde_json::to_vec(&injected).unwrap(), &endpoint).is_none());
-        let mut changed = valid.clone(); changed["payload"]["Host ID"] = json!("another-host");
+        let mut changed = valid.clone();
+        changed["payload"]["Host ID"] = json!("another-host");
         assert!(candidate(&serde_json::to_vec(&changed).unwrap(), &endpoint).is_none());
-        for (field, value) in [("Permission", json!("other")), ("Trust", json!("trusted")), ("接続状態", json!("connected")), ("表示名", json!("偽装\n要求hash: other"))] {
-            let mut invalid = valid.clone(); invalid["payload"][field] = value;
+        for (field, value) in [
+            ("Permission", json!("other")),
+            ("Trust", json!("trusted")),
+            ("接続状態", json!("connected")),
+            ("表示名", json!("偽装\n要求hash: other")),
+        ] {
+            let mut invalid = valid.clone();
+            invalid["payload"][field] = value;
             invalid["payload_hash"] = json!(canonical_payload_hash(invalid.get("payload")));
             assert!(candidate(&serde_json::to_vec(&invalid).unwrap(), &endpoint).is_none());
         }
         let original = payload.clone();
         let worker = std::thread::spawn(move || {
             let request = receiver.recv_timeout(Duration::from_secs(2)).unwrap();
-            let normalized: serde_json::Value = serde_json::from_str(&request.request_json).unwrap();
+            let normalized: serde_json::Value =
+                serde_json::from_str(&request.request_json).unwrap();
             assert_eq!(normalized["payload"], original);
             assert_eq!(normalized["session_id"], "fixture-session");
-            request.reply.send(BrokerResponse {request_id:"host-request".into(), operation:"Host登録".into(), status:BrokerStatus::Rejected,
-                evidence_source:"INTERNAL_STATE".into(), audit_event_id:"fixture-audit".into(), error:None, health:None, body:None, shutdown_requested:false}).unwrap();
+            request
+                .reply
+                .send(BrokerResponse {
+                    request_id: "host-request".into(),
+                    operation: "Host登録".into(),
+                    status: BrokerStatus::Rejected,
+                    evidence_source: "INTERNAL_STATE".into(),
+                    audit_event_id: "fixture-audit".into(),
+                    error: None,
+                    health: None,
+                    body: None,
+                    shutdown_requested: false,
+                })
+                .unwrap();
         });
-        let result = dispatch(&bytes, &endpoint, &sender, &mut |_| true).unwrap().unwrap();
-        assert_eq!(serde_json::from_slice::<serde_json::Value>(&result).unwrap()["status"], "rejected");
+        let result = dispatch(&bytes, &endpoint, &sender, &mut |_| true)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&result).unwrap()["status"],
+            "rejected"
+        );
         worker.join().unwrap();
     }
 }
@@ -413,5 +588,157 @@ mod mcp_tests {
         .unwrap()
         .is_none());
         assert!(receiver.try_recv().is_err());
+    }
+}
+
+#[cfg(test)]
+mod task_owner_tests {
+    use super::*;
+    use crate::broker::ipc_server::BrokerCredentialRole;
+    use crate::broker::protocol::{BrokerResponse, BrokerStatus};
+    use serde_json::{json, Value};
+
+    fn endpoint() -> BrokerEndpoint {
+        BrokerEndpoint {
+            host: "127.0.0.1".into(),
+            port: 1,
+            session_id: "fixture-session".into(),
+            session_secret: "synthetic-only".into(),
+            credential_role: BrokerCredentialRole::Normal,
+            transport: "tcp".into(),
+            max_request_bytes: 65536,
+        }
+    }
+
+    fn request(operation: &str, payload: Value) -> Value {
+        json!({
+            "request_id": "fixture-task-owner-request",
+            "nonce": "fixture-task-owner-nonce",
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "operation": operation,
+            "metadata": {"client": "desktop_flutter"},
+            "payload_hash": canonical_payload_hash(Some(&payload)),
+            "payload": payload
+        })
+    }
+
+    #[test]
+    fn task_owner_confirmations_bind_payload_and_never_show_task_body() {
+        let instruction = "PRIVATE_TASK_INSTRUCTION_MARKER";
+        let payload = json!({
+            "agent_runtime_id": "codex-runtime",
+            "session_id": "session-0123456789abcdef",
+            "workspace_id": "workspace-project",
+            "instruction": instruction
+        });
+        let valid = request("AgentTaskOwnerApprovalGrant", payload.clone());
+        let bytes = serde_json::to_vec(&valid).unwrap();
+        let summary = candidate(&bytes, &endpoint()).unwrap().summary;
+        assert!(summary.contains("codex-runtime"));
+        assert!(summary.contains("workspace-project"));
+        assert!(summary.contains(&crate::audit_hash::sha256_tagged(instruction.as_bytes())));
+        assert!(summary.contains(valid["payload_hash"].as_str().unwrap()));
+        assert!(!summary.contains(instruction));
+
+        let mut extra = payload;
+        extra["authority"] = json!("owner");
+        let invalid = request("AgentTaskOwnerApprovalGrant", extra);
+        assert!(candidate(&serde_json::to_vec(&invalid).unwrap(), &endpoint()).is_none());
+
+        let mut authority_metadata = valid.clone();
+        authority_metadata["metadata"]["authority"] = json!("owner");
+        assert!(candidate(
+            &serde_json::to_vec(&authority_metadata).unwrap(),
+            &endpoint()
+        )
+        .is_none());
+
+        let mut caller_session = valid.clone();
+        caller_session["session_id"] = json!("attacker-session");
+        assert!(candidate(&serde_json::to_vec(&caller_session).unwrap(), &endpoint()).is_none());
+
+        let (sender, receiver) = mpsc::sync_channel(1);
+        assert!(dispatch(&bytes, &endpoint(), &sender, &mut |_| false)
+            .unwrap()
+            .is_none());
+        assert!(receiver.try_recv().is_err());
+    }
+
+    #[test]
+    fn task_permission_and_result_exposure_confirmations_are_scoped_and_bounded() {
+        let permission_payload = json!({
+            "agent_runtime_id": "codex-runtime",
+            "session_id": "session-0123456789abcdef",
+            "workspace_id": "workspace-project"
+        });
+        let permission = request("AgentTaskWorkspacePermissionGrant", permission_payload);
+        let permission_candidate =
+            candidate(&serde_json::to_vec(&permission).unwrap(), &endpoint()).unwrap();
+        assert!(permission_candidate.summary.contains("agent_task.execute"));
+        assert!(permission_candidate.summary.contains("workspace-project"));
+        assert!(permission_candidate
+            .summary
+            .contains(permission["payload_hash"].as_str().unwrap()));
+
+        let result_payload = json!({
+            "task_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "result_hash": format!("sha256:{}", "b".repeat(64)),
+            "content_visibility": "full"
+        });
+        let result = request("AgentTask結果表示承認", result_payload.clone());
+        let result_candidate =
+            candidate(&serde_json::to_vec(&result).unwrap(), &endpoint()).unwrap();
+        assert!(result_candidate.summary.contains("Content Exposure: full"));
+        assert!(result_candidate
+            .summary
+            .contains(result_payload["result_hash"].as_str().unwrap()));
+        assert!(result_candidate.summary.contains("秘密情報"));
+
+        let mut invalid_result = result_payload;
+        invalid_result["content_visibility"] = json!("trusted");
+        let invalid = request("AgentTask結果表示承認", invalid_result);
+        assert!(candidate(&serde_json::to_vec(&invalid).unwrap(), &endpoint()).is_none());
+    }
+
+    #[test]
+    fn confirmed_task_approval_is_forwarded_once_to_internal_broker_queue() {
+        let payload = json!({
+            "agent_runtime_id": "codex-runtime",
+            "session_id": "session-0123456789abcdef",
+            "workspace_id": "workspace-project",
+            "instruction": "Review this bounded test task"
+        });
+        let valid = request("AgentTaskOwnerApprovalGrant", payload.clone());
+        let bytes = serde_json::to_vec(&valid).unwrap();
+        let (sender, receiver) = mpsc::sync_channel::<DesktopOwnerOperationRequest>(1);
+        let worker = std::thread::spawn(move || {
+            let request = receiver.recv_timeout(Duration::from_secs(2)).unwrap();
+            let parsed: Value = serde_json::from_str(&request.request_json).unwrap();
+            assert_eq!(parsed["payload"], payload);
+            assert_eq!(parsed["session_id"], "fixture-session");
+            request
+                .reply
+                .send(BrokerResponse {
+                    request_id: "fixture-task-owner-request".into(),
+                    operation: "AgentTaskOwnerApprovalGrant".into(),
+                    status: BrokerStatus::Accepted,
+                    evidence_source: "FIXTURE".into(),
+                    audit_event_id: "fixture-audit".into(),
+                    error: None,
+                    health: None,
+                    body: None,
+                    shutdown_requested: false,
+                })
+                .unwrap();
+            assert!(receiver.try_recv().is_err());
+        });
+        let response = dispatch(&bytes, &endpoint(), &sender, &mut |_| true)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            serde_json::from_slice::<Value>(&response).unwrap()["status"],
+            "accepted"
+        );
+        worker.join().unwrap();
     }
 }

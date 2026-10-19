@@ -1461,8 +1461,8 @@ fn parse_tool_call_request(payload: &Value) -> Result<ToolCallRequest, McpError>
     Ok(request)
 }
 
-/// Mac native確認の公開表示。承認・catalog適合・実行資格は既存Brokerが別途再評価する。
-#[cfg(any(target_os = "macos", test))]
+/// Desktop native確認の公開表示。承認・catalog適合・実行資格は既存Brokerが別途再評価する。
+#[cfg(any(target_os = "linux", target_os = "macos", test))]
 pub(crate) fn macos_owner_summary(operation: &str, payload: &Value) -> Option<String> {
     match operation {
         OP_CONNECT => {

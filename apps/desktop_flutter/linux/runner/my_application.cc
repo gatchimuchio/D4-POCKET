@@ -72,7 +72,7 @@ static void my_application_activate(GApplication* application) {
   gtk_widget_realize(GTK_WIDGET(view));
 
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
-  broker_process_channel_register(FL_PLUGIN_REGISTRY(view));
+  broker_process_channel_register(FL_PLUGIN_REGISTRY(view), window);
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }

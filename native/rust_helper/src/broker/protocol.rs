@@ -107,8 +107,8 @@ impl AgentCliRuntimeWorkspaceRegistration {
     }
 }
 
-/// 構造確認済みの登録範囲だけを表示する。承認・Trust・実体確認は生成しない。
-#[cfg(any(target_os = "macos", test))]
+/// 構造確認済みの登録範囲だけをDesktop native確認へ表示する。承認・Trust・実体確認は生成しない。
+#[cfg(any(target_os = "linux", target_os = "macos", test))]
 pub(crate) fn macos_agent_registration_summary(payload: &Value) -> Option<String> {
     let request: AgentCliRuntimeWorkspaceRegistration =
         serde_json::from_value(payload.clone()).ok()?;
