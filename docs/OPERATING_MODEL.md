@@ -1,8 +1,10 @@
 # GUI Shell の運用モデル
 
-状態: Phase B の owner-use は完了。completed product release は未主張
+状態: Phase B の owner-use 完了は本書作成時の履歴。現行phase・状態は本書では定義しない
 参照様式: BLUE-TANUKI の direct-main owner workflow
-適用範囲: repository の作業流、安全姿勢、validation、backup、報告
+適用範囲: repository の作業流、安全姿勢、validation、backup、報告に関する補助資料
+
+現行適用注記（2026-10-19）: この文書は現行正本索引に登録されていない補助資料である。現行の作業規則・進捗はroot `AGENTS.md`、`規定/正本索引.json`、`ROADMAP.md`、`docs/REV5_PRODUCT_PROGRESS.md`を優先する。本書の古いPhase記述を現在状態として扱わない。Rust検査は`tooling/run_cargo_isolated.py`、Flutter analyze／test／buildは`tooling/validate_all.py --flutter-step`の隔離入口を使う。同期対象source上でCargo／Flutter commandを直接実行しない。
 
 ## 1. 中核姿勢
 
@@ -81,18 +83,18 @@ git status --short --branch
 
 ~~~bash
 # If codex/backup-main already exists:
-git branch -f codex/backup-main-prev codex/backup-main
+git branch -f codex/backup-main-prev refs/heads/codex/backup-main
 
 # Always update the latest backup to the current pushed main:
-git branch -f codex/backup-main main
+git branch -f codex/backup-main refs/heads/main
 ~~~
 
 backup generation は remote branch ではなく remote tag として push する。
 
 ~~~bash
 git push -f origin \
-  codex/backup-main-prev:refs/tags/codex/backup-main-prev \
-  codex/backup-main:refs/tags/codex/backup-main
+  refs/heads/codex/backup-main-prev:refs/tags/codex/backup-main-prev \
+  refs/heads/codex/backup-main:refs/tags/codex/backup-main
 ~~~
 
 GitHub は push された backup branch を通常 branch として扱い、pull request candidate として表示し得る。remote tag なら、pull request candidate を作らずに off-machine recovery を提供できる。
@@ -154,9 +156,11 @@ python3 tooling/conformance_tests/run_conformance_skeleton.py
 条件付き check:
 
 ~~~bash
-cd native/rust_helper && cargo test
-cd apps/desktop_flutter && flutter analyze
+python -X utf8 tooling/run_cargo_isolated.py +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets
+python -X utf8 tooling/validate_all.py --flutter-step desktop_flutter_analyze --desktop-platform windows
 ~~~
+
+Rust例はCargo生成物をRepository／OneDrive外の検証済み一時targetへ置く。Flutter例はOneDrive外の一時source snapshotで対象stepだけを実行する。target OS・stepに応じた正確な選択肢はroot `AGENTS.md`と`tooling/validate_all.py --help`を確認する。任意の直接Flutter起動や別processの全書込みを隔離する仕組みではない。
 
 各 command を passed、failed、not run のいずれかとして報告する。
 

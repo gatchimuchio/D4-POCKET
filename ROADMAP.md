@@ -1,5 +1,7 @@
 # GUI Shell ロードマップ
 
+後続追補（2026-10-19、旧運用文書の直接Flutter／Cargo実行例）: 非正本の`docs/OPERATING_MODEL.md`に同期対象source内で`cargo test`／`flutter analyze`を直接実行する旧例が残っていたため、現行の隔離runnerへ同期し、2世代backup refのbranch/tag曖昧性も除去した。`docs/COMPLETION_STRATEGY_INSTRUCTION.md`は旧履歴であることを明示した。Conformanceが両文書の誤用防止注記と安全な入口を検査する。現行B5状態とrelease gateは変更しない。
+
 後続追補（2026-10-19、BUF-T05のPktmon失敗診断保持）: `tooling/pktmon_packet_summary.ps1`が期待するRST header不在時にsummaryを書き込む前にthrowし、packet record／decoded tupleの区別と未解釈header形状が残らない欠陥を修正。失敗時も、方向・IPv4表記数・TCP/RST有無・区切り種別・行長だけを最大20件記録し、生packet行、packet内IP／port、payloadは出力しない。照合用の期待probe port（番号）は不在判定に表示する。別形式header fixtureのcanary非露出、fail-closed、PowerShell fixture、manual workflow check、Conformance 259 checks、manifest check、release gate checkはPASS。厳格日本語監査は12 files／51 findingsでFAIL。更新sourceのhosted captureは未実施のため、`BUF-T05`／B5／`FQ-TEST-LOOPBACK`はOPEN、reset根因と発生主体は未確定のまま。
 
 後続追補（2026-10-19、Flutter検証snapshotのreparse root拒否）: Windows一時配置先をresolve前に検査し、snapshot rootのcleanup／使用でreparse aliasをcanonical targetへ追跡しないよう修正した。実NTFS junctionを使ったLIVE_RUNTIME試験ではcleanupとtemp parent選択が拒否され、link先markerは保持された。dirty source `e74180b2`のisolated snapshotでDesktop Flutter analyze（88.7秒）とcleanupがPASSし、Conformance 259 checks、Python compile、Manifest検査もPASS。strict日本語監査は既存12 files／51 findingsでFAILし、新規code／追補行にfindingなし。共有Pub cacheを使用したがrun前後差分は未測定。OneDrive同期問題の原因・解消を示さない。`BUF-T04`部分観測、B5 OPEN、通常Release `task_execution=unsupported`、`release_ready=false`を維持する。詳細は[現行進捗](docs/REV5_PRODUCT_PROGRESS.md)と[B5自己適用記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md)。

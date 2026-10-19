@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "67442bcd0caf82c706b2b61db84f3a514336161a3dc5c218c9665211bc97c575"
+      "sha256": "733bfd8752808a834b35135541435d1bda619bf6b928f47387e0a897741327d0"
     },
     {
       "path": "SECURITY.md",
@@ -1216,7 +1216,7 @@
     },
     {
       "path": "docs/COMPLETION_STRATEGY_INSTRUCTION.md",
-      "sha256": "e0fa5d6240d24bcd9cfc4054ae514f1dd0952f5a84c3db7ab08e4dc7e55b2ec8"
+      "sha256": "9a4579d989b776e24ae05c15f16790df419c04083b84f68573dca1783a179f97"
     },
     {
       "path": "docs/D4_POCKET_PHASE_MAPPING.md",
@@ -1260,7 +1260,7 @@
     },
     {
       "path": "docs/OPERATING_MODEL.md",
-      "sha256": "e7627b840defe7c0ca71c09ce44b4acbf2211c154b46ef831fcce52a49b57b3b"
+      "sha256": "91d35fb001ad54fdaf57af44a2ef994195cbe5f417f8eccd70e37b8d63c9d46b"
     },
     {
       "path": "docs/PHASE_STRATEGY.md",
@@ -1288,7 +1288,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "3ad4e630600e964fa2c0c80248cd5d9d27c0e140dc6792302a1e5803762054ca"
+      "sha256": "e5842901b2ac4a177bbe39c82f2c4b914e71ccb0bb24d8f15770a83ed15b1e44"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -4932,7 +4932,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "93e239acdb593eab04bdf95cd571b95f8d3ae5a46ffe83ad7a589853815f07bd"
+      "sha256": "eb675b1c362090bd59a0cb550bb1a25be559960d83a1e9016ced658660d2097b"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",

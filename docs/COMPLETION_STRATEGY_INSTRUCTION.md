@@ -1,6 +1,8 @@
 # GUI-Shell 完了戦略指示
 
 状態: Phase B の owner-use は complete。OSS v1.0 RC または paid／product release ではない
+
+現行状態注記: 本書は旧Phase Bの完了時に作成された補助・履歴資料であり、現行phase、release状態、検証入口の正本ではない。現在の指示と状態はroot `AGENTS.md`、`規定/正本索引.json`、`ROADMAP.md`、`docs/REV5_PRODUCT_PROGRESS.md`を参照する。以下に残る直接Flutter commandは当時の記録・例であり、OneDrive上のsourceに対する現行実行指示ではない。現在のFlutter検査は`tooling/validate_all.py --flutter-step`、Rust検査は`tooling/run_cargo_isolated.py`を使う。
 repository の識別子: <code>gatchimuchio/GUI-Shell</code>
 主要目標: GUI-Shell を desktop-first AI Runtime／Agent Operation Shell として完成させる
 参照 consumer／Runtime: adapter contract のみを介した BLUE-TANUKI

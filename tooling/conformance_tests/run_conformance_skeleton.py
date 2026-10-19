@@ -11878,6 +11878,18 @@ def test_developer_validation_entrypoints_use_isolated_paths() -> list[str]:
     if "--flutter-step mobile_flutter_analyze" not in agents:
         errors.append("AGENTS.mdが隔離Mobile Flutter analyze入口を示していない")
 
+    operating_model = (ROOT / "docs" / "OPERATING_MODEL.md").read_text(encoding="utf-8")
+    if _markdown_has_direct_flutter_or_cargo_validation_command(operating_model):
+        errors.append("補助運用モデルにOneDrive上で直接実行するCargo／Flutter検査例が残る")
+    if "tooling/run_cargo_isolated.py" not in operating_model or "tooling/validate_all.py --flutter-step" not in operating_model:
+        errors.append("補助運用モデルが現行のCargo／Flutter隔離入口を示していない")
+    if "現行正本索引に登録されていない補助資料" not in operating_model:
+        errors.append("補助運用モデルの非正本・現行規則の優先関係を明示しない")
+
+    legacy_strategy = (ROOT / "docs" / "COMPLETION_STRATEGY_INSTRUCTION.md").read_text(encoding="utf-8")
+    if "旧Phase Bの完了時に作成された補助・履歴資料" not in legacy_strategy:
+        errors.append("旧完了戦略文書の現在状態・実行指示としての誤用防止注記がない")
+
     mobile_readme = (ROOT / "apps" / "mobile_flutter" / "README.md").read_text(encoding="utf-8")
     for token in (
         "--flutter-step mobile_flutter_analyze",
