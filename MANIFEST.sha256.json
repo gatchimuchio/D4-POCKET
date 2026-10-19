@@ -1511,6 +1511,10 @@
       "sha256": "aca5a55f1dd6e20c4fd21ec5cd8cd5c7ec8d77462583e9ed0b7d1a4c4816ca59"
     },
     {
+      "path": "docs/specs/linux-workspace-selection.md",
+      "sha256": "13fa1ba5b3db3e418b5a0c55bdfeb310fbd3675f34debef97b9c5ceede536437"
+    },
+    {
       "path": "docs/specs/long-run-validation.md",
       "sha256": "0a696f44b913b0515f8a2cb8ca388e8c1ae98b449cf7575174b4ebc74a4c96a3"
     },
@@ -2479,6 +2483,14 @@
       "sha256": "93754e3aa24f2a09c261578ffe2a91fe85485412bf79877d6fc29f23436137b1"
     },
     {
+      "path": "examples/contracts/invalid/linux_workspace_selection_authority.invalid.json",
+      "sha256": "19bf17b31f473938691c5a101bdb86076edba52a9fc84d309f650dde59fcb7d4"
+    },
+    {
+      "path": "examples/contracts/invalid/linux_workspace_selection_receipt_authority.invalid.json",
+      "sha256": "c80f8f162b4082ff1f289ca0e0439ac9eb6b3d775db2498a59ca94669f2101da"
+    },
+    {
       "path": "examples/contracts/invalid/macos_agent_cli_selection.invalid.json",
       "sha256": "861f6b480617366c8f87a64f8cc0af07a0f65c6ac5ae89acc505a9e71ca90b53"
     },
@@ -2921,6 +2933,14 @@
     {
       "path": "examples/contracts/ipc_response.valid.json",
       "sha256": "81419021e81c9704ad84120df8ba05692de380ea2d0ab7213dd72b65a667047a"
+    },
+    {
+      "path": "examples/contracts/linux_workspace_selection.valid.json",
+      "sha256": "50208d78350a7a160dec59a82df1499b6ca7da33e54c5eb11c97e342118e68bb"
+    },
+    {
+      "path": "examples/contracts/linux_workspace_selection_receipt.valid.json",
+      "sha256": "bdf9183a6942aa6c3d6acc438660dd6e0a9f583e6589a5d6c869dab250809a83"
     },
     {
       "path": "examples/contracts/llm_bounded_extension.valid.json",
@@ -3665,6 +3685,10 @@
     {
       "path": "native/rust_helper/src/linux_desktop_worker.rs",
       "sha256": "e529e4333812be4f973ef2ad4742ea1957f89328f1d2f1068f841fcb64059a3c"
+    },
+    {
+      "path": "native/rust_helper/src/linux_workspace_selection.rs",
+      "sha256": "38c2b79d81dac35d68a6b715c201214c61acf133e46db4ba2629ee583f4f2933"
     },
     {
       "path": "native/rust_helper/src/macos_credential_input.rs",
@@ -4593,6 +4617,14 @@
     {
       "path": "specs/ipc_response.schema.json",
       "sha256": "0b4168b36363ecdd766b7b55bbedf2cc3eb17347ba5f72d0ab6b963b2085394e"
+    },
+    {
+      "path": "specs/linux_workspace_selection.schema.json",
+      "sha256": "28308946e5f85d443eb89e4cdcd2bc7fd2d5a103b3551383a9334ce7fba4d0f7"
+    },
+    {
+      "path": "specs/linux_workspace_selection_receipt.schema.json",
+      "sha256": "e59ee533efe62067438b223c2569cea49919464373324d794f525f8055eff066"
     },
     {
       "path": "specs/macos_agent_cli_selection.schema.json",
