@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/d4_pocket_linux_product_package_manifest.schema.json",
+  "title": "D4 Pocket Linux製品package目録",
+  "description": "D4PKG01内のLinux native payloadをBrokerが展開前に再検査する固定目録。署名trust、Permission、Approvalを含まない。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "product", "product_version", "target_platform", "app_id", "audit_store_id", "files"],
+  "properties": {
+    "version": { "const": 1 },
+    "product": { "const": "D4 Pocket" },
+    "product_version": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9][A-Za-z0-9.+_-]*$" },
+    "target_platform": { "const": "linux" },
+    "app_id": { "type": "string", "pattern": "^d4-pocket-app-[a-f0-9]{32}$" },
+    "audit_store_id": { "type": "string", "pattern": "^audit-store-[a-f0-9]{32}$" },
+    "files": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 20000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "byte_length", "sha256", "mode"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1, "maxLength": 1024, "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(/|$))(?:data|lib)/(?:[A-Za-z0-9_-](?:[A-Za-z0-9._-]*[A-Za-z0-9_-])?)(?:/[A-Za-z0-9_-](?:[A-Za-z0-9._-]*[A-Za-z0-9_-])?)*$|^libexec/gui_shell_linux_broker$|^(?:gui_shell_desktop|gui_shell_desktop_launcher|product_manifest\\.json)$" },
+          "byte_length": { "type": "integer", "minimum": 0, "maximum": 4294967296 },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "mode": { "enum": [420, 493] }
+        }
+      }
+    }
+  }
+}

@@ -168,7 +168,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "667fdd47a87b8c125165bf82cd55650213b4d5d6a2f1d2413d42a0f2414e232d"
+      "sha256": "18c09334baaedcb36562e3cdde275c72d635cb8d549eb866bfcd747460b0b9d5"
     },
     {
       "path": "SECURITY.md",
@@ -1304,7 +1304,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "14161b168d42c4521ba3677d4591f1b0905c7a652f8c6ec8ae355c1f5aed0618"
+      "sha256": "dad411ac59166f49b97a34ff4869d9530dd9597047b1ae3d6008bab761c0a4a0"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -3632,7 +3632,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "4e85385aa42640ca66f2c6fa50456b508644f873867fb5fc1a0071b5eaf42fbe"
+      "sha256": "c19f0553d8224fc2243207ff77a2cbae0a2597755f38c58851558e15fbca228c"
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
@@ -3740,11 +3740,11 @@
     },
     {
       "path": "native/rust_helper/src/product_bootstrapper.rs",
-      "sha256": "353619f63acb052486aeb12ea37487910419fe9784ecd87a15668b41d7890f7d"
+      "sha256": "68895e770aee9c6ba1e5d6a33214e1f020c78f1708cc1233480d6354c2afece0"
     },
     {
       "path": "native/rust_helper/src/product_package.rs",
-      "sha256": "8a1eb72130a515522104c1dd8cce818ba73ffb93925d75e2feb8eb8321d81dee"
+      "sha256": "a98bbafd381197a7eb58f021fa053e84810c6748c0c100d3a55fb4f7d0c978fe"
     },
     {
       "path": "native/rust_helper/src/protected_store.rs",
@@ -5128,7 +5128,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "74e6e6c1b41b695cb8c5abaeea703c02016f7420de1e8b78ced97c094a3b3fb4"
+      "sha256": "5672babe2471e1f703b93068cb742651e3f6ecd0a14b537608ec658490d14d21"
     },
     {
       "path": "tooling/shell_snapshot.py",
@@ -5160,7 +5160,7 @@
     },
     {
       "path": "\u898f\u5b9a/00_\u65e5\u672c\u8a9e\u57fa\u5e95\u898f\u5b9a.md",
-      "sha256": "0591f9f70eb7fd3c136f1d739a3069cd2caa47c99964b953f999125d8099b895"
+      "sha256": "c6e9e1a3c881a76342e0749277030f4e14034526c7d3c335ca8d396c05f71ea1"
     },
     {
       "path": "\u898f\u5b9a/\u65e5\u672c\u8a9e\u57fa\u5e95\u4f8b\u5916.json",
@@ -5168,7 +5168,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "d984cc14496e3812603cd23fc37fc7b8324d57adba7df7fd3eb268a6b42fac0a"
+      "sha256": "0edd7f8a5f5b958b6a736ceab1e48a4a9490a9fd0da0bbba0508bca653c207ad"
     }
   ]
 }

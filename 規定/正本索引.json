@@ -284,6 +284,10 @@
       "責任": "D4PKG01製品package、有効版記録、固定root Bootstrapperの境界とreader検証範囲、限定launch-entry repairとの分離、Installer／Update writer未接続の明示"
     },
     {
+      "path": "docs/specs/linux-product-package.md",
+      "責任": "Linux native D4PKG01 payloadの対象platform、許可root、必須file、POSIX mode、Broker展開境界と未接続の署名・Owner・導入consumer"
+    },
+    {
       "path": "specs/gui_shell_module_catalog.json",
       "責任": "書出し対象Desktop画面Module、必須境界、依存、source surfaceの機械可読一覧"
     },
@@ -298,6 +302,10 @@
     {
       "path": "specs/d4_pocket_product_package_manifest.schema.json",
       "責任": "Brokerが外側署名とpackage全体hashを検査した後、Installerが展開対象file、製品版、独立App／Audit identity、各file hashと許可rootを再検査する固定package目録。Permission／Approval／Authorityを含まない"
+    },
+    {
+      "path": "specs/d4_pocket_linux_product_package_manifest.schema.json",
+      "責任": "D4PKG01 Linux native payloadのtarget_platform、固定path、file byte hash、実行mode目録。配布元trustやPermission／Approval／Authorityを含まない"
     },
     {
       "path": "specs/d4_pocket_active_version.schema.json",

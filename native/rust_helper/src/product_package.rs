@@ -6,6 +6,8 @@
 use cap_fs_ext::{DirExt, FollowSymlinks, OpenOptionsFollowExt};
 #[cfg(windows)]
 use cap_std::fs::MetadataExt as CapMetadataExt;
+#[cfg(unix)]
+use cap_std::fs::MetadataExt as CapMetadataExt;
 use cap_std::fs::{Dir, OpenOptions};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -35,6 +37,22 @@ pub struct ProductPackageExpectation<'a> {
     pub product_version: Option<&'a str>,
     pub app_id: &'a str,
     pub audit_store_id: &'a str,
+    pub platform: ProductPackagePlatform,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProductPackagePlatform {
+    Windows,
+    Linux,
+}
+
+impl ProductPackagePlatform {
+    fn manifest_value(self) -> &'static str {
+        match self {
+            Self::Windows => "windows",
+            Self::Linux => "linux",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -63,6 +81,8 @@ struct PackageManifest {
     product_version: String,
     app_id: String,
     audit_store_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    target_platform: Option<String>,
     files: Vec<PackageFile>,
 }
 
@@ -72,6 +92,8 @@ struct PackageFile {
     path: String,
     byte_length: u64,
     sha256: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    mode: Option<u32>,
 }
 
 /// 外側packageの全fileを検証し、未存在のstage directoryだけへ展開する。
@@ -218,7 +240,8 @@ pub(crate) fn verify_staged_product_package_hash(
     let mut product_manifest_bytes = None;
     for path in paths {
         validate_path(&path)?;
-        let (byte_length, sha256, contents) = hash_staged_file(stage, &path)?;
+        let (byte_length, sha256, contents, staged_mode) =
+            hash_staged_file(stage, &path, expected.platform)?;
         total_file_bytes = total_file_bytes
             .checked_add(byte_length)
             .ok_or_else(|| err("package_total_size_overflow"))?;
@@ -231,10 +254,17 @@ pub(crate) fn verify_staged_product_package_hash(
             }
             product_manifest_bytes = Some(contents);
         }
+        let mode = match expected.platform {
+            ProductPackagePlatform::Windows => None,
+            ProductPackagePlatform::Linux => {
+                Some(staged_mode.ok_or_else(|| err("package_file_mode_unavailable"))?)
+            }
+        };
         files.push(PackageFile {
             path,
             byte_length,
             sha256,
+            mode,
         });
     }
 
@@ -247,6 +277,10 @@ pub(crate) fn verify_staged_product_package_hash(
             .to_owned(),
         app_id: expected.app_id.to_owned(),
         audit_store_id: expected.audit_store_id.to_owned(),
+        target_platform: match expected.platform {
+            ProductPackagePlatform::Windows => None,
+            ProductPackagePlatform::Linux => Some("linux".to_owned()),
+        },
         files,
     };
     validate_manifest(&manifest, &expected)?;
@@ -274,7 +308,7 @@ pub(crate) fn verify_staged_product_package_hash(
     package_digest.update(manifest_length.to_le_bytes());
     package_digest.update(&manifest_bytes);
     for entry in &manifest.files {
-        hash_staged_file_into(stage, entry, &mut package_digest)?;
+        hash_staged_file_into(stage, entry, expected.platform, &mut package_digest)?;
     }
     validate_stage_tree(stage, &manifest.files)?;
     if hex::encode(package_digest.finalize()) != expected_package_sha256 {
@@ -349,8 +383,12 @@ fn collect_staged_file_paths(
     Ok(files)
 }
 
-fn hash_staged_file(root: &Dir, path: &str) -> Result<(u64, String, Vec<u8>), ProductPackageError> {
-    let (parent, name) = open_package_parent(root, path)?;
+fn hash_staged_file(
+    root: &Dir,
+    path: &str,
+    platform: ProductPackagePlatform,
+) -> Result<(u64, String, Vec<u8>, Option<u32>), ProductPackageError> {
+    let (parent, name) = open_package_parent(root, path, platform)?;
     let before = parent
         .symlink_metadata(name)
         .map_err(|_| err("package_stage_file_unavailable"))?;
@@ -368,6 +406,7 @@ fn hash_staged_file(root: &Dir, path: &str) -> Result<(u64, String, Vec<u8>), Pr
     if !opened.is_file() || is_cap_reparse_point(&opened) || !same_cap_file(&before, &opened) {
         return Err(err("package_stage_file_changed"));
     }
+    let mode = file_mode(&opened);
     let capture = path == "product_manifest.json";
     if capture && opened.len() > MAX_PRODUCT_MANIFEST_BYTES {
         return Err(err("package_product_manifest_size_invalid"));
@@ -404,15 +443,16 @@ fn hash_staged_file(root: &Dir, path: &str) -> Result<(u64, String, Vec<u8>), Pr
     if !same_cap_file(&opened, &after) || opened.len() != total || after.len() != total {
         return Err(err("package_stage_file_changed"));
     }
-    Ok((total, hex::encode(hasher.finalize()), contents))
+    Ok((total, hex::encode(hasher.finalize()), contents, mode))
 }
 
 fn hash_staged_file_into(
     root: &Dir,
     entry: &PackageFile,
+    platform: ProductPackagePlatform,
     package_digest: &mut Sha256,
 ) -> Result<(), ProductPackageError> {
-    let (parent, name) = open_package_parent(root, &entry.path)?;
+    let (parent, name) = open_package_parent(root, &entry.path, platform)?;
     let before = parent
         .symlink_metadata(name)
         .map_err(|_| err("package_stage_file_unavailable"))?;
@@ -429,6 +469,9 @@ fn hash_staged_file_into(
         .map_err(|_| err("package_stage_file_invalid"))?;
     if !opened.is_file() || is_cap_reparse_point(&opened) || !same_cap_file(&before, &opened) {
         return Err(err("package_stage_file_changed"));
+    }
+    if platform == ProductPackagePlatform::Linux && file_mode(&opened) != entry.mode {
+        return Err(err("package_file_mode_mismatch"));
     }
     let mut file_digest = Sha256::new();
     let mut total = 0u64;
@@ -531,6 +574,19 @@ fn extract_verified_package_into_directory_mode<R: Read>(
         }
         Err(_) => return Err(err("package_destination_invalid")),
     };
+    if expected.platform == ProductPackagePlatform::Linux {
+        let mode_result = if created_stage {
+            set_linux_directory_mode(&stage)
+        } else {
+            verify_linux_directory_mode(&stage)
+        };
+        if let Err(error) = mode_result {
+            if created_stage {
+                let _ = stage.remove_open_dir_all();
+            }
+            return Err(error);
+        }
+    }
     let stage_metadata = match stage.dir_metadata() {
         Ok(metadata) => metadata,
         Err(_) => {
@@ -643,7 +699,7 @@ fn extract_inner<R: Read>(
         if entry.path == "product_manifest.json" && entry.byte_length > MAX_PRODUCT_MANIFEST_BYTES {
             return Err(err("package_product_manifest_size_invalid"));
         }
-        let (parent, file_name) = open_package_parent(destination, &entry.path)?;
+        let (parent, file_name) = open_package_parent(destination, &entry.path, expected.platform)?;
         let (mut output, existing_prefix_bytes) = match mode {
             StageMode::Resume => {
                 let mut options = OpenOptions::new();
@@ -708,6 +764,14 @@ fn extract_inner<R: Read>(
                 )
             }
         };
+        if expected.platform == ProductPackagePlatform::Linux {
+            let expected_mode = entry.mode.ok_or_else(|| err("package_file_mode_invalid"))?;
+            if mode == StageMode::Create {
+                set_linux_file_mode(&output, expected_mode)?;
+            } else {
+                verify_linux_file_mode(&output, expected_mode)?;
+            }
+        }
         let mut remaining = entry.byte_length;
         let mut consumed = 0u64;
         let mut digest = Sha256::new();
@@ -942,19 +1006,46 @@ fn validate_manifest(
     {
         return Err(err("package_manifest_invalid"));
     }
+    let target_platform = manifest
+        .target_platform
+        .as_deref()
+        .unwrap_or(ProductPackagePlatform::Windows.manifest_value());
+    if target_platform != expected.platform.manifest_value() {
+        return Err(err("package_platform_mismatch"));
+    }
     let mut seen = BTreeSet::new();
-    let mut required = BTreeSet::from([
-        "app/gui_shell_desktop.exe",
-        "app/flutter_windows.dll",
-        "app/data/app.so",
-        "app/data/icudtl.dat",
-        "broker/gui_shell_rust_helper.exe",
-        "gui_shell_desktop_launcher.exe",
-        "product_manifest.json",
-    ]);
+    let mut required = match expected.platform {
+        ProductPackagePlatform::Windows => BTreeSet::from([
+            "app/gui_shell_desktop.exe",
+            "app/flutter_windows.dll",
+            "app/data/app.so",
+            "app/data/icudtl.dat",
+            "broker/gui_shell_rust_helper.exe",
+            "gui_shell_desktop_launcher.exe",
+            "product_manifest.json",
+        ]),
+        ProductPackagePlatform::Linux => BTreeSet::from([
+            "data/icudtl.dat",
+            "gui_shell_desktop",
+            "gui_shell_desktop_launcher",
+            "lib/libflutter_linux_gtk.so",
+            "libexec/gui_shell_linux_broker",
+            "product_manifest.json",
+        ]),
+    };
     let mut previous = String::new();
     for file in &manifest.files {
         validate_path(&file.path)?;
+        if !path_allowed_for_platform(&file.path, expected.platform) {
+            return Err(err("package_path_outside_payload"));
+        }
+        let expected_mode = match expected.platform {
+            ProductPackagePlatform::Windows => None,
+            ProductPackagePlatform::Linux => Some(expected_linux_mode(&file.path)?),
+        };
+        if file.mode != expected_mode {
+            return Err(err("package_file_mode_invalid"));
+        }
         let key = file.path.to_ascii_lowercase();
         if !seen.insert(key.clone()) || (!previous.is_empty() && key <= previous) {
             return Err(err("package_file_order_or_duplicate"));
@@ -985,6 +1076,81 @@ fn valid_sha256(value: &str) -> bool {
         && value
             .bytes()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn expected_linux_mode(path: &str) -> Result<u32, ProductPackageError> {
+    match path {
+        "gui_shell_desktop" | "gui_shell_desktop_launcher" | "libexec/gui_shell_linux_broker" => {
+            Ok(0o755)
+        }
+        "product_manifest.json" | "data/icudtl.dat" => Ok(0o644),
+        _ if path.starts_with("data/") || path.starts_with("lib/") => Ok(0o644),
+        _ => Err(err("package_path_outside_payload")),
+    }
+}
+
+fn file_mode(metadata: &cap_std::fs::Metadata) -> Option<u32> {
+    #[cfg(unix)]
+    {
+        Some(metadata.mode() & 0o7777)
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = metadata;
+        None
+    }
+}
+
+fn set_linux_file_mode(file: &cap_std::fs::File, mode: u32) -> Result<(), ProductPackageError> {
+    #[cfg(unix)]
+    {
+        use cap_std::fs::PermissionsExt;
+        file.set_permissions(cap_std::fs::Permissions::from_mode(mode))
+            .map_err(|_| err("package_file_mode_set_failed"))
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (file, mode);
+        Err(err("package_platform_unsupported"))
+    }
+}
+
+fn verify_linux_file_mode(
+    file: &cap_std::fs::File,
+    expected: u32,
+) -> Result<(), ProductPackageError> {
+    let actual = file
+        .metadata()
+        .map_err(|_| err("package_file_mode_unavailable"))?;
+    if file_mode(&actual) != Some(expected) {
+        return Err(err("package_file_mode_mismatch"));
+    }
+    Ok(())
+}
+
+fn set_linux_directory_mode(directory: &Dir) -> Result<(), ProductPackageError> {
+    #[cfg(unix)]
+    {
+        use cap_std::fs::PermissionsExt;
+        directory
+            .set_permissions(".", cap_std::fs::Permissions::from_mode(0o755))
+            .map_err(|_| err("package_directory_mode_set_failed"))
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = directory;
+        Err(err("package_platform_unsupported"))
+    }
+}
+
+fn verify_linux_directory_mode(directory: &Dir) -> Result<(), ProductPackageError> {
+    let metadata = directory
+        .dir_metadata()
+        .map_err(|_| err("package_directory_mode_unavailable"))?;
+    if file_mode(&metadata) != Some(0o755) {
+        return Err(err("package_directory_mode_mismatch"));
+    }
+    Ok(())
 }
 
 fn valid_product_version(value: &str) -> bool {
@@ -1032,16 +1198,47 @@ fn validate_path(value: &str) -> Result<(), ProductPackageError> {
     {
         return Err(err("package_path_invalid"));
     }
-    let allowed_root = matches!(components[0], "app" | "broker")
+    let allowed_root = matches!(components[0], "app" | "broker" | "data" | "lib" | "libexec")
         || (components.len() == 1
             && matches!(
                 components[0],
-                "gui_shell_desktop_launcher.exe" | "product_manifest.json"
+                "gui_shell_desktop_launcher.exe"
+                    | "gui_shell_desktop"
+                    | "gui_shell_desktop_launcher"
+                    | "product_manifest.json"
             ));
     if !allowed_root {
         return Err(err("package_path_outside_payload"));
     }
     Ok(())
+}
+
+fn path_allowed_for_platform(value: &str, platform: ProductPackagePlatform) -> bool {
+    let mut components = value.split('/');
+    let Some(root) = components.next() else {
+        return false;
+    };
+    let has_child = components.next().is_some();
+    match platform {
+        ProductPackagePlatform::Windows => {
+            matches!(root, "app" | "broker")
+                || (!has_child
+                    && matches!(
+                        root,
+                        "gui_shell_desktop_launcher.exe" | "product_manifest.json"
+                    ))
+        }
+        ProductPackagePlatform::Linux => {
+            matches!(root, "data" | "lib" | "libexec")
+                || (!has_child
+                    && matches!(
+                        root,
+                        "gui_shell_desktop"
+                            | "gui_shell_desktop_launcher"
+                            | "product_manifest.json"
+                    ))
+        }
+    }
 }
 
 fn is_reserved_windows_component(value: &str) -> bool {
@@ -1075,6 +1272,7 @@ fn validate_stage_name(value: &str) -> Result<(), ProductPackageError> {
 fn open_package_parent<'a>(
     root: &Dir,
     relative: &'a str,
+    platform: ProductPackagePlatform,
 ) -> Result<(Dir, &'a str), ProductPackageError> {
     validate_path(relative)?;
     let mut components = relative.split('/').peekable();
@@ -1085,24 +1283,35 @@ fn open_package_parent<'a>(
         if components.peek().is_none() {
             return Ok((current, component));
         }
-        match current.open_dir_nofollow(component) {
-            Ok(next) => current = next,
+        let (next, created) = match current.open_dir_nofollow(component) {
+            Ok(next) => (next, false),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
                 current
                     .create_dir(component)
                     .map_err(|_| err("package_directory_create_failed"))?;
-                current = current
-                    .open_dir_nofollow(component)
-                    .map_err(|_| err("package_directory_invalid"))?;
+                (
+                    current
+                        .open_dir_nofollow(component)
+                        .map_err(|_| err("package_directory_invalid"))?,
+                    true,
+                )
             }
             Err(_) => return Err(err("package_path_reparse_or_conflict")),
+        };
+        if platform == ProductPackagePlatform::Linux {
+            if created {
+                set_linux_directory_mode(&next)?;
+            } else {
+                verify_linux_directory_mode(&next)?;
+            }
         }
-        let metadata = current
+        let metadata = next
             .dir_metadata()
             .map_err(|_| err("package_directory_invalid"))?;
         if !metadata.is_dir() || is_cap_reparse_point(&metadata) {
             return Err(err("package_path_reparse_or_conflict"));
         }
+        current = next;
     }
     Err(err("package_path_invalid"))
 }
@@ -1152,13 +1361,22 @@ mod tests {
 
     const PRODUCT_MANIFEST: &[u8] = br#"{"version":1,"product":"D4 Pocket","export_id":"export-test","manifest":{"app_identity":{"app_id":"d4-pocket-app-11111111111111111111111111111111"},"audit_store":{"store_id":"audit-store-22222222222222222222222222222222","chain_status":"new","inherited":false},"inheritance_policy":{"authority":"none","permission":"none","approval":"none","credential":"none","audit_chain":"none"}}}"#;
 
-    fn package_with(files: Vec<(&str, &[u8])>) -> Vec<u8> {
+    fn package_with_platform(
+        files: Vec<(&str, &[u8])>,
+        platform: ProductPackagePlatform,
+    ) -> Vec<u8> {
         let entries: Vec<_> = files
             .iter()
             .map(|(path, bytes)| PackageFile {
                 path: (*path).to_owned(),
                 byte_length: bytes.len() as u64,
                 sha256: hex::encode(Sha256::digest(bytes)),
+                mode: match platform {
+                    ProductPackagePlatform::Windows => None,
+                    ProductPackagePlatform::Linux => {
+                        Some(expected_linux_mode(path).unwrap_or(0o644))
+                    }
+                },
             })
             .collect();
         let manifest = PackageManifest {
@@ -1167,6 +1385,10 @@ mod tests {
             product_version: "1.2.3".to_owned(),
             app_id: APP.to_owned(),
             audit_store_id: AUDIT.to_owned(),
+            target_platform: match platform {
+                ProductPackagePlatform::Windows => None,
+                ProductPackagePlatform::Linux => Some("linux".to_owned()),
+            },
             files: entries,
         };
         let raw = serde_json::to_vec(&manifest).unwrap();
@@ -1179,6 +1401,10 @@ mod tests {
         output
     }
 
+    fn package_with(files: Vec<(&str, &[u8])>) -> Vec<u8> {
+        package_with_platform(files, ProductPackagePlatform::Windows)
+    }
+
     fn files_for_test() -> Vec<(&'static str, &'static [u8])> {
         vec![
             ("app/data/app.so", b"a"),
@@ -1187,6 +1413,17 @@ mod tests {
             ("app/gui_shell_desktop.exe", b"d"),
             ("broker/gui_shell_rust_helper.exe", b"e"),
             ("gui_shell_desktop_launcher.exe", b"f"),
+            ("product_manifest.json", PRODUCT_MANIFEST),
+        ]
+    }
+
+    fn linux_files_for_test() -> Vec<(&'static str, &'static [u8])> {
+        vec![
+            ("data/icudtl.dat", b"icu"),
+            ("gui_shell_desktop", b"runner"),
+            ("gui_shell_desktop_launcher", b"launcher"),
+            ("lib/libflutter_linux_gtk.so", b"flutter"),
+            ("libexec/gui_shell_linux_broker", b"broker"),
             ("product_manifest.json", PRODUCT_MANIFEST),
         ]
     }
@@ -1210,7 +1447,134 @@ mod tests {
             product_version: version,
             app_id: APP,
             audit_store_id: AUDIT,
+            platform: ProductPackagePlatform::Windows,
         }
+    }
+
+    fn linux_expectation<'a>(version: Option<&'a str>) -> ProductPackageExpectation<'a> {
+        ProductPackageExpectation {
+            product_version: version,
+            app_id: APP,
+            audit_store_id: AUDIT,
+            platform: ProductPackagePlatform::Linux,
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn linux_package_extracts_fixed_native_bundle_and_reconstructs_outer_hash() {
+        let bytes = package_with_platform(linux_files_for_test(), ProductPackagePlatform::Linux);
+        let digest = hex::encode(Sha256::digest(&bytes));
+        let path = write_temp(&bytes, "linux-valid");
+        let destination = path.parent().unwrap().join("linux-stage");
+        let info = extract_verified_package(&path, &destination, linux_expectation(Some("1.2.3")))
+            .unwrap();
+        assert_eq!(info.file_count, 6);
+        assert_eq!(
+            fs::read(destination.join("gui_shell_desktop_launcher")).unwrap(),
+            b"launcher"
+        );
+        use std::os::unix::fs::{MetadataExt, PermissionsExt};
+        assert_eq!(
+            fs::metadata(destination.join("gui_shell_desktop_launcher"))
+                .unwrap()
+                .mode()
+                & 0o7777,
+            0o755
+        );
+        assert_eq!(
+            fs::metadata(destination.join("data")).unwrap().mode() & 0o7777,
+            0o755
+        );
+        let stage = Dir::open_ambient_dir(&destination, cap_std::ambient_authority()).unwrap();
+        assert_eq!(
+            verify_staged_product_package_hash(&stage, linux_expectation(Some("1.2.3")), &digest,)
+                .unwrap(),
+            info
+        );
+        fs::set_permissions(
+            destination.join("gui_shell_desktop_launcher"),
+            fs::Permissions::from_mode(0o700),
+        )
+        .unwrap();
+        assert_eq!(
+            verify_staged_product_package_hash(&stage, linux_expectation(Some("1.2.3")), &digest,)
+                .unwrap_err()
+                .0,
+            "package_file_mode_invalid"
+        );
+        fs::set_permissions(
+            destination.join("gui_shell_desktop_launcher"),
+            fs::Permissions::from_mode(0o755),
+        )
+        .unwrap();
+        fs::set_permissions(destination.join("data"), fs::Permissions::from_mode(0o777)).unwrap();
+        assert_eq!(
+            verify_staged_product_package_hash(&stage, linux_expectation(Some("1.2.3")), &digest,)
+                .unwrap_err()
+                .0,
+            "package_directory_mode_mismatch"
+        );
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn package_platform_mismatch_and_cross_platform_payload_are_rejected() {
+        let linux_bytes =
+            package_with_platform(linux_files_for_test(), ProductPackagePlatform::Linux);
+        let linux_path = write_temp(&linux_bytes, "linux-platform-mismatch");
+        assert_eq!(
+            extract_verified_package(
+                &linux_path,
+                &linux_path.parent().unwrap().join("wrong-platform"),
+                expectation(Some("1.2.3")),
+            )
+            .unwrap_err()
+            .0,
+            "package_platform_mismatch"
+        );
+        fs::remove_dir_all(linux_path.parent().unwrap()).unwrap();
+
+        let mut invalid_files = linux_files_for_test();
+        invalid_files.push(("app/foreign_payload", b"not-linux"));
+        let invalid_bytes = package_with_platform(invalid_files, ProductPackagePlatform::Linux);
+        let invalid_path = write_temp(&invalid_bytes, "linux-cross-platform-payload");
+        assert_eq!(
+            extract_verified_package(
+                &invalid_path,
+                &invalid_path.parent().unwrap().join("invalid-stage"),
+                linux_expectation(Some("1.2.3")),
+            )
+            .unwrap_err()
+            .0,
+            "package_path_outside_payload"
+        );
+        fs::remove_dir_all(invalid_path.parent().unwrap()).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn linux_package_rejects_special_mode_before_creating_stage() {
+        let bytes = package_with_platform(linux_files_for_test(), ProductPackagePlatform::Linux);
+        let manifest_length = u32::from_le_bytes(bytes[8..12].try_into().unwrap()) as usize;
+        let mut manifest: serde_json::Value =
+            serde_json::from_slice(&bytes[12..12 + manifest_length]).unwrap();
+        manifest["files"][1]["mode"] = json!(0o4755);
+        let manifest_bytes = serde_json::to_vec(&manifest).unwrap();
+        let mut invalid = MAGIC.to_vec();
+        invalid.extend_from_slice(&(manifest_bytes.len() as u32).to_le_bytes());
+        invalid.extend_from_slice(&manifest_bytes);
+        invalid.extend_from_slice(&bytes[12 + manifest_length..]);
+        let path = write_temp(&invalid, "linux-special-mode");
+        let destination = path.parent().unwrap().join("special-mode-stage");
+        assert_eq!(
+            extract_verified_package(&path, &destination, linux_expectation(Some("1.2.3")),)
+                .unwrap_err()
+                .0,
+            "package_file_mode_invalid"
+        );
+        assert!(!destination.exists());
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
     }
 
     #[test]
@@ -1301,13 +1665,15 @@ mod tests {
             .0,
             "package_stage_name_invalid"
         );
-        assert!(!path
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .join("escaped")
-            .exists());
+        assert!(
+            !path
+                .parent()
+                .unwrap()
+                .parent()
+                .unwrap()
+                .join("escaped")
+                .exists()
+        );
         drop(directory);
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
     }

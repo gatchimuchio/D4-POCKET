@@ -7,22 +7,22 @@
 #![allow(non_snake_case)]
 
 use super::protocol::{
-    Broker, BrokerError, BrokerOperation, BrokerResponse, BrokerStatus, OwnerConfirmationSource,
-    EVIDENCE_SOURCE_INTERNAL_STATE,
+    Broker, BrokerError, BrokerOperation, BrokerResponse, BrokerStatus,
+    EVIDENCE_SOURCE_INTERNAL_STATE, OwnerConfirmationSource,
 };
 use super::store::{BrokerPersistentStore, BrokerStoreError};
 use crate::audit_hash::sha256_tagged;
-use crate::update_verification::{verify_signed_update_signature, SignedUpdateCandidate};
+use crate::update_verification::{SignedUpdateCandidate, verify_signed_update_signature};
 #[cfg(windows)]
 use cap_fs_ext::OsMetadataExt as _;
 use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
 use cap_std::fs::OpenOptions;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{mpsc, Arc};
+use std::sync::{Arc, mpsc};
 use std::thread::JoinHandle;
 
 const VERSION: u64 = 1;
@@ -49,8 +49,7 @@ const OP_UNINSTALL_FAILED: &str = "製品アンインストール失敗";
 const EMBEDDED_PRODUCT_APP_ID: Option<&str> = option_env!("GUI_SHELL_PRODUCT_APP_ID");
 const EMBEDDED_PRODUCT_AUDIT_STORE_ID: Option<&str> =
     option_env!("GUI_SHELL_PRODUCT_AUDIT_STORE_ID");
-const EMBEDDED_PRODUCT_UPDATE_TRUST_JSON: Option<&str> =
-    option_env!("GUI_SHELL_UPDATE_TRUST_JSON");
+const EMBEDDED_PRODUCT_UPDATE_TRUST_JSON: Option<&str> = option_env!("GUI_SHELL_UPDATE_TRUST_JSON");
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct UpdateDownloadConfirmation {
@@ -329,15 +328,24 @@ pub(super) fn poll_download_completion(broker: &mut Broker) {
         match package.disposition {
             super::update_download::PackageDisposition::AlreadyVerified => (
                 "completed",
-                format!("Capability=署名済みupdate package取得 Permission=Broker固定store内の既存packageを全byte再検証 Approval=対象候補とHTTPS hostのRust Desktop native Owner確認済み AuditEvent=既存packageの一致を記録 RecoveryAction=適用前にもfile全体を再hash検証。ここではinstall／process起動しない。{} byte", package.bytes),
+                format!(
+                    "Capability=署名済みupdate package取得 Permission=Broker固定store内の既存packageを全byte再検証 Approval=対象候補とHTTPS hostのRust Desktop native Owner確認済み AuditEvent=既存packageの一致を記録 RecoveryAction=適用前にもfile全体を再hash検証。ここではinstall／process起動しない。{} byte",
+                    package.bytes
+                ),
             ),
             super::update_download::PackageDisposition::Downloaded => (
                 "completed",
-                format!("Capability=署名済みupdate package取得 Permission=Broker固定package directoryへ検証済み{} byteを新規保存 Approval=対象候補とHTTPS hostのRust Desktop native Owner確認済み AuditEvent=download完了を記録 RecoveryAction=適用時にfileを再度hash検証。ここではinstall／process起動しない", package.bytes),
+                format!(
+                    "Capability=署名済みupdate package取得 Permission=Broker固定package directoryへ検証済み{} byteを新規保存 Approval=対象候補とHTTPS hostのRust Desktop native Owner確認済み AuditEvent=download完了を記録 RecoveryAction=適用時にfileを再度hash検証。ここではinstall／process起動しない",
+                    package.bytes
+                ),
             ),
             super::update_download::PackageDisposition::RepairedCorrupt => (
                 "recovered",
-                format!("Capability=署名済みupdate package取得 Permission=同一digest名の通常fileだけを原子的に置換 Approval=対象候補とHTTPS hostのRust Desktop native Owner確認済み AuditEvent=既存fileの長さ／hash不一致と検証済みpackageへの置換を記録 RecoveryAction=適用前にfile全体を再hash検証。ここではinstall／process起動しない。{} byte", package.bytes),
+                format!(
+                    "Capability=署名済みupdate package取得 Permission=同一digest名の通常fileだけを原子的に置換 Approval=対象候補とHTTPS hostのRust Desktop native Owner確認済み AuditEvent=既存fileの長さ／hash不一致と検証済みpackageへの置換を記録 RecoveryAction=適用前にfile全体を再hash検証。ここではinstall／process起動しない。{} byte",
+                    package.bytes
+                ),
             ),
         }
     } else {
@@ -752,19 +760,20 @@ fn request_product_uninstall(
     owner_confirmation: OwnerConfirmationSource,
     confirmation: Option<&ProductUninstallConfirmation>,
 ) -> BrokerResponse {
-    let request: ProductUninstallRequest = match serde_json::from_value::<ProductUninstallRequest>(payload.clone()) {
-        Ok(request) if request.version == VERSION => request,
-        _ => {
-            return reject(
-                broker,
-                request_id,
-                OP_UNINSTALL,
-                "product_uninstall_request_invalid",
-                "製品アンインストール要求の構造が不正",
-                payload_hash,
-            )
-        }
-    };
+    let request: ProductUninstallRequest =
+        match serde_json::from_value::<ProductUninstallRequest>(payload.clone()) {
+            Ok(request) if request.version == VERSION => request,
+            _ => {
+                return reject(
+                    broker,
+                    request_id,
+                    OP_UNINSTALL,
+                    "product_uninstall_request_invalid",
+                    "製品アンインストール要求の構造が不正",
+                    payload_hash,
+                );
+            }
+        };
     let _ = request;
     if owner_confirmation != OwnerConfirmationSource::DesktopNativeConfirmation
         || !broker.desktop_install_path_verified
@@ -816,7 +825,8 @@ fn request_product_uninstall(
         #[cfg(not(test))]
         let start_menu = super::product_install::current_user_start_menu_directory().ok()?;
         let root = super::product_install::product_install_root(&local_app_data, app_id).ok()?;
-        let shortcut = super::product_install::plan_start_menu_shortcut(&start_menu, app_id).ok()?;
+        let shortcut =
+            super::product_install::plan_start_menu_shortcut(&start_menu, app_id).ok()?;
         Some((local_app_data, root, shortcut))
     })();
     #[cfg(not(windows))]
@@ -832,8 +842,8 @@ fn request_product_uninstall(
             payload_hash,
         );
     };
-    let root_is_present = super::product_install::open_existing_product_root(&local_app_data, app_id)
-        .is_ok();
+    let root_is_present =
+        super::product_install::open_existing_product_root(&local_app_data, app_id).is_ok();
     if !root_is_present
         || confirmation.app_id != *app_id
         || confirmation.audit_store_id != *audit_store_id
@@ -883,7 +893,7 @@ fn request_product_uninstall(
                 OP_UNINSTALL,
                 "product_uninstall_audit_failed",
                 "削除前の監査を確定できないため、製品を削除しない",
-            )
+            );
         }
     };
     BrokerResponse {
@@ -926,7 +936,7 @@ fn repair_product_launch_entries(
                     "product_repair_request_invalid",
                     "製品起動項目修復要求の構造が不正",
                     payload_hash,
-                )
+                );
             }
         };
     let _ = request;
@@ -995,22 +1005,23 @@ fn repair_product_launch_entries(
             payload_hash,
         );
     };
-    let snapshot =
-        match crate::product_bootstrapper::active_version_snapshot(
-            &local_app_data,
-            &app_id,
-            &audit_store_id,
-        ) {
-            Ok(snapshot) => snapshot,
-            Err(error) => return reject(
+    let snapshot = match crate::product_bootstrapper::active_version_snapshot(
+        &local_app_data,
+        &app_id,
+        &audit_store_id,
+    ) {
+        Ok(snapshot) => snapshot,
+        Err(error) => {
+            return reject(
                 broker,
                 request_id,
                 OP_PRODUCT_REPAIR,
                 error.0,
                 "現行active recordまたはversion-local launcherを安全に検証できないため修復しない",
                 payload_hash,
-            ),
-        };
+            );
+        }
+    };
     let current = &snapshot.current;
     if !rollback_descriptor_matches_candidate(broker, current)
         || confirmation.app_id != app_id
@@ -1052,7 +1063,7 @@ fn repair_product_launch_entries(
                 payload_hash,
                 "product_start_menu_shortcut_unavailable",
                 "Start Menu shortcutの状態を安全に確認できないため修復しない",
-            )
+            );
         }
     };
     let intent = match broker.append_audit(
@@ -1088,7 +1099,7 @@ fn repair_product_launch_entries(
                 payload_hash,
                 error.0,
                 "現行stageから固定root起動器を安全に復元できないため、状態を上書きせず停止した",
-            )
+            );
         }
     };
     let root_path =
@@ -1101,7 +1112,7 @@ fn repair_product_launch_entries(
                     payload_hash,
                     "product_install_root_changed",
                     "修復中に固定製品rootが変化したため停止した",
-                )
+                );
             }
         };
     let _registered_shortcut = match super::product_install::register_start_menu_shortcut(
@@ -1118,7 +1129,7 @@ fn repair_product_launch_entries(
                 payload_hash,
                 "product_start_menu_published_path_mismatch",
                 "Start Menu shortcutの公開先が確認済み固定pathと一致しない",
-            )
+            );
         }
         Err(error) => {
             return product_repair_failed(
@@ -1127,7 +1138,7 @@ fn repair_product_launch_entries(
                 payload_hash,
                 error.0,
                 "固定Start Menu shortcutを安全に復元できないため停止した",
-            )
+            );
         }
     };
     let repaired = bootstrapper_restored || !existing_shortcut;
@@ -1316,8 +1327,7 @@ impl Broker {
             matches!(
                 event.operation.as_str(),
                 OP_UNINSTALL_FAILED | OP_UNINSTALL_COMPLETED
-            )
-                && event.reason.contains(&ticket_marker)
+            ) && event.reason.contains(&ticket_marker)
         });
         if !has_authorization || !has_started || has_terminal {
             return Err("product_uninstall_ticket_not_pending");
@@ -1421,7 +1431,7 @@ where
                     "update_catalog_size_invalid",
                     "候補一覧のbyte長が上限外",
                     hash,
-                )
+                );
             }
             Err(error) => {
                 let (code, reason) = catalog_download_error(&error);
@@ -1437,7 +1447,7 @@ where
                     "update_catalog_total_size_invalid",
                     "候補一覧の合計byte長が上限外",
                     hash,
-                )
+                );
             }
         };
         let catalog_hash = sha256_tagged(&bytes);
@@ -1451,7 +1461,7 @@ where
                     "update_catalog_encoding_invalid",
                     "候補一覧がUTF-8ではない",
                     hash,
-                )
+                );
             }
         };
         let document: UpdateCatalogDocument =
@@ -1469,7 +1479,7 @@ where
                         "update_catalog_invalid",
                         "候補一覧の構造または版が不正",
                         hash,
-                    )
+                    );
                 }
             };
         for candidate in document.candidates {
@@ -1486,7 +1496,7 @@ where
             match verify_candidate(broker, candidate) {
                 Ok(record) => records.push(record),
                 Err((code, reason)) => {
-                    return reject_catalog(broker, request_id, code, reason, hash)
+                    return reject_catalog(broker, request_id, code, reason, hash);
                 }
             }
         }
@@ -1537,7 +1547,8 @@ where
         hash,
         &catalog_audit_reason(&format!(
             "Broker固定HTTPS配布元から署名検証済み候補を取得し永続化 catalog_hashes={} candidates={}",
-            catalog_hashes, records.len()
+            catalog_hashes,
+            records.len()
         )),
     )
 }
@@ -1804,7 +1815,7 @@ fn verify(broker: &mut Broker, payload: &Value, request_id: &str, hash: &str) ->
                     "update_candidate_invalid",
                     "更新候補の構造が不正",
                     hash,
-                )
+                );
             }
         };
     let record = match verify_candidate(broker, request.candidate) {
@@ -1832,7 +1843,7 @@ fn check(broker: &mut Broker, payload: &Value, request_id: &str, hash: &str) -> 
                 "update_check_invalid",
                 "更新確認の構造が不正",
                 hash,
-            )
+            );
         }
     };
     if request.candidates.len() > MAX_UPDATES {
@@ -1850,7 +1861,7 @@ fn check(broker: &mut Broker, payload: &Value, request_id: &str, hash: &str) -> 
         match verify_candidate(broker, candidate) {
             Ok(record) => records.push(record),
             Err((code, message)) => {
-                return reject(broker, request_id, OP_CHECK, code, message, hash)
+                return reject(broker, request_id, OP_CHECK, code, message, hash);
             }
         }
     }
@@ -1866,7 +1877,7 @@ fn check(broker: &mut Broker, payload: &Value, request_id: &str, hash: &str) -> 
                     "update_serialize_failed",
                     "更新候補を保存形式へ変換できない",
                     hash,
-                )
+                );
             }
         };
         broker
@@ -1916,7 +1927,7 @@ fn defer(broker: &mut Broker, payload: &Value, request_id: &str, hash: &str) -> 
                 "update_defer_invalid",
                 "更新延期の構造が不正",
                 hash,
-            )
+            );
         }
     };
     let Some(current) = broker.updates.get(&request.update_id).cloned() else {
@@ -1939,7 +1950,7 @@ fn defer(broker: &mut Broker, payload: &Value, request_id: &str, hash: &str) -> 
                 "update_state_invalid",
                 "更新状態が不正",
                 hash,
-            )
+            );
         }
     };
     if record.candidate_hash != request.candidate_hash {
@@ -2004,7 +2015,7 @@ fn execution_request(
                 "update_request_invalid",
                 "更新実行要求の構造が不正",
                 hash,
-            )
+            );
         }
     };
     let Some(value) = broker.updates.get(&request.update_id) else {
@@ -2027,7 +2038,7 @@ fn execution_request(
                 "update_state_invalid",
                 "更新状態が不正",
                 hash,
-            )
+            );
         }
     };
     if record.candidate_hash != request.candidate_hash {
@@ -2153,7 +2164,7 @@ fn execution_request(
                     "update_download_store_unavailable",
                     "Broker所有の永続package directoryがない",
                     hash,
-                )
+                );
             }
             Err(_) => {
                 return reject(
@@ -2163,7 +2174,7 @@ fn execution_request(
                     "update_download_store_invalid",
                     "Broker所有のpackage directoryを安全に開けない",
                     hash,
-                )
+                );
             }
         };
         let cleanup_request_id = format!("{}:recovery", request_id);
@@ -2461,7 +2472,7 @@ fn rollback_active_version(
                 error.0,
                 "有効版recordまたはstageを安全に検証できないためrollbackしない",
                 payload_hash,
-            )
+            );
         }
     };
     let Some(previous) = snapshot.previous.as_ref() else {
@@ -2515,7 +2526,7 @@ fn rollback_active_version(
                 "product_install_plan_invalid",
                 "Brokerが現行版の固定導入先を導出できない",
                 payload_hash,
-            )
+            );
         }
     };
     if current_plan.version_directory != confirmation.version_directory {
@@ -2551,7 +2562,7 @@ fn rollback_active_version(
                 "product_install_plan_invalid",
                 "Brokerがrollback先の固定導入先を導出できない",
                 payload_hash,
-            )
+            );
         }
     };
     if plan.version_directory != target_confirmation.version_directory {
@@ -2585,7 +2596,7 @@ fn rollback_active_version(
                     "product_install_root_unavailable",
                     "既存の固定製品rootがないためrollbackしない",
                     payload_hash,
-                )
+                );
             }
         };
     if root_path != plan.root {
@@ -2612,7 +2623,7 @@ fn rollback_active_version(
                     "product_install_versions_unavailable",
                     "固定versions directoryがないためrollbackしない",
                     payload_hash,
-                )
+                );
             }
         };
     if plan.version_directory.parent() != Some(versions_path.as_path()) {
@@ -2673,7 +2684,7 @@ fn rollback_active_version(
                 payload_hash,
                 error.0,
                 "有効版recordを変更できずrollbackを完了しない",
-            )
+            );
         }
     };
     let completion = match broker.append_audit(
@@ -2904,7 +2915,7 @@ fn apply_verified_package(
                     "product_install_plan_invalid",
                     "Brokerが固定導入先を導出できない",
                     payload_hash,
-                )
+                );
             }
         };
         if plan.version_directory != confirmation.version_directory {
@@ -2951,7 +2962,7 @@ fn apply_verified_package(
                     "update_package_store_unavailable",
                     "Broker固定download package directoryを開けない",
                     payload_hash,
-                )
+                );
             }
         };
         let package_name = format!("{package_sha256}.pkg");
@@ -2967,7 +2978,7 @@ fn apply_verified_package(
                     "update_package_missing",
                     "署名済みdigest名のdownload packageがない",
                     payload_hash,
-                )
+                );
             }
         };
         let package_metadata = match package.metadata() {
@@ -2986,7 +2997,7 @@ fn apply_verified_package(
                     "update_package_file_invalid",
                     "download packageの通常file属性または署名済みbyte長が一致しない",
                     payload_hash,
-                )
+                );
             }
         };
         let intent_reason = format!(
@@ -3011,7 +3022,7 @@ fn apply_verified_package(
                     OP_APPLY,
                     "update_apply_audit_failed",
                     "導入開始前Auditを確定できない",
-                )
+                );
             }
         };
         #[cfg(test)]
@@ -3098,6 +3109,7 @@ fn apply_verified_package(
                 product_version: Some(&record.candidate.offered_version),
                 app_id: &app_id,
                 audit_store_id: &audit_store_id,
+                platform: crate::product_package::ProductPackagePlatform::Windows,
             },
         );
         let (info, resumed) = match extraction {
@@ -3147,7 +3159,7 @@ fn apply_verified_package(
                     OP_APPLY,
                     "update_apply_audit_failed",
                     "展開後のAuditを確定できない。version directoryは自動起動しない",
-                )
+                );
             }
         };
         return BrokerResponse {
@@ -3303,7 +3315,7 @@ fn activate_verified_staged_package(
                     "product_install_plan_invalid",
                     "Brokerが切替対象の固定導入先を導出できない",
                     payload_hash,
-                )
+                );
             }
         };
         #[cfg(test)]
@@ -3336,7 +3348,7 @@ fn activate_verified_staged_package(
                     "product_start_menu_plan_invalid",
                     "BrokerがStart Menu shortcutの固定配置を導出できない",
                     payload_hash,
-                )
+                );
             }
         };
         if planned_start_menu_shortcut != confirmation.start_menu_shortcut_path {
@@ -3393,7 +3405,7 @@ fn activate_verified_staged_package(
                     "update_package_store_unavailable",
                     "Broker固定download package directoryを開けない",
                     payload_hash,
-                )
+                );
             }
         };
         let package_name = format!("{package_sha256}.pkg");
@@ -3409,7 +3421,7 @@ fn activate_verified_staged_package(
                     "update_package_missing",
                     "署名済みdigest名のdownload packageがない",
                     payload_hash,
-                )
+                );
             }
         };
         let package_metadata = match package.metadata() {
@@ -3428,7 +3440,7 @@ fn activate_verified_staged_package(
                     "update_package_file_invalid",
                     "download packageの通常file属性または署名済みbyte長が一致しない",
                     payload_hash,
-                )
+                );
             }
         };
         let (root_path, product_root) =
@@ -3442,7 +3454,7 @@ fn activate_verified_staged_package(
                         "product_install_root_unavailable",
                         "固定製品rootがないため有効版を切り替えない",
                         payload_hash,
-                    )
+                    );
                 }
             };
         if root_path != plan.root {
@@ -3469,7 +3481,7 @@ fn activate_verified_staged_package(
                         "product_install_versions_unavailable",
                         "既存の固定versions directoryがないため有効版を切り替えない",
                         payload_hash,
-                    )
+                    );
                 }
             };
         if plan.version_directory.parent() != Some(versions_path.as_path()) {
@@ -3505,7 +3517,7 @@ fn activate_verified_staged_package(
                     OP_ACTIVATE,
                     "update_activation_audit_failed",
                     "有効版切替前Auditを確定できない",
-                )
+                );
             }
         };
         let info = match crate::product_package::verify_staged_package_into_directory(
@@ -3518,6 +3530,7 @@ fn activate_verified_staged_package(
                 product_version: Some(&record.candidate.offered_version),
                 app_id: &app_id,
                 audit_store_id: &audit_store_id,
+                platform: crate::product_package::ProductPackagePlatform::Windows,
             },
         ) {
             Ok(info) => info,
@@ -3528,7 +3541,7 @@ fn activate_verified_staged_package(
                     payload_hash,
                     error.0,
                     "署名済みpackageと既存version stageが完全一致しないため切替を拒否",
-                )
+                );
             }
         };
         let mut suffix_bytes = [0u8; 16];
@@ -3560,24 +3573,23 @@ fn activate_verified_staged_package(
                 "固定root Bootstrapperまたは有効版recordを安全に公開できず切替を拒否",
             );
         }
-        let registered_shortcut =
-            match super::product_install::register_start_menu_shortcut(
-                &local_app_data,
-                &start_menu_directory,
-                &app_id,
-                &root_path,
-            ) {
-                Ok(path) => path,
-                Err(error) => {
-                    return activation_failed(
-                        broker,
-                        request_id,
-                        payload_hash,
-                        error.0,
-                        "有効版record公開後のStart Menu shortcut登録が未完了。既存状態を維持し、Owner確認付きで再試行する",
-                    )
-                }
-            };
+        let registered_shortcut = match super::product_install::register_start_menu_shortcut(
+            &local_app_data,
+            &start_menu_directory,
+            &app_id,
+            &root_path,
+        ) {
+            Ok(path) => path,
+            Err(error) => {
+                return activation_failed(
+                    broker,
+                    request_id,
+                    payload_hash,
+                    error.0,
+                    "有効版record公開後のStart Menu shortcut登録が未完了。既存状態を維持し、Owner確認付きで再試行する",
+                );
+            }
+        };
         if registered_shortcut != confirmation.start_menu_shortcut_path {
             return activation_failed(
                 broker,
@@ -3603,7 +3615,7 @@ fn activate_verified_staged_package(
                     OP_ACTIVATE,
                     "update_activation_audit_failed",
                     "有効版record公開後の完了Auditを確定できない。再起動・起動成立は主張しない",
-                )
+                );
             }
         };
         let package_cleanup_intent = broker.append_audit(
@@ -3993,7 +4005,7 @@ fn accepted(
                 operation,
                 "update_audit_append_failed",
                 "更新操作の監査を確定できない",
-            )
+            );
         }
     };
     BrokerResponse {
@@ -4032,7 +4044,7 @@ fn accepted_external(
                 operation,
                 "update_audit_append_failed",
                 "更新操作の監査を確定できない",
-            )
+            );
         }
     };
     BrokerResponse {
@@ -4071,7 +4083,7 @@ fn suspended(
                 operation,
                 "update_audit_append_failed",
                 "更新操作の監査を確定できない",
-            )
+            );
         }
     };
     BrokerResponse {
@@ -4362,16 +4374,12 @@ mod tests {
     #[test]
     fn product_build_without_embedded_trust_ignores_persistent_trust() {
         let mut persistent_store_read = false;
-        let resolved = resolve_build_update_trust(
-            Some(INSTALL_APP_ID),
-            Some(INSTALL_AUDIT_ID),
-            None,
-            || {
+        let resolved =
+            resolve_build_update_trust(Some(INSTALL_APP_ID), Some(INSTALL_AUDIT_ID), None, || {
                 persistent_store_read = true;
                 Ok(Some(configured_product_trust()))
-            },
-        )
-        .unwrap();
+            })
+            .unwrap();
         assert_eq!(resolved, None);
         assert!(!persistent_store_read);
     }
@@ -4401,13 +4409,15 @@ mod tests {
         let mut no_source_trust = configured_product_trust();
         no_source_trust.package_sources.clear();
         let no_source_json = serde_json::to_string(&no_source_trust).unwrap();
-        assert!(resolve_build_update_trust(
-            Some(INSTALL_APP_ID),
-            Some(INSTALL_AUDIT_ID),
-            Some(&no_source_json),
-            || Ok(None)
-        )
-        .is_err());
+        assert!(
+            resolve_build_update_trust(
+                Some(INSTALL_APP_ID),
+                Some(INSTALL_AUDIT_ID),
+                Some(&no_source_json),
+                || Ok(None)
+            )
+            .is_err()
+        );
         assert!(resolve_build_update_trust(None, None, Some(&valid_json), || Ok(None)).is_err());
     }
 
@@ -4544,8 +4554,8 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
-    fn product_launch_repair_restores_only_missing_entries_after_current_trust_and_owner_confirmation(
-    ) {
+    fn product_launch_repair_restores_only_missing_entries_after_current_trust_and_owner_confirmation()
+     {
         let unique = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -4600,6 +4610,7 @@ mod tests {
                 product_version: Some("1.1.0"),
                 app_id: INSTALL_APP_ID,
                 audit_store_id: INSTALL_AUDIT_ID,
+                platform: crate::product_package::ProductPackagePlatform::Windows,
             },
         )
         .unwrap();
@@ -4784,11 +4795,9 @@ mod tests {
         let store_root = root.join("broker-store");
         let local_app_data = root.join("local-app-data");
         let start_menu = root.join("start-menu");
-        let product_root = super::super::product_install::product_install_root(
-            &local_app_data,
-            INSTALL_APP_ID,
-        )
-        .unwrap();
+        let product_root =
+            super::super::product_install::product_install_root(&local_app_data, INSTALL_APP_ID)
+                .unwrap();
         std::fs::create_dir_all(&product_root).unwrap();
         std::fs::write(
             product_root.join("gui_shell_desktop_launcher.exe"),
@@ -4930,7 +4939,8 @@ mod tests {
         );
 
         drop(reopened);
-        let mut verified = Broker::new_persistent("uninstall-test-final-reopen", &store_root).unwrap();
+        let mut verified =
+            Broker::new_persistent("uninstall-test-final-reopen", &store_root).unwrap();
         verified
             .set_desktop_product_identity(INSTALL_APP_ID.into(), INSTALL_AUDIT_ID.into())
             .unwrap();
@@ -4989,13 +4999,17 @@ mod tests {
         assert_eq!(event.evidence_source, "EXTERNAL_EVIDENCE");
         assert!(event.reason.contains("catalog_hashes=sha256:"));
         assert!(event.reason.contains("Capability=更新候補取得"));
-        assert!(event
-            .reason
-            .contains("Permission=Broker所有trust.package_sources"));
+        assert!(
+            event
+                .reason
+                .contains("Permission=Broker所有trust.package_sources")
+        );
         assert!(event.reason.contains("Approval=明示操作"));
-        assert!(event
-            .reason
-            .contains("RecoveryAction=失敗時は既存候補を保持"));
+        assert!(
+            event
+                .reason
+                .contains("RecoveryAction=失敗時は既存候補を保持")
+        );
     }
 
     #[test]
@@ -5029,9 +5043,11 @@ mod tests {
         assert_eq!(response.status, BrokerStatus::Rejected);
         let error = response.error.unwrap();
         assert_eq!(error.code, "update_signature_invalid");
-        assert!(error
-            .message
-            .contains("RecoveryAction=失敗時は既存候補を保持"));
+        assert!(
+            error
+                .message
+                .contains("RecoveryAction=失敗時は既存候補を保持")
+        );
         assert_eq!(broker.updates, previous);
         assert_eq!(
             broker.audit_events().last().unwrap().reason,
@@ -5420,6 +5436,7 @@ mod tests {
                 product_version: Some("1.0.0"),
                 app_id: INSTALL_APP_ID,
                 audit_store_id: INSTALL_AUDIT_ID,
+                platform: crate::product_package::ProductPackagePlatform::Windows,
             },
         )
         .unwrap();
@@ -5605,10 +5622,12 @@ mod tests {
             std::fs::read(target.join("app").join("gui_shell_desktop.exe")).unwrap(),
             b"d"
         );
-        assert!(broker
-            .audit_events()
-            .iter()
-            .any(|event| { event.operation == OP_APPLY && event.decision == "queued" }));
+        assert!(
+            broker
+                .audit_events()
+                .iter()
+                .any(|event| { event.operation == OP_APPLY && event.decision == "queued" })
+        );
         assert!(broker.audit_events().iter().any(|event| {
             event.request_id == "desktop-update-apply:complete"
                 && event.operation == OP_APPLY
@@ -5758,9 +5777,11 @@ mod tests {
         );
         assert!(!package_path.exists());
         assert!(activation_confirmation.start_menu_shortcut_path.is_file());
-        assert!(product_root
-            .join("gui_shell_desktop_launcher.exe")
-            .is_file());
+        assert!(
+            product_root
+                .join("gui_shell_desktop_launcher.exe")
+                .is_file()
+        );
         let selected_launcher = crate::product_bootstrapper::resolve_active_version_launcher(
             &install_root,
             INSTALL_APP_ID,
@@ -5778,13 +5799,15 @@ mod tests {
         assert_eq!(active_record["product_version"], "1.1.0");
         assert_eq!(active_record["previous"]["product_version"], "1.0.0");
         assert!(target.is_dir());
-        assert!(install_root
-            .join("Programs")
-            .join("D4 Pocket")
-            .join(INSTALL_APP_ID)
-            .join("versions")
-            .join(&previous_stage_name)
-            .is_dir());
+        assert!(
+            install_root
+                .join("Programs")
+                .join("D4 Pocket")
+                .join(INSTALL_APP_ID)
+                .join("versions")
+                .join(&previous_stage_name)
+                .is_dir()
+        );
         let shortcut_bytes =
             std::fs::read(&activation_confirmation.start_menu_shortcut_path).unwrap();
         assert!(broker.audit_events().iter().any(|event| {
@@ -5833,12 +5856,11 @@ mod tests {
         }));
 
         std::fs::write(&repair_file, b"x").unwrap();
-        let mismatched_active_stage =
-            broker.desktop_owner_operation_json_with_update_confirmation(
-                &envelope("desktop-active-version-repair-mismatch"),
-                None,
-                Some(confirmation.clone()),
-            );
+        let mismatched_active_stage = broker.desktop_owner_operation_json_with_update_confirmation(
+            &envelope("desktop-active-version-repair-mismatch"),
+            None,
+            Some(confirmation.clone()),
+        );
         assert_eq!(mismatched_active_stage.status, BrokerStatus::Rejected);
         assert_eq!(
             mismatched_active_stage.error.as_ref().unwrap().code,
@@ -6156,10 +6178,12 @@ mod tests {
             job["失敗code"].as_str(),
             Some("update_download_dns_failed" | "update_download_network_failed")
         ));
-        assert!(broker
-            .audit_events()
-            .iter()
-            .any(|event| { event.operation == OP_DOWNLOAD && event.decision == "failed" }));
+        assert!(
+            broker
+                .audit_events()
+                .iter()
+                .any(|event| { event.operation == OP_DOWNLOAD && event.decision == "failed" })
+        );
         drop(broker);
         drop(package_directory);
         std::fs::remove_dir_all(root).unwrap();

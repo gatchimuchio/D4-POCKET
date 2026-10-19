@@ -132,6 +132,7 @@ REQUIRED = {
     "update_download_job.schema.json",
     "update_trust.schema.json",
     "d4_pocket_product_package_manifest.schema.json",
+    "d4_pocket_linux_product_package_manifest.schema.json",
     "d4_pocket_active_version.schema.json",
     "notification.schema.json",
     "notification_list.schema.json",

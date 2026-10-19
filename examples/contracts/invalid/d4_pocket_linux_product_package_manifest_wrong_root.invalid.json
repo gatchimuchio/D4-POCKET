@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "product": "D4 Pocket",
+  "product_version": "1.2.3",
+  "target_platform": "linux",
+  "app_id": "d4-pocket-app-11111111111111111111111111111111",
+  "audit_store_id": "audit-store-22222222222222222222222222222222",
+  "files": [
+    { "path": "data/icudtl.dat", "byte_length": 3, "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "mode": 420 },
+    { "path": "gui_shell_desktop", "byte_length": 6, "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "mode": 493 },
+    { "path": "gui_shell_desktop_launcher", "byte_length": 8, "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "mode": 493 },
+    { "path": "lib/libflutter_linux_gtk.so", "byte_length": 7, "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "mode": 420 },
+    { "path": "libexec/gui_shell_linux_broker", "byte_length": 6, "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "mode": 493 },
+    { "path": "product_manifest.json", "byte_length": 12, "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", "mode": 420 },
+    { "path": "app/foreign_payload", "byte_length": 1, "sha256": "1111111111111111111111111111111111111111111111111111111111111111", "mode": 420 }
+  ]
+}

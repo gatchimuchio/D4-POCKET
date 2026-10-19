@@ -340,6 +340,7 @@ pub(crate) fn restore_missing_root_bootstrapper(
             product_version: Some(&expected_current.product_version),
             app_id: expected_app_id,
             audit_store_id: expected_audit_store_id,
+            platform: crate::product_package::ProductPackagePlatform::Windows,
         },
         &expected_current.package_sha256,
     )
@@ -738,9 +739,9 @@ fn valid_sha256(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        activate_staged_version, active_version_snapshot, is_active_version_launcher,
-        resolve_active_version_launcher, toggle_previous_active_version, ACTIVE_VERSION_FILE,
-        VERSIONED_LAUNCHER,
+        ACTIVE_VERSION_FILE, VERSIONED_LAUNCHER, activate_staged_version, active_version_snapshot,
+        is_active_version_launcher, resolve_active_version_launcher,
+        toggle_previous_active_version,
     };
     use cap_std::fs::Dir;
     use serde_json::json;
@@ -863,9 +864,11 @@ mod tests {
             fs::read(root.join(VERSIONED_LAUNCHER)).unwrap(),
             b"fixed version launcher"
         );
-        assert!(!root
-            .join("active_version.0123456789abcdef0123456789abcdef.tmp")
-            .exists());
+        assert!(
+            !root
+                .join("active_version.0123456789abcdef0123456789abcdef.tmp")
+                .exists()
+        );
 
         drop(versions_dir);
         drop(root_dir);
@@ -895,9 +898,11 @@ mod tests {
             b"bootstrapper launcher"
         );
         resolve_active_version_launcher(&local, APP_ID, AUDIT_ID).unwrap();
-        assert!(!root
-            .join("active_version.fedcba9876543210fedcba9876543210.tmp")
-            .exists());
+        assert!(
+            !root
+                .join("active_version.fedcba9876543210fedcba9876543210.tmp")
+                .exists()
+        );
 
         drop(versions_dir);
         drop(root_dir);
