@@ -1,6 +1,6 @@
 # Linux製品Package
 
-状態: Linux native必須製品対象の固定package producer／目録／reader契約。Brokerの署名trust、Owner確認、導入consumer、配布物の受入れを代行しない。
+状態: Linux native必須製品対象のExport build／固定package producer／目録／reader契約。Brokerの署名trust、Owner確認、active-version導入、native installed product受入れを代行しない。
 
 ## 1. 役割と互換性
 
@@ -20,7 +20,7 @@ Readerはpackage structure、製品版、固定identity、Product Manifestの新
 
 Linux Brokerの署名候補、compile-time App／Audit identity、固定XDG導入root、native Owner確認、durable Auditを再照合する導入consumerを既存Brokerへ接続する。更新適用はBrokerの現在candidate一覧に束縛したLinux native Owner確認を経て、承認時のみ同じ確認情報を既存Broker queueへ渡す。Brokerは署名済みdigestのdownload fileを再検証してLinux D4PKG01を未起動version directoryへstageし、開始／完了Auditを確定する。通常IPC、確認先差替、所有UID／hardlink／unsafe mode違反、package hash／内容不一致はfail-closedする。
 
-このstage接続はactive-version切替、desktop entry、起動、更新rollback、uninstall、source／toolchain provenance、Linux native installed product受入れを意味しない。Linux完全対応と`task_execution=supported`の判定には、これらを含む現行Release blockerの全残件を閉じる必要がある。WSL証拠をnative Linux acceptanceへ転用しない。
+このstage接続はactive-version切替、desktop entry、起動、更新rollback、uninstall、Linux native installed product受入れを意味しない。Export builderのsource／toolchain／artifact provenanceは別節で定義する。Linux完全対応と`task_execution=supported`の判定には、installer lifecycleとnative acceptanceを含む現行Release blockerの全残件を閉じる必要がある。WSL証拠をnative Linux acceptanceへ転用しない。
 
 ## 4. Linux製品package作成tool
 
@@ -28,4 +28,14 @@ tooling/package_linux_product.pyはLinux host専用の開発／build toolであ�
 
 目録modeはD4所有executable三fileを0755、その他を0644へ固定する。package outputは新規fileとしてbundle／Repository／OneDriveの外へcreate-only公開する。既知Credential pattern scanも実行するが、これは列挙済み形式の検出に限られ、秘密不存在の一般証明ではない。
 
-このproducerはLinux binaryをbuildせず、source commit／toolchain provenanceを生成・検証せず、packageへ署名せず、Broker trust／Permission／Approval／導入を行わない。出力されたunsigned D4PKG01のdigestはBrokerの信頼済みcandidate検証へ別途結合する。Linux build／package evidence、署名candidate、Owner確認付きstage／activation、desktop entry、更新／rollback／削除とnative installed product受入れは別の必須工程であり、このtoolの成功で完了扱いしない。
+このproducer自身はLinux binaryをbuildせず、source commit／toolchain provenanceを生成・検証せず、packageへ署名せず、Broker trust／Permission／Approval／導入を行わない。出力されたunsigned D4PKG01のdigestはBrokerの信頼済みcandidate検証へ別途結合する。Linux binary buildは次節のExport builderが担う。
+
+## 5. Linux Export builder
+
+`tooling/export_linux_product.py`はLinux host上でだけ動くDeveloper／build経路である。入力はBroker Export Receiptと同Receiptに束縛されたManifest fileであり、両者のSchema、byte長、SHA-256、Export ID、Manifest内容、Linux target、新規App／Audit identity、Authority非継承、ModulePlanを検査する。合成fixtureはbuilderのtest専用であり、Owner承認や実Broker Exportの証拠ではない。
+
+開始時にsource branch、clean working tree、HEAD、同名origin branchのremote HEAD一致を検査し、commitからGit archiveを作って隔離sourceへ展開する。Flutter／Pub／Cargo／HOME／cache／一時領域を分離し、build子processへ認証情報を含む親環境を継承しない。Flutter Linux Releaseの設定後、CMake install先をstaging bundleへ固定してRunner、launcher、Linux Broker、Flutter engine／assetをbuildする。検証済みManifestのApp ID／Audit store IDはFlutter入力やUI stateでなく、Rust binaryのcompile-time入力へ渡す。更新trustは検証済みManifestからRust build環境へだけ渡し、provenanceへは公開fingerprint／配布元数だけを記録する。
+
+出力rootはRepository／OneDrive外の新規pathに限定し、`bundle/`、unsigned `D4PKG01`、`d4_pocket_linux_export_build.json`を一括公開する。evidenceはsource ref／commit／archive hash、Receipt／Manifest hash、toolchain、実行argument、compile-time identity／update-trust summary、artifact inventory／hash、package hash、限定known-pattern Credential scanを結合する。失敗時に部分出力を残さない。Credential scanは既知patternだけを対象とし、秘密不存在の一般証明ではない。
+
+このbuild evidenceは`INTERNAL_STATE`であり、Manifestのruntime消費、binary pruningの実証、Owner承認、署名、正式配布、インストール、起動、update／rollback／uninstallを主張しない。`.github/workflows/linux-manual-export-build.yml`は`workflow_dispatch`だけで起動するLinux build補助で、Pinned Flutter／Rust toolchain、合成非権限fixture、出力cleanupを使う。Actions成功はLinux source build／bundle／packageの証拠であり、Linux native GUI／Secret Service／権限／installed productの受入れを代替しない。Linuxは任意platformではなくWindows／macOSと同列の必須製品対象であり、installer lifecycleとnative installed acceptanceを含む残件が閉じるまで完全対応扱いにしない。

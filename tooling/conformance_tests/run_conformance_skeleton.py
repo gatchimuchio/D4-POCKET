@@ -120,6 +120,7 @@ from tooling.export_windows_product import (
     validate_export_inputs,
 )
 import tooling.export_windows_product as windows_export
+import tooling.export_linux_product as linux_export
 import tooling.package_windows_product as windows_product_package
 import tooling.package_windows_portable as windows_portable_package
 
@@ -229,6 +230,7 @@ REQUIRED_SCHEMA_NAMES = {
     "gui_shell_module_build_evidence",
     "gui_shell_module_comparison_evidence",
     "gui_shell_windows_export_build",
+    "gui_shell_linux_export_build",
     "ipc_request",
     "ipc_response",
     "broker_error",
@@ -11241,6 +11243,65 @@ def test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative() ->
     return errors
 
 
+def test_gui_shell_linux_export_build_is_hash_bound_and_non_authoritative() -> list[str]:
+    evidence = load_contract_fixture("gui_shell_linux_export_build.valid.json")
+    schema = load_schema("gui_shell_linux_export_build.schema.json")
+    errors = []
+    if validate_instance(evidence, schema):
+        errors.append("Linux Export buildの正常証拠がSchemaに適合しない")
+    for field, value, label in (
+        (("target_platform",), "windows", "別platform build"),
+        (("authority_boundary", "owner_authorization_verified"), True, "Owner承認"),
+        (("authority_boundary", "source_authority_verified"), True, "source authority"),
+        (("authority_boundary", "credential_inherited"), True, "Credential継承"),
+        (("authority_boundary", "permission_inherited"), True, "Permission継承"),
+        (("authority_boundary", "approval_inherited"), True, "Approval継承"),
+        (("authority_boundary", "audit_chain_inherited"), True, "Audit継承"),
+        (("signed",), True, "署名済み配布"),
+        (("formal_distribution_claimed",), True, "正式配布"),
+        (("runtime_manifest_consumed",), True, "Runtime Manifest消費"),
+        (("binary_pruning_verified",), True, "binary pruning"),
+        (("package", "installed_product_verified"), True, "installed product受入れ"),
+    ):
+        candidate = copy.deepcopy(evidence)
+        target = candidate
+        for key in field[:-1]:
+            target = target[key]
+        target[field[-1]] = value
+        if not validate_instance(candidate, schema):
+            errors.append(f"Linux Export build証拠が未成立の{label}を主張できる")
+
+    exporter_path = ROOT / "tooling" / "export_linux_product.py"
+    runtime_test = ROOT / "tooling" / "tests" / "test_export_linux_product.py"
+    exporter = exporter_path.read_text(encoding="utf-8")
+    test_source = runtime_test.read_text(encoding="utf-8")
+    for token in (
+        "target_platform=\"linux\"",
+        "_write_source_archive(commit, archive_path)",
+        "--target-platform=linux-x64",
+        "--config-only",
+        "-DCMAKE_INSTALL_PREFIX=",
+        "-DD4_PRODUCT_APP_ID=",
+        "-DD4_PRODUCT_AUDIT_STORE_ID=",
+        "write_product_package(",
+        "validate_build_evidence(evidence, bundle, package_path, manifest_raw)",
+        "os.rename(staging_root, output)",
+    ):
+        if token not in exporter:
+            errors.append(f"Linux Export builderの実接続が欠落: {token}")
+    for token in (
+        "test_release_bundle_package_and_provenance_are_published_together",
+        "test_failed_native_build_never_publishes_partial_output",
+        "test_child_environment_drops_credentials_and_user_build_caches",
+        "test_toolchain_probes_do_not_inherit_credentials",
+    ):
+        if token not in test_source:
+            errors.append(f"Linux Export builderのruntime testが欠落: {token}")
+    if not linux_export.__file__ or not exporter_path.is_file():
+        errors.append("Linux Export builder moduleがconformance processへ接続されていない")
+    return errors
+
+
 def load_bounded_extension_fixture() -> dict:
     return load_contract_fixture(BOUNDED_EXTENSION_FIXTURE)
 
@@ -11906,6 +11967,30 @@ def test_linux_rust_workflow_is_manual_and_scoped() -> list[str]:
     return [f"Linux Rust手動workflowに必須検査／scope／cleanupがない: {token}" for token in missing]
 
 
+def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]:
+    workflow_path = ROOT / ".github/workflows/linux-manual-export-build.yml"
+    if workflow_path.is_symlink() or not workflow_path.is_file():
+        return ["Linux Export build用の通常file workflowがない"]
+    workflow = workflow_path.read_text(encoding="utf-8")
+    required = (
+        "'on':\n  workflow_dispatch:",
+        "runs-on: ubuntu-24.04",
+        "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+        "fetch-depth: 0",
+        "559ffa3f75e7402d65a8def9c28389a9b2e6fe42",
+        "rustup toolchain install 1.95.0",
+        "tooling/tests/create_linux_export_fixture.py",
+        "tooling/export_linux_product.py",
+        "D4P_EXPORT_ROOT",
+        "rm -rf -- \"$D4P_EXPORT_ROOT\"",
+        "installed-product acceptance",
+    )
+    missing = [token for token in required if token not in workflow]
+    if "pull_request:" in workflow or "push:" in workflow:
+        missing.append("manual trigger only")
+    return [f"Linux Export build workflowに固定・scope・cleanup条件がない: {token}" for token in missing]
+
+
 def test_macos_agent_cli_selection_is_non_authoritative() -> list[str]:
     errors = []
     request_schema = json.loads((SPECS / "macos_agent_cli_selection.schema.json").read_text(encoding="utf-8"))
@@ -12482,6 +12567,7 @@ def main() -> int:
         test_gui_shell_export_is_new_identity_and_non_inheriting,
         test_gui_shell_module_build_is_untrusted_ui_only_selection,
         test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative,
+        test_gui_shell_linux_export_build_is_hash_bound_and_non_authoritative,
         test_windows_product_package_writer_is_bounded_and_hash_bound,
         test_linux_product_package_writer_is_platform_bound_and_non_authoritative,
         test_d4_pocket_active_version_record_is_fixed_and_path_free,
@@ -12497,6 +12583,7 @@ def main() -> int:
         test_macos_workspace_selection_is_native_scoped_and_non_authoritative,
         test_linux_workspace_selection_is_native_and_non_authoritative,
         test_linux_product_launcher_is_built_and_bundle_bound,
+        test_linux_export_build_workflow_is_manual_pinned_and_cleaned,
         test_linux_installer_is_required_release_scope,
         test_linux_rust_workflow_is_manual_and_scoped,
         test_macos_agent_cli_selection_is_non_authoritative,

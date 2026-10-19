@@ -1,7 +1,9 @@
-"""開発時にだけ使用するWindows向けGUI Shell ModulePlan build。
+"""開発時にだけ使用するDesktop向けGUI Shell ModulePlan build。
 
 Flutterや製品Runtimeからは呼び出さない。Receipt JSONは画面選択としてだけ
 読み、Owner AuthorityやReceiptの出所を検証せず、非製品build証拠を記録する。
+このModulePlan検証はWindows／LinuxのDesktop Exportで共有し、実buildの責任は
+各platform専用toolへ残す。
 """
 
 from __future__ import annotations
@@ -193,9 +195,14 @@ def _validate_export_receipt(receipt: dict[str, Any]) -> None:
 
 
 def resolve_module_plan(
-    receipt: dict[str, Any], catalog: dict[str, Any] | None = None
+    receipt: dict[str, Any],
+    catalog: dict[str, Any] | None = None,
+    *,
+    target_platform: str = "windows",
 ) -> ResolvedModulePlan:
     """書出しReceiptを画面選択として検証する。authorityは検証も継承もしない。"""
+    if target_platform not in {"windows", "linux", "macos"}:
+        raise ValueError("Desktop Export targetが未対応である")
     _validate_export_receipt(receipt)
     catalog = _validate_catalog(catalog) if catalog is not None else _load_catalog()
     if receipt.get("status") != "accepted" or receipt.get("operation") != "GUI Shell書出し":
@@ -219,12 +226,12 @@ def resolve_module_plan(
     if (
         not isinstance(identity, dict)
         or not isinstance(identity.get("app_id"), str)
-        or identity.get("target_platform") != "windows"
+        or identity.get("target_platform") != target_platform
         or not isinstance(distribution, dict)
         or distribution.get("artifact_status") != "not_built"
         or distribution.get("signed") is not False
     ):
-        raise ValueError("Export ReceiptがWindows manifest-only build入力ではない")
+        raise ValueError("Export Receiptが指定Desktop platformのmanifest-only build入力ではない")
 
     plan = export_manifest.get("module_plan")
     if not isinstance(plan, dict) or plan.get("catalog_version") != catalog["version"]:

@@ -1520,7 +1520,7 @@
     },
     {
       "path": "docs/specs/linux-product-package.md",
-      "sha256": "1fc6b78168dc9478952b1ec97c6f610aae1cff98409433b0dcb9d8f58b51d003"
+      "sha256": "b9a388d716aa5ed9b07cdb6078b4fa8e5399ec5fb259699a459616edb391e8c9"
     },
     {
       "path": "docs/specs/linux-workspace-selection.md",
@@ -2027,6 +2027,10 @@
       "sha256": "2406f7fba5090dd83fa3a9b4c2b6a37c0bbc59bb982a948c991fa3b77f0595f6"
     },
     {
+      "path": "examples/contracts/gui_shell_linux_export_build.valid.json",
+      "sha256": "659be6d0ae83a3510276208f5920be3c76a3bc37046bf7f989c1884f1360d635"
+    },
+    {
       "path": "examples/contracts/gui_shell_module_build_evidence.valid.json",
       "sha256": "501e48ae0ed8ea60713248da451910f31420c3e87f18d31fc687fee56e795268"
     },
@@ -2441,6 +2445,14 @@
     {
       "path": "examples/contracts/invalid/gui_shell_export_unknown_module.invalid.json",
       "sha256": "d202ef5da4e5ec99afc7e54b9bfe8d46936443f7a85d3e37c25fe31e4c38c477"
+    },
+    {
+      "path": "examples/contracts/invalid/gui_shell_linux_export_build_authority.invalid.json",
+      "sha256": "cf802bd59301bf2b233a33ffbb8283f7240e9ffdea2a8d1b896d0e127863ce69"
+    },
+    {
+      "path": "examples/contracts/invalid/gui_shell_linux_export_build_wrong_target.invalid.json",
+      "sha256": "64fb2ecd30db607fad0622b639f85a15e52a93e9cef11af824aecc9d181e745d"
     },
     {
       "path": "examples/contracts/invalid/gui_shell_module_build_evidence_authority_claim.invalid.json",
@@ -4595,6 +4607,10 @@
       "sha256": "efd06589ef0aef17b8cbec533eb55199063ce9b1a829212796ad4b065e7004d9"
     },
     {
+      "path": "specs/gui_shell_linux_export_build.schema.json",
+      "sha256": "a014e0ecebedb73d1398a02a9e32574cd0f73cbad4a8c18761ab30e5ca4b0295"
+    },
+    {
       "path": "specs/gui_shell_module_build_evidence.schema.json",
       "sha256": "75c38d67b3fd4f83af703fe225e6df2e04de5df96aa404c244157a929fc8d284"
     },
@@ -5004,7 +5020,7 @@
     },
     {
       "path": "tooling/build_module_pruned_windows.py",
-      "sha256": "2b7ade932a466c38bb6a3352002b0395ce47f7346f4448fb8f8480456cc7e66e"
+      "sha256": "565a885ed741093ee8fde4f175f4c799ee07a71afc0e55d803809b30356c4661"
     },
     {
       "path": "tooling/canonicalization_vectors/runtime_resource_observation_decimal.json",
@@ -5028,7 +5044,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "82518c7c8a953ae21db9639f7465d6374506b90c4e761c67f29c1c426e6d0ba8"
+      "sha256": "8c8720f8b4f5d7c930aa48304f38345fd6602714c3f2669369ef5642f4646321"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
@@ -5067,8 +5083,12 @@
       "sha256": "de48f55521adda17ff16f729037c6944f247d12478a43080e4ba059a2e27244d"
     },
     {
+      "path": "tooling/export_linux_product.py",
+      "sha256": "d830e43d2aedd74f6d5043e343f3c64688451093efdc85b81a3d214da2edb4fc"
+    },
+    {
       "path": "tooling/export_windows_product.py",
-      "sha256": "378288f43d48f03e816c0b46d139870d7c997f668b2e691e1eb916562b3cf8b5"
+      "sha256": "7d1f3ab02342737a612b1dc09cc2f4fdf4944498f2756267b659590453190a37"
     },
     {
       "path": "tooling/failure_injection_validation.py",
@@ -5156,7 +5176,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "5672babe2471e1f703b93068cb742651e3f6ecd0a14b537608ec658490d14d21"
+      "sha256": "ecb8ad804503d1186a0d6205c8eabfb0ef3253243b0f5f981c8fdfe1d56e7507"
     },
     {
       "path": "tooling/shell_snapshot.py",
@@ -5165,6 +5185,14 @@
     {
       "path": "tooling/test_pktmon_packet_summary.ps1",
       "sha256": "eaaf9e68d6d8a676b97461a40010e3b2d2090d3605a103e1c241a43672dbf330"
+    },
+    {
+      "path": "tooling/tests/create_linux_export_fixture.py",
+      "sha256": "31f00d41b64bb1c44f6f2b015d50e88b0363822c0d84da0571580ee3512eca20"
+    },
+    {
+      "path": "tooling/tests/test_export_linux_product.py",
+      "sha256": "f0f7289dd3db11ae6eb602475afd708e40848997262f114969e1209c9e319a19"
     },
     {
       "path": "tooling/tests/test_linux_product_package.py",
@@ -5200,7 +5228,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "0edd7f8a5f5b958b6a736ceab1e48a4a9490a9fd0da0bbba0508bca653c207ad"
+      "sha256": "0fc2d31c8769b479818d78a9b702e8ef9093580477f4e1ca31ff4f8a279d7e10"
     }
   ]
 }

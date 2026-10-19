@@ -285,7 +285,7 @@
     },
     {
       "path": "docs/specs/linux-product-package.md",
-      "責任": "Linux native D4PKG01 payloadの対象platform、許可root、必須file、POSIX mode、Broker展開境界と未接続の署名・Owner・導入consumer"
+      "責任": "Linux native必須製品向けExport build、D4PKG01 payload／POSIX mode、Broker展開境界、未成立installer lifecycleとnative acceptance"
     },
     {
       "path": "specs/gui_shell_module_catalog.json",
@@ -294,6 +294,10 @@
     {
       "path": "specs/gui_shell_module_build_evidence.schema.json",
       "責任": "Developer専用Flutter画面選択buildのcommit・未信頼Receipt入力・artifact hash証拠。Owner Authority、独立製品、binary除去完了を主張しない"
+    },
+    {
+      "path": "specs/gui_shell_linux_export_build.schema.json",
+      "責任": "Linux Export builderのsource／Receipt／Manifest／toolchain／compile-time identity／artifact／unsigned package結合と、未成立のOwner authority・install・launch主張の否定"
     },
     {
       "path": "specs/gui_shell_module_comparison_evidence.schema.json",
@@ -314,6 +318,14 @@
     {
       "path": "tooling/compare_module_builds_windows.py",
       "責任": "cleanなcommit済みWindows worktreeでFlutter UIのall-enabled baselineと未信頼Receipt選択buildを同条件比較し、report、snapshot、trace、artifactの外部証拠を採取するDeveloper専用補助"
+    },
+    {
+      "path": "tooling/export_linux_product.py",
+      "責任": "Linux hostでBroker Receipt／Manifestとclean remote commitから隔離Flutter／Rust Release bundle、D4PKG01、限定build provenanceを生成するDeveloper／build専用経路。Owner authorityやinstalled acceptanceを生成しない"
+    },
+    {
+      "path": ".github/workflows/linux-manual-export-build.yml",
+      "責任": "Linux Export builderをubuntu-24.04／pinned toolchain／合成非権限fixtureで手動検証するworkflow_dispatch限定補助。artifactを公開せず、native installed acceptanceを主張しない"
     },
     {
       "path": "CLAIM.md",

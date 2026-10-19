@@ -265,7 +265,7 @@ def product_version_from_source(source_root: Path) -> str:
 
 
 def validate_export_inputs(
-    receipt_raw: bytes, manifest_raw: bytes
+    receipt_raw: bytes, manifest_raw: bytes, *, target_platform: str = "windows"
 ) -> tuple[dict[str, Any], dict[str, Any], Any, str, str]:
     if len(receipt_raw) > MAX_INPUT_BYTES or len(manifest_raw) > MAX_MANIFEST_BYTES:
         raise ValueError("Export ReceiptまたはManifest fileがsize上限を超えている")
@@ -300,7 +300,7 @@ def validate_export_inputs(
 
     catalog_raw = _read_regular_file(CATALOG_PATH, MAX_INPUT_BYTES, "Module一覧")
     catalog = _validate_catalog(_parse_json_bytes(catalog_raw))
-    plan = resolve_module_plan(receipt, catalog)
+    plan = resolve_module_plan(receipt, catalog, target_platform=target_platform)
     return receipt, manifest_file, plan, _sha256(receipt_raw), _sha256(manifest_raw)
 
 

@@ -1,0 +1,83 @@
+"""手動Linux build検証用の非権限Broker-shaped Export fixtureを生成する。"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+from pathlib import Path
+from typing import Any
+
+ROOT = Path(__file__).resolve().parents[2]
+APP_ID = "d4-pocket-app-11111111111111111111111111111111"
+AUDIT_STORE_ID = "audit-store-22222222222222222222222222222222"
+
+
+def linux_export_pair() -> tuple[bytes, bytes]:
+    receipt: dict[str, Any] = json.loads(
+        (ROOT / "examples/contracts/gui_shell_export_receipt.valid.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    manifest_file: dict[str, Any] = json.loads(
+        (ROOT / "examples/contracts/gui_shell_export_manifest.valid.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    export_id = "export-linux-build-fixture"
+    for document in (receipt["export_manifest"], manifest_file["manifest"]):
+        document["app_identity"]["app_id"] = APP_ID
+        document["app_identity"]["target_platform"] = "linux"
+        document["audit_store"]["store_id"] = AUDIT_STORE_ID
+        document["distribution_metadata"]["target_platform"] = "linux"
+    receipt["export_id"] = export_id
+    receipt["export_manifest"] = manifest_file["manifest"]
+    manifest_file["export_id"] = export_id
+    manifest_raw = json.dumps(
+        manifest_file, ensure_ascii=False, separators=(",", ":")
+    ).encode("utf-8")
+    receipt["manifest_file"]["file_name"] = f"{APP_ID}.json"
+    receipt["manifest_file"]["path"] = f"/tmp/{APP_ID}.json"
+    receipt["manifest_file"]["byte_length"] = len(manifest_raw)
+    receipt["manifest_file"]["sha256"] = "sha256:" + hashlib.sha256(manifest_raw).hexdigest()
+    receipt_raw = json.dumps(
+        receipt, ensure_ascii=False, separators=(",", ":")
+    ).encode("utf-8")
+    return receipt_raw, manifest_raw
+
+
+def write_fixture(output_dir: Path) -> tuple[Path, Path]:
+    output_dir.mkdir(mode=0o700, parents=False, exist_ok=False)
+    receipt_raw, manifest_raw = linux_export_pair()
+    receipt = output_dir / "d4_pocket_export_receipt.json"
+    manifest = output_dir / f"{APP_ID}.json"
+    with receipt.open("xb") as target:
+        target.write(receipt_raw)
+    with manifest.open("xb") as target:
+        target.write(manifest_raw)
+    return receipt, manifest
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Owner authorityを含まない合成Linux Export入力fixtureを作る"
+    )
+    parser.add_argument("--output-dir", type=Path, required=True)
+    args = parser.parse_args()
+    receipt, manifest = write_fixture(args.output_dir)
+    print(
+        json.dumps(
+            {
+                "fixture_only": True,
+                "owner_authorization_verified": False,
+                "receipt": str(receipt),
+                "manifest": str(manifest),
+            },
+            separators=(",", ":"),
+        )
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
