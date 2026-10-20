@@ -20,6 +20,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _safe_log_tail,
     _verify_export_manifest,
     _verify_live_audit,
+    _wait_for_owner_dialog_window,
 )
 
 
@@ -186,6 +187,31 @@ class AccessibleActionResolutionTests(unittest.TestCase):
         )
 
 class LinuxInstalledDesktopEntryTests(unittest.TestCase):
+    def test_waits_for_native_owner_dialog_to_become_visible(self) -> None:
+        from unittest.mock import patch
+
+        visible = subprocess.CompletedProcess(
+            args=[], returncode=0, stdout=b"0x42\n", stderr=b""
+        )
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke.subprocess.run",
+                side_effect=(
+                    subprocess.CompletedProcess(
+                        args=[], returncode=1, stdout=b"", stderr=b""
+                    ),
+                    visible,
+                ),
+            ) as run,
+            patch("tooling.tests.linux_installed_product_smoke.time.sleep") as sleep,
+        ):
+            self.assertEqual(
+                _wait_for_owner_dialog_window({"DISPLAY": ":99"}), "0x42"
+            )
+
+        self.assertEqual(run.call_count, 2)
+        sleep.assert_called_once_with(0.1)
+
     def test_log_tail_is_bounded_and_masks_isolated_roots(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -20,6 +20,8 @@ ROOT = Path(__file__).resolve().parents[2]
 APP_ID = "d4-pocket-app-11111111111111111111111111111111"
 AUDIT_ID = "audit-store-22222222222222222222222222222222"
 WINDOW_TITLE = "D4 Pocket powered by GUI Shell"
+OWNER_DIALOG_TITLE = "D4 Pocket Owner確認"
+OWNER_DIALOG_TIMEOUT = 15.0
 RUST_TESTS = (
     "broker::update_center::tests::linux_installed_acceptance_stages_real_export_and_registers_entry",
     "broker::update_center::tests::linux_installed_acceptance_runtime_audit_is_durable",
@@ -379,19 +381,8 @@ def _focused_named_accessible(name: str, *, root=None):
 def _answer_owner_dialog(environment: dict[str, str], decision: str) -> None:
     if decision not in {"許可", "拒否"}:
         raise ValueError("Owner確認の回答値が不正")
-    result = subprocess.run(
-        ["xdotool", "search", "--onlyvisible", "--name", "^D4 Pocket Owner確認$"],
-        env=environment,
-        capture_output=True,
-        check=False,
-        timeout=5,
-    )
-    if result.returncode != 0:
-        raise RuntimeError("GTK native Owner確認dialogが表示されません")
-    dialog_ids = result.stdout.decode("ascii", errors="ignore").splitlines()
-    if len(dialog_ids) != 1:
-        raise RuntimeError("native Owner確認dialogが一意ではありません")
-    dialog = _find_accessible("D4 Pocket Owner確認", timeout=10)
+    _wait_for_owner_dialog_window(environment)
+    dialog = _find_accessible(OWNER_DIALOG_TITLE, timeout=10)
     descendants = _accessible_descendants(dialog)
     names = [accessible_name for _, accessible_name in descendants]
     if not any("対象platform: Linux" in value for value in names):
@@ -400,6 +391,34 @@ def _answer_owner_dialog(environment: dict[str, str], decision: str) -> None:
         raise RuntimeError("Owner確認summaryに要求hashがありません")
     button = _find_operable_accessible(decision, root=dialog, timeout=10)
     _activate_accessible(button, decision, environment)
+
+
+def _wait_for_owner_dialog_window(
+    environment: dict[str, str], *, timeout: float = OWNER_DIALOG_TIMEOUT
+) -> str:
+    deadline = time.monotonic() + timeout
+    while True:
+        result = subprocess.run(
+            [
+                "xdotool",
+                "search",
+                "--onlyvisible",
+                "--name",
+                f"^{re.escape(OWNER_DIALOG_TITLE)}$",
+            ],
+            env=environment,
+            capture_output=True,
+            check=False,
+            timeout=5,
+        )
+        if result.returncode == 0:
+            dialog_ids = result.stdout.decode("ascii", errors="ignore").splitlines()
+            if len(dialog_ids) != 1:
+                raise RuntimeError("native Owner確認dialogが一意ではありません")
+            return dialog_ids[0]
+        if time.monotonic() >= deadline:
+            raise RuntimeError("GTK native Owner確認dialogが期限内に表示されません")
+        time.sleep(0.1)
 
 
 def _verify_live_audit(store: Path) -> dict[str, int]:
