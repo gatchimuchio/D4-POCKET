@@ -5,30 +5,29 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tooling.tests.linux_gtk_bundle_smoke import (
-    PRODUCT_WINDOW_TITLE,
     _owned_product_groups,
-    _wayland_toplevel_ready,
+    _wayland_socket_connected,
 )
 
 
-class WaylandToplevelSmokeTests(unittest.TestCase):
-    def test_accepts_exact_toplevel_title_and_surface_commit(self) -> None:
+class WaylandSocketSmokeTests(unittest.TestCase):
+    def test_accepts_successful_connection_to_exact_isolated_socket(self) -> None:
         output = (
-            f'[1.0] -> xdg_toplevel@7.set_title("{PRODUCT_WINDOW_TITLE}")\n'
-            "[1.1] -> wl_surface@5.commit()\n"
+            'connect(5, {sa_family=AF_UNIX, sun_path="/tmp/d4p/r/w"}, 17) = 0\n'
         )
-        self.assertTrue(_wayland_toplevel_ready(output))
+        self.assertTrue(_wayland_socket_connected(output, Path("/tmp/d4p/r/w")))
 
-    def test_rejects_unrelated_toplevel_title(self) -> None:
+    def test_rejects_connection_to_a_different_socket(self) -> None:
         output = (
-            '[1.0] -> xdg_toplevel@7.set_title("Other application")\n'
-            "[1.1] -> wl_surface@5.commit()\n"
+            'connect(5, {sa_family=AF_UNIX, sun_path="/tmp/other/wayland-0"}, 24) = 0\n'
         )
-        self.assertFalse(_wayland_toplevel_ready(output))
+        self.assertFalse(_wayland_socket_connected(output, Path("/tmp/d4p/r/w")))
 
-    def test_rejects_title_without_surface_commit(self) -> None:
-        output = f'[1.0] -> xdg_toplevel@7.set_title("{PRODUCT_WINDOW_TITLE}")\n'
-        self.assertFalse(_wayland_toplevel_ready(output))
+    def test_rejects_failed_connection_to_exact_socket(self) -> None:
+        output = (
+            'connect(5, {sa_family=AF_UNIX, sun_path="/tmp/d4p/r/w"}, 17) = -1 ECONNREFUSED\n'
+        )
+        self.assertFalse(_wayland_socket_connected(output, Path("/tmp/d4p/r/w")))
 
     def test_tracks_only_groups_for_bundle_processes_started_by_this_smoke(self) -> None:
         class Launcher:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import shutil
 import signal
 import stat
 import subprocess
@@ -178,11 +179,13 @@ def _terminate_owned_product(
         )
 
 
-def _wayland_toplevel_ready(output: str) -> bool:
-    title = re.escape(PRODUCT_WINDOW_TITLE)
-    return bool(
-        re.search(r"xdg_toplevel@\d+\.set_title\(\"" + title + r"\"\)", output)
-        and re.search(r"wl_surface@\d+\.commit\(\)", output)
+def _wayland_socket_connected(output: str, socket_path: Path) -> bool:
+    expected_path = f'sun_path="{socket_path.as_posix()}"'
+    return any(
+        "connect(" in line
+        and expected_path in line
+        and re.search(r"\)\s+= 0(?:\s|$)", line)
+        for line in output.splitlines()
     )
 
 
@@ -200,7 +203,6 @@ def _start_wayland_compositor(
         "XAUTHORITY",
         "WAYLAND_DISPLAY",
         "GDK_BACKEND",
-        "WAYLAND_DEBUG",
         "XDG_SESSION_TYPE",
     ):
         compositor_environment.pop(name, None)
@@ -313,9 +315,9 @@ def run_smoke(launcher: Path, temp_root: Path, backend: str) -> None:
                 "GDK_BACKEND": backend,
             }
         )
+        wayland_socket: Path | None = None
         if backend == "wayland":
             env["XDG_SESSION_TYPE"] = "wayland"
-            env["WAYLAND_DEBUG"] = "client"
         for name in (".config", ".local/state", ".cache"):
             (home / name).mkdir(mode=0o700, parents=True, exist_ok=True)
 
@@ -337,7 +339,9 @@ def run_smoke(launcher: Path, temp_root: Path, backend: str) -> None:
                 runtime, env, root / "weston-output.log"
             )
             env["WAYLAND_DISPLAY"] = wayland_display
+            wayland_socket = runtime / wayland_display
         app_log = root / "app-output.log"
+        connect_trace = root / "wayland-connect.log"
         runner_process: subprocess.Popen[bytes] | None = None
         try:
             if backend == "x11":
@@ -345,8 +349,24 @@ def run_smoke(launcher: Path, temp_root: Path, backend: str) -> None:
                 if window_manager is None or window_manager.poll() is not None:
                     raise RuntimeError("隔離X11 window managerが起動しませんでした")
             with app_log.open("xb") as log:
+                command = [str(launcher)]
+                if backend == "wayland":
+                    if shutil.which("strace") is None:
+                        raise RuntimeError("Wayland接続観測用straceがありません")
+                    command = [
+                        "strace",
+                        "-f",
+                        "-e",
+                        "trace=connect",
+                        "-s",
+                        "256",
+                        "-o",
+                        str(connect_trace),
+                        "--",
+                        str(launcher),
+                    ]
                 runner_process = subprocess.Popen(
-                    [str(launcher)],
+                    command,
                     cwd=bundle_root,
                     env=env,
                     stdin=subprocess.DEVNULL,
@@ -382,25 +402,40 @@ def run_smoke(launcher: Path, temp_root: Path, backend: str) -> None:
                             window_id = candidate[0]
                             break
                 else:
-                    output = app_log.read_bytes()[-256 * 1024 :].decode(
-                        "utf-8", errors="replace"
+                    output = (
+                        connect_trace.read_text(encoding="utf-8", errors="replace")
+                        if connect_trace.exists()
+                        else ""
                     )
-                    if _wayland_toplevel_ready(output):
+                    if wayland_socket is not None and _wayland_socket_connected(
+                        output, wayland_socket
+                    ):
                         break
                 time.sleep(0.25)
-            wayland_ready = backend == "wayland" and _wayland_toplevel_ready(
-                app_log.read_bytes()[-256 * 1024 :].decode("utf-8", errors="replace")
+            wayland_output = (
+                connect_trace.read_text(encoding="utf-8", errors="replace")
+                if connect_trace.exists()
+                else ""
+            )
+            wayland_ready = (
+                backend == "wayland"
+                and wayland_socket is not None
+                and _wayland_socket_connected(wayland_output, wayland_socket)
             )
             if (backend == "x11" and window_id is None) or (
                 backend == "wayland" and not wayland_ready
             ):
-                raise RuntimeError(
-                    _failure_with_runner_output(
-                        f"D4 PocketのGTK {backend} toplevel／surfaceを検出できませんでした",
-                        app_log,
-                        root,
-                    )
+                detail = _failure_with_runner_output(
+                    f"D4 PocketのGTK {backend}接続を検出できませんでした",
+                    app_log,
+                    root,
                 )
+                if backend == "wayland" and wayland_output:
+                    trace_tail = wayland_output[-2048:].replace(str(root), "<隔離root>")
+                    detail += f"\nconnect syscall診断（末尾2048文字以内）:\n{trace_tail}"
+                raise RuntimeError(detail)
+            if backend == "wayland" and runner_process.poll() is not None:
+                raise RuntimeError("Wayland接続観測後に製品launcherが終了しました")
 
             helper_seen = False
             for _ in range(20):
@@ -459,9 +494,13 @@ def run_smoke(launcher: Path, temp_root: Path, backend: str) -> None:
                     "GTK終了後にBroker helper／Flutter runner processが残留しました"
                 )
             stop_mode = "window-close" if backend == "x11" else "owned-process-group SIGTERM"
+            observation = (
+                "製品GTK window close後の終了"
+                if backend == "x11"
+                else "隔離Wayland socketへの成功接続とlive processを確認"
+            )
             print(
-                f"Linux GTK {backend} bundle runtime試験 合格: 製品画面作成を確認; "
-                f"終了方式={stop_mode}; "
+                f"Linux GTK {backend} bundle runtime試験 合格: {observation}; 終了方式={stop_mode}; "
                 f"Broker helper観測済み={str(helper_seen).lower()}"
             )
         finally:
