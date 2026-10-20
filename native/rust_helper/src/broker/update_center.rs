@@ -8391,4 +8391,285 @@ mod tests {
         assert_eq!(execution.error.unwrap().code, "update_trust_unconfigured");
         let _ = std::fs::remove_dir_all(root);
     }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    #[ignore = "explicit Ubuntu installed-product GTK acceptance harness"]
+    fn linux_installed_acceptance_stages_real_export_and_registers_entry() {
+        use ring::signature::{Ed25519KeyPair, KeyPair};
+        use std::os::unix::fs::PermissionsExt;
+
+        let package_path = std::path::PathBuf::from(
+            std::env::var_os("D4P_LINUX_ACCEPTANCE_PACKAGE")
+                .expect("acceptance package path is required"),
+        );
+        let acceptance_root = std::path::PathBuf::from(
+            std::env::var_os("D4P_LINUX_ACCEPTANCE_ROOT").expect("acceptance root is required"),
+        );
+        let install_root = std::path::PathBuf::from(
+            std::env::var_os("XDG_DATA_HOME").expect("XDG_DATA_HOME is required"),
+        );
+        let state_home = std::path::PathBuf::from(
+            std::env::var_os("XDG_STATE_HOME").expect("XDG_STATE_HOME is required"),
+        );
+        let root_metadata = std::fs::symlink_metadata(&acceptance_root).unwrap();
+        assert!(root_metadata.is_dir() && !root_metadata.file_type().is_symlink());
+        assert_eq!(root_metadata.permissions().mode() & 0o077, 0);
+        assert!(package_path.is_absolute());
+        let package_metadata = std::fs::symlink_metadata(&package_path).unwrap();
+        assert!(package_metadata.is_file() && !package_metadata.file_type().is_symlink());
+        let package = std::fs::read(&package_path).unwrap();
+        assert!(package.len() >= 12);
+        assert_eq!(&package[..8], b"D4PKG01\n");
+        let manifest_bytes = u32::from_le_bytes(package[8..12].try_into().unwrap()) as usize;
+        let manifest_end = 12usize.checked_add(manifest_bytes).unwrap();
+        assert!(manifest_end <= package.len());
+        let manifest: Value = serde_json::from_slice(&package[12..manifest_end]).unwrap();
+        let offered_version = manifest["product_version"].as_str().unwrap().to_owned();
+        assert_eq!(manifest["app_id"], INSTALL_APP_ID);
+        assert_eq!(manifest["audit_store_id"], INSTALL_AUDIT_ID);
+        assert_eq!(manifest["target_platform"], "linux");
+
+        let install_metadata = std::fs::symlink_metadata(&install_root).unwrap();
+        let state_metadata = std::fs::symlink_metadata(&state_home).unwrap();
+        assert!(install_metadata.is_dir() && !install_metadata.file_type().is_symlink());
+        assert!(state_metadata.is_dir() && !state_metadata.file_type().is_symlink());
+        let store_root = state_home.join("d4-pocket/linux-broker/store");
+        std::fs::create_dir_all(&store_root).unwrap();
+
+        let digest = hex::encode(Sha256::digest(&package));
+        let key = Ed25519KeyPair::generate_pkcs8(&SystemRandom::new()).unwrap();
+        let pair = Ed25519KeyPair::from_pkcs8(key.as_ref()).unwrap();
+        let public_der = [
+            0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00,
+        ]
+        .into_iter()
+        .chain(pair.public_key().as_ref().iter().copied())
+        .collect::<Vec<_>>();
+        let fingerprint = sha256_tagged(pair.public_key().as_ref());
+        let update_id = "linux-installed-acceptance";
+        let summary = "Ubuntu native installed launcher検証";
+        let signed = serde_json::to_vec(&SignedManifest {
+            version: CANDIDATE_VERSION,
+            update_id,
+            current_version: "0.0.0",
+            offered_version: &offered_version,
+            channel: "stable",
+            summary,
+            package_sha256: &digest,
+            package_size_bytes: package.len() as u64,
+            rollback_available: false,
+        })
+        .unwrap();
+        let signature = pair.sign(&signed);
+        let trust = UpdateTrust {
+            version: TRUST_VERSION,
+            algorithm: "Ed25519".into(),
+            public_key_der_hex: hex::encode(public_der),
+            public_key_fingerprint: fingerprint.clone(),
+            package_sources: Vec::new(),
+        };
+        let candidate = UpdateCandidateDocument {
+            version: CANDIDATE_VERSION,
+            update_id: update_id.into(),
+            current_version: "0.0.0".into(),
+            offered_version: offered_version.clone(),
+            channel: "stable".into(),
+            summary: summary.into(),
+            package_sha256: Some(digest.clone()),
+            package_size_bytes: Some(package.len() as u64),
+            signed_bytes_hex: hex::encode(signed),
+            signature_hex: hex::encode(signature.as_ref()),
+            signer_fingerprint: fingerprint,
+            rollback_available: false,
+        };
+        let candidate_value = serde_json::to_value(&candidate).unwrap();
+        let candidate_hash =
+            crate::broker::protocol::canonical_payload_hash(Some(&candidate_value));
+        let mut broker = Broker::new_persistent("session-1", &store_root).unwrap();
+        broker.update_trust = Some(trust);
+        broker
+            .set_desktop_product_identity(INSTALL_APP_ID.into(), INSTALL_AUDIT_ID.into())
+            .unwrap();
+        broker.set_desktop_product_install_local_app_data(install_root.clone());
+        assert!(
+            crate::product_bootstrapper::resolve_active_version_launcher_if_present(
+                &install_root,
+                INSTALL_APP_ID,
+                INSTALL_AUDIT_ID,
+            )
+            .unwrap()
+            .is_none()
+        );
+
+        let checked = call(
+            &mut broker,
+            BrokerOperation::更新確認,
+            json!({"版": VERSION, "候補": [candidate]}),
+        );
+        assert_eq!(checked.status, BrokerStatus::Accepted, "{checked:?}");
+
+        let package_directory = broker
+            .state_store
+            .open_update_package_directory()
+            .unwrap()
+            .unwrap();
+        drop(package_directory);
+        let stored_package = store_root
+            .join("update_packages")
+            .join(format!("{digest}.pkg"));
+        std::fs::write(&stored_package, &package).unwrap();
+        std::fs::set_permissions(&stored_package, std::fs::Permissions::from_mode(0o644)).unwrap();
+
+        let payload = json!({
+            "版": VERSION,
+            "更新ID": update_id,
+            "候補hash": candidate_hash,
+        });
+        let payload_hash = crate::broker::protocol::canonical_payload_hash(Some(&payload));
+        let plan = super::super::product_install::plan_product_install(
+            &install_root,
+            INSTALL_APP_ID,
+            &offered_version,
+            &digest,
+        )
+        .unwrap();
+        let fixed_launcher = plan.root.join("gui_shell_desktop_launcher");
+        let apply_confirmation = UpdateApplyConfirmation {
+            download: UpdateDownloadConfirmation {
+                update_id: update_id.into(),
+                candidate_hash: payload["候補hash"].as_str().unwrap().into(),
+                source_url: String::new(),
+                package_sha256: digest.clone(),
+                package_size_bytes: package.len() as u64,
+                offered_version: offered_version.clone(),
+                channel: "stable".into(),
+                summary: summary.into(),
+                display_host: String::new(),
+                payload_hash: payload_hash.clone(),
+            },
+            app_id: INSTALL_APP_ID.into(),
+            audit_store_id: INSTALL_AUDIT_ID.into(),
+            version_directory: plan.version_directory.clone(),
+        };
+        let apply_envelope = |request_id: &str| {
+            json!({
+                "request_id": request_id,
+                "session_id": "session-1",
+                "operation": OP_APPLY,
+                "payload_hash": payload_hash,
+                "nonce": format!("{request_id}-nonce"),
+                "issued_at": BrokerRequestEnvelope::current_issued_at(),
+                "metadata": {"client": "desktop_flutter"},
+                "payload": payload,
+            })
+            .to_string()
+        };
+        let unconfirmed_apply = call(&mut broker, BrokerOperation::更新適用要求, payload.clone());
+        assert_eq!(unconfirmed_apply.status, BrokerStatus::Rejected);
+        assert_eq!(
+            unconfirmed_apply.error.unwrap().code,
+            "desktop_native_owner_confirmation_required"
+        );
+        let applied = broker.desktop_owner_operation_json_with_update_confirmation(
+            &apply_envelope("linux-installed-acceptance-apply"),
+            None,
+            Some(apply_confirmation),
+        );
+        assert_eq!(applied.status, BrokerStatus::Accepted, "{applied:?}");
+        assert_eq!(applied.body.as_ref().unwrap()["導入状態"], "version_staged");
+
+        let desktop_entry_path =
+            super::super::product_install::plan_linux_desktop_entry(&install_root, INSTALL_APP_ID)
+                .unwrap();
+        let activation_confirmation = UpdateActivationConfirmation {
+            update_id: update_id.into(),
+            candidate_hash: payload["候補hash"].as_str().unwrap().into(),
+            package_sha256: digest.clone(),
+            package_size_bytes: package.len() as u64,
+            offered_version: offered_version.clone(),
+            channel: "stable".into(),
+            summary: summary.into(),
+            payload_hash: payload_hash.clone(),
+            app_id: INSTALL_APP_ID.into(),
+            audit_store_id: INSTALL_AUDIT_ID.into(),
+            version_directory: plan.version_directory,
+            linux_desktop_entry_path: desktop_entry_path.clone(),
+            rollback_target: None,
+        };
+        let activation_envelope = |request_id: &str| {
+            json!({
+                "request_id": request_id,
+                "session_id": "session-1",
+                "operation": OP_ACTIVATE,
+                "payload_hash": payload_hash,
+                "nonce": format!("{request_id}-nonce"),
+                "issued_at": BrokerRequestEnvelope::current_issued_at(),
+                "metadata": {"client": "desktop_flutter"},
+                "payload": payload,
+            })
+            .to_string()
+        };
+        let unconfirmed_activation = call(
+            &mut broker,
+            BrokerOperation::更新有効版切替要求,
+            payload.clone(),
+        );
+        assert_eq!(unconfirmed_activation.status, BrokerStatus::Rejected);
+        assert_eq!(
+            unconfirmed_activation.error.unwrap().code,
+            "desktop_native_owner_confirmation_required"
+        );
+        let activated = broker.desktop_owner_operation_json_with_update_confirmations(
+            &activation_envelope("linux-installed-acceptance-activate"),
+            None,
+            None,
+            Some(activation_confirmation),
+        );
+        assert_eq!(activated.status, BrokerStatus::Accepted, "{activated:?}");
+        assert_eq!(
+            activated.body.as_ref().unwrap()["有効化"],
+            "active_version_recorded"
+        );
+        assert_eq!(activated.body.as_ref().unwrap()["起動"], "not_started");
+        assert!(desktop_entry_path.is_file());
+        assert!(std::fs::read_to_string(&desktop_entry_path)
+            .unwrap()
+            .contains(&format!("Exec=\"{}\"", fixed_launcher.display())));
+        assert!(!stored_package.exists());
+        assert!(broker.audit_events().iter().any(|event| {
+            event.request_id == "linux-installed-acceptance-activate:complete"
+                && event.operation == OP_ACTIVATE
+                && event.decision == "completed"
+        }));
+        println!(
+            "Linux installed acceptance seed: version={offered_version} package_sha256={digest} entry_registered=true owner_confirmation_source=isolated_test_fixture"
+        );
+        let _ = acceptance_root;
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    #[ignore = "explicit Ubuntu installed-product GTK acceptance harness"]
+    fn linux_installed_acceptance_runtime_audit_is_durable() {
+        let state_home = std::path::PathBuf::from(
+            std::env::var_os("XDG_STATE_HOME").expect("XDG_STATE_HOME is required"),
+        );
+        let store_root = state_home.join("d4-pocket/linux-broker/store");
+        let broker = Broker::new_persistent("linux-installed-audit-check", &store_root).unwrap();
+        let started = broker.audit_events().iter().position(|event| {
+            event.operation == "D4 Pocket Desktop起動"
+                && event.decision == "recorded"
+                && event.evidence_source == "LIVE_RUNTIME"
+        });
+        let stopped = broker.audit_events().iter().position(|event| {
+            event.operation == "D4 Pocket Desktop終了"
+                && event.decision == "recorded"
+                && event.evidence_source == "LIVE_RUNTIME"
+        });
+        assert!(started.is_some(), "installed launch Audit was not durable");
+        assert!(stopped.is_some(), "installed exit Audit was not durable");
+        assert!(started.unwrap() < stopped.unwrap());
+        println!("Linux installed acceptance audit: LIVE_RUNTIME start/exit durable");
+    }
 }

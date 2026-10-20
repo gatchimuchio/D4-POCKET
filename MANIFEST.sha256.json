@@ -76,7 +76,7 @@
     },
     {
       "path": ".github/workflows/linux-manual-export-build.yml",
-      "sha256": "a1ddfc0454ec9ede8aad980d902fd195766faa666c54011985ffe21d1814ff41"
+      "sha256": "a6d4aa0c5e250254b399e744945955a6592ce7201fa92eb575c67e79cd4f4df6"
     },
     {
       "path": ".github/workflows/linux-manual-rust-validation.yml",
@@ -3664,7 +3664,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "bd2c9a85e9245caba4faaad9ffb5b0773fd162de051ede70c22f47edecf138a9"
+      "sha256": "4ab810e08475f02d15ace2a2366830a691d20e2de468b61801a84bfeed0ca55e"
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
