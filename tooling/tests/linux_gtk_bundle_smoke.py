@@ -147,14 +147,14 @@ def _request_x11_window_manager_close(window_id: str, environment: dict[str, str
     if activated.returncode != 0:
         raise RuntimeError("D4 Pocket GTK windowをwindow manager経由でactivateできませんでした")
     closed = subprocess.run(
-        ["xdotool", "key", "--clearmodifiers", "Alt+F4"],
+        ["xdotool", "windowclose", window_id],
         env=environment,
         capture_output=True,
         check=False,
         timeout=10,
     )
     if closed.returncode != 0:
-        raise RuntimeError("D4 Pocket GTK windowへwindow manager close keyを送れませんでした")
+        raise RuntimeError("D4 Pocket GTK windowへWM_DELETE_WINDOWを送れませんでした")
 
 
 def _terminate_owned_product(

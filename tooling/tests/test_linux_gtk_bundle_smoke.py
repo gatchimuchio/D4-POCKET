@@ -61,7 +61,7 @@ class WaylandSocketSmokeTests(unittest.TestCase):
 
 
 class X11WindowManagerCloseTests(unittest.TestCase):
-    def test_uses_window_manager_close_key_for_the_detected_window(self) -> None:
+    def test_sends_wm_delete_to_the_detected_window(self) -> None:
         with patch(
             "tooling.tests.linux_gtk_bundle_smoke.subprocess.run",
             side_effect=(
@@ -77,10 +77,10 @@ class X11WindowManagerCloseTests(unittest.TestCase):
         )
         self.assertEqual(
             run.call_args_list[1].args[0],
-            ["xdotool", "key", "--clearmodifiers", "Alt+F4"],
+            ["xdotool", "windowclose", "0x42"],
         )
 
-    def test_does_not_send_close_key_when_window_activation_fails(self) -> None:
+    def test_does_not_send_wm_delete_when_window_activation_fails(self) -> None:
         with patch(
             "tooling.tests.linux_gtk_bundle_smoke.subprocess.run",
             return_value=subprocess.CompletedProcess([], 1),

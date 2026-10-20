@@ -5196,7 +5196,7 @@
     },
     {
       "path": "tooling/tests/linux_gtk_bundle_smoke.py",
-      "sha256": "cd780f53090ba2b9aeb4a16083b009d4ae2bb2302ade139b3370c4e743dd19af"
+      "sha256": "961a41cdc7183900ff26bc7bca8070a659004908427a5eca04509be9d984937b"
     },
     {
       "path": "tooling/tests/linux_installed_product_smoke.py",
@@ -5208,7 +5208,7 @@
     },
     {
       "path": "tooling/tests/test_linux_gtk_bundle_smoke.py",
-      "sha256": "c491a4499de67131b12c9164c7482977bfcaca0e52134cc49a1d79576eeab9b5"
+      "sha256": "2543b455dd5ab968ba9094919443966749c846202dd8dcdbaef4dd9cbb13ed41"
     },
     {
       "path": "tooling/tests/test_linux_installed_product_smoke.py",
