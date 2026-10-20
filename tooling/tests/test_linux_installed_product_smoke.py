@@ -9,6 +9,7 @@ from pathlib import Path
 
 from tooling.tests.linux_installed_product_smoke import (
     _actionable_node,
+    _component_center,
     _desktop_entry_targets_fixed_launcher,
     _resolve_regular_package,
     _safe_log_tail,
@@ -35,6 +36,13 @@ class AccessibleActionResolutionTests(unittest.TestCase):
         def queryAction(self):
             return AccessibleActionResolutionTests.Actions(self.actions)
 
+        def queryComponent(self):
+            return self
+
+        def getExtents(self, coordinate_type: int):
+            self.coordinate_type = coordinate_type
+            return type("Bounds", (), {"x": 10, "y": 20, "width": 30, "height": 40})()
+
     def test_resolves_actionable_button_ancestor_of_visible_label(self) -> None:
         button = self.Node("", ("click",))
         label = self.Node("Owner確認してManifest fileを生成")
@@ -44,6 +52,15 @@ class AccessibleActionResolutionTests(unittest.TestCase):
     def test_does_not_treat_non_actionable_label_as_a_button(self) -> None:
         label = self.Node("Owner確認してManifest fileを生成")
         self.assertIsNone(_actionable_node(label))
+
+    def test_uses_live_accessible_bounds_for_coordinate_fallback(self) -> None:
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        label = self.Node("Owner確認してManifest fileを生成")
+        with patch.dict("sys.modules", {"pyatspi": SimpleNamespace(DESKTOP_COORDS=1)}):
+            self.assertEqual(_component_center(label), (25, 40))
+        self.assertEqual(label.coordinate_type, 1)
 
 
 class LinuxInstalledDesktopEntryTests(unittest.TestCase):

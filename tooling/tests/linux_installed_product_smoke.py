@@ -157,7 +157,23 @@ def _actionable_node(node, *, max_ancestors: int = 5):
     return None
 
 
-def _find_actionable_accessible(name: str, *, root=None, timeout: float = 10.0):
+def _component_center(node) -> tuple[int, int] | None:
+    try:
+        import pyatspi
+
+        bounds = node.queryComponent().getExtents(pyatspi.DESKTOP_COORDS)
+    except Exception:
+        return None
+    x, y = int(bounds.x), int(bounds.y)
+    width, height = int(bounds.width), int(bounds.height)
+    if width <= 0 or height <= 0 or width > 4096 or height > 4096:
+        return None
+    if abs(x) > 8192 or abs(y) > 8192:
+        return None
+    return x + width // 2, y + height // 2
+
+
+def _find_operable_accessible(name: str, *, root=None, timeout: float = 10.0):
     try:
         import pyatspi
     except ImportError as error:
@@ -175,11 +191,13 @@ def _find_actionable_accessible(name: str, *, root=None, timeout: float = 10.0):
             actionable = _actionable_node(node)
             if actionable is not None:
                 return actionable
+            if _component_center(node) is not None:
+                return node
         time.sleep(0.15)
-    raise RuntimeError(f"AT-SPI操作可能buttonを確認できません: {name}")
+    raise RuntimeError(f"AT-SPIで操作可能なGTK controlを確認できません: {name}")
 
 
-def _activate_accessible(node, name: str) -> None:
+def _activate_accessible(node, name: str, environment: dict[str, str]) -> None:
     try:
         actions = node.queryAction()
         for index in range(actions.nActions):
@@ -187,9 +205,20 @@ def _activate_accessible(node, name: str) -> None:
             if action_name in {"click", "press", "activate"}:
                 if actions.doAction(index):
                     return
-    except Exception as error:
-        raise RuntimeError(f"AT-SPI要素を操作できません: {name}") from error
-    raise RuntimeError(f"AT-SPI要素に操作可能なactionがありません: {name}")
+    except Exception:
+        pass
+    center = _component_center(node)
+    if center is None:
+        raise RuntimeError(f"AT-SPI action／可視boundsがありません: {name}")
+    clicked = subprocess.run(
+        ["xdotool", "mousemove", "--sync", str(center[0]), str(center[1]), "click", "1"],
+        env=environment,
+        capture_output=True,
+        check=False,
+        timeout=5,
+    )
+    if clicked.returncode != 0:
+        raise RuntimeError(f"GTK controlのAT-SPI座標clickに失敗しました: {name}")
 
 
 def _accessible_descendants(root) -> list[tuple[object, str]]:
@@ -222,10 +251,12 @@ def _trigger_export_from_installed_ui(environment: dict[str, str], window_id: st
         check=True,
         timeout=5,
     )
-    button = _find_actionable_accessible(
+    button = _find_operable_accessible(
         "Owner確認してManifest fileを生成", timeout=20
     )
-    _activate_accessible(button, "Owner確認してManifest fileを生成")
+    _activate_accessible(
+        button, "Owner確認してManifest fileを生成", environment
+    )
 
 
 def _answer_owner_dialog(environment: dict[str, str], decision: str) -> None:
@@ -250,8 +281,8 @@ def _answer_owner_dialog(environment: dict[str, str], decision: str) -> None:
         raise RuntimeError("Owner確認summaryにLinux対象platformがありません")
     if not any("要求hash:" in value or "payload hash:" in value for value in names):
         raise RuntimeError("Owner確認summaryに要求hashがありません")
-    button = _find_actionable_accessible(decision, root=dialog, timeout=10)
-    _activate_accessible(button, decision)
+    button = _find_operable_accessible(decision, root=dialog, timeout=10)
+    _activate_accessible(button, decision, environment)
 
 
 def _verify_live_audit(store: Path) -> dict[str, int]:
