@@ -15,6 +15,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _component_center,
     _desktop_entry_targets_fixed_launcher,
     _focused_named_accessible,
+    _find_operable_accessible,
     _resolve_regular_package,
     _safe_log_tail,
     _verify_export_manifest,
@@ -126,6 +127,28 @@ class AccessibleActionResolutionTests(unittest.TestCase):
             )
             self.assertIs(_focused_named_accessible("Owner確認"), visible_focus)
             self.assertIsNone(_focused_named_accessible("different label"))
+
+    def test_operable_lookup_matches_a_composite_accessible_name(self) -> None:
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        button = self.Node(
+            "独立Appを書き出す GUI Shell独立App書出し面を開く", ("Tap",)
+        )
+
+        class Root:
+            childCount = 1
+
+            def getChildAtIndex(self, index: int):
+                return button
+
+        fake_pyatspi = SimpleNamespace(
+            Registry=SimpleNamespace(getDesktop=lambda _: Root())
+        )
+        with patch.dict("sys.modules", {"pyatspi": fake_pyatspi}):
+            self.assertIs(
+                _find_operable_accessible("独立Appを書き出す", root=Root()), button
+            )
 
     def test_keyboard_activation_sends_enter_only_after_target_focus(self) -> None:
         from unittest.mock import patch

@@ -243,7 +243,7 @@ def _find_operable_accessible(name: str, *, root=None, timeout: float = 10.0):
         matches = [
             node
             for node, accessible_name in _accessible_nodes(search_root)
-            if accessible_name.strip() == name
+            if name in accessible_name.strip()
         ]
         for node in matches:
             actionable = _actionable_node(node)
