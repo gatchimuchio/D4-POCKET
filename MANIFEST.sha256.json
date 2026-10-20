@@ -3664,7 +3664,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "b7192fb2e8f614b1cb6fb1445aa09aeb49bd7ab32df8dc4b22cd6b01ee577819"
+      "sha256": "54194c2ba58bebe191a8a045a100e1a617284cf5316bcfbf96404ee59e07d4e5"
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
@@ -3740,7 +3740,7 @@
     },
     {
       "path": "native/rust_helper/src/macos_desktop_owner.rs",
-      "sha256": "f40863d726d2c7159ca0910a41ff9003ece55032bdbfd9f3cf02927190c8a961"
+      "sha256": "ce4a06a5794fffee1ffe0f58c3685c94389865f40c545704763e671b076fafa5"
     },
     {
       "path": "native/rust_helper/src/macos_desktop_worker.rs",

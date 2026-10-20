@@ -1748,8 +1748,7 @@ mod task_owner_tests {
         let payload = json!({"版": 1});
         let valid = request("製品アンインストール要求", payload);
         let bytes = serde_json::to_vec(&valid).unwrap();
-        let owner_candidate =
-            candidate(&bytes, &endpoint()).expect("導入済み製品の削除Owner候補");
+        let owner_candidate = candidate(&bytes, &endpoint()).expect("導入済み製品の削除Owner候補");
         assert!(owner_candidate
             .summary
             .contains(&product_root.display().to_string()));

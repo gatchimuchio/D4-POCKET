@@ -975,7 +975,7 @@ fn request_product_uninstall(
     ticket_bytes.fill(0);
     let ticket_hash = sha256_tagged(ticket.as_bytes());
     let reason = format!(
-        "Capability=product.install.uninstall Permission=Known Folderから再導出した固定導入rootと同じ起動先のStart Menu shortcutだけ Approval=導入済み製品identity・固定root・保持データを示した独立Rust Desktop native Owner確認 AuditEvent=削除前意図を永続化 RecoveryAction=終了後helperがBroker ticketを再照合し、AppDataのruntime・Credential・Audit Storeを保持する。失敗後は新しいnative Owner確認から再要求する 製品ID={app_id} 監査保存先ID={audit_store_id} ticket_sha256={ticket_hash}"
+        "Capability=product.install.uninstall 現在利用者から再導出した固定導入rootと対応するplatform起動項目だけ Approval=導入済み製品identity・固定root・保持データを示した独立Rust Desktop native Owner確認 AuditEvent=削除前意図を永続化 RecoveryAction=終了後helperがBroker ticketを再照合し、利用者runtime・Credential・Audit Storeを保持する。失敗後は新しいnative Owner確認から再要求する 製品ID={app_id} 監査保存先ID={audit_store_id} ticket_sha256={ticket_hash}"
     );
     let event = match broker.append_audit(
         request_id,
@@ -1724,7 +1724,7 @@ impl Broker {
             operation,
             decision,
             &format!(
-                "Capability=product.install.uninstall Permission=固定導入rootと同一targetのStart Menu entryだけ Approval=先行する独立native Owner確認 AuditEvent=終了後処理 {decision} RecoveryAction={recovery} failure_code={detail} {identity_marker} {ticket_marker}"
+                "Capability=product.install.uninstall Permission=固定導入rootと対応するplatform起動項目だけ Approval=先行する独立native Owner確認 AuditEvent=終了後処理 {decision} RecoveryAction={recovery} failure_code={detail} {identity_marker} {ticket_marker}"
             ),
             "LIVE_RUNTIME",
             ticket_hash,
@@ -6585,6 +6585,15 @@ mod tests {
             .as_str()
             .unwrap()
             .to_owned();
+        let acceptance_audit = broker
+            .audit_events()
+            .iter()
+            .find(|event| event.event_id == accepted.audit_event_id)
+            .expect("Linux uninstall authorization audit");
+        assert!(acceptance_audit
+            .reason
+            .contains("対応するplatform起動項目だけ"));
+        assert!(!acceptance_audit.reason.contains("Start Menu"));
         assert_eq!(ticket.len(), 64);
         assert!(!serde_json::to_string(broker.audit_events())
             .unwrap()
