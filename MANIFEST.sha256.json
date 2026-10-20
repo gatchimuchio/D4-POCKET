@@ -1308,7 +1308,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "3b89f96b67804bebfe02400e117a00b5d7fba3780edbf2dd6a5cde6c3519b466"
+      "sha256": "7414207b1eaf026871afa47f3defb04e27207b1a5615f11814dfeca0db858432"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1596,7 +1596,7 @@
     },
     {
       "path": "docs/specs/process-supervision.md",
-      "sha256": "82dda5d9de9b3fa816e9934fb2cd6a93fa8cf6930d9a7b76127895e52df90523"
+      "sha256": "7ad6c4a2f2465edea4e29da9f742b7e3986986a4dc075f32ff590322d0f8b327"
     },
     {
       "path": "docs/specs/regression-case.md",
@@ -3769,6 +3769,10 @@
     {
       "path": "native/rust_helper/src/process.rs",
       "sha256": "34615c193fbc16ced050cedb995bdc1d000b31aff667cd3f8bada1d6cd3bdd6c"
+    },
+    {
+      "path": "native/rust_helper/src/process_group_guardian.rs",
+      "sha256": "8aa3f276e407b06add56c257bbde2bfcf98da9f49aedaae648bbd6459cd23eb1"
     },
     {
       "path": "native/rust_helper/src/product_bootstrapper.rs",
