@@ -172,7 +172,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "72d3edb26ea023ad27272472427df2dad35a7092b16d9477b6fc52469d3517b1"
+      "sha256": "529dfe1e6b921fd8955f8298b2f5aa9472d67f4a186e2e90115258e0ec2d551d"
     },
     {
       "path": "SECURITY.md",
@@ -1308,7 +1308,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "a0f17267bd901b44cda97937bb363c9b3f91c49b138dfd1299ce29fd863f4c93"
+      "sha256": "5fcba01db9e6e7a0642c4cc207a29a8df8bade77b67d51d9e25348e79207bbb7"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1520,7 +1520,7 @@
     },
     {
       "path": "docs/specs/linux-product-package.md",
-      "sha256": "1bec6a95872713dada73c0dcdb38202d990c408fa0ab1031596334cdba0299dd"
+      "sha256": "a2356d67a47b8c858fc80a55e9bd7384df02a4ccfef81291db8e85882d15ae9c"
     },
     {
       "path": "docs/specs/linux-workspace-selection.md",
