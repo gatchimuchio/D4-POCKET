@@ -466,6 +466,28 @@ def run_smoke(launcher: Path, temp_root: Path, backend: str) -> None:
                 time.sleep(0.1)
 
             if backend == "x11":
+                # GTK maps the window before Flutter's first OpenGL frame is ready.
+                # Let the initial frame settle before asking X11 to destroy its drawable.
+                time.sleep(5)
+                if runner_process.poll() is not None:
+                    raise RuntimeError(
+                        _failure_with_runner_output(
+                            "Flutter GTK runnerが初回frame表示前に終了しました: "
+                            f"{runner_process.returncode}",
+                            app_log,
+                            root,
+                        )
+                    )
+                visible = subprocess.run(
+                    ["xdotool", "search", "--onlyvisible", "--name", pattern],
+                    env=env,
+                    capture_output=True,
+                    check=False,
+                    timeout=5,
+                )
+                visible_ids = visible.stdout.decode("ascii", errors="ignore").splitlines()
+                if visible.returncode != 0 or window_id not in visible_ids:
+                    raise RuntimeError("GTK windowが初回frame待機中に可視状態でなくなりました")
                 _request_x11_window_manager_close(window_id, env)
                 try:
                     exit_code = runner_process.wait(timeout=45)
