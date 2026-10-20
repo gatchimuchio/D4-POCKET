@@ -173,6 +173,46 @@ def _component_center(node) -> tuple[int, int] | None:
     return x + width // 2, y + height // 2
 
 
+def _accessibility_debug(node, *, max_ancestors: int = 5) -> str:
+    try:
+        import pyatspi
+    except ImportError:
+        return "pyatspi_unavailable"
+    details = []
+    current = node
+    for depth in range(max_ancestors + 1):
+        try:
+            role = current.getRoleName()
+        except Exception:
+            role = "unknown"
+        try:
+            actions = current.queryAction()
+            action_names = [
+                actions.getName(index) for index in range(min(actions.nActions, 8))
+            ]
+        except Exception:
+            action_names = []
+        try:
+            showing = current.getState().contains(pyatspi.STATE_SHOWING)
+        except Exception:
+            showing = "unknown"
+        try:
+            bounds = current.queryComponent().getExtents(pyatspi.DESKTOP_COORDS)
+            extents = f"{bounds.x},{bounds.y},{bounds.width},{bounds.height}"
+        except Exception as error:
+            extents = f"unavailable:{type(error).__name__}"
+        details.append(
+            f"depth={depth},role={role},showing={showing},bounds={extents},actions={action_names}"
+        )
+        try:
+            current = current.parent
+        except Exception:
+            break
+        if current is None:
+            break
+    return "; ".join(details)
+
+
 def _find_operable_accessible(name: str, *, root=None, timeout: float = 10.0):
     try:
         import pyatspi
@@ -180,6 +220,7 @@ def _find_operable_accessible(name: str, *, root=None, timeout: float = 10.0):
         raise RuntimeError("AT-SPI UI操作にpython3-pyatspiが必要です") from error
 
     deadline = time.monotonic() + timeout
+    last_debug = "no matching AT-SPI node"
     while time.monotonic() < deadline:
         search_root = root if root is not None else pyatspi.Registry.getDesktop(0)
         matches = [
@@ -193,8 +234,11 @@ def _find_operable_accessible(name: str, *, root=None, timeout: float = 10.0):
                 return actionable
             if _component_center(node) is not None:
                 return node
+            last_debug = _accessibility_debug(node)
         time.sleep(0.15)
-    raise RuntimeError(f"AT-SPIで操作可能なGTK controlを確認できません: {name}")
+    raise RuntimeError(
+        f"AT-SPIで操作可能なGTK controlを確認できません: {name}; {last_debug}"
+    )
 
 
 def _activate_accessible(node, name: str, environment: dict[str, str]) -> None:
