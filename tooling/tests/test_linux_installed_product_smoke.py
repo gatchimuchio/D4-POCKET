@@ -350,20 +350,20 @@ class LinuxInstalledOwnerEvidenceTests(unittest.TestCase):
             events = []
             previous_hash = None
             audit_cases = (
-                ("GUI Shell書出し", "rejected"),
-                ("GUI Shell書出し", "accepted"),
-                ("製品アンインストール要求", "rejected"),
-                ("製品アンインストール要求", "accepted"),
-                ("製品アンインストール完了", "completed"),
+                ("GUI Shell書出し", "rejected", "INTERNAL_STATE"),
+                ("GUI Shell書出し", "accepted", "INTERNAL_STATE"),
+                ("製品アンインストール要求", "rejected", "LIVE_RUNTIME"),
+                ("製品アンインストール要求", "accepted", "LIVE_RUNTIME"),
+                ("製品アンインストール完了", "completed", "LIVE_RUNTIME"),
             )
-            for index, (operation, decision) in enumerate(audit_cases, start=1):
+            for index, (operation, decision, evidence_source) in enumerate(audit_cases, start=1):
                 event = {
                     "event_id": f"broker-audit-{index}",
                     "request_id": f"request-{index}",
                     "operation": operation,
                     "decision": decision,
                     "reason": "fixture",
-                    "evidence_source": "LIVE_RUNTIME",
+                    "evidence_source": evidence_source,
                     "payload_hash": f"sha256:{index:064x}",
                     "previous_event_hash": previous_hash,
                 }

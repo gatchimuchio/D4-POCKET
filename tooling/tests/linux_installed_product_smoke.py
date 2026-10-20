@@ -536,12 +536,12 @@ def _verify_live_audit(
         event
         for event in events
         if event.get("operation") == "GUI Shell書出し"
-        and event.get("evidence_source") == "LIVE_RUNTIME"
+        and event.get("evidence_source") == "INTERNAL_STATE"
     ]
     accepted = sum(event.get("decision") == "accepted" for event in exports)
     rejected = sum(event.get("decision") == "rejected" for event in exports)
     if accepted < 1 or rejected < 1:
-        raise RuntimeError("GTK Owner拒否／許可の両方がLIVE_RUNTIME Auditにありません")
+        raise RuntimeError("GTK Owner拒否／許可の両方がINTERNAL_STATE Auditにありません")
     uninstall = [
         event
         for event in events
