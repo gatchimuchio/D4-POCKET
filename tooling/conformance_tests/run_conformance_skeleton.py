@@ -11870,6 +11870,7 @@ def test_linux_workspace_selection_is_native_and_non_authoritative() -> list[str
 def test_linux_product_launcher_is_built_and_bundle_bound() -> list[str]:
     binary_entry = (RUST_HELPER / "src/bin/gui_shell_desktop_launcher.rs").read_text(encoding="utf-8")
     launcher = (RUST_HELPER / "src/linux_desktop_launcher.rs").read_text(encoding="utf-8")
+    worker = (RUST_HELPER / "src/linux_desktop_worker.rs").read_text(encoding="utf-8")
     bundle = (RUST_HELPER / "src/linux_product_bundle.rs").read_text(encoding="utf-8")
     lib = (RUST_HELPER / "src/lib.rs").read_text(encoding="utf-8")
     cargo = (RUST_HELPER / "Cargo.toml").read_text(encoding="utf-8")
@@ -11887,8 +11888,13 @@ def test_linux_product_launcher_is_built_and_bundle_bound() -> list[str]:
             (
                 "linux_product_bundle::from_launcher",
                 "is_fixed_installed_entrypoint",
-                "resolve_active_version_launcher",
-                "is_active_version_launcher",
+                "resolve_active_version_launcher_if_present",
+                "RunInitialInstallBundle",
+                "is_product_versioned_launcher_path",
+                "product_bundle_bootstraps_only_when_no_active_install_record_exists",
+                "dispatch_active_version_and_finalize",
+                "finalize_linux_product_uninstall(data_home, identity, runtime, launch_nonce)",
+                "installed_handoff_cleans_only_its_bound_ticket_when_child_fails",
                 "FRONTEND_ENVIRONMENT_ALLOWLIST",
                 ".env_clear()",
                 ".process_group(0)",
@@ -11896,6 +11902,15 @@ def test_linux_product_launcher_is_built_and_bundle_bound() -> list[str]:
                 "frontend_exit_stops_a_remaining_owned_process_group",
             ),
             "launcher behavior",
+        ),
+        (
+            worker,
+            (
+                "mark_initial_install_handoff",
+                "active_version_recorded",
+                "initial_install_handoff_requires_matching_accepted_activation",
+            ),
+            "initial-install handoff",
         ),
         (bundle, ("gui_shell_desktop", "gui_shell_linux_broker", "symlink_metadata", "mode() & 0o111 == 0"), "bundle verification"),
         (
@@ -11924,6 +11939,9 @@ def test_linux_product_launcher_is_built_and_bundle_bound() -> list[str]:
 
     if "Windows専用です" in binary_entry:
         errors.append("Linux launcherがWindows専用stubのまま残っている")
+    production_launcher = launcher.split("#[cfg(test)]", 1)[0]
+    if production_launcher.count("dispatch_active_version_and_finalize(") != 3:
+        errors.append("Linux固定launcherとportable初回handoffが共通Uninstall最終化へ接続されない")
     return errors
 
 

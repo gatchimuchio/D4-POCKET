@@ -88,9 +88,47 @@ pub(crate) fn resolve_active_version_launcher(
     let (product_root, root) =
         crate::broker::product_install::open_existing_product_root(local_app_data, expected_app_id)
             .map_err(|_| BootstrapperError("installed_product_root_unavailable"))?;
-    let record_bytes = read_regular_file(&root, ACTIVE_VERSION_FILE, MAX_ACTIVE_VERSION_BYTES)?;
-    let record: ActiveVersionRecord = serde_json::from_slice(&record_bytes)
-        .map_err(|_| BootstrapperError("active_version_record_invalid"))?;
+    resolve_active_version_launcher_from_root(
+        &product_root,
+        &root,
+        expected_app_id,
+        expected_audit_store_id,
+    )?
+    .ok_or(BootstrapperError("active_version_file_unavailable"))
+}
+
+/// 正常な未導入状態だけ`None`とし、破損・不整合な有効版recordはerrorにする。
+pub(crate) fn resolve_active_version_launcher_if_present(
+    local_app_data: &Path,
+    expected_app_id: &str,
+    expected_audit_store_id: &str,
+) -> Result<Option<PathBuf>, BootstrapperError> {
+    let Some((product_root, root)) =
+        crate::broker::product_install::open_existing_product_root_if_present(
+            local_app_data,
+            expected_app_id,
+        )
+        .map_err(|_| BootstrapperError("installed_product_root_unavailable"))?
+    else {
+        return Ok(None);
+    };
+    resolve_active_version_launcher_from_root(
+        &product_root,
+        &root,
+        expected_app_id,
+        expected_audit_store_id,
+    )
+}
+
+fn resolve_active_version_launcher_from_root(
+    product_root: &Path,
+    root: &cap_std::fs::Dir,
+    expected_app_id: &str,
+    expected_audit_store_id: &str,
+) -> Result<Option<PathBuf>, BootstrapperError> {
+    let Some(record) = read_existing_active_record(&root)? else {
+        return Ok(None);
+    };
     if !valid_record(&record, expected_app_id, expected_audit_store_id) {
         return Err(BootstrapperError("active_version_record_invalid"));
     }
@@ -121,7 +159,7 @@ pub(crate) fn resolve_active_version_launcher(
     if !launcher_path.starts_with(&stage_path) {
         return Err(BootstrapperError("active_version_launcher_outside_stage"));
     }
-    Ok(launcher_path)
+    Ok(Some(launcher_path))
 }
 
 /// 固定rootの有効版recordが現在の実行fileを選択している場合だけ導入済み起動と認める。
@@ -745,8 +783,8 @@ fn valid_sha256(value: &str) -> bool {
 mod tests {
     use super::{
         activate_staged_version, active_version_snapshot, is_active_version_launcher,
-        resolve_active_version_launcher, toggle_previous_active_version, ACTIVE_VERSION_FILE,
-        VERSIONED_LAUNCHER,
+        resolve_active_version_launcher, resolve_active_version_launcher_if_present,
+        toggle_previous_active_version, ACTIVE_VERSION_FILE, VERSIONED_LAUNCHER,
     };
     use cap_std::fs::Dir;
     use serde_json::json;
@@ -831,6 +869,46 @@ mod tests {
             APP_ID,
             AUDIT_ID
         ));
+        fs::remove_dir_all(local).unwrap();
+    }
+
+    #[test]
+    fn optional_active_launcher_separates_uninstalled_state_from_corrupt_record() {
+        let local = std::env::temp_dir().join(format!(
+            "d4p-bootstrapper-optional-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let missing_data_home = local.join("missing-xdg-data-home");
+        assert_eq!(
+            resolve_active_version_launcher_if_present(&missing_data_home, APP_ID, AUDIT_ID)
+                .unwrap(),
+            None
+        );
+        assert!(!missing_data_home.exists());
+        fs::create_dir_all(&local).unwrap();
+        assert_eq!(
+            resolve_active_version_launcher_if_present(&local, APP_ID, AUDIT_ID).unwrap(),
+            None
+        );
+        fs::remove_dir_all(&local).unwrap();
+
+        let (local, root) = fixture("optional-no-record");
+        fs::remove_file(root.join(ACTIVE_VERSION_FILE)).unwrap();
+        assert_eq!(
+            resolve_active_version_launcher_if_present(&local, APP_ID, AUDIT_ID).unwrap(),
+            None
+        );
+        fs::write(root.join(ACTIVE_VERSION_FILE), b"{\"unexpected\":true}").unwrap();
+        assert_eq!(
+            resolve_active_version_launcher_if_present(&local, APP_ID, AUDIT_ID)
+                .unwrap_err()
+                .0,
+            "active_version_record_invalid"
+        );
         fs::remove_dir_all(local).unwrap();
     }
 

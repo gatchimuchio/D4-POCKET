@@ -119,9 +119,26 @@ pub(crate) fn open_existing_product_root(
     local_app_data: &Path,
     app_id: &str,
 ) -> Result<(PathBuf, Dir), ProductInstallPlanError> {
+    open_existing_product_root_if_present(local_app_data, app_id)?.ok_or(ProductInstallPlanError(
+        "product_install_directory_unavailable",
+    ))
+}
+
+/// 利用者data rootまたは固定製品rootが未作成なら`None`を返し、既存pathはno-followで検証する。
+pub(crate) fn open_existing_product_root_if_present(
+    local_app_data: &Path,
+    app_id: &str,
+) -> Result<Option<(PathBuf, Dir)>, ProductInstallPlanError> {
     validate_install_inputs(local_app_data, app_id)?;
-    let metadata = std::fs::symlink_metadata(local_app_data)
-        .map_err(|_| ProductInstallPlanError("product_install_local_app_data_unavailable"))?;
+    let metadata = match std::fs::symlink_metadata(local_app_data) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(_) => {
+            return Err(ProductInstallPlanError(
+                "product_install_local_app_data_unavailable",
+            ));
+        }
+    };
     if !metadata.is_dir() || metadata.file_type().is_symlink() || is_reparse_point(&metadata) {
         return Err(ProductInstallPlanError(
             "product_install_local_app_data_invalid",
@@ -142,13 +159,17 @@ pub(crate) fn open_existing_product_root(
     let root_device = CapMetadataExt::dev(&root_metadata);
     let mut current = root;
     for component in [INSTALL_DIRECTORY, PRODUCT_DIRECTORY, app_id] {
-        current = open_existing_child_directory(&current, component, root_device)?;
+        let Some(next) = open_existing_optional_child_directory(&current, component, root_device)?
+        else {
+            return Ok(None);
+        };
+        current = next;
     }
     let product_root = local_app_data
         .join(INSTALL_DIRECTORY)
         .join(PRODUCT_DIRECTORY)
         .join(app_id);
-    Ok((product_root, current))
+    Ok(Some((product_root, current)))
 }
 
 /// 既存の固定rootと`versions`だけをno-followで開く。activation時にdirectoryを新規作成しない。
@@ -1486,9 +1507,9 @@ fn valid_product_version(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        open_existing_product_root, open_existing_product_versions_directory,
-        open_product_versions_directory, plan_product_install, INSTALL_DIRECTORY,
-        PRODUCT_DIRECTORY, VERSIONS_DIRECTORY,
+        open_existing_product_root, open_existing_product_root_if_present,
+        open_existing_product_versions_directory, open_product_versions_directory,
+        plan_product_install, INSTALL_DIRECTORY, PRODUCT_DIRECTORY, VERSIONS_DIRECTORY,
     };
     use std::path::Path;
 
@@ -1583,6 +1604,47 @@ mod tests {
         assert!(capability.dir_metadata().unwrap().is_dir());
         drop(capability);
         std::fs::remove_dir_all(local_app_data).unwrap();
+    }
+
+    #[test]
+    fn optional_product_root_reports_only_absence_and_never_creates_installation() {
+        let parent = std::env::temp_dir().join(format!(
+            "d4p-product-root-optional-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&parent).unwrap();
+        let local_app_data = parent.join("xdg-data");
+        assert!(
+            open_existing_product_root_if_present(&local_app_data, APP_ID)
+                .unwrap()
+                .is_none()
+        );
+        assert!(!local_app_data.exists());
+        std::fs::create_dir_all(&local_app_data).unwrap();
+        assert!(
+            open_existing_product_root_if_present(&local_app_data, APP_ID)
+                .unwrap()
+                .is_none()
+        );
+        assert!(!local_app_data.join(INSTALL_DIRECTORY).exists());
+
+        let product_root = local_app_data
+            .join(INSTALL_DIRECTORY)
+            .join(PRODUCT_DIRECTORY)
+            .join(APP_ID);
+        std::fs::create_dir_all(&product_root).unwrap();
+        let (opened_path, capability) =
+            open_existing_product_root_if_present(&local_app_data, APP_ID)
+                .unwrap()
+                .unwrap();
+        assert_eq!(opened_path, std::fs::canonicalize(&product_root).unwrap());
+        assert!(capability.dir_metadata().unwrap().is_dir());
+        drop(capability);
+        std::fs::remove_dir_all(parent).unwrap();
     }
 
     #[test]

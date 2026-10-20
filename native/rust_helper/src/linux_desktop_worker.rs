@@ -225,11 +225,14 @@ fn serve(
     let product_identity =
         crate::broker::update_center::embedded_product_identity().map_err(|_| failure())?;
     let product_data_home = crate::broker::product_install::current_user_local_app_data().ok();
-    config.desktop_install_path_verified = installed_product_path_verified(
+    let desktop_install_path_verified = installed_product_path_verified(
         bundle,
         product_identity.as_ref(),
         product_data_home.as_deref(),
     );
+    let allow_initial_install_handoff =
+        product_identity.is_some() && !desktop_install_path_verified;
+    config.desktop_install_path_verified = desktop_install_path_verified;
     config.desktop_product_identity = product_identity;
     let (ready_tx, ready_rx) = mpsc::sync_channel(1);
     let (owner_tx, owner_rx) = mpsc::sync_channel(4);
@@ -328,6 +331,7 @@ fn serve(
                     relay(&request, &endpoint.0)?
                 }
             };
+            mark_initial_install_handoff(&frame, &mut response, allow_initial_install_handoff)?;
             let sanitized = crate::linux_desktop_launcher::capture_product_uninstall_ticket(
                 &mut response,
                 runtime,
@@ -536,6 +540,59 @@ fn normalize(input: &[u8], session_id: &str) -> Vec<u8> {
     serde_json::to_vec(&value).unwrap_or_else(|_| input.to_vec())
 }
 
+fn mark_initial_install_handoff(
+    request_frame: &[u8],
+    response_frame: &mut Vec<u8>,
+    allow_initial_install_handoff: bool,
+) -> io::Result<()> {
+    if !allow_initial_install_handoff {
+        return Ok(());
+    }
+    let Ok(request) = serde_json::from_slice::<serde_json::Value>(request_frame) else {
+        return Ok(());
+    };
+    let Ok(mut response) = serde_json::from_slice::<serde_json::Value>(response_frame.as_slice())
+    else {
+        return Ok(());
+    };
+    let Some(request_id) = request
+        .get("request_id")
+        .and_then(serde_json::Value::as_str)
+    else {
+        return Ok(());
+    };
+    if request.get("operation").and_then(serde_json::Value::as_str) != Some("更新有効版切替要求")
+        || response
+            .get("request_id")
+            .and_then(serde_json::Value::as_str)
+            != Some(request_id)
+        || response
+            .get("operation")
+            .and_then(serde_json::Value::as_str)
+            != Some("更新有効版切替要求")
+        || response.get("status").and_then(serde_json::Value::as_str) != Some("accepted")
+    {
+        return Ok(());
+    }
+    let Some(body) = response
+        .get_mut("body")
+        .and_then(serde_json::Value::as_object_mut)
+    else {
+        return Ok(());
+    };
+    if body.get("有効化").and_then(serde_json::Value::as_str) != Some("active_version_recorded")
+    {
+        return Ok(());
+    }
+    body.insert(
+        "起動".to_owned(),
+        serde_json::Value::String("after_current_exit".to_owned()),
+    );
+    *response_frame = serde_json::to_vec(&response)
+        .map_err(|_| io::Error::other("Linux初回導入応答を安全に整形できません"))?;
+    Ok(())
+}
+
 fn relay(request: &[u8], endpoint: &BrokerEndpoint) -> io::Result<Vec<u8>> {
     let address = SocketAddr::from((Ipv4Addr::LOCALHOST, endpoint.port));
     let mut socket = TcpStream::connect_timeout(&address, IO_TIMEOUT)?;
@@ -555,6 +612,30 @@ mod tests {
 
     const PRODUCT_APP_ID: &str = "d4-pocket-app-11111111111111111111111111111111";
     const PRODUCT_AUDIT_ID: &str = "audit-store-22222222222222222222222222222222";
+
+    #[test]
+    fn initial_install_handoff_requires_matching_accepted_activation() {
+        let request = r#"{"request_id":"request-install","operation":"更新有効版切替要求"}"#;
+        let mut response = r#"{"request_id":"request-install","operation":"更新有効版切替要求","status":"accepted","body":{"有効化":"active_version_recorded","起動":"not_started"}}"#.as_bytes().to_vec();
+        mark_initial_install_handoff(request.as_bytes(), &mut response, true).unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&response).unwrap();
+        assert_eq!(value["body"]["起動"], "after_current_exit");
+
+        let mut denied = r#"{"request_id":"request-install","operation":"更新有効版切替要求","status":"rejected","body":{"有効化":"active_version_recorded","起動":"not_started"}}"#.as_bytes().to_vec();
+        let original = denied.clone();
+        mark_initial_install_handoff(request.as_bytes(), &mut denied, true).unwrap();
+        assert_eq!(denied, original);
+
+        let mut mismatched = r#"{"request_id":"different-request","operation":"更新有効版切替要求","status":"accepted","body":{"有効化":"active_version_recorded","起動":"not_started"}}"#.as_bytes().to_vec();
+        let original = mismatched.clone();
+        mark_initial_install_handoff(request.as_bytes(), &mut mismatched, true).unwrap();
+        assert_eq!(mismatched, original);
+
+        let mut installed = r#"{"request_id":"request-install","operation":"更新有効版切替要求","status":"accepted","body":{"有効化":"active_version_recorded","起動":"not_started"}}"#.as_bytes().to_vec();
+        let original = installed.clone();
+        mark_initial_install_handoff(request.as_bytes(), &mut installed, false).unwrap();
+        assert_eq!(installed, original);
+    }
 
     fn unique_test_root(label: &str) -> PathBuf {
         let nonce = std::time::SystemTime::now()

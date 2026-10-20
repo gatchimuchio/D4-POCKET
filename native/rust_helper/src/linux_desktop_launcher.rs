@@ -276,6 +276,7 @@ impl ProductLauncherLock {
 enum LaunchPlan {
     DispatchToActiveVersion(VerifiedBundle),
     RunBundle(VerifiedBundle),
+    RunInitialInstallBundle(VerifiedBundle),
 }
 
 fn resolve_launch_plan(
@@ -290,34 +291,69 @@ fn resolve_launch_plan(
     };
     let data_home =
         product_data_home.ok_or_else(|| failure("製品の利用者保存領域を確認できません。"))?;
+    let active_launcher = crate::product_bootstrapper::resolve_active_version_launcher_if_present(
+        data_home,
+        app_id,
+        audit_store_id,
+    )
+    .map_err(|_| failure("D4 Pocketの導入状態を安全に確認できません。"))?;
     if crate::product_bootstrapper::is_fixed_installed_entrypoint(
         current_launcher,
         data_home,
         app_id,
     ) {
-        let active_launcher = crate::product_bootstrapper::resolve_active_version_launcher(
-            data_home,
-            app_id,
-            audit_store_id,
-        )
-        .map_err(|_| failure("D4 Pocketの有効版を確認できません。導入状態を確認してください。"))?;
+        let active_launcher = active_launcher.ok_or_else(|| {
+            failure("D4 Pocketの有効版を確認できません。導入状態を確認してください。")
+        })?;
         let bundle = linux_product_bundle::from_launcher(&active_launcher)
             .map_err(|_| failure("D4 Pocketの有効版bundleが不正です。"))?;
         return Ok(LaunchPlan::DispatchToActiveVersion(bundle));
     }
-    if !crate::product_bootstrapper::is_active_version_launcher(
-        current_launcher,
-        data_home,
-        app_id,
-        audit_store_id,
-    ) {
-        return Err(failure(
+
+    let bundle = linux_product_bundle::from_launcher(current_launcher)
+        .map_err(|_| failure("製品bundleの起動fileを確認できません。再導入してください。"))?;
+    match active_launcher {
+        Some(active_launcher)
+            if fs::canonicalize(current_launcher).ok().as_deref()
+                == Some(active_launcher.as_path()) =>
+        {
+            Ok(LaunchPlan::RunBundle(bundle))
+        }
+        Some(_) => Err(failure(
             "このLinux製品launcherは現在の有効版ではありません。",
-        ));
+        )),
+        None if bundle.versioned_launcher.is_some()
+            && !is_product_versioned_launcher_path(current_launcher, app_id) =>
+        {
+            Ok(LaunchPlan::RunInitialInstallBundle(bundle))
+        }
+        None => Err(failure("初回導入bundleに固定Linux launcherがありません。")),
     }
-    linux_product_bundle::from_launcher(current_launcher)
-        .map(LaunchPlan::RunBundle)
-        .map_err(|_| failure("製品bundleの起動fileを確認できません。再導入してください。"))
+}
+
+fn is_product_versioned_launcher_path(launcher: &Path, app_id: &str) -> bool {
+    let Some(stage) = launcher.parent() else {
+        return false;
+    };
+    let Some(versions) = stage.parent() else {
+        return false;
+    };
+    let Some(product_root) = versions.parent() else {
+        return false;
+    };
+    let Some(product_directory) = product_root.parent() else {
+        return false;
+    };
+    let Some(programs_directory) = product_directory.parent() else {
+        return false;
+    };
+    versions.file_name().and_then(|name| name.to_str()) == Some("versions")
+        && product_root.file_name().and_then(|name| name.to_str()) == Some(app_id)
+        && product_directory.file_name().and_then(|name| name.to_str()) == Some("d4-pocket")
+        && programs_directory
+            .file_name()
+            .and_then(|name| name.to_str())
+            == Some("apps")
 }
 
 fn filtered_frontend_environment(
@@ -433,6 +469,31 @@ fn dispatch_to_active_version(
         return Err(failure("D4 Pocketの有効版が正常に終了しませんでした。"));
     }
     Ok(())
+}
+
+fn dispatch_active_version_and_finalize(
+    bundle: &VerifiedBundle,
+    data_home: &Path,
+    identity: &(String, String),
+    runtime: &Path,
+    launch_nonce: &str,
+) -> Result<(), LinuxLaunchError> {
+    if let Err(error) = dispatch_to_active_version(bundle, launch_nonce) {
+        if take_product_uninstall_ticket(runtime, launch_nonce).is_err() {
+            return Err(failure("終了後削除の未確定ticketを安全に回収できません。"));
+        }
+        return Err(error);
+    }
+    finalize_linux_product_uninstall(data_home, identity, runtime, launch_nonce)
+}
+
+fn new_launch_nonce() -> Result<String, LinuxLaunchError> {
+    let mut nonce_bytes = [0u8; 16];
+    getrandom::getrandom(&mut nonce_bytes)
+        .map_err(|_| failure("製品起動の相関値を生成できません。"))?;
+    let nonce = hex::encode(nonce_bytes);
+    nonce_bytes.zeroize();
+    Ok(nonce)
 }
 
 fn verify_existing_linux_audit_store(store: &Path) -> Result<(), LinuxLaunchError> {
@@ -562,34 +623,57 @@ pub fn run() -> Result<(), LinuxLaunchError> {
             let runtime = crate::linux_desktop_worker::prepare_runtime_directory()
                 .map_err(|_| failure("製品runtime directoryを安全に準備できません。"))?;
             let _launcher_lock = ProductLauncherLock::acquire(&runtime)?;
-            let mut nonce_bytes = [0u8; 16];
-            getrandom::getrandom(&mut nonce_bytes)
-                .map_err(|_| failure("製品起動の相関値を生成できません。"))?;
-            let launch_nonce = hex::encode(nonce_bytes);
-            nonce_bytes.zeroize();
-            let launch_result = dispatch_to_active_version(&bundle, &launch_nonce);
-            if let Err(error) = launch_result {
-                let ticket = take_product_uninstall_ticket(&runtime, &launch_nonce);
-                if ticket.is_err() {
-                    return Err(failure("終了後削除の未確定ticketを安全に回収できません。"));
-                }
-                return Err(error);
-            }
-            if let Some(identity) = identity.as_ref() {
-                finalize_linux_product_uninstall(
-                    data_home
-                        .as_deref()
-                        .ok_or_else(|| failure("製品の利用者保存領域を確認できません。"))?,
-                    identity,
-                    &runtime,
-                    &launch_nonce,
-                )?;
-            }
-            Ok(())
+            let launch_nonce = new_launch_nonce()?;
+            let identity = identity
+                .as_ref()
+                .ok_or_else(|| failure("製品identityを確認できません。"))?;
+            let data_home = data_home
+                .as_deref()
+                .ok_or_else(|| failure("製品の利用者保存領域を確認できません。"))?;
+            dispatch_active_version_and_finalize(
+                &bundle,
+                data_home,
+                identity,
+                &runtime,
+                &launch_nonce,
+            )
         }
         LaunchPlan::RunBundle(bundle) => {
             let launch_nonce = std::env::var(LAUNCH_NONCE_ENV).ok();
             run_frontend(&bundle, std::env::vars_os(), launch_nonce.as_deref())
+        }
+        LaunchPlan::RunInitialInstallBundle(bundle) => {
+            let runtime = crate::linux_desktop_worker::prepare_runtime_directory()
+                .map_err(|_| failure("製品runtime directoryを安全に準備できません。"))?;
+            let _launcher_lock = ProductLauncherLock::acquire(&runtime)?;
+            run_frontend(&bundle, std::env::vars_os(), None)?;
+
+            let identity = identity
+                .as_ref()
+                .ok_or_else(|| failure("製品identityを確認できません。"))?;
+            let data_home = data_home
+                .as_deref()
+                .ok_or_else(|| failure("製品の利用者保存領域を確認できません。"))?;
+            let Some(active_launcher) =
+                crate::product_bootstrapper::resolve_active_version_launcher_if_present(
+                    data_home,
+                    &identity.0,
+                    &identity.1,
+                )
+                .map_err(|_| failure("導入後の有効版を安全に確認できません。"))?
+            else {
+                return Ok(());
+            };
+            let installed_bundle = linux_product_bundle::from_launcher(&active_launcher)
+                .map_err(|_| failure("導入後の有効版bundleが不正です。"))?;
+            let launch_nonce = new_launch_nonce()?;
+            dispatch_active_version_and_finalize(
+                &installed_bundle,
+                data_home,
+                identity,
+                &runtime,
+                &launch_nonce,
+            )
         }
     }
 }
@@ -644,6 +728,68 @@ mod tests {
             resolve_launch_plan(&root.join("gui_shell_desktop_launcher"), None, None).unwrap();
         assert!(matches!(plan, LaunchPlan::RunBundle(_)));
         assert!(resolve_launch_plan(&root.join("elsewhere"), None, None).is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn product_bundle_bootstraps_only_when_no_active_install_record_exists() {
+        let local_app_data = unique_root("first-install-data");
+        let portable_root = unique_root("first-install-bundle");
+        fs::create_dir_all(&local_app_data).unwrap();
+        write_bundle(&portable_root);
+        let identity = (APP_ID.to_owned(), AUDIT_ID.to_owned());
+        assert!(matches!(
+            resolve_launch_plan(
+                &portable_root.join("gui_shell_desktop_launcher"),
+                Some(&identity),
+                Some(&local_app_data),
+            ),
+            Ok(LaunchPlan::RunInitialInstallBundle(_))
+        ));
+
+        let product_root = local_app_data.join("apps").join("d4-pocket").join(APP_ID);
+        fs::create_dir_all(&product_root).unwrap();
+        fs::write(
+            product_root.join("active_version.json"),
+            b"{\"invalid\":true}",
+        )
+        .unwrap();
+        assert!(resolve_launch_plan(
+            &portable_root.join("gui_shell_desktop_launcher"),
+            Some(&identity),
+            Some(&local_app_data),
+        )
+        .is_err());
+        fs::remove_dir_all(local_app_data).unwrap();
+        fs::remove_dir_all(portable_root).unwrap();
+    }
+
+    #[test]
+    fn installed_handoff_cleans_only_its_bound_ticket_when_child_fails() {
+        let root = unique_root("handoff-uninstall-failure");
+        let runtime = unique_root("handoff-uninstall-runtime");
+        write_bundle(&root);
+        write_executable(
+            &root.join("gui_shell_desktop_launcher"),
+            b"#!/bin/sh\nexit 1\n",
+        );
+        fs::create_dir_all(&runtime).unwrap();
+        fs::set_permissions(&runtime, fs::Permissions::from_mode(0o700)).unwrap();
+        let nonce = "a".repeat(32);
+        let ticket_path = uninstall_ticket_path(&runtime, &nonce).unwrap();
+        fs::write(&ticket_path, "b".repeat(64)).unwrap();
+        fs::set_permissions(&ticket_path, fs::Permissions::from_mode(0o600)).unwrap();
+        let bundle =
+            linux_product_bundle::from_launcher(&root.join("gui_shell_desktop_launcher")).unwrap();
+        let identity = (APP_ID.to_owned(), AUDIT_ID.to_owned());
+
+        assert!(
+            dispatch_active_version_and_finalize(&bundle, &root, &identity, &runtime, &nonce,)
+                .is_err()
+        );
+        assert!(!ticket_path.exists());
+
+        fs::remove_dir_all(runtime).unwrap();
         fs::remove_dir_all(root).unwrap();
     }
 
@@ -729,6 +875,15 @@ mod tests {
             resolve_launch_plan(&active_launcher, Some(&identity), Some(&local_app_data)),
             Ok(LaunchPlan::RunBundle(_))
         ));
+        let portable_root = unique_root("stale-portable");
+        write_bundle(&portable_root);
+        assert!(resolve_launch_plan(
+            &portable_root.join("gui_shell_desktop_launcher"),
+            Some(&identity),
+            Some(&local_app_data),
+        )
+        .is_err());
+        fs::remove_dir_all(portable_root).unwrap();
         let other_root = unique_root("other-data");
         fs::create_dir_all(&other_root).unwrap();
         assert!(

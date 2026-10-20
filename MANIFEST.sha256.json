@@ -1308,7 +1308,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "b8321c282fac1add6224f48df0d7a9dd2663058cc3ea734b9db56cef90501371"
+      "sha256": "b98ac3db8cc501947c88f005db03d8a88a7db55b9f639a031bcd144ec6788ec1"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -3328,7 +3328,7 @@
     },
     {
       "path": "installer/linux/README.md",
-      "sha256": "b3884821b00bd0ca65107f3c4dba0918136354b7d65173129fc814f7dd35b07a"
+      "sha256": "19f0da823d810c79c8b4cce339e1cefa3c88c4ca03527bbba9c1f303955bb3f7"
     },
     {
       "path": "installer/macos/README.md",
@@ -3632,7 +3632,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/product_install.rs",
-      "sha256": "b517d5211af364ba8d3f573cf80c146a71a4b1de432bd4ee7fd0572a592b6600"
+      "sha256": "b14a2f523968b5f444b57f2d5b995998b0b43e2837fc430577dafda953caa10c"
     },
     {
       "path": "native/rust_helper/src/broker/profile_center.rs",
@@ -3720,11 +3720,11 @@
     },
     {
       "path": "native/rust_helper/src/linux_desktop_launcher.rs",
-      "sha256": "6a1da656d4c9af1b6cfce927e5b8145536220f737859d7cef4ac09741740e8a9"
+      "sha256": "3e92fa0228748c6fb09c632fbdc76b105d31264b6136fe4a8ab6d645b1a3b27a"
     },
     {
       "path": "native/rust_helper/src/linux_desktop_worker.rs",
-      "sha256": "484875edfeb9ca914d766ed15f162bb3857e63d0687a2b9f646fd0f10285c95b"
+      "sha256": "3ec4d929cd647375e82f3f81ff16b150ca7c49c603b5b5fb6f7edbc047bc645d"
     },
     {
       "path": "native/rust_helper/src/linux_product_bundle.rs",
@@ -3776,7 +3776,7 @@
     },
     {
       "path": "native/rust_helper/src/product_bootstrapper.rs",
-      "sha256": "d04d1c710383c2c092c209d18f03c21a93e9a02f58acb52f0b6e0e721a6e63ac"
+      "sha256": "f0c2e8af5297b8fe50ceef99eecd909c98f1a8970bdc3301e40c55cd9b9f9c90"
     },
     {
       "path": "native/rust_helper/src/product_package.rs",
@@ -5048,7 +5048,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "29540d6b5bba8118109c4ea58ba792bf6186a05689c4c6dbb5e7514bdf93f831"
+      "sha256": "f1b89bdbc24306a09a32f73e0ee2dea517e52aacd6dfa60b72561dea76af6921"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
