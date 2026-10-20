@@ -80,7 +80,7 @@
     },
     {
       "path": ".github/workflows/linux-manual-rust-validation.yml",
-      "sha256": "c413dc36d60d4841162c893428ca3d013287fb1f88dcc24cc17563eed64415ad"
+      "sha256": "bb31646fce496911483ee1164262d9131600b5d52f848ac0236520cd83ec6fed"
     },
     {
       "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
@@ -296,7 +296,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/settings.dart",
-      "sha256": "abbf89274b49783856414f147d19ee688a5cfa39580084f6a35a146f28fa3dbe"
+      "sha256": "b458e455be5f99bf18bb2ebcf81a4627099279f90e8343dd57690932d8c00847"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/setup_doctor.dart",
@@ -404,7 +404,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/update_client.dart",
-      "sha256": "5150a12a9e6fd6b108d04b1aca0f15391508ba94be1806ec7b3b41ac33c3d4ae"
+      "sha256": "35ac47f9ef2ae5575e2b60848c416d06543fa20fde9ed048af2bea86e534badf"
     },
     {
       "path": "apps/desktop_flutter/lib/services/windows_tray_client.dart",
@@ -700,7 +700,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/settings_install_flow_test.dart",
-      "sha256": "840e1e4cf551e9e04b1a23d37791d406971e03142435bef73f3a8078064e5663"
+      "sha256": "16cb78a668463d0f74180f598c33e7c02754fa965cf7bff0fee412152bf15e22"
     },
     {
       "path": "apps/desktop_flutter/test/support/test_broker_tcp_transport.dart",
@@ -708,7 +708,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/update_client_test.dart",
-      "sha256": "fef629933aebb598725746815557958e3388493d15c6964943efe39e59e0f72b"
+      "sha256": "f1cb8a62f656e73ab2f6d5f0c264e669d34ffbfb9550f477f128194782c3485b"
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
@@ -1516,11 +1516,11 @@
     },
     {
       "path": "docs/specs/linux-desktop-channel.md",
-      "sha256": "b013e0c90b173a113fda63811a9f492d80418c06fd224e8fdb4ae4c6f1d63018"
+      "sha256": "d36e8efaa68ffd3e5250e46ff356ccde7b48ceded2de9829a2bba6f11a609816"
     },
     {
       "path": "docs/specs/linux-product-package.md",
-      "sha256": "192cbcfac43776afdf85f20a60b741ecd3f0cd2b5c55dde3dd017a8352d6fea6"
+      "sha256": "1bec6a95872713dada73c0dcdb38202d990c408fa0ab1031596334cdba0299dd"
     },
     {
       "path": "docs/specs/linux-workspace-selection.md",
@@ -3640,7 +3640,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "8cd041e71f5ff21597300e5a6f350cf4a927132fcf6d6055d15d69e5f685892e"
+      "sha256": "3e085741e516b39c5bf6658ac47d30f3b06c8a086a572b6cdf984d73a252ad99"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -3664,7 +3664,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "54194c2ba58bebe191a8a045a100e1a617284cf5316bcfbf96404ee59e07d4e5"
+      "sha256": "bd2c9a85e9245caba4faaad9ffb5b0773fd162de051ede70c22f47edecf138a9"
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
@@ -3692,7 +3692,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "f56247ee9058bf8413a0481deb7d5d6ebaa5b31f0ab9bb3b1a84e5acebc3518e"
+      "sha256": "4a1096395ef57f96f2f99acf5036b17dc3e120df31cbc4cc4ef8bc12d7201531"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -3720,11 +3720,11 @@
     },
     {
       "path": "native/rust_helper/src/linux_desktop_launcher.rs",
-      "sha256": "ebb3a606212085f6b67304e101d5a463189dce810ba9de57d6ba955dacb54f9e"
+      "sha256": "6a1da656d4c9af1b6cfce927e5b8145536220f737859d7cef4ac09741740e8a9"
     },
     {
       "path": "native/rust_helper/src/linux_desktop_worker.rs",
-      "sha256": "d7f935aba53f95ae152443307d2fe9d89ae64953b823f4e7edd72838f3fea854"
+      "sha256": "484875edfeb9ca914d766ed15f162bb3857e63d0687a2b9f646fd0f10285c95b"
     },
     {
       "path": "native/rust_helper/src/linux_product_bundle.rs",
@@ -3740,7 +3740,7 @@
     },
     {
       "path": "native/rust_helper/src/macos_desktop_owner.rs",
-      "sha256": "ce4a06a5794fffee1ffe0f58c3685c94389865f40c545704763e671b076fafa5"
+      "sha256": "47c0a6c9a532e5436a2fe15f3d238c5d37b18e4679566d51419819e29d147595"
     },
     {
       "path": "native/rust_helper/src/macos_desktop_worker.rs",
@@ -4664,11 +4664,11 @@
     },
     {
       "path": "specs/ipc_request.schema.json",
-      "sha256": "3dfdd2bd38fd881d856cce251e3d967c0525f55117a48a10ed3fabe307e6b4c3"
+      "sha256": "94dae410b6247597b54cfac093856f200c23407250b40d9505cb233bfbd05ab1"
     },
     {
       "path": "specs/ipc_response.schema.json",
-      "sha256": "0b4168b36363ecdd766b7b55bbedf2cc3eb17347ba5f72d0ab6b963b2085394e"
+      "sha256": "d232f9613d9e0c981675af3636bc936fb73b542617756626b327cd17e14611ce"
     },
     {
       "path": "specs/linux_workspace_selection.schema.json",

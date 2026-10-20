@@ -63,7 +63,17 @@ class _UpdateTransport implements BrokerTransport {
     if (operation == '製品アンインストール要求') {
       return {
         'status': 'accepted',
-        'body': {'版': 1, '状態': 'uninstall_authorized'},
+        'body': {
+          '版': 1,
+          '状態': 'uninstall_authorized',
+          '認可監査ID': 'broker-audit-uninstall',
+        },
+      };
+    }
+    if (operation == '製品アンインストール取消要求') {
+      return {
+        'status': 'accepted',
+        'body': {'版': 1, '状態': 'uninstall_cancelled'},
       };
     }
     if (operation == '製品起動項目修復要求') {
@@ -386,6 +396,11 @@ void main() {
     await client.fetchCandidates();
     final uninstall = await client.requestUninstall();
     expect(uninstall['状態'], 'uninstall_authorized');
+    expect(uninstall['認可監査ID'], 'broker-audit-uninstall');
+    final uninstallCancellation = await client.cancelUninstall(
+      authorizationAuditId: uninstall['認可監査ID']! as String,
+    );
+    expect(uninstallCancellation['状態'], 'uninstall_cancelled');
     final repair = await client.requestProductRepair();
     expect(repair['状態'], 'product_launch_entries_repaired');
     expect(transport.operations, [
@@ -398,6 +413,7 @@ void main() {
       '更新rollback要求',
       '更新候補取得',
       '製品アンインストール要求',
+      '製品アンインストール取消要求',
       '製品起動項目修復要求',
     ]);
     expect(transport.payloads[4], {
@@ -407,6 +423,10 @@ void main() {
     });
     expect(transport.payloads[7], {'版': 1});
     expect(transport.payloads[8], {'版': 1});
-    expect(transport.payloads[9], {'版': 1});
+    expect(transport.payloads[9], {
+      '版': 1,
+      '認可監査ID': 'broker-audit-uninstall',
+    });
+    expect(transport.payloads[10], {'版': 1});
   });
 }

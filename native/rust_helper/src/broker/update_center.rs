@@ -45,6 +45,7 @@ const OP_DEFER: &str = "更新延期";
 const OP_ROLLBACK: &str = "更新rollback要求";
 const OP_PRODUCT_REPAIR: &str = "製品起動項目修復要求";
 const OP_UNINSTALL: &str = "製品アンインストール要求";
+const OP_UNINSTALL_CANCEL: &str = "製品アンインストール取消要求";
 const OP_UNINSTALL_STARTED: &str = "製品アンインストール開始";
 const OP_UNINSTALL_COMPLETED: &str = "製品アンインストール完了";
 const OP_UNINSTALL_FAILED: &str = "製品アンインストール失敗";
@@ -745,6 +746,7 @@ pub(super) fn dispatch(
             owner_confirmation,
             product_uninstall_confirmation,
         ),
+        OP_UNINSTALL_CANCEL => cancel_product_uninstall(broker, payload, request_id, payload_hash),
         _ => broker.reject_with_payload_hash(
             request_id,
             operation.as_str(),
@@ -995,15 +997,171 @@ fn request_product_uninstall(
             );
         }
     };
+    let authorization_audit_id = event.event_id.clone();
     BrokerResponse {
         request_id: request_id.to_string(),
         operation: OP_UNINSTALL.to_string(),
         status: BrokerStatus::Accepted,
         evidence_source: "LIVE_RUNTIME".to_string(),
+        audit_event_id: authorization_audit_id.clone(),
+        error: None,
+        health: None,
+        body: Some(json!({
+            "版": VERSION,
+            "状態": "uninstall_authorized",
+            "認可監査ID": authorization_audit_id,
+            "ticket": ticket
+        })),
+        shutdown_requested: broker.shutdown_requested,
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ProductUninstallCancelRequest {
+    #[serde(rename = "版")]
+    version: u64,
+    #[serde(rename = "認可監査ID")]
+    authorization_audit_id: String,
+}
+
+fn cancel_product_uninstall(
+    broker: &mut Broker,
+    payload: &Value,
+    request_id: &str,
+    payload_hash: &str,
+) -> BrokerResponse {
+    let request = match serde_json::from_value::<ProductUninstallCancelRequest>(payload.clone()) {
+        Ok(request)
+            if request.version == VERSION
+                && !request.authorization_audit_id.is_empty()
+                && request.authorization_audit_id.len() <= 128
+                && request
+                    .authorization_audit_id
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || b"-_.:".contains(&byte)) =>
+        {
+            request
+        }
+        _ => {
+            return reject(
+                broker,
+                request_id,
+                OP_UNINSTALL_CANCEL,
+                "product_uninstall_cancel_request_invalid",
+                "アンインストール取消要求の構造が不正",
+                payload_hash,
+            );
+        }
+    };
+    let Some((app_id, audit_store_id)) = broker.desktop_product_identity.as_ref() else {
+        return reject(
+            broker,
+            request_id,
+            OP_UNINSTALL_CANCEL,
+            "product_identity_unavailable",
+            "導入済み製品identityを確認できない",
+            payload_hash,
+        );
+    };
+    let identity_marker = format!("製品ID={app_id} 監査保存先ID={audit_store_id}");
+    let Some(authorization) = broker.audit_events().iter().find(|event| {
+        event.event_id == request.authorization_audit_id
+            && event.operation == OP_UNINSTALL
+            && event.decision == "accepted"
+            && event.reason.contains(&identity_marker)
+    }) else {
+        return reject(
+            broker,
+            request_id,
+            OP_UNINSTALL_CANCEL,
+            "product_uninstall_authorization_unrecognized",
+            "同一製品identityの未確認アンインストール要求がない",
+            payload_hash,
+        );
+    };
+    let ticket_hash = authorization
+        .reason
+        .split_whitespace()
+        .find_map(|field| field.strip_prefix("ticket_sha256="))
+        .map(str::to_owned);
+    let Some(ticket_hash) = ticket_hash.filter(|hash| {
+        hash.len() == 71
+            && hash.starts_with("sha256:")
+            && hash[7..]
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    }) else {
+        return reject(
+            broker,
+            request_id,
+            OP_UNINSTALL_CANCEL,
+            "product_uninstall_authorization_invalid",
+            "アンインストール要求のAudit bindingが不正",
+            payload_hash,
+        );
+    };
+    let ticket_marker = format!("ticket_sha256={ticket_hash}");
+    if let Some(cancelled) = broker.audit_events().iter().find(|event| {
+        event.operation == OP_UNINSTALL_CANCEL && event.reason.contains(&ticket_marker)
+    }) {
+        return BrokerResponse {
+            request_id: request_id.to_string(),
+            operation: OP_UNINSTALL_CANCEL.to_string(),
+            status: BrokerStatus::Accepted,
+            evidence_source: "LIVE_RUNTIME".to_string(),
+            audit_event_id: cancelled.event_id.clone(),
+            error: None,
+            health: None,
+            body: Some(json!({"版": VERSION, "状態": "uninstall_cancelled"})),
+            shutdown_requested: broker.shutdown_requested,
+        };
+    }
+    let already_started = broker.audit_events().iter().any(|event| {
+        matches!(
+            event.operation.as_str(),
+            OP_UNINSTALL_STARTED | OP_UNINSTALL_FAILED | OP_UNINSTALL_COMPLETED
+        ) && event.reason.contains(&ticket_marker)
+    });
+    if already_started {
+        return reject(
+            broker,
+            request_id,
+            OP_UNINSTALL_CANCEL,
+            "product_uninstall_ticket_not_pending",
+            "開始済みまたは終了済みの削除ticketは取消できない",
+            payload_hash,
+        );
+    }
+    let event = match broker.append_audit(
+        request_id,
+        OP_UNINSTALL_CANCEL,
+        "cancelled",
+        &format!(
+            "Capability=product.install.uninstall.cancel Permission=削除を実行せず、同じ未開始ticketだけを失効 Approval=追加承認なし。取消は権限を減らす AuditEvent=終了拒否後に取消を永続記録 RecoveryAction=製品fileを保持し、再実行には新しいnative Owner確認を要求 {identity_marker} {ticket_marker}"
+        ),
+        "LIVE_RUNTIME",
+        payload_hash,
+    ) {
+        Ok(event) => event,
+        Err(_) => {
+            return broker.audit_store_failed_response(
+                request_id,
+                OP_UNINSTALL_CANCEL,
+                "product_uninstall_cancel_audit_failed",
+                "取消Auditを確定できない。native launcherは保有ticketを破棄する",
+            );
+        }
+    };
+    BrokerResponse {
+        request_id: request_id.to_string(),
+        operation: OP_UNINSTALL_CANCEL.to_string(),
+        status: BrokerStatus::Accepted,
+        evidence_source: "LIVE_RUNTIME".to_string(),
         audit_event_id: event.event_id,
         error: None,
         health: None,
-        body: Some(json!({"版": VERSION, "状態": "uninstall_authorized", "ticket": ticket})),
+        body: Some(json!({"版": VERSION, "状態": "uninstall_cancelled"})),
         shutdown_requested: broker.shutdown_requested,
     }
 }
@@ -1651,7 +1809,10 @@ impl Broker {
         if self.audit_events().iter().any(|event| {
             matches!(
                 event.operation.as_str(),
-                OP_UNINSTALL_STARTED | OP_UNINSTALL_FAILED | OP_UNINSTALL_COMPLETED
+                OP_UNINSTALL_STARTED
+                    | OP_UNINSTALL_FAILED
+                    | OP_UNINSTALL_COMPLETED
+                    | OP_UNINSTALL_CANCEL
             ) && event.reason.contains(&ticket_marker)
         }) {
             return Err("product_uninstall_ticket_replayed");
@@ -1698,7 +1859,7 @@ impl Broker {
         let has_terminal = self.audit_events().iter().any(|event| {
             matches!(
                 event.operation.as_str(),
-                OP_UNINSTALL_FAILED | OP_UNINSTALL_COMPLETED
+                OP_UNINSTALL_FAILED | OP_UNINSTALL_COMPLETED | OP_UNINSTALL_CANCEL
             ) && event.reason.contains(&ticket_marker)
         });
         if !has_authorization || !has_started || has_terminal {
@@ -6585,11 +6746,15 @@ mod tests {
             .as_str()
             .unwrap()
             .to_owned();
+        let authorization_audit_id = accepted.body.as_ref().unwrap()["認可監査ID"]
+            .as_str()
+            .unwrap()
+            .to_owned();
         let acceptance_audit = broker
             .audit_events()
             .iter()
             .find(|event| event.event_id == accepted.audit_event_id)
-            .expect("Linux uninstall authorization audit");
+            .expect("Linux製品のアンインストール認可Audit");
         assert!(acceptance_audit
             .reason
             .contains("対応するplatform起動項目だけ"));
@@ -6621,6 +6786,43 @@ mod tests {
             std::fs::read(&entry_path).unwrap(),
             b"conflicting desktop entry"
         );
+        assert_eq!(std::fs::read(&audit_marker).unwrap(), b"keep");
+
+        let invalid_cancel = super::cancel_product_uninstall(
+            &mut broker,
+            &json!({"版": VERSION, "認可監査ID": "unknown-audit"}),
+            "linux-uninstall-cancel-unknown",
+            &payload_hash,
+        );
+        assert_eq!(invalid_cancel.status, BrokerStatus::Rejected);
+        assert!(product_root.exists());
+
+        let cancel_payload = json!({"版": VERSION, "認可監査ID": authorization_audit_id});
+        let cancelled = super::cancel_product_uninstall(
+            &mut broker,
+            &cancel_payload,
+            "linux-uninstall-cancel",
+            &payload_hash,
+        );
+        assert_eq!(cancelled.status, BrokerStatus::Accepted);
+        assert_eq!(
+            cancelled.body.as_ref().unwrap()["状態"],
+            "uninstall_cancelled"
+        );
+        assert_eq!(
+            broker.begin_product_uninstall_finalization(&ticket),
+            Err("product_uninstall_ticket_replayed")
+        );
+        let audit_count = broker.audit_events().len();
+        let cancelled_again = super::cancel_product_uninstall(
+            &mut broker,
+            &cancel_payload,
+            "linux-uninstall-cancel-retry",
+            &payload_hash,
+        );
+        assert_eq!(cancelled_again.status, BrokerStatus::Accepted);
+        assert_eq!(broker.audit_events().len(), audit_count);
+        assert!(product_root.exists());
         assert_eq!(std::fs::read(&audit_marker).unwrap(), b"keep");
         std::fs::remove_dir_all(root).unwrap();
     }

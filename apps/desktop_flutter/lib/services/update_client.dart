@@ -213,6 +213,14 @@ class UpdateClient {
   Future<Map<String, Object?>> requestUninstall() =>
       _request('製品アンインストール要求', const {'版': 1});
 
+  Future<Map<String, Object?>> cancelUninstall({
+    required String authorizationAuditId,
+  }) =>
+      _request('製品アンインストール取消要求', {
+        '版': 1,
+        '認可監査ID': authorizationAuditId,
+      });
+
   Future<Map<String, Object?>> requestProductRepair() =>
       _request('製品起動項目修復要求', const {'版': 1});
 

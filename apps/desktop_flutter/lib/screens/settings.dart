@@ -1271,6 +1271,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (body['状態'] != 'uninstall_authorized') {
         throw const BrokerClientException('アンインストール許可を確認できません');
       }
+      final authorizationAuditId = body['認可監査ID'];
+      if (authorizationAuditId is! String || authorizationAuditId.isEmpty) {
+        throw const BrokerClientException('アンインストール認可Audit IDを確認できません');
+      }
       uninstallAuthorized = true;
       _setUpdateMessage(
           'Rust Brokerが削除意図をAuditへ記録しました。画面を終了して固定導入先を削除します。利用者データは保持されます。');
@@ -1281,9 +1285,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ServicesBinding.instance.exitApplication(ui.AppExitType.required));
       applicationExitAccepted = response == ui.AppExitResponse.exit;
       if (!applicationExitAccepted) {
-        _setUpdateMessage(
-          'アプリの終了がキャンセルされました。製品fileはまだ削除されていません。再度アンインストールを要求してください。',
-        );
+        try {
+          final cancellation = await client.cancelUninstall(
+            authorizationAuditId: authorizationAuditId,
+          );
+          if (cancellation['状態'] != 'uninstall_cancelled') {
+            throw const BrokerClientException('アンインストール取消状態を確認できません');
+          }
+          _setUpdateMessage(
+            'アプリの終了がキャンセルされ、アンインストール取消をAuditへ記録しました。必要なら改めて要求してください。',
+          );
+        } catch (_) {
+          _setUpdateMessage(
+            'アプリの終了はキャンセルされましたが、アンインストール取消の応答を確認できません。アプリを閉じず、Broker接続を確認してください。',
+          );
+        }
       }
     } catch (error) {
       _setUpdateMessage(uninstallAuthorized

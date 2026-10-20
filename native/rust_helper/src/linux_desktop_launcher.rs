@@ -87,10 +87,24 @@ pub(crate) fn capture_product_uninstall_ticket(
             .ok_or_else(|| std::io::Error::other("製品削除後処理のlaunch bindingがありません"))?;
         let path = uninstall_ticket_path(runtime, nonce)
             .ok_or_else(|| std::io::Error::other("製品削除後処理のlaunch bindingが不正です"))?;
-        let ticket = value
+        let body = value
             .get_mut("body")
             .and_then(serde_json::Value::as_object_mut)
-            .and_then(|body| body.get_mut("ticket"))
+            .ok_or_else(|| std::io::Error::other("Brokerの製品削除応答bodyが不正です"))?;
+        let authorization_audit_id = body
+            .get("認可監査ID")
+            .and_then(serde_json::Value::as_str)
+            .filter(|id| {
+                !id.is_empty()
+                    && id.len() <= 128
+                    && id
+                        .bytes()
+                        .all(|byte| byte.is_ascii_alphanumeric() || b"-_.:".contains(&byte))
+            })
+            .ok_or_else(|| std::io::Error::other("製品削除の認可Audit IDが不正です"))?;
+        let _ = authorization_audit_id;
+        let ticket = body
+            .get_mut("ticket")
             .and_then(|ticket| ticket.as_str())
             .filter(|ticket| valid_hex(ticket, 64))
             .map(|ticket| Zeroizing::new(ticket.to_owned()))
@@ -196,6 +210,35 @@ fn take_product_uninstall_ticket(
     }
     fs::remove_file(&path).map_err(|_| failure("製品削除ticketを消費できません。"))?;
     Ok(Some(Zeroizing::new(ticket.to_owned())))
+}
+
+pub(crate) fn cancel_product_uninstall_ticket(
+    runtime: &Path,
+    launch_nonce: &str,
+) -> std::io::Result<()> {
+    take_product_uninstall_ticket(runtime, launch_nonce)
+        .map(|ticket| drop(ticket))
+        .map_err(|_| std::io::Error::other("アンインストール取消時に保有ticketを破棄できません"))
+}
+
+pub(crate) fn cancel_product_uninstall_ticket_for_request(
+    frame: &[u8],
+    runtime: &Path,
+    launch_nonce: &str,
+) -> std::io::Result<bool> {
+    let is_cancel = serde_json::from_slice::<serde_json::Value>(frame)
+        .ok()
+        .and_then(|value| {
+            value
+                .get("operation")
+                .and_then(serde_json::Value::as_str)
+                .map(|operation| operation == "製品アンインストール取消要求")
+        })
+        .unwrap_or(false);
+    if is_cancel {
+        cancel_product_uninstall_ticket(runtime, launch_nonce)?;
+    }
+    Ok(is_cancel)
 }
 
 struct ProductLauncherLock {
@@ -765,7 +808,7 @@ mod tests {
             "request_id": "uninstall-request",
             "operation": "製品アンインストール要求",
             "status": "accepted",
-            "body": {"版": 1, "状態": "uninstall_authorized", "ticket": ticket}
+            "body": {"版": 1, "状態": "uninstall_authorized", "認可監査ID": "broker-audit-uninstall", "ticket": ticket}
         }))
         .unwrap();
 
@@ -803,6 +846,37 @@ mod tests {
         .unwrap();
         assert!(capture_product_uninstall_ticket(&mut response, &runtime, None).is_err());
         assert!(fs::read_dir(&runtime).unwrap().next().is_none());
+        fs::remove_dir_all(runtime).unwrap();
+    }
+
+    #[test]
+    fn uninstall_cancel_request_discards_only_the_current_launch_ticket() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let runtime = unique_root("uninstall-cancel-handoff");
+        fs::create_dir_all(&runtime).unwrap();
+        fs::set_permissions(&runtime, fs::Permissions::from_mode(0o700)).unwrap();
+        let nonce = "d".repeat(32);
+        let ticket = "e".repeat(64);
+        let mut response = serde_json::to_vec(&serde_json::json!({
+            "operation": "製品アンインストール要求",
+            "status": "accepted",
+            "body": {"版": 1, "認可監査ID": "broker-audit-uninstall-cancel", "ticket": ticket}
+        }))
+        .unwrap();
+        let _ = capture_product_uninstall_ticket(&mut response, &runtime, Some(&nonce)).unwrap();
+
+        let unrelated = r#"{"operation":"更新一覧"}"#.as_bytes();
+        assert!(!cancel_product_uninstall_ticket_for_request(unrelated, &runtime, &nonce).unwrap());
+        assert!(uninstall_ticket_path(&runtime, &nonce).unwrap().exists());
+        let cancellation = r#"{"operation":"製品アンインストール取消要求"}"#.as_bytes();
+        assert!(
+            cancel_product_uninstall_ticket_for_request(cancellation, &runtime, &nonce).unwrap()
+        );
+        assert!(!uninstall_ticket_path(&runtime, &nonce).unwrap().exists());
+        assert!(take_product_uninstall_ticket(&runtime, &nonce)
+            .unwrap()
+            .is_none());
         fs::remove_dir_all(runtime).unwrap();
     }
 

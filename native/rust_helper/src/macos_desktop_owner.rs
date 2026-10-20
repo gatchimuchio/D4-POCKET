@@ -1805,7 +1805,7 @@ mod task_owner_tests {
                 && summary.contains("Audit Storeは保持")
         })
         .unwrap()
-        .expect("native Owner confirmation forwards the fixed uninstall request");
+        .expect("固定製品rootに束縛したnative Owner要求");
         assert_eq!(
             serde_json::from_slice::<Value>(&response).unwrap()["status"],
             "accepted"

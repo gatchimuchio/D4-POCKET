@@ -1955,6 +1955,7 @@ where
 {
     let request = match frame {
         gui_shell_windows_broker_channel::PipeFrame::Line(bytes) => {
+            cancel_product_uninstall_ticket_for_request(&bytes, uninstall_ticket)?;
             if let Some(owner_operations) = owner_operations {
                 if let Some((request_json, summary)) =
                     owner_operation_candidate_with_product_identity(
@@ -2038,6 +2039,34 @@ where
         }
     };
     relay_normalized_channel_request(&request, endpoint)
+}
+
+fn is_product_uninstall_cancel_request(bytes: &[u8]) -> bool {
+    serde_json::from_slice::<Value>(bytes)
+        .ok()
+        .and_then(|value| {
+            value
+                .get("operation")
+                .and_then(Value::as_str)
+                .map(|operation| operation == "製品アンインストール取消要求")
+        })
+        .unwrap_or(false)
+}
+
+fn cancel_product_uninstall_ticket_for_request(
+    bytes: &[u8],
+    ticket_slot: Option<&Mutex<Option<String>>>,
+) -> Option<bool> {
+    if !is_product_uninstall_cancel_request(bytes) {
+        return Some(false);
+    }
+    if let Some(ticket_slot) = ticket_slot {
+        let mut pending = ticket_slot.lock().ok()?;
+        if let Some(mut ticket) = pending.take() {
+            ticket.zeroize();
+        }
+    }
+    Some(true)
 }
 
 fn current_product_uninstall_confirmation(
@@ -2142,6 +2171,18 @@ fn capture_product_uninstall_ticket(
     let Some(body) = response.body.as_mut().and_then(Value::as_object_mut) else {
         return false;
     };
+    let Some(authorization_audit_id) =
+        body.get("認可監査ID").and_then(Value::as_str).filter(|id| {
+            !id.is_empty()
+                && id.len() <= 128
+                && id
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || b"-_.:".contains(&byte))
+        })
+    else {
+        return false;
+    };
+    let _ = authorization_audit_id;
     let Some(mut ticket) = body
         .remove("ticket")
         .and_then(|value| value.as_str().map(str::to_owned))
@@ -3607,15 +3648,39 @@ mod tests {
             audit_event_id: "audit-uninstall".to_string(),
             error: None,
             health: None,
-            body: Some(json!({"版": 1, "状態": "uninstall_authorized", "ticket": ticket})),
+            body: Some(
+                json!({"版": 1, "状態": "uninstall_authorized", "認可監査ID": "audit-uninstall", "ticket": ticket}),
+            ),
             shutdown_requested: false,
         };
         let slot = Mutex::new(None);
 
         assert!(capture_product_uninstall_ticket(&mut response, &slot));
         assert!(response.body.as_ref().unwrap().get("ticket").is_none());
+        assert_eq!(
+            response.body.as_ref().unwrap().get("認可監査ID").unwrap(),
+            "audit-uninstall"
+        );
         assert!(!response.to_json_string().unwrap().contains(&ticket));
         assert_eq!(slot.lock().unwrap().as_deref(), Some(ticket.as_str()));
+    }
+
+    #[test]
+    fn uninstall_cancel_request_discards_only_the_pending_ticket() {
+        let ticket_slot = Mutex::new(Some("f".repeat(64)));
+        let unrelated = r#"{"operation":"更新一覧"}"#.as_bytes();
+        assert_eq!(
+            cancel_product_uninstall_ticket_for_request(unrelated, Some(&ticket_slot)),
+            Some(false)
+        );
+        assert!(ticket_slot.lock().unwrap().is_some());
+
+        let cancellation = r#"{"operation":"製品アンインストール取消要求"}"#.as_bytes();
+        assert_eq!(
+            cancel_product_uninstall_ticket_for_request(cancellation, Some(&ticket_slot)),
+            Some(true)
+        );
+        assert!(ticket_slot.lock().unwrap().is_none());
     }
 
     #[test]

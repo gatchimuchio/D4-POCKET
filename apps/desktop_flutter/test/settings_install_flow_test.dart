@@ -187,8 +187,12 @@ void main() {
 
     expect(exitRequests, [ui.AppExitType.required]);
     expect(
+      transport.operations.where((operation) => operation == '製品アンインストール取消要求'),
+      hasLength(1),
+    );
+    expect(
       find.text(
-        'アプリの終了がキャンセルされました。製品fileはまだ削除されていません。再度アンインストールを要求してください。',
+        'アプリの終了がキャンセルされ、アンインストール取消をAuditへ記録しました。必要なら改めて要求してください。',
       ),
       findsOneWidget,
     );
@@ -326,7 +330,17 @@ class _InstallFlowTransport implements BrokerTransport {
     if (operation == '製品アンインストール要求') {
       return {
         'status': 'accepted',
-        'body': {'版': 1, '状態': 'uninstall_authorized'},
+        'body': {
+          '版': 1,
+          '状態': 'uninstall_authorized',
+          '認可監査ID': 'broker-audit-uninstall',
+        },
+      };
+    }
+    if (operation == '製品アンインストール取消要求') {
+      return {
+        'status': 'accepted',
+        'body': {'版': 1, '状態': 'uninstall_cancelled'},
       };
     }
     if (operation == '製品起動項目修復要求') {

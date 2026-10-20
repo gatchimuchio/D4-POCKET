@@ -610,6 +610,8 @@ pub enum BrokerOperation {
     製品起動項目修復要求,
     #[serde(rename = "製品アンインストール要求")]
     製品アンインストール要求,
+    #[serde(rename = "製品アンインストール取消要求")]
+    製品アンインストール取消要求,
     #[serde(rename = "通知一覧")]
     通知一覧,
     #[serde(rename = "通知既読")]
@@ -777,6 +779,9 @@ impl BrokerOperation {
             BrokerOperation::更新rollback要求 => "更新rollback要求",
             BrokerOperation::製品起動項目修復要求 => "製品起動項目修復要求",
             BrokerOperation::製品アンインストール要求 => "製品アンインストール要求",
+            BrokerOperation::製品アンインストール取消要求 => {
+                "製品アンインストール取消要求"
+            }
             BrokerOperation::通知一覧 => "通知一覧",
             BrokerOperation::通知既読 => "通知既読",
             BrokerOperation::通知破棄 => "通知破棄",
@@ -2160,13 +2165,11 @@ impl Broker {
         }
 
         let required_selection_source = match envelope.operation {
-            Some(BrokerOperation::作業領域OS選択) => {
-                Some(if cfg!(target_os = "linux") {
-                    OwnerConfirmationSource::LinuxWorkspaceSelection
-                } else {
-                    OwnerConfirmationSource::MacOSWorkspaceSelection
-                })
-            }
+            Some(BrokerOperation::作業領域OS選択) => Some(if cfg!(target_os = "linux") {
+                OwnerConfirmationSource::LinuxWorkspaceSelection
+            } else {
+                OwnerConfirmationSource::MacOSWorkspaceSelection
+            }),
             Some(BrokerOperation::AgentCLI実行fileOS選択) => {
                 Some(OwnerConfirmationSource::MacOSAgentCLISelection)
             }
@@ -2408,13 +2411,12 @@ impl Broker {
                         &payload_hash,
                     );
                 };
-                let scope_lifetime = if export_confirmation
-                    == OwnerConfirmationSource::LinuxWorkspaceSelection
-                {
-                    "none"
-                } else {
-                    "broker_process"
-                };
+                let scope_lifetime =
+                    if export_confirmation == OwnerConfirmationSource::LinuxWorkspaceSelection {
+                        "none"
+                    } else {
+                        "broker_process"
+                    };
                 self.accept_body_with_evidence(&request_id, selection_operation,
                     serde_json::json!({"version":1,"selection_status":selection.selection_status,
                         (path_key):selection.workspace_root,"selection_request_hash":selection.selection_request_hash,
@@ -2707,7 +2709,8 @@ impl Broker {
             | BrokerOperation::更新延期
             | BrokerOperation::更新rollback要求
             | BrokerOperation::製品起動項目修復要求
-            | BrokerOperation::製品アンインストール要求) => {
+            | BrokerOperation::製品アンインストール要求
+            | BrokerOperation::製品アンインストール取消要求) => {
                 super::update_center::dispatch(
                     self,
                     operation,

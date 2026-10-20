@@ -279,6 +279,11 @@ fn serve(
                 break;
             };
             let frame = Zeroizing::new(frame);
+            if let Some(nonce) = launch_nonce {
+                crate::linux_desktop_launcher::cancel_product_uninstall_ticket_for_request(
+                    &frame, runtime, nonce,
+                )?;
+            }
             let mut confirmation_error = None;
             let selection_response = crate::linux_workspace_selection::dispatch_native(
                 &frame,
