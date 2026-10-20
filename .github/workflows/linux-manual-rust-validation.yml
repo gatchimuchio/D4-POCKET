@@ -87,7 +87,8 @@ jobs:
           GUI_SHELL_PRODUCT_APP_ID: d4-pocket-app-11111111111111111111111111111111
           GUI_SHELL_PRODUCT_AUDIT_STORE_ID: audit-store-22222222222222222222222222222222
         run: cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib uninstall_ -- --test-threads=1
-      - name: Linux Codex sandbox runtime and synthetic Task tests
+      - name: Linux Codex CLI and sandbox capability
+        id: codex_sandbox
         shell: bash
         run: |
           set -euo pipefail
@@ -96,7 +97,6 @@ jobs:
             sudo apt-get install --yes bubblewrap
           fi
           bwrap --version
-          bwrap --unshare-user --unshare-pid --unshare-net --die-with-parent --ro-bind / / --dev /dev --proc /proc -- /bin/true
           package_dir="$RUNNER_TEMP/d4p-codex-cli-0.163.0-alpha.10.2-linux-x64"
           test ! -e "$package_dir"
           mkdir -m 0700 "$package_dir"
@@ -114,6 +114,19 @@ jobs:
             "$cli" exec --help
           } > "$RUNNER_TEMP/d4p-linux-codex-cli-interface.txt"
           cat "$RUNNER_TEMP/d4p-linux-codex-cli-interface.txt"
+          probe_log="$RUNNER_TEMP/d4p-linux-bwrap-probe-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.txt"
+          test ! -e "$probe_log"
+          if bwrap --unshare-user --unshare-pid --unshare-net --die-with-parent --ro-bind / / --dev /dev --proc /proc -- /bin/true >"$probe_log" 2>&1; then
+            echo 'available=true' >> "$GITHUB_OUTPUT"
+          else
+            cat "$probe_log"
+            if grep -Fq 'bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted' "$probe_log"; then
+              echo 'available=false' >> "$GITHUB_OUTPUT"
+              printf '\n- Codex LIVE_RUNTIME: NOT_RUN; hosted runner denies bubblewrap network-namespace loopback setup. The local WSL LIVE_RUNTIME result is recorded separately.\n' >> "$GITHUB_STEP_SUMMARY"
+            else
+              exit 1
+            fi
+          fi
       - name: Linux fake Codex Task, deadline and descendant cleanup
         shell: bash
         run: cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib adapters::codex_cli::tests::偽CodexCLIはAdapterのTask成功・期限超過cleanup・子孫停止を通る -- --exact --test-threads=1
@@ -124,6 +137,7 @@ jobs:
         shell: bash
         run: cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib adapters::codex_cli::tests::Agent一覧の投影はread_only状態と秘密値非保持を表す -- --exact --test-threads=1
       - name: Linux real Codex sandbox and synthetic credential boundary
+        if: steps.codex_sandbox.outputs.available == 'true'
         shell: bash
         env:
           RUST_BACKTRACE: "0"
@@ -185,3 +199,6 @@ jobs:
           test ! -e "$expected_codex_package_dir"
           rm -f -- "$RUNNER_TEMP/d4p-linux-codex-cli-interface.txt"
           test ! -e "$RUNNER_TEMP/d4p-linux-codex-cli-interface.txt"
+          probe_log="$RUNNER_TEMP/d4p-linux-bwrap-probe-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.txt"
+          rm -f -- "$probe_log"
+          test ! -e "$probe_log"
