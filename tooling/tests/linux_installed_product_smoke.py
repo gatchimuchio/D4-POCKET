@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import hmac
 import json
 import os
 import re
@@ -85,6 +87,221 @@ def _visible_product_window(environment: dict[str, str]) -> str | None:
         return None
     values = result.stdout.decode("ascii", errors="ignore").splitlines()
     return values[0] if values else None
+
+
+def _accessible_nodes(root):
+    """Installed UIの現在のAT-SPI treeをboundedに列挙する。"""
+    pending = [root]
+    visited = 0
+    while pending and visited < 12000:
+        node = pending.pop()
+        visited += 1
+        try:
+            name = node.name or ""
+        except Exception:
+            name = ""
+        yield node, name
+        try:
+            count = min(node.childCount, 12000 - visited)
+            for index in reversed(range(count)):
+                try:
+                    pending.append(node.getChildAtIndex(index))
+                except Exception:
+                    continue
+        except Exception:
+            continue
+
+
+def _find_accessible(name: str, *, root=None, timeout: float = 10.0):
+    try:
+        import pyatspi
+    except ImportError as error:
+        raise RuntimeError("AT-SPI UI操作にpython3-pyatspiが必要です") from error
+
+    deadline = time.monotonic() + timeout
+    last_names: list[str] = []
+    while time.monotonic() < deadline:
+        search_root = root if root is not None else pyatspi.Registry.getDesktop(0)
+        for node, accessible_name in _accessible_nodes(search_root):
+            if accessible_name == name or name in accessible_name:
+                return node
+            if accessible_name and any(
+                token in accessible_name
+                for token in ("D4 Pocket", "Owner確認", "Manifest file")
+            ):
+                last_names.append(accessible_name[:160])
+        time.sleep(0.15)
+    observed = ", ".join(dict.fromkeys(last_names[-12:]))
+    raise RuntimeError(f"AT-SPI要素を確認できません: {name}; observed={observed or '(none)'}")
+
+
+def _activate_accessible(node, name: str) -> None:
+    try:
+        actions = node.queryAction()
+        for index in range(actions.nActions):
+            action_name = actions.getName(index).lower()
+            if action_name in {"click", "press", "activate"}:
+                if actions.doAction(index):
+                    return
+    except Exception as error:
+        raise RuntimeError(f"AT-SPI要素を操作できません: {name}") from error
+    raise RuntimeError(f"AT-SPI要素に操作可能なactionがありません: {name}")
+
+
+def _accessible_descendants(root) -> list[tuple[object, str]]:
+    return list(_accessible_nodes(root))
+
+
+def _trigger_export_from_installed_ui(environment: dict[str, str], window_id: str) -> None:
+    subprocess.run(
+        ["xdotool", "windowactivate", "--sync", window_id],
+        env=environment,
+        check=True,
+        timeout=5,
+    )
+    subprocess.run(
+        ["xdotool", "key", "--clearmodifiers", "ctrl+k"],
+        env=environment,
+        check=True,
+        timeout=5,
+    )
+    _find_accessible("コマンドパレット", timeout=10)
+    subprocess.run(
+        ["xdotool", "type", "--clearmodifiers", "--delay", "30", "export"],
+        env=environment,
+        check=True,
+        timeout=5,
+    )
+    subprocess.run(
+        ["xdotool", "key", "--clearmodifiers", "Return"],
+        env=environment,
+        check=True,
+        timeout=5,
+    )
+    button = _find_accessible("Owner確認してManifest fileを生成", timeout=20)
+    _activate_accessible(button, "Owner確認してManifest fileを生成")
+
+
+def _answer_owner_dialog(environment: dict[str, str], decision: str) -> None:
+    if decision not in {"許可", "拒否"}:
+        raise ValueError("Owner確認の回答値が不正")
+    result = subprocess.run(
+        ["xdotool", "search", "--onlyvisible", "--name", "^D4 Pocket Owner確認$"],
+        env=environment,
+        capture_output=True,
+        check=False,
+        timeout=5,
+    )
+    if result.returncode != 0:
+        raise RuntimeError("GTK native Owner確認dialogが表示されません")
+    dialog_ids = result.stdout.decode("ascii", errors="ignore").splitlines()
+    if len(dialog_ids) != 1:
+        raise RuntimeError("native Owner確認dialogが一意ではありません")
+    dialog = _find_accessible("D4 Pocket Owner確認", timeout=10)
+    descendants = _accessible_descendants(dialog)
+    names = [accessible_name for _, accessible_name in descendants]
+    if not any("対象platform: Linux" in value for value in names):
+        raise RuntimeError("Owner確認summaryにLinux対象platformがありません")
+    if not any("要求hash:" in value or "payload hash:" in value for value in names):
+        raise RuntimeError("Owner確認summaryに要求hashがありません")
+    button = next(
+        (
+            node
+            for node, accessible_name in descendants
+            if accessible_name.strip() == decision
+        ),
+        None,
+    )
+    if button is None:
+        raise RuntimeError(f"native Owner確認dialogに{decision}操作がありません")
+    _activate_accessible(button, decision)
+
+
+def _verify_live_audit(store: Path) -> dict[str, int]:
+    audit_path = store / "audit.jsonl"
+    anchor_path = store / "audit_anchor.json"
+    key_path = store / "audit_anchor.key"
+    events = [
+        json.loads(line)
+        for line in audit_path.read_text(encoding="utf-8").splitlines()
+        if line
+    ]
+    if not events:
+        raise RuntimeError("installed productのLIVE_RUNTIME Auditが空です")
+    previous_hash: str | None = None
+    for index, event in enumerate(events, start=1):
+        if (
+            event.get("event_id") != f"broker-audit-{index}"
+            or event.get("previous_event_hash") != previous_hash
+        ):
+            raise RuntimeError("installed product Auditのevent IDまたはprevious linkが不正です")
+        hash_input = "|".join(
+            (
+                event["event_id"],
+                event["request_id"],
+                event["operation"],
+                event["decision"],
+                event["reason"],
+                event["evidence_source"],
+                event["payload_hash"],
+                previous_hash or "",
+            )
+        )
+        expected = "sha256:" + hashlib.sha256(hash_input.encode("utf-8")).hexdigest()
+        if not hmac.compare_digest(event.get("event_hash", ""), expected):
+            raise RuntimeError("installed product Audit event hashが不正です")
+        previous_hash = expected
+
+    anchor = json.loads(anchor_path.read_text(encoding="utf-8"))
+    key = key_path.read_bytes()
+    anchor_input = (
+        f"version=1|event_count={len(events)}|head_event_hash={previous_hash or ''}"
+    ).encode("utf-8")
+    expected_hmac = "sha256:" + hmac.new(key, anchor_input, hashlib.sha256).hexdigest()
+    if (
+        anchor.get("version") != 1
+        or anchor.get("event_count") != len(events)
+        or anchor.get("head_event_hash") != previous_hash
+        or not hmac.compare_digest(anchor.get("anchor_hmac", ""), expected_hmac)
+    ):
+        raise RuntimeError("installed product Audit anchor／HMACが不正です")
+
+    exports = [event for event in events if event.get("operation") == "GUI Shell書出し"]
+    accepted = sum(event.get("decision") == "accepted" for event in exports)
+    rejected = sum(event.get("decision") == "rejected" for event in exports)
+    if accepted < 1 or rejected < 1:
+        raise RuntimeError("GTK Owner拒否／許可の両方がLIVE_RUNTIME Auditにありません")
+    return {"events": len(events), "export_accepted": accepted, "export_rejected": rejected}
+
+
+def _verify_export_manifest(export_root: Path) -> dict[str, str]:
+    files = list(export_root.glob("d4-pocket-app-*.json"))
+    if len(files) != 1:
+        raise RuntimeError(
+            f"Broker Export directoryの新規Manifest数が1ではありません: {len(files)}"
+        )
+    path = files[0]
+    metadata = path.lstat()
+    if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+        raise RuntimeError("Broker Export結果がprivate regular fileではありません")
+    document = json.loads(path.read_text(encoding="utf-8"))
+    manifest = document.get("manifest", {})
+    app_id = manifest.get("app_identity", {}).get("app_id", "")
+    audit_id = manifest.get("audit_store", {}).get("store_id", "")
+    if (
+        document.get("version") != 1
+        or document.get("product") != "D4 Pocket"
+        or manifest.get("app_identity", {}).get("target_platform") != "linux"
+        or not re.fullmatch(r"d4-pocket-app-[0-9a-f]{32}", app_id)
+        or not re.fullmatch(r"audit-store-[0-9a-f]{32}", audit_id)
+        or app_id == APP_ID
+        or audit_id == AUDIT_ID
+        or manifest.get("audit_store", {}).get("inherited") is not False
+        or set(manifest.get("inheritance_policy", {}).values()) != {"none"}
+        or manifest.get("distribution_metadata", {}).get("signed") is not False
+    ):
+        raise RuntimeError("実UI Export結果のidentity／継承禁止／unsigned条件が不正です")
+    return {"file": path.name, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
 
 
 def _owned_groups(pids: set[int]) -> set[int]:
@@ -252,6 +469,8 @@ def run_installed_smoke(package: Path, temp_root: Path, acceptance_root: Path) -
         if len(entries) != 1 or not _desktop_entry_targets_fixed_launcher(entries[0], fixed_launcher):
             raise RuntimeError("登録desktop entryが固定installed launcherだけを指していません")
         product_paths = {fixed_launcher.resolve(), active_launcher.resolve(), runner.resolve(), helper.resolve()}
+        broker_state = xdg_state_home / "d4-pocket/linux-broker"
+        export_root = broker_state / "exports"
         preexisting = _processes_using(product_paths)
         if preexisting:
             raise RuntimeError("受入れ開始前からtest product processが存在します")
@@ -298,6 +517,27 @@ def run_installed_smoke(package: Path, temp_root: Path, acceptance_root: Path) -
             if window_id is None or not (_processes_using(product_paths) - preexisting):
                 tail = _safe_log_tail(app_log, (acceptance_root, temp_root))
                 raise RuntimeError(f"installed GTK windowを検出できませんでした\n{tail}")
+            deadline = time.monotonic() + 10
+            while not export_root.exists() and time.monotonic() < deadline:
+                time.sleep(0.1)
+            if export_root.is_symlink() or not export_root.is_dir():
+                raise RuntimeError("installed Brokerの固定Export directoryがありません")
+            metadata = export_root.lstat()
+            if not stat.S_ISDIR(metadata.st_mode) or metadata.st_uid != os.getuid() or metadata.st_mode & 0o077:
+                raise RuntimeError("installed BrokerのExport directoryがprivate／owner-boundではありません")
+            if any(export_root.iterdir()):
+                raise RuntimeError("installed BrokerのExport directoryが受入れ前から空ではありません")
+
+            _trigger_export_from_installed_ui(environment, window_id)
+            _answer_owner_dialog(environment, "拒否")
+            _find_accessible("GUI Shell独立App書出しは受理されませんでした", timeout=20)
+            if any(export_root.iterdir()):
+                raise RuntimeError("Owner拒否後にManifestまたは一時fileが作成されました")
+
+            _trigger_export_from_installed_ui(environment, window_id)
+            _answer_owner_dialog(environment, "許可")
+            _find_accessible("独立Manifest fileを保存しました", timeout=30)
+            manifest_evidence = _verify_export_manifest(export_root)
 
             _request_x11_window_manager_close(window_id, environment)
             deadline = time.monotonic() + 60
@@ -313,6 +553,7 @@ def run_installed_smoke(package: Path, temp_root: Path, acceptance_root: Path) -
             if desktop_process.returncode not in (0, None):
                 raise RuntimeError(f"gio launch exited unexpectedly: {desktop_process.returncode}")
 
+        audit_evidence = _verify_live_audit(broker_state / "store")
         _run_rust_test(RUST_TESTS[1], environment)
         print(
             json.dumps(
@@ -322,8 +563,10 @@ def run_installed_smoke(package: Path, temp_root: Path, acceptance_root: Path) -
                     "package_sha256": record["package_sha256"],
                     "gtk_window": "opened_and_normally_closed",
                     "owned_processes": "all_stopped",
+                    "installed_ui_owner_confirmation": "native_AT-SPI_rejected_then_approved_through_GTK_runner_private_pipe",
+                    "manifest": manifest_evidence,
+                    "live_audit": audit_evidence,
                     "runtime_audit": "durable_after_broker_restart",
-                    "owner_ui_gesture": "not_simulated; Broker owner-confirmation API used by isolated test fixture",
                 },
                 ensure_ascii=False,
                 separators=(",", ":"),

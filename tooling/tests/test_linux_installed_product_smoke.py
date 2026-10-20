@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -8,6 +11,8 @@ from tooling.tests.linux_installed_product_smoke import (
     _desktop_entry_targets_fixed_launcher,
     _resolve_regular_package,
     _safe_log_tail,
+    _verify_export_manifest,
+    _verify_live_audit,
 )
 
 
@@ -81,6 +86,112 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                 self.skipTest("symlink creation unavailable")
             with self.assertRaisesRegex(RuntimeError, "通常file"):
                 _resolve_regular_package(link)
+
+
+class LinuxInstalledOwnerEvidenceTests(unittest.TestCase):
+    def test_export_manifest_requires_fresh_linux_identity_and_no_inheritance(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "d4-pocket-app-0123456789abcdef0123456789abcdef.json").write_text(
+                json.dumps(
+                    {
+                        "version": 1,
+                        "product": "D4 Pocket",
+                        "manifest": {
+                            "app_identity": {
+                                "app_id": "d4-pocket-app-0123456789abcdef0123456789abcdef",
+                                "target_platform": "linux",
+                            },
+                            "audit_store": {
+                                "store_id": "audit-store-fedcba9876543210fedcba9876543210",
+                                "inherited": False,
+                            },
+                            "inheritance_policy": {
+                                "authority": "none",
+                                "permission": "none",
+                                "approval": "none",
+                                "credential": "none",
+                                "audit_chain": "none",
+                            },
+                            "distribution_metadata": {"signed": False},
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            evidence = _verify_export_manifest(root)
+            self.assertEqual(
+                evidence["file"],
+                "d4-pocket-app-0123456789abcdef0123456789abcdef.json",
+            )
+            self.assertRegex(evidence["sha256"], r"^[0-9a-f]{64}$")
+
+    def test_live_audit_verifies_chain_and_anchor_hmac_for_reject_then_allow(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = Path(directory)
+            key = bytes(range(32))
+            (store / "audit_anchor.key").write_bytes(key)
+            events = []
+            previous_hash = None
+            for index, decision in enumerate(("rejected", "accepted"), start=1):
+                event = {
+                    "event_id": f"broker-audit-{index}",
+                    "request_id": f"request-{index}",
+                    "operation": "GUI Shell書出し",
+                    "decision": decision,
+                    "reason": "fixture",
+                    "evidence_source": "INTERNAL_STATE",
+                    "payload_hash": f"sha256:{index:064x}",
+                    "previous_event_hash": previous_hash,
+                }
+                hash_input = "|".join(
+                    (
+                        event["event_id"],
+                        event["request_id"],
+                        event["operation"],
+                        event["decision"],
+                        event["reason"],
+                        event["evidence_source"],
+                        event["payload_hash"],
+                        previous_hash or "",
+                    )
+                )
+                previous_hash = "sha256:" + hashlib.sha256(
+                    hash_input.encode()
+                ).hexdigest()
+                event["event_hash"] = previous_hash
+                events.append(event)
+            (store / "audit.jsonl").write_text(
+                "".join(json.dumps(event) + "\n" for event in events),
+                encoding="utf-8",
+            )
+            anchor_input = (
+                f"version=1|event_count=2|head_event_hash={previous_hash}"
+            ).encode()
+            anchor_hmac = "sha256:" + hmac.new(key, anchor_input, hashlib.sha256).hexdigest()
+            (store / "audit_anchor.json").write_text(
+                json.dumps(
+                    {
+                        "version": 1,
+                        "event_count": 2,
+                        "head_event_hash": previous_hash,
+                        "anchor_hmac": anchor_hmac,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                _verify_live_audit(store),
+                {"events": 2, "export_accepted": 1, "export_rejected": 1},
+            )
+
+            events[0]["reason"] = "tampered"
+            (store / "audit.jsonl").write_text(
+                "".join(json.dumps(event) + "\n" for event in events),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(RuntimeError, "event hash"):
+                _verify_live_audit(store)
 
 
 if __name__ == "__main__":
