@@ -100,7 +100,10 @@ pub(crate) struct ProductUninstallConfirmation {
     pub(crate) app_id: String,
     pub(crate) audit_store_id: String,
     pub(crate) product_root: PathBuf,
+    #[cfg(windows)]
     pub(crate) start_menu_shortcut_path: PathBuf,
+    #[cfg(target_os = "linux")]
+    pub(crate) linux_desktop_entry_path: PathBuf,
     pub(crate) payload_hash: String,
 }
 
@@ -816,37 +819,33 @@ fn request_product_uninstall(
         );
     };
 
-    #[cfg(windows)]
-    let expected_paths = (|| {
-        #[cfg(test)]
-        let local_app_data = broker
-            .desktop_product_install_local_app_data
-            .clone()
-            .or_else(|| super::product_install::current_user_local_app_data().ok())?;
-        #[cfg(not(test))]
-        let local_app_data = super::product_install::current_user_local_app_data().ok()?;
-        #[cfg(test)]
-        let start_menu = broker
-            .desktop_product_start_menu_directory
-            .clone()
-            .or_else(|| super::product_install::current_user_start_menu_directory().ok())?;
-        #[cfg(not(test))]
-        let start_menu = super::product_install::current_user_start_menu_directory().ok()?;
-        let root = super::product_install::product_install_root(&local_app_data, app_id).ok()?;
-        let shortcut =
-            super::product_install::plan_start_menu_shortcut(&start_menu, app_id).ok()?;
-        Some((local_app_data, root, shortcut))
-    })();
-    #[cfg(not(windows))]
-    let expected_paths: Option<(PathBuf, PathBuf, PathBuf)> = None;
-
-    let Some((local_app_data, expected_root, expected_shortcut)) = expected_paths else {
+    #[cfg(all(test, any(windows, target_os = "linux")))]
+    let local_app_data = broker
+        .desktop_product_install_local_app_data
+        .clone()
+        .or_else(|| super::product_install::current_user_local_app_data().ok());
+    #[cfg(all(not(test), any(windows, target_os = "linux")))]
+    let local_app_data = super::product_install::current_user_local_app_data().ok();
+    #[cfg(not(any(windows, target_os = "linux")))]
+    let local_app_data: Option<PathBuf> = None;
+    let Some(local_app_data) = local_app_data else {
         return reject(
             broker,
             request_id,
             OP_UNINSTALL,
             "product_uninstall_platform_unavailable",
-            "Windows Known Folderから固定導入先を確認できない",
+            "現在利用者の固定導入先を確認できない",
+            payload_hash,
+        );
+    };
+    let Ok(expected_root) = super::product_install::product_install_root(&local_app_data, app_id)
+    else {
+        return reject(
+            broker,
+            request_id,
+            OP_UNINSTALL,
+            "product_uninstall_platform_unavailable",
+            "現在利用者の固定製品rootを導出できない",
             payload_hash,
         );
     };
@@ -856,7 +855,6 @@ fn request_product_uninstall(
         || confirmation.app_id != *app_id
         || confirmation.audit_store_id != *audit_store_id
         || confirmation.product_root != expected_root
-        || confirmation.start_menu_shortcut_path != expected_shortcut
         || confirmation.payload_hash != payload_hash
     {
         return reject(
@@ -865,6 +863,99 @@ fn request_product_uninstall(
             OP_UNINSTALL,
             "product_uninstall_confirmation_stale",
             "native Owner確認後に固定導入先または製品identityが変化した",
+            payload_hash,
+        );
+    }
+
+    #[cfg(windows)]
+    {
+        #[cfg(test)]
+        let start_menu = broker
+            .desktop_product_start_menu_directory
+            .clone()
+            .or_else(|| super::product_install::current_user_start_menu_directory().ok());
+        #[cfg(not(test))]
+        let start_menu = super::product_install::current_user_start_menu_directory().ok();
+        let Some(start_menu) = start_menu else {
+            return reject(
+                broker,
+                request_id,
+                OP_UNINSTALL,
+                "product_uninstall_platform_unavailable",
+                "Windows Start Menuの固定先を確認できない",
+                payload_hash,
+            );
+        };
+        let Ok(expected_shortcut) =
+            super::product_install::plan_start_menu_shortcut(&start_menu, app_id)
+        else {
+            return reject(
+                broker,
+                request_id,
+                OP_UNINSTALL,
+                "product_uninstall_platform_unavailable",
+                "Windows Start Menu shortcutの固定先を導出できない",
+                payload_hash,
+            );
+        };
+        if confirmation.start_menu_shortcut_path != expected_shortcut {
+            return reject(
+                broker,
+                request_id,
+                OP_UNINSTALL,
+                "product_uninstall_confirmation_stale",
+                "native Owner確認後に固定shortcut pathが変化した",
+                payload_hash,
+            );
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let Ok(expected_entry) =
+            super::product_install::plan_linux_desktop_entry(&local_app_data, app_id)
+        else {
+            return reject(
+                broker,
+                request_id,
+                OP_UNINSTALL,
+                "product_uninstall_platform_unavailable",
+                "Linux XDG desktop entryの固定先を導出できない",
+                payload_hash,
+            );
+        };
+        if confirmation.linux_desktop_entry_path != expected_entry {
+            return reject(
+                broker,
+                request_id,
+                OP_UNINSTALL,
+                "product_uninstall_confirmation_stale",
+                "native Owner確認後に固定Linux desktop entry pathが変化した",
+                payload_hash,
+            );
+        }
+        if super::product_install::validate_linux_product_uninstall_targets(&local_app_data, app_id)
+            .is_err()
+        {
+            return reject(
+                broker,
+                request_id,
+                OP_UNINSTALL,
+                "product_uninstall_target_invalid",
+                "固定製品rootまたはdesktop entryに競合があるため削除しない",
+                payload_hash,
+            );
+        }
+    }
+
+    #[cfg(not(any(windows, target_os = "linux")))]
+    {
+        return reject(
+            broker,
+            request_id,
+            OP_UNINSTALL,
+            "product_uninstall_platform_unavailable",
+            "このDesktop platformの固定製品削除は未接続",
             payload_hash,
         );
     }
@@ -6400,6 +6491,128 @@ mod tests {
                 && event.operation == OP_PRODUCT_REPAIR
                 && event.decision == "failed"
         }));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_product_uninstall_is_native_owner_bound_and_keeps_audit_outside_product_root() {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "d4p-linux-uninstall-broker-{}-{unique}",
+            std::process::id()
+        ));
+        let store_root = root.join("broker-store");
+        let data_home = root.join("xdg-data");
+        let product_root =
+            super::super::product_install::product_install_root(&data_home, INSTALL_APP_ID)
+                .unwrap();
+        std::fs::create_dir_all(&product_root).unwrap();
+        std::fs::write(
+            product_root.join("gui_shell_desktop_launcher"),
+            b"synthetic bootstrapper",
+        )
+        .unwrap();
+        let entry_path =
+            super::super::product_install::plan_linux_desktop_entry(&data_home, INSTALL_APP_ID)
+                .unwrap();
+        let audit_marker = store_root.join("audit-preserved.marker");
+        std::fs::create_dir_all(&store_root).unwrap();
+        std::fs::write(&audit_marker, b"keep").unwrap();
+
+        let mut broker = Broker::new_persistent("linux-uninstall-test", &store_root).unwrap();
+        broker
+            .set_desktop_product_identity(INSTALL_APP_ID.into(), INSTALL_AUDIT_ID.into())
+            .unwrap();
+        broker.set_desktop_product_install_local_app_data(data_home.clone());
+        broker.set_desktop_setup_doctor_runtime_evidence(true, true, true);
+        let payload = json!({"版": VERSION});
+        let payload_hash = crate::broker::protocol::canonical_payload_hash(Some(&payload));
+        let confirmation = ProductUninstallConfirmation {
+            app_id: INSTALL_APP_ID.into(),
+            audit_store_id: INSTALL_AUDIT_ID.into(),
+            product_root: product_root.clone(),
+            linux_desktop_entry_path: entry_path.clone(),
+            payload_hash: payload_hash.clone(),
+        };
+
+        let denied = super::request_product_uninstall(
+            &mut broker,
+            &payload,
+            "linux-uninstall-nonnative",
+            &payload_hash,
+            OwnerConfirmationSource::OwnerCredential,
+            Some(&confirmation),
+        );
+        assert_eq!(denied.status, BrokerStatus::Rejected);
+        assert_eq!(
+            denied.error.as_ref().map(|error| error.code.as_str()),
+            Some("desktop_native_owner_confirmation_required")
+        );
+
+        let mut stale = confirmation.clone();
+        stale.linux_desktop_entry_path = data_home.join("applications/other.desktop");
+        let stale_response = super::request_product_uninstall(
+            &mut broker,
+            &payload,
+            "linux-uninstall-stale-entry",
+            &payload_hash,
+            OwnerConfirmationSource::DesktopNativeConfirmation,
+            Some(&stale),
+        );
+        assert_eq!(stale_response.status, BrokerStatus::Rejected);
+        assert_eq!(
+            stale_response
+                .error
+                .as_ref()
+                .map(|error| error.code.as_str()),
+            Some("product_uninstall_confirmation_stale")
+        );
+
+        let accepted = super::request_product_uninstall(
+            &mut broker,
+            &payload,
+            "linux-uninstall-native-owner",
+            &payload_hash,
+            OwnerConfirmationSource::DesktopNativeConfirmation,
+            Some(&confirmation),
+        );
+        assert_eq!(accepted.status, BrokerStatus::Accepted);
+        let ticket = accepted.body.as_ref().unwrap()["ticket"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        assert_eq!(ticket.len(), 64);
+        assert!(!serde_json::to_string(broker.audit_events())
+            .unwrap()
+            .contains(&ticket));
+        assert!(product_root.exists());
+        assert_eq!(std::fs::read(&audit_marker).unwrap(), b"keep");
+
+        std::fs::create_dir_all(entry_path.parent().unwrap()).unwrap();
+        std::fs::write(&entry_path, b"conflicting desktop entry").unwrap();
+        let conflict = super::request_product_uninstall(
+            &mut broker,
+            &payload,
+            "linux-uninstall-conflict",
+            &payload_hash,
+            OwnerConfirmationSource::DesktopNativeConfirmation,
+            Some(&confirmation),
+        );
+        assert_eq!(conflict.status, BrokerStatus::Rejected);
+        assert_eq!(
+            conflict.error.as_ref().map(|error| error.code.as_str()),
+            Some("product_uninstall_target_invalid")
+        );
+        assert!(product_root.exists());
+        assert_eq!(
+            std::fs::read(&entry_path).unwrap(),
+            b"conflicting desktop entry"
+        );
+        assert_eq!(std::fs::read(&audit_marker).unwrap(), b"keep");
         std::fs::remove_dir_all(root).unwrap();
     }
 

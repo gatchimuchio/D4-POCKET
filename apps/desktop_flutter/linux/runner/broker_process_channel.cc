@@ -741,6 +741,7 @@ class BrokerContext {
     static const char* const allowed_environment[] = {
         "HOME",          "XDG_DATA_HOME",   "XDG_RUNTIME_DIR",
         "XDG_STATE_HOME",
+        "D4P_LAUNCH_NONCE",
         "DISPLAY",       "WAYLAND_DISPLAY", "DBUS_SESSION_BUS_ADDRESS",
         "XDG_SESSION_TYPE", "GDK_BACKEND",  "LANG",
         "LC_ALL",         "LC_CTYPE",       nullptr};

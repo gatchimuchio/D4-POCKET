@@ -13,6 +13,8 @@ struct Candidate {
     apply_confirmation: Option<crate::broker::update_center::UpdateApplyConfirmation>,
     activation_confirmation: Option<crate::broker::update_center::UpdateActivationConfirmation>,
     product_repair_confirmation: Option<crate::broker::update_center::ProductRepairConfirmation>,
+    product_uninstall_confirmation:
+        Option<crate::broker::update_center::ProductUninstallConfirmation>,
 }
 
 struct LinuxUpdateOwnerCandidate {
@@ -25,6 +27,12 @@ struct LinuxUpdateOwnerCandidate {
 struct LinuxProductRepairOwnerCandidate {
     summary: String,
     confirmation: crate::broker::update_center::ProductRepairConfirmation,
+}
+
+#[cfg(target_os = "linux")]
+struct LinuxProductUninstallOwnerCandidate {
+    summary: String,
+    confirmation: crate::broker::update_center::ProductUninstallConfirmation,
 }
 
 #[derive(serde::Deserialize)]
@@ -533,6 +541,41 @@ fn linux_product_repair_owner_candidate(
     })
 }
 
+#[cfg(target_os = "linux")]
+fn linux_product_uninstall_owner_candidate(
+    payload: &serde_json::Value,
+    payload_hash: &str,
+) -> Option<LinuxProductUninstallOwnerCandidate> {
+    let object = payload.as_object()?;
+    if object.len() != 1 || object.get("版") != Some(&serde_json::Value::from(1)) {
+        return None;
+    }
+    let (app_id, audit_store_id) =
+        crate::broker::update_center::embedded_product_identity().ok()??;
+    let data_home = crate::broker::product_install::current_user_local_app_data().ok()?;
+    let product_root =
+        crate::broker::product_install::product_install_root(&data_home, &app_id).ok()?;
+    let desktop_entry_path =
+        crate::broker::product_install::plan_linux_desktop_entry(&data_home, &app_id).ok()?;
+    crate::broker::product_install::validate_linux_product_uninstall_targets(&data_home, &app_id)
+        .ok()?;
+
+    Some(LinuxProductUninstallOwnerCandidate {
+        summary: format!(
+            "D4 Pocketを終了後にこの利用者から削除しますか？\n\n製品ID: {app_id}\n固定製品root: {}\n固定XDG desktop entry: {}\n\n製品rootと内容が一致するdesktop entryだけを削除します。XDG state内のRuntime設定、Credential、Audit Storeは保持します。確認後、画面とBrokerを正常終了してから削除します。失敗時は残存fileを維持し、新しいOwner確認を要求します。\n要求hash: {payload_hash}",
+            product_root.display(),
+            desktop_entry_path.display()
+        ),
+        confirmation: crate::broker::update_center::ProductUninstallConfirmation {
+            app_id,
+            audit_store_id,
+            product_root,
+            linux_desktop_entry_path: desktop_entry_path,
+            payload_hash: payload_hash.to_owned(),
+        },
+    })
+}
+
 #[cfg(any(target_os = "linux", target_os = "macos", test))]
 fn macos_owner_summary(operation: &str, payload: &serde_json::Value) -> Option<String> {
     crate::broker::mcp_center::desktop_owner_summary(operation, payload)
@@ -566,6 +609,7 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
     let registration = operation == "AgentCLI実行系作業領域登録";
     let mut update_owner_candidate = None;
     let mut product_repair_confirmation = None;
+    let mut product_uninstall_confirmation = None;
     let text = if registration {
         let summary = crate::broker::protocol::macos_agent_registration_summary(payload)?;
         format!("{summary}\n要求hash: {hash}")
@@ -583,6 +627,18 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
             let repair = linux_product_repair_owner_candidate(payload, &hash, endpoint)?;
             let summary = repair.summary.clone();
             product_repair_confirmation = Some(repair.confirmation);
+            summary
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            return None;
+        }
+    } else if operation == "製品アンインストール要求" {
+        #[cfg(target_os = "linux")]
+        {
+            let uninstall = linux_product_uninstall_owner_candidate(payload, &hash)?;
+            let summary = uninstall.summary.clone();
+            product_uninstall_confirmation = Some(uninstall.confirmation);
             summary
         }
         #[cfg(not(target_os = "linux"))]
@@ -775,6 +831,7 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
             .as_ref()
             .and_then(|update| update.activation_confirmation.clone()),
         product_repair_confirmation,
+        product_uninstall_confirmation,
     })
 }
 
@@ -799,7 +856,7 @@ pub(super) fn dispatch(
             apply_confirmation: candidate.apply_confirmation,
             activation_confirmation: candidate.activation_confirmation,
             product_repair_confirmation: candidate.product_repair_confirmation,
-            product_uninstall_confirmation: None,
+            product_uninstall_confirmation: candidate.product_uninstall_confirmation,
             reply,
         })
         .map_err(|_| std::io::Error::other("Owner操作のBroker配送が不能"))?;
@@ -1654,6 +1711,108 @@ mod task_owner_tests {
         );
         worker.join().unwrap();
         listener_thread.join().unwrap();
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_product_uninstall_binds_compile_time_identity_and_fixed_targets() {
+        use std::path::Path;
+
+        let (app_id, audit_store_id) = crate::broker::update_center::embedded_product_identity()
+            .expect("Linux試験用identityが正しい")
+            .expect("Linux試験用identityが設定されている");
+        let data_home = crate::broker::product_install::current_user_local_app_data().unwrap();
+        let product_root =
+            crate::broker::product_install::product_install_root(&data_home, &app_id).unwrap();
+        assert!(
+            std::env::var_os("XDG_DATA_HOME").is_some_and(|path| {
+                Path::new(&path)
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| name.starts_with("d4p-linux-owner-xdg-"))
+            }),
+            "アンインストールOwner試験には隔離したXDG_DATA_HOMEが必要"
+        );
+        assert!(
+            !product_root.exists(),
+            "Owner試験で既存の製品rootを上書き・削除しない"
+        );
+        std::fs::create_dir_all(product_root.join("versions")).unwrap();
+        std::fs::write(
+            product_root.join("gui_shell_desktop_launcher"),
+            b"synthetic bootstrapper",
+        )
+        .unwrap();
+        let desktop_entry =
+            crate::broker::product_install::plan_linux_desktop_entry(&data_home, &app_id).unwrap();
+        let payload = json!({"版": 1});
+        let valid = request("製品アンインストール要求", payload);
+        let bytes = serde_json::to_vec(&valid).unwrap();
+        let owner_candidate =
+            candidate(&bytes, &endpoint()).expect("導入済み製品の削除Owner候補");
+        assert!(owner_candidate
+            .summary
+            .contains(&product_root.display().to_string()));
+        assert!(owner_candidate
+            .summary
+            .contains(&desktop_entry.display().to_string()));
+        assert!(owner_candidate.summary.contains("Audit Storeは保持"));
+        let confirmation = owner_candidate
+            .product_uninstall_confirmation
+            .as_ref()
+            .unwrap();
+        assert_eq!(confirmation.app_id, app_id);
+        assert_eq!(confirmation.audit_store_id, audit_store_id);
+        assert_eq!(confirmation.product_root, product_root);
+        assert_eq!(confirmation.linux_desktop_entry_path, desktop_entry);
+
+        let (sender, receiver) = mpsc::sync_channel(1);
+        assert!(dispatch(&bytes, &endpoint(), &sender, &mut |_| false)
+            .unwrap()
+            .is_none());
+        assert!(receiver.try_recv().is_err());
+        let expected_app = confirmation.app_id.clone();
+        let expected_audit = confirmation.audit_store_id.clone();
+        let expected_root = confirmation.product_root.clone();
+        let expected_entry = confirmation.linux_desktop_entry_path.clone();
+        let payload_hash = valid["payload_hash"].as_str().unwrap().to_owned();
+        let worker = std::thread::spawn(move || {
+            let operation: DesktopOwnerOperationRequest = receiver.recv().unwrap();
+            let confirmation = operation.product_uninstall_confirmation.unwrap();
+            assert_eq!(confirmation.app_id, expected_app);
+            assert_eq!(confirmation.audit_store_id, expected_audit);
+            assert_eq!(confirmation.product_root, expected_root);
+            assert_eq!(confirmation.linux_desktop_entry_path, expected_entry);
+            assert_eq!(confirmation.payload_hash, payload_hash);
+            operation
+                .reply
+                .send(BrokerResponse {
+                    request_id: "fixture-uninstall-owner".into(),
+                    operation: "製品アンインストール要求".into(),
+                    status: BrokerStatus::Accepted,
+                    evidence_source: "FIXTURE".into(),
+                    audit_event_id: "fixture-uninstall-audit".into(),
+                    error: None,
+                    health: None,
+                    body: Some(json!({"版": 1, "状態": "uninstall_authorized"})),
+                    shutdown_requested: false,
+                })
+                .unwrap();
+        });
+        let response = dispatch(&bytes, &endpoint(), &sender, &mut |summary| {
+            summary.contains(&product_root.display().to_string())
+                && summary.contains(&desktop_entry.display().to_string())
+                && summary.contains(valid["payload_hash"].as_str().unwrap())
+                && summary.contains("Audit Storeは保持")
+        })
+        .unwrap()
+        .expect("native Owner confirmation forwards the fixed uninstall request");
+        assert_eq!(
+            serde_json::from_slice::<Value>(&response).unwrap()["status"],
+            "accepted"
+        );
+        worker.join().unwrap();
+        std::fs::remove_dir_all(product_root).unwrap();
     }
 
     #[cfg(target_os = "linux")]

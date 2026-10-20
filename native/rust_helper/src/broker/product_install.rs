@@ -559,6 +559,157 @@ pub(crate) fn remove_installed_product(
         .map_err(|_| ProductInstallPlanError("product_install_remove_failed"))
 }
 
+/// Linuxの固定製品rootと、同root launcherを指す一致済みXDG desktop entryだけを除去する。
+/// XDG state／Credential／Audit Storeは対象外で、競合entryがあれば何も削除しない。
+#[cfg(target_os = "linux")]
+pub(crate) fn remove_installed_linux_product(
+    data_home: &Path,
+    app_id: &str,
+) -> Result<(), ProductInstallPlanError> {
+    let targets = linux_product_uninstall_targets(data_home, app_id)?;
+    if let Some(applications) = targets.applications.as_ref() {
+        match applications.symlink_metadata(&targets.entry_name) {
+            Ok(_) => applications
+                .remove_file(&targets.entry_name)
+                .map_err(|_| ProductInstallPlanError("product_desktop_entry_remove_failed"))?,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(_) => return Err(ProductInstallPlanError("product_desktop_entry_unavailable")),
+        }
+    }
+
+    let current_product_metadata = std::fs::symlink_metadata(&targets.product_root)
+        .map_err(|_| ProductInstallPlanError("product_install_root_changed"))?;
+    if !current_product_metadata.is_dir()
+        || current_product_metadata.file_type().is_symlink()
+        || current_product_metadata.uid() != rustix::process::geteuid().as_raw()
+        || StdMetadataExt::dev(&current_product_metadata) != targets.product_device
+        || StdMetadataExt::ino(&current_product_metadata) != targets.product_inode
+    {
+        return Err(ProductInstallPlanError("product_install_root_changed"));
+    }
+    let device = CapMetadataExt::dev(
+        &targets
+            .data_home
+            .dir_metadata()
+            .map_err(|_| ProductInstallPlanError("product_install_data_home_invalid"))?,
+    );
+    let programs = open_existing_child_directory(&targets.data_home, INSTALL_DIRECTORY, device)?;
+    let products = open_existing_child_directory(&programs, PRODUCT_DIRECTORY, device)?;
+    products
+        .remove_dir_all(app_id)
+        .map_err(|_| ProductInstallPlanError("product_install_remove_failed"))
+}
+
+#[cfg(target_os = "linux")]
+pub(crate) fn validate_linux_product_uninstall_targets(
+    data_home: &Path,
+    app_id: &str,
+) -> Result<(), ProductInstallPlanError> {
+    linux_product_uninstall_targets(data_home, app_id).map(|_| ())
+}
+
+#[cfg(target_os = "linux")]
+struct LinuxProductUninstallTargets {
+    product_root: PathBuf,
+    product_device: u64,
+    product_inode: u64,
+    data_home: Dir,
+    applications: Option<Dir>,
+    entry_name: String,
+}
+
+#[cfg(target_os = "linux")]
+fn linux_product_uninstall_targets(
+    data_home: &Path,
+    app_id: &str,
+) -> Result<LinuxProductUninstallTargets, ProductInstallPlanError> {
+    let (product_root, product_directory) = open_existing_product_root(data_home, app_id)?;
+    let product_metadata = std::fs::symlink_metadata(&product_root)
+        .map_err(|_| ProductInstallPlanError("product_install_root_invalid"))?;
+    if !product_metadata.is_dir()
+        || product_metadata.file_type().is_symlink()
+        || product_metadata.uid() != rustix::process::geteuid().as_raw()
+        || product_metadata.permissions().mode() & 0o022 != 0
+    {
+        return Err(ProductInstallPlanError("product_install_root_invalid"));
+    }
+    let opened_product_metadata = product_directory
+        .dir_metadata()
+        .map_err(|_| ProductInstallPlanError("product_install_root_invalid"))?;
+    if !opened_product_metadata.is_dir()
+        || is_cap_reparse_point(&opened_product_metadata)
+        || StdMetadataExt::dev(&product_metadata) != CapMetadataExt::dev(&opened_product_metadata)
+        || StdMetadataExt::ino(&product_metadata) != CapMetadataExt::ino(&opened_product_metadata)
+    {
+        return Err(ProductInstallPlanError("product_install_root_invalid"));
+    }
+    let entry_path = plan_linux_desktop_entry(data_home, app_id)?;
+    let expected_entry =
+        linux_desktop_entry_content(&product_root.join("gui_shell_desktop_launcher"))?;
+
+    let data_metadata = std::fs::symlink_metadata(data_home)
+        .map_err(|_| ProductInstallPlanError("product_install_data_home_unavailable"))?;
+    validate_linux_data_home_metadata(&data_metadata)?;
+    let data = Dir::open_ambient_dir(data_home, cap_std::ambient_authority())
+        .map_err(|_| ProductInstallPlanError("product_install_data_home_unavailable"))?;
+    let opened_data = data
+        .dir_metadata()
+        .map_err(|_| ProductInstallPlanError("product_install_data_home_invalid"))?;
+    if !opened_data.is_dir()
+        || is_cap_reparse_point(&opened_data)
+        || StdMetadataExt::dev(&data_metadata) != CapMetadataExt::dev(&opened_data)
+        || StdMetadataExt::ino(&data_metadata) != CapMetadataExt::ino(&opened_data)
+    {
+        return Err(ProductInstallPlanError("product_install_data_home_invalid"));
+    }
+
+    let applications = match data.symlink_metadata("applications") {
+        Ok(metadata) => {
+            let path_metadata = std::fs::symlink_metadata(data_home.join("applications"))
+                .map_err(|_| ProductInstallPlanError("product_desktop_entry_directory_invalid"))?;
+            if !metadata.is_dir()
+                || is_cap_reparse_point(&metadata)
+                || path_metadata.uid() != rustix::process::geteuid().as_raw()
+                || path_metadata.permissions().mode() & 0o022 != 0
+                || StdMetadataExt::dev(&path_metadata) != CapMetadataExt::dev(&metadata)
+                || StdMetadataExt::ino(&path_metadata) != CapMetadataExt::ino(&metadata)
+            {
+                return Err(ProductInstallPlanError(
+                    "product_desktop_entry_directory_invalid",
+                ));
+            }
+            Some(open_existing_child_directory(
+                &data,
+                "applications",
+                CapMetadataExt::dev(&opened_data),
+            )?)
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+        Err(_) => {
+            return Err(ProductInstallPlanError(
+                "product_desktop_entry_directory_invalid",
+            ));
+        }
+    };
+    let entry_name = linux_desktop_entry_name(app_id)?;
+    if let Some(applications) = applications.as_ref() {
+        match applications.symlink_metadata(&entry_name) {
+            Ok(_) => verify_linux_desktop_entry(applications, &entry_path, &expected_entry)?,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(_) => return Err(ProductInstallPlanError("product_desktop_entry_unavailable")),
+        }
+    }
+
+    Ok(LinuxProductUninstallTargets {
+        product_root,
+        product_device: StdMetadataExt::dev(&product_metadata),
+        product_inode: StdMetadataExt::ino(&product_metadata),
+        data_home: data,
+        applications,
+        entry_name,
+    })
+}
+
 #[cfg(windows)]
 fn verify_existing_start_menu_shortcut(
     product_directory: &Dir,
@@ -1704,6 +1855,97 @@ mod tests {
         .is_err());
         assert_eq!(std::fs::read(target).unwrap(), b"attacker target\n");
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_uninstall_removes_only_matching_product_and_desktop_entry() {
+        use super::{
+            linux_desktop_entry_content, plan_linux_desktop_entry, remove_installed_linux_product,
+            validate_linux_product_uninstall_targets, INSTALL_DIRECTORY, PRODUCT_DIRECTORY,
+        };
+        use std::os::unix::fs::PermissionsExt;
+
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let scratch = std::env::temp_dir().join(format!(
+            "d4p-linux-uninstall-{}-{unique}",
+            std::process::id()
+        ));
+        let data_home = scratch.join("xdg-data");
+        let state_home = scratch.join("xdg-state");
+        let product_root = data_home
+            .join(INSTALL_DIRECTORY)
+            .join(PRODUCT_DIRECTORY)
+            .join(APP_ID);
+        let launcher = product_root.join("gui_shell_desktop_launcher");
+        std::fs::create_dir_all(product_root.join(VERSIONS_DIRECTORY)).unwrap();
+        std::fs::write(&launcher, b"synthetic installed launcher").unwrap();
+        std::fs::create_dir_all(&state_home).unwrap();
+        std::fs::write(state_home.join("audit.jsonl"), b"durable audit").unwrap();
+        let entry = plan_linux_desktop_entry(&data_home, APP_ID).unwrap();
+        std::fs::create_dir_all(entry.parent().unwrap()).unwrap();
+        std::fs::write(&entry, linux_desktop_entry_content(&launcher).unwrap()).unwrap();
+        std::fs::write(entry.parent().unwrap().join("unrelated.desktop"), b"keep").unwrap();
+        assert_eq!(
+            std::fs::metadata(&entry).unwrap().permissions().mode() & 0o777,
+            0o644
+        );
+
+        validate_linux_product_uninstall_targets(&data_home, APP_ID).unwrap();
+        remove_installed_linux_product(&data_home, APP_ID).unwrap();
+
+        assert!(!product_root.exists());
+        assert!(!entry.exists());
+        assert_eq!(
+            std::fs::read(entry.parent().unwrap().join("unrelated.desktop")).unwrap(),
+            b"keep"
+        );
+        assert_eq!(
+            std::fs::read(state_home.join("audit.jsonl")).unwrap(),
+            b"durable audit"
+        );
+        std::fs::remove_dir_all(scratch).unwrap();
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_uninstall_rejects_conflicting_entry_before_removing_product() {
+        use super::{
+            plan_linux_desktop_entry, remove_installed_linux_product, INSTALL_DIRECTORY,
+            PRODUCT_DIRECTORY,
+        };
+
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let scratch = std::env::temp_dir().join(format!(
+            "d4p-linux-uninstall-conflict-{}-{unique}",
+            std::process::id()
+        ));
+        let data_home = scratch.join("xdg-data");
+        let product_root = data_home
+            .join(INSTALL_DIRECTORY)
+            .join(PRODUCT_DIRECTORY)
+            .join(APP_ID);
+        std::fs::create_dir_all(product_root.join(VERSIONS_DIRECTORY)).unwrap();
+        std::fs::write(product_root.join("gui_shell_desktop_launcher"), b"launcher").unwrap();
+        let entry = plan_linux_desktop_entry(&data_home, APP_ID).unwrap();
+        std::fs::create_dir_all(entry.parent().unwrap()).unwrap();
+        std::fs::write(&entry, b"unrelated content").unwrap();
+
+        assert_eq!(
+            remove_installed_linux_product(&data_home, APP_ID)
+                .unwrap_err()
+                .0,
+            "product_desktop_entry_conflict"
+        );
+        assert!(product_root.exists());
+        assert_eq!(std::fs::read(&entry).unwrap(), b"unrelated content");
+        std::fs::remove_dir_all(scratch).unwrap();
     }
 
     #[test]

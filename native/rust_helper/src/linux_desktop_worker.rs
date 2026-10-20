@@ -51,16 +51,37 @@ pub fn run() -> io::Result<()> {
         }
         None => private_directory(&home, &[".local", "state", "d4-pocket", "linux-broker"], 2)?,
     };
-    let runtime_base = PathBuf::from(std::env::var_os("XDG_RUNTIME_DIR").ok_or_else(failure)?);
-    let runtime_base = verify_owned_directory(&runtime_base, true)?;
-    let runtime = private_directory(&runtime_base, &["d4-pocket", "linux-broker"], 0)?;
+    let runtime = prepare_runtime_directory()?;
+    let launch_nonce = std::env::var(crate::linux_desktop_launcher::LAUNCH_NONCE_ENV).ok();
     serve(
         &state,
         &runtime,
         &bundle,
+        launch_nonce.as_deref(),
         &mut io::stdin().lock(),
         &mut io::stdout().lock(),
     )
+}
+
+pub(crate) fn prepare_runtime_directory() -> io::Result<PathBuf> {
+    let runtime_base = PathBuf::from(std::env::var_os("XDG_RUNTIME_DIR").ok_or_else(failure)?);
+    let runtime_base = verify_owned_directory(&runtime_base, true)?;
+    private_directory(&runtime_base, &["d4-pocket", "linux-broker"], 0)
+}
+
+pub(crate) fn existing_store_directory() -> io::Result<PathBuf> {
+    let home = PathBuf::from(std::env::var_os("HOME").ok_or_else(failure)?);
+    let home = verify_owned_directory(&home, false)?;
+    let state_base = match std::env::var_os("XDG_STATE_HOME") {
+        Some(path) => verify_owned_directory(Path::new(&path), false)?,
+        None => verify_owned_directory(&home.join(".local").join("state"), false)?,
+    };
+    let mut state = state_base.join("d4-pocket");
+    state = verify_owned_directory(&state, true)?;
+    state.push("linux-broker");
+    state = verify_owned_directory(&state, true)?;
+    let store = verify_owned_directory(&state.join("store"), false)?;
+    Ok(store)
 }
 
 fn verify_bundle(helper: &Path) -> io::Result<VerifiedBundle> {
@@ -187,6 +208,7 @@ fn serve(
     state: &Path,
     runtime: &Path,
     bundle: &VerifiedBundle,
+    launch_nonce: Option<&str>,
     input: &mut impl BufRead,
     output: &mut impl Write,
 ) -> io::Result<()> {
@@ -294,14 +316,19 @@ fn serve(
             if let Some(error) = confirmation_error {
                 return Err(error);
             }
-            let response = match owner_response {
+            let mut response = match owner_response {
                 Some(response) => response,
                 None => {
                     let request = Zeroizing::new(normalize(&frame, &endpoint.0.session_id));
                     relay(&request, &endpoint.0)?
                 }
             };
-            output.write_all(&response)?;
+            let sanitized = crate::linux_desktop_launcher::capture_product_uninstall_ticket(
+                &mut response,
+                runtime,
+                launch_nonce,
+            )?;
+            output.write_all(&sanitized)?;
             output.write_all(b"\n")?;
             output.flush()?;
         }
