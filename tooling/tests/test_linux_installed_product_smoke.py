@@ -9,12 +9,13 @@ import unittest
 from pathlib import Path
 
 from tooling.tests.linux_installed_product_smoke import (
+    _activate_named_control_by_keyboard,
     _actionable_node,
     _component_center,
     _desktop_entry_targets_fixed_launcher,
+    _focused_named_accessible,
     _resolve_regular_package,
     _safe_log_tail,
-    _scroll_to_export_controls,
     _verify_export_manifest,
     _verify_live_audit,
 )
@@ -68,27 +69,74 @@ class AccessibleActionResolutionTests(unittest.TestCase):
         self.assertEqual(label.coordinate_type, 0)
 
 
-class InstalledExportScrollTests(unittest.TestCase):
-    def test_scrolls_inside_the_live_product_window(self) -> None:
+    def test_focused_lookup_requires_exact_name_and_visible_state(self) -> None:
+        from types import SimpleNamespace
         from unittest.mock import patch
 
-        geometry = subprocess.CompletedProcess(
-            [], 0, stdout=b"WINDOW=7\nX=0\nY=0\nWIDTH=1280\nHEIGHT=800\n"
+        class State:
+            def __init__(self, values: set[int]) -> None:
+                self.values = values
+
+            def contains(self, value: int) -> bool:
+                return value in self.values
+
+        class Node:
+            name = "Owner確認してManifest fileを生成"
+            childCount = 0
+
+            def __init__(self, values: set[int]) -> None:
+                self.values = values
+
+            def getState(self):
+                return State(self.values)
+
+        class Root:
+            childCount = 2
+
+            def __init__(self, nodes) -> None:
+                self.nodes = nodes
+
+            def getChildAtIndex(self, index: int):
+                return self.nodes[index]
+
+        visible_focus = Node({1, 2})
+        hidden_focus = Node({1})
+        fake_pyatspi = SimpleNamespace(
+            STATE_FOCUSED=1,
+            STATE_SHOWING=2,
+            Registry=SimpleNamespace(
+                getDesktop=lambda _: Root([hidden_focus, visible_focus])
+            ),
         )
-        success = subprocess.CompletedProcess([], 0)
-        with patch(
-            "tooling.tests.linux_installed_product_smoke.subprocess.run",
-            side_effect=(geometry, success, success),
-        ) as run:
-            _scroll_to_export_controls({"DISPLAY": ":99"}, "0x42")
+        with patch.dict("sys.modules", {"pyatspi": fake_pyatspi}):
+            self.assertIs(
+                _focused_named_accessible(visible_focus.name), visible_focus
+            )
+            self.assertIsNone(_focused_named_accessible("different label"))
+
+    def test_keyboard_activation_sends_enter_only_after_target_focus(self) -> None:
+        from unittest.mock import patch
+
+        focused_node = object()
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._focused_named_accessible",
+                side_effect=(None, focused_node),
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke.subprocess.run"
+            ) as run,
+            patch("tooling.tests.linux_installed_product_smoke.time.sleep"),
+        ):
+            _activate_named_control_by_keyboard("target", {"DISPLAY": ":99"}, "0x42")
 
         self.assertEqual(
-            run.call_args_list[1].args[0],
-            ["xdotool", "mousemove", "--window", "0x42", "640", "600"],
-        )
-        self.assertEqual(
-            run.call_args_list[2].args[0],
-            ["xdotool", "click", "--repeat", "16", "--delay", "60", "5"],
+            [call.args[0] for call in run.call_args_list],
+            [
+                ["xdotool", "windowactivate", "--sync", "0x42"],
+                ["xdotool", "key", "--clearmodifiers", "Tab"],
+                ["xdotool", "key", "--clearmodifiers", "Return"],
+            ],
         )
 
 

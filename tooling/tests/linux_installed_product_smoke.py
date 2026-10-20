@@ -307,50 +307,68 @@ def _trigger_export_from_installed_ui(environment: dict[str, str], window_id: st
         check=True,
         timeout=5,
     )
-    _scroll_to_export_controls(environment, window_id)
-    button = _find_operable_accessible(
-        "Owner確認してManifest fileを生成", timeout=20
-    )
-    _activate_accessible(
-        button, "Owner確認してManifest fileを生成", environment
+    _activate_named_control_by_keyboard(
+        "Owner確認してManifest fileを生成", environment, window_id
     )
 
 
-def _scroll_to_export_controls(environment: dict[str, str], window_id: str) -> None:
-    geometry = subprocess.run(
-        ["xdotool", "getwindowgeometry", "--shell", window_id],
-        env=environment,
-        capture_output=True,
-        check=True,
-        timeout=5,
-    )
-    dimensions = {
-        match.group(1): int(match.group(2))
-        for line in geometry.stdout.decode("ascii", errors="ignore").splitlines()
-        if (match := re.match(r"^(WIDTH|HEIGHT)=(\d+)$", line))
-    }
-    width, height = dimensions.get("WIDTH", 0), dimensions.get("HEIGHT", 0)
-    if not (0 < width <= 4096 and 0 < height <= 4096):
-        raise RuntimeError("Export画面をscrollするGTK window geometryが不正です")
+def _activate_named_control_by_keyboard(
+    name: str,
+    environment: dict[str, str],
+    window_id: str,
+    *,
+    max_tabs: int = 96,
+) -> None:
+    """可視かつ正確なAccessible名にfocusがある場合だけEnterを送る。"""
     subprocess.run(
-        [
-            "xdotool",
-            "mousemove",
-            "--window",
-            window_id,
-            str(width // 2),
-            str(height * 3 // 4),
-        ],
+        ["xdotool", "windowactivate", "--sync", window_id],
         env=environment,
         check=True,
         timeout=5,
     )
-    subprocess.run(
-        ["xdotool", "click", "--repeat", "16", "--delay", "60", "5"],
-        env=environment,
-        check=True,
-        timeout=5,
+    for index in range(max_tabs + 1):
+        if _focused_named_accessible(name) is not None:
+            subprocess.run(
+                ["xdotool", "key", "--clearmodifiers", "Return"],
+                env=environment,
+                check=True,
+                timeout=5,
+            )
+            return
+        if index == max_tabs:
+            break
+        subprocess.run(
+            ["xdotool", "key", "--clearmodifiers", "Tab"],
+            env=environment,
+            check=True,
+            timeout=5,
+        )
+        time.sleep(0.05)
+    target = _find_accessible(name, timeout=2)
+    raise RuntimeError(
+        f"GTK keyboard traversalで可視focusを確認できません: {name}; "
+        f"{_accessibility_debug(target)}"
     )
+
+
+def _focused_named_accessible(name: str, *, root=None):
+    try:
+        import pyatspi
+    except ImportError:
+        return None
+    search_root = root if root is not None else pyatspi.Registry.getDesktop(0)
+    for node, accessible_name in _accessible_nodes(search_root):
+        if accessible_name.strip() != name:
+            continue
+        try:
+            state = node.getState()
+            if state.contains(pyatspi.STATE_FOCUSED) and state.contains(
+                pyatspi.STATE_SHOWING
+            ):
+                return node
+        except Exception:
+            continue
+    return None
 
 
 def _answer_owner_dialog(environment: dict[str, str], decision: str) -> None:
