@@ -20,6 +20,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _safe_log_tail,
     _verify_export_manifest,
     _verify_live_audit,
+    _wayland_launch_environment,
     _wait_for_owner_dialog_window,
 )
 
@@ -187,6 +188,25 @@ class AccessibleActionResolutionTests(unittest.TestCase):
         )
 
 class LinuxInstalledDesktopEntryTests(unittest.TestCase):
+    def test_wayland_launch_environment_cannot_fall_back_to_x11(self) -> None:
+        source = {
+            "DISPLAY": ":99",
+            "XAUTHORITY": "/tmp/xauth",
+            "GDK_BACKEND": "x11",
+            "XDG_SESSION_TYPE": "x11",
+            "XDG_RUNTIME_DIR": "/run/user/1000/d4p",
+        }
+
+        result = _wayland_launch_environment(source, "wayland-test")
+
+        self.assertNotIn("DISPLAY", result)
+        self.assertNotIn("XAUTHORITY", result)
+        self.assertEqual(result["GDK_BACKEND"], "wayland")
+        self.assertEqual(result["XDG_SESSION_TYPE"], "wayland")
+        self.assertEqual(result["WAYLAND_DISPLAY"], "wayland-test")
+        self.assertEqual(result["XDG_RUNTIME_DIR"], source["XDG_RUNTIME_DIR"])
+        self.assertEqual(source["DISPLAY"], ":99")
+
     def test_waits_for_native_owner_dialog_to_become_visible(self) -> None:
         from unittest.mock import patch
 

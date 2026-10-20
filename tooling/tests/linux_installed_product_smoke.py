@@ -28,9 +28,17 @@ RUST_TESTS = (
 )
 
 if __package__:
-    from .linux_gtk_bundle_smoke import _request_x11_window_manager_close
+    from .linux_gtk_bundle_smoke import (
+        _request_x11_window_manager_close,
+        _start_wayland_compositor,
+        _terminate_group,
+    )
 else:
-    from linux_gtk_bundle_smoke import _request_x11_window_manager_close
+    from linux_gtk_bundle_smoke import (
+        _request_x11_window_manager_close,
+        _start_wayland_compositor,
+        _terminate_group,
+    )
 
 
 def _processes_using(executables: set[Path]) -> set[int]:
@@ -89,6 +97,22 @@ def _visible_product_window(environment: dict[str, str]) -> str | None:
         return None
     values = result.stdout.decode("ascii", errors="ignore").splitlines()
     return values[0] if values else None
+
+
+def _wayland_launch_environment(
+    environment: dict[str, str], display: str
+) -> dict[str, str]:
+    result = environment.copy()
+    for name in ("DISPLAY", "XAUTHORITY"):
+        result.pop(name, None)
+    result.update(
+        {
+            "GDK_BACKEND": "wayland",
+            "XDG_SESSION_TYPE": "wayland",
+            "WAYLAND_DISPLAY": display,
+        }
+    )
+    return result
 
 
 def _accessible_nodes(root):
@@ -658,6 +682,8 @@ def run_installed_smoke(package: Path, temp_root: Path, acceptance_root: Path) -
 
     window_manager: subprocess.Popen[bytes] | None = None
     desktop_process: subprocess.Popen[bytes] | None = None
+    wayland_compositor: subprocess.Popen[bytes] | None = None
+    wayland_process: subprocess.Popen[bytes] | None = None
     product_paths: set[Path] = set()
     preexisting: set[int] = set()
     app_log = acceptance_root / "installed-app.log"
@@ -762,6 +788,54 @@ def run_installed_smoke(package: Path, temp_root: Path, acceptance_root: Path) -
             if desktop_process.returncode not in (0, None):
                 raise RuntimeError(f"gio launch exited unexpectedly: {desktop_process.returncode}")
 
+        wayland_compositor, wayland_display = _start_wayland_compositor(
+            runtime, environment, acceptance_root / "wayland-compositor.log"
+        )
+        wayland_environment = _wayland_launch_environment(environment, wayland_display)
+        wayland_log = acceptance_root / "installed-wayland-app.log"
+        with wayland_log.open("xb") as log:
+            wayland_process = subprocess.Popen(
+                ["gio", "launch", str(entries[0])],
+                cwd=stage,
+                env=wayland_environment,
+                stdin=subprocess.DEVNULL,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
+            try:
+                wayland_window = _find_accessible(WINDOW_TITLE, timeout=60)
+            except RuntimeError as error:
+                tail = _safe_log_tail(wayland_log, (acceptance_root, temp_root))
+                raise RuntimeError(
+                    f"installed Wayland GTK windowがAT-SPIへ現れませんでした\n{tail}"
+                ) from error
+            try:
+                import pyatspi
+
+                if not wayland_window.getState().contains(pyatspi.STATE_SHOWING):
+                    raise RuntimeError("installed Wayland GTK top-levelがshowingではありません")
+            except RuntimeError:
+                raise
+            except Exception as error:
+                raise RuntimeError(
+                    "installed Wayland GTK window visibilityを取得できません"
+                ) from error
+            running_wayland = _processes_using(product_paths) - preexisting
+            if not running_wayland or wayland_process.poll() not in (None, 0):
+                raise RuntimeError("Wayland GTK window観測時にinstalled processが稼働していません")
+            _stop_owned_processes(running_wayland, wayland_process)
+            if _processes_using(product_paths) - preexisting:
+                raise RuntimeError("Wayland installed productの所有process cleanupが残留しました")
+            if wayland_process.poll() is None:
+                wayland_process.wait(timeout=10)
+            if wayland_process.returncode not in (0, -signal.SIGTERM, -signal.SIGKILL, None):
+                raise RuntimeError(
+                    f"Wayland installed launcher終了codeが想定外です: {wayland_process.returncode}"
+                )
+        _terminate_group(wayland_compositor)
+        wayland_compositor = None
+
         audit_evidence = _verify_live_audit(broker_state / "store")
         _run_rust_test(RUST_TESTS[1], environment)
         print(
@@ -771,6 +845,7 @@ def run_installed_smoke(package: Path, temp_root: Path, acceptance_root: Path) -
                     "active_version": record["product_version"],
                     "package_sha256": record["package_sha256"],
                     "gtk_window": "opened_and_normally_closed",
+                    "wayland_installed_window": "AT-SPI showing; owner process group stopped; surface rendering not established",
                     "owned_processes": "all_stopped",
                     "installed_ui_owner_confirmation": "native_AT-SPI_rejected_then_approved_through_GTK_runner_private_pipe",
                     "manifest": manifest_evidence,
@@ -795,6 +870,12 @@ def run_installed_smoke(package: Path, temp_root: Path, acceptance_root: Path) -
                     os.killpg(window_manager.pid, signal.SIGKILL)
                 except ProcessLookupError:
                     pass
+        if wayland_process is not None and wayland_process.poll() is None:
+            _stop_owned_processes(
+                _processes_using(product_paths) - preexisting, wayland_process
+            )
+        if wayland_compositor is not None and wayland_compositor.poll() is None:
+            _terminate_group(wayland_compositor)
         if acceptance_root.exists():
             resolved = acceptance_root.resolve(strict=True)
             if resolved == temp_root or temp_root not in resolved.parents or acceptance_root.is_symlink():
