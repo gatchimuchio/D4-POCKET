@@ -325,7 +325,7 @@ class LinuxInstalledOwnerEvidenceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             store = Path(directory)
             key = bytes(range(32))
-            (store / "audit_anchor.key").write_bytes(key)
+            (store / "audit_anchor.key").write_text(key.hex(), encoding="ascii")
             events = []
             previous_hash = None
             for index, decision in enumerate(("rejected", "accepted"), start=1):

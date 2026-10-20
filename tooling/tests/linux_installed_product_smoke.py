@@ -457,7 +457,12 @@ def _verify_live_audit(store: Path) -> dict[str, int]:
         previous_hash = expected
 
     anchor = json.loads(anchor_path.read_text(encoding="utf-8"))
-    key = key_path.read_bytes()
+    try:
+        key = bytes.fromhex(key_path.read_text(encoding="ascii").strip())
+    except (OSError, UnicodeError, ValueError) as error:
+        raise RuntimeError("installed product Audit anchor keyが不正です") from error
+    if len(key) != 32:
+        raise RuntimeError("installed product Audit anchor key長が不正です")
     anchor_input = (
         f"version=1|event_count={len(events)}|head_event_hash={previous_hash or ''}"
     ).encode("utf-8")
