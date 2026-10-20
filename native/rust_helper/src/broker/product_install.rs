@@ -1378,6 +1378,11 @@ fn linux_desktop_entry_content(launcher: &Path) -> Result<Vec<u8>, ProductInstal
     let launcher = launcher.to_str().ok_or(ProductInstallPlanError(
         "product_desktop_entry_launcher_invalid",
     ))?;
+    if launcher.chars().any(char::is_control) {
+        return Err(ProductInstallPlanError(
+            "product_desktop_entry_launcher_invalid",
+        ));
+    }
     let escaped = launcher
         .chars()
         .map(|character| match character {
@@ -1389,8 +1394,9 @@ fn linux_desktop_entry_content(launcher: &Path) -> Result<Vec<u8>, ProductInstal
             _ => character.to_string(),
         })
         .collect::<String>();
+    let try_exec = launcher.replace('\\', "\\\\");
     Ok(format!(
-        "[Desktop Entry]\nType=Application\nName=D4 Pocket\nExec=\"{escaped}\"\nTryExec=\"{escaped}\"\nTerminal=false\nCategories=Utility;Development;\nStartupWMClass=d4-pocket\n"
+        "[Desktop Entry]\nType=Application\nName=D4 Pocket\nExec=\"{escaped}\"\nTryExec={try_exec}\nTerminal=false\nCategories=Utility;Development;\nStartupWMClass=d4-pocket\n"
     )
     .into_bytes())
 }
@@ -1792,6 +1798,12 @@ mod tests {
         std::fs::write(version_directory.join("product_manifest.json"), b"{}").unwrap();
         let data_home = std::fs::canonicalize(data_home).unwrap();
         let product_root = std::fs::canonicalize(product_root).unwrap();
+        assert_eq!(
+            super::linux_desktop_entry_content(&product_root.join("bad\nlauncher"))
+                .unwrap_err()
+                .0,
+            "product_desktop_entry_launcher_invalid"
+        );
         let root_directory =
             Dir::open_ambient_dir(&product_root, cap_std::ambient_authority()).unwrap();
         let versions_directory = Dir::open_ambient_dir(
@@ -1876,6 +1888,10 @@ mod tests {
         let content = String::from_utf8(content).unwrap();
         assert!(content.contains("Name=D4 Pocket\n"));
         assert!(content.contains("Exec=\""));
+        assert!(content.contains(&format!(
+            "TryExec={}\n",
+            product_root.join("gui_shell_desktop_launcher").display()
+        )));
         assert!(content.contains("d4 pocket%%desktop-entry-"));
         assert_eq!(
             std::fs::metadata(&registered).unwrap().permissions().mode() & 0o777,
