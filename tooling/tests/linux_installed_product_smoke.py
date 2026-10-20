@@ -1,4 +1,4 @@
-"""実Linux GTK sessionでBroker-installed desktop entryを起動・終了する。"""
+"""実Linux GTK sessionでBroker-installed productのUIとUninstallを検証する。"""
 
 from __future__ import annotations
 
@@ -21,6 +21,7 @@ APP_ID = "d4-pocket-app-11111111111111111111111111111111"
 AUDIT_ID = "audit-store-22222222222222222222222222222222"
 WINDOW_TITLE = "D4 Pocket powered by GUI Shell"
 OWNER_DIALOG_TITLE = "D4 Pocket Owner確認"
+UNINSTALL_BUTTON = "D4 Pocketをアンインストール"
 OWNER_DIALOG_TIMEOUT = 15.0
 RUST_TESTS = (
     "broker::update_center::tests::linux_installed_acceptance_stages_real_export_and_registers_entry",
@@ -342,6 +343,36 @@ def _trigger_export_from_installed_ui(environment: dict[str, str], window_id: st
     )
 
 
+def _trigger_uninstall_from_installed_ui(
+    environment: dict[str, str], window_id: str
+) -> None:
+    window = _find_accessible(WINDOW_TITLE, timeout=10)
+    subprocess.run(
+        ["xdotool", "windowactivate", "--sync", window_id],
+        env=environment,
+        check=True,
+        timeout=5,
+    )
+    subprocess.run(
+        ["xdotool", "key", "--clearmodifiers", "ctrl+k"],
+        env=environment,
+        check=True,
+        timeout=5,
+    )
+    _find_accessible("コマンドパレット", root=window, timeout=10)
+    subprocess.run(
+        ["xdotool", "type", "--clearmodifiers", "--delay", "30", "update"],
+        env=environment,
+        check=True,
+        timeout=5,
+    )
+    command = _find_operable_accessible("更新確認", root=window, timeout=10)
+    _activate_accessible(command, "更新確認", environment)
+    _find_accessible("更新センター", root=window, timeout=10)
+    _find_accessible(UNINSTALL_BUTTON, root=window, timeout=10)
+    _activate_named_control_by_keyboard(UNINSTALL_BUTTON, environment, window_id)
+
+
 def _activate_named_control_by_keyboard(
     name: str,
     environment: dict[str, str],
@@ -445,7 +476,9 @@ def _wait_for_owner_dialog_window(
         time.sleep(0.1)
 
 
-def _verify_live_audit(store: Path) -> dict[str, int]:
+def _verify_live_audit(
+    store: Path, *, require_uninstall: bool = False
+) -> dict[str, int]:
     audit_path = store / "audit.jsonl"
     anchor_path = store / "audit_anchor.json"
     key_path = store / "audit_anchor.key"
@@ -499,12 +532,42 @@ def _verify_live_audit(store: Path) -> dict[str, int]:
     ):
         raise RuntimeError("installed product Audit anchor／HMACが不正です")
 
-    exports = [event for event in events if event.get("operation") == "GUI Shell書出し"]
+    exports = [
+        event
+        for event in events
+        if event.get("operation") == "GUI Shell書出し"
+        and event.get("evidence_source") == "LIVE_RUNTIME"
+    ]
     accepted = sum(event.get("decision") == "accepted" for event in exports)
     rejected = sum(event.get("decision") == "rejected" for event in exports)
     if accepted < 1 or rejected < 1:
         raise RuntimeError("GTK Owner拒否／許可の両方がLIVE_RUNTIME Auditにありません")
-    return {"events": len(events), "export_accepted": accepted, "export_rejected": rejected}
+    uninstall = [
+        event
+        for event in events
+        if event.get("operation") == "製品アンインストール要求"
+        and event.get("evidence_source") == "LIVE_RUNTIME"
+    ]
+    uninstall_accepted = sum(event.get("decision") == "accepted" for event in uninstall)
+    uninstall_rejected = sum(event.get("decision") == "rejected" for event in uninstall)
+    uninstall_completed = sum(
+        event.get("operation") == "製品アンインストール完了"
+        and event.get("decision") == "completed"
+        and event.get("evidence_source") == "LIVE_RUNTIME"
+        for event in events
+    )
+    if require_uninstall and (
+        uninstall_accepted < 1 or uninstall_rejected < 1 or uninstall_completed < 1
+    ):
+        raise RuntimeError("Uninstall Owner拒否／許可／完了のLIVE_RUNTIME Auditが不足しています")
+    return {
+        "events": len(events),
+        "export_accepted": accepted,
+        "export_rejected": rejected,
+        "uninstall_accepted": uninstall_accepted,
+        "uninstall_rejected": uninstall_rejected,
+        "uninstall_completed": uninstall_completed,
+    }
 
 
 def _verify_export_manifest(export_root: Path) -> dict[str, str]:
@@ -537,6 +600,40 @@ def _verify_export_manifest(export_root: Path) -> dict[str, str]:
     return {"file": path.name, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
 
 
+def _verify_uninstalled_state(
+    product_root: Path,
+    desktop_entry: Path,
+    audit_store: Path,
+    preserved_user_data: Path,
+) -> dict[str, str]:
+    if product_root.exists() or product_root.is_symlink():
+        raise RuntimeError("Uninstall後も固定製品rootが残っています")
+    if desktop_entry.exists() or desktop_entry.is_symlink():
+        raise RuntimeError("Uninstall後も製品desktop entryが残っています")
+    if product_root == audit_store or product_root in audit_store.parents:
+        raise RuntimeError("Audit Storeが削除対象の製品root内にあります")
+    if not audit_store.is_dir() or audit_store.is_symlink():
+        raise RuntimeError("Uninstall後にBroker Audit Storeが保持されていません")
+    audit_path = audit_store / "audit.jsonl"
+    anchor_path = audit_store / "audit_anchor.json"
+    if not audit_path.is_file() or audit_path.is_symlink():
+        raise RuntimeError("Uninstall後のfile-backed Auditがありません")
+    if not anchor_path.is_file() or anchor_path.is_symlink():
+        raise RuntimeError("Uninstall後のAudit anchorがありません")
+    if (
+        not preserved_user_data.is_file()
+        or preserved_user_data.is_symlink()
+        or preserved_user_data.read_bytes() != b"D4P uninstall scope sentinel\n"
+    ):
+        raise RuntimeError("Uninstall後に製品root外の利用者dataが保持されていません")
+    return {
+        "product_root": "removed",
+        "desktop_entry": "removed",
+        "audit_store": "retained_outside_product_root",
+        "user_data": "retained_outside_product_root",
+    }
+
+
 def _owned_groups(pids: set[int]) -> set[int]:
     groups: set[int] = set()
     for pid in pids:
@@ -553,6 +650,15 @@ def _stop_owned_processes(pids: set[int], extra_process: subprocess.Popen[bytes]
     groups = _owned_groups(pids)
     if extra_process is not None and extra_process.poll() is None:
         groups.add(extra_process.pid)
+    _stop_owned_groups(groups)
+    if extra_process is not None:
+        try:
+            extra_process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            pass
+
+
+def _stop_owned_groups(groups: set[int]) -> None:
     for group in groups:
         try:
             os.killpg(group, signal.SIGTERM)
@@ -569,11 +675,6 @@ def _stop_owned_processes(pids: set[int], extra_process: subprocess.Popen[bytes]
                 os.killpg(group, signal.SIGKILL)
             except ProcessLookupError:
                 pass
-    if extra_process is not None:
-        try:
-            extra_process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            pass
 
 
 def _group_exists(group: int) -> bool:
@@ -646,6 +747,9 @@ def run_installed_smoke(package: Path, temp_root: Path, acceptance_root: Path) -
         xdg_state_home,
     ):
         directory.mkdir(mode=0o700, parents=True, exist_ok=False)
+    preserved_user_data = home / ".config/owner-data-sentinel/uninstall-preserved.marker"
+    preserved_user_data.parent.mkdir(mode=0o700, exist_ok=False)
+    preserved_user_data.write_bytes(b"D4P uninstall scope sentinel\n")
 
     environment = {
         name: os.environ[name]
@@ -684,6 +788,8 @@ def run_installed_smoke(package: Path, temp_root: Path, acceptance_root: Path) -
     desktop_process: subprocess.Popen[bytes] | None = None
     wayland_compositor: subprocess.Popen[bytes] | None = None
     wayland_process: subprocess.Popen[bytes] | None = None
+    uninstall_process: subprocess.Popen[bytes] | None = None
+    uninstall_groups: set[int] = set()
     product_paths: set[Path] = set()
     preexisting: set[int] = set()
     app_log = acceptance_root / "installed-app.log"
@@ -838,6 +944,77 @@ def run_installed_smoke(package: Path, temp_root: Path, acceptance_root: Path) -
 
         audit_evidence = _verify_live_audit(broker_state / "store")
         _run_rust_test(RUST_TESTS[1], environment)
+
+        audit_store = broker_state / "store"
+        active_record_before_uninstall = record_path.read_bytes()
+        uninstall_log = acceptance_root / "installed-uninstall-app.log"
+        with uninstall_log.open("xb") as log:
+            uninstall_process = subprocess.Popen(
+                ["gio", "launch", str(entries[0])],
+                cwd=stage,
+                env=environment,
+                stdin=subprocess.DEVNULL,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
+            deadline = time.monotonic() + 90
+            uninstall_window_id: str | None = None
+            while time.monotonic() < deadline:
+                uninstall_window_id = _visible_product_window(environment)
+                uninstall_pids = _processes_using(product_paths) - preexisting
+                if uninstall_window_id is not None and uninstall_pids:
+                    uninstall_groups = _owned_groups(uninstall_pids)
+                    break
+                if uninstall_process.poll() is not None and uninstall_process.returncode != 0:
+                    tail = _safe_log_tail(uninstall_log, (acceptance_root, temp_root))
+                    raise RuntimeError(
+                        f"Uninstall確認用installed UI起動失敗: {uninstall_process.returncode}\n{tail}"
+                    )
+                time.sleep(0.25)
+            if uninstall_window_id is None or not uninstall_groups:
+                tail = _safe_log_tail(uninstall_log, (acceptance_root, temp_root))
+                raise RuntimeError(f"Uninstall確認用installed UI／process groupがありません\n{tail}")
+
+            _trigger_uninstall_from_installed_ui(environment, uninstall_window_id)
+            _answer_owner_dialog(environment, "拒否")
+            if not _desktop_entry_targets_fixed_launcher(entries[0], fixed_launcher):
+                raise RuntimeError("Uninstall Owner拒否後にdesktop entryが変化しました")
+            if (
+                not product_root.is_dir()
+                or product_root.is_symlink()
+                or not record_path.is_file()
+                or record_path.is_symlink()
+                or record_path.read_bytes() != active_record_before_uninstall
+                or not all(_group_exists(group) for group in uninstall_groups)
+            ):
+                raise RuntimeError("Uninstall Owner拒否後にproduct root／active record／processが保持されませんでした")
+
+            uninstall_window_id = _visible_product_window(environment)
+            if uninstall_window_id is None:
+                raise RuntimeError("Uninstall Owner拒否後にGTK windowがありません")
+            _trigger_uninstall_from_installed_ui(environment, uninstall_window_id)
+            _answer_owner_dialog(environment, "許可")
+
+            deadline = time.monotonic() + 90
+            while time.monotonic() < deadline:
+                if not any(_group_exists(group) for group in uninstall_groups):
+                    break
+                time.sleep(0.2)
+            if any(_group_exists(group) for group in uninstall_groups):
+                raise RuntimeError("Uninstall許可後もowned product process groupが残留しています")
+            uninstall_groups.clear()
+            if uninstall_process.poll() is None:
+                uninstall_process.wait(timeout=10)
+            if uninstall_process.returncode not in (0, None):
+                raise RuntimeError(
+                    f"installed Uninstall launcher終了codeが想定外です: {uninstall_process.returncode}"
+                )
+
+        uninstall_evidence = _verify_uninstalled_state(
+            product_root, entries[0], audit_store, preserved_user_data
+        )
+        audit_evidence = _verify_live_audit(audit_store, require_uninstall=True)
         print(
             json.dumps(
                 {
@@ -849,6 +1026,7 @@ def run_installed_smoke(package: Path, temp_root: Path, acceptance_root: Path) -
                     "owned_processes": "all_stopped",
                     "installed_ui_owner_confirmation": "native_AT-SPI_rejected_then_approved_through_GTK_runner_private_pipe",
                     "manifest": manifest_evidence,
+                    "uninstall": uninstall_evidence,
                     "live_audit": audit_evidence,
                     "runtime_audit": "durable_after_broker_restart",
                 },
@@ -857,6 +1035,8 @@ def run_installed_smoke(package: Path, temp_root: Path, acceptance_root: Path) -
             )
         )
     finally:
+        if uninstall_groups:
+            _stop_owned_groups(uninstall_groups)
         if product_paths:
             _stop_owned_processes(_processes_using(product_paths) - preexisting, desktop_process)
         elif desktop_process is not None and desktop_process.poll() is None:
@@ -876,6 +1056,8 @@ def run_installed_smoke(package: Path, temp_root: Path, acceptance_root: Path) -
             )
         if wayland_compositor is not None and wayland_compositor.poll() is None:
             _terminate_group(wayland_compositor)
+        if uninstall_process is not None and uninstall_process.poll() is None:
+            _stop_owned_processes(set(), uninstall_process)
         if acceptance_root.exists():
             resolved = acceptance_root.resolve(strict=True)
             if resolved == temp_root or temp_root not in resolved.parents or acceptance_root.is_symlink():

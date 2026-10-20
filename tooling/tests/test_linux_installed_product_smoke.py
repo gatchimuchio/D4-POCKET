@@ -20,6 +20,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _safe_log_tail,
     _verify_export_manifest,
     _verify_live_audit,
+    _verify_uninstalled_state,
     _wayland_launch_environment,
     _wait_for_owner_dialog_window,
 )
@@ -348,14 +349,21 @@ class LinuxInstalledOwnerEvidenceTests(unittest.TestCase):
             (store / "audit_anchor.key").write_text(key.hex(), encoding="ascii")
             events = []
             previous_hash = None
-            for index, decision in enumerate(("rejected", "accepted"), start=1):
+            audit_cases = (
+                ("GUI Shell書出し", "rejected"),
+                ("GUI Shell書出し", "accepted"),
+                ("製品アンインストール要求", "rejected"),
+                ("製品アンインストール要求", "accepted"),
+                ("製品アンインストール完了", "completed"),
+            )
+            for index, (operation, decision) in enumerate(audit_cases, start=1):
                 event = {
                     "event_id": f"broker-audit-{index}",
                     "request_id": f"request-{index}",
-                    "operation": "GUI Shell書出し",
+                    "operation": operation,
                     "decision": decision,
                     "reason": "fixture",
-                    "evidence_source": "INTERNAL_STATE",
+                    "evidence_source": "LIVE_RUNTIME",
                     "payload_hash": f"sha256:{index:064x}",
                     "previous_event_hash": previous_hash,
                 }
@@ -381,14 +389,14 @@ class LinuxInstalledOwnerEvidenceTests(unittest.TestCase):
                 encoding="utf-8",
             )
             anchor_input = (
-                f"version=1|event_count=2|head_event_hash={previous_hash}"
+                f"version=1|event_count={len(events)}|head_event_hash={previous_hash}"
             ).encode()
             anchor_hmac = "sha256:" + hmac.new(key, anchor_input, hashlib.sha256).hexdigest()
             (store / "audit_anchor.json").write_text(
                 json.dumps(
                     {
                         "version": 1,
-                        "event_count": 2,
+                        "event_count": len(events),
                         "head_event_hash": previous_hash,
                         "anchor_hmac": anchor_hmac,
                     }
@@ -396,8 +404,15 @@ class LinuxInstalledOwnerEvidenceTests(unittest.TestCase):
                 encoding="utf-8",
             )
             self.assertEqual(
-                _verify_live_audit(store),
-                {"events": 2, "export_accepted": 1, "export_rejected": 1},
+                _verify_live_audit(store, require_uninstall=True),
+                {
+                    "events": 5,
+                    "export_accepted": 1,
+                    "export_rejected": 1,
+                    "uninstall_accepted": 1,
+                    "uninstall_rejected": 1,
+                    "uninstall_completed": 1,
+                },
             )
 
             events[0]["reason"] = "tampered"
@@ -407,6 +422,37 @@ class LinuxInstalledOwnerEvidenceTests(unittest.TestCase):
             )
             with self.assertRaisesRegex(RuntimeError, "event hash"):
                 _verify_live_audit(store)
+
+    def test_uninstall_keeps_audit_outside_removed_product_and_entry(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            product_root = root / "data/apps/d4-pocket/app-id"
+            entry = root / "data/applications/d4-pocket.desktop"
+            audit_store = root / "state/d4-pocket/linux-broker/store"
+            user_data = root / "config/owner-data-sentinel/uninstall-preserved.marker"
+            product_root.mkdir(parents=True)
+            entry.parent.mkdir(parents=True)
+            entry.write_text("[Desktop Entry]\n", encoding="utf-8")
+            audit_store.mkdir(parents=True)
+            (audit_store / "audit.jsonl").write_text("{}\n", encoding="utf-8")
+            (audit_store / "audit_anchor.json").write_text("{}", encoding="utf-8")
+            user_data.parent.mkdir(parents=True)
+            user_data.write_bytes(b"D4P uninstall scope sentinel\n")
+
+            with self.assertRaisesRegex(RuntimeError, "製品rootが残っています"):
+                _verify_uninstalled_state(product_root, entry, audit_store, user_data)
+
+            product_root.rmdir()
+            entry.unlink()
+            self.assertEqual(
+                _verify_uninstalled_state(product_root, entry, audit_store, user_data),
+                {
+                    "product_root": "removed",
+                    "desktop_entry": "removed",
+                    "audit_store": "retained_outside_product_root",
+                    "user_data": "retained_outside_product_root",
+                },
+            )
 
 
 if __name__ == "__main__":

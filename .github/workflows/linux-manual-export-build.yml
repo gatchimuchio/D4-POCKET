@@ -1,4 +1,4 @@
-name: Linux manual Export build validation
+name: Linux manual product build and installed acceptance
 
 'on':
   workflow_dispatch:
@@ -70,7 +70,7 @@ jobs:
             printf -- '- Flutter: `3.44.0` (`%s`)\n' "$flutter_commit"
             printf -- '- Rust: `%s`\n' "$(rustc --version)"
             printf -- '- Weston: `%s`\n' "$(weston --version | head -n 1)"
-            printf -- '- Scope: Linux Release Export build／bundle／package／provenance; not installed-product acceptance.\n'
+            printf -- '- This step covers Linux Release Export build／bundle／package／provenance only; installed-product acceptance is performed by a later step.\n'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Broker-shaped non-authority fixtureからLinux Release buildとportable launcher初回起動
@@ -103,7 +103,7 @@ jobs:
             printf -- '- Scope: portable first-launch, Linux GTK X11 window close, and Wayland socket-connect smoke only; the Wayland check does not prove surface rendering. not signed Install/Owner activation, installed-version handoff, production compositor coverage, formal distribution, or runtime Manifest consumption.\n'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: installed GTKの実Owner拒否／許可を通してExportする
+      - name: installed GTK UIでOwner拒否／許可付きExportとUninstallを受入れる
         shell: bash
         env:
           GUI_SHELL_PRODUCT_APP_ID: d4-pocket-app-11111111111111111111111111111111
@@ -118,8 +118,9 @@ jobs:
             --acceptance-root "$acceptance_root"
           {
             printf '\n- Installed acceptance: the Release package passed Broker stage／activation with a per-run Ed25519 candidate signature bound to its exact package hash, fixed XDG desktop entry validation, `gio launch` under X11, normal GTK window close, owned-process cleanup, and durable LIVE_RUNTIME startup／exit Audit reload. A second installed-entry launch ran with X11／XAUTHORITY removed under isolated Weston/Wayland; the GTK top-level was AT-SPI `SHOWING` and owned processes were stopped. This does not establish Wayland surface rendering, compositor coverage beyond Weston headless/Pixman, or production signing.\n'
-            printf -- '- Owner boundary: the installed product UI activates the exact visible Export command via its exposed AT-SPI Tap action and sends Enter for the Export control only after visible focus; native Owner Reject／Allow uses its verified GTK control. Reject creates no file; a new request plus Allow reaches the installed Rust Broker, creates a fresh Linux App／Audit identity Manifest, and is verified in the durable LIVE_RUNTIME Audit chain／anchor HMAC. This is automated UI input, not a human gesture.\n'
-            printf -- '- Scope: Ubuntu hosted Xvfb／X11 plus isolated Weston headless/Pixman Wayland session and ephemeral per-run signing identity; Wayland window visibility is observed through AT-SPI but surface rendering is not established. Not real desktop-session distribution coverage, production signing／publisher identity, Secret Service／MCP, Workspace selection, Agent Task recovery, or release readiness.\n'
+            printf -- '- Export Owner boundary: the installed product UI activates the exact visible Export command via its exposed AT-SPI Tap action and sends Enter only after visible focus; native Owner Reject／Allow uses its verified GTK control. Reject creates no file; a new request plus Allow reaches the installed Rust Broker, creates a fresh Linux App／Audit identity Manifest, and is verified in the durable LIVE_RUNTIME Audit chain／anchor HMAC.\n'
+            printf -- '- Uninstaller LIVE_RUNTIME: after X11／Wayland launch checks, the installed UI opens Update Center and requests Uninstall. Native Owner rejection leaves the fixed product root, active-version record, desktop entry, and running process group intact. A separate Owner approval requests required application exit; the launcher consumes the one-time handoff, removes only the fixed product root／entry, and leaves a config sentinel plus the file-backed Audit Store and anchor outside that root. Both decisions and completion are checked in the chained Audit.\n'
+            printf -- '- All UI actions use automated AT-SPI／keyboard input, not a human gesture. Scope: Ubuntu hosted Xvfb／X11 plus isolated Weston headless/Pixman Wayland session and ephemeral test identity; Wayland surface rendering is not established. Not real desktop-session distribution coverage, production signing／publisher identity, Secret Service／MCP, Workspace selection, Agent Task recovery, Update／Rollback lifecycle, or release readiness.\n'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: build fixture／bundleを正確な一時rootから削除
