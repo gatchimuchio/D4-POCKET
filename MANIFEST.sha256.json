@@ -3460,7 +3460,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
-      "sha256": "606673e79dc464872025851fb818d568991f39f30d93d4e6ce2c2e9a91ee4218"
+      "sha256": "7bf8ac8ce58ad0094a721c24693ddb2eda6bf09230061fc5557ebe5cabc8b887"
     },
     {
       "path": "native/rust_helper/src/adapters/mcp_stdio.rs",
@@ -3816,7 +3816,7 @@
     },
     {
       "path": "native/rust_helper/tests/fixtures/fake_codex_cli.rs",
-      "sha256": "307f6497dfe8a8681daa1ad36c0c7587db87808f465ef6b0615e8fea3792425d"
+      "sha256": "cc4484048d1f6793c7fb989114f1e660f88113453b4d0b2dd0c0f49de48d93af"
     },
     {
       "path": "native/rust_helper/tests/protected_data.rs",
@@ -3836,7 +3836,7 @@
     },
     {
       "path": "native/rust_helper/tests/support/codex_loopback_responses.rs",
-      "sha256": "1aeb78e65d427cce14dd9e4df8d33d5fe45e54fb864c9610b36cab48a6201ffc"
+      "sha256": "b096cc539cf88aa7abed99eac76ff4b72ae846a2a6ae5d846316dd436e2e062e"
     },
     {
       "path": "native/rust_helper/tests/unit/agent_task_fixture_fs.rs",
@@ -3844,7 +3844,7 @@
     },
     {
       "path": "native/rust_helper/tests/unit/codex_cli_fixture.rs",
-      "sha256": "6f103db07a03b3c67b927d032183b221f2feb55df41518a6fb1a45142a28f608"
+      "sha256": "36fe12ba7d648c85108143f7c7b5aeccae5e790382aa13425c7016683c91199f"
     },
     {
       "path": "native/rust_helper/tests/unit/content_save.rs",

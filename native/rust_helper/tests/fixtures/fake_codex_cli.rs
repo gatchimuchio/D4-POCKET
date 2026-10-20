@@ -202,11 +202,34 @@ fn valid_task_arguments(arguments: &[String]) -> bool {
     } else {
         0
     };
+    let mut expected_filesystem = TASK_PERMISSION_PROFILE_SUFFIX[0].to_owned();
+    #[cfg(target_os = "linux")]
+    {
+        let Some(insertion_point) = expected_filesystem.find(r#",":workspace_roots"={"#) else {
+            return false;
+        };
+        expected_filesystem.insert_str(insertion_point, r#",":slash_tmp"="deny""#);
+        let Some(executable) = env::current_exe().ok() else {
+            return false;
+        };
+        let executable = format!("\"{}\"", executable.to_string_lossy().replace('\\', "/"));
+        let Some(insertion_point) = expected_filesystem.find(r#",":workspace_roots"={"#) else {
+            return false;
+        };
+        expected_filesystem.insert_str(insertion_point, &format!(",{executable}=\"read\""));
+    }
     let expected_task_profile = TASK_PERMISSION_PROFILE_PREFIX
         .iter()
-        .copied()
-        .chain(TASK_PERMISSION_PROFILE_PLATFORM.iter().copied())
-        .chain(TASK_PERMISSION_PROFILE_SUFFIX.iter().copied())
+        .map(|setting| (*setting).to_owned())
+        .chain(
+            TASK_PERMISSION_PROFILE_PLATFORM
+                .iter()
+                .map(|setting| (*setting).to_owned()),
+        )
+        .chain([
+            expected_filesystem,
+            TASK_PERMISSION_PROFILE_SUFFIX[1].to_owned(),
+        ])
         .collect::<Vec<_>>();
     if (has_provider_key
         && (configs.len() < provider_settings.len()
@@ -214,6 +237,9 @@ fn valid_task_arguments(arguments: &[String]) -> bool {
         || configs.len() != expected_task_profile.len() + 1 + provider_offset
         || configs[provider_offset..provider_offset + expected_task_profile.len()]
             != expected_task_profile
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>()
     {
         return false;
     }
@@ -227,12 +253,27 @@ fn valid_task_arguments(arguments: &[String]) -> bool {
         return false;
     };
     let normalized_temp = temp.replace('\\', "/");
-    configs.last().is_some_and(|setting| {
-        *setting
-            == format!(
-                "shell_environment_policy.set={{TEMP=\"{normalized_temp}\",TMP=\"{normalized_temp}\"}}"
-            )
-    })
+    #[cfg(target_os = "linux")]
+    let (Some(tmpdir), expected_environment) = (
+        env::var_os("TMPDIR"),
+        format!(
+            "shell_environment_policy.set={{TEMP=\"{normalized_temp}\",TMP=\"{normalized_temp}\",TMPDIR=\"{normalized_temp}\"}}"
+        ),
+    )
+    else {
+        return false;
+    };
+    #[cfg(target_os = "linux")]
+    if tmpdir.to_str() != Some(temp.as_str()) {
+        return false;
+    }
+    #[cfg(not(target_os = "linux"))]
+    let expected_environment = format!(
+        "shell_environment_policy.set={{TEMP=\"{normalized_temp}\",TMP=\"{normalized_temp}\"}}"
+    );
+    configs
+        .last()
+        .is_some_and(|setting| *setting == expected_environment)
 }
 
 fn contains_pair(arguments: &[String], first: &str, second: &str) -> bool {

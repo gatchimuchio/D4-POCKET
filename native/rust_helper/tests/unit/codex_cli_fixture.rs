@@ -43,8 +43,9 @@ pub(super) fn compile_fake_codex_cli(directory: &Path) -> PathBuf {
         .expect("Rust試験toolchain compiler");
     assert!(
         output.status.success(),
-        "偽Codex CLI試験用fileのcompileに失敗: {:?}",
-        output.status.code()
+        "偽Codex CLI試験用fileのcompileに失敗: {:?}; stderr={}",
+        output.status.code(),
+        String::from_utf8_lossy(&output.stderr)
     );
     executable
 }

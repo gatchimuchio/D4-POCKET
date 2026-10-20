@@ -8,8 +8,8 @@
 use super::process_tree;
 use crate::audit_hash::sha256_tagged;
 use crate::broker::dialogue::{
-    AgentTaskAdapterExecution, AgentTaskScratchObservation, 実行系Adapter, 実行結果, 対話失敗,
-    対話要求,
+    実行系Adapter, 実行結果, 対話失敗, 対話要求, AgentTaskAdapterExecution,
+    AgentTaskScratchObservation,
 };
 use cap_fs_ext::DirExt;
 use cap_std::fs::Dir;
@@ -39,6 +39,10 @@ const TASK_PERMISSION_PROFILE_SUFFIX_OVERRIDES: &[&str] =
 const TASK_BASE_DENY_GLOBS: &[&str] = &["**/*.env", "**/.env.*", "**/.ssh/**", "**/secrets/**"];
 const MAX_TASK_FILESYSTEM_OVERRIDE_BYTES: usize = 12 * 1024;
 const MAX_REGISTERED_SECRET_PATHS: usize = 256;
+#[cfg(target_os = "linux")]
+const TASK_FILESYSTEM_OVERRIDE_PREFIX: &str =
+    "permissions.d4p-agent-task.filesystem={\":root\"=\"deny\",\":minimal\"=\"read\",\":slash_tmp\"=\"deny\",\":workspace_roots\"={";
+#[cfg(not(target_os = "linux"))]
 const TASK_FILESYSTEM_OVERRIDE_PREFIX: &str =
     "permissions.d4p-agent-task.filesystem={\":root\"=\"deny\",\":minimal\"=\"read\",\":workspace_roots\"={";
 
@@ -304,7 +308,8 @@ impl CodexCliAdapter {
             Ok(scratch) => scratch,
             Err(error) => return failed(error),
         };
-        let temp_environment = match TaskTemporaryEnvironment::bind(&self.workspace, scratch.path()) {
+        let temp_environment = match TaskTemporaryEnvironment::bind(&self.workspace, scratch.path())
+        {
             Ok(environment) => environment,
             Err(error) => {
                 let _ = scratch.cleanup();
@@ -354,9 +359,10 @@ impl CodexCliAdapter {
                 runtime_id: context.runtime_id,
                 workspace_id: context.workspace_id,
                 recovery_binding_hash: context.recovery_binding_hash,
-                root_identity: crate::broker::dialogue::AgentTaskWorkspaceIdentity::from_directory_identity(
-                    context.root_identity,
-                ),
+                root_identity:
+                    crate::broker::dialogue::AgentTaskWorkspaceIdentity::from_directory_identity(
+                        context.root_identity,
+                    ),
                 before_state_hash,
                 after_state_hash,
                 cleanup_completed,
@@ -798,29 +804,49 @@ impl TaskTemporaryEnvironment {
         let encoded_path =
             serde_json::to_string(&codex_path).map_err(|_| 対話失敗::要求不正)?;
         // 生pathはAdapter結果・Auditへ出さず、変更前後の状態hashだけを返す。
-        let before_state_hash = sha256_tagged(
-            format!(
-                "TEMP={:?}\0TMP={:?}",
-                env::var_os("TEMP").map(|value| value.to_string_lossy().into_owned()),
-                env::var_os("TMP").map(|value| value.to_string_lossy().into_owned())
-            )
-            .as_bytes(),
+        #[cfg(target_os = "linux")]
+        let before_state = format!(
+            "TEMP={:?}\0TMP={:?}\0TMPDIR={:?}",
+            env::var_os("TEMP").map(|value| value.to_string_lossy().into_owned()),
+            env::var_os("TMP").map(|value| value.to_string_lossy().into_owned()),
+            env::var_os("TMPDIR").map(|value| value.to_string_lossy().into_owned())
         );
-        let after_state_hash = sha256_tagged(
-            format!(
-                "TEMP={}\0TMP={}\0CODEX_TEMP={}\0CODEX_TMP={}",
-                host_path.to_string_lossy(),
-                host_path.to_string_lossy(),
-                codex_path,
-                codex_path
-            )
-            .as_bytes(),
+        #[cfg(not(target_os = "linux"))]
+        let before_state = format!(
+            "TEMP={:?}\0TMP={:?}",
+            env::var_os("TEMP").map(|value| value.to_string_lossy().into_owned()),
+            env::var_os("TMP").map(|value| value.to_string_lossy().into_owned())
         );
+        let before_state_hash = sha256_tagged(before_state.as_bytes());
+        #[cfg(target_os = "linux")]
+        let after_state = format!(
+            "TEMP={}\0TMP={}\0TMPDIR={}\0CODEX_TEMP={}\0CODEX_TMP={}\0CODEX_TMPDIR={}",
+            host_path.to_string_lossy(),
+            host_path.to_string_lossy(),
+            host_path.to_string_lossy(),
+            codex_path,
+            codex_path,
+            codex_path
+        );
+        #[cfg(not(target_os = "linux"))]
+        let after_state = format!(
+            "TEMP={}\0TMP={}\0CODEX_TEMP={}\0CODEX_TMP={}",
+            host_path.to_string_lossy(),
+            host_path.to_string_lossy(),
+            codex_path,
+            codex_path
+        );
+        let after_state_hash = sha256_tagged(after_state.as_bytes());
+        #[cfg(target_os = "linux")]
+        let codex_override = format!(
+            "shell_environment_policy.set={{TEMP={encoded_path},TMP={encoded_path},TMPDIR={encoded_path}}}"
+        );
+        #[cfg(not(target_os = "linux"))]
+        let codex_override =
+            format!("shell_environment_policy.set={{TEMP={encoded_path},TMP={encoded_path}}}");
         Ok(Self {
             host_path,
-            codex_override: format!(
-                "shell_environment_policy.set={{TEMP={encoded_path},TMP={encoded_path}}}"
-            ),
+            codex_override,
             before_state_hash,
             after_state_hash,
         })
@@ -832,6 +858,8 @@ impl TaskTemporaryEnvironment {
             .arg(self.codex_override)
             .env("TEMP", &self.host_path)
             .env("TMP", &self.host_path);
+        #[cfg(target_os = "linux")]
+        command.env("TMPDIR", &self.host_path);
     }
 }
 
@@ -1081,6 +1109,7 @@ fn build_codex_command_with_model(
             "model_provider=\"d4p_loopback_probe\"".to_owned(),
             "model_providers.d4p_loopback_probe.name=\"D4 Pocket loopback probe\"".to_owned(),
             format!("model_providers.d4p_loopback_probe.base_url=\"{base_url}\""),
+            "model_providers.d4p_loopback_probe.env_key=\"OPENAI_API_KEY\"".to_owned(),
             "model_providers.d4p_loopback_probe.wire_api=\"responses\"".to_owned(),
             format!(
                 "model_providers.d4p_loopback_probe.requires_openai_auth={}",
@@ -1123,9 +1152,15 @@ fn build_codex_command_with_model(
         {
             task_command.arg("-c").arg(setting);
         }
-        task_command
-            .arg("-c")
-            .arg(task_filesystem_override(secret_paths)?);
+        #[cfg(target_os = "linux")]
+        let filesystem_override = {
+            let mut filesystem_override = task_filesystem_override(secret_paths)?;
+            include_linux_codex_runtime_read(&mut filesystem_override, executable)?;
+            filesystem_override
+        };
+        #[cfg(not(target_os = "linux"))]
+        let filesystem_override = task_filesystem_override(secret_paths)?;
+        task_command.arg("-c").arg(filesystem_override);
         for setting in TASK_PERMISSION_PROFILE_SUFFIX_OVERRIDES {
             task_command.arg("-c").arg(setting);
         }
@@ -1191,6 +1226,33 @@ fn task_filesystem_override(secret_paths: &[String]) -> Result<String, 対話失
     Ok(setting)
 }
 
+#[cfg(target_os = "linux")]
+fn include_linux_codex_runtime_read(
+    filesystem_override: &mut String,
+    executable: &Path,
+) -> Result<(), 対話失敗> {
+    if !executable.is_absolute() {
+        // Unit fixtures may use Windows-shaped paths on Linux. Production adapters
+        // canonicalize and validate the configured executable before this point.
+        #[cfg(test)]
+        return Ok(());
+        #[cfg(not(test))]
+        return Err(対話失敗::要求不正);
+    }
+    let executable = executable.to_str().ok_or(対話失敗::要求不正)?;
+    let executable = escape_codex_glob_literal(executable);
+    let encoded_path =
+        serde_json::to_string(&executable).map_err(|_| 対話失敗::要求不正)?;
+    let insertion_point = filesystem_override
+        .find(r#",":workspace_roots"={"#)
+        .ok_or(対話失敗::要求不正)?;
+    filesystem_override.insert_str(insertion_point, &format!(",{encoded_path}=\"read\""));
+    if filesystem_override.len() > MAX_TASK_FILESYSTEM_OVERRIDE_BYTES {
+        return Err(対話失敗::要求不正);
+    }
+    Ok(())
+}
+
 fn escape_codex_glob_literal(path: &str) -> String {
     let mut escaped = String::with_capacity(path.len());
     for character in path.chars() {
@@ -1199,6 +1261,8 @@ fn escape_codex_glob_literal(path: &str) -> String {
             ']' => escaped.push_str("[]]"),
             '{' => escaped.push_str("[{]"),
             '}' => escaped.push_str("[}]"),
+            '*' => escaped.push_str("[*]"),
+            '?' => escaped.push_str("[?]"),
             _ => escaped.push(character),
         }
     }
@@ -1551,7 +1615,7 @@ mod tests {
     }
 
     #[test]
-    fn Task一時環境緩衝はHostとCodex内のTEMP_TMPを同一scratchへ束縛する() {
+    fn Task一時環境緩衝はHostとCodex内のtemporary_environmentを同一scratchへ束縛する() {
         let workspace = std::env::temp_dir().join("d4p-buffer-workspace");
         let scratch = workspace.join(".d4p-tmp-task");
         let binding = TaskTemporaryEnvironment::bind(&workspace, &scratch)
@@ -1559,6 +1623,14 @@ mod tests {
         let encoded = serde_json::to_string(&scratch.to_string_lossy().replace('\\', "/"))
             .expect("Codex設定pathをJSON encoding");
         assert_eq!(binding.host_path, scratch);
+        #[cfg(target_os = "linux")]
+        assert_eq!(
+            binding.codex_override,
+            format!(
+                "shell_environment_policy.set={{TEMP={encoded},TMP={encoded},TMPDIR={encoded}}}"
+            )
+        );
+        #[cfg(not(target_os = "linux"))]
         assert_eq!(
             binding.codex_override,
             format!("shell_environment_policy.set={{TEMP={encoded},TMP={encoded}}}")
@@ -1614,6 +1686,11 @@ mod tests {
                 let scratch_json =
                     serde_json::to_string(&scratch.to_string_lossy().replace('\\', "/"))
                         .expect("Task scratch pathのJSON符号化");
+                #[cfg(target_os = "linux")]
+                let scratch_override = format!(
+                    "shell_environment_policy.set={{TEMP={scratch_json},TMP={scratch_json},TMPDIR={scratch_json}}}"
+                );
+                #[cfg(not(target_os = "linux"))]
                 let scratch_override = format!(
                     "shell_environment_policy.set={{TEMP={scratch_json},TMP={scratch_json}}}"
                 );
@@ -1632,6 +1709,8 @@ mod tests {
                 assert!(filesystem_override.contains("**/.env.*"));
                 assert!(filesystem_override.contains("private/credential-backup.txt"));
                 assert!(filesystem_override.contains("private/credential-backup.txt/**"));
+                #[cfg(target_os = "linux")]
+                assert!(filesystem_override.contains(r#"":slash_tmp"="deny""#));
                 assert!(filesystem_override.contains(r#""glob_scan_max_depth"=32"#));
                 assert_eq!(
                     args.windows(2)
@@ -1807,6 +1886,20 @@ mod tests {
         assert!(setting.contains("\":root\"=\"deny\""));
         assert!(setting.contains("\":minimal\"=\"read\""));
         assert!(setting.contains("\"glob_scan_max_depth\"=32"));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn LinuxTaskProfileはCodex実行fileだけをread許可する() {
+        let mut setting = task_filesystem_override(&[]).expect("Task filesystem profile");
+        include_linux_codex_runtime_read(&mut setting, Path::new("/opt/d4 pocket/codex[stable]?"))
+            .expect("Codex実行fileをread-onlyで追加");
+
+        assert!(setting.contains(r#""/opt/d4 pocket/codex[[]stable[]][?]"="read""#));
+        assert!(setting.contains(r#"":root"="deny""#));
+        assert!(setting.contains(r#"":minimal"="read""#));
+        assert!(setting.contains(r#"":slash_tmp"="deny""#));
+        assert!(!setting.contains(r#""/opt/d4 pocket"="read""#));
     }
 
     #[cfg(windows)]
@@ -3233,11 +3326,18 @@ exit 0
         assert_eq!(server.authorization_rejections(), 0);
         assert_eq!(result, Ok("合成試験Taskが完了しました".into()));
         assert_eq!(server.credential_canary_observations(), 0);
-        assert_eq!(
-            fs::read_to_string(workspace.join("broker-real-codex-marker.txt"))
-                .expect("実Codex CLIがWorkspaceへ書いたmarker"),
-            "synthetic-provider-auth-probe"
-        );
+        let marker = fs::read_to_string(workspace.join("broker-real-codex-marker.txt"))
+            .unwrap_or_else(|error| {
+                panic!(
+                    "実Codex CLIのWorkspace markerがない: {error}; tool_call_sent={}, tool_result_received={}, tool_output={}, tool_diagnostics={:?}, request_shapes={}",
+                    server.tool_call_was_sent(),
+                    server.tool_result_was_received(),
+                    server.tool_output_summary(),
+                    server.tool_output_diagnostics(),
+                    server.request_shape_summary(),
+                )
+            });
+        assert_eq!(marker, "synthetic-provider-auth-probe");
         #[cfg(target_os = "linux")]
         assert!(
             !root.path().join("outside-write-probe.txt").exists(),
@@ -3361,9 +3461,10 @@ exit 0
 
     #[test]
     fn secret_componentはworkspace登録を拒否する() {
-        assert!(secret_component(Path::new("C:\\workspace\\secrets")));
-        assert!(secret_component(Path::new("C:\\workspace\\.ssh")));
-        assert!(!secret_component(Path::new("C:\\workspace\\src")));
+        let workspace = Path::new("workspace");
+        assert!(secret_component(&workspace.join("secrets")));
+        assert!(secret_component(&workspace.join(".ssh")));
+        assert!(!secret_component(&workspace.join("src")));
     }
 
     #[cfg(any(windows, target_os = "linux", target_os = "macos"))]

@@ -54,6 +54,7 @@ struct State {
     blocked_non_local_requests: AtomicUsize,
     blocked_unhandled_local_requests: AtomicUsize,
     command: Mutex<String>,
+    shell: Mutex<String>,
     workspace: String,
     expected_authorization_hash: Option<String>,
     credential_canary_hash: Option<String>,
@@ -156,6 +157,7 @@ impl CodexLoopbackResponses {
             blocked_non_local_requests: AtomicUsize::new(0),
             blocked_unhandled_local_requests: AtomicUsize::new(0),
             command: Mutex::new(synthetic_workspace_probe(extended_tool_wait)),
+            shell: Mutex::new("powershell.exe".into()),
             workspace: workspace_text,
             expected_authorization_hash: authentication
                 .map(|(bearer, _)| crate::audit_hash::sha256_tagged(bearer.as_bytes())),
@@ -216,6 +218,16 @@ impl CodexLoopbackResponses {
 
     pub(crate) fn use_provider_auth_probe_command(&self, command: String) {
         self.set_command(command);
+        *self
+            .state
+            .shell
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = if cfg!(windows) {
+            "powershell.exe"
+        } else {
+            "/bin/bash"
+        }
+        .into();
         self.state
             .finalize_after_one_tool
             .store(true, Ordering::SeqCst);
@@ -543,9 +555,12 @@ fn collect_output_text(value: &Value, depth: usize, output: &mut String) {
             for key in [
                 "error",
                 "message",
+                "content",
+                "text",
                 "stdout",
                 "stderr",
                 "output",
+                "aggregated_output",
                 "status",
                 "exit_code",
                 "exitCode",
@@ -640,15 +655,59 @@ fn safe_tool_output_diagnostic(output: &Value) -> Value {
     let parsed_string = output
         .as_str()
         .and_then(|text| serde_json::from_str::<Value>(text).ok());
+    let parsed_object = parsed_string.as_ref().and_then(Value::as_object);
+    let parsed_output_fields = [
+        "stdout",
+        "stderr",
+        "output",
+        "aggregated_output",
+        "error",
+        "message",
+        "exit_code",
+        "exitCode",
+        "content",
+        "text",
+    ]
+    .into_iter()
+    .filter(|field| parsed_object.is_some_and(|object| object.contains_key(*field)))
+    .collect::<Vec<_>>();
+    let parsed_exit_code = parsed_object
+        .and_then(|object| object.get("exit_code").or_else(|| object.get("exitCode")))
+        .and_then(Value::as_i64);
+    let parsed_stdout_bytes = parsed_object
+        .and_then(|object| object.get("stdout"))
+        .and_then(Value::as_str)
+        .map(str::len);
+    let parsed_stderr_bytes = parsed_object
+        .and_then(|object| object.get("stderr"))
+        .and_then(Value::as_str)
+        .map(str::len);
     let mut diagnostic_text = String::new();
     if let Some(parsed) = parsed_string.as_ref() {
         collect_output_text(parsed, 0, &mut diagnostic_text);
     } else {
         collect_output_text(output, 0, &mut diagnostic_text);
     }
-    let normalized = diagnostic_text.to_ascii_lowercase();
-    let error_category = if normalized.contains("createprocess") && normalized.contains("rejected")
+    let serialized_output = output.to_string();
+    let normalized = serialized_output.to_ascii_lowercase();
+    let bwrap_exec_target = if normalized.contains("bwrap: execvp")
+        && normalized.contains("no such file or directory")
     {
+        if normalized.contains("/bin/bash") || normalized.contains("/usr/bin/bash") {
+            "tool_shell"
+        } else if normalized.contains("/codex") {
+            "codex_runtime"
+        } else {
+            "unknown"
+        }
+    } else {
+        "not_applicable"
+    };
+    let error_category = if normalized.contains("bwrap: execvp")
+        && normalized.contains("no such file or directory")
+    {
+        "sandbox実行file未発見"
+    } else if normalized.contains("createprocess") && normalized.contains("rejected") {
         "process起動拒否"
     } else if normalized.contains("running scripts is disabled")
         || normalized.contains("not digitally signed")
@@ -890,13 +949,39 @@ fn safe_tool_output_diagnostic(output: &Value) -> Value {
             error_fingerprints.push(fingerprint);
         }
     }
-    let probe_started =
-        allowlisted_marker(&diagnostic_text, "", &["D4P_R2_SYNTHETIC_PROBE_STARTED"]).is_some();
+    let probe_started = serialized_output.contains("D4P_R2_SYNTHETIC_PROBE_STARTED");
+    let mut safe_preview = if error_category == "error兆候なし" {
+        diagnostic_text.clone()
+    } else {
+        format!("<{error_category}>")
+    };
+    for pattern in [
+        r"D4P_[A-Za-z0-9_]+",
+        r"D4_SYNTHETIC_[A-Za-z0-9_]+",
+        r"synthetic-[A-Za-z0-9_-]+",
+        r"(?i)\b(?:bearer|api[_ -]?key|token|password|secret)\b\s*[:=]?\s*[^\s,;]+",
+        r#"(?:[A-Za-z]:\\|/)(?:[^\s"'<>]+[\\/])*[^\s"'<>]*"#,
+    ] {
+        safe_preview = regex::Regex::new(pattern)
+            .expect("safe diagnostic preview redaction pattern")
+            .replace_all(&safe_preview, "[redacted]")
+            .into_owned();
+    }
+    let safe_preview: String = safe_preview.chars().take(240).collect();
     json!({
         "output_type": output_type,
         "output_bytes": output_bytes,
+        "parsed_json": parsed_string.is_some(),
+        "parsed_output_fields": parsed_output_fields,
+        "parsed_exit_code": parsed_exit_code,
+        "parsed_stdout_bytes": parsed_stdout_bytes,
+        "parsed_stderr_bytes": parsed_stderr_bytes,
         "error_category": error_category,
+        "bwrap_exec_target": bwrap_exec_target,
+        "safe_preview": safe_preview,
         "probe_started": probe_started,
+        "provider_key_observed": serialized_output.contains("synthetic-d4-pocket-provider-key-never-production"),
+        "provider_key_absent_marker": serialized_output.contains("D4P_PROVIDER_KEY_ABSENT"),
         "temp_step": temp_step,
         "temp_scope": temp_scope,
         "temp_write": temp_write,
@@ -1295,7 +1380,11 @@ fn handle_request(mut stream: TcpStream, port: u16, state: &State) {
                 .unwrap_or_else(|poisoned| poisoned.into_inner())
                 .clone(),
             "workdir": state.workspace,
-            "shell": "powershell.exe",
+            "shell": state
+                .shell
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .clone(),
             "yield_time_ms": 30000
         });
         let started_item = json!({
