@@ -76,7 +76,7 @@
     },
     {
       "path": ".github/workflows/linux-manual-export-build.yml",
-      "sha256": "6433636da4bc8dae4d4d4ac782ffe708d075187ec9309f8e69205e5b1eb4c51c"
+      "sha256": "fc34cfba76041fc77ab4accaaa31a94b39e9243d6f93813e7abbb0209ac4d9f1"
     },
     {
       "path": ".github/workflows/linux-manual-rust-validation.yml",
@@ -456,7 +456,7 @@
     },
     {
       "path": "apps/desktop_flutter/linux/runner/my_application.cc",
-      "sha256": "5358bcb3c125443a5d05fac0291f76dca8d59b1608b73936258476692b91b514"
+      "sha256": "c21fcd4134a7200dc177ee9e075a3142e3ca34bb3acaeb4b42ac480b3857cf55"
     },
     {
       "path": "apps/desktop_flutter/linux/runner/my_application.h",
@@ -5193,6 +5193,10 @@
     {
       "path": "tooling/tests/create_linux_export_fixture.py",
       "sha256": "31f00d41b64bb1c44f6f2b015d50e88b0363822c0d84da0571580ee3512eca20"
+    },
+    {
+      "path": "tooling/tests/linux_gtk_bundle_smoke.py",
+      "sha256": "7513630ffac9cf4aa5a4a45f1680b78a5fbdbca0cb3d2b59f613f4b84596047f"
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",
