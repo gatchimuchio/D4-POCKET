@@ -5199,12 +5199,20 @@
       "sha256": "88f213b05eb3e9d3e3134deafff87c1dc35b5c28842f0ed9d09b3fb69d6789dc"
     },
     {
+      "path": "tooling/tests/linux_installed_product_smoke.py",
+      "sha256": "737482bd977dc28bc56405458e6e178a99e5200d6ffb2578dfb2cebe11ac950d"
+    },
+    {
       "path": "tooling/tests/test_export_linux_product.py",
       "sha256": "f0f7289dd3db11ae6eb602475afd708e40848997262f114969e1209c9e319a19"
     },
     {
       "path": "tooling/tests/test_linux_gtk_bundle_smoke.py",
       "sha256": "a8713299df86bed1261a96e95cef73ad97a82a9826ace53ed7af2e1f339c1d8f"
+    },
+    {
+      "path": "tooling/tests/test_linux_installed_product_smoke.py",
+      "sha256": "a31e37c08e676834d67f502abd0a6ac8c12e539383d51521a29ea3e4ad893aa4"
     },
     {
       "path": "tooling/tests/test_linux_product_package.py",

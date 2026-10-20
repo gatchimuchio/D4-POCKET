@@ -58,6 +58,16 @@ def _resolve_regular_package(package: Path) -> Path:
     return package.resolve(strict=True)
 
 
+def _safe_log_tail(path: Path, roots: tuple[Path, ...]) -> str:
+    try:
+        content = path.read_text(encoding="utf-8", errors="replace")[-4000:]
+    except OSError:
+        return ""
+    for root in sorted((str(root) for root in roots), key=len, reverse=True):
+        content = content.replace(root, "<isolated-root>")
+    return content
+
+
 def _visible_product_window(environment: dict[str, str]) -> str | None:
     result = subprocess.run(
         ["xdotool", "search", "--onlyvisible", "--name", f"^{re.escape(WINDOW_TITLE)}$"],
@@ -265,15 +275,23 @@ def run_installed_smoke(package: Path, temp_root: Path, acceptance_root: Path) -
             )
             deadline = time.monotonic() + 90
             window_id: str | None = None
+            launch_error_since: float | None = None
             while time.monotonic() < deadline:
-                if desktop_process.poll() is not None and desktop_process.returncode != 0:
-                    raise RuntimeError(f"gio launch failed: {desktop_process.returncode}")
                 window_id = _visible_product_window(environment)
-                if window_id is not None and _processes_using(product_paths) - preexisting:
+                running_products = _processes_using(product_paths) - preexisting
+                if window_id is not None and running_products:
                     break
+                if desktop_process.poll() is not None and desktop_process.returncode != 0:
+                    if launch_error_since is None:
+                        launch_error_since = time.monotonic()
+                    elif time.monotonic() - launch_error_since >= 5:
+                        tail = _safe_log_tail(app_log, (acceptance_root, temp_root))
+                        raise RuntimeError(
+                            f"gio launch failed: {desktop_process.returncode}\n{tail or '(no launcher output)'}"
+                        )
                 time.sleep(0.25)
             if window_id is None or not (_processes_using(product_paths) - preexisting):
-                tail = app_log.read_text(encoding="utf-8", errors="replace")[-4000:]
+                tail = _safe_log_tail(app_log, (acceptance_root, temp_root))
                 raise RuntimeError(f"installed GTK windowを検出できませんでした\n{tail}")
 
             close = subprocess.run(

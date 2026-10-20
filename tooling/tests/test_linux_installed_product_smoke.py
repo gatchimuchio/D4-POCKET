@@ -7,10 +7,21 @@ from pathlib import Path
 from tooling.tests.linux_installed_product_smoke import (
     _desktop_entry_targets_fixed_launcher,
     _resolve_regular_package,
+    _safe_log_tail,
 )
 
 
 class LinuxInstalledDesktopEntryTests(unittest.TestCase):
+    def test_log_tail_is_bounded_and_masks_isolated_roots(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            log = root / "launcher.log"
+            log.write_text("x" * 2000 + str(root) + "x" * 3000, encoding="utf-8")
+            tail = _safe_log_tail(log, (root,))
+            self.assertLessEqual(len(tail), 4000)
+            self.assertNotIn(str(root), tail)
+            self.assertIn("<isolated-root>", tail)
+
     def test_accepts_registered_fixed_launcher(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
