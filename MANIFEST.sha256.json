@@ -3460,7 +3460,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
-      "sha256": "ffe94c17c5d6da9b80b0e5f5090e6c5f78b8585d09ddc50ad13a9a392934ca90"
+      "sha256": "606673e79dc464872025851fb818d568991f39f30d93d4e6ce2c2e9a91ee4218"
     },
     {
       "path": "native/rust_helper/src/adapters/mcp_stdio.rs",
@@ -3576,7 +3576,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/dialogue.rs",
-      "sha256": "2a9919a4d512a6873702cdee24c9049c8c6c3dcfc96d35dfd43c835fd64d1915"
+      "sha256": "0feb43203a3e00fdd5d66217381918245019c8ebedaff8314afab75590b59074"
     },
     {
       "path": "native/rust_helper/src/broker/evaluation_control.rs",

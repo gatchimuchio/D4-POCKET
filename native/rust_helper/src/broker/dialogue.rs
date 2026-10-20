@@ -3146,7 +3146,7 @@ mod agent_task_fixture_fs;
 #[path = "../../tests/support/broker_codex_fixture.rs"]
 mod broker_codex_fixture_support;
 
-#[cfg(all(test, windows))]
+#[cfg(all(test, any(windows, target_os = "linux")))]
 #[path = "../../tests/support/codex_loopback_responses.rs"]
 pub(crate) mod broker_codex_loopback_support;
 

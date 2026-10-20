@@ -1671,8 +1671,8 @@ mod tests {
             assert_eq!(has_tmp, is_task);
         }
         assert!(build_codex_command(
-            executable,
-            workspace,
+            &executable,
+            &workspace,
             CodexSandbox::WorkspaceWrite,
             Some(Path::new(r"C:\outside-temp")),
             &[],
@@ -1680,8 +1680,8 @@ mod tests {
         )
         .is_err());
         assert!(build_codex_command(
-            executable,
-            workspace,
+            &executable,
+            &workspace,
             CodexSandbox::WorkspaceWrite,
             None,
             &[],
