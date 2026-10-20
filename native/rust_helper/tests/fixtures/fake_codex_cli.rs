@@ -94,7 +94,10 @@ fn main() {
         println!(r#"{{"type":"turn.completed"}}"#);
         return;
     }
-    if let Some(heartbeat_path) = instruction.strip_prefix("FIXTURE_TIMEOUT_WITH_DESCENDANT ") {
+    if let Some(heartbeat_path) = instruction
+        .strip_prefix("FIXTURE_TIMEOUT_WITH_DESCENDANT ")
+        .or_else(|| instruction.strip_prefix("FIXTURE_CRASH_WITH_DESCENDANT "))
+    {
         let executable = env::current_exe().unwrap_or_else(|_| process::exit(48));
         let _descendant = Command::new(executable)
             .arg("--fixture-descendant")
@@ -155,6 +158,10 @@ fn main() {
 }
 
 fn persistent_descendant(heartbeat_path: &Path) -> ! {
+    let pid_path = heartbeat_path.with_extension("pid");
+    if fs::write(pid_path, process::id().to_string()).is_err() {
+        process::exit(49);
+    }
     loop {
         let write_result = OpenOptions::new()
             .create(true)

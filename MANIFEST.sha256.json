@@ -80,7 +80,7 @@
     },
     {
       "path": ".github/workflows/linux-manual-rust-validation.yml",
-      "sha256": "3286ee0e465ed0aebe5aa5281917f70b0a03243ed9d5646d3d1b56fdac708c4f"
+      "sha256": "17d315406c3615635b4bc5a8c6b9d7f0351f1916a7697cc8920311c3c1c3420a"
     },
     {
       "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
@@ -1308,7 +1308,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "7414207b1eaf026871afa47f3defb04e27207b1a5615f11814dfeca0db858432"
+      "sha256": "c2c48420337455fb7b3d07802f83479025ab86a5f6c929fd0c321e17d38e3856"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1596,7 +1596,7 @@
     },
     {
       "path": "docs/specs/process-supervision.md",
-      "sha256": "7ad6c4a2f2465edea4e29da9f742b7e3986986a4dc075f32ff590322d0f8b327"
+      "sha256": "149a030b596314091234876c4a8e0f6c031a31c172274e9c0c42d7014727d2b4"
     },
     {
       "path": "docs/specs/regression-case.md",
@@ -3640,7 +3640,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "3e085741e516b39c5bf6658ac47d30f3b06c8a086a572b6cdf984d73a252ad99"
+      "sha256": "8f786b9003b656e8697a191cab2eb950d15ddb7e021990660629aac0ec97e001"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -3820,7 +3820,7 @@
     },
     {
       "path": "native/rust_helper/tests/fixtures/fake_codex_cli.rs",
-      "sha256": "cc4484048d1f6793c7fb989114f1e660f88113453b4d0b2dd0c0f49de48d93af"
+      "sha256": "0dc0d67c9003ec3bf6c77717bd9f14f220109564c0523afadd1ab41c4401623d"
     },
     {
       "path": "native/rust_helper/tests/protected_data.rs",

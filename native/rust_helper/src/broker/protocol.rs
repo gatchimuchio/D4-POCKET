@@ -6673,6 +6673,273 @@ mod tests {
         fs::remove_dir_all(root).expect("試験用Broker storeとWorkspaceを除去");
     }
 
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn broker_crash_stops_codex_descendant_then_registration_recovers_task_scratch_and_audit() {
+        const CHILD_ROOT_ENV: &str = "GUI_SHELL_AGENT_TASK_GUARDIAN_CRASH_TEST_ROOT";
+        const CHILD_CLI_ENV: &str = "GUI_SHELL_AGENT_TASK_GUARDIAN_CRASH_TEST_CLI";
+        if let Some(root) = std::env::var_os(CHILD_ROOT_ENV).map(PathBuf::from) {
+            use std::sync::atomic::AtomicBool;
+
+            let executable = std::env::var_os(CHILD_CLI_ENV)
+                .map(PathBuf::from)
+                .expect("試験用CLI実行fileの場所");
+            let store_root = root.join("store");
+            let workspace_root = root.join("workspace");
+            fs::create_dir_all(&workspace_root).expect("作業領域を作成");
+            let protected = vec![store_root.clone()];
+            let workspace_config = super::super::workspace_root::WorkspaceStartup {
+                runtime_id: "fixture-runtime".into(),
+                workspace_id: "fixture-workspace".into(),
+                root_path: workspace_root.to_string_lossy().into_owned(),
+                secret_paths: vec!["private/credential-backup.txt".into()],
+            };
+            let mut broker = Broker::new_persistent("guardian-crash-child", &store_root)
+                .expect("永続Brokerを起動");
+            broker
+                .実行系登録(
+                    "fixture-runtime",
+                    Arc::new(
+                        crate::adapters::minidora::MinidoraAdapter::new("127.0.0.1:9").unwrap(),
+                    ),
+                )
+                .unwrap();
+            broker
+                .作業領域起動登録(&workspace_config, &protected)
+                .expect("BrokerへWorkspaceを登録");
+            let binding = broker
+                .作業領域
+                .dialogue_binding("fixture-runtime", "fixture-workspace")
+                .expect("現在のWorkspace binding");
+            let context = super::super::agent_task_scratch::AgentTaskScratchContext {
+                task_id: "fixture-task".into(),
+                runtime_id: "fixture-runtime".into(),
+                workspace_id: "fixture-workspace".into(),
+                recovery_binding_hash: binding.recovery_binding_hash().to_owned(),
+                root_identity: binding.root_directory_identity(),
+                secret_paths: binding.secret_paths().to_vec(),
+                journal: broker
+                    .agent_task_scratch
+                    .clone()
+                    .expect("永続scratch journal"),
+            };
+            broker
+                .append_audit(
+                    "fixture-task",
+                    "Agent Task実行開始（Permission／Owner Approval一回消費）",
+                    "accepted",
+                    "合成Codex Adapter crash fixtureのTask開始記録",
+                    EVIDENCE_SOURCE_INTERNAL_STATE,
+                    &sha256_tagged(b"fixture-task-start"),
+                )
+                .expect("Task開始Auditを耐久保存");
+            let ready_path = root.join("child-ready.pid");
+            let ready_temp = root.join("child-ready.pid.tmp");
+            fs::write(&ready_temp, std::process::id().to_string())
+                .expect("子Broker PID札を一時fileへ保存");
+            fs::rename(ready_temp, ready_path).expect("子Broker PID札をatomic公開");
+
+            let selection: crate::adapters::ProviderModelSelection =
+                serde_json::from_value(json!({
+                    "version": 1,
+                    "provider_id": "openai_codex_cli",
+                    "model_id": "o3",
+                    "authentication_source": "codex_cli_managed",
+                    "automatic_fallback": false
+                }))
+                .expect("Codex Provider／Model登録値");
+            let adapter = crate::adapters::create_cli_adapter(
+                "codex-cli",
+                &executable,
+                &workspace_root,
+                &selection,
+            )
+            .expect("Brokerの登録factoryからCodex CLI Adapterを生成");
+            let heartbeat = root.join("codex-descendant-heartbeat");
+            let result = adapter.AgentTask実行(
+                &format!("FIXTURE_CRASH_WITH_DESCENDANT {}", heartbeat.display()),
+                &AtomicBool::new(false),
+                Instant::now() + Duration::from_secs(120),
+                Some(context),
+            );
+            panic!("親Brokerが生存中にfixture Taskが戻った: {result:?}");
+        }
+
+        let root = temp_store_dir("agent-task-guardian-crash-recovery");
+        let store_root = root.join("store");
+        let workspace_root = root.join("workspace");
+        fs::create_dir(&workspace_root).expect("作業領域を作成");
+        let fixture_directory = root.join("fixture");
+        fs::create_dir(&fixture_directory).expect("合成CLI試験用領域を作成");
+        let fixture_source = fixture_directory.join("fake_codex_cli.rs");
+        fs::write(
+            &fixture_source,
+            include_str!("../../tests/fixtures/fake_codex_cli.rs"),
+        )
+        .expect("合成CLI試験用Rust source file");
+        let fixture_executable = fixture_directory.join("fake-codex-cli");
+        let compile = Command::new("rustc")
+            .args(["--edition=2021"])
+            .arg(&fixture_source)
+            .arg("-o")
+            .arg(&fixture_executable)
+            .output()
+            .expect("Rust fixture compilerを起動");
+        assert!(
+            compile.status.success(),
+            "fake Codex CLI compilation failed: {}",
+            String::from_utf8_lossy(&compile.stderr)
+        );
+
+        let heartbeat = root.join("codex-descendant-heartbeat");
+        let descendant_pid_path = heartbeat.with_extension("pid");
+        let child = Command::new(std::env::current_exe().expect("現在の試験実行file"))
+            .arg("broker_crash_stops_codex_descendant_then_registration_recovers_task_scratch_and_audit")
+            .arg("--nocapture")
+            .env(CHILD_ROOT_ENV, &root)
+            .env(CHILD_CLI_ENV, &fixture_executable)
+            .stdout(Stdio::null())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .expect("Broker／Codex Adapter fixture子processを起動");
+        let mut child = TestChildProcess(child);
+        let child_pid = child.0.id();
+        let child_ready_path = root.join("child-ready.pid");
+        let startup_deadline = Instant::now() + Duration::from_secs(15);
+        loop {
+            if let Ok(contents) = fs::read_to_string(&child_ready_path) {
+                assert_eq!(
+                    contents.parse::<u32>().expect("子Broker PID"),
+                    child_pid,
+                    "別processの準備完了札を拒否する"
+                );
+                break;
+            }
+            if let Some(status) = child.0.try_wait().expect("子Broker状態") {
+                panic!("子Brokerは準備完了前に終了した: {status}");
+            }
+            assert!(Instant::now() < startup_deadline, "子Broker起動期限");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+
+        let execution_deadline = Instant::now() + Duration::from_secs(15);
+        let descendant_pid = loop {
+            if let Ok(contents) = fs::read_to_string(&descendant_pid_path) {
+                let pid = contents.parse::<u32>().expect("Codex子孫PID");
+                let has_scratch = fs::read_dir(&workspace_root)
+                    .expect("Workspace entryを読む")
+                    .filter_map(Result::ok)
+                    .any(|entry| entry.file_name().to_string_lossy().starts_with(".d4p-tmp-"));
+                if heartbeat.exists() && has_scratch {
+                    break pid;
+                }
+            }
+            if let Some(status) = child.0.try_wait().expect("子Broker／Adapter状態") {
+                panic!("子Broker／Adapterはdescendant起動前に終了した: {status}");
+            }
+            assert!(
+                Instant::now() < execution_deadline,
+                "Codex descendantとactive Task scratchが揃わない"
+            );
+            std::thread::sleep(Duration::from_millis(10));
+        };
+        let heartbeat_started = fs::metadata(&heartbeat).expect("子孫の生存記録").len();
+        assert!(heartbeat_started > 0, "descendantがheartbeatを書き込む");
+
+        child.0.kill().expect("親Broker processを強制終了");
+        let status = child.0.wait().expect("crashしたBroker processを回収");
+        assert!(!status.success(), "子Brokerは強制終了される");
+
+        fn linux_process_still_runs(pid: u32) -> bool {
+            let path = PathBuf::from(format!("/proc/{pid}/stat"));
+            let Ok(stat) = fs::read_to_string(path) else {
+                return false;
+            };
+            let Some((_, fields)) = stat.rsplit_once(')') else {
+                return true;
+            };
+            !matches!(fields.split_whitespace().next(), Some("Z" | "X"))
+        }
+
+        let stop_deadline = Instant::now() + Duration::from_secs(5);
+        while linux_process_still_runs(descendant_pid) {
+            assert!(
+                Instant::now() < stop_deadline,
+                "Broker pipe EOF後もCodex descendantが実行中"
+            );
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let heartbeat_after_stop = fs::metadata(&heartbeat)
+            .expect("停止後もheartbeat markerを保持")
+            .len();
+        std::thread::sleep(Duration::from_millis(100));
+        assert_eq!(
+            fs::metadata(&heartbeat)
+                .expect("停止後もheartbeat markerを保持")
+                .len(),
+            heartbeat_after_stop,
+            "Broker crash後にguardianがprocess groupを停止する"
+        );
+
+        let protected = vec![store_root.clone()];
+        let workspace_config = || super::super::workspace_root::WorkspaceStartup {
+            runtime_id: "fixture-runtime".into(),
+            workspace_id: "fixture-workspace".into(),
+            root_path: workspace_root.to_string_lossy().into_owned(),
+            secret_paths: vec!["private/credential-backup.txt".into()],
+        };
+        let mut restarted = Broker::new_persistent("guardian-crash-restarted", &store_root)
+            .expect("耐久storeからBrokerを再起動");
+        assert!(restarted.audit_events().iter().any(|event| {
+            event.request_id == "fixture-task"
+                && event.operation.starts_with("Agent Task中断回復")
+                && event.decision == "suspended"
+        }));
+        restarted
+            .実行系登録(
+                "fixture-runtime",
+                Arc::new(crate::adapters::minidora::MinidoraAdapter::new("127.0.0.1:9").unwrap()),
+            )
+            .unwrap();
+        restarted
+            .作業領域起動登録(&workspace_config(), &protected)
+            .expect("現在の登録bindingでTask scratchを回復");
+
+        let scratch_path = fs::read_dir(&workspace_root)
+            .expect("Workspace entryを読む")
+            .filter_map(Result::ok)
+            .find(|entry| entry.file_name().to_string_lossy().starts_with(".d4p-tmp-"))
+            .map(|entry| entry.path());
+        assert!(scratch_path.is_none(), "crash Task scratchを削除する");
+        assert!(!restarted
+            .agent_task_scratch
+            .as_ref()
+            .expect("再読込したscratch journal")
+            .has_pending_workspace("fixture-workspace"));
+        assert!(restarted.audit_events().iter().any(|event| {
+            event.request_id == "agent-task-scratch-recovery:0"
+                && event.operation == "Agent Task scratch回復"
+                && event.decision == "recorded"
+                && event.evidence_source == EVIDENCE_SOURCE_LIVE_RUNTIME
+        }));
+        drop(restarted);
+
+        let reopened = Broker::new_persistent("guardian-crash-audit-reopen", &store_root)
+            .expect("回復Auditを別Broker起動で再読込");
+        assert!(reopened.audit_events().iter().any(|event| {
+            event.request_id == "agent-task-scratch-recovery:0"
+                && event.operation == "Agent Task scratch回復"
+                && event.decision == "recorded"
+        }));
+        assert!(!reopened
+            .agent_task_scratch
+            .as_ref()
+            .expect("再起動後のscratch journal")
+            .has_pending_workspace("fixture-workspace"));
+        drop(reopened);
+        fs::remove_dir_all(root).expect("crash／guardian fixtureを除去");
+    }
+
     #[test]
     fn first_run_configuration_is_create_only_broker_audited_and_used_by_setup_doctor() {
         let root = temp_store_dir("first-run-config");
