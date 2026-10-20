@@ -9,6 +9,7 @@ import unittest
 from pathlib import Path
 
 from tooling.tests.linux_installed_product_smoke import (
+    _activate_accessible,
     _activate_named_control_by_keyboard,
     _actionable_node,
     _component_center,
@@ -26,18 +27,24 @@ class AccessibleActionResolutionTests(unittest.TestCase):
         def __init__(self, names: tuple[str, ...]) -> None:
             self.names = names
             self.nActions = len(names)
+            self.activated: int | None = None
 
         def getName(self, index: int) -> str:
             return self.names[index]
+
+        def doAction(self, index: int) -> bool:
+            self.activated = index
+            return True
 
     class Node:
         def __init__(self, name: str, actions: tuple[str, ...] = ()) -> None:
             self.name = name
             self.parent = None
             self.actions = actions
+            self.action_interface = AccessibleActionResolutionTests.Actions(actions)
 
         def queryAction(self):
-            return AccessibleActionResolutionTests.Actions(self.actions)
+            return self.action_interface
 
         def get_parent(self):
             return self.parent
@@ -58,6 +65,11 @@ class AccessibleActionResolutionTests(unittest.TestCase):
     def test_does_not_treat_non_actionable_label_as_a_button(self) -> None:
         label = self.Node("Owner確認してManifest fileを生成")
         self.assertIsNone(_actionable_node(label))
+
+    def test_activates_the_exposed_at_spi_tap_action(self) -> None:
+        button = self.Node("独立Appを書き出す", ("Tap", "Focus"))
+        _activate_accessible(button, button.name, {"DISPLAY": ":99"})
+        self.assertEqual(button.action_interface.activated, 0)
 
     def test_uses_live_accessible_bounds_for_coordinate_fallback(self) -> None:
         from types import SimpleNamespace
@@ -149,37 +161,6 @@ class AccessibleActionResolutionTests(unittest.TestCase):
         self.assertEqual(
             focused_lookup.call_args.kwargs["root"], find_accessible.return_value
         )
-
-    def test_keyboard_activation_can_select_a_command_result_with_down(self) -> None:
-        from unittest.mock import patch
-
-        with (
-            patch(
-                "tooling.tests.linux_installed_product_smoke._find_accessible",
-                return_value=object(),
-            ),
-            patch(
-                "tooling.tests.linux_installed_product_smoke._focused_named_accessible",
-                side_effect=(None, object()),
-            ),
-            patch(
-                "tooling.tests.linux_installed_product_smoke.subprocess.run"
-            ) as run,
-            patch("tooling.tests.linux_installed_product_smoke.time.sleep"),
-        ):
-            _activate_named_control_by_keyboard(
-                "独立Appを書き出す",
-                {"DISPLAY": ":99"},
-                "0x42",
-                max_tabs=1,
-                step_key="Down",
-            )
-
-        self.assertEqual(
-            run.call_args_list[1].args[0],
-            ["xdotool", "key", "--clearmodifiers", "Down"],
-        )
-
 
 class LinuxInstalledDesktopEntryTests(unittest.TestCase):
     def test_log_tail_is_bounded_and_masks_isolated_roots(self) -> None:

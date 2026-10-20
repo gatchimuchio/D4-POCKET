@@ -142,7 +142,12 @@ def _actionable_node(node, *, max_ancestors: int = 5):
         try:
             actions = current.queryAction()
             for index in range(actions.nActions):
-                if actions.getName(index).lower() in {"click", "press", "activate"}:
+                if actions.getName(index).lower() in {
+                    "click",
+                    "press",
+                    "activate",
+                    "tap",
+                }:
                     return current
         except Exception:
             pass
@@ -258,7 +263,7 @@ def _activate_accessible(node, name: str, environment: dict[str, str]) -> None:
         actions = node.queryAction()
         for index in range(actions.nActions):
             action_name = actions.getName(index).lower()
-            if action_name in {"click", "press", "activate"}:
+            if action_name in {"click", "press", "activate", "tap"}:
                 if actions.doAction(index):
                     return
     except Exception:
@@ -282,6 +287,7 @@ def _accessible_descendants(root) -> list[tuple[object, str]]:
 
 
 def _trigger_export_from_installed_ui(environment: dict[str, str], window_id: str) -> None:
+    window = _find_accessible(WINDOW_TITLE, timeout=10)
     subprocess.run(
         ["xdotool", "windowactivate", "--sync", window_id],
         env=environment,
@@ -294,21 +300,17 @@ def _trigger_export_from_installed_ui(environment: dict[str, str], window_id: st
         check=True,
         timeout=5,
     )
-    _find_accessible("コマンドパレット", timeout=10)
+    _find_accessible("コマンドパレット", root=window, timeout=10)
     subprocess.run(
         ["xdotool", "type", "--clearmodifiers", "--delay", "30", "export"],
         env=environment,
         check=True,
         timeout=5,
     )
-    _find_accessible("独立Appを書き出す", timeout=10)
-    _activate_named_control_by_keyboard(
-        "独立Appを書き出す",
-        environment,
-        window_id,
-        max_tabs=8,
-        step_key="Down",
+    command = _find_operable_accessible(
+        "独立Appを書き出す", root=window, timeout=10
     )
+    _activate_accessible(command, "独立Appを書き出す", environment)
     _activate_named_control_by_keyboard(
         "Owner確認してManifest fileを生成", environment, window_id
     )
@@ -320,7 +322,6 @@ def _activate_named_control_by_keyboard(
     window_id: str,
     *,
     max_tabs: int = 96,
-    step_key: str = "Tab",
 ) -> None:
     """可視かつ正確なAccessible名にfocusがある場合だけEnterを送る。"""
     subprocess.run(
@@ -342,7 +343,7 @@ def _activate_named_control_by_keyboard(
         if index == max_tabs:
             break
         subprocess.run(
-            ["xdotool", "key", "--clearmodifiers", step_key],
+            ["xdotool", "key", "--clearmodifiers", "Tab"],
             env=environment,
             check=True,
             timeout=5,
