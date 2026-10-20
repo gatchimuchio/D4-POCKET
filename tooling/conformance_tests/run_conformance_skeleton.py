@@ -11878,6 +11878,7 @@ def test_linux_product_launcher_is_built_and_bundle_bound() -> list[str]:
     runner_cmake = (DESKTOP_FLUTTER / "linux/runner/CMakeLists.txt").read_text(encoding="utf-8")
     runner = (DESKTOP_FLUTTER / "linux/runner/broker_process_channel.cc").read_text(encoding="utf-8")
     gtk_smoke = (ROOT / "tooling/tests/linux_gtk_bundle_smoke.py").read_text(encoding="utf-8")
+    gtk_smoke_tests = (ROOT / "tooling/tests/test_linux_gtk_bundle_smoke.py").read_text(encoding="utf-8")
     export_workflow = (ROOT / ".github/workflows/linux-manual-export-build.yml").read_text(encoding="utf-8")
     errors = []
 
@@ -11942,18 +11943,41 @@ def test_linux_product_launcher_is_built_and_bundle_bound() -> list[str]:
                 'home / ".local" / "share"',
                 "xdg_data_home.exists() or xdg_data_home.is_symlink()",
                 "[str(launcher)]",
+                'parser.add_argument("--backend", choices=("x11", "wayland")',
+                '"--backend=headless"',
+                '"--renderer=pixman"',
+                '"WAYLAND_DEBUG"',
+                "_wayland_toplevel_ready",
+                "_owned_product_groups",
+                "os.getpgid(pid)",
+                "_request_owned_product_sigterm",
+                "_terminate_owned_product",
             ),
-            "portable first-launch GTK smoke",
+            "portable X11／Wayland first-launch GTK smoke",
+        ),
+        (
+            gtk_smoke_tests,
+            (
+                "test_accepts_exact_toplevel_title_and_surface_commit",
+                "test_rejects_unrelated_toplevel_title",
+                "test_rejects_title_without_surface_commit",
+            ),
+            "Wayland protocol smoke matcher tests",
         ),
         (
             export_workflow,
             (
                 "workflow_dispatch:",
                 '--launcher "$output_root/bundle/gui_shell_desktop_launcher"',
+                "weston xdotool xvfb",
+                "weston --version",
+                "python3 -m unittest tooling.tests.test_linux_gtk_bundle_smoke",
+                "--backend x11",
+                "--backend wayland",
                 "initially absent XDG_DATA_HOME",
                 "not signed Install/Owner activation",
             ),
-            "manual native launcher runtime validation",
+            "manual X11／Wayland native launcher runtime validation",
         ),
     ):
         for token in tokens:
