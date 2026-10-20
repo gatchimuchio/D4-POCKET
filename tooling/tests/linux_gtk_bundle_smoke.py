@@ -189,7 +189,7 @@ def _wayland_toplevel_ready(output: str) -> bool:
 def _start_wayland_compositor(
     runtime: Path, environment: dict[str, str], log_path: Path
 ) -> tuple[subprocess.Popen[bytes], str]:
-    display_name = "wayland-d4p-smoke"
+    display_name = "w"
     socket_path = runtime / display_name
     if socket_path.exists() or socket_path.is_symlink():
         raise RuntimeError("隔離Wayland socketが事前に存在しています")
@@ -280,11 +280,11 @@ def run_smoke(launcher: Path, temp_root: Path, backend: str) -> None:
     if not os.environ.get("DBUS_SESSION_BUS_ADDRESS"):
         raise RuntimeError("一時D-Bus sessionがありません")
 
-    with tempfile.TemporaryDirectory(prefix="d4p-linux-gtk-smoke-", dir=temp_root) as raw:
+    with tempfile.TemporaryDirectory(prefix="d4p-", dir=temp_root) as raw:
         root = Path(raw)
         os.chmod(root, 0o700)
         home = root / "home"
-        runtime = root / "runtime"
+        runtime = root / "r"
         temporary = root / "tmp"
         xdg_data_home = home / ".local" / "share"
         for directory in (home, runtime, temporary):

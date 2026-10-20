@@ -5196,11 +5196,15 @@
     },
     {
       "path": "tooling/tests/linux_gtk_bundle_smoke.py",
-      "sha256": "bbea8b0a754123bce91a8a61cf90acfe73de2a8a9f56d85abb6ffb8b4d6cf0ea"
+      "sha256": "506e2ba6072725b3792cf212b39485578dc95b09a84d66cfedc31e5800053f04"
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",
       "sha256": "f0f7289dd3db11ae6eb602475afd708e40848997262f114969e1209c9e319a19"
+    },
+    {
+      "path": "tooling/tests/test_linux_gtk_bundle_smoke.py",
+      "sha256": "349afd89c75e316dc2471c60617fb1c6bfb9ed3abf612a6c84b17f45bf9c1dcf"
     },
     {
       "path": "tooling/tests/test_linux_product_package.py",
