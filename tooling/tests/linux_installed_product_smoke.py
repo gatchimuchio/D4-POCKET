@@ -23,6 +23,11 @@ RUST_TESTS = (
     "broker::update_center::tests::linux_installed_acceptance_runtime_audit_is_durable",
 )
 
+if __package__:
+    from .linux_gtk_bundle_smoke import _request_x11_window_manager_close
+else:
+    from linux_gtk_bundle_smoke import _request_x11_window_manager_close
+
 
 def _processes_using(executables: set[Path]) -> set[int]:
     found: set[int] = set()
@@ -294,15 +299,7 @@ def run_installed_smoke(package: Path, temp_root: Path, acceptance_root: Path) -
                 tail = _safe_log_tail(app_log, (acceptance_root, temp_root))
                 raise RuntimeError(f"installed GTK windowを検出できませんでした\n{tail}")
 
-            close = subprocess.run(
-                ["xdotool", "windowclose", window_id],
-                env=environment,
-                capture_output=True,
-                check=False,
-                timeout=10,
-            )
-            if close.returncode != 0:
-                raise RuntimeError("installed GTK windowへ正常終了要求を送れませんでした")
+            _request_x11_window_manager_close(window_id, environment)
             deadline = time.monotonic() + 60
             while time.monotonic() < deadline:
                 if not (_processes_using(product_paths) - preexisting):
