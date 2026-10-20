@@ -8667,8 +8667,24 @@ mod tests {
                 && event.decision == "recorded"
                 && event.evidence_source == "LIVE_RUNTIME"
         });
-        assert!(started.is_some(), "installed launch Audit was not durable");
-        assert!(stopped.is_some(), "installed exit Audit was not durable");
+        let event_summary = broker
+            .audit_events()
+            .iter()
+            .map(|event| {
+                format!(
+                    "{}:{}:{}",
+                    event.operation, event.decision, event.evidence_source
+                )
+            })
+            .collect::<Vec<_>>();
+        assert!(
+            started.is_some(),
+            "installed launch Audit was not durable; persisted event summary={event_summary:?}"
+        );
+        assert!(
+            stopped.is_some(),
+            "installed exit Audit was not durable; persisted event summary={event_summary:?}"
+        );
         assert!(started.unwrap() < stopped.unwrap());
         println!("Linux installed acceptance audit: LIVE_RUNTIME start/exit durable");
     }
