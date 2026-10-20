@@ -38,6 +38,9 @@ class AccessibleActionResolutionTests(unittest.TestCase):
         def queryAction(self):
             return AccessibleActionResolutionTests.Actions(self.actions)
 
+        def get_parent(self):
+            return self.parent
+
         def queryComponent(self):
             return self
 
@@ -60,9 +63,9 @@ class AccessibleActionResolutionTests(unittest.TestCase):
         from unittest.mock import patch
 
         label = self.Node("Owner確認してManifest fileを生成")
-        with patch.dict("sys.modules", {"pyatspi": SimpleNamespace(DESKTOP_COORDS=1)}):
+        with patch.dict("sys.modules", {"pyatspi": SimpleNamespace(XY_SCREEN=0)}):
             self.assertEqual(_component_center(label), (25, 40))
-        self.assertEqual(label.coordinate_type, 1)
+        self.assertEqual(label.coordinate_type, 0)
 
 
 class InstalledExportScrollTests(unittest.TestCase):

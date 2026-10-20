@@ -148,20 +148,35 @@ def _actionable_node(node, *, max_ancestors: int = 5):
             pass
         if depth == max_ancestors:
             break
-        try:
-            current = current.parent
-        except Exception:
-            break
+        current = _accessible_parent(current)
         if current is None:
             break
     return None
+
+
+def _accessible_parent(node):
+    """pyatspi／GIの実APIを優先し、legacy propertyにも対応する。"""
+    for method_name in ("get_parent", "getParent"):
+        try:
+            getter = getattr(node, method_name)
+        except Exception:
+            continue
+        if callable(getter):
+            try:
+                return getter()
+            except Exception:
+                continue
+    try:
+        return node.parent
+    except Exception:
+        return None
 
 
 def _component_center(node) -> tuple[int, int] | None:
     try:
         import pyatspi
 
-        bounds = node.queryComponent().getExtents(pyatspi.DESKTOP_COORDS)
+        bounds = node.queryComponent().getExtents(pyatspi.XY_SCREEN)
     except Exception:
         return None
     x, y = int(bounds.x), int(bounds.y)
@@ -204,10 +219,7 @@ def _accessibility_debug(node, *, max_ancestors: int = 5) -> str:
         details.append(
             f"depth={depth},role={role},showing={showing},bounds={extents},actions={action_names}"
         )
-        try:
-            current = current.parent
-        except Exception:
-            break
+        current = _accessible_parent(current)
         if current is None:
             break
     return "; ".join(details)
