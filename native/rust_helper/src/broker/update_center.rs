@@ -8397,7 +8397,7 @@ mod tests {
     #[ignore = "explicit Ubuntu installed-product GTK acceptance harness"]
     fn linux_installed_acceptance_stages_real_export_and_registers_entry() {
         use ring::signature::{Ed25519KeyPair, KeyPair};
-        use std::os::unix::fs::PermissionsExt;
+        use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 
         let package_path = std::path::PathBuf::from(
             std::env::var_os("D4P_LINUX_ACCEPTANCE_PACKAGE")
@@ -8434,8 +8434,21 @@ mod tests {
         let state_metadata = std::fs::symlink_metadata(&state_home).unwrap();
         assert!(install_metadata.is_dir() && !install_metadata.file_type().is_symlink());
         assert!(state_metadata.is_dir() && !state_metadata.file_type().is_symlink());
-        let store_root = state_home.join("d4-pocket/linux-broker/store");
-        std::fs::create_dir_all(&store_root).unwrap();
+        let product_state = state_home.join("d4-pocket");
+        let broker_state = product_state.join("linux-broker");
+        let store_root = broker_state.join("store");
+        std::fs::DirBuilder::new()
+            .mode(0o700)
+            .create(&product_state)
+            .unwrap();
+        std::fs::DirBuilder::new()
+            .mode(0o700)
+            .create(&broker_state)
+            .unwrap();
+        std::fs::DirBuilder::new()
+            .mode(0o700)
+            .create(&store_root)
+            .unwrap();
 
         let digest = hex::encode(Sha256::digest(&package));
         let key = Ed25519KeyPair::generate_pkcs8(&SystemRandom::new()).unwrap();

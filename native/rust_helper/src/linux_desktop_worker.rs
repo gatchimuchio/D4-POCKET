@@ -214,12 +214,13 @@ fn serve(
 ) -> io::Result<()> {
     let _lock = RunLock::acquire(runtime)?;
     let export_root = open_export_directory(state)?;
+    let store = private_directory(state, &["store"], 0)?;
     let session = runtime.join("normal-session.json");
     remove_stale_private_file(&session)?;
     remove_stale_private_file(&session.with_extension("json.tmp"))?;
     let shutdown = Arc::new(AtomicBool::new(false));
     let stop = Arc::clone(&shutdown);
-    let mut config = BrokerServerConfig::new(state.join("store"), session.clone());
+    let mut config = BrokerServerConfig::new(store, session.clone());
     config.max_request_bytes = REQUEST_LIMIT;
     config.desktop_package_layout_verified = true;
     let product_identity =
