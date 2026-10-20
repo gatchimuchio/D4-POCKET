@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -13,6 +14,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _desktop_entry_targets_fixed_launcher,
     _resolve_regular_package,
     _safe_log_tail,
+    _scroll_to_export_controls,
     _verify_export_manifest,
     _verify_live_audit,
 )
@@ -61,6 +63,30 @@ class AccessibleActionResolutionTests(unittest.TestCase):
         with patch.dict("sys.modules", {"pyatspi": SimpleNamespace(DESKTOP_COORDS=1)}):
             self.assertEqual(_component_center(label), (25, 40))
         self.assertEqual(label.coordinate_type, 1)
+
+
+class InstalledExportScrollTests(unittest.TestCase):
+    def test_scrolls_inside_the_live_product_window(self) -> None:
+        from unittest.mock import patch
+
+        geometry = subprocess.CompletedProcess(
+            [], 0, stdout=b"WINDOW=7\nX=0\nY=0\nWIDTH=1280\nHEIGHT=800\n"
+        )
+        success = subprocess.CompletedProcess([], 0)
+        with patch(
+            "tooling.tests.linux_installed_product_smoke.subprocess.run",
+            side_effect=(geometry, success, success),
+        ) as run:
+            _scroll_to_export_controls({"DISPLAY": ":99"}, "0x42")
+
+        self.assertEqual(
+            run.call_args_list[1].args[0],
+            ["xdotool", "mousemove", "--window", "0x42", "640", "600"],
+        )
+        self.assertEqual(
+            run.call_args_list[2].args[0],
+            ["xdotool", "click", "--repeat", "16", "--delay", "60", "5"],
+        )
 
 
 class LinuxInstalledDesktopEntryTests(unittest.TestCase):

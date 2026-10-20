@@ -251,11 +251,49 @@ def _trigger_export_from_installed_ui(environment: dict[str, str], window_id: st
         check=True,
         timeout=5,
     )
+    _scroll_to_export_controls(environment, window_id)
     button = _find_operable_accessible(
         "Owner確認してManifest fileを生成", timeout=20
     )
     _activate_accessible(
         button, "Owner確認してManifest fileを生成", environment
+    )
+
+
+def _scroll_to_export_controls(environment: dict[str, str], window_id: str) -> None:
+    geometry = subprocess.run(
+        ["xdotool", "getwindowgeometry", "--shell", window_id],
+        env=environment,
+        capture_output=True,
+        check=True,
+        timeout=5,
+    )
+    dimensions = {
+        match.group(1): int(match.group(2))
+        for line in geometry.stdout.decode("ascii", errors="ignore").splitlines()
+        if (match := re.match(r"^(WIDTH|HEIGHT)=(\d+)$", line))
+    }
+    width, height = dimensions.get("WIDTH", 0), dimensions.get("HEIGHT", 0)
+    if not (0 < width <= 4096 and 0 < height <= 4096):
+        raise RuntimeError("Export画面をscrollするGTK window geometryが不正です")
+    subprocess.run(
+        [
+            "xdotool",
+            "mousemove",
+            "--window",
+            window_id,
+            str(width // 2),
+            str(height * 3 // 4),
+        ],
+        env=environment,
+        check=True,
+        timeout=5,
+    )
+    subprocess.run(
+        ["xdotool", "click", "--repeat", "16", "--delay", "60", "5"],
+        env=environment,
+        check=True,
+        timeout=5,
     )
 
 
