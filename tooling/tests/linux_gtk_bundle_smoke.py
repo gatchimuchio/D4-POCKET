@@ -27,6 +27,25 @@ def _processes_using(executable: Path) -> set[int]:
     return result
 
 
+def _failure_with_launcher_output(message: str, app_log: Path, isolated_root: Path) -> str:
+    try:
+        output = app_log.read_bytes()[-4096:].decode("utf-8", errors="replace")
+    except OSError:
+        output = ""
+    output = output.replace(str(isolated_root), "<隔離root>")
+    output = re.sub(
+        r"(?i)\b(authorization|password|passwd|token|secret|api[_-]?key)(\s*[:=]\s*)[^\s,;]+",
+        r"\1\2[伏字]",
+        output,
+    )
+    output = output.strip()
+    if len(output) > 2048:
+        output = output[-2048:]
+    if not output:
+        return message
+    return f"{message}\nGTK launcher診断（末尾2048文字以内）:\n{output}"
+
+
 def _terminate_group(process: subprocess.Popen[bytes]) -> None:
     if process.poll() is not None:
         return
@@ -131,7 +150,12 @@ def run_smoke(launcher: Path, temp_root: Path) -> None:
             while time.monotonic() < deadline:
                 if launcher_process.poll() is not None:
                     raise RuntimeError(
-                        f"GTK launcherがwindow表示前に終了しました: {launcher_process.returncode}"
+                        _failure_with_launcher_output(
+                            "GTK launcherがwindow表示前に終了しました: "
+                            f"{launcher_process.returncode}",
+                            app_log,
+                            root,
+                        )
                     )
                 search = subprocess.run(
                     ["xdotool", "search", "--onlyvisible", "--name", pattern],
@@ -147,7 +171,13 @@ def run_smoke(launcher: Path, temp_root: Path) -> None:
                         break
                 time.sleep(0.25)
             if window_id is None:
-                raise RuntimeError("D4 PocketのGTK window titleを検出できませんでした")
+                raise RuntimeError(
+                    _failure_with_launcher_output(
+                        "D4 PocketのGTK window titleを検出できませんでした",
+                        app_log,
+                        root,
+                    )
+                )
 
             helper_seen = False
             for _ in range(20):
@@ -170,7 +200,11 @@ def run_smoke(launcher: Path, temp_root: Path) -> None:
             except subprocess.TimeoutExpired as error:
                 raise RuntimeError("GTK window close後にlauncherが終了しませんでした") from error
             if exit_code != 0:
-                raise RuntimeError(f"GTK launcherが異常終了しました: {exit_code}")
+                raise RuntimeError(
+                    _failure_with_launcher_output(
+                        f"GTK launcherが異常終了しました: {exit_code}", app_log, root
+                    )
+                )
 
             cleanup_deadline = time.monotonic() + 10
             remaining: set[int] = set()

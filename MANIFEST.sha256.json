@@ -5196,7 +5196,7 @@
     },
     {
       "path": "tooling/tests/linux_gtk_bundle_smoke.py",
-      "sha256": "7513630ffac9cf4aa5a4a45f1680b78a5fbdbca0cb3d2b59f613f4b84596047f"
+      "sha256": "7d3099c5681dae211720a39e188478557f85007b5db990c35904e665df753031"
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",
