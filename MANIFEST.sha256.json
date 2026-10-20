@@ -80,7 +80,7 @@
     },
     {
       "path": ".github/workflows/linux-manual-rust-validation.yml",
-      "sha256": "bb31646fce496911483ee1164262d9131600b5d52f848ac0236520cd83ec6fed"
+      "sha256": "2305ce12d6de352e6276e2529c6180ffd97c045690d8a26c6df18a0a8ba1bfa6"
     },
     {
       "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
@@ -3460,7 +3460,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
-      "sha256": "6e99abf539863b50a34221c686ab642088266391138efbfd22c8d538485af9dc"
+      "sha256": "ffe94c17c5d6da9b80b0e5f5090e6c5f78b8585d09ddc50ad13a9a392934ca90"
     },
     {
       "path": "native/rust_helper/src/adapters/mcp_stdio.rs",
@@ -3816,7 +3816,7 @@
     },
     {
       "path": "native/rust_helper/tests/fixtures/fake_codex_cli.rs",
-      "sha256": "5766397cc107f70852695f72360a8e47890323e4264d4b21fe9e96c5a0ce2749"
+      "sha256": "307f6497dfe8a8681daa1ad36c0c7587db87808f465ef6b0615e8fea3792425d"
     },
     {
       "path": "native/rust_helper/tests/protected_data.rs",

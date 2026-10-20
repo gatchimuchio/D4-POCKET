@@ -87,6 +87,47 @@ jobs:
           GUI_SHELL_PRODUCT_APP_ID: d4-pocket-app-11111111111111111111111111111111
           GUI_SHELL_PRODUCT_AUDIT_STORE_ID: audit-store-22222222222222222222222222222222
         run: cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib uninstall_ -- --test-threads=1
+      - name: Linux Codex sandbox runtime and synthetic Task tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v bwrap >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes bubblewrap
+          fi
+          bwrap --version
+          bwrap --unshare-user --unshare-pid --unshare-net --die-with-parent --ro-bind / / --dev /dev --proc /proc -- /bin/true
+          package_dir="$RUNNER_TEMP/d4p-codex-cli-0.163.0-alpha.10.2-linux-x64"
+          test ! -e "$package_dir"
+          mkdir -m 0700 "$package_dir"
+          curl --fail --location --output "$package_dir/package.tgz" https://registry.npmjs.org/@openai/codex/-/codex-0.163.0-alpha.10.2-linux-x64.tgz
+          digest="$(openssl dgst -sha512 -binary "$package_dir/package.tgz" | openssl base64 -A)"
+          test "$digest" = 'S3Om6e/GIhhheqWmc/aRCGM55ibvhnpYKq1gJ4bwCYeCNEtXEd7+L8xa5aX+JVmV0wL1oOFZi/R/R8iSLriHTA=='
+          tar -xzf "$package_dir/package.tgz" -C "$package_dir"
+          cli="$(find "$package_dir/package" -type f -name codex -print -quit)"
+          test -n "$cli" && test -f "$cli"
+          chmod 0700 "$cli"
+          printf 'GUI_SHELL_CODEX_PROVIDER_AUTH_TEST_EXE=%s\n' "$cli" >> "$GITHUB_ENV"
+          {
+            "$cli" --version
+            sha256sum "$cli"
+            "$cli" exec --help
+          } > "$RUNNER_TEMP/d4p-linux-codex-cli-interface.txt"
+          cat "$RUNNER_TEMP/d4p-linux-codex-cli-interface.txt"
+      - name: Linux fake Codex Task, deadline and descendant cleanup
+        shell: bash
+        run: cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib adapters::codex_cli::tests::偽CodexCLIはAdapterのTask成功・期限超過cleanup・子孫停止を通る -- --exact --test-threads=1
+      - name: Linux Task permission profile stays platform-bounded
+        shell: bash
+        run: cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib adapters::codex_cli::tests::Dialogueはread_onlyのままTaskだけ専用permission_profileを使う -- --exact --test-threads=1
+      - name: Normal Linux Release metadata remains unsupported before acceptance
+        shell: bash
+        run: cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib adapters::codex_cli::tests::Agent一覧の投影はread_only状態と秘密値非保持を表す -- --exact --test-threads=1
+      - name: Linux real Codex sandbox and synthetic credential boundary
+        shell: bash
+        env:
+          RUST_BACKTRACE: "0"
+        run: cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib adapters::codex_cli::tests::Provider資格情報は実CodexCLIへ届きtool子processから除外される_LIVE_RUNTIME -- --exact --ignored --test-threads=1
       - name: Broker validates candidate-bound package source for Owner display
         shell: bash
         run: cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib broker::update_center::tests::package_source_host_is_https_and_bound_to_the_candidate -- --exact --test-threads=1
@@ -134,3 +175,13 @@ jobs:
             rm -rf -- "$XDG_DATA_HOME"
           fi
           test ! -e "$XDG_DATA_HOME"
+          expected_codex_package_dir="$RUNNER_TEMP/d4p-codex-cli-0.163.0-alpha.10.2-linux-x64"
+          if [ -e "$expected_codex_package_dir" ]; then
+            if [ -L "$expected_codex_package_dir" ]; then
+              echo '一時Codex package rootがsymlink'; exit 1
+            fi
+            rm -rf -- "$expected_codex_package_dir"
+          fi
+          test ! -e "$expected_codex_package_dir"
+          rm -f -- "$RUNNER_TEMP/d4p-linux-codex-cli-interface.txt"
+          test ! -e "$RUNNER_TEMP/d4p-linux-codex-cli-interface.txt"

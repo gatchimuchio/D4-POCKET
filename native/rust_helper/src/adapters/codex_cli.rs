@@ -28,10 +28,12 @@ const PROBE_TIMEOUT: Duration = Duration::from_secs(5);
 const MAX_OUTPUT_BYTES: usize = 1024 * 1024;
 const TASK_PERMISSION_PROFILE_PREFIX_OVERRIDES: &[&str] = &[
     "default_permissions=\"d4p-agent-task\"",
-    // user設定を無視するTaskでもmxcを固定し、backend選択をuser configへ委ねない。
-    "windows.sandbox=\"mxc\"",
     "permissions.d4p-agent-task.extends=\":workspace\"",
 ];
+#[cfg(windows)]
+const TASK_PERMISSION_PROFILE_PLATFORM_OVERRIDES: &[&str] = &["windows.sandbox=\"mxc\""];
+#[cfg(not(windows))]
+const TASK_PERMISSION_PROFILE_PLATFORM_OVERRIDES: &[&str] = &[];
 const TASK_PERMISSION_PROFILE_SUFFIX_OVERRIDES: &[&str] =
     &["permissions.d4p-agent-task.network.enabled=false"];
 const TASK_BASE_DENY_GLOBS: &[&str] = &["**/*.env", "**/.env.*", "**/.ssh/**", "**/secrets/**"];
@@ -558,7 +560,7 @@ impl 実行系Adapter for CodexCliAdapter {
     }
 
     fn AgentTask実行対応(&self) -> bool {
-        cfg!(windows) && self.workspace_write_interface
+        cfg!(any(windows, target_os = "linux")) && self.workspace_write_interface
     }
 
     fn AgentTask実行(
@@ -1115,7 +1117,10 @@ fn build_codex_command_with_model(
         if task_temporary_environment.is_none() {
             return Err(対話失敗::要求不正);
         }
-        for setting in TASK_PERMISSION_PROFILE_PREFIX_OVERRIDES {
+        for setting in TASK_PERMISSION_PROFILE_PREFIX_OVERRIDES
+            .iter()
+            .chain(TASK_PERMISSION_PROFILE_PLATFORM_OVERRIDES.iter())
+        {
             task_command.arg("-c").arg(setting);
         }
         task_command
@@ -1483,7 +1488,7 @@ fn trace_id(request_id: &str) -> String {
         .collect()
 }
 
-#[cfg(all(test, windows))]
+#[cfg(all(test, any(windows, target_os = "linux")))]
 #[path = "../../tests/unit/codex_cli_fixture.rs"]
 mod codex_cli_fixture;
 
@@ -1568,9 +1573,10 @@ mod tests {
 
     #[test]
     fn Dialogueはread_onlyのままTaskだけ専用permission_profileを使う() {
-        let executable = Path::new(r"C:\codex.exe");
-        let workspace = Path::new(r"C:\workspace");
-        let scratch = Path::new(r"C:\workspace\.d4p-tmp-test");
+        let executable = std::env::temp_dir().join("d4p-codex-command-fixture");
+        let workspace = std::env::temp_dir().join("d4p-codex-command-workspace");
+        let scratch = workspace.join(".d4p-tmp-test");
+        let workspace_text = workspace.to_string_lossy().to_string();
         for sandbox in [CodexSandbox::ReadOnly, CodexSandbox::WorkspaceWrite] {
             let is_task = matches!(sandbox, CodexSandbox::WorkspaceWrite);
             let secret_paths = if is_task {
@@ -1579,10 +1585,10 @@ mod tests {
                 Vec::new()
             };
             let command = build_codex_command(
-                executable,
-                workspace,
+                &executable,
+                &workspace,
                 sandbox,
-                is_task.then_some(scratch),
+                is_task.then_some(scratch.as_path()),
                 &secret_paths,
                 None,
             )
@@ -1594,22 +1600,26 @@ mod tests {
             assert!(args.iter().any(|arg| arg == "--skip-git-repo-check"));
             assert!(args
                 .windows(2)
-                .any(|pair| pair == ["--cd", r"C:\workspace"]));
+                .any(|pair| pair == ["--cd", workspace_text.as_str()]));
             if is_task {
                 assert!(!args.iter().any(|arg| arg == "--sandbox"));
                 assert!(args.iter().any(|arg| arg == "--ignore-user-config"));
                 for setting in TASK_PERMISSION_PROFILE_PREFIX_OVERRIDES
                     .iter()
+                    .chain(TASK_PERMISSION_PROFILE_PLATFORM_OVERRIDES.iter())
                     .chain(TASK_PERMISSION_PROFILE_SUFFIX_OVERRIDES.iter())
                 {
                     assert!(args.windows(2).any(|pair| pair == ["-c", *setting]));
                 }
-                assert!(args.windows(2).any(|pair| {
-                    pair == [
-                        "-c",
-                        "shell_environment_policy.set={TEMP=\"C:/workspace/.d4p-tmp-test\",TMP=\"C:/workspace/.d4p-tmp-test\"}"
-                    ]
-                }));
+                let scratch_json =
+                    serde_json::to_string(&scratch.to_string_lossy().replace('\\', "/"))
+                        .expect("Task scratch pathのJSON符号化");
+                let scratch_override = format!(
+                    "shell_environment_policy.set={{TEMP={scratch_json},TMP={scratch_json}}}"
+                );
+                assert!(args
+                    .windows(2)
+                    .any(|pair| { pair[0] == "-c" && pair[1] == scratch_override }));
                 let filesystem_override = args
                     .windows(2)
                     .find(|pair| {
@@ -1633,9 +1643,12 @@ mod tests {
                     1,
                     "filesystem policyは単一overrideにまとめて後続tableに潰されない"
                 );
-                assert!(args
-                    .windows(2)
-                    .any(|pair| { pair == ["-c", "windows.sandbox=\"mxc\""] }));
+                assert_eq!(
+                    args.windows(2)
+                        .any(|pair| pair == ["-c", "windows.sandbox=\"mxc\""]),
+                    cfg!(windows),
+                    "Windows MxC overrideはWindowsだけへ渡す"
+                );
                 assert!(filesystem_override.contains("\":root\"=\"deny\""));
             } else {
                 assert!(args
@@ -3135,7 +3148,7 @@ exit 0
         assert!(!context.journal.has_pending_workspace("workspace-fixture"));
     }
 
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "linux"))]
     #[test]
     #[ignore = "GUI_SHELL_CODEX_PROVIDER_AUTH_TEST_EXEの実Codex CLIと合成API keyだけで認証・tool子process除外を確認するときに実行する"]
     fn Provider資格情報は実CodexCLIへ届きtool子processから除外される_LIVE_RUNTIME() {
@@ -3158,12 +3171,26 @@ exit 0
                 synthetic_key,
             )
             .expect("認証方式照合付きの試験用API");
-        server.use_provider_auth_probe_command(concat!(
-            "$ErrorActionPreference='Stop'; ",
-            "if($env:OPENAI_API_KEY){Write-Output $env:OPENAI_API_KEY}else{Write-Output 'D4P_PROVIDER_KEY_ABSENT'}; ",
-            "Set-Content -LiteralPath (Join-Path (Get-Location) 'broker-real-codex-marker.txt') ",
-            "-Value 'synthetic-provider-auth-probe' -NoNewline -ErrorAction Stop"
-        ).to_owned());
+        let provider_auth_probe = if cfg!(windows) {
+            concat!(
+                "$ErrorActionPreference='Stop'; ",
+                "if($env:OPENAI_API_KEY){Write-Output $env:OPENAI_API_KEY}else{Write-Output 'D4P_PROVIDER_KEY_ABSENT'}; ",
+                "Set-Content -LiteralPath (Join-Path (Get-Location) 'broker-real-codex-marker.txt') ",
+                "-Value 'synthetic-provider-auth-probe' -NoNewline -ErrorAction Stop"
+            )
+            .to_owned()
+        } else {
+            concat!(
+                "set -eu; ",
+                "if [ -n \"${OPENAI_API_KEY:-}\" ]; then printf '%s' \"$OPENAI_API_KEY\"; ",
+                "else printf '%s' 'D4P_PROVIDER_KEY_ABSENT'; fi; ",
+                "if cat private/credential-backup.txt >/dev/null 2>&1; then exit 61; fi; ",
+                "if printf '%s' 'outside' > ../outside-write-probe.txt 2>/dev/null; then exit 62; fi; ",
+                "printf '%s' 'synthetic-provider-auth-probe' > broker-real-codex-marker.txt"
+            )
+            .to_owned()
+        };
+        server.use_provider_auth_probe_command(provider_auth_probe);
 
         let mut adapter = CodexCliAdapter::new_with_provider_authentication(
             &executable,
@@ -3177,6 +3204,20 @@ exit 0
             .expect("合成Workspace identity")
             .identity;
         let context = scratch_context(identity);
+        #[cfg(target_os = "linux")]
+        let context = {
+            let mut context = context;
+            fs::create_dir(workspace.join("private")).expect("登録secretの試験directory");
+            fs::write(
+                workspace.join("private/credential-backup.txt"),
+                "D4_SYNTHETIC_REGISTERED_SECRET_NEVER_LOG",
+            )
+            .expect("登録secretの合成fixture");
+            context
+                .secret_paths
+                .push("private/credential-backup.txt".into());
+            context
+        };
         let result = adapter.AgentTask実行資格情報付き(
             "合成keyを使い、tool childがそのkeyを継承しないことだけを確認する",
             &AtomicBool::new(false),
@@ -3192,12 +3233,21 @@ exit 0
         assert_eq!(server.authorization_rejections(), 0);
         assert_eq!(result, Ok("合成試験Taskが完了しました".into()));
         assert_eq!(server.credential_canary_observations(), 0);
-        assert!(workspace.join("broker-real-codex-marker.txt").is_file());
+        assert_eq!(
+            fs::read_to_string(workspace.join("broker-real-codex-marker.txt"))
+                .expect("実Codex CLIがWorkspaceへ書いたmarker"),
+            "synthetic-provider-auth-probe"
+        );
+        #[cfg(target_os = "linux")]
+        assert!(
+            !root.path().join("outside-write-probe.txt").exists(),
+            "Linux sandboxは登録Workspace外への書込みを拒否する"
+        );
         codex_cli_fixture::assert_no_workspace_task_scratch(&workspace);
         assert!(!context.journal.has_pending_workspace("workspace-fixture"));
     }
 
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "linux"))]
     #[test]
     fn 偽CodexCLIはAdapterのTask成功・期限超過cleanup・子孫停止を通る() {
         let root = codex_cli_fixture::FixtureTempDirectory::create();
@@ -3275,7 +3325,7 @@ exit 0
             .len();
         assert_eq!(
             heartbeat_after, heartbeat_before,
-            "Adapterの期限超過後にJob Object配下の子孫が追加書込しない"
+            "Adapterの期限超過後に所有process group／Job Object配下の子孫が追加書込しない"
         );
         codex_cli_fixture::assert_no_workspace_task_scratch(&workspace);
         assert!(!context.journal.has_pending_workspace("workspace-fixture"));

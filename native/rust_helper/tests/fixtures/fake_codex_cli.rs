@@ -11,10 +11,17 @@ const PROVIDER_CREDENTIAL_CANARY: &str = "synthetic-provider-key-fixture-only";
 const EXEC_HELP_OUTPUT: &str =
     "codex exec --sandbox workspace-write --cd DIR --json --ephemeral --ignore-user-config --skip-git-repo-check --model MODEL";
 
-const TASK_PERMISSION_PROFILE: [&str; 5] = [
+const TASK_PERMISSION_PROFILE_PREFIX: [&str; 2] = [
     "default_permissions=\"d4p-agent-task\"",
-    "windows.sandbox=\"mxc\"",
     "permissions.d4p-agent-task.extends=\":workspace\"",
+];
+
+#[cfg(windows)]
+const TASK_PERMISSION_PROFILE_PLATFORM: &[&str] = &["windows.sandbox=\"mxc\""];
+#[cfg(not(windows))]
+const TASK_PERMISSION_PROFILE_PLATFORM: &[&str] = &[];
+
+const TASK_PERMISSION_PROFILE_SUFFIX: [&str; 2] = [
     "permissions.d4p-agent-task.filesystem={\":root\"=\"deny\",\":minimal\"=\"read\",\":workspace_roots\"={\"**/*.env\"=\"deny\",\"**/.env.*\"=\"deny\",\"**/.ssh/**\"=\"deny\",\"**/secrets/**\"=\"deny\",\"private/credential-backup.txt\"=\"deny\",\"private/credential-backup.txt/**\"=\"deny\"},\"glob_scan_max_depth\"=32}",
     "permissions.d4p-agent-task.network.enabled=false",
 ];
@@ -195,12 +202,18 @@ fn valid_task_arguments(arguments: &[String]) -> bool {
     } else {
         0
     };
+    let expected_task_profile = TASK_PERMISSION_PROFILE_PREFIX
+        .iter()
+        .copied()
+        .chain(TASK_PERMISSION_PROFILE_PLATFORM.iter().copied())
+        .chain(TASK_PERMISSION_PROFILE_SUFFIX.iter().copied())
+        .collect::<Vec<_>>();
     if (has_provider_key
         && (configs.len() < provider_settings.len()
             || configs[..provider_settings.len()] != provider_settings))
-        || configs.len() != TASK_PERMISSION_PROFILE.len() + 1 + provider_offset
-        || configs[provider_offset..provider_offset + TASK_PERMISSION_PROFILE.len()]
-            != TASK_PERMISSION_PROFILE
+        || configs.len() != expected_task_profile.len() + 1 + provider_offset
+        || configs[provider_offset..provider_offset + expected_task_profile.len()]
+            != expected_task_profile
     {
         return false;
     }
