@@ -50,7 +50,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Linux変更範囲を含むRust整形
         shell: bash
-        run: rustfmt +1.95.0 --edition 2021 --check --config skip_children=true native/rust_helper/src/bin/gui_shell_desktop_launcher.rs native/rust_helper/src/broker/product_install.rs native/rust_helper/src/broker/protocol.rs native/rust_helper/src/broker/update_center.rs native/rust_helper/src/desktop_launcher.rs native/rust_helper/src/linux_desktop_launcher.rs native/rust_helper/src/linux_desktop_worker.rs native/rust_helper/src/linux_product_bundle.rs native/rust_helper/src/macos_desktop_owner.rs native/rust_helper/src/product_bootstrapper.rs
+        run: rustfmt +1.95.0 --edition 2021 --check --config skip_children=true native/rust_helper/src/bin/gui_shell_desktop_launcher.rs native/rust_helper/src/bin/gui_shell_linux_broker.rs native/rust_helper/src/adapters/process_tree.rs native/rust_helper/src/process_group_guardian.rs native/rust_helper/src/broker/product_install.rs native/rust_helper/src/broker/protocol.rs native/rust_helper/src/broker/update_center.rs native/rust_helper/src/desktop_launcher.rs native/rust_helper/src/linux_desktop_launcher.rs native/rust_helper/src/linux_desktop_worker.rs native/rust_helper/src/linux_product_bundle.rs native/rust_helper/src/macos_desktop_owner.rs native/rust_helper/src/product_bootstrapper.rs
       - name: Linux product install path tests
         shell: bash
         run: cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib broker::product_install::tests -- --test-threads=1
@@ -130,6 +130,9 @@ jobs:
       - name: Linux fake Codex Task, deadline and descendant cleanup
         shell: bash
         run: cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib adapters::codex_cli::tests::偽CodexCLIはAdapterのTask成功・期限超過cleanup・子孫停止を通る -- --exact --test-threads=1
+      - name: Linux Broker crash guardian process-group recovery
+        shell: bash
+        run: 'cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib adapters::process_tree::unix_tests:: -- --test-threads=1'
       - name: Linux Task permission profile stays platform-bounded
         shell: bash
         run: cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib adapters::codex_cli::tests::Dialogueはread_onlyのままTaskだけ専用permission_profileを使う -- --exact --test-threads=1

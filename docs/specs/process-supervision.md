@@ -19,3 +19,13 @@ processは初期threadを停止した状態で生成し、実行を再開する�
 Codex Adapterのread-only対話、固定`sandbox=workspace-write`を使うAgent Task実装、およびWindowsのMCP stdio childは、このJob Object経路でprocess群を監督する。Agent Task実装はBrokerへ接続済みだが、CLI実Task、Workspace隔離、失敗・取消時cleanupのLIVE_RUNTIME証拠が揃うまでAdapter metadataを`task_execution=unsupported`に保ち、Brokerから起動できない。MCP childのfake protocol fixtureは実Windows process群の起動・停止に対する`LIVE_RUNTIME`証拠であり、実外部MCP Serverやinstalled Brokerの証拠ではない。Job Objectはprocess群の終了管理であり、filesystem／network sandbox、Workspace書込隔離、Runtime trust、Permission、Approvalの証拠ではない。Windows以外のMCP process群停止は本単位で検証していない。
 
 Windows実process fixtureによるowner強制終了・child停止、およびAdapter接続後のchild取消・回収試験は、このprocess群監督機構に対する`LIVE_RUNTIME`証拠である。実Codex CLIのversion／help確認はinterface証拠に限り、モデル実行、Broker Task、Task Workspace隔離・scratch cleanup、Broker異常終了後のcleanup、Agent間隔離の証拠ではない。固定`sandbox=workspace-write`ではWorkspace内の`.env`等の秘密fileをAgentから読めないことも証明されず、Broker crash／強制終了／電源断後のscratch回収機構もない。process群の停止確認をこの2つのfilesystem保証へ転用してはならない。
+
+## Linux Broker crash後のprocess群停止
+
+Linux Agent CLI／MCP childの起動では、既存の同梱`gui_shell_linux_broker`を内部guardian modeで先に起動し、そのPIDをleaderとする専用process groupへchildを配置する。Brokerだけがguardianのstdin pipe writerを保持する。正常終了・取消・deadline・IPC failureではBrokerが現在のguardian保有中にprocess groupを停止・waitし、group消失まで確認する。Brokerがcrash／強制終了してpipeがEOFになった場合、guardianが自身の専用groupへ`SIGKILL`を送り、childとgroup内descendantを停止する。
+
+Guardianは`PID == PGID`を確認できない場合、signal前に終了する。Broker稼働中にguardian消失を検知した場合はTaskを成功扱いせず、追跡rootだけを停止する。guardian終了後は数値PGIDの再利用を避けるためgroup signalを試みず、cleanup未確定を返す。内部mode以外の起動argumentはBroker helperが拒否する。
+
+保証範囲は専用process groupに残るprocess群に限る。childが`setsid`等でgroupを離れた場合の停止、filesystem／network sandbox、外部副作用、scratch journalのcrash RecoveryやAudit durabilityを証明しない。WSLのpipe-EOF fixtureはOS process群の停止機構を検証するが、Linux native installed Brokerの実crash・Agent/MCP consumer一体受入れではない。
+
+2026-10-20のUbuntu 24.04.5 WSL／Rust 1.95.0で、pipe EOF後のdescendant group停止、guardian消失時のfail-closed、既存group停止を含むprocess tree試験3 passed／0 failed／1 ignored、全Adapter試験29 passed／0 failed／2 ignored、Linux `cargo check --all-targets`を確認した。Windows Job Object試験2 passed／0 failedも確認した。これはLinux installed product supportのrelease acceptanceを成立させない。

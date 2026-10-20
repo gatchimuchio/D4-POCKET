@@ -80,7 +80,7 @@
     },
     {
       "path": ".github/workflows/linux-manual-rust-validation.yml",
-      "sha256": "9daa5ed4a91c26e00a64aaf04b31db66419a34b1c4e46be0ed2d1282d076180c"
+      "sha256": "3286ee0e465ed0aebe5aa5281917f70b0a03243ed9d5646d3d1b56fdac708c4f"
     },
     {
       "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
@@ -1308,7 +1308,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "9d9e81a44dc7e22340ddb972612f4f98b12564776db658722c8873decf339080"
+      "sha256": "3b89f96b67804bebfe02400e117a00b5d7fba3780edbf2dd6a5cde6c3519b466"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1516,7 +1516,7 @@
     },
     {
       "path": "docs/specs/linux-desktop-channel.md",
-      "sha256": "d36e8efaa68ffd3e5250e46ff356ccde7b48ceded2de9829a2bba6f11a609816"
+      "sha256": "e0bdf5115bd9ba27665f4647c9dee86bd5a787ef8beba2b30ff5efacf6bb3c99"
     },
     {
       "path": "docs/specs/linux-product-package.md",
@@ -1596,7 +1596,7 @@
     },
     {
       "path": "docs/specs/process-supervision.md",
-      "sha256": "40ffa50e4b44aafae4afc8ff16a3fc59297c683bc5bf44968b2c4b8c7ece8d6a"
+      "sha256": "82dda5d9de9b3fa816e9934fb2cd6a93fa8cf6930d9a7b76127895e52df90523"
     },
     {
       "path": "docs/specs/regression-case.md",
@@ -3476,7 +3476,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/process_tree.rs",
-      "sha256": "d72c950a70fb28f8ea1d52070bc395163cb25484b7612d8768af53166dae7bb6"
+      "sha256": "bf47b5c85920fa61af8d79b946976ec2c4d9035e72106fa4ef0082877bbb8f5c"
     },
     {
       "path": "native/rust_helper/src/audit_hash.rs",
@@ -3488,7 +3488,7 @@
     },
     {
       "path": "native/rust_helper/src/bin/gui_shell_linux_broker.rs",
-      "sha256": "301156b6eeb920c7e231bfc4ebb1e9d849a05c132d5a22202c1fc4638e8d945c"
+      "sha256": "931c4b475da67cd67ae9742ee332e0f980d0ec65b3f30066798f4ebe54a2bb05"
     },
     {
       "path": "native/rust_helper/src/bin/gui_shell_macos_broker.rs",
@@ -3712,7 +3712,7 @@
     },
     {
       "path": "native/rust_helper/src/lib.rs",
-      "sha256": "03270838d51a03522cd0660284406803c8ee772095e3c2925ae082d545123118"
+      "sha256": "6b230f552f03de2dfcf2bd88ee718813d4128d307c17a9bcae4def4311c1be59"
     },
     {
       "path": "native/rust_helper/src/linux_credential_input.rs",
@@ -4304,7 +4304,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "cdc8f6233e662fc4c214380efdc3b4149326f57b1227b3bd8aff8472345d94d2"
+      "sha256": "3b2d20e14163913d391e3fdbd3597879c3764583c6d2f67c5214bcfbe0106ade"
     },
     {
       "path": "requirements-dev.txt",

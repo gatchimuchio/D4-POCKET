@@ -22,6 +22,9 @@ pub mod linux_desktop_launcher;
 #[cfg(target_os = "linux")]
 pub mod linux_desktop_worker;
 #[cfg(target_os = "linux")]
+#[path = "process_group_guardian.rs"]
+pub mod linux_process_group_guardian;
+#[cfg(target_os = "linux")]
 mod linux_product_bundle;
 #[cfg(target_os = "linux")]
 mod linux_workspace_selection;
