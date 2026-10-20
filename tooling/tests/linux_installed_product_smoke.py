@@ -326,8 +326,9 @@ def _activate_named_control_by_keyboard(
         check=True,
         timeout=5,
     )
+    window = _find_accessible(WINDOW_TITLE, timeout=10)
     for index in range(max_tabs + 1):
-        if _focused_named_accessible(name) is not None:
+        if _focused_named_accessible(name, root=window) is not None:
             subprocess.run(
                 ["xdotool", "key", "--clearmodifiers", "Return"],
                 env=environment,

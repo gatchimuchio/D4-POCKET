@@ -120,9 +120,13 @@ class AccessibleActionResolutionTests(unittest.TestCase):
         focused_node = object()
         with (
             patch(
+                "tooling.tests.linux_installed_product_smoke._find_accessible",
+                return_value=object(),
+            ) as find_accessible,
+            patch(
                 "tooling.tests.linux_installed_product_smoke._focused_named_accessible",
                 side_effect=(None, focused_node),
-            ),
+            ) as focused_lookup,
             patch(
                 "tooling.tests.linux_installed_product_smoke.subprocess.run"
             ) as run,
@@ -138,6 +142,8 @@ class AccessibleActionResolutionTests(unittest.TestCase):
                 ["xdotool", "key", "--clearmodifiers", "Return"],
             ],
         )
+        self.assertEqual(find_accessible.call_args.args[0], "D4 Pocket powered by GUI Shell")
+        self.assertEqual(focused_lookup.call_args.kwargs["root"], find_accessible.return_value)
 
 
 class LinuxInstalledDesktopEntryTests(unittest.TestCase):
