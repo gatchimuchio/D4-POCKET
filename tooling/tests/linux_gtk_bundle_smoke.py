@@ -1,4 +1,4 @@
-"""Linux Release bundleを隔離X11 desktop上で起動し、正常終了を確認する。"""
+"""Linux Release bundleのFlutter GTK runnerを隔離X11 desktopで確認する。"""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ def _processes_using(executable: Path) -> set[int]:
     return result
 
 
-def _failure_with_launcher_output(message: str, app_log: Path, isolated_root: Path) -> str:
+def _failure_with_runner_output(message: str, app_log: Path, isolated_root: Path) -> str:
     try:
         output = app_log.read_bytes()[-4096:].decode("utf-8", errors="replace")
     except OSError:
@@ -43,7 +43,7 @@ def _failure_with_launcher_output(message: str, app_log: Path, isolated_root: Pa
         output = output[-2048:]
     if not output:
         return message
-    return f"{message}\nGTK launcher診断（末尾2048文字以内）:\n{output}"
+    return f"{message}\nGTK runner診断（末尾2048文字以内）:\n{output}"
 
 
 def _terminate_group(process: subprocess.Popen[bytes]) -> None:
@@ -63,15 +63,15 @@ def _terminate_group(process: subprocess.Popen[bytes]) -> None:
             pass
 
 
-def run_smoke(launcher: Path, temp_root: Path) -> None:
-    if launcher.is_symlink():
-        raise RuntimeError("GTK launcherがsymlinkです")
+def run_smoke(runner: Path, temp_root: Path) -> None:
+    if runner.is_symlink():
+        raise RuntimeError("Flutter GTK runnerがsymlinkです")
     if temp_root.is_symlink():
         raise RuntimeError("smoke用一時rootがsymlinkです")
-    launcher = launcher.resolve(strict=True)
-    if not launcher.is_file() or not os.access(launcher, os.X_OK):
-        raise RuntimeError("GTK launcherが通常実行fileではありません")
-    helper = launcher.parent / "libexec" / "gui_shell_linux_broker"
+    runner = runner.resolve(strict=True)
+    if not runner.is_file() or not os.access(runner, os.X_OK):
+        raise RuntimeError("Flutter GTK runnerが通常実行fileではありません")
+    helper = runner.parent / "libexec" / "gui_shell_linux_broker"
     if helper.is_symlink():
         raise RuntimeError("Broker helperがsymlinkです")
     helper = helper.resolve(strict=True)
@@ -128,15 +128,15 @@ def run_smoke(launcher: Path, temp_root: Path) -> None:
             start_new_session=True,
         )
         app_log = root / "app-output.log"
-        launcher_process: subprocess.Popen[bytes] | None = None
+        runner_process: subprocess.Popen[bytes] | None = None
         try:
             time.sleep(0.5)
             if window_manager.poll() is not None:
                 raise RuntimeError("隔離X11 window managerが起動しませんでした")
             with app_log.open("xb") as log:
-                launcher_process = subprocess.Popen(
-                    [str(launcher)],
-                    cwd=launcher.parent,
+                runner_process = subprocess.Popen(
+                    [str(runner)],
+                    cwd=runner.parent,
                     env=env,
                     stdin=subprocess.DEVNULL,
                     stdout=log,
@@ -148,11 +148,11 @@ def run_smoke(launcher: Path, temp_root: Path) -> None:
             deadline = time.monotonic() + 60
             pattern = f"^{re.escape(PRODUCT_WINDOW_TITLE)}$"
             while time.monotonic() < deadline:
-                if launcher_process.poll() is not None:
+                if runner_process.poll() is not None:
                     raise RuntimeError(
-                        _failure_with_launcher_output(
-                            "GTK launcherがwindow表示前に終了しました: "
-                            f"{launcher_process.returncode}",
+                        _failure_with_runner_output(
+                            "Flutter GTK runnerがwindow表示前に終了しました: "
+                            f"{runner_process.returncode}",
                             app_log,
                             root,
                         )
@@ -172,7 +172,7 @@ def run_smoke(launcher: Path, temp_root: Path) -> None:
                 time.sleep(0.25)
             if window_id is None:
                 raise RuntimeError(
-                    _failure_with_launcher_output(
+                    _failure_with_runner_output(
                         "D4 PocketのGTK window titleを検出できませんでした",
                         app_log,
                         root,
@@ -196,13 +196,15 @@ def run_smoke(launcher: Path, temp_root: Path) -> None:
             if close.returncode != 0:
                 raise RuntimeError("D4 Pocket GTK windowへ正常終了要求を送れませんでした")
             try:
-                exit_code = launcher_process.wait(timeout=45)
+                exit_code = runner_process.wait(timeout=45)
             except subprocess.TimeoutExpired as error:
-                raise RuntimeError("GTK window close後にlauncherが終了しませんでした") from error
+                raise RuntimeError("GTK window close後にFlutter GTK runnerが終了しませんでした") from error
             if exit_code != 0:
                 raise RuntimeError(
-                    _failure_with_launcher_output(
-                        f"GTK launcherが異常終了しました: {exit_code}", app_log, root
+                    _failure_with_runner_output(
+                        f"Flutter GTK runnerが異常終了しました: {exit_code}",
+                        app_log,
+                        root,
                     )
                 )
 
@@ -216,24 +218,24 @@ def run_smoke(launcher: Path, temp_root: Path) -> None:
             if remaining:
                 raise RuntimeError("GTK正常終了後にBroker helper processが残留しました")
             print(
-                "Linux GTK製品画面試験 合格: 製品画面を表示し正常終了; "
+                "Linux GTK bundle runtime試験 合格: 製品画面を表示し正常終了; "
                 f"Broker helper観測済み={str(helper_seen).lower()}"
             )
         finally:
-            if launcher_process is not None:
-                _terminate_group(launcher_process)
+            if runner_process is not None:
+                _terminate_group(runner_process)
             _terminate_group(window_manager)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--launcher", type=Path, required=True)
+    parser.add_argument("--runner", type=Path, required=True)
     parser.add_argument("--temp-root", type=Path, required=True)
     args = parser.parse_args()
     try:
-        run_smoke(args.launcher, args.temp_root)
+        run_smoke(args.runner, args.temp_root)
     except Exception as error:
-        print(f"Linux GTK製品画面試験 不合格: {error}")
+        print(f"Linux GTK bundle runtime試験 不合格: {error}")
         return 1
     return 0
 

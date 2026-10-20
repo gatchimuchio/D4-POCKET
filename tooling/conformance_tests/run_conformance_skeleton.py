@@ -7864,8 +7864,10 @@ def test_desktop_flutter_product_baseline_chrome_exists() -> list[str]:
         if token not in win32:
             errors.append(f"Windows runnerのminimum-size guardにtokenがない: {token}")
     for token in [
-        'gtk_header_bar_set_title(header_bar, "GUI Shell")',
-        'gtk_window_set_title(window, "GUI Shell")',
+        "static constexpr char kProductWindowTitle[] =",
+        '"D4 Pocket powered by GUI Shell";',
+        "gtk_header_bar_set_title(header_bar, kProductWindowTitle)",
+        "gtk_window_set_title(window, kProductWindowTitle)",
         "gtk_window_set_default_size(window, 1280, 800)",
         "gtk_widget_set_size_request(GTK_WIDGET(window), 1024, 640)",
     ]:
