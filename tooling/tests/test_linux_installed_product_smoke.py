@@ -112,6 +112,7 @@ class AccessibleActionResolutionTests(unittest.TestCase):
             self.assertIs(
                 _focused_named_accessible(visible_focus.name), visible_focus
             )
+            self.assertIs(_focused_named_accessible("Owner確認"), visible_focus)
             self.assertIsNone(_focused_named_accessible("different label"))
 
     def test_keyboard_activation_sends_enter_only_after_target_focus(self) -> None:
@@ -142,8 +143,42 @@ class AccessibleActionResolutionTests(unittest.TestCase):
                 ["xdotool", "key", "--clearmodifiers", "Return"],
             ],
         )
-        self.assertEqual(find_accessible.call_args.args[0], "D4 Pocket powered by GUI Shell")
-        self.assertEqual(focused_lookup.call_args.kwargs["root"], find_accessible.return_value)
+        self.assertEqual(
+            find_accessible.call_args.args[0], "D4 Pocket powered by GUI Shell"
+        )
+        self.assertEqual(
+            focused_lookup.call_args.kwargs["root"], find_accessible.return_value
+        )
+
+    def test_keyboard_activation_can_select_a_command_result_with_down(self) -> None:
+        from unittest.mock import patch
+
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_accessible",
+                return_value=object(),
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._focused_named_accessible",
+                side_effect=(None, object()),
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke.subprocess.run"
+            ) as run,
+            patch("tooling.tests.linux_installed_product_smoke.time.sleep"),
+        ):
+            _activate_named_control_by_keyboard(
+                "独立Appを書き出す",
+                {"DISPLAY": ":99"},
+                "0x42",
+                max_tabs=1,
+                step_key="Down",
+            )
+
+        self.assertEqual(
+            run.call_args_list[1].args[0],
+            ["xdotool", "key", "--clearmodifiers", "Down"],
+        )
 
 
 class LinuxInstalledDesktopEntryTests(unittest.TestCase):

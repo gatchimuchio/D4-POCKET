@@ -301,11 +301,13 @@ def _trigger_export_from_installed_ui(environment: dict[str, str], window_id: st
         check=True,
         timeout=5,
     )
-    subprocess.run(
-        ["xdotool", "key", "--clearmodifiers", "Return"],
-        env=environment,
-        check=True,
-        timeout=5,
+    _find_accessible("独立Appを書き出す", timeout=10)
+    _activate_named_control_by_keyboard(
+        "独立Appを書き出す",
+        environment,
+        window_id,
+        max_tabs=8,
+        step_key="Down",
     )
     _activate_named_control_by_keyboard(
         "Owner確認してManifest fileを生成", environment, window_id
@@ -318,6 +320,7 @@ def _activate_named_control_by_keyboard(
     window_id: str,
     *,
     max_tabs: int = 96,
+    step_key: str = "Tab",
 ) -> None:
     """可視かつ正確なAccessible名にfocusがある場合だけEnterを送る。"""
     subprocess.run(
@@ -339,7 +342,7 @@ def _activate_named_control_by_keyboard(
         if index == max_tabs:
             break
         subprocess.run(
-            ["xdotool", "key", "--clearmodifiers", "Tab"],
+            ["xdotool", "key", "--clearmodifiers", step_key],
             env=environment,
             check=True,
             timeout=5,
@@ -359,7 +362,7 @@ def _focused_named_accessible(name: str, *, root=None):
         return None
     search_root = root if root is not None else pyatspi.Registry.getDesktop(0)
     for node, accessible_name in _accessible_nodes(search_root):
-        if accessible_name.strip() != name:
+        if name not in accessible_name.strip():
             continue
         try:
             state = node.getState()

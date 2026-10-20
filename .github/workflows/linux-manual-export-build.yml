@@ -118,7 +118,7 @@ jobs:
             --acceptance-root "$acceptance_root"
           {
             printf '\n- Installed acceptance: the Release package passed Broker stage／activation with a per-run Ed25519 candidate signature bound to its exact package hash, fixed XDG desktop entry validation, `gio launch` under X11, normal GTK window close, owned-process cleanup, and durable LIVE_RUNTIME startup／exit Audit reload. This is not production signing evidence.\n'
-            printf -- '- Owner boundary: the installed product UI opens its command palette and Export surface; AT-SPI resolves the actual GTK controls and uses their exposed action or live accessible bounds for Reject／Allow input. Reject creates no file; a new request plus Allow reaches the installed Rust Broker, creates a fresh Linux App／Audit identity Manifest, and is verified in the durable LIVE_RUNTIME Audit chain／anchor HMAC. This is automated UI input, not a human gesture.\n'
+            printf -- '- Owner boundary: the installed product UI opens its command palette, confirms the exact Export result, and sends Enter only after the intended visible control is focused; native Owner Reject／Allow uses its verified GTK control. Reject creates no file; a new request plus Allow reaches the installed Rust Broker, creates a fresh Linux App／Audit identity Manifest, and is verified in the durable LIVE_RUNTIME Audit chain／anchor HMAC. This is automated UI input, not a human gesture.\n'
             printf -- '- Scope: Ubuntu hosted Xvfb／X11 and ephemeral per-run signing identity only; not real desktop-session distribution coverage, production signing／publisher identity, Secret Service／MCP, Workspace selection, Agent Task recovery, Wayland rendering, or release readiness.\n'
           } >> "$GITHUB_STEP_SUMMARY"
 
