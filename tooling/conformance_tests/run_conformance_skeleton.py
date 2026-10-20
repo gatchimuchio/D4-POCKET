@@ -11877,6 +11877,8 @@ def test_linux_product_launcher_is_built_and_bundle_bound() -> list[str]:
     cmake = (DESKTOP_FLUTTER / "linux/CMakeLists.txt").read_text(encoding="utf-8")
     runner_cmake = (DESKTOP_FLUTTER / "linux/runner/CMakeLists.txt").read_text(encoding="utf-8")
     runner = (DESKTOP_FLUTTER / "linux/runner/broker_process_channel.cc").read_text(encoding="utf-8")
+    gtk_smoke = (ROOT / "tooling/tests/linux_gtk_bundle_smoke.py").read_text(encoding="utf-8")
+    export_workflow = (ROOT / ".github/workflows/linux-manual-export-build.yml").read_text(encoding="utf-8")
     errors = []
 
     for text, tokens, label in (
@@ -11932,6 +11934,27 @@ def test_linux_product_launcher_is_built_and_bundle_bound() -> list[str]:
             "CMake Rust binary build",
         ),
         (runner, ('"XDG_DATA_HOME"',), "XDG product root environment"),
+        (
+            gtk_smoke,
+            (
+                'parser.add_argument("--launcher"',
+                'launcher.name != "gui_shell_desktop_launcher"',
+                'home / ".local" / "share"',
+                "xdg_data_home.exists() or xdg_data_home.is_symlink()",
+                "[str(launcher)]",
+            ),
+            "portable first-launch GTK smoke",
+        ),
+        (
+            export_workflow,
+            (
+                "workflow_dispatch:",
+                '--launcher "$output_root/bundle/gui_shell_desktop_launcher"',
+                "initially absent XDG_DATA_HOME",
+                "not signed Install/Owner activation",
+            ),
+            "manual native launcher runtime validation",
+        ),
     ):
         for token in tokens:
             if token not in text:

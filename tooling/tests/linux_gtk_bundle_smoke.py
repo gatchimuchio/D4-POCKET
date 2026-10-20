@@ -63,15 +63,24 @@ def _terminate_group(process: subprocess.Popen[bytes]) -> None:
             pass
 
 
-def run_smoke(runner: Path, temp_root: Path) -> None:
-    if runner.is_symlink():
-        raise RuntimeError("Flutter GTK runnerがsymlinkです")
+def run_smoke(launcher: Path, temp_root: Path) -> None:
+    if launcher.is_symlink():
+        raise RuntimeError("Linux製品launcherがsymlinkです")
     if temp_root.is_symlink():
         raise RuntimeError("smoke用一時rootがsymlinkです")
+    launcher = launcher.resolve(strict=True)
+    if launcher.name != "gui_shell_desktop_launcher":
+        raise RuntimeError("Linux製品launcherの固定file名が一致しません")
+    if not launcher.is_file() or not os.access(launcher, os.X_OK):
+        raise RuntimeError("Linux製品launcherが通常実行fileではありません")
+    bundle_root = launcher.parent
+    runner = bundle_root / "gui_shell_desktop"
+    if runner.is_symlink():
+        raise RuntimeError("Flutter GTK runnerがsymlinkです")
     runner = runner.resolve(strict=True)
     if not runner.is_file() or not os.access(runner, os.X_OK):
         raise RuntimeError("Flutter GTK runnerが通常実行fileではありません")
-    helper = runner.parent / "libexec" / "gui_shell_linux_broker"
+    helper = bundle_root / "libexec" / "gui_shell_linux_broker"
     if helper.is_symlink():
         raise RuntimeError("Broker helperがsymlinkです")
     helper = helper.resolve(strict=True)
@@ -87,8 +96,11 @@ def run_smoke(runner: Path, temp_root: Path) -> None:
         home = root / "home"
         runtime = root / "runtime"
         temporary = root / "tmp"
+        xdg_data_home = home / ".local" / "share"
         for directory in (home, runtime, temporary):
             directory.mkdir(mode=0o700)
+        if xdg_data_home.exists() or xdg_data_home.is_symlink():
+            raise RuntimeError("初回起動前にXDG_DATA_HOMEが存在しています")
         env = {
             key: os.environ[key]
             for key in (
@@ -115,7 +127,7 @@ def run_smoke(runner: Path, temp_root: Path) -> None:
                 "GDK_BACKEND": "x11",
             }
         )
-        for name in (".config", ".local", ".local/share", ".local/state", ".cache"):
+        for name in (".config", ".local/state", ".cache"):
             (home / name).mkdir(mode=0o700, parents=True, exist_ok=True)
 
         preexisting_helpers = _processes_using(helper)
@@ -135,8 +147,8 @@ def run_smoke(runner: Path, temp_root: Path) -> None:
                 raise RuntimeError("隔離X11 window managerが起動しませんでした")
             with app_log.open("xb") as log:
                 runner_process = subprocess.Popen(
-                    [str(runner)],
-                    cwd=runner.parent,
+                    [str(launcher)],
+                    cwd=bundle_root,
                     env=env,
                     stdin=subprocess.DEVNULL,
                     stdout=log,
@@ -207,6 +219,8 @@ def run_smoke(runner: Path, temp_root: Path) -> None:
                         root,
                     )
                 )
+            if xdg_data_home.exists() or xdg_data_home.is_symlink():
+                raise RuntimeError("未導入状態のportable起動がXDG_DATA_HOMEを作成しました")
 
             cleanup_deadline = time.monotonic() + 10
             remaining: set[int] = set()
@@ -229,11 +243,11 @@ def run_smoke(runner: Path, temp_root: Path) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--runner", type=Path, required=True)
+    parser.add_argument("--launcher", type=Path, required=True)
     parser.add_argument("--temp-root", type=Path, required=True)
     args = parser.parse_args()
     try:
-        run_smoke(args.runner, args.temp_root)
+        run_smoke(args.launcher, args.temp_root)
     except Exception as error:
         print(f"Linux GTK bundle runtime試験 不合格: {error}")
         return 1
