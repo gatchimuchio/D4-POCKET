@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import subprocess
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 from tooling.tests.linux_gtk_bundle_smoke import (
     _owned_product_groups,
+    _request_x11_window_manager_close,
     _wayland_socket_connected,
 )
 
@@ -56,6 +58,37 @@ class WaylandSocketSmokeTests(unittest.TestCase):
                 {20},
             )
         self.assertEqual(groups, {99, 110, 210})
+
+
+class X11WindowManagerCloseTests(unittest.TestCase):
+    def test_uses_window_manager_close_key_for_the_detected_window(self) -> None:
+        with patch(
+            "tooling.tests.linux_gtk_bundle_smoke.subprocess.run",
+            side_effect=(
+                subprocess.CompletedProcess([], 0),
+                subprocess.CompletedProcess([], 0),
+            ),
+        ) as run:
+            _request_x11_window_manager_close("0x42", {"DISPLAY": ":99"})
+
+        self.assertEqual(
+            run.call_args_list[0].args[0],
+            ["xdotool", "windowactivate", "--sync", "0x42"],
+        )
+        self.assertEqual(
+            run.call_args_list[1].args[0],
+            ["xdotool", "key", "--clearmodifiers", "Alt+F4"],
+        )
+
+    def test_does_not_send_close_key_when_window_activation_fails(self) -> None:
+        with patch(
+            "tooling.tests.linux_gtk_bundle_smoke.subprocess.run",
+            return_value=subprocess.CompletedProcess([], 1),
+        ) as run:
+            with self.assertRaisesRegex(RuntimeError, "activate"):
+                _request_x11_window_manager_close("0x42", {"DISPLAY": ":99"})
+
+        run.assert_called_once()
 
 
 if __name__ == "__main__":

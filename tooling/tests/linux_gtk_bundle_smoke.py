@@ -136,6 +136,27 @@ def _request_owned_product_sigterm(
         raise RuntimeError("Wayland smoke後に所有launcherがSIGTERMで停止しませんでした") from error
 
 
+def _request_x11_window_manager_close(window_id: str, environment: dict[str, str]) -> None:
+    activated = subprocess.run(
+        ["xdotool", "windowactivate", "--sync", window_id],
+        env=environment,
+        capture_output=True,
+        check=False,
+        timeout=10,
+    )
+    if activated.returncode != 0:
+        raise RuntimeError("D4 Pocket GTK windowをwindow manager経由でactivateできませんでした")
+    closed = subprocess.run(
+        ["xdotool", "key", "--clearmodifiers", "Alt+F4"],
+        env=environment,
+        capture_output=True,
+        check=False,
+        timeout=10,
+    )
+    if closed.returncode != 0:
+        raise RuntimeError("D4 Pocket GTK windowへwindow manager close keyを送れませんでした")
+
+
 def _terminate_owned_product(
     launcher: subprocess.Popen[bytes],
     runner: Path,
@@ -445,15 +466,7 @@ def run_smoke(launcher: Path, temp_root: Path, backend: str) -> None:
                 time.sleep(0.1)
 
             if backend == "x11":
-                close = subprocess.run(
-                    ["xdotool", "windowclose", window_id],
-                    env=env,
-                    capture_output=True,
-                    check=False,
-                    timeout=10,
-                )
-                if close.returncode != 0:
-                    raise RuntimeError("D4 Pocket GTK windowへ正常終了要求を送れませんでした")
+                _request_x11_window_manager_close(window_id, env)
                 try:
                     exit_code = runner_process.wait(timeout=45)
                 except subprocess.TimeoutExpired as error:
