@@ -135,6 +135,50 @@ def _find_accessible(name: str, *, root=None, timeout: float = 10.0):
     raise RuntimeError(f"AT-SPI要素を確認できません: {name}; observed={observed or '(none)'}")
 
 
+def _actionable_node(node, *, max_ancestors: int = 5):
+    """Flutterの可視label leafからAT-SPI actionを持つ親buttonを解決する。"""
+    current = node
+    for depth in range(max_ancestors + 1):
+        try:
+            actions = current.queryAction()
+            for index in range(actions.nActions):
+                if actions.getName(index).lower() in {"click", "press", "activate"}:
+                    return current
+        except Exception:
+            pass
+        if depth == max_ancestors:
+            break
+        try:
+            current = current.parent
+        except Exception:
+            break
+        if current is None:
+            break
+    return None
+
+
+def _find_actionable_accessible(name: str, *, root=None, timeout: float = 10.0):
+    try:
+        import pyatspi
+    except ImportError as error:
+        raise RuntimeError("AT-SPI UI操作にpython3-pyatspiが必要です") from error
+
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        search_root = root if root is not None else pyatspi.Registry.getDesktop(0)
+        matches = [
+            node
+            for node, accessible_name in _accessible_nodes(search_root)
+            if accessible_name.strip() == name
+        ]
+        for node in matches:
+            actionable = _actionable_node(node)
+            if actionable is not None:
+                return actionable
+        time.sleep(0.15)
+    raise RuntimeError(f"AT-SPI操作可能buttonを確認できません: {name}")
+
+
 def _activate_accessible(node, name: str) -> None:
     try:
         actions = node.queryAction()
@@ -178,7 +222,9 @@ def _trigger_export_from_installed_ui(environment: dict[str, str], window_id: st
         check=True,
         timeout=5,
     )
-    button = _find_accessible("Owner確認してManifest fileを生成", timeout=20)
+    button = _find_actionable_accessible(
+        "Owner確認してManifest fileを生成", timeout=20
+    )
     _activate_accessible(button, "Owner確認してManifest fileを生成")
 
 
@@ -204,16 +250,7 @@ def _answer_owner_dialog(environment: dict[str, str], decision: str) -> None:
         raise RuntimeError("Owner確認summaryにLinux対象platformがありません")
     if not any("要求hash:" in value or "payload hash:" in value for value in names):
         raise RuntimeError("Owner確認summaryに要求hashがありません")
-    button = next(
-        (
-            node
-            for node, accessible_name in descendants
-            if accessible_name.strip() == decision
-        ),
-        None,
-    )
-    if button is None:
-        raise RuntimeError(f"native Owner確認dialogに{decision}操作がありません")
+    button = _find_actionable_accessible(decision, root=dialog, timeout=10)
     _activate_accessible(button, decision)
 
 

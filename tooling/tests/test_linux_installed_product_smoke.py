@@ -8,12 +8,42 @@ import unittest
 from pathlib import Path
 
 from tooling.tests.linux_installed_product_smoke import (
+    _actionable_node,
     _desktop_entry_targets_fixed_launcher,
     _resolve_regular_package,
     _safe_log_tail,
     _verify_export_manifest,
     _verify_live_audit,
 )
+
+
+class AccessibleActionResolutionTests(unittest.TestCase):
+    class Actions:
+        def __init__(self, names: tuple[str, ...]) -> None:
+            self.names = names
+            self.nActions = len(names)
+
+        def getName(self, index: int) -> str:
+            return self.names[index]
+
+    class Node:
+        def __init__(self, name: str, actions: tuple[str, ...] = ()) -> None:
+            self.name = name
+            self.parent = None
+            self.actions = actions
+
+        def queryAction(self):
+            return AccessibleActionResolutionTests.Actions(self.actions)
+
+    def test_resolves_actionable_button_ancestor_of_visible_label(self) -> None:
+        button = self.Node("", ("click",))
+        label = self.Node("Owner確認してManifest fileを生成")
+        label.parent = button
+        self.assertIs(_actionable_node(label), button)
+
+    def test_does_not_treat_non_actionable_label_as_a_button(self) -> None:
+        label = self.Node("Owner確認してManifest fileを生成")
+        self.assertIsNone(_actionable_node(label))
 
 
 class LinuxInstalledDesktopEntryTests(unittest.TestCase):
