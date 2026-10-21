@@ -172,7 +172,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "084d480c8e3b482903305b6aded9d9390266bf8c40952b20ac9b342a3df88cfe"
+      "sha256": "441945b2b55f12995c4044ffb61de3a3f8b2fb0789d9c8f515430efad2a0e689"
     },
     {
       "path": "SECURITY.md",
@@ -1308,7 +1308,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "ce65c62ea4f464e888f0c9ae878f78dedc48fa26585713d77c4a890dd9c78ca5"
+      "sha256": "0d5e9de65b0b0b2f0e50a5e13dd05f1257ffc3619689c7737a30c33f4e575afe"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -4308,7 +4308,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "0176cb3363c65c26531f9943b7f6f99909de98bd9c765f91bfb95d2cd44a8bd1"
+      "sha256": "e740c9c4ecb296bbb080d25dfaf0f35bb03c43d7745d3215ac82ba73e1c5f53b"
     },
     {
       "path": "requirements-dev.txt",
@@ -5048,7 +5048,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "e7cbad0c5c06e60d29a878d4424ff67c8b54078aff826e5ed9f1be4114deff65"
+      "sha256": "64e12d52ba6ea8bb550bb823154cb016e2fcebab02794919c1f9b562498c27ec"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",

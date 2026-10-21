@@ -7236,8 +7236,28 @@ def test_codex_cli_adapter_is_broker_governed_and_bounded() -> list[str]:
     )
     if not explicit_unsupported_gate and not isolated_e2e_unsupported_gate:
         errors.append("Codex Agent Taskの通常Release unsupported gateが既定のまま保たれない")
-    if adapter.count("task_filesystem_override(secret_paths)?") != 1:
-        errors.append("Codex Taskが登録secretから単一のfilesystem overrideを生成しない")
+    linux_filesystem_override = re.search(
+        r'#\[cfg\(target_os = "linux"\)\]\s*let filesystem_override = \{(?P<body>.*?)\n\s*\};',
+        adapter,
+        re.DOTALL,
+    )
+    non_linux_filesystem_override = re.search(
+        r'#\[cfg\(not\(target_os = "linux"\)\)\]\s*let filesystem_override = task_filesystem_override\(secret_paths\)\?;',
+        adapter,
+    )
+    if (
+        adapter.count("task_filesystem_override(secret_paths)?") != 2
+        or linux_filesystem_override is None
+        or linux_filesystem_override.group("body").count(
+            "task_filesystem_override(secret_paths)?"
+        )
+        != 1
+        or non_linux_filesystem_override is None
+        or adapter.count('task_command.arg("-c").arg(filesystem_override);') != 1
+    ):
+        errors.append(
+            "Codex TaskがLinux／非Linuxの排他的分岐でsecret-filtered filesystem overrideを各一回生成しない"
+        )
     if "permissions.d4p-agent-task.filesystem.glob_scan_max_depth=" in adapter:
         errors.append("後続filesystem table overrideで走査深度を上書きするCodex設定を受理した")
     propagation = (
