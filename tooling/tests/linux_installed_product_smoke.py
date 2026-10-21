@@ -1111,6 +1111,13 @@ def run_installed_smoke(
             if any(export_root.iterdir()):
                 raise RuntimeError("Owner拒否後にManifestまたは一時fileが作成されました")
 
+            before_catalog = _catalog_failure_diagnostics(
+                helper, preexisting, broker_state / "store/audit.jsonl"
+            )
+            print(
+                "catalog transport immediately before fetch="
+                + json.dumps(before_catalog, ensure_ascii=False, separators=(",", ":"))
+            )
             try:
                 catalog_evidence = _trigger_catalog_fetch_from_installed_ui(
                     environment, window_id
