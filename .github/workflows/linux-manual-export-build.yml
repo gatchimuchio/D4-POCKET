@@ -2,6 +2,15 @@ name: Linux manual product build and installed acceptance
 
 'on':
   workflow_dispatch:
+    inputs:
+      acceptance_scope:
+        description: Installed product acceptance scope
+        required: true
+        type: choice
+        options:
+          - update_lifecycle
+          - credential_vault
+        default: update_lifecycle
 
 permissions:
   contents: read
@@ -39,7 +48,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends \
             at-spi2-core clang cmake ninja-build pkg-config libgtk-3-dev \
-            dbus-daemon libglib2.0-bin openbox python3-pyatspi strace weston xdotool xvfb
+            dbus-daemon gnome-keyring libglib2.0-bin libsecret-tools openbox \
+            python3-pyatspi strace weston xdotool xvfb
 
       - name: Flutter／Rust toolchainを固定
         shell: bash
@@ -118,6 +128,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: installed GTK UIでRollback／Export／Uninstallを受入れる
+        if: ${{ inputs.acceptance_scope == 'update_lifecycle' }}
         shell: bash
         env:
           GUI_SHELL_PRODUCT_APP_ID: d4-pocket-app-11111111111111111111111111111111
@@ -141,6 +152,29 @@ jobs:
             printf -- '- Uninstaller LIVE_RUNTIME: after X11／Wayland launch checks, the installed UI opens Update Center and requests Uninstall. Native Owner rejection leaves the fixed product root, active-version record, desktop entry, and running process group intact. A separate Owner approval requests required application exit; the launcher consumes the one-time handoff, removes only the fixed product root／entry, and leaves a config sentinel plus the file-backed Audit Store and anchor outside that root. Both decisions and completion are checked in the chained Audit.\n'
             printf -- '- Update Center LIVE_RUNTIME: installed UI fetched the immutable-commit catalog and package from raw.githubusercontent.com over Broker-owned HTTPS; current Broker trust verified the Ed25519 candidate and exact package digest／length. Automated UI accepted separate download, stage, and activation native Owner dialogs, while each preceding rejection left package／stage／active record／desktop entry／running process unchanged. The resulting 0.1.2 test candidate was then Owner-rolled back to the runnable 0.1.1 release bundle. Audit contains the remote download LIVE_RUNTIME completion and durable stage／activation／rollback decisions.\n'
             printf -- '- The remote update package is a deliberately non-executable 1.8 KiB test-only Linux D4PKG fixture signed with the published RFC 8032 test key; it was never launched and is not a release payload. All UI actions use automated AT-SPI／keyboard input, not a human gesture. Scope: Ubuntu hosted Xvfb／X11 plus isolated Weston headless/Pixman Wayland session and test identity; Wayland surface rendering is not established. Not real desktop-session distribution coverage, production signing／publisher identity, Secret Service／MCP, Workspace selection, Agent Task recovery, production update artifact acceptance, or release readiness.\n'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: installed GTK UIでSecret Service Credential Vaultを受入れる
+        if: ${{ inputs.acceptance_scope == 'credential_vault' }}
+        shell: bash
+        env:
+          GUI_SHELL_PRODUCT_APP_ID: d4-pocket-app-11111111111111111111111111111111
+          GUI_SHELL_PRODUCT_AUDIT_STORE_ID: audit-store-22222222222222222222222222222222
+          D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE: ${{ runner.temp }}/d4p-linux-export-${{ github.run_id }}-${{ github.run_attempt }}/output/D4Pocket-linux-rollback.d4pkg
+        run: |
+          set -euo pipefail
+          test_package="$D4P_EXPORT_ROOT/output/D4Pocket-linux.d4pkg"
+          acceptance_root="$D4P_EXPORT_ROOT/installed-credential-acceptance"
+          dbus-run-session -- xvfb-run -a python3 tooling/tests/linux_installed_product_smoke.py \
+            --package "$test_package" \
+            --temp-root "$D4P_EXPORT_ROOT" \
+            --acceptance-root "$acceptance_root" \
+            --private-key "$D4P_EXPORT_ROOT/test-update-private.der" \
+            --update-package "$D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE" \
+            --acceptance-scope credential_vault
+          {
+            printf '\n- Installed Credential acceptance: isolated unlocked run-owned GNOME Secret Service; installed GTK native masked-entry path; Owner reject produced no stored items; a distinct Owner allow created one metadata record and separate key／ciphertext items; normal installed-app exit／restart reloaded the same active metadata from durable Broker Audit; Owner reject／allow for logical revocation preserved the two Secret Service items; final metadata was revoked; Audit chain／anchor HMAC and test-secret non-exposure in UI／Audit／logs／acceptance files were checked.\n'
+            printf -- '- Scope: Ubuntu 24.04 hosted Xvfb／X11, unsigned test-identity installed product and automated AT-SPI／keyboard input. This does not establish MCP child injection／Tool execution, Secret Service behavior in other Linux desktop sessions, Wayland rendering, production package signing／distribution, or full Linux product completion.\n'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: build fixture／bundleを正確な一時rootから削除

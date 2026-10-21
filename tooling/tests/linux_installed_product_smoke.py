@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Callable
 import hashlib
 import hmac
 import json
 import os
 import re
+import secrets
 import shutil
 import signal
 import stat
@@ -39,6 +41,9 @@ RUST_STAGE_TEST = (
 )
 RUST_ROLLBACK_SEED_TEST = (
     "broker::update_center::tests::linux_installed_acceptance_seeds_verified_rollback_target"
+)
+RUST_SECRET_SERVICE_TEST = (
+    "broker::credential_storage::tests::linux_secret_service_actual_store_is_create_only_namespaced_and_cleaned"
 )
 RUST_AUDIT_TEST = (
     "broker::update_center::tests::linux_installed_acceptance_runtime_audit_is_durable"
@@ -505,6 +510,436 @@ def _open_update_center_from_installed_ui(
     _activate_accessible(command, "更新確認", environment)
     _find_accessible("更新センター", root=window, timeout=10)
     return window
+
+
+def _open_mcp_center_from_installed_ui(
+    environment: dict[str, str], window_id: str
+):
+    window = _find_accessible(WINDOW_TITLE, timeout=10)
+    subprocess.run(
+        ["xdotool", "windowactivate", "--sync", window_id],
+        env=environment,
+        check=True,
+        timeout=5,
+    )
+    subprocess.run(
+        ["xdotool", "key", "--clearmodifiers", "ctrl+k"],
+        env=environment,
+        check=True,
+        timeout=5,
+    )
+    _find_accessible("コマンドパレット", root=window, timeout=10)
+    subprocess.run(
+        ["xdotool", "type", "--clearmodifiers", "--delay", "30", "mcp"],
+        env=environment,
+        check=True,
+        timeout=5,
+    )
+    command = _find_operable_accessible("MCP接続", root=window, timeout=10)
+    _activate_accessible(command, "MCP接続", environment)
+    _find_accessible("MCP接続センター", root=window, timeout=10)
+    return window
+
+
+def _set_accessible_text(root, label: str, value: str, *, secret: bool = False) -> None:
+    node = _find_accessible(label, root=root, timeout=10)
+    for _ in range(6):
+        try:
+            editor = node.queryEditableText()
+        except Exception:
+            node = _accessible_parent(node)
+            if node is None:
+                break
+            continue
+        if editor.setTextContents(value) is False:
+            raise RuntimeError("accessible text setter rejected the value")
+        return
+    purpose = "native secret" if secret else "non-secret field"
+    raise RuntimeError(f"GTK accessible input is unavailable for the {purpose}")
+
+
+def _enter_native_credential_secret(dialog, secret: str) -> None:
+    editable = []
+    for node, _ in _accessible_descendants(dialog):
+        try:
+            role = node.getRoleName().lower()
+            node.queryEditableText()
+            if "password" in role or "entry" in role or "text" in role:
+                editable.append(node)
+        except Exception:
+            continue
+    if len(editable) != 1:
+        raise RuntimeError("native GTK secret entry is not uniquely accessible")
+    try:
+        if editable[0].queryEditableText().setTextContents(secret) is False:
+            raise RuntimeError("native GTK secret entry rejected input")
+    except Exception:
+        raise RuntimeError("native GTK secret entry could not accept test input") from None
+
+
+def _enter_credential_and_answer_owner(
+    environment: dict[str, str],
+    secret: str,
+    decision: str,
+    *,
+    target_server_id: str,
+    operation: str,
+) -> None:
+    dialog = _find_accessible("D4 Pocket 資格情報入力", timeout=10)
+    _enter_native_credential_secret(dialog, secret)
+    accept = _find_operable_accessible("入力して続行", root=dialog, timeout=10)
+    _activate_accessible(accept, "入力して続行", environment)
+    if operation == "登録":
+        markers = (
+            "Linux Secret Service default collectionへ登録します。",
+            f"接続対象: {target_server_id}",
+            "公開要求hash:",
+        )
+    else:
+        markers = ("失効", target_server_id)
+    _answer_owner_dialog(environment, decision, expected_summary_markers=markers)
+    _wait_for_owner_dialog_closed(environment)
+
+
+def _secret_service_item_labels(environment: dict[str, str]) -> list[str]:
+    result = subprocess.run(
+        ["secret-tool", "search", "application", "d4-pocket"],
+        env=environment,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+        timeout=10,
+    )
+    if result.returncode not in (0, 1):
+        raise RuntimeError("Secret Service metadata search failed")
+    if re.search(r"(?im)^\s*(secret|password)\s*=", result.stdout):
+        raise RuntimeError("Secret Service metadata search unexpectedly exposed a value")
+    return re.findall(r"(?m)^label\s*=\s*(.+)$", result.stdout)
+
+
+def _start_isolated_secret_service(
+    environment: dict[str, str], control_directory: Path, log_path: Path
+) -> subprocess.Popen[bytes]:
+    if control_directory.exists() or control_directory.is_symlink():
+        raise RuntimeError("run固有Secret Service control directoryは未使用でなければなりません")
+    control_directory.mkdir(mode=0o700)
+    if control_directory.stat().st_mode & 0o077:
+        raise RuntimeError("Secret Service control directoryがprivateではありません")
+    process: subprocess.Popen[bytes] | None = None
+    try:
+        with log_path.open("xb") as log:
+            process = subprocess.Popen(
+                [
+                    "gnome-keyring-daemon",
+                    "--foreground",
+                    "--unlock",
+                    "--components=secrets",
+                    "--control-directory",
+                    str(control_directory),
+                ],
+                env=environment,
+                stdin=subprocess.PIPE,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
+        if process.stdin is None:
+            raise RuntimeError("Secret Service password stdin is unavailable")
+        process.stdin.write(b"\n")
+        process.stdin.close()
+        environment["GNOME_KEYRING_CONTROL"] = str(control_directory)
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline:
+            if process.poll() is not None:
+                raise RuntimeError("isolated Secret Service exited during startup")
+            owner = subprocess.run(
+                [
+                    "gdbus",
+                    "call",
+                    "--session",
+                    "--dest",
+                    "org.freedesktop.DBus",
+                    "--object-path",
+                    "/org/freedesktop/DBus",
+                    "--method",
+                    "org.freedesktop.DBus.NameHasOwner",
+                    "org.freedesktop.secrets",
+                ],
+                env=environment,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=5,
+            )
+            if owner.returncode == 0 and "(true,)" in owner.stdout:
+                return process
+            time.sleep(0.2)
+        raise RuntimeError("isolated user-session Secret Service did not become available")
+    except Exception:
+        if process is not None and process.poll() is None:
+            _terminate_group(process)
+        raise
+
+
+def _verify_credential_audit(store: Path, secret: str) -> dict[str, int]:
+    audit_path = store / "audit.jsonl"
+    anchor_path = store / "audit_anchor.json"
+    key_path = store / "audit_anchor.key"
+    audit_bytes = audit_path.read_bytes()
+    if secret.encode("utf-8") in audit_bytes:
+        raise RuntimeError("Credential secret leaked into durable Audit")
+    events = [json.loads(line) for line in audit_bytes.decode("utf-8").splitlines() if line]
+    if not events:
+        raise RuntimeError("Credential acceptance produced no durable Audit")
+    previous_hash: str | None = None
+    for index, event in enumerate(events, start=1):
+        if (
+            event.get("event_id") != f"broker-audit-{index}"
+            or event.get("previous_event_hash") != previous_hash
+        ):
+            raise RuntimeError("Credential Audit event sequence is invalid")
+        hash_input = "|".join(
+            (
+                event["event_id"],
+                event["request_id"],
+                event["operation"],
+                event["decision"],
+                event["reason"],
+                event["evidence_source"],
+                event["payload_hash"],
+                previous_hash or "",
+            )
+        )
+        previous_hash = "sha256:" + hashlib.sha256(hash_input.encode("utf-8")).hexdigest()
+        if not hmac.compare_digest(event.get("event_hash", ""), previous_hash):
+            raise RuntimeError("Credential Audit event hash is invalid")
+    anchor = json.loads(anchor_path.read_text(encoding="utf-8"))
+    key = bytes.fromhex(key_path.read_text(encoding="ascii").strip())
+    anchor_input = (
+        f"version=1|event_count={len(events)}|head_event_hash={previous_hash or ''}"
+    ).encode("utf-8")
+    expected = "sha256:" + hmac.new(key, anchor_input, hashlib.sha256).hexdigest()
+    if (
+        len(key) != 32
+        or anchor.get("version") != 1
+        or anchor.get("event_count") != len(events)
+        or anchor.get("head_event_hash") != previous_hash
+        or not hmac.compare_digest(anchor.get("anchor_hmac", ""), expected)
+    ):
+        raise RuntimeError("Credential Audit anchor／HMAC is invalid")
+    operations = [event.get("operation", "") for event in events]
+    if not any("資格情報登録" in operation for operation in operations):
+        raise RuntimeError("Credential registration Audit is missing")
+    if not any("資格情報失効" in operation for operation in operations):
+        raise RuntimeError("Credential revocation Audit is missing")
+    for operation_name in ("資格情報登録", "資格情報失効"):
+        decisions = {
+            event.get("decision")
+            for event in events
+            if event.get("operation") == operation_name
+        }
+        if not {"rejected", "accepted"}.issubset(decisions):
+            raise RuntimeError(f"{operation_name} Audit lacks separate reject and accept decisions")
+    return {
+        "events": len(events),
+        "registration_events": sum(operation == "資格情報登録" for operation in operations),
+        "revocation_events": sum(operation == "資格情報失効" for operation in operations),
+    }
+
+
+def _assert_secret_absent_from_files(
+    root: Path, secret: str, *, excluded_roots: tuple[Path, ...] = ()
+) -> None:
+    marker = secret.encode("utf-8")
+    excluded = tuple(path.resolve(strict=True) for path in excluded_roots)
+    for path in root.rglob("*"):
+        if any(path.is_relative_to(excluded_root) for excluded_root in excluded):
+            continue
+        try:
+            metadata = path.lstat()
+            if not stat.S_ISREG(metadata.st_mode):
+                continue
+            if metadata.st_size > 64 * 1024 * 1024:
+                raise RuntimeError("Credential acceptance file exceeds the bounded leak-scan size")
+            content = path.read_bytes()
+        except OSError:
+            raise RuntimeError("Credential acceptance file scan could not read a test file") from None
+        if marker in content:
+            raise RuntimeError("Credential secret leaked into an acceptance file or log")
+
+
+def _accessible_snapshot(root) -> str:
+    values: list[str] = []
+    for node, name in _accessible_nodes(root):
+        if name:
+            values.append(name)
+        text = _accessible_text(node)
+        if text and text != name:
+            values.append(text)
+    return "\n".join(values)
+
+
+def _run_installed_credential_vault_acceptance(
+    environment: dict[str, str],
+    window_id: str,
+    *,
+    target_server_id: str,
+    audit_store: Path,
+    acceptance_root: Path,
+    restart_application: Callable[[str], str],
+) -> dict[str, object]:
+    secret = secrets.token_urlsafe(36)
+    window = _open_mcp_center_from_installed_ui(environment, window_id)
+    _set_accessible_text(window, "サーバー識別子", target_server_id)
+    _activate_named_control_by_keyboard("native入力で資格情報を登録", environment, window_id)
+    _enter_credential_and_answer_owner(
+        environment,
+        secret,
+        "拒否",
+        target_server_id=target_server_id,
+        operation="登録",
+    )
+    _activate_named_control_by_keyboard(
+        "対象ServerのCredential metadata一覧を取得", environment, window_id
+    )
+    _find_accessible(
+        "このServer向けに利用可能なCredential metadataはありません。値は読み出していません。",
+        root=window,
+        timeout=10,
+    )
+    if _secret_service_item_labels(environment):
+        raise RuntimeError("Credential Owner拒否後にSecret Service itemが作成されました")
+
+    _activate_named_control_by_keyboard("native入力で資格情報を登録", environment, window_id)
+    _enter_credential_and_answer_owner(
+        environment,
+        secret,
+        "許可",
+        target_server_id=target_server_id,
+        operation="登録",
+    )
+    _find_accessible("Linux Secret Service登録後のmetadataを取得しました。秘密値は取得していません。", root=window, timeout=15)
+    _find_accessible("api_key ・ 有効", root=window, timeout=10)
+    names = _accessible_snapshot(window)
+    credential_ids = set(re.findall(r"\b[0-9a-f]{32}\b", names))
+    if len(credential_ids) != 1:
+        raise RuntimeError("installed UI did not expose exactly one public Credential ID")
+    credential_id = next(iter(credential_ids))
+    labels = _secret_service_item_labels(environment)
+    if sorted(labels) != ["D4 Pocket credential ciphertext", "D4 Pocket credential key"]:
+        raise RuntimeError("Secret Service did not contain exactly the separate key and ciphertext items")
+    if secret in names:
+        raise RuntimeError("Credential secret leaked into the installed UI accessibility tree")
+
+    window_id = restart_application(window_id)
+    if _secret_service_item_labels(environment) != labels:
+        raise RuntimeError("Broker restart changed the run-owned Secret Service items")
+    window = _open_mcp_center_from_installed_ui(environment, window_id)
+    _set_accessible_text(window, "サーバー識別子", target_server_id)
+    _activate_named_control_by_keyboard(
+        "対象ServerのCredential metadata一覧を取得", environment, window_id
+    )
+    _find_accessible(
+        "1件の対象Credential metadataを取得しました。秘密値は取得していません。",
+        root=window,
+        timeout=15,
+    )
+    restarted_names = _accessible_snapshot(window)
+    if credential_id not in restarted_names or "api_key ・ 有効" not in restarted_names:
+        raise RuntimeError("Broker restart後に同じ有効Credential metadataを読戻せません")
+    if secret in restarted_names:
+        raise RuntimeError("Broker restart後のUIへCredential secretが露出しました")
+
+    _activate_named_control_by_keyboard("資格情報を失効", environment, window_id)
+    _answer_owner_dialog(
+        environment,
+        "拒否",
+        expected_summary_markers=(credential_id, target_server_id, "失効"),
+    )
+    _wait_for_owner_dialog_closed(environment)
+    _find_accessible("api_key ・ 有効", root=window, timeout=10)
+    if _secret_service_item_labels(environment) != labels:
+        raise RuntimeError("Credential revocation rejection changed Secret Service items")
+
+    _activate_named_control_by_keyboard("資格情報を失効", environment, window_id)
+    _answer_owner_dialog(
+        environment,
+        "許可",
+        expected_summary_markers=(credential_id, target_server_id, "失効"),
+    )
+    _wait_for_owner_dialog_closed(environment)
+    _find_accessible("Credentialを論理失効しました。以後の使用を拒否し、Secret Service itemは保持します。", root=window, timeout=15)
+    _find_accessible("api_key ・ 失効", root=window, timeout=10)
+    if _secret_service_item_labels(environment) != labels:
+        raise RuntimeError("Logical revocation unexpectedly removed Secret Service items")
+
+    audit_evidence = _verify_credential_audit(audit_store, secret)
+    _assert_secret_absent_from_files(
+        acceptance_root,
+        secret,
+        excluded_roots=(acceptance_root / "home/.local/share/apps",),
+    )
+    return {
+        "target_server_id": target_server_id,
+        "credential_id": credential_id,
+        "owner_reject_then_allow": True,
+        "secret_service_items_after_logical_revocation": labels,
+        "metadata_after_registration": "active",
+        "broker_restarted_and_metadata_reloaded": True,
+        "metadata_after_revocation": "revoked",
+        "secret_in_flutter_a11y_audit_logs_or_files": False,
+        "audit": audit_evidence,
+    }
+
+
+def _restart_installed_product(
+    environment: dict[str, str],
+    window_id: str,
+    launcher: Path,
+    desktop_entry: Path,
+    stage: Path,
+    log_path: Path,
+    product_paths: set[Path],
+    preexisting: set[int],
+    current_process: subprocess.Popen[bytes],
+) -> tuple[subprocess.Popen[bytes], str]:
+    if not _desktop_entry_targets_fixed_launcher(desktop_entry, launcher):
+        raise RuntimeError("Broker restart前に固定XDG desktop entryがinstalled launcherから変化しました")
+    _request_x11_window_manager_close(window_id, environment)
+    deadline = time.monotonic() + 60
+    while time.monotonic() < deadline:
+        if not (_processes_using(product_paths) - preexisting):
+            break
+        time.sleep(0.2)
+    if _processes_using(product_paths) - preexisting:
+        raise RuntimeError("Broker restart前の正常終了後にowned installed processが残留しています")
+    if current_process.poll() is None:
+        current_process.wait(timeout=10)
+    if current_process.returncode not in (0, None):
+        raise RuntimeError("Broker restart前のinstalled launcher終了codeが不正です")
+
+    with log_path.open("xb") as log:
+        restarted_process = subprocess.Popen(
+            ["gio", "launch", str(desktop_entry)],
+            cwd=stage,
+            env=environment,
+            stdin=subprocess.DEVNULL,
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+    deadline = time.monotonic() + 90
+    while time.monotonic() < deadline:
+        restarted_window = _visible_product_window(environment)
+        running_products = _processes_using(product_paths) - preexisting
+        if restarted_window is not None and running_products:
+            return restarted_process, restarted_window
+        if restarted_process.poll() is not None and restarted_process.returncode != 0:
+            raise RuntimeError("固定desktop entryからのBroker restartが失敗しました")
+        time.sleep(0.25)
+    raise RuntimeError("固定desktop entryからBroker restart後のinstalled UIを確認できません")
 
 
 def _reenter_update_center_for_fresh_broker_state(
@@ -1438,6 +1873,7 @@ def run_installed_smoke(
     acceptance_root: Path,
     private_key_path: Path,
     update_package: Path,
+    acceptance_scope: str = "update_lifecycle",
 ) -> None:
     if not os.environ.get("DISPLAY") or not os.environ.get("DBUS_SESSION_BUS_ADDRESS"):
         raise RuntimeError("隔離X11 displayとD-Bus sessionが必要です")
@@ -1448,6 +1884,8 @@ def run_installed_smoke(
     update_package = _resolve_regular_package(update_package)
     if temp_root not in update_package.parents:
         raise RuntimeError("rollback fixture packageがrun固有一時root外です")
+    if acceptance_scope not in {"update_lifecycle", "credential_vault"}:
+        raise RuntimeError("installed acceptance scopeが未対応です")
     resolved_private_key = private_key_path.resolve(strict=True)
     if (
         resolved_private_key != private_key_path
@@ -1520,16 +1958,26 @@ def run_installed_smoke(
     wayland_compositor: subprocess.Popen[bytes] | None = None
     wayland_process: subprocess.Popen[bytes] | None = None
     uninstall_process: subprocess.Popen[bytes] | None = None
+    secret_service_process: subprocess.Popen[bytes] | None = None
     uninstall_groups: set[int] = set()
     product_paths: set[Path] = set()
     preexisting: set[int] = set()
     app_log = acceptance_root / "installed-app.log"
     try:
-        _run_rust_test(RUST_CATALOG_RELAY_TIMEOUT_TEST, environment, private_key_path)
-        _run_rust_test(RUST_HELPER_EXIT_CLASS_TEST, environment, private_key_path)
-        _run_rust_test(RUST_CATALOG_TLS_PROVIDER_TEST, environment, private_key_path)
+        if acceptance_scope == "credential_vault":
+            secret_service_process = _start_isolated_secret_service(
+                environment,
+                acceptance_root / "keyring-control",
+                acceptance_root / "gnome-keyring.log",
+            )
+            _run_rust_test(RUST_SECRET_SERVICE_TEST, environment, private_key_path)
+        else:
+            _run_rust_test(RUST_CATALOG_RELAY_TIMEOUT_TEST, environment, private_key_path)
+            _run_rust_test(RUST_HELPER_EXIT_CLASS_TEST, environment, private_key_path)
+            _run_rust_test(RUST_CATALOG_TLS_PROVIDER_TEST, environment, private_key_path)
         _run_rust_test(RUST_STAGE_TEST, environment, private_key_path)
-        _run_rust_test(RUST_ROLLBACK_SEED_TEST, environment, private_key_path)
+        if acceptance_scope == "update_lifecycle":
+            _run_rust_test(RUST_ROLLBACK_SEED_TEST, environment, private_key_path)
         for test_only_name in (
             "D4P_LINUX_ACCEPTANCE_PACKAGE",
             "D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE",
@@ -1542,10 +1990,14 @@ def run_installed_smoke(
         record = json.loads(record_path.read_text(encoding="utf-8"))
         stage = product_root / "versions" / f"{record['product_version']}-{record['package_sha256']}"
         previous_record = record.get("previous")
-        if not isinstance(previous_record, dict):
+        if acceptance_scope == "update_lifecycle" and not isinstance(previous_record, dict):
             raise RuntimeError("Rollback受入れ前のactive recordに直前版がありません")
-        previous_stage = product_root / "versions" / (
-            f"{previous_record['product_version']}-{previous_record['package_sha256']}"
+        previous_stage = (
+            product_root / "versions" / (
+                f"{previous_record['product_version']}-{previous_record['package_sha256']}"
+            )
+            if isinstance(previous_record, dict)
+            else None
         )
         active_launcher = stage / "gui_shell_desktop_launcher"
         runner = stage / "gui_shell_desktop"
@@ -1556,12 +2008,18 @@ def run_installed_smoke(
         entries = list(applications.glob("*.desktop"))
         if len(entries) != 1 or not _desktop_entry_targets_fixed_launcher(entries[0], fixed_launcher):
             raise RuntimeError("登録desktop entryが固定installed launcherだけを指していません")
-        previous_binaries = {
-            previous_stage / "gui_shell_desktop_launcher",
-            previous_stage / "gui_shell_desktop",
-            previous_stage / "libexec/gui_shell_linux_broker",
-        }
-        if not all(path.is_file() and not path.is_symlink() for path in previous_binaries):
+        previous_binaries = (
+            {
+                previous_stage / "gui_shell_desktop_launcher",
+                previous_stage / "gui_shell_desktop",
+                previous_stage / "libexec/gui_shell_linux_broker",
+            }
+            if previous_stage is not None
+            else set()
+        )
+        if previous_binaries and not all(
+            path.is_file() and not path.is_symlink() for path in previous_binaries
+        ):
             raise RuntimeError("Rollback target stageの固定binaryが不足しています")
         product_paths = {
             fixed_launcher.resolve(),
@@ -1628,6 +2086,64 @@ def run_installed_smoke(
                 raise RuntimeError("installed BrokerのExport directoryがprivate／owner-boundではありません")
             if any(export_root.iterdir()):
                 raise RuntimeError("installed BrokerのExport directoryが受入れ前から空ではありません")
+
+            if acceptance_scope == "credential_vault":
+                if _secret_service_item_labels(environment):
+                    raise RuntimeError("Credential acceptance開始前のrun固有Secret Serviceが空ではありません")
+
+                def restart_application(old_window_id: str) -> str:
+                    nonlocal desktop_process
+                    desktop_process, restarted_window_id = _restart_installed_product(
+                        environment,
+                        old_window_id,
+                        fixed_launcher,
+                        entries[0],
+                        stage,
+                        acceptance_root / "installed-app-after-broker-restart.log",
+                        product_paths,
+                        preexisting,
+                        desktop_process,
+                    )
+                    return restarted_window_id
+
+                credential_evidence = _run_installed_credential_vault_acceptance(
+                    environment,
+                    window_id,
+                    target_server_id="installed-secret-service-server",
+                    audit_store=broker_state / "store",
+                    acceptance_root=acceptance_root,
+                    restart_application=restart_application,
+                )
+                current_window_id = _visible_product_window(environment)
+                if current_window_id is None:
+                    raise RuntimeError("Credential受入れ後にinstalled GTK windowが見つかりません")
+                _request_x11_window_manager_close(current_window_id, environment)
+                deadline = time.monotonic() + 60
+                while time.monotonic() < deadline:
+                    if not (_processes_using(product_paths) - preexisting):
+                        break
+                    time.sleep(0.2)
+                if _processes_using(product_paths) - preexisting:
+                    raise RuntimeError("Credential受入れ後の正常終了でowned processが残留しています")
+                if desktop_process.poll() is None:
+                    desktop_process.wait(timeout=10)
+                if desktop_process.returncode not in (0, None):
+                    raise RuntimeError("Credential受入れ後のdesktop launcher終了codeが不正です")
+                print(
+                    json.dumps(
+                        {
+                            "acceptance_scope": acceptance_scope,
+                            "installed_entry": str(entries[0]),
+                            "product_version": record["product_version"],
+                            "package_sha256": record["package_sha256"],
+                            "credential_vault": credential_evidence,
+                            "installed_app_exit": "normal_window_close_and_owned_process_cleanup",
+                        },
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    )
+                )
+                return
 
             _trigger_export_from_installed_ui(environment, window_id)
             _answer_owner_dialog(
@@ -2026,6 +2542,10 @@ def run_installed_smoke(
             _terminate_group(wayland_compositor)
         if uninstall_process is not None and uninstall_process.poll() is None:
             _stop_owned_processes(set(), uninstall_process)
+        if secret_service_process is not None and secret_service_process.poll() is None:
+            _terminate_group(secret_service_process)
+        if secret_service_process is not None and secret_service_process.poll() is None:
+            raise RuntimeError("run固有Secret Service processを停止できません")
         if acceptance_root.exists():
             resolved = acceptance_root.resolve(strict=True)
             if resolved == temp_root or temp_root not in resolved.parents or acceptance_root.is_symlink():
@@ -2042,6 +2562,11 @@ def main() -> int:
     parser.add_argument("--acceptance-root", type=Path, required=True)
     parser.add_argument("--private-key", type=Path, required=True)
     parser.add_argument("--update-package", type=Path, required=True)
+    parser.add_argument(
+        "--acceptance-scope",
+        choices=("update_lifecycle", "credential_vault"),
+        default="update_lifecycle",
+    )
     args = parser.parse_args()
     try:
         run_installed_smoke(
@@ -2050,6 +2575,7 @@ def main() -> int:
             args.acceptance_root,
             args.private_key,
             args.update_package,
+            args.acceptance_scope,
         )
     except Exception as error:
         print(f"Linux installed product GTK受入れ 不合格: {error}", file=sys.stderr)

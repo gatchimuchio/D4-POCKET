@@ -15,6 +15,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _actionable_node,
     _answer_owner_dialog,
     _bounded_owner_text_diagnostics,
+    _assert_secret_absent_from_files,
     _catalog_failure_diagnostics,
     _component_center,
     _desktop_entry_targets_fixed_launcher,
@@ -23,7 +24,9 @@ from tooling.tests.linux_installed_product_smoke import (
     _helper_exit_diagnostics,
     _resolve_regular_package,
     _safe_log_tail,
+    _secret_service_item_labels,
     _verify_export_manifest,
+    _verify_credential_audit,
     _verify_live_audit,
     _verify_uninstalled_state,
     _trigger_update_action_from_installed_ui,
@@ -433,7 +436,7 @@ class InstalledOwnerSummaryTests(unittest.TestCase):
         self.assertIn("state->summary[line_end] != '\\n'", source)
 
 
-class LinuxInstalledDesktopEntryTests(unittest.TestCase):
+class LinuxWaylandEnvironmentTests(unittest.TestCase):
     def test_wayland_launch_environment_cannot_fall_back_to_x11(self) -> None:
         source = {
             "DISPLAY": ":99",
@@ -453,6 +456,132 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
         self.assertEqual(result["XDG_RUNTIME_DIR"], source["XDG_RUNTIME_DIR"])
         self.assertEqual(source["DISPLAY"], ":99")
 
+
+class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
+    def test_secret_service_listing_reads_metadata_without_requesting_values(self) -> None:
+        completed = subprocess.CompletedProcess(
+            args=[],
+            returncode=0,
+            stdout=(
+                "[/org/freedesktop/secrets/collection/login/item1]\n"
+                "label = D4 Pocket credential key\n"
+                "application = d4-pocket\n"
+                "[/org/freedesktop/secrets/collection/login/item2]\n"
+                "label = D4 Pocket credential ciphertext\n"
+                "application = d4-pocket\n"
+            ),
+            stderr="",
+        )
+        with patch(
+            "tooling.tests.linux_installed_product_smoke.subprocess.run",
+            return_value=completed,
+        ) as run:
+            labels = _secret_service_item_labels({})
+
+        self.assertEqual(
+            sorted(labels),
+            ["D4 Pocket credential ciphertext", "D4 Pocket credential key"],
+        )
+        self.assertNotIn("--all", run.call_args.args[0])
+
+    def test_secret_service_listing_rejects_any_value_output(self) -> None:
+        completed = subprocess.CompletedProcess(
+            args=[], returncode=0, stdout="label = key\nsecret = never-print-this\n", stderr=""
+        )
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke.subprocess.run",
+                return_value=completed,
+            ),
+            self.assertRaisesRegex(RuntimeError, "unexpectedly exposed a value"),
+        ):
+            _secret_service_item_labels({})
+
+    def test_audit_chain_hmac_and_secret_non_exposure(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = Path(directory) / "store"
+            store.mkdir()
+            key = b"k" * 32
+            previous_hash = None
+            events = []
+            for index, (operation, decision) in enumerate(
+                (
+                    ("資格情報登録", "rejected"),
+                    ("資格情報登録", "accepted"),
+                    ("資格情報失効", "rejected"),
+                    ("資格情報失効", "accepted"),
+                ),
+                start=1,
+            ):
+                event = {
+                    "event_id": f"broker-audit-{index}",
+                    "request_id": f"credential-request-{index}",
+                    "operation": operation,
+                    "decision": decision,
+                    "reason": "metadata only",
+                    "evidence_source": "INTERNAL_STATE",
+                    "payload_hash": f"sha256:{index:064x}",
+                    "previous_event_hash": previous_hash,
+                }
+                hash_input = "|".join(
+                    (
+                        event["event_id"],
+                        event["request_id"],
+                        event["operation"],
+                        event["decision"],
+                        event["reason"],
+                        event["evidence_source"],
+                        event["payload_hash"],
+                        previous_hash or "",
+                    )
+                )
+                previous_hash = "sha256:" + hashlib.sha256(
+                    hash_input.encode("utf-8")
+                ).hexdigest()
+                event["event_hash"] = previous_hash
+                events.append(event)
+            (store / "audit.jsonl").write_text(
+                "".join(json.dumps(event) + "\n" for event in events),
+                encoding="utf-8",
+            )
+            anchor_input = (
+                f"version=1|event_count={len(events)}|head_event_hash={previous_hash}"
+            ).encode("utf-8")
+            anchor_hmac = "sha256:" + hmac.new(
+                key, anchor_input, hashlib.sha256
+            ).hexdigest()
+            (store / "audit_anchor.json").write_text(
+                json.dumps(
+                    {
+                        "version": 1,
+                        "event_count": len(events),
+                        "head_event_hash": previous_hash,
+                        "anchor_hmac": anchor_hmac,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (store / "audit_anchor.key").write_text(key.hex(), encoding="ascii")
+            self.assertEqual(
+                _verify_credential_audit(store, "secret-not-in-audit"),
+                {"events": 4, "registration_events": 2, "revocation_events": 2},
+            )
+            with (store / "audit.jsonl").open("ab") as audit:
+                audit.write(b"secret-not-in-audit")
+            with self.assertRaisesRegex(RuntimeError, "leaked into durable Audit"):
+                _verify_credential_audit(store, "secret-not-in-audit")
+
+    def test_acceptance_file_scan_reports_leak_without_echoing_value(self) -> None:
+        marker = "test-secret-that-must-not-escape"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "test.log").write_text(marker, encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "leaked into an acceptance file") as error:
+                _assert_secret_absent_from_files(root, marker)
+        self.assertNotIn(marker, str(error.exception))
+
+
+class LinuxInstalledDesktopEntryTests(unittest.TestCase):
     def test_waits_for_native_owner_dialog_to_become_visible(self) -> None:
         from unittest.mock import patch
 
