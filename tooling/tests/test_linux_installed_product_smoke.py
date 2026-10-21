@@ -353,17 +353,18 @@ class InstalledOwnerSummaryTests(unittest.TestCase):
         self.assertNotIn(r"C:\Users\runner", observed)
         self.assertIn("<path>", observed)
 
-    def test_linux_native_owner_summary_uses_multiline_atk_text_view(self) -> None:
+    def test_linux_native_owner_summary_uses_bounded_accessible_line_labels(self) -> None:
         source = (
             Path(__file__).resolve().parents[2]
             / "apps/desktop_flutter/linux/runner/broker_process_channel.cc"
         ).read_text(encoding="utf-8")
-        self.assertIn("gtk_text_view_set_editable(GTK_TEXT_VIEW(summary_view), FALSE)", source)
         self.assertIn(
-            "gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(summary_view), GTK_WRAP_WORD_CHAR)",
+            "constexpr size_t kOwnerSummaryLineLimit = 256;",
             source,
         )
-        self.assertIn("state->summary.c_str(), -1", source)
+        self.assertIn("std::count(state->summary.begin(), state->summary.end()", source)
+        self.assertIn("gtk_label_new(line.c_str())", source)
+        self.assertIn("state->summary[line_end] != '\\n'", source)
 
 
 class LinuxInstalledDesktopEntryTests(unittest.TestCase):

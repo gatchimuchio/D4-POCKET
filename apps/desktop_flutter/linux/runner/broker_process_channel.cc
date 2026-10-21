@@ -18,6 +18,7 @@ namespace {
 constexpr size_t kRequestLimit = 64 * 1024;
 constexpr size_t kResponseLimit = 4 * 1024 * 1024;
 constexpr size_t kOwnerSummaryLimit = 16 * 1024;
+constexpr size_t kOwnerSummaryLineLimit = 256;
 constexpr size_t kOwnerPromptFrameLimit = kOwnerSummaryLimit * 2 + 64;
 constexpr size_t kOwnerChallengeLength = 32;
 constexpr unsigned int kMaxQueuedRequests = 16;
@@ -168,6 +169,11 @@ gboolean show_owner_dialog_on_gtk_thread(gpointer data) {
     finish_owner_dialog(state, false);
     return G_SOURCE_REMOVE;
   }
+  if (static_cast<size_t>(std::count(state->summary.begin(), state->summary.end(),
+                                     '\n')) >= kOwnerSummaryLineLimit) {
+    finish_owner_dialog(state, false);
+    return G_SOURCE_REMOVE;
+  }
 
   GtkWidget* dialog = gtk_dialog_new_with_buttons(
       "D4 Pocket Owner確認", state->parent,
@@ -181,18 +187,24 @@ gboolean show_owner_dialog_on_gtk_thread(gpointer data) {
   GtkWidget* scroller = gtk_scrolled_window_new(nullptr, nullptr);
   gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroller),
                                  GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
-  GtkWidget* summary_view = gtk_text_view_new();
-  gtk_text_view_set_editable(GTK_TEXT_VIEW(summary_view), FALSE);
-  gtk_text_view_set_cursor_visible(GTK_TEXT_VIEW(summary_view), FALSE);
-  gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(summary_view), GTK_WRAP_WORD_CHAR);
-  gtk_text_view_set_left_margin(GTK_TEXT_VIEW(summary_view), 0);
-  gtk_text_view_set_right_margin(GTK_TEXT_VIEW(summary_view), 0);
-  gtk_text_view_set_top_margin(GTK_TEXT_VIEW(summary_view), 0);
-  gtk_text_view_set_bottom_margin(GTK_TEXT_VIEW(summary_view), 0);
-  gtk_widget_set_can_focus(summary_view, FALSE);
-  gtk_text_buffer_set_text(gtk_text_view_get_buffer(GTK_TEXT_VIEW(summary_view)),
-                           state->summary.c_str(), -1);
-  gtk_container_add(GTK_CONTAINER(scroller), summary_view);
+  GtkWidget* summary_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
+  size_t line_start = 0;
+  for (size_t line_end = 0; line_end <= state->summary.size(); ++line_end) {
+    if (line_end < state->summary.size() &&
+        state->summary[line_end] != '\n') {
+      continue;
+    }
+    const std::string line =
+        state->summary.substr(line_start, line_end - line_start);
+    GtkWidget* label = gtk_label_new(line.c_str());
+    gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
+    gtk_label_set_line_wrap_mode(GTK_LABEL(label), PANGO_WRAP_WORD_CHAR);
+    gtk_label_set_xalign(GTK_LABEL(label), 0.0f);
+    gtk_label_set_yalign(GTK_LABEL(label), 0.0f);
+    gtk_box_pack_start(GTK_BOX(summary_box), label, FALSE, FALSE, 0);
+    line_start = line_end + 1;
+  }
+  gtk_container_add(GTK_CONTAINER(scroller), summary_box);
   gtk_container_add(GTK_CONTAINER(content), scroller);
   if (state->expired.load()) {
     gtk_widget_destroy(dialog);
