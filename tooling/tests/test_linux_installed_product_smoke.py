@@ -24,6 +24,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _verify_export_manifest,
     _verify_live_audit,
     _verify_uninstalled_state,
+    _trigger_update_action_from_installed_ui,
     _wait_for_catalog_fetch_status,
     _wayland_launch_environment,
     _wait_for_owner_dialog_window,
@@ -190,6 +191,28 @@ class AccessibleActionResolutionTests(unittest.TestCase):
         self.assertEqual(
             focused_lookup.call_args.kwargs["root"], find_accessible.return_value
         )
+
+    def test_update_action_uses_visible_focus_when_flutter_exposes_no_action(self) -> None:
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._open_update_center_from_installed_ui",
+                return_value=object(),
+            ) as open_center,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_accessible"
+            ) as find_accessible,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._activate_named_control_by_keyboard"
+            ) as activate_by_focus,
+        ):
+            _trigger_update_action_from_installed_ui(
+                {"DISPLAY": ":99"}, "0x42", "download"
+            )
+
+        self.assertEqual(open_center.call_args.args, ({"DISPLAY": ":99"}, "0x42"))
+        self.assertEqual(find_accessible.call_args.args[0], "download")
+        self.assertEqual(find_accessible.call_args.kwargs["root"], open_center.return_value)
+        activate_by_focus.assert_called_once_with("download", {"DISPLAY": ":99"}, "0x42")
 
 
 class InstalledCatalogFetchStatusTests(unittest.TestCase):

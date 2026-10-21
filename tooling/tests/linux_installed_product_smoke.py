@@ -520,8 +520,10 @@ def _trigger_update_action_from_installed_ui(
     environment: dict[str, str], window_id: str, action: str
 ):
     window = _open_update_center_from_installed_ui(environment, window_id)
-    button = _find_operable_accessible(action, root=window, timeout=10)
-    _activate_accessible(button, action, environment)
+    # Flutter may expose a TextButton label without an AT-SPI action/bounds.
+    # Resolve the visible exact label, then use the existing focus-checked path.
+    _find_accessible(action, root=window, timeout=10)
+    _activate_named_control_by_keyboard(action, environment, window_id)
     return window
 
 
