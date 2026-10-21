@@ -48,6 +48,7 @@ RUST_SECRET_SERVICE_TEST = (
 MCP_PUBLIC_INPUT = "installed-mcp-public-input"
 MCP_RESULT_PREFIX = "D4P_MCP_RESULT_PROBE_"
 MCP_OWNER_WORKSPACE_LABEL = "Workspace: "
+MCP_OWNER_ARGUMENT_HASH_MARKER = "引数hash:"
 MCP_OWNER_NO_CREDENTIAL_MARKER = "Credential注入: なし"
 RUST_AUDIT_TEST = (
     "broker::update_center::tests::linux_installed_acceptance_runtime_audit_is_durable"
@@ -1417,7 +1418,7 @@ def _run_installed_mcp_tool_acceptance(
         expected_summary_markers=(
             f"Server ID: {server_id}",
             "Tool: echo",
-            "arguments hash:",
+            MCP_OWNER_ARGUMENT_HASH_MARKER,
         ),
     )
     _wait_for_owner_dialog_closed(environment)

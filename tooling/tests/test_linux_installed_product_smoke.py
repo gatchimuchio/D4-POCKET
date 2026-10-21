@@ -41,6 +41,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _trigger_update_action_from_installed_ui,
     _wait_for_catalog_fetch_status,
     _wayland_launch_environment,
+    MCP_OWNER_ARGUMENT_HASH_MARKER,
     MCP_OWNER_NO_CREDENTIAL_MARKER,
     MCP_OWNER_WORKSPACE_LABEL,
     _owner_dialog_timeout_diagnostics,
@@ -523,8 +524,10 @@ class InstalledOwnerSummaryTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn(f"{MCP_OWNER_WORKSPACE_LABEL}{{}}", broker)
+        self.assertIn(MCP_OWNER_ARGUMENT_HASH_MARKER, broker)
         self.assertIn(MCP_OWNER_NO_CREDENTIAL_MARKER, broker)
         self.assertIn('f"{MCP_OWNER_WORKSPACE_LABEL}{workspace}"', acceptance)
+        self.assertIn("MCP_OWNER_ARGUMENT_HASH_MARKER,", acceptance)
         self.assertIn("MCP_OWNER_NO_CREDENTIAL_MARKER,", acceptance)
 
     def test_installed_mcp_owner_summary_is_accepted_before_decision(self) -> None:
@@ -537,7 +540,7 @@ class InstalledOwnerSummaryTests(unittest.TestCase):
             f"実行file: {executable}",
             f"{MCP_OWNER_WORKSPACE_LABEL}{workspace}",
             "引数: 2項目",
-            "引数hash: sha256:" + "a" * 64,
+            MCP_OWNER_ARGUMENT_HASH_MARKER + " sha256:" + "a" * 64,
             MCP_OWNER_NO_CREDENTIAL_MARKER,
             "LinuxではDesktop sandboxを付与しません。",
             "要求hash: sha256:" + "b" * 64,
