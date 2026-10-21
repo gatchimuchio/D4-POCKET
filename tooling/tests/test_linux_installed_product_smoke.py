@@ -693,7 +693,7 @@ class InstalledMcpToolListTests(unittest.TestCase):
             ],
         )
 
-    def test_argument_preview_and_continue_are_resolved_from_window_root(self) -> None:
+    def test_argument_preview_uses_accessible_text_snapshot_before_continue(self) -> None:
         events: list[tuple[object, ...]] = []
         environment = {"DISPLAY": ":99"}
         window = object()
@@ -702,6 +702,14 @@ class InstalledMcpToolListTests(unittest.TestCase):
         def find_accessible(name: str, *, root: object, timeout: float):
             events.append(("find", name, root, timeout))
             return object()
+
+        def accessible_snapshot(root: object):
+            events.append(("snapshot", root))
+            return (
+                "送信する引数を確認\n"
+                '{"text": "installed-mcp-public-input"}\n'
+                "Tool結果本文は返却されず"
+            )
 
         def find_operable(name: str, *, root: object, timeout: float):
             events.append(("find-button", name, root, timeout))
@@ -714,6 +722,10 @@ class InstalledMcpToolListTests(unittest.TestCase):
             patch(
                 "tooling.tests.linux_installed_product_smoke._find_accessible",
                 side_effect=find_accessible,
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._accessible_snapshot",
+                side_effect=accessible_snapshot,
             ),
             patch(
                 "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
@@ -730,12 +742,32 @@ class InstalledMcpToolListTests(unittest.TestCase):
             events,
             [
                 ("find", "送信する引数を確認", window, 10),
-                ("find", "installed-mcp-public-input", window, 5),
-                ("find", "Tool結果本文は返却されず", window, 5),
+                ("snapshot", window),
                 ("find-button", "Linux確認へ進む", window, 10),
                 ("activate", proceed_button, "Linux確認へ進む", environment),
             ],
         )
+
+    def test_argument_preview_missing_public_input_fails_before_native_owner_step(
+        self,
+    ) -> None:
+        window = object()
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_accessible"
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._accessible_snapshot",
+                return_value="送信する引数を確認\nTool結果本文は返却されず",
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_operable_accessible"
+            ) as find_button,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "public arguments"):
+                _review_single_installed_mcp_tool_arguments({}, window)
+
+        find_button.assert_not_called()
 
 
 class LinuxWaylandEnvironmentTests(unittest.TestCase):

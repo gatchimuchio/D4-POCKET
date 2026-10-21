@@ -172,7 +172,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "0e75f0f43ec89959c36a3284f7ee86193c164904e344430f3a8501d558a4f856"
+      "sha256": "b6beb39ca68377193b13abee03fc6808164658acfb4d76536ea0fb209e49985d"
     },
     {
       "path": "SECURITY.md",
@@ -1308,7 +1308,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "e100dde74d4da0e51a76c6b2cada6782e552b835658b8bc6426066eca29f5f32"
+      "sha256": "62a2056645062b5d1089533fd92545eeea8cfac23eaf3e69aeb2bbbaaf565cf3"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -5212,7 +5212,7 @@
     },
     {
       "path": "tooling/tests/linux_installed_product_smoke.py",
-      "sha256": "1ef2cc50353a051baf2d1eb85c6b51bc033247a397292b41dc4ad36d7c45f174"
+      "sha256": "77b93f6068b227a2737c273280b2463021165650b5b5ae2a65028a248f7b190a"
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",
@@ -5224,7 +5224,7 @@
     },
     {
       "path": "tooling/tests/test_linux_installed_product_smoke.py",
-      "sha256": "4a15e4dadb1b55445843663ee336db375070985d8cf47845f56a9e0d14ded3bb"
+      "sha256": "fbfcff3c6e0c344ddc171a1d1720c5f7a2f8c01dce1c15759f8c0019c2fa3321"
     },
     {
       "path": "tooling/tests/test_linux_product_package.py",

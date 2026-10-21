@@ -1314,8 +1314,16 @@ def _review_single_installed_mcp_tool_arguments(
     environment: dict[str, str], window: object
 ) -> None:
     _find_accessible("送信する引数を確認", root=window, timeout=10)
-    _find_accessible(MCP_PUBLIC_INPUT, root=window, timeout=5)
-    _find_accessible("Tool結果本文は返却されず", root=window, timeout=5)
+    preview = _accessible_snapshot(window)
+    if MCP_PUBLIC_INPUT not in preview:
+        raise RuntimeError(
+            "installed MCP public arguments are not exposed in the product UI "
+            "accessibility tree"
+        )
+    if "Tool結果本文は返却されず" not in preview:
+        raise RuntimeError(
+            "installed MCP result-exposure notice is missing from the product UI"
+        )
     proceed = _find_operable_accessible("Linux確認へ進む", root=window, timeout=10)
     _activate_accessible(proceed, "Linux確認へ進む", environment)
 
