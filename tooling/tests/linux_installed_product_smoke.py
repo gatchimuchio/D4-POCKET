@@ -1292,6 +1292,24 @@ def _expand_single_installed_mcp_tool_list(
     _find_accessible("echo", root=window, timeout=15)
 
 
+def _enter_single_installed_mcp_tool_arguments(
+    environment: dict[str, str], window: object, window_id: str
+) -> None:
+    _find_accessible("echo のarguments", root=window, timeout=10)
+    arguments = json.dumps({"text": MCP_PUBLIC_INPUT}, ensure_ascii=False)
+    _set_public_text_by_keyboard(
+        window,
+        "JSON形式のobject",
+        arguments,
+        environment,
+        window_id,
+    )
+    confirm_arguments = _find_operable_accessible(
+        "入力内容を確認", root=window, timeout=10
+    )
+    _activate_accessible(confirm_arguments, "入力内容を確認", environment)
+
+
 def _run_installed_mcp_tool_acceptance(
     environment: dict[str, str],
     window_id: str,
@@ -1370,19 +1388,7 @@ def _run_installed_mcp_tool_acceptance(
     _expand_single_installed_mcp_tool_list(environment, window)
     run_tool = _find_operable_accessible("確認して実行", root=window, timeout=10)
     _activate_accessible(run_tool, "確認して実行", environment)
-    arguments_dialog = _find_accessible("echo のarguments", root=window, timeout=10)
-    arguments = json.dumps({"text": MCP_PUBLIC_INPUT}, ensure_ascii=False)
-    _set_public_text_by_keyboard(
-        arguments_dialog,
-        "JSON形式のobject",
-        arguments,
-        environment,
-        window_id,
-    )
-    confirm_arguments = _find_operable_accessible(
-        "入力内容を確認", root=arguments_dialog, timeout=10
-    )
-    _activate_accessible(confirm_arguments, "入力内容を確認", environment)
+    _enter_single_installed_mcp_tool_arguments(environment, window, window_id)
     confirmation = _find_accessible("送信する引数を確認", root=window, timeout=10)
     _find_accessible(MCP_PUBLIC_INPUT, root=confirmation, timeout=5)
     _find_accessible("Tool結果本文は返却されず", root=confirmation, timeout=5)

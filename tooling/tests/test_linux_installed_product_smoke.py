@@ -22,6 +22,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _component_center,
     _credential_scan_file_role,
     _desktop_entry_targets_fixed_launcher,
+    _enter_single_installed_mcp_tool_arguments,
     _expand_single_installed_mcp_tool_list,
     _focused_named_accessible,
     _find_operable_accessible,
@@ -625,6 +626,69 @@ class InstalledMcpToolListTests(unittest.TestCase):
                 ("find-control", "Tool一覧：1件", window, 15),
                 ("activate", tool_list, "Tool一覧：1件", environment),
                 ("find-tool", "echo", window, 15),
+            ],
+        )
+
+    def test_argument_field_and_button_are_resolved_from_window_root(self) -> None:
+        events: list[tuple[object, ...]] = []
+        environment = {"DISPLAY": ":99"}
+        window = object()
+        confirm_button = object()
+
+        def find_accessible(name: str, *, root: object, timeout: float):
+            events.append(("find-title", name, root, timeout))
+            return object()
+
+        def set_public_text(
+            root: object,
+            label: str,
+            value: str,
+            observed_environment: dict[str, str],
+            window_id: str,
+        ):
+            events.append(("set-text", root, label, value, observed_environment, window_id))
+
+        def find_operable(name: str, *, root: object, timeout: float):
+            events.append(("find-button", name, root, timeout))
+            return confirm_button
+
+        def activate(control: object, name: str, observed_environment: dict[str, str]):
+            events.append(("activate", control, name, observed_environment))
+
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_accessible",
+                side_effect=find_accessible,
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._set_public_text_by_keyboard",
+                side_effect=set_public_text,
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
+                side_effect=find_operable,
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._activate_accessible",
+                side_effect=activate,
+            ),
+        ):
+            _enter_single_installed_mcp_tool_arguments(environment, window, "0x42")
+
+        self.assertEqual(
+            events,
+            [
+                ("find-title", "echo のarguments", window, 10),
+                (
+                    "set-text",
+                    window,
+                    "JSON形式のobject",
+                    '{"text": "installed-mcp-public-input"}',
+                    environment,
+                    "0x42",
+                ),
+                ("find-button", "入力内容を確認", window, 10),
+                ("activate", confirm_button, "入力内容を確認", environment),
             ],
         )
 
