@@ -800,7 +800,28 @@ class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
         self.assertIn("files_scanned=0", str(error.exception))
         self.assertIn("next_file_bytes=9", str(error.exception))
         self.assertIn("next_file_role=diagnostic_or_text", str(error.exception))
+        self.assertIn("scanned_role_totals=none", str(error.exception))
         self.assertNotIn("large.log", str(error.exception))
+
+    def test_acceptance_file_scan_budget_diagnostic_has_role_totals_only(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "first.log").write_bytes(b"1234")
+            (root / "second.json").write_bytes(b"5678")
+            (root / "third.txt").write_bytes(b"9012")
+            with (
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._CREDENTIAL_SCAN_MAX_BYTES",
+                    8,
+                ),
+                self.assertRaisesRegex(RuntimeError, "bounded byte budget") as error,
+            ):
+                _assert_secret_absent_from_files(root, "test-secret")
+        diagnostic = str(error.exception)
+        self.assertIn("scanned_role_totals=diagnostic_or_text(files=2,bytes=8)", diagnostic)
+        self.assertNotIn("first.log", diagnostic)
+        self.assertNotIn("second.json", diagnostic)
+        self.assertNotIn("third.txt", diagnostic)
 
 
 class LinuxInstalledDesktopEntryTests(unittest.TestCase):

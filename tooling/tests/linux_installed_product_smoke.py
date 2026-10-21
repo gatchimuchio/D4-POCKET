@@ -882,6 +882,15 @@ def _credential_scan_file_role(path: Path, root: Path) -> str:
     return "other_regular_file"
 
 
+def _credential_scan_role_summary(
+    totals: dict[str, tuple[int, int]],
+) -> str:
+    return ",".join(
+        f"{role}(files={file_count},bytes={byte_count})"
+        for role, (file_count, byte_count) in sorted(totals.items())
+    ) or "none"
+
+
 def _assert_secret_absent_from_files(
     root: Path, secret: str, *, excluded_roots: tuple[Path, ...] = ()
 ) -> None:
@@ -889,6 +898,25 @@ def _assert_secret_absent_from_files(
     excluded = tuple(path.resolve(strict=True) for path in excluded_roots)
     remaining = _CREDENTIAL_SCAN_MAX_BYTES
     files_scanned = 0
+    role_totals: dict[str, tuple[int, int]] = {}
+
+    def budget_error(
+        *,
+        next_file_bytes: int | None = None,
+        next_file_role: str | None = None,
+    ) -> RuntimeError:
+        next_file = (
+            f", next_file_bytes={next_file_bytes}, next_file_role={next_file_role}"
+            if next_file_bytes is not None and next_file_role is not None
+            else ""
+        )
+        return RuntimeError(
+            "Credential acceptance scan exceeds its bounded byte budget "
+            f"(files_scanned={files_scanned}, "
+            f"scanned_bytes={_CREDENTIAL_SCAN_MAX_BYTES - remaining}"
+            f"{next_file}, scanned_role_totals={_credential_scan_role_summary(role_totals)})"
+        )
+
     for path in root.rglob("*"):
         if any(path.is_relative_to(excluded_root) for excluded_root in excluded):
             continue
@@ -896,24 +924,26 @@ def _assert_secret_absent_from_files(
             metadata = path.lstat()
             if not stat.S_ISREG(metadata.st_mode):
                 continue
+            role = _credential_scan_file_role(path, root)
             if metadata.st_size > remaining:
-                raise RuntimeError(
-                    "Credential acceptance scan exceeds its bounded byte budget "
-                    f"(files_scanned={files_scanned}, "
-                    f"scanned_bytes={_CREDENTIAL_SCAN_MAX_BYTES - remaining}, "
-                    f"next_file_bytes={metadata.st_size}, "
-                    f"next_file_role={_credential_scan_file_role(path, root)})"
+                raise budget_error(
+                    next_file_bytes=metadata.st_size,
+                    next_file_role=role,
                 )
+            role_file_count, role_byte_count = role_totals.get(role, (0, 0))
+            role_totals[role] = (role_file_count + 1, role_byte_count)
             with path.open("rb") as stream:
                 overlap = b""
                 while chunk := stream.read(min(_CREDENTIAL_SCAN_CHUNK_BYTES, remaining + 1)):
                     remaining -= len(chunk)
+                    role_totals[role] = (
+                        role_totals[role][0],
+                        role_totals[role][1] + len(chunk),
+                    )
                     if remaining < 0:
-                        raise RuntimeError(
-                            "Credential acceptance scan exceeds its bounded byte budget "
-                            f"(files_scanned={files_scanned}, "
-                            f"scanned_bytes={_CREDENTIAL_SCAN_MAX_BYTES - remaining}, "
-                            f"next_file_role={_credential_scan_file_role(path, root)})"
+                        raise budget_error(
+                            next_file_bytes=metadata.st_size,
+                            next_file_role=role,
                         )
                     content = overlap + chunk
                     if marker in content:
