@@ -5274,8 +5274,9 @@ mod tests {
             record.candidate.update_id,
             "linux-installed-catalog-display"
         );
-        assert_eq!(record.candidate.current_version, "0.1.0");
+        assert_eq!(record.candidate.current_version, "0.1.1");
         assert_eq!(record.candidate.offered_version, "0.1.2");
+        assert!(record.candidate.rollback_available);
     }
 
     fn install_test_package() -> Vec<u8> {

@@ -19,6 +19,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 APP_ID = "d4-pocket-app-11111111111111111111111111111111"
 AUDIT_ID = "audit-store-22222222222222222222222222222222"
+UPDATE_ID = "linux-installed-catalog-display"
+UPDATE_VERSION = "0.1.2"
 WINDOW_TITLE = "D4 Pocket powered by GUI Shell"
 OWNER_DIALOG_TITLE = "D4 Pocket Owner確認"
 UNINSTALL_BUTTON = "D4 Pocketをアンインストール"
@@ -475,12 +477,52 @@ def _open_update_center_from_installed_ui(
     return window
 
 
+def _reenter_update_center_for_fresh_broker_state(
+    environment: dict[str, str], window_id: str
+):
+    window = _find_accessible(WINDOW_TITLE, timeout=10)
+    subprocess.run(
+        ["xdotool", "windowactivate", "--sync", window_id],
+        env=environment,
+        check=True,
+        timeout=5,
+    )
+    subprocess.run(
+        ["xdotool", "key", "--clearmodifiers", "ctrl+k"],
+        env=environment,
+        check=True,
+        timeout=5,
+    )
+    _find_accessible("コマンドパレット", root=window, timeout=10)
+    subprocess.run(
+        ["xdotool", "type", "--clearmodifiers", "--delay", "30", "runtime"],
+        env=environment,
+        check=True,
+        timeout=5,
+    )
+    runtime_command = _find_operable_accessible(
+        "Runtimeを開く", root=window, timeout=10
+    )
+    _activate_accessible(runtime_command, "Runtimeを開く", environment)
+    time.sleep(0.25)
+    return _open_update_center_from_installed_ui(environment, window_id)
+
+
 def _trigger_rollback_from_installed_ui(
     environment: dict[str, str], window_id: str
 ) -> None:
     window = _open_update_center_from_installed_ui(environment, window_id)
     _find_accessible("直前版へ戻す", root=window, timeout=10)
     _activate_named_control_by_keyboard("直前版へ戻す", environment, window_id)
+
+
+def _trigger_update_action_from_installed_ui(
+    environment: dict[str, str], window_id: str, action: str
+):
+    window = _open_update_center_from_installed_ui(environment, window_id)
+    button = _find_operable_accessible(action, root=window, timeout=10)
+    _activate_accessible(button, action, environment)
+    return window
 
 
 def _trigger_catalog_fetch_from_installed_ui(
@@ -504,7 +546,7 @@ def _trigger_catalog_fetch_from_installed_ui(
         "candidate": candidate.name,
         "signature": "verified_by_current_broker_trust",
         "source": "raw.githubusercontent.com",
-        "package_downloaded": "not_attempted",
+        "package_downloaded": "download-and-apply-follows-in-this-acceptance",
     }
 
 
@@ -604,6 +646,265 @@ def _answer_owner_dialog(
     _activate_accessible(button, decision, environment)
 
 
+def _wait_for_owner_dialog_closed(
+    environment: dict[str, str], *, timeout: float = 15.0
+) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        result = subprocess.run(
+            [
+                "xdotool",
+                "search",
+                "--onlyvisible",
+                "--name",
+                f"^{re.escape(OWNER_DIALOG_TITLE)}$",
+            ],
+            env=environment,
+            capture_output=True,
+            check=False,
+            timeout=5,
+        )
+        if result.returncode != 0:
+            return
+        time.sleep(0.1)
+    raise RuntimeError("native Owner確認dialogが閉じませんでした")
+
+
+def _wait_for_audit_event(
+    audit_path: Path,
+    operation: str,
+    decision: str,
+    *,
+    evidence_source: str | None = None,
+    timeout: float = 90.0,
+) -> dict[str, object]:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            events = [
+                json.loads(line)
+                for line in audit_path.read_text(encoding="utf-8").splitlines()
+                if line
+            ]
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            events = []
+        for event in reversed(events):
+            if (
+                event.get("operation") == operation
+                and event.get("decision") == decision
+                and (
+                    evidence_source is None
+                    or event.get("evidence_source") == evidence_source
+                )
+            ):
+                return event
+        time.sleep(0.2)
+    raise RuntimeError(
+        f"installed Auditにterminal eventがありません: {operation}/{decision}"
+    )
+
+
+def _installed_update_download_stage_activate(
+    environment: dict[str, str],
+    window_id: str,
+    *,
+    product_root: Path,
+    record_path: Path,
+    desktop_entry: Path,
+    audit_path: Path,
+    product_paths: set[Path],
+) -> dict[str, object]:
+    fixture_package = (
+        ROOT
+        / "tooling/tests/fixtures/linux-update-catalog"
+        / f"{UPDATE_ID}.pkg"
+    ).resolve(strict=True)
+    package_bytes = fixture_package.read_bytes()
+    package_hash = hashlib.sha256(package_bytes).hexdigest()
+    store_root = audit_path.parent
+    package_store = store_root / "update_packages"
+    downloaded_package = package_store / f"{package_hash}.pkg"
+    record_before = record_path.read_bytes()
+    entry_before = desktop_entry.read_bytes()
+    current = json.loads(record_before)
+    if current.get("product_version") != "0.1.1":
+        raise RuntimeError("remote update開始時のactive versionが0.1.1ではありません")
+
+    download_markers = (
+        "Linux製品の署名検査済み更新packageを取得しますか？",
+        f"更新ID: {UPDATE_ID}",
+        f"提供版: {UPDATE_VERSION}",
+        "取得host: raw.githubusercontent.com",
+        package_hash,
+        str(len(package_bytes)),
+    )
+    _trigger_update_action_from_installed_ui(environment, window_id, "download")
+    _answer_owner_dialog(
+        environment, "拒否", expected_summary_markers=download_markers
+    )
+    _wait_for_owner_dialog_closed(environment)
+    if downloaded_package.exists() or (
+        package_store.exists() and list(package_store.glob("*.part"))
+    ):
+        raise RuntimeError("download Owner拒否後にpackageまたはpartial fileが作成されました")
+    if record_path.read_bytes() != record_before or desktop_entry.read_bytes() != entry_before:
+        raise RuntimeError("download Owner拒否がinstalled product状態を変更しました")
+
+    _trigger_update_action_from_installed_ui(environment, window_id, "download")
+    _answer_owner_dialog(
+        environment, "許可", expected_summary_markers=download_markers
+    )
+    _find_accessible("download jobを開始しました", timeout=15)
+    _wait_for_audit_event(
+        audit_path,
+        "更新download要求",
+        "completed",
+        evidence_source="LIVE_RUNTIME",
+    )
+    package_metadata = downloaded_package.lstat()
+    if (
+        not package_metadata.is_file()
+        or downloaded_package.is_symlink()
+        or package_metadata.st_nlink != 1
+        or package_metadata.st_mode & 0o022
+        or downloaded_package.read_bytes() != package_bytes
+    ):
+        raise RuntimeError("Broker固定store上のremote download byte/hash/identityが一致しません")
+
+    window = _reenter_update_center_for_fresh_broker_state(environment, window_id)
+    _find_accessible("download済み（installは別途保留）", root=window, timeout=15)
+    stage_directory = product_root / "versions" / f"{UPDATE_VERSION}-{package_hash}"
+    stage_markers = (
+        "Linux製品の署名検査済みpackageを固定導入先へ展開しますか？",
+        f"更新ID: {UPDATE_ID}",
+        f"提供版: {UPDATE_VERSION}",
+        f"package SHA-256: {package_hash}",
+        APP_ID,
+        AUDIT_ID,
+        str(stage_directory),
+    )
+    _trigger_update_action_from_installed_ui(
+        environment, window_id, "未起動版へ展開"
+    )
+    _answer_owner_dialog(environment, "拒否", expected_summary_markers=stage_markers)
+    _wait_for_owner_dialog_closed(environment)
+    if (
+        stage_directory.exists()
+        or record_path.read_bytes() != record_before
+        or desktop_entry.read_bytes() != entry_before
+        or not downloaded_package.is_file()
+    ):
+        raise RuntimeError("stage Owner拒否がpackage／installed product状態を変更しました")
+
+    _trigger_update_action_from_installed_ui(
+        environment, window_id, "未起動版へ展開"
+    )
+    _answer_owner_dialog(environment, "許可", expected_summary_markers=stage_markers)
+    _find_accessible(
+        "署名済みpackageを未起動versionとして固定導入先へ展開しました。",
+        timeout=30,
+    )
+    package_document = json.loads(
+        (ROOT / "tooling/tests/fixtures/linux-update-catalog/updates.json").read_text(
+            encoding="utf-8"
+        )
+    )["候補"][0]
+    signed_bytes = bytes.fromhex(package_document["署名対象"])
+    signed_candidate = json.loads(signed_bytes)
+    stage_manifest_length = int.from_bytes(package_bytes[8:12], "little")
+    stage_manifest = json.loads(package_bytes[12 : 12 + stage_manifest_length])
+    expected_stage_files = {entry["path"] for entry in stage_manifest["files"]}
+    actual_stage_files = {
+        path.relative_to(stage_directory).as_posix()
+        for path in stage_directory.rglob("*")
+        if path.is_file() and not path.is_symlink()
+    }
+    if (
+        not stage_directory.is_dir()
+        or stage_directory.is_symlink()
+        or actual_stage_files != expected_stage_files
+        or any(path.is_symlink() for path in stage_directory.rglob("*"))
+        or signed_candidate["package_sha256"] != package_hash
+        or signed_candidate["package_size_bytes"] != len(package_bytes)
+    ):
+        raise RuntimeError("Owner-confirmed stageが署名packageの固定inventoryと一致しません")
+    product_paths.update(
+        (stage_directory / relative).resolve()
+        for relative in expected_stage_files
+        if relative
+        in {
+            "gui_shell_desktop",
+            "gui_shell_desktop_launcher",
+            "libexec/gui_shell_linux_broker",
+        }
+    )
+    _wait_for_audit_event(audit_path, "更新適用要求", "completed")
+
+    stage_record_before_activation = record_path.read_bytes()
+    active_pids = _processes_using(product_paths)
+    active_groups = _owned_groups(active_pids)
+    activation_markers = (
+        "Linux製品の署名検査済みstageを有効版に切り替え",
+        f"更新ID: {UPDATE_ID}",
+        f"提供版: {UPDATE_VERSION}",
+        f"package SHA-256: {package_hash}",
+        APP_ID,
+        AUDIT_ID,
+        str(stage_directory),
+        str(desktop_entry),
+    )
+    _trigger_update_action_from_installed_ui(environment, window_id, "更新を有効化")
+    _answer_owner_dialog(
+        environment, "拒否", expected_summary_markers=activation_markers
+    )
+    _wait_for_owner_dialog_closed(environment)
+    if (
+        record_path.read_bytes() != stage_record_before_activation
+        or desktop_entry.read_bytes() != entry_before
+        or not stage_directory.is_dir()
+        or not downloaded_package.is_file()
+        or _processes_using(product_paths) != active_pids
+        or not all(_group_exists(group) for group in active_groups)
+    ):
+        raise RuntimeError("activation Owner拒否がstage／record／entry／processを変更しました")
+
+    _trigger_update_action_from_installed_ui(environment, window_id, "更新を有効化")
+    _answer_owner_dialog(
+        environment, "許可", expected_summary_markers=activation_markers
+    )
+    _find_accessible(
+        "有効版を切り替え、OS起動項目へ登録しました。",
+        timeout=30,
+    )
+    activated_record = json.loads(record_path.read_text(encoding="utf-8"))
+    if (
+        activated_record.get("product_version") != UPDATE_VERSION
+        or activated_record.get("package_sha256") != package_hash
+        or not isinstance(activated_record.get("previous"), dict)
+        or activated_record["previous"].get("product_version") != current["product_version"]
+        or desktop_entry.read_bytes() != entry_before
+        or not _desktop_entry_targets_fixed_launcher(
+            desktop_entry, product_root / "gui_shell_desktop_launcher"
+        )
+        or not stage_directory.is_dir()
+        or downloaded_package.exists()
+        or _processes_using(product_paths) != active_pids
+        or not all(_group_exists(group) for group in active_groups)
+    ):
+        raise RuntimeError("Owner-confirmed activation record／entry／process／cleanupが不正です")
+    _wait_for_audit_event(audit_path, "更新有効版切替要求", "completed")
+    return {
+        "active_record": activated_record,
+        "package_sha256": package_hash,
+        "package_size_bytes": len(package_bytes),
+        "staged_file_count": len(expected_stage_files),
+        "download_rejected_then_owner_approved": True,
+        "stage_rejected_then_owner_approved": True,
+        "activation_rejected_then_owner_approved": True,
+        "installed_process_preserved": True,
+    }
+
+
 def _wait_for_owner_dialog_window(
     environment: dict[str, str], *, timeout: float = OWNER_DIALOG_TIMEOUT
 ) -> str:
@@ -638,6 +939,7 @@ def _verify_live_audit(
     require_uninstall: bool = False,
     require_rollback: bool = False,
     require_catalog: bool = False,
+    require_update_lifecycle: bool = False,
 ) -> dict[str, int]:
     audit_path = store / "audit.jsonl"
     anchor_path = store / "audit_anchor.json"
@@ -767,6 +1069,59 @@ def _verify_live_audit(
         raise RuntimeError(
             "installed UIからの更新候補取得がEXTERNAL_EVIDENCEとしてAuditにありません"
         )
+    update_download = [
+        event for event in events if event.get("operation") == "更新download要求"
+    ]
+    update_apply = [event for event in events if event.get("operation") == "更新適用要求"]
+    update_activation = [
+        event for event in events if event.get("operation") == "更新有効版切替要求"
+    ]
+    download_rejected = sum(
+        event.get("decision") == "rejected"
+        and event.get("reason") == "desktop_native_owner_confirmation_required"
+        and event.get("evidence_source") == "INTERNAL_STATE"
+        for event in update_download
+    )
+    download_completed = sum(
+        event.get("decision") == "completed"
+        and event.get("evidence_source") == "LIVE_RUNTIME"
+        for event in update_download
+    )
+    apply_rejected = sum(
+        event.get("decision") == "rejected"
+        and event.get("reason") == "desktop_native_owner_confirmation_required"
+        and event.get("evidence_source") == "INTERNAL_STATE"
+        for event in update_apply
+    )
+    apply_completed = sum(
+        event.get("decision") == "completed"
+        and event.get("evidence_source") == "INTERNAL_STATE"
+        for event in update_apply
+    )
+    activation_rejected = sum(
+        event.get("decision") == "rejected"
+        and event.get("reason") == "desktop_native_owner_confirmation_required"
+        and event.get("evidence_source") == "INTERNAL_STATE"
+        for event in update_activation
+    )
+    activation_completed = sum(
+        event.get("decision") == "completed"
+        and event.get("evidence_source") == "INTERNAL_STATE"
+        for event in update_activation
+    )
+    if require_update_lifecycle and not all(
+        (
+            download_rejected >= 1,
+            download_completed >= 1,
+            apply_rejected >= 1,
+            apply_completed >= 1,
+            activation_rejected >= 1,
+            activation_completed >= 1,
+        )
+    ):
+        raise RuntimeError(
+            "installed Update download／stage／activationのfresh Owner拒否・許可Auditが不足しています"
+        )
     return {
         "events": len(events),
         "export_accepted": accepted,
@@ -778,6 +1133,12 @@ def _verify_live_audit(
         "rollback_queued": rollback_queued,
         "rollback_completed": rollback_completed,
         "catalog_fetch_external_accepted": catalog_accepted,
+        "update_download_owner_rejected": download_rejected,
+        "update_download_live_completed": download_completed,
+        "update_stage_owner_rejected": apply_rejected,
+        "update_stage_completed": apply_completed,
+        "update_activation_owner_rejected": activation_rejected,
+        "update_activation_completed": activation_completed,
     }
 
 
@@ -1164,6 +1525,28 @@ def run_installed_smoke(
                     + json.dumps(diagnostics, ensure_ascii=False, separators=(",", ":"))
                 ) from error
 
+            update_evidence = _installed_update_download_stage_activate(
+                environment,
+                window_id,
+                product_root=product_root,
+                record_path=record_path,
+                desktop_entry=entries[0],
+                audit_path=broker_state / "store/audit.jsonl",
+                product_paths=product_paths,
+            )
+            record = update_evidence.get("active_record")
+            if not isinstance(record, dict):
+                raise RuntimeError("installed Update受入れがactive recordを返しません")
+            previous_record = record.get("previous")
+            if not isinstance(previous_record, dict):
+                raise RuntimeError("remote Update後のactive recordにprevious versionがありません")
+            stage = product_root / "versions" / (
+                f"{record['product_version']}-{record['package_sha256']}"
+            )
+            previous_stage = product_root / "versions" / (
+                f"{previous_record['product_version']}-{previous_record['package_sha256']}"
+            )
+
             rollback_entry_before = entries[0].read_bytes()
             rollback_record_before = record_path.read_bytes()
             rollback_pids = _processes_using(product_paths) - preexisting
@@ -1172,7 +1555,7 @@ def run_installed_smoke(
                 raise RuntimeError("Rollback開始時にinstalled productの所有process groupがありません")
             current_version = record["product_version"]
             target_version = previous_record["product_version"]
-            if current_version != "0.1.1" or target_version != "0.1.0":
+            if current_version != UPDATE_VERSION or target_version != "0.1.1":
                 raise RuntimeError("Rollback acceptanceの現在版／対象版が期待値と一致しません")
 
             _trigger_rollback_from_installed_ui(environment, window_id)
@@ -1302,7 +1685,10 @@ def run_installed_smoke(
         wayland_compositor = None
 
         audit_evidence = _verify_live_audit(
-            broker_state / "store", require_rollback=True
+            broker_state / "store",
+            require_rollback=True,
+            require_catalog=True,
+            require_update_lifecycle=True,
         )
         _run_rust_test(RUST_AUDIT_TEST, environment, private_key_path)
 
@@ -1453,6 +1839,7 @@ def run_installed_smoke(
             require_uninstall=True,
             require_rollback=True,
             require_catalog=True,
+            require_update_lifecycle=True,
         )
         print(
             json.dumps(
@@ -1471,6 +1858,7 @@ def run_installed_smoke(
                     ),
                     "manifest": manifest_evidence,
                     "update_catalog": catalog_evidence,
+                    "update_lifecycle": update_evidence,
                     "uninstall": uninstall_evidence,
                     "live_audit": audit_evidence,
                     "runtime_audit": "durable_after_broker_restart",

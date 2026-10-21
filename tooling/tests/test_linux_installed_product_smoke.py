@@ -503,6 +503,12 @@ class LinuxInstalledOwnerEvidenceTests(unittest.TestCase):
                     "rollback_queued": 1,
                     "rollback_completed": 1,
                     "catalog_fetch_external_accepted": 0,
+                    "update_download_owner_rejected": 0,
+                    "update_download_live_completed": 0,
+                    "update_stage_owner_rejected": 0,
+                    "update_stage_completed": 0,
+                    "update_activation_owner_rejected": 0,
+                    "update_activation_completed": 0,
                 },
             )
 

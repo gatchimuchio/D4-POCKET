@@ -76,7 +76,7 @@
     },
     {
       "path": ".github/workflows/linux-manual-export-build.yml",
-      "sha256": "84ee5316c206f398645c7f7cac8259bb483411dfc85ce284e1794471bef66d2d"
+      "sha256": "f5baa79b3fe702b6144d8a35454a01ba4e277ec5ee4fef514100705955522f18"
     },
     {
       "path": ".github/workflows/linux-manual-rust-validation.yml",
@@ -3664,7 +3664,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "c0508d6a766ccea4900850c56955be53b13fbfb292e11671c563c169e3792250"
+      "sha256": "a0cd06bae8b810cd099291f45ceabad1ea86ff6c99cc21afe425ffb776fe35d4"
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
@@ -5195,8 +5195,16 @@
       "sha256": "235af10cb3c66c5606be4790a2c20066e3ded14db75a95fc2cc99d2ab43d93e3"
     },
     {
+      "path": "tooling/tests/create_linux_update_catalog_fixture.py",
+      "sha256": "59046698c581bf3033ffb7e87df0ca908ed60750b6b935c25e32e557bb8d700d"
+    },
+    {
+      "path": "tooling/tests/fixtures/linux-update-catalog/linux-installed-catalog-display.pkg",
+      "sha256": "c24c86c83f5fcacc15f03030ba2a6c10fabeeed405b4735ee0c1260dd7c21123"
+    },
+    {
       "path": "tooling/tests/fixtures/linux-update-catalog/updates.json",
-      "sha256": "ec3e5680e03147901958a36a81fd824dae4f267fa51422dc5463d6332f8c0afc"
+      "sha256": "28e611dce3ece4bb54dafdc4bb3a494f1e656a3111d90d26ee7914dd893d145c"
     },
     {
       "path": "tooling/tests/linux_gtk_bundle_smoke.py",
@@ -5204,7 +5212,7 @@
     },
     {
       "path": "tooling/tests/linux_installed_product_smoke.py",
-      "sha256": "44dc404cd9225e327724df71bce82faf82192bfa86774b73f368632067b8c6c0"
+      "sha256": "071618d9fc58eb267a7daaf69b016790dc816065a6820cdcd083be55e53ae400"
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",
@@ -5216,11 +5224,15 @@
     },
     {
       "path": "tooling/tests/test_linux_installed_product_smoke.py",
-      "sha256": "bdaa559338c171c4c88aea2dcfa0566da15c8fe04901ec54d3f4c89f7d8c0417"
+      "sha256": "9d1e1d008b4bfd96bc4f7500593c9c4145aa9ec9b3c4612fbde5988ea753e56a"
     },
     {
       "path": "tooling/tests/test_linux_product_package.py",
       "sha256": "812b2d4f51cb91cd6599034da15dca2e3423ffa6f08a53c2b3987c143d1dda22"
+    },
+    {
+      "path": "tooling/tests/test_linux_update_catalog_fixture.py",
+      "sha256": "be8b5e13a5b6ab022c26740bd4cc7b94b07b7949025a7c5f6d510570d320afa2"
     },
     {
       "path": "tooling/ui_snapshot_tests/README.md",
