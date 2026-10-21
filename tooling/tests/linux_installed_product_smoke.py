@@ -859,7 +859,10 @@ def _verify_credential_audit(store: Path, secret: str) -> dict[str, int]:
 
 
 _CREDENTIAL_SCAN_CHUNK_BYTES = 1024 * 1024
-_CREDENTIAL_SCAN_MAX_BYTES = 512 * 1024 * 1024
+# A hosted installed GTK acceptance exceeded 512 MiB while scanning 10,677
+# regular acceptance files (at least 572,613,198 bytes). Keep the scan complete
+# with a fixed 1 MiB memory chunk and a still-bounded 1 GiB total byte ceiling.
+_CREDENTIAL_SCAN_MAX_BYTES = 1024 * 1024 * 1024
 
 
 def _credential_scan_file_role(path: Path, root: Path) -> str:
