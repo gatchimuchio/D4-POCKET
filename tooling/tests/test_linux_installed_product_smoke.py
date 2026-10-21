@@ -355,6 +355,9 @@ class LinuxInstalledOwnerEvidenceTests(unittest.TestCase):
                 ("製品アンインストール要求", "rejected", "INTERNAL_STATE"),
                 ("製品アンインストール要求", "accepted", "LIVE_RUNTIME"),
                 ("製品アンインストール完了", "completed", "LIVE_RUNTIME"),
+                ("更新rollback要求", "rejected", "INTERNAL_STATE"),
+                ("更新rollback要求", "queued", "INTERNAL_STATE"),
+                ("更新rollback要求", "completed", "INTERNAL_STATE"),
             )
             for index, (operation, decision, evidence_source) in enumerate(audit_cases, start=1):
                 event = {
@@ -364,7 +367,7 @@ class LinuxInstalledOwnerEvidenceTests(unittest.TestCase):
                     "decision": decision,
                     "reason": (
                         "desktop_native_owner_confirmation_required"
-                        if operation == "製品アンインストール要求"
+                        if operation in {"製品アンインストール要求", "更新rollback要求"}
                         and decision == "rejected"
                         else "fixture"
                     ),
@@ -409,14 +412,19 @@ class LinuxInstalledOwnerEvidenceTests(unittest.TestCase):
                 encoding="utf-8",
             )
             self.assertEqual(
-                _verify_live_audit(store, require_uninstall=True),
+                _verify_live_audit(
+                    store, require_uninstall=True, require_rollback=True
+                ),
                 {
-                    "events": 5,
+                    "events": 8,
                     "export_accepted": 1,
                     "export_rejected": 1,
                     "uninstall_accepted": 1,
                     "uninstall_rejected": 1,
                     "uninstall_completed": 1,
+                    "rollback_rejected": 1,
+                    "rollback_queued": 1,
+                    "rollback_completed": 1,
                 },
             )
 

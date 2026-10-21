@@ -1,4 +1,4 @@
-"""実Linux GTK sessionでBroker-installed productのUIとUninstallを検証する。"""
+"""実Linux GTK sessionでBroker-installed productのRollback／UI／Uninstallを検証する。"""
 
 from __future__ import annotations
 
@@ -23,9 +23,14 @@ WINDOW_TITLE = "D4 Pocket powered by GUI Shell"
 OWNER_DIALOG_TITLE = "D4 Pocket Owner確認"
 UNINSTALL_BUTTON = "D4 Pocketをアンインストール"
 OWNER_DIALOG_TIMEOUT = 15.0
-RUST_TESTS = (
-    "broker::update_center::tests::linux_installed_acceptance_stages_real_export_and_registers_entry",
-    "broker::update_center::tests::linux_installed_acceptance_runtime_audit_is_durable",
+RUST_STAGE_TEST = (
+    "broker::update_center::tests::linux_installed_acceptance_stages_real_export_and_registers_entry"
+)
+RUST_ROLLBACK_SEED_TEST = (
+    "broker::update_center::tests::linux_installed_acceptance_seeds_verified_rollback_target"
+)
+RUST_AUDIT_TEST = (
+    "broker::update_center::tests::linux_installed_acceptance_runtime_audit_is_durable"
 )
 
 if __package__:
@@ -343,9 +348,9 @@ def _trigger_export_from_installed_ui(environment: dict[str, str], window_id: st
     )
 
 
-def _trigger_uninstall_from_installed_ui(
+def _open_update_center_from_installed_ui(
     environment: dict[str, str], window_id: str
-) -> None:
+):
     window = _find_accessible(WINDOW_TITLE, timeout=10)
     subprocess.run(
         ["xdotool", "windowactivate", "--sync", window_id],
@@ -369,6 +374,21 @@ def _trigger_uninstall_from_installed_ui(
     command = _find_operable_accessible("更新確認", root=window, timeout=10)
     _activate_accessible(command, "更新確認", environment)
     _find_accessible("更新センター", root=window, timeout=10)
+    return window
+
+
+def _trigger_rollback_from_installed_ui(
+    environment: dict[str, str], window_id: str
+) -> None:
+    window = _open_update_center_from_installed_ui(environment, window_id)
+    _find_accessible("直前版へ戻す", root=window, timeout=10)
+    _activate_named_control_by_keyboard("直前版へ戻す", environment, window_id)
+
+
+def _trigger_uninstall_from_installed_ui(
+    environment: dict[str, str], window_id: str
+) -> None:
+    window = _open_update_center_from_installed_ui(environment, window_id)
     _find_accessible(UNINSTALL_BUTTON, root=window, timeout=10)
     _activate_named_control_by_keyboard(UNINSTALL_BUTTON, environment, window_id)
 
@@ -490,7 +510,7 @@ def _wait_for_owner_dialog_window(
 
 
 def _verify_live_audit(
-    store: Path, *, require_uninstall: bool = False
+    store: Path, *, require_uninstall: bool = False, require_rollback: bool = False
 ) -> dict[str, int]:
     audit_path = store / "audit.jsonl"
     anchor_path = store / "audit_anchor.json"
@@ -583,6 +603,31 @@ def _verify_live_audit(
         raise RuntimeError(
             "Uninstall拒否(INTERNAL_STATE)／許可・完了(LIVE_RUNTIME) Auditが不足しています"
         )
+    rollback = [
+        event for event in events if event.get("operation") == "更新rollback要求"
+    ]
+    rollback_rejected = sum(
+        event.get("decision") == "rejected"
+        and event.get("reason") == "desktop_native_owner_confirmation_required"
+        and event.get("evidence_source") == "INTERNAL_STATE"
+        for event in rollback
+    )
+    rollback_queued = sum(
+        event.get("decision") == "queued"
+        and event.get("evidence_source") == "INTERNAL_STATE"
+        for event in rollback
+    )
+    rollback_completed = sum(
+        event.get("decision") == "completed"
+        and event.get("evidence_source") == "INTERNAL_STATE"
+        for event in rollback
+    )
+    if require_rollback and (
+        rollback_rejected < 1 or rollback_queued < 1 or rollback_completed < 1
+    ):
+        raise RuntimeError(
+            "Rollback拒否／fresh Owner承認後のintent・完了(INTERNAL_STATE) Auditが不足しています"
+        )
     return {
         "events": len(events),
         "export_accepted": accepted,
@@ -590,6 +635,9 @@ def _verify_live_audit(
         "uninstall_accepted": uninstall_accepted,
         "uninstall_rejected": uninstall_rejected,
         "uninstall_completed": uninstall_completed,
+        "rollback_rejected": rollback_rejected,
+        "rollback_queued": rollback_queued,
+        "rollback_completed": rollback_completed,
     }
 
 
@@ -753,6 +801,7 @@ def run_installed_smoke(
     temp_root: Path,
     acceptance_root: Path,
     private_key_path: Path,
+    update_package: Path,
 ) -> None:
     if not os.environ.get("DISPLAY") or not os.environ.get("DBUS_SESSION_BUS_ADDRESS"):
         raise RuntimeError("隔離X11 displayとD-Bus sessionが必要です")
@@ -760,6 +809,9 @@ def run_installed_smoke(
         raise RuntimeError("run固有一時rootが通常directoryではありません")
     temp_root = temp_root.resolve(strict=True)
     package = _resolve_regular_package(package)
+    update_package = _resolve_regular_package(update_package)
+    if temp_root not in update_package.parents:
+        raise RuntimeError("rollback fixture packageがrun固有一時root外です")
     resolved_private_key = private_key_path.resolve(strict=True)
     if (
         resolved_private_key != private_key_path
@@ -821,6 +873,7 @@ def run_installed_smoke(
             "GUI_SHELL_PRODUCT_APP_ID": APP_ID,
             "GUI_SHELL_PRODUCT_AUDIT_STORE_ID": AUDIT_ID,
             "D4P_LINUX_ACCEPTANCE_PACKAGE": str(package),
+            "D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE": str(update_package),
             "D4P_LINUX_ACCEPTANCE_ROOT": str(acceptance_root),
             "CARGO_TARGET_DIR": str(temp_root / "linux-installed-cargo-target"),
         }
@@ -836,12 +889,25 @@ def run_installed_smoke(
     preexisting: set[int] = set()
     app_log = acceptance_root / "installed-app.log"
     try:
-        _run_rust_test(RUST_TESTS[0], environment, private_key_path)
+        _run_rust_test(RUST_STAGE_TEST, environment, private_key_path)
+        _run_rust_test(RUST_ROLLBACK_SEED_TEST, environment, private_key_path)
+        for test_only_name in (
+            "D4P_LINUX_ACCEPTANCE_PACKAGE",
+            "D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE",
+            "D4P_LINUX_ACCEPTANCE_ROOT",
+        ):
+            environment.pop(test_only_name, None)
         product_root = xdg_data_home / "apps/d4-pocket" / APP_ID
         fixed_launcher = product_root / "gui_shell_desktop_launcher"
         record_path = product_root / "active_version.json"
         record = json.loads(record_path.read_text(encoding="utf-8"))
         stage = product_root / "versions" / f"{record['product_version']}-{record['package_sha256']}"
+        previous_record = record.get("previous")
+        if not isinstance(previous_record, dict):
+            raise RuntimeError("Rollback受入れ前のactive recordに直前版がありません")
+        previous_stage = product_root / "versions" / (
+            f"{previous_record['product_version']}-{previous_record['package_sha256']}"
+        )
         active_launcher = stage / "gui_shell_desktop_launcher"
         runner = stage / "gui_shell_desktop"
         helper = stage / "libexec/gui_shell_linux_broker"
@@ -851,7 +917,20 @@ def run_installed_smoke(
         entries = list(applications.glob("*.desktop"))
         if len(entries) != 1 or not _desktop_entry_targets_fixed_launcher(entries[0], fixed_launcher):
             raise RuntimeError("登録desktop entryが固定installed launcherだけを指していません")
-        product_paths = {fixed_launcher.resolve(), active_launcher.resolve(), runner.resolve(), helper.resolve()}
+        previous_binaries = {
+            previous_stage / "gui_shell_desktop_launcher",
+            previous_stage / "gui_shell_desktop",
+            previous_stage / "libexec/gui_shell_linux_broker",
+        }
+        if not all(path.is_file() and not path.is_symlink() for path in previous_binaries):
+            raise RuntimeError("Rollback target stageの固定binaryが不足しています")
+        product_paths = {
+            fixed_launcher.resolve(),
+            active_launcher.resolve(),
+            runner.resolve(),
+            helper.resolve(),
+            *(path.resolve() for path in previous_binaries),
+        }
         broker_state = xdg_state_home / "d4-pocket/linux-broker"
         export_root = broker_state / "exports"
         preexisting = _processes_using(product_paths)
@@ -920,6 +999,71 @@ def run_installed_smoke(
             _find_accessible("GUI Shell独立App書出しは受理されませんでした", timeout=20)
             if any(export_root.iterdir()):
                 raise RuntimeError("Owner拒否後にManifestまたは一時fileが作成されました")
+
+            rollback_entry_before = entries[0].read_bytes()
+            rollback_record_before = record_path.read_bytes()
+            rollback_pids = _processes_using(product_paths) - preexisting
+            rollback_groups = _owned_groups(rollback_pids)
+            if not rollback_groups:
+                raise RuntimeError("Rollback開始時にinstalled productの所有process groupがありません")
+            current_version = record["product_version"]
+            target_version = previous_record["product_version"]
+            if current_version != "0.1.1" or target_version != "0.1.0":
+                raise RuntimeError("Rollback acceptanceの現在版／対象版が期待値と一致しません")
+
+            _trigger_rollback_from_installed_ui(environment, window_id)
+            rollback_markers = (
+                f"現在の有効版: {current_version}",
+                f"rollback先の版: {target_version}",
+                APP_ID,
+                AUDIT_ID,
+            )
+            _answer_owner_dialog(
+                environment,
+                "拒否",
+                expected_summary_markers=rollback_markers,
+            )
+            if (
+                record_path.read_bytes() != rollback_record_before
+                or entries[0].read_bytes() != rollback_entry_before
+                or not _desktop_entry_targets_fixed_launcher(entries[0], fixed_launcher)
+                or not stage.is_dir()
+                or not previous_stage.is_dir()
+                or (_processes_using(product_paths) - preexisting) != rollback_pids
+                or not all(_group_exists(group) for group in rollback_groups)
+            ):
+                raise RuntimeError("Rollback Owner拒否後にrecord／entry／processが保持されませんでした")
+
+            _trigger_rollback_from_installed_ui(environment, window_id)
+            _answer_owner_dialog(
+                environment,
+                "許可",
+                expected_summary_markers=rollback_markers,
+            )
+            rollback_deadline = time.monotonic() + 20
+            while time.monotonic() < rollback_deadline:
+                if record_path.read_bytes() != rollback_record_before:
+                    break
+                time.sleep(0.1)
+            record = json.loads(record_path.read_text(encoding="utf-8"))
+            if (
+                record.get("product_version") != target_version
+                or not isinstance(record.get("previous"), dict)
+                or record["previous"].get("product_version") != current_version
+                or entries[0].read_bytes() != rollback_entry_before
+                or not _desktop_entry_targets_fixed_launcher(entries[0], fixed_launcher)
+                or not stage.is_dir()
+                or not previous_stage.is_dir()
+                or (_processes_using(product_paths) - preexisting) != rollback_pids
+                or not all(_group_exists(group) for group in rollback_groups)
+            ):
+                raise RuntimeError("fresh Owner許可後のRollback状態遷移または隔離が不正です")
+            stage = previous_stage
+            _find_accessible(
+                "有効版切替は次回の固定root起動時に反映されます",
+                root=_find_accessible(WINDOW_TITLE, timeout=10),
+                timeout=10,
+            )
 
             _trigger_export_from_installed_ui(environment, window_id)
             _answer_owner_dialog(
@@ -992,8 +1136,10 @@ def run_installed_smoke(
         _terminate_group(wayland_compositor)
         wayland_compositor = None
 
-        audit_evidence = _verify_live_audit(broker_state / "store")
-        _run_rust_test(RUST_TESTS[1], environment, private_key_path)
+        audit_evidence = _verify_live_audit(
+            broker_state / "store", require_rollback=True
+        )
+        _run_rust_test(RUST_AUDIT_TEST, environment, private_key_path)
 
         audit_store = broker_state / "store"
         active_record_before_uninstall = record_path.read_bytes()
@@ -1137,7 +1283,9 @@ def run_installed_smoke(
         uninstall_evidence = _verify_uninstalled_state(
             product_root, entries[0], audit_store, preserved_user_data
         )
-        audit_evidence = _verify_live_audit(audit_store, require_uninstall=True)
+        audit_evidence = _verify_live_audit(
+            audit_store, require_uninstall=True, require_rollback=True
+        )
         print(
             json.dumps(
                 {
@@ -1201,10 +1349,15 @@ def main() -> int:
     parser.add_argument("--temp-root", type=Path, required=True)
     parser.add_argument("--acceptance-root", type=Path, required=True)
     parser.add_argument("--private-key", type=Path, required=True)
+    parser.add_argument("--update-package", type=Path, required=True)
     args = parser.parse_args()
     try:
         run_installed_smoke(
-            args.package, args.temp_root, args.acceptance_root, args.private_key
+            args.package,
+            args.temp_root,
+            args.acceptance_root,
+            args.private_key,
+            args.update_package,
         )
     except Exception as error:
         print(f"Linux installed product GTK受入れ 不合格: {error}", file=sys.stderr)

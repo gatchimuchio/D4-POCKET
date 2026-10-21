@@ -8698,6 +8698,211 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[test]
     #[ignore = "explicit Ubuntu installed-product GTK acceptance harness"]
+    fn linux_installed_acceptance_seeds_verified_rollback_target() {
+        use ring::signature::{Ed25519KeyPair, KeyPair};
+        use std::os::unix::fs::PermissionsExt;
+
+        let update_package_path = std::path::PathBuf::from(
+            std::env::var_os("D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE")
+                .expect("rollback acceptance package path is required"),
+        );
+        let install_root = std::path::PathBuf::from(
+            std::env::var_os("XDG_DATA_HOME").expect("XDG_DATA_HOME is required"),
+        );
+        let state_home = std::path::PathBuf::from(
+            std::env::var_os("XDG_STATE_HOME").expect("XDG_STATE_HOME is required"),
+        );
+        let store_root = state_home.join("d4-pocket/linux-broker/store");
+        let update_package_metadata = std::fs::symlink_metadata(&update_package_path).unwrap();
+        assert!(update_package_metadata.is_file());
+        assert!(!update_package_metadata.file_type().is_symlink());
+        let package = std::fs::read(&update_package_path).unwrap();
+        assert!(package.len() >= 12);
+        assert_eq!(&package[..8], b"D4PKG01\n");
+        let manifest_bytes = u32::from_le_bytes(package[8..12].try_into().unwrap()) as usize;
+        let manifest_end = 12usize.checked_add(manifest_bytes).unwrap();
+        assert!(manifest_end <= package.len());
+        let package_manifest: Value = serde_json::from_slice(&package[12..manifest_end]).unwrap();
+        let offered_version = "0.1.1";
+        assert_eq!(package_manifest["product_version"], offered_version);
+        assert_eq!(package_manifest["app_id"], INSTALL_APP_ID);
+        assert_eq!(package_manifest["audit_store_id"], INSTALL_AUDIT_ID);
+        assert_eq!(package_manifest["target_platform"], "linux");
+
+        let private_key_path = std::path::PathBuf::from(
+            std::env::var_os("D4P_LINUX_ACCEPTANCE_PRIVATE_KEY")
+                .expect("ephemeral test signing key path is required"),
+        );
+        let key_metadata = std::fs::symlink_metadata(&private_key_path).unwrap();
+        assert!(key_metadata.is_file() && !key_metadata.file_type().is_symlink());
+        assert_eq!(key_metadata.permissions().mode() & 0o077, 0);
+        let private_key = std::fs::read(private_key_path).unwrap();
+        let pair = Ed25519KeyPair::from_pkcs8_maybe_unchecked(&private_key).unwrap();
+        let public_der = [
+            0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00,
+        ]
+        .into_iter()
+        .chain(pair.public_key().as_ref().iter().copied())
+        .collect::<Vec<_>>();
+        let fingerprint = sha256_tagged(pair.public_key().as_ref());
+        let digest = hex::encode(Sha256::digest(&package));
+
+        let (product_root_path, product_root) =
+            super::super::product_install::open_existing_product_root(
+                &install_root,
+                INSTALL_APP_ID,
+            )
+            .unwrap();
+        let (versions_path, versions) =
+            super::super::product_install::open_existing_product_versions_directory(
+                &install_root,
+                INSTALL_APP_ID,
+            )
+            .unwrap();
+        let initial = crate::product_bootstrapper::active_version_snapshot(
+            &install_root,
+            INSTALL_APP_ID,
+            INSTALL_AUDIT_ID,
+        )
+        .unwrap();
+        assert_eq!(initial.current.product_version, "0.1.0");
+        let previous = initial.current;
+        let previous_stage = versions_path.join(format!(
+            "{}-{}",
+            previous.product_version, previous.package_sha256
+        ));
+        let product_manifest: Value = serde_json::from_slice(
+            &std::fs::read(previous_stage.join("product_manifest.json")).unwrap(),
+        )
+        .unwrap();
+        let trust: UpdateTrust =
+            serde_json::from_value(product_manifest["update_trust"].clone()).unwrap();
+        assert_eq!(trust.public_key_der_hex, hex::encode(public_der));
+        assert_eq!(trust.public_key_fingerprint, fingerprint);
+
+        let mut broker =
+            Broker::new_persistent("linux-installed-rollback-seed", &store_root).unwrap();
+        broker.update_trust = Some(trust);
+        broker
+            .set_desktop_product_identity(INSTALL_APP_ID.into(), INSTALL_AUDIT_ID.into())
+            .unwrap();
+        broker.set_desktop_product_install_local_app_data(install_root.clone());
+        let previous_record: UpdateRecord = serde_json::from_value(
+            broker
+                .updates
+                .get(&previous.update_id)
+                .expect("previously installed candidate must remain in the Broker catalog")
+                .clone(),
+        )
+        .unwrap();
+        assert_eq!(previous_record.candidate_hash, previous.candidate_hash);
+        assert_eq!(
+            previous_record.candidate.package_sha256.as_deref(),
+            Some(previous.package_sha256.as_str())
+        );
+
+        let update_id = "linux-installed-rollback";
+        let summary = "installed Linux UI rollback acceptance";
+        let signed = serde_json::to_vec(&SignedManifest {
+            version: CANDIDATE_VERSION,
+            update_id,
+            current_version: &previous.product_version,
+            offered_version,
+            channel: "stable",
+            summary,
+            package_sha256: &digest,
+            package_size_bytes: package.len() as u64,
+            rollback_available: true,
+        })
+        .unwrap();
+        let signature = pair.sign(&signed);
+        let candidate = UpdateCandidateDocument {
+            version: CANDIDATE_VERSION,
+            update_id: update_id.into(),
+            current_version: previous.product_version.clone(),
+            offered_version: offered_version.into(),
+            channel: "stable".into(),
+            summary: summary.into(),
+            package_sha256: Some(digest.clone()),
+            package_size_bytes: Some(package.len() as u64),
+            signed_bytes_hex: hex::encode(signed),
+            signature_hex: hex::encode(signature.as_ref()),
+            signer_fingerprint: fingerprint,
+            rollback_available: true,
+        };
+        let checked = call(
+            &mut broker,
+            BrokerOperation::更新確認,
+            json!({
+                "版": VERSION,
+                "候補": [previous_record.candidate, candidate],
+            }),
+        );
+        assert_eq!(checked.status, BrokerStatus::Accepted, "{checked:?}");
+        let current_record: UpdateRecord =
+            serde_json::from_value(broker.updates.get(update_id).unwrap().clone()).unwrap();
+        assert_eq!(current_record.signature_status, "verified");
+        assert!(current_record.candidate_hash.starts_with("sha256:"));
+        assert_eq!(current_record.candidate_hash.len(), 71);
+
+        let plan = super::super::product_install::plan_product_install(
+            &install_root,
+            INSTALL_APP_ID,
+            offered_version,
+            &digest,
+        )
+        .unwrap();
+        let info = crate::product_package::extract_verified_package_from_reader(
+            std::io::Cursor::new(package.as_slice()),
+            package.len() as u64,
+            Some(&digest),
+            &plan.version_directory,
+            crate::product_package::ProductPackageExpectation {
+                product_version: Some(offered_version),
+                app_id: INSTALL_APP_ID,
+                audit_store_id: INSTALL_AUDIT_ID,
+                platform: crate::product_package::ProductPackagePlatform::Linux,
+            },
+        )
+        .unwrap();
+        assert_eq!(info.product_version, offered_version);
+        let desktop_entry =
+            super::super::product_install::plan_linux_desktop_entry(&install_root, INSTALL_APP_ID)
+                .unwrap();
+        let desktop_entry_before = std::fs::read(&desktop_entry).unwrap();
+        crate::product_bootstrapper::activate_staged_version(
+            &product_root,
+            &versions,
+            offered_version,
+            INSTALL_APP_ID,
+            INSTALL_AUDIT_ID,
+            &digest,
+            update_id,
+            &current_record.candidate_hash,
+            "0123456789abcdef0123456789abcdef",
+        )
+        .unwrap();
+        let active = crate::product_bootstrapper::active_version_snapshot(
+            &install_root,
+            INSTALL_APP_ID,
+            INSTALL_AUDIT_ID,
+        )
+        .unwrap();
+        assert_eq!(active.current.product_version, offered_version);
+        assert_eq!(active.current.update_id, update_id);
+        assert_eq!(active.previous.as_ref(), Some(&previous));
+        assert_eq!(std::fs::read(&desktop_entry).unwrap(), desktop_entry_before);
+        assert!(product_root_path.is_dir());
+        assert!(versions_path.is_dir());
+        println!(
+            "Linux installed rollback seed: current={} target={} package_sha256={} candidate_signature=verified package_stage=verified activation_fixture=true desktop_entry_unchanged=true",
+            active.current.product_version, previous.product_version, digest
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    #[ignore = "explicit Ubuntu installed-product GTK acceptance harness"]
     fn linux_installed_acceptance_runtime_audit_is_durable() {
         let state_home = std::path::PathBuf::from(
             std::env::var_os("XDG_STATE_HOME").expect("XDG_STATE_HOME is required"),
