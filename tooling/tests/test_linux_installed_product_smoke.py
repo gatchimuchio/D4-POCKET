@@ -6,7 +6,7 @@ import json
 import subprocess
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import call, patch
 from pathlib import Path
 
 from tooling.tests.linux_installed_product_smoke import (
@@ -166,12 +166,13 @@ class AccessibleActionResolutionTests(unittest.TestCase):
 
     def test_mcp_palette_uses_unique_subtitle_not_navigation_label(self) -> None:
         window = object()
+        fresh_window = object()
         command = object()
         with (
             patch(
                 "tooling.tests.linux_installed_product_smoke._find_accessible",
-                return_value=window,
-            ),
+                side_effect=(window, window, object(), fresh_window, fresh_window),
+            ) as find_accessible,
             patch(
                 "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
                 return_value=command,
@@ -182,9 +183,19 @@ class AccessibleActionResolutionTests(unittest.TestCase):
             patch("tooling.tests.linux_installed_product_smoke.subprocess.run"),
         ):
             self.assertIs(
-                _open_mcp_center_from_installed_ui({}, "0x42"), window
+                _open_mcp_center_from_installed_ui({}, "0x42"), fresh_window
             )
 
+        self.assertEqual(
+            find_accessible.call_args_list,
+            [
+                call("D4 Pocket powered by GUI Shell", timeout=10),
+                call("コマンドパレット", root=window, timeout=10),
+                call("MCP接続センター", timeout=10),
+                call("D4 Pocket powered by GUI Shell", timeout=10),
+                call("MCP接続センター", root=fresh_window, timeout=10),
+            ],
+        )
         find_operable.assert_called_once_with(
             "MCP接続一覧とOwner確認付き切断を開く",
             root=window,

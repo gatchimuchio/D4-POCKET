@@ -541,6 +541,11 @@ def _open_mcp_center_from_installed_ui(
         "MCP接続一覧とOwner確認付き切断を開く", root=window, timeout=10
     )
     _activate_accessible(command, "MCP接続", environment)
+    # Dismissing the command-palette dialog can invalidate its old AT-SPI
+    # subtree. Resolve the destination from the desktop, then reacquire the
+    # product window before returning it to callers that inspect its controls.
+    _find_accessible("MCP接続センター", timeout=10)
+    window = _find_accessible(WINDOW_TITLE, timeout=10)
     _find_accessible("MCP接続センター", root=window, timeout=10)
     return window
 
