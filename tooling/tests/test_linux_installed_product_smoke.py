@@ -353,18 +353,17 @@ class InstalledOwnerSummaryTests(unittest.TestCase):
         self.assertNotIn(r"C:\Users\runner", observed)
         self.assertIn("<path>", observed)
 
-    def test_linux_native_owner_label_exposes_the_full_summary_to_atspi(self) -> None:
+    def test_linux_native_owner_summary_uses_multiline_atk_text_view(self) -> None:
         source = (
             Path(__file__).resolve().parents[2]
             / "apps/desktop_flutter/linux/runner/broker_process_channel.cc"
         ).read_text(encoding="utf-8")
-        self.assertIn("gtk_widget_get_accessible(label)", source)
-        owner_dialog = source.index("show_owner_dialog_on_gtk_thread")
-        show_dialog = source.index("gtk_widget_show_all(dialog);", owner_dialog)
-        expose_summary = source.index(
-            "atk_object_set_name(label_accessible, state->summary.c_str())", show_dialog
+        self.assertIn("gtk_text_view_set_editable(GTK_TEXT_VIEW(summary_view), FALSE)", source)
+        self.assertIn(
+            "gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(summary_view), GTK_WRAP_WORD_CHAR)",
+            source,
         )
-        self.assertLess(show_dialog, expose_summary)
+        self.assertIn("state->summary.c_str(), -1", source)
 
 
 class LinuxInstalledDesktopEntryTests(unittest.TestCase):

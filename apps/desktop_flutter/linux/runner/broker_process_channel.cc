@@ -181,12 +181,18 @@ gboolean show_owner_dialog_on_gtk_thread(gpointer data) {
   GtkWidget* scroller = gtk_scrolled_window_new(nullptr, nullptr);
   gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroller),
                                  GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
-  GtkWidget* label = gtk_label_new(state->summary.c_str());
-  gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
-  gtk_label_set_line_wrap_mode(GTK_LABEL(label), PANGO_WRAP_WORD_CHAR);
-  gtk_label_set_xalign(GTK_LABEL(label), 0.0f);
-  gtk_label_set_yalign(GTK_LABEL(label), 0.0f);
-  gtk_container_add(GTK_CONTAINER(scroller), label);
+  GtkWidget* summary_view = gtk_text_view_new();
+  gtk_text_view_set_editable(GTK_TEXT_VIEW(summary_view), FALSE);
+  gtk_text_view_set_cursor_visible(GTK_TEXT_VIEW(summary_view), FALSE);
+  gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(summary_view), GTK_WRAP_WORD_CHAR);
+  gtk_text_view_set_left_margin(GTK_TEXT_VIEW(summary_view), 0);
+  gtk_text_view_set_right_margin(GTK_TEXT_VIEW(summary_view), 0);
+  gtk_text_view_set_top_margin(GTK_TEXT_VIEW(summary_view), 0);
+  gtk_text_view_set_bottom_margin(GTK_TEXT_VIEW(summary_view), 0);
+  gtk_widget_set_can_focus(summary_view, FALSE);
+  gtk_text_buffer_set_text(gtk_text_view_get_buffer(GTK_TEXT_VIEW(summary_view)),
+                           state->summary.c_str(), -1);
+  gtk_container_add(GTK_CONTAINER(scroller), summary_view);
   gtk_container_add(GTK_CONTAINER(content), scroller);
   if (state->expired.load()) {
     gtk_widget_destroy(dialog);
@@ -194,12 +200,6 @@ gboolean show_owner_dialog_on_gtk_thread(gpointer data) {
     return G_SOURCE_REMOVE;
   }
   gtk_widget_show_all(dialog);
-  // GTK initializes GtkLabelAccessible while showing the widget and can replace
-  // a custom name with the first rendered line. Set the complete Owner summary
-  // after realization so assistive technology receives the same text shown to
-  // the operator.
-  AtkObject* label_accessible = gtk_widget_get_accessible(label);
-  atk_object_set_name(label_accessible, state->summary.c_str());
 
   OwnerDialogTimeout timeout{GTK_DIALOG(dialog), false};
   const guint timeout_id = g_timeout_add_seconds(
