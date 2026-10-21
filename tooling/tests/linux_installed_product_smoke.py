@@ -1039,9 +1039,64 @@ def run_installed_smoke(
             ):
                 raise RuntimeError("Uninstall Owner拒否後にproduct root／active record／processが保持されませんでした")
 
-            uninstall_window_id = _visible_product_window(environment)
+            reject_window_deadline = time.monotonic() + 10
+            uninstall_window_id = None
+            while time.monotonic() < reject_window_deadline:
+                uninstall_window_id = _visible_product_window(environment)
+                if uninstall_window_id is not None:
+                    break
+                time.sleep(0.2)
+            reject_window_reopened = uninstall_window_id is not None
             if uninstall_window_id is None:
-                raise RuntimeError("Uninstall Owner拒否後にGTK windowがありません")
+                # Owner拒否後の非作用を確認済み。再試行用にこのtestが所有する
+                # process groupだけを停止し、固定desktop entryから新しいUIを起動する。
+                _stop_owned_groups(uninstall_groups)
+                if _processes_using(product_paths) - preexisting:
+                    raise RuntimeError("Owner拒否後のtest-owned process groupを停止できません")
+                uninstall_groups.clear()
+                if uninstall_process.poll() is None:
+                    uninstall_process.wait(timeout=10)
+
+                uninstall_retry_log = acceptance_root / "installed-uninstall-retry-app.log"
+                with uninstall_retry_log.open("xb") as log:
+                    uninstall_process = subprocess.Popen(
+                        ["gio", "launch", str(entries[0])],
+                        cwd=stage,
+                        env=environment,
+                        stdin=subprocess.DEVNULL,
+                        stdout=log,
+                        stderr=subprocess.STDOUT,
+                        start_new_session=True,
+                    )
+                    deadline = time.monotonic() + 90
+                    uninstall_window_id = None
+                    uninstall_pids: set[int] = set()
+                    while time.monotonic() < deadline:
+                        uninstall_window_id = _visible_product_window(environment)
+                        uninstall_pids = _processes_using(product_paths) - preexisting
+                        if uninstall_window_id is not None and uninstall_pids:
+                            uninstall_groups = _owned_groups(uninstall_pids)
+                            break
+                        if (
+                            uninstall_process.poll() is not None
+                            and uninstall_process.returncode != 0
+                        ):
+                            tail = _safe_log_tail(
+                                uninstall_retry_log, (acceptance_root, temp_root)
+                            )
+                            raise RuntimeError(
+                                "Owner拒否後のinstalled UI再起動に失敗: "
+                                f"{uninstall_process.returncode}\n{tail}"
+                            )
+                        time.sleep(0.25)
+                    if uninstall_window_id is None or not uninstall_groups:
+                        tail = _safe_log_tail(
+                            uninstall_retry_log, (acceptance_root, temp_root)
+                        )
+                        raise RuntimeError(
+                            "Owner拒否後に固定desktop entryからinstalled UIを再起動できません\n"
+                            f"{tail}"
+                        )
             _trigger_uninstall_from_installed_ui(environment, uninstall_window_id)
             _answer_owner_dialog(
                 environment,
@@ -1083,6 +1138,11 @@ def run_installed_smoke(
                     "wayland_installed_window": "AT-SPI showing; owner process group stopped; surface rendering not established",
                     "owned_processes": "all_stopped",
                     "installed_ui_owner_confirmation": "native_AT-SPI_rejected_then_approved_through_GTK_runner_private_pipe",
+                    "uninstall_rejection_ui": (
+                        "same_window_remained_visible"
+                        if reject_window_reopened
+                        else "restarted_from_fixed_desktop_entry_for_fresh_approval"
+                    ),
                     "manifest": manifest_evidence,
                     "uninstall": uninstall_evidence,
                     "live_audit": audit_evidence,
