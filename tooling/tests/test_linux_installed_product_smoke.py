@@ -1018,6 +1018,13 @@ class LinuxInstalledOwnerEvidenceTests(unittest.TestCase):
             audit_cases = (
                 ("GUI Shell書出し", "rejected", "INTERNAL_STATE"),
                 ("GUI Shell書出し", "accepted", "INTERNAL_STATE"),
+                ("MCP接続", "rejected", "INTERNAL_STATE"),
+                ("MCP接続", "accepted", "INTERNAL_STATE"),
+                ("MCP Tool実行", "approved", "INTERNAL_STATE"),
+                ("MCP Tool実行", "started", "INTERNAL_STATE"),
+                ("MCP Tool実行", "accepted", "LIVE_RUNTIME"),
+                ("MCP切断", "rejected", "INTERNAL_STATE"),
+                ("MCP切断", "accepted", "LIVE_RUNTIME"),
                 ("製品アンインストール要求", "rejected", "INTERNAL_STATE"),
                 ("製品アンインストール要求", "accepted", "LIVE_RUNTIME"),
                 ("製品アンインストール完了", "completed", "LIVE_RUNTIME"),
@@ -1033,9 +1040,22 @@ class LinuxInstalledOwnerEvidenceTests(unittest.TestCase):
                     "decision": decision,
                     "reason": (
                         "desktop_native_owner_confirmation_required"
-                        if operation in {"製品アンインストール要求", "更新rollback要求"}
+                        if operation in {
+                            "製品アンインストール要求",
+                            "更新rollback要求",
+                            "MCP接続",
+                            "MCP切断",
+                        }
                         and decision == "rejected"
-                        else "fixture"
+                        else (
+                            "Capability=mcp.tool.call Permission=one consumed=true"
+                            if operation == "MCP Tool実行" and decision == "started"
+                            else (
+                                "Tool result hash-only receipt"
+                                if operation == "MCP Tool実行" and decision == "accepted"
+                                else "fixture"
+                            )
+                        )
                     ),
                     "evidence_source": evidence_source,
                     "payload_hash": f"sha256:{index:064x}",
@@ -1079,12 +1099,23 @@ class LinuxInstalledOwnerEvidenceTests(unittest.TestCase):
             )
             self.assertEqual(
                 _verify_live_audit(
-                    store, require_uninstall=True, require_rollback=True
+                    store,
+                    require_export=True,
+                    require_mcp=True,
+                    require_uninstall=True,
+                    require_rollback=True,
                 ),
                 {
-                    "events": 8,
+                    "events": 15,
                     "export_accepted": 1,
                     "export_rejected": 1,
+                    "mcp_connect_owner_rejected": 1,
+                    "mcp_connect_internal_accepted": 1,
+                    "mcp_tool_approved": 1,
+                    "mcp_tool_permission_consumed": 1,
+                    "mcp_tool_live_hash_only_completed": 1,
+                    "mcp_disconnect_owner_rejected": 1,
+                    "mcp_disconnect_live_completed": 1,
                     "uninstall_accepted": 1,
                     "uninstall_rejected": 1,
                     "uninstall_completed": 1,

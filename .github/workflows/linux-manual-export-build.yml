@@ -10,6 +10,7 @@ name: Linux manual product build and installed acceptance
         options:
           - update_lifecycle
           - credential_vault
+          - mcp_tool_execution
         default: update_lifecycle
 
 permissions:
@@ -111,6 +112,7 @@ jobs:
             --product-version 0.1.1
           python3 -c 'import hashlib,json,pathlib,sys; root=pathlib.Path(sys.argv[1]); evidence=json.loads((root/"d4_pocket_linux_export_build.json").read_text()); package=root/"D4Pocket-linux.d4pkg"; assert evidence["target_platform"]=="linux"; assert evidence["source_commit"]==sys.argv[2]; assert evidence["signed"] is False and evidence["formal_distribution_claimed"] is False; assert evidence["package"]["installed_product_verified"] is False; assert evidence["package"]["sha256"]==hashlib.sha256(package.read_bytes()).hexdigest(); print(json.dumps({"source_commit":evidence["source_commit"],"artifact_tree_sha256":evidence["artifact_tree_sha256"],"package_sha256":evidence["package"]["sha256"],"signed":False,"installed_product_verified":False},separators=(",",":")))' "$output_root" "$(git rev-parse HEAD)" | tee "$D4P_EXPORT_ROOT/build-result.json"
           python3 -m unittest tooling.tests.test_linux_gtk_bundle_smoke
+          python3 -m unittest tooling.tests.test_linux_installed_product_smoke
           dbus-run-session -- xvfb-run -a python3 tooling/tests/linux_gtk_bundle_smoke.py \
             --launcher "$output_root/bundle/gui_shell_desktop_launcher" \
             --temp-root "$D4P_EXPORT_ROOT" \
@@ -175,6 +177,29 @@ jobs:
           {
             printf '\n- Installed Credential acceptance: isolated unlocked run-owned GNOME Secret Service; installed GTK native masked-entry path; Owner reject produced no stored items; a distinct Owner allow created one metadata record and separate key／ciphertext items; normal installed-app exit／restart reloaded the same active metadata from durable Broker Audit; Owner reject／allow for logical revocation preserved the two Secret Service items; final metadata was revoked; Audit chain／anchor HMAC and test-secret non-exposure in UI／Audit／logs／acceptance files were checked.\n'
             printf -- '- Scope: Ubuntu 24.04 hosted Xvfb／X11, unsigned test-identity installed product and automated AT-SPI／keyboard input. This does not establish MCP child injection／Tool execution, Secret Service behavior in other Linux desktop sessions, Wayland rendering, production package signing／distribution, or full Linux product completion.\n'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: installed GTK UIでMCP stdio childとToolを受入れる
+        if: ${{ inputs.acceptance_scope == 'mcp_tool_execution' }}
+        shell: bash
+        env:
+          GUI_SHELL_PRODUCT_APP_ID: d4-pocket-app-11111111111111111111111111111111
+          GUI_SHELL_PRODUCT_AUDIT_STORE_ID: audit-store-22222222222222222222222222222222
+          D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE: ${{ runner.temp }}/d4p-linux-export-${{ github.run_id }}-${{ github.run_attempt }}/output/D4Pocket-linux-rollback.d4pkg
+        run: |
+          set -euo pipefail
+          test_package="$D4P_EXPORT_ROOT/output/D4Pocket-linux.d4pkg"
+          acceptance_root="$D4P_EXPORT_ROOT/installed-mcp-acceptance"
+          dbus-run-session -- xvfb-run -a python3 tooling/tests/linux_installed_product_smoke.py \
+            --package "$test_package" \
+            --temp-root "$D4P_EXPORT_ROOT" \
+            --acceptance-root "$acceptance_root" \
+            --private-key "$D4P_EXPORT_ROOT/test-update-private.der" \
+            --update-package "$D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE" \
+            --acceptance-scope mcp_tool_execution
+          {
+            printf '\n- Installed MCP acceptance: a fresh native Owner rejection created no stdio child; a separate Owner approval launched the run-owned real `/usr/bin/python3` MCP fixture through the installed GTK Runner and production Broker. The fixture completed `server/discover`, `tools/list`, and one Owner-confirmed `tools/call`; the installed UI showed the LIVE_RUNTIME result hash, content type, and Audit receipt while the fixture result marker stayed absent from UI／Audit／logs／acceptance files. Disconnect rejection preserved the child group; a separate native Owner approval confirmed owned group termination and removed the Broker connection. The installed app then exited normally, and the file-backed Audit chain／anchor HMAC was checked.\n'
+            printf -- '- Scope: Ubuntu 24.04 hosted Xvfb／X11, unsigned test-identity installed product, and automated AT-SPI／keyboard input. This proves the installed MCP stdio／Tool metadata and hash-only result path for a local synthetic server only; no external provider／credential injection, non-X11 desktop session, Wayland rendering, production signing／distribution, or full Linux product completion.\n'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: build fixture／bundleを正確な一時rootから削除

@@ -45,6 +45,8 @@ RUST_ROLLBACK_SEED_TEST = (
 RUST_SECRET_SERVICE_TEST = (
     "broker::credential_storage::tests::linux_secret_service_actual_store_is_create_only_namespaced_and_cleaned"
 )
+MCP_PUBLIC_INPUT = "installed-mcp-public-input"
+MCP_RESULT_PREFIX = "D4P_MCP_RESULT_PROBE_"
 RUST_AUDIT_TEST = (
     "broker::update_center::tests::linux_installed_acceptance_runtime_audit_is_durable"
 )
@@ -1088,6 +1090,369 @@ def _run_installed_credential_vault_acceptance(
     }
 
 
+def _write_linux_mcp_fixture(
+    temp_root: Path, acceptance_root: Path
+) -> tuple[Path, Path, str, str]:
+    workspace = acceptance_root / "mcp-workspace"
+    workspace.mkdir(mode=0o700)
+    metadata = workspace.lstat()
+    if (
+        workspace.is_symlink()
+        or not stat.S_ISDIR(metadata.st_mode)
+        or metadata.st_uid != os.getuid()
+        or metadata.st_mode & 0o077
+    ):
+        raise RuntimeError("installed MCP fixture workspace is not private and owner-bound")
+
+    fixture = temp_root / "linux-installed-mcp-server.py"
+    if fixture.exists() or fixture.is_symlink():
+        raise RuntimeError("run-owned MCP fixture path is already occupied")
+    source = '''import json
+import os
+import sys
+
+seed = sys.argv[1]
+
+def write_private(name, value):
+    fd = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as stream:
+        json.dump(value, stream, separators=(",", ":"))
+        stream.flush()
+        os.fsync(stream.fileno())
+
+write_private("mcp-child-started.json", {"pid": os.getpid(), "pgid": os.getpgrp()})
+
+for line in sys.stdin:
+    request = json.loads(line)
+    method = request.get("method")
+    request_id = request.get("id")
+    if request_id is None:
+        continue
+    if method == "server/discover":
+        response = {
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "result": {
+                "resultType": "complete",
+                "supportedVersions": ["2026-07-28"],
+                "capabilities": {"tools": {}},
+            },
+            "_meta": {"io.modelcontextprotocol/serverInfo": {"name": "installed-fixture", "version": "1"}},
+        }
+    elif method == "tools/list":
+        response = {
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "result": {
+                "resultType": "complete",
+                "tools": [{
+                    "name": "echo",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {"text": {"type": "string"}},
+                        "required": ["text"],
+                        "additionalProperties": False,
+                    },
+                }],
+            },
+        }
+    elif method == "tools/call":
+        arguments = request.get("params", {}).get("arguments", {})
+        if request.get("params", {}).get("name") != "echo" or arguments != {"text": "installed-mcp-public-input"}:
+            raise SystemExit(73)
+        write_private("mcp-tool-called.json", {"method": method, "count": 1})
+        response = {
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "result": {
+                "resultType": "complete",
+                "content": [{"type": "text", "text": "D4P_MCP_RESULT_PROBE_" + seed}],
+                "isError": False,
+            },
+        }
+    else:
+        response = {"jsonrpc": "2.0", "id": request_id, "error": {"code": -32601, "message": "method not found"}}
+    sys.stdout.write(json.dumps(response, separators=(",", ":")) + "\\n")
+    sys.stdout.flush()
+'''
+    with fixture.open("x", encoding="utf-8", newline="\n") as stream:
+        stream.write(source)
+    fixture.chmod(0o600)
+    fixture_metadata = fixture.lstat()
+    if (
+        fixture.is_symlink()
+        or not stat.S_ISREG(fixture_metadata.st_mode)
+        or fixture_metadata.st_nlink != 1
+        or fixture_metadata.st_uid != os.getuid()
+        or fixture_metadata.st_mode & 0o077
+        or temp_root.resolve(strict=True) not in fixture.resolve(strict=True).parents
+    ):
+        raise RuntimeError("run-owned MCP fixture is not a private regular file")
+
+    seed = secrets.token_hex(16)
+    result_marker = MCP_RESULT_PREFIX + seed
+    return workspace, fixture, seed, result_marker
+
+
+def _read_mcp_child_identity(workspace: Path) -> tuple[int, int]:
+    marker = workspace / "mcp-child-started.json"
+    metadata = marker.lstat()
+    if (
+        marker.is_symlink()
+        or not stat.S_ISREG(metadata.st_mode)
+        or metadata.st_nlink != 1
+        or metadata.st_uid != os.getuid()
+        or metadata.st_mode & 0o077
+    ):
+        raise RuntimeError("installed MCP child identity marker is not a private regular file")
+    try:
+        document = json.loads(marker.read_text(encoding="utf-8"))
+        pid = int(document["pid"])
+        pgid = int(document["pgid"])
+    except (OSError, UnicodeError, json.JSONDecodeError, KeyError, TypeError, ValueError) as error:
+        raise RuntimeError("installed MCP child identity marker is malformed") from error
+    if pid <= 1 or pgid <= 1 or pid == pgid or pgid == os.getpgrp():
+        raise RuntimeError("installed MCP child is not in its isolated owned process group")
+    return pid, pgid
+
+
+def _mcp_process_group_is_fixture_owned(
+    pid: int, pgid: int, *, helper: Path, fixture: Path
+) -> bool:
+    if pgid <= 1 or pgid == os.getpgrp():
+        return False
+    try:
+        leader_executable = Path(os.readlink(f"/proc/{pgid}/exe")).resolve(strict=True)
+        leader_arguments = Path(f"/proc/{pgid}/cmdline").read_bytes().split(b"\0")
+        if (
+            leader_executable != helper.resolve(strict=True)
+            or b"--internal-process-group-guardian-v1" not in leader_arguments
+        ):
+            return False
+        try:
+            child_executable = Path(os.readlink(f"/proc/{pid}/exe")).resolve(strict=True)
+            child_arguments = Path(f"/proc/{pid}/cmdline").read_bytes().split(b"\0")
+        except (FileNotFoundError, ProcessLookupError):
+            return True
+        return (
+            os.getpgid(pid) == pgid
+            and fixture.as_posix().encode() in child_arguments
+            and child_executable.is_file()
+        )
+    except (OSError, ProcessLookupError, PermissionError):
+        return False
+
+
+def _wait_for_mcp_group_state(pgid: int, should_exist: bool, *, timeout: float = 15.0) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if _group_exists(pgid) == should_exist:
+            return
+        time.sleep(0.1)
+    expected = "alive" if should_exist else "stopped"
+    raise RuntimeError(f"installed MCP owned process group did not become {expected}")
+
+
+def _cleanup_mcp_fixture_group(workspace: Path, *, helper: Path, fixture: Path) -> None:
+    marker = workspace / "mcp-child-started.json"
+    if not marker.exists() and not marker.is_symlink():
+        return
+    _, pgid = _read_mcp_child_identity(workspace)
+    if not _group_exists(pgid):
+        return
+    if not _mcp_process_group_is_fixture_owned(
+        *_read_mcp_child_identity(workspace), helper=helper, fixture=fixture
+    ):
+        raise RuntimeError("refusing to clean an MCP process group not proven to be run-owned")
+    _stop_owned_groups({pgid})
+    _wait_for_mcp_group_state(pgid, False)
+
+
+def _run_installed_mcp_tool_acceptance(
+    environment: dict[str, str],
+    window_id: str,
+    *,
+    helper: Path,
+    audit_store: Path,
+    temp_root: Path,
+    acceptance_root: Path,
+) -> dict[str, object]:
+    workspace, fixture, seed, result_marker = _write_linux_mcp_fixture(
+        temp_root, acceptance_root
+    )
+    python_executable = Path("/usr/bin/python3")
+    if not python_executable.is_file() or not os.access(python_executable, os.X_OK):
+        raise RuntimeError("installed MCP acceptance requires the runner-owned /usr/bin/python3")
+    server_id = "linux-installed-mcp-fixture"
+    start_marker = workspace / "mcp-child-started.json"
+    call_marker = workspace / "mcp-tool-called.json"
+    window = _open_mcp_center_from_installed_ui(environment, window_id)
+
+    for label, value in (
+        ("サーバー識別子", server_id),
+        ("実行ファイルの絶対パス", str(python_executable)),
+        ("作業フォルダーの絶対パス", str(workspace)),
+        ("起動引数（1行に1項目、最大32項目）", f"-u\n{fixture}\n{seed}"),
+    ):
+        _set_public_text_by_keyboard(window, label, value, environment, window_id)
+
+    connect = _find_operable_accessible("MCP接続を開始", root=window, timeout=10)
+    _activate_accessible(connect, "MCP接続を開始", environment)
+    _answer_owner_dialog(
+        environment,
+        "拒否",
+        expected_summary_markers=(
+            f"Server ID: {server_id}",
+            f"実行file: {python_executable}",
+            f"作業folder: {workspace}",
+            "Credential: 未選択",
+        ),
+    )
+    _wait_for_owner_dialog_closed(environment)
+    _find_accessible("MCP接続は確定していません", root=window, timeout=15)
+    if start_marker.exists() or call_marker.exists():
+        raise RuntimeError("installed MCP native Owner rejection started a child or Tool")
+
+    connect = _find_operable_accessible("MCP接続を開始", root=window, timeout=10)
+    _activate_accessible(connect, "MCP接続を開始", environment)
+    _answer_owner_dialog(
+        environment,
+        "許可",
+        expected_summary_markers=(
+            f"Server ID: {server_id}",
+            f"実行file: {python_executable}",
+            f"作業folder: {workspace}",
+            "Credential: 未選択",
+        ),
+    )
+    _wait_for_owner_dialog_closed(environment)
+    _find_accessible("接続receiptを受理しました", root=window, timeout=20)
+    _find_accessible("echo", root=window, timeout=15)
+    deadline = time.monotonic() + 10
+    while not start_marker.exists() and time.monotonic() < deadline:
+        time.sleep(0.1)
+    pid, pgid = _read_mcp_child_identity(workspace)
+    if not _mcp_process_group_is_fixture_owned(
+        pid, pgid, helper=helper, fixture=fixture
+    ):
+        raise RuntimeError("installed MCP child is not supervised by the installed Broker guardian")
+    _wait_for_mcp_group_state(pgid, True)
+
+    tool_list = _find_operable_accessible("Tool一覧：1件", root=window, timeout=15)
+    _activate_accessible(tool_list, "Tool一覧：1件", environment)
+    run_tool = _find_operable_accessible("確認して実行", root=window, timeout=10)
+    _activate_accessible(run_tool, "確認して実行", environment)
+    arguments_dialog = _find_accessible("echo のarguments", root=window, timeout=10)
+    arguments = json.dumps({"text": MCP_PUBLIC_INPUT}, ensure_ascii=False)
+    _set_public_text_by_keyboard(
+        arguments_dialog,
+        "JSON形式のobject",
+        arguments,
+        environment,
+        window_id,
+    )
+    confirm_arguments = _find_operable_accessible(
+        "入力内容を確認", root=arguments_dialog, timeout=10
+    )
+    _activate_accessible(confirm_arguments, "入力内容を確認", environment)
+    confirmation = _find_accessible("送信する引数を確認", root=window, timeout=10)
+    _find_accessible(MCP_PUBLIC_INPUT, root=confirmation, timeout=5)
+    _find_accessible("Tool結果本文は返却されず", root=confirmation, timeout=5)
+    proceed = _find_operable_accessible("Linux確認へ進む", root=confirmation, timeout=10)
+    _activate_accessible(proceed, "Linux確認へ進む", environment)
+    _answer_owner_dialog(
+        environment,
+        "許可",
+        expected_summary_markers=(
+            f"Server ID: {server_id}",
+            "Tool: echo",
+            "arguments hash:",
+        ),
+    )
+    _wait_for_owner_dialog_closed(environment)
+    _find_accessible("Tool応答receiptを受理しました", root=window, timeout=20)
+    _find_accessible("result hash: sha256:", root=window, timeout=10)
+    _find_accessible("content: text", root=window, timeout=10)
+    if not call_marker.is_file() or call_marker.is_symlink():
+        raise RuntimeError("installed MCP child did not receive exactly one tools/call")
+    try:
+        call_document = json.loads(call_marker.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise RuntimeError("installed MCP tools/call marker is malformed") from error
+    if call_document != {"method": "tools/call", "count": 1}:
+        raise RuntimeError("installed MCP child did not receive the expected single tools/call")
+
+    snapshot_after_tool = _accessible_snapshot(window)
+    if result_marker in snapshot_after_tool:
+        raise RuntimeError("installed MCP Tool result body leaked into the UI accessibility tree")
+    result_hashes = re.findall(r"result hash: (sha256:[0-9a-f]{64})", snapshot_after_tool)
+    if len(result_hashes) != 1:
+        raise RuntimeError("installed MCP Tool UI did not expose exactly one hash-only result receipt")
+
+    _activate_named_control_by_keyboard(
+        "切断", environment, window_id, context_marker=server_id
+    )
+    _answer_owner_dialog(
+        environment,
+        "拒否",
+        expected_summary_markers=(f"Server ID: {server_id}",),
+    )
+    _wait_for_owner_dialog_closed(environment)
+    _find_accessible("切断は確定していません", root=window, timeout=15)
+    if not _group_exists(pgid):
+        raise RuntimeError("MCP disconnect Owner rejection stopped the still-registered child")
+
+    _activate_named_control_by_keyboard(
+        "切断", environment, window_id, context_marker=server_id
+    )
+    _answer_owner_dialog(
+        environment,
+        "許可",
+        expected_summary_markers=(f"Server ID: {server_id}",),
+    )
+    _wait_for_owner_dialog_closed(environment)
+    _find_accessible("切断receiptを受理しました", root=window, timeout=20)
+    _wait_for_mcp_group_state(pgid, False)
+    _find_accessible("Brokerが保持するMCP接続はありません。", root=window, timeout=10)
+
+    audit = _verify_live_audit(
+        audit_store,
+        require_export=False,
+        require_mcp=True,
+    )
+    audit_events = [
+        json.loads(line)
+        for line in (audit_store / "audit.jsonl").read_text(encoding="utf-8").splitlines()
+        if line
+    ]
+    tool_events = [
+        event
+        for event in audit_events
+        if event.get("operation") == "MCP Tool実行"
+        and event.get("decision") == "accepted"
+        and event.get("evidence_source") == "LIVE_RUNTIME"
+    ]
+    if len(tool_events) != 1 or result_hashes[0] not in tool_events[0].get("reason", ""):
+        raise RuntimeError("installed MCP UI result hash is not bound to the durable LIVE_RUNTIME Audit")
+    _assert_secret_absent_from_files(
+        acceptance_root,
+        result_marker,
+        excluded_roots=(acceptance_root / "home/.local/share/apps",),
+    )
+    return {
+        "server_id": server_id,
+        "installed_python_child_started_after_owner_allow": True,
+        "connection_owner_rejected_then_allowed": True,
+        "tool_call_owner_approved_once": True,
+        "tool_result": "hash_only_live_runtime_receipt",
+        "result_hash_matches_durable_audit": True,
+        "result_body_absent_from_ui_audit_logs_and_acceptance_files": True,
+        "disconnect_owner_rejected_then_allowed": True,
+        "owned_process_group_stopped": True,
+        "audit": audit,
+    }
+
+
 def _restart_installed_product(
     environment: dict[str, str],
     window_id: str,
@@ -1700,6 +2065,8 @@ def _wait_for_owner_dialog_window(
 def _verify_live_audit(
     store: Path,
     *,
+    require_export: bool = True,
+    require_mcp: bool = False,
     require_uninstall: bool = False,
     require_rollback: bool = False,
     require_catalog: bool = False,
@@ -1766,8 +2133,64 @@ def _verify_live_audit(
     ]
     accepted = sum(event.get("decision") == "accepted" for event in exports)
     rejected = sum(event.get("decision") == "rejected" for event in exports)
-    if accepted < 1 or rejected < 1:
+    if require_export and (accepted < 1 or rejected < 1):
         raise RuntimeError("GTK Owner拒否／許可の両方がINTERNAL_STATE Auditにありません")
+    mcp_connect = [event for event in events if event.get("operation") == "MCP接続"]
+    mcp_tool = [event for event in events if event.get("operation") == "MCP Tool実行"]
+    mcp_disconnect = [event for event in events if event.get("operation") == "MCP切断"]
+    mcp_connect_rejected = sum(
+        event.get("decision") == "rejected"
+        and event.get("reason") == "desktop_native_owner_confirmation_required"
+        and event.get("evidence_source") == "INTERNAL_STATE"
+        for event in mcp_connect
+    )
+    mcp_connect_accepted = sum(
+        event.get("decision") == "accepted"
+        and event.get("evidence_source") == "INTERNAL_STATE"
+        for event in mcp_connect
+    )
+    mcp_tool_approved = sum(
+        event.get("decision") == "approved"
+        and event.get("evidence_source") == "INTERNAL_STATE"
+        for event in mcp_tool
+    )
+    mcp_tool_started = sum(
+        event.get("decision") == "started"
+        and event.get("evidence_source") == "INTERNAL_STATE"
+        and "consumed=true" in event.get("reason", "")
+        for event in mcp_tool
+    )
+    mcp_tool_live_completed = sum(
+        event.get("decision") == "accepted"
+        and event.get("evidence_source") == "LIVE_RUNTIME"
+        and "hash-only receipt" in event.get("reason", "")
+        for event in mcp_tool
+    )
+    mcp_disconnect_rejected = sum(
+        event.get("decision") == "rejected"
+        and event.get("reason") == "desktop_native_owner_confirmation_required"
+        and event.get("evidence_source") == "INTERNAL_STATE"
+        for event in mcp_disconnect
+    )
+    mcp_disconnect_live_completed = sum(
+        event.get("decision") == "accepted"
+        and event.get("evidence_source") == "LIVE_RUNTIME"
+        for event in mcp_disconnect
+    )
+    if require_mcp and not all(
+        (
+            mcp_connect_rejected >= 1,
+            mcp_connect_accepted >= 1,
+            mcp_tool_approved == 1,
+            mcp_tool_started == 1,
+            mcp_tool_live_completed == 1,
+            mcp_disconnect_rejected >= 1,
+            mcp_disconnect_live_completed >= 1,
+        )
+    ):
+        raise RuntimeError(
+            "installed MCP connect／Tool one-shot Permission／disconnectのOwner・LIVE_RUNTIME Auditが不足しています"
+        )
     uninstall = [
         event
         for event in events
@@ -1890,6 +2313,13 @@ def _verify_live_audit(
         "events": len(events),
         "export_accepted": accepted,
         "export_rejected": rejected,
+        "mcp_connect_owner_rejected": mcp_connect_rejected,
+        "mcp_connect_internal_accepted": mcp_connect_accepted,
+        "mcp_tool_approved": mcp_tool_approved,
+        "mcp_tool_permission_consumed": mcp_tool_started,
+        "mcp_tool_live_hash_only_completed": mcp_tool_live_completed,
+        "mcp_disconnect_owner_rejected": mcp_disconnect_rejected,
+        "mcp_disconnect_live_completed": mcp_disconnect_live_completed,
         "uninstall_accepted": uninstall_accepted,
         "uninstall_rejected": uninstall_rejected,
         "uninstall_completed": uninstall_completed,
@@ -2085,7 +2515,7 @@ def run_installed_smoke(
     update_package = _resolve_regular_package(update_package)
     if temp_root not in update_package.parents:
         raise RuntimeError("rollback fixture packageがrun固有一時root外です")
-    if acceptance_scope not in {"update_lifecycle", "credential_vault"}:
+    if acceptance_scope not in {"update_lifecycle", "credential_vault", "mcp_tool_execution"}:
         raise RuntimeError("installed acceptance scopeが未対応です")
     resolved_private_key = private_key_path.resolve(strict=True)
     if (
@@ -2163,6 +2593,7 @@ def run_installed_smoke(
     uninstall_groups: set[int] = set()
     product_paths: set[Path] = set()
     preexisting: set[int] = set()
+    installed_helper: Path | None = None
     app_log = acceptance_root / "installed-app.log"
     try:
         if acceptance_scope == "credential_vault":
@@ -2172,6 +2603,8 @@ def run_installed_smoke(
                 acceptance_root / "gnome-keyring.log",
             )
             _run_rust_test(RUST_SECRET_SERVICE_TEST, environment, private_key_path)
+        elif acceptance_scope == "mcp_tool_execution":
+            pass
         else:
             _run_rust_test(RUST_CATALOG_RELAY_TIMEOUT_TEST, environment, private_key_path)
             _run_rust_test(RUST_HELPER_EXIT_CLASS_TEST, environment, private_key_path)
@@ -2203,6 +2636,7 @@ def run_installed_smoke(
         active_launcher = stage / "gui_shell_desktop_launcher"
         runner = stage / "gui_shell_desktop"
         helper = stage / "libexec/gui_shell_linux_broker"
+        installed_helper = helper
         if not all(path.is_file() and not path.is_symlink() for path in (fixed_launcher, active_launcher, runner, helper)):
             raise RuntimeError("Brokerが有効化したinstalled bundleの固定fileが不足しています")
         applications = xdg_data_home / "applications"
@@ -2338,6 +2772,46 @@ def run_installed_smoke(
                             "product_version": record["product_version"],
                             "package_sha256": record["package_sha256"],
                             "credential_vault": credential_evidence,
+                            "installed_app_exit": "normal_window_close_and_owned_process_cleanup",
+                        },
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    )
+                )
+                return
+
+            if acceptance_scope == "mcp_tool_execution":
+                mcp_evidence = _run_installed_mcp_tool_acceptance(
+                    environment,
+                    window_id,
+                    helper=helper,
+                    audit_store=broker_state / "store",
+                    temp_root=temp_root,
+                    acceptance_root=acceptance_root,
+                )
+                current_window_id = _visible_product_window(environment)
+                if current_window_id is None:
+                    raise RuntimeError("MCP acceptance後にinstalled GTK windowが見つかりません")
+                _request_x11_window_manager_close(current_window_id, environment)
+                deadline = time.monotonic() + 60
+                while time.monotonic() < deadline:
+                    if not (_processes_using(product_paths) - preexisting):
+                        break
+                    time.sleep(0.2)
+                if _processes_using(product_paths) - preexisting:
+                    raise RuntimeError("MCP acceptance後の正常終了でowned product processが残留しています")
+                if desktop_process.poll() is None:
+                    desktop_process.wait(timeout=10)
+                if desktop_process.returncode not in (0, None):
+                    raise RuntimeError("MCP acceptance後のdesktop launcher終了codeが不正です")
+                print(
+                    json.dumps(
+                        {
+                            "acceptance_scope": acceptance_scope,
+                            "installed_entry": str(entries[0]),
+                            "product_version": record["product_version"],
+                            "package_sha256": record["package_sha256"],
+                            "mcp_tool_execution": mcp_evidence,
                             "installed_app_exit": "normal_window_close_and_owned_process_cleanup",
                         },
                         ensure_ascii=False,
@@ -2747,6 +3221,17 @@ def run_installed_smoke(
             _terminate_group(secret_service_process)
         if secret_service_process is not None and secret_service_process.poll() is None:
             raise RuntimeError("run固有Secret Service processを停止できません")
+        if (
+            acceptance_scope == "mcp_tool_execution"
+            and installed_helper is not None
+            and acceptance_root.exists()
+            and (acceptance_root / "mcp-workspace").is_dir()
+        ):
+            _cleanup_mcp_fixture_group(
+                acceptance_root / "mcp-workspace",
+                helper=installed_helper,
+                fixture=temp_root / "linux-installed-mcp-server.py",
+            )
         if acceptance_root.exists():
             resolved = acceptance_root.resolve(strict=True)
             if resolved == temp_root or temp_root not in resolved.parents or acceptance_root.is_symlink():
@@ -2765,7 +3250,7 @@ def main() -> int:
     parser.add_argument("--update-package", type=Path, required=True)
     parser.add_argument(
         "--acceptance-scope",
-        choices=("update_lifecycle", "credential_vault"),
+        choices=("update_lifecycle", "credential_vault", "mcp_tool_execution"),
         default="update_lifecycle",
     )
     args = parser.parse_args()

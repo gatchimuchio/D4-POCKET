@@ -12032,8 +12032,11 @@ def test_linux_installer_is_required_release_scope() -> list[str]:
         errors.append("Installer statusがLinux native product release blockerへ接続されていない")
     if blocker is None or blocker.get("blocks_release") is not True:
         errors.append("Linux native product blockerがreleaseを遮断していない")
-    elif not all(token in blocker.get("required_action", "") for token in ("Installer", "Rollback", "Uninstaller")):
-        errors.append("Linux native product blockerのrequired_actionにinstaller lifecycleがない")
+    elif not all(
+        token in blocker.get("required_action", "")
+        for token in ("MCP子process", "正式Installer", "署名配布", "再試験しない")
+    ):
+        errors.append("Linux native product blockerのrequired_actionが成立済み受入れと残件を区別していない")
     return errors
 
 
@@ -12059,6 +12062,10 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
     if workflow_path.is_symlink() or not workflow_path.is_file():
         return ["Linux Export build用の通常file workflowがない"]
     workflow = workflow_path.read_text(encoding="utf-8")
+    smoke_path = ROOT / "tooling/tests/linux_installed_product_smoke.py"
+    if smoke_path.is_symlink() or not smoke_path.is_file():
+        return ["Linux installed-product smoke acceptanceが通常fileではない"]
+    smoke = smoke_path.read_text(encoding="utf-8")
     required = (
         "'on':\n  workflow_dispatch:",
         "runs-on: ubuntu-24.04",
@@ -12068,11 +12075,23 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
         "rustup toolchain install 1.95.0",
         "tooling/tests/create_linux_export_fixture.py",
         "tooling/export_linux_product.py",
+        "python3 -m unittest tooling.tests.test_linux_installed_product_smoke",
         "D4P_EXPORT_ROOT",
         "rm -rf -- \"$D4P_EXPORT_ROOT\"",
         "installed-product acceptance",
+        "mcp_tool_execution",
+        "inputs.acceptance_scope == 'mcp_tool_execution'",
+        "--acceptance-scope mcp_tool_execution",
     )
     missing = [token for token in required if token not in workflow]
+    for token in (
+        "def _run_installed_mcp_tool_acceptance(",
+        "require_mcp=True",
+        "result_body_absent_from_ui_audit_logs_and_acceptance_files",
+        "_cleanup_mcp_fixture_group(",
+    ):
+        if token not in smoke:
+            missing.append(f"installed MCP smoke: {token}")
     if "pull_request:" in workflow or "push:" in workflow:
         missing.append("manual trigger only")
     return [f"Linux Export build workflowに固定・scope・cleanup条件がない: {token}" for token in missing]
