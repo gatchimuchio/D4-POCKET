@@ -78,11 +78,6 @@ pub fn helper_exit_code(error: &io::Error) -> i32 {
         .unwrap_or_else(|| 20 + helper_error_kind_offset(error.kind()))
 }
 
-fn classify_relay_error(error: io::Error) -> io::Error {
-    let exit_code = 40 + helper_error_kind_offset(error.kind());
-    io::Error::new(error.kind(), ClassifiedHelperError { exit_code })
-}
-
 fn classify_stage_error(error: io::Error, exit_code: i32) -> io::Error {
     io::Error::new(error.kind(), ClassifiedHelperError { exit_code })
 }
@@ -386,7 +381,7 @@ fn serve(
                 Some(response) => response,
                 None => {
                     let request = Zeroizing::new(normalize(&frame, &endpoint.0.session_id));
-                    relay(&request, &endpoint.0).map_err(classify_relay_error)?
+                    relay(&request, &endpoint.0)?
                 }
             };
             mark_initial_install_handoff(&frame, &mut response, allow_initial_install_handoff)
@@ -666,15 +661,26 @@ fn mark_initial_install_handoff(
 
 fn relay(request: &[u8], endpoint: &BrokerEndpoint) -> io::Result<Vec<u8>> {
     let address = SocketAddr::from((Ipv4Addr::LOCALHOST, endpoint.port));
-    let mut socket = TcpStream::connect_timeout(&address, IO_TIMEOUT)?;
-    socket.set_read_timeout(Some(relay_response_timeout(request)))?;
-    socket.set_write_timeout(Some(IO_TIMEOUT))?;
-    socket.write_all(endpoint.session_secret.as_bytes())?;
-    socket.write_all(b"\n")?;
-    socket.write_all(request)?;
-    socket.write_all(b"\n")?;
-    socket.flush()?;
-    read_frame(&mut BufReader::new(socket), RESPONSE_LIMIT)?.ok_or_else(failure)
+    let mut socket = TcpStream::connect_timeout(&address, IO_TIMEOUT)
+        .map_err(|error| classify_stage_error(error, 70))?;
+    socket
+        .set_read_timeout(Some(relay_response_timeout(request)))
+        .map_err(|error| classify_stage_error(error, 71))?;
+    socket
+        .set_write_timeout(Some(IO_TIMEOUT))
+        .map_err(|error| classify_stage_error(error, 72))?;
+    socket
+        .write_all(endpoint.session_secret.as_bytes())
+        .and_then(|()| socket.write_all(b"\n"))
+        .map_err(|error| classify_stage_error(error, 73))?;
+    socket
+        .write_all(request)
+        .and_then(|()| socket.write_all(b"\n"))
+        .and_then(|()| socket.flush())
+        .map_err(|error| classify_stage_error(error, 74))?;
+    let response = read_frame(&mut BufReader::new(socket), RESPONSE_LIMIT)
+        .map_err(|error| classify_stage_error(error, 75))?;
+    response.ok_or_else(|| classify_stage_error(failure(), 76))
 }
 
 fn relay_response_timeout(request: &[u8]) -> Duration {
@@ -957,22 +963,16 @@ mod tests {
             30
         );
         assert_eq!(
-            helper_exit_code(&classify_relay_error(io::Error::other("omitted"))),
-            40
-        );
-        assert_eq!(
-            helper_exit_code(&classify_relay_error(io::Error::from(
-                io::ErrorKind::TimedOut
-            ))),
-            41
-        );
-        assert_eq!(
             helper_exit_code(&classify_stage_error(io::Error::other("omitted"), 52)),
             52
         );
         assert_eq!(
             helper_exit_code(&classify_stage_error(io::Error::other("omitted"), 59)),
             59
+        );
+        assert_eq!(
+            helper_exit_code(&classify_stage_error(io::Error::other("omitted"), 76)),
+            76
         );
     }
 
