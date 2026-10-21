@@ -882,7 +882,7 @@ def _installed_update_download_stage_activate(
     )
     package_metadata = downloaded_package.lstat()
     if (
-        not package_metadata.is_file()
+        not stat.S_ISREG(package_metadata.st_mode)
         or downloaded_package.is_symlink()
         or package_metadata.st_nlink != 1
         or package_metadata.st_mode & 0o022
