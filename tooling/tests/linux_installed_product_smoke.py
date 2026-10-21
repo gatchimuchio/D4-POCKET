@@ -632,10 +632,11 @@ def _answer_owner_dialog(
     dialog = _find_accessible(OWNER_DIALOG_TITLE, timeout=10)
     descendants = _accessible_descendants(dialog)
     names = [accessible_name for _, accessible_name in descendants]
+    normalized_summary = " ".join(" ".join(names).split())
     missing_markers = [
         marker
         for marker in expected_summary_markers
-        if not any(marker in value for value in names)
+        if " ".join(marker.split()) not in normalized_summary
     ]
     if missing_markers:
         raise RuntimeError(

@@ -13,6 +13,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _activate_accessible,
     _activate_named_control_by_keyboard,
     _actionable_node,
+    _answer_owner_dialog,
     _catalog_failure_diagnostics,
     _component_center,
     _desktop_entry_targets_fixed_launcher,
@@ -273,6 +274,68 @@ class InstalledCatalogFetchStatusTests(unittest.TestCase):
         self.assertEqual(diagnostics["helper_count"], 0)
         self.assertIn('"operation": "更新候補取得"', rendered)
         self.assertNotIn("secret-test", rendered)
+
+
+class InstalledOwnerSummaryTests(unittest.TestCase):
+    class Node:
+        def __init__(self, name: str, children=()) -> None:
+            self.name = name
+            self.children = list(children)
+            self.childCount = len(self.children)
+
+        def getChildAtIndex(self, index: int):
+            return self.children[index]
+
+    def test_accepts_required_owner_markers_split_across_accessible_text_nodes(self) -> None:
+        package_hash = "c24c86c83f5fcacc15f03030ba2a6c10fabeeed405b4735ee0c1260dd7c21123"
+        parts = (
+            "Linux製品の署名検査済み更新packageを取得しますか？",
+            "更新ID:",
+            "linux-installed-catalog-display",
+            "提供版:",
+            "0.1.2",
+            "channel: stable",
+            "署名者fingerprint: " + "a" * 64,
+            "取得host: raw.githubusercontent.com",
+            "package SHA-256:",
+            package_hash,
+            "byte長:",
+            "1809",
+            "要求hash:",
+            "b" * 64,
+        )
+        dialog = self.Node(
+            "D4 Pocket Owner確認", [self.Node(part) for part in parts]
+        )
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._wait_for_owner_dialog_window"
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_accessible",
+                return_value=dialog,
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
+                return_value=object(),
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._activate_accessible"
+            ) as activate,
+        ):
+            _answer_owner_dialog(
+                {"DISPLAY": ":99"},
+                "拒否",
+                expected_summary_markers=(
+                    "Linux製品の署名検査済み更新packageを取得しますか？",
+                    "更新ID: linux-installed-catalog-display",
+                    "提供版: 0.1.2",
+                    "取得host: raw.githubusercontent.com",
+                    f"package SHA-256: {package_hash}",
+                    "1809",
+                ),
+            )
+        activate.assert_called_once()
 
 
 class LinuxInstalledDesktopEntryTests(unittest.TestCase):
