@@ -55,9 +55,14 @@ const EMBEDDED_PRODUCT_AUDIT_STORE_ID: Option<&str> =
 const EMBEDDED_PRODUCT_UPDATE_TRUST_JSON: Option<&str> = option_env!("GUI_SHELL_UPDATE_TRUST_JSON");
 
 // Linux installed acceptanceでBroker thread panicの処理区間だけを数値分類する。
-// 1=要求/trust、2=HTTPS、3=catalog decode、4=候補検証、5=永続化、6=成功Audit。
+// 1=要求/trust、2=HTTPS呼出し、3=catalog decode、4=候補検証、5=永続化、6=成功Audit。
+// 7=URL parse、8=DNS、9=TLS client、10=Tokio runtime、11=HTTPS送信、12=bounded応答。
 // panic本文・候補本文・credentialは保持しない。通常終了時は0へ戻す。
 static CATALOG_PANIC_STAGE: AtomicU8 = AtomicU8::new(0);
+
+pub(crate) fn set_catalog_panic_stage(stage: u8) {
+    CATALOG_PANIC_STAGE.store(stage, Ordering::Release);
+}
 
 #[cfg(target_os = "linux")]
 pub(crate) fn catalog_panic_stage() -> u8 {

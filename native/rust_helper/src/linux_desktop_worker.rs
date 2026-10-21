@@ -83,7 +83,7 @@ fn classify_stage_error(error: io::Error, exit_code: i32) -> io::Error {
 }
 
 fn broker_panic_exit_code(catalog_stage: u8) -> i32 {
-    if (1..=6).contains(&catalog_stage) {
+    if (1..=12).contains(&catalog_stage) {
         90 + i32::from(catalog_stage)
     } else {
         61
@@ -91,7 +91,7 @@ fn broker_panic_exit_code(catalog_stage: u8) -> i32 {
 }
 
 fn relay_and_broker_panic_exit_code(catalog_stage: u8) -> Option<i32> {
-    (1..=6)
+    (1..=12)
         .contains(&catalog_stage)
         .then_some(100 + i32::from(catalog_stage))
 }
@@ -444,7 +444,7 @@ fn serve(
     match (request_failure_code, stopped_failure_code) {
         (Some(76), Some(59)) => Err(classify_stage_error(failure(), 80)),
         (Some(76), Some(61)) => Err(classify_stage_error(failure(), 81)),
-        (Some(76), Some(code)) if (91..=96).contains(&code) => Err(classify_stage_error(
+        (Some(76), Some(code)) if (91..=102).contains(&code) => Err(classify_stage_error(
             failure(),
             relay_and_broker_panic_exit_code((code - 90) as u8).unwrap_or(81),
         )),
@@ -1012,10 +1012,10 @@ mod tests {
         );
         assert_eq!(broker_panic_exit_code(0), 61);
         assert_eq!(broker_panic_exit_code(1), 91);
-        assert_eq!(broker_panic_exit_code(6), 96);
+        assert_eq!(broker_panic_exit_code(12), 102);
         assert_eq!(relay_and_broker_panic_exit_code(0), None);
         assert_eq!(relay_and_broker_panic_exit_code(1), Some(101));
-        assert_eq!(relay_and_broker_panic_exit_code(6), Some(106));
+        assert_eq!(relay_and_broker_panic_exit_code(12), Some(112));
     }
 
     #[test]

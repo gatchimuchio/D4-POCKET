@@ -290,6 +290,7 @@ pub(crate) fn fetch_update_catalog(
     max_bytes: usize,
     deadline: std::time::Instant,
 ) -> Result<Vec<u8>, DownloadError> {
+    super::update_center::set_catalog_panic_stage(7);
     if max_bytes == 0 || max_bytes > MAX_CATALOG_BYTES {
         return Err(DownloadError::InvalidRequest);
     }
@@ -298,23 +299,28 @@ pub(crate) fn fetch_update_catalog(
     }
     let url = parse_source_url(url_text)?;
     let host = url.host_str().ok_or(DownloadError::InvalidRequest)?;
+    super::update_center::set_catalog_panic_stage(8);
     let addresses = resolve_public_addresses(host, 443, &AtomicBool::new(false), deadline)?;
     let remaining = deadline.saturating_duration_since(std::time::Instant::now());
     if remaining.is_zero() {
         return Err(DownloadError::TimedOut);
     }
+    super::update_center::set_catalog_panic_stage(9);
     let client = build_download_client(host, &addresses, &[], remaining)?;
+    super::update_center::set_catalog_panic_stage(10);
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .map_err(|_| DownloadError::Network)?;
     runtime.block_on(async {
+        super::update_center::set_catalog_panic_stage(11);
         let response = client
             .get(url)
             .header(ACCEPT_ENCODING, "identity")
             .send()
             .await
             .map_err(map_reqwest_error)?;
+        super::update_center::set_catalog_panic_stage(12);
         receive_bounded_document(response, max_bytes, deadline).await
     })
 }

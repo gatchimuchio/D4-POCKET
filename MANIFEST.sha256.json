@@ -3664,11 +3664,11 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "f55ec383d12d5171eb06a2fb85372cf65c7d56d59d4ebdc2ad2a77436d902945"
+      "sha256": "c0508d6a766ccea4900850c56955be53b13fbfb292e11671c563c169e3792250"
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
-      "sha256": "69aacf362ed52d4c293e1dcc16dce824075e4e213e2e6bc8661b8235ae09792f"
+      "sha256": "1214745b4eb682e97ffbcce356ab3b5aa92dafaf72415588b1d8cad4da3829fe"
     },
     {
       "path": "native/rust_helper/src/broker/update_download/windows_dns.rs",
@@ -3724,7 +3724,7 @@
     },
     {
       "path": "native/rust_helper/src/linux_desktop_worker.rs",
-      "sha256": "44ec8f0d68780e6d51e7518066c30a71c9a748737ebd333abedecd97d98b8692"
+      "sha256": "71d1ea7e00b31d2f57df26e45e7c68ea26dc9504d5d62631e00aab290822d243"
     },
     {
       "path": "native/rust_helper/src/linux_product_bundle.rs",
