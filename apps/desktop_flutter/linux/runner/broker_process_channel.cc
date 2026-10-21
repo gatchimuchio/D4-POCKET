@@ -538,6 +538,26 @@ bool confirm_owner_operation(GWeakRef* owner_parent,
   return state->confirmed;
 }
 
+void helper_wait_completed(GObject* source_object, GAsyncResult* result,
+                           gpointer) {
+  GError* error = nullptr;
+  if (!g_subprocess_wait_finish(G_SUBPROCESS(source_object), result, &error)) {
+    g_warning("Linux Broker helper exit status could not be collected");
+    g_clear_error(&error);
+    return;
+  }
+  GSubprocess* process = G_SUBPROCESS(source_object);
+  if (g_subprocess_get_if_exited(process)) {
+    g_warning("Linux Broker helper exited with classified code %d",
+              g_subprocess_get_exit_status(process));
+  } else if (g_subprocess_get_if_signaled(process)) {
+    g_warning("Linux Broker helper terminated by signal %d",
+              g_subprocess_get_term_sig(process));
+  } else {
+    g_warning("Linux Broker helper terminated without a classifiable status");
+  }
+}
+
 class BrokerContext {
  public:
   explicit BrokerContext(GtkWindow* owner_parent)
@@ -591,6 +611,7 @@ class BrokerContext {
       if (!read_helper_frame(&buffer, &error)) {
         g_clear_error(&error);
         poison();
+        g_subprocess_wait_async(process_, nullptr, helper_wait_completed, nullptr);
         return false;
       }
       if (has_workspace_picker_prefix(buffer)) {

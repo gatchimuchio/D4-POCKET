@@ -26,6 +26,9 @@ OWNER_DIALOG_TIMEOUT = 15.0
 RUST_CATALOG_RELAY_TIMEOUT_TEST = (
     "linux_desktop_worker::tests::catalog_relay_wait_matches_broker_fetch_deadline_without_extending_other_operations"
 )
+RUST_HELPER_EXIT_CLASS_TEST = (
+    "linux_desktop_worker::tests::helper_exit_code_exposes_only_a_bounded_io_error_class"
+)
 RUST_STAGE_TEST = (
     "broker::update_center::tests::linux_installed_acceptance_stages_real_export_and_registers_entry"
 )
@@ -1000,6 +1003,7 @@ def run_installed_smoke(
     app_log = acceptance_root / "installed-app.log"
     try:
         _run_rust_test(RUST_CATALOG_RELAY_TIMEOUT_TEST, environment, private_key_path)
+        _run_rust_test(RUST_HELPER_EXIT_CLASS_TEST, environment, private_key_path)
         _run_rust_test(RUST_STAGE_TEST, environment, private_key_path)
         _run_rust_test(RUST_ROLLBACK_SEED_TEST, environment, private_key_path)
         for test_only_name in (

@@ -18,11 +18,12 @@ fn main() {
         }
         return;
     }
-    if gui_shell_rust_helper::linux_desktop_worker::run().is_err() {
+    if let Err(error) = gui_shell_rust_helper::linux_desktop_worker::run() {
+        let exit_code = gui_shell_rust_helper::linux_desktop_worker::helper_exit_code(error.kind());
         eprintln!(
-            "Linux安全Broker接続を終了しました。要求を再送せず、接続状態を確認してください。"
+            "Linux安全Broker接続を終了しました。要求を再送せず、接続状態を確認してください。分類code={exit_code}"
         );
-        std::process::exit(1);
+        std::process::exit(exit_code);
     }
 }
 

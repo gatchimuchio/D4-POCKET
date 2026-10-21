@@ -444,7 +444,7 @@
     },
     {
       "path": "apps/desktop_flutter/linux/runner/broker_process_channel.cc",
-      "sha256": "cfef7fd979f4fd50f8c24d1c9f08dac2bc35c198da54a52763b95616db7042bd"
+      "sha256": "ba662ffa28d3ffa7d3c3b09c9984f9e62acc69dae34c2919c826f7929455b6d7"
     },
     {
       "path": "apps/desktop_flutter/linux/runner/broker_process_channel.h",
@@ -3488,7 +3488,7 @@
     },
     {
       "path": "native/rust_helper/src/bin/gui_shell_linux_broker.rs",
-      "sha256": "931c4b475da67cd67ae9742ee332e0f980d0ec65b3f30066798f4ebe54a2bb05"
+      "sha256": "370f271f6e77f55cef833c941c53580d8e049f178c8c5dc1c430627a9c80d23e"
     },
     {
       "path": "native/rust_helper/src/bin/gui_shell_macos_broker.rs",
@@ -3724,7 +3724,7 @@
     },
     {
       "path": "native/rust_helper/src/linux_desktop_worker.rs",
-      "sha256": "19f4337f2cbf421bf33571a1858c319ff38c5d00b5cb9213a3320c6780cd4a15"
+      "sha256": "a195d851d99f96e16822925a3526e674a1344fa0489c2d9525cee816a29cade9"
     },
     {
       "path": "native/rust_helper/src/linux_product_bundle.rs",
@@ -5204,7 +5204,7 @@
     },
     {
       "path": "tooling/tests/linux_installed_product_smoke.py",
-      "sha256": "5c9d96a40dd88417861df0e8a4f85f48360c394590ca3d3433c37dd23e00660a"
+      "sha256": "0a683aa4ce72a0110b36a77f8178e3db85e9f7c511b8be242d8a38587626be84"
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",

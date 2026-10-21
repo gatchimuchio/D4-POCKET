@@ -39,6 +39,22 @@ fn failure() -> io::Error {
     io::Error::other("Linux安全Broker接続を確認できません")
 }
 
+pub fn helper_exit_code(kind: io::ErrorKind) -> i32 {
+    match kind {
+        io::ErrorKind::Other => 20,
+        io::ErrorKind::TimedOut => 21,
+        io::ErrorKind::ConnectionRefused => 22,
+        io::ErrorKind::ConnectionReset => 23,
+        io::ErrorKind::BrokenPipe => 24,
+        io::ErrorKind::UnexpectedEof => 25,
+        io::ErrorKind::InvalidData => 26,
+        io::ErrorKind::PermissionDenied => 27,
+        io::ErrorKind::NotFound => 28,
+        io::ErrorKind::WouldBlock => 29,
+        _ => 30,
+    }
+}
+
 pub fn run() -> io::Result<()> {
     if std::env::args_os().len() != 1 {
         return Err(failure());
@@ -866,6 +882,16 @@ mod tests {
             IO_TIMEOUT
         );
         assert_eq!(relay_response_timeout(b"malformed"), IO_TIMEOUT);
+    }
+
+    #[test]
+    #[ignore = "Linux helperの安全な終了分類をLinux手動Acceptanceで検証する"]
+    fn helper_exit_code_exposes_only_a_bounded_io_error_class() {
+        assert_eq!(helper_exit_code(io::ErrorKind::TimedOut), 21);
+        assert_eq!(helper_exit_code(io::ErrorKind::ConnectionRefused), 22);
+        assert_eq!(helper_exit_code(io::ErrorKind::UnexpectedEof), 25);
+        assert_eq!(helper_exit_code(io::ErrorKind::Other), 20);
+        assert_eq!(helper_exit_code(io::ErrorKind::AddrNotAvailable), 30);
     }
 
     #[test]
