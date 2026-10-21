@@ -3724,7 +3724,7 @@
     },
     {
       "path": "native/rust_helper/src/linux_desktop_worker.rs",
-      "sha256": "c3a936d794904568f8648f87718c581f52e088781c72c1a0227bedcd936c87e6"
+      "sha256": "a8f36177e9409706d5ed334294f6b5fd1b64e93da098e913ec0c99a38e5ded3a"
     },
     {
       "path": "native/rust_helper/src/linux_product_bundle.rs",

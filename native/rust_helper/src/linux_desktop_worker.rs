@@ -406,17 +406,22 @@ fn serve(
         Ok(())
     })();
     shutdown.store(true, Ordering::Release);
-    let stopped = server
-        .join()
-        .map_err(|_| classify_stage_error(failure(), 59))?
-        .map_err(|_| classify_stage_error(failure(), 59));
+    let stopped = match server.join() {
+        Ok(Ok(())) => Ok(()),
+        Ok(Err(_)) => Err(classify_stage_error(failure(), 59)),
+        Err(_) => Err(classify_stage_error(failure(), 61)),
+    };
     let cleanup = if !owned_session.is_empty() {
-        let current =
-            Zeroizing::new(fs::read(&session).map_err(|error| classify_stage_error(error, 60))?);
-        if *current == *owned_session {
-            fs::remove_file(&session).map_err(|error| classify_stage_error(error, 60))
-        } else {
-            Err(classify_stage_error(failure(), 60))
+        match fs::read(&session) {
+            Ok(current) => {
+                let current = Zeroizing::new(current);
+                if *current == *owned_session {
+                    fs::remove_file(&session).map_err(|_| classify_stage_error(failure(), 60))
+                } else {
+                    Err(classify_stage_error(failure(), 60))
+                }
+            }
+            Err(_) => Err(classify_stage_error(failure(), 60)),
         }
     } else {
         Ok(())
