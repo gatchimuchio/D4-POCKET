@@ -877,8 +877,12 @@ def _credential_scan_file_role(path: Path, root: Path) -> str:
         return "user_config"
     if parts[0] in {"tmp", "runtime"}:
         return "temporary_or_runtime"
+    if parts[:3] == ("home", ".local", "share"):
+        return "user_data"
     if path.suffix.lower() in {".log", ".txt", ".json", ".jsonl", ".trace"}:
         return "diagnostic_or_text"
+    if parts[0] == "home":
+        return "home_other"
     return "other_regular_file"
 
 

@@ -5212,7 +5212,7 @@
     },
     {
       "path": "tooling/tests/linux_installed_product_smoke.py",
-      "sha256": "98f117261ebe8a525e45a5c3d2a27d0542d94658ca6a7e7981ffab0fa85c82a2"
+      "sha256": "6cc8f336dc0a05550248a571d78fad9f9ceb8e08e24ff7d4db9d4be1ae70f730"
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",
@@ -5224,7 +5224,7 @@
     },
     {
       "path": "tooling/tests/test_linux_installed_product_smoke.py",
-      "sha256": "76336e483908cab5ad321f22462e466f6e7506c25427ccf4dbe9290ccaadc0df"
+      "sha256": "7082499a75f7c90e978fbcbc315b2ed1b781ec7b7949949eabbbf0ced2c8f01d"
     },
     {
       "path": "tooling/tests/test_linux_product_package.py",

@@ -19,6 +19,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _catalog_failure_diagnostics,
     _click_accessible_by_coordinates,
     _component_center,
+    _credential_scan_file_role,
     _desktop_entry_targets_fixed_launcher,
     _focused_named_accessible,
     _find_operable_accessible,
@@ -540,6 +541,16 @@ class LinuxWaylandEnvironmentTests(unittest.TestCase):
 
 
 class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
+    def test_credential_scan_roles_keep_xdg_user_data_distinct(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            user_data = root / "home/.local/share/app-data/state.bin"
+            home_other = root / "home/.ssh/config.bin"
+            user_data.parent.mkdir(parents=True)
+            home_other.parent.mkdir(parents=True)
+            self.assertEqual(_credential_scan_file_role(user_data, root), "user_data")
+            self.assertEqual(_credential_scan_file_role(home_other, root), "home_other")
+
     def test_public_text_uses_keyboard_and_is_read_back_before_owner_action(self) -> None:
         class TextField:
             def __init__(self) -> None:
