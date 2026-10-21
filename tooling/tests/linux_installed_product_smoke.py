@@ -433,15 +433,28 @@ def _focused_named_accessible(name: str, *, root=None):
     return None
 
 
-def _answer_owner_dialog(environment: dict[str, str], decision: str) -> None:
+def _answer_owner_dialog(
+    environment: dict[str, str],
+    decision: str,
+    *,
+    expected_summary_markers: tuple[str, ...],
+) -> None:
     if decision not in {"許可", "拒否"}:
         raise ValueError("Owner確認の回答値が不正")
     _wait_for_owner_dialog_window(environment)
     dialog = _find_accessible(OWNER_DIALOG_TITLE, timeout=10)
     descendants = _accessible_descendants(dialog)
     names = [accessible_name for _, accessible_name in descendants]
-    if not any("対象platform: Linux" in value for value in names):
-        raise RuntimeError("Owner確認summaryにLinux対象platformがありません")
+    missing_markers = [
+        marker
+        for marker in expected_summary_markers
+        if not any(marker in value for value in names)
+    ]
+    if missing_markers:
+        raise RuntimeError(
+            "Owner確認summaryに操作固有の必須情報がありません: "
+            + "、".join(missing_markers)
+        )
     if not any("要求hash:" in value or "payload hash:" in value for value in names):
         raise RuntimeError("Owner確認summaryに要求hashがありません")
     button = _find_operable_accessible(decision, root=dialog, timeout=10)
@@ -889,13 +902,21 @@ def run_installed_smoke(
                 raise RuntimeError("installed BrokerのExport directoryが受入れ前から空ではありません")
 
             _trigger_export_from_installed_ui(environment, window_id)
-            _answer_owner_dialog(environment, "拒否")
+            _answer_owner_dialog(
+                environment,
+                "拒否",
+                expected_summary_markers=("対象platform: Linux",),
+            )
             _find_accessible("GUI Shell独立App書出しは受理されませんでした", timeout=20)
             if any(export_root.iterdir()):
                 raise RuntimeError("Owner拒否後にManifestまたは一時fileが作成されました")
 
             _trigger_export_from_installed_ui(environment, window_id)
-            _answer_owner_dialog(environment, "許可")
+            _answer_owner_dialog(
+                environment,
+                "許可",
+                expected_summary_markers=("対象platform: Linux",),
+            )
             _find_accessible("独立Manifest fileを保存しました", timeout=30)
             manifest_evidence = _verify_export_manifest(export_root)
 
@@ -996,7 +1017,15 @@ def run_installed_smoke(
                 raise RuntimeError(f"Uninstall確認用installed UI／process groupがありません\n{tail}")
 
             _trigger_uninstall_from_installed_ui(environment, uninstall_window_id)
-            _answer_owner_dialog(environment, "拒否")
+            _answer_owner_dialog(
+                environment,
+                "拒否",
+                expected_summary_markers=(
+                    "D4 Pocketをアンインストールしますか？",
+                    "削除対象:",
+                    "保持:",
+                ),
+            )
             if not _desktop_entry_targets_fixed_launcher(entries[0], fixed_launcher):
                 raise RuntimeError("Uninstall Owner拒否後にdesktop entryが変化しました")
             if (
@@ -1013,7 +1042,15 @@ def run_installed_smoke(
             if uninstall_window_id is None:
                 raise RuntimeError("Uninstall Owner拒否後にGTK windowがありません")
             _trigger_uninstall_from_installed_ui(environment, uninstall_window_id)
-            _answer_owner_dialog(environment, "許可")
+            _answer_owner_dialog(
+                environment,
+                "許可",
+                expected_summary_markers=(
+                    "D4 Pocketをアンインストールしますか？",
+                    "削除対象:",
+                    "保持:",
+                ),
+            )
 
             deadline = time.monotonic() + 90
             while time.monotonic() < deadline:

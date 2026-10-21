@@ -5200,7 +5200,7 @@
     },
     {
       "path": "tooling/tests/linux_installed_product_smoke.py",
-      "sha256": "ae33d4455730f90d40a76e468e5c2d2d1158d81b0b92fd888b295aa8d69c836f"
+      "sha256": "322f87e4304a112d8d7332ac71faa684cb80b0f7159497b0bbaf82407bbc5898"
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",
