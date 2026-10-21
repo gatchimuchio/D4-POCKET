@@ -1559,7 +1559,8 @@ def _open_installed_codex_registration(environment: dict[str, str]):
     window = _open_agent_center_from_installed_ui(environment, current_window_id)
     button = _find_operable_accessible("登録を開始", root=window, timeout=10)
     _activate_accessible(button, "登録を開始", environment)
-    return _find_accessible("Codex実行系をBrokerへ登録", timeout=10)
+    _find_accessible("Codex実行系をBrokerへ登録", root=window, timeout=10)
+    return window
 
 
 def _fill_linux_workspace_registration(
