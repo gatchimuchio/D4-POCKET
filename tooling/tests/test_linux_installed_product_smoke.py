@@ -543,43 +543,98 @@ class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
         self.assertEqual(commands[2][-1], "installed-server")
 
     def test_secret_service_listing_reads_metadata_without_requesting_values(self) -> None:
-        completed = subprocess.CompletedProcess(
-            args=[],
-            returncode=0,
-            stdout=(
-                "[/org/freedesktop/secrets/collection/login/item1]\n"
-                "label = D4 Pocket credential key\n"
-                "application = d4-pocket\n"
-                "[/org/freedesktop/secrets/collection/login/item2]\n"
-                "label = D4 Pocket credential ciphertext\n"
-                "application = d4-pocket\n"
+        from types import SimpleNamespace
+
+        labels_by_path = {
+            "/org/freedesktop/secrets/collection/test/item1": (
+                "D4 Pocket credential key"
             ),
-            stderr="",
+            "/org/freedesktop/secrets/collection/test/item2": (
+                "D4 Pocket credential ciphertext"
+            ),
+        }
+        requested_properties = []
+
+        class FakeItem:
+            def __init__(self, path: str) -> None:
+                self.path = path
+
+            def Get(self, interface: str, property_name: str):
+                requested_properties.append(property_name)
+                if property_name == "Label":
+                    return labels_by_path[self.path]
+                raise AssertionError("unexpected Secret Service property request")
+
+            def GetSecret(self, *_args):
+                raise AssertionError("Secret Service secret retrieval is forbidden")
+
+        class FakeService:
+            def SearchItems(self, attributes):
+                self.attributes = attributes
+                paths = tuple(labels_by_path)
+                return paths, ()
+
+        class FakeBus:
+            def __init__(self) -> None:
+                self.service = FakeService()
+
+            def get_object(self, _service: str, path: str):
+                if path == "/org/freedesktop/secrets":
+                    return self.service
+                return FakeItem(path)
+
+        bus = FakeBus()
+        dbus_exception = type("DBusException", (Exception,), {})
+
+        def dictionary(values, signature: str):
+            bus.service.search_signature = signature
+            return values
+
+        fake_dbus = SimpleNamespace(
+            SessionBus=lambda: bus,
+            Interface=lambda proxy, _interface: proxy,
+            Dictionary=dictionary,
+            exceptions=SimpleNamespace(DBusException=dbus_exception),
         )
-        with patch(
-            "tooling.tests.linux_installed_product_smoke.subprocess.run",
-            return_value=completed,
-        ) as run:
-            labels = _secret_service_item_labels({})
+        with patch.dict("sys.modules", {"dbus": fake_dbus}):
+            labels = _secret_service_item_labels()
 
         self.assertEqual(
             sorted(labels),
             ["D4 Pocket credential ciphertext", "D4 Pocket credential key"],
         )
-        self.assertNotIn("--all", run.call_args.args[0])
+        self.assertEqual(bus.service.attributes, {"application": "d4-pocket"})
+        self.assertEqual(bus.service.search_signature, "ss")
+        self.assertEqual(requested_properties.count("Label"), 2)
+        self.assertNotIn("Secret", requested_properties)
+        self.assertNotIn("Attributes", requested_properties)
 
-    def test_secret_service_listing_rejects_any_value_output(self) -> None:
-        completed = subprocess.CompletedProcess(
-            args=[], returncode=0, stdout="label = key\nsecret = never-print-this\n", stderr=""
-        )
+    def test_secret_service_dbus_error_is_sanitized(self) -> None:
+        from types import SimpleNamespace
+
+        dbus_exception = type("DBusException", (Exception,), {})
+
+        class FailingService:
+            def SearchItems(self, _attributes):
+                raise dbus_exception("sensitive backend detail")
+
         with (
-            patch(
-                "tooling.tests.linux_installed_product_smoke.subprocess.run",
-                return_value=completed,
+            patch.dict(
+                "sys.modules",
+                {
+                    "dbus": SimpleNamespace(
+                        SessionBus=lambda: SimpleNamespace(
+                            get_object=lambda *_args: FailingService()
+                        ),
+                        Interface=lambda proxy, _interface: proxy,
+                        Dictionary=lambda values, signature: values,
+                        exceptions=SimpleNamespace(DBusException=dbus_exception),
+                    )
+                },
             ),
-            self.assertRaisesRegex(RuntimeError, "unexpectedly exposed a value"),
+            self.assertRaisesRegex(RuntimeError, "metadata search failed"),
         ):
-            _secret_service_item_labels({})
+            _secret_service_item_labels()
 
     def test_audit_chain_hmac_and_secret_non_exposure(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

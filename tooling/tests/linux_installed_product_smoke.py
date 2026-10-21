@@ -657,22 +657,49 @@ def _enter_credential_and_answer_owner(
     _wait_for_owner_dialog_closed(environment)
 
 
-def _secret_service_item_labels(environment: dict[str, str]) -> list[str]:
-    result = subprocess.run(
-        ["secret-tool", "search", "application", "d4-pocket"],
-        env=environment,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        check=False,
-        timeout=10,
-    )
-    if result.returncode not in (0, 1):
-        raise RuntimeError("Secret Service metadata search failed")
-    if re.search(r"(?im)^\s*(secret|password)\s*=", result.stdout):
-        raise RuntimeError("Secret Service metadata search unexpectedly exposed a value")
-    return re.findall(r"(?m)^label\s*=\s*(.+)$", result.stdout)
+def _secret_service_item_labels() -> list[str]:
+    try:
+        import dbus
+    except ImportError as error:
+        raise RuntimeError(
+            "Secret Service metadata inspection requires python3-dbus"
+        ) from error
+
+    try:
+        bus = dbus.SessionBus()
+        service_object = bus.get_object(
+            "org.freedesktop.secrets", "/org/freedesktop/secrets"
+        )
+        service = dbus.Interface(
+            service_object, "org.freedesktop.Secret.Service"
+        )
+        attributes = dbus.Dictionary(
+            {"application": "d4-pocket"}, signature="ss"
+        )
+        unlocked, locked = service.SearchItems(attributes)
+        labels: list[str] = []
+        seen_paths: set[str] = set()
+        for object_path in (*unlocked, *locked):
+            path = str(object_path)
+            if path in seen_paths:
+                continue
+            seen_paths.add(path)
+            item_object = bus.get_object("org.freedesktop.secrets", path)
+            properties = dbus.Interface(
+                item_object, "org.freedesktop.DBus.Properties"
+            )
+            label = properties.Get("org.freedesktop.Secret.Item", "Label")
+            if (
+                not isinstance(label, str)
+                or not label
+                or len(label) > 256
+                or any(ord(character) < 0x20 for character in label)
+            ):
+                raise RuntimeError("Secret Service item metadata is malformed")
+            labels.append(label)
+        return labels
+    except dbus.exceptions.DBusException:
+        raise RuntimeError("Secret Service metadata search failed") from None
 
 
 def _start_isolated_secret_service(
@@ -867,7 +894,7 @@ def _run_installed_credential_vault_acceptance(
         root=window,
         timeout=10,
     )
-    if _secret_service_item_labels(environment):
+    if _secret_service_item_labels():
         raise RuntimeError("Credential Owner拒否後にSecret Service itemが作成されました")
 
     _activate_named_control_by_keyboard("native入力で資格情報を登録", environment, window_id)
@@ -885,14 +912,14 @@ def _run_installed_credential_vault_acceptance(
     if len(credential_ids) != 1:
         raise RuntimeError("installed UI did not expose exactly one public Credential ID")
     credential_id = next(iter(credential_ids))
-    labels = _secret_service_item_labels(environment)
+    labels = _secret_service_item_labels()
     if sorted(labels) != ["D4 Pocket credential ciphertext", "D4 Pocket credential key"]:
         raise RuntimeError("Secret Service did not contain exactly the separate key and ciphertext items")
     if secret in names:
         raise RuntimeError("Credential secret leaked into the installed UI accessibility tree")
 
     window_id = restart_application(window_id)
-    if _secret_service_item_labels(environment) != labels:
+    if _secret_service_item_labels() != labels:
         raise RuntimeError("Broker restart changed the run-owned Secret Service items")
     window = _open_mcp_center_from_installed_ui(environment, window_id)
     _set_public_text_by_keyboard(
@@ -920,7 +947,7 @@ def _run_installed_credential_vault_acceptance(
     )
     _wait_for_owner_dialog_closed(environment)
     _find_accessible("api_key ・ 有効", root=window, timeout=10)
-    if _secret_service_item_labels(environment) != labels:
+    if _secret_service_item_labels() != labels:
         raise RuntimeError("Credential revocation rejection changed Secret Service items")
 
     _activate_named_control_by_keyboard("資格情報を失効", environment, window_id)
@@ -932,7 +959,7 @@ def _run_installed_credential_vault_acceptance(
     _wait_for_owner_dialog_closed(environment)
     _find_accessible("Credentialを論理失効しました。以後の使用を拒否し、Secret Service itemは保持します。", root=window, timeout=15)
     _find_accessible("api_key ・ 失効", root=window, timeout=10)
-    if _secret_service_item_labels(environment) != labels:
+    if _secret_service_item_labels() != labels:
         raise RuntimeError("Logical revocation unexpectedly removed Secret Service items")
 
     audit_evidence = _verify_credential_audit(audit_store, secret)
@@ -2148,7 +2175,7 @@ def run_installed_smoke(
                 raise RuntimeError("installed BrokerのExport directoryが受入れ前から空ではありません")
 
             if acceptance_scope == "credential_vault":
-                if _secret_service_item_labels(environment):
+                if _secret_service_item_labels():
                     raise RuntimeError("Credential acceptance開始前のrun固有Secret Serviceが空ではありません")
 
                 def restart_application(old_window_id: str) -> str:
