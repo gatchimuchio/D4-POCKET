@@ -319,6 +319,19 @@ def _accessible_parent(node):
         return None
 
 
+def _editable_text_ancestor(node, *, max_depth: int = 16):
+    current = node
+    for _ in range(max_depth + 1):
+        if current is None:
+            return None
+        try:
+            current.queryEditableText()
+            return current
+        except Exception:
+            current = _accessible_parent(current)
+    return None
+
+
 def _component_center(node) -> tuple[int, int] | None:
     try:
         import pyatspi
@@ -593,18 +606,7 @@ def _set_public_text_by_keyboard(
     ):
         raise RuntimeError("public GTK field value is empty or outside its bounded format")
     node = _find_accessible(label, root=root, timeout=10)
-    editable_node = None
-    for _ in range(6):
-        try:
-            node.queryEditableText()
-            editable_node = node
-            break
-        except Exception:
-            node = _accessible_parent(node)
-            if node is None:
-                break
-    if editable_node is None:
-        raise RuntimeError("GTK public text field is not keyboard-accessible")
+    editable_node = _editable_text_ancestor(node)
 
     subprocess.run(
         ["xdotool", "windowactivate", "--sync", window_id],
@@ -628,6 +630,10 @@ def _set_public_text_by_keyboard(
         time.sleep(0.05)
     if focused is None:
         raise RuntimeError("GTK public text field did not receive keyboard focus")
+    if editable_node is None:
+        editable_node = _editable_text_ancestor(focused)
+    if editable_node is None:
+        raise RuntimeError(f"GTK public text field is not keyboard-accessible: {label}")
     subprocess.run(
         ["xdotool", "key", "--clearmodifiers", "ctrl+a"],
         env=environment,

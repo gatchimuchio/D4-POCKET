@@ -12095,6 +12095,8 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
         "def _open_agent_center_from_installed_ui(",
         '"Agentを開く"',
         '_find_accessible("Codex実行系をBrokerへ登録", root=window, timeout=10)',
+        "def _editable_text_ancestor(",
+        "_editable_text_ancestor(focused)",
         "def _run_installed_workspace_selection_acceptance(",
         "require_workspace=True",
         "_verify_workspace_projection(",

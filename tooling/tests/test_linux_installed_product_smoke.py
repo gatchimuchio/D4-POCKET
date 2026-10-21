@@ -38,6 +38,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _verify_credential_audit,
     _verify_live_audit,
     _verify_workspace_projection,
+    _editable_text_ancestor,
     _verify_uninstalled_state,
     _trigger_update_action_from_installed_ui,
     _wait_for_catalog_fetch_status,
@@ -1225,6 +1226,35 @@ class LinuxWorkspaceProjectionTests(unittest.TestCase):
                 public_markers=("public.txt",),
                 forbidden_markers=(".env",),
             )
+
+
+class LinuxEditableTextAncestorTests(unittest.TestCase):
+    class Node:
+        def __init__(self, parent=None, editable=False):
+            self.parent = parent
+            self.editable = editable
+
+        def get_parent(self):
+            return self.parent
+
+        def queryEditableText(self):
+            if not self.editable:
+                raise RuntimeError("not editable")
+            return object()
+
+    def test_finds_editable_control_within_bounded_nested_form_tree(self) -> None:
+        editable = self.Node(editable=True)
+        current = editable
+        for _ in range(10):
+            current = self.Node(parent=current)
+        self.assertIs(_editable_text_ancestor(current), editable)
+
+    def test_fails_closed_when_editable_control_exceeds_depth_bound(self) -> None:
+        editable = self.Node(editable=True)
+        current = editable
+        for _ in range(18):
+            current = self.Node(parent=current)
+        self.assertIsNone(_editable_text_ancestor(current))
 
 
 class LinuxInstalledDesktopEntryTests(unittest.TestCase):
