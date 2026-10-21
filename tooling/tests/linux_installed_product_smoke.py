@@ -418,6 +418,19 @@ def _accessible_descendants(root) -> list[tuple[object, str]]:
     return list(_accessible_nodes(root))
 
 
+def _accessible_text(node) -> str:
+    """GTK labels may expose their body through AT-SPI Text, not Accessible.name."""
+    try:
+        text = node.queryText()
+        length = int(text.characterCount)
+        if length < 0 or length > 8192:
+            return ""
+        value = text.getText(0, length)
+        return value if isinstance(value, str) else ""
+    except Exception:
+        return ""
+
+
 def _trigger_export_from_installed_ui(environment: dict[str, str], window_id: str) -> None:
     window = _find_accessible(WINDOW_TITLE, timeout=10)
     subprocess.run(
@@ -631,7 +644,12 @@ def _answer_owner_dialog(
     _wait_for_owner_dialog_window(environment)
     dialog = _find_accessible(OWNER_DIALOG_TITLE, timeout=10)
     descendants = _accessible_descendants(dialog)
-    names = [accessible_name for _, accessible_name in descendants]
+    names = []
+    for node, accessible_name in descendants:
+        names.append(accessible_name)
+        text = _accessible_text(node)
+        if text and text != accessible_name:
+            names.append(text)
     normalized_summary = " ".join(" ".join(names).split())
     missing_markers = [
         marker

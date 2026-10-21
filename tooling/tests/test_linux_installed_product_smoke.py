@@ -277,36 +277,43 @@ class InstalledCatalogFetchStatusTests(unittest.TestCase):
 
 
 class InstalledOwnerSummaryTests(unittest.TestCase):
+    class Text:
+        def __init__(self, value: str) -> None:
+            self.value = value
+            self.characterCount = len(value)
+
+        def getText(self, start: int, end: int) -> str:
+            return self.value[start:end]
+
     class Node:
-        def __init__(self, name: str, children=()) -> None:
+        def __init__(self, name: str, children=(), text: str | None = None) -> None:
             self.name = name
             self.children = list(children)
             self.childCount = len(self.children)
+            self.text = text
 
         def getChildAtIndex(self, index: int):
             return self.children[index]
 
+        def queryText(self):
+            if self.text is None:
+                raise NotImplementedError
+            return InstalledOwnerSummaryTests.Text(self.text)
+
     def test_accepts_required_owner_markers_split_across_accessible_text_nodes(self) -> None:
         package_hash = "c24c86c83f5fcacc15f03030ba2a6c10fabeeed405b4735ee0c1260dd7c21123"
-        parts = (
+        summary = "\n".join((
             "Linux製品の署名検査済み更新packageを取得しますか？",
-            "更新ID:",
-            "linux-installed-catalog-display",
-            "提供版:",
-            "0.1.2",
+            "更新ID: linux-installed-catalog-display",
+            "提供版: 0.1.2",
             "channel: stable",
             "署名者fingerprint: " + "a" * 64,
             "取得host: raw.githubusercontent.com",
-            "package SHA-256:",
-            package_hash,
-            "byte長:",
-            "1809",
-            "要求hash:",
-            "b" * 64,
-        )
-        dialog = self.Node(
-            "D4 Pocket Owner確認", [self.Node(part) for part in parts]
-        )
+            f"package SHA-256: {package_hash}",
+            "byte長: 1809",
+            "要求hash: " + "b" * 64,
+        ))
+        dialog = self.Node("D4 Pocket Owner確認", [self.Node("", text=summary)])
         with (
             patch(
                 "tooling.tests.linux_installed_product_smoke._wait_for_owner_dialog_window"
