@@ -1329,6 +1329,426 @@ def _review_single_installed_mcp_tool_arguments(
     _activate_accessible(proceed, "Linux確認へ進む", environment)
 
 
+WORKSPACE_PUBLIC_CONTENT = "D4P_WORKSPACE_PUBLIC_PROJECTION_OK"
+WORKSPACE_ENV_SECRET = "D4P_WORKSPACE_ENV_SECRET_CANARY_71A9"
+WORKSPACE_REGISTERED_SECRET = "D4P_WORKSPACE_REGISTERED_SECRET_CANARY_4F2C"
+WORKSPACE_OUTSIDE_SECRET = "D4P_WORKSPACE_OUTSIDE_SECRET_CANARY_93D1"
+
+
+def _gtk_dialog_window_id(environment: dict[str, str], title: str) -> str:
+    result = subprocess.run(
+        ["xdotool", "search", "--onlyvisible", "--name", f"^{re.escape(title)}$"],
+        env=environment,
+        capture_output=True,
+        check=False,
+        timeout=5,
+    )
+    if result.returncode != 0:
+        raise RuntimeError("GTK OS選択dialogの表示を確認できません")
+    window_ids = result.stdout.decode("ascii", errors="ignore").splitlines()
+    if len(window_ids) != 1 or not window_ids[0].isdecimal():
+        raise RuntimeError("GTK OS選択dialogが一意ではありません")
+    return window_ids[0]
+
+
+def _wait_for_gtk_dialog_closed(
+    environment: dict[str, str], title: str, *, timeout: float = 10.0
+) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        result = subprocess.run(
+            ["xdotool", "search", "--onlyvisible", "--name", f"^{re.escape(title)}$"],
+            env=environment,
+            capture_output=True,
+            check=False,
+            timeout=5,
+        )
+        if result.returncode != 0:
+            return
+        time.sleep(0.1)
+    raise RuntimeError("GTK OS選択dialogが閉じませんでした")
+
+
+def _workspace_root_field_value(dialog) -> str:
+    node = _find_accessible("Workspace rootの絶対path", root=dialog, timeout=10)
+    for _ in range(7):
+        try:
+            node.queryEditableText()
+            return _accessible_text(node)
+        except Exception:
+            node = _accessible_parent(node)
+            if node is None:
+                break
+    raise RuntimeError("Workspace root入力fieldの現在値を確認できません")
+
+
+def _open_workspace_folder_chooser(environment: dict[str, str], dialog) -> str:
+    button = _find_operable_accessible("OSで作業領域を選択", root=dialog, timeout=10)
+    _activate_accessible(button, "OSで作業領域を選択", environment)
+    _find_accessible("D4 Pocket 作業領域の選択", timeout=10)
+    return _gtk_dialog_window_id(environment, "D4 Pocket 作業領域の選択")
+
+
+def _select_folder_in_gtk_chooser(
+    environment: dict[str, str], chooser_window_id: str, folder: Path
+) -> None:
+    if not folder.is_absolute() or not folder.is_dir() or folder.is_symlink():
+        raise RuntimeError("GTK chooserへ渡すtest directoryが不正です")
+    subprocess.run(
+        ["xdotool", "windowactivate", "--sync", chooser_window_id],
+        env=environment,
+        check=True,
+        timeout=5,
+    )
+    subprocess.run(
+        ["xdotool", "key", "--clearmodifiers", "ctrl+l"],
+        env=environment,
+        check=True,
+        timeout=5,
+    )
+    subprocess.run(
+        ["xdotool", "type", "--clearmodifiers", "--delay", "1", "--", str(folder)],
+        env=environment,
+        check=True,
+        timeout=5,
+    )
+    subprocess.run(
+        ["xdotool", "key", "--clearmodifiers", "Return"],
+        env=environment,
+        check=True,
+        timeout=5,
+    )
+    visible = subprocess.run(
+        [
+            "xdotool",
+            "search",
+            "--onlyvisible",
+            "--name",
+            "^D4 Pocket 作業領域の選択$",
+        ],
+        env=environment,
+        capture_output=True,
+        check=False,
+        timeout=5,
+    )
+    if visible.returncode != 0:
+        _wait_for_gtk_dialog_closed(environment, "D4 Pocket 作業領域の選択")
+        return
+    window_ids = visible.stdout.decode("ascii", errors="ignore").splitlines()
+    if window_ids != [chooser_window_id]:
+        raise RuntimeError("GTK folder chooser changed to an unexpected window")
+    chooser = _find_accessible("D4 Pocket 作業領域の選択", timeout=10)
+    accept = _find_operable_accessible("選択", root=chooser, timeout=10)
+    _activate_accessible(accept, "選択", environment)
+    _wait_for_gtk_dialog_closed(environment, "D4 Pocket 作業領域の選択")
+
+
+def _cancel_gtk_folder_chooser(environment: dict[str, str], chooser_window_id: str) -> None:
+    subprocess.run(
+        ["xdotool", "windowactivate", "--sync", chooser_window_id],
+        env=environment,
+        check=True,
+        timeout=5,
+    )
+    chooser = _find_accessible("D4 Pocket 作業領域の選択", timeout=10)
+    cancel = _find_operable_accessible("取消", root=chooser, timeout=10)
+    _activate_accessible(cancel, "取消", environment)
+    _wait_for_gtk_dialog_closed(environment, "D4 Pocket 作業領域の選択")
+
+
+def _verify_workspace_projection(
+    snapshot: str,
+    *,
+    public_markers: tuple[str, ...],
+    forbidden_markers: tuple[str, ...],
+) -> dict[str, int]:
+    if not public_markers or any(marker not in snapshot for marker in public_markers):
+        raise RuntimeError("approved public Workspace content is not visible")
+    if any(marker and marker in snapshot for marker in forbidden_markers):
+        raise RuntimeError("Workspace Inspector exposed secret or external content")
+    return {
+        "public_markers_visible": len(public_markers),
+        "secret_and_external_markers_absent": len(forbidden_markers),
+    }
+
+
+def _write_linux_workspace_acceptance_fixture(
+    acceptance_root: Path,
+) -> tuple[Path, Path, Path, Path, Path]:
+    fixture_root = acceptance_root / "workspace-fixture-source"
+    workspace = fixture_root / "selected-workspace"
+    outside_root = fixture_root / "outside-root"
+    decoy_workspace = fixture_root / "decoy-workspace"
+    fixture_root.mkdir(mode=0o700)
+    workspace.mkdir(mode=0o700)
+    outside_root.mkdir(mode=0o700)
+    decoy_workspace.mkdir(mode=0o700)
+    (workspace / "public.txt").write_text(WORKSPACE_PUBLIC_CONTENT, encoding="utf-8")
+    (workspace / ".env").write_text(WORKSPACE_ENV_SECRET, encoding="utf-8")
+    registered_secret_root = workspace / "private"
+    registered_secret_root.mkdir(mode=0o700)
+    (registered_secret_root / "token.txt").write_text(
+        WORKSPACE_REGISTERED_SECRET, encoding="utf-8"
+    )
+    outside_file = outside_root / "external.txt"
+    outside_file.write_text(WORKSPACE_OUTSIDE_SECRET, encoding="utf-8")
+    (workspace / "external-alias.txt").symlink_to(outside_file)
+
+    cli_marker = acceptance_root / "workspace-cli-probe.jsonl"
+    cli_fixture = acceptance_root / "workspace-codex-cli-fixture"
+    marker_literal = json.dumps(str(cli_marker))
+    cli_fixture.write_text(
+        "#!/usr/bin/python3\n"
+        "import json, pathlib, sys\n"
+        f"marker = pathlib.Path({marker_literal})\n"
+        "with marker.open('a', encoding='utf-8') as stream:\n"
+        "    stream.write(json.dumps(sys.argv[1:]) + '\\n')\n"
+        "args = sys.argv[1:]\n"
+        "if args == ['--version']:\n"
+        "    print('codex-cli 0.1.0')\n"
+        "elif args == ['exec', '--help']:\n"
+        "    print('codex exec --sandbox --cd --json --ephemeral --ignore-user-config --skip-git-repo-check --model')\n"
+        "else:\n"
+        "    raise SystemExit(2)\n",
+        encoding="utf-8",
+    )
+    cli_fixture.chmod(0o700)
+    return fixture_root, workspace, decoy_workspace, cli_fixture, cli_marker
+
+
+def _open_installed_codex_registration(environment: dict[str, str]):
+    window = _find_accessible(WINDOW_TITLE, timeout=10)
+    button = _find_operable_accessible("登録を開始", root=window, timeout=10)
+    _activate_accessible(button, "登録を開始", environment)
+    return _find_accessible("Codex実行系をBrokerへ登録", timeout=10)
+
+
+def _fill_linux_workspace_registration(
+    environment: dict[str, str],
+    dialog,
+    *,
+    cli_fixture: Path,
+    workspace_id: str,
+    workspace_root: Path,
+    secret_paths: str,
+) -> None:
+    window_id = _visible_product_window(environment)
+    if window_id is None:
+        raise RuntimeError("Workspace registration中にinstalled product windowがありません")
+    for label, value in (
+        ("模型識別子", "model-linux-workspace-acceptance"),
+        ("実行系ID（Runtime ID）", "runtime-linux-workspace-acceptance"),
+        ("Codex CLI実行fileの絶対path", str(cli_fixture)),
+        ("作業領域ID（Workspace ID）", workspace_id),
+        ("Workspace rootの絶対path", str(workspace_root)),
+        ("除外する秘密path（相対path、1行に1件）", secret_paths),
+    ):
+        _set_public_text_by_keyboard(dialog, label, value, environment, window_id)
+
+
+def _run_installed_workspace_selection_acceptance(
+    environment: dict[str, str],
+    window_id: str,
+    *,
+    audit_store: Path,
+    acceptance_root: Path,
+) -> dict[str, object]:
+    fixture_root, workspace, decoy_workspace, cli_fixture, cli_marker = (
+        _write_linux_workspace_acceptance_fixture(acceptance_root)
+    )
+    workspace_id = "workspace-linux-installed-acceptance"
+    secret_paths = "private/token.txt"
+    expected_owner_markers = (
+        "Agent CLI実行系とWorkspaceを、このBroker起動中だけ登録します。",
+        "Runtime: runtime-linux-workspace-acceptance",
+        f"CLI実行file: {cli_fixture}",
+        f"Workspace ID: {workspace_id}",
+        f"Workspace root: {workspace}",
+        f"除外する秘密path: {secret_paths}",
+        "Task実行能力はunsupportedのままです。",
+    )
+
+    dialog = _open_installed_codex_registration(environment)
+    _fill_linux_workspace_registration(
+        environment,
+        dialog,
+        cli_fixture=cli_fixture,
+        workspace_id=workspace_id,
+        workspace_root=decoy_workspace,
+        secret_paths=secret_paths,
+    )
+    chooser_window_id = _open_workspace_folder_chooser(environment, dialog)
+    _cancel_gtk_folder_chooser(environment, chooser_window_id)
+    if _workspace_root_field_value(dialog) != str(decoy_workspace):
+        raise RuntimeError("GTK chooser cancellation did not preserve the existing Workspace input")
+    _find_accessible(
+        "OS選択を取り消しました。入力は変更していません。",
+        root=dialog,
+        timeout=10,
+    )
+    chooser_window_id = _open_workspace_folder_chooser(environment, dialog)
+    _select_folder_in_gtk_chooser(environment, chooser_window_id, workspace)
+    if _workspace_root_field_value(dialog) != str(workspace):
+        raise RuntimeError("GTK chooser selection did not update the Workspace input")
+    _find_accessible(
+        "OS選択済み（選択結果のみ）。登録・Permission・Approvalは別です。",
+        root=dialog,
+        timeout=10,
+    )
+    continue_button = _find_operable_accessible(
+        "native Owner確認へ進む", root=dialog, timeout=10
+    )
+    _activate_accessible(continue_button, "native Owner確認へ進む", environment)
+    _wait_for_owner_dialog_window(environment, context="Linux Workspace登録Owner拒否")
+    if cli_marker.exists():
+        raise RuntimeError("CLI probe started before native Owner approval")
+    _answer_owner_dialog(
+        environment,
+        "拒否",
+        context="Linux Workspace登録の初回拒否",
+        expected_summary_markers=expected_owner_markers,
+    )
+    _wait_for_owner_dialog_closed(environment)
+    if cli_marker.exists():
+        raise RuntimeError("native Owner rejection launched the registered CLI")
+
+    dialog = _open_installed_codex_registration(environment)
+    _fill_linux_workspace_registration(
+        environment,
+        dialog,
+        cli_fixture=cli_fixture,
+        workspace_id=workspace_id,
+        workspace_root=decoy_workspace,
+        secret_paths=secret_paths,
+    )
+    chooser_window_id = _open_workspace_folder_chooser(environment, dialog)
+    _select_folder_in_gtk_chooser(environment, chooser_window_id, workspace)
+    if _workspace_root_field_value(dialog) != str(workspace):
+        raise RuntimeError("fresh GTK chooser selection is not the Workspace root sent for review")
+    continue_button = _find_operable_accessible(
+        "native Owner確認へ進む", root=dialog, timeout=10
+    )
+    _activate_accessible(continue_button, "native Owner確認へ進む", environment)
+    _answer_owner_dialog(
+        environment,
+        "許可",
+        context="Linux Workspace登録の独立Owner許可",
+        expected_summary_markers=expected_owner_markers,
+    )
+    _wait_for_owner_dialog_closed(environment)
+    _find_accessible("Task実行能力: unsupported", timeout=20)
+    if not cli_marker.is_file() or cli_marker.is_symlink():
+        raise RuntimeError("Owner-approved Workspace registration did not run its CLI interface probe")
+    try:
+        probe_calls = [
+            json.loads(line)
+            for line in cli_marker.read_text(encoding="utf-8").splitlines()
+            if line
+        ]
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise RuntimeError("run-owned Codex CLI probe evidence is malformed") from error
+    if probe_calls != [["--version"], ["exec", "--help"]]:
+        raise RuntimeError("Workspace registration launched an unexpected CLI probe")
+
+    window = _find_accessible(WINDOW_TITLE, timeout=10)
+    _find_accessible("Permission／Approval／Credential: 生成なし", root=window, timeout=10)
+    inspector = _find_accessible("作業領域インスペクタ", root=window, timeout=15)
+    row = _find_operable_accessible(workspace_id, root=inspector, timeout=20)
+    _activate_accessible(row, workspace_id, environment)
+    visibility = _find_operable_accessible("hash_only", root=inspector, timeout=10)
+    _activate_accessible(visibility, "hash_only", environment)
+    full = _find_operable_accessible("full", root=window, timeout=10)
+    _activate_accessible(full, "full", environment)
+    approve = _find_operable_accessible(
+        "native Owner確認でWorkspace読取を許可", root=inspector, timeout=10
+    )
+    _activate_accessible(approve, "native Owner確認でWorkspace読取を許可", environment)
+    _answer_owner_dialog(
+        environment,
+        "許可",
+        context="Linux Workspace内容露出の独立Approval",
+        expected_summary_markers=(
+            "Workspace操作: 作業領域承認",
+            f"Workspace ID: {workspace_id}",
+            "内容露出: full",
+            "fullは登録済みsecret除外以外の本文を画面へ返せます。",
+        ),
+    )
+    _wait_for_owner_dialog_closed(environment)
+    _find_accessible(
+        "現在のWorkspace読取範囲: full・Task実行／書込権は別です。",
+        root=inspector,
+        timeout=15,
+    )
+    row = _find_operable_accessible(workspace_id, root=inspector, timeout=10)
+    _activate_accessible(row, workspace_id, environment)
+    public_file = _find_operable_accessible("public.txt", root=inspector, timeout=15)
+    initial_projection = _accessible_snapshot(inspector)
+    tree_projection_evidence = _verify_workspace_projection(
+        initial_projection,
+        public_markers=("public.txt",),
+        forbidden_markers=(
+            ".env",
+            "private/token.txt",
+            "external-alias.txt",
+            WORKSPACE_ENV_SECRET,
+            WORKSPACE_REGISTERED_SECRET,
+            WORKSPACE_OUTSIDE_SECRET,
+        ),
+    )
+    _activate_accessible(public_file, "public.txt", environment)
+    _find_accessible(WORKSPACE_PUBLIC_CONTENT, root=inspector, timeout=15)
+    projection = _accessible_snapshot(inspector)
+    projection_evidence = _verify_workspace_projection(
+        projection,
+        public_markers=("public.txt", WORKSPACE_PUBLIC_CONTENT),
+        forbidden_markers=(
+            ".env",
+            "private/token.txt",
+            "external-alias.txt",
+            WORKSPACE_ENV_SECRET,
+            WORKSPACE_REGISTERED_SECRET,
+            WORKSPACE_OUTSIDE_SECRET,
+        ),
+    )
+
+    audit_path = audit_store / "audit.jsonl"
+    try:
+        audit_text = audit_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as error:
+        raise RuntimeError("Workspace acceptance durable Audit is unavailable") from error
+    if any(
+        marker in audit_text
+        for marker in (
+            str(workspace),
+            secret_paths,
+            ".env",
+            WORKSPACE_ENV_SECRET,
+            WORKSPACE_REGISTERED_SECRET,
+            WORKSPACE_OUTSIDE_SECRET,
+        )
+    ):
+        raise RuntimeError("Workspace root or secret content leaked into durable Audit")
+    for secret in (
+        WORKSPACE_ENV_SECRET,
+        WORKSPACE_REGISTERED_SECRET,
+        WORKSPACE_OUTSIDE_SECRET,
+    ):
+        _assert_secret_absent_from_files(
+            acceptance_root, secret, excluded_roots=(fixture_root,)
+        )
+    return {
+        "workspace_selection": "GTK native chooser selected and cancellation preserved prior input",
+        "registration": "native Owner rejected before CLI probe, then independently approved",
+        "cli_interface_probe_calls": len(probe_calls),
+        "workspace_read_approval": "separate native Owner approval for full content projection",
+        "workspace_tree_projection": tree_projection_evidence,
+        "workspace_projection": projection_evidence,
+        "task_execution": "unsupported",
+        "audit_secret_and_root_exposure": "absent",
+    }
+
+
 def _run_installed_mcp_tool_acceptance(
     environment: dict[str, str],
     window_id: str,
@@ -2236,6 +2656,7 @@ def _verify_live_audit(
     *,
     require_export: bool = True,
     require_mcp: bool = False,
+    require_workspace: bool = False,
     require_uninstall: bool = False,
     require_rollback: bool = False,
     require_catalog: bool = False,
@@ -2360,6 +2781,71 @@ def _verify_live_audit(
         raise RuntimeError(
             "installed MCP connect／Tool one-shot Permission／disconnectのOwner・LIVE_RUNTIME Auditが不足しています"
         )
+    workspace_selection = [
+        event for event in events if event.get("operation") == "作業領域OS選択"
+    ]
+    workspace_registration = [
+        event
+        for event in events
+        if event.get("operation") == "AgentCLI実行系作業領域登録"
+    ]
+    workspace_approval = [
+        event for event in events if event.get("operation") == "作業領域承認"
+    ]
+    workspace_tree = [
+        event for event in events if event.get("operation") == "作業領域ツリー"
+    ]
+    workspace_selection_accepted = sum(
+        event.get("decision") == "accepted"
+        and event.get("evidence_source") == "INTERNAL_STATE"
+        for event in workspace_selection
+    )
+    workspace_registration_rejected = sum(
+        event.get("decision") == "rejected"
+        and event.get("reason") == "desktop_native_owner_confirmation_required"
+        and event.get("evidence_source") == "INTERNAL_STATE"
+        for event in workspace_registration
+    )
+    workspace_registration_accepted = sum(
+        event.get("decision") == "accepted"
+        and event.get("evidence_source") == "LIVE_RUNTIME"
+        for event in workspace_registration
+    )
+    workspace_approval_recorded = sum(
+        event.get("decision") == "recorded"
+        and event.get("reason") == "ownerが現在登録の読取を承認"
+        and event.get("evidence_source") == "INTERNAL_STATE"
+        for event in workspace_approval
+    )
+    workspace_approval_accepted = sum(
+        event.get("decision") == "accepted"
+        and event.get("evidence_source") == "INTERNAL_STATE"
+        for event in workspace_approval
+    )
+    workspace_tree_accepted = sum(
+        event.get("decision") == "accepted"
+        and event.get("evidence_source") == "LIVE_RUNTIME"
+        for event in workspace_tree
+    )
+    task_permission_events = sum(
+        event.get("operation")
+        in {"AgentTaskWorkspacePermissionGrant", "AgentTaskOwnerApprovalGrant"}
+        for event in events
+    )
+    if require_workspace and not all(
+        (
+            workspace_selection_accepted >= 2,
+            workspace_registration_rejected >= 1,
+            workspace_registration_accepted == 1,
+            workspace_approval_recorded >= 1,
+            workspace_approval_accepted >= 1,
+            workspace_tree_accepted >= 1,
+            task_permission_events == 0,
+        )
+    ):
+        raise RuntimeError(
+            "installed Workspace selection／registration／read approval／tree Audit evidence is incomplete"
+        )
     uninstall = [
         event
         for event in events
@@ -2478,7 +2964,7 @@ def _verify_live_audit(
         raise RuntimeError(
             "installed Update download／stage／activationのfresh Owner拒否・許可Auditが不足しています"
         )
-    return {
+    audit_evidence: dict[str, int] = {
         "events": len(events),
         "export_accepted": accepted,
         "export_rejected": rejected,
@@ -2503,6 +2989,19 @@ def _verify_live_audit(
         "update_activation_owner_rejected": activation_rejected,
         "update_activation_completed": activation_completed,
     }
+    if require_workspace:
+        audit_evidence.update(
+            {
+                "workspace_selection_accepted": workspace_selection_accepted,
+                "workspace_registration_owner_rejected": workspace_registration_rejected,
+                "workspace_registration_live_accepted": workspace_registration_accepted,
+                "workspace_read_approval_recorded": workspace_approval_recorded,
+                "workspace_read_approval_accepted": workspace_approval_accepted,
+                "workspace_tree_live_accepted": workspace_tree_accepted,
+                "agent_task_permission_or_approval_events": task_permission_events,
+            }
+        )
+    return audit_evidence
 
 
 def _verify_export_manifest(export_root: Path) -> dict[str, str]:
@@ -2684,7 +3183,12 @@ def run_installed_smoke(
     update_package = _resolve_regular_package(update_package)
     if temp_root not in update_package.parents:
         raise RuntimeError("rollback fixture packageがrun固有一時root外です")
-    if acceptance_scope not in {"update_lifecycle", "credential_vault", "mcp_tool_execution"}:
+    if acceptance_scope not in {
+        "update_lifecycle",
+        "credential_vault",
+        "mcp_tool_execution",
+        "workspace_selection",
+    }:
         raise RuntimeError("installed acceptance scopeが未対応です")
     resolved_private_key = private_key_path.resolve(strict=True)
     if (
@@ -2772,7 +3276,7 @@ def run_installed_smoke(
                 acceptance_root / "gnome-keyring.log",
             )
             _run_rust_test(RUST_SECRET_SERVICE_TEST, environment, private_key_path)
-        elif acceptance_scope == "mcp_tool_execution":
+        elif acceptance_scope in {"mcp_tool_execution", "workspace_selection"}:
             pass
         else:
             _run_rust_test(RUST_CATALOG_RELAY_TIMEOUT_TEST, environment, private_key_path)
@@ -2981,6 +3485,55 @@ def run_installed_smoke(
                             "product_version": record["product_version"],
                             "package_sha256": record["package_sha256"],
                             "mcp_tool_execution": mcp_evidence,
+                            "installed_app_exit": "normal_window_close_and_owned_process_cleanup",
+                        },
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    )
+                )
+                return
+
+            if acceptance_scope == "workspace_selection":
+                workspace_evidence = _run_installed_workspace_selection_acceptance(
+                    environment,
+                    window_id,
+                    audit_store=broker_state / "store",
+                    acceptance_root=acceptance_root,
+                )
+                current_window_id = _visible_product_window(environment)
+                if current_window_id is None:
+                    raise RuntimeError(
+                        "Workspace acceptance後にinstalled GTK windowが見つかりません"
+                    )
+                _request_x11_window_manager_close(current_window_id, environment)
+                deadline = time.monotonic() + 60
+                while time.monotonic() < deadline:
+                    if not (_processes_using(product_paths) - preexisting):
+                        break
+                    time.sleep(0.2)
+                if _processes_using(product_paths) - preexisting:
+                    raise RuntimeError(
+                        "Workspace acceptance後の正常終了でowned product processが残留しています"
+                    )
+                if desktop_process.poll() is None:
+                    desktop_process.wait(timeout=10)
+                if desktop_process.returncode not in (0, None):
+                    raise RuntimeError(
+                        "Workspace acceptance後のdesktop launcher終了codeが不正です"
+                    )
+                audit_evidence = _verify_live_audit(
+                    broker_state / "store",
+                    require_export=False,
+                    require_workspace=True,
+                )
+                print(
+                    json.dumps(
+                        {
+                            "acceptance_scope": acceptance_scope,
+                            "product_version": record["product_version"],
+                            "package_sha256": record["package_sha256"],
+                            "workspace_selection": workspace_evidence,
+                            "live_audit": audit_evidence,
                             "installed_app_exit": "normal_window_close_and_owned_process_cleanup",
                         },
                         ensure_ascii=False,
@@ -3419,7 +3972,12 @@ def main() -> int:
     parser.add_argument("--update-package", type=Path, required=True)
     parser.add_argument(
         "--acceptance-scope",
-        choices=("update_lifecycle", "credential_vault", "mcp_tool_execution"),
+        choices=(
+            "update_lifecycle",
+            "credential_vault",
+            "mcp_tool_execution",
+            "workspace_selection",
+        ),
         default="update_lifecycle",
     )
     args = parser.parse_args()

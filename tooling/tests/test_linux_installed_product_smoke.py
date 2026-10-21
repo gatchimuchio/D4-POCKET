@@ -37,6 +37,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _verify_export_manifest,
     _verify_credential_audit,
     _verify_live_audit,
+    _verify_workspace_projection,
     _verify_uninstalled_state,
     _trigger_update_action_from_installed_ui,
     _wait_for_catalog_fetch_status,
@@ -1185,6 +1186,47 @@ class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
         self.assertNotIn("third.txt", diagnostic)
 
 
+class LinuxWorkspaceProjectionTests(unittest.TestCase):
+    def test_accepts_public_content_only_when_secret_and_external_markers_are_absent(self) -> None:
+        evidence = _verify_workspace_projection(
+            "Workspace Inspector\npublic.txt\nD4P_WORKSPACE_PUBLIC_PROJECTION_OK",
+            public_markers=("public.txt", "D4P_WORKSPACE_PUBLIC_PROJECTION_OK"),
+            forbidden_markers=(
+                ".env",
+                "private/token.txt",
+                "external-alias.txt",
+                "D4P_WORKSPACE_SECRET_CANARY",
+            ),
+        )
+        self.assertEqual(
+            evidence,
+            {
+                "public_markers_visible": 2,
+                "secret_and_external_markers_absent": 4,
+            },
+        )
+
+    def test_rejects_any_secret_or_external_content_without_echoing_it(self) -> None:
+        marker = "D4P_WORKSPACE_SECRET_CANARY_DO_NOT_PRINT"
+        with self.assertRaisesRegex(
+            RuntimeError, "exposed secret or external content"
+        ) as error:
+            _verify_workspace_projection(
+                f"public.txt\n{marker}",
+                public_markers=("public.txt",),
+                forbidden_markers=(marker,),
+            )
+        self.assertNotIn(marker, str(error.exception))
+
+    def test_fails_closed_when_allowed_public_projection_is_missing(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "public Workspace content"):
+            _verify_workspace_projection(
+                "Workspace Inspector",
+                public_markers=("public.txt",),
+                forbidden_markers=(".env",),
+            )
+
+
 class LinuxInstalledDesktopEntryTests(unittest.TestCase):
     def test_waits_for_native_owner_dialog_to_become_visible(self) -> None:
         from unittest.mock import patch
@@ -1415,6 +1457,13 @@ class LinuxInstalledOwnerEvidenceTests(unittest.TestCase):
                 ("MCP Tool実行", "accepted", "LIVE_RUNTIME"),
                 ("MCP切断", "rejected", "INTERNAL_STATE"),
                 ("MCP切断", "accepted", "LIVE_RUNTIME"),
+                ("作業領域OS選択", "accepted", "INTERNAL_STATE"),
+                ("作業領域OS選択", "accepted", "INTERNAL_STATE"),
+                ("AgentCLI実行系作業領域登録", "rejected", "INTERNAL_STATE"),
+                ("AgentCLI実行系作業領域登録", "accepted", "LIVE_RUNTIME"),
+                ("作業領域承認", "recorded", "INTERNAL_STATE"),
+                ("作業領域承認", "accepted", "INTERNAL_STATE"),
+                ("作業領域ツリー", "accepted", "LIVE_RUNTIME"),
                 ("製品アンインストール要求", "rejected", "INTERNAL_STATE"),
                 ("製品アンインストール要求", "accepted", "LIVE_RUNTIME"),
                 ("製品アンインストール完了", "completed", "LIVE_RUNTIME"),
@@ -1435,6 +1484,7 @@ class LinuxInstalledOwnerEvidenceTests(unittest.TestCase):
                             "更新rollback要求",
                             "MCP接続",
                             "MCP切断",
+                            "AgentCLI実行系作業領域登録",
                         }
                         and decision == "rejected"
                         else (
@@ -1442,8 +1492,12 @@ class LinuxInstalledOwnerEvidenceTests(unittest.TestCase):
                             if operation == "MCP Tool実行" and decision == "started"
                             else (
                                 "Tool result hash-only receipt"
-                                if operation == "MCP Tool実行" and decision == "accepted"
+                            if operation == "MCP Tool実行" and decision == "accepted"
+                            else (
+                                "ownerが現在登録の読取を承認"
+                                if operation == "作業領域承認" and decision == "recorded"
                                 else "fixture"
+                            )
                             )
                         )
                     ),
@@ -1492,11 +1546,12 @@ class LinuxInstalledOwnerEvidenceTests(unittest.TestCase):
                     store,
                     require_export=True,
                     require_mcp=True,
+                    require_workspace=True,
                     require_uninstall=True,
                     require_rollback=True,
                 ),
                 {
-                    "events": 15,
+                    "events": 22,
                     "export_accepted": 1,
                     "export_rejected": 1,
                     "mcp_connect_owner_rejected": 1,
@@ -1506,6 +1561,13 @@ class LinuxInstalledOwnerEvidenceTests(unittest.TestCase):
                     "mcp_tool_live_hash_only_completed": 1,
                     "mcp_disconnect_owner_rejected": 1,
                     "mcp_disconnect_live_completed": 1,
+                    "workspace_selection_accepted": 2,
+                    "workspace_registration_owner_rejected": 1,
+                    "workspace_registration_live_accepted": 1,
+                    "workspace_read_approval_recorded": 1,
+                    "workspace_read_approval_accepted": 1,
+                    "workspace_tree_live_accepted": 1,
+                    "agent_task_permission_or_approval_events": 0,
                     "uninstall_accepted": 1,
                     "uninstall_rejected": 1,
                     "uninstall_completed": 1,

@@ -12082,6 +12082,9 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
         "mcp_tool_execution",
         "inputs.acceptance_scope == 'mcp_tool_execution'",
         "--acceptance-scope mcp_tool_execution",
+        "workspace_selection",
+        "inputs.acceptance_scope == 'workspace_selection'",
+        "--acceptance-scope workspace_selection",
     )
     missing = [token for token in required if token not in workflow]
     for token in (
@@ -12089,6 +12092,9 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
         "require_mcp=True",
         "result_body_absent_from_ui_audit_logs_and_acceptance_files",
         "_cleanup_mcp_fixture_group(",
+        "def _run_installed_workspace_selection_acceptance(",
+        "require_workspace=True",
+        "_verify_workspace_projection(",
     ):
         if token not in smoke:
             missing.append(f"installed MCP smoke: {token}")
