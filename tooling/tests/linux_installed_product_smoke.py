@@ -1013,8 +1013,9 @@ def run_installed_smoke(
 
             _trigger_rollback_from_installed_ui(environment, window_id)
             rollback_markers = (
-                f"現在の有効版: {current_version}",
-                f"rollback先の版: {target_version}",
+                "Linux製品を直前の署名済み有効版へrollbackしますか？",
+                f"現行版: {current_version}",
+                f"復元版: {target_version}",
                 APP_ID,
                 AUDIT_ID,
             )
