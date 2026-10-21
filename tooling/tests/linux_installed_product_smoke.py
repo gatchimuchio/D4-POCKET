@@ -1021,9 +1021,10 @@ def run_installed_smoke(
                 environment,
                 "拒否",
                 expected_summary_markers=(
-                    "D4 Pocketをアンインストールしますか？",
-                    "削除対象:",
-                    "保持:",
+                    "D4 Pocketを終了後にこの利用者から削除しますか？",
+                    "固定製品root:",
+                    "固定XDG desktop entry:",
+                    "XDG state内のRuntime設定、Credential、Audit Storeは保持します。",
                 ),
             )
             if not _desktop_entry_targets_fixed_launcher(entries[0], fixed_launcher):
@@ -1046,9 +1047,10 @@ def run_installed_smoke(
                 environment,
                 "許可",
                 expected_summary_markers=(
-                    "D4 Pocketをアンインストールしますか？",
-                    "削除対象:",
-                    "保持:",
+                    "D4 Pocketを終了後にこの利用者から削除しますか？",
+                    "固定製品root:",
+                    "固定XDG desktop entry:",
+                    "XDG state内のRuntime設定、Credential、Audit Storeは保持します。",
                 ),
             )
 
