@@ -928,7 +928,8 @@ class McpConnectionClient {
       value.isNotEmpty &&
       utf8.encode(value).length <= 1024 &&
       !_containsControl(value) &&
-      (defaultTargetPlatform == TargetPlatform.macOS
+      (defaultTargetPlatform == TargetPlatform.macOS ||
+              defaultTargetPlatform == TargetPlatform.linux
           ? value.startsWith('/') && !value.startsWith('//')
           : RegExp(r'^(?:[A-Za-z]:[\\/]|\\\\[^\\/]+[\\/][^\\/]+)')
               .hasMatch(value));

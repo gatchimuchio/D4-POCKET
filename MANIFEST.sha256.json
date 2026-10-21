@@ -368,7 +368,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/mcp_connection_client.dart",
-      "sha256": "64481dea77acd317445d3a355d4d9c0346af5d4ac3b323a8744e69fc52f819af"
+      "sha256": "4dbd55364f00e1859f294dbd9d595cdd16d9de8d54c2ac4ae43305b74a74075a"
     },
     {
       "path": "apps/desktop_flutter/lib/services/notification_client.dart",
@@ -664,7 +664,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/mcp_connection_center_test.dart",
-      "sha256": "afd44590a75b03183594228c40420cfa73af11f8a0344ef214bd101d756a4d37"
+      "sha256": "7b4166e968fbfda7d9c68d55a0ab354517e79f859031ee79cf4c2b9a14b81340"
     },
     {
       "path": "apps/desktop_flutter/test/module_pruning_test.dart",

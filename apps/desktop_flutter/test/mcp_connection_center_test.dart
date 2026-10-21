@@ -321,6 +321,54 @@ void main() {
       'environment_variable': 'MCP_API_KEY',
     });
   });
+  test('Linux MCP接続はPOSIX絶対pathを受け付けWindows／相対pathを拒否する', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final transport = _McpTransport()..connected = false;
+    final client = McpConnectionClient(transport);
+
+    await client.connect(
+      serverId: 'mcp-fixture',
+      executable: '/usr/bin/python3',
+      workspace: '/tmp/d4-pocket-mcp-workspace',
+      argumentsText: '/tmp/mcp-fixture.py\nseed-value',
+    );
+
+    expect(transport.operations, ['MCP接続']);
+    expect(transport.payloads.single?['実行file'], '/usr/bin/python3');
+    expect(transport.payloads.single?['workspace'],
+        '/tmp/d4-pocket-mcp-workspace');
+    expect(transport.payloads.single?['引数'], [
+      '/tmp/mcp-fixture.py',
+      'seed-value',
+    ]);
+
+    for (final executable in [
+      'python3',
+      r'C:\Python312\python.exe',
+      '//usr/bin/python3'
+    ]) {
+      await expectLater(
+        client.connect(
+          serverId: 'mcp-fixture',
+          executable: executable,
+          workspace: '/tmp/d4-pocket-mcp-workspace',
+          argumentsText: '',
+        ),
+        throwsA(isA<BrokerClientException>()),
+      );
+    }
+    await expectLater(
+      client.connect(
+        serverId: 'mcp-fixture',
+        executable: '/usr/bin/python3',
+        workspace: r'C:\Users\Public\D4PocketWorkspace',
+        argumentsText: '',
+      ),
+      throwsA(isA<BrokerClientException>()),
+    );
+    expect(transport.operations, ['MCP接続']);
+  });
   testWidgets('Mac MCP投影は公開ID選択だけをBrokerへ送り委譲範囲を表示する', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
