@@ -524,6 +524,52 @@ class InstalledOwnerSummaryTests(unittest.TestCase):
         self.assertIn('f"{MCP_OWNER_WORKSPACE_LABEL}{workspace}"', acceptance)
         self.assertIn("MCP_OWNER_NO_CREDENTIAL_MARKER,", acceptance)
 
+    def test_installed_mcp_owner_summary_is_accepted_before_decision(self) -> None:
+        server_id = "linux-installed-mcp-fixture"
+        executable = "/usr/bin/python3"
+        workspace = "/tmp/d4-pocket-mcp-workspace"
+        summary = "\n".join((
+            "このstdio Serverを起動して接続します。",
+            f"Server ID: {server_id}",
+            f"実行file: {executable}",
+            f"{MCP_OWNER_WORKSPACE_LABEL}{workspace}",
+            "引数: 2項目",
+            "引数hash: sha256:" + "a" * 64,
+            MCP_OWNER_NO_CREDENTIAL_MARKER,
+            "LinuxではDesktop sandboxを付与しません。",
+            "要求hash: sha256:" + "b" * 64,
+        ))
+        dialog = self.Node("D4 Pocket Owner確認", [self.Node("", text=summary)])
+        environment = {"DISPLAY": ":99"}
+        button = object()
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._wait_for_owner_dialog_window"
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_accessible",
+                return_value=dialog,
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
+                return_value=button,
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._activate_accessible"
+            ) as activate,
+        ):
+            _answer_owner_dialog(
+                environment,
+                "拒否",
+                expected_summary_markers=(
+                    f"Server ID: {server_id}",
+                    f"実行file: {executable}",
+                    f"{MCP_OWNER_WORKSPACE_LABEL}{workspace}",
+                    MCP_OWNER_NO_CREDENTIAL_MARKER,
+                ),
+            )
+        activate.assert_called_once_with(button, "拒否", environment)
+
     def test_linux_native_owner_summary_uses_bounded_accessible_line_labels(self) -> None:
         source = (
             Path(__file__).resolve().parents[2]
