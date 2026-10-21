@@ -352,7 +352,7 @@ class LinuxInstalledOwnerEvidenceTests(unittest.TestCase):
             audit_cases = (
                 ("GUI Shell書出し", "rejected", "INTERNAL_STATE"),
                 ("GUI Shell書出し", "accepted", "INTERNAL_STATE"),
-                ("製品アンインストール要求", "rejected", "LIVE_RUNTIME"),
+                ("製品アンインストール要求", "rejected", "INTERNAL_STATE"),
                 ("製品アンインストール要求", "accepted", "LIVE_RUNTIME"),
                 ("製品アンインストール完了", "completed", "LIVE_RUNTIME"),
             )
@@ -362,7 +362,12 @@ class LinuxInstalledOwnerEvidenceTests(unittest.TestCase):
                     "request_id": f"request-{index}",
                     "operation": operation,
                     "decision": decision,
-                    "reason": "fixture",
+                    "reason": (
+                        "desktop_native_owner_confirmation_required"
+                        if operation == "製品アンインストール要求"
+                        and decision == "rejected"
+                        else "fixture"
+                    ),
                     "evidence_source": evidence_source,
                     "payload_hash": f"sha256:{index:064x}",
                     "previous_event_hash": previous_hash,

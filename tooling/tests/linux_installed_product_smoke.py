@@ -559,10 +559,18 @@ def _verify_live_audit(
         event
         for event in events
         if event.get("operation") == "製品アンインストール要求"
-        and event.get("evidence_source") == "LIVE_RUNTIME"
     ]
-    uninstall_accepted = sum(event.get("decision") == "accepted" for event in uninstall)
-    uninstall_rejected = sum(event.get("decision") == "rejected" for event in uninstall)
+    uninstall_accepted = sum(
+        event.get("decision") == "accepted"
+        and event.get("evidence_source") == "LIVE_RUNTIME"
+        for event in uninstall
+    )
+    uninstall_rejected = sum(
+        event.get("decision") == "rejected"
+        and event.get("reason") == "desktop_native_owner_confirmation_required"
+        and event.get("evidence_source") == "INTERNAL_STATE"
+        for event in uninstall
+    )
     uninstall_completed = sum(
         event.get("operation") == "製品アンインストール完了"
         and event.get("decision") == "completed"
@@ -572,7 +580,9 @@ def _verify_live_audit(
     if require_uninstall and (
         uninstall_accepted < 1 or uninstall_rejected < 1 or uninstall_completed < 1
     ):
-        raise RuntimeError("Uninstall Owner拒否／許可／完了のLIVE_RUNTIME Auditが不足しています")
+        raise RuntimeError(
+            "Uninstall拒否(INTERNAL_STATE)／許可・完了(LIVE_RUNTIME) Auditが不足しています"
+        )
     return {
         "events": len(events),
         "export_accepted": accepted,
