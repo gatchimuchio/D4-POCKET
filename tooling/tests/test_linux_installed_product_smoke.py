@@ -22,6 +22,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _component_center,
     _credential_scan_file_role,
     _desktop_entry_targets_fixed_launcher,
+    _expand_single_installed_mcp_tool_list,
     _focused_named_accessible,
     _find_operable_accessible,
     _helper_exit_diagnostics,
@@ -582,6 +583,50 @@ class InstalledOwnerSummaryTests(unittest.TestCase):
         self.assertIn("std::count(state->summary.begin(), state->summary.end()", source)
         self.assertIn("gtk_label_new(line.c_str())", source)
         self.assertIn("state->summary[line_end] != '\\n'", source)
+
+
+class InstalledMcpToolListTests(unittest.TestCase):
+    def test_expands_tool_list_before_looking_for_echo(self) -> None:
+        events: list[tuple[object, ...]] = []
+        environment = {"DISPLAY": ":99"}
+        window = object()
+        tool_list = object()
+
+        def find_operable(name: str, *, root: object, timeout: float):
+            events.append(("find-control", name, root, timeout))
+            return tool_list
+
+        def activate(control: object, name: str, observed_environment: dict[str, str]):
+            events.append(("activate", control, name, observed_environment))
+
+        def find_accessible(name: str, *, root: object, timeout: float):
+            events.append(("find-tool", name, root, timeout))
+            return object()
+
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
+                side_effect=find_operable,
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._activate_accessible",
+                side_effect=activate,
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_accessible",
+                side_effect=find_accessible,
+            ),
+        ):
+            _expand_single_installed_mcp_tool_list(environment, window)
+
+        self.assertEqual(
+            events,
+            [
+                ("find-control", "Tool一覧：1件", window, 15),
+                ("activate", tool_list, "Tool一覧：1件", environment),
+                ("find-tool", "echo", window, 15),
+            ],
+        )
 
 
 class LinuxWaylandEnvironmentTests(unittest.TestCase):

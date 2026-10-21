@@ -1283,6 +1283,15 @@ def _cleanup_mcp_fixture_group(workspace: Path, *, helper: Path, fixture: Path) 
     _wait_for_mcp_group_state(pgid, False)
 
 
+def _expand_single_installed_mcp_tool_list(
+    environment: dict[str, str], window: object
+) -> None:
+    label = "Tool一覧：1件"
+    tool_list = _find_operable_accessible(label, root=window, timeout=15)
+    _activate_accessible(tool_list, label, environment)
+    _find_accessible("echo", root=window, timeout=15)
+
+
 def _run_installed_mcp_tool_acceptance(
     environment: dict[str, str],
     window_id: str,
@@ -1348,7 +1357,6 @@ def _run_installed_mcp_tool_acceptance(
     )
     _wait_for_owner_dialog_closed(environment)
     _find_accessible("接続receiptを受理しました", root=window, timeout=20)
-    _find_accessible("echo", root=window, timeout=15)
     deadline = time.monotonic() + 10
     while not start_marker.exists() and time.monotonic() < deadline:
         time.sleep(0.1)
@@ -1359,8 +1367,7 @@ def _run_installed_mcp_tool_acceptance(
         raise RuntimeError("installed MCP child is not supervised by the installed Broker guardian")
     _wait_for_mcp_group_state(pgid, True)
 
-    tool_list = _find_operable_accessible("Tool一覧：1件", root=window, timeout=15)
-    _activate_accessible(tool_list, "Tool一覧：1件", environment)
+    _expand_single_installed_mcp_tool_list(environment, window)
     run_tool = _find_operable_accessible("確認して実行", root=window, timeout=10)
     _activate_accessible(run_tool, "確認して実行", environment)
     arguments_dialog = _find_accessible("echo のarguments", root=window, timeout=10)
