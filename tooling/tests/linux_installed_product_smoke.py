@@ -1310,6 +1310,16 @@ def _enter_single_installed_mcp_tool_arguments(
     _activate_accessible(confirm_arguments, "入力内容を確認", environment)
 
 
+def _review_single_installed_mcp_tool_arguments(
+    environment: dict[str, str], window: object
+) -> None:
+    _find_accessible("送信する引数を確認", root=window, timeout=10)
+    _find_accessible(MCP_PUBLIC_INPUT, root=window, timeout=5)
+    _find_accessible("Tool結果本文は返却されず", root=window, timeout=5)
+    proceed = _find_operable_accessible("Linux確認へ進む", root=window, timeout=10)
+    _activate_accessible(proceed, "Linux確認へ進む", environment)
+
+
 def _run_installed_mcp_tool_acceptance(
     environment: dict[str, str],
     window_id: str,
@@ -1389,11 +1399,7 @@ def _run_installed_mcp_tool_acceptance(
     run_tool = _find_operable_accessible("確認して実行", root=window, timeout=10)
     _activate_accessible(run_tool, "確認して実行", environment)
     _enter_single_installed_mcp_tool_arguments(environment, window, window_id)
-    confirmation = _find_accessible("送信する引数を確認", root=window, timeout=10)
-    _find_accessible(MCP_PUBLIC_INPUT, root=confirmation, timeout=5)
-    _find_accessible("Tool結果本文は返却されず", root=confirmation, timeout=5)
-    proceed = _find_operable_accessible("Linux確認へ進む", root=confirmation, timeout=10)
-    _activate_accessible(proceed, "Linux確認へ進む", environment)
+    _review_single_installed_mcp_tool_arguments(environment, window)
     _answer_owner_dialog(
         environment,
         "許可",

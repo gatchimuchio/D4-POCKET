@@ -29,6 +29,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _helper_exit_diagnostics,
     _open_mcp_center_from_installed_ui,
     _resolve_regular_package,
+    _review_single_installed_mcp_tool_arguments,
     _run_rust_test,
     _safe_log_tail,
     _set_public_text_by_keyboard,
@@ -689,6 +690,50 @@ class InstalledMcpToolListTests(unittest.TestCase):
                 ),
                 ("find-button", "入力内容を確認", window, 10),
                 ("activate", confirm_button, "入力内容を確認", environment),
+            ],
+        )
+
+    def test_argument_preview_and_continue_are_resolved_from_window_root(self) -> None:
+        events: list[tuple[object, ...]] = []
+        environment = {"DISPLAY": ":99"}
+        window = object()
+        proceed_button = object()
+
+        def find_accessible(name: str, *, root: object, timeout: float):
+            events.append(("find", name, root, timeout))
+            return object()
+
+        def find_operable(name: str, *, root: object, timeout: float):
+            events.append(("find-button", name, root, timeout))
+            return proceed_button
+
+        def activate(control: object, name: str, observed_environment: dict[str, str]):
+            events.append(("activate", control, name, observed_environment))
+
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_accessible",
+                side_effect=find_accessible,
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
+                side_effect=find_operable,
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._activate_accessible",
+                side_effect=activate,
+            ),
+        ):
+            _review_single_installed_mcp_tool_arguments(environment, window)
+
+        self.assertEqual(
+            events,
+            [
+                ("find", "送信する引数を確認", window, 10),
+                ("find", "installed-mcp-public-input", window, 5),
+                ("find", "Tool結果本文は返却されず", window, 5),
+                ("find-button", "Linux確認へ進む", window, 10),
+                ("activate", proceed_button, "Linux確認へ進む", environment),
             ],
         )
 
