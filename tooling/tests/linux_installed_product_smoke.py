@@ -837,11 +837,16 @@ def _verify_credential_audit(store: Path, secret: str) -> dict[str, int]:
     }
 
 
+_CREDENTIAL_SCAN_CHUNK_BYTES = 1024 * 1024
+_CREDENTIAL_SCAN_MAX_BYTES = 512 * 1024 * 1024
+
+
 def _assert_secret_absent_from_files(
     root: Path, secret: str, *, excluded_roots: tuple[Path, ...] = ()
 ) -> None:
     marker = secret.encode("utf-8")
     excluded = tuple(path.resolve(strict=True) for path in excluded_roots)
+    remaining = _CREDENTIAL_SCAN_MAX_BYTES
     for path in root.rglob("*"):
         if any(path.is_relative_to(excluded_root) for excluded_root in excluded):
             continue
@@ -849,13 +854,24 @@ def _assert_secret_absent_from_files(
             metadata = path.lstat()
             if not stat.S_ISREG(metadata.st_mode):
                 continue
-            if metadata.st_size > 64 * 1024 * 1024:
-                raise RuntimeError("Credential acceptance file exceeds the bounded leak-scan size")
-            content = path.read_bytes()
+            if metadata.st_size > remaining:
+                raise RuntimeError("Credential acceptance scan exceeds its bounded byte budget")
+            with path.open("rb") as stream:
+                overlap = b""
+                while chunk := stream.read(min(_CREDENTIAL_SCAN_CHUNK_BYTES, remaining + 1)):
+                    remaining -= len(chunk)
+                    if remaining < 0:
+                        raise RuntimeError(
+                            "Credential acceptance scan exceeds its bounded byte budget"
+                        )
+                    content = overlap + chunk
+                    if marker in content:
+                        raise RuntimeError(
+                            "Credential secret leaked into an acceptance file or log"
+                        )
+                    overlap = content[-(len(marker) - 1) :] if len(marker) > 1 else b""
         except OSError:
             raise RuntimeError("Credential acceptance file scan could not read a test file") from None
-        if marker in content:
-            raise RuntimeError("Credential secret leaked into an acceptance file or log")
 
 
 def _accessible_snapshot(root) -> str:

@@ -730,6 +730,33 @@ class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
                 _assert_secret_absent_from_files(root, marker)
         self.assertNotIn(marker, str(error.exception))
 
+    def test_acceptance_file_scan_detects_secret_across_read_chunks(self) -> None:
+        marker = "test-secret-that-must-not-escape"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "test.log").write_text("prefix-" + marker + "-suffix", encoding="utf-8")
+            with (
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._CREDENTIAL_SCAN_CHUNK_BYTES",
+                    7,
+                ),
+                self.assertRaisesRegex(RuntimeError, "leaked into an acceptance file"),
+            ):
+                _assert_secret_absent_from_files(root, marker)
+
+    def test_acceptance_file_scan_fails_closed_at_total_byte_budget(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "large.log").write_bytes(b"123456789")
+            with (
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._CREDENTIAL_SCAN_MAX_BYTES",
+                    8,
+                ),
+                self.assertRaisesRegex(RuntimeError, "bounded byte budget"),
+            ):
+                _assert_secret_absent_from_files(root, "test-secret")
+
 
 class LinuxInstalledDesktopEntryTests(unittest.TestCase):
     def test_waits_for_native_owner_dialog_to_become_visible(self) -> None:
