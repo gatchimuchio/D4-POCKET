@@ -401,11 +401,13 @@ fn serve(
         Ok(())
     })();
     shutdown.store(true, Ordering::Release);
+    let request_failure_code = result.as_ref().err().map(helper_exit_code);
     let stopped = match server.join() {
         Ok(Ok(())) => Ok(()),
         Ok(Err(_)) => Err(classify_stage_error(failure(), 59)),
         Err(_) => Err(classify_stage_error(failure(), 61)),
     };
+    let stopped_failure_code = stopped.as_ref().err().map(helper_exit_code);
     let cleanup = if !owned_session.is_empty() {
         match fs::read(&session) {
             Ok(current) => {
@@ -421,7 +423,12 @@ fn serve(
     } else {
         Ok(())
     };
-    result.and(stopped).and(cleanup)
+    let outcome = result.and(stopped).and(cleanup);
+    match (request_failure_code, stopped_failure_code) {
+        (Some(76), Some(59)) => Err(classify_stage_error(failure(), 80)),
+        (Some(76), Some(61)) => Err(classify_stage_error(failure(), 81)),
+        _ => outcome,
+    }
 }
 
 fn request_workspace_selection(
@@ -973,6 +980,14 @@ mod tests {
         assert_eq!(
             helper_exit_code(&classify_stage_error(io::Error::other("omitted"), 76)),
             76
+        );
+        assert_eq!(
+            helper_exit_code(&classify_stage_error(io::Error::other("omitted"), 80)),
+            80
+        );
+        assert_eq!(
+            helper_exit_code(&classify_stage_error(io::Error::other("omitted"), 81)),
+            81
         );
     }
 
