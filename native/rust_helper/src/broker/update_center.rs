@@ -23,7 +23,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering};
 use std::sync::{mpsc, Arc};
 use std::thread::JoinHandle;
 
@@ -53,6 +53,26 @@ const EMBEDDED_PRODUCT_APP_ID: Option<&str> = option_env!("GUI_SHELL_PRODUCT_APP
 const EMBEDDED_PRODUCT_AUDIT_STORE_ID: Option<&str> =
     option_env!("GUI_SHELL_PRODUCT_AUDIT_STORE_ID");
 const EMBEDDED_PRODUCT_UPDATE_TRUST_JSON: Option<&str> = option_env!("GUI_SHELL_UPDATE_TRUST_JSON");
+
+// Linux installed acceptanceでBroker thread panicの処理区間だけを数値分類する。
+// 1=要求/trust、2=HTTPS、3=catalog decode、4=候補検証、5=永続化、6=成功Audit。
+// panic本文・候補本文・credentialは保持しない。通常終了時は0へ戻す。
+static CATALOG_PANIC_STAGE: AtomicU8 = AtomicU8::new(0);
+
+#[cfg(target_os = "linux")]
+pub(crate) fn catalog_panic_stage() -> u8 {
+    CATALOG_PANIC_STAGE.load(Ordering::Acquire)
+}
+
+struct CatalogPanicStageReset;
+
+impl Drop for CatalogPanicStageReset {
+    fn drop(&mut self) {
+        if !std::thread::panicking() {
+            CATALOG_PANIC_STAGE.store(0, Ordering::Release);
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct UpdateDownloadConfirmation {
@@ -1916,6 +1936,8 @@ fn fetch_catalog_with<F>(
 where
     F: FnMut(&str, std::time::Instant) -> Result<Vec<u8>, super::update_download::DownloadError>,
 {
+    let _stage_reset = CatalogPanicStageReset;
+    CATALOG_PANIC_STAGE.store(1, Ordering::Release);
     if payload != &json!({"版": VERSION}) {
         return reject_catalog(
             broker,
@@ -1955,6 +1977,7 @@ where
     let mut total_bytes = 0usize;
     for source in &trust.package_sources {
         let url = format!("{}/updates.json", source.base_url);
+        CATALOG_PANIC_STAGE.store(2, Ordering::Release);
         let bytes = match fetch(&url, deadline) {
             Ok(bytes) if !bytes.is_empty() && bytes.len() <= MAX_MANIFEST_BYTES => bytes,
             Ok(_) => {
@@ -1985,6 +2008,7 @@ where
         };
         let catalog_hash = sha256_tagged(&bytes);
         catalog_hashes.push(catalog_hash);
+        CATALOG_PANIC_STAGE.store(3, Ordering::Release);
         let raw = match std::str::from_utf8(&bytes) {
             Ok(raw) => raw,
             Err(_) => {
@@ -2016,6 +2040,7 @@ where
                 }
             };
         for candidate in document.candidates {
+            CATALOG_PANIC_STAGE.store(4, Ordering::Release);
             if candidate.channel != source.channel || !seen_ids.insert(candidate.update_id.clone())
             {
                 return reject_catalog(
@@ -2060,6 +2085,7 @@ where
             hash,
         );
     }
+    CATALOG_PANIC_STAGE.store(5, Ordering::Release);
     if persist(broker).is_err() {
         broker.updates = previous;
         return broker.audit_store_failed_response(
@@ -2072,6 +2098,7 @@ where
         );
     }
     let catalog_hashes = catalog_hashes.join(",");
+    CATALOG_PANIC_STAGE.store(6, Ordering::Release);
     accepted_external(
         broker,
         OP_FETCH_CATALOG,

@@ -82,6 +82,20 @@ fn classify_stage_error(error: io::Error, exit_code: i32) -> io::Error {
     io::Error::new(error.kind(), ClassifiedHelperError { exit_code })
 }
 
+fn broker_panic_exit_code(catalog_stage: u8) -> i32 {
+    if (1..=6).contains(&catalog_stage) {
+        90 + i32::from(catalog_stage)
+    } else {
+        61
+    }
+}
+
+fn relay_and_broker_panic_exit_code(catalog_stage: u8) -> Option<i32> {
+    (1..=6)
+        .contains(&catalog_stage)
+        .then_some(100 + i32::from(catalog_stage))
+}
+
 pub fn run() -> io::Result<()> {
     if std::env::args_os().len() != 1 {
         return Err(failure());
@@ -405,7 +419,10 @@ fn serve(
     let stopped = match server.join() {
         Ok(Ok(())) => Ok(()),
         Ok(Err(_)) => Err(classify_stage_error(failure(), 59)),
-        Err(_) => Err(classify_stage_error(failure(), 61)),
+        Err(_) => Err(classify_stage_error(
+            failure(),
+            broker_panic_exit_code(crate::broker::update_center::catalog_panic_stage()),
+        )),
     };
     let stopped_failure_code = stopped.as_ref().err().map(helper_exit_code);
     let cleanup = if !owned_session.is_empty() {
@@ -427,6 +444,10 @@ fn serve(
     match (request_failure_code, stopped_failure_code) {
         (Some(76), Some(59)) => Err(classify_stage_error(failure(), 80)),
         (Some(76), Some(61)) => Err(classify_stage_error(failure(), 81)),
+        (Some(76), Some(code)) if (91..=96).contains(&code) => Err(classify_stage_error(
+            failure(),
+            relay_and_broker_panic_exit_code((code - 90) as u8).unwrap_or(81),
+        )),
         _ => outcome,
     }
 }
@@ -989,6 +1010,12 @@ mod tests {
             helper_exit_code(&classify_stage_error(io::Error::other("omitted"), 81)),
             81
         );
+        assert_eq!(broker_panic_exit_code(0), 61);
+        assert_eq!(broker_panic_exit_code(1), 91);
+        assert_eq!(broker_panic_exit_code(6), 96);
+        assert_eq!(relay_and_broker_panic_exit_code(0), None);
+        assert_eq!(relay_and_broker_panic_exit_code(1), Some(101));
+        assert_eq!(relay_and_broker_panic_exit_code(6), Some(106));
     }
 
     #[test]
