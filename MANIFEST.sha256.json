@@ -3488,7 +3488,7 @@
     },
     {
       "path": "native/rust_helper/src/bin/gui_shell_linux_broker.rs",
-      "sha256": "370f271f6e77f55cef833c941c53580d8e049f178c8c5dc1c430627a9c80d23e"
+      "sha256": "c0fa501927acd7daa027518877013eed2f6fb6d256f8f0af8154f0f2e183fd0c"
     },
     {
       "path": "native/rust_helper/src/bin/gui_shell_macos_broker.rs",
@@ -3724,7 +3724,7 @@
     },
     {
       "path": "native/rust_helper/src/linux_desktop_worker.rs",
-      "sha256": "a195d851d99f96e16822925a3526e674a1344fa0489c2d9525cee816a29cade9"
+      "sha256": "64dcc3b9b91ea10c63aa46fc5a8a7e833c5fff32058440c92281d8c9457c5178"
     },
     {
       "path": "native/rust_helper/src/linux_product_bundle.rs",

@@ -17,6 +17,8 @@ use std::thread;
 use std::time::Duration;
 use std::{
     collections::BTreeSet,
+    error::Error,
+    fmt,
     io::{self, BufRead, BufReader, Read, Write},
 };
 use zeroize::{Zeroize, Zeroizing};
@@ -39,20 +41,46 @@ fn failure() -> io::Error {
     io::Error::other("Linux安全Broker接続を確認できません")
 }
 
-pub fn helper_exit_code(kind: io::ErrorKind) -> i32 {
-    match kind {
-        io::ErrorKind::Other => 20,
-        io::ErrorKind::TimedOut => 21,
-        io::ErrorKind::ConnectionRefused => 22,
-        io::ErrorKind::ConnectionReset => 23,
-        io::ErrorKind::BrokenPipe => 24,
-        io::ErrorKind::UnexpectedEof => 25,
-        io::ErrorKind::InvalidData => 26,
-        io::ErrorKind::PermissionDenied => 27,
-        io::ErrorKind::NotFound => 28,
-        io::ErrorKind::WouldBlock => 29,
-        _ => 30,
+#[derive(Debug)]
+struct ClassifiedHelperError {
+    exit_code: i32,
+}
+
+impl fmt::Display for ClassifiedHelperError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("Linux helper failure category")
     }
+}
+
+impl Error for ClassifiedHelperError {}
+
+fn helper_error_kind_offset(kind: io::ErrorKind) -> i32 {
+    match kind {
+        io::ErrorKind::Other => 0,
+        io::ErrorKind::TimedOut => 1,
+        io::ErrorKind::ConnectionRefused => 2,
+        io::ErrorKind::ConnectionReset => 3,
+        io::ErrorKind::BrokenPipe => 4,
+        io::ErrorKind::UnexpectedEof => 5,
+        io::ErrorKind::InvalidData => 6,
+        io::ErrorKind::PermissionDenied => 7,
+        io::ErrorKind::NotFound => 8,
+        io::ErrorKind::WouldBlock => 9,
+        _ => 10,
+    }
+}
+
+pub fn helper_exit_code(error: &io::Error) -> i32 {
+    error
+        .get_ref()
+        .and_then(|source| source.downcast_ref::<ClassifiedHelperError>())
+        .map(|classified| classified.exit_code)
+        .unwrap_or_else(|| 20 + helper_error_kind_offset(error.kind()))
+}
+
+fn classify_relay_error(error: io::Error) -> io::Error {
+    let exit_code = 40 + helper_error_kind_offset(error.kind());
+    io::Error::new(error.kind(), ClassifiedHelperError { exit_code })
 }
 
 pub fn run() -> io::Result<()> {
@@ -347,7 +375,7 @@ fn serve(
                 Some(response) => response,
                 None => {
                     let request = Zeroizing::new(normalize(&frame, &endpoint.0.session_id));
-                    relay(&request, &endpoint.0)?
+                    relay(&request, &endpoint.0).map_err(classify_relay_error)?
                 }
             };
             mark_initial_install_handoff(&frame, &mut response, allow_initial_install_handoff)?;
@@ -887,11 +915,33 @@ mod tests {
     #[test]
     #[ignore = "Linux helperの安全な終了分類をLinux手動Acceptanceで検証する"]
     fn helper_exit_code_exposes_only_a_bounded_io_error_class() {
-        assert_eq!(helper_exit_code(io::ErrorKind::TimedOut), 21);
-        assert_eq!(helper_exit_code(io::ErrorKind::ConnectionRefused), 22);
-        assert_eq!(helper_exit_code(io::ErrorKind::UnexpectedEof), 25);
-        assert_eq!(helper_exit_code(io::ErrorKind::Other), 20);
-        assert_eq!(helper_exit_code(io::ErrorKind::AddrNotAvailable), 30);
+        assert_eq!(
+            helper_exit_code(&io::Error::from(io::ErrorKind::TimedOut)),
+            21
+        );
+        assert_eq!(
+            helper_exit_code(&io::Error::from(io::ErrorKind::ConnectionRefused)),
+            22
+        );
+        assert_eq!(
+            helper_exit_code(&io::Error::from(io::ErrorKind::UnexpectedEof)),
+            25
+        );
+        assert_eq!(helper_exit_code(&io::Error::other("omitted")), 20);
+        assert_eq!(
+            helper_exit_code(&io::Error::from(io::ErrorKind::AddrNotAvailable)),
+            30
+        );
+        assert_eq!(
+            helper_exit_code(&classify_relay_error(io::Error::other("omitted"))),
+            40
+        );
+        assert_eq!(
+            helper_exit_code(&classify_relay_error(io::Error::from(
+                io::ErrorKind::TimedOut
+            ))),
+            41
+        );
     }
 
     #[test]
