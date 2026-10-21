@@ -630,6 +630,79 @@ class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
         self.assertEqual(commands[1], ["xdotool", "key", "--clearmodifiers", "ctrl+a"])
         self.assertEqual(commands[2][-1], "installed-server")
 
+    def test_public_text_preserves_bounded_multiline_argument_fields(self) -> None:
+        class TextField:
+            value = ""
+
+            def queryEditableText(self):
+                return self
+
+            def queryText(self):
+                return self
+
+            def getText(self, start: int, end: int) -> str:
+                return self.value
+
+            @property
+            def characterCount(self) -> int:
+                return len(self.value)
+
+        field = TextField()
+        commands = []
+
+        def run(command, **kwargs):
+            commands.append(command)
+            if command[1] == "type":
+                field.value += command[-1]
+            elif command[1] == "key" and command[-1] == "ctrl+a":
+                field.value = ""
+            elif command[1] == "key" and command[-1] == "Return":
+                field.value += "\n"
+            return subprocess.CompletedProcess(command, 0)
+
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_accessible",
+                return_value=field,
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._focused_named_accessible",
+                return_value=field,
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke.subprocess.run",
+                side_effect=run,
+            ),
+            patch("tooling.tests.linux_installed_product_smoke.time.sleep"),
+        ):
+            _set_public_text_by_keyboard(
+                object(),
+                "起動引数（1行に1項目、最大32項目）",
+                "-u\n/path/to/mcp-fixture.py\nseed",
+                {},
+                "0x42",
+            )
+
+        self.assertEqual(field.value, "-u\n/path/to/mcp-fixture.py\nseed")
+        self.assertEqual(
+            [command[-1] for command in commands if command[1] == "type"],
+            ["-u", "/path/to/mcp-fixture.py", "seed"],
+        )
+        self.assertEqual(
+            sum(command[1] == "key" and command[-1] == "Return" for command in commands),
+            2,
+        )
+
+    def test_public_text_rejects_carriage_return_and_nonprintable_controls(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "bounded format"):
+            _set_public_text_by_keyboard(
+                object(), "field", "first\r\nsecond", {}, "0x42"
+            )
+        with self.assertRaisesRegex(RuntimeError, "bounded format"):
+            _set_public_text_by_keyboard(
+                object(), "field", "first\x00second", {}, "0x42"
+            )
+
     def test_secret_service_listing_reads_metadata_without_requesting_values(self) -> None:
         from types import SimpleNamespace
 

@@ -583,7 +583,10 @@ def _set_public_text_by_keyboard(
     if (
         not value
         or len(value) > 256
-        or any(ord(character) < 0x20 for character in value)
+        or any(
+            ord(character) < 0x20 and character != "\n"
+            for character in value
+        )
     ):
         raise RuntimeError("public GTK field value is empty or outside its bounded format")
     node = _find_accessible(label, root=root, timeout=10)
@@ -628,12 +631,22 @@ def _set_public_text_by_keyboard(
         check=True,
         timeout=5,
     )
-    subprocess.run(
-        ["xdotool", "type", "--clearmodifiers", "--delay", "20", value],
-        env=environment,
-        check=True,
-        timeout=5,
-    )
+    lines = value.split("\n")
+    for index, line in enumerate(lines):
+        if line:
+            subprocess.run(
+                ["xdotool", "type", "--clearmodifiers", "--delay", "20", line],
+                env=environment,
+                check=True,
+                timeout=5,
+            )
+        if index < len(lines) - 1:
+            subprocess.run(
+                ["xdotool", "key", "--clearmodifiers", "Return"],
+                env=environment,
+                check=True,
+                timeout=5,
+            )
     deadline = time.monotonic() + 2
     while time.monotonic() < deadline:
         if _accessible_text(editable_node) == value:
