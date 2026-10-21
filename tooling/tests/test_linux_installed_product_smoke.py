@@ -353,6 +353,16 @@ class InstalledOwnerSummaryTests(unittest.TestCase):
         self.assertNotIn(r"C:\Users\runner", observed)
         self.assertIn("<path>", observed)
 
+    def test_linux_native_owner_label_exposes_the_full_summary_to_atspi(self) -> None:
+        source = (
+            Path(__file__).resolve().parents[2]
+            / "apps/desktop_flutter/linux/runner/broker_process_channel.cc"
+        ).read_text(encoding="utf-8")
+        self.assertIn("gtk_widget_get_accessible(label)", source)
+        self.assertIn(
+            "atk_object_set_name(label_accessible, state->summary.c_str())", source
+        )
+
 
 class LinuxInstalledDesktopEntryTests(unittest.TestCase):
     def test_wayland_launch_environment_cannot_fall_back_to_x11(self) -> None:

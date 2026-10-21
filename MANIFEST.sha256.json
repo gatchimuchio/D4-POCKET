@@ -444,7 +444,7 @@
     },
     {
       "path": "apps/desktop_flutter/linux/runner/broker_process_channel.cc",
-      "sha256": "ba662ffa28d3ffa7d3c3b09c9984f9e62acc69dae34c2919c826f7929455b6d7"
+      "sha256": "43fd1ad092610c582d0214b8669a1bbc061d4a5bd2992bee3fae736ee1787e3d"
     },
     {
       "path": "apps/desktop_flutter/linux/runner/broker_process_channel.h",
@@ -5224,7 +5224,7 @@
     },
     {
       "path": "tooling/tests/test_linux_installed_product_smoke.py",
-      "sha256": "1514f7c0d6949183d30f62d57b77fc74e9ce9acf8fb1e5a38abd3f656967b01d"
+      "sha256": "4e19cb1f8981e0e254907231bc4ca66d9ea5b7f4fcd7a36c34aa7002420b7c88"
     },
     {
       "path": "tooling/tests/test_linux_product_package.py",
