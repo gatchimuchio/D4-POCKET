@@ -14,6 +14,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _activate_named_control_by_keyboard,
     _actionable_node,
     _answer_owner_dialog,
+    _bounded_owner_text_diagnostics,
     _catalog_failure_diagnostics,
     _component_center,
     _desktop_entry_targets_fixed_launcher,
@@ -343,6 +344,14 @@ class InstalledOwnerSummaryTests(unittest.TestCase):
                 ),
             )
         activate.assert_called_once()
+
+    def test_failure_diagnostics_redact_absolute_paths(self) -> None:
+        observed = _bounded_owner_text_diagnostics(
+            ["desktop entry: /home/runner/work/d4p/app.desktop", r"root: C:\Users\runner\private"]
+        )
+        self.assertNotIn("/home/runner", observed)
+        self.assertNotIn(r"C:\Users\runner", observed)
+        self.assertIn("<path>", observed)
 
 
 class LinuxInstalledDesktopEntryTests(unittest.TestCase):

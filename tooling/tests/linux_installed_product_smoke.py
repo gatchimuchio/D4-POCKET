@@ -431,6 +431,19 @@ def _accessible_text(node) -> str:
         return ""
 
 
+def _bounded_owner_text_diagnostics(values: list[str]) -> str:
+    observed = []
+    for value in values:
+        if not value.strip():
+            continue
+        value = re.sub(r"\b[A-Za-z]:\\[^\s]+", "<path>", value)
+        value = re.sub(r"(?<![\w:/])/(?:[^\s]+)", "<path>", value)
+        observed.append(value[:240])
+        if len(observed) == 12:
+            break
+    return " | ".join(observed)[:1800] or "(no accessible text)"
+
+
 def _trigger_export_from_installed_ui(environment: dict[str, str], window_id: str) -> None:
     window = _find_accessible(WINDOW_TITLE, timeout=10)
     subprocess.run(
@@ -660,6 +673,8 @@ def _answer_owner_dialog(
         raise RuntimeError(
             "Owner確認summaryに操作固有の必須情報がありません: "
             + "、".join(missing_markers)
+            + "; bounded accessible text="
+            + _bounded_owner_text_diagnostics(names)
         )
     if not any("要求hash:" in value or "payload hash:" in value for value in names):
         raise RuntimeError("Owner確認summaryに要求hashがありません")
