@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import os
 import subprocess
 import tempfile
 import unittest
@@ -26,6 +27,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _helper_exit_diagnostics,
     _open_mcp_center_from_installed_ui,
     _resolve_regular_package,
+    _run_rust_test,
     _safe_log_tail,
     _set_public_text_by_keyboard,
     _secret_service_item_labels,
@@ -541,6 +543,29 @@ class LinuxWaylandEnvironmentTests(unittest.TestCase):
 
 
 class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
+    def test_rust_test_uses_runner_tool_cache_without_changing_isolated_home(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            runner_home = Path(directory) / "runner-home"
+            runner_home.mkdir()
+            acceptance_home = str(Path(directory) / "acceptance-home")
+            with (
+                patch.dict(os.environ, {"HOME": str(runner_home)}, clear=True),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke.subprocess.run",
+                    return_value=subprocess.CompletedProcess([], 0, "", ""),
+                ) as run,
+            ):
+                _run_rust_test(
+                    "safe-test",
+                    {"HOME": acceptance_home},
+                    Path(directory) / "private-test-key.der",
+                )
+
+        test_environment = run.call_args.kwargs["env"]
+        self.assertEqual(test_environment["HOME"], acceptance_home)
+        self.assertEqual(test_environment["CARGO_HOME"], str(runner_home / ".cargo"))
+        self.assertEqual(test_environment["RUSTUP_HOME"], str(runner_home / ".rustup"))
+
     def test_credential_scan_roles_keep_xdg_user_data_distinct(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

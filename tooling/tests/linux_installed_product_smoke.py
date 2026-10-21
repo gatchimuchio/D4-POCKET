@@ -2026,9 +2026,16 @@ def _group_exists(group: int) -> bool:
 def _run_rust_test(
     name: str, environment: dict[str, str], private_key_path: Path
 ) -> None:
+    runner_home = Path(os.environ.get("HOME") or Path.home())
     test_environment = environment | {
         "D4P_LINUX_ACCEPTANCE_PRIVATE_KEY": str(private_key_path)
     }
+    test_environment.setdefault(
+        "CARGO_HOME", os.environ.get("CARGO_HOME", str(runner_home / ".cargo"))
+    )
+    test_environment.setdefault(
+        "RUSTUP_HOME", os.environ.get("RUSTUP_HOME", str(runner_home / ".rustup"))
+    )
     completed = subprocess.run(
         [
             "cargo",
