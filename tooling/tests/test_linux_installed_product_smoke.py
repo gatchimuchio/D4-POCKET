@@ -284,7 +284,7 @@ class InstalledOwnerSummaryTests(unittest.TestCase):
             self.characterCount = len(value)
 
         def getText(self, start: int, end: int) -> str:
-            return self.value[start:end]
+            return self.value[start:] if end == -1 else self.value[start:end]
 
     class Node:
         def __init__(self, name: str, children=(), text: str | None = None) -> None:

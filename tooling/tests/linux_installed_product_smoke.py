@@ -422,10 +422,14 @@ def _accessible_text(node) -> str:
     """GTK labels may expose their body through AT-SPI Text, not Accessible.name."""
     try:
         text = node.queryText()
-        length = int(text.characterCount)
-        if length < 0 or length > 8192:
+        value = text.getText(0, -1)
+        if not value:
+            length = int(text.characterCount)
+            if length < 0 or length > 8192:
+                return ""
+            value = text.getText(0, length)
+        if len(value) > 8192:
             return ""
-        value = text.getText(0, length)
         return value if isinstance(value, str) else ""
     except Exception:
         return ""
