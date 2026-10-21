@@ -25,7 +25,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _open_mcp_center_from_installed_ui,
     _resolve_regular_package,
     _safe_log_tail,
-    _set_accessible_text,
+    _set_public_text_by_keyboard,
     _secret_service_item_labels,
     _verify_export_manifest,
     _verify_credential_audit,
@@ -488,7 +488,7 @@ class LinuxWaylandEnvironmentTests(unittest.TestCase):
 
 
 class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
-    def test_public_text_entry_is_read_back_before_owner_action(self) -> None:
+    def test_public_text_uses_keyboard_and_is_read_back_before_owner_action(self) -> None:
         class TextField:
             def __init__(self) -> None:
                 self.value = ""
@@ -511,13 +511,36 @@ class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
                 return len(self.value)
 
         field = TextField()
-        with patch(
-            "tooling.tests.linux_installed_product_smoke._find_accessible",
-            return_value=field,
+        commands = []
+
+        def run(command, **kwargs):
+            commands.append(command)
+            if command[1] == "type":
+                field.value = command[-1]
+            return subprocess.CompletedProcess(command, 0)
+
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_accessible",
+                return_value=field,
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._focused_named_accessible",
+                return_value=field,
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke.subprocess.run",
+                side_effect=run,
+            ),
+            patch("tooling.tests.linux_installed_product_smoke.time.sleep"),
         ):
-            _set_accessible_text(object(), "サーバー識別子", "installed-server")
+            _set_public_text_by_keyboard(
+                object(), "サーバー識別子", "installed-server", {}, "0x42"
+            )
 
         self.assertEqual(field.value, "installed-server")
+        self.assertEqual(commands[1], ["xdotool", "key", "--clearmodifiers", "ctrl+a"])
+        self.assertEqual(commands[2][-1], "installed-server")
 
     def test_secret_service_listing_reads_metadata_without_requesting_values(self) -> None:
         completed = subprocess.CompletedProcess(

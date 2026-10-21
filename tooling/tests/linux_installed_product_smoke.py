@@ -545,26 +545,73 @@ def _open_mcp_center_from_installed_ui(
     return window
 
 
-def _set_accessible_text(root, label: str, value: str, *, secret: bool = False) -> None:
+def _set_public_text_by_keyboard(
+    root,
+    label: str,
+    value: str,
+    environment: dict[str, str],
+    window_id: str,
+) -> None:
+    if (
+        not value
+        or len(value) > 256
+        or any(ord(character) < 0x20 for character in value)
+    ):
+        raise RuntimeError("public GTK field value is empty or outside its bounded format")
     node = _find_accessible(label, root=root, timeout=10)
+    editable_node = None
     for _ in range(6):
         try:
-            editor = node.queryEditableText()
+            node.queryEditableText()
+            editable_node = node
+            break
         except Exception:
             node = _accessible_parent(node)
             if node is None:
                 break
-            continue
-        if editor.setTextContents(value) is False:
-            raise RuntimeError("accessible text setter rejected the value")
-        deadline = time.monotonic() + 2
-        while time.monotonic() < deadline:
-            if _accessible_text(node) == value:
-                return
-            time.sleep(0.05)
-        raise RuntimeError("GTK accessible field did not reflect the requested public value")
-    purpose = "native secret" if secret else "non-secret field"
-    raise RuntimeError(f"GTK accessible input is unavailable for the {purpose}")
+    if editable_node is None:
+        raise RuntimeError("GTK public text field is not keyboard-accessible")
+
+    subprocess.run(
+        ["xdotool", "windowactivate", "--sync", window_id],
+        env=environment,
+        check=True,
+        timeout=5,
+    )
+    focused = None
+    for index in range(97):
+        focused = _focused_named_accessible(label, root=root)
+        if focused is not None:
+            break
+        if index == 96:
+            break
+        subprocess.run(
+            ["xdotool", "key", "--clearmodifiers", "Tab"],
+            env=environment,
+            check=True,
+            timeout=5,
+        )
+        time.sleep(0.05)
+    if focused is None:
+        raise RuntimeError("GTK public text field did not receive keyboard focus")
+    subprocess.run(
+        ["xdotool", "key", "--clearmodifiers", "ctrl+a"],
+        env=environment,
+        check=True,
+        timeout=5,
+    )
+    subprocess.run(
+        ["xdotool", "type", "--clearmodifiers", "--delay", "20", value],
+        env=environment,
+        check=True,
+        timeout=5,
+    )
+    deadline = time.monotonic() + 2
+    while time.monotonic() < deadline:
+        if _accessible_text(editable_node) == value:
+            return
+        time.sleep(0.05)
+    raise RuntimeError("GTK public text field did not reflect the typed identifier")
 
 
 def _enter_native_credential_secret(dialog, secret: str) -> None:
@@ -801,7 +848,9 @@ def _run_installed_credential_vault_acceptance(
 ) -> dict[str, object]:
     window = _open_mcp_center_from_installed_ui(environment, window_id)
     secret = secrets.token_urlsafe(36)
-    _set_accessible_text(window, "サーバー識別子", target_server_id)
+    _set_public_text_by_keyboard(
+        window, "サーバー識別子", target_server_id, environment, window_id
+    )
     _activate_named_control_by_keyboard("native入力で資格情報を登録", environment, window_id)
     _enter_credential_and_answer_owner(
         environment,
@@ -846,7 +895,9 @@ def _run_installed_credential_vault_acceptance(
     if _secret_service_item_labels(environment) != labels:
         raise RuntimeError("Broker restart changed the run-owned Secret Service items")
     window = _open_mcp_center_from_installed_ui(environment, window_id)
-    _set_accessible_text(window, "サーバー識別子", target_server_id)
+    _set_public_text_by_keyboard(
+        window, "サーバー識別子", target_server_id, environment, window_id
+    )
     _activate_named_control_by_keyboard(
         "対象ServerのCredential metadata一覧を取得", environment, window_id
     )
