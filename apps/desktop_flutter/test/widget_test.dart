@@ -1167,7 +1167,43 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('MCP接続一覧とOwner確認付き切断を開く'), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Text && widget.data == 'MCP接続一覧とOwner確認付き切断を開く',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('コマンドパレットは一意検索結果をEnterで実行する', (WidgetTester tester) async {
+    await tester.pumpWidget(const GuiShellDesktopApp());
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.control);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyK);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.control);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is TextField && widget.decoration?.labelText == 'コマンドパレット',
+      ),
+      'MCP接続一覧とOwner確認付き切断を開く',
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Text && widget.data == 'MCP接続一覧とOwner確認付き切断を開く',
+      ),
+      findsOneWidget,
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+
+    expect(find.text('MCP接続センター'), findsWidgets);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('全体検索がCtrl+Shift+Fで開き画面遷移だけを行う', (WidgetTester tester) async {

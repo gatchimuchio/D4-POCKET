@@ -712,7 +712,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "cbe5b56069da416b00fe3480d3b5bb7ae6e04cbfd12a972119b6c81f1b6d6ac2"
+      "sha256": "ce02e3a8462370286b6c64cdb348f2df9249a417702caf0c1e8887b6eb5082fa"
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
@@ -5212,7 +5212,7 @@
     },
     {
       "path": "tooling/tests/linux_installed_product_smoke.py",
-      "sha256": "67ed842bdcc22e7d439ced7f0492c1634633bc980cf10363c3687f19311f7110"
+      "sha256": "9112094e3d49f475478b359675b7075a5ae32e2d1a16d78b140f374707eebb10"
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",
@@ -5224,7 +5224,7 @@
     },
     {
       "path": "tooling/tests/test_linux_installed_product_smoke.py",
-      "sha256": "f7bc9bc6ed691297edbabe75f0e9222b431775d9a5807ca6d77adfd9bf61ab0f"
+      "sha256": "dd5b741fafc30598c74c26c08edf5353b8b0c58b72cf0b82c6566148c0d288fa"
     },
     {
       "path": "tooling/tests/test_linux_product_package.py",

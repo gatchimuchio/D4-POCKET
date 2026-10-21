@@ -189,28 +189,21 @@ class AccessibleActionResolutionTests(unittest.TestCase):
                 _find_operable_accessible("独立Appを書き出す", root=Root()), button
             )
 
-    def test_mcp_palette_clicks_unique_row_and_refreshes_window_tree(self) -> None:
+    def test_mcp_palette_submits_unique_command_and_refreshes_window_tree(self) -> None:
         window = object()
         fresh_window = object()
-        command = object()
         with (
             patch(
                 "tooling.tests.linux_installed_product_smoke._find_accessible",
-                side_effect=(window, window, object(), fresh_window, fresh_window),
+                side_effect=(
+                    window,
+                    window,
+                    object(),
+                    object(),
+                    fresh_window,
+                    fresh_window,
+                ),
             ) as find_accessible,
-            patch(
-                "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
-                return_value=command,
-            ) as find_operable,
-            patch(
-                "tooling.tests.linux_installed_product_smoke._click_accessible_by_coordinates"
-            ) as coordinate_activate,
-            patch(
-                "tooling.tests.linux_installed_product_smoke._activate_accessible"
-            ) as click_activate,
-            patch(
-                "tooling.tests.linux_installed_product_smoke._activate_named_control_by_keyboard"
-            ) as keyboard_activate,
             patch(
                 "tooling.tests.linux_installed_product_smoke.subprocess.run"
             ) as run,
@@ -224,26 +217,31 @@ class AccessibleActionResolutionTests(unittest.TestCase):
             [
                 call("D4 Pocket powered by GUI Shell", timeout=10),
                 call("コマンドパレット", root=window, timeout=10),
+                call(
+                    "MCP接続一覧とOwner確認付き切断を開く",
+                    root=window,
+                    timeout=10,
+                ),
                 call("MCP接続センター", timeout=10),
                 call("D4 Pocket powered by GUI Shell", timeout=10),
                 call("MCP接続センター", root=fresh_window, timeout=10),
             ],
         )
-        find_operable.assert_called_once_with(
-            "MCP接続一覧とOwner確認付き切断を開く",
-            root=window,
-            timeout=10,
-        )
-        coordinate_activate.assert_called_once_with(
-            command,
-            "MCP接続一覧とOwner確認付き切断を開く",
-            {},
-        )
-        click_activate.assert_not_called()
-        keyboard_activate.assert_not_called()
         self.assertEqual(
-            run.call_args_list[-1].args[0],
-            ["xdotool", "type", "--clearmodifiers", "--delay", "30", "mcp"],
+            [entry.args[0] for entry in run.call_args_list],
+            [
+                ["xdotool", "windowactivate", "--sync", "0x42"],
+                ["xdotool", "key", "--clearmodifiers", "ctrl+k"],
+                [
+                    "xdotool",
+                    "type",
+                    "--clearmodifiers",
+                    "--delay",
+                    "30",
+                    "MCP接続一覧とOwner確認付き切断を開く",
+                ],
+                ["xdotool", "key", "--clearmodifiers", "Return"],
+            ],
         )
 
     def test_keyboard_activation_sends_enter_only_after_target_focus(self) -> None:

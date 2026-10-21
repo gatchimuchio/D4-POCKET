@@ -536,20 +536,28 @@ def _open_mcp_center_from_installed_ui(
     )
     _find_accessible("コマンドパレット", root=window, timeout=10)
     subprocess.run(
-        ["xdotool", "type", "--clearmodifiers", "--delay", "30", "mcp"],
+        [
+            "xdotool",
+            "type",
+            "--clearmodifiers",
+            "--delay",
+            "30",
+            "MCP接続一覧とOwner確認付き切断を開く",
+        ],
         env=environment,
         check=True,
         timeout=5,
     )
-    # Navigation also exposes an "MCP接続" item; target the palette row by its
-    # unique subtitle so this activates the command rather than the nav item.
-    command = _find_operable_accessible(
-        "MCP接続一覧とOwner確認付き切断を開く", root=window, timeout=10
-    )
-    # GTK's coordinate click follows the real ListTile hit target; Flutter's
-    # AT-SPI Tap action can dismiss the palette without selecting the row.
-    _click_accessible_by_coordinates(
-        command, "MCP接続一覧とOwner確認付き切断を開く", environment
+    # Submit a uniquely matching command through the palette's supported
+    # TextField onSubmitted path. Some GTK AT-SPI action nodes lack component
+    # extents, so their accessible action is not a reliable screen hit target.
+    command_query = "MCP接続一覧とOwner確認付き切断を開く"
+    _find_accessible(command_query, root=window, timeout=10)
+    subprocess.run(
+        ["xdotool", "key", "--clearmodifiers", "Return"],
+        env=environment,
+        check=True,
+        timeout=5,
     )
     # Dismissing the command-palette dialog can invalidate its old AT-SPI
     # subtree. Resolve the destination from the desktop, then reacquire the
