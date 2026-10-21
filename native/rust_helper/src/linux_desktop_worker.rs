@@ -29,6 +29,8 @@ const OWNER_PROMPT_LIMIT: usize = OWNER_SUMMARY_LIMIT * 2 + 64;
 const WORKSPACE_PICKER_REPLY_LIMIT: usize = 2 * 1024 + 128;
 const OWNER_PROTOCOL_MAGIC: [u8; 8] = [68, 52, 79, 87, 78, 69, 82, 49];
 const OWNER_REPLY_YES: [u8; 3] = [89, 69, 83];
+// Catalog HTTPS has a 30-second Broker deadline; allow bounded relay headroom.
+const CATALOG_RELAY_RESPONSE_TIMEOUT: Duration = Duration::from_secs(35);
 #[cfg(test)]
 const OWNER_REPLY_NO: [u8; 2] = [78, 79];
 const IO_TIMEOUT: Duration = Duration::from_secs(4);
@@ -597,7 +599,7 @@ fn mark_initial_install_handoff(
 fn relay(request: &[u8], endpoint: &BrokerEndpoint) -> io::Result<Vec<u8>> {
     let address = SocketAddr::from((Ipv4Addr::LOCALHOST, endpoint.port));
     let mut socket = TcpStream::connect_timeout(&address, IO_TIMEOUT)?;
-    socket.set_read_timeout(Some(IO_TIMEOUT))?;
+    socket.set_read_timeout(Some(relay_response_timeout(request)))?;
     socket.set_write_timeout(Some(IO_TIMEOUT))?;
     socket.write_all(endpoint.session_secret.as_bytes())?;
     socket.write_all(b"\n")?;
@@ -605,6 +607,17 @@ fn relay(request: &[u8], endpoint: &BrokerEndpoint) -> io::Result<Vec<u8>> {
     socket.write_all(b"\n")?;
     socket.flush()?;
     read_frame(&mut BufReader::new(socket), RESPONSE_LIMIT)?.ok_or_else(failure)
+}
+
+fn relay_response_timeout(request: &[u8]) -> Duration {
+    let Ok(value) = serde_json::from_slice::<serde_json::Value>(request) else {
+        return IO_TIMEOUT;
+    };
+    if value.get("operation").and_then(serde_json::Value::as_str) == Some("更新候補取得") {
+        CATALOG_RELAY_RESPONSE_TIMEOUT
+    } else {
+        IO_TIMEOUT
+    }
 }
 
 #[cfg(test)]
@@ -835,6 +848,24 @@ mod tests {
         assert!(read_frame(&mut &b"{}\r\n"[..], 8).is_err());
         assert!(read_frame(&mut &b"1234\n"[..], 3).is_err());
         assert_eq!(read_frame(&mut &b""[..], 4).unwrap(), None);
+    }
+
+    #[test]
+    #[ignore = "Linux helperのcatalog relay期限をLinux手動Acceptanceで検証する"]
+    fn catalog_relay_wait_matches_broker_fetch_deadline_without_extending_other_operations() {
+        assert_eq!(
+            CATALOG_RELAY_RESPONSE_TIMEOUT,
+            crate::broker::update_download::CATALOG_TIMEOUT + Duration::from_secs(5)
+        );
+        assert_eq!(
+            relay_response_timeout(r#"{"operation":"更新候補取得"}"#.as_bytes()),
+            CATALOG_RELAY_RESPONSE_TIMEOUT
+        );
+        assert_eq!(
+            relay_response_timeout(r#"{"operation":"更新候補一覧"}"#.as_bytes()),
+            IO_TIMEOUT
+        );
+        assert_eq!(relay_response_timeout(b"malformed"), IO_TIMEOUT);
     }
 
     #[test]

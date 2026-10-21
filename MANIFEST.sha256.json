@@ -76,7 +76,7 @@
     },
     {
       "path": ".github/workflows/linux-manual-export-build.yml",
-      "sha256": "c16f9bb9d9fd7316a8245ac0d326cb0e1c39834a8e57d7f494fadbe3d5c7c647"
+      "sha256": "84ee5316c206f398645c7f7cac8259bb483411dfc85ce284e1794471bef66d2d"
     },
     {
       "path": ".github/workflows/linux-manual-rust-validation.yml",
@@ -344,7 +344,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/broker_client.dart",
-      "sha256": "5da016345424f6fefbaa550bab9b0e163e380a775d02c57b81b450bf8bf29d0f"
+      "sha256": "efa6b32605fc5ca2839aa2a8e7eecaebcc0a981fdbe4544b4dfe3fe9729dda87"
     },
     {
       "path": "apps/desktop_flutter/lib/services/compose_client.dart",
@@ -620,7 +620,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/broker_client_payload_hash_test.dart",
-      "sha256": "1a3b743d998014f9c52cd7ededa73f17f17f14a55abd89a808894eabaa576ac5"
+      "sha256": "2ceb515017c474281142da98e94eb464499d30a9abd443ec8846547cf7c7d6b8"
     },
     {
       "path": "apps/desktop_flutter/test/c27_performance_validation_test.dart",
@@ -3664,7 +3664,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "9226827f2cebc2fa624b2c0722957447f666b153c71b62f232b65544d123e354"
+      "sha256": "71c554727ee345775e050f126764885e96fef152e4ff442a5a15e1d9848d00b1"
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
@@ -3724,7 +3724,7 @@
     },
     {
       "path": "native/rust_helper/src/linux_desktop_worker.rs",
-      "sha256": "d4e0f1d7f672e4a5a853663170fe10843da2f712d4a3e9e9236b5d683ff82dcf"
+      "sha256": "19f4337f2cbf421bf33571a1858c319ff38c5d00b5cb9213a3320c6780cd4a15"
     },
     {
       "path": "native/rust_helper/src/linux_product_bundle.rs",
@@ -5192,7 +5192,11 @@
     },
     {
       "path": "tooling/tests/create_linux_export_fixture.py",
-      "sha256": "9947ff45dbc3e9646af9de0f39e1194382b246abbf3300b4f48fab7a858872ab"
+      "sha256": "235af10cb3c66c5606be4790a2c20066e3ded14db75a95fc2cc99d2ab43d93e3"
+    },
+    {
+      "path": "tooling/tests/fixtures/linux-update-catalog/updates.json",
+      "sha256": "ec3e5680e03147901958a36a81fd824dae4f267fa51422dc5463d6332f8c0afc"
     },
     {
       "path": "tooling/tests/linux_gtk_bundle_smoke.py",
@@ -5200,11 +5204,11 @@
     },
     {
       "path": "tooling/tests/linux_installed_product_smoke.py",
-      "sha256": "473f206f9e0029e3185bd02cd0b424bd990a6d8b30ad33ace68a7206f9ff6c7d"
+      "sha256": "7e3c28823d9fe1841c9226af2fde058ada74cb00a468cb3bab8130249bd3f619"
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",
-      "sha256": "af3ff8d8d265c0742e3daee1b70c3d038b2346ea75409d95014290935c27f5fe"
+      "sha256": "23828469d12050fe9b4c6eae64e6d92b1ea32bb27377b84018bfb12dcd38766f"
     },
     {
       "path": "tooling/tests/test_linux_gtk_bundle_smoke.py",
@@ -5212,7 +5216,7 @@
     },
     {
       "path": "tooling/tests/test_linux_installed_product_smoke.py",
-      "sha256": "dd2de736174706404b67fa339b30afdcdd45253edfcc70d31119c7932543ca5c"
+      "sha256": "24943686215a771e7a7db9090643f2d08dcd3202f7444e91f73224ffbc38b5eb"
     },
     {
       "path": "tooling/tests/test_linux_product_package.py",

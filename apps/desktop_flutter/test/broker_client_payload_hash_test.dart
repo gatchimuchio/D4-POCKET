@@ -20,6 +20,13 @@ void main() {
         const Duration(seconds: 305));
   });
 
+  test('更新カタログ取得はBrokerの外部取得期限を待ち、他操作は短い既定期限を保つ', () {
+    expect(brokerRequestTimeoutForOperation('更新候補取得'),
+        const Duration(seconds: 40));
+    expect(
+        brokerRequestTimeoutForOperation('更新候補一覧'), const Duration(seconds: 5));
+  });
+
   test('Mac MCPだけはOwner確認とstdio処理の有限待機を共有する', () {
     debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
