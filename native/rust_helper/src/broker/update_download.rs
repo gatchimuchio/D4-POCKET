@@ -352,6 +352,12 @@ fn build_download_client(
     additional_roots: &[Certificate],
     timeout: Duration,
 ) -> Result<Client, DownloadError> {
+    if rustls::crypto::CryptoProvider::get_default().is_none() {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+    }
+    if rustls::crypto::CryptoProvider::get_default().is_none() {
+        return Err(DownloadError::Network);
+    }
     let mut builder = Client::builder()
         .https_only(true)
         .no_proxy()
@@ -1402,6 +1408,15 @@ mod tests {
             ),
             Err(DownloadError::TimedOut),
         );
+    }
+
+    #[test]
+    #[ignore = "Linux installed acceptanceでreqwestの明示ring provider初期化を確認する"]
+    fn catalog_client_builds_with_the_explicit_ring_crypto_provider() {
+        let addresses = [SocketAddr::from((Ipv4Addr::new(8, 8, 8, 8), 443))];
+        let result =
+            build_download_client("updates.example.invalid", &addresses, &[], CATALOG_TIMEOUT);
+        assert!(result.is_ok());
     }
 
     #[test]

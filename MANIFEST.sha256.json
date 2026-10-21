@@ -3668,7 +3668,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
-      "sha256": "1214745b4eb682e97ffbcce356ab3b5aa92dafaf72415588b1d8cad4da3829fe"
+      "sha256": "09755c96cb9ab397caee37e04eab88510662351d5bab048f0f10df96c49864a0"
     },
     {
       "path": "native/rust_helper/src/broker/update_download/windows_dns.rs",
@@ -5204,7 +5204,7 @@
     },
     {
       "path": "tooling/tests/linux_installed_product_smoke.py",
-      "sha256": "2922d1d1a36f9f838557c89213b69a751d6d9e479ab82fb8a195936170532cd6"
+      "sha256": "44dc404cd9225e327724df71bce82faf82192bfa86774b73f368632067b8c6c0"
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",

@@ -29,6 +29,9 @@ RUST_CATALOG_RELAY_TIMEOUT_TEST = (
 RUST_HELPER_EXIT_CLASS_TEST = (
     "linux_desktop_worker::tests::helper_exit_code_exposes_only_a_bounded_io_error_class"
 )
+RUST_CATALOG_TLS_PROVIDER_TEST = (
+    "broker::update_download::tests::catalog_client_builds_with_the_explicit_ring_crypto_provider"
+)
 RUST_STAGE_TEST = (
     "broker::update_center::tests::linux_installed_acceptance_stages_real_export_and_registers_entry"
 )
@@ -1028,6 +1031,7 @@ def run_installed_smoke(
     try:
         _run_rust_test(RUST_CATALOG_RELAY_TIMEOUT_TEST, environment, private_key_path)
         _run_rust_test(RUST_HELPER_EXIT_CLASS_TEST, environment, private_key_path)
+        _run_rust_test(RUST_CATALOG_TLS_PROVIDER_TEST, environment, private_key_path)
         _run_rust_test(RUST_STAGE_TEST, environment, private_key_path)
         _run_rust_test(RUST_ROLLBACK_SEED_TEST, environment, private_key_path)
         for test_only_name in (
