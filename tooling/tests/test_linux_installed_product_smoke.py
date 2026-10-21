@@ -164,7 +164,7 @@ class AccessibleActionResolutionTests(unittest.TestCase):
                 _find_operable_accessible("独立Appを書き出す", root=Root()), button
             )
 
-    def test_mcp_palette_uses_unique_subtitle_not_navigation_label(self) -> None:
+    def test_mcp_palette_uses_unique_focused_row_and_fresh_window_tree(self) -> None:
         window = object()
         fresh_window = object()
         command = object()
@@ -179,7 +179,10 @@ class AccessibleActionResolutionTests(unittest.TestCase):
             ) as find_operable,
             patch(
                 "tooling.tests.linux_installed_product_smoke._activate_accessible"
-            ) as activate,
+            ) as click_activate,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._activate_named_control_by_keyboard"
+            ) as keyboard_activate,
             patch("tooling.tests.linux_installed_product_smoke.subprocess.run"),
         ):
             self.assertIs(
@@ -201,7 +204,13 @@ class AccessibleActionResolutionTests(unittest.TestCase):
             root=window,
             timeout=10,
         )
-        activate.assert_called_once_with(command, "MCP接続", {})
+        click_activate.assert_not_called()
+        keyboard_activate.assert_called_once_with(
+            "MCP接続一覧とOwner確認付き切断を開く",
+            {},
+            "0x42",
+            context_marker="コマンドパレット",
+        )
 
     def test_keyboard_activation_sends_enter_only_after_target_focus(self) -> None:
         from unittest.mock import patch

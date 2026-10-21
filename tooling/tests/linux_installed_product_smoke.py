@@ -537,10 +537,15 @@ def _open_mcp_center_from_installed_ui(
     )
     # Navigation also exposes an "MCP接続" item; target the palette row by its
     # unique subtitle so this activates the command rather than the nav item.
-    command = _find_operable_accessible(
+    _find_operable_accessible(
         "MCP接続一覧とOwner確認付き切断を開く", root=window, timeout=10
     )
-    _activate_accessible(command, "MCP接続", environment)
+    _activate_named_control_by_keyboard(
+        "MCP接続一覧とOwner確認付き切断を開く",
+        environment,
+        window_id,
+        context_marker="コマンドパレット",
+    )
     # Dismissing the command-palette dialog can invalidate its old AT-SPI
     # subtree. Resolve the destination from the desktop, then reacquire the
     # product window before returning it to callers that inspect its controls.
