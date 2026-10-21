@@ -1316,6 +1316,7 @@ def _run_installed_mcp_tool_acceptance(
         "拒否",
         context="MCP接続の初回拒否",
         diagnostic_root=window,
+        diagnostic_audit_path=audit_store / "audit.jsonl",
         expected_summary_markers=(
             f"Server ID: {server_id}",
             f"実行file: {python_executable}",
@@ -1335,6 +1336,7 @@ def _run_installed_mcp_tool_acceptance(
         "許可",
         context="MCP接続の独立許可",
         diagnostic_root=window,
+        diagnostic_audit_path=audit_store / "audit.jsonl",
         expected_summary_markers=(
             f"Server ID: {server_id}",
             f"実行file: {python_executable}",
@@ -1382,6 +1384,7 @@ def _run_installed_mcp_tool_acceptance(
         "許可",
         context="MCP Toolの一回実行許可",
         diagnostic_root=window,
+        diagnostic_audit_path=audit_store / "audit.jsonl",
         expected_summary_markers=(
             f"Server ID: {server_id}",
             "Tool: echo",
@@ -1416,6 +1419,7 @@ def _run_installed_mcp_tool_acceptance(
         "拒否",
         context="MCP切断の初回拒否",
         diagnostic_root=window,
+        diagnostic_audit_path=audit_store / "audit.jsonl",
         expected_summary_markers=(f"Server ID: {server_id}",),
     )
     _wait_for_owner_dialog_closed(environment)
@@ -1431,6 +1435,7 @@ def _run_installed_mcp_tool_acceptance(
         "許可",
         context="MCP切断の独立許可",
         diagnostic_root=window,
+        diagnostic_audit_path=audit_store / "audit.jsonl",
         expected_summary_markers=(f"Server ID: {server_id}",),
     )
     _wait_for_owner_dialog_closed(environment)
@@ -1747,12 +1752,16 @@ def _answer_owner_dialog(
     *,
     context: str = "Owner確認",
     diagnostic_root=None,
+    diagnostic_audit_path: Path | None = None,
     expected_summary_markers: tuple[str, ...],
 ) -> None:
     if decision not in {"許可", "拒否"}:
         raise ValueError("Owner確認の回答値が不正")
     _wait_for_owner_dialog_window(
-        environment, context=context, diagnostic_root=diagnostic_root
+        environment,
+        context=context,
+        diagnostic_root=diagnostic_root,
+        diagnostic_audit_path=diagnostic_audit_path,
     )
     dialog = _find_accessible(OWNER_DIALOG_TITLE, timeout=10)
     descendants = _accessible_descendants(dialog)
@@ -2067,6 +2076,7 @@ def _wait_for_owner_dialog_window(
     timeout: float = OWNER_DIALOG_TIMEOUT,
     context: str = "Owner確認",
     diagnostic_root=None,
+    diagnostic_audit_path: Path | None = None,
 ) -> str:
     deadline = time.monotonic() + timeout
     while True:
@@ -2092,13 +2102,17 @@ def _wait_for_owner_dialog_window(
             raise RuntimeError(
                 "GTK native Owner確認dialogが期限内に表示されません; "
                 f"context={context}; "
-                + _owner_dialog_timeout_diagnostics(environment, diagnostic_root)
+                + _owner_dialog_timeout_diagnostics(
+                    environment, diagnostic_root, diagnostic_audit_path
+                )
             )
         time.sleep(0.1)
 
 
 def _owner_dialog_timeout_diagnostics(
-    environment: dict[str, str], diagnostic_root=None
+    environment: dict[str, str],
+    diagnostic_root=None,
+    diagnostic_audit_path: Path | None = None,
 ) -> str:
     visible = subprocess.run(
         ["xdotool", "search", "--onlyvisible", "--name", ".*"],
@@ -2145,11 +2159,45 @@ def _owner_dialog_timeout_diagnostics(
                     statuses.append(normalized[:160])
         except Exception:
             statuses.append("<accessible-state-unavailable>")
+    audit_status = "<unavailable>"
+    if diagnostic_audit_path is not None:
+        try:
+            matching_events = []
+            for line in diagnostic_audit_path.read_text(encoding="utf-8").splitlines():
+                if not line:
+                    continue
+                event = json.loads(line)
+                if isinstance(event, dict) and event.get("operation") == "MCP接続":
+                    matching_events.append(event)
+            if matching_events:
+                event = matching_events[-1]
+                decision = event.get("decision")
+                decision = (
+                    decision
+                    if decision in {"accepted", "rejected", "denied"}
+                    else "other"
+                )
+                reason = event.get("reason")
+                reason_categories = {
+                    "MCP接続にはowner controlが必要": "owner_required",
+                    "MCP接続には永続Auditが必要": "audit_unavailable",
+                    "MCP接続の受信Auditを確定できない": "receive_audit_failed",
+                    "MCP接続の受理Auditを確定できない": "acceptance_audit_failed",
+                }
+                audit_status = (
+                    f"decision:{decision},category:{reason_categories.get(reason, 'other')}"
+                )
+            else:
+                audit_status = "<no_mcp_connect_event>"
+        except (OSError, UnicodeError, json.JSONDecodeError, TypeError):
+            audit_status = "<unavailable_or_malformed>"
     return (
         "visible_window_kinds="
         + ",".join(f"{name}:{count}" for name, count in kinds.items())
         + "; product_status="
         + ("|".join(dict.fromkeys(statuses[-4:])) if statuses else "<none-observed>")
+        + "; mcp_connect_audit="
+        + audit_status
     )
 
 
