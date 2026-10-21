@@ -51,6 +51,20 @@ class LinuxExportInputTests(unittest.TestCase):
         self.assertFalse(receipt["approval_inherited"])
         self.assertFalse(receipt["audit_chain_inherited"])
 
+    def test_linux_fixture_can_embed_bounded_ephemeral_update_trust(self) -> None:
+        public_der = bytes.fromhex("302a300506032b6570032100") + bytes(range(32))
+        receipt_raw, manifest_raw = linux_export_pair(public_der)
+        _, manifest, _, _, _ = validate_export_inputs(
+            receipt_raw, manifest_raw, target_platform="linux"
+        )
+        trust = manifest["update_trust"]
+        self.assertEqual(trust["public_key_der_hex"], public_der.hex())
+        self.assertEqual(
+            trust["public_key_fingerprint"],
+            "sha256:" + hashlib.sha256(public_der[-32:]).hexdigest(),
+        )
+        self.assertEqual(trust["package_sources"][0]["base_url"], "https://updates.example.invalid/d4/stable")
+
     def test_wrong_target_and_tampered_manifest_are_rejected(self) -> None:
         receipt_raw, manifest_raw = linux_export_pair()
         receipt = json.loads(receipt_raw)

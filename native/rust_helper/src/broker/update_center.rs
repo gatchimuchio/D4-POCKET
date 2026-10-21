@@ -8451,8 +8451,15 @@ mod tests {
             .unwrap();
 
         let digest = hex::encode(Sha256::digest(&package));
-        let key = Ed25519KeyPair::generate_pkcs8(&SystemRandom::new()).unwrap();
-        let pair = Ed25519KeyPair::from_pkcs8(key.as_ref()).unwrap();
+        let private_key_path = std::path::PathBuf::from(
+            std::env::var_os("D4P_LINUX_ACCEPTANCE_PRIVATE_KEY")
+                .expect("ephemeral test signing key path is required"),
+        );
+        let key_metadata = std::fs::symlink_metadata(&private_key_path).unwrap();
+        assert!(key_metadata.is_file() && !key_metadata.file_type().is_symlink());
+        assert_eq!(key_metadata.permissions().mode() & 0o077, 0);
+        let private_key = std::fs::read(private_key_path).unwrap();
+        let pair = Ed25519KeyPair::from_pkcs8(&private_key).unwrap();
         let public_der = [
             0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00,
         ]
@@ -8480,7 +8487,10 @@ mod tests {
             algorithm: "Ed25519".into(),
             public_key_der_hex: hex::encode(public_der),
             public_key_fingerprint: fingerprint.clone(),
-            package_sources: Vec::new(),
+            package_sources: vec![UpdatePackageSource {
+                channel: "stable".into(),
+                base_url: "https://updates.example.invalid/d4/stable".into(),
+            }],
         };
         let candidate = UpdateCandidateDocument {
             version: CANDIDATE_VERSION,

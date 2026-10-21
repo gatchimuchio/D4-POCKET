@@ -687,7 +687,12 @@ def _group_exists(group: int) -> bool:
         return True
 
 
-def _run_rust_test(name: str, environment: dict[str, str]) -> None:
+def _run_rust_test(
+    name: str, environment: dict[str, str], private_key_path: Path
+) -> None:
+    test_environment = environment | {
+        "D4P_LINUX_ACCEPTANCE_PRIVATE_KEY": str(private_key_path)
+    }
     completed = subprocess.run(
         [
             "cargo",
@@ -704,7 +709,7 @@ def _run_rust_test(name: str, environment: dict[str, str]) -> None:
             "--test-threads=1",
         ],
         cwd=ROOT,
-        env=environment,
+        env=test_environment,
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -720,13 +725,27 @@ def _run_rust_test(name: str, environment: dict[str, str]) -> None:
         raise RuntimeError(f"installed acceptance Rust test failed: {name}")
 
 
-def run_installed_smoke(package: Path, temp_root: Path, acceptance_root: Path) -> None:
+def run_installed_smoke(
+    package: Path,
+    temp_root: Path,
+    acceptance_root: Path,
+    private_key_path: Path,
+) -> None:
     if not os.environ.get("DISPLAY") or not os.environ.get("DBUS_SESSION_BUS_ADDRESS"):
         raise RuntimeError("隔離X11 displayとD-Bus sessionが必要です")
     if temp_root.is_symlink() or not temp_root.is_dir():
         raise RuntimeError("run固有一時rootが通常directoryではありません")
     temp_root = temp_root.resolve(strict=True)
     package = _resolve_regular_package(package)
+    resolved_private_key = private_key_path.resolve(strict=True)
+    if (
+        resolved_private_key != private_key_path
+        or private_key_path.is_symlink()
+        or not private_key_path.is_file()
+        or temp_root not in private_key_path.parents
+        or private_key_path.stat().st_mode & 0o077
+    ):
+        raise RuntimeError("test署名鍵がacceptance root配下のprivate通常fileではありません")
     if acceptance_root.exists() or acceptance_root.is_symlink():
         raise RuntimeError("installed acceptance rootは未使用でなければなりません")
     if not acceptance_root.is_absolute() or temp_root not in acceptance_root.parents:
@@ -794,7 +813,7 @@ def run_installed_smoke(package: Path, temp_root: Path, acceptance_root: Path) -
     preexisting: set[int] = set()
     app_log = acceptance_root / "installed-app.log"
     try:
-        _run_rust_test(RUST_TESTS[0], environment)
+        _run_rust_test(RUST_TESTS[0], environment, private_key_path)
         product_root = xdg_data_home / "apps/d4-pocket" / APP_ID
         fixed_launcher = product_root / "gui_shell_desktop_launcher"
         record_path = product_root / "active_version.json"
@@ -943,7 +962,7 @@ def run_installed_smoke(package: Path, temp_root: Path, acceptance_root: Path) -
         wayland_compositor = None
 
         audit_evidence = _verify_live_audit(broker_state / "store")
-        _run_rust_test(RUST_TESTS[1], environment)
+        _run_rust_test(RUST_TESTS[1], environment, private_key_path)
 
         audit_store = broker_state / "store"
         active_record_before_uninstall = record_path.read_bytes()
@@ -1072,9 +1091,12 @@ def main() -> int:
     parser.add_argument("--package", type=Path, required=True)
     parser.add_argument("--temp-root", type=Path, required=True)
     parser.add_argument("--acceptance-root", type=Path, required=True)
+    parser.add_argument("--private-key", type=Path, required=True)
     args = parser.parse_args()
     try:
-        run_installed_smoke(args.package, args.temp_root, args.acceptance_root)
+        run_installed_smoke(
+            args.package, args.temp_root, args.acceptance_root, args.private_key
+        )
     except Exception as error:
         print(f"Linux installed product GTK受入れ 不合格: {error}", file=sys.stderr)
         return 1
