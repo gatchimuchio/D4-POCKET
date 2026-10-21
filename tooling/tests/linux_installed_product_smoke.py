@@ -47,6 +47,8 @@ RUST_SECRET_SERVICE_TEST = (
 )
 MCP_PUBLIC_INPUT = "installed-mcp-public-input"
 MCP_RESULT_PREFIX = "D4P_MCP_RESULT_PROBE_"
+MCP_OWNER_WORKSPACE_LABEL = "Workspace: "
+MCP_OWNER_NO_CREDENTIAL_MARKER = "Credential注入: なし"
 RUST_AUDIT_TEST = (
     "broker::update_center::tests::linux_installed_acceptance_runtime_audit_is_durable"
 )
@@ -1320,8 +1322,8 @@ def _run_installed_mcp_tool_acceptance(
         expected_summary_markers=(
             f"Server ID: {server_id}",
             f"実行file: {python_executable}",
-            f"作業folder: {workspace}",
-            "Credential: 未選択",
+            f"{MCP_OWNER_WORKSPACE_LABEL}{workspace}",
+            MCP_OWNER_NO_CREDENTIAL_MARKER,
         ),
     )
     _wait_for_owner_dialog_closed(environment)
@@ -1340,8 +1342,8 @@ def _run_installed_mcp_tool_acceptance(
         expected_summary_markers=(
             f"Server ID: {server_id}",
             f"実行file: {python_executable}",
-            f"作業folder: {workspace}",
-            "Credential: 未選択",
+            f"{MCP_OWNER_WORKSPACE_LABEL}{workspace}",
+            MCP_OWNER_NO_CREDENTIAL_MARKER,
         ),
     )
     _wait_for_owner_dialog_closed(environment)

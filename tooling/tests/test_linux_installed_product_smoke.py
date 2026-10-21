@@ -38,6 +38,8 @@ from tooling.tests.linux_installed_product_smoke import (
     _trigger_update_action_from_installed_ui,
     _wait_for_catalog_fetch_status,
     _wayland_launch_environment,
+    MCP_OWNER_NO_CREDENTIAL_MARKER,
+    MCP_OWNER_WORKSPACE_LABEL,
     _owner_dialog_timeout_diagnostics,
     _wait_for_owner_dialog_window,
     WINDOW_TITLE,
@@ -508,6 +510,19 @@ class InstalledOwnerSummaryTests(unittest.TestCase):
         self.assertNotIn("/home/runner", observed)
         self.assertNotIn(r"C:\Users\runner", observed)
         self.assertIn("<path>", observed)
+
+    def test_installed_mcp_owner_markers_match_the_broker_summary(self) -> None:
+        root = Path(__file__).resolve().parents[2]
+        broker = (root / "native/rust_helper/src/broker/mcp_center.rs").read_text(
+            encoding="utf-8"
+        )
+        acceptance = (root / "tooling/tests/linux_installed_product_smoke.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(f"{MCP_OWNER_WORKSPACE_LABEL}{{}}", broker)
+        self.assertIn(MCP_OWNER_NO_CREDENTIAL_MARKER, broker)
+        self.assertIn('f"{MCP_OWNER_WORKSPACE_LABEL}{workspace}"', acceptance)
+        self.assertIn("MCP_OWNER_NO_CREDENTIAL_MARKER,", acceptance)
 
     def test_linux_native_owner_summary_uses_bounded_accessible_line_labels(self) -> None:
         source = (
