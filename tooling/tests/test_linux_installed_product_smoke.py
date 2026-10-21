@@ -38,7 +38,9 @@ from tooling.tests.linux_installed_product_smoke import (
     _trigger_update_action_from_installed_ui,
     _wait_for_catalog_fetch_status,
     _wayland_launch_environment,
+    _owner_dialog_timeout_diagnostics,
     _wait_for_owner_dialog_window,
+    WINDOW_TITLE,
 )
 
 
@@ -958,6 +960,46 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
 
         self.assertEqual(run.call_count, 2)
         sleep.assert_called_once_with(0.1)
+
+    def test_owner_timeout_diagnostics_classify_windows_and_allowlisted_status(self) -> None:
+        class Node:
+            def __init__(self, name: str, children=()) -> None:
+                self.name = name
+                self.children = list(children)
+                self.childCount = len(self.children)
+
+            def getChildAtIndex(self, index: int):
+                return self.children[index]
+
+        root = Node(
+            "",
+            [
+                Node("MCP接続は確定していません"),
+                Node("untrusted fixture content must not be logged"),
+            ],
+        )
+        with patch(
+            "tooling.tests.linux_installed_product_smoke.subprocess.run",
+            side_effect=(
+                subprocess.CompletedProcess(
+                    args=[], returncode=0, stdout=b"0x1\n0x2\n", stderr=b""
+                ),
+                subprocess.CompletedProcess(
+                    args=[], returncode=0, stdout=(WINDOW_TITLE + "\n").encode(), stderr=b""
+                ),
+                subprocess.CompletedProcess(
+                    args=[], returncode=0, stdout="D4 Pocket Owner確認\n".encode(), stderr=b""
+                ),
+            ),
+        ):
+            diagnostics = _owner_dialog_timeout_diagnostics(
+                {"DISPLAY": ":99"}, root
+            )
+
+        self.assertIn("product:1", diagnostics)
+        self.assertIn("owner:1", diagnostics)
+        self.assertIn("MCP接続は確定していません", diagnostics)
+        self.assertNotIn("untrusted fixture content", diagnostics)
 
     def test_log_tail_is_bounded_and_masks_isolated_roots(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

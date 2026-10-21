@@ -1314,6 +1314,8 @@ def _run_installed_mcp_tool_acceptance(
     _answer_owner_dialog(
         environment,
         "拒否",
+        context="MCP接続の初回拒否",
+        diagnostic_root=window,
         expected_summary_markers=(
             f"Server ID: {server_id}",
             f"実行file: {python_executable}",
@@ -1331,6 +1333,8 @@ def _run_installed_mcp_tool_acceptance(
     _answer_owner_dialog(
         environment,
         "許可",
+        context="MCP接続の独立許可",
+        diagnostic_root=window,
         expected_summary_markers=(
             f"Server ID: {server_id}",
             f"実行file: {python_executable}",
@@ -1376,6 +1380,8 @@ def _run_installed_mcp_tool_acceptance(
     _answer_owner_dialog(
         environment,
         "許可",
+        context="MCP Toolの一回実行許可",
+        diagnostic_root=window,
         expected_summary_markers=(
             f"Server ID: {server_id}",
             "Tool: echo",
@@ -1408,6 +1414,8 @@ def _run_installed_mcp_tool_acceptance(
     _answer_owner_dialog(
         environment,
         "拒否",
+        context="MCP切断の初回拒否",
+        diagnostic_root=window,
         expected_summary_markers=(f"Server ID: {server_id}",),
     )
     _wait_for_owner_dialog_closed(environment)
@@ -1421,6 +1429,8 @@ def _run_installed_mcp_tool_acceptance(
     _answer_owner_dialog(
         environment,
         "許可",
+        context="MCP切断の独立許可",
+        diagnostic_root=window,
         expected_summary_markers=(f"Server ID: {server_id}",),
     )
     _wait_for_owner_dialog_closed(environment)
@@ -1735,11 +1745,15 @@ def _answer_owner_dialog(
     environment: dict[str, str],
     decision: str,
     *,
+    context: str = "Owner確認",
+    diagnostic_root=None,
     expected_summary_markers: tuple[str, ...],
 ) -> None:
     if decision not in {"許可", "拒否"}:
         raise ValueError("Owner確認の回答値が不正")
-    _wait_for_owner_dialog_window(environment)
+    _wait_for_owner_dialog_window(
+        environment, context=context, diagnostic_root=diagnostic_root
+    )
     dialog = _find_accessible(OWNER_DIALOG_TITLE, timeout=10)
     descendants = _accessible_descendants(dialog)
     names = []
@@ -2048,7 +2062,11 @@ def _installed_update_download_stage_activate(
 
 
 def _wait_for_owner_dialog_window(
-    environment: dict[str, str], *, timeout: float = OWNER_DIALOG_TIMEOUT
+    environment: dict[str, str],
+    *,
+    timeout: float = OWNER_DIALOG_TIMEOUT,
+    context: str = "Owner確認",
+    diagnostic_root=None,
 ) -> str:
     deadline = time.monotonic() + timeout
     while True:
@@ -2071,8 +2089,68 @@ def _wait_for_owner_dialog_window(
                 raise RuntimeError("native Owner確認dialogが一意ではありません")
             return dialog_ids[0]
         if time.monotonic() >= deadline:
-            raise RuntimeError("GTK native Owner確認dialogが期限内に表示されません")
+            raise RuntimeError(
+                "GTK native Owner確認dialogが期限内に表示されません; "
+                f"context={context}; "
+                + _owner_dialog_timeout_diagnostics(environment, diagnostic_root)
+            )
         time.sleep(0.1)
+
+
+def _owner_dialog_timeout_diagnostics(
+    environment: dict[str, str], diagnostic_root=None
+) -> str:
+    visible = subprocess.run(
+        ["xdotool", "search", "--onlyvisible", "--name", ".*"],
+        env=environment,
+        capture_output=True,
+        check=False,
+        timeout=5,
+    )
+    window_ids = (
+        visible.stdout.decode("ascii", errors="ignore").splitlines()
+        if visible.returncode == 0
+        else []
+    )
+    kinds = {"product": 0, "owner": 0, "credential": 0, "workspace": 0, "other": 0}
+    expected_titles = {
+        WINDOW_TITLE: "product",
+        OWNER_DIALOG_TITLE: "owner",
+        "D4 Pocket 資格情報入力": "credential",
+        "D4 Pocket 作業領域の選択": "workspace",
+    }
+    for window_id in window_ids[:32]:
+        title = subprocess.run(
+            ["xdotool", "getwindowname", window_id],
+            env=environment,
+            capture_output=True,
+            check=False,
+            timeout=5,
+        )
+        name = title.stdout.decode("utf-8", errors="replace").strip()
+        kinds[expected_titles.get(name, "other")] += 1
+
+    statuses: list[str] = []
+    if diagnostic_root is not None:
+        allowed_statuses = (
+            "MCP接続は確定していません",
+            "接続receiptを受理しました",
+            "MCP接続設定の識別子または絶対pathが不正です",
+            "安全Brokerとの通信に失敗しました",
+        )
+        try:
+            for _, name in _accessible_nodes(diagnostic_root):
+                normalized = " ".join(name.split())
+                if any(normalized.startswith(value) for value in allowed_statuses):
+                    statuses.append(normalized[:160])
+        except Exception:
+            statuses.append("<accessible-state-unavailable>")
+    return (
+        "visible_window_kinds="
+        + ",".join(f"{name}:{count}" for name, count in kinds.items())
+        + "; product_status="
+        + ("|".join(dict.fromkeys(statuses[-4:])) if statuses else "<none-observed>")
+    )
 
 
 def _verify_live_audit(
