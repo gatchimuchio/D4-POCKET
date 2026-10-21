@@ -18,6 +18,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _desktop_entry_targets_fixed_launcher,
     _focused_named_accessible,
     _find_operable_accessible,
+    _helper_exit_diagnostics,
     _resolve_regular_package,
     _safe_log_tail,
     _verify_export_manifest,
@@ -305,6 +306,19 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             self.assertLessEqual(len(tail), 4000)
             self.assertNotIn(str(root), tail)
             self.assertIn("<isolated-root>", tail)
+
+    def test_helper_exit_diagnostics_extract_only_numeric_categories(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / "installed-app.log"
+            log.write_text(
+                "token=must-not-leave-this-file\n"
+                "Linux Broker helper exited with classified code 22\n"
+                "Linux Broker helper terminated by signal 9\n",
+                encoding="utf-8",
+            )
+            diagnostics = _helper_exit_diagnostics(log)
+            self.assertEqual(diagnostics, {"exit_codes": [22], "signals": [9]})
+            self.assertNotIn("token", json.dumps(diagnostics))
 
     def test_accepts_registered_fixed_launcher(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

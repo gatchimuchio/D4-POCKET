@@ -97,6 +97,30 @@ def _catalog_failure_diagnostics(
     }
 
 
+def _helper_exit_diagnostics(path: Path) -> dict[str, list[int]]:
+    try:
+        content = path.read_text(encoding="utf-8", errors="replace")[-4000:]
+    except OSError:
+        return {"exit_codes": [], "signals": []}
+    exit_codes = [
+        int(match.group(1))
+        for match in re.finditer(
+            r"Linux Broker helper exited with classified code ([0-9]{1,3})",
+            content,
+        )
+    ]
+    signals = [
+        int(match.group(1))
+        for match in re.finditer(
+            r"Linux Broker helper terminated by signal ([0-9]{1,3})", content
+        )
+    ]
+    return {
+        "exit_codes": [value for value in exit_codes if 0 <= value <= 255][-4:],
+        "signals": [value for value in signals if 1 <= value <= 255][-4:],
+    }
+
+
 def _desktop_entry_targets_fixed_launcher(entry: Path, launcher: Path) -> bool:
     try:
         metadata = entry.lstat()
@@ -1130,6 +1154,7 @@ def run_installed_smoke(
                 diagnostics = _catalog_failure_diagnostics(
                     helper, preexisting, broker_state / "store/audit.jsonl"
                 )
+                diagnostics["helper_exit"] = _helper_exit_diagnostics(app_log)
                 raise RuntimeError(
                     f"{error}; catalog transport diagnostics="
                     + json.dumps(diagnostics, ensure_ascii=False, separators=(",", ":"))
