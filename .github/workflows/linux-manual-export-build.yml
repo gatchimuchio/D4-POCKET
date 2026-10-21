@@ -80,9 +80,9 @@ jobs:
           fixture_root="$D4P_EXPORT_ROOT/fixture"
           output_root="$D4P_EXPORT_ROOT/output"
           umask 077
-          openssl genpkey -algorithm ED25519 -out "$D4P_EXPORT_ROOT/test-update-private.pem"
-          openssl pkey -in "$D4P_EXPORT_ROOT/test-update-private.pem" -outform DER -out "$D4P_EXPORT_ROOT/test-update-private.der"
-          openssl pkey -in "$D4P_EXPORT_ROOT/test-update-private.pem" -pubout -outform DER -out "$D4P_EXPORT_ROOT/test-update-public.der"
+          openssl rand -out "$D4P_EXPORT_ROOT/test-update-private.seed" 32
+          python3 -c 'import pathlib,sys; root=pathlib.Path(sys.argv[1]); seed=(root/"test-update-private.seed").read_bytes(); assert len(seed)==32; key=root/"test-update-private.pk8.der"; key.write_bytes(bytes.fromhex("302e020100300506032b657004220420")+seed); key.chmod(0o600)' "$D4P_EXPORT_ROOT"
+          openssl pkey -inform DER -in "$D4P_EXPORT_ROOT/test-update-private.pk8.der" -pubout -outform DER -out "$D4P_EXPORT_ROOT/test-update-public.der"
           python3 tooling/tests/create_linux_export_fixture.py \
             --output-dir "$fixture_root" \
             --update-trust-public-key-der "$D4P_EXPORT_ROOT/test-update-public.der"
@@ -122,10 +122,10 @@ jobs:
             --package "$test_package" \
             --temp-root "$D4P_EXPORT_ROOT" \
             --acceptance-root "$acceptance_root" \
-            --private-key "$D4P_EXPORT_ROOT/test-update-private.der"
+            --private-key "$D4P_EXPORT_ROOT/test-update-private.pk8.der"
           {
             printf '\n- Installed acceptance: the Release package passed Broker stage／activation with a per-run Ed25519 candidate signature bound to its exact package hash, fixed XDG desktop entry validation, `gio launch` under X11, normal GTK window close, owned-process cleanup, and durable LIVE_RUNTIME startup／exit Audit reload. A second installed-entry launch ran with X11／XAUTHORITY removed under isolated Weston/Wayland; the GTK top-level was AT-SPI `SHOWING` and owned processes were stopped. This does not establish Wayland surface rendering, compositor coverage beyond Weston headless/Pixman, or production signing.\n'
-            printf -- '- Test update trust: per-run OpenSSL Ed25519 test identity. Only public trust enters the synthetic export Manifest／product; the private key is mode-0600 inside this run temporary root, passed only to the Rust acceptance seeder, never to the installed app, and removed by exact-root cleanup. It is not a production signing identity.\n'
+            printf -- '- Test update trust: per-run OpenSSL Ed25519 test identity. Only public trust enters the synthetic export Manifest／product; the 32-byte seed and PKCS#8 v1 private key are mode-0600 inside this run temporary root, only the PKCS#8 file is passed to the Rust acceptance seeder, neither reaches the installed app, and both are removed by exact-root cleanup. It is not a production signing identity.\n'
             printf -- '- Export Owner boundary: the installed product UI activates the exact visible Export command via its exposed AT-SPI Tap action and sends Enter only after visible focus; native Owner Reject／Allow uses its verified GTK control. Reject creates no file; a new request plus Allow reaches the installed Rust Broker and creates a fresh Linux App／Audit identity Manifest. The file-backed Audit chain／anchor HMAC is LIVE_RUNTIME-reloaded; individual Export events retain their `INTERNAL_STATE` evidence classification.\n'
             printf -- '- Uninstaller LIVE_RUNTIME: after X11／Wayland launch checks, the installed UI opens Update Center and requests Uninstall. Native Owner rejection leaves the fixed product root, active-version record, desktop entry, and running process group intact. A separate Owner approval requests required application exit; the launcher consumes the one-time handoff, removes only the fixed product root／entry, and leaves a config sentinel plus the file-backed Audit Store and anchor outside that root. Both decisions and completion are checked in the chained Audit.\n'
             printf -- '- All UI actions use automated AT-SPI／keyboard input, not a human gesture. Scope: Ubuntu hosted Xvfb／X11 plus isolated Weston headless/Pixman Wayland session and ephemeral test identity; Wayland surface rendering is not established. Not real desktop-session distribution coverage, production signing／publisher identity, Secret Service／MCP, Workspace selection, Agent Task recovery, Update／Rollback lifecycle, or release readiness.\n'
