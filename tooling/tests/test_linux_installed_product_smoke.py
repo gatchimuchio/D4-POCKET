@@ -17,6 +17,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _bounded_owner_text_diagnostics,
     _assert_secret_absent_from_files,
     _catalog_failure_diagnostics,
+    _click_accessible_by_coordinates,
     _component_center,
     _desktop_entry_targets_fixed_launcher,
     _focused_named_accessible,
@@ -96,6 +97,30 @@ class AccessibleActionResolutionTests(unittest.TestCase):
             self.assertEqual(_component_center(label), (25, 40))
         self.assertEqual(label.coordinate_type, 0)
 
+    def test_coordinate_activation_clicks_the_observed_accessible_center(self) -> None:
+        from unittest.mock import patch
+
+        environment = {"DISPLAY": ":99"}
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._component_center",
+                return_value=(25, 40),
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke.subprocess.run",
+                return_value=subprocess.CompletedProcess(args=[], returncode=0),
+            ) as run,
+        ):
+            _click_accessible_by_coordinates(object(), "visible row", environment)
+
+        run.assert_called_once_with(
+            ["xdotool", "mousemove", "--sync", "25", "40", "click", "1"],
+            env=environment,
+            capture_output=True,
+            check=False,
+            timeout=5,
+        )
+
     def test_focused_lookup_requires_exact_name_and_visible_state(self) -> None:
         from types import SimpleNamespace
         from unittest.mock import patch
@@ -164,7 +189,7 @@ class AccessibleActionResolutionTests(unittest.TestCase):
                 _find_operable_accessible("独立Appを書き出す", root=Root()), button
             )
 
-    def test_mcp_palette_uses_unique_focused_row_and_fresh_window_tree(self) -> None:
+    def test_mcp_palette_clicks_unique_row_and_refreshes_window_tree(self) -> None:
         window = object()
         fresh_window = object()
         command = object()
@@ -178,12 +203,17 @@ class AccessibleActionResolutionTests(unittest.TestCase):
                 return_value=command,
             ) as find_operable,
             patch(
+                "tooling.tests.linux_installed_product_smoke._click_accessible_by_coordinates"
+            ) as coordinate_activate,
+            patch(
                 "tooling.tests.linux_installed_product_smoke._activate_accessible"
             ) as click_activate,
             patch(
                 "tooling.tests.linux_installed_product_smoke._activate_named_control_by_keyboard"
             ) as keyboard_activate,
-            patch("tooling.tests.linux_installed_product_smoke.subprocess.run"),
+            patch(
+                "tooling.tests.linux_installed_product_smoke.subprocess.run"
+            ) as run,
         ):
             self.assertIs(
                 _open_mcp_center_from_installed_ui({}, "0x42"), fresh_window
@@ -204,12 +234,16 @@ class AccessibleActionResolutionTests(unittest.TestCase):
             root=window,
             timeout=10,
         )
-        click_activate.assert_not_called()
-        keyboard_activate.assert_called_once_with(
+        coordinate_activate.assert_called_once_with(
+            command,
             "MCP接続一覧とOwner確認付き切断を開く",
             {},
-            "0x42",
-            context_marker="コマンドパレット",
+        )
+        click_activate.assert_not_called()
+        keyboard_activate.assert_not_called()
+        self.assertEqual(
+            run.call_args_list[-1].args[0],
+            ["xdotool", "type", "--clearmodifiers", "--delay", "30", "mcp"],
         )
 
     def test_keyboard_activation_sends_enter_only_after_target_focus(self) -> None:

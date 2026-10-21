@@ -405,9 +405,15 @@ def _activate_accessible(node, name: str, environment: dict[str, str]) -> None:
                     return
     except Exception:
         pass
+    _click_accessible_by_coordinates(node, name, environment)
+
+
+def _click_accessible_by_coordinates(
+    node, name: str, environment: dict[str, str]
+) -> None:
     center = _component_center(node)
     if center is None:
-        raise RuntimeError(f"AT-SPI action／可視boundsがありません: {name}")
+        raise RuntimeError(f"AT-SPI controlに可視boundsがありません: {name}")
     clicked = subprocess.run(
         ["xdotool", "mousemove", "--sync", str(center[0]), str(center[1]), "click", "1"],
         env=environment,
@@ -537,14 +543,13 @@ def _open_mcp_center_from_installed_ui(
     )
     # Navigation also exposes an "MCP接続" item; target the palette row by its
     # unique subtitle so this activates the command rather than the nav item.
-    _find_operable_accessible(
+    command = _find_operable_accessible(
         "MCP接続一覧とOwner確認付き切断を開く", root=window, timeout=10
     )
-    _activate_named_control_by_keyboard(
-        "MCP接続一覧とOwner確認付き切断を開く",
-        environment,
-        window_id,
-        context_marker="コマンドパレット",
+    # GTK's coordinate click follows the real ListTile hit target; Flutter's
+    # AT-SPI Tap action can dismiss the palette without selecting the row.
+    _click_accessible_by_coordinates(
+        command, "MCP接続一覧とOwner確認付き切断を開く", environment
     )
     # Dismissing the command-palette dialog can invalidate its old AT-SPI
     # subtree. Resolve the destination from the desktop, then reacquire the
