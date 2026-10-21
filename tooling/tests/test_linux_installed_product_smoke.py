@@ -21,6 +21,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _verify_export_manifest,
     _verify_live_audit,
     _verify_uninstalled_state,
+    _wait_for_catalog_fetch_status,
     _wayland_launch_environment,
     _wait_for_owner_dialog_window,
 )
@@ -83,7 +84,6 @@ class AccessibleActionResolutionTests(unittest.TestCase):
         with patch.dict("sys.modules", {"pyatspi": SimpleNamespace(XY_SCREEN=0)}):
             self.assertEqual(_component_center(label), (25, 40))
         self.assertEqual(label.coordinate_type, 0)
-
 
     def test_focused_lookup_requires_exact_name_and_visible_state(self) -> None:
         from types import SimpleNamespace
@@ -187,6 +187,35 @@ class AccessibleActionResolutionTests(unittest.TestCase):
         self.assertEqual(
             focused_lookup.call_args.kwargs["root"], find_accessible.return_value
         )
+
+
+class InstalledCatalogFetchStatusTests(unittest.TestCase):
+    class Node:
+        def __init__(self, name: str, children=()) -> None:
+            self.name = name
+            self.children = list(children)
+            self.childCount = len(self.children)
+
+        def getChildAtIndex(self, index: int):
+            return self.children[index]
+
+    def test_requires_terminal_success_with_exactly_one_candidate(self) -> None:
+        status = "Brokerが署名検証済み候補を取得しました（1件）。"
+        root = self.Node("window", [self.Node(status)])
+        self.assertEqual(_wait_for_catalog_fetch_status(root), status)
+
+    def test_surfaces_broker_catalog_fetch_error(self) -> None:
+        status = "更新候補の取得に失敗しました: 候補配布元の名前解決に失敗"
+        root = self.Node("window", [self.Node(status)])
+        with self.assertRaisesRegex(RuntimeError, "名前解決に失敗"):
+            _wait_for_catalog_fetch_status(root)
+
+    def test_rejects_unexpected_candidate_count(self) -> None:
+        status = "Brokerが署名検証済み候補を取得しました（0件）。"
+        root = self.Node("window", [self.Node(status)])
+        with self.assertRaisesRegex(RuntimeError, "0件"):
+            _wait_for_catalog_fetch_status(root)
+
 
 class LinuxInstalledDesktopEntryTests(unittest.TestCase):
     def test_wayland_launch_environment_cannot_fall_back_to_x11(self) -> None:
@@ -425,6 +454,7 @@ class LinuxInstalledOwnerEvidenceTests(unittest.TestCase):
                     "rollback_rejected": 1,
                     "rollback_queued": 1,
                     "rollback_completed": 1,
+                    "catalog_fetch_external_accepted": 0,
                 },
             )
 

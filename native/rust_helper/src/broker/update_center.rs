@@ -5217,6 +5217,35 @@ mod tests {
     const INSTALL_APP_ID: &str = "d4-pocket-app-11111111111111111111111111111111";
     const INSTALL_AUDIT_ID: &str = "audit-store-22222222222222222222222222222222";
 
+    #[test]
+    fn linux_installed_catalog_fixture_signature_is_canonical_and_valid() {
+        let catalog: UpdateCatalogDocument = serde_json::from_str(include_str!(
+            "../../../../tooling/tests/fixtures/linux-update-catalog/updates.json"
+        ))
+        .unwrap();
+        assert_eq!(catalog.version, VERSION);
+        assert_eq!(catalog.candidates.len(), 1);
+        let trust = UpdateTrust {
+            version: TRUST_VERSION,
+            algorithm: "Ed25519".into(),
+            public_key_der_hex: "302a300506032b6570032100d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a".into(),
+            public_key_fingerprint: "sha256:21fe31dfa154a261626bf854046fd2271b7bed4b6abe45aa58877ef47f9721b9".into(),
+            package_sources: vec![],
+        };
+        let record = verify_candidate_with_trust(
+            Some(&trust),
+            catalog.candidates.into_iter().next().unwrap(),
+        )
+        .unwrap();
+        assert_eq!(record.signature_status, "verified");
+        assert_eq!(
+            record.candidate.update_id,
+            "linux-installed-catalog-display"
+        );
+        assert_eq!(record.candidate.current_version, "0.1.0");
+        assert_eq!(record.candidate.offered_version, "0.1.2");
+    }
+
     fn install_test_package() -> Vec<u8> {
         install_test_package_for_version("1.1.0")
     }

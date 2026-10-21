@@ -13,7 +13,10 @@ APP_ID = "d4-pocket-app-11111111111111111111111111111111"
 AUDIT_STORE_ID = "audit-store-22222222222222222222222222222222"
 
 
-def linux_export_pair(update_trust_public_key_der: bytes | None = None) -> tuple[bytes, bytes]:
+def linux_export_pair(
+    update_trust_public_key_der: bytes | None = None,
+    update_trust_base_url: str = "https://updates.example.invalid/d4/stable",
+) -> tuple[bytes, bytes]:
     receipt: dict[str, Any] = json.loads(
         (ROOT / "examples/contracts/gui_shell_export_receipt.valid.json").read_text(
             encoding="utf-8"
@@ -49,7 +52,7 @@ def linux_export_pair(update_trust_public_key_der: bytes | None = None) -> tuple
             "package_sources": [
                 {
                     "channel": "stable",
-                    "base_url": "https://updates.example.invalid/d4/stable",
+                    "base_url": update_trust_base_url,
                 }
             ],
         }
@@ -67,10 +70,14 @@ def linux_export_pair(update_trust_public_key_der: bytes | None = None) -> tuple
 
 
 def write_fixture(
-    output_dir: Path, update_trust_public_key_der: bytes | None = None
+    output_dir: Path,
+    update_trust_public_key_der: bytes | None = None,
+    update_trust_base_url: str = "https://updates.example.invalid/d4/stable",
 ) -> tuple[Path, Path]:
     output_dir.mkdir(mode=0o700, parents=False, exist_ok=False)
-    receipt_raw, manifest_raw = linux_export_pair(update_trust_public_key_der)
+    receipt_raw, manifest_raw = linux_export_pair(
+        update_trust_public_key_der, update_trust_base_url
+    )
     receipt = output_dir / "d4_pocket_export_receipt.json"
     manifest = output_dir / f"{APP_ID}.json"
     with receipt.open("xb") as target:
@@ -86,13 +93,18 @@ def main() -> int:
     )
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--update-trust-public-key-der", type=Path)
+    parser.add_argument("--update-trust-base-url")
     args = parser.parse_args()
     update_trust_public_key_der = (
         args.update_trust_public_key_der.read_bytes()
         if args.update_trust_public_key_der is not None
         else None
     )
-    receipt, manifest = write_fixture(args.output_dir, update_trust_public_key_der)
+    receipt, manifest = write_fixture(
+        args.output_dir,
+        update_trust_public_key_der,
+        args.update_trust_base_url or "https://updates.example.invalid/d4/stable",
+    )
     print(
         json.dumps(
             {

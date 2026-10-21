@@ -65,6 +65,21 @@ class LinuxExportInputTests(unittest.TestCase):
         )
         self.assertEqual(trust["package_sources"][0]["base_url"], "https://updates.example.invalid/d4/stable")
 
+    def test_linux_fixture_can_pin_update_catalog_to_an_immutable_public_source(self) -> None:
+        public_der = bytes.fromhex("302a300506032b6570032100") + bytes(range(32))
+        source = (
+            "https://raw.githubusercontent.com/gatchimuchio/D4-POCKET/"
+            "0123456789abcdef0123456789abcdef01234567/"
+            "tooling/tests/fixtures/linux-update-catalog"
+        )
+        receipt_raw, manifest_raw = linux_export_pair(public_der, source)
+        _, manifest, _, _, _ = validate_export_inputs(
+            receipt_raw, manifest_raw, target_platform="linux"
+        )
+        self.assertEqual(
+            manifest["update_trust"]["package_sources"][0]["base_url"], source
+        )
+
     def test_wrong_target_and_tampered_manifest_are_rejected(self) -> None:
         receipt_raw, manifest_raw = linux_export_pair()
         receipt = json.loads(receipt_raw)

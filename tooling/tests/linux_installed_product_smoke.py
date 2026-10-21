@@ -167,6 +167,41 @@ def _find_accessible(name: str, *, root=None, timeout: float = 10.0):
     raise RuntimeError(f"AT-SPI要素を確認できません: {name}; observed={observed or '(none)'}")
 
 
+def _wait_for_catalog_fetch_status(root, *, timeout: float = 60.0) -> str:
+    success_prefix = "Brokerが署名検証済み候補を取得しました（"
+    failure_prefix = "更新候補の取得に失敗しました:"
+    unconfigured = "Brokerに署名済み配布元が構成されていません。"
+    expected_success = f"{success_prefix}1件）。"
+    deadline = time.monotonic() + timeout
+    observed: list[str] = []
+    while time.monotonic() < deadline:
+        names = [name for _, name in _accessible_nodes(root)]
+        statuses = [
+            name
+            for name in names
+            if name.startswith((success_prefix, failure_prefix)) or name == unconfigured
+        ]
+        observed.extend(name for name in names if "候補取得" in name)
+        observed[:] = observed[-24:]
+        if statuses:
+            status = statuses[-1]
+            if status.startswith(failure_prefix):
+                raise RuntimeError(f"installed UI catalog fetch failed: {status[:400]}")
+            if status == unconfigured:
+                raise RuntimeError(f"installed UI catalog trust is unconfigured: {status}")
+            if status != expected_success:
+                raise RuntimeError(
+                    f"installed UI catalog returned an unexpected result: {status[:400]}"
+                )
+            return status
+        time.sleep(0.15)
+    observed_text = ", ".join(dict.fromkeys(observed[-6:]))
+    raise RuntimeError(
+        "installed UI catalog fetch did not expose a terminal status"
+        + (f": {observed_text}" if observed_text else "")
+    )
+
+
 def _actionable_node(node, *, max_ancestors: int = 5):
     """Flutterの可視label leafからAT-SPI actionを持つ親buttonを解決する。"""
     current = node
@@ -385,6 +420,31 @@ def _trigger_rollback_from_installed_ui(
     _activate_named_control_by_keyboard("直前版へ戻す", environment, window_id)
 
 
+def _trigger_catalog_fetch_from_installed_ui(
+    environment: dict[str, str], window_id: str
+) -> dict[str, str]:
+    window = _open_update_center_from_installed_ui(environment, window_id)
+    command = _find_operable_accessible("配布元から候補取得", root=window, timeout=10)
+    _activate_accessible(command, "配布元から候補取得", environment)
+    _wait_for_catalog_fetch_status(window)
+    candidate = _find_accessible(
+        "0.1.2 (linux-installed-catalog-display)", root=window, timeout=10
+    )
+    _find_accessible(
+        "現在のBroker trustで検証済み", root=window, timeout=10
+    )
+    _find_accessible("配布元=raw.githubusercontent.com", root=window, timeout=10)
+    _find_accessible("Brokerが署名検証済み候補を取得しました（1件）。", root=window, timeout=10)
+    if not candidate.name:
+        raise RuntimeError("Update Centerに候補表示がありません")
+    return {
+        "candidate": candidate.name,
+        "signature": "verified_by_current_broker_trust",
+        "source": "raw.githubusercontent.com",
+        "package_downloaded": "not_attempted",
+    }
+
+
 def _trigger_uninstall_from_installed_ui(
     environment: dict[str, str], window_id: str
 ) -> None:
@@ -510,7 +570,11 @@ def _wait_for_owner_dialog_window(
 
 
 def _verify_live_audit(
-    store: Path, *, require_uninstall: bool = False, require_rollback: bool = False
+    store: Path,
+    *,
+    require_uninstall: bool = False,
+    require_rollback: bool = False,
+    require_catalog: bool = False,
 ) -> dict[str, int]:
     audit_path = store / "audit.jsonl"
     anchor_path = store / "audit_anchor.json"
@@ -628,6 +692,18 @@ def _verify_live_audit(
         raise RuntimeError(
             "Rollback拒否／fresh Owner承認後のintent・完了(INTERNAL_STATE) Auditが不足しています"
         )
+    catalog_fetch = [
+        event for event in events if event.get("operation") == "更新候補取得"
+    ]
+    catalog_accepted = sum(
+        event.get("decision") == "accepted"
+        and event.get("evidence_source") == "EXTERNAL_EVIDENCE"
+        for event in catalog_fetch
+    )
+    if require_catalog and catalog_accepted < 1:
+        raise RuntimeError(
+            "installed UIからの更新候補取得がEXTERNAL_EVIDENCEとしてAuditにありません"
+        )
     return {
         "events": len(events),
         "export_accepted": accepted,
@@ -638,6 +714,7 @@ def _verify_live_audit(
         "rollback_rejected": rollback_rejected,
         "rollback_queued": rollback_queued,
         "rollback_completed": rollback_completed,
+        "catalog_fetch_external_accepted": catalog_accepted,
     }
 
 
@@ -1000,6 +1077,10 @@ def run_installed_smoke(
             if any(export_root.iterdir()):
                 raise RuntimeError("Owner拒否後にManifestまたは一時fileが作成されました")
 
+            catalog_evidence = _trigger_catalog_fetch_from_installed_ui(
+                environment, window_id
+            )
+
             rollback_entry_before = entries[0].read_bytes()
             rollback_record_before = record_path.read_bytes()
             rollback_pids = _processes_using(product_paths) - preexisting
@@ -1285,7 +1366,10 @@ def run_installed_smoke(
             product_root, entries[0], audit_store, preserved_user_data
         )
         audit_evidence = _verify_live_audit(
-            audit_store, require_uninstall=True, require_rollback=True
+            audit_store,
+            require_uninstall=True,
+            require_rollback=True,
+            require_catalog=True,
         )
         print(
             json.dumps(
@@ -1303,6 +1387,7 @@ def run_installed_smoke(
                         else "restarted_from_fixed_desktop_entry_for_fresh_approval"
                     ),
                     "manifest": manifest_evidence,
+                    "update_catalog": catalog_evidence,
                     "uninstall": uninstall_evidence,
                     "live_audit": audit_evidence,
                     "runtime_audit": "durable_after_broker_restart",
