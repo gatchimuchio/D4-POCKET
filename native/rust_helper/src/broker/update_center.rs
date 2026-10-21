@@ -8459,14 +8459,23 @@ mod tests {
         assert!(key_metadata.is_file() && !key_metadata.file_type().is_symlink());
         assert_eq!(key_metadata.permissions().mode() & 0o077, 0);
         let private_key = std::fs::read(private_key_path).unwrap();
-        let pair = Ed25519KeyPair::from_pkcs8(&private_key).unwrap();
+        let pair = Ed25519KeyPair::from_pkcs8_maybe_unchecked(&private_key).unwrap();
         let public_der = [
             0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00,
         ]
         .into_iter()
         .chain(pair.public_key().as_ref().iter().copied())
         .collect::<Vec<_>>();
+        let public_key_der_hex = hex::encode(&public_der);
         let fingerprint = sha256_tagged(pair.public_key().as_ref());
+        assert_eq!(
+            manifest["update_trust"]["public_key_der_hex"].as_str(),
+            Some(public_key_der_hex.as_str())
+        );
+        assert_eq!(
+            manifest["update_trust"]["public_key_fingerprint"].as_str(),
+            Some(fingerprint.as_str())
+        );
         let update_id = "linux-installed-acceptance";
         let summary = "Ubuntu native installed launcher検証";
         let signed = serde_json::to_vec(&SignedManifest {
@@ -8485,7 +8494,7 @@ mod tests {
         let trust = UpdateTrust {
             version: TRUST_VERSION,
             algorithm: "Ed25519".into(),
-            public_key_der_hex: hex::encode(public_der),
+            public_key_der_hex,
             public_key_fingerprint: fingerprint.clone(),
             package_sources: vec![UpdatePackageSource {
                 channel: "stable".into(),
