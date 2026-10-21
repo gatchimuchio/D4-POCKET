@@ -193,6 +193,14 @@
       "release_tracks": ["non_windows"],
       "blocks_release": true,
       "blocks_windows_technical_complete": false,
+      "latest_evidence": {
+        "date": "2026-10-21",
+        "result": "PASS",
+        "workflow_run": "https://github.com/gatchimuchio/D4-POCKET/actions/runs/39527951009",
+        "source_commit": "cf11968c7081a5ef28702b3c91e9f1d9db5827b6",
+        "scope": "Ubuntu 24.04.5 installed GTK Uninstaller Owner rejection/approval, fixed product root and desktop entry deletion, user-data/config and Audit Store retention, 90-event file-backed Audit verification and Broker restart readback.",
+        "limits": "Unsigned package with run-scoped test identity; does not establish integrated Installer/Update/Rollback/Uninstaller lifecycle, production signing, all Linux product requirements, or release readiness."
+      },
       "reason": "Linux native DesktopはWindows／macOSと同列の完全対応が必須の独立製品対象。GTK Owner確認、Secret Service資格情報store、MCP、target選択Manifest Export、固定Broker保存先、Linux D4PKG01目録／reader、固定inventory・Linux identity・POSIX mode・nofollow再照合・known-pattern Credential scan付きLinux host限定package writer、Broker署名candidateから固定XDG rootへのstageとdurable Audit、active-version recordとfixed XDG desktop entryをnative Owner／Broker経路へ接続するfixture実装、現行版・直前署名版を束縛したOwner-confirmed Broker rollback、Owner-confirmed Uninstaller要求から一回ticketのFlutter非露出handoff・終了後fixed-target削除・Audit Store保持までのLinux実装、Receipt／ManifestからRelease bundle／D4PKG01／compile-time App・Audit identityおよびsource・toolchain・artifact hash evidenceを結合するExport builderが存在する。Ubuntu-24.04 WSL上のLinux target試験39 passed／0 failed／1 ignoredとall-target cargo checkが成功し、Ubuntu-24.04.5 manual Actions run #39326770256もrollbackを含むRust tests・all-target compile・cleanupをPASSした。2026-10-20にはLinux Broker helperのguardianがpipe EOF後にprocess groupを停止するLinux LIVE_RUNTIME fixture、guardian消失時のfail-closed、全Adapter試験29 passed／0 failed／2 ignored、全target cargo check、Windows process supervision 2 passedを確認した。guardian fixtureはinstalled Linux Brokerのreal crashやAgent/MCP consumer一体受入れではない。今回のUninstaller Rust fixture testsとall-target cargo checkもWSLでPASSしたが、Linux native installed UI／desktop entry起動を含むInstall／Update／Rollback／Uninstaller一体受入れ、X11／Wayland実機受入れは未成立。同じsource commit `e83d3177a08deb5e4a5aea3999fdce3658eb8d89`の手動Ubuntu workflow run #39385578455は対象Rust tests、all-target compile、一時target／XDG cleanupをPASSしたが、実Codex sandbox LIVE_RUNTIME stepはSKIPPEDであり、installed Linux製品受入れは成立しない。",
       "required_action": "Linux native Installer lifecycleとしてOwner-confirmed stage→activation→fixed XDG entry→実launcher起動を受入れ、installed product上のUpdate／Rollback／Uninstaller lifecycleとRecoveryを検証する。加えてLinux native installed経路でCredential／Secret Service／MCP、Workspace OS選択、Agent process監督・scratch／descendant cleanup・cancel／deadline／crash Recovery、X11／Wayland、source／toolchain／artifact provenanceを受入れる。Linux対応は必須であり、Linux Taskの停止・Recovery・Audit条件を含む全必須製品要求が成立するまで通常Release task_execution=supportedへ昇格しない。"
     },

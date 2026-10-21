@@ -172,7 +172,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "529dfe1e6b921fd8955f8298b2f5aa9472d67f4a186e2e90115258e0ec2d551d"
+      "sha256": "91a2b48d919baae2aea2c70d41cc65da383d466f7908388efc21a39029818044"
     },
     {
       "path": "SECURITY.md",
@@ -1308,7 +1308,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "5fcba01db9e6e7a0642c4cc207a29a8df8bade77b67d51d9e25348e79207bbb7"
+      "sha256": "418fa7810de4aaf9a6cca193289a6bef9e52669e2c3b5365b51b08dcd61728ff"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1520,7 +1520,7 @@
     },
     {
       "path": "docs/specs/linux-product-package.md",
-      "sha256": "a2356d67a47b8c858fc80a55e9bd7384df02a4ccfef81291db8e85882d15ae9c"
+      "sha256": "08710c050f089c24c01e11a985b614e67dcf1495b58422d30bebd7b5a2aee44b"
     },
     {
       "path": "docs/specs/linux-workspace-selection.md",
@@ -4308,7 +4308,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "0b2695314fb58f15f479a2fb408b4a660892b3b477e5d8e788d414776765c7c5"
+      "sha256": "998d5b8142ab1d2d15373a7284cacd5e21a718094f6daddc6df966b249596c57"
     },
     {
       "path": "requirements-dev.txt",
