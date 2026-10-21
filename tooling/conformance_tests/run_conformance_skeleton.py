@@ -12092,6 +12092,8 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
         "require_mcp=True",
         "result_body_absent_from_ui_audit_logs_and_acceptance_files",
         "_cleanup_mcp_fixture_group(",
+        "def _open_agent_center_from_installed_ui(",
+        '"Agentを開く"',
         "def _run_installed_workspace_selection_acceptance(",
         "require_workspace=True",
         "_verify_workspace_projection(",

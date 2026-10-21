@@ -1516,8 +1516,47 @@ def _write_linux_workspace_acceptance_fixture(
     return fixture_root, workspace, decoy_workspace, cli_fixture, cli_marker
 
 
-def _open_installed_codex_registration(environment: dict[str, str]):
+def _open_agent_center_from_installed_ui(
+    environment: dict[str, str], window_id: str
+):
     window = _find_accessible(WINDOW_TITLE, timeout=10)
+    subprocess.run(
+        ["xdotool", "windowactivate", "--sync", window_id],
+        env=environment,
+        check=True,
+        timeout=5,
+    )
+    subprocess.run(
+        ["xdotool", "key", "--clearmodifiers", "ctrl+k"],
+        env=environment,
+        check=True,
+        timeout=5,
+    )
+    _find_accessible("コマンドパレット", root=window, timeout=10)
+    subprocess.run(
+        ["xdotool", "type", "--clearmodifiers", "--delay", "30", "agent"],
+        env=environment,
+        check=True,
+        timeout=5,
+    )
+    _find_accessible("Agentを開く", root=window, timeout=10)
+    subprocess.run(
+        ["xdotool", "key", "--clearmodifiers", "Return"],
+        env=environment,
+        check=True,
+        timeout=5,
+    )
+    _find_accessible("エージェントセンター", timeout=10)
+    window = _find_accessible(WINDOW_TITLE, timeout=10)
+    _find_accessible("エージェントセンター", root=window, timeout=10)
+    return window
+
+
+def _open_installed_codex_registration(environment: dict[str, str]):
+    current_window_id = _visible_product_window(environment)
+    if current_window_id is None:
+        raise RuntimeError("Agent Centerへ移動するinstalled product windowがありません")
+    window = _open_agent_center_from_installed_ui(environment, current_window_id)
     button = _find_operable_accessible("登録を開始", root=window, timeout=10)
     _activate_accessible(button, "登録を開始", environment)
     return _find_accessible("Codex実行系をBrokerへ登録", timeout=10)
