@@ -193,6 +193,7 @@ class AccessibleActionResolutionTests(unittest.TestCase):
         self.assertEqual(
             focused_lookup.call_args.kwargs["root"], find_accessible.return_value
         )
+        self.assertIsNone(focused_lookup.call_args.kwargs["context_node"])
 
     def test_update_action_uses_visible_focus_when_flutter_exposes_no_action(self) -> None:
         with (
@@ -208,13 +209,78 @@ class AccessibleActionResolutionTests(unittest.TestCase):
             ) as activate_by_focus,
         ):
             _trigger_update_action_from_installed_ui(
-                {"DISPLAY": ":99"}, "0x42", "download"
+                {"DISPLAY": ":99"},
+                "0x42",
+                "download",
+                row_marker="0.1.2 (linux-installed-catalog-display)",
             )
 
         self.assertEqual(open_center.call_args.args, ({"DISPLAY": ":99"}, "0x42"))
-        self.assertEqual(find_accessible.call_args.args[0], "download")
-        self.assertEqual(find_accessible.call_args.kwargs["root"], open_center.return_value)
-        activate_by_focus.assert_called_once_with("download", {"DISPLAY": ":99"}, "0x42")
+        self.assertEqual(find_accessible.call_args_list[0].args[0], "download")
+        self.assertEqual(
+            find_accessible.call_args_list[0].kwargs["root"],
+            open_center.return_value,
+        )
+        activate_by_focus.assert_called_once_with(
+            "download",
+            {"DISPLAY": ":99"},
+            "0x42",
+            context_marker="0.1.2 (linux-installed-catalog-display)",
+        )
+
+    def test_focused_duplicate_action_must_share_the_candidate_row(self) -> None:
+        class State:
+            def __init__(self, focused: bool) -> None:
+                self.focused = focused
+
+            def contains(self, state: int) -> bool:
+                return self.focused if state == 1 else True
+
+        class Node:
+            def __init__(self, name: str, children=(), *, focused: bool = False) -> None:
+                self.name = name
+                self.children = list(children)
+                self.childCount = len(self.children)
+                self.parent = None
+                self.state = State(focused)
+                for child in self.children:
+                    child.parent = self
+
+            def getChildAtIndex(self, index: int):
+                return self.children[index]
+
+            def get_parent(self):
+                return self.parent
+
+            def getState(self):
+                return self.state
+
+        old_action = Node("download", focused=True)
+        old_row = Node("old candidate", [Node("0.1.0 (linux-installed-acceptance)"), old_action])
+        selected_action = Node("download", focused=True)
+        selected_row = Node(
+            "selected candidate",
+            [Node("0.1.2 (linux-installed-catalog-display)"), selected_action],
+        )
+        root = Node("window", [old_row, selected_row])
+        fake_pyatspi = type(
+            "FakePyatspi",
+            (),
+            {"STATE_FOCUSED": 1, "STATE_SHOWING": 2, "Registry": type("Registry", (), {"getDesktop": staticmethod(lambda _: root)})},
+        )
+
+        with patch.dict("sys.modules", {"pyatspi": fake_pyatspi}):
+            focused = _focused_named_accessible(
+                "download", root=root, context_node=selected_row
+            )
+            old_action.state.focused = True
+            selected_action.state.focused = False
+            wrong_row = _focused_named_accessible(
+                "download", root=root, context_node=selected_row
+            )
+
+        self.assertIs(focused, selected_action)
+        self.assertIsNone(wrong_row)
 
 
 class InstalledCatalogFetchStatusTests(unittest.TestCase):

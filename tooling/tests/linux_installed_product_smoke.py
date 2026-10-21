@@ -547,13 +547,21 @@ def _trigger_rollback_from_installed_ui(
 
 
 def _trigger_update_action_from_installed_ui(
-    environment: dict[str, str], window_id: str, action: str
+    environment: dict[str, str],
+    window_id: str,
+    action: str,
+    *,
+    row_marker: str | None = None,
 ):
     window = _open_update_center_from_installed_ui(environment, window_id)
     # Flutter may expose a TextButton label without an AT-SPI action/bounds.
-    # Resolve the visible exact label, then use the existing focus-checked path.
+    # Bind repeated action labels to the candidate row before keyboard activation.
     _find_accessible(action, root=window, timeout=10)
-    _activate_named_control_by_keyboard(action, environment, window_id)
+    if row_marker is not None:
+        _find_accessible(row_marker, root=window, timeout=10)
+    _activate_named_control_by_keyboard(
+        action, environment, window_id, context_marker=row_marker
+    )
     return window
 
 
@@ -596,6 +604,7 @@ def _activate_named_control_by_keyboard(
     window_id: str,
     *,
     max_tabs: int = 96,
+    context_marker: str | None = None,
 ) -> None:
     """可視かつ正確なAccessible名にfocusがある場合だけEnterを送る。"""
     subprocess.run(
@@ -605,8 +614,18 @@ def _activate_named_control_by_keyboard(
         timeout=5,
     )
     window = _find_accessible(WINDOW_TITLE, timeout=10)
+    context_node = (
+        _find_accessible(context_marker, root=window, timeout=10)
+        if context_marker is not None
+        else None
+    )
     for index in range(max_tabs + 1):
-        if _focused_named_accessible(name, root=window) is not None:
+        if (
+            _focused_named_accessible(
+                name, root=window, context_node=context_node
+            )
+            is not None
+        ):
             subprocess.run(
                 ["xdotool", "key", "--clearmodifiers", "Return"],
                 env=environment,
@@ -630,7 +649,7 @@ def _activate_named_control_by_keyboard(
     )
 
 
-def _focused_named_accessible(name: str, *, root=None):
+def _focused_named_accessible(name: str, *, root=None, context_node=None):
     try:
         import pyatspi
     except ImportError:
@@ -638,6 +657,10 @@ def _focused_named_accessible(name: str, *, root=None):
     search_root = root if root is not None else pyatspi.Registry.getDesktop(0)
     for node, accessible_name in _accessible_nodes(search_root):
         if name not in accessible_name.strip():
+            continue
+        if context_node is not None and not _focused_node_matches_context(
+            node, name, context_node
+        ):
             continue
         try:
             state = node.getState()
@@ -648,6 +671,57 @@ def _focused_named_accessible(name: str, *, root=None):
         except Exception:
             continue
     return None
+
+
+def _focused_node_matches_context(node, name: str, context_node) -> bool:
+    """候補とfocus controlを含む最小rowだけに同名actionが一つある場合に一致。"""
+    scope = context_node
+    for _ in range(32):
+        if _accessible_contains(scope, node):
+            matches = [
+                _accessible_identity(candidate)
+                for candidate, accessible_name in _accessible_nodes(scope)
+                if accessible_name.strip() == name
+            ]
+            if len(set(matches)) == 1:
+                return True
+        scope = _accessible_parent(scope)
+        if scope is None:
+            break
+    return False
+
+
+def _accessible_contains(root, target) -> bool:
+    current = target
+    for _ in range(32):
+        if _accessible_identity(current) == _accessible_identity(root):
+            return True
+        current = _accessible_parent(current)
+        if current is None:
+            break
+    return False
+
+
+def _accessible_identity(node):
+    for attribute in ("path", "object_path", "objectPath"):
+        try:
+            value = getattr(node, attribute)
+        except Exception:
+            continue
+        if value is not None:
+            return (attribute, str(value))
+    for method_name in ("getPath", "get_path"):
+        try:
+            method = getattr(node, method_name)
+            value = method() if callable(method) else None
+        except Exception:
+            continue
+        if value is not None:
+            return ("path", str(value))
+    try:
+        return ("proxy", hash(node))
+    except Exception:
+        return ("object", id(node))
 
 
 def _answer_owner_dialog(
@@ -778,7 +852,10 @@ def _installed_update_download_stage_activate(
         package_hash,
         str(len(package_bytes)),
     )
-    _trigger_update_action_from_installed_ui(environment, window_id, "download")
+    candidate_row = f"{UPDATE_VERSION} ({UPDATE_ID})"
+    _trigger_update_action_from_installed_ui(
+        environment, window_id, "download", row_marker=candidate_row
+    )
     _answer_owner_dialog(
         environment, "拒否", expected_summary_markers=download_markers
     )
@@ -790,7 +867,9 @@ def _installed_update_download_stage_activate(
     if record_path.read_bytes() != record_before or desktop_entry.read_bytes() != entry_before:
         raise RuntimeError("download Owner拒否がinstalled product状態を変更しました")
 
-    _trigger_update_action_from_installed_ui(environment, window_id, "download")
+    _trigger_update_action_from_installed_ui(
+        environment, window_id, "download", row_marker=candidate_row
+    )
     _answer_owner_dialog(
         environment, "許可", expected_summary_markers=download_markers
     )
@@ -824,7 +903,10 @@ def _installed_update_download_stage_activate(
         str(stage_directory),
     )
     _trigger_update_action_from_installed_ui(
-        environment, window_id, "未起動版へ展開"
+        environment,
+        window_id,
+        "未起動版へ展開",
+        row_marker=candidate_row,
     )
     _answer_owner_dialog(environment, "拒否", expected_summary_markers=stage_markers)
     _wait_for_owner_dialog_closed(environment)
@@ -837,7 +919,10 @@ def _installed_update_download_stage_activate(
         raise RuntimeError("stage Owner拒否がpackage／installed product状態を変更しました")
 
     _trigger_update_action_from_installed_ui(
-        environment, window_id, "未起動版へ展開"
+        environment,
+        window_id,
+        "未起動版へ展開",
+        row_marker=candidate_row,
     )
     _answer_owner_dialog(environment, "許可", expected_summary_markers=stage_markers)
     _find_accessible(
@@ -893,7 +978,12 @@ def _installed_update_download_stage_activate(
         str(stage_directory),
         str(desktop_entry),
     )
-    _trigger_update_action_from_installed_ui(environment, window_id, "更新を有効化")
+    _trigger_update_action_from_installed_ui(
+        environment,
+        window_id,
+        "更新を有効化",
+        row_marker=candidate_row,
+    )
     _answer_owner_dialog(
         environment, "拒否", expected_summary_markers=activation_markers
     )
@@ -908,7 +998,12 @@ def _installed_update_download_stage_activate(
     ):
         raise RuntimeError("activation Owner拒否がstage／record／entry／processを変更しました")
 
-    _trigger_update_action_from_installed_ui(environment, window_id, "更新を有効化")
+    _trigger_update_action_from_installed_ui(
+        environment,
+        window_id,
+        "更新を有効化",
+        row_marker=candidate_row,
+    )
     _answer_owner_dialog(
         environment, "許可", expected_summary_markers=activation_markers
     )
