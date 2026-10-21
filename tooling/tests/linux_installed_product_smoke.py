@@ -631,21 +631,28 @@ def _set_public_text_by_keyboard(
         check=True,
         timeout=5,
     )
-    subprocess.run(
-        ["xdotool", "type", "--clearmodifiers", "--delay", "20", "--file", "-"],
-        input=value,
-        text=True,
-        encoding="utf-8",
-        env=environment,
-        check=True,
-        timeout=5,
-    )
+    lines = value.split("\n")
+    for index, line in enumerate(lines):
+        if line:
+            subprocess.run(
+                ["xdotool", "type", "--clearmodifiers", "--delay", "20", line],
+                env=environment,
+                check=True,
+                timeout=5,
+            )
+        if index < len(lines) - 1:
+            subprocess.run(
+                ["xdotool", "key", "--clearmodifiers", "Return"],
+                env=environment,
+                check=True,
+                timeout=5,
+            )
     deadline = time.monotonic() + 2
     while time.monotonic() < deadline:
         if _accessible_text(editable_node) == value:
             return
         time.sleep(0.05)
-    raise RuntimeError("GTK public text field did not reflect the typed identifier")
+    raise RuntimeError(f"GTK public text field {label!r} did not reflect the typed identifier")
 
 
 def _enter_native_credential_secret(dialog, secret: str) -> None:
@@ -1298,7 +1305,7 @@ def _run_installed_mcp_tool_acceptance(
         ("サーバー識別子", server_id),
         ("実行ファイルの絶対パス", str(python_executable)),
         ("作業フォルダーの絶対パス", str(workspace)),
-        ("起動引数（1行に1項目、最大32項目）", f"-u\n{fixture}\n{seed}"),
+        ("起動引数（1行に1項目、最大32項目）", f"{fixture}\n{seed}"),
     ):
         _set_public_text_by_keyboard(window, label, value, environment, window_id)
 

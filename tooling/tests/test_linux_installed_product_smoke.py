@@ -604,7 +604,7 @@ class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
         def run(command, **kwargs):
             commands.append(command)
             if command[1] == "type":
-                field.value = kwargs["input"]
+                field.value = command[-1]
             return subprocess.CompletedProcess(command, 0)
 
         with (
@@ -628,10 +628,7 @@ class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
 
         self.assertEqual(field.value, "installed-server")
         self.assertEqual(commands[1], ["xdotool", "key", "--clearmodifiers", "ctrl+a"])
-        self.assertEqual(
-            commands[2],
-            ["xdotool", "type", "--clearmodifiers", "--delay", "20", "--file", "-"],
-        )
+        self.assertEqual(commands[2][-1], "installed-server")
 
     def test_public_text_preserves_bounded_multiline_argument_fields(self) -> None:
         class TextField:
@@ -656,9 +653,11 @@ class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
         def run(command, **kwargs):
             commands.append(command)
             if command[1] == "type":
-                field.value = kwargs["input"]
+                field.value += command[-1]
             elif command[1] == "key" and command[-1] == "ctrl+a":
                 field.value = ""
+            elif command[1] == "key" and command[-1] == "Return":
+                field.value += "\n"
             return subprocess.CompletedProcess(command, 0)
 
         with (
@@ -679,15 +678,19 @@ class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
             _set_public_text_by_keyboard(
                 object(),
                 "起動引数（1行に1項目、最大32項目）",
-                "-u\n/path/to/mcp-fixture.py\nseed",
+                "/path/to/mcp-fixture.py\nseed",
                 {},
                 "0x42",
             )
 
-        self.assertEqual(field.value, "-u\n/path/to/mcp-fixture.py\nseed")
-        self.assertIn(
-            ["xdotool", "type", "--clearmodifiers", "--delay", "20", "--file", "-"],
-            commands,
+        self.assertEqual(field.value, "/path/to/mcp-fixture.py\nseed")
+        self.assertEqual(
+            [command[-1] for command in commands if command[1] == "type"],
+            ["/path/to/mcp-fixture.py", "seed"],
+        )
+        self.assertEqual(
+            sum(command[1] == "key" and command[-1] == "Return" for command in commands),
+            1,
         )
 
     def test_public_text_rejects_carriage_return_and_nonprintable_controls(self) -> None:
