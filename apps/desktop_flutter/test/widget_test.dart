@@ -1192,7 +1192,13 @@ void main() {
       'MCP',
     );
     await tester.pumpAndSettle();
-    expect(find.text('MCP接続'), findsWidgets);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Text && widget.data == 'MCP接続一覧とOwner確認付き切断を開く',
+      ),
+      findsOneWidget,
+    );
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
 

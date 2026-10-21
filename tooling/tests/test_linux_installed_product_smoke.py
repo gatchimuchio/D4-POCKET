@@ -199,6 +199,7 @@ class AccessibleActionResolutionTests(unittest.TestCase):
                     window,
                     window,
                     object(),
+                    object(),
                     fresh_window,
                     fresh_window,
                 ),
@@ -216,6 +217,11 @@ class AccessibleActionResolutionTests(unittest.TestCase):
             [
                 call("D4 Pocket powered by GUI Shell", timeout=10),
                 call("コマンドパレット", root=window, timeout=10),
+                call(
+                    "MCP接続一覧とOwner確認付き切断を開く",
+                    root=window,
+                    timeout=10,
+                ),
                 call("MCP接続センター", timeout=10),
                 call("D4 Pocket powered by GUI Shell", timeout=10),
                 call("MCP接続センター", root=fresh_window, timeout=10),
