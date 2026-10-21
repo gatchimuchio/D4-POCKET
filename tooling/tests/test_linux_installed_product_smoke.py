@@ -6,12 +6,14 @@ import json
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from tooling.tests.linux_installed_product_smoke import (
     _activate_accessible,
     _activate_named_control_by_keyboard,
     _actionable_node,
+    _catalog_failure_diagnostics,
     _component_center,
     _desktop_entry_targets_fixed_launcher,
     _focused_named_accessible,
@@ -215,6 +217,38 @@ class InstalledCatalogFetchStatusTests(unittest.TestCase):
         root = self.Node("window", [self.Node(status)])
         with self.assertRaisesRegex(RuntimeError, "0件"):
             _wait_for_catalog_fetch_status(root)
+
+    def test_failure_diagnostics_expose_process_and_audit_metadata_only(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            helper = root / "gui_shell_linux_broker"
+            helper.write_bytes(b"fixture")
+            audit_path = root / "audit.jsonl"
+            audit_path.write_text(
+                json.dumps(
+                    {
+                        "event_id": "broker-audit-2",
+                        "operation": "更新候補取得",
+                        "decision": "rejected",
+                        "evidence_source": "LIVE_RUNTIME",
+                        "payload": "secret-test-payload",
+                        "reason": "secret-test-reason",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            with patch(
+                "tooling.tests.linux_installed_product_smoke._processes_using",
+                return_value=set(),
+            ):
+                diagnostics = _catalog_failure_diagnostics(helper, set(), audit_path)
+
+        rendered = json.dumps(diagnostics, ensure_ascii=False)
+        self.assertFalse(diagnostics["helper_alive"])
+        self.assertEqual(diagnostics["helper_count"], 0)
+        self.assertIn('"operation": "更新候補取得"', rendered)
+        self.assertNotIn("secret-test", rendered)
 
 
 class LinuxInstalledDesktopEntryTests(unittest.TestCase):

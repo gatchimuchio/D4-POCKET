@@ -64,6 +64,36 @@ def _processes_using(executables: set[Path]) -> set[int]:
     return found
 
 
+def _catalog_failure_diagnostics(
+    helper: Path, preexisting: set[int], audit_path: Path
+) -> dict[str, object]:
+    helper_pids = _processes_using({helper.resolve()}) - preexisting
+    recent_audit: list[dict[str, object]] = []
+    try:
+        lines = audit_path.read_text(encoding="utf-8").splitlines()[-6:]
+        for line in lines:
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(event, dict):
+                continue
+            recent_audit.append(
+                {
+                    key: event[key]
+                    for key in ("event_id", "operation", "decision", "evidence_source")
+                    if isinstance(event.get(key), str)
+                }
+            )
+    except (OSError, UnicodeError):
+        pass
+    return {
+        "helper_alive": bool(helper_pids),
+        "helper_count": len(helper_pids),
+        "recent_audit": recent_audit,
+    }
+
+
 def _desktop_entry_targets_fixed_launcher(entry: Path, launcher: Path) -> bool:
     try:
         metadata = entry.lstat()
@@ -1081,9 +1111,18 @@ def run_installed_smoke(
             if any(export_root.iterdir()):
                 raise RuntimeError("Owner拒否後にManifestまたは一時fileが作成されました")
 
-            catalog_evidence = _trigger_catalog_fetch_from_installed_ui(
-                environment, window_id
-            )
+            try:
+                catalog_evidence = _trigger_catalog_fetch_from_installed_ui(
+                    environment, window_id
+                )
+            except RuntimeError as error:
+                diagnostics = _catalog_failure_diagnostics(
+                    helper, preexisting, broker_state / "store/audit.jsonl"
+                )
+                raise RuntimeError(
+                    f"{error}; catalog transport diagnostics="
+                    + json.dumps(diagnostics, ensure_ascii=False, separators=(",", ":"))
+                ) from error
 
             rollback_entry_before = entries[0].read_bytes()
             rollback_record_before = record_path.read_bytes()
