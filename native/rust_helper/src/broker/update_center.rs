@@ -8425,6 +8425,21 @@ mod tests {
         let manifest_end = 12usize.checked_add(manifest_bytes).unwrap();
         assert!(manifest_end <= package.len());
         let manifest: Value = serde_json::from_slice(&package[12..manifest_end]).unwrap();
+        let mut payload_offset = manifest_end;
+        let mut product_manifest = None;
+        for file in manifest["files"].as_array().unwrap() {
+            let byte_length = usize::try_from(file["byte_length"].as_u64().unwrap()).unwrap();
+            let file_end = payload_offset.checked_add(byte_length).unwrap();
+            assert!(file_end <= package.len());
+            if file["path"] == "product_manifest.json" {
+                product_manifest = Some(
+                    serde_json::from_slice::<Value>(&package[payload_offset..file_end]).unwrap(),
+                );
+            }
+            payload_offset = file_end;
+        }
+        assert_eq!(payload_offset, package.len());
+        let product_manifest = product_manifest.expect("package product manifest is required");
         let offered_version = manifest["product_version"].as_str().unwrap().to_owned();
         assert_eq!(manifest["app_id"], INSTALL_APP_ID);
         assert_eq!(manifest["audit_store_id"], INSTALL_AUDIT_ID);
@@ -8469,11 +8484,11 @@ mod tests {
         let public_key_der_hex = hex::encode(&public_der);
         let fingerprint = sha256_tagged(pair.public_key().as_ref());
         assert_eq!(
-            manifest["update_trust"]["public_key_der_hex"].as_str(),
+            product_manifest["update_trust"]["public_key_der_hex"].as_str(),
             Some(public_key_der_hex.as_str())
         );
         assert_eq!(
-            manifest["update_trust"]["public_key_fingerprint"].as_str(),
+            product_manifest["update_trust"]["public_key_fingerprint"].as_str(),
             Some(fingerprint.as_str())
         );
         let update_id = "linux-installed-acceptance";
