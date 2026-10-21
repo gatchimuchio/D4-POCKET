@@ -189,7 +189,7 @@ class AccessibleActionResolutionTests(unittest.TestCase):
                 _find_operable_accessible("独立Appを書き出す", root=Root()), button
             )
 
-    def test_mcp_palette_submits_unique_command_and_refreshes_window_tree(self) -> None:
+    def test_mcp_palette_submits_ascii_query_and_refreshes_window_tree(self) -> None:
         window = object()
         fresh_window = object()
         with (
@@ -198,7 +198,6 @@ class AccessibleActionResolutionTests(unittest.TestCase):
                 side_effect=(
                     window,
                     window,
-                    object(),
                     object(),
                     fresh_window,
                     fresh_window,
@@ -217,11 +216,6 @@ class AccessibleActionResolutionTests(unittest.TestCase):
             [
                 call("D4 Pocket powered by GUI Shell", timeout=10),
                 call("コマンドパレット", root=window, timeout=10),
-                call(
-                    "MCP接続一覧とOwner確認付き切断を開く",
-                    root=window,
-                    timeout=10,
-                ),
                 call("MCP接続センター", timeout=10),
                 call("D4 Pocket powered by GUI Shell", timeout=10),
                 call("MCP接続センター", root=fresh_window, timeout=10),
@@ -238,7 +232,7 @@ class AccessibleActionResolutionTests(unittest.TestCase):
                     "--clearmodifiers",
                     "--delay",
                     "30",
-                    "MCP接続一覧とOwner確認付き切断を開く",
+                    "mcp",
                 ],
                 ["xdotool", "key", "--clearmodifiers", "Return"],
             ],

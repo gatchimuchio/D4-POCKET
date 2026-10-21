@@ -1176,7 +1176,7 @@ void main() {
     );
   });
 
-  testWidgets('コマンドパレットは一意検索結果をEnterで実行する', (WidgetTester tester) async {
+  testWidgets('コマンドパレットはMCP検索結果をEnterで実行する', (WidgetTester tester) async {
     await tester.pumpWidget(const GuiShellDesktopApp());
 
     await tester.sendKeyDownEvent(LogicalKeyboardKey.control);
@@ -1189,16 +1189,10 @@ void main() {
         (widget) =>
             widget is TextField && widget.decoration?.labelText == 'コマンドパレット',
       ),
-      'MCP接続一覧とOwner確認付き切断を開く',
+      'MCP',
     );
     await tester.pumpAndSettle();
-    expect(
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is Text && widget.data == 'MCP接続一覧とOwner確認付き切断を開く',
-      ),
-      findsOneWidget,
-    );
+    expect(find.text('MCP接続'), findsWidgets);
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
 

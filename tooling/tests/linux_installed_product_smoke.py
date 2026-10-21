@@ -542,17 +542,15 @@ def _open_mcp_center_from_installed_ui(
             "--clearmodifiers",
             "--delay",
             "30",
-            "MCP接続一覧とOwner確認付き切断を開く",
+            "mcp",
         ],
         env=environment,
         check=True,
         timeout=5,
     )
-    # Submit a uniquely matching command through the palette's supported
-    # TextField onSubmitted path. Some GTK AT-SPI action nodes lack component
-    # extents, so their accessible action is not a reliable screen hit target.
-    command_query = "MCP接続一覧とOwner確認付き切断を開く"
-    _find_accessible(command_query, root=window, timeout=10)
+    # Submit the ASCII MCP query through the palette's supported TextField
+    # onSubmitted path. Some GTK AT-SPI action nodes lack extents, and xdotool
+    # cannot type Japanese text; the first MCP result opens this same center.
     subprocess.run(
         ["xdotool", "key", "--clearmodifiers", "Return"],
         env=environment,
