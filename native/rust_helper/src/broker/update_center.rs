@@ -8780,8 +8780,7 @@ mod tests {
         assert_eq!(trust.public_key_der_hex, hex::encode(public_der));
         assert_eq!(trust.public_key_fingerprint, fingerprint);
 
-        let mut broker =
-            Broker::new_persistent("linux-installed-rollback-seed", &store_root).unwrap();
+        let mut broker = Broker::new_persistent("session-1", &store_root).unwrap();
         broker.update_trust = Some(trust);
         broker
             .set_desktop_product_identity(INSTALL_APP_ID.into(), INSTALL_AUDIT_ID.into())

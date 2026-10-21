@@ -3664,7 +3664,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "d0fc7c7267f6162de875c1a7806931d2947f43abb3feff17eb4a1f26a0422480"
+      "sha256": "9226827f2cebc2fa624b2c0722957447f666b153c71b62f232b65544d123e354"
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
