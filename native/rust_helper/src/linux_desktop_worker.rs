@@ -409,7 +409,7 @@ fn serve(
     let stopped = server
         .join()
         .map_err(|_| classify_stage_error(failure(), 59))?
-        .map_err(|error| classify_stage_error(error, 59));
+        .map_err(|_| classify_stage_error(failure(), 59));
     let cleanup = if !owned_session.is_empty() {
         let current =
             Zeroizing::new(fs::read(&session).map_err(|error| classify_stage_error(error, 60))?);
