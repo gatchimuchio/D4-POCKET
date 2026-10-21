@@ -83,6 +83,10 @@ fn classify_relay_error(error: io::Error) -> io::Error {
     io::Error::new(error.kind(), ClassifiedHelperError { exit_code })
 }
 
+fn classify_stage_error(error: io::Error, exit_code: i32) -> io::Error {
+    io::Error::new(error.kind(), ClassifiedHelperError { exit_code })
+}
+
 pub fn run() -> io::Result<()> {
     if std::env::args_os().len() != 1 {
         return Err(failure());
@@ -325,14 +329,17 @@ fn serve(
         let mut seen_credential_nonces = BTreeSet::new();
         let mut seen_workspace_selection_nonces = BTreeSet::new();
         loop {
-            let Some(frame) = read_frame(input, REQUEST_LIMIT)? else {
+            let Some(frame) = read_frame(input, REQUEST_LIMIT)
+                .map_err(|error| classify_stage_error(error, 50))?
+            else {
                 break;
             };
             let frame = Zeroizing::new(frame);
             if let Some(nonce) = launch_nonce {
                 crate::linux_desktop_launcher::cancel_product_uninstall_ticket_for_request(
                     &frame, runtime, nonce,
-                )?;
+                )
+                .map_err(|error| classify_stage_error(error, 51))?;
             }
             let mut confirmation_error = None;
             let selection_response = crate::linux_workspace_selection::dispatch_native(
@@ -341,7 +348,8 @@ fn serve(
                 &owner_tx,
                 &mut seen_workspace_selection_nonces,
                 &mut |challenge| request_workspace_selection(challenge, input, output),
-            )?;
+            )
+            .map_err(|error| classify_stage_error(error, 52))?;
             let owner_response = if selection_response.is_some() {
                 selection_response
             } else {
@@ -352,7 +360,9 @@ fn serve(
                     &owner_tx,
                     &mut seen_credential_nonces,
                     &mut ui,
-                )? {
+                )
+                .map_err(|error| classify_stage_error(error, 53))?
+                {
                     Some(response) => Some(response),
                     None => crate::macos_desktop_owner::dispatch(
                         &frame,
@@ -365,11 +375,12 @@ fn serve(
                                 false
                             }
                         },
-                    )?,
+                    )
+                    .map_err(|error| classify_stage_error(error, 54))?,
                 }
             };
             if let Some(error) = confirmation_error {
-                return Err(error);
+                return Err(classify_stage_error(error, 55));
             }
             let mut response = match owner_response {
                 Some(response) => response,
@@ -378,26 +389,34 @@ fn serve(
                     relay(&request, &endpoint.0).map_err(classify_relay_error)?
                 }
             };
-            mark_initial_install_handoff(&frame, &mut response, allow_initial_install_handoff)?;
+            mark_initial_install_handoff(&frame, &mut response, allow_initial_install_handoff)
+                .map_err(|error| classify_stage_error(error, 56))?;
             let sanitized = crate::linux_desktop_launcher::capture_product_uninstall_ticket(
                 &mut response,
                 runtime,
                 launch_nonce,
-            )?;
-            output.write_all(&sanitized)?;
-            output.write_all(b"\n")?;
-            output.flush()?;
+            )
+            .map_err(|error| classify_stage_error(error, 57))?;
+            output
+                .write_all(&sanitized)
+                .and_then(|()| output.write_all(b"\n"))
+                .and_then(|()| output.flush())
+                .map_err(|error| classify_stage_error(error, 58))?;
         }
         Ok(())
     })();
     shutdown.store(true, Ordering::Release);
-    let stopped = server.join().map_err(|_| failure())?.map_err(|_| failure());
+    let stopped = server
+        .join()
+        .map_err(|_| classify_stage_error(failure(), 59))?
+        .map_err(|error| classify_stage_error(error, 59));
     let cleanup = if !owned_session.is_empty() {
-        let current = Zeroizing::new(fs::read(&session)?);
+        let current =
+            Zeroizing::new(fs::read(&session).map_err(|error| classify_stage_error(error, 60))?);
         if *current == *owned_session {
-            fs::remove_file(&session)
+            fs::remove_file(&session).map_err(|error| classify_stage_error(error, 60))
         } else {
-            Err(failure())
+            Err(classify_stage_error(failure(), 60))
         }
     } else {
         Ok(())
@@ -941,6 +960,14 @@ mod tests {
                 io::ErrorKind::TimedOut
             ))),
             41
+        );
+        assert_eq!(
+            helper_exit_code(&classify_stage_error(io::Error::other("omitted"), 52)),
+            52
+        );
+        assert_eq!(
+            helper_exit_code(&classify_stage_error(io::Error::other("omitted"), 59)),
+            59
         );
     }
 
