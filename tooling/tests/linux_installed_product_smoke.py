@@ -862,12 +862,30 @@ _CREDENTIAL_SCAN_CHUNK_BYTES = 1024 * 1024
 _CREDENTIAL_SCAN_MAX_BYTES = 512 * 1024 * 1024
 
 
+def _credential_scan_file_role(path: Path, root: Path) -> str:
+    parts = path.relative_to(root).parts
+    if parts[:4] == ("home", ".local", "share", "keyrings"):
+        return "secret_service_store"
+    if parts[:2] == ("home", ".cache"):
+        return "user_cache"
+    if parts[:3] == ("home", ".local", "state"):
+        return "user_state"
+    if parts[:2] == ("home", ".config"):
+        return "user_config"
+    if parts[0] in {"tmp", "runtime"}:
+        return "temporary_or_runtime"
+    if path.suffix.lower() in {".log", ".txt", ".json", ".jsonl", ".trace"}:
+        return "diagnostic_or_text"
+    return "other_regular_file"
+
+
 def _assert_secret_absent_from_files(
     root: Path, secret: str, *, excluded_roots: tuple[Path, ...] = ()
 ) -> None:
     marker = secret.encode("utf-8")
     excluded = tuple(path.resolve(strict=True) for path in excluded_roots)
     remaining = _CREDENTIAL_SCAN_MAX_BYTES
+    files_scanned = 0
     for path in root.rglob("*"):
         if any(path.is_relative_to(excluded_root) for excluded_root in excluded):
             continue
@@ -876,14 +894,23 @@ def _assert_secret_absent_from_files(
             if not stat.S_ISREG(metadata.st_mode):
                 continue
             if metadata.st_size > remaining:
-                raise RuntimeError("Credential acceptance scan exceeds its bounded byte budget")
+                raise RuntimeError(
+                    "Credential acceptance scan exceeds its bounded byte budget "
+                    f"(files_scanned={files_scanned}, "
+                    f"scanned_bytes={_CREDENTIAL_SCAN_MAX_BYTES - remaining}, "
+                    f"next_file_bytes={metadata.st_size}, "
+                    f"next_file_role={_credential_scan_file_role(path, root)})"
+                )
             with path.open("rb") as stream:
                 overlap = b""
                 while chunk := stream.read(min(_CREDENTIAL_SCAN_CHUNK_BYTES, remaining + 1)):
                     remaining -= len(chunk)
                     if remaining < 0:
                         raise RuntimeError(
-                            "Credential acceptance scan exceeds its bounded byte budget"
+                            "Credential acceptance scan exceeds its bounded byte budget "
+                            f"(files_scanned={files_scanned}, "
+                            f"scanned_bytes={_CREDENTIAL_SCAN_MAX_BYTES - remaining}, "
+                            f"next_file_role={_credential_scan_file_role(path, root)})"
                         )
                     content = overlap + chunk
                     if marker in content:
@@ -891,6 +918,7 @@ def _assert_secret_absent_from_files(
                             "Credential secret leaked into an acceptance file or log"
                         )
                     overlap = content[-(len(marker) - 1) :] if len(marker) > 1 else b""
+            files_scanned += 1
         except OSError:
             raise RuntimeError("Credential acceptance file scan could not read a test file") from None
 

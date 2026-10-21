@@ -794,9 +794,13 @@ class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
                     "tooling.tests.linux_installed_product_smoke._CREDENTIAL_SCAN_MAX_BYTES",
                     8,
                 ),
-                self.assertRaisesRegex(RuntimeError, "bounded byte budget"),
+                self.assertRaisesRegex(RuntimeError, "bounded byte budget") as error,
             ):
                 _assert_secret_absent_from_files(root, "test-secret")
+        self.assertIn("files_scanned=0", str(error.exception))
+        self.assertIn("next_file_bytes=9", str(error.exception))
+        self.assertIn("next_file_role=diagnostic_or_text", str(error.exception))
+        self.assertNotIn("large.log", str(error.exception))
 
 
 class LinuxInstalledDesktopEntryTests(unittest.TestCase):
