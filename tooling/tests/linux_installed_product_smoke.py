@@ -535,7 +535,11 @@ def _open_mcp_center_from_installed_ui(
         check=True,
         timeout=5,
     )
-    command = _find_operable_accessible("MCP接続", root=window, timeout=10)
+    # Navigation also exposes an "MCP接続" item; target the palette row by its
+    # unique subtitle so this activates the command rather than the nav item.
+    command = _find_operable_accessible(
+        "MCP接続一覧とOwner確認付き切断を開く", root=window, timeout=10
+    )
     _activate_accessible(command, "MCP接続", environment)
     _find_accessible("MCP接続センター", root=window, timeout=10)
     return window
@@ -790,8 +794,8 @@ def _run_installed_credential_vault_acceptance(
     acceptance_root: Path,
     restart_application: Callable[[str], str],
 ) -> dict[str, object]:
-    secret = secrets.token_urlsafe(36)
     window = _open_mcp_center_from_installed_ui(environment, window_id)
+    secret = secrets.token_urlsafe(36)
     _set_accessible_text(window, "サーバー識別子", target_server_id)
     _activate_named_control_by_keyboard("native入力で資格情報を登録", environment, window_id)
     _enter_credential_and_answer_owner(
