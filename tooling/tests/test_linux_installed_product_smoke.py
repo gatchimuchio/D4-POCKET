@@ -25,6 +25,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _open_mcp_center_from_installed_ui,
     _resolve_regular_package,
     _safe_log_tail,
+    _set_accessible_text,
     _secret_service_item_labels,
     _verify_export_manifest,
     _verify_credential_audit,
@@ -487,6 +488,37 @@ class LinuxWaylandEnvironmentTests(unittest.TestCase):
 
 
 class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
+    def test_public_text_entry_is_read_back_before_owner_action(self) -> None:
+        class TextField:
+            def __init__(self) -> None:
+                self.value = ""
+
+            def queryEditableText(self):
+                return self
+
+            def setTextContents(self, value: str) -> bool:
+                self.value = value
+                return True
+
+            def queryText(self):
+                return self
+
+            def getText(self, start: int, end: int) -> str:
+                return self.value
+
+            @property
+            def characterCount(self) -> int:
+                return len(self.value)
+
+        field = TextField()
+        with patch(
+            "tooling.tests.linux_installed_product_smoke._find_accessible",
+            return_value=field,
+        ):
+            _set_accessible_text(object(), "サーバー識別子", "installed-server")
+
+        self.assertEqual(field.value, "installed-server")
+
     def test_secret_service_listing_reads_metadata_without_requesting_values(self) -> None:
         completed = subprocess.CompletedProcess(
             args=[],

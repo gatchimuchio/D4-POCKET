@@ -557,7 +557,12 @@ def _set_accessible_text(root, label: str, value: str, *, secret: bool = False) 
             continue
         if editor.setTextContents(value) is False:
             raise RuntimeError("accessible text setter rejected the value")
-        return
+        deadline = time.monotonic() + 2
+        while time.monotonic() < deadline:
+            if _accessible_text(node) == value:
+                return
+            time.sleep(0.05)
+        raise RuntimeError("GTK accessible field did not reflect the requested public value")
     purpose = "native secret" if secret else "non-secret field"
     raise RuntimeError(f"GTK accessible input is unavailable for the {purpose}")
 
