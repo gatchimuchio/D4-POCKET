@@ -359,9 +359,12 @@ class InstalledOwnerSummaryTests(unittest.TestCase):
             / "apps/desktop_flutter/linux/runner/broker_process_channel.cc"
         ).read_text(encoding="utf-8")
         self.assertIn("gtk_widget_get_accessible(label)", source)
-        self.assertIn(
-            "atk_object_set_name(label_accessible, state->summary.c_str())", source
+        owner_dialog = source.index("show_owner_dialog_on_gtk_thread")
+        show_dialog = source.index("gtk_widget_show_all(dialog);", owner_dialog)
+        expose_summary = source.index(
+            "atk_object_set_name(label_accessible, state->summary.c_str())", show_dialog
         )
+        self.assertLess(show_dialog, expose_summary)
 
 
 class LinuxInstalledDesktopEntryTests(unittest.TestCase):

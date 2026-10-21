@@ -182,8 +182,6 @@ gboolean show_owner_dialog_on_gtk_thread(gpointer data) {
   gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroller),
                                  GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
   GtkWidget* label = gtk_label_new(state->summary.c_str());
-  AtkObject* label_accessible = gtk_widget_get_accessible(label);
-  atk_object_set_name(label_accessible, state->summary.c_str());
   gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
   gtk_label_set_line_wrap_mode(GTK_LABEL(label), PANGO_WRAP_WORD_CHAR);
   gtk_label_set_xalign(GTK_LABEL(label), 0.0f);
@@ -196,6 +194,12 @@ gboolean show_owner_dialog_on_gtk_thread(gpointer data) {
     return G_SOURCE_REMOVE;
   }
   gtk_widget_show_all(dialog);
+  // GTK initializes GtkLabelAccessible while showing the widget and can replace
+  // a custom name with the first rendered line. Set the complete Owner summary
+  // after realization so assistive technology receives the same text shown to
+  // the operator.
+  AtkObject* label_accessible = gtk_widget_get_accessible(label);
+  atk_object_set_name(label_accessible, state->summary.c_str());
 
   OwnerDialogTimeout timeout{GTK_DIALOG(dialog), false};
   const guint timeout_id = g_timeout_add_seconds(
