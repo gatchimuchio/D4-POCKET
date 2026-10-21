@@ -4308,7 +4308,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "3a52c430e88e04af9386810cab37180bc5c957fa6597d6ab98f26ab0b4a9a7c5"
+      "sha256": "49c002d55469a83ed096ad318c6d7e8c099f3f6038126f772a1cef0846e1fc6c"
     },
     {
       "path": "requirements-dev.txt",
