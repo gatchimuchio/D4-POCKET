@@ -1346,15 +1346,14 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             )
 
         find_operable.assert_called_once_with(
-            "Agentを開く", root=window, timeout=10
+            "エージェントセンターを開く", root=window, timeout=10
         )
-        activate.assert_called_once_with(command, "Agentを開く", environment)
+        activate.assert_called_once_with(command, "エージェントセンターを開く", environment)
         self.assertEqual(
             [entry.args[0] for entry in run.call_args_list],
             [
                 ["xdotool", "windowactivate", "--sync", "0x42"],
                 ["xdotool", "key", "--clearmodifiers", "ctrl+k"],
-                ["xdotool", "type", "--clearmodifiers", "--delay", "30", "agent"],
             ],
         )
         self.assertEqual(find_accessible.call_count, 5)

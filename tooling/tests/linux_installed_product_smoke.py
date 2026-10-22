@@ -1791,14 +1791,10 @@ def _open_agent_center_from_installed_ui(
         timeout=5,
     )
     _find_accessible("コマンドパレット", root=window, timeout=10)
-    subprocess.run(
-        ["xdotool", "type", "--clearmodifiers", "--delay", "30", "agent"],
-        env=environment,
-        check=True,
-        timeout=5,
+    command = _find_operable_accessible(
+        "エージェントセンターを開く", root=window, timeout=10
     )
-    command = _find_operable_accessible("Agentを開く", root=window, timeout=10)
-    _activate_accessible(command, "Agentを開く", environment)
+    _activate_accessible(command, "エージェントセンターを開く", environment)
     _find_accessible("エージェントセンター", timeout=10)
     window = _find_accessible(WINDOW_TITLE, timeout=10)
     _find_accessible("エージェントセンター", root=window, timeout=10)
