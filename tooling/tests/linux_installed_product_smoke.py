@@ -1458,10 +1458,13 @@ def _select_folder_in_gtk_chooser(
     if window_ids != [chooser_window_id]:
         raise RuntimeError("GTK folder chooser changed to an unexpected window")
     chooser = _find_accessible("D4 Pocket 作業領域の選択", timeout=10)
+    selection_target_source = "atspi_row"
+    selection_target_xy = None
     try:
         folder_row = _find_operable_accessible(
             folder.name, root=chooser, timeout=10
         )
+        selection_target_xy = _component_center(folder_row)
     except RuntimeError:
         visible_directories = sorted(
             child.name
@@ -1476,7 +1479,10 @@ def _select_folder_in_gtk_chooser(
             ) from None
         row_target = _gtk_folder_row_text_target(chooser, folder.name)
         if row_target is None:
+            selection_target_source = "column_header_geometry"
             row_target = _gtk_folder_list_first_row_target(chooser)
+        else:
+            selection_target_source = "exact_folder_text_bounds"
         if row_target is None:
             diagnostics = _gtk_folder_chooser_diagnostics(chooser, folder)
             raise RuntimeError(
@@ -1497,6 +1503,7 @@ def _select_folder_in_gtk_chooser(
             check=True,
             timeout=5,
         )
+        selection_target_xy = row_target
         subprocess.run(
             ["xdotool", "key", "--clearmodifiers", "Home"],
             env=environment,
@@ -1515,6 +1522,14 @@ def _select_folder_in_gtk_chooser(
         )
     except RuntimeError:
         diagnostics = _gtk_folder_chooser_diagnostics(chooser, folder)
+        diagnostics.update(
+            {
+                "selection_target_source": selection_target_source,
+                "selection_target_xy": selection_target_xy,
+                "home_sent_after_click": selection_target_source
+                != "atspi_row",
+            }
+        )
         raise RuntimeError(
             "GTK folder selection did not close after row selection and accept; "
             f"bounded_state={diagnostics}"
@@ -1543,13 +1558,78 @@ def _gtk_folder_chooser_diagnostics(chooser, folder: Path) -> dict[str, object]:
                 pass
     common_roles = sorted(role_counts.items(), key=lambda item: (-item[1], item[0]))[:12]
     focused_roles = _gtk_focused_accessible_roles(chooser)
+    header_bounds = []
+    table_bounds = []
+    target_entries = []
+    for node, accessible_name in _accessible_nodes(chooser):
+        try:
+            role = str(node.getRoleName())
+        except Exception:
+            role = "unknown"
+        bounds = _accessible_component_bounds(node)
+        if role == "table column header" and bounds is not None and len(header_bounds) < 5:
+            header_bounds.append(bounds)
+        if role == "table" and bounds is not None and len(table_bounds) < 3:
+            table_bounds.append(bounds)
+        text = _accessible_text(node)
+        if (
+            accessible_name.strip() == folder.name
+            or text.strip() == folder.name
+            or folder.name in accessible_name
+            or folder.name in text
+        ) and len(target_entries) < 4:
+            parent = _accessible_parent(node)
+            try:
+                parent_role = str(parent.getRoleName()) if parent is not None else "none"
+            except Exception:
+                parent_role = "unknown"
+            target_entries.append(
+                {
+                    "role": role,
+                    "name_exact": accessible_name.strip() == folder.name,
+                    "text_exact": text.strip() == folder.name,
+                    "name_contains": folder.name in accessible_name,
+                    "text_contains": folder.name in text,
+                    "bounds": bounds,
+                    "parent_role": parent_role,
+                    "parent_bounds": _accessible_component_bounds(parent)
+                    if parent is not None
+                    else None,
+                }
+            )
     return {
         "parent_path_visible": str(folder.parent) in snapshot,
         "folder_name_visible": folder.name in snapshot,
         "selected_accessible_count": selected_count,
         "common_roles": common_roles,
         "focused_roles": focused_roles,
+        "visible_header_bounds": header_bounds,
+        "visible_table_bounds": table_bounds,
+        "target_entries": target_entries,
     }
+
+
+def _accessible_component_bounds(node) -> tuple[int, int, int, int] | None:
+    if node is None:
+        return None
+    try:
+        import pyatspi
+
+        bounds = node.queryComponent().getExtents(pyatspi.XY_SCREEN)
+        values = tuple(int(value) for value in (bounds.x, bounds.y, bounds.width, bounds.height))
+    except Exception:
+        return None
+    x, y, width, height = values
+    if (
+        width <= 0
+        or height <= 0
+        or width > 4096
+        or height > 4096
+        or abs(x) > 8192
+        or abs(y) > 8192
+    ):
+        return None
+    return values
 
 
 def _gtk_focused_accessible_roles(chooser) -> list[tuple[str, int]]:

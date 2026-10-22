@@ -1540,6 +1540,9 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                 "selected_accessible_count": 1,
                 "common_roles": [("table cell", 1)],
                 "focused_roles": [],
+                "visible_header_bounds": [],
+                "visible_table_bounds": [],
+                "target_entries": [],
             },
         )
         self.assertNotIn(str(folder.parent), repr(diagnostics))
