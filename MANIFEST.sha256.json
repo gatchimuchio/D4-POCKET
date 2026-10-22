@@ -5088,7 +5088,7 @@
     },
     {
       "path": "tooling/export_linux_product.py",
-      "sha256": "d830e43d2aedd74f6d5043e343f3c64688451093efdc85b81a3d214da2edb4fc"
+      "sha256": "11b5b32ec01eec2eb410eece14cf660341b680a2d8b48c6315e62e5b14cd247e"
     },
     {
       "path": "tooling/export_windows_product.py",
@@ -5216,7 +5216,7 @@
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",
-      "sha256": "23828469d12050fe9b4c6eae64e6d92b1ea32bb27377b84018bfb12dcd38766f"
+      "sha256": "586e4430f8e7ed1048175309e3831b5aa6efedcb72b05dd849314e2eac4e7437"
     },
     {
       "path": "tooling/tests/test_linux_gtk_bundle_smoke.py",
