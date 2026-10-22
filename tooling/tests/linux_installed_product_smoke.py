@@ -1971,6 +1971,7 @@ def _run_installed_workspace_selection_acceptance(
     *,
     audit_store: Path,
     acceptance_root: Path,
+    screenshot_path: Path,
 ) -> dict[str, object]:
     fixture_root, workspace, decoy_workspace, cli_fixture, cli_marker = (
         _write_linux_workspace_acceptance_fixture(acceptance_root)
@@ -2006,7 +2007,6 @@ def _run_installed_workspace_selection_acceptance(
         timeout=10,
     )
     chooser_window_id = _open_workspace_folder_chooser(environment, dialog)
-    screenshot_path = acceptance_root / "workspace-chooser.png"
     _select_folder_in_gtk_chooser(
         environment,
         chooser_window_id,
@@ -3929,6 +3929,7 @@ def run_installed_smoke(
                     window_id,
                     audit_store=broker_state / "store",
                     acceptance_root=acceptance_root,
+                    screenshot_path=temp_root / "workspace-chooser.png",
                 )
                 current_window_id = _visible_product_window(environment)
                 if current_window_id is None:
