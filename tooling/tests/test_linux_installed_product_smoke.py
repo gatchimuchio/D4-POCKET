@@ -39,6 +39,8 @@ from tooling.tests.linux_installed_product_smoke import (
     _verify_live_audit,
     _verify_workspace_projection,
     _editable_text_ancestor,
+    _open_agent_center_from_installed_ui,
+    _open_installed_codex_registration,
     _verify_uninstalled_state,
     _trigger_update_action_from_installed_ui,
     _wait_for_catalog_fetch_status,
@@ -1259,6 +1261,69 @@ class LinuxEditableTextAncestorTests(unittest.TestCase):
 
 
 class LinuxInstalledDesktopEntryTests(unittest.TestCase):
+    def test_agent_palette_activates_the_observed_command_item(self) -> None:
+        window = object()
+        destination_window = object()
+        command = object()
+        environment = {"DISPLAY": ":99"}
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_accessible",
+                side_effect=(window, object(), object(), destination_window, object()),
+            ) as find_accessible,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
+                return_value=command,
+            ) as find_operable,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._activate_accessible"
+            ) as activate,
+            patch(
+                "tooling.tests.linux_installed_product_smoke.subprocess.run"
+            ) as run,
+        ):
+            self.assertIs(
+                _open_agent_center_from_installed_ui(environment, "0x42"),
+                destination_window,
+            )
+
+        find_operable.assert_called_once_with(
+            "Agentを開く", root=window, timeout=10
+        )
+        activate.assert_called_once_with(command, "Agentを開く", environment)
+        self.assertEqual(
+            [entry.args[0] for entry in run.call_args_list],
+            [
+                ["xdotool", "windowactivate", "--sync", "0x42"],
+                ["xdotool", "key", "--clearmodifiers", "ctrl+k"],
+                ["xdotool", "type", "--clearmodifiers", "--delay", "30", "agent"],
+            ],
+        )
+        self.assertEqual(find_accessible.call_count, 5)
+
+    def test_missing_agent_registration_action_reports_broker_unavailable(self) -> None:
+        environment = {"DISPLAY": ":99"}
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._visible_product_window",
+                return_value="0x42",
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._open_agent_center_from_installed_ui",
+                return_value=object(),
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
+                side_effect=RuntimeError("control missing"),
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._accessible_snapshot",
+                return_value="スナップショット: broker_unavailable",
+            ),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "broker_unavailable"):
+                _open_installed_codex_registration(environment)
+
     def test_gtk_chooser_close_timeout_names_the_response_action(self) -> None:
         for action in ("folder selection click", "cancel control click"):
             with self.subTest(action=action):

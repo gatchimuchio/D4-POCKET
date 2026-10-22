@@ -1555,13 +1555,8 @@ def _open_agent_center_from_installed_ui(
         check=True,
         timeout=5,
     )
-    _find_accessible("Agentを開く", root=window, timeout=10)
-    subprocess.run(
-        ["xdotool", "key", "--clearmodifiers", "Return"],
-        env=environment,
-        check=True,
-        timeout=5,
-    )
+    command = _find_operable_accessible("Agentを開く", root=window, timeout=10)
+    _activate_accessible(command, "Agentを開く", environment)
     _find_accessible("エージェントセンター", timeout=10)
     window = _find_accessible(WINDOW_TITLE, timeout=10)
     _find_accessible("エージェントセンター", root=window, timeout=10)
@@ -1573,7 +1568,20 @@ def _open_installed_codex_registration(environment: dict[str, str]):
     if current_window_id is None:
         raise RuntimeError("Agent Centerへ移動するinstalled product windowがありません")
     window = _open_agent_center_from_installed_ui(environment, current_window_id)
-    button = _find_operable_accessible("登録を開始", root=window, timeout=10)
+    try:
+        button = _find_operable_accessible("登録を開始", root=window, timeout=10)
+    except RuntimeError as error:
+        snapshot = _accessible_snapshot(window)
+        if (
+            "broker_unavailable" in snapshot
+            or "RustブローカーIPCを利用できないか、接続が拒否されました。" in snapshot
+        ):
+            raise RuntimeError(
+                "installed Agent Center reports broker_unavailable; registration remained fail-closed"
+            ) from error
+        raise RuntimeError(
+            "Agent Center registration control was not exposed and no bounded broker-unavailable marker was found"
+        ) from error
     _activate_accessible(button, "登録を開始", environment)
     _find_accessible("Codex実行系をBrokerへ登録", root=window, timeout=10)
     return window
