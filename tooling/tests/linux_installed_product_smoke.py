@@ -1483,6 +1483,7 @@ def _select_folder_in_gtk_chooser(
     chooser_window_id: str,
     folder: Path,
     *,
+    screenshot_before_selection_path: Path | None = None,
     screenshot_path: Path | None = None,
 ) -> None:
     if not folder.is_absolute() or not folder.is_dir() or folder.is_symlink():
@@ -1543,6 +1544,7 @@ def _select_folder_in_gtk_chooser(
     chooser = _find_accessible("D4 Pocket 作業領域の選択", timeout=10)
     selection_target_source = "atspi_row"
     selection_target_xy = None
+    screenshot_before_selection_captured = False
     try:
         folder_row = _find_operable_accessible(
             folder.name, root=chooser, timeout=10
@@ -1560,6 +1562,15 @@ def _select_folder_in_gtk_chooser(
                 "GTK folder row is not accessible and isolated chooser parent "
                 f"does not contain exactly the target; bounded_state={diagnostics}"
             ) from None
+        screenshot_before_selection_captured = (
+            _capture_gtk_dialog_screenshot(
+                environment,
+                "D4 Pocket 作業領域の選択",
+                screenshot_before_selection_path,
+            )
+            if screenshot_before_selection_path is not None
+            else False
+        )
         row_target = _gtk_folder_row_text_target(chooser, folder.name)
         if row_target is None:
             selection_target_source = "column_header_geometry"
@@ -1620,6 +1631,9 @@ def _select_folder_in_gtk_chooser(
                 "selection_target_xy": selection_target_xy,
                 "home_sent_after_click": selection_target_source
                 != "atspi_row",
+                "screenshot_before_selection_captured": (
+                    screenshot_before_selection_captured
+                ),
                 "screenshot_captured": screenshot_captured,
             }
         )
@@ -1971,6 +1985,7 @@ def _run_installed_workspace_selection_acceptance(
     *,
     audit_store: Path,
     acceptance_root: Path,
+    screenshot_before_selection_path: Path,
     screenshot_path: Path,
 ) -> dict[str, object]:
     fixture_root, workspace, decoy_workspace, cli_fixture, cli_marker = (
@@ -2011,10 +2026,15 @@ def _run_installed_workspace_selection_acceptance(
         environment,
         chooser_window_id,
         workspace,
+        screenshot_before_selection_path=screenshot_before_selection_path,
         screenshot_path=screenshot_path,
     )
     if _workspace_root_field_value(dialog) != str(workspace):
         raise RuntimeError("GTK chooser selection did not update the Workspace input")
+    for diagnostic_path in (screenshot_before_selection_path, screenshot_path):
+        if diagnostic_path.is_symlink():
+            raise RuntimeError("successful GTK chooser left a symlink diagnostic image")
+        diagnostic_path.unlink(missing_ok=True)
     _find_accessible(
         "OS選択済み（選択結果のみ）。登録・Permission・Approvalは別です。",
         root=dialog,
@@ -2051,6 +2071,7 @@ def _run_installed_workspace_selection_acceptance(
         environment,
         chooser_window_id,
         workspace,
+        screenshot_before_selection_path=screenshot_before_selection_path,
         screenshot_path=screenshot_path,
     )
     if _workspace_root_field_value(dialog) != str(workspace):
@@ -3929,7 +3950,12 @@ def run_installed_smoke(
                     window_id,
                     audit_store=broker_state / "store",
                     acceptance_root=acceptance_root,
-                    screenshot_path=temp_root / "workspace-chooser.png",
+                    screenshot_before_selection_path=(
+                        temp_root / "workspace-chooser-before-selection.png"
+                    ),
+                    screenshot_path=(
+                        temp_root / "workspace-chooser-after-selection.png"
+                    ),
                 )
                 current_window_id = _visible_product_window(environment)
                 if current_window_id is None:

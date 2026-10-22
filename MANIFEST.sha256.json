@@ -76,7 +76,7 @@
     },
     {
       "path": ".github/workflows/linux-manual-export-build.yml",
-      "sha256": "ff1af8669a3a105c04d8736557f9aa284c7073da2d2e08e70e8400398f45ec73"
+      "sha256": "30a714b3dbe598a7c8f0a50a45d351d99e7b031fba22ff8014ded0c5435069dc"
     },
     {
       "path": ".github/workflows/linux-manual-rust-validation.yml",
@@ -172,7 +172,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "9f07205486a97d741120981ce5208479da3ab5b4d4cd2153986afc05726a6c89"
+      "sha256": "2e737bc6e5db787557a3dd66675021ff1964dcec7c6a4cf0745fa292d47d8185"
     },
     {
       "path": "SECURITY.md",
@@ -1308,7 +1308,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "9d20f8bdf6017ad82c7e37e2bd41f8d784cbe09ed7e2b156b7f9efc44a2e5846"
+      "sha256": "b2a177e8dcdb63e8da71c6e115c403a413563976c310615674e10fdc8bb5e5d3"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -5212,7 +5212,7 @@
     },
     {
       "path": "tooling/tests/linux_installed_product_smoke.py",
-      "sha256": "288a0e9b3385241acb8abba08b76334e8f1847e31876116c4a50473a01698bd4"
+      "sha256": "1f484824d8e2420b4695dddd2d0b71cce2c6c1cca9dee869964b7402827271ad"
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",
