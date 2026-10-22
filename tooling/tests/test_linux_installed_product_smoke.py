@@ -1328,6 +1328,38 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "broker_unavailable"):
                 _open_installed_codex_registration(environment)
 
+    def test_agent_registration_reuses_supplied_window_when_lookup_is_transiently_empty(self) -> None:
+        environment = {"DISPLAY": ":99"}
+        window = object()
+        button = object()
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._visible_product_window",
+                return_value=None,
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._open_agent_center_from_installed_ui",
+                return_value=window,
+            ) as open_agent_center,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
+                return_value=button,
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._activate_accessible"
+            ) as activate,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_accessible"
+            ),
+        ):
+            self.assertIs(
+                _open_installed_codex_registration(environment, window_id="0x42"),
+                window,
+            )
+
+        open_agent_center.assert_called_once_with(environment, "0x42")
+        activate.assert_called_once_with(button, "登録を開始", environment)
+
     def test_gtk_chooser_close_timeout_names_the_response_action(self) -> None:
         for action in (
             "folder row selection and accept click",

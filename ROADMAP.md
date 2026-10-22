@@ -1,5 +1,7 @@
 # GUI Shell ロードマップ
 
+履歴追補（2026-10-22、Linux installed Workspace acceptance run #119）: manual `workflow_dispatch` [run #119](https://github.com/gatchimuchio/D4-POCKET/actions/runs/39705744803)は対象commit `bf754aa2a6238f940bbe9e61ea92ebc83560dc18`でRelease build／portable launcher、cleanup、post clean checkoutがPASSした。installer側で検出済みGTK window IDをregistration helperが即時再検索して見失い、chooser前に失敗した。Owner操作前で製品作用失敗は観測していない。既知window IDを初回registrationへ渡し、不要な二重検索を除く。Linux acceptance未成立を維持する。
+
 履歴追補（2026-10-22、Linux installed Workspace acceptance run #118）: manual `workflow_dispatch` [run #118](https://github.com/gatchimuchio/D4-POCKET/actions/runs/39704828047)は対象commit `ef303163096c15e923a2f38321ce4321a3b36f8c`でRelease build／portable launcher、cleanup、post clean checkoutがPASSした。chooserのparent／target nameは可視、row text/actionは取れず、一覧header由来clickでfocusは`table`へ移ったがrowは選択されずdialogが閉じなかった。Owner操作前で製品作用失敗は観測していない。次runはtable focus後にHomeを送り、専用一件rowを選択する。Linux native受入れ状態は未解決のまま維持する。
 
 履歴追補（2026-10-22、Linux installed Workspace acceptance run #117）: manual `workflow_dispatch` [run #117](https://github.com/gatchimuchio/D4-POCKET/actions/runs/39703554408)は対象commit `bca8f5c035a990b3de5d54fe4ac771c475c5bbf3`でRelease build／portable launcher、cleanup、post clean checkoutがPASSした。chooserのparent path・target nameは表示されたが、12回のTab後もfocused roleは`text`でfolder listへ移れずFAIL。Owner／registration／CLI probe未到達で、製品作用失敗は観測していない。AT-SPI exact text boundsを優先し、fallbackに単一target一覧のheader geometryを使う。`linux_native_product_support=unresolved`、`task_execution=unsupported`、`release_ready=false`を維持する。

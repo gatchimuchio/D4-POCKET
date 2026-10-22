@@ -1743,8 +1743,10 @@ def _open_agent_center_from_installed_ui(
     return window
 
 
-def _open_installed_codex_registration(environment: dict[str, str]):
-    current_window_id = _visible_product_window(environment)
+def _open_installed_codex_registration(
+    environment: dict[str, str], *, window_id: str | None = None
+):
+    current_window_id = _visible_product_window(environment) or window_id
     if current_window_id is None:
         raise RuntimeError("Agent Centerへ移動するinstalled product windowがありません")
     window = _open_agent_center_from_installed_ui(environment, current_window_id)
@@ -1812,7 +1814,7 @@ def _run_installed_workspace_selection_acceptance(
         "Task実行能力はunsupportedのままです。",
     )
 
-    dialog = _open_installed_codex_registration(environment)
+    dialog = _open_installed_codex_registration(environment, window_id=window_id)
     _fill_linux_workspace_registration(
         environment,
         dialog,
