@@ -20,6 +20,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _catalog_failure_diagnostics,
     _click_accessible_by_coordinates,
     _component_center,
+    _gtk_folder_chooser_diagnostics,
     _credential_scan_file_role,
     _desktop_entry_targets_fixed_launcher,
     _enter_single_installed_mcp_tool_arguments,
@@ -1416,6 +1417,45 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             "D4 Pocket 作業領域の選択",
             action="folder row selection and accept click",
         )
+
+    def test_folder_chooser_diagnostics_emit_only_bounded_state(self) -> None:
+        from types import SimpleNamespace
+
+        class State:
+            def contains(self, state: int) -> bool:
+                return state == 1
+
+        class Node:
+            name = ""
+            childCount = 0
+
+            def getRoleName(self) -> str:
+                return "table cell"
+
+            def getState(self):
+                return State()
+
+        with tempfile.TemporaryDirectory() as directory:
+            folder = Path(directory) / "selected-workspace"
+            with (
+                patch.dict("sys.modules", {"pyatspi": SimpleNamespace(STATE_SELECTED=1)}),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._accessible_snapshot",
+                    return_value=str(folder.parent),
+                ),
+            ):
+                diagnostics = _gtk_folder_chooser_diagnostics(Node(), folder)
+
+        self.assertEqual(
+            diagnostics,
+            {
+                "parent_path_visible": True,
+                "folder_name_visible": False,
+                "selected_accessible_count": 1,
+                "common_roles": [("table cell", 1)],
+            },
+        )
+        self.assertNotIn(str(folder.parent), repr(diagnostics))
 
     def test_waits_for_native_owner_dialog_to_become_visible(self) -> None:
         from unittest.mock import patch
