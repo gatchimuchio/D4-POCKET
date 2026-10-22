@@ -1417,7 +1417,15 @@ def _select_folder_in_gtk_chooser(
         timeout=5,
     )
     subprocess.run(
-        ["xdotool", "type", "--clearmodifiers", "--delay", "1", "--", str(folder)],
+        [
+            "xdotool",
+            "type",
+            "--clearmodifiers",
+            "--delay",
+            "1",
+            "--",
+            str(folder.parent),
+        ],
         env=environment,
         check=True,
         timeout=5,
@@ -1450,10 +1458,12 @@ def _select_folder_in_gtk_chooser(
     if window_ids != [chooser_window_id]:
         raise RuntimeError("GTK folder chooser changed to an unexpected window")
     chooser = _find_accessible("D4 Pocket 作業領域の選択", timeout=10)
+    folder_row = _find_operable_accessible(folder.name, root=chooser, timeout=10)
+    _click_accessible_by_coordinates(folder_row, folder.name, environment)
     accept = _find_operable_accessible("選択", root=chooser, timeout=10)
     _click_accessible_by_coordinates(accept, "選択", environment)
     _wait_for_gtk_dialog_closed(
-        environment, "D4 Pocket 作業領域の選択", action="folder selection click"
+        environment, "D4 Pocket 作業領域の選択", action="folder row selection and accept click"
     )
 
 

@@ -12099,6 +12099,7 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
         "def _editable_text_ancestor(",
         "_editable_text_ancestor(focused)",
         '"broker_unavailable" in snapshot',
+        '_click_accessible_by_coordinates(folder_row, folder.name, environment)',
         '_click_accessible_by_coordinates(accept, "選択", environment)',
         '_click_accessible_by_coordinates(cancel, "取消", environment)',
         "def _run_installed_workspace_selection_acceptance(",

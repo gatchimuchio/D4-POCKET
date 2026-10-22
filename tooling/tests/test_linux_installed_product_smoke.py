@@ -32,6 +32,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _review_single_installed_mcp_tool_arguments,
     _run_rust_test,
     _safe_log_tail,
+    _select_folder_in_gtk_chooser,
     _set_public_text_by_keyboard,
     _secret_service_item_labels,
     _verify_export_manifest,
@@ -1325,7 +1326,10 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                 _open_installed_codex_registration(environment)
 
     def test_gtk_chooser_close_timeout_names_the_response_action(self) -> None:
-        for action in ("folder selection click", "cancel control click"):
+        for action in (
+            "folder row selection and accept click",
+            "cancel control click",
+        ):
             with self.subTest(action=action):
                 with self.assertRaisesRegex(RuntimeError, action):
                     _wait_for_gtk_dialog_closed(
@@ -1334,6 +1338,84 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                         action=action,
                         timeout=0,
                     )
+
+    def test_folder_chooser_selects_the_folder_row_from_its_parent(self) -> None:
+        from unittest.mock import call
+
+        environment = {"DISPLAY": ":99"}
+        with tempfile.TemporaryDirectory() as directory:
+            folder = Path(directory) / "selected-workspace"
+            folder.mkdir()
+            chooser = object()
+            folder_row = object()
+            accept = object()
+            visible = subprocess.CompletedProcess(
+                args=[], returncode=0, stdout=b"0x42\n", stderr=b""
+            )
+            with (
+                patch(
+                    "tooling.tests.linux_installed_product_smoke.subprocess.run",
+                    side_effect=(None, None, None, None, visible),
+                ) as run,
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._find_accessible",
+                    return_value=chooser,
+                ),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
+                    side_effect=(folder_row, accept),
+                ) as find_operable,
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._click_accessible_by_coordinates"
+                ) as click,
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._wait_for_gtk_dialog_closed"
+                ) as wait_closed,
+            ):
+                _select_folder_in_gtk_chooser(environment, "0x42", folder)
+
+        self.assertEqual(
+            [entry.args[0] for entry in run.call_args_list],
+            [
+                ["xdotool", "windowactivate", "--sync", "0x42"],
+                ["xdotool", "key", "--clearmodifiers", "ctrl+l"],
+                [
+                    "xdotool",
+                    "type",
+                    "--clearmodifiers",
+                    "--delay",
+                    "1",
+                    "--",
+                    str(folder.parent),
+                ],
+                ["xdotool", "key", "--clearmodifiers", "Return"],
+                [
+                    "xdotool",
+                    "search",
+                    "--onlyvisible",
+                    "--name",
+                    "^D4 Pocket 作業領域の選択$",
+                ],
+            ],
+        )
+        self.assertEqual(
+            find_operable.call_args_list,
+            [
+                call(folder.name, root=chooser, timeout=10),
+                call("選択", root=chooser, timeout=10),
+            ],
+        )
+        click.assert_has_calls(
+            [
+                call(folder_row, folder.name, environment),
+                call(accept, "選択", environment),
+            ]
+        )
+        wait_closed.assert_called_once_with(
+            environment,
+            "D4 Pocket 作業領域の選択",
+            action="folder row selection and accept click",
+        )
 
     def test_waits_for_native_owner_dialog_to_become_visible(self) -> None:
         from unittest.mock import patch
