@@ -1358,7 +1358,11 @@ def _gtk_dialog_window_id(environment: dict[str, str], title: str) -> str:
 
 
 def _wait_for_gtk_dialog_closed(
-    environment: dict[str, str], title: str, *, timeout: float = 10.0
+    environment: dict[str, str],
+    title: str,
+    *,
+    action: str,
+    timeout: float = 10.0,
 ) -> None:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -1372,7 +1376,7 @@ def _wait_for_gtk_dialog_closed(
         if result.returncode != 0:
             return
         time.sleep(0.1)
-    raise RuntimeError("GTK OS選択dialogが閉じませんでした")
+    raise RuntimeError(f"GTK OS選択dialogが{action}後も閉じませんでした")
 
 
 def _workspace_root_field_value(dialog) -> str:
@@ -1438,15 +1442,19 @@ def _select_folder_in_gtk_chooser(
         timeout=5,
     )
     if visible.returncode != 0:
-        _wait_for_gtk_dialog_closed(environment, "D4 Pocket 作業領域の選択")
+        _wait_for_gtk_dialog_closed(
+            environment, "D4 Pocket 作業領域の選択", action="path入力"
+        )
         return
     window_ids = visible.stdout.decode("ascii", errors="ignore").splitlines()
     if window_ids != [chooser_window_id]:
         raise RuntimeError("GTK folder chooser changed to an unexpected window")
     chooser = _find_accessible("D4 Pocket 作業領域の選択", timeout=10)
     accept = _find_operable_accessible("選択", root=chooser, timeout=10)
-    _activate_accessible(accept, "選択", environment)
-    _wait_for_gtk_dialog_closed(environment, "D4 Pocket 作業領域の選択")
+    _click_accessible_by_coordinates(accept, "選択", environment)
+    _wait_for_gtk_dialog_closed(
+        environment, "D4 Pocket 作業領域の選択", action="folder selection click"
+    )
 
 
 def _cancel_gtk_folder_chooser(environment: dict[str, str], chooser_window_id: str) -> None:
@@ -1458,8 +1466,10 @@ def _cancel_gtk_folder_chooser(environment: dict[str, str], chooser_window_id: s
     )
     chooser = _find_accessible("D4 Pocket 作業領域の選択", timeout=10)
     cancel = _find_operable_accessible("取消", root=chooser, timeout=10)
-    _activate_accessible(cancel, "取消", environment)
-    _wait_for_gtk_dialog_closed(environment, "D4 Pocket 作業領域の選択")
+    _click_accessible_by_coordinates(cancel, "取消", environment)
+    _wait_for_gtk_dialog_closed(
+        environment, "D4 Pocket 作業領域の選択", action="cancel control click"
+    )
 
 
 def _verify_workspace_projection(

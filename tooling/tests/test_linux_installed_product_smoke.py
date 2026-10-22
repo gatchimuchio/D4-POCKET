@@ -42,6 +42,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _verify_uninstalled_state,
     _trigger_update_action_from_installed_ui,
     _wait_for_catalog_fetch_status,
+    _wait_for_gtk_dialog_closed,
     _wayland_launch_environment,
     MCP_OWNER_ARGUMENT_HASH_MARKER,
     MCP_OWNER_NO_CREDENTIAL_MARKER,
@@ -1258,6 +1259,17 @@ class LinuxEditableTextAncestorTests(unittest.TestCase):
 
 
 class LinuxInstalledDesktopEntryTests(unittest.TestCase):
+    def test_gtk_chooser_close_timeout_names_the_response_action(self) -> None:
+        for action in ("folder selection click", "cancel control click"):
+            with self.subTest(action=action):
+                with self.assertRaisesRegex(RuntimeError, action):
+                    _wait_for_gtk_dialog_closed(
+                        {"DISPLAY": ":99"},
+                        "D4 Pocket 作業領域の選択",
+                        action=action,
+                        timeout=0,
+                    )
+
     def test_waits_for_native_owner_dialog_to_become_visible(self) -> None:
         from unittest.mock import patch
 
