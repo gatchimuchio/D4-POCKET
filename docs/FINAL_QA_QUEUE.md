@@ -2,12 +2,14 @@
 
 状態: `DEFERRED`（最新版rev5実装指示§2の`PRODUCT_BUILD_MODE`に従い、Final QAは現在modeではない）
 
+現行QE工程との境界（2026-10-22）: [採用記録付きQE統合3点](QE_2026-10-22/採用記録.md)はQE方法論・施工工程を定めるが、本Final QA Queueの開始状態・Q0〜Q7識別子・過去の検査履歴・Release Gateを変更しない。Q0〜Q7は引き続き`DEFERRED`であり、製品工程の現在状態は[REV5_PRODUCT_PROGRESS.md](REV5_PRODUCT_PROGRESS.md)を参照する。
+
 2026-10-09 P13 Workspace Inspector作業時の必須検査履歴: 全Rustはlib 518 PASS／1 FAIL／12 ignored、他target PASS。変更外`a2a::tests::loopback_HTTPからAgent_Cardを取得してmetadata_onlyへ射影する`が`a2a_connection_failed`／「A2A Agent Card応答を読めない」でFAIL。根因未確定の既存`FQ-TEST-LOOPBACK`へ同分類で保持し、新native入口の局所2試験PASSとは分離する。旧fixtureを再試験・根因探索せず、全体FAILを上書きせず、Final QAを開始しない。
 
 2026-10-09 P13 Host作業時の必須検査履歴: 最終全Rustはlib 516 PASS／1 FAIL／12 ignored、他target PASS。変更外`bounded_catalog_fetch_rejects_declared_document_over_limit`がlocalhost TLSのOS error 10054／ConnectionResetでFAILし、単独再実行は1 PASS。根因未確定の既存`FQ-TEST-LOOPBACK`へ同分類で保存する。Hostのcurrent blockerへ追加せず、全体FAILを上書きせず、Final QAを開始しない。
 
 2026-10-09 P13 A2A作業時の必須検査履歴: 全Rust実行はlib target FAIL、他target PASS。短縮lib再確認は514 passed／1 failed／12 ignoredで、既存`failed_tool_result_is_not_replayed_as_another_exec_command`がHTTP応答途中のConnectionReset（expected 23274、received 0）。対象単独再実行は1 passed。根因未確定の既存`FQ-TEST-LOOPBACK`へ同分類で記録し、P13 A2A入口のregressionとは観測されない。全体FAILを成功へ書換えず、本記録だけを追加し、Final QA試験を開始しない。
-工程正本: ユーザー提示の最新版rev5仕様書・工程表・実装指示書。旧版および過去のphase記録は補助履歴として扱う。
+製品工程・Final QA要求正本: ユーザー提示の最新版rev5仕様書・工程表・実装指示書。QE施工方法・BUILD_BATCH工程正本: [2026-10-22 QE統合3点](QE_2026-10-22/採用記録.md)。両者の責任範囲を分け、旧版および過去のphase記録は補助履歴として扱う。
 現行製品phase: `docs/REV5_PRODUCT_PROGRESS.md`
 
 ## 0. 現在の凍結・進行状態

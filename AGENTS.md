@@ -1,6 +1,6 @@
 # D4Pocket エージェント実装・監査規定
 
-本書はD4Pocket（旧GUI-Shell）のAI実装エージェントが守るリポジトリ共通規律である。BLUE-TANUKIのQE思想を開発方法論として採用する一方、D4Pocket固有の権限、安全、復旧、OS別証拠、Git運用を保持する。BLUE側のHDS-BRAIN実装、192小単位、別リポジトリの成果や書込み権限は移植しない。
+本書はD4Pocket（旧GUI-Shell）のAI実装エージェントが守るリポジトリ共通規律である。QE方法論・工程・2026-10-22の是正工程の詳細は、採用記録付きの現行3点（`docs/QE_2026-10-22/`）を適用し、D4Pocket固有の権限、安全、復旧、OS別証拠、Git運用を保持する。BLUE側のHDS-BRAIN実装、192小単位、別リポジトリの成果や書込み権限は移植しない。
 
 ## 第I部 共通基底規律
 
@@ -20,7 +20,7 @@
 
 **安全第一・堅牢性第二。** Authority、Permission、Approval、Credential、秘密、Audit、Recovery、Content Exposure、Workspace／Host、process監督、OS保護、非冪等外部作用の境界はBUILD中も常時維持し、当該変更の必要な否定試験・安全停止をその場で実施する。不成立なら危険な経路を無効化・隔離する。既存試験・リリースゲートの削除や恒久skipは許可しない。
 
-対象OSはWindows-firstの優先順位を維持した上で**Windows／macOS／Linux（Desktop）、Android／iOS（Mobile）**。Linux nativeは独立した**必須の製品対象**であり、製品機能・導入・GUI・権限境界・配布まで完全対応する。Linux対応の対象可否や施工開始を、2026-10-12再構成3文書v1.1の採否待ちにしてはならない。Linuxの追加要求`D4-QE-R13`と試験`D4-LNX-T01〜T08`、Linux専用`QEB-D4-LNX-01〜03`は、要求ID・詳細試験・QE作業分割の**正本候補**にすぎず、その候補扱いはLinux製品対応の必須性を弱めない。WSL Ubuntu、WSLg X11、headlessの開発用証拠をLinux nativeの導入・GUI・権限・配布・Waylandの完成へ転用しない。現在のLinux製品受入状態は`docs/REV5_PRODUCT_PROGRESS.md`を参照する。
+対象OSはWindows-firstの優先順位を維持した上で**Windows／macOS／Linux（Desktop）、Android／iOS（Mobile）**。Linux nativeは独立した**必須の製品対象**であり、製品機能・導入・GUI・権限境界・配布まで完全対応する。Linux対応の対象可否や施工開始を、2026-10-12再構成3文書v1.1の採否待ちにしてはならない。2026-10-22 QE正本に記載されたLinux要求・試験・工程IDの現行状態は、その採用記録および各文書内の区分に従い、候補を黙ってAcceptanceへ昇格させない。WSL Ubuntu、WSLg X11、headlessの開発用証拠をLinux nativeの導入・GUI・権限・配布・Waylandの完成へ転用しない。現在のLinux製品受入状態は`docs/REV5_PRODUCT_PROGRESS.md`を参照する。
 
 本§0、§19、§20、§25、§28〜31は採用済みの**QE施工方法**を優先して示す。既存のrev5原本、採用済み緩衝補遺（`BUF-R01〜R09`、`BUF-T01〜T24`）、製品契約、安全・release gate、過去のCLOSED／FAILは削除しない。従来文書に小単位ごとの全suite／個別QA／毎回Git閉包が残れば、その部分は旧施工方式の残差として別途文書同期し、今回の`AGENTS.md`だけの更新で他文書を改竄しない。安全上の強い条件は常に保持する。
 
@@ -718,7 +718,7 @@ Product UI完成をcontract完成として扱わない。
 
 現行ROADMAPの正本は`ROADMAP.md`である。
 
-基盤の共通実装仕様は`docs/specs/gui-shell-spec-v1.md`である。同じ製品工程に対する仕様・工程表・実装指示書は、ユーザーが明示した最新版が現行正本となる。現在のrev5製品・緩衝基盤工程は、最新rev5指示、採用済み緩衝補遺と`docs/REV5_PRODUCT_PROGRESS.md`がphase・Acceptance・状態を決める。§0がQE施工方法を定め、2026-10-12のQE再構成3文書は別のOwner採用まで正本候補である。旧版は最新版で置き換えられていない基盤責任範囲または補助履歴に限って参照し、現行phaseを上書きしない。
+基盤の共通実装仕様は`docs/specs/gui-shell-spec-v1.md`である。同じ製品工程に対する仕様・工程表・実装指示書は、ユーザーが明示した最新版が現行正本となる。現在のrev5製品・緩衝基盤工程は、最新rev5指示、採用済み緩衝補遺と`docs/REV5_PRODUCT_PROGRESS.md`がphase・Acceptance・状態を決める。QE方法論・工程・D4-AUD是正手順は採用記録付きの`docs/QE_2026-10-22/`を現行正本とする。2026-10-12のQE再構成3文書はその履歴・補助資料であり、現行正本の状態を上書きしない。
 
 拡張標準は`docs/standards/gui-shell-extended-standard.md`である。
 
@@ -772,6 +772,6 @@ CLOSEDを理由なく再施工しない。Linux未実装をP13やWindows B4の�
 
 ### 31. D4Pocket QEとLinux追加設計の採用境界
 
-Linux nativeは完全対応が必須の独立Desktop製品対象であり、その実装・工程開始にLinux v1.1追加文書の採用を前提としない。2026-10-12作成のLinux明示改訂3点（D4Pocket QE統合実装仕様書／統合工程表／Codex QE施工指示書 v1.1）は、現時点では**要求ID・詳細試験・QE作業分割に関する未採用の詳細正本候補**であり、Linux対応自体の採否候補ではない。候補文書の具体的要求を拘束的なAcceptanceとして適用するかは別途管理し、採用済み正本・現行工程・Owner指示に基づくLinux製品作業は継続する。本AGENTS.mdの更新はOwnerが許可した**本ファイルのQE方法論同期**のみであり、それだけで候補全文・追加の詳細工程・他リポジトリ変更・releaseを承認しない。既存工程と現行進捗を照合し、Linux製品の必須要求を実装・受入れへ反映する。
+Linux nativeは完全対応が必須の独立Desktop製品対象であり、その実装・工程開始は2026-10-12詳細案の採否に依存しない。QE方法論・工程・`D4-AUD-20261022`是正工程の現行正本は、Owner採用済みの[2026-10-22統合3点](docs/QE_2026-10-22/採用記録.md)とする。これらはrev5の製品機能要求を欠落なく置換したものではないため、rev5・既存Contract／Schema・緩衝補遺の要求意味、既存CLOSED／FAIL、製品状態、Release Gateを保持する。3点内で候補・未採用と明記されたIDや詳細工程はその区分も保持し、Linux必須性を弱めず、黙って拘束的Acceptanceへ昇格させない。正式Q0〜Q7、通常Release capability、Owner GOは既存の開始条件を維持する。
 
 D4Pocket固有のremoteバックアップ正本は`refs/tags/codex/backup-main`と`refs/tags/codex/backup-main-prev`。BLUE側の`refs/heads`へ自動変更しない。D4の手動`workflow_dispatch`限定Actions運用、direct-main、単一writer、Shell Core／Broker authority、各OSの証拠区分を保持する。LinuxはWindows・macOSと並ぶ独立Desktop対象だが、native製品の実接続・導入・Release・保証が実証済みとは主張しない。既存試験・Release Gateを省略せず、作業開始時に現物と正本を再読する。

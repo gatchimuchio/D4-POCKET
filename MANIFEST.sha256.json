@@ -100,7 +100,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "9d3d0831ad2c8ea1aa2408d8ae219fd6dbd27aa2eb5f623fa4d03b08ae733c36"
+      "sha256": "bdf8aa79d893d8bd6e477ad073eb8bfa80688b65cd183176ceb9579889f4c6b6"
     },
     {
       "path": "AUDIT.md",
@@ -172,7 +172,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "563e3036071018f3263e603c655a20ccbe24babc0889734f363273ebafe2064f"
+      "sha256": "50155dfb39525b629864c0d636b2d6c6d53e697f0db23788e2cf16c78dac5085"
     },
     {
       "path": "SECURITY.md",
@@ -1252,7 +1252,7 @@
     },
     {
       "path": "docs/FINAL_QA_QUEUE.md",
-      "sha256": "5dab1faebcad58e39e6bce58db41b53d07c79ef8d969548bd744370dd99ffc5e"
+      "sha256": "e34af10ed8f9ed96552f2f870758d9ad4277109714ee5d3df1f032dc7f6228c0"
     },
     {
       "path": "docs/FIRST_RUN.md",
@@ -1280,7 +1280,7 @@
     },
     {
       "path": "docs/OPERATING_MODEL.md",
-      "sha256": "91d35fb001ad54fdaf57af44a2ef994195cbe5f417f8eccd70e37b8d63c9d46b"
+      "sha256": "798c8b1097666de849b9ef38a12e53bcd246dcada7ea2df46e9b3814fc66c32d"
     },
     {
       "path": "docs/PHASE_STRATEGY.md",
@@ -1289,6 +1289,22 @@
     {
       "path": "docs/PRODUCT_COMPLETION_PLAN.md",
       "sha256": "7279e4f19804d24d614b467c03fa5ef4bbfc9184185893da51da6aedf7609338"
+    },
+    {
+      "path": "docs/QE_2026-10-22/D4Pocket_01_QE\u7d71\u5408\u5b9f\u88c5\u4ed5\u69d8\u66f8_20261022.md",
+      "sha256": "f06cf46d2f89bc13e55ce4fe8a9eac6e80d326da3faba9e77a373ce6fa2c4f7b"
+    },
+    {
+      "path": "docs/QE_2026-10-22/D4Pocket_02_QE\u7d71\u5408\u5de5\u7a0b\u8868_20261022.md",
+      "sha256": "36aeba6c0694b8dc14a391166fc3f4c9f4ecff5c21f0715575df452077ba7dbc"
+    },
+    {
+      "path": "docs/QE_2026-10-22/D4Pocket_03_Codex_QE\u65bd\u5de5\u6307\u793a\u66f8_20261022.md",
+      "sha256": "7c40ff4fb0644e087e6c3bae731ffcde5f8c8eeb3cc63f6c093cf1d585583e20"
+    },
+    {
+      "path": "docs/QE_2026-10-22/\u63a1\u7528\u8a18\u9332.md",
+      "sha256": "3ee6b120269f80ab8eaa9877640ef3863912a2d1e18124f02393fdcac662d921"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1308,7 +1324,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "cd3795e7e291ba8859547e31b285fcd52efd018e4cec17d20e0a4b835a92304b"
+      "sha256": "2ec9b93ccd47f291c13a6032c294799fcdfdcfa6ce4fb370ddc1c62fc043aff2"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1724,7 +1740,7 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/\u63a1\u7528\u8a18\u9332.md",
-      "sha256": "2c107bfe7ec4709fefd570000b047cd400e1a43773f70969943c4f6e0283dbd5"
+      "sha256": "4c3c140c5adad4f619c9df996ac1be2ef0905b109cdc2cc35d3deb502f447815"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -5264,7 +5280,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "0fc2d31c8769b479818d78a9b702e8ef9093580477f4e1ca31ff4f8a279d7e10"
+      "sha256": "bc1de5a5b747551950a280fc099bec275ec9e5cf5b540184c14ee33b02a7ab5c"
     }
   ]
 }

@@ -4,7 +4,7 @@
 参照様式: BLUE-TANUKI の direct-main owner workflow
 適用範囲: repository の作業流、安全姿勢、validation、backup、報告に関する補助資料
 
-現行適用注記（2026-10-19）: この文書は現行正本索引に登録されていない補助資料である。現行の作業規則・進捗はroot `AGENTS.md`、`規定/正本索引.json`、`ROADMAP.md`、`docs/REV5_PRODUCT_PROGRESS.md`を優先する。本書の古いPhase記述を現在状態として扱わない。Rust検査は`tooling/run_cargo_isolated.py`、Flutter analyze／test／buildは`tooling/validate_all.py --flutter-step`の隔離入口を使う。同期対象source上でCargo／Flutter commandを直接実行しない。
+現行適用注記（2026-10-22）: この文書は現行正本索引に登録されていない補助資料である。QE方法論・工程・BUILD_BATCH運用・D4-AUD是正工程は[採用記録付き2026-10-22 QE統合3点](QE_2026-10-22/採用記録.md)、現行製品状態は`docs/REV5_PRODUCT_PROGRESS.md`と各Contractを優先する。本書の古いPhase記述や小単位ごとの一律test／Git閉包記述を現行状態として扱わない。小単位は要求・作用・consumerの再同期に使い、関連小単位のBUILD_BATCHで必要な技術確認・Git保全・報告を閉じる。安全上必要な否定試験・停止確認と既存release gateは各作用時に維持する。Rust検査は`tooling/run_cargo_isolated.py`、Flutter analyze／test／buildは`tooling/validate_all.py --flutter-step`の隔離入口を使う。同期対象source上でCargo／Flutter commandを直接実行しない。
 
 ## 1. 中核姿勢
 
@@ -131,7 +131,7 @@ Phase ごとの backup branch または追加の backup generation を作成し�
 
 ## 5. validation の gate
 
-開発と品質判定はローカル作業ツリーで行う。GitHub は完成した局所成果の記録・共有面とし、各単位で試験、差分監査、commit、push、remote HEAD 確認を完了する。自動 CI と CI 必須 status check は使用しない。
+開発と品質判定はローカル作業ツリーで行う。GitHubは完成したBUILD_BATCHの記録・共有面とし、各小単位での一律な全suite・Git閉包は要求しない。小単位の安全上必要な確認は作用時に行い、関連小単位を束ねたBUILD_BATCH末に対象に応じた検証・差分監査・commit／push・remote HEAD確認を閉じる。自動CIとCI必須status checkは使用しない。
 
 GitHub Actions は `workflow_dispatch` のみの手動補助に限る。ローカルにない OS の build、artifact 生成、重い手動検証の必要性を ROADMAP または phase instruction に記録する。実行時は理由、対象 commit、trigger、結果、artifact、証拠範囲を報告する。Actions 成功は実機動作、製品完成、release readiness、owner GO の代替にならない。
 
