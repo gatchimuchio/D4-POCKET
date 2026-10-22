@@ -1418,6 +1418,51 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             action="folder row selection and accept click",
         )
 
+    def test_folder_chooser_uses_home_for_single_isolated_row_when_atspi_hides_it(self) -> None:
+        environment = {"DISPLAY": ":99"}
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory) / "workspace-picker"
+            folder = parent / "selected-workspace"
+            parent.mkdir()
+            folder.mkdir()
+            chooser = object()
+            accept = object()
+            visible = subprocess.CompletedProcess(
+                args=[], returncode=0, stdout=b"0x42\n", stderr=b""
+            )
+            with (
+                patch(
+                    "tooling.tests.linux_installed_product_smoke.subprocess.run",
+                    side_effect=(None, None, None, None, visible, None),
+                ) as run,
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._find_accessible",
+                    return_value=chooser,
+                ),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
+                    side_effect=(RuntimeError("folder row is not exposed"), accept),
+                ),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._click_accessible_by_coordinates"
+                ) as click,
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._wait_for_gtk_dialog_closed"
+                ) as wait_closed,
+            ):
+                _select_folder_in_gtk_chooser(environment, "0x42", folder)
+
+        self.assertEqual(
+            run.call_args_list[-1].args[0],
+            ["xdotool", "key", "--clearmodifiers", "Home"],
+        )
+        click.assert_called_once_with(accept, "選択", environment)
+        wait_closed.assert_called_once_with(
+            environment,
+            "D4 Pocket 作業領域の選択",
+            action="folder row selection and accept click",
+        )
+
     def test_folder_chooser_diagnostics_emit_only_bounded_state(self) -> None:
         from types import SimpleNamespace
 
@@ -1453,6 +1498,7 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                 "folder_name_visible": False,
                 "selected_accessible_count": 1,
                 "common_roles": [("table cell", 1)],
+                "focused_roles": [],
             },
         )
         self.assertNotIn(str(folder.parent), repr(diagnostics))

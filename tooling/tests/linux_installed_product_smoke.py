@@ -1462,17 +1462,40 @@ def _select_folder_in_gtk_chooser(
         folder_row = _find_operable_accessible(
             folder.name, root=chooser, timeout=10
         )
-    except RuntimeError as error:
-        diagnostics = _gtk_folder_chooser_diagnostics(chooser, folder)
-        raise RuntimeError(
-            f"GTK folder row is absent from AT-SPI; bounded_state={diagnostics}"
-        ) from error
-    _click_accessible_by_coordinates(folder_row, folder.name, environment)
+    except RuntimeError:
+        visible_directories = sorted(
+            child.name
+            for child in folder.parent.iterdir()
+            if child.is_dir() and not child.is_symlink()
+        )
+        if visible_directories != [folder.name]:
+            diagnostics = _gtk_folder_chooser_diagnostics(chooser, folder)
+            raise RuntimeError(
+                "GTK folder row is not accessible and isolated chooser parent "
+                f"does not contain exactly the target; bounded_state={diagnostics}"
+            ) from None
+        subprocess.run(
+            ["xdotool", "key", "--clearmodifiers", "Home"],
+            env=environment,
+            check=True,
+            timeout=5,
+        )
+    else:
+        _click_accessible_by_coordinates(folder_row, folder.name, environment)
     accept = _find_operable_accessible("選択", root=chooser, timeout=10)
     _click_accessible_by_coordinates(accept, "選択", environment)
-    _wait_for_gtk_dialog_closed(
-        environment, "D4 Pocket 作業領域の選択", action="folder row selection and accept click"
-    )
+    try:
+        _wait_for_gtk_dialog_closed(
+            environment,
+            "D4 Pocket 作業領域の選択",
+            action="folder row selection and accept click",
+        )
+    except RuntimeError:
+        diagnostics = _gtk_folder_chooser_diagnostics(chooser, folder)
+        raise RuntimeError(
+            "GTK folder selection did not close after row selection and accept; "
+            f"bounded_state={diagnostics}"
+        ) from None
 
 
 def _gtk_folder_chooser_diagnostics(chooser, folder: Path) -> dict[str, object]:
@@ -1495,12 +1518,23 @@ def _gtk_folder_chooser_diagnostics(chooser, folder: Path) -> dict[str, object]:
                     selected_count += 1
             except Exception:
                 pass
-    common_roles = sorted(role_counts.items(), key=lambda item: (-item[1], item[0]))[:8]
+    common_roles = sorted(role_counts.items(), key=lambda item: (-item[1], item[0]))[:12]
+    focused_roles: dict[str, int] = {}
+    if pyatspi is not None:
+        for node, _ in _accessible_nodes(chooser):
+            try:
+                state = node.getState()
+                if state.contains(pyatspi.STATE_FOCUSED):
+                    role = str(node.getRoleName())
+                    focused_roles[role] = focused_roles.get(role, 0) + 1
+            except Exception:
+                continue
     return {
         "parent_path_visible": str(folder.parent) in snapshot,
         "folder_name_visible": folder.name in snapshot,
         "selected_accessible_count": selected_count,
         "common_roles": common_roles,
+        "focused_roles": sorted(focused_roles.items()),
     }
 
 
@@ -1539,10 +1573,12 @@ def _write_linux_workspace_acceptance_fixture(
     acceptance_root: Path,
 ) -> tuple[Path, Path, Path, Path, Path]:
     fixture_root = acceptance_root / "workspace-fixture-source"
-    workspace = fixture_root / "selected-workspace"
+    picker_root = fixture_root / "workspace-picker"
+    workspace = picker_root / "selected-workspace"
     outside_root = fixture_root / "outside-root"
     decoy_workspace = fixture_root / "decoy-workspace"
     fixture_root.mkdir(mode=0o700)
+    picker_root.mkdir(mode=0o700)
     workspace.mkdir(mode=0o700)
     outside_root.mkdir(mode=0o700)
     decoy_workspace.mkdir(mode=0o700)
