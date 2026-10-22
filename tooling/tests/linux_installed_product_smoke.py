@@ -1501,6 +1501,12 @@ def _select_folder_in_gtk_chooser(
         timeout=5,
     )
     subprocess.run(
+        ["xdotool", "key", "--clearmodifiers", "ctrl+a"],
+        env=environment,
+        check=True,
+        timeout=5,
+    )
+    subprocess.run(
         [
             "xdotool",
             "type",
@@ -1508,14 +1514,8 @@ def _select_folder_in_gtk_chooser(
             "--delay",
             "1",
             "--",
-            str(folder.parent),
+            str(folder),
         ],
-        env=environment,
-        check=True,
-        timeout=5,
-    )
-    subprocess.run(
-        ["xdotool", "key", "--clearmodifiers", "Return"],
         env=environment,
         check=True,
         timeout=5,
@@ -1542,77 +1542,22 @@ def _select_folder_in_gtk_chooser(
     if window_ids != [chooser_window_id]:
         raise RuntimeError("GTK folder chooser changed to an unexpected window")
     chooser = _find_accessible("D4 Pocket 作業領域の選択", timeout=10)
-    selection_target_source = "atspi_row"
-    selection_target_xy = None
-    screenshot_before_selection_captured = False
-    try:
-        folder_row = _find_operable_accessible(
-            folder.name, root=chooser, timeout=10
+    screenshot_before_selection_captured = (
+        _capture_gtk_dialog_screenshot(
+            environment,
+            "D4 Pocket 作業領域の選択",
+            screenshot_before_selection_path,
         )
-        selection_target_xy = _component_center(folder_row)
-    except RuntimeError:
-        visible_directories = sorted(
-            child.name
-            for child in folder.parent.iterdir()
-            if child.is_dir() and not child.is_symlink()
-        )
-        if visible_directories != [folder.name]:
-            diagnostics = _gtk_folder_chooser_diagnostics(chooser, folder)
-            raise RuntimeError(
-                "GTK folder row is not accessible and isolated chooser parent "
-                f"does not contain exactly the target; bounded_state={diagnostics}"
-            ) from None
-        screenshot_before_selection_captured = (
-            _capture_gtk_dialog_screenshot(
-                environment,
-                "D4 Pocket 作業領域の選択",
-                screenshot_before_selection_path,
-            )
-            if screenshot_before_selection_path is not None
-            else False
-        )
-        row_target = _gtk_folder_row_text_target(chooser, folder.name)
-        if row_target is None:
-            selection_target_source = "column_header_geometry"
-            row_target = _gtk_folder_list_first_row_target(chooser)
-        else:
-            selection_target_source = "exact_folder_text_bounds"
-        if row_target is None:
-            diagnostics = _gtk_folder_chooser_diagnostics(chooser, folder)
-            raise RuntimeError(
-                "GTK folder row and visible list header are not accessible; "
-                f"bounded_state={diagnostics}"
-            ) from None
-        subprocess.run(
-            [
-                "xdotool",
-                "mousemove",
-                "--sync",
-                str(row_target[0]),
-                str(row_target[1]),
-                "click",
-                "1",
-            ],
-            env=environment,
-            check=True,
-            timeout=5,
-        )
-        selection_target_xy = row_target
-        subprocess.run(
-            ["xdotool", "key", "--clearmodifiers", "Home"],
-            env=environment,
-            check=True,
-            timeout=5,
-        )
-    else:
-        _click_accessible_by_coordinates(folder_row, folder.name, environment)
+        if screenshot_before_selection_path is not None
+        else False
+    )
     accept = _find_operable_accessible("選択", root=chooser, timeout=10)
     _click_accessible_by_coordinates(accept, "選択", environment)
     try:
         _wait_for_gtk_dialog_closed(
             environment,
             "D4 Pocket 作業領域の選択",
-            action="folder row selection and accept click",
+            action="absolute folder path entry and accept click",
         )
     except RuntimeError:
         diagnostics = _gtk_folder_chooser_diagnostics(chooser, folder)
@@ -1627,10 +1572,7 @@ def _select_folder_in_gtk_chooser(
         )
         diagnostics.update(
             {
-                "selection_target_source": selection_target_source,
-                "selection_target_xy": selection_target_xy,
-                "home_sent_after_click": selection_target_source
-                != "atspi_row",
+                "selection_target_source": "absolute_location_entry",
                 "screenshot_before_selection_captured": (
                     screenshot_before_selection_captured
                 ),
@@ -1638,7 +1580,7 @@ def _select_folder_in_gtk_chooser(
             }
         )
         raise RuntimeError(
-            "GTK folder selection did not close after row selection and accept; "
+            "GTK folder selection did not close after absolute path entry and accept; "
             f"bounded_state={diagnostics}"
         ) from None
 
@@ -1753,73 +1695,6 @@ def _gtk_focused_accessible_roles(chooser) -> list[tuple[str, int]]:
         except Exception:
             continue
     return sorted(roles.items())
-
-
-def _gtk_folder_row_text_target(
-    chooser, folder_name: str
-) -> tuple[int, int] | None:
-    try:
-        import pyatspi
-    except ImportError:
-        return None
-    row_roles = {"text", "table cell", "table row", "list item", "tree item"}
-    for node, accessible_name in _accessible_nodes(chooser):
-        if (
-            accessible_name.strip() != folder_name
-            and _accessible_text(node).strip() != folder_name
-        ):
-            continue
-        current = node
-        for _ in range(5):
-            try:
-                if (
-                    str(current.getRoleName()) in row_roles
-                    and current.getState().contains(pyatspi.STATE_SHOWING)
-                ):
-                    center = _component_center(current)
-                    if center is not None:
-                        return center
-            except Exception:
-                pass
-            current = _accessible_parent(current)
-            if current is None:
-                break
-    return None
-
-
-def _gtk_folder_list_first_row_target(chooser) -> tuple[int, int] | None:
-    try:
-        import pyatspi
-    except ImportError:
-        return None
-    headers = []
-    for node, _ in _accessible_nodes(chooser):
-        try:
-            if str(node.getRoleName()) != "table column header":
-                continue
-            if not node.getState().contains(pyatspi.STATE_SHOWING):
-                continue
-            bounds = node.queryComponent().getExtents(pyatspi.XY_SCREEN)
-            x, y = int(bounds.x), int(bounds.y)
-            width, height = int(bounds.width), int(bounds.height)
-            if (
-                width <= 0
-                or height <= 0
-                or width > 4096
-                or height > 4096
-                or abs(x) > 8192
-                or abs(y) > 8192
-            ):
-                continue
-            headers.append((y, x, width, height))
-        except Exception:
-            continue
-    if not headers:
-        return None
-    y, x, width, height = min(headers)
-    # The isolated picker parent has exactly one child directory; click the first
-    # data row directly below the visible GTK column header.
-    return x + width // 2, y + height + max(1, height // 2)
 
 
 def _cancel_gtk_folder_chooser(environment: dict[str, str], chooser_window_id: str) -> None:

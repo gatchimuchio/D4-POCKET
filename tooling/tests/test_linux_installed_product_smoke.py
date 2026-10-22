@@ -25,8 +25,6 @@ from tooling.tests.linux_installed_product_smoke import (
     _component_center,
     _capture_gtk_dialog_screenshot,
     _gtk_folder_chooser_diagnostics,
-    _gtk_folder_list_first_row_target,
-    _gtk_folder_row_text_target,
     _credential_scan_file_role,
     _desktop_entry_targets_fixed_launcher,
     _enter_single_installed_mcp_tool_arguments,
@@ -1418,7 +1416,7 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
 
     def test_gtk_chooser_close_timeout_names_the_response_action(self) -> None:
         for action in (
-            "folder row selection and accept click",
+            "absolute folder path entry and accept click",
             "cancel control click",
         ):
             with self.subTest(action=action):
@@ -1430,7 +1428,7 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                         timeout=0,
                     )
 
-    def test_folder_chooser_selects_the_folder_row_from_its_parent(self) -> None:
+    def test_folder_chooser_selects_target_from_absolute_location_entry(self) -> None:
         from unittest.mock import call
 
         environment = {"DISPLAY": ":99"}
@@ -1438,7 +1436,6 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             folder = Path(directory) / "selected-workspace"
             folder.mkdir()
             chooser = object()
-            folder_row = object()
             accept = object()
             visible = subprocess.CompletedProcess(
                 args=[], returncode=0, stdout=b"0x42\n", stderr=b""
@@ -1454,7 +1451,7 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                 ),
                 patch(
                     "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
-                    side_effect=(folder_row, accept),
+                    return_value=accept,
                 ) as find_operable,
                 patch(
                     "tooling.tests.linux_installed_product_smoke._click_accessible_by_coordinates"
@@ -1470,6 +1467,7 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             [
                 ["xdotool", "windowactivate", "--sync", "0x42"],
                 ["xdotool", "key", "--clearmodifiers", "ctrl+l"],
+                ["xdotool", "key", "--clearmodifiers", "ctrl+a"],
                 [
                     "xdotool",
                     "type",
@@ -1477,9 +1475,8 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                     "--delay",
                     "1",
                     "--",
-                    str(folder.parent),
+                    str(folder),
                 ],
-                ["xdotool", "key", "--clearmodifiers", "Return"],
                 [
                     "xdotool",
                     "search",
@@ -1491,73 +1488,13 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
         )
         self.assertEqual(
             find_operable.call_args_list,
-            [
-                call(folder.name, root=chooser, timeout=10),
-                call("選択", root=chooser, timeout=10),
-            ],
-        )
-        click.assert_has_calls(
-            [
-                call(folder_row, folder.name, environment),
-                call(accept, "選択", environment),
-            ]
-        )
-        wait_closed.assert_called_once_with(
-            environment,
-            "D4 Pocket 作業領域の選択",
-            action="folder row selection and accept click",
-        )
-
-    def test_folder_chooser_clicks_first_row_only_for_isolated_parent(self) -> None:
-        environment = {"DISPLAY": ":99"}
-        with tempfile.TemporaryDirectory() as directory:
-            parent = Path(directory) / "workspace-picker"
-            folder = parent / "selected-workspace"
-            parent.mkdir()
-            folder.mkdir()
-            chooser = object()
-            accept = object()
-            visible = subprocess.CompletedProcess(
-                args=[], returncode=0, stdout=b"0x42\n", stderr=b""
-            )
-            with (
-                patch(
-                    "tooling.tests.linux_installed_product_smoke.subprocess.run",
-                    side_effect=(None, None, None, None, visible, None, None),
-                ) as run,
-                patch(
-                    "tooling.tests.linux_installed_product_smoke._find_accessible",
-                    return_value=chooser,
-                ),
-                patch(
-                    "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
-                    side_effect=(RuntimeError("folder row is not exposed"), accept),
-                ),
-                patch(
-                    "tooling.tests.linux_installed_product_smoke._gtk_folder_list_first_row_target",
-                    return_value=(100, 200),
-                ),
-                patch(
-                    "tooling.tests.linux_installed_product_smoke._click_accessible_by_coordinates"
-                ) as click,
-                patch(
-                    "tooling.tests.linux_installed_product_smoke._wait_for_gtk_dialog_closed"
-                ) as wait_closed,
-            ):
-                _select_folder_in_gtk_chooser(environment, "0x42", folder)
-
-        self.assertEqual(
-            [call.args[0] for call in run.call_args_list[-2:]],
-            [
-                ["xdotool", "mousemove", "--sync", "100", "200", "click", "1"],
-                ["xdotool", "key", "--clearmodifiers", "Home"],
-            ],
+            [call("選択", root=chooser, timeout=10)],
         )
         click.assert_called_once_with(accept, "選択", environment)
         wait_closed.assert_called_once_with(
             environment,
             "D4 Pocket 作業領域の選択",
-            action="folder row selection and accept click",
+            action="absolute folder path entry and accept click",
         )
 
     def test_folder_chooser_diagnostics_emit_only_bounded_state(self) -> None:
@@ -1602,74 +1539,6 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             },
         )
         self.assertNotIn(str(folder.parent), repr(diagnostics))
-
-    def test_gtk_folder_row_target_uses_visible_header_geometry(self) -> None:
-        from types import SimpleNamespace
-
-        class State:
-            def contains(self, state: int) -> bool:
-                return state == 1
-
-        class Header:
-            childCount = 0
-            name = ""
-
-            def getRoleName(self) -> str:
-                return "table column header"
-
-            def getState(self):
-                return State()
-
-            def queryComponent(self):
-                return self
-
-            def getExtents(self, coordinate_type: int):
-                self.coordinate_type = coordinate_type
-                return SimpleNamespace(x=100, y=50, width=200, height=20)
-
-        with patch.dict(
-            "sys.modules",
-            {"pyatspi": SimpleNamespace(STATE_SHOWING=1, XY_SCREEN=2)},
-        ):
-            self.assertEqual(_gtk_folder_list_first_row_target(Header()), (200, 80))
-
-    def test_gtk_folder_row_text_target_uses_exact_visible_name(self) -> None:
-        from types import SimpleNamespace
-
-        class State:
-            def contains(self, state: int) -> bool:
-                return state == 1
-
-        class TextNode:
-            name = ""
-            childCount = 0
-
-            def getRoleName(self) -> str:
-                return "text"
-
-            def getState(self):
-                return State()
-
-        node = TextNode()
-        with (
-            patch.dict("sys.modules", {"pyatspi": SimpleNamespace(STATE_SHOWING=1)}),
-            patch(
-                "tooling.tests.linux_installed_product_smoke._accessible_nodes",
-                return_value=[(node, "")],
-            ),
-            patch(
-                "tooling.tests.linux_installed_product_smoke._accessible_text",
-                return_value="selected-workspace",
-            ),
-            patch(
-                "tooling.tests.linux_installed_product_smoke._component_center",
-                return_value=(15, 25),
-            ),
-        ):
-            self.assertEqual(
-                _gtk_folder_row_text_target(node, "selected-workspace"),
-                (15, 25),
-            )
 
     def test_waits_for_native_owner_dialog_to_become_visible(self) -> None:
         from unittest.mock import patch
