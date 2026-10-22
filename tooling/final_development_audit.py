@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
 
@@ -52,7 +52,22 @@ def _is_present(value: Any) -> bool:
 
 
 def _relative_path(value: str) -> Path:
-    return ROOT / value.replace("/", "\\")
+    """区切り表記を正規化し、実体がRepository内にある相対参照だけ返す。"""
+    if not value.strip() or "\0" in value:
+        raise ValueError("参照pathが空または不正")
+    relative = PurePosixPath(value.replace("\\", "/"))
+    if (
+        not relative.parts
+        or relative.is_absolute()
+        or ".." in relative.parts
+        or any(PureWindowsPath(part).drive for part in relative.parts)
+    ):
+        raise ValueError("Repository内の相対参照ではない")
+    root = ROOT.resolve()
+    path = root.joinpath(*relative.parts).resolve()
+    if not path.is_relative_to(root):
+        raise ValueError("参照pathがRepository外へ解決される")
+    return path
 
 
 def _check_reference_paths(paths: list[Any], errors: list[str], label: str) -> None:
@@ -60,8 +75,13 @@ def _check_reference_paths(paths: list[Any], errors: list[str], label: str) -> N
         if not isinstance(raw_path, str) or not raw_path.strip():
             errors.append(f"{label}の参照pathが文字列ではない")
             continue
-        path = _relative_path(raw_path)
-        if not path.exists():
+        try:
+            path = _relative_path(raw_path)
+            exists = path.exists()
+        except (OSError, ValueError, RuntimeError):
+            errors.append(f"{label}の参照pathが不正または検証不能: {raw_path}")
+            continue
+        if not exists:
             errors.append(f"{label}の参照pathが存在しない: {raw_path}")
 
 

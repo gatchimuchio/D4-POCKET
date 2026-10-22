@@ -172,7 +172,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "50155dfb39525b629864c0d636b2d6c6d53e697f0db23788e2cf16c78dac5085"
+      "sha256": "024cbea37c78d5a7fc09a942ef6e332784338de6a9c65e81ce92ab6b3969b394"
     },
     {
       "path": "SECURITY.md",
@@ -1324,7 +1324,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "2ec9b93ccd47f291c13a6032c294799fcdfdcfa6ce4fb370ddc1c62fc043aff2"
+      "sha256": "ca89e8074da1c7433ced676422bb51a57972fbeb558c1b5aea094d80254b8334"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1488,7 +1488,7 @@
     },
     {
       "path": "docs/specs/final-development-audit.md",
-      "sha256": "e487e69ad67f0d3b4ac37bfca248dee1620457c5e574dedda98a1435ecd426f3"
+      "sha256": "46df615d04d3f5224de0b03c467d467d79102fa98436e1efc1d0c3e1e7a02623"
     },
     {
       "path": "docs/specs/full-regression-validation.md",
@@ -5067,6 +5067,10 @@
       "sha256": "5b5b68185ed02713376e0e042dfe62b460f535ceeb7d2e5b6fb80ce93201d2a5"
     },
     {
+      "path": "tooling/conformance_tests/test_final_development_audit.py",
+      "sha256": "61b5a74e0f6cae0041a09117d9099a94756c57d27dfa005e324d2245333ee8d7"
+    },
+    {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
       "sha256": "463ca2a9e9e35be33c75c38d3fc63b4736a3c3987ba5015ff2e10ec18aca5488"
     },
@@ -5116,7 +5120,7 @@
     },
     {
       "path": "tooling/final_development_audit.py",
-      "sha256": "81430695313ecc65a4dda4814b45aa533860601ce830e4184b0d35e6a47d2f7d"
+      "sha256": "5b46cf3e5bf550477f43944be540dfce5647e5112c0d9b00d6d668d94d8978db"
     },
     {
       "path": "tooling/flutter_workspace.py",
