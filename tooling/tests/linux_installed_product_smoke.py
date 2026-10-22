@@ -1474,12 +1474,7 @@ def _select_folder_in_gtk_chooser(
                 "GTK folder row is not accessible and isolated chooser parent "
                 f"does not contain exactly the target; bounded_state={diagnostics}"
             ) from None
-        subprocess.run(
-            ["xdotool", "key", "--clearmodifiers", "Home"],
-            env=environment,
-            check=True,
-            timeout=5,
-        )
+        _focus_gtk_folder_list(environment, chooser, folder)
     else:
         _click_accessible_by_coordinates(folder_row, folder.name, environment)
     accept = _find_operable_accessible("選択", root=chooser, timeout=10)
@@ -1519,23 +1514,68 @@ def _gtk_folder_chooser_diagnostics(chooser, folder: Path) -> dict[str, object]:
             except Exception:
                 pass
     common_roles = sorted(role_counts.items(), key=lambda item: (-item[1], item[0]))[:12]
-    focused_roles: dict[str, int] = {}
-    if pyatspi is not None:
-        for node, _ in _accessible_nodes(chooser):
-            try:
-                state = node.getState()
-                if state.contains(pyatspi.STATE_FOCUSED):
-                    role = str(node.getRoleName())
-                    focused_roles[role] = focused_roles.get(role, 0) + 1
-            except Exception:
-                continue
+    focused_roles = _gtk_focused_accessible_roles(chooser)
     return {
         "parent_path_visible": str(folder.parent) in snapshot,
         "folder_name_visible": folder.name in snapshot,
         "selected_accessible_count": selected_count,
         "common_roles": common_roles,
-        "focused_roles": sorted(focused_roles.items()),
+        "focused_roles": focused_roles,
     }
+
+
+def _gtk_focused_accessible_roles(chooser) -> list[tuple[str, int]]:
+    try:
+        import pyatspi
+    except ImportError:
+        return []
+    roles: dict[str, int] = {}
+    for node, _ in _accessible_nodes(chooser):
+        try:
+            if node.getState().contains(pyatspi.STATE_FOCUSED):
+                role = str(node.getRoleName())
+                roles[role] = roles.get(role, 0) + 1
+        except Exception:
+            continue
+    return sorted(roles.items())
+
+
+def _focus_gtk_folder_list(
+    environment: dict[str, str], chooser, folder: Path
+) -> None:
+    folder_list_roles = {
+        "list",
+        "list item",
+        "table",
+        "table cell",
+        "table row",
+        "table column header",
+        "tree",
+        "tree item",
+        "tree table",
+    }
+    for _ in range(12):
+        subprocess.run(
+            ["xdotool", "key", "--clearmodifiers", "Tab"],
+            env=environment,
+            check=True,
+            timeout=5,
+        )
+        focused_roles = _gtk_focused_accessible_roles(chooser)
+        focus = {role for role, _ in focused_roles}
+        if focus & folder_list_roles:
+            subprocess.run(
+                ["xdotool", "key", "--clearmodifiers", "Home"],
+                env=environment,
+                check=True,
+                timeout=5,
+            )
+            return
+    diagnostics = _gtk_folder_chooser_diagnostics(chooser, folder)
+    raise RuntimeError(
+        "GTK chooser keyboard focus did not reach a folder-list role; "
+        f"bounded_state={diagnostics}"
+    )
 
 
 def _cancel_gtk_folder_chooser(environment: dict[str, str], chooser_window_id: str) -> None:

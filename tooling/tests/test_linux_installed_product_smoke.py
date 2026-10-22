@@ -1418,7 +1418,7 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             action="folder row selection and accept click",
         )
 
-    def test_folder_chooser_uses_home_for_single_isolated_row_when_atspi_hides_it(self) -> None:
+    def test_folder_chooser_tabs_to_list_before_home_for_single_isolated_row(self) -> None:
         environment = {"DISPLAY": ":99"}
         with tempfile.TemporaryDirectory() as directory:
             parent = Path(directory) / "workspace-picker"
@@ -1433,7 +1433,7 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             with (
                 patch(
                     "tooling.tests.linux_installed_product_smoke.subprocess.run",
-                    side_effect=(None, None, None, None, visible, None),
+                    side_effect=(None, None, None, None, visible, None, None, None),
                 ) as run,
                 patch(
                     "tooling.tests.linux_installed_product_smoke._find_accessible",
@@ -1442,6 +1442,10 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                 patch(
                     "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
                     side_effect=(RuntimeError("folder row is not exposed"), accept),
+                ),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._gtk_focused_accessible_roles",
+                    side_effect=([], [("table", 1)]),
                 ),
                 patch(
                     "tooling.tests.linux_installed_product_smoke._click_accessible_by_coordinates"
@@ -1453,8 +1457,12 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                 _select_folder_in_gtk_chooser(environment, "0x42", folder)
 
         self.assertEqual(
-            run.call_args_list[-1].args[0],
-            ["xdotool", "key", "--clearmodifiers", "Home"],
+            [call.args[0] for call in run.call_args_list[-3:]],
+            [
+                ["xdotool", "key", "--clearmodifiers", "Tab"],
+                ["xdotool", "key", "--clearmodifiers", "Tab"],
+                ["xdotool", "key", "--clearmodifiers", "Home"],
+            ],
         )
         click.assert_called_once_with(accept, "選択", environment)
         wait_closed.assert_called_once_with(
