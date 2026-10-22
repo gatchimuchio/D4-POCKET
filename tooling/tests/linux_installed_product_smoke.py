@@ -1357,6 +1357,85 @@ def _gtk_dialog_window_id(environment: dict[str, str], title: str) -> str:
     return window_ids[0]
 
 
+def _capture_gtk_dialog_screenshot(
+    environment: dict[str, str], title: str, destination: Path
+) -> bool:
+    try:
+        if destination.exists() or destination.is_symlink():
+            return False
+        search = subprocess.run(
+            ["xdotool", "search", "--onlyvisible", "--name", f"^{re.escape(title)}$"],
+            env=environment,
+            capture_output=True,
+            check=False,
+            timeout=5,
+        )
+        if search.returncode != 0:
+            return False
+        window_ids = search.stdout.decode("ascii", errors="ignore").splitlines()
+        if len(window_ids) != 1 or not window_ids[0].isdecimal():
+            return False
+        geometry = subprocess.run(
+            ["xdotool", "getwindowgeometry", "--shell", window_ids[0]],
+            env=environment,
+            capture_output=True,
+            check=False,
+            timeout=5,
+        )
+        if geometry.returncode != 0:
+            return False
+        fields = {}
+        for line in geometry.stdout.decode("ascii", errors="ignore").splitlines():
+            key, separator, value = line.partition("=")
+            if separator and key in {"X", "Y", "WIDTH", "HEIGHT"}:
+                fields[key] = int(value)
+        if set(fields) != {"X", "Y", "WIDTH", "HEIGHT"}:
+            return False
+        x, y, width, height = (
+            fields["X"],
+            fields["Y"],
+            fields["WIDTH"],
+            fields["HEIGHT"],
+        )
+        if (
+            width <= 0
+            or height <= 0
+            or width > 4096
+            or height > 4096
+            or abs(x) > 8192
+            or abs(y) > 8192
+        ):
+            return False
+        import gi
+
+        gi.require_version("Gdk", "3.0")
+        from gi.repository import Gdk
+
+        display = Gdk.Display.get_default()
+        screen = display.get_default_screen() if display is not None else None
+        root = screen.get_root_window() if screen is not None else None
+        pixbuf = (
+            Gdk.pixbuf_get_from_window(root, x, y, width, height)
+            if root is not None
+            else None
+        )
+        if pixbuf is None:
+            return False
+        old_umask = os.umask(0o077)
+        try:
+            pixbuf.savev(str(destination), "png", [], [])
+        finally:
+            os.umask(old_umask)
+        metadata = destination.lstat()
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+            destination.unlink(missing_ok=True)
+            return False
+        destination.chmod(0o600)
+        return True
+    except Exception:
+        return False
+
+
 def _wait_for_gtk_dialog_closed(
     environment: dict[str, str],
     title: str,
@@ -1400,7 +1479,11 @@ def _open_workspace_folder_chooser(environment: dict[str, str], dialog) -> str:
 
 
 def _select_folder_in_gtk_chooser(
-    environment: dict[str, str], chooser_window_id: str, folder: Path
+    environment: dict[str, str],
+    chooser_window_id: str,
+    folder: Path,
+    *,
+    screenshot_path: Path | None = None,
 ) -> None:
     if not folder.is_absolute() or not folder.is_dir() or folder.is_symlink():
         raise RuntimeError("GTK chooserへ渡すtest directoryが不正です")
@@ -1522,12 +1605,22 @@ def _select_folder_in_gtk_chooser(
         )
     except RuntimeError:
         diagnostics = _gtk_folder_chooser_diagnostics(chooser, folder)
+        screenshot_captured = (
+            _capture_gtk_dialog_screenshot(
+                environment,
+                "D4 Pocket 作業領域の選択",
+                screenshot_path,
+            )
+            if screenshot_path is not None
+            else False
+        )
         diagnostics.update(
             {
                 "selection_target_source": selection_target_source,
                 "selection_target_xy": selection_target_xy,
                 "home_sent_after_click": selection_target_source
                 != "atspi_row",
+                "screenshot_captured": screenshot_captured,
             }
         )
         raise RuntimeError(
@@ -1913,7 +2006,13 @@ def _run_installed_workspace_selection_acceptance(
         timeout=10,
     )
     chooser_window_id = _open_workspace_folder_chooser(environment, dialog)
-    _select_folder_in_gtk_chooser(environment, chooser_window_id, workspace)
+    screenshot_path = acceptance_root / "workspace-chooser.png"
+    _select_folder_in_gtk_chooser(
+        environment,
+        chooser_window_id,
+        workspace,
+        screenshot_path=screenshot_path,
+    )
     if _workspace_root_field_value(dialog) != str(workspace):
         raise RuntimeError("GTK chooser selection did not update the Workspace input")
     _find_accessible(
@@ -1948,7 +2047,12 @@ def _run_installed_workspace_selection_acceptance(
         secret_paths=secret_paths,
     )
     chooser_window_id = _open_workspace_folder_chooser(environment, dialog)
-    _select_folder_in_gtk_chooser(environment, chooser_window_id, workspace)
+    _select_folder_in_gtk_chooser(
+        environment,
+        chooser_window_id,
+        workspace,
+        screenshot_path=screenshot_path,
+    )
     if _workspace_root_field_value(dialog) != str(workspace):
         raise RuntimeError("fresh GTK chooser selection is not the Workspace root sent for review")
     continue_button = _find_operable_accessible(

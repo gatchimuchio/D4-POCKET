@@ -227,6 +227,15 @@ jobs:
             printf -- '- Scope: Ubuntu 24.04 hosted Xvfb／X11, unsigned test-identity installed product, automated AT-SPI／keyboard and a run-owned interface-only Codex CLI fixture. This does not establish Wayland rendering, real desktop-session coverage, Agent Task execution／Recovery, formal signing／distribution, or full Linux product completion.\n'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: failure-only GTK Workspace chooser screenshot
+        if: ${{ failure() && inputs.acceptance_scope == 'workspace_selection' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-workspace-chooser-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/d4p-linux-export-${{ github.run_id }}-${{ github.run_attempt }}/installed-workspace-acceptance/workspace-chooser.png
+          if-no-files-found: ignore
+          retention-days: 1
+
       - name: build fixture／bundleを正確な一時rootから削除
         if: always()
         shell: bash

@@ -4,8 +4,11 @@ import hashlib
 import hmac
 import json
 import os
+import stat
 import subprocess
+import sys
 import tempfile
+import types
 import unittest
 from unittest.mock import call, patch
 from pathlib import Path
@@ -20,6 +23,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _catalog_failure_diagnostics,
     _click_accessible_by_coordinates,
     _component_center,
+    _capture_gtk_dialog_screenshot,
     _gtk_folder_chooser_diagnostics,
     _gtk_folder_list_first_row_target,
     _gtk_folder_row_text_target,
@@ -1265,6 +1269,58 @@ class LinuxEditableTextAncestorTests(unittest.TestCase):
 
 
 class LinuxInstalledDesktopEntryTests(unittest.TestCase):
+    def test_gtk_dialog_screenshot_is_private_and_uses_bounded_window_geometry(self) -> None:
+        environment = {"DISPLAY": ":99"}
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory) / "chooser.png"
+            root = object()
+            screen = types.SimpleNamespace(get_root_window=lambda: root)
+            display = types.SimpleNamespace(get_default_screen=lambda: screen)
+            pixbuf = types.SimpleNamespace(
+                savev=lambda path, image_type, keys, values: Path(path).write_bytes(
+                    b"png-test-double"
+                )
+            )
+            gdk = types.SimpleNamespace(
+                Display=types.SimpleNamespace(get_default=lambda: display),
+                pixbuf_get_from_window=lambda window, x, y, width, height: (
+                    pixbuf
+                    if (window, x, y, width, height) == (root, 11, 22, 300, 180)
+                    else None
+                ),
+            )
+            gi = types.ModuleType("gi")
+            gi.__path__ = []
+            gi.require_version = unittest.mock.Mock()
+            gi_repository = types.ModuleType("gi.repository")
+            gi_repository.Gdk = gdk
+            search = subprocess.CompletedProcess(
+                args=[], returncode=0, stdout=b"123\n", stderr=b""
+            )
+            geometry = subprocess.CompletedProcess(
+                args=[],
+                returncode=0,
+                stdout=b"X=11\nY=22\nWIDTH=300\nHEIGHT=180\n",
+                stderr=b"",
+            )
+            with (
+                patch.dict(sys.modules, {"gi": gi, "gi.repository": gi_repository}),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke.subprocess.run",
+                    side_effect=(search, geometry),
+                ) as run,
+            ):
+                self.assertTrue(
+                    _capture_gtk_dialog_screenshot(
+                        environment, "D4 Pocket 作業領域の選択", destination
+                    )
+                )
+
+            self.assertEqual(destination.read_bytes(), b"png-test-double")
+            if os.name == "posix":
+                self.assertEqual(stat.S_IMODE(destination.stat().st_mode), 0o600)
+            self.assertEqual(run.call_count, 2)
+
     def test_agent_palette_activates_the_observed_command_item(self) -> None:
         window = object()
         destination_window = object()
