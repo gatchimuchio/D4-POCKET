@@ -1474,7 +1474,29 @@ def _select_folder_in_gtk_chooser(
                 "GTK folder row is not accessible and isolated chooser parent "
                 f"does not contain exactly the target; bounded_state={diagnostics}"
             ) from None
-        _focus_gtk_folder_list(environment, chooser, folder)
+        row_target = _gtk_folder_row_text_target(chooser, folder.name)
+        if row_target is None:
+            row_target = _gtk_folder_list_first_row_target(chooser)
+        if row_target is None:
+            diagnostics = _gtk_folder_chooser_diagnostics(chooser, folder)
+            raise RuntimeError(
+                "GTK folder row and visible list header are not accessible; "
+                f"bounded_state={diagnostics}"
+            ) from None
+        subprocess.run(
+            [
+                "xdotool",
+                "mousemove",
+                "--sync",
+                str(row_target[0]),
+                str(row_target[1]),
+                "click",
+                "1",
+            ],
+            env=environment,
+            check=True,
+            timeout=5,
+        )
     else:
         _click_accessible_by_coordinates(folder_row, folder.name, environment)
     accept = _find_operable_accessible("選択", root=chooser, timeout=10)
@@ -1540,42 +1562,71 @@ def _gtk_focused_accessible_roles(chooser) -> list[tuple[str, int]]:
     return sorted(roles.items())
 
 
-def _focus_gtk_folder_list(
-    environment: dict[str, str], chooser, folder: Path
-) -> None:
-    folder_list_roles = {
-        "list",
-        "list item",
-        "table",
-        "table cell",
-        "table row",
-        "table column header",
-        "tree",
-        "tree item",
-        "tree table",
-    }
-    for _ in range(12):
-        subprocess.run(
-            ["xdotool", "key", "--clearmodifiers", "Tab"],
-            env=environment,
-            check=True,
-            timeout=5,
-        )
-        focused_roles = _gtk_focused_accessible_roles(chooser)
-        focus = {role for role, _ in focused_roles}
-        if focus & folder_list_roles:
-            subprocess.run(
-                ["xdotool", "key", "--clearmodifiers", "Home"],
-                env=environment,
-                check=True,
-                timeout=5,
-            )
-            return
-    diagnostics = _gtk_folder_chooser_diagnostics(chooser, folder)
-    raise RuntimeError(
-        "GTK chooser keyboard focus did not reach a folder-list role; "
-        f"bounded_state={diagnostics}"
-    )
+def _gtk_folder_row_text_target(
+    chooser, folder_name: str
+) -> tuple[int, int] | None:
+    try:
+        import pyatspi
+    except ImportError:
+        return None
+    row_roles = {"text", "table cell", "table row", "list item", "tree item"}
+    for node, accessible_name in _accessible_nodes(chooser):
+        if (
+            accessible_name.strip() != folder_name
+            and _accessible_text(node).strip() != folder_name
+        ):
+            continue
+        current = node
+        for _ in range(5):
+            try:
+                if (
+                    str(current.getRoleName()) in row_roles
+                    and current.getState().contains(pyatspi.STATE_SHOWING)
+                ):
+                    center = _component_center(current)
+                    if center is not None:
+                        return center
+            except Exception:
+                pass
+            current = _accessible_parent(current)
+            if current is None:
+                break
+    return None
+
+
+def _gtk_folder_list_first_row_target(chooser) -> tuple[int, int] | None:
+    try:
+        import pyatspi
+    except ImportError:
+        return None
+    headers = []
+    for node, _ in _accessible_nodes(chooser):
+        try:
+            if str(node.getRoleName()) != "table column header":
+                continue
+            if not node.getState().contains(pyatspi.STATE_SHOWING):
+                continue
+            bounds = node.queryComponent().getExtents(pyatspi.XY_SCREEN)
+            x, y = int(bounds.x), int(bounds.y)
+            width, height = int(bounds.width), int(bounds.height)
+            if (
+                width <= 0
+                or height <= 0
+                or width > 4096
+                or height > 4096
+                or abs(x) > 8192
+                or abs(y) > 8192
+            ):
+                continue
+            headers.append((y, x, width, height))
+        except Exception:
+            continue
+    if not headers:
+        return None
+    y, x, width, height = min(headers)
+    # The isolated picker parent has exactly one child directory; click the first
+    # data row directly below the visible GTK column header.
+    return x + width // 2, y + height + max(1, height // 2)
 
 
 def _cancel_gtk_folder_chooser(environment: dict[str, str], chooser_window_id: str) -> None:

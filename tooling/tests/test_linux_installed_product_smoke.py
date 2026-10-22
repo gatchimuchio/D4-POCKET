@@ -21,6 +21,8 @@ from tooling.tests.linux_installed_product_smoke import (
     _click_accessible_by_coordinates,
     _component_center,
     _gtk_folder_chooser_diagnostics,
+    _gtk_folder_list_first_row_target,
+    _gtk_folder_row_text_target,
     _credential_scan_file_role,
     _desktop_entry_targets_fixed_launcher,
     _enter_single_installed_mcp_tool_arguments,
@@ -1418,7 +1420,7 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             action="folder row selection and accept click",
         )
 
-    def test_folder_chooser_tabs_to_list_before_home_for_single_isolated_row(self) -> None:
+    def test_folder_chooser_clicks_first_row_only_for_isolated_parent(self) -> None:
         environment = {"DISPLAY": ":99"}
         with tempfile.TemporaryDirectory() as directory:
             parent = Path(directory) / "workspace-picker"
@@ -1433,7 +1435,7 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             with (
                 patch(
                     "tooling.tests.linux_installed_product_smoke.subprocess.run",
-                    side_effect=(None, None, None, None, visible, None, None, None),
+                    side_effect=(None, None, None, None, visible, None),
                 ) as run,
                 patch(
                     "tooling.tests.linux_installed_product_smoke._find_accessible",
@@ -1444,8 +1446,8 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                     side_effect=(RuntimeError("folder row is not exposed"), accept),
                 ),
                 patch(
-                    "tooling.tests.linux_installed_product_smoke._gtk_focused_accessible_roles",
-                    side_effect=([], [("table", 1)]),
+                    "tooling.tests.linux_installed_product_smoke._gtk_folder_list_first_row_target",
+                    return_value=(100, 200),
                 ),
                 patch(
                     "tooling.tests.linux_installed_product_smoke._click_accessible_by_coordinates"
@@ -1457,12 +1459,8 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                 _select_folder_in_gtk_chooser(environment, "0x42", folder)
 
         self.assertEqual(
-            [call.args[0] for call in run.call_args_list[-3:]],
-            [
-                ["xdotool", "key", "--clearmodifiers", "Tab"],
-                ["xdotool", "key", "--clearmodifiers", "Tab"],
-                ["xdotool", "key", "--clearmodifiers", "Home"],
-            ],
+            run.call_args_list[-1].args[0],
+            ["xdotool", "mousemove", "--sync", "100", "200", "click", "1"],
         )
         click.assert_called_once_with(accept, "選択", environment)
         wait_closed.assert_called_once_with(
@@ -1510,6 +1508,74 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             },
         )
         self.assertNotIn(str(folder.parent), repr(diagnostics))
+
+    def test_gtk_folder_row_target_uses_visible_header_geometry(self) -> None:
+        from types import SimpleNamespace
+
+        class State:
+            def contains(self, state: int) -> bool:
+                return state == 1
+
+        class Header:
+            childCount = 0
+            name = ""
+
+            def getRoleName(self) -> str:
+                return "table column header"
+
+            def getState(self):
+                return State()
+
+            def queryComponent(self):
+                return self
+
+            def getExtents(self, coordinate_type: int):
+                self.coordinate_type = coordinate_type
+                return SimpleNamespace(x=100, y=50, width=200, height=20)
+
+        with patch.dict(
+            "sys.modules",
+            {"pyatspi": SimpleNamespace(STATE_SHOWING=1, XY_SCREEN=2)},
+        ):
+            self.assertEqual(_gtk_folder_list_first_row_target(Header()), (200, 80))
+
+    def test_gtk_folder_row_text_target_uses_exact_visible_name(self) -> None:
+        from types import SimpleNamespace
+
+        class State:
+            def contains(self, state: int) -> bool:
+                return state == 1
+
+        class TextNode:
+            name = ""
+            childCount = 0
+
+            def getRoleName(self) -> str:
+                return "text"
+
+            def getState(self):
+                return State()
+
+        node = TextNode()
+        with (
+            patch.dict("sys.modules", {"pyatspi": SimpleNamespace(STATE_SHOWING=1)}),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._accessible_nodes",
+                return_value=[(node, "")],
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._accessible_text",
+                return_value="selected-workspace",
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._component_center",
+                return_value=(15, 25),
+            ),
+        ):
+            self.assertEqual(
+                _gtk_folder_row_text_target(node, "selected-workspace"),
+                (15, 25),
+            )
 
     def test_waits_for_native_owner_dialog_to_become_visible(self) -> None:
         from unittest.mock import patch
