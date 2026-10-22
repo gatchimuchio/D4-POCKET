@@ -1435,7 +1435,7 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             with (
                 patch(
                     "tooling.tests.linux_installed_product_smoke.subprocess.run",
-                    side_effect=(None, None, None, None, visible, None),
+                    side_effect=(None, None, None, None, visible, None, None),
                 ) as run,
                 patch(
                     "tooling.tests.linux_installed_product_smoke._find_accessible",
@@ -1459,8 +1459,11 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                 _select_folder_in_gtk_chooser(environment, "0x42", folder)
 
         self.assertEqual(
-            run.call_args_list[-1].args[0],
-            ["xdotool", "mousemove", "--sync", "100", "200", "click", "1"],
+            [call.args[0] for call in run.call_args_list[-2:]],
+            [
+                ["xdotool", "mousemove", "--sync", "100", "200", "click", "1"],
+                ["xdotool", "key", "--clearmodifiers", "Home"],
+            ],
         )
         click.assert_called_once_with(accept, "選択", environment)
         wait_closed.assert_called_once_with(

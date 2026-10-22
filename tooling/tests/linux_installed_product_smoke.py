@@ -1497,6 +1497,12 @@ def _select_folder_in_gtk_chooser(
             check=True,
             timeout=5,
         )
+        subprocess.run(
+            ["xdotool", "key", "--clearmodifiers", "Home"],
+            env=environment,
+            check=True,
+            timeout=5,
+        )
     else:
         _click_accessible_by_coordinates(folder_row, folder.name, environment)
     accept = _find_operable_accessible("選択", root=chooser, timeout=10)
