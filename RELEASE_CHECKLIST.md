@@ -1,6 +1,14 @@
 # リリースチェックリスト
 
-## rev5 Final QA既知制約（2026-10-07）
+## 現行の対象と関門（2026-10-22）
+
+製品対象はWindows／macOS／LinuxのDesktopとAndroid／iOSのMobile。現行状態は[rev5進捗](docs/REV5_PRODUCT_PROGRESS.md)と`release_blockers.registry.json`を正本とし、現在18項目中16項目がactiveである。旧v1.0欄のLinux補助対象・Mobile範囲外・macOS環境不在という当時の記述から、現行の対象を縮小しない。以下の旧欄は測定時点の状態・結果を保持するもので、安全検査や引き継いだ出荷関門を解除しない。
+
+Windows B4はstaged `r2-e2e`の有限経路に限定してCLOSED、B5はOPEN。run #55（source `1e57a828`）はRust試験572成功／0失敗／13除外でもcapture判定でworkflow FAILし、Broker build／IPC smokeはSKIP。Linux run #107（source `bf2a51ac`）の成功はUbuntu 24.04／Xvfb・X11の導入済みGTK製品・合成MCPだけで、同runの資格情報保管・更新等の受入れstepは対象外SKIPである。別run #77／#94の限定成功はそれぞれのsourceに結合する。[F03実績文書対応](docs/QE_2026-10-22/F03_実績文書対応.md)に各実行の射程を示す。
+
+通常Release `task_execution=unsupported`、`release_ready=false`、正式Q0〜Q7 `DEFERRED`を維持する。Windows installed-path正式証拠、Linux全製品対応、物理端末・正式配布、署名・Audit鍵・Owner GO等の未閉包は元台帳で管理する。本文の履歴PASSやこの文書同期だけで関門を閉じない。
+
+## rev5 Final QAの既知制約記録（2026-10-07）
 
 - item: Desktop Flutter analyzerのdeprecated API情報
   classification: known_limitation
@@ -8,7 +16,7 @@
   required_action: 現行Flutterが当該APIを削除する前に`RadioGroup`／`initialValue`へ移行し、Desktop analyzerを再実行する。
   blocks_release: no
 
-## rev2の現在証拠（2026-09-10）
+## rev2の証拠履歴（2026-09-10）
 
 以下の旧Desktop v1.0記録は過去の基準面を含む。現行owner rev2ではMobile・端末連携・Android・Apple補助buildも作業対象であり、旧post_v1_scopeを理由に未完了を除外しない。現在の要求別監査は `docs/REV2_PROGRESS.md`、Mobile状態は `MOBILE_STATUS.md` を参照する。
 
@@ -37,7 +45,7 @@ Phase A の personal Windows trial operation は完了している。Phase B の
 
 Windows-first product path と LLM-readable substrate の demonstration path を統合した完了ロードマップの正本は <code>docs/implementation/GUI_SHELL_LLM_SUBSTRATE_COMPLETION_ROADMAP.md</code> である。
 
-## リリース阻害項目（release blocker）
+## 従来の検査関門と判定履歴（現行状態は冒頭の正本参照）
 
 ~~~yaml
 - item: D4 Pocket rev2 Mobile Device Link Flutter境界が未成立
@@ -341,7 +349,7 @@ Windows-first product path と LLM-readable substrate の demonstration path を
 
 これらは、実証済み LLM-readable substrate という public claim を block する。owner が正本ロードマップの default の combined public positioning を選ばない限り、狭く記述した Windows-first desktop の product release を自動的に block するものではない。
 
-## v1 後の既定範囲
+## 旧v1.0の既定範囲履歴（現行rev5対象を除外しない）
 
 ~~~yaml
 - item: mobile full release

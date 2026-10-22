@@ -9,7 +9,7 @@ AIエージェントが高度になるほど、次に難しくなるのは「何
 
 [開発状況](docs/REV5_PRODUCT_PROGRESS.md) · [クイックスタート](QUICKSTART.md) · [アーキテクチャ仕様](docs/specs/gui-shell-spec-v1.md) · [責任境界](CLAIM.md) · [エージェント向け開発規則](AGENTS.md)
 
-> **開発中 — 製品リリース未宣言。** Windowsは機能実装の到達点を持ち、macOS・Android・iOSにも対象を限定した受入証拠があります。Linux nativeは完全対応が必須の独立デスクトップ対象ですが、Linux上で直接動く製品経路・導入・配布は未受入れです。2026-10-12の追加3文書はLinux対象を決める資料ではなく、要求ID・詳細試験・QE作業分割の採否前候補です。B4のWindows Desktop統合経路は2026年10月17日に限定受入済み、B5自己適用QCはOPENです。Windows hosted run #54（固定source `5f4e810`）ではRust全target 569 passed／0 failed／13 ignoredを3回確認し、Release Broker build・通常IPC smoke・Pktmon cleanupもPASSしました。run #53／#54のdecoded loopback tupleは0件で、raw packet未保存のためRST根因は未確定です。後続commit `61e3b93`の自己接続RST probeはlocal検査のみで、hosted capture未確認です。`BUF-T04`は部分観測、`BUF-T05`／`BUF-T06`はOPEN、`BUF-T23`はB5局所受入済み（Q4長期／反復／資源検査は未実施）です。通常Releaseは`task_execution=unsupported`、`release_ready=false`で、正式配布・実機保証・最終QAも未完了です。
+> **開発中 — 製品リリース未宣言。** WindowsのP12とB4、macOS・Android・iOSのP13には、対象を限定した開発受入れがあります。Linux nativeは完全対応が必須の独立対象で、Ubuntu 24.04の導入済みGTK製品では更新・資格情報保管・MCPの限定受入れまで進みました。Linux全体の対応・正式配布は未完了です。B4はWindowsのstaged `r2-e2e`経路に限定してCLOSED、B5はOPEN。後続Windows run #55はRust試験572成功／0失敗／13除外でしたが、期待RSTのcapture判定に失敗し、workflow全体はFAILです。通常Releaseの`task_execution=unsupported`、`release_ready=false`、正式Q0〜Q7の`DEFERRED`を維持します。[対象別の証拠と限界](docs/QE_2026-10-22/F03_実績文書対応.md)を参照してください。
 
 ## D4 Pocketが変えようとしていること
 
@@ -25,21 +25,21 @@ AIエージェントが高度になるほど、次に難しくなるのは「何
 
 ## 現在の到達点
 
-2026年10月19日までに記録された、対象と環境を限定した実装・検査の状態です。**工程のCLOSEDは正式な製品出荷の意味ではありません。**
+2026年10月22日時点で照合した、対象と環境を限定した実装・検査の状態です。各証拠は実行時のsource commitへ結合し、現在のmainを再試験した結果へ付け替えません。**工程のCLOSEDは正式な製品出荷の意味ではありません。**
 
 | 対象 | 現行の状態 | 成立していない範囲 |
 |---|---|---|
 | **Windows Desktop** | rev5のWindows側P12、Feature Completeの開発到達点 | installed-path最終証拠、正式Release、owner GO |
 | **Agent Compare / Handoff** | P2 Multi-Agent Compare、P3 Agent HandoffのProduct Build受入CLOSED | すべての実Agent・実環境での一般保証 |
 | **モバイル（Android／iOS）** | P13の有限Product Build受入は2026-10-09にCLOSED。Android Emulator・iOS Simulator等の限定証拠を保持 | 物理端末保証、OS別の正式配布・署名・identity |
-| **Linux Desktop** | 完全対応が必須の独立対象OS。Linux nativeの製品経路受入れは未成立。追加3文書は詳細試験・工程方式の候補に限る | Linux nativeの実Broker／GUI／権限境界・導入・配布の製品受入れ |
-| **緩衝基盤とAgent Task** | B0〜B4は有限Product Build受入CLOSED。B5はOPEN。Windows hosted run #54はRust全target 569／0／13を3回PASSし、Release Broker build・通常IPC smoke・capture cleanupもPASS。run #53／#54のdecoded tupleは0件だが、raw packetがない証明ではなく、後続RST probe commit `61e3b93`のhosted検証も未実施。`BUF-T04`は部分観測、`BUF-T05`／`BUF-T06`はOPEN、`BUF-T23`はB5局所受入済み。長期累積・同時利用等は工程表Q4に残す。詳細は[B5記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md) | OneDrive警告との因果、loopback/TLS failureの根因、Q4の長期／反復／資源影響、現行SAC policy全体、通常Release能力、正式配布・実機保証 |
+| **Linux Desktop** | 完全対応が必須。Ubuntu 24.04／Xvfb・X11の導入済みGTK製品でrun #77の更新等、#94の資格情報保管、#107の合成MCP接続・一回Tool実行・切断を対象別に受入れ。#107はsource `bf2a51ac`に固定 | Workspace／Agent Task・Recovery等の残る製品経路、Wayland描画、一般環境・正式署名／配布を含む全体受入れ。`linux_native_product_support=unresolved` |
+| **緩衝基盤とAgent Task** | B0〜B4は有限受入れCLOSED、B5はOPEN。#54の3回PASSは履歴として保持。後続#55（source `1e57a828`）はRust全target 572成功／0失敗／13除外の一方、capture判定でworkflow FAIL。後続Broker build／IPC smokeはSKIP。`BUF-T04`部分観測、`BUF-T05`／`BUF-T06`OPEN、`BUF-T23`局所PASS。詳細は[B5記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md) | OneDrive警告との因果、loopback/TLS failureの根因、Q4の長期／反復／資源影響、現行SAC policy全体、通常Release能力、正式配布・実機保証 |
 | **正式な出荷判断** | Release GateとOwner承認を独立に保持 | <code>task_execution=unsupported</code>、<code>release_ready=false</code> |
 
 - item: Linux native full product support
   classification: `release_blocker`
   registry_id: linux_native_product_support
-  reason: Linux native Desktopは必須製品対象だが、現行の部分実装とWSLg開発smokeだけでは、installed製品・権限境界・復旧・配布の完全対応を受入れていない。
+  reason: Linux native Desktopは必須製品対象。WSL／WSLgの開発証拠とhosted Xvfb／X11の導入済みGTK製品の限定成功はあるが、残る製品経路・Wayland・一般環境・正式配布を含む完全対応は未受入れである。
   required_action: Linux nativeの全必須Desktop経路を実装し、X11／Wayland、Broker／Owner、資格情報、Workspace、Agent recovery、導入／更新／rollback／削除、provenanceを対象別に受入れる。
 
 B4-L2の記録済み検査では、Rust全体直列テスト **569 passed / 0 failed / 13 ignored**、Agent Task Flutter client 14件とAgent Center widget 1件、Schema **167件**・正常例 **163件**・否定fixture **215件**、Conformance **245 checks**を確認しています。これらは**2026-10-11の開発環境における対象版の証拠**であり、このREADME更新時に再実行した値でも、インストール済み製品の保証でもありません。10月17日のB4統合経路証拠も`r2-e2e` staged buildとlocalhost合成APIの範囲に限られ、通常Release能力やinstalled provenanceを示しません。[観測範囲と残差](docs/REV5_PRODUCT_PROGRESS.md)を参照してください。

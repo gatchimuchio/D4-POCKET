@@ -1,6 +1,19 @@
 # 互換性対応表
 
-## C31現行互換性要約（2026-09-28）
+## 現行の対象別成立範囲（2026-10-22）
+
+| 対象 | 対象を限定した現行証拠 | 未受入れの範囲 |
+|---|---|---|
+| Windows製品経路 | P12の開発到達点と、2026-10-17のB4 staged `r2-e2e`・合成APIによる有限CLOSED | 通常Release能力、installed-pathの正式証拠、署名・Owner GO |
+| Linux製品経路 | Ubuntu 24.04／Xvfb・X11の導入済みGTK製品。#77の更新等、#94の資格情報保管、#107（source `bf2a51ac`）の合成MCP接続・一回Tool実行・切断はそれぞれ限定受入れ | Workspace／Agent Task・Recovery等の残る経路、Wayland描画、一般環境・正式配布。`linux_native_product_support`はunresolved |
+| macOS／Android／iOS製品経路 | 2026-10-09にP13の有限Product Build受入れCLOSED。対象ごとのhosted／Emulator／Simulator証拠を保持 | 物理端末・全一般環境・正式署名／配布。Android実機凍結を維持 |
+| 緩衝基盤と検査 | B4 CLOSED、B5 OPEN。Windows #55はRust試験572成功／0失敗／13除外でもcapture判定FAIL | loopback根因、OneDrive因果、長期・資源、B5全体。単独PASSを根因閉鎖へ昇格しない |
+
+証拠の日時・source・環境・結果は[F03実績文書対応](docs/QE_2026-10-22/F03_実績文書対応.md)、製品の現在状態は[rev5進捗](docs/REV5_PRODUCT_PROGRESS.md)を参照。Linuxは必須の独立対象であり、下記の旧表の開発sliceだけに限定しない。通常Release `task_execution=unsupported`、`release_ready=false`、正式Q0〜Q7 `DEFERRED`と既存Release Gateを保持する。
+
+以下はC31／旧v1.0／rev2の履歴表である。各「現行」「現在」は記録当時の意味に限り、旧Mobile範囲外やmacOS環境不在を現在状態へ転用しない。
+
+## C31互換性の履歴要約（2026-09-28）
 
 現行の開発検証対象はWindows Rust Broker、共有／Desktop／Mobile Flutter、Schema、Conformance、C29障害注入である。Schema 149件／normal example 149件／negative fixture 192件、Conformance 225 checks、C29 9/9 casesがPASS。Desktop FlutterはASCII一時copyで124 testsと`flutter analyze`、Mobile Flutterも`flutter analyze`がPASSした。Windows Actions [`Windows Rust manual validation #10`](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36419291719)は対象commit `9c841a5`のRust全target checkと12 test target／389件をPASSした。これらは開発検証であり、installed product・外部MCP実接続・release proofではない。C0〜C31の監査対応表は構造PASS、C32〜C34は未監査、active release blocker 31件、`release_ready=false`。
 

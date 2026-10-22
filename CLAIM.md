@@ -1,10 +1,20 @@
 # GUI Shell の主張境界
 
-## Windows Setup Doctorの現行状態（2026-09-26）
+## 現行の主張と証拠（2026-10-22）
+
+現行製品はD4 Pocketで、Windows／macOS／LinuxのDesktopとAndroid／iOSのMobileを対象とする。Windows-firstは優先順位であり、Linuxを開発用の補助対象へ限定しない。現在の製品状態は[rev5進捗](docs/REV5_PRODUCT_PROGRESS.md)、是正・施工方法は[2026-10-22 QE正本](docs/QE_2026-10-22/採用記録.md)、出荷関門は`release_blockers.registry.json`を参照する。
+
+Windows B4は2026-10-17のstaged `r2-e2e`・合成APIを使った単一Task経路の範囲でCLOSED、B5はOPEN。Linux run #107はsource `bf2a51ac955eb5b9d7b6ecccdf0a21ee0875b96c`、Ubuntu 24.04／Xvfb・X11の導入済みGTK製品と合成MCP serverに限定したPASSである。前後のOwner拒否／別要求の許可、一回Tool実行、hash主体の結果、Audit、切断を示す。一般Linux環境、Wayland描画、全機能・正式署名／配布の保証へは昇格しない。P13のmacOS／Android／iOSも有限受入れの範囲でCLOSEDであり、物理端末保証・正式配布は別の関門である。
+
+後続Windows run #55はRust試験572成功／0失敗／13除外の一方、capture判定でworkflow FAIL、後続Broker build／IPC smokeはSKIPだった。`FQ-TEST-LOOPBACK`／B5 OPEN、通常Release `task_execution=unsupported`、`release_ready=false`、正式Q0〜Q7 `DEFERRED`を保持する。対象commit・環境・結果の対応は[F03実績文書対応](docs/QE_2026-10-22/F03_実績文書対応.md)に記録する。
+
+以下の旧v1.0／rev2欄は、その時点の実装・検査・範囲・判断を保存した履歴である。「現在」等の語も当時を指し、現行の製品状態や対象OSの除外根拠にはしない。安全・Authority・Approval・Audit・Recovery・Content Exposureと、引き継がれた出荷条件は保持する。
+
+## Windows Setup Doctorの状態履歴（2026-09-26）
 
 通常production起動からのBroker統治machine-readable Setup Doctor exportは未接続である。過去にcollector注入環境変数で得たproduct-shaped JSONは通常production pathの証拠ではなく、現行Rust起動器はその注入環境変数をFlutter childから除去する。PowerShell collectorもexternal probeに限る。この項目は下記の過去記録に優先し、native Windows product evidenceとともに`release_blocker`を維持する。
 
-## rev2の現在証拠（2026-09-10）
+## rev2の証拠履歴（2026-09-10）
 
 以下の旧Desktop v1.0記録は過去の基準面を含む。現行owner rev2ではMobile・端末連携・Android・Apple補助buildも作業対象であり、旧post_v1_scopeを理由に未完了を除外しない。現在の要求別監査は `docs/REV2_PROGRESS.md`、Mobile状態は `MOBILE_STATUS.md` を参照する。
 
@@ -13,7 +23,7 @@ macOS projectは追加済みで、手動補助run 34446194013（commit 27b8713fd
 Android開発APK/AABはbuild済み。実機install以降、Windowsの中断された画面回帰、installed-path証拠、正式配布、owner GOはrelease_blockerとして保持する。開発検査のPASSはこれらのgateを解消しない。
 
 
-## 現在の状態
+## 旧v1.0の状態履歴
 
 GUI-Shell は、まだ完成製品の release ではない。
 
@@ -37,7 +47,7 @@ LLM-readable substrate の定義、範囲を限定した Reference Extension の
 
 公開 Windows proof pack には、実測 Windows installed-path evidence に由来する redacted review copy が含まれる。これらは canonical release evidence ではなく、この公開 repository 上の完成製品 release blocker を解消しない。
 
-## 現在完了している領域
+## 旧v1.0／C31までの完了記録
 
 ~~~yaml
 - item: schema と conformance skeleton
@@ -93,7 +103,7 @@ LLM-readable substrate の定義、範囲を限定した Reference Extension の
   status: 実装が存在する。
 ~~~
 
-## 現在の release blocker
+## 旧v1.0／rev2の関門・判定履歴
 
 ~~~yaml
 - item: 実装言語方針の Runtime convergence が未通過
@@ -202,7 +212,7 @@ LLM-readable substrate の定義、範囲を限定した Reference Extension の
   blocks_release: yes
 ~~~
 
-## v1 後の範囲
+## 旧v1.0の範囲履歴（現行rev5対象を除外しない）
 
 ~~~yaml
 - item: multi-user mode

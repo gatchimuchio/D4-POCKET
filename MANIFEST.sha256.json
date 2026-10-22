@@ -116,11 +116,11 @@
     },
     {
       "path": "CLAIM.md",
-      "sha256": "0ce49d60d2515f0bc03a7d9b63660480cbf1f4015984bee0587a430b34dc08ea"
+      "sha256": "3619f63cd5e1ae9d309190457f3c122f29dc41fed4c19f8b81c348ec3bed58fd"
     },
     {
       "path": "COMPATIBILITY_MATRIX.md",
-      "sha256": "02ba3c853e6fb8317d66308384ce4e05b5e3994a11901321af175651b545b6a3"
+      "sha256": "092ddae492f94470987dbabe14d3c4c1a9a29e58fbfd2eba5a31a3b10832ae77"
     },
     {
       "path": "CONFIG.md",
@@ -136,7 +136,7 @@
     },
     {
       "path": "INSTALLER_STATUS.md",
-      "sha256": "7fe332b40ae6cb82b9697a7ff946feca2a62afd6b996c5f77dcf3d23e7ac8959"
+      "sha256": "40baa8fa3dbea1d094a851a7b9fc5163fd4f512745688fbec98aa25ef9655cba"
     },
     {
       "path": "LICENSE",
@@ -152,7 +152,7 @@
     },
     {
       "path": "MOBILE_STATUS.md",
-      "sha256": "e4e782fb90a2863922cf48416f360bf96a63f762c4a9f6be05700807b096549a"
+      "sha256": "18208dfa524f9aa2e5ad10ac0ac1408bfd7f10bf28aeafe655fe62c4de7286a0"
     },
     {
       "path": "NOTICE",
@@ -164,15 +164,15 @@
     },
     {
       "path": "README.md",
-      "sha256": "dd24e44739242829ed51ee2947e9e41fe1bab71b29e7a41014370e801571a983"
+      "sha256": "def6ffdcd7a1dd61f07453b755992d9c017e5c78db0307751ac7047931fcd956"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "35c232e01e57dedd59e42878979a571ab7f8f41aa7b7100da62ddd3706bc3dbd"
+      "sha256": "88fbc5ad4958d0d43b4720eda65f7f1fe720aa8175d85de98d953f067adbcc1d"
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "024cbea37c78d5a7fc09a942ef6e332784338de6a9c65e81ce92ab6b3969b394"
+      "sha256": "f7f948c35495d78f99c338f3849b20584265bb0304e65c257c7540bb0f77fee6"
     },
     {
       "path": "SECURITY.md",
@@ -1303,6 +1303,10 @@
       "sha256": "7c40ff4fb0644e087e6c3bae731ffcde5f8c8eeb3cc63f6c093cf1d585583e20"
     },
     {
+      "path": "docs/QE_2026-10-22/F03_\u5b9f\u7e3e\u6587\u66f8\u5bfe\u5fdc.md",
+      "sha256": "c05e55641d0563f6b7177bcf3e77d76191dcb68c4232b8bff4b3e41406e84066"
+    },
+    {
       "path": "docs/QE_2026-10-22/\u63a1\u7528\u8a18\u9332.md",
       "sha256": "3ee6b120269f80ab8eaa9877640ef3863912a2d1e18124f02393fdcac662d921"
     },
@@ -1324,7 +1328,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "ca89e8074da1c7433ced676422bb51a57972fbeb558c1b5aea094d80254b8334"
+      "sha256": "072da0ea724e6cd5c4a745df28eaa76bf129171dfa673d094253c3f7db9fb4c7"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",

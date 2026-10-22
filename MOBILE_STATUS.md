@@ -1,6 +1,14 @@
 # Mobile 状態
 
-## D4 Pocket rev2 最新境界確認（2026-09-25）
+## rev5の現行到達点（2026-10-22照合）
+
+Android／iOSは必須のMobile製品対象で、P13の有限Product Build受入れは2026-10-09にCLOSEDである。個々のsource・hosted／Emulator／Simulator・対象機能は[rev5進捗](docs/REV5_PRODUCT_PROGRESS.md)のP13受入記録へ結合する。現在のmainを本更新時に端末上で再試験した意味ではない。物理端末の安全保管・TLS・lifecycle、正式identity／署名／配布は別の`release_blocker`であり、Android実機検証凍結も維持する。
+
+Flutterは公開状態と要求、Android Kotlin／iOS Swiftはnative保管とtransport、既存Rust BrokerはAuthority／Permission／Approval／Audit／Recoveryを担う。旧Dart直接経路の成功は現行native経路の証拠にしない。Linux run #107の導入済みGTK・合成MCP検査もMobile TLS／資格情報／実機の証拠ではない。[F03実績文書対応](docs/QE_2026-10-22/F03_実績文書対応.md)を参照する。
+
+下記の2026-09-25以前の検査・未確認事項は当時の履歴であり、iOS native compile未確認等を現在のP13状態へ転記しない。物理端末・正式配布の現行未閉包は`release_blockers.registry.json`を参照する。B4の限定CLOSED、B5 OPEN、正式Q0〜Q7 `DEFERRED`、通常Release `task_execution=unsupported`／`release_ready=false`は変更しない。
+
+## D4 Pocket rev2 境界確認履歴（2026-09-25）
 
 旧Dart製品client、資格モデル、安全保管API、SecureSocket、招待をDartへ注入するdebug VM integration harnessを廃止した。Flutterは固定MethodChannelを通じて状態projectionとallowlist済みBroker operationだけを送受信する。Android Kotlin／iOS Swiftへnative store・serviceを実装し、`local_delete`は資格削除と同じOS保護状態へ最大32件の非権威回復記録を保存する。Flutterにはversionだけで読む固定methodと、秘密fieldを拒む限定表示を追加した。Flutter試験16件・analyzeは成功。現行のAndroid sourceは対象のMobileアプリと共有UI計117ファイルを一時検証先へ複製し、内容hash差分0件を確認した検証先で、`gradlew.bat clean :app:testDebugUnitTest :app:assembleDebug --no-daemon --offline --console=plain`が成功した。JUnit 8件はすべて成功し、debug APKは146,311,641 bytes、SHA-256 `2D40701A90A518261D5E9E7E5E96AADF036D1A78354B9181B0E001E9A6632129`。これは現行sourceの隔離clean build証拠で、実機・実TLS・製品releaseの証拠ではない。元OneDrive作業場所の除外対象`apps/mobile_flutter/build`には親からの`Everyone Deny DeleteSubdirectoriesAndFiles`が継承され、標準出力先では後片付けとresource生成が`AccessDenied`となる。ACLは変更せず、一時検証先で試験した。iOS native sourceは追加済みだがApple toolchain compile／XCTest未確認。実TLS・Keystore/Keychain実機動作は未検証である。Flutterからnative foreground状態を偽装できる`set_foreground` channelは設けない。
 
@@ -9,7 +17,7 @@
 - Android実機検証凍結、rev2_mobile_device_evidence、正式配布blockerは維持する。Flutter/Kotlin unit test・APK build・emulator起動は実機証拠へ昇格しない。
 - 旧Dart client・Simulator integrationのPASSは履歴のまま保持し、現行native経路の適合根拠に使用しない。
 
-## C31現況（2026-09-24）
+## C31の状態履歴（2026-09-24）
 
 Mobileは既存の9画面を保持し、C24で通知summary、Runtime lifecycle状態、資源概要、owner再承認待ち停止receipt、現在owner承認に結合した履歴metadataを既存Rust Brokerの読み取り専用経路へ投影する。MobileはApproval、Permission、Authority、Credential、MCP接続、Tool実行、実停止を所有しない。取得不能な資源値は`unknown`のままとし、MCP live一覧はDesktop owner管理面の境界上、未観測として表示する。
 
@@ -28,7 +36,7 @@ Windows hostではMobile Flutterの解析と試験、Android debug APK／AABのb
 
 owner指示により、Androidの実機install・launch・端末結合・対話・安全保管・lifecycle検証を凍結する。再開指示まで端末接続を要求せず、実機検証を実施しない。ビルド済みAPK/AABとhost上の検証結果は保持する。凍結は実機合格やrelease許可を意味せず、未検証のrelease_blockerを保持する。iOS実機検証はこの凍結指示の対象外である。
 
-## 観測した検証
+## 旧Dart経路を含む検証履歴（現行native証拠へ転用しない）
 
 - Mobile analyzeと14試験、共有6試験、Desktop32試験はPASS。
 - Windows/Linux上のMobile製品Dart client → TLS → Rust Core → 固定参照MINIDORAの実対話はPASS。証明書拒否・停止・再確認・失効も検査した。
