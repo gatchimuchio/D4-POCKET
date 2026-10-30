@@ -1564,14 +1564,29 @@ def _select_folder_in_gtk_chooser(
     )
     accept = _find_operable_accessible("選択", root=chooser, timeout=10, exact=True)
     _activate_accessible(accept, "選択", environment)
+    coordinate_fallback_used = False
     try:
         _wait_for_gtk_dialog_closed(
             environment,
             "D4 Pocket 作業領域の選択",
-            action="absolute folder path entry and accept action",
+            action="AT-SPI exact accept action",
+            timeout=2,
+        )
+        return
+    except RuntimeError:
+        coordinate_fallback_used = True
+        _click_accessible_by_coordinates(accept, "選択", environment)
+    try:
+        _wait_for_gtk_dialog_closed(
+            environment,
+            "D4 Pocket 作業領域の選択",
+            action="AT-SPI action and exact-control coordinate fallback",
         )
     except RuntimeError:
         diagnostics = _gtk_folder_chooser_diagnostics(chooser, folder)
+        diagnostics["exact_accept_coordinate_fallback_used"] = (
+            coordinate_fallback_used
+        )
         screenshot_captured = (
             _capture_gtk_dialog_screenshot(
                 environment,
@@ -1591,7 +1606,7 @@ def _select_folder_in_gtk_chooser(
             }
         )
         raise RuntimeError(
-            "GTK folder selection did not close after absolute path entry and accept action; "
+            "GTK folder selection did not close after AT-SPI action and exact-control coordinate fallback; "
             f"bounded_state={diagnostics}"
         ) from None
 

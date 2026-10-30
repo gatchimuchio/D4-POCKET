@@ -1513,7 +1513,55 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
         wait_closed.assert_called_once_with(
             environment,
             "D4 Pocket 作業領域の選択",
-            action="absolute folder path entry and accept action",
+            action="AT-SPI exact accept action",
+            timeout=2,
+        )
+
+    def test_folder_chooser_uses_exact_control_coordinates_if_action_does_not_close(self) -> None:
+        environment = {"DISPLAY": ":99"}
+        with tempfile.TemporaryDirectory() as directory:
+            folder = Path(directory) / "selected-workspace"
+            folder.mkdir()
+            chooser = object()
+            accept = object()
+            visible = subprocess.CompletedProcess(
+                args=[], returncode=0, stdout=b"0x42\n", stderr=b""
+            )
+            with (
+                patch(
+                    "tooling.tests.linux_installed_product_smoke.subprocess.run",
+                    side_effect=(None, None, None, None, None, visible),
+                ),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._find_accessible",
+                    return_value=chooser,
+                ),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
+                    return_value=accept,
+                ),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._activate_accessible"
+                ),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._click_accessible_by_coordinates"
+                ) as coordinate_click,
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._wait_for_gtk_dialog_closed",
+                    side_effect=(RuntimeError("still open"), None),
+                ) as wait_closed,
+            ):
+                _select_folder_in_gtk_chooser(environment, "0x42", folder)
+
+        coordinate_click.assert_called_once_with(accept, "選択", environment)
+        self.assertEqual(wait_closed.call_count, 2)
+        self.assertEqual(
+            wait_closed.call_args_list[0].kwargs["action"],
+            "AT-SPI exact accept action",
+        )
+        self.assertEqual(
+            wait_closed.call_args_list[1].kwargs["action"],
+            "AT-SPI action and exact-control coordinate fallback",
         )
 
     def test_folder_chooser_accepts_location_entry_return(self) -> None:
