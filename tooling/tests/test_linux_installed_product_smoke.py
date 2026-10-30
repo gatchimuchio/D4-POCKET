@@ -1579,19 +1579,14 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
         self.assertNotIn(expected, str(failure.exception))
         self.assertNotIn("/home/test/decoy-workspace", str(failure.exception))
 
-    def test_workspace_inspector_control_reacquires_and_scrolls_live_page(self) -> None:
-        first_window, second_window = object(), object()
-        first_heading, second_heading = object(), object()
+    def test_workspace_inspector_control_retains_live_scope_while_scrolling(self) -> None:
+        window = object()
+        heading = object()
         scope, control = object(), object()
         with (
             patch(
                 "tooling.tests.linux_installed_product_smoke._find_accessible",
-                side_effect=(
-                    first_window,
-                    first_heading,
-                    second_window,
-                    second_heading,
-                ),
+                side_effect=(window, heading),
             ) as find,
             patch(
                 "tooling.tests.linux_installed_product_smoke._accessible_scope_with_named_descendant",
@@ -1615,7 +1610,14 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             )
 
         self.assertIs(actual, control)
-        self.assertEqual(find.call_count, 4)
+        self.assertEqual(
+            [entry.args[0] for entry in find.call_args_list],
+            [WINDOW_TITLE, "作業領域インスペクタ"],
+        )
+        self.assertIs(find.call_args_list[1].kwargs["root"], window)
+        self.assertTrue(
+            all(0 < entry.kwargs["timeout"] <= 1 for entry in find.call_args_list)
+        )
         self.assertEqual(find_control.call_count, 2)
         scroll.assert_called_once_with({"DISPLAY": ":99"}, "0x42")
 

@@ -504,24 +504,32 @@ def _find_workspace_inspector_control(
     deadline = time.monotonic() + timeout
     last_error = "not observed"
     scroll_steps = 0
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise RuntimeError(
+            "Workspace Inspector control search timed out before window "
+            f"lookup: control={name}; workspace_id={workspace_id}"
+        )
+    window = _find_accessible(WINDOW_TITLE, timeout=remaining)
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise RuntimeError(
+            "Workspace Inspector control search timed out before Inspector "
+            f"lookup: control={name}; workspace_id={workspace_id}"
+        )
+    heading = _find_accessible(
+        "作業領域インスペクタ", root=window, timeout=remaining
+    )
+    inspector = _accessible_scope_with_named_descendant(
+        heading, workspace_id
+    )
     while scroll_steps <= 48:
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             break
         try:
-            window = _find_accessible(
-                WINDOW_TITLE, timeout=min(0.5, remaining)
-            )
-            heading = _find_accessible(
-                "作業領域インスペクタ",
-                root=window,
-                timeout=min(0.5, remaining),
-            )
-            inspector = _accessible_scope_with_named_descendant(
-                heading, workspace_id
-            )
             return _find_operable_accessible(
-                name, root=inspector, timeout=min(0.25, remaining)
+                name, root=inspector, timeout=min(0.5, remaining)
             )
         except RuntimeError as error:
             last_error = str(error)[:400]
