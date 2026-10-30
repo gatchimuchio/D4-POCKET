@@ -320,6 +320,26 @@ def _accessible_parent(node):
         return None
 
 
+def _accessible_scope_with_named_descendant(
+    node, descendant_name: str, *, max_ancestors: int = 16
+):
+    """見出しから昇り、指定要素を含む最小のAT-SPI部分木を返す。"""
+    current = node
+    for _ in range(max_ancestors + 1):
+        if any(
+            descendant_name in accessible_name
+            for _, accessible_name in _accessible_nodes(current)
+        ):
+            return current
+        parent = _accessible_parent(current)
+        if parent is None or parent is current:
+            break
+        current = parent
+    raise RuntimeError(
+        f"AT-SPI見出しの親範囲に対象要素がありません: {descendant_name}"
+    )
+
+
 def _editable_text_ancestor(node, *, max_depth: int = 16):
     current = node
     for _ in range(max_depth + 1):
@@ -2296,7 +2316,12 @@ def _run_installed_workspace_selection_acceptance(
 
     window = _find_accessible(WINDOW_TITLE, timeout=10)
     _find_accessible("Permission／Approval／Credential: 生成なし", root=window, timeout=10)
-    inspector = _find_accessible("作業領域インスペクタ", root=window, timeout=15)
+    inspector_heading = _find_accessible(
+        "作業領域インスペクタ", root=window, timeout=15
+    )
+    inspector = _accessible_scope_with_named_descendant(
+        inspector_heading, workspace_id
+    )
     row = _find_operable_accessible(workspace_id, root=inspector, timeout=20)
     _activate_accessible(row, workspace_id, environment)
     visibility = _find_operable_accessible("hash_only", root=inspector, timeout=10)
@@ -2319,6 +2344,13 @@ def _run_installed_workspace_selection_acceptance(
         ),
     )
     _wait_for_owner_dialog_closed(environment)
+    window = _find_accessible(WINDOW_TITLE, timeout=10)
+    inspector_heading = _find_accessible(
+        "作業領域インスペクタ", root=window, timeout=15
+    )
+    inspector = _accessible_scope_with_named_descendant(
+        inspector_heading, workspace_id
+    )
     _find_accessible(
         "現在のWorkspace読取範囲: full・Task実行／書込権は別です。",
         root=inspector,
@@ -2326,6 +2358,13 @@ def _run_installed_workspace_selection_acceptance(
     )
     row = _find_operable_accessible(workspace_id, root=inspector, timeout=10)
     _activate_accessible(row, workspace_id, environment)
+    window = _find_accessible(WINDOW_TITLE, timeout=10)
+    inspector_heading = _find_accessible(
+        "作業領域インスペクタ", root=window, timeout=15
+    )
+    inspector = _accessible_scope_with_named_descendant(
+        inspector_heading, "public.txt"
+    )
     public_file = _find_operable_accessible("public.txt", root=inspector, timeout=15)
     initial_projection = _accessible_snapshot(inspector)
     tree_projection_evidence = _verify_workspace_projection(
@@ -2342,6 +2381,13 @@ def _run_installed_workspace_selection_acceptance(
     )
     _activate_accessible(public_file, "public.txt", environment)
     _find_accessible(WORKSPACE_PUBLIC_CONTENT, root=inspector, timeout=15)
+    window = _find_accessible(WINDOW_TITLE, timeout=10)
+    inspector_heading = _find_accessible(
+        "作業領域インスペクタ", root=window, timeout=15
+    )
+    inspector = _accessible_scope_with_named_descendant(
+        inspector_heading, WORKSPACE_PUBLIC_CONTENT
+    )
     projection = _accessible_snapshot(inspector)
     projection_evidence = _verify_workspace_projection(
         projection,

@@ -17,6 +17,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _activate_accessible,
     _activate_named_control_by_keyboard,
     _actionable_node,
+    _accessible_scope_with_named_descendant,
     _answer_owner_dialog,
     _bounded_owner_text_diagnostics,
     _assert_secret_absent_from_files,
@@ -233,6 +234,34 @@ class AccessibleActionResolutionTests(unittest.TestCase):
             self.assertIs(
                 _find_operable_accessible("選択", root=Root(), exact=True), accept
             )
+
+    def test_workspace_scope_includes_rows_sibling_to_the_heading(self) -> None:
+        class TreeNode:
+            def __init__(self, name: str, children=()) -> None:
+                self.name = name
+                self.parent = None
+                self.children = list(children)
+                self.childCount = len(self.children)
+                for child in self.children:
+                    child.parent = self
+
+            def get_parent(self):
+                return self.parent
+
+            def getChildAtIndex(self, index: int):
+                return self.children[index]
+
+        heading = TreeNode("作業領域インスペクタ")
+        registration_row = TreeNode("workspace-linux-installed-acceptance")
+        inspector_column = TreeNode("", (heading, registration_row))
+        page = TreeNode("Agent Center", (inspector_column,))
+
+        self.assertIs(
+            _accessible_scope_with_named_descendant(
+                heading, "workspace-linux-installed-acceptance"
+            ),
+            inspector_column,
+        )
 
     def test_mcp_palette_submits_ascii_query_and_refreshes_window_tree(self) -> None:
         window = object()
