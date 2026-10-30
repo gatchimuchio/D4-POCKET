@@ -1557,12 +1557,12 @@ def _select_folder_in_gtk_chooser(
         else False
     )
     accept = _find_operable_accessible("選択", root=chooser, timeout=10)
-    _click_accessible_by_coordinates(accept, "選択", environment)
+    _activate_accessible(accept, "選択", environment)
     try:
         _wait_for_gtk_dialog_closed(
             environment,
             "D4 Pocket 作業領域の選択",
-            action="absolute folder path entry and accept click",
+            action="absolute folder path entry and accept action",
         )
     except RuntimeError:
         diagnostics = _gtk_folder_chooser_diagnostics(chooser, folder)
@@ -1585,7 +1585,7 @@ def _select_folder_in_gtk_chooser(
             }
         )
         raise RuntimeError(
-            "GTK folder selection did not close after absolute path entry and accept; "
+            "GTK folder selection did not close after absolute path entry and accept action; "
             f"bounded_state={diagnostics}"
         ) from None
 

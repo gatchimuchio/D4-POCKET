@@ -1415,7 +1415,7 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
 
     def test_gtk_chooser_close_timeout_names_the_response_action(self) -> None:
         for action in (
-            "absolute folder path entry and accept click",
+            "absolute folder path entry and accept action",
             "cancel control click",
         ):
             with self.subTest(action=action):
@@ -1453,8 +1453,8 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                     return_value=accept,
                 ) as find_operable,
                 patch(
-                    "tooling.tests.linux_installed_product_smoke._click_accessible_by_coordinates"
-                ) as click,
+                    "tooling.tests.linux_installed_product_smoke._activate_accessible"
+                ) as activate,
                 patch(
                     "tooling.tests.linux_installed_product_smoke._wait_for_gtk_dialog_closed"
                 ) as wait_closed,
@@ -1490,11 +1490,11 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             find_operable.call_args_list,
             [call("選択", root=chooser, timeout=10)],
         )
-        click.assert_called_once_with(accept, "選択", environment)
+        activate.assert_called_once_with(accept, "選択", environment)
         wait_closed.assert_called_once_with(
             environment,
             "D4 Pocket 作業領域の選択",
-            action="absolute folder path entry and accept click",
+            action="absolute folder path entry and accept action",
         )
 
     def test_folder_chooser_accepts_location_entry_return(self) -> None:
