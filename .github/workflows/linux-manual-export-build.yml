@@ -54,6 +54,26 @@ jobs:
             bubblewrap dbus-daemon gnome-keyring libglib2.0-bin openbox \
             python3-dbus python3-pyatspi strace weston xdotool xvfb
 
+      - name: Codex Linux sandbox capability gate
+        id: codex_sandbox
+        if: ${{ inputs.acceptance_scope == 'agent_task_supervision' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          probe_log="$D4P_EXPORT_ROOT/codex-bwrap-preflight.txt"
+          test ! -e "$probe_log"
+          if bwrap --unshare-user --unshare-pid --unshare-net --die-with-parent \
+            --ro-bind / / --dev /dev --proc /proc -- /bin/true >"$probe_log" 2>&1; then
+            printf 'available=true\n' >> "$GITHUB_OUTPUT"
+            printf '\n- Agent Task LIVE_RUNTIME preflight: PASS; rootless bubblewrap user／PID／network namespaces are available.\n' >> "$GITHUB_STEP_SUMMARY"
+          elif grep -Fq 'bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted' "$probe_log"; then
+            printf 'available=false\n' >> "$GITHUB_OUTPUT"
+            printf '\n- Agent Task LIVE_RUNTIME: NOT_RUN; this GitHub-hosted runner denies bubblewrap network-namespace loopback setup (`RTM_NEWADDR`). The product sandbox is unchanged; this host limitation is not reported as an installed-product failure.\n' >> "$GITHUB_STEP_SUMMARY"
+          else
+            cat "$probe_log"
+            exit 1
+          fi
+
       - name: Flutter／Rust toolchainを固定
         shell: bash
         run: |
@@ -302,7 +322,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: installed GTK UIでAgent Task process／scratch supervisionを受入れる
-        if: ${{ inputs.acceptance_scope == 'agent_task_supervision' }}
+        if: ${{ inputs.acceptance_scope == 'agent_task_supervision' && steps.codex_sandbox.outputs.available == 'true' }}
         shell: bash
         env:
           GUI_SHELL_PRODUCT_APP_ID: d4-pocket-app-11111111111111111111111111111111

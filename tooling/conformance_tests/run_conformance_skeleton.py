@@ -12087,6 +12087,13 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
         "workspace_selection",
         "inputs.acceptance_scope == 'workspace_selection'",
         "--acceptance-scope workspace_selection",
+        "id: codex_sandbox",
+        "bwrap --unshare-user --unshare-pid --unshare-net --die-with-parent",
+        "bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted",
+        "Agent Task LIVE_RUNTIME: NOT_RUN",
+        "steps.codex_sandbox.outputs.available == 'true'",
+        "inputs.acceptance_scope == 'agent_task_supervision'",
+        "--acceptance-scope agent_task_supervision",
     )
     missing = [token for token in required if token not in workflow]
     for token in (
