@@ -24,7 +24,7 @@ concurrency:
 
 jobs:
   export-build:
-    runs-on: ubuntu-24.04
+    runs-on: ${{ inputs.acceptance_scope == 'agent_task_supervision' && 'ubuntu-22.04' || 'ubuntu-24.04' }}
     timeout-minutes: 120
     steps:
       - name: 対象commitをclean checkout
@@ -97,9 +97,13 @@ jobs:
           ninja --version
           clang --version | head -n 1
           weston --version
+          runner_label="ubuntu-24.04"
+          if [ '${{ inputs.acceptance_scope }}' = 'agent_task_supervision' ]; then
+            runner_label="ubuntu-22.04"
+          fi
           {
             printf '\n- Commit: `%s`\n' "$head"
-            printf -- '- Runner: `ubuntu-24.04` (`%s/%s`)\n' "$ImageOS" "$ImageVersion"
+            printf -- '- Runner: `%s` (`%s/%s`)\n' "$runner_label" "$ImageOS" "$ImageVersion"
             printf -- '- Flutter: `3.44.0` (`%s`)\n' "$flutter_commit"
             printf -- '- Rust: `%s`\n' "$(rustc --version)"
             printf -- '- Weston: `%s`\n' "$(weston --version | head -n 1)"
