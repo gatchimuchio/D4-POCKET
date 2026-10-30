@@ -611,7 +611,7 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
     let mut product_repair_confirmation = None;
     let mut product_uninstall_confirmation = None;
     let text = if registration {
-        let summary = crate::broker::protocol::macos_agent_registration_summary(payload)?;
+        let summary = crate::broker::protocol::agent_cli_registration_summary(payload)?;
         format!("{summary}\n要求hash: {hash}")
     } else if matches!(
         operation,

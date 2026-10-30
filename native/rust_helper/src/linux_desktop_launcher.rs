@@ -39,6 +39,13 @@ const FRONTEND_ENVIRONMENT_ALLOWLIST: &[&str] = &[
     "LC_MESSAGES",
 ];
 
+#[cfg(any(test, feature = "r2-e2e"))]
+const R2_E2E_FRONTEND_ENVIRONMENT_ALLOWLIST: &[&str] = &[
+    "GUI_SHELL_R2_E2E_RESPONSES_PORT",
+    "GUI_SHELL_R2_E2E_CODEX_HOME",
+    "GUI_SHELL_R2_E2E_TASK_EXECUTION_LIMIT_MS",
+];
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LinuxLaunchError(&'static str);
 
@@ -363,9 +370,15 @@ fn filtered_frontend_environment(
         .into_iter()
         .filter(|(name, _)| {
             name.to_str().is_some_and(|name| {
-                FRONTEND_ENVIRONMENT_ALLOWLIST
+                let allowed = FRONTEND_ENVIRONMENT_ALLOWLIST
                     .iter()
-                    .any(|allowed| name == *allowed)
+                    .any(|allowed| name == *allowed);
+                #[cfg(feature = "r2-e2e")]
+                let allowed = allowed
+                    || R2_E2E_FRONTEND_ENVIRONMENT_ALLOWLIST
+                        .iter()
+                        .any(|test_name| name == *test_name);
+                allowed
             })
         })
         .collect()
@@ -915,6 +928,18 @@ mod tests {
                 OsString::from("/tmp/inject.so"),
             ),
             (OsString::from("PATH"), OsString::from("/tmp/inject-bin")),
+            (
+                OsString::from("GUI_SHELL_R2_E2E_RESPONSES_PORT"),
+                OsString::from("45001"),
+            ),
+            (
+                OsString::from("GUI_SHELL_R2_E2E_CODEX_HOME"),
+                OsString::from("/tmp/d4p/codex-home"),
+            ),
+            (
+                OsString::from("GUI_SHELL_R2_E2E_TASK_EXECUTION_LIMIT_MS"),
+                OsString::from("25000"),
+            ),
         ]);
         assert!(selected.iter().any(|(name, value)| {
             name == OsStr::new("XDG_DATA_HOME") && value == OsStr::new("/home/owner/data")
@@ -927,6 +952,16 @@ mod tests {
             assert!(!selected
                 .iter()
                 .any(|(name, _)| name == OsStr::new(forbidden)));
+        }
+        for test_name in R2_E2E_FRONTEND_ENVIRONMENT_ALLOWLIST {
+            #[cfg(feature = "r2-e2e")]
+            assert!(selected
+                .iter()
+                .any(|(name, _)| name == OsStr::new(test_name)));
+            #[cfg(not(feature = "r2-e2e"))]
+            assert!(!selected
+                .iter()
+                .any(|(name, _)| name == OsStr::new(test_name)));
         }
         assert!(!selected
             .iter()

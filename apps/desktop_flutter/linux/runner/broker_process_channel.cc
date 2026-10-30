@@ -8,6 +8,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstring>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -26,6 +27,20 @@ constexpr auto kOwnerDialogTimeout = std::chrono::seconds(300);
 constexpr auto kCredentialDialogTimeout = std::chrono::seconds(300);
 constexpr auto kWorkspaceDialogTimeout = std::chrono::seconds(300);
 constexpr size_t kWorkspaceReplyLimit = 2 * 1024 + 128;
+
+const char* const kR2E2eEnvironmentNames[] = {
+    "GUI_SHELL_R2_E2E_RESPONSES_PORT",
+    "GUI_SHELL_R2_E2E_CODEX_HOME",
+    "GUI_SHELL_R2_E2E_TASK_EXECUTION_LIMIT_MS",
+};
+#if defined(D4_LINUX_R2_E2E_TEST_BUILD)
+std::map<std::string, std::string> r2_e2e_environment;
+
+const char* r2_e2e_environment_value(const char* name) {
+  const auto entry = r2_e2e_environment.find(name);
+  return entry == r2_e2e_environment.end() ? nullptr : entry->second.c_str();
+}
+#endif
 
 bool is_lower_hex(char value) {
   return (value >= '0' && value <= '9') || (value >= 'a' && value <= 'f');
@@ -783,11 +798,22 @@ class BrokerContext {
         "D4P_LAUNCH_NONCE",
         "DISPLAY",       "WAYLAND_DISPLAY", "DBUS_SESSION_BUS_ADDRESS",
         "XDG_SESSION_TYPE", "GDK_BACKEND",  "LANG",
-        "LC_ALL",         "LC_CTYPE",       nullptr};
+        "LC_ALL",         "LC_CTYPE",
+#if defined(D4_LINUX_R2_E2E_TEST_BUILD)
+        "GUI_SHELL_R2_E2E_RESPONSES_PORT",
+        "GUI_SHELL_R2_E2E_CODEX_HOME",
+        "GUI_SHELL_R2_E2E_TASK_EXECUTION_LIMIT_MS",
+#endif
+        nullptr};
     gchar** environment = g_new0(gchar*, G_N_ELEMENTS(allowed_environment));
     size_t output_index = 0;
     for (size_t index = 0; allowed_environment[index] != nullptr; ++index) {
       const gchar* value = g_getenv(allowed_environment[index]);
+#if defined(D4_LINUX_R2_E2E_TEST_BUILD)
+      if (value == nullptr) {
+        value = r2_e2e_environment_value(allowed_environment[index]);
+      }
+#endif
       if (value != nullptr) {
         environment[output_index++] =
             g_strdup_printf("%s=%s", allowed_environment[index], value);
@@ -928,6 +954,20 @@ void shared_context_free(gpointer data) {
 }
 
 }  // namespace
+
+void broker_process_channel_prepare_r2_e2e_environment() {
+  for (const char* name : kR2E2eEnvironmentNames) {
+#if defined(D4_LINUX_R2_E2E_TEST_BUILD)
+    const gchar* value = g_getenv(name);
+    if (value != nullptr && value[0] != '\0' && std::strlen(value) <= 4096) {
+      r2_e2e_environment.emplace(name, value);
+    }
+#endif
+    // Test configuration belongs to the native helper. Remove it before the
+    // Flutter engine starts so Dart and the UI cannot observe it.
+    g_unsetenv(name);
+  }
+}
 
 void broker_process_channel_register(FlPluginRegistry* registry,
                                      GtkWindow* owner_parent) {

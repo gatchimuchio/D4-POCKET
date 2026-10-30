@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Callable
+import copy
 import hashlib
 import hmac
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
 import posixpath
@@ -16,6 +18,7 @@ import signal
 import stat
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -2583,6 +2586,414 @@ def _open_installed_codex_registration(
     return window
 
 
+def _add_responses_sequence_numbers(
+    events: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    for sequence_number, event in enumerate(events):
+        event["sequence_number"] = sequence_number
+    return events
+
+
+def _responses_lifecycle_event(
+    event_type: str,
+    response_id: str,
+    status: str,
+    output: list[dict[str, object]],
+) -> dict[str, object]:
+    completed = status == "completed"
+    return {
+        "type": event_type,
+        "response": {
+            "id": response_id,
+            "object": "response",
+            "access_programs": None,
+            "status": status,
+            "output": output,
+            "created_at": 1,
+            "completed_at": 1 if completed else None,
+            "background": False,
+            "error": None,
+            "incomplete_details": None,
+            "instructions": None,
+            "max_output_tokens": None,
+            "max_tool_calls": None,
+            "model": "o3",
+            "parallel_tool_calls": True,
+            "previous_response_id": None,
+            "reasoning": {"effort": None, "summary": None},
+            "service_tier": "default",
+            "store": True,
+            "temperature": 1.0,
+            "text": {"format": {"type": "text"}},
+            "tool_choice": "auto",
+            "tools": [],
+            "top_p": 1.0,
+            "truncation": "disabled",
+            "usage": (
+                {
+                    "input_tokens": 1,
+                    "input_tokens_details": {"cached_tokens": 0, "cache_write_tokens": 0},
+                    "output_tokens": 1,
+                    "output_tokens_details": {"reasoning_tokens": 0},
+                    "total_tokens": 2,
+                }
+                if completed
+                else None
+            ),
+            "user": None,
+            "metadata": {},
+        },
+    }
+
+
+def _responses_final_message_events(request_number: int) -> list[dict[str, object]]:
+    response_id = f"resp_d4p_linux_agent_task_{request_number}"
+    message_id = f"msg_d4p_linux_agent_task_{request_number}"
+    text = "合成installed Agent Task fixtureが完了しました。"
+    started = {
+        "type": "message",
+        "role": "assistant",
+        "id": message_id,
+        "status": "in_progress",
+        "content": [],
+    }
+    completed = {
+        "type": "message",
+        "role": "assistant",
+        "id": message_id,
+        "status": "completed",
+        "content": [{"type": "output_text", "text": text, "annotations": [], "logprobs": []}],
+    }
+    events: list[dict[str, object]] = [
+        _responses_lifecycle_event("response.created", response_id, "in_progress", []),
+        _responses_lifecycle_event("response.in_progress", response_id, "in_progress", []),
+        {
+            "type": "response.output_item.added",
+            "response_id": response_id,
+            "output_index": 0,
+            "item": started,
+        },
+        {
+            "type": "response.content_part.added",
+            "response_id": response_id,
+            "item_id": message_id,
+            "output_index": 0,
+            "content_index": 0,
+            "part": {"type": "output_text", "text": "", "annotations": [], "logprobs": []},
+        },
+        {
+            "type": "response.output_text.delta",
+            "response_id": response_id,
+            "item_id": message_id,
+            "output_index": 0,
+            "content_index": 0,
+            "delta": text,
+            "logprobs": [],
+        },
+        {
+            "type": "response.output_text.done",
+            "response_id": response_id,
+            "item_id": message_id,
+            "output_index": 0,
+            "content_index": 0,
+            "text": text,
+            "logprobs": [],
+        },
+        {
+            "type": "response.content_part.done",
+            "response_id": response_id,
+            "item_id": message_id,
+            "output_index": 0,
+            "content_index": 0,
+            "part": {"type": "output_text", "text": text, "annotations": [], "logprobs": []},
+        },
+        {
+            "type": "response.output_item.done",
+            "response_id": response_id,
+            "output_index": 0,
+            "item": completed,
+        },
+        _responses_lifecycle_event("response.completed", response_id, "completed", [completed]),
+    ]
+    return _add_responses_sequence_numbers(events)
+
+
+class _LinuxAgentTaskResponsesServer:
+    """Codex Responses wire fixture bound to loopback and one active Task at a time."""
+
+    def __init__(self) -> None:
+        fixture = self
+
+        class Handler(BaseHTTPRequestHandler):
+            protocol_version = "HTTP/1.1"
+
+            def log_message(self, _format: str, *_args: object) -> None:
+                return
+
+            def _send(self, status: int, content_type: str, body: bytes) -> None:
+                self.close_connection = True
+                self.send_response(status)
+                self.send_header("Content-Type", content_type)
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Connection", "close")
+                self.end_headers()
+                self.wfile.write(body)
+
+            def do_GET(self) -> None:
+                if self.headers.get("Authorization") is not None:
+                    fixture._reject_request("unexpected_authorization_header")
+                    self._send(401, "application/json", b"{}")
+                    return
+                if self.path.split("?", 1)[0] not in {"/v1/models", "/models"}:
+                    fixture._reject_request("unexpected_get")
+                    self._send(404, "application/json", b"{}")
+                    return
+                fixture._record_model_request()
+                body = json.dumps(
+                    {
+                        "object": "list",
+                        "data": [
+                            {
+                                "id": "o3",
+                                "object": "model",
+                                "created": 0,
+                                "owned_by": "d4-pocket-local-fixture",
+                            }
+                        ],
+                    },
+                    separators=(",", ":"),
+                ).encode("utf-8")
+                self._send(200, "application/json", body)
+
+            def do_POST(self) -> None:
+                if self.headers.get("Authorization") is not None:
+                    fixture._reject_request("unexpected_authorization_header")
+                    self._send(401, "application/json", b"{}")
+                    return
+                if self.path.split("?", 1)[0] not in {"/v1/responses", "/responses"}:
+                    fixture._reject_request("unexpected_post")
+                    self._send(404, "application/json", b"{}")
+                    return
+                try:
+                    length = int(self.headers.get("Content-Length", "-1"))
+                    if length < 0 or length > 2 * 1024 * 1024:
+                        raise ValueError
+                    request = json.loads(self.rfile.read(length))
+                    if not isinstance(request, dict):
+                        raise ValueError
+                except (OSError, UnicodeError, ValueError, json.JSONDecodeError):
+                    fixture._reject_request("malformed_request")
+                    self._send(400, "application/json", b"{}")
+                    return
+                try:
+                    events = fixture._response_events(request)
+                except RuntimeError:
+                    self._send(409, "application/json", b"{}")
+                    return
+                payload = b"".join(
+                    b"data: "
+                    + json.dumps(event, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+                    + b"\n\n"
+                    for event in events
+                ) + b"data: [DONE]\n\n"
+                self._send(200, "text/event-stream", payload)
+
+            def do_CONNECT(self) -> None:
+                fixture._reject_request("blocked_connect_request")
+                self._send(403, "text/plain", b"")
+
+            def do_PUT(self) -> None:
+                fixture._reject_request("unexpected_put")
+                self._send(403, "text/plain", b"")
+
+            def do_DELETE(self) -> None:
+                fixture._reject_request("unexpected_delete")
+                self._send(403, "text/plain", b"")
+
+        self._server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self._server.daemon_threads = True
+        self._server.timeout = 0.2
+        self._lock = threading.Lock()
+        self._scenario: dict[str, object] | None = None
+        self._history: list[dict[str, object]] = []
+        self._model_requests = 0
+        self._rejections: list[str] = []
+        self._thread: threading.Thread | None = None
+
+    @property
+    def port(self) -> int:
+        return int(self._server.server_address[1])
+
+    def start(self) -> None:
+        if self._thread is not None:
+            raise RuntimeError("loopback fixtureは既に起動しています")
+        self._thread = threading.Thread(
+            target=self._server.serve_forever,
+            kwargs={"poll_interval": 0.1},
+            name="d4p-agent-task-loopback-responses",
+            daemon=True,
+        )
+        self._thread.start()
+
+    def close(self) -> None:
+        if self._thread is not None:
+            self._server.shutdown()
+            self._thread.join(timeout=5)
+            self._thread = None
+        self._server.server_close()
+
+    def configure(self, scenario: str, command: str, workspace: Path) -> None:
+        if scenario not in {"complete", "cancel", "deadline"}:
+            raise ValueError("Agent Task loopback scenario is not supported")
+        with self._lock:
+            self._scenario = {
+                "name": scenario,
+                "command": command,
+                "workspace": str(workspace),
+                "posts": 0,
+                "tool_calls": 0,
+                "tool_outputs": 0,
+                "tool_output_sha256": None,
+                "call_id": None,
+                "request_shapes": [],
+            }
+            self._history.append(self._scenario)
+
+    def snapshot(self) -> dict[str, object]:
+        with self._lock:
+            return {
+                "model_requests": self._model_requests,
+                "rejections": list(self._rejections),
+                "scenarios": [
+                    {
+                        "name": row["name"],
+                        "posts": row["posts"],
+                        "tool_calls": row["tool_calls"],
+                        "tool_outputs": row["tool_outputs"],
+                        "tool_output_sha256": row["tool_output_sha256"],
+                        "request_shapes": copy.deepcopy(row["request_shapes"]),
+                    }
+                    for row in self._history
+                ],
+            }
+
+    def _record_model_request(self) -> None:
+        with self._lock:
+            self._model_requests += 1
+
+    def _reject_request(self, reason: str) -> None:
+        with self._lock:
+            self._rejections.append(reason)
+
+    def _response_events(self, request: dict[str, object]) -> list[dict[str, object]]:
+        with self._lock:
+            scenario = self._scenario
+            if scenario is None:
+                self._rejections.append("request_without_active_task")
+                raise RuntimeError("no active Task")
+            posts = int(scenario["posts"]) + 1
+            scenario["posts"] = posts
+            input_items = request.get("input")
+            if not isinstance(input_items, list):
+                self._rejections.append("responses_input_not_array")
+                raise RuntimeError("invalid input")
+            tool_outputs = [
+                item
+                for item in input_items
+                if isinstance(item, dict) and item.get("type") == "function_call_output"
+            ]
+            tools = request.get("tools")
+            offers_exec = isinstance(tools, list) and any(
+                isinstance(tool, dict) and tool.get("name") == "exec_command"
+                for tool in tools
+            )
+            cast_shapes = scenario["request_shapes"]
+            assert isinstance(cast_shapes, list)
+            cast_shapes.append(
+                {
+                    "input_items": len(input_items),
+                    "function_call_output_items": len(tool_outputs),
+                    "exec_command_offered": offers_exec,
+                }
+            )
+            if posts == 1 and not tool_outputs and offers_exec:
+                scenario["tool_calls"] = 1
+                call_id = "call_d4p_linux_agent_task_1"
+                item_id = "fc_d4p_linux_agent_task_1"
+                scenario["call_id"] = call_id
+                arguments = json.dumps(
+                    {
+                        "cmd": scenario["command"],
+                        "workdir": scenario["workspace"],
+                        "shell": "/bin/bash",
+                        "yield_time_ms": 30000,
+                    },
+                    separators=(",", ":"),
+                )
+                response_id = f"resp_d4p_linux_agent_task_{posts}"
+                started = {
+                    "type": "function_call",
+                    "id": item_id,
+                    "call_id": call_id,
+                    "name": "exec_command",
+                    "status": "in_progress",
+                    "arguments": "",
+                }
+                completed = {**started, "status": "completed", "arguments": arguments}
+                events: list[dict[str, object]] = [
+                    _responses_lifecycle_event("response.created", response_id, "in_progress", []),
+                    _responses_lifecycle_event("response.in_progress", response_id, "in_progress", []),
+                    {
+                        "type": "response.output_item.added",
+                        "response_id": response_id,
+                        "output_index": 0,
+                        "item": started,
+                    },
+                    {
+                        "type": "response.function_call_arguments.delta",
+                        "response_id": response_id,
+                        "item_id": item_id,
+                        "output_index": 0,
+                        "delta": arguments,
+                    },
+                    {
+                        "type": "response.function_call_arguments.done",
+                        "response_id": response_id,
+                        "item_id": item_id,
+                        "output_index": 0,
+                        "arguments": arguments,
+                    },
+                    {
+                        "type": "response.output_item.done",
+                        "response_id": response_id,
+                        "output_index": 0,
+                        "item": completed,
+                    },
+                    _responses_lifecycle_event("response.completed", response_id, "completed", [completed]),
+                ]
+                return _add_responses_sequence_numbers(events)
+            if posts == 2 and len(tool_outputs) == 1 and scenario.get("call_id"):
+                output = tool_outputs[0]
+                assert isinstance(output, dict)
+                if output.get("call_id") != scenario["call_id"]:
+                    self._rejections.append("tool_output_call_id_mismatch")
+                    raise RuntimeError("tool output id mismatch")
+                output_text = output.get("output")
+                if not isinstance(output_text, str):
+                    self._rejections.append("tool_output_not_text")
+                    raise RuntimeError("tool output missing")
+                if "D4P_SYNTHETIC_SECRET_CANARY" in output_text:
+                    self._rejections.append("synthetic_secret_canary_in_tool_output")
+                    raise RuntimeError("secret canary exposed")
+                scenario["tool_outputs"] = 1
+                scenario["tool_output_sha256"] = hashlib.sha256(
+                    output_text.encode("utf-8", errors="replace")
+                ).hexdigest()
+                return _responses_final_message_events(posts)
+            self._rejections.append("unexpected_response_request_shape")
+            raise RuntimeError("unexpected request sequence")
+
+
 def _fill_linux_workspace_registration(
     environment: dict[str, str],
     dialog,
@@ -2591,19 +3002,588 @@ def _fill_linux_workspace_registration(
     workspace_id: str,
     workspace_root: Path,
     secret_paths: str,
+    runtime_id: str = "runtime-linux-workspace-acceptance",
+    model_id: str = "model-linux-workspace-acceptance",
 ) -> None:
     window_id = _visible_product_window(environment)
     if window_id is None:
         raise RuntimeError("Workspace registration中にinstalled product windowがありません")
     for label, value in (
-        ("模型識別子", "model-linux-workspace-acceptance"),
-        ("実行系ID（Runtime ID）", "runtime-linux-workspace-acceptance"),
+        ("模型識別子", model_id),
+        ("実行系ID（Runtime ID）", runtime_id),
         ("Codex CLI実行fileの絶対path", str(cli_fixture)),
         ("作業領域ID（Workspace ID）", workspace_id),
         ("Workspace rootの絶対path", str(workspace_root)),
         ("除外する秘密path（相対path、1行に1件）", secret_paths),
     ):
         _set_public_text_by_keyboard(dialog, label, value, environment, window_id)
+
+
+def _write_linux_agent_task_fixture(acceptance_root: Path) -> tuple[Path, Path, Path]:
+    fixture_root = acceptance_root / "agent-task-fixture"
+    workspace = fixture_root / "workspace"
+    outside_root = fixture_root / "outside"
+    for directory in (fixture_root, workspace, outside_root, workspace / "private"):
+        directory.mkdir(mode=0o700, parents=True, exist_ok=False)
+    (workspace / ".env").write_text(
+        "D4P_SYNTHETIC_SECRET_CANARY=must-not-be-readable\n", encoding="utf-8"
+    )
+    (workspace / "private/token.txt").write_text(
+        "D4P_SYNTHETIC_SECRET_CANARY=must-not-be-readable\n", encoding="utf-8"
+    )
+    outside_file = outside_root / "outside.txt"
+    outside_file.write_text("D4P_SYNTHETIC_SECRET_CANARY=outside-workspace\n", encoding="utf-8")
+    outside_link = workspace / "outside-link.txt"
+    outside_link.symlink_to(outside_file)
+    (workspace / "task_fixture.py").write_text(
+        "import json, os, pathlib, subprocess, sys, time\n"
+        "workspace = pathlib.Path(__file__).resolve().parent\n"
+        "fixture_root = workspace.parent\n"
+        "scratch = pathlib.Path(os.environ['TMPDIR']).resolve()\n"
+        "scratch_workspace_bound = scratch.parent == workspace\n"
+        "def read_allowed(path):\n"
+        "    try:\n"
+        "        path.read_text(encoding='utf-8')\n"
+        "        return True\n"
+        "    except OSError:\n"
+        "        return False\n"
+        "def write_allowed(path):\n"
+        "    try:\n"
+        "        path.write_text('D4P_SYNTHETIC_WRITE_PROBE', encoding='utf-8')\n"
+        "        return True\n"
+        "    except OSError:\n"
+        "        return False\n"
+        "read_denied = not any((read_allowed(workspace / '.env'), read_allowed(workspace / 'private/token.txt'), read_allowed(workspace / 'outside-link.txt'), read_allowed(fixture_root / 'outside/outside.txt')))\n"
+        "write_denied = not any((write_allowed(workspace / 'private/write-probe.txt'), write_allowed(fixture_root / 'outside/write-probe.txt')))\n"
+        "(scratch / 'fixture-scratch-marker').write_text('owned-task-scratch\\n', encoding='utf-8')\n"
+        "mode = sys.argv[1]\n"
+        "if mode == 'complete':\n"
+        "    report = {'mode': mode, 'secret_and_outside_reads_denied': read_denied, 'secret_and_outside_writes_denied': write_denied, 'workspace_write': True, 'scratch_marker': True, 'scratch_workspace_bound': scratch_workspace_bound, 'scratch_name': scratch.name}\n"
+        "    (workspace / 'agent-task-result.json').write_text(json.dumps(report, sort_keys=True) + '\\n', encoding='utf-8')\n"
+        "    print('D4P_AGENT_TASK_FIXTURE_RESULT ' + json.dumps(report, sort_keys=True))\n"
+        "elif mode in {'cancel', 'deadline'}:\n"
+        "    child = subprocess.Popen(['/usr/bin/sleep', '300'])\n"
+        "    stat_text = pathlib.Path(f'/proc/{child.pid}/stat').read_text(encoding='utf-8')\n"
+        "    fields = stat_text[stat_text.rfind(')') + 2:].split()\n"
+        "    identity = {'pid': child.pid, 'pgid': int(fields[2]), 'starttime': int(fields[19])}\n"
+        "    report = {'mode': mode, 'secret_and_outside_reads_denied': read_denied, 'secret_and_outside_writes_denied': write_denied, 'scratch_marker': True, 'scratch_workspace_bound': scratch_workspace_bound, 'scratch_name': scratch.name, **identity}\n"
+        "    (workspace / f'agent-task-{mode}-active.json').write_text(json.dumps(report, sort_keys=True) + '\\n', encoding='utf-8')\n"
+        "    while True:\n"
+        "        time.sleep(0.1)\n"
+        "else:\n"
+        "    raise SystemExit(3)\n",
+        encoding="utf-8",
+    )
+    return fixture_root, workspace, outside_file
+
+
+def _linux_proc_identity(pid: int) -> tuple[int, int, str] | None:
+    try:
+        raw = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
+    except (FileNotFoundError, ProcessLookupError, PermissionError, OSError):
+        return None
+    close = raw.rfind(")")
+    if close < 0:
+        raise RuntimeError("Linux process statの形が不正です")
+    fields = raw[close + 2 :].split()
+    if len(fields) <= 19:
+        raise RuntimeError("Linux process statのfieldが不足しています")
+    return int(fields[2]), int(fields[19]), fields[0]
+
+
+def _linux_process_group_members(pgid: int) -> list[tuple[int, int, str]]:
+    members: list[tuple[int, int, str]] = []
+    for entry in Path("/proc").iterdir():
+        if not entry.name.isascii() or not entry.name.isdigit():
+            continue
+        identity = _linux_proc_identity(int(entry.name))
+        if identity is not None and identity[0] == pgid and identity[2] != "Z":
+            members.append((int(entry.name), identity[1], identity[2]))
+    return members
+
+
+def _wait_for_linux_process_group_exit(
+    pgid: int, *, timeout: float = 12.0
+) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if not _linux_process_group_members(pgid):
+            return
+        time.sleep(0.1)
+    raise RuntimeError("Agent Task終了後も所有process groupのlive processが残っています")
+
+
+def _stop_linux_agent_task_process_group(
+    pgid: int, anchor_pid: int, anchor_start_time: int, *, timeout: float = 3.0
+) -> None:
+    if (
+        pgid <= 1
+        or anchor_pid <= 1
+        or anchor_start_time <= 0
+        or pgid == os.getpgrp()
+    ):
+        raise RuntimeError("試験runner自身または不正なAgent Task process groupは停止しません")
+    if not _linux_process_group_members(pgid):
+        return
+    identity = _linux_proc_identity(anchor_pid)
+    if identity is None or (identity[0], identity[1]) != (pgid, anchor_start_time):
+        raise RuntimeError("Agent Task process groupの所有identityを再確認できず停止を拒否しました")
+    try:
+        os.killpg(pgid, signal.SIGTERM)
+    except ProcessLookupError:
+        if not _linux_process_group_members(pgid):
+            return
+        raise RuntimeError("Agent Task process groupへのTERM送信を確認できません")
+    try:
+        _wait_for_linux_process_group_exit(pgid, timeout=timeout)
+        return
+    except RuntimeError:
+        if not _linux_process_group_members(pgid):
+            return
+    try:
+        os.killpg(pgid, signal.SIGKILL)
+    except ProcessLookupError:
+        if not _linux_process_group_members(pgid):
+            return
+        raise RuntimeError("Agent Task process groupへのKILL送信を確認できません")
+    _wait_for_linux_process_group_exit(pgid, timeout=timeout)
+
+
+def _cleanup_linux_agent_task_process_groups(acceptance_root: Path) -> None:
+    if acceptance_root.is_symlink():
+        raise RuntimeError("Agent Task cleanup rootがsymlinkです")
+    fixture_root = acceptance_root / "agent-task-fixture"
+    if fixture_root.is_symlink():
+        raise RuntimeError("Agent Task cleanup fixture rootがsymlinkです")
+    if not fixture_root.exists():
+        return
+    workspace = fixture_root / "workspace"
+    if workspace.is_symlink():
+        raise RuntimeError("Agent Task cleanup Workspaceがsymlinkです")
+    if not workspace.exists():
+        return
+    if not workspace.is_dir():
+        raise RuntimeError("Agent Task cleanup Workspaceがdirectoryではありません")
+    first_failure: Exception | None = None
+    for scenario in ("cancel", "deadline"):
+        try:
+            marker = workspace / f"agent-task-{scenario}-active.json"
+            if marker.is_symlink():
+                raise RuntimeError("Agent Task cleanup markerがsymlinkです")
+            if not marker.exists():
+                continue
+            if not marker.is_file() or marker.stat().st_size > 4096:
+                raise RuntimeError(
+                    "Agent Task cleanup markerが通常fileまたはsize上限に違反します"
+                )
+            value = json.loads(marker.read_text(encoding="utf-8"))
+            if not isinstance(value, dict) or value.get("mode") != scenario:
+                raise ValueError
+            pid = int(value["pid"])
+            pgid = int(value["pgid"])
+            start_time = int(value["starttime"])
+            _stop_linux_agent_task_process_group(pgid, pid, start_time)
+        except Exception as error:
+            if first_failure is None:
+                first_failure = error
+    if first_failure is not None:
+        raise RuntimeError(
+            "Agent Task process group cleanupで一つ以上の失敗を確認しました"
+        ) from first_failure
+
+
+def _read_task_scratch_recovery_state(store: Path) -> dict[str, object]:
+    path = store / "agent_task_scratch_recovery.json"
+    if path.is_symlink() or not path.is_file():
+        raise RuntimeError("WorkspaceTaskScratch recovery journalが通常fileとしてありません")
+    try:
+        wrapper = json.loads(path.read_text(encoding="utf-8"))
+        state = wrapper["state"]
+        entries = state["entries"]
+    except (OSError, UnicodeError, KeyError, TypeError, json.JSONDecodeError) as error:
+        raise RuntimeError("WorkspaceTaskScratch recovery journalを解析できません") from error
+    if wrapper.get("version") != 1 or state.get("version") != 1 or not isinstance(entries, list):
+        raise RuntimeError("WorkspaceTaskScratch recovery journalのversionまたは形が不正です")
+    if entries:
+        raise RuntimeError("終端TaskのWorkspaceTaskScratch recovery journalに残存entryがあります")
+    hmac_value = wrapper.get("hmac")
+    key_path = store / "audit_anchor.key"
+    if (
+        not isinstance(hmac_value, str)
+        or not key_path.is_file()
+        or key_path.is_symlink()
+    ):
+        raise RuntimeError("WorkspaceTaskScratch recovery journalのHMAC keyまたはHMACがありません")
+    try:
+        key = bytes.fromhex(key_path.read_text(encoding="ascii").strip())
+    except (OSError, UnicodeError, ValueError) as error:
+        raise RuntimeError("WorkspaceTaskScratch recovery journalのHMAC keyが不正です") from error
+    if len(key) != 32:
+        raise RuntimeError("WorkspaceTaskScratch recovery journalのHMAC key長が不正です")
+    normalized_state = json.dumps(
+        state, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    )
+    expected_hmac = "sha256:" + hmac.new(
+        key,
+        f"version=1|state={normalized_state}".encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+    if not hmac.compare_digest(hmac_value, expected_hmac):
+        raise RuntimeError("WorkspaceTaskScratch recovery journalのHMACが一致しません")
+    return {"entries": len(entries), "hmac_present": True}
+
+
+def _wait_installed_task_status(
+    environment: dict[str, str], window, expected_status: str, *, timeout: float
+) -> str:
+    deadline = time.monotonic() + timeout
+    last_snapshot = ""
+    while time.monotonic() < deadline:
+        last_snapshot = _accessible_snapshot(window)
+        if f"Task状態: {expected_status}" in last_snapshot:
+            return last_snapshot
+        try:
+            refresh = _find_operable_accessible("Task状態を更新", root=window, timeout=1)
+            _activate_accessible(refresh, "Task状態を更新", environment)
+        except RuntimeError:
+            pass
+        time.sleep(0.25)
+    raise RuntimeError(
+        f"installed Agent Taskが{expected_status}へ遷移しませんでした: "
+        + last_snapshot[-1200:]
+    )
+
+
+def _prepare_and_start_installed_agent_task(
+    environment: dict[str, str],
+    window,
+    *,
+    runtime_id: str,
+    workspace_id: str,
+    instruction: str,
+) -> None:
+    inspect = _find_operable_accessible(
+        "Task実行能力を事前検査（実行なし）", root=window, timeout=15
+    )
+    _activate_accessible(inspect, "Task実行能力を事前検査（実行なし）", environment)
+    dialog_title = _find_accessible("Agent Task能力の事前検査", timeout=10)
+    dialog = _accessible_scope_with_named_descendant(
+        dialog_title, "Task指示", deadline=time.monotonic() + 10
+    )
+    window_id = _visible_product_window(environment)
+    if window_id is None:
+        raise RuntimeError("Task instruction dialog中にinstalled product windowがありません")
+    _set_public_text_by_keyboard(dialog, "Task指示", instruction, environment, window_id)
+    submit = _find_operable_accessible("Broker事前検査", root=dialog, timeout=10)
+    _activate_accessible(submit, "Broker事前検査", environment)
+    _find_accessible("Broker事前検査済み", root=window, timeout=15)
+
+    permission = _find_operable_accessible(
+        "Workspace PermissionのOwner確認", root=window, timeout=10
+    )
+    _activate_accessible(permission, "Workspace PermissionのOwner確認", environment)
+    _answer_owner_dialog(
+        environment,
+        "許可",
+        context="Agent Task Workspace Permission",
+        expected_summary_markers=(
+            "このAgent Sessionに限定したTask用Workspace Permissionを発行しますか？",
+            f"Runtime ID: {runtime_id}",
+            f"Workspace ID: {workspace_id}",
+            "許可operation: agent_task.execute",
+            "この確認はTask本文を承認せず",
+        ),
+    )
+    _wait_for_owner_dialog_closed(environment)
+
+    approval = _find_operable_accessible(
+        "Task一回ApprovalのOwner確認", root=window, timeout=10
+    )
+    _activate_accessible(approval, "Task一回ApprovalのOwner確認", environment)
+    _answer_owner_dialog(
+        environment,
+        "許可",
+        context="Agent Task一回Owner Approval",
+        expected_summary_markers=(
+            "このAgent Taskの一回限りOwner Approvalを発行しますか？",
+            f"Runtime ID: {runtime_id}",
+            f"Workspace ID: {workspace_id}",
+            "指示hash:",
+            "範囲: このSession・Workspace・指示hash・実行条件に限定",
+        ),
+    )
+    _wait_for_owner_dialog_closed(environment)
+    start = _find_operable_accessible("Taskを一回実行", root=window, timeout=10)
+    _activate_accessible(start, "Taskを一回実行", environment)
+
+
+def _run_installed_agent_task_acceptance(
+    environment: dict[str, str],
+    window_id: str,
+    *,
+    codex_cli: Path,
+    responses_server: _LinuxAgentTaskResponsesServer,
+    audit_store: Path,
+    acceptance_root: Path,
+    task_execution_limit_ms: int,
+) -> dict[str, object]:
+    fixture_root, workspace, outside_file = _write_linux_agent_task_fixture(acceptance_root)
+    workspace_id = "workspace-linux-installed-agent-task"
+    runtime_id = "runtime-linux-installed-agent-task"
+    secret_paths = ".env\nprivate/token.txt"
+    registration = _open_installed_codex_registration(environment, window_id=window_id)
+    _fill_linux_workspace_registration(
+        environment,
+        registration,
+        cli_fixture=codex_cli,
+        workspace_id=workspace_id,
+        workspace_root=workspace,
+        secret_paths=secret_paths,
+        runtime_id=runtime_id,
+    )
+    continue_button = _find_operable_accessible(
+        "native Owner確認へ進む", root=registration, timeout=10
+    )
+    _activate_accessible(continue_button, "native Owner確認へ進む", environment)
+    _answer_owner_dialog(
+        environment,
+        "許可",
+        context="Linux installed Codex Runtime／Workspace registration",
+        expected_summary_markers=(
+            "Agent CLI実行系とWorkspaceを、このBroker起動中だけ登録します。",
+            f"Runtime: {runtime_id}",
+            f"CLI実行file: {codex_cli}",
+            "認証方式: Codex CLI管理設定（登録時は認証しません）",
+            "Permission・Approval・Trust・Credentialを生成しません。",
+            "LinuxのWorkspace rootがBroker内部の保護領域と重ならないことを確認します。",
+            f"Workspace ID: {workspace_id}",
+            f"Workspace root: {workspace}",
+        ),
+    )
+    _wait_for_owner_dialog_closed(environment)
+    window = _find_accessible(WINDOW_TITLE, timeout=10)
+    _find_accessible("Task実行能力: supported", root=window, timeout=20)
+    session_start = _find_operable_accessible(
+        "登録Workspaceで対話Sessionを開始", root=window, timeout=10
+    )
+    _activate_accessible(session_start, "登録Workspaceで対話Sessionを開始", environment)
+    _find_accessible("Task実行能力を事前検査（実行なし）", root=window, timeout=20)
+
+    scenarios = (
+        ("complete", "completed", 90.0),
+        ("cancel", "cancelled", 30.0),
+        ("deadline", "failed", task_execution_limit_ms / 1000 + 30.0),
+    )
+    task_ids: list[str] = []
+    completed_reports: list[dict[str, object]] = []
+    process_groups: list[int] = []
+    positive_result_hash: str | None = None
+    for scenario_name, expected_status, wait_seconds in scenarios:
+        command = f"/usr/bin/python3 {workspace / 'task_fixture.py'} {scenario_name}"
+        responses_server.configure(scenario_name, command, workspace)
+        instruction = (
+            f"D4 Pocket installed Linux acceptance fixture: execute the provided "
+            f"workspace task_fixture.py in {scenario_name} mode exactly once. "
+            "Do not use network access or credentials."
+        )
+        _prepare_and_start_installed_agent_task(
+            environment,
+            window,
+            runtime_id=runtime_id,
+            workspace_id=workspace_id,
+            instruction=instruction,
+        )
+        task_matches = re.findall(
+            r"Task識別子:\s*([A-Za-z0-9_.:-]+)", _accessible_snapshot(window)
+        )
+        if not task_matches:
+            raise RuntimeError("installed Agent Centerに開始Task IDが表示されません")
+        task_ids.append(task_matches[-1])
+
+        active_marker = workspace / f"agent-task-{scenario_name}-active.json"
+        result_file = workspace / "agent-task-result.json"
+        if scenario_name == "complete":
+            deadline = time.monotonic() + wait_seconds
+            while not result_file.is_file() and time.monotonic() < deadline:
+                time.sleep(0.1)
+            if result_file.is_symlink() or not result_file.is_file():
+                raise RuntimeError("installed Agent Taskが許可Workspaceへ結果fileを書き込みませんでした")
+            try:
+                report = json.loads(result_file.read_text(encoding="utf-8"))
+            except (OSError, UnicodeError, json.JSONDecodeError) as error:
+                raise RuntimeError("Agent Task fixture結果がJSONとして読めません") from error
+            if not isinstance(report, dict) or set(report) != {
+                "mode",
+                "secret_and_outside_reads_denied",
+                "secret_and_outside_writes_denied",
+                "workspace_write",
+                "scratch_marker",
+                "scratch_workspace_bound",
+                "scratch_name",
+            } or any(
+                report.get(name) is not True
+                for name in (
+                    "secret_and_outside_reads_denied",
+                    "secret_and_outside_writes_denied",
+                    "workspace_write",
+                    "scratch_marker",
+                    "scratch_workspace_bound",
+                )
+            ) or report.get("mode") != "complete":
+                raise RuntimeError("Agent Taskのsecret／Workspace境界またはscratch fixtureが不成立です")
+            if not isinstance(report["scratch_name"], str) or not report["scratch_name"].startswith(".d4p-tmp-"):
+                raise RuntimeError("completed Agent Taskのscratch nameがD4所有形式ではありません")
+            completed_snapshot = _wait_installed_task_status(
+                environment, window, expected_status, timeout=wait_seconds
+            )
+            result_hash_match = re.search(
+                r"結果hash:\s*(sha256:[0-9a-f]{64})", completed_snapshot
+            )
+            if result_hash_match is None:
+                raise RuntimeError("completed Agent Taskに結果hashがありません")
+            positive_result_hash = result_hash_match.group(1)
+            completed_reports.append(report)
+            if list(workspace.glob(".d4p-tmp-*")):
+                raise RuntimeError("positive Task終了後にWorkspaceTaskScratchが残っています")
+            _read_task_scratch_recovery_state(audit_store)
+        else:
+            deadline = time.monotonic() + 25
+            while not active_marker.is_file() and time.monotonic() < deadline:
+                time.sleep(0.1)
+            if active_marker.is_symlink() or not active_marker.is_file():
+                raise RuntimeError(f"installed Agent Taskの{scenario_name} process markerがありません")
+            try:
+                active = json.loads(active_marker.read_text(encoding="utf-8"))
+                pid = int(active["pid"])
+                pgid = int(active["pgid"])
+                start_time = int(active["starttime"])
+            except (OSError, UnicodeError, KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+                raise RuntimeError("Agent Task descendant identity markerが不正です") from error
+            if (
+                active.get("mode") != scenario_name
+                or active.get("secret_and_outside_reads_denied") is not True
+                or active.get("secret_and_outside_writes_denied") is not True
+                or active.get("scratch_workspace_bound") is not True
+                or not isinstance(active.get("scratch_name"), str)
+                or not active["scratch_name"].startswith(".d4p-tmp-")
+            ):
+                raise RuntimeError("active Agent Taskのsecret／Workspace境界が不成立です")
+            if pgid == os.getpgrp():
+                raise RuntimeError("Agent Task process groupが受入れrunner自身と共有されています")
+            if not any(
+                member[0] == pid and member[1] == start_time
+                for member in _linux_process_group_members(pgid)
+            ):
+                raise RuntimeError("Agent Task descendantが監督対象process groupで実行中ではありません")
+            scratch_candidates = [
+                path
+                for path in workspace.glob(".d4p-tmp-*")
+                if path.is_dir() and not path.is_symlink()
+            ]
+            if len(scratch_candidates) != 1:
+                raise RuntimeError("active Taskに束縛されたWorkspaceTaskScratchが一つではありません")
+            scratch_path = scratch_candidates[0]
+            if scratch_path.name != active["scratch_name"]:
+                raise RuntimeError("active TaskのTMPDIRとWorkspaceTaskScratchが一致しません")
+            if not (scratch_path / "fixture-scratch-marker").is_file():
+                raise RuntimeError("active Agent TaskのTMPDIRがWorkspaceTaskScratchへ結合していません")
+            if scenario_name == "cancel":
+                cancel = _find_operable_accessible("Task停止を要求", root=window, timeout=10)
+                _activate_accessible(cancel, "Task停止を要求", environment)
+                _find_accessible("取消要求を記録しました", root=window, timeout=10)
+            else:
+                # The Broker owns the deadline; wait for its terminal transition without sending Cancel.
+                _wait_installed_task_status(
+                    environment, window, expected_status, timeout=wait_seconds
+                )
+            _wait_installed_task_status(
+                environment,
+                window,
+                expected_status,
+                timeout=wait_seconds if scenario_name == "cancel" else 2.0,
+            )
+            current_identity = _linux_proc_identity(pid)
+            if current_identity is not None and current_identity[1] == start_time:
+                raise RuntimeError("Task terminal化後も同一descendant processが残っています")
+            process_groups.append(pgid)
+            _wait_for_linux_process_group_exit(pgid)
+            if scratch_path.exists() or scratch_path.is_symlink():
+                raise RuntimeError(f"{scenario_name}終了後にWorkspaceTaskScratchが残っています")
+            _read_task_scratch_recovery_state(audit_store)
+
+    if positive_result_hash is None:
+        raise RuntimeError("positive Agent Taskの結果hashがAgent Centerに表示されません")
+    if len(task_ids) != 3 or len(set(task_ids)) != 3:
+        raise RuntimeError("各Agent Taskが独立した一意Task IDを持っていません")
+    audit = _verify_live_audit(
+        audit_store,
+        require_export=False,
+        require_agent_task=True,
+    )
+    scratch_state = _read_task_scratch_recovery_state(audit_store)
+    loopback = responses_server.snapshot()
+    expected_scenarios = {
+        "complete": (2, 1, 1),
+        "cancel": (1, 1, 0),
+        "deadline": (1, 1, 0),
+    }
+    observed_scenarios = loopback.get("scenarios")
+    if not isinstance(observed_scenarios, list) or len(observed_scenarios) != 3:
+        raise RuntimeError("loopback Responses fixtureのTask数が期待値と一致しません")
+    for row in observed_scenarios:
+        if not isinstance(row, dict) or row.get("name") not in expected_scenarios:
+            raise RuntimeError("loopback Responses fixtureに未知のTaskがあります")
+        expected_counts = expected_scenarios[row["name"]]
+        actual_counts = (row.get("posts"), row.get("tool_calls"), row.get("tool_outputs"))
+        if actual_counts != expected_counts:
+            raise RuntimeError("loopback Responses fixtureの呼出し・tool結果数が不正です")
+    if loopback.get("rejections"):
+        raise RuntimeError("loopback Responses fixtureが不正・外部要求を観測しました")
+    if {row["name"] for row in observed_scenarios} != set(expected_scenarios):
+        raise RuntimeError("loopback Responses fixtureで必須Task scenarioが揃っていません")
+    if outside_file.is_symlink() or outside_file.read_bytes() != b"D4P_SYNTHETIC_SECRET_CANARY=outside-workspace\n":
+        raise RuntimeError("Workspace外のsynthetic fileが変更または置換されました")
+    for path, expected in (
+        (workspace / ".env", b"D4P_SYNTHETIC_SECRET_CANARY=must-not-be-readable\n"),
+        (workspace / "private/token.txt", b"D4P_SYNTHETIC_SECRET_CANARY=must-not-be-readable\n"),
+    ):
+        if path.is_symlink() or path.read_bytes() != expected:
+            raise RuntimeError("registered secret fixtureがTaskから変更されました")
+    if any(
+        path.exists() or path.is_symlink()
+        for path in (
+            workspace / "private/write-probe.txt",
+            fixture_root / "outside/write-probe.txt",
+        )
+    ):
+        raise RuntimeError("Agent Taskがsecret／Workspace外へwrite probeを作成しました")
+    for canary in (
+        "D4P_SYNTHETIC_SECRET_CANARY=must-not-be-readable",
+        "D4P_SYNTHETIC_SECRET_CANARY=outside-workspace",
+    ):
+        _assert_secret_absent_from_files(
+            audit_store,
+            canary,
+        )
+        codex_home = Path(environment["GUI_SHELL_R2_E2E_CODEX_HOME"])
+        _assert_secret_absent_from_files(codex_home, canary)
+        app_log = acceptance_root / "installed-app.log"
+        if app_log.is_file() and canary.encode("utf-8") in app_log.read_bytes():
+            raise RuntimeError("synthetic secret canaryがinstalled product logへ漏えいしました")
+    return {
+        "task_scenarios": ["complete", "cancel", "deadline"],
+        "terminal_statuses": ["completed", "cancelled", "failed"],
+        "workspace_write": (workspace / "agent-task-result.json").is_file(),
+        "secret_and_outside_reads_denied": True,
+        "descendant_groups_stopped": len(process_groups) == 2,
+        "workspace_task_scratch_removed": not list(workspace.glob(".d4p-tmp-*")),
+        "scratch_recovery_journal": scratch_state,
+        "task_id_count": len(task_ids),
+        "completed_fixture_reports": len(completed_reports),
+        "positive_result_hash": positive_result_hash,
+        "loopback": loopback,
+        "live_audit": audit,
+    }
 
 
 def _run_installed_workspace_selection_acceptance(
@@ -3789,6 +4769,7 @@ def _verify_live_audit(
     require_rollback: bool = False,
     require_catalog: bool = False,
     require_update_lifecycle: bool = False,
+    require_agent_task: bool = False,
 ) -> dict[str, int]:
     audit_path = store / "audit.jsonl"
     anchor_path = store / "audit_anchor.json"
@@ -3960,6 +4941,76 @@ def _verify_live_audit(
         in {"AgentTaskWorkspacePermissionGrant", "AgentTaskOwnerApprovalGrant"}
         for event in events
     )
+    task_records: list[dict[str, object]] = []
+    scratch_mediation: list[dict[str, object]] = []
+    for event in events:
+        reason = event.get("reason")
+        if not isinstance(reason, str):
+            continue
+        if event.get("operation") in {"AgentTask実行", "AgentTask状態"} and reason.startswith(
+            "AgentTask履歴:"
+        ):
+            try:
+                record = json.loads(reason.removeprefix("AgentTask履歴:"))
+            except json.JSONDecodeError as error:
+                raise RuntimeError("LIVE_RUNTIME Agent Task履歴Auditが不正JSONです") from error
+            if not isinstance(record, dict):
+                raise RuntimeError("LIVE_RUNTIME Agent Task履歴Auditがobjectではありません")
+            task_records.append(record)
+        if reason.startswith("AgentTask調停作用:"):
+            try:
+                evidence = json.loads(reason.removeprefix("AgentTask調停作用:"))
+            except json.JSONDecodeError as error:
+                raise RuntimeError("LIVE_RUNTIME Agent Task scratch調停Auditが不正JSONです") from error
+            if isinstance(evidence, dict):
+                scratch_mediation.append(evidence)
+    task_starts = [record for record in task_records if record.get("stage") == "start"]
+    task_terminals = [record for record in task_records if record.get("stage") == "terminal"]
+    task_statuses = [record.get("status") for record in task_terminals]
+    task_permission_grants = sum(
+        event.get("operation") == "AgentTaskWorkspacePermissionGrant" for event in events
+    )
+    task_owner_approvals = sum(
+        event.get("operation") == "AgentTaskOwnerApprovalGrant" for event in events
+    )
+    scratch_cleanup_confirmed = sum(
+        item.get("scratch_cleanup_completed") is True for item in scratch_mediation
+    )
+    if require_agent_task:
+        task_ids = [record.get("task_id") for record in task_starts]
+        terminal_task_ids = [record.get("task_id") for record in task_terminals]
+        request_hashes = [record.get("request_hash") for record in task_starts]
+        if not all(
+            (
+                len(task_starts) == 3,
+                len(task_terminals) == 3,
+                len(set(task_ids)) == 3,
+                set(task_ids) == set(terminal_task_ids),
+                len(set(request_hashes)) == 3,
+                sorted(task_statuses) == ["cancelled", "completed", "failed"],
+                task_permission_grants == 3,
+                task_owner_approvals == 3,
+                scratch_cleanup_confirmed == 1,
+            )
+        ):
+            raise RuntimeError(
+                "installed Agent Taskの一回Permission／Approval、3 terminal outcome、scratch cleanup Auditが不成立です"
+            )
+        deadline_records = [
+            record
+            for record in task_terminals
+            if record.get("status") == "failed"
+            and isinstance(record.get("failure_class"), str)
+            and "期限" in record["failure_class"]
+        ]
+        cancelled_records = [
+            record for record in task_terminals if record.get("status") == "cancelled"
+        ]
+        completed_records = [
+            record for record in task_terminals if record.get("status") == "completed"
+        ]
+        if not all((len(deadline_records) == 1, len(cancelled_records) == 1, len(completed_records) == 1)):
+            raise RuntimeError("deadline／cancel／positive Task terminal Auditの対応が不正です")
     if require_workspace and not all(
         (
             workspace_selection_accepted >= 2,
@@ -4127,6 +5178,18 @@ def _verify_live_audit(
                 "workspace_read_approval_accepted": workspace_approval_accepted,
                 "workspace_tree_live_accepted": workspace_tree_accepted,
                 "agent_task_permission_or_approval_events": task_permission_events,
+            }
+        )
+    if require_agent_task:
+        audit_evidence.update(
+            {
+                "agent_task_started": len(task_starts),
+                "agent_task_completed": task_statuses.count("completed"),
+                "agent_task_cancelled": task_statuses.count("cancelled"),
+                "agent_task_deadline_failed": task_statuses.count("failed"),
+                "agent_task_permission_grants": task_permission_grants,
+                "agent_task_owner_approvals": task_owner_approvals,
+                "agent_task_scratch_cleanup_confirmed": scratch_cleanup_confirmed,
             }
         )
     return audit_evidence
@@ -4301,6 +5364,7 @@ def run_installed_smoke(
     private_key_path: Path,
     update_package: Path,
     acceptance_scope: str = "update_lifecycle",
+    codex_cli: Path | None = None,
 ) -> None:
     if not os.environ.get("DISPLAY") or not os.environ.get("DBUS_SESSION_BUS_ADDRESS"):
         raise RuntimeError("隔離X11 displayとD-Bus sessionが必要です")
@@ -4316,6 +5380,7 @@ def run_installed_smoke(
         "credential_vault",
         "mcp_tool_execution",
         "workspace_selection",
+        "agent_task_supervision",
     }:
         raise RuntimeError("installed acceptance scopeが未対応です")
     resolved_private_key = private_key_path.resolve(strict=True)
@@ -4331,6 +5396,20 @@ def run_installed_smoke(
         raise RuntimeError("installed acceptance rootは未使用でなければなりません")
     if not acceptance_root.is_absolute() or temp_root not in acceptance_root.parents:
         raise RuntimeError("installed acceptance rootがrun固有一時root外です")
+    if acceptance_scope == "agent_task_supervision":
+        if codex_cli is None:
+            raise RuntimeError("Agent Task acceptanceに固定Codex CLIが必要です")
+        resolved_codex_cli = codex_cli.resolve(strict=True)
+        if (
+            resolved_codex_cli != codex_cli
+            or codex_cli.is_symlink()
+            or not codex_cli.is_file()
+            or temp_root not in codex_cli.parents
+            or not os.access(codex_cli, os.X_OK)
+        ):
+            raise RuntimeError("固定Codex CLIがrun固有一時root配下の実行fileではありません")
+    else:
+        resolved_codex_cli = None
     acceptance_root.mkdir(mode=0o700)
     home = acceptance_root / "home"
     runtime = acceptance_root / "runtime"
@@ -4395,8 +5474,31 @@ def run_installed_smoke(
     product_paths: set[Path] = set()
     preexisting: set[int] = set()
     installed_helper: Path | None = None
+    responses_server: _LinuxAgentTaskResponsesServer | None = None
+    task_group_cleanup_error: Exception | None = None
+    task_execution_limit_ms = 45_000
     app_log = acceptance_root / "installed-app.log"
     try:
+        if acceptance_scope == "agent_task_supervision":
+            if resolved_codex_cli is None:
+                raise RuntimeError("Agent Task acceptanceのCodex CLI pathがありません")
+            synthetic_root = acceptance_root / "D4Pocket-R2-E2E-SYNTHETIC"
+            synthetic_root.mkdir(mode=0o700)
+            (synthetic_root / "OWNER-APPROVED-SYNTHETIC.txt").write_text(
+                "Run-owned test identity only; no provider credentials.\n",
+                encoding="utf-8",
+            )
+            agent_task_codex_home = synthetic_root / "codex-home"
+            agent_task_codex_home.mkdir(mode=0o700)
+            responses_server = _LinuxAgentTaskResponsesServer()
+            responses_server.start()
+            environment.update(
+                {
+                    "GUI_SHELL_R2_E2E_RESPONSES_PORT": str(responses_server.port),
+                    "GUI_SHELL_R2_E2E_CODEX_HOME": str(agent_task_codex_home),
+                    "GUI_SHELL_R2_E2E_TASK_EXECUTION_LIMIT_MS": str(task_execution_limit_ms),
+                }
+            )
         if acceptance_scope == "credential_vault":
             secret_service_process = _start_isolated_secret_service(
                 environment,
@@ -4404,7 +5506,11 @@ def run_installed_smoke(
                 acceptance_root / "gnome-keyring.log",
             )
             _run_rust_test(RUST_SECRET_SERVICE_TEST, environment, private_key_path)
-        elif acceptance_scope in {"mcp_tool_execution", "workspace_selection"}:
+        elif acceptance_scope in {
+            "mcp_tool_execution",
+            "workspace_selection",
+            "agent_task_supervision",
+        }:
             pass
         else:
             _run_rust_test(RUST_CATALOG_RELAY_TIMEOUT_TEST, environment, private_key_path)
@@ -4671,6 +5777,55 @@ def run_installed_smoke(
                             "package_sha256": record["package_sha256"],
                             "workspace_selection": workspace_evidence,
                             "live_audit": audit_evidence,
+                            "installed_app_exit": "normal_window_close_and_owned_process_cleanup",
+                        },
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    )
+                )
+                return
+
+            if acceptance_scope == "agent_task_supervision":
+                if resolved_codex_cli is None or responses_server is None:
+                    raise RuntimeError("installed Agent Task acceptance fixtureの初期化が不足しています")
+                agent_task_evidence = _run_installed_agent_task_acceptance(
+                    environment,
+                    window_id,
+                    codex_cli=resolved_codex_cli,
+                    responses_server=responses_server,
+                    audit_store=broker_state / "store",
+                    acceptance_root=acceptance_root,
+                    task_execution_limit_ms=task_execution_limit_ms,
+                )
+                current_window_id = _visible_product_window(environment)
+                if current_window_id is None:
+                    raise RuntimeError("Agent Task acceptance後にinstalled GTK windowがありません")
+                _request_x11_window_manager_close(current_window_id, environment)
+                deadline = time.monotonic() + 60
+                while time.monotonic() < deadline:
+                    if not (_processes_using(product_paths) - preexisting):
+                        break
+                    time.sleep(0.2)
+                if _processes_using(product_paths) - preexisting:
+                    raise RuntimeError("Agent Task acceptance後にowned product processが残留しています")
+                if desktop_process.poll() is None:
+                    desktop_process.wait(timeout=10)
+                if desktop_process.returncode not in (0, None):
+                    raise RuntimeError("Agent Task acceptance後のdesktop launcher終了codeが不正です")
+                durable_audit = _verify_live_audit(
+                    broker_state / "store",
+                    require_export=False,
+                    require_agent_task=True,
+                )
+                print(
+                    json.dumps(
+                        {
+                            "acceptance_scope": acceptance_scope,
+                            "installed_entry": str(entries[0]),
+                            "product_version": record["product_version"],
+                            "package_sha256": record["package_sha256"],
+                            "agent_task_supervision": agent_task_evidence,
+                            "durable_audit_after_normal_exit": durable_audit,
                             "installed_app_exit": "normal_window_close_and_owned_process_cleanup",
                         },
                         ensure_ascii=False,
@@ -5053,12 +6208,19 @@ def run_installed_smoke(
             )
         )
     finally:
+        if acceptance_scope == "agent_task_supervision":
+            try:
+                _cleanup_linux_agent_task_process_groups(acceptance_root)
+            except Exception as error:
+                task_group_cleanup_error = error
         if uninstall_groups:
             _stop_owned_groups(uninstall_groups)
         if product_paths:
             _stop_owned_processes(_processes_using(product_paths) - preexisting, desktop_process)
         elif desktop_process is not None and desktop_process.poll() is None:
             _stop_owned_processes(set(), desktop_process)
+        if responses_server is not None:
+            responses_server.close()
         if window_manager is not None and window_manager.poll() is None:
             try:
                 os.killpg(window_manager.pid, signal.SIGTERM)
@@ -5091,6 +6253,8 @@ def run_installed_smoke(
                 helper=installed_helper,
                 fixture=temp_root / "linux-installed-mcp-server.py",
             )
+        if task_group_cleanup_error is not None:
+            raise RuntimeError("Agent Task acceptance失敗後のprocess group cleanupが成立しません") from task_group_cleanup_error
         if acceptance_root.exists():
             resolved = acceptance_root.resolve(strict=True)
             if resolved == temp_root or temp_root not in resolved.parents or acceptance_root.is_symlink():
@@ -5114,9 +6278,11 @@ def main() -> int:
             "credential_vault",
             "mcp_tool_execution",
             "workspace_selection",
+            "agent_task_supervision",
         ),
         default="update_lifecycle",
     )
+    parser.add_argument("--codex-cli", type=Path)
     args = parser.parse_args()
     try:
         run_installed_smoke(
@@ -5126,6 +6292,7 @@ def main() -> int:
             args.private_key,
             args.update_package,
             args.acceptance_scope,
+            args.codex_cli,
         )
     except Exception as error:
         print(f"Linux installed product GTK受入れ 不合格: {error}", file=sys.stderr)

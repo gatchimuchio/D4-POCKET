@@ -142,7 +142,7 @@ class LinuxExportInputTests(unittest.TestCase):
         calls: list[dict[str, Any]] = []
 
         def run(command: list[str], **kwargs: Any) -> SimpleNamespace:
-            calls.append(kwargs)
+            calls.append({"command": command, **kwargs})
             if "--machine" in command:
                 stdout = json.dumps(
                     {
@@ -166,7 +166,7 @@ class LinuxExportInputTests(unittest.TestCase):
         self.assertEqual(versions["framework_revision"], "e" * 40)
         self.assertEqual(versions["distribution_id"], "ubuntu")
         self.assertEqual(versions["distribution_version"], "24.04")
-        self.assertEqual(len(calls), 8)
+        self.assertEqual(len(calls), 8, [call["command"] for call in calls])
         self.assertEqual(calls[0]["env"]["CI"], "true")
         self.assertTrue(all("CI" not in call["env"] for call in calls[1:]))
         self.assertTrue(all("GITHUB_TOKEN" not in call["env"] for call in calls))
@@ -224,6 +224,63 @@ class LinuxExportBuildTests(unittest.TestCase):
         receipt.write_bytes(receipt_raw)
         manifest.write_bytes(manifest_raw)
         return receipt, manifest
+
+    def test_r2_e2e_build_requires_explicit_manual_verification_scope(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-linux-r2-e2e-gate-") as temporary:
+            root = Path(temporary)
+            receipt, manifest = self._input_files(root)
+            with patch(
+                "tooling.export_linux_product._require_clean_source",
+                return_value=("main", "a" * 40),
+            ):
+                with self.assertRaisesRegex(ValueError, "明示された手動検証build"):
+                    build_linux_product(
+                        receipt,
+                        manifest,
+                        root / "output",
+                        r2_e2e_test_build=True,
+                    )
+
+    def test_r2_e2e_build_rejects_non_synthetic_identity(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-linux-r2-e2e-identity-") as temporary:
+            root = Path(temporary)
+            receipt_path, manifest_path = self._input_files(root)
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["manifest"]["app_identity"]["app_id"] = (
+                "d4-pocket-app-33333333333333333333333333333333"
+            )
+            manifest["manifest"]["audit_store"]["store_id"] = (
+                "audit-store-44444444444444444444444444444444"
+            )
+            receipt["export_manifest"] = manifest["manifest"]
+            manifest_raw = json.dumps(
+                manifest, ensure_ascii=False, separators=(",", ":")
+            ).encode("utf-8")
+            manifest_path = root / f"{manifest['manifest']['app_identity']['app_id']}.json"
+            manifest_path.write_bytes(manifest_raw)
+            receipt["manifest_file"]["file_name"] = manifest_path.name
+            receipt["manifest_file"]["path"] = f"/tmp/{manifest_path.name}"
+            receipt["manifest_file"]["byte_length"] = len(manifest_raw)
+            receipt["manifest_file"]["sha256"] = "sha256:" + hashlib.sha256(
+                manifest_raw
+            ).hexdigest()
+            receipt_path.write_text(
+                json.dumps(receipt, ensure_ascii=False, separators=(",", ":")),
+                encoding="utf-8",
+            )
+            with patch(
+                "tooling.export_linux_product._require_clean_source",
+                return_value=("codex/linux-test", "a" * 40),
+            ):
+                with self.assertRaisesRegex(ValueError, "固定test identity"):
+                    build_linux_product(
+                        receipt_path,
+                        manifest_path,
+                        root / "output",
+                        allow_verification_branch=True,
+                        r2_e2e_test_build=True,
+                    )
 
     def test_release_bundle_package_and_provenance_are_published_together(self) -> None:
         with tempfile.TemporaryDirectory(prefix="d4p-linux-export-test-") as temporary:
@@ -329,6 +386,8 @@ class LinuxExportBuildTests(unittest.TestCase):
             ))
             self.assertIn(f"-DD4_PRODUCT_APP_ID={APP_ID}", cmake_configure)
             self.assertIn(f"-DD4_PRODUCT_AUDIT_STORE_ID={AUDIT_ID}", cmake_configure)
+            self.assertIn("-DD4_LINUX_R2_E2E_TEST_BUILD=OFF", cmake_configure)
+            self.assertNotIn("-DD4_LINUX_R2_E2E_TEST_BUILD=ON", cmake_configure)
             schema = json.loads(
                 (ROOT / "specs/gui_shell_linux_export_build.schema.json").read_text(
                     encoding="utf-8"

@@ -291,6 +291,7 @@ def build_linux_product(
     output_dir: Path,
     *,
     allow_verification_branch: bool = False,
+    r2_e2e_test_build: bool = False,
 ) -> dict[str, Any]:
     if not sys.platform.startswith("linux") or not hasattr(os, "O_NOFOLLOW"):
         raise ValueError("Linux Export buildはLinux host専用である")
@@ -307,6 +308,14 @@ def build_linux_product(
         raise ValueError("入力Manifest file名がBroker Receiptと一致しない")
     app_id = manifest_file["manifest"]["app_identity"]["app_id"]
     audit_store_id = manifest_file["manifest"]["audit_store"]["store_id"]
+    if r2_e2e_test_build:
+        if not allow_verification_branch:
+            raise ValueError("R2 E2E buildは明示された手動検証buildだけで有効化できる")
+        if (
+            app_id != "d4-pocket-app-11111111111111111111111111111111"
+            or audit_store_id != "audit-store-22222222222222222222222222222222"
+        ):
+            raise ValueError("R2 E2E buildは固定test identityだけを受け付ける")
     version = product_version_from_source(ROOT)
     paths = _tool_paths()
     rustup_home = _rustup_home()
@@ -390,6 +399,7 @@ def build_linux_product(
                 f"-DCMAKE_INSTALL_PREFIX={bundle}",
                 f"-DD4_PRODUCT_APP_ID={app_id}",
                 f"-DD4_PRODUCT_AUDIT_STORE_ID={audit_store_id}",
+                f"-DD4_LINUX_R2_E2E_TEST_BUILD={'ON' if r2_e2e_test_build else 'OFF'}",
             ]
             subprocess.run(
                 [paths["cmake"], *cmake_configure_arguments],
@@ -513,6 +523,11 @@ def main() -> int:
         action="store_true",
         help="cleanでremote HEAD一致のcodex/* branchを手動検証buildに限り許可する",
     )
+    parser.add_argument(
+        "--r2-e2e-test-build",
+        action="store_true",
+        help="固定test identity限定でLinux installed Agent Task acceptance buildを生成する",
+    )
     args = parser.parse_args()
     try:
         evidence = build_linux_product(
@@ -520,6 +535,7 @@ def main() -> int:
             args.manifest_file,
             args.output_dir,
             allow_verification_branch=args.allow_verification_branch,
+            r2_e2e_test_build=args.r2_e2e_test_build,
         )
     except Exception as error:
         print(f"Linux Export buildを停止した: {type(error).__name__}", file=sys.stderr)
@@ -534,6 +550,7 @@ def main() -> int:
                 "source_commit": evidence["source_commit"],
                 "signed": False,
                 "installed_product_verified": False,
+                "r2_e2e_test_build": args.r2_e2e_test_build,
             },
             ensure_ascii=False,
             separators=(",", ":"),

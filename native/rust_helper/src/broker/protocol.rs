@@ -114,9 +114,19 @@ impl AgentCliRuntimeWorkspaceRegistration {
     }
 }
 
+#[cfg(target_os = "linux")]
+const AGENT_CLI_REGISTRATION_BOUNDARY_SUMMARY: &str =
+    "LinuxのWorkspace rootがBroker内部の保護領域と重ならないことを確認します。";
+#[cfg(target_os = "macos")]
+const AGENT_CLI_REGISTRATION_BOUNDARY_SUMMARY: &str =
+    "APFS rootとBroker内部領域との非重複を検査します。App Sandboxの外へ権限を広げません。";
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+const AGENT_CLI_REGISTRATION_BOUNDARY_SUMMARY: &str =
+    "Workspace rootがBroker内部の保護領域と重ならないことを確認します。";
+
 /// 構造確認済みの登録範囲だけをDesktop native確認へ表示する。承認・Trust・実体確認は生成しない。
 #[cfg(any(target_os = "linux", target_os = "macos", test))]
-pub(crate) fn macos_agent_registration_summary(payload: &Value) -> Option<String> {
+pub(crate) fn agent_cli_registration_summary(payload: &Value) -> Option<String> {
     let request: AgentCliRuntimeWorkspaceRegistration =
         serde_json::from_value(payload.clone()).ok()?;
     if !request.is_valid() || request.provider_model_selection.credential_id().is_some() {
@@ -124,10 +134,11 @@ pub(crate) fn macos_agent_registration_summary(payload: &Value) -> Option<String
     }
     let scope = crate::adapters::cli_adapter_confirmation_scope(&request.adapter_id)?;
     Some(format!(
-        "Agent CLI実行系とWorkspaceを、このBroker起動中だけ登録します。\nAdapter: {}\nRuntime: {}\nCLI実行file: {}\nCLI検査範囲: {}\nWorkspace ID: {}\nWorkspace root: {}\n除外する秘密path: {}\n提供元／模型: {} / {}\n認証方式: Codex CLI管理設定（登録時は認証しません）\n\nOwner承認後にCLI probe processを起動し、APFS rootとBroker内部領域との非重複を検査します。App Sandboxの外へ権限を広げません。アクセス不能時は登録を拒否します。Task・模型要求・Workspace変更は行わず、Permission・Approval・Trust・Credentialを生成しません。Task実行能力はunsupportedのままです。登録は終了時に消えます。",
+        "Agent CLI実行系とWorkspaceを、このBroker起動中だけ登録します。\nAdapter: {}\nRuntime: {}\nCLI実行file: {}\nCLI検査範囲: {}\nWorkspace ID: {}\nWorkspace root: {}\n除外する秘密path: {}\n提供元／模型: {} / {}\n認証方式: Codex CLI管理設定（登録時は認証しません）\n\nOwner承認後にCLI probe processを起動し、{} 境界を確認できない場合は登録を拒否します。Task・模型要求・Workspace変更は行わず、Permission・Approval・Trust・Credentialを生成しません。Task実行能力はunsupportedのままです。登録は終了時に消えます。",
         request.adapter_id, request.runtime_id, request.cli_path, scope, request.workspace_id,
         request.workspace_root, request.secret_paths.join(" / "),
         request.provider_model_selection.provider_id, request.provider_model_selection.model_id,
+        AGENT_CLI_REGISTRATION_BOUNDARY_SUMMARY,
     ))
 }
 
@@ -5989,6 +6000,39 @@ mod tests {
             "session-1",
             parse_issued_at_epoch_seconds("2026-06-01T00:00:30Z").unwrap(),
         )
+    }
+
+    #[test]
+    fn agent_cli_owner_summary_does_not_claim_another_platforms_boundary() {
+        let payload = json!({
+            "version": 1,
+            "adapter_id": "codex-cli",
+            "runtime_id": "runtime-summary-test",
+            "cli_path": "/usr/bin/codex",
+            "workspace_id": "workspace-summary-test",
+            "workspace_root": "/tmp/d4p-summary-test",
+            "secret_paths": [".env"],
+            "provider_model_selection": {
+                "version": 1,
+                "provider_id": "openai_codex_cli",
+                "model_id": "o3",
+                "authentication_source": "codex_cli_managed",
+                "automatic_fallback": false
+            }
+        });
+        let summary = agent_cli_registration_summary(&payload).unwrap();
+        assert!(summary.contains("Permission・Approval・Trust・Credentialを生成しません"));
+        #[cfg(target_os = "linux")]
+        {
+            assert!(summary.contains("LinuxのWorkspace root"));
+            assert!(!summary.contains("APFS"));
+            assert!(!summary.contains("App Sandbox"));
+        }
+        #[cfg(target_os = "macos")]
+        {
+            assert!(summary.contains("APFS root"));
+            assert!(summary.contains("App Sandbox"));
+        }
     }
 
     #[test]

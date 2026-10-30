@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import json
 import os
+import signal
 import stat
 import subprocess
 import sys
@@ -14,6 +15,7 @@ from unittest.mock import call, patch
 from pathlib import Path
 
 from tooling.tests.linux_installed_product_smoke import (
+    _LinuxAgentTaskResponsesServer,
     _activate_accessible,
     _activate_named_control_by_keyboard,
     _actionable_node,
@@ -21,6 +23,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _accessible_snapshot,
     _atspi_desktop_failure_summary,
     _accessible_scope_with_named_descendant,
+    _cleanup_linux_agent_task_process_groups,
     _answer_owner_dialog,
     _bounded_owner_text_diagnostics,
     _assert_secret_absent_from_files,
@@ -42,6 +45,8 @@ from tooling.tests.linux_installed_product_smoke import (
     _helper_exit_diagnostics,
     _open_mcp_center_from_installed_ui,
     _resolve_regular_package,
+    _read_task_scratch_recovery_state,
+    _stop_linux_agent_task_process_group,
     _review_single_installed_mcp_tool_arguments,
     _run_rust_test,
     _safe_log_tail,
@@ -66,6 +71,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _wait_for_catalog_fetch_status,
     _wait_for_gtk_dialog_closed,
     _write_linux_workspace_acceptance_fixture,
+    _write_linux_agent_task_fixture,
     _wayland_launch_environment,
     MCP_OWNER_ARGUMENT_HASH_MARKER,
     MCP_OWNER_NO_CREDENTIAL_MARKER,
@@ -383,6 +389,32 @@ class AccessibleActionResolutionTests(unittest.TestCase):
                 heading, "workspace-linux-installed-acceptance"
             ),
             inspector_column,
+        )
+
+    def test_agent_task_scope_includes_task_input_sibling_to_dialog_title(self) -> None:
+        class TreeNode:
+            def __init__(self, name: str, children=()) -> None:
+                self.name = name
+                self.parent = None
+                self.children = list(children)
+                self.childCount = len(self.children)
+                for child in self.children:
+                    child.parent = self
+
+            def get_parent(self):
+                return self.parent
+
+            def getChildAtIndex(self, index: int):
+                return self.children[index]
+
+        title = TreeNode("Agent Task能力の事前検査")
+        task_field = TreeNode("Task指示")
+        dialog_content = TreeNode("", (title, task_field))
+        product_window = TreeNode("D4 Pocket", (dialog_content,))
+
+        self.assertIs(
+            _accessible_scope_with_named_descendant(title, "Task指示"),
+            dialog_content,
         )
 
     def test_mcp_palette_submits_ascii_query_and_refreshes_window_tree(self) -> None:
@@ -2828,6 +2860,378 @@ class LinuxInstalledOwnerEvidenceTests(unittest.TestCase):
                     "user_data": "retained_outside_product_root",
                 },
             )
+
+
+class WorkspaceTaskScratchJournalEvidenceTests(unittest.TestCase):
+    def test_empty_journal_hmac_and_rejects_tampering(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = Path(directory)
+            key = b"k" * 32
+            (store / "audit_anchor.key").write_text(key.hex(), encoding="ascii")
+            state = {"version": 1, "entries": []}
+            serialized_state = json.dumps(
+                state, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+            )
+            signed = {
+                "version": 1,
+                "state": state,
+                "hmac": "sha256:" + hmac.new(
+                    key,
+                    f"version=1|state={serialized_state}".encode(),
+                    hashlib.sha256,
+                ).hexdigest(),
+            }
+            journal = store / "agent_task_scratch_recovery.json"
+            journal.write_text(json.dumps(signed), encoding="utf-8")
+            self.assertEqual(
+                _read_task_scratch_recovery_state(store),
+                {"entries": 0, "hmac_present": True},
+            )
+            signed["state"] = {"version": 1, "entries": [], "tampered": True}
+            journal.write_text(json.dumps(signed), encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "HMACが一致しません"):
+                _read_task_scratch_recovery_state(store)
+            signed["state"] = {"version": 1, "entries": [{"task_id": "stale"}]}
+            journal.write_text(json.dumps(signed), encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "残存entry"):
+                _read_task_scratch_recovery_state(store)
+
+
+class LinuxAgentTaskFailureCleanupTests(unittest.TestCase):
+    @staticmethod
+    def _write_marker(root: Path, *, pid: int, pgid: int, starttime: int) -> None:
+        workspace = root / "agent-task-fixture" / "workspace"
+        workspace.mkdir(parents=True)
+        (workspace / "agent-task-cancel-active.json").write_text(
+            json.dumps(
+                {
+                    "mode": "cancel",
+                    "pid": pid,
+                    "pgid": pgid,
+                    "starttime": starttime,
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    def test_failure_cleanup_stops_only_verified_group_and_escalates(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_marker(root, pid=234, pgid=345, starttime=678)
+            members = [(234, 678, "S")]
+            with (
+                patch(
+                    "tooling.tests.linux_installed_product_smoke.os.getpgrp",
+                    return_value=999,
+                    create=True,
+                ),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._linux_process_group_members",
+                    return_value=members,
+                ),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._linux_proc_identity",
+                    return_value=(345, 678, "S"),
+                ),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._wait_for_linux_process_group_exit",
+                    side_effect=[RuntimeError("still live"), None],
+                ),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke.os.killpg",
+                    create=True,
+                ) as killpg,
+                patch(
+                    "tooling.tests.linux_installed_product_smoke.signal.SIGKILL",
+                    9,
+                    create=True,
+                ),
+            ):
+                _cleanup_linux_agent_task_process_groups(root)
+            self.assertEqual(
+                killpg.call_args_list,
+                [call(345, signal.SIGTERM), call(345, getattr(signal, "SIGKILL", 9))],
+            )
+
+    def test_failure_cleanup_refuses_runner_group_and_reused_pid(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_marker(root, pid=234, pgid=345, starttime=678)
+            with (
+                patch(
+                    "tooling.tests.linux_installed_product_smoke.os.getpgrp",
+                    return_value=345,
+                    create=True,
+                ),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke.os.killpg",
+                    create=True,
+                ) as killpg,
+            ):
+                with self.assertRaisesRegex(RuntimeError, "cleanup") as caught:
+                    _cleanup_linux_agent_task_process_groups(root)
+                self.assertRegex(str(caught.exception.__cause__), "runner自身")
+                killpg.assert_not_called()
+
+            with (
+                patch(
+                    "tooling.tests.linux_installed_product_smoke.os.getpgrp",
+                    return_value=999,
+                    create=True,
+                ),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._linux_process_group_members",
+                    return_value=[(234, 678, "S")],
+                ),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._linux_proc_identity",
+                    return_value=(345, 679, "S"),
+                ),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke.os.killpg",
+                    create=True,
+                ) as killpg,
+            ):
+                with self.assertRaisesRegex(RuntimeError, "cleanup") as caught:
+                    _cleanup_linux_agent_task_process_groups(root)
+                self.assertRegex(str(caught.exception.__cause__), "identity")
+                killpg.assert_not_called()
+
+    def test_failure_cleanup_continues_to_other_run_owned_group(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_marker(root, pid=234, pgid=345, starttime=678)
+            workspace = root / "agent-task-fixture" / "workspace"
+            (workspace / "agent-task-deadline-active.json").write_text(
+                json.dumps(
+                    {"mode": "deadline", "pid": 456, "pgid": 567, "starttime": 890}
+                ),
+                encoding="utf-8",
+            )
+            with patch(
+                "tooling.tests.linux_installed_product_smoke._stop_linux_agent_task_process_group",
+                side_effect=[RuntimeError("first group remains live"), None],
+            ) as stop:
+                with self.assertRaisesRegex(RuntimeError, "cleanup"):
+                    _cleanup_linux_agent_task_process_groups(root)
+            self.assertEqual(
+                stop.call_args_list,
+                [call(345, 234, 678), call(567, 456, 890)],
+            )
+
+
+class AgentTaskAuditAcceptanceTests(unittest.TestCase):
+    def test_three_independent_terminal_tasks_and_scratch_cleanup_are_audited(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = Path(directory)
+            key = b"a" * 32
+            (store / "audit_anchor.key").write_text(key.hex(), encoding="ascii")
+            rows: list[tuple[str, str, str]] = []
+            task_ids = ("task-complete", "task-cancel", "task-deadline")
+            statuses = ("completed", "cancelled", "failed")
+            for index, task_id in enumerate(task_ids):
+                rows.extend(
+                    (
+                        ("AgentTaskWorkspacePermissionGrant", "recorded", "permission"),
+                        ("AgentTaskOwnerApprovalGrant", "recorded", "approval"),
+                    )
+                )
+                common = {
+                    "version": 1,
+                    "task_id": task_id,
+                    "runtime_id": "runtime-test",
+                    "session_id": "session-test",
+                    "workspace_id": "workspace-test",
+                    "instruction_hash": f"sha256:{index + 1:064x}",
+                    "request_hash": f"sha256:{index + 4:064x}",
+                    "created_at": index + 1,
+                    "updated_at": index + 1,
+                    "result_hash": None,
+                    "failure_class": None,
+                    "start_audit_event_id": None,
+                }
+                start = {**common, "stage": "start", "status": "running"}
+                terminal = {
+                    **common,
+                    "stage": "terminal",
+                    "status": statuses[index],
+                    "failure_class": "期限超過" if statuses[index] == "failed" else None,
+                }
+                rows.append(
+                    (
+                        "AgentTask実行",
+                        "recorded",
+                        "AgentTask履歴:" + json.dumps(start, ensure_ascii=False, separators=(",", ":")),
+                    )
+                )
+                rows.append(
+                    (
+                        "AgentTask状態",
+                        "recorded",
+                        "AgentTask履歴:" + json.dumps(terminal, ensure_ascii=False, separators=(",", ":")),
+                    )
+                )
+            rows.append(
+                (
+                    "AgentTask状態",
+                    "recorded",
+                    "AgentTask調停作用:" + json.dumps(
+                        {"scratch_cleanup_completed": True}, separators=(",", ":")
+                    ),
+                )
+            )
+            events: list[dict[str, object]] = []
+            previous_hash: str | None = None
+            for index, (operation, decision, reason) in enumerate(rows, start=1):
+                event = {
+                    "event_id": f"broker-audit-{index}",
+                    "request_id": f"request-{index}",
+                    "operation": operation,
+                    "decision": decision,
+                    "reason": reason,
+                    "evidence_source": "INTERNAL_STATE",
+                    "payload_hash": f"sha256:{index:064x}",
+                    "previous_event_hash": previous_hash,
+                }
+                hash_input = "|".join(
+                    (
+                        event["event_id"],
+                        event["request_id"],
+                        event["operation"],
+                        event["decision"],
+                        event["reason"],
+                        event["evidence_source"],
+                        event["payload_hash"],
+                        previous_hash or "",
+                    )
+                )
+                previous_hash = "sha256:" + hashlib.sha256(hash_input.encode()).hexdigest()
+                event["event_hash"] = previous_hash
+                events.append(event)
+            (store / "audit.jsonl").write_text(
+                "".join(json.dumps(event, ensure_ascii=False) + "\n" for event in events),
+                encoding="utf-8",
+            )
+            anchor_input = (
+                f"version=1|event_count={len(events)}|head_event_hash={previous_hash}"
+            ).encode()
+            anchor_hmac = "sha256:" + hmac.new(key, anchor_input, hashlib.sha256).hexdigest()
+            (store / "audit_anchor.json").write_text(
+                json.dumps(
+                    {
+                        "version": 1,
+                        "event_count": len(events),
+                        "head_event_hash": previous_hash,
+                        "anchor_hmac": anchor_hmac,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            evidence = _verify_live_audit(
+                store,
+                require_export=False,
+                require_agent_task=True,
+            )
+            self.assertEqual(evidence["agent_task_started"], 3)
+            self.assertEqual(evidence["agent_task_completed"], 1)
+            self.assertEqual(evidence["agent_task_cancelled"], 1)
+            self.assertEqual(evidence["agent_task_deadline_failed"], 1)
+            self.assertEqual(evidence["agent_task_permission_grants"], 3)
+            self.assertEqual(evidence["agent_task_owner_approvals"], 3)
+            self.assertEqual(evidence["agent_task_scratch_cleanup_confirmed"], 1)
+
+
+class LinuxAgentTaskResponsesFixtureTests(unittest.TestCase):
+    def test_fixture_builds_codex_function_call_and_final_response(self) -> None:
+        server = _LinuxAgentTaskResponsesServer()
+        self.addCleanup(server.close)
+        server.configure("complete", "/usr/bin/python3 task_fixture.py complete", Path("/tmp/workspace"))
+        tool_events = server._response_events(
+            {"input": [], "tools": [{"name": "exec_command"}]}
+        )
+        call_event = next(
+            event
+            for event in tool_events
+            if event["type"] == "response.output_item.done"
+            and isinstance(event.get("item"), dict)
+            and event["item"].get("type") == "function_call"
+        )
+        item = call_event["item"]
+        call_id = item["call_id"]
+        arguments = json.loads(item["arguments"])
+        self.assertEqual(arguments["workdir"], str(Path("/tmp/workspace")))
+        self.assertEqual(arguments["shell"], "/bin/bash")
+
+        final_events = server._response_events(
+            {
+                "input": [
+                    {
+                        "type": "function_call_output",
+                        "call_id": call_id,
+                        "output": "safe fixture result",
+                    }
+                ],
+                "tools": [{"name": "exec_command"}],
+            }
+        )
+        self.assertIn("response.completed", [event["type"] for event in final_events])
+        snapshot = server.snapshot()
+        self.assertEqual(snapshot["rejections"], [])
+        self.assertEqual(snapshot["scenarios"][0]["tool_outputs"], 1)
+        self.assertEqual(snapshot["scenarios"][0]["posts"], 2)
+
+    def test_fixture_rejects_secret_canary_in_tool_output(self) -> None:
+        server = _LinuxAgentTaskResponsesServer()
+        self.addCleanup(server.close)
+        server.configure("cancel", "/usr/bin/sleep 300", Path("/tmp/workspace"))
+        call_event = next(
+            event
+            for event in server._response_events(
+                {"input": [], "tools": [{"name": "exec_command"}]}
+            )
+            if event["type"] == "response.output_item.done"
+            and isinstance(event.get("item"), dict)
+            and event["item"].get("type") == "function_call"
+        )
+        with self.assertRaisesRegex(RuntimeError, "secret canary exposed"):
+            server._response_events(
+                {
+                    "input": [
+                        {
+                            "type": "function_call_output",
+                            "call_id": call_event["item"]["call_id"],
+                            "output": "D4P_SYNTHETIC_SECRET_CANARY=do-not-forward",
+                        }
+                    ],
+                    "tools": [{"name": "exec_command"}],
+                }
+            )
+        snapshot = server.snapshot()
+        self.assertEqual(snapshot["rejections"], ["synthetic_secret_canary_in_tool_output"])
+        self.assertNotIn("do-not-forward", json.dumps(snapshot))
+
+
+@unittest.skipUnless(sys.platform.startswith("linux"), "Linux filesystem semantics are required")
+class LinuxAgentTaskFixtureSourceTests(unittest.TestCase):
+    def test_generated_task_fixture_compiles_and_uses_workspace_bound_scratch(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-linux-task-fixture-") as temporary:
+            fixture_root, workspace, outside_file = _write_linux_agent_task_fixture(
+                Path(temporary)
+            )
+            fixture_source = workspace / "task_fixture.py"
+            source = fixture_source.read_text(encoding="utf-8")
+            compile(source, str(fixture_source), "exec")
+            self.assertEqual(
+                outside_file.read_text(encoding="utf-8"),
+                "D4P_SYNTHETIC_SECRET_CANARY=outside-workspace\n",
+            )
+            self.assertTrue((workspace / "outside-link.txt").is_symlink())
+            self.assertEqual(
+                (workspace / "outside-link.txt").resolve(strict=True),
+                outside_file.resolve(strict=True),
+            )
+            self.assertIn("scratch_workspace_bound = scratch.parent == workspace", source)
+            self.assertTrue(fixture_root.is_dir())
 
 
 if __name__ == "__main__":
