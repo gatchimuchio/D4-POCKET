@@ -10663,7 +10663,9 @@ def test_linux_product_package_writer_is_platform_bound_and_non_authoritative() 
         errors.append("Linux product package producerが実行host制約を明示しない")
     if "D4PKG01" not in contract or "producer" not in contract:
         errors.append("Linux package contractがproducer責任範囲を記載しない")
-    if "署名" not in contract or "installed product" not in contract:
+    if "署名" not in contract or not any(
+        marker in contract for marker in ("installed product", "導入済み製品")
+    ):
         errors.append("Linux package contractがtrust／installed acceptance境界を分離しない")
     return errors
 
@@ -12101,9 +12103,10 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
         "def _gtk_folder_chooser_diagnostics(",
         '"broker_unavailable" in snapshot',
         '["xdotool", "key", "--clearmodifiers", "ctrl+a"]',
-        '"--",\n            str(folder),',
+        '"--",\n            str(folder.parent) + os.sep,',
         '["xdotool", "key", "--clearmodifiers", "Return"]',
-        '"selection_target_source": "absolute_location_entry"',
+        "_select_gtk_folder_entry(chooser, folder, environment)",
+        '"selection_target_source": "parent_directory_exact_row"',
         '_click_accessible_by_coordinates(accept, "選択", environment)',
         '_click_accessible_by_coordinates(cancel, "取消", environment)',
         "def _run_installed_workspace_selection_acceptance(",

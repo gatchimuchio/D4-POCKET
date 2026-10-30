@@ -25,6 +25,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _component_center,
     _capture_gtk_dialog_screenshot,
     _gtk_folder_chooser_diagnostics,
+    _gtk_folder_entry,
     _credential_scan_file_role,
     _desktop_entry_targets_fixed_launcher,
     _enter_single_installed_mcp_tool_arguments,
@@ -1446,7 +1447,7 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                         timeout=0,
                     )
 
-    def test_folder_chooser_selects_target_from_absolute_location_entry(self) -> None:
+    def test_folder_chooser_navigates_parent_then_selects_exact_workspace_row(self) -> None:
         from unittest.mock import call
 
         environment = {"DISPLAY": ":99"}
@@ -1467,6 +1468,9 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                     "tooling.tests.linux_installed_product_smoke._find_accessible",
                     return_value=chooser,
                 ),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._select_gtk_folder_entry"
+                ) as select_folder_entry,
                 patch(
                     "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
                     return_value=accept,
@@ -1493,7 +1497,7 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                     "--delay",
                     "1",
                     "--",
-                    str(folder),
+                    str(folder.parent) + os.sep,
                 ],
                 ["xdotool", "key", "--clearmodifiers", "Return"],
                 [
@@ -1505,6 +1509,7 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                 ],
             ],
         )
+        select_folder_entry.assert_called_once_with(chooser, folder, environment)
         self.assertEqual(
             find_operable.call_args_list,
             [call("選択", root=chooser, timeout=10, exact=True)],
@@ -1537,6 +1542,9 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                     return_value=chooser,
                 ),
                 patch(
+                    "tooling.tests.linux_installed_product_smoke._select_gtk_folder_entry"
+                ),
+                patch(
                     "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
                     return_value=accept,
                 ),
@@ -1563,6 +1571,51 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             wait_closed.call_args_list[1].kwargs["action"],
             "AT-SPI action and exact-control coordinate fallback",
         )
+
+    def test_gtk_folder_entry_ignores_path_text_and_matches_visible_table_row(self) -> None:
+        class Node:
+            def __init__(self, name: str, role: str, bounds, text: str = "") -> None:
+                self.name = name
+                self.role = role
+                self.bounds = bounds
+                self.text = text
+                self.childCount = 0
+
+            def getRoleName(self) -> str:
+                return self.role
+
+            def queryComponent(self):
+                from types import SimpleNamespace
+
+                x, y, width, height = self.bounds
+                return SimpleNamespace(
+                    getExtents=lambda _coordinate: SimpleNamespace(
+                        x=x, y=y, width=width, height=height
+                    )
+                )
+
+            def queryText(self):
+                from types import SimpleNamespace
+
+                return SimpleNamespace(getText=lambda _start, _end: self.text)
+
+        table = Node("", "table", (600, 80, 500, 600))
+        path = Node("", "text", (650, 30, 400, 30), "/tmp/selected-workspace/private/")
+        row = Node("selected-workspace", "table cell", (650, 120, 180, 28))
+        nodes = [(table, ""), (path, ""), (row, "selected-workspace")]
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._accessible_nodes",
+                side_effect=lambda _root: iter(nodes),
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._accessible_component_bounds",
+                side_effect=lambda node: node.bounds,
+            ),
+        ):
+            self.assertIs(
+                _gtk_folder_entry(object(), Path("/tmp/selected-workspace")), row
+            )
 
     def test_folder_chooser_accepts_location_entry_return(self) -> None:
         environment = {"DISPLAY": ":99"}

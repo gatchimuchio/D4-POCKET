@@ -1463,6 +1463,80 @@ def _wait_for_gtk_dialog_closed(
     raise RuntimeError(f"GTK OS選択dialogが{action}後も閉じませんでした")
 
 
+def _gtk_folder_list_bounds(chooser) -> tuple[int, int, int, int] | None:
+    tables = []
+    for node, _ in _accessible_nodes(chooser):
+        try:
+            if str(node.getRoleName()) != "table":
+                continue
+        except Exception:
+            continue
+        bounds = _accessible_component_bounds(node)
+        if bounds is not None:
+            tables.append(bounds)
+    return max(tables, key=lambda value: value[2] * value[3]) if tables else None
+
+
+def _gtk_folder_entry(chooser, folder: Path):
+    """親directoryの一覧内にある、名前が完全一致するfolder entryだけを返す。"""
+    table = _gtk_folder_list_bounds(chooser)
+    if table is None:
+        return None
+    table_x, table_y, table_width, table_height = table
+    table_right = table_x + table_width
+    table_bottom = table_y + table_height
+    allowed_roles = {"icon", "list item", "table cell", "table row", "text", "tree item"}
+    for node, accessible_name in _accessible_nodes(chooser):
+        try:
+            role = str(node.getRoleName())
+        except Exception:
+            continue
+        if role not in allowed_roles:
+            continue
+        if accessible_name.strip() != folder.name and _accessible_text(node).strip() != folder.name:
+            continue
+        bounds = _accessible_component_bounds(node)
+        if bounds is None:
+            continue
+        x, y, width, height = bounds
+        if x >= table_x and y >= table_y and x + width <= table_right and y + height <= table_bottom:
+            return node
+    return None
+
+
+def _gtk_accessible_selected(node) -> bool:
+    try:
+        import pyatspi
+    except ImportError:
+        return False
+    current = node
+    for _ in range(5):
+        if current is None:
+            break
+        try:
+            if current.getState().contains(pyatspi.STATE_SELECTED):
+                return True
+        except Exception:
+            pass
+        current = _accessible_parent(current)
+    return False
+
+
+def _select_gtk_folder_entry(
+    chooser, folder: Path, environment: dict[str, str]
+) -> None:
+    entry = _gtk_folder_entry(chooser, folder)
+    if entry is None:
+        raise RuntimeError("GTK chooserの親directory一覧に対象folder行がありません")
+    _click_accessible_by_coordinates(entry, folder.name, environment)
+    deadline = time.monotonic() + 2
+    while time.monotonic() < deadline:
+        if _gtk_accessible_selected(entry):
+            return
+        time.sleep(0.1)
+    raise RuntimeError("GTK chooserの対象folder行が選択状態になりません")
+
+
 def _workspace_root_field_value(dialog) -> str:
     node = _find_accessible("Workspace rootの絶対path", root=dialog, timeout=10)
     for _ in range(7):
@@ -1519,7 +1593,7 @@ def _select_folder_in_gtk_chooser(
             "--delay",
             "1",
             "--",
-            str(folder),
+            str(folder.parent) + os.sep,
         ],
         env=environment,
         check=True,
@@ -1562,6 +1636,30 @@ def _select_folder_in_gtk_chooser(
         if screenshot_before_selection_path is not None
         else False
     )
+    try:
+        _select_gtk_folder_entry(chooser, folder, environment)
+    except RuntimeError as error:
+        diagnostics = _gtk_folder_chooser_diagnostics(chooser, folder)
+        screenshot_captured = (
+            _capture_gtk_dialog_screenshot(
+                environment,
+                "D4 Pocket 作業領域の選択",
+                screenshot_path,
+            )
+            if screenshot_path is not None
+            else False
+        )
+        diagnostics.update(
+            {
+                "folder_row_selection_error": str(error),
+                "screenshot_before_selection_captured": screenshot_before_selection_captured,
+                "screenshot_captured": screenshot_captured,
+            }
+        )
+        raise RuntimeError(
+            "GTK chooser did not expose and select the exact Workspace folder row; "
+            f"bounded_state={diagnostics}"
+        ) from None
     accept = _find_operable_accessible("選択", root=chooser, timeout=10, exact=True)
     _activate_accessible(accept, "選択", environment)
     coordinate_fallback_used = False
@@ -1598,7 +1696,7 @@ def _select_folder_in_gtk_chooser(
         )
         diagnostics.update(
             {
-                "selection_target_source": "absolute_location_entry",
+                "selection_target_source": "parent_directory_exact_row",
                 "screenshot_before_selection_captured": (
                     screenshot_before_selection_captured
                 ),
