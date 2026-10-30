@@ -245,6 +245,17 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
     }
   }
 
+  void _selectRegistration(WorkspaceRegistration registration) {
+    if (!_isActive || _busy) return;
+    setState(() {
+      _selected = registration.id;
+      _view = null;
+    });
+    if (registration.current(DateTime.now())) {
+      _read(registration, '', true);
+    }
+  }
+
   Future<void> _revokeContent(WorkspaceRegistration registration) async {
     if (!_isActive || _busy) return;
     final generation = ++_generation;
@@ -327,30 +338,43 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
         _registrations.where((registration) => registration.id == _selected);
     final selectedRegistration =
         selectedMatches.isEmpty ? null : selectedMatches.first;
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('作業領域インスペクタ', style: Theme.of(context).textTheme.titleLarge),
+    return Semantics(
+        container: true,
+        explicitChildNodes: true,
+        label: '作業領域インスペクタ',
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Semantics(
+          header: true,
+          label: '作業領域インスペクタ',
+          child: Text('作業領域インスペクタ',
+              style: Theme.of(context).textTheme.titleLarge)),
       TextButton(
           onPressed: _busy || !_isActive ? null : () => _refresh(),
           child: const Text('登録状態を更新')),
       Text(_message),
       if (_busy) const LinearProgressIndicator(),
       for (final registration in _registrations)
-        ListTile(
-          title: Text(registration.id),
-          subtitle: Text(
-              '${registration.runtime}・${registration.visibility}・${registration.current(DateTime.now()) ? '承認あり' : '未承認または期限切れ'}'),
+        Semantics(
+          container: true,
+          label:
+              '${registration.id}・${registration.runtime}・${registration.visibility}・${registration.current(DateTime.now()) ? '承認あり' : '未承認または期限切れ'}',
+          button: true,
           selected: _selected == registration.id,
+          enabled: _isActive && !_busy,
           onTap: !_isActive || _busy
               ? null
-              : () {
-                  setState(() {
-                    _selected = registration.id;
-                    _view = null;
-                  });
-                  if (registration.current(DateTime.now())) {
-                    _read(registration, '', true);
-                  }
-                },
+              : () => _selectRegistration(registration),
+          child: ExcludeSemantics(
+            child: ListTile(
+              title: Text(registration.id),
+              subtitle: Text(
+                  '${registration.runtime}・${registration.visibility}・${registration.current(DateTime.now()) ? '承認あり' : '未承認または期限切れ'}'),
+              selected: _selected == registration.id,
+              onTap: !_isActive || _busy
+                  ? null
+                  : () => _selectRegistration(registration),
+            ),
+          ),
         ),
       if (selectedRegistration != null) ...[
         Text(
@@ -543,6 +567,6 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
             SelectableText(projection['text'] as String),
         ],
       ],
-    ]);
+    ]));
   }
 }

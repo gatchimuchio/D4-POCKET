@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' show SemanticsAction;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -426,6 +427,30 @@ void main() {
         client.read((await client.list()).single, 'file.txt', tree: false),
         throwsA(isA<BrokerClientException>()));
   });
+  testWidgets('Inspectorと登録Workspace行を明示Semanticsで公開する', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    final broker = TestBroker();
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: WorkspaceInspector(client: WorkspaceClient(broker)))));
+    await tester.pumpAndSettle();
+
+    expect(find.bySemanticsLabel('作業領域インスペクタ'), findsWidgets);
+    final row =
+        find.bySemanticsLabel(RegExp(r'workspace-a.*runtime-a.*full.*承認あり'));
+    expect(row, findsOneWidget);
+    expect(
+      tester
+          .getSemantics(row)
+          .getSemanticsData()
+          .hasAction(SemanticsAction.tap),
+      isTrue,
+    );
+
+    semanticsHandle.dispose();
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('実一覧と本文を描画し承認失効確認で本文を消す', (tester) async {
     final broker = TestBroker();
     await tester.pumpWidget(MaterialApp(
