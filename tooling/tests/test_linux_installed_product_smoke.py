@@ -1523,6 +1523,61 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             timeout=2,
         )
 
+    def test_folder_chooser_returns_from_autocompleted_direct_child_and_verifies_workspace(self) -> None:
+        environment = {"DISPLAY": ":99"}
+        with tempfile.TemporaryDirectory() as directory:
+            folder = Path(directory) / "selected-workspace"
+            folder.mkdir()
+            folder_posix = str(folder).replace("\\", "/")
+            chooser = object()
+            accept = object()
+            visible = subprocess.CompletedProcess(
+                args=[], returncode=0, stdout=b"0x42\n", stderr=b""
+            )
+            with (
+                patch(
+                    "tooling.tests.linux_installed_product_smoke.subprocess.run",
+                    side_effect=(None, None, None, None, None, visible, None),
+                ) as run,
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._find_accessible",
+                    return_value=chooser,
+                ),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._wait_for_gtk_location",
+                    side_effect=(False, True),
+                ) as wait_for_location,
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._gtk_location_entry_value",
+                    return_value=f"{folder_posix}/private",
+                ),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
+                    return_value=accept,
+                ),
+                patch("tooling.tests.linux_installed_product_smoke._activate_accessible"),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._wait_for_gtk_dialog_closed"
+                ),
+            ):
+                _select_folder_in_gtk_chooser(environment, "0x42", folder)
+
+        self.assertEqual(
+            run.call_args_list[5].args[0],
+            [
+                "xdotool",
+                "search",
+                "--onlyvisible",
+                "--name",
+                "^D4 Pocket 作業領域の選択$",
+            ],
+        )
+        self.assertEqual(
+            run.call_args_list[6].args[0],
+            ["xdotool", "key", "--clearmodifiers", "alt+Up"],
+        )
+        self.assertEqual(wait_for_location.call_count, 2)
+
     def test_folder_chooser_uses_exact_control_coordinates_if_action_does_not_close(self) -> None:
         environment = {"DISPLAY": ":99"}
         with tempfile.TemporaryDirectory() as directory:
@@ -1688,6 +1743,7 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             {
                 "parent_path_visible": True,
                 "location_entry_matches_requested_folder": False,
+                "location_entry_is_direct_child_of_requested_folder": False,
                 "folder_name_visible": False,
                 "selected_accessible_count": 1,
                 "common_roles": [("table cell", 1)],
