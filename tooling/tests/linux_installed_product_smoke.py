@@ -3291,7 +3291,7 @@ def _prepare_and_start_installed_agent_task(
             f"Runtime ID: {runtime_id}",
             f"Workspace ID: {workspace_id}",
             "許可operation: agent_task.execute",
-            "この確認はTask本文を承認せず",
+            "Task本文と実行条件を示す別個のOwner Approvalは必要です",
         ),
     )
     _wait_for_owner_dialog_closed(environment)
