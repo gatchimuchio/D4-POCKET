@@ -211,6 +211,25 @@ class AccessibleActionResolutionTests(unittest.TestCase):
                 _find_operable_accessible("独立Appを書き出す", root=Root()), button
             )
 
+    def test_exact_operable_lookup_skips_dialog_title_substring(self) -> None:
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        accept = self.Node("選択", ("click",))
+
+        class Root:
+            name = "D4 Pocket 作業領域の選択"
+            childCount = 1
+
+            def getChildAtIndex(self, index: int):
+                return accept
+
+        fake_pyatspi = SimpleNamespace(Registry=SimpleNamespace())
+        with patch.dict("sys.modules", {"pyatspi": fake_pyatspi}):
+            self.assertIs(
+                _find_operable_accessible("選択", root=Root(), exact=True), accept
+            )
+
     def test_mcp_palette_submits_ascii_query_and_refreshes_window_tree(self) -> None:
         window = object()
         fresh_window = object()
@@ -1488,7 +1507,7 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
         )
         self.assertEqual(
             find_operable.call_args_list,
-            [call("選択", root=chooser, timeout=10)],
+            [call("選択", root=chooser, timeout=10, exact=True)],
         )
         activate.assert_called_once_with(accept, "選択", environment)
         wait_closed.assert_called_once_with(

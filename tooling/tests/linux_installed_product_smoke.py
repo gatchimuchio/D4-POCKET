@@ -385,7 +385,9 @@ def _accessibility_debug(node, *, max_ancestors: int = 5) -> str:
     return "; ".join(details)
 
 
-def _find_operable_accessible(name: str, *, root=None, timeout: float = 10.0):
+def _find_operable_accessible(
+    name: str, *, root=None, timeout: float = 10.0, exact: bool = False
+):
     try:
         import pyatspi
     except ImportError as error:
@@ -398,7 +400,11 @@ def _find_operable_accessible(name: str, *, root=None, timeout: float = 10.0):
         matches = [
             node
             for node, accessible_name in _accessible_nodes(search_root)
-            if name in accessible_name.strip()
+            if (
+                accessible_name.strip() == name
+                if exact
+                else name in accessible_name.strip()
+            )
         ]
         for node in matches:
             actionable = _actionable_node(node)
@@ -1556,7 +1562,7 @@ def _select_folder_in_gtk_chooser(
         if screenshot_before_selection_path is not None
         else False
     )
-    accept = _find_operable_accessible("選択", root=chooser, timeout=10)
+    accept = _find_operable_accessible("選択", root=chooser, timeout=10, exact=True)
     _activate_accessible(accept, "選択", environment)
     try:
         _wait_for_gtk_dialog_closed(
