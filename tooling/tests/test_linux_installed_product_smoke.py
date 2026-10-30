@@ -767,7 +767,7 @@ class InstalledMcpToolListTests(unittest.TestCase):
                 "tooling.tests.linux_installed_product_smoke._find_operable_accessible"
             ) as find_button,
         ):
-            with self.assertRaisesRegex(RuntimeError, "public arguments"):
+            with self.assertRaisesRegex(RuntimeError, "公開引数"):
                 _review_single_installed_mcp_tool_arguments({}, window)
 
         find_button.assert_not_called()
@@ -946,11 +946,11 @@ class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
         )
 
     def test_public_text_rejects_carriage_return_and_nonprintable_controls(self) -> None:
-        with self.assertRaisesRegex(RuntimeError, "bounded format"):
+        with self.assertRaisesRegex(RuntimeError, "許容形式"):
             _set_public_text_by_keyboard(
                 object(), "field", "first\r\nsecond", {}, "0x42"
             )
-        with self.assertRaisesRegex(RuntimeError, "bounded format"):
+        with self.assertRaisesRegex(RuntimeError, "許容形式"):
             _set_public_text_by_keyboard(
                 object(), "field", "first\x00second", {}, "0x42"
             )
@@ -976,10 +976,10 @@ class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
                 requested_properties.append(property_name)
                 if property_name == "Label":
                     return labels_by_path[self.path]
-                raise AssertionError("unexpected Secret Service property request")
+                raise AssertionError("想定外のSecret Serviceプロパティ要求です")
 
             def GetSecret(self, *_args):
-                raise AssertionError("Secret Service secret retrieval is forbidden")
+                raise AssertionError("Secret Serviceからの秘密取得は禁止です")
 
         class FakeService:
             def SearchItems(self, attributes):
@@ -1029,7 +1029,7 @@ class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
 
         class FailingService:
             def SearchItems(self, _attributes):
-                raise dbus_exception("sensitive backend detail")
+                raise dbus_exception("秘密を含み得る保管処理の詳細")
 
         with (
             patch.dict(
@@ -1045,7 +1045,7 @@ class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
                     )
                 },
             ),
-            self.assertRaisesRegex(RuntimeError, "metadata search failed"),
+            self.assertRaisesRegex(RuntimeError, "メタデータ検索に失敗"),
         ):
             _secret_service_item_labels()
 
@@ -1070,7 +1070,7 @@ class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
                     "request_id": f"credential-request-{index}",
                     "operation": operation,
                     "decision": decision,
-                    "reason": "metadata only",
+                    "reason": "メタデータのみ",
                     "evidence_source": "INTERNAL_STATE",
                     "payload_hash": f"sha256:{index:064x}",
                     "previous_event_hash": previous_hash,
@@ -1120,7 +1120,7 @@ class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
             )
             with (store / "audit.jsonl").open("ab") as audit:
                 audit.write(b"secret-not-in-audit")
-            with self.assertRaisesRegex(RuntimeError, "leaked into durable Audit"):
+            with self.assertRaisesRegex(RuntimeError, "永続監査に漏えい"):
                 _verify_credential_audit(store, "secret-not-in-audit")
 
     def test_acceptance_file_scan_reports_leak_without_echoing_value(self) -> None:
@@ -1128,7 +1128,7 @@ class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "test.log").write_text(marker, encoding="utf-8")
-            with self.assertRaisesRegex(RuntimeError, "leaked into an acceptance file") as error:
+            with self.assertRaisesRegex(RuntimeError, "受入れファイルまたはログへ漏えい") as error:
                 _assert_secret_absent_from_files(root, marker)
         self.assertNotIn(marker, str(error.exception))
 
@@ -1142,7 +1142,7 @@ class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
                     "tooling.tests.linux_installed_product_smoke._CREDENTIAL_SCAN_CHUNK_BYTES",
                     7,
                 ),
-                self.assertRaisesRegex(RuntimeError, "leaked into an acceptance file"),
+                self.assertRaisesRegex(RuntimeError, "受入れファイルまたはログへ漏えい"),
             ):
                 _assert_secret_absent_from_files(root, marker)
 
@@ -1155,7 +1155,7 @@ class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
                     "tooling.tests.linux_installed_product_smoke._CREDENTIAL_SCAN_MAX_BYTES",
                     8,
                 ),
-                self.assertRaisesRegex(RuntimeError, "bounded byte budget") as error,
+                self.assertRaisesRegex(RuntimeError, "上限バイト数を超えました") as error,
             ):
                 _assert_secret_absent_from_files(root, "test-secret")
         self.assertIn("files_scanned=0", str(error.exception))
@@ -1175,7 +1175,7 @@ class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
                     "tooling.tests.linux_installed_product_smoke._CREDENTIAL_SCAN_MAX_BYTES",
                     8,
                 ),
-                self.assertRaisesRegex(RuntimeError, "bounded byte budget") as error,
+                self.assertRaisesRegex(RuntimeError, "上限バイト数を超えました") as error,
             ):
                 _assert_secret_absent_from_files(root, "test-secret")
         diagnostic = str(error.exception)
@@ -1441,7 +1441,7 @@ class LinuxInstalledOwnerEvidenceTests(unittest.TestCase):
                             "Capability=mcp.tool.call Permission=one consumed=true"
                             if operation == "MCP Tool実行" and decision == "started"
                             else (
-                                "Tool result hash-only receipt"
+                                "ツール結果のハッシュだけを含む受領票"
                                 if operation == "MCP Tool実行" and decision == "accepted"
                                 else "fixture"
                             )
@@ -1527,7 +1527,7 @@ class LinuxInstalledOwnerEvidenceTests(unittest.TestCase):
                 "".join(json.dumps(event) + "\n" for event in events),
                 encoding="utf-8",
             )
-            with self.assertRaisesRegex(RuntimeError, "event hash"):
+            with self.assertRaisesRegex(RuntimeError, "監査事象ハッシュ"):
                 _verify_live_audit(store)
 
     def test_uninstall_keeps_audit_outside_removed_product_and_entry(self) -> None:

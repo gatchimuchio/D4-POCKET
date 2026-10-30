@@ -921,7 +921,7 @@ mod workspace_inspector_tests {
         });
         let bytes = serde_json::to_vec(&request).unwrap();
         let candidate_value =
-            candidate(&bytes, &endpoint).expect("Linux export is an Owner operation");
+            candidate(&bytes, &endpoint).expect("Linuxの書き出しは所有者操作です");
         assert!(candidate_value.summary.contains("対象platform: Linux"));
         assert!(candidate_value.summary.contains("linux-export-fixture"));
         assert!(candidate_value
@@ -1464,8 +1464,8 @@ mod task_owner_tests {
         use std::net::TcpListener;
 
         let (app_id, audit_store_id) = crate::broker::update_center::embedded_product_identity()
-            .expect("test build identity")
-            .expect("compile-time Linux test identity");
+            .expect("試験用ビルド識別情報")
+            .expect("コンパイル時のLinux試験識別情報");
         let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
         let port = listener.local_addr().unwrap().port();
         let listener_thread = std::thread::spawn(move || {
@@ -1548,7 +1548,7 @@ mod task_owner_tests {
             let operation = receiver.recv_timeout(Duration::from_secs(2)).unwrap();
             let apply = operation
                 .apply_confirmation
-                .expect("Owner confirmation must carry a Broker-derived stage binding");
+                .expect("所有者確認にはBrokerが導出したstage束縛が必要です");
             assert_eq!(apply.app_id, app_id);
             assert_eq!(apply.audit_store_id, audit_store_id);
             assert_eq!(apply.download.update_id, "linux-owner-update");
@@ -1600,8 +1600,8 @@ mod task_owner_tests {
         use std::net::TcpListener;
 
         let (app_id, audit_store_id) = crate::broker::update_center::embedded_product_identity()
-            .expect("test build identity")
-            .expect("compile-time Linux test identity");
+            .expect("試験用ビルド識別情報")
+            .expect("コンパイル時のLinux試験識別情報");
         let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
         let port = listener.local_addr().unwrap().port();
         let listener_thread = std::thread::spawn(move || {
@@ -1669,7 +1669,7 @@ mod task_owner_tests {
             let operation = receiver.recv_timeout(Duration::from_secs(2)).unwrap();
             let activation = operation
                 .activation_confirmation
-                .expect("native confirmation must carry activation binding");
+                .expect("native確認には有効化対象の束縛が必要です");
             assert_eq!(activation.app_id, app_id);
             assert_eq!(activation.audit_store_id, audit_store_id);
             assert_eq!(activation.update_id, "linux-owner-update");
@@ -1704,7 +1704,7 @@ mod task_owner_tests {
                 && !summary.contains("linux-owner-fixture-secret")
         })
         .unwrap()
-        .expect("Owner confirmation should forward once");
+        .expect("所有者確認は一度だけ転送します");
         assert_eq!(
             serde_json::from_slice::<Value>(&response).unwrap()["status"],
             "accepted"
@@ -1979,8 +1979,8 @@ mod task_owner_tests {
         use std::net::TcpListener;
 
         let (app_id, audit_store_id) = crate::broker::update_center::embedded_product_identity()
-            .expect("test build identity")
-            .expect("compile-time Linux test identity");
+            .expect("試験用ビルド識別情報")
+            .expect("コンパイル時のLinux試験識別情報");
         let current_hash =
             "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
         let previous_hash =
@@ -2108,7 +2108,7 @@ mod task_owner_tests {
             let operation = receiver.recv_timeout(Duration::from_secs(2)).unwrap();
             let confirmation = operation
                 .activation_confirmation
-                .expect("rollback must carry a Broker-derived version binding");
+                .expect("ロールバックにはBrokerが導出した版の束縛が必要です");
             assert_eq!(confirmation.app_id, app_id);
             assert_eq!(confirmation.audit_store_id, audit_store_id);
             assert_eq!(confirmation.update_id, current_update_id);
@@ -2151,7 +2151,7 @@ mod task_owner_tests {
                 && !summary.contains("linux-owner-fixture-secret")
         })
         .unwrap()
-        .expect("matching native confirmation should be forwarded once");
+        .expect("一致するnative確認は一度だけ転送します");
         assert_eq!(
             serde_json::from_slice::<Value>(&response).unwrap()["status"],
             "accepted"

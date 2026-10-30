@@ -432,7 +432,7 @@ mod unix_tests {
         supervised
             .guardian
             .as_mut()
-            .expect("guardian child")
+            .expect("監督対象の子process")
             .kill()
             .expect("failure fixtureでguardianを終了");
 

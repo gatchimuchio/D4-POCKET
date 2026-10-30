@@ -43,7 +43,7 @@ R14へ送る作業には、追加long-run、網羅的fault matrix、全数regres
 | R2-E | 配置済み経路で通常NTFS／OneDrive Cloud Files双方のsecret・Workspace境界 | `OPEN` | 未着手 | 直接的な回帰証拠のみ |
 | R2-F | D4-owned WorkspaceTaskScratchのTask結合、通常／cancel／deadline／crash回収、failure時fail-closed | `OPEN` | cancel／deadline／crashのScratch証拠はR2-A/Bから参照し、同じ意味の試験を重複しない。MxC AppContainer TEMP物理削除は対象外 | 直接的な回帰証拠のみ |
 | R2-G | R2-A〜FのPASS後、normal Release `task_execution=supported`へ昇格 | `OPEN` | R2-A〜FのPASS後に実施 | 具体的な回帰証拠のみ |
-| R2-H | source commit、app／launcher／Broker hash、runtime identity、installed root、Audit store identityをRelease evidenceへ結合 | `OPEN` | 正式証拠bundleの最終検証はR13/R14 | 具体的な回帰証拠のみ |
+| R2-H | 対象ソースcommit、app／launcher／Broker hash、runtime identity、installed root、Audit store identityをRelease evidenceへ結合 | `OPEN` | 正式証拠bundleの最終検証はR13/R14 | 具体的な回帰証拠のみ |
 
 現在の工程状態: `IMPLEMENTING`
 
@@ -65,7 +65,7 @@ R2-Aは次の一回ずつの限定受入れでPASSとする。短縮期限は試
 
 ### R2-A 受入れ結果（2026-10-05）
 
-- `Owner cancel`: installed run `d4p-r2-A-cd4f2ab-run2`、実Codex CLI 0.160.0／MxC child。Task `e3a093e56923d91b8f2053336df094cd`は新規Permission（`broker-audit-139/140`）と独立Owner Approval（`broker-audit-142/143`）を使い、開始Audit `broker-audit-146`に一回消費を記録した。取消要求`broker-audit-148/149`後、installed Agent Centerは`cancelled`と終端Audit `broker-audit-151`を表示した。終端Audit reasonには`RecoveryAction=Workspace差分を確認`が記録された。loopback偽APIは1 request／tool call送信／tool resultなし／外部要求0。終端後にCodex／MxC子process、Task scratch journal entry、`.d4p-tmp-*`、完了markerは存在しなかった。
+- `Owner cancel`: 導入済み製品で実Codex CLI 0.160.0とMxC子プロセスを使用。Task `e3a093e56923d91b8f2053336df094cd`は新規Permission（`broker-audit-139/140`）と独立Owner Approval（`broker-audit-142/143`）を使い、開始時Audit `broker-audit-146`に各一回の消費を記録した。取消要求`broker-audit-148/149`の後、導入済みAgent Centerに`cancelled`と終端Audit `broker-audit-151`を表示した。終端Auditの理由には`RecoveryAction=Workspace差分を確認`が記録された。loopback偽APIへのrequestは1件で、tool callは送信したがtool resultはなく、外部要求は0件。終端後、Codex／MxC子プロセス、Task用scratch journal entry、`.d4p-tmp-*`、完了markerはいずれも存在しなかった。
 - `短縮deadline`: 同じstaged installed経路の新Session `253b9133001ba0189eac12c210debc4b`、実Codex CLI 0.160.0／MxC childでTask `38285d80bf8d4aa0d088fb93b81211c5`を開始。新規Permission `broker-audit-167/168`、Owner Approval `broker-audit-169/170`、一回消費を記録した開始Audit `broker-audit-173`、installed UIの`failed`終端とAudit `broker-audit-182`を確認した。終端Audit reasonには`RecoveryAction=Workspace差分を確認`が記録された。試験専用`r2-e2e`短縮期限（25,000ms）で、長時間待機markerを持つ合成toolとloopback偽Responses APIを使用。偽APIは1 request／tool call送信／result未受信／外部要求0を報告。Owner cancel要求はなく、期限到達後にCodex／MxC子processとscratch journal entryはなく、Workspace完了markerもなかった。
 - deadlineのAudit reasonは汎用のTask失敗／取消表現であり、終端理由単独では期限を識別できない。期限への帰属は、試験専用短縮設定、期限を越えて待機する制御probe、cancel要求の不在、Taskの`failed`終端、子孫停止を組み合わせた`CONFIG`＋`FIXTURE`＋`LIVE_RUNTIME`証拠による。コード上、期限超過はprocess群停止後に`期限超過`として返り、Task状態を`failed`へ写像する。
 - 両TaskのOwner確認・Permission・Approvalは各run内で新規発行され、開始時に一回消費された。終端後の自動Grant復元・再発行はAuditにない。Grant再利用拒否は既存CLOSED R2-C1の証拠に委ね、再試験していない。

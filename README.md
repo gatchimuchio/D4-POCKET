@@ -25,18 +25,18 @@ AIエージェントが高度になるほど、次に難しくなるのは「何
 
 ## 現在の到達点
 
-2026年10月22日時点で照合した、対象と環境を限定した実装・検査の状態です。各証拠は実行時のsource commitへ結合し、現在のmainを再試験した結果へ付け替えません。**工程のCLOSEDは正式な製品出荷の意味ではありません。**
+2026年10月22日時点で照合した、対象と環境を限定した実装・検査の状態です。各証拠は実行時の対象ソースcommitへ結合し、現在のmainを再試験した結果へ付け替えません。**工程のCLOSEDは正式な製品出荷の意味ではありません。**
 
 | 対象 | 現行の状態 | 成立していない範囲 |
 |---|---|---|
-| **Windows Desktop** | rev5のWindows側P12、Feature Completeの開発到達点 | installed-path最終証拠、正式Release、owner GO |
-| **Agent Compare / Handoff** | P2 Multi-Agent Compare、P3 Agent HandoffのProduct Build受入CLOSED | すべての実Agent・実環境での一般保証 |
+| **Windowsデスクトップ版** | rev5のWindows側P12、Feature Completeの開発到達点 | installed-path最終証拠、正式Release、owner GO |
+| **Agent比較／引継ぎ** | P2複数Agent比較、P3 Agent引継ぎのProduct Build受入CLOSED | すべての実Agent・実環境での一般保証 |
 | **モバイル（Android／iOS）** | P13の有限Product Build受入は2026-10-09にCLOSED。Android Emulator・iOS Simulator等の限定証拠を保持 | 物理端末保証、OS別の正式配布・署名・identity |
-| **Linux Desktop** | 完全対応が必須。Ubuntu 24.04／Xvfb・X11の導入済みGTK製品でrun #77の更新等、#94の資格情報保管、#107の合成MCP接続・一回Tool実行・切断を対象別に受入れ。#107はsource `bf2a51ac`に固定 | Workspace／Agent Task・Recovery等の残る製品経路、Wayland描画、一般環境・正式署名／配布を含む全体受入れ。`linux_native_product_support=unresolved` |
+| **Linuxデスクトップ版** | 完全対応が必須。Ubuntu 24.04／Xvfb・X11の導入済みGTK製品でrun #77の更新等、#94の資格情報保管、#107の合成MCP接続・一回Tool実行・切断を対象別に受入れ。#107はsource `bf2a51ac`に固定 | Workspace／Agent Task・Recovery等の残る製品経路、Wayland描画、一般環境・正式署名／配布を含む全体受入れ。`linux_native_product_support=unresolved` |
 | **緩衝基盤とAgent Task** | B0〜B4は有限受入れCLOSED、B5はOPEN。#54の3回PASSは履歴として保持。後続#55（source `1e57a828`）はRust全target 572成功／0失敗／13除外の一方、capture判定でworkflow FAIL。後続Broker build／IPC smokeはSKIP。`BUF-T04`部分観測、`BUF-T05`／`BUF-T06`OPEN、`BUF-T23`局所PASS。詳細は[B5記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md) | OneDrive警告との因果、loopback/TLS failureの根因、Q4の長期／反復／資源影響、現行SAC policy全体、通常Release能力、正式配布・実機保証 |
-| **正式な出荷判断** | Release GateとOwner承認を独立に保持 | <code>task_execution=unsupported</code>、<code>release_ready=false</code> |
+| **正式な出荷判断** | Release GateとOwner承認を独立に保持 | `task_execution=unsupported`、`release_ready=false` |
 
-- item: Linux native full product support
+- 項目: Linux native製品の全面対応
   classification: `release_blocker`
   registry_id: linux_native_product_support
   reason: Linux native Desktopは必須製品対象。WSL／WSLgの開発証拠とhosted Xvfb／X11の導入済みGTK製品の限定成功はあるが、残る製品経路・Wayland・一般環境・正式配布を含む完全対応は未受入れである。
@@ -99,7 +99,7 @@ python tooling/validate_all.py --flutter-step desktop_flutter_analyze --desktop-
 | [`specs/`](specs/) | Contract Schemaと各種機能境界 |
 | [`packages/shell_core/`](packages/shell_core/) | Framework非依存のShell Core参照実装 |
 | [`native/rust_helper/`](native/rust_helper/) | Rust Security Brokerと認証された作用経路 |
-| [`apps/desktop_flutter/`](apps/desktop_flutter/) | Desktop Flutter UI |
+| [`apps/desktop_flutter/`](apps/desktop_flutter/) | デスクトップ向けFlutter UI |
 | [`apps/mobile_flutter/`](apps/mobile_flutter/) | Android / iOSのUI製品面 |
 | [`tooling/`](tooling/) | Schema・Conformance・release検証 |
 | [`docs/`](docs/) | 契約、工程、証拠、未成立条件 |

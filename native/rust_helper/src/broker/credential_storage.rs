@@ -633,10 +633,10 @@ mod linux_storage_tests {
         std::fs::set_permissions(&broker_store, std::fs::Permissions::from_mode(0o700)).unwrap();
         let session = "linux-credential-installed-path";
         let mut broker = crate::broker::protocol::Broker::new_persistent(session, &broker_store)
-            .expect("isolated persistent Broker");
+            .expect("隔離された永続Broker");
         broker
             .linux資格情報保存先を初期化(&broker_store)
-            .expect("private Broker store namespace");
+            .expect("Broker保管領域の非公開namespace");
         let broker_id_text = hex::encode(random);
         let broker_id = &broker_id_text[..32];
         let broker_secret = "synthetic-linux-owner-gated-secret-not-operational";
@@ -661,7 +661,7 @@ mod linux_storage_tests {
             response.status,
             crate::broker::protocol::BrokerStatus::Accepted
         );
-        let receipt = response.body.expect("metadata-only receipt");
+        let receipt = response.body.expect("metadataのみの受領票");
         let public_response = serde_json::to_string(&receipt).unwrap();
         assert!(!public_response.contains(broker_secret));
         assert_eq!(receipt["保管方式"], "linux_secret_service");

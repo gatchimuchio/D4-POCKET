@@ -31,7 +31,7 @@ const OWNER_PROMPT_LIMIT: usize = OWNER_SUMMARY_LIMIT * 2 + 64;
 const WORKSPACE_PICKER_REPLY_LIMIT: usize = 2 * 1024 + 128;
 const OWNER_PROTOCOL_MAGIC: [u8; 8] = [68, 52, 79, 87, 78, 69, 82, 49];
 const OWNER_REPLY_YES: [u8; 3] = [89, 69, 83];
-// Catalog HTTPS has a 30-second Broker deadline; allow bounded relay headroom.
+// 一覧取得のHTTPS通信にはBrokerの30秒期限があります。中継に許される余裕時間を確保します。
 const CATALOG_RELAY_RESPONSE_TIMEOUT: Duration = Duration::from_secs(35);
 #[cfg(test)]
 const OWNER_REPLY_NO: [u8; 2] = [78, 79];

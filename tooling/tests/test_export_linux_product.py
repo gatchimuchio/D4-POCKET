@@ -331,9 +331,9 @@ class LinuxExportBuildTests(unittest.TestCase):
                     (target / "apps/desktop_flutter").mkdir(parents=True),
                     (target / "apps/desktop_flutter/pubspec.yaml").write_text("name: x\nversion: 1.0.0\n", encoding="utf-8"),
                 )),
-                patch("tooling.export_linux_product.subprocess.run", side_effect=RuntimeError("synthetic build failure")),
+                patch("tooling.export_linux_product.subprocess.run", side_effect=RuntimeError("合成ビルド失敗")),
             ):
-                with self.assertRaisesRegex(RuntimeError, "synthetic build failure"):
+                with self.assertRaisesRegex(RuntimeError, "合成ビルド失敗"):
                     build_linux_product(receipt, manifest, output)
             self.assertFalse(output.exists())
 

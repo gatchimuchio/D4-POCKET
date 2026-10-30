@@ -1,0 +1,235 @@
+# F04 日本語基底監査 分類・是正台帳（2026-10-30）
+
+## 対象と判定
+
+- 基準監査原文: [F04_日本語基底監査原文_20261030.json.txt](F04_日本語基底監査原文_20261030.json.txt)
+- 基準SHA-256: `4FA48D57AC2EC0FE26B51B581A0DE1DF2D032E1169FA5F089BF9E9675BF05959`
+- 基準結果: 220件（active_markdown_prose 64、cli_or_diagnostic_string 137、code_comment 18、code_docstring 1）。
+- 是正後: 208件を日本語化し、12件は固定CLI・IPC・OS形式・試験識別子・型検査directiveとして原表記を保持。
+- strict再監査: 12件（cli_or_diagnostic_string 11、code_comment 1）。12件すべてが下表の保持分類と一致。strict監査は残件を報告するため終了値1であり、監査PASSとは記録しない。
+- 抜粋・行番号は基準監査時点のもの。原文JSONを変更せず証拠として保持する。
+
+## 個別分類
+
+| # | 基準位置 | 面 | 分類 | 処置・根拠 | 基準抜粋 |
+|---:|---|---|---|---|---|
+| 001 | `README.md:32` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | *Windows Desktop** |
+| 002 | `README.md:33` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | *Agent Compare / Handoff** |
+| 003 | `README.md:35` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | *Linux Desktop** |
+| 004 | `README.md:37` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | task_execution=unsupported 、 release_ready=false |
+| 005 | `README.md:39` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | item: Linux native full product support |
+| 006 | `README.md:102` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | Desktop Flutter UI |
+| 007 | `ROADMAP.md:9` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 現行追補（2026-10-22、Linux installed MCP acceptance run #107）: manual run #107は検査対象commit で実行対象stepがPASSした（Rollback／Export／UninstallとCredential Vaultの受入れstepは対象外SKIP）。installed product… |
+| 008 | `ROADMAP.md:11` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 履歴追補（2026-10-22、Linux installed MCP acceptance run #106）: manual run #106は検査対象commit でLinux Release build／portable launcher、fixture root cleanup、run後clean checkoutがPASSした。前回修正したac… |
+| 009 | `ROADMAP.md:13` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 履歴追補（2026-10-22、Linux installed MCP acceptance run #105）: manual run #105は検査対象commit でLinux Release build／portable launcher、fixture root cleanup、run後clean checkoutがPASSした。installe… |
+| 010 | `ROADMAP.md:15` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 履歴追補（2026-10-22、Linux installed MCP acceptance run #104）: manual run #104は検査対象commit でLinux Release build／portable launcher、fixture root cleanup、run後clean checkoutがPASSした。installe… |
+| 011 | `ROADMAP.md:17` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 履歴追補（2026-10-22、Linux installed MCP acceptance run #103）: manual run #103は検査対象commit でLinux Release build／portable launcher、fixture root cleanup、run後clean checkoutがPASSした。installe… |
+| 012 | `ROADMAP.md:19` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 履歴追補（2026-10-22、Linux installed MCP acceptance run #102）: manual run #102は検査対象commit でLinux Release build／portable launcher、fixture root cleanup、run後clean checkoutがPASSした。MCP acce… |
+| 013 | `ROADMAP.md:27` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 現行追補（2026-10-21、Linux installed GTK Update Center catalog取得）: 必須Linux Desktopのmanual run #39583523058、source commit は全step PASS。installed UIからBroker-owned HTTPS catalogを取得し、Ed2551… |
+| 014 | `ROADMAP.md:29` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 現行追補（2026-10-21、Linux installed GTK Rollback Owner確認）: 必須Linux Desktopのmanual run #39556531968、tested source commit は全step PASS。installed GTK UIでOwner拒否がactive-version record／desk… |
+| 015 | `ROADMAP.md:31` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 現行追補（2026-10-21、Linux installed GTK Uninstaller受入れ）: 必須Linux Desktopのmanual run #39527951009、source commit は全step PASS。Ubuntu 24.04.5／Flutter 3.44.0／Rust 1.95.0でBroker-installed固定… |
+| 016 | `ROADMAP.md:153` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 2026-10-09承認の緩衝基盤rev5補遺・QC基底改訂をP13完了後の追加正本として採用。P13とB0〜B2はCLOSED。B0は356 Actions run中203 failureを一意に列挙し、184を原因対応、19をUNKNOWNとして保持。226 failed job log中75取得不能、legacy validation 17件の個別j… |
+| 017 | `docs/REV3_PROGRESS.md:2239` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | rev4の開発通過Acceptanceに限定し、fresh staged installed run でOwner cancelと短縮deadlineを各1回実行した。source checkoutは開始時に でclean、installed artifactは正式provenanceではない。 |
+| 018 | `docs/REV4_ACCEPTANCE_LEDGER.md:68` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | : installed run 、実Codex CLI 0.160.0／MxC child。Task は新規Permission（ ）と独立Owner Approval（ ）を使い、開始Audit に一回消費を記録した。取消要求 後、installed Agent Centerは と終端Audit を表示した。終端Audit reasonには が記録された… |
+| 019 | `docs/REV5_PRODUCT_PROGRESS.md:9` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 作業追補（2026-10-22、Linux installed MCP acceptance run #107）: 手動 run #107は検査対象commit で実行対象stepがPASSした（Rollback／Export／UninstallとCredential Vaultの受入れstepは対象外SKIP）。installed product ver… |
+| 020 | `docs/REV5_PRODUCT_PROGRESS.md:11` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 履歴追補（2026-10-22、Linux installed MCP acceptance run #106）: 手動 run #106は検査対象commit でLinux Release build／portable launcher、fixture root cleanup、run後clean checkoutがPASSした。前回修正したaccess… |
+| 021 | `docs/REV5_PRODUCT_PROGRESS.md:13` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 履歴追補（2026-10-22、Linux installed MCP acceptance run #105）: 手動 run #105は検査対象commit でLinux Release build／portable launcher、fixture root cleanup、run後clean checkoutがPASSした。installed ac… |
+| 022 | `docs/REV5_PRODUCT_PROGRESS.md:15` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 履歴追補（2026-10-22、Linux installed MCP acceptance run #104）: 手動 run #104は検査対象commit でLinux Release build／portable launcher、fixture root cleanup、run後clean checkoutがPASSした。installed ac… |
+| 023 | `docs/REV5_PRODUCT_PROGRESS.md:17` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 履歴追補（2026-10-22、Linux installed MCP acceptance run #103）: 手動 run #103は検査対象commit でLinux Release build／portable launcher、fixture root cleanup、run後clean checkoutがPASSした。installed ac… |
+| 024 | `docs/REV5_PRODUCT_PROGRESS.md:19` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 履歴追補（2026-10-22、Linux installed MCP acceptance run #102）: 手動 run #102は検査対象commit でLinux Release build／portable launcher、fixture root cleanup、run後clean checkoutがPASSした。MCP acceptan… |
+| 025 | `docs/REV5_PRODUCT_PROGRESS.md:21` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 作業追補（2026-10-22、Linux installed MCP acceptance run #101）: 手動 run #101は検査対象commit で、Linux Release build／portable launcher初回起動はPASS、installed MCP acceptanceはFAILした。失敗は最初のnative Owne… |
+| 026 | `docs/REV5_PRODUCT_PROGRESS.md:29` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 作業追補（2026-10-21、Linux installed GTK Update Center lifecycle）: 必須Linux Desktopのmanual run #77（run ID ）はtested source commit で全job step PASSした。Ubuntu 24.04.5／Flutter 3.44.0／Rust 1.9… |
+| 027 | `docs/REV5_PRODUCT_PROGRESS.md:31` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 作業追補（2026-10-21、Linux installed GTK Update Center catalog取得）: 必須Linux Desktopのmanual run #39583523058はsource commit で全step PASSした。Ubuntu 24.04.5、Flutter 3.44.0／Rust 1.95.0。Release… |
+| 028 | `docs/REV5_PRODUCT_PROGRESS.md:37` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 作業追補（2026-10-21、Linux installed GTK rollback Owner確認）: 必須Linux Desktopのmanual run #39556531968は対象コードcommit で全step PASSした。Ubuntu 24.04.5、Flutter 3.44.0／Rust 1.95.0。Release bundle a… |
+| 029 | `docs/REV5_PRODUCT_PROGRESS.md:113` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 作業追補（2026-10-20、Linux Broker rollback接続）: LinuxはWindows／macOSと同列の必須製品対象として扱う。現在版と直前版の署名済みcandidateをBroker一覧から取得し、両方のidentity・digest・fixed version directory・XDG desktop entryをLinux… |
+| 030 | `docs/REV5_PRODUCT_PROGRESS.md:119` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | Ubuntu-24.04 on WSL／Linux target、compile-time test identityを使った は38 passed／0 failed／1 ignored（実user-session Secret Serviceが必要な試験）、407 filtered out。含む範囲はdesktop entryのcreate-only／i… |
+| 031 | `docs/REV5_PRODUCT_PROGRESS.md:121` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 現時点でstage→active record→fixed XDG entryの実装接続とLinux target試験は成立した。Linux native installed product launch／更新・rollback・uninstall全体、Secret Service／MCP／Workspace／Agentのinstalled経路、proce… |
+| 032 | `docs/REV5_PRODUCT_PROGRESS.md:232` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 後続追補（2026-10-19、BUF-T05 Update TLS early-reject fixture）: baseline ／ のWindows hosted parallel run #46で、library 522 passed／1 failed／12 ignored。 は応答／TLS close_notify送信後、fixture serv… |
+| 033 | `docs/REV5_PRODUCT_PROGRESS.md:343` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 現行mode: （最新版rev5実装指示§2）。Windows側P12 、P2 Compare、P3 HandoffはCLOSEDのまま保持する。P13 Mobile／Non-Windows Product Buildは2026-10-09に有限Acceptanceを閉鎖。P13後の追加工程B0は2026-10-10に、取得可能な履歴範囲・欠測・原因対応・… |
+| 034 | `docs/REV5_PRODUCT_PROGRESS.md:602` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 手動Actions run 37661491163、commit では6欄のAX identity束縛と模型欄クリックまで成立し、 が「Neither element nor any descendant has keyboard focus」でFAIL（17.885秒）。videoは模型欄の実cursorを示し、固定Flutter engineの はAX… |
+| 035 | `docs/REV5_PRODUCT_PROGRESS.md:608` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 現在の差分は検証branch へ保存し、mainへ未統合。初回の製品UI入力欄探索FAILを修正した の手動Actions run 37635033580は、job開始前にGitHub側で拒否された。check annotationは「recent account payments have failed or your spending limit ne… |
+| 036 | `docs/specs/credential-vault.md:59` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 実装済み範囲は、Windows DPAPIおよびLinux Secret Serviceへ秘密値を暗号化して保存するowner登録、秘密値を含まない公開receipt、通常IPCの検証付き一覧、normal channelからのowner操作拒否、保管先未登録・永続Audit未使用・秘密値混入をfail-closedで拒否する経路である。Linuxはpac… |
+| 037 | `docs/specs/linux-product-package.md:41` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 5. Linux Export builder |
+| 038 | `docs/緩衝基盤_rev5補遺_QC/B0_参照原本一覧.md:27` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | Repository内の最後に記録されたActions母集団snapshot（2026-10-09取得）は356 run／203 failure run／226 failed job／250 failed-step summary。2026-10-10の原因対応更新で203 failure run中190件をcause-mapへ結合し、13件をrun-le… |
+| 039 | `docs/緩衝基盤_rev5補遺_QC/B0_参照原本一覧.md:33` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 各appの 、 、Mac／iOS native UI tests |
+| 040 | `docs/緩衝基盤_rev5補遺_QC/B0_参照原本一覧.md:213` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 後続run #27028440534は 上で とWindows／Linux Flutter Analyzeの成功を示す。同runの後続Windows／Linux build失敗は別に扱う。これは該当failure境界に対する強いsource-history対応であり、元jobのsource-exact再現ではない。元30 failed job logはHT… |
+| 041 | `docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md:27` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 3. B3-M01：target／toolchain／API contract |
+| 042 | `docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md:34` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | Swift／Rust callable contract |
+| 043 | `docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md:35` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | SDK package／lock graph |
+| 044 | `docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md:37` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | formatter／test assertion／diagnostic contract |
+| 045 | `docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md:38` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | Broker error-code／platform parser contract |
+| 046 | `docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md:73` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 6. B3-M03：UI test observation／interaction boundary |
+| 047 | `docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md:84` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | bounded accessibility query |
+| 048 | `docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md:99` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 7. B3-M04：macOS Flutter form field input／AX observation |
+| 049 | `docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md:292` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 17. B3-M14：Broker parity cold-start source-history反復 |
+| 050 | `docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md:296` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | B0 run |
+| 051 | `docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md:538` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 33. B3-M30：Mac MCP public locator ambiguityとcleanup sequencing |
+| 052 | `docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md:553` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 34. B3-M31：Mac MCP receipt／Owner prompt UI observation unknowns |
+| 053 | `docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md:583` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 36. B3-M33：Mac MCP argument field clear |
+| 054 | `docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md:643` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 40. B3-M37：Credential native sheet button locator（UNKNOWN） |
+| 055 | `docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md:658` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 41. B3-M38：Credential public row StaticText query |
+| 056 | `docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md:673` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 42. B3-M39：Credential final-use timestamp StaticText query |
+| 057 | `docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md:688` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 43. B3-M40：MCP disconnect public-text locator |
+| 058 | `docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md:748` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 47. B3-M44：UITest temp PNG recovery path gate mismatch |
+| 059 | `docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md:853` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 54. B3-M51：Workspace Inspector Owner button hit-test（UNKNOWN） |
+| 060 | `docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md:866` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 55. B3-M52：Workspace Inspector Owner button scroll後hit-test（UNKNOWN） |
+| 061 | `docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md:221` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | Windows hosted parallel run #47は同commit・ で実施。Rust全target 569 passed／0 failed／13 ignored。Release Broker helper build PASS（SHA-256 ）、Windows Broker smoke collector v6 PASS。authentic… |
+| 062 | `docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md:548` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 手動 run #55は commit 、Windows Server 2025 image 、Rust で実行し、入力はparallel／1回／loopback RST capture enabled。branch／PR／artifactは作成していない。 |
+| 063 | `docs/緩衝基盤_rev5補遺_QC/採用記録.md:216` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | 最新追加入力（2026-10-10、#26931288196／#26932073214／#26935106026 source-history照合後）: cause-mapは実行記録184件／153行。初期直接参照欠落56 run中37件cause-map・19件未解明（旧 15、Android 3、Apple 1）。3 source SHAのworkfl… |
+| 064 | `installer/linux/README.md:1` | `active_markdown_prose` | 本文の日本語化 | 説明文を日本語化。実行ID・commit・固定status・API名は保持。 | Linux native Desktop installer |
+| 065 | `native/rust_helper/src/adapters/codex_cli.rs:1235` | `code_comment` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Unit fixtures may use Windows-shaped paths on Linux. Production adapters |
+| 066 | `native/rust_helper/src/adapters/codex_cli.rs:1236` | `code_comment` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | canonicalize and validate the configured executable before this point. |
+| 067 | `native/rust_helper/src/adapters/codex_cli.rs:1249` | `cli_or_diagnostic_string` | 外部CLI契約保持 | Codex CLIが要求するread capability指定。引数表現を変更すると実際のCLI要求が変わる。 | ,{encoded_path}=\"read\" |
+| 068 | `native/rust_helper/src/adapters/codex_cli.rs:1894` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Task filesystem profile |
+| 069 | `native/rust_helper/src/adapters/codex_cli.rs:3263` | `cli_or_diagnostic_string` | 外部プロトコル保持 | HTTP認証方式Bearerの固定識別子。 | Bearer {synthetic_key} |
+| 070 | `native/rust_helper/src/adapters/minidora.rs:43` | `cli_or_diagnostic_string` | Broker診断プロトコル保持 | C28_RUNTIME_DIAGNOSTICの機械可読診断wire形式。 | C28_RUNTIME_DIAGNOSTIC&#124;{}&#124;{}&#124;elapsed_us={}&#124;{} |
+| 071 | `native/rust_helper/src/adapters/process_tree.rs:435` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | guardian child |
+| 072 | `native/rust_helper/src/broker/credential_storage.rs:636` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | isolated persistent Broker |
+| 073 | `native/rust_helper/src/broker/credential_storage.rs:639` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | private Broker store namespace |
+| 074 | `native/rust_helper/src/broker/credential_storage.rs:664` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | metadata-only receipt |
+| 075 | `native/rust_helper/src/broker/credential_storage.rs:705` | `cli_or_diagnostic_string` | 試験用スクリプト保持 | 資格情報経路のfixtureで実行するPOSIX shell。実行内容と秘密値照合を変えない。 | #!/bin/sh\n[ \"$MCP_TEST_CREDENTIAL\" = \"{broker_secret}\" ] &#124;&#124; exit 41\nIFS= read -r request &#124;&#124; exit 42\ncase \"$request\" in *server/discover*) ;; *) exit 43 ;; esac\nprintf '%… |
+| 076 | `native/rust_helper/src/broker/export_center.rs:1050` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | platform target {index} export cleanup failed: {error} |
+| 077 | `native/rust_helper/src/broker/product_install.rs:1399` | `cli_or_diagnostic_string` | OS連携形式保持 | Freedesktop Desktop Entryの固定field名・値。 | [Desktop Entry]\nType=Application\nName=D4 Pocket\nExec=\"{escaped}\"\nTryExec={try_exec}\nTerminal=false\nCategories=Utility;Development;\nStartupWMClass=d4-pocket\n |
+| 078 | `native/rust_helper/src/broker/product_install.rs:1774` | `cli_or_diagnostic_string` | 試験用識別子保持 | 空白と%を含む一時fixture名。パス処理試験の入力であり、表示文ではない。 | d4 pocket%desktop-entry-{}-{unique} |
+| 079 | `native/rust_helper/src/broker/update_center.rs:8466` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | acceptance package path is required |
+| 080 | `native/rust_helper/src/broker/update_center.rs:8469` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | acceptance root is required |
+| 081 | `native/rust_helper/src/broker/update_center.rs:8472` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | XDG_DATA_HOME is required |
+| 082 | `native/rust_helper/src/broker/update_center.rs:8475` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | XDG_STATE_HOME is required |
+| 083 | `native/rust_helper/src/broker/update_center.rs:8504` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | package product manifest is required |
+| 084 | `native/rust_helper/src/broker/update_center.rs:8533` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | ephemeral test signing key path is required |
+| 085 | `native/rust_helper/src/broker/update_center.rs:8755` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Linux installed acceptance seed: version={offered_version} package_sha256={digest} entry_registered=true owner_confirmation_source=isolated_test_fixture |
+| 086 | `native/rust_helper/src/broker/update_center.rs:8769` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | rollback acceptance package path is required |
+| 087 | `native/rust_helper/src/broker/update_center.rs:8772` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | XDG_DATA_HOME is required |
+| 088 | `native/rust_helper/src/broker/update_center.rs:8775` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | XDG_STATE_HOME is required |
+| 089 | `native/rust_helper/src/broker/update_center.rs:8796` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | ephemeral test signing key path is required |
+| 090 | `native/rust_helper/src/broker/update_center.rs:8855` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | previously installed candidate must remain in the Broker catalog |
+| 091 | `native/rust_helper/src/broker/update_center.rs:8959` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Linux installed rollback seed: current={} target={} package_sha256={} candidate_signature=verified package_stage=verified activation_fixture=true desktop_entry_unchanged=true |
+| 092 | `native/rust_helper/src/broker/update_center.rs:8969` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | XDG_STATE_HOME is required |
+| 093 | `native/rust_helper/src/broker/update_center.rs:9002` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Linux installed acceptance audit: LIVE_RUNTIME start/exit durable |
+| 094 | `native/rust_helper/src/linux_credential_input.rs:114` | `cli_or_diagnostic_string` | 内部IPC識別子保持 | D4CRED1資格情報入力frameの固定識別子。 | D4CRED1 {challenge} {}\n |
+| 095 | `native/rust_helper/src/linux_credential_input.rs:364` | `cli_or_diagnostic_string` | 内部IPC識別子保持 | D4CRED1資格情報入力応答frameの固定識別子。 | D4CRED1 {challenge} ENTERED {} |
+| 096 | `native/rust_helper/src/linux_desktop_worker.rs:34` | `code_comment` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Catalog HTTPS has a 30-second Broker deadline; allow bounded relay headroom. |
+| 097 | `native/rust_helper/src/linux_desktop_worker.rs:460` | `cli_or_diagnostic_string` | 内部IPC識別子保持 | D4PICK1 Linux選択入力frameの固定識別子。 | D4PICK1 {challenge}\n |
+| 098 | `native/rust_helper/src/linux_workspace_selection.rs:1` | `code_comment` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Linux GTK chooser response is selection-only input, never an Authority source. |
+| 099 | `native/rust_helper/src/macos_desktop_owner.rs:924` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Linux export is an Owner operation |
+| 100 | `native/rust_helper/src/macos_desktop_owner.rs:1467` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | test build identity |
+| 101 | `native/rust_helper/src/macos_desktop_owner.rs:1468` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | compile-time Linux test identity |
+| 102 | `native/rust_helper/src/macos_desktop_owner.rs:1551` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Owner confirmation must carry a Broker-derived stage binding |
+| 103 | `native/rust_helper/src/macos_desktop_owner.rs:1603` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | test build identity |
+| 104 | `native/rust_helper/src/macos_desktop_owner.rs:1604` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | compile-time Linux test identity |
+| 105 | `native/rust_helper/src/macos_desktop_owner.rs:1672` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | native confirmation must carry activation binding |
+| 106 | `native/rust_helper/src/macos_desktop_owner.rs:1707` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Owner confirmation should forward once |
+| 107 | `native/rust_helper/src/macos_desktop_owner.rs:1982` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | test build identity |
+| 108 | `native/rust_helper/src/macos_desktop_owner.rs:1983` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | compile-time Linux test identity |
+| 109 | `native/rust_helper/src/macos_desktop_owner.rs:2111` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | rollback must carry a Broker-derived version binding |
+| 110 | `native/rust_helper/src/macos_desktop_owner.rs:2154` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | matching native confirmation should be forwarded once |
+| 111 | `native/rust_helper/tests/fixtures/fake_codex_cli.rs:226` | `cli_or_diagnostic_string` | 外部CLI契約保持 | Codex CLI fixtureが検査するread capability指定。実CLI引数との一致が必要。 | ,{executable}=\"read\" |
+| 112 | `native/rust_helper/tests/support/codex_loopback_responses.rs:966` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | safe diagnostic preview redaction pattern |
+| 113 | `tooling/device_link_live_check.py:121` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | device ID frame invalid |
+| 114 | `tooling/device_link_live_check.py:129` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | owner invitation failed |
+| 115 | `tooling/device_link_live_check.py:134` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | owner invitation output boundary failed |
+| 116 | `tooling/device_link_live_check.py:160` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | instrumentation output contained invitation secret |
+| 117 | `tooling/device_link_live_check.py:163` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | instrumentation failed at |
+| 118 | `tooling/device_link_live_check.py:165` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | invitation bridge failed: |
+| 119 | `tooling/device_link_live_check.py:167` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | native test did not request a broker invitation |
+| 120 | `tooling/device_link_live_check.py:172` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Android test pairing remained active |
+| 121 | `tooling/device_link_live_check.py:173` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Android test invitation remained active |
+| 122 | `tooling/device_link_live_check.py:177` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Rust Broker Audit contained invitation secret |
+| 123 | `tooling/device_link_live_check.py:180` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Rust Broker log contained invitation secret |
+| 124 | `tooling/device_link_live_check.py:233` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Android native Device Link LIVE_RUNTIME failed at ( ) |
+| 125 | `tooling/tests/create_linux_export_fixture.py:45` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | test update trust public key must be an Ed25519 SPKI DER |
+| 126 | `tooling/tests/create_linux_update_catalog_fixture.py:114` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | RFC 8032 test key must be a 48-byte regular DER file |
+| 127 | `tooling/tests/create_linux_update_catalog_fixture.py:136` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | private key does not match the published RFC 8032 test vector |
+| 128 | `tooling/tests/create_linux_update_catalog_fixture.py:157` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | OpenSSL returned an invalid Ed25519 signature length |
+| 129 | `tooling/tests/create_linux_update_catalog_fixture.py:188` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | fixture output is not a regular file: |
+| 130 | `tooling/tests/create_linux_update_catalog_fixture.py:206` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | tracked Linux update fixture directory is unavailable |
+| 131 | `tooling/tests/create_linux_update_catalog_fixture.py:235` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | optional RFC 8032 test-vector DER key; if omitted the published test vector is used |
+| 132 | `tooling/tests/linux_gtk_bundle_smoke.py:469` | `code_comment` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | GTK maps the window before Flutter's first OpenGL frame is ready. |
+| 133 | `tooling/tests/linux_gtk_bundle_smoke.py:470` | `code_comment` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Let the initial frame settle before asking X11 to destroy its drawable. |
+| 134 | `tooling/tests/linux_installed_product_smoke.py:264` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | installed UI catalog fetch failed: |
+| 135 | `tooling/tests/linux_installed_product_smoke.py:266` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | installed UI catalog trust is unconfigured: |
+| 136 | `tooling/tests/linux_installed_product_smoke.py:269` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | installed UI catalog returned an unexpected result: |
+| 137 | `tooling/tests/linux_installed_product_smoke.py:275` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | installed UI catalog fetch did not expose a terminal status |
+| 138 | `tooling/tests/linux_installed_product_smoke.py:438` | `code_docstring` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | GTK labels may expose their body through AT-SPI Text, not Accessible.name. |
+| 139 | `tooling/tests/linux_installed_product_smoke.py:561` | `code_comment` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Submit the ASCII MCP query through the palette's supported TextField |
+| 140 | `tooling/tests/linux_installed_product_smoke.py:562` | `code_comment` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | onSubmitted path. Some GTK AT-SPI action nodes lack extents, and xdotool |
+| 141 | `tooling/tests/linux_installed_product_smoke.py:563` | `code_comment` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | cannot type Japanese text; the first MCP result opens this same center. |
+| 142 | `tooling/tests/linux_installed_product_smoke.py:570` | `code_comment` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Dismissing the command-palette dialog can invalidate its old AT-SPI |
+| 143 | `tooling/tests/linux_installed_product_smoke.py:571` | `code_comment` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | subtree. Resolve the destination from the desktop, then reacquire the |
+| 144 | `tooling/tests/linux_installed_product_smoke.py:572` | `code_comment` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | product window before returning it to callers that inspect its controls. |
+| 145 | `tooling/tests/linux_installed_product_smoke.py:594` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | public GTK field value is empty or outside its bounded format |
+| 146 | `tooling/tests/linux_installed_product_smoke.py:607` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | GTK public text field is not keyboard-accessible |
+| 147 | `tooling/tests/linux_installed_product_smoke.py:630` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | GTK public text field did not receive keyboard focus |
+| 148 | `tooling/tests/linux_installed_product_smoke.py:658` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | GTK public text field did not reflect the typed identifier |
+| 149 | `tooling/tests/linux_installed_product_smoke.py:672` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | native GTK secret entry is not uniquely accessible |
+| 150 | `tooling/tests/linux_installed_product_smoke.py:675` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | native GTK secret entry rejected input |
+| 151 | `tooling/tests/linux_installed_product_smoke.py:677` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | native GTK secret entry could not accept test input |
+| 152 | `tooling/tests/linux_installed_product_smoke.py:709` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Secret Service metadata inspection requires python3-dbus |
+| 153 | `tooling/tests/linux_installed_product_smoke.py:742` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Secret Service item metadata is malformed |
+| 154 | `tooling/tests/linux_installed_product_smoke.py:746` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Secret Service metadata search failed |
+| 155 | `tooling/tests/linux_installed_product_smoke.py:776` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Secret Service password stdin is unavailable |
+| 156 | `tooling/tests/linux_installed_product_smoke.py:783` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | isolated Secret Service exited during startup |
+| 157 | `tooling/tests/linux_installed_product_smoke.py:806` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | isolated user-session Secret Service did not become available |
+| 158 | `tooling/tests/linux_installed_product_smoke.py:819` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Credential secret leaked into durable Audit |
+| 159 | `tooling/tests/linux_installed_product_smoke.py:822` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Credential acceptance produced no durable Audit |
+| 160 | `tooling/tests/linux_installed_product_smoke.py:829` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Credential Audit event sequence is invalid |
+| 161 | `tooling/tests/linux_installed_product_smoke.py:844` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Credential Audit event hash is invalid |
+| 162 | `tooling/tests/linux_installed_product_smoke.py:858` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Credential Audit anchor／HMAC is invalid |
+| 163 | `tooling/tests/linux_installed_product_smoke.py:861` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Credential registration Audit is missing |
+| 164 | `tooling/tests/linux_installed_product_smoke.py:863` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Credential revocation Audit is missing |
+| 165 | `tooling/tests/linux_installed_product_smoke.py:871` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Audit lacks separate reject and accept decisions |
+| 166 | `tooling/tests/linux_installed_product_smoke.py:880` | `code_comment` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | A hosted installed GTK acceptance exceeded 512 MiB while scanning 10,677 |
+| 167 | `tooling/tests/linux_installed_product_smoke.py:881` | `code_comment` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | regular acceptance files (at least 572,613,198 bytes). Keep the scan complete |
+| 168 | `tooling/tests/linux_installed_product_smoke.py:882` | `code_comment` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | with a fixed 1 MiB memory chunk and a still-bounded 1 GiB total byte ceiling. |
+| 169 | `tooling/tests/linux_installed_product_smoke.py:936` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Credential acceptance scan exceeds its bounded byte budget (files_scanned= , scanned_bytes= , scanned_role_totals= ) |
+| 170 | `tooling/tests/linux_installed_product_smoke.py:973` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Credential secret leaked into an acceptance file or log |
+| 171 | `tooling/tests/linux_installed_product_smoke.py:978` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Credential acceptance file scan could not read a test file |
+| 172 | `tooling/tests/linux_installed_product_smoke.py:1038` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | installed UI did not expose exactly one public Credential ID |
+| 173 | `tooling/tests/linux_installed_product_smoke.py:1042` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Secret Service did not contain exactly the separate key and ciphertext items |
+| 174 | `tooling/tests/linux_installed_product_smoke.py:1044` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Credential secret leaked into the installed UI accessibility tree |
+| 175 | `tooling/tests/linux_installed_product_smoke.py:1048` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Broker restart changed the run-owned Secret Service items |
+| 176 | `tooling/tests/linux_installed_product_smoke.py:1076` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Credential revocation rejection changed Secret Service items |
+| 177 | `tooling/tests/linux_installed_product_smoke.py:1088` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Logical revocation unexpectedly removed Secret Service items |
+| 178 | `tooling/tests/linux_installed_product_smoke.py:1121` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | installed MCP fixture workspace is not private and owner-bound |
+| 179 | `tooling/tests/linux_installed_product_smoke.py:1125` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | run-owned MCP fixture path is already occupied |
+| 180 | `tooling/tests/linux_installed_product_smoke.py:1206` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | run-owned MCP fixture is not a private regular file |
+| 181 | `tooling/tests/linux_installed_product_smoke.py:1223` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | installed MCP child identity marker is not a private regular file |
+| 182 | `tooling/tests/linux_installed_product_smoke.py:1229` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | installed MCP child identity marker is malformed |
+| 183 | `tooling/tests/linux_installed_product_smoke.py:1231` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | installed MCP child is not in its isolated owned process group |
+| 184 | `tooling/tests/linux_installed_product_smoke.py:1269` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | installed MCP owned process group did not become |
+| 185 | `tooling/tests/linux_installed_product_smoke.py:1282` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | refusing to clean an MCP process group not proven to be run-owned |
+| 186 | `tooling/tests/linux_installed_product_smoke.py:1321` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | installed MCP public arguments are not exposed in the product UI accessibility tree |
+| 187 | `tooling/tests/linux_installed_product_smoke.py:1326` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | installed MCP result-exposure notice is missing from the product UI |
+| 188 | `tooling/tests/linux_installed_product_smoke.py:1346` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | installed MCP acceptance requires the runner-owned /usr/bin/python3 |
+| 189 | `tooling/tests/linux_installed_product_smoke.py:1378` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | installed MCP native Owner rejection started a child or Tool |
+| 190 | `tooling/tests/linux_installed_product_smoke.py:1404` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | installed MCP child is not supervised by the installed Broker guardian |
+| 191 | `tooling/tests/linux_installed_product_smoke.py:1429` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | installed MCP child did not receive exactly one tools/call |
+| 192 | `tooling/tests/linux_installed_product_smoke.py:1433` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | installed MCP tools/call marker is malformed |
+| 193 | `tooling/tests/linux_installed_product_smoke.py:1435` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | installed MCP child did not receive the expected single tools/call |
+| 194 | `tooling/tests/linux_installed_product_smoke.py:1439` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | installed MCP Tool result body leaked into the UI accessibility tree |
+| 195 | `tooling/tests/linux_installed_product_smoke.py:1442` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | installed MCP Tool UI did not expose exactly one hash-only result receipt |
+| 196 | `tooling/tests/linux_installed_product_smoke.py:1458` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | MCP disconnect Owner rejection stopped the still-registered child |
+| 197 | `tooling/tests/linux_installed_product_smoke.py:1494` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | installed MCP UI result hash is not bound to the durable LIVE_RUNTIME Audit |
+| 198 | `tooling/tests/linux_installed_product_smoke.py:1609` | `code_comment` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Flutter may expose a TextButton label without an AT-SPI action/bounds. |
+| 199 | `tooling/tests/linux_installed_product_smoke.py:1610` | `code_comment` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Bind repeated action labels to the candidate row before keyboard activation. |
+| 200 | `tooling/tests/linux_installed_product_smoke.py:1814` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | ; bounded accessible text= |
+| 201 | `tooling/tests/linux_installed_product_smoke.py:2275` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | installed product Audit event hashが不正です |
+| 202 | `tooling/tests/linux_installed_product_smoke.py:2282` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | installed product Audit anchor keyが不正です |
+| 203 | `tooling/tests/linux_installed_product_smoke.py:2284` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | installed product Audit anchor key長が不正です |
+| 204 | `tooling/tests/linux_installed_product_smoke.py:2295` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | installed product Audit anchor／HMACが不正です |
+| 205 | `tooling/tests/linux_installed_product_smoke.py:2667` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | installed acceptance Rust test failed: |
+| 206 | `tooling/tests/linux_installed_product_smoke.py:2877` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | gio launch failed: |
+| 207 | `tooling/tests/linux_installed_product_smoke.py:3006` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | catalog transport immediately before fetch= |
+| 208 | `tooling/tests/linux_installed_product_smoke.py:3019` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | ; catalog transport diagnostics= |
+| 209 | `tooling/tests/linux_installed_product_smoke.py:3132` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | gio launch exited unexpectedly: |
+| 210 | `tooling/tests/linux_installed_product_smoke.py:3160` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | installed Wayland GTK top-levelがshowingではありません |
+| 211 | `tooling/tests/linux_installed_product_smoke.py:3165` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | installed Wayland GTK window visibilityを取得できません |
+| 212 | `tooling/tests/linux_installed_product_smoke.py:3346` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | AT-SPI showing; owner process group stopped; surface rendering not established |
+| 213 | `tooling/tests/test_export_linux_product.py:334` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | synthetic build failure |
+| 214 | `tooling/tests/test_linux_gtk_bundle_smoke.py:54` | `code_comment` | 静的解析指示保持 | mypyの固定directive。翻訳すると型検査の意味が変わる。 | type: ignore[arg-type] |
+| 215 | `tooling/tests/test_linux_installed_product_smoke.py:979` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | unexpected Secret Service property request |
+| 216 | `tooling/tests/test_linux_installed_product_smoke.py:982` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Secret Service secret retrieval is forbidden |
+| 217 | `tooling/tests/test_linux_installed_product_smoke.py:1032` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | sensitive backend detail |
+| 218 | `tooling/tests/test_linux_installed_product_smoke.py:1073` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | metadata only |
+| 219 | `tooling/tests/test_linux_installed_product_smoke.py:1441` | `cli_or_diagnostic_string` | 監査項目名保持 | 受入れfixtureの機械照合用Capability／Permission／consumed field名。 | Capability=mcp.tool.call Permission=one consumed=true |
+| 220 | `tooling/tests/test_linux_installed_product_smoke.py:1444` | `cli_or_diagnostic_string` | 自作診断・説明の日本語化 | 利用者向け診断または説明を日本語化。固定契約値・動作は保持。 | Tool result hash-only receipt |

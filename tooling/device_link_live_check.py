@@ -118,7 +118,7 @@ def AndroidNative検証(owner, binary, root, mobile_port, serial):
                         break
                     request.extend(part)
                 if not request.endswith(b"\n") or not re.fullmatch(rb"[a-f0-9]{32}\n", request):
-                    raise RuntimeError("device ID frame invalid")
+                    raise RuntimeError("端末IDフレームが不正です")
                 device_id = request[:-1].decode("ascii")
                 result = subprocess.run(
                     [str(binary), "対話承認操作", "--session-file", str(root / "owner.json"),
@@ -126,12 +126,12 @@ def AndroidNative検証(owner, binary, root, mobile_port, serial):
                     capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10,
                 )
                 if result.returncode != 0:
-                    raise RuntimeError("owner invitation failed")
+                    raise RuntimeError("所有者招待要求に失敗しました")
                 invitation = json.loads(invitation_path.read_text(encoding="utf-8"))
                 invitation_path.unlink()
                 secret = invitation.get("招待秘密")
                 if not isinstance(secret, str) or secret in result.stdout + result.stderr:
-                    raise RuntimeError("owner invitation output boundary failed")
+                    raise RuntimeError("所有者招待出力の境界検査に失敗しました")
                 issued.update({"device_id": device_id, "invitation": invitation, "secret": secret})
                 connection.sendall(json.dumps(invitation, ensure_ascii=False, separators=(",", ":")).encode("utf-8") + b"\n")
         except BaseException as error:
@@ -157,27 +157,27 @@ def AndroidNative検証(owner, binary, root, mobile_port, serial):
             server_thread.join(timeout=10)
         invitation_secret = issued.get("secret")
         if invitation_secret and invitation_secret in instrument_output:
-            raise RuntimeError("instrumentation output contained invitation secret")
+            raise RuntimeError("計測出力に招待秘密が含まれていました")
         if runner.returncode != 0 or not re.search(r"OK \(\s*1 test\)", instrument_output) or "FAILURES!!!" in instrument_output:
             safe_stage = re.search(r"Android native Device Link E2E failed at ([^\s(]+)", instrument_output)
-            raise RuntimeError("instrumentation failed at " + (safe_stage.group(1) if safe_stage else "runner"))
+            raise RuntimeError("計測に失敗しました: " + (safe_stage.group(1) if safe_stage else "runner"))
         if server_errors:
-            raise RuntimeError("invitation bridge failed: " + server_errors[0])
+            raise RuntimeError("招待中継に失敗しました: " + server_errors[0])
         if not issued.get("device_id") or not server_finished.is_set():
-            raise RuntimeError("native test did not request a broker invitation")
+            raise RuntimeError("native試験がBroker招待を要求しませんでした")
 
         # Native結合が実Brokerで失効したこと、未消費招待が残らないことをOwner経路で照合する。
         state = 成功(owner, "端末一覧", {})
         device_id = issued["device_id"]
-        assert not any(item.get("端末ID") == device_id for item in state.get("結合", [])), "Android test pairing remained active"
-        assert not any(item.get("端末ID") == device_id for item in state.get("招待", [])), "Android test invitation remained active"
+        assert not any(item.get("端末ID") == device_id for item in state.get("結合", [])), "Android試験の端末結合が残っています"
+        assert not any(item.get("端末ID") == device_id for item in state.get("招待", [])), "Android試験の招待が残っています"
         audit_path = root / "store/audit.jsonl"
         audit = audit_path.read_text(encoding="utf-8")
         if invitation_secret in audit:
-            raise RuntimeError("Rust Broker Audit contained invitation secret")
+            raise RuntimeError("Rust Broker監査に招待秘密が含まれていました")
         broker_log = (root / "process.log").read_text(encoding="utf-8", errors="replace")
         if invitation_secret in broker_log:
-            raise RuntimeError("Rust Broker log contained invitation secret")
+            raise RuntimeError("Rust Broker記録に招待秘密が含まれていました")
     except BaseException as error:
         detail = str(error)
         if any(marker in detail for marker in ("招待秘密", "端末秘密", "資格秘密")):
@@ -230,7 +230,7 @@ def AndroidNative検証(owner, binary, root, mobile_port, serial):
 
     if caught:
         stage_name, error_type, safe_detail = caught
-        raise RuntimeError(f"Android native Device Link LIVE_RUNTIME failed at {stage_name} ({error_type})" + (f": {safe_detail}" if safe_detail else ""))
+        raise RuntimeError(f"Android native Device LinkのLIVE_RUNTIMEが失敗しました: {stage_name} ({error_type})" + (f": {safe_detail}" if safe_detail else ""))
     return {
         "result": "PASS",
         "evidence_source": "LIVE_RUNTIME",

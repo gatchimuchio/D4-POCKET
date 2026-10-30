@@ -42,7 +42,7 @@ def linux_export_pair(
             len(update_trust_public_key_der) != len(ed25519_spki_prefix) + 32
             or not update_trust_public_key_der.startswith(ed25519_spki_prefix)
         ):
-            raise ValueError("test update trust public key must be an Ed25519 SPKI DER")
+            raise ValueError("更新信頼用公開鍵はEd25519形式のSPKI-DERである必要があります")
         manifest_file["update_trust"] = {
             "版": 2,
             "algorithm": "Ed25519",

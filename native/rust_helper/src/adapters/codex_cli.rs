@@ -1232,8 +1232,8 @@ fn include_linux_codex_runtime_read(
     executable: &Path,
 ) -> Result<(), 対話失敗> {
     if !executable.is_absolute() {
-        // Unit fixtures may use Windows-shaped paths on Linux. Production adapters
-        // canonicalize and validate the configured executable before this point.
+        // 単体fixtureではLinux上でWindows形式のpathを使う場合があります。本番Adapterは
+        // この地点より前に、設定された実行fileを正規化して検証します。
         #[cfg(test)]
         return Ok(());
         #[cfg(not(test))]
@@ -1891,7 +1891,7 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[test]
     fn LinuxTaskProfileはCodex実行fileだけをread許可する() {
-        let mut setting = task_filesystem_override(&[]).expect("Task filesystem profile");
+        let mut setting = task_filesystem_override(&[]).expect("Taskの作業領域設定");
         include_linux_codex_runtime_read(&mut setting, Path::new("/opt/d4 pocket/codex[stable]?"))
             .expect("Codex実行fileをread-onlyで追加");
 

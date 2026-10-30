@@ -1047,7 +1047,7 @@ mod tests {
             );
             drop(broker);
             fs::remove_dir_all(export_root).unwrap_or_else(|error| {
-                panic!("platform target {index} export cleanup failed: {error}")
+                panic!("対象OS {index}の書き出し後処理に失敗しました: {error}")
             });
         }
 

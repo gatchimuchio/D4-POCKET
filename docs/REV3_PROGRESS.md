@@ -4,17 +4,17 @@
 
 ## R2追補 現行Codex CLIでのBroker／Owner否定経路再検証（2026-10-01）
 
-- 対象source commitは`7f7feb3e5723ee30a45acc3383007addd99f2440`で、Rust test実行前のsource worktreeはcleanだった。実機PATHのCodex CLIは`0.159.2`。`codex exec --help`で`--ignore-user-config`、`--ephemeral`等の実interfaceも再確認した。実model／資格情報、Windows保護設定は使用・変更していない。
+- 対象対象ソースcommitは`7f7feb3e5723ee30a45acc3383007addd99f2440`で、Rust test実行前のsource worktreeはcleanだった。実機PATHのCodex CLIは`0.159.2`。`codex exec --help`で`--ignore-user-config`、`--ephemeral`等の実interfaceも再確認した。実model／資格情報、Windows保護設定は使用・変更していない。
 - `cargo +1.95.0 build --release --locked --manifest-path native/rust_helper/Cargo.toml --bin gui_shell_rust_helper --bin gui_shell_desktop_launcher`は成功。Release helperのSHA-256は`2087943b9b519621471b16eebb33e4ea69bb376ce1a9bd7aec4925a70c59153`。未使用のMINIDORA診断関数に既存warningが2件出た。
 - `production_agent_task_gate_fails_closed_over_authenticated_ipc`の最初の`--exact`指定はWindows module prefixを欠き、0件実行だったため証拠に採用しない。正しい`windows::production_agent_task_gate_fails_closed_over_authenticated_ipc`指定で再実行し、1 passed／0 failed（2.08秒）。実Release Broker process、認証済みloopback IPC、現行Codex登録／metadata、unsupported Task要求の拒否、Broker終了後のfile-backed Audit再読込を確認した。
-- `登録CodexへのnativeOwner確認後もAgentTask非対応gateを維持する`は1 passed／0 failed（2.70秒）。現行CLI登録に対する実Win32 Owner No／Yes dialog、Broker owner-operation handler、通常Desktop IPC projectionを通し、Permission／Approval／preflight／startが`AgentTask実行非対応`で拒否され、Task workerが開始されず、Auditに合成secret・Task本文がないことを確認した。Owner dialog自体の単独Yes／No testも1 passed／0 failed（0.70秒）。ただしBrokerはtest harness内threadであり、installed Flutter UIや製品起動器からのnamed-pipe全経路ではない。
+- `登録CodexへのnativeOwner確認後もAgentTask非対応gateを維持する`は1 passed／0 failed（2.70秒）。現行CLI登録に対する実Win32 Owner No／Yes dialog、Broker owner-operation handler、通常Desktop IPC projectionを通し、Permission／Approval／preflight／startが`AgentTask実行非対応`で拒否され、Task workerが開始されず、Auditに合成secret・Task本文がないことを確認した。Owner確認画面自体の単独Yes／No testも1 passed／0 failed（0.70秒）。ただしBrokerはtest harness内threadであり、installed Flutter UIや製品起動器からのnamed-pipe全経路ではない。
 - `Broker承認経路から実CodexCLIをloopback偽APIで実行し隔離とcleanupを確認する_LIVE_RUNTIME`は1 passed／0 failed（17.61秒）。実Codex CLI `0.159.2`とMxC tool childが合成Workspace上で完了TaskとBroker cancellationを実行した。MxC TEMP／TMPは互いに一致したがBrokerのWorkspaceTaskScratchとは不一致。合成TEMP markerはchild生存中に読め、正常終了／取消後はhost側probeで`not_found`となった。これはmarkerのhost可視性だけであり、TEMP directoryの物理削除やdeadline／crash後cleanupを証明しない。試験専用Adapter wrapper、Owner callback、in-memory Audit、loopback偽Responses APIを使用しており、production Broker process／durable Auditの正のTask実行ではない。
 - `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`は13 targets、444 passed／0 failed／7 ignored。現行CLIを用いた上記ignored testは別途明示実行した。
-- これらによりproductionのunsupported fail-closed、Owner dialog部品、実CLI/MxCの限定したTask／取消が個別に再確認できたが、1本のinstalled-product production E2Eには統合されていない。`task_execution=unsupported`、R2 `release_blocker`、`release_ready=false`を維持する。未成立範囲はinstalled Flutter→native Owner→authenticated production IPC→durable Auditの正のTask経路、OneDrive Cloud Files／通常NTFSの実tool-child secret・depth・hardlink隔離、failure／deadline／crash Recovery、MxC TEMP異常終了cleanup、result／diff Content Exposureである。
+- これらによりproductionのunsupported fail-closed、Owner確認画面部品、実CLI/MxCの限定したTask／取消が個別に再確認できたが、1本のinstalled-product production E2Eには統合されていない。`task_execution=unsupported`、R2 `release_blocker`、`release_ready=false`を維持する。未成立範囲はinstalled Flutter→native Owner→authenticated production IPC→durable Auditの正のTask経路、OneDrive Cloud Files／通常NTFSの実tool-child secret・depth・hardlink隔離、failure／deadline／crash Recovery、MxC TEMP異常終了cleanup、result／diff Content Exposureである。
 
 ## R2追補 Windows Release installed UI／Owner窓の実測（2026-10-01）
 
-- source commit `7f7feb3e5723ee30a45acc3383007addd99f2440`からASCII-only detached worktreeでFlutter Windows Releaseをbuildし、Rust Release起動器／Broker helperとともにisolated temporary installへstageした。日本語pathのmanaged worktreeではFlutter buildが`app.dill` pathの文字化けで失敗し、ASCII-only worktreeでのbuild成功をその代替にした。Flutter artifact SHA-256 `2fda3beb48f15420e1e7683129abfdfdafc94f10f32452c9c3c53e42ccdd9d03`、launcher `341217def14a59fc6160f725d52743027fed0e666a4303bd50287810e5f17df6`、Broker helper `2087943b9b519621471b16eebb33e4ea69bb376ce1a9bd7aec4925a70c59153`。
+- 対象ソースcommit `7f7feb3e5723ee30a45acc3383007addd99f2440`からASCII-only detached worktreeでFlutter Windows Releaseをbuildし、Rust Release起動器／Broker helperとともにisolated temporary installへstageした。日本語pathのmanaged worktreeではFlutter buildが`app.dill` pathの文字化けで失敗し、ASCII-only worktreeでのbuild成功をその代替にした。Flutter artifact SHA-256 `2fda3beb48f15420e1e7683129abfdfdafc94f10f32452c9c3c53e42ccdd9d03`、launcher `341217def14a59fc6160f725d52743027fed0e666a4303bd50287810e5f17df6`、Broker helper `2087943b9b519621471b16eebb33e4ea69bb376ce1a9bd7aec4925a70c59153`。
 - 収集器第16版の`-NoPythonRuntime -DiagnosticOnly`導入検査は終了コード`0`で成果物・Rust起動器経由の起動・Broker接続先・`Setup Doctor`製品報告の合格を観測したが、正式証拠ではない。配置作業者と同じWindows利用者で実行し、UI Automationが前景画面を確認できず必須画面要素を取得できなかった。画面は通常終了せずFrontendを強制停止し、後始末失敗とBroker起動検査の欠落もあったため、`diagnostic_only`のまま保持する。`installed_manifest.json`内のFlutter成果物SHA-256は`2fda3beb48f15420e1e7683129abfdfdafc94f10f32452c9c3c53e42ccdd9d03`、証拠一式のSHA-256は`812a3a0a50402a6dbb391b0c05f01f003c8d8beea603ddac1bf975fd509d925e`。
 - 同じstaged ReleaseをRust Desktop起動器から別の一時LOCALAPPDATAで再起動した。実Frontend PID／image hashの一致を確認し、Computer Use screenshotとUI Automation treeで概要およびAgent Centerを観測した。画面には段階D/E pending、release未主張、実Adapter未登録、比較なし、Task結果未接続が表示された。synthetic WorkspaceとCodex CLI pathを登録フォームへ入れ、native Owner確認窓の表示まで進んだ。
 - Owner窓はComputer Useの`activate_window`が2回連続timeoutし、No／Yesいずれの入力も行っていない。registration受理、Session開始、Task preflight／start、Task worker、production Task Auditは未実行。LLMがOwner確認を代行しない境界を維持した。確認待ちで残った試験専用Frontend／Launcher processだけをPIDと実行path照合後に停止した。
@@ -29,7 +29,7 @@
 - 日本語監査の中間失敗: 初回の統合validatorは新規試験診断文字列3件を検出した。診断文を日本語化し、埋込みPowerShellを人間向け`format!`診断文として誤走査させないraw scriptと明示path置換へ整理した。監査規則は変更せず、最終strict監査は1126 files／0 findingsで合格した。
 - 正確な検証: PowerShellで`$env:GUI_SHELL_CODEX_SANDBOX_TEST_EXE = (Get-Command codex -CommandType Application | Select-Object -First 1 -ExpandProperty Source)`を設定後、`cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib adapters::codex_cli::tests::Rust生成Task設定で実Windows隔離の登録secretを拒否する -- --ignored --exact --nocapture --test-threads=1`を実行。最終exit 0、対象ignored test 1 passed／0 failed。回帰は`cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`で12 target、438 passed／0 failed／5 ignored。`rustfmt --check --edition 2021 native/rust_helper/src/adapters/codex_cli.rs`と`git diff --check`もpass。
 - 最終統合検証`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`はexit 0。strict日本語監査1126 files／0 findings、Schema 151／example 151／negative 194、Conformance 230 checks、manifest／release gate／梱包portability／release smoke／evidence bundle／release runtime assertions（12 passed／0 failed）／C32監査が全件passした。release blocker 31件、`post_v1_scope` 2件、`release_ready=false`を維持した。
-- 証拠区分は、2つのRust生成Task permission profileを使う実Codex CLI／MxC processの指定操作が`LIVE_RUNTIME`、Workspace・marker・同期fileが`FIXTURE`。これは同時に生存する直接sandbox child間の指定された隣接Workspace隔離を示すが、production Broker／IPC、Owner確認、Approval／Audit、実Agent Task/model、失敗時の製品Recovery、AppContainer内部temporary領域のtask間cleanup、別path alias全般、installed productは示さない。
+- 証拠区分は、2つのRust生成Task permission profileを使う実Codex CLI／MxC processの指定操作が`LIVE_RUNTIME`、Workspace・marker・同期fileが`FIXTURE`。これは同時に生存する直接sandbox child間の指定された隣接Workspace隔離を示すが、production Broker／IPC、Owner確認、Approval／Audit、実Agent Task/model、失敗時の製品Recovery、AppContainer内部temporary領域のtask間cleanup、別path alias全般、導入済み製品は示さない。
 - Agent Taskのproduction隔離全体は未成立の`release_blocker`。Adapter metadataの`task_execution=unsupported`、関連blocker、`release_ready=false`を維持し、本試験をTask実行対応またはcross-agent contamination全体のPASSへ昇格しない。
 
 ## R2追補 実Windows MxC sandboxから別Agent Workspaceへの到達拒否（2026-10-01）
@@ -37,7 +37,7 @@
 - 既存のignored Rust probeを拡張し、`build_codex_command`が生成するTask permission profileを使って、実Codex CLI `0.158.0-alpha.2.1`のWindows MxC sandboxから合成Workspace AのPowerShell childを起動した。Workspace Aの兄弟directoryにAgent B用の合成markerと未作成write targetを置き、childからのmarker読取とwriteをそれぞれnegative probeに加えた。
 - permissiveな初回試験は任意の例外を拒否として扱ったため証拠に採用しなかった。Windows Access Deniedの明示確認を加えた初回strict試験は、PowerShellの`MethodInvocationException` wrapper HRESULT `-2146233087`を直接比較してexit 45となった。追加診断後、内側の`.NET UnauthorizedAccessException`とHRESULT `-2147024891`の両方を確認する判定へ修正した。この中間失敗は試験harnessの例外unwrap不備であり、Product失敗とも拒否成功とも扱わない。
 - 最終実行結果は1 passed。兄弟Workspace markerのread HRESULTとwrite inner exception HRESULTはともに`-2147024891`、write exception型は`UnauthorizedAccessException`だった。A内の通常writeは成功し、Bのmarker内容は不変、B側write targetは生成されなかった。登録secretのexact／deep path拒否とhardlink作成拒否も同じ既存probeで再確認した。TEMP／TMPがBroker scratchと一致しない観測も維持され、今回の成功条件やcleanup証拠には使っていない。
-- 証拠区分は、実Codex CLI／MxC sandbox childによる指定path操作が`LIVE_RUNTIME`、二つのWorkspaceとmarkerが`FIXTURE`。これは単一Task sandboxから隣接する一つの別Workspaceへ到達できないことだけを示し、二Agentの同時実行、production Broker／IPC、Owner確認、durable Audit、実Agent／model、Task取消・deadline・crash Recovery、installed product、別path aliasの網羅を示さない。
+- 証拠区分は、実Codex CLI／MxC sandbox childによる指定path操作が`LIVE_RUNTIME`、二つのWorkspaceとmarkerが`FIXTURE`。これは単一Task sandboxから隣接する一つの別Workspaceへ到達できないことだけを示し、二Agentの同時実行、production Broker／IPC、Owner確認、durable Audit、実Agent／model、Task取消・deadline・crash Recovery、導入済み製品、別path aliasの網羅を示さない。
 - 正確な検証: `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml Rust生成Task設定で実Windows隔離の登録secretを拒否する -- --ignored --nocapture --test-threads=1`。exit 0、対象test 1 passed／0 failed。binaryは既定のCodex CLI探索ではなく、明示したインストール済みCLI絶対pathを`GUI_SHELL_CODEX_SANDBOX_TEST_EXE`へ設定して起動した。
 - 回帰確認: `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`は12 target、438 passed／0 failed／5 ignored。個別ignored probeは別途上記のとおり実行済み。`rustfmt --check --edition 2021 native/rust_helper/src/adapters/codex_cli.rs`と`git diff --check`はpass。`cargo +1.95.0 fmt --manifest-path native/rust_helper/Cargo.toml -- --check`は変更していない複数Rust fileにも既存format差分を報告したため失敗として保持し、無関係fileの一括formatは行わなかった。
 - `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`は開発validatorの全登録checkをpassした。strict日本語監査は1126 files／0 findings、Schema 151／151・example 151・negative 194、Conformance 230 checks、manifest／release gate／packaging portability／release smoke／evidence bundle／release runtime assertions（12 passed／0 failed）／C32監査がpass。Windows installed evidenceは5 gateが未成立であり、最終監査は31 `release_blocker`・2 `post_v1_scope`、`release_ready=false`を維持した。
@@ -45,7 +45,7 @@
 
 ## `Windows Server 2025`上での`Setup Doctor`画面証拠取得失敗（2026-10-01）
 
-- `workflow_dispatch`で一時branch `codex/verify-setup-doctor-uia-v16` のcommit `f51ba074be693ab58e0df965d413645b491ef29b`（[run #7](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36764681765)）と `1139eef24ff945cce677ce115582487c593400f7`（[run #8](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36767327753)）をWindows Server 2025で手動検査した。workflowは`workflow_dispatch`のみで起動し、自動trigger、PR、artifact uploadは使用していない。
+- `workflow_dispatch`で一時branch `codex/verify-setup-doctor-uia-v16` のcommit `f51ba074be693ab58e0df965d413645b491ef29b`（[run #7](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36764681765)）と `1139eef24ff945cce677ce115582487c593400f7`（[run #8](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36767327753)）をWindows Server 2025で手動検査した。workflowは`workflow_dispatch`のみで起動し、自動trigger、PR、成果物のuploadは使用していない。
 - run #8では固定Rust 1.95.0／Flutter commit `559ffa3f75e7402d65a8def9c28389a9b2e6fe42`、Desktop Release build、installed配置が成功。別jobのRust helper build、Desktop Flutter analyze／全test、Mobile analyze、終了時source cleanも成功した。
 - installed appのDiagnosticOnly起動では、初回windowが可視で、製品Setup Doctor reportとBroker Auditの照合も成立した。一方、UIA collectorは`verified_frontend_not_foreground`を記録し、Setup Doctorの要求可視要素を収集できなかった。診断値は`operator_readable=false`、`proof_passed=false`、`required_element_minimum=false`、`no_proof_errors=false`。よってこのhosted runのUI可読性proofは失敗であり、合格証拠として扱わない。この結果だけから製品regressionとも断定しない。
 - run #7はRelease build／stage後に同じ総合UIA条件で失敗し、run #8で判定別の安全なdiagnosticを追加して再実行した。失敗は同一runner sessionで対象Frontendをforegroundとして確認できず、global pointer操作・実画面要素確認を安全に成立させられなかったことによる。
@@ -54,7 +54,7 @@
 ## Windows Setup Doctor UIAutomation収集器 v16 実装（2026-10-01）
 
 - v15で未収集だったSetup Doctor専用画面について、製品FrontendのMainWindowHandleとUIA runtime IDへ束縛した診断ナビゲーション、画面見出し、status、authority notice、各checkのtitle／status／message／non-pass recovery textを収集するv16 pathを追加した。観測対象は同一PID・同一MainWindowのControl Viewに限定し、scrollは最大17回、node数は既存上限内とする。
-- global pointer入力は、操作直前にforeground PID、WindowFromPoint PID、root HWNDを照合し、対象Frontend MainWindow以外へclick／wheelを送らない。各観測要素はUIA `IsOffscreen`、親子geometry交差に加え、要素内sample pointで最前面root HWNDを記録する。各要素はrun ID、Frontend PID／HWND、report hash、同じevidence bundleのsidecar hashへ結合する。
+- global pointer入力は、操作直前にforeground PID、WindowFromPoint PID、root HWNDを照合し、対象Frontend MainWindow以外へclick／wheelを送らない。各観測要素はUIA `IsOffscreen`、親子geometry交差に加え、要素内sample pointで最前面root HWNDを記録する。各要素は実行ID、Frontend PID／HWND、report hash、同じevidence bundleのsidecar hashへ結合する。
 - UIA観測は実画面text controlが露出している範囲の`LIVE_RUNTIME`証拠である。pixel／contrastの判定とscreen reader実操作は計測しない。Microsoftの[`IsOffscreen`仕様](https://learn.microsoft.com/en-us/dotnet/api/system.windows.automation.automationelement.automationelementinformation.isoffscreen?view=windowsdesktop-10.0)は別windowによる遮蔽をこの値で判定しないと明記するため、topmost HWND sampleを追加したが、文字全体のpixel描画品質を証明するものではない。
 - validator negative coverageにMainWindow／PID取り違え、foreign overlay sample、画面外、範囲外座標、aggregate／重複文字、空message、runtime ID再利用、sidecar不結合を追加した。synthetic fixtureはvalidator構造だけを試し、製品UIの実測証拠ではない。
 - 検証: `python -m py_compile tooling/windows_release_evidence.py tooling/conformance_tests/run_conformance_skeleton.py`、対象negative test（13 mutation、全てrelease blockerへfail-closed）、Win32 interop `Add-Type` compile、PowerShell AST parse、`git diff --check`が成功。`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`もexit 0。内訳は厳格日本語監査1126 file／0 finding、Schema 151／example 151／negative fixture 194、Conformance 230 checks、Manifest 1123 file、release gate、packaging portability、release smoke、evidence bundle、runtime assertions、C32 development auditが成功。集約結果はrelease blocker 31件、`release_ready=false`。
@@ -67,7 +67,7 @@
 
 - PowerShell UI Automation helperを除去し、Windows test専用child processと既存`winsafe`の安全APIで、production `confirm_owner_operation`が生成する実Win32 MessageBoxを検査する。試験はCredentialやTask本文をchild processへ渡さず、Agent Taskの表示用ID・hash・文字数・選択期待値だけをstdinで渡す。
 - 操作前にchild PID、可視top-level windowのclass/title、MessageBox本文、Yes／No control IDとlabel、foreground window、UI threadのactive／focus controlを照合する。Noは既定button、YesはTab後にfocus IDを確認してからEnterを送る。異常時に終了するのは試験が起動したchild processだけで、通常のBroker権限要求やTask実行は行わない。
-- ignored UI testは日本語Windows local対話Desktopで実行し、No／Yes各結果がchild processの`confirm_owner_operation`返値へ反映されること、Task本文markerが表示文に含まれないことを確認した。これは固定fixtureを使った実Windows MessageBox表示・入力の直接観測（`FIXTURE`）であり、Broker経由のOwner操作、installed productのlive runtime、Agent Task成功、`task_execution=supported`の証拠ではない。
+- ignored UI testは日本語Windows local対話Desktopで実行し、No／Yes各結果がchild processの`confirm_owner_operation`返値へ反映されること、Task本文markerが表示文に含まれないことを確認した。これは固定fixtureを使った実Windows MessageBox表示・入力の直接観測（`FIXTURE`）であり、Broker経由のOwner操作、導入済み製品のlive runtime、Agent Task成功、`task_execution=supported`の証拠ではない。
 - Windows Rust manual workflowは`workflow_dispatch`のみのまま維持し、対話Desktopを必要とするUI入力を削除した。旧helperのUTF-8／hosted UI失敗経路を削除し、失敗履歴は下記の通り残す。
 - `task_execution=unsupported`、Agent Task実行・製品配布等の既存`release_blocker`と`release_ready=false`を維持する。
 
@@ -92,14 +92,14 @@
 
 - 先行記録の統合testはsynthetic Owner callbackを使っていたため、既存の実Win32 dialog試験を登録済みCodex CLIのBroker loopback統合testへ接続し直した。試験専用BrokerはRust test thread、Workspace／storeは一時fixture、要求relayはtestから直接呼び出す構成である。
 - Workspace Permission要求では実native dialogのNoを確認し、次の要求ではYesを選んでもBrokerが`AgentTask実行非対応`としてgrantを返さない。Owner Approvalも実native dialogでYesを選択した後、同じunsupported gateで拒否される。試験はPermissionとApprovalの拒否Auditがfile-backed test storeへ記録されること、grant発行Auditがないこと、Task本文がdialog／response／Auditへ露出しないことを確認する。実Codex CLIはRuntime登録probeだけに使い、Agent Task／model requestは開始しない。
-- 証拠classは混在する。実Windows MessageBox表示・入力とCLI登録probeは`LIVE_RUNTIME`、test thread Broker・一時Workspace/store・固定入力自動化は`FIXTURE`である。これはDesktop installed product、別process起動器／FlutterからのIPC、通常Owner操作、耐久製品Audit、Task実行成功または`task_execution=supported`の証拠ではない。
+- 証拠classは混在する。実Windows MessageBox表示・入力とCLI登録probeは`LIVE_RUNTIME`、test thread Broker・一時Workspace/store・固定入力自動化は`FIXTURE`である。これはDesktop 導入済み製品、別process起動器／FlutterからのIPC、通常Owner操作、耐久製品Audit、Task実行成功または`task_execution=supported`の証拠ではない。
 - ignored統合testはWindows localで1件合格。実行時だけ`GUI_SHELL_CODEX_TASK_BROKER_TEST_EXE`へ検出したCodex CLI実行fileを設定し、値は保存しない。
 
 ```powershell
 cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib 'desktop_launcher::tests::登録CodexへのnativeOwner確認後もAgentTask非対応gateを維持する' -- --ignored --exact --test-threads=1 --nocapture
 ```
 
-- Windows local ignored test: 1 passed／0 failed。全suiteやinstalled productの再検証ではない。既存Rust／Desktop／Agent隔離のrelease blockerと`task_execution=unsupported`、`release_ready=false`を維持する。
+- Windows local ignored test: 1 passed／0 failed。全suiteや導入済み製品の再検証ではない。既存Rust／Desktop／Agent隔離のrelease blockerと`task_execution=unsupported`、`release_ready=false`を維持する。
 
 ## R0 現行状態再固定（2026-09-29）
 
@@ -139,8 +139,8 @@ cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib 
 いずれも`workflow_dispatch`で、対象は`main`の上記正確なcommit。automatic CI、PR、branchは作成していない。
 
 - [Windows Rust validation #19](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36512064184): Windows Server 2025／Rust 1.95.0。checkout SHA一致、workflow対象Rust fileのrustfmt、全target `cargo check`／`cargo test`、試験後cleanが成功。12 test target、391 passed／0 failed／0 ignored。
-- [Windows Desktop Flutter validation #2](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36512206643): Windows Server 2025。Rust helper build、Desktop `flutter analyze`、Desktop `flutter test`（125件）、Mobile `flutter analyze`、試験後cleanが成功。両analyzeは`No issues found!`。
-- 両runともActions artifactなし。Hosted runnerの成功は、OneDrive workspaceのACLやApplication Controlを解消したこと、installed product／実Agent／release readinessを証明しない。
+- [Windowsデスクトップ版 Flutter validation #2](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36512206643): Windows Server 2025。Rust helper build、Desktop `flutter analyze`、Desktop `flutter test`（125件）、Mobile `flutter analyze`、試験後cleanが成功。両analyzeは`No issues found!`。
+- 両runともActions artifactなし。Hosted runnerの成功は、OneDrive workspaceのACLやApplication Controlを解消したこと、導入済み製品／実Agent／release readinessを証明しない。
 
 ### R0時点のblocker inventory
 
@@ -161,7 +161,7 @@ cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib 
 - `rev2_module_pruning_binary_and_measurement`
 - `rev2_mobile_flutter_native_device_link_boundary`
 
-resolved inactiveの`rev2_desktop_launch_regression`と`windows_rust_integration_test_execution_policy`は履歴として保持する。Windows ActionsによるRust test実行確認は、実Agent Task、production Broker経路、installed product、正式配布、release readinessを証明しない。
+resolved inactiveの`rev2_desktop_launch_regression`と`windows_rust_integration_test_execution_policy`は履歴として保持する。Windows ActionsによるRust test実行確認は、実Agent Task、production Broker経路、導入済み製品、正式配布、release readinessを証明しない。
 
 ## R1 正本・Blocker体系再編（2026-09-29）
 
@@ -185,8 +185,8 @@ resolved inactiveの`rev2_desktop_launch_regression`と`windows_rust_integration
 ### Track境界・Owner待ち再監査
 
 - Windows専用ではないMobile実機・配布・native Device Linkの3 blockerは`mobile`だけに割当て、Windows 1.0 strict releaseとTechnical Completeから除外した。Android実機凍結指示は変更していない。
-- Windows正式配布identityは技術的Installer／Update作業から`windows_distribution_identity`へ分離した。test identity／unsigned artifactでR0–R14を進め、正式identityはTechnical Complete後のR16 Owner Finalizationまで要求しない。
-- ExportのOwner No／Yes経路は隔離test identityで検証可能とし、Final GOをroutine試験条件から外した。
+- Windows正式配布identityは技術的Installer／Update作業から`windows_distribution_identity`へ分離した。試験用識別情報／unsigned artifactでR0–R14を進め、正式identityはTechnical Complete後のR16 Owner Finalizationまで要求しない。
+- ExportのOwner No／Yes経路は隔離試験用識別情報で検証可能とし、Final GOをroutine試験条件から外した。
 - Agent Task／Compare／Handoffの制御試験は非課金identity・multi-instance Codex・決定論的fixtureで進める。実Agent／provider相互運用の証拠をfixtureへ昇格させない。有料資格を使う試験をR0–R14のOwner待ち条件にしない。
 - Offline Audit production keyと署名は真の`production_secret`、Final GOは真の`owner_decision`としてrelease gateに保持する。いずれもWindows Technical Completeを阻止しない。
 - Windows Rust test方針のresolved項目は、古いrun #17を過去記録に残し、`current_validation`をR0のWindows Actions #19／commit `ec9b11a1330c3626fe7e7c25ef5c4068241b1d28`へ更新した。
@@ -344,7 +344,7 @@ R2を継続し、登録済み任意secret pathのTask sandboxへの伝播、Owne
 - Windows専用Rust testで、BrokerのWorkspace登録・対話Session・Task制御から、実`CodexCliAdapter`、fake Codex CLI executable、Broker管理scratchまでを一つの縦断fixtureとして接続した。
 - Permissionなしの拒否、本文hashに結合したOwner Approvalなしの拒否、fixture内でのPermission／Approval発行、Task開始時のApproval一回消費、終端状態のhash-only射影、本文・fake応答の非露出、scratchの正常完了後片付けを確認する。
 - 縦断専用wrapperだけが`task_execution=supported`を返し、証拠源を`FIXTURE`と明記する。wrapperの内側にある製品`CodexCliAdapter` metadataは引き続き`task_execution=unsupported`であることをtest内で確認した。test用Rust CLIは実Codex CLIでも実modelでもない。
-- この結果は、合成Adapter metadataを使ったBroker制御と実Rust Adapter実装の結合fixtureに限る。実Codex CLI、production Broker登録・認証済みIPC、installed product、Owner native確認画面、実Agent Taskの証拠へ昇格しない。
+- この結果は、合成Adapter metadataを使ったBroker制御と実Rust Adapter実装の結合fixtureに限る。実Codex CLI、production Broker登録・認証済みIPC、導入済み製品、Owner native確認画面、実Agent Taskの証拠へ昇格しない。
 
 ### 失敗履歴と検証
 
@@ -361,7 +361,7 @@ R2を継続し、登録済み任意secret pathのTask sandboxへの伝播、Owne
 
 ### 次工程と残存gate
 
-本追補は`FIXTURE`の局所縦断証拠であり、Ownerの実UI確認、認証済みDesktop IPCからの実`codex exec`、実model、AgentによるWorkspace書込、取消・期限・crash回復、結果diff／testのContent Exposure、Windows installed productを検証しない。これらのR2項目は`release_blocker`のまま保持し、製品Adapterの`task_execution=unsupported`と`release_ready=false`を変更しない。
+本追補は`FIXTURE`の局所縦断証拠であり、Ownerの実UI確認、認証済みDesktop IPCからの実`codex exec`、実model、AgentによるWorkspace書込、取消・期限・crash回復、結果diff／testのContent Exposure、Windows 導入済み製品を検証しない。これらのR2項目は`release_blocker`のまま保持し、製品Adapterの`task_execution=unsupported`と`release_ready=false`を変更しない。
 
 ## R2追補 Broker取消からfake Codex子孫停止・scratch回収（2026-09-29）
 
@@ -370,7 +370,7 @@ R2を継続し、登録済み任意secret pathのTask sandboxへの伝播、Owne
 - 既存Windows Rust縦断fixtureへ取消分岐を追加した。正常fixture Task完了後に新しい一回Permissionと本文hash結合Owner Approvalを発行し、Broker consumerから実`CodexCliAdapter`実装とfake CLIを起動する。
 - fake CLIは試験用子processをspawnし、heartbeat fileを継続更新する。2 byte以上のheartbeatを観測して子孫が稼働中であることを確認後、Brokerへ`AgentTask取消`を要求する。
 - 取消応答は`running`のまま、AdapterがWindows Job Object配下のprocess群を終了してworkerが戻った後だけterminal `cancelled`となる。terminal後にresult hashはなく、150 msの観測窓でheartbeatが増えず、Broker管理Task scratchもなく、開始・取消・terminal監査へ指示本文やheartbeat pathが露出しないことを確認する。
-- 証拠源は合成metadata wrapper、fake CLI、unit test内Broker、in-memory scratch journalを使う`FIXTURE`である。実Codex CLI／model、production認証IPC、永続Audit／crash recovery、実Workspace変更、installed productを示さない。製品Codex Adapterの`task_execution=unsupported`は維持する。
+- 証拠源は合成metadata wrapper、fake CLI、unit test内Broker、in-memory scratch journalを使う`FIXTURE`である。実Codex CLI／model、production認証IPC、永続Audit／crash recovery、実Workspace変更、導入済み製品を示さない。製品Codex Adapterの`task_execution=unsupported`は維持する。
 
 ### 検証・履歴
 
@@ -386,7 +386,7 @@ R2を継続し、登録済み任意secret pathのTask sandboxへの伝播、Owne
 
 ### 次工程と残存gate
 
-本fixtureはAdapter経由のBroker取消・process群停止・scratch cleanupをfake CLI上で縦断確認したに過ぎない。production `codex exec`とreal Agent tool、Owner native UI、実model、実Filesystem隔離、deadline／crash／強制Broker終了、永続Audit／Recovery、Workspace diffとtest結果のContent Exposure、Windows installed productは未検証の`release_blocker`。`task_execution=unsupported`、`release_ready=false`を維持する。
+本fixtureはAdapter経由のBroker取消・process群停止・scratch cleanupをfake CLI上で縦断確認したに過ぎない。production `codex exec`とreal Agent tool、Owner native UI、実model、実Filesystem隔離、deadline／crash／強制Broker終了、永続Audit／Recovery、Workspace diffとtest結果のContent Exposure、Windows 導入済み製品は未検証の`release_blocker`。`task_execution=unsupported`、`release_ready=false`を維持する。
 
 ## Windows installed collector v15 Control View追補（2026-09-29）
 
@@ -395,7 +395,7 @@ R2を継続し、登録済み任意secret pathのTask sandboxへの伝播、Owne
 - `installer/windows/collect_installed_smoke.ps1`のtray menu／surface取得をRaw ViewからControl Viewへ変更した。tray探索は対象frontend PIDでtop-level windowを絞り、surface projectionは10,000 element上限とruntime ID重複検出を持つ。上限到達または重複時は完全なsurface証拠と見なさない。collector versionは15。
 - `tooling/windows_release_evidence.py`はUI Automation sourceに`full_uiautomation_tree_projection`、`tree_view=control`、`capture_limit=none`を要求する。`tooling/conformance_tests/run_conformance_skeleton.py`にはControl View／欠落tree拒否とtray PID境界のtestを追加し、既存accessibility-tree sourceの別policyは維持した。
 - `installer/windows/README.md`、`docs/WINDOWS_RELEASE_EVIDENCE.md`、`release_blockers.registry.json`を実測と残存gateに合わせた。ROADMAPのC33失敗履歴は書き換えず、追補を追加した。
-- 製品binaryはclean source commit `ae337eee62074229244fb0502fa498c3daa1a3e3`からstagingしたFlutter Windows Release、Rust Broker helper、launcher。dirtyなcollectorを含む現在の未commit作業treeから製品をbuildした証拠ではない。
+- 製品binaryはclean 対象ソースcommit `ae337eee62074229244fb0502fa498c3daa1a3e3`からstagingしたFlutter Windows Release、Rust Broker helper、launcher。dirtyなcollectorを含む現在の未commit作業treeから製品をbuildした証拠ではない。
 
 ### Windows実測（DiagnosticOnly）
 
@@ -422,7 +422,7 @@ R2を継続し、登録済み任意secret pathのTask sandboxへの伝播、Owne
 - `windows_setup_doctor_smoke`: `release_blocker` — Setup Doctor operator readability未確認。
 - `windows_broker_installed_smoke`: `release_blocker` — standalone smokeはあるが、正式aggregate evidence bundle内のBroker証拠が未成立。
 - `audit_anchor_external_tamper_evidence_proof`: `release_blocker` — external owner-controlled anchor/tamper proofが未成立。
-- `release_ready=false`を維持。installed product総合証拠、owner GO、正式releaseは成立していない。
+- `release_ready=false`を維持。導入済み製品総合証拠、owner GO、正式releaseは成立していない。
 
 ## R2追補 Owner Approvalの二重期限切れを有効Permissionから分離する否定試験（2026-09-29）
 
@@ -436,12 +436,12 @@ R2を継続し、登録済み任意secret pathのTask sandboxへの伝播、Owne
 
 - focused試験command `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib 'broker::dialogue::tests::AgentTask実行は期限切れOwnerApprovalを有効Permissionから分離して拒否する' -- --exact --nocapture`: 1 passed。変更対象Rust fileの`rustfmt +1.95.0 --edition 2021 --check`と`git diff --check`も成功した。
 - Windows local全target試験command `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`は2回とも全体PASSにならなかった。1回目は`adapters::minidora::tests::ContentLength付きJSONだけを期限内に取得する`が通信失敗で終了し、2回目（`GUI_SHELL_C28_DIAGNOSTICS=1`）は`a2a::tests::loopback_HTTPからAgent_Cardを取得してmetadata_onlyへ射影する`と`broker::a2a_center::tests::owner接続をBrokerで受理し通常IPC一覧へbounded射影する`が応答読取失敗となった。各失敗testは個別再実行で成功した。原因は確定していないため、通信系testの断続失敗として記録し、製品回帰・環境障害のいずれとも断定しない。
-- この不確実性を対象commit上で補うため、所有者が許可した一時branchでworkflowを手動起動した。Windows Actions [run #20](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36548519704)はcommit `95921dc549abb7d74386f45dadd98f8478d47b68`とcheckout SHAの一致、Windows Server 2025 image `win25-vs2026/20260922.246.2`／Rust 1.95.0、対象Rust fileのrustfmt、`cargo check --all-targets`、全Rust target test（12 target、396 passed／0 failed／1 ignored）、試験後cleanをすべて確認した。所要5分28秒、artifactなし。これは当該commitのhosted Windows Rust検査に限り、実Agent Task、実機installed product、production隔離、release readinessを証明しない。
+- この不確実性を対象commit上で補うため、所有者が許可した一時branchでworkflowを手動起動した。Windows Actions [run #20](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36548519704)はcommit `95921dc549abb7d74386f45dadd98f8478d47b68`とcheckout SHAの一致、Windows Server 2025 image `win25-vs2026/20260922.246.2`／Rust 1.95.0、対象Rust fileのrustfmt、`cargo check --all-targets`、全Rust target test（12 target、396 passed／0 failed／1 ignored）、試験後cleanをすべて確認した。所要5分28秒、artifactなし。これは当該commitのhosted Windows Rust検査に限り、実Agent Task、実機導入済み製品、production隔離、release readinessを証明しない。
 - `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`: exit 0。開発validator登録10項目、厳格日本語監査（1113 files／0 findings）、Schema（149／149／192 negative）、Conformance（225 checks）、Manifest、portable性、release smoke、evidence bundle、runtime assertions（12／0）、C32開発監査が成功した。evidence bundleは既存release blocker 5件と`release_ready=false`を保持した。
 
 ### 残存gate
 
-Owner Approval期限の否定試験追加はAgent Task本番経路完成を意味しない。実Agent実行隔離、production Broker／IPC、Audit／Recovery、結果のContent Exposure、Windows installed product等の既存`release_blocker`を維持し、`task_execution=unsupported`および`release_ready=false`を維持する。
+Owner Approval期限の否定試験追加はAgent Task本番経路完成を意味しない。実Agent実行隔離、production Broker／IPC、Audit／Recovery、結果のContent Exposure、Windows 導入済み製品等の既存`release_blocker`を維持し、`task_execution=unsupported`および`release_ready=false`を維持する。
 
 ## R2追補 有効Owner Approvalが期限切れPermissionを補完しない否定試験（2026-09-29）
 
@@ -457,11 +457,11 @@ Owner Approval期限の否定試験追加はAgent Task本番経路完成を意�
 - 初回`rustfmt +1.95.0 --edition 2021 --check native/rust_helper/src/broker/dialogue.rs`は新規assertionの折返し差だけを検出したため修正し、再実行は成功。`cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`も成功。
 - `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`: exit 0。開発validator登録10項目、日本語厳格監査（1113 files／0 findings）、Schema（149／149／192 negative）、Conformance（225 checks）、Manifest、release gate、package portability、release smoke、evidence bundle、runtime assertions（12／0）、C32開発監査が成功した。Windows installed evidence等のrelease blocker 5件と`release_ready=false`を保持した。
 - Owner許可に基づくWindows Actions [run #21](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36552280495)は、一時branch上の正確なcommit `dc2ec0960421442f34e3c229451b1f4a76c105f5`をWindows Server 2025 image `win25-vs2026/20260922.246.2`／Rust 1.95.0で検査した。checkout SHA照合、対象Rust fileのrustfmt、全target `cargo check`／`cargo test`（12 target、397 passed／0 failed／1 ignored）、試験後cleanが成功した。所要6分24秒、artifactなし。成功した同一SHAを`main`へfast-forwardしてpushし、remote HEAD一致後に一時branchをlocal／remote双方から削除した。
-- hosted Rust検査とfixture試験は、実Codex Agent Task、production Broker／IPC、Owner native UI、実Workspace隔離、installed product、release readinessを証明しない。
+- hosted Rust検査とfixture試験は、実Codex Agent Task、production Broker／IPC、Owner native UI、実Workspace隔離、導入済み製品、release readinessを証明しない。
 
 ### 残存gate
 
-有効Approvalと期限切れPermissionの分離試験は、Task実行隔離・production runtime・release readinessを証明しない。Codex Adapter metadataの`unsupported`、R2のTask／sandbox／Audit／Recovery／Content ExposureおよびWindows installed productの既存`release_blocker`、`release_ready=false`を維持する。
+有効Approvalと期限切れPermissionの分離試験は、Task実行隔離・production runtime・release readinessを証明しない。Codex Adapter metadataの`unsupported`、R2のTask／sandbox／Audit／Recovery／Content ExposureおよびWindows 導入済み製品の既存`release_blocker`、`release_ready=false`を維持する。
 
 ## R2追補 Owner拒否時にAgent Task権限を発行しないnative relay否定試験（2026-09-29）
 
@@ -480,7 +480,7 @@ Owner Approval期限の否定試験追加はAgent Task本番経路完成を意�
 
 ### 残存gate
 
-Owner拒否時のloopback relay拒否はnative dialogの実操作やproduction installed pathの証拠ではない。実Owner Yes／No経路、実Codex `exec`と隔離、取消／期限／crash後Recovery、Audit／Content Exposureの製品縦断、Windows installed productを未成立の`release_blocker`として保持し、`release_ready=false`を維持する。
+Owner拒否時のloopback relay拒否はnative dialogの実操作やproduction installed pathの証拠ではない。実Owner Yes／No経路、実Codex `exec`と隔離、取消／期限／crash後Recovery、Audit／Content Exposureの製品縦断、Windows 導入済み製品を未成立の`release_blocker`として保持し、`release_ready=false`を維持する。
 
 ## R2追補 native確認後も未登録WorkspaceへTask権限を発行しないrelay縦断試験（2026-09-29）
 
@@ -500,7 +500,7 @@ Owner拒否時のloopback relay拒否はnative dialogの実操作やproduction i
 
 ### 残存gate
 
-肯定callbackは実Owner dialogではなく、Workspaceも未登録であり、Brokerがgrantを拒否するfixtureである。run #23はhosted Rust検査の証拠に限る。実Owner Yes／No、登録済みsupported AdapterでのPermission／Approval発行、実Codex `exec`と隔離、取消／期限／crash後Recovery、Audit／Content Exposureの製品縦断、Windows installed productは未成立の`release_blocker`として保持し、`task_execution=unsupported`と`release_ready=false`を維持する。
+肯定callbackは実Owner確認画面ではなく、Workspaceも未登録であり、Brokerがgrantを拒否するfixtureである。run #23はhosted Rust検査の証拠に限る。実Owner Yes／No、登録済みsupported AdapterでのPermission／Approval発行、実Codex `exec`と隔離、取消／期限／crash後Recovery、Audit／Content Exposureの製品縦断、Windows 導入済み製品は未成立の`release_blocker`として保持し、`task_execution=unsupported`と`release_ready=false`を維持する。
 
 ## R2追補 Agent Task deadline停止をOwner取消と区別する（2026-09-29）
 
@@ -509,7 +509,7 @@ Owner拒否時のloopback relay拒否はnative dialogの実操作やproduction i
 - Broker workerの内部受信結果へ単調完了時刻を付け、Brokerが結果をpollした時刻ではなく、Task deadlineに対する実際の完了時刻でterminal結果を判定する。期限到達時には受信済み結果を先に処理し、未着の場合だけ停止を要求する。
 - deadline前に完了したOwner取消結果は`cancelled`として保持し、deadline後に届いた取消応答または成功結果は`failed`／`期限超過`へ分類する。停止を確認できない`通信失敗`はdeadlineで覆い隠さない。Codex CLI Adapterもdeadlineをcancel flagより先に判定する。
 - Rust単体試験は期限前Owner取消、deadline上の取消、期限後成功、期限後の停止不能を区別する。Windows fake CLI Broker縦断fixtureは成功・明示取消・deadline停止を通し、deadline停止時に子孫process停止、結果hash不採用、scratch cleanup、Task本文非露出を確認する。fixtureは内部Broker recordのdeadlineを短縮しており、実時間の900秒deadline、実Codex Task、production隔離の証拠ではない（証拠class: `FIXTURE`）。
-- `task_execution=unsupported`、既存`release_blocker`、`release_ready=false`を維持する。この変更はAgent Taskのproduction execution、OS process群の任意条件下での強制停止、installed product、release readinessを成立させない。
+- `task_execution=unsupported`、既存`release_blocker`、`release_ready=false`を維持する。この変更はAgent Taskのproduction execution、OS process群の任意条件下での強制停止、導入済み製品、release readinessを成立させない。
 
 ### 検証と履歴
 
@@ -523,7 +523,7 @@ Owner拒否時のloopback relay拒否はnative dialogの実操作やproduction i
 
 ### 残存gate
 
-Worker結果時刻のfixtureとAdapter試験は、実Agent executionのdeadline enforcementや全OS process descendantの実環境停止保証ではない。実Codex `exec`／隔離、cancel・deadline・crash後Recovery、production Audit／Content Exposure、Windows installed productの既存`release_blocker`を維持し、`task_execution=unsupported`および`release_ready=false`を維持する。
+Worker結果時刻のfixtureとAdapter試験は、実Agent executionのdeadline enforcementや全OS process descendantの実環境停止保証ではない。実Codex `exec`／隔離、cancel・deadline・crash後Recovery、production Audit／Content Exposure、Windows 導入済み製品の既存`release_blocker`を維持し、`task_execution=unsupported`および`release_ready=false`を維持する。
 
 ## R2追補 Owner取消受理と競合するAgent Task成功応答を採用しない（2026-09-29）
 
@@ -531,7 +531,7 @@ Worker結果時刻のfixtureとAdapter試験は、実Agent executionのdeadline 
 
 - 期限完了時刻の再監査で、Owner取消flagをworkerの最終hash化前に検査した後、Brokerが結果を受け取るまでに取消要求が成立する競合を特定した。Broker進捗反映が取消受理時刻を知らないまま成功hashを採用し得る境界だった。
 - BrokerはOwner取消Auditの成功後に単調取消受理時刻を内部Task recordへ記録する。workerの単調完了時刻が取消受理時刻以後なら成功結果を採用せず、worker終端を確認した後に`cancelled`とする。取消受理より前にworkerが完了済みなら、後続poll遅延だけを理由に完了結果を書き換えない。deadline判定を先に適用するため、期限後の結果は引き続き`failed`／`期限超過`となる。
-- 決定論的試験で、Owner取消受理後の成功を取消へ分類し、取消受理前に完了済みの成功を維持する。既存Windows fake CLI Broker縦断fixtureは成功・明示取消・期限停止、子孫process停止、result hash不採用、scratch cleanup、Task本文非露出を検査する。これはRust内の時刻境界試験とfake CLI `FIXTURE`に限り、実Codex Taskやinstalled productの証拠ではない。
+- 決定論的試験で、Owner取消受理後の成功を取消へ分類し、取消受理前に完了済みの成功を維持する。既存Windows fake CLI Broker縦断fixtureは成功・明示取消・期限停止、子孫process停止、result hash不採用、scratch cleanup、Task本文非露出を検査する。これはRust内の時刻境界試験とfake CLI `FIXTURE`に限り、実Codex Taskや導入済み製品の証拠ではない。
 - `task_execution=unsupported`、既存`release_blocker`、`release_ready=false`を維持する。
 
 ### 検証と履歴
@@ -543,7 +543,7 @@ Worker結果時刻のfixtureとAdapter試験は、実Agent executionのdeadline 
 
 ### 残存gate
 
-時刻境界試験はcancel受理後に成功応答が競合する分類を検証する`FIXTURE`であり、実Codex `exec`、全OS process群の強制停止保証、実Workspace隔離、production Audit／Recovery、Windows installed productを証明しない。関連`release_blocker`、`task_execution=unsupported`および`release_ready=false`を維持する。
+時刻境界試験はcancel受理後に成功応答が競合する分類を検証する`FIXTURE`であり、実Codex `exec`、全OS process群の強制停止保証、実Workspace隔離、production Audit／Recovery、Windows 導入済み製品を証明しない。関連`release_blocker`、`task_execution=unsupported`および`release_ready=false`を維持する。
 
 ## R2追補 MxC shell childへscratch環境変数を固定できるか再検査（2026-09-29）
 
@@ -664,7 +664,7 @@ Worker結果時刻のfixtureとAdapter試験は、実Agent executionのdeadline 
 
 - 登録後に合成secret fileへのhardlink aliasを追加し、既存の事前検査helperに加えて`CodexCliAdapter::AgentTask実行`本体を直接呼ぶWindows Rust fixtureへ拡張した。対応可能な試験用Adapterとsynthetic Task contextを使い、実行結果が`作業領域不在`となることを確認する。
 - Adapterの実行fileには意図的に不存在の合成pathを渡す。期待した拒否結果が返ることで、Task scratch作成後またはCLI起動時の別エラーではなく、AgentTask入口のsecret再検査で停止したことを区別する。合成secret本文はfixture内だけで使用する。
-- 証拠classは`FIXTURE`。これはRust Adapter method内の事前検査接続を示すが、production Broker consumer／IPC、Owner Approval、Codex `exec`、実Agent、installed productの証拠ではない。実MxC childで事前alias読取が可能だった`LIVE_RUNTIME`観測は別記録として保持する。`task_execution=unsupported`、該当`release_blocker`、`release_ready=false`を維持する。
+- 証拠classは`FIXTURE`。これはRust Adapter method内の事前検査接続を示すが、production Broker consumer／IPC、Owner Approval、Codex `exec`、実Agent、導入済み製品の証拠ではない。実MxC childで事前alias読取が可能だった`LIVE_RUNTIME`観測は別記録として保持する。`task_execution=unsupported`、該当`release_blocker`、`release_ready=false`を維持する。
 
 ### 検証
 
@@ -687,7 +687,7 @@ Worker結果時刻のfixtureとAdapter試験は、実Agent executionのdeadline 
 ### 検証
 
 - persistent journalのactivate耐久保存失敗fixtureで、メモリ状態と再読込後の永続状態がともに`reserved`へ戻ることを検査する。
-- 未起動scratchのjournal有効化失敗fixtureで、handle経由のdirectory回収と記録解消を検査する。証拠classは`FIXTURE`であり、process crash後やinstalled productのRecovery証拠ではない。
+- 未起動scratchのjournal有効化失敗fixtureで、handle経由のdirectory回収と記録解消を検査する。証拠classは`FIXTURE`であり、process crash後や導入済み製品のRecovery証拠ではない。
 - `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`: 合格、404 passed／0 failed／1 ignored。対象はRust helperのunit・integration testであり、Codex CLIの実broker起動やchild process isolationの`LIVE_RUNTIME`証拠ではない。
 - `cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`: 合格。
 - adapter focused testの初回は、test fixtureが開いたworkspace handleをroot削除前に閉じておらず、Windows sharing violationで終了した。fixtureを修正して再実行し合格。製品処理の失敗ではない。
@@ -717,7 +717,7 @@ Worker結果時刻のfixtureとAdapter試験は、実Agent executionのdeadline 
 
 - 公開Rust API `verify_update_signature`は更新IDと署名文字列しか受け取らず、署名対象byteもBroker所有信頼鍵も持たないのに、以前は署名文字列が空でなければ成功を返していた。Repository内のBroker本線からは呼ばれていないが、public moduleから利用できるため、署名の存在を真正性と誤認させる入口だった。
 - 互換入口は空署名を`update_signature_required`で拒否し、非空署名も`update_signer_untrusted`で拒否する。署名真正性を成功にできるのは、Broker所有公開鍵とfingerprint、署名対象byte、Ed25519署名を照合する`verify_signed_update_signature`だけである。非空の任意文字列が成功にならない否定試験を追加した。
-- これはRust APIの誤用防止であり、download、install、process起動、update適用、rollbackを追加しない。更新信頼鍵のproduction provisioning、Windows installed product、`rev2_desktop_product_distribution`、`release_ready=false`は未解決のまま保持する。
+- これはRust APIの誤用防止であり、download、install、process起動、update適用、rollbackを追加しない。更新信頼鍵のproduction provisioning、Windows 導入済み製品、`rev2_desktop_product_distribution`、`release_ready=false`は未解決のまま保持する。
 
 ### 検証
 
@@ -727,7 +727,7 @@ Worker結果時刻のfixtureとAdapter試験は、実Agent executionのdeadline 
 - `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`: 225 checksで合格。
 - `python -X utf8 tooling/日本語基底監査.py --strict`: 1113 file／0 findingsで合格。
 - `python -X utf8 tooling/manifest.py --write`および`--check`、`git diff --check`: 合格。
-- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`: exit 0。10 development checksは全件合格。Windows installed evidenceの不足5件はrelease blockerとして残り、release gateの合格表示はdevelopment validation自体の判定であってrelease readinessではない。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`: exit 0。10 development checksは全件合格。Windows installed evidenceの不足5件はrelease blockerとして残り、release gateの合格表示は開発検証自体の判定であってrelease readinessではない。
 - Windows Actionsは未使用。現行Windows hostでRust全targetと統合validationを実行できたため、追加hosted検査は不要だった。
 
 ## R2追補 Broker制御経路から実Codex CLIを実起動（2026-09-30）
@@ -760,7 +760,7 @@ Worker結果時刻のfixtureとAdapter試験は、実Agent executionのdeadline 
 
 - `installer/windows/collect_broker_smoke.ps1`をversion 6へ更新し、実Broker processのnormal loopback credentialから`AgentTaskWorkspacePermissionGrant`と`AgentTaskOwnerApprovalGrant`を個別送信する。両要求が`desktop_native_owner_confirmation_required`で拒否されない場合はcollectorを失敗させる。応答本文や資格値はevidenceへ複写せず、拒否bool、固定error code、source provenanceだけを記録する。
 - release evidence validatorは両操作の実測bool、固定error code、`LIVE_RUNTIME` provenanceを必須化した。Conformanceへcollector構造検査と、片方の拒否欠落／error code差替をrelease blockerとして検出する否定試験を追加した。
-- 現行Rust source commit `e8ea0587031402a19fc9dff260d7c925403cca2e`からRelease helperをbuildし、isolated temporary store／sessionでcollectorを起動した。build時のworktreeは文書・tooling差分を含むdirty状態だったが、Rust sourceの差分はなかった。helper SHA-256は`e9f6e1c536f4e8a166fe4ff5d775bd649c89b0bba635e82ab42d83c252b80344`、collector output SHA-256は`e2b40602ef691373635d0cbf137d6aa4c0c4aac46944e796f7290333cdd191c9`。
+- 現行Rust 対象ソースcommit `e8ea0587031402a19fc9dff260d7c925403cca2e`からRelease helperをbuildし、isolated temporary store／sessionでcollectorを起動した。build時のworktreeは文書・tooling差分を含むdirty状態だったが、Rust sourceの差分はなかった。helper SHA-256は`e9f6e1c536f4e8a166fe4ff5d775bd649c89b0bba635e82ab42d83c252b80344`、collector output SHA-256は`e2b40602ef691373635d0cbf137d6aa4c0c4aac46944e796f7290333cdd191c9`。
 - collectorは両grant要求を通常IPCから拒否し、restart後replay拒否、新規health受理、Broker強制終了後のfail-closed、session資格fileの生成後削除も成功した。collector resultは`passed`、errorは0件。
 
 ### 証拠境界
@@ -779,7 +779,7 @@ Worker結果時刻のfixtureとAdapter試験は、実Agent executionのdeadline 
 - `python -X utf8 tooling/manifest.py --write`: exit 0。Manifestへ1111 fileを記録。
 - `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`: exit 0。登録済みdevelopment検査10件は合格。Windows installed evidence 5項目はrelease blockerとして残り、`release_ready=false`。
 - GitHub Actionsは未使用。現WindowsでRelease helperのbuild・実Broker processを検証できたため不要。
-- このblockはcollector／validatorの拡張でありRust source変更を含まないため、Rust test suiteは再実行していない。Flutter、installed product、Desktop Owner操作も未検証。
+- このblockはcollector／validatorの拡張でありRust source変更を含まないため、Rust test suiteは再実行していない。Flutter、導入済み製品、Desktop Owner操作も未検証。
 
 ## R2追補 Agent Task native Owner確認のFlutter応答待ち（2026-09-30）
 
@@ -799,7 +799,7 @@ Worker結果時刻のfixtureとAdapter試験は、実Agent executionのdeadline 
 - `flutter analyze --no-pub`: Analysis Serverが日本語を含むOneDrive project path上の不正LSP JSONで異常終了。exit 1、Analyzer成功とは扱わない。初回focused testも既存`build/unit_test_assets`削除拒否で開始できなかったが、`--no-test-assets`指定のfocused／全testは合格。
 - `dart analyze lib/services/broker_client.dart test/broker_client_payload_hash_test.dart`: Analysis Server終了処理が`C:\Users\ohira\AppData\Local\Dart\perf\18552`を削除できずexit 1。静的Analyzer成功とは扱わない。GitHub CLIがこの環境にないため手動Actionsは起動していない。
 - `python -X utf8 tooling/manifest.py --write`: 1111 fileを記録。`python -X utf8 tooling/manifest.py --check`と`git diff --check`はともに合格。
-- Windows Actionsは未使用。ローカルDesktop全126 testsとPython統合validatorが合格し、残ったFlutter AnalyzerはOneDrive上のAnalysis Server障害である。`gh` CLIは未導入で、現行接続済みGitHub toolにも手動dispatch機能がないため、Actions runでの代替検証は実施していない。
+- Windows Actionsは未使用。ローカルDesktop全126 testsとPython統合validatorが合格し、残ったFlutter AnalyzerはOneDrive上のAnalysis Server障害である。`gh` CLIは未導入で、現行接続済みGitHub toolにも手動dispatch機能がないため、Actions実行での代替検証は実施していない。
 
 ## R2追補 Codex Adapter metadataのAuthority誤検知を修正しBroker経路を再確認（2026-09-30）
 
@@ -807,7 +807,7 @@ Worker結果時刻のfixtureとAdapter試験は、実Agent executionのdeadline 
 
 - Codex Adapterは`task_execution=unsupported`とする理由に「専用permission profileの実Taskは未検証」と通常の説明文を含む。BrokerのAdapter metadata走査器は自由文を含む任意文字列から`permission`等をAuthority keyとして扱っていたため、権限昇格のない正規metadataを`応答不正`で拒否し、Task要求以前のAgent Session開始を阻害していた。
 - 自由文走査は`admin`、`all`、`approved`、`elevated`、`root`等の危険Authority値を拒否し、構造化object keyは従来どおりcanonical Authority／Permission keyを拒否するよう責務を分離した。説明文中の`permission profile`は受理しつつ、`{"permission":"workspace.write"}`、`permission=all`、`admin`は拒否する否定・境界testを追加した。Codex Adapter自身のmetadataを検査する回帰testも追加し、Task capabilityが`unsupported`のまま保持されることを確認する。
-- Windows専用ignored統合testは、明示指定したインストール済みCodex CLIの登録probeと実Broker loopback IPCを通し、登録Workspaceに結合したAgent Session開始が成功することを確認する。Owner操作callbackを肯定にしてもWorkspace Permission／Owner Approvalの両要求が`AgentTask実行非対応`で拒否され、grantを返さず、永続Auditへ拒否を記録し、Task本文をsummary／response／Auditへ露出しない。CLIは登録probeに限り、実Agent Task・model・network接続・実Win32 Owner dialogは実行していない。Owner確認callbackはtest fixtureであり、native確認画面の製品動作証拠ではない。
+- Windows専用ignored統合testは、明示指定したインストール済みCodex CLIの登録probeと実Broker loopback IPCを通し、登録Workspaceに結合したAgent Session開始が成功することを確認する。Owner操作callbackを肯定にしてもWorkspace Permission／Owner Approvalの両要求が`AgentTask実行非対応`で拒否され、grantを返さず、永続Auditへ拒否を記録し、Task本文をsummary／response／Auditへ露出しない。CLIは登録probeに限り、実Agent Task・model・network接続・実Win32 Owner確認画面は実行していない。Owner確認callbackはtest fixtureであり、native確認画面の製品動作証拠ではない。
 - したがって本修正は通常metadataの誤拒否を解消するが、実Task実行を有効化しない。`task_execution=unsupported`、Agent隔離およびWindows installed証拠等の`release_blocker`、`release_ready=false`を維持する。
 
 ### 検証
@@ -826,7 +826,7 @@ cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml author
 ### 統合検査の追補
 
 - 統合validator初回は、新規testの英語diagnostic 1箇所と進捗記録のcommand表記2行を日本語基底監査が検出し、2 file／3 findingsで失敗した。test診断を日本語化し、正確なcommandを独立した実行記録へ分離した後の厳格監査は1114 file／0 findingsで合格した。監査規則や許可例外は変更していない。
-- 修正後の統合validatorは登録済みdevelopment検査10件すべて合格した。Schema 149件、正常例149件、negative fixture 192件、Conformance 228 checks、Manifest照合、release gate、packaging portability、release smoke、evidence bundle、runtime assertion、C32構造監査が合格した。Windows installed product evidence 5項目は既存`release_blocker`のままで、`release_ready=false`を維持する。
+- 修正後の統合validatorは登録済みdevelopment検査10件すべて合格した。Schema 149件、正常例149件、negative fixture 192件、Conformance 228 checks、Manifest照合、release gate、packaging portability、release smoke、evidence bundle、runtime assertion、C32構造監査が合格した。Windows 導入済み製品 evidence 5項目は既存`release_blocker`のままで、`release_ready=false`を維持する。
 - 統合validatorの実行command:
 
 ```powershell
@@ -838,8 +838,8 @@ python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
 ### 成立した変更
 
 - Rust Desktop起動器のnative Owner確認を経た内部経路だけで、現在の候補hash、Broker trustで再検証した署名、配布URL、version/channel/summary、package SHA-256・正確なbyte長、request payload hashをBrokerが副作用直前に再照合し、download要求を受理する。通常IPCやOwner credential単独では受理しない。Flutterは既存Broker bridge経由で要求・状態取得だけを行い、network／filesystemを直接扱わない。
-- Rust Brokerはserial IPC loop外の単一非同期workerでHTTPS取得する。proxy／redirect／retryを無効化し、DNS結果をpublic unicastに限定して取得addressへpinする。HTTP status、単一Content-Length、Transfer-Encoding／Content-Encodingの不在、実byte長、SHA-256を検査し、完全一致したfileだけをBroker固定directoryへcontent-addressed・create-onlyで公開する。処理は64 KiB単位、Job状態とfailure codeはbounded／Schema固定で、常駐pollingを行わない。partial cleanupと結果はBroker Auditへ接続する。
-- 適用、process起動、rollback、破損package修復は未接続。OS同期DNS resolverには期限／cancelがなく、同一digestの破損packageは修復不能である。これらはrelease_blockerとして保持する。system proxy必須環境への非対応はknown_limitation。local TLS serverとBroker test storeはFIXTUREであり、実配布元／Windows installed productのLIVE_RUNTIME証拠ではない。
+- Rust Brokerはserial IPC loop外の単一非同期workerでHTTPS取得する。proxy／redirect／retryを無効化し、DNS結果をpublic unicastに限定して取得addressへpinする。HTTP status、単一Content-Length、Transfer-Encoding／Content-Encodingの不在、実byte長、SHA-256を検査し、完全一致したfileだけをBroker固定directoryへcontent-addressed・新規作成のみで公開する。処理は64 KiB単位、Job状態とfailure codeはbounded／Schema固定で、常駐pollingを行わない。partial cleanupと結果はBroker Auditへ接続する。
+- 適用、process起動、rollback、破損package修復は未接続。OS同期DNS resolverには期限／cancelがなく、同一digestの破損packageは修復不能である。これらはrelease_blockerとして保持する。system proxy必須環境への非対応はknown_limitation。local TLS serverとBroker test storeはFIXTUREであり、実配布元／Windows 導入済み製品のLIVE_RUNTIME証拠ではない。
 
 ### 検証
 
@@ -854,16 +854,16 @@ cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-
 ### 成立した変更
 
 - 既存`<digest>.pkg`をBroker固定directoryからnofollowで開き、通常file・非reparseを確認した上で全byteを再hashする。期待byte長またはdigestと異なる通常fileだけを破損候補とし、symlink／reparse／directory／不正entryは従来どおりfail-closedにした。
-- native Owner確認済みdownloadが新しいresponseのstatus／header／byte長／SHA-256検査を通り、一時fileをfsyncした後にだけ、同一digest名の破損通常fileをatomic renameで置換する。保存先が欠損している場合はcreate-only hard linkを維持し、別digest／別packageは置換しない。
+- native Owner確認済みdownloadが新しいresponseのstatus／header／byte長／SHA-256検査を通り、一時fileをfsyncした後にだけ、同一digest名の破損通常fileをatomic renameで置換する。保存先が欠損している場合は新規作成のみ hard linkを維持し、別digest／別packageは置換しない。
 - queued Auditへ条件付きrepairの対象・RecoveryActionを先に記録し、置換成功を`recovered`結果としてBroker Auditへ記録する。download後もinstall／process／rollbackはsuspendedのまま。再起動後は`.part`回復とfinal全byte再検証を明示download要求で行う。
-- 過去Phase 21／C12記録の「repair未成立」は当時の観測履歴として残し、本追補で現在状態を更新する。製品Broker／installed productでの修復証拠は未成立である。
+- 過去Phase 21／C12記録の「repair未成立」は当時の観測履歴として残し、本追補で現在状態を更新する。製品Broker／導入済み製品での修復証拠は未成立である。
 
 ### 検証
 
-- 更新focused Rust試験は27 passed／0 failed。既存破損fileの分類・修復、non-file宛先拒否、通常新規時のcreate-only維持、Broker `recovered` Audit、local TLSで検証済みresponseだけを置換する経路を実行した。誤digest responseでは既存fileを変更せず、一時fileを除去する試験も合格した。
+- 更新focused Rust試験は27 passed／0 failed。既存破損fileの分類・修復、non-file宛先拒否、通常新規時の新規作成のみ維持、Broker `recovered` Audit、local TLSで検証済みresponseだけを置換する経路を実行した。誤digest responseでは既存fileを変更せず、一時fileを除去する試験も合格した。
 - focused試験の最初の全群実行でlocal TLS fixtureが一度ConnectionResetになり、26 passed／1 failedだった。失敗case単独再実行と、その後のfocused全群再実行はいずれも成功した。初回失敗の原因は特定できておらず履歴として保持する。
 - Rust全targetは12 target、434 passed／0 failed／3 ignored。`cargo check --all-targets`も成功。Windows localで実行し、GitHub Actionsは使っていない。
-- Schemaは150件／正常例150件／negative fixture 193件、Conformanceは229 checks。Conformance初回は移動後のcreate-only hard-link実装に旧tokenを要求して失敗したため、現行実装のtokenを検査するよう更新し、全229 checksを再実行して合格した。
+- Schemaは150件／正常例150件／negative fixture 193件、Conformanceは229 checks。Conformance初回は移動後の新規作成のみ hard-link実装に旧tokenを要求して失敗したため、現行実装のtokenを検査するよう更新し、全229 checksを再実行して合格した。
 - `python -X utf8 tooling/manifest.py --write`で1119 filesを記録し、統合validator内のmanifest checkも合格した。strict日本語監査はrepository 1122 files、debt 0、findings 0。`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`のdevelopment checksはすべてpassedで、release gate／portability／smoke／evidence bundle／runtime assertion／C32監査を確認した。`release_ready=false`とrelease blocker 5件は維持する。
 
 ```powershell
@@ -878,10 +878,10 @@ python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
 
 ### 残存範囲
 
-- item: Windows installed product／実配布元でのdownload・repair・failure injection、Installer／Uninstaller、install／rollback／crash recovery、正式trust provisioning
+- item: Windows 導入済み製品／実配布元でのdownload・repair・failure injection、Installer／Uninstaller、install／rollback／crash recovery、正式trust provisioning
   classification: release_blocker
-  reason: local Rust／TLS fixtureは実配布元・製品Broker・installed productを通らず、release経路を実証しない
-  required_action: test identityの隔離Windows installed productへ同じ境界を接続し、実配布元tamperと失敗／crashを検証する
+  reason: local Rust／TLS fixtureは実配布元・製品Broker・導入済み製品を通らず、release経路を実証しない
+  required_action: 試験用識別情報の隔離Windows 導入済み製品へ同じ境界を接続し、実配布元tamperと失敗／crashを検証する
   blocks_release: yes
 - item: Linux／macOSの期限付きcancel可能DNS resolver
   classification: post_v1_scope
@@ -901,7 +901,7 @@ python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
 - C12 package downloadが呼ぶ名前解決について、Windowsだけを対象にWindows DNS Client `DnsQueryEx`のcallback経路へ接続した。A／AAAAは逐次照会し、それぞれdownload全体deadlineと最大15秒のDNS deadlineの早い方を使用する。download cancel flagは20 ms間隔で確認する。
 - deadline／cancel時は`DnsCancelQuery`を呼び、callback完了まで結果・cancel handle・query contextを保持する。callback回収は最大2秒とし、cancel失敗・callback未回収をstatic failureへ閉じる。未完了queryが残る間はprocess内pending slotを維持し、次のDNS queryを拒否する。既存のpublic-address判定と、検査済みaddressへの接続pinningは保持した。
 - Rust helperの`#![forbid(unsafe_code)]`は変更していない。Windows DNS APIの`unsafe`とFFI共有状態は専用crate `native/windows_dns`へ隔離した。Windows外では既存`ToSocketAddrs`を維持し、期限付きcancel対応はWindows 1.0対象に限定する。
-- Windows localの試験processから実Windows DNS Client APIをloopback DNS fixtureへ呼び出した。A／AAAA応答のparse、非対称IPv4 octet `1.2.3.4`、明示cancel、deadline超過後cancel、事前cancelを観測した。これはhelper APIの`LIVE_RUNTIME`証拠だが、製品Broker／native Owner確認／installed productや実配布元の証拠ではない。
+- Windows localの試験processから実Windows DNS Client APIをloopback DNS fixtureへ呼び出した。A／AAAA応答のparse、非対称IPv4 octet `1.2.3.4`、明示cancel、deadline超過後cancel、事前cancelを観測した。これはhelper APIの`LIVE_RUNTIME`証拠だが、製品Broker／native Owner確認／導入済み製品や実配布元の証拠ではない。
 - `release_blockers.registry.json`、C11のmachine-readable最終監査、`ROADMAP.md`、`docs/specs/update-center.md`へ成立範囲と残存blockerを反映した。破損package修復、installed download、install／rollback、実配布元は`release_blocker`を維持し、Linux／macOSの期限付きresolver差はR15の`post_v1_scope`として区別する。
 
 ### 検証
@@ -918,7 +918,7 @@ python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
 
 ### 残存範囲
 
-- `release_blocker`: 破損package repair、Windows installed product上の実download、実配布元／失敗注入、Installer／Uninstaller、install／rollback／crash Recovery、正式trust provisioning。
+- `release_blocker`: 破損package repair、Windows 導入済み製品上の実download、実配布元／失敗注入、Installer／Uninstaller、install／rollback／crash Recovery、正式trust provisioning。
 - `post_v1_scope`: Linux／macOSの期限付きcancel可能なDNS resolver。非Windows技術工程R15で実装・検証する。
 - `known_limitation`: system proxyを必要とする環境ではdownloadを利用できない。
 - release blockerは未解消のものが残るため`release_ready=false`を維持する。GitHub Actionsは未使用。Windows localで必要なAPI／Rust試験が実行できた。
@@ -952,7 +952,7 @@ dart format --output=none --set-exit-if-changed lib/screens/settings.dart test/u
   blocks_release: yes
 - item: 破損済み同一digest packageの修復
   classification: release_blocker
-  reason: create-only保存と既存file検査により既存packageを置換しないが、安全なrepair／Recovery経路がない
+  reason: 新規作成のみ保存と既存file検査により既存packageを置換しないが、安全なrepair／Recovery経路がない
   required_action: Broker Audit／Recovery付きrepairを追加し、tamper・crash・再試行を試験する
   blocks_release: yes
 - item: system proxy必須環境
@@ -960,10 +960,10 @@ dart format --output=none --set-exit-if-changed lib/screens/settings.dart test/u
   reason: download workerはsystem proxyを使用しない
   required_action: 直接HTTPSが許可されない環境では使用できない旨を製品文書へ維持する
   blocks_release: no
-- item: 外部配布元・Windows installed productでのdownloadおよびinstall／rollback
+- item: 外部配布元・Windows 導入済み製品でのdownloadおよびinstall／rollback
   classification: release_blocker
   reason: local TLS fixtureは実配布元、配布物、installed update transactionを証明しない
-  required_action: test identityと隔離Windows installed packageを用いて実配布元からの取得・tamper・install・rollback・crash Recoveryを実証する
+  required_action: 試験用識別情報と隔離Windows installed packageを用いて実配布元からの取得・tamper・install・rollback・crash Recoveryを実証する
   blocks_release: yes
 
 ## Phase 21／C11 Broker導出取得元projectionとDesktop表示（2026-09-30）
@@ -979,7 +979,7 @@ dart format --output=none --set-exit-if-changed lib/screens/settings.dart test/u
 
 - Rust全12 targetで419 passed／0 failed／3 ignored。新しいBroker取得元projectionと呼出元URL拒否focused testは1 passed。`cargo check --all-targets`成功。
 - Schema 149件／正常example 149件／negative fixture 192件、Conformance 228 checks成功。取得元欠落、状態とURLの矛盾、dot segment、候補由来URLを拒否した。
-- `flutter test --no-pub test/update_client_test.dart`は元OneDrive workspaceでは`build/unit_test_assets`削除失敗でtest前に停止した。同じcurrent sourceを短縮一時workspaceへ複製（`build`と`macos`生成物を除外）して3件passed。`flutter analyze --no-pub`も同workspaceで`No issues found`。この結果はFlutter sourceの検査でありWindows installed productの起動証拠ではない。
+- `flutter test --no-pub test/update_client_test.dart`は元OneDrive workspaceでは`build/unit_test_assets`削除失敗でtest前に停止した。同じcurrent sourceを短縮一時workspaceへ複製（`build`と`macos`生成物を除外）して3件passed。`flutter analyze --no-pub`も同workspaceで`No issues found`。この結果はFlutter sourceの検査でありWindows 導入済み製品の起動証拠ではない。
 - Flutter検証用の一時workspace cleanupは、検証済みTemp直下pathへのPowerShell再帰削除commandが実行policyで拒否されたため完了していない。Repository外のTempにsource copyと`.dart_tool`生成物が残る。production credentialは複製していない。正確なpathとcleanup未完了は作業報告に明記する。
 - Dart format checkで変更なし。Rustfmt check、`git diff --check`、変更JSON parseは成功。
 - 最終URL Schema締め付け前の統合validatorはexit 0、登録10検査すべてpassed、strict日本語監査1114 file／0 findings。release gate検査はpassしたがrelease blocker 5件と`release_ready=false`を維持した。後続のSchema pattern／negative test変更後にもSchema 149／149／192とConformance 228 checksを再実行し合格した。
@@ -1072,7 +1072,7 @@ python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
 - channelは既存署名済み候補と同じ`stable`／`beta`／`nightly`に限定し、各channel一件・総数3件までとした。配布元はHTTPS、小文字ASCII DNS host、port／userinfo／query／fragmentなし、ASCII unreserved pathに限定し、IP literal、localhost、percent-encoding、dot segment、空segment、末尾slashを拒否する。
 - Brokerはtrust fileを8 KiBまでに制限し、通常file／非reparse point、重複JSON fieldなし、版に対応した厳密field構成を確認してから再検証する。Flutter・更新候補からURLやfile pathを受け取らない。
 - 次段download consumerが使う予定の決定式は、署名済み`channel`でBroker所有sourceを選び、`base_url`へ安全な`update_id`と固定`.pkg`を追加するものと定義した。現実装はsource設定の読込・検証までで、URL取得、redirect／DNS／TLS検証、package byte照合、archive展開、install／rollbackは未接続であり、実行要求は`suspended`のまま。
-- 証拠classは`CONFIG`と`FIXTURE`に限る。これはWindows installed product、実配布元、実HTTP、製品release readinessの`LIVE_RUNTIME`証拠ではない。`rev2_desktop_product_distribution`と`release_ready=false`を維持する。
+- 証拠classは`CONFIG`と`FIXTURE`に限る。これはWindows 導入済み製品、実配布元、実HTTP、製品release readinessの`LIVE_RUNTIME`証拠ではない。`rev2_desktop_product_distribution`と`release_ready=false`を維持する。
 
 ### 検証
 
@@ -1097,7 +1097,7 @@ python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py
 - 初回検査では、新Schema JSONの構文誤りとConformanceが禁止するfixture file書込patternを順に検出した。JSON構文を直し、fixture準備を固定test store上のfile操作へ変更してから上記最終検査を再実行し、全件合格を確認した。先行FAILは履歴として保持し、検査規則は弱めていない。
 - 初回統合validatorはRustの試験用JSONを1行の長い文字列で埋め込んだ箇所をstrict日本語監査が1件検出し、残る9検査は合格した。fixtureを構造化JSON生成へ変更し、再度のstrict監査は1114 file／0 findingsで合格した。例外台帳と監査規則は変更していない。
 - 最終`tooling/validate_all.py --python-only --desktop-platform windows`はexit 0。strict日本語監査1114 file／0 findings、Schema 149／149／192、Conformance 228 checks、Manifest、release gate整合、packaging portability、release smoke、evidence bundle、runtime assertions、C32構造監査を含む登録development check 10件がすべて合格した。
-- 統合validator内のrelease gate整合検査とdevelopment smokeの合格はrelease readinessを意味しない。`release_ready=false`、Windows installed product／実package取得・照合・install・rollbackの既存`release_blocker`を維持する。
+- 統合validator内のrelease gate整合検査とdevelopment smokeの合格はrelease readinessを意味しない。`release_ready=false`、Windows 導入済み製品／実package取得・照合・install・rollbackの既存`release_blocker`を維持する。
 - Windows Actionsは未使用。Windowsローカルの全target試験とcheckが完了したため、今回は追加runnerを要しないと判断した。
 ```powershell
 python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
@@ -1109,7 +1109,7 @@ python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
 
 - 現行UpdateCandidate版1のEd25519署名は版・説明等のmetadataだけを結合し、将来取得する配布packageのbyte identityを含んでいなかった。UpdateCandidate版2では`package_sha256`（小文字hex SHA-256）と`package_size_bytes`（1〜4 GiB）を必須化し、Brokerが再構成するcanonical signed byteへ双方を含める。署名対象byteとfieldの不一致は候補保存前に拒否する。candidateから公開鍵、package path、実行commandは引き続き受け取らない。
 - 版1の永続recordは削除せずBroker再起動後もdecode可能に保つ。一覧と延期receiptでは署名表示を`legacy_unbound`へ降格する。版1を新規候補として再受理せず、適用要求もpackage未結合として拒否する。
-- これはC11のdownload前の信頼metadata改善であり、実際に取得したbyteの長さ／hash照合、archive展開、Installer／Uninstaller、update置換、rollback／crash Recoveryは未実装。更新download／適用／rollbackは従来どおり`suspended`、Windows配布blockerと`release_ready=false`を維持する。証拠classは`FIXTURE`で、Windows installed productの`LIVE_RUNTIME`証拠ではない。
+- これはC11のdownload前の信頼metadata改善であり、実際に取得したbyteの長さ／hash照合、archive展開、Installer／Uninstaller、update置換、rollback／crash Recoveryは未実装。更新download／適用／rollbackは従来どおり`suspended`、Windows配布blockerと`release_ready=false`を維持する。証拠classは`FIXTURE`で、Windows 導入済み製品の`LIVE_RUNTIME`証拠ではない。
 
 ### 検証
 
@@ -1149,7 +1149,7 @@ git diff --check
 
 - 前項のAnalyzer失敗をコード失敗と断定せず、Repositoryを移動せずに一時`Z:` drive aliasから`apps/desktop_flutter`を開いて`flutter analyze --no-pub`を再実行した。Analysis Serverは62秒で`No issues found!`を返し、Flutter Analyzerは成功した。一時drive aliasは実行後に解除し、Repository path・Windows保護設定は変更していない。
 - `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml desktop_owner_allowlist_requires_native_confirmation_and_broker_audits_both_outcomes -- --test-threads=1`: 1件pass。Owner確認allowlistの既存Broker testを再実行しただけであり、登録済みCodex RuntimeへのOwner確認後、Agent Taskが非対応として拒否される統合経路は未試験。
-- この追試は前記LSP parse障害を短縮pathで回避できることを示す環境限定の静的解析結果で、OneDrive原pathでの再発防止やinstalled productを証明しない。以前の失敗記録と`dart analyze`の終了処理失敗は履歴として保持する。GitHub Actionsは使用していない。
+- この追試は前記LSP parse障害を短縮pathで回避できることを示す環境限定の静的解析結果で、OneDrive原pathでの再発防止や導入済み製品を証明しない。以前の失敗記録と`dart analyze`の終了処理失敗は履歴として保持する。GitHub Actionsは使用していない。
 
 ## R2追補 scratch作成後のsecret aliasをCLI起動直前に再検査（2026-09-30）
 
@@ -1157,7 +1157,7 @@ git diff --check
 
 - 登録secretの初回検査はAdapter入口で実施済みだったが、その後Task scratchを作ってCLIをspawnするまでの間に、別のWorkspace writerがhardlink aliasを作成する競合窓があった。MxCの完全一致denyはalias名を検出しないため、起動直前にも同じ登録Workspace identityとsecret tree検査を行う。
 - WorkspaceWrite用command構成後、process_tree::spawnの直前に検査し、読み取り専用Dialogueの経路は変更しない。Windows fixtureはscratchを先に作り、その後secret hardlink aliasを追加して、実spawn_codex_task入口がCLI process生成前に「作業領域不在」で止まることを確認する。
-- この再検査はWorkspaceのcontentsを外部writerから原子的に固定せず、最終scanとprocess生成間の変更を排除しない。証拠classはFIXTUREであり、実MxC tool-child、production Broker IPC／Owner Approval、installed productの隔離証拠ではない。Adapterのtask_execution=unsupportedと関連release_blocker、release_ready=falseを維持する。
+- この再検査はWorkspaceのcontentsを外部writerから原子的に固定せず、最終scanとprocess生成間の変更を排除しない。証拠classはFIXTUREであり、実MxC tool-child、production Broker IPC／Owner Approval、導入済み製品の隔離証拠ではない。Adapterのtask_execution=unsupportedと関連release_blocker、release_ready=falseを維持する。
 
 ### 検証
 
@@ -1179,7 +1179,7 @@ cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all
 ```
 - 統合validatorの初回実行は、実行commandを散文で記した1行を厳格日本語監査が検出して失敗した。commandをコードblockへ分離し、監査規則は変更していない。
 - 修正後の厳格日本語監査は1114 file／0 findingsで合格。Schema 149、正常example 149、negative fixture 192、Conformance 228 checks、および登録development check 10件を含む統合validatorはexit 0。
-- Release blocker 5件とrelease_ready=falseは維持される。統合開発検査は合格したが、installed product／MxC child isolation／release readinessを証明しない。
+- Release blocker 5件とrelease_ready=falseは維持される。統合開発検査は合格したが、導入済み製品／MxC child isolation／release readinessを証明しない。
 - Windows Actionsは未使用。対象Windows上でRust全target検査を完了できたため、別runnerでの補助実行は不要と判断した。
 ```powershell
 python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
@@ -1221,9 +1221,9 @@ cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-
 ### Windows Actionsの履歴と結果
 
 - 手動`workflow_dispatch`によるExport検証の先行失敗は履歴として保持する。#1 run `36699100289`はsource-HEAD guard、#2 run `36699507211`はfixture manifest名不整合、#3 run `36700047744`はbundle build後の`slack_token`、#4 run `36702628049`はbundle build後の`credential_assignment`で失敗した。#1〜#4はいずれも成功証拠ではない。
-- 修正済みcommit `6f0681ce1439d9d6f769075952658d063e04a3f2`に対する[Windows Rust validation #25](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36705515991)は成功した。Windows Server 2025 runnerでRust／Cargo 1.95.0を使用し、全targetの`cargo check`と`cargo test`が完了。Rust試験は12 target、435 passed／0 failed／3 ignored。workflow所定のformat、checkout SHA、終了時clean確認も成功した。artifact uploadなし。
+- 修正済みcommit `6f0681ce1439d9d6f769075952658d063e04a3f2`に対する[Windows Rust validation #25](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36705515991)は成功した。Windows Server 2025 runnerでRust／Cargo 1.95.0を使用し、全targetの`cargo check`と`cargo test`が完了。Rust試験は12 target、435 passed／0 failed／3 ignored。workflow所定のformat、checkout SHA、終了時clean確認も成功した。成果物のuploadなし。
 - 同じcommitに対する[Windows GUI Shell Export bundle #5](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36705659036)は`workflow_dispatch`で成功した。Windows Server 2025、image version `20260922.246.2`上でFlutter Windows ReleaseとRust Releaseを含む未署名portable fixture bundleを組み立て、実装済みknown-pattern scanを実行してfindings 0を確認。bundleは61,971,154 bytes、tree SHA-256は`82cf6393462eee3d710dd0edaaf45c944b4f3f866b9c9e1dfa3643368f3ba8f1`。source tree clean確認も成功し、Actions artifactはuploadされていない。
-- Export workflowの明示条件どおり、`portable_bundle_assembled=true`だが`standalone_app_verified=false`、正式distribution claimなし、installer未開始、launch未検証。これはWindows installed product、起動、署名、installer／updater／rollback、binary module pruning、一般的なsecret不存在の証拠ではない。
+- Export workflowの明示条件どおり、`portable_bundle_assembled=true`だが`standalone_app_verified=false`、正式distribution claimなし、installer未開始、launch未検証。これはWindows 導入済み製品、起動、署名、installer／updater／rollback、binary module pruning、一般的なsecret不存在の証拠ではない。
 - Actionsは既存の手動workflowを利用し、一時検証branch、PR、自動triggerは作っていない。対象は正確に上記commitで固定した。workflow sourceはtracked manifestにも追加した。
 
 ### ローカル検証
@@ -1252,7 +1252,7 @@ python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
 - focused command設定test、fake CLIを使うAdapter lifecycle test、Broker fakeTask縦断testはいずれも1件ずつ合格した。
 - 全target testの初回実行はfixture 2件が失敗した。Rust側の新しい設定追加後もfixtureが旧来の`-c`設定5件と完全一致を要求しており、追加のTask TEMP／TMP設定を未知構成として拒否したのが原因だった。fixtureを現行command contractに同期した後の再実行は12 target、435 passed／0 failed／3 ignoredで合格した。初回の失敗は履歴として保持する。
 - `cargo check --all-targets`、変更Rust fileとfake CLI fixtureの`rustfmt --check`、`git diff --check`は合格した。ignored実Codex CLI／MxC probeは、既存の環境不一致を再測定しても解決根拠にならず、一時領域へ不要なmarkerを残すおそれもあるため再実行していない。
-- Windows Actionsは未使用。対象Windows上で全Rust targetのbuild／testを実行できたため、今回の設定生成検査にhosted補助は加えていない。実Codex CLIのMxC実測、production Broker IPC、Owner確認、installed product、release readinessは未検証である。
+- Windows Actionsは未使用。対象Windows上で全Rust targetのbuild／testを実行できたため、今回の設定生成検査にhosted補助は加えていない。実Codex CLIのMxC実測、production Broker IPC、Owner確認、導入済み製品、release readinessは未検証である。
 - `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`はexit 0。strict日本語監査1123 file／0 findings、Schema 150／150／negative fixture 193、Conformance 229 checks、登録済みdevelopment checks 10件を含む全項目が合格した。development evidence bundleのWindows evidence blocker 5件と`release_ready=false`を保持する。これはregistry全体のactive unresolved 15件とは別scopeであり、release readinessの証拠ではない。
 
 ```powershell
@@ -1302,16 +1302,16 @@ python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
 - 手動Windows Actions #4 (`36714964375`) は`f88cb7a22bca5ac67e3f9b8df07fd0d3f692387d`でFlutter analyzeが成功した一方、古い表示名を期待する既存widget assertion 1件が失敗した。残り129件と、新規のwarning／unknown・狭幅画面testは成功。失敗履歴は保持し、assertionを現在の「通信範囲」「Broker監査鎖」表示に修正した。
 - 修正後の統合validator `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows` はexit 0。厳格日本語監査1123 file／指摘0、Schema 150、正常例150、negative fixture 193、Conformance 229、登録済みdevelopment検査10件を含む検査が成功した。Windows installed-evidence blocker 5件とregistry全体のactive unresolved 15件を維持し、`release_ready=false`。
 - 手動Windows Actions [#5 (`36716608834`)](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36716608834) は`workflow_dispatch`で`codex/verify-setup-doctor-ui-20260930`上の正確なcommit `c447376083d042f41f5af83be07459c9b932a93a`を検証し、全step成功。Windows Server 2025 image `20260922.246.2`、Flutter 3.44.0（commit `559ffa3f75e7402d65a8def9c28389a9b2e6fe42`）でRust helper build、Desktop analyze、全130 Desktop test、Mobile analyze、終了時clean確認が成功した。artifactはなく、runに関連するPRもない。
-- 成功した正確なcommit `c447376083d042f41f5af83be07459c9b932a93a`を`main`へfast-forwardし、`origin/main`との一致を確認した。一時検証branchはlocal／remote双方から削除済み。ActionsはRust／Flutter検査の証拠であり、Windows installed productの実起動、Setup DoctorのLIVE_RUNTIME製品証拠、release readinessを証明しない。既存release blockerと`release_ready=false`は維持する。
+- 成功した正確なcommit `c447376083d042f41f5af83be07459c9b932a93a`を`main`へfast-forwardし、`origin/main`との一致を確認した。一時検証branchはlocal／remote双方から削除済み。ActionsはRust／Flutter検査の証拠であり、Windows 導入済み製品の実起動、Setup DoctorのLIVE_RUNTIME製品証拠、release readinessを証明しない。既存release blockerと`release_ready=false`は維持する。
 
 ## R2追補 Windows ActionsでRelease Broker runtime smokeを手動検証（2026-10-01）
 
 ### 成立した確認
 
-- `.github/workflows/windows-manual-rust-validation.yml`を`workflow_dispatch`限定のまま拡張し、対象checkoutのRust全target検査・試験に続けてRelease helperをbuildし、既存`installer/windows/collect_broker_smoke.ps1` version 6で独立Broker processを検査する。build、store、session、collector outputはrun／attempt固有の`RUNNER_TEMP`に置き、所有marker・固定path・helper command lineを検査してprocessと一時領域をcleanupする。artifact upload、自動trigger、PRは追加しない。
+- `.github/workflows/windows-manual-rust-validation.yml`を`workflow_dispatch`限定のまま拡張し、対象checkoutのRust全target検査・試験に続けてRelease helperをbuildし、既存`installer/windows/collect_broker_smoke.ps1` version 6で独立Broker processを検査する。build、store、session、collector outputはrun／attempt固有の`RUNNER_TEMP`に置き、所有marker・固定path・helper command lineを検査してprocessと一時領域をcleanupする。成果物のupload、自動trigger、PRは追加しない。
 - 手動run [Windows Rust manual validation #29](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36734597479)は2026-10-01にcommit `f740fff64248d1a16b900fafa790a65f245e9150`を対象として成功した。Windows Server 2025 runner image `win25-vs2026/20260922.246.2`、`rustc 1.95.0 (59807616e 2026-04-14)`。全Rust targetの`cargo check`／`cargo test`が成功し、12 test targetで435 passed／0 failed／5 ignored。Release helper build、Broker smoke、cleanup、試験後clean確認も成功。job所要14分58秒、workflow全体15分11秒。
-- Release helper SHA-256は`425ecedb7ebfa486c16aa3351b8aaa55e33304c3cf31e088afd08c8f108f8fe7`。collector v6はnon-synthetic `passed`を返し、認証loopback IPC、durable-store readiness、通常credentialによるWorkspace Permission grant／Owner Approval grant双方の拒否（error codeはいずれも`desktop_native_owner_confirmation_required`）、restart後nonce replay拒否、再起動後health、強制停止後fail-closed、session credential fileの生成後削除を確認した。
-- collector outputはrunnerのrun専用temporary領域に作られ、cleanupで削除された。artifact uploadはないため、collector outputのhash／file自体は保存されていない。証拠はrun summaryとjob logに限定する。
+- Release helper SHA-256は`425ecedb7ebfa486c16aa3351b8aaa55e33304c3cf31e088afd08c8f108f8fe7`。collector v6はnon-synthetic `passed`を返し、認証loopback IPC、永続ストアの準備状態、通常credentialによるWorkspace Permission grant／Owner Approval grant双方の拒否（error codeはいずれも`desktop_native_owner_confirmation_required`）、restart後nonce replay拒否、再起動後health、強制停止後fail-closed、session credential fileの生成後削除を確認した。
+- collector outputはrunnerのrun専用temporary領域に作られ、cleanupで削除された。成果物のuploadはないため、collector outputのhash／file自体は保存されていない。証拠はrun summaryとjob logに限定する。
 - 成功した正確なcommitだけを`main`へfast-forwardし、remote HEADとの一致を確認した。一時検証branch `codex/verify-broker-runtime-smoke-20260930`はlocal／remote双方から削除済み。
 
 ### 証拠境界
@@ -1336,7 +1336,7 @@ python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
 
 ### 証拠境界と環境範囲
 
-- Flutterのunit／widget testは開発環境の`FIXTURE` evidenceである。Desktopのうち2件はdebug Broker process／IPCへ接続するが、開発用lifecycle fixtureを含む`LIVE_RUNTIME`／`FIXTURE`の限定証拠である。installed product、Mobile実機、Agent Task隔離、Windows正式配布、release readinessを証明しない。
+- Flutterのunit／widget testは開発環境の`FIXTURE` evidenceである。Desktopのうち2件はdebug Broker process／IPCへ接続するが、開発用lifecycle fixtureを含む`LIVE_RUNTIME`／`FIXTURE`の限定証拠である。導入済み製品、Mobile実機、Agent Task隔離、Windows正式配布、release readinessを証明しない。
 - OneDrive外の短いlocal pathではRust helper buildとFlutter testが成立する。元のOneDrive checkoutは移動・修復しておらず、OneDriveが生成build artifactを同期できない既存制約を解消したとは主張しない。以後同環境でFlutter全数検証を行う場合は、OneDrive外の短いtemporary checkoutを使う。
 - `task_execution=unsupported`、既存release blocker、`release_ready=false`は変更しない。
 
@@ -1369,15 +1369,15 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 - `cargo test --locked --all-targets -- --test-threads=1`: 12 test target、438 passed／0 failed／5 ignored。失効後のBroker再起動復元、再利用拒否、native確認metadata固定、永続Audit不在時の拒否を含む。初回並列実行は既存loopback／TLS試験3件が不安定失敗したが、直列の全target再実行ではすべてpassした。
 - `cargo test --locked revocation -- --test-threads=1`: 3件のRust単体試験と2件のWorkspace integration試験がpass。`dart format --output=none --set-exit-if-changed`は変更Dart 4 fileすべて整形済み。Schemaは151件／正常example 151件／negative fixture 194件、Conformanceは229 checksでpass。
 - `python -X utf8 tooling/日本語基底監査.py --strict`: 1126 files／0 findings。`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`: exit 0。Schema 151／正常example 151／negative fixture 194、Conformance 229、梱包portability、Release Gate、Smoke、manifestを含む全登録checkがpass。
-- OneDrive checkoutのDesktop `flutter analyze --no-pub`はAnalysis ServerのLSP JSON `FormatException`でexit 255。Desktop `flutter test test/mcp_connection_center_test.dart`とMobile `flutter analyze`はFlutterがOneDrive配下の`macos/Flutter/ephemeral/Packages/.packages`／`ios/Flutter/ephemeral/Packages/.packages`を削除できず開始前に停止した。いずれも成功証拠に数えない。補完としてworkflow_dispatch限定の[Windows Actions run #6](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36749071150)を検証branchの正確なcommit `d60bfe2e89572bee47f655f8c714863d89ea02bb`で実行し、Windows Server 2025 hosted runner（`win25-vs2026/20260925.250.1`）でRust helper build、Desktop `flutter analyze --no-pub`（問題なし）、Desktop `flutter test --no-pub --reporter expanded`（132件全pass）、Mobile `flutter analyze --no-pub`（問題なし）、検査後cleanを確認した。Flutterは3.44.0 commit `559ffa3f75e7402d65a8def9c28389a9b2e6fe42`。runは7分52秒で成功。これは当該hosted runnerのbuild／analysis／test証拠であり、local OneDrive問題の解消、installed product、Owner dialog実操作、release readinessを証明しない。
+- OneDrive checkoutのDesktop `flutter analyze --no-pub`はAnalysis ServerのLSP JSON `FormatException`でexit 255。Desktop `flutter test test/mcp_connection_center_test.dart`とMobile `flutter analyze`はFlutterがOneDrive配下の`macos/Flutter/ephemeral/Packages/.packages`／`ios/Flutter/ephemeral/Packages/.packages`を削除できず開始前に停止した。いずれも成功証拠に数えない。補完としてworkflow_dispatch限定の[Windows Actions実行 #6](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36749071150)を検証branchの正確なcommit `d60bfe2e89572bee47f655f8c714863d89ea02bb`で実行し、Windows Server 2025 hosted runner（`win25-vs2026/20260925.250.1`）でRust helper build、Desktop `flutter analyze --no-pub`（問題なし）、Desktop `flutter test --no-pub --reporter expanded`（132件全pass）、Mobile `flutter analyze --no-pub`（問題なし）、検査後cleanを確認した。Flutterは3.44.0 commit `559ffa3f75e7402d65a8def9c28389a9b2e6fe42`。runは7分52秒で成功。これは当該hosted runnerのbuild／analysis／test証拠であり、local OneDrive問題の解消、導入済み製品、Owner確認画面実操作、release readinessを証明しない。
 
 ### 証拠境界と残存分類
 
-- Rust／Flutter試験は`FIXTURE`であり、実installed Desktop、実際のWin32 Owner dialog操作、配布物とのbinary identity、製品release readinessを証明しない。Windows Actionsもそのworkflowが実行したbuild／analysis／testの範囲だけを示す。
-- item: Windows installed product上の資格情報登録・注入・失効の実操作、C7内のMCP以外の注入、更新、暗号文物理削除・Recovery、GUI登録・接続先変更、Mobile安全保管は未成立。
+- Rust／Flutter試験は`FIXTURE`であり、実installed Desktop、実際のWin32 Owner確認画面操作、配布物とのbinary identity、製品release readinessを証明しない。Windows Actionsもそのworkflowが実行したbuild／analysis／testの範囲だけを示す。
+- item: Windows 導入済み製品上の資格情報登録・注入・失効の実操作、C7内のMCP以外の注入、更新、暗号文物理削除・Recovery、GUI登録・接続先変更、Mobile安全保管は未成立。
   classification: release_blocker
   reason: 現行範囲はWindows DPAPIとMCP stdioの限定Credentialに対する開発試験であり、上記機能や導入済み製品の実測を含まない。
-  required_action: 対象ごとの独立contract・負例試験・Owner操作を実装し、clean Windows installed productと必要platformで証拠を取得する。
+  required_action: 対象ごとの独立contract・負例試験・Owner操作を実装し、clean Windows 導入済み製品と必要platformで証拠を取得する。
   blocks_release: yes
 - `release_ready=false`を維持する。
 
@@ -1394,7 +1394,7 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 
 - `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml Rust生成Task設定で実Windows隔離の登録secretを拒否する -- --ignored --nocapture --test-threads=1`: exit 0、1 passed／0 failed。インストール済みCodex CLI `0.158.0-alpha.2.1`と合成Workspace／secretを使う直接MxC sandbox probeであり、実Agent、Rust Broker、Owner Approval、production Task、cleanup lifecycleの試験ではない。
 - 外部資料の確認（`EXTERNAL_EVIDENCE`）: [Microsoft Learn AppContainer資料](https://learn.microsoft.com/en-us/windows/win32/secauthz/implementing-an-appcontainer)、[Codex CLIの依存版固定箇所](https://github.com/openai/codex/blob/rust-v0.158.0-alpha.2.1/codex-rs/Cargo.toml)、[Codex CLIのMxC権限変換処理](https://github.com/openai/codex/blob/rust-v0.158.0-alpha.2.1/codex-rs/mxc-sandbox/src/policy.rs)、[Codex CLIのWindows起動処理](https://github.com/openai/codex/blob/rust-v0.158.0-alpha.2.1/codex-rs/mxc-sandbox/src/windows.rs)、[Microsoft MxC BaseContainerの起動終了処理](https://github.com/microsoft/mxc/blob/6cd3d58f05d3447e67109cfb75e042803b843ca4/src/backends/appcontainer/common/src/base_container_runner.rs)、[PSEC環境handleの寿命処理](https://github.com/microsoft/mxc/blob/6cd3d58f05d3447e67109cfb75e042803b843ca4/src/backends/learning_mode/windows/src/secenv.rs)。source確認は実行環境の`LIVE_RUNTIME`証拠ではない。
-- production Broker／IPC経由の実Task、AppContainer tempの実体・task間分離・物理cleanup、取消／期限／crash後Recovery、installed product、Audit、result／diffのContent Exposureは未成立。TEMP pathの完全一致をblocker条件から外したが、AppContainer一時領域の寿命とRecovery検証は`release_blocker`として残し、`task_execution=unsupported`および`release_ready=false`を維持する。
+- production Broker／IPC経由の実Task、AppContainer tempの実体・task間分離・物理cleanup、取消／期限／crash後Recovery、導入済み製品、Audit、result／diffのContent Exposureは未成立。TEMP pathの完全一致をblocker条件から外したが、AppContainer一時領域の寿命とRecovery検証は`release_blocker`として残し、`task_execution=unsupported`および`release_ready=false`を維持する。
 
 ## R2追補 Windows Job Objectによる子孫process停止試験（2026-10-01）
 
@@ -1433,7 +1433,7 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 ### 証拠境界と未解決範囲
 
 - 相手TEMP markerが見えなかった限定結果は、TEMP rootの物理的一意性を示さない。異なる`CODEX_HOME`を使う2つの直接sandbox childに限られ、同じ`CODEX_HOME`のAgent、順次Task、再起動後のmarker残存、AppContainer TEMPの物理cleanupは未検証である。
-- production Broker／IPC、native Owner Approval、durable Audit、実Agent Task、cancel／deadline／crash時Recovery、installed product、result／diff Content Exposureは通していない。従ってcross-agent contamination全体とMxC TEMP cleanupは`release_blocker`のままで、`task_execution=unsupported`および`release_ready=false`を維持する。
+- production Broker／IPC、native Owner Approval、durable Audit、実Agent Task、cancel／deadline／crash時Recovery、導入済み製品、result／diff Content Exposureは通していない。従ってcross-agent contamination全体とMxC TEMP cleanupは`release_blocker`のままで、`task_execution=unsupported`および`release_ready=false`を維持する。
 
 ## R2追補 同一CODEX_HOMEでの同時・後続MxC TEMP目印照合（2026-10-01）
 
@@ -1454,14 +1454,14 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 ### 証拠境界と未解決範囲
 
 - 同一`CODEX_HOME`条件の相互・後続child非可視性を示すが、実TEMP rootの一意性、child終了時の物理削除、同じ実Agent profileでの隔離、再起動後のmarker残存、MxC内部temporary dataのcleanupを示さない。後続child自身のTEMPから先行markerを読めなかったことは削除証拠ではない。
-- production Broker／IPC、native Owner Approval、durable Audit／Recovery、実Agent Task、cancel／deadline／crash時のcleanup、installed product、result／diff Content Exposureは通していない。cross-agent contamination全体とMxC TEMP cleanupは`release_blocker`のまま、`task_execution=unsupported`および`release_ready=false`を維持する。
+- production Broker／IPC、native Owner Approval、durable Audit／Recovery、実Agent Task、cancel／deadline／crash時のcleanup、導入済み製品、result／diff Content Exposureは通していない。cross-agent contamination全体とMxC TEMP cleanupは`release_blocker`のまま、`task_execution=unsupported`および`release_ready=false`を維持する。
 
 ## R2追補 Windows Export credential scan診断と実Codex CLI再試験（2026-10-01）
 
 ### Windows Export手動検証
 
 - [手動Windows Export run #6](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36784185786)は`workflow_dispatch`でclean `main`のcommit `1468bbaec77991bd6bf82e12bee9bf32279d8851`を検査した。checkout SHA／`origin/main`一致、clean source、固定Rust 1.95.0／Flutter 3.44.0 toolchain準備を確認し、Flutter Windows ReleaseとRust helper／launcher Release buildまで到達した。
-- その後Export bundleの既知Credential走査が`broker/gui_shell_rust_helper.exe`に`credential_assignment`を検出して停止した。検出一致が本物のcredentialかbinary内の別文字列との誤一致かは、このrunの診断では特定できない。fail-closed判定を維持し、bundle成功へ読み替えない。artifact uploadなし。前段失敗によりsource clean終了stepはskipされたが、hosted runnerは終了済みで一時workspace／build出力は保持されていない。
+- その後Export bundleの既知Credential走査が`broker/gui_shell_rust_helper.exe`に`credential_assignment`を検出して停止した。検出一致が本物のcredentialかbinary内の別文字列との誤一致かは、このrunの診断では特定できない。fail-closed判定を維持し、bundle成功へ読み替えない。成果物のuploadなし。前段失敗によりsource clean終了stepはskipされたが、hosted runnerは終了済みで一時workspace／build出力は保持されていない。
 - `tooling/export_windows_product.py`のCredential判定自体は変更せず、次回調査に限って一致field、artifact内byte offset、値長を診断し、候補値本文は出力しないようにした。conformance negative testはsynthetic候補値がdiagnosticへ漏れないことも検査する。原因が確定するまではscanを緩めない。
 - `python -X utf8 -m py_compile tooling/export_windows_product.py tooling/conformance_tests/run_conformance_skeleton.py`は成功。`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`は230 checks合格。`python -X utf8 tooling/manifest.py --write`でtracked manifest 1123件を更新後、履歴追記を含む最終`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`もexit 0。strict日本語監査1126 files／0 findings、Schema 151／example 151／negative 194、Conformance 230、manifest、release gate、packaging portability、release smoke、evidence bundle、release runtime assertions、C32監査の全登録checkがpassした。product Windows installed evidenceの5 gateは未成立、release blocker 31件、`post_v1_scope` 2件、`release_ready=false`を維持する。`git diff --check`もpass。
 
@@ -1479,7 +1479,7 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 ## R2追補 Windows Export credential scan再診断とマーカー保持形式変更（2026-10-01）
 
 - [手動Windows Export run #7](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36786755352)は`workflow_dispatch`でclean `main`のcommit `d2107c25fb8cbc2815534677d38723b373bf5ca6`をWindows Server 2025上で検査した。固定toolchain、Flutter Windows Release、Rust helper／launcher Release build、および開始時source cleanは成功した。
-- Exportのfail-closed既知Credential走査は`broker/gui_shell_rust_helper.exe`に`credential_assignment`を検出した。診断は`field=api_key`、artifact内byte offset `42737273`、一致値長`25`だけを記録し、候補値本文は出力していない。bundleは不成立、artifact uploadなし。scan後段のsource clean確認は前段失敗でskipされた。
+- Exportのfail-closed既知Credential走査は`broker/gui_shell_rust_helper.exe`に`credential_assignment`を検出した。診断は`field=api_key`、artifact内byte offset `42737273`、一致値長`25`だけを記録し、候補値本文は出力していない。bundleは不成立、成果物のuploadなし。scan後段のsource clean確認は前段失敗でskipされた。
 - [手動Windows Export run #8](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36789422406)は`workflow_dispatch`でclean `main`のcommit `f5bbd67e279fecb473e8cb3b261f8b6370d70741`をWindows Server 2025 image `20260922.246.2`上で検査した。固定Rust／Cargo 1.95.0とFlutter commit `559ffa3f75e7402d65a8def9c28389a9b2e6fe42`の準備、checkout SHA／remote main一致、Flutter／Rust Windows Release build、未署名fixture bundle組立、credential scan、最終source clean確認がすべて成功した。
 - run #8のfixture bundleは61,974,738 bytes、tree SHA-256 `dfa1233410ad75b3dd65ddb66b7d7bd3788e93c1a14aba03af41b03b7d4c7e69`。workflowは`passed_known_patterns`かつ0 findingsを検査して成功し、artifactはuploadされていない。既知patternで今回の停止は解消したが、run #7の一致byte列を取得していないため、数値marker変更との因果を確定したりrun #7をfalse positiveと断定したりはしない。
 - この一致が実Credentialかbinary内byte列による誤検出かは未確定であり、run #7をfalse positiveと断定しない。commit `6f0681c`で追加された既知marker片の文字列配置が関連する可能性を調べ、検出field・offset・長さとmarker構成を照合したが、hosted executableの一致byte列そのものは取得していない。
@@ -1491,7 +1491,7 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 ## R2追補 Windows起動器正本のExport build接続記述を同期（2026-10-01）
 
 - 現行`docs/specs/gui-shell-export.md`、`docs/specs/gui-shell-module-pruning.md`および`tooling/export_windows_product.py`は、Schema検証済みManifestのApp ID／Audit store IDをRust compile-timeへ渡すDeveloper専用Windows bundle buildを定義・実装している。一方、`docs/specs/windows-desktop-launcher.md`にはbuild tool未接続・将来実装とする旧記述が残り、同じ正本索引内で矛盾していた。
-- 起動器正本を実装とExport意味正本へ同期し、現在のDeveloper build補助はcompile-time identityとidentity別Cargo targetを使う一方、runtime Manifest消費・Owner承認済みproduction Export・installed productを成立させない境界を明記した。
+- 起動器正本を実装とExport意味正本へ同期し、現在のDeveloper build補助はcompile-time identityとidentity別Cargo targetを使う一方、runtime Manifest消費・Owner承認済みproduction Export・導入済み製品を成立させない境界を明記した。
 - これは文書整合性の修正であり、Export Owner path、正式製品build、installed runtime、署名・Installerのrelease blocker状態を変更しない。
 - 記述変更直後の`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`はConformanceとpackaging portabilityが失敗した。`run_conformance_skeleton.py`の起動器境界検査が未接続／将来実装という旧文言を要求していた。packaging portabilityのnested Conformance実行も同じ旧assertionを検出し、`fatal: not a git repository`診断を含め失敗した。
 - Conformanceの境界検査を弱めず、現在のDeveloper compile-time接続と、runtime Manifest消費／Owner承認済みproduction Exportが未成立であることを要求するassertionへ改めた。`python -X utf8 -m py_compile tooling/conformance_tests/run_conformance_skeleton.py`、`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`（230 checks）、最終の同`validate_all.py`はexit 0となり、packaging portabilityも合格した。release blocker 31件、`post_v1_scope` 2件、`release_ready=false`に変更はない。
@@ -1509,10 +1509,10 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 
 - `native/rust_helper/src/desktop_launcher.rs`の既存対話型Windows ignored test harnessへ、`GuiShellExport`確認summaryの子process直列化・復元を追加した。合成Export summaryを渡し、実Win32 Owner確認dialogを「いいえ」「はい」で自動操作する専用ignored testを追加した。private payload markerがdialog表示へ漏れないことも同じ試験で確認する。
 - この端末で実行した正確なコマンド `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib desktop_launcher::tests::nativeOwner確認dialogのExportNoYesを制御UI自動化できpayload本文を露出しない -- --ignored --exact --test-threads=1 --nocapture` は終了値0、1件成功。既存のAgent Task向けOwner確認画面の試験 `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib desktop_launcher::tests::nativeOwner確認dialogのYesNoを制御UI自動化できTask本文を露出しない -- --ignored --exact --test-threads=1 --nocapture` も終了値0、1件成功。
-- このUI試験はlocal Windows上のWin32 dialog操作について`LIVE_RUNTIME`証拠であり、dialogへ渡したsummary／payload markerは合成`FIXTURE`である。対話はtest用child process内で行われ、本試験はBrokerへExport requestを送らず、Receipt／Manifest／Audit fileを生成しない。製品のExport処理全体やinstalled productの証拠ではない。
+- このUI試験はlocal Windows上のWin32 dialog操作について`LIVE_RUNTIME`証拠であり、dialogへ渡したsummary／payload markerは合成`FIXTURE`である。対話はtest用child process内で行われ、本試験はBrokerへExport requestを送らず、Receipt／Manifest／Audit fileを生成しない。製品のExport処理全体や導入済み製品の証拠ではない。
 - `tooling/conformance_tests/run_conformance_skeleton.py`へ、Export No／Yes UI試験と子process discriminatorの存在を確認するassertionを追加した。`python -X utf8 -m py_compile tooling/conformance_tests/run_conformance_skeleton.py`と`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`（230 checks）はpass。`rustfmt +1.95.0 --edition 2021 --config skip_children=true --check native/rust_helper/src/desktop_launcher.rs`もpassした。
 - `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`はexit 0。lib 393 passed／0 failed／6 ignored、main 10、Broker IPC 10、その他integration targets 36、合計439 passed／0 failed／6 ignored。Windows Actionsは未使用であり、interactive Win32 dialogはlocal Windowsで直接検査した。
-- `rev2_export_owner_ui_authority_path`は引き続きunresolvedである。Brokerが生成したReceipt／Manifestを使うExport・unsigned bundle化、別profileでのinstalled product起動、独立Identity／Audit store、Owner判断とBroker結果の一連のproduction pathは未証明であり、release blockerを解除しない。`release_ready=false`を維持する。
+- `rev2_export_owner_ui_authority_path`は引き続きunresolvedである。Brokerが生成したReceipt／Manifestを使うExport・unsigned bundle化、別profileでの導入済み製品起動、独立Identity／Audit store、Owner判断とBroker結果の一連のproduction pathは未証明であり、release blockerを解除しない。`release_ready=false`を維持する。
 
 ## R2追補 Export Owner確認からBroker生成Receipt／ManifestのWindows Bundle検証（2026-10-01）
 
@@ -1520,7 +1520,7 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 
 - Export用ignored Windows testを、実Win32 Owner確認dialogのNo／Yes操作からBroker処理まで接続した。Noは`owner_required`で拒否されManifestを作らず、YesはBroker test経路がaccepted ReceiptとManifestを生成する。Receipt／ManifestのApp ID、Audit store ID、hashを照合し、Manifestは`build_status=not_started`／`artifact_status=not_built`である。Compose側synthetic ID markerは確認summaryおよびBroker Auditへ出ない。
 - Win32 dialog操作はlocal `LIVE_RUNTIME`、request payload・Workspace・Broker storeはsynthetic `FIXTURE`。Broker生成Receipt／Manifestはtest Broker経路でのfixture-backed結果であり、実production Owner identityやinstalled runtimeの証拠ではない。
-- 成功したReceipt／Manifestをclean source commit `3d312b27d2a4b53575de5561790ecc7fc8f2439c`のWindows Export buildへ渡し、14-file unsigned development bundleを生成した。bundleは62,023,973 bytes、tree SHA-256 `d154308a123315a82ed59ebb6d57fb128ff24c2b8052ce65da86f37d2713af36`。Receipt内Manifest SHA-256 `ba49850e15aea12a27f28007d418230c92b6ee897e78117f9743f6c08fdcd5b6`とbundle内`product_manifest.json`のhashは一致し、Receipt raw SHA-256は`32fb15004c2531fd44631af8edca23b17105dade097cb0107d10d0fc3b846ad5`。Build identityはApp ID `d4-pocket-app-aded8a8e3c38d9dcc233bb44786d87b7`、Audit store ID `audit-store-cf50852e45f1fcfe5e04d485d112ab2b`、Export ID `export-desktop-test`。
+- 成功したReceipt／Manifestをclean 対象ソースcommit `3d312b27d2a4b53575de5561790ecc7fc8f2439c`のWindows Export buildへ渡し、14-file unsigned development bundleを生成した。bundleは62,023,973 bytes、tree SHA-256 `d154308a123315a82ed59ebb6d57fb128ff24c2b8052ce65da86f37d2713af36`。Receipt内Manifest SHA-256 `ba49850e15aea12a27f28007d418230c92b6ee897e78117f9743f6c08fdcd5b6`とbundle内`product_manifest.json`のhashは一致し、Receipt raw SHA-256は`32fb15004c2531fd44631af8edca23b17105dade097cb0107d10d0fc3b846ad5`。Build identityはApp ID `d4-pocket-app-aded8a8e3c38d9dcc233bb44786d87b7`、Audit store ID `audit-store-cf50852e45f1fcfe5e04d485d112ab2b`、Export ID `export-desktop-test`。
 - Exporterは既知Credential pattern走査`passed_known_patterns`、0 findings。これは走査対象patternに対する結果であり、秘密が一般に存在しない保証ではない。証拠はbundle生成の`INTERNAL_STATE`とsynthetic Broker／Workspaceの`FIXTURE`であり、Owner authorization、source authority、runtime Manifest消費、installed起動、署名、Installer完了はいずれも未確認。artifactはActionsにもRepositoryにもuploadしていない。
 
 ### 検証と履歴
@@ -1530,9 +1530,9 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 - `cargo +1.95.0 fmt --manifest-path native/rust_helper/Cargo.toml --all -- --check`は変更対象外の既存Rust fileの書式差分でfail。無関係な全体整形は行わず、対象fileの局所rustfmt checkとActionsの変更Rust file整形checkを使用した。
 - `python -X utf8 tooling/schema_check/check_schemas.py`はSchema 151件、正常例151件、否定例194件で成功。`python -X utf8 -m py_compile tooling/conformance_tests/run_conformance_skeleton.py`と`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`（適合検査230件）も成功。
 - Workflow編集直後の`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`はMANIFESTのhash不一致で失敗。その後の実行では、この追記に含まれる英語散文4箇所が厳格日本語監査で検出された。該当記述を日本語化した後、同`validate_all.py`は終了値0となった。監査対象1126件・指摘0件、登録10検査すべて成功。内訳はSchema、適合検査、MANIFEST、リリースゲート、配布形式、起動確認、証拠束、runtime表明、C32を含む。Release blocker 31件、`post_v1_scope` 2件、`release_ready=false`は維持。
-- [Windows手動検査 第30回](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36798761327)は`workflow_dispatch`、一時branch `codex/export-owner-broker-validation`上のcommit `3d312b27d2a4b53575de5561790ecc7fc8f2439c`を対象として9工程すべて成功、所要10分25秒。Rust整形・全target確認／試験、Broker helperのrelease build、単体Broker実行試験、後片付け、作業tree cleanを確認した。Runnerは`win25-vs2026/20260925.250.1`、Rust `1.95.0`、helper SHA-256 `ca9a0f335380d141ffcf469d9f8e119d882254ce79af09f0c6d37c6403e8dc17`。実測した内容は認証済みloopback IPC、永続store、通常Task grant拒否、再起動後replay拒否、新鮮なhealth、強制停止後fail-closed、session file cleanup。これは単体Brokerと検証runnerの証拠で、Owner Export・installed product・正式release evidenceではなく、artifact uploadもない。
+- [Windows手動検査 第30回](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36798761327)は`workflow_dispatch`、一時branch `codex/export-owner-broker-validation`上のcommit `3d312b27d2a4b53575de5561790ecc7fc8f2439c`を対象として9工程すべて成功、所要10分25秒。Rust整形・全target確認／試験、Broker helperのrelease build、単体Broker実行試験、後片付け、作業tree cleanを確認した。Runnerは`win25-vs2026/20260925.250.1`、Rust `1.95.0`、helper SHA-256 `ca9a0f335380d141ffcf469d9f8e119d882254ce79af09f0c6d37c6403e8dc17`。実測した内容は認証済みloopback IPC、永続store、通常Task grant拒否、再起動後replay拒否、新鮮なhealth、強制停止後fail-closed、session fileの清掃。これは単体Brokerと検証runnerの証拠で、Owner Export・導入済み製品・正式release evidenceではなく、成果物のuploadもない。
 - Windows Export buildは、Receiptが指定するManifest filenameと合わない初回入力をbuild前に拒否した。Temp上で期待filenameへ置いた後の再実行は成功。build中にMSBuild `MSB8029`および変更外Rust dead-code warningが出たが、buildは完了した。Temp生成物の後片付けは環境policyが`Remove-Item -Recurse`を起動前に拒否したため未完了で、削除は一件も行われていない。対象は`D4PocketBrokerExportCapture-9874e540`、`D4PocketBrokerExportCapture-9874e540-retry1`、`D4PocketBrokerExportBuild-3d312b2`、`d4-pocket-app-aded8a8e3c38d9dcc233bb44786d87b7.json`。4対象はTemp直下にあり、再解析pointがなく、参照中processもないことを確認した。
-- 手動Actions検査後、成功した同一commitだけを`main`へfast-forwardし、pushとremote HEAD一致を確認した。一時branchはlocal／remote双方で削除し、PR・自動trigger・artifact uploadは作成していない。
+- 手動Actions検査後、成功した同一commitだけを`main`へfast-forwardし、pushとremote HEAD一致を確認した。一時branchはlocal／remote双方で削除し、PR・自動trigger・成果物のuploadは作成していない。
 
 ### 境界と残存範囲
 
@@ -1571,7 +1571,7 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 - Agent CenterのCodex CLI登録UIからBroker要求へ渡すfieldをWidget testで固定した。runtime／adapter／Workspace／secret pathだけを送信し、Permission、Approval ID、Credential実値は送らない。表示されるTask能力は`unsupported`のままである。
 - 実Windows上のignored Rust testでは、実Codex CLIをBroker登録要求へ接続し、実Win32 Owner確認dialogのNo／Yesをそれぞれ操作した。Noの後はAgent未登録、Yesの後はBroker Agent一覧に登録されたことを確認した。確認summaryと監査へsecret本文が出ず、登録応答はPermission／Approval／Credentialを生成しない。
 - 同じtest内で、通常Desktop relayからのWorkspace Permission／Owner Approval要求、Task preflight、Task startを送信した。Taskはworker起動前に`AgentTask実行非対応`で拒否され、応答本文・監査にTask指示markerまたはsecret markerがない。終了後にfile-backed Auditを照合し、成功した登録と拒否結果だけが残ることを確認した。
-- 別のignored integration testでは、現在sourceからbuildしたWindows Release Broker helperを別process起動し、実Codex CLIの起動時登録を含む認証loopback IPCでTask能力の`unsupported`、通常資格によるPermission／Approval発行拒否、Task preflight／start拒否、Broker終了後のAudit再openを確認した。これはOwner dialog経路とは別probeであり、二つの試験を単一installed-product E2Eとは扱わない。
+- 別のignored integration testでは、現在sourceからbuildしたWindows Release Broker helperを別process起動し、実Codex CLIの起動時登録を含む認証loopback IPCでTask能力の`unsupported`、通常資格によるPermission／Approval発行拒否、Task preflight／start拒否、Broker終了後のAudit再openを確認した。これはOwner確認画面経路とは別probeであり、二つの試験を単一installed-product E2Eとは扱わない。
 - 証拠class: 実CLI probeと実Win32 dialogの`LIVE_RUNTIME`、test thread Broker・Release Broker用合成Workspace／store・自動入力の`FIXTURE`。実model、実Credential、課金要求、Windows保護設定変更は使っていない。
 
 ### 検証結果と境界
@@ -1580,9 +1580,9 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 - Rust `cargo check --all-targets`、serial `cargo test --all-targets`（13 targets、444 passed／0 failed／7 ignored）、Schema（152／正常example 152／negative fixture 195）、Conformance（231 checks）はpassした。
 - 初回`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`は、新規進捗行1件が厳格日本語監査へ検出されexit 1。該当表現を日本語化し、`python -X utf8 tooling/日本語基底監査.py --strict`を再実行して1130 files／0 findingsでpassした。初回失敗を成功へ読み替えない。
 - `cargo +1.95.0 build --locked --manifest-path native/rust_helper/Cargo.toml --release --bin gui_shell_rust_helper --target-dir C:\\d4-r2-target`による現行Release helperのbuildは成功した。既存MINIDORAの未使用項目に関するwarningは2件。Release helper SHA-256 `56bc5d14b4bd94361802f01d9a908b311d7d06f3119f289f587ddffd5f92710d`。実Codex CLIは`codex-cli 0.159.3`。`GUI_SHELL_AGENT_TASK_E2E_HELPER_EXE`と`GUI_SHELL_CODEX_TASK_E2E_CLI`へそれぞれ当該Release helper／CLIの絶対pathを設定した`cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --test agent_task_production_e2e 'windows::production_agent_task_gate_fails_closed_over_authenticated_ipc' -- --ignored --exact --nocapture --test-threads=1`はexit 0、1 passed。
-- OneDrive checkout上のFlutter SDKはephemeral directoryを削除できず、local Desktop analyzeとfocused Widget testだけを短い一時pathで実行した。ACLは変更していない。このhost制約の補助として、対象source commit `fc8144c743c980b004637952f31734e4ca9910da`を一時branch `codex/r2-agent-registration-e2e`へ固定し、Windows hosted Actionsを`workflow_dispatch`で実行した。Rust manual validation [run #32](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36835238543)とDesktop Flutter manual validation [run #10](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36835318511)は、両方とも同一commit checkout、全step成功、試験後source clean確認まで成立した。
+- OneDrive checkout上のFlutter SDKはephemeral directoryを削除できず、local Desktop analyzeとfocused Widget testだけを短い一時pathで実行した。ACLは変更していない。このhost制約の補助として、対象対象ソースcommit `fc8144c743c980b004637952f31734e4ca9910da`を一時branch `codex/r2-agent-registration-e2e`へ固定し、Windowsホスト型 Actionsを`workflow_dispatch`で実行した。Rust manual validation [run #32](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36835238543)とDesktop Flutter manual validation [run #10](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36835318511)は、両方とも同一commit checkout、全step成功、試験後source clean確認まで成立した。
 - Rustの手動Windows検証run #32は`windows-2025`、Rust／Cargo 1.95.0で、変更Rustファイルの`rustfmt`整形検査、`cargo check --all-targets`、直列実行の`cargo test --all-targets`、Release Broker helperのrelease版ビルド、通常認証loopback IPCによる独立Broker動作確認を実行した。全対象試験は6分32秒、release版ビルドは8分45秒、Broker動作確認は7秒、runner後片付けは2秒、job全体は16分04秒。Broker動作確認の観測範囲は通常IPC、通常資格によるTask grant拒否、再起動後のreplay拒否、新規稼働状態の確認、強制停止時のfail-closed、session fileの削除であり、Owner確認画面やAgent Task実行を含まない。
-- Desktop／Mobile向け手動Windows検証run #10は固定Flutter 3.44.0でRust helperのビルド、Desktopの`flutter analyze --no-pub`と全テスト、Mobileの`flutter analyze --no-pub`を実行し、全て成功した。job全体は8分03秒で、生成物のuploadはなく、検査後にsource treeがcleanであることも確認した。この検査結果は自動検証の必須条件、installed product起動、Owner UI／named pipe結合、正式公開の準備完了を証明しない。
+- Desktop／Mobile向け手動Windows検証run #10は固定Flutter 3.44.0でRust helperのビルド、Desktopの`flutter analyze --no-pub`と全テスト、Mobileの`flutter analyze --no-pub`を実行し、全て成功した。job全体は8分03秒で、生成物のuploadはなく、検査後にsource treeがcleanであることも確認した。この検査結果は自動検証の必須条件、導入済み製品起動、Owner UI／named pipe結合、正式公開の準備完了を証明しない。
 - 検証成功後、対象commitだけを`main`へfast-forwardし、local／remote HEAD一致を確認して一時branchをlocal／remote双方から削除した。Actions実行とbranch cleanupの詳細を`release_blockers.registry.json`にも記録した。
 - 手動検証の結果追記後の初回統合検査では、報告文1行の英語混在を日本語厳格監査が検出し、終了値1となった。該当散文を日本語化した後、厳格監査単体は1130ファイル／検出0件で成功した。初回失敗は履歴に保持する。`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`の再実行は終了値0となり、登録済み10検査が全て成功した。内訳は厳格監査1130ファイル／検出0件、Schema 152件／正常例152件／negative fixture 195件、Conformance 231件、Manifest 1127ファイル、release gate、packaging、release smoke、evidence bundle、runtime assertion、最終開発監査の成功である。`release_ready=false`と未解決release blockerは維持する。
 - 本E2EでAgent Taskを起動しない。clean installed Flutter／Desktop UIと実native pipe／Brokerを通した一体動作、Task成功、OneDrive Cloud Files／通常NTFSの実隔離matrix、Task間分離、Audit改変試験、failure／deadline／crash Recovery、Broker scratchとMxC TEMP実体のcleanup、result／diff Content Exposureは未成立の`release_blocker`である。`task_execution=unsupported`と`release_ready=false`を保持する。
@@ -1672,7 +1672,7 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 - 初回`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`は日本語基底監査が画面英語ラベル3件とfake Broker error文字列1件を検出して失敗した。表示ラベルとfixture errorを日本語化して失敗履歴を保持し、`python -X utf8 tooling/manifest.py --write`で1128 fileのManifestを再生成した後、同じ統合validatorを再実行して成功した。厳格日本語監査1133 files／0 findings、Schema 152／正常例152／negative fixture 196、Conformance 231 checks、release gate、source packaging、smoke、証拠束、runtime assertion、最終開発監査の登録10検査がすべて成功し、`release_ready=false`と31件のrelease blockerを維持した。
 - analyzer指摘を修正した後、`flutter test --no-pub --no-test-assets --reporter expanded`を再実行し142 passed／0 failed、`dart format --output=none --set-exit-if-changed`と`git diff --check`も成功した。最新のManifestは1130 file。`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`は終了値0で、厳格日本語監査1133 files／0 findings、Schema 152／正常例152／negative fixture 196、Conformance 231 checksと登録10検査すべてが成功し、31件のrelease blockerと`release_ready=false`を維持した。
 - Windows手動workflow run #11（`workflow_dispatch`、2026-10-01、対象commit `be12e4e6140ff6e612ff9ef1897aca072b709e92`）はRust helper build成功後にDesktop `flutter analyze`で失敗した。追加testの相対`lib` import 1件と`const`不足2件が原因であり、Desktop全test・Mobile analyze・試験後clean確認は未実行、artifactはなし。失敗履歴を保持し、指摘修正をcommit `459369a637ff60b92f7ce1550d78ad3cb41548c2`へ記録した。
-- 同じbranch上の後続Windows手動workflow run #12（`workflow_dispatch`、[run 36864800422](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36864800422)、対象commit `459369a637ff60b92f7ce1550d78ad3cb41548c2`、runner `windows-2025`／`win25-vs2026/20260925.250.1`）は全体成功、7m36s、artifactなし。Rust helper build成功、Desktop analyzeは`No issues found`、Desktop全testは142 passed／0 failed、Mobile analyzeは`No issues found`、検査後の作業tree clean確認も成功した。これはhosted Windowsでのbuild／Flutter検査だけで、installed product・native Owner実操作・Agent Task production E2Eを証明しない。
+- 同じbranch上の後続Windows手動workflow run #12（`workflow_dispatch`、[run 36864800422](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36864800422)、対象commit `459369a637ff60b92f7ce1550d78ad3cb41548c2`、runner `windows-2025`／`win25-vs2026/20260925.250.1`）は全体成功、7m36s、artifactなし。Rust helper build成功、Desktop analyzeは`No issues found`、Desktop全testは142 passed／0 failed、Mobile analyzeは`No issues found`、検査後の作業tree clean確認も成功した。これはhosted Windowsでのbuild／Flutter検査だけで、導入済み製品・native Owner実操作・Agent Task production E2Eを証明しない。
 - このUI／service testは`FIXTURE`のみ。installed Desktop UI、実native Owner confirmation、authenticated production IPC、Agent Task process、durable Audit／Recovery、OneDrive Cloud Files／NTFS隔離、result／diff Content Exposureは未実証。
 - `task_execution=unsupported`、R2 production E2E `release_blocker`、`release_ready=false`を維持する。
 
@@ -1680,7 +1680,7 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 
 ### 成立した範囲
 
-- clean source commit `c0b15ae82a46a298e42bc2aaf54615d4c32682dd`からbuildしたstaged Windows Releaseを、Rust Desktop launcher経由で起動した。manifest上のapp／Broker helper／launcher SHA-256は順に`5d02c1f144dc5eddd7c3d6abcee1aa85a251bec880c8e64b93e5e7270878510b`、`d98a430d3714c1f29d1c98fa5fce536e70cf0679d8503278d9e574424b6fb1b8`、`c9da06cd11c960617b045fb29bf12d0c8637c267c29f3b2105109c7623b8fc0a`。
+- clean 対象ソースcommit `c0b15ae82a46a298e42bc2aaf54615d4c32682dd`からbuildしたstaged Windows Releaseを、Rust Desktop launcher経由で起動した。manifest上のapp／Broker helper／launcher SHA-256は順に`5d02c1f144dc5eddd7c3d6abcee1aa85a251bec880c8e64b93e5e7270878510b`、`d98a430d3714c1f29d1c98fa5fce536e70cf0679d8503278d9e574424b6fb1b8`、`c9da06cd11c960617b045fb29bf12d0c8637c267c29f3b2105109c7623b8fc0a`。
 - Agent Centerの登録UIから実Codex CLIの登録要求を行い、native Owner確認を承認した。登録は合成NTFS Workspace、CLIの`--version`／`exec --help`確認、secret pathなしに限定し、Task・Permission・Approval・Trust・Credentialは生成されなかった。UIはRuntime `codex-local`、Workspace `workspace-local`、Task `unsupported`を表示した。
 - Broker Session開始とWorkspace結合をUIから実行し、Session `240fda7256cf022e06cb92e47d5dc44a`、Audit `broker-audit-39/40`を確認した。Task事前検査には外部接続・file変更を指示しない合成本文だけを入力した。production UI／Broker経路は`AgentTask実行非対応`で拒否し、Audit `broker-audit-48/49`に受信／拒否を記録した。Worker、Task、Workspace変更、Task Permission／Approvalは発生しなかった。
 - Product Audit UIは`durable_file_store`／`hash_chain`を表示した。保存JSONLのRust Broker固定field連結hashを79件について再計算し、連続hash、anchor件数、head一致を確認した。Task本文の完全一致はAuditに存在しない。Rust BrokerはAudit storeを開いて稼働し、UIからの追加要求を処理した。HMAC鍵そのものは読み出していない。
@@ -1743,10 +1743,10 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 
 ## R2追補 native Owner登録dialogと試験build capability表示の整合（2026-10-02）
 
-- source commit `f69ec7abfc5072dec2937f64eddeb03d0eaeab80`からFlutter Windows Release、通常Broker helper Release、`r2-e2e` feature付きRust Desktop launcher／loopback serverをbuildし、新規の隔離installed layoutへstageした。試験IdentityとLOCALAPPDATAはrun固有で、通常利用者の設定・Audit領域へ混ぜていない。
-- オーナー承認済みの合成OneDrive fixtureだけを使い、D4 Pocketの実Agent画面からCodex CLI／Workspace登録を開始した。native Win32 Owner dialogを実際に取得すると、feature付き試験buildが条件成立時にTask capabilityを`supported`として返す一方、「unsupportedのまま」と表示していた。この不整合を確認して登録要求をNoで拒否した。Runtime登録、Permission、Task Approval、Task実行、Task Auditは発生していない。
+- 対象ソースcommit `f69ec7abfc5072dec2937f64eddeb03d0eaeab80`からFlutter Windows Release、通常Broker helper Release、`r2-e2e` feature付きRust Desktop launcher／loopback serverをbuildし、新規の隔離installed layoutへstageした。試験IdentityとLOCALAPPDATAはrun固有で、通常利用者の設定・Audit領域へ混ぜていない。
+- オーナー承認済みの合成OneDrive fixtureだけを使い、D4 Pocketの実Agent画面からCodex CLI／Workspace登録を開始した。native Win32 Owner確認画面を実際に取得すると、feature付き試験buildが条件成立時にTask capabilityを`supported`として返す一方、「unsupportedのまま」と表示していた。この不整合を確認して登録要求をNoで拒否した。Runtime登録、Permission、Task Approval、Task実行、Task Auditは発生していない。
 - `desktop_launcher.rs`の登録確認文をCargo featureに合わせ、通常buildは従来どおりunsupportedを表示し、`r2-e2e` buildはloopback API・隔離CODEX_HOME・合成Workspace専用の検証buildであり、登録だけではPermission／Approvalを与えない旨を示すよう修正した。通常product capabilityやdefault featureは変更していない。双方の表示をRust testで固定した。
-- computer-useの`activate_window`は対象Owner dialogに対して2回timeoutしたが、返却済みwindow handleで直接状態取得することで、実dialog本文とNo選択後のアプリ状態を確認できた。No後にAgent登録が存在しない表示を確認した。
+- computer-useの`activate_window`は対象Owner確認画面に対して2回timeoutしたが、返却済みwindow handleで直接状態取得することで、実dialog本文とNo選択後のアプリ状態を確認できた。No後にAgent登録が存在しない表示を確認した。
 - この修正後の再build・validationと、fresh installed appでのOwner登録／Workspace Permission／Task Approval／Task実行／positive durable Auditは未実行。前回stage artifactは修正前sourceに由来するため再使用しない。R2 `release_blocker`、通常buildの`task_execution=unsupported`、`release_ready=false`を維持する。
 
 ## R2追補 installed positive E2E試行で発見したWorkspace Permission receipt不整合の修正（2026-10-02）
@@ -1771,10 +1771,10 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 
 ## R2追補 修正commitからのfresh installed run4とUI操作基盤停止（2026-10-02）
 
-- clean source commit `7dbeba1361d852180dd12c4165fffcab6e355da9`から作ったsource archiveを使用し、変更対象5 fileのSHA-256がcommit済み作業ツリーと一致することを確認した。Flutter 3.44.0の`flutter build windows --release --no-pub`は成功（271.8秒）。Rust 1.95.0の`cargo +1.95.0 build --locked --release --features r2-e2e --manifest-path native/rust_helper/Cargo.toml --bins`も成功（7分35秒、既存MINIDORA dead-code warning 2件）。
+- clean 対象ソースcommit `7dbeba1361d852180dd12c4165fffcab6e355da9`から作ったsource archiveを使用し、変更対象5 fileのSHA-256がcommit済み作業ツリーと一致することを確認した。Flutter 3.44.0の`flutter build windows --release --no-pub`は成功（271.8秒）。Rust 1.95.0の`cargo +1.95.0 build --locked --release --features r2-e2e --manifest-path native/rust_helper/Cargo.toml --bins`も成功（7分35秒、既存MINIDORA dead-code warning 2件）。
 - run `r2-synthetic-task-e2e-7dbeba1-run4`を`C:\d4p-r2-install-7dbeba1-run4`へfresh stageし、local dataとTEMP／TMPをrun専用rootへ分離した。Flutter UI、Rust launcher、feature付きBroker helper、loopback偽Responses APIのSHA-256はregistryの同名probeに記録した。
 - CLI `0.159.2`の`--version`だけをローカル確認した。Owner承認済み合成fixture内の空CODEX_HOMEを指定し、偽API serverはloopback `127.0.0.1:49630`で待機した。OneDrive Workspace内の`private/credential-backup.txt`は存在だけを確認し、内容は読んでいない。
-- installed `D4 Pocket` overview画面の表示までは`LIVE_RUNTIME`で観測した。Agent Centerへの画面操作後、Computer Useのclick／画面状態更新が失敗し、fresh windowを再選択した復旧後も`Cannot read properties of null (reading 'window')`で状態取得できなかった。UI helperの再試行条件に達したため操作を停止し、native Owner dialog、Runtime登録、Session、Permission／Approval、Taskには進まなかった。
+- installed `D4 Pocket` overview画面の表示までは`LIVE_RUNTIME`で観測した。Agent Centerへの画面操作後、Computer Useのclick／画面状態更新が失敗し、fresh windowを再選択した復旧後も`Cannot read properties of null (reading 'window')`で状態取得できなかった。UI helperの再試行条件に達したため操作を停止し、native Owner確認画面、Runtime登録、Session、Permission／Approval、Taskには進まなかった。
 - 偽API停止時の証跡はrequests／models／tool提示／tool送信／不正body／途中request／応答失敗／外部要求がすべて0、Workspace markerなし。Task childは起動していない。実credentialと実modelは不使用。OS保護設定は変更していない。
 - このrunで起動したlauncher PID 18044とFlutter frontend PID 17844だけを停止した。run専用rootに残った`broker_session.json`（endpoint／secretを含むsession file）と`desktop_launcher.lock`を完全path照合後に削除し、Audit storeは保持した。`audit_anchor.key`は読んでいない。fake API listener終了を確認した。
 
@@ -1784,7 +1784,7 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 
 ## R2追補 fresh installed positive Task試行run7と偽API再送ループ（2026-10-02）
 
-- source commit `7dbeba1361d852180dd12c4165fffcab6e355da9`由来の`r2-e2e` staged app／launcher／Broker／localhost偽Responses APIを使用し、通常NTFS上のrun専用Workspace、LOCALAPPDATA、TEMP／TMP、空CODEX_HOMEで実施した。実Codex CLI `0.159.2`を起動し、API接続先はloopback `127.0.0.1:54155`だけだった。実provider、実credential、課金要求、外部通信は使用していない。
+- 対象ソースcommit `7dbeba1361d852180dd12c4165fffcab6e355da9`由来の`r2-e2e` staged app／launcher／Broker／localhost偽Responses APIを使用し、通常NTFS上のrun専用Workspace、LOCALAPPDATA、TEMP／TMP、空CODEX_HOMEで実施した。実Codex CLI `0.159.2`を起動し、API接続先はloopback `127.0.0.1:54155`だけだった。実provider、実credential、課金要求、外部通信は使用していない。
 - 実Flutter UIからRuntime `codex-local`とWorkspace `workspace-local`をnative Owner確認付きで登録し、Broker Session `179daa7b113a0ede282f79fe332e901e`を作成した。Workspace `agent_task.execute` Permission（同Session／Workspace、1回、短期限）と別個のTask Approval（同Session／Workspace、1回、最大15分）をそれぞれOwner確認で発行した。合成Task `76f0d99f6c34a1142d314d6f0f6af430`をUIからBroker経由で開始し、開始Audit参照は`broker-audit-58`、終端状態は`failed`（Audit参照`broker-audit-68`）となった。取消要求は`broker-audit-69`で拒否されており、取消成功とは扱わない。
 - CLI childはMxC経由でPowerShell tool childを起動した。偽Responses APIはtoolを提示・送信した後、同一tool callをmarker未作成のまま128 POSTにわたり再送した。期待したWorkspace report、TEMP observer marker、完了marker、継続marker、Workspace外書込markerはいずれも存在しなかった。したがってpositive Task、Workspace差分、TEMP書込成否は成立・観測できず、task成功とは扱わない。
 - 終了後、scratch recovery journalはHMAC付きで空entryだった。合成secret fileの存在のみを扱い内容は読んでいない。Task childと偽API listenerは終了し、このrunのlauncher／Broker processも個別確認後に停止した。Task結果とAudit参照は記録したが、run7についてAudit chainの独立再計算はしていない。run専用の失敗証跡は削除せず保持した。
@@ -1811,13 +1811,13 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 
 ### 維持する境界
 
-- このblockはRust test fixture／ignored integration testだけの修正で、production implementation、Flutter、通常Release capabilityを変更していない。実installed productのOwner／Permission／ApprovalからTask成功、file-backed positive Audit chainの独立検証、Cloud Filesと通常NTFSの隔離matrix、failure／deadline／crash Recovery、result／diff Content Exposureは未成立。`task_execution=unsupported`、R2 production E2E `release_blocker`、`release_ready=false`を維持し、次はこのcommitからfresh installed runを行う。
+- このblockはRust test fixture／ignored integration testだけの修正で、production implementation、Flutter、通常Release capabilityを変更していない。実導入済み製品のOwner／Permission／ApprovalからTask成功、file-backed positive Audit chainの独立検証、Cloud Filesと通常NTFSの隔離matrix、failure／deadline／crash Recovery、result／diff Content Exposureは未成立。`task_execution=unsupported`、R2 production E2E `release_blocker`、`release_ready=false`を維持し、次はこのcommitからfresh installed runを行う。
 
 ## R2追補 fresh installed run16／run17のTask失敗と安全なtool出力診断（2026-10-02）
 
 ### 失敗履歴・観測
 
-- run16／run17は、当時の作業branch `codex/r2-inspector-owner-confirmation-20261002`のsource commit `fca1d0c9d83f03108ebaaf64ea742ca38079b4fc`からstageした試験buildであり、指定基準HEAD `c306548e559d069fafd7dfb20088882521b04bb1`そのものではない。後続の診断buildは基準HEADへ戻した`main`で作成する。
+- run16／run17は、当時の作業branch `codex/r2-inspector-owner-confirmation-20261002`の対象ソースcommit `fca1d0c9d83f03108ebaaf64ea742ca38079b4fc`からstageした試験buildであり、指定基準HEAD `c306548e559d069fafd7dfb20088882521b04bb1`そのものではない。後続の診断buildは基準HEADへ戻した`main`で作成する。
 - fresh install run16では、合成fixture、native Owner確認、Session／Workspace結合、Task preflightまで進んだ。UIに残った古いsnapshotからの遅延操作によりPermission確認のissued-at期限が切れ、Brokerは`broker_issued_at_invalid`として拒否した。Task、偽API要求、tool実行、Workspace変更は発生せず、当該失敗Auditを保持した。
 - fresh install run17では、native Owner登録、Session／Workspace結合、preflight、Workspace Permission、別個のTask Owner Approval、Task開始までをinstalled UI→Rust Brokerで実行した。Task開始Audit参照は`broker-audit-43/44`、終了状態は`failed`・Audit参照`broker-audit-53`である。Task結果／diffはBrokerから未取得であり、成功とは扱わない。
 - run17のloopback偽Responses APIは4 POSTを受け、tool offer／call／function output受領が各成立した。Workspace完了markerがないためAPIが409を返し、同一結果を含む後続requestが3回観測された。これはtoolを3回再実行した証拠ではなく、API応答後のrequest再試行である。外部要求、不正body、途中request、応答書込み失敗は0件。TEMP reportとWorkspace完了markerはいずれも存在しない。
@@ -1828,7 +1828,7 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 
 - 偽APIが受け取った`function_call_output`本文を保存しないまま、出力形式・byte数・固定済み失敗分類・合成開始marker有無だけを返す診断を追加した。固定分類はHostFxr起動失敗、shell解決失敗、sandboxアクセス拒否、期限超過、その他error、出力なし／error兆候なしに限る。要求本文、stdout／stderr、path、secretは診断値へ含めない。PowerShell probeの先頭へ固定合成開始markerを追加した。
 - `cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml --features r2-e2e --bin gui_shell_r2_e2e_responses tool_output_diagnostic_records_only_bounded_safe_classification -- --nocapture --test-threads=1`: 1 passed。synthetic secretとlocal pathを含む入力が診断出力へ漏れないnegative testを含む。
-- `GUI_SHELL_CODEX_TASK_BROKER_TEST_EXE`へCodex CLI `0.159.2`を指定したignored Rust integration test: 1 passed。実CLI／MxC childのTEMP marker消失、Broker scratchとの分離、取消後cleanup、外部要求0を再確認した。これはin-process Broker／test fixtureであり、installed production Broker E2Eではない。
+- `GUI_SHELL_CODEX_TASK_BROKER_TEST_EXE`へCodex CLI `0.159.2`を指定したignored Rust integration test: 1 passed。実CLI／MxC childのTEMP marker消失、Broker scratchとの分離、取消後cleanup、外部要求0を再確認した。これはin-process Broker／test fixtureであり、導入済み製品ion Broker E2Eではない。
 - `cargo +1.95.0 check --locked --offline --manifest-path native/rust_helper/Cargo.toml --features r2-e2e --bin gui_shell_r2_e2e_responses`: 成功。変更Rust fileの`rustfmt +1.95.0 --edition 2021 --config skip_children=true --check`と`git diff --check`も成功。
 - 初回focused試験呼出しはbinary target名、feature指定、exact test名の不一致で実行前に拒否または0件となった。正しい`gui_shell_r2_e2e_responses` targetと`r2-e2e` featureを指定した後に1件実行し成功した。Rust source／production path failureへ読み替えない。
 
@@ -1841,7 +1841,7 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 
 ### run18の観測と失敗履歴
 
-- source commit `f71b7b9a9ba848f33c78a8381e9af2d4fbd7bd25`からFlutter Windows Releaseと`r2-e2e` Rust launcher／Broker／loopback偽APIをbuildし、run固有の新規installed layoutへstageした。実Flutter Agent CenterとWin32 native Owner確認dialogで、合成WorkspaceとCodex CLI `0.159.2`の登録を開始し、Owner確認はYesで確定した。
+- 対象ソースcommit `f71b7b9a9ba848f33c78a8381e9af2d4fbd7bd25`からFlutter Windows Releaseと`r2-e2e` Rust launcher／Broker／loopback偽APIをbuildし、run固有の新規installed layoutへstageした。実Flutter Agent CenterとWin32 native Owner確認dialogで、合成WorkspaceとCodex CLI `0.159.2`の登録を開始し、Owner確認はYesで確定した。
 - installed run18 Auditでは登録要求`broker-audit-46`がreceived、interface検査後の登録`broker-audit-47`と集約拒否`broker-audit-48`がrejectedだった。UIには「Owner確認後のAgent CLI interface検査に失敗」と表示された。Runtime／Workspace登録は成立せず、Workspace Permission、Task Approval、Task、model／tool要求、Workspace writeは発生していない。native確認は登録要求だけで、Task権限を与えたものではない。
 - 隔離run18のloopback偽Responses APIは停止時に要求0、tool提示／送信なし、tool結果なし、Workspace markerなしを返した。安全な同一環境probeでは`--version`成功、`exec --help`成功、必要な8 interface tokenをすべて確認した。実Codex CLI probe後に試験用`CODEX_HOME`へ`tmp` directoryが生成されていた。
 - 根本原因は、CLI version/help probeがCODEX_HOMEを初期化した後に、登録経路が「試験用CODEX_HOMEは空」と検査して自ら拒否する順序だった。TaskやAuthorityの拒否ではなく、試験初期状態検査と実CLI probeの副作用が衝突していた。
@@ -1860,7 +1860,7 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 
 ## R2追補 fresh installed run19の登録再失敗と失敗理由の安全な細分化（2026-10-02）
 
-- source commit `ae95ddf1a53f547e655ddff0464f42966d8b7ddc`由来としてbuild／stageしたrun19のFlutter、launcher、Rust Broker helperは、直前のbuild artifact hashとそれぞれ一致した。実Flutter Agent Centerで合成Workspace／Codex CLI `0.159.2`の登録を開始し、除外pathの入力形式を正規化した後、実Win32 native Owner確認dialogでOwner Yesを選択した。
+- 対象ソースcommit `ae95ddf1a53f547e655ddff0464f42966d8b7ddc`由来としてbuild／stageしたrun19のFlutter、launcher、Rust Broker helperは、直前のbuild artifact hashとそれぞれ一致した。実Flutter Agent Centerで合成Workspace／Codex CLI `0.159.2`の登録を開始し、除外pathの入力形式を正規化した後、実Win32 native Owner確認dialogでOwner Yesを選択した。
 - run19 Auditは`broker-audit-36`で要求を受領し、`broker-audit-37`で拒否、`broker-audit-38`で集約拒否を記録した。UIは「Owner確認後のAgent CLI interface検査に失敗」。Runtime／Workspace登録、Permission、Task Approval、Task、model／tool request、Workspace writeは発生していない。loopback偽APIへのrequestと完了markerもなかった。
 - 実行後の隔離CODEX_HOMEに`tmp`が存在した。一方、別の新規合成環境で実Codex CLIを同じ許可環境変数集合から直接起動したprobeは`--version`／`exec --help`ともexit 0で、要求interface tokenと`workspace-write`を確認した。この直接probeは`LIVE_RUNTIME`だが、Broker Adapterが同じ応答を読んだことの証拠ではない。
 - run18で推定した「空CODEX_HOME確認とCLI probeの順序衝突」の修正だけでは、run19登録を閉じたと確認できなかった。既存protocolは複数のAdapter初期化失敗を同一表示へ丸めるため、どの固定検査段階で拒否したかは未確定のまま保持する。
@@ -1872,7 +1872,7 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 
 ## R2追補 fresh installed run20のTask失敗とprobe境界分離（2026-10-02）
 
-- run20はsource commit `1e90ad1014e67a8d8ab22427966c32c168807636`からFlutter Windows Releaseと`r2-e2e` Rust helper／launcherをbuildし、run固有layoutへstageした。アプリ・Broker・launcher artifact hashはinstalled manifestに固定した。実Flutter Agent Centerから実Codex CLI `0.159.2`と合成NTFS Workspaceを登録し、native Owner確認後にSession、Workspace Permission、別個の一回限りOwner Approvalを発行した。通常ReleaseのTask capabilityは変更していない。
+- run20は対象ソースcommit `1e90ad1014e67a8d8ab22427966c32c168807636`からFlutter Windows Releaseと`r2-e2e` Rust helper／launcherをbuildし、run固有layoutへstageした。アプリ・Broker・launcher artifact hashはinstalled manifestに固定した。実Flutter Agent Centerから実Codex CLI `0.159.2`と合成NTFS Workspaceを登録し、native Owner確認後にSession、Workspace Permission、別個の一回限りOwner Approvalを発行した。通常ReleaseのTask capabilityは変更していない。
 - Task `4d27416c282e47581836c77f395842dc`はproduction IPC経路から開始Audit `broker-audit-94`まで到達した。loopback偽Responses APIは4要求を受け、`exec_command` tool offer／call／function outputを各観測した。応答後の同一要求再試行3件をHTTP 409で拒否し、非loopback要求、不正body、途中request、応答書込み失敗は0件。実model、資格情報、外部APIは使っていない。
 - Task toolはWorkspaceへtemp診断reportを書いた。reportはTEMP／TMP設定済み、scope=`mxc_appcontainer`、temp書込み=`failed`、例外型`System.Management.Automation.RuntimeException`、HRESULT `-2146233087`を記録した。失敗stepを記録していなかったため、Test-Pathと一時file書込みのどちらで失敗したかは未確定。host watcherはtemp書込み失敗を理由にcontinuation markerを拒否し、secret read、Workspace外read/write、Task完了markerまで進めなかった。Taskは失敗・取消、最終Audit `broker-audit-104`。synthetic secretは空fileであり読取りを試みず、outside write markerとTask completion markerは生成されていない。
 - Agent CenterはTask `failed`を表示した。実行directory、変更file、tool／command、試験状態、diff、resultのBroker projectionは未接続のまま。Auditはrun専用file-backed storeに残したが、本runのchain再計算、anchor HMAC、Broker再起動後の再読込は未検証。
@@ -1882,7 +1882,7 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 
 ## R2追補 fresh staged run23のpositive Taskとfile-backed Audit検証（2026-10-02）
 
-- remote `main`と一致したclean source commit `19bab4e05b152b99ac1a01308f6be17f7d7721b0`からstageしたrun23で、実Flutter UI、Rust Desktop起動器／PID照合付きnamed-pipe relay、production Broker、実Codex CLI `0.159.2`／MxC childを通した。製品artifactには試験専用`r2-e2e`機能を有効化しており、通常ReleaseのTask能力は変更していない。app／launcher／Broker helper／localhost偽Responses APIのSHA-256は`release_blockers.registry.json`へ固定した。
+- remote `main`と一致したclean 対象ソースcommit `19bab4e05b152b99ac1a01308f6be17f7d7721b0`からstageしたrun23で、実Flutter UI、Rust Desktop起動器／PID照合付きnamed-pipe relay、production Broker、実Codex CLI `0.159.2`／MxC childを通した。製品artifactには試験専用`r2-e2e`機能を有効化しており、通常ReleaseのTask能力は変更していない。app／launcher／Broker helper／localhost偽Responses APIのSHA-256は`release_blockers.registry.json`へ固定した。
 - 合成NTFS Workspaceと空の隔離CODEX_HOMEを使用し、APIは`127.0.0.1:58556`の偽Responses APIだけに向けた。実provider、実model、実資格情報、外部API要求は不使用。偽APIは2 requestを受け、tool提示・送信・tool結果受領を確認し、不正body、途中request、応答書込み失敗、非loopback／外部要求はいずれも0件。
 - installed UIからRuntime／Workspace登録とSession `566fb8538a6ac3afa6fe026fa831d83e`を行い、native Owner確認で登録、`agent_task.execute`の一回Workspace Permission（Audit `broker-audit-83`）、別個の一回Task Approval（Audit `broker-audit-85`）を発行した。Task `4e0b5663267328232d6156ebea9e9134`はBroker経由で開始され、UIは`completed`、結果hash `sha256:55c569826e219f9d375b6ec4b1e4a15d2d569e81a4ff75403e579e18c53787ab`を表示した。Audit `broker-audit-94`の理由は`Agent Task完了（結果本文非保存・hashのみ）`であり、本文ではなくhashだけが記録された。
 - file-backed Audit JSONLの2026-10-02 13:54 UTC時点の検査snapshot 139件について、Rust `BrokerAuditEvent`の実際のfield連結hash方式で全event hash、previous link、event ID一意性を独立再計算し、不一致0件を確認した。headは`sha256:0aeedfdb46285c1014689d09cfc9ae9773b31ee1b8c5d9fdf9a2f6fc10f4aaaf`。anchorのevent count／head一致とHMACも確認し、Task指示本文はAuditに存在しなかった。これは稼働中store snapshotの独立検証であり、Broker停止後の再起動・再読込検証ではない。
@@ -1901,7 +1901,7 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 
 - `native/rust_helper/tests/agent_task_production_e2e.rs`のignored Windows E2Eを拡張し、同じ合成Workspace／file-backed storeを使うRelease Brokerを順次2 process起動する。1つ目の通常終了後に同じstoreから2つ目を起動し、通常Session IDと資格が新しくなること、再起動前の要求は拒否され本文を返さないこと、新Sessionからのfresh要求は受理されることを検査する。
 - 2つ目のBroker終了後に永続storeを開き直す。再起動前後双方の応答Audit参照と、旧Session要求の拒否Auditがhash chain上に残ること、合成Task指示・secret markerがAudit本文にないことを確認する。
-- 現行Release Broker helperはproduction Rust source commit `59b32108dc0003a6834d4be9059970c9f95b898c`からbuildし、実Codex CLI `0.160.0`のinterface検査を行った。Windows `LIVE_RUNTIME`はstandalone Release Broker／loopback IPC／実CLI probeの範囲、Workspace・store・markerは`FIXTURE`。実Task、model／Credential、installed Flutter UI、Owner画面、外部通信は使っていない。
+- 現行Release Broker helperはproduction Rust 対象ソースcommit `59b32108dc0003a6834d4be9059970c9f95b898c`からbuildし、実Codex CLI `0.160.0`のinterface検査を行った。Windows `LIVE_RUNTIME`はstandalone Release Broker／loopback IPC／実CLI probeの範囲、Workspace・store・markerは`FIXTURE`。実Task、model／Credential、installed Flutter UI、Owner画面、外部通信は使っていない。
 - 同日、Ownerのtray `終了`操作後にrun23の既知Launcher PID `16268`とFlutter PID `8268`が不在、偽API port `58556`のlistener不在を確認した。run23の元cleanup recordは試験終了時点の記録として保持し、後追い終了確認をregistryへ追記した。
 
 ### 検証と境界
@@ -1917,14 +1917,14 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 - 現行CLI `0.160.0`を既存の`tooling/codex_mxc_exec_temp_probe.py`で1回実行した。実model・Credentialなし、run専用CODEX_HOME／合成Workspace／loopback偽Responses APIを使用し、非loopback接続要求はprobeで遮断した。Codexアプリ同梱PowerShellを含む元の`PATH`では偽API応答と`exec_command`提示まで進んだが、command childが`-2147450747`（`0x80008085`）で終了しreportを生成しなかった。これは失敗記録であり、TaskやTEMP cleanupの成功証拠には数えない。
 - 同じprobeを、probe process内だけWindows `System32`／`WindowsPowerShell`／`SystemRoot`に限定した`PATH`で再実行すると1/1正常完了した。PATH変更は終了後に元へ戻し、Codex設定・Windows保護設定・永続環境変数は変更していない。偽API要求2件、childのTEMP／TMP一致、Broker相当scratchとの不一致、child内marker書込成功、終了後markerとTEMP directoryがhostから不可視、non-loopback CONNECT遮断4件を観測した。host不可視は物理削除の証明ではない。
 - 同じ現行CLIを明示絶対pathで指定した既存Rust ignored live test `Rust生成Task設定で実Windows隔離の登録secretを拒否する`も1/1成功した。Rust生成設定での明示`powershell.exe`起動、登録secret read／write拒否、動的hardlink作成拒否、別AgentのWorkspace／TEMP相互read拒否を確認した。一方、合成secretへの事前hardlink aliasはMxC単体permissionでは読めた。登録時・起動直前のBroker側file identity／hardlink検査は別責務として維持する。
-- MxCの既定`.env`／`.ssh`／`secrets` globはreadを拒否したがwriteは許した。登録済みsecret path、Workspace外pathはread／writeとも拒否した。この観測を全filesystem隔離やinstalled productの保証へ昇格しない。
+- MxCの既定`.env`／`.ssh`／`secrets` globはreadを拒否したがwriteは許した。登録済みsecret path、Workspace外pathはread／writeとも拒否した。この観測を全filesystem隔離や導入済み製品の保証へ昇格しない。
 - 環境変数`PATH`の差で`codex exec`の子commandの結果が変わった。ただし試行は各1回であり、CLIが選んだ実行shellと製品起動時の環境が一致しているかまでは確定しない。終了値`-2147450747`は[.NETホスト異常code表](https://github.com/dotnet/runtime/blob/main/docs/design/features/host-error-codes.md)の`CoreHostCurHostFindFailure`に対応する。原因の最終確認には、実際に配置した製品の`Broker`経路と同じ起動条件で再検証する。
 - 証拠範囲は直接Codex CLI／MxC childおよび明示PowerShellのRust live testであり、Owner UI、production Broker Task、実Workspace登録、期限／crash Recovery、Audit、task間cleanup、OneDrive／NTFS統合matrixを通していない。`task_execution=unsupported`、R2 `release_blocker`、`release_ready=false`を維持する。
 - 実行command: `python -X utf8 tooling/codex_mxc_exec_temp_probe.py --exe <明示指定Codex CLI絶対path> --runs 1`（PATH継承／一時Windows標準shell PATHの各1回）、`cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml --lib "Rust生成Task設定で実Windows隔離の登録secretを拒否する" -- --ignored --nocapture --test-threads=1`（1 passed）。前者は直接CLI probe、後者はRust生成permission profileの明示`powershell.exe` sandbox testであり、同一production経路ではない。
 
 ## R2追補 fresh installed run27失敗とTEMP scope判定不備の修正（2026-10-03）
 
-- source commit `9c1f8a777728efc2ab02c8ae4e4e8addd10a0282`から作成したstaged app（manifestの`source_worktree_clean=true`、app SHA-256 `sha256:e617996bdd69365aacf1095cee9f2b3d2a3d6ba9dd1ac39ac48e22ad7c3ce44f`）を使い、synthetic run27でnative Owner確認、Runtime／Workspace登録、Workspace Permission、別個のTask Approval、production Broker Task開始まで実行した。Session `15e47a5f7d02173b29210ece3c914c99`、Task `363174fe325b01a4c9bb73f6c68eaf38`はterminal `failed`であり、positive completionではない。
+- 対象ソースcommit `9c1f8a777728efc2ab02c8ae4e4e8addd10a0282`から作成したstaged app（manifestの`source_worktree_clean=true`、app SHA-256 `sha256:e617996bdd69365aacf1095cee9f2b3d2a3d6ba9dd1ac39ac48e22ad7c3ce44f`）を使い、synthetic run27でnative Owner確認、Runtime／Workspace登録、Workspace Permission、別個のTask Approval、production Broker Task開始まで実行した。Session `15e47a5f7d02173b29210ece3c914c99`、Task `363174fe325b01a4c9bb73f6c68eaf38`はterminal `failed`であり、positive completionではない。
 - Permission発行Auditは`broker-audit-55/56`、別個のApprovalは`broker-audit-57/58`、Task開始は`broker-audit-60/61`、失敗・取消記録は`broker-audit-80/81`。二度目の取消要求`broker-audit-82`は`要求不正`で拒否された。UIの終端状態は`failed`。偽Responses API `127.0.0.1:56106`は4 requestを観測し、tool提示・送信・結果受領はあったが、同一tool-call再送拒否3件、invalid body／応答書込み失敗／外部要求0件で、completion markerは作られなかった。
 - Workspace completion markerとoutside-write markerは不在、登録secret canaryは0 byte。outside-read拒否が成立したことを示す安全な証拠はなく、結果は`unknown`とする。TEMP reportは`stage=temp_checked`、`temp_scope=unrecognized`、`temp_write=failed`、`temp_step=temp_directory_check`、TEMP／TMP一致を記録した。
 - このTEMP分類については、実path componentが`sandbox.{GUID}`形式であるのに、試験probeのmatcherが`sandbox.GUID`形式だけを受理していた不備を確認した。従ってrun27の`unrecognized`／`failed`はTEMP directoryの実書込み拒否を証明しない。Rust source `native/rust_helper/tests/support/codex_loopback_responses.rs`を波括弧付き／なし双方を受理するmatcherへ直し、実probe文字列からmatcherを取り出して両形式と片側括弧の拒否を確認するtestを追加した。この修正はtest harnessだけで、製品のTEMP挙動を証明・変更しない。Task全体の失敗原因は確定していない。
@@ -1934,7 +1934,7 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 
 ## R2追補 fresh installed run31のTask失敗・取消と終了未完了（2026-10-03）
 
-- source commit `9159b88f73e1036381493a957545535afd48c5cc`からのinstalled app／Broker／launcherを使用し、実Flutter UI、native Owner confirmation、production Broker、実Codex CLI／MxC、loopback偽Responses APIを通した。installed artifact hashとrun固有の証拠は`release_blockers.registry.json`の`r2_installed_synthetic_task_e2e_run31`へ記録した。通常Release能力を有効化せず、実Model、Credential、課金、外部通信、Windows保護設定変更はない。
+- 対象ソースcommit `9159b88f73e1036381493a957545535afd48c5cc`からのinstalled app／Broker／launcherを使用し、実Flutter UI、native Owner confirmation、production Broker、実Codex CLI／MxC、loopback偽Responses APIを通した。installed artifact hashとrun固有の証拠は`release_blockers.registry.json`の`r2_installed_synthetic_task_e2e_run31`へ記録した。通常Release能力を有効化せず、実Model、Credential、課金、外部通信、Windows保護設定変更はない。
 - 先行Task `1e908929679bf19963495eebf5feb172`は開始Audit `broker-audit-62`後にterminal `broker-audit-72`で失敗した。再試行Task `0296907e42edae32637e87f1fa027926`はWorkspace Permission `broker-audit-86`、独立Approval `broker-audit-89`、開始`broker-audit-92`まで到達したが、Taskは取消Audit `broker-audit-100/101`で終端し、重複取消`broker-audit-102`は拒否された。状態更新のつもりの私の画面操作直後に取消requestが記録されており、誤って停止controlを選んだ可能性が高い。これは私の操作ミスとして扱い、成功証拠には数えない。
 - 各偽API試行は4 requests、tool提示／送信／結果受領あり、同一tool-call再送拒否3件、invalid／incomplete／response write failure／外部要求0件、Workspace completion markerなしだった。TEMP reportは`temp_scope=unrecognized`／`temp_write=failed`／`temp_step=temp_directory_check`を記録し、偽APIの安全診断projectionでは`workspace_detected`までしか確認できなかった。実TEMP書込み拒否、secret read拒否、outside read拒否はいずれも証明せず、結果を`unknown`とする。
 - 試験commandはWorkspaceへTEMP reportを書いた後、合成継続markerを最大30秒待つ。report後のmarker作成は期限を超えていたため、tool retryの一因として有力だが唯一の根本原因とは確定していない。次の試行ではTask開始前からrun専用watcherを稼働させ、`stage=temp_checked`を検証した直後にzero-byte continuation markerを作る。期限内markerでも再送が起きる場合はCodex/MxCのtool result acknowledgementを切り分ける。
@@ -1944,7 +1944,7 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 
 ## R2追補 fresh installed run32のpositive TaskとTEMP未判定（2026-10-03）
 
-- run31と同じstaged product artifact（product source commit 9159b88f73e1036381493a957545535afd48c5cc）で、freshなprofile／合成Workspaceを用いたrun32を実行した。現行main 209751720b973ce52ebf1dbb60137485bc9f56f8との比較では、apps/desktop_flutterとnative/rust_helper/srcに差分はない。artifact hash、synthetic run ID、Task／Audit参照はrelease_blockers.registry.jsonのr2_installed_synthetic_task_e2e_run32に記録した。
+- run31と同じstaged product artifact（product 対象ソースcommit 9159b88f73e1036381493a957545535afd48c5cc）で、freshなprofile／合成Workspaceを用いたrun32を実行した。現行main 209751720b973ce52ebf1dbb60137485bc9f56f8との比較では、apps/desktop_flutterとnative/rust_helper/srcに差分はない。artifact hash、synthetic 実行ID、Task／Audit参照はrelease_blockers.registry.jsonのr2_installed_synthetic_task_e2e_run32に記録した。
 - 実Flutter UI、native Owner確認、production Broker、別個の一回限りWorkspace Permission／Task Approval、実Codex CLI／MxC、loopback偽Responses APIを通り、Task bc442f051d8ac54a7568bd45b7b04e59はUI上completedとなり、Workspaceのbroker-real-codex-marker.txtが存在した。Permission broker-audit-44、Approval broker-audit-46、Task開始broker-audit-52、状態照会broker-audit-56。合成secretは0 byte、outside-read canaryは存在、outside-write markerとBroker scratch directoryは不在だった。
 - TEMP reportはscope=unrecognized／write=failed／step=temp_directory_checkであり、scope不明のため実TEMP書込みは試みられていない。watcherはreport後に継続markerを作ったのでTaskは完了したが、TEMPの書込み可否・marker cleanupは未確認である。Broker終了後のAudit JSONL 100 eventを独立再計算し、event hash／previous link不一致0、重複0、anchor count／head一致、HMAC有効を確認した。head=sha256:e9e9d8d9a626c46e62563bf854919438af558053576ac0ab397cbd41fdb6b589。Broker restart後の再読込ではない。
 - このrunはstaged r2-e2e buildでのpositive Task completionを補強するが、通常ReleaseのTask capability、TEMP cleanup、Audit restart durability、result／diff Content Exposure、OneDrive Cloud Files／通常NTFSの統合隔離、failure／deadline／crash Recoveryを証明しない。task_execution=unsupported、R2 release_blocker、release_ready=falseを維持する。
@@ -1985,7 +1985,7 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 
 ## R2追補 fresh installed run35のpositive Task・同一profile Audit再起動確認（2026-10-03）
 
-- 試験用source commit `0acda4705c432c298269ace5b23abfa35960213d`から生成し、SHA-256 `sha256:f8e220e9b91b15038d7c69708b67fcc1198354028b8f5019feca8260718884c5`を固定したlocalhost限定応答API試験fileと、製品成果物commit `9159b88f73e1036381493a957545535afd48c5cc`由来の段階配置アプリ／Broker／起動器を用いた。製品成果物のhash群はrun30と一致し、app `sha256:e617996bdd69365aacf1095cee9f2b3d2a3d6ba9dd1ac39ac48e22ad7c3ce44f`、Broker `sha256:c9169cc0880b39dfad7fa458407824f6d7299e064145dbf8ab0d203816c5622d`、起動器 `sha256:c3165076021ffcd0814d32244be2667e67634c5495267cff186094d83a0c4671`。実行記録、合成Workspace、隔離profile、Task／Audit参照は`release_blockers.registry.json`の`r2_installed_synthetic_task_e2e_run35`に保存した。実Codex CLIのfile hashは記録したが、version確認は行っておらずCLI版は未観測。
+- 試験用対象ソースcommit `0acda4705c432c298269ace5b23abfa35960213d`から生成し、SHA-256 `sha256:f8e220e9b91b15038d7c69708b67fcc1198354028b8f5019feca8260718884c5`を固定したlocalhost限定応答API試験fileと、製品成果物commit `9159b88f73e1036381493a957545535afd48c5cc`由来の段階配置アプリ／Broker／起動器を用いた。製品成果物のhash群はrun30と一致し、app `sha256:e617996bdd69365aacf1095cee9f2b3d2a3d6ba9dd1ac39ac48e22ad7c3ce44f`、Broker `sha256:c9169cc0880b39dfad7fa458407824f6d7299e064145dbf8ab0d203816c5622d`、起動器 `sha256:c3165076021ffcd0814d32244be2667e67634c5495267cff186094d83a0c4671`。実行記録、合成Workspace、隔離profile、Task／Audit参照は`release_blockers.registry.json`の`r2_installed_synthetic_task_e2e_run35`に保存した。実Codex CLIのfile hashは記録したが、version確認は行っておらずCLI版は未観測。
 - 実Flutter UIのnative Owner確認、Production Brokerのauthenticated IPC、one-use Workspace Permission（`broker-audit-60/61`）、別個のone-use Task Approval（`broker-audit-63/64`）、Task開始（`broker-audit-66/67`）、実Codex CLI／MxC tool child、loopback偽APIを通し、Task `933db3b53d0641ab8b842a1a8d640856`はUI状態照会で`completed`、result hash `sha256:55c569826e219f9d375b6ec4b1e4a15d2d569e81a4ff75403e579e18c53787ab`となった。Task instruction hashは`sha256:925fe4108448289885e4d5b48452c6cd9986f8102d3d501272954c109cc8a165`。固定probeは合成登録secret read、Workspace外read／writeを拒否した場合に限りmarkerを書く設計であり、Workspace marker（20 byte、SHA-256 `sha256:712aff9ceb6418d369c1f968d51294af292dbfe4bda6739d4e86ba333227a29c`）が作成された。偽APIは2 request、model request 0、tool offer／call／result受領各true、再送拒否・invalid／incomplete body・response write failure・外部requestは0。実model、資格情報、課金、OS保護設定変更なし。
 - 完了状態に至る途中で取消要求Audit `broker-audit-69/70`が記録され、後続取消`broker-audit-71`はterminal Taskとして拒否された。`broker-audit-70`のreasonは「Agent Task完了（結果本文非保存・hashのみ）」だが、外側operation fieldは`AgentTask取消`である。後続の状態照会`broker-audit-75`とUIは`completed`を示す。operation名を完了へ書き換えず、このAudit意味上の注意を保持する。
 - Task probeはTEMPを`mxc_appcontainer`と分類したものの、`temp_directory_check`で失敗し、TEMP markerへの実書込みを試みなかった。tool output diagnosticsは`workspace_detected`まで、host watcherは約254.9秒後に継続markerを置いて`continued`となった。TEMP report SHA-256は`sha256:f30e5a0c90c21faf903b98c5034ecd69915123dcb5818dc4b64e0f2e167ee538`。実pathを保存・表示せず、hostからdirectoryが見えないことを物理削除の証拠にしない。
@@ -1994,7 +1994,7 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 
 ## R2追補 fresh installed run36失敗とoutside境界fixtureのhost-side照合（2026-10-03）
 
-- run36は試験用source commit `6e31a1c0b6b8d22481bab6bd61d93a77edbfc660`から作った`r2-e2e`段階配置品、実Flutter UI、native Owner確認、authenticated Broker IPC、production Broker、実Codex CLI `0.160.0`／MxC child、loopback偽Responses APIを通った。product artifactはapp `sha256:e617996bdd69365aac1095cee9f2b3d2a3d6ba9dd1ac39ac48e22ad7c3ce44f`、Broker `sha256:c9169cc0880b39dfad7fa458407824f6d7299e064145dbf8ab0d203816c5622d`、launcher `sha256:c3165076021ffcd0814d32244be2667e67634c5495267cff186094d83a0c4671`、偽API `sha256:9c0525d68cf105df01fdd9d27f3edee8e9aa0d355cb7b8f6b2035e64311f8eea`。real model／credential、課金、OS保護設定変更なし。実行manifest、隔離profile／Workspaceはrun固有root `C:\d4p-r2-run36-6e31a1c`に保持した。
+- run36は試験用対象ソースcommit `6e31a1c0b6b8d22481bab6bd61d93a77edbfc660`から作った`r2-e2e`段階配置品、実Flutter UI、native Owner確認、authenticated Broker IPC、production Broker、実Codex CLI `0.160.0`／MxC child、loopback偽Responses APIを通った。product artifactはapp `sha256:e617996bdd69365aac1095cee9f2b3d2a3d6ba9dd1ac39ac48e22ad7c3ce44f`、Broker `sha256:c9169cc0880b39dfad7fa458407824f6d7299e064145dbf8ab0d203816c5622d`、launcher `sha256:c3165076021ffcd0814d32244be2667e67634c5495267cff186094d83a0c4671`、偽API `sha256:9c0525d68cf105df01fdd9d27f3edee8e9aa0d355cb7b8f6b2035e64311f8eea`。real model／credential、課金、OS保護設定変更なし。実行manifest、隔離profile／Workspaceはrun固有root `C:\d4p-r2-run36-6e31a1c`に保持した。
 - Workspace Permission `broker-audit-74`、別個のone-use Task Approval `broker-audit-76`、Task開始`broker-audit-80`を経て、Task `0e548cb404c14d12c057a4a80e9ced98`（Session `c8b0cd0031dc7d08db72f426d5074542`）は状態照会`broker-audit-94`でfailedとなった。終端理由は「Agent Task失敗・取消（RecoveryAction=Workspace差分を確認）」。Workspace completion markerはなく、result hash／completed stateは成立していない。
 - 偽APIは4 requests、model requests 0、tool offer／call／result受領あり、repeated tool-call rejection 3、invalid／incomplete body、response write failure、blocked external requestは各0。Workspace markerは不在。Host側でoutside-write marker不在、registered-secret file存在、`.d4p-tmp-*` scratch 0件を確認したが、Taskがmarkerを作る前に失敗したため、childによるsecret／outside read拒否をpositive結果として扱わない。outside-read結果もこのrunでは未確定。
 - TEMP reportは`scope=mxc_appcontainer`、`stage=temp_checked`、`temp_step=temp_write`、`temp_write=failed`。実TEMP markerへの書込みを試み、tool-output diagnosticの安全な分類は`directory_missing`。これはTEMP pathの実書込み失敗を記録するが、TEMP rootの物理削除・cleanupを証明しない。
@@ -2012,7 +2012,7 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 
 ## R2追補 fresh installed run37の正Task・境界・Audit再起動確認とTEMP書込み失敗（2026-10-03）
 
-- run37は試験用source commit `3688fa0fc0a50d3f06df40d003b8115c194846e1`からのfresh `r2-e2e`配置品で実行した。Rust launcher／Brokerは同commit、Flutter appはsource commit `9159b88f73e1036381493a957545535afd48c5cc`由来であり、該当Flutter sourceは`3688fa0`まで変更なし。app／Broker／launcher hashはそれぞれ`sha256:e617996bdd69365aac1095cee9f2b3d2a3d6ba9dd1ac39ac48e22ad7c3ce44f`、`sha256:c9169cc0880b39dfad7fa458407824f6d7299e064145dbf8ab0d203816c5622d`、`sha256:c3165076021ffcd0814d32244be2667e67634c5495267cff186094d83a0c4671`。run manifest、loopback偽API、合成Workspaceと隔離profileは`C:\d4p-r2-run37-3688fa0`に保持し、偽API hashは`sha256:83a1e3cbcd92b76cd34c929f731385984c65aa7a4bbeea25154b7fd0353999dc`。実Codex CLIは0.160.0、hash `sha256:7d4588265a55adb1403f85d2e058b11dc971459842de84876c86ff02fb7771f2`。実Model／Credential／課金／外部通信は使わず、OS保護設定も変更していない。
+- run37は試験用対象ソースcommit `3688fa0fc0a50d3f06df40d003b8115c194846e1`からのfresh `r2-e2e`配置品で実行した。Rust launcher／Brokerは同commit、Flutter appは対象ソースcommit `9159b88f73e1036381493a957545535afd48c5cc`由来であり、該当Flutter sourceは`3688fa0`まで変更なし。app／Broker／launcher hashはそれぞれ`sha256:e617996bdd69365aac1095cee9f2b3d2a3d6ba9dd1ac39ac48e22ad7c3ce44f`、`sha256:c9169cc0880b39dfad7fa458407824f6d7299e064145dbf8ab0d203816c5622d`、`sha256:c3165076021ffcd0814d32244be2667e67634c5495267cff186094d83a0c4671`。run manifest、loopback偽API、合成Workspaceと隔離profileは`C:\d4p-r2-run37-3688fa0`に保持し、偽API hashは`sha256:83a1e3cbcd92b76cd34c929f731385984c65aa7a4bbeea25154b7fd0353999dc`。実Codex CLIは0.160.0、hash `sha256:7d4588265a55adb1403f85d2e058b11dc971459842de84876c86ff02fb7771f2`。実Model／Credential／課金／外部通信は使わず、OS保護設定も変更していない。
 - 実Flutter UIとRust native Owner確認を経てRuntime／Workspaceを登録し、Workspace Permission `broker-audit-50/51`と別個のone-use Task Approval `broker-audit-53/54`を発行した。実Codex CLI／MxC childを用いるproduction Broker Task `7d3b5a7c71758370f35192231f7211e8`は、状態照会`broker-audit-65`でcompleted、result hash `sha256:55c569826e219f9d375b6ec4b1e4a15d2d569e81a4ff75403e579e18c53787ab`。偽APIは2 requests、tool offer／call／result受領あり、重複tool-call、invalid／incomplete body、応答書込み失敗、外部要求はいずれも0。Audit reasonは完了を分類し、task instruction本文はAuditに含まれない。
 - 固定合成MxC probeは、登録secretと指定outside-read canaryのread拒否後にのみTask completion markerを書く。markerは20 bytes、hash `sha256:712aff9ceb6418d369c1f968d51294af292dbfe4bda6739d4e86ba333227a29c`。Host側でもoutside-read canaryの固定byte列が不変、outside-write marker不在、登録secret file存在を検査し、偽APIはpostcondition一致を報告した。この境界証拠は指定した合成pathと一回のchild runだけに限る。
 - TEMP reportは`scope=mxc_appcontainer`、`temp_step=temp_write`、`temp_write=failed`、安全な診断分類`directory_missing`。実MxC childがTEMP marker書込みを試みた結果であり、report hashは`sha256:728e5e9dc5d1f43815f2364bdb8b037a5853e7b9bdd022edf8621f4f6037b8a6`。物理TEMP cleanupは証明していない。TEMP path不在の原因は未確定で、製品隔離を緩める根拠にはしない。
@@ -2026,7 +2026,7 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 - TEMP原因を区別するため、development-only合成probeを拡張した。TEMPへの直接writeは引き続き最初に実行し、失敗後だけdirectory存在を観測する。認識済みMxC AppContainerで、初回失敗が`directory_missing`かつ再観測も不在の場合だけ、対象TEMP directoryのbounded createと一回のmarker retryを行う。cleanupはprobe自身の一意markerと、probeが作成した空directoryだけを非再帰で除去する。他のentryがあればdirectoryを再帰削除せず残存分類する。Audit投影はpath／raw error／本文ではなくallowlist enumだけを含む。Production runtime、Permission、通常Release `task_execution`は変更していない。
 - `cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml --features r2-e2e --bin gui_shell_r2_e2e_responses -- --test-threads=1`は9 passed／0 failed。`cargo +1.95.0 check --locked --offline --manifest-path native/rust_helper/Cargo.toml --all-targets --features r2-e2e`はexit 0。変更fileの`rustfmt +1.95.0 --edition 2021 --config skip_children=true --check native/rust_helper/tests/support/codex_loopback_responses.rs`と`git diff --check`はpass。
 - Rust all-target全件実行はlocalhost／TLS fixtureの3件で別々にWSA 10054／不正Content-Typeを観測し、各該当testの単独再実行はpass。3件だけを明示skipしたall-target commandはexit 0。これはhost loopback不安定性の原因を特定せず、unfiltered all-target全passとは主張しない。`cargo fmt --all --check`は今回変更していない既存Rust file群にも整形差分を報告したため、広域formatは実施せず、変更fileだけを整形・検査した。
-- ここまでのTEMP拡張証拠は`FIXTURE`のみ。MxC directory作成可否、retry、cleanupはfresh installed productで未観測。次はこの正確なcommitからrun38をfresh stageして実行する。TEMP診断の改善だけでR2を閉じず、期限／crash Recovery、Task間隔離、result／diff Content Exposure、OneDrive Cloud Files／通常NTFS統合、通常Release gate、tray正常終了Auditを別々に検証する。`task_execution=unsupported`、R2 `release_blocker`、`release_ready=false`を維持する。
+- ここまでのTEMP拡張証拠は`FIXTURE`のみ。MxC directory作成可否、retry、cleanupはfresh 導入済み製品で未観測。次はこの正確なcommitからrun38をfresh stageして実行する。TEMP診断の改善だけでR2を閉じず、期限／crash Recovery、Task間隔離、result／diff Content Exposure、OneDrive Cloud Files／通常NTFS統合、通常Release gate、tray正常終了Auditを別々に検証する。`task_execution=unsupported`、R2 `release_blocker`、`release_ready=false`を維持する。
 
 ## R2追補 現行Codex CLIのMxC TEMP正常終了・取消cleanup再確認（2026-10-04）
 
@@ -2034,14 +2034,14 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 - 現行probeはTEMP markerへの直接writeを最初に試し、その後のdirectory観測だけを行う。directory作成・retry・child削除は`not_attempted`とする。parent test processは実行中と子process終端後を別々に観測し、実Codex／MxCの自然なcleanupだけを判定する。権限不足を迂回する操作はない。
 - `GUI_SHELL_CODEX_TASK_BROKER_TEST_EXE`に`Get-Command codex`が返す絶対pathを設定したうえで、`cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml --features r2-e2e 'broker::dialogue::tests::Broker承認経路から実CodexCLIをloopback偽APIで実行し隔離とcleanupを確認する_LIVE_RUNTIME' -- --exact --ignored --nocapture --test-threads=1`を実行し、exit 0、1 passed。環境変数なしの最初の呼出しはfixture開始前に失敗したため、明示CLI pathを与えて再実行した。実Codex CLI `0.160.0`（SHA-256 `7d4588265a55adb1403f85d2e058b11dc971459842de84876c86ff02fb7771f2`）のMxC childで、TEMP marker write=`passed`、実行中parent read=`readable_match`、正常終端後marker=`not_found`／TEMP directory=`不在`を観測した。Broker取消経路でも実行中marker可読、終端後marker不在／TEMP directory不在を確認した。Task結果の`completed`、Workspace marker、secret／outside境界、loopback限定もtest assertionを通過した。
 - focused loopback support 11件、`cargo check --all-targets --features r2-e2e`、Schema 152件／example 152件／negative fixture 196件、Conformance 231 checks、変更Rust fileの`rustfmt --check`、`git diff --check`は成功。現行作業treeでの全target test再実行は全件PASSではない。1回目は417件中410 passed／1 failed／6 ignoredで、別process Broker recovery testが準備PIDの空fileをparseして失敗し、同test単独再実行は1 passed。2回目は同じく410 passed／1 failed／6 ignoredで、既存localhost TLS更新testがWSA 10054 connection reset、同test単独再試行も`Network`で失敗した。これは今回編集したfileの経路ではないが、原因未確定のため現行全target testは未完了として記録し、成功へ昇格しない。
-- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`はexit 0。development validationの成功であり、同validator出力はWindows installed smoke evidence不在と`release_ready=false`を示すため、installed product／release evidenceへ昇格しない。
-- 証拠分類は実Codex／MxC childのTEMP動作・process終了観測が`LIVE_RUNTIME`、in-process Broker、Owner callback、Workspace、loopback偽APIが`FIXTURE`。この結果はinstalled product経路ではなく、run37のinstalled TEMP `directory_missing`を置換しない。次は変更をcommit／pushしたclean sourceからfresh installed run38を行い、同じ挙動をFlutter UI→native Owner→production Broker経路で再確認する。active Taskのdeadline／crash Recovery、result／diff Content Exposure、OneDrive Cloud Files／通常NTFS統合、通常Release capability gate、tray正常終了Auditも未成立。`task_execution=unsupported`、R2 `release_blocker`、`release_ready=false`を維持する。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`はexit 0。開発検証の成功であり、同validator出力はWindows installed smoke evidence不在と`release_ready=false`を示すため、導入済み製品／release evidenceへ昇格しない。
+- 証拠分類は実Codex／MxC childのTEMP動作・process終了観測が`LIVE_RUNTIME`、in-process Broker、Owner callback、Workspace、loopback偽APIが`FIXTURE`。この結果は導入済み製品経路ではなく、run37のinstalled TEMP `directory_missing`を置換しない。次は変更をcommit／pushしたclean sourceからfresh installed run38を行い、同じ挙動をFlutter UI→native Owner→production Broker経路で再確認する。active Taskのdeadline／crash Recovery、result／diff Content Exposure、OneDrive Cloud Files／通常NTFS統合、通常Release capability gate、tray正常終了Auditも未成立。`task_execution=unsupported`、R2 `release_blocker`、`release_ready=false`を維持する。
 
 ## R2追補 fresh staged run38の正Task・同profile Audit再起動読戻しと終了／TEMP未成立（2026-10-04）
 
 - 記録中にregistryのmanifest hashを修正したため、その修正前に開始していた初回`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`は`release_blockers.registry.json`のManifest hash不一致でexit 1。日本語strict監査、Schema、Conformance、release smoke等はpassしたが、この実行を最終成功へ数えない。Manifest再生成後の最終統合validatorはexit 0で登録済みdevelopment check 10件すべてpass。
 - 最終検証結果: Schema 152件／正常例152件／negative fixture 196件、Conformance 231 checks、厳格日本語監査1134 files／0 findings、Manifest check、`git diff --check`、`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`が成功。統合validator内のrelease gate／package portability／release smoke／evidence bundle／runtime assertion／C32監査も合格。証拠束と最終開発監査は既存31 `release_blocker`・2 `post_v1_scope`と`release_ready=false`を維持し、正式releaseを証明しない。
-- clean source commit `ffd2e02729f5726a7ea631b0623420f8737ed442`からFlutter Windows ReleaseとRust `r2-e2e` feature付きhelperをbuildし、run `d4p-r2-run38-ffd2e02`としてstageした。app／Broker／launcher／偽Responses APIのSHA-256はそれぞれ`ea185a53cb06417cb410ad4bbf1cc0eed49a43db6d9946814ae7803b2cf2b474`、`48903cd3a59ae798bab3d1068440be1fa121ec7234bb313a8fcf83a3ece22cff`、`3826256ef1352f9822ba5010f00e72513dff1cdfeecdb331d697dc36e62c7b88`、`18c52176c7e824c1f050c28ebd520647af42bb22a6c49aec9ba81cb6dc0b7275`。Codex CLIは0.160.0（SHA-256 `7d4588265a55adb1403f85d2e058b11dc971459842de84876c86ff02fb7771f2`）。実model／実資格情報／課金／外部API要求なし。通常Release能力は変更していない。
+- clean 対象ソースcommit `ffd2e02729f5726a7ea631b0623420f8737ed442`からFlutter Windows ReleaseとRust `r2-e2e` feature付きhelperをbuildし、run `d4p-r2-run38-ffd2e02`としてstageした。app／Broker／launcher／偽Responses APIのSHA-256はそれぞれ`ea185a53cb06417cb410ad4bbf1cc0eed49a43db6d9946814ae7803b2cf2b474`、`48903cd3a59ae798bab3d1068440be1fa121ec7234bb313a8fcf83a3ece22cff`、`3826256ef1352f9822ba5010f00e72513dff1cdfeecdb331d697dc36e62c7b88`、`18c52176c7e824c1f050c28ebd520647af42bb22a6c49aec9ba81cb6dc0b7275`。Codex CLIは0.160.0（SHA-256 `7d4588265a55adb1403f85d2e058b11dc971459842de84876c86ff02fb7771f2`）。実model／実資格情報／課金／外部API要求なし。通常Release能力は変更していない。
 - installed `r2-e2e` UIからRuntime／Workspaceを登録し、native Owner確認でWorkspace Permissionと別個のone-use Task Approvalを発行。Session `broker-session-28c9095ac4bdb1d73bc15bb27d244906`のproduction Broker経路でTask `f77929ef9cc1df0f46640b5bb5531e40`を開始し、UIは`completed`と結果hash `sha256:55c569826e219f9d375b6ec4b1e4a15d2d569e81a4ff75403e579e18c53787ab`を表示。Audit `broker-audit-58`は`Agent Task完了（結果本文非保存・hashのみ）`を記録し、指示hashは`sha256:31472a49fd4e10bc38363f08ca1eae96888e8c7ff53f6a373ec5d87f67b37d62`。指示本文はAuditに保存されていない。
 - loopback fake APIは2 request、model 0、tool提示／送信／結果受領あり、重複tool call、invalid／incomplete request、応答write failure、外部要求はいずれも0で正常終了。Workspace completion markerは20 byte、hash `sha256:712aff9ceb6418d369c1f968d51294af292dbfe4bda6739d4e86ba333227a29c`。固定した合成secret／outside-read canaryは不変、outside-write markerなし。これはnamed synthetic pathと一回のMxC childに限る境界証拠。
 - TEMP probeは認識済みscope `mxc_appcontainer`のTEMP markerへ直接writeを試みたが、`temp_step=temp_write`、`temp_write=failed`、安全な分類`directory_missing`。report hash `sha256:548893e0d6a72de321ed99b3bba6b4f8da6216ac291d77961703940b85e913ed`。TEMP物理cleanupの成功は証明しない。
@@ -2053,7 +2053,7 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 
 ## R2追補 run40の常駐poll監査増加と可視性連動修正（2026-10-04）
 
-- run40はRuntime／Workspace登録と拒否境界まで進んだが、Task Permission／Approval／Taskは発行・開始されず、positive Task E2Eではない。source commit `8babcd3b4eba08e959e8d447d6a680d7cdbba994`のinstalled test appがwindow非表示のまま稼働し、2026-10-04 06:22:44 +09:00時点94件から06:41:35時点132件へAuditが増加した。増加分は`通知一覧`／`accepted` 38件。最終snapshotのAudit JSONL SHA-256は`sha256:2e2e756f928704aa6faf547465ccc2f72727fe76a4f3afa8389793aa10f3e9ee`、anchorは132 events／head `sha256:bd7b51a2ce29e2c1e2bc22cbe3459564f615e18c8fda49a3437b5eb7473dbaa1`。この最終snapshotの全chain／HMAC再計算は未実施であり、有効性を主張しない。
+- run40はRuntime／Workspace登録と拒否境界まで進んだが、Task Permission／Approval／Taskは発行・開始されず、positive Task E2Eではない。対象ソースcommit `8babcd3b4eba08e959e8d447d6a680d7cdbba994`のinstalled test appがwindow非表示のまま稼働し、2026-10-04 06:22:44 +09:00時点94件から06:41:35時点132件へAuditが増加した。増加分は`通知一覧`／`accepted` 38件。最終snapshotのAudit JSONL SHA-256は`sha256:2e2e756f928704aa6faf547465ccc2f72727fe76a4f3afa8389793aa10f3e9ee`、anchorは132 events／head `sha256:bd7b51a2ce29e2c1e2bc22cbe3459564f615e18c8fda49a3437b5eb7473dbaa1`。この最終snapshotの全chain／HMAC再計算は未実施であり、有効性を主張しない。
 - Ownerから終了操作済みとの報告を受けたが、06:41:35時点でもrun40 Launcher PID `14376`とFrontend PID `2388`が稼働し、Frontendは非表示、fake API listener `127.0.0.1:56601`（PID `4624`）も待受中だった。通常終了Auditはなく、報告対象と試験用run40 processが一致したかは不明。process終了・graceful tray exit・cleanupを成立扱いしない。古いappはこの間もpollを続けたため、追加の通知Auditが生じ得る。
 - 追加の終了報告後、06:55:02 +09:00に再確認しても同じrun40 Launcher／Frontend PIDとfake API listenerが残っていた。Auditは132件から159件へ27件増え、最新は`broker-audit-159`／`通知一覧`／`accepted`、JSONL SHA-256は`sha256:68532a0528d1a959c13e5a57eed07e2682fa085b597d2170d6a5e959dc9934fc`、anchor count 159／head `sha256:b412a686390a94ae3a7d36c063bcea3352a25358d139226679e094b85f7dec25`。この時点のchain／HMAC再計算は未実施。報告された終了操作がrun40 instanceへ届いていないことを再度確認し、通常終了は未成立のままとする。
 - 原因はDesktop `_trayRefreshTimer`がwindowを隠した後も30秒周期pollを続けること。Win32の`WM_SHOWWINDOW`から実可視状態変化をMethodChannelで通知し、Flutter側は非表示時にtimerを即時cancel、再表示時に現在状態を再取得するよう修正した。Broker取得前後にもnative visibilityを確認し、非表示になったrequestの古いprojectionを捨てる。native側も非表示時点でprojectionを`不明`へ落とし、非表示中の再投影を拒否する。tray未対応／visibility照会不可時にはpollを開始しない。AuthorityやTask capabilityは変更していない。
@@ -2062,7 +2062,7 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 
 ## R2追補 run40のトレイ正常終了と最終Audit再検証（2026-10-04）
 
-- 2026-10-04 07:43:22 +09:00の再照合で、source commit `8babcd3b4eba08e959e8d447d6a680d7cdbba994`のrun40 root由来processは0件、fake API listener `127.0.0.1:56601`も不在だった。run manifestはsource worktree cleanを示す一方、runtime `isolated=false`／`formal_runtime_proof=false`を宣言する。
+- 2026-10-04 07:43:22 +09:00の再照合で、対象ソースcommit `8babcd3b4eba08e959e8d447d6a680d7cdbba994`のrun40 root由来processは0件、fake API listener `127.0.0.1:56601`も不在だった。run manifestはsource worktree cleanを示す一方、runtime `isolated=false`／`formal_runtime_proof=false`を宣言する。
 - 最終file-backed Auditは188 event。末尾`broker-audit-188`はnative trayからのDesktop終了要求を`D4 Pocket Desktop終了`／`recorded`／`LIVE_RUNTIME`として記録し、event hashは`sha256:3915510aaa5448ad1f813a11a715bd2f5cb99dc9c6ec42d9841b0033ad57e283`。
 - Rust `BrokerAuditEvent`の固定field連結hash規則で188 eventを独立再計算し、連番、重複ID、previous link、event hashの不一致はいずれも0。anchor event count／head一致、HMAC有効を確認した。headは末尾event hash、Audit JSONL SHA-256は`sha256:1463ee37fef4ef0ae91d14c1e751864334a5f00a9458d27289d61ae8445ce29c`。HMAC鍵値は表示・保存していない。
 - run40ではTask start、Workspace Permission、Task Owner Approvalは発行されていない。したがって本追補はrun40の通常tray終了と最終Audit整合だけを閉じ、positive Task E2E、run40 sourceより後の可視性連動修正のinstalled検証、正式隔離runtime、TEMP cleanup、deadline／crash Recovery、結果／差分表示を証明しない。`task_execution=unsupported`、R2 `release_blocker`、`release_ready=false`を維持する。
@@ -2076,7 +2076,7 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 
 ## R2追補 fresh installed run43のpositive Task・TEMP失敗・終了後監査（2026-10-04）
 
-- run43はsource commit `38624dda3fe80d2ec955728ee3cb98d13db7b0c8`、manifest上`source_worktree_clean=true`のFlutter 3.44.0 Windows ReleaseとRust 1.95.0 Release `r2-e2e` feature buildからfreshにstageした。installed artifact、loopback fake Responses API、Codex CLI、manifestのhashとTask/Audit参照は`release_blockers.registry.json`の`r2_installed_synthetic_task_e2e_run43`に固定した。Codex CLIは実物0.160.0／SHA-256 `7d4588265a55adb1403f85d2e058b11dc971459842de84876c86ff02fb7771f2`。実model、実credential、課金、外部API要求は使用せず、Windows保護設定も変更していない。
+- run43は対象ソースcommit `38624dda3fe80d2ec955728ee3cb98d13db7b0c8`、manifest上`source_worktree_clean=true`のFlutter 3.44.0 Windows ReleaseとRust 1.95.0 Release `r2-e2e` feature buildからfreshにstageした。installed artifact、loopback fake Responses API、Codex CLI、manifestのhashとTask/Audit参照は`release_blockers.registry.json`の`r2_installed_synthetic_task_e2e_run43`に固定した。Codex CLIは実物0.160.0／SHA-256 `7d4588265a55adb1403f85d2e058b11dc971459842de84876c86ff02fb7771f2`。実model、実credential、課金、外部API要求は使用せず、Windows保護設定も変更していない。
 - installed Flutter UIからRuntime／Workspaceを登録し、native Owner confirmationでWorkspace Permissionと独立したone-use Task Approvalを発行した。production Broker IPC経由、Session `b565cf151147d98ae35dd6ac261396ea`でTask `4e5d884a4d0798e9d67fc1a0b80a6c26`は`completed`となり、結果hash `sha256:55c569826e219f9d375b6ec4b1e4a15d2d569e81a4ff75403e579e18c53787ab`をUIで確認した。Permission Auditは`broker-audit-52/53`、Approvalは`broker-audit-54/55`、開始は`broker-audit-57/58`、完了状態の記録は`broker-audit-61`。指示本文はAuditに保存されず、製品UIは結果本文／Diffを表示せずhashのみを投影する。
 - 実Codex CLI／MxC childを通したloopback-only fake Responses APIは2 requests、tool提示・送信・結果受領あり、重複tool call拒否0、invalid／incomplete request 0、応答write failure 0、外部要求0で終了した。Task完了時には合成Workspace completion markerを観測し、合成secret／Workspace外境界のprobe assertionは当該pathに限りpass、outside-write markerなし。これは一回の合成probeであり、広域filesystem隔離の証拠ではない。
 - TEMP probeは認識済みscope `mxc_appcontainer`に対する直接writeを試みたが`temp_step=temp_write`／`temp_write=failed`／安全な診断`directory_missing`。directory作成とretryは未実施で、MxC物理TEMP cleanupは証明しない。Task本体のpositive completionとは分離して記録する。
@@ -2117,11 +2117,11 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 - `ShellHomePage`を通るFlutter testを追加した。試験用native channelで可視／非表示を遷移させ、試験用Broker transportが受ける`通知一覧`要求数を照合する。可視中の周期更新、非表示60秒間に追加pollがないこと、再表示直後と次周期の更新再開を確認した。さらに通知要求の応答を保留して非表示化し、応答解放後に古い射影が再publishされず`不明`表示が保持されることを確認した。
 - OneDrive内checkoutではFlutterが生成物`macos/Flutter/ephemeral/Packages/.packages`と`build/unit_test_assets`を削除できず、Flutter commandが起動前に停止した。ACL、OS保護設定、製品pathは変更せず、tracked sourceをASCII名の一時copyへ複写して同じFlutter SDKで検査した。tray testは8 passed／0 failed、Desktop全体とMobileの`flutter analyze`は問題なし、`dart format`差分なし。
 - この回帰検査の証拠区分は`FIXTURE`。native channelとBroker transportは試験用であり、installed Windowsの実際の×操作、実Rust Broker、実Audit増分停止を証明しない。起動中の一件は完了してよいが、非表示windowへ古い値を再投影しない境界のfixture検査である。
-- `release_blocker`: Windows installed productでのtray icon、×によるhide／再表示、通常終了、Broker-mediated stop requestの一体実証は未成立。今回のtest追加はC20のrelease gate、通常Release `task_execution=unsupported`、R2 `release_blocker`、`release_ready=false`を変更しない。
+- `release_blocker`: Windows 導入済み製品でのtray icon、×によるhide／再表示、通常終了、Broker-mediated stop requestの一体実証は未成立。今回のtest追加はC20のrelease gate、通常Release `task_execution=unsupported`、R2 `release_blocker`、`release_ready=false`を変更しない。
 
 ## R2追補 run44 installed smokeのruntime identity path不一致とcollector修正（2026-10-04）
 
-- run44由来のinstalled product artifactを独立hash照合した。App SHA-256 `sha256:4f251459fc7388fb779da6006e29923d41280d39ced995869b09b4555059745b`、Broker SHA-256 `sha256:d677eddb9169e243530478a71571cd4e52d9f1152c073bdc4183e4c1c131cc40`、launcher SHA-256 `sha256:8e6bc2c88c7bf329ecd2d0787c2994f83ee3bfbb2927fb6a9039bbba538d6391`はstaged manifestと一致し、source commitは`7340e27566b11f5fa729fbf4212ff82d5380f595`。staged manifestは`manifest_version=2`でgeneric GUI-Shell pathを宣言していた一方、launcher binaryにはApp ID `d4-pocket-app-d1474f66da93456d958f1d31f587db69`とAudit store ID `audit-store-f314a97880754e509c4d09ae92aa47bf`が埋め込まれていた。
+- run44由来の導入済み製品 artifactを独立hash照合した。App SHA-256 `sha256:4f251459fc7388fb779da6006e29923d41280d39ced995869b09b4555059745b`、Broker SHA-256 `sha256:d677eddb9169e243530478a71571cd4e52d9f1152c073bdc4183e4c1c131cc40`、launcher SHA-256 `sha256:8e6bc2c88c7bf329ecd2d0787c2994f83ee3bfbb2927fb6a9039bbba538d6391`はstaged manifestと一致し、対象ソースcommitは`7340e27566b11f5fa729fbf4212ff82d5380f595`。staged manifestは`manifest_version=2`でgeneric GUI-Shell pathを宣言していた一方、launcher binaryにはApp ID `d4-pocket-app-d1474f66da93456d958f1d31f587db69`とAudit store ID `audit-store-f314a97880754e509c4d09ae92aa47bf`が埋め込まれていた。
 - `collect_installed_smoke.ps1`のDiagnosticOnly実行は、Rust Desktop起動器が宣言済みruntime endpointを作らないとしてcollector timeoutになった。collector期待pathが`%LOCALAPPDATA%\GUI-Shell\broker\desktop`だったのに対し、LIVE_RUNTIME Auditはcompile-time identityに対応する`%LOCALAPPDATA%\D4Pocket\apps\<App ID>\stores\<Audit store ID>`側に作成されていたため、製品実行成功とcollectorのpath前提不一致を切り分けた。temp profileのAuditは24 event、末尾`broker-audit-24 / D4 Pocket Desktop終了 / recorded / LIVE_RUNTIME`で、anchor head/count一致と`broker_session.json`不在を観測した。event hash chain全件とanchor HMACは再計算しておらず、この失敗runをformal passへ昇格しない。Product Manifestは旧stagingに保存されていない。
 - 配置処理に製品定義書の受取りと、起動器実行file内のコンパイル時識別子との照合を追加し、識別子ごとの保存先と第3版の配置記録を生成する。Broker単体検査用の接続先は従来どおり一時領域に置き、製品runtimeの`launcher_runtime.session_file`から分離した。証拠収集器は第2版との互換を保ち、製品第3版では製品定義書とそのSHA-256、コンパイル時識別子から実保存先を求め、製品定義書を証拠一式へ結合する。厳格検証器は識別子種別、ID、実保存先末尾、配置済みManifest path、証拠一式の不一致を`release_blocker`にする。保存先識別情報の証拠区分は`CONFIG`であり、製品隔離や正式release証明を実測した証拠の代用ではない。
 - 規約適合試験に、旧形式との互換、正しい製品識別子の受理、不正識別子の拒否を追加した。現行ソースから製品を再生成し、新しい配置・実行で再検証する作業は未実施である。本記録は診断と修正を記録するもので、Windows配置後の初回実行判定、R2、`task_execution=unsupported`、`release_ready=false`を変更しない。次は製品定義書を含む新規D4 Pocket書出しから実行収集器第17版を再実行し、実保存先、操作画面の読取、通常終了、接続情報ファイルの整理を再観測する。
@@ -2129,18 +2129,18 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 ## R2追補 Broker再起動時の中断Task隔離（2026-10-04）
 
 - 着手時の正本は`main`=`origin/main`=`52f7817fc10e9f7870338801d1e4272146d76b0b`で、working treeはcleanだった。編集前rollback pointとしてlocal `codex/backup-main`／`codex/backup-main-prev`とremote tag `refs/tags/codex/backup-main`／`refs/tags/codex/backup-main-prev`を同commitへ保存した。
-- Owner許可済みの手動GitHub Actionsをrun `37177787371`（[実行記録](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37177787371)）で、対象commit `52f7817fc10e9f7870338801d1e4272146d76b0b`に対して実行し、Windows runnerの結果はsuccessだった。対象はfixture由来の未署名Windows Release bundle構築・検証であり、artifactは生成・保持されず、installed product、active Task recovery、Release readinessの証拠ではない。triggerは`workflow_dispatch`のみで、自動CIは追加していない。
+- Owner許可済みの手動GitHub Actionsをrun `37177787371`（[実行記録](https://github.com/gatchimuchio/GUI-Shell/actions/runs/37177787371)）で、対象commit `52f7817fc10e9f7870338801d1e4272146d76b0b`に対して実行し、Windows runnerの結果はsuccessだった。対象はfixture由来の未署名Windows Release bundle構築・検証であり、artifactは生成・保持されず、導入済み製品、active Task recovery、Release readinessの証拠ではない。triggerは`workflow_dispatch`のみで、自動CIは追加していない。
 - `Broker::new_persistent`は読戻したAuditEventからPermission／Owner Approval一回消費済みのTask開始を照合し、terminal eventを持たないTaskを再開せず`suspended`として一度だけRecovery Auditへ記録する。Permission／Approvalを復元せず、RecoveryActionはWorkspace差分確認を要求する。Completed／failed／cancelled等のterminal Taskは再分類しない。task本文ではなくtask IDと開始Audit hashを材料にする。観測根拠は耐久Audit記録の照合であり、Broker再起動だけから元のcrash原因を断定しない。
 - 正常・境界・negative／idempotency確認: `cargo test --locked --manifest-path native/rust_helper/Cargo.toml task_crash_recovery_is_idempotent_and_fails_closed` 1 passed。Broker process kill後のAudit付きscratch回収fixture: `cargo test --locked --manifest-path native/rust_helper/Cargo.toml broker強制終了後の別process起動登録で永続scratchを監査付き回収する` 1 passed。偽Codex CLIのdeadline／子孫停止／scratch cleanup fixture: `cargo test --locked --manifest-path native/rust_helper/Cargo.toml 偽CodexCLIはAdapterのTask成功・期限超過cleanup・子孫停止を通る` 1 passed。Windows Job ObjectのBroker owner終了後descendant／grandchild停止fixture: `cargo test --locked --manifest-path native/process_supervision/Cargo.toml abrupt_broker_exit_closes_job_and_terminates_descendants` 1 passed。
 - 全Rust helper target: `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1` success、合計460 passed／0 failed／7 ignored（既存のignored testを含む）。`rustfmt --edition 2021 --config skip_children=true --check native/rust_helper/src/broker/protocol.rs` success。workspace全体の`cargo fmt --manifest-path native/rust_helper/Cargo.toml -- --check`は既存の多数の無関係Rust fileのformat差分でfailedしたため一括整形はしていない。
 - `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows` exit 0。日本語基底strict、152 Schema／example、232 conformance check、manifest、release gate、packaging portability、release smoke、evidence bundle、release runtime assertions、development auditは実行結果上passed。validator内のWindows installed evidenceはcurrent provenance、installed first-run、Setup Doctor、Broker installed smoke、external Audit tamper evidenceを未成立として列挙し、`release_ready=false`を保持した。これはinstalled R2 E2Eの成功ではない。
-- 今回のBroker再起動照合とscratch再回収は`FIXTURE`／永続状態の`INTERNAL_STATE`範囲、偽CLI deadlineとJob Object killはそれぞれ局所fixtureの`LIVE_RUNTIME`範囲に限る。D4 Pocket installed product上でのactive Task deadline停止・Recovery、Codex／Broker／Launcher各crash後の一体Recovery、Agent CenterからのRecovery状態再取得は未実証であり、この追補だけでユーザー指定R2項目を閉じない。
+- 今回のBroker再起動照合とscratch再回収は`FIXTURE`／永続状態の`INTERNAL_STATE`範囲、偽CLI deadlineとJob Object killはそれぞれ局所fixtureの`LIVE_RUNTIME`範囲に限る。D4 Pocket 導入済み製品上でのactive Task deadline停止・Recovery、Codex／Broker／Launcher各crash後の一体Recovery、Agent CenterからのRecovery状態再取得は未実証であり、この追補だけでユーザー指定R2項目を閉じない。
 - R2は継続、通常Releaseの`task_execution=unsupported`、`release_ready=false`を維持する。既存positive Task、権限一回消費、Workspace／secret境界、Audit耐久性、Desktop終了、cross-Workspace局所LIVE_RUNTIME証拠は履歴どおり保持し、同じ試験を別名で反復しない。残る有限R2項目は現行指示に沿って順次統合検証し、明示条件が成立した時点でR2を終了してR3へ進む。
 
 ## R2追補 run50 installed Launcher crash試験の失敗とAudit記録形式修正（2026-10-04）
 
-- run50はclean source commit 1dc2014c6a71b5dd1cf094a2f313608ab06b9160から作られたr2-e2e段階配置品。artifact hashはapp sha256:4cdf0b3cf55d8c034d87b06b0ba297860581be6ff8f2231a347ec2d22197ac46、Broker sha256:d208cf43d29c6bd2dc6eb3c411056bb37030faaf9fdfb45f4163aace431ba64a、Launcher sha256:f63380d7b38ecc4dda7727a07cd2d10874fd8139f9d06078254e0dd6c4db1f9f。Manifestはidentity_kind=gui_shell、isolated=false、formal_runtime_proof=falseであり、Release provenance evidenceではない。
-- installed Flutter UIから合成Runtime／Workspace、native Owner確認、Workspace Permission、独立one-use Task Approvalを通し、Task fdf5688cc878b9574978f3c08d837953を開始した。永続Audit broker-audit-59はoperation=AgentTask実行、decision=recorded、reason=Agent Task実行開始（Permission／Owner Approval一回消費）。Broker restart後のAudit JSONLは108 eventで、当該Task IDは開始event一件だけ、Agent Task中断回復eventは0件だった。これはinstalled productのLIVE_RUNTIME失敗証拠である。
+- run50はclean 対象ソースcommit 1dc2014c6a71b5dd1cf094a2f313608ab06b9160から作られたr2-e2e段階配置品。artifact hashはapp sha256:4cdf0b3cf55d8c034d87b06b0ba297860581be6ff8f2231a347ec2d22197ac46、Broker sha256:d208cf43d29c6bd2dc6eb3c411056bb37030faaf9fdfb45f4163aace431ba64a、Launcher sha256:f63380d7b38ecc4dda7727a07cd2d10874fd8139f9d06078254e0dd6c4db1f9f。Manifestはidentity_kind=gui_shell、isolated=false、formal_runtime_proof=falseであり、Release provenance evidenceではない。
+- installed Flutter UIから合成Runtime／Workspace、native Owner確認、Workspace Permission、独立one-use Task Approvalを通し、Task fdf5688cc878b9574978f3c08d837953を開始した。永続Audit broker-audit-59はoperation=AgentTask実行、decision=recorded、reason=Agent Task実行開始（Permission／Owner Approval一回消費）。Broker restart後のAudit JSONLは108 eventで、当該Task IDは開始event一件だけ、Agent Task中断回復eventは0件だった。これは導入済み製品のLIVE_RUNTIME失敗証拠である。
 - 根因は、起動Recoveryが意味markerをAuditEvent.operationだけから検索していた一方、production AuditではBroker operation名がoperation、Task開始／完了等の意味markerがreasonに保存されるprojection差。したがって前commitの単体fixture PASSはproduction形式を再現していなかった。task_execution=unsupportedとR2 release blockerは維持する。
 - run50のfake Responses APIでは4 request、3 repeated-tool-call rejection、completion markerなし。MxC TEMPはmxc_appcontainer、write failed／directory_missing。Codex／PowerShell descendantsはLauncherを停止する時点ですでに消えていたため、crash時process-group stopを検証したとは扱わない。Launcher停止後にFlutter childが残り、確認したrun50の2 processだけをcleanupした。通常終了の証拠ではない。
 - Recovery実装は、Task開始／終端markerをoperationまたはreasonのいずれにも認識するよう修正し、production形式（開始AgentTask実行／終端AgentTask取消と意味marker in reason）、旧直接形式、完了Task非回復、再起動冪等性を同じ回帰testへ加えた。focused recovery testは1 passed。crash fixtureのPID札も一時fileからrenameで公開し、親processが空の準備fileを読むraceを除去した。この修正後のBroker crash fixture単体は1 passed。
@@ -2148,7 +2148,7 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 
 ## R2追補 fresh installed run51のBroker crash Recovery監査とprocess cleanup未判定（2026-10-04）
 
-- run51はclean source commit `b19a4f05b9d38e0057f15ae61d02a67f386898c7`から作ったfresh `r2-e2e` staged product。stage rootは`C:\Users\ohira\AppData\Local\Temp\d4p-r2-installed-run51`、manifest SHA-256は`sha256:de67d49d7d3e90b6044f57fba5433c93ef3df2091bbf2dda80228d967f253de9`。App／Broker／Launcher hashは`sha256:4cdf0b3cf55d8c034d87b06b0ba297860581be6ff8f2231a347ec2d22197ac46`／`sha256:b35cdedc3479e6a651a7d6b0f121a734b2ce24ed2091455fab5d8fee2a30a339`／`sha256:28b3ebaa51d4577bd5df3918e39130ec8e81eac7870377a0b4bee95ede63b405`。Manifestは`identity_kind=gui_shell`、`scope=per_user`、`isolated=false`、`formal_runtime_proof=false`、`product_manifest=null`を宣言する。Process環境をrun専用profile／`LOCALAPPDATA`へ上書きしてstoreを隔離したが、正式Runtime provenanceの証拠ではない。fake API executableの実行開始時hashは記録していない。
+- run51はclean 対象ソースcommit `b19a4f05b9d38e0057f15ae61d02a67f386898c7`から作ったfresh `r2-e2e` staged product。stage rootは`C:\Users\ohira\AppData\Local\Temp\d4p-r2-installed-run51`、manifest SHA-256は`sha256:de67d49d7d3e90b6044f57fba5433c93ef3df2091bbf2dda80228d967f253de9`。App／Broker／Launcher hashは`sha256:4cdf0b3cf55d8c034d87b06b0ba297860581be6ff8f2231a347ec2d22197ac46`／`sha256:b35cdedc3479e6a651a7d6b0f121a734b2ce24ed2091455fab5d8fee2a30a339`／`sha256:28b3ebaa51d4577bd5df3918e39130ec8e81eac7870377a0b4bee95ede63b405`。Manifestは`identity_kind=gui_shell`、`scope=per_user`、`isolated=false`、`formal_runtime_proof=false`、`product_manifest=null`を宣言する。Process環境をrun専用profile／`LOCALAPPDATA`へ上書きしてstoreを隔離したが、正式Runtime provenanceの証拠ではない。fake API executableの実行開始時hashは記録していない。
 - installed Flutter UI、native Owner確認、Production Broker経路でRuntime／Workspace登録を行い、Workspace Permission `broker-audit-57`、別個のTask Approval `broker-audit-62`、Task開始`broker-audit-70`を確認した。Task IDは`7ec80a7ebc87995f3f2d4c68ee44c4ec`、Task本文hashは`sha256:1e3b6477058a6aba51d759188018139b28838382630af5abd0041a604d375be8`。Task開始eventは`operation=AgentTask実行`／`reason=Agent Task実行開始（Permission／Owner Approval一回消費）`。
 - 偽Responses APIの停止時記録では要求4件、`models=0`、tool offer／call／resultの受信あり、重複tool-call拒否3件、外部要求0件だった。合成Workspace境界の事後確認は`true`と報告された一方、Workspace完了目印は存在しなかった。MxC一時領域の記録は`scope=mxc_appcontainer`、`temp_write=failed`、`directory_missing`。Agent Task終端結果はBrokerに返らず、この限定fixtureの結果を、Agent Task成功、一時領域の回収、秘密情報・作業領域の一般保証へ拡張しない。
 - 正確なrun51 Launcher PID／path／hashを直前照合してBroker／Launcherを強制終了した時点で、Codex／PowerShell tool descendantsは既に不在、Flutter childは残存していた。従ってLauncher crash後のFlutter残存は観測したが、active tool process群をcrash時に止めた証拠ではない。Flutter childはpath・hash・parent PIDを再照合後に試験cleanupした。Fake APIは明示stopした。
@@ -2175,7 +2175,7 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 
 ## R2追補 deadline試験のfixture失敗記録と継続要求対応（2026-10-04）
 
-- run52はrun51段階配置品（source commit `b19a4f05b9d38e0057f15ae61d02a67f386898c7`）を再利用したinstalled synthetic Task試行。Agent CenterのTask IDは`c9c89e299d261afdf1c92ebbde61c943`、Task開始Auditは`broker-audit-229`、終端Auditは`broker-audit-238`。状態更新後にUIは`failed`となり、Codex／PowerShell子孫とWorkspaceTaskScratchは不在、journalのactive entryは0だった。終端Auditは失敗／取消の理由を示すが期限到達を確定しないため、この結果をdeadline成功へ昇格しない。
+- run52はrun51段階配置品（対象ソースcommit `b19a4f05b9d38e0057f15ae61d02a67f386898c7`）を再利用したinstalled synthetic Task試行。Agent CenterのTask IDは`c9c89e299d261afdf1c92ebbde61c943`、Task開始Auditは`broker-audit-229`、終端Auditは`broker-audit-238`。状態更新後にUIは`failed`となり、Codex／PowerShell子孫とWorkspaceTaskScratchは不在、journalのactive entryは0だった。終端Auditは失敗／取消の理由を示すが期限到達を確定しないため、この結果をdeadline成功へ昇格しない。
 - 偽Responses APIは4 request、tool offer／call／result各あり、repeated tool-call rejection 3件、Workspace完了markerなし、外部要求なしを報告した。試験probeはBroker期限を越えて最大1,000秒待つ一方、Codex tool callは30秒でyieldする。loopback fixtureはWorkspace完了markerより前の継続要求を拒否するため、期限前に試験経路が失敗したことが根因と判定した。このrunではBroker期限処理、process群停止の原因、Recoveryを検証したとは扱わない。MxC AppContainer TEMPはwrite=`failed`／`directory_missing`で、D4-owned scratch保証とは分離する。
 - このfixture矛盾を閉じるため、`r2-e2e` feature buildに限って`GUI_SHELL_R2_E2E_TASK_EXECUTION_LIMIT_MS`による短縮期限を追加した。有効範囲は1–899,999msで、未指定／不正値は固定900秒へ戻る。通常Releaseはこの環境変数を読まず、Ownerの`max-runtime-900s`上限とproduction期限は変えない。偽Responses API helperはdeadline期待modeを追加し、継続拒否・tool結果・Workspace書込みが起きていないことを検査する。既存positive modeは2 request、tool結果、Workspace markerを引き続き要求する。
 - focused validationでは期限parser 1 passed、loopback helper 15 passed。全Rust target試験は1回目415 passed／1 failed／6 ignoredで、失敗は今回の変更外のA2A loopback response-read testだった。同test単独再実行は1 passed。全target再実行では同testだけを明示skipし、lib 415 passed／0 failed／6 ignored／1 filtered、r2_e2e_responses 15 passed、main 10、broker_ipc 10、canonical_decimal_hash 1、checkpoint 8、protected_data 2、protected_startup 1、protected_store 3、workspace_diff 2、workspace_reader 2、workspace_startup 7がすべてpassed。default／`r2-e2e`双方の`cargo check --all-targets`もpassed。
@@ -2188,12 +2188,12 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 - 変更file／diffは結果表示Approvalを流用せず、選択中のRuntime／Workspaceに結合したWorkspace Inspectorの独立読取Approvalとnative Owner確認を要求する。secret除外は登録済みpathだけを対象にする。Workspace baselineはWorkspaceあたり一つでTask IDに結合されないため、UIは特定Taskの変更証拠と表示しない。full Workspace読取が許可されれば登録除外path以外のfile内容を露出し得ることも表示する。
 - Contract、Schema、正例／負例、Broker／native confirmation、Dart client、Agent Center、Workspace Inspectorの変更を追加し、`task_execution=unsupported`、R2 gate未完了、`release_ready=false`は変更していない。
 - 検査結果: `python -X utf8 tooling/schema_check/check_schemas.py`はSchema 153、正例153、負例197でPASS。`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`は232 checksでPASS。`python -X utf8 tooling/日本語基底監査.py --strict`は1137 repository files／findings 0でPASS。Focused RustはAgent Task結果4 passed、Workspace／secret境界・diff等34 passed。Desktop Flutter全suiteは158件中157 passed／1 failed（実Broker loopbackのRuntime lifecycle testでconnection reset）。同一test単独再実行は1 passed。Workspace Inspectorを含む他caseは全て完了し、この変更のWidget／client focused testはPASS。
-- ローカル`flutter analyze --no-pub`はDesktop一時検証copy上で143 issuesとなり、source URI不在と現行sourceにない`selected`参照を報告した。Mobile側の同コマンドもOneDrive配下でAnalysis Serverが不正JSON parse errorにより終了した。Dart unit testはDesktop copyから実行可能だが、どちらの解析もclean判定として採用しない。固定toolchain・clean checkoutの手動Windows Actionsで解析と全suiteを別途確認する。Actions未実行であり、Windows installed product／native Ownerからの本文開示／diff投影の`LIVE_RUNTIME`証拠も未取得。
-- この作業は内容露出制御の実装・Contract／fixture／unit検査までであり、R2条件4をPASSへ閉じない。該当条件はinstalled product経路の正例とvisibility／expiry／secret否定を観測するまで未成立とする。他の有限残件を増やさない。通常Release `task_execution=unsupported`を維持する。
+- ローカル`flutter analyze --no-pub`はDesktop一時検証copy上で143 issuesとなり、source URI不在と現行sourceにない`selected`参照を報告した。Mobile側の同コマンドもOneDrive配下でAnalysis Serverが不正JSON parse errorにより終了した。Dart unit testはDesktop copyから実行可能だが、どちらの解析もclean判定として採用しない。固定toolchain・clean checkoutの手動Windows Actionsで解析と全suiteを別途確認する。Actions未実行であり、Windows 導入済み製品／native Ownerからの本文開示／diff投影の`LIVE_RUNTIME`証拠も未取得。
+- この作業は内容露出制御の実装・Contract／fixture／unit検査までであり、R2条件4をPASSへ閉じない。該当条件は導入済み製品経路の正例とvisibility／expiry／secret否定を観測するまで未成立とする。他の有限残件を増やさない。通常Release `task_execution=unsupported`を維持する。
 
 ## R2追補 Workspace起動統合testのOwner確認契約是正（2026-10-04）
 
-- Windows手動Rust Actions run #37（`workflow_dispatch`、対象commit `0977bb1f34914a4b469cb622cece55081a1e368c`）は失敗した。`workspace_startup`の4 testが、通常Owner資格CLIだけでWorkspace内容Approval／基準点保存を成功できる旧挙動を期待していたが、現行BrokerはRust Desktop起動器のnative確認がない要求を`desktop_native_owner_confirmation_required`でfail-closed拒否した。失敗test名とrun URLは`release_blockers.registry.json`へ追記する。
+- Windows手動Rust Actions実行 #37（`workflow_dispatch`、対象commit `0977bb1f34914a4b469cb622cece55081a1e368c`）は失敗した。`workspace_startup`の4 testが、通常Owner資格CLIだけでWorkspace内容Approval／基準点保存を成功できる旧挙動を期待していたが、現行BrokerはRust Desktop起動器のnative確認がない要求を`desktop_native_owner_confirmation_required`でfail-closed拒否した。失敗test名とrun URLは`release_blockers.registry.json`へ追記する。
 - 該当するプロセス結合試験を、native確認のない通常IPC／Owner CLIではApproval、読取、基準点、変更一覧、diffを許可しない拒否契約へ修正した。製品の権限判定は変更していない。Workspace読取・差分の成功試験は既存targetに残し、Agent Centerからの成功結果投影はR2 Content Exposure条件で`LIVE_RUNTIME`確認する。
 - 修正後の`workspace_startup`対象試験は7 passed／0 failed。Schema 153件／正例153件／負例197件、Conformance 232件、日本語厳格監査1137 file／findings 0、Manifest 1134件の再生成と照合、`git diff --check`は成功した。ローカル全target実行の一部localhost/TLS試験は別の実行でWindowsのsocket resetが発生しており、全target無失敗とは報告しない。Windows Actions再実行は修正commit作成後に手動dispatchし、その正確な結果を追記する。
 - この記録は試験契約の是正に限られ、配置済みAgent Centerでの内容提示およびR2条件4の許可経路を実稼働で証明しない。`task_execution=unsupported`、R2 gate未完了、`release_ready=false`を維持する。
@@ -2201,13 +2201,13 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 ## R2追補 修正commitのWindows Rust手動Actions再検証（2026-10-04）
 
 - Windows Server 2025のhosted runnerでworkflow `.github/workflows/windows-manual-rust-validation.yml`を`workflow_dispatch`により手動起動した。run #38／ID `37207891109`は一時検証branch `codex/r2-agent-center-content-exposure-20261004`の正確なcommit `f888c7e0d4abb499c9524849c2605570748a0146`を取得し、runner image `20260925.250.1`とRust 1.95.0を記録した。全target結果は468 passed／0 failed／7 ignored。
-- Release Broker helperのbuildと非synthetic Broker smokeが成功した。認証済みloopback IPC、永続storeの準備、通常IPCからのWorkspace Permission／Task Approval拒否、再起動後のreplay拒否、新規health、強制停止時のfail-closed、session file cleanupを確認した。検査process／一時出力をcleanupし、試験後に作業treeへ差分がないことも確認した。成果物のuploadはない。
+- Release Broker helperのbuildと非synthetic Broker smokeが成功した。認証済みloopback IPC、永続storeの準備、通常IPCからのWorkspace Permission／Task Approval拒否、再起動後のreplay拒否、新規health、強制停止時のfail-closed、session fileの清掃を確認した。検査process／一時出力をcleanupし、試験後に作業treeへ差分がないことも確認した。成果物のuploadはない。
 - Actionsの証拠範囲はRust全targetと単独Release Broker processのWindows検証であり、配置済みFlutter UI／native Owner経路、正のAgent Task、Content Exposure UI、deadline／crash Recovery、正式Release capability、artifact provenanceを証明しない。R2条件4は未閉鎖であり、通常Release `task_execution=unsupported`、R2 `release_blocker`、`release_ready=false`を維持する。
 - 成功した正確なcommitだけを`main`へfast-forwardしてpushし、remote `main` HEAD一致を確認した。検証用branchはlocal／remote双方から削除した。手動検査branchはPRを作成せず、Actions結果を自動gateに用いていない。
 
 ## R2追補 installed Task取消試行と状態照会不整合（2026-10-05）
 
-- clean source commit `f888c7e0d4abb499c9524849c2605570748a0146`から作成したmanifest v3の試験用段階配置品を使用した。source worktreeはclean。App／Broker／LauncherのSHA-256と配置Manifestのhashは`release_blockers.registry.json`へ記録した。Manifestは`product_manifest=null`、runtime formal proof=falseであり、正式Release provenanceではない。
+- clean 対象ソースcommit `f888c7e0d4abb499c9524849c2605570748a0146`から作成したmanifest v3の試験用段階配置品を使用した。source worktreeはclean。App／Broker／LauncherのSHA-256と配置Manifestのhashは`release_blockers.registry.json`へ記録した。Manifestは`product_manifest=null`、runtime formal proof=falseであり、正式Release provenanceではない。
 - installed Flutter UIで合成Taskを開始した。Session `a1b4b3238e555d3e11db0367eeb2724e`、Task `ce0673b83169287daf32eee0442e029f`、Task本文hash `sha256:dad7e4dec545e58200ffa7f8e5b2b09a0fc48821f6e96537842261e588f519d3`、開始Audit `broker-audit-121`。Workspace Permissionと独立した一回限りTask Approvalを現行native UIで発行した。
 - Task状態更新を試みたUI自動操作で、隣接する「Task stop」を誤クリックした。これは試験自動化側の誤操作であり、実際の終端Audit `broker-audit-128`は`AgentTask取消`。期限到達でもprocess crashでもない。Codex processとTask専用一時directoryは取消後に不在、Launcher／Flutterは残存、Task完了markerなしを観測した。偽APIは1 request、tool call送信、tool resultなし、外部要求なし。
 - 取消後もAgent CenterはTaskを`running`と表示し、状態照会要求は`broker-audit-135`で`要求不正`として拒否された。従って取消の画面状態反映・Recoveryは未成立として保持する。試験helperの`expected-deadline`判定は取消と期限停止を識別できないため、そのexit statusを期限証拠に採用しない。
@@ -2224,19 +2224,19 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 ## R2追補 取消／期限helper証拠名の是正とfresh installed再試行（2026-10-05）
 
 - 直前の取消／期限helperは`expected_outcome=cancellation|deadline`を出力していたが、観測できるのは偽Responses APIの要求形状だけであり、Broker Taskの終端原因を判定していなかった。これを`expected_request_shape`へ変更し、取消・期限の両方を`tool_call_without_result`として扱う。Taskの終端原因はBroker Auditで独立確認する旨をsource commentに固定した。完了modeは`completed_tool_write`とし、tool結果とWorkspace markerを引き続き必須にする。
-- helperの`gui_shell_r2_e2e_responses` 16 test、`rustfmt --check`、`git diff --check`はPASS。最初のCargo試行はbin targetを誤指定して未実行となったが、Cargoが示した正式target名へ訂正後に16件全件が通過した。既定Rust suiteの並列実行は419 passed／3 failed／6 ignoredとなり、失敗したloopback／TLS ConnectionReset 3件を単独再実行すると各1 passed。その後、同suiteを`--test-threads=1`で全target再実行し、468 passed／0 failed／7 ignoredとなった。初回失敗は履歴に保持し、直列成功をWindows Actionsやinstalled productの証拠へ昇格しない。
-- 記録確定前のfocused再実行ではhelper内16件中15 passed／1 failedとなり、同じ`failed_tool_result_is_not_replayed_as_another_exec_command`がHTTP header前の`ConnectionReset`で再発した。対象を単独再実行すると1 passed。したがってloopback試験には実行間変動が残る。全suiteの直列結果は成功だが、単独成功を安定性・Windows Actions・installed productの証拠へ昇格しない。
+- helperの`gui_shell_r2_e2e_responses` 16 test、`rustfmt --check`、`git diff --check`はPASS。最初のCargo試行はbin targetを誤指定して未実行となったが、Cargoが示した正式target名へ訂正後に16件全件が通過した。既定Rust suiteの並列実行は419 passed／3 failed／6 ignoredとなり、失敗したloopback／TLS ConnectionReset 3件を単独再実行すると各1 passed。その後、同suiteを`--test-threads=1`で全target再実行し、468 passed／0 failed／7 ignoredとなった。初回失敗は履歴に保持し、直列成功をWindows Actionsや導入済み製品の証拠へ昇格しない。
+- 記録確定前のfocused再実行ではhelper内16件中15 passed／1 failedとなり、同じ`failed_tool_result_is_not_replayed_as_another_exec_command`がHTTP header前の`ConnectionReset`で再発した。対象を単独再実行すると1 passed。したがってloopback試験には実行間変動が残る。全suiteの直列結果は成功だが、単独成功を安定性・Windows Actions・導入済み製品の証拠へ昇格しない。
 - 同一作業単位の静的検査はSchema 153／example 153／negative 197、Conformance 232 checks、日本語厳格監査1137 files／findings 0、Manifest 1134 filesのcheckがPASS。
 - `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`もexit 0で登録済みdevelopment check 10件がPASS。release gate分類では`release_ready=false`、既存release blocker 31件を維持する。packaging portabilityの抽出先でManifest／Conformance／release gateも再検査されたが、この統合validatorはinstalled R2 Task実証や正式releaseの証拠ではない。
 - 120秒deadline、fresh LOCALAPPDATA、空の専用CODEX_HOME、合成secret／Workspace外canary、loopback偽APIを設定したstage run `d4p-r2-cancel-120s`では、installed UI／native Owner確認／production Broker経路でCodex runtimeとWorkspaceの登録がaccepted（Audit `broker-audit-32`〜`broker-audit-35`）となった。登録はPermission／Approvalを生成せず、Taskは未開始。
 - native Owner確認後にfresh Flutter windowがWindows上で応答なしとなり、再選択後のComputer Use captureもD4 PocketではなくCodex app画面を返したため、Task開始操作を行わず停止した。新規試験Launcher／Flutter processだけを停止し、Broker Auditと合成Workspaceは保持した。偽APIは0 request、tool offer／call／resultなし、completion markerなし、外部要求なし。helperは要求形状未成立によりexit 1であり、取消・期限の証拠ではない。
 - その後のhost process照合で、同じ`f888c7` stage pathからの残留Launcher／Flutter childを3組発見した（PID 16732/16016、10/4 23:38起動；16380/10848、10/5 00:53起動；14192/16276、10/5 04:45起動）。実行pathと各親子関係を照合して6 processを停止した。どのTask／runに由来するprocessか確定できないため、今回runのcleanup、cancel、deadline、crash Recoveryの証拠には算入しない。stageのAudit／Workspaceは保持した。
-- stage artifactはsource commit `f888c7e0d4abb499c9524849c2605570748a0146`製、Manifest `product_manifest=null`／`formal_runtime_proof=false`。現行HEAD `7126ae0d9a3df3d0b0dd5d0b5efc1e4132169e33`との間にRust／Flutter product source差分はないが、これはfresh current-HEAD buildまたは正式provenanceではない。
+- stage artifactは対象ソースcommit `f888c7e0d4abb499c9524849c2605570748a0146`製、Manifest `product_manifest=null`／`formal_runtime_proof=false`。現行HEAD `7126ae0d9a3df3d0b0dd5d0b5efc1e4132169e33`との間にRust／Flutter product source差分はないが、これはfresh current-HEAD buildまたは正式provenanceではない。
 - 判定: この再試行もR2の取消／期限条件を閉じない。応答なしの原因は未確定で、製品異常か検査window capture異常かを追加証拠なしに断定しない。有限R2 scopeと通常Release `task_execution=unsupported`、R2 `release_blocker`、`release_ready=false`を維持する。
 
 ## R2-A rev4有限受入れ完了（2026-10-05）
 
-- rev4の開発通過Acceptanceに限定し、fresh staged installed run `d4p-r2-A-cd4f2ab-run2`でOwner cancelと短縮deadlineを各1回実行した。source checkoutは開始時に`cd4f2abe66cb07972e0d16e3b8362521b1d060ac`でclean、installed artifactは正式provenanceではない。
+- rev4の開発通過Acceptanceに限定し、新規導入済みステージの実行 `d4p-r2-A-cd4f2ab-run2`でOwner cancelと短縮deadlineを各1回実行した。ソース作業ツリーは開始時に`cd4f2abe66cb07972e0d16e3b8362521b1d060ac`でclean、installed artifactは正式provenanceではない。
 - Cancel Task `e3a093e56923d91b8f2053336df094cd`: Session/Workspace登録はnative Owner確認後に成立。fresh Workspace Permission `broker-audit-139/140`、独立Task Approval `broker-audit-142/143`、開始・一回消費`broker-audit-146`、取消要求`broker-audit-148/149`、installed UI terminal `cancelled`／Audit `broker-audit-151`。終端reasonは`RecoveryAction=Workspace差分を確認`。実Codex CLI 0.160.0／MxC child。偽APIはloopback内1 request、tool call送信、tool result未受信、invalid body・外部要求・完了markerなし。
 - Deadline Task `38285d80bf8d4aa0d088fb93b81211c5`: fresh Session `253b9133001ba0189eac12c210debc4b`、Permission `broker-audit-167/168`、Owner Approval `broker-audit-169/170`、開始・一回消費`broker-audit-173`、installed UI terminal `failed`／Audit `broker-audit-182`。終端reasonは`RecoveryAction=Workspace差分を確認`。実Codex CLI 0.160.0／MxC child。`r2-e2e`専用25,000ms deadlineと1,000秒待機markerを使い、偽APIは1 request／tool call送信／結果未受信／外部要求なしを報告した。Owner cancel eventはなく、終端後にCodex／MxC子process、D4 scratch journal entry、Workspace完了markerは存在しなかった。
 - deadline終端Auditのreasonは汎用的で、単独では期限分類を示さない。期限帰属は短縮期限の試験設定、期限越え待機probe、cancel不在、Task `failed`、process消失を合わせたCONFIG／FIXTURE／LIVE_RUNTIME観測と、Rustの期限超過→process停止→`failed`写像に基づく。期限だけを示す新規Audit形式はR2-A Acceptance外の拡張となるため追加しない。

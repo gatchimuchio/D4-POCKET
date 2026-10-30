@@ -6,7 +6,7 @@
 
 この契約で接続済みの範囲は、owner control経路からの新規追加、通常IPCからの安全なmetadata一覧、Windows／macOS／Linux MCP stdio接続への限定利用、およびnative Owner確認付き論理失効である。Runtime一般、Agent、Tool、A2Aへの注入、更新、暗号文の物理削除、接続先変更、物理削除Recoveryは未接続であり、未完成のまま保管庫完成とは扱わない。
 
-P13のMac登録・Keychain保管・論理失効の現在範囲は`macos-credential-vault.md`のCLOSED受入れを正本とする。本書のC9当時のWindows限定・Keychain未接続は履歴である。Mac MCPへの追加consumerは`macos-mcp-credential-binding.md`（CLOSED）へ限定し、公開ID参照・別個native確認・現在recordの再照合から対象stdio環境一つへ結合する。Linux DesktopはGTK native入力→別個Owner確認→既存Broker→ユーザーSecret Service default collectionの限定経路を追加した。Linux Provider／Agent／A2A注入や正式配布へ成立を拡大しない。
+P13のMac登録・Keychain保管・論理失効の現在範囲は`macos-credential-vault.md`のCLOSED受入れを正本とする。本書のC9当時のWindows限定・Keychain未接続は履歴である。Mac MCPへの追加consumerは`macos-mcp-credential-binding.md`（CLOSED）へ限定し、公開ID参照・別個native確認・現在recordの再照合から対象stdio環境一つへ結合する。Linuxデスクトップ版はGTK native入力→別個Owner確認→既存Broker→ユーザーSecret Service default collectionの限定経路を追加した。Linux Provider／Agent／A2A注入や正式配布へ成立を拡大しない。
 
 ## 登録境界
 
@@ -56,7 +56,7 @@ normal IPC、Flutter、Adapter metadata、Profile、History、MCP metadata、A2A
 
 ## 実装済み範囲と未接続範囲
 
-実装済み範囲は、Windows DPAPIおよびLinux Secret Serviceへ秘密値を暗号化して保存するowner登録、秘密値を含まない公開receipt、通常IPCの検証付き一覧、normal channelからのowner操作拒否、保管先未登録・永続Audit未使用・秘密値混入をfail-closedで拒否する経路である。Linuxはpackage layoutを検証したBrokerだけでSecret Service storeを初期化する。ユーザーsessionのD-Bus Secret Service default collectionにAES-256-GCMで暗号化した秘密ciphertextとrandom keyを別itemとして保存し、lookup attributeはBroker store由来namespaceとCredential IDに束縛する。collection不在／locked、D-Bus不通、item欠落・不一致では通常fileへfallbackせず拒否する。GTK RunnerからRust helper private pipeへ入るnative入力と二段目Owner確認の後だけ登録し、秘密値をDart、platform channel、通常IPC、receipt、Auditへ戻さない。
+実装済み範囲は、Windows DPAPIおよびLinux Secret Serviceへ秘密値を暗号化して保存するOwner登録、秘密値を含まない公開受領票、通常IPCの検証付き一覧、通常経路からのOwner操作拒否、保管先未登録・永続監査未使用・秘密値混入をfail-closedで拒否する経路である。Linuxは製品パッケージ配置を検証したBrokerだけでSecret Service保管領域を初期化する。ユーザーsessionのD-Bus Secret Service 既定collectionにAES-256-GCMで暗号化した秘密の暗号文と乱数鍵を別項目として保存し、検索属性はBroker store由来namespaceとCredential IDに束縛する。collection不在／locked、D-Bus不通、item欠落・不一致では通常fileへfallbackせず拒否する。GTK RunnerからRust helperのprivate pipeへ入るnative入力と二段階目のOwner確認の後だけ登録し、秘密値をDart、platform channel、通常IPC、受領票、監査へ戻さない。
 
 資格情報の論理失効は、Rust Desktopのnative Owner確認を通過した単一Credential IDだけに許可する。Brokerは確認後に永続Auditを再検証し、登録receiptのID・作成監査ID・暗号文hashへ結び付いた失効eventを追加する。資格情報状態は登録・失効・MCP使用Auditを時系列に検証して復元し、失効後のCredential使用event、重複失効、孤立した失効receiptはAudit不整合としてfail-closedにする。失効後はMCP注入を拒否し、一覧には`状態=失効`と失効時刻をmetadata-onlyで表示する。暗号文fileはこの操作では削除せず保持する。失効は取消できず、再利用には別IDの再登録が必要である。暗号文の物理削除とそのRecoveryは別操作であり未接続。
 
@@ -68,4 +68,4 @@ P6のCodex CLI Provider結合は、`provider_model_selection.authentication_sour
 
 Product Buildでは合成Credentialを偽Codex CLIへ渡すfixtureで、親process環境への受渡し、引数・結果への非露出、tool shell除外設定を検査する。Broker単体ではcurrent Permission／Approvalの検証後だけcredential resolverへ進むことを検査する。実Codex CLI 0.160.0を合成loopback Responses APIへ接続するWindows `LIVE_RUNTIME`試験は、API request前にMxCの`CreateProcessSecurityEnvironment`／HRESULT `0x80070003`で停止したため、実CLIでの認証・tool child除外・Provider接続は未確認である。Provider healthとmodel availabilityは`unknown`のままとする。この環境制約はProduct Buildのfixture成立を取り消さず、実CLI経路はFinal QA／release evidenceで確認する。
 
-未接続範囲は、Codex CLI Provider以外のRuntime／Tool／A2A使用、GUI上でのCredential登録・更新・物理削除・接続先変更・物理削除Recovery操作、Windows installed productでの登録／注入／失効証拠、Linux native installed productでの登録／注入／失効とprocess回復証拠、macOS/iOS KeychainおよびAndroid Keystoreである。これらは`release_blocker`として残し、限定Codex CLI結合、登録・論理失効またはMCP用への注入成功を製品完成やrelease readinessへ昇格させない。
+未接続範囲は、Codex CLI Provider以外のRuntime／Tool／A2A使用、GUI上でのCredential登録・更新・物理削除・接続先変更・物理削除Recovery操作、Windows 導入済み製品での登録／注入／失効証拠、Linux native 導入済み製品での登録／注入／失効とprocess回復証拠、macOS/iOS KeychainおよびAndroid Keystoreである。これらは`release_blocker`として残し、限定Codex CLI結合、登録・論理失効またはMCP用への注入成功を製品完成やrelease readinessへ昇格させない。

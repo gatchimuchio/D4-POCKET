@@ -111,7 +111,7 @@ def build_package() -> bytes:
 def _sign_with_public_test_key(private_key: Path, signed_bytes: bytes) -> bytes:
     metadata = private_key.lstat()
     if private_key.is_symlink() or not private_key.is_file() or metadata.st_size != 48:
-        raise ValueError("RFC 8032 test key must be a 48-byte regular DER file")
+        raise ValueError("RFC 8032試験鍵は48バイトの通常DERファイルである必要があります")
     with tempfile.TemporaryDirectory(prefix="d4p-linux-update-sign-") as temporary:
         temporary_path = Path(temporary)
         input_path = temporary_path / "candidate.bin"
@@ -133,7 +133,7 @@ def _sign_with_public_test_key(private_key: Path, signed_bytes: bytes) -> bytes:
             capture_output=True,
         )
         if public_result.stdout != PUBLIC_KEY_DER:
-            raise ValueError("private key does not match the published RFC 8032 test vector")
+            raise ValueError("秘密鍵が公開済みRFC 8032試験ベクトルと一致しません")
         subprocess.run(
             [
                 "openssl",
@@ -154,7 +154,7 @@ def _sign_with_public_test_key(private_key: Path, signed_bytes: bytes) -> bytes:
         )
         signature = output_path.read_bytes()
     if len(signature) != 64:
-        raise ValueError("OpenSSL returned an invalid Ed25519 signature length")
+        raise ValueError("OpenSSLが不正なEd25519署名長を返しました")
     return signature
 
 
@@ -185,7 +185,7 @@ def build_catalog(package: bytes, private_key: Path) -> bytes:
 
 def _atomic_write(path: Path, content: bytes) -> None:
     if path.is_symlink() or (path.exists() and not path.is_file()):
-        raise ValueError(f"fixture output is not a regular file: {path.name}")
+        raise ValueError(f"fixture出力が通常fileではありません: {path.name}")
     descriptor, temporary_name = tempfile.mkstemp(
         prefix=f".{path.name}.", dir=path.parent
     )
@@ -203,7 +203,7 @@ def _atomic_write(path: Path, content: bytes) -> None:
 
 def write_fixture(private_key: Path | None = None) -> dict[str, Any]:
     if not FIXTURE_DIR.is_dir() or FIXTURE_DIR.is_symlink():
-        raise ValueError("tracked Linux update fixture directory is unavailable")
+        raise ValueError("追跡対象Linux更新fixture用directoryを利用できません")
     package = build_package()
     if private_key is None:
         with tempfile.TemporaryDirectory(prefix="d4p-linux-update-key-") as temporary:
@@ -232,7 +232,7 @@ def main() -> int:
     parser.add_argument(
         "--private-key",
         type=Path,
-        help="optional RFC 8032 test-vector DER key; if omitted the published test vector is used",
+        help="RFC 8032試験ベクトル用DER鍵（任意）。省略時は公開試験ベクトルを使います",
     )
     args = parser.parse_args()
     print(

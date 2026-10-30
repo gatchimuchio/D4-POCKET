@@ -1,4 +1,4 @@
-//! Linux GTK chooser response is selection-only input, never an Authority source.
+//! Linux GTKファイル選択画面の応答は選択内容だけを渡す入力であり、権限の根拠にはなりません。
 use crate::broker::ipc_server::DesktopOwnerOperationRequest;
 use crate::broker::protocol::{canonical_payload_hash, request_issued_at_is_current};
 use crate::broker::{BrokerEndpoint, BrokerRequestEnvelope};

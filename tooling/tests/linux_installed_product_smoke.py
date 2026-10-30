@@ -261,18 +261,18 @@ def _wait_for_catalog_fetch_status(root, *, timeout: float = 60.0) -> str:
         if statuses:
             status = statuses[-1]
             if status.startswith(failure_prefix):
-                raise RuntimeError(f"installed UI catalog fetch failed: {status[:400]}")
+                raise RuntimeError(f"導入済みUIからの一覧取得に失敗しました: {status[:400]}")
             if status == unconfigured:
-                raise RuntimeError(f"installed UI catalog trust is unconfigured: {status}")
+                raise RuntimeError(f"導入済みUIの一覧信頼設定がありません: {status}")
             if status != expected_success:
                 raise RuntimeError(
-                    f"installed UI catalog returned an unexpected result: {status[:400]}"
+                    f"導入済みUI一覧から想定外の結果が返りました: {status[:400]}"
                 )
             return status
         time.sleep(0.15)
     observed_text = ", ".join(dict.fromkeys(observed[-6:]))
     raise RuntimeError(
-        "installed UI catalog fetch did not expose a terminal status"
+        "導入済みUI一覧取得の終端状態が示されませんでした"
         + (f": {observed_text}" if observed_text else "")
     )
 
@@ -435,7 +435,7 @@ def _accessible_descendants(root) -> list[tuple[object, str]]:
 
 
 def _accessible_text(node) -> str:
-    """GTK labels may expose their body through AT-SPI Text, not Accessible.name."""
+    """GTKラベルは本文をAT-SPIのTextとして公開し、Accessible.nameは使わない場合があります。"""
     try:
         text = node.queryText()
         value = text.getText(0, -1)
@@ -558,18 +558,18 @@ def _open_mcp_center_from_installed_ui(
         root=window,
         timeout=10,
     )
-    # Submit the ASCII MCP query through the palette's supported TextField
-    # onSubmitted path. Some GTK AT-SPI action nodes lack extents, and xdotool
-    # cannot type Japanese text; the first MCP result opens this same center.
+    # 対応済みのTextField経由でASCII文字のMCP問合せを送信する
+    # onSubmitted経路を使う。GTKのAT-SPI action nodeには位置情報がない場合があり、xdotoolでは
+    # 日本語を入力できない。最初のMCP結果から同じ画面を開ける。
     subprocess.run(
         ["xdotool", "key", "--clearmodifiers", "Return"],
         env=environment,
         check=True,
         timeout=5,
     )
-    # Dismissing the command-palette dialog can invalidate its old AT-SPI
-    # subtree. Resolve the destination from the desktop, then reacquire the
-    # product window before returning it to callers that inspect its controls.
+    # コマンドパレットのdialogを閉じると、古いAT-SPI
+    # 部分木が無効になることがある。desktopから移動先を特定してから、
+    # controlを調べる呼出元へ返す前に製品windowを再取得する。
     _find_accessible("MCP接続センター", timeout=10)
     window = _find_accessible(WINDOW_TITLE, timeout=10)
     _find_accessible("MCP接続センター", root=window, timeout=10)
@@ -591,7 +591,7 @@ def _set_public_text_by_keyboard(
             for character in value
         )
     ):
-        raise RuntimeError("public GTK field value is empty or outside its bounded format")
+        raise RuntimeError("公開GTK欄の値が空か、許容形式を超えています")
     node = _find_accessible(label, root=root, timeout=10)
     editable_node = None
     for _ in range(6):
@@ -604,7 +604,7 @@ def _set_public_text_by_keyboard(
             if node is None:
                 break
     if editable_node is None:
-        raise RuntimeError("GTK public text field is not keyboard-accessible")
+        raise RuntimeError("公開GTKテキスト欄をキーボードで操作できません")
 
     subprocess.run(
         ["xdotool", "windowactivate", "--sync", window_id],
@@ -627,7 +627,7 @@ def _set_public_text_by_keyboard(
         )
         time.sleep(0.05)
     if focused is None:
-        raise RuntimeError("GTK public text field did not receive keyboard focus")
+        raise RuntimeError("公開GTKテキスト欄にキーボード焦点が移りませんでした")
     subprocess.run(
         ["xdotool", "key", "--clearmodifiers", "ctrl+a"],
         env=environment,
@@ -655,7 +655,7 @@ def _set_public_text_by_keyboard(
         if _accessible_text(editable_node) == value:
             return
         time.sleep(0.05)
-    raise RuntimeError(f"GTK public text field {label!r} did not reflect the typed identifier")
+    raise RuntimeError(f"公開GTKテキスト欄{label!r}に入力した識別子が反映されませんでした")
 
 
 def _enter_native_credential_secret(dialog, secret: str) -> None:
@@ -669,12 +669,12 @@ def _enter_native_credential_secret(dialog, secret: str) -> None:
         except Exception:
             continue
     if len(editable) != 1:
-        raise RuntimeError("native GTK secret entry is not uniquely accessible")
+        raise RuntimeError("native GTK秘密入力欄を一意に特定できません")
     try:
         if editable[0].queryEditableText().setTextContents(secret) is False:
-            raise RuntimeError("native GTK secret entry rejected input")
+            raise RuntimeError("native GTK秘密入力欄が入力を拒否しました")
     except Exception:
-        raise RuntimeError("native GTK secret entry could not accept test input") from None
+        raise RuntimeError("native GTK秘密入力欄が試験入力を受け付けませんでした") from None
 
 
 def _enter_credential_and_answer_owner(
@@ -706,7 +706,7 @@ def _secret_service_item_labels() -> list[str]:
         import dbus
     except ImportError as error:
         raise RuntimeError(
-            "Secret Service metadata inspection requires python3-dbus"
+            "秘密保管サービスのメタデータ検査にはpython3-dbusが必要です"
         ) from error
 
     try:
@@ -739,11 +739,11 @@ def _secret_service_item_labels() -> list[str]:
                 or len(label) > 256
                 or any(ord(character) < 0x20 for character in label)
             ):
-                raise RuntimeError("Secret Service item metadata is malformed")
+                raise RuntimeError("秘密保管サービス項目のメタデータが不正です")
             labels.append(label)
         return labels
     except dbus.exceptions.DBusException:
-        raise RuntimeError("Secret Service metadata search failed") from None
+        raise RuntimeError("秘密保管サービスのメタデータ検索に失敗しました") from None
 
 
 def _start_isolated_secret_service(
@@ -773,14 +773,14 @@ def _start_isolated_secret_service(
                 start_new_session=True,
             )
         if process.stdin is None:
-            raise RuntimeError("Secret Service password stdin is unavailable")
+            raise RuntimeError("秘密保管サービスへ渡すパスワード用標準入力を利用できません")
         process.stdin.write(b"\n")
         process.stdin.close()
         environment["GNOME_KEYRING_CONTROL"] = str(control_directory)
         deadline = time.monotonic() + 15
         while time.monotonic() < deadline:
             if process.poll() is not None:
-                raise RuntimeError("isolated Secret Service exited during startup")
+                raise RuntimeError("隔離した秘密保管サービスが起動中に終了しました")
             owner = subprocess.run(
                 [
                     "gdbus",
@@ -803,7 +803,7 @@ def _start_isolated_secret_service(
             if owner.returncode == 0 and "(true,)" in owner.stdout:
                 return process
             time.sleep(0.2)
-        raise RuntimeError("isolated user-session Secret Service did not become available")
+        raise RuntimeError("隔離した利用者sessionの秘密保管サービスが利用可能になりませんでした")
     except Exception:
         if process is not None and process.poll() is None:
             _terminate_group(process)
@@ -816,17 +816,17 @@ def _verify_credential_audit(store: Path, secret: str) -> dict[str, int]:
     key_path = store / "audit_anchor.key"
     audit_bytes = audit_path.read_bytes()
     if secret.encode("utf-8") in audit_bytes:
-        raise RuntimeError("Credential secret leaked into durable Audit")
+        raise RuntimeError("資格情報の秘密が永続監査に漏えいしました")
     events = [json.loads(line) for line in audit_bytes.decode("utf-8").splitlines() if line]
     if not events:
-        raise RuntimeError("Credential acceptance produced no durable Audit")
+        raise RuntimeError("資格情報受入れで永続監査が生成されませんでした")
     previous_hash: str | None = None
     for index, event in enumerate(events, start=1):
         if (
             event.get("event_id") != f"broker-audit-{index}"
             or event.get("previous_event_hash") != previous_hash
         ):
-            raise RuntimeError("Credential Audit event sequence is invalid")
+            raise RuntimeError("資格情報の監査事象順序が不正です")
         hash_input = "|".join(
             (
                 event["event_id"],
@@ -841,7 +841,7 @@ def _verify_credential_audit(store: Path, secret: str) -> dict[str, int]:
         )
         previous_hash = "sha256:" + hashlib.sha256(hash_input.encode("utf-8")).hexdigest()
         if not hmac.compare_digest(event.get("event_hash", ""), previous_hash):
-            raise RuntimeError("Credential Audit event hash is invalid")
+            raise RuntimeError("資格情報の監査事象ハッシュが不正です")
     anchor = json.loads(anchor_path.read_text(encoding="utf-8"))
     key = bytes.fromhex(key_path.read_text(encoding="ascii").strip())
     anchor_input = (
@@ -855,12 +855,12 @@ def _verify_credential_audit(store: Path, secret: str) -> dict[str, int]:
         or anchor.get("head_event_hash") != previous_hash
         or not hmac.compare_digest(anchor.get("anchor_hmac", ""), expected)
     ):
-        raise RuntimeError("Credential Audit anchor／HMAC is invalid")
+        raise RuntimeError("資格情報の監査アンカー／HMACが不正です")
     operations = [event.get("operation", "") for event in events]
     if not any("資格情報登録" in operation for operation in operations):
-        raise RuntimeError("Credential registration Audit is missing")
+        raise RuntimeError("資格情報登録の監査記録がありません")
     if not any("資格情報失効" in operation for operation in operations):
-        raise RuntimeError("Credential revocation Audit is missing")
+        raise RuntimeError("資格情報失効の監査記録がありません")
     for operation_name in ("資格情報登録", "資格情報失効"):
         decisions = {
             event.get("decision")
@@ -868,7 +868,7 @@ def _verify_credential_audit(store: Path, secret: str) -> dict[str, int]:
             if event.get("operation") == operation_name
         }
         if not {"rejected", "accepted"}.issubset(decisions):
-            raise RuntimeError(f"{operation_name} Audit lacks separate reject and accept decisions")
+            raise RuntimeError(f"{operation_name} 拒否と許可の判断が別々に監査記録されていません")
     return {
         "events": len(events),
         "registration_events": sum(operation == "資格情報登録" for operation in operations),
@@ -877,9 +877,9 @@ def _verify_credential_audit(store: Path, secret: str) -> dict[str, int]:
 
 
 _CREDENTIAL_SCAN_CHUNK_BYTES = 1024 * 1024
-# A hosted installed GTK acceptance exceeded 512 MiB while scanning 10,677
-# regular acceptance files (at least 572,613,198 bytes). Keep the scan complete
-# with a fixed 1 MiB memory chunk and a still-bounded 1 GiB total byte ceiling.
+# ホスト型の導入済みGTK受入れ試験で10,677件を走査中に512 MiBを超えました。
+# 通常の受入れfile（合計572,613,198 byte以上）です。走査を完全に保ちつつ
+# 固定1 MiBメモリ単位を使い、合計byte数の上限を1 GiBに保ちます。
 _CREDENTIAL_SCAN_MAX_BYTES = 1024 * 1024 * 1024
 
 
@@ -933,7 +933,7 @@ def _assert_secret_absent_from_files(
             else ""
         )
         return RuntimeError(
-            "Credential acceptance scan exceeds its bounded byte budget "
+            "資格情報の受入れファイル走査が上限バイト数を超えました "
             f"(files_scanned={files_scanned}, "
             f"scanned_bytes={_CREDENTIAL_SCAN_MAX_BYTES - remaining}"
             f"{next_file}, scanned_role_totals={_credential_scan_role_summary(role_totals)})"
@@ -970,12 +970,12 @@ def _assert_secret_absent_from_files(
                     content = overlap + chunk
                     if marker in content:
                         raise RuntimeError(
-                            "Credential secret leaked into an acceptance file or log"
+                            "資格情報の秘密が受入れファイルまたはログへ漏えいしました"
                         )
                     overlap = content[-(len(marker) - 1) :] if len(marker) > 1 else b""
             files_scanned += 1
         except OSError:
-            raise RuntimeError("Credential acceptance file scan could not read a test file") from None
+            raise RuntimeError("資格情報の受入れファイル走査で試験ファイルを読めませんでした") from None
 
 
 def _accessible_snapshot(root) -> str:
@@ -1035,17 +1035,17 @@ def _run_installed_credential_vault_acceptance(
     names = _accessible_snapshot(window)
     credential_ids = set(re.findall(r"\b[0-9a-f]{32}\b", names))
     if len(credential_ids) != 1:
-        raise RuntimeError("installed UI did not expose exactly one public Credential ID")
+        raise RuntimeError("導入済みUIに公開資格情報IDが一つだけ表示されませんでした")
     credential_id = next(iter(credential_ids))
     labels = _secret_service_item_labels()
     if sorted(labels) != ["D4 Pocket credential ciphertext", "D4 Pocket credential key"]:
-        raise RuntimeError("Secret Service did not contain exactly the separate key and ciphertext items")
+        raise RuntimeError("秘密保管サービスに鍵と暗号文が別々の項目として一つずつ存在しません")
     if secret in names:
-        raise RuntimeError("Credential secret leaked into the installed UI accessibility tree")
+        raise RuntimeError("資格情報の秘密が導入済みUIのアクセシビリティ木へ漏えいしました")
 
     window_id = restart_application(window_id)
     if _secret_service_item_labels() != labels:
-        raise RuntimeError("Broker restart changed the run-owned Secret Service items")
+        raise RuntimeError("Broker再起動で実行単位が所有する秘密保管サービス項目が変化しました")
     window = _open_mcp_center_from_installed_ui(environment, window_id)
     _set_public_text_by_keyboard(
         window, "サーバー識別子", target_server_id, environment, window_id
@@ -1073,7 +1073,7 @@ def _run_installed_credential_vault_acceptance(
     _wait_for_owner_dialog_closed(environment)
     _find_accessible("api_key ・ 有効", root=window, timeout=10)
     if _secret_service_item_labels() != labels:
-        raise RuntimeError("Credential revocation rejection changed Secret Service items")
+        raise RuntimeError("資格情報失効の拒否で秘密保管サービス項目が変化しました")
 
     _activate_named_control_by_keyboard("資格情報を失効", environment, window_id)
     _answer_owner_dialog(
@@ -1085,7 +1085,7 @@ def _run_installed_credential_vault_acceptance(
     _find_accessible("Credentialを論理失効しました。以後の使用を拒否し、Secret Service itemは保持します。", root=window, timeout=15)
     _find_accessible("api_key ・ 失効", root=window, timeout=10)
     if _secret_service_item_labels() != labels:
-        raise RuntimeError("Logical revocation unexpectedly removed Secret Service items")
+        raise RuntimeError("論理失効で秘密保管サービス項目が予期せず削除されました")
 
     audit_evidence = _verify_credential_audit(audit_store, secret)
     _assert_secret_absent_from_files(
@@ -1118,11 +1118,11 @@ def _write_linux_mcp_fixture(
         or metadata.st_uid != os.getuid()
         or metadata.st_mode & 0o077
     ):
-        raise RuntimeError("installed MCP fixture workspace is not private and owner-bound")
+        raise RuntimeError("導入済みMCPの試験用作業領域が非公開で所有者に束縛されていません")
 
     fixture = temp_root / "linux-installed-mcp-server.py"
     if fixture.exists() or fixture.is_symlink():
-        raise RuntimeError("run-owned MCP fixture path is already occupied")
+        raise RuntimeError("実行単位所有のMCP試験用pathが既に使われています")
     source = '''import json
 import os
 import sys
@@ -1203,7 +1203,7 @@ for line in sys.stdin:
         or fixture_metadata.st_mode & 0o077
         or temp_root.resolve(strict=True) not in fixture.resolve(strict=True).parents
     ):
-        raise RuntimeError("run-owned MCP fixture is not a private regular file")
+        raise RuntimeError("実行単位所有のMCP試験用fileが非公開の通常fileではありません")
 
     seed = secrets.token_hex(16)
     result_marker = MCP_RESULT_PREFIX + seed
@@ -1220,15 +1220,15 @@ def _read_mcp_child_identity(workspace: Path) -> tuple[int, int]:
         or metadata.st_uid != os.getuid()
         or metadata.st_mode & 0o077
     ):
-        raise RuntimeError("installed MCP child identity marker is not a private regular file")
+        raise RuntimeError("導入済みMCP子processの識別markerが非公開の通常fileではありません")
     try:
         document = json.loads(marker.read_text(encoding="utf-8"))
         pid = int(document["pid"])
         pgid = int(document["pgid"])
     except (OSError, UnicodeError, json.JSONDecodeError, KeyError, TypeError, ValueError) as error:
-        raise RuntimeError("installed MCP child identity marker is malformed") from error
+        raise RuntimeError("導入済みMCP子processの識別markerの形式が不正です") from error
     if pid <= 1 or pgid <= 1 or pid == pgid or pgid == os.getpgrp():
-        raise RuntimeError("installed MCP child is not in its isolated owned process group")
+        raise RuntimeError("導入済みMCP子processが隔離された所有process群に属していません")
     return pid, pgid
 
 
@@ -1266,7 +1266,7 @@ def _wait_for_mcp_group_state(pgid: int, should_exist: bool, *, timeout: float =
             return
         time.sleep(0.1)
     expected = "alive" if should_exist else "stopped"
-    raise RuntimeError(f"installed MCP owned process group did not become {expected}")
+    raise RuntimeError(f"導入済みMCP所有process群の状態が {expected}")
 
 
 def _cleanup_mcp_fixture_group(workspace: Path, *, helper: Path, fixture: Path) -> None:
@@ -1279,7 +1279,7 @@ def _cleanup_mcp_fixture_group(workspace: Path, *, helper: Path, fixture: Path) 
     if not _mcp_process_group_is_fixture_owned(
         *_read_mcp_child_identity(workspace), helper=helper, fixture=fixture
     ):
-        raise RuntimeError("refusing to clean an MCP process group not proven to be run-owned")
+        raise RuntimeError("実行単位が所有すると証明できないMCP process群の清掃を拒否します")
     _stop_owned_groups({pgid})
     _wait_for_mcp_group_state(pgid, False)
 
@@ -1318,12 +1318,11 @@ def _review_single_installed_mcp_tool_arguments(
     preview = _accessible_snapshot(window)
     if MCP_PUBLIC_INPUT not in preview:
         raise RuntimeError(
-            "installed MCP public arguments are not exposed in the product UI "
-            "accessibility tree"
+            "導入済みMCPの公開引数が製品UIのアクセシビリティ木に表示されていません"
         )
     if "Tool結果本文は返却されず" not in preview:
         raise RuntimeError(
-            "installed MCP result-exposure notice is missing from the product UI"
+            "導入済みMCP結果の露出範囲表示が製品UIにありません"
         )
     proceed = _find_operable_accessible("Linux確認へ進む", root=window, timeout=10)
     _activate_accessible(proceed, "Linux確認へ進む", environment)
@@ -1343,7 +1342,7 @@ def _run_installed_mcp_tool_acceptance(
     )
     python_executable = Path("/usr/bin/python3")
     if not python_executable.is_file() or not os.access(python_executable, os.X_OK):
-        raise RuntimeError("installed MCP acceptance requires the runner-owned /usr/bin/python3")
+        raise RuntimeError("導入済みMCP受入れには実行runnerが所有する/usr/bin/python3が必要です")
     server_id = "linux-installed-mcp-fixture"
     start_marker = workspace / "mcp-child-started.json"
     call_marker = workspace / "mcp-tool-called.json"
@@ -1375,7 +1374,7 @@ def _run_installed_mcp_tool_acceptance(
     _wait_for_owner_dialog_closed(environment)
     _find_accessible("MCP接続は確定していません", root=window, timeout=15)
     if start_marker.exists() or call_marker.exists():
-        raise RuntimeError("installed MCP native Owner rejection started a child or Tool")
+        raise RuntimeError("導入済みMCPのnative所有者拒否後に子processまたはツールが起動しました")
 
     connect = _find_operable_accessible("MCP接続を開始", root=window, timeout=10)
     _activate_accessible(connect, "MCP接続を開始", environment)
@@ -1401,7 +1400,7 @@ def _run_installed_mcp_tool_acceptance(
     if not _mcp_process_group_is_fixture_owned(
         pid, pgid, helper=helper, fixture=fixture
     ):
-        raise RuntimeError("installed MCP child is not supervised by the installed Broker guardian")
+        raise RuntimeError("導入済みMCP子processは導入済みBrokerの監督下にありません")
     _wait_for_mcp_group_state(pgid, True)
 
     _expand_single_installed_mcp_tool_list(environment, window)
@@ -1426,20 +1425,20 @@ def _run_installed_mcp_tool_acceptance(
     _find_accessible("result hash: sha256:", root=window, timeout=10)
     _find_accessible("content: text", root=window, timeout=10)
     if not call_marker.is_file() or call_marker.is_symlink():
-        raise RuntimeError("installed MCP child did not receive exactly one tools/call")
+        raise RuntimeError("導入済みMCP子processがtools/callを一回だけ受け取りませんでした")
     try:
         call_document = json.loads(call_marker.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as error:
-        raise RuntimeError("installed MCP tools/call marker is malformed") from error
+        raise RuntimeError("導入済みMCPのtools/call markerの形式が不正です") from error
     if call_document != {"method": "tools/call", "count": 1}:
-        raise RuntimeError("installed MCP child did not receive the expected single tools/call")
+        raise RuntimeError("導入済みMCP子processが想定したtools/call一回を受け取りませんでした")
 
     snapshot_after_tool = _accessible_snapshot(window)
     if result_marker in snapshot_after_tool:
-        raise RuntimeError("installed MCP Tool result body leaked into the UI accessibility tree")
+        raise RuntimeError("導入済みMCPツール結果本文がUIのアクセシビリティ木へ漏えいしました")
     result_hashes = re.findall(r"result hash: (sha256:[0-9a-f]{64})", snapshot_after_tool)
     if len(result_hashes) != 1:
-        raise RuntimeError("installed MCP Tool UI did not expose exactly one hash-only result receipt")
+        raise RuntimeError("導入済みMCPツールUIにハッシュのみの結果受領票が一つだけ表示されませんでした")
 
     _activate_named_control_by_keyboard(
         "切断", environment, window_id, context_marker=server_id
@@ -1455,7 +1454,7 @@ def _run_installed_mcp_tool_acceptance(
     _wait_for_owner_dialog_closed(environment)
     _find_accessible("切断は確定していません", root=window, timeout=15)
     if not _group_exists(pgid):
-        raise RuntimeError("MCP disconnect Owner rejection stopped the still-registered child")
+        raise RuntimeError("MCP切断の所有者拒否が登録中の子processを停止させました")
 
     _activate_named_control_by_keyboard(
         "切断", environment, window_id, context_marker=server_id
@@ -1491,7 +1490,7 @@ def _run_installed_mcp_tool_acceptance(
         and event.get("evidence_source") == "LIVE_RUNTIME"
     ]
     if len(tool_events) != 1 or result_hashes[0] not in tool_events[0].get("reason", ""):
-        raise RuntimeError("installed MCP UI result hash is not bound to the durable LIVE_RUNTIME Audit")
+        raise RuntimeError("導入済みMCP UIの結果ハッシュが永続LIVE_RUNTIME監査に結合されていません")
     _assert_secret_absent_from_files(
         acceptance_root,
         result_marker,
@@ -1606,8 +1605,8 @@ def _trigger_update_action_from_installed_ui(
     row_marker: str | None = None,
 ):
     window = _open_update_center_from_installed_ui(environment, window_id)
-    # Flutter may expose a TextButton label without an AT-SPI action/bounds.
-    # Bind repeated action labels to the candidate row before keyboard activation.
+    # FlutterはAT-SPIの操作機能／位置情報を持たないTextButton表示名を公開する場合があります。
+    # キーボードで操作する前に、重複する操作名を候補行へ束縛します。
     _find_accessible(action, root=window, timeout=10)
     if row_marker is not None:
         _find_accessible(row_marker, root=window, timeout=10)
@@ -1811,7 +1810,7 @@ def _answer_owner_dialog(
         raise RuntimeError(
             "Owner確認summaryに操作固有の必須情報がありません: "
             + "、".join(missing_markers)
-            + "; bounded accessible text="
+            + "; 範囲を限定したアクセシビリティ表示文字列="
             + _bounded_owner_text_diagnostics(names)
         )
     if not any("要求hash:" in value or "payload hash:" in value for value in names):
@@ -2272,16 +2271,16 @@ def _verify_live_audit(
         )
         expected = "sha256:" + hashlib.sha256(hash_input.encode("utf-8")).hexdigest()
         if not hmac.compare_digest(event.get("event_hash", ""), expected):
-            raise RuntimeError("installed product Audit event hashが不正です")
+            raise RuntimeError("導入済み製品の監査事象ハッシュが不正です")
         previous_hash = expected
 
     anchor = json.loads(anchor_path.read_text(encoding="utf-8"))
     try:
         key = bytes.fromhex(key_path.read_text(encoding="ascii").strip())
     except (OSError, UnicodeError, ValueError) as error:
-        raise RuntimeError("installed product Audit anchor keyが不正です") from error
+        raise RuntimeError("導入済み製品の監査アンカー鍵が不正です") from error
     if len(key) != 32:
-        raise RuntimeError("installed product Audit anchor key長が不正です")
+        raise RuntimeError("導入済み製品の監査アンカー鍵長が不正です")
     anchor_input = (
         f"version=1|event_count={len(events)}|head_event_hash={previous_hash or ''}"
     ).encode("utf-8")
@@ -2292,7 +2291,7 @@ def _verify_live_audit(
         or anchor.get("head_event_hash") != previous_hash
         or not hmac.compare_digest(anchor.get("anchor_hmac", ""), expected_hmac)
     ):
-        raise RuntimeError("installed product Audit anchor／HMACが不正です")
+        raise RuntimeError("導入済み製品の監査アンカー／HMACが不正です")
 
     exports = [
         event
@@ -2332,7 +2331,7 @@ def _verify_live_audit(
     mcp_tool_live_completed = sum(
         event.get("decision") == "accepted"
         and event.get("evidence_source") == "LIVE_RUNTIME"
-        and "hash-only receipt" in event.get("reason", "")
+        and "ハッシュだけを含む受領票" in event.get("reason", "")
         for event in mcp_tool
     )
     mcp_disconnect_rejected = sum(
@@ -2664,7 +2663,7 @@ def _run_rust_test(
     if completed.stderr:
         print(completed.stderr[-12000:], file=sys.stderr, end="")
     if completed.returncode != 0:
-        raise RuntimeError(f"installed acceptance Rust test failed: {name}")
+        raise RuntimeError(f"導入済み受入れRust試験に失敗しました: {name}")
 
 
 def run_installed_smoke(
@@ -2874,7 +2873,7 @@ def run_installed_smoke(
                     elif time.monotonic() - launch_error_since >= 5:
                         tail = _safe_log_tail(app_log, (acceptance_root, temp_root))
                         raise RuntimeError(
-                            f"gio launch failed: {desktop_process.returncode}\n{tail or '(no launcher output)'}"
+                            f"gioによる起動に失敗しました: {desktop_process.returncode}\n{tail or '(no launcher output)'}"
                         )
                 time.sleep(0.25)
             if window_id is None or not (_processes_using(product_paths) - preexisting):
@@ -3003,7 +3002,7 @@ def run_installed_smoke(
                 helper, preexisting, broker_state / "store/audit.jsonl"
             )
             print(
-                "catalog transport immediately before fetch="
+                "一覧取得直前の通信状態="
                 + json.dumps(before_catalog, ensure_ascii=False, separators=(",", ":"))
             )
             try:
@@ -3016,7 +3015,7 @@ def run_installed_smoke(
                 )
                 diagnostics["helper_exit"] = _helper_exit_diagnostics(app_log)
                 raise RuntimeError(
-                    f"{error}; catalog transport diagnostics="
+                    f"{error}; 一覧取得の通信診断="
                     + json.dumps(diagnostics, ensure_ascii=False, separators=(",", ":"))
                 ) from error
 
@@ -3129,7 +3128,7 @@ def run_installed_smoke(
             if desktop_process.poll() is None:
                 desktop_process.wait(timeout=10)
             if desktop_process.returncode not in (0, None):
-                raise RuntimeError(f"gio launch exited unexpectedly: {desktop_process.returncode}")
+                raise RuntimeError(f"gioによる起動が想定外に終了しました: {desktop_process.returncode}")
 
         wayland_compositor, wayland_display = _start_wayland_compositor(
             runtime, environment, acceptance_root / "wayland-compositor.log"
@@ -3157,12 +3156,12 @@ def run_installed_smoke(
                 import pyatspi
 
                 if not wayland_window.getState().contains(pyatspi.STATE_SHOWING):
-                    raise RuntimeError("installed Wayland GTK top-levelがshowingではありません")
+                    raise RuntimeError("導入済みWayland GTK最上位windowが表示状態ではありません")
             except RuntimeError:
                 raise
             except Exception as error:
                 raise RuntimeError(
-                    "installed Wayland GTK window visibilityを取得できません"
+                    "導入済みWayland GTK windowの表示状態を取得できません"
                 ) from error
             running_wayland = _processes_using(product_paths) - preexisting
             if not running_wayland or wayland_process.poll() not in (None, 0):
@@ -3343,7 +3342,7 @@ def run_installed_smoke(
                     "active_version": record["product_version"],
                     "package_sha256": record["package_sha256"],
                     "gtk_window": "opened_and_normally_closed",
-                    "wayland_installed_window": "AT-SPI showing; owner process group stopped; surface rendering not established",
+                    "wayland_installed_window": "AT-SPI表示確認済み; 所有process群停止済み; 画面描画は未確認",
                     "owned_processes": "all_stopped",
                     "installed_ui_owner_confirmation": "native_AT-SPI_rejected_then_approved_through_GTK_runner_private_pipe",
                     "uninstall_rejection_ui": (

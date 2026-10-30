@@ -963,7 +963,7 @@ fn safe_tool_output_diagnostic(output: &Value) -> Value {
         r#"(?:[A-Za-z]:\\|/)(?:[^\s"'<>]+[\\/])*[^\s"'<>]*"#,
     ] {
         safe_preview = regex::Regex::new(pattern)
-            .expect("safe diagnostic preview redaction pattern")
+            .expect("診断表示を安全に伏せる正規表現")
             .replace_all(&safe_preview, "[redacted]")
             .into_owned();
     }

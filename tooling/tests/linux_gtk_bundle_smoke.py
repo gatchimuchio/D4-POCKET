@@ -466,8 +466,8 @@ def run_smoke(launcher: Path, temp_root: Path, backend: str) -> None:
                 time.sleep(0.1)
 
             if backend == "x11":
-                # GTK maps the window before Flutter's first OpenGL frame is ready.
-                # Let the initial frame settle before asking X11 to destroy its drawable.
+                # GTKはFlutterの最初のOpenGL描画frameが準備できる前にwindowを画面へ登録します。
+                # 初期frameが落ち着いてからX11に描画領域を破棄させます。
                 time.sleep(5)
                 if runner_process.poll() is not None:
                     raise RuntimeError(

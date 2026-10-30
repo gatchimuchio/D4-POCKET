@@ -8463,16 +8463,16 @@ mod tests {
 
         let package_path = std::path::PathBuf::from(
             std::env::var_os("D4P_LINUX_ACCEPTANCE_PACKAGE")
-                .expect("acceptance package path is required"),
+                .expect("受入れ対象packageのpathが必要です"),
         );
         let acceptance_root = std::path::PathBuf::from(
-            std::env::var_os("D4P_LINUX_ACCEPTANCE_ROOT").expect("acceptance root is required"),
+            std::env::var_os("D4P_LINUX_ACCEPTANCE_ROOT").expect("受入れ用rootが必要です"),
         );
         let install_root = std::path::PathBuf::from(
-            std::env::var_os("XDG_DATA_HOME").expect("XDG_DATA_HOME is required"),
+            std::env::var_os("XDG_DATA_HOME").expect("XDG_DATA_HOMEが必要です"),
         );
         let state_home = std::path::PathBuf::from(
-            std::env::var_os("XDG_STATE_HOME").expect("XDG_STATE_HOME is required"),
+            std::env::var_os("XDG_STATE_HOME").expect("XDG_STATE_HOMEが必要です"),
         );
         let root_metadata = std::fs::symlink_metadata(&acceptance_root).unwrap();
         assert!(root_metadata.is_dir() && !root_metadata.file_type().is_symlink());
@@ -8501,7 +8501,7 @@ mod tests {
             payload_offset = file_end;
         }
         assert_eq!(payload_offset, package.len());
-        let product_manifest = product_manifest.expect("package product manifest is required");
+        let product_manifest = product_manifest.expect("packageの製品manifestが必要です");
         let offered_version = manifest["product_version"].as_str().unwrap().to_owned();
         assert_eq!(manifest["app_id"], INSTALL_APP_ID);
         assert_eq!(manifest["audit_store_id"], INSTALL_AUDIT_ID);
@@ -8530,7 +8530,7 @@ mod tests {
         let digest = hex::encode(Sha256::digest(&package));
         let private_key_path = std::path::PathBuf::from(
             std::env::var_os("D4P_LINUX_ACCEPTANCE_PRIVATE_KEY")
-                .expect("ephemeral test signing key path is required"),
+                .expect("一時試験署名鍵のpathが必要です"),
         );
         let key_metadata = std::fs::symlink_metadata(&private_key_path).unwrap();
         assert!(key_metadata.is_file() && !key_metadata.file_type().is_symlink());
@@ -8752,7 +8752,7 @@ mod tests {
                 && event.decision == "completed"
         }));
         println!(
-            "Linux installed acceptance seed: version={offered_version} package_sha256={digest} entry_registered=true owner_confirmation_source=isolated_test_fixture"
+            "Linux導入済み受入れ初期状態: version={offered_version} package_sha256={digest} entry_registered=true owner_confirmation_source=isolated_test_fixture"
         );
         let _ = acceptance_root;
     }
@@ -8766,13 +8766,13 @@ mod tests {
 
         let update_package_path = std::path::PathBuf::from(
             std::env::var_os("D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE")
-                .expect("rollback acceptance package path is required"),
+                .expect("ロールバック受入れ用packageのpathが必要です"),
         );
         let install_root = std::path::PathBuf::from(
-            std::env::var_os("XDG_DATA_HOME").expect("XDG_DATA_HOME is required"),
+            std::env::var_os("XDG_DATA_HOME").expect("XDG_DATA_HOMEが必要です"),
         );
         let state_home = std::path::PathBuf::from(
-            std::env::var_os("XDG_STATE_HOME").expect("XDG_STATE_HOME is required"),
+            std::env::var_os("XDG_STATE_HOME").expect("XDG_STATE_HOMEが必要です"),
         );
         let store_root = state_home.join("d4-pocket/linux-broker/store");
         let update_package_metadata = std::fs::symlink_metadata(&update_package_path).unwrap();
@@ -8793,7 +8793,7 @@ mod tests {
 
         let private_key_path = std::path::PathBuf::from(
             std::env::var_os("D4P_LINUX_ACCEPTANCE_PRIVATE_KEY")
-                .expect("ephemeral test signing key path is required"),
+                .expect("一時試験署名鍵のpathが必要です"),
         );
         let key_metadata = std::fs::symlink_metadata(&private_key_path).unwrap();
         assert!(key_metadata.is_file() && !key_metadata.file_type().is_symlink());
@@ -8852,7 +8852,7 @@ mod tests {
             broker
                 .updates
                 .get(&previous.update_id)
-                .expect("previously installed candidate must remain in the Broker catalog")
+                .expect("既に導入済みの候補はBroker一覧に残っている必要があります")
                 .clone(),
         )
         .unwrap();
@@ -8956,7 +8956,7 @@ mod tests {
         assert!(product_root_path.is_dir());
         assert!(versions_path.is_dir());
         println!(
-            "Linux installed rollback seed: current={} target={} package_sha256={} candidate_signature=verified package_stage=verified activation_fixture=true desktop_entry_unchanged=true",
+            "Linux導入済みロールバック初期状態: current={} target={} package_sha256={} candidate_signature=verified package_stage=verified activation_fixture=true desktop_entry_unchanged=true",
             active.current.product_version, previous.product_version, digest
         );
     }
@@ -8966,7 +8966,7 @@ mod tests {
     #[ignore = "explicit Ubuntu installed-product GTK acceptance harness"]
     fn linux_installed_acceptance_runtime_audit_is_durable() {
         let state_home = std::path::PathBuf::from(
-            std::env::var_os("XDG_STATE_HOME").expect("XDG_STATE_HOME is required"),
+            std::env::var_os("XDG_STATE_HOME").expect("XDG_STATE_HOMEが必要です"),
         );
         let store_root = state_home.join("d4-pocket/linux-broker/store");
         let broker = Broker::new_persistent("linux-installed-audit-check", &store_root).unwrap();
@@ -8999,6 +8999,6 @@ mod tests {
             "installed exit Audit was not durable; persisted event summary={event_summary:?}"
         );
         assert!(started.unwrap() < stopped.unwrap());
-        println!("Linux installed acceptance audit: LIVE_RUNTIME start/exit durable");
+        println!("Linux導入済み受入れ監査: LIVE_RUNTIMEの開始／終了を耐久保存");
     }
 }
