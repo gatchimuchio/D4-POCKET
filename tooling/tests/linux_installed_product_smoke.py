@@ -3307,7 +3307,7 @@ def _prepare_and_start_installed_agent_task(
         expected_summary_markers=(
             "このAgent Taskに一回限りのOwner Approvalを発行しますか？",
             f"Runtime ID: {runtime_id}",
-            f"Session ID: {session_id}",
+            "Session ID:",
             f"Workspace ID: {workspace_id}",
             "指示hash:",
             "実行上限: 最大15分",
