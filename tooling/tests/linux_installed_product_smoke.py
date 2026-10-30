@@ -2436,6 +2436,47 @@ def _verify_workspace_projection(
     }
 
 
+def _wait_for_workspace_projection(
+    snapshot: Callable[[], str],
+    *,
+    public_markers: tuple[str, ...],
+    forbidden_markers: tuple[str, ...],
+    timeout: float = 15.0,
+) -> tuple[str, dict[str, int]]:
+    """AT-SPIのAccessible.nameとText interfaceを使い、boundedに表示を待つ。"""
+    deadline = time.monotonic() + timeout
+    latest_snapshot = ""
+    snapshot_observed = False
+    while True:
+        latest_snapshot = snapshot()
+        snapshot_observed = True
+        if any(marker and marker in latest_snapshot for marker in forbidden_markers):
+            raise RuntimeError("Workspace Inspector exposed secret or external content")
+        if all(marker in latest_snapshot for marker in public_markers):
+            return latest_snapshot, _verify_workspace_projection(
+                latest_snapshot,
+                public_markers=public_markers,
+                forbidden_markers=forbidden_markers,
+            )
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            statuses = (
+                "取得時点の表示です。承認状態を定期確認しています。",
+                "取得または現在の承認を確認できません。登録状態を更新してください。",
+                "承認済み範囲を取得中",
+            )
+            read_status = next(
+                (status for status in statuses if status in latest_snapshot),
+                "unknown",
+            )
+            raise RuntimeError(
+                "approved public Workspace content is not visible; "
+                f"snapshot_observed={snapshot_observed}; "
+                f"read_status={read_status}"
+            )
+        time.sleep(min(0.15, remaining))
+
+
 def _write_linux_workspace_acceptance_fixture(
     acceptance_root: Path,
     isolated_home: Path,
@@ -2784,12 +2825,10 @@ def _run_installed_workspace_selection_acceptance(
         ),
     )
     _activate_accessible(public_file, "public.txt", environment)
-    _, inspector = _workspace_inspector_scope(workspace_id)
-    _find_accessible(WORKSPACE_PUBLIC_CONTENT, root=inspector, timeout=15)
-    _, inspector = _workspace_inspector_scope(workspace_id)
-    projection = _accessible_snapshot(inspector)
-    projection_evidence = _verify_workspace_projection(
-        projection,
+    projection, projection_evidence = _wait_for_workspace_projection(
+        lambda: _accessible_snapshot(
+            _workspace_inspector_scope(workspace_id, timeout=3)[1]
+        ),
         public_markers=("public.txt", WORKSPACE_PUBLIC_CONTENT),
         forbidden_markers=(
             ".env",

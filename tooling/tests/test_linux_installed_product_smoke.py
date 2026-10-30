@@ -18,6 +18,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _activate_named_control_by_keyboard,
     _actionable_node,
     _accessible_nodes,
+    _accessible_snapshot,
     _atspi_desktop_failure_summary,
     _accessible_scope_with_named_descendant,
     _answer_owner_dialog,
@@ -51,6 +52,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _verify_credential_audit,
     _verify_live_audit,
     _verify_workspace_projection,
+    _wait_for_workspace_projection,
     _scroll_product_page_down,
     _select_workspace_inspector_visibility,
     _wait_for_workspace_root_value,
@@ -1369,6 +1371,41 @@ class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
 
 
 class LinuxWorkspaceProjectionTests(unittest.TestCase):
+    def test_waits_for_public_body_from_accessible_text_interface(self) -> None:
+        marker = "D4P_WORKSPACE_PUBLIC_PROJECTION_OK"
+        root = InstalledOwnerSummaryTests.Node(
+            "Workspace Inspector",
+            [
+                InstalledOwnerSummaryTests.Node("public.txt"),
+                InstalledOwnerSummaryTests.Node("", text=marker),
+            ],
+        )
+        snapshot, evidence = _wait_for_workspace_projection(
+            lambda: _accessible_snapshot(root),
+            public_markers=("public.txt", marker),
+            forbidden_markers=(".env", "D4P_WORKSPACE_SECRET_CANARY"),
+            timeout=1,
+        )
+        self.assertIn(marker, snapshot)
+        self.assertEqual(evidence["public_markers_visible"], 2)
+
+    def test_workspace_projection_fails_closed_without_echoing_exposed_secret(self) -> None:
+        marker = "D4P_WORKSPACE_SECRET_CANARY_DO_NOT_PRINT"
+        root = InstalledOwnerSummaryTests.Node(
+            "Workspace Inspector",
+            [InstalledOwnerSummaryTests.Node("", text=marker)],
+        )
+        with self.assertRaisesRegex(
+            RuntimeError, "exposed secret or external content"
+        ) as error:
+            _wait_for_workspace_projection(
+                lambda: _accessible_snapshot(root),
+                public_markers=("public.txt", "public-content"),
+                forbidden_markers=(marker,),
+                timeout=1,
+            )
+        self.assertNotIn(marker, str(error.exception))
+
     def test_accepts_public_content_only_when_secret_and_external_markers_are_absent(self) -> None:
         evidence = _verify_workspace_projection(
             "Workspace Inspector\npublic.txt\nD4P_WORKSPACE_PUBLIC_PROJECTION_OK",
