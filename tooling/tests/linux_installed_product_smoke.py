@@ -54,6 +54,7 @@ MCP_RESULT_PREFIX = "D4P_MCP_RESULT_PROBE_"
 MCP_OWNER_WORKSPACE_LABEL = "Workspace: "
 MCP_OWNER_ARGUMENT_HASH_MARKER = "引数hash:"
 MCP_OWNER_NO_CREDENTIAL_MARKER = "Credential注入: なし"
+LINUX_AGENT_TASK_FIXTURE_MODEL_ID = "o3"
 RUST_AUDIT_TEST = (
     "broker::update_center::tests::linux_installed_acceptance_runtime_audit_is_durable"
 )
@@ -2617,7 +2618,7 @@ def _responses_lifecycle_event(
             "instructions": None,
             "max_output_tokens": None,
             "max_tool_calls": None,
-            "model": "o3",
+            "model": LINUX_AGENT_TASK_FIXTURE_MODEL_ID,
             "parallel_tool_calls": True,
             "previous_response_id": None,
             "reasoning": {"effort": None, "summary": None},
@@ -2861,7 +2862,7 @@ class _LinuxAgentTaskResponsesServer:
                         "object": "list",
                         "data": [
                             {
-                                "id": "o3",
+                                "id": LINUX_AGENT_TASK_FIXTURE_MODEL_ID,
                                 "object": "model",
                                 "created": 0,
                                 "owned_by": "d4-pocket-local-fixture",
@@ -3638,6 +3639,8 @@ def _run_installed_agent_task_acceptance(
         workspace_root=workspace,
         secret_paths=secret_paths,
         runtime_id=runtime_id,
+        # Real Codex CLI receives this value as --model; it must exist in the loopback catalog.
+        model_id=LINUX_AGENT_TASK_FIXTURE_MODEL_ID,
     )
     continue_button = _find_operable_accessible(
         "native Owner確認へ進む", root=registration, timeout=10
