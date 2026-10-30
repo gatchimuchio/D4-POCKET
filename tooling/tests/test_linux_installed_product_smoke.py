@@ -1574,7 +1574,7 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
         )
         self.assertEqual(
             run.call_args_list[6].args[0],
-            ["xdotool", "key", "--clearmodifiers", "alt+Up"],
+            ["xdotool", "key", "--clearmodifiers", "BackSpace"],
         )
         self.assertEqual(wait_for_location.call_count, 2)
 

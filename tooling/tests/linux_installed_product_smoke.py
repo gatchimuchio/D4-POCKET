@@ -1612,7 +1612,7 @@ def _select_folder_in_gtk_chooser(
             and posixpath.dirname(current_location) == expected_location
         ):
             subprocess.run(
-                ["xdotool", "key", "--clearmodifiers", "alt+Up"],
+                ["xdotool", "key", "--clearmodifiers", "BackSpace"],
                 env=environment,
                 check=True,
                 timeout=5,
@@ -1631,7 +1631,7 @@ def _select_folder_in_gtk_chooser(
             diagnostics.update(
                 {
                     "exact_location_unconfirmed": True,
-                    "direct_child_parent_navigation_attempted": (
+                    "direct_child_completion_clear_attempted": (
                         current_location is not None
                         and posixpath.dirname(current_location) == expected_location
                     ),
