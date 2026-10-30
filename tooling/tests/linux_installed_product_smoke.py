@@ -2664,7 +2664,6 @@ def _run_installed_workspace_selection_acceptance(
         workspace_id,
         environment,
         timeout=20,
-        accessibility_root=window,
         diagnostic_screenshot_path=inspector_failure_screenshot_path,
     )
     _activate_accessible(row, workspace_id, environment)
@@ -2673,18 +2672,16 @@ def _run_installed_workspace_selection_acceptance(
         workspace_id,
         environment,
         timeout=10,
-        accessibility_root=window,
     )
     _activate_accessible(visibility, "hash_only", environment)
-    window, _ = _workspace_inspector_scope(workspace_id, timeout=10, root=window)
-    full = _find_operable_accessible("full", root=window, timeout=10)
+    _, inspector = _workspace_inspector_scope(workspace_id, timeout=10)
+    full = _find_operable_accessible("full", root=inspector, timeout=10)
     _activate_accessible(full, "full", environment)
     approve = _find_workspace_inspector_control(
         "native Owner確認でWorkspace読取を許可",
         workspace_id,
         environment,
         timeout=10,
-        accessibility_root=window,
     )
     _activate_accessible(approve, "native Owner確認でWorkspace読取を許可", environment)
     _answer_owner_dialog(
@@ -2699,7 +2696,7 @@ def _run_installed_workspace_selection_acceptance(
         ),
     )
     _wait_for_owner_dialog_closed(environment)
-    _, inspector = _workspace_inspector_scope(workspace_id, root=window)
+    _, inspector = _workspace_inspector_scope(workspace_id)
     _find_accessible(
         "現在のWorkspace読取範囲: full・Task実行／書込権は別です。",
         root=inspector,
@@ -2710,7 +2707,6 @@ def _run_installed_workspace_selection_acceptance(
         workspace_id,
         environment,
         timeout=10,
-        accessibility_root=window,
     )
     _activate_accessible(row, workspace_id, environment)
     public_file = _find_workspace_inspector_control(
@@ -2718,9 +2714,8 @@ def _run_installed_workspace_selection_acceptance(
         workspace_id,
         environment,
         timeout=15,
-        accessibility_root=window,
     )
-    _, inspector = _workspace_inspector_scope(workspace_id, root=window)
+    _, inspector = _workspace_inspector_scope(workspace_id)
     initial_projection = _accessible_snapshot(inspector)
     tree_projection_evidence = _verify_workspace_projection(
         initial_projection,
@@ -2735,9 +2730,9 @@ def _run_installed_workspace_selection_acceptance(
         ),
     )
     _activate_accessible(public_file, "public.txt", environment)
-    _, inspector = _workspace_inspector_scope(workspace_id, root=window)
+    _, inspector = _workspace_inspector_scope(workspace_id)
     _find_accessible(WORKSPACE_PUBLIC_CONTENT, root=inspector, timeout=15)
-    _, inspector = _workspace_inspector_scope(workspace_id, root=window)
+    _, inspector = _workspace_inspector_scope(workspace_id)
     projection = _accessible_snapshot(inspector)
     projection_evidence = _verify_workspace_projection(
         projection,
