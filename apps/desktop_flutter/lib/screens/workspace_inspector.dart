@@ -33,6 +33,7 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
   bool _diffPaired = false;
   String _requestedVisibility = 'hash_only';
   int _generation = 0;
+  int _lifecycleGeneration = 0;
   Timer? _timer;
   final _elapsed = Stopwatch()..start();
   int _nextCheck = 0;
@@ -65,6 +66,7 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    _lifecycleGeneration++;
     _active = state == AppLifecycleState.resumed;
     _generation++;
     setState(() {
@@ -219,6 +221,7 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
   Future<void> _approveContent(WorkspaceRegistration registration) async {
     if (!_isActive || _busy) return;
     final generation = ++_generation;
+    final lifecycleGeneration = _lifecycleGeneration;
     setState(() {
       _busy = true;
       _view = null;
@@ -228,7 +231,16 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
     try {
       final current = await widget.client
           .approveContent(registration, _requestedVisibility);
-      if (!mounted || !_isActive || generation != _generation) return;
+      if (!mounted || !_isActive) return;
+      if (generation != _generation) {
+        // Native Owner確認で画面復帰時の一覧取得と承認応答が競合した場合、
+        // 古い一覧に戻さずBrokerの現在状態を再取得する。
+        if (lifecycleGeneration != _lifecycleGeneration &&
+            _selected == registration.id) {
+          await _refresh();
+        }
+        return;
+      }
       setState(() {
         _registrations = _registrations
             .map((entry) => entry.id == current.id ? current : entry)

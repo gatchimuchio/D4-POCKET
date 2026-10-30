@@ -22,6 +22,7 @@ class TestBroker implements BrokerTransport {
   List<Map<String, Object?>> additionalRegistrations = [];
   void Function(Map<String, Object?>)? mutate;
   Completer<void>? pendingRead;
+  Completer<void>? pendingApproval;
   final operations = <String>[];
   Map<String, Object?> get registration => {
         '作業領域ID': 'workspace-a',
@@ -43,6 +44,7 @@ class TestBroker implements BrokerTransport {
         '作業領域': [registration, ...additionalRegistrations]
       };
     } else if (operation == '作業領域承認') {
+      await pendingApproval?.future;
       approval = 'approval-created';
       expires = DateTime.now().millisecondsSinceEpoch ~/ 1000 + 240;
       visibility = payload!['表示範囲'] as String;
@@ -866,6 +868,52 @@ void main() {
     expect(broker.operations, isNot(contains('作業領域承認')));
     expect(broker.operations, isNot(contains('作業領域読取')));
     expect(find.text('file.txt'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('Owner承認中の画面復帰後に古い未承認一覧を残さない',
+      (tester) async {
+    final pendingApproval = Completer<void>();
+    final broker = TestBroker()
+      ..approval = null
+      ..visibility = 'none'
+      ..pendingApproval = pendingApproval;
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: SingleChildScrollView(
+                child: WorkspaceInspector(client: WorkspaceClient(broker))))));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('workspace-a'));
+    await tester.pumpAndSettle();
+    final visibility = find.byType(DropdownButton<String>).last;
+    await tester.ensureVisible(visibility);
+    await tester.tap(visibility);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('full').last);
+    await tester.pumpAndSettle();
+    final approve = find.text('native Owner確認でWorkspace読取を許可');
+    await tester.ensureVisible(approve);
+    await tester.tap(approve);
+    await tester.pump();
+    expect(broker.operations, contains('作業領域承認'));
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    await tester.pump();
+    expect(find.text('workspace-a'), findsNothing);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(find.text('workspace-a'), findsOneWidget);
+    expect(find.text('現在のWorkspace読取範囲: full・Task実行／書込権は別です。'),
+        findsNothing);
+
+    pendingApproval.complete();
+    await tester.pumpAndSettle();
+
+    expect(find.text('現在のWorkspace読取範囲: full・Task実行／書込権は別です。'),
+        findsOneWidget);
+    expect(broker.operations.where((operation) => operation == '作業領域一覧'),
+        hasLength(greaterThanOrEqualTo(3)));
     await tester.pumpWidget(const SizedBox());
   });
 }
