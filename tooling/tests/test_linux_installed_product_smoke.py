@@ -1580,13 +1580,18 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
         self.assertNotIn("/home/test/decoy-workspace", str(failure.exception))
 
     def test_workspace_inspector_control_retains_live_scope_while_scrolling(self) -> None:
-        window = object()
+        first_window, second_window = object(), object()
         first_heading, second_heading = object(), object()
         first_scope, second_scope, control = object(), object(), object()
         with (
             patch(
                 "tooling.tests.linux_installed_product_smoke._find_accessible",
-                side_effect=(window, first_heading, second_heading),
+                side_effect=(
+                    first_window,
+                    first_heading,
+                    second_window,
+                    second_heading,
+                ),
             ) as find,
             patch(
                 "tooling.tests.linux_installed_product_smoke._accessible_scope_with_named_descendant",
@@ -1615,11 +1620,12 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             [
                 WINDOW_TITLE,
                 "作業領域インスペクタ",
+                WINDOW_TITLE,
                 "作業領域インスペクタ",
             ],
         )
-        self.assertIs(find.call_args_list[1].kwargs["root"], window)
-        self.assertIs(find.call_args_list[2].kwargs["root"], window)
+        self.assertIs(find.call_args_list[1].kwargs["root"], first_window)
+        self.assertIs(find.call_args_list[3].kwargs["root"], second_window)
         self.assertTrue(
             all(0 < entry.kwargs["timeout"] <= 1 for entry in find.call_args_list)
         )

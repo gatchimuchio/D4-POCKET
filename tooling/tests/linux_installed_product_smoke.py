@@ -499,27 +499,25 @@ def _find_workspace_inspector_control(
     workspace_id: str,
     environment: dict[str, str],
     *,
-    timeout: float = 20.0,
+    timeout: float = 60.0,
 ):
     deadline = time.monotonic() + timeout
     last_error = "not observed"
     scroll_steps = 0
-    remaining = deadline - time.monotonic()
-    if remaining <= 0:
-        raise RuntimeError(
-            "Workspace Inspector control search timed out before window "
-            f"lookup: control={name}; workspace_id={workspace_id}"
-        )
-    window = _find_accessible(WINDOW_TITLE, timeout=remaining)
+    window_lookups = 0
     while scroll_steps <= 48:
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             break
         try:
+            window_lookups += 1
+            window = _find_accessible(
+                WINDOW_TITLE, timeout=min(2.0, remaining)
+            )
             heading = _find_accessible(
                 "作業領域インスペクタ",
                 root=window,
-                timeout=min(0.5, remaining),
+                timeout=min(1.0, remaining),
             )
             inspector = _accessible_scope_with_named_descendant(
                 heading, workspace_id
@@ -542,7 +540,8 @@ def _find_workspace_inspector_control(
     raise RuntimeError(
         "Workspace Inspector control did not become operable after bounded "
         f"page scrolling: control={name}; workspace_id={workspace_id}; "
-        f"scroll_steps={scroll_steps}; last_error={last_error}"
+        f"window_lookups={window_lookups}; scroll_steps={scroll_steps}; "
+        f"last_error={last_error}"
     )
 
 
