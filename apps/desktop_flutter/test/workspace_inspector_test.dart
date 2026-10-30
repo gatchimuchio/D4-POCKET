@@ -19,6 +19,7 @@ class TestBroker implements BrokerTransport {
   String? approval = 'approval-a';
   int expires = DateTime.now().millisecondsSinceEpoch ~/ 1000 + 240;
   bool revokeAfterRead = false;
+  bool failApprovalResponseAfterCommit = false;
   List<Map<String, Object?>> additionalRegistrations = [];
   void Function(Map<String, Object?>)? mutate;
   Completer<void>? pendingRead;
@@ -178,6 +179,9 @@ class TestBroker implements BrokerTransport {
               ? 'LIVE_RUNTIME'
               : 'INTERNAL_STATE';
       if (revokeAfterRead) approval = null;
+    }
+    if (operation == '作業領域承認' && failApprovalResponseAfterCommit) {
+      throw StateError('approval response lost after Broker commit');
     }
     return {
       'status': 'accepted',
@@ -972,6 +976,62 @@ void main() {
         findsOneWidget);
     expect(broker.operations.where((operation) => operation == '作業領域一覧'),
         hasLength(greaterThan(listCountBeforeApproval)));
+    expect(broker.operations, isNot(contains('作業領域ツリー')));
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('画面復帰後に承認応答が失敗してもBroker確定状態だけを再取得する',
+      (tester) async {
+    final pendingApproval = Completer<void>();
+    final broker = TestBroker()
+      ..approval = null
+      ..visibility = 'none'
+      ..pendingApproval = pendingApproval
+      ..failApprovalResponseAfterCommit = true;
+    final client = WorkspaceClient(broker);
+    var active = true;
+    Widget buildHarness() => MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: WorkspaceInspector(
+                client: client,
+                active: active,
+              ),
+            ),
+          ),
+        );
+
+    await tester.pumpWidget(buildHarness());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('workspace-a'));
+    await tester.pumpAndSettle();
+    final visibility = find.byType(DropdownButton<String>).last;
+    await tester.ensureVisible(visibility);
+    await tester.tap(visibility);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('full').last);
+    await tester.pumpAndSettle();
+    final approve = find.text('native Owner確認でWorkspace読取を許可');
+    await tester.ensureVisible(approve);
+    await tester.tap(approve);
+    await tester.pump();
+
+    active = false;
+    await tester.pumpWidget(buildHarness());
+    await tester.pump();
+    active = true;
+    await tester.pumpWidget(buildHarness());
+    await tester.pumpAndSettle();
+    expect(find.text('現在のWorkspace読取範囲: full・Task実行／書込権は別です。'),
+        findsNothing);
+
+    pendingApproval.complete();
+    await tester.pumpAndSettle();
+
+    expect(find.text('現在のWorkspace読取範囲: full・Task実行／書込権は別です。'),
+        findsOneWidget);
+    expect(broker.operations.where((operation) => operation == '作業領域一覧'),
+        hasLength(greaterThanOrEqualTo(3)));
     expect(broker.operations, isNot(contains('作業領域ツリー')));
     await tester.pumpWidget(const SizedBox());
   });

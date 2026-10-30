@@ -248,7 +248,15 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
         _message = '現在のWorkspace読取Approvalを確認しました。Task実行権は付与していません。';
       });
     } on Object {
-      if (!mounted || generation != _generation) return;
+      if (!mounted) return;
+      if (generation != _generation || activeGeneration != _activeGeneration) {
+        // native Owner確認中に画面が非activeになった後で要求が失敗しても、
+        // Brokerが確定した現在状態だけを再取得する。Approvalは再利用・再発行しない。
+        if (_isActive && _selected == registration.id) {
+          await _refresh();
+        }
+        return;
+      }
       setState(() => _message = 'Workspace読取Approvalを確認できません。本文表示を停止しました。');
     } finally {
       if (mounted && generation == _generation) {

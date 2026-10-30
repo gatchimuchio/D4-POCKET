@@ -2723,11 +2723,39 @@ def _run_installed_workspace_selection_acceptance(
     )
     _wait_for_owner_dialog_closed(environment)
     _, inspector = _workspace_inspector_scope(workspace_id)
-    _find_accessible(
-        "現在のWorkspace読取範囲: full・Task実行／書込権は別です。",
-        root=inspector,
-        timeout=15,
-    )
+    try:
+        _find_accessible(
+            "現在のWorkspace読取範囲: full・Task実行／書込権は別です。",
+            root=inspector,
+            timeout=15,
+        )
+    except RuntimeError as error:
+        screenshot_captured = _capture_gtk_dialog_screenshot(
+            environment, WINDOW_TITLE, inspector_failure_screenshot_path
+        )
+        safe_status_names = []
+        for _, accessible_name in _accessible_nodes(
+            inspector, deadline=time.monotonic() + 2, max_depth=12
+        ):
+            if (
+                accessible_name == workspace_id
+                or accessible_name.startswith(
+                    (
+                        f"{workspace_id}・",
+                        "現在のWorkspace読取範囲:",
+                        "native Owner確認でWorkspace読取を許可",
+                        "Workspace読取Approvalを確認できません。",
+                        "現在の登録・承認状態を確認中",
+                        "登録状態を確認できないため表示を停止しました。",
+                        "読取には所有者による現在登録の承認が必要です。",
+                    )
+                )
+            ):
+                safe_status_names.append(accessible_name[:180])
+        raise RuntimeError(
+            f"{error}; inspector_status={list(dict.fromkeys(safe_status_names))}; "
+            f"screenshot_captured={screenshot_captured}"
+        ) from error
     row = _find_workspace_inspector_control(
         workspace_id,
         workspace_id,
