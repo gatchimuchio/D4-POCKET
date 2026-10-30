@@ -9,11 +9,11 @@
 - commit authorはGit metadata上いずれも`がっちむち♂`。これは過去のcommit authorであり、現在の担当者・作業者を確定する情報ではない。Codexの会話一覧では他の稼働中D4スレッドを観測しなかったが、外部writerがいないことまでは証明しない。
 - mainへの統合・remote branch削除・branch更新は行っていない。各枝の最新HEADと未統合差分をそのまま保持した。
 
-| remote branch | HEAD / 最終commit | mainのみ / branchのみ | 差分 | 判定と処置 |
+| リモート作業枝 | 先頭記録 / 最新コミット | `main`側のみ / 作業枝側のみ | 差分 | 判定と処置 |
 |---|---|---:|---|---|
-| `codex/b5-pktmon-safe-log` | `4d0a222fcc594dfbe12462f9a8666c446dbb393c` / 2026-10-19 `test(windows): report bounded pktmon text shape` | 154 / 2 | 6 files、+211/-5 | `継続`。B5はOPENで、Pktmon失敗診断・形状確認の固有差分がある。現担当は未確認のため保持し、B5施工時に統合可否を決める。 |
-| `codex/linux-installed-workspace-acceptance` | `9659fa63e1b499723635ee4754c56bc930ba6ba2` / 2026-10-22 `test: align Linux Agent entry conformance` | 4 / 21 | 9 files、+1440/-30 | `継続`。Linux nativeは必須製品対象で、導入済みWorkspace受入れ差分は未統合。Linux受入れ工程で継続し、削除しない。 |
-| `codex/r2-inspector-owner-confirmation-20261002` | `fca1d0c9d83f03108ebaaf64ea742ca38079b4fc` / 2026-10-02 `修正: Workspace Inspector Owner承認と基準点保存を接続` | 750 / 1 | 9 files、+585/-12 | `要判断`。Workspace Inspectorの固有commitは未統合。現在の作業者・継続予定を確定できず、関連するdirty worktreeもあるため保持する。 |
+| `codex/b5-pktmon-safe-log` | `4d0a222fcc594dfbe12462f9a8666c446dbb393c` / 2026-10-19 | 154 / 2 | 6ファイル、+211/-5 | `継続`。B5は`OPEN`で、`Pktmon`の失敗診断と出力形状確認に固有の差分がある。現担当は未確認のため保持し、B5施工時に統合可否を決める。 |
+| `codex/linux-installed-workspace-acceptance` | `9659fa63e1b499723635ee4754c56bc930ba6ba2` / 2026-10-22 | 4 / 21 | 9ファイル、+1440/-30 | `継続`。Linuxネイティブ製品は必須対象で、導入済み作業領域の受入れ差分は未統合。Linux受入れ工程で継続し、削除しない。 |
+| `codex/r2-inspector-owner-confirmation-20261002` | `fca1d0c9d83f03108ebaaf64ea742ca38079b4fc` / 2026-10-02 | 750 / 1 | 9ファイル、+585/-12 | `要判断`。作業領域の所有者確認と基準点保存に関する固有変更は未統合。現在の作業者・継続予定を確定できず、関連する別作業場所にも未反映変更があるため保持する。 |
 
 各branch tipは`origin/main`の祖先ではなく、`git cherry origin/main <branch>`でもbranch固有commitにpatch相当を確認できなかった。件数は`git rev-list --left-right --count origin/main...<branch>`の左がmainのみ、右がbranchのみ。
 

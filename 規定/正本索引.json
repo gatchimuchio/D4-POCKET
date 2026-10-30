@@ -373,7 +373,7 @@
     },
     {
       "path": "docs/specs/mcp-contract.md",
-      "責任": "C8 MCP外部概念のServer、Tool、Resource、Prompt、Transport、Credential ref、Trust、Capability diff射影、接続時Credential metadataと権限非生成境界"
+      "責任": "C8 MCP外部概念のServer、Tool、Resource、Prompt、Transport、Credential ref、Trust、Capability diffのmetadata射影・接続時Credential metadata・権限非生成境界と、C9 Windows stdioの対象限定Credential利用、Tool引数Schema検査、native Owner確認、一回Permission、Audit、hash-only結果境界"
     },
     {
       "path": "docs/specs/a2a-contract.md",
@@ -494,10 +494,6 @@
     {
       "path": "docs/specs/final-development-audit.json",
       "責任": "C32監査器が読むC0〜C31の意味正本・Contract・Code・Production path・Test・Negative・Recovery・Audit・UI・Evidence対応データ"
-    },
-    {
-      "path": "docs/specs/mcp-contract.md",
-      "責任": "C8 MCP metadataの意味射影・Authority非生成とC9 Windows stdio対象限定Credential利用、Tool引数Schema検査、native Owner確認、一回Permission、Audit、hash-only結果境界"
     },
     {
       "path": "docs/specs/mcp-connection-center.md",

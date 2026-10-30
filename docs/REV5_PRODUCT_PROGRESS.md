@@ -1,5 +1,7 @@
 # D4 Pocket / GUI-Shell rev5 Product-First 進捗
 
+是正追補（2026-10-30、`D4-AUD-F06`）: 基準main `c72e67d3d7c630123634c0f306804384b7486abf`で正本索引の113参照／112 pathを再集計。監査基準の109／108から増えた4件は採用済みQE3文書と採用記録で、未解決参照ではない。`mcp-contract.md`のC8意味契約とC9 Windows stdio責任は別役割だが一つの契約文書に属するため、責任を合併しpathを一意化した。112参照／112 path、110個の実ファイル・Schema glob 1件（171対象）・既存directory 1件、欠落0、責任記述欠落0。F06を`VERIFIED`で閉じ、次は`D4-AUD-F07`。[F06索引記録](QE_2026-10-22/F06_正本索引重複参照_20261030.md)。製品状態・Release Gate・Linux対象範囲は変更しない。
+
 是正追補（2026-10-30、`D4-AUD-F05`）: 基準main `41e834c8bdf3237c52329aa261f934762771c9bc`時点でremote `codex/*`3本を棚卸しした。B5は2、Linuxは21、R2 Inspectorは1のbranch固有未統合commitを確認し、全枝を保持した。R2枝はdirty detached worktreeと変更pathが重なるため`要判断`。削除・統合なし。F05を`VERIFIED`として閉じ、次は`D4-AUD-F06`。[F05 branch台帳](QE_2026-10-22/F05_remote_codex_branch棚卸し_20261030.md)。製品Acceptance、B5 OPEN、Linux native必須性、通常Release capability／release gateは変更しない。
 
 是正追補（2026-10-30、`D4-AUD-F04`）: 基準監査33ファイル・220件を全件個別分類し、208件を局所是正、12件を固定CLI構文・wire／IPC識別子・OS形式・試験識別子等として保持した。最終厳格監査は9ファイル・12件（CLI／診断11、コードコメント1）で終了値1。監査器・例外登録は変更せず、PASSとは記録しない。Python受入れ補助48試験とUbuntu 24.04 WSLのLinux書き出し9試験はPASS。Rust全548試験は531成功・4失敗・13 ignoreで、全体FAILを保持する。個別分類・検証・残件は[F04台帳](QE_2026-10-22/F04_分類・是正台帳_20261030.md)を参照。F04の分類・局所是正を閉じ、次は`D4-AUD-F05`。
