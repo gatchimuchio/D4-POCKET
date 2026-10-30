@@ -1,5 +1,7 @@
 # GUI Shell ロードマップ
 
+是正追補（2026-10-30、`D4-AUD-F07`）: rev5原本3点のSHA-256が採用記録と一致し、仕様804行・工程表507行・指示書473行の全文要求差分を確認した。QE 3点はQE方法論・工程の現行正本、rev5は製品機能要求正本として保持し、置換・欠落は確認されなかった。Linux native必須対応は後続のOwner指示／AGENTSによる追加要求と明記した。F07を`VERIFIED`として閉じ、詳細は[F07要求照合記録](docs/QE_2026-10-22/F07_rev5原本要求照合_20261030.md)。P2–P13・B4/B5/B6・Q0–Q7・Release gateは変更しない。次は現行QE工程に沿ってB5／Linux nativeの未成立consumerを継続する。
+
 是正追補（2026-10-30、`D4-AUD-F06`）: 基準main `c72e67d3d7c630123634c0f306804384b7486abf`で正本索引の113参照／112 pathを再集計。監査基準の109／108から増えた4件は採用済みQE3文書と採用記録で、未解決参照ではない。`mcp-contract.md`のC8意味契約とC9 Windows stdio責任は別役割だが一つの契約文書に属するため、責任を合併しpathを一意化した。112参照／112 path、110個の実ファイル・Schema glob 1件（171対象）・既存directory 1件、欠落0、責任記述欠落0。F06を`VERIFIED`で閉じ、次は`D4-AUD-F07`。[F06索引記録](docs/QE_2026-10-22/F06_正本索引重複参照_20261030.md)。
 
 是正追補（2026-10-30、`D4-AUD-F05`）: 基準main `41e834c8bdf3237c52329aa261f934762771c9bc`時点でremote `codex/*`3本を棚卸しした。B5は2、Linuxは21、R2 Inspectorは1のbranch固有未統合commitを確認し、全枝を保持した。R2枝はdirty detached worktreeと変更pathが重なるため`要判断`。削除・統合なし。F05を`VERIFIED`として閉じ、次は`D4-AUD-F06`。[F05 branch台帳](docs/QE_2026-10-22/F05_remote_codex_branch棚卸し_20261030.md)。
