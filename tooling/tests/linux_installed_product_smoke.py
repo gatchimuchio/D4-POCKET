@@ -2718,6 +2718,113 @@ def _responses_final_message_events(request_number: int) -> list[dict[str, objec
     return _add_responses_sequence_numbers(events)
 
 
+def _normalize_r2_e2e_diagnostic(payload: object) -> dict[str, object] | None:
+    if not isinstance(payload, dict) or not isinstance(payload.get("kind"), str):
+        return None
+    kind = payload["kind"]
+    stages = {
+        "secret_path_validation",
+        "scratch_create",
+        "temporary_environment_bind",
+        "codex_task_execution",
+        "scratch_cleanup",
+    }
+    failure_classes = {
+        "要求不正",
+        "実行系不在",
+        "権限拒否",
+        "セッション不一致",
+        "通信失敗",
+        "期限超過",
+        "応答不正",
+        "監査失敗",
+        "取消",
+        "実行系隔離済み",
+        "作業領域不在",
+        "AgentTask実行非対応",
+    }
+    error_kinds = {
+        "NotFound",
+        "PermissionDenied",
+        "ConnectionRefused",
+        "ConnectionReset",
+        "ConnectionAborted",
+        "NotConnected",
+        "AddrInUse",
+        "AddrNotAvailable",
+        "BrokenPipe",
+        "AlreadyExists",
+        "WouldBlock",
+        "InvalidInput",
+        "InvalidData",
+        "TimedOut",
+        "WriteZero",
+        "Interrupted",
+        "UnexpectedEof",
+        "OutOfMemory",
+        "Other",
+        "Unsupported",
+    }
+    if kind == "task_failure":
+        stage, failure_class = payload.get("stage"), payload.get("failure_class")
+        if set(payload) != {"kind", "stage", "failure_class"}:
+            return None
+        if (
+            not isinstance(stage, str)
+            or not isinstance(failure_class, str)
+            or stage not in stages
+            or failure_class not in failure_classes
+        ):
+            return None
+        return {"stage": stage, "failure_class": failure_class}
+    if kind == "os_failure":
+        stage, error_kind = payload.get("stage"), payload.get("os_error_kind")
+        if set(payload) != {"kind", "stage", "os_error_kind"}:
+            return None
+        if not isinstance(stage, str) or stage not in {
+            "codex_process_spawn",
+            "codex_stdin_write",
+        }:
+            return None
+        if not isinstance(error_kind, str) or error_kind not in error_kinds:
+            return None
+        return {"stage": stage, "os_error_kind": error_kind}
+    if kind == "missing_stdin_pipe":
+        if set(payload) != {"kind"}:
+            return None
+        return {"stage": "codex_stdin_pipe_missing"}
+    if kind != "cli_failure" or set(payload) != {"kind", "summary"}:
+        return None
+    summary = payload.get("summary")
+    if not isinstance(summary, str):
+        return None
+    match = re.fullmatch(
+        r'exit_code=(Some\(-?\d+\)|None); '
+        r'stdout_event_types=(\[(?:"(?:thread\.started|turn\.started|turn\.completed|'
+        r'turn\.failed|error|item\.started|item\.completed|other)"(?:, )?)*\]); '
+        r'stderr_class=(empty|sandbox_setup|authentication|configuration|permission|'
+        r'transport|missing_dependency|other); stderr_bytes=(\d+)',
+        summary,
+    )
+    if match is None:
+        return None
+    exit_code, event_json, stderr_class, stderr_bytes = match.groups()
+    try:
+        event_types = json.loads(event_json)
+        byte_count = int(stderr_bytes)
+    except (json.JSONDecodeError, ValueError):
+        return None
+    if not isinstance(event_types, list) or len(event_types) > 32 or byte_count > 1_048_576:
+        return None
+    return {
+        "stage": "codex_cli_exit",
+        "exit_code": exit_code,
+        "stdout_event_types": event_types,
+        "stderr_class": stderr_class,
+        "stderr_bytes": byte_count,
+    }
+
+
 class _LinuxAgentTaskResponsesServer:
     """Codex Responses wire fixture bound to loopback and one active Task at a time."""
 
@@ -2770,6 +2877,24 @@ class _LinuxAgentTaskResponsesServer:
                     fixture._reject_request("unexpected_authorization_header")
                     self._send(401, "application/json", b"{}")
                     return
+                if self.path.split("?", 1)[0] == "/__d4p_r2_e2e/diagnostics":
+                    try:
+                        length = int(self.headers.get("Content-Length", "-1"))
+                        if length < 0 or length > 4096:
+                            raise ValueError
+                        payload = json.loads(self.rfile.read(length))
+                    except (OSError, UnicodeError, ValueError, json.JSONDecodeError):
+                        fixture._reject_request("malformed_diagnostic")
+                        self._send(400, "application/json", b"{}")
+                        return
+                    diagnostic = _normalize_r2_e2e_diagnostic(payload)
+                    if diagnostic is None:
+                        fixture._reject_request("unsafe_diagnostic_rejected")
+                        self._send(400, "application/json", b"{}")
+                        return
+                    fixture._record_diagnostic(diagnostic)
+                    self._send(200, "application/json", b"{}")
+                    return
                 if self.path.split("?", 1)[0] not in {"/v1/responses", "/responses"}:
                     fixture._reject_request("unexpected_post")
                     self._send(404, "application/json", b"{}")
@@ -2818,6 +2943,7 @@ class _LinuxAgentTaskResponsesServer:
         self._history: list[dict[str, object]] = []
         self._model_requests = 0
         self._rejections: list[str] = []
+        self._diagnostics: list[dict[str, object]] = []
         self._thread: threading.Thread | None = None
 
     @property
@@ -2864,6 +2990,7 @@ class _LinuxAgentTaskResponsesServer:
             return {
                 "model_requests": self._model_requests,
                 "rejections": list(self._rejections),
+                "agent_task_diagnostics": copy.deepcopy(self._diagnostics),
                 "scenarios": [
                     {
                         "name": row["name"],
@@ -2884,6 +3011,13 @@ class _LinuxAgentTaskResponsesServer:
     def _reject_request(self, reason: str) -> None:
         with self._lock:
             self._rejections.append(reason)
+
+    def _record_diagnostic(self, diagnostic: dict[str, object]) -> None:
+        with self._lock:
+            if len(self._diagnostics) < 32:
+                self._diagnostics.append(copy.deepcopy(diagnostic))
+            else:
+                self._rejections.append("diagnostic_limit_exceeded")
 
     def _response_events(self, request: dict[str, object]) -> list[dict[str, object]]:
         with self._lock:
@@ -3387,6 +3521,7 @@ def _installed_task_write_failure_diagnostics(
     audit_store: Path,
 ) -> dict[str, object]:
     snapshot = _accessible_snapshot(window)
+    loopback = responses_server.snapshot()
     statuses = re.findall(
         r"Task状態:\s*(pending|running|blocked|completed|failed|cancelled|quarantined)\b",
         snapshot,
@@ -3406,8 +3541,12 @@ def _installed_task_write_failure_diagnostics(
         "scratch_marker_count": sum(
             (path / "fixture-scratch-marker").is_file() for path in scratch_paths
         ),
-        "loopback": responses_server.snapshot(),
+        "loopback": loopback,
         "task_history": _installed_task_history_diagnostics(audit_store, task_id),
+        "runtime_failure_diagnostics": {
+            "state": "read",
+            "records": loopback["agent_task_diagnostics"],
+        },
     }
 
 

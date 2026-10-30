@@ -11,6 +11,8 @@ import sys
 import tempfile
 import types
 import unittest
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
 from unittest.mock import call, patch
 from pathlib import Path
 
@@ -3359,6 +3361,59 @@ class LinuxAgentTaskFailureDiagnosticsTests(unittest.TestCase):
             self.assertEqual(diagnostics["scratch_directory_count"], 1)
             self.assertEqual(diagnostics["scratch_marker_count"], 1)
             self.assertNotIn("private-value", rendered)
+
+    def test_loopback_fixture_records_only_allowlisted_runtime_diagnostics(self) -> None:
+        server = _LinuxAgentTaskResponsesServer()
+        server.start()
+        try:
+            payloads = [
+                {"kind": "task_failure", "stage": "scratch_create", "failure_class": "通信失敗"},
+                {
+                    "kind": "cli_failure",
+                    "summary": 'exit_code=Some(2); stdout_event_types=["error", "other"]; '
+                    "stderr_class=configuration; stderr_bytes=52",
+                },
+                {
+                    "kind": "os_failure",
+                    "stage": "codex_process_spawn",
+                    "os_error_kind": "NotFound",
+                },
+                {"kind": "task_failure", "stage": "scratch_create", "detail": "PRIVATE_SECRET"},
+            ]
+            responses: list[int] = []
+            for payload in payloads:
+                request = Request(
+                    f"http://127.0.0.1:{server.port}/__d4p_r2_e2e/diagnostics",
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                try:
+                    with urlopen(request, timeout=2) as response:
+                        responses.append(response.status)
+                except HTTPError as error:
+                    responses.append(error.code)
+            snapshot = server.snapshot()
+        finally:
+            server.close()
+
+        self.assertEqual(responses, [200, 200, 200, 400])
+        self.assertEqual(
+            snapshot["agent_task_diagnostics"],
+            [
+                {"stage": "scratch_create", "failure_class": "通信失敗"},
+                {
+                    "stage": "codex_cli_exit",
+                    "exit_code": "Some(2)",
+                    "stdout_event_types": ["error", "other"],
+                    "stderr_class": "configuration",
+                    "stderr_bytes": 52,
+                },
+                {"stage": "codex_process_spawn", "os_error_kind": "NotFound"},
+            ],
+        )
+        self.assertEqual(snapshot["rejections"], ["unsafe_diagnostic_rejected"])
+        self.assertNotIn("PRIVATE_SECRET", json.dumps(snapshot, ensure_ascii=False))
 
 
 @unittest.skipUnless(sys.platform.startswith("linux"), "Linux filesystem semantics are required")

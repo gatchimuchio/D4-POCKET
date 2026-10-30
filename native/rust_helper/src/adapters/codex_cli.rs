@@ -18,6 +18,8 @@ use std::env;
 #[cfg(all(feature = "r2-e2e", not(test)))]
 use std::fs;
 use std::io::{Read, Write};
+#[cfg(feature = "r2-e2e")]
+use std::net::{SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -298,6 +300,10 @@ impl CodexCliAdapter {
             self.workspace_identity,
             &context.secret_paths,
         ) {
+            #[cfg(feature = "r2-e2e")]
+            if let Some(test_api) = self.test_responses_api.as_ref() {
+                report_r2_e2e_task_failure(test_api, "secret_path_validation", &error);
+            }
             return failed(error);
         }
         let mut scratch = match WorkspaceTaskScratch::create(
@@ -306,12 +312,22 @@ impl CodexCliAdapter {
             &context,
         ) {
             Ok(scratch) => scratch,
-            Err(error) => return failed(error),
+            Err(error) => {
+                #[cfg(feature = "r2-e2e")]
+                if let Some(test_api) = self.test_responses_api.as_ref() {
+                    report_r2_e2e_task_failure(test_api, "scratch_create", &error);
+                }
+                return failed(error);
+            }
         };
         let temp_environment = match TaskTemporaryEnvironment::bind(&self.workspace, scratch.path())
         {
             Ok(environment) => environment,
             Err(error) => {
+                #[cfg(feature = "r2-e2e")]
+                if let Some(test_api) = self.test_responses_api.as_ref() {
+                    report_r2_e2e_task_failure(test_api, "temporary_environment_bind", &error);
+                }
                 let _ = scratch.cleanup();
                 return failed(error);
             }
@@ -346,7 +362,19 @@ impl CodexCliAdapter {
             deadline,
         );
         let tool_exit_code = result.as_ref().ok().map(|_| 0);
+        #[cfg(feature = "r2-e2e")]
+        if let Some(test_api) = self.test_responses_api.as_ref() {
+            if let Err(error) = result.as_ref() {
+                report_r2_e2e_task_failure(test_api, "codex_task_execution", error);
+            }
+        }
         let cleanup_result = scratch.cleanup();
+        #[cfg(feature = "r2-e2e")]
+        if let Some(test_api) = self.test_responses_api.as_ref() {
+            if let Err(error) = cleanup_result.as_ref() {
+                report_r2_e2e_task_failure(test_api, "scratch_cleanup", error);
+            }
+        }
         let cleanup_completed = cleanup_result.is_ok();
         let result = match cleanup_result {
             Ok(()) => result,
@@ -473,6 +501,112 @@ impl CodexCliAdapter {
             生応答: stdout,
         })
     }
+}
+
+#[cfg(feature = "r2-e2e")]
+fn report_r2_e2e_task_failure(
+    test_api: &CodexCliTestResponses,
+    stage: &'static str,
+    error: &対話失敗,
+) {
+    let failure_class = error.分類();
+    if !matches!(
+        stage,
+        "secret_path_validation"
+            | "scratch_create"
+            | "temporary_environment_bind"
+            | "codex_task_execution"
+            | "scratch_cleanup"
+    ) || !matches!(
+        failure_class,
+        "要求不正"
+            | "実行系不在"
+            | "権限拒否"
+            | "セッション不一致"
+            | "通信失敗"
+            | "期限超過"
+            | "応答不正"
+            | "監査失敗"
+            | "取消"
+            | "実行系隔離済み"
+            | "作業領域不在"
+            | "AgentTask実行非対応"
+    ) {
+        return;
+    }
+    send_r2_e2e_diagnostic(
+        test_api,
+        json!({
+            "kind": "task_failure",
+            "stage": stage,
+            "failure_class": failure_class,
+        }),
+    );
+}
+
+#[cfg(feature = "r2-e2e")]
+fn report_r2_e2e_os_failure(
+    test_api: &CodexCliTestResponses,
+    stage: &'static str,
+    error_kind: std::io::ErrorKind,
+) {
+    if !matches!(stage, "codex_process_spawn" | "codex_stdin_write") {
+        return;
+    }
+    send_r2_e2e_diagnostic(
+        test_api,
+        json!({
+            "kind": "os_failure",
+            "stage": stage,
+            "os_error_kind": format!("{error_kind:?}"),
+        }),
+    );
+}
+
+#[cfg(feature = "r2-e2e")]
+fn report_r2_e2e_missing_stdin_pipe(test_api: &CodexCliTestResponses) {
+    send_r2_e2e_diagnostic(
+        test_api,
+        json!({"kind": "missing_stdin_pipe"}),
+    );
+}
+
+#[cfg(feature = "r2-e2e")]
+fn report_r2_e2e_cli_failure(
+    test_api: &CodexCliTestResponses,
+    exit_code: Option<i32>,
+    stdout: &[u8],
+    stderr: &[u8],
+) {
+    let summary = loopback_test_safe_failure_summary(exit_code, stdout, stderr);
+    send_r2_e2e_diagnostic(
+        test_api,
+        json!({"kind": "cli_failure", "summary": summary}),
+    );
+}
+
+#[cfg(feature = "r2-e2e")]
+fn send_r2_e2e_diagnostic(test_api: &CodexCliTestResponses, payload: Value) {
+    let Ok(body) = serde_json::to_vec(&payload) else {
+        return;
+    };
+    if body.len() > 4096 {
+        return;
+    }
+    let address = SocketAddr::from(([127, 0, 0, 1], test_api.port));
+    let Ok(mut stream) = TcpStream::connect_timeout(&address, Duration::from_millis(500)) else {
+        return;
+    };
+    let _ = stream.set_write_timeout(Some(Duration::from_millis(500)));
+    let request = format!(
+        "POST /__d4p_r2_e2e/diagnostics HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        test_api.port,
+        body.len()
+    );
+    if stream.write_all(request.as_bytes()).is_err() || stream.write_all(&body).is_err() {
+        return;
+    }
+    let _ = stream.flush();
 }
 
 impl 実行系Adapter for CodexCliAdapter {
@@ -1039,11 +1173,30 @@ fn spawn_codex_task(
     let child_result = process_tree::spawn(task_command);
     // WindowsではCreateProcessがcurrent_dirを解決し終えるまでpath階層を固定する。
     drop(workspace_guard);
-    let mut child = child_result.map_err(|_| 対話失敗::通信失敗)?;
-    let mut stdin = child.child.stdin.take().ok_or(対話失敗::通信失敗)?;
-    stdin
-        .write_all(input.as_bytes())
-        .map_err(|_| 対話失敗::通信失敗)?;
+    let mut child = match child_result {
+        Ok(child) => child,
+        Err(error) => {
+            #[cfg(feature = "r2-e2e")]
+            if let Some(test_api) = test_responses_api {
+                report_r2_e2e_os_failure(test_api, "codex_process_spawn", error.kind());
+            }
+            return Err(対話失敗::通信失敗);
+        }
+    };
+    let Some(mut stdin) = child.child.stdin.take() else {
+        #[cfg(feature = "r2-e2e")]
+        if let Some(test_api) = test_responses_api {
+            report_r2_e2e_missing_stdin_pipe(test_api);
+        }
+        return Err(対話失敗::通信失敗);
+    };
+    if let Err(error) = stdin.write_all(input.as_bytes()) {
+        #[cfg(feature = "r2-e2e")]
+        if let Some(test_api) = test_responses_api {
+            report_r2_e2e_os_failure(test_api, "codex_stdin_write", error.kind());
+        }
+        return Err(対話失敗::通信失敗);
+    }
     drop(stdin);
     Ok(child)
 }
@@ -1363,29 +1516,38 @@ fn run_agent_task(
         .map_err(|_| 対話失敗::通信失敗)?
         .map_err(|_| 対話失敗::応答不正)?;
     if !status.success() {
-        #[cfg(test)]
-        if test_responses_api.is_some() {
+        #[cfg(any(test, feature = "r2-e2e"))]
+        if let Some(test_api) = test_responses_api {
+            #[cfg(feature = "r2-e2e")]
+            report_r2_e2e_cli_failure(test_api, status.code(), &stdout, &_stderr);
+            #[cfg(test)]
             eprintln!(
-                "Codex偽API試験の秘匿済み失敗概要: {}",
-                loopback_test_failure_summary(status.code(), &stdout, &_stderr)
+                "D4P_R2_E2E_AGENT_TASK_CLI_FAILURE {}",
+                loopback_test_safe_failure_summary(status.code(), &stdout, &_stderr)
             );
         }
         return Err(対話失敗::通信失敗);
     }
     let parsed = parse_jsonl(&stdout);
-    #[cfg(test)]
-    if test_responses_api.is_some() && parsed.is_err() {
+    #[cfg(any(test, feature = "r2-e2e"))]
+    if let (Some(test_api), Err(_)) = (test_responses_api, &parsed) {
+        #[cfg(feature = "r2-e2e")]
+        report_r2_e2e_cli_failure(test_api, status.code(), &stdout, &_stderr);
+        #[cfg(test)]
         eprintln!(
-            "Codex偽API試験の秘匿済み応答解析概要: {}",
-            loopback_test_failure_summary(status.code(), &stdout, &_stderr)
+            "D4P_R2_E2E_AGENT_TASK_CLI_FAILURE {}",
+            loopback_test_safe_failure_summary(status.code(), &stdout, &_stderr)
         );
     }
     parsed.map(|(message, _)| message)
 }
 
-#[cfg(test)]
-fn loopback_test_failure_summary(exit_code: Option<i32>, stdout: &[u8], stderr: &[u8]) -> String {
-    let stderr_summary = redact_loopback_test_message(&String::from_utf8_lossy(stderr));
+#[cfg(any(test, feature = "r2-e2e"))]
+fn loopback_test_safe_failure_summary(
+    exit_code: Option<i32>,
+    stdout: &[u8],
+    stderr: &[u8],
+) -> String {
     let events = stdout
         .split(|byte| *byte == b'\n')
         .filter_map(|line| serde_json::from_slice::<Value>(line).ok())
@@ -1393,59 +1555,52 @@ fn loopback_test_failure_summary(exit_code: Option<i32>, stdout: &[u8], stderr: 
         .collect::<Vec<_>>();
     let event_types = events
         .iter()
-        .filter_map(|event| event.get("type").and_then(Value::as_str).map(str::to_owned))
-        .collect::<Vec<_>>();
-    let error_message = events
-        .iter()
-        .find(|event| event.get("type").and_then(Value::as_str) == Some("error"))
-        .and_then(|event| event.get("message"))
-        .or_else(|| {
-            events
-                .iter()
-                .find_map(|event| event.get("item").and_then(|item| item.get("message")))
+        .filter_map(|event| event.get("type").and_then(Value::as_str))
+        .map(|event_type| match event_type {
+            "thread.started" | "turn.started" | "turn.completed" | "turn.failed" | "error"
+            | "item.started" | "item.completed" => event_type,
+            _ => "other",
         })
-        .and_then(Value::as_str)
-        .map(redact_loopback_test_message)
-        .unwrap_or_else(|| "<absent>".to_owned());
+        .take(32)
+        .collect::<Vec<_>>();
+    let stderr_class = classify_loopback_test_stderr(stderr);
     format!(
-        "exit_code={exit_code:?}; stdout_event_types={event_types:?}; error_message={error_message:?}; stderr_summary={stderr_summary:?}; stderr_bytes={}",
-        stderr.len(),
+        "exit_code={exit_code:?}; stdout_event_types={event_types:?}; stderr_class={stderr_class}; stderr_bytes={}",
+        stderr.len()
     )
 }
 
-#[cfg(test)]
-fn redact_loopback_test_message(message: &str) -> String {
-    let mut sanitized = message.to_owned();
-    for marker in [
-        "INTEGRATION_TASK_INSTRUCTION_SENTINEL",
-        "synthetic-secret-content-never-returned",
-        "synthetic-outside-workspace-marker",
-    ] {
-        sanitized = sanitized.replace(marker, "<SYNTHETIC_MARKER>");
+#[cfg(any(test, feature = "r2-e2e"))]
+fn classify_loopback_test_stderr(stderr: &[u8]) -> &'static str {
+    let stderr = String::from_utf8_lossy(stderr).to_ascii_lowercase();
+    if stderr.is_empty() {
+        "empty"
+    } else if stderr.contains("bwrap") || stderr.contains("sandbox") {
+        "sandbox_setup"
+    } else if stderr.contains("unauthorized")
+        || stderr.contains("authentication")
+        || stderr.contains("api key")
+        || stderr.contains("not logged in")
+    {
+        "authentication"
+    } else if stderr.contains("config")
+        || stderr.contains("toml")
+        || stderr.contains("model_provider")
+    {
+        "configuration"
+    } else if stderr.contains("permission denied") || stderr.contains("operation not permitted") {
+        "permission"
+    } else if stderr.contains("connect")
+        || stderr.contains("proxy")
+        || stderr.contains("dns")
+        || stderr.contains("network")
+    {
+        "transport"
+    } else if stderr.contains("no such file") || stderr.contains("not found") {
+        "missing_dependency"
+    } else {
+        "other"
     }
-    for name in ["USERPROFILE", "HOME", "TEMP", "TMP"] {
-        if let Some(path) = env::var_os(name).and_then(|value| value.into_string().ok()) {
-            if !path.is_empty() {
-                sanitized = sanitized.replace(&path, "<LOCAL_PATH>");
-            }
-        }
-    }
-    for pattern in [
-        r"(?i)bearer\s+[A-Za-z0-9._~+/=-]+",
-        r"(?i)sk-[A-Za-z0-9_-]{8,}",
-        r"(?i)gh[pousr]_[A-Za-z0-9_]{8,}",
-        r"(?i)github_pat_[A-Za-z0-9_]{8,}",
-    ] {
-        let expression = regex::Regex::new(pattern).expect("試験診断文の秘匿化正規表現");
-        sanitized = expression
-            .replace_all(&sanitized, "<REDACTED>")
-            .into_owned();
-    }
-    sanitized
-        .chars()
-        .filter(|character| !character.is_control() || *character == '\t')
-        .take(700)
-        .collect()
 }
 
 fn pin_registered_workspace(
@@ -1612,6 +1767,22 @@ mod tests {
         );
         assert_eq!(parse_jsonl(br#"{"type":"error"}"#), Err(対話失敗::通信失敗));
         assert_eq!(parse_jsonl(br#"not-json"#), Err(対話失敗::応答不正));
+    }
+
+    #[test]
+    fn loopback失敗診断は本文と生エラーを出さず分類だけを示す() {
+        let stdout = br#"{"type":"error","message":"PRIVATE_TASK_AND_SECRET","code":"unknown_sensitive_code"}
+{"type":"provider.internal-private-event"}"#;
+        let stderr = b"invalid TOML at PRIVATE_LOCAL_PATH api_key=PRIVATE_SECRET";
+        let summary = loopback_test_safe_failure_summary(Some(2), stdout, stderr);
+
+        assert!(summary.contains("exit_code=Some(2)"));
+        assert!(summary.contains("stdout_event_types=[\"error\", \"other\"]"));
+        assert!(summary.contains("stderr_class=configuration"));
+        assert!(!summary.contains("PRIVATE_TASK_AND_SECRET"));
+        assert!(!summary.contains("unknown_sensitive_code"));
+        assert!(!summary.contains("PRIVATE_LOCAL_PATH"));
+        assert!(!summary.contains("PRIVATE_SECRET"));
     }
 
     #[test]
