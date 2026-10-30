@@ -251,14 +251,16 @@ def _wayland_launch_environment(
     return result
 
 
-def _accessible_nodes(root, *, deadline: float | None = None):
+def _accessible_nodes(
+    root, *, deadline: float | None = None, max_depth: int | None = None
+):
     """Installed UIの現在のAT-SPI treeをboundedに列挙する。"""
-    pending = [root]
+    pending = [(root, 0)]
     visited = 0
     while pending and visited < 12000:
         if deadline is not None and time.monotonic() >= deadline:
             return
-        node = pending.pop()
+        node, depth = pending.pop()
         visited += 1
         try:
             name = node.name or ""
@@ -267,20 +269,28 @@ def _accessible_nodes(root, *, deadline: float | None = None):
         yield node, name
         if deadline is not None and time.monotonic() >= deadline:
             return
+        if max_depth is not None and depth >= max_depth:
+            continue
         try:
             count = min(node.childCount, 12000 - visited)
             for index in reversed(range(count)):
                 if deadline is not None and time.monotonic() >= deadline:
                     return
                 try:
-                    pending.append(node.getChildAtIndex(index))
+                    pending.append((node.getChildAtIndex(index), depth + 1))
                 except Exception:
                     continue
         except Exception:
             continue
 
 
-def _find_accessible(name: str, *, root=None, timeout: float = 10.0):
+def _find_accessible(
+    name: str,
+    *,
+    root=None,
+    timeout: float = 10.0,
+    max_depth: int | None = None,
+):
     try:
         import pyatspi
     except ImportError as error:
@@ -291,7 +301,7 @@ def _find_accessible(name: str, *, root=None, timeout: float = 10.0):
     while time.monotonic() < deadline:
         search_root = root if root is not None else pyatspi.Registry.getDesktop(0)
         for node, accessible_name in _accessible_nodes(
-            search_root, deadline=deadline
+            search_root, deadline=deadline, max_depth=max_depth
         ):
             if accessible_name == name or name in accessible_name:
                 return node
@@ -533,12 +543,13 @@ def _find_workspace_inspector_control(
         try:
             window_lookups += 1
             window = _find_accessible(
-                WINDOW_TITLE, timeout=min(2.0, remaining)
+                WINDOW_TITLE, timeout=min(2.0, remaining), max_depth=4
             )
             heading = _find_accessible(
                 "作業領域インスペクタ",
                 root=window,
                 timeout=min(1.0, remaining),
+                max_depth=12,
             )
             inspector = _accessible_scope_with_named_descendant(
                 heading, workspace_id, deadline=deadline

@@ -238,6 +238,24 @@ class AccessibleActionResolutionTests(unittest.TestCase):
         self.assertEqual(len(observed), 1)
         self.assertEqual(observed[0][1], "root")
 
+    def test_accessible_tree_traversal_can_limit_desktop_search_depth(self) -> None:
+        class Node:
+            def __init__(self, name: str, children=()) -> None:
+                self.name = name
+                self.children = list(children)
+                self.childCount = len(self.children)
+
+            def getChildAtIndex(self, index: int):
+                return self.children[index]
+
+        target = Node("target")
+        nested_app = Node("application", (Node("window", (target,)),))
+        desktop = Node("desktop", (nested_app,))
+
+        observed = list(_accessible_nodes(desktop, max_depth=1))
+
+        self.assertEqual([name for _, name in observed], ["desktop", "application"])
+
     def test_exact_operable_lookup_skips_dialog_title_substring(self) -> None:
         from types import SimpleNamespace
         from unittest.mock import patch
@@ -1644,6 +1662,8 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
         )
         self.assertIs(find.call_args_list[1].kwargs["root"], first_window)
         self.assertIs(find.call_args_list[3].kwargs["root"], second_window)
+        self.assertEqual(find.call_args_list[0].kwargs["max_depth"], 4)
+        self.assertEqual(find.call_args_list[1].kwargs["max_depth"], 12)
         self.assertTrue(
             all(0 < entry.kwargs["timeout"] <= 1 for entry in find.call_args_list)
         )
