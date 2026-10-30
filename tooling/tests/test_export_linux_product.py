@@ -155,10 +155,20 @@ class LinuxExportInputTests(unittest.TestCase):
                 stdout = "tool version 1.0"
             return SimpleNamespace(stdout=stdout)
 
-        with patch("tooling.export_linux_product.subprocess.run", side_effect=run):
+        with (
+            patch("tooling.export_linux_product.subprocess.run", side_effect=run),
+            patch(
+                "tooling.export_linux_product.platform.freedesktop_os_release",
+                return_value={"ID": "ubuntu", "VERSION_ID": "24.04"},
+            ),
+        ):
             versions = _toolchain(paths, environment)
         self.assertEqual(versions["framework_revision"], "e" * 40)
+        self.assertEqual(versions["distribution_id"], "ubuntu")
+        self.assertEqual(versions["distribution_version"], "24.04")
         self.assertEqual(len(calls), 8)
+        self.assertEqual(calls[0]["env"]["CI"], "true")
+        self.assertTrue(all("CI" not in call["env"] for call in calls[1:]))
         self.assertTrue(all("GITHUB_TOKEN" not in call["env"] for call in calls))
         self.assertTrue(all("AWS_SECRET_ACCESS_KEY" not in call["env"] for call in calls))
 
@@ -256,9 +266,11 @@ class LinuxExportBuildTests(unittest.TestCase):
 
             configure_args: list[str] = []
             commands: list[list[str]] = []
+            command_environments: list[dict[str, str]] = []
 
-            def run(command: list[str], **_kwargs: Any) -> None:
+            def run(command: list[str], **kwargs: Any) -> None:
                 commands.append(command)
+                command_environments.append(kwargs["env"])
                 if "--build" in command:
                     bundle_arg = next(
                         value.split("=", 1)[1]
@@ -294,6 +306,24 @@ class LinuxExportBuildTests(unittest.TestCase):
             self.assertFalse(evidence["signed"])
             self.assertFalse(evidence["formal_distribution_claimed"])
             self.assertGreaterEqual(len(commands), 4)
+            flutter_commands = [
+                (command, environment)
+                for command, environment in zip(commands, command_environments, strict=True)
+                if command[0] == tool_paths["flutter"]
+            ]
+            self.assertEqual(len(flutter_commands), 2)
+            self.assertTrue(
+                all(environment["CI"] == "true" for _, environment in flutter_commands)
+            )
+            cmake_environments = [
+                environment
+                for command, environment in zip(commands, command_environments, strict=True)
+                if command[0] == tool_paths["cmake"]
+            ]
+            self.assertTrue(cmake_environments)
+            self.assertTrue(
+                all("CI" not in environment for environment in cmake_environments)
+            )
             cmake_configure = next(command for command in commands if any(
                 item.startswith("-DD4_PRODUCT_APP_ID=") for item in command
             ))

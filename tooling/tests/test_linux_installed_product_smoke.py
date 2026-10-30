@@ -4,8 +4,11 @@ import hashlib
 import hmac
 import json
 import os
+import stat
 import subprocess
+import sys
 import tempfile
+import types
 import unittest
 from unittest.mock import call, patch
 from pathlib import Path
@@ -20,6 +23,8 @@ from tooling.tests.linux_installed_product_smoke import (
     _catalog_failure_diagnostics,
     _click_accessible_by_coordinates,
     _component_center,
+    _capture_gtk_dialog_screenshot,
+    _gtk_folder_chooser_diagnostics,
     _credential_scan_file_role,
     _desktop_entry_targets_fixed_launcher,
     _enter_single_installed_mcp_tool_arguments,
@@ -32,14 +37,20 @@ from tooling.tests.linux_installed_product_smoke import (
     _review_single_installed_mcp_tool_arguments,
     _run_rust_test,
     _safe_log_tail,
+    _select_folder_in_gtk_chooser,
     _set_public_text_by_keyboard,
     _secret_service_item_labels,
     _verify_export_manifest,
     _verify_credential_audit,
     _verify_live_audit,
+    _verify_workspace_projection,
+    _editable_text_ancestor,
+    _open_agent_center_from_installed_ui,
+    _open_installed_codex_registration,
     _verify_uninstalled_state,
     _trigger_update_action_from_installed_ui,
     _wait_for_catalog_fetch_status,
+    _wait_for_gtk_dialog_closed,
     _wayland_launch_environment,
     MCP_OWNER_ARGUMENT_HASH_MARKER,
     MCP_OWNER_NO_CREDENTIAL_MARKER,
@@ -1185,7 +1196,384 @@ class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
         self.assertNotIn("third.txt", diagnostic)
 
 
+class LinuxWorkspaceProjectionTests(unittest.TestCase):
+    def test_accepts_public_content_only_when_secret_and_external_markers_are_absent(self) -> None:
+        evidence = _verify_workspace_projection(
+            "Workspace Inspector\npublic.txt\nD4P_WORKSPACE_PUBLIC_PROJECTION_OK",
+            public_markers=("public.txt", "D4P_WORKSPACE_PUBLIC_PROJECTION_OK"),
+            forbidden_markers=(
+                ".env",
+                "private/token.txt",
+                "external-alias.txt",
+                "D4P_WORKSPACE_SECRET_CANARY",
+            ),
+        )
+        self.assertEqual(
+            evidence,
+            {
+                "public_markers_visible": 2,
+                "secret_and_external_markers_absent": 4,
+            },
+        )
+
+    def test_rejects_any_secret_or_external_content_without_echoing_it(self) -> None:
+        marker = "D4P_WORKSPACE_SECRET_CANARY_DO_NOT_PRINT"
+        with self.assertRaisesRegex(
+            RuntimeError, "exposed secret or external content"
+        ) as error:
+            _verify_workspace_projection(
+                f"public.txt\n{marker}",
+                public_markers=("public.txt",),
+                forbidden_markers=(marker,),
+            )
+        self.assertNotIn(marker, str(error.exception))
+
+    def test_fails_closed_when_allowed_public_projection_is_missing(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "public Workspace content"):
+            _verify_workspace_projection(
+                "Workspace Inspector",
+                public_markers=("public.txt",),
+                forbidden_markers=(".env",),
+            )
+
+
+class LinuxEditableTextAncestorTests(unittest.TestCase):
+    class Node:
+        def __init__(self, parent=None, editable=False):
+            self.parent = parent
+            self.editable = editable
+
+        def get_parent(self):
+            return self.parent
+
+        def queryEditableText(self):
+            if not self.editable:
+                raise RuntimeError("not editable")
+            return object()
+
+    def test_finds_editable_control_within_bounded_nested_form_tree(self) -> None:
+        editable = self.Node(editable=True)
+        current = editable
+        for _ in range(10):
+            current = self.Node(parent=current)
+        self.assertIs(_editable_text_ancestor(current), editable)
+
+    def test_fails_closed_when_editable_control_exceeds_depth_bound(self) -> None:
+        editable = self.Node(editable=True)
+        current = editable
+        for _ in range(18):
+            current = self.Node(parent=current)
+        self.assertIsNone(_editable_text_ancestor(current))
+
+
 class LinuxInstalledDesktopEntryTests(unittest.TestCase):
+    def test_gtk_dialog_screenshot_is_private_and_uses_bounded_window_geometry(self) -> None:
+        environment = {"DISPLAY": ":99"}
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory) / "chooser.png"
+            root = object()
+            screen = types.SimpleNamespace(get_root_window=lambda: root)
+            display = types.SimpleNamespace(get_default_screen=lambda: screen)
+            pixbuf = types.SimpleNamespace(
+                savev=lambda path, image_type, keys, values: Path(path).write_bytes(
+                    b"png-test-double"
+                )
+            )
+            gdk = types.SimpleNamespace(
+                Display=types.SimpleNamespace(get_default=lambda: display),
+                pixbuf_get_from_window=lambda window, x, y, width, height: (
+                    pixbuf
+                    if (window, x, y, width, height) == (root, 11, 22, 300, 180)
+                    else None
+                ),
+            )
+            gi = types.ModuleType("gi")
+            gi.__path__ = []
+            gi.require_version = unittest.mock.Mock()
+            gi_repository = types.ModuleType("gi.repository")
+            gi_repository.Gdk = gdk
+            search = subprocess.CompletedProcess(
+                args=[], returncode=0, stdout=b"123\n", stderr=b""
+            )
+            geometry = subprocess.CompletedProcess(
+                args=[],
+                returncode=0,
+                stdout=b"X=11\nY=22\nWIDTH=300\nHEIGHT=180\n",
+                stderr=b"",
+            )
+            with (
+                patch.dict(sys.modules, {"gi": gi, "gi.repository": gi_repository}),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke.subprocess.run",
+                    side_effect=(search, geometry),
+                ) as run,
+            ):
+                self.assertTrue(
+                    _capture_gtk_dialog_screenshot(
+                        environment, "D4 Pocket 作業領域の選択", destination
+                    )
+                )
+
+            self.assertEqual(destination.read_bytes(), b"png-test-double")
+            if os.name == "posix":
+                self.assertEqual(stat.S_IMODE(destination.stat().st_mode), 0o600)
+            self.assertEqual(run.call_count, 2)
+
+    def test_agent_palette_activates_the_observed_command_item(self) -> None:
+        window = object()
+        destination_window = object()
+        command = object()
+        environment = {"DISPLAY": ":99"}
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_accessible",
+                side_effect=(window, object(), object(), destination_window, object()),
+            ) as find_accessible,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
+                return_value=command,
+            ) as find_operable,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._activate_accessible"
+            ) as activate,
+            patch(
+                "tooling.tests.linux_installed_product_smoke.subprocess.run"
+            ) as run,
+        ):
+            self.assertIs(
+                _open_agent_center_from_installed_ui(environment, "0x42"),
+                destination_window,
+            )
+
+        find_operable.assert_called_once_with(
+            "エージェントセンターを開く", root=window, timeout=10
+        )
+        activate.assert_called_once_with(command, "エージェントセンターを開く", environment)
+        self.assertEqual(
+            [entry.args[0] for entry in run.call_args_list],
+            [
+                ["xdotool", "windowactivate", "--sync", "0x42"],
+                ["xdotool", "key", "--clearmodifiers", "ctrl+k"],
+            ],
+        )
+        self.assertEqual(find_accessible.call_count, 5)
+
+    def test_missing_agent_registration_action_reports_broker_unavailable(self) -> None:
+        environment = {"DISPLAY": ":99"}
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._visible_product_window",
+                return_value="0x42",
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._open_agent_center_from_installed_ui",
+                return_value=object(),
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
+                side_effect=RuntimeError("control missing"),
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._accessible_snapshot",
+                return_value="スナップショット: broker_unavailable",
+            ),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "broker_unavailable"):
+                _open_installed_codex_registration(environment)
+
+    def test_agent_registration_reuses_supplied_window_when_lookup_is_transiently_empty(self) -> None:
+        environment = {"DISPLAY": ":99"}
+        window = object()
+        button = object()
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._visible_product_window",
+                return_value=None,
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._open_agent_center_from_installed_ui",
+                return_value=window,
+            ) as open_agent_center,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
+                return_value=button,
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._activate_accessible"
+            ) as activate,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_accessible"
+            ),
+        ):
+            self.assertIs(
+                _open_installed_codex_registration(environment, window_id="0x42"),
+                window,
+            )
+
+        open_agent_center.assert_called_once_with(environment, "0x42")
+        activate.assert_called_once_with(button, "登録を開始", environment)
+
+    def test_gtk_chooser_close_timeout_names_the_response_action(self) -> None:
+        for action in (
+            "absolute folder path entry and accept click",
+            "cancel control click",
+        ):
+            with self.subTest(action=action):
+                with self.assertRaisesRegex(RuntimeError, action):
+                    _wait_for_gtk_dialog_closed(
+                        {"DISPLAY": ":99"},
+                        "D4 Pocket 作業領域の選択",
+                        action=action,
+                        timeout=0,
+                    )
+
+    def test_folder_chooser_selects_target_from_absolute_location_entry(self) -> None:
+        from unittest.mock import call
+
+        environment = {"DISPLAY": ":99"}
+        with tempfile.TemporaryDirectory() as directory:
+            folder = Path(directory) / "selected-workspace"
+            folder.mkdir()
+            chooser = object()
+            accept = object()
+            visible = subprocess.CompletedProcess(
+                args=[], returncode=0, stdout=b"0x42\n", stderr=b""
+            )
+            with (
+                patch(
+                    "tooling.tests.linux_installed_product_smoke.subprocess.run",
+                    side_effect=(None, None, None, None, None, visible),
+                ) as run,
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._find_accessible",
+                    return_value=chooser,
+                ),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
+                    return_value=accept,
+                ) as find_operable,
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._click_accessible_by_coordinates"
+                ) as click,
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._wait_for_gtk_dialog_closed"
+                ) as wait_closed,
+            ):
+                _select_folder_in_gtk_chooser(environment, "0x42", folder)
+
+        self.assertEqual(
+            [entry.args[0] for entry in run.call_args_list],
+            [
+                ["xdotool", "windowactivate", "--sync", "0x42"],
+                ["xdotool", "key", "--clearmodifiers", "ctrl+l"],
+                ["xdotool", "key", "--clearmodifiers", "ctrl+a"],
+                [
+                    "xdotool",
+                    "type",
+                    "--clearmodifiers",
+                    "--delay",
+                    "1",
+                    "--",
+                    str(folder),
+                ],
+                ["xdotool", "key", "--clearmodifiers", "Return"],
+                [
+                    "xdotool",
+                    "search",
+                    "--onlyvisible",
+                    "--name",
+                    "^D4 Pocket 作業領域の選択$",
+                ],
+            ],
+        )
+        self.assertEqual(
+            find_operable.call_args_list,
+            [call("選択", root=chooser, timeout=10)],
+        )
+        click.assert_called_once_with(accept, "選択", environment)
+        wait_closed.assert_called_once_with(
+            environment,
+            "D4 Pocket 作業領域の選択",
+            action="absolute folder path entry and accept click",
+        )
+
+    def test_folder_chooser_accepts_location_entry_return(self) -> None:
+        environment = {"DISPLAY": ":99"}
+        with tempfile.TemporaryDirectory() as directory:
+            folder = Path(directory) / "selected-workspace"
+            folder.mkdir()
+            closed = subprocess.CompletedProcess(
+                args=[], returncode=1, stdout=b"", stderr=b""
+            )
+            with (
+                patch(
+                    "tooling.tests.linux_installed_product_smoke.subprocess.run",
+                    side_effect=(None, None, None, None, None, closed),
+                ) as run,
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._wait_for_gtk_dialog_closed"
+                ) as wait_closed,
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._find_accessible"
+                ) as find_accessible,
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._click_accessible_by_coordinates"
+                ) as click,
+            ):
+                _select_folder_in_gtk_chooser(environment, "0x42", folder)
+
+        self.assertEqual(len(run.call_args_list), 6)
+        wait_closed.assert_called_once_with(
+            environment,
+            "D4 Pocket 作業領域の選択",
+            action="path入力",
+        )
+        find_accessible.assert_not_called()
+        click.assert_not_called()
+
+    def test_folder_chooser_diagnostics_emit_only_bounded_state(self) -> None:
+        from types import SimpleNamespace
+
+        class State:
+            def contains(self, state: int) -> bool:
+                return state == 1
+
+        class Node:
+            name = ""
+            childCount = 0
+
+            def getRoleName(self) -> str:
+                return "table cell"
+
+            def getState(self):
+                return State()
+
+        with tempfile.TemporaryDirectory() as directory:
+            folder = Path(directory) / "selected-workspace"
+            with (
+                patch.dict("sys.modules", {"pyatspi": SimpleNamespace(STATE_SELECTED=1)}),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._accessible_snapshot",
+                    return_value=str(folder.parent),
+                ),
+            ):
+                diagnostics = _gtk_folder_chooser_diagnostics(Node(), folder)
+
+        self.assertEqual(
+            diagnostics,
+            {
+                "parent_path_visible": True,
+                "folder_name_visible": False,
+                "selected_accessible_count": 1,
+                "common_roles": [("table cell", 1)],
+                "focused_roles": [],
+                "visible_header_bounds": [],
+                "visible_table_bounds": [],
+                "target_entries": [],
+            },
+        )
+        self.assertNotIn(str(folder.parent), repr(diagnostics))
+
     def test_waits_for_native_owner_dialog_to_become_visible(self) -> None:
         from unittest.mock import patch
 
@@ -1415,6 +1803,13 @@ class LinuxInstalledOwnerEvidenceTests(unittest.TestCase):
                 ("MCP Tool実行", "accepted", "LIVE_RUNTIME"),
                 ("MCP切断", "rejected", "INTERNAL_STATE"),
                 ("MCP切断", "accepted", "LIVE_RUNTIME"),
+                ("作業領域OS選択", "accepted", "INTERNAL_STATE"),
+                ("作業領域OS選択", "accepted", "INTERNAL_STATE"),
+                ("AgentCLI実行系作業領域登録", "rejected", "INTERNAL_STATE"),
+                ("AgentCLI実行系作業領域登録", "accepted", "LIVE_RUNTIME"),
+                ("作業領域承認", "recorded", "INTERNAL_STATE"),
+                ("作業領域承認", "accepted", "INTERNAL_STATE"),
+                ("作業領域ツリー", "accepted", "LIVE_RUNTIME"),
                 ("製品アンインストール要求", "rejected", "INTERNAL_STATE"),
                 ("製品アンインストール要求", "accepted", "LIVE_RUNTIME"),
                 ("製品アンインストール完了", "completed", "LIVE_RUNTIME"),
@@ -1435,6 +1830,7 @@ class LinuxInstalledOwnerEvidenceTests(unittest.TestCase):
                             "更新rollback要求",
                             "MCP接続",
                             "MCP切断",
+                            "AgentCLI実行系作業領域登録",
                         }
                         and decision == "rejected"
                         else (
@@ -1443,7 +1839,11 @@ class LinuxInstalledOwnerEvidenceTests(unittest.TestCase):
                             else (
                                 "ツール結果のハッシュだけを含む受領票"
                                 if operation == "MCP Tool実行" and decision == "accepted"
-                                else "fixture"
+                                else (
+                                    "ownerが現在登録の読取を承認"
+                                    if operation == "作業領域承認" and decision == "recorded"
+                                    else "fixture"
+                                )
                             )
                         )
                     ),
@@ -1492,11 +1892,12 @@ class LinuxInstalledOwnerEvidenceTests(unittest.TestCase):
                     store,
                     require_export=True,
                     require_mcp=True,
+                    require_workspace=True,
                     require_uninstall=True,
                     require_rollback=True,
                 ),
                 {
-                    "events": 15,
+                    "events": 22,
                     "export_accepted": 1,
                     "export_rejected": 1,
                     "mcp_connect_owner_rejected": 1,
@@ -1506,6 +1907,13 @@ class LinuxInstalledOwnerEvidenceTests(unittest.TestCase):
                     "mcp_tool_live_hash_only_completed": 1,
                     "mcp_disconnect_owner_rejected": 1,
                     "mcp_disconnect_live_completed": 1,
+                    "workspace_selection_accepted": 2,
+                    "workspace_registration_owner_rejected": 1,
+                    "workspace_registration_live_accepted": 1,
+                    "workspace_read_approval_recorded": 1,
+                    "workspace_read_approval_accepted": 1,
+                    "workspace_tree_live_accepted": 1,
+                    "agent_task_permission_or_approval_events": 0,
                     "uninstall_accepted": 1,
                     "uninstall_rejected": 1,
                     "uninstall_completed": 1,

@@ -76,7 +76,7 @@
     },
     {
       "path": ".github/workflows/linux-manual-export-build.yml",
-      "sha256": "d1a2580c4bde3fb0493af78680681836576696b622f9b6cf6487f3e0a75089a7"
+      "sha256": "30a714b3dbe598a7c8f0a50a45d351d99e7b031fba22ff8014ded0c5435069dc"
     },
     {
       "path": ".github/workflows/linux-manual-rust-validation.yml",
@@ -164,7 +164,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "def6ffdcd7a1dd61f07453b755992d9c017e5c78db0307751ac7047931fcd956"
+      "sha256": "16cf96f44151cc93df991121c131490ec358aa815a6fa7cc12874ac4213c0d4f"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -172,7 +172,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "f7f948c35495d78f99c338f3849b20584265bb0304e65c257c7540bb0f77fee6"
+      "sha256": "d2c51f040bbc87bdfd2f42067b97dcdccf2c258649744978eb982a8ce55309bc"
     },
     {
       "path": "SECURITY.md",
@@ -1307,8 +1307,32 @@
       "sha256": "c05e55641d0563f6b7177bcf3e77d76191dcb68c4232b8bff4b3e41406e84066"
     },
     {
+      "path": "docs/QE_2026-10-22/F04_\u5206\u985e\u30fb\u662f\u6b63\u53f0\u5e33_20261030.md",
+      "sha256": "b6b7b221c577df19da274d74e967ae1e7410aafa3883d895cfdaa0b1bf07389f"
+    },
+    {
+      "path": "docs/QE_2026-10-22/F04_\u5206\u985e\u30fb\u662f\u6b63\u53f0\u5e33_20261030.txt",
+      "sha256": "9165d6fc902fae4d7f937032b48f20f3ae35d37d45043fbef2300ee74df1b8e2"
+    },
+    {
+      "path": "docs/QE_2026-10-22/F04_\u65e5\u672c\u8a9e\u57fa\u5e95\u76e3\u67fb\u539f\u6587_20261030.json.txt",
+      "sha256": "4fa48d57ac2ec0fe26b51b581a0de1df2d032e1169fa5f089bf9e9675bf05959"
+    },
+    {
+      "path": "docs/QE_2026-10-22/F05_remote_codex_branch\u68da\u5378\u3057_20261030.md",
+      "sha256": "b4eeac82122bb6b0ceca5bf772eafb79d0c1434e50afd7b4211633d02f19913c"
+    },
+    {
+      "path": "docs/QE_2026-10-22/F06_\u6b63\u672c\u7d22\u5f15\u91cd\u8907\u53c2\u7167_20261030.md",
+      "sha256": "d1631489f5107558be258d34afe33af111a272a1fe25d08771dd31ed37cabdb2"
+    },
+    {
+      "path": "docs/QE_2026-10-22/F07_rev5\u539f\u672c\u8981\u6c42\u7167\u5408_20261030.md",
+      "sha256": "70b26d130cd8bfcdbbb8fa7fe547868496177e6fe0f06b45a7f11bc532299076"
+    },
+    {
       "path": "docs/QE_2026-10-22/\u63a1\u7528\u8a18\u9332.md",
-      "sha256": "3ee6b120269f80ab8eaa9877640ef3863912a2d1e18124f02393fdcac662d921"
+      "sha256": "0f9b3f146d13d9ddda79a686ca037a814a92bf8ba2a8e6398239962c78994bdf"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1320,15 +1344,15 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "739c93525c06aa96f04be571a4f62ec71b1bcc5468f09440c6c7036552ca725e"
+      "sha256": "d7a2e7f9940b62c1c8e95336fdaed8a2acc74d2b02139562987f50a58500fca0"
     },
     {
       "path": "docs/REV4_ACCEPTANCE_LEDGER.md",
-      "sha256": "86af93d0e2490ffd4e3c13efd062e6a174a8d6a701eda2e8ef886f37326580c6"
+      "sha256": "de04dc08e077f4200a04514ac39708808d3aa3240edb185ea76d555483151e9c"
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "072da0ea724e6cd5c4a745df28eaa76bf129171dfa673d094253c3f7db9fb4c7"
+      "sha256": "3575bf8f520b645c6a21c9d61352e037d9ad49b02e64176a3eb30978f7700168"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1464,7 +1488,7 @@
     },
     {
       "path": "docs/specs/credential-vault.md",
-      "sha256": "827be8b520a5af08b044143985aa360c65a48a05976dd5747e73144687680da3"
+      "sha256": "07f9c9e0f96b6fb079bbd78d22e2ed72b46e78cf784228ac3ac9b417f4af5dee"
     },
     {
       "path": "docs/specs/desktop-broker-channel.md",
@@ -1540,7 +1564,7 @@
     },
     {
       "path": "docs/specs/linux-product-package.md",
-      "sha256": "08710c050f089c24c01e11a985b614e67dcf1495b58422d30bebd7b5a2aee44b"
+      "sha256": "95ca716246ed5db1121f6f595d95154ea7502d948275bbe651a6c2530d16c7d6"
     },
     {
       "path": "docs/specs/linux-workspace-selection.md",
@@ -1704,7 +1728,7 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B0_\u53c2\u7167\u539f\u672c\u4e00\u89a7.md",
-      "sha256": "a2c1e0d072f5cb1a0cd5aeb9b2fd72e4dbbc1ab191c18e0bad62647eccb9b4e2"
+      "sha256": "3a1e2ab905e422c4703e56701234c99665f4fb0f6da3434cf3f021cb13c7c1a9"
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B0_\u91cd\u8907\u5883\u754c\u56f3.md",
@@ -1720,7 +1744,7 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B3_\u5168\u539f\u56e0\u6a5f\u69cb\u5bfe\u5fdc.md",
-      "sha256": "98f13987452b7ab597c6edec08239b90100347a4ca1305c91d572d777d8c836a"
+      "sha256": "0fdb32ccc04d59d05e533cc6a15df09ca26a207ba97486691ccbedc3d85d3c55"
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B4_\u88fd\u54c1\u63a5\u7d9a\u8a2d\u8a08.md",
@@ -1728,7 +1752,7 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/B5_\u81ea\u5df1\u9069\u7528.md",
-      "sha256": "93ac93c07aa2e1ec43d9a07fba2e00f6ed4fa4be54e12d442e22cd27e0df0ea7"
+      "sha256": "1c405ceebe84697ff704bfc5582ac65ed0a486e927404360f4ef61cda77900f4"
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/\u5b9f\u88c5\u4ed5\u69d8\u66f8.md",
@@ -1744,7 +1768,7 @@
     },
     {
       "path": "docs/\u7de9\u885d\u57fa\u76e4_rev5\u88dc\u907a_QC/\u63a1\u7528\u8a18\u9332.md",
-      "sha256": "4c3c140c5adad4f619c9df996ac1be2ef0905b109cdc2cc35d3deb502f447815"
+      "sha256": "a4a5f6acf7f4b7fea143e3eb9421b1a8daf72f82479d80fbcc253dad30e6551d"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -3348,7 +3372,7 @@
     },
     {
       "path": "installer/linux/README.md",
-      "sha256": "19f0da823d810c79c8b4cce339e1cefa3c88c4ca03527bbba9c1f303955bb3f7"
+      "sha256": "8ea65646802894dcb38a61b4efc3198d78b9284fb68a9744dface210e37b5b42"
     },
     {
       "path": "installer/macos/README.md",
@@ -3480,7 +3504,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
-      "sha256": "7bf8ac8ce58ad0094a721c24693ddb2eda6bf09230061fc5557ebe5cabc8b887"
+      "sha256": "49bdac8b540593f646f387f1dc5c335c833441a86e3b9f16334a07b011370826"
     },
     {
       "path": "native/rust_helper/src/adapters/mcp_stdio.rs",
@@ -3496,7 +3520,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/process_tree.rs",
-      "sha256": "bf47b5c85920fa61af8d79b946976ec2c4d9035e72106fa4ef0082877bbb8f5c"
+      "sha256": "9a0aeb6c7ec367cce9449e85933be65f4d3b57208b6b0b53ccad1cc0e9afd437"
     },
     {
       "path": "native/rust_helper/src/audit_hash.rs",
@@ -3580,7 +3604,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/credential_storage.rs",
-      "sha256": "83aa5dee362b7ad922f840d16b36ff0a8eb7013ab9a565c8f3212240ccadf688"
+      "sha256": "f3ed8f2070828ca1e8df05dd3a79ce8514ea1c3fe11cbfc8484e84c6909b8bb6"
     },
     {
       "path": "native/rust_helper/src/broker/credential_vault.rs",
@@ -3612,7 +3636,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/export_center.rs",
-      "sha256": "930bf9e3cad30d96c2ffd048d480f56b5ebe4158b8b3b96dcdc354228e1b7986"
+      "sha256": "2ba40a3b0221bec10d1d830198cebd378f0d0afa2262badf5793169c2850e3a0"
     },
     {
       "path": "native/rust_helper/src/broker/history_access.rs",
@@ -3684,7 +3708,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "a0cd06bae8b810cd099291f45ceabad1ea86ff6c99cc21afe425ffb776fe35d4"
+      "sha256": "c8b9b8b85278cd6b3d464f5551ad62da9a4b362adf3255ce268109d6f8a63f23"
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
@@ -3744,7 +3768,7 @@
     },
     {
       "path": "native/rust_helper/src/linux_desktop_worker.rs",
-      "sha256": "71d1ea7e00b31d2f57df26e45e7c68ea26dc9504d5d62631e00aab290822d243"
+      "sha256": "99b33dc0aea397a804b9d1f0053c31908a2258fc62576d6312f93fd0bc81771c"
     },
     {
       "path": "native/rust_helper/src/linux_product_bundle.rs",
@@ -3752,7 +3776,7 @@
     },
     {
       "path": "native/rust_helper/src/linux_workspace_selection.rs",
-      "sha256": "38c2b79d81dac35d68a6b715c201214c61acf133e46db4ba2629ee583f4f2933"
+      "sha256": "5a24c29f388abacbd19631fbc9704102f05a3cb6369eaa9ae1d90dcfbe666c98"
     },
     {
       "path": "native/rust_helper/src/macos_credential_input.rs",
@@ -3760,7 +3784,7 @@
     },
     {
       "path": "native/rust_helper/src/macos_desktop_owner.rs",
-      "sha256": "47c0a6c9a532e5436a2fe15f3d238c5d37b18e4679566d51419819e29d147595"
+      "sha256": "0b870e46e06f378f8abd8f87863c7a81e7093a4a9806c4541ae47cf5e5a5239e"
     },
     {
       "path": "native/rust_helper/src/macos_desktop_worker.rs",
@@ -3860,7 +3884,7 @@
     },
     {
       "path": "native/rust_helper/tests/support/codex_loopback_responses.rs",
-      "sha256": "b096cc539cf88aa7abed99eac76ff4b72ae846a2a6ae5d846316dd436e2e062e"
+      "sha256": "dca5969b7ff3f33dcba69aded78a6525d56f5ad0e6f764330c155223dcdb3e91"
     },
     {
       "path": "native/rust_helper/tests/unit/agent_task_fixture_fs.rs",
@@ -5068,7 +5092,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "5b5b68185ed02713376e0e042dfe62b460f535ceeb7d2e5b6fb80ce93201d2a5"
+      "sha256": "da4b6dd504efbb387c1715119b3b69675bc9797c03385924ac7307230471b620"
     },
     {
       "path": "tooling/conformance_tests/test_final_development_audit.py",
@@ -5096,7 +5120,7 @@
     },
     {
       "path": "tooling/device_link_live_check.py",
-      "sha256": "7fd3f58dd1adf65d0cc1655c2c00aa732b5c42fe0e0c8732d52caadbcb55857b"
+      "sha256": "ada2e8f61cc2209bb1307d4365378d629dffd9250ea32dcda290b429d3db6ff2"
     },
     {
       "path": "tooling/dialogue_contract_check.py",
@@ -5112,7 +5136,7 @@
     },
     {
       "path": "tooling/export_linux_product.py",
-      "sha256": "d830e43d2aedd74f6d5043e343f3c64688451093efdc85b81a3d214da2edb4fc"
+      "sha256": "11b5b32ec01eec2eb410eece14cf660341b680a2d8b48c6315e62e5b14cd247e"
     },
     {
       "path": "tooling/export_windows_product.py",
@@ -5216,11 +5240,11 @@
     },
     {
       "path": "tooling/tests/create_linux_export_fixture.py",
-      "sha256": "235af10cb3c66c5606be4790a2c20066e3ded14db75a95fc2cc99d2ab43d93e3"
+      "sha256": "b5ba18392e5aa2f367b56a4aeb3b3c02ba3a31422fadba726eb41bd89524b356"
     },
     {
       "path": "tooling/tests/create_linux_update_catalog_fixture.py",
-      "sha256": "59046698c581bf3033ffb7e87df0ca908ed60750b6b935c25e32e557bb8d700d"
+      "sha256": "580defceb9ba045dfc442038bb20b595c3892853c346c846d2380533b0277188"
     },
     {
       "path": "tooling/tests/fixtures/linux-update-catalog/linux-installed-catalog-display.pkg",
@@ -5232,15 +5256,15 @@
     },
     {
       "path": "tooling/tests/linux_gtk_bundle_smoke.py",
-      "sha256": "9d40a9857350826315ed8621adb31005bb5a17f2e5f6941fafe89cf092452d71"
+      "sha256": "36f24c6fbc3ba746b7b79cb5e179382268831c8b7232be1a68e7f3f9feaff1f8"
     },
     {
       "path": "tooling/tests/linux_installed_product_smoke.py",
-      "sha256": "42bd1d7584556c53375b8ef95759922401dad59d9f30ea8318aa253a0749794e"
+      "sha256": "ecff8c7b3bed9f6be9309d29455152db435c84a86010f302fa211e755dfdf809"
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",
-      "sha256": "23828469d12050fe9b4c6eae64e6d92b1ea32bb27377b84018bfb12dcd38766f"
+      "sha256": "e5311a6039a9ed84838f9669bfd1c792adadd7f8fb4ff847457d50bc59eb7c47"
     },
     {
       "path": "tooling/tests/test_linux_gtk_bundle_smoke.py",
@@ -5248,7 +5272,7 @@
     },
     {
       "path": "tooling/tests/test_linux_installed_product_smoke.py",
-      "sha256": "1f8c5af4bdd869b88dd725895270762f4f5a2cc3891c4bc8716d010339076c1c"
+      "sha256": "e8060006d2dee680e6fd633a53c7e40c1bd1a3292676ed8bb1d5fb5e7a04c428"
     },
     {
       "path": "tooling/tests/test_linux_product_package.py",
@@ -5288,7 +5312,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "bc1de5a5b747551950a280fc099bec275ec9e5cf5b540184c14ee33b02a7ab5c"
+      "sha256": "220c85d6f99f4c320fb2ad4381e7d491c78530d87cb0de57ee3dc48e23c9ffa5"
     }
   ]
 }

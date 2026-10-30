@@ -113,6 +113,14 @@ def _linux_build_environment(
     return result
 
 
+def _flutter_build_environment(environment: dict[str, str]) -> dict[str, str]:
+    # Flutter's first-run analytics notice is appended to stdout unless it detects CI;
+    # that breaks the machine-readable JSON emitted by `flutter --version --machine`.
+    result = {name: value for name, value in environment.items() if name.upper() != "CI"}
+    result["CI"] = "true"
+    return result
+
+
 def _rustup_home() -> str:
     configured = os.environ.get("RUSTUP_HOME", "").strip()
     if configured:
@@ -161,6 +169,7 @@ def _tool_version(command: list[str], environment: dict[str, str]) -> str:
 
 
 def _toolchain(paths: dict[str, str], environment: dict[str, str]) -> dict[str, str]:
+    flutter_environment = _flutter_build_environment(environment)
     flutter_result = subprocess.run(
         [paths["flutter"], "--version", "--machine"],
         cwd=ROOT / "apps" / "desktop_flutter",
@@ -169,7 +178,7 @@ def _toolchain(paths: dict[str, str], environment: dict[str, str]) -> dict[str, 
         stderr=subprocess.PIPE,
         text=True,
         encoding="utf-8",
-        env=environment,
+        env=flutter_environment,
     )
     flutter_value = json.loads(flutter_result.stdout)
     versions = {
@@ -343,12 +352,13 @@ def build_linux_product(
             if update_trust is None:
                 build_overrides.pop("GUI_SHELL_UPDATE_TRUST_JSON")
             child_environment = _linux_build_environment(build_overrides)
+            flutter_environment = _flutter_build_environment(child_environment)
             toolchain = _toolchain(paths, child_environment)
             pub_arguments = ["pub", "get", "--enforce-lockfile"]
             subprocess.run(
                 [paths["flutter"], *pub_arguments],
                 cwd=flutter_project,
-                env=child_environment,
+                env=flutter_environment,
                 check=True,
             )
             flutter_arguments = [
@@ -367,7 +377,7 @@ def build_linux_product(
             subprocess.run(
                 [paths["flutter"], *flutter_arguments],
                 cwd=flutter_project,
-                env=child_environment,
+                env=flutter_environment,
                 check=True,
             )
 

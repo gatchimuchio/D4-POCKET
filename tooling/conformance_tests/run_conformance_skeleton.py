@@ -12082,6 +12082,9 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
         "mcp_tool_execution",
         "inputs.acceptance_scope == 'mcp_tool_execution'",
         "--acceptance-scope mcp_tool_execution",
+        "workspace_selection",
+        "inputs.acceptance_scope == 'workspace_selection'",
+        "--acceptance-scope workspace_selection",
     )
     missing = [token for token in required if token not in workflow]
     for token in (
@@ -12089,6 +12092,23 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
         "require_mcp=True",
         "result_body_absent_from_ui_audit_logs_and_acceptance_files",
         "_cleanup_mcp_fixture_group(",
+        "def _open_agent_center_from_installed_ui(",
+        '"エージェントセンターを開く"',
+        '_activate_accessible(command, "エージェントセンターを開く", environment)',
+        '_find_accessible("Codex実行系をBrokerへ登録", root=window, timeout=10)',
+        "def _editable_text_ancestor(",
+        "_editable_text_ancestor(focused)",
+        "def _gtk_folder_chooser_diagnostics(",
+        '"broker_unavailable" in snapshot',
+        '["xdotool", "key", "--clearmodifiers", "ctrl+a"]',
+        '"--",\n            str(folder),',
+        '["xdotool", "key", "--clearmodifiers", "Return"]',
+        '"selection_target_source": "absolute_location_entry"',
+        '_click_accessible_by_coordinates(accept, "選択", environment)',
+        '_click_accessible_by_coordinates(cancel, "取消", environment)',
+        "def _run_installed_workspace_selection_acceptance(",
+        "require_workspace=True",
+        "_verify_workspace_projection(",
     ):
         if token not in smoke:
             missing.append(f"installed MCP smoke: {token}")

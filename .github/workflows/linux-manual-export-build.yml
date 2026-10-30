@@ -11,6 +11,7 @@ name: Linux manual product build and installed acceptance
           - update_lifecycle
           - credential_vault
           - mcp_tool_execution
+          - workspace_selection
         default: update_lifecycle
 
 permissions:
@@ -201,6 +202,39 @@ jobs:
             printf '\n- Installed MCP acceptance: a fresh native Owner rejection created no stdio child; a separate Owner approval launched the run-owned real `/usr/bin/python3` MCP fixture through the installed GTK Runner and production Broker. The fixture completed `server/discover`, `tools/list`, and one Owner-confirmed `tools/call`; the installed UI showed the LIVE_RUNTIME result hash, content type, and Audit receipt while the fixture result marker stayed absent from UI／Audit／logs／acceptance files. Disconnect rejection preserved the child group; a separate native Owner approval confirmed owned group termination and removed the Broker connection. The installed app then exited normally, and the file-backed Audit chain／anchor HMAC was checked.\n'
             printf -- '- Scope: Ubuntu 24.04 hosted Xvfb／X11, unsigned test-identity installed product, and automated AT-SPI／keyboard input. This proves the installed MCP stdio／Tool metadata and hash-only result path for a local synthetic server only; no external provider／credential injection, non-X11 desktop session, Wayland rendering, production signing／distribution, or full Linux product completion.\n'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: installed GTK UIでWorkspace OS選択／secret boundaryを受入れる
+        if: ${{ inputs.acceptance_scope == 'workspace_selection' }}
+        shell: bash
+        env:
+          GUI_SHELL_PRODUCT_APP_ID: d4-pocket-app-11111111111111111111111111111111
+          GUI_SHELL_PRODUCT_AUDIT_STORE_ID: audit-store-22222222222222222222222222222222
+          D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE: ${{ runner.temp }}/d4p-linux-export-${{ github.run_id }}-${{ github.run_attempt }}/output/D4Pocket-linux-rollback.d4pkg
+        run: |
+          set -euo pipefail
+          test_package="$D4P_EXPORT_ROOT/output/D4Pocket-linux.d4pkg"
+          acceptance_root="$D4P_EXPORT_ROOT/installed-workspace-acceptance"
+          dbus-run-session -- xvfb-run -a python3 tooling/tests/linux_installed_product_smoke.py \
+            --package "$test_package" \
+            --temp-root "$D4P_EXPORT_ROOT" \
+            --acceptance-root "$acceptance_root" \
+            --private-key "$D4P_EXPORT_ROOT/test-update-private.der" \
+            --update-package "$D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE" \
+            --acceptance-scope workspace_selection
+          {
+            printf '\n- Installed Workspace acceptance: the GTK folder chooser selected the registered Workspace; cancellation preserved the prior field value; a native Owner rejection started no CLI probe; a separate Owner approval allowed only the bounded CLI interface probe and created a broker-process Workspace registration without Agent Task Permission／Approval.\n'
+            printf -- '- Workspace Inspector required a separate native Owner read Approval. An allowed public file was visible; registered secret content, default secret path, and a symlink to content outside the Workspace were absent from the projection. Durable Audit chain／anchor HMAC, root／secret non-exposure, and test-root cleanup were checked.\n'
+            printf -- '- Scope: Ubuntu 24.04 hosted Xvfb／X11, unsigned test-identity installed product, automated AT-SPI／keyboard and a run-owned interface-only Codex CLI fixture. This does not establish Wayland rendering, real desktop-session coverage, Agent Task execution／Recovery, formal signing／distribution, or full Linux product completion.\n'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: failure-only GTK Workspace chooser screenshot
+        if: ${{ failure() && inputs.acceptance_scope == 'workspace_selection' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-workspace-chooser-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/d4p-linux-export-${{ github.run_id }}-${{ github.run_attempt }}/workspace-chooser-*.png
+          if-no-files-found: ignore
+          retention-days: 1
 
       - name: build fixture／bundleを正確な一時rootから削除
         if: always()
