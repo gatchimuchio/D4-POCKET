@@ -46,6 +46,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _open_mcp_center_from_installed_ui,
     _resolve_regular_package,
     _read_task_scratch_recovery_state,
+    _installed_task_write_failure_diagnostics,
     _stop_linux_agent_task_process_group,
     _review_single_installed_mcp_tool_arguments,
     _run_rust_test,
@@ -3209,6 +3210,45 @@ class LinuxAgentTaskResponsesFixtureTests(unittest.TestCase):
         snapshot = server.snapshot()
         self.assertEqual(snapshot["rejections"], ["synthetic_secret_canary_in_tool_output"])
         self.assertNotIn("do-not-forward", json.dumps(snapshot))
+
+
+class LinuxAgentTaskFailureDiagnosticsTests(unittest.TestCase):
+    def test_write_failure_diagnostics_are_structured_and_secret_free(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-task-diagnostics-") as temporary:
+            workspace = Path(temporary) / "workspace"
+            workspace.mkdir()
+            scratch = workspace / ".d4p-tmp-fixture"
+            scratch.mkdir()
+            (scratch / "fixture-scratch-marker").write_text("owned\n", encoding="utf-8")
+            result_file = workspace / "agent-task-result.json"
+            responses_server = _LinuxAgentTaskResponsesServer()
+            responses_server.configure(
+                "complete", "/usr/bin/python3 task_fixture.py complete", workspace
+            )
+            self.addCleanup(responses_server.close)
+            snapshot = (
+                "Task識別子: task-fixture-1\n"
+                "Task状態: running\n"
+                "D4P_SYNTHETIC_SECRET_CANARY=private-value\n"
+            )
+            with patch(
+                "tooling.tests.linux_installed_product_smoke._accessible_snapshot",
+                return_value=snapshot,
+            ):
+                diagnostics = _installed_task_write_failure_diagnostics(
+                    object(),
+                    "task-fixture-1",
+                    result_file,
+                    workspace,
+                    responses_server,
+                )
+            rendered = json.dumps(diagnostics, ensure_ascii=False)
+            self.assertEqual(diagnostics["visible_task_statuses"], ["running"])
+            self.assertTrue(diagnostics["requested_task_visible"])
+            self.assertFalse(diagnostics["result_file_exists"])
+            self.assertEqual(diagnostics["scratch_directory_count"], 1)
+            self.assertEqual(diagnostics["scratch_marker_count"], 1)
+            self.assertNotIn("private-value", rendered)
 
 
 @unittest.skipUnless(sys.platform.startswith("linux"), "Linux filesystem semantics are required")

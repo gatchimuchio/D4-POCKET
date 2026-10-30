@@ -3254,6 +3254,37 @@ def _wait_installed_task_status(
     )
 
 
+def _installed_task_write_failure_diagnostics(
+    window,
+    task_id: str,
+    result_file: Path,
+    workspace: Path,
+    responses_server: _LinuxAgentTaskResponsesServer,
+) -> dict[str, object]:
+    snapshot = _accessible_snapshot(window)
+    statuses = re.findall(
+        r"Task状態:\s*(pending|running|blocked|completed|failed|cancelled|quarantined)\b",
+        snapshot,
+    )
+    task_ids = re.findall(r"Task識別子:\s*([A-Za-z0-9_.:-]+)", snapshot)
+    scratch_paths = [
+        path
+        for path in workspace.glob(".d4p-tmp-*")
+        if path.is_dir() and not path.is_symlink()
+    ]
+    return {
+        "visible_task_statuses": statuses[-4:],
+        "requested_task_visible": task_id in task_ids,
+        "result_file_exists": result_file.is_file() and not result_file.is_symlink(),
+        "result_file_is_symlink": result_file.is_symlink(),
+        "scratch_directory_count": len(scratch_paths),
+        "scratch_marker_count": sum(
+            (path / "fixture-scratch-marker").is_file() for path in scratch_paths
+        ),
+        "loopback": responses_server.snapshot(),
+    }
+
+
 def _prepare_and_start_installed_agent_task(
     environment: dict[str, str],
     window,
@@ -3409,7 +3440,17 @@ def _run_installed_agent_task_acceptance(
             while not result_file.is_file() and time.monotonic() < deadline:
                 time.sleep(0.1)
             if result_file.is_symlink() or not result_file.is_file():
-                raise RuntimeError("installed Agent Taskが許可Workspaceへ結果fileを書き込みませんでした")
+                diagnostics = _installed_task_write_failure_diagnostics(
+                    window,
+                    task_ids[-1],
+                    result_file,
+                    workspace,
+                    responses_server,
+                )
+                raise RuntimeError(
+                    "installed Agent Taskが許可Workspaceへ結果fileを書き込みませんでした: "
+                    + json.dumps(diagnostics, ensure_ascii=False, sort_keys=True)
+                )
             try:
                 report = json.loads(result_file.read_text(encoding="utf-8"))
             except (OSError, UnicodeError, json.JSONDecodeError) as error:
