@@ -35,6 +35,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _expand_single_installed_mcp_tool_list,
     _focused_named_accessible,
     _find_operable_accessible,
+    _find_workspace_inspector_control,
     _helper_exit_diagnostics,
     _open_mcp_center_from_installed_ui,
     _resolve_regular_package,
@@ -48,6 +49,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _verify_credential_audit,
     _verify_live_audit,
     _verify_workspace_projection,
+    _scroll_product_page_down,
     _wait_for_workspace_root_value,
     _workspace_root_field_value,
     _editable_text_ancestor,
@@ -1576,6 +1578,85 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                 _wait_for_workspace_root_value(expected, timeout=0.01)
         self.assertNotIn(expected, str(failure.exception))
         self.assertNotIn("/home/test/decoy-workspace", str(failure.exception))
+
+    def test_workspace_inspector_control_reacquires_and_scrolls_live_page(self) -> None:
+        first_window, second_window = object(), object()
+        first_heading, second_heading = object(), object()
+        scope, control = object(), object()
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_accessible",
+                side_effect=(
+                    first_window,
+                    first_heading,
+                    second_window,
+                    second_heading,
+                ),
+            ) as find,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._accessible_scope_with_named_descendant",
+                return_value=scope,
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
+                side_effect=(RuntimeError("not visible"), control),
+            ) as find_control,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._visible_product_window",
+                return_value="0x42",
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._scroll_product_page_down"
+            ) as scroll,
+            patch("tooling.tests.linux_installed_product_smoke.time.sleep"),
+        ):
+            actual = _find_workspace_inspector_control(
+                "workspace-a", "workspace-a", {"DISPLAY": ":99"}, timeout=1
+            )
+
+        self.assertIs(actual, control)
+        self.assertEqual(find.call_count, 4)
+        self.assertEqual(find_control.call_count, 2)
+        scroll.assert_called_once_with({"DISPLAY": ":99"}, "0x42")
+
+    def test_product_page_scroll_uses_bounded_window_relative_coordinates(self) -> None:
+        completed = subprocess.CompletedProcess([], 0, b"", b"")
+        geometry = subprocess.CompletedProcess(
+            [], 0, b"X=1\nY=2\nWIDTH=1200\nHEIGHT=800\n", b""
+        )
+        environment = {"DISPLAY": ":99"}
+        with patch(
+            "tooling.tests.linux_installed_product_smoke.subprocess.run",
+            side_effect=(completed, geometry, completed),
+        ) as run:
+            _scroll_product_page_down(environment, "0x42")
+
+        self.assertEqual(
+            [entry.args[0] for entry in run.call_args_list],
+            [
+                ["xdotool", "windowactivate", "--sync", "0x42"],
+                ["xdotool", "getwindowgeometry", "--shell", "0x42"],
+                [
+                    "xdotool",
+                    "mousemove",
+                    "--window",
+                    "0x42",
+                    "900",
+                    "600",
+                    "click",
+                    "5",
+                ],
+            ],
+        )
+
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke.subprocess.run"
+            ) as run,
+            self.assertRaisesRegex(RuntimeError, "window IDが不正"),
+        ):
+            _scroll_product_page_down(environment, "not-a-window")
+        run.assert_not_called()
 
     def test_folder_chooser_navigates_from_home_by_exact_folder_rows_then_accepts(self) -> None:
         from unittest.mock import call

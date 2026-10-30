@@ -181,6 +181,60 @@ def _visible_product_window(environment: dict[str, str]) -> str | None:
     return values[0] if values else None
 
 
+def _scroll_product_page_down(environment: dict[str, str], window_id: str) -> None:
+    if re.fullmatch(r"(?:0x)?[0-9a-fA-F]+", window_id) is None:
+        raise RuntimeError("製品window IDが不正なため画面をscrollできません")
+    activated = subprocess.run(
+        ["xdotool", "windowactivate", "--sync", window_id],
+        env=environment,
+        capture_output=True,
+        check=False,
+        timeout=5,
+    )
+    if activated.returncode != 0:
+        raise RuntimeError("製品windowを有効化できずWorkspace画面をscrollできません")
+    geometry = subprocess.run(
+        ["xdotool", "getwindowgeometry", "--shell", window_id],
+        env=environment,
+        capture_output=True,
+        check=False,
+        timeout=5,
+    )
+    if geometry.returncode != 0:
+        raise RuntimeError("製品windowの表示範囲を取得できません")
+    fields: dict[str, int] = {}
+    for line in geometry.stdout.decode("ascii", errors="ignore").splitlines():
+        key, separator, value = line.partition("=")
+        if separator and key in {"WIDTH", "HEIGHT"}:
+            try:
+                fields[key] = int(value)
+            except ValueError:
+                continue
+    if set(fields) != {"WIDTH", "HEIGHT"} or not (
+        320 <= fields["WIDTH"] <= 4096 and 240 <= fields["HEIGHT"] <= 4096
+    ):
+        raise RuntimeError("製品windowの表示範囲がscroll可能な範囲ではありません")
+    x, y = fields["WIDTH"] * 3 // 4, fields["HEIGHT"] * 3 // 4
+    scrolled = subprocess.run(
+        [
+            "xdotool",
+            "mousemove",
+            "--window",
+            window_id,
+            str(x),
+            str(y),
+            "click",
+            "5",
+        ],
+        env=environment,
+        capture_output=True,
+        check=False,
+        timeout=5,
+    )
+    if scrolled.returncode != 0:
+        raise RuntimeError("製品のWorkspace画面をscrollできません")
+
+
 def _wayland_launch_environment(
     environment: dict[str, str], display: str
 ) -> dict[str, str]:
@@ -438,6 +492,63 @@ def _find_operable_accessible(
     raise RuntimeError(
         f"AT-SPIで操作可能なGTK controlを確認できません: {name}; {last_debug}"
     )
+
+
+def _find_workspace_inspector_control(
+    name: str,
+    workspace_id: str,
+    environment: dict[str, str],
+    *,
+    timeout: float = 20.0,
+):
+    deadline = time.monotonic() + timeout
+    last_error = "not observed"
+    scroll_steps = 0
+    while scroll_steps <= 48:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        try:
+            window = _find_accessible(
+                WINDOW_TITLE, timeout=min(0.5, remaining)
+            )
+            heading = _find_accessible(
+                "作業領域インスペクタ",
+                root=window,
+                timeout=min(0.5, remaining),
+            )
+            inspector = _accessible_scope_with_named_descendant(
+                heading, workspace_id
+            )
+            return _find_operable_accessible(
+                name, root=inspector, timeout=min(0.25, remaining)
+            )
+        except RuntimeError as error:
+            last_error = str(error)[:400]
+
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        window_id = _visible_product_window(environment)
+        if window_id is not None:
+            _scroll_product_page_down(environment, window_id)
+            scroll_steps += 1
+        time.sleep(min(0.12, remaining))
+
+    raise RuntimeError(
+        "Workspace Inspector control did not become operable after bounded "
+        f"page scrolling: control={name}; workspace_id={workspace_id}; "
+        f"scroll_steps={scroll_steps}; last_error={last_error}"
+    )
+
+
+def _workspace_inspector_scope(workspace_id: str, *, timeout: float = 15.0):
+    window = _find_accessible(WINDOW_TITLE, timeout=timeout)
+    heading = _find_accessible(
+        "作業領域インスペクタ", root=window, timeout=timeout
+    )
+    inspector = _accessible_scope_with_named_descendant(heading, workspace_id)
+    return window, inspector
 
 
 def _activate_accessible(node, name: str, environment: dict[str, str]) -> None:
@@ -2348,20 +2459,22 @@ def _run_installed_workspace_selection_acceptance(
 
     window = _find_accessible(WINDOW_TITLE, timeout=10)
     _find_accessible("Permission／Approval／Credential: 生成なし", root=window, timeout=10)
-    inspector_heading = _find_accessible(
-        "作業領域インスペクタ", root=window, timeout=15
+    row = _find_workspace_inspector_control(
+        workspace_id, workspace_id, environment, timeout=20
     )
-    inspector = _accessible_scope_with_named_descendant(
-        inspector_heading, workspace_id
-    )
-    row = _find_operable_accessible(workspace_id, root=inspector, timeout=20)
     _activate_accessible(row, workspace_id, environment)
-    visibility = _find_operable_accessible("hash_only", root=inspector, timeout=10)
+    visibility = _find_workspace_inspector_control(
+        "hash_only", workspace_id, environment, timeout=10
+    )
     _activate_accessible(visibility, "hash_only", environment)
+    window = _find_accessible(WINDOW_TITLE, timeout=10)
     full = _find_operable_accessible("full", root=window, timeout=10)
     _activate_accessible(full, "full", environment)
-    approve = _find_operable_accessible(
-        "native Owner確認でWorkspace読取を許可", root=inspector, timeout=10
+    approve = _find_workspace_inspector_control(
+        "native Owner確認でWorkspace読取を許可",
+        workspace_id,
+        environment,
+        timeout=10,
     )
     _activate_accessible(approve, "native Owner確認でWorkspace読取を許可", environment)
     _answer_owner_dialog(
@@ -2376,28 +2489,20 @@ def _run_installed_workspace_selection_acceptance(
         ),
     )
     _wait_for_owner_dialog_closed(environment)
-    window = _find_accessible(WINDOW_TITLE, timeout=10)
-    inspector_heading = _find_accessible(
-        "作業領域インスペクタ", root=window, timeout=15
-    )
-    inspector = _accessible_scope_with_named_descendant(
-        inspector_heading, workspace_id
-    )
+    _, inspector = _workspace_inspector_scope(workspace_id)
     _find_accessible(
         "現在のWorkspace読取範囲: full・Task実行／書込権は別です。",
         root=inspector,
         timeout=15,
     )
-    row = _find_operable_accessible(workspace_id, root=inspector, timeout=10)
+    row = _find_workspace_inspector_control(
+        workspace_id, workspace_id, environment, timeout=10
+    )
     _activate_accessible(row, workspace_id, environment)
-    window = _find_accessible(WINDOW_TITLE, timeout=10)
-    inspector_heading = _find_accessible(
-        "作業領域インスペクタ", root=window, timeout=15
+    public_file = _find_workspace_inspector_control(
+        "public.txt", workspace_id, environment, timeout=15
     )
-    inspector = _accessible_scope_with_named_descendant(
-        inspector_heading, "public.txt"
-    )
-    public_file = _find_operable_accessible("public.txt", root=inspector, timeout=15)
+    _, inspector = _workspace_inspector_scope(workspace_id)
     initial_projection = _accessible_snapshot(inspector)
     tree_projection_evidence = _verify_workspace_projection(
         initial_projection,
@@ -2412,14 +2517,9 @@ def _run_installed_workspace_selection_acceptance(
         ),
     )
     _activate_accessible(public_file, "public.txt", environment)
+    _, inspector = _workspace_inspector_scope(workspace_id)
     _find_accessible(WORKSPACE_PUBLIC_CONTENT, root=inspector, timeout=15)
-    window = _find_accessible(WINDOW_TITLE, timeout=10)
-    inspector_heading = _find_accessible(
-        "作業領域インスペクタ", root=window, timeout=15
-    )
-    inspector = _accessible_scope_with_named_descendant(
-        inspector_heading, WORKSPACE_PUBLIC_CONTENT
-    )
+    _, inspector = _workspace_inspector_scope(workspace_id)
     projection = _accessible_snapshot(inspector)
     projection_evidence = _verify_workspace_projection(
         projection,
