@@ -1646,7 +1646,21 @@ def _select_folder_in_gtk_chooser(
     window_ids = visible.stdout.decode("ascii", errors="ignore").splitlines()
     if window_ids != [chooser_window_id]:
         raise RuntimeError("GTK folder chooser changed to an unexpected window")
-    row = _wait_for_gtk_folder_row(chooser, folder)
+    try:
+        row = _wait_for_gtk_folder_row(chooser, folder)
+    except RuntimeError as error:
+        screenshot_captured = (
+            _capture_gtk_dialog_screenshot(
+                environment,
+                "D4 Pocket 作業領域の選択",
+                screenshot_path,
+            )
+            if screenshot_path is not None
+            else False
+        )
+        raise RuntimeError(
+            f"{error}; screenshot_captured={screenshot_captured}"
+        ) from None
     screenshot_before_selection_captured = (
         _capture_gtk_dialog_screenshot(
             environment,
@@ -1835,6 +1849,7 @@ def _gtk_folder_chooser_diagnostics(chooser, folder: Path) -> dict[str, object]:
     header_bounds = []
     table_bounds = []
     target_entries = []
+    visible_row_entries = []
     for node, accessible_name in _accessible_nodes(chooser):
         try:
             role = str(node.getRoleName())
@@ -1846,6 +1861,22 @@ def _gtk_folder_chooser_diagnostics(chooser, folder: Path) -> dict[str, object]:
         if role == "table" and bounds is not None and len(table_bounds) < 3:
             table_bounds.append(bounds)
         text = _accessible_text(node)
+        if (
+            role in {"table cell", "list item", "icon", "text"}
+            and bounds is not None
+            and bounds[1] >= 120
+            and len(visible_row_entries) < 20
+        ):
+            visible_row_entries.append(
+                {
+                    "role": role,
+                    "name_exact": accessible_name.strip() == folder.name,
+                    "text_exact": text.strip() == folder.name,
+                    "name_contains": folder.name in accessible_name,
+                    "text_contains": folder.name in text,
+                    "bounds": bounds,
+                }
+            )
         if (
             role in {"table cell", "list item", "icon", "text"}
             and bounds is not None
@@ -1893,6 +1924,7 @@ def _gtk_folder_chooser_diagnostics(chooser, folder: Path) -> dict[str, object]:
         "focused_roles": focused_roles,
         "visible_header_bounds": header_bounds,
         "visible_table_bounds": table_bounds,
+        "visible_row_entries": visible_row_entries,
         "target_entries": target_entries,
     }
 

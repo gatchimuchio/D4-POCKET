@@ -1841,6 +1841,7 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                 "focused_roles": [],
                 "visible_header_bounds": [],
                 "visible_table_bounds": [],
+                "visible_row_entries": [],
                 "target_entries": [],
             },
         )
