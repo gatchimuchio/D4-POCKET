@@ -916,4 +916,63 @@ void main() {
         hasLength(greaterThanOrEqualTo(3)));
     await tester.pumpWidget(const SizedBox());
   });
+
+  testWidgets('親画面のactive切替後にOwner承認をBrokerから再取得する',
+      (tester) async {
+    final pendingApproval = Completer<void>();
+    final broker = TestBroker()
+      ..approval = null
+      ..visibility = 'none'
+      ..pendingApproval = pendingApproval;
+    final client = WorkspaceClient(broker);
+    var active = true;
+    Widget buildHarness() => MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: WorkspaceInspector(
+                client: client,
+                active: active,
+              ),
+            ),
+          ),
+        );
+
+    await tester.pumpWidget(buildHarness());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('workspace-a'));
+    await tester.pumpAndSettle();
+    final visibility = find.byType(DropdownButton<String>).last;
+    await tester.ensureVisible(visibility);
+    await tester.tap(visibility);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('full').last);
+    await tester.pumpAndSettle();
+    final approve = find.text('native Owner確認でWorkspace読取を許可');
+    await tester.ensureVisible(approve);
+    await tester.tap(approve);
+    await tester.pump();
+
+    active = false;
+    await tester.pumpWidget(buildHarness());
+    await tester.pump();
+    expect(find.text('workspace-a'), findsNothing);
+    active = true;
+    await tester.pumpWidget(buildHarness());
+    await tester.pumpAndSettle();
+    expect(find.text('workspace-a'), findsOneWidget);
+    expect(find.text('現在のWorkspace読取範囲: full・Task実行／書込権は別です。'),
+        findsNothing);
+
+    final listCountBeforeApproval =
+        broker.operations.where((operation) => operation == '作業領域一覧').length;
+    pendingApproval.complete();
+    await tester.pumpAndSettle();
+
+    expect(find.text('現在のWorkspace読取範囲: full・Task実行／書込権は別です。'),
+        findsOneWidget);
+    expect(broker.operations.where((operation) => operation == '作業領域一覧'),
+        hasLength(greaterThan(listCountBeforeApproval)));
+    expect(broker.operations, isNot(contains('作業領域ツリー')));
+    await tester.pumpWidget(const SizedBox());
+  });
 }
