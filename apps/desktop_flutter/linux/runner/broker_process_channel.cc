@@ -59,8 +59,9 @@ bool has_workspace_picker_prefix(const std::string& frame) {
 }
 
 void secure_clear(std::string* value) {
+  if (value == nullptr || value->empty()) return;
   volatile unsigned char* bytes =
-      reinterpret_cast<volatile unsigned char*>(value->data());
+      reinterpret_cast<volatile unsigned char*>(&(*value)[0]);
   for (size_t index = 0; index < value->size(); ++index) bytes[index] = 0;
   value->clear();
 }
