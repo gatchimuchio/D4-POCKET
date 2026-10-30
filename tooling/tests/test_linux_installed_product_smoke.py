@@ -54,6 +54,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _trigger_update_action_from_installed_ui,
     _wait_for_catalog_fetch_status,
     _wait_for_gtk_dialog_closed,
+    _write_linux_workspace_acceptance_fixture,
     _wayland_launch_environment,
     MCP_OWNER_ARGUMENT_HASH_MARKER,
     MCP_OWNER_NO_CREDENTIAL_MARKER,
@@ -1289,6 +1290,44 @@ class LinuxEditableTextAncestorTests(unittest.TestCase):
 
 
 class LinuxInstalledDesktopEntryTests(unittest.TestCase):
+    def test_workspace_fixture_is_a_home_child_with_sibling_outside_target(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            acceptance_root = Path(directory) / "acceptance"
+            home = acceptance_root / "home"
+            acceptance_root.mkdir()
+            home.mkdir()
+
+            fixture_root, workspace, decoy, cli_fixture, cli_marker = (
+                _write_linux_workspace_acceptance_fixture(acceptance_root, home)
+            )
+
+            self.assertEqual(fixture_root, home / "workspace-picker")
+            self.assertEqual(workspace, fixture_root / "selected-workspace")
+            self.assertEqual(decoy, fixture_root / "decoy-workspace")
+            self.assertEqual(workspace.parent.parent, home)
+            alias = workspace / "external-alias.txt"
+            self.assertTrue(alias.is_symlink())
+            self.assertEqual(
+                alias.resolve(), fixture_root / "outside-root" / "external.txt"
+            )
+            self.assertTrue(cli_fixture.is_file())
+            self.assertEqual(cli_marker.parent, acceptance_root)
+
+    def test_workspace_fixture_rejects_symlinked_isolated_home(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            acceptance_root = root / "acceptance"
+            outside_home = root / "outside-home"
+            acceptance_root.mkdir()
+            outside_home.mkdir()
+            home_link = acceptance_root / "home"
+            home_link.symlink_to(outside_home, target_is_directory=True)
+
+            with self.assertRaisesRegex(RuntimeError, "direct isolated child"):
+                _write_linux_workspace_acceptance_fixture(
+                    acceptance_root, home_link
+                )
+
     def test_gtk_dialog_screenshot_is_private_and_uses_bounded_window_geometry(self) -> None:
         environment = {"DISPLAY": ":99"}
         with tempfile.TemporaryDirectory() as directory:
@@ -1449,16 +1488,19 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                         timeout=0,
                     )
 
-    def test_folder_chooser_selects_exact_workspace_row_from_parent_then_accepts(self) -> None:
+    def test_folder_chooser_navigates_from_home_by_exact_folder_rows_then_accepts(self) -> None:
         from unittest.mock import call
 
-        environment = {"DISPLAY": ":99"}
         with tempfile.TemporaryDirectory() as directory:
-            folder = Path(directory) / "selected-workspace"
-            folder.mkdir()
-            parent_posix = str(folder.parent).replace("\\", "/")
+            home = Path(directory) / "home"
+            picker_root = home / "workspace-picker"
+            folder = picker_root / "selected-workspace"
+            folder.mkdir(parents=True)
+            environment = {"DISPLAY": ":99", "HOME": str(home)}
             chooser = object()
-            row = object()
+            home_control = object()
+            picker_row = object()
+            workspace_row = object()
             accept = object()
             visible = subprocess.CompletedProcess(
                 args=[], returncode=0, stdout=b"0x42\n", stderr=b""
@@ -1466,37 +1508,32 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             with (
                 patch(
                     "tooling.tests.linux_installed_product_smoke.subprocess.run",
-                    side_effect=(None, None, None, None, None, visible),
+                    side_effect=(None, visible, visible),
                 ) as run,
                 patch(
                     "tooling.tests.linux_installed_product_smoke._find_accessible",
                     return_value=chooser,
                 ),
                 patch(
-                    "tooling.tests.linux_installed_product_smoke._wait_for_gtk_location",
-                    return_value=True,
-                ) as wait_for_location,
+                    "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
+                    side_effect=(home_control, accept),
+                ) as find_operable,
                 patch(
-                    "tooling.tests.linux_installed_product_smoke._gtk_location_entry_value",
-                    return_value=parent_posix,
-                ),
+                    "tooling.tests.linux_installed_product_smoke._activate_accessible"
+                ) as activate,
                 patch(
                     "tooling.tests.linux_installed_product_smoke._wait_for_gtk_folder_row",
-                    return_value=row,
+                    side_effect=(picker_row, workspace_row),
                 ) as find_row,
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._double_click_accessible_by_coordinates"
+                ) as double_click,
                 patch(
                     "tooling.tests.linux_installed_product_smoke._click_accessible_by_coordinates"
                 ) as click_row,
                 patch(
                     "tooling.tests.linux_installed_product_smoke._wait_for_gtk_folder_row_selected"
                 ) as wait_selected,
-                patch(
-                    "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
-                    return_value=accept,
-                ) as find_operable,
-                patch(
-                    "tooling.tests.linux_installed_product_smoke._activate_accessible"
-                ) as activate,
                 patch(
                     "tooling.tests.linux_installed_product_smoke._wait_for_gtk_dialog_closed"
                 ) as wait_closed,
@@ -1507,18 +1544,13 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             [entry.args[0] for entry in run.call_args_list],
             [
                 ["xdotool", "windowactivate", "--sync", "0x42"],
-                ["xdotool", "key", "--clearmodifiers", "ctrl+l"],
-                ["xdotool", "key", "--clearmodifiers", "ctrl+a"],
                 [
                     "xdotool",
-                    "type",
-                    "--clearmodifiers",
-                    "--delay",
-                    "1",
-                    "--",
-                    folder.parent.as_posix() + "/.",
+                    "search",
+                    "--onlyvisible",
+                    "--name",
+                    "^D4 Pocket 作業領域の選択$",
                 ],
-                ["xdotool", "key", "--clearmodifiers", "Return"],
                 [
                     "xdotool",
                     "search",
@@ -1529,17 +1561,30 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             ],
         )
         self.assertEqual(
-            wait_for_location.call_args_list,
-            [call(chooser, folder.parent)],
-        )
-        find_row.assert_called_once_with(chooser, folder)
-        click_row.assert_called_once_with(row, "Workspace folder row", environment)
-        wait_selected.assert_called_once_with(chooser, folder)
-        self.assertEqual(
             find_operable.call_args_list,
-            [call("選択", root=chooser, timeout=10, exact=True)],
+            [
+                call("Home", root=chooser, timeout=10, exact=True),
+                call("選択", root=chooser, timeout=10, exact=True),
+            ],
         )
-        activate.assert_called_once_with(accept, "選択", environment)
+        self.assertEqual(
+            activate.call_args_list,
+            [
+                call(home_control, "Home", environment),
+                call(accept, "選択", environment),
+            ],
+        )
+        self.assertEqual(
+            find_row.call_args_list,
+            [call(chooser, picker_root), call(chooser, folder)],
+        )
+        double_click.assert_called_once_with(
+            picker_row, "Workspace picker root row", environment
+        )
+        click_row.assert_called_once_with(
+            workspace_row, "Workspace folder row", environment
+        )
+        wait_selected.assert_called_once_with(chooser, folder)
         wait_closed.assert_called_once_with(
             environment,
             "D4 Pocket 作業領域の選択",
@@ -1547,119 +1592,85 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             timeout=2,
         )
 
-    def test_folder_chooser_clears_autocompleted_workspace_child_before_parent_navigation(self) -> None:
-        environment = {"DISPLAY": ":99"}
+    def test_folder_chooser_fails_closed_if_exact_workspace_row_is_missing(self) -> None:
+        from unittest.mock import call
+
         with tempfile.TemporaryDirectory() as directory:
-            folder = Path(directory) / "selected-workspace"
-            folder.mkdir()
-            parent_posix = str(folder.parent).replace("\\", "/")
+            home = Path(directory) / "home"
+            picker_root = home / "workspace-picker"
+            folder = picker_root / "selected-workspace"
+            folder.mkdir(parents=True)
+            environment = {"DISPLAY": ":99", "HOME": str(home)}
             chooser = object()
-            row = object()
-            accept = object()
+            home_control = object()
+            picker_row = object()
             visible = subprocess.CompletedProcess(
                 args=[], returncode=0, stdout=b"0x42\n", stderr=b""
             )
             with (
                 patch(
                     "tooling.tests.linux_installed_product_smoke.subprocess.run",
-                    side_effect=(None, None, None, None, None, None, visible),
-                ) as run,
+                    side_effect=(None, visible, visible),
+                ),
                 patch(
                     "tooling.tests.linux_installed_product_smoke._find_accessible",
                     return_value=chooser,
                 ),
                 patch(
-                    "tooling.tests.linux_installed_product_smoke._wait_for_gtk_location",
-                    return_value=True,
-                ) as wait_for_location,
-                patch(
-                    "tooling.tests.linux_installed_product_smoke._gtk_location_entry_value",
-                    return_value=f"{parent_posix}/{folder.name}",
-                ),
+                    "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
+                    return_value=home_control,
+                ) as find_operable,
                 patch(
                     "tooling.tests.linux_installed_product_smoke._wait_for_gtk_folder_row",
-                    return_value=row,
+                    side_effect=(picker_row, RuntimeError("exact row absent")),
                 ),
                 patch(
-                    "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
-                    return_value=accept,
+                    "tooling.tests.linux_installed_product_smoke._double_click_accessible_by_coordinates"
+                ),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._gtk_folder_chooser_diagnostics",
+                    return_value={"bounded": True},
                 ),
                 patch(
                     "tooling.tests.linux_installed_product_smoke._click_accessible_by_coordinates"
-                ),
-                patch(
-                    "tooling.tests.linux_installed_product_smoke._wait_for_gtk_folder_row_selected"
-                ),
-                patch("tooling.tests.linux_installed_product_smoke._activate_accessible"),
-                patch(
-                    "tooling.tests.linux_installed_product_smoke._wait_for_gtk_dialog_closed"
-                ),
-            ):
-                _select_folder_in_gtk_chooser(environment, "0x42", folder)
-
-        self.assertEqual(
-            run.call_args_list[4].args[0],
-            [
-                "xdotool",
-                "key",
-                "--clearmodifiers",
-                "BackSpace",
-            ],
-        )
-        self.assertEqual(
-            run.call_args_list[3].args[0][-1], folder.parent.as_posix() + "/."
-        )
-        self.assertEqual(
-            wait_for_location.call_args_list,
-            [call(chooser, folder.parent), call(chooser, folder.parent)],
-        )
-
-    def test_folder_chooser_fails_closed_if_workspace_row_is_not_visible(self) -> None:
-        environment = {"DISPLAY": ":99"}
-        with tempfile.TemporaryDirectory() as directory:
-            folder = Path(directory) / "selected-workspace"
-            folder.mkdir()
-            parent_posix = str(folder.parent).replace("\\", "/")
-            chooser = object()
-            visible = subprocess.CompletedProcess(
-                args=[], returncode=0, stdout=b"0x42\n", stderr=b""
-            )
-            with (
-                patch(
-                    "tooling.tests.linux_installed_product_smoke.subprocess.run",
-                    side_effect=(None, None, None, None, None, visible),
-                ),
-                patch(
-                    "tooling.tests.linux_installed_product_smoke._find_accessible",
-                    return_value=chooser,
-                ),
-                patch(
-                    "tooling.tests.linux_installed_product_smoke._gtk_location_entry_value",
-                    return_value=parent_posix,
-                ),
-                patch(
-                    "tooling.tests.linux_installed_product_smoke._wait_for_gtk_location",
-                    return_value=True,
-                ),
-                patch(
-                    "tooling.tests.linux_installed_product_smoke._wait_for_gtk_folder_row",
-                    side_effect=RuntimeError("exact row absent"),
-                ),
-                patch(
-                    "tooling.tests.linux_installed_product_smoke._find_operable_accessible"
-                ) as find_accept,
+                ) as click_row,
             ):
                 with self.assertRaisesRegex(RuntimeError, "exact row absent"):
                     _select_folder_in_gtk_chooser(environment, "0x42", folder)
-        find_accept.assert_not_called()
+
+        find_operable.assert_called_once_with(
+            "Home", root=chooser, timeout=10, exact=True
+        )
+        click_row.assert_called_once_with(home_control, "Home", environment)
+
+    def test_folder_chooser_rejects_workspace_outside_isolated_home(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            outside = Path(directory) / "outside" / "selected-workspace"
+            home.mkdir()
+            outside.mkdir(parents=True)
+            with patch(
+                "tooling.tests.linux_installed_product_smoke.subprocess.run"
+            ) as run:
+                with self.assertRaisesRegex(RuntimeError, "HOME直下"):
+                    _select_folder_in_gtk_chooser(
+                        {"DISPLAY": ":99", "HOME": str(home)}, "0x42", outside
+                    )
+        run.assert_not_called()
 
     def test_folder_chooser_uses_exact_control_coordinates_if_action_does_not_close(self) -> None:
-        environment = {"DISPLAY": ":99"}
+        from unittest.mock import call
+
         with tempfile.TemporaryDirectory() as directory:
-            folder = Path(directory) / "selected-workspace"
-            folder.mkdir()
+            home = Path(directory) / "home"
+            picker_root = home / "workspace-picker"
+            folder = picker_root / "selected-workspace"
+            folder.mkdir(parents=True)
+            environment = {"DISPLAY": ":99", "HOME": str(home)}
             chooser = object()
-            row = object()
+            home_control = object()
+            picker_row = object()
+            workspace_row = object()
             accept = object()
             visible = subprocess.CompletedProcess(
                 args=[], returncode=0, stdout=b"0x42\n", stderr=b""
@@ -1667,33 +1678,26 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             with (
                 patch(
                     "tooling.tests.linux_installed_product_smoke.subprocess.run",
-                    side_effect=(None, None, None, None, None, visible),
+                    side_effect=(None, visible, visible),
                 ),
                 patch(
                     "tooling.tests.linux_installed_product_smoke._find_accessible",
                     return_value=chooser,
                 ),
                 patch(
-                    "tooling.tests.linux_installed_product_smoke._wait_for_gtk_location",
-                    return_value=True,
+                    "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
+                    side_effect=(home_control, accept),
                 ),
-                patch(
-                    "tooling.tests.linux_installed_product_smoke._gtk_location_entry_value",
-                    return_value=str(folder.parent).replace("\\", "/"),
-                ),
+                patch("tooling.tests.linux_installed_product_smoke._activate_accessible"),
                 patch(
                     "tooling.tests.linux_installed_product_smoke._wait_for_gtk_folder_row",
-                    return_value=row,
+                    side_effect=(picker_row, workspace_row),
+                ),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._double_click_accessible_by_coordinates"
                 ),
                 patch(
                     "tooling.tests.linux_installed_product_smoke._wait_for_gtk_folder_row_selected"
-                ),
-                patch(
-                    "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
-                    return_value=accept,
-                ),
-                patch(
-                    "tooling.tests.linux_installed_product_smoke._activate_accessible"
                 ),
                 patch(
                     "tooling.tests.linux_installed_product_smoke._click_accessible_by_coordinates"
@@ -1708,7 +1712,7 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
         self.assertEqual(
             coordinate_click.call_args_list,
             [
-                call(row, "Workspace folder row", environment),
+                call(workspace_row, "Workspace folder row", environment),
                 call(accept, "選択", environment),
             ],
         )
@@ -1769,37 +1773,6 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                 _gtk_location_entry_value(object()), "/tmp/selected-workspace"
             )
 
-    def test_folder_chooser_does_not_treat_navigation_into_folder_as_selection(self) -> None:
-        environment = {"DISPLAY": ":99"}
-        with tempfile.TemporaryDirectory() as directory:
-            folder = Path(directory) / "selected-workspace"
-            folder.mkdir()
-            closed = subprocess.CompletedProcess(
-                args=[], returncode=1, stdout=b"", stderr=b""
-            )
-            with (
-                patch(
-                    "tooling.tests.linux_installed_product_smoke.subprocess.run",
-                    side_effect=(None, None, None, None, None, closed),
-                ) as run,
-                patch(
-                    "tooling.tests.linux_installed_product_smoke._find_accessible"
-                ) as find_accessible,
-                patch(
-                    "tooling.tests.linux_installed_product_smoke._gtk_location_entry_value",
-                    return_value=str(folder.parent).replace("\\", "/"),
-                ),
-                patch(
-                    "tooling.tests.linux_installed_product_smoke._wait_for_gtk_location",
-                    return_value=True,
-                ),
-            ):
-                with self.assertRaisesRegex(RuntimeError, "closed before the exact Workspace row"):
-                    _select_folder_in_gtk_chooser(environment, "0x42", folder)
-
-        self.assertEqual(len(run.call_args_list), 6)
-        find_accessible.assert_called_once_with("D4 Pocket 作業領域の選択", timeout=10)
-
     def test_folder_chooser_diagnostics_emit_only_bounded_state(self) -> None:
         from types import SimpleNamespace
 
@@ -1855,15 +1828,28 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                 return state == 1
 
         class Node:
-            name = "selected-workspace"
+            def __init__(self, role: str, name: str, bounds) -> None:
+                self.role = role
+                self.name = name
+                self.bounds = bounds
 
             def getRoleName(self) -> str:
-                return "table cell"
+                return self.role
 
             def getState(self):
                 return State()
 
-        node = Node()
+        table = Node("table", "", (675, 76, 514, 729))
+        header = Node("table column header", "Name", (675, 76, 514, 25))
+        node = Node("table cell", "selected-workspace", (690, 103, 130, 18))
+        sidebar = Node("list item", "selected-workspace", (93, 147, 581, 36))
+        nodes = [
+            (table, ""),
+            (header, "Name"),
+            (node, "selected-workspace"),
+            (sidebar, "selected-workspace"),
+        ]
+        bounds = {item: item.bounds for item, _ in nodes}
         with (
             patch.dict(
                 "sys.modules",
@@ -1871,11 +1857,11 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             ),
             patch(
                 "tooling.tests.linux_installed_product_smoke._accessible_nodes",
-                return_value=[(node, "selected-workspace")],
+                side_effect=lambda _root: iter(nodes),
             ),
             patch(
                 "tooling.tests.linux_installed_product_smoke._accessible_component_bounds",
-                return_value=(700, 180, 130, 24),
+                side_effect=lambda item: bounds.get(item),
             ),
             patch(
                 "tooling.tests.linux_installed_product_smoke._accessible_text",
@@ -1895,16 +1881,27 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                 return state == 1
 
         class Node:
-            name = "selected-workspace"
+            def __init__(self, role: str, bounds) -> None:
+                self.role = role
+                self.bounds = bounds
 
             def getRoleName(self) -> str:
-                return "table cell"
+                return self.role
 
             def getState(self):
                 return State()
 
-        first = Node()
-        second = Node()
+        table = Node("table", (675, 76, 514, 729))
+        header = Node("table column header", (675, 76, 514, 25))
+        first = Node("table cell", (700, 120, 130, 24))
+        second = Node("table cell", (700, 160, 130, 24))
+        nodes = [
+            (table, ""),
+            (header, "Name"),
+            (first, "selected-workspace"),
+            (second, "selected-workspace"),
+        ]
+        bounds = {item: item.bounds for item, _ in nodes}
         with (
             patch.dict(
                 "sys.modules",
@@ -1912,11 +1909,11 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             ),
             patch(
                 "tooling.tests.linux_installed_product_smoke._accessible_nodes",
-                return_value=[(first, "selected-workspace"), (second, "selected-workspace")],
+                side_effect=lambda _root: iter(nodes),
             ),
             patch(
                 "tooling.tests.linux_installed_product_smoke._accessible_component_bounds",
-                side_effect=((700, 180, 130, 24), (700, 220, 130, 24)),
+                side_effect=lambda item: bounds.get(item),
             ),
             patch(
                 "tooling.tests.linux_installed_product_smoke._accessible_text",

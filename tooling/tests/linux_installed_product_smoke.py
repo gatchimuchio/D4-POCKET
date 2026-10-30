@@ -450,6 +450,35 @@ def _click_accessible_by_coordinates(
         raise RuntimeError(f"GTK controlのAT-SPI座標clickに失敗しました: {name}")
 
 
+def _double_click_accessible_by_coordinates(
+    node, name: str, environment: dict[str, str]
+) -> None:
+    center = _component_center(node)
+    if center is None:
+        raise RuntimeError(f"AT-SPI controlに可視boundsがありません: {name}")
+    activated = subprocess.run(
+        [
+            "xdotool",
+            "mousemove",
+            "--sync",
+            str(center[0]),
+            str(center[1]),
+            "click",
+            "--repeat",
+            "2",
+            "--delay",
+            "100",
+            "1",
+        ],
+        env=environment,
+        capture_output=True,
+        check=False,
+        timeout=5,
+    )
+    if activated.returncode != 0:
+        raise RuntimeError(f"GTK folder rowのAT-SPI座標double-clickに失敗しました: {name}")
+
+
 def _accessible_descendants(root) -> list[tuple[object, str]]:
     return list(_accessible_nodes(root))
 
@@ -1363,6 +1392,27 @@ def _gtk_dialog_window_id(environment: dict[str, str], title: str) -> str:
     return window_ids[0]
 
 
+def _assert_gtk_chooser_open(environment: dict[str, str], window_id: str) -> None:
+    visible = subprocess.run(
+        [
+            "xdotool",
+            "search",
+            "--onlyvisible",
+            "--name",
+            "^D4 Pocket 作業領域の選択$",
+        ],
+        env=environment,
+        capture_output=True,
+        check=False,
+        timeout=5,
+    )
+    window_ids = visible.stdout.decode("ascii", errors="ignore").splitlines()
+    if visible.returncode != 0 or window_ids != [window_id]:
+        raise RuntimeError(
+            "フォルダー移動中にGTKの選択画面が閉じたか、別ウィンドウへ切り替わりました"
+        )
+
+
 def _capture_gtk_dialog_screenshot(
     environment: dict[str, str], title: str, destination: Path
 ) -> bool:
@@ -1537,118 +1587,43 @@ def _select_folder_in_gtk_chooser(
 ) -> None:
     if not folder.is_absolute() or not folder.is_dir() or folder.is_symlink():
         raise RuntimeError("GTK chooserへ渡すtest directoryが不正です")
-    parent = folder.parent
-    expected_parent = _normalize_gtk_path(str(parent))
+    home_root = Path(environment.get("HOME", ""))
+    try:
+        resolved_home = home_root.resolve(strict=True)
+        resolved_picker_root = folder.parent.parent.resolve(strict=True)
+    except (OSError, RuntimeError):
+        raise RuntimeError(
+            "GTKの選択試験用directoryが隔離HOME外です"
+        ) from None
+    if (
+        not home_root.is_absolute()
+        or home_root.is_symlink()
+        or resolved_home != home_root
+        or resolved_picker_root != resolved_home
+    ):
+        raise RuntimeError(
+            "GTKの選択試験用directoryは隔離HOME直下のpicker直下workspaceに限ります"
+        )
+
     subprocess.run(
         ["xdotool", "windowactivate", "--sync", chooser_window_id],
         env=environment,
         check=True,
         timeout=5,
     )
-    subprocess.run(
-        ["xdotool", "key", "--clearmodifiers", "ctrl+l"],
-        env=environment,
-        check=True,
-        timeout=5,
-    )
-    subprocess.run(
-        ["xdotool", "key", "--clearmodifiers", "ctrl+a"],
-        env=environment,
-        check=True,
-        timeout=5,
-    )
-    subprocess.run(
-        [
-            "xdotool",
-            "type",
-            "--clearmodifiers",
-            "--delay",
-            "1",
-            "--",
-            parent.as_posix() + "/.",
-        ],
-        env=environment,
-        check=True,
-        timeout=5,
-    )
     chooser = _find_accessible("D4 Pocket 作業領域の選択", timeout=10)
-    location_value = _gtk_location_entry_value(chooser)
-    current_location = (
-        _normalize_gtk_path(location_value)
-        if location_value is not None
-        else None
+
+    home_control = _find_operable_accessible(
+        "Home", root=chooser, timeout=10, exact=True
     )
-    completion_cleared = False
-    if current_location != expected_parent:
-        if (
-            current_location is not None
-            and posixpath.dirname(current_location) == expected_parent
-        ):
-            subprocess.run(
-                ["xdotool", "key", "--clearmodifiers", "BackSpace"],
-                env=environment,
-                check=True,
-                timeout=5,
-            )
-            completion_cleared = True
-        if not _wait_for_gtk_location(chooser, parent):
-            diagnostics = _gtk_folder_chooser_diagnostics(chooser, folder)
-            diagnostics.update(
-                {
-                    "workspace_parent_path_confirmed": False,
-                    "autocomplete_completion_cleared": completion_cleared,
-                }
-            )
-            screenshot_captured = (
-                _capture_gtk_dialog_screenshot(
-                    environment,
-                    "D4 Pocket 作業領域の選択",
-                    screenshot_path,
-                )
-                if screenshot_path is not None
-                else False
-            )
-            diagnostics["screenshot_captured"] = screenshot_captured
-            raise RuntimeError(
-                "GTK chooser did not confirm the exact Workspace parent before navigation; "
-                f"bounded_state={diagnostics}"
-            )
-    subprocess.run(
-        ["xdotool", "key", "--clearmodifiers", "Return"],
-        env=environment,
-        check=True,
-        timeout=5,
-    )
-    if not _wait_for_gtk_location(chooser, parent):
-        diagnostics = _gtk_folder_chooser_diagnostics(chooser, folder)
-        diagnostics["workspace_parent_path_confirmed"] = False
-        raise RuntimeError(
-            "GTK chooser did not remain at the exact Workspace parent after navigation; "
-            f"bounded_state={diagnostics}"
-        )
-    visible = subprocess.run(
-        [
-            "xdotool",
-            "search",
-            "--onlyvisible",
-            "--name",
-            "^D4 Pocket 作業領域の選択$",
-        ],
-        env=environment,
-        capture_output=True,
-        check=False,
-        timeout=5,
-    )
-    if visible.returncode != 0:
-        raise RuntimeError(
-            "GTK chooser closed before the exact Workspace row was selected"
-        )
-    window_ids = visible.stdout.decode("ascii", errors="ignore").splitlines()
-    if window_ids != [chooser_window_id]:
-        raise RuntimeError("GTK folder chooser changed to an unexpected window")
+    _activate_accessible(home_control, "Home", environment)
+    _assert_gtk_chooser_open(environment, chooser_window_id)
+
     try:
-        row = _wait_for_gtk_folder_row(chooser, folder)
+        picker_row = _wait_for_gtk_folder_row(chooser, folder.parent)
     except RuntimeError as error:
+        diagnostics = _gtk_folder_chooser_diagnostics(chooser, folder)
+        diagnostics["navigation_stage"] = "home_to_picker_root"
         screenshot_captured = (
             _capture_gtk_dialog_screenshot(
                 environment,
@@ -1659,8 +1634,32 @@ def _select_folder_in_gtk_chooser(
             else False
         )
         raise RuntimeError(
-            f"{error}; screenshot_captured={screenshot_captured}"
+            f"{error}; bounded_state={diagnostics}; screenshot_captured={screenshot_captured}"
         ) from None
+
+    _double_click_accessible_by_coordinates(
+        picker_row, "Workspace picker root row", environment
+    )
+    _assert_gtk_chooser_open(environment, chooser_window_id)
+
+    try:
+        row = _wait_for_gtk_folder_row(chooser, folder)
+    except RuntimeError as error:
+        diagnostics = _gtk_folder_chooser_diagnostics(chooser, folder)
+        diagnostics["navigation_stage"] = "picker_root_to_workspace"
+        screenshot_captured = (
+            _capture_gtk_dialog_screenshot(
+                environment,
+                "D4 Pocket 作業領域の選択",
+                screenshot_path,
+            )
+            if screenshot_path is not None
+            else False
+        )
+        raise RuntimeError(
+            f"{error}; bounded_state={diagnostics}; screenshot_captured={screenshot_captured}"
+        ) from None
+
     screenshot_before_selection_captured = (
         _capture_gtk_dialog_screenshot(
             environment,
@@ -1709,7 +1708,7 @@ def _select_folder_in_gtk_chooser(
         )
         diagnostics.update(
             {
-                "selection_target_source": "verified_exact_location",
+                "selection_target_source": "verified_home_navigation_and_exact_visible_row",
                 "screenshot_before_selection_captured": (
                     screenshot_before_selection_captured
                 ),
@@ -1722,8 +1721,50 @@ def _select_folder_in_gtk_chooser(
         ) from None
 
 
+def _gtk_file_list_region(chooser) -> tuple[int, int, int, int, int] | None:
+    table_bounds = []
+    header_bottoms = []
+    for node, _ in _accessible_nodes(chooser):
+        try:
+            role = str(node.getRoleName())
+        except Exception:
+            continue
+        bounds = _accessible_component_bounds(node)
+        if bounds is None:
+            continue
+        if role == "table":
+            table_bounds.append(bounds)
+        elif role == "table column header":
+            header_bottoms.append(bounds[1] + bounds[3])
+    if len(table_bounds) != 1 or not header_bottoms:
+        return None
+    x, y, width, height = table_bounds[0]
+    rows_top = max(y, max(header_bottoms))
+    if width <= 0 or height <= 0 or rows_top >= y + height:
+        return None
+    return (x, y, width, height, rows_top)
+
+
+def _gtk_bounds_are_in_file_list(
+    bounds: tuple[int, int, int, int], region: tuple[int, int, int, int, int] | None
+) -> bool:
+    if region is None:
+        return False
+    x, y, width, height = bounds
+    table_x, table_y, table_width, table_height, rows_top = region
+    center_x = x + width // 2
+    center_y = y + height // 2
+    return (
+        table_x <= center_x < table_x + table_width
+        and rows_top <= center_y < table_y + table_height
+    )
+
+
 def _gtk_folder_row_candidates(chooser, folder: Path) -> list[object]:
     role_priority = {"table cell": 0, "list item": 1, "icon": 2, "text": 3}
+    region = _gtk_file_list_region(chooser)
+    if region is None:
+        return []
     candidates = []
     for node, accessible_name in _accessible_nodes(chooser):
         try:
@@ -1733,7 +1774,7 @@ def _gtk_folder_row_candidates(chooser, folder: Path) -> list[object]:
         if role not in role_priority:
             continue
         bounds = _accessible_component_bounds(node)
-        if bounds is None or bounds[1] < 120:
+        if bounds is None or not _gtk_bounds_are_in_file_list(bounds, region):
             continue
         text = _accessible_text(node).strip()
         if accessible_name.strip() != folder.name and text != folder.name:
@@ -1850,6 +1891,7 @@ def _gtk_folder_chooser_diagnostics(chooser, folder: Path) -> dict[str, object]:
     table_bounds = []
     target_entries = []
     visible_row_entries = []
+    file_list_region = _gtk_file_list_region(chooser)
     for node, accessible_name in _accessible_nodes(chooser):
         try:
             role = str(node.getRoleName())
@@ -1864,7 +1906,7 @@ def _gtk_folder_chooser_diagnostics(chooser, folder: Path) -> dict[str, object]:
         if (
             role in {"table cell", "list item", "icon", "text"}
             and bounds is not None
-            and bounds[1] >= 120
+            and _gtk_bounds_are_in_file_list(bounds, file_list_region)
             and len(visible_row_entries) < 20
         ):
             visible_row_entries.append(
@@ -1880,7 +1922,7 @@ def _gtk_folder_chooser_diagnostics(chooser, folder: Path) -> dict[str, object]:
         if (
             role in {"table cell", "list item", "icon", "text"}
             and bounds is not None
-            and bounds[1] >= 120
+            and _gtk_bounds_are_in_file_list(bounds, file_list_region)
             and (
                 accessible_name.strip() == folder.name
                 or text.strip() == folder.name
@@ -2001,14 +2043,21 @@ def _verify_workspace_projection(
 
 def _write_linux_workspace_acceptance_fixture(
     acceptance_root: Path,
+    isolated_home: Path,
 ) -> tuple[Path, Path, Path, Path, Path]:
-    fixture_root = acceptance_root / "workspace-fixture-source"
-    picker_root = fixture_root / "workspace-picker"
-    workspace = picker_root / "selected-workspace"
+    resolved_acceptance_root = acceptance_root.resolve(strict=True)
+    resolved_home = isolated_home.resolve(strict=True)
+    if (
+        isolated_home.is_symlink()
+        or resolved_home != isolated_home
+        or resolved_home.parent != resolved_acceptance_root
+    ):
+        raise RuntimeError("Workspace acceptance HOME must be a direct isolated child")
+    fixture_root = isolated_home / "workspace-picker"
+    workspace = fixture_root / "selected-workspace"
     outside_root = fixture_root / "outside-root"
     decoy_workspace = fixture_root / "decoy-workspace"
     fixture_root.mkdir(mode=0o700)
-    picker_root.mkdir(mode=0o700)
     workspace.mkdir(mode=0o700)
     outside_root.mkdir(mode=0o700)
     decoy_workspace.mkdir(mode=0o700)
@@ -2131,7 +2180,9 @@ def _run_installed_workspace_selection_acceptance(
     screenshot_path: Path,
 ) -> dict[str, object]:
     fixture_root, workspace, decoy_workspace, cli_fixture, cli_marker = (
-        _write_linux_workspace_acceptance_fixture(acceptance_root)
+        _write_linux_workspace_acceptance_fixture(
+            acceptance_root, Path(environment["HOME"])
+        )
     )
     workspace_id = "workspace-linux-installed-acceptance"
     secret_paths = "private/token.txt"
