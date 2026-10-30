@@ -203,6 +203,13 @@ jobs:
             printf -- '- Scope: Ubuntu 24.04 hosted Xvfb／X11, unsigned test-identity installed product, and automated AT-SPI／keyboard input. This proves the installed MCP stdio／Tool metadata and hash-only result path for a local synthetic server only; no external provider／credential injection, non-X11 desktop session, Wayland rendering, production signing／distribution, or full Linux product completion.\n'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Linux Broker Workspace Inspector Owner経路をRust試験で確認
+        if: ${{ inputs.acceptance_scope == 'workspace_selection' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --manifest-path native/rust_helper/Cargo.toml --lib workspace_inspector -- --nocapture
+
       - name: installed GTK UIでWorkspace OS選択／secret boundaryを受入れる
         if: ${{ inputs.acceptance_scope == 'workspace_selection' }}
         shell: bash

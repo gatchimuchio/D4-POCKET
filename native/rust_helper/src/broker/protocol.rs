@@ -1982,7 +1982,7 @@ impl Broker {
                     | BrokerOperation::製品アンインストール要求
             )
         );
-        // Linux資格情報入力／Linux・MacのMCP操作／Mac限定操作の別個native Owner確認だけ。
+        // Linux資格情報入力／Workspace Inspector／Linux・MacのMCP操作の別個native Owner確認だけ。
         // 試験専用Ownerへ追加しない。
         let operation_is_allowlisted = operation_is_allowlisted
             || (cfg!(target_os = "linux")
@@ -1992,6 +1992,9 @@ impl Broker {
                         BrokerOperation::資格情報登録
                             | BrokerOperation::MCP接続
                             | BrokerOperation::MCP切断
+                            | BrokerOperation::作業領域承認
+                            | BrokerOperation::作業領域失効
+                            | BrokerOperation::作業領域全体基準点保存
                     )
                 ));
         let operation_is_allowlisted = operation_is_allowlisted
@@ -6011,8 +6014,8 @@ mod tests {
     }
 
     #[test]
-    #[cfg(any(windows, target_os = "macos"))]
-    fn macos_workspace_inspector_broker入口は通常要求と未登録scopeを拒否する() {
+    #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
+    fn desktop_workspace_inspector_broker入口は通常要求と未登録scopeを拒否する() {
         for operation in ["作業領域承認", "作業領域失効", "作業領域全体基準点保存"]
         {
             let mut payload = json!({"作業領域ID":"unregistered-workspace", "登録hash":format!("sha256:{}", "a".repeat(64))});
@@ -6034,7 +6037,7 @@ mod tests {
             fs::remove_dir_all(&store).expect("Workspace入口fixtureを削除");
             assert_eq!(
                 confirmed.error.unwrap().code,
-                if cfg!(target_os = "macos") {
+                if cfg!(any(target_os = "macos", target_os = "linux")) {
                     "作業領域拒否"
                 } else {
                     "desktop_owner_operation_invalid"
@@ -6042,6 +6045,115 @@ mod tests {
             );
             assert!(confirmed.body.is_none());
         }
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn linux_workspace_inspector_owner確認は登録Workspaceだけを承認する() {
+        let store = temp_store_dir("linux-workspace-inspector-owner");
+        let broker_store = store.join("broker");
+        fs::create_dir_all(&broker_store).unwrap();
+        let workspace_root = store.join("workspace");
+        fs::create_dir_all(&workspace_root).unwrap();
+        fs::write(workspace_root.join("result.txt"), "workspace fixture").unwrap();
+
+        let mut broker = persistent_test_broker(&broker_store);
+        broker
+            .実行系登録(
+                "runtime-linux-owner-test",
+                Arc::new(crate::adapters::minidora::MinidoraAdapter::new("127.0.0.1:9").unwrap()),
+            )
+            .unwrap();
+        broker
+            .作業領域登録(
+                "runtime-linux-owner-test",
+                "workspace-linux-owner-test",
+                cap_std::fs::Dir::open_ambient_dir(&workspace_root, cap_std::ambient_authority())
+                    .unwrap(),
+                &[],
+            )
+            .unwrap();
+
+        let request = |request_id: &str, nonce: &str, operation: &str, payload: Value| {
+            json!({
+                "request_id": request_id,
+                "session_id": "session-1",
+                "nonce": nonce,
+                "issued_at": "2026-06-01T00:00:30Z",
+                "operation": operation,
+                "metadata": {"client": "desktop_flutter"},
+                "payload_hash": canonical_payload_hash(Some(&payload)),
+                "payload": payload,
+            })
+        };
+
+        let initial_list = request(
+            "linux-workspace-owner-list-before",
+            "linux-workspace-owner-list-before-nonce",
+            "作業領域一覧",
+            json!({}),
+        );
+        let initial_list =
+            broker.handle(BrokerRequestEnvelope::from_json_str(&initial_list.to_string()).unwrap());
+        assert_eq!(initial_list.status, BrokerStatus::Accepted);
+        let registration_hash = initial_list.body.unwrap()["作業領域"][0]["登録hash"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        let approval_payload = json!({
+            "作業領域ID": "workspace-linux-owner-test",
+            "登録hash": registration_hash,
+            "表示範囲": "full",
+        });
+
+        let unconfirmed = request(
+            "linux-workspace-owner-unconfirmed",
+            "linux-workspace-owner-unconfirmed-nonce",
+            "作業領域承認",
+            approval_payload.clone(),
+        );
+        let unconfirmed =
+            broker.handle(BrokerRequestEnvelope::from_json_str(&unconfirmed.to_string()).unwrap());
+        assert_eq!(
+            unconfirmed.error.unwrap().code,
+            "desktop_native_owner_confirmation_required"
+        );
+
+        let confirmed = request(
+            "linux-workspace-owner-confirmed",
+            "linux-workspace-owner-confirmed-nonce",
+            "作業領域承認",
+            approval_payload,
+        );
+        let confirmed = broker.desktop_owner_operation_json(&confirmed.to_string());
+        assert_eq!(confirmed.status, BrokerStatus::Accepted);
+        let approved_body = confirmed.body.unwrap();
+        assert_eq!(approved_body["作業領域ID"], "workspace-linux-owner-test");
+        assert_eq!(approved_body["表示範囲"], "full");
+        assert_eq!(approved_body["capability_id"], "workspace.inspect");
+        let approval_id = approved_body["approval_id"].as_str().unwrap();
+
+        let after_list = request(
+            "linux-workspace-owner-list-after",
+            "linux-workspace-owner-list-after-nonce",
+            "作業領域一覧",
+            json!({}),
+        );
+        let after_list =
+            broker.handle(BrokerRequestEnvelope::from_json_str(&after_list.to_string()).unwrap());
+        assert_eq!(after_list.status, BrokerStatus::Accepted);
+        let registered = &after_list.body.unwrap()["作業領域"][0];
+        assert_eq!(registered["承認状態"], "approved");
+        assert_eq!(registered["表示範囲"], "full");
+        assert_eq!(registered["approval_id"], approval_id);
+        assert!(broker.audit_events().iter().any(|event| {
+            event.request_id == "linux-workspace-owner-confirmed"
+                && event.operation == "作業領域承認"
+                && event.decision == "recorded"
+        }));
+
+        drop(broker);
+        fs::remove_dir_all(&store).expect("Linux Workspace Owner fixtureを削除");
     }
 
     #[test]

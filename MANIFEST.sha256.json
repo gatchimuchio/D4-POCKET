@@ -76,7 +76,7 @@
     },
     {
       "path": ".github/workflows/linux-manual-export-build.yml",
-      "sha256": "30a714b3dbe598a7c8f0a50a45d351d99e7b031fba22ff8014ded0c5435069dc"
+      "sha256": "a18f002427a12fd5ace111e7ed92dfcb737f647d9fa599aadeb7cd2f796b4ed6"
     },
     {
       "path": ".github/workflows/linux-manual-rust-validation.yml",
@@ -172,7 +172,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "d2c51f040bbc87bdfd2f42067b97dcdccf2c258649744978eb982a8ce55309bc"
+      "sha256": "f732af1263497b6db40b6b349e8ea0fd85790b9ffc6a4cfcaf19e547693097bf"
     },
     {
       "path": "SECURITY.md",
@@ -320,7 +320,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/workspace_inspector.dart",
-      "sha256": "d8cc35e9533561b1e40bc033f2b4989307e6c0e72066f2a7079f6b6dcc748f7b"
+      "sha256": "a7c03bd0a733e9debd39f79696f5b954a5949dc207d28bc9e3e5b160bf75dfff"
     },
     {
       "path": "apps/desktop_flutter/lib/services/a2a_connection_client.dart",
@@ -720,7 +720,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/workspace_inspector_test.dart",
-      "sha256": "ae0cbd63c0c4baf33001d861ab9c0cedb1a1859fe4a7115928cd399412b94f56"
+      "sha256": "6a1b77542f1a7b4ed251345372ce8072b1b02c3a2ec7497dca300fa48a73a43f"
     },
     {
       "path": "apps/desktop_flutter/tool/content_live_client.dart",
@@ -1352,7 +1352,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "3575bf8f520b645c6a21c9d61352e037d9ad49b02e64176a3eb30978f7700168"
+      "sha256": "c31f35df95c3a460df4076059e79b71ed9f8be687df420ab74057de342604fb2"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -3684,7 +3684,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "8f786b9003b656e8697a191cab2eb950d15ddb7e021990660629aac0ec97e001"
+      "sha256": "9818800f0f8b789c5bc91b86fc12b6c2ea58f4a2b86ef553675b2de5605831a4"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -5092,7 +5092,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "da4b6dd504efbb387c1715119b3b69675bc9797c03385924ac7307230471b620"
+      "sha256": "2dc24cd187a7ee178bab0f4ec4e0ea9ccb1287269e27331993f4aea0c1f9da4b"
     },
     {
       "path": "tooling/conformance_tests/test_final_development_audit.py",
@@ -5260,7 +5260,7 @@
     },
     {
       "path": "tooling/tests/linux_installed_product_smoke.py",
-      "sha256": "ecff8c7b3bed9f6be9309d29455152db435c84a86010f302fa211e755dfdf809"
+      "sha256": "c326be5b42fd64ac6d94ef808af39ed572ad44ae03982c9e2788fd0701831eec"
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",
@@ -5272,7 +5272,7 @@
     },
     {
       "path": "tooling/tests/test_linux_installed_product_smoke.py",
-      "sha256": "e8060006d2dee680e6fd633a53c7e40c1bd1a3292676ed8bb1d5fb5e7a04c428"
+      "sha256": "b2b221fc685ac21e026ce40dea55adbd8db698911eb8d54725e7df5eeb2f0ad0"
     },
     {
       "path": "tooling/tests/test_linux_product_package.py",
