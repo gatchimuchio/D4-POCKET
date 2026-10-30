@@ -1565,7 +1565,7 @@ def _select_folder_in_gtk_chooser(
             "--delay",
             "1",
             "--",
-            str(parent),
+            parent.as_posix() + "/.",
         ],
         env=environment,
         check=True,
@@ -1847,11 +1847,17 @@ def _gtk_folder_chooser_diagnostics(chooser, folder: Path) -> dict[str, object]:
             table_bounds.append(bounds)
         text = _accessible_text(node)
         if (
-            accessible_name.strip() == folder.name
-            or text.strip() == folder.name
-            or folder.name in accessible_name
-            or folder.name in text
-        ) and len(target_entries) < 4:
+            role in {"table cell", "list item", "icon", "text"}
+            and bounds is not None
+            and bounds[1] >= 120
+            and (
+                accessible_name.strip() == folder.name
+                or text.strip() == folder.name
+                or folder.name in accessible_name
+                or folder.name in text
+            )
+            and len(target_entries) < 4
+        ):
             parent = _accessible_parent(node)
             try:
                 parent_role = str(parent.getRoleName()) if parent is not None else "none"

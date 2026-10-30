@@ -1516,7 +1516,7 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                     "--delay",
                     "1",
                     "--",
-                    str(folder.parent),
+                    folder.parent.as_posix() + "/.",
                 ],
                 ["xdotool", "key", "--clearmodifiers", "Return"],
                 [
@@ -1606,7 +1606,9 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                 "BackSpace",
             ],
         )
-        self.assertEqual(run.call_args_list[3].args[0][-1], str(folder.parent))
+        self.assertEqual(
+            run.call_args_list[3].args[0][-1], folder.parent.as_posix() + "/."
+        )
         self.assertEqual(
             wait_for_location.call_args_list,
             [call(chooser, folder.parent), call(chooser, folder.parent)],

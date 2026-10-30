@@ -12103,7 +12103,7 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
         "def _gtk_folder_chooser_diagnostics(",
         '"broker_unavailable" in snapshot',
         '["xdotool", "key", "--clearmodifiers", "ctrl+a"]',
-        '"--",\n            str(parent),',
+        '"--",\n            parent.as_posix() + "/.",',
         '["xdotool", "key", "--clearmodifiers", "Return"]',
         "_wait_for_gtk_location(chooser, parent)",
         "def _gtk_folder_row_candidates(",
