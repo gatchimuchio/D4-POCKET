@@ -1696,8 +1696,8 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
         self.assertIs(find_scope.call_args.args[0], heading)
         self.assertEqual(find_scope.call_args.args[1], "workspace-a")
 
-    def test_workspace_inspector_scope_reuses_existing_window_accessible(self) -> None:
-        window, heading, inspector = object(), object(), object()
+    def test_workspace_inspector_scope_anchors_to_registered_workspace_row(self) -> None:
+        window, registration, inspector = object(), object(), object()
         with (
             patch(
                 "tooling.tests.linux_installed_product_smoke.time.monotonic",
@@ -1705,7 +1705,7 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             ),
             patch(
                 "tooling.tests.linux_installed_product_smoke._find_accessible",
-                return_value=heading,
+                return_value=registration,
             ) as find,
             patch(
                 "tooling.tests.linux_installed_product_smoke._accessible_scope_with_named_descendant",
@@ -1719,13 +1719,13 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
         self.assertIs(actual_window, window)
         self.assertIs(actual_scope, inspector)
         find.assert_called_once_with(
-            "作業領域インスペクタ",
+            "workspace-a",
             root=window,
             timeout=3.0,
             max_depth=20,
         )
-        self.assertIs(find_scope.call_args.args[0], heading)
-        self.assertEqual(find_scope.call_args.args[1], "workspace-a")
+        self.assertIs(find_scope.call_args.args[0], registration)
+        self.assertEqual(find_scope.call_args.args[1], "登録状態を更新")
 
     def test_workspace_inspector_scope_keeps_window_scoped_fallback(self) -> None:
         window, heading, inspector = object(), object(), object()

@@ -696,14 +696,14 @@ def _workspace_inspector_scope(
 ):
     deadline = time.monotonic() + timeout
     if root is not None:
-        heading = _find_accessible(
-            "作業領域インスペクタ",
+        registration = _find_accessible(
+            workspace_id,
             root=root,
             timeout=min(3.0, timeout),
             max_depth=20,
         )
         inspector = _accessible_scope_with_named_descendant(
-            heading, workspace_id, deadline=deadline
+            registration, "登録状態を更新", deadline=deadline
         )
         return root, inspector
 
