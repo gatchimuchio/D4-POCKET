@@ -25,7 +25,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _component_center,
     _capture_gtk_dialog_screenshot,
     _gtk_folder_chooser_diagnostics,
-    _gtk_folder_entry,
+    _gtk_location_entry_value,
     _credential_scan_file_role,
     _desktop_entry_targets_fixed_launcher,
     _enter_single_installed_mcp_tool_arguments,
@@ -1447,7 +1447,7 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                         timeout=0,
                     )
 
-    def test_folder_chooser_navigates_parent_then_selects_exact_workspace_row(self) -> None:
+    def test_folder_chooser_navigates_to_exact_workspace_then_accepts_current_location(self) -> None:
         from unittest.mock import call
 
         environment = {"DISPLAY": ":99"}
@@ -1469,8 +1469,9 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                     return_value=chooser,
                 ),
                 patch(
-                    "tooling.tests.linux_installed_product_smoke._select_gtk_folder_entry"
-                ) as select_folder_entry,
+                    "tooling.tests.linux_installed_product_smoke._wait_for_gtk_location",
+                    return_value=True,
+                ) as wait_for_location,
                 patch(
                     "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
                     return_value=accept,
@@ -1497,7 +1498,7 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                     "--delay",
                     "1",
                     "--",
-                    str(folder.parent) + os.sep,
+                    str(folder),
                 ],
                 ["xdotool", "key", "--clearmodifiers", "Return"],
                 [
@@ -1509,7 +1510,7 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                 ],
             ],
         )
-        select_folder_entry.assert_called_once_with(chooser, folder, environment)
+        wait_for_location.assert_called_once_with(chooser, folder)
         self.assertEqual(
             find_operable.call_args_list,
             [call("選択", root=chooser, timeout=10, exact=True)],
@@ -1542,7 +1543,8 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                     return_value=chooser,
                 ),
                 patch(
-                    "tooling.tests.linux_installed_product_smoke._select_gtk_folder_entry"
+                    "tooling.tests.linux_installed_product_smoke._wait_for_gtk_location",
+                    return_value=True,
                 ),
                 patch(
                     "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
@@ -1572,7 +1574,7 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             "AT-SPI action and exact-control coordinate fallback",
         )
 
-    def test_gtk_folder_entry_ignores_path_text_and_matches_visible_table_row(self) -> None:
+    def test_gtk_location_entry_value_reads_editable_absolute_path(self) -> None:
         class Node:
             def __init__(self, name: str, role: str, bounds, text: str = "") -> None:
                 self.name = name
@@ -1599,10 +1601,12 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
 
                 return SimpleNamespace(getText=lambda _start, _end: self.text)
 
-        table = Node("", "table", (600, 80, 500, 600))
-        path = Node("", "text", (650, 30, 400, 30), "/tmp/selected-workspace/private/")
-        row = Node("selected-workspace", "table cell", (650, 120, 180, 28))
-        nodes = [(table, ""), (path, ""), (row, "selected-workspace")]
+            def queryEditableText(self):
+                return object()
+
+        path = Node("", "text", (650, 0, 490, 34), "/tmp/selected-workspace")
+        unrelated = Node("", "text", (650, 160, 400, 30), "/tmp/not-a-location-entry")
+        nodes = [(path, ""), (unrelated, "")]
         with (
             patch(
                 "tooling.tests.linux_installed_product_smoke._accessible_nodes",
@@ -1613,8 +1617,8 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                 side_effect=lambda node: node.bounds,
             ),
         ):
-            self.assertIs(
-                _gtk_folder_entry(object(), Path("/tmp/selected-workspace")), row
+            self.assertEqual(
+                _gtk_location_entry_value(object()), "/tmp/selected-workspace"
             )
 
     def test_folder_chooser_accepts_location_entry_return(self) -> None:
@@ -1646,7 +1650,7 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
         wait_closed.assert_called_once_with(
             environment,
             "D4 Pocket 作業領域の選択",
-            action="path入力",
+            action="absolute Workspace path entry",
         )
         find_accessible.assert_not_called()
         click.assert_not_called()
@@ -1683,6 +1687,7 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             diagnostics,
             {
                 "parent_path_visible": True,
+                "location_entry_matches_requested_folder": False,
                 "folder_name_visible": False,
                 "selected_accessible_count": 1,
                 "common_roles": [("table cell", 1)],

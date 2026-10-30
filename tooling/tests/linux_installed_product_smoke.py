@@ -8,6 +8,7 @@ import hashlib
 import hmac
 import json
 import os
+import posixpath
 import re
 import secrets
 import shutil
@@ -1463,78 +1464,43 @@ def _wait_for_gtk_dialog_closed(
     raise RuntimeError(f"GTK OS選択dialogが{action}後も閉じませんでした")
 
 
-def _gtk_folder_list_bounds(chooser) -> tuple[int, int, int, int] | None:
-    tables = []
+def _gtk_location_entry_value(chooser) -> str | None:
+    """GTK chooser上部の編集可能な絶対path欄を一意に読む。"""
+    candidates = []
     for node, _ in _accessible_nodes(chooser):
         try:
-            if str(node.getRoleName()) != "table":
-                continue
+            node.queryEditableText()
         except Exception:
             continue
         bounds = _accessible_component_bounds(node)
-        if bounds is not None:
-            tables.append(bounds)
-    return max(tables, key=lambda value: value[2] * value[3]) if tables else None
-
-
-def _gtk_folder_entry(chooser, folder: Path):
-    """親directoryの一覧内にある、名前が完全一致するfolder entryだけを返す。"""
-    table = _gtk_folder_list_bounds(chooser)
-    if table is None:
+        value = _accessible_text(node).strip()
+        if (
+            bounds is None
+            or bounds[1] >= 120
+            or bounds[2] < 100
+            or not value.startswith("/")
+            or len(value) > 4096
+        ):
+            continue
+        candidates.append((bounds[2], value))
+    if not candidates:
         return None
-    table_x, table_y, table_width, table_height = table
-    table_right = table_x + table_width
-    table_bottom = table_y + table_height
-    allowed_roles = {"icon", "list item", "table cell", "table row", "text", "tree item"}
-    for node, accessible_name in _accessible_nodes(chooser):
-        try:
-            role = str(node.getRoleName())
-        except Exception:
-            continue
-        if role not in allowed_roles:
-            continue
-        if accessible_name.strip() != folder.name and _accessible_text(node).strip() != folder.name:
-            continue
-        bounds = _accessible_component_bounds(node)
-        if bounds is None:
-            continue
-        x, y, width, height = bounds
-        if x >= table_x and y >= table_y and x + width <= table_right and y + height <= table_bottom:
-            return node
-    return None
+    largest_width = max(width for width, _ in candidates)
+    widest = {value for width, value in candidates if width == largest_width}
+    return next(iter(widest)) if len(widest) == 1 else None
 
 
-def _gtk_accessible_selected(node) -> bool:
-    try:
-        import pyatspi
-    except ImportError:
-        return False
-    current = node
-    for _ in range(5):
-        if current is None:
-            break
-        try:
-            if current.getState().contains(pyatspi.STATE_SELECTED):
-                return True
-        except Exception:
-            pass
-        current = _accessible_parent(current)
-    return False
-
-
-def _select_gtk_folder_entry(
-    chooser, folder: Path, environment: dict[str, str]
-) -> None:
-    entry = _gtk_folder_entry(chooser, folder)
-    if entry is None:
-        raise RuntimeError("GTK chooserの親directory一覧に対象folder行がありません")
-    _click_accessible_by_coordinates(entry, folder.name, environment)
-    deadline = time.monotonic() + 2
+def _wait_for_gtk_location(chooser, folder: Path, timeout: float = 2) -> bool:
+    expected = posixpath.normpath(str(folder))
+    deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        if _gtk_accessible_selected(entry):
-            return
+        value = _gtk_location_entry_value(chooser)
+        if value is not None:
+            actual = posixpath.normpath(value)
+            if actual == expected:
+                return True
         time.sleep(0.1)
-    raise RuntimeError("GTK chooserの対象folder行が選択状態になりません")
+    return False
 
 
 def _workspace_root_field_value(dialog) -> str:
@@ -1593,7 +1559,7 @@ def _select_folder_in_gtk_chooser(
             "--delay",
             "1",
             "--",
-            str(folder.parent) + os.sep,
+            str(folder),
         ],
         env=environment,
         check=True,
@@ -1620,7 +1586,9 @@ def _select_folder_in_gtk_chooser(
     )
     if visible.returncode != 0:
         _wait_for_gtk_dialog_closed(
-            environment, "D4 Pocket 作業領域の選択", action="path入力"
+            environment,
+            "D4 Pocket 作業領域の選択",
+            action="absolute Workspace path entry",
         )
         return
     window_ids = visible.stdout.decode("ascii", errors="ignore").splitlines()
@@ -1636,9 +1604,7 @@ def _select_folder_in_gtk_chooser(
         if screenshot_before_selection_path is not None
         else False
     )
-    try:
-        _select_gtk_folder_entry(chooser, folder, environment)
-    except RuntimeError as error:
+    if not _wait_for_gtk_location(chooser, folder):
         diagnostics = _gtk_folder_chooser_diagnostics(chooser, folder)
         screenshot_captured = (
             _capture_gtk_dialog_screenshot(
@@ -1651,15 +1617,15 @@ def _select_folder_in_gtk_chooser(
         )
         diagnostics.update(
             {
-                "folder_row_selection_error": str(error),
+                "exact_location_unconfirmed": True,
                 "screenshot_before_selection_captured": screenshot_before_selection_captured,
                 "screenshot_captured": screenshot_captured,
             }
         )
         raise RuntimeError(
-            "GTK chooser did not expose and select the exact Workspace folder row; "
+            "GTK chooser did not navigate to the exact requested Workspace path; "
             f"bounded_state={diagnostics}"
-        ) from None
+        )
     accept = _find_operable_accessible("選択", root=chooser, timeout=10, exact=True)
     _activate_accessible(accept, "選択", environment)
     coordinate_fallback_used = False
@@ -1696,7 +1662,7 @@ def _select_folder_in_gtk_chooser(
         )
         diagnostics.update(
             {
-                "selection_target_source": "parent_directory_exact_row",
+                "selection_target_source": "verified_exact_location",
                 "screenshot_before_selection_captured": (
                     screenshot_before_selection_captured
                 ),
@@ -1711,6 +1677,11 @@ def _select_folder_in_gtk_chooser(
 
 def _gtk_folder_chooser_diagnostics(chooser, folder: Path) -> dict[str, object]:
     snapshot = _accessible_snapshot(chooser)
+    location_value = _gtk_location_entry_value(chooser)
+    location_matches = (
+        location_value is not None
+        and posixpath.normpath(location_value) == posixpath.normpath(str(folder))
+    )
     try:
         import pyatspi
     except ImportError:
@@ -1772,6 +1743,7 @@ def _gtk_folder_chooser_diagnostics(chooser, folder: Path) -> dict[str, object]:
             )
     return {
         "parent_path_visible": str(folder.parent) in snapshot,
+        "location_entry_matches_requested_folder": location_matches,
         "folder_name_visible": folder.name in snapshot,
         "selected_accessible_count": selected_count,
         "common_roles": common_roles,
