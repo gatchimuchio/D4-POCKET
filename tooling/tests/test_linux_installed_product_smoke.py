@@ -18,6 +18,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _activate_named_control_by_keyboard,
     _actionable_node,
     _accessible_nodes,
+    _atspi_desktop_failure_summary,
     _accessible_scope_with_named_descendant,
     _answer_owner_dialog,
     _bounded_owner_text_diagnostics,
@@ -1673,6 +1674,92 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
         )
         self.assertEqual(find_control.call_count, 2)
         scroll.assert_called_once_with({"DISPLAY": ":99"}, "0x42")
+
+    def test_workspace_inspector_failure_captures_only_the_named_product_window(self) -> None:
+        from pathlib import Path
+
+        destination = Path("/tmp/workspace-inspector-failure.png")
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke.time.monotonic",
+                side_effect=(1.0, 1.0),
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._visible_product_window",
+                return_value="0x42",
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._capture_gtk_dialog_screenshot",
+                return_value=True,
+            ) as capture,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._atspi_desktop_failure_summary",
+                return_value='{"status":"process_timeout"}',
+            ),
+            self.assertRaisesRegex(
+                RuntimeError,
+                "x11_window_visible=True; screenshot_captured=True",
+            ),
+        ):
+            _find_workspace_inspector_control(
+                "workspace-a",
+                "workspace-a",
+                {"DISPLAY": ":99"},
+                timeout=0,
+                diagnostic_screenshot_path=destination,
+            )
+
+        capture.assert_called_once_with(
+            {"DISPLAY": ":99"}, WINDOW_TITLE, destination
+        )
+
+    def test_atspi_failure_summary_is_bounded_and_drops_accessible_names(self) -> None:
+        payload = {
+            "status": "ok",
+            "elapsed_ms": 17,
+            "node_count": 1,
+            "targets": [True, False, True],
+            "nodes": [
+                {
+                    "depth": 1,
+                    "role": "frame",
+                    "children": 2,
+                    "name": "PRIVATE_PATH_SHOULD_NOT_ESCAPE",
+                }
+            ],
+        }
+        result = subprocess.CompletedProcess(
+            [], 0, json.dumps(payload).encode("utf-8"), b""
+        )
+        with patch(
+            "tooling.tests.linux_installed_product_smoke.subprocess.run",
+            return_value=result,
+        ) as run:
+            summary = _atspi_desktop_failure_summary(
+                {"DISPLAY": ":99"}, "workspace-a"
+            )
+
+        parsed = json.loads(summary)
+        self.assertEqual(parsed["targets"], {
+            "product_window": True,
+            "inspector_heading": False,
+            "workspace_id": True,
+        })
+        self.assertEqual(parsed["nodes"], [{"depth": 1, "role": "frame", "children": 2}])
+        self.assertNotIn("PRIVATE_PATH_SHOULD_NOT_ESCAPE", summary)
+        self.assertEqual(run.call_args.kwargs["timeout"], 3)
+        compile(run.call_args.args[0][2], "<atspi-diagnostic>", "exec")
+
+    def test_atspi_failure_summary_reports_timeout_without_partial_tree(self) -> None:
+        with patch(
+            "tooling.tests.linux_installed_product_smoke.subprocess.run",
+            side_effect=subprocess.TimeoutExpired([sys.executable], 3),
+        ) as run:
+            summary = _atspi_desktop_failure_summary(
+                {"DISPLAY": ":99"}, "workspace-a"
+            )
+        self.assertEqual(json.loads(summary), {"status": "process_timeout"})
+        self.assertEqual(run.call_args.kwargs["timeout"], 3)
 
     def test_product_page_scroll_uses_bounded_window_relative_coordinates(self) -> None:
         completed = subprocess.CompletedProcess([], 0, b"", b"")

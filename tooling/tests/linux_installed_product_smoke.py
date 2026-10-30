@@ -235,6 +235,114 @@ def _scroll_product_page_down(environment: dict[str, str], window_id: str) -> No
         raise RuntimeError("製品のWorkspace画面をscrollできません")
 
 
+def _atspi_desktop_failure_summary(
+    environment: dict[str, str], workspace_id: str
+) -> str:
+    """AT-SPI desktopの構造だけを別processで短時間・限定取得する。"""
+    targets = json.dumps(
+        [WINDOW_TITLE, "作業領域インスペクタ", workspace_id], ensure_ascii=True
+    )
+    script = f"""
+import json, time
+targets = {targets}
+started = time.monotonic()
+flags = [False, False, False]
+nodes = []
+status = "ok"
+try:
+    import pyatspi
+    pending = [(pyatspi.Registry.getDesktop(0), 0)]
+    while pending and len(nodes) < 64 and time.monotonic() - started < 2.0:
+        node, depth = pending.pop(0)
+        try:
+            name = node.name or ""
+        except Exception:
+            name = ""
+        for index, target in enumerate(targets):
+            flags[index] = flags[index] or name == target
+        try:
+            role = str(node.getRoleName())[:40]
+        except Exception:
+            role = "unknown"
+        try:
+            child_count = max(0, min(int(node.childCount), 64))
+        except Exception:
+            child_count = 0
+        nodes.append({{"depth": depth, "role": role, "children": child_count}})
+        if depth < 3:
+            for index in range(min(child_count, 64 - len(nodes))):
+                if time.monotonic() - started >= 2.0:
+                    break
+                try:
+                    pending.append((node.getChildAtIndex(index), depth + 1))
+                except Exception:
+                    continue
+    if pending:
+        status = "bounded"
+except Exception:
+    status = "error"
+    nodes = []
+print(json.dumps({{"status": status, "elapsed_ms": int((time.monotonic()-started)*1000),
+                  "node_count": len(nodes), "targets": flags, "nodes": nodes}}))
+"""
+    try:
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            env=environment,
+            capture_output=True,
+            check=False,
+            timeout=3,
+        )
+    except subprocess.TimeoutExpired:
+        return json.dumps({"status": "process_timeout"}, separators=(",", ":"))
+    if result.returncode != 0 or len(result.stdout) > 8192:
+        return json.dumps({"status": "process_error"}, separators=(",", ":"))
+    try:
+        payload = json.loads(result.stdout.decode("utf-8"))
+        if not isinstance(payload, dict):
+            raise ValueError("invalid payload")
+        status = payload.get("status")
+        if status not in {"ok", "bounded", "error"}:
+            raise ValueError("invalid status")
+        raw_nodes = payload.get("nodes", [])
+        if not isinstance(raw_nodes, list):
+            raise ValueError("invalid nodes")
+        nodes = []
+        for raw_node in raw_nodes[:64]:
+            if not isinstance(raw_node, dict):
+                continue
+            role = raw_node.get("role")
+            depth = raw_node.get("depth")
+            children = raw_node.get("children")
+            if (
+                isinstance(role, str)
+                and isinstance(depth, int)
+                and 0 <= depth <= 3
+                and isinstance(children, int)
+                and 0 <= children <= 64
+            ):
+                nodes.append(
+                    {"depth": depth, "role": role[:40], "children": children}
+                )
+        flags = payload.get("targets", [])
+        if not isinstance(flags, list) or len(flags) != 3:
+            flags = [False, False, False]
+        sanitized = {
+            "status": status,
+            "elapsed_ms": min(max(int(payload.get("elapsed_ms", 0)), 0), 3000),
+            "node_count": min(max(int(payload.get("node_count", 0)), 0), 64),
+            "targets": {
+                "product_window": flags[0] is True,
+                "inspector_heading": flags[1] is True,
+                "workspace_id": flags[2] is True,
+            },
+            "nodes": nodes,
+        }
+        return json.dumps(sanitized, ensure_ascii=True, separators=(",", ":"))
+    except (UnicodeError, json.JSONDecodeError, TypeError, ValueError):
+        return json.dumps({"status": "invalid_response"}, separators=(",", ":"))
+
+
 def _wayland_launch_environment(
     environment: dict[str, str], display: str
 ) -> dict[str, str]:
@@ -531,6 +639,7 @@ def _find_workspace_inspector_control(
     environment: dict[str, str],
     *,
     timeout: float = 60.0,
+    diagnostic_screenshot_path: Path | None = None,
 ):
     deadline = time.monotonic() + timeout
     last_error = "not observed"
@@ -569,11 +678,22 @@ def _find_workspace_inspector_control(
             scroll_steps += 1
         time.sleep(min(0.12, remaining))
 
+    visible_window_id = _visible_product_window(environment)
+    screenshot_captured = (
+        _capture_gtk_dialog_screenshot(
+            environment, WINDOW_TITLE, diagnostic_screenshot_path
+        )
+        if diagnostic_screenshot_path is not None
+        else False
+    )
+    atspi_summary = _atspi_desktop_failure_summary(environment, workspace_id)
     raise RuntimeError(
         "Workspace Inspector control did not become operable after bounded "
         f"page scrolling: control={name}; workspace_id={workspace_id}; "
         f"window_lookups={window_lookups}; scroll_steps={scroll_steps}; "
-        f"last_error={last_error}"
+        f"x11_window_visible={visible_window_id is not None}; "
+        f"screenshot_captured={screenshot_captured}; "
+        f"atspi_desktop={atspi_summary}; last_error={last_error}"
     )
 
 
@@ -2379,6 +2499,7 @@ def _run_installed_workspace_selection_acceptance(
     acceptance_root: Path,
     screenshot_before_selection_path: Path,
     screenshot_path: Path,
+    inspector_failure_screenshot_path: Path,
 ) -> dict[str, object]:
     fixture_root, workspace, decoy_workspace, cli_fixture, cli_marker = (
         _write_linux_workspace_acceptance_fixture(
@@ -2495,7 +2616,11 @@ def _run_installed_workspace_selection_acceptance(
     window = _find_accessible(WINDOW_TITLE, timeout=10)
     _find_accessible("Permission／Approval／Credential: 生成なし", root=window, timeout=10)
     row = _find_workspace_inspector_control(
-        workspace_id, workspace_id, environment, timeout=20
+        workspace_id,
+        workspace_id,
+        environment,
+        timeout=20,
+        diagnostic_screenshot_path=inspector_failure_screenshot_path,
     )
     _activate_accessible(row, workspace_id, environment)
     visibility = _find_workspace_inspector_control(
@@ -4361,6 +4486,9 @@ def run_installed_smoke(
                     ),
                     screenshot_path=(
                         temp_root / "workspace-chooser-after-selection.png"
+                    ),
+                    inspector_failure_screenshot_path=(
+                        temp_root / "workspace-inspector-failure.png"
                     ),
                 )
                 current_window_id = _visible_product_window(environment)
