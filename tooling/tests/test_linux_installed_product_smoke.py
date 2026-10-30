@@ -17,6 +17,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _activate_accessible,
     _activate_named_control_by_keyboard,
     _actionable_node,
+    _accessible_nodes,
     _accessible_scope_with_named_descendant,
     _answer_owner_dialog,
     _bounded_owner_text_diagnostics,
@@ -219,6 +220,23 @@ class AccessibleActionResolutionTests(unittest.TestCase):
             self.assertIs(
                 _find_operable_accessible("独立Appを書き出す", root=Root()), button
             )
+
+    def test_accessible_tree_traversal_stops_at_deadline(self) -> None:
+        class Root:
+            name = "root"
+            childCount = 1
+
+            def getChildAtIndex(self, index: int):
+                raise AssertionError("期限後の子要素を取得してはいけない")
+
+        with patch(
+            "tooling.tests.linux_installed_product_smoke.time.monotonic",
+            side_effect=(0.0, 1.0),
+        ):
+            observed = list(_accessible_nodes(Root(), deadline=1.0))
+
+        self.assertEqual(len(observed), 1)
+        self.assertEqual(observed[0][1], "root")
 
     def test_exact_operable_lookup_skips_dialog_title_substring(self) -> None:
         from types import SimpleNamespace

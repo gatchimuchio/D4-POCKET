@@ -251,11 +251,13 @@ def _wayland_launch_environment(
     return result
 
 
-def _accessible_nodes(root):
+def _accessible_nodes(root, *, deadline: float | None = None):
     """Installed UIの現在のAT-SPI treeをboundedに列挙する。"""
     pending = [root]
     visited = 0
     while pending and visited < 12000:
+        if deadline is not None and time.monotonic() >= deadline:
+            return
         node = pending.pop()
         visited += 1
         try:
@@ -263,9 +265,13 @@ def _accessible_nodes(root):
         except Exception:
             name = ""
         yield node, name
+        if deadline is not None and time.monotonic() >= deadline:
+            return
         try:
             count = min(node.childCount, 12000 - visited)
             for index in reversed(range(count)):
+                if deadline is not None and time.monotonic() >= deadline:
+                    return
                 try:
                     pending.append(node.getChildAtIndex(index))
                 except Exception:
@@ -284,7 +290,9 @@ def _find_accessible(name: str, *, root=None, timeout: float = 10.0):
     last_names: list[str] = []
     while time.monotonic() < deadline:
         search_root = root if root is not None else pyatspi.Registry.getDesktop(0)
-        for node, accessible_name in _accessible_nodes(search_root):
+        for node, accessible_name in _accessible_nodes(
+            search_root, deadline=deadline
+        ):
             if accessible_name == name or name in accessible_name:
                 return node
             if accessible_name and any(
@@ -375,16 +383,26 @@ def _accessible_parent(node):
 
 
 def _accessible_scope_with_named_descendant(
-    node, descendant_name: str, *, max_ancestors: int = 16
+    node,
+    descendant_name: str,
+    *,
+    max_ancestors: int = 16,
+    deadline: float | None = None,
 ):
     """見出しから昇り、指定要素を含む最小のAT-SPI部分木を返す。"""
     current = node
     for _ in range(max_ancestors + 1):
-        if any(
-            descendant_name in accessible_name
-            for _, accessible_name in _accessible_nodes(current)
-        ):
+        found = False
+        for _, accessible_name in _accessible_nodes(current, deadline=deadline):
+            if descendant_name in accessible_name:
+                found = True
+                break
+        if found:
             return current
+        if deadline is not None and time.monotonic() >= deadline:
+            raise RuntimeError(
+                f"AT-SPI部分木の検索期限切れ: {descendant_name}"
+            )
         parent = _accessible_parent(current)
         if parent is None or parent is current:
             break
@@ -472,15 +490,18 @@ def _find_operable_accessible(
     last_debug = "no matching AT-SPI node"
     while time.monotonic() < deadline:
         search_root = root if root is not None else pyatspi.Registry.getDesktop(0)
-        matches = [
-            node
-            for node, accessible_name in _accessible_nodes(search_root)
+        matches = []
+        for node, accessible_name in _accessible_nodes(
+            search_root, deadline=deadline
+        ):
             if (
                 accessible_name.strip() == name
                 if exact
                 else name in accessible_name.strip()
-            )
-        ]
+            ):
+                matches.append(node)
+        if not matches and time.monotonic() >= deadline:
+            last_debug = "AT-SPI tree traversal reached its deadline"
         for node in matches:
             actionable = _actionable_node(node)
             if actionable is not None:
@@ -520,7 +541,7 @@ def _find_workspace_inspector_control(
                 timeout=min(1.0, remaining),
             )
             inspector = _accessible_scope_with_named_descendant(
-                heading, workspace_id
+                heading, workspace_id, deadline=deadline
             )
             return _find_operable_accessible(
                 name, root=inspector, timeout=min(0.5, remaining)
