@@ -210,6 +210,13 @@ def _wayland_socket_connected(output: str, socket_path: Path) -> bool:
     )
 
 
+def _weston_backend_is_unsupported(backend_argument: str, output: str) -> bool:
+    return (
+        backend_argument == "--backend=headless"
+        and 'Error: unknown backend "headless"' in output
+    )
+
+
 def _start_wayland_compositor(
     runtime: Path, environment: dict[str, str], log_path: Path
 ) -> tuple[subprocess.Popen[bytes], str]:
@@ -227,45 +234,69 @@ def _start_wayland_compositor(
         "XDG_SESSION_TYPE",
     ):
         compositor_environment.pop(name, None)
-    with log_path.open("xb") as log:
-        compositor = subprocess.Popen(
-            [
-                "weston",
-                "--backend=headless",
-                "--renderer=pixman",
-                f"--socket={display_name}",
-            ],
-            env=compositor_environment,
-            stdin=subprocess.DEVNULL,
-            stdout=log,
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-        )
+    backend_arguments = ("--backend=headless", "--backend=headless-backend.so")
+    for attempt, backend_argument in enumerate(backend_arguments):
+        with log_path.open("xb" if attempt == 0 else "ab") as log:
+            compositor = subprocess.Popen(
+                [
+                    "weston",
+                    backend_argument,
+                    "--renderer=pixman",
+                    f"--socket={display_name}",
+                ],
+                env=compositor_environment,
+                stdin=subprocess.DEVNULL,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
 
-    deadline = time.monotonic() + 20
-    while time.monotonic() < deadline:
-        if compositor.poll() is not None:
+        deadline = time.monotonic() + 20
+        while time.monotonic() < deadline:
+            if compositor.poll() is not None:
+                try:
+                    output = log_path.read_bytes()[-4096:].decode(
+                        "utf-8", errors="replace"
+                    )
+                except OSError:
+                    output = ""
+                if _weston_backend_is_unsupported(backend_argument, output):
+                    if socket_path.exists() or socket_path.is_symlink():
+                        raise RuntimeError(
+                            "Westonのbackend拒否後にWayland endpointが残りました"
+                        )
+                    break
+                raise RuntimeError(
+                    _failure_with_runner_output(
+                        f"隔離Weston compositorが起動前に終了しました: {compositor.returncode}",
+                        log_path,
+                        runtime.parent,
+                    )
+                )
+            try:
+                socket_info = socket_path.lstat()
+            except FileNotFoundError:
+                time.sleep(0.1)
+                continue
+            if stat.S_ISSOCK(socket_info.st_mode):
+                print(f"Weston headless backend option: {backend_argument}")
+                return compositor, display_name
+            _terminate_group(compositor)
+            raise RuntimeError("Westonが通常Unix socket以外のWayland endpointを作成しました")
+
+        else:
+            _terminate_group(compositor)
             raise RuntimeError(
                 _failure_with_runner_output(
-                    f"隔離Weston compositorが起動前に終了しました: {compositor.returncode}",
+                    "隔離Weston compositorのWayland socketが時間内に作成されませんでした",
                     log_path,
                     runtime.parent,
                 )
             )
-        try:
-            socket_info = socket_path.lstat()
-        except FileNotFoundError:
-            time.sleep(0.1)
-            continue
-        if stat.S_ISSOCK(socket_info.st_mode):
-            return compositor, display_name
-        _terminate_group(compositor)
-        raise RuntimeError("Westonが通常Unix socket以外のWayland endpointを作成しました")
 
-    _terminate_group(compositor)
     raise RuntimeError(
         _failure_with_runner_output(
-            "隔離Weston compositorのWayland socketが時間内に作成されませんでした",
+            "Westonのheadless backend指定が全て拒否されました",
             log_path,
             runtime.parent,
         )

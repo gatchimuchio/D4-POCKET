@@ -9,6 +9,7 @@ from tooling.tests.linux_gtk_bundle_smoke import (
     _owned_product_groups,
     _request_x11_window_manager_close,
     _wayland_socket_connected,
+    _weston_backend_is_unsupported,
 )
 
 
@@ -58,6 +59,26 @@ class WaylandSocketSmokeTests(unittest.TestCase):
                 {20},
             )
         self.assertEqual(groups, {99, 110, 210})
+
+
+class WestonBackendCompatibilityTests(unittest.TestCase):
+    def test_retries_legacy_module_name_only_for_unknown_short_backend(self) -> None:
+        self.assertTrue(
+            _weston_backend_is_unsupported(
+                "--backend=headless", 'Error: unknown backend "headless"\n'
+            )
+        )
+        self.assertFalse(
+            _weston_backend_is_unsupported(
+                "--backend=headless", "fatal: failed to create compositor backend\n"
+            )
+        )
+        self.assertFalse(
+            _weston_backend_is_unsupported(
+                "--backend=headless-backend.so",
+                'Error: unknown backend "headless"\n',
+            )
+        )
 
 
 class X11WindowManagerCloseTests(unittest.TestCase):
