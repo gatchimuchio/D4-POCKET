@@ -54,6 +54,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _scroll_product_page_down,
     _wait_for_workspace_root_value,
     _workspace_root_field_value,
+    _workspace_inspector_scope,
     _editable_text_ancestor,
     _open_agent_center_from_installed_ui,
     _open_installed_codex_registration,
@@ -1618,22 +1619,12 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
 
     def test_workspace_inspector_control_retains_live_scope_while_scrolling(self) -> None:
         first_window, second_window = object(), object()
-        first_heading, second_heading = object(), object()
         first_scope, second_scope, control = object(), object(), object()
         with (
             patch(
-                "tooling.tests.linux_installed_product_smoke._find_accessible",
-                side_effect=(
-                    first_window,
-                    first_heading,
-                    second_window,
-                    second_heading,
-                ),
-            ) as find,
-            patch(
-                "tooling.tests.linux_installed_product_smoke._accessible_scope_with_named_descendant",
-                side_effect=(first_scope, second_scope),
-            ),
+                "tooling.tests.linux_installed_product_smoke._workspace_inspector_scope",
+                side_effect=((first_window, first_scope), (second_window, second_scope)),
+            ) as find_scope,
             patch(
                 "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
                 side_effect=(RuntimeError("not visible"), control),
@@ -1652,21 +1643,13 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             )
 
         self.assertIs(actual, control)
+        self.assertEqual(find_scope.call_count, 2)
         self.assertEqual(
-            [entry.args[0] for entry in find.call_args_list],
-            [
-                WINDOW_TITLE,
-                "作業領域インスペクタ",
-                WINDOW_TITLE,
-                "作業領域インスペクタ",
-            ],
+            [entry.args[0] for entry in find_scope.call_args_list],
+            ["workspace-a", "workspace-a"],
         )
-        self.assertIs(find.call_args_list[1].kwargs["root"], first_window)
-        self.assertIs(find.call_args_list[3].kwargs["root"], second_window)
-        self.assertEqual(find.call_args_list[0].kwargs["max_depth"], 4)
-        self.assertEqual(find.call_args_list[1].kwargs["max_depth"], 12)
         self.assertTrue(
-            all(0 < entry.kwargs["timeout"] <= 1 for entry in find.call_args_list)
+            all(0 < entry.kwargs["timeout"] <= 1 for entry in find_scope.call_args_list)
         )
         self.assertEqual(
             [entry.kwargs["root"] for entry in find_control.call_args_list],
@@ -1674,6 +1657,35 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
         )
         self.assertEqual(find_control.call_count, 2)
         scroll.assert_called_once_with({"DISPLAY": ":99"}, "0x42")
+
+    def test_workspace_inspector_scope_falls_back_to_heading_without_window_title(self) -> None:
+        heading, inspector = object(), object()
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke.time.monotonic",
+                side_effect=(1.0, 1.1),
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_accessible",
+                side_effect=(RuntimeError("window title missing"), heading),
+            ) as find,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._accessible_scope_with_named_descendant",
+                return_value=inspector,
+            ) as find_scope,
+        ):
+            window, actual = _workspace_inspector_scope(
+                "workspace-a", timeout=5
+            )
+
+        self.assertIsNone(window)
+        self.assertIs(actual, inspector)
+        self.assertEqual(find.call_args_list[0].args[0], WINDOW_TITLE)
+        self.assertEqual(find.call_args_list[1].args[0], "作業領域インスペクタ")
+        self.assertIsNone(find.call_args_list[1].kwargs.get("root"))
+        self.assertEqual(find.call_args_list[1].kwargs["max_depth"], 20)
+        self.assertIs(find_scope.call_args.args[0], heading)
+        self.assertEqual(find_scope.call_args.args[1], "workspace-a")
 
     def test_workspace_inspector_failure_captures_only_the_named_product_window(self) -> None:
         from pathlib import Path

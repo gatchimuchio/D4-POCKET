@@ -651,17 +651,8 @@ def _find_workspace_inspector_control(
             break
         try:
             window_lookups += 1
-            window = _find_accessible(
-                WINDOW_TITLE, timeout=min(2.0, remaining), max_depth=4
-            )
-            heading = _find_accessible(
-                "作業領域インスペクタ",
-                root=window,
-                timeout=min(1.0, remaining),
-                max_depth=12,
-            )
-            inspector = _accessible_scope_with_named_descendant(
-                heading, workspace_id, deadline=deadline
+            _, inspector = _workspace_inspector_scope(
+                workspace_id, timeout=min(3.0, remaining)
             )
             return _find_operable_accessible(
                 name, root=inspector, timeout=min(0.5, remaining)
@@ -698,11 +689,30 @@ def _find_workspace_inspector_control(
 
 
 def _workspace_inspector_scope(workspace_id: str, *, timeout: float = 15.0):
-    window = _find_accessible(WINDOW_TITLE, timeout=timeout)
-    heading = _find_accessible(
-        "作業領域インスペクタ", root=window, timeout=timeout
+    deadline = time.monotonic() + timeout
+    window = None
+    try:
+        window = _find_accessible(
+            WINDOW_TITLE, timeout=min(2.0, timeout), max_depth=4
+        )
+        heading = _find_accessible(
+            "作業領域インスペクタ",
+            root=window,
+            timeout=max(0.01, deadline - time.monotonic()),
+            max_depth=12,
+        )
+    except RuntimeError:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise
+        heading = _find_accessible(
+            "作業領域インスペクタ",
+            timeout=remaining,
+            max_depth=20,
+        )
+    inspector = _accessible_scope_with_named_descendant(
+        heading, workspace_id, deadline=deadline
     )
-    inspector = _accessible_scope_with_named_descendant(heading, workspace_id)
     return window, inspector
 
 
@@ -2627,7 +2637,7 @@ def _run_installed_workspace_selection_acceptance(
         "hash_only", workspace_id, environment, timeout=10
     )
     _activate_accessible(visibility, "hash_only", environment)
-    window = _find_accessible(WINDOW_TITLE, timeout=10)
+    window, _ = _workspace_inspector_scope(workspace_id, timeout=10)
     full = _find_operable_accessible("full", root=window, timeout=10)
     _activate_accessible(full, "full", environment)
     approve = _find_workspace_inspector_control(
