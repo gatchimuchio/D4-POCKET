@@ -1,5 +1,7 @@
 # GUI Shell ロードマップ
 
+作業追補（2026-10-30、Linux Workspace installed run #138 FAIL）: 候補commit `5c468c6dc0939c6ac9e646a71dfa964179081364` の手動Actions [run #138](https://github.com/gatchimuchio/D4-POCKET/actions/runs/41032860980)はLinux Release build／portable launcherまでPASSしたが、GTK chooserを閉じた後のWorkspace入力反映照合でFAILした。Owner確認・Workspace登録・secret boundaryへ未到達のため、#137で修正したInspector復帰経路は未検証。検査scriptがフォーム遷移前に取得したwindow参照から入力を一度だけ読み取っており、現在windowの再取得と完全一致の期限付き待機へ修正する。#138 FAILは保持する。次候補で同じinstalled受入れを再実行し、path反映が成立した場合に限りOwner／登録／secret boundaryへ進む。Linux native blocker、通常Release `task_execution=unsupported`、`release_ready=false`を維持する。詳細は[進捗記録](docs/REV5_PRODUCT_PROGRESS.md)。
+
 作業追補（2026-10-30、Linux Workspace installed run #137）: 候補commit `bffb4347838fd5884714f9ce0a1a9cf081f1095e` の手動Actions [run #137](https://github.com/gatchimuchio/D4-POCKET/actions/runs/41029333130)はLinux Release build／portable launcherまでPASSしたが、Workspace Inspectorの登録行取得でFAILした。native Owner確認後のFlutter lifecycle復帰時に登録一覧を消したまま再取得しない実装を根因として修正し、復帰時はBrokerの現在登録一覧だけを読み直して内容・承認を復元しない。回帰試験と同じinstalled受入れを次候補で実行する。Linux native blocker、通常Release `task_execution=unsupported`、`release_ready=false`を維持する。詳細は[進捗記録](docs/REV5_PRODUCT_PROGRESS.md)。
 
 作業追補（2026-10-30、Linux Workspace受入れ候補）: run #125はLinux build／初回起動PASS、GTK Workspace chooser FAIL。path入力後の確定漏れを受入れ手順側で修正し、現行main基底の候補で再検証する。Workspace境界の成立判断は未確定で、Linux native blockerと通常Release gateは維持する。詳しくは[進捗記録](docs/REV5_PRODUCT_PROGRESS.md)を参照。

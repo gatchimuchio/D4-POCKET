@@ -48,6 +48,8 @@ from tooling.tests.linux_installed_product_smoke import (
     _verify_credential_audit,
     _verify_live_audit,
     _verify_workspace_projection,
+    _wait_for_workspace_root_value,
+    _workspace_root_field_value,
     _editable_text_ancestor,
     _open_agent_center_from_installed_ui,
     _open_installed_codex_registration,
@@ -1516,6 +1518,64 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                         action=action,
                         timeout=0,
                     )
+
+    def test_workspace_root_value_reacquires_the_current_product_window(self) -> None:
+        window = object()
+        field = types.SimpleNamespace(queryEditableText=lambda: object())
+        expected = "/home/test/workspace"
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_accessible",
+                side_effect=(window, field),
+            ) as find,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._accessible_text",
+                return_value=expected,
+            ),
+        ):
+            actual = _workspace_root_field_value(timeout=2)
+
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            find.call_args_list,
+            [
+                call(WINDOW_TITLE, timeout=2),
+                call("Workspace rootの絶対path", root=window, timeout=2),
+            ],
+        )
+
+    def test_workspace_root_value_waits_for_exact_update_and_fails_closed(self) -> None:
+        expected = "/home/test/selected-workspace"
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._workspace_root_field_value",
+                side_effect=("/home/test/decoy-workspace", expected),
+            ) as read,
+            patch("tooling.tests.linux_installed_product_smoke.time.sleep") as sleep,
+        ):
+            _wait_for_workspace_root_value(expected, timeout=1)
+        self.assertEqual(read.call_count, 2)
+        sleep.assert_called_once()
+
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke.time.monotonic",
+                side_effect=(0.0, 0.0, 0.02),
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._workspace_root_field_value",
+                return_value="/home/test/decoy-workspace",
+            ),
+            patch("tooling.tests.linux_installed_product_smoke.time.sleep"),
+        ):
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "GTK chooser selection did not update the Workspace input.*"
+                "expected_basename=selected-workspace.*observed_basename=decoy-workspace",
+            ) as failure:
+                _wait_for_workspace_root_value(expected, timeout=0.01)
+        self.assertNotIn(expected, str(failure.exception))
+        self.assertNotIn("/home/test/decoy-workspace", str(failure.exception))
 
     def test_folder_chooser_navigates_from_home_by_exact_folder_rows_then_accepts(self) -> None:
         from unittest.mock import call

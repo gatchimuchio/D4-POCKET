@@ -1577,8 +1577,11 @@ def _wait_for_gtk_location(chooser, folder: Path, timeout: float = 2) -> bool:
     return False
 
 
-def _workspace_root_field_value(dialog) -> str:
-    node = _find_accessible("Workspace rootの絶対path", root=dialog, timeout=10)
+def _workspace_root_field_value(*, timeout: float = 10.0) -> str:
+    window = _find_accessible(WINDOW_TITLE, timeout=timeout)
+    node = _find_accessible(
+        "Workspace rootの絶対path", root=window, timeout=timeout
+    )
     for _ in range(7):
         try:
             node.queryEditableText()
@@ -1588,6 +1591,38 @@ def _workspace_root_field_value(dialog) -> str:
             if node is None:
                 break
     raise RuntimeError("Workspace root入力fieldの現在値を確認できません")
+
+
+def _wait_for_workspace_root_value(expected: str, *, timeout: float = 5.0) -> None:
+    deadline = time.monotonic() + timeout
+    observed: str | None = None
+    read_error: str | None = None
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        try:
+            observed = _workspace_root_field_value(timeout=min(0.5, remaining))
+            read_error = None
+            if observed == expected:
+                return
+        except RuntimeError as error:
+            read_error = type(error).__name__
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        time.sleep(min(0.1, remaining))
+
+    observed_basename = (
+        Path(observed).name if observed and observed.startswith("/") else "unavailable"
+    )
+    raise RuntimeError(
+        "GTK chooser selection did not update the Workspace input after bounded "
+        "fresh-window checks; "
+        f"expected_basename={Path(expected).name}; "
+        f"observed_basename={observed_basename}; "
+        f"field_read_error={read_error or 'none'}"
+    )
 
 
 def _open_workspace_folder_chooser(environment: dict[str, str], dialog) -> str:
@@ -2227,8 +2262,7 @@ def _run_installed_workspace_selection_acceptance(
     )
     chooser_window_id = _open_workspace_folder_chooser(environment, dialog)
     _cancel_gtk_folder_chooser(environment, chooser_window_id)
-    if _workspace_root_field_value(dialog) != str(decoy_workspace):
-        raise RuntimeError("GTK chooser cancellation did not preserve the existing Workspace input")
+    _wait_for_workspace_root_value(str(decoy_workspace))
     _find_accessible(
         "OS選択を取り消しました。入力は変更していません。",
         root=dialog,
@@ -2242,8 +2276,7 @@ def _run_installed_workspace_selection_acceptance(
         screenshot_before_selection_path=screenshot_before_selection_path,
         screenshot_path=screenshot_path,
     )
-    if _workspace_root_field_value(dialog) != str(workspace):
-        raise RuntimeError("GTK chooser selection did not update the Workspace input")
+    _wait_for_workspace_root_value(str(workspace))
     for diagnostic_path in (screenshot_before_selection_path, screenshot_path):
         if diagnostic_path.is_symlink():
             raise RuntimeError("successful GTK chooser left a symlink diagnostic image")
@@ -2287,8 +2320,7 @@ def _run_installed_workspace_selection_acceptance(
         screenshot_before_selection_path=screenshot_before_selection_path,
         screenshot_path=screenshot_path,
     )
-    if _workspace_root_field_value(dialog) != str(workspace):
-        raise RuntimeError("fresh GTK chooser selection is not the Workspace root sent for review")
+    _wait_for_workspace_root_value(str(workspace))
     continue_button = _find_operable_accessible(
         "native Owner確認へ進む", root=dialog, timeout=10
     )
