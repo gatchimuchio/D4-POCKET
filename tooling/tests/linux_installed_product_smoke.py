@@ -3305,11 +3305,13 @@ def _prepare_and_start_installed_agent_task(
         "許可",
         context="Agent Task一回Owner Approval",
         expected_summary_markers=(
-            "このAgent Taskの一回限りOwner Approvalを発行しますか？",
+            "このAgent Taskに一回限りのOwner Approvalを発行しますか？",
             f"Runtime ID: {runtime_id}",
+            f"Session ID: {session_id}",
             f"Workspace ID: {workspace_id}",
             "指示hash:",
-            "範囲: このSession・Workspace・指示hash・実行条件に限定",
+            "実行上限: 最大15分",
+            "Approvalは本文hashと現在の実行条件に束縛され",
         ),
     )
     _wait_for_owner_dialog_closed(environment)
