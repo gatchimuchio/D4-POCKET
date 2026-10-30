@@ -3273,12 +3273,118 @@ def _wait_for_installed_task_id(window, *, timeout: float) -> str:
     )
 
 
+def _wait_for_installed_task_result_or_terminal(
+    environment: dict[str, str], window, result_file: Path, *, timeout: float
+) -> str:
+    terminal_statuses = {"completed", "failed", "cancelled", "quarantined"}
+    deadline = time.monotonic() + timeout
+    next_refresh = 0.0
+    while time.monotonic() < deadline:
+        if result_file.is_symlink():
+            return "result_symlink"
+        if result_file.is_file():
+            return "result_present"
+        now = time.monotonic()
+        if now >= next_refresh:
+            try:
+                refresh = _find_operable_accessible(
+                    "Task状態を更新", root=window, timeout=1
+                )
+                _activate_accessible(refresh, "Task状態を更新", environment)
+            except RuntimeError:
+                pass
+            next_refresh = now + 1.0
+            snapshot = _accessible_snapshot(window)
+            statuses = re.findall(
+                r"Task状態:\s*(pending|running|blocked|completed|failed|cancelled|quarantined)\b",
+                snapshot,
+            )
+            if statuses and statuses[-1] in terminal_statuses:
+                return statuses[-1]
+        time.sleep(0.1)
+    return "timeout"
+
+
+def _installed_task_history_diagnostics(store: Path, task_id: str) -> dict[str, object]:
+    audit_path = store / "audit.jsonl"
+    terminal_statuses = {"completed", "failed", "cancelled", "quarantined"}
+    try:
+        if audit_path.is_symlink() or not audit_path.is_file():
+            return {"state": "absent", "terminal_records": []}
+        if audit_path.stat().st_size > 8 * 1024 * 1024:
+            return {"state": "over_limit", "terminal_records": []}
+        lines = audit_path.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeError):
+        return {"state": "unreadable", "terminal_records": []}
+
+    failure_classes = {
+        "要求不正",
+        "実行系不在",
+        "権限拒否",
+        "セッション不一致",
+        "通信失敗",
+        "期限超過",
+        "応答不正",
+        "監査失敗",
+        "取消",
+        "実行系隔離済み",
+        "作業領域不在",
+        "AgentTask実行非対応",
+    }
+    terminal_records: list[dict[str, str]] = []
+    for line in lines:
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            return {"state": "invalid", "terminal_records": []}
+        if not isinstance(event, dict) or event.get("request_id") != task_id:
+            continue
+        operation = event.get("operation")
+        if not isinstance(operation, str) or operation not in {
+            "AgentTask実行",
+            "AgentTask状態",
+        }:
+            continue
+        reason = event.get("reason")
+        if not isinstance(reason, str) or not reason.startswith("AgentTask履歴:"):
+            continue
+        try:
+            record = json.loads(reason.removeprefix("AgentTask履歴:"))
+        except json.JSONDecodeError:
+            return {"state": "invalid", "terminal_records": []}
+        if (
+            not isinstance(record, dict)
+            or record.get("task_id") != task_id
+            or record.get("stage") != "terminal"
+        ):
+            continue
+        status = record.get("status")
+        failure_class = record.get("failure_class")
+        terminal_records.append(
+            {
+                "status": (
+                    status
+                    if isinstance(status, str) and status in terminal_statuses
+                    else "unknown"
+                ),
+                "failure_class": (
+                    failure_class
+                    if isinstance(failure_class, str)
+                    and failure_class in failure_classes
+                    else "unknown"
+                ),
+            }
+        )
+    return {"state": "read", "terminal_records": terminal_records[-1:]}
+
+
 def _installed_task_write_failure_diagnostics(
     window,
     task_id: str,
     result_file: Path,
     workspace: Path,
     responses_server: _LinuxAgentTaskResponsesServer,
+    audit_store: Path,
 ) -> dict[str, object]:
     snapshot = _accessible_snapshot(window)
     statuses = re.findall(
@@ -3301,6 +3407,7 @@ def _installed_task_write_failure_diagnostics(
             (path / "fixture-scratch-marker").is_file() for path in scratch_paths
         ),
         "loopback": responses_server.snapshot(),
+        "task_history": _installed_task_history_diagnostics(audit_store, task_id),
     }
 
 
@@ -3450,9 +3557,9 @@ def _run_installed_agent_task_acceptance(
         active_marker = workspace / f"agent-task-{scenario_name}-active.json"
         result_file = workspace / "agent-task-result.json"
         if scenario_name == "complete":
-            deadline = time.monotonic() + wait_seconds
-            while not result_file.is_file() and time.monotonic() < deadline:
-                time.sleep(0.1)
+            wait_outcome = _wait_for_installed_task_result_or_terminal(
+                environment, window, result_file, timeout=wait_seconds
+            )
             if result_file.is_symlink() or not result_file.is_file():
                 diagnostics = _installed_task_write_failure_diagnostics(
                     window,
@@ -3460,7 +3567,9 @@ def _run_installed_agent_task_acceptance(
                     result_file,
                     workspace,
                     responses_server,
+                    audit_store,
                 )
+                diagnostics["wait_outcome"] = wait_outcome
                 raise RuntimeError(
                     "installed Agent Taskが許可Workspaceへ結果fileを書き込みませんでした: "
                     + json.dumps(diagnostics, ensure_ascii=False, sort_keys=True)

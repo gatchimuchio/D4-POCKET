@@ -47,6 +47,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _resolve_regular_package,
     _read_task_scratch_recovery_state,
     _installed_task_write_failure_diagnostics,
+    _installed_task_history_diagnostics,
     _stop_linux_agent_task_process_group,
     _review_single_installed_mcp_tool_arguments,
     _run_rust_test,
@@ -60,6 +61,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _verify_workspace_projection,
     _wait_for_workspace_projection,
     _wait_for_installed_task_id,
+    _wait_for_installed_task_result_or_terminal,
     _scroll_product_page_down,
     _select_workspace_inspector_visibility,
     _wait_for_workspace_root_value,
@@ -3230,6 +3232,96 @@ class LinuxAgentTaskFailureDiagnosticsTests(unittest.TestCase):
             task_id = _wait_for_installed_task_id(object(), timeout=1.0)
         self.assertEqual(task_id, "task-fixture-2")
 
+    def test_task_result_wait_refreshes_broker_and_stops_on_terminal_status(self) -> None:
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
+                return_value=object(),
+            ) as find,
+            patch("tooling.tests.linux_installed_product_smoke._activate_accessible") as activate,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._accessible_snapshot",
+                return_value="Task状態: failed",
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke.time.monotonic",
+                side_effect=[0.0, 0.0, 0.0],
+            ),
+            patch("tooling.tests.linux_installed_product_smoke.time.sleep"),
+        ):
+            outcome = _wait_for_installed_task_result_or_terminal(
+                {}, object(), Path("missing-result.json"), timeout=30.0
+            )
+        self.assertEqual(outcome, "failed")
+        find.assert_called_once()
+        activate.assert_called_once()
+
+    def test_task_audit_diagnostics_return_only_terminal_classification(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-task-history-diagnostics-") as temporary:
+            store = Path(temporary)
+            task_id = "task-fixture-3"
+            record = {
+                "stage": "terminal",
+                "task_id": task_id,
+                "status": "failed",
+                "failure_class": "通信失敗",
+                "instruction": "SYNTHETIC_SECRET_CANARY",
+            }
+            event = {
+                "operation": "AgentTask状態",
+                "request_id": task_id,
+                "reason": "AgentTask履歴:" + json.dumps(record, ensure_ascii=False),
+            }
+            (store / "audit.jsonl").write_text(
+                json.dumps(event, ensure_ascii=False) + "\n", encoding="utf-8"
+            )
+            diagnostics = _installed_task_history_diagnostics(store, task_id)
+        self.assertEqual(
+            diagnostics,
+            {
+                "state": "read",
+                "terminal_records": [{"status": "failed", "failure_class": "通信失敗"}],
+            },
+        )
+        self.assertNotIn("SYNTHETIC_SECRET_CANARY", json.dumps(diagnostics))
+
+    def test_task_audit_diagnostics_discard_untyped_terminal_fields(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-task-history-untyped-") as temporary:
+            store = Path(temporary)
+            task_id = "task-fixture-4"
+            record = {
+                "stage": "terminal",
+                "task_id": task_id,
+                "status": ["failed"],
+                "failure_class": {"detail": "SYNTHETIC_SECRET_CANARY"},
+            }
+            event = {
+                "operation": "AgentTask状態",
+                "request_id": task_id,
+                "reason": "AgentTask履歴:" + json.dumps(record, ensure_ascii=False),
+            }
+            unrelated = {
+                "operation": ["AgentTask状態"],
+                "request_id": task_id,
+                "reason": event["reason"],
+            }
+            (store / "audit.jsonl").write_text(
+                "\n".join(
+                    json.dumps(item, ensure_ascii=False) for item in (unrelated, event)
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            diagnostics = _installed_task_history_diagnostics(store, task_id)
+        self.assertEqual(
+            diagnostics,
+            {
+                "state": "read",
+                "terminal_records": [{"status": "unknown", "failure_class": "unknown"}],
+            },
+        )
+        self.assertNotIn("SYNTHETIC_SECRET_CANARY", json.dumps(diagnostics))
+
     def test_write_failure_diagnostics_are_structured_and_secret_free(self) -> None:
         with tempfile.TemporaryDirectory(prefix="d4p-task-diagnostics-") as temporary:
             workspace = Path(temporary) / "workspace"
@@ -3258,6 +3350,7 @@ class LinuxAgentTaskFailureDiagnosticsTests(unittest.TestCase):
                     result_file,
                     workspace,
                     responses_server,
+                    Path(temporary),
                 )
             rendered = json.dumps(diagnostics, ensure_ascii=False)
             self.assertEqual(diagnostics["visible_task_statuses"], ["running"])
