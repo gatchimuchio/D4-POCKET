@@ -1,5 +1,7 @@
 # D4 Pocket / GUI-Shell rev5 Product-First 進捗
 
+是正追補（2026-10-30、`D4-AUD-F05`）: 基準main `41e834c8bdf3237c52329aa261f934762771c9bc`時点でremote `codex/*`3本を棚卸しした。B5は2、Linuxは21、R2 Inspectorは1のbranch固有未統合commitを確認し、全枝を保持した。R2枝はdirty detached worktreeと変更pathが重なるため`要判断`。削除・統合なし。F05を`VERIFIED`として閉じ、次は`D4-AUD-F06`。[F05 branch台帳](QE_2026-10-22/F05_remote_codex_branch棚卸し_20261030.md)。製品Acceptance、B5 OPEN、Linux native必須性、通常Release capability／release gateは変更しない。
+
 是正追補（2026-10-30、`D4-AUD-F04`）: 基準監査33ファイル・220件を全件個別分類し、208件を局所是正、12件を固定CLI構文・wire／IPC識別子・OS形式・試験識別子等として保持した。最終厳格監査は9ファイル・12件（CLI／診断11、コードコメント1）で終了値1。監査器・例外登録は変更せず、PASSとは記録しない。Python受入れ補助48試験とUbuntu 24.04 WSLのLinux書き出し9試験はPASS。Rust全548試験は531成功・4失敗・13 ignoreで、全体FAILを保持する。個別分類・検証・残件は[F04台帳](QE_2026-10-22/F04_分類・是正台帳_20261030.md)を参照。F04の分類・局所是正を閉じ、次は`D4-AUD-F05`。
 
 是正追補（2026-10-22、`D4-AUD-F03`）: README／CLAIM／Release Checklist／互換性表／Mobile／Installerの6文書を現行実績へ同期し、F03を`VERIFIED`として閉鎖した。GitHubの4runを読み取り照合し、Linux #107の合成X11・MCP限定成功と対象外2stepのSKIP、別run #77／#94の限定受入れ、Windows #55のRust試験成功とcapture判定FAIL・後続SKIPを区別した。旧v1.0／rev2欄は履歴と明記し、旧FAIL・B4限定CLOSED・B5 OPEN・全Release Gateを保持する。Conformance266件、release gate整合、ローカル参照44件はPASS。日本語strictは既存33ファイル／220件でFAIL、新規指摘0件。[F03実績文書対応](QE_2026-10-22/F03_実績文書対応.md)に日時・source・環境・対象と限界を記録した。次は`D4-AUD-F04`。

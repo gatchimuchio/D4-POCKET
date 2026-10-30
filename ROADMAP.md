@@ -1,5 +1,7 @@
 # GUI Shell ロードマップ
 
+是正追補（2026-10-30、`D4-AUD-F05`）: 基準main `41e834c8bdf3237c52329aa261f934762771c9bc`時点でremote `codex/*`3本を棚卸しした。B5は2、Linuxは21、R2 Inspectorは1のbranch固有未統合commitを確認し、全枝を保持した。R2枝はdirty detached worktreeと変更pathが重なるため`要判断`。削除・統合なし。F05を`VERIFIED`として閉じ、次は`D4-AUD-F06`。[F05 branch台帳](docs/QE_2026-10-22/F05_remote_codex_branch棚卸し_20261030.md)。
+
 是正追補（2026-10-30、`D4-AUD-F04`）: 基準監査33ファイル・220件を全件個別分類し、208件を局所是正、12件を固定CLI構文・wire／IPC識別子・OS形式・試験識別子等として保持した。最終厳格監査は9ファイル・12件（CLI／診断11、コードコメント1）で終了値1。監査器・例外登録は変更せず、PASSとは記録しない。Python受入れ補助48試験とUbuntu 24.04 WSLのLinux書き出し9試験はPASS。Rust全548試験は531成功・4失敗・13 ignoreで、全体FAILを保持する。個別分類・検証・残件は[F04台帳](docs/QE_2026-10-22/F04_分類・是正台帳_20261030.md)を参照。F04の分類・局所是正を閉じ、次は`D4-AUD-F05`。
 
 是正追補（2026-10-22、`D4-AUD-F03`）: 現行6文書の対象OS・機能・版・環境と結果を照合してF03を`VERIFIED`とした。Linux #107のMCP限定PASS／対象外SKIPと、Windows #55のRust成功／capture判定FAILを同期した。Conformance266件・release gate整合・ローカル参照44件はPASS。新規日本語指摘は0、既存33ファイル／220件はF04へ引き継ぐ。[F03実績文書対応](docs/QE_2026-10-22/F03_実績文書対応.md)を参照。製品状態・Release Gate・過去履歴を保持し、次は`D4-AUD-F04`。
