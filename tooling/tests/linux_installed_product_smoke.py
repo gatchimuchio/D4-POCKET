@@ -750,6 +750,36 @@ def _workspace_inspector_scope(
     return window, inspector
 
 
+def _select_workspace_inspector_visibility(
+    workspace_id: str,
+    visibility: str,
+    environment: dict[str, str],
+    *,
+    diagnostic_screenshot_path: Path | None = None,
+) -> None:
+    """現在値のDropdownを開いてから、製品window内の選択肢を選ぶ。"""
+    _, inspector = _workspace_inspector_scope(workspace_id, timeout=10)
+    current_value = _find_operable_accessible(
+        "hash_only", root=inspector, timeout=10, exact=True
+    )
+    _activate_accessible(current_value, "hash_only", environment)
+
+    try:
+        # Dropdown menuはInspectorの子ではなくOverlayとして公開されるため、
+        # 開いた後に製品windowの現行AT-SPI treeから選択肢を取り直す。
+        product_window = _find_accessible(WINDOW_TITLE, timeout=10)
+        option = _find_operable_accessible(
+            visibility, root=product_window, timeout=10, exact=True
+        )
+    except RuntimeError:
+        if diagnostic_screenshot_path is not None:
+            _capture_gtk_dialog_screenshot(
+                environment, WINDOW_TITLE, diagnostic_screenshot_path
+            )
+        raise
+    _activate_accessible(option, visibility, environment)
+
+
 def _activate_accessible(node, name: str, environment: dict[str, str]) -> None:
     try:
         actions = node.queryAction()
@@ -2667,16 +2697,12 @@ def _run_installed_workspace_selection_acceptance(
         diagnostic_screenshot_path=inspector_failure_screenshot_path,
     )
     _activate_accessible(row, workspace_id, environment)
-    visibility = _find_workspace_inspector_control(
-        "hash_only",
+    _select_workspace_inspector_visibility(
         workspace_id,
+        "full",
         environment,
-        timeout=10,
+        diagnostic_screenshot_path=inspector_failure_screenshot_path,
     )
-    _activate_accessible(visibility, "hash_only", environment)
-    _, inspector = _workspace_inspector_scope(workspace_id, timeout=10)
-    full = _find_operable_accessible("full", root=inspector, timeout=10)
-    _activate_accessible(full, "full", environment)
     approve = _find_workspace_inspector_control(
         "native Owner確認でWorkspace読取を許可",
         workspace_id,

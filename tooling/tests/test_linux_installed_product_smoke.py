@@ -52,6 +52,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _verify_live_audit,
     _verify_workspace_projection,
     _scroll_product_page_down,
+    _select_workspace_inspector_visibility,
     _wait_for_workspace_root_value,
     _workspace_root_field_value,
     _workspace_inspector_scope,
@@ -276,6 +277,83 @@ class AccessibleActionResolutionTests(unittest.TestCase):
             self.assertIs(
                 _find_operable_accessible("選択", root=Root(), exact=True), accept
             )
+
+    def test_workspace_visibility_opens_exact_current_dropdown_before_overlay_option(self) -> None:
+        inspector, product_window = object(), object()
+        current_value, full_option = object(), object()
+        environment = {"DISPLAY": ":99"}
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._workspace_inspector_scope",
+                return_value=(None, inspector),
+            ) as find_inspector,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
+                side_effect=(current_value, full_option),
+            ) as find_option,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_accessible",
+                return_value=product_window,
+            ) as find_window,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._activate_accessible"
+            ) as activate,
+        ):
+            _select_workspace_inspector_visibility(
+                "workspace-a", "full", environment
+            )
+
+        find_inspector.assert_called_once_with("workspace-a", timeout=10)
+        self.assertEqual(
+            find_option.call_args_list,
+            [
+                call("hash_only", root=inspector, timeout=10, exact=True),
+                call("full", root=product_window, timeout=10, exact=True),
+            ],
+        )
+        find_window.assert_called_once_with(WINDOW_TITLE, timeout=10)
+        self.assertEqual(
+            activate.call_args_list,
+            [
+                call(current_value, "hash_only", environment),
+                call(full_option, "full", environment),
+            ],
+        )
+
+    def test_workspace_visibility_failure_captures_inspector_window(self) -> None:
+        inspector, product_window, current_value = object(), object(), object()
+        environment = {"DISPLAY": ":99"}
+        destination = Path("/tmp/workspace-inspector-failure.png")
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._workspace_inspector_scope",
+                return_value=(None, inspector),
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
+                side_effect=(current_value, RuntimeError("full option missing")),
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_accessible",
+                return_value=product_window,
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._activate_accessible"
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._capture_gtk_dialog_screenshot",
+                return_value=True,
+            ) as capture,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "full option missing"):
+                _select_workspace_inspector_visibility(
+                    "workspace-a",
+                    "full",
+                    environment,
+                    diagnostic_screenshot_path=destination,
+                )
+
+        capture.assert_called_once_with(environment, WINDOW_TITLE, destination)
 
     def test_workspace_scope_includes_rows_sibling_to_the_heading(self) -> None:
         class TreeNode:
