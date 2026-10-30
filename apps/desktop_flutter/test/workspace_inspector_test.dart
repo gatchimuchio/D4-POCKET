@@ -817,4 +817,30 @@ void main() {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pumpWidget(const SizedBox());
   });
+
+  testWidgets('画面復帰後は登録だけをBrokerから再取得する', (tester) async {
+    final broker = TestBroker();
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: WorkspaceInspector(client: WorkspaceClient(broker)))));
+    await tester.pumpAndSettle();
+    expect(find.text('workspace-a'), findsOneWidget);
+    final initialListCount =
+        broker.operations.where((operation) => operation == '作業領域一覧').length;
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    await tester.pump();
+    expect(find.text('workspace-a'), findsNothing);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+
+    expect(broker.operations.where((operation) => operation == '作業領域一覧').length,
+        initialListCount + 1);
+    expect(find.text('workspace-a'), findsOneWidget);
+    expect(broker.operations, isNot(contains('作業領域承認')));
+    expect(broker.operations, isNot(contains('作業領域読取')));
+    expect(find.text('file.txt'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+  });
 }

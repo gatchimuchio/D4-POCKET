@@ -73,6 +73,7 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
       _registrations = [];
       _message = '画面復帰後は登録状態を更新してください。';
     });
+    if (_isActive) _refresh();
   }
 
   @override
