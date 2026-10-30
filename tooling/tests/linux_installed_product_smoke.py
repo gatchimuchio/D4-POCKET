@@ -3287,7 +3287,7 @@ def _prepare_and_start_installed_agent_task(
         "許可",
         context="Agent Task Workspace Permission",
         expected_summary_markers=(
-            "このAgent Sessionに限定したTask用Workspace Permissionを発行しますか？",
+            "このAgent Sessionに限定した、一回限りのTask用Workspace Permissionを発行しますか？",
             f"Runtime ID: {runtime_id}",
             f"Workspace ID: {workspace_id}",
             "許可operation: agent_task.execute",
