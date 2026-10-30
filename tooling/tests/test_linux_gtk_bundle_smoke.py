@@ -10,6 +10,7 @@ from tooling.tests.linux_gtk_bundle_smoke import (
     _request_x11_window_manager_close,
     _wayland_socket_connected,
     _weston_backend_is_unsupported,
+    _weston_renderer_is_unsupported,
 )
 
 
@@ -77,6 +78,24 @@ class WestonBackendCompatibilityTests(unittest.TestCase):
             _weston_backend_is_unsupported(
                 "--backend=headless-backend.so",
                 'Error: unknown backend "headless"\n',
+            )
+        )
+
+
+    def test_retries_legacy_pixman_flag_only_for_unhandled_renderer_option(self) -> None:
+        self.assertTrue(
+            _weston_renderer_is_unsupported(
+                "--renderer=pixman", "fatal: unhandled option: --renderer=pixman\n"
+            )
+        )
+        self.assertFalse(
+            _weston_renderer_is_unsupported(
+                "--renderer=pixman", "fatal: failed to initialize pixman renderer\n"
+            )
+        )
+        self.assertFalse(
+            _weston_renderer_is_unsupported(
+                "--use-pixman", "fatal: unhandled option: --renderer=pixman\n"
             )
         )
 
