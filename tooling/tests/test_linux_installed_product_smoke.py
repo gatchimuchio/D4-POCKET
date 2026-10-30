@@ -1581,16 +1581,16 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
 
     def test_workspace_inspector_control_retains_live_scope_while_scrolling(self) -> None:
         window = object()
-        heading = object()
-        scope, control = object(), object()
+        first_heading, second_heading = object(), object()
+        first_scope, second_scope, control = object(), object(), object()
         with (
             patch(
                 "tooling.tests.linux_installed_product_smoke._find_accessible",
-                side_effect=(window, heading),
+                side_effect=(window, first_heading, second_heading),
             ) as find,
             patch(
                 "tooling.tests.linux_installed_product_smoke._accessible_scope_with_named_descendant",
-                return_value=scope,
+                side_effect=(first_scope, second_scope),
             ),
             patch(
                 "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
@@ -1612,11 +1612,20 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
         self.assertIs(actual, control)
         self.assertEqual(
             [entry.args[0] for entry in find.call_args_list],
-            [WINDOW_TITLE, "作業領域インスペクタ"],
+            [
+                WINDOW_TITLE,
+                "作業領域インスペクタ",
+                "作業領域インスペクタ",
+            ],
         )
         self.assertIs(find.call_args_list[1].kwargs["root"], window)
+        self.assertIs(find.call_args_list[2].kwargs["root"], window)
         self.assertTrue(
             all(0 < entry.kwargs["timeout"] <= 1 for entry in find.call_args_list)
+        )
+        self.assertEqual(
+            [entry.kwargs["root"] for entry in find_control.call_args_list],
+            [first_scope, second_scope],
         )
         self.assertEqual(find_control.call_count, 2)
         scroll.assert_called_once_with({"DISPLAY": ":99"}, "0x42")
