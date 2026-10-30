@@ -1618,6 +1618,7 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
         self.assertNotIn("/home/test/decoy-workspace", str(failure.exception))
 
     def test_workspace_inspector_control_retains_live_scope_while_scrolling(self) -> None:
+        window_root = object()
         first_window, second_window = object(), object()
         first_scope, second_scope, control = object(), object(), object()
         with (
@@ -1639,7 +1640,11 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             patch("tooling.tests.linux_installed_product_smoke.time.sleep"),
         ):
             actual = _find_workspace_inspector_control(
-                "workspace-a", "workspace-a", {"DISPLAY": ":99"}, timeout=1
+                "workspace-a",
+                "workspace-a",
+                {"DISPLAY": ":99"},
+                timeout=1,
+                accessibility_root=window_root,
             )
 
         self.assertIs(actual, control)
@@ -1652,22 +1657,26 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             all(0 < entry.kwargs["timeout"] <= 1 for entry in find_scope.call_args_list)
         )
         self.assertEqual(
+            [entry.kwargs["root"] for entry in find_scope.call_args_list],
+            [window_root, window_root],
+        )
+        self.assertEqual(
             [entry.kwargs["root"] for entry in find_control.call_args_list],
             [first_scope, second_scope],
         )
         self.assertEqual(find_control.call_count, 2)
         scroll.assert_called_once_with({"DISPLAY": ":99"}, "0x42")
 
-    def test_workspace_inspector_scope_falls_back_to_heading_without_window_title(self) -> None:
+    def test_workspace_inspector_scope_uses_heading_before_window_title(self) -> None:
         heading, inspector = object(), object()
         with (
             patch(
                 "tooling.tests.linux_installed_product_smoke.time.monotonic",
-                side_effect=(1.0, 1.1),
+                return_value=1.0,
             ),
             patch(
                 "tooling.tests.linux_installed_product_smoke._find_accessible",
-                side_effect=(RuntimeError("window title missing"), heading),
+                return_value=heading,
             ) as find,
             patch(
                 "tooling.tests.linux_installed_product_smoke._accessible_scope_with_named_descendant",
@@ -1680,12 +1689,74 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
 
         self.assertIsNone(window)
         self.assertIs(actual, inspector)
-        self.assertEqual(find.call_args_list[0].args[0], WINDOW_TITLE)
-        self.assertEqual(find.call_args_list[1].args[0], "作業領域インスペクタ")
-        self.assertIsNone(find.call_args_list[1].kwargs.get("root"))
-        self.assertEqual(find.call_args_list[1].kwargs["max_depth"], 20)
+        self.assertEqual(find.call_count, 1)
+        self.assertEqual(find.call_args.args[0], "作業領域インスペクタ")
+        self.assertIsNone(find.call_args.kwargs.get("root"))
+        self.assertEqual(find.call_args.kwargs["max_depth"], 20)
         self.assertIs(find_scope.call_args.args[0], heading)
         self.assertEqual(find_scope.call_args.args[1], "workspace-a")
+
+    def test_workspace_inspector_scope_reuses_existing_window_accessible(self) -> None:
+        window, heading, inspector = object(), object(), object()
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke.time.monotonic",
+                return_value=1.0,
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_accessible",
+                return_value=heading,
+            ) as find,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._accessible_scope_with_named_descendant",
+                return_value=inspector,
+            ) as find_scope,
+        ):
+            actual_window, actual_scope = _workspace_inspector_scope(
+                "workspace-a", timeout=5, root=window
+            )
+
+        self.assertIs(actual_window, window)
+        self.assertIs(actual_scope, inspector)
+        find.assert_called_once_with(
+            "作業領域インスペクタ",
+            root=window,
+            timeout=3.0,
+            max_depth=20,
+        )
+        self.assertIs(find_scope.call_args.args[0], heading)
+        self.assertEqual(find_scope.call_args.args[1], "workspace-a")
+
+    def test_workspace_inspector_scope_keeps_window_scoped_fallback(self) -> None:
+        window, heading, inspector = object(), object(), object()
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke.time.monotonic",
+                side_effect=(1.0, 1.1, 1.2),
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_accessible",
+                side_effect=(
+                    RuntimeError("desktop heading missing"),
+                    window,
+                    heading,
+                ),
+            ) as find,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._accessible_scope_with_named_descendant",
+                return_value=inspector,
+            ),
+        ):
+            actual_window, actual_scope = _workspace_inspector_scope(
+                "workspace-a", timeout=5
+            )
+        self.assertIs(actual_window, window)
+        self.assertIs(actual_scope, inspector)
+        self.assertEqual(
+            [call.args[0] for call in find.call_args_list],
+            ["作業領域インスペクタ", WINDOW_TITLE, "作業領域インスペクタ"],
+        )
+        self.assertIs(find.call_args_list[2].kwargs["root"], window)
 
     def test_workspace_inspector_failure_captures_only_the_named_product_window(self) -> None:
         from pathlib import Path
