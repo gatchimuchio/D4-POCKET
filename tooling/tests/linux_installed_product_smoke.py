@@ -1537,6 +1537,8 @@ def _select_folder_in_gtk_chooser(
 ) -> None:
     if not folder.is_absolute() or not folder.is_dir() or folder.is_symlink():
         raise RuntimeError("GTK chooserへ渡すtest directoryが不正です")
+    parent = folder.parent
+    expected_parent = _normalize_gtk_path(str(parent))
     subprocess.run(
         ["xdotool", "windowactivate", "--sync", chooser_window_id],
         env=environment,
@@ -1563,18 +1565,67 @@ def _select_folder_in_gtk_chooser(
             "--delay",
             "1",
             "--",
-            str(folder),
+            str(parent),
         ],
         env=environment,
         check=True,
         timeout=5,
     )
+    chooser = _find_accessible("D4 Pocket 作業領域の選択", timeout=10)
+    location_value = _gtk_location_entry_value(chooser)
+    current_location = (
+        _normalize_gtk_path(location_value)
+        if location_value is not None
+        else None
+    )
+    completion_cleared = False
+    if current_location != expected_parent:
+        if (
+            current_location is not None
+            and posixpath.dirname(current_location) == expected_parent
+        ):
+            subprocess.run(
+                ["xdotool", "key", "--clearmodifiers", "BackSpace"],
+                env=environment,
+                check=True,
+                timeout=5,
+            )
+            completion_cleared = True
+        if not _wait_for_gtk_location(chooser, parent):
+            diagnostics = _gtk_folder_chooser_diagnostics(chooser, folder)
+            diagnostics.update(
+                {
+                    "workspace_parent_path_confirmed": False,
+                    "autocomplete_completion_cleared": completion_cleared,
+                }
+            )
+            screenshot_captured = (
+                _capture_gtk_dialog_screenshot(
+                    environment,
+                    "D4 Pocket 作業領域の選択",
+                    screenshot_path,
+                )
+                if screenshot_path is not None
+                else False
+            )
+            diagnostics["screenshot_captured"] = screenshot_captured
+            raise RuntimeError(
+                "GTK chooser did not confirm the exact Workspace parent before navigation; "
+                f"bounded_state={diagnostics}"
+            )
     subprocess.run(
         ["xdotool", "key", "--clearmodifiers", "Return"],
         env=environment,
         check=True,
         timeout=5,
     )
+    if not _wait_for_gtk_location(chooser, parent):
+        diagnostics = _gtk_folder_chooser_diagnostics(chooser, folder)
+        diagnostics["workspace_parent_path_confirmed"] = False
+        raise RuntimeError(
+            "GTK chooser did not remain at the exact Workspace parent after navigation; "
+            f"bounded_state={diagnostics}"
+        )
     visible = subprocess.run(
         [
             "xdotool",
@@ -1589,59 +1640,13 @@ def _select_folder_in_gtk_chooser(
         timeout=5,
     )
     if visible.returncode != 0:
-        _wait_for_gtk_dialog_closed(
-            environment,
-            "D4 Pocket 作業領域の選択",
-            action="absolute Workspace path entry",
+        raise RuntimeError(
+            "GTK chooser closed before the exact Workspace row was selected"
         )
-        return
     window_ids = visible.stdout.decode("ascii", errors="ignore").splitlines()
     if window_ids != [chooser_window_id]:
         raise RuntimeError("GTK folder chooser changed to an unexpected window")
-    chooser = _find_accessible("D4 Pocket 作業領域の選択", timeout=10)
-    if not _wait_for_gtk_location(chooser, folder):
-        location_value = _gtk_location_entry_value(chooser)
-        current_location = (
-            _normalize_gtk_path(location_value)
-            if location_value is not None
-            else None
-        )
-        expected_location = _normalize_gtk_path(str(folder))
-        if (
-            current_location is not None
-            and posixpath.dirname(current_location) == expected_location
-        ):
-            subprocess.run(
-                ["xdotool", "key", "--clearmodifiers", "BackSpace"],
-                env=environment,
-                check=True,
-                timeout=5,
-            )
-        if not _wait_for_gtk_location(chooser, folder):
-            diagnostics = _gtk_folder_chooser_diagnostics(chooser, folder)
-            screenshot_captured = (
-                _capture_gtk_dialog_screenshot(
-                    environment,
-                    "D4 Pocket 作業領域の選択",
-                    screenshot_path,
-                )
-                if screenshot_path is not None
-                else False
-            )
-            diagnostics.update(
-                {
-                    "exact_location_unconfirmed": True,
-                    "direct_child_completion_clear_attempted": (
-                        current_location is not None
-                        and posixpath.dirname(current_location) == expected_location
-                    ),
-                    "screenshot_captured": screenshot_captured,
-                }
-            )
-            raise RuntimeError(
-                "GTK chooser did not navigate to the exact requested Workspace path; "
-                f"bounded_state={diagnostics}"
-            )
+    row = _wait_for_gtk_folder_row(chooser, folder)
     screenshot_before_selection_captured = (
         _capture_gtk_dialog_screenshot(
             environment,
@@ -1651,6 +1656,8 @@ def _select_folder_in_gtk_chooser(
         if screenshot_before_selection_path is not None
         else False
     )
+    _click_accessible_by_coordinates(row, "Workspace folder row", environment)
+    _wait_for_gtk_folder_row_selected(chooser, folder)
     accept = _find_operable_accessible("選択", root=chooser, timeout=10, exact=True)
     _activate_accessible(accept, "選択", environment)
     coordinate_fallback_used = False
@@ -1676,6 +1683,7 @@ def _select_folder_in_gtk_chooser(
         diagnostics["exact_accept_coordinate_fallback_used"] = (
             coordinate_fallback_used
         )
+        diagnostics["selected_workspace_row_confirmed"] = True
         screenshot_captured = (
             _capture_gtk_dialog_screenshot(
                 environment,
@@ -1700,17 +1708,109 @@ def _select_folder_in_gtk_chooser(
         ) from None
 
 
+def _gtk_folder_row_candidates(chooser, folder: Path) -> list[object]:
+    role_priority = {"table cell": 0, "list item": 1, "icon": 2, "text": 3}
+    candidates = []
+    for node, accessible_name in _accessible_nodes(chooser):
+        try:
+            role = str(node.getRoleName())
+        except Exception:
+            continue
+        if role not in role_priority:
+            continue
+        bounds = _accessible_component_bounds(node)
+        if bounds is None or bounds[1] < 120:
+            continue
+        text = _accessible_text(node).strip()
+        if accessible_name.strip() != folder.name and text != folder.name:
+            continue
+        try:
+            import pyatspi
+
+            if not node.getState().contains(pyatspi.STATE_SHOWING):
+                continue
+        except Exception:
+            continue
+        candidates.append(
+            (
+                0 if accessible_name.strip() == folder.name else 1,
+                role_priority[role],
+                bounds,
+                node,
+            )
+        )
+    if not candidates:
+        return []
+    candidates.sort(key=lambda item: (item[0], item[1]))
+    best_score = candidates[0][:2]
+    best = [item for item in candidates if item[:2] == best_score]
+    unique_bounds = {item[2] for item in best}
+    if len(unique_bounds) != 1:
+        return []
+    return [best[0][3]]
+
+
+def _wait_for_gtk_folder_row(
+    chooser, folder: Path, *, timeout: float = 10.0
+):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        candidates = _gtk_folder_row_candidates(chooser, folder)
+        if candidates:
+            return candidates[0]
+        time.sleep(0.15)
+    diagnostics = _gtk_folder_chooser_diagnostics(chooser, folder)
+    raise RuntimeError(
+        "GTK Workspace parent listing did not expose one exact visible folder row; "
+        f"bounded_state={diagnostics}"
+    )
+
+
+def _gtk_accessible_or_parent_selected(node, *, max_ancestors: int = 5) -> bool:
+    try:
+        import pyatspi
+    except ImportError:
+        return False
+    current = node
+    for _ in range(max_ancestors + 1):
+        if current is None:
+            break
+        try:
+            if current.getState().contains(pyatspi.STATE_SELECTED):
+                return True
+        except Exception:
+            pass
+        current = _accessible_parent(current)
+    return False
+
+
+def _wait_for_gtk_folder_row_selected(
+    chooser, folder: Path, *, timeout: float = 10.0
+) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        candidates = _gtk_folder_row_candidates(chooser, folder)
+        if candidates and _gtk_accessible_or_parent_selected(candidates[0]):
+            return
+        time.sleep(0.15)
+    diagnostics = _gtk_folder_chooser_diagnostics(chooser, folder)
+    raise RuntimeError(
+        "GTK Workspace row did not enter the selected state; "
+        f"bounded_state={diagnostics}"
+    )
+
+
 def _gtk_folder_chooser_diagnostics(chooser, folder: Path) -> dict[str, object]:
     snapshot = _accessible_snapshot(chooser)
     location_value = _gtk_location_entry_value(chooser)
-    location_matches = (
-        location_value is not None
-        and _normalize_gtk_path(location_value) == _normalize_gtk_path(str(folder))
+    expected_parent = _normalize_gtk_path(str(folder.parent))
+    normalized_location = (
+        _normalize_gtk_path(location_value) if location_value is not None else None
     )
-    location_is_direct_child = (
-        location_value is not None
-        and posixpath.dirname(_normalize_gtk_path(location_value))
-        == _normalize_gtk_path(str(folder))
+    location_matches_parent = normalized_location == expected_parent
+    location_is_autocompleted_child = (
+        normalized_location is not None
+        and posixpath.dirname(normalized_location) == expected_parent
     )
     try:
         import pyatspi
@@ -1769,13 +1869,19 @@ def _gtk_folder_chooser_diagnostics(chooser, folder: Path) -> dict[str, object]:
                     "parent_bounds": _accessible_component_bounds(parent)
                     if parent is not None
                     else None,
+                    "selected": _gtk_accessible_or_parent_selected(node),
                 }
             )
     return {
-        "parent_path_visible": str(folder.parent) in snapshot,
-        "location_entry_matches_requested_folder": location_matches,
-        "location_entry_is_direct_child_of_requested_folder": location_is_direct_child,
-        "folder_name_visible": folder.name in snapshot,
+        "workspace_parent_path_visible": str(folder.parent) in snapshot,
+        "location_entry_matches_workspace_parent": location_matches_parent,
+        "location_entry_is_autocompleted_workspace_child": (
+            location_is_autocompleted_child
+        ),
+        "workspace_folder_row_visible": bool(target_entries),
+        "workspace_folder_row_selected": any(
+            entry["selected"] for entry in target_entries
+        ),
         "selected_accessible_count": selected_count,
         "common_roles": common_roles,
         "focused_roles": focused_roles,
