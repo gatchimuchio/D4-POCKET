@@ -172,7 +172,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "fcca71befbce8b20d03d2d883223c83296f16c3260494b16113e38b813544df5"
+      "sha256": "7d003762b0a871478700c5de7c0b1a77ff0bf3ffec3ee3cc4b53718d8a990955"
     },
     {
       "path": "SECURITY.md",
@@ -1352,7 +1352,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "4f4fa3cc18f80e064b908a6b89865018d5986146ebfbd7893a1168d6ab91778b"
+      "sha256": "fec171fcf53bfc0efe5336e37f7b7e1ec5beb6f26d75230509dfdd9c3f4cb2de"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -4352,7 +4352,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "49c002d55469a83ed096ad318c6d7e8c099f3f6038126f772a1cef0846e1fc6c"
+      "sha256": "877c0f279a31a9edee6b75bdd6ac64577093ccbf82d5d800807f49878abbcb8a"
     },
     {
       "path": "requirements-dev.txt",
