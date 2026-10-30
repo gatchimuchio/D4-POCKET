@@ -3254,6 +3254,25 @@ def _wait_installed_task_status(
     )
 
 
+def _wait_for_installed_task_id(window, *, timeout: float) -> str:
+    deadline = time.monotonic() + timeout
+    last_statuses: list[str] = []
+    while time.monotonic() < deadline:
+        snapshot = _accessible_snapshot(window)
+        task_ids = re.findall(r"Task識別子:\s*([A-Za-z0-9_.:-]+)", snapshot)
+        if task_ids:
+            return task_ids[-1]
+        last_statuses = re.findall(
+            r"Task状態:\s*(pending|running|blocked|completed|failed|cancelled|quarantined)\b",
+            snapshot,
+        )[-4:]
+        time.sleep(0.1)
+    raise RuntimeError(
+        "installed Agent Centerに開始Task IDが表示されません: "
+        + json.dumps({"visible_task_statuses": last_statuses}, ensure_ascii=False)
+    )
+
+
 def _installed_task_write_failure_diagnostics(
     window,
     task_id: str,
@@ -3426,12 +3445,7 @@ def _run_installed_agent_task_acceptance(
             workspace_id=workspace_id,
             instruction=instruction,
         )
-        task_matches = re.findall(
-            r"Task識別子:\s*([A-Za-z0-9_.:-]+)", _accessible_snapshot(window)
-        )
-        if not task_matches:
-            raise RuntimeError("installed Agent Centerに開始Task IDが表示されません")
-        task_ids.append(task_matches[-1])
+        task_ids.append(_wait_for_installed_task_id(window, timeout=15.0))
 
         active_marker = workspace / f"agent-task-{scenario_name}-active.json"
         result_file = workspace / "agent-task-result.json"

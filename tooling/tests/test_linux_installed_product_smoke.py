@@ -59,6 +59,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _verify_live_audit,
     _verify_workspace_projection,
     _wait_for_workspace_projection,
+    _wait_for_installed_task_id,
     _scroll_product_page_down,
     _select_workspace_inspector_visibility,
     _wait_for_workspace_root_value,
@@ -3213,6 +3214,22 @@ class LinuxAgentTaskResponsesFixtureTests(unittest.TestCase):
 
 
 class LinuxAgentTaskFailureDiagnosticsTests(unittest.TestCase):
+    def test_task_id_wait_handles_asynchronous_agent_center_update(self) -> None:
+        snapshots = ["Task状態: running", "Task状態: running\nTask識別子: task-fixture-2"]
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._accessible_snapshot",
+                side_effect=snapshots,
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke.time.monotonic",
+                side_effect=[0.0, 0.0, 0.1],
+            ),
+            patch("tooling.tests.linux_installed_product_smoke.time.sleep"),
+        ):
+            task_id = _wait_for_installed_task_id(object(), timeout=1.0)
+        self.assertEqual(task_id, "task-fixture-2")
+
     def test_write_failure_diagnostics_are_structured_and_secret_free(self) -> None:
         with tempfile.TemporaryDirectory(prefix="d4p-task-diagnostics-") as temporary:
             workspace = Path(temporary) / "workspace"
