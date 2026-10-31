@@ -5109,7 +5109,13 @@ def _open_installed_host_registration_dialog(
     window = _open_installed_host_operation_center(environment, window_id)
     register = _find_operable_accessible("Hostを登録", root=window, timeout=10)
     _activate_accessible(register, "Hostを登録", environment)
-    return window, _find_accessible("公開Host metadata登録", root=window, timeout=10)
+    dialog_title = _find_accessible(
+        "公開Host metadata登録", root=window, timeout=10
+    )
+    dialog = _accessible_scope_with_named_descendant(
+        dialog_title, "Host識別子", deadline=time.monotonic() + 10
+    )
+    return window, dialog
 
 
 def _fill_installed_host_registration(

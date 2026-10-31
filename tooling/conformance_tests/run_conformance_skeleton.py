@@ -12164,6 +12164,7 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
     for token in (
         'host_query = "Host"',
         '"xdotool", "type", "--clearmodifiers", "--delay", "30", host_query',
+        '_accessible_scope_with_named_descendant(\n        dialog_title, "Host識別子"',
         '_find_operable_accessible("Host操作面を開く", root=window, timeout=10)',
         '_activate_accessible(command, "Host操作面を開く", environment)',
     ):
