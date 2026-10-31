@@ -5238,7 +5238,7 @@ def _run_installed_host_registration_acceptance(
     _find_accessible(accepted_host_id, root=accepted_window, timeout=10)
     projection = _accessible_snapshot(accepted_window)
     for marker in (
-        "Platform: linux",
+        "基盤: linux",
         "接続: pending_review",
         "登録接続状態: pending_review",
         "信頼: pending_review",
