@@ -2822,25 +2822,36 @@ def _select_folder_in_wayland_gtk_chooser(
                 f"(exit={result.returncode})"
             )
 
-    send_keys(["-M", "ctrl", "-k", "a", "-m", "ctrl"])
-    delay_ms = 100 if len(str(folder)) > 30 else 40
-    send_keys(["-d", str(delay_ms), "-"], text=str(folder))
-    send_keys(["-k", "Return"])
+    initial_delay_ms = 100 if len(str(folder)) > 30 else 40
+    delay_attempts = (initial_delay_ms, max(initial_delay_ms, 160))
+    exact_folder_visible = False
+    for attempt, delay_ms in enumerate(delay_attempts):
+        if attempt:
+            # Reopen/focus GTK's native location prompt, then replace the
+            # incomplete value. Never infer selection from the typed path.
+            send_keys(["-M", "ctrl", "-k", "l", "-m", "ctrl"])
+        send_keys(["-M", "ctrl", "-k", "a", "-m", "ctrl"])
+        send_keys(["-d", str(delay_ms), "-"], text=str(folder))
+        send_keys(["-k", "Return"])
 
-    deadline = time.monotonic() + 10
-    while time.monotonic() < deadline:
-        chooser = _find_accessible("D4 Pocket 作業領域の選択", timeout=1)
-        if (
-            _normalize_gtk_path(_gtk_location_entry_value(chooser) or "")
-            == _normalize_gtk_path(str(folder))
-        ):
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            chooser = _find_accessible("D4 Pocket 作業領域の選択", timeout=1)
+            if (
+                _normalize_gtk_path(_gtk_location_entry_value(chooser) or "")
+                == _normalize_gtk_path(str(folder))
+            ):
+                exact_folder_visible = True
+                break
+            time.sleep(0.1)
+        if exact_folder_visible:
             break
-        time.sleep(0.1)
-    else:
+
+    if not exact_folder_visible:
         diagnostics = _gtk_folder_chooser_diagnostics(chooser, folder)
         raise RuntimeError(
             "Wayland GTK chooser did not select the exact isolated Workspace path; "
-            f"bounded_state={diagnostics}"
+            f"attempts={len(delay_attempts)}; bounded_state={diagnostics}"
         )
 
     accept = _find_operable_accessible("選択", root=chooser, timeout=10, exact=True)
@@ -7535,7 +7546,7 @@ def run_installed_smoke(
                             "product_version": record["product_version"],
                             "installed_package_sha256": record["package_sha256"],
                             "display_server": "隔離Sway headless/Pixman；X11 DISPLAY未設定",
-                            "keyboard_input": "AT-SPI focus後にwtypeで実キー入力（30文字超は100ms間隔、その他40ms。不一致は1回だけ160msで再入力）",
+                            "keyboard_input": "AT-SPI focus後にwtypeで実キー入力（30文字超は100ms間隔、その他40ms。実値不一致時は1回だけ160msで再入力）",
                             "visible_window": "AT-SPI SHOWING",
                             "workspace_selection": workspace_evidence,
                             "live_installed_runner": live_runner,

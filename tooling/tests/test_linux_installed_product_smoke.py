@@ -2847,8 +2847,13 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                 ),
                 patch(
                     "tooling.tests.linux_installed_product_smoke._gtk_location_entry_value",
-                    return_value=str(folder),
+                    side_effect=[str(folder) + "-partial", str(folder)],
                 ),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke.time.monotonic",
+                    side_effect=[0, 0, 11, 12, 12],
+                ),
+                patch("tooling.tests.linux_installed_product_smoke.time.sleep"),
                 patch(
                     "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
                     return_value=accept,
@@ -2877,9 +2882,13 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                 ["wtype", "-M", "ctrl", "-k", "a", "-m", "ctrl"],
                 ["wtype", "-d", "100" if len(str(folder)) > 30 else "40", "-"],
                 ["wtype", "-k", "Return"],
+                ["wtype", "-M", "ctrl", "-k", "l", "-m", "ctrl"],
+                ["wtype", "-M", "ctrl", "-k", "a", "-m", "ctrl"],
+                ["wtype", "-d", "160", "-"],
+                ["wtype", "-k", "Return"],
             ],
         )
-        self.assertEqual(run.call_count, 4)
+        self.assertEqual(run.call_count, 8)
         activate.assert_called_once_with(accept, "選択", {"WAYLAND_DISPLAY": "wayland-1"})
         wait_closed.assert_called_once()
 
