@@ -15,7 +15,7 @@ import unittest
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 from unittest.mock import call, patch
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from tooling.tests.linux_installed_product_smoke import (
     _LinuxAgentTaskResponsesServer,
@@ -61,12 +61,15 @@ from tooling.tests.linux_installed_product_smoke import (
     _run_rust_test,
     _safe_log_tail,
     _select_folder_in_gtk_chooser,
+    _select_folder_in_wayland_gtk_chooser,
     _set_public_text_by_keyboard,
+    _set_public_text_by_wayland_keyboard,
     _secret_service_item_labels,
     _verify_export_manifest,
     _verify_credential_audit,
     _verify_live_audit,
     _verify_workspace_projection,
+    _installed_acceptance_runtime_directory,
     _wait_for_workspace_projection,
     _wait_for_installed_task_id,
     _wait_for_installed_task_result_or_terminal,
@@ -86,6 +89,8 @@ from tooling.tests.linux_installed_product_smoke import (
     _write_linux_workspace_acceptance_fixture,
     _write_linux_agent_task_fixture,
     _wayland_launch_environment,
+    _publish_wayland_dbus_activation_environment,
+    _parse_xdg_document_portal_mount_points,
     LINUX_AGENT_TASK_DEADLINE_TEST_LIMIT_MS,
     LINUX_AGENT_TASK_INITIAL_TOOL_YIELD_MS,
     MCP_OWNER_ARGUMENT_HASH_MARKER,
@@ -1166,6 +1171,45 @@ class InstalledMcpToolListTests(unittest.TestCase):
 
 
 class LinuxWaylandEnvironmentTests(unittest.TestCase):
+    def test_wayland_workspace_runtime_is_short_and_run_owned(self) -> None:
+        temp_root = PurePosixPath(
+            "/home/runner/work/_temp/d4p-linux-export-99999999999-1"
+        )
+        acceptance_root = temp_root / "wayland-workspace-selection"
+
+        runtime = _installed_acceptance_runtime_directory(
+            "wayland_workspace_selection", acceptance_root, temp_root
+        )
+        socket_path = str(runtime / "wayland-0")
+
+        self.assertEqual(runtime, temp_root / "sway-runtime")
+        self.assertLess(len(socket_path.encode("utf-8")) + 1, 108)
+        self.assertEqual(runtime.parent, temp_root)
+
+    def test_xdg_document_portal_mount_parser_is_run_root_scoped(self) -> None:
+        runtime = "/tmp/d4p isolated/runtime"
+        doc_root = f"{runtime}/doc"
+        by_app = f"{doc_root}/by-app"
+        escaped_doc = doc_root.replace(" ", r"\040")
+        escaped_by_app = by_app.replace(" ", r"\040")
+        mount_info = "\n".join(
+            (
+                f"36 25 0:32 / {escaped_doc} rw - fuse.portal portal rw",
+                f"37 36 0:33 / {escaped_by_app} rw - fuse.portal portal rw",
+                f"38 25 0:34 / {runtime}-other/doc rw - fuse.portal other rw",
+            )
+        )
+
+        mounts = _parse_xdg_document_portal_mount_points(runtime, mount_info)
+
+        self.assertEqual(mounts, [by_app, doc_root])
+
+    def test_xdg_document_portal_mount_parser_rejects_parent_traversal(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "cleanup root"):
+            _parse_xdg_document_portal_mount_points(
+                "/tmp/d4p/runtime/../outside", ""
+            )
+
     def test_wayland_launch_environment_cannot_fall_back_to_x11(self) -> None:
         source = {
             "DISPLAY": ":99",
@@ -1184,6 +1228,250 @@ class LinuxWaylandEnvironmentTests(unittest.TestCase):
         self.assertEqual(result["WAYLAND_DISPLAY"], "wayland-test")
         self.assertEqual(result["XDG_RUNTIME_DIR"], source["XDG_RUNTIME_DIR"])
         self.assertEqual(source["DISPLAY"], ":99")
+
+    def test_wayland_accessible_action_does_not_fall_back_to_x11_coordinates(self) -> None:
+        class Actions:
+            nActions = 1
+
+            def getName(self, _index: int) -> str:
+                return "focus"
+
+            def doAction(self, _index: int) -> bool:
+                return False
+
+        class Node:
+            def queryAction(self):
+                return Actions()
+
+        environment = {
+            "WAYLAND_DISPLAY": "wayland-test",
+            "XDG_SESSION_TYPE": "wayland",
+        }
+        with patch(
+            "tooling.tests.linux_installed_product_smoke._click_accessible_by_coordinates"
+        ) as click:
+            with self.assertRaisesRegex(RuntimeError, "Waylandでは座標入力へfallbackせず"):
+                _activate_accessible(Node(), "Wayland control", environment)
+
+        click.assert_not_called()
+
+    def test_wayland_public_text_uses_virtual_keyboard_after_accessible_focus(self) -> None:
+        class TextField:
+            name = "Workspace ID"
+            childCount = 0
+
+            def __init__(self) -> None:
+                self.value = ""
+
+            def queryEditableText(self):
+                return self
+
+            def queryText(self):
+                return self
+
+            def getText(self, _start: int, _end: int) -> str:
+                return self.value
+
+        field = TextField()
+        environment = {
+            "WAYLAND_DISPLAY": "wayland-test",
+            "XDG_SESSION_TYPE": "wayland",
+        }
+        def send_keys(command, *, input=None, **_kwargs):
+            if command == ["wtype", "-M", "ctrl", "-k", "a", "-m", "ctrl"]:
+                field.value = ""
+            elif command == ["wtype", "-d", "100", "-"]:
+                field.value += (input or "")[:-1]
+            elif command == ["wtype", "-d", "160", "-"]:
+                field.value += input or ""
+            return types.SimpleNamespace(returncode=0)
+
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._focus_accessible_text",
+                return_value=True,
+            ) as focus,
+            patch(
+                "tooling.tests.linux_installed_product_smoke.subprocess.run",
+                side_effect=send_keys,
+            ) as run,
+        ):
+            long_value = "x" * 131
+            _set_public_text_by_keyboard(
+                field,
+                "Workspace ID",
+                long_value,
+                environment,
+                None,
+            )
+
+        self.assertEqual(field.value, long_value)
+        self.assertEqual(focus.call_count, 2)
+        self.assertEqual(run.call_count, 4)
+        self.assertEqual(run.call_args_list[1].kwargs["timeout"], 18.1)
+        self.assertEqual(run.call_args_list[3].kwargs["timeout"], 25.96)
+
+    def test_wayland_public_text_fails_closed_without_accessibility_focus(self) -> None:
+        class TextField:
+            name = "Workspace ID"
+            childCount = 0
+
+            def __init__(self) -> None:
+                self.value = ""
+
+            def queryEditableText(self):
+                return self
+
+            def queryText(self):
+                return self
+
+            def getText(self, _start: int, _end: int) -> str:
+                return self.value
+
+        field = TextField()
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._focus_accessible_text",
+                return_value=False,
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke.subprocess.run"
+            ) as run,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "keyboard focus"):
+                _set_public_text_by_wayland_keyboard(
+                    field,
+                    "Workspace ID",
+                    "test-value",
+                    {"WAYLAND_DISPLAY": "wayland-test"},
+                )
+        run.assert_not_called()
+
+    def test_wayland_public_text_uses_control_action_when_grab_focus_is_rejected(
+        self,
+    ) -> None:
+        class TextField:
+            name = "Workspace ID"
+            childCount = 0
+
+            def __init__(self) -> None:
+                self.focused = False
+                self.value = ""
+
+            def queryComponent(self):
+                class Component:
+                    def grabFocus(self) -> bool:
+                        return False
+
+                return Component()
+
+            def queryAction(self):
+                field = self
+
+                class Actions:
+                    nActions = 2
+
+                    def getName(self, index: int) -> str:
+                        return ("tap", "focus")[index]
+
+                    def doAction(self, index: int) -> bool:
+                        if index == 1:
+                            field.focused = True
+                        return True
+
+                return Actions()
+
+            def queryEditableText(self):
+                return self
+
+            def queryText(self):
+                return self
+
+            def getText(self, _start: int, _end: int) -> str:
+                return self.value
+
+        field = TextField()
+        def send_keys(command, *, input=None, **_kwargs):
+            if command == ["wtype", "-M", "ctrl", "-k", "a", "-m", "ctrl"]:
+                field.value = ""
+            elif command == ["wtype", "-d", "40", "-"]:
+                if not field.focused:
+                    return types.SimpleNamespace(returncode=1)
+                field.value += input or ""
+            return types.SimpleNamespace(returncode=0)
+
+        with patch(
+            "tooling.tests.linux_installed_product_smoke.subprocess.run",
+            side_effect=send_keys,
+        ):
+            _set_public_text_by_wayland_keyboard(
+                field,
+                "Workspace ID",
+                "test-value",
+                {"WAYLAND_DISPLAY": "wayland-test"},
+            )
+        self.assertEqual(field.value, "test-value")
+
+    def test_wayland_public_text_fails_closed_when_virtual_keyboard_fails(
+        self,
+    ) -> None:
+        class TextField:
+            name = "Workspace ID"
+            childCount = 0
+
+            def queryEditableText(self):
+                return self
+
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._focus_accessible_text",
+                return_value=True,
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke.subprocess.run",
+                return_value=types.SimpleNamespace(returncode=1),
+            ),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "仮想keyboard入力が失敗"):
+                _set_public_text_by_wayland_keyboard(
+                    TextField(),
+                    "Workspace ID",
+                    "test-value",
+                    {"WAYLAND_DISPLAY": "wayland-test"},
+                )
+
+    def test_wayland_dbus_activation_environment_includes_compositor_runtime(self) -> None:
+        from tooling.tests.linux_installed_product_smoke import (
+            _publish_wayland_dbus_activation_environment,
+        )
+
+        environment = {
+            "WAYLAND_DISPLAY": "wayland-d4-test",
+            "XDG_RUNTIME_DIR": "/tmp/d4-wayland-runtime",
+            "XDG_SESSION_TYPE": "wayland",
+            "XDG_CURRENT_DESKTOP": "weston",
+            "GDK_BACKEND": "wayland",
+            "DBUS_SESSION_BUS_ADDRESS": "unix:path=/tmp/d4-session-bus",
+        }
+        with patch(
+            "tooling.tests.linux_installed_product_smoke.subprocess.run",
+            return_value=subprocess.CompletedProcess([], 0, "", ""),
+        ) as run:
+            _publish_wayland_dbus_activation_environment(environment)
+
+        args = run.call_args.args[0]
+        self.assertEqual(args[0], "dbus-update-activation-environment")
+        self.assertEqual(
+            set(args[1:]),
+            {
+                "WAYLAND_DISPLAY",
+                "XDG_RUNTIME_DIR",
+                "XDG_SESSION_TYPE",
+                "XDG_CURRENT_DESKTOP",
+                "GDK_BACKEND",
+            },
+        )
+        self.assertEqual(run.call_args.kwargs["env"], environment)
 
 
 class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
@@ -1810,6 +2098,47 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                 ["xdotool", "key", "--clearmodifiers", "ctrl+k"],
             ],
         )
+        self.assertEqual(find_accessible.call_count, 5)
+
+    def test_wayland_agent_palette_selects_exact_visible_command_without_search_input(self) -> None:
+        window = object()
+        destination_window = object()
+        palette_button = object()
+        command = object()
+        environment = {
+            "WAYLAND_DISPLAY": "wayland-test",
+            "XDG_SESSION_TYPE": "wayland",
+        }
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_accessible",
+                side_effect=(window, object(), object(), destination_window, object()),
+            ) as find_accessible,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
+                side_effect=(palette_button, command),
+            ) as find_operable,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._activate_accessible"
+            ) as activate,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._set_public_text_by_wayland_keyboard"
+            ) as set_text,
+        ):
+            self.assertIs(
+                _open_agent_center_from_installed_ui(environment, None),
+                destination_window,
+            )
+
+        self.assertEqual(
+            [call.args[0] for call in find_operable.call_args_list],
+            ["コマンドパレット", "エージェントセンターを開く"],
+        )
+        self.assertEqual(
+            [call.args[1] for call in activate.call_args_list],
+            ["コマンドパレット", "エージェントセンターを開く"],
+        )
+        set_text.assert_not_called()
         self.assertEqual(find_accessible.call_count, 5)
 
     def test_missing_agent_registration_action_reports_broker_unavailable(self) -> None:
@@ -2489,6 +2818,70 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             self.assertEqual(
                 _gtk_location_entry_value(object()), "/tmp/selected-workspace"
             )
+
+    def test_wayland_folder_chooser_opens_hidden_location_entry_with_ctrl_l(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            folder = Path(directory) / "selected-workspace"
+            folder.mkdir()
+            chooser = object()
+            accept = object()
+            completed = subprocess.CompletedProcess(
+                args=[], returncode=0, stdout=b"", stderr=b""
+            )
+            with (
+                patch(
+                    "tooling.tests.linux_installed_product_smoke.subprocess.run",
+                    return_value=completed,
+                ) as run,
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._find_accessible",
+                    return_value=chooser,
+                ),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._gtk_location_entry_candidates",
+                    return_value=[],
+                ),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._accessible_nodes",
+                    return_value=iter([]),
+                ),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._gtk_location_entry_value",
+                    return_value=str(folder),
+                ),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
+                    return_value=accept,
+                ),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._activate_accessible"
+                ) as activate,
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._wait_for_gtk_dialog_closed"
+                ) as wait_closed,
+            ):
+                _select_folder_in_wayland_gtk_chooser(
+                    {"WAYLAND_DISPLAY": "wayland-1"},
+                    folder,
+                    screenshot_before_selection_path=None,
+                    screenshot_path=None,
+                )
+
+        self.assertEqual(
+            run.call_args_list[0].args[0],
+            ["wtype", "-M", "ctrl", "-k", "l", "-m", "ctrl"],
+        )
+        self.assertEqual(
+            [call.args[0] for call in run.call_args_list[1:]],
+            [
+                ["wtype", "-M", "ctrl", "-k", "a", "-m", "ctrl"],
+                ["wtype", "-d", "100" if len(str(folder)) > 30 else "40", "-"],
+                ["wtype", "-k", "Return"],
+            ],
+        )
+        self.assertEqual(run.call_count, 4)
+        activate.assert_called_once_with(accept, "選択", {"WAYLAND_DISPLAY": "wayland-1"})
+        wait_closed.assert_called_once()
 
     def test_folder_chooser_diagnostics_emit_only_bounded_state(self) -> None:
         from types import SimpleNamespace

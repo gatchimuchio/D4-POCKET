@@ -231,6 +231,10 @@ def _weston_arguments(
     return arguments
 
 
+def _sway_arguments(config_path: Path) -> list[str]:
+    return ["sway", "--debug", "--config", str(config_path)]
+
+
 def _decode_png_rgba(image: bytes) -> tuple[int, int, bytes]:
     signature = b"\x89PNG\r\n\x1a\n"
     if len(image) > 64 * 1024 * 1024 or not image.startswith(signature):
@@ -556,6 +560,95 @@ def _start_wayland_compositor(
     raise RuntimeError(
         _failure_with_runner_output(
             "Westonのheadless backend指定が全て拒否されました",
+            log_path,
+            runtime.parent,
+        )
+    )
+
+
+def _start_sway_compositor(
+    runtime: Path,
+    environment: dict[str, str],
+    log_path: Path,
+) -> tuple[subprocess.Popen[bytes], str]:
+    """検査専用の隔離Sway headless Wayland sessionを起動する。"""
+    if not runtime.is_dir() or runtime.is_symlink():
+        raise RuntimeError("隔離Sway runtimeが通常directoryではありません")
+    if log_path.exists() or log_path.is_symlink():
+        raise RuntimeError("隔離Sway logが事前に存在しています")
+    config_path = log_path.with_name("sway.conf")
+    if config_path.exists() or config_path.is_symlink():
+        raise RuntimeError("隔離Sway configが事前に存在しています")
+
+    existing_sockets = [
+        path
+        for path in runtime.glob("wayland-*")
+        if stat.S_ISSOCK(path.lstat().st_mode)
+    ]
+    if existing_sockets:
+        raise RuntimeError("隔離Sway runtimeに既存Wayland socketがあります")
+
+    with config_path.open("x", encoding="utf-8") as config:
+        config.write("xwayland disable\n")
+    compositor_environment = environment.copy()
+    for name in (
+        "DISPLAY",
+        "XAUTHORITY",
+        "WAYLAND_DISPLAY",
+        "GDK_BACKEND",
+        "SWAYSOCK",
+    ):
+        compositor_environment.pop(name, None)
+    compositor_environment.update(
+        {
+            "XDG_CURRENT_DESKTOP": "sway",
+            "XDG_SESSION_TYPE": "wayland",
+            "WLR_BACKENDS": "headless",
+            "WLR_RENDERER": "pixman",
+            "WLR_LIBINPUT_NO_DEVICES": "1",
+        }
+    )
+    with log_path.open("xb") as log:
+        compositor = subprocess.Popen(
+            _sway_arguments(config_path),
+            env=compositor_environment,
+            stdin=subprocess.DEVNULL,
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+
+    deadline = time.monotonic() + 20
+    while time.monotonic() < deadline:
+        if compositor.poll() is not None:
+            raise RuntimeError(
+                _failure_with_runner_output(
+                    f"隔離Sway compositorが起動前に終了しました: {compositor.returncode}",
+                    log_path,
+                    runtime.parent,
+                )
+            )
+        sockets = [
+            path
+            for path in runtime.glob("wayland-*")
+            if stat.S_ISSOCK(path.lstat().st_mode)
+        ]
+        if len(sockets) == 1:
+            display_name = sockets[0].name
+            print(
+                "検査用Sway: WLR_BACKENDS=headless、WLR_RENDERER=pixman、"
+                "wtype仮想keyboard入力を有効化"
+            )
+            return compositor, display_name
+        if len(sockets) > 1:
+            _terminate_group(compositor)
+            raise RuntimeError("隔離Sway runtimeに複数Wayland socketが作られました")
+        time.sleep(0.1)
+
+    _terminate_group(compositor)
+    raise RuntimeError(
+        _failure_with_runner_output(
+            "隔離Sway compositorのWayland socketが時間内に作成されませんでした",
             log_path,
             runtime.parent,
         )

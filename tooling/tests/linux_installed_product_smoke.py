@@ -20,6 +20,7 @@ import subprocess
 import sys
 import threading
 import time
+import traceback
 import uuid
 from pathlib import Path, PurePosixPath
 
@@ -69,6 +70,7 @@ if __package__:
         _capture_weston_frame,
         _different_pixel_count,
         _request_x11_window_manager_close,
+        _start_sway_compositor,
         _start_wayland_compositor,
         _terminate_group,
     )
@@ -77,6 +79,7 @@ else:
         _capture_weston_frame,
         _different_pixel_count,
         _request_x11_window_manager_close,
+        _start_sway_compositor,
         _start_wayland_compositor,
         _terminate_group,
     )
@@ -648,6 +651,157 @@ def _wayland_launch_environment(
     return result
 
 
+def _publish_wayland_dbus_activation_environment(
+    environment: dict[str, str],
+) -> None:
+    """Pass the compositor session to D-Bus-activated GTK portal services."""
+    names = (
+        "WAYLAND_DISPLAY",
+        "XDG_RUNTIME_DIR",
+        "XDG_SESSION_TYPE",
+        "XDG_CURRENT_DESKTOP",
+        "GDK_BACKEND",
+    )
+    if any(not environment.get(name) for name in names):
+        raise RuntimeError("Wayland portal用のD-Bus session environmentが不足しています")
+    try:
+        result = subprocess.run(
+            ["dbus-update-activation-environment", *names],
+            env=environment,
+            capture_output=True,
+            check=False,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        raise RuntimeError(
+            "Wayland portal用D-Bus activation environmentを更新できません"
+        ) from None
+    if result.returncode != 0:
+        raise RuntimeError(
+            "Wayland portal用D-Bus activation environment更新が失敗しました "
+            f"(exit={result.returncode})"
+        )
+
+
+def _parse_xdg_document_portal_mount_points(
+    runtime_path: str, mount_info_text: str
+) -> list[str]:
+    runtime = PurePosixPath(runtime_path)
+    if not runtime.is_absolute() or ".." in runtime.parts:
+        raise RuntimeError("XDG Document Portal cleanup rootが不正です")
+    portal_root = runtime / "doc"
+    mounts: set[str] = set()
+    for line in mount_info_text.splitlines():
+        before_separator, separator, _ = line.partition(" - ")
+        fields = before_separator.split()
+        if not separator or len(fields) < 5:
+            continue
+        mount_path = re.sub(
+            r"\\([0-7]{3})",
+            lambda match: chr(int(match.group(1), 8)),
+            fields[4],
+        )
+        candidate = PurePosixPath(mount_path)
+        if candidate == portal_root or portal_root in candidate.parents:
+            mounts.add(str(candidate))
+    return sorted(mounts, key=lambda value: len(PurePosixPath(value).parts), reverse=True)
+
+
+def _cleanup_xdg_document_portal_mounts(
+    runtime: Path, temp_root: Path, environment: dict[str, str]
+) -> None:
+    if (
+        not runtime.is_absolute()
+        or runtime.is_symlink()
+        or not runtime.is_dir()
+        or runtime.resolve(strict=True) != runtime
+        or temp_root not in runtime.parents
+        or environment.get("XDG_RUNTIME_DIR") != str(runtime)
+    ):
+        raise RuntimeError("XDG Document Portal cleanup rootがrun固有runtime外です")
+    mount_info_path = Path("/proc/self/mountinfo")
+    try:
+        mount_info = mount_info_path.read_text(encoding="utf-8")
+    except OSError as error:
+        raise RuntimeError(
+            f"XDG Document Portal mount tableを読めません ({type(error).__name__})"
+        ) from None
+    mount_points = _parse_xdg_document_portal_mount_points(
+        str(runtime), mount_info
+    )
+    if not mount_points:
+        return
+    fusermount = shutil.which("fusermount3")
+    if fusermount is None:
+        raise RuntimeError("XDG Document Portal mount解放にfusermount3がありません")
+    for mount_point in mount_points:
+        try:
+            result = subprocess.run(
+                [fusermount, "-u", mount_point],
+                env=environment,
+                capture_output=True,
+                check=False,
+                timeout=10,
+            )
+        except (OSError, subprocess.TimeoutExpired) as error:
+            raise RuntimeError(
+                f"run所有XDG Document Portal mountを解放できません ({type(error).__name__})"
+            ) from None
+        if result.returncode != 0:
+            raise RuntimeError(
+                "run所有XDG Document Portal mount解放が失敗しました "
+                f"(exit={result.returncode})"
+            )
+        try:
+            remaining = _parse_xdg_document_portal_mount_points(
+                str(runtime), mount_info_path.read_text(encoding="utf-8")
+            )
+        except OSError as error:
+            raise RuntimeError(
+                f"XDG Document Portal mount解放後の確認ができません ({type(error).__name__})"
+            ) from None
+        if mount_point in remaining:
+            raise RuntimeError("XDG Document Portal mountが解放後も残っています")
+
+
+def _installed_acceptance_runtime_directory(
+    acceptance_scope: str, acceptance_root: Path, temp_root: Path
+) -> Path:
+    if acceptance_scope == "wayland_workspace_selection":
+        return temp_root / "sway-runtime"
+    return acceptance_root / "runtime"
+
+
+def _cleanup_owned_sway_runtime(runtime: Path, temp_root: Path) -> None:
+    expected = temp_root / "sway-runtime"
+    if (
+        runtime != expected
+        or not temp_root.is_absolute()
+        or temp_root.is_symlink()
+        or not temp_root.is_dir()
+        or temp_root.resolve(strict=True) != temp_root
+    ):
+        raise RuntimeError("Sway runtime cleanup対象がrun所有pathではありません")
+    if not runtime.exists() and not runtime.is_symlink():
+        return
+    try:
+        metadata = runtime.lstat()
+    except OSError as error:
+        raise RuntimeError(
+            f"Sway runtime cleanup対象を確認できません ({type(error).__name__})"
+        ) from None
+    if (
+        not stat.S_ISDIR(metadata.st_mode)
+        or metadata.st_uid != os.getuid()
+        or metadata.st_mode & 0o077
+        or runtime.resolve(strict=True) != runtime
+    ):
+        raise RuntimeError("Sway runtime cleanup対象がprivateなrun所有directoryではありません")
+    shutil.rmtree(runtime)
+    if runtime.exists() or runtime.is_symlink():
+        raise RuntimeError("Sway runtime directoryをcleanupできません")
+
+
 def _visible_wayland_window(window) -> bool:
     try:
         import pyatspi
@@ -655,6 +809,20 @@ def _visible_wayland_window(window) -> bool:
         return window.getState().contains(pyatspi.STATE_SHOWING)
     except Exception as error:
         raise RuntimeError("導入済みWayland GTK windowの表示状態を取得できません") from error
+
+
+def _is_wayland_environment(environment: dict[str, str]) -> bool:
+    return bool(environment.get("WAYLAND_DISPLAY")) and environment.get(
+        "XDG_SESSION_TYPE"
+    ) == "wayland"
+
+
+def _wayland_named_window_is_visible(name: str, *, timeout: float = 0.2) -> bool:
+    try:
+        window = _find_accessible(name, timeout=timeout)
+    except RuntimeError:
+        return False
+    return _visible_wayland_window(window)
 
 
 def _accessible_nodes(
@@ -839,6 +1007,35 @@ def _editable_text_ancestor(node, *, max_depth: int = 16):
         except Exception:
             current = _accessible_parent(current)
     return None
+
+
+def _focus_accessible_text(editable) -> bool:
+    """AT-SPI Componentまたは同じText欄のfocus/click Actionで焦点を要求する。"""
+    try:
+        if editable.queryComponent().grabFocus() is True:
+            return True
+    except Exception:
+        pass
+    try:
+        actions = editable.queryAction()
+        action_names = [
+            actions.getName(index).strip().lower()
+            for index in range(actions.nActions)
+        ]
+        for expected in (
+            "focus",
+            "set focus",
+            "tap",
+            "click",
+            "press",
+            "activate",
+        ):
+            for index, action_name in enumerate(action_names):
+                if action_name == expected and actions.doAction(index):
+                    return True
+    except Exception:
+        pass
+    return False
 
 
 def _component_center(node) -> tuple[int, int] | None:
@@ -1088,6 +1285,10 @@ def _activate_accessible(node, name: str, environment: dict[str, str]) -> None:
                     return
     except Exception:
         pass
+    if _is_wayland_environment(environment):
+        raise RuntimeError(
+            f"Waylandでは座標入力へfallbackせず、AT-SPI actionを要求します: {name}"
+        )
     _click_accessible_by_coordinates(node, name, environment)
 
 
@@ -1288,7 +1489,7 @@ def _set_public_text_by_keyboard(
     label: str,
     value: str,
     environment: dict[str, str],
-    window_id: str,
+    window_id: str | None,
 ) -> None:
     if (
         not value
@@ -1299,6 +1500,9 @@ def _set_public_text_by_keyboard(
         )
     ):
         raise RuntimeError("公開GTK欄の値が空か、許容形式を超えています")
+    if _is_wayland_environment(environment):
+        _set_public_text_by_wayland_keyboard(root, label, value, environment)
+        return
     node = _find_accessible(label, root=root, timeout=10)
     editable_node = _editable_text_ancestor(node)
 
@@ -1356,6 +1560,105 @@ def _set_public_text_by_keyboard(
             return
         time.sleep(0.05)
     raise RuntimeError(f"公開GTKテキスト欄{label!r}に入力した識別子が反映されませんでした")
+
+
+def _set_public_text_by_wayland_keyboard(
+    root, label: str, value: str, environment: dict[str, str]
+) -> None:
+    """AT-SPIで公開欄へfocusし、Wayland仮想keyboardで実キー入力する。"""
+    editable_candidates = []
+    for node, accessible_name in _accessible_nodes(root, deadline=time.monotonic() + 5):
+        if label not in accessible_name:
+            continue
+        editable = _editable_text_ancestor(node)
+        if editable is not None and all(
+            _accessible_identity(editable) != _accessible_identity(candidate)
+            for candidate in editable_candidates
+        ):
+            editable_candidates.append(editable)
+    if len(editable_candidates) != 1:
+        raise RuntimeError(
+            f"公開Wayland欄のAT-SPI EditableTextが一意ではありません: {label}"
+        )
+    editable = editable_candidates[0]
+    focus_requested = _focus_accessible_text(editable)
+    if not focus_requested:
+        raise RuntimeError(
+            f"公開Wayland欄へkeyboard focusを設定できません: {label}"
+        )
+
+    def send_keys(arguments: list[str], *, text: str | None = None) -> None:
+        timeout_seconds = 15
+        if text is not None and "-d" in arguments:
+            delay_index = arguments.index("-d") + 1
+            delay_ms = int(arguments[delay_index])
+            timeout_seconds = max(
+                timeout_seconds, len(text) * delay_ms / 1000 + 5
+            )
+        try:
+            result = subprocess.run(
+                ["wtype", *arguments],
+                env=environment,
+                input=text,
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=timeout_seconds,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            raise RuntimeError("Wayland仮想keyboard入力を実行できません") from None
+        if result.returncode != 0:
+            raise RuntimeError(
+                "Wayland仮想keyboard入力が失敗しました "
+                f"(exit={result.returncode})"
+            )
+
+    observed_length = 0
+    candidate_count = 0
+    initial_delay_ms = 100 if len(value) > 30 else 40
+    delay_attempts = (initial_delay_ms, max(initial_delay_ms, 160))
+    for attempt, delay_ms in enumerate(delay_attempts):
+        if attempt and not _focus_accessible_text(editable):
+            break
+        send_keys(["-M", "ctrl", "-k", "a", "-m", "ctrl"])
+        lines = value.split("\n")
+        for index, line in enumerate(lines):
+            if line:
+                send_keys(["-d", str(delay_ms), "-"], text=line)
+            if index < len(lines) - 1:
+                send_keys(["-k", "Return"])
+        deadline = time.monotonic() + 2
+        while time.monotonic() < deadline:
+            direct_text = _accessible_text(editable)
+            observed_length = len(direct_text)
+            if direct_text == value:
+                return
+            current_candidates = []
+            for node, accessible_name in _accessible_nodes(
+                root, deadline=min(deadline, time.monotonic() + 0.25)
+            ):
+                if label not in accessible_name:
+                    continue
+                current = _editable_text_ancestor(node)
+                if current is not None and all(
+                    _accessible_identity(current) != _accessible_identity(candidate)
+                    for candidate in current_candidates
+                ):
+                    current_candidates.append(current)
+            candidate_count = len(current_candidates)
+            if candidate_count == 1:
+                current_text = _accessible_text(current_candidates[0])
+                observed_length = len(current_text)
+                if current_text == value:
+                    return
+            time.sleep(0.05)
+    raise RuntimeError(
+        f"公開GTK欄{label!r}に設定した値が反映されませんでした "
+        f"(focus_requested={'yes' if focus_requested else 'no'}, "
+        f"editable_candidates={candidate_count}, observed_length={observed_length}, "
+        f"expected_length={len(value)}, attempts={len(delay_attempts)}; "
+        f"{_accessibility_debug(editable)})"
+    )
 
 
 def _enter_native_credential_secret(dialog, secret: str) -> None:
@@ -2036,7 +2339,12 @@ WORKSPACE_REGISTERED_SECRET = "D4P_WORKSPACE_REGISTERED_SECRET_CANARY_4F2C"
 WORKSPACE_OUTSIDE_SECRET = "D4P_WORKSPACE_OUTSIDE_SECRET_CANARY_93D1"
 
 
-def _gtk_dialog_window_id(environment: dict[str, str], title: str) -> str:
+def _gtk_dialog_window_id(
+    environment: dict[str, str], title: str
+) -> str | None:
+    if _is_wayland_environment(environment):
+        _find_accessible(title, timeout=10)
+        return None
     result = subprocess.run(
         ["xdotool", "search", "--onlyvisible", "--name", f"^{re.escape(title)}$"],
         env=environment,
@@ -2052,7 +2360,12 @@ def _gtk_dialog_window_id(environment: dict[str, str], title: str) -> str:
     return window_ids[0]
 
 
-def _assert_gtk_chooser_open(environment: dict[str, str], window_id: str) -> None:
+def _assert_gtk_chooser_open(
+    environment: dict[str, str], window_id: str | None
+) -> None:
+    if _is_wayland_environment(environment):
+        _find_accessible("D4 Pocket 作業領域の選択", timeout=2)
+        return
     visible = subprocess.run(
         [
             "xdotool",
@@ -2161,6 +2474,13 @@ def _wait_for_gtk_dialog_closed(
 ) -> None:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
+        if _is_wayland_environment(environment):
+            if not _wayland_named_window_is_visible(
+                title, timeout=min(0.2, deadline - time.monotonic())
+            ):
+                return
+            time.sleep(0.1)
+            continue
         result = subprocess.run(
             ["xdotool", "search", "--onlyvisible", "--name", f"^{re.escape(title)}$"],
             env=environment,
@@ -2174,8 +2494,7 @@ def _wait_for_gtk_dialog_closed(
     raise RuntimeError(f"GTK OS選択dialogが{action}後も閉じませんでした")
 
 
-def _gtk_location_entry_value(chooser) -> str | None:
-    """GTK chooser上部の編集可能な絶対path欄を一意に読む。"""
+def _gtk_location_entry_candidates(chooser):
     candidates = []
     for node, _ in _accessible_nodes(chooser):
         try:
@@ -2192,11 +2511,17 @@ def _gtk_location_entry_value(chooser) -> str | None:
             or len(value) > 4096
         ):
             continue
-        candidates.append((bounds[2], value))
+        candidates.append((bounds[2], value, node))
+    return candidates
+
+
+def _gtk_location_entry_value(chooser) -> str | None:
+    """GTK chooser上部の編集可能な絶対path欄を一意に読む。"""
+    candidates = _gtk_location_entry_candidates(chooser)
     if not candidates:
         return None
-    largest_width = max(width for width, _ in candidates)
-    widest = {value for width, value in candidates if width == largest_width}
+    largest_width = max(width for width, _, _ in candidates)
+    widest = {value for width, value, _ in candidates if width == largest_width}
     return next(iter(widest)) if len(widest) == 1 else None
 
 
@@ -2265,7 +2590,9 @@ def _wait_for_workspace_root_value(expected: str, *, timeout: float = 5.0) -> No
     )
 
 
-def _open_workspace_folder_chooser(environment: dict[str, str], dialog) -> str:
+def _open_workspace_folder_chooser(
+    environment: dict[str, str], dialog
+) -> str | None:
     button = _find_operable_accessible("OSで作業領域を選択", root=dialog, timeout=10)
     _activate_accessible(button, "OSで作業領域を選択", environment)
     _find_accessible("D4 Pocket 作業領域の選択", timeout=10)
@@ -2274,7 +2601,7 @@ def _open_workspace_folder_chooser(environment: dict[str, str], dialog) -> str:
 
 def _select_folder_in_gtk_chooser(
     environment: dict[str, str],
-    chooser_window_id: str,
+    chooser_window_id: str | None,
     folder: Path,
     *,
     screenshot_before_selection_path: Path | None = None,
@@ -2299,6 +2626,18 @@ def _select_folder_in_gtk_chooser(
         raise RuntimeError(
             "GTKの選択試験用directoryは隔離HOME直下のpicker直下workspaceに限ります"
         )
+
+    if _is_wayland_environment(environment):
+        _select_folder_in_wayland_gtk_chooser(
+            environment,
+            folder,
+            screenshot_before_selection_path=screenshot_before_selection_path,
+            screenshot_path=screenshot_path,
+        )
+        return
+
+    if chooser_window_id is None:
+        raise RuntimeError("X11 GTK chooserのwindow IDがありません")
 
     subprocess.run(
         ["xdotool", "windowactivate", "--sync", chooser_window_id],
@@ -2414,6 +2753,103 @@ def _select_folder_in_gtk_chooser(
             "GTK folder selection did not close after AT-SPI action and exact-control coordinate fallback; "
             f"bounded_state={diagnostics}"
         ) from None
+
+
+def _select_folder_in_wayland_gtk_chooser(
+    environment: dict[str, str],
+    folder: Path,
+    *,
+    screenshot_before_selection_path: Path | None,
+    screenshot_path: Path | None,
+) -> None:
+    chooser = _find_accessible("D4 Pocket 作業領域の選択", timeout=10)
+    candidates = _gtk_location_entry_candidates(chooser)
+    if not candidates:
+        # GTK file choosers hide the location entry until the standard Ctrl+L
+        # shortcut is used. Keep this as real Wayland keyboard input: the
+        # acceptance must exercise the installed chooser, not mutate its
+        # accessibility model.
+        try:
+            result = subprocess.run(
+                ["wtype", "-M", "ctrl", "-k", "l", "-m", "ctrl"],
+                env=environment,
+                capture_output=True,
+                check=False,
+                timeout=5,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            raise RuntimeError(
+                "Wayland GTK chooserの場所入力を開けませんでした"
+            ) from None
+        if result.returncode != 0:
+            raise RuntimeError(
+                "Wayland GTK chooserの場所入力を開けませんでした "
+                f"(exit={result.returncode})"
+            )
+
+    else:
+        widest = max(width for width, _, _ in candidates)
+        location_nodes = [node for width, _, node in candidates if width == widest]
+        if len(location_nodes) != 1:
+            raise RuntimeError("Wayland GTK chooserのpath欄を一意に特定できません")
+        location = location_nodes[0]
+        if not _focus_accessible_text(location):
+            raise RuntimeError("Wayland GTK chooserの場所入力へfocusできません")
+
+    def send_keys(arguments: list[str], *, text: str | None = None) -> None:
+        timeout_seconds = 15
+        if text is not None and "-d" in arguments:
+            delay_index = arguments.index("-d") + 1
+            delay_ms = int(arguments[delay_index])
+            timeout_seconds = max(
+                timeout_seconds, len(text) * delay_ms / 1000 + 5
+            )
+        try:
+            result = subprocess.run(
+                ["wtype", *arguments],
+                env=environment,
+                input=text,
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=timeout_seconds,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            raise RuntimeError("Wayland GTK chooserへの実キー入力に失敗しました") from None
+        if result.returncode != 0:
+            raise RuntimeError(
+                "Wayland GTK chooserへの実キー入力に失敗しました "
+                f"(exit={result.returncode})"
+            )
+
+    send_keys(["-M", "ctrl", "-k", "a", "-m", "ctrl"])
+    delay_ms = 100 if len(str(folder)) > 30 else 40
+    send_keys(["-d", str(delay_ms), "-"], text=str(folder))
+    send_keys(["-k", "Return"])
+
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        chooser = _find_accessible("D4 Pocket 作業領域の選択", timeout=1)
+        if (
+            _normalize_gtk_path(_gtk_location_entry_value(chooser) or "")
+            == _normalize_gtk_path(str(folder))
+        ):
+            break
+        time.sleep(0.1)
+    else:
+        diagnostics = _gtk_folder_chooser_diagnostics(chooser, folder)
+        raise RuntimeError(
+            "Wayland GTK chooser did not select the exact isolated Workspace path; "
+            f"bounded_state={diagnostics}"
+        )
+
+    accept = _find_operable_accessible("選択", root=chooser, timeout=10, exact=True)
+    _activate_accessible(accept, "選択", environment)
+    _wait_for_gtk_dialog_closed(
+        environment,
+        "D4 Pocket 作業領域の選択",
+        action="Wayland GTK exact Workspace path and accept action",
+    )
 
 
 def _gtk_file_list_region(chooser) -> tuple[int, int, int, int, int] | None:
@@ -2705,18 +3141,32 @@ def _gtk_focused_accessible_roles(chooser) -> list[tuple[str, int]]:
     return sorted(roles.items())
 
 
-def _cancel_gtk_folder_chooser(environment: dict[str, str], chooser_window_id: str) -> None:
-    subprocess.run(
-        ["xdotool", "windowactivate", "--sync", chooser_window_id],
-        env=environment,
-        check=True,
-        timeout=5,
-    )
+def _cancel_gtk_folder_chooser(
+    environment: dict[str, str], chooser_window_id: str | None
+) -> None:
+    if not _is_wayland_environment(environment):
+        if chooser_window_id is None:
+            raise RuntimeError("X11 GTK chooserのwindow IDがありません")
+        subprocess.run(
+            ["xdotool", "windowactivate", "--sync", chooser_window_id],
+            env=environment,
+            check=True,
+            timeout=5,
+        )
     chooser = _find_accessible("D4 Pocket 作業領域の選択", timeout=10)
     cancel = _find_operable_accessible("取消", root=chooser, timeout=10)
-    _click_accessible_by_coordinates(cancel, "取消", environment)
+    if _is_wayland_environment(environment):
+        _activate_accessible(cancel, "取消", environment)
+    else:
+        _click_accessible_by_coordinates(cancel, "取消", environment)
     _wait_for_gtk_dialog_closed(
-        environment, "D4 Pocket 作業領域の選択", action="cancel control click"
+        environment,
+        "D4 Pocket 作業領域の選択",
+        action=(
+            "AT-SPI cancel control activation"
+            if _is_wayland_environment(environment)
+            else "cancel control click"
+        ),
     )
 
 
@@ -2831,9 +3281,29 @@ def _write_linux_workspace_acceptance_fixture(
 
 
 def _open_agent_center_from_installed_ui(
-    environment: dict[str, str], window_id: str
+    environment: dict[str, str], window_id: str | None
 ):
     window = _find_accessible(WINDOW_TITLE, timeout=10)
+    if _is_wayland_environment(environment):
+        palette_button = _find_operable_accessible(
+            "コマンドパレット", root=window, timeout=10
+        )
+        _activate_accessible(palette_button, "コマンドパレット", environment)
+        _find_accessible("コマンドパレット", root=window, timeout=10)
+        # The product lists page commands before any query is entered. Select
+        # the exact visible action directly; the search field shares its
+        # accessible label with the launcher button and is ambiguous in some
+        # GTK/AT-SPI trees.
+        command = _find_operable_accessible(
+            "エージェントセンターを開く", root=window, timeout=10
+        )
+        _activate_accessible(command, "エージェントセンターを開く", environment)
+        _find_accessible("エージェントセンター", timeout=10)
+        window = _find_accessible(WINDOW_TITLE, timeout=10)
+        _find_accessible("エージェントセンター", root=window, timeout=10)
+        return window
+    if window_id is None:
+        raise RuntimeError("Agent Centerへ移動するX11 window IDがありません")
     subprocess.run(
         ["xdotool", "windowactivate", "--sync", window_id],
         env=environment,
@@ -2860,8 +3330,12 @@ def _open_agent_center_from_installed_ui(
 def _open_installed_codex_registration(
     environment: dict[str, str], *, window_id: str | None = None
 ):
-    current_window_id = _visible_product_window(environment) or window_id
-    if current_window_id is None:
+    current_window_id = (
+        window_id
+        if _is_wayland_environment(environment)
+        else (_visible_product_window(environment) or window_id)
+    )
+    if current_window_id is None and not _is_wayland_environment(environment):
         raise RuntimeError("Agent Centerへ移動するinstalled product windowがありません")
     window = _open_agent_center_from_installed_ui(environment, current_window_id)
     try:
@@ -3443,8 +3917,12 @@ def _fill_linux_workspace_registration(
     runtime_id: str = "runtime-linux-workspace-acceptance",
     model_id: str = "model-linux-workspace-acceptance",
 ) -> None:
-    window_id = _visible_product_window(environment)
-    if window_id is None:
+    window_id = (
+        None
+        if _is_wayland_environment(environment)
+        else _visible_product_window(environment)
+    )
+    if window_id is None and not _is_wayland_environment(environment):
         raise RuntimeError("Workspace registration中にinstalled product windowがありません")
     for label, value in (
         ("模型識別子", model_id),
@@ -4580,13 +5058,14 @@ def _run_installed_agent_task_acceptance(
 
 def _run_installed_workspace_selection_acceptance(
     environment: dict[str, str],
-    window_id: str,
+    window_id: str | None,
     *,
     audit_store: Path,
     acceptance_root: Path,
     screenshot_before_selection_path: Path,
     screenshot_path: Path,
     inspector_failure_screenshot_path: Path,
+    registration_only: bool = False,
 ) -> dict[str, object]:
     fixture_root, workspace, decoy_workspace, cli_fixture, cli_marker = (
         _write_linux_workspace_acceptance_fixture(
@@ -4702,6 +5181,71 @@ def _run_installed_workspace_selection_acceptance(
 
     window = _find_accessible(WINDOW_TITLE, timeout=10)
     _find_accessible("Permission／Approval／Credential: 生成なし", root=window, timeout=10)
+    if registration_only:
+        audit_path = audit_store / "audit.jsonl"
+        try:
+            audit_text = audit_path.read_text(encoding="utf-8")
+            audit_events = [
+                json.loads(line)
+                for line in audit_text.splitlines()
+                if line
+            ]
+        except (OSError, UnicodeError, json.JSONDecodeError) as error:
+            raise RuntimeError(
+                "Wayland Workspace登録のdurable Auditが利用できません"
+            ) from error
+        accepted_registration = [
+            event
+            for event in audit_events
+            if event.get("operation") == "AgentCLI実行系作業領域登録"
+            and event.get("decision") == "accepted"
+            and event.get("evidence_source") == "LIVE_RUNTIME"
+        ]
+        if len(accepted_registration) != 1:
+            raise RuntimeError(
+                "Wayland Workspace登録のLIVE_RUNTIME accepted Auditが一意ではありません"
+            )
+        if any(
+            event.get("operation")
+            in {
+                "AgentTaskWorkspacePermissionGrant",
+                "AgentTaskOwnerApprovalGrant",
+            }
+            for event in audit_events
+        ):
+            raise RuntimeError(
+                "Wayland登録でTask用PermissionまたはApprovalが生成されました"
+            )
+        if any(
+            marker in audit_text
+            for marker in (
+                str(workspace),
+                secret_paths,
+                WORKSPACE_ENV_SECRET,
+                WORKSPACE_REGISTERED_SECRET,
+                WORKSPACE_OUTSIDE_SECRET,
+            )
+        ):
+            raise RuntimeError(
+                "Wayland Workspace登録rootまたはsecret markerがdurable Auditへ露出しました"
+            )
+        for secret in (
+            WORKSPACE_ENV_SECRET,
+            WORKSPACE_REGISTERED_SECRET,
+            WORKSPACE_OUTSIDE_SECRET,
+        ):
+            _assert_secret_absent_from_files(
+                acceptance_root, secret, excluded_roots=(fixture_root,)
+            )
+        return {
+            "workspace_selection": "Wayland GTK native chooser selected and cancellation preserved prior input",
+            "registration": "native Owner rejected before CLI probe, then independently approved",
+            "cli_interface_probe_calls": len(probe_calls),
+            "workspace_read_permission": "not requested",
+            "task_execution": "unsupported",
+            "audit_secret_and_root_exposure": "absent",
+            "accepted_registration_audit": "one LIVE_RUNTIME event",
+        }
     row = _find_workspace_inspector_control(
         workspace_id,
         workspace_id,
@@ -5345,6 +5889,14 @@ def _wait_for_owner_dialog_closed(
 ) -> None:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
+        if _is_wayland_environment(environment):
+            if not _wayland_named_window_is_visible(
+                OWNER_DIALOG_TITLE,
+                timeout=min(0.2, deadline - time.monotonic()),
+            ):
+                return
+            time.sleep(0.1)
+            continue
         result = subprocess.run(
             [
                 "xdotool",
@@ -5627,9 +6179,25 @@ def _wait_for_owner_dialog_window(
     context: str = "Owner確認",
     diagnostic_root=None,
     diagnostic_audit_path: Path | None = None,
-) -> str:
+) -> str | None:
     deadline = time.monotonic() + timeout
     while True:
+        if _is_wayland_environment(environment):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise RuntimeError(
+                    "GTK native Owner確認dialogが期限内に表示されません; "
+                    f"context={context}; "
+                    + _owner_dialog_timeout_diagnostics(
+                        environment, diagnostic_root, diagnostic_audit_path
+                    )
+                )
+            if _wayland_named_window_is_visible(
+                OWNER_DIALOG_TITLE, timeout=min(0.2, remaining)
+            ):
+                return None
+            time.sleep(min(0.1, remaining))
+            continue
         result = subprocess.run(
             [
                 "xdotool",
@@ -5664,6 +6232,21 @@ def _owner_dialog_timeout_diagnostics(
     diagnostic_root=None,
     diagnostic_audit_path: Path | None = None,
 ) -> str:
+    if _is_wayland_environment(environment):
+        try:
+            import pyatspi
+
+            desktop = pyatspi.Registry.getDesktop(0)
+            names = [
+                name
+                for _, name in _accessible_nodes(
+                    desktop, deadline=time.monotonic() + 1, max_depth=8
+                )
+                if name
+            ]
+            return _bounded_owner_text_diagnostics(names)
+        except Exception:
+            return "Wayland AT-SPI desktop unavailable"
     visible = subprocess.run(
         ["xdotool", "search", "--onlyvisible", "--name", ".*"],
         env=environment,
@@ -6497,7 +7080,10 @@ def run_installed_smoke(
     bundle_root: Path | None = None,
     source_commit: str | None = None,
 ) -> None:
-    needs_x11 = acceptance_scope != "wayland_rendering"
+    needs_x11 = acceptance_scope not in {
+        "wayland_rendering",
+        "wayland_workspace_selection",
+    }
     if (needs_x11 and not os.environ.get("DISPLAY")) or not os.environ.get(
         "DBUS_SESSION_BUS_ADDRESS"
     ):
@@ -6517,6 +7103,7 @@ def run_installed_smoke(
         "agent_task_supervision",
         "runtime_provenance",
         "wayland_rendering",
+        "wayland_workspace_selection",
     }:
         raise RuntimeError("installed acceptance scopeが未対応です")
     if acceptance_scope == "runtime_provenance":
@@ -6526,10 +7113,10 @@ def run_installed_smoke(
             resolved_source = source.resolve(strict=True)
             if temp_root not in resolved_source.parents or source.is_symlink():
                 raise RuntimeError("runtime provenance入力がrun固有temporary root外です")
-    if acceptance_scope == "wayland_rendering" and (
+    if acceptance_scope in {"wayland_rendering", "wayland_workspace_selection"} and (
         source_commit is None or re.fullmatch(r"[0-9a-f]{40}", source_commit) is None
     ):
-        raise RuntimeError("Wayland描画受入れに固定source commitがありません")
+        raise RuntimeError("Wayland installed acceptanceに固定source commitがありません")
     resolved_private_key = private_key_path.resolve(strict=True)
     if (
         resolved_private_key != private_key_path
@@ -6559,7 +7146,9 @@ def run_installed_smoke(
         resolved_codex_cli = None
     acceptance_root.mkdir(mode=0o700)
     home = acceptance_root / "home"
-    runtime = acceptance_root / "runtime"
+    runtime = _installed_acceptance_runtime_directory(
+        acceptance_scope, acceptance_root, temp_root
+    )
     temporary = acceptance_root / "tmp"
     xdg_data_home = home / ".local/share"
     xdg_state_home = home / ".local/state"
@@ -6659,6 +7248,7 @@ def run_installed_smoke(
             "agent_task_supervision",
             "runtime_provenance",
             "wayland_rendering",
+            "wayland_workspace_selection",
         }:
             pass
         else:
@@ -6835,6 +7425,119 @@ def run_installed_smoke(
                                 "rendered_png_sha256": rendered_png_sha256,
                                 "image_files_retained": False,
                             },
+                            "live_installed_runner": live_runner,
+                            "owned_process_cleanup": "PASS",
+                        },
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                        sort_keys=True,
+                    )
+                )
+            finally:
+                if wayland_process is not None and wayland_process.poll() is None:
+                    _stop_owned_processes(
+                        _processes_using(product_paths) - preexisting,
+                        wayland_process,
+                    )
+                if wayland_compositor is not None and wayland_compositor.poll() is None:
+                    _terminate_group(wayland_compositor)
+            return
+
+        if acceptance_scope == "wayland_workspace_selection":
+            wayland_compositor, wayland_display = _start_sway_compositor(
+                runtime,
+                environment,
+                acceptance_root / "wayland-compositor.log",
+            )
+            wayland_environment = _wayland_launch_environment(
+                environment, wayland_display
+            )
+            wayland_environment.pop("DISPLAY", None)
+            wayland_environment.pop("XAUTHORITY", None)
+            wayland_environment["XDG_CURRENT_DESKTOP"] = "sway"
+            _publish_wayland_dbus_activation_environment(wayland_environment)
+            with app_log.open("xb") as log:
+                wayland_process = subprocess.Popen(
+                    ["gio", "launch", str(entries[0])],
+                    cwd=stage,
+                    env=wayland_environment,
+                    stdin=subprocess.DEVNULL,
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                    start_new_session=True,
+                )
+            try:
+                wayland_window = _find_accessible(WINDOW_TITLE, timeout=60)
+                if not _visible_wayland_window(wayland_window):
+                    raise RuntimeError(
+                        "導入済みWayland GTK windowがAT-SPIで表示状態ではありません"
+                    )
+                running_wayland = _processes_using(product_paths) - preexisting
+                if not running_wayland:
+                    raise RuntimeError(
+                        "Wayland UIのAT-SPI表示中にinstalled product processがありません"
+                    )
+                live_runner = _observe_linux_runtime_executables(
+                    {
+                        "runner": (
+                            runner,
+                            hashlib.sha256(runner.read_bytes()).hexdigest(),
+                        )
+                    }
+                )
+                workspace_evidence = _run_installed_workspace_selection_acceptance(
+                    wayland_environment,
+                    None,
+                    audit_store=broker_state / "store",
+                    acceptance_root=acceptance_root,
+                    screenshot_before_selection_path=(
+                        temp_root / "wayland-workspace-before-selection.png"
+                    ),
+                    screenshot_path=(
+                        temp_root / "wayland-workspace-after-selection.png"
+                    ),
+                    inspector_failure_screenshot_path=(
+                        temp_root / "wayland-workspace-inspector-failure.png"
+                    ),
+                    registration_only=True,
+                )
+                _stop_owned_processes(
+                    _processes_using(product_paths) - preexisting,
+                    wayland_process,
+                )
+                if _processes_using(product_paths) - preexisting:
+                    raise RuntimeError(
+                        "Wayland Workspace acceptance後にinstalled product processが残留しました"
+                    )
+                if wayland_process.poll() is None:
+                    wayland_process.wait(timeout=10)
+                if wayland_process.returncode not in (
+                    0,
+                    -signal.SIGTERM,
+                    -signal.SIGKILL,
+                    None,
+                ):
+                    raise RuntimeError(
+                        "Wayland Workspace acceptance後のlauncher終了codeが不正です"
+                    )
+                _terminate_group(wayland_compositor)
+                if wayland_compositor.poll() is None:
+                    raise RuntimeError(
+                        "Wayland Workspace acceptance用compositorが停止しませんでした"
+                    )
+                wayland_compositor = None
+                print(
+                    json.dumps(
+                        {
+                            "acceptance_scope": acceptance_scope,
+                            "evidence_class": "LIVE_RUNTIME",
+                            "source_commit": source_commit,
+                            "product_version": record["product_version"],
+                            "installed_package_sha256": record["package_sha256"],
+                            "display_server": "隔離Sway headless/Pixman；X11 DISPLAY未設定",
+                            "keyboard_input": "AT-SPI focus後にwtypeで実キー入力（30文字超は100ms間隔、その他40ms。不一致は1回だけ160msで再入力）",
+                            "visible_window": "AT-SPI SHOWING",
+                            "workspace_selection": workspace_evidence,
                             "live_installed_runner": live_runner,
                             "owned_process_cleanup": "PASS",
                         },
@@ -7689,13 +8392,52 @@ def run_installed_smoke(
                     sort_keys=True,
                 )
             ) from task_group_cleanup_error
-        if acceptance_root.exists():
-            resolved = acceptance_root.resolve(strict=True)
-            if resolved == temp_root or temp_root not in resolved.parents or acceptance_root.is_symlink():
-                raise RuntimeError("cleanup対象がrun固有test root外またはsymlinkです")
-            shutil.rmtree(resolved)
-        if acceptance_root.exists() or acceptance_root.is_symlink():
-            raise RuntimeError("installed acceptance test rootをcleanupできません")
+        cleanup_operation = "acceptance_root_validation"
+        try:
+            if acceptance_scope in {
+                "workspace_selection",
+                "wayland_workspace_selection",
+            }:
+                cleanup_operation = "xdg_document_portal_mounts"
+                _cleanup_xdg_document_portal_mounts(
+                    runtime, temp_root, environment
+                )
+            if acceptance_scope == "wayland_workspace_selection":
+                cleanup_operation = "sway_runtime_removal"
+                _cleanup_owned_sway_runtime(runtime, temp_root)
+            if acceptance_root.exists():
+                cleanup_operation = "acceptance_root_removal"
+                resolved = acceptance_root.resolve(strict=True)
+                if (
+                    resolved == temp_root
+                    or temp_root not in resolved.parents
+                    or acceptance_root.is_symlink()
+                ):
+                    raise RuntimeError(
+                        "cleanup対象がrun固有test root外またはsymlinkです"
+                    )
+                shutil.rmtree(resolved)
+            if acceptance_root.exists() or acceptance_root.is_symlink():
+                cleanup_operation = "acceptance_root_verification"
+                raise RuntimeError("installed acceptance test rootをcleanupできません")
+        except Exception as cleanup_error:
+            if primary_acceptance_error is not None:
+                cleanup_summary: dict[str, object] = {
+                    "primary_error_type": type(primary_acceptance_error).__name__,
+                    "primary_call_path": _safe_exception_call_path(
+                        primary_acceptance_error
+                    ),
+                    "cleanup_error_type": type(cleanup_error).__name__,
+                    "cleanup_operation": cleanup_operation,
+                }
+                cleanup_errno = getattr(cleanup_error, "errno", None)
+                if isinstance(cleanup_errno, int):
+                    cleanup_summary["cleanup_errno"] = cleanup_errno
+                raise RuntimeError(
+                    "installed acceptanceのprimary failureとcleanup failure: "
+                    + json.dumps(cleanup_summary, ensure_ascii=True, sort_keys=True)
+                ) from cleanup_error
+            raise
 
 
 def main() -> int:
@@ -7715,6 +8457,7 @@ def main() -> int:
             "agent_task_supervision",
             "runtime_provenance",
             "wayland_rendering",
+            "wayland_workspace_selection",
         ),
         default="update_lifecycle",
     )
@@ -7737,9 +8480,21 @@ def main() -> int:
             args.source_commit,
         )
     except Exception as error:
-        print(f"Linux installed product GTK受入れ 不合格: {error}", file=sys.stderr)
+        call_path = _safe_exception_call_path(error)
+        print(
+            "Linux installed product GTK受入れ 不合格: "
+            f"{type(error).__name__}; call_path={call_path}; {error}",
+            file=sys.stderr,
+        )
         return 1
     return 0
+
+
+def _safe_exception_call_path(error: BaseException) -> str:
+    return " -> ".join(
+        f"{frame.name}:{frame.lineno}"
+        for frame in traceback.extract_tb(error.__traceback__)[-8:]
+    )
 
 
 if __name__ == "__main__":

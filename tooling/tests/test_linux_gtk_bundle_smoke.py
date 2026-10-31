@@ -15,6 +15,7 @@ from tooling.tests.linux_gtk_bundle_smoke import (
     _different_pixel_count,
     _owned_product_groups,
     _request_x11_window_manager_close,
+    _sway_arguments,
     _wayland_socket_connected,
     _weston_arguments,
     _weston_backend_is_unsupported,
@@ -141,6 +142,7 @@ class WestonBackendCompatibilityTests(unittest.TestCase):
         self.assertNotIn("--debug", ordinary)
         self.assertEqual(capture.count("--debug"), 1)
 
+
     def test_retries_legacy_module_name_only_for_unknown_short_backend(self) -> None:
         self.assertTrue(
             _weston_backend_is_unsupported(
@@ -175,6 +177,15 @@ class WestonBackendCompatibilityTests(unittest.TestCase):
             _weston_renderer_is_unsupported(
                 "--use-pixman", "fatal: unhandled option: --renderer=pixman\n"
             )
+        )
+
+
+class SwayBackendCompatibilityTests(unittest.TestCase):
+    def test_sway_test_compositor_uses_explicit_private_config(self) -> None:
+        config = Path("/tmp/d4-sway.conf")
+        self.assertEqual(
+            _sway_arguments(config),
+            ["sway", "--debug", "--config", str(config)],
         )
 
 

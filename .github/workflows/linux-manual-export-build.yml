@@ -15,6 +15,7 @@ name: Linux manual product build and installed acceptance
           - agent_task_supervision
           - runtime_provenance
           - wayland_rendering
+          - wayland_workspace_selection
         default: update_lifecycle
 
 permissions:
@@ -51,10 +52,16 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends \
+          packages=(
             at-spi2-core clang cmake ninja-build pkg-config libgtk-3-dev \
+            xdg-desktop-portal xdg-desktop-portal-gtk \
             bubblewrap dbus-daemon gnome-keyring libglib2.0-bin openbox \
             python3-dbus python3-pyatspi strace weston xdotool xvfb
+          )
+          if [ '${{ inputs.acceptance_scope }}' = 'wayland_workspace_selection' ]; then
+            packages+=(sway wtype)
+          fi
+          sudo apt-get install --yes --no-install-recommends "${packages[@]}"
 
       - name: Codex Linux sandbox capability gate
         id: codex_sandbox
@@ -109,6 +116,11 @@ jobs:
             printf -- '- Flutter: `3.44.0` (`%s`)\n' "$flutter_commit"
             printf -- '- Rust: `%s`\n' "$(rustc --version)"
             printf -- '- Weston: `%s`\n' "$(weston --version | head -n 1)"
+            if [ '${{ inputs.acceptance_scope }}' = 'wayland_workspace_selection' ]; then
+              sway_version="$(sway --version | head -n 1)"
+              wtype_version="$(dpkg-query -W -f='${Version}' wtype)"
+              printf -- '- Wayland input test: `%s`; `wtype %s`\n' "$sway_version" "$wtype_version"
+            fi
             printf -- '- This step covers Linux Release Export build／bundle／package／provenance only; installed-product acceptance is performed by a later step.\n'
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -458,8 +470,57 @@ jobs:
           print("- Scope: installed UI surface output in an isolated Weston headless/Pixman compositor. This does not establish a physical desktop session, Wayland compositor diversity, formal distribution/signing, or Linux-wide release readiness.")
           PY
 
+      - name: installed GTK UIからWayland上のWorkspace選択とOwner境界を受入れる
+        if: ${{ inputs.acceptance_scope == 'wayland_workspace_selection' }}
+        shell: bash
+        env:
+          GUI_SHELL_PRODUCT_APP_ID: d4-pocket-app-11111111111111111111111111111111
+          GUI_SHELL_PRODUCT_AUDIT_STORE_ID: audit-store-22222222222222222222222222222222
+          D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE: ${{ runner.temp }}/d4p-linux-export-${{ github.run_id }}-${{ github.run_attempt }}/output/D4Pocket-linux-rollback.d4pkg
+        run: |
+          set -euo pipefail
+          test_package="$D4P_EXPORT_ROOT/output/D4Pocket-linux.d4pkg"
+          acceptance_root="$D4P_EXPORT_ROOT/installed-wayland-workspace-acceptance"
+          result_path="$D4P_EXPORT_ROOT/installed-wayland-workspace-acceptance.json"
+          dbus-run-session -- python3 tooling/tests/linux_installed_product_smoke.py \
+            --package "$test_package" \
+            --temp-root "$D4P_EXPORT_ROOT" \
+            --acceptance-root "$acceptance_root" \
+            --private-key "$D4P_EXPORT_ROOT/test-update-private.der" \
+            --update-package "$D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE" \
+            --acceptance-scope wayland_workspace_selection \
+            --source-commit "$(git rev-parse HEAD)" | tee "$result_path"
+          python3 - "$result_path" >> "$GITHUB_STEP_SUMMARY" <<'PY'
+          import json, pathlib, sys
+          matches = []
+          for line in pathlib.Path(sys.argv[1]).read_text(encoding="utf-8").splitlines():
+              try:
+                  candidate = json.loads(line)
+              except json.JSONDecodeError:
+                  continue
+              if isinstance(candidate, dict) and candidate.get("acceptance_scope") == "wayland_workspace_selection":
+                  matches.append(candidate)
+          if len(matches) != 1:
+              raise SystemExit(f"expected one Wayland Workspace result, found {len(matches)}")
+          result = matches[0]
+          evidence = result["workspace_selection"]
+          runner = result["live_installed_runner"]["runner"]
+          print("\n### Installed Wayland Workspace selection and Owner boundary (LIVE_RUNTIME)")
+          print(f"- Source commit: `{result['source_commit']}`")
+          print(f"- Package SHA-256: `{result['installed_package_sha256']}`; version `{result['product_version']}`")
+          print(f"- Display: {result['display_server']}; visible window `{result['visible_window']}`")
+          print(f"- Input driver: {result['keyboard_input']}")
+          print(f"- Native selection: {evidence['workspace_selection']}")
+          print(f"- Owner boundary: {evidence['registration']}; bounded CLI probes `{evidence['cli_interface_probe_calls']}`")
+          print(f"- Task capability: `{evidence['task_execution']}`; Task Permission: `{evidence['workspace_read_permission']}`")
+          print(f"- Durable registration Audit: `{evidence['accepted_registration_audit']}`; secret/root exposure `{evidence['audit_secret_and_root_exposure']}`")
+          print(f"- Live Runner SHA-256: `{runner['sha256']}`; process count `{runner['process_count']}`")
+          print(f"- Owned process cleanup: `{result['owned_process_cleanup']}`")
+          print("- Scope: headless Weston/Pixman Wayland session with X11 DISPLAY unset; this does not establish a physical desktop session, compositor diversity, signing/distribution, or Linux-wide release readiness.")
+          PY
+
       - name: failure-only GTK Workspace chooser screenshot
-        if: ${{ failure() && inputs.acceptance_scope == 'workspace_selection' }}
+        if: ${{ failure() && (inputs.acceptance_scope == 'workspace_selection' || inputs.acceptance_scope == 'wayland_workspace_selection') }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: linux-workspace-acceptance-${{ github.run_id }}-${{ github.run_attempt }}
