@@ -3580,14 +3580,54 @@ def _wait_installed_task_status(
     )
 
 
-def _wait_for_installed_task_id(window, *, timeout: float) -> str:
+def _linux_installed_visible_task_ids(*, deadline: float) -> set[str]:
+    try:
+        import pyatspi
+    except ImportError as error:
+        raise RuntimeError("AT-SPI UI操作にpython3-pyatspiが必要です") from error
+
+    task_ids: set[str] = set()
+    desktop = pyatspi.Registry.getDesktop(0)
+    for node, name in _accessible_nodes(desktop, deadline=deadline, max_depth=20):
+        for value in (name, _accessible_text(node)):
+            task_ids.update(
+                re.findall(r"Task識別子:\s*([A-Za-z0-9_.:-]+)", value)
+            )
+    return task_ids
+
+
+def _wait_for_installed_task_id(
+    window, *, previously_visible_task_ids: set[str], timeout: float
+) -> str:
     deadline = time.monotonic() + timeout
     last_statuses: list[str] = []
+    last_new_task_count = 0
+    observation_errors = 0
     while time.monotonic() < deadline:
+        current_task_ids: set[str] = set()
+        try:
+            current_task_ids.update(
+                _linux_installed_visible_task_ids(
+                    deadline=min(deadline, time.monotonic() + 1.0)
+                )
+            )
+        except RuntimeError:
+            observation_errors += 1
         snapshot = _accessible_snapshot(window)
-        task_ids = re.findall(r"Task識別子:\s*([A-Za-z0-9_.:-]+)", snapshot)
-        if task_ids:
-            return task_ids[-1]
+        current_task_ids.update(
+            re.findall(r"Task識別子:\s*([A-Za-z0-9_.:-]+)", snapshot)
+        )
+        new_task_ids = current_task_ids - previously_visible_task_ids
+        last_new_task_count = len(new_task_ids)
+        if len(new_task_ids) == 1:
+            return next(iter(new_task_ids))
+        if len(new_task_ids) > 1:
+            raise RuntimeError(
+                "installed Agent Centerで新規Task IDを一意に特定できません: "
+                + json.dumps(
+                    {"new_task_count": len(new_task_ids)}, ensure_ascii=False
+                )
+            )
         last_statuses = re.findall(
             r"Task状態:\s*(pending|running|blocked|completed|failed|cancelled|quarantined)\b",
             snapshot,
@@ -3595,7 +3635,15 @@ def _wait_for_installed_task_id(window, *, timeout: float) -> str:
         time.sleep(0.1)
     raise RuntimeError(
         "installed Agent Centerに開始Task IDが表示されません: "
-        + json.dumps({"visible_task_statuses": last_statuses}, ensure_ascii=False)
+        + json.dumps(
+            {
+                "visible_task_statuses": last_statuses,
+                "new_task_count": last_new_task_count,
+                "observation_errors": observation_errors,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        )
     )
 
 
@@ -3878,6 +3926,10 @@ def _run_installed_agent_task_acceptance(
             f"workspace task_fixture.py in {scenario_name} mode exactly once. "
             "Do not use network access or credentials."
         )
+        previously_visible_task_ids = _linux_installed_visible_task_ids(
+            deadline=time.monotonic() + 5.0
+        )
+        previously_visible_task_ids.update(task_ids)
         _prepare_and_start_installed_agent_task(
             environment,
             window,
@@ -3885,7 +3937,13 @@ def _run_installed_agent_task_acceptance(
             workspace_id=workspace_id,
             instruction=instruction,
         )
-        task_ids.append(_wait_for_installed_task_id(window, timeout=15.0))
+        task_ids.append(
+            _wait_for_installed_task_id(
+                window,
+                previously_visible_task_ids=previously_visible_task_ids,
+                timeout=15.0,
+            )
+        )
 
         active_marker = workspace / f"agent-task-{scenario_name}-active.json"
         result_file = workspace / "agent-task-result.json"

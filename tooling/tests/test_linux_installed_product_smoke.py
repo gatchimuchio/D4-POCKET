@@ -3487,20 +3487,64 @@ class LinuxAgentTaskResponsesFixtureTests(unittest.TestCase):
 
 class LinuxAgentTaskFailureDiagnosticsTests(unittest.TestCase):
     def test_task_id_wait_handles_asynchronous_agent_center_update(self) -> None:
-        snapshots = ["Task状態: running", "Task状態: running\nTask識別子: task-fixture-2"]
+        snapshots = ["Task状態: running", "Task状態: running"]
         with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._linux_installed_visible_task_ids",
+                side_effect=(set(), {"task-fixture-2"}),
+            ),
             patch(
                 "tooling.tests.linux_installed_product_smoke._accessible_snapshot",
                 side_effect=snapshots,
             ),
             patch(
                 "tooling.tests.linux_installed_product_smoke.time.monotonic",
-                side_effect=[0.0, 0.0, 0.1],
+                side_effect=[0.0, 0.0, 0.0, 0.1, 0.1],
             ),
             patch("tooling.tests.linux_installed_product_smoke.time.sleep"),
         ):
-            task_id = _wait_for_installed_task_id(object(), timeout=1.0)
+            task_id = _wait_for_installed_task_id(
+                object(), previously_visible_task_ids=set(), timeout=1.0
+            )
         self.assertEqual(task_id, "task-fixture-2")
+
+    def test_task_id_wait_uses_new_id_set_not_display_order(self) -> None:
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._linux_installed_visible_task_ids",
+                return_value={"task-new", "task-old"},
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._accessible_snapshot",
+                return_value=(
+                    "Task識別子: task-new\nTask識別子: task-old"
+                ),
+            ),
+        ):
+            task_id = _wait_for_installed_task_id(
+                object(),
+                previously_visible_task_ids={"task-old"},
+                timeout=1.0,
+            )
+        self.assertEqual(task_id, "task-new")
+
+    def test_task_id_wait_rejects_ambiguous_new_ids(self) -> None:
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._linux_installed_visible_task_ids",
+                return_value={"task-new-a", "task-new-b"},
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._accessible_snapshot",
+                return_value="",
+            ),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "一意に特定できません"):
+                _wait_for_installed_task_id(
+                    object(),
+                    previously_visible_task_ids=set(),
+                    timeout=1.0,
+                )
 
     def test_task_result_wait_refreshes_broker_and_stops_on_terminal_status(self) -> None:
         with (
