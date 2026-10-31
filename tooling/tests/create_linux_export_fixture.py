@@ -16,6 +16,8 @@ AUDIT_STORE_ID = "audit-store-22222222222222222222222222222222"
 def linux_export_pair(
     update_trust_public_key_der: bytes | None = None,
     update_trust_base_url: str = "https://updates.example.invalid/d4/stable",
+    *,
+    include_host_operations: bool = False,
 ) -> tuple[bytes, bytes]:
     receipt: dict[str, Any] = json.loads(
         (ROOT / "examples/contracts/gui_shell_export_receipt.valid.json").read_text(
@@ -33,6 +35,29 @@ def linux_export_pair(
         document["app_identity"]["target_platform"] = "linux"
         document["audit_store"]["store_id"] = AUDIT_STORE_ID
         document["distribution_metadata"]["target_platform"] = "linux"
+    if include_host_operations:
+        module_plan = manifest_file["manifest"].get("module_plan")
+        if not isinstance(module_plan, dict):
+            raise ValueError("Linux Export fixtureのModulePlanがありません")
+        module_id = "shell.host_operations"
+        for field in ("requested_optional_module_ids", "included_module_ids"):
+            values = module_plan.get(field)
+            if not isinstance(values, list) or any(
+                not isinstance(value, str) for value in values
+            ):
+                raise ValueError(f"Linux Export fixtureの{field}が不正です")
+            if module_id not in values:
+                values.append(module_id)
+        excluded = module_plan.get("excluded_optional_module_ids")
+        if not isinstance(excluded, list) or any(
+            not isinstance(value, str) for value in excluded
+        ):
+            raise ValueError(
+                "Linux Export fixtureのexcluded_optional_module_idsが不正です"
+            )
+        module_plan["excluded_optional_module_ids"] = [
+            value for value in excluded if value != module_id
+        ]
     receipt["export_id"] = export_id
     receipt["export_manifest"] = manifest_file["manifest"]
     manifest_file["export_id"] = export_id
@@ -73,10 +98,14 @@ def write_fixture(
     output_dir: Path,
     update_trust_public_key_der: bytes | None = None,
     update_trust_base_url: str = "https://updates.example.invalid/d4/stable",
+    *,
+    include_host_operations: bool = False,
 ) -> tuple[Path, Path]:
     output_dir.mkdir(mode=0o700, parents=False, exist_ok=False)
     receipt_raw, manifest_raw = linux_export_pair(
-        update_trust_public_key_der, update_trust_base_url
+        update_trust_public_key_der,
+        update_trust_base_url,
+        include_host_operations=include_host_operations,
     )
     receipt = output_dir / "d4_pocket_export_receipt.json"
     manifest = output_dir / f"{APP_ID}.json"
@@ -94,6 +123,7 @@ def main() -> int:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--update-trust-public-key-der", type=Path)
     parser.add_argument("--update-trust-base-url")
+    parser.add_argument("--include-host-operations", action="store_true")
     args = parser.parse_args()
     update_trust_public_key_der = (
         args.update_trust_public_key_der.read_bytes()
@@ -104,6 +134,7 @@ def main() -> int:
         args.output_dir,
         update_trust_public_key_der,
         args.update_trust_base_url or "https://updates.example.invalid/d4/stable",
+        include_host_operations=args.include_host_operations,
     )
     print(
         json.dumps(

@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
+from tooling.build_module_pruned_windows import dart_defines
 from tooling.export_linux_product import (
     _linux_build_environment,
     _require_clean_source,
@@ -38,6 +39,15 @@ PAYLOADS = {
 
 
 class LinuxExportInputTests(unittest.TestCase):
+    def test_host_registration_fixture_includes_host_operations_module(self) -> None:
+        receipt_raw, manifest_raw = linux_export_pair(include_host_operations=True)
+        _, _, plan, _, _ = validate_export_inputs(
+            receipt_raw, manifest_raw, target_platform="linux"
+        )
+        self.assertIn("shell.host_operations", plan.included_module_ids)
+        self.assertNotIn("shell.host_operations", plan.excluded_optional_ids)
+        self.assertTrue(dart_defines(plan)["GUI_SHELL_MODULE_HOST_OPERATIONS"])
+
     def test_main_reports_value_error_detail_for_build_failure(self) -> None:
         stderr = io.StringIO()
         arguments = [
@@ -184,6 +194,7 @@ class LinuxExportInputTests(unittest.TestCase):
                 "tooling.export_linux_product.platform.freedesktop_os_release",
                 return_value={"ID": "ubuntu", "VERSION_ID": "24.04"},
             ),
+            patch("tooling.export_linux_product.platform.machine", return_value="x86_64"),
         ):
             versions = _toolchain(paths, environment)
         self.assertEqual(versions["framework_revision"], "e" * 40)

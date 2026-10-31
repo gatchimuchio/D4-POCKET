@@ -12088,6 +12088,7 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
         "559ffa3f75e7402d65a8def9c28389a9b2e6fe42",
         "rustup toolchain install 1.95.0",
         "tooling/tests/create_linux_export_fixture.py",
+        "fixture_arguments+=(--include-host-operations)",
         "tooling/export_linux_product.py",
         "python3 -m unittest tooling.tests.test_linux_installed_product_smoke",
         "D4P_EXPORT_ROOT",
@@ -12151,12 +12152,18 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
     ):
         if token not in smoke:
             missing.append(f"installed Linux smoke: {token}")
-    for token in ("title: 'Host切替'", "pageIndex: 19"):
+    for token in (
+        "_ShellPageEntry(19, 'Host操作面'",
+        "title: 'Host切替'",
+        "pageIndex: 19",
+    ):
         if token not in product_ui:
             missing.append(f"installed Linux Host UI command: {token}")
+    if "if [ '${{ inputs.acceptance_scope }}' = 'host_registration' ]; then" not in workflow:
+        missing.append("installed Linux Host scope selects the Host operations module")
     for token in (
-        '_find_operable_accessible("Host切替", root=window, timeout=10)',
-        '_activate_accessible(command, "Host切替", environment)',
+        '_find_operable_accessible("Host操作面を開く", root=window, timeout=10)',
+        '_activate_accessible(command, "Host操作面を開く", environment)',
     ):
         if token not in smoke:
             missing.append(f"installed Linux Host navigation: {token}")

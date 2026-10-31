@@ -158,10 +158,15 @@ jobs:
           python3 tooling/tests/create_linux_update_catalog_fixture.py --private-key "$D4P_EXPORT_ROOT/test-update-private.der"
           git diff --exit-code -- tooling/tests/fixtures/linux-update-catalog/updates.json tooling/tests/fixtures/linux-update-catalog/linux-installed-catalog-display.pkg
           catalog_base_url="https://raw.githubusercontent.com/gatchimuchio/D4-POCKET/${GITHUB_SHA}/tooling/tests/fixtures/linux-update-catalog"
-          python3 tooling/tests/create_linux_export_fixture.py \
-            --output-dir "$fixture_root" \
-            --update-trust-public-key-der "$D4P_EXPORT_ROOT/test-update-public.der" \
+          fixture_arguments=(
+            --output-dir "$fixture_root"
+            --update-trust-public-key-der "$D4P_EXPORT_ROOT/test-update-public.der"
             --update-trust-base-url "$catalog_base_url"
+          )
+          if [ '${{ inputs.acceptance_scope }}' = 'host_registration' ]; then
+            fixture_arguments+=(--include-host-operations)
+          fi
+          python3 tooling/tests/create_linux_export_fixture.py "${fixture_arguments[@]}"
           export_arguments=(
             --receipt "$fixture_root/d4_pocket_export_receipt.json"
             --manifest-file "$fixture_root/d4-pocket-app-11111111111111111111111111111111.json"
