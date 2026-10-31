@@ -5088,8 +5088,8 @@ def _open_installed_host_operation_center(
         timeout=5,
     )
     _find_accessible("コマンドパレット", root=window, timeout=10)
-    command = _find_operable_accessible("Host操作面を開く", root=window, timeout=10)
-    _activate_accessible(command, "Host操作面を開く", environment)
+    command = _find_operable_accessible("Host切替", root=window, timeout=10)
+    _activate_accessible(command, "Host切替", environment)
     _find_accessible("D4 Pocket Host操作面", timeout=10)
     window = _find_accessible(WINDOW_TITLE, timeout=10)
     _find_accessible("D4 Pocket Host操作面", root=window, timeout=10)

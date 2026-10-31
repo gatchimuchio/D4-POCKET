@@ -12070,6 +12070,10 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
     if workflow_path.is_symlink() or not workflow_path.is_file():
         return ["Linux Export build用の通常file workflowがない"]
     workflow = workflow_path.read_text(encoding="utf-8")
+    product_ui_path = ROOT / "apps/desktop_flutter/lib/main.dart"
+    if product_ui_path.is_symlink() or not product_ui_path.is_file():
+        return ["Linux installed Host acceptance用のDesktop UIが通常fileではない"]
+    product_ui = product_ui_path.read_text(encoding="utf-8")
     smoke_path = ROOT / "tooling/tests/linux_installed_product_smoke.py"
     if smoke_path.is_symlink() or not smoke_path.is_file():
         return ["Linux installed-product smoke acceptanceが通常fileではない"]
@@ -12147,6 +12151,15 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
     ):
         if token not in smoke:
             missing.append(f"installed Linux smoke: {token}")
+    for token in ("title: 'Host切替'", "pageIndex: 19"):
+        if token not in product_ui:
+            missing.append(f"installed Linux Host UI command: {token}")
+    for token in (
+        '_find_operable_accessible("Host切替", root=window, timeout=10)',
+        '_activate_accessible(command, "Host切替", environment)',
+    ):
+        if token not in smoke:
+            missing.append(f"installed Linux Host navigation: {token}")
     if "pull_request:" in workflow or "push:" in workflow:
         missing.append("manual trigger only")
     return [f"Linux Export build workflowに固定・scope・cleanup条件がない: {token}" for token in missing]
