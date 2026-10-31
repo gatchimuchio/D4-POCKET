@@ -1266,13 +1266,12 @@ fn build_codex_command_with_model(
     #[cfg(any(test, feature = "r2-e2e"))]
     if let Some(test_api) = test_responses_api {
         let base_url = format!("http://127.0.0.1:{}/v1", test_api.port);
-        let overrides = [
+        let mut overrides = vec![
             // 偽API fixtureではCLI標準helpにあるmodel例を使い、独自識別子への依存を避ける。
             "model=\"o3\"".to_owned(),
             "model_provider=\"d4p_loopback_probe\"".to_owned(),
             "model_providers.d4p_loopback_probe.name=\"D4 Pocket loopback probe\"".to_owned(),
             format!("model_providers.d4p_loopback_probe.base_url=\"{base_url}\""),
-            "model_providers.d4p_loopback_probe.env_key=\"OPENAI_API_KEY\"".to_owned(),
             "model_providers.d4p_loopback_probe.wire_api=\"responses\"".to_owned(),
             format!(
                 "model_providers.d4p_loopback_probe.requires_openai_auth={}",
@@ -1288,6 +1287,11 @@ fn build_codex_command_with_model(
             "analytics.enabled=false".to_owned(),
             "approval_policy=\"never\"".to_owned(),
         ];
+        if provider_credential.is_some() {
+            // Codex CLIはenv_keyを指定すると、その環境変数がない場合に送信前失敗する。
+            overrides
+                .push("model_providers.d4p_loopback_probe.env_key=\"OPENAI_API_KEY\"".to_owned());
+        }
         for setting in overrides {
             task_command.arg("-c").arg(setting);
         }
@@ -1623,7 +1627,15 @@ fn classify_loopback_test_error(error: &Value) -> &'static str {
             .any(|field| markers.iter().any(|marker| field.contains(marker)))
     };
 
-    if matches(&["invalid_api_key", "authentication_error", "unauthorized"]) {
+    if matches(&[
+        "invalid_api_key",
+        "authentication_error",
+        "unauthorized",
+        "api key",
+        "environment variable",
+        "env var",
+        "not logged in",
+    ]) {
         "authentication"
     } else if matches(&[
         "model_not_found",
@@ -1671,6 +1683,8 @@ fn classify_loopback_test_stderr(stderr: &[u8]) -> &'static str {
     } else if stderr.contains("unauthorized")
         || stderr.contains("authentication")
         || stderr.contains("api key")
+        || stderr.contains("environment variable")
+        || stderr.contains("env var")
         || stderr.contains("not logged in")
     {
         "authentication"
@@ -1886,6 +1900,12 @@ mod tests {
         assert!(!summary.contains("private model name"));
         assert!(!summary.contains("credential"));
         assert!(!summary.contains("model_not_found"));
+
+        let missing_key = br#"{"type":"error","message":"Required environment variable OPENAI_API_KEY is missing; PRIVATE_DETAIL"}"#;
+        let summary = loopback_test_safe_failure_summary(Some(1), missing_key, b"");
+        assert!(summary.contains("stdout_error_class=authentication"));
+        assert!(!summary.contains("OPENAI_API_KEY"));
+        assert!(!summary.contains("PRIVATE_DETAIL"));
     }
 
     #[test]
@@ -2093,6 +2113,66 @@ mod tests {
         assert_eq!(metadata["authentication"]["method"], "codex_cli_managed");
         assert_eq!(metadata["authentication"]["status"], "unknown");
         assert_eq!(metadata["authentication"]["secret_value_present"], false);
+    }
+
+    #[test]
+    fn loopbackProviderは合成Credentialがある時だけenv_keyを要求する() {
+        let unauthenticated = CodexCliTestResponses {
+            port: 43129,
+            codex_home: PathBuf::from(r"C:\synthetic\codex-home"),
+            requires_openai_auth: false,
+        };
+        let unauthenticated_command = build_codex_command_with_model(
+            Path::new(r"C:\codex.exe"),
+            Path::new(r"C:\workspace"),
+            CodexSandbox::ReadOnly,
+            None,
+            &[],
+            None,
+            None,
+            Some(&unauthenticated),
+        )
+        .expect("Credentialなしのloopback CLI command");
+        let unauthenticated_args: Vec<_> = unauthenticated_command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().to_string())
+            .collect();
+        assert!(unauthenticated_args
+            .iter()
+            .any(|arg| arg == "model_providers.d4p_loopback_probe.requires_openai_auth=false"));
+        assert!(!unauthenticated_args
+            .iter()
+            .any(|arg| arg.contains("model_providers.d4p_loopback_probe.env_key")));
+
+        let authenticated = CodexCliTestResponses {
+            requires_openai_auth: true,
+            ..unauthenticated
+        };
+        let authenticated_command = build_codex_command_with_model(
+            Path::new(r"C:\codex.exe"),
+            Path::new(r"C:\workspace"),
+            CodexSandbox::ReadOnly,
+            None,
+            &[],
+            None,
+            Some(b"synthetic-provider-key"),
+            Some(&authenticated),
+        )
+        .expect("合成Credential付きのloopback CLI command");
+        let authenticated_args: Vec<_> = authenticated_command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().to_string())
+            .collect();
+        assert!(authenticated_args
+            .iter()
+            .any(|arg| arg == "model_providers.d4p_loopback_probe.env_key=\"OPENAI_API_KEY\""));
+        assert!(authenticated_args
+            .iter()
+            .all(|arg| !arg.contains("synthetic-provider-key")));
+        assert!(authenticated_command.get_envs().any(|(name, value)| {
+            name == "OPENAI_API_KEY"
+                && value == Some(std::ffi::OsStr::new("synthetic-provider-key"))
+        }));
     }
 
     #[test]

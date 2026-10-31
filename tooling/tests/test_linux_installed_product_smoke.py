@@ -3381,6 +3381,12 @@ class LinuxAgentTaskFailureDiagnosticsTests(unittest.TestCase):
                     "stderr_class=empty; stderr_bytes=0",
                 },
                 {
+                    "kind": "cli_failure",
+                    "summary": 'exit_code=Some(1); stdout_event_types=["error"]; '
+                    "stdout_error_class=authentication; stdout_http_status=none; "
+                    "stderr_class=empty; stderr_bytes=0",
+                },
+                {
                     "kind": "os_failure",
                     "stage": "codex_process_spawn",
                     "os_error_kind": "NotFound",
@@ -3406,7 +3412,7 @@ class LinuxAgentTaskFailureDiagnosticsTests(unittest.TestCase):
         finally:
             server.close()
 
-        self.assertEqual(responses, [200, 200, 200, 200, 400])
+        self.assertEqual(responses, [200, 200, 200, 200, 200, 400])
         self.assertEqual(
             snapshot["agent_task_diagnostics"],
             [
@@ -3426,6 +3432,15 @@ class LinuxAgentTaskFailureDiagnosticsTests(unittest.TestCase):
                     "stdout_event_types": ["turn.failed"],
                     "stdout_error_class": "model_unavailable",
                     "stdout_http_status": 404,
+                    "stderr_class": "empty",
+                    "stderr_bytes": 0,
+                },
+                {
+                    "stage": "codex_cli_exit",
+                    "exit_code": "Some(1)",
+                    "stdout_event_types": ["error"],
+                    "stdout_error_class": "authentication",
+                    "stdout_http_status": None,
                     "stderr_class": "empty",
                     "stderr_bytes": 0,
                 },
