@@ -320,6 +320,11 @@ class LinuxExportBuildTests(unittest.TestCase):
                 (project / "pubspec.yaml").write_text(
                     "name: d4p_fixture\nversion: 1.2.3+4\n", encoding="utf-8"
                 )
+                portable_readme = destination / "installer" / "linux" / "PORTABLE_README_ja.txt"
+                portable_readme.parent.mkdir(parents=True)
+                portable_readme.write_bytes(
+                    (ROOT / "installer/linux/PORTABLE_README_ja.txt").read_bytes()
+                )
 
             configure_args: list[str] = []
             commands: list[list[str]] = []
@@ -355,6 +360,8 @@ class LinuxExportBuildTests(unittest.TestCase):
 
             self.assertTrue((output / "bundle" / "gui_shell_desktop").is_file())
             self.assertTrue((output / "D4Pocket-linux.d4pkg").is_file())
+            portable_archive = output / "D4Pocket-1.2.3+4-linux-x64-portable.tar.gz"
+            self.assertTrue(portable_archive.is_file())
             self.assertTrue((output / "d4_pocket_linux_export_build.json").is_file())
             self.assertEqual(evidence["source_commit"], source_commit)
             self.assertEqual(evidence["compile_time_identity"]["app_id"], APP_ID)
@@ -362,6 +369,11 @@ class LinuxExportBuildTests(unittest.TestCase):
             self.assertFalse(evidence["authority_boundary"]["owner_authorization_verified"])
             self.assertFalse(evidence["signed"])
             self.assertFalse(evidence["formal_distribution_claimed"])
+            self.assertEqual(
+                evidence["portable_archive"]["sha256"],
+                hashlib.sha256(portable_archive.read_bytes()).hexdigest(),
+            )
+            self.assertFalse(evidence["portable_archive"]["signed"])
             self.assertGreaterEqual(len(commands), 4)
             flutter_commands = [
                 (command, environment)

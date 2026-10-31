@@ -4,7 +4,7 @@ name: Linux manual product build and installed acceptance
   workflow_dispatch:
     inputs:
       acceptance_scope:
-        description: Installed product acceptance scope
+        description: Linux product build and acceptance scope
         required: true
         type: choice
         options:
@@ -16,6 +16,7 @@ name: Linux manual product build and installed acceptance
           - runtime_provenance
           - wayland_rendering
           - wayland_workspace_selection
+          - portable_archive
         default: update_lifecycle
 
 permissions:
@@ -185,6 +186,13 @@ jobs:
           assert evidence["signed"] is False and evidence["formal_distribution_claimed"] is False
           assert evidence["package"]["installed_product_verified"] is False
           assert evidence["package"]["sha256"] == hashlib.sha256(package.read_bytes()).hexdigest()
+          if sys.argv[3] == "portable_archive":
+              archive = evidence["portable_archive"]
+              assert archive["target"] == "ubuntu-24.04-x86_64"
+              assert archive["signed"] is False
+              archive_path = root / archive["file_name"]
+              assert archive["byte_length"] == archive_path.stat().st_size
+              assert archive["sha256"] == hashlib.sha256(archive_path.read_bytes()).hexdigest()
           assert evidence["cmake_configure_arguments"].count(
               "-DD4_LINUX_R2_E2E_TEST_BUILD=ON" if expected_test_build
               else "-DD4_LINUX_R2_E2E_TEST_BUILD=OFF"
@@ -198,7 +206,36 @@ jobs:
           python3 -m unittest tooling.tests.test_linux_gtk_bundle_smoke
           python3 -m unittest tooling.tests.test_linux_installed_product_smoke
           python3 -m unittest tooling.tests.test_export_linux_product
-          if [ '${{ inputs.acceptance_scope }}' != 'runtime_provenance' ] && \
+          python3 -m unittest tooling.tests.test_linux_portable_archive
+          if [ '${{ inputs.acceptance_scope }}' = 'portable_archive' ]; then
+            archive_name="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["portable_archive"]["file_name"])' "$output_root/d4_pocket_linux_export_build.json")"
+            python3 - "$output_root" "$archive_name" <<'PY'
+          import hashlib, json, pathlib, stat, sys
+          root = pathlib.Path(sys.argv[1]).resolve()
+          evidence = json.loads((root / "d4_pocket_linux_export_build.json").read_text())
+          record = evidence["portable_archive"]
+          archive = root / sys.argv[2]
+          assert record["target"] == "ubuntu-24.04-x86_64" and record["format"] == "tar.gz"
+          assert record["file_name"] == archive.name and archive.parent.resolve() == root
+          assert stat.S_ISREG(archive.lstat().st_mode)
+          assert archive.stat().st_size == record["byte_length"]
+          assert hashlib.sha256(archive.read_bytes()).hexdigest() == record["sha256"]
+          PY
+            extracted_root="$D4P_EXPORT_ROOT/portable-extracted"
+            mkdir -m 700 "$extracted_root"
+            umask 077
+            tar --no-same-owner --no-same-permissions -xzf "$output_root/$archive_name" -C "$extracted_root"
+            test -f "$extracted_root/D4Pocket/gui_shell_desktop_launcher"
+            test -x "$extracted_root/D4Pocket/gui_shell_desktop_launcher"
+            dbus-run-session -- xvfb-run -a python3 tooling/tests/linux_gtk_bundle_smoke.py \
+              --launcher "$extracted_root/D4Pocket/gui_shell_desktop_launcher" \
+              --temp-root "$D4P_EXPORT_ROOT" \
+              --backend x11
+            dbus-run-session -- python3 tooling/tests/linux_gtk_bundle_smoke.py \
+              --launcher "$extracted_root/D4Pocket/gui_shell_desktop_launcher" \
+              --temp-root "$D4P_EXPORT_ROOT" \
+              --backend wayland
+          elif [ '${{ inputs.acceptance_scope }}' != 'runtime_provenance' ] && \
              [ '${{ inputs.acceptance_scope }}' != 'wayland_rendering' ]; then
             dbus-run-session -- xvfb-run -a python3 tooling/tests/linux_gtk_bundle_smoke.py \
               --launcher "$output_root/bundle/gui_shell_desktop_launcher" \
@@ -212,11 +249,16 @@ jobs:
           {
             printf '\n- Export evidence: `%s`\n' "$(cat "$output_root/d4_pocket_linux_export_build.json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["artifact_tree_sha256"])')"
             printf -- '- Package hash: `%s`\n' "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["package"]["sha256"])' "$output_root/d4_pocket_linux_export_build.json")"
+            if [ '${{ inputs.acceptance_scope }}' = 'portable_archive' ]; then
+              printf -- '- Portable archive hash: `%s`\n' "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["portable_archive"]["sha256"])' "$output_root/d4_pocket_linux_export_build.json")"
+            fi
             printf -- '- Fixture: synthetic Broker-shaped Receipt／Manifest; no Owner authority or credentials.\n'
             if [ '${{ inputs.acceptance_scope }}' = 'runtime_provenance' ]; then
               printf -- '- Portable X11／Wayland smoke was skipped because this scope verifies the installed product provenance; previously accepted scopes are not replayed.\n'
             elif [ '${{ inputs.acceptance_scope }}' = 'wayland_rendering' ]; then
               printf -- '- Portable smoke was skipped; the dedicated installed-product Wayland surface-rendering acceptance runs below.\n'
+            elif [ '${{ inputs.acceptance_scope }}' = 'portable_archive' ]; then
+              printf -- '- The unsigned Ubuntu 24.04 x86_64 tar.gz was hash-checked and extracted in the isolated runner; its extracted launcher completed the portable X11／Wayland smoke. This is not a signed distribution or general Linux acceptance.\n'
             else
               printf -- '- Runtime smoke: portable product Rust launcher opened and normally closed its Flutter GTK window under Xvfb/X11; Wayland run used Weston headless/Pixman, verified the live launcher GTK process successfully connected to the isolated Wayland socket using external connect-syscall observation, then stopped the owned process group. No debug environment variable was required or forwarded through the frontend allowlist. Both used an initially absent XDG_DATA_HOME and verified cleanup.\n'
               printf -- '- Scope: portable first-launch, Linux GTK X11 window close, and Wayland socket-connect smoke only; the Wayland check does not prove surface rendering. This build is not signed Install/Owner activation, installed-version handoff, production compositor coverage, formal distribution, or runtime Manifest consumption.\n'

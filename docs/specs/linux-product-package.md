@@ -2,6 +2,14 @@
 
 状態: Linux native必須製品対象のExport build／固定package producer／目録／reader契約。Brokerの署名trust、Owner確認、active-version導入、native 導入済み製品受入れを代行しない。
 
+## 0. 最初のportable archive検証target
+
+最初に生成・検証するportable archiveはUbuntu 24.04 LTS／x86_64向け`tar.gz`とし、展開rootを`D4Pocket/`、file名を`D4Pocket-<製品版>-linux-x64-portable.tar.gz`に固定する。同梱する日本語起動案内は`D4Pocket/README-linux-ja.txt`である。対象環境はGTK 3、GLib 2、ログイン中のD-Bus sessionを備える。Credential機能にはSecret Service互換の資格情報保管サービスを要する。
+
+archiveは、Export buildで検査済みbundleの全payloadと起動案内から生成する。gzip timestamp、tar owner／group、member時刻、順序、modeを固定する。同一実行環境で同じ入力から同じhashになることをtestする。symlink、特殊file、絶対path、`..` path、重複entry、許可外modeを拒否する。Build evidenceはarchiveのtarget、byte長、SHA-256、entry数、起動案内hash、未署名状態を記録し、読み戻したentryとbundle inventoryの内容・hashを照合する。
+
+portable archiveは初回画面を起動するbootstrap payloadであり、Brokerが導入・更新時に読む`D4PKG01`と区別する。利用者はファイルマネージャーで展開してlauncherを起動でき、その後のInstall／Update／Rollback／Uninstallは既存Linux Brokerとnative Owner確認へ接続する。現在生成する未署名archiveは開発・検証用であり正式配布へ使用しない。archive生成・headless起動は、正式Publisher署名、一般配布、実desktop compositor、導入済み製品の受入れ、Linux全対応を証明しない。
+
 ## 1. 役割と互換性
 
 Linux製品payloadも既存の固定container `D4PKG01`を使う。既存Windows packageの公開形式、Schema名、path、legacy manifest bytesは変更しない。Linux packageは専用目録Schema `d4_pocket_linux_product_package_manifest.schema.json`を使用し、manifestへ`target_platform: "linux"`を必須記録する。`target_platform`のない既存manifestはWindows payloadとしてのみ解釈し、Linux packageとして推測しない。

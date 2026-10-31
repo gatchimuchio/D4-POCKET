@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import gzip
 import hashlib
+import io
 import json
 import os
 import platform
@@ -12,9 +14,10 @@ import shutil
 import stat
 import subprocess
 import sys
+import tarfile
 import tempfile
 import time
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -38,7 +41,7 @@ from tooling.export_windows_product import (
     product_version_from_source,
     validate_export_inputs,
 )
-from tooling.package_linux_product import write_product_package
+from tooling.package_linux_product import EXECUTABLE_PATHS, write_product_package
 from tooling.schema_check.check_schemas import validate_instance
 
 
@@ -46,6 +49,10 @@ RECEIPT_NAME = "d4_pocket_linux_export_build.json"
 BUILD_SCHEMA_NAME = "gui_shell_linux_export_build.schema.json"
 BUILD_TEMP_PREFIX = "d4p-linux-build-"
 OUTPUT_TEMP_PREFIX = "d4p-linux-output-"
+PORTABLE_ARCHIVE_ROOT = "D4Pocket"
+PORTABLE_ARCHIVE_TARGET = "ubuntu-24.04-x86_64"
+PORTABLE_README_MEMBER = "README-linux-ja.txt"
+PORTABLE_README_MAX_BYTES = 32 * 1024
 ISOLATED_ENVIRONMENT_ALLOWLIST = {
     "PATH",
     "LANG",
@@ -229,8 +236,221 @@ def _write_source_archive(commit: str, archive_path: Path) -> str:
     return _sha256_file(archive_path)
 
 
+def _portable_archive_plan(
+    bundle: Path, readme_raw: bytes, artifact_records: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    root_metadata = bundle.lstat()
+    if stat.S_ISLNK(root_metadata.st_mode) or not stat.S_ISDIR(root_metadata.st_mode):
+        raise ValueError("Linux portable archiveのbundle rootが通常directoryではない")
+    if not readme_raw or len(readme_raw) > PORTABLE_README_MAX_BYTES:
+        raise ValueError("Linux portable archiveのREADMEが空または上限超過")
+
+    current_records, _total_bytes, _tree_hash = _artifact_inventory(bundle)
+    if current_records != artifact_records:
+        raise ValueError("Linux portable archiveのbundle inventoryが変化した")
+    expected_files = {record["path"]: record for record in artifact_records}
+    plan: list[dict[str, Any]] = [
+        {
+            "name": PORTABLE_ARCHIVE_ROOT,
+            "kind": "directory",
+            "path": None,
+            "payload": None,
+            "mode": 0o755,
+            "size": 0,
+            "sha256": None,
+        },
+        {
+            "name": f"{PORTABLE_ARCHIVE_ROOT}/{PORTABLE_README_MEMBER}",
+            "kind": "file",
+            "path": None,
+            "payload": readme_raw,
+            "mode": 0o644,
+            "size": len(readme_raw),
+            "sha256": hashlib.sha256(readme_raw).hexdigest(),
+        },
+    ]
+    seen_files: set[str] = set()
+    children = sorted(bundle.rglob("*"), key=lambda item: item.relative_to(bundle).as_posix())
+    for path in children:
+        relative = path.relative_to(bundle).as_posix()
+        pure = PurePosixPath(relative)
+        if (
+            not relative
+            or "\\" in relative
+            or pure.is_absolute()
+            or pure.as_posix() != relative
+            or any(part in {"", ".", ".."} for part in relative.split("/"))
+        ):
+            raise ValueError("Linux portable archiveに不正な相対pathがある")
+        if relative == PORTABLE_README_MEMBER:
+            raise ValueError("Linux portable archiveのbundleが予約済みREADME名を使用している")
+        metadata = path.lstat()
+        if stat.S_ISLNK(metadata.st_mode):
+            raise ValueError("Linux portable archiveはsymlinkを含められない")
+        member_name = f"{PORTABLE_ARCHIVE_ROOT}/{relative}"
+        if stat.S_ISDIR(metadata.st_mode):
+            plan.append(
+                {
+                    "name": member_name,
+                    "kind": "directory",
+                    "path": None,
+                    "payload": None,
+                    "mode": 0o755,
+                    "size": 0,
+                    "sha256": None,
+                }
+            )
+            continue
+        if not stat.S_ISREG(metadata.st_mode):
+            raise ValueError("Linux portable archiveに通常file／directory以外がある")
+        record = expected_files.get(relative)
+        if record is None:
+            raise ValueError("Linux portable archive fileがbundle inventoryにない")
+        expected_mode = 0o755 if relative in EXECUTABLE_PATHS else 0o644
+        if stat.S_IMODE(metadata.st_mode) != expected_mode:
+            raise ValueError("Linux portable archive source modeが固定package modeと異なる")
+        seen_files.add(relative)
+        plan.append(
+            {
+                "name": member_name,
+                "kind": "file",
+                "path": path,
+                "payload": None,
+                "mode": expected_mode,
+                "size": record["size_bytes"],
+                "sha256": record["sha256"],
+            }
+        )
+    if seen_files != set(expected_files):
+        raise ValueError("Linux portable archive file setがbundle inventoryと異なる")
+    return [plan[0], *sorted(plan[1:], key=lambda item: item["name"])]
+
+
+def _write_portable_archive(
+    bundle: Path,
+    archive_path: Path,
+    readme_raw: bytes,
+    artifact_records: list[dict[str, Any]],
+) -> dict[str, Any]:
+    plan = _portable_archive_plan(bundle, readme_raw, artifact_records)
+    with archive_path.open("xb") as raw_output:
+        with gzip.GzipFile(
+            filename="", fileobj=raw_output, mode="wb", compresslevel=9, mtime=0
+        ) as compressed:
+            with tarfile.open(fileobj=compressed, mode="w|", format=tarfile.PAX_FORMAT) as archive:
+                for item in plan:
+                    info = tarfile.TarInfo(item["name"])
+                    info.uid = 0
+                    info.gid = 0
+                    info.uname = ""
+                    info.gname = ""
+                    info.mtime = 0
+                    info.mode = item["mode"]
+                    if item["kind"] == "directory":
+                        info.type = tarfile.DIRTYPE
+                        info.size = 0
+                        archive.addfile(info)
+                    else:
+                        info.type = tarfile.REGTYPE
+                        info.size = item["size"]
+                        if item["path"] is None:
+                            source = io.BytesIO(item["payload"])
+                        else:
+                            source = item["path"].open("rb")
+                        with source:
+                            archive.addfile(info, source)
+        raw_output.flush()
+        os.fsync(raw_output.fileno())
+
+    metadata = archive_path.lstat()
+    if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode):
+        raise ValueError("Linux portable archive outputが通常fileではない")
+    return {
+        "file_name": archive_path.name,
+        "format": "tar.gz",
+        "target": PORTABLE_ARCHIVE_TARGET,
+        "byte_length": metadata.st_size,
+        "sha256": _sha256_file(archive_path),
+        "entry_count": len(plan),
+        "readme_sha256": hashlib.sha256(readme_raw).hexdigest(),
+        "signed": False,
+    }
+
+
+def _validate_portable_archive(
+    bundle: Path,
+    archive_path: Path,
+    readme_raw: bytes,
+    artifact_records: list[dict[str, Any]],
+    record: dict[str, Any],
+) -> None:
+    metadata = archive_path.lstat()
+    if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode):
+        raise ValueError("Linux portable archiveが通常fileではない")
+    if (
+        metadata.st_size != record["byte_length"]
+        or _sha256_file(archive_path) != record["sha256"]
+        or record["format"] != "tar.gz"
+        or record["target"] != PORTABLE_ARCHIVE_TARGET
+        or record["entry_count"] < 2
+        or record["readme_sha256"] != hashlib.sha256(readme_raw).hexdigest()
+        or record["signed"] is not False
+    ):
+        raise ValueError("Linux portable archive identity／hashがbuild evidenceと一致しない")
+
+    plan = _portable_archive_plan(bundle, readme_raw, artifact_records)
+    try:
+        with tarfile.open(archive_path, mode="r:gz") as archive:
+            members = archive.getmembers()
+            if len(members) != len(plan) or len(members) != record["entry_count"]:
+                raise ValueError("Linux portable archive entry数が一致しない")
+            names = [member.name for member in members]
+            if names != [item["name"] for item in plan] or len(set(names)) != len(names):
+                raise ValueError("Linux向け可搬packageの構成要素の位置と並び順が一致しない")
+            for member, item in zip(members, plan, strict=True):
+                pure = PurePosixPath(member.name)
+                if (
+                    "\\" in member.name
+                    or pure.is_absolute()
+                    or pure.as_posix() != member.name
+                    or any(part in {"", ".", ".."} for part in member.name.split("/"))
+                    or member.uid != 0
+                    or member.gid != 0
+                    or member.uname != ""
+                    or member.gname != ""
+                    or member.mtime != 0
+                    or member.mode != item["mode"]
+                    or member.pax_headers.keys() - {"path"}
+                ):
+                    raise ValueError("Linux portable archive metadataが安全な固定値ではない")
+                if item["kind"] == "directory":
+                    if not member.isdir() or member.size != 0:
+                        raise ValueError("Linux portable archive directory entryが不正")
+                    continue
+                if not member.isfile() or member.size != item["size"]:
+                    raise ValueError("Linux portable archive file entryが不正")
+                source = archive.extractfile(member)
+                if source is None:
+                    raise ValueError("Linux portable archive fileを読めない")
+                digest = hashlib.sha256()
+                total = 0
+                with source:
+                    for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                        total += len(chunk)
+                        digest.update(chunk)
+                if total != item["size"] or digest.hexdigest() != item["sha256"]:
+                    raise ValueError("Linux portable archive内容がbundle／READMEと不一致")
+    except (tarfile.TarError, OSError) as error:
+        raise ValueError("Linux portable archiveを安全に検証できない") from error
+
+
 def validate_build_evidence(
-    evidence: dict[str, Any], bundle: Path, package_path: Path, manifest_raw: bytes
+    evidence: dict[str, Any],
+    bundle: Path,
+    package_path: Path,
+    manifest_raw: bytes,
+    portable_archive_path: Path | None = None,
+    portable_readme_raw: bytes | None = None,
 ) -> None:
     schema = _schema(BUILD_SCHEMA_NAME)
     errors = validate_instance(evidence, schema)
@@ -283,6 +503,22 @@ def validate_build_evidence(
         or package_record["file_name"] != package_path.name
     ):
         raise ValueError("Linux D4PKG01がbuild evidenceと一致しない")
+    portable_record = evidence["portable_archive"]
+    if portable_record is None:
+        if portable_archive_path is not None or portable_readme_raw is not None:
+            raise ValueError("Linux portable archiveの対象外buildにarchive入力がある")
+    else:
+        if portable_archive_path is None or portable_readme_raw is None:
+            raise ValueError("Linux portable archive evidenceにarchive／README入力がない")
+        if portable_record["file_name"] != portable_archive_path.name:
+            raise ValueError("Linux portable archive file nameがevidenceと一致しない")
+        _validate_portable_archive(
+            bundle,
+            portable_archive_path,
+            portable_readme_raw,
+            records,
+            portable_record,
+        )
 
 
 def build_linux_product(
@@ -428,6 +664,26 @@ def build_linux_product(
                 bundle, package_path, product_version=product_version
             )
             artifact_files, total_bytes, tree_hash = _artifact_inventory(bundle)
+            portable_archive_record = None
+            portable_archive_path = None
+            portable_readme_raw = None
+            if (
+                toolchain["distribution_id"] == "ubuntu"
+                and toolchain["distribution_version"] == "24.04"
+                and toolchain["architecture"] == "x86_64"
+            ):
+                portable_readme_path = source_root / "installer" / "linux" / "PORTABLE_README_ja.txt"
+                portable_readme_raw = _read_regular_file(
+                    portable_readme_path,
+                    PORTABLE_README_MAX_BYTES,
+                    "Linux portable archive README",
+                )
+                portable_archive_path = staging_root / (
+                    f"D4Pocket-{product_version}-linux-x64-portable.tar.gz"
+                )
+                portable_archive_record = _write_portable_archive(
+                    bundle, portable_archive_path, portable_readme_raw, artifact_files
+                )
             credential_scan = _scan_credential_inventory(
                 bundle, artifact_files, total_bytes, tree_hash
             )
@@ -499,9 +755,22 @@ def build_linux_product(
                     "signed": False,
                     "installed_product_verified": False,
                 },
+                "portable_archive": portable_archive_record,
                 "credential_artifact_scan": credential_scan,
             }
-            validate_build_evidence(evidence, bundle, package_path, manifest_raw)
+            if portable_archive_record is None:
+                validate_build_evidence(evidence, bundle, package_path, manifest_raw)
+            else:
+                if portable_archive_path is None or portable_readme_raw is None:
+                    raise ValueError("portable archiveの検証入力が不足している")
+                validate_build_evidence(
+                    evidence,
+                    bundle,
+                    package_path,
+                    manifest_raw,
+                    portable_archive_path,
+                    portable_readme_raw,
+                )
             (staging_root / RECEIPT_NAME).write_text(
                 json.dumps(evidence, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
             )

@@ -92,6 +92,7 @@
     "signed": false,
     "installed_product_verified": false
   },
+  "portable_archive": null,
   "credential_artifact_scan": {
     "version": 1,
     "status": "passed_known_patterns",

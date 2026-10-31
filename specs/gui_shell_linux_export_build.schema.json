@@ -13,7 +13,7 @@
     "portable_bundle_assembled", "manifest_copied_byte_for_byte", "runtime_manifest_consumed",
     "binary_pruning_verified", "formal_distribution_claimed", "signed", "installer_status",
     "launch_status", "artifact_root", "artifact_files", "artifact_total_bytes",
-    "artifact_tree_sha256", "package", "credential_artifact_scan"
+    "artifact_tree_sha256", "package", "portable_archive", "credential_artifact_scan"
   ],
   "additionalProperties": false,
   "properties": {
@@ -156,6 +156,26 @@
         "signed": { "const": false },
         "installed_product_verified": { "const": false }
       }
+    },
+    "portable_archive": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["file_name", "format", "target", "byte_length", "sha256", "entry_count", "readme_sha256", "signed"],
+          "additionalProperties": false,
+          "properties": {
+            "file_name": { "type": "string", "pattern": "^D4Pocket-[A-Za-z0-9.+-]+-linux-x64-portable\\.tar\\.gz$" },
+            "format": { "const": "tar.gz" },
+            "target": { "const": "ubuntu-24.04-x86_64" },
+            "byte_length": { "type": "integer", "minimum": 1 },
+            "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "entry_count": { "type": "integer", "minimum": 2 },
+            "readme_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "signed": { "const": false }
+          }
+        }
+      ]
     },
     "credential_artifact_scan": {
       "type": "object",

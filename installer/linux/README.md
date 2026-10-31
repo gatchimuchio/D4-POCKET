@@ -2,7 +2,9 @@
 
 Linux native DesktopはD4 Pocketの完全対応が必須の製品対象である。Linux installerをpost-v1、任意platform、release対象外として扱わない。
 
-現時点ではLinux packaged installer、導入済み製品、更新・rollback・uninstallの一貫した製品経路は未完成であり、`release_blockers.registry.json`の`linux_native_product_support`がreleaseを遮断する。WSL／WSLg／headless上のbuildや試験は開発証拠であり、Linux native 導入済み製品の受入れへ代用しない。
+最初のportable archive検証targetをUbuntu 24.04 LTS／x86_64の`tar.gz`とする。ファイルマネージャーで展開し、同梱launcherから初回画面を開く方式で、通常利用者にPython、Rust、Flutter、Git、clone、terminalを要求しない。GTK 3、GLib 2、ログイン中のD-Bus sessionが必要で、Credential機能にはSecret Service互換の資格情報保管サービスが必要となる。起動後の製品導入・更新・rollback・uninstallは既存Brokerのnative Owner確認を通す。
+
+portable `tar.gz`は初回起動用のunsigned archiveであり、D4PKG01更新payloadや通常のsystem package manager installerとは異なる。署名・Publisher identity・正式な一般配布が成立したことを示さない。Linux packaged installer、導入済み製品、更新・rollback・uninstallの一貫した製品受入れは未完了であり、`release_blockers.registry.json`の`linux_native_product_support`がreleaseを遮断する。WSL／WSLg／headless上のbuildや試験は開発証拠であり、Linux native導入済み製品の受入れへ代用しない。
 
 Linux版Rust launcherは実装済みであり、Flutter Linux runtime bundleとともにbuild／installされる。起動時に固定bundle、compile-time App／Audit identity、active-version record、版別起動器の実行元を照合し、Frontend終了後に所有process groupを停止する。XDG_DATA_HOME（未設定時HOME/.local/share）由来のversioned install rootとBroker identity配線、Linux Product ManifestをD4PKG01にするpackage writer、source／toolchain／artifact hash provenance付きExport builder、Linux Brokerの署名済みpackage stage／有効版切替／固定XDG デスクトップ項目登録／直前の署名済み版へのrollbackが実装され、WSL Linux-target fixture試験で確認されている。Ubuntu 24.04.5手動Actionsでは合成Broker-shaped Release bundle／unsigned package buildと一時root cleanupに加え、run [#39326770256](https://github.com/gatchimuchio/D4-POCKET/actions/runs/39326770256)でrollbackを含むRust tests・all-target compile・XDG／Cargo cleanupを確認した。一方、実際のLinux native 導入済み製品上でのInstaller lifecycle、desktop sessionからの起動、Update／Rollback／Uninstaller、X11／Wayland全体の受入れは未成立である。従ってLinux対応完成やnative 導入済み製品 acceptanceを意味しない。
 

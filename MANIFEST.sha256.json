@@ -76,7 +76,7 @@
     },
     {
       "path": ".github/workflows/linux-manual-export-build.yml",
-      "sha256": "1a419c6556c477294bb191bc8b167d2c67022e31dfa8ef8238a845bc5312abdf"
+      "sha256": "c24bec2b74cec3277d5781cd813d34b6575442100c2906610aab14141498ad91"
     },
     {
       "path": ".github/workflows/linux-manual-rust-validation.yml",
@@ -1564,7 +1564,7 @@
     },
     {
       "path": "docs/specs/linux-product-package.md",
-      "sha256": "f88bede88b2cc72ed5aa49f32d1d4f9b6d8a12c301a7b6a396ce83cadc530454"
+      "sha256": "bdf4934e964accedf503837da96dd688f10ad2e8176b470f6da6825388d0be8e"
     },
     {
       "path": "docs/specs/linux-workspace-selection.md",
@@ -2072,7 +2072,7 @@
     },
     {
       "path": "examples/contracts/gui_shell_linux_export_build.valid.json",
-      "sha256": "659be6d0ae83a3510276208f5920be3c76a3bc37046bf7f989c1884f1360d635"
+      "sha256": "f3aa2413b8736d35697e1e0a16fb5b54647840745041034092c1da930c3f459c"
     },
     {
       "path": "examples/contracts/gui_shell_module_build_evidence.valid.json",
@@ -3371,8 +3371,12 @@
       "sha256": "c4203ce00ff2e02bab956ecda3fe1483066ec32429a9048568ee9a22b8943ca2"
     },
     {
+      "path": "installer/linux/PORTABLE_README_ja.txt",
+      "sha256": "4cb781d337a596186758526488725d924066b62fe8e5bba05660023fd54d7acf"
+    },
+    {
       "path": "installer/linux/README.md",
-      "sha256": "8ea65646802894dcb38a61b4efc3198d78b9284fb68a9744dface210e37b5b42"
+      "sha256": "65965086457c6179496eb4e3b6142520162dc3f6d88bb4db32e2d13228a46373"
     },
     {
       "path": "installer/macos/README.md",
@@ -4656,7 +4660,7 @@
     },
     {
       "path": "specs/gui_shell_linux_export_build.schema.json",
-      "sha256": "a014e0ecebedb73d1398a02a9e32574cd0f73cbad4a8c18761ab30e5ca4b0295"
+      "sha256": "1ce9665a99d3664eb779f5b4ffb324c373352638f526bd0d883edcf11d7e0029"
     },
     {
       "path": "specs/gui_shell_module_build_evidence.schema.json",
@@ -5136,7 +5140,7 @@
     },
     {
       "path": "tooling/export_linux_product.py",
-      "sha256": "4c680977d9d75d02fe306388a0dfb6ea05c1831c3012d81e373338b469df384d"
+      "sha256": "8db7ba593aa4b9a1b7246118c3146ff795013ca1a161c00f84c99546d5a1c800"
     },
     {
       "path": "tooling/export_windows_product.py",
@@ -5264,7 +5268,7 @@
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",
-      "sha256": "5c3c95a885b8ef829ea56662753f0b1a721e10dc5a2a120399e74937632bb8e9"
+      "sha256": "64f51899797d37edd19fecee1fc6e324ec3118602caf946ea0fad662659cbeb3"
     },
     {
       "path": "tooling/tests/test_linux_gtk_bundle_smoke.py",
@@ -5273,6 +5277,10 @@
     {
       "path": "tooling/tests/test_linux_installed_product_smoke.py",
       "sha256": "90b7bd8ddff4c3cf6438c6d8b381db73595e67088fa0d52e2817f5eba5f39f5f"
+    },
+    {
+      "path": "tooling/tests/test_linux_portable_archive.py",
+      "sha256": "13b35e423eb95bee58d889f7dfe5bda5ea9e7ea27496cee8b60494a9abb20c66"
     },
     {
       "path": "tooling/tests/test_linux_product_package.py",
