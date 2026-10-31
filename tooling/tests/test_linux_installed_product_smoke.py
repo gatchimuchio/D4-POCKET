@@ -19,6 +19,7 @@ from pathlib import Path
 
 from tooling.tests.linux_installed_product_smoke import (
     _LinuxAgentTaskResponsesServer,
+    _agent_task_audit_acceptance_diagnostics,
     _activate_accessible,
     _activate_named_control_by_keyboard,
     _actionable_node,
@@ -3629,6 +3630,42 @@ class AgentTaskAuditAcceptanceTests(unittest.TestCase):
             self.assertEqual(evidence["agent_task_permission_grants"], 3)
             self.assertEqual(evidence["agent_task_owner_approvals"], 3)
             self.assertEqual(evidence["agent_task_scratch_cleanup_confirmed"], 1)
+
+    def test_failure_diagnostics_show_only_bounded_counts(self) -> None:
+        task_ids = ("PRIVATE_TASK_A", "PRIVATE_TASK_B", "PRIVATE_TASK_C")
+        statuses = ("completed", "cancelled", "failed")
+        starts = [
+            {
+                "task_id": task_id,
+                "request_hash": f"PRIVATE_HASH_{index}",
+                "instruction": "RAW_PRIVATE_TASK_TEXT",
+            }
+            for index, task_id in enumerate(task_ids)
+        ]
+        terminals = [
+            {"task_id": task_id, "status": status}
+            for task_id, status in zip(task_ids, statuses, strict=True)
+        ]
+
+        diagnostics = _agent_task_audit_acceptance_diagnostics(
+            starts,
+            terminals,
+            task_permission_grants=2,
+            task_owner_approvals=3,
+            scratch_mediation=[{"scratch_cleanup_completed": True}],
+        )
+        serialized = json.dumps(diagnostics, ensure_ascii=False, sort_keys=True)
+
+        self.assertEqual(
+            diagnostics["failed_checks"], ["three_workspace_permission_grants"]
+        )
+        self.assertEqual(
+            diagnostics["counts"]["terminal_status_counts"],
+            {"cancelled": 1, "completed": 1, "failed": 1},
+        )
+        self.assertNotIn("PRIVATE_TASK_", serialized)
+        self.assertNotIn("PRIVATE_HASH_", serialized)
+        self.assertNotIn("RAW_PRIVATE_TASK_TEXT", serialized)
 
 
 class LinuxAgentTaskResponsesFixtureTests(unittest.TestCase):

@@ -5462,6 +5462,69 @@ def _owner_dialog_timeout_diagnostics(
     )
 
 
+def _agent_task_audit_acceptance_diagnostics(
+    task_starts: list[dict[str, object]],
+    task_terminals: list[dict[str, object]],
+    task_permission_grants: int,
+    task_owner_approvals: int,
+    scratch_mediation: list[dict[str, object]],
+) -> dict[str, object]:
+    start_task_ids = [record.get("task_id") for record in task_starts]
+    terminal_task_ids = [record.get("task_id") for record in task_terminals]
+    request_hashes = [record.get("request_hash") for record in task_starts]
+    valid_start_task_ids = [value for value in start_task_ids if isinstance(value, str)]
+    valid_terminal_task_ids = [
+        value for value in terminal_task_ids if isinstance(value, str)
+    ]
+    valid_request_hashes = [value for value in request_hashes if isinstance(value, str)]
+    statuses = [record.get("status") for record in task_terminals]
+    expected_statuses = ("cancelled", "completed", "failed")
+    status_counts = {
+        status: sum(value == status for value in statuses)
+        for status in expected_statuses
+    }
+    unknown_status_count = sum(
+        not isinstance(value, str) or value not in expected_statuses
+        for value in statuses
+    )
+    scratch_cleanup_confirmed = sum(
+        item.get("scratch_cleanup_completed") is True for item in scratch_mediation
+    )
+    checks = {
+        "three_task_start_records": len(task_starts) == 3,
+        "three_task_terminal_records": len(task_terminals) == 3,
+        "three_unique_task_ids": len(set(valid_start_task_ids)) == 3
+        and len(valid_start_task_ids) == len(start_task_ids),
+        "terminal_task_ids_match": len(valid_terminal_task_ids)
+        == len(terminal_task_ids)
+        and set(valid_start_task_ids) == set(valid_terminal_task_ids),
+        "three_unique_request_hashes": len(set(valid_request_hashes)) == 3
+        and len(valid_request_hashes) == len(request_hashes),
+        "expected_terminal_statuses": unknown_status_count == 0
+        and all(status_counts[status] == 1 for status in expected_statuses),
+        "three_workspace_permission_grants": task_permission_grants == 3,
+        "three_owner_approval_grants": task_owner_approvals == 3,
+        "one_scratch_cleanup_confirmation": scratch_cleanup_confirmed == 1,
+    }
+    return {
+        "checks": checks,
+        "failed_checks": [name for name, passed in checks.items() if not passed],
+        "counts": {
+            "task_start_records": len(task_starts),
+            "task_terminal_records": len(task_terminals),
+            "unique_start_task_ids": len(set(valid_start_task_ids)),
+            "terminal_task_ids_match": checks["terminal_task_ids_match"],
+            "unique_start_request_hashes": len(set(valid_request_hashes)),
+            "terminal_status_counts": status_counts,
+            "unknown_terminal_status_count": unknown_status_count,
+            "workspace_permission_grants": task_permission_grants,
+            "owner_approval_grants": task_owner_approvals,
+            "scratch_mediation_records": len(scratch_mediation),
+            "scratch_cleanup_confirmations": scratch_cleanup_confirmed,
+        },
+    }
+
+
 def _verify_live_audit(
     store: Path,
     *,
@@ -5680,24 +5743,17 @@ def _verify_live_audit(
         item.get("scratch_cleanup_completed") is True for item in scratch_mediation
     )
     if require_agent_task:
-        task_ids = [record.get("task_id") for record in task_starts]
-        terminal_task_ids = [record.get("task_id") for record in task_terminals]
-        request_hashes = [record.get("request_hash") for record in task_starts]
-        if not all(
-            (
-                len(task_starts) == 3,
-                len(task_terminals) == 3,
-                len(set(task_ids)) == 3,
-                set(task_ids) == set(terminal_task_ids),
-                len(set(request_hashes)) == 3,
-                sorted(task_statuses) == ["cancelled", "completed", "failed"],
-                task_permission_grants == 3,
-                task_owner_approvals == 3,
-                scratch_cleanup_confirmed == 1,
-            )
-        ):
+        acceptance_diagnostics = _agent_task_audit_acceptance_diagnostics(
+            task_starts,
+            task_terminals,
+            task_permission_grants,
+            task_owner_approvals,
+            scratch_mediation,
+        )
+        if acceptance_diagnostics["failed_checks"]:
             raise RuntimeError(
-                "installed Agent Taskの一回Permission／Approval、3 terminal outcome、scratch cleanup Auditが不成立です"
+                "installed Agent Task Auditの有限受入れ条件が不成立です: "
+                + json.dumps(acceptance_diagnostics, ensure_ascii=False, sort_keys=True)
             )
         deadline_records = [
             record
@@ -5713,7 +5769,18 @@ def _verify_live_audit(
             record for record in task_terminals if record.get("status") == "completed"
         ]
         if not all((len(deadline_records) == 1, len(cancelled_records) == 1, len(completed_records) == 1)):
-            raise RuntimeError("deadline／cancel／positive Task terminal Auditの対応が不正です")
+            raise RuntimeError(
+                "deadline／cancel／positive Task terminal Auditの対応が不正です: "
+                + json.dumps(
+                    {
+                        "deadline_failure_records": len(deadline_records),
+                        "cancelled_records": len(cancelled_records),
+                        "completed_records": len(completed_records),
+                    },
+                    ensure_ascii=False,
+                    sort_keys=True,
+                )
+            )
     if require_workspace and not all(
         (
             workspace_selection_accepted >= 2,
