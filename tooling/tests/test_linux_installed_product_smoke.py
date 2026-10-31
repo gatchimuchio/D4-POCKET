@@ -27,6 +27,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _atspi_desktop_failure_summary,
     _accessible_scope_with_named_descendant,
     _cleanup_linux_agent_task_process_groups,
+    _linux_installed_task_status_observation,
     _answer_owner_dialog,
     _bounded_owner_text_diagnostics,
     _assert_secret_absent_from_files,
@@ -3150,29 +3151,112 @@ class LinuxAgentTaskFailureCleanupTests(unittest.TestCase):
 
 
 class InstalledTaskStatusPollingTests(unittest.TestCase):
+    class _Accessible:
+        def __init__(self, name: str, children=()) -> None:
+            self.name = name
+            self._children = list(children)
+            self.parent = None
+            for child in self._children:
+                child.parent = self
+
+        @property
+        def childCount(self) -> int:
+            return len(self._children)
+
+        def getChildAtIndex(self, index: int):
+            return self._children[index]
+
+        def get_parent(self):
+            return self.parent
+
+    def test_status_observation_binds_current_task_not_an_older_status(self) -> None:
+        old_task = self._Accessible(
+            "older Task",
+            [
+                self._Accessible("Task識別子: task-old"),
+                self._Accessible("Task状態: cancelled"),
+            ],
+        )
+        current_task = self._Accessible(
+            "current Task",
+            [
+                self._Accessible("Task識別子: task-current"),
+                self._Accessible("Task状態: running"),
+            ],
+        )
+        desktop = self._Accessible("desktop", [old_task, current_task])
+        pyatspi = types.SimpleNamespace(
+            Registry=types.SimpleNamespace(getDesktop=lambda _index: desktop)
+        )
+        with patch.dict(sys.modules, {"pyatspi": pyatspi}):
+            snapshot, status, observed = _linux_installed_task_status_observation(
+                "task-current", "cancelled", deadline=time.monotonic() + 1
+            )
+        self.assertIsNone(snapshot)
+        self.assertEqual(status, "running")
+        self.assertEqual(observed, ["cancelled", "running"])
+
+    def test_status_observation_returns_current_task_terminal_scope(self) -> None:
+        current_task = self._Accessible(
+            "current Task",
+            [
+                self._Accessible("Task識別子: task-current"),
+                self._Accessible("Task状態: failed"),
+                self._Accessible("結果hash: sha256:abc"),
+            ],
+        )
+        desktop = self._Accessible("desktop", [current_task])
+        pyatspi = types.SimpleNamespace(
+            Registry=types.SimpleNamespace(getDesktop=lambda _index: desktop)
+        )
+        with patch.dict(sys.modules, {"pyatspi": pyatspi}):
+            snapshot, status, _observed = _linux_installed_task_status_observation(
+                "task-current", "failed", deadline=time.monotonic() + 1
+            )
+        self.assertIsNotNone(snapshot)
+        self.assertEqual(status, "failed")
+        self.assertIn("Task識別子: task-current", snapshot)
+        self.assertIn("結果hash: sha256:abc", snapshot)
+
     def test_status_poll_reacquires_the_current_product_window(self) -> None:
         previous_window = object()
         current_window = object()
         with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._linux_installed_task_status_observation",
+                side_effect=(
+                    (None, "running", ["cancelled", "running"]),
+                    (
+                        "Task識別子: task-test\nTask状態: cancelled",
+                        "cancelled",
+                        ["cancelled"],
+                    ),
+                ),
+            ),
             patch(
                 "tooling.tests.linux_installed_product_smoke._find_accessible",
                 return_value=current_window,
             ) as find_window,
             patch(
                 "tooling.tests.linux_installed_product_smoke._accessible_snapshot",
-                side_effect=lambda root: (
-                    "Task状態: cancelled" if root is current_window else ""
+                return_value=(
+                    "Task識別子: task-old\nTask状態: cancelled\n"
+                    "Task識別子: task-test\nTask状態: running"
                 ),
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
+                side_effect=RuntimeError("refresh unavailable"),
             ),
         ):
             snapshot = _wait_installed_task_status(
-                {}, previous_window, "cancelled", timeout=1
+                {}, previous_window, "cancelled", task_id="task-test", timeout=1
             )
-        self.assertEqual(snapshot, "Task状態: cancelled")
+        self.assertEqual(snapshot, "Task識別子: task-test\nTask状態: cancelled")
         find_window.assert_called_once()
 
     def test_status_failure_diagnostics_exclude_unbounded_snapshot_text(self) -> None:
-        ticks = iter((0.0, 0.0, 0.0, 2.0))
+        ticks = iter((0.0, 0.0, 0.0, 0.0, 0.0, 2.0))
         with (
             patch(
                 "tooling.tests.linux_installed_product_smoke.time.monotonic",
@@ -3180,12 +3264,19 @@ class InstalledTaskStatusPollingTests(unittest.TestCase):
             ),
             patch("tooling.tests.linux_installed_product_smoke.time.sleep"),
             patch(
+                "tooling.tests.linux_installed_product_smoke._linux_installed_task_status_observation",
+                return_value=(None, "running", ["running"]),
+            ),
+            patch(
                 "tooling.tests.linux_installed_product_smoke._find_accessible",
                 side_effect=RuntimeError("window unavailable"),
             ),
             patch(
                 "tooling.tests.linux_installed_product_smoke._accessible_snapshot",
-                return_value="Task状態: running\\nRAW_PRIVATE_TASK_TEXT",
+                return_value=(
+                    "Task識別子: task-test\nTask状態: cancelled\n"
+                    "RAW_PRIVATE_TASK_TEXT"
+                ),
             ),
             patch(
                 "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
@@ -3193,8 +3284,13 @@ class InstalledTaskStatusPollingTests(unittest.TestCase):
             ),
         ):
             with self.assertRaisesRegex(RuntimeError, "cancelled") as caught:
-                _wait_installed_task_status({}, object(), "cancelled", timeout=0.01)
+                _wait_installed_task_status(
+                    {}, object(), "cancelled", task_id="task-test", timeout=0.01
+                )
         self.assertIn("running", str(caught.exception))
+        self.assertIn(
+            '"task_id_was_visible_in_last_snapshot": true', str(caught.exception)
+        )
         self.assertNotIn("RAW_PRIVATE_TASK_TEXT", str(caught.exception))
 
 

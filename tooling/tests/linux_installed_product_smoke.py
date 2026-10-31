@@ -3454,17 +3454,91 @@ def _read_task_scratch_recovery_state(store: Path) -> dict[str, object]:
     return {"entries": len(entries), "hmac_present": True}
 
 
+def _linux_installed_task_status_observation(
+    task_id: str, expected_status: str, *, deadline: float
+) -> tuple[str | None, str | None, list[str]]:
+    try:
+        import pyatspi
+    except ImportError as error:
+        raise RuntimeError("AT-SPI UI操作にpython3-pyatspiが必要です") from error
+
+    task_id_label = f"Task識別子: {task_id}"
+    visible_statuses: list[str] = []
+    current_task_status: str | None = None
+    desktop = pyatspi.Registry.getDesktop(0)
+    for node, name in _accessible_nodes(desktop, deadline=deadline):
+        match = re.search(
+            r"Task状態:\s*(pending|running|blocked|completed|failed|cancelled|quarantined)\b",
+            name,
+        )
+        if match is None:
+            continue
+        status = match.group(1)
+        if status not in visible_statuses:
+            visible_statuses.append(status)
+            visible_statuses[:] = visible_statuses[-6:]
+        scope = node
+        task_scope = None
+        for _ in range(25):
+            if time.monotonic() >= deadline:
+                raise RuntimeError("Task状態のAT-SPI観測期限が切れました")
+            scope_text = _accessible_snapshot(scope)
+            scope_task_ids = set(
+                re.findall(r"Task識別子:\s*([A-Za-z0-9_.:-]+)", scope_text)
+            )
+            if scope_task_ids:
+                if scope_task_ids == {task_id} and task_id_label in scope_text:
+                    task_scope = scope
+                break
+            parent = _accessible_parent(scope)
+            if parent is None or parent is scope:
+                break
+            scope = parent
+        if task_scope is None:
+            continue
+        snapshot = _accessible_snapshot(task_scope)
+        if task_id_label not in snapshot:
+            continue
+        task_status_match = re.search(
+            r"Task状態:\s*(pending|running|blocked|completed|failed|cancelled|quarantined)\b",
+            snapshot,
+        )
+        if task_status_match is None:
+            continue
+        current_task_status = task_status_match.group(1)
+        if current_task_status == expected_status:
+            return snapshot, current_task_status, visible_statuses
+    return None, current_task_status, visible_statuses
+
+
 def _wait_installed_task_status(
-    environment: dict[str, str], window, expected_status: str, *, timeout: float
+    environment: dict[str, str],
+    window,
+    expected_status: str,
+    *,
+    task_id: str,
+    timeout: float,
 ) -> str:
     deadline = time.monotonic() + timeout
     last_snapshot = ""
     visible_statuses: list[str] = []
+    current_task_status: str | None = None
     window_lookup_failures = 0
     refresh_control_seen = False
     refresh_attempts = 0
     while time.monotonic() < deadline:
         remaining = max(0.01, deadline - time.monotonic())
+        task_snapshot, current_task_status, observed_statuses = (
+            _linux_installed_task_status_observation(
+                task_id,
+                expected_status,
+                deadline=min(deadline, time.monotonic() + min(0.2, remaining)),
+            )
+        )
+        visible_statuses.extend(observed_statuses)
+        visible_statuses[:] = list(dict.fromkeys(visible_statuses))[-6:]
+        if task_snapshot is not None:
+            return task_snapshot
         try:
             window = _find_accessible(
                 WINDOW_TITLE, timeout=min(0.2, remaining)
@@ -3472,8 +3546,6 @@ def _wait_installed_task_status(
         except RuntimeError:
             window_lookup_failures += 1
         last_snapshot = _accessible_snapshot(window)
-        if f"Task状態: {expected_status}" in last_snapshot:
-            return last_snapshot
         visible_statuses.extend(
             re.findall(
                 r"Task状態:\s*(pending|running|blocked|completed|failed|cancelled|quarantined)\b",
@@ -3482,7 +3554,11 @@ def _wait_installed_task_status(
         )
         visible_statuses[:] = list(dict.fromkeys(visible_statuses))[-6:]
         try:
-            refresh = _find_operable_accessible("Task状態を更新", root=window, timeout=1)
+            refresh = _find_operable_accessible(
+                "Task状態を更新",
+                root=window,
+                timeout=min(0.2, max(0.01, deadline - time.monotonic())),
+            )
             refresh_control_seen = True
             refresh_attempts += 1
             _activate_accessible(refresh, "Task状態を更新", environment)
@@ -3491,6 +3567,8 @@ def _wait_installed_task_status(
         time.sleep(0.25)
     diagnostics = {
         "visible_task_statuses": visible_statuses,
+        "current_task_status": current_task_status,
+        "task_id_was_visible_in_last_snapshot": f"Task識別子: {task_id}" in last_snapshot,
         "product_window_lookup_failures": window_lookup_failures,
         "last_snapshot_nonempty": bool(last_snapshot),
         "refresh_control_seen": refresh_control_seen,
@@ -3892,7 +3970,11 @@ def _run_installed_agent_task_acceptance(
                     + json.dumps(report_diagnostics, ensure_ascii=False, sort_keys=True)
                 )
             completed_snapshot = _wait_installed_task_status(
-                environment, window, expected_status, timeout=wait_seconds
+                environment,
+                window,
+                expected_status,
+                task_id=task_ids[-1],
+                timeout=wait_seconds,
             )
             result_hash_match = re.search(
                 r"結果hash:\s*(sha256:[0-9a-f]{64})", completed_snapshot
@@ -3964,12 +4046,17 @@ def _run_installed_agent_task_acceptance(
             else:
                 # The Broker owns the deadline; wait for its terminal transition without sending Cancel.
                 _wait_installed_task_status(
-                    environment, window, expected_status, timeout=wait_seconds
+                    environment,
+                    window,
+                    expected_status,
+                    task_id=task_ids[-1],
+                    timeout=wait_seconds,
                 )
             _wait_installed_task_status(
                 environment,
                 window,
                 expected_status,
+                task_id=task_ids[-1],
                 timeout=wait_seconds if scenario_name == "cancel" else 2.0,
             )
             current_identity = _linux_proc_identity(pid)
