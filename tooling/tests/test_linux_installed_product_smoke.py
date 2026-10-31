@@ -3152,9 +3152,12 @@ class LinuxAgentTaskFailureCleanupTests(unittest.TestCase):
 
 class InstalledTaskStatusPollingTests(unittest.TestCase):
     class _Accessible:
-        def __init__(self, name: str, children=()) -> None:
+        def __init__(
+            self, name: str, children=(), *, text: str | None = None
+        ) -> None:
             self.name = name
             self._children = list(children)
+            self._text = text
             self.parent = None
             for child in self._children:
                 child.parent = self
@@ -3165,6 +3168,15 @@ class InstalledTaskStatusPollingTests(unittest.TestCase):
 
         def getChildAtIndex(self, index: int):
             return self._children[index]
+
+        def queryText(self):
+            if self._text is None:
+                raise RuntimeError("Text interface unavailable")
+            value = self._text
+            return types.SimpleNamespace(
+                getText=lambda _start, _end: value,
+                characterCount=len(value),
+            )
 
         def get_parent(self):
             return self.parent
@@ -3267,6 +3279,72 @@ class InstalledTaskStatusPollingTests(unittest.TestCase):
         with patch.dict(sys.modules, {"pyatspi": pyatspi}):
             snapshot, status, observed = _linux_installed_task_status_observation(
                 "task-current", "completed", deadline=time.monotonic() + 1
+            )
+        self.assertIsNone(snapshot)
+        self.assertEqual(status, "running")
+        self.assertIn("completed", observed)
+
+    def test_text_interface_only_scope_binds_current_task_status(self) -> None:
+        old_task = self._Accessible(
+            "",
+            [
+                self._Accessible("", text="Task識別子: task-old"),
+                self._Accessible("", text="Task状態: cancelled"),
+            ],
+            text="Broker Task状態",
+        )
+        current_task = self._Accessible(
+            "",
+            [
+                self._Accessible("", text="Task識別子: task-current"),
+                self._Accessible("", text="Task状態: failed"),
+                self._Accessible("", text="結果hash: sha256:current"),
+            ],
+            text="Broker Task状態",
+        )
+        window = self._Accessible("D4 Pocket", [old_task, current_task])
+        pyatspi = types.SimpleNamespace(
+            Registry=types.SimpleNamespace(getDesktop=lambda _index: window)
+        )
+        with patch.dict(sys.modules, {"pyatspi": pyatspi}):
+            snapshot, status, observed = _linux_installed_task_status_observation(
+                "task-current",
+                "failed",
+                deadline=time.monotonic() + 1,
+                accessibility_root=window,
+            )
+        self.assertIsNotNone(snapshot)
+        self.assertIn("Task識別子: task-current", snapshot)
+        self.assertEqual(status, "failed")
+        self.assertEqual(observed, ["cancelled", "failed"])
+
+    def test_text_interface_only_scope_rejects_another_tasks_terminal_status(self) -> None:
+        old_task = self._Accessible(
+            "",
+            [
+                self._Accessible("", text="Task識別子: task-old"),
+                self._Accessible("", text="Task状態: completed"),
+            ],
+            text="Broker Task状態",
+        )
+        current_task = self._Accessible(
+            "",
+            [
+                self._Accessible("", text="Task識別子: task-current"),
+                self._Accessible("", text="Task状態: running"),
+            ],
+            text="Broker Task状態",
+        )
+        window = self._Accessible("D4 Pocket", [old_task, current_task])
+        pyatspi = types.SimpleNamespace(
+            Registry=types.SimpleNamespace(getDesktop=lambda _index: window)
+        )
+        with patch.dict(sys.modules, {"pyatspi": pyatspi}):
+            snapshot, status, observed = _linux_installed_task_status_observation(
+                "task-current",
+                "completed",
+                deadline=time.monotonic() + 1,
+                accessibility_root=window,
             )
         self.assertIsNone(snapshot)
         self.assertEqual(status, "running")

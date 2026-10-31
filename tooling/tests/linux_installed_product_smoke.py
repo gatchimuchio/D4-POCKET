@@ -3478,9 +3478,20 @@ def _linux_installed_task_status_observation(
     )
     status_nodes: list[tuple[object, str]] = []
     for node, name in _accessible_nodes(desktop, deadline=deadline):
+        # GTK may expose a visible label through AT-SPI Text while Accessible.name
+        # remains empty. Read Text for nodes whose accessible name does not already
+        # carry one of the Task correlation fields.
+        content = name
+        if not any(
+            marker in name
+            for marker in ("Broker Task状態", "Task識別子:", "Task状態:")
+        ):
+            text = _accessible_text(node)
+            if text and text != name:
+                content = f"{name}\n{text}" if name else text
         match = re.search(
             r"Task状態:\s*(pending|running|blocked|completed|failed|cancelled|quarantined)\b",
-            name,
+            content,
         )
         if match is not None:
             status_nodes.append((node, match.group(1)))
@@ -3488,7 +3499,7 @@ def _linux_installed_task_status_observation(
             if status not in visible_statuses:
                 visible_statuses.append(status)
                 visible_statuses[:] = visible_statuses[-6:]
-        if "Broker Task状態" in name:
+        if "Broker Task状態" in content:
             if time.monotonic() >= deadline:
                 return None, current_task_status, visible_statuses
             snapshot = _accessible_snapshot(node, deadline=deadline)
