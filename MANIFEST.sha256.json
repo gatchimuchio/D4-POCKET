@@ -76,7 +76,7 @@
     },
     {
       "path": ".github/workflows/linux-manual-export-build.yml",
-      "sha256": "ec11c3bb9bafc5a0474b96ab2ba0a126bb8b1a0e7afe6214f36702974f72dd0e"
+      "sha256": "9743cb43112ed91b741604647dc6a99fa74dbaa6f93e4533b6f6d92f688caf8a"
     },
     {
       "path": ".github/workflows/linux-manual-rust-validation.yml",
@@ -172,7 +172,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "f0afc3b7001621056f7be207704d749886b0d82ebb64743e9a3224f0f3eda9d1"
+      "sha256": "8c3021414d8d4e95813c1800917a46062d1b82928ee8c7cd5b97341a10181a29"
     },
     {
       "path": "SECURITY.md",
@@ -1352,7 +1352,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "34a7ace21d29174795ea719f704feac47490f2cb74b7291c5ddfc5e324857168"
+      "sha256": "1e488229e205bdbedc20f4b69ee9bead26260d4f6ee9bf0317514851a8a211ce"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1564,7 +1564,7 @@
     },
     {
       "path": "docs/specs/linux-product-package.md",
-      "sha256": "95ca716246ed5db1121f6f595d95154ea7502d948275bbe651a6c2530d16c7d6"
+      "sha256": "f88bede88b2cc72ed5aa49f32d1d4f9b6d8a12c301a7b6a396ce83cadc530454"
     },
     {
       "path": "docs/specs/linux-workspace-selection.md",
@@ -4352,7 +4352,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "0734b6faebe351f45b3994dd1b9ef9b1c1abbaf8cfaf2d4f17c16b8af9122a38"
+      "sha256": "dfc5ba958e2c1e841aebeff44deb36782837f51e0845c791a6ef8961ba9bb53c"
     },
     {
       "path": "requirements-dev.txt",
@@ -5256,11 +5256,11 @@
     },
     {
       "path": "tooling/tests/linux_gtk_bundle_smoke.py",
-      "sha256": "2be876dae6b8e9baca3559914f00f13177cd02a00a797268f3e630cbebb564c5"
+      "sha256": "d82dceae18421c2bb8a2b72433c5a73aae934d0ded70c5c44c0c6bd7de8fec0a"
     },
     {
       "path": "tooling/tests/linux_installed_product_smoke.py",
-      "sha256": "cebc5f782eac9c96d0e7cb3771b678cd9c5f640169a3daa36bdf979c599f69dd"
+      "sha256": "587e6d4531024f4aa5f6c26add2b0785c7594f9636f4f2a8a73ec13953dcb0f0"
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",
@@ -5268,11 +5268,11 @@
     },
     {
       "path": "tooling/tests/test_linux_gtk_bundle_smoke.py",
-      "sha256": "a4dc39daf67774c705095133c3db007a1e6c24de1b27ac83043cde644e4ceb11"
+      "sha256": "a2a57188bd8ea4bd277e498c64e9eddda1903f6afb5c1da4f03507d1f91107ec"
     },
     {
       "path": "tooling/tests/test_linux_installed_product_smoke.py",
-      "sha256": "f826f158be91bcc112c4055d0ca2de13e0107c3a03651c8fdaace8045266c12e"
+      "sha256": "9df65aa66013b22b1d6169f38011116dd664395bd4dd57ac9094c88120565d39"
     },
     {
       "path": "tooling/tests/test_linux_product_package.py",
