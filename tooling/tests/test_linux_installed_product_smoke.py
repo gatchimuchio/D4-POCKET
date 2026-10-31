@@ -3306,6 +3306,31 @@ class InstalledTaskStatusPollingTests(unittest.TestCase):
         self.assertIsNotNone(snapshot)
         self.assertEqual(status, "completed")
 
+    def test_status_observation_scans_the_supplied_product_window(self) -> None:
+        current_task = self._Accessible(
+            "Broker Task状態",
+            [
+                self._Accessible("Task識別子: task-current"),
+                self._Accessible("Task状態: completed"),
+            ],
+        )
+        window = self._Accessible("D4 Pocket", [current_task])
+        pyatspi = types.SimpleNamespace(
+            Registry=types.SimpleNamespace(
+                getDesktop=unittest.mock.Mock(return_value=object())
+            )
+        )
+        with patch.dict(sys.modules, {"pyatspi": pyatspi}):
+            snapshot, status, _observed = _linux_installed_task_status_observation(
+                "task-current",
+                "completed",
+                deadline=time.monotonic() + 1,
+                accessibility_root=window,
+            )
+        self.assertIsNotNone(snapshot)
+        self.assertEqual(status, "completed")
+        pyatspi.Registry.getDesktop.assert_not_called()
+
     def test_status_observation_returns_current_task_terminal_scope(self) -> None:
         current_task = self._Accessible(
             "current Task",
@@ -3342,7 +3367,7 @@ class InstalledTaskStatusPollingTests(unittest.TestCase):
                         ["cancelled"],
                     ),
                 ),
-            ),
+            ) as observe,
             patch(
                 "tooling.tests.linux_installed_product_smoke._find_accessible",
                 return_value=current_window,
@@ -3363,7 +3388,8 @@ class InstalledTaskStatusPollingTests(unittest.TestCase):
                 {}, previous_window, "cancelled", task_id="task-test", timeout=1
             )
         self.assertEqual(snapshot, "Task識別子: task-test\nTask状態: cancelled")
-        find_window.assert_called_once()
+        self.assertEqual(find_window.call_count, 2)
+        self.assertIs(observe.call_args.kwargs["accessibility_root"], current_window)
 
     def test_status_failure_diagnostics_exclude_unbounded_snapshot_text(self) -> None:
         ticks = iter((0.0, 0.0, 0.0, 0.0, 0.0, 2.0))

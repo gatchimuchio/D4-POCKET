@@ -3457,7 +3457,11 @@ def _read_task_scratch_recovery_state(store: Path) -> dict[str, object]:
 
 
 def _linux_installed_task_status_observation(
-    task_id: str, expected_status: str, *, deadline: float
+    task_id: str,
+    expected_status: str,
+    *,
+    deadline: float,
+    accessibility_root=None,
 ) -> tuple[str | None, str | None, list[str]]:
     try:
         import pyatspi
@@ -3467,7 +3471,11 @@ def _linux_installed_task_status_observation(
     task_id_label = f"Task識別子: {task_id}"
     visible_statuses: list[str] = []
     current_task_status: str | None = None
-    desktop = pyatspi.Registry.getDesktop(0)
+    desktop = (
+        accessibility_root
+        if accessibility_root is not None
+        else pyatspi.Registry.getDesktop(0)
+    )
     status_nodes: list[tuple[object, str]] = []
     for node, name in _accessible_nodes(desktop, deadline=deadline):
         match = re.search(
@@ -3567,23 +3575,25 @@ def _wait_installed_task_status(
     refresh_attempts = 0
     while time.monotonic() < deadline:
         remaining = max(0.01, deadline - time.monotonic())
+        try:
+            current_window = _find_accessible(
+                WINDOW_TITLE, timeout=min(0.2, remaining)
+            )
+            window = current_window
+        except RuntimeError:
+            window_lookup_failures += 1
         task_snapshot, current_task_status, observed_statuses = (
             _linux_installed_task_status_observation(
                 task_id,
                 expected_status,
                 deadline=min(deadline, time.monotonic() + min(0.2, remaining)),
+                accessibility_root=window,
             )
         )
         visible_statuses.extend(observed_statuses)
         visible_statuses[:] = list(dict.fromkeys(visible_statuses))[-6:]
         if task_snapshot is not None:
             return task_snapshot
-        try:
-            window = _find_accessible(
-                WINDOW_TITLE, timeout=min(0.2, remaining)
-            )
-        except RuntimeError:
-            window_lookup_failures += 1
         last_snapshot = _accessible_snapshot(window)
         visible_statuses.extend(
             re.findall(
