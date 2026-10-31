@@ -3371,7 +3371,14 @@ class LinuxAgentTaskFailureDiagnosticsTests(unittest.TestCase):
                 {
                     "kind": "cli_failure",
                     "summary": 'exit_code=Some(2); stdout_event_types=["error", "other"]; '
+                    "stdout_error_class=other; stdout_http_status=none; "
                     "stderr_class=configuration; stderr_bytes=52",
+                },
+                {
+                    "kind": "cli_failure",
+                    "summary": 'exit_code=Some(1); stdout_event_types=["turn.failed"]; '
+                    "stdout_error_class=model_unavailable; stdout_http_status=404; "
+                    "stderr_class=empty; stderr_bytes=0",
                 },
                 {
                     "kind": "os_failure",
@@ -3390,14 +3397,16 @@ class LinuxAgentTaskFailureDiagnosticsTests(unittest.TestCase):
                 )
                 try:
                     with urlopen(request, timeout=2) as response:
+                        self.assertEqual(response.read(4096), b"{}")
                         responses.append(response.status)
                 except HTTPError as error:
+                    self.assertEqual(error.read(4096), b"{}")
                     responses.append(error.code)
             snapshot = server.snapshot()
         finally:
             server.close()
 
-        self.assertEqual(responses, [200, 200, 200, 400])
+        self.assertEqual(responses, [200, 200, 200, 200, 400])
         self.assertEqual(
             snapshot["agent_task_diagnostics"],
             [
@@ -3406,8 +3415,19 @@ class LinuxAgentTaskFailureDiagnosticsTests(unittest.TestCase):
                     "stage": "codex_cli_exit",
                     "exit_code": "Some(2)",
                     "stdout_event_types": ["error", "other"],
+                    "stdout_error_class": "other",
+                    "stdout_http_status": None,
                     "stderr_class": "configuration",
                     "stderr_bytes": 52,
+                },
+                {
+                    "stage": "codex_cli_exit",
+                    "exit_code": "Some(1)",
+                    "stdout_event_types": ["turn.failed"],
+                    "stdout_error_class": "model_unavailable",
+                    "stdout_http_status": 404,
+                    "stderr_class": "empty",
+                    "stderr_bytes": 0,
                 },
                 {"stage": "codex_process_spawn", "os_error_kind": "NotFound"},
             ],

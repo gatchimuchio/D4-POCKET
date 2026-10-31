@@ -2803,13 +2803,18 @@ def _normalize_r2_e2e_diagnostic(payload: object) -> dict[str, object] | None:
         r'exit_code=(Some\(-?\d+\)|None); '
         r'stdout_event_types=(\[(?:"(?:thread\.started|turn\.started|turn\.completed|'
         r'turn\.failed|error|item\.started|item\.completed|other)"(?:, )?)*\]); '
+        r'stdout_error_class=(none|authentication|model_unavailable|rate_limited|'
+        r'invalid_request|timeout|transport|service_error|other); '
+        r'stdout_http_status=(none|[45]\d\d); '
         r'stderr_class=(empty|sandbox_setup|authentication|configuration|permission|'
         r'transport|missing_dependency|other); stderr_bytes=(\d+)',
         summary,
     )
     if match is None:
         return None
-    exit_code, event_json, stderr_class, stderr_bytes = match.groups()
+    exit_code, event_json, stdout_error_class, http_status, stderr_class, stderr_bytes = (
+        match.groups()
+    )
     try:
         event_types = json.loads(event_json)
         byte_count = int(stderr_bytes)
@@ -2821,6 +2826,8 @@ def _normalize_r2_e2e_diagnostic(payload: object) -> dict[str, object] | None:
         "stage": "codex_cli_exit",
         "exit_code": exit_code,
         "stdout_event_types": event_types,
+        "stdout_error_class": stdout_error_class,
+        "stdout_http_status": None if http_status == "none" else int(http_status),
         "stderr_class": stderr_class,
         "stderr_bytes": byte_count,
     }

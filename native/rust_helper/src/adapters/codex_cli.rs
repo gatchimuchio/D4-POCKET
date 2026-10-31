@@ -607,6 +607,16 @@ fn send_r2_e2e_diagnostic(test_api: &CodexCliTestResponses, payload: Value) {
         return;
     }
     let _ = stream.flush();
+    let _ = stream.set_read_timeout(Some(Duration::from_millis(500)));
+    let mut response = [0u8; 1024];
+    let mut response_bytes = 0usize;
+    while response_bytes < 4096 {
+        let limit = (4096 - response_bytes).min(response.len());
+        match stream.read(&mut response[..limit]) {
+            Ok(0) | Err(_) => break,
+            Ok(read) => response_bytes += read,
+        }
+    }
 }
 
 impl 実行系Adapter for CodexCliAdapter {
@@ -1563,11 +1573,92 @@ fn loopback_test_safe_failure_summary(
         })
         .take(32)
         .collect::<Vec<_>>();
+    let (stdout_error_class, stdout_http_status) = summarize_loopback_test_stdout_error(&events);
     let stderr_class = classify_loopback_test_stderr(stderr);
     format!(
-        "exit_code={exit_code:?}; stdout_event_types={event_types:?}; stderr_class={stderr_class}; stderr_bytes={}",
+        "exit_code={exit_code:?}; stdout_event_types={event_types:?}; stdout_error_class={stdout_error_class}; stdout_http_status={}; stderr_class={stderr_class}; stderr_bytes={}",
+        stdout_http_status
+            .map(|status| status.to_string())
+            .unwrap_or_else(|| "none".to_owned()),
         stderr.len()
     )
+}
+
+#[cfg(any(test, feature = "r2-e2e"))]
+fn summarize_loopback_test_stdout_error(events: &[Value]) -> (&'static str, Option<u16>) {
+    for event in events {
+        if !matches!(
+            event.get("type").and_then(Value::as_str),
+            Some("error" | "turn.failed")
+        ) {
+            continue;
+        }
+
+        let error = event.get("error").unwrap_or(event);
+        let class = classify_loopback_test_error(error);
+        let status = error
+            .get("status_code")
+            .or_else(|| error.get("http_status"))
+            .or_else(|| error.get("status"))
+            .or_else(|| event.get("status_code"))
+            .and_then(Value::as_u64)
+            .and_then(|status| u16::try_from(status).ok())
+            .filter(|status| (400..=599).contains(status));
+        return (class, status);
+    }
+    ("none", None)
+}
+
+#[cfg(any(test, feature = "r2-e2e"))]
+fn classify_loopback_test_error(error: &Value) -> &'static str {
+    let fields = ["code", "type", "message"]
+        .iter()
+        .filter_map(|key| error.get(*key).and_then(Value::as_str))
+        .filter(|value| value.len() <= 512)
+        .map(str::to_ascii_lowercase)
+        .collect::<Vec<_>>();
+    let matches = |markers: &[&str]| {
+        fields
+            .iter()
+            .any(|field| markers.iter().any(|marker| field.contains(marker)))
+    };
+
+    if matches(&["invalid_api_key", "authentication_error", "unauthorized"]) {
+        "authentication"
+    } else if matches(&[
+        "model_not_found",
+        "model_not_available",
+        "model_unavailable",
+    ]) {
+        "model_unavailable"
+    } else if matches(&["rate_limit_exceeded", "rate_limited", "rate limit"]) {
+        "rate_limited"
+    } else if matches(&[
+        "invalid_request_error",
+        "bad_request",
+        "invalid request",
+        "unsupported_value",
+        "unsupported value",
+    ]) {
+        "invalid_request"
+    } else if matches(&["timed_out", "timeout", "timed out"]) {
+        "timeout"
+    } else if matches(&[
+        "connection_error",
+        "transport_error",
+        "network error",
+        "connection refused",
+    ]) {
+        "transport"
+    } else if matches(&[
+        "server_error",
+        "internal_server_error",
+        "service_unavailable",
+    ]) {
+        "service_error"
+    } else {
+        "other"
+    }
 }
 
 #[cfg(any(test, feature = "r2-e2e"))]
@@ -1778,11 +1869,23 @@ mod tests {
 
         assert!(summary.contains("exit_code=Some(2)"));
         assert!(summary.contains("stdout_event_types=[\"error\", \"other\"]"));
+        assert!(summary.contains("stdout_error_class=other; stdout_http_status=none"));
         assert!(summary.contains("stderr_class=configuration"));
         assert!(!summary.contains("PRIVATE_TASK_AND_SECRET"));
         assert!(!summary.contains("unknown_sensitive_code"));
         assert!(!summary.contains("PRIVATE_LOCAL_PATH"));
         assert!(!summary.contains("PRIVATE_SECRET"));
+    }
+
+    #[test]
+    fn loopback失敗診断は許可分類とHTTP状態だけを抽出する() {
+        let stdout = br#"{"type":"turn.failed","error":{"type":"api_error","code":"model_not_found","status_code":404,"message":"private model name and credential"}}"#;
+        let summary = loopback_test_safe_failure_summary(Some(1), stdout, b"");
+
+        assert!(summary.contains("stdout_error_class=model_unavailable; stdout_http_status=404"));
+        assert!(!summary.contains("private model name"));
+        assert!(!summary.contains("credential"));
+        assert!(!summary.contains("model_not_found"));
     }
 
     #[test]
