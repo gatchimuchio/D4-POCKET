@@ -380,8 +380,18 @@ jobs:
             --bundle-root "$D4P_EXPORT_ROOT/output/bundle" \
             --source-commit "$(git rev-parse HEAD)" | tee "$result_path"
           python3 - "$result_path" <<'PY' >> "$GITHUB_STEP_SUMMARY"
-          import json, sys
-          result = json.load(open(sys.argv[1], encoding="utf-8"))
+          import json, pathlib, sys
+          matches = []
+          for line in pathlib.Path(sys.argv[1]).read_text(encoding="utf-8").splitlines():
+              try:
+                  candidate = json.loads(line)
+              except json.JSONDecodeError:
+                  continue
+              if isinstance(candidate, dict) and candidate.get("acceptance_scope") == "runtime_provenance":
+                  matches.append(candidate)
+          if len(matches) != 1:
+              raise SystemExit(f"expected one runtime provenance result, found {len(matches)}")
+          result = matches[0]
           runtime = result["runtime_identity"]
           audit = result["audit_store_observation"]
           components = result["component_sha256"]
