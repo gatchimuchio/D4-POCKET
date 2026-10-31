@@ -11,6 +11,7 @@ name: Linux manual product build and installed acceptance
           - update_lifecycle
           - credential_vault
           - mcp_tool_execution
+          - a2a_metadata
           - host_registration
           - workspace_selection
           - agent_task_supervision
@@ -363,6 +364,29 @@ jobs:
           {
             printf '\n- Installed MCP acceptance: a fresh native Owner rejection created no stdio child; a separate Owner approval launched the run-owned real `/usr/bin/python3` MCP fixture through the installed GTK Runner and production Broker. The fixture completed `server/discover`, `tools/list`, and one Owner-confirmed `tools/call`; the installed UI showed the LIVE_RUNTIME result hash, content type, and Audit receipt while the fixture result marker stayed absent from UI／Audit／logs／acceptance files. Disconnect rejection preserved the child group; a separate native Owner approval confirmed owned group termination and removed the Broker connection. The installed app then exited normally, and the file-backed Audit chain／anchor HMAC was checked.\n'
             printf -- '- Scope: Ubuntu 24.04 hosted Xvfb／X11, unsigned test-identity installed product, and automated AT-SPI／keyboard input. This proves the installed MCP stdio／Tool metadata and hash-only result path for a local synthetic server only; no external provider／credential injection, non-X11 desktop session, Wayland rendering, production signing／distribution, or full Linux product completion.\n'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: installed GTK UIでA2A Agent Card metadataを受入れる
+        if: ${{ inputs.acceptance_scope == 'a2a_metadata' }}
+        shell: bash
+        env:
+          GUI_SHELL_PRODUCT_APP_ID: d4-pocket-app-11111111111111111111111111111111
+          GUI_SHELL_PRODUCT_AUDIT_STORE_ID: audit-store-22222222222222222222222222222222
+          D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE: ${{ runner.temp }}/d4p-linux-export-${{ github.run_id }}-${{ github.run_attempt }}/output/D4Pocket-linux-rollback.d4pkg
+        run: |
+          set -euo pipefail
+          test_package="$D4P_EXPORT_ROOT/output/D4Pocket-linux.d4pkg"
+          acceptance_root="$D4P_EXPORT_ROOT/installed-a2a-acceptance"
+          dbus-run-session -- xvfb-run -a python3 tooling/tests/linux_installed_product_smoke.py \
+            --package "$test_package" \
+            --temp-root "$D4P_EXPORT_ROOT" \
+            --acceptance-root "$acceptance_root" \
+            --private-key "$D4P_EXPORT_ROOT/test-update-private.der" \
+            --update-package "$D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE" \
+            --acceptance-scope a2a_metadata
+          {
+            printf '\n- Installed A2A acceptance: automated UI input entered a run-owned loopback Agent Card endpoint. A native Owner rejection caused no HTTP request or persisted connection; a separate request and Owner approval reached the installed Rust Broker, fetched one local fixture Agent Card, and displayed its metadata-only receipt. Trust remained `pending_review`, capability diff remained `not_evaluated`, authority stayed stripped, and Task／Message／Artifact stayed empty. The endpoint URI was absent from the Broker Audit and persisted connection state; durable Audit chain／anchor verification and normal app/process cleanup passed.\n'
+            printf -- '- Scope: Ubuntu 24.04 hosted Xvfb／X11, unsigned synthetic product identity, automated AT-SPI／keyboard input, and a run-owned loopback HTTP fixture. This is installed Linux UI／Owner／Broker integration evidence for the bounded Agent Card metadata path; it does not establish external A2A providers, HTTPS, Task／Message／Artifact execution, other desktop sessions, production signing／distribution, or Linux product completion.\n'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Linux Broker Workspace Inspector Owner経路をRust試験で確認

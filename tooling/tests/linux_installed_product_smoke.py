@@ -1484,6 +1484,46 @@ def _open_mcp_center_from_installed_ui(
     return window
 
 
+def _open_a2a_center_from_installed_ui(
+    environment: dict[str, str], window_id: str
+):
+    window = _find_accessible(WINDOW_TITLE, timeout=10)
+    subprocess.run(
+        ["xdotool", "windowactivate", "--sync", window_id],
+        env=environment,
+        check=True,
+        timeout=5,
+    )
+    subprocess.run(
+        ["xdotool", "key", "--clearmodifiers", "ctrl+k"],
+        env=environment,
+        check=True,
+        timeout=5,
+    )
+    _find_accessible("コマンドパレット", root=window, timeout=10)
+    subprocess.run(
+        ["xdotool", "type", "--clearmodifiers", "--delay", "30", "a2a"],
+        env=environment,
+        check=True,
+        timeout=5,
+    )
+    _find_accessible(
+        "A2A Agent Cardのloopback metadata接続面を開く",
+        root=window,
+        timeout=10,
+    )
+    subprocess.run(
+        ["xdotool", "key", "--clearmodifiers", "Return"],
+        env=environment,
+        check=True,
+        timeout=5,
+    )
+    _find_accessible("A2A接続センター", timeout=10)
+    window = _find_accessible(WINDOW_TITLE, timeout=10)
+    _find_accessible("A2A接続センター", root=window, timeout=10)
+    return window
+
+
 def _set_public_text_by_keyboard(
     root,
     label: str,
@@ -5802,6 +5842,266 @@ def _run_installed_mcp_tool_acceptance(
     }
 
 
+def _run_installed_a2a_metadata_acceptance(
+    environment: dict[str, str],
+    window_id: str,
+    *,
+    audit_store: Path,
+) -> dict[str, object]:
+    rejected_agent_id = "linux-installed-a2a-rejected"
+    accepted_agent_id = "linux-installed-a2a-approved"
+    expected_path = "/.well-known/agent-card.json"
+    card = {
+        "name": "Linux installed A2A fixture",
+        "description": "Run-owned local Agent Card metadata fixture",
+        "version": "1.0.0",
+        "supportedInterfaces": [
+            {"protocolBinding": "JSONRPC", "protocolVersion": "1.0"}
+        ],
+        "capabilities": {
+            "streaming": False,
+            "pushNotifications": False,
+            "stateTransitionHistory": False,
+            "extendedAgentCard": False,
+        },
+        "securitySchemes": {"oauth2": {}},
+        "skills": [
+            {
+                "id": "metadata-probe",
+                "name": "Metadata probe",
+                "description": "Fixture metadata only",
+                "tags": ["test"],
+                "inputModes": ["text/plain"],
+                "outputModes": ["text/plain"],
+            }
+        ],
+    }
+    card_bytes = json.dumps(card, ensure_ascii=False, separators=(",", ":")).encode(
+        "utf-8"
+    )
+    request_lock = threading.Lock()
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            with request_lock:
+                self.server.request_count += 1
+                self.server.request_paths.append(self.path)
+            if self.path != expected_path:
+                body = b""
+                status = 404
+            else:
+                body = card_bytes
+                status = 200
+            self.send_response(status)
+            self.send_header(
+                "Content-Type",
+                "application/json" if status == 200 else "text/plain",
+            )
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            if body:
+                self.wfile.write(body)
+
+        def log_message(self, format: str, *args: object) -> None:
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    server.daemon_threads = True
+    server.request_count = 0
+    server.request_paths = []
+    server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+    server_thread.start()
+    endpoint_uri = (
+        f"http://127.0.0.1:{server.server_address[1]}{expected_path}"
+    )
+    try:
+        window = _open_a2a_center_from_installed_ui(environment, window_id)
+        _find_accessible(
+            "Broker一覧にA2A接続metadataはありません。",
+            root=window,
+            timeout=20,
+        )
+        _set_public_text_by_keyboard(
+            window,
+            "Agent識別子（Agent ID）",
+            rejected_agent_id,
+            environment,
+            window_id,
+        )
+        _set_public_text_by_keyboard(
+            window,
+            "Agent Card接続先URI（http://127.x.x.x:port/...）",
+            endpoint_uri,
+            environment,
+            window_id,
+        )
+        connect = _find_operable_accessible("Owner確認して接続", root=window, timeout=10)
+        _activate_accessible(connect, "Owner確認して接続", environment)
+        _answer_owner_dialog(
+            environment,
+            "拒否",
+            context="Linux installed A2A接続のOwner拒否",
+            diagnostic_root=window,
+            diagnostic_audit_path=audit_store / "audit.jsonl",
+            expected_summary_markers=(
+                f"Agent ID: {rejected_agent_id}",
+                "取得先: http://127.0.0.1",
+                "Transport: HTTP（loopback IP限定）",
+                "Credential実値は受け取らず",
+                "Permission、Approval、Authorityを生成しません",
+            ),
+        )
+        _wait_for_owner_dialog_closed(environment)
+        window = _find_accessible(WINDOW_TITLE, timeout=10)
+        _find_accessible(
+            "A2A接続を確認できませんでした。受理receiptがないため成功表示はしていません。",
+            root=window,
+            timeout=20,
+        )
+        if server.request_count != 0:
+            raise RuntimeError("A2A Owner拒否後にloopback Agent Cardを取得しました")
+
+        _set_public_text_by_keyboard(
+            window,
+            "Agent識別子（Agent ID）",
+            accepted_agent_id,
+            environment,
+            window_id,
+        )
+        _set_public_text_by_keyboard(
+            window,
+            "Agent Card接続先URI（http://127.x.x.x:port/...）",
+            endpoint_uri,
+            environment,
+            window_id,
+        )
+        connect = _find_operable_accessible("Owner確認して接続", root=window, timeout=10)
+        _activate_accessible(connect, "Owner確認して接続", environment)
+        _answer_owner_dialog(
+            environment,
+            "許可",
+            context="Linux installed A2A接続の独立Owner許可",
+            diagnostic_root=window,
+            diagnostic_audit_path=audit_store / "audit.jsonl",
+            expected_summary_markers=(
+                f"Agent ID: {accepted_agent_id}",
+                "取得先: http://127.0.0.1",
+                "Transport: HTTP（loopback IP限定）",
+                "Credential実値は受け取らず",
+                "Permission、Approval、Authorityを生成しません",
+            ),
+        )
+        _wait_for_owner_dialog_closed(environment)
+        window = _find_accessible(WINDOW_TITLE, timeout=10)
+        _find_accessible(
+            "接続metadataを受理しました。Trustは未審査のままです。Audit=",
+            root=window,
+            timeout=20,
+        )
+        _find_accessible(
+            "表示名（未信頼metadata）: Linux installed A2A fixture",
+            root=window,
+            timeout=10,
+        )
+        _find_accessible(
+            f"Agent識別子: {accepted_agent_id}", root=window, timeout=10
+        )
+        _find_accessible(
+            "信頼状態: 未審査（pending_review）",
+            root=window,
+            timeout=10,
+        )
+        _find_accessible(
+            "証拠: LIVE_RUNTIME / 承認: owner_control_approved",
+            root=window,
+            timeout=10,
+        )
+        snapshot = _accessible_snapshot(window)
+        if endpoint_uri in snapshot:
+            raise RuntimeError("A2A接続先URIが接続後の製品UIへ残っています")
+        if server.request_count != 1 or server.request_paths != [expected_path]:
+            raise RuntimeError("Owner許可後のloopback Agent Card取得件数またはpathが不正です")
+
+        state_path = audit_store / "a2a_connections.json"
+        if state_path.is_symlink() or not state_path.is_file():
+            raise RuntimeError("Broker永続A2A metadata stateが通常fileではありません")
+        state_bytes = state_path.read_bytes()
+        state = json.loads(state_bytes.decode("utf-8"))
+        connections = state.get("connections") if isinstance(state, dict) else None
+        if not isinstance(connections, list) or len(connections) != 1:
+            raise RuntimeError("Broker永続A2A stateに承認済みmetadata一件がありません")
+        receipt = connections[0]
+        card_projection = receipt.get("Agent Card")
+        trust = receipt.get("Trust")
+        capability_diff = receipt.get("Capability diff")
+        authentication = (
+            card_projection.get("authentication")
+            if isinstance(card_projection, dict)
+            else None
+        )
+        if (
+            receipt.get("AgentID") != accepted_agent_id
+            or receipt.get("接続状態") != "connected"
+            or receipt.get("証拠種別") != "LIVE_RUNTIME"
+            or receipt.get("承認状態") != "owner_control_approved"
+            or receipt.get("権限生成") != "なし"
+            or receipt.get("authority_strip") is not True
+            or receipt.get("公開範囲") != "metadata_only"
+            or receipt.get("Task") != []
+            or receipt.get("Message") != []
+            or receipt.get("Artifact") != []
+            or receipt.get("Stream") != []
+            or not isinstance(card_projection, dict)
+            or card_projection.get("display_name") != "Linux installed A2A fixture"
+            or not str(card_projection.get("endpoint_hash", "")).startswith("sha256:")
+            or card_projection.get("origin") != "live_runtime"
+            or not isinstance(trust, dict)
+            or trust.get("state") != "pending_review"
+            or trust.get("requires_operator_review") is not True
+            or not isinstance(capability_diff, dict)
+            or capability_diff.get("status") != "not_evaluated"
+            or capability_diff.get("requires_operator_review") is not True
+            or not isinstance(authentication, dict)
+            or authentication.get("secret_value_present") is not False
+        ):
+            raise RuntimeError("A2A永続receiptがmetadata-only／authority境界を満たしません")
+
+        audit = _verify_live_audit(audit_store, require_export=False)
+        audit_bytes = (audit_store / "audit.jsonl").read_bytes()
+        if endpoint_uri.encode("utf-8") in state_bytes or endpoint_uri.encode("utf-8") in audit_bytes:
+            raise RuntimeError("A2A接続先URIがBroker永続stateまたはAuditへ保存されています")
+        audit_events = [
+            json.loads(line)
+            for line in audit_bytes.decode("utf-8").splitlines()
+            if line
+        ]
+        accepted_events = [
+            event
+            for event in audit_events
+            if event.get("operation") == "A2A接続"
+            and event.get("decision") == "accepted"
+        ]
+        if len(accepted_events) != 1 or endpoint_uri in accepted_events[0].get("reason", ""):
+            raise RuntimeError("A2A接続metadataのAudit受理またはURI非露出を確認できません")
+        return {
+            "owner_rejected_before_http_request": True,
+            "independent_owner_approval_before_http_request": True,
+            "loopback_fixture_requests_after_approval": server.request_count,
+            "installed_ui_metadata_only_projection": True,
+            "trust_pending_review_and_capability_not_evaluated": True,
+            "authority_not_generated": True,
+            "task_message_artifact_empty": True,
+            "endpoint_uri_absent_from_ui_state_and_audit": True,
+            "audit": audit,
+        }
+    finally:
+        server.shutdown()
+        server.server_close()
+        server_thread.join(timeout=5)
+        if server_thread.is_alive():
+            raise RuntimeError("run-owned A2A loopback fixture serverが停止しません")
+
+
 def _restart_installed_product(
     environment: dict[str, str],
     window_id: str,
@@ -7416,6 +7716,7 @@ def run_installed_smoke(
         "update_lifecycle",
         "credential_vault",
         "mcp_tool_execution",
+        "a2a_metadata",
         "host_registration",
         "workspace_selection",
         "agent_task_supervision",
@@ -8018,6 +8319,43 @@ def run_installed_smoke(
                             "product_version": record["product_version"],
                             "package_sha256": record["package_sha256"],
                             "mcp_tool_execution": mcp_evidence,
+                            "installed_app_exit": "normal_window_close_and_owned_process_cleanup",
+                        },
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    )
+                )
+                return
+
+            if acceptance_scope == "a2a_metadata":
+                a2a_evidence = _run_installed_a2a_metadata_acceptance(
+                    environment,
+                    window_id,
+                    audit_store=broker_state / "store",
+                )
+                current_window_id = _visible_product_window(environment)
+                if current_window_id is None:
+                    raise RuntimeError("A2A acceptance後にinstalled GTK windowが見つかりません")
+                _request_x11_window_manager_close(current_window_id, environment)
+                deadline = time.monotonic() + 60
+                while time.monotonic() < deadline:
+                    if not (_processes_using(product_paths) - preexisting):
+                        break
+                    time.sleep(0.2)
+                if _processes_using(product_paths) - preexisting:
+                    raise RuntimeError("A2A acceptance後の正常終了でowned product processが残留しています")
+                if desktop_process.poll() is None:
+                    desktop_process.wait(timeout=10)
+                if desktop_process.returncode not in (0, None):
+                    raise RuntimeError("A2A acceptance後のdesktop launcher終了codeが不正です")
+                print(
+                    json.dumps(
+                        {
+                            "acceptance_scope": acceptance_scope,
+                            "installed_entry": str(entries[0]),
+                            "product_version": record["product_version"],
+                            "package_sha256": record["package_sha256"],
+                            "a2a_metadata": a2a_evidence,
                             "installed_app_exit": "normal_window_close_and_owned_process_cleanup",
                         },
                         ensure_ascii=False,
@@ -8816,6 +9154,7 @@ def main() -> int:
             "update_lifecycle",
             "credential_vault",
             "mcp_tool_execution",
+            "a2a_metadata",
             "host_registration",
             "workspace_selection",
             "agent_task_supervision",
