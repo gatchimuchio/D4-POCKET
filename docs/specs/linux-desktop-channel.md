@@ -32,6 +32,8 @@ Rust helperは、現在時刻・`desktop_flutter` client・payload hash・operat
 
 Agent TaskのOwner操作として、Workspace Permission発行、Task本文hash／実行条件hashへのApproval発行、完了結果表示Approvalを確認allowlistへ接続する。Permission確認にはRuntime／Session／Workspaceと限定scopeを、Task Approval確認にはRuntime／Session／Workspace、指示文字数と指示hashを、結果表示確認にはTask ID・結果hash・visibilityを表示する。Task本文・結果本文・Credential実値はRust確認文やRunner transportへ載せない。Brokerは操作時点のSession／Permission／Approval条件を再評価する。
 
+Host metadata登録は、共有Owner dispatcherの`Host登録`候補summaryと既存Broker Owner receiverを使う。Host ID、表示名、Platform、公開identity hash、申告Runtime／Agent件数、要求hashをGTK native確認へ示し、拒否時は登録せず、別要求の新しいOwner確認後にだけmetadata-only登録する。許可はremote接続、Trust、Permission、Approval、Credential、Task能力を生成しない。Linux installed UIの操作証拠は`host_registration` manual acceptance scopeで取得し、C18の既存意味契約を再利用する。
+
 ## Linux Brokerへの製品identity
 
 Linux Brokerは`GUI_SHELL_PRODUCT_APP_ID`と`GUI_SHELL_PRODUCT_AUDIT_STORE_ID`のcompile-time値だけを製品identityとして受け取る。両方未設定の開発buildはidentityなしで起動できるが、片方だけ、または`d4-pocket-app-`／`audit-store-`と32桁小文字16進suffixに一致しない値はBroker起動前にfail-closed拒否する。Flutter要求、environment、保存済みstateからidentityを選ばない。Linux Export builderはBroker Receipt／Manifestに束縛されたidentityをcompile-time値へ渡し、source／toolchain／artifact hash evidenceへ記録する。ただし、このbuild証拠は署名済みinstalled binary、導入root、installed Audit storeの配布／更新保証を成立させない。

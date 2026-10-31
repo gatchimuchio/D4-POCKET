@@ -31,6 +31,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _linux_installed_task_status_observation,
     _linux_runtime_artifact_inventory,
     _verify_linux_installed_artifact_provenance,
+    _host_registration_audit_evidence,
     _answer_owner_dialog,
     _bounded_owner_text_diagnostics,
     _assert_secret_absent_from_files,
@@ -3215,6 +3216,67 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
                 self.skipTest("symlink creation unavailable")
             with self.assertRaisesRegex(RuntimeError, "通常file"):
                 _resolve_regular_package(link)
+
+
+class LinuxHostRegistrationAuditTests(unittest.TestCase):
+    def _events(self) -> list[dict[str, object]]:
+        return [
+            {
+                "event_id": "broker-audit-1",
+                "request_id": "host-request-rejected",
+                "operation": "Host登録",
+                "decision": "rejected",
+                "reason": "desktop_native_owner_confirmation_required",
+                "evidence_source": "INTERNAL_STATE",
+                "payload_hash": "sha256:" + "a" * 64,
+            },
+            {
+                "event_id": "broker-audit-2",
+                "request_id": "host-request-approved",
+                "operation": "Host登録",
+                "decision": "received",
+                "reason": "owner controlからHost metadata登録要求を受信",
+                "evidence_source": "INTERNAL_STATE",
+                "payload_hash": "sha256:" + "b" * 64,
+            },
+            {
+                "event_id": "broker-audit-3",
+                "request_id": "host-request-approved",
+                "operation": "Host登録",
+                "decision": "accepted",
+                "reason": "Host metadataを受理",
+                "evidence_source": "INTERNAL_STATE",
+                "payload_hash": "sha256:" + "c" * 64,
+            },
+        ]
+
+    def test_requires_distinct_native_owner_rejection_and_approval_requests(self) -> None:
+        evidence = _host_registration_audit_evidence(self._events())
+        self.assertEqual(evidence["host_registration_owner_rejected"], 1)
+        self.assertEqual(evidence["host_registration_internal_accepted"], 1)
+        self.assertEqual(evidence["host_registration_distinct_requests"], 2)
+        self.assertEqual(evidence["host_registration_distinct_request_payload_hashes"], 2)
+        self.assertEqual(evidence["host_registration_forbidden_authority_events"], 0)
+
+    def test_rejects_reused_request_hash_or_generated_task_authority(self) -> None:
+        same_hash = self._events()
+        same_hash[0]["payload_hash"] = same_hash[1]["payload_hash"]
+        with self.assertRaisesRegex(RuntimeError, "独立hash"):
+            _host_registration_audit_evidence(same_hash)
+
+        for operation in (
+            "AgentTaskOwnerApprovalGrant",
+            "CredentialVaultRegister",
+            "host.trust.grant",
+        ):
+            with self.subTest(operation=operation):
+                with_authority = self._events()
+                with_authority.append({"operation": operation, "decision": "approved"})
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    "Permission／Approval／Credential／Trust／Task authority",
+                ):
+                    _host_registration_audit_evidence(with_authority)
 
 
 class LinuxInstalledOwnerEvidenceTests(unittest.TestCase):

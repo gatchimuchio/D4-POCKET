@@ -43,7 +43,9 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
       title: 'D4 Pocket Host操作面',
       evidenceTitle: 'Host Operation Center',
       children: [
-        if (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS)
+        if (!kIsWeb &&
+            (defaultTargetPlatform == TargetPlatform.macOS ||
+                defaultTargetPlatform == TargetPlatform.linux))
           BorderedPanel(
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -182,7 +184,14 @@ class _HostRegistrationDialogState extends State<_HostRegistrationDialog> {
     ])
       label: TextEditingController(),
   };
-  String _platform = 'macos';
+  late String _platform = switch (defaultTargetPlatform) {
+    TargetPlatform.windows => 'windows',
+    TargetPlatform.linux => 'linux',
+    TargetPlatform.macOS => 'macos',
+    TargetPlatform.android => 'android',
+    TargetPlatform.iOS => 'ios',
+    _ => 'unknown',
+  };
   @override
   void dispose() {
     for (final controller in _fields.values) {

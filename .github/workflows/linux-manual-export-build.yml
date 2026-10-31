@@ -11,6 +11,7 @@ name: Linux manual product build and installed acceptance
           - update_lifecycle
           - credential_vault
           - mcp_tool_execution
+          - host_registration
           - workspace_selection
           - agent_task_supervision
           - runtime_provenance
@@ -365,6 +366,30 @@ jobs:
         run: |
           set -euo pipefail
           cargo test --manifest-path native/rust_helper/Cargo.toml --lib workspace_inspector -- --nocapture
+
+      - name: installed GTK UIでHost metadata登録のOwner境界を受入れる
+        if: ${{ inputs.acceptance_scope == 'host_registration' }}
+        shell: bash
+        env:
+          GUI_SHELL_PRODUCT_APP_ID: d4-pocket-app-11111111111111111111111111111111
+          GUI_SHELL_PRODUCT_AUDIT_STORE_ID: audit-store-22222222222222222222222222222222
+          D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE: ${{ runner.temp }}/d4p-linux-export-${{ github.run_id }}-${{ github.run_attempt }}/output/D4Pocket-linux-rollback.d4pkg
+        run: |
+          set -euo pipefail
+          test_package="$D4P_EXPORT_ROOT/output/D4Pocket-linux.d4pkg"
+          acceptance_root="$D4P_EXPORT_ROOT/installed-host-registration-acceptance"
+          dbus-run-session -- xvfb-run -a python3 tooling/tests/linux_installed_product_smoke.py \
+            --package "$test_package" \
+            --temp-root "$D4P_EXPORT_ROOT" \
+            --acceptance-root "$acceptance_root" \
+            --private-key "$D4P_EXPORT_ROOT/test-update-private.der" \
+            --update-package "$D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE" \
+            --acceptance-scope host_registration
+          {
+            printf '\n- Installed Host registration: the GTK Host Operation Center exposes Linux public metadata registration. Native Owner rejection leaves the rejected Host absent; a new request with a distinct payload hash and fresh native Owner approval registers only pending-review metadata. No remote connection, Trust, Permission, Approval, Credential, or Task authority is created.\n'
+            printf -- '- The durable Broker Audit chain and anchor HMAC verify both decisions; rejected raw metadata and identity hashes are absent from Audit. The installed app closes normally and all owned product processes exit.\n'
+            printf -- '- Scope: Ubuntu 24.04 hosted Xvfb／X11, unsigned test-identity installed product, automated AT-SPI／keyboard, and synthetic public Host metadata. This does not establish a physical desktop session, Wayland rendering, production signing／distribution, or Linux-wide release readiness.\n'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: installed GTK UIでWorkspace OS選択／secret boundaryを受入れる
         if: ${{ inputs.acceptance_scope == 'workspace_selection' }}

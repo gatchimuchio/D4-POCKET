@@ -10,11 +10,11 @@ const id = 'mac-host-fixture';
 const hash =
     'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
-Map<String, Object?> receipt() => {
+Map<String, Object?> receipt({String platform = 'macos'}) => {
       '版': 1,
       'Host ID': id,
       '表示名': 'Mac公開Host',
-      'Platform': 'macos',
+      'Platform': platform,
       '接続状態': 'pending_review',
       'Trust': {
         'state': 'pending_review',
@@ -45,15 +45,20 @@ class PublicHostBroker implements BrokerTransport {
   final void Function(Map<String, Object?>)? change;
   final operations = <String>[];
   Map<String, Object?>? registration;
+  String registeredPlatform = 'macos';
   @override
   Future<Map<String, Object?>> request(String operation,
       {Map<String, Object?>? payload}) async {
     operations.add(operation);
-    final row = receipt();
+    final platform = operation == 'Host登録'
+        ? (payload?['Platform'] as String? ?? 'macos')
+        : registeredPlatform;
+    final row = receipt(platform: platform);
     change?.call(row);
     Object? body;
     if (operation == 'Host登録') {
       registration = payload;
+      registeredPlatform = platform;
       body = row;
     } else if (operation == 'Host一覧') {
       body = {
@@ -193,4 +198,31 @@ void main() {
     expect(find.textContaining('Host登録または一覧更新は未成立です。'), findsWidgets);
     expect(find.textContaining('Host metadataを登録しました。'), findsNothing);
   }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+  testWidgets('LinuxにHost登録入口を表示しLinux metadataをBrokerへ送る', (tester) async {
+    final broker = PublicHostBroker();
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: HostOperationCenter(
+                client: ShellCoreClient.mock(transport: broker)))));
+    expect(find.text('Hostを登録'), findsOneWidget);
+    await enter(tester);
+    expect(broker.operations, ['Host登録', 'Host一覧']);
+    expect(broker.registration?['Platform'], 'linux');
+    expect(find.textContaining('Host metadataを登録しました。未審査のままです。Audit='),
+        findsWidgets);
+    expect(find.textContaining('remote接続やTrust・権限は生成しません'), findsOneWidget);
+    expect(find.textContaining('接続: pending_review'), findsOneWidget);
+    expect(find.textContaining('metadata_only'), findsWidgets);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.linux));
+  testWidgets('LinuxでもOwner拒否は失敗のまま、自動再送しない', (tester) async {
+    final broker = PublicHostBroker(reject: true);
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: HostOperationCenter(
+                client: ShellCoreClient.mock(transport: broker)))));
+    await enter(tester);
+    expect(broker.operations, ['Host登録']);
+    expect(find.textContaining('Host登録または一覧更新は未成立です。'), findsWidgets);
+    expect(find.textContaining('Host metadataを登録しました。'), findsNothing);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.linux));
 }

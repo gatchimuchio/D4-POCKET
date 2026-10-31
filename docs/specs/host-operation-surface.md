@@ -20,6 +20,10 @@ Host metadataの証拠種別は`INTERNAL_STATE`であり、未接続HostのRunti
 
 Host registryの接続状態・Trustは登録metadataとして表示し、Broker現在HostのLIVE_RUNTIME観測と混同しない。ホスト能力画面の`degraded`は観測された機能状態の投影であり、Permission、Approval、Authority、Credential、接続Trustを生成しない。
 
+## Host metadata登録
+
+DesktopのHost操作面は、Linux／GTKとmacOSで公開metadataの登録入口を表示する。登録要求は既存Rust Brokerへ送り、native Owner確認の同一payload hashへ一回だけ結合する。LinuxではGTK Runnerのprivate helper往復を使用し、FlutterはOwner確認boolやOwner資格を保持しない。Owner拒否はHost登録を成立させず自動再送しない。許可後も登録状態は`pending_review`、公開範囲は`metadata_only`に固定し、remote接続、Trust、Permission、Approval、Credential、Task実行権限を生成しない。登録後の表示は現在のBroker観測が一致しない限り、別Hostのlive状態を未観測として示す。
+
 ## 残存範囲
 
 - live Host再接続、Trust検証、Runtime／Agentの個別remote discoveryは`release_blocker`。

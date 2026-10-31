@@ -12092,6 +12092,9 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
         "mcp_tool_execution",
         "inputs.acceptance_scope == 'mcp_tool_execution'",
         "--acceptance-scope mcp_tool_execution",
+        "host_registration",
+        "inputs.acceptance_scope == 'host_registration'",
+        "--acceptance-scope host_registration",
         "workspace_selection",
         "inputs.acceptance_scope == 'workspace_selection'",
         "--acceptance-scope workspace_selection",
@@ -12137,9 +12140,13 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
         "def _run_installed_workspace_selection_acceptance(",
         "require_workspace=True",
         "_verify_workspace_projection(",
+        "def _open_installed_host_operation_center(",
+        "def _run_installed_host_registration_acceptance(",
+        "require_host_registration=True",
+        "_host_registration_audit_evidence(events)",
     ):
         if token not in smoke:
-            missing.append(f"installed MCP smoke: {token}")
+            missing.append(f"installed Linux smoke: {token}")
     if "pull_request:" in workflow or "push:" in workflow:
         missing.append("manual trigger only")
     return [f"Linux Export build workflowに固定・scope・cleanup条件がない: {token}" for token in missing]

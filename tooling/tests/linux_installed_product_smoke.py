@@ -5067,6 +5067,209 @@ def _run_installed_agent_task_acceptance(
     }
 
 
+def _open_installed_host_operation_center(
+    environment: dict[str, str], window_id: str | None
+):
+    if _is_wayland_environment(environment):
+        raise RuntimeError("Host登録acceptanceはX11 GTK scopeだけを対象にします")
+    if window_id is None:
+        raise RuntimeError("Host操作面へ移動するinstalled product windowがありません")
+    window = _find_accessible(WINDOW_TITLE, timeout=10)
+    subprocess.run(
+        ["xdotool", "windowactivate", "--sync", window_id],
+        env=environment,
+        check=True,
+        timeout=5,
+    )
+    subprocess.run(
+        ["xdotool", "key", "--clearmodifiers", "ctrl+k"],
+        env=environment,
+        check=True,
+        timeout=5,
+    )
+    _find_accessible("コマンドパレット", root=window, timeout=10)
+    command = _find_operable_accessible("Host操作面を開く", root=window, timeout=10)
+    _activate_accessible(command, "Host操作面を開く", environment)
+    _find_accessible("D4 Pocket Host操作面", timeout=10)
+    window = _find_accessible(WINDOW_TITLE, timeout=10)
+    _find_accessible("D4 Pocket Host操作面", root=window, timeout=10)
+    return window
+
+
+def _open_installed_host_registration_dialog(
+    environment: dict[str, str], window_id: str | None
+):
+    window = _open_installed_host_operation_center(environment, window_id)
+    register = _find_operable_accessible("Hostを登録", root=window, timeout=10)
+    _activate_accessible(register, "Hostを登録", environment)
+    return window, _find_accessible("公開Host metadata登録", root=window, timeout=10)
+
+
+def _fill_installed_host_registration(
+    environment: dict[str, str],
+    dialog,
+    window_id: str | None,
+    *,
+    host_id: str,
+    display_name: str,
+    identity_hash: str,
+) -> None:
+    for label, value in (
+        ("Host識別子", host_id),
+        ("Host表示名", display_name),
+        ("公開identity hash", identity_hash),
+        ("申告Runtime件数", "2"),
+        ("申告Agent件数", "1"),
+    ):
+        _set_public_text_by_keyboard(dialog, label, value, environment, window_id)
+    continue_button = _find_operable_accessible(
+        "Owner確認して登録", root=dialog, timeout=10
+    )
+    _activate_accessible(continue_button, "Owner確認して登録", environment)
+
+
+def _run_installed_host_registration_acceptance(
+    environment: dict[str, str],
+    window_id: str | None,
+    *,
+    audit_store: Path,
+    acceptance_root: Path,
+) -> dict[str, object]:
+    audit_path = audit_store / "audit.jsonl"
+    rejected_host_id = f"linux-host-rejected-{uuid.uuid4().hex[:12]}"
+    accepted_host_id = f"linux-host-approved-{uuid.uuid4().hex[:12]}"
+    rejected_hash = "sha256:" + "a" * 64
+    accepted_hash = "sha256:" + "b" * 64
+    def request_registration(host_id: str, display_name: str, identity_hash: str):
+        window, dialog = _open_installed_host_registration_dialog(
+            environment, window_id
+        )
+        _fill_installed_host_registration(
+            environment,
+            dialog,
+            window_id,
+            host_id=host_id,
+            display_name=display_name,
+            identity_hash=identity_hash,
+        )
+        _wait_for_owner_dialog_window(
+            environment,
+            context="Linux installed Host metadata登録",
+            diagnostic_root=acceptance_root,
+            diagnostic_audit_path=audit_path,
+        )
+        return window
+
+    rejected_window = request_registration(
+        rejected_host_id, "拒否されるLinux Host metadata", rejected_hash
+    )
+    common_owner_markers = (
+        "Host metadataを未審査で登録します。",
+        "Platform: linux",
+        "申告Runtime件数: 2 / Agent件数: 1",
+        "remote接続・Trust・Permission・Approval・Credential・Task実行権限を生成せず",
+        "表示切替だけを可能にします。",
+    )
+    _answer_owner_dialog(
+        environment,
+        "拒否",
+        context="Linux Host登録のOwner拒否",
+        diagnostic_root=acceptance_root,
+        diagnostic_audit_path=audit_path,
+        expected_summary_markers=(
+            *common_owner_markers,
+            f"Host ID: {rejected_host_id}",
+            "表示名: 拒否されるLinux Host metadata",
+            f"identity hash: {rejected_hash}",
+        ),
+    )
+    _wait_for_owner_dialog_closed(environment)
+    rejected_window = _find_accessible(WINDOW_TITLE, timeout=10)
+    _find_accessible(
+        "Host登録または一覧更新は未成立です。",
+        root=rejected_window,
+        timeout=20,
+    )
+    rejected_event = _wait_for_audit_event(
+        audit_path,
+        "Host登録",
+        "rejected",
+        evidence_source="INTERNAL_STATE",
+    )
+    if rejected_event.get("reason") != "desktop_native_owner_confirmation_required":
+        raise RuntimeError("Host登録のOwner拒否が別の理由で記録されました")
+
+    accepted_window = request_registration(
+        accepted_host_id, "許可されたLinux Host metadata", accepted_hash
+    )
+    _answer_owner_dialog(
+        environment,
+        "許可",
+        context="Linux Host登録の独立Owner許可",
+        diagnostic_root=acceptance_root,
+        diagnostic_audit_path=audit_path,
+        expected_summary_markers=(
+            *common_owner_markers,
+            f"Host ID: {accepted_host_id}",
+            "表示名: 許可されたLinux Host metadata",
+            f"identity hash: {accepted_hash}",
+        ),
+    )
+    _wait_for_owner_dialog_closed(environment)
+    accepted_window = _find_accessible(WINDOW_TITLE, timeout=10)
+    _find_accessible(
+        "Host metadataを登録しました。未審査のままです。Audit=",
+        root=accepted_window,
+        timeout=20,
+    )
+    _find_accessible(accepted_host_id, root=accepted_window, timeout=10)
+    projection = _accessible_snapshot(accepted_window)
+    for marker in (
+        "Platform: linux",
+        "接続: pending_review",
+        "登録接続状態: pending_review",
+        "信頼: pending_review",
+        "公開範囲: metadata_only",
+        "Runtime summary: 2件 / Agent summary: 1件",
+        "別登録Host（remote接続・個別状態は未観測）",
+        "remote接続やTrust・権限は生成しません。",
+    ):
+        if marker not in projection:
+            raise RuntimeError(f"Host registration projectionが未審査境界を表示しません: {marker}")
+    if rejected_host_id in projection:
+        raise RuntimeError("Owner拒否したHostが登録一覧へ現れました")
+
+    _wait_for_audit_event(
+        audit_path,
+        "Host登録",
+        "accepted",
+        evidence_source="INTERNAL_STATE",
+    )
+    audit_text = audit_path.read_text(encoding="utf-8")
+    if any(
+        marker in audit_text
+        for marker in (
+            rejected_host_id,
+            "拒否されるLinux Host metadata",
+            rejected_hash,
+            accepted_hash,
+        )
+    ):
+        raise RuntimeError("Host登録Auditへraw payload／identity hashが露出しました")
+    audit_events = [json.loads(line) for line in audit_text.splitlines() if line]
+    audit_projection = _host_registration_audit_evidence(audit_events)
+    return {
+        "owner_rejected_host_id": rejected_host_id,
+        "owner_approved_host_id": accepted_host_id,
+        "distinct_request_payload_hashes": audit_projection[
+            "host_registration_distinct_request_payload_hashes"
+        ],
+        "audit_projection": "raw input and identity hashes absent",
+        "metadata_projection": "pending_review / metadata_only / no remote observation",
+        "authority": "no Permission, Approval, Credential, Trust, or Task authority generated",
+    }
+
+
 def _run_installed_workspace_selection_acceptance(
     environment: dict[str, str],
     window_id: str | None,
@@ -6478,6 +6681,78 @@ def _agent_task_audit_acceptance_diagnostics(
     }
 
 
+def _host_registration_audit_evidence(
+    events: list[dict[str, object]],
+) -> dict[str, int]:
+    registrations = [
+        event for event in events if event.get("operation") == "Host登録"
+    ]
+    rejected = [
+        event
+        for event in registrations
+        if event.get("decision") == "rejected"
+        and event.get("reason") == "desktop_native_owner_confirmation_required"
+        and event.get("evidence_source") == "INTERNAL_STATE"
+    ]
+    accepted = [
+        event
+        for event in registrations
+        if event.get("decision") == "accepted"
+        and event.get("evidence_source") == "INTERNAL_STATE"
+    ]
+    received = [
+        event
+        for event in registrations
+        if event.get("decision") == "received"
+        and event.get("evidence_source") == "INTERNAL_STATE"
+    ]
+    terminal = [*rejected, *accepted]
+    if (
+        len(rejected) != 1
+        or len(accepted) != 1
+        or len(received) != 1
+        or len(terminal) != 2
+        or received[0].get("request_id") != accepted[0].get("request_id")
+    ):
+        raise RuntimeError("Host登録のfresh Owner拒否／許可Auditが一意ではありません")
+    request_ids = [rejected[0].get("request_id"), received[0].get("request_id")]
+    payload_hashes = [rejected[0].get("payload_hash"), received[0].get("payload_hash")]
+    audit_hashes = [event.get("payload_hash") for event in terminal]
+    if (
+        not all(isinstance(value, str) and value for value in request_ids)
+        or len(set(request_ids)) != 2
+        or not all(
+            isinstance(value, str)
+            and re.fullmatch(r"sha256:[0-9a-f]{64}", value)
+            for value in [*payload_hashes, *audit_hashes]
+        )
+        or len(set(payload_hashes)) != 2
+    ):
+        raise RuntimeError("Host登録の拒否／許可要求が独立hashへ束縛されていません")
+    authority_terms = ("permission", "approval", "credential", "trust", "task")
+    forbidden_authority_events = [
+        event
+        for event in events
+        if any(
+            term in str(event.get("operation", "")).casefold()
+            for term in authority_terms
+        )
+    ]
+    if forbidden_authority_events:
+        raise RuntimeError(
+            "Host登録acceptanceでPermission／Approval／Credential／Trust／Task authorityが生成されました"
+        )
+    return {
+        "host_registration_owner_rejected": len(rejected),
+        "host_registration_internal_accepted": len(accepted),
+        "host_registration_distinct_requests": len(set(request_ids)),
+        "host_registration_distinct_request_payload_hashes": len(set(payload_hashes)),
+        "host_registration_forbidden_authority_events": len(
+            forbidden_authority_events
+        ),
+    }
+
+
 def _verify_live_audit(
     store: Path,
     *,
@@ -6489,6 +6764,7 @@ def _verify_live_audit(
     require_catalog: bool = False,
     require_update_lifecycle: bool = False,
     require_agent_task: bool = False,
+    require_host_registration: bool = False,
 ) -> dict[str, int]:
     audit_path = store / "audit.jsonl"
     anchor_path = store / "audit_anchor.json"
@@ -6865,6 +7141,11 @@ def _verify_live_audit(
         raise RuntimeError(
             "installed Update download／stage／activationのfresh Owner拒否・許可Auditが不足しています"
         )
+    host_registration_evidence = (
+        _host_registration_audit_evidence(events)
+        if require_host_registration
+        else None
+    )
     audit_evidence: dict[str, int] = {
         "events": len(events),
         "export_accepted": accepted,
@@ -6890,6 +7171,8 @@ def _verify_live_audit(
         "update_activation_owner_rejected": activation_rejected,
         "update_activation_completed": activation_completed,
     }
+    if host_registration_evidence is not None:
+        audit_evidence.update(host_registration_evidence)
     if require_workspace:
         audit_evidence.update(
             {
@@ -7110,6 +7393,7 @@ def run_installed_smoke(
         "update_lifecycle",
         "credential_vault",
         "mcp_tool_execution",
+        "host_registration",
         "workspace_selection",
         "agent_task_supervision",
         "runtime_provenance",
@@ -7255,6 +7539,7 @@ def run_installed_smoke(
             _run_rust_test(RUST_SECRET_SERVICE_TEST, environment, private_key_path)
         elif acceptance_scope in {
             "mcp_tool_execution",
+            "host_registration",
             "workspace_selection",
             "agent_task_supervision",
             "runtime_provenance",
@@ -7710,6 +7995,50 @@ def run_installed_smoke(
                             "product_version": record["product_version"],
                             "package_sha256": record["package_sha256"],
                             "mcp_tool_execution": mcp_evidence,
+                            "installed_app_exit": "normal_window_close_and_owned_process_cleanup",
+                        },
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    )
+                )
+                return
+
+            if acceptance_scope == "host_registration":
+                host_evidence = _run_installed_host_registration_acceptance(
+                    environment,
+                    window_id,
+                    audit_store=broker_state / "store",
+                    acceptance_root=acceptance_root,
+                )
+                current_window_id = _visible_product_window(environment)
+                if current_window_id is None:
+                    raise RuntimeError("Host registration後にinstalled GTK windowがありません")
+                _request_x11_window_manager_close(current_window_id, environment)
+                deadline = time.monotonic() + 60
+                while time.monotonic() < deadline:
+                    if not (_processes_using(product_paths) - preexisting):
+                        break
+                    time.sleep(0.2)
+                if _processes_using(product_paths) - preexisting:
+                    raise RuntimeError("Host registration後にowned product processが残留しています")
+                if desktop_process.poll() is None:
+                    desktop_process.wait(timeout=10)
+                if desktop_process.returncode not in (0, None):
+                    raise RuntimeError("Host registration後のdesktop launcher終了codeが不正です")
+                durable_audit = _verify_live_audit(
+                    broker_state / "store",
+                    require_export=False,
+                    require_host_registration=True,
+                )
+                print(
+                    json.dumps(
+                        {
+                            "acceptance_scope": acceptance_scope,
+                            "installed_entry": str(entries[0]),
+                            "product_version": record["product_version"],
+                            "package_sha256": record["package_sha256"],
+                            "host_registration": host_evidence,
+                            "durable_audit_after_normal_exit": durable_audit,
                             "installed_app_exit": "normal_window_close_and_owned_process_cleanup",
                         },
                         ensure_ascii=False,
@@ -8464,6 +8793,7 @@ def main() -> int:
             "update_lifecycle",
             "credential_vault",
             "mcp_tool_execution",
+            "host_registration",
             "workspace_selection",
             "agent_task_supervision",
             "runtime_provenance",
