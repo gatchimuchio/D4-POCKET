@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import os
 import sys
@@ -16,6 +17,7 @@ from tooling.export_linux_product import (
     _require_clean_source,
     _toolchain,
     build_linux_product,
+    main as linux_export_main,
 )
 from tooling.export_windows_product import validate_export_inputs
 from tooling.package_linux_product import EXECUTABLE_PATHS
@@ -36,6 +38,27 @@ PAYLOADS = {
 
 
 class LinuxExportInputTests(unittest.TestCase):
+    def test_main_reports_value_error_detail_for_build_failure(self) -> None:
+        stderr = io.StringIO()
+        arguments = [
+            "export_linux_product.py",
+            "--receipt", "receipt.json",
+            "--manifest-file", "manifest.json",
+            "--output-dir", "output",
+        ]
+        with (
+            patch.object(sys, "argv", arguments),
+            patch(
+                "tooling.export_linux_product.build_linux_product",
+                side_effect=ValueError("portable archiveの検証条件に不一致"),
+            ),
+            patch("sys.stderr", stderr),
+        ):
+            self.assertEqual(linux_export_main(), 1)
+        self.assertIn(
+            "ValueError: portable archiveの検証条件に不一致", stderr.getvalue()
+        )
+
     def test_broker_shaped_receipt_and_manifest_are_hash_bound_for_linux(self) -> None:
         receipt_raw, manifest_raw = linux_export_pair()
         receipt, manifest, plan, receipt_hash, manifest_hash = validate_export_inputs(

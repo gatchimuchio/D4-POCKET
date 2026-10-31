@@ -807,7 +807,11 @@ def main() -> int:
             r2_e2e_test_build=args.r2_e2e_test_build,
         )
     except Exception as error:
-        print(f"Linux Export buildを停止した: {type(error).__name__}", file=sys.stderr)
+        message = f": {error}" if isinstance(error, ValueError) else ""
+        print(
+            f"Linux Export buildを停止した: {type(error).__name__}{message}",
+            file=sys.stderr,
+        )
         return 1
     print(
         json.dumps(
