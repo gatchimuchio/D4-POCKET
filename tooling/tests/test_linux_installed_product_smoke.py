@@ -3272,11 +3272,9 @@ class LinuxHostRegistrationAuditTests(unittest.TestCase):
             with self.subTest(operation=operation):
                 with_authority = self._events()
                 with_authority.append({"operation": operation, "decision": "approved"})
-                with self.assertRaisesRegex(
-                    RuntimeError,
-                    "Permission／Approval／Credential／Trust／Task authority",
-                ):
+                with self.assertRaises(RuntimeError) as caught:
                     _host_registration_audit_evidence(with_authority)
+                self.assertIn(operation, str(caught.exception))
 
 
 class LinuxInstalledOwnerEvidenceTests(unittest.TestCase):

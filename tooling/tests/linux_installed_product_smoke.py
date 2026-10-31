@@ -6752,8 +6752,15 @@ def _host_registration_audit_evidence(
         )
     ]
     if forbidden_authority_events:
+        operation_names = sorted(
+            {
+                str(event.get("operation", ""))[:120]
+                for event in forbidden_authority_events
+            }
+        )
         raise RuntimeError(
-            "Host登録acceptanceでPermission／Approval／Credential／Trust／Task authorityが生成されました"
+            "Host登録acceptanceでAuthority関連operationを検出しました: "
+            + json.dumps(operation_names, ensure_ascii=False)
         )
     return {
         "host_registration_owner_rejected": len(rejected),
