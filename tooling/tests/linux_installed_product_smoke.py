@@ -1,4 +1,4 @@
-"""実Linux GTK sessionでBroker-installed productのRollback／UI／Uninstallを検証する。"""
+"""実Linux GTK sessionでBroker-installed productの導入とruntime provenanceを検証する。"""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ import sys
 import threading
 import time
 import uuid
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[2]
 APP_ID = "d4-pocket-app-11111111111111111111111111111111"
@@ -90,6 +90,282 @@ def _processes_using(executables: set[Path]) -> set[int]:
         if running in executables:
             found.add(int(entry.name))
     return found
+
+
+def _linux_runtime_artifact_inventory(root: Path) -> tuple[list[dict[str, object]], int, str]:
+    metadata = root.lstat()
+    if not stat.S_ISDIR(metadata.st_mode) or stat.S_ISLNK(metadata.st_mode):
+        raise RuntimeError("runtime provenance artifact rootが通常directoryではありません")
+    resolved_root = root.resolve(strict=True)
+    records: list[dict[str, object]] = []
+    total_bytes = 0
+    tree_hash = hashlib.sha256()
+    seen: set[str] = set()
+    for path in sorted(
+        root.rglob("*"),
+        key=lambda item: item.relative_to(root).as_posix().casefold(),
+    ):
+        item = path.lstat()
+        if stat.S_ISLNK(item.st_mode):
+            raise RuntimeError("runtime provenance artifactにsymlinkがあります")
+        if stat.S_ISDIR(item.st_mode):
+            continue
+        if not stat.S_ISREG(item.st_mode):
+            raise RuntimeError("runtime provenance artifactに通常file以外があります")
+        relative = path.relative_to(root).as_posix()
+        relative_path = PurePosixPath(relative)
+        if (
+            relative_path.is_absolute()
+            or ".." in relative_path.parts
+            or not path.resolve(strict=True).is_relative_to(resolved_root)
+            or relative.casefold() in seen
+        ):
+            raise RuntimeError("runtime provenance artifact pathが不正です")
+        seen.add(relative.casefold())
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        records.append(
+            {"path": relative, "size_bytes": item.st_size, "sha256": digest}
+        )
+        total_bytes += item.st_size
+        tree_hash.update(
+            f"{relative}\0{item.st_size}\0{digest}\n".encode("utf-8")
+        )
+    if not records:
+        raise RuntimeError("runtime provenance artifact inventoryが空です")
+    return records, total_bytes, tree_hash.hexdigest()
+
+
+def _verify_linux_installed_artifact_provenance(
+    *,
+    build_evidence_path: Path,
+    bundle_root: Path,
+    package_path: Path,
+    source_commit: str,
+    product_root: Path,
+    stage: Path,
+    xdg_data_home: Path,
+    xdg_state_home: Path,
+    active_record: dict[str, object],
+    app_id: str,
+    audit_store_id: str,
+) -> dict[str, object]:
+    try:
+        evidence_metadata = build_evidence_path.lstat()
+        if not stat.S_ISREG(evidence_metadata.st_mode) or stat.S_ISLNK(
+            evidence_metadata.st_mode
+        ):
+            raise RuntimeError("Linux build evidenceが通常fileではありません")
+        evidence = json.loads(build_evidence_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise RuntimeError("Linux build evidenceを読み取れません") from error
+    if not isinstance(evidence, dict):
+        raise RuntimeError("Linux build evidenceのroot objectが不正です")
+    if (
+        evidence.get("target_platform") != "linux"
+        or evidence.get("source_commit") != source_commit
+        or not re.fullmatch(r"[0-9a-f]{40}", source_commit)
+        or evidence.get("signed") is not False
+        or evidence.get("formal_distribution_claimed") is not False
+    ):
+        raise RuntimeError("Linux build evidenceのtarget／source／unsigned scopeが不一致です")
+    expected_identity = {
+        "source": "schema_validated_manifest",
+        "app_id": app_id,
+        "audit_store_id": audit_store_id,
+    }
+    if (
+        evidence.get("app_id") != app_id
+        or evidence.get("audit_store_id") != audit_store_id
+        or evidence.get("compile_time_identity") != expected_identity
+    ):
+        raise RuntimeError("compile-time product identityがbuild evidenceと不一致です")
+
+    bundle_records, bundle_bytes, bundle_tree = _linux_runtime_artifact_inventory(
+        bundle_root
+    )
+    installed_records, installed_bytes, installed_tree = (
+        _linux_runtime_artifact_inventory(stage)
+    )
+    if (
+        evidence.get("artifact_files") != bundle_records
+        or evidence.get("artifact_total_bytes") != bundle_bytes
+        or evidence.get("artifact_tree_sha256") != bundle_tree
+    ):
+        raise RuntimeError("build evidenceとexport bundle inventoryが一致しません")
+    if installed_records != bundle_records or installed_bytes != bundle_bytes:
+        raise RuntimeError("installed stageのfile／hash inventoryがexport bundleと不一致です")
+
+    package_metadata = package_path.lstat()
+    if not stat.S_ISREG(package_metadata.st_mode) or stat.S_ISLNK(
+        package_metadata.st_mode
+    ):
+        raise RuntimeError("runtime provenance packageが通常fileではありません")
+    package_hash = hashlib.sha256(package_path.read_bytes()).hexdigest()
+    package_record = evidence.get("package")
+    if not isinstance(package_record, dict) or package_record != {
+        "file_name": package_path.name,
+        "format": "D4PKG01",
+        "byte_length": package_metadata.st_size,
+        "sha256": package_hash,
+        "signed": False,
+        "installed_product_verified": False,
+    }:
+        raise RuntimeError("package byte length／hashがbuild evidenceと一致しません")
+
+    try:
+        manifest = json.loads((stage / "product_manifest.json").read_text(encoding="utf-8"))
+        manifest_body = manifest["manifest"]
+        manifest_app_id = manifest_body["app_identity"]["app_id"]
+        manifest_audit_store_id = manifest_body["audit_store"]["store_id"]
+        manifest_platform = manifest_body["app_identity"]["target_platform"]
+    except (OSError, UnicodeError, json.JSONDecodeError, KeyError, TypeError) as error:
+        raise RuntimeError("installed Product Manifestのidentityを確認できません") from error
+    if (
+        manifest_app_id != app_id
+        or manifest_audit_store_id != audit_store_id
+        or manifest_platform != "linux"
+    ):
+        raise RuntimeError("installed Product Manifest identityがbuildと不一致です")
+
+    product_version = active_record.get("product_version")
+    if not isinstance(product_version, str) or not re.fullmatch(
+        r"[0-9]+\.[0-9]+\.[0-9]+", product_version
+    ):
+        raise RuntimeError("active versionの製品版が不正です")
+    if (
+        active_record.get("version") != 1
+        or active_record.get("product") != "D4 Pocket"
+        or active_record.get("app_id") != app_id
+        or active_record.get("audit_store_id") != audit_store_id
+        or active_record.get("package_sha256") != package_hash
+    ):
+        raise RuntimeError("active version record identity／packageが不一致です")
+
+    evidence_files = {
+        item["path"]: item
+        for item in bundle_records
+        if isinstance(item.get("path"), str)
+    }
+    component_paths = {
+        "launcher": "gui_shell_desktop_launcher",
+        "runner": "gui_shell_desktop",
+        "broker": "libexec/gui_shell_linux_broker",
+        "product_manifest": "product_manifest.json",
+    }
+    if set(component_paths.values()) - evidence_files.keys():
+        raise RuntimeError("必須installed componentがbuild inventoryにありません")
+    component_hashes = {
+        name: evidence_files[relative]["sha256"]
+        for name, relative in component_paths.items()
+    }
+    if (
+        active_record.get("launcher_sha256") != component_hashes["launcher"]
+        or active_record.get("product_manifest_sha256")
+        != component_hashes["product_manifest"]
+    ):
+        raise RuntimeError("active versionのlauncher／Manifest hashが不一致です")
+
+    expected_product_root = xdg_data_home / "apps" / "d4-pocket" / app_id
+    expected_stage = expected_product_root / "versions" / f"{product_version}-{package_hash}"
+    if (
+        product_root.resolve(strict=True) != expected_product_root.resolve(strict=True)
+        or stage.resolve(strict=True) != expected_stage.resolve(strict=True)
+    ):
+        raise RuntimeError("installed product root／active stageが固定XDG pathと不一致です")
+    fixed_launcher = product_root / "gui_shell_desktop_launcher"
+    active_launcher = stage / "gui_shell_desktop_launcher"
+    try:
+        fixed_metadata = fixed_launcher.lstat()
+        if (
+            not stat.S_ISREG(fixed_metadata.st_mode)
+            or stat.S_ISLNK(fixed_metadata.st_mode)
+            or not os.path.samefile(fixed_launcher, active_launcher)
+        ):
+            raise RuntimeError("固定root launcherがactive stage launcherと同一fileではありません")
+    except OSError as error:
+        raise RuntimeError("固定root launcherを確認できません") from error
+
+    audit_store = xdg_state_home / "d4-pocket" / "linux-broker" / "store"
+    return {
+        "evidence_source": "LIVE_RUNTIME",
+        "source_commit": source_commit,
+        "package_sha256": package_hash,
+        "package_byte_length": package_metadata.st_size,
+        "artifact_tree_sha256": bundle_tree,
+        "installed_artifact_tree_sha256": installed_tree,
+        "artifact_count": len(bundle_records),
+        "runtime_identity": {
+            "app_id": app_id,
+            "audit_store_id": audit_store_id,
+            "source": "compile_time_identity_and_installed_product_manifest",
+        },
+        "installed_root": str(product_root.resolve(strict=True)),
+        "active_stage": str(stage.resolve(strict=True)),
+        "component_sha256": component_hashes,
+        "active_record_sha256": hashlib.sha256(
+            (product_root / "active_version.json").read_bytes()
+        ).hexdigest(),
+        "audit_store_identity": {
+            "audit_store_id": audit_store_id,
+            "path": str(audit_store),
+            "path_contract": "XDG_STATE_HOME/d4-pocket/linux-broker/store",
+        },
+    }
+
+
+def _observe_linux_runtime_executables(
+    expected: dict[str, tuple[Path, str]],
+) -> dict[str, dict[str, object]]:
+    observed: dict[str, list[str]] = {role: [] for role in expected}
+    for process in Path("/proc").iterdir():
+        if not process.name.isdecimal():
+            continue
+        try:
+            executable = Path(os.readlink(process / "exe"))
+        except (FileNotFoundError, PermissionError, ProcessLookupError):
+            continue
+        for role, (expected_path, expected_hash) in expected.items():
+            if executable != expected_path.resolve(strict=True):
+                continue
+            try:
+                digest = hashlib.sha256((process / "exe").read_bytes()).hexdigest()
+            except (OSError, ProcessLookupError):
+                continue
+            if digest != expected_hash:
+                raise RuntimeError("実行中process image hashがinstalled artifactと不一致です")
+            observed[role].append(digest)
+    result: dict[str, dict[str, object]] = {}
+    for role, digests in observed.items():
+        if not digests or len(set(digests)) != 1:
+            raise RuntimeError("installed productのlive executableを確認できません")
+        result[role] = {"process_count": len(digests), "sha256": digests[0]}
+    return result
+
+
+def _observe_linux_audit_store(store: Path) -> dict[str, object]:
+    metadata = store.lstat()
+    if not stat.S_ISDIR(metadata.st_mode) or stat.S_ISLNK(metadata.st_mode):
+        raise RuntimeError("installed BrokerのAudit Store rootが通常directoryではありません")
+    observations: dict[str, object] = {"path": str(store.resolve(strict=True))}
+    for name in ("audit.jsonl", "audit_anchor.json"):
+        path = store / name
+        item = path.lstat()
+        if not stat.S_ISREG(item.st_mode) or stat.S_ISLNK(item.st_mode):
+            raise RuntimeError("installed BrokerのAudit evidence fileが通常fileではありません")
+        observations[name] = {
+            "byte_length": item.st_size,
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        }
+    key_path = store / "audit_anchor.key"
+    key_metadata = key_path.lstat()
+    if (
+        not stat.S_ISREG(key_metadata.st_mode)
+        or stat.S_ISLNK(key_metadata.st_mode)
+        or key_metadata.st_mode & 0o077
+    ):
+        raise RuntimeError("Audit anchor keyのprivate regular-file境界が不成立です")
+    observations["anchor_key_private_file"] = True
+    return observations
 
 
 def _catalog_failure_diagnostics(
@@ -6204,6 +6480,9 @@ def run_installed_smoke(
     update_package: Path,
     acceptance_scope: str = "update_lifecycle",
     codex_cli: Path | None = None,
+    build_evidence_path: Path | None = None,
+    bundle_root: Path | None = None,
+    source_commit: str | None = None,
 ) -> None:
     if not os.environ.get("DISPLAY") or not os.environ.get("DBUS_SESSION_BUS_ADDRESS"):
         raise RuntimeError("隔離X11 displayとD-Bus sessionが必要です")
@@ -6220,8 +6499,16 @@ def run_installed_smoke(
         "mcp_tool_execution",
         "workspace_selection",
         "agent_task_supervision",
+        "runtime_provenance",
     }:
         raise RuntimeError("installed acceptance scopeが未対応です")
+    if acceptance_scope == "runtime_provenance":
+        if build_evidence_path is None or bundle_root is None or source_commit is None:
+            raise RuntimeError("runtime provenanceにbuild evidence／bundle／source commitが必要です")
+        for source in (build_evidence_path, bundle_root):
+            resolved_source = source.resolve(strict=True)
+            if temp_root not in resolved_source.parents or source.is_symlink():
+                raise RuntimeError("runtime provenance入力がrun固有temporary root外です")
     resolved_private_key = private_key_path.resolve(strict=True)
     if (
         resolved_private_key != private_key_path
@@ -6349,6 +6636,7 @@ def run_installed_smoke(
             "mcp_tool_execution",
             "workspace_selection",
             "agent_task_supervision",
+            "runtime_provenance",
         }:
             pass
         else:
@@ -6669,6 +6957,59 @@ def run_installed_smoke(
                         },
                         ensure_ascii=False,
                         separators=(",", ":"),
+                    )
+                )
+                return
+
+            if acceptance_scope == "runtime_provenance":
+                if source_commit is None or build_evidence_path is None or bundle_root is None:
+                    raise RuntimeError("runtime provenance入力が初期化されていません")
+                provenance = _verify_linux_installed_artifact_provenance(
+                    build_evidence_path=build_evidence_path,
+                    bundle_root=bundle_root,
+                    package_path=package,
+                    source_commit=source_commit,
+                    product_root=product_root,
+                    stage=stage,
+                    xdg_data_home=xdg_data_home,
+                    xdg_state_home=xdg_state_home,
+                    active_record=record,
+                    app_id=APP_ID,
+                    audit_store_id=AUDIT_ID,
+                )
+                provenance["live_processes"] = _observe_linux_runtime_executables(
+                    {
+                        "runner": (runner, provenance["component_sha256"]["runner"]),
+                        "broker": (helper, provenance["component_sha256"]["broker"]),
+                    }
+                )
+                current_window_id = _visible_product_window(environment)
+                if current_window_id is None:
+                    raise RuntimeError("runtime provenance受入れ中にinstalled GTK windowがありません")
+                _request_x11_window_manager_close(current_window_id, environment)
+                deadline = time.monotonic() + 60
+                while time.monotonic() < deadline:
+                    if not (_processes_using(product_paths) - preexisting):
+                        break
+                    time.sleep(0.2)
+                if _processes_using(product_paths) - preexisting:
+                    raise RuntimeError("runtime provenance受入れ後にowned product processが残留しています")
+                if desktop_process.poll() is None:
+                    desktop_process.wait(timeout=10)
+                if desktop_process.returncode not in (0, None):
+                    raise RuntimeError("runtime provenance受入れ後のdesktop launcher終了codeが不正です")
+                provenance["audit_store_observation"] = _observe_linux_audit_store(
+                    broker_state / "store"
+                )
+                provenance["installed_app_exit"] = (
+                    "normal_window_close_and_owned_process_cleanup"
+                )
+                print(
+                    json.dumps(
+                        {"acceptance_scope": acceptance_scope, **provenance},
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                        sort_keys=True,
                     )
                 )
                 return
@@ -7222,10 +7563,14 @@ def main() -> int:
             "mcp_tool_execution",
             "workspace_selection",
             "agent_task_supervision",
+            "runtime_provenance",
         ),
         default="update_lifecycle",
     )
     parser.add_argument("--codex-cli", type=Path)
+    parser.add_argument("--build-evidence", type=Path)
+    parser.add_argument("--bundle-root", type=Path)
+    parser.add_argument("--source-commit")
     args = parser.parse_args()
     try:
         run_installed_smoke(
@@ -7236,6 +7581,9 @@ def main() -> int:
             args.update_package,
             args.acceptance_scope,
             args.codex_cli,
+            args.build_evidence,
+            args.bundle_root,
+            args.source_commit,
         )
     except Exception as error:
         print(f"Linux installed product GTK受入れ 不合格: {error}", file=sys.stderr)

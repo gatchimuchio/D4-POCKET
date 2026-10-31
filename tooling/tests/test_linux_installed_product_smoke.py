@@ -29,6 +29,8 @@ from tooling.tests.linux_installed_product_smoke import (
     _accessible_scope_with_named_descendant,
     _cleanup_linux_agent_task_process_groups,
     _linux_installed_task_status_observation,
+    _linux_runtime_artifact_inventory,
+    _verify_linux_installed_artifact_provenance,
     _answer_owner_dialog,
     _bounded_owner_text_diagnostics,
     _assert_secret_absent_from_files,
@@ -93,6 +95,166 @@ from tooling.tests.linux_installed_product_smoke import (
     _wait_for_owner_dialog_window,
     WINDOW_TITLE,
 )
+
+
+class LinuxInstalledRuntimeProvenanceTests(unittest.TestCase):
+    app_id = "d4-pocket-app-11111111111111111111111111111111"
+    audit_store_id = "audit-store-22222222222222222222222222222222"
+    source_commit = "a" * 40
+
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.root = Path(self.temporary.name)
+        self.bundle = self.root / "output" / "bundle"
+        self.bundle.mkdir(parents=True)
+        manifest = {
+            "manifest": {
+                "app_identity": {
+                    "app_id": self.app_id,
+                    "target_platform": "linux",
+                },
+                "audit_store": {"store_id": self.audit_store_id},
+            }
+        }
+        (self.bundle / "product_manifest.json").write_text(
+            json.dumps(manifest, separators=(",", ":")), encoding="utf-8"
+        )
+        (self.bundle / "gui_shell_desktop").write_bytes(b"runner artifact")
+        (self.bundle / "gui_shell_desktop_launcher").write_bytes(b"launcher artifact")
+        helper_dir = self.bundle / "libexec"
+        helper_dir.mkdir()
+        (helper_dir / "gui_shell_linux_broker").write_bytes(b"broker artifact")
+
+        self.package = self.root / "output" / "D4Pocket-linux.d4pkg"
+        self.package.write_bytes(b"D4PKG01\nsynthetic package bytes")
+        self.package_hash = hashlib.sha256(self.package.read_bytes()).hexdigest()
+        self.xdg_data_home = self.root / "home" / ".local" / "share"
+        self.xdg_data_home.mkdir(parents=True)
+        self.xdg_state_home = self.root / "home" / ".local" / "state"
+        self.xdg_state_home.mkdir(parents=True)
+        self.product_root = (
+            self.xdg_data_home / "apps" / "d4-pocket" / self.app_id
+        )
+        self.stage = (
+            self.product_root
+            / "versions"
+            / f"0.1.0-{self.package_hash}"
+        )
+        self.stage.mkdir(parents=True)
+        for source in self.bundle.rglob("*"):
+            if source.is_file():
+                destination = self.stage / source.relative_to(self.bundle)
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes(source.read_bytes())
+        self.fixed_launcher = self.product_root / "gui_shell_desktop_launcher"
+        try:
+            os.link(self.stage / "gui_shell_desktop_launcher", self.fixed_launcher)
+        except OSError as error:
+            self.temporary.cleanup()
+            self.skipTest(f"test filesystem does not support hard links: {type(error).__name__}")
+
+        files, total_bytes, tree_hash = _linux_runtime_artifact_inventory(self.bundle)
+        file_hashes = {item["path"]: item["sha256"] for item in files}
+        self.evidence_path = self.root / "output" / "d4_pocket_linux_export_build.json"
+        self.evidence_path.write_text(
+            json.dumps(
+                {
+                    "target_platform": "linux",
+                    "source_commit": self.source_commit,
+                    "signed": False,
+                    "formal_distribution_claimed": False,
+                    "app_id": self.app_id,
+                    "audit_store_id": self.audit_store_id,
+                    "compile_time_identity": {
+                        "source": "schema_validated_manifest",
+                        "app_id": self.app_id,
+                        "audit_store_id": self.audit_store_id,
+                    },
+                    "artifact_files": files,
+                    "artifact_total_bytes": total_bytes,
+                    "artifact_tree_sha256": tree_hash,
+                    "package": {
+                        "file_name": self.package.name,
+                        "format": "D4PKG01",
+                        "byte_length": self.package.stat().st_size,
+                        "sha256": self.package_hash,
+                        "signed": False,
+                        "installed_product_verified": False,
+                    },
+                },
+                separators=(",", ":"),
+            ),
+            encoding="utf-8",
+        )
+        self.active_record = {
+            "version": 1,
+            "product": "D4 Pocket",
+            "app_id": self.app_id,
+            "audit_store_id": self.audit_store_id,
+            "product_version": "0.1.0",
+            "package_sha256": self.package_hash,
+            "launcher_sha256": file_hashes["gui_shell_desktop_launcher"],
+            "product_manifest_sha256": file_hashes["product_manifest.json"],
+        }
+        (self.product_root / "active_version.json").write_text(
+            json.dumps(self.active_record), encoding="utf-8"
+        )
+
+    def tearDown(self) -> None:
+        self.temporary.cleanup()
+
+    def verify(self, **overrides):
+        arguments = {
+            "build_evidence_path": self.evidence_path,
+            "bundle_root": self.bundle,
+            "package_path": self.package,
+            "source_commit": self.source_commit,
+            "product_root": self.product_root,
+            "stage": self.stage,
+            "xdg_data_home": self.xdg_data_home,
+            "xdg_state_home": self.xdg_state_home,
+            "active_record": self.active_record,
+            "app_id": self.app_id,
+            "audit_store_id": self.audit_store_id,
+        }
+        arguments.update(overrides)
+        return _verify_linux_installed_artifact_provenance(**arguments)
+
+    def test_binds_source_package_installed_files_identity_and_roots(self) -> None:
+        result = self.verify()
+        self.assertEqual(result["source_commit"], self.source_commit)
+        self.assertEqual(result["package_sha256"], self.package_hash)
+        self.assertEqual(result["artifact_tree_sha256"], result["installed_artifact_tree_sha256"])
+        self.assertEqual(result["runtime_identity"]["app_id"], self.app_id)
+        self.assertEqual(result["runtime_identity"]["audit_store_id"], self.audit_store_id)
+        self.assertEqual(result["component_sha256"]["broker"], hashlib.sha256(b"broker artifact").hexdigest())
+
+    def test_rejects_build_evidence_from_another_source_commit(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "source"):
+            self.verify(source_commit="b" * 40)
+
+    def test_rejects_package_bytes_changed_after_build(self) -> None:
+        self.package.write_bytes(b"different package")
+        with self.assertRaisesRegex(RuntimeError, "package byte length"):
+            self.verify()
+
+    def test_rejects_installed_component_changed_after_extraction(self) -> None:
+        (self.stage / "gui_shell_desktop").write_bytes(b"changed runner")
+        with self.assertRaisesRegex(RuntimeError, "installed stage"):
+            self.verify()
+
+    def test_rejects_active_record_identity_mismatch(self) -> None:
+        altered = dict(self.active_record)
+        altered["audit_store_id"] = "audit-store-33333333333333333333333333333333"
+        with self.assertRaisesRegex(RuntimeError, "active version record"):
+            self.verify(active_record=altered)
+
+    def test_provenance_projection_does_not_copy_unrelated_sensitive_fields(self) -> None:
+        evidence = json.loads(self.evidence_path.read_text(encoding="utf-8"))
+        evidence["fixture_secret_canary"] = "D4P_PROVENANCE_SECRET_CANARY"
+        self.evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
+        result = self.verify()
+        self.assertNotIn("D4P_PROVENANCE_SECRET_CANARY", json.dumps(result))
 
 
 class AccessibleActionResolutionTests(unittest.TestCase):

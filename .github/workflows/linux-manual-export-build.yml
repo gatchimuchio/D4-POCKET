@@ -13,6 +13,7 @@ name: Linux manual product build and installed acceptance
           - mcp_tool_execution
           - workspace_selection
           - agent_task_supervision
+          - runtime_provenance
         default: update_lifecycle
 
 permissions:
@@ -184,20 +185,26 @@ jobs:
           python3 -m unittest tooling.tests.test_linux_gtk_bundle_smoke
           python3 -m unittest tooling.tests.test_linux_installed_product_smoke
           python3 -m unittest tooling.tests.test_export_linux_product
-          dbus-run-session -- xvfb-run -a python3 tooling/tests/linux_gtk_bundle_smoke.py \
-            --launcher "$output_root/bundle/gui_shell_desktop_launcher" \
-            --temp-root "$D4P_EXPORT_ROOT" \
-            --backend x11
-          dbus-run-session -- python3 tooling/tests/linux_gtk_bundle_smoke.py \
-            --launcher "$output_root/bundle/gui_shell_desktop_launcher" \
-            --temp-root "$D4P_EXPORT_ROOT" \
-            --backend wayland
+          if [ '${{ inputs.acceptance_scope }}' != 'runtime_provenance' ]; then
+            dbus-run-session -- xvfb-run -a python3 tooling/tests/linux_gtk_bundle_smoke.py \
+              --launcher "$output_root/bundle/gui_shell_desktop_launcher" \
+              --temp-root "$D4P_EXPORT_ROOT" \
+              --backend x11
+            dbus-run-session -- python3 tooling/tests/linux_gtk_bundle_smoke.py \
+              --launcher "$output_root/bundle/gui_shell_desktop_launcher" \
+              --temp-root "$D4P_EXPORT_ROOT" \
+              --backend wayland
+          fi
           {
             printf '\n- Export evidence: `%s`\n' "$(cat "$output_root/d4_pocket_linux_export_build.json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["artifact_tree_sha256"])')"
             printf -- '- Package hash: `%s`\n' "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["package"]["sha256"])' "$output_root/d4_pocket_linux_export_build.json")"
             printf -- '- Fixture: synthetic Broker-shaped Receipt／Manifest; no Owner authority or credentials.\n'
-            printf -- '- Runtime smoke: portable product Rust launcher opened and normally closed its Flutter GTK window under Xvfb/X11; Wayland run used Weston headless/Pixman, verified the live launcher GTK process successfully connected to the isolated Wayland socket using external connect-syscall observation, then stopped the owned process group. No debug environment variable was required or forwarded through the frontend allowlist. Both used an initially absent XDG_DATA_HOME and verified cleanup.\n'
-            printf -- '- Scope: portable first-launch, Linux GTK X11 window close, and Wayland socket-connect smoke only; the Wayland check does not prove surface rendering. This build is not signed Install/Owner activation, installed-version handoff, production compositor coverage, formal distribution, or runtime Manifest consumption.\n'
+            if [ '${{ inputs.acceptance_scope }}' = 'runtime_provenance' ]; then
+              printf -- '- Portable X11／Wayland smoke was skipped because this scope verifies the installed product provenance; previously accepted scopes are not replayed.\n'
+            else
+              printf -- '- Runtime smoke: portable product Rust launcher opened and normally closed its Flutter GTK window under Xvfb/X11; Wayland run used Weston headless/Pixman, verified the live launcher GTK process successfully connected to the isolated Wayland socket using external connect-syscall observation, then stopped the owned process group. No debug environment variable was required or forwarded through the frontend allowlist. Both used an initially absent XDG_DATA_HOME and verified cleanup.\n'
+              printf -- '- Scope: portable first-launch, Linux GTK X11 window close, and Wayland socket-connect smoke only; the Wayland check does not prove surface rendering. This build is not signed Install/Owner activation, installed-version handoff, production compositor coverage, formal distribution, or runtime Manifest consumption.\n'
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: 固定版Linux Codex CLIを検証rootへ取得
@@ -349,6 +356,47 @@ jobs:
             printf -- '- Required cases: successful bounded Workspace write and normal scratch cleanup; active Task cancellation with descendant stop and scratch cleanup; Broker-enforced deadline with descendant stop, failed terminal state, and scratch cleanup. Secret canaries and outside-Workspace target remain denied; previous Approval is not reused.\n'
             printf -- '- This is a dedicated unsigned verification build with the fixed synthetic App/Audit identity. It is not a normal Release, distribution artifact, real-model result, Wayland GUI proof, or release-readiness claim.\n'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: installed GTK UIからruntime provenanceを照合
+        if: ${{ inputs.acceptance_scope == 'runtime_provenance' }}
+        shell: bash
+        env:
+          GUI_SHELL_PRODUCT_APP_ID: d4-pocket-app-11111111111111111111111111111111
+          GUI_SHELL_PRODUCT_AUDIT_STORE_ID: audit-store-22222222222222222222222222222222
+          D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE: ${{ runner.temp }}/d4p-linux-export-${{ github.run_id }}-${{ github.run_attempt }}/output/D4Pocket-linux-rollback.d4pkg
+        run: |
+          set -euo pipefail
+          test_package="$D4P_EXPORT_ROOT/output/D4Pocket-linux.d4pkg"
+          acceptance_root="$D4P_EXPORT_ROOT/installed-runtime-provenance"
+          result_path="$D4P_EXPORT_ROOT/installed-runtime-provenance.json"
+          dbus-run-session -- xvfb-run -a python3 tooling/tests/linux_installed_product_smoke.py \
+            --package "$test_package" \
+            --temp-root "$D4P_EXPORT_ROOT" \
+            --acceptance-root "$acceptance_root" \
+            --private-key "$D4P_EXPORT_ROOT/test-update-private.der" \
+            --update-package "$D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE" \
+            --acceptance-scope runtime_provenance \
+            --build-evidence "$D4P_EXPORT_ROOT/output/d4_pocket_linux_export_build.json" \
+            --bundle-root "$D4P_EXPORT_ROOT/output/bundle" \
+            --source-commit "$(git rev-parse HEAD)" | tee "$result_path"
+          python3 - "$result_path" <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json, sys
+          result = json.load(open(sys.argv[1], encoding="utf-8"))
+          runtime = result["runtime_identity"]
+          audit = result["audit_store_observation"]
+          components = result["component_sha256"]
+          print("\n### Installed runtime provenance (LIVE_RUNTIME)")
+          print(f"- Source commit: `{result['source_commit']}`")
+          print(f"- Package: `{result['package_sha256']}` ({result['package_byte_length']} bytes)")
+          print(f"- Artifact tree: `{result['artifact_tree_sha256']}`; installed tree: `{result['installed_artifact_tree_sha256']}` ({result['artifact_count']} files)")
+          print(f"- Installed root: `{result['installed_root']}`")
+          print(f"- Active stage: `{result['active_stage']}`")
+          print(f"- Runtime identity: App `{runtime['app_id']}`, Audit Store `{runtime['audit_store_id']}`")
+          print(f"- Runner: `{components['runner']}`; Launcher: `{components['launcher']}`; Broker: `{components['broker']}`")
+          print(f"- Live Runner: `{result['live_processes']['runner']['sha256']}` ({result['live_processes']['runner']['process_count']} process); live Broker: `{result['live_processes']['broker']['sha256']}` ({result['live_processes']['broker']['process_count']} process)")
+          print(f"- Audit Store path: `{audit['path']}`; Audit file `{audit['audit.jsonl']['sha256']}`; anchor `{audit['audit_anchor.json']['sha256']}`; private key file present: `{audit['anchor_key_private_file']}`")
+          print("- Scope: Ubuntu 24.04 hosted Xvfb/X11, unsigned synthetic test identity. This binds the installed artifacts and current runtime paths to this source commit; it does not establish a real desktop session, Wayland rendering, signing, formal distribution, or Linux-wide release readiness.")
+          PY
 
       - name: failure-only GTK Workspace chooser screenshot
         if: ${{ failure() && inputs.acceptance_scope == 'workspace_selection' }}
