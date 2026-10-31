@@ -5174,7 +5174,7 @@ def _run_installed_host_registration_acceptance(
         return window
 
     rejected_window = request_registration(
-        rejected_host_id, "拒否されるLinux Host metadata", rejected_hash
+        rejected_host_id, "Rejected Linux Host metadata", rejected_hash
     )
     common_owner_markers = (
         "Host metadataを未審査で登録します。",
@@ -5192,7 +5192,7 @@ def _run_installed_host_registration_acceptance(
         expected_summary_markers=(
             *common_owner_markers,
             f"Host ID: {rejected_host_id}",
-            "表示名: 拒否されるLinux Host metadata",
+            "表示名: Rejected Linux Host metadata",
             f"identity hash: {rejected_hash}",
         ),
     )
@@ -5213,7 +5213,7 @@ def _run_installed_host_registration_acceptance(
         raise RuntimeError("Host登録のOwner拒否が別の理由で記録されました")
 
     accepted_window = request_registration(
-        accepted_host_id, "許可されたLinux Host metadata", accepted_hash
+        accepted_host_id, "Approved Linux Host metadata", accepted_hash
     )
     _answer_owner_dialog(
         environment,
@@ -5224,7 +5224,7 @@ def _run_installed_host_registration_acceptance(
         expected_summary_markers=(
             *common_owner_markers,
             f"Host ID: {accepted_host_id}",
-            "表示名: 許可されたLinux Host metadata",
+            "表示名: Approved Linux Host metadata",
             f"identity hash: {accepted_hash}",
         ),
     )
@@ -5263,7 +5263,7 @@ def _run_installed_host_registration_acceptance(
         marker in audit_text
         for marker in (
             rejected_host_id,
-            "拒否されるLinux Host metadata",
+            "Rejected Linux Host metadata",
             rejected_hash,
             accepted_hash,
         )
