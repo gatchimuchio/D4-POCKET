@@ -860,6 +860,27 @@ void main() {
     await tester.tap(find.text('Task状態を更新'));
     await tester.pumpAndSettle();
     expect(find.text('Task状態: completed'), findsOneWidget);
+    final taskStatusRegion = find.byWidgetPredicate(
+      (widget) => widget is Semantics &&
+          widget.container &&
+          widget.explicitChildNodes &&
+          widget.properties.label == 'Broker Task状態',
+    );
+    expect(taskStatusRegion, findsOneWidget);
+    expect(
+      find.descendant(
+        of: taskStatusRegion,
+        matching: find.text('Task識別子: $taskId'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: taskStatusRegion,
+        matching: find.text('Task状態: completed'),
+      ),
+      findsOneWidget,
+    );
     expect(find.textContaining(resultHash), findsOneWidget);
     expect(find.text('緩衝調停: 作用後未照合（独立照合前）'), findsOneWidget);
     expect(find.textContaining(bufferRecordHash), findsOneWidget);

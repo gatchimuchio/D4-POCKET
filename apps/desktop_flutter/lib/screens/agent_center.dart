@@ -1181,25 +1181,30 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
           _comparison!.agentBSessionId,
         }.contains(session.sessionId);
     return [
-      SectionList(
-        title: 'Broker Task承認状態',
-        rows: [
-          '作業領域Permission状態: ${taskState.permissionStatus}',
-          'Task一回承認状態（Owner Approval）: ${taskState.approvalStatus}',
-          if (task != null) 'Task識別子: ${task.taskId}',
-          if (task != null) 'Task状態: ${task.status}',
-          if (task != null) '指示hash: ${task.instructionHash}',
-          if (task?.resultHash != null) '結果hash: ${task!.resultHash}',
-          if (task?.bufferIntervention != null)
-            '緩衝調停: ${task!.bufferIntervention!.status}（独立照合前）',
-          if (task?.bufferIntervention != null)
-            '緩衝調停record hash: ${task!.bufferIntervention!.recordHash}',
-          if (task?.bufferIntervention != null)
-            '緩衝調停Audit: ${task!.bufferIntervention!.auditEventId}',
-          if (task != null)
-            '結果本文: ${task.resultContentAvailable ? 'Broker内に期限付きで利用可能' : '利用不可・期限切れ・未保持'}',
-          if (task != null) '終了監査参照: ${task.auditEventId}',
-        ],
+      Semantics(
+        container: true,
+        explicitChildNodes: true,
+        label: 'Broker Task状態',
+        child: SectionList(
+          title: 'Broker Task承認状態',
+          rows: [
+            '作業領域Permission状態: ${taskState.permissionStatus}',
+            'Task一回承認状態（Owner Approval）: ${taskState.approvalStatus}',
+            if (task != null) 'Task識別子: ${task.taskId}',
+            if (task != null) 'Task状態: ${task.status}',
+            if (task != null) '指示hash: ${task.instructionHash}',
+            if (task?.resultHash != null) '結果hash: ${task!.resultHash}',
+            if (task?.bufferIntervention != null)
+              '緩衝調停: ${task!.bufferIntervention!.status}（独立照合前）',
+            if (task?.bufferIntervention != null)
+              '緩衝調停record hash: ${task!.bufferIntervention!.recordHash}',
+            if (task?.bufferIntervention != null)
+              '緩衝調停Audit: ${task!.bufferIntervention!.auditEventId}',
+            if (task != null)
+              '結果本文: ${task.resultContentAvailable ? 'Broker内に期限付きで利用可能' : '利用不可・期限切れ・未保持'}',
+            if (task != null) '終了監査参照: ${task.auditEventId}',
+          ],
+        ),
       ),
       if (taskState.handoffReceipt case final receipt?)
         SectionList(
