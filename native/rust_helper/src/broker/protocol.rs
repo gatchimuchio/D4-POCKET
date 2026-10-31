@@ -1993,14 +1993,15 @@ impl Broker {
                     | BrokerOperation::製品アンインストール要求
             )
         );
-        // Linux資格情報入力／Workspace Inspector／Linux・MacのMCP操作の別個native Owner確認だけ。
+        // Linux Host／資格情報入力／Workspace Inspector／Linux・MacのMCP操作の別個native Owner確認だけ。
         // 試験専用Ownerへ追加しない。
         let operation_is_allowlisted = operation_is_allowlisted
             || (cfg!(target_os = "linux")
                 && matches!(
                     envelope.operation,
                     Some(
-                        BrokerOperation::資格情報登録
+                        BrokerOperation::Host登録
+                            | BrokerOperation::資格情報登録
                             | BrokerOperation::MCP接続
                             | BrokerOperation::MCP切断
                             | BrokerOperation::作業領域承認
@@ -2176,6 +2177,20 @@ impl Broker {
                     envelope.payload_hash.as_deref().unwrap_or("unknown"),
                 );
             }
+        }
+
+        if envelope.operation == Some(BrokerOperation::Host登録)
+            && cfg!(any(target_os = "linux", target_os = "macos"))
+            && export_confirmation != OwnerConfirmationSource::DesktopNativeConfirmation
+        {
+            return self.reject_with_payload_hash(
+                &request_id,
+                &operation,
+                "desktop_native_owner_confirmation_required",
+                "Linux／macOSのHost登録はRust Desktopのnative Owner確認経路だけで許可します",
+                true,
+                envelope.payload_hash.as_deref().unwrap_or("unknown"),
+            );
         }
 
         let required_selection_source = match envelope.operation {
@@ -6036,7 +6051,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(any(windows, target_os = "macos"))]
+    #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
     fn macos_host_broker入口はplatform限定で通常要求を拒否する() {
         let payload = json!({"版":1});
         let request = json!({"request_id":"mac-host-gate", "session_id":"session-1",
@@ -6045,11 +6060,18 @@ mod tests {
             "payload_hash":canonical_payload_hash(Some(&payload)),"payload":payload});
         let normal = test_broker()
             .handle(BrokerRequestEnvelope::from_json_str(&request.to_string()).unwrap());
-        assert_eq!(normal.error.unwrap().code, "host_owner_required");
+        assert_eq!(
+            normal.error.unwrap().code,
+            if cfg!(any(target_os = "linux", target_os = "macos")) {
+                "desktop_native_owner_confirmation_required"
+            } else {
+                "host_owner_required"
+            }
+        );
         let confirmed = test_broker().desktop_owner_operation_json(&request.to_string());
         assert_eq!(
             confirmed.error.unwrap().code,
-            if cfg!(target_os = "macos") {
+            if cfg!(any(target_os = "macos", target_os = "linux")) {
                 "broker_persistence_unavailable"
             } else {
                 "desktop_owner_operation_invalid"
