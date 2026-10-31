@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 import re
 import shutil
 import signal
 import stat
+import struct
 import subprocess
 import tempfile
 import time
+import zlib
 from pathlib import Path
 
 PRODUCT_WINDOW_TITLE = "D4 Pocket powered by GUI Shell"
@@ -210,6 +213,228 @@ def _wayland_socket_connected(output: str, socket_path: Path) -> bool:
     )
 
 
+def _weston_arguments(
+    backend_argument: str,
+    renderer_argument: str,
+    display_name: str,
+    *,
+    enable_output_capture: bool,
+) -> list[str]:
+    arguments = ["weston"]
+    if enable_output_capture:
+        # This exposes Weston’s output-capture debug protocol. It is enabled only
+        # for a private, run-owned compositor with no untrusted clients.
+        arguments.append("--debug")
+    arguments.extend(
+        (backend_argument, renderer_argument, f"--socket={display_name}")
+    )
+    return arguments
+
+
+def _decode_png_rgba(image: bytes) -> tuple[int, int, bytes]:
+    signature = b"\x89PNG\r\n\x1a\n"
+    if len(image) > 64 * 1024 * 1024 or not image.startswith(signature):
+        raise RuntimeError("Westonの出力画像がPNG形式または上限内ではありません")
+
+    offset = len(signature)
+    width = height = bit_depth = color_type = None
+    compressed = bytearray()
+    saw_idat = False
+    idat_sequence_ended = False
+    saw_iend = False
+    while offset < len(image):
+        if offset + 12 > len(image):
+            raise RuntimeError("PNG chunkが途中で切れています")
+        length = struct.unpack_from(">I", image, offset)[0]
+        end = offset + 12 + length
+        if end > len(image):
+            raise RuntimeError("PNG chunk長がfile境界を越えています")
+        chunk_type = image[offset + 4 : offset + 8]
+        chunk_data = image[offset + 8 : offset + 8 + length]
+        expected_crc = struct.unpack_from(">I", image, offset + 8 + length)[0]
+        if len(chunk_type) != 4 or any(
+            not (65 <= byte <= 90 or 97 <= byte <= 122) for byte in chunk_type
+        ):
+            raise RuntimeError("PNG chunk名が不正です")
+        if zlib.crc32(chunk_type + chunk_data) & 0xFFFFFFFF != expected_crc:
+            raise RuntimeError("PNG chunkのCRCが一致しません")
+        if offset == len(signature):
+            if chunk_type != b"IHDR" or length != 13:
+                raise RuntimeError("PNG先頭に正しいIHDRがありません")
+            width, height, bit_depth, color_type, compression, filtering, interlace = (
+                struct.unpack(">IIBBBBB", chunk_data)
+            )
+            if (
+                width < 1
+                or height < 1
+                or width * height > 16_777_216
+                or bit_depth != 8
+                or color_type not in (2, 6)
+                or compression != 0
+                or filtering != 0
+                or interlace != 0
+            ):
+                raise RuntimeError("PNGの画像形式または寸法が対応範囲外です")
+        elif chunk_type == b"IHDR":
+            raise RuntimeError("PNGに重複IHDRがあります")
+        elif chunk_type not in (b"PLTE", b"IDAT", b"IEND") and not (
+            chunk_type[0] & 0x20
+        ):
+            raise RuntimeError("PNGに未対応のcritical chunkがあります")
+
+        if chunk_type == b"IDAT":
+            if idat_sequence_ended:
+                raise RuntimeError("PNGのIDAT chunkが連続していません")
+            saw_idat = True
+            compressed.extend(chunk_data)
+        elif chunk_type == b"IEND":
+            if length != 0 or not saw_idat:
+                raise RuntimeError("PNGのIENDまたはIDATが不正です")
+            saw_iend = True
+            offset = end
+            break
+        elif saw_idat:
+            idat_sequence_ended = True
+        offset = end
+
+    if not saw_iend or offset != len(image) or width is None or height is None:
+        raise RuntimeError("PNG終端が欠落しているか余分なdataがあります")
+
+    channels = 4 if color_type == 6 else 3
+    row_length = width * channels
+    decoded_length = height * (row_length + 1)
+    if decoded_length > 64 * 1024 * 1024:
+        raise RuntimeError("PNG展開後の画像が上限を超えます")
+    inflater = zlib.decompressobj()
+    filtered = inflater.decompress(bytes(compressed), decoded_length + 1)
+    if len(filtered) > decoded_length or inflater.unconsumed_tail:
+        raise RuntimeError("PNG展開後の画像が宣言寸法を超えます")
+    filtered += inflater.flush()
+    if (
+        len(filtered) != decoded_length
+        or not inflater.eof
+        or inflater.unused_data
+    ):
+        raise RuntimeError("PNG展開dataの長さまたは終端が不正です")
+
+    rgba = bytearray(width * height * 4)
+    previous = bytearray(row_length)
+    source_offset = 0
+    pixel_offset = 0
+
+    def paeth(left: int, above: int, upper_left: int) -> int:
+        estimate = left + above - upper_left
+        distances = (
+            abs(estimate - left),
+            abs(estimate - above),
+            abs(estimate - upper_left),
+        )
+        return (left, above, upper_left)[distances.index(min(distances))]
+
+    for _ in range(height):
+        filter_type = filtered[source_offset]
+        source_offset += 1
+        encoded_row = filtered[source_offset : source_offset + row_length]
+        source_offset += row_length
+        row = bytearray(row_length)
+        if filter_type > 4:
+            raise RuntimeError("PNGに未対応の行filterがあります")
+        for index, value in enumerate(encoded_row):
+            left = row[index - channels] if index >= channels else 0
+            above = previous[index]
+            upper_left = previous[index - channels] if index >= channels else 0
+            if filter_type == 1:
+                value += left
+            elif filter_type == 2:
+                value += above
+            elif filter_type == 3:
+                value += (left + above) // 2
+            elif filter_type == 4:
+                value += paeth(left, above, upper_left)
+            row[index] = value & 0xFF
+
+        if channels == 4:
+            rgba[pixel_offset : pixel_offset + row_length] = row
+            pixel_offset += row_length
+        else:
+            for index in range(0, row_length, 3):
+                rgba[pixel_offset : pixel_offset + 3] = row[index : index + 3]
+                rgba[pixel_offset + 3] = 255
+                pixel_offset += 4
+        previous = row
+
+    return width, height, bytes(rgba)
+
+
+def _different_pixel_count(
+    first: tuple[int, int, bytes], second: tuple[int, int, bytes]
+) -> int:
+    first_width, first_height, first_pixels = first
+    second_width, second_height, second_pixels = second
+    if (
+        first_width != second_width
+        or first_height != second_height
+        or len(first_pixels) != len(second_pixels)
+    ):
+        raise RuntimeError("Westonの比較画像寸法が一致しません")
+    return sum(
+        first_pixels[offset : offset + 4] != second_pixels[offset : offset + 4]
+        for offset in range(0, len(first_pixels), 4)
+    )
+
+
+def _capture_weston_frame(
+    environment: dict[str, str], pictures_dir: Path
+) -> tuple[tuple[int, int, bytes], str]:
+    if pictures_dir.exists() or pictures_dir.is_symlink():
+        raise RuntimeError("Weston画面取得用directoryは未使用でなければなりません")
+    parent = pictures_dir.parent
+    if parent.is_symlink() or not parent.is_dir():
+        raise RuntimeError("Weston画面取得rootが通常directoryではありません")
+    pictures_dir.mkdir(mode=0o700)
+    if os.name == "posix" and stat.S_IMODE(pictures_dir.stat().st_mode) & 0o077:
+        raise RuntimeError("Weston画面取得directoryがprivateではありません")
+
+    capture_environment = environment.copy()
+    capture_environment["XDG_PICTURES_DIR"] = str(pictures_dir)
+    image_path: Path | None = None
+    try:
+        if shutil.which("weston-screenshooter", path=capture_environment.get("PATH")) is None:
+            raise RuntimeError("Wayland出力取得用weston-screenshooterがありません")
+        result = subprocess.run(
+            ["weston-screenshooter"],
+            env=capture_environment,
+            capture_output=True,
+            check=False,
+            timeout=20,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"Wayland compositorの出力取得に失敗しました: exit={result.returncode}"
+            )
+        candidates = list(pictures_dir.glob("wayland-screenshot-*.png"))
+        if len(candidates) != 1:
+            raise RuntimeError("Weston出力取得fileが一意に生成されませんでした")
+        image_path = candidates[0]
+        metadata = image_path.lstat()
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or stat.S_ISLNK(metadata.st_mode)
+            or metadata.st_size < 1
+            or metadata.st_size > 64 * 1024 * 1024
+        ):
+            raise RuntimeError("Weston出力取得fileが通常fileまたはsize上限を満たしません")
+        os.chmod(image_path, 0o600)
+        image = image_path.read_bytes()
+        frame = _decode_png_rgba(image)
+        return frame, hashlib.sha256(image).hexdigest()
+    finally:
+        if image_path is not None and image_path.exists() and not image_path.is_symlink():
+            image_path.unlink()
+        if pictures_dir.exists() and not pictures_dir.is_symlink():
+            pictures_dir.rmdir()
+
+
 def _weston_backend_is_unsupported(backend_argument: str, output: str) -> bool:
     return (
         backend_argument == "--backend=headless"
@@ -225,7 +450,11 @@ def _weston_renderer_is_unsupported(renderer_argument: str, output: str) -> bool
 
 
 def _start_wayland_compositor(
-    runtime: Path, environment: dict[str, str], log_path: Path
+    runtime: Path,
+    environment: dict[str, str],
+    log_path: Path,
+    *,
+    enable_output_capture: bool = False,
 ) -> tuple[subprocess.Popen[bytes], str]:
     display_name = "w"
     socket_path = runtime / display_name
@@ -248,12 +477,12 @@ def _start_wayland_compositor(
         for renderer_argument in renderer_arguments:
             with log_path.open("xb" if attempt == 0 else "ab") as log:
                 compositor = subprocess.Popen(
-                    [
-                        "weston",
+                    _weston_arguments(
                         backend_argument,
                         renderer_argument,
-                        f"--socket={display_name}",
-                    ],
+                        display_name,
+                        enable_output_capture=enable_output_capture,
+                    ),
                     env=compositor_environment,
                     stdin=subprocess.DEVNULL,
                     stdout=log,

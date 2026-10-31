@@ -66,12 +66,16 @@ RUST_AUDIT_TEST = (
 
 if __package__:
     from .linux_gtk_bundle_smoke import (
+        _capture_weston_frame,
+        _different_pixel_count,
         _request_x11_window_manager_close,
         _start_wayland_compositor,
         _terminate_group,
     )
 else:
     from linux_gtk_bundle_smoke import (
+        _capture_weston_frame,
+        _different_pixel_count,
         _request_x11_window_manager_close,
         _start_wayland_compositor,
         _terminate_group,
@@ -642,6 +646,15 @@ def _wayland_launch_environment(
         }
     )
     return result
+
+
+def _visible_wayland_window(window) -> bool:
+    try:
+        import pyatspi
+
+        return window.getState().contains(pyatspi.STATE_SHOWING)
+    except Exception as error:
+        raise RuntimeError("導入済みWayland GTK windowの表示状態を取得できません") from error
 
 
 def _accessible_nodes(
@@ -6484,8 +6497,11 @@ def run_installed_smoke(
     bundle_root: Path | None = None,
     source_commit: str | None = None,
 ) -> None:
-    if not os.environ.get("DISPLAY") or not os.environ.get("DBUS_SESSION_BUS_ADDRESS"):
-        raise RuntimeError("隔離X11 displayとD-Bus sessionが必要です")
+    needs_x11 = acceptance_scope != "wayland_rendering"
+    if (needs_x11 and not os.environ.get("DISPLAY")) or not os.environ.get(
+        "DBUS_SESSION_BUS_ADDRESS"
+    ):
+        raise RuntimeError("対象acceptanceに必要な隔離displayまたはD-Bus sessionがありません")
     if temp_root.is_symlink() or not temp_root.is_dir():
         raise RuntimeError("run固有一時rootが通常directoryではありません")
     temp_root = temp_root.resolve(strict=True)
@@ -6500,6 +6516,7 @@ def run_installed_smoke(
         "workspace_selection",
         "agent_task_supervision",
         "runtime_provenance",
+        "wayland_rendering",
     }:
         raise RuntimeError("installed acceptance scopeが未対応です")
     if acceptance_scope == "runtime_provenance":
@@ -6509,6 +6526,10 @@ def run_installed_smoke(
             resolved_source = source.resolve(strict=True)
             if temp_root not in resolved_source.parents or source.is_symlink():
                 raise RuntimeError("runtime provenance入力がrun固有temporary root外です")
+    if acceptance_scope == "wayland_rendering" and (
+        source_commit is None or re.fullmatch(r"[0-9a-f]{40}", source_commit) is None
+    ):
+        raise RuntimeError("Wayland描画受入れに固定source commitがありません")
     resolved_private_key = private_key_path.resolve(strict=True)
     if (
         resolved_private_key != private_key_path
@@ -6637,6 +6658,7 @@ def run_installed_smoke(
             "workspace_selection",
             "agent_task_supervision",
             "runtime_provenance",
+            "wayland_rendering",
         }:
             pass
         else:
@@ -6702,6 +6724,134 @@ def run_installed_smoke(
         preexisting = _processes_using(product_paths)
         if preexisting:
             raise RuntimeError("受入れ開始前からtest product processが存在します")
+
+        if acceptance_scope == "wayland_rendering":
+            wayland_compositor, wayland_display = _start_wayland_compositor(
+                runtime,
+                environment,
+                acceptance_root / "wayland-compositor.log",
+                enable_output_capture=True,
+            )
+            wayland_environment = _wayland_launch_environment(
+                environment, wayland_display
+            )
+            time.sleep(0.5)
+            baseline_frame, baseline_png_sha256 = _capture_weston_frame(
+                wayland_environment, acceptance_root / "wayland-frame-before"
+            )
+
+            with app_log.open("xb") as log:
+                wayland_process = subprocess.Popen(
+                    ["gio", "launch", str(entries[0])],
+                    cwd=stage,
+                    env=wayland_environment,
+                    stdin=subprocess.DEVNULL,
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                    start_new_session=True,
+                )
+
+            try:
+                wayland_window = _find_accessible(WINDOW_TITLE, timeout=60)
+                if not _visible_wayland_window(wayland_window):
+                    raise RuntimeError(
+                        "導入済みWayland GTK windowがAT-SPIで表示状態ではありません"
+                    )
+                live_runner = _observe_linux_runtime_executables(
+                    {
+                        "runner": (
+                            runner,
+                            hashlib.sha256(runner.read_bytes()).hexdigest(),
+                        )
+                    }
+                )
+                changed_pixels = 0
+                rendered_png_sha256 = ""
+                rendered_frame: tuple[int, int, bytes] | None = None
+                required_changed_pixels = max(
+                    4096, baseline_frame[0] * baseline_frame[1] // 100
+                )
+                deadline = time.monotonic() + 20
+                sample_number = 0
+                while time.monotonic() < deadline:
+                    if not (_processes_using(product_paths) - preexisting):
+                        raise RuntimeError(
+                            "Weston出力取得前に導入済みWayland製品processが停止しました"
+                        )
+                    sample_number += 1
+                    rendered_frame, rendered_png_sha256 = _capture_weston_frame(
+                        wayland_environment,
+                        acceptance_root / f"wayland-frame-after-{sample_number:02d}",
+                    )
+                    changed_pixels = _different_pixel_count(
+                        baseline_frame, rendered_frame
+                    )
+                    if changed_pixels >= required_changed_pixels:
+                        break
+                    time.sleep(0.25)
+                if rendered_frame is None or changed_pixels < required_changed_pixels:
+                    raise RuntimeError(
+                        "導入済みWayland surfaceのcompositor画面変化が受入れ下限未満です"
+                    )
+
+                running_wayland = _processes_using(product_paths) - preexisting
+                _stop_owned_processes(running_wayland, wayland_process)
+                if _processes_using(product_paths) - preexisting:
+                    raise RuntimeError(
+                        "Wayland描画受入れ後にinstalled product processが残留しました"
+                    )
+                if wayland_process.poll() is None:
+                    wayland_process.wait(timeout=10)
+                if wayland_process.returncode not in (
+                    0,
+                    -signal.SIGTERM,
+                    -signal.SIGKILL,
+                    None,
+                ):
+                    raise RuntimeError(
+                        "Wayland描画受入れ後のinstalled launcher終了codeが不正です"
+                    )
+
+                _terminate_group(wayland_compositor)
+                if wayland_compositor.poll() is None:
+                    raise RuntimeError("Wayland描画用isolated compositorが停止しませんでした")
+                wayland_compositor = None
+                print(
+                    json.dumps(
+                        {
+                            "acceptance_scope": acceptance_scope,
+                            "evidence_class": "LIVE_RUNTIME",
+                            "source_commit": source_commit,
+                            "product_version": record["product_version"],
+                            "installed_package_sha256": record["package_sha256"],
+                            "display_server": "isolated Weston headless/Pixman",
+                            "visible_window": "AT-SPI SHOWING",
+                            "compositor_output": {
+                                "width": rendered_frame[0],
+                                "height": rendered_frame[1],
+                                "changed_pixels": changed_pixels,
+                                "required_changed_pixels": required_changed_pixels,
+                                "baseline_png_sha256": baseline_png_sha256,
+                                "rendered_png_sha256": rendered_png_sha256,
+                                "image_files_retained": False,
+                            },
+                            "live_installed_runner": live_runner,
+                            "owned_process_cleanup": "PASS",
+                        },
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                        sort_keys=True,
+                    )
+                )
+            finally:
+                if wayland_process is not None and wayland_process.poll() is None:
+                    _stop_owned_processes(
+                        _processes_using(product_paths) - preexisting,
+                        wayland_process,
+                    )
+                if wayland_compositor is not None and wayland_compositor.poll() is None:
+                    _terminate_group(wayland_compositor)
+            return
 
         window_manager = subprocess.Popen(
             ["openbox", "--sm-disable"],
@@ -7564,6 +7714,7 @@ def main() -> int:
             "workspace_selection",
             "agent_task_supervision",
             "runtime_provenance",
+            "wayland_rendering",
         ),
         default="update_lifecycle",
     )

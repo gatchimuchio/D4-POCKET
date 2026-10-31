@@ -14,6 +14,7 @@ name: Linux manual product build and installed acceptance
           - workspace_selection
           - agent_task_supervision
           - runtime_provenance
+          - wayland_rendering
         default: update_lifecycle
 
 permissions:
@@ -185,7 +186,8 @@ jobs:
           python3 -m unittest tooling.tests.test_linux_gtk_bundle_smoke
           python3 -m unittest tooling.tests.test_linux_installed_product_smoke
           python3 -m unittest tooling.tests.test_export_linux_product
-          if [ '${{ inputs.acceptance_scope }}' != 'runtime_provenance' ]; then
+          if [ '${{ inputs.acceptance_scope }}' != 'runtime_provenance' ] && \
+             [ '${{ inputs.acceptance_scope }}' != 'wayland_rendering' ]; then
             dbus-run-session -- xvfb-run -a python3 tooling/tests/linux_gtk_bundle_smoke.py \
               --launcher "$output_root/bundle/gui_shell_desktop_launcher" \
               --temp-root "$D4P_EXPORT_ROOT" \
@@ -201,6 +203,8 @@ jobs:
             printf -- '- Fixture: synthetic Broker-shaped Receipt／Manifest; no Owner authority or credentials.\n'
             if [ '${{ inputs.acceptance_scope }}' = 'runtime_provenance' ]; then
               printf -- '- Portable X11／Wayland smoke was skipped because this scope verifies the installed product provenance; previously accepted scopes are not replayed.\n'
+            elif [ '${{ inputs.acceptance_scope }}' = 'wayland_rendering' ]; then
+              printf -- '- Portable smoke was skipped; the dedicated installed-product Wayland surface-rendering acceptance runs below.\n'
             else
               printf -- '- Runtime smoke: portable product Rust launcher opened and normally closed its Flutter GTK window under Xvfb/X11; Wayland run used Weston headless/Pixman, verified the live launcher GTK process successfully connected to the isolated Wayland socket using external connect-syscall observation, then stopped the owned process group. No debug environment variable was required or forwarded through the frontend allowlist. Both used an initially absent XDG_DATA_HOME and verified cleanup.\n'
               printf -- '- Scope: portable first-launch, Linux GTK X11 window close, and Wayland socket-connect smoke only; the Wayland check does not prove surface rendering. This build is not signed Install/Owner activation, installed-version handoff, production compositor coverage, formal distribution, or runtime Manifest consumption.\n'
@@ -406,6 +410,52 @@ jobs:
           print(f"- Live Runner: `{result['live_processes']['runner']['sha256']}` ({result['live_processes']['runner']['process_count']} process); live Broker: `{result['live_processes']['broker']['sha256']}` ({result['live_processes']['broker']['process_count']} process)")
           print(f"- Audit Store path: `{audit['path']}`; Audit file `{audit['audit.jsonl']['sha256']}`; anchor `{audit['audit_anchor.json']['sha256']}`; private key file present: `{audit['anchor_key_private_file']}`")
           print("- Scope: Ubuntu 24.04 hosted Xvfb/X11, unsigned synthetic test identity. This binds the installed artifacts and current runtime paths to this source commit; it does not establish a real desktop session, Wayland rendering, signing, formal distribution, or Linux-wide release readiness.")
+          PY
+
+      - name: installed GTK UI surfaceをWayland compositorで描画確認
+        if: ${{ inputs.acceptance_scope == 'wayland_rendering' }}
+        shell: bash
+        env:
+          GUI_SHELL_PRODUCT_APP_ID: d4-pocket-app-11111111111111111111111111111111
+          GUI_SHELL_PRODUCT_AUDIT_STORE_ID: audit-store-22222222222222222222222222222222
+          D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE: ${{ runner.temp }}/d4p-linux-export-${{ github.run_id }}-${{ github.run_attempt }}/output/D4Pocket-linux-rollback.d4pkg
+        run: |
+          set -euo pipefail
+          test_package="$D4P_EXPORT_ROOT/output/D4Pocket-linux.d4pkg"
+          acceptance_root="$D4P_EXPORT_ROOT/installed-wayland-rendering"
+          result_path="$D4P_EXPORT_ROOT/installed-wayland-rendering.json"
+          dbus-run-session -- python3 tooling/tests/linux_installed_product_smoke.py \
+            --package "$test_package" \
+            --temp-root "$D4P_EXPORT_ROOT" \
+            --acceptance-root "$acceptance_root" \
+            --private-key "$D4P_EXPORT_ROOT/test-update-private.der" \
+            --update-package "$D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE" \
+            --acceptance-scope wayland_rendering \
+            --source-commit "$(git rev-parse HEAD)" | tee "$result_path"
+          python3 - "$result_path" <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json, pathlib, sys
+          matches = []
+          for line in pathlib.Path(sys.argv[1]).read_text(encoding="utf-8").splitlines():
+              try:
+                  candidate = json.loads(line)
+              except json.JSONDecodeError:
+                  continue
+              if isinstance(candidate, dict) and candidate.get("acceptance_scope") == "wayland_rendering":
+                  matches.append(candidate)
+          if len(matches) != 1:
+              raise SystemExit(f"expected one Wayland rendering result, found {len(matches)}")
+          result = matches[0]
+          frame = result["compositor_output"]
+          runner = result["live_installed_runner"]["runner"]
+          print("\n### Installed Wayland surface rendering (LIVE_RUNTIME)")
+          print(f"- Source commit: `{result['source_commit']}`")
+          print(f"- Installed package SHA-256: `{result['installed_package_sha256']}`")
+          print(f"- Display: {result['display_server']}; visible window: {result['visible_window']}")
+          print(f"- Compositor output: `{frame['width']}×{frame['height']}`, `{frame['changed_pixels']}` changed pixels (minimum `{frame['required_changed_pixels']}`)")
+          print(f"- Baseline PNG SHA-256: `{frame['baseline_png_sha256']}`; rendered PNG SHA-256: `{frame['rendered_png_sha256']}`; image files retained: `{frame['image_files_retained']}`")
+          print(f"- Live installed Runner: SHA-256 `{runner['sha256']}`; process count `{runner['process_count']}`")
+          print(f"- Owned process cleanup: `{result['owned_process_cleanup']}`")
+          print("- Scope: installed UI surface output in an isolated Weston headless/Pixman compositor. This does not establish a physical desktop session, Wayland compositor diversity, formal distribution/signing, or Linux-wide release readiness.")
           PY
 
       - name: failure-only GTK Workspace chooser screenshot
