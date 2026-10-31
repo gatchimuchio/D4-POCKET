@@ -172,7 +172,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "273a66d7dc478b16597643ebe53c986676aadc132c4a199cbc7c082dd6d9c022"
+      "sha256": "c5a09b6bf0b7fda4b188f6d58344ec1d5db182c834a71035b2424a304c651a41"
     },
     {
       "path": "SECURITY.md",
@@ -344,7 +344,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/broker_client.dart",
-      "sha256": "efa6b32605fc5ca2839aa2a8e7eecaebcc0a981fdbe4544b4dfe3fe9729dda87"
+      "sha256": "f516c4acd8e19972f33baa323497732753ac27ef78f0eb34706d4dd36c67226f"
     },
     {
       "path": "apps/desktop_flutter/lib/services/compose_client.dart",
@@ -652,7 +652,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/host_registration_test.dart",
-      "sha256": "85c002dc55a751ec48a72ed43a875fcf85f75a28a6c665ace8f94f162da0d23d"
+      "sha256": "a6b9a3a7a21fa6caaae9b9d712ef56639a70053cd31cb3005b6ac1f719926ddf"
     },
     {
       "path": "apps/desktop_flutter/test/linux_credential_vault_test.dart",
@@ -1352,7 +1352,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "31395afe11204c39224fbe3d0c63e3d645d0acdd9f0eb08e4c826b66195d9562"
+      "sha256": "e5ae5bcf9ec52edfff3fc6f5daaa76448d76abdc455bd8d01d6e5269e0d8eee7"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",

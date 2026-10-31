@@ -43,7 +43,9 @@ const _nativeOwnerConfirmationOperations = <String>{
 Duration brokerRequestTimeoutForOperation(String operation) =>
     operation == '更新候補取得'
         ? const Duration(seconds: 40)
-        : defaultTargetPlatform == TargetPlatform.macOS && operation == 'Host登録'
+        : (defaultTargetPlatform == TargetPlatform.macOS ||
+                    defaultTargetPlatform == TargetPlatform.linux) &&
+                operation == 'Host登録'
             ? const Duration(seconds: 305)
             : defaultTargetPlatform == TargetPlatform.macOS &&
                     {'MCP接続', 'MCP切断', 'MCP Tool実行'}.contains(operation)

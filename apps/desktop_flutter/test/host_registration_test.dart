@@ -125,6 +125,16 @@ void main() {
     expect(
         brokerRequestTimeoutForOperation('Host切替'), const Duration(seconds: 5));
   });
+  test('Linux Host登録はGTK Owner確認待ちを許し一覧・切替は通常待機', () {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    expect(brokerRequestTimeoutForOperation('Host登録'),
+        const Duration(seconds: 305));
+    expect(
+        brokerRequestTimeoutForOperation('Host一覧'), const Duration(seconds: 5));
+    expect(
+        brokerRequestTimeoutForOperation('Host切替'), const Duration(seconds: 5));
+  });
   test('公開Host要求と同一receiptだけを受理し未知件数を0へ補完しない', () async {
     final broker = PublicHostBroker();
     expect(await register(broker), 'audit-host-register');
