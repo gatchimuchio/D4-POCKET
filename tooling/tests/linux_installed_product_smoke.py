@@ -56,6 +56,10 @@ MCP_OWNER_WORKSPACE_LABEL = "Workspace: "
 MCP_OWNER_ARGUMENT_HASH_MARKER = "引数hash:"
 MCP_OWNER_NO_CREDENTIAL_MARKER = "Credential注入: なし"
 LINUX_AGENT_TASK_FIXTURE_MODEL_ID = "o3"
+# Keep the simulated Broker deadline shorter than the first real CLI tool wait,
+# so the deadline scenario cannot receive the fixture's final model response first.
+LINUX_AGENT_TASK_INITIAL_TOOL_YIELD_MS = 30_000
+LINUX_AGENT_TASK_DEADLINE_TEST_LIMIT_MS = 20_000
 RUST_AUDIT_TEST = (
     "broker::update_center::tests::linux_installed_acceptance_runtime_audit_is_durable"
 )
@@ -3071,7 +3075,7 @@ class _LinuxAgentTaskResponsesServer:
                         "cmd": scenario["command"],
                         "workdir": scenario["workspace"],
                         "shell": "/bin/bash",
-                        "yield_time_ms": 30000,
+                        "yield_time_ms": LINUX_AGENT_TASK_INITIAL_TOOL_YIELD_MS,
                     },
                     separators=(",", ":"),
                 )
@@ -3925,6 +3929,10 @@ def _run_installed_agent_task_acceptance(
     acceptance_root: Path,
     task_execution_limit_ms: int,
 ) -> dict[str, object]:
+    if not 0 < task_execution_limit_ms < LINUX_AGENT_TASK_INITIAL_TOOL_YIELD_MS:
+        raise RuntimeError(
+            "deadline acceptanceにはAgent初回tool待機より短いBroker期限が必要です"
+        )
     fixture_root, workspace, outside_file = _write_linux_agent_task_fixture(acceptance_root)
     workspace_id = "workspace-linux-installed-agent-task"
     runtime_id = "runtime-linux-installed-agent-task"
@@ -4163,13 +4171,29 @@ def _run_installed_agent_task_acceptance(
                 _find_accessible("取消要求を記録しました", root=window, timeout=10)
             else:
                 # The Broker owns the deadline; wait for its terminal transition without sending Cancel.
-                _wait_installed_task_status(
-                    environment,
-                    window,
-                    expected_status,
-                    task_id=task_ids[-1],
-                    timeout=wait_seconds,
-                )
+                try:
+                    _wait_installed_task_status(
+                        environment,
+                        window,
+                        expected_status,
+                        task_id=task_ids[-1],
+                        timeout=wait_seconds,
+                    )
+                except RuntimeError as error:
+                    raise RuntimeError(
+                        "installed deadline Taskの終端状態がAcceptanceと一致しません: "
+                        + json.dumps(
+                            {
+                                "status_wait": str(error),
+                                "responses_fixture": responses_server.snapshot(),
+                                "task_history": _installed_task_history_diagnostics(
+                                    audit_store, task_ids[-1]
+                                ),
+                            },
+                            ensure_ascii=False,
+                            sort_keys=True,
+                        )
+                    ) from None
             _wait_installed_task_status(
                 environment,
                 window,
@@ -6155,7 +6179,7 @@ def run_installed_smoke(
     installed_helper: Path | None = None
     responses_server: _LinuxAgentTaskResponsesServer | None = None
     task_group_cleanup_error: Exception | None = None
-    task_execution_limit_ms = 45_000
+    task_execution_limit_ms = LINUX_AGENT_TASK_DEADLINE_TEST_LIMIT_MS
     app_log = acceptance_root / "installed-app.log"
     try:
         if acceptance_scope == "agent_task_supervision":

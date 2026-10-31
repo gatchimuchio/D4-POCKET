@@ -83,6 +83,8 @@ from tooling.tests.linux_installed_product_smoke import (
     _write_linux_workspace_acceptance_fixture,
     _write_linux_agent_task_fixture,
     _wayland_launch_environment,
+    LINUX_AGENT_TASK_DEADLINE_TEST_LIMIT_MS,
+    LINUX_AGENT_TASK_INITIAL_TOOL_YIELD_MS,
     MCP_OWNER_ARGUMENT_HASH_MARKER,
     MCP_OWNER_NO_CREDENTIAL_MARKER,
     MCP_OWNER_WORKSPACE_LABEL,
@@ -3630,6 +3632,12 @@ class AgentTaskAuditAcceptanceTests(unittest.TestCase):
 
 
 class LinuxAgentTaskResponsesFixtureTests(unittest.TestCase):
+    def test_deadline_acceptance_expires_before_initial_exec_tool_yield(self) -> None:
+        self.assertLess(
+            LINUX_AGENT_TASK_DEADLINE_TEST_LIMIT_MS,
+            LINUX_AGENT_TASK_INITIAL_TOOL_YIELD_MS,
+        )
+
     def test_fixture_builds_codex_function_call_and_final_response(self) -> None:
         server = _LinuxAgentTaskResponsesServer()
         self.addCleanup(server.close)
