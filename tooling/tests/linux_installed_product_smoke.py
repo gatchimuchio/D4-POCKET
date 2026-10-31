@@ -6743,10 +6743,13 @@ def _host_registration_audit_evidence(
     ):
         raise RuntimeError("Host登録の拒否／許可要求が独立hashへ束縛されていません")
     authority_terms = ("permission", "approval", "credential", "trust", "task")
+    non_issuance_operations = {"approval_edit"}
     forbidden_authority_events = [
         event
         for event in events
-        if any(
+        if str(event.get("operation", "")).casefold()
+        not in non_issuance_operations
+        and any(
             term in str(event.get("operation", "")).casefold()
             for term in authority_terms
         )

@@ -3258,6 +3258,12 @@ class LinuxHostRegistrationAuditTests(unittest.TestCase):
         self.assertEqual(evidence["host_registration_distinct_request_payload_hashes"], 2)
         self.assertEqual(evidence["host_registration_forbidden_authority_events"], 0)
 
+    def test_protected_approval_edit_probe_is_not_an_approval_issuance(self) -> None:
+        events = self._events()
+        events.append({"operation": "approval_edit", "decision": "accepted"})
+        evidence = _host_registration_audit_evidence(events)
+        self.assertEqual(evidence["host_registration_forbidden_authority_events"], 0)
+
     def test_rejects_reused_request_hash_or_generated_task_authority(self) -> None:
         same_hash = self._events()
         same_hash[0]["payload_hash"] = same_hash[1]["payload_hash"]
