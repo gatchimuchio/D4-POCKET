@@ -3169,6 +3169,26 @@ class InstalledTaskStatusPollingTests(unittest.TestCase):
         def get_parent(self):
             return self.parent
 
+    def test_status_observation_chunk_deadline_returns_partial_for_outer_retry(self) -> None:
+        status_node = self._Accessible("Task状態: running")
+        desktop = self._Accessible("desktop", [status_node])
+        pyatspi = types.SimpleNamespace(
+            Registry=types.SimpleNamespace(getDesktop=lambda _index: desktop)
+        )
+        with (
+            patch.dict(sys.modules, {"pyatspi": pyatspi}),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._accessible_nodes",
+                return_value=iter([(status_node, "Task状態: running")]),
+            ),
+        ):
+            snapshot, status, observed = _linux_installed_task_status_observation(
+                "task-current", "failed", deadline=time.monotonic() - 1
+            )
+        self.assertIsNone(snapshot)
+        self.assertIsNone(status)
+        self.assertEqual(observed, ["running"])
+
     def test_status_observation_binds_current_task_not_an_older_status(self) -> None:
         old_task = self._Accessible(
             "older Task",

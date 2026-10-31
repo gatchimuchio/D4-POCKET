@@ -1385,9 +1385,11 @@ def _assert_secret_absent_from_files(
             raise RuntimeError("資格情報の受入れファイル走査で試験ファイルを読めませんでした") from None
 
 
-def _accessible_snapshot(root) -> str:
+def _accessible_snapshot(root, *, deadline: float | None = None) -> str:
     values: list[str] = []
-    for node, name in _accessible_nodes(root):
+    for node, name in _accessible_nodes(root, deadline=deadline):
+        if deadline is not None and time.monotonic() >= deadline:
+            break
         if name:
             values.append(name)
         text = _accessible_text(node)
@@ -3481,8 +3483,10 @@ def _linux_installed_task_status_observation(
         task_scope = None
         for _ in range(25):
             if time.monotonic() >= deadline:
-                raise RuntimeError("Task状態のAT-SPI観測期限が切れました")
-            scope_text = _accessible_snapshot(scope)
+                return None, current_task_status, visible_statuses
+            scope_text = _accessible_snapshot(scope, deadline=deadline)
+            if time.monotonic() >= deadline:
+                return None, current_task_status, visible_statuses
             scope_task_ids = set(
                 re.findall(r"Task識別子:\s*([A-Za-z0-9_.:-]+)", scope_text)
             )
@@ -3496,7 +3500,9 @@ def _linux_installed_task_status_observation(
             scope = parent
         if task_scope is None:
             continue
-        snapshot = _accessible_snapshot(task_scope)
+        snapshot = _accessible_snapshot(task_scope, deadline=deadline)
+        if time.monotonic() >= deadline:
+            return None, current_task_status, visible_statuses
         if task_id_label not in snapshot:
             continue
         task_status_match = re.search(
