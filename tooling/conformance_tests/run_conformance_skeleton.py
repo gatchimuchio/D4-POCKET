@@ -12162,6 +12162,8 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
     if "if [ '${{ inputs.acceptance_scope }}' = 'host_registration' ]; then" not in workflow:
         missing.append("installed Linux Host scope selects the Host operations module")
     for token in (
+        'host_query = "Host"',
+        '"xdotool", "type", "--clearmodifiers", "--delay", "30", host_query',
         '_find_operable_accessible("Host操作面を開く", root=window, timeout=10)',
         '_activate_accessible(command, "Host操作面を開く", environment)',
     ):

@@ -5088,6 +5088,13 @@ def _open_installed_host_operation_center(
         timeout=5,
     )
     _find_accessible("コマンドパレット", root=window, timeout=10)
+    host_query = "Host"
+    subprocess.run(
+        ["xdotool", "type", "--clearmodifiers", "--delay", "30", host_query],
+        env=environment,
+        check=True,
+        timeout=5,
+    )
     command = _find_operable_accessible("Host操作面を開く", root=window, timeout=10)
     _activate_accessible(command, "Host操作面を開く", environment)
     _find_accessible("D4 Pocket Host操作面", timeout=10)
