@@ -3191,12 +3191,13 @@ def _write_linux_agent_task_fixture(acceptance_root: Path) -> tuple[Path, Path, 
         "        return False\n"
         "def write_allowed(path):\n"
         "    try:\n"
-        "        path.write_text('D4P_SYNTHETIC_WRITE_PROBE', encoding='utf-8')\n"
+        "        fd = os.open(path, os.O_WRONLY | getattr(os, 'O_CLOEXEC', 0))\n"
+        "        os.close(fd)\n"
         "        return True\n"
         "    except OSError:\n"
         "        return False\n"
         "read_denied = not any((read_allowed(workspace / '.env'), read_allowed(workspace / 'private/token.txt'), read_allowed(workspace / 'outside-link.txt'), read_allowed(fixture_root / 'outside/outside.txt')))\n"
-        "write_denied = not any((write_allowed(workspace / 'private/write-probe.txt'), write_allowed(fixture_root / 'outside/write-probe.txt')))\n"
+        "write_denied = not any((write_allowed(workspace / '.env'), write_allowed(workspace / 'private/token.txt'), write_allowed(fixture_root / 'outside/outside.txt')))\n"
         "(scratch / 'fixture-scratch-marker').write_text('owned-task-scratch\\n', encoding='utf-8')\n"
         "mode = sys.argv[1]\n"
         "if mode == 'complete':\n"
@@ -3727,7 +3728,7 @@ def _run_installed_agent_task_acceptance(
                 report = json.loads(result_file.read_text(encoding="utf-8"))
             except (OSError, UnicodeError, json.JSONDecodeError) as error:
                 raise RuntimeError("Agent Task fixture結果がJSONとして読めません") from error
-            if not isinstance(report, dict) or set(report) != {
+            expected_report_fields = {
                 "mode",
                 "secret_and_outside_reads_denied",
                 "secret_and_outside_writes_denied",
@@ -3735,19 +3736,56 @@ def _run_installed_agent_task_acceptance(
                 "scratch_marker",
                 "scratch_workspace_bound",
                 "scratch_name",
-            } or any(
-                report.get(name) is not True
-                for name in (
-                    "secret_and_outside_reads_denied",
-                    "secret_and_outside_writes_denied",
-                    "workspace_write",
-                    "scratch_marker",
-                    "scratch_workspace_bound",
+            }
+            report_is_object = isinstance(report, dict)
+            report_fields_match = report_is_object and set(report) == expected_report_fields
+            failed_report_checks = (
+                [
+                    name
+                    for name in (
+                        "secret_and_outside_reads_denied",
+                        "secret_and_outside_writes_denied",
+                        "workspace_write",
+                        "scratch_marker",
+                        "scratch_workspace_bound",
+                    )
+                    if report.get(name) is not True
+                ]
+                if report_is_object
+                else ["report_not_object"]
+            )
+            mode_matches = report_is_object and report.get("mode") == "complete"
+            scratch_name_matches = (
+                report_is_object
+                and isinstance(report.get("scratch_name"), str)
+                and report["scratch_name"].startswith(".d4p-tmp-")
+            )
+            if (
+                not report_fields_match
+                or failed_report_checks
+                or not mode_matches
+                or not scratch_name_matches
+            ):
+                report_diagnostics = {
+                    "report_fields_match": report_fields_match,
+                    "missing_fields": (
+                        sorted(expected_report_fields - set(report))
+                        if report_is_object
+                        else []
+                    ),
+                    "unexpected_fields": (
+                        sorted(set(report) - expected_report_fields)
+                        if report_is_object
+                        else []
+                    ),
+                    "failed_checks": failed_report_checks,
+                    "mode_matches": mode_matches,
+                    "scratch_name_matches": scratch_name_matches,
+                }
+                raise RuntimeError(
+                    "Agent Taskのsecret／Workspace境界またはscratch fixtureが不成立です: "
+                    + json.dumps(report_diagnostics, ensure_ascii=False, sort_keys=True)
                 )
-            ) or report.get("mode") != "complete":
-                raise RuntimeError("Agent Taskのsecret／Workspace境界またはscratch fixtureが不成立です")
-            if not isinstance(report["scratch_name"], str) or not report["scratch_name"].startswith(".d4p-tmp-"):
-                raise RuntimeError("completed Agent Taskのscratch nameがD4所有形式ではありません")
             completed_snapshot = _wait_installed_task_status(
                 environment, window, expected_status, timeout=wait_seconds
             )

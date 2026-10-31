@@ -3471,7 +3471,38 @@ class LinuxAgentTaskFixtureSourceTests(unittest.TestCase):
                 outside_file.resolve(strict=True),
             )
             self.assertIn("scratch_workspace_bound = scratch.parent == workspace", source)
+            self.assertIn("os.open(path, os.O_WRONLY | getattr(os, 'O_CLOEXEC', 0))", source)
+            self.assertIn(
+                "write_allowed(workspace / '.env'), write_allowed(workspace / 'private/token.txt'), "
+                "write_allowed(fixture_root / 'outside/outside.txt')",
+                source,
+            )
+            self.assertNotIn("private/write-probe.txt", source)
             self.assertTrue(fixture_root.is_dir())
+
+    def test_write_guard_probes_registered_secret_files_without_mutating_them(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-linux-task-fixture-write-") as temporary:
+            _fixture_root, workspace, outside_file = _write_linux_agent_task_fixture(
+                Path(temporary)
+            )
+            scratch = workspace / ".d4p-tmp-fixture"
+            scratch.mkdir()
+            secret_files = {
+                workspace / ".env": "D4P_SYNTHETIC_SECRET_CANARY=must-not-be-readable\n",
+                workspace / "private/token.txt": "D4P_SYNTHETIC_SECRET_CANARY=must-not-be-readable\n",
+                outside_file: "D4P_SYNTHETIC_SECRET_CANARY=outside-workspace\n",
+            }
+            environment = os.environ.copy()
+            environment["TMPDIR"] = str(scratch)
+            subprocess.run(
+                [sys.executable, str(workspace / "task_fixture.py"), "complete"],
+                check=True,
+                capture_output=True,
+                env=environment,
+            )
+
+            for path, original_contents in secret_files.items():
+                self.assertEqual(path.read_text(encoding="utf-8"), original_contents)
 
 
 if __name__ == "__main__":
