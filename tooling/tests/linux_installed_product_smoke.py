@@ -3468,17 +3468,45 @@ def _linux_installed_task_status_observation(
     visible_statuses: list[str] = []
     current_task_status: str | None = None
     desktop = pyatspi.Registry.getDesktop(0)
+    status_nodes: list[tuple[object, str]] = []
     for node, name in _accessible_nodes(desktop, deadline=deadline):
         match = re.search(
             r"Task状態:\s*(pending|running|blocked|completed|failed|cancelled|quarantined)\b",
             name,
         )
-        if match is None:
-            continue
-        status = match.group(1)
-        if status not in visible_statuses:
-            visible_statuses.append(status)
-            visible_statuses[:] = visible_statuses[-6:]
+        if match is not None:
+            status_nodes.append((node, match.group(1)))
+            status = match.group(1)
+            if status not in visible_statuses:
+                visible_statuses.append(status)
+                visible_statuses[:] = visible_statuses[-6:]
+        if "Broker Task状態" in name:
+            if time.monotonic() >= deadline:
+                return None, current_task_status, visible_statuses
+            snapshot = _accessible_snapshot(node, deadline=deadline)
+            if time.monotonic() >= deadline:
+                return None, current_task_status, visible_statuses
+            scope_task_ids = set(
+                re.findall(r"Task識別子:\s*([A-Za-z0-9_.:-]+)", snapshot)
+            )
+            if scope_task_ids == {task_id} and task_id_label in snapshot:
+                task_status_match = re.search(
+                    r"Task状態:\s*(pending|running|blocked|completed|failed|cancelled|quarantined)\b",
+                    snapshot,
+                )
+                if task_status_match is None:
+                    return None, current_task_status, visible_statuses
+                current_task_status = task_status_match.group(1)
+                if current_task_status not in visible_statuses:
+                    visible_statuses.append(current_task_status)
+                    visible_statuses[:] = visible_statuses[-6:]
+                if current_task_status == expected_status:
+                    return snapshot, current_task_status, visible_statuses
+                return None, current_task_status, visible_statuses
+
+    for node, observed_status in status_nodes:
+        if time.monotonic() >= deadline:
+            return None, current_task_status, visible_statuses
         scope = node
         task_scope = None
         for _ in range(25):
@@ -3503,7 +3531,10 @@ def _linux_installed_task_status_observation(
         snapshot = _accessible_snapshot(task_scope, deadline=deadline)
         if time.monotonic() >= deadline:
             return None, current_task_status, visible_statuses
-        if task_id_label not in snapshot:
+        snapshot_task_ids = set(
+            re.findall(r"Task識別子:\s*([A-Za-z0-9_.:-]+)", snapshot)
+        )
+        if snapshot_task_ids != {task_id} or task_id_label not in snapshot:
             continue
         task_status_match = re.search(
             r"Task状態:\s*(pending|running|blocked|completed|failed|cancelled|quarantined)\b",
@@ -3514,6 +3545,8 @@ def _linux_installed_task_status_observation(
         current_task_status = task_status_match.group(1)
         if current_task_status == expected_status:
             return snapshot, current_task_status, visible_statuses
+        if current_task_status != observed_status:
+            return None, current_task_status, visible_statuses
     return None, current_task_status, visible_statuses
 
 

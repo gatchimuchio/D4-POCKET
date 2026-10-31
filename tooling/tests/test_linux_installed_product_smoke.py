@@ -3216,6 +3216,96 @@ class InstalledTaskStatusPollingTests(unittest.TestCase):
         self.assertEqual(status, "running")
         self.assertEqual(observed, ["cancelled", "running"])
 
+    def test_named_broker_task_scope_binds_terminal_status_to_current_task(self) -> None:
+        old_task = self._Accessible(
+            "Broker Task状態",
+            [
+                self._Accessible("Task識別子: task-old"),
+                self._Accessible("Task状態: completed"),
+            ],
+        )
+        current_task = self._Accessible(
+            "Broker Task状態",
+            [
+                self._Accessible("Task識別子: task-current"),
+                self._Accessible("Task状態: completed"),
+                self._Accessible("結果hash: sha256:current"),
+            ],
+        )
+        desktop = self._Accessible("desktop", [old_task, current_task])
+        pyatspi = types.SimpleNamespace(
+            Registry=types.SimpleNamespace(getDesktop=lambda _index: desktop)
+        )
+        with patch.dict(sys.modules, {"pyatspi": pyatspi}):
+            snapshot, status, _observed = _linux_installed_task_status_observation(
+                "task-current", "completed", deadline=time.monotonic() + 1
+            )
+        self.assertIsNotNone(snapshot)
+        self.assertEqual(status, "completed")
+        self.assertIn("Task識別子: task-current", snapshot)
+        self.assertIn("結果hash: sha256:current", snapshot)
+
+    def test_named_broker_task_scope_rejects_another_tasks_terminal_status(self) -> None:
+        old_task = self._Accessible(
+            "Broker Task状態",
+            [
+                self._Accessible("Task識別子: task-old"),
+                self._Accessible("Task状態: completed"),
+            ],
+        )
+        current_task = self._Accessible(
+            "Broker Task状態",
+            [
+                self._Accessible("Task識別子: task-current"),
+                self._Accessible("Task状態: running"),
+            ],
+        )
+        desktop = self._Accessible("desktop", [old_task, current_task])
+        pyatspi = types.SimpleNamespace(
+            Registry=types.SimpleNamespace(getDesktop=lambda _index: desktop)
+        )
+        with patch.dict(sys.modules, {"pyatspi": pyatspi}):
+            snapshot, status, observed = _linux_installed_task_status_observation(
+                "task-current", "completed", deadline=time.monotonic() + 1
+            )
+        self.assertIsNone(snapshot)
+        self.assertEqual(status, "running")
+        self.assertIn("completed", observed)
+
+    def test_named_task_scope_is_checked_before_remaining_desktop_traversal(self) -> None:
+        current_task = self._Accessible(
+            "Broker Task状態",
+            [
+                self._Accessible("Task識別子: task-current"),
+                self._Accessible("Task状態: completed"),
+            ],
+        )
+        desktop = self._Accessible("desktop", [current_task])
+        pyatspi = types.SimpleNamespace(
+            Registry=types.SimpleNamespace(getDesktop=lambda _index: desktop)
+        )
+        accessible_nodes = _accessible_nodes
+
+        def bounded_nodes(root, *, deadline=None, max_depth=None):
+            if root is desktop:
+                yield desktop, "desktop"
+                yield current_task, "Broker Task状態"
+                raise AssertionError("desktop traversal continued past current Task scope")
+            yield from accessible_nodes(root, deadline=deadline, max_depth=max_depth)
+
+        with (
+            patch.dict(sys.modules, {"pyatspi": pyatspi}),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._accessible_nodes",
+                side_effect=bounded_nodes,
+            ),
+        ):
+            snapshot, status, _observed = _linux_installed_task_status_observation(
+                "task-current", "completed", deadline=time.monotonic() + 1
+            )
+        self.assertIsNotNone(snapshot)
+        self.assertEqual(status, "completed")
+
     def test_status_observation_returns_current_task_terminal_scope(self) -> None:
         current_task = self._Accessible(
             "current Task",
