@@ -3292,6 +3292,30 @@ def _stop_linux_agent_task_process_group(
     _wait_for_linux_process_group_exit(pgid, timeout=timeout)
 
 
+def _linux_agent_task_cleanup_failure_code(error: Exception) -> str:
+    safe_messages = {
+        "試験runner自身または不正なAgent Task process groupは停止しません": "unsafe_process_group",
+        "Agent Task process groupの所有identityを再確認できず停止を拒否しました": "identity_mismatch",
+        "Agent Task process groupへのTERM送信を確認できません": "term_unconfirmed",
+        "Agent Task process groupへのKILL送信を確認できません": "kill_unconfirmed",
+        "Agent Task終了後も所有process groupのlive processが残っています": "live_process_remains",
+        "Agent Task cleanup rootがsymlinkです": "acceptance_root_symlink",
+        "Agent Task cleanup fixture rootがsymlinkです": "fixture_root_symlink",
+        "Agent Task cleanup Workspaceがsymlinkです": "workspace_symlink",
+        "Agent Task cleanup Workspaceがdirectoryではありません": "workspace_not_directory",
+        "Agent Task cleanup markerがsymlinkです": "marker_symlink",
+        "Agent Task cleanup markerが通常fileまたはsize上限に違反します": "marker_shape_invalid",
+    }
+    known_message = safe_messages.get(str(error))
+    if known_message is not None:
+        return known_message
+    if isinstance(error, (json.JSONDecodeError, UnicodeError, KeyError, TypeError, ValueError)):
+        return "marker_identity_invalid"
+    if isinstance(error, OSError):
+        return f"os_error_{error.errno}" if isinstance(error.errno, int) else "os_error"
+    return "cleanup_internal_error"
+
+
 def _cleanup_linux_agent_task_process_groups(acceptance_root: Path) -> None:
     if acceptance_root.is_symlink():
         raise RuntimeError("Agent Task cleanup rootがsymlinkです")
@@ -3307,7 +3331,8 @@ def _cleanup_linux_agent_task_process_groups(acceptance_root: Path) -> None:
         return
     if not workspace.is_dir():
         raise RuntimeError("Agent Task cleanup Workspaceがdirectoryではありません")
-    first_failure: Exception | None = None
+    first_failure: dict[str, str] | None = None
+    first_failure_cause: Exception | None = None
     for scenario in ("cancel", "deadline"):
         try:
             marker = workspace / f"agent-task-{scenario}-active.json"
@@ -3328,11 +3353,17 @@ def _cleanup_linux_agent_task_process_groups(acceptance_root: Path) -> None:
             _stop_linux_agent_task_process_group(pgid, pid, start_time)
         except Exception as error:
             if first_failure is None:
-                first_failure = error
+                first_failure = {
+                    "scenario": scenario,
+                    "error_type": type(error).__name__,
+                    "failure_code": _linux_agent_task_cleanup_failure_code(error),
+                }
+                first_failure_cause = error
     if first_failure is not None:
         raise RuntimeError(
-            "Agent Task process group cleanupで一つ以上の失敗を確認しました"
-        ) from first_failure
+            "Agent Task process group cleanupで一つ以上の失敗を確認しました: "
+            + json.dumps(first_failure, ensure_ascii=False, sort_keys=True)
+        ) from first_failure_cause
 
 
 def _read_task_scratch_recovery_state(store: Path) -> dict[str, object]:
@@ -6561,6 +6592,7 @@ def run_installed_smoke(
             )
         )
     finally:
+        primary_acceptance_error = sys.exc_info()[1]
         if acceptance_scope == "agent_task_supervision":
             try:
                 _cleanup_linux_agent_task_process_groups(acceptance_root)
@@ -6607,7 +6639,110 @@ def run_installed_smoke(
                 fixture=temp_root / "linux-installed-mcp-server.py",
             )
         if task_group_cleanup_error is not None:
-            raise RuntimeError("Agent Task acceptance失敗後のprocess group cleanupが成立しません") from task_group_cleanup_error
+            primary_summary: dict[str, object] = {
+                "error_type": (
+                    type(primary_acceptance_error).__name__
+                    if primary_acceptance_error is not None
+                    else "none"
+                )
+            }
+            primary_message = str(primary_acceptance_error or "")
+            report_failure_prefix = (
+                "Agent Taskのsecret／Workspace境界またはscratch fixtureが不成立です: "
+            )
+            if primary_message.startswith(report_failure_prefix):
+                try:
+                    report_diagnostics = json.loads(
+                        primary_message[len(report_failure_prefix) :]
+                    )
+                except json.JSONDecodeError:
+                    report_diagnostics = None
+                if isinstance(report_diagnostics, dict):
+                    allowed_check_names = {
+                        "secret_and_outside_reads_denied",
+                        "secret_and_outside_writes_denied",
+                        "workspace_write",
+                        "scratch_marker",
+                        "scratch_workspace_bound",
+                    }
+                    primary_summary["failure_stage"] = "fixture_report_validation"
+                    primary_summary["diagnostics"] = {
+                        "report_fields_match": report_diagnostics.get(
+                            "report_fields_match"
+                        )
+                        is True,
+                        "missing_fields": [
+                            field
+                            for field in report_diagnostics.get("missing_fields", [])
+                            if isinstance(field, str)
+                            and field
+                            in {
+                                "mode",
+                                "secret_and_outside_reads_denied",
+                                "secret_and_outside_writes_denied",
+                                "workspace_write",
+                                "scratch_marker",
+                                "scratch_workspace_bound",
+                                "scratch_name",
+                            }
+                        ],
+                        "unexpected_fields": [
+                            field
+                            for field in report_diagnostics.get("unexpected_fields", [])
+                            if isinstance(field, str)
+                            and re.fullmatch(r"[A-Za-z_]{1,64}", field)
+                        ],
+                        "failed_checks": [
+                            name
+                            for name in report_diagnostics.get("failed_checks", [])
+                            if isinstance(name, str) and name in allowed_check_names
+                        ],
+                        "mode_matches": report_diagnostics.get("mode_matches") is True,
+                        "scratch_name_matches": report_diagnostics.get(
+                            "scratch_name_matches"
+                        )
+                        is True,
+                    }
+            cleanup_summary: dict[str, object] = {
+                "error_type": type(task_group_cleanup_error).__name__,
+                "failure_code": _linux_agent_task_cleanup_failure_code(
+                    task_group_cleanup_error
+                ),
+            }
+            cleanup_message = str(task_group_cleanup_error)
+            cleanup_prefix = (
+                "Agent Task process group cleanupで一つ以上の失敗を確認しました: "
+            )
+            if cleanup_message.startswith(cleanup_prefix):
+                try:
+                    parsed_cleanup = json.loads(cleanup_message[len(cleanup_prefix) :])
+                except json.JSONDecodeError:
+                    parsed_cleanup = None
+                if isinstance(parsed_cleanup, dict):
+                    scenario = parsed_cleanup.get("scenario")
+                    error_type = parsed_cleanup.get("error_type")
+                    failure_code = parsed_cleanup.get("failure_code")
+                    if scenario in {"cancel", "deadline"}:
+                        cleanup_summary["scenario"] = scenario
+                    if isinstance(error_type, str) and re.fullmatch(
+                        r"[A-Za-z]{1,64}", error_type
+                    ):
+                        cleanup_summary["error_type"] = error_type
+                    if isinstance(failure_code, str) and re.fullmatch(
+                        r"[a-z0-9_]{1,64}", failure_code
+                    ):
+                        cleanup_summary["failure_code"] = failure_code
+            raise RuntimeError(
+                "Agent Task acceptance後のprocess group cleanupが成立しません: "
+                + json.dumps(
+                    {
+                        "primary_failure": primary_summary,
+                        "cleanup_failure": cleanup_summary,
+                    },
+                    ensure_ascii=False,
+                    sort_keys=True,
+                )
+            ) from task_group_cleanup_error
         if acceptance_root.exists():
             resolved = acceptance_root.resolve(strict=True)
             if resolved == temp_root or temp_root not in resolved.parents or acceptance_root.is_symlink():

@@ -3025,6 +3025,32 @@ class LinuxAgentTaskFailureCleanupTests(unittest.TestCase):
                 [call(345, 234, 678), call(567, 456, 890)],
             )
 
+    def test_cleanup_failure_summary_is_allowlisted_and_preserves_original_cause(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_marker(root, pid=234, pgid=345, starttime=678)
+            with patch(
+                "tooling.tests.linux_installed_product_smoke._stop_linux_agent_task_process_group",
+                side_effect=PermissionError(
+                    13, "permission denied", "/synthetic/private/credential-canary"
+                ),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "cleanup") as caught:
+                    _cleanup_linux_agent_task_process_groups(root)
+
+            prefix = "Agent Task process group cleanupで一つ以上の失敗を確認しました: "
+            summary = json.loads(str(caught.exception).removeprefix(prefix))
+            self.assertEqual(
+                summary,
+                {
+                    "scenario": "cancel",
+                    "error_type": "PermissionError",
+                    "failure_code": "os_error_13",
+                },
+            )
+            self.assertNotIn("credential-canary", str(caught.exception))
+            self.assertIsInstance(caught.exception.__cause__, PermissionError)
+
 
 class AgentTaskAuditAcceptanceTests(unittest.TestCase):
     def test_three_independent_terminal_tasks_and_scratch_cleanup_are_audited(self) -> None:
