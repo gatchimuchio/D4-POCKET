@@ -9,6 +9,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 import types
 import unittest
 from urllib.error import HTTPError
@@ -51,6 +52,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _installed_task_write_failure_diagnostics,
     _installed_task_history_diagnostics,
     _stop_linux_agent_task_process_group,
+    _linux_processes_with_task_nonce,
     _review_single_installed_mcp_tool_arguments,
     _run_rust_test,
     _safe_log_tail,
@@ -2905,16 +2907,19 @@ class WorkspaceTaskScratchJournalEvidenceTests(unittest.TestCase):
 
 class LinuxAgentTaskFailureCleanupTests(unittest.TestCase):
     @staticmethod
-    def _write_marker(root: Path, *, pid: int, pgid: int, starttime: int) -> None:
+    def _write_marker(
+        root: Path,
+        *,
+        scenario: str = "cancel",
+        nonce: str = "d4p-task-descendant-" + ("a" * 32),
+    ) -> None:
         workspace = root / "agent-task-fixture" / "workspace"
-        workspace.mkdir(parents=True)
-        (workspace / "agent-task-cancel-active.json").write_text(
+        workspace.mkdir(parents=True, exist_ok=True)
+        (workspace / f"agent-task-{scenario}-active.json").write_text(
             json.dumps(
                 {
-                    "mode": "cancel",
-                    "pid": pid,
-                    "pgid": pgid,
-                    "starttime": starttime,
+                    "mode": scenario,
+                    "descendant_nonce": nonce,
                 }
             ),
             encoding="utf-8",
@@ -2923,9 +2928,13 @@ class LinuxAgentTaskFailureCleanupTests(unittest.TestCase):
     def test_failure_cleanup_stops_only_verified_group_and_escalates(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            self._write_marker(root, pid=234, pgid=345, starttime=678)
+            self._write_marker(root)
             members = [(234, 678, "S")]
             with (
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._linux_processes_with_task_nonce",
+                    return_value=[(234, 345, 678)],
+                ),
                 patch(
                     "tooling.tests.linux_installed_product_smoke.os.getpgrp",
                     return_value=999,
@@ -2962,8 +2971,12 @@ class LinuxAgentTaskFailureCleanupTests(unittest.TestCase):
     def test_failure_cleanup_refuses_runner_group_and_reused_pid(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            self._write_marker(root, pid=234, pgid=345, starttime=678)
+            self._write_marker(root)
             with (
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._linux_processes_with_task_nonce",
+                    return_value=[(234, 345, 678)],
+                ),
                 patch(
                     "tooling.tests.linux_installed_product_smoke.os.getpgrp",
                     return_value=345,
@@ -2980,6 +2993,10 @@ class LinuxAgentTaskFailureCleanupTests(unittest.TestCase):
                 killpg.assert_not_called()
 
             with (
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._linux_processes_with_task_nonce",
+                    return_value=[(234, 345, 678)],
+                ),
                 patch(
                     "tooling.tests.linux_installed_product_smoke.os.getpgrp",
                     return_value=999,
@@ -3006,18 +3023,40 @@ class LinuxAgentTaskFailureCleanupTests(unittest.TestCase):
     def test_failure_cleanup_continues_to_other_run_owned_group(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            self._write_marker(root, pid=234, pgid=345, starttime=678)
-            workspace = root / "agent-task-fixture" / "workspace"
-            (workspace / "agent-task-deadline-active.json").write_text(
-                json.dumps(
-                    {"mode": "deadline", "pid": 456, "pgid": 567, "starttime": 890}
+            self._write_marker(root)
+            deadline_nonce = "d4p-task-descendant-" + ("b" * 32)
+            self._write_marker(root, scenario="deadline", nonce=deadline_nonce)
+            with (
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._linux_processes_with_task_nonce",
+                    side_effect=[[(234, 345, 678)], [(456, 567, 890)]],
                 ),
-                encoding="utf-8",
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._stop_linux_agent_task_process_group",
+                    side_effect=[RuntimeError("first group remains live"), None],
+                ) as stop,
+            ):
+                with self.assertRaisesRegex(RuntimeError, "cleanup"):
+                    _cleanup_linux_agent_task_process_groups(root)
+            self.assertEqual(
+                stop.call_args_list,
+                [call(345, 234, 678), call(567, 456, 890)],
             )
-            with patch(
-                "tooling.tests.linux_installed_product_smoke._stop_linux_agent_task_process_group",
-                side_effect=[RuntimeError("first group remains live"), None],
-            ) as stop:
+
+    def test_failure_cleanup_attempts_each_nonce_owned_group(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_marker(root)
+            with (
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._linux_processes_with_task_nonce",
+                    return_value=[(234, 345, 678), (456, 567, 890)],
+                ),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._stop_linux_agent_task_process_group",
+                    side_effect=[RuntimeError("first group remains live"), None],
+                ) as stop,
+            ):
                 with self.assertRaisesRegex(RuntimeError, "cleanup"):
                     _cleanup_linux_agent_task_process_groups(root)
             self.assertEqual(
@@ -3028,11 +3067,17 @@ class LinuxAgentTaskFailureCleanupTests(unittest.TestCase):
     def test_cleanup_failure_summary_is_allowlisted_and_preserves_original_cause(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            self._write_marker(root, pid=234, pgid=345, starttime=678)
-            with patch(
-                "tooling.tests.linux_installed_product_smoke._stop_linux_agent_task_process_group",
-                side_effect=PermissionError(
-                    13, "permission denied", "/synthetic/private/credential-canary"
+            self._write_marker(root)
+            with (
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._linux_processes_with_task_nonce",
+                    return_value=[(234, 345, 678)],
+                ),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._stop_linux_agent_task_process_group",
+                    side_effect=PermissionError(
+                        13, "permission denied", "/synthetic/private/credential-canary"
+                    ),
                 ),
             ):
                 with self.assertRaisesRegex(RuntimeError, "cleanup") as caught:
@@ -3050,6 +3095,57 @@ class LinuxAgentTaskFailureCleanupTests(unittest.TestCase):
             )
             self.assertNotIn("credential-canary", str(caught.exception))
             self.assertIsInstance(caught.exception.__cause__, PermissionError)
+
+    def test_cleanup_rejects_malformed_nonce_without_signaling(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_marker(root, nonce="not-a-process-identity")
+            with (
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._linux_processes_with_task_nonce",
+                    side_effect=ValueError("Agent Task descendant nonceが不正です"),
+                ),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke.os.killpg",
+                    create=True,
+                ) as killpg,
+            ):
+                with self.assertRaisesRegex(RuntimeError, "cleanup") as caught:
+                    _cleanup_linux_agent_task_process_groups(root)
+            self.assertIn("marker_identity_invalid", str(caught.exception))
+            killpg.assert_not_called()
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "Linux /proc is required")
+    def test_host_proc_finds_child_by_nonce_and_returns_host_identity(self) -> None:
+        nonce = "d4p-task-descendant-" + ("c" * 32)
+        with self.assertRaisesRegex(ValueError, "nonce"):
+            _linux_processes_with_task_nonce("invalid")
+        child = subprocess.Popen(
+            [
+                sys.executable,
+                "-c",
+                "import time; time.sleep(30)",
+                nonce,
+            ],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        try:
+            deadline = time.monotonic() + 3
+            matches: list[tuple[int, int, int]] = []
+            while time.monotonic() < deadline:
+                matches = _linux_processes_with_task_nonce(nonce)
+                if matches:
+                    break
+                time.sleep(0.02)
+            self.assertEqual(len(matches), 1)
+            self.assertEqual(matches[0][0], child.pid)
+            self.assertEqual(matches[0][1], os.getpgid(child.pid))
+            self.assertGreater(matches[0][2], 0)
+        finally:
+            child.kill()
+            child.wait(timeout=5)
 
 
 class AgentTaskAuditAcceptanceTests(unittest.TestCase):
@@ -3487,6 +3583,9 @@ class LinuxAgentTaskFixtureSourceTests(unittest.TestCase):
             fixture_source = workspace / "task_fixture.py"
             source = fixture_source.read_text(encoding="utf-8")
             compile(source, str(fixture_source), "exec")
+            descendant_source_path = workspace / "task_fixture_descendant.py"
+            descendant_source = descendant_source_path.read_text(encoding="utf-8")
+            compile(descendant_source, str(descendant_source_path), "exec")
             self.assertEqual(
                 outside_file.read_text(encoding="utf-8"),
                 "D4P_SYNTHETIC_SECRET_CANARY=outside-workspace\n",
@@ -3497,6 +3596,11 @@ class LinuxAgentTaskFixtureSourceTests(unittest.TestCase):
                 outside_file.resolve(strict=True),
             )
             self.assertIn("scratch_workspace_bound = scratch.parent == workspace", source)
+            self.assertIn("descendant_nonce", source)
+            self.assertIn("d4p-task-descendant-", source)
+            self.assertNotIn("/proc/{child.pid}", source)
+            self.assertNotIn("'starttime'", source)
+            self.assertNotIn("'pgid'", source)
             self.assertIn("os.open(path, os.O_WRONLY | getattr(os, 'O_CLOEXEC', 0))", source)
             self.assertIn(
                 "write_allowed(workspace / '.env'), write_allowed(workspace / 'private/token.txt'), "

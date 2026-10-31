@@ -20,6 +20,7 @@ import subprocess
 import sys
 import threading
 import time
+import uuid
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -3177,8 +3178,17 @@ def _write_linux_agent_task_fixture(acceptance_root: Path) -> tuple[Path, Path, 
     outside_file.write_text("D4P_SYNTHETIC_SECRET_CANARY=outside-workspace\n", encoding="utf-8")
     outside_link = workspace / "outside-link.txt"
     outside_link.symlink_to(outside_file)
+    (workspace / "task_fixture_descendant.py").write_text(
+        "import sys, time\n"
+        "nonce = sys.argv[1]\n"
+        "if not nonce.startswith('d4p-task-descendant-'):\n"
+        "    raise SystemExit(4)\n"
+        "while True:\n"
+        "    time.sleep(300)\n",
+        encoding="utf-8",
+    )
     (workspace / "task_fixture.py").write_text(
-        "import json, os, pathlib, subprocess, sys, time\n"
+        "import json, os, pathlib, subprocess, sys, time, uuid\n"
         "workspace = pathlib.Path(__file__).resolve().parent\n"
         "fixture_root = workspace.parent\n"
         "scratch = pathlib.Path(os.environ['TMPDIR']).resolve()\n"
@@ -3205,11 +3215,9 @@ def _write_linux_agent_task_fixture(acceptance_root: Path) -> tuple[Path, Path, 
         "    (workspace / 'agent-task-result.json').write_text(json.dumps(report, sort_keys=True) + '\\n', encoding='utf-8')\n"
         "    print('D4P_AGENT_TASK_FIXTURE_RESULT ' + json.dumps(report, sort_keys=True))\n"
         "elif mode in {'cancel', 'deadline'}:\n"
-        "    child = subprocess.Popen(['/usr/bin/sleep', '300'])\n"
-        "    stat_text = pathlib.Path(f'/proc/{child.pid}/stat').read_text(encoding='utf-8')\n"
-        "    fields = stat_text[stat_text.rfind(')') + 2:].split()\n"
-        "    identity = {'pid': child.pid, 'pgid': int(fields[2]), 'starttime': int(fields[19])}\n"
-        "    report = {'mode': mode, 'secret_and_outside_reads_denied': read_denied, 'secret_and_outside_writes_denied': write_denied, 'scratch_marker': True, 'scratch_workspace_bound': scratch_workspace_bound, 'scratch_name': scratch.name, **identity}\n"
+        "    nonce = 'd4p-task-descendant-' + uuid.uuid4().hex\n"
+        "    child = subprocess.Popen([sys.executable, str(workspace / 'task_fixture_descendant.py'), nonce], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)\n"
+        "    report = {'mode': mode, 'secret_and_outside_reads_denied': read_denied, 'secret_and_outside_writes_denied': write_denied, 'scratch_marker': True, 'scratch_workspace_bound': scratch_workspace_bound, 'scratch_name': scratch.name, 'descendant_nonce': nonce}\n"
         "    (workspace / f'agent-task-{mode}-active.json').write_text(json.dumps(report, sort_keys=True) + '\\n', encoding='utf-8')\n"
         "    while True:\n"
         "        time.sleep(0.1)\n"
@@ -3243,6 +3251,34 @@ def _linux_process_group_members(pgid: int) -> list[tuple[int, int, str]]:
         if identity is not None and identity[0] == pgid and identity[2] != "Z":
             members.append((int(entry.name), identity[1], identity[2]))
     return members
+
+
+def _linux_processes_with_task_nonce(nonce: str) -> list[tuple[int, int, int]]:
+    if not re.fullmatch(r"d4p-task-descendant-[a-f0-9]{32}", nonce):
+        raise ValueError("Agent Task descendant nonceが不正です")
+    encoded_nonce = nonce.encode("ascii")
+    matches: list[tuple[int, int, int]] = []
+    for entry in Path("/proc").iterdir():
+        if not entry.name.isascii() or not entry.name.isdigit():
+            continue
+        try:
+            pid = int(entry.name)
+            if encoded_nonce not in (entry / "cmdline").read_bytes().split(b"\0"):
+                continue
+            identity = _linux_proc_identity(pid)
+            if identity is None or identity[2] == "Z":
+                continue
+            confirmed = (entry / "cmdline").read_bytes().split(b"\0")
+            current_identity = _linux_proc_identity(pid)
+        except OSError:
+            continue
+        if (
+            encoded_nonce in confirmed
+            and current_identity == identity
+            and identity is not None
+        ):
+            matches.append((pid, identity[0], identity[1]))
+    return matches
 
 
 def _wait_for_linux_process_group_exit(
@@ -3347,10 +3383,21 @@ def _cleanup_linux_agent_task_process_groups(acceptance_root: Path) -> None:
             value = json.loads(marker.read_text(encoding="utf-8"))
             if not isinstance(value, dict) or value.get("mode") != scenario:
                 raise ValueError
-            pid = int(value["pid"])
-            pgid = int(value["pgid"])
-            start_time = int(value["starttime"])
-            _stop_linux_agent_task_process_group(pgid, pid, start_time)
+            nonce = value["descendant_nonce"]
+            if not isinstance(nonce, str):
+                raise ValueError
+            owned_groups: dict[int, tuple[int, int, int]] = {}
+            for pid, pgid, start_time in _linux_processes_with_task_nonce(nonce):
+                owned_groups.setdefault(pgid, (pid, pgid, start_time))
+            group_failure: Exception | None = None
+            for pid, pgid, start_time in owned_groups.values():
+                try:
+                    _stop_linux_agent_task_process_group(pgid, pid, start_time)
+                except Exception as error:
+                    if group_failure is None:
+                        group_failure = error
+            if group_failure is not None:
+                raise group_failure
         except Exception as error:
             if first_failure is None:
                 first_failure = {
@@ -3838,9 +3885,7 @@ def _run_installed_agent_task_acceptance(
                 raise RuntimeError(f"installed Agent Taskの{scenario_name} process markerがありません")
             try:
                 active = json.loads(active_marker.read_text(encoding="utf-8"))
-                pid = int(active["pid"])
-                pgid = int(active["pgid"])
-                start_time = int(active["starttime"])
+                nonce = active["descendant_nonce"]
             except (OSError, UnicodeError, KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
                 raise RuntimeError("Agent Task descendant identity markerが不正です") from error
             if (
@@ -3850,8 +3895,22 @@ def _run_installed_agent_task_acceptance(
                 or active.get("scratch_workspace_bound") is not True
                 or not isinstance(active.get("scratch_name"), str)
                 or not active["scratch_name"].startswith(".d4p-tmp-")
+                or not isinstance(nonce, str)
+                or not re.fullmatch(r"d4p-task-descendant-[a-f0-9]{32}", nonce)
             ):
                 raise RuntimeError("active Agent Taskのsecret／Workspace境界が不成立です")
+            descendant_matches: list[tuple[int, int, int]] = []
+            descendant_deadline = time.monotonic() + 5
+            while time.monotonic() < descendant_deadline:
+                descendant_matches = _linux_processes_with_task_nonce(nonce)
+                if descendant_matches:
+                    break
+                time.sleep(0.05)
+            if len(descendant_matches) != 1:
+                raise RuntimeError(
+                    "Agent Task descendant nonceからhost process identityを一意に特定できません"
+                )
+            pid, pgid, start_time = descendant_matches[0]
             if pgid == os.getpgrp():
                 raise RuntimeError("Agent Task process groupが受入れrunner自身と共有されています")
             if not any(
@@ -3887,7 +3946,11 @@ def _run_installed_agent_task_acceptance(
                 timeout=wait_seconds if scenario_name == "cancel" else 2.0,
             )
             current_identity = _linux_proc_identity(pid)
-            if current_identity is not None and current_identity[1] == start_time:
+            if (
+                current_identity is not None
+                and current_identity[1] == start_time
+                and current_identity[2] != "Z"
+            ):
                 raise RuntimeError("Task terminal化後も同一descendant processが残っています")
             process_groups.append(pgid)
             _wait_for_linux_process_group_exit(pgid)
