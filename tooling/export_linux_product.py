@@ -307,8 +307,15 @@ def _portable_archive_plan(
         if record is None:
             raise ValueError("Linux portable archive fileがbundle inventoryにない")
         expected_mode = 0o755 if relative in EXECUTABLE_PATHS else 0o644
-        if stat.S_IMODE(metadata.st_mode) != expected_mode:
-            raise ValueError("Linux portable archive source modeが固定package modeと異なる")
+        source_mode = stat.S_IMODE(metadata.st_mode)
+        if source_mode & 0o7022 or not source_mode & 0o400:
+            raise ValueError(
+                f"Linux portable archive source permissionが安全でない: {relative}"
+            )
+        if relative in EXECUTABLE_PATHS and not source_mode & 0o100:
+            raise ValueError(
+                f"Linux portable archiveの実行fileにowner execute bitがない: {relative}"
+            )
         seen_files.add(relative)
         plan.append(
             {

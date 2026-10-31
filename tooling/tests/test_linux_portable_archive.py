@@ -85,6 +85,20 @@ class LinuxPortableArchiveTests(unittest.TestCase):
                 _write_portable_archive(bundle, root / "rejected.tar.gz", README, records)
             self.assertFalse((root / "rejected.tar.gz").exists())
 
+    def test_archive_normalizes_safe_source_mode_to_fixed_package_mode(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-linux-portable-normalize-mode-") as temporary:
+            root = Path(temporary)
+            bundle = self.create_bundle(root)
+            data_file = bundle / "data" / "icudtl.dat"
+            os.chmod(data_file, 0o755)
+            records, _size, _tree_hash = _artifact_inventory(bundle)
+            archive_path = root / "normalized.tar.gz"
+            record = _write_portable_archive(bundle, archive_path, README, records)
+            _validate_portable_archive(bundle, archive_path, README, records, record)
+            with tarfile.open(archive_path, mode="r:gz") as archive:
+                member = archive.getmember(f"{PORTABLE_ARCHIVE_ROOT}/data/icudtl.dat")
+            self.assertEqual(member.mode, 0o644)
+
     def test_archive_rejects_unsafe_source_mode(self) -> None:
         with tempfile.TemporaryDirectory(prefix="d4p-linux-portable-mode-") as temporary:
             root = Path(temporary)
@@ -92,7 +106,7 @@ class LinuxPortableArchiveTests(unittest.TestCase):
             unsafe_file = bundle / "data" / "icudtl.dat"
             os.chmod(unsafe_file, 0o666)
             records, _size, _tree_hash = _artifact_inventory(bundle)
-            with self.assertRaisesRegex(ValueError, "固定package mode"):
+            with self.assertRaisesRegex(ValueError, "source permission"):
                 _write_portable_archive(bundle, root / "rejected.tar.gz", README, records)
             self.assertFalse((root / "rejected.tar.gz").exists())
 

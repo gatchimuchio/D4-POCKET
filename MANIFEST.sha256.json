@@ -5140,7 +5140,7 @@
     },
     {
       "path": "tooling/export_linux_product.py",
-      "sha256": "7176309c1a03c3b38ede60c132896814540b4f9a5e5bba4860c498324693dc27"
+      "sha256": "b12ba935c94e94d839bbbd1742aea9f2e21802c72adca91e95d8681643b1e9f5"
     },
     {
       "path": "tooling/export_windows_product.py",
@@ -5280,7 +5280,7 @@
     },
     {
       "path": "tooling/tests/test_linux_portable_archive.py",
-      "sha256": "13b35e423eb95bee58d889f7dfe5bda5ea9e7ea27496cee8b60494a9abb20c66"
+      "sha256": "af8a9934ec3780666e33cbfb29ce58ce8c41d999676b18c67d72ae2556b21e9a"
     },
     {
       "path": "tooling/tests/test_linux_product_package.py",
