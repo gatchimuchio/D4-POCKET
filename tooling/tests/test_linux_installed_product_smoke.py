@@ -3523,8 +3523,26 @@ class AgentTaskAuditAcceptanceTests(unittest.TestCase):
             for index, task_id in enumerate(task_ids):
                 rows.extend(
                     (
-                        ("AgentTaskWorkspacePermissionGrant", "recorded", "permission"),
-                        ("AgentTaskOwnerApprovalGrant", "recorded", "approval"),
+                        (
+                            "AgentTaskWorkspacePermissionGrant",
+                            "received",
+                            "対話操作を受信",
+                        ),
+                        (
+                            "AgentTaskWorkspacePermissionGrant",
+                            "recorded",
+                            "Agent Task用Workspace Permission発行（native Owner確認・Task未実行）",
+                        ),
+                        (
+                            "AgentTaskOwnerApprovalGrant",
+                            "received",
+                            "対話操作を受信",
+                        ),
+                        (
+                            "AgentTaskOwnerApprovalGrant",
+                            "recorded",
+                            "Agent Task本文hash・実行条件hashへのOwner Approval発行（native確認・Task未実行）",
+                        ),
                     )
                 )
                 common = {
@@ -3647,17 +3665,60 @@ class AgentTaskAuditAcceptanceTests(unittest.TestCase):
             for task_id, status in zip(task_ids, statuses, strict=True)
         ]
 
+        permission_events = [
+            {
+                "operation": "AgentTaskWorkspacePermissionGrant",
+                "decision": "received",
+                "reason": "対話操作を受信",
+                "request_id": f"private-request-{index}",
+            }
+            for index in range(3)
+        ]
+        permission_events.extend(
+            {
+                "operation": "AgentTaskWorkspacePermissionGrant",
+                "decision": "recorded",
+                "reason": (
+                    "Agent Task用Workspace Permission発行（native Owner確認・Task未実行）"
+                ),
+                "payload_hash": f"PRIVATE_ISSUANCE_HASH_{index}",
+            }
+            for index in range(2)
+        )
+        approval_events = [
+            {
+                "operation": "AgentTaskOwnerApprovalGrant",
+                "decision": "received",
+                "reason": "対話操作を受信",
+                "request_id": f"private-approval-request-{index}",
+            }
+            for index in range(3)
+        ]
+        approval_events.extend(
+            {
+                "operation": "AgentTaskOwnerApprovalGrant",
+                "decision": "recorded",
+                "reason": (
+                    "Agent Task本文hash・実行条件hashへのOwner Approval発行（native確認・Task未実行）"
+                ),
+                "payload_hash": f"PRIVATE_APPROVAL_HASH_{index}",
+            }
+            for index in range(3)
+        )
         diagnostics = _agent_task_audit_acceptance_diagnostics(
             starts,
             terminals,
-            task_permission_grants=2,
-            task_owner_approvals=3,
+            permission_events + approval_events,
             scratch_mediation=[{"scratch_cleanup_completed": True}],
         )
         serialized = json.dumps(diagnostics, ensure_ascii=False, sort_keys=True)
 
         self.assertEqual(
-            diagnostics["failed_checks"], ["three_workspace_permission_grants"]
+            diagnostics["failed_checks"],
+            [
+                "three_workspace_permission_grants",
+                "three_unique_workspace_permission_issuance_hashes",
+            ],
         )
         self.assertEqual(
             diagnostics["counts"]["terminal_status_counts"],
@@ -3665,6 +3726,8 @@ class AgentTaskAuditAcceptanceTests(unittest.TestCase):
         )
         self.assertNotIn("PRIVATE_TASK_", serialized)
         self.assertNotIn("PRIVATE_HASH_", serialized)
+        self.assertNotIn("PRIVATE_ISSUANCE_HASH_", serialized)
+        self.assertNotIn("PRIVATE_APPROVAL_HASH_", serialized)
         self.assertNotIn("RAW_PRIVATE_TASK_TEXT", serialized)
 
 

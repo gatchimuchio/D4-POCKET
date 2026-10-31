@@ -5465,8 +5465,7 @@ def _owner_dialog_timeout_diagnostics(
 def _agent_task_audit_acceptance_diagnostics(
     task_starts: list[dict[str, object]],
     task_terminals: list[dict[str, object]],
-    task_permission_grants: int,
-    task_owner_approvals: int,
+    events: list[dict[str, object]],
     scratch_mediation: list[dict[str, object]],
 ) -> dict[str, object]:
     start_task_ids = [record.get("task_id") for record in task_starts]
@@ -5490,6 +5489,58 @@ def _agent_task_audit_acceptance_diagnostics(
     scratch_cleanup_confirmed = sum(
         item.get("scratch_cleanup_completed") is True for item in scratch_mediation
     )
+    permission_operation = "AgentTaskWorkspacePermissionGrant"
+    approval_operation = "AgentTaskOwnerApprovalGrant"
+    permission_issue_reason = (
+        "Agent Task用Workspace Permission発行（native Owner確認・Task未実行）"
+    )
+    approval_issue_reason = (
+        "Agent Task本文hash・実行条件hashへのOwner Approval発行（native確認・Task未実行）"
+    )
+
+    def operation_audit_counts(
+        operation: str, issue_reason: str
+    ) -> dict[str, int]:
+        operation_events = [
+            event for event in events if event.get("operation") == operation
+        ]
+        request_receipts = [
+            event
+            for event in operation_events
+            if event.get("decision") == "received"
+            and event.get("reason") == "対話操作を受信"
+        ]
+        issue_records = [
+            event
+            for event in operation_events
+            if event.get("decision") == "recorded"
+            and event.get("reason") == issue_reason
+        ]
+        request_ids = [
+            event.get("request_id")
+            for event in request_receipts
+            if isinstance(event.get("request_id"), str)
+        ]
+        issue_hashes = [
+            event.get("payload_hash")
+            for event in issue_records
+            if isinstance(event.get("payload_hash"), str)
+        ]
+        return {
+            "operation_events": len(operation_events),
+            "request_receipts": len(request_receipts),
+            "unique_request_ids": len(set(request_ids)),
+            "issue_records": len(issue_records),
+            "unique_issue_hashes": len(set(issue_hashes)),
+            "unclassified_operation_events": len(operation_events)
+            - len(request_receipts)
+            - len(issue_records),
+        }
+
+    permission_audit = operation_audit_counts(
+        permission_operation, permission_issue_reason
+    )
+    approval_audit = operation_audit_counts(approval_operation, approval_issue_reason)
     checks = {
         "three_task_start_records": len(task_starts) == 3,
         "three_task_terminal_records": len(task_terminals) == 3,
@@ -5502,8 +5553,27 @@ def _agent_task_audit_acceptance_diagnostics(
         and len(valid_request_hashes) == len(request_hashes),
         "expected_terminal_statuses": unknown_status_count == 0
         and all(status_counts[status] == 1 for status in expected_statuses),
-        "three_workspace_permission_grants": task_permission_grants == 3,
-        "three_owner_approval_grants": task_owner_approvals == 3,
+        "three_workspace_permission_requests": permission_audit["request_receipts"]
+        == 3,
+        "three_unique_workspace_permission_request_ids": permission_audit[
+            "unique_request_ids"
+        ]
+        == 3,
+        "three_workspace_permission_grants": permission_audit["issue_records"] == 3,
+        "three_unique_workspace_permission_issuance_hashes": permission_audit[
+            "unique_issue_hashes"
+        ]
+        == 3,
+        "three_owner_approval_requests": approval_audit["request_receipts"] == 3,
+        "three_unique_owner_approval_request_ids": approval_audit[
+            "unique_request_ids"
+        ]
+        == 3,
+        "three_owner_approval_grants": approval_audit["issue_records"] == 3,
+        "three_unique_owner_approval_issuance_hashes": approval_audit[
+            "unique_issue_hashes"
+        ]
+        == 3,
         "one_scratch_cleanup_confirmation": scratch_cleanup_confirmed == 1,
     }
     return {
@@ -5517,8 +5587,8 @@ def _agent_task_audit_acceptance_diagnostics(
             "unique_start_request_hashes": len(set(valid_request_hashes)),
             "terminal_status_counts": status_counts,
             "unknown_terminal_status_count": unknown_status_count,
-            "workspace_permission_grants": task_permission_grants,
-            "owner_approval_grants": task_owner_approvals,
+            "workspace_permission_audit": permission_audit,
+            "owner_approval_audit": approval_audit,
             "scratch_mediation_records": len(scratch_mediation),
             "scratch_cleanup_confirmations": scratch_cleanup_confirmed,
         },
@@ -5733,12 +5803,6 @@ def _verify_live_audit(
     task_starts = [record for record in task_records if record.get("stage") == "start"]
     task_terminals = [record for record in task_records if record.get("stage") == "terminal"]
     task_statuses = [record.get("status") for record in task_terminals]
-    task_permission_grants = sum(
-        event.get("operation") == "AgentTaskWorkspacePermissionGrant" for event in events
-    )
-    task_owner_approvals = sum(
-        event.get("operation") == "AgentTaskOwnerApprovalGrant" for event in events
-    )
     scratch_cleanup_confirmed = sum(
         item.get("scratch_cleanup_completed") is True for item in scratch_mediation
     )
@@ -5746,10 +5810,15 @@ def _verify_live_audit(
         acceptance_diagnostics = _agent_task_audit_acceptance_diagnostics(
             task_starts,
             task_terminals,
-            task_permission_grants,
-            task_owner_approvals,
+            events,
             scratch_mediation,
         )
+        permission_audit = acceptance_diagnostics["counts"][
+            "workspace_permission_audit"
+        ]
+        approval_audit = acceptance_diagnostics["counts"]["owner_approval_audit"]
+        task_permission_grants = permission_audit["issue_records"]
+        task_owner_approvals = approval_audit["issue_records"]
         if acceptance_diagnostics["failed_checks"]:
             raise RuntimeError(
                 "installed Agent Task Auditの有限受入れ条件が不成立です: "
