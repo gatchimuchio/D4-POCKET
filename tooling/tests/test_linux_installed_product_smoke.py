@@ -69,6 +69,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _scroll_product_page_down,
     _select_workspace_inspector_visibility,
     _wait_for_workspace_root_value,
+    _wait_installed_task_status,
     _workspace_root_field_value,
     _workspace_inspector_scope,
     _editable_text_ancestor,
@@ -3146,6 +3147,55 @@ class LinuxAgentTaskFailureCleanupTests(unittest.TestCase):
         finally:
             child.kill()
             child.wait(timeout=5)
+
+
+class InstalledTaskStatusPollingTests(unittest.TestCase):
+    def test_status_poll_reacquires_the_current_product_window(self) -> None:
+        previous_window = object()
+        current_window = object()
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_accessible",
+                return_value=current_window,
+            ) as find_window,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._accessible_snapshot",
+                side_effect=lambda root: (
+                    "Task状態: cancelled" if root is current_window else ""
+                ),
+            ),
+        ):
+            snapshot = _wait_installed_task_status(
+                {}, previous_window, "cancelled", timeout=1
+            )
+        self.assertEqual(snapshot, "Task状態: cancelled")
+        find_window.assert_called_once()
+
+    def test_status_failure_diagnostics_exclude_unbounded_snapshot_text(self) -> None:
+        ticks = iter((0.0, 0.0, 0.0, 2.0))
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke.time.monotonic",
+                side_effect=lambda: next(ticks),
+            ),
+            patch("tooling.tests.linux_installed_product_smoke.time.sleep"),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_accessible",
+                side_effect=RuntimeError("window unavailable"),
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._accessible_snapshot",
+                return_value="Task状態: running\\nRAW_PRIVATE_TASK_TEXT",
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
+                side_effect=RuntimeError("refresh unavailable"),
+            ),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "cancelled") as caught:
+                _wait_installed_task_status({}, object(), "cancelled", timeout=0.01)
+        self.assertIn("running", str(caught.exception))
+        self.assertNotIn("RAW_PRIVATE_TASK_TEXT", str(caught.exception))
 
 
 class AgentTaskAuditAcceptanceTests(unittest.TestCase):

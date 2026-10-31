@@ -3459,19 +3459,46 @@ def _wait_installed_task_status(
 ) -> str:
     deadline = time.monotonic() + timeout
     last_snapshot = ""
+    visible_statuses: list[str] = []
+    window_lookup_failures = 0
+    refresh_control_seen = False
+    refresh_attempts = 0
     while time.monotonic() < deadline:
+        remaining = max(0.01, deadline - time.monotonic())
+        try:
+            window = _find_accessible(
+                WINDOW_TITLE, timeout=min(0.2, remaining)
+            )
+        except RuntimeError:
+            window_lookup_failures += 1
         last_snapshot = _accessible_snapshot(window)
         if f"Task状態: {expected_status}" in last_snapshot:
             return last_snapshot
+        visible_statuses.extend(
+            re.findall(
+                r"Task状態:\s*(pending|running|blocked|completed|failed|cancelled|quarantined)\b",
+                last_snapshot,
+            )
+        )
+        visible_statuses[:] = list(dict.fromkeys(visible_statuses))[-6:]
         try:
             refresh = _find_operable_accessible("Task状態を更新", root=window, timeout=1)
+            refresh_control_seen = True
+            refresh_attempts += 1
             _activate_accessible(refresh, "Task状態を更新", environment)
         except RuntimeError:
             pass
         time.sleep(0.25)
+    diagnostics = {
+        "visible_task_statuses": visible_statuses,
+        "product_window_lookup_failures": window_lookup_failures,
+        "last_snapshot_nonempty": bool(last_snapshot),
+        "refresh_control_seen": refresh_control_seen,
+        "refresh_attempts": refresh_attempts,
+    }
     raise RuntimeError(
         f"installed Agent Taskが{expected_status}へ遷移しませんでした: "
-        + last_snapshot[-1200:]
+        + json.dumps(diagnostics, ensure_ascii=False, sort_keys=True)
     )
 
 
