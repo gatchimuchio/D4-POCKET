@@ -25,22 +25,22 @@ AIエージェントが高度になるほど、次に難しくなるのは「何
 
 ## 現在の到達点
 
-2026年10月22日時点で照合した、対象と環境を限定した実装・検査の状態です。各証拠は実行時の対象ソースcommitへ結合し、現在のmainを再試験した結果へ付け替えません。**工程のCLOSEDは正式な製品出荷の意味ではありません。**
+2026年11月1日時点で照合した、対象と環境を限定した実装・検査の状態です。各証拠は実行時の対象ソースcommitへ結合し、現在のmainを再試験した結果へ付け替えません。**工程のCLOSEDは正式な製品出荷の意味ではありません。**
 
 | 対象 | 現行の状態 | 成立していない範囲 |
 |---|---|---|
 | **Windowsデスクトップ版** | rev5のWindows側P12、Feature Completeの開発到達点 | installed-path最終証拠、正式Release、owner GO |
 | **Agent比較／引継ぎ** | P2複数Agent比較、P3 Agent引継ぎのProduct Build受入CLOSED | すべての実Agent・実環境での一般保証 |
 | **モバイル（Android／iOS）** | P13の有限Product Build受入は2026-10-09にCLOSED。Android Emulator・iOS Simulator等の限定証拠を保持 | 物理端末保証、OS別の正式配布・署名・identity |
-| **Linuxデスクトップ版** | 完全対応が必須。Ubuntu 24.04／Xvfb・X11の導入済みGTK製品でrun #77の更新等、#94の資格情報保管、#107の合成MCP接続・一回Tool実行・切断を対象別に受入れ。#107はsource `bf2a51ac`に固定 | Workspace／Agent Task・Recovery等の残る製品経路、Wayland描画、一般環境・正式署名／配布を含む全体受入れ。`linux_native_product_support=unresolved` |
+| **Linuxデスクトップ版** | 完全対応が必須。Ubuntu 24.04の導入済みGTK製品ではWorkspace #157、Agent Task／Recovery #190・#237、provenance #192、MCP Credential #248などを各限定範囲で受入れ。portable archive #249、headless Wayland選択・描画 #250・#251もPASS | 通常ReleaseのTask capability、実desktop/compositorを含む全必須consumer、正式Installer／update／rollback／uninstallと署名配布。headless Wayland evidenceを実desktop受入れへ読み替えない。`linux_native_product_support=unresolved` |
 | **緩衝基盤とAgent Task** | B0〜B4は有限受入れCLOSED、B5はOPEN。#54の3回PASSは履歴として保持。後続#55（source `1e57a828`）はRust全target 572成功／0失敗／13除外の一方、capture判定でworkflow FAIL。後続Broker build／IPC smokeはSKIP。`BUF-T04`部分観測、`BUF-T05`／`BUF-T06`OPEN、`BUF-T23`局所PASS。詳細は[B5記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md) | OneDrive警告との因果、loopback/TLS failureの根因、Q4の長期／反復／資源影響、現行SAC policy全体、通常Release能力、正式配布・実機保証 |
 | **正式な出荷判断** | Release GateとOwner承認を独立に保持 | `task_execution=unsupported`、`release_ready=false` |
 
 - 項目: Linux native製品の全面対応
   classification: `release_blocker`
   registry_id: linux_native_product_support
-  reason: Linux native Desktopは必須製品対象。WSL／WSLgの開発証拠とhosted Xvfb／X11の導入済みGTK製品の限定成功はあるが、残る製品経路・Wayland・一般環境・正式配布を含む完全対応は未受入れである。
-  required_action: Linux nativeの全必須Desktop経路を実装し、X11／Wayland、Broker／Owner、資格情報、Workspace、Agent recovery、導入／更新／rollback／削除、provenanceを対象別に受入れる。
+  reason: Linux native Desktopは必須製品対象。Workspace、Agent Task／Recovery、MCP Credential等の限定受入れと、headless Waylandの選択／描画、portable archiveの証拠はあるが、通常ReleaseのTask capability、実desktop/compositor、正式配布を含むLinux製品全体は未受入れである。
+  required_action: 受入れ済み範囲を再試験せず、通常Release capability、実desktop/compositor、残る必須consumer、正式Installer／update／rollback／uninstall／署名配布を進め、Linux native全体の製品受入れを成立させる。
 
 B4-L2の記録済み検査では、Rust全体直列テスト **569 passed / 0 failed / 13 ignored**、Agent Task Flutter client 14件とAgent Center widget 1件、Schema **167件**・正常例 **163件**・否定fixture **215件**、Conformance **245 checks**を確認しています。これらは**2026-10-11の開発環境における対象版の証拠**であり、このREADME更新時に再実行した値でも、インストール済み製品の保証でもありません。10月17日のB4統合経路証拠も`r2-e2e` staged buildとlocalhost合成APIの範囲に限られ、通常Release能力やinstalled provenanceを示しません。[観測範囲と残差](docs/REV5_PRODUCT_PROGRESS.md)を参照してください。
 
