@@ -1493,20 +1493,14 @@ def _open_mcp_center_from_installed_ui(
         check=True,
         timeout=5,
     )
-    _find_accessible(
+    command = _find_operable_accessible(
         "MCP接続一覧とOwner確認付き切断を開く",
         root=window,
         timeout=10,
     )
-    # 対応済みのTextField経由でASCII文字のMCP問合せを送信する
-    # onSubmitted経路を使う。GTKのAT-SPI action nodeには位置情報がない場合があり、xdotoolでは
-    # 日本語を入力できない。最初のMCP結果から同じ画面を開ける。
-    subprocess.run(
-        ["xdotool", "key", "--clearmodifiers", "Return"],
-        env=environment,
-        check=True,
-        timeout=5,
-    )
+    # AT-SPIで表示候補の操作部品を特定して選ぶ。文字列検索後のEnter送信では
+    # GTK上で候補が表示されたまま遷移しない場合があった。
+    _activate_accessible(command, "MCP接続一覧とOwner確認付き切断を開く", environment)
     # コマンドパレットのdialogを閉じると、古いAT-SPI
     # 部分木が無効になることがある。desktopから移動先を特定してから、
     # controlを調べる呼出元へ返す前に製品windowを再取得する。

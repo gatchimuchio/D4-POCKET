@@ -1352,7 +1352,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "ca54a3df8995e40673c2e0b70a3e072fbb39dd11ec7f885c08e30c019b16b4d3"
+      "sha256": "2d6fb596322c9adc18ba8f8689227d29be999cf98315873d327c2b2305626ae5"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -5264,7 +5264,7 @@
     },
     {
       "path": "tooling/tests/linux_installed_product_smoke.py",
-      "sha256": "990e166d0edfd92e1d4134ddaa687c5e61e9feec69f24886f883765f05d4c6e9"
+      "sha256": "2ebfe6ef8fc05b693606090e8b69d656a1e3a4063de7c831ed9392670e261f77"
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",
@@ -5276,7 +5276,7 @@
     },
     {
       "path": "tooling/tests/test_linux_installed_product_smoke.py",
-      "sha256": "3c468e74a11f55f9f28aa0fc773ed044377db4c5fe30e51e37666ce40607dc5e"
+      "sha256": "a134d054d618207f6f3fdc8058374a42fe08af433042bbd54748630fd00659e1"
     },
     {
       "path": "tooling/tests/test_linux_portable_archive.py",
