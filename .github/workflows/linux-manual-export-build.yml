@@ -15,6 +15,7 @@ name: Linux manual product build and installed acceptance
           - host_registration
           - workspace_selection
           - agent_task_supervision
+          - agent_task_crash_recovery
           - runtime_provenance
           - wayland_rendering
           - wayland_workspace_selection
@@ -30,7 +31,7 @@ concurrency:
 
 jobs:
   export-build:
-    runs-on: ${{ inputs.acceptance_scope == 'agent_task_supervision' && 'ubuntu-22.04' || 'ubuntu-24.04' }}
+    runs-on: ${{ (inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_task_crash_recovery') && 'ubuntu-22.04' || 'ubuntu-24.04' }}
     timeout-minutes: 120
     steps:
       - name: 対象commitをclean checkout
@@ -68,7 +69,7 @@ jobs:
 
       - name: Codex Linux sandbox capability gate
         id: codex_sandbox
-        if: ${{ inputs.acceptance_scope == 'agent_task_supervision' }}
+        if: ${{ inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_task_crash_recovery' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -110,7 +111,7 @@ jobs:
           clang --version | head -n 1
           weston --version
           runner_label="ubuntu-24.04"
-          if [ '${{ inputs.acceptance_scope }}' = 'agent_task_supervision' ]; then
+          if [ '${{ inputs.acceptance_scope }}' = 'agent_task_supervision' ] || [ '${{ inputs.acceptance_scope }}' = 'agent_task_crash_recovery' ]; then
             runner_label="ubuntu-22.04"
           fi
           {
@@ -128,7 +129,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Linux test-only environment allowlist gateをRust試験
-        if: ${{ inputs.acceptance_scope == 'agent_task_supervision' }}
+        if: ${{ inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_task_crash_recovery' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -174,7 +175,7 @@ jobs:
             --output-dir "$output_root"
             --allow-verification-branch
           )
-          if [ '${{ inputs.acceptance_scope }}' = 'agent_task_supervision' ]; then
+          if [ '${{ inputs.acceptance_scope }}' = 'agent_task_supervision' ] || [ '${{ inputs.acceptance_scope }}' = 'agent_task_crash_recovery' ]; then
             export_arguments+=(--r2-e2e-test-build)
           fi
           python3 tooling/export_linux_product.py "${export_arguments[@]}"
@@ -187,7 +188,7 @@ jobs:
           root = pathlib.Path(sys.argv[1])
           evidence = json.loads((root / "d4_pocket_linux_export_build.json").read_text())
           package = root / "D4Pocket-linux.d4pkg"
-          expected_test_build = sys.argv[3] == "agent_task_supervision"
+          expected_test_build = sys.argv[3] in {"agent_task_supervision", "agent_task_crash_recovery"}
           assert evidence["target_platform"] == "linux"
           assert evidence["source_commit"] == sys.argv[2]
           assert evidence["signed"] is False and evidence["formal_distribution_claimed"] is False
@@ -273,7 +274,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: 固定版Linux Codex CLIを検証rootへ取得
-        if: ${{ inputs.acceptance_scope == 'agent_task_supervision' }}
+        if: ${{ inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_task_crash_recovery' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -467,6 +468,31 @@ jobs:
             printf '\n- Installed Agent Task acceptance uses the real pinned Codex CLI interface against a run-owned loopback Responses fixture, without provider credentials or external model access. It exercises the installed GTK UI, native Owner confirmation, production Broker, one-use Workspace Permission and per-Task Approval, Linux process guardian, WorkspaceTaskScratch, Audit, and Task status.\n'
             printf -- '- Required cases: successful bounded Workspace write and normal scratch cleanup; active Task cancellation with descendant stop and scratch cleanup; Broker-enforced deadline with descendant stop, failed terminal state, and scratch cleanup. Secret canaries and outside-Workspace target remain denied; previous Approval is not reused.\n'
             printf -- '- This is a dedicated unsigned verification build with the fixed synthetic App/Audit identity. It is not a normal Release, distribution artifact, real-model result, Wayland GUI proof, or release-readiness claim.\n'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: installed GTK UIでBroker crash後のAgent Task回復を受入れる
+        if: ${{ inputs.acceptance_scope == 'agent_task_crash_recovery' && steps.codex_sandbox.outputs.available == 'true' }}
+        shell: bash
+        env:
+          GUI_SHELL_PRODUCT_APP_ID: d4-pocket-app-11111111111111111111111111111111
+          GUI_SHELL_PRODUCT_AUDIT_STORE_ID: audit-store-22222222222222222222222222222222
+          D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE: ${{ runner.temp }}/d4p-linux-export-${{ github.run_id }}-${{ github.run_attempt }}/output/D4Pocket-linux-rollback.d4pkg
+        run: |
+          set -euo pipefail
+          test_package="$D4P_EXPORT_ROOT/output/D4Pocket-linux.d4pkg"
+          acceptance_root="$D4P_EXPORT_ROOT/installed-agent-task-crash-acceptance"
+          dbus-run-session -- xvfb-run -a python3 tooling/tests/linux_installed_product_smoke.py \
+            --package "$test_package" \
+            --temp-root "$D4P_EXPORT_ROOT" \
+            --acceptance-root "$acceptance_root" \
+            --private-key "$D4P_EXPORT_ROOT/test-update-private.der" \
+            --update-package "$D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE" \
+            --acceptance-scope agent_task_crash_recovery \
+            --codex-cli "$D4P_LINUX_TASK_CODEX_CLI"
+          {
+            printf '\n- Installed crash recovery: a run-owned Codex CLI fixture starts one approved Task through the installed GTK UI and production Broker; the harness verifies the exact installed Broker image and process start identity, then SIGKILLs only that Broker.\n'
+            printf -- '- PASS requires the Linux guardian to stop the active Task process group, preserve the authenticated scratch journal across the crash, and on a fresh installed launch plus same Workspace registration recover/remove scratch, record the Task as suspended, retain durable Audit integrity, and send no tool result or positive Task result. No prior Permission／Approval is restored.\n'
+            printf -- '- Scope: Ubuntu 22.04 hosted Xvfb／X11, unsigned synthetic-identity verification build, pinned Codex CLI against a run-owned loopback fixture; no provider credential or external model. This does not establish normal Release capability, Wayland GUI acceptance, formal signing／distribution, or release readiness.\n'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: installed GTK UIからruntime provenanceを照合

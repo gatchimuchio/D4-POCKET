@@ -3798,7 +3798,7 @@ class _LinuxAgentTaskResponsesServer:
         self._server.server_close()
 
     def configure(self, scenario: str, command: str, workspace: Path) -> None:
-        if scenario not in {"complete", "cancel", "deadline"}:
+        if scenario not in {"complete", "cancel", "deadline", "crash"}:
             raise ValueError("Agent Task loopback scenario is not supported")
         with self._lock:
             self._scenario = {
@@ -4038,7 +4038,7 @@ def _write_linux_agent_task_fixture(acceptance_root: Path) -> tuple[Path, Path, 
         "    report = {'mode': mode, 'secret_and_outside_reads_denied': read_denied, 'secret_and_outside_writes_denied': write_denied, 'workspace_write': True, 'scratch_marker': True, 'scratch_workspace_bound': scratch_workspace_bound, 'scratch_name': scratch.name}\n"
         "    (workspace / 'agent-task-result.json').write_text(json.dumps(report, sort_keys=True) + '\\n', encoding='utf-8')\n"
         "    print('D4P_AGENT_TASK_FIXTURE_RESULT ' + json.dumps(report, sort_keys=True))\n"
-        "elif mode in {'cancel', 'deadline'}:\n"
+        "elif mode in {'cancel', 'deadline', 'crash'}:\n"
         "    nonce = 'd4p-task-descendant-' + uuid.uuid4().hex\n"
         "    child = subprocess.Popen([sys.executable, str(workspace / 'task_fixture_descendant.py'), nonce], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)\n"
         "    report = {'mode': mode, 'secret_and_outside_reads_denied': read_denied, 'secret_and_outside_writes_denied': write_denied, 'scratch_marker': True, 'scratch_workspace_bound': scratch_workspace_bound, 'scratch_name': scratch.name, 'descendant_nonce': nonce}\n"
@@ -4193,7 +4193,7 @@ def _cleanup_linux_agent_task_process_groups(acceptance_root: Path) -> None:
         raise RuntimeError("Agent Task cleanup Workspaceがdirectoryではありません")
     first_failure: dict[str, str] | None = None
     first_failure_cause: Exception | None = None
-    for scenario in ("cancel", "deadline"):
+    for scenario in ("cancel", "deadline", "crash"):
         try:
             marker = workspace / f"agent-task-{scenario}-active.json"
             if marker.is_symlink():
@@ -4237,7 +4237,9 @@ def _cleanup_linux_agent_task_process_groups(acceptance_root: Path) -> None:
         ) from first_failure_cause
 
 
-def _read_task_scratch_recovery_state(store: Path) -> dict[str, object]:
+def _read_task_scratch_recovery_state(
+    store: Path, *, expected_entries: int = 0
+) -> dict[str, object]:
     path = store / "agent_task_scratch_recovery.json"
     if path.is_symlink() or not path.is_file():
         raise RuntimeError("WorkspaceTaskScratch recovery journalが通常fileとしてありません")
@@ -4249,8 +4251,10 @@ def _read_task_scratch_recovery_state(store: Path) -> dict[str, object]:
         raise RuntimeError("WorkspaceTaskScratch recovery journalを解析できません") from error
     if wrapper.get("version") != 1 or state.get("version") != 1 or not isinstance(entries, list):
         raise RuntimeError("WorkspaceTaskScratch recovery journalのversionまたは形が不正です")
-    if entries:
-        raise RuntimeError("終端TaskのWorkspaceTaskScratch recovery journalに残存entryがあります")
+    if expected_entries < 0 or len(entries) != expected_entries:
+        raise RuntimeError(
+            "WorkspaceTaskScratch recovery journalのentry数が期待値と一致しません"
+        )
     hmac_value = wrapper.get("hmac")
     key_path = store / "audit_anchor.key"
     if (
@@ -5104,6 +5108,366 @@ def _run_installed_agent_task_acceptance(
         "positive_result_hash": positive_result_hash,
         "loopback": loopback,
         "live_audit": audit,
+    }
+
+
+def _restart_installed_product_after_broker_crash(
+    environment: dict[str, str],
+    fixed_launcher: Path,
+    desktop_entry: Path,
+    stage: Path,
+    log_path: Path,
+    product_paths: set[Path],
+    preexisting: set[int],
+    current_process: subprocess.Popen[bytes],
+) -> tuple[subprocess.Popen[bytes], str]:
+    if not _desktop_entry_targets_fixed_launcher(desktop_entry, fixed_launcher):
+        raise RuntimeError("Broker crash後に固定XDG desktop entryを照合できません")
+    owned = _processes_using(product_paths) - preexisting
+    _stop_owned_processes(owned, current_process)
+    deadline = time.monotonic() + 15
+    while time.monotonic() < deadline:
+        if not (_processes_using(product_paths) - preexisting):
+            break
+        time.sleep(0.1)
+    if _processes_using(product_paths) - preexisting:
+        raise RuntimeError("Broker crash後のtest所有installed process群を停止できません")
+    if current_process.poll() is None:
+        current_process.wait(timeout=10)
+
+    with log_path.open("xb") as log:
+        restarted_process = subprocess.Popen(
+            ["gio", "launch", str(desktop_entry)],
+            cwd=stage,
+            env=environment,
+            stdin=subprocess.DEVNULL,
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+    deadline = time.monotonic() + 90
+    while time.monotonic() < deadline:
+        restarted_window = _visible_product_window(environment)
+        running_products = _processes_using(product_paths) - preexisting
+        if restarted_window is not None and running_products:
+            return restarted_process, restarted_window
+        if restarted_process.poll() is not None and restarted_process.returncode != 0:
+            raise RuntimeError("Broker crash後に固定desktop entryから再起動できません")
+        time.sleep(0.25)
+    raise RuntimeError("Broker crash後のinstalled UI再起動を確認できません")
+
+
+def _run_installed_agent_task_crash_recovery_acceptance(
+    environment: dict[str, str],
+    window_id: str,
+    *,
+    codex_cli: Path,
+    responses_server: _LinuxAgentTaskResponsesServer,
+    audit_store: Path,
+    acceptance_root: Path,
+    broker_executable: Path,
+    restart_application: Callable[[], str],
+) -> dict[str, object]:
+    _fixture_root, workspace, _outside_file = _write_linux_agent_task_fixture(
+        acceptance_root
+    )
+    workspace_id = "workspace-linux-agent-task-crash"
+    runtime_id = "runtime-linux-agent-task-crash"
+    secret_paths = ".env\nprivate/token.txt"
+
+    def register_workspace(current_window_id: str) -> object:
+        registration = _open_installed_codex_registration(
+            environment, window_id=current_window_id
+        )
+        _fill_linux_workspace_registration(
+            environment,
+            registration,
+            cli_fixture=codex_cli,
+            workspace_id=workspace_id,
+            workspace_root=workspace,
+            secret_paths=secret_paths,
+            runtime_id=runtime_id,
+            model_id=LINUX_AGENT_TASK_FIXTURE_MODEL_ID,
+        )
+        _activate_accessible(
+            _find_operable_accessible(
+                "native Owner確認へ進む", root=registration, timeout=10
+            ),
+            "native Owner確認へ進む",
+            environment,
+        )
+        _answer_owner_dialog(
+            environment,
+            "許可",
+            context="Linux installed Codex Runtime／Workspace crash recovery registration",
+            expected_summary_markers=(
+                "Agent CLI実行系とWorkspaceを、このBroker起動中だけ登録します。",
+                f"Runtime: {runtime_id}",
+                f"CLI実行file: {codex_cli}",
+                "Permission・Approval・Trust・Credentialを生成しません。",
+                f"Workspace ID: {workspace_id}",
+                f"Workspace root: {workspace}",
+            ),
+        )
+        _wait_for_owner_dialog_closed(environment)
+        window = _find_accessible(WINDOW_TITLE, timeout=15)
+        _find_accessible("Task実行能力: supported", root=window, timeout=20)
+        _activate_accessible(
+            _find_operable_accessible(
+                "登録Workspaceで対話Sessionを開始", root=window, timeout=10
+            ),
+            "登録Workspaceで対話Sessionを開始",
+            environment,
+        )
+        _find_accessible("Task実行能力を事前検査（実行なし）", root=window, timeout=20)
+        return window
+
+    window = register_workspace(window_id)
+    scenario = "crash"
+    command = f"/usr/bin/python3 {workspace / 'task_fixture.py'} {scenario}"
+    responses_server.configure(scenario, command, workspace)
+    instruction = (
+        "D4 Pocket installed Linux crash-recovery fixture: execute the provided "
+        "workspace task_fixture.py in crash mode exactly once. Do not use network "
+        "access or credentials."
+    )
+    prior_task_ids = _linux_installed_visible_task_ids(
+        deadline=time.monotonic() + 5.0
+    )
+    _prepare_and_start_installed_agent_task(
+        environment,
+        window,
+        runtime_id=runtime_id,
+        workspace_id=workspace_id,
+        instruction=instruction,
+    )
+    task_id = _wait_for_installed_task_id(
+        window, previously_visible_task_ids=prior_task_ids, timeout=15.0
+    )
+
+    active_marker = workspace / "agent-task-crash-active.json"
+    deadline = time.monotonic() + 30
+    while not active_marker.is_file() and time.monotonic() < deadline:
+        time.sleep(0.1)
+    if active_marker.is_symlink() or not active_marker.is_file():
+        raise RuntimeError("Broker crash前のactive Agent Task markerがありません")
+    try:
+        active = json.loads(active_marker.read_text(encoding="utf-8"))
+        nonce = active["descendant_nonce"]
+    except (OSError, UnicodeError, KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+        raise RuntimeError("Broker crash用Task markerを解析できません") from error
+    if (
+        active.get("mode") != scenario
+        or active.get("secret_and_outside_reads_denied") is not True
+        or active.get("secret_and_outside_writes_denied") is not True
+        or active.get("scratch_workspace_bound") is not True
+        or not isinstance(active.get("scratch_name"), str)
+        or not active["scratch_name"].startswith(".d4p-tmp-")
+        or not isinstance(nonce, str)
+        or not re.fullmatch(r"d4p-task-descendant-[a-f0-9]{32}", nonce)
+    ):
+        raise RuntimeError("active TaskのWorkspace／secret boundaryが不成立です")
+    if _outside_file.is_symlink() or _outside_file.read_bytes() != b"D4P_SYNTHETIC_SECRET_CANARY=outside-workspace\n":
+        raise RuntimeError("crash recovery中にWorkspace外fixtureが変更または置換されました")
+
+    descendant_matches: list[tuple[int, int, int]] = []
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        descendant_matches = _linux_processes_with_task_nonce(nonce)
+        if descendant_matches:
+            break
+        time.sleep(0.05)
+    if len(descendant_matches) != 1:
+        raise RuntimeError("Broker crash用Task descendant identityが一意ではありません")
+    descendant_pid, task_pgid, descendant_start = descendant_matches[0]
+    if task_pgid == os.getpgrp() or not any(
+        member[0] == descendant_pid and member[1] == descendant_start
+        for member in _linux_process_group_members(task_pgid)
+    ):
+        raise RuntimeError("Broker crash用Taskが独立監督process groupにありません")
+
+    scratch_candidates = [
+        path
+        for path in workspace.glob(".d4p-tmp-*")
+        if path.is_dir() and not path.is_symlink()
+    ]
+    if len(scratch_candidates) != 1:
+        raise RuntimeError("Broker crash前のWorkspaceTaskScratchが一つではありません")
+    scratch_path = scratch_candidates[0]
+    if (
+        scratch_path.name != active["scratch_name"]
+        or not (scratch_path / "fixture-scratch-marker").is_file()
+    ):
+        raise RuntimeError("Broker crash前のTask scratch bindingが一致しません")
+
+    broker_executable = broker_executable.resolve(strict=True)
+    broker_pids = _processes_using({broker_executable})
+    if len(broker_pids) != 1:
+        raise RuntimeError("停止対象のinstalled Broker processが一つではありません")
+    broker_pid = next(iter(broker_pids))
+    broker_identity = _linux_proc_identity(broker_pid)
+    try:
+        running_image = Path(os.readlink(f"/proc/{broker_pid}/exe")).resolve(strict=True)
+    except (OSError, RuntimeError) as error:
+        raise RuntimeError("Broker crash直前のinstalled image identityを確認できません") from error
+    if (
+        broker_identity is None
+        or broker_identity[2] == "Z"
+        or running_image != broker_executable
+    ):
+        raise RuntimeError("Broker crash対象がinstalled Broker imageと一致しません")
+    before_kill = _linux_proc_identity(broker_pid)
+    try:
+        image_before_kill = Path(os.readlink(f"/proc/{broker_pid}/exe")).resolve(strict=True)
+    except (OSError, RuntimeError) as error:
+        raise RuntimeError("Broker kill直前のprocess identityを再確認できません") from error
+    if before_kill != broker_identity or image_before_kill != broker_executable:
+        raise RuntimeError("Broker kill直前にprocess identityが変化したため停止を拒否しました")
+    os.kill(broker_pid, signal.SIGKILL)
+    deadline = time.monotonic() + 15
+    while time.monotonic() < deadline:
+        current = _linux_proc_identity(broker_pid)
+        if current is None or current[2] == "Z" or current[1] != broker_identity[1]:
+            break
+        time.sleep(0.05)
+    else:
+        raise RuntimeError("強制終了したinstalled Broker processが終了しません")
+    if _processes_using({broker_executable}):
+        raise RuntimeError("Broker crash後にinstalled Broker processが残っています")
+
+    _wait_for_linux_process_group_exit(task_pgid)
+    if _linux_processes_with_task_nonce(nonce):
+        raise RuntimeError("Broker crash後もTask descendantが稼働しています")
+    if not scratch_path.is_dir() or scratch_path.is_symlink():
+        raise RuntimeError("Broker crash前後で未回復scratchを保持できません")
+    active_journal = _read_task_scratch_recovery_state(
+        audit_store, expected_entries=1
+    )
+    if (workspace / "agent-task-result.json").exists():
+        raise RuntimeError("Broker crash後に中断Taskのpositive resultが存在します")
+
+    loopback_before_restart = responses_server.snapshot()
+    if loopback_before_restart.get("rejections"):
+        raise RuntimeError("crash前にloopback Responses fixtureが拒否を観測しました")
+    scenarios = loopback_before_restart.get("scenarios")
+    if (
+        not isinstance(scenarios, list)
+        or len(scenarios) != 1
+        or not isinstance(scenarios[0], dict)
+        or scenarios[0].get("name") != "crash"
+        or (scenarios[0].get("posts"), scenarios[0].get("tool_calls"), scenarios[0].get("tool_outputs"))
+        != (1, 1, 0)
+    ):
+        raise RuntimeError("Broker crash後にTask tool結果が送られていないことを確認できません")
+
+    restarted_window_id = restart_application()
+    new_window = register_workspace(restarted_window_id)
+    if scratch_path.exists() or scratch_path.is_symlink():
+        raise RuntimeError("Broker再起動後の同一Workspace登録でscratchが回復されません")
+    after_restart_loopback = responses_server.snapshot()
+    if (
+        (workspace / "agent-task-result.json").exists()
+        or _linux_processes_with_task_nonce(nonce)
+        or after_restart_loopback.get("model_requests")
+        != loopback_before_restart.get("model_requests")
+        or after_restart_loopback.get("scenarios")
+        != loopback_before_restart.get("scenarios")
+        or after_restart_loopback.get("rejections")
+        != loopback_before_restart.get("rejections")
+    ):
+        raise RuntimeError("Broker再起動後に中断TaskまたはTool要求が再実行されました")
+    scratch_state = _read_task_scratch_recovery_state(audit_store)
+    audit = _verify_live_audit(audit_store, require_export=False)
+    try:
+        audit_events = [
+            json.loads(line)
+            for line in (audit_store / "audit.jsonl").read_text(encoding="utf-8").splitlines()
+            if line
+        ]
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise RuntimeError("Broker再起動後のTask recovery Auditを読めません") from error
+    recovery_records = [
+        event
+        for event in audit_events
+        if event.get("request_id") == task_id
+        and event.get("operation", "").startswith("Agent Task中断回復")
+        and event.get("decision") == "suspended"
+    ]
+    task_history: list[dict[str, object]] = []
+    for event in audit_events:
+        reason = event.get("reason")
+        if (
+            event.get("operation") in {"AgentTask実行", "AgentTask状態"}
+            and isinstance(reason, str)
+            and reason.startswith("AgentTask履歴:")
+        ):
+            record = json.loads(reason.removeprefix("AgentTask履歴:"))
+            if isinstance(record, dict) and record.get("task_id") == task_id:
+                task_history.append(record)
+    terminal = [record for record in task_history if record.get("stage") == "terminal"]
+    scratch_recovery_events = [
+        event
+        for event in audit_events
+        if event.get("operation") == "Agent Task scratch回復"
+        and event.get("decision") == "recorded"
+        and event.get("evidence_source") == "LIVE_RUNTIME"
+    ]
+    if (
+        len(recovery_records) != 1
+        or len(task_history) != 2
+        or sum(record.get("stage") == "start" for record in task_history) != 1
+        or len(terminal) != 1
+        or terminal[0].get("status") != "suspended"
+        or terminal[0].get("result_hash") is not None
+        or len(scratch_recovery_events) < 1
+    ):
+        raise RuntimeError("Broker restartが中断Taskを隔離し、Approvalを再利用しない状態を記録しません")
+    if any(
+        sum(
+            event.get("operation") == operation
+            and event.get("decision") == "recorded"
+            for event in audit_events
+        )
+        != 1
+        for operation in (
+            "AgentTaskWorkspacePermissionGrant",
+            "AgentTaskOwnerApprovalGrant",
+        )
+    ):
+        raise RuntimeError("Broker再起動後に以前のPermission／Approval発行記録が再利用されています")
+    if any(
+        marker.encode("utf-8") in (audit_store / name).read_bytes()
+        for name in ("audit.jsonl",)
+        for marker in (
+            "D4P_SYNTHETIC_SECRET_CANARY=must-not-be-readable",
+            "D4P_SYNTHETIC_SECRET_CANARY=outside-workspace",
+        )
+    ):
+        raise RuntimeError("Broker crash recovery Auditへsecret canaryが露出しました")
+    for canary in (
+        "D4P_SYNTHETIC_SECRET_CANARY=must-not-be-readable",
+        "D4P_SYNTHETIC_SECRET_CANARY=outside-workspace",
+    ):
+        _assert_secret_absent_from_files(
+            Path(environment["GUI_SHELL_R2_E2E_CODEX_HOME"]), canary
+        )
+        if canary.encode("utf-8") in (
+            acceptance_root / "installed-app-after-broker-crash.log"
+        ).read_bytes():
+            raise RuntimeError("synthetic secret canaryが再起動後のinstalled UI logへ漏えいしました")
+    return {
+        "task_id": task_id,
+        "broker_image": str(broker_executable),
+        "broker_killed_by": "SIGKILL_after_executable_and_start_time_recheck",
+        "task_descendant_group_stopped": True,
+        "scratch_retained_until_recovery": active_journal["entries"] == 1,
+        "scratch_removed_after_restart_and_workspace_registration": scratch_state["entries"] == 0,
+        "task_recovery_status": "suspended",
+        "old_approval_reused": False,
+        "positive_result_after_crash": False,
+        "loopback": loopback_before_restart,
+        "audit_chain": audit,
+        "workspace_registration_after_restart": bool(new_window),
     }
 
 
@@ -7722,6 +8086,7 @@ def run_installed_smoke(
         "host_registration",
         "workspace_selection",
         "agent_task_supervision",
+        "agent_task_crash_recovery",
         "runtime_provenance",
         "wayland_rendering",
         "wayland_workspace_selection",
@@ -7751,7 +8116,7 @@ def run_installed_smoke(
         raise RuntimeError("installed acceptance rootは未使用でなければなりません")
     if not acceptance_root.is_absolute() or temp_root not in acceptance_root.parents:
         raise RuntimeError("installed acceptance rootがrun固有一時root外です")
-    if acceptance_scope == "agent_task_supervision":
+    if acceptance_scope in {"agent_task_supervision", "agent_task_crash_recovery"}:
         if codex_cli is None:
             raise RuntimeError("Agent Task acceptanceに固定Codex CLIが必要です")
         resolved_codex_cli = codex_cli.resolve(strict=True)
@@ -7836,7 +8201,7 @@ def run_installed_smoke(
     task_execution_limit_ms = LINUX_AGENT_TASK_DEADLINE_TEST_LIMIT_MS
     app_log = acceptance_root / "installed-app.log"
     try:
-        if acceptance_scope == "agent_task_supervision":
+        if acceptance_scope in {"agent_task_supervision", "agent_task_crash_recovery"}:
             if resolved_codex_cli is None:
                 raise RuntimeError("Agent Task acceptanceのCodex CLI pathがありません")
             synthetic_root = acceptance_root / "D4Pocket-R2-E2E-SYNTHETIC"
@@ -7868,6 +8233,7 @@ def run_installed_smoke(
             "host_registration",
             "workspace_selection",
             "agent_task_supervision",
+            "agent_task_crash_recovery",
             "runtime_provenance",
             "wayland_rendering",
             "wayland_workspace_selection",
@@ -8517,6 +8883,71 @@ def run_installed_smoke(
                 )
                 return
 
+            if acceptance_scope == "agent_task_crash_recovery":
+                if resolved_codex_cli is None or responses_server is None:
+                    raise RuntimeError("Agent Task crash recovery fixtureの初期化が不足しています")
+
+                def restart_after_broker_crash() -> str:
+                    nonlocal desktop_process
+                    if desktop_process is None:
+                        raise RuntimeError("Broker crash recovery前のinstalled launcherがありません")
+                    desktop_process, restarted_window = _restart_installed_product_after_broker_crash(
+                        environment,
+                        fixed_launcher,
+                        entries[0],
+                        stage,
+                        acceptance_root / "installed-app-after-broker-crash.log",
+                        product_paths,
+                        preexisting,
+                        desktop_process,
+                    )
+                    return restarted_window
+
+                crash_evidence = _run_installed_agent_task_crash_recovery_acceptance(
+                    environment,
+                    window_id,
+                    codex_cli=resolved_codex_cli,
+                    responses_server=responses_server,
+                    audit_store=broker_state / "store",
+                    acceptance_root=acceptance_root,
+                    broker_executable=helper,
+                    restart_application=restart_after_broker_crash,
+                )
+                current_window_id = _visible_product_window(environment)
+                if current_window_id is None:
+                    raise RuntimeError("Agent Task crash recovery後にinstalled GTK windowがありません")
+                _request_x11_window_manager_close(current_window_id, environment)
+                deadline = time.monotonic() + 60
+                while time.monotonic() < deadline:
+                    if not (_processes_using(product_paths) - preexisting):
+                        break
+                    time.sleep(0.2)
+                if _processes_using(product_paths) - preexisting:
+                    raise RuntimeError("Agent Task crash recovery後にowned processが残留しています")
+                if desktop_process.poll() is None:
+                    desktop_process.wait(timeout=10)
+                if desktop_process.returncode not in (0, None):
+                    raise RuntimeError("crash recovery後のdesktop launcher終了codeが不正です")
+                durable_audit = _verify_live_audit(
+                    broker_state / "store", require_export=False
+                )
+                print(
+                    json.dumps(
+                        {
+                            "acceptance_scope": acceptance_scope,
+                            "installed_entry": str(entries[0]),
+                            "product_version": record["product_version"],
+                            "package_sha256": record["package_sha256"],
+                            "agent_task_crash_recovery": crash_evidence,
+                            "durable_audit_after_broker_restart": durable_audit,
+                            "installed_app_exit": "normal_window_close_and_owned_process_cleanup",
+                        },
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    )
+                )
+                return
+
             if acceptance_scope == "runtime_provenance":
                 if source_commit is None or build_evidence_path is None or bundle_root is None:
                     raise RuntimeError("runtime provenance入力が初期化されていません")
@@ -8945,7 +9376,7 @@ def run_installed_smoke(
         )
     finally:
         primary_acceptance_error = sys.exc_info()[1]
-        if acceptance_scope == "agent_task_supervision":
+        if acceptance_scope in {"agent_task_supervision", "agent_task_crash_recovery"}:
             try:
                 _cleanup_linux_agent_task_process_groups(acceptance_root)
             except Exception as error:
@@ -9160,6 +9591,7 @@ def main() -> int:
             "host_registration",
             "workspace_selection",
             "agent_task_supervision",
+            "agent_task_crash_recovery",
             "runtime_provenance",
             "wayland_rendering",
             "wayland_workspace_selection",

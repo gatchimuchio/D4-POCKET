@@ -3536,8 +3536,22 @@ class WorkspaceTaskScratchJournalEvidenceTests(unittest.TestCase):
                 _read_task_scratch_recovery_state(store)
             signed["state"] = {"version": 1, "entries": [{"task_id": "stale"}]}
             journal.write_text(json.dumps(signed), encoding="utf-8")
-            with self.assertRaisesRegex(RuntimeError, "残存entry"):
+            with self.assertRaisesRegex(RuntimeError, "entry数"):
                 _read_task_scratch_recovery_state(store)
+            active_state = signed["state"]
+            active_serialized = json.dumps(
+                active_state, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+            )
+            signed["hmac"] = "sha256:" + hmac.new(
+                key,
+                f"version=1|state={active_serialized}".encode(),
+                hashlib.sha256,
+            ).hexdigest()
+            journal.write_text(json.dumps(signed), encoding="utf-8")
+            self.assertEqual(
+                _read_task_scratch_recovery_state(store, expected_entries=1),
+                {"entries": 1, "hmac_present": True},
+            )
 
 
 class LinuxAgentTaskFailureCleanupTests(unittest.TestCase):
@@ -4405,6 +4419,21 @@ class LinuxAgentTaskResponsesFixtureTests(unittest.TestCase):
         self.assertEqual(snapshot["rejections"], [])
         self.assertEqual(snapshot["scenarios"][0]["tool_outputs"], 1)
         self.assertEqual(snapshot["scenarios"][0]["posts"], 2)
+
+    def test_crash_fixture_records_tool_call_without_tool_result(self) -> None:
+        server = _LinuxAgentTaskResponsesServer()
+        self.addCleanup(server.close)
+        server.configure("crash", "/usr/bin/python3 task_fixture.py crash", Path("/tmp/workspace"))
+        events = server._response_events(
+            {"input": [], "tools": [{"name": "exec_command"}]}
+        )
+        self.assertIn("response.completed", [event["type"] for event in events])
+        snapshot = server.snapshot()
+        self.assertEqual(snapshot["rejections"], [])
+        self.assertEqual(
+            (snapshot["scenarios"][0]["posts"], snapshot["scenarios"][0]["tool_calls"], snapshot["scenarios"][0]["tool_outputs"]),
+            (1, 1, 0),
+        )
 
     def test_fixture_rejects_secret_canary_in_tool_output(self) -> None:
         server = _LinuxAgentTaskResponsesServer()

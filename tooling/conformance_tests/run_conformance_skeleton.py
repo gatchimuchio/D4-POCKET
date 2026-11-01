@@ -12080,7 +12080,7 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
     smoke = smoke_path.read_text(encoding="utf-8")
     required = (
         "'on':\n  workflow_dispatch:",
-        "runs-on: ${{ inputs.acceptance_scope == 'agent_task_supervision' && 'ubuntu-22.04' || 'ubuntu-24.04' }}",
+        "runs-on: ${{ (inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_task_crash_recovery') && 'ubuntu-22.04' || 'ubuntu-24.04' }}",
         'runner_label="ubuntu-24.04"',
         'runner_label="ubuntu-22.04"',
         "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
@@ -12110,6 +12110,9 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
         "steps.codex_sandbox.outputs.available == 'true'",
         "inputs.acceptance_scope == 'agent_task_supervision'",
         "--acceptance-scope agent_task_supervision",
+        "agent_task_crash_recovery",
+        "inputs.acceptance_scope == 'agent_task_crash_recovery'",
+        "--acceptance-scope agent_task_crash_recovery",
     )
     missing = [token for token in required if token not in workflow]
     for token in (
@@ -12149,6 +12152,10 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
         "def _run_installed_host_registration_acceptance(",
         "require_host_registration=True",
         "_host_registration_audit_evidence(events)",
+        "def _run_installed_agent_task_crash_recovery_acceptance(",
+        "_wait_for_linux_process_group_exit(task_pgid)",
+        "expected_entries=1",
+        '"task_recovery_status": "suspended"',
     ):
         if token not in smoke:
             missing.append(f"installed Linux smoke: {token}")
