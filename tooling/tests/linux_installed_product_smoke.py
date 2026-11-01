@@ -5343,7 +5343,11 @@ def _run_installed_agent_task_crash_recovery_acceptance(
         or guardian_identity[0] != task_pgid
         or guardian_identity[2] == "Z"
     ):
-        raise RuntimeError("active Taskのguardian process groupを一意に照合できません")
+        raise RuntimeError(
+            "active Taskのguardian process groupを一意に照合できません: "
+            f"descendant_pid={descendant_pid}, task_pgid={task_pgid}, "
+            f"guardian_pid={guardian_pid}, guardian_identity={guardian_identity!r}"
+        )
     broker_identity = _linux_proc_identity(broker_pid)
     try:
         running_image = Path(os.readlink(f"/proc/{broker_pid}/exe")).resolve(strict=True)
