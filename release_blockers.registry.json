@@ -196,28 +196,28 @@
       "latest_evidence": {
         "date": "2026-11-01",
         "result": "PASS",
-        "workflow_run": "https://github.com/gatchimuchio/D4-POCKET/actions/runs/41282313140",
-        "source_commit": "4fdffdb559cbd6a91677785db5b798b05d613827",
-        "scope": "Manual workflow_dispatch run #248 on Ubuntu 24.04 with acceptance_scope=mcp_credential_binding. A clean checkout built Linux Release product 0.1.0 and passed the installed GTK MCP Credential binding acceptance, run-owned fixture cleanup, and post-job clean checkout. The installed path verified Owner denial and independent approval, Secret Service Credential selection, one-use credential Audit, exact synthetic credential match in the stdio child after Owner approval, one Tool Approval and Permission consumption, hash-only result with matching durable Audit hash, credential secret and result body absent from UI/Audit/logs/acceptance files, disconnect denial and approval, owned process-group stop, and normal app exit. Audit contained 54 events; MCP connect reject/accept, Tool approval/Permission consumption/hash-only completion, and disconnect reject/completion were each recorded once. Package SHA-256 6028f698136f0bbe75d6243938358e3ee0a8d022b6b83e8682aca7920a408351.",
-        "limits": "Limited to Ubuntu 24.04 hosted Xvfb/X11, automated installed UI, unsigned synthetic product identity, and synthetic test credential; no production credential or external model was used. It does not establish normal Release task_execution=supported, physical desktop or other compositor behavior, production installer/signing/distribution, or Linux native product completion. Keep linux_native_product_support unresolved and release_ready=false."
+        "workflow_run": "https://github.com/gatchimuchio/D4-POCKET/actions/runs/41283791725",
+        "source_commit": "52d716263d7141e248f36e49e8fe76acf001c74a",
+        "scope": "手動workflow_dispatchのrun #249。Ubuntu 24.04 hosted runnerでacceptance_scope=portable_archiveを実行し、unsigned Ubuntu 24.04 x86_64 tar.gzを生成した。export evidence SHA-256 de6d828e74c86639a5ec397102f3ee376363440d0acfec88294071cbaa99c8eb、D4PKG SHA-256 f332206a0895b2dcc6278f123bf4637b398fe11c2ca9917dee69e7e2f32a69b5、archive SHA-256 e2ce713600193d0623dea2d8e31906c77587ece7ffccffe79d084486d0fd84bc。byte length／SHA-256一致、隔離rootへの展開、launcher実行属性、X11 GTK window正常終了、Wayland隔離socket接続後のowned process group停止を確認した。関連suite 15／153／13／6件、run-owned fixture／bundle cleanup、post-job clean checkoutがPASSし、run全体は5m21sでSUCCESS。",
+        "limits": "証拠はhosted Ubuntu上のportable first-launch bundleに限り、synthetic non-authority Broker fixtureを使用した。Actions artifactは保存されていない。Wayland surface rendering、実desktop session、production Publisher／署名identity、system installer、正式配布、Linux native製品全体は証明しない。Linux blocker、通常Release task_execution=unsupported、release_ready=falseを維持する。"
       },
       "previous_passed_evidence": {
         "date": "2026-11-01",
         "result": "PASS",
-        "workflow_run": "https://github.com/gatchimuchio/D4-POCKET/actions/runs/41263655288",
-        "source_commit": "07e83ec463e819d953c52b8d37a00feca764b694",
-        "scope": "Prior limited run #237 on Ubuntu 22.04 verified installed Agent Task Broker-crash recovery, descendant stop, WorkspaceTaskScratch recovery, suspended durable Audit, no prior Approval reuse, normal app exit, and run-owned cleanup. It remains distinct prior evidence; see docs/REV5_PRODUCT_PROGRESS.md for its full scope and limits."
+        "workflow_run": "https://github.com/gatchimuchio/D4-POCKET/actions/runs/41282313140",
+        "source_commit": "4fdffdb559cbd6a91677785db5b798b05d613827",
+        "scope": "直前の限定run #248。Ubuntu 24.04 installed GTK MCP Credential bindingでOwner拒否／許可、Secret Service選択、一回Credential Audit、承認後のstdio child合成値一致、一回Tool Approval／Permission消費、hash-only結果とdurable Audit一致、secret／本文非露出、disconnect拒否／許可、owned process group停止、cleanup、正常終了を受け入れた。詳細と証拠範囲はdocs/REV5_PRODUCT_PROGRESS.mdを参照。"
       },
       "previous_failed_evidence": {
-        "date": "2026-10-31",
+        "date": "2026-11-01",
         "result": "FAIL",
-        "workflow_run": "https://github.com/gatchimuchio/D4-POCKET/actions/runs/41181201934",
-        "source_commit": "9cea5772ba27ca38c975d904a9b03cbc6f7e337b",
-        "scope": "Manual workflow_dispatch run #191 on Ubuntu 24.04, acceptance_scope=runtime_provenance, source commit 9cea5772ba27ca38c975d904a9b03cbc6f7e337b. The installed runtime probe emitted its LIVE_RUNTIME result after binding package/build and installed trees, runtime identities, live Runner/Broker images, Audit store observations, and normal process cleanup. The workflow failed afterward because the summary parser passed the combined tee output, including preceding test stdout, to json.load and raised JSONDecodeError. Other acceptance scopes were skipped; run-owned cleanup succeeded.",
-        "disposition": "Preserved as a workflow-summary/parser FAIL, not reclassified as a provenance or product-runtime failure and not retroactively marked PASS. The parser was fixed in commit dcf60d9421a363d7425111cef95c45a0788d0078; manual run #192 then passed the same scope."
+        "workflow_run": "https://github.com/gatchimuchio/D4-POCKET/actions/runs/41281473962",
+        "source_commit": "d1f13d7ea229f01624eb7d461294dfa1923ccb1b",
+        "scope": "直前の失敗run #247はMCP Credential binding受入れでpositive acceptance JSONを出した後、summary用printfの引用符不整合によりworkflowが失敗した。",
+        "disposition": "workflow summaryの引用符不整合として履歴を保持する。製品受入れ自体の失敗とは分類しない。修正後のrun #248が同じMCP Credential binding scopeをPASSした。"
       },
-      "reason": "Linux native DesktopはWindows／macOSと同列の必須製品対象。Ubuntu hosted installed Agent Taskのrun #190はpositive／cancel／deadlineとscratch／descendant cleanup、crash recovery run #237はBroker crash／Task descendant停止／scratch回復／suspended durable Audit／既存Approval非再利用、MCP Credential binding run #248はCredential注入とhash-only Tool結果の限定範囲でPASSした。A2A metadata #231、runtime provenance #192、Weston headless Wayland rendering #193、Credential Vault #194、MCP child／Tool、Update Center lifecycle #77も各限定範囲のPASS証拠である。実desktop／他compositor、通常ReleaseのTask capability、正式production installer／update／rollback／uninstall／署名配布、Linux必須consumer全体は未成立。Linux nativeは未解決、通常Release task_execution=unsupported、release_ready=falseを維持する。",
-      "required_action": "Agent Task run #190、crash recovery run #237、A2A metadata #231、runtime provenance #192、Weston headless Wayland #193、Credential Vault #194、成立済みMCP child／Tool、MCP Credential binding #248、Update Center lifecycle #77は、回帰がない限り再試験しない。残るLinux acceptance contractの実desktop／compositor範囲、通常Release Task capability、正式Installer／update／rollback／uninstall／署名配布、その他の未成立product consumer／platform gateを施工・検証する。全production必須条件が成立するまで通常Release task_execution=unsupported、release_ready=falseを維持する。"
+      "reason": "Linux native DesktopはWindows／macOSと同列の必須製品対象である。portable_archive run #249はUbuntu 24.04 x86_64 unsigned tar.gzの生成、サイズ／SHA-256照合、隔離展開、portable launcherのX11／Wayland smokeに限るPASSである。MCPのCredential binding受入れrun #248、Agent Task #190、crash recovery #237、A2A metadata #231、runtime provenance #192、Wayland rendering #193、Credential Vault #194、MCP child／Tool、Update Center #77も各限定範囲の証拠である。実desktop／compositor受入れ、通常ReleaseのTask capability、正式Installer／update／rollback／uninstall／署名配布、Linux必須consumer全体は未成立。Linux native blockerはunresolved、通常Release task_execution=unsupported、release_ready=falseを維持する。",
+      "required_action": "portable archive run #249、MCP Credential binding run #248、成立済みMCP child／Tool、およびその他の受入れ済み範囲は、再現可能な回帰がない限り再試験しない。残件は実desktop／compositor範囲、通常ReleaseのTask capability条件、正式Installer／update／rollback／uninstall／署名配布、その他の未成立な必須製品consumerである。全必須条件が成立するまでLinux blockerとrelease gateを維持する。"
     },
     {
       "name": "rev2_mobile_device_evidence",

@@ -76,7 +76,7 @@
     },
     {
       "path": ".github/workflows/linux-manual-export-build.yml",
-      "sha256": "b33bfe7de3b976c7e18b2784567e4f138b22de6dd342f7cb330936f1bdd87ac9"
+      "sha256": "114677ee439fc0d5d76c4c693eb3df96d0f7bda1e3ba040cb8dc34e4b27e8915"
     },
     {
       "path": ".github/workflows/linux-manual-rust-validation.yml",
@@ -172,7 +172,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "875508ec725fa9f0ed197b36350912ad93789882208b1fd9fc4d1606b2b3f22a"
+      "sha256": "01682ba82e958bb1673af21d110a19c208669d79ddc1bc41be98d029096e7029"
     },
     {
       "path": "SECURITY.md",
@@ -1352,7 +1352,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "2d6fb596322c9adc18ba8f8689227d29be999cf98315873d327c2b2305626ae5"
+      "sha256": "57ebfbe921d2d511711bb81f286b6cdd354686bcd9d2b8ceb78935221919f016"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -3664,7 +3664,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/mcp_center.rs",
-      "sha256": "db71f07a130dd47aa5fe4955641acbfe841e68e97bd4cade0dfa3393a8c77fa3"
+      "sha256": "bdfaca412e7454ea3857c49046902ccce36e9b8699b887d9dfcb2c49c221a71e"
     },
     {
       "path": "native/rust_helper/src/broker/mod.rs",
@@ -4356,7 +4356,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "dcf2b1cfcdf8bfd153806400e2ff3401149a2497bb45ba65819218357b9dbae4"
+      "sha256": "13595e259c0130e7ddf554c3fc10ee580465992e44fd5b31ebd041d8272c97da"
     },
     {
       "path": "requirements-dev.txt",
@@ -5264,7 +5264,7 @@
     },
     {
       "path": "tooling/tests/linux_installed_product_smoke.py",
-      "sha256": "2ebfe6ef8fc05b693606090e8b69d656a1e3a4063de7c831ed9392670e261f77"
+      "sha256": "bb298e652d9f3436801d6ddb91ded05ab499f8cb257d1503324c5694b50e17f2"
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",
@@ -5276,7 +5276,7 @@
     },
     {
       "path": "tooling/tests/test_linux_installed_product_smoke.py",
-      "sha256": "a134d054d618207f6f3fdc8058374a42fe08af433042bbd54748630fd00659e1"
+      "sha256": "63b2863e56d7ee0ab1e31539942918c86df487b7bf1b71eef5cd70f1a7c3042a"
     },
     {
       "path": "tooling/tests/test_linux_portable_archive.py",
