@@ -8553,7 +8553,12 @@ mod tests {
             product_manifest["update_trust"]["public_key_fingerprint"].as_str(),
             Some(fingerprint.as_str())
         );
-        let update_id = "linux-installed-acceptance";
+        let seed_only = std::env::var("D4P_LINUX_ACCEPTANCE_SEED_ONLY").as_deref() == Ok("1");
+        let update_id = if seed_only {
+            "linux-installed-first-install"
+        } else {
+            "linux-installed-acceptance"
+        };
         let summary = "Ubuntu native installed launcher検証";
         let signed = serde_json::to_vec(&SignedManifest {
             version: CANDIDATE_VERSION,
@@ -8629,6 +8634,37 @@ mod tests {
             .join(format!("{digest}.pkg"));
         std::fs::write(&stored_package, &package).unwrap();
         std::fs::set_permissions(&stored_package, std::fs::Permissions::from_mode(0o644)).unwrap();
+
+        if seed_only {
+            let plan = super::super::product_install::plan_product_install(
+                &install_root,
+                INSTALL_APP_ID,
+                &offered_version,
+                &digest,
+            )
+            .unwrap();
+            let desktop_entry = super::super::product_install::plan_linux_desktop_entry(
+                &install_root,
+                INSTALL_APP_ID,
+            )
+            .unwrap();
+            assert!(!plan.root.exists(), "seed時点で製品rootは未導入であること");
+            assert!(
+                !desktop_entry.exists(),
+                "seed時点で利用者desktop entryは未登録であること"
+            );
+            let metadata = std::fs::symlink_metadata(&stored_package).unwrap();
+            assert!(metadata.is_file() && !metadata.file_type().is_symlink());
+            assert_eq!(metadata.permissions().mode() & 0o777, 0o644);
+            assert_eq!(
+                hex::encode(Sha256::digest(std::fs::read(&stored_package).unwrap())),
+                digest
+            );
+            println!(
+                "Linux初回導入候補準備: version={offered_version} package_sha256={digest} candidate_id={update_id} stage=absent active_record=absent desktop_entry=absent"
+            );
+            return;
+        }
 
         let payload = json!({
             "版": VERSION,

@@ -29,6 +29,7 @@ APP_ID = "d4-pocket-app-11111111111111111111111111111111"
 AUDIT_ID = "audit-store-22222222222222222222222222222222"
 UPDATE_ID = "linux-installed-catalog-display"
 UPDATE_VERSION = "0.1.2"
+FIRST_INSTALL_UPDATE_ID = "linux-installed-first-install"
 WINDOW_TITLE = "D4 Pocket powered by GUI Shell"
 OWNER_DIALOG_TITLE = "D4 Pocket Owner確認"
 UNINSTALL_BUTTON = "D4 Pocketをアンインストール"
@@ -8741,6 +8742,7 @@ def run_installed_smoke(
         raise RuntimeError("rollback fixture packageがrun固有一時root外です")
     if acceptance_scope not in {
         "update_lifecycle",
+        "debian_setup_first_install",
         "credential_vault",
         "mcp_tool_execution",
         "mcp_credential_binding",
@@ -8917,6 +8919,7 @@ def run_installed_smoke(
             "agent_task_crash_recovery",
             "provider_credential_binding",
             "runtime_provenance",
+            "debian_setup_first_install",
             "wayland_rendering",
             "wayland_workspace_selection",
         }:
@@ -8925,18 +8928,311 @@ def run_installed_smoke(
             _run_rust_test(RUST_CATALOG_RELAY_TIMEOUT_TEST, environment, private_key_path)
             _run_rust_test(RUST_HELPER_EXIT_CLASS_TEST, environment, private_key_path)
             _run_rust_test(RUST_CATALOG_TLS_PROVIDER_TEST, environment, private_key_path)
+        if acceptance_scope == "debian_setup_first_install":
+            environment["D4P_LINUX_ACCEPTANCE_SEED_ONLY"] = "1"
         _run_rust_test(RUST_STAGE_TEST, environment, private_key_path)
+        environment.pop("D4P_LINUX_ACCEPTANCE_SEED_ONLY", None)
         if acceptance_scope == "update_lifecycle":
             _run_rust_test(RUST_ROLLBACK_SEED_TEST, environment, private_key_path)
         for test_only_name in (
             "D4P_LINUX_ACCEPTANCE_PACKAGE",
             "D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE",
             "D4P_LINUX_ACCEPTANCE_ROOT",
+            "D4P_LINUX_ACCEPTANCE_SEED_ONLY",
         ):
             environment.pop(test_only_name, None)
         product_root = xdg_data_home / "apps/d4-pocket" / APP_ID
         fixed_launcher = product_root / "gui_shell_desktop_launcher"
         record_path = product_root / "active_version.json"
+        if acceptance_scope == "debian_setup_first_install":
+            if product_root.exists() or product_root.is_symlink() or record_path.exists():
+                raise RuntimeError("初回導入開始前に固定製品root／active recordが存在します")
+            if not os.environ.get("DISPLAY"):
+                raise RuntimeError("初回導入acceptanceにX11 DISPLAYがありません")
+            manifest_length = int.from_bytes(package.read_bytes()[8:12], "little")
+            package_bytes = package.read_bytes()
+            if package_bytes[:8] != b"D4PKG01\n" or 12 + manifest_length > len(package_bytes):
+                raise RuntimeError("初回導入対象packageのheaderが不正です")
+            package_manifest = json.loads(package_bytes[12 : 12 + manifest_length])
+            product_version = package_manifest.get("product_version")
+            if (
+                package_manifest.get("app_id") != APP_ID
+                or package_manifest.get("audit_store_id") != AUDIT_ID
+                or package_manifest.get("target_platform") != "linux"
+                or not isinstance(product_version, str)
+            ):
+                raise RuntimeError("初回導入packageの製品identityが不正です")
+            package_hash = hashlib.sha256(package_bytes).hexdigest()
+            stage_directory = product_root / "versions" / f"{product_version}-{package_hash}"
+            desktop_entry = xdg_data_home / "applications" / f"d4-pocket-{APP_ID}.desktop"
+            broker_state = xdg_state_home / "d4-pocket/linux-broker"
+            audit_store = broker_state / "store"
+            package_store = audit_store / "update_packages" / f"{package_hash}.pkg"
+            bootstrap_launcher = Path("/opt/d4-pocket/setup/gui_shell_desktop_launcher")
+            bootstrap_entry = Path("/usr/share/applications/d4-pocket-setup.desktop")
+            if (
+                not bootstrap_launcher.is_file()
+                or bootstrap_launcher.is_symlink()
+                or not os.access(bootstrap_launcher, os.X_OK)
+                or not bootstrap_entry.is_file()
+                or f"Exec={bootstrap_launcher}" not in bootstrap_entry.read_text(encoding="utf-8")
+            ):
+                raise RuntimeError("APT導入済みSetup launcher／desktop entryが固定pathと一致しません")
+            if desktop_entry.exists() or desktop_entry.is_symlink() or stage_directory.exists():
+                raise RuntimeError("初回導入前にper-user entry／stageが存在します")
+            if (
+                not package_store.is_file()
+                or package_store.is_symlink()
+                or package_store.read_bytes() != package_bytes
+            ):
+                raise RuntimeError("Broker candidate seedの既存packageが一致しません")
+            bootstrap_runner = Path("/opt/d4-pocket/setup/gui_shell_desktop")
+            bootstrap_broker = Path("/opt/d4-pocket/setup/libexec/gui_shell_linux_broker")
+            if not all(
+                path.is_file() and not path.is_symlink()
+                for path in (bootstrap_runner, bootstrap_broker)
+            ):
+                raise RuntimeError("APT Setup packageの固定runner／Brokerがありません")
+            product_paths.update(
+                path.resolve(strict=True)
+                for path in (bootstrap_launcher, bootstrap_runner, bootstrap_broker)
+            )
+            product_paths.add(fixed_launcher.resolve(strict=False))
+            preexisting = _processes_using(product_paths)
+            window_manager = subprocess.Popen(
+                ["openbox", "--sm-disable"],
+                env=environment,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            time.sleep(0.5)
+            if window_manager.poll() is not None:
+                raise RuntimeError("初回導入acceptance用isolated Openboxが起動しません")
+            with app_log.open("xb") as log:
+                desktop_process = subprocess.Popen(
+                    ["gio", "launch", str(bootstrap_entry)],
+                    cwd=acceptance_root,
+                    env=environment,
+                    stdin=subprocess.DEVNULL,
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                    start_new_session=True,
+                )
+            window_id: str | None = None
+            deadline = time.monotonic() + 90
+            while time.monotonic() < deadline:
+                window_id = _visible_product_window(environment)
+                if window_id and (_processes_using(product_paths) - preexisting):
+                    break
+                if desktop_process.poll() is not None and desktop_process.returncode != 0:
+                    raise RuntimeError("APT導入済みSetup launcherが起動直後に失敗しました")
+                time.sleep(0.25)
+            if window_id is None:
+                raise RuntimeError("APT導入済み初回Setup GTK windowを検出できません")
+
+            candidate_row = f"{product_version} ({FIRST_INSTALL_UPDATE_ID})"
+            download_markers = (
+                "Linux製品の署名検査済み更新packageを取得しますか？",
+                f"更新ID: {FIRST_INSTALL_UPDATE_ID}",
+                f"提供版: {product_version}",
+                "取得host: updates.example.invalid",
+                package_hash,
+                str(len(package_bytes)),
+            )
+            _trigger_update_action_from_installed_ui(
+                environment, window_id, "download", row_marker=candidate_row
+            )
+            _answer_owner_dialog(environment, "拒否", expected_summary_markers=download_markers)
+            _wait_for_owner_dialog_closed(environment)
+            if (
+                not package_store.is_file()
+                or package_store.read_bytes() != package_bytes
+                or list(package_store.parent.glob("*.part"))
+                or product_root.exists()
+                or desktop_entry.exists()
+            ):
+                raise RuntimeError("初回download Owner拒否後にpackage／製品状態が変更されました")
+            _trigger_update_action_from_installed_ui(
+                environment, window_id, "download", row_marker=candidate_row
+            )
+            _answer_owner_dialog(environment, "許可", expected_summary_markers=download_markers)
+            _find_accessible("download jobを開始しました", timeout=20)
+            download_event = _wait_for_audit_event(
+                audit_store / "audit.jsonl",
+                "更新download要求",
+                "completed",
+                evidence_source="LIVE_RUNTIME",
+            )
+            if "既存packageの一致を記録" not in download_event.get("reason", ""):
+                raise RuntimeError("Brokerが既存cache packageを再検証したAudit理由がありません")
+            if package_store.read_bytes() != package_bytes:
+                raise RuntimeError("初回download後にcache packageが変化しました")
+
+            window = _reenter_update_center_for_fresh_broker_state(environment, window_id)
+            _find_accessible("download済み（installは別途保留）", root=window, timeout=15)
+            stage_markers = (
+                "Linux製品の署名検査済みpackageを固定導入先へ展開しますか？",
+                f"更新ID: {FIRST_INSTALL_UPDATE_ID}",
+                f"提供版: {product_version}",
+                package_hash,
+                APP_ID,
+                AUDIT_ID,
+                str(stage_directory),
+            )
+            _trigger_update_action_from_installed_ui(
+                environment, window_id, "未起動版へ展開", row_marker=candidate_row
+            )
+            _answer_owner_dialog(environment, "拒否", expected_summary_markers=stage_markers)
+            _wait_for_owner_dialog_closed(environment)
+            if (
+                stage_directory.exists()
+                or product_root.exists()
+                or desktop_entry.exists()
+                or package_store.read_bytes() != package_bytes
+            ):
+                raise RuntimeError("初回stage Owner拒否後に製品状態が変更されました")
+            _trigger_update_action_from_installed_ui(
+                environment, window_id, "未起動版へ展開", row_marker=candidate_row
+            )
+            _answer_owner_dialog(environment, "許可", expected_summary_markers=stage_markers)
+            _find_accessible(
+                "署名済みpackageを未起動versionとして固定導入先へ展開しました。",
+                timeout=30,
+            )
+            package_files = json.loads(package_bytes[12 : 12 + manifest_length])["files"]
+            expected_files = {entry["path"] for entry in package_files}
+            actual_files = {
+                path.relative_to(stage_directory).as_posix()
+                for path in stage_directory.rglob("*")
+                if path.is_file() and not path.is_symlink()
+            }
+            if (
+                not stage_directory.is_dir()
+                or stage_directory.is_symlink()
+                or actual_files != expected_files
+                or any(path.is_symlink() for path in stage_directory.rglob("*"))
+            ):
+                raise RuntimeError("初回Broker stageのsigned package inventoryが一致しません")
+            stage_record_path = product_root / "active_version.json"
+            if stage_record_path.exists() or desktop_entry.exists():
+                raise RuntimeError("初回stage操作が有効版record／entryを早期作成しました")
+            product_paths.update(
+                (stage_directory / relative).resolve(strict=True)
+                for relative in expected_files
+                if relative in {
+                    "gui_shell_desktop",
+                    "gui_shell_desktop_launcher",
+                    "libexec/gui_shell_linux_broker",
+                }
+            )
+            _wait_for_audit_event(audit_store / "audit.jsonl", "更新適用要求", "completed")
+
+            activation_markers = (
+                "Linux製品の署名検査済みstageを有効版に切り替え",
+                f"更新ID: {FIRST_INSTALL_UPDATE_ID}",
+                f"提供版: {product_version}",
+                package_hash,
+                APP_ID,
+                AUDIT_ID,
+                str(stage_directory),
+                str(desktop_entry),
+            )
+            stage_pids = _processes_using(product_paths)
+            stage_groups = _owned_groups(stage_pids)
+            _trigger_update_action_from_installed_ui(
+                environment, window_id, "インストール", row_marker=candidate_row
+            )
+            _answer_owner_dialog(environment, "拒否", expected_summary_markers=activation_markers)
+            _wait_for_owner_dialog_closed(environment)
+            if (
+                stage_record_path.exists()
+                or desktop_entry.exists()
+                or not stage_directory.is_dir()
+                or package_store.read_bytes() != package_bytes
+                or _processes_using(product_paths) != stage_pids
+                or not all(_group_exists(group) for group in stage_groups)
+            ):
+                raise RuntimeError("初回activation Owner拒否後にstage／record／entry／processが変化しました")
+            _trigger_update_action_from_installed_ui(
+                environment, window_id, "インストール", row_marker=candidate_row
+            )
+            _answer_owner_dialog(environment, "許可", expected_summary_markers=activation_markers)
+            audit_path = audit_store / "audit.jsonl"
+            _wait_for_audit_event(
+                audit_path,
+                "更新有効版切替要求",
+                "completed",
+                evidence_source="INTERNAL_STATE",
+            )
+            handoff_deadline = time.monotonic() + 120
+            installed_window: str | None = None
+            live_processes: dict[str, dict[str, object]] | None = None
+            while time.monotonic() < handoff_deadline:
+                if stage_record_path.is_file() and desktop_entry.is_file():
+                    installed_window = _visible_product_window(environment)
+                    if installed_window is not None:
+                        try:
+                            live_processes = _observe_linux_runtime_executables(
+                                {
+                                    "runner": (
+                                        stage_directory / "gui_shell_desktop",
+                                        hashlib.sha256((stage_directory / "gui_shell_desktop").read_bytes()).hexdigest(),
+                                    ),
+                                    "broker": (
+                                        stage_directory / "libexec/gui_shell_linux_broker",
+                                        hashlib.sha256((stage_directory / "libexec/gui_shell_linux_broker").read_bytes()).hexdigest(),
+                                    ),
+                                }
+                            )
+                            break
+                        except (OSError, RuntimeError):
+                            live_processes = None
+                time.sleep(0.2)
+            if installed_window is None or live_processes is None:
+                raise RuntimeError("初回導入後のinstalled UI／runtime process handoffを確認できません")
+            active_record = json.loads(stage_record_path.read_text(encoding="utf-8"))
+            if (
+                active_record.get("product_version") != product_version
+                or active_record.get("package_sha256") != package_hash
+                or not _desktop_entry_targets_fixed_launcher(desktop_entry, fixed_launcher)
+                or not (product_root / "gui_shell_desktop_launcher").is_file()
+                or package_store.exists()
+            ):
+                raise RuntimeError("Broker初回install record／entry／cache cleanupが一致しません")
+            _request_x11_window_manager_close(installed_window, environment)
+            close_deadline = time.monotonic() + 90
+            while time.monotonic() < close_deadline:
+                if not (_processes_using(product_paths) - preexisting):
+                    break
+                time.sleep(0.2)
+            if _processes_using(product_paths) - preexisting:
+                raise RuntimeError("初回導入後の正常終了でowned product processが残留しています")
+            if desktop_process.poll() is None:
+                desktop_process.wait(timeout=15)
+            if desktop_process.returncode not in (0, None):
+                raise RuntimeError("初回install handoff後のbootstrap launcher終了codeが不正です")
+            durable_audit = _verify_live_audit(
+                audit_store, require_export=False, require_update_lifecycle=True
+            )
+            print(json.dumps({
+                "acceptance_scope": acceptance_scope,
+                "evidence_class": "LIVE_RUNTIME",
+                "bootstrap_source": str(bootstrap_launcher),
+                "candidate_id": FIRST_INSTALL_UPDATE_ID,
+                "product_version": product_version,
+                "package_sha256": package_hash,
+                "cached_download_request_owner_rejected_then_approved": True,
+                "cached_package_revalidated_by_broker": True,
+                "stage_owner_rejected_then_approved": True,
+                "activation_owner_rejected_then_approved": True,
+                "installed_version_handoff": live_processes,
+                "active_record_and_desktop_entry": "Broker-created-and-verified",
+                "durable_audit": durable_audit,
+                "normal_exit_and_owned_process_cleanup": "PASS",
+            }, ensure_ascii=False, separators=(",", ":"), sort_keys=True))
+            return
         record = json.loads(record_path.read_text(encoding="utf-8"))
         stage = product_root / "versions" / f"{record['product_version']}-{record['package_sha256']}"
         previous_record = record.get("previous")
@@ -10293,6 +10589,7 @@ def main() -> int:
         "--acceptance-scope",
         choices=(
             "update_lifecycle",
+            "debian_setup_first_install",
             "credential_vault",
             "mcp_tool_execution",
             "mcp_credential_binding",
