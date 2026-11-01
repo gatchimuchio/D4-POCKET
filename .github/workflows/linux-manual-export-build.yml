@@ -468,8 +468,8 @@ jobs:
           print(record["output_path"], record["source_commit"], record["artifact_tree_sha256"], manifest["app_identity"]["app_id"], manifest["audit_store"]["store_id"], digest)
           PY
           )
-          test "$app_id" = "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["app_identity"]["app_id"])' "$output_root/bundle/product_manifest.json")"
-          test "$audit_store_id" = "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["audit_store"]["store_id"])' "$output_root/bundle/product_manifest.json")"
+          test "$app_id" = "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["manifest"]["app_identity"]["app_id"])' "$output_root/bundle/product_manifest.json")"
+          test "$audit_store_id" = "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["manifest"]["audit_store"]["store_id"])' "$output_root/bundle/product_manifest.json")"
           test "$(dpkg-deb --field "$deb" Package)" = d4-pocket-setup
           test "$(dpkg-deb --field "$deb" Architecture)" = amd64
           touch "$install_marker"
