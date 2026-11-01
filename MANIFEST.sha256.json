@@ -172,7 +172,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "01682ba82e958bb1673af21d110a19c208669d79ddc1bc41be98d029096e7029"
+      "sha256": "017b3384117853fd7da5223b4a74c67436b2cc86eb76cfb365b7cf5581907594"
     },
     {
       "path": "SECURITY.md",
@@ -1352,7 +1352,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "57ebfbe921d2d511711bb81f286b6cdd354686bcd9d2b8ceb78935221919f016"
+      "sha256": "6f0652d0f41cc2f46db0518242c4ba26cdf8fae49005b94ce3dcaa74834fc8ea"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
