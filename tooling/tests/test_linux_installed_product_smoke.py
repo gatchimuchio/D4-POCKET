@@ -68,6 +68,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _set_public_text_by_keyboard,
     _set_public_text_by_wayland_keyboard,
     _secret_service_item_labels,
+    _secret_service_startup_diagnostic,
     _verify_export_manifest,
     _verify_credential_audit,
     _verify_live_audit,
@@ -1479,6 +1480,25 @@ class LinuxWaylandEnvironmentTests(unittest.TestCase):
 
 
 class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
+    def test_secret_service_startup_diagnostic_is_bounded_and_redacted(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            log = root / "gnome-keyring.log"
+            log.write_text(
+                f"gnome-keyring: failed to start at {root}; password=do-not-print "
+                + "A" * 64,
+                encoding="utf-8",
+            )
+
+            diagnostic = _secret_service_startup_diagnostic(log, (root,))
+
+            self.assertIn("gnome-keyring: failed to start", diagnostic)
+            self.assertIn("<isolated-root>", diagnostic)
+            self.assertIn("password=<redacted>", diagnostic)
+            self.assertNotIn(str(root), diagnostic)
+            self.assertNotIn("do-not-print", diagnostic)
+            self.assertLessEqual(len(diagnostic), 1200)
+
     @unittest.skipUnless(hasattr(os, "getuid"), "Linux-specific fixture ownership check")
     def test_mcp_credential_fixture_verifies_hash_without_persisting_secret(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

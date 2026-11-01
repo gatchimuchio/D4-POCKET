@@ -1821,6 +1821,28 @@ def _secret_service_item_labels() -> list[str]:
         raise RuntimeError("秘密保管サービスのメタデータ検索に失敗しました") from None
 
 
+def _secret_service_startup_diagnostic(
+    log_path: Path, isolated_roots: tuple[Path, ...]
+) -> str:
+    try:
+        with log_path.open("rb") as log:
+            size = log.seek(0, os.SEEK_END)
+            log.seek(max(0, size - 8192))
+            content = log.read(8192).decode("utf-8", errors="replace")
+    except OSError as error:
+        return f"diagnostic_unavailable:{type(error).__name__}"
+    for root in sorted((str(root) for root in isolated_roots), key=len, reverse=True):
+        content = content.replace(root, "<isolated-root>")
+    content = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", content)
+    content = re.sub(
+        r"(?i)\b(password|secret(?:_value)?|credential|token|authorization)\b\s*[:=]\s*[^\s,;]+",
+        r"\1=<redacted>",
+        content,
+    )
+    content = re.sub(r"\b[A-Za-z0-9+/=_-]{40,}\b", "<redacted>", content)
+    return " | ".join(line.strip() for line in content.splitlines() if line.strip())[:1200]
+
+
 def _start_isolated_secret_service(
     environment: dict[str, str], control_directory: Path, log_path: Path
 ) -> subprocess.Popen[bytes]:
@@ -1855,7 +1877,13 @@ def _start_isolated_secret_service(
         deadline = time.monotonic() + 15
         while time.monotonic() < deadline:
             if process.poll() is not None:
-                raise RuntimeError("隔離した秘密保管サービスが起動中に終了しました")
+                diagnostic = _secret_service_startup_diagnostic(
+                    log_path, (control_directory.parent, control_directory.parent.parent)
+                )
+                raise RuntimeError(
+                    "隔離した秘密保管サービスが起動中に終了しました "
+                    f"(exit={process.returncode}; diagnostic={diagnostic or 'empty'})"
+                )
             owner = subprocess.run(
                 [
                     "gdbus",

@@ -379,7 +379,7 @@ jobs:
           set -euo pipefail
           test_package="$D4P_EXPORT_ROOT/output/D4Pocket-linux.d4pkg"
           acceptance_root="$D4P_EXPORT_ROOT/installed-mcp-credential-acceptance"
-          xvfb-run -a dbus-run-session -- python3 tooling/tests/linux_installed_product_smoke.py \
+          dbus-run-session -- xvfb-run -a python3 tooling/tests/linux_installed_product_smoke.py \
             --package "$test_package" \
             --temp-root "$D4P_EXPORT_ROOT" \
             --acceptance-root "$acceptance_root" \
