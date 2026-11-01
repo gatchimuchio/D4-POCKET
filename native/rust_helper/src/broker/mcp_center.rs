@@ -1124,6 +1124,7 @@ mod tests {
         reference["Credential ref"]["environment_variable"] = json!("MCP_API_KEY");
         let configured_summary = desktop_owner_summary(OP_CONNECT, &reference).unwrap();
         assert!(configured_summary.contains("MCP_API_KEY"));
+        assert!(configured_summary.contains("子process環境変数名: MCP_API_KEY"));
         assert!(configured_summary.contains("外部送信"));
         if cfg!(target_os = "linux") {
             assert!(configured_summary.contains("LinuxではDesktop sandboxを付与しません"));
@@ -1483,7 +1484,7 @@ pub(crate) fn desktop_owner_summary(operation: &str, payload: &Value) -> Option<
                 &serde_json::to_value(&request.arguments).ok()?,
             ));
             let credential = if request.credential_ref.status == "configured" {
-                format!("Credential ID: {}\n用途: mcp_transport\n対象: {}\n環境変数: {}\nこのServerと子孫は秘密値を読み取り・外部送信できます。版交渉の限定再起動でも同じ相手へ委譲します。Brokerが現在record・失効・暗号文を再検証します。参照はPermission／Approvalではありません。",
+                format!("Credential ID: {}\n用途: mcp_transport\n対象: {}\n子process環境変数名: {}\nこのServerと子孫は秘密値を読み取り・外部送信できます。版交渉の限定再起動でも同じ相手へ委譲します。Brokerが現在record・失効・暗号文を再検証します。参照はPermission／Approvalではありません。",
                     request.credential_ref.credential_id, request.credential_ref.target,
                     request.credential_ref.environment_variable.as_deref()?)
             } else {
