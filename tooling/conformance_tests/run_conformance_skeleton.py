@@ -10699,12 +10699,16 @@ def test_linux_debian_setup_package_is_manual_and_non_authoritative() -> list[st
         ('"credential_values_included": False', "Credential値非同梱"),
         ('PurePosixPath("opt/d4-pocket/setup")', "固定install root"),
         ('PurePosixPath("usr/share/applications/d4-pocket-setup.desktop")', "固定Desktop entry"),
+        ("source_mode & 0o7022", "unsafe source permission拒否"),
+        ("os.fchmod(output_fd, package_mode)", "固定package modeへの正規化"),
     ):
         if token not in writer:
             errors.append(f"Debian Setup producerに{label}の実装境界がない")
     for token in (
         "test_package_is_reproducible_scoped_and_has_no_maintainer_scripts",
         "test_export_evidence_failure_and_unsafe_dependencies_fail_closed",
+        "test_safe_source_modes_are_normalized_to_fixed_package_modes",
+        "test_unsafe_source_mode_is_rejected_before_package_output",
         "test_symlink_and_existing_output_are_rejected",
         "test_dependency_parser_rejects_control_injection",
     ):

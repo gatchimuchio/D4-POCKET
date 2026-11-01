@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -108,8 +109,16 @@ class LinuxDebSetupPackageTests(unittest.TestCase):
         evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
         return bundle, evidence_path
 
-    def build_package(self, root: Path, revision: int, output_name: str | None = None) -> tuple[Path, dict[str, object]]:
+    def build_package(
+        self,
+        root: Path,
+        revision: int,
+        output_name: str | None = None,
+        source_modes: dict[str, int] | None = None,
+    ) -> tuple[Path, dict[str, object]]:
         bundle, evidence = self.create_export(root)
+        for relative, mode in (source_modes or {}).items():
+            (bundle / relative).chmod(mode)
         output_dir = root / (output_name or f"deb-{revision}")
         with (
             patch("tooling.package_linux_deb_setup._require_supported_target"),
@@ -185,6 +194,42 @@ class LinuxDebSetupPackageTests(unittest.TestCase):
                     {"preinst", "postinst", "prerm", "postrm", "config"}
                     & {path.name for path in control_dir.iterdir()}
                 )
+
+    def test_safe_source_modes_are_normalized_to_fixed_package_modes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-linux-deb-mode-normalization-") as temporary:
+            root = Path(temporary)
+            package, _result = self.build_package(
+                root,
+                1,
+                source_modes={
+                    "data/icudtl.dat": 0o600,
+                    "gui_shell_desktop_launcher": 0o700,
+                },
+            )
+            extracted = root / "extracted"
+            extracted.mkdir()
+            result = subprocess.run(
+                ["dpkg-deb", "--extract", str(package), str(extracted)],
+                check=False,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            installed_root = extracted / "opt/d4-pocket/setup"
+            self.assertEqual(stat.S_IMODE((installed_root / "data/icudtl.dat").stat().st_mode), 0o644)
+            self.assertEqual(stat.S_IMODE((installed_root / "gui_shell_desktop_launcher").stat().st_mode), 0o755)
+
+    def test_unsafe_source_mode_is_rejected_before_package_output(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-linux-deb-unsafe-mode-") as temporary:
+            root = Path(temporary)
+            with self.assertRaisesRegex(ValueError, "Linux bundle input permissionが安全でない"):
+                self.build_package(
+                    root,
+                    1,
+                    source_modes={"data/icudtl.dat": 0o664},
+                )
+            self.assertFalse(list(root.rglob("*.deb")))
 
     def test_export_evidence_failure_and_unsafe_dependencies_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="d4p-linux-deb-negative-") as temporary:

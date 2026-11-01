@@ -12,7 +12,7 @@ portable archiveは初回画面を起動するbootstrap payloadであり、Broke
 
 ### 0.1 Ubuntu APT first-run setup bootstrap
 
-Ubuntu 24.04 LTS／amd64向け`d4-pocket-setup_<製品版>-<package revision>_amd64.deb`は、portable bundleと同じ初回起動UIをOS package manager経由で配置する開発・受入れ用bootstrapである。producerは`tooling/package_linux_deb_setup.py`で、clean source commitに結合したLinux Export evidenceとbundle inventoryを再検査し、`dpkg-shlibdeps`でruntime依存を収集して、検査済みpayloadを`/opt/d4-pocket/setup/`、固定desktop entryを`/usr/share/applications/d4-pocket-setup.desktop`へ配置する。package作成・展開検証では通常file、hash、mode、root ownership、固定rootを照合し、package maintainer scriptを含めない。
+Ubuntu 24.04 LTS／amd64向け`d4-pocket-setup_<製品版>-<package revision>_amd64.deb`は、portable bundleと同じ初回起動UIをOS package manager経由で配置する開発・受入れ用bootstrapである。producerは`tooling/package_linux_deb_setup.py`で、clean source commitに結合したLinux Export evidenceとbundle inventoryを再検査し、`dpkg-shlibdeps`でruntime依存を収集して、検査済みpayloadを`/opt/d4-pocket/setup/`、固定desktop entryを`/usr/share/applications/d4-pocket-setup.desktop`へ配置する。入力fileはowner-read、group／other writeと特殊permissionの不在、実行fileのowner executeを検査し、package payload modeを実行file `0755`／その他`0644`へ固定する。package作成・展開検証では通常file、hash、固定mode、root ownership、固定rootを照合し、package maintainer scriptを含めない。
 
 このAPT packageが行うのは初回画面の配置だけである。Owner Authority、Permission、Approval、Credentialを生成せず、XDG user dataを変更しない。製品本体のper-user Install／Update／Rollback／Uninstallは、従来どおり既存Brokerとnative Owner確認が実行する。APT upgrade／downgrade／purgeはbootstrap fileだけを対象とし、Broker管理下の製品versionを操作しない。検証入口は`.github/workflows/linux-manual-export-build.yml`の手動`workflow_dispatch` scope `debian_setup_package`である。未署名の開発buildとhosted Xvfb／X11 acceptanceは、物理desktop、正式署名・配布、Linux native全対応を証明しない。これらが成立するまで`linux_native_product_support` release blockerは維持する。
 

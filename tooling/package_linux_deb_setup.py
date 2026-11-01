@@ -172,27 +172,37 @@ def _control_text(package_version: str, dependencies: str, installed_kib: int) -
     return value
 
 
-def _copy_regular_file(source: Path, destination: Path, expected_size: int, expected_hash: str, mode: int) -> None:
+def _copy_regular_file(
+    source: Path,
+    destination: Path,
+    expected_size: int,
+    expected_hash: str,
+    package_mode: int,
+    relative: str,
+) -> None:
     flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW
     source_fd = os.open(source, flags)
     try:
         before = os.fstat(source_fd)
+        source_mode = stat.S_IMODE(before.st_mode)
+        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1 or before.st_size != expected_size:
+            raise ValueError(f"Linux bundle inputが通常の単独fileではない: {relative}")
         if (
-            not stat.S_ISREG(before.st_mode)
-            or before.st_nlink != 1
-            or stat.S_IMODE(before.st_mode) != mode
-            or before.st_size != expected_size
+            source_mode & 0o7022
+            or not source_mode & 0o400
+            or (package_mode == 0o755 and not source_mode & 0o100)
         ):
-            raise ValueError("Linux bundle inputが通常の単独fileではない")
+            raise ValueError(f"Linux bundle input permissionが安全でない: {relative}")
         destination.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
         output_fd = os.open(
             destination,
             os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW,
-            mode,
+            package_mode,
         )
         digest = hashlib.sha256()
         count = 0
         try:
+            os.fchmod(output_fd, package_mode)
             while True:
                 chunk = os.read(source_fd, 1024 * 1024)
                 if not chunk:
@@ -215,6 +225,7 @@ def _copy_regular_file(source: Path, destination: Path, expected_size: int, expe
             or before.st_dev != after.st_dev
             or before.st_ino != after.st_ino
             or before.st_size != after.st_size
+            or stat.S_IMODE(before.st_mode) != stat.S_IMODE(after.st_mode)
             or before.st_mtime_ns != after.st_mtime_ns
             or before.st_ctime_ns != after.st_ctime_ns
             or before.st_nlink != after.st_nlink
@@ -384,16 +395,14 @@ def write_debian_setup_package(
             relative_path = PurePosixPath(relative)
             if relative_path.is_absolute() or any(part in {"", ".", ".."} for part in relative_path.parts):
                 raise ValueError("Linux bundle pathがpackage rootから逸脱する")
-            expected_mode = 0o755 if relative in EXECUTABLE_PATHS else 0o644
-            source_mode = stat.S_IMODE((bundle / relative).lstat().st_mode)
-            if source_mode != expected_mode:
-                raise ValueError("Linux bundle modeが固定package modeと一致しない")
+            package_mode = 0o755 if relative in EXECUTABLE_PATHS else 0o644
             _copy_regular_file(
                 bundle / relative,
                 payload_root.joinpath(*relative_path.parts),
                 record["size_bytes"],
                 record["sha256"],
-                expected_mode,
+                package_mode,
+                relative,
             )
         desktop_path = package_root.joinpath(*DESKTOP_ENTRY.parts)
         desktop_path.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
