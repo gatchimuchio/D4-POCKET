@@ -76,7 +76,7 @@
     },
     {
       "path": ".github/workflows/linux-manual-export-build.yml",
-      "sha256": "b33bfe7de3b976c7e18b2784567e4f138b22de6dd342f7cb330936f1bdd87ac9"
+      "sha256": "e91969f8d05f59321eb533e186bf1df9f95cae081662b54a0bae0c1856cf2351"
     },
     {
       "path": ".github/workflows/linux-manual-rust-validation.yml",
@@ -1352,7 +1352,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "bac63aced7f03699d88abcab99ef4c6588fc1f0e3db5ba638c98dc49d3d8589e"
+      "sha256": "65f4ddc3a8e719b0f1ffdb2db38b4f69cb6fab92d4058f08dfaf4850232fe996"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -5096,7 +5096,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "f81af8692b08a8d6220dfe727e56463f02468c2ede62138f4977a66c8c884638"
+      "sha256": "ed83f7be0d91924d518b68cac6bbc743bc898a60246dfd646e67fac8501f7df5"
     },
     {
       "path": "tooling/conformance_tests/test_final_development_audit.py",

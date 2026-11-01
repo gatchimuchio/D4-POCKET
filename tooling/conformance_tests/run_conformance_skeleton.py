@@ -12100,6 +12100,7 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
         "mcp_credential_binding",
         "inputs.acceptance_scope == 'mcp_credential_binding'",
         "--acceptance-scope mcp_credential_binding",
+        "xvfb-run -a dbus-run-session -- python3 tooling/tests/linux_installed_product_smoke.py",
         "host_registration",
         "inputs.acceptance_scope == 'host_registration'",
         "--acceptance-scope host_registration",
