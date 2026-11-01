@@ -152,7 +152,7 @@ def _control_text(package_version: str, dependencies: str, installed_kib: int) -
     for index, piece in enumerate(pieces):
         suffix = piece if index == 0 else ", " + piece
         if len(current) + len(suffix) > 78 and current != "Depends: ":
-            lines.append(current)
+            lines.append(current + ",")
             current = " " + piece
         else:
             current += suffix

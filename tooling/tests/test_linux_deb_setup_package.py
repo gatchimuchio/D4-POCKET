@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -15,6 +16,7 @@ from unittest.mock import patch
 from tooling.package_linux_deb_setup import (
     DESKTOP_CONTENT,
     PACKAGE_NAME,
+    _control_text,
     _parse_dependencies,
     write_debian_setup_package,
 )
@@ -55,6 +57,22 @@ PAYLOADS = {
     ).encode("utf-8"),
 }
 DEPENDENCIES = "libc6 (>= 2.38), libgtk-3-0t64 (>= 3.24.41)"
+
+
+class ControlFieldTests(unittest.TestCase):
+    def test_dependency_folding_preserves_group_separators(self) -> None:
+        dependencies = ", ".join(f"libexample-{index} (>= 1.0)" for index in range(6))
+        control = _control_text("1.2.3-1", dependencies, 1)
+        lines = control.splitlines()
+        start = next(index for index, line in enumerate(lines) if line.startswith("Depends: "))
+        field_lines = [lines[start]]
+        for line in lines[start + 1 :]:
+            if not line.startswith((" ", "\t")):
+                break
+            field_lines.append(line)
+
+        self.assertGreater(len(field_lines), 1)
+        self.assertEqual(re.sub(r"\n[ \t]+", " ", "\n".join(field_lines)), f"Depends: {dependencies}")
 
 
 @unittest.skipUnless(
