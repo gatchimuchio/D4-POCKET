@@ -9037,7 +9037,7 @@ def run_installed_smoke(
                 "Linux製品の署名検査済み更新packageを取得しますか？",
                 f"更新ID: {FIRST_INSTALL_UPDATE_ID}",
                 f"提供版: {product_version}",
-                "取得host: updates.example.invalid",
+                "取得host: raw.githubusercontent.com",
                 package_hash,
                 str(len(package_bytes)),
             )
