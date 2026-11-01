@@ -10670,6 +10670,65 @@ def test_linux_product_package_writer_is_platform_bound_and_non_authoritative() 
     return errors
 
 
+def test_linux_debian_setup_package_is_manual_and_non_authoritative() -> list[str]:
+    writer_path = ROOT / "tooling/package_linux_deb_setup.py"
+    runtime_tests_path = ROOT / "tooling/tests/test_linux_deb_setup_package.py"
+    workflow_path = ROOT / ".github/workflows/linux-manual-export-build.yml"
+    contract_path = ROOT / "docs/specs/linux-product-package.md"
+    required_files = (writer_path, runtime_tests_path, workflow_path, contract_path)
+    if any(path.is_symlink() or not path.is_file() for path in required_files):
+        return [
+            "Debian Setup bootstrap producer／test／manual workflow／contractが通常fileとして揃っていない"
+        ]
+
+    writer = writer_path.read_text(encoding="utf-8")
+    tests = runtime_tests_path.read_text(encoding="utf-8")
+    workflow = workflow_path.read_text(encoding="utf-8")
+    contract = contract_path.read_text(encoding="utf-8")
+    errors: list[str] = []
+    for token, label in (
+        ("dpkg-shlibdeps", "runtime dependency検出"),
+        ('"--root-owner-group"', "root ownership固定"),
+        ("_require_source_checkout", "source commit／clean checkout束縛"),
+        ("os.link(", "既存fileを上書きしないoutput公開"),
+        ('"package_manager_scripts": []', "maintainer script不使用"),
+        ('"scope": "first_run_setup_bootstrap_only"', "bootstrap範囲限定"),
+        ('"owner_authorization_created": False', "Owner Authority非生成"),
+        ('"permission_created": False', "Permission非生成"),
+        ('"approval_created": False', "Approval非生成"),
+        ('"credential_values_included": False', "Credential値非同梱"),
+        ('PurePosixPath("opt/d4-pocket/setup")', "固定install root"),
+        ('PurePosixPath("usr/share/applications/d4-pocket-setup.desktop")', "固定Desktop entry"),
+    ):
+        if token not in writer:
+            errors.append(f"Debian Setup producerに{label}の実装境界がない")
+    for token in (
+        "test_package_is_reproducible_scoped_and_has_no_maintainer_scripts",
+        "test_export_evidence_failure_and_unsafe_dependencies_fail_closed",
+        "test_symlink_and_existing_output_are_rejected",
+        "test_dependency_parser_rejects_control_injection",
+    ):
+        if token not in tests:
+            errors.append(f"Debian Setup package testに必要なcaseがない: {token}")
+    for token in (
+        "debian_setup_package",
+        "packages+=(dpkg-dev)",
+        "python3 -m unittest tooling.tests.test_linux_deb_setup_package",
+        "sudo apt-get install --yes --no-install-recommends \"$deb_v1\"",
+        "--allow-downgrades",
+        "invalid-update.deb",
+        "sudo apt-get purge --yes d4-pocket-setup",
+        "failed APT test cleanup of package-owned files",
+    ):
+        if token not in workflow:
+            errors.append(f"Debian Setup acceptanceに必要なmanual lifecycle確認がない: {token}")
+    if "workflow_dispatch:" not in workflow or "pull_request:" in workflow or "push:" in workflow:
+        errors.append("Debian Setup acceptanceがmanual workflow_dispatchに限定されない")
+    if "first-run setup" not in contract or "正式配布" not in contract or "Broker" not in contract:
+        errors.append("Debian Setup package contractがbootstrap／配布／Broker責任境界を記載しない")
+    return errors
+
+
 def test_d4_pocket_active_version_record_is_fixed_and_path_free() -> list[str]:
     schema = load_schema("d4_pocket_active_version.schema.json")
     valid = load_contract_fixture("d4_pocket_active_version.valid.json")
@@ -12772,6 +12831,7 @@ def main() -> int:
         test_gui_shell_linux_export_build_is_hash_bound_and_non_authoritative,
         test_windows_product_package_writer_is_bounded_and_hash_bound,
         test_linux_product_package_writer_is_platform_bound_and_non_authoritative,
+        test_linux_debian_setup_package_is_manual_and_non_authoritative,
         test_d4_pocket_active_version_record_is_fixed_and_path_free,
         test_gui_shell_module_comparison_is_same_commit_and_non_authoritative,
         test_l3_bounded_reference_extension_uses_existing_contracts,

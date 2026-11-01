@@ -10,6 +10,12 @@ archiveは、Export buildで検査済みbundleの全payloadと起動案内から
 
 portable archiveは初回画面を起動するbootstrap payloadであり、Brokerが導入・更新時に読む`D4PKG01`と区別する。利用者はファイルマネージャーで展開してlauncherを起動でき、その後のInstall／Update／Rollback／Uninstallは既存Linux Brokerとnative Owner確認へ接続する。現在生成する未署名archiveは開発・検証用であり正式配布へ使用しない。archive生成・headless起動は、正式Publisher署名、一般配布、実desktop compositor、導入済み製品の受入れ、Linux全対応を証明しない。
 
+### 0.1 Ubuntu APT first-run setup bootstrap
+
+Ubuntu 24.04 LTS／amd64向け`d4-pocket-setup_<製品版>-<package revision>_amd64.deb`は、portable bundleと同じ初回起動UIをOS package manager経由で配置する開発・受入れ用bootstrapである。producerは`tooling/package_linux_deb_setup.py`で、clean source commitに結合したLinux Export evidenceとbundle inventoryを再検査し、`dpkg-shlibdeps`でruntime依存を収集して、検査済みpayloadを`/opt/d4-pocket/setup/`、固定desktop entryを`/usr/share/applications/d4-pocket-setup.desktop`へ配置する。package作成・展開検証では通常file、hash、mode、root ownership、固定rootを照合し、package maintainer scriptを含めない。
+
+このAPT packageが行うのは初回画面の配置だけである。Owner Authority、Permission、Approval、Credentialを生成せず、XDG user dataを変更しない。製品本体のper-user Install／Update／Rollback／Uninstallは、従来どおり既存Brokerとnative Owner確認が実行する。APT upgrade／downgrade／purgeはbootstrap fileだけを対象とし、Broker管理下の製品versionを操作しない。検証入口は`.github/workflows/linux-manual-export-build.yml`の手動`workflow_dispatch` scope `debian_setup_package`である。未署名の開発buildとhosted Xvfb／X11 acceptanceは、物理desktop、正式署名・配布、Linux native全対応を証明しない。これらが成立するまで`linux_native_product_support` release blockerは維持する。
+
 ## 1. 役割と互換性
 
 Linux製品payloadも既存の固定container `D4PKG01`を使う。既存Windows packageの公開形式、Schema名、path、legacy manifest bytesは変更しない。Linux packageは専用目録Schema `d4_pocket_linux_product_package_manifest.schema.json`を使用し、manifestへ`target_platform: "linux"`を必須記録する。`target_platform`のない既存manifestはWindows payloadとしてのみ解釈し、Linux packageとして推測しない。

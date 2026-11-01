@@ -23,6 +23,7 @@ name: Linux manual product build and installed acceptance
           - wayland_rendering
           - wayland_workspace_selection
           - portable_archive
+          - debian_setup_package
         default: update_lifecycle
 
 permissions:
@@ -67,6 +68,9 @@ jobs:
           )
           if [ '${{ inputs.acceptance_scope }}' = 'wayland_workspace_selection' ]; then
             packages+=(sway wtype)
+          fi
+          if [ '${{ inputs.acceptance_scope }}' = 'debian_setup_package' ]; then
+            packages+=(dpkg-dev)
           fi
           sudo apt-get install --yes --no-install-recommends "${packages[@]}"
 
@@ -218,6 +222,9 @@ jobs:
           python3 -m unittest tooling.tests.test_linux_installed_product_smoke
           python3 -m unittest tooling.tests.test_export_linux_product
           python3 -m unittest tooling.tests.test_linux_portable_archive
+          if [ '${{ inputs.acceptance_scope }}' = 'debian_setup_package' ]; then
+            python3 -m unittest tooling.tests.test_linux_deb_setup_package
+          fi
           if [ '${{ inputs.acceptance_scope }}' = 'portable_archive' ]; then
             archive_name="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["portable_archive"]["file_name"])' "$output_root/d4_pocket_linux_export_build.json")"
             python3 - "$output_root" "$archive_name" <<'PY'
@@ -248,7 +255,8 @@ jobs:
               --backend wayland
           elif [ '${{ inputs.acceptance_scope }}' != 'product_build' ] && \
              [ '${{ inputs.acceptance_scope }}' != 'runtime_provenance' ] && \
-             [ '${{ inputs.acceptance_scope }}' != 'wayland_rendering' ]; then
+             [ '${{ inputs.acceptance_scope }}' != 'wayland_rendering' ] && \
+             [ '${{ inputs.acceptance_scope }}' != 'debian_setup_package' ]; then
             dbus-run-session -- xvfb-run -a python3 tooling/tests/linux_gtk_bundle_smoke.py \
               --launcher "$output_root/bundle/gui_shell_desktop_launcher" \
               --temp-root "$D4P_EXPORT_ROOT" \
@@ -273,11 +281,144 @@ jobs:
               printf -- '- Portable smoke was skipped; the dedicated installed-product Wayland surface-rendering acceptance runs below.\n'
             elif [ '${{ inputs.acceptance_scope }}' = 'portable_archive' ]; then
               printf -- '- The unsigned Ubuntu 24.04 x86_64 tar.gz was hash-checked and extracted in the isolated runner; its extracted launcher completed the portable X11／Wayland smoke. This is not a signed distribution or general Linux acceptance.\n'
+            elif [ '${{ inputs.acceptance_scope }}' = 'debian_setup_package' ]; then
+              printf -- '- Debian Setup package acceptance follows in a separate installed-package step; the APT package is a first-run bootstrap and does not replace Broker-controlled per-user product install/update/rollback/uninstall.\n'
             else
               printf -- '- Runtime smoke: portable product Rust launcher opened and normally closed its Flutter GTK window under Xvfb/X11; Wayland run used Weston headless/Pixman, verified the live launcher GTK process successfully connected to the isolated Wayland socket using external connect-syscall observation, then stopped the owned process group. No debug environment variable was required or forwarded through the frontend allowlist. Both used an initially absent XDG_DATA_HOME and verified cleanup.\n'
               printf -- '- Scope: portable first-launch, Linux GTK X11 window close, and Wayland socket-connect smoke only; the Wayland check does not prove surface rendering. This build is not signed Install/Owner activation, installed-version handoff, production compositor coverage, formal distribution, or runtime Manifest consumption.\n'
             fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Ubuntu 24.04 APT setup package install／update／rollback／uninstall
+        if: ${{ inputs.acceptance_scope == 'debian_setup_package' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          output_root="$D4P_EXPORT_ROOT/output"
+          acceptance_root="$D4P_EXPORT_ROOT/debian-setup-acceptance"
+          mkdir -m 700 -- "$acceptance_root"
+          test "$(dpkg --print-architecture)" = amd64
+          . /etc/os-release
+          test "$ID" = ubuntu
+          test "$VERSION_ID" = 24.04
+          package_status="$(dpkg-query -W -f='${Status}' d4-pocket-setup 2>/dev/null || true)"
+          if [ -n "$package_status" ]; then
+            echo 'runnerにD4 Pocket Setup packageが事前存在する'
+            exit 1
+          fi
+
+          package_dir="$output_root/debian-setup"
+          evidence="$output_root/d4_pocket_linux_export_build.json"
+          python3 tooling/package_linux_deb_setup.py \
+            --source-dir "$output_root/bundle" \
+            --build-evidence "$evidence" \
+            --output-dir "$package_dir" \
+            --package-revision 1 > "$acceptance_root/package-v1.json"
+          python3 tooling/package_linux_deb_setup.py \
+            --source-dir "$output_root/bundle" \
+            --build-evidence "$evidence" \
+            --output-dir "$package_dir" \
+            --package-revision 2 > "$acceptance_root/package-v2.json"
+
+          read -r deb_v1 deb_v2 source_commit artifact_tree_sha app_id audit_store_id < <(
+            python3 - "$acceptance_root/package-v1.json" "$acceptance_root/package-v2.json" "$GITHUB_SHA" "$output_root/bundle/product_manifest.json" <<'PY'
+          import hashlib, json, pathlib, sys
+          one_path, two_path = map(pathlib.Path, sys.argv[1:3])
+          one, two = json.loads(one_path.read_text()), json.loads(two_path.read_text())
+          expected_commit = sys.argv[3]
+          manifest = json.loads(pathlib.Path(sys.argv[4]).read_text())["manifest"]
+          assert one["evidence_type"] == two["evidence_type"] == "d4_pocket_linux_debian_setup_package"
+          assert one["target"] == two["target"] == "ubuntu-24.04-amd64"
+          assert one["package_version"].rsplit("-", 1)[0] == two["package_version"].rsplit("-", 1)[0]
+          assert one["package_version"].endswith("-1") and two["package_version"].endswith("-2")
+          assert one["source_commit"] == two["source_commit"] == expected_commit
+          assert one["artifact_tree_sha256"] == two["artifact_tree_sha256"]
+          assert one["scope"] == "first_run_setup_bootstrap_only"
+          assert one["signed"] is False and one["owner_authorization_created"] is False
+          assert one["permission_created"] is False and one["approval_created"] is False
+          assert one["credential_values_included"] is False and one["user_xdg_data_modified_by_package"] is False
+          assert one["package_manager_scripts"] == [] and two["package_manager_scripts"] == []
+          for record in (one, two):
+              package = pathlib.Path(record["output_path"])
+              assert package.is_file() and package.stat().st_size == record["package_size_bytes"]
+              assert hashlib.sha256(package.read_bytes()).hexdigest() == record["package_sha256"]
+          print(one["output_path"], two["output_path"], one["source_commit"], one["artifact_tree_sha256"], manifest["app_identity"]["app_id"], manifest["audit_store"]["store_id"])
+          PY
+          )
+          test "$(dpkg-deb --field "$deb_v1" Package)" = d4-pocket-setup
+          test "$(dpkg-deb --field "$deb_v2" Architecture)" = amd64
+          dpkg --compare-versions "$(dpkg-deb --field "$deb_v1" Version)" lt "$(dpkg-deb --field "$deb_v2" Version)"
+          touch "$acceptance_root/package-install-started"
+
+          xdg_data="$acceptance_root/isolated-xdg-data"
+          sentinel="$xdg_data/apps/d4-pocket/$app_id/stores/$audit_store_id/owner-data-sentinel"
+          mkdir -m 700 -p -- "$(dirname "$sentinel")"
+          printf 'keep-user-owned-data\n' > "$sentinel"
+          sentinel_hash="$(sha256sum "$sentinel" | cut -d ' ' -f 1)"
+
+          sudo apt-get install --yes --no-install-recommends "$deb_v1"
+          test "$(dpkg-query -W -f='${Version}' d4-pocket-setup)" = "$(dpkg-deb --field "$deb_v1" Version)"
+          test -x /opt/d4-pocket/setup/gui_shell_desktop_launcher
+          test -f /usr/share/applications/d4-pocket-setup.desktop
+          test "$(stat -c '%U:%G:%a' /opt/d4-pocket/setup/gui_shell_desktop_launcher)" = root:root:755
+          grep -Fx 'Exec=/opt/d4-pocket/setup/gui_shell_desktop_launcher' /usr/share/applications/d4-pocket-setup.desktop
+
+          sudo apt-get install --yes --no-install-recommends "$deb_v2"
+          test "$(dpkg-query -W -f='${Version}' d4-pocket-setup)" = "$(dpkg-deb --field "$deb_v2" Version)"
+          dbus-run-session -- xvfb-run -a python3 tooling/tests/linux_gtk_bundle_smoke.py \
+            --launcher /opt/d4-pocket/setup/gui_shell_desktop_launcher \
+            --temp-root "$acceptance_root" \
+            --backend x11
+
+          printf 'not a Debian package\n' > "$acceptance_root/invalid-update.deb"
+          if sudo apt-get install --yes "$acceptance_root/invalid-update.deb"; then
+            echo 'invalid update unexpectedly succeeded'
+            exit 1
+          fi
+          test "$(dpkg-query -W -f='${Version}' d4-pocket-setup)" = "$(dpkg-deb --field "$deb_v2" Version)"
+          sudo apt-get install --reinstall --yes --no-install-recommends "$deb_v2"
+          test "$(dpkg-query -W -f='${Version}' d4-pocket-setup)" = "$(dpkg-deb --field "$deb_v2" Version)"
+
+          sudo apt-get install --allow-downgrades --yes --no-install-recommends "$deb_v1"
+          test "$(dpkg-query -W -f='${Version}' d4-pocket-setup)" = "$(dpkg-deb --field "$deb_v1" Version)"
+          sudo apt-get install --yes --no-install-recommends "$deb_v2"
+          test "$(dpkg-query -W -f='${Version}' d4-pocket-setup)" = "$(dpkg-deb --field "$deb_v2" Version)"
+
+          sudo apt-get purge --yes d4-pocket-setup
+          test ! -e /opt/d4-pocket/setup
+          test ! -e /usr/share/applications/d4-pocket-setup.desktop
+          test -f "$sentinel"
+          test "$(sha256sum "$sentinel" | cut -d ' ' -f 1)" = "$sentinel_hash"
+          test -z "$(dpkg-query -W -f='${Status}' d4-pocket-setup 2>/dev/null || true)"
+          printf '\n- Linux APT bootstrap package: Ubuntu 24.04 amd64; package hashes `%s`／`%s`; source `%s`; artifact tree `%s`.\n' \
+            "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["package_sha256"])' "$acceptance_root/package-v1.json")" \
+            "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["package_sha256"])' "$acceptance_root/package-v2.json")" \
+            "$source_commit" "$artifact_tree_sha" >> "$GITHUB_STEP_SUMMARY"
+          printf -- '- LIVE_RUNTIME: APT install／upgrade／invalid-candidate rejection／reinstall recovery／downgrade／purge passed; installed launcher opened and normally closed under Xvfb/X11. The package contained no maintainer scripts and removal preserved the isolated XDG user-data sentinel.\n' >> "$GITHUB_STEP_SUMMARY"
+          printf -- '- Scope is first-run bootstrap only. It does not prove a physical desktop/compositor, signed distribution, full Broker install/update/rollback/uninstall lifecycle, ordinary Release Task capability, or Linux-wide support.\n' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: failed APT test cleanup of package-owned files
+        if: ${{ always() && inputs.acceptance_scope == 'debian_setup_package' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          marker="$D4P_EXPORT_ROOT/debian-setup-acceptance/package-install-started"
+          if [ -f "$marker" ]; then
+            package_status="$(dpkg-query -W -f='${Status}' d4-pocket-setup 2>/dev/null || true)"
+            case "$package_status" in
+              'install ok installed'|'deinstall ok config-files')
+                sudo apt-get purge --yes d4-pocket-setup
+                ;;
+              '')
+                ;;
+              *)
+                echo "D4 Pocket Setup package cleanup state is unexpected: $package_status"
+                exit 1
+                ;;
+            esac
+            test ! -e /opt/d4-pocket/setup
+            test ! -e /usr/share/applications/d4-pocket-setup.desktop
+          fi
 
       - name: 固定版Linux Codex CLIを検証rootへ取得
         if: ${{ inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_task_crash_recovery' || inputs.acceptance_scope == 'provider_credential_binding' }}
