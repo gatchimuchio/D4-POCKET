@@ -5945,10 +5945,11 @@ def _run_installed_a2a_metadata_acceptance(
             diagnostic_audit_path=audit_store / "audit.jsonl",
             expected_summary_markers=(
                 f"Agent ID: {rejected_agent_id}",
-                "取得先: http://127.0.0.1",
-                "Transport: HTTP（loopback IP限定）",
-                "Credential実値は受け取らず",
-                "Permission、Approval、Authorityを生成しません",
+                "接続先: http://127.0.0.1",
+                "外部Agentの宣言情報だけを取得します。",
+                "Agent Cardは未信頼metadataです。",
+                "Trust・Task Permission・Approval・Credentialを生成せず、Task実行を行いません。",
+                "Brokerが現在の要求と永続Auditを再評価します。",
             ),
         )
         _wait_for_owner_dialog_closed(environment)
@@ -5985,10 +5986,11 @@ def _run_installed_a2a_metadata_acceptance(
             diagnostic_audit_path=audit_store / "audit.jsonl",
             expected_summary_markers=(
                 f"Agent ID: {accepted_agent_id}",
-                "取得先: http://127.0.0.1",
-                "Transport: HTTP（loopback IP限定）",
-                "Credential実値は受け取らず",
-                "Permission、Approval、Authorityを生成しません",
+                "接続先: http://127.0.0.1",
+                "外部Agentの宣言情報だけを取得します。",
+                "Agent Cardは未信頼metadataです。",
+                "Trust・Task Permission・Approval・Credentialを生成せず、Task実行を行いません。",
+                "Brokerが現在の要求と永続Auditを再評価します。",
             ),
         )
         _wait_for_owner_dialog_closed(environment)
