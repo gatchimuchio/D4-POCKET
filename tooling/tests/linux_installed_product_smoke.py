@@ -8743,6 +8743,7 @@ def run_installed_smoke(
     if acceptance_scope not in {
         "update_lifecycle",
         "debian_setup_first_install",
+        "debian_setup_lifecycle",
         "credential_vault",
         "mcp_tool_execution",
         "mcp_credential_binding",
@@ -8869,6 +8870,7 @@ def run_installed_smoke(
     task_group_cleanup_error: Exception | None = None
     task_execution_limit_ms = LINUX_AGENT_TASK_DEADLINE_TEST_LIMIT_MS
     app_log = acceptance_root / "installed-app.log"
+    first_install_evidence: dict[str, object] | None = None
     try:
         if acceptance_scope in {
             "agent_task_supervision",
@@ -8920,6 +8922,7 @@ def run_installed_smoke(
             "provider_credential_binding",
             "runtime_provenance",
             "debian_setup_first_install",
+            "debian_setup_lifecycle",
             "wayland_rendering",
             "wayland_workspace_selection",
         }:
@@ -8928,7 +8931,10 @@ def run_installed_smoke(
             _run_rust_test(RUST_CATALOG_RELAY_TIMEOUT_TEST, environment, private_key_path)
             _run_rust_test(RUST_HELPER_EXIT_CLASS_TEST, environment, private_key_path)
             _run_rust_test(RUST_CATALOG_TLS_PROVIDER_TEST, environment, private_key_path)
-        if acceptance_scope == "debian_setup_first_install":
+        if acceptance_scope in {
+            "debian_setup_first_install",
+            "debian_setup_lifecycle",
+        }:
             environment["D4P_LINUX_ACCEPTANCE_SEED_ONLY"] = "1"
         _run_rust_test(RUST_STAGE_TEST, environment, private_key_path)
         environment.pop("D4P_LINUX_ACCEPTANCE_SEED_ONLY", None)
@@ -8944,7 +8950,10 @@ def run_installed_smoke(
         product_root = xdg_data_home / "apps/d4-pocket" / APP_ID
         fixed_launcher = product_root / "gui_shell_desktop_launcher"
         record_path = product_root / "active_version.json"
-        if acceptance_scope == "debian_setup_first_install":
+        if acceptance_scope in {
+            "debian_setup_first_install",
+            "debian_setup_lifecycle",
+        }:
             if product_root.exists() or product_root.is_symlink() or record_path.exists():
                 raise RuntimeError("初回導入開始前に固定製品root／active recordが存在します")
             if not os.environ.get("DISPLAY"):
@@ -9216,8 +9225,7 @@ def run_installed_smoke(
             durable_audit = _verify_live_audit(
                 audit_store, require_export=False, require_update_lifecycle=True
             )
-            print(json.dumps({
-                "acceptance_scope": acceptance_scope,
+            first_install_evidence = {
                 "evidence_class": "LIVE_RUNTIME",
                 "bootstrap_source": str(bootstrap_launcher),
                 "candidate_id": FIRST_INSTALL_UPDATE_ID,
@@ -9231,8 +9239,14 @@ def run_installed_smoke(
                 "active_record_and_desktop_entry": "Broker-created-and-verified",
                 "durable_audit": durable_audit,
                 "normal_exit_and_owned_process_cleanup": "PASS",
-            }, ensure_ascii=False, separators=(",", ":"), sort_keys=True))
-            return
+            }
+            if acceptance_scope == "debian_setup_first_install":
+                print(json.dumps({
+                    "acceptance_scope": acceptance_scope,
+                    **first_install_evidence,
+                }, ensure_ascii=False, separators=(",", ":"), sort_keys=True))
+                return
+            app_log = acceptance_root / "installed-after-first-install-app.log"
         record = json.loads(record_path.read_text(encoding="utf-8"))
         stage = product_root / "versions" / f"{record['product_version']}-{record['package_sha256']}"
         previous_record = record.get("previous")
@@ -9522,14 +9536,15 @@ def run_installed_smoke(
                     _terminate_group(wayland_compositor)
             return
 
-        window_manager = subprocess.Popen(
-            ["openbox", "--sm-disable"],
-            env=environment,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True,
-        )
+        if window_manager is None or window_manager.poll() is not None:
+            window_manager = subprocess.Popen(
+                ["openbox", "--sm-disable"],
+                env=environment,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
         time.sleep(0.5)
         if window_manager.poll() is not None:
             raise RuntimeError("隔離Openboxが起動しませんでした")
@@ -10348,32 +10363,30 @@ def run_installed_smoke(
             require_catalog=True,
             require_update_lifecycle=True,
         )
-        print(
-            json.dumps(
-                {
-                    "installed_entry": str(entries[0]),
-                    "active_version": record["product_version"],
-                    "package_sha256": record["package_sha256"],
-                    "gtk_window": "opened_and_normally_closed",
-                    "wayland_installed_window": "AT-SPI表示確認済み; 所有process群停止済み; 画面描画は未確認",
-                    "owned_processes": "all_stopped",
-                    "installed_ui_owner_confirmation": "native_AT-SPI_rejected_then_approved_through_GTK_runner_private_pipe",
-                    "uninstall_rejection_ui": (
-                        "same_window_remained_visible"
-                        if reject_window_reopened
-                        else "restarted_from_fixed_desktop_entry_for_fresh_approval"
-                    ),
-                    "manifest": manifest_evidence,
-                    "update_catalog": catalog_evidence,
-                    "update_lifecycle": update_evidence,
-                    "uninstall": uninstall_evidence,
-                    "live_audit": audit_evidence,
-                    "runtime_audit": "durable_after_broker_restart",
-                },
-                ensure_ascii=False,
-                separators=(",", ":"),
-            )
-        )
+        final_evidence: dict[str, object] = {
+            "installed_entry": str(entries[0]),
+            "active_version": record["product_version"],
+            "package_sha256": record["package_sha256"],
+            "gtk_window": "opened_and_normally_closed",
+            "wayland_installed_window": "AT-SPI表示確認済み; 所有process群停止済み; 画面描画は未確認",
+            "owned_processes": "all_stopped",
+            "installed_ui_owner_confirmation": "native_AT-SPI_rejected_then_approved_through_GTK_runner_private_pipe",
+            "uninstall_rejection_ui": (
+                "same_window_remained_visible"
+                if reject_window_reopened
+                else "restarted_from_fixed_desktop_entry_for_fresh_approval"
+            ),
+            "manifest": manifest_evidence,
+            "update_catalog": catalog_evidence,
+            "update_lifecycle": update_evidence,
+            "uninstall": uninstall_evidence,
+            "live_audit": audit_evidence,
+            "runtime_audit": "durable_after_broker_restart",
+        }
+        if first_install_evidence is not None:
+            final_evidence["first_install"] = first_install_evidence
+            final_evidence["acceptance_scope"] = acceptance_scope
+        print(json.dumps(final_evidence, ensure_ascii=False, separators=(",", ":")))
     finally:
         primary_acceptance_error = sys.exc_info()[1]
         if acceptance_scope in {
@@ -10590,6 +10603,7 @@ def main() -> int:
         choices=(
             "update_lifecycle",
             "debian_setup_first_install",
+            "debian_setup_lifecycle",
             "credential_vault",
             "mcp_tool_execution",
             "mcp_credential_binding",

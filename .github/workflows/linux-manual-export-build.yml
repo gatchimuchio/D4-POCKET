@@ -25,6 +25,7 @@ name: Linux manual product build and installed acceptance
           - portable_archive
           - debian_setup_package
           - debian_setup_first_install
+          - debian_setup_lifecycle
         default: update_lifecycle
 
 permissions:
@@ -71,7 +72,8 @@ jobs:
             packages+=(sway wtype)
           fi
           if [ '${{ inputs.acceptance_scope }}' = 'debian_setup_package' ] || \
-             [ '${{ inputs.acceptance_scope }}' = 'debian_setup_first_install' ]; then
+             [ '${{ inputs.acceptance_scope }}' = 'debian_setup_first_install' ] || \
+             [ '${{ inputs.acceptance_scope }}' = 'debian_setup_lifecycle' ]; then
             packages+=(dpkg-dev)
           fi
           sudo apt-get install --yes --no-install-recommends "${packages[@]}"
@@ -225,7 +227,8 @@ jobs:
           python3 -m unittest tooling.tests.test_export_linux_product
           python3 -m unittest tooling.tests.test_linux_portable_archive
           if [ '${{ inputs.acceptance_scope }}' = 'debian_setup_package' ] || \
-             [ '${{ inputs.acceptance_scope }}' = 'debian_setup_first_install' ]; then
+             [ '${{ inputs.acceptance_scope }}' = 'debian_setup_first_install' ] || \
+             [ '${{ inputs.acceptance_scope }}' = 'debian_setup_lifecycle' ]; then
             python3 -m unittest tooling.tests.test_linux_deb_setup_package
           fi
           if [ '${{ inputs.acceptance_scope }}' = 'portable_archive' ]; then
@@ -260,7 +263,8 @@ jobs:
              [ '${{ inputs.acceptance_scope }}' != 'runtime_provenance' ] && \
              [ '${{ inputs.acceptance_scope }}' != 'wayland_rendering' ] && \
              [ '${{ inputs.acceptance_scope }}' != 'debian_setup_package' ] && \
-             [ '${{ inputs.acceptance_scope }}' != 'debian_setup_first_install' ]; then
+             [ '${{ inputs.acceptance_scope }}' != 'debian_setup_first_install' ] && \
+             [ '${{ inputs.acceptance_scope }}' != 'debian_setup_lifecycle' ]; then
             dbus-run-session -- xvfb-run -a python3 tooling/tests/linux_gtk_bundle_smoke.py \
               --launcher "$output_root/bundle/gui_shell_desktop_launcher" \
               --temp-root "$D4P_EXPORT_ROOT" \
@@ -289,6 +293,8 @@ jobs:
               printf -- '- Debian Setup package acceptance follows in a separate installed-package step; the APT package is a first-run bootstrap and does not replace Broker-controlled per-user product install/update/rollback/uninstall.\n'
             elif [ '${{ inputs.acceptance_scope }}' = 'debian_setup_first_install' ]; then
               printf -- '- APT-installed Setup UIからの初回Broker導入Acceptanceを専用stepで実行します。従来のbootstrap package更新／rollback Acceptanceは再実行しません。\n'
+            elif [ '${{ inputs.acceptance_scope }}' = 'debian_setup_lifecycle' ]; then
+              printf -- '- APT-installed Setup初回導入からinstalled Update Centerのdownload／stage／activation／rollback、Export、Uninstallまでを同じrunで接続するD4-LNX-T06統合acceptanceを専用stepで実行します。更新candidateは既存の非実行test fixtureです。\n'
             else
               printf -- '- Runtime smoke: portable product Rust launcher opened and normally closed its Flutter GTK window under Xvfb/X11; Wayland run used Weston headless/Pixman, verified the live launcher GTK process successfully connected to the isolated Wayland socket using external connect-syscall observation, then stopped the owned process group. No debug environment variable was required or forwarded through the frontend allowlist. Both used an initially absent XDG_DATA_HOME and verified cleanup.\n'
               printf -- '- Scope: portable first-launch, Linux GTK X11 window close, and Wayland socket-connect smoke only; the Wayland check does not prove surface rendering. This build is not signed Install/Owner activation, installed-version handoff, production compositor coverage, formal distribution, or runtime Manifest consumption.\n'
@@ -427,15 +433,23 @@ jobs:
           fi
 
       - name: Ubuntu 24.04 installed Setupからの初回Broker導入とversion handoff
-        if: ${{ inputs.acceptance_scope == 'debian_setup_first_install' }}
+        if: ${{ inputs.acceptance_scope == 'debian_setup_first_install' || inputs.acceptance_scope == 'debian_setup_lifecycle' }}
         shell: bash
         run: |
           set -euo pipefail
           output_root="$D4P_EXPORT_ROOT/output"
           acceptance_root="$D4P_EXPORT_ROOT/debian-first-install-acceptance"
+          if [ '${{ inputs.acceptance_scope }}' = 'debian_setup_lifecycle' ]; then
+            acceptance_root="$D4P_EXPORT_ROOT/debian-setup-lifecycle-acceptance"
+          fi
           package_dir="$output_root/debian-first-install"
           install_marker="$D4P_EXPORT_ROOT/debian-first-install-package-install-started"
           evidence="$output_root/d4_pocket_linux_export_build.json"
+          product_package="$output_root/D4Pocket-linux.d4pkg"
+          if [ '${{ inputs.acceptance_scope }}' = 'debian_setup_lifecycle' ]; then
+            product_package="$output_root/D4Pocket-linux-rollback.d4pkg"
+          fi
+          product_package_sha="$(sha256sum "$product_package" | cut -d ' ' -f 1)"
           test "$(dpkg --print-architecture)" = amd64
           . /etc/os-release
           test "$ID" = ubuntu
@@ -481,20 +495,40 @@ jobs:
           test "$(dpkg-query -S /usr/share/applications/d4-pocket-setup.desktop | cut -d: -f1)" = d4-pocket-setup
           grep -Fx 'Exec=/opt/d4-pocket/setup/gui_shell_desktop_launcher' /usr/share/applications/d4-pocket-setup.desktop
           dbus-run-session -- xvfb-run -a python3 tooling/tests/linux_installed_product_smoke.py \
-            --package "$output_root/D4Pocket-linux.d4pkg" \
+            --package "$product_package" \
             --temp-root "$D4P_EXPORT_ROOT" \
             --acceptance-root "$acceptance_root" \
             --private-key "$D4P_EXPORT_ROOT/test-update-private.der" \
-            --update-package "$output_root/D4Pocket-linux.d4pkg" \
-            --acceptance-scope debian_setup_first_install
+            --update-package "$product_package" \
+            --acceptance-scope '${{ inputs.acceptance_scope }}' | tee "$D4P_EXPORT_ROOT/debian-setup-acceptance-result.json"
+          python3 - "$D4P_EXPORT_ROOT/debian-setup-acceptance-result.json" '${{ inputs.acceptance_scope }}' "$product_package_sha" <<'PY'
+          import json, pathlib, sys
+          result = json.loads(pathlib.Path(sys.argv[1]).read_text())
+          scope = sys.argv[2]
+          assert result["acceptance_scope"] == scope
+          if scope == "debian_setup_lifecycle":
+              first = result["first_install"]
+              assert first["product_version"] == "0.1.1"
+              assert first["package_sha256"] == sys.argv[3]
+              assert result["update_lifecycle"]["active_record"]["product_version"] == "0.1.2"
+              assert result["active_version"] == "0.1.1"
+              assert result["uninstall"] and result["live_audit"]
+          PY
           test "$(dpkg-query -W -f='${Status}' d4-pocket-setup)" = 'install ok installed'
-          printf '\n- Linux first-install product path: Ubuntu 24.04 amd64; source `%s`; APT package SHA-256 `%s`; bundle tree `%s`。\n' \
-            "$source_commit" "$package_sha" "$artifact_tree_sha" >> "$GITHUB_STEP_SUMMARY"
-          printf -- '- LIVE_RUNTIME: APT-installed Setup launcherから、同run生成packageのBroker cache再検証要求／stage／初回Installを各々native Owner拒否後に新規要求で承認し、Broker active record／XDG entry、実installed Flutter／Broker process、version handoff、正常終了、file-backed Auditを確認。download要求は既存cacheを検証する経路で、HTTPSからの取得は本scope外。署名鍵とOwner判断はrun限定fixture。\n' >> "$GITHUB_STEP_SUMMARY"
-          printf -- '- Scope does not establish physical desktop behavior, formal signing/distribution, general Linux support, or release readiness.\n' >> "$GITHUB_STEP_SUMMARY"
+          if [ '${{ inputs.acceptance_scope }}' = 'debian_setup_lifecycle' ]; then
+            printf '\n- Linux integrated Setup lifecycle: Ubuntu 24.04 amd64; source `%s`; APT Setup `.deb` SHA-256 `%s`; initial product D4PKG SHA-256 `%s`; bundle tree `%s`。\n' \
+              "$source_commit" "$package_sha" "$product_package_sha" "$artifact_tree_sha" >> "$GITHUB_STEP_SUMMARY"
+            printf -- '- LIVE_RUNTIME: APT-installed Setup first-installed same-run product D4PKG v0.1.1; then installed Update Center staged and activated test v0.1.2, rolled back to v0.1.1, and completed installed Export/Uninstall with user-data preservation, Audit, and owned-process cleanup. The remote update payload remains a non-executable acceptance fixture, so this does not close the full same-source update requirement. Initial cache and Owner decisions use run-scoped test fixtures.\n' >> "$GITHUB_STEP_SUMMARY"
+            printf -- '- Scope does not establish physical desktop behavior, formal signing/distribution, general Linux support, or release readiness.\n' >> "$GITHUB_STEP_SUMMARY"
+          else
+            printf '\n- Linux first-install product path: Ubuntu 24.04 amd64; source `%s`; APT Setup `.deb` SHA-256 `%s`; product D4PKG SHA-256 `%s`; bundle tree `%s`。\n' \
+              "$source_commit" "$package_sha" "$product_package_sha" "$artifact_tree_sha" >> "$GITHUB_STEP_SUMMARY"
+            printf -- '- LIVE_RUNTIME: APT-installed Setup launcherから、同run生成packageのBroker cache再検証要求／stage／初回Installを各々native Owner拒否後に新規要求で承認し、Broker active record／XDG entry、実installed Flutter／Broker process、version handoff、正常終了、file-backed Auditを確認。download要求は既存cacheを検証する経路で、HTTPSからの取得は本scope外。署名鍵とOwner判断はrun限定fixture。\n' >> "$GITHUB_STEP_SUMMARY"
+            printf -- '- Scope does not establish physical desktop behavior, formal signing/distribution, general Linux support, or release readiness.\n' >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: 初回導入試験後のAPT package-owned file cleanup
-        if: ${{ always() && inputs.acceptance_scope == 'debian_setup_first_install' }}
+        if: ${{ always() && (inputs.acceptance_scope == 'debian_setup_first_install' || inputs.acceptance_scope == 'debian_setup_lifecycle') }}
         shell: bash
         run: |
           set -euo pipefail
