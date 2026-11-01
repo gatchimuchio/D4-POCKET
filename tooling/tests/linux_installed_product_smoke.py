@@ -8964,7 +8964,7 @@ def run_installed_smoke(
                 raise RuntimeError("初回導入packageの製品identityが不正です")
             package_hash = hashlib.sha256(package_bytes).hexdigest()
             stage_directory = product_root / "versions" / f"{product_version}-{package_hash}"
-            desktop_entry = xdg_data_home / "applications" / f"d4-pocket-{APP_ID}.desktop"
+            desktop_entry = xdg_data_home / "applications" / f"com.d4pocket.{APP_ID}.desktop"
             broker_state = xdg_state_home / "d4-pocket/linux-broker"
             audit_store = broker_state / "store"
             package_store = audit_store / "update_packages" / f"{package_hash}.pkg"
