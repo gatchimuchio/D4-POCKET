@@ -196,17 +196,17 @@
       "latest_evidence": {
         "date": "2026-11-02",
         "result": "PASS",
-        "workflow_run": "https://github.com/gatchimuchio/D4-POCKET/actions/runs/41333200330",
-        "source_commit": "c8320cc162449c8e6b76433509a0ad2c0aa6cc98",
-        "scope": "手動workflow_dispatchのActions run ID 41333200330。Ubuntu 22.04でacceptance_scope=provider_credential_bindingを実行し、installed product 0.1.0のpackage SHA-256 3f86b81037c788d48bc8c15a5a4fea9d65306ad57fd429d3f18f936c89de61deを検証した。GTK UIから隔離Secret Serviceへ合成keyを登録し、Permission 1件と独立Owner Approval 1件を消費して実Codex CLIのTaskを完了、Workspaceへ書き込んだ。secret／Workspace外read拒否、Provider keyのtool環境・Audit非露出、Provider-use Audit、Task scratch cleanup、正常終了後のAudit再読込、owned process cleanupを確認した。",
-        "limits": "合成keyとloopback Responses fixtureを使用し、外部Providerには接続していない。証拠はProvider credential bindingの限定installed scopeであり、通常Release task_execution能力、Linux native製品全体、production Publisher／署名identity、正式配布を証明しない。Linux blockerはunresolved、通常Release task_execution=unsupported、release_ready=falseを維持する。"
+        "workflow_run": "https://github.com/gatchimuchio/D4-POCKET/actions/runs/41355224582",
+        "source_commit": "0fefe229d41548551145f6cf8d647e363b4c2fa2",
+        "scope": "手動workflow_dispatchのActions run ID 41355224582。Ubuntu 24.04.5 LTS amd64のhosted runnerでacceptance_scope=debian_setup_first_installを実行した。APT-installed Setup UIからBroker cache package再検証、stage、初回activation、installed version handoffまで成立し、cached download／stage／activation各操作のnative Owner拒否と独立要求の許可、Broker作成active record／desktop entry、version 0.1.0、durable_audit.events=75、正常終了とowned process cleanupを確認した。APT package SHA-256 57d8e52f13fa1e66bdf88bac62be34b90b152aca53c7783c1af3e6df60f487f9、bundle tree SHA-256 f07da26424d0581fe1c4333766d2c6bb9446aaae65892834bf4d8bbba349ab4c。",
+        "limits": "run内cache packageのBroker再検証であり、新規HTTPS package取得を含まない。Xvfb／X11 hosted runner上のLIVE_RUNTIME限定証拠で、実desktop／Wayland、正式Publisher／署名identity、正式配布、Linux native製品全体を証明しない。Linux blockerはunresolved、通常Release task_execution=unsupported、release_ready=falseを維持する。"
       },
       "previous_passed_evidence": {
-        "date": "2026-11-01",
+        "date": "2026-11-02",
         "result": "PASS",
-        "workflow_run": "https://github.com/gatchimuchio/D4-POCKET/actions/runs/41282313140",
-        "source_commit": "4fdffdb559cbd6a91677785db5b798b05d613827",
-        "scope": "直前の限定run #248。Ubuntu 24.04 installed GTK MCP Credential bindingでOwner拒否／許可、Secret Service選択、一回Credential Audit、承認後のstdio child合成値一致、一回Tool Approval／Permission消費、hash-only結果とdurable Audit一致、secret／本文非露出、disconnect拒否／許可、owned process group停止、cleanup、正常終了を受け入れた。詳細と証拠範囲はdocs/REV5_PRODUCT_PROGRESS.mdを参照。"
+        "workflow_run": "https://github.com/gatchimuchio/D4-POCKET/actions/runs/41333200330",
+        "source_commit": "c8320cc162449c8e6b76433509a0ad2c0aa6cc98",
+        "scope": "Ubuntu 22.04 installed productのprovider_credential_binding限定run。GTK UIから隔離Secret Serviceへ合成keyを登録し、Permission 1件とOwner Approval 1件を消費して実Codex CLI Taskを完了、Workspaceへ書き込んだ。secret／Workspace外read拒否、Provider keyのtool環境・Audit非露出、scratch cleanup、Audit再読込、owned process cleanupを確認した。loopback fixtureであり、外部Providerには接続していない。詳細はdocs/REV5_PRODUCT_PROGRESS.mdを参照。"
       },
       "previous_failed_evidence": {
         "date": "2026-11-01",
@@ -216,8 +216,8 @@
         "scope": "直前の失敗run #247はMCP Credential binding受入れでpositive acceptance JSONを出した後、summary用printfの引用符不整合によりworkflowが失敗した。",
         "disposition": "workflow summaryの引用符不整合として履歴を保持する。製品受入れ自体の失敗とは分類しない。修正後のrun #248が同じMCP Credential binding scopeをPASSした。"
       },
-      "reason": "Linux native DesktopはWindows／macOSと同列の必須製品対象である。Provider credential binding Actions run ID 41333200330は、Ubuntu 22.04 installed productでの合成Credential登録と実Codex CLI Task完了に限るPASSであり、外部Provider接続を含まない。portable_archive run #249、MCP Credential binding run #248、Agent Task #190、crash recovery #237、A2A metadata #231、runtime provenance #192、Wayland rendering #193、Credential Vault #194、MCP child／Tool、Update Center #77も各限定範囲の証拠である。実desktop／compositor受入れ、通常ReleaseのTask capability、正式Installer／update／rollback／uninstall／署名配布、Linux必須consumer全体は未成立。Linux native blockerはunresolved、通常Release task_execution=unsupported、release_ready=falseを維持する。",
-      "required_action": "Provider credential binding Actions run ID 41333200330、portable archive run #249、MCP Credential binding run #248、成立済みMCP child／Tool、およびその他の受入れ済み範囲は、再現可能な回帰がない限り再試験しない。残件は実desktop／compositor範囲、通常ReleaseのTask capability条件、正式Installer／update／rollback／uninstall／署名配布、その他の未成立な必須製品consumerである。全必須条件が成立するまでLinux blockerとrelease gateを維持する。"
+      "reason": "Linux native DesktopはWindows／macOSと同列の必須製品対象である。最新のAPT-installed Setup初回導入run #41355224582は、cache packageのBroker再検証、stage、初回activation、installed version handoffの限定PASSであり、新規HTTPS package取得や物理desktop／Waylandを含まない。Provider credential binding run #41333200330、portable_archive run #249、MCP Credential binding run #248、Agent Task #190、crash recovery #237、A2A metadata #231、runtime provenance #192、Wayland rendering #193、Credential Vault #194、MCP child／Tool、Update Center #77は各限定範囲の証拠である。同一source／manifest／hashでの完全なbuild→package→install→first-run→update／rollback→uninstall、実desktop／compositor、通常Release Task capability、正式署名配布、Linux必須consumer全体は未成立。Linux native blockerはunresolved、通常Release task_execution=unsupported、release_ready=falseを維持する。",
+      "required_action": "受入れ済みの個別scopeは再現可能な回帰がない限り再試験しない。次はD4-LNX-T06の同一source／manifest／hashによるbuild→package→install→first-run→update／rollback→uninstall統合経路で、既存証拠間の未接続箇所を閉じる。Linux受入れ表に残る実desktop／compositor範囲、通常Release Task capability条件、正式署名配布、その他の未成立な必須consumerも完了まで保持する。全必須条件が成立するまでLinux blockerとrelease gateを維持する。"
     },
     {
       "name": "rev2_mobile_device_evidence",
