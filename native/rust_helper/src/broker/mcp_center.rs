@@ -743,7 +743,7 @@ pub(super) fn call_tool(
         OP_TOOL_CALL,
         "accepted",
         &format!(
-            "Capability=mcp.tool.call Permission={} consumed=true Approval={} RecoveryAction=inspect-mcp-tool-side-effect; 結果本文を保持せずhash-only receiptを確定; result_hash={} content_count={} isError={}",
+            "Capability=mcp.tool.call Permission={} consumed=true Approval={} RecoveryAction=inspect-mcp-tool-side-effect; 結果本文を保持せず、ツール結果のハッシュだけを含む受領票を確定; result_hash={} content_count={} isError={}",
             permission.id,
             approval_event.event_id,
             result_hash,
@@ -1363,6 +1363,7 @@ echo {"jsonrpc":"2.0","id":3,"result":{"resultType":"complete","content":[{"type
             event.operation == "MCP Tool実行"
                 && event.decision == "accepted"
                 && event.evidence_source == EVIDENCE_SOURCE_LIVE_RUNTIME
+                && event.reason.contains("ハッシュだけを含む受領票")
         }));
 
         let disconnected = broker_test_operation(
