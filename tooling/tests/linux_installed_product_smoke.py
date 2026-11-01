@@ -4312,6 +4312,26 @@ def _read_task_scratch_recovery_state(
     return {"entries": len(entries), "hmac_present": True}
 
 
+def _linux_agent_task_history_records(
+    audit_events: list[dict[str, object]], task_id: str
+) -> list[dict[str, object]]:
+    records: list[dict[str, object]] = []
+    for event in audit_events:
+        operation = event.get("operation")
+        reason = event.get("reason")
+        if not isinstance(operation, str) or not isinstance(reason, str):
+            continue
+        if not (
+            operation in {"AgentTask実行", "AgentTask状態"}
+            or operation.startswith("Agent Task中断回復")
+        ) or not reason.startswith("AgentTask履歴:"):
+            continue
+        record = json.loads(reason.removeprefix("AgentTask履歴:"))
+        if isinstance(record, dict) and record.get("task_id") == task_id:
+            records.append(record)
+    return records
+
+
 def _linux_installed_task_status_observation(
     task_id: str,
     expected_status: str,
@@ -5466,17 +5486,7 @@ def _run_installed_agent_task_crash_recovery_acceptance(
         and event.get("operation", "").startswith("Agent Task中断回復")
         and event.get("decision") == "suspended"
     ]
-    task_history: list[dict[str, object]] = []
-    for event in audit_events:
-        reason = event.get("reason")
-        if (
-            event.get("operation") in {"AgentTask実行", "AgentTask状態"}
-            and isinstance(reason, str)
-            and reason.startswith("AgentTask履歴:")
-        ):
-            record = json.loads(reason.removeprefix("AgentTask履歴:"))
-            if isinstance(record, dict) and record.get("task_id") == task_id:
-                task_history.append(record)
+    task_history = _linux_agent_task_history_records(audit_events, task_id)
     terminal = [record for record in task_history if record.get("stage") == "terminal"]
     scratch_recovery_events = [
         event

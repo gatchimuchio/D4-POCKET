@@ -12161,6 +12161,7 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
         "expected_entries=1",
         '"post-crash-cli-identity"',
         "previous_codex_home.relative_to(acceptance_root.resolve(strict=True))",
+        'operation.startswith("Agent Task中断回復")',
         '"codex_home_after_broker_restart": "fresh_run_owned_empty_fixture"',
         '"task_recovery_status": "suspended"',
     ):

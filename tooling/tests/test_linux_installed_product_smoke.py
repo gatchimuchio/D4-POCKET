@@ -29,6 +29,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _accessible_scope_with_named_descendant,
     _cleanup_linux_agent_task_process_groups,
     _linux_installed_task_status_observation,
+    _linux_agent_task_history_records,
     _linux_broker_process_role,
     _linux_runtime_artifact_inventory,
     _verify_linux_installed_artifact_provenance,
@@ -3523,6 +3524,38 @@ class LinuxBrokerProcessRoleTests(unittest.TestCase):
             _linux_broker_process_role(
                 [b"/installed/gui_shell_linux_broker", b"--internal-process-group-guardian-v1", b"extra"]
             )
+        )
+
+
+class LinuxAgentTaskHistoryRecoveryEvidenceTests(unittest.TestCase):
+    def test_includes_structured_recovery_terminal_record(self) -> None:
+        task_id = "task-crash-recovery-1"
+        start = {"task_id": task_id, "stage": "start", "status": "running"}
+        terminal = {
+            "task_id": task_id,
+            "stage": "terminal",
+            "status": "suspended",
+            "result_hash": None,
+        }
+        events = [
+            {
+                "operation": "AgentTask実行",
+                "reason": "AgentTask履歴:" + json.dumps(start),
+            },
+            {
+                "operation": "Agent Task中断回復（状態隔離・RecoveryAction=Workspace差分を確認）",
+                "reason": "AgentTask履歴:" + json.dumps(terminal),
+            },
+            {
+                "operation": "AgentTask実行",
+                "reason": "AgentTask履歴:"
+                + json.dumps({"task_id": "another-task", "stage": "start"}),
+            },
+        ]
+
+        self.assertEqual(
+            _linux_agent_task_history_records(events, task_id),
+            [start, terminal],
         )
 
 
