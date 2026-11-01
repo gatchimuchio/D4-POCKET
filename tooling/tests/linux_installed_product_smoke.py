@@ -1843,6 +1843,65 @@ def _secret_service_startup_diagnostic(
     return " | ".join(line.strip() for line in content.splitlines() if line.strip())[:1200]
 
 
+def _secret_service_control_diagnostic(control_directory: Path) -> str:
+    control_path = control_directory / "control"
+    try:
+        control_stat = control_path.lstat()
+        if stat.S_ISSOCK(control_stat.st_mode):
+            socket_kind = "socket"
+        elif stat.S_ISREG(control_stat.st_mode):
+            socket_kind = "regular-file"
+        else:
+            socket_kind = "other"
+    except FileNotFoundError:
+        socket_kind = "absent"
+    except OSError:
+        socket_kind = "unreadable"
+
+    try:
+        unix_rows = Path("/proc/net/unix").read_text(encoding="utf-8").splitlines()[1:]
+    except OSError:
+        return f"control_socket={socket_kind}; listener_owners=proc-unavailable"
+
+    socket_inodes = {
+        fields[6]
+        for fields in (line.split(maxsplit=7) for line in unix_rows)
+        if len(fields) == 8 and fields[7] == str(control_path)
+    }
+    if not socket_inodes:
+        return f"control_socket={socket_kind}; listener_owners=not-found"
+
+    owners: list[str] = []
+    inspected_processes = 0
+    proc_entries = Path("/proc").iterdir()
+    for process_entry in proc_entries:
+        if not process_entry.name.isdigit():
+            continue
+        inspected_processes += 1
+        if inspected_processes > 1024:
+            break
+        try:
+            command = (process_entry / "comm").read_text(encoding="utf-8").strip()
+            descriptors = (process_entry / "fd").iterdir()
+            for descriptor_index, descriptor in enumerate(descriptors):
+                if descriptor_index >= 256:
+                    break
+                try:
+                    target = os.readlink(descriptor)
+                except OSError:
+                    continue
+                if any(target == f"socket:[{inode}]" for inode in socket_inodes):
+                    safe_command = re.sub(r"[^A-Za-z0-9_.-]", "_", command)[:16]
+                    owners.append(f"{process_entry.name}:{safe_command or 'unknown'}")
+                    break
+        except OSError:
+            continue
+        if len(owners) >= 8:
+            break
+    owner_summary = ",".join(owners) if owners else "unknown"
+    return f"control_socket={socket_kind}; listener_owners={owner_summary}"
+
+
 def _start_isolated_secret_service(
     environment: dict[str, str], control_directory: Path, log_path: Path
 ) -> subprocess.Popen[bytes]:
@@ -1880,9 +1939,11 @@ def _start_isolated_secret_service(
                 diagnostic = _secret_service_startup_diagnostic(
                     log_path, (control_directory.parent, control_directory.parent.parent)
                 )
+                control_diagnostic = _secret_service_control_diagnostic(control_directory)
                 raise RuntimeError(
                     "隔離した秘密保管サービスが起動中に終了しました "
-                    f"(exit={process.returncode}; diagnostic={diagnostic or 'empty'})"
+                    f"(exit={process.returncode}; {control_diagnostic}; "
+                    f"log={diagnostic or 'empty'})"
                 )
             owner = subprocess.run(
                 [

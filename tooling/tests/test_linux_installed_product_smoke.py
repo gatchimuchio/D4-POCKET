@@ -5,6 +5,7 @@ import hmac
 import json
 import os
 import signal
+import socket
 import stat
 import subprocess
 import sys
@@ -68,6 +69,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _set_public_text_by_keyboard,
     _set_public_text_by_wayland_keyboard,
     _secret_service_item_labels,
+    _secret_service_control_diagnostic,
     _secret_service_startup_diagnostic,
     _verify_export_manifest,
     _verify_credential_audit,
@@ -1480,6 +1482,24 @@ class LinuxWaylandEnvironmentTests(unittest.TestCase):
 
 
 class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
+    @unittest.skipUnless(Path("/proc/net/unix").is_file(), "Linux Unix socket inspection")
+    def test_secret_service_control_diagnostic_identifies_socket_owner_without_path(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            control_directory = root / "keyring-control"
+            control_directory.mkdir()
+            listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            control_path = control_directory / "control"
+            try:
+                listener.bind(str(control_path))
+                diagnostic = _secret_service_control_diagnostic(control_directory)
+            finally:
+                listener.close()
+
+        self.assertIn("control_socket=socket", diagnostic)
+        self.assertIn(f"listener_owners={os.getpid()}:", diagnostic)
+        self.assertNotIn(str(root), diagnostic)
+
     def test_secret_service_startup_diagnostic_is_bounded_and_redacted(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
