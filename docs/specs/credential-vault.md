@@ -6,7 +6,7 @@
 
 この契約で接続済みの範囲は、owner control経路からの新規追加、通常IPCからの安全なmetadata一覧、Windows／macOS／Linux MCP stdio接続への限定利用、およびnative Owner確認付き論理失効である。Runtime一般、Agent、Tool、A2Aへの注入、更新、暗号文の物理削除、接続先変更、物理削除Recoveryは未接続であり、未完成のまま保管庫完成とは扱わない。
 
-P13のMac登録・Keychain保管・論理失効の現在範囲は`macos-credential-vault.md`のCLOSED受入れを正本とする。本書のC9当時のWindows限定・Keychain未接続は履歴である。Mac MCPへの追加consumerは`macos-mcp-credential-binding.md`（CLOSED）へ限定し、公開ID参照・別個native確認・現在recordの再照合から対象stdio環境一つへ結合する。Linuxデスクトップ版はGTK native入力→別個Owner確認→既存Broker→ユーザーSecret Service default collectionの限定経路を追加した。Linux Provider／Agent／A2A注入や正式配布へ成立を拡大しない。
+P13のMac登録・Keychain保管・論理失効の現在範囲は`macos-credential-vault.md`のCLOSED受入れを正本とする。本書のC9当時のWindows限定・Keychain未接続は履歴である。Mac MCPへの追加consumerは`macos-mcp-credential-binding.md`（CLOSED）へ限定し、公開ID参照・別個native確認・現在recordの再照合から対象stdio環境一つへ結合する。Linuxデスクトップ版はGTK native入力→別個Owner確認→既存Broker→ユーザーSecret Service default collectionの限定経路を追加した。Agent CenterのCodex登録画面からLinux Provider資格情報登録を開始する場合、FlutterはランダムID・固定用途`provider_api_key`・固定対象`openai_codex_cli`・種類`api_key`だけを既存登録要求へ渡し、秘密入力とOwner確認は既存Rust GTK経路で完結する。登録receiptを検査した後、metadata-only一覧で同じIDを確認できた場合だけProvider選択へ接続する。このUI接続はProvider実行・通常Release Task能力・正式配布の受入れではなく、Linux Provider／Agent／A2Aへの秘密注入が成立したとも扱わない。
 
 ## 登録境界
 
@@ -68,4 +68,4 @@ P6のCodex CLI Provider結合は、`provider_model_selection.authentication_sour
 
 Product Buildでは合成Credentialを偽Codex CLIへ渡すfixtureで、親process環境への受渡し、引数・結果への非露出、tool shell除外設定を検査する。Broker単体ではcurrent Permission／Approvalの検証後だけcredential resolverへ進むことを検査する。実Codex CLI 0.160.0を合成loopback Responses APIへ接続するWindows `LIVE_RUNTIME`試験は、API request前にMxCの`CreateProcessSecurityEnvironment`／HRESULT `0x80070003`で停止したため、実CLIでの認証・tool child除外・Provider接続は未確認である。Provider healthとmodel availabilityは`unknown`のままとする。この環境制約はProduct Buildのfixture成立を取り消さず、実CLI経路はFinal QA／release evidenceで確認する。
 
-未接続範囲は、Codex CLI Provider以外のRuntime／Tool／A2A使用、GUI上でのCredential登録・更新・物理削除・接続先変更・物理削除Recovery操作、Windows 導入済み製品での登録／注入／失効証拠、Linux native 導入済み製品での登録／注入／失効とprocess回復証拠、macOS/iOS KeychainおよびAndroid Keystoreである。これらは`release_blocker`として残し、限定Codex CLI結合、登録・論理失効またはMCP用への注入成功を製品完成やrelease readinessへ昇格させない。
+未接続範囲は、Codex CLI Provider以外の実行系／道具／A2Aでの資格情報利用、資格情報の更新・接続先変更・暗号文の物理削除と復旧、Windows導入済み製品における登録／注入／失効の証拠、Linux導入済み製品における子プロセス異常終了後を含む回復、macOS／iOS KeychainおよびAndroid Keystoreである。Linux Agent CenterとMCP Centerからの登録導線、および既受入れのLinux限定範囲は個別の接続に留まり、資格情報管理全体やLinux製品全体のblockerを閉じない。これらは`release_blocker`に残し、限定Codex CLI結合や登録・論理失効またはMCP用注入の成功を、製品完成やrelease readinessへ昇格させない。

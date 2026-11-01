@@ -8,6 +8,7 @@ import 'package:gui_shell_desktop/services/mcp_connection_client.dart';
 class _LinuxCredentialTransport implements BrokerTransport {
   final payloads = <Map<String, Object?>?>[];
   Map<String, Object?>? entry;
+  String? receiptPurposeOverride;
 
   @override
   Future<Map<String, Object?>> request(String operation,
@@ -17,7 +18,7 @@ class _LinuxCredentialTransport implements BrokerTransport {
       entry = {
         '版': 1,
         '資格情報ID': payload!['資格情報ID'],
-        '用途': 'mcp_transport',
+        '用途': receiptPurposeOverride ?? payload['用途'],
         '接続対象': payload['接続対象'],
         '種類': 'api_key',
         '保管方式': 'linux_secret_service',
@@ -71,6 +72,72 @@ void main() {
     expect(revoked.storage, 'linux_secret_service');
   });
 
+  test('Linux Provider Credential登録は固定対象と公開metadataだけをBrokerへ渡す', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final transport = _LinuxCredentialTransport();
+    final client = McpConnectionClient(transport);
+
+    await client.registerLinuxNativeProviderCredential(credentialId: 'c' * 32);
+
+    expect(transport.payloads.single, {
+      '版': 1,
+      '資格情報ID': 'c' * 32,
+      '用途': 'provider_api_key',
+      '接続対象': 'openai_codex_cli',
+      '種類': 'api_key',
+    });
+    expect(
+      (await client.listProviderCredentials()).single.credentialId,
+      'c' * 32,
+    );
+    expect(transport.payloads.toString(), isNot(contains('秘密値')));
+  });
+
+  test('Provider Credential native registration is unavailable off Linux',
+      () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final transport = _LinuxCredentialTransport();
+
+    await expectLater(
+      McpConnectionClient(transport)
+          .registerLinuxNativeProviderCredential(credentialId: 'd' * 32),
+      throwsA(isA<BrokerClientException>()),
+    );
+    expect(transport.payloads, isEmpty);
+  });
+
+  test('Linux Provider Credential registration rejects a mismatched receipt',
+      () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final transport = _LinuxCredentialTransport()
+      ..receiptPurposeOverride = 'mcp_transport';
+
+    await expectLater(
+      McpConnectionClient(transport)
+          .registerLinuxNativeProviderCredential(credentialId: 'e' * 32),
+      throwsA(isA<BrokerClientException>()),
+    );
+    expect(transport.payloads.single!['用途'], 'provider_api_key');
+  });
+
+  test(
+      'Linux Provider Credential registration rejects malformed IDs before IPC',
+      () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final transport = _LinuxCredentialTransport();
+
+    await expectLater(
+      McpConnectionClient(transport)
+          .registerLinuxNativeProviderCredential(credentialId: 'invalid'),
+      throwsA(isA<BrokerClientException>()),
+    );
+    expect(transport.payloads, isEmpty);
+  });
+
   testWidgets('Linux MCP画面はGTK native入力を開始しFlutter秘密入力を作らない', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.linux;
     try {
@@ -90,8 +157,8 @@ void main() {
           findsOneWidget);
       expect(find.byKey(const ValueKey('mcp-credential-selection')),
           findsOneWidget);
-      expect(find.textContaining('Linux Desktop sandboxはありません'),
-          findsOneWidget);
+      expect(
+          find.textContaining('Linux Desktop sandboxはありません'), findsOneWidget);
       expect(
           find
               .byType(TextField)

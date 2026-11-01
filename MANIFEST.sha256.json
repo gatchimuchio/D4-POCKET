@@ -76,7 +76,7 @@
     },
     {
       "path": ".github/workflows/linux-manual-export-build.yml",
-      "sha256": "114677ee439fc0d5d76c4c693eb3df96d0f7bda1e3ba040cb8dc34e4b27e8915"
+      "sha256": "03f34b5d07dfdd341da4d0b9f505b9b298282b046724a554e572173a35295e9e"
     },
     {
       "path": ".github/workflows/linux-manual-rust-validation.yml",
@@ -220,7 +220,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/agent_center.dart",
-      "sha256": "d2596141e8a2faaf6b0087cc9bde1b5167939bdd715613491824b99214e975c4"
+      "sha256": "601308c087fe32ce407fd305452fa2341ec282088bae620dc4d0496ddcbbdca8"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/approval_center.dart",
@@ -368,7 +368,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/mcp_connection_client.dart",
-      "sha256": "4dbd55364f00e1859f294dbd9d595cdd16d9de8d54c2ac4ae43305b74a74075a"
+      "sha256": "9021c3b44f330fea645072629fbaa5b2abf67fbe6e628fc7587d0306dad95bb1"
     },
     {
       "path": "apps/desktop_flutter/lib/services/notification_client.dart",
@@ -656,7 +656,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/linux_credential_vault_test.dart",
-      "sha256": "a65fe77d3d18d3f4b31f92a992626f1760a947397e60f17055679d7983239e0f"
+      "sha256": "82c157cd4787066bd4566f2c584f9c21a47bb713bfcb250332b7f4b1a55324c2"
     },
     {
       "path": "apps/desktop_flutter/test/macos_credential_vault_test.dart",
@@ -712,7 +712,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "ea3597c0870d5ec6c0d07523f393e9ed3645b0fbb1f079960774d6e577d607cd"
+      "sha256": "8a502b1d989480508655fc3bf3bffd09f52d9a23e33fe9f9765c5d91e4beb84a"
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
@@ -1352,7 +1352,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "6f0652d0f41cc2f46db0518242c4ba26cdf8fae49005b94ce3dcaa74834fc8ea"
+      "sha256": "b6d0e9f176cce44fc3c09bf30688ee6583dfc27c70f08abc0571d095f0c76612"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1488,7 +1488,7 @@
     },
     {
       "path": "docs/specs/credential-vault.md",
-      "sha256": "07f9c9e0f96b6fb079bbd78d22e2ed72b46e78cf784228ac3ac9b417f4af5dee"
+      "sha256": "55d489799f99c65b81af99b9fa440eedfc269a574a447cefffc24ef3bc625d53"
     },
     {
       "path": "docs/specs/desktop-broker-channel.md",

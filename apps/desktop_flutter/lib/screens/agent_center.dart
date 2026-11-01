@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert' show jsonEncode, utf8;
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
@@ -2018,6 +2019,8 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
   String _authenticationSource = 'codex_cli_managed';
   String? _credentialId;
   Future<List<McpCredentialSummary>>? _providerCredentials;
+  bool _providerCredentialRegistrationPending = false;
+  String? _providerCredentialRegistrationMessage;
   bool _workspaceSelectionPending = false;
   String? _workspaceSelectionMessage;
 
@@ -2291,6 +2294,7 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
           ),
           FilledButton(
             onPressed: _workspaceSelectionPending ||
+                    _providerCredentialRegistrationPending ||
                     (_authenticationSource == 'broker_credential_vault' &&
                         _providerCredentials == null)
                 ? null
@@ -2322,6 +2326,52 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
         ],
       );
 
+  Future<void> _registerLinuxProviderCredential() async {
+    final transport = widget.transport;
+    if (transport == null ||
+        defaultTargetPlatform != TargetPlatform.linux ||
+        _providerCredentialRegistrationPending) {
+      return;
+    }
+    final random = Random.secure();
+    final credentialId = List.generate(
+            16, (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0'))
+        .join();
+    setState(() {
+      _providerCredentialRegistrationPending = true;
+      _providerCredentialRegistrationMessage = null;
+    });
+    final client = McpConnectionClient(transport);
+    try {
+      await client.registerLinuxNativeProviderCredential(
+          credentialId: credentialId);
+      final credentials = await client.listProviderCredentials();
+      if (!mounted) return;
+      final registered = credentials.any(
+        (credential) => credential.credentialId == credentialId,
+      );
+      setState(() {
+        _providerCredentials = Future.value(credentials);
+        if (registered) _credentialId = credentialId;
+        _providerCredentialRegistrationMessage = registered
+            ? '登録receiptと一覧metadataを確認しました。秘密値は画面へ取得していません。'
+            : '登録receipt後の一覧に対象IDがありません。選択を停止しました。';
+      });
+    } on Object {
+      if (mounted) {
+        setState(() {
+          _providerCredentials = client.listProviderCredentials();
+          _providerCredentialRegistrationMessage =
+              '登録結果を確認できません。metadataを再取得します。自動再送しません。';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _providerCredentialRegistrationPending = false);
+      }
+    }
+  }
+
   Future<List<McpCredentialSummary>> _loadProviderCredentials() {
     final transport = widget.transport;
     if (transport == null) {
@@ -2335,10 +2385,13 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
         future: _providerCredentials,
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return const ListTile(
+            return ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.error_outline),
-              title: Text('資格情報metadataを取得できません。登録を停止しました。'),
+              leading: const Icon(Icons.error_outline),
+              title: const Text('資格情報metadataを取得できません。登録を停止しました。'),
+              subtitle: _providerCredentialRegistrationMessage == null
+                  ? null
+                  : Text(_providerCredentialRegistrationMessage!),
             );
           }
           if (!snapshot.hasData) {
@@ -2354,11 +2407,22 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
           }
           final credentials = snapshot.data!;
           if (credentials.isEmpty) {
-            return const ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.info_outline),
-              title: Text('利用可能なOpenAI API keyがありません'),
-              subtitle: Text('資格情報保管庫へ登録後、この画面を開き直してください。'),
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.info_outline),
+                  title: const Text('利用可能なOpenAI API keyがありません'),
+                  subtitle: Text(defaultTargetPlatform == TargetPlatform.linux
+                      ? 'Linuxではnative入力から資格情報を登録できます。'
+                      : '資格情報は未登録です。この画面からの登録は未対応です。'),
+                ),
+                if (defaultTargetPlatform == TargetPlatform.linux)
+                  _linuxProviderCredentialRegistrationButton(),
+                if (_providerCredentialRegistrationMessage != null)
+                  Text(_providerCredentialRegistrationMessage!),
+              ],
             );
           }
           final selected = credentials.any(
@@ -2366,23 +2430,49 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
           )
               ? _credentialId
               : null;
-          return DropdownButtonFormField<String>(
-            key: ValueKey(selected),
-            initialValue: selected,
-            decoration: const InputDecoration(
-              labelText: '資格情報ID',
-              helperText: '秘密値はBrokerから読み取り、画面には返しません。',
-            ),
-            items: credentials
-                .map((credential) => DropdownMenuItem(
-                      value: credential.credentialId,
-                      child: Text(credential.credentialId),
-                    ))
-                .toList(growable: false),
-            validator: (value) => value == null ? '資格情報IDを選択してください' : null,
-            onChanged: (value) => setState(() => _credentialId = value),
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              DropdownButtonFormField<String>(
+                key: ValueKey(selected),
+                initialValue: selected,
+                decoration: const InputDecoration(
+                  labelText: '資格情報ID',
+                  helperText: '秘密値はBrokerから読み取り、画面には返しません。',
+                ),
+                items: credentials
+                    .map((credential) => DropdownMenuItem(
+                          value: credential.credentialId,
+                          child: Text(credential.credentialId),
+                        ))
+                    .toList(growable: false),
+                validator: (value) => value == null ? '資格情報IDを選択してください' : null,
+                onChanged: (value) => setState(() => _credentialId = value),
+              ),
+              if (defaultTargetPlatform == TargetPlatform.linux)
+                _linuxProviderCredentialRegistrationButton(),
+              if (_providerCredentialRegistrationMessage != null)
+                Text(_providerCredentialRegistrationMessage!),
+            ],
           );
         },
+      );
+
+  Widget _linuxProviderCredentialRegistrationButton() => TextButton.icon(
+        key: const ValueKey('linux-provider-credential-register'),
+        onPressed: _providerCredentialRegistrationPending
+            ? null
+            : _registerLinuxProviderCredential,
+        icon: _providerCredentialRegistrationPending
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.key_outlined),
+        label: Text(_providerCredentialRegistrationPending
+            ? 'native入力を待っています'
+            : 'OpenAI API keyをnative入力で登録'),
       );
 }
 

@@ -8,6 +8,7 @@ name: Linux manual product build and installed acceptance
         required: true
         type: choice
         options:
+          - product_build
           - update_lifecycle
           - credential_vault
           - mcp_tool_execution
@@ -148,7 +149,7 @@ jobs:
             agent_cli_owner_summary_does_not_claim_another_platforms_boundary
           printf '\n- Frontend environment allowlist: test-only settings are rejected by the normal Linux feature set and admitted only by the dedicated `r2-e2e` verification feature. Agent CLI Owner confirmation text is tested with both normal and verification feature sets.\n' >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Broker-shaped non-authority fixtureからLinux Release buildとportable launcher初回起動
+      - name: Broker-shaped non-authority fixtureからLinux Release buildとscope別launcher起動
         shell: bash
         run: |
           set -euo pipefail
@@ -244,7 +245,8 @@ jobs:
               --launcher "$extracted_root/D4Pocket/gui_shell_desktop_launcher" \
               --temp-root "$D4P_EXPORT_ROOT" \
               --backend wayland
-          elif [ '${{ inputs.acceptance_scope }}' != 'runtime_provenance' ] && \
+          elif [ '${{ inputs.acceptance_scope }}' != 'product_build' ] && \
+             [ '${{ inputs.acceptance_scope }}' != 'runtime_provenance' ] && \
              [ '${{ inputs.acceptance_scope }}' != 'wayland_rendering' ]; then
             dbus-run-session -- xvfb-run -a python3 tooling/tests/linux_gtk_bundle_smoke.py \
               --launcher "$output_root/bundle/gui_shell_desktop_launcher" \
@@ -264,6 +266,8 @@ jobs:
             printf -- '- Fixture: synthetic Broker-shaped Receipt／Manifest; no Owner authority or credentials.\n'
             if [ '${{ inputs.acceptance_scope }}' = 'runtime_provenance' ]; then
               printf -- '- Portable X11／Wayland smoke was skipped because this scope verifies the installed product provenance; previously accepted scopes are not replayed.\n'
+            elif [ '${{ inputs.acceptance_scope }}' = 'product_build' ]; then
+              printf -- '- Build-only scope: Linux Release export／package compilation and export helper unit tests ran. Portable launcher smoke and every installed-product Acceptance scope were skipped. This does not establish runtime or product acceptance.\n'
             elif [ '${{ inputs.acceptance_scope }}' = 'wayland_rendering' ]; then
               printf -- '- Portable smoke was skipped; the dedicated installed-product Wayland surface-rendering acceptance runs below.\n'
             elif [ '${{ inputs.acceptance_scope }}' = 'portable_archive' ]; then

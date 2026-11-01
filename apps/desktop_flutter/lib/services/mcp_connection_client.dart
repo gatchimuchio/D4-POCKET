@@ -125,6 +125,7 @@ class McpConnectionClient {
       {required String credentialId, required String targetServerId}) async {
     await _registerNativeCredential(
       credentialId: credentialId,
+      purpose: 'mcp_transport',
       targetServerId: targetServerId,
       expectedStorage: 'macos_keychain',
     );
@@ -134,13 +135,28 @@ class McpConnectionClient {
       {required String credentialId, required String targetServerId}) async {
     await _registerNativeCredential(
       credentialId: credentialId,
+      purpose: 'mcp_transport',
       targetServerId: targetServerId,
+      expectedStorage: 'linux_secret_service',
+    );
+  }
+
+  Future<void> registerLinuxNativeProviderCredential(
+      {required String credentialId}) async {
+    if (defaultTargetPlatform != TargetPlatform.linux) {
+      throw const BrokerClientException('Provider資格情報のnative登録はLinuxのみ対応です');
+    }
+    await _registerNativeCredential(
+      credentialId: credentialId,
+      purpose: 'provider_api_key',
+      targetServerId: 'openai_codex_cli',
       expectedStorage: 'linux_secret_service',
     );
   }
 
   Future<void> _registerNativeCredential({
     required String credentialId,
+    required String purpose,
     required String targetServerId,
     required String expectedStorage,
   }) async {
@@ -151,7 +167,7 @@ class McpConnectionClient {
     final response = await _transport.request('資格情報登録', payload: {
       '版': 1,
       '資格情報ID': credentialId,
-      '用途': 'mcp_transport',
+      '用途': purpose,
       '接続対象': targetServerId,
       '種類': 'api_key',
     });
@@ -176,7 +192,7 @@ class McpConnectionClient {
         !body.keys.toSet().containsAll(fields) ||
         body['版'] != 1 ||
         body['資格情報ID'] != credentialId ||
-        body['用途'] != 'mcp_transport' ||
+        body['用途'] != purpose ||
         body['接続対象'] != targetServerId ||
         body['種類'] != 'api_key' ||
         body['保管方式'] != expectedStorage ||
