@@ -29,6 +29,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _accessible_scope_with_named_descendant,
     _cleanup_linux_agent_task_process_groups,
     _linux_installed_task_status_observation,
+    _linux_broker_process_role,
     _linux_runtime_artifact_inventory,
     _verify_linux_installed_artifact_provenance,
     _host_registration_audit_evidence,
@@ -3503,6 +3504,26 @@ class LinuxInstalledOwnerEvidenceTests(unittest.TestCase):
                     "user_data": "retained_outside_product_root",
                 },
             )
+
+
+class LinuxBrokerProcessRoleTests(unittest.TestCase):
+    def test_separates_broker_from_its_same_image_guardian(self) -> None:
+        self.assertEqual(_linux_broker_process_role([b"/installed/gui_shell_linux_broker"]), "broker")
+        self.assertEqual(
+            _linux_broker_process_role(
+                [b"/installed/gui_shell_linux_broker", b"--internal-process-group-guardian-v1"]
+            ),
+            "guardian",
+        )
+
+    def test_rejects_unknown_or_malformed_broker_arguments(self) -> None:
+        self.assertIsNone(_linux_broker_process_role([]))
+        self.assertIsNone(_linux_broker_process_role([b"/installed/gui_shell_linux_broker", b"--other"]))
+        self.assertIsNone(
+            _linux_broker_process_role(
+                [b"/installed/gui_shell_linux_broker", b"--internal-process-group-guardian-v1", b"extra"]
+            )
+        )
 
 
 class WorkspaceTaskScratchJournalEvidenceTests(unittest.TestCase):

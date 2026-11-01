@@ -61,6 +61,7 @@ LINUX_AGENT_TASK_FIXTURE_MODEL_ID = "o3"
 # so the deadline scenario cannot receive the fixture's final model response first.
 LINUX_AGENT_TASK_INITIAL_TOOL_YIELD_MS = 30_000
 LINUX_AGENT_TASK_DEADLINE_TEST_LIMIT_MS = 20_000
+LINUX_PROCESS_GROUP_GUARDIAN_ARGUMENT = b"--internal-process-group-guardian-v1"
 RUST_AUDIT_TEST = (
     "broker::update_center::tests::linux_installed_acceptance_runtime_audit_is_durable"
 )
@@ -97,6 +98,35 @@ def _processes_using(executables: set[Path]) -> set[int]:
         if running in executables:
             found.add(int(entry.name))
     return found
+
+
+def _linux_broker_process_role(arguments: list[bytes]) -> str | None:
+    if not arguments or not arguments[0]:
+        return None
+    if len(arguments) == 1:
+        return "broker"
+    if len(arguments) == 2 and arguments[1] == LINUX_PROCESS_GROUP_GUARDIAN_ARGUMENT:
+        return "guardian"
+    return None
+
+
+def _linux_broker_processes(executable: Path) -> tuple[set[int], set[int]]:
+    brokers: set[int] = set()
+    guardians: set[int] = set()
+    for pid in _processes_using({executable}):
+        try:
+            raw_arguments = Path(f"/proc/{pid}/cmdline").read_bytes()
+        except (FileNotFoundError, PermissionError, ProcessLookupError, OSError):
+            continue
+        arguments = [argument for argument in raw_arguments.split(b"\0") if argument]
+        role = _linux_broker_process_role(arguments)
+        if role == "broker":
+            brokers.add(pid)
+        elif role == "guardian":
+            guardians.add(pid)
+        else:
+            raise RuntimeError("installed Broker executableのprocess roleを判定できません")
+    return brokers, guardians
 
 
 def _linux_runtime_artifact_inventory(root: Path) -> tuple[list[dict[str, object]], int, str]:
@@ -5301,10 +5331,19 @@ def _run_installed_agent_task_crash_recovery_acceptance(
         raise RuntimeError("Broker crash前のTask scratch bindingが一致しません")
 
     broker_executable = broker_executable.resolve(strict=True)
-    broker_pids = _processes_using({broker_executable})
-    if len(broker_pids) != 1:
+    broker_pids, guardian_pids = _linux_broker_processes(broker_executable)
+    if len(broker_pids) != 1 or len(guardian_pids) != 1:
         raise RuntimeError("停止対象のinstalled Broker processが一つではありません")
     broker_pid = next(iter(broker_pids))
+    guardian_pid = next(iter(guardian_pids))
+    guardian_identity = _linux_proc_identity(guardian_pid)
+    if (
+        guardian_pid != task_pgid
+        or guardian_identity is None
+        or guardian_identity[0] != task_pgid
+        or guardian_identity[2] == "Z"
+    ):
+        raise RuntimeError("active Taskのguardian process groupを一意に照合できません")
     broker_identity = _linux_proc_identity(broker_pid)
     try:
         running_image = Path(os.readlink(f"/proc/{broker_pid}/exe")).resolve(strict=True)
@@ -5332,12 +5371,16 @@ def _run_installed_agent_task_crash_recovery_acceptance(
         time.sleep(0.05)
     else:
         raise RuntimeError("強制終了したinstalled Broker processが終了しません")
-    if _processes_using({broker_executable}):
+    remaining_brokers, _remaining_guardians = _linux_broker_processes(broker_executable)
+    if remaining_brokers:
         raise RuntimeError("Broker crash後にinstalled Broker processが残っています")
 
     _wait_for_linux_process_group_exit(task_pgid)
     if _linux_processes_with_task_nonce(nonce):
         raise RuntimeError("Broker crash後もTask descendantが稼働しています")
+    remaining_brokers, remaining_guardians = _linux_broker_processes(broker_executable)
+    if remaining_brokers or remaining_guardians:
+        raise RuntimeError("Broker crash後にBrokerまたはguardian processが残っています")
     if not scratch_path.is_dir() or scratch_path.is_symlink():
         raise RuntimeError("Broker crash前後で未回復scratchを保持できません")
     active_journal = _read_task_scratch_recovery_state(
