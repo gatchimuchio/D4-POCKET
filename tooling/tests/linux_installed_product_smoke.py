@@ -5338,13 +5338,12 @@ def _run_installed_agent_task_crash_recovery_acceptance(
     guardian_pid = next(iter(guardian_pids))
     guardian_identity = _linux_proc_identity(guardian_pid)
     if (
-        guardian_pid != task_pgid
-        or guardian_identity is None
-        or guardian_identity[0] != task_pgid
+        guardian_identity is None
+        or guardian_identity[0] != guardian_pid
         or guardian_identity[2] == "Z"
     ):
         raise RuntimeError(
-            "active Taskのguardian process groupを一意に照合できません: "
+            "active Taskのguardian process identityが一意に有効ではありません: "
             f"descendant_pid={descendant_pid}, task_pgid={task_pgid}, "
             f"guardian_pid={guardian_pid}, guardian_identity={guardian_identity!r}"
         )

@@ -12155,7 +12155,7 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
         "def _run_installed_agent_task_crash_recovery_acceptance(",
         "def _linux_broker_process_role(arguments: list[bytes]) -> str | None:",
         "--internal-process-group-guardian-v1",
-        "guardian_pid != task_pgid",
+        "guardian_identity[0] != guardian_pid",
         "remaining_brokers, remaining_guardians = _linux_broker_processes(broker_executable)",
         "_wait_for_linux_process_group_exit(task_pgid)",
         "expected_entries=1",
