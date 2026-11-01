@@ -4629,6 +4629,79 @@ class AgentTaskAuditAcceptanceTests(unittest.TestCase):
             self.assertEqual(evidence["agent_task_owner_approvals"], 3)
             self.assertEqual(evidence["agent_task_scratch_cleanup_confirmed"], 1)
 
+    def test_provider_profile_accepts_one_completed_task_and_one_authority_grant_each(
+        self,
+    ) -> None:
+        task_id = "task-provider"
+        starts = [
+            {
+                "task_id": task_id,
+                "request_hash": "sha256:" + "1" * 64,
+            }
+        ]
+        terminals = [{"task_id": task_id, "status": "completed"}]
+        permission_events = [
+            {
+                "operation": "AgentTaskWorkspacePermissionGrant",
+                "decision": "received",
+                "reason": "対話操作を受信",
+                "request_id": "permission-request-provider",
+            },
+            {
+                "operation": "AgentTaskWorkspacePermissionGrant",
+                "decision": "recorded",
+                "reason": "Agent Task用Workspace Permission発行（native Owner確認・Task未実行）",
+                "payload_hash": "sha256:" + "2" * 64,
+            },
+        ]
+        approval_events = [
+            {
+                "operation": "AgentTaskOwnerApprovalGrant",
+                "decision": "received",
+                "reason": "対話操作を受信",
+                "request_id": "approval-request-provider",
+            },
+            {
+                "operation": "AgentTaskOwnerApprovalGrant",
+                "decision": "recorded",
+                "reason": "Agent Task本文hash・実行条件hashへのOwner Approval発行（native確認・Task未実行）",
+                "payload_hash": "sha256:" + "3" * 64,
+            },
+        ]
+        scratch = [{"scratch_cleanup_completed": True}]
+
+        diagnostics = _agent_task_audit_acceptance_diagnostics(
+            starts,
+            terminals,
+            permission_events + approval_events,
+            scratch,
+            expected_terminal_statuses=("completed",),
+        )
+        self.assertEqual(diagnostics["failed_checks"], [])
+        self.assertEqual(diagnostics["counts"]["expected_task_count"], 1)
+        self.assertEqual(
+            diagnostics["counts"]["terminal_status_counts"],
+            {"cancelled": 0, "completed": 1, "failed": 0},
+        )
+        self.assertEqual(
+            diagnostics["counts"]["workspace_permission_audit"]["issue_records"],
+            1,
+        )
+        self.assertEqual(
+            diagnostics["counts"]["owner_approval_audit"]["issue_records"],
+            1,
+        )
+
+        extra_scenario = _agent_task_audit_acceptance_diagnostics(
+            starts,
+            [*terminals, {"task_id": "unexpected-cancel", "status": "cancelled"}],
+            permission_events + approval_events,
+            scratch,
+            expected_terminal_statuses=("completed",),
+        )
+        self.assertIn("expected_task_terminal_records", extra_scenario["failed_checks"])
+        self.assertIn("expected_terminal_statuses", extra_scenario["failed_checks"])
+
     def test_failure_diagnostics_show_only_bounded_counts(self) -> None:
         task_ids = ("PRIVATE_TASK_A", "PRIVATE_TASK_B", "PRIVATE_TASK_C")
         statuses = ("completed", "cancelled", "failed")
@@ -4696,8 +4769,8 @@ class AgentTaskAuditAcceptanceTests(unittest.TestCase):
         self.assertEqual(
             diagnostics["failed_checks"],
             [
-                "three_workspace_permission_grants",
-                "three_unique_workspace_permission_issuance_hashes",
+                "expected_workspace_permission_grants",
+                "expected_unique_workspace_permission_issuance_hashes",
             ],
         )
         self.assertEqual(

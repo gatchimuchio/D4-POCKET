@@ -5403,6 +5403,11 @@ def _run_installed_agent_task_acceptance(
         audit_store,
         require_export=False,
         require_agent_task=True,
+        expected_agent_task_statuses=(
+            ("completed",)
+            if provider_secret is not None
+            else ("cancelled", "completed", "failed")
+        ),
     )
     scratch_state = _read_task_scratch_recovery_state(audit_store)
     loopback = responses_server.snapshot()
@@ -7853,6 +7858,11 @@ def _agent_task_audit_acceptance_diagnostics(
     task_terminals: list[dict[str, object]],
     events: list[dict[str, object]],
     scratch_mediation: list[dict[str, object]],
+    expected_terminal_statuses: tuple[str, ...] = (
+        "cancelled",
+        "completed",
+        "failed",
+    ),
 ) -> dict[str, object]:
     start_task_ids = [record.get("task_id") for record in task_starts]
     terminal_task_ids = [record.get("task_id") for record in task_terminals]
@@ -7863,13 +7873,21 @@ def _agent_task_audit_acceptance_diagnostics(
     ]
     valid_request_hashes = [value for value in request_hashes if isinstance(value, str)]
     statuses = [record.get("status") for record in task_terminals]
-    expected_statuses = ("cancelled", "completed", "failed")
+    known_statuses = ("cancelled", "completed", "failed")
+    if not expected_terminal_statuses or any(
+        status not in known_statuses for status in expected_terminal_statuses
+    ):
+        raise ValueError("Agent Task acceptance terminal profile is invalid")
+    expected_task_count = len(expected_terminal_statuses)
+    expected_status_counts = {
+        status: expected_terminal_statuses.count(status) for status in known_statuses
+    }
     status_counts = {
         status: sum(value == status for value in statuses)
-        for status in expected_statuses
+        for status in known_statuses
     }
     unknown_status_count = sum(
-        not isinstance(value, str) or value not in expected_statuses
+        not isinstance(value, str) or value not in known_statuses
         for value in statuses
     )
     scratch_cleanup_confirmed = sum(
@@ -7928,38 +7946,44 @@ def _agent_task_audit_acceptance_diagnostics(
     )
     approval_audit = operation_audit_counts(approval_operation, approval_issue_reason)
     checks = {
-        "three_task_start_records": len(task_starts) == 3,
-        "three_task_terminal_records": len(task_terminals) == 3,
-        "three_unique_task_ids": len(set(valid_start_task_ids)) == 3
-        and len(valid_start_task_ids) == len(start_task_ids),
+        "expected_task_start_records": len(task_starts) == expected_task_count,
+        "expected_task_terminal_records": len(task_terminals) == expected_task_count,
+        "expected_unique_task_ids": (
+            len(set(valid_start_task_ids)) == expected_task_count
+            and len(valid_start_task_ids) == len(start_task_ids)
+        ),
         "terminal_task_ids_match": len(valid_terminal_task_ids)
         == len(terminal_task_ids)
         and set(valid_start_task_ids) == set(valid_terminal_task_ids),
-        "three_unique_request_hashes": len(set(valid_request_hashes)) == 3
-        and len(valid_request_hashes) == len(request_hashes),
+        "expected_unique_request_hashes": (
+            len(set(valid_request_hashes)) == expected_task_count
+            and len(valid_request_hashes) == len(request_hashes)
+        ),
         "expected_terminal_statuses": unknown_status_count == 0
-        and all(status_counts[status] == 1 for status in expected_statuses),
-        "three_workspace_permission_requests": permission_audit["request_receipts"]
-        == 3,
-        "three_unique_workspace_permission_request_ids": permission_audit[
+        and all(
+            status_counts[status] == expected_status_counts[status]
+            for status in known_statuses
+        ),
+        "expected_workspace_permission_requests": permission_audit["request_receipts"]
+        == expected_task_count,
+        "expected_unique_workspace_permission_request_ids": permission_audit[
             "unique_request_ids"
-        ]
-        == 3,
-        "three_workspace_permission_grants": permission_audit["issue_records"] == 3,
-        "three_unique_workspace_permission_issuance_hashes": permission_audit[
+        ] == expected_task_count,
+        "expected_workspace_permission_grants": permission_audit["issue_records"]
+        == expected_task_count,
+        "expected_unique_workspace_permission_issuance_hashes": permission_audit[
             "unique_issue_hashes"
-        ]
-        == 3,
-        "three_owner_approval_requests": approval_audit["request_receipts"] == 3,
-        "three_unique_owner_approval_request_ids": approval_audit[
+        ] == expected_task_count,
+        "expected_owner_approval_requests": approval_audit["request_receipts"]
+        == expected_task_count,
+        "expected_unique_owner_approval_request_ids": approval_audit[
             "unique_request_ids"
-        ]
-        == 3,
-        "three_owner_approval_grants": approval_audit["issue_records"] == 3,
-        "three_unique_owner_approval_issuance_hashes": approval_audit[
+        ] == expected_task_count,
+        "expected_owner_approval_grants": approval_audit["issue_records"]
+        == expected_task_count,
+        "expected_unique_owner_approval_issuance_hashes": approval_audit[
             "unique_issue_hashes"
-        ]
-        == 3,
+        ] == expected_task_count,
         "one_scratch_cleanup_confirmation": scratch_cleanup_confirmed == 1,
     }
     return {
@@ -7968,6 +7992,7 @@ def _agent_task_audit_acceptance_diagnostics(
         "counts": {
             "task_start_records": len(task_starts),
             "task_terminal_records": len(task_terminals),
+            "expected_task_count": expected_task_count,
             "unique_start_task_ids": len(set(valid_start_task_ids)),
             "terminal_task_ids_match": checks["terminal_task_ids_match"],
             "unique_start_request_hashes": len(set(valid_request_hashes)),
@@ -8074,6 +8099,11 @@ def _verify_live_audit(
     require_catalog: bool = False,
     require_update_lifecycle: bool = False,
     require_agent_task: bool = False,
+    expected_agent_task_statuses: tuple[str, ...] = (
+        "cancelled",
+        "completed",
+        "failed",
+    ),
     require_host_registration: bool = False,
 ) -> dict[str, int]:
     audit_path = store / "audit.jsonl"
@@ -8281,6 +8311,7 @@ def _verify_live_audit(
             task_terminals,
             events,
             scratch_mediation,
+            expected_terminal_statuses=expected_agent_task_statuses,
         )
         permission_audit = acceptance_diagnostics["counts"][
             "workspace_permission_audit"
@@ -8306,9 +8337,18 @@ def _verify_live_audit(
         completed_records = [
             record for record in task_terminals if record.get("status") == "completed"
         ]
-        if not all((len(deadline_records) == 1, len(cancelled_records) == 1, len(completed_records) == 1)):
+        expected_failed = expected_agent_task_statuses.count("failed")
+        expected_cancelled = expected_agent_task_statuses.count("cancelled")
+        expected_completed = expected_agent_task_statuses.count("completed")
+        if not all(
+            (
+                len(deadline_records) == expected_failed,
+                len(cancelled_records) == expected_cancelled,
+                len(completed_records) == expected_completed,
+            )
+        ):
             raise RuntimeError(
-                "deadline／cancel／positive Task terminal Auditの対応が不正です: "
+                "scope別Task terminal Auditの状態またはdeadline分類が不正です: "
                 + json.dumps(
                     {
                         "deadline_failure_records": len(deadline_records),
@@ -9520,6 +9560,11 @@ def run_installed_smoke(
                     broker_state / "store",
                     require_export=False,
                     require_agent_task=True,
+                    expected_agent_task_statuses=(
+                        ("completed",)
+                        if acceptance_scope == "provider_credential_binding"
+                        else ("cancelled", "completed", "failed")
+                    ),
                 )
                 print(
                     json.dumps(
