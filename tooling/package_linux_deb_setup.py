@@ -385,7 +385,9 @@ def write_debian_setup_package(
 
     with tempfile.TemporaryDirectory(prefix="d4-pocket-deb-build-", dir=output_root) as temporary:
         temporary_root = Path(temporary)
-        package_root = temporary_root / "debian" / PACKAGE_NAME
+        # dpkg-shlibdeps owns temporary_root/debian for its control metadata.
+        # Keep the actual package tree separate so both staging contracts can coexist.
+        package_root = temporary_root / "package-root" / PACKAGE_NAME
         payload_root = package_root.joinpath(*INSTALL_ROOT.parts)
         payload_root.mkdir(mode=0o755, parents=True)
         os.chmod(package_root, 0o755)

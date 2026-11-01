@@ -231,6 +231,36 @@ class LinuxDebSetupPackageTests(unittest.TestCase):
                 )
             self.assertFalse(list(root.rglob("*.deb")))
 
+    def test_package_root_does_not_collide_with_shlibdeps_metadata(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-linux-deb-stage-roots-") as temporary:
+            root = Path(temporary)
+            bundle, evidence = self.create_export(root)
+
+            def collect_dependencies(stage: Path, _bundle_stage: Path) -> tuple[str, str]:
+                control_root = stage / "debian"
+                control_root.mkdir(mode=0o700)
+                (control_root / "control").write_text("shlibdeps input\n", encoding="utf-8")
+                self.assertFalse((control_root / PACKAGE_NAME).exists())
+                return DEPENDENCIES, ""
+
+            with (
+                patch("tooling.package_linux_deb_setup._require_supported_target"),
+                patch("tooling.package_linux_deb_setup._require_source_checkout"),
+                patch("tooling.package_linux_deb_setup.product_version_from_source", return_value="1.2.3"),
+                patch("tooling.package_linux_deb_setup._collect_dependencies", side_effect=collect_dependencies),
+                patch("tooling.package_linux_deb_setup.validate_build_evidence"),
+            ):
+                result = write_debian_setup_package(
+                    bundle,
+                    evidence,
+                    root / "deb",
+                    package_revision=1,
+                )
+
+            package = Path(str(result["output_path"]))
+            self.assertTrue(package.is_file())
+            self.assertTrue(package.name.endswith("_1.2.3-1_amd64.deb"))
+
     def test_export_evidence_failure_and_unsafe_dependencies_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="d4p-linux-deb-negative-") as temporary:
             root = Path(temporary)
