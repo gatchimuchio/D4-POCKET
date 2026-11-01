@@ -12159,6 +12159,9 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
         "remaining_brokers, remaining_guardians = _linux_broker_processes(broker_executable)",
         "_wait_for_linux_process_group_exit(task_pgid)",
         "expected_entries=1",
+        '"post-crash-cli-identity"',
+        "previous_codex_home.relative_to(acceptance_root.resolve(strict=True))",
+        '"codex_home_after_broker_restart": "fresh_run_owned_empty_fixture"',
         '"task_recovery_status": "suspended"',
     ):
         if token not in smoke:

@@ -5406,6 +5406,33 @@ def _run_installed_agent_task_crash_recovery_acceptance(
     ):
         raise RuntimeError("Broker crash後にTask tool結果が送られていないことを確認できません")
 
+    configured_codex_home = Path(environment["GUI_SHELL_R2_E2E_CODEX_HOME"])
+    if configured_codex_home.is_symlink():
+        raise RuntimeError("Broker crash前の合成Codex HOMEがsymlinkです")
+    previous_codex_home = configured_codex_home.resolve(strict=True)
+    try:
+        previous_codex_home.relative_to(acceptance_root.resolve(strict=True))
+    except ValueError as error:
+        raise RuntimeError("Broker crash前の合成Codex HOMEが受入れroot外です") from error
+    if not previous_codex_home.is_dir():
+        raise RuntimeError("Broker crash前の合成Codex HOMEが通常directoryではありません")
+
+    post_crash_fixture_root = (
+        acceptance_root
+        / "post-crash-cli-identity"
+        / "D4Pocket-R2-E2E-SYNTHETIC"
+    )
+    post_crash_fixture_root.mkdir(mode=0o700, parents=True, exist_ok=False)
+    (post_crash_fixture_root / "OWNER-APPROVED-SYNTHETIC.txt").write_text(
+        "Run-owned test identity only; no provider credentials.\n",
+        encoding="utf-8",
+    )
+    post_crash_codex_home = post_crash_fixture_root / "codex-home"
+    post_crash_codex_home.mkdir(mode=0o700)
+    if next(post_crash_codex_home.iterdir(), None) is not None:
+        raise RuntimeError("Broker crash後の合成Codex HOMEが初期状態で空ではありません")
+    environment["GUI_SHELL_R2_E2E_CODEX_HOME"] = str(post_crash_codex_home)
+
     restarted_window_id = restart_application()
     new_window = register_workspace(restarted_window_id)
     if scratch_path.exists() or scratch_path.is_symlink():
@@ -5494,8 +5521,9 @@ def _run_installed_agent_task_crash_recovery_acceptance(
         "D4P_SYNTHETIC_SECRET_CANARY=must-not-be-readable",
         "D4P_SYNTHETIC_SECRET_CANARY=outside-workspace",
     ):
+        _assert_secret_absent_from_files(previous_codex_home, canary)
         _assert_secret_absent_from_files(
-            Path(environment["GUI_SHELL_R2_E2E_CODEX_HOME"]), canary
+            post_crash_codex_home, canary
         )
         if canary.encode("utf-8") in (
             acceptance_root / "installed-app-after-broker-crash.log"
@@ -5511,6 +5539,7 @@ def _run_installed_agent_task_crash_recovery_acceptance(
         "task_recovery_status": "suspended",
         "old_approval_reused": False,
         "positive_result_after_crash": False,
+        "codex_home_after_broker_restart": "fresh_run_owned_empty_fixture",
         "loopback": loopback_before_restart,
         "audit_chain": audit,
         "workspace_registration_after_restart": bool(new_window),
