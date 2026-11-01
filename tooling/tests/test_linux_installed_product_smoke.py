@@ -57,6 +57,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _open_mcp_center_from_installed_ui,
     _resolve_regular_package,
     _read_task_scratch_recovery_state,
+    _register_linux_provider_credential_in_installed_dialog,
     _installed_task_write_failure_diagnostics,
     _installed_task_history_diagnostics,
     _stop_linux_agent_task_process_group,
@@ -1518,6 +1519,98 @@ class LinuxMcpCredentialIdProjectionTests(unittest.TestCase):
 
 
 class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
+    def test_provider_registration_uses_native_owner_path_and_returns_only_metadata_id(self) -> None:
+        secret = "synthetic-provider-key-never-operational"
+        credential_id = "a" * 32
+        environment = {"D4P_TEST": "isolated"}
+        registration_dialog = object()
+        controls = [object(), object()]
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
+                side_effect=controls,
+            ) as find_control,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._activate_accessible"
+            ) as activate,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_accessible"
+            ) as find_label,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._enter_credential_and_answer_owner"
+            ) as enter_secret,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._secret_service_item_labels",
+                return_value=[
+                    "D4 Pocket credential key",
+                    "D4 Pocket credential ciphertext",
+                ],
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._accessible_snapshot",
+                return_value=f"資格情報ID\nID: {credential_id}",
+            ),
+        ):
+            result = _register_linux_provider_credential_in_installed_dialog(
+                environment,
+                registration_dialog,
+                secret,
+            )
+
+        self.assertEqual(result, credential_id)
+        self.assertNotIn(secret, result)
+        self.assertEqual(
+            [entry.args[0] for entry in find_control.call_args_list],
+            [
+                "D4 Pocket資格情報保管庫",
+                "OpenAI API keyをnative入力で登録",
+            ],
+        )
+        self.assertEqual(activate.call_count, 2)
+        self.assertIn(
+            "利用可能なOpenAI API keyがありません",
+            [entry.args[0] for entry in find_label.call_args_list],
+        )
+        enter_secret.assert_called_once_with(
+            environment,
+            secret,
+            "許可",
+            target_server_id="openai_codex_cli",
+            operation="登録",
+        )
+
+    def test_provider_registration_rejects_secret_in_ui_snapshot_without_echoing_it(self) -> None:
+        secret = "synthetic-provider-key-never-operational"
+        credential_id = "b" * 32
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
+                side_effect=[object(), object()],
+            ),
+            patch("tooling.tests.linux_installed_product_smoke._activate_accessible"),
+            patch("tooling.tests.linux_installed_product_smoke._find_accessible"),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._enter_credential_and_answer_owner"
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._secret_service_item_labels",
+                return_value=[
+                    "D4 Pocket credential key",
+                    "D4 Pocket credential ciphertext",
+                ],
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._accessible_snapshot",
+                return_value=f"資格情報ID {credential_id} {secret}",
+            ),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "ID参照限定") as caught:
+                _register_linux_provider_credential_in_installed_dialog(
+                    {"D4P_TEST": "isolated"}, object(), secret
+                )
+
+        self.assertNotIn(secret, str(caught.exception))
+
     def test_secret_service_control_path_rejects_linux_sun_path_overflow(self) -> None:
         short_directory = Path("/tmp") / "keyring-control"
         self.assertEqual(

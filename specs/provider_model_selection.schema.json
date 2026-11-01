@@ -20,7 +20,7 @@
     "credential_id": {
       "type": "string",
       "pattern": "^[a-f0-9]{32}$(?![\\s\\S])",
-      "description": "Broker DPAPI保管庫にあるprovider_api_key資格情報のmetadata参照。実値ではなく、Brokerが登録時・使用時に用途、対象、状態を再検証する。"
+      "description": "BrokerのOS別資格情報保管庫にあるprovider_api_key資格情報への公開メタデータ参照。WindowsではDPAPI、LinuxではSecret Serviceを使う。秘密値ではなく、Brokerが登録時・使用時に用途、対象、状態を再検証する。"
     },
     "automatic_fallback": {"const": false}
   },

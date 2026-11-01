@@ -18,6 +18,7 @@ name: Linux manual product build and installed acceptance
           - workspace_selection
           - agent_task_supervision
           - agent_task_crash_recovery
+          - provider_credential_binding
           - runtime_provenance
           - wayland_rendering
           - wayland_workspace_selection
@@ -33,7 +34,7 @@ concurrency:
 
 jobs:
   export-build:
-    runs-on: ${{ (inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_task_crash_recovery') && 'ubuntu-22.04' || 'ubuntu-24.04' }}
+    runs-on: ${{ (inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_task_crash_recovery' || inputs.acceptance_scope == 'provider_credential_binding') && 'ubuntu-22.04' || 'ubuntu-24.04' }}
     timeout-minutes: 120
     steps:
       - name: 対象commitをclean checkout
@@ -71,7 +72,7 @@ jobs:
 
       - name: Codex Linux sandbox capability gate
         id: codex_sandbox
-        if: ${{ inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_task_crash_recovery' }}
+        if: ${{ inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_task_crash_recovery' || inputs.acceptance_scope == 'provider_credential_binding' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -113,7 +114,7 @@ jobs:
           clang --version | head -n 1
           weston --version
           runner_label="ubuntu-24.04"
-          if [ '${{ inputs.acceptance_scope }}' = 'agent_task_supervision' ] || [ '${{ inputs.acceptance_scope }}' = 'agent_task_crash_recovery' ]; then
+          if [ '${{ inputs.acceptance_scope }}' = 'agent_task_supervision' ] || [ '${{ inputs.acceptance_scope }}' = 'agent_task_crash_recovery' ] || [ '${{ inputs.acceptance_scope }}' = 'provider_credential_binding' ]; then
             runner_label="ubuntu-22.04"
           fi
           {
@@ -131,7 +132,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Linux test-only environment allowlist gateをRust試験
-        if: ${{ inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_task_crash_recovery' }}
+        if: ${{ inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_task_crash_recovery' || inputs.acceptance_scope == 'provider_credential_binding' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -177,7 +178,7 @@ jobs:
             --output-dir "$output_root"
             --allow-verification-branch
           )
-          if [ '${{ inputs.acceptance_scope }}' = 'agent_task_supervision' ] || [ '${{ inputs.acceptance_scope }}' = 'agent_task_crash_recovery' ]; then
+          if [ '${{ inputs.acceptance_scope }}' = 'agent_task_supervision' ] || [ '${{ inputs.acceptance_scope }}' = 'agent_task_crash_recovery' ] || [ '${{ inputs.acceptance_scope }}' = 'provider_credential_binding' ]; then
             export_arguments+=(--r2-e2e-test-build)
           fi
           python3 tooling/export_linux_product.py "${export_arguments[@]}"
@@ -190,7 +191,7 @@ jobs:
           root = pathlib.Path(sys.argv[1])
           evidence = json.loads((root / "d4_pocket_linux_export_build.json").read_text())
           package = root / "D4Pocket-linux.d4pkg"
-          expected_test_build = sys.argv[3] in {"agent_task_supervision", "agent_task_crash_recovery"}
+          expected_test_build = sys.argv[3] in {"agent_task_supervision", "agent_task_crash_recovery", "provider_credential_binding"}
           assert evidence["target_platform"] == "linux"
           assert evidence["source_commit"] == sys.argv[2]
           assert evidence["signed"] is False and evidence["formal_distribution_claimed"] is False
@@ -279,7 +280,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: 固定版Linux Codex CLIを検証rootへ取得
-        if: ${{ inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_task_crash_recovery' }}
+        if: ${{ inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_task_crash_recovery' || inputs.acceptance_scope == 'provider_credential_binding' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -295,8 +296,8 @@ jobs:
           chmod 0700 "$cli"
           printf 'D4P_LINUX_TASK_CODEX_CLI=%s\n' "$cli" >> "$GITHUB_ENV"
           {
-            printf '\n- Codex CLI interface source: pinned `@openai/codex 0.163.0-alpha.10.2 linux-x64` package, SHA-512 verified against the fixed digest. No API credential is installed or used.\n'
-            printf -- '- The CLI runs only against the run-owned loopback Responses fixture in this workflow. The artifact is stored under the exact runner temporary root and removed by the existing final cleanup step.\n'
+            printf '\n- Codex CLI interface source: pinned `@openai/codex 0.163.0-alpha.10.2 linux-x64` package, SHA-512 verified against the fixed digest. No operational API credential is installed or used.\n'
+            printf -- '- The CLI runs only against the run-owned loopback Responses fixture in this workflow. The dedicated Provider scope generates a synthetic run-only key for that fixture; it never contacts an external Provider. The artifact is stored under the exact runner temporary root and removed by the existing final cleanup step.\n'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: installed GTK UIでRollback／Export／Uninstallを受入れる
@@ -496,6 +497,30 @@ jobs:
             printf '\n- Installed Agent Task acceptance uses the real pinned Codex CLI interface against a run-owned loopback Responses fixture, without provider credentials or external model access. It exercises the installed GTK UI, native Owner confirmation, production Broker, one-use Workspace Permission and per-Task Approval, Linux process guardian, WorkspaceTaskScratch, Audit, and Task status.\n'
             printf -- '- Required cases: successful bounded Workspace write and normal scratch cleanup; active Task cancellation with descendant stop and scratch cleanup; Broker-enforced deadline with descendant stop, failed terminal state, and scratch cleanup. Secret canaries and outside-Workspace target remain denied; previous Approval is not reused.\n'
             printf -- '- This is a dedicated unsigned verification build with the fixed synthetic App/Audit identity. It is not a normal Release, distribution artifact, real-model result, Wayland GUI proof, or release-readiness claim.\n'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: installed GTK UIからSecret Service Provider認証のAgent Taskを受入れる
+        if: ${{ inputs.acceptance_scope == 'provider_credential_binding' && steps.codex_sandbox.outputs.available == 'true' }}
+        shell: bash
+        env:
+          GUI_SHELL_PRODUCT_APP_ID: d4-pocket-app-11111111111111111111111111111111
+          GUI_SHELL_PRODUCT_AUDIT_STORE_ID: audit-store-22222222222222222222222222222222
+          D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE: ${{ runner.temp }}/d4p-linux-export-${{ github.run_id }}-${{ github.run_attempt }}/output/D4Pocket-linux-rollback.d4pkg
+        run: |
+          set -euo pipefail
+          test_package="$D4P_EXPORT_ROOT/output/D4Pocket-linux.d4pkg"
+          acceptance_root="$D4P_EXPORT_ROOT/installed-provider-credential-acceptance"
+          dbus-run-session -- xvfb-run -a python3 tooling/tests/linux_installed_product_smoke.py \
+            --package "$test_package" \
+            --temp-root "$D4P_EXPORT_ROOT" \
+            --acceptance-root "$acceptance_root" \
+            --private-key "$D4P_EXPORT_ROOT/test-update-private.der" \
+            --update-package "$D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE" \
+            --acceptance-scope provider_credential_binding \
+            --codex-cli "$D4P_LINUX_TASK_CODEX_CLI"
+          {
+            printf '\n- Linux installed Provider資格情報Acceptance: installed Agent Centerから実行単位の合成keyを伏字native GTK入力と独立Owner確認で登録し、production Brokerが隔離GNOME Secret Serviceへ保存した。Permission／Approvalを経た正Taskを固定版実Codex CLIがrun-owned loopback Responses fixtureへ送り、fixtureはAuthorization値を記録せず完全一致だけを計数した。Provider使用Auditは一件でCredential／Provider／Runtimeへ結合していることを確認する。\n'
+            printf -- '- Tool child環境に`OPENAI_API_KEY`、`CODEX_API_KEY`、`CODEX_ACCESS_TOKEN`がないこと、合成値がUI・Audit・アプリlog・Codex home・Acceptance fileにないことを確認する。製品の正常終了とAudit再読込も確認する。公開API／運用Credentialは使用しない。この結果は外部Provider可用性、通常Release Task能力、production署名／配布、Linux release readinessを示さない。\n'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: installed GTK UIでBroker crash後のAgent Task回復を受入れる

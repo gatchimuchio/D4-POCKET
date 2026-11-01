@@ -76,7 +76,7 @@
     },
     {
       "path": ".github/workflows/linux-manual-export-build.yml",
-      "sha256": "03f34b5d07dfdd341da4d0b9f505b9b298282b046724a554e572173a35295e9e"
+      "sha256": "079a5f8940ec10fd67504b3c3e7aee6271e86cd64003bc9c8a5ea8bf342aa668"
     },
     {
       "path": ".github/workflows/linux-manual-rust-validation.yml",
@@ -1460,7 +1460,7 @@
     },
     {
       "path": "docs/specs/agent-runtime.md",
-      "sha256": "47e9fceb30a34808582e21201fab93cba27d7bec0209a68a48c48ca73aaedcee"
+      "sha256": "b901d94bcdc4826d2a66088e484a58692f0a9bcf997fbbe3d0b6e84d78efba21"
     },
     {
       "path": "docs/specs/agent-task-history.md",
@@ -1488,7 +1488,7 @@
     },
     {
       "path": "docs/specs/credential-vault.md",
-      "sha256": "55d489799f99c65b81af99b9fa440eedfc269a574a447cefffc24ef3bc625d53"
+      "sha256": "0112917d451a75370f4f3257c72aede078bac2c4d58d0213af8d8774116d9d5e"
     },
     {
       "path": "docs/specs/desktop-broker-channel.md",
@@ -3608,11 +3608,11 @@
     },
     {
       "path": "native/rust_helper/src/broker/credential_storage.rs",
-      "sha256": "f3ed8f2070828ca1e8df05dd3a79ce8514ea1c3fe11cbfc8484e84c6909b8bb6"
+      "sha256": "5ddd032a236fad0af5d17dc6454c0bc18c2fe803575801c90c897f4d96763747"
     },
     {
       "path": "native/rust_helper/src/broker/credential_vault.rs",
-      "sha256": "1944b45f46e2752392d45a69a1e2741a11d786e4bea7e763c01ad51e0af7d206"
+      "sha256": "07a0908e0e07e67319a2761aba776d20e4e47dac55c46f85faa187f87e30c4e5"
     },
     {
       "path": "native/rust_helper/src/broker/device_link.rs",
@@ -3688,7 +3688,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "a0f5677081b63f078fbe031c7477a1a90866777a5facf08520838400f34fe04a"
+      "sha256": "c4d0e23ace5bdbe38ce8b4108c6124a3c5fd0445585e9f70fe63ff325f46227a"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -4844,7 +4844,7 @@
     },
     {
       "path": "specs/provider_model_selection.schema.json",
-      "sha256": "93cadd1909953ee1977a1fbd5ed22194699213bc024a19fe1695a2de22c71c54"
+      "sha256": "979eb27df347b10ef38b4c7045c360ea93767c0bd47996eae7c676804292e0a5"
     },
     {
       "path": "specs/recovery.schema.json",
@@ -5264,7 +5264,7 @@
     },
     {
       "path": "tooling/tests/linux_installed_product_smoke.py",
-      "sha256": "bb298e652d9f3436801d6ddb91ded05ab499f8cb257d1503324c5694b50e17f2"
+      "sha256": "fa9b56db26226f0f2e27d5bfe6981ff823cb4c7d82b566d4b3529bf72ae77c9b"
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",
@@ -5276,7 +5276,7 @@
     },
     {
       "path": "tooling/tests/test_linux_installed_product_smoke.py",
-      "sha256": "63b2863e56d7ee0ab1e31539942918c86df487b7bf1b71eef5cd70f1a7c3042a"
+      "sha256": "1020799d3188955d955b433795e3e8451c6f72a8f2d5a2863fcce6046023f1a3"
     },
     {
       "path": "tooling/tests/test_linux_portable_archive.py",
@@ -5320,7 +5320,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "220c85d6f99f4c320fb2ad4381e7d491c78530d87cb0de57ee3dc48e23c9ffa5"
+      "sha256": "7609caaff8671eedcfd562c85a530b86486d8a63ac6a7ff7b85df2b8f6a1f958"
     }
   ]
 }

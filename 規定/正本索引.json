@@ -369,7 +369,7 @@
     },
     {
       "path": "docs/specs/credential-vault.md",
-      "責任": "C7資格情報保管庫のowner登録、Windows DPAPI保管、公開metadata、C9 Windows MCP stdioへの対象限定利用、秘密値非投影、MCP以外の未接続操作の境界"
+      "責任": "C7資格情報保管庫のowner登録、Windows DPAPI／Linux Secret Service保管、公開metadata、C9対象限定MCP stdio利用、P6 OpenAI Codex CLI Providerへの承認済み対象限定利用、秘密値非投影、未接続OS・操作の拒否境界"
     },
     {
       "path": "docs/specs/mcp-contract.md",

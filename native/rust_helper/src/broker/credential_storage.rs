@@ -758,6 +758,157 @@ mod linux_storage_tests {
         assert!(broker_credential_store.点検(broker_id).unwrap().is_none());
         std::fs::remove_dir_all(broker_store).unwrap();
     }
+
+    #[test]
+    #[ignore = "requires an isolated, unlocked user-session Secret Service"]
+    fn linux_provider_credential_use_is_secret_service_backed_audited_and_revocable() {
+        let mut random = [0_u8; 32];
+        getrandom::getrandom(&mut random).unwrap();
+        let broker_store = std::env::temp_dir().join(format!(
+            "d4-linux-provider-credential-broker-{}-{}",
+            std::process::id(),
+            hex::encode(random)
+        ));
+        std::fs::create_dir(&broker_store).unwrap();
+        std::fs::set_permissions(&broker_store, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let session = "linux-provider-credential-use";
+        let mut broker = crate::broker::protocol::Broker::new_persistent(session, &broker_store)
+            .expect("隔離された永続Broker");
+        broker
+            .linux資格情報保存先を初期化(&broker_store)
+            .expect("Broker保管領域の非公開namespace");
+
+        let broker_id_text = hex::encode(random);
+        let broker_id = &broker_id_text[..32];
+        let provider_secret = "synthetic-linux-provider-key-never-operational";
+        let registration = serde_json::json!({
+            "版":1,"操作":"追加","資格情報ID":broker_id,"用途":"provider_api_key",
+            "接続対象":"openai_codex_cli","種類":"api_key",
+            "保管方式":"linux_secret_service","登録者種別":"owner",
+            "登録経路":"owner_control","秘密値":provider_secret
+        });
+        let request = serde_json::json!({
+            "request_id":"linux-provider-credential-owner-register",
+            "session_id":session,
+            "operation":"資格情報登録",
+            "payload_hash":crate::broker::protocol::canonical_payload_hash(Some(&registration)),
+            "nonce":"linux-provider-credential-register-once",
+            "issued_at":crate::broker::protocol::BrokerRequestEnvelope::current_issued_at(),
+            "metadata":{"client":"desktop_flutter"},
+            "payload":registration
+        });
+        let registered = broker.desktop_owner_operation_json(&request.to_string());
+        assert_eq!(
+            registered.status,
+            crate::broker::protocol::BrokerStatus::Accepted,
+            "合成Provider資格情報のowner登録"
+        );
+        let receipt = registered.body.expect("秘密値を含まないmetadata receipt");
+        assert_eq!(receipt["保管方式"], "linux_secret_service");
+        assert!(!receipt.to_string().contains(provider_secret));
+        assert!(broker.提供元資格情報参照確認(broker_id));
+
+        let broker_root = broker_store.canonicalize().unwrap();
+        let broker_namespace =
+            crate::audit_hash::sha256_tagged(broker_root.to_str().unwrap().as_bytes())[7..]
+                .to_owned();
+        let broker_credential_store = LinuxCredentialStore::new(broker_namespace);
+        let ciphertext_hash = receipt["暗号文hash"].as_str().unwrap().to_owned();
+        struct Cleanup<'a>(&'a LinuxCredentialStore, &'a str, &'a str, bool);
+        impl Cleanup<'_> {
+            fn clean(&mut self) -> bool {
+                let cleaned = self.0.新規破棄(self.1, self.2);
+                self.3 = !cleaned;
+                cleaned
+            }
+        }
+        impl Drop for Cleanup<'_> {
+            fn drop(&mut self) {
+                if self.3 {
+                    let _ = self.0.新規破棄(self.1, self.2);
+                }
+            }
+        }
+        let mut cleanup = Cleanup(&broker_credential_store, broker_id, &ciphertext_hash, true);
+
+        assert!(matches!(
+            broker.提供元資格情報使用処理(
+                "linux-provider-credential-wrong-target",
+                "runtime-linux-provider-use",
+                "another_provider",
+                broker_id,
+                &crate::broker::protocol::canonical_payload_hash(None),
+            ),
+            Err(crate::broker::credential_vault::ProviderCredentialUseFailure::Denied)
+        ));
+        assert!(matches!(
+            broker.提供元資格情報使用処理(
+                "linux-provider-credential-unknown-id",
+                "runtime-linux-provider-use",
+                "openai_codex_cli",
+                &"8".repeat(32),
+                &crate::broker::protocol::canonical_payload_hash(None),
+            ),
+            Err(crate::broker::credential_vault::ProviderCredentialUseFailure::Denied)
+        ));
+        let secret = match broker.提供元資格情報使用処理(
+            "linux-provider-credential-approved-use",
+            "runtime-linux-provider-use",
+            "openai_codex_cli",
+            broker_id,
+            &crate::broker::protocol::canonical_payload_hash(None),
+        ) {
+            Ok(secret) => secret,
+            Err(_) => panic!("用途・対象・永続AuditとLinux Secret Service保管値を照合"),
+        };
+        assert!(
+            secret.as_slice() == provider_secret.as_bytes(),
+            "Provider保管値が要求した合成値と一致しません"
+        );
+        drop(secret);
+
+        let audit = serde_json::to_string(&broker.audit_events()).unwrap();
+        assert!(audit.contains("提供元資格情報使用"));
+        assert!(audit.contains(broker_id));
+        assert!(audit.contains("runtime-linux-provider-use"));
+        assert!(!audit.contains(provider_secret));
+        let revoke = serde_json::json!({
+            "版":1,"資格情報ID":broker_id,"用途":"provider_api_key",
+            "接続対象":"openai_codex_cli","暗号文hash":receipt["暗号文hash"],
+            "作成監査ID":receipt["作成監査ID"]
+        });
+        let revoked = broker.資格情報失効処理(
+            "linux-provider-credential-revoke",
+            &revoke,
+            true,
+            &crate::broker::protocol::canonical_payload_hash(Some(&revoke)),
+        );
+        assert_eq!(
+            revoked.status,
+            crate::broker::protocol::BrokerStatus::Accepted,
+            "native Owner経路相当のBroker revoke fixture"
+        );
+        assert!(!broker.提供元資格情報参照確認(broker_id));
+        assert!(matches!(
+            broker.提供元資格情報使用処理(
+                "linux-provider-credential-after-revoke",
+                "runtime-linux-provider-use",
+                "openai_codex_cli",
+                broker_id,
+                &crate::broker::protocol::canonical_payload_hash(None),
+            ),
+            Err(crate::broker::credential_vault::ProviderCredentialUseFailure::Denied)
+        ));
+        let final_audit = serde_json::to_string(&broker.audit_events()).unwrap();
+        assert!(!final_audit.contains(provider_secret));
+        drop(broker);
+        assert!(
+            cleanup.clean(),
+            "この試験が作成したProvider key itemだけ回収"
+        );
+        assert!(broker_credential_store.点検(broker_id).unwrap().is_none());
+        std::fs::remove_dir_all(broker_store).unwrap();
+    }
 }
 
 #[cfg(all(test, target_os = "macos"))]

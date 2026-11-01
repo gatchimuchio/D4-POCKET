@@ -1,7 +1,7 @@
 //! C7 資格情報保管庫のowner登録・失効、metadata一覧、統治済みMCP利用。
 //!
 //! このmoduleは秘密値をRuntime、Flutter、Audit reason、応答へ返さない。秘密値の
-//! MCP以外への注入、更新、物理削除、接続先変更は未接続に保つ。
+//! 対象限定MCP／承認済みCodex Provider以外への注入、更新、物理削除、接続先変更は未接続に保つ。
 #![cfg(any(windows, target_os = "linux", target_os = "macos"))]
 #![allow(non_snake_case)]
 
@@ -136,7 +136,7 @@ struct ProviderCredentialUseRecord {
     used_at: i64,
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "linux"))]
 pub(super) enum ProviderCredentialUseFailure {
     Denied,
     Audit,
@@ -158,7 +158,7 @@ struct CredentialLedger {
 }
 
 impl Broker {
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "linux"))]
     pub(super) fn 提供元資格情報参照確認(&self, credential_id: &str) -> bool {
         credential_ledger(&self.audit_log).is_ok_and(|ledger| {
             ledger.entries.iter().any(|entry| {
@@ -172,7 +172,7 @@ impl Broker {
         })
     }
 
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "linux"))]
     pub(super) fn 提供元資格情報使用処理(
         &mut self,
         request_id: &str,
@@ -203,7 +203,7 @@ impl Broker {
                     && entry.public.revoked_at.is_none()
             })
             .ok_or(ProviderCredentialUseFailure::Denied)?;
-        if self.protected_store.is_none() {
+        if self.資格情報保存先().is_none() {
             return Err(ProviderCredentialUseFailure::Denied);
         }
         self.append_audit(

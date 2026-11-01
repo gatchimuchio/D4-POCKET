@@ -49,7 +49,10 @@ RUST_ROLLBACK_SEED_TEST = (
     "broker::update_center::tests::linux_installed_acceptance_seeds_verified_rollback_target"
 )
 RUST_SECRET_SERVICE_TEST = (
-    "broker::credential_storage::tests::linux_secret_service_actual_store_is_create_only_namespaced_and_cleaned"
+    "broker::credential_storage::linux_storage_tests::linux_secret_service_actual_store_is_create_only_namespaced_and_cleaned"
+)
+RUST_PROVIDER_CREDENTIAL_TEST = (
+    "broker::credential_storage::linux_storage_tests::linux_provider_credential_use_is_secret_service_backed_audited_and_revocable"
 )
 MCP_PUBLIC_INPUT = "installed-mcp-public-input"
 MCP_RESULT_PREFIX = "D4P_MCP_RESULT_PROBE_"
@@ -1768,6 +1771,51 @@ def _enter_credential_and_answer_owner(
         markers = ("失効", target_server_id)
     _answer_owner_dialog(environment, decision, expected_summary_markers=markers)
     _wait_for_owner_dialog_closed(environment)
+
+
+def _register_linux_provider_credential_in_installed_dialog(
+    environment: dict[str, str],
+    registration_dialog,
+    secret: str,
+) -> str:
+    vault_option = _find_operable_accessible(
+        "D4 Pocket資格情報保管庫", root=registration_dialog, timeout=10
+    )
+    _activate_accessible(vault_option, "D4 Pocket資格情報保管庫", environment)
+    _find_accessible(
+        "利用可能なOpenAI API keyがありません",
+        root=registration_dialog,
+        timeout=20,
+    )
+    register = _find_operable_accessible(
+        "OpenAI API keyをnative入力で登録",
+        root=registration_dialog,
+        timeout=10,
+    )
+    _activate_accessible(register, "OpenAI API keyをnative入力で登録", environment)
+    _enter_credential_and_answer_owner(
+        environment,
+        secret,
+        "許可",
+        target_server_id="openai_codex_cli",
+        operation="登録",
+    )
+    if sorted(_secret_service_item_labels()) != [
+        "D4 Pocket credential ciphertext",
+        "D4 Pocket credential key",
+    ]:
+        raise RuntimeError("installed Provider登録後のSecret Service key／ciphertext itemが不正です")
+    success = "登録receiptと一覧metadataを確認しました。秘密値は画面へ取得していません。"
+    _find_accessible(success, root=registration_dialog, timeout=30)
+    snapshot = _accessible_snapshot(registration_dialog)
+    if secret in snapshot or "資格情報ID" not in snapshot:
+        raise RuntimeError("Provider登録後のAgent Center投影がID参照限定ではありません")
+    credential_ids = set(
+        re.findall(r"(?<![0-9a-f])[0-9a-f]{32}(?![0-9a-f])", snapshot)
+    )
+    if len(credential_ids) != 1:
+        raise RuntimeError("Provider登録後に選択済みCredential IDを一意に確認できません")
+    return credential_ids.pop()
 
 
 def _secret_service_item_labels() -> list[str]:
@@ -3878,14 +3926,15 @@ class _LinuxAgentTaskResponsesServer:
                 self.wfile.write(body)
 
             def do_GET(self) -> None:
-                if self.headers.get("Authorization") is not None:
-                    fixture._reject_request("unexpected_authorization_header")
-                    self._send(401, "application/json", b"{}")
-                    return
                 if self.path.split("?", 1)[0] not in {"/v1/models", "/models"}:
                     fixture._reject_request("unexpected_get")
                     self._send(404, "application/json", b"{}")
                     return
+                if not fixture._authorization_matches(self.headers.get("Authorization")):
+                    fixture._reject_request("authorization_mismatch")
+                    self._send(401, "application/json", b"{}")
+                    return
+                fixture._record_authorization_match()
                 fixture._record_model_request()
                 body = json.dumps(
                     {
@@ -3904,11 +3953,11 @@ class _LinuxAgentTaskResponsesServer:
                 self._send(200, "application/json", body)
 
             def do_POST(self) -> None:
-                if self.headers.get("Authorization") is not None:
-                    fixture._reject_request("unexpected_authorization_header")
-                    self._send(401, "application/json", b"{}")
-                    return
                 if self.path.split("?", 1)[0] == "/__d4p_r2_e2e/diagnostics":
+                    if self.headers.get("Authorization") is not None:
+                        fixture._reject_request("diagnostic_authorization_header")
+                        self._send(401, "application/json", b"{}")
+                        return
                     try:
                         length = int(self.headers.get("Content-Length", "-1"))
                         if length < 0 or length > 4096:
@@ -3930,6 +3979,11 @@ class _LinuxAgentTaskResponsesServer:
                     fixture._reject_request("unexpected_post")
                     self._send(404, "application/json", b"{}")
                     return
+                if not fixture._authorization_matches(self.headers.get("Authorization")):
+                    fixture._reject_request("authorization_mismatch")
+                    self._send(401, "application/json", b"{}")
+                    return
+                fixture._record_authorization_match()
                 try:
                     length = int(self.headers.get("Content-Length", "-1"))
                     if length < 0 or length > 2 * 1024 * 1024:
@@ -3973,6 +4027,7 @@ class _LinuxAgentTaskResponsesServer:
         self._scenario: dict[str, object] | None = None
         self._history: list[dict[str, object]] = []
         self._model_requests = 0
+        self._authorization_match_requests = 0
         self._rejections: list[str] = []
         self._diagnostics: list[dict[str, object]] = []
         self._thread: threading.Thread | None = None
@@ -3999,7 +4054,14 @@ class _LinuxAgentTaskResponsesServer:
             self._thread = None
         self._server.server_close()
 
-    def configure(self, scenario: str, command: str, workspace: Path) -> None:
+    def configure(
+        self,
+        scenario: str,
+        command: str,
+        workspace: Path,
+        *,
+        expected_authorization: str | None = None,
+    ) -> None:
         if scenario not in {"complete", "cancel", "deadline", "crash"}:
             raise ValueError("Agent Task loopback scenario is not supported")
         with self._lock:
@@ -4013,6 +4075,8 @@ class _LinuxAgentTaskResponsesServer:
                 "tool_output_sha256": None,
                 "call_id": None,
                 "request_shapes": [],
+                "expected_authorization": expected_authorization,
+                "authorization_match_requests": 0,
             }
             self._history.append(self._scenario)
 
@@ -4030,6 +4094,9 @@ class _LinuxAgentTaskResponsesServer:
                         "tool_outputs": row["tool_outputs"],
                         "tool_output_sha256": row["tool_output_sha256"],
                         "request_shapes": copy.deepcopy(row["request_shapes"]),
+                        "authorization_match_requests": row[
+                            "authorization_match_requests"
+                        ],
                     }
                     for row in self._history
                 ],
@@ -4038,6 +4105,29 @@ class _LinuxAgentTaskResponsesServer:
     def _record_model_request(self) -> None:
         with self._lock:
             self._model_requests += 1
+
+    def _authorization_matches(self, authorization: str | None) -> bool:
+        with self._lock:
+            scenario = self._scenario
+            expected = (
+                scenario.get("expected_authorization")
+                if scenario is not None
+                else None
+            )
+        if expected is None:
+            return authorization is None
+        return (
+            isinstance(expected, str)
+            and isinstance(authorization, str)
+            and hmac.compare_digest(authorization, expected)
+        )
+
+    def _record_authorization_match(self) -> None:
+        with self._lock:
+            if self._scenario is not None:
+                self._scenario["authorization_match_requests"] = (
+                    int(self._scenario["authorization_match_requests"]) + 1
+                )
 
     def _reject_request(self, reason: str) -> None:
         with self._lock:
@@ -4236,8 +4326,11 @@ def _write_linux_agent_task_fixture(acceptance_root: Path) -> tuple[Path, Path, 
         "write_denied = not any((write_allowed(workspace / '.env'), write_allowed(workspace / 'private/token.txt'), write_allowed(fixture_root / 'outside/outside.txt')))\n"
         "(scratch / 'fixture-scratch-marker').write_text('owned-task-scratch\\n', encoding='utf-8')\n"
         "mode = sys.argv[1]\n"
+        "check_provider_key_isolation = len(sys.argv) > 2 and sys.argv[2] == '--check-provider-key-isolation'\n"
         "if mode == 'complete':\n"
         "    report = {'mode': mode, 'secret_and_outside_reads_denied': read_denied, 'secret_and_outside_writes_denied': write_denied, 'workspace_write': True, 'scratch_marker': True, 'scratch_workspace_bound': scratch_workspace_bound, 'scratch_name': scratch.name}\n"
+        "    if check_provider_key_isolation:\n"
+        "        report['provider_api_key_absent_from_tool_environment'] = not any(name in os.environ for name in ('OPENAI_API_KEY', 'CODEX_API_KEY', 'CODEX_ACCESS_TOKEN'))\n"
         "    (workspace / 'agent-task-result.json').write_text(json.dumps(report, sort_keys=True) + '\\n', encoding='utf-8')\n"
         "    print('D4P_AGENT_TASK_FIXTURE_RESULT ' + json.dumps(report, sort_keys=True))\n"
         "elif mode in {'cancel', 'deadline', 'crash'}:\n"
@@ -4972,6 +5065,7 @@ def _run_installed_agent_task_acceptance(
     audit_store: Path,
     acceptance_root: Path,
     task_execution_limit_ms: int,
+    provider_secret: str | None = None,
 ) -> dict[str, object]:
     if not 0 < task_execution_limit_ms < LINUX_AGENT_TASK_INITIAL_TOOL_YIELD_MS:
         raise RuntimeError(
@@ -4982,6 +5076,13 @@ def _run_installed_agent_task_acceptance(
     runtime_id = "runtime-linux-installed-agent-task"
     secret_paths = ".env\nprivate/token.txt"
     registration = _open_installed_codex_registration(environment, window_id=window_id)
+    provider_credential_id = (
+        _register_linux_provider_credential_in_installed_dialog(
+            environment, registration, provider_secret
+        )
+        if provider_secret is not None
+        else None
+    )
     _fill_linux_workspace_registration(
         environment,
         registration,
@@ -4997,6 +5098,14 @@ def _run_installed_agent_task_acceptance(
         "native Owner確認へ進む", root=registration, timeout=10
     )
     _activate_accessible(continue_button, "native Owner確認へ進む", environment)
+    provider_authentication_marker = (
+        (
+            "認証: Broker資格情報保管庫のProvider API keyを、Approval済み実行だけに使用",
+            f"資格情報ID: {provider_credential_id}",
+        )
+        if provider_credential_id is not None
+        else ("認証方式: Codex CLI管理設定（登録時は認証しません）",)
+    )
     _answer_owner_dialog(
         environment,
         "許可",
@@ -5005,7 +5114,7 @@ def _run_installed_agent_task_acceptance(
             "Agent CLI実行系とWorkspaceを、このBroker起動中だけ登録します。",
             f"Runtime: {runtime_id}",
             f"CLI実行file: {codex_cli}",
-            "認証方式: Codex CLI管理設定（登録時は認証しません）",
+            *provider_authentication_marker,
             "Permission・Approval・Trust・Credentialを生成しません。",
             "LinuxのWorkspace rootがBroker内部の保護領域と重ならないことを確認します。",
             f"Workspace ID: {workspace_id}",
@@ -5022,21 +5131,42 @@ def _run_installed_agent_task_acceptance(
     _find_accessible("Task実行能力を事前検査（実行なし）", root=window, timeout=20)
 
     scenarios = (
-        ("complete", "completed", 90.0),
-        ("cancel", "cancelled", 30.0),
-        ("deadline", "failed", task_execution_limit_ms / 1000 + 30.0),
+        (("complete", "completed", 90.0),)
+        if provider_secret is not None
+        else (
+            ("complete", "completed", 90.0),
+            ("cancel", "cancelled", 30.0),
+            ("deadline", "failed", task_execution_limit_ms / 1000 + 30.0),
+        )
     )
     task_ids: list[str] = []
     completed_reports: list[dict[str, object]] = []
     process_groups: list[int] = []
     positive_result_hash: str | None = None
     for scenario_name, expected_status, wait_seconds in scenarios:
-        command = f"/usr/bin/python3 {workspace / 'task_fixture.py'} {scenario_name}"
-        responses_server.configure(scenario_name, command, workspace)
+        provider_mode = provider_secret is not None
+        provider_fixture_flag = " --check-provider-key-isolation" if provider_mode else ""
+        command = (
+            f"/usr/bin/python3 {workspace / 'task_fixture.py'} {scenario_name}"
+            f"{provider_fixture_flag}"
+        )
+        responses_server.configure(
+            scenario_name,
+            command,
+            workspace,
+            expected_authorization=(
+                f"Bearer {provider_secret}" if provider_secret is not None else None
+            ),
+        )
         instruction = (
             f"D4 Pocket installed Linux acceptance fixture: execute the provided "
             f"workspace task_fixture.py in {scenario_name} mode exactly once. "
-            "Do not use network access or credentials."
+            + (
+                "Do not inspect or print environment values. The only network request "
+                "is made by the Codex CLI to its configured loopback fixture."
+                if provider_mode
+                else "Do not use network access or credentials."
+            )
         )
         previously_visible_task_ids = _linux_installed_visible_task_ids(
             deadline=time.monotonic() + 5.0
@@ -5090,6 +5220,8 @@ def _run_installed_agent_task_acceptance(
                 "scratch_workspace_bound",
                 "scratch_name",
             }
+            if provider_mode:
+                expected_report_fields.add("provider_api_key_absent_from_tool_environment")
             report_is_object = isinstance(report, dict)
             report_fields_match = report_is_object and set(report) == expected_report_fields
             failed_report_checks = (
@@ -5101,6 +5233,11 @@ def _run_installed_agent_task_acceptance(
                         "workspace_write",
                         "scratch_marker",
                         "scratch_workspace_bound",
+                        *(
+                            ("provider_api_key_absent_from_tool_environment",)
+                            if provider_mode
+                            else ()
+                        ),
                     )
                     if report.get(name) is not True
                 ]
@@ -5260,8 +5397,8 @@ def _run_installed_agent_task_acceptance(
 
     if positive_result_hash is None:
         raise RuntimeError("positive Agent Taskの結果hashがAgent Centerに表示されません")
-    if len(task_ids) != 3 or len(set(task_ids)) != 3:
-        raise RuntimeError("各Agent Taskが独立した一意Task IDを持っていません")
+    if len(task_ids) != len(scenarios) or len(set(task_ids)) != len(task_ids):
+        raise RuntimeError("Agent Taskが独立した一意Task IDを持っていません")
     audit = _verify_live_audit(
         audit_store,
         require_export=False,
@@ -5269,13 +5406,17 @@ def _run_installed_agent_task_acceptance(
     )
     scratch_state = _read_task_scratch_recovery_state(audit_store)
     loopback = responses_server.snapshot()
-    expected_scenarios = {
-        "complete": (2, 1, 1),
-        "cancel": (1, 1, 0),
-        "deadline": (1, 1, 0),
-    }
+    expected_scenarios = (
+        {"complete": (2, 1, 1)}
+        if provider_secret is not None
+        else {
+            "complete": (2, 1, 1),
+            "cancel": (1, 1, 0),
+            "deadline": (1, 1, 0),
+        }
+    )
     observed_scenarios = loopback.get("scenarios")
-    if not isinstance(observed_scenarios, list) or len(observed_scenarios) != 3:
+    if not isinstance(observed_scenarios, list) or len(observed_scenarios) != len(expected_scenarios):
         raise RuntimeError("loopback Responses fixtureのTask数が期待値と一致しません")
     for row in observed_scenarios:
         if not isinstance(row, dict) or row.get("name") not in expected_scenarios:
@@ -5288,6 +5429,40 @@ def _run_installed_agent_task_acceptance(
         raise RuntimeError("loopback Responses fixtureが不正・外部要求を観測しました")
     if {row["name"] for row in observed_scenarios} != set(expected_scenarios):
         raise RuntimeError("loopback Responses fixtureで必須Task scenarioが揃っていません")
+    if provider_secret is not None:
+        if provider_credential_id is None:
+            raise RuntimeError("Provider Credential IDが登録経路から得られません")
+        if not isinstance(observed_scenarios, list) or any(
+            int(row.get("authorization_match_requests", 0)) < 2
+            for row in observed_scenarios
+            if isinstance(row, dict)
+        ):
+            raise RuntimeError("Codex CLIのmodels／Responses要求でProvider Bearer認証が確認できません")
+        audit_lines = [
+            json.loads(line)
+            for line in (audit_store / "audit.jsonl").read_text(encoding="utf-8").splitlines()
+            if line
+        ]
+        provider_use = [
+            event
+            for event in audit_lines
+            if event.get("operation") == "提供元資格情報使用"
+            and event.get("decision") == "accepted"
+        ]
+        if len(provider_use) != 1:
+            raise RuntimeError("installed Taskに束縛されたProvider使用Auditが一回ではありません")
+        provider_reason = str(provider_use[0].get("reason", ""))
+        if any(
+            value not in provider_reason
+            for value in (
+                provider_credential_id,
+                "openai_codex_cli",
+                runtime_id,
+            )
+        ):
+            raise RuntimeError("Provider使用AuditがCredential／Provider／Runtimeに束縛されていません")
+        if provider_secret in provider_reason:
+            raise RuntimeError("Provider秘密値がBroker usage Auditへ漏えいしました")
     if outside_file.is_symlink() or outside_file.read_bytes() != b"D4P_SYNTHETIC_SECRET_CANARY=outside-workspace\n":
         raise RuntimeError("Workspace外のsynthetic fileが変更または置換されました")
     for path, expected in (
@@ -5317,15 +5492,51 @@ def _run_installed_agent_task_acceptance(
         app_log = acceptance_root / "installed-app.log"
         if app_log.is_file() and canary.encode("utf-8") in app_log.read_bytes():
             raise RuntimeError("synthetic secret canaryがinstalled product logへ漏えいしました")
+    if provider_secret is not None:
+        _assert_secret_absent_from_files(
+            audit_store,
+            provider_secret,
+        )
+        _assert_secret_absent_from_files(
+            Path(environment["GUI_SHELL_R2_E2E_CODEX_HOME"]),
+            provider_secret,
+        )
+        _assert_secret_absent_from_files(
+            acceptance_root,
+            provider_secret,
+            excluded_roots=(acceptance_root / "home/.local/share/apps",),
+        )
+        if app_log.is_file() and provider_secret.encode("utf-8") in app_log.read_bytes():
+            raise RuntimeError("Provider秘密値がinstalled product logへ漏えいしました")
     return {
-        "task_scenarios": ["complete", "cancel", "deadline"],
-        "terminal_statuses": ["completed", "cancelled", "failed"],
+        "task_scenarios": list(expected_scenarios),
+        "terminal_statuses": (
+            ["completed"]
+            if provider_secret is not None
+            else ["completed", "cancelled", "failed"]
+        ),
         "workspace_write": (workspace / "agent-task-result.json").is_file(),
         "secret_and_outside_reads_denied": True,
-        "descendant_groups_stopped": len(process_groups) == 2,
+        "descendant_groups_stopped": len(process_groups) == (0 if provider_secret is not None else 2),
         "workspace_task_scratch_removed": not list(workspace.glob(".d4p-tmp-*")),
         "scratch_recovery_journal": scratch_state,
         "task_id_count": len(task_ids),
+        "provider_credential_id": provider_credential_id,
+        "provider_authorization_match_requests": (
+            sum(
+                int(row.get("authorization_match_requests", 0))
+                for row in loopback.get("scenarios", [])
+                if isinstance(row, dict)
+            )
+            if provider_secret is not None
+            else None
+        ),
+        "provider_use_audit_once": provider_secret is not None,
+        "provider_key_absent_from_tool_environment": (
+            completed_reports[0].get("provider_api_key_absent_from_tool_environment") is True
+            if provider_secret is not None and completed_reports
+            else None
+        ),
         "completed_fixture_reports": len(completed_reports),
         "positive_result_hash": positive_result_hash,
         "loopback": loopback,
@@ -8498,6 +8709,7 @@ def run_installed_smoke(
         "workspace_selection",
         "agent_task_supervision",
         "agent_task_crash_recovery",
+        "provider_credential_binding",
         "runtime_provenance",
         "wayland_rendering",
         "wayland_workspace_selection",
@@ -8527,7 +8739,11 @@ def run_installed_smoke(
         raise RuntimeError("installed acceptance rootは未使用でなければなりません")
     if not acceptance_root.is_absolute() or temp_root not in acceptance_root.parents:
         raise RuntimeError("installed acceptance rootがrun固有一時root外です")
-    if acceptance_scope in {"agent_task_supervision", "agent_task_crash_recovery"}:
+    if acceptance_scope in {
+        "agent_task_supervision",
+        "agent_task_crash_recovery",
+        "provider_credential_binding",
+    }:
         if codex_cli is None:
             raise RuntimeError("Agent Task acceptanceに固定Codex CLIが必要です")
         resolved_codex_cli = codex_cli.resolve(strict=True)
@@ -8612,13 +8828,17 @@ def run_installed_smoke(
     task_execution_limit_ms = LINUX_AGENT_TASK_DEADLINE_TEST_LIMIT_MS
     app_log = acceptance_root / "installed-app.log"
     try:
-        if acceptance_scope in {"agent_task_supervision", "agent_task_crash_recovery"}:
+        if acceptance_scope in {
+            "agent_task_supervision",
+            "agent_task_crash_recovery",
+            "provider_credential_binding",
+        }:
             if resolved_codex_cli is None:
                 raise RuntimeError("Agent Task acceptanceのCodex CLI pathがありません")
             synthetic_root = acceptance_root / "D4Pocket-R2-E2E-SYNTHETIC"
             synthetic_root.mkdir(mode=0o700)
             (synthetic_root / "OWNER-APPROVED-SYNTHETIC.txt").write_text(
-                "Run-owned test identity only; no provider credentials.\n",
+                "Run-owned test identity; synthetic run-only credential only; no operational provider credentials.\n",
                 encoding="utf-8",
             )
             agent_task_codex_home = synthetic_root / "codex-home"
@@ -8632,19 +8852,30 @@ def run_installed_smoke(
                     "GUI_SHELL_R2_E2E_TASK_EXECUTION_LIMIT_MS": str(task_execution_limit_ms),
                 }
             )
-        if acceptance_scope in {"credential_vault", "mcp_credential_binding"}:
+        if acceptance_scope in {
+            "credential_vault",
+            "mcp_credential_binding",
+            "provider_credential_binding",
+        }:
             secret_service_process = _start_isolated_secret_service(
                 environment,
                 temp_root / "keyring-control",
                 acceptance_root / "gnome-keyring.log",
             )
             _run_rust_test(RUST_SECRET_SERVICE_TEST, environment, private_key_path)
+            if acceptance_scope == "provider_credential_binding":
+                _run_rust_test(
+                    RUST_PROVIDER_CREDENTIAL_TEST,
+                    environment,
+                    private_key_path,
+                )
         elif acceptance_scope in {
             "mcp_tool_execution",
             "host_registration",
             "workspace_selection",
             "agent_task_supervision",
             "agent_task_crash_recovery",
+            "provider_credential_binding",
             "runtime_provenance",
             "wayland_rendering",
             "wayland_workspace_selection",
@@ -9250,7 +9481,10 @@ def run_installed_smoke(
                 )
                 return
 
-            if acceptance_scope == "agent_task_supervision":
+            if acceptance_scope in {
+                "agent_task_supervision",
+                "provider_credential_binding",
+            }:
                 if resolved_codex_cli is None or responses_server is None:
                     raise RuntimeError("installed Agent Task acceptance fixtureの初期化が不足しています")
                 agent_task_evidence = _run_installed_agent_task_acceptance(
@@ -9261,6 +9495,11 @@ def run_installed_smoke(
                     audit_store=broker_state / "store",
                     acceptance_root=acceptance_root,
                     task_execution_limit_ms=task_execution_limit_ms,
+                    provider_secret=(
+                        secrets.token_urlsafe(32)
+                        if acceptance_scope == "provider_credential_binding"
+                        else None
+                    ),
                 )
                 current_window_id = _visible_product_window(environment)
                 if current_window_id is None:
@@ -9289,7 +9528,11 @@ def run_installed_smoke(
                             "installed_entry": str(entries[0]),
                             "product_version": record["product_version"],
                             "package_sha256": record["package_sha256"],
-                            "agent_task_supervision": agent_task_evidence,
+                            (
+                                "provider_credential_binding"
+                                if acceptance_scope == "provider_credential_binding"
+                                else "agent_task_supervision"
+                            ): agent_task_evidence,
                             "durable_audit_after_normal_exit": durable_audit,
                             "installed_app_exit": "normal_window_close_and_owned_process_cleanup",
                         },
@@ -9792,7 +10035,11 @@ def run_installed_smoke(
         )
     finally:
         primary_acceptance_error = sys.exc_info()[1]
-        if acceptance_scope in {"agent_task_supervision", "agent_task_crash_recovery"}:
+        if acceptance_scope in {
+            "agent_task_supervision",
+            "agent_task_crash_recovery",
+            "provider_credential_binding",
+        }:
             try:
                 _cleanup_linux_agent_task_process_groups(acceptance_root)
             except Exception as error:
@@ -10009,6 +10256,7 @@ def main() -> int:
             "workspace_selection",
             "agent_task_supervision",
             "agent_task_crash_recovery",
+            "provider_credential_binding",
             "runtime_provenance",
             "wayland_rendering",
             "wayland_workspace_selection",
