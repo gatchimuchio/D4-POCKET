@@ -71,6 +71,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _secret_service_item_labels,
     _secret_service_control_diagnostic,
     _secret_service_startup_diagnostic,
+    _validate_secret_service_control_path,
     _verify_export_manifest,
     _verify_credential_audit,
     _verify_live_audit,
@@ -1482,6 +1483,17 @@ class LinuxWaylandEnvironmentTests(unittest.TestCase):
 
 
 class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
+    def test_secret_service_control_path_rejects_linux_sun_path_overflow(self) -> None:
+        short_directory = Path("/tmp") / "keyring-control"
+        self.assertEqual(
+            _validate_secret_service_control_path(short_directory),
+            len(os.fsencode(str(short_directory / "control"))),
+        )
+
+        long_directory = Path("/tmp") / ("x" * 100)
+        with self.assertRaisesRegex(RuntimeError, "too long: [0-9]+ bytes"):
+            _validate_secret_service_control_path(long_directory)
+
     @unittest.skipUnless(Path("/proc/net/unix").is_file(), "Linux Unix socket inspection")
     def test_secret_service_control_diagnostic_identifies_socket_owner_without_path(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
