@@ -1858,10 +1858,29 @@ def _secret_service_control_diagnostic(control_directory: Path) -> str:
     except OSError:
         socket_kind = "unreadable"
 
+    processes: list[tuple[Path, str]] = []
+    keyring_pids: list[str] = []
+    for process_entry in Path("/proc").iterdir():
+        if not process_entry.name.isdigit():
+            continue
+        if len(processes) >= 1024:
+            break
+        try:
+            command = (process_entry / "comm").read_text(encoding="utf-8").strip()
+        except OSError:
+            continue
+        processes.append((process_entry, command))
+        if command.startswith("gnome-keyring-") and len(keyring_pids) < 16:
+            keyring_pids.append(process_entry.name)
+    keyring_summary = ",".join(keyring_pids) if keyring_pids else "none"
+
     try:
         unix_rows = Path("/proc/net/unix").read_text(encoding="utf-8").splitlines()[1:]
     except OSError:
-        return f"control_socket={socket_kind}; listener_owners=proc-unavailable"
+        return (
+            f"control_socket={socket_kind}; listener_owners=proc-unavailable; "
+            f"keyring_pids={keyring_summary}"
+        )
 
     socket_inodes = {
         fields[6]
@@ -1869,19 +1888,14 @@ def _secret_service_control_diagnostic(control_directory: Path) -> str:
         if len(fields) == 8 and fields[7] == str(control_path)
     }
     if not socket_inodes:
-        return f"control_socket={socket_kind}; listener_owners=not-found"
+        return (
+            f"control_socket={socket_kind}; listener_owners=not-found; "
+            f"keyring_pids={keyring_summary}"
+        )
 
     owners: list[str] = []
-    inspected_processes = 0
-    proc_entries = Path("/proc").iterdir()
-    for process_entry in proc_entries:
-        if not process_entry.name.isdigit():
-            continue
-        inspected_processes += 1
-        if inspected_processes > 1024:
-            break
+    for process_entry, command in processes:
         try:
-            command = (process_entry / "comm").read_text(encoding="utf-8").strip()
             descriptors = (process_entry / "fd").iterdir()
             for descriptor_index, descriptor in enumerate(descriptors):
                 if descriptor_index >= 256:
@@ -1899,7 +1913,10 @@ def _secret_service_control_diagnostic(control_directory: Path) -> str:
         if len(owners) >= 8:
             break
     owner_summary = ",".join(owners) if owners else "unknown"
-    return f"control_socket={socket_kind}; listener_owners={owner_summary}"
+    return (
+        f"control_socket={socket_kind}; listener_owners={owner_summary}; "
+        f"keyring_pids={keyring_summary}"
+    )
 
 
 def _start_isolated_secret_service(
@@ -1911,7 +1928,21 @@ def _start_isolated_secret_service(
     if control_directory.stat().st_mode & 0o077:
         raise RuntimeError("Secret Service control directoryがprivateではありません")
     process: subprocess.Popen[bytes] | None = None
+    monitor_stop = threading.Event()
+    monitor_thread: threading.Thread | None = None
+    monitor_samples: list[str] = []
     try:
+        baseline = _secret_service_control_diagnostic(control_directory)
+
+        def monitor_control_socket() -> None:
+            while not monitor_stop.wait(0.02):
+                sample = _secret_service_control_diagnostic(control_directory)
+                if sample != baseline and sample not in monitor_samples:
+                    monitor_samples.append(sample)
+                    del monitor_samples[:-8]
+
+        monitor_thread = threading.Thread(target=monitor_control_socket, daemon=True)
+        monitor_thread.start()
         with log_path.open("xb") as log:
             process = subprocess.Popen(
                 [
@@ -1936,14 +1967,17 @@ def _start_isolated_secret_service(
         deadline = time.monotonic() + 15
         while time.monotonic() < deadline:
             if process.poll() is not None:
+                monitor_stop.set()
+                monitor_thread.join(timeout=1)
                 diagnostic = _secret_service_startup_diagnostic(
                     log_path, (control_directory.parent, control_directory.parent.parent)
                 )
                 control_diagnostic = _secret_service_control_diagnostic(control_directory)
+                observed_control = ",".join(monitor_samples[-6:]) or "none"
                 raise RuntimeError(
                     "隔離した秘密保管サービスが起動中に終了しました "
                     f"(exit={process.returncode}; {control_diagnostic}; "
-                    f"log={diagnostic or 'empty'})"
+                    f"observed={observed_control}; log={diagnostic or 'empty'})"
                 )
             owner = subprocess.run(
                 [
@@ -1965,10 +1999,15 @@ def _start_isolated_secret_service(
                 timeout=5,
             )
             if owner.returncode == 0 and "(true,)" in owner.stdout:
+                monitor_stop.set()
+                monitor_thread.join(timeout=1)
                 return process
             time.sleep(0.2)
         raise RuntimeError("隔離した利用者sessionの秘密保管サービスが利用可能になりませんでした")
     except Exception:
+        monitor_stop.set()
+        if monitor_thread is not None:
+            monitor_thread.join(timeout=1)
         if process is not None and process.poll() is None:
             _terminate_group(process)
         raise

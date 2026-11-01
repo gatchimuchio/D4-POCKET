@@ -1352,7 +1352,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "977d0e1ce0aabceaf53b6f41d803d7dbc56f8e5fc2e91669937e986df34f77c1"
+      "sha256": "06b4679ba547827c8820d1008c7f98ecac26c240a040d60e4a1ac86b7498105c"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -5264,7 +5264,7 @@
     },
     {
       "path": "tooling/tests/linux_installed_product_smoke.py",
-      "sha256": "bc52a457de54ebf662feac2b744282654d4a74817e2be41883b9921b644cfe5a"
+      "sha256": "1d17f37bc40cc381f998489be60f41beb426cf1dbde84788560d6192c8d37a42"
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",
