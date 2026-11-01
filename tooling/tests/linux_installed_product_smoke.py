@@ -2181,6 +2181,15 @@ def _accessible_snapshot(root, *, deadline: float | None = None) -> str:
     return "\n".join(values)
 
 
+def _visible_mcp_credential_ids(accessibility_snapshot: str) -> set[str]:
+    return set(
+        re.findall(
+            r"(?m)^[ \t]*ID:[ \t]*([0-9a-f]{32})(?=[ \t\r\n]|$)",
+            accessibility_snapshot,
+        )
+    )
+
+
 def _run_installed_credential_vault_acceptance(
     environment: dict[str, str],
     window_id: str,
@@ -6344,7 +6353,7 @@ def _run_installed_mcp_tool_acceptance(
         )
         _find_accessible("api_key ・ 有効", root=window, timeout=10)
         credential_names = _accessible_snapshot(window)
-        credential_ids = set(re.findall(r"\b[0-9a-f]{32}\b", credential_names))
+        credential_ids = _visible_mcp_credential_ids(credential_names)
         if len(credential_ids) != 1:
             raise RuntimeError("MCP画面に対象Credential IDが一つだけ表示されません")
         credential_id = next(iter(credential_ids))

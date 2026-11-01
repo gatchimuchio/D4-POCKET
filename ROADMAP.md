@@ -1,5 +1,7 @@
 # GUI Shell ロードマップ
 
+作業追補（2026-11-01、Linux installed MCP Credential binding acceptance #244 FAIL）: 手動Actions [run #244](https://github.com/gatchimuchio/D4-POCKET/actions/runs/41275817582)はsource `232258b50cb088a6dd86bcd3930146cb8dac7b78`でUbuntu 24.04 Release build、portable launcher、run-owned cleanup、post-job clean checkoutがPASSした。installed GTK UIでCredentialのOwner拒否／許可と有効metadata表示まで進んだ後、画面全体から任意の32桁hexを集める受入れscript検査で停止した。検査をCredential metadataの`ID:`行へ限定し、ID以外の値と複数行を区別するtestを追加して再実行する。#244のFAILを保持し、Credential binding acceptance未成立、`linux_native_product_support=unresolved`、通常Release `task_execution=unsupported`、`release_ready=false`を維持する。詳細は[進捗記録](docs/REV5_PRODUCT_PROGRESS.md)。
+
 作業追補（2026-11-01、Linux installed A2A Agent Card metadata scope PASS）: 手動Actions [run #231](https://github.com/gatchimuchio/D4-POCKET/actions/runs/41255568341)はcommit `06bb2747ec2af565111c4aa3a91ec31e4c2e9453`をUbuntu 24.04 hosted runnerで検証し、installed GTK UIのAgent Card metadata scope、Owner拒否／別要求hashでの許可、metadata-only projection、権限非生成、Audit、run-owned cleanup、post-job clean checkoutがPASSした。対象scope以外はskipし、Linux native全体の未解決状態と通常Release gateは維持する。詳細は[進捗記録](docs/REV5_PRODUCT_PROGRESS.md)。
 
 作業追補（2026-11-01、Linux installed A2A Agent Card metadata run #230 FAIL）: run [#230](https://github.com/gatchimuchio/D4-POCKET/actions/runs/41254041765)はRelease build／cleanup PASS後、Windows固有Owner-summary markerを期待したLinux acceptance probeがnative summaryと不一致でFAILした。Owner判断／Agent Card取得前のprobe mismatchとしてFAIL履歴を保持し、Linux実表示に合わせた修正後run #231で同scopeをPASSした。詳細は[進捗記録](docs/REV5_PRODUCT_PROGRESS.md)。

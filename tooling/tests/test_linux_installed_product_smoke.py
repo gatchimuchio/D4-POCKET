@@ -76,6 +76,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _verify_credential_audit,
     _verify_live_audit,
     _verify_workspace_projection,
+    _visible_mcp_credential_ids,
     _installed_acceptance_runtime_directory,
     _wait_for_workspace_projection,
     _wait_for_installed_task_id,
@@ -1490,6 +1491,30 @@ class LinuxWaylandEnvironmentTests(unittest.TestCase):
             },
         )
         self.assertEqual(run.call_args.kwargs["env"], environment)
+
+
+class LinuxMcpCredentialIdProjectionTests(unittest.TestCase):
+    def test_counts_only_explicit_credential_metadata_rows(self) -> None:
+        credential_id = "a" * 32
+        snapshot = "\n".join(
+            (
+                "サーバーID: " + "b" * 32,
+                "result hash: " + "c" * 32,
+                "Task ID: " + "d" * 32,
+                f"ID: {credential_id}\n最終使用時刻: 未使用",
+                "ID: not-a-credential-id",
+                "ID: " + "E" * 32,
+            )
+        )
+
+        self.assertEqual(_visible_mcp_credential_ids(snapshot), {credential_id})
+
+    def test_distinct_credential_metadata_rows_are_counted_separately(self) -> None:
+        first = "a" * 32
+        second = "b" * 32
+        snapshot = f"ID: {first}\nID: {second}"
+
+        self.assertEqual(_visible_mcp_credential_ids(snapshot), {first, second})
 
 
 class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
