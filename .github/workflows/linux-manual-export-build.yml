@@ -484,7 +484,7 @@ jobs:
             --package "$output_root/D4Pocket-linux.d4pkg" \
             --temp-root "$D4P_EXPORT_ROOT" \
             --acceptance-root "$acceptance_root" \
-            --private-key "$output_root/test-update-private.der" \
+            --private-key "$D4P_EXPORT_ROOT/test-update-private.der" \
             --update-package "$output_root/D4Pocket-linux.d4pkg" \
             --acceptance-scope debian_setup_first_install
           test "$(dpkg-query -W -f='${Status}' d4-pocket-setup)" = 'install ok installed'
