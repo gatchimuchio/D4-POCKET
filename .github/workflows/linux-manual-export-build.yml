@@ -500,10 +500,19 @@ jobs:
             --acceptance-root "$acceptance_root" \
             --private-key "$D4P_EXPORT_ROOT/test-update-private.der" \
             --update-package "$product_package" \
-            --acceptance-scope '${{ inputs.acceptance_scope }}' | tee "$D4P_EXPORT_ROOT/debian-setup-acceptance-result.json"
-          python3 - "$D4P_EXPORT_ROOT/debian-setup-acceptance-result.json" '${{ inputs.acceptance_scope }}' "$product_package_sha" <<'PY'
+            --acceptance-scope '${{ inputs.acceptance_scope }}' 2>&1 | tee "$D4P_EXPORT_ROOT/debian-setup-acceptance-output.log"
+          python3 - "$D4P_EXPORT_ROOT/debian-setup-acceptance-output.log" '${{ inputs.acceptance_scope }}' "$product_package_sha" <<'PY'
           import json, pathlib, sys
-          result = json.loads(pathlib.Path(sys.argv[1]).read_text())
+          records = []
+          for line in pathlib.Path(sys.argv[1]).read_text().splitlines():
+              try:
+                  value = json.loads(line)
+              except json.JSONDecodeError:
+                  continue
+              if isinstance(value, dict) and value.get("acceptance_scope") == sys.argv[2]:
+                  records.append(value)
+          assert records, "installed smokeのJSON acceptance resultを取得できません"
+          result = records[-1]
           scope = sys.argv[2]
           assert result["acceptance_scope"] == scope
           if scope == "debian_setup_lifecycle":
