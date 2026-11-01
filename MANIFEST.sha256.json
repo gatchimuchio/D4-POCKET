@@ -76,7 +76,7 @@
     },
     {
       "path": ".github/workflows/linux-manual-export-build.yml",
-      "sha256": "164ab8d202a49a67403160c0d3ecaeb4110c0eef0d34628cc4deb96825c38237"
+      "sha256": "b33bfe7de3b976c7e18b2784567e4f138b22de6dd342f7cb330936f1bdd87ac9"
     },
     {
       "path": ".github/workflows/linux-manual-rust-validation.yml",
@@ -1352,7 +1352,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "f6fcff04009148e8f9b6f28faf95ba21e9782e6e18344e9ab8bc65ce30143916"
+      "sha256": "bac63aced7f03699d88abcab99ef4c6588fc1f0e3db5ba638c98dc49d3d8589e"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1560,7 +1560,7 @@
     },
     {
       "path": "docs/specs/linux-desktop-channel.md",
-      "sha256": "05c8ab4d6b18a32dcd44f5425f75685d761a72e35321597d6f4dbdffbdf142f5"
+      "sha256": "556a14499973a6b6adacdbfaedf5837f84d0281a05e1107f0fc2c3c5a630e45e"
     },
     {
       "path": "docs/specs/linux-product-package.md",
@@ -4356,7 +4356,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "60047f2c227e98bac0c03a6d49fbfde5236565dfe641540ff2a0a5b5f9eaf565"
+      "sha256": "dcf2b1cfcdf8bfd153806400e2ff3401149a2497bb45ba65819218357b9dbae4"
     },
     {
       "path": "requirements-dev.txt",
@@ -5096,7 +5096,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "bffa3bfc30faf3a47efbdd13a4d30d0efc8d34b8f6e64796543f245fd0a4b9ce"
+      "sha256": "f81af8692b08a8d6220dfe727e56463f02468c2ede62138f4977a66c8c884638"
     },
     {
       "path": "tooling/conformance_tests/test_final_development_audit.py",
@@ -5264,7 +5264,7 @@
     },
     {
       "path": "tooling/tests/linux_installed_product_smoke.py",
-      "sha256": "436670e5797d182cec38ae74efd66887a84fac193ccc38ee431a32284fdb7afc"
+      "sha256": "8aa3ea417a91219f2e74ff7e65ee3e7e5c9a77dc4bbf522fee359b02b5e9a4a1"
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",
@@ -5276,7 +5276,7 @@
     },
     {
       "path": "tooling/tests/test_linux_installed_product_smoke.py",
-      "sha256": "d9d4ac88511ec20bcb103317d4d2b8ba0ef3846183aef906102c3f40bd0bb380"
+      "sha256": "bff1f4e7e12002f1536c82e802e61be69ad64d88c686e52f949f27d9857f68eb"
     },
     {
       "path": "tooling/tests/test_linux_portable_archive.py",

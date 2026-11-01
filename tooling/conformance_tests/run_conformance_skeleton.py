@@ -12042,7 +12042,7 @@ def test_linux_installer_is_required_release_scope() -> list[str]:
         errors.append("Linux native product blockerがreleaseを遮断していない")
     elif not all(
         token in blocker.get("required_action", "")
-        for token in ("MCP子process", "正式Installer", "署名配布", "再試験しない")
+        for token in ("成立済みMCP child／Tool", "正式Installer", "署名配布", "再試験しない")
     ):
         errors.append("Linux native product blockerのrequired_actionが成立済み受入れと残件を区別していない")
     return errors
@@ -12097,6 +12097,9 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
         "mcp_tool_execution",
         "inputs.acceptance_scope == 'mcp_tool_execution'",
         "--acceptance-scope mcp_tool_execution",
+        "mcp_credential_binding",
+        "inputs.acceptance_scope == 'mcp_credential_binding'",
+        "--acceptance-scope mcp_credential_binding",
         "host_registration",
         "inputs.acceptance_scope == 'host_registration'",
         "--acceptance-scope host_registration",

@@ -53,6 +53,8 @@ RUST_SECRET_SERVICE_TEST = (
 )
 MCP_PUBLIC_INPUT = "installed-mcp-public-input"
 MCP_RESULT_PREFIX = "D4P_MCP_RESULT_PROBE_"
+MCP_TEST_CREDENTIAL_ENV = "D4P_MCP_TEST_CREDENTIAL"
+MCP_CREDENTIAL_USE_PREFIX = "MCP資格情報使用:"
 MCP_OWNER_WORKSPACE_LABEL = "Workspace: "
 MCP_OWNER_ARGUMENT_HASH_MARKER = "引数hash:"
 MCP_OWNER_NO_CREDENTIAL_MARKER = "Credential注入: なし"
@@ -2182,7 +2184,10 @@ def _run_installed_credential_vault_acceptance(
 
 
 def _write_linux_mcp_fixture(
-    temp_root: Path, acceptance_root: Path
+    temp_root: Path,
+    acceptance_root: Path,
+    *,
+    expected_credential_sha256: str | None = None,
 ) -> tuple[Path, Path, str, str]:
     workspace = acceptance_root / "mcp-workspace"
     workspace.mkdir(mode=0o700)
@@ -2194,15 +2199,50 @@ def _write_linux_mcp_fixture(
         or metadata.st_mode & 0o077
     ):
         raise RuntimeError("導入済みMCPの試験用作業領域が非公開で所有者に束縛されていません")
+    if expected_credential_sha256 is not None:
+        if re.fullmatch(r"[0-9a-f]{64}", expected_credential_sha256) is None:
+            raise RuntimeError("MCP資格情報の試験用照合値が不正です")
+        verifier = workspace / ".d4p-expected-credential.sha256"
+        with verifier.open("x", encoding="ascii", newline="\n") as stream:
+            stream.write(expected_credential_sha256 + "\n")
+        verifier.chmod(0o600)
+        verifier_metadata = verifier.lstat()
+        if (
+            verifier.is_symlink()
+            or not stat.S_ISREG(verifier_metadata.st_mode)
+            or verifier_metadata.st_nlink != 1
+            or verifier_metadata.st_uid != os.getuid()
+            or verifier_metadata.st_mode & 0o077
+        ):
+            raise RuntimeError("MCP資格情報の試験用照合fileがprivateではありません")
 
     fixture = temp_root / "linux-installed-mcp-server.py"
     if fixture.exists() or fixture.is_symlink():
         raise RuntimeError("実行単位所有のMCP試験用pathが既に使われています")
     source = '''import json
+import hashlib
+import hmac
 import os
 import sys
 
 seed = sys.argv[1]
+
+credential_verifier = ".d4p-expected-credential.sha256"
+if os.path.exists(credential_verifier):
+    with open(credential_verifier, "r", encoding="ascii") as stream:
+        expected_credential_hash = stream.read().strip()
+    os.unlink(credential_verifier)
+    credential = os.environ.get("D4P_MCP_TEST_CREDENTIAL")
+    actual_credential_hash = (
+        hashlib.sha256(credential.encode("utf-8")).hexdigest()
+        if credential is not None
+        else ""
+    )
+    if not hmac.compare_digest(actual_credential_hash, expected_credential_hash):
+        raise SystemExit(74)
+    credential_verified = True
+else:
+    credential_verified = False
 
 def write_private(name, value):
     fd = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
@@ -2212,6 +2252,11 @@ def write_private(name, value):
         os.fsync(stream.fileno())
 
 write_private("mcp-child-started.json", {"pid": os.getpid(), "pgid": os.getpgrp()})
+if credential_verified:
+    write_private(
+        "mcp-credential-verified.json",
+        {"credential_present": True, "credential_matches": True},
+    )
 
 for line in sys.stdin:
     request = json.loads(line)
@@ -2251,7 +2296,10 @@ for line in sys.stdin:
         arguments = request.get("params", {}).get("arguments", {})
         if request.get("params", {}).get("name") != "echo" or arguments != {"text": "installed-mcp-public-input"}:
             raise SystemExit(73)
-        write_private("mcp-tool-called.json", {"method": method, "count": 1})
+        call_marker = {"method": method, "count": 1}
+        if credential_verified:
+            call_marker["credential_verified"] = True
+        write_private("mcp-tool-called.json", call_marker)
         response = {
             "jsonrpc": "2.0",
             "id": request_id,
@@ -6117,9 +6165,17 @@ def _run_installed_mcp_tool_acceptance(
     audit_store: Path,
     temp_root: Path,
     acceptance_root: Path,
+    credential_binding: bool = False,
 ) -> dict[str, object]:
+    credential_secret = secrets.token_urlsafe(36) if credential_binding else None
     workspace, fixture, seed, result_marker = _write_linux_mcp_fixture(
-        temp_root, acceptance_root
+        temp_root,
+        acceptance_root,
+        expected_credential_sha256=(
+            hashlib.sha256(credential_secret.encode("utf-8")).hexdigest()
+            if credential_secret is not None
+            else None
+        ),
     )
     python_executable = Path("/usr/bin/python3")
     if not python_executable.is_file() or not os.access(python_executable, os.X_OK):
@@ -6127,6 +6183,7 @@ def _run_installed_mcp_tool_acceptance(
     server_id = "linux-installed-mcp-fixture"
     start_marker = workspace / "mcp-child-started.json"
     call_marker = workspace / "mcp-tool-called.json"
+    credential_verified_marker = workspace / "mcp-credential-verified.json"
     window = _open_mcp_center_from_installed_ui(environment, window_id)
 
     for label, value in (
@@ -6136,6 +6193,83 @@ def _run_installed_mcp_tool_acceptance(
         ("起動引数（1行に1項目、最大32項目）", f"{fixture}\n{seed}"),
     ):
         _set_public_text_by_keyboard(window, label, value, environment, window_id)
+
+    credential_id: str | None = None
+    environment_variable = MCP_TEST_CREDENTIAL_ENV
+    if credential_binding:
+        if credential_secret is None or _secret_service_item_labels():
+            raise RuntimeError("MCP Credential受入れ前の隔離Secret Serviceが空ではありません")
+        _activate_named_control_by_keyboard(
+            "native入力で資格情報を登録", environment, window_id
+        )
+        _enter_credential_and_answer_owner(
+            environment,
+            credential_secret,
+            "拒否",
+            target_server_id=server_id,
+            operation="登録",
+        )
+        if _secret_service_item_labels():
+            raise RuntimeError("Credential登録のOwner拒否後にSecret Service itemが作成されました")
+
+        _activate_named_control_by_keyboard(
+            "native入力で資格情報を登録", environment, window_id
+        )
+        _enter_credential_and_answer_owner(
+            environment,
+            credential_secret,
+            "許可",
+            target_server_id=server_id,
+            operation="登録",
+        )
+        _find_accessible(
+            "Linux Secret Service登録後のmetadataを取得しました。秘密値は取得していません。",
+            root=window,
+            timeout=15,
+        )
+        _find_accessible("api_key ・ 有効", root=window, timeout=10)
+        credential_names = _accessible_snapshot(window)
+        credential_ids = set(re.findall(r"\b[0-9a-f]{32}\b", credential_names))
+        if len(credential_ids) != 1:
+            raise RuntimeError("MCP画面に対象Credential IDが一つだけ表示されません")
+        credential_id = next(iter(credential_ids))
+        if sorted(_secret_service_item_labels()) != [
+            "D4 Pocket credential ciphertext",
+            "D4 Pocket credential key",
+        ]:
+            raise RuntimeError("MCP登録後にSecret Serviceの鍵／暗号文項目が揃いません")
+        if credential_secret in credential_names:
+            raise RuntimeError("Credential実値がMCP画面のアクセシビリティ木へ漏えいしました")
+
+        dropdown = _find_operable_accessible(
+            "対象ServerのCredential（任意）", root=window, timeout=10
+        )
+        _activate_accessible(dropdown, "対象ServerのCredential（任意）", environment)
+        credential_option_name = f"api_key ・ {credential_id}"
+        credential_option = _find_operable_accessible(
+            credential_option_name, root=window, timeout=10, exact=True
+        )
+        _activate_accessible(credential_option, credential_option_name, environment)
+        _find_accessible(credential_option_name, root=window, timeout=10)
+        _set_public_text_by_keyboard(
+            window,
+            "子processへ渡す環境変数名",
+            environment_variable,
+            environment,
+            window_id,
+        )
+        selected_snapshot = _accessible_snapshot(window)
+        if environment_variable not in selected_snapshot or credential_secret in selected_snapshot:
+            raise RuntimeError("MCP画面でCredential選択または秘密値非露出を確認できません")
+
+    connection_markers = (
+        (
+            f"Credential ID: {credential_id}",
+            f"子process環境変数名: {environment_variable}",
+        )
+        if credential_id is not None
+        else (MCP_OWNER_NO_CREDENTIAL_MARKER,)
+    )
 
     connect = _find_operable_accessible("MCP接続を開始", root=window, timeout=10)
     _activate_accessible(connect, "MCP接続を開始", environment)
@@ -6149,13 +6283,25 @@ def _run_installed_mcp_tool_acceptance(
             f"Server ID: {server_id}",
             f"実行file: {python_executable}",
             f"{MCP_OWNER_WORKSPACE_LABEL}{workspace}",
-            MCP_OWNER_NO_CREDENTIAL_MARKER,
+            *connection_markers,
         ),
     )
     _wait_for_owner_dialog_closed(environment)
     _find_accessible("MCP接続は確定していません", root=window, timeout=15)
     if start_marker.exists() or call_marker.exists():
         raise RuntimeError("導入済みMCPのnative所有者拒否後に子processまたはツールが起動しました")
+    if credential_binding:
+        rejected_events = [
+            json.loads(line)
+            for line in (audit_store / "audit.jsonl").read_text(encoding="utf-8").splitlines()
+            if line
+        ]
+        if any(
+            event.get("operation") == "MCP Credential使用"
+            and event.get("decision") == "accepted"
+            for event in rejected_events
+        ):
+            raise RuntimeError("Credential接続Owner拒否後に使用Auditが受理されています")
 
     connect = _find_operable_accessible("MCP接続を開始", root=window, timeout=10)
     _activate_accessible(connect, "MCP接続を開始", environment)
@@ -6169,7 +6315,7 @@ def _run_installed_mcp_tool_acceptance(
             f"Server ID: {server_id}",
             f"実行file: {python_executable}",
             f"{MCP_OWNER_WORKSPACE_LABEL}{workspace}",
-            MCP_OWNER_NO_CREDENTIAL_MARKER,
+            *connection_markers,
         ),
     )
     _wait_for_owner_dialog_closed(environment)
@@ -6183,6 +6329,45 @@ def _run_installed_mcp_tool_acceptance(
     ):
         raise RuntimeError("導入済みMCP子processは導入済みBrokerの監督下にありません")
     _wait_for_mcp_group_state(pgid, True)
+    if credential_binding:
+        if not credential_verified_marker.is_file() or credential_verified_marker.is_symlink():
+            raise RuntimeError("stdio childが指定environmentのCredential一致を実証しませんでした")
+        try:
+            credential_verification = json.loads(
+                credential_verified_marker.read_text(encoding="utf-8")
+            )
+        except (OSError, UnicodeError, json.JSONDecodeError) as error:
+            raise RuntimeError("MCP Credential検証markerの形式が不正です") from error
+        if credential_verification != {"credential_present": True, "credential_matches": True}:
+            raise RuntimeError("stdio childのCredential一致markerが不正です")
+        credential_events = [
+            json.loads(line)
+            for line in (audit_store / "audit.jsonl").read_text(encoding="utf-8").splitlines()
+            if line
+        ]
+        credential_events = [
+            event
+            for event in credential_events
+            if event.get("operation") == "MCP Credential使用"
+            and event.get("decision") == "accepted"
+        ]
+        if len(credential_events) != 1 or credential_events[0].get("evidence_source") != "INTERNAL_STATE":
+            raise RuntimeError("MCP Credential使用が一度だけinternal Auditへ記録されません")
+        reason = credential_events[0].get("reason", "")
+        prefix, separator, payload = reason.partition(MCP_CREDENTIAL_USE_PREFIX)
+        try:
+            usage_record = json.loads(payload) if separator and not prefix else None
+        except json.JSONDecodeError:
+            usage_record = None
+        if usage_record != {
+            "version": 1,
+            "credential_id": credential_id,
+            "purpose": "mcp_transport",
+            "target": server_id,
+            "environment_variable": environment_variable,
+            "used_at": usage_record.get("used_at") if isinstance(usage_record, dict) else None,
+        } or not isinstance(usage_record.get("used_at") if isinstance(usage_record, dict) else None, int):
+            raise RuntimeError("MCP Credential使用AuditがID／対象／環境変数へ結合されていません")
 
     _expand_single_installed_mcp_tool_list(environment, window)
     run_tool = _find_operable_accessible("確認して実行", root=window, timeout=10)
@@ -6211,12 +6396,17 @@ def _run_installed_mcp_tool_acceptance(
         call_document = json.loads(call_marker.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as error:
         raise RuntimeError("導入済みMCPのtools/call markerの形式が不正です") from error
-    if call_document != {"method": "tools/call", "count": 1}:
+    expected_call_document = {"method": "tools/call", "count": 1}
+    if credential_binding:
+        expected_call_document["credential_verified"] = True
+    if call_document != expected_call_document:
         raise RuntimeError("導入済みMCP子processが想定したtools/call一回を受け取りませんでした")
 
     snapshot_after_tool = _accessible_snapshot(window)
     if result_marker in snapshot_after_tool:
         raise RuntimeError("導入済みMCPツール結果本文がUIのアクセシビリティ木へ漏えいしました")
+    if credential_secret is not None and credential_secret in snapshot_after_tool:
+        raise RuntimeError("MCP Credential実値がTool結果後のUIへ漏えいしました")
     result_hashes = re.findall(r"result hash: (sha256:[0-9a-f]{64})", snapshot_after_tool)
     if len(result_hashes) != 1:
         raise RuntimeError("導入済みMCPツールUIにハッシュのみの結果受領票が一つだけ表示されませんでした")
@@ -6277,8 +6467,19 @@ def _run_installed_mcp_tool_acceptance(
         result_marker,
         excluded_roots=(acceptance_root / "home/.local/share/apps",),
     )
+    if credential_secret is not None:
+        _assert_secret_absent_from_files(
+            acceptance_root,
+            credential_secret,
+            excluded_roots=(acceptance_root / "home/.local/share/apps",),
+        )
+        _assert_secret_absent_from_files(audit_store, credential_secret)
     return {
         "server_id": server_id,
+        "credential_id": credential_id,
+        "credential_use_audit_once": credential_id is not None,
+        "stdio_child_verified_exact_credential_match": credential_id is not None,
+        "credential_secret_absent_from_ui_audit_logs_and_acceptance_files": credential_id is not None,
         "installed_python_child_started_after_owner_allow": True,
         "connection_owner_rejected_then_allowed": True,
         "tool_call_owner_approved_once": True,
@@ -8167,6 +8368,7 @@ def run_installed_smoke(
         "update_lifecycle",
         "credential_vault",
         "mcp_tool_execution",
+        "mcp_credential_binding",
         "a2a_metadata",
         "host_registration",
         "workspace_selection",
@@ -8306,7 +8508,7 @@ def run_installed_smoke(
                     "GUI_SHELL_R2_E2E_TASK_EXECUTION_LIMIT_MS": str(task_execution_limit_ms),
                 }
             )
-        if acceptance_scope == "credential_vault":
+        if acceptance_scope in {"credential_vault", "mcp_credential_binding"}:
             secret_service_process = _start_isolated_secret_service(
                 environment,
                 acceptance_root / "keyring-control",
@@ -8740,7 +8942,7 @@ def run_installed_smoke(
                 )
                 return
 
-            if acceptance_scope == "mcp_tool_execution":
+            if acceptance_scope in {"mcp_tool_execution", "mcp_credential_binding"}:
                 mcp_evidence = _run_installed_mcp_tool_acceptance(
                     environment,
                     window_id,
@@ -8748,6 +8950,7 @@ def run_installed_smoke(
                     audit_store=broker_state / "store",
                     temp_root=temp_root,
                     acceptance_root=acceptance_root,
+                    credential_binding=acceptance_scope == "mcp_credential_binding",
                 )
                 current_window_id = _visible_product_window(environment)
                 if current_window_id is None:
@@ -8771,7 +8974,11 @@ def run_installed_smoke(
                             "installed_entry": str(entries[0]),
                             "product_version": record["product_version"],
                             "package_sha256": record["package_sha256"],
-                            "mcp_tool_execution": mcp_evidence,
+                            (
+                                "mcp_credential_binding"
+                                if acceptance_scope == "mcp_credential_binding"
+                                else "mcp_tool_execution"
+                            ): mcp_evidence,
                             "installed_app_exit": "normal_window_close_and_owned_process_cleanup",
                         },
                         ensure_ascii=False,
@@ -9491,12 +9698,8 @@ def run_installed_smoke(
             _terminate_group(wayland_compositor)
         if uninstall_process is not None and uninstall_process.poll() is None:
             _stop_owned_processes(set(), uninstall_process)
-        if secret_service_process is not None and secret_service_process.poll() is None:
-            _terminate_group(secret_service_process)
-        if secret_service_process is not None and secret_service_process.poll() is None:
-            raise RuntimeError("run固有Secret Service processを停止できません")
         if (
-            acceptance_scope == "mcp_tool_execution"
+            acceptance_scope in {"mcp_tool_execution", "mcp_credential_binding"}
             and installed_helper is not None
             and acceptance_root.exists()
             and (acceptance_root / "mcp-workspace").is_dir()
@@ -9506,6 +9709,10 @@ def run_installed_smoke(
                 helper=installed_helper,
                 fixture=temp_root / "linux-installed-mcp-server.py",
             )
+        if secret_service_process is not None and secret_service_process.poll() is None:
+            _terminate_group(secret_service_process)
+        if secret_service_process is not None and secret_service_process.poll() is None:
+            raise RuntimeError("run固有Secret Service processを停止できません")
         if task_group_cleanup_error is not None:
             primary_summary: dict[str, object] = {
                 "error_type": (
@@ -9672,6 +9879,7 @@ def main() -> int:
             "update_lifecycle",
             "credential_vault",
             "mcp_tool_execution",
+            "mcp_credential_binding",
             "a2a_metadata",
             "host_registration",
             "workspace_selection",

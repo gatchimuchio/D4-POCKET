@@ -11,6 +11,7 @@ name: Linux manual product build and installed acceptance
           - update_lifecycle
           - credential_vault
           - mcp_tool_execution
+          - mcp_credential_binding
           - a2a_metadata
           - host_registration
           - workspace_selection
@@ -365,6 +366,29 @@ jobs:
           {
             printf '\n- Installed MCP acceptance: a fresh native Owner rejection created no stdio child; a separate Owner approval launched the run-owned real `/usr/bin/python3` MCP fixture through the installed GTK Runner and production Broker. The fixture completed `server/discover`, `tools/list`, and one Owner-confirmed `tools/call`; the installed UI showed the LIVE_RUNTIME result hash, content type, and Audit receipt while the fixture result marker stayed absent from UI／Audit／logs／acceptance files. Disconnect rejection preserved the child group; a separate native Owner approval confirmed owned group termination and removed the Broker connection. The installed app then exited normally, and the file-backed Audit chain／anchor HMAC was checked.\n'
             printf -- '- Scope: Ubuntu 24.04 hosted Xvfb／X11, unsigned test-identity installed product, and automated AT-SPI／keyboard input. This proves the installed MCP stdio／Tool metadata and hash-only result path for a local synthetic server only; no external provider／credential injection, non-X11 desktop session, Wayland rendering, production signing／distribution, or full Linux product completion.\n'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: installed GTK UIからMCP Credential注入とToolを受入れる
+        if: ${{ inputs.acceptance_scope == 'mcp_credential_binding' }}
+        shell: bash
+        env:
+          GUI_SHELL_PRODUCT_APP_ID: d4-pocket-app-11111111111111111111111111111111
+          GUI_SHELL_PRODUCT_AUDIT_STORE_ID: audit-store-22222222222222222222222222222222
+          D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE: ${{ runner.temp }}/d4p-linux-export-${{ github.run_id }}-${{ github.run_attempt }}/output/D4Pocket-linux-rollback.d4pkg
+        run: |
+          set -euo pipefail
+          test_package="$D4P_EXPORT_ROOT/output/D4Pocket-linux.d4pkg"
+          acceptance_root="$D4P_EXPORT_ROOT/installed-mcp-credential-acceptance"
+          dbus-run-session -- xvfb-run -a python3 tooling/tests/linux_installed_product_smoke.py \
+            --package "$test_package" \
+            --temp-root "$D4P_EXPORT_ROOT" \
+            --acceptance-root "$acceptance_root" \
+            --private-key "$D4P_EXPORT_ROOT/test-update-private.der" \
+            --update-package "$D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE" \
+            --acceptance-scope mcp_credential_binding
+          {
+            printf '\n- Installed MCP Credential binding: native credential-entry Owner rejection created no Secret Service items; separate Owner approval registered a synthetic value, then the MCP connection Owner rejection launched no child and recorded no accepted Credential-use event. A fresh connection approval bound the selected Credential ID／Server／environment variable; the installed Broker's real stdio child verified exact value equality against a one-time hash challenge, without returning the value. A separate one-use Tool Owner approval produced a hash-only LIVE_RUNTIME result; Credential-use Audit contains metadata only and the durable chain／anchor HMAC verifies. Disconnect rejection preserved the owned group; explicit approval stopped it. The installed app exited normally; the secret was absent from UI／Audit／logs／acceptance files.\n'
+            printf -- '- Scope: Ubuntu 24.04 hosted Xvfb／X11, unsigned test-identity installed product, automated AT-SPI／keyboard input, isolated unlocked run-owned GNOME Secret Service, and a local synthetic MCP fixture. The scope does not establish sandboxing, provider／external-server behavior, process-group escape control, Broker-crash cleanup, Wayland or other Linux desktop sessions, production signing／distribution, or full Linux product completion.\n'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: installed GTK UIでA2A Agent Card metadataを受入れる

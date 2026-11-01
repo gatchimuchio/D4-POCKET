@@ -90,6 +90,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _wait_for_catalog_fetch_status,
     _wait_for_gtk_dialog_closed,
     _write_linux_workspace_acceptance_fixture,
+    _write_linux_mcp_fixture,
     _write_linux_agent_task_fixture,
     _wayland_launch_environment,
     _publish_wayland_dbus_activation_environment,
@@ -1478,6 +1479,107 @@ class LinuxWaylandEnvironmentTests(unittest.TestCase):
 
 
 class LinuxCredentialVaultAcceptanceHelperTests(unittest.TestCase):
+    @unittest.skipUnless(hasattr(os, "getuid"), "Linux-specific fixture ownership check")
+    def test_mcp_credential_fixture_verifies_hash_without_persisting_secret(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            temp_root = root / "runner-temp"
+            acceptance_root = root / "acceptance"
+            temp_root.mkdir()
+            acceptance_root.mkdir()
+            secret = os.urandom(32).hex()
+            expected_hash = hashlib.sha256(secret.encode("utf-8")).hexdigest()
+
+            workspace, fixture, seed, _ = _write_linux_mcp_fixture(
+                temp_root,
+                acceptance_root,
+                expected_credential_sha256=expected_hash,
+            )
+
+            verifier = workspace / ".d4p-expected-credential.sha256"
+            self.assertTrue(verifier.is_file())
+            self.assertEqual(stat.S_IMODE(verifier.stat().st_mode), 0o600)
+            self.assertEqual(verifier.read_text(encoding="ascii"), expected_hash + "\n")
+            fixture_source = fixture.read_text(encoding="utf-8")
+            self.assertIn("hmac.compare_digest", fixture_source)
+            self.assertIn('os.environ.get("D4P_MCP_TEST_CREDENTIAL")', fixture_source)
+            self.assertIn('"mcp-credential-verified.json"', fixture_source)
+            self.assertNotIn(secret, verifier.read_text(encoding="ascii"))
+            self.assertNotIn(secret, fixture_source)
+            environment = os.environ.copy()
+            environment["D4P_MCP_TEST_CREDENTIAL"] = secret
+            result = subprocess.run(
+                [sys.executable, str(fixture), seed],
+                cwd=workspace,
+                env=environment,
+                input="",
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=5,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse(verifier.exists())
+            marker = json.loads(
+                (workspace / "mcp-credential-verified.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertEqual(
+                marker, {"credential_present": True, "credential_matches": True}
+            )
+            self.assertNotIn(secret, result.stdout + result.stderr)
+
+    @unittest.skipUnless(hasattr(os, "getuid"), "Linux-specific fixture ownership check")
+    def test_mcp_credential_fixture_rejects_wrong_value_without_start_marker(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            temp_root = root / "runner-temp"
+            acceptance_root = root / "acceptance"
+            temp_root.mkdir()
+            acceptance_root.mkdir()
+            expected = os.urandom(32).hex()
+            workspace, fixture, seed, _ = _write_linux_mcp_fixture(
+                temp_root,
+                acceptance_root,
+                expected_credential_sha256=hashlib.sha256(
+                    expected.encode("utf-8")
+                ).hexdigest(),
+            )
+            environment = os.environ.copy()
+            environment["D4P_MCP_TEST_CREDENTIAL"] = expected + "-wrong"
+
+            result = subprocess.run(
+                [sys.executable, str(fixture), seed],
+                cwd=workspace,
+                env=environment,
+                input="",
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=5,
+            )
+
+            self.assertEqual(result.returncode, 74)
+            self.assertFalse((workspace / "mcp-child-started.json").exists())
+            self.assertNotIn(expected, result.stdout + result.stderr)
+
+    @unittest.skipUnless(hasattr(os, "getuid"), "Linux-specific fixture ownership check")
+    def test_mcp_credential_fixture_rejects_malformed_verifier_hash(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            temp_root = root / "runner-temp"
+            acceptance_root = root / "acceptance"
+            temp_root.mkdir()
+            acceptance_root.mkdir()
+
+            with self.assertRaisesRegex(RuntimeError, "試験用照合値が不正"):
+                _write_linux_mcp_fixture(
+                    temp_root,
+                    acceptance_root,
+                    expected_credential_sha256="not-a-sha256",
+                )
+
     def test_rust_test_uses_runner_tool_cache_without_changing_isolated_home(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             runner_home = Path(directory) / "runner-home"
