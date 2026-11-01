@@ -129,15 +129,33 @@ const AGENT_CLI_REGISTRATION_BOUNDARY_SUMMARY: &str =
 pub(crate) fn agent_cli_registration_summary(payload: &Value) -> Option<String> {
     let request: AgentCliRuntimeWorkspaceRegistration =
         serde_json::from_value(payload.clone()).ok()?;
-    if !request.is_valid() || request.provider_model_selection.credential_id().is_some() {
+    if !request.is_valid() {
         return None;
     }
+    let authentication_summary = match request.provider_model_selection.authentication_source() {
+        "codex_cli_managed" => "認証方式: Codex CLI管理設定（登録時は認証しません）".to_owned(),
+        "broker_credential_vault" => {
+            #[cfg(target_os = "linux")]
+            {
+                let credential_id = request.provider_model_selection.credential_id()?;
+                format!(
+                    "認証: Broker資格情報保管庫のProvider API keyを、Approval済み実行だけに使用\n資格情報ID: {credential_id}"
+                )
+            }
+            #[cfg(not(target_os = "linux"))]
+            {
+                return None;
+            }
+        }
+        _ => return None,
+    };
     let scope = crate::adapters::cli_adapter_confirmation_scope(&request.adapter_id)?;
     Some(format!(
-        "Agent CLI実行系とWorkspaceを、このBroker起動中だけ登録します。\nAdapter: {}\nRuntime: {}\nCLI実行file: {}\nCLI検査範囲: {}\nWorkspace ID: {}\nWorkspace root: {}\n除外する秘密path: {}\n提供元／模型: {} / {}\n認証方式: Codex CLI管理設定（登録時は認証しません）\n\nOwner承認後にCLI probe processを起動し、{} 境界を確認できない場合は登録を拒否します。Task・模型要求・Workspace変更は行わず、Permission・Approval・Trust・Credentialを生成しません。Task実行能力はunsupportedのままです。登録は終了時に消えます。",
+        "Agent CLI実行系とWorkspaceを、このBroker起動中だけ登録します。\nAdapter: {}\nRuntime: {}\nCLI実行file: {}\nCLI検査範囲: {}\nWorkspace ID: {}\nWorkspace root: {}\n除外する秘密path: {}\n提供元／模型: {} / {}\n{}\n\nOwner承認後にCLI probe processを起動し、{} 境界を確認できない場合は登録を拒否します。Task・模型要求・Workspace変更は行わず、Permission・Approval・Trust・Credentialを生成しません。Task実行能力はunsupportedのままです。登録は終了時に消えます。",
         request.adapter_id, request.runtime_id, request.cli_path, scope, request.workspace_id,
         request.workspace_root, request.secret_paths.join(" / "),
         request.provider_model_selection.provider_id, request.provider_model_selection.model_id,
+        authentication_summary,
         AGENT_CLI_REGISTRATION_BOUNDARY_SUMMARY,
     ))
 }
@@ -6048,6 +6066,87 @@ mod tests {
             assert!(summary.contains("APFS root"));
             assert!(summary.contains("App Sandbox"));
         }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn agent_cli_owner_summary_shows_only_provider_credential_metadata() {
+        let credential_id = "a1b2c3d4e5f60718293a4b5c6d7e8f90";
+        let payload = json!({
+            "version": 1,
+            "adapter_id": "codex-cli",
+            "runtime_id": "runtime-provider-credential-summary-test",
+            "cli_path": "/usr/bin/codex",
+            "workspace_id": "workspace-provider-credential-summary-test",
+            "workspace_root": "/tmp/d4p-provider-credential-summary-test",
+            "secret_paths": [".env"],
+            "provider_model_selection": {
+                "version": 1,
+                "provider_id": "openai_codex_cli",
+                "model_id": "o3",
+                "authentication_source": "broker_credential_vault",
+                "credential_id": credential_id,
+                "automatic_fallback": false
+            }
+        });
+
+        let summary = agent_cli_registration_summary(&payload).unwrap();
+        assert!(summary.contains(
+            "認証: Broker資格情報保管庫のProvider API keyを、Approval済み実行だけに使用"
+        ));
+        assert!(summary.contains(&format!("資格情報ID: {credential_id}")));
+        assert!(summary.contains("提供元／模型: openai_codex_cli / o3"));
+        assert!(summary.contains("Permission・Approval・Trust・Credentialを生成しません"));
+        assert!(summary.contains("Task実行能力はunsupportedのままです"));
+    }
+
+    #[test]
+    fn agent_cli_owner_summary_rejects_malformed_provider_credential_id() {
+        for credential_id in ["short", "A1B2C3D4E5F60718293A4B5C6D7E8F90"] {
+            let payload = json!({
+                "version": 1,
+                "adapter_id": "codex-cli",
+                "runtime_id": "runtime-invalid-provider-credential-summary-test",
+                "cli_path": "/usr/bin/codex",
+                "workspace_id": "workspace-invalid-provider-credential-summary-test",
+                "workspace_root": "/tmp/d4p-invalid-provider-credential-summary-test",
+                "secret_paths": [".env"],
+                "provider_model_selection": {
+                    "version": 1,
+                    "provider_id": "openai_codex_cli",
+                    "model_id": "o3",
+                    "authentication_source": "broker_credential_vault",
+                    "credential_id": credential_id,
+                    "automatic_fallback": false
+                }
+            });
+            assert!(agent_cli_registration_summary(&payload).is_none());
+        }
+    }
+
+    #[test]
+    fn agent_cli_owner_summary_rejects_provider_credential_secret_input() {
+        let mut payload = json!({
+            "version": 1,
+            "adapter_id": "codex-cli",
+            "runtime_id": "runtime-provider-credential-secret-summary-test",
+            "cli_path": "/usr/bin/codex",
+            "workspace_id": "workspace-provider-credential-secret-summary-test",
+            "workspace_root": "/tmp/d4p-provider-credential-secret-summary-test",
+            "secret_paths": [".env"],
+            "provider_model_selection": {
+                "version": 1,
+                "provider_id": "openai_codex_cli",
+                "model_id": "o3",
+                "authentication_source": "broker_credential_vault",
+                "credential_id": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+                "automatic_fallback": false
+            }
+        });
+        payload["provider_model_selection"]["credential_value"] =
+            json!("synthetic-secret-sentinel-must-never-enter-owner-summary");
+
+        assert!(agent_cli_registration_summary(&payload).is_none());
     }
 
     #[test]
