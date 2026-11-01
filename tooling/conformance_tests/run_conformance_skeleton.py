@@ -12143,7 +12143,7 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
     smoke = smoke_path.read_text(encoding="utf-8")
     required = (
         "'on':\n  workflow_dispatch:",
-        "runs-on: ${{ (inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_task_crash_recovery') && 'ubuntu-22.04' || 'ubuntu-24.04' }}",
+        "runs-on: ${{ (inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_task_crash_recovery' || inputs.acceptance_scope == 'provider_credential_binding') && 'ubuntu-22.04' || 'ubuntu-24.04' }}",
         'runner_label="ubuntu-24.04"',
         'runner_label="ubuntu-22.04"',
         "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
