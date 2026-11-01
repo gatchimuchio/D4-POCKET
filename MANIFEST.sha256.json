@@ -172,7 +172,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "017b3384117853fd7da5223b4a74c67436b2cc86eb76cfb365b7cf5581907594"
+      "sha256": "d71571bdc8abeb14487b9b5125e59554eeacf856ff26a432aa1dda7117f8332c"
     },
     {
       "path": "SECURITY.md",
@@ -1352,7 +1352,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "f475868c7d8d09a7aa8bb61a2170ac4e8ca2ec7a3ebe1a48ab77744929e78433"
+      "sha256": "47aa9c1c04911c5a11a4ff1c4c5964372ace94a481d74ab44fd87c060ec25c16"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -3688,7 +3688,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "c4d0e23ace5bdbe38ce8b4108c6124a3c5fd0445585e9f70fe63ff325f46227a"
+      "sha256": "cac6a93bf9e9e902dfbc123c0eaeaf04b2d4acdc5df3c843a5135a23e1834883"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -4356,7 +4356,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "13595e259c0130e7ddf554c3fc10ee580465992e44fd5b31ebd041d8272c97da"
+      "sha256": "37b7d081c461692fb6b373e72415086d62032c026859a8626963db0c2b34e157"
     },
     {
       "path": "requirements-dev.txt",
@@ -5264,7 +5264,7 @@
     },
     {
       "path": "tooling/tests/linux_installed_product_smoke.py",
-      "sha256": "fa9b56db26226f0f2e27d5bfe6981ff823cb4c7d82b566d4b3529bf72ae77c9b"
+      "sha256": "6a94a01eb7ccd44728dff9295908fb7205967985186a92323774a6b1c24f70d1"
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",
@@ -5276,7 +5276,7 @@
     },
     {
       "path": "tooling/tests/test_linux_installed_product_smoke.py",
-      "sha256": "1020799d3188955d955b433795e3e8451c6f72a8f2d5a2863fcce6046023f1a3"
+      "sha256": "0908ee37280cbfc3b803f844b0ecad99a6306de1dce347008c9a8b531e69f70f"
     },
     {
       "path": "tooling/tests/test_linux_portable_archive.py",

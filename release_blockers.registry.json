@@ -194,12 +194,12 @@
       "blocks_release": true,
       "blocks_windows_technical_complete": false,
       "latest_evidence": {
-        "date": "2026-11-01",
+        "date": "2026-11-02",
         "result": "PASS",
-        "workflow_run": "https://github.com/gatchimuchio/D4-POCKET/actions/runs/41283791725",
-        "source_commit": "52d716263d7141e248f36e49e8fe76acf001c74a",
-        "scope": "手動workflow_dispatchのrun #249。Ubuntu 24.04 hosted runnerでacceptance_scope=portable_archiveを実行し、unsigned Ubuntu 24.04 x86_64 tar.gzを生成した。export evidence SHA-256 de6d828e74c86639a5ec397102f3ee376363440d0acfec88294071cbaa99c8eb、D4PKG SHA-256 f332206a0895b2dcc6278f123bf4637b398fe11c2ca9917dee69e7e2f32a69b5、archive SHA-256 e2ce713600193d0623dea2d8e31906c77587ece7ffccffe79d084486d0fd84bc。byte length／SHA-256一致、隔離rootへの展開、launcher実行属性、X11 GTK window正常終了、Wayland隔離socket接続後のowned process group停止を確認した。関連suite 15／153／13／6件、run-owned fixture／bundle cleanup、post-job clean checkoutがPASSし、run全体は5m21sでSUCCESS。",
-        "limits": "証拠はhosted Ubuntu上のportable first-launch bundleに限り、synthetic non-authority Broker fixtureを使用した。Actions artifactは保存されていない。Wayland surface rendering、実desktop session、production Publisher／署名identity、system installer、正式配布、Linux native製品全体は証明しない。Linux blocker、通常Release task_execution=unsupported、release_ready=falseを維持する。"
+        "workflow_run": "https://github.com/gatchimuchio/D4-POCKET/actions/runs/41333200330",
+        "source_commit": "c8320cc162449c8e6b76433509a0ad2c0aa6cc98",
+        "scope": "手動workflow_dispatchのActions run ID 41333200330。Ubuntu 22.04でacceptance_scope=provider_credential_bindingを実行し、installed product 0.1.0のpackage SHA-256 3f86b81037c788d48bc8c15a5a4fea9d65306ad57fd429d3f18f936c89de61deを検証した。GTK UIから隔離Secret Serviceへ合成keyを登録し、Permission 1件と独立Owner Approval 1件を消費して実Codex CLIのTaskを完了、Workspaceへ書き込んだ。secret／Workspace外read拒否、Provider keyのtool環境・Audit非露出、Provider-use Audit、Task scratch cleanup、正常終了後のAudit再読込、owned process cleanupを確認した。",
+        "limits": "合成keyとloopback Responses fixtureを使用し、外部Providerには接続していない。証拠はProvider credential bindingの限定installed scopeであり、通常Release task_execution能力、Linux native製品全体、production Publisher／署名identity、正式配布を証明しない。Linux blockerはunresolved、通常Release task_execution=unsupported、release_ready=falseを維持する。"
       },
       "previous_passed_evidence": {
         "date": "2026-11-01",
@@ -216,8 +216,8 @@
         "scope": "直前の失敗run #247はMCP Credential binding受入れでpositive acceptance JSONを出した後、summary用printfの引用符不整合によりworkflowが失敗した。",
         "disposition": "workflow summaryの引用符不整合として履歴を保持する。製品受入れ自体の失敗とは分類しない。修正後のrun #248が同じMCP Credential binding scopeをPASSした。"
       },
-      "reason": "Linux native DesktopはWindows／macOSと同列の必須製品対象である。portable_archive run #249はUbuntu 24.04 x86_64 unsigned tar.gzの生成、サイズ／SHA-256照合、隔離展開、portable launcherのX11／Wayland smokeに限るPASSである。MCPのCredential binding受入れrun #248、Agent Task #190、crash recovery #237、A2A metadata #231、runtime provenance #192、Wayland rendering #193、Credential Vault #194、MCP child／Tool、Update Center #77も各限定範囲の証拠である。実desktop／compositor受入れ、通常ReleaseのTask capability、正式Installer／update／rollback／uninstall／署名配布、Linux必須consumer全体は未成立。Linux native blockerはunresolved、通常Release task_execution=unsupported、release_ready=falseを維持する。",
-      "required_action": "portable archive run #249、MCP Credential binding run #248、成立済みMCP child／Tool、およびその他の受入れ済み範囲は、再現可能な回帰がない限り再試験しない。残件は実desktop／compositor範囲、通常ReleaseのTask capability条件、正式Installer／update／rollback／uninstall／署名配布、その他の未成立な必須製品consumerである。全必須条件が成立するまでLinux blockerとrelease gateを維持する。"
+      "reason": "Linux native DesktopはWindows／macOSと同列の必須製品対象である。Provider credential binding Actions run ID 41333200330は、Ubuntu 22.04 installed productでの合成Credential登録と実Codex CLI Task完了に限るPASSであり、外部Provider接続を含まない。portable_archive run #249、MCP Credential binding run #248、Agent Task #190、crash recovery #237、A2A metadata #231、runtime provenance #192、Wayland rendering #193、Credential Vault #194、MCP child／Tool、Update Center #77も各限定範囲の証拠である。実desktop／compositor受入れ、通常ReleaseのTask capability、正式Installer／update／rollback／uninstall／署名配布、Linux必須consumer全体は未成立。Linux native blockerはunresolved、通常Release task_execution=unsupported、release_ready=falseを維持する。",
+      "required_action": "Provider credential binding Actions run ID 41333200330、portable archive run #249、MCP Credential binding run #248、成立済みMCP child／Tool、およびその他の受入れ済み範囲は、再現可能な回帰がない限り再試験しない。残件は実desktop／compositor範囲、通常ReleaseのTask capability条件、正式Installer／update／rollback／uninstall／署名配布、その他の未成立な必須製品consumerである。全必須条件が成立するまでLinux blockerとrelease gateを維持する。"
     },
     {
       "name": "rev2_mobile_device_evidence",
