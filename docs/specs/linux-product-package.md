@@ -16,6 +16,8 @@ Ubuntu 24.04 LTS／amd64向け`d4-pocket-setup_<製品版>-<package revision>_am
 
 このAPT packageが行うのは初回画面の配置だけである。Owner Authority、Permission、Approval、Credentialを生成せず、XDG user dataを変更しない。製品本体のper-user Install／Update／Rollback／Uninstallは、従来どおり既存Brokerとnative Owner確認が実行する。APT upgrade／downgrade／purgeはbootstrap fileだけを対象とし、Broker管理下の製品versionを操作しない。検証入口は`.github/workflows/linux-manual-export-build.yml`の手動`workflow_dispatch` scope `debian_setup_package`である。未署名の開発buildとhosted Xvfb／X11 acceptanceは、物理desktop、正式署名・配布、Linux native全対応を証明しない。これらが成立するまで`linux_native_product_support` release blockerは維持する。
 
+2026-11-02のUbuntu 24.04手動Actions [run #258](https://github.com/gatchimuchio/D4-POCKET/actions/runs/41345798027)は、source `86113c9fe7cd44087429f93713cc505b4187a8e5`の`debian_setup_package` scopeでPASSした。APT package v1 install、v2 upgrade、不正candidate拒否後の現行版保持、再導入、v2からv1へのdowngradeとv2再upgrade、purge後のpackage-owned file削除と隔離XDG user-data sentinel保持を確認した。導入launcherはXvfb／X11で起動し正常終了した。これはbootstrap packageだけの受入れであり、初回画面からBroker経由で製品本体をper-user導入する縦断、製品本体のUpdate／Rollback／Uninstall、実desktop／Wayland、正式署名／配布、Linux native全体の受入れは証明しない。既存FAILのrun #257は進捗履歴に残す。
+
 ## 1. 役割と互換性
 
 Linux製品payloadも既存の固定container `D4PKG01`を使う。既存Windows packageの公開形式、Schema名、path、legacy manifest bytesは変更しない。Linux packageは専用目録Schema `d4_pocket_linux_product_package_manifest.schema.json`を使用し、manifestへ`target_platform: "linux"`を必須記録する。`target_platform`のない既存manifestはWindows payloadとしてのみ解釈し、Linux packageとして推測しない。
