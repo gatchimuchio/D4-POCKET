@@ -11763,6 +11763,18 @@ def 手動補助の起動境界を検査する() -> list[str]:
         (格納先 / "automatic.yaml").write_text("on: push", encoding="utf-8")
         if not 手動補助一覧検査(ルート):
             不整合.append("実ファイル経路で自動起動が見逃された")
+    with tempfile.TemporaryDirectory() as 場所:
+        ルート = Path(場所)
+        格納先 = ルート / ".github" / "workflows"
+        格納先.mkdir(parents=True)
+        prefix = "on: workflow_dispatch\n#"
+        上限本文 = prefix + ("x" * (65536 - len(prefix)))
+        (格納先 / "boundary.yml").write_text(上限本文, encoding="utf-8")
+        if len(上限本文) != 65536 or 手動補助一覧検査(ルート):
+            不整合.append("workflowの既存65,536文字上限ちょうどが許可されない")
+        (格納先 / "boundary.yml").write_text(上限本文 + "x", encoding="utf-8")
+        if not 手動補助一覧検査(ルート):
+            不整合.append("workflow検査の65,536文字上限超過が見逃された")
     export_workflow = (ROOT / ".github" / "workflows" / "windows-manual-export-build.yml").read_text(encoding="utf-8")
     if "python -X utf8 tooling/package_windows_portable.py" not in export_workflow:
         不整合.append("手動Windows Export workflowが検証済みportable ZIPを生成しない")
@@ -12133,6 +12145,30 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
     if workflow_path.is_symlink() or not workflow_path.is_file():
         return ["Linux Export build用の通常file workflowがない"]
     workflow = workflow_path.read_text(encoding="utf-8")
+    helper_commands = (
+        "tooling/linux_export_workflow.py verify-build-result",
+        "tooling/linux_export_workflow.py verify-portable-archive",
+        "tooling/linux_debian_setup_workflow.py verify-package-pair",
+        "tooling/linux_debian_setup_workflow.py verify-first-install-package",
+        "tooling/linux_debian_setup_workflow.py validate-installed-acceptance",
+        "tooling/linux_installed_acceptance_summary.py summarize-runtime-provenance",
+        "tooling/linux_installed_acceptance_summary.py summarize-wayland-rendering",
+        "tooling/linux_installed_acceptance_summary.py summarize-wayland-workspace-selection",
+    )
+    for relative in (
+        "tooling/linux_export_workflow.py",
+        "tooling/linux_debian_setup_workflow.py",
+        "tooling/linux_installed_acceptance_summary.py",
+        "tooling/tests/test_linux_workflow_helpers.py",
+    ):
+        path = ROOT / relative
+        if path.is_symlink() or not path.is_file():
+            missing.append(f"抽出済みLinux workflow補助が通常fileではない: {relative}")
+    for token in helper_commands:
+        if token not in workflow:
+            missing.append(f"Linux workflowが抽出済み操作を呼び出さない: {token}")
+    if "python3 -m unittest tooling.tests.test_linux_workflow_helpers" not in workflow:
+        missing.append("Linux workflow helperの正常／異常系testを実行しない")
     product_ui_path = ROOT / "apps/desktop_flutter/lib/main.dart"
     if product_ui_path.is_symlink() or not product_ui_path.is_file():
         return ["Linux installed Host acceptance用のDesktop UIが通常fileではない"]

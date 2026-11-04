@@ -194,34 +194,8 @@ jobs:
             --source-dir "$output_root/bundle" \
             --output "$output_root/D4Pocket-linux-rollback.d4pkg" \
             --product-version 0.1.1
-          python3 - "$output_root" "$(git rev-parse HEAD)" '${{ inputs.acceptance_scope }}' <<'PY' | tee "$D4P_EXPORT_ROOT/build-result.json"
-          import hashlib, json, pathlib, sys
-          root = pathlib.Path(sys.argv[1])
-          evidence = json.loads((root / "d4_pocket_linux_export_build.json").read_text())
-          package = root / "D4Pocket-linux.d4pkg"
-          expected_test_build = sys.argv[3] in {"agent_task_supervision", "agent_task_crash_recovery", "provider_credential_binding"}
-          assert evidence["target_platform"] == "linux"
-          assert evidence["source_commit"] == sys.argv[2]
-          assert evidence["signed"] is False and evidence["formal_distribution_claimed"] is False
-          assert evidence["package"]["installed_product_verified"] is False
-          assert evidence["package"]["sha256"] == hashlib.sha256(package.read_bytes()).hexdigest()
-          if sys.argv[3] == "portable_archive":
-              archive = evidence["portable_archive"]
-              assert archive["target"] == "ubuntu-24.04-x86_64"
-              assert archive["signed"] is False
-              archive_path = root / archive["file_name"]
-              assert archive["byte_length"] == archive_path.stat().st_size
-              assert archive["sha256"] == hashlib.sha256(archive_path.read_bytes()).hexdigest()
-          assert evidence["cmake_configure_arguments"].count(
-              "-DD4_LINUX_R2_E2E_TEST_BUILD=ON" if expected_test_build
-              else "-DD4_LINUX_R2_E2E_TEST_BUILD=OFF"
-          ) == 1
-          assert evidence["cmake_configure_arguments"].count(
-              "-DD4_LINUX_R2_E2E_TEST_BUILD=ON" if not expected_test_build
-              else "-DD4_LINUX_R2_E2E_TEST_BUILD=OFF"
-          ) == 0
-          print(json.dumps({"source_commit": evidence["source_commit"], "artifact_tree_sha256": evidence["artifact_tree_sha256"], "package_sha256": evidence["package"]["sha256"], "r2_e2e_test_build": expected_test_build, "signed": False, "installed_product_verified": False}, separators=(",", ":")))
-          PY
+          python3 tooling/linux_export_workflow.py verify-build-result "$output_root" "$(git rev-parse HEAD)" '${{ inputs.acceptance_scope }}' | tee "$D4P_EXPORT_ROOT/build-result.json"
+          python3 -m unittest tooling.tests.test_linux_workflow_helpers
           python3 -m unittest tooling.tests.test_linux_gtk_bundle_smoke
           python3 -m unittest tooling.tests.test_linux_installed_product_smoke
           python3 -m unittest tooling.tests.test_export_linux_product
@@ -233,18 +207,7 @@ jobs:
           fi
           if [ '${{ inputs.acceptance_scope }}' = 'portable_archive' ]; then
             archive_name="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["portable_archive"]["file_name"])' "$output_root/d4_pocket_linux_export_build.json")"
-            python3 - "$output_root" "$archive_name" <<'PY'
-          import hashlib, json, pathlib, stat, sys
-          root = pathlib.Path(sys.argv[1]).resolve()
-          evidence = json.loads((root / "d4_pocket_linux_export_build.json").read_text())
-          record = evidence["portable_archive"]
-          archive = root / sys.argv[2]
-          assert record["target"] == "ubuntu-24.04-x86_64" and record["format"] == "tar.gz"
-          assert record["file_name"] == archive.name and archive.parent.resolve() == root
-          assert stat.S_ISREG(archive.lstat().st_mode)
-          assert archive.stat().st_size == record["byte_length"]
-          assert hashlib.sha256(archive.read_bytes()).hexdigest() == record["sha256"]
-          PY
+            python3 tooling/linux_export_workflow.py verify-portable-archive "$output_root" "$archive_name"
             extracted_root="$D4P_EXPORT_ROOT/portable-extracted"
             mkdir -m 700 "$extracted_root"
             umask 077
@@ -333,29 +296,7 @@ jobs:
             --package-revision 2 > "$acceptance_root/package-v2.json"
 
           read -r deb_v1 deb_v2 source_commit artifact_tree_sha app_id audit_store_id < <(
-            python3 - "$acceptance_root/package-v1.json" "$acceptance_root/package-v2.json" "$GITHUB_SHA" "$output_root/bundle/product_manifest.json" <<'PY'
-          import hashlib, json, pathlib, sys
-          one_path, two_path = map(pathlib.Path, sys.argv[1:3])
-          one, two = json.loads(one_path.read_text()), json.loads(two_path.read_text())
-          expected_commit = sys.argv[3]
-          manifest = json.loads(pathlib.Path(sys.argv[4]).read_text())["manifest"]
-          assert one["evidence_type"] == two["evidence_type"] == "d4_pocket_linux_debian_setup_package"
-          assert one["target"] == two["target"] == "ubuntu-24.04-amd64"
-          assert one["package_version"].rsplit("-", 1)[0] == two["package_version"].rsplit("-", 1)[0]
-          assert one["package_version"].endswith("-1") and two["package_version"].endswith("-2")
-          assert one["source_commit"] == two["source_commit"] == expected_commit
-          assert one["artifact_tree_sha256"] == two["artifact_tree_sha256"]
-          assert one["scope"] == "first_run_setup_bootstrap_only"
-          assert one["signed"] is False and one["owner_authorization_created"] is False
-          assert one["permission_created"] is False and one["approval_created"] is False
-          assert one["credential_values_included"] is False and one["user_xdg_data_modified_by_package"] is False
-          assert one["package_manager_scripts"] == [] and two["package_manager_scripts"] == []
-          for record in (one, two):
-              package = pathlib.Path(record["output_path"])
-              assert package.is_file() and package.stat().st_size == record["package_size_bytes"]
-              assert hashlib.sha256(package.read_bytes()).hexdigest() == record["package_sha256"]
-          print(one["output_path"], two["output_path"], one["source_commit"], one["artifact_tree_sha256"], manifest["app_identity"]["app_id"], manifest["audit_store"]["store_id"])
-          PY
+            python3 tooling/linux_debian_setup_workflow.py verify-package-pair "$acceptance_root/package-v1.json" "$acceptance_root/package-v2.json" "$GITHUB_SHA" "$output_root/bundle/product_manifest.json"
           )
           test "$(dpkg-deb --field "$deb_v1" Package)" = d4-pocket-setup
           test "$(dpkg-deb --field "$deb_v2" Architecture)" = amd64
@@ -462,25 +403,7 @@ jobs:
             --output-dir "$package_dir" \
             --package-revision 1 > "$D4P_EXPORT_ROOT/debian-first-install-package.json"
           read -r deb source_commit artifact_tree_sha app_id audit_store_id package_sha < <(
-            python3 - "$D4P_EXPORT_ROOT/debian-first-install-package.json" "$GITHUB_SHA" "$output_root/bundle/product_manifest.json" <<'PY'
-          import hashlib, json, pathlib, sys
-          record = json.loads(pathlib.Path(sys.argv[1]).read_text())
-          manifest = json.loads(pathlib.Path(sys.argv[3]).read_text())["manifest"]
-          package = pathlib.Path(record["output_path"])
-          assert record["evidence_type"] == "d4_pocket_linux_debian_setup_package"
-          assert record["target"] == "ubuntu-24.04-amd64"
-          assert record["source_commit"] == sys.argv[2]
-          assert record["scope"] == "first_run_setup_bootstrap_only"
-          assert record["signed"] is False
-          assert record["owner_authorization_created"] is False
-          assert record["permission_created"] is False and record["approval_created"] is False
-          assert record["credential_values_included"] is False
-          assert record["package_manager_scripts"] == []
-          assert package.is_file() and package.stat().st_size == record["package_size_bytes"]
-          digest = hashlib.sha256(package.read_bytes()).hexdigest()
-          assert digest == record["package_sha256"]
-          print(record["output_path"], record["source_commit"], record["artifact_tree_sha256"], manifest["app_identity"]["app_id"], manifest["audit_store"]["store_id"], digest)
-          PY
+            python3 tooling/linux_debian_setup_workflow.py verify-first-install-package "$D4P_EXPORT_ROOT/debian-first-install-package.json" "$GITHUB_SHA" "$output_root/bundle/product_manifest.json"
           )
           test "$app_id" = "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["manifest"]["app_identity"]["app_id"])' "$output_root/bundle/product_manifest.json")"
           test "$audit_store_id" = "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["manifest"]["audit_store"]["store_id"])' "$output_root/bundle/product_manifest.json")"
@@ -501,28 +424,7 @@ jobs:
             --private-key "$D4P_EXPORT_ROOT/test-update-private.der" \
             --update-package "$product_package" \
             --acceptance-scope '${{ inputs.acceptance_scope }}' 2>&1 | tee "$D4P_EXPORT_ROOT/debian-setup-acceptance-output.log"
-          python3 - "$D4P_EXPORT_ROOT/debian-setup-acceptance-output.log" '${{ inputs.acceptance_scope }}' "$product_package_sha" <<'PY'
-          import json, pathlib, sys
-          records = []
-          for line in pathlib.Path(sys.argv[1]).read_text().splitlines():
-              try:
-                  value = json.loads(line)
-              except json.JSONDecodeError:
-                  continue
-              if isinstance(value, dict) and value.get("acceptance_scope") == sys.argv[2]:
-                  records.append(value)
-          assert records, "installed smokeのJSON acceptance resultを取得できません"
-          result = records[-1]
-          scope = sys.argv[2]
-          assert result["acceptance_scope"] == scope
-          if scope == "debian_setup_lifecycle":
-              first = result["first_install"]
-              assert first["product_version"] == "0.1.1"
-              assert first["package_sha256"] == sys.argv[3]
-              assert result["update_lifecycle"]["active_record"]["product_version"] == "0.1.2"
-              assert result["active_version"] == "0.1.1"
-              assert result["uninstall"] and result["live_audit"]
-          PY
+          python3 tooling/linux_debian_setup_workflow.py validate-installed-acceptance "$D4P_EXPORT_ROOT/debian-setup-acceptance-output.log" '${{ inputs.acceptance_scope }}' "$product_package_sha"
           test "$(dpkg-query -W -f='${Status}' d4-pocket-setup)" = 'install ok installed'
           if [ '${{ inputs.acceptance_scope }}' = 'debian_setup_lifecycle' ]; then
             printf '\n- Linux integrated Setup lifecycle: Ubuntu 24.04 amd64; source `%s`; APT Setup `.deb` SHA-256 `%s`; initial product D4PKG SHA-256 `%s`; bundle tree `%s`。\n' \
@@ -850,34 +752,7 @@ jobs:
             --build-evidence "$D4P_EXPORT_ROOT/output/d4_pocket_linux_export_build.json" \
             --bundle-root "$D4P_EXPORT_ROOT/output/bundle" \
             --source-commit "$(git rev-parse HEAD)" | tee "$result_path"
-          python3 - "$result_path" <<'PY' >> "$GITHUB_STEP_SUMMARY"
-          import json, pathlib, sys
-          matches = []
-          for line in pathlib.Path(sys.argv[1]).read_text(encoding="utf-8").splitlines():
-              try:
-                  candidate = json.loads(line)
-              except json.JSONDecodeError:
-                  continue
-              if isinstance(candidate, dict) and candidate.get("acceptance_scope") == "runtime_provenance":
-                  matches.append(candidate)
-          if len(matches) != 1:
-              raise SystemExit(f"expected one runtime provenance result, found {len(matches)}")
-          result = matches[0]
-          runtime = result["runtime_identity"]
-          audit = result["audit_store_observation"]
-          components = result["component_sha256"]
-          print("\n### Installed runtime provenance (LIVE_RUNTIME)")
-          print(f"- Source commit: `{result['source_commit']}`")
-          print(f"- Package: `{result['package_sha256']}` ({result['package_byte_length']} bytes)")
-          print(f"- Artifact tree: `{result['artifact_tree_sha256']}`; installed tree: `{result['installed_artifact_tree_sha256']}` ({result['artifact_count']} files)")
-          print(f"- Installed root: `{result['installed_root']}`")
-          print(f"- Active stage: `{result['active_stage']}`")
-          print(f"- Runtime identity: App `{runtime['app_id']}`, Audit Store `{runtime['audit_store_id']}`")
-          print(f"- Runner: `{components['runner']}`; Launcher: `{components['launcher']}`; Broker: `{components['broker']}`")
-          print(f"- Live Runner: `{result['live_processes']['runner']['sha256']}` ({result['live_processes']['runner']['process_count']} process); live Broker: `{result['live_processes']['broker']['sha256']}` ({result['live_processes']['broker']['process_count']} process)")
-          print(f"- Audit Store path: `{audit['path']}`; Audit file `{audit['audit.jsonl']['sha256']}`; anchor `{audit['audit_anchor.json']['sha256']}`; private key file present: `{audit['anchor_key_private_file']}`")
-          print("- Scope: Ubuntu 24.04 hosted Xvfb/X11, unsigned synthetic test identity. This binds the installed artifacts and current runtime paths to this source commit; it does not establish a real desktop session, Wayland rendering, signing, formal distribution, or Linux-wide release readiness.")
-          PY
+          python3 tooling/linux_installed_acceptance_summary.py summarize-runtime-provenance "$result_path" >> "$GITHUB_STEP_SUMMARY"
 
       - name: installed GTK UI surfaceをWayland compositorで描画確認
         if: ${{ inputs.acceptance_scope == 'wayland_rendering' }}
@@ -899,31 +774,7 @@ jobs:
             --update-package "$D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE" \
             --acceptance-scope wayland_rendering \
             --source-commit "$(git rev-parse HEAD)" | tee "$result_path"
-          python3 - "$result_path" <<'PY' >> "$GITHUB_STEP_SUMMARY"
-          import json, pathlib, sys
-          matches = []
-          for line in pathlib.Path(sys.argv[1]).read_text(encoding="utf-8").splitlines():
-              try:
-                  candidate = json.loads(line)
-              except json.JSONDecodeError:
-                  continue
-              if isinstance(candidate, dict) and candidate.get("acceptance_scope") == "wayland_rendering":
-                  matches.append(candidate)
-          if len(matches) != 1:
-              raise SystemExit(f"expected one Wayland rendering result, found {len(matches)}")
-          result = matches[0]
-          frame = result["compositor_output"]
-          runner = result["live_installed_runner"]["runner"]
-          print("\n### Installed Wayland surface rendering (LIVE_RUNTIME)")
-          print(f"- Source commit: `{result['source_commit']}`")
-          print(f"- Installed package SHA-256: `{result['installed_package_sha256']}`")
-          print(f"- Display: {result['display_server']}; visible window: {result['visible_window']}")
-          print(f"- Compositor output: `{frame['width']}×{frame['height']}`, `{frame['changed_pixels']}` changed pixels (minimum `{frame['required_changed_pixels']}`)")
-          print(f"- Baseline PNG SHA-256: `{frame['baseline_png_sha256']}`; rendered PNG SHA-256: `{frame['rendered_png_sha256']}`; image files retained: `{frame['image_files_retained']}`")
-          print(f"- Live installed Runner: SHA-256 `{runner['sha256']}`; process count `{runner['process_count']}`")
-          print(f"- Owned process cleanup: `{result['owned_process_cleanup']}`")
-          print("- Scope: installed UI surface output in an isolated Weston headless/Pixman compositor. This does not establish a physical desktop session, Wayland compositor diversity, formal distribution/signing, or Linux-wide release readiness.")
-          PY
+          python3 tooling/linux_installed_acceptance_summary.py summarize-wayland-rendering "$result_path" >> "$GITHUB_STEP_SUMMARY"
 
       - name: installed GTK UIからWayland上のWorkspace選択とOwner境界を受入れる
         if: ${{ inputs.acceptance_scope == 'wayland_workspace_selection' }}
@@ -945,34 +796,7 @@ jobs:
             --update-package "$D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE" \
             --acceptance-scope wayland_workspace_selection \
             --source-commit "$(git rev-parse HEAD)" | tee "$result_path"
-          python3 - "$result_path" >> "$GITHUB_STEP_SUMMARY" <<'PY'
-          import json, pathlib, sys
-          matches = []
-          for line in pathlib.Path(sys.argv[1]).read_text(encoding="utf-8").splitlines():
-              try:
-                  candidate = json.loads(line)
-              except json.JSONDecodeError:
-                  continue
-              if isinstance(candidate, dict) and candidate.get("acceptance_scope") == "wayland_workspace_selection":
-                  matches.append(candidate)
-          if len(matches) != 1:
-              raise SystemExit(f"expected one Wayland Workspace result, found {len(matches)}")
-          result = matches[0]
-          evidence = result["workspace_selection"]
-          runner = result["live_installed_runner"]["runner"]
-          print("\n### Installed Wayland Workspace selection and Owner boundary (LIVE_RUNTIME)")
-          print(f"- Source commit: `{result['source_commit']}`")
-          print(f"- Package SHA-256: `{result['installed_package_sha256']}`; version `{result['product_version']}`")
-          print(f"- Display: {result['display_server']}; visible window `{result['visible_window']}`")
-          print(f"- Input driver: {result['keyboard_input']}")
-          print(f"- Native selection: {evidence['workspace_selection']}")
-          print(f"- Owner boundary: {evidence['registration']}; bounded CLI probes `{evidence['cli_interface_probe_calls']}`")
-          print(f"- Task capability: `{evidence['task_execution']}`; Task Permission: `{evidence['workspace_read_permission']}`")
-          print(f"- Durable registration Audit: `{evidence['accepted_registration_audit']}`; secret/root exposure `{evidence['audit_secret_and_root_exposure']}`")
-          print(f"- Live Runner SHA-256: `{runner['sha256']}`; process count `{runner['process_count']}`")
-          print(f"- Owned process cleanup: `{result['owned_process_cleanup']}`")
-          print("- Scope: headless Weston/Pixman Wayland session with X11 DISPLAY unset; this does not establish a physical desktop session, compositor diversity, signing/distribution, or Linux-wide release readiness.")
-          PY
+          python3 tooling/linux_installed_acceptance_summary.py summarize-wayland-workspace-selection "$result_path" >> "$GITHUB_STEP_SUMMARY"
 
       - name: failure-only GTK Workspace chooser screenshot
         if: ${{ failure() && (inputs.acceptance_scope == 'workspace_selection' || inputs.acceptance_scope == 'wayland_workspace_selection') }}

@@ -36,7 +36,7 @@ WindowsではFlutterの実行物がPATH上の`flutter.bat`等になるため、t
 
 `tooling/export_windows_product.py`は、SchemaとManifest file hashで照合したBroker Receipt／Manifestから、Flutter Release、Rust Broker helper、Rust Desktop起動器を未署名portable directoryへ組み立てる独立した開発用経路である。cleanでGitHub `origin/main`と一致するsource commitを一時展開し、App ID／Audit store IDの組から生成した固有SHA-256 pathでCargo targetを分け、選択ModuleをFlutter defineへ渡す。これはDeveloperが明示実行し、製品Runtime／Export UIから呼び出さない。
 
-Receiptの出所とOwner操作は認証せず、Credential artifact scanは未実施と記録する。Manifestはbyte-for-byte同梱するがRuntimeでは消費しない。Receiptの`binary_pruning_status=not_applied`、build evidenceの`binary_pruning_verified=false`を維持し、画面defineの反映、artifact一覧／hash記録、bundle組立を実binary除去・意味上の安全Core保持・実起動・性能・正式配布へ昇格させない。正式なpruning gateには、clean sourceのall-enabled／選択最終製品artifactをhash固定したpositive／negative／回帰実挙動、Core保持、cold startup、bounded resourceの検証が別途必要である。
+Receiptの出所とOwner操作は認証しない。Windows Export buildでは、build evidenceを除くartifact inventoryを対象に、既知patternだけを照合するCredential artifact scanが実行される。未知形式、暗号化、分割、変換された秘密の不存在は証明せず、scan結果は正式なpruning受入れの代替にならない（範囲と証拠は[Export契約](gui-shell-export.md)を参照）。Manifestはbyte-for-byte同梱するがRuntimeでは消費しない。Receiptの`binary_pruning_status=not_applied`、build evidenceの`binary_pruning_verified=false`を維持し、画面defineの反映、artifact一覧／hash記録、bundle組立を実binary除去・意味上の安全Core保持・実起動・性能・正式配布へ昇格させない。正式なpruning gateには、clean sourceのall-enabled／選択最終製品artifactをhash固定したpositive／negative／回帰実挙動、Core保持、cold startup、bounded resourceの検証が別途必要である。
 
 ## Developer専用の同一commit AOT比較
 

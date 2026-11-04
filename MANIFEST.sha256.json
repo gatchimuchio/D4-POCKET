@@ -76,7 +76,7 @@
     },
     {
       "path": ".github/workflows/linux-manual-export-build.yml",
-      "sha256": "666b66f08252a7bf5809ddea4d39e61313e44118dfed1f2585ceb559a841ce81"
+      "sha256": "d2d6bdf6419e3662cc96f08b5a9c29bcb3811817eb8d9747072ad8257b19c3b8"
     },
     {
       "path": ".github/workflows/linux-manual-rust-validation.yml",
@@ -164,7 +164,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "a97ea50d835e23259395082cbcbca738c41e00283c8b52058ed921f41818fcc9"
+      "sha256": "072fcca80716b2044d4e523d46d69a1d5b0e50ceee65f399fd9d1f12ea8395f7"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -1352,7 +1352,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "8b6811ce76e0f69c3116ac42ba5ca8017994c97f83b6cbc96d052096ea4b8e0d"
+      "sha256": "22b394e0484e128bcfba74e95f7290d7ec0c04a952397b3a4b9860ce347c0f65"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1540,7 +1540,7 @@
     },
     {
       "path": "docs/specs/gui-shell-module-pruning.md",
-      "sha256": "6909de6131af4695e3234242ae3bdd4d4e8b9dd5bd38c48170abff1bf176d9c3"
+      "sha256": "5c2c25f72060f83b7db66f4f739a4d07c7a3c3b06c219b131bbf7581f91b6cf1"
     },
     {
       "path": "docs/specs/gui-shell-preview.md",
@@ -5096,7 +5096,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "1057348f501ac0a198e373792119df5cca6c14e1ec37598e8aed1755dbb8fa89"
+      "sha256": "ed647a9bf77eb5f393b022475b20292f30c455614884749ff455f6cccbd3c246"
     },
     {
       "path": "tooling/conformance_tests/test_final_development_audit.py",
@@ -5169,6 +5169,18 @@
     {
       "path": "tooling/launch_owner_desktop_isolated.py",
       "sha256": "b1b7c97d373e77cbf7158ca9978a3556e58b47ffd1262e5e831e5662ced4545f"
+    },
+    {
+      "path": "tooling/linux_debian_setup_workflow.py",
+      "sha256": "6a016adef5e7e9af0c8b0fea5186aa0d241f01eb104cb32c0c67528797aaaa6c"
+    },
+    {
+      "path": "tooling/linux_export_workflow.py",
+      "sha256": "cc899592b38c15da13e1647f1351dabc2ae5494293aa6e8fa47f7312e8856584"
+    },
+    {
+      "path": "tooling/linux_installed_acceptance_summary.py",
+      "sha256": "98ddde1ee4307c26bd16bc04dc36c6454f72d111ce03b902d74cfc28aa548349"
     },
     {
       "path": "tooling/long_run_validation.py",
@@ -5297,6 +5309,10 @@
     {
       "path": "tooling/tests/test_linux_update_catalog_fixture.py",
       "sha256": "be8b5e13a5b6ab022c26740bd4cc7b94b07b7949025a7c5f6d510570d320afa2"
+    },
+    {
+      "path": "tooling/tests/test_linux_workflow_helpers.py",
+      "sha256": "39f2845764fc6e6ee9635d6b253605108c7f04ecadf43be9b7489643d61f72da"
     },
     {
       "path": "tooling/ui_snapshot_tests/README.md",
