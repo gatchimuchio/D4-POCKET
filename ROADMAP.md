@@ -1,5 +1,11 @@
 # GUI Shell ロードマップ
 
+## 現行統合製品工程（2026-11-05）
+
+Owner指示により採用した統合製品要求・工程・Codex施工指示は[`docs/QE_2026-11-05/`](docs/QE_2026-11-05/)を参照する。現在の状態は[進捗](docs/QE_2026-11-05/進捗.md)、現物照合とW01開始根拠は[W00対応表](docs/QE_2026-11-05/W00_要件consumer照合_20261105.md)。W00は`SCOPED_PASS`、W01は`IN_PROGRESS`。
+
+QE段階・BUILD_BATCH・結合後QC／QAの方法論はOwner採用済みの[`docs/QE_2026-10-22/`](docs/QE_2026-10-22/)に従う。rev5製品要求、既存P／B／Qの履歴、緩衝基盤、Release Gateは保持し、この追補は過去の限定CLOSED／FAILを遡及変更しない。以下の時系列記録は履歴であり、上記現行工程の状態を上書きしない。
+
 ローカル検証補足（2026-11-02、Linux Setup installed lifecycle統合）: `tooling/manifest.py --check`、`tooling/release_gate_check.py --release-track non_windows`、Linux blocker／workflowの対象conformance確認はPASSした。全`tooling/conformance_tests/run_conformance_skeleton.py`は、manual workflow検査の65,536文字上限に対し現workflow 75,916文字でFAILした。同じworkflowはorigin/main基準でも72,354文字で既に上限を超過していた。これは既存workflow構成のconformance残件であり、今回のinstalled runtime Acceptance失敗ではない。
 
 作業追補（2026-11-02、Linux Setup installed lifecycle統合）: 手動`workflow_dispatch` [run #41359281663](https://github.com/gatchimuchio/D4-POCKET/actions/runs/41359281663)はsource commit `8f630c05e989c668b234611d2dd89bd0e14ffe22`でUbuntu 24.04 hosted runner上の`debian_setup_lifecycle`にPASSした。APT-installed Setup UIから同runの製品D4PKG v0.1.1（SHA-256 `a1a86897e865a6a1b563ef3430c516d9d9557d1dd4a7bffbf79763cadf064648`）を初回導入し、installed Update Centerでv0.1.2の更新受入れ、v0.1.1へのrollback、Export／Uninstallまで実行した。Audit 191件はBroker再起動後も読戻し可能で、製品root／desktop entry削除、利用者データ／Audit store保持、所有process停止を確認した。先行run [#41358061536](https://github.com/gatchimuchio/D4-POCKET/actions/runs/41358061536)はruntimeが最終Acceptance JSONを出力した後、harnessが空のcapture fileをparseしてFAILした。captureを両streamへ対応させた修正後に同scopeを再実行し、run #41359281663が成功した。v0.1.2更新payloadは1,809 byteの非実行Acceptance fixtureであり、同一sourceから生成した製品更新packageの実更新ではない。run内cache／Owner fixtureを使うXvfb／X11限定のLIVE_RUNTIME証拠で、実desktop／Wayland、正式署名配布、完全な同一source update、Linux製品全体の完成を証明しない。`linux_native_product_support=unresolved`、通常Release `task_execution=unsupported`、`release_ready=false`を維持する。詳細は[進捗記録](docs/REV5_PRODUCT_PROGRESS.md)。

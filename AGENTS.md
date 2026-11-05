@@ -1,6 +1,6 @@
 # D4Pocket エージェント実装・監査規定
 
-本書はD4Pocket（旧GUI-Shell）のAI実装エージェントが守るリポジトリ共通規律である。QE方法論・工程・2026-10-22の是正工程の詳細は、採用記録付きの現行3点（`docs/QE_2026-10-22/`）を適用し、D4Pocket固有の権限、安全、復旧、OS別証拠、Git運用を保持する。BLUE側のHDS-BRAIN実装、192小単位、別リポジトリの成果や書込み権限は移植しない。
+本書はD4Pocket（旧GUI-Shell）のAI実装エージェントが守るリポジトリ共通規律である。QE方法論・工程・2026-10-22の是正工程の詳細は、採用記録付きの現行QE方法論3点（`docs/QE_2026-10-22/`）を適用する。2026-11-05に採用された統合製品要求・工程・施工指示は`docs/QE_2026-11-05/`を適用し、既存の製品要求、安全境界、権限、復旧、OS別証拠、Git運用を保持する。BLUE側のHDS-BRAIN実装、192小単位、別リポジトリの成果や書込み権限は移植しない。
 
 ## 第I部 共通基底規律
 
@@ -686,7 +686,7 @@ Product UI完成をcontract完成として扱わない。
 
 第I部の優先順位modelの範囲内で、リポジトリ固有の現行指針を次の順に使用する。
 
-1. 作業対象についてユーザーが明示した最新版の仕様・工程表・実装指示書と、それへ同期した現行進捗。これらが現行phaseの対象・Acceptance・状態を決める。
+1. 作業対象についてユーザーが明示した最新版の仕様・工程表・実装指示書と、それへ同期した現行進捗。2026-11-05統合製品工程は`docs/QE_2026-11-05/`の採用記録付き3点と進捗がD4-N01〜N11／W00〜W08の対象・Acceptance・状態を決める。
 2. `docs/specs/adapter-conformance.md`、`docs/specs/content-exposure-policy.md`、`docs/specs/approval-visibility-boundary.md`および関連する`docs/specs/`契約。`docs/specs/gui-shell-spec-v1.md`は基盤仕様として扱い、最新版の現行指示で置き換えられていない技術責任範囲にだけ適用する。
 3. `specs/*.schema.json`
 4. `tooling/conformance_tests/`
@@ -718,7 +718,7 @@ Product UI完成をcontract完成として扱わない。
 
 現行ROADMAPの正本は`ROADMAP.md`である。
 
-基盤の共通実装仕様は`docs/specs/gui-shell-spec-v1.md`である。同じ製品工程に対する仕様・工程表・実装指示書は、ユーザーが明示した最新版が現行正本となる。現在のrev5製品・緩衝基盤工程は、最新rev5指示、採用済み緩衝補遺と`docs/REV5_PRODUCT_PROGRESS.md`がphase・Acceptance・状態を決める。QE方法論・工程・D4-AUD是正手順は採用記録付きの`docs/QE_2026-10-22/`を現行正本とする。2026-10-12のQE再構成3文書はその履歴・補助資料であり、現行正本の状態を上書きしない。
+基盤の共通実装仕様は`docs/specs/gui-shell-spec-v1.md`である。2026-11-05にOwnerが採用した統合製品仕様・工程・Codex施工指示とW00〜W08進捗は`docs/QE_2026-11-05/`を現行正本とする。製品機能の原要求、既存AcceptanceとRelease Gateはrev5原本、採用済み緩衝補遺、`docs/REV5_PRODUCT_PROGRESS.md`に保持する。QE方法論・工程・D4-AUD是正手順は採用記録付きの`docs/QE_2026-10-22/`を引き続き正本とし、2026-11-05製品工程はQE方法論を置換しない。2026-10-12のQE再構成3文書は履歴・補助資料であり、現行正本の状態を上書きしない。
 
 拡張標準は`docs/standards/gui-shell-extended-standard.md`である。
 
@@ -754,11 +754,11 @@ QEは要求・設計・実装・観測・是正を通じた上位思想である
 
 ### 29. rev5製品・B工程の現況と施工境界
 
-作業時には最新`docs/REV5_PRODUCT_PROGRESS.md`、該当するAcceptance記録、明示Owner指示を読み直し、現行工程・次作業はそれらの現行状態を使う。以下の2026-10-12記述は履歴snapshotであり、現在の施工境界として使わない。
+rev5／緩衝基盤の製品Acceptance履歴と証拠には`docs/REV5_PRODUCT_PROGRESS.md`を、2026-11-05統合工程の状態には`docs/QE_2026-11-05/進捗.md`を参照する。以下の2026-10-12、2026-10-19記述は履歴snapshotであり、現在の施工境界として使わない。
 
 履歴snapshot（2026-10-12）: P2 Compare／P3 Handoff／P12 Windows／P13 Mobile・Non-Windowsは局所CLOSED、B0〜B3はCLOSED、B4-L1／B4-L2は局所CLOSED、当時のB4全体はOPEN。B4統合製品経路は2026-10-17に限定Acceptanceを満たしてCLOSEDとなった。詳細は現行進捗とB4記録を参照する。
 
-現行の施工境界（2026-10-19）: B4はCLOSED、B5はOPEN。B5ではWindows Flutter検証snapshot隔離とAndroid debug buildが記録済みで、`BUF-T04`は部分観測、`BUF-T05`はOPEN、`BUF-T06`は全体OPEN（Windows非管理者Cargo checkの通常経路を局所確認、Apple signing／sandboxは未確認）、`BUF-T23`のB5局所AcceptanceはPASS（Q4の長期／反復／資源検査は未実施）である。検査対象source commit `7ef761b`の全target Cargo checkはOS保護変更なしでPASSし、詳細はB5自己適用記録にある。Windows hosted run #54は固定source commit `5f4e810ac358008d64c6981c6ce1e0a895c8e6b4`でRust全targetを3回実行し、各回569 passed／0 failed／13 ignored、Release Broker build／通常IPC smoke／capture cleanup／runner clean-treeまでPASSした。これは診断workflowの反復実行確認であり、Pktmon formatted event数はpacket数ではなく、loopback RSTの実packet・方向・発生主体・根因は未確定。B5完了の証拠ではない。次作業は現行B5記録の未成立条件から選び、OneDrive同期復旧や製品全体完成へ証拠を拡大しない。B4を再施工するのは再現可能なregressionが確認された場合に限る。Linux native完全対応は必須製品要求であり、現行工程・実装はその要求に基づき進める。Linux v1.1追加文書の未採用状態は同文書の要求ID・詳細試験・QE作業分割を自動的に現行正本へしないという意味に限られ、Linux作業の開始や継続を止めない。正式Q0〜Q7は`DEFERRED`を維持し、新候補の開始条件はその現行責任正本に従う。
+履歴snapshot（2026-10-19）: B4はCLOSED、B5はOPEN。B5ではWindows Flutter検証snapshot隔離とAndroid debug buildが記録済みで、`BUF-T04`は部分観測、`BUF-T05`はOPEN、`BUF-T06`は全体OPEN（Windows非管理者Cargo checkの通常経路を局所確認、Apple signing／sandboxは未確認）、`BUF-T23`のB5局所AcceptanceはPASS（Q4の長期／反復／資源検査は未実施）である。検査対象source commit `7ef761b`の全target Cargo checkはOS保護変更なしでPASSし、詳細はB5自己適用記録にある。Windows hosted run #54は固定source commit `5f4e810ac358008d64c6981c6ce1e0a895c8e6b4`でRust全targetを3回実行し、各回569 passed／0 failed／13 ignored、Release Broker build／通常IPC smoke／capture cleanup／runner clean-treeまでPASSした。これは診断workflowの反復実行確認であり、Pktmon formatted event数はpacket数ではなく、loopback RSTの実packet・方向・発生主体・根因は未確定。B5完了の証拠ではない。次作業は現行B5記録の未成立条件から選び、OneDrive同期復旧や製品全体完成へ証拠を拡大しない。B4を再施工するのは再現可能なregressionが確認された場合に限る。Linux native完全対応は必須製品要求であり、現行工程・実装はその要求に基づき進める。Linux v1.1追加文書の未採用状態は同文書の要求ID・詳細試験・QE作業分割を自動的に現行正本へしないという意味に限られ、Linux作業の開始や継続を止めない。正式Q0〜Q7は`DEFERRED`を維持し、新候補の開始条件はその現行責任正本に従う。
 
 CLOSEDを理由なく再施工しない。Linux未実装をP13やWindows B4の局所完了記録へ遡及させない。B3の153原因対応行の分類を全原因の解消や全緩衝作用の実証と呼ばない。既存R2-A〜H、`FQ-TEST-LOOPBACK`、取得不能証拠の残余を維持する。
 
@@ -773,5 +773,7 @@ CLOSEDを理由なく再施工しない。Linux未実装をP13やWindows B4の�
 ### 31. D4Pocket QEとLinux追加設計の採用境界
 
 Linux nativeは完全対応が必須の独立Desktop製品対象であり、その実装・工程開始は2026-10-12詳細案の採否に依存しない。QE方法論・工程・`D4-AUD-20261022`是正工程の現行正本は、Owner採用済みの[2026-10-22統合3点](docs/QE_2026-10-22/採用記録.md)とする。これらはrev5の製品機能要求を欠落なく置換したものではないため、rev5・既存Contract／Schema・緩衝補遺の要求意味、既存CLOSED／FAIL、製品状態、Release Gateを保持する。3点内で候補・未採用と明記されたIDや詳細工程はその区分も保持し、Linux必須性を弱めず、黙って拘束的Acceptanceへ昇格させない。正式Q0〜Q7、通常Release capability、Owner GOは既存の開始条件を維持する。
+
+2026-11-05統合製品3点は、Owner指示によりD4-N01〜N11およびW00〜W08の現行製品施工範囲として採用した。正本は[採用記録](docs/QE_2026-11-05/採用記録.md)。W00は`SCOPED_PASS`、W01は`IN_PROGRESS`であり、状態は同ディレクトリの進捗で管理する。本採用は2026-10-22 QE方法論の置換ではなく、rev5／緩衝基盤の要求、既存CLOSED／FAIL、通常Release capability、Final QA、Owner GOを変更しない。
 
 D4Pocket固有のremoteバックアップ正本は`refs/tags/codex/backup-main`と`refs/tags/codex/backup-main-prev`。BLUE側の`refs/heads`へ自動変更しない。D4の手動`workflow_dispatch`限定Actions運用、direct-main、単一writer、Shell Core／Broker authority、各OSの証拠区分を保持する。LinuxはWindows・macOSと並ぶ独立Desktop対象だが、native製品の実接続・導入・Release・保証が実証済みとは主張しない。既存試験・Release Gateを省略せず、作業開始時に現物と正本を再読する。

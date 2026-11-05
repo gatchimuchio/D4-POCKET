@@ -100,7 +100,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "bdf8aa79d893d8bd6e477ad073eb8bfa80688b65cd183176ceb9579889f4c6b6"
+      "sha256": "8f90491d0cc2bfa70db5cf495ec3f5a2f682fae953b3976fd0925bab346b41a2"
     },
     {
       "path": "AUDIT.md",
@@ -172,7 +172,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "1120abba32011e9e80f65f30e2d8baac3a453fc8cce0f0294fa8611ed61a6d75"
+      "sha256": "0119686f05c30dd15191a2ffe85e559f2ee9637c76a0497217488fc004e2f540"
     },
     {
       "path": "SECURITY.md",
@@ -1335,6 +1335,30 @@
       "sha256": "0f9b3f146d13d9ddda79a686ca037a814a92bf8ba2a8e6398239962c78994bdf"
     },
     {
+      "path": "docs/QE_2026-11-05/01_D4Pocket_\u7d71\u5408\u88fd\u54c1\u5b9f\u88c5\u4ed5\u69d8\u66f8_20261105.md",
+      "sha256": "310f3aca23da4cc4685fb53c9679e2881149776be2496074d396b3cec88232be"
+    },
+    {
+      "path": "docs/QE_2026-11-05/02_D4Pocket_\u7d71\u5408\u958b\u767a\u5de5\u7a0b\u8868_20261105.md",
+      "sha256": "4c8ab701175ceac634720fcf64f909ab4e2392867845575d09ea87d4356406a0"
+    },
+    {
+      "path": "docs/QE_2026-11-05/03_D4Pocket_Codex\u65bd\u5de5\u6307\u793a\u66f8_20261105.md",
+      "sha256": "a3422ea4a0ca547fa9d0cd280750f7a8c6f67ed8a40615c2135afbf46136d60e"
+    },
+    {
+      "path": "docs/QE_2026-11-05/W00_\u8981\u4ef6consumer\u7167\u5408_20261105.md",
+      "sha256": "f9a68f8cf2cfb47a257d8289d6cc9e33fcf8b4cb4638f4dadb1ff41836b4815f"
+    },
+    {
+      "path": "docs/QE_2026-11-05/\u63a1\u7528\u8a18\u9332.md",
+      "sha256": "36e7c37a228c735f713e9996645d8a86ef6772b17bab0d6453b8c335b1bf3bf6"
+    },
+    {
+      "path": "docs/QE_2026-11-05/\u9032\u6357.md",
+      "sha256": "3c84785eb8c9ef416d5e4b9d4af7ad996332dcde93d6d79bfd82875b54a81ffe"
+    },
+    {
       "path": "docs/RELEASE_VALIDATION.md",
       "sha256": "4dcc0dfb17332bd291e3f5b08c9b6f3ee13dd891b9aebdb68b74cab6e5a6dea5"
     },
@@ -1352,7 +1376,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "22b394e0484e128bcfba74e95f7290d7ec0c04a952397b3a4b9860ce347c0f65"
+      "sha256": "11eb2a5e644bade4ba1ec975b9967940a60ec3654966ecc7138a1989637255f4"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -5344,7 +5368,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "7609caaff8671eedcfd562c85a530b86486d8a63ac6a7ff7b85df2b8f6a1f958"
+      "sha256": "08e15874868cee2d0da06be450a7f81a1ce0fdbc2fff61a8dbc6958f1eb07ab7"
     }
   ]
 }
