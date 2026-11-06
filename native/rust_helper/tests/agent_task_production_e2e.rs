@@ -227,8 +227,8 @@ mod windows {
     }
 
     #[test]
-    #[ignore = "明示指定したRelease Brokerと実Codex CLIでR2のproduction unsupported gateを検証するときに実行する"]
-    fn production_agent_task_gate_fails_closed_over_authenticated_ipc() {
+    #[ignore = "明示指定したnormal Release Brokerと実Codex CLIでG1の能力表示・無許可拒否を検証するときに実行する"]
+    fn normal_release_agent_task_requires_native_owner_grants_over_authenticated_ipc() {
         let helper = std::env::var_os("GUI_SHELL_AGENT_TASK_E2E_HELPER_EXE")
             .map(PathBuf::from)
             .expect("検査対象のRelease Broker helper path");
@@ -256,7 +256,7 @@ mod windows {
                     .find(|capability| capability["capability_id"] == "task_execution")
             })
             .expect("Task実行Capability");
-        assert_eq!(task_capability["support"]["status"], "unsupported");
+        assert_eq!(task_capability["support"]["status"], "supported");
 
         let started = send_request(
             &endpoint,
@@ -278,13 +278,27 @@ mod windows {
             "instruction":instruction,
         });
 
-        for operation in ["Agent作業要求検査", "AgentTask実行"] {
-            let response = send_request(&endpoint, &request(&endpoint, operation, task.clone()));
-            assert_eq!(response["status"], "rejected", "{operation}: {response}");
-            assert_eq!(response["error"]["code"], "AgentTask実行非対応");
-            assert!(response["body"].is_null());
-            assert!(!response.to_string().contains(instruction));
-        }
+        let preflight = send_request(
+            &endpoint,
+            &request(&endpoint, "Agent作業要求検査", task.clone()),
+        );
+        assert_eq!(preflight["status"], "accepted", "{preflight}");
+        assert_eq!(preflight["body"]["実行状態"], "未実行");
+        assert_eq!(preflight["body"]["Permission状態"], "未付与");
+        assert_eq!(preflight["body"]["Approval状態"], "未取得");
+        assert!(!preflight.to_string().contains(instruction));
+
+        let unauthorized_task = send_request(
+            &endpoint,
+            &request(&endpoint, "AgentTask実行", task.clone()),
+        );
+        assert_eq!(
+            unauthorized_task["status"], "rejected",
+            "{unauthorized_task}"
+        );
+        assert_eq!(unauthorized_task["error"]["code"], "権限拒否");
+        assert!(unauthorized_task["body"].is_null());
+        assert!(!unauthorized_task.to_string().contains(instruction));
 
         let permission = json!({
             "agent_runtime_id":"r2-codex",
@@ -348,6 +362,8 @@ mod windows {
         for response in [
             &agent_list,
             &started,
+            &preflight,
+            &unauthorized_task,
             &workspace_permission,
             &owner_approval,
             &stale_session,
@@ -360,13 +376,14 @@ mod windows {
                 .iter()
                 .any(|event| event.event_id == event_id));
         }
-        for operation in ["Agent作業要求検査", "AgentTask実行"] {
-            assert!(persisted.audit_log.events().iter().any(|event| {
-                event.operation == operation
-                    && event.decision == "rejected"
-                    && event.reason.contains("AgentTask実行非対応")
-            }));
-        }
+        assert!(persisted.audit_log.events().iter().any(|event| {
+            event.event_id == preflight["audit_event_id"]
+                && event.operation == "Agent作業要求検査"
+        }));
+        assert!(persisted.audit_log.events().iter().any(|event| {
+            event.event_id == unauthorized_task["audit_event_id"]
+                && event.operation == "AgentTask実行"
+        }));
         assert!(persisted
             .audit_log
             .events()

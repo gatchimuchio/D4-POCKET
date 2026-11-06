@@ -659,12 +659,31 @@ impl 実行系Adapter for CodexCliAdapter {
                 }
             })
         };
+        #[cfg(all(
+            target_os = "windows",
+            not(test),
+            not(debug_assertions),
+            not(feature = "r2-e2e")
+        ))]
+        let task_execution_capability = json!({
+            "capability_id": "task_execution",
+            "support": {
+                "status": "supported",
+                "reason": "Windows normal ReleaseのBroker Agent Task経路がG1条件で検証済み。他OSは別途未検証"
+            }
+        });
         #[cfg(not(all(feature = "r2-e2e", not(test))))]
+        #[cfg(not(all(
+            target_os = "windows",
+            not(test),
+            not(debug_assertions),
+            not(feature = "r2-e2e")
+        )))]
         let task_execution_capability = json!({
             "capability_id": "task_execution",
             "support": {
                 "status": "unsupported",
-                "reason": "専用permission profileの実Task、隔離、後始末を実Agentで検証していない"
+                "reason": "このOS／build条件の通常Release Task経路は未検証"
             }
         });
         Some(json!({
@@ -1285,7 +1304,6 @@ fn build_codex_command_with_model(
             "features.plugins=false".to_owned(),
             // loopback試験ではmachine analyticsの送信も無効化する。
             "analytics.enabled=false".to_owned(),
-            "approval_policy=\"never\"".to_owned(),
         ];
         if provider_credential.is_some() {
             // Codex CLIはenv_keyを指定すると、その環境変数がない場合に送信前失敗する。
@@ -1313,6 +1331,9 @@ fn build_codex_command_with_model(
         if task_temporary_environment.is_none() {
             return Err(対話失敗::要求不正);
         }
+        // D4 Brokerが指示hashへ束縛した一回Owner Approvalを消費してからTaskを起動する。
+        // CLI自身の二重確認は行わず、直後の専用permission profileで作用範囲を制限する。
+        task_command.arg("-c").arg("approval_policy=\"never\"");
         for setting in TASK_PERMISSION_PROFILE_PREFIX_OVERRIDES
             .iter()
             .chain(TASK_PERMISSION_PROFILE_PLATFORM_OVERRIDES.iter())
@@ -1970,6 +1991,13 @@ mod tests {
             if is_task {
                 assert!(!args.iter().any(|arg| arg == "--sandbox"));
                 assert!(args.iter().any(|arg| arg == "--ignore-user-config"));
+                assert_eq!(
+                    args.windows(2)
+                        .filter(|pair| pair[0] == "-c" && pair[1] == "approval_policy=\"never\"")
+                        .count(),
+                    1,
+                    "D4 Owner Approval済みのTaskだけCLIの第二承認待ちを無効化する"
+                );
                 for setting in TASK_PERMISSION_PROFILE_PREFIX_OVERRIDES
                     .iter()
                     .chain(TASK_PERMISSION_PROFILE_PLATFORM_OVERRIDES.iter())

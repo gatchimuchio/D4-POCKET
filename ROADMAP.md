@@ -2,7 +2,7 @@
 
 ## 現行統合製品工程（2026-11-05）
 
-Owner指示により採用した統合製品要求・工程・Codex施工指示は[`docs/QE_2026-11-05/`](docs/QE_2026-11-05/)を参照する。現在の状態は[進捗](docs/QE_2026-11-05/進捗.md)、現物照合とW01開始根拠は[W00対応表](docs/QE_2026-11-05/W00_要件consumer照合_20261105.md)。W00は`SCOPED_PASS`、W01は`IN_PROGRESS`。
+Owner指示により採用した統合製品要求・工程・Codex施工指示は[`docs/QE_2026-11-05/`](docs/QE_2026-11-05/)を参照する。現在の状態は[進捗](docs/QE_2026-11-05/進捗.md)、現物照合とW01開始根拠は[W00対応表](docs/QE_2026-11-05/W00_要件consumer照合_20261105.md)。W00は`SCOPED_PASS`、W01/G1は`CLOSED`。Windows normal Release Codex CLIに限り`task_execution=supported`、全体`release_ready=false`は維持。
 
 QE段階・BUILD_BATCH・結合後QC／QAの方法論はOwner採用済みの[`docs/QE_2026-10-22/`](docs/QE_2026-10-22/)に従う。rev5製品要求、既存P／B／Qの履歴、緩衝基盤、Release Gateは保持し、この追補は過去の限定CLOSED／FAILを遡及変更しない。以下の時系列記録は履歴であり、上記現行工程の状態を上書きしない。
 
