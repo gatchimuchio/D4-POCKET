@@ -4,8 +4,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gui_shell_desktop/main.dart';
 import 'package:gui_shell_desktop/screens/mcp_connection_center.dart';
 import 'package:gui_shell_desktop/services/mcp_connection_client.dart';
+import 'package:gui_shell_desktop/services/shell_core_client.dart';
 import 'package:gui_shell_ui/runtime_dialogue_client.dart'
     show BrokerClientException, BrokerTransport;
 
@@ -895,6 +897,60 @@ void main() {
     });
     expect(find.text('fixture server'), findsOneWidget);
     expect(find.textContaining('secret-marker'), findsNothing);
+  });
+
+  testWidgets('製品ShellはMCP接続accepted後も画面遷移と再表示を続けられる', (tester) async {
+    tester.view.physicalSize = const Size(1600, 2200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final transport = _McpTransport()..connected = false;
+    await tester.pumpWidget(
+      GuiShellDesktopApp(client: ShellCoreClient.mock(transport: transport)),
+    );
+    await tester.pumpAndSettle();
+
+    var rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
+    rail.onDestinationSelected!(11);
+    await tester.pumpAndSettle();
+    expect(find.text('MCP接続センター').hitTestable(), findsOneWidget);
+
+    Finder field(String label) => find.byWidgetPredicate(
+          (widget) =>
+              widget is TextField && widget.decoration?.labelText == label,
+        );
+    await tester.enterText(field('サーバー識別子'), 'mcp-fixture');
+    await tester.enterText(
+        field('実行ファイルの絶対パス'), r'C:\Users\Public\Python\python.exe');
+    await tester.enterText(
+        field('作業フォルダーの絶対パス'), r'C:\Users\Public\D4PocketWorkspace');
+    await tester.enterText(field('起動引数（1行に1項目、最大32項目）'), 'fixture.py');
+
+    final connect = find.text('MCP接続を開始');
+    await tester.ensureVisible(connect);
+    await tester.tap(connect);
+    await tester.pumpAndSettle();
+
+    expect(
+      transport.operations.where((operation) => operation == 'MCP接続'),
+      hasLength(1),
+    );
+    expect(find.textContaining('接続receiptを受理しました'), findsOneWidget);
+    expect(find.text('fixture server'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
+    rail.onDestinationSelected!(0);
+    await tester.pumpAndSettle();
+    expect(find.text('D4 Pocketの導入・更新'), findsOneWidget);
+
+    rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
+    rail.onDestinationSelected!(11);
+    await tester.pumpAndSettle();
+    expect(find.text('fixture server'), findsOneWidget);
+    expect(find.textContaining('接続receiptを受理しました'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Desktop panelは対象Credential metadataと環境変数名だけを接続要求へ送る',
