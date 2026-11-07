@@ -1756,6 +1756,8 @@ mod tests {
         let audit_root = root.join("audit");
         let vault_root = root.join("vault");
         let workspace = root.join("workspace");
+        let calls_path = workspace.join("calls.log");
+        let calls_path_text = calls_path.to_string_lossy().into_owned();
         std::fs::create_dir_all(&vault_root).expect("資格情報保管先を作成");
         std::fs::create_dir_all(&workspace).expect("MCP作業領域を作成");
         let mut broker =
@@ -1808,11 +1810,18 @@ echo {"jsonrpc":"2.0","id":2,"result":{"resultType":"complete","tools":[{"name":
 set /p request=
 echo !request! | findstr /c:"tools/call" > nul
 if errorlevel 1 exit /b 44
+>>"__CALLS_PATH__" echo call
 echo {"jsonrpc":"2.0","id":3,"result":{"resultType":"complete","content":[{"type":"text","text":"__OUTPUT__"}],"isError":false}}
+set /p request=
+echo !request! | findstr /c:"tools/call" > nul
+if errorlevel 1 exit /b 45
+>>"__CALLS_PATH__" echo call
+echo {"jsonrpc":"2.0","id":4,"error":{"code":-32603,"message":"synthetic provider failure"}}
 "%SystemRoot%\System32\ping.exe" -t 127.0.0.1 > nul
 "#
             .replace("__SECRET__", SECRET)
             .replace("__OUTPUT__", OUTPUT)
+            .replace("__CALLS_PATH__", &calls_path_text)
             .replace("__PROTOCOL_VERSION__", crate::mcp::MODERN_PROTOCOL_VERSION);
         std::fs::write(&script_path, script).expect("MCP fixture scriptを書き込む");
         let executable = std::env::var_os("SystemRoot")
@@ -1885,10 +1894,43 @@ echo {"jsonrpc":"2.0","id":3,"result":{"resultType":"complete","content":[{"type
             unconfirmed.error.as_ref().map(|error| error.code.as_str()),
             Some("desktop_native_owner_confirmation_required")
         );
+        let mut unknown_tool_request = tool_request.clone();
+        unknown_tool_request["ToolID"] = json!(format!("tool-{}", "b".repeat(142)));
+        let unknown_tool = broker_test_native_owner_operation(
+            &mut broker,
+            BrokerOperation::MCPTool実行,
+            unknown_tool_request,
+        );
+        assert_eq!(unknown_tool.status, BrokerStatus::Rejected);
+        assert_eq!(
+            unknown_tool.error.as_ref().map(|error| error.code.as_str()),
+            Some("mcp_tool_identity_mismatch"),
+            "現在CatalogにないTool identityをstdio送信前に拒否する"
+        );
+        let mut invalid_arguments_request = tool_request.clone();
+        invalid_arguments_request["arguments"] = json!({});
+        let invalid_arguments = broker_test_native_owner_operation(
+            &mut broker,
+            BrokerOperation::MCPTool実行,
+            invalid_arguments_request,
+        );
+        assert_eq!(invalid_arguments.status, BrokerStatus::Rejected);
+        assert_eq!(
+            invalid_arguments
+                .error
+                .as_ref()
+                .map(|error| error.code.as_str()),
+            Some("mcp_tool_arguments_schema_invalid"),
+            "現在CatalogのSchemaに合わないargumentsをstdio送信前に拒否する"
+        );
+        assert!(
+            !calls_path.exists(),
+            "Tool不在／引数不正では外部MCP childへ一度も送信しない"
+        );
         let call = broker_test_native_owner_operation(
             &mut broker,
             BrokerOperation::MCPTool実行,
-            tool_request,
+            tool_request.clone(),
         );
         assert_eq!(call.status, BrokerStatus::Accepted, "{call:?}");
         assert_eq!(call.evidence_source, EVIDENCE_SOURCE_LIVE_RUNTIME);
@@ -1899,6 +1941,14 @@ echo {"jsonrpc":"2.0","id":3,"result":{"resultType":"complete","content":[{"type
             .as_str()
             .is_some_and(|hash| hash.starts_with("sha256:")));
         assert_eq!(call.body.as_ref().unwrap()["公開範囲"], "hash_only");
+        assert_eq!(
+            std::fs::read_to_string(&calls_path)
+                .expect("MCP fixtureの送信記録")
+                .lines()
+                .count(),
+            1,
+            "有効呼出しだけが外部MCP childへ一度送信される"
+        );
 
         let credential_metadata = add.body.as_ref().expect("登録済みCredential metadata");
         let revoked = broker_test_native_owner_operation(
@@ -1933,7 +1983,10 @@ echo {"jsonrpc":"2.0","id":3,"result":{"resultType":"complete","content":[{"type
         );
         assert_eq!(after_revocation.status, BrokerStatus::Rejected);
         assert_eq!(
-            after_revocation.error.as_ref().map(|error| error.code.as_str()),
+            after_revocation
+                .error
+                .as_ref()
+                .map(|error| error.code.as_str()),
             Some("credential_revoked"),
             "失効Credentialを使うAgent起点Tool要求を外部送信前に拒否する"
         );
@@ -1962,6 +2015,72 @@ echo {"jsonrpc":"2.0","id":3,"result":{"resultType":"complete","content":[{"type
             .mcp_connections
             .get_mut(SERVER)
             .is_some_and(|entry| entry.connection.is_alive()));
+        assert_eq!(
+            std::fs::read_to_string(&calls_path)
+                .expect("失効後の送信記録")
+                .lines()
+                .count(),
+            1,
+            "失効CredentialのAgent要求は外部MCP childへ送らない"
+        );
+
+        let mut abnormal_result_request = tool_request.clone();
+        abnormal_result_request["arguments"] = json!({"text": "trigger-error"});
+        let abnormal_result = broker_test_native_owner_operation(
+            &mut broker,
+            BrokerOperation::MCPTool実行,
+            abnormal_result_request.clone(),
+        );
+        assert_eq!(abnormal_result.status, BrokerStatus::Rejected);
+        assert_eq!(
+            abnormal_result
+                .error
+                .as_ref()
+                .map(|error| error.code.as_str()),
+            Some("mcp_tool_result_unknown"),
+            "JSON-RPC error応答を結果不明として扱い自動再送しない"
+        );
+        assert!(broker
+            .mcp_connections
+            .get(SERVER)
+            .is_some_and(|entry| entry.quarantined));
+        let quarantined_retry = broker_test_native_owner_operation(
+            &mut broker,
+            BrokerOperation::MCPTool実行,
+            abnormal_result_request,
+        );
+        assert_eq!(quarantined_retry.status, BrokerStatus::Rejected);
+        assert_eq!(
+            quarantined_retry
+                .error
+                .as_ref()
+                .map(|error| error.code.as_str()),
+            Some("mcp_connection_quarantined"),
+            "結果不明後の非冪等呼出しを再送せず隔離状態で拒否する"
+        );
+        assert_eq!(
+            std::fs::read_to_string(&calls_path)
+                .expect("隔離後の送信記録")
+                .lines()
+                .count(),
+            2,
+            "結果不明の呼出しも1回だけで、隔離後の再試行は送らない"
+        );
+        for code in [
+            "mcp_tool_identity_mismatch",
+            "mcp_tool_arguments_schema_invalid",
+            "mcp_tool_result_unknown",
+            "mcp_connection_quarantined",
+        ] {
+            assert!(
+                broker.audit_events().iter().any(|event| {
+                    event.operation == "MCP Tool実行"
+                        && event.decision == "rejected"
+                        && event.reason.contains(code)
+                }),
+                "拒否Auditが欠落: {code}"
+            );
+        }
 
         let audit_json = serde_json::to_string(&broker.audit_events()).expect("永続Auditを直列化");
         assert!(!audit_json.contains(SECRET));
