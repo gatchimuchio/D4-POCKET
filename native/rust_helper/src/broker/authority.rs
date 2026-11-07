@@ -31,7 +31,9 @@ pub struct BrokerAuthorityRegistry {
 
 impl BrokerAuthorityRegistry {
     pub(crate) fn runtime_registered(&self, id: &str) -> bool {
-        self.state["runtimes"].as_array().is_some_and(|items| items.iter().any(|runtime| runtime["runtime_id"] == id))
+        self.state["runtimes"]
+            .as_array()
+            .is_some_and(|items| items.iter().any(|runtime| runtime["runtime_id"] == id))
     }
     pub fn production_default() -> Self {
         Self {
@@ -526,7 +528,9 @@ pub fn verify_audit_chain(events: &Value) -> Value {
         };
         if let Some(event_id) = object.get("event_id").and_then(Value::as_str) {
             if !seen_event_ids.insert(event_id.to_string()) {
-                errors.push(format!("event {index} の event_id {event_id} が重複しています"));
+                errors.push(format!(
+                    "event {index} の event_id {event_id} が重複しています"
+                ));
             }
         } else {
             errors.push(format!("event {index} に event_id がありません"));

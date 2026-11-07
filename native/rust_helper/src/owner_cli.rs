@@ -3,9 +3,7 @@
 
 use gui_shell_rust_helper::audit_hash::sha256_tagged;
 use gui_shell_rust_helper::broker::dialogue::識別子生成;
-use gui_shell_rust_helper::broker::{
-    BrokerCredentialRole, BrokerEndpoint, BrokerRequestEnvelope,
-};
+use gui_shell_rust_helper::broker::{BrokerCredentialRole, BrokerEndpoint, BrokerRequestEnvelope};
 use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{Ipv4Addr, SocketAddr, TcpStream};
@@ -22,36 +20,73 @@ pub fn 実行(args: &[String]) -> Result<(), String> {
         return Err("使用法: 対話承認操作 --session-file <owner資格file> 一覧 | 承認 <要求ID> <要求hash> <表示範囲> | 端末招待 <端末ID> <接続先Host> <新規出力file> | 端末一覧 | 端末招待取消 <招待ID> | 端末失効 <結合ID>".into());
     }
     let (operation, payload) = match args[2].as_str() {
-        "内容閲覧承認" if args.len()==6 => ("対話内容承認",json!({"要求ID":args[3],"保存監査ID":args[4],"保存監査hash":args[5]})),
-        "内容閲覧失効" if args.len()==3 => ("対話内容失効",json!({})),
+        "内容閲覧承認" if args.len() == 6 => (
+            "対話内容承認",
+            json!({"要求ID":args[3],"保存監査ID":args[4],"保存監査hash":args[5]}),
+        ),
+        "内容閲覧失効" if args.len() == 3 => ("対話内容失効", json!({})),
 
-        "内容削除" if args.len()==6 => ("対話内容削除",json!({"要求ID":args[3],"保存監査ID":args[4],"保存監査hash":args[5]})),
-        "削除中断確認" if args.len()==6 => ("対話削除中断確認",json!({"要求ID":args[3],"要求hash":args[4],"削除承認監査ID":args[5]})),
-        "部分破棄中断確認" if args.len()==6 => ("対話部分破棄中断確認",json!({"要求ID":args[3],"要求hash":args[4],"部分保存破棄承認監査ID":args[5]})),
-        "部分保存破棄" if args.len()==7 => ("対話部分保存破棄",json!({"要求ID":args[3],"要求hash":args[4],"保存試行監査ID":args[5],"暗号文hash":args[6]})),
-        "保管状態" if args.len()==5 => ("対話保管状態",json!({"要求ID":args[3],"要求hash":args[4]})),
-        "内容保存" if args.len() == 5 => ("対話内容保存", json!({"要求ID":args[3],"要求hash":args[4]})),
-        "作業領域基準点保存" if (6..=133).contains(&args.len()) => ("作業領域基準点保存", json!({"作業領域ID":args[3],"登録hash":args[4],"相対paths":args[5..]})),
-        "作業領域全体基準点保存" if args.len() == 5 => ("作業領域全体基準点保存", json!({"作業領域ID":args[3],"登録hash":args[4]})),
+        "内容削除" if args.len() == 6 => (
+            "対話内容削除",
+            json!({"要求ID":args[3],"保存監査ID":args[4],"保存監査hash":args[5]}),
+        ),
+        "削除中断確認" if args.len() == 6 => (
+            "対話削除中断確認",
+            json!({"要求ID":args[3],"要求hash":args[4],"削除承認監査ID":args[5]}),
+        ),
+        "部分破棄中断確認" if args.len() == 6 => (
+            "対話部分破棄中断確認",
+            json!({"要求ID":args[3],"要求hash":args[4],"部分保存破棄承認監査ID":args[5]}),
+        ),
+        "部分保存破棄" if args.len() == 7 => (
+            "対話部分保存破棄",
+            json!({"要求ID":args[3],"要求hash":args[4],"保存試行監査ID":args[5],"暗号文hash":args[6]}),
+        ),
+        "保管状態" if args.len() == 5 => {
+            ("対話保管状態", json!({"要求ID":args[3],"要求hash":args[4]}))
+        }
+        "内容保存" if args.len() == 5 => {
+            ("対話内容保存", json!({"要求ID":args[3],"要求hash":args[4]}))
+        }
+        "作業領域基準点保存" if (6..=133).contains(&args.len()) => (
+            "作業領域基準点保存",
+            json!({"作業領域ID":args[3],"登録hash":args[4],"相対paths":args[5..]}),
+        ),
+        "作業領域全体基準点保存" if args.len() == 5 => (
+            "作業領域全体基準点保存",
+            json!({"作業領域ID":args[3],"登録hash":args[4]}),
+        ),
         "作業領域一覧" if args.len() == 3 => ("作業領域一覧", json!({})),
-        "作業領域承認" if args.len() == 6 => ("作業領域承認", json!({"作業領域ID":args[3],"登録hash":args[4],"表示範囲":args[5]})),
-        "作業領域失効" if args.len() == 5 => ("作業領域失効", json!({"作業領域ID":args[3],"登録hash":args[4]})),
-        "端末招待" if args.len() == 6 => ("端末招待", json!({"端末ID":args[3],"接続先Host":args[4]})),
+        "作業領域承認" if args.len() == 6 => (
+            "作業領域承認",
+            json!({"作業領域ID":args[3],"登録hash":args[4],"表示範囲":args[5]}),
+        ),
+        "作業領域失効" if args.len() == 5 => (
+            "作業領域失効",
+            json!({"作業領域ID":args[3],"登録hash":args[4]}),
+        ),
+        "端末招待" if args.len() == 6 => {
+            ("端末招待", json!({"端末ID":args[3],"接続先Host":args[4]}))
+        }
         "端末一覧" if args.len() == 3 => ("端末一覧", json!({})),
         "端末招待取消" if args.len() == 4 => ("端末招待取消", json!({"招待ID":args[3]})),
         "端末失効" if args.len() == 4 => ("端末失効", json!({"結合ID":args[3]})),
-        "履歴承認" if args.len()==4 => ("対話履歴承認",json!({"実行系ID":args[3]})),
-        "履歴失効" if args.len()==3 => ("対話履歴失効",json!({})),
-        "履歴閲覧状態" if args.len()==3 => ("対話履歴閲覧状態",json!({})),
-        "履歴" | "履歴集約" if args.len() >= 5 && args.len() <= 13 && (args.len() - 5) % 2 == 0 => {
+        "履歴承認" if args.len() == 4 => ("対話履歴承認", json!({"実行系ID":args[3]})),
+        "履歴失効" if args.len() == 3 => ("対話履歴失効", json!({})),
+        "履歴閲覧状態" if args.len() == 3 => ("対話履歴閲覧状態", json!({})),
+        "履歴" | "履歴集約" if args.len() >= 5 && args.len() <= 13 && (args.len() - 5) % 2 == 0 =>
+        {
             let mut filter = serde_json::Map::new();
             for pair in args[5..].chunks_exact(2) {
                 if filter.insert(pair[0].clone(), json!(pair[1])).is_some() {
                     return Err("履歴検索条件が重複".into());
                 }
             }
-            ("対話履歴一覧", json!({"after":args[3].parse::<usize>().map_err(|_| "cursorが不正")?,"limit":args[4].parse::<usize>().map_err(|_| "件数が不正")?,"filter":filter,"latest_per_request":args[2]=="履歴集約"}))
-        },
+            (
+                "対話履歴一覧",
+                json!({"after":args[3].parse::<usize>().map_err(|_| "cursorが不正")?,"limit":args[4].parse::<usize>().map_err(|_| "件数が不正")?,"filter":filter,"latest_per_request":args[2]=="履歴集約"}),
+            )
+        }
         "一覧" if args.len() == 3 => ("対話承認待ち", json!({})),
         "承認" if args.len() == 6 => (
             "対話承認",
@@ -63,14 +98,17 @@ pub fn 実行(args: &[String]) -> Result<(), String> {
     if operation == "端末招待" {
         let mut options = std::fs::OpenOptions::new();
         options.write(true).create_new(true);
-        #[cfg(unix)] {
+        #[cfg(unix)]
+        {
             use std::os::unix::fs::OpenOptionsExt;
             options.mode(0o600);
         }
-        let mut output = options.open(&args[5]).map_err(|_| "招待fileを新規作成できない。既存fileは上書きしない")?;
-        let data = serde_json::to_vec_pretty(&body).map_err(|_|"招待の保存形式不正")?;
-        output.write_all(&data).map_err(|_|"招待保存失敗")?;
-        output.sync_all().map_err(|_|"招待保存の確定失敗")?;
+        let mut output = options
+            .open(&args[5])
+            .map_err(|_| "招待fileを新規作成できない。既存fileは上書きしない")?;
+        let data = serde_json::to_vec_pretty(&body).map_err(|_| "招待の保存形式不正")?;
+        output.write_all(&data).map_err(|_| "招待保存失敗")?;
+        output.sync_all().map_err(|_| "招待保存の確定失敗")?;
         println!("端末招待を指定fileへ保存した。秘密を含むため対面で渡し、結合後に削除する。");
         return Ok(());
     }
@@ -111,7 +149,8 @@ pub fn 評価データセット登録(args: &[String]) -> Result<(), String> {
     let manifest = 評価データセット公開投影(&body)?;
     println!(
         "{}",
-        serde_json::to_string_pretty(&manifest).map_err(|_| "評価Dataset公開manifestの表示に失敗")?
+        serde_json::to_string_pretty(&manifest)
+            .map_err(|_| "評価Dataset公開manifestの表示に失敗")?
     );
     Ok(())
 }
@@ -120,7 +159,10 @@ pub fn 評価データセット登録(args: &[String]) -> Result<(), String> {
 /// Brokerの公開receipt以外（入力本文・条件・参照）は表示しない。
 pub fn 回帰Case登録(args: &[String]) -> Result<(), String> {
     if args.len() != 4 || args[0] != "--session-file" || args[2] != "登録" {
-        return Err("使用法: 回帰Case登録 --session-file <owner資格file> 登録 <回帰Case登録JSONファイル>".into());
+        return Err(
+            "使用法: 回帰Case登録 --session-file <owner資格file> 登録 <回帰Case登録JSONファイル>"
+                .into(),
+        );
     }
     let payload = 評価データセット読取(&args[3])?;
     let body = owner操作送信(&args[1], "回帰Case登録", payload)?;
@@ -135,10 +177,7 @@ pub fn 回帰Case登録(args: &[String]) -> Result<(), String> {
 /// ownerがCase IDと両hashを確認した明示操作だけをBrokerへ渡す。
 /// private定義の読取・表示・復号は行わない。
 pub fn 回帰Case削除(args: &[String]) -> Result<(), String> {
-    if args.len() == 7
-        && args[0] == "--session-file"
-        && args[2] == "削除"
-        && args[6] == "削除確認"
+    if args.len() == 7 && args[0] == "--session-file" && args[2] == "削除" && args[6] == "削除確認"
     {
         let payload = json!({
             "版": 1,
@@ -163,7 +202,8 @@ pub fn 回帰Case削除(args: &[String]) -> Result<(), String> {
         let receipt = 回帰Case削除中断照合公開応答(&body)?;
         println!(
             "{}",
-            serde_json::to_string_pretty(&receipt).map_err(|_| "回帰Case中断照合結果の表示に失敗")?
+            serde_json::to_string_pretty(&receipt)
+                .map_err(|_| "回帰Case中断照合結果の表示に失敗")?
         );
         return Ok(());
     }
@@ -219,7 +259,9 @@ fn 回帰Case削除中断照合公開応答(body: &Value) -> Result<Value, Strin
         || !safe_audit_id(&body["削除承認監査ID"])
         || !tagged_hash(&body["暗号文hash"])
         || !tagged_hash(&body["観測監査head"])
-        || !body["観測時刻UnixMillis"].as_i64().is_some_and(|time| time >= 0)
+        || !body["観測時刻UnixMillis"]
+            .as_i64()
+            .is_some_and(|time| time >= 0)
         || !matches!(
             body["現在状態"].as_str(),
             Some("暗号文残存・再試行可能" | "暗号文不在・中断照合済み")
@@ -241,12 +283,15 @@ fn lower_hex_id(value: &Value) -> bool {
 }
 
 fn tagged_hash(value: &Value) -> bool {
-    value.as_str().and_then(|text| text.strip_prefix("sha256:")).is_some_and(|text| {
-        text.len() == 64
-            && text
-                .bytes()
-                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-    })
+    value
+        .as_str()
+        .and_then(|text| text.strip_prefix("sha256:"))
+        .is_some_and(|text| {
+            text.len() == 64
+                && text
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        })
 }
 
 fn safe_audit_id(value: &Value) -> bool {
@@ -263,7 +308,10 @@ fn safe_audit_id(value: &Value) -> bool {
 /// Broker応答のmetadataだけを表示し、秘密値を端末出力へ戻さない。
 pub fn 資格情報登録(args: &[String]) -> Result<(), String> {
     if args.len() != 4 || args[0] != "--session-file" || args[2] != "登録" {
-        return Err("使用法: 資格情報登録 --session-file <owner資格file> 登録 <資格情報登録JSONファイル>".into());
+        return Err(
+            "使用法: 資格情報登録 --session-file <owner資格file> 登録 <資格情報登録JSONファイル>"
+                .into(),
+        );
     }
     let payload = 資格情報登録読取(&args[3])?;
     let body = owner操作送信(&args[1], "資格情報登録", payload)?;
@@ -278,7 +326,9 @@ pub fn 資格情報登録(args: &[String]) -> Result<(), String> {
 /// ownerが明示したMCP接続設定だけをBrokerへ渡す。実行file、workspace、Credential実値はCLI出力へ戻さない。
 pub fn MCP接続(args: &[String]) -> Result<(), String> {
     if args.len() != 4 || args[0] != "--session-file" || args[2] != "接続" {
-        return Err("使用法: MCP接続 --session-file <owner資格file> 接続 <MCP接続JSONファイル>".into());
+        return Err(
+            "使用法: MCP接続 --session-file <owner資格file> 接続 <MCP接続JSONファイル>".into(),
+        );
     }
     let payload = MCP接続設定読取(&args[3])?;
     let body = owner操作送信(&args[1], "MCP接続", payload)?;
@@ -331,7 +381,9 @@ struct MCP切断要求<'a> {
 /// Agent Card URI、Credential実値、外部Agentのraw contentはCLI出力へ戻さない。
 pub fn A2A接続(args: &[String]) -> Result<(), String> {
     if args.len() != 4 || args[0] != "--session-file" || args[2] != "接続" {
-        return Err("使用法: A2A接続 --session-file <owner資格file> 接続 <A2A接続JSONファイル>".into());
+        return Err(
+            "使用法: A2A接続 --session-file <owner資格file> 接続 <A2A接続JSONファイル>".into(),
+        );
     }
     let payload = A2A接続設定読取(&args[3])?;
     let body = owner操作送信(&args[1], "A2A接続", payload)?;
@@ -346,7 +398,9 @@ pub fn A2A接続(args: &[String]) -> Result<(), String> {
 /// ownerが明示したHost metadataだけをBrokerへ渡す。identity実値・権限・秘密値は表示しない。
 pub fn Host登録(args: &[String]) -> Result<(), String> {
     if args.len() != 4 || args[0] != "--session-file" || args[2] != "登録" {
-        return Err("使用法: Host登録 --session-file <owner資格file> 登録 <Host登録JSONファイル>".into());
+        return Err(
+            "使用法: Host登録 --session-file <owner資格file> 登録 <Host登録JSONファイル>".into(),
+        );
     }
     let payload = Host登録設定読取(&args[3])?;
     let body = owner操作送信(&args[1], "Host登録", payload)?;
@@ -366,9 +420,24 @@ fn Host登録公開投影(body: &Value) -> Result<Value, String> {
         return Err("Host登録receiptへidentity実値・権限・秘密値が混入している".into());
     }
     let required = [
-        "版", "Host ID", "表示名", "Platform", "接続状態", "Trust", "証明書/identity",
-        "Runtime summary", "最終接続", "公開範囲", "証拠種別", "権限生成", "authority_strip",
-        "能力ID", "権限ID", "承認状態", "復旧ID", "登録監査ID",
+        "版",
+        "Host ID",
+        "表示名",
+        "Platform",
+        "接続状態",
+        "Trust",
+        "証明書/identity",
+        "Runtime summary",
+        "最終接続",
+        "公開範囲",
+        "証拠種別",
+        "権限生成",
+        "authority_strip",
+        "能力ID",
+        "権限ID",
+        "承認状態",
+        "復旧ID",
+        "登録監査ID",
     ];
     if object.len() != required.len() || required.iter().any(|key| !object.contains_key(*key)) {
         return Err("Host登録receiptの形式が不正".into());
@@ -415,12 +484,31 @@ fn A2A接続公開投影(body: &Value) -> Result<Value, String> {
         .as_object()
         .ok_or_else(|| "A2A接続公開receiptの形式が不正".to_string())?;
     if A2A公開receiptに禁止fieldがある(body) {
-        return Err("A2A接続公開receiptへ接続先実値・権限・秘密値・raw contentが混入している".into());
+        return Err(
+            "A2A接続公開receiptへ接続先実値・権限・秘密値・raw contentが混入している".into(),
+        );
     }
     let required = [
-        "版", "契約種別", "AgentID", "Agent Card", "Task", "Message", "Artifact", "Stream",
-        "Trust", "Capability diff", "権限生成", "authority_strip", "公開範囲", "証拠種別",
-        "接続状態", "能力ID", "権限ID", "承認状態", "復旧ID", "接続監査ID",
+        "版",
+        "契約種別",
+        "AgentID",
+        "Agent Card",
+        "Task",
+        "Message",
+        "Artifact",
+        "Stream",
+        "Trust",
+        "Capability diff",
+        "権限生成",
+        "authority_strip",
+        "公開範囲",
+        "証拠種別",
+        "接続状態",
+        "能力ID",
+        "権限ID",
+        "承認状態",
+        "復旧ID",
+        "接続監査ID",
     ];
     if required.iter().any(|key| !object.contains_key(*key)) {
         return Err("A2A接続公開receiptの形式が不正".into());
@@ -468,8 +556,16 @@ fn MCP接続公開投影(body: &Value) -> Result<Value, String> {
         .ok_or_else(|| "MCP接続公開receiptの形式が不正".to_string())?;
     let encoded = serde_json::to_string(body).map_err(|_| "MCP接続公開receiptを検査できない")?;
     for forbidden in [
-        "実行file", "workspace", "secret", "secret_value", "token", "password", "credential_value",
-        "permission_id", "approval_id", "authority",
+        "実行file",
+        "workspace",
+        "secret",
+        "secret_value",
+        "token",
+        "password",
+        "credential_value",
+        "permission_id",
+        "approval_id",
+        "authority",
     ] {
         if encoded.contains(forbidden) {
             return Err("MCP接続公開receiptへ実行設定・権限・秘密値が混入している".into());
@@ -514,8 +610,17 @@ fn MCP切断公開投影(body: &Value, expected_server_id: &str) -> Result<Value
         .as_object()
         .ok_or_else(|| "MCP切断公開receiptの形式が不正".to_string())?;
     let required = [
-        "版", "ServerID", "接続状態", "能力ID", "権限ID", "承認状態", "復旧ID",
-        "権限生成", "公開範囲", "証拠種別", "切断監査ID",
+        "版",
+        "ServerID",
+        "接続状態",
+        "能力ID",
+        "権限ID",
+        "承認状態",
+        "復旧ID",
+        "権限生成",
+        "公開範囲",
+        "証拠種別",
+        "切断監査ID",
     ];
     if object.len() != required.len() || required.iter().any(|key| !object.contains_key(*key)) {
         return Err("MCP切断公開receiptの形式が不正".into());
@@ -547,9 +652,20 @@ fn 資格情報公開投影(body: &Value) -> Result<Value, String> {
         return Err("資格情報公開receiptへ秘密値が混入している".into());
     }
     let required = [
-        "版", "資格情報ID", "用途", "接続対象", "種類", "保管方式", "状態",
-        "作成時刻UnixMillis", "最終使用時刻UnixMillis", "失効時刻UnixMillis", "暗号文hash",
-        "作成監査ID", "公開範囲", "証拠種別",
+        "版",
+        "資格情報ID",
+        "用途",
+        "接続対象",
+        "種類",
+        "保管方式",
+        "状態",
+        "作成時刻UnixMillis",
+        "最終使用時刻UnixMillis",
+        "失効時刻UnixMillis",
+        "暗号文hash",
+        "作成監査ID",
+        "公開範囲",
+        "証拠種別",
     ];
     if object.len() != required.len() || required.iter().any(|key| !object.contains_key(*key)) {
         return Err("資格情報公開receiptの形式が不正".into());
@@ -570,8 +686,8 @@ fn 資格情報登録読取(path: &str) -> Result<Value, String> {
     if raw.len() as u64 > MAX_CREDENTIAL_REGISTRATION_BYTES {
         return Err("資格情報登録fileが64KiB上限を超過".into());
     }
-    let payload: Value = serde_json::from_slice(&raw)
-        .map_err(|_| "資格情報登録fileのJSON形式が不正")?;
+    let payload: Value =
+        serde_json::from_slice(&raw).map_err(|_| "資格情報登録fileのJSON形式が不正")?;
     if !payload.is_object() {
         return Err("資格情報登録fileはJSON objectでなければならない".into());
     }
@@ -594,8 +710,8 @@ fn MCP接続設定読取(path: &str) -> Result<Value, String> {
     if raw.len() as u64 > MAX_MCP_CONNECTION_BYTES {
         return Err("MCP接続設定fileが64KiB上限を超過".into());
     }
-    let payload: Value = serde_json::from_slice(&raw)
-        .map_err(|_| "MCP接続設定fileのJSON形式が不正")?;
+    let payload: Value =
+        serde_json::from_slice(&raw).map_err(|_| "MCP接続設定fileのJSON形式が不正")?;
     if !payload.is_object() {
         return Err("MCP接続設定fileはJSON objectでなければならない".into());
     }
@@ -645,8 +761,8 @@ fn A2A接続設定読取(path: &str) -> Result<Value, String> {
     if raw.len() as u64 > MAX_A2A_CONNECTION_BYTES {
         return Err("A2A接続設定fileが64KiB上限を超過".into());
     }
-    let payload: Value = serde_json::from_slice(&raw)
-        .map_err(|_| "A2A接続設定fileのJSON形式が不正")?;
+    let payload: Value =
+        serde_json::from_slice(&raw).map_err(|_| "A2A接続設定fileのJSON形式が不正")?;
     if !payload.is_object() {
         return Err("A2A接続設定fileはJSON objectでなければならない".into());
     }
@@ -699,8 +815,8 @@ fn Host登録設定読取(path: &str) -> Result<Value, String> {
     if raw.len() as u64 > MAX_HOST_REGISTRATION_BYTES {
         return Err("Host登録設定fileが64KiB上限を超過".into());
     }
-    let payload: Value = serde_json::from_slice(&raw)
-        .map_err(|_| "Host登録設定fileのJSON形式が不正")?;
+    let payload: Value =
+        serde_json::from_slice(&raw).map_err(|_| "Host登録設定fileのJSON形式が不正")?;
     if !payload.is_object() {
         return Err("Host登録設定fileはJSON objectでなければならない".into());
     }
@@ -741,15 +857,37 @@ fn 回帰Case公開投影(body: &Value) -> Result<Value, String> {
     let object = body
         .as_object()
         .ok_or_else(|| "回帰Case公開receiptの形式が不正".to_string())?;
-    let forbidden = ["入力", "必要条件", "禁止条件", "必要参照", "期待経路", "本文"];
+    let forbidden = [
+        "入力",
+        "必要条件",
+        "禁止条件",
+        "必要参照",
+        "期待経路",
+        "本文",
+    ];
     if forbidden.iter().any(|key| object.contains_key(*key)) {
         return Err("回帰Case公開receiptにprivate本文が含まれている".into());
     }
     let required = [
-        "版", "回帰CaseID", "定義hash", "非公開保管ID", "暗号文hash", "公開表示名",
-        "要求ID", "要求hash", "実行系ID", "結果状態", "応答hash", "終了監査ID",
-        "公開範囲", "必要条件数", "禁止条件数", "必要参照数", "作成時刻UnixMillis",
-        "作成監査ID", "証拠種別",
+        "版",
+        "回帰CaseID",
+        "定義hash",
+        "非公開保管ID",
+        "暗号文hash",
+        "公開表示名",
+        "要求ID",
+        "要求hash",
+        "実行系ID",
+        "結果状態",
+        "応答hash",
+        "終了監査ID",
+        "公開範囲",
+        "必要条件数",
+        "禁止条件数",
+        "必要参照数",
+        "作成時刻UnixMillis",
+        "作成監査ID",
+        "証拠種別",
     ];
     if object.len() != required.len() || required.iter().any(|key| !object.contains_key(*key)) {
         return Err("回帰Case公開receiptの形式が不正".into());
@@ -840,9 +978,7 @@ fn 評価データセット公開投影(body: &Value) -> Result<Value, String> {
             let case = case
                 .as_object()
                 .ok_or_else(|| "評価Dataset公開manifestの形式が不正".to_string())?;
-            if case.len() != 2
-                || !case.contains_key("評価CaseID")
-                || !case.contains_key("定義hash")
+            if case.len() != 2 || !case.contains_key("評価CaseID") || !case.contains_key("定義hash")
             {
                 return Err("評価Dataset公開manifestの形式が不正".to_string());
             }
@@ -962,7 +1098,8 @@ mod tests {
 
         let scalar = test_file("scalar");
         write_test_file(&scalar, br#"["private"]"#);
-        let error = 評価データセット読取(&scalar.to_string_lossy()).expect_err("配列形式は拒否される");
+        let error =
+            評価データセット読取(&scalar.to_string_lossy()).expect_err("配列形式は拒否される");
         assert!(!error.contains("private"));
         let scalar_path = scalar.to_string_lossy();
         assert!(!error.contains(scalar_path.as_ref()));
@@ -973,8 +1110,8 @@ mod tests {
             &oversized,
             vec![b'x'; MAX_EVALUATION_DATASET_BYTES as usize + 1],
         );
-        let error = 評価データセット読取(&oversized.to_string_lossy())
-            .expect_err("上限超過は拒否される");
+        let error =
+            評価データセット読取(&oversized.to_string_lossy()).expect_err("上限超過は拒否される");
         assert!(error.contains("48KiB上限"));
         let oversized_path = oversized.to_string_lossy();
         assert!(!error.contains(oversized_path.as_ref()));
@@ -1075,7 +1212,10 @@ mod tests {
             "作成監査ID": "audit-create",
             "証拠種別": "INTERNAL_STATE"
         });
-        assert_eq!(回帰Case公開投影(&body).expect("公開receiptを取得できる"), body);
+        assert_eq!(
+            回帰Case公開投影(&body).expect("公開receiptを取得できる"),
+            body
+        );
         let mut unsafe_body = body;
         unsafe_body["入力"] = json!("private-regression-sentinel");
         assert!(回帰Case公開投影(&unsafe_body).is_err());
@@ -1113,7 +1253,10 @@ mod tests {
             "観測時刻UnixMillis": 1780000000000_i64,
             "証拠種別": "LIVE_RUNTIME"
         });
-        assert_eq!(回帰Case削除中断照合公開応答(&body).expect("公開照合結果"), body);
+        assert_eq!(
+            回帰Case削除中断照合公開応答(&body).expect("公開照合結果"),
+            body
+        );
         let mut false_erasure = body;
         false_erasure["物理消去"] = json!(true);
         assert!(回帰Case削除中断照合公開応答(&false_erasure).is_err());
@@ -1137,7 +1280,10 @@ mod tests {
             "公開範囲": "metadata_only",
             "証拠種別": "INTERNAL_STATE"
         });
-        assert_eq!(資格情報公開投影(&body).expect("公開資格情報を取得できる"), body);
+        assert_eq!(
+            資格情報公開投影(&body).expect("公開資格情報を取得できる"),
+            body
+        );
         let mut unsafe_body = body;
         unsafe_body["秘密値"] = json!("表示してはならない");
         assert!(資格情報公開投影(&unsafe_body).is_err());

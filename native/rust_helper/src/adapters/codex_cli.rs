@@ -565,10 +565,7 @@ fn report_r2_e2e_os_failure(
 
 #[cfg(feature = "r2-e2e")]
 fn report_r2_e2e_missing_stdin_pipe(test_api: &CodexCliTestResponses) {
-    send_r2_e2e_diagnostic(
-        test_api,
-        json!({"kind": "missing_stdin_pipe"}),
-    );
+    send_r2_e2e_diagnostic(test_api, json!({"kind": "missing_stdin_pipe"}));
 }
 
 #[cfg(feature = "r2-e2e")]
@@ -579,10 +576,7 @@ fn report_r2_e2e_cli_failure(
     stderr: &[u8],
 ) {
     let summary = loopback_test_safe_failure_summary(exit_code, stdout, stderr);
-    send_r2_e2e_diagnostic(
-        test_api,
-        json!({"kind": "cli_failure", "summary": summary}),
-    );
+    send_r2_e2e_diagnostic(test_api, json!({"kind": "cli_failure", "summary": summary}));
 }
 
 #[cfg(feature = "r2-e2e")]

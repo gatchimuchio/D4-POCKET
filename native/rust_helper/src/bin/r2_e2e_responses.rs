@@ -189,8 +189,8 @@ fn main() -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::{
-        ExpectedRequestShape, evidence_matches_expected_request_shape,
-        workspace_boundary_fixtures_valid,
+        evidence_matches_expected_request_shape, workspace_boundary_fixtures_valid,
+        ExpectedRequestShape,
     };
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};

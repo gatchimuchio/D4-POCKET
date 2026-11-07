@@ -2,7 +2,9 @@
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-pub(crate) fn read_unique<T: serde::de::DeserializeOwned>(raw: &str) -> Result<T, serde_json::Error> {
+pub(crate) fn read_unique<T: serde::de::DeserializeOwned>(
+    raw: &str,
+) -> Result<T, serde_json::Error> {
     use serde::de::{self, MapAccess, SeqAccess, Visitor};
     struct 一意値(Value);
     impl<'de> Deserialize<'de> for 一意値 {

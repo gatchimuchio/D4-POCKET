@@ -56,6 +56,9 @@
     }
   ],
   "件数": 1,
+  "Agent能力hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "Agent能力件数": 1,
+  "Agent能力状態": "available",
   "公開範囲": "metadata_only",
   "証拠種別": "INTERNAL_STATE"
 }

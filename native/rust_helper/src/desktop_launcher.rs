@@ -76,6 +76,8 @@ enum DesktopOwnerOperationSummary {
         workspace_id: String,
         instruction_characters: usize,
         instruction_hash: String,
+        mcp_capability_snapshot_hash: Option<String>,
+        mcp_result_hash: Option<String>,
         payload_hash: String,
     },
     AgentTaskResultExposure {
@@ -169,6 +171,8 @@ enum DesktopOwnerOperationSummary {
         name: String,
         argument_count: usize,
         arguments_hash: String,
+        source_agent_task_id: Option<String>,
+        source_agent_result_hash: Option<String>,
         payload_hash: String,
     },
     UpdateDownload {
@@ -207,6 +211,12 @@ struct AgentTaskOwnerApprovalRequest {
     session_id: String,
     workspace_id: String,
     instruction: String,
+    #[serde(default)]
+    mcp_capability_snapshot_hash: Option<String>,
+    #[serde(default)]
+    mcp_result_id: Option<String>,
+    #[serde(default)]
+    mcp_result_hash: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -327,6 +337,10 @@ struct McpToolCallOwnerRequest {
     name: String,
     #[serde(rename = "arguments")]
     arguments: Value,
+    #[serde(default, rename = "source_agent_task_id")]
+    source_agent_task_id: Option<String>,
+    #[serde(default, rename = "source_agent_result_hash")]
+    source_agent_result_hash: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -1629,6 +1643,22 @@ fn owner_operation_candidate_with_product_identity(
                 || !agent_task_permission_identifier_is_valid(&request.workspace_id)
                 || request.instruction.trim().is_empty()
                 || request.instruction.chars().count() > 32_768
+                || request
+                    .mcp_capability_snapshot_hash
+                    .as_deref()
+                    .is_some_and(|hash| !tagged_sha256_is_valid(hash))
+                || request
+                    .mcp_result_hash
+                    .as_deref()
+                    .is_some_and(|hash| !tagged_sha256_is_valid(hash))
+                || request.mcp_result_id.is_some() != request.mcp_result_hash.is_some()
+                || request.mcp_result_id.as_deref().is_some_and(|id| {
+                    id.len() != "mcp-agent-result-".len() + 32
+                        || !id.starts_with("mcp-agent-result-")
+                        || !id["mcp-agent-result-".len()..]
+                            .bytes()
+                            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+                })
             {
                 return None;
             }
@@ -1638,6 +1668,8 @@ fn owner_operation_candidate_with_product_identity(
                 workspace_id: request.workspace_id,
                 instruction_characters: request.instruction.chars().count(),
                 instruction_hash: sha256_tagged(request.instruction.as_bytes()),
+                mcp_capability_snapshot_hash: request.mcp_capability_snapshot_hash,
+                mcp_result_hash: request.mcp_result_hash,
                 payload_hash,
             }
         }
@@ -1733,6 +1765,16 @@ fn owner_operation_candidate_with_product_identity(
                 || request.name.len() > 256
                 || request.name.chars().any(char::is_control)
                 || !mcp_arguments_within_limits(&request.arguments)
+                || request.source_agent_task_id.is_some()
+                    != request.source_agent_result_hash.is_some()
+                || request
+                    .source_agent_task_id
+                    .as_deref()
+                    .is_some_and(|task_id| !agent_task_permission_identifier_is_valid(task_id))
+                || request
+                    .source_agent_result_hash
+                    .as_deref()
+                    .is_some_and(|hash| !tagged_sha256_is_valid(hash))
             {
                 return None;
             }
@@ -1744,6 +1786,8 @@ fn owner_operation_candidate_with_product_identity(
                 name: request.name,
                 argument_count: arguments.len(),
                 arguments_hash,
+                source_agent_task_id: request.source_agent_task_id,
+                source_agent_result_hash: request.source_agent_result_hash,
                 payload_hash,
             }
         }
@@ -2296,7 +2340,11 @@ fn confirm_owner_operation(
         HWND::NULL.MessageBox(
             &text,
             "D4 Pocket Owner確認",
-            co::MB::YESNO | co::MB::DEFBUTTON2 | co::MB::ICONWARNING | co::MB::TASKMODAL,
+            co::MB::YESNO
+                | co::MB::DEFBUTTON2
+                | co::MB::ICONWARNING
+                | co::MB::TASKMODAL
+                | co::MB::SETFOREGROUND,
         ),
         Ok(co::DLGID::YES)
     )
@@ -2405,11 +2453,26 @@ fn owner_confirmation_text_for_identity(
             workspace_id,
             instruction_characters,
             instruction_hash,
+            mcp_capability_snapshot_hash,
+            mcp_result_hash,
             payload_hash,
-        } => format!(
-            "このAgent Taskの一回限りOwner Approvalを発行しますか？\n\nRuntime ID: {}\nSession ID: {}\nWorkspace ID: {}\n指示文字数: {}\n指示hash: {}\n要求ポリシー: gui-shell-agent-task-sandbox-v1-max-runtime-900s\n範囲: このSession・Workspace・指示hash・実行条件に限定、Approval発行後5分以内に開始、開始後の最大実行時間15分\n\nCompose画面でTask本文を確認してから判断してください。この確認画面は本文を表示しません。このApprovalはTask開始と最大15分の実行を一回だけ許可し、Workspace差分の確認と判断は別操作です。Credential等の秘密をTask本文へ含めないでください。発行はTaskを保存・変更・実行せず、実行可能なsandboxの存在も証明しません。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
-            runtime_id, session_id, workspace_id, instruction_characters, instruction_hash, payload_hash
-        ),
+        } => {
+            let mcp_context = match (mcp_capability_snapshot_hash, mcp_result_hash) {
+                (Some(capability_hash), Some(result_hash)) => format!(
+                    "\n\n追加Task context:\nMCP capability snapshot hash: {capability_hash}\nMCP Tool result hash: {result_hash}\nこの結果本文全体を、未信頼データとして同じAgentへ渡します。Brokerが登録済み同一Session／Workspaceの一回結果を照合します。"
+                ),
+                (Some(capability_hash), None) => format!(
+                    "\n\n追加Task context:\nBrokerの現在MCP capability snapshot hash: {capability_hash}\nMCP metadataは未信頼で、権限を与えません。"
+                ),
+                (None, Some(result_hash)) => format!(
+                    "\n\n追加Task context:\nMCP Tool result hash: {result_hash}\nこの結果本文全体を、未信頼データとして同じAgentへ渡します。Brokerが登録済み同一Session／Workspaceの一回結果を照合します。"
+                ),
+                (None, None) => String::new(),
+            };
+            format!(
+                "このAgent Taskの一回限りOwner Approvalを発行しますか？\n\nRuntime ID: {runtime_id}\nSession ID: {session_id}\nWorkspace ID: {workspace_id}\n指示文字数: {instruction_characters}\n指示hash: {instruction_hash}{mcp_context}\n要求ポリシー: gui-shell-agent-task-sandbox-v1-max-runtime-900s\n範囲: このSession・Workspace・指示hash・実行条件に限定、Approval発行後5分以内に開始、開始後の最大実行時間15分\n\nCompose画面でTask本文を確認してから判断してください。この確認画面は本文を表示しません。このApprovalはTask開始と最大15分の実行を一回だけ許可し、Workspace差分の確認と判断は別操作です。Credential等の秘密をTask本文へ含めないでください。発行はTaskを保存・変更・実行せず、実行可能なsandboxの存在も証明しません。Windows accountの再認証ではありません。\n\npayload hash:\n{payload_hash}"
+            )
+        }
         DesktopOwnerOperationSummary::AgentTaskResultExposure {
             task_id,
             result_hash,
@@ -2570,16 +2633,28 @@ fn owner_confirmation_text_for_identity(
             name,
             argument_count,
             arguments_hash,
+            source_agent_task_id,
+            source_agent_result_hash,
             payload_hash,
-        } => format!(
-            "このMCP Toolを指定Serverへ一度だけ実行しますか？\n\nServer ID: {}\nTool: {} ({})\narguments: {}項目\narguments hash: {}\n\n前画面でJSON arguments全文と対象Server／Toolを確認してから判断してください。ここでは引数本文もTool結果本文も表示しません。秘密値をargumentsへ含めないでください。Brokerは現在CatalogとJSON Schemaを再検査し、この呼出しだけの一回限りPermissionを消費してAuditを記録します。MCP Server側の外部副作用は取り消せません。送信後に結果を確定できない場合は接続を隔離し、自動再送しません。ownerが外部状態を確認してから切断・再接続してください。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
-            owner_confirmation_value(server_id),
-            owner_confirmation_value(name),
-            owner_confirmation_value(tool_id),
-            argument_count,
-            arguments_hash,
-            payload_hash
-        ),
+        } => {
+            let agent_source = match (source_agent_task_id, source_agent_result_hash) {
+                (Some(task_id), Some(result_hash)) => format!(
+                    "\nAgent source Task: {}\nAgent result hash: {}\n成功したTool結果はBroker内に期限付き・一回限りで保持し、別のWorkspace PermissionとTask Approval後に同じAgentへ渡せます。",
+                    owner_confirmation_value(task_id),
+                    owner_confirmation_value(result_hash),
+                ),
+                _ => String::new(),
+            };
+            format!(
+                "このMCP Toolを指定Serverへ一度だけ実行しますか？\n\nServer ID: {}\nTool: {} ({})\narguments: {}項目\narguments hash: {}{agent_source}\n\n前画面でJSON arguments全文と対象Server／Toolを確認してから判断してください。ここでは引数本文もTool結果本文も表示しません。秘密値をargumentsへ含めないでください。Brokerは現在CatalogとJSON Schemaを再検査し、この呼出しだけの一回限りPermissionを消費してAuditを記録します。MCP Server側の外部副作用は取り消せません。送信後に結果を確定できない場合は接続を隔離し、自動再送しません。ownerが外部状態を確認してから切断・再接続してください。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
+                owner_confirmation_value(server_id),
+                owner_confirmation_value(name),
+                owner_confirmation_value(tool_id),
+                argument_count,
+                arguments_hash,
+                payload_hash
+            )
+        }
         DesktopOwnerOperationSummary::UpdateDownload {
             confirmation,
             payload_hash,
@@ -3898,6 +3973,8 @@ mod tests {
                 workspace_id,
                 instruction_characters,
                 instruction_hash,
+                mcp_capability_snapshot_hash,
+                mcp_result_hash,
                 payload_hash,
             } => json!({
                 "summary": {
@@ -3907,6 +3984,8 @@ mod tests {
                     "workspace_id": workspace_id,
                     "instruction_characters": instruction_characters,
                     "instruction_hash": instruction_hash,
+                    "mcp_capability_snapshot_hash": mcp_capability_snapshot_hash,
+                    "mcp_result_hash": mcp_result_hash,
                     "payload_hash": payload_hash
                 },
                 "confirm": confirm
@@ -4441,6 +4520,8 @@ mod tests {
             workspace_id: "owner-ui-test-workspace".into(),
             instruction_characters: instruction.chars().count(),
             instruction_hash: sha256_tagged(instruction.as_bytes()),
+            mcp_capability_snapshot_hash: None,
+            mcp_result_hash: None,
             payload_hash: sha256_tagged(b"owner-ui-test-payload"),
         };
 
@@ -4744,6 +4825,10 @@ mod tests {
                 workspace_id: String,
                 instruction_characters: usize,
                 instruction_hash: String,
+                #[serde(default)]
+                mcp_capability_snapshot_hash: Option<String>,
+                #[serde(default)]
+                mcp_result_hash: Option<String>,
                 payload_hash: String,
             },
             AgentTaskResultExposure {
@@ -4876,6 +4961,8 @@ mod tests {
                 workspace_id,
                 instruction_characters,
                 instruction_hash,
+                mcp_capability_snapshot_hash,
+                mcp_result_hash,
                 payload_hash,
             } => DesktopOwnerOperationSummary::AgentTaskOwnerApproval {
                 runtime_id,
@@ -4883,6 +4970,8 @@ mod tests {
                 workspace_id,
                 instruction_characters,
                 instruction_hash,
+                mcp_capability_snapshot_hash,
+                mcp_result_hash,
                 payload_hash,
             },
             TestSummary::AgentTaskResultExposure {
@@ -7483,7 +7572,9 @@ mod tests {
             "ServerID": "mcp-fixture",
             "ToolID": tool_id,
             "名前": "search",
-            "arguments": {"query": "SENSITIVE_ARGUMENT_MARKER"}
+            "arguments": {"query": "SENSITIVE_ARGUMENT_MARKER"},
+            "source_agent_task_id": "task-source-123",
+            "source_agent_result_hash": format!("sha256:{}", "e".repeat(64))
         });
         let input = serde_json::json!({
             "request_id": "desktop-mcp-tool-call",
@@ -7514,6 +7605,9 @@ mod tests {
         )));
         assert!(confirmation.contains("一回限りPermission"));
         assert!(confirmation.contains("自動再送しません"));
+        assert!(confirmation.contains("task-source-123"));
+        assert!(confirmation.contains(&format!("sha256:{}", "e".repeat(64))));
+        assert!(confirmation.contains("期限付き・一回限り"));
         assert!(!confirmation.contains("SENSITIVE_ARGUMENT_MARKER"));
 
         let mut escalated = payload.clone();
@@ -7524,6 +7618,22 @@ mod tests {
             "payload_hash": canonical_payload_hash(Some(&escalated)),
             "payload": escalated,
             "nonce": "desktop-mcp-tool-call-escalated-nonce",
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {"client": "desktop_flutter"}
+        });
+        assert!(owner_operation_candidate(request.to_string().as_bytes(), &endpoint).is_none());
+
+        let mut unbound_source = payload.clone();
+        unbound_source
+            .as_object_mut()
+            .expect("Tool要求object")
+            .remove("source_agent_result_hash");
+        let request = serde_json::json!({
+            "request_id": "desktop-mcp-tool-call-unbound-source",
+            "operation": "MCP Tool実行",
+            "payload_hash": canonical_payload_hash(Some(&unbound_source)),
+            "payload": unbound_source,
+            "nonce": "desktop-mcp-tool-call-unbound-source-nonce",
             "issued_at": BrokerRequestEnvelope::current_issued_at(),
             "metadata": {"client": "desktop_flutter"}
         });

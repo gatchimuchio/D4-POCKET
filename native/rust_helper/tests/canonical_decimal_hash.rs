@@ -15,11 +15,11 @@ fn repository_root() -> PathBuf {
 #[test]
 fn runtime_resource_observation_decimal_vector_matches_rust_and_python_payload_hash() {
     let root = repository_root();
-    let vector_path = root.join("tooling/canonicalization_vectors/runtime_resource_observation_decimal.json");
-    let vector: Value = serde_json::from_str(
-        &fs::read_to_string(&vector_path).expect("小数正本化vectorを読取"),
-    )
-    .expect("小数正本化vectorをJSONとして読取");
+    let vector_path =
+        root.join("tooling/canonicalization_vectors/runtime_resource_observation_decimal.json");
+    let vector: Value =
+        serde_json::from_str(&fs::read_to_string(&vector_path).expect("小数正本化vectorを読取"))
+            .expect("小数正本化vectorをJSONとして読取");
     let expected = vector["expected_rust_payload_hash"]
         .as_str()
         .expect("固定Rust hash")

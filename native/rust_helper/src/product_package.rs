@@ -1667,15 +1667,13 @@ mod tests {
             .0,
             "package_stage_name_invalid"
         );
-        assert!(
-            !path
-                .parent()
-                .unwrap()
-                .parent()
-                .unwrap()
-                .join("escaped")
-                .exists()
-        );
+        assert!(!path
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("escaped")
+            .exists());
         drop(directory);
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
     }

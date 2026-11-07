@@ -1093,6 +1093,7 @@ pub struct Broker {
     作業領域: super::workspace::WorkspaceRegistry,
     端末: Option<super::device_link::端末制御>,
     pub(super) mcp_connections: BTreeMap<String, super::mcp_center::McpConnectionEntry>,
+    pub(super) mcp_agent_results: BTreeMap<String, super::mcp_center::McpAgentResultContext>,
     pub(super) a2a_connections: BTreeMap<String, Value>,
     pub(super) hosts: BTreeMap<String, Value>,
     pub(super) adapters: BTreeMap<String, Value>,
@@ -1142,6 +1143,7 @@ impl Broker {
             作業領域: super::workspace::WorkspaceRegistry::default(),
             端末: None,
             mcp_connections: BTreeMap::new(),
+            mcp_agent_results: BTreeMap::new(),
             a2a_connections: BTreeMap::new(),
             hosts: BTreeMap::new(),
             adapters: BTreeMap::new(),
@@ -1226,6 +1228,7 @@ impl Broker {
             作業領域: super::workspace::WorkspaceRegistry::default(),
             端末: None,
             mcp_connections: BTreeMap::new(),
+            mcp_agent_results: BTreeMap::new(),
             a2a_connections,
             hosts,
             adapters,
@@ -1995,6 +1998,8 @@ impl Broker {
                     | BrokerOperation::AgentCLI実行系作業領域登録
                     | BrokerOperation::作業領域OS選択
                     | BrokerOperation::AgentCLI実行fileOS選択
+                    | BrokerOperation::MCP接続
+                    | BrokerOperation::MCP切断
                     | BrokerOperation::AgentTaskWorkspacePermissionGrant
                     | BrokerOperation::AgentTaskOwnerApprovalGrant
                     | BrokerOperation::AgentTask結果表示承認
@@ -4722,6 +4727,20 @@ impl Broker {
                 payload_hash,
             );
         }
+        let (effective_payload, mcp_result_to_consume) =
+            match super::mcp_center::enrich_agent_task_payload(self, operation.as_str(), payload) {
+                Ok(value) => value,
+                Err(error) => {
+                    return self.reject_with_payload_hash(
+                        request_id,
+                        operation.as_str(),
+                        error.code,
+                        error.message,
+                        true,
+                        payload_hash,
+                    )
+                }
+            };
         if matches!(
             operation,
             BrokerOperation::対話承認 | BrokerOperation::対話承認待ち
@@ -4860,7 +4879,7 @@ impl Broker {
             };
         let result = 対話.操作_作業領域結合済み_scratch_提供元資格情報付き(
             operation.as_str(),
-            payload,
+            &effective_payload,
             owner,
             now,
             workspace_binding.as_ref(),
@@ -4871,6 +4890,11 @@ impl Broker {
         drop(audit);
         drop(broker);
         self.対話 = 対話;
+        if operation == BrokerOperation::AgentTask実行 && result.is_ok() {
+            if let Some(result_id) = mcp_result_to_consume {
+                self.mcp_agent_results.remove(&result_id);
+            }
+        }
         match result {
             Ok(body) => BrokerResponse {
                 request_id: request_id.into(),
@@ -4920,6 +4944,25 @@ impl Broker {
 
     pub fn shutdown_requested(&self) -> bool {
         self.shutdown_requested
+    }
+
+    pub(super) fn consume_agent_mcp_tool_proposal(
+        &mut self,
+        task_id: &str,
+        result_hash: &str,
+        server_id: &str,
+        tool_id: &str,
+        name: &str,
+        arguments: &Value,
+    ) -> Result<super::dialogue::AgentTaskToolProvenance, &'static str> {
+        self.対話.consume_agent_mcp_tool_proposal(
+            task_id,
+            result_hash,
+            server_id,
+            tool_id,
+            name,
+            arguments,
+        )
     }
 
     pub fn reject_ipc(&mut self, code: &str, message: &str, recoverable: bool) -> BrokerResponse {
@@ -6362,6 +6405,47 @@ mod tests {
                     "metadata":{"client":"desktop_flutter"}, "payload":request.payload})
                 .to_string(),
             );
+            assert_eq!(
+                confirmed.error.unwrap().code,
+                "broker_persistence_unavailable"
+            );
+        }
+    }
+
+    #[test]
+    #[cfg(target_os = "windows")]
+    fn windows_mcp_connect_and_disconnect_use_desktop_native_owner_allowlist() {
+        for (request_id, operation) in [
+            ("windows-mcp-connect", BrokerOperation::MCP接続),
+            ("windows-mcp-disconnect", BrokerOperation::MCP切断),
+        ] {
+            let mut request =
+                BrokerRequestEnvelope::health(request_id, &format!("{request_id}-nonce"));
+            request.session_id = Some("session-1".into());
+            request.operation = Some(operation.clone());
+            request.metadata = vec![BrokerMetadata {
+                key: "client".into(),
+                value: "desktop_flutter".into(),
+            }];
+            request.metadata_present = true;
+            request.payload = Some(json!({"版": 1}));
+            request.refresh_payload_hash();
+
+            let normal = test_broker().handle(request.clone());
+            assert_eq!(normal.error.unwrap().code, "mcp_owner_required");
+
+            let native_owner_request = json!({
+                "request_id": request.request_id,
+                "session_id": request.session_id,
+                "operation": operation.as_str(),
+                "nonce": request.nonce,
+                "issued_at": request.issued_at,
+                "payload_hash": request.payload_hash,
+                "metadata": {"client": "desktop_flutter"},
+                "payload": request.payload,
+            });
+            let confirmed =
+                test_broker().desktop_owner_operation_json(&native_owner_request.to_string());
             assert_eq!(
                 confirmed.error.unwrap().code,
                 "broker_persistence_unavailable"

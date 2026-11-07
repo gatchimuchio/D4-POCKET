@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
-mod owner_cli;
 mod checkpoint_cli;
+mod owner_cli;
 
 use std::env;
 use std::io::{self, BufRead};
@@ -22,7 +22,9 @@ fn main() {
                 eprintln!("development lifecycle fixture childは引数を受け付けない");
                 std::process::exit(2);
             }
-            std::process::exit(gui_shell_rust_helper::broker::run_development_lifecycle_fixture_child());
+            std::process::exit(
+                gui_shell_rust_helper::broker::run_development_lifecycle_fixture_child(),
+            );
         }
         #[cfg(not(debug_assertions))]
         {
@@ -31,37 +33,109 @@ fn main() {
         }
     }
     if args.first().is_some_and(|v| v == "監査チェックポイント") {
-        match checkpoint_cli::run(&args[1..]) { Ok(()) => return, Err(error) => { eprintln!("{error}"); std::process::exit(1); } }
+        match checkpoint_cli::run(&args[1..]) {
+            Ok(()) => return,
+            Err(error) => {
+                eprintln!("{error}");
+                std::process::exit(1);
+            }
+        }
     }
-    if args.first().is_some_and(|v| v == "実行系ライフサイクル承認") {
-        match owner_cli::実行系ライフサイクル承認(&args[1..]) { Ok(()) => return, Err(error) => { eprintln!("{error}"); std::process::exit(1); } }
+    if args
+        .first()
+        .is_some_and(|v| v == "実行系ライフサイクル承認")
+    {
+        match owner_cli::実行系ライフサイクル承認(&args[1..]) {
+            Ok(()) => return,
+            Err(error) => {
+                eprintln!("{error}");
+                std::process::exit(1);
+            }
+        }
     }
     if args.first().is_some_and(|v| v == "評価Dataset登録") {
-        match owner_cli::評価データセット登録(&args[1..]) { Ok(()) => return, Err(error) => { eprintln!("{error}"); std::process::exit(1); } }
+        match owner_cli::評価データセット登録(&args[1..]) {
+            Ok(()) => return,
+            Err(error) => {
+                eprintln!("{error}");
+                std::process::exit(1);
+            }
+        }
     }
     if args.first().is_some_and(|v| v == "回帰Case登録") {
-        match owner_cli::回帰Case登録(&args[1..]) { Ok(()) => return, Err(error) => { eprintln!("{error}"); std::process::exit(1); } }
+        match owner_cli::回帰Case登録(&args[1..]) {
+            Ok(()) => return,
+            Err(error) => {
+                eprintln!("{error}");
+                std::process::exit(1);
+            }
+        }
     }
     if args.first().is_some_and(|v| v == "回帰Case削除") {
-        match owner_cli::回帰Case削除(&args[1..]) { Ok(()) => return, Err(error) => { eprintln!("{error}"); std::process::exit(1); } }
+        match owner_cli::回帰Case削除(&args[1..]) {
+            Ok(()) => return,
+            Err(error) => {
+                eprintln!("{error}");
+                std::process::exit(1);
+            }
+        }
     }
     if args.first().is_some_and(|v| v == "資格情報登録") {
-        match owner_cli::資格情報登録(&args[1..]) { Ok(()) => return, Err(error) => { eprintln!("{error}"); std::process::exit(1); } }
+        match owner_cli::資格情報登録(&args[1..]) {
+            Ok(()) => return,
+            Err(error) => {
+                eprintln!("{error}");
+                std::process::exit(1);
+            }
+        }
     }
     if args.first().is_some_and(|v| v == "MCP接続") {
-        match owner_cli::MCP接続(&args[1..]) { Ok(()) => return, Err(error) => { eprintln!("{error}"); std::process::exit(1); } }
+        match owner_cli::MCP接続(&args[1..]) {
+            Ok(()) => return,
+            Err(error) => {
+                eprintln!("{error}");
+                std::process::exit(1);
+            }
+        }
     }
     if args.first().is_some_and(|v| v == "MCP切断") {
-        match owner_cli::MCP切断(&args[1..]) { Ok(()) => return, Err(error) => { eprintln!("{error}"); std::process::exit(1); } }
+        match owner_cli::MCP切断(&args[1..]) {
+            Ok(()) => return,
+            Err(error) => {
+                eprintln!("{error}");
+                std::process::exit(1);
+            }
+        }
     }
     if args.first().is_some_and(|v| v == "A2A接続") {
-        match owner_cli::A2A接続(&args[1..]) { Ok(()) => return, Err(error) => { eprintln!("{error}"); std::process::exit(1); } }
+        match owner_cli::A2A接続(&args[1..]) {
+            Ok(()) => return,
+            Err(error) => {
+                eprintln!("{error}");
+                std::process::exit(1);
+            }
+        }
     }
     if args.first().is_some_and(|v| v == "Host登録") {
-        match owner_cli::Host登録(&args[1..]) { Ok(()) => return, Err(error) => { eprintln!("{error}"); std::process::exit(1); } }
+        match owner_cli::Host登録(&args[1..]) {
+            Ok(()) => return,
+            Err(error) => {
+                eprintln!("{error}");
+                std::process::exit(1);
+            }
+        }
     }
-    if args.first().is_some_and(|v| matches!(v.as_str(), "対話承認操作" | "作業領域制御")) {
-        match owner_cli::実行(&args[1..]) { Ok(()) => return, Err(error) => { eprintln!("{error}"); std::process::exit(1); } }
+    if args
+        .first()
+        .is_some_and(|v| matches!(v.as_str(), "対話承認操作" | "作業領域制御"))
+    {
+        match owner_cli::実行(&args[1..]) {
+            Ok(()) => return,
+            Err(error) => {
+                eprintln!("{error}");
+                std::process::exit(1);
+            }
+        }
     }
     if let Some(exit_code) = maybe_run_broker_server() {
         std::process::exit(exit_code);
@@ -86,9 +160,13 @@ fn main() {
     eprintln!("内容保存: 対話承認操作 --session-file <owner資格file> 内容保存 <要求ID> <要求hash>");
     eprintln!("lifecycle owner承認: 実行系ライフサイクル承認 --session-file <owner資格file> 承認 <承認ID> <承認hash>");
     eprintln!("評価Dataset登録: 評価Dataset登録 --session-file <owner資格file> 登録 <非公開評価データセットJSONファイル>");
-    eprintln!("回帰Case登録: 回帰Case登録 --session-file <owner資格file> 登録 <回帰Case登録JSONファイル>");
+    eprintln!(
+        "回帰Case登録: 回帰Case登録 --session-file <owner資格file> 登録 <回帰Case登録JSONファイル>"
+    );
     eprintln!("回帰Case削除: 回帰Case削除 --session-file <owner資格file> 削除 <CaseID> <定義hash> <暗号文hash> 削除確認 | 中断照合 <CaseID>");
-    eprintln!("資格情報登録: 資格情報登録 --session-file <owner資格file> 登録 <資格情報登録JSONファイル>");
+    eprintln!(
+        "資格情報登録: 資格情報登録 --session-file <owner資格file> 登録 <資格情報登録JSONファイル>"
+    );
     eprintln!("MCP接続: MCP接続 --session-file <owner資格file> 接続 <MCP接続JSONファイル>");
     eprintln!("MCP切断: MCP切断 --session-file <owner資格file> 切断 <ServerID>");
     eprintln!("A2A接続: A2A接続 --session-file <owner資格file> 接続 <A2A接続JSONファイル>");
@@ -127,35 +205,75 @@ fn maybe_run_broker_server() -> Option<i32> {
     while let Some(argument) = args.next() {
         match argument.as_str() {
             "--protected-store-dir" => {
-                let Some(value) = args.next() else { eprintln!("保管先directoryの値が必要"); return Some(2); };
-                if protected_store_dir.is_some() { eprintln!("保管先の重複指定を拒否"); return Some(2); }
+                let Some(value) = args.next() else {
+                    eprintln!("保管先directoryの値が必要");
+                    return Some(2);
+                };
+                if protected_store_dir.is_some() {
+                    eprintln!("保管先の重複指定を拒否");
+                    return Some(2);
+                }
                 protected_store_dir = Some(PathBuf::from(value));
             }
             "--workspace-config" => {
-                let Some(value)=args.next() else {eprintln!("作業領域設定fileの値が必要");return Some(2);};
-                if workspace_config.is_some() {eprintln!("作業領域設定fileの重複指定を拒否");return Some(2);}
-                workspace_config=Some(PathBuf::from(value));
+                let Some(value) = args.next() else {
+                    eprintln!("作業領域設定fileの値が必要");
+                    return Some(2);
+                };
+                if workspace_config.is_some() {
+                    eprintln!("作業領域設定fileの重複指定を拒否");
+                    return Some(2);
+                }
+                workspace_config = Some(PathBuf::from(value));
             }
             "--mobile-bind" => {
-                let Some(value) = args.next() else {eprintln!("端末bind先の値が必要");return Some(2);};
+                let Some(value) = args.next() else {
+                    eprintln!("端末bind先の値が必要");
+                    return Some(2);
+                };
                 mobile_bind = Some(value);
             }
             "--owner-session-file" => {
-                let Some(value) = args.next() else { eprintln!("owner資格fileの値が必要"); return Some(2); };
+                let Some(value) = args.next() else {
+                    eprintln!("owner資格fileの値が必要");
+                    return Some(2);
+                };
                 owner_session_file = Some(PathBuf::from(value));
             }
             "--minidora-runtime" => {
-                let Some(value) = args.next() else { eprintln!("実行系ID=127.0.0.1:portの値が必要"); return Some(2); };
-                let Some((id, address)) = value.split_once('=') else { eprintln!("実行系登録の形式が不正"); return Some(2); };
+                let Some(value) = args.next() else {
+                    eprintln!("実行系ID=127.0.0.1:portの値が必要");
+                    return Some(2);
+                };
+                let Some((id, address)) = value.split_once('=') else {
+                    eprintln!("実行系登録の形式が不正");
+                    return Some(2);
+                };
                 minidora_runtimes.push((id.to_owned(), address.to_owned()));
             }
             "--codex-runtime" => {
-                let Some(value) = args.next() else { eprintln!("Codex実行系の値が必要"); return Some(2); };
+                let Some(value) = args.next() else {
+                    eprintln!("Codex実行系の値が必要");
+                    return Some(2);
+                };
                 let mut fields = value.splitn(3, '=');
-                let Some(id) = fields.next().filter(|v| !v.is_empty()) else { eprintln!("Codex実行系IDが空です"); return Some(2); };
-                let Some(executable) = fields.next().filter(|v| !v.is_empty()) else { eprintln!("Codex executable pathが必要です"); return Some(2); };
-                let Some(workspace) = fields.next().filter(|v| !v.is_empty()) else { eprintln!("Codex workspace pathが必要です"); return Some(2); };
-                codex_runtimes.push((id.to_owned(), PathBuf::from(executable), PathBuf::from(workspace)));
+                let Some(id) = fields.next().filter(|v| !v.is_empty()) else {
+                    eprintln!("Codex実行系IDが空です");
+                    return Some(2);
+                };
+                let Some(executable) = fields.next().filter(|v| !v.is_empty()) else {
+                    eprintln!("Codex executable pathが必要です");
+                    return Some(2);
+                };
+                let Some(workspace) = fields.next().filter(|v| !v.is_empty()) else {
+                    eprintln!("Codex workspace pathが必要です");
+                    return Some(2);
+                };
+                codex_runtimes.push((
+                    id.to_owned(),
+                    PathBuf::from(executable),
+                    PathBuf::from(workspace),
+                ));
             }
             "--enable-development-lifecycle-fixture" => {
                 if development_lifecycle_fixture_enabled {
@@ -178,21 +296,21 @@ fn maybe_run_broker_server() -> Option<i32> {
             }
             "--store-dir" => {
                 let Some(value) = args.next() else {
-                eprintln!("--store-dirには値が必要");
+                    eprintln!("--store-dirには値が必要");
                     return Some(2);
                 };
                 store_dir = Some(PathBuf::from(value));
             }
             "--session-file" => {
                 let Some(value) = args.next() else {
-                eprintln!("--session-fileには値が必要");
+                    eprintln!("--session-fileには値が必要");
                     return Some(2);
                 };
                 session_file = Some(PathBuf::from(value));
             }
             "--port" => {
                 let Some(value) = args.next() else {
-                eprintln!("--portには値が必要");
+                    eprintln!("--portには値が必要");
                     return Some(2);
                 };
                 let Ok(parsed) = value.parse::<u16>() else {
@@ -203,7 +321,7 @@ fn maybe_run_broker_server() -> Option<i32> {
             }
             "--max-request-bytes" => {
                 let Some(value) = args.next() else {
-                eprintln!("--max-request-bytesには値が必要");
+                    eprintln!("--max-request-bytesには値が必要");
                     return Some(2);
                 };
                 let Ok(parsed) = value.parse::<usize>() else {
@@ -217,7 +335,7 @@ fn maybe_run_broker_server() -> Option<i32> {
                 max_request_bytes = parsed;
             }
             _ => {
-            eprintln!("未知のbroker-server引数: {argument}");
+                eprintln!("未知のbroker-server引数: {argument}");
                 return Some(2);
             }
         }
@@ -248,7 +366,9 @@ fn maybe_run_broker_server() -> Option<i32> {
                 || config.workspace_config.is_none()
                 || config.codex_runtimes.is_empty())
         {
-            eprintln!("r2-e2e synthetic Owner fixtureにはOwner file、Workspace設定、Codex Runtimeが必要");
+            eprintln!(
+                "r2-e2e synthetic Owner fixtureにはOwner file、Workspace設定、Codex Runtimeが必要"
+            );
             return Some(2);
         }
         config.r2_e2e_synthetic_owner_confirmation = r2_e2e_synthetic_owner_confirmation;

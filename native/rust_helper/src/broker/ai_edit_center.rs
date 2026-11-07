@@ -4,9 +4,7 @@
 //! file、process、network、credential、Permission、Approvalを変更しない。
 #![allow(non_snake_case)]
 
-use super::protocol::{
-    Broker, BrokerResponse, BrokerStatus, EVIDENCE_SOURCE_INTERNAL_STATE,
-};
+use super::protocol::{Broker, BrokerResponse, BrokerStatus, EVIDENCE_SOURCE_INTERNAL_STATE};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
@@ -127,13 +125,18 @@ fn parse_proposal(value: &Value) -> Result<EditProposal, String> {
         || proposal.self_approval
         || proposal.execution_mode != "proposal_only"
     {
-        return Err("編集提案はowner規約確認済み、自己承認なし、proposal_onlyだけを受け付ける".to_string());
+        return Err(
+            "編集提案はowner規約確認済み、自己承認なし、proposal_onlyだけを受け付ける".to_string(),
+        );
     }
     if proposal.instruction.contains('\0')
         || proposal.expected_changes.iter().any(|change| {
             change.trim().is_empty() || change.chars().count() > 240 || change.contains('\0')
         })
-        || proposal.target_paths.iter().any(|path| !valid_target_path(path))
+        || proposal
+            .target_paths
+            .iter()
+            .any(|path| !valid_target_path(path))
     {
         return Err("編集提案の指示、変更予定、対象pathが許可境界外".to_string());
     }
@@ -143,9 +146,9 @@ fn parse_proposal(value: &Value) -> Result<EditProposal, String> {
 fn valid_identifier(value: &str) -> bool {
     !value.is_empty()
         && value.chars().count() <= 64
-        && value
-            .chars()
-            .all(|character| character.is_ascii_alphanumeric() || matches!(character, '.' | '_' | '-'))
+        && value.chars().all(|character| {
+            character.is_ascii_alphanumeric() || matches!(character, '.' | '_' | '-')
+        })
 }
 
 fn valid_target_path(value: &str) -> bool {
@@ -172,9 +175,13 @@ fn valid_target_path(value: &str) -> bool {
     allowed_root
         && !value.contains('\\')
         && !value.contains(':')
-        && value.split('/').all(|part| !part.is_empty() && part != "." && part != "..")
+        && value
+            .split('/')
+            .all(|part| !part.is_empty() && part != "." && part != "..")
         && value.chars().all(|character| !character.is_control())
-        && !forbidden.iter().any(|token| value.to_ascii_lowercase().contains(token))
+        && !forbidden
+            .iter()
+            .any(|token| value.to_ascii_lowercase().contains(token))
 }
 
 #[cfg(test)]
@@ -238,7 +245,9 @@ mod tests {
         assert_eq!(body["files_written"], false);
         assert_eq!(body["permission_generated"], false);
         assert_eq!(body["approval_state"], "owner_review_required");
-        assert!(!body.to_string().contains("構成Previewへ対象platformを表示する"));
+        assert!(!body
+            .to_string()
+            .contains("構成Previewへ対象platformを表示する"));
     }
 
     #[test]

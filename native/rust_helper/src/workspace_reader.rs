@@ -3,8 +3,8 @@ use cap_fs_ext::{DirExt, FollowSymlinks, OpenOptionsFollowExt};
 #[cfg(windows)]
 use cap_std::fs::MetadataExt;
 use cap_std::fs::{Dir, Metadata, OpenOptions};
-use std::io::Read;
 use sha2::{Digest, Sha256};
+use std::io::Read;
 use unicode_normalization::UnicodeNormalization;
 
 const MAX_BYTES: u64 = 65_536;
@@ -57,7 +57,9 @@ pub struct WorkspaceReader {
 }
 
 pub(crate) fn validate_root_part(part: &str) -> Result<(), ReadError> {
-    if path_parts(part)?.len()!=1 || secret_part(part) {return Err(ReadError::SecretPath);}
+    if path_parts(part)?.len() != 1 || secret_part(part) {
+        return Err(ReadError::SecretPath);
+    }
     Ok(())
 }
 
@@ -147,8 +149,14 @@ impl WorkspaceReader {
         &self.secrets
     }
 
-    pub(crate) fn validate_relative_path(&self, path: &str, allow_root: bool) -> Result<(), ReadError> {
-        if path.is_empty() && allow_root {return Ok(());}
+    pub(crate) fn validate_relative_path(
+        &self,
+        path: &str,
+        allow_root: bool,
+    ) -> Result<(), ReadError> {
+        if path.is_empty() && allow_root {
+            return Ok(());
+        }
         self.allowed(path).map(|_| ())
     }
 
@@ -165,9 +173,11 @@ impl WorkspaceReader {
             path_parts(secret)?;
             normalized.push(secret.to_lowercase());
         }
-        let metadata=root.dir_metadata().map_err(|_| ReadError::Unavailable)?;
-        if !metadata.is_dir() || reparse(&metadata) {return Err(ReadError::UnsafeFile);}
-        let root_device=cap_fs_ext::MetadataExt::dev(&metadata);
+        let metadata = root.dir_metadata().map_err(|_| ReadError::Unavailable)?;
+        if !metadata.is_dir() || reparse(&metadata) {
+            return Err(ReadError::UnsafeFile);
+        }
+        let root_device = cap_fs_ext::MetadataExt::dev(&metadata);
         let reader = Self {
             root,
             secrets: normalized,
@@ -199,9 +209,7 @@ impl WorkspaceReader {
                 }
                 Err(_) => return Err(ReadError::Unavailable),
             };
-            if reparse(&observed)
-                || cap_fs_ext::MetadataExt::dev(&observed) != self.root_device
-            {
+            if reparse(&observed) || cap_fs_ext::MetadataExt::dev(&observed) != self.root_device {
                 return Err(ReadError::UnsafeFile);
             }
             if observed.is_file() {
@@ -227,12 +235,7 @@ impl WorkspaceReader {
                 {
                     return Err(ReadError::Changed);
                 }
-                validate_secret_tree(
-                    &directory,
-                    self.root_device,
-                    0,
-                    &mut inspected_entries,
-                )?;
+                validate_secret_tree(&directory, self.root_device, 0, &mut inspected_entries)?;
             } else {
                 return Err(ReadError::UnsafeFile);
             }
@@ -261,7 +264,10 @@ impl WorkspaceReader {
                 .open_dir_nofollow(part)
                 .map_err(|_| ReadError::UnsafeFile)?;
             let metadata = next.dir_metadata().map_err(|_| ReadError::Unavailable)?;
-            if !metadata.is_dir() || reparse(&metadata) || cap_fs_ext::MetadataExt::dev(&metadata)!=self.root_device {
+            if !metadata.is_dir()
+                || reparse(&metadata)
+                || cap_fs_ext::MetadataExt::dev(&metadata) != self.root_device
+            {
                 return Err(ReadError::UnsafeFile);
             }
             dir = next;
@@ -303,18 +309,25 @@ impl WorkspaceReader {
             if reparse(&metadata) {
                 continue;
             }
-            if !metadata.is_file() && !metadata.is_dir() {continue;}
+            if !metadata.is_file() && !metadata.is_dir() {
+                continue;
+            }
             let metadata = if metadata.is_file() {
                 let file = dir
                     .open_with(name, &read_options())
                     .map_err(|_| ReadError::Changed)?;
                 file.metadata().map_err(|_| ReadError::Changed)?
             } else if metadata.is_dir() {
-                dir.open_dir_nofollow(name).map_err(|_| ReadError::Changed)?.dir_metadata().map_err(|_| ReadError::Changed)?
+                dir.open_dir_nofollow(name)
+                    .map_err(|_| ReadError::Changed)?
+                    .dir_metadata()
+                    .map_err(|_| ReadError::Changed)?
             } else {
                 metadata
             };
-            if cap_fs_ext::MetadataExt::dev(&metadata)!=self.root_device {continue;}
+            if cap_fs_ext::MetadataExt::dev(&metadata) != self.root_device {
+                continue;
+            }
             let kind = if metadata.is_dir() {
                 EntryKind::Directory
             } else if regular(&metadata) {
@@ -341,60 +354,110 @@ impl WorkspaceReader {
         self.inventory_checked(MAX_INVENTORY_ENTRIES, || {})
     }
 
-    fn inventory_checked(&self, budget: usize, after_walk: impl FnOnce()) -> Result<ComparisonInventory, ReadError> {
-        let root_metadata=self.root.dir_metadata().map_err(|_| ReadError::Unavailable)?;
-        let mut pending=vec![(String::new(),root_metadata)];
-        let mut directories=Vec::new();
-        let mut files=Vec::new();
-        let mut excluded_secrets=0;
-        let mut total=0usize;
-        while let Some((path, expected))=pending.pop() {
-            let parts=if path.is_empty() {vec![]} else {self.allowed(&path)?};
-            let dir=self.directory(&parts)?;
-            let before=dir.dir_metadata().map_err(|_| ReadError::Unavailable)?;
-            if !same_file(&expected,&before) || expected.modified().ok().is_none()
-                || expected.modified().ok()!=before.modified().ok() {return Err(ReadError::Changed);}
-            for (count,entry) in dir.entries().map_err(|_| ReadError::Unavailable)?.enumerate() {
-                if count>=MAX_ENTRIES || total>=budget.min(MAX_INVENTORY_ENTRIES) {return Err(ReadError::TooManyEntries);}
-                total+=1;
-                let entry=entry.map_err(|_| ReadError::Unavailable)?;
-                let name=entry.file_name();
-                let name=name.to_str().ok_or(ReadError::InvalidPath)?;
-                let relative=if path.is_empty() {name.to_owned()} else {format!("{path}/{name}")};
-                match self.allowed(&relative) {
-                    Err(ReadError::SecretPath)=>{excluded_secrets+=1;continue;},
-                    Err(error)=>return Err(error),
-                    Ok(_)=>{},
+    fn inventory_checked(
+        &self,
+        budget: usize,
+        after_walk: impl FnOnce(),
+    ) -> Result<ComparisonInventory, ReadError> {
+        let root_metadata = self
+            .root
+            .dir_metadata()
+            .map_err(|_| ReadError::Unavailable)?;
+        let mut pending = vec![(String::new(), root_metadata)];
+        let mut directories = Vec::new();
+        let mut files = Vec::new();
+        let mut excluded_secrets = 0;
+        let mut total = 0usize;
+        while let Some((path, expected)) = pending.pop() {
+            let parts = if path.is_empty() {
+                vec![]
+            } else {
+                self.allowed(&path)?
+            };
+            let dir = self.directory(&parts)?;
+            let before = dir.dir_metadata().map_err(|_| ReadError::Unavailable)?;
+            if !same_file(&expected, &before)
+                || expected.modified().ok().is_none()
+                || expected.modified().ok() != before.modified().ok()
+            {
+                return Err(ReadError::Changed);
+            }
+            for (count, entry) in dir
+                .entries()
+                .map_err(|_| ReadError::Unavailable)?
+                .enumerate()
+            {
+                if count >= MAX_ENTRIES || total >= budget.min(MAX_INVENTORY_ENTRIES) {
+                    return Err(ReadError::TooManyEntries);
                 }
-                let observed=dir.symlink_metadata(name).map_err(|_| ReadError::Changed)?;
-                if reparse(&observed) || cap_fs_ext::MetadataExt::dev(&observed)!=self.root_device {
+                total += 1;
+                let entry = entry.map_err(|_| ReadError::Unavailable)?;
+                let name = entry.file_name();
+                let name = name.to_str().ok_or(ReadError::InvalidPath)?;
+                let relative = if path.is_empty() {
+                    name.to_owned()
+                } else {
+                    format!("{path}/{name}")
+                };
+                match self.allowed(&relative) {
+                    Err(ReadError::SecretPath) => {
+                        excluded_secrets += 1;
+                        continue;
+                    }
+                    Err(error) => return Err(error),
+                    Ok(_) => {}
+                }
+                let observed = dir.symlink_metadata(name).map_err(|_| ReadError::Changed)?;
+                if reparse(&observed) || cap_fs_ext::MetadataExt::dev(&observed) != self.root_device
+                {
                     return Err(ReadError::UnsafeFile);
                 }
                 if observed.is_dir() {
-                    let child=dir.open_dir_nofollow(name).map_err(|_| ReadError::Changed)?;
-                    let opened=child.dir_metadata().map_err(|_| ReadError::Changed)?;
-                    if !same_file(&observed,&opened) || reparse(&opened) || !opened.is_dir() {return Err(ReadError::Changed);}
-                    pending.push((relative,opened));
+                    let child = dir
+                        .open_dir_nofollow(name)
+                        .map_err(|_| ReadError::Changed)?;
+                    let opened = child.dir_metadata().map_err(|_| ReadError::Changed)?;
+                    if !same_file(&observed, &opened) || reparse(&opened) || !opened.is_dir() {
+                        return Err(ReadError::Changed);
+                    }
+                    pending.push((relative, opened));
                 } else {
-                    if !regular(&observed) {return Err(ReadError::UnsafeFile);}
-                    let file=dir.open_with(name,&read_options()).map_err(|_| ReadError::Changed)?;
-                    let opened=file.metadata().map_err(|_| ReadError::Changed)?;
-                    if !same_file(&observed,&opened) || !regular(&opened) {return Err(ReadError::Changed);}
+                    if !regular(&observed) {
+                        return Err(ReadError::UnsafeFile);
+                    }
+                    let file = dir
+                        .open_with(name, &read_options())
+                        .map_err(|_| ReadError::Changed)?;
+                    let opened = file.metadata().map_err(|_| ReadError::Changed)?;
+                    if !same_file(&observed, &opened) || !regular(&opened) {
+                        return Err(ReadError::Changed);
+                    }
                     files.push(relative);
                 }
             }
-            directories.push((path,before));
+            directories.push((path, before));
         }
         after_walk();
-        for (path,before) in directories {
-            let parts=if path.is_empty() {vec![]} else {self.allowed(&path)?};
-            let current=self.directory(&parts).map_err(|_| ReadError::Changed)?;
-            let after=current.dir_metadata().map_err(|_| ReadError::Changed)?;
-            if !same_file(&before,&after) || before.modified().ok().is_none()
-                || before.modified().ok()!=after.modified().ok() {return Err(ReadError::Changed);}
+        for (path, before) in directories {
+            let parts = if path.is_empty() {
+                vec![]
+            } else {
+                self.allowed(&path)?
+            };
+            let current = self.directory(&parts).map_err(|_| ReadError::Changed)?;
+            let after = current.dir_metadata().map_err(|_| ReadError::Changed)?;
+            if !same_file(&before, &after)
+                || before.modified().ok().is_none()
+                || before.modified().ok() != after.modified().ok()
+            {
+                return Err(ReadError::Changed);
+            }
         }
         files.sort();
-        Ok(ComparisonInventory {files,excluded_secrets})
+        Ok(ComparisonInventory {
+            files,
+            excluded_secrets,
+        })
     }
 
     /// 差分用の存在状態。拒否・競合・linkをfile不在へ変換しない。
@@ -402,17 +465,34 @@ impl WorkspaceReader {
         self.read_version_checked(path, || {})
     }
 
-    fn read_version_checked(&self, path: &str, missing_observed: impl FnOnce()) -> Result<Option<Vec<u8>>, ReadError> {
-        if self.is_missing_checked(path, missing_observed)? {return Ok(None);}
+    fn read_version_checked(
+        &self,
+        path: &str,
+        missing_observed: impl FnOnce(),
+    ) -> Result<Option<Vec<u8>>, ReadError> {
+        if self.is_missing_checked(path, missing_observed)? {
+            return Ok(None);
+        }
         self.read(path).map(Some)
     }
 
-    pub fn read_comparison_version(&self, path: &str, budget: u64) -> Result<Option<ComparedFile>, ReadError> {
-        if self.is_missing_checked(path, || {})? {return Ok(None);}
-        self.read_file_checked(path, budget.min(MAX_COMPARISON_BYTES), || {}).map(Some)
+    pub fn read_comparison_version(
+        &self,
+        path: &str,
+        budget: u64,
+    ) -> Result<Option<ComparedFile>, ReadError> {
+        if self.is_missing_checked(path, || {})? {
+            return Ok(None);
+        }
+        self.read_file_checked(path, budget.min(MAX_COMPARISON_BYTES), || {})
+            .map(Some)
     }
 
-    fn is_missing_checked(&self, path: &str, missing_observed: impl FnOnce()) -> Result<bool, ReadError> {
+    fn is_missing_checked(
+        &self,
+        path: &str,
+        missing_observed: impl FnOnce(),
+    ) -> Result<bool, ReadError> {
         let parts = self.allowed(path)?;
         let mut dir = self.root.try_clone().map_err(|_| ReadError::Unavailable)?;
         for (index, part) in parts.iter().enumerate() {
@@ -420,27 +500,43 @@ impl WorkspaceReader {
                 Ok(value) => value,
                 Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
                     missing_observed();
-                    let current = self.directory(&parts[..index]).map_err(|_| ReadError::Changed)?;
+                    let current = self
+                        .directory(&parts[..index])
+                        .map_err(|_| ReadError::Changed)?;
                     let original_metadata = dir.dir_metadata().map_err(|_| ReadError::Changed)?;
-                    let current_metadata = current.dir_metadata().map_err(|_| ReadError::Changed)?;
-                    if !same_file(&original_metadata, &current_metadata) {return Err(ReadError::Changed);}
+                    let current_metadata =
+                        current.dir_metadata().map_err(|_| ReadError::Changed)?;
+                    if !same_file(&original_metadata, &current_metadata) {
+                        return Err(ReadError::Changed);
+                    }
                     return match current.symlink_metadata(part) {
                         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(true),
                         _ => Err(ReadError::Changed),
                     };
-                },
+                }
                 Err(_) => return Err(ReadError::Unavailable),
             };
-            if reparse(&metadata) {return Err(ReadError::UnsafeFile);}
+            if reparse(&metadata) {
+                return Err(ReadError::UnsafeFile);
+            }
             if index + 1 == parts.len() {
-                if !regular(&metadata) {return Err(ReadError::UnsafeFile);}
+                if !regular(&metadata) {
+                    return Err(ReadError::UnsafeFile);
+                }
                 // 存在確認後の消失も、既存取得器の競合・取得拒否として扱う。
                 return Ok(false);
             }
-            if !metadata.is_dir() {return Err(ReadError::UnsafeFile);}
-            let next = dir.open_dir_nofollow(part).map_err(|_| ReadError::Changed)?;
+            if !metadata.is_dir() {
+                return Err(ReadError::UnsafeFile);
+            }
+            let next = dir
+                .open_dir_nofollow(part)
+                .map_err(|_| ReadError::Changed)?;
             let opened = next.dir_metadata().map_err(|_| ReadError::Unavailable)?;
-            if !opened.is_dir() || reparse(&opened) || cap_fs_ext::MetadataExt::dev(&opened) != self.root_device {
+            if !opened.is_dir()
+                || reparse(&opened)
+                || cap_fs_ext::MetadataExt::dev(&opened) != self.root_device
+            {
                 return Err(ReadError::UnsafeFile);
             }
             dir = next;
@@ -453,11 +549,18 @@ impl WorkspaceReader {
     }
 
     fn read_checked(&self, path: &str, after_open: impl FnOnce()) -> Result<Vec<u8>, ReadError> {
-        let result=self.read_file_checked(path,MAX_BYTES,after_open)?;
-        result.content.ok_or(ReadError::TooLarge(result.bytes as u64))
+        let result = self.read_file_checked(path, MAX_BYTES, after_open)?;
+        result
+            .content
+            .ok_or(ReadError::TooLarge(result.bytes as u64))
     }
 
-    fn read_file_checked(&self, path: &str, limit: u64, after_open: impl FnOnce()) -> Result<ComparedFile, ReadError> {
+    fn read_file_checked(
+        &self,
+        path: &str,
+        limit: u64,
+        after_open: impl FnOnce(),
+    ) -> Result<ComparedFile, ReadError> {
         let parts = self.allowed(path)?;
         let parent = self.directory(&parts[..parts.len() - 1])?;
         let name = parts[parts.len() - 1];
@@ -466,27 +569,37 @@ impl WorkspaceReader {
             .open_with(name, &options)
             .map_err(|_| ReadError::UnsafeFile)?;
         let before = file.metadata().map_err(|_| ReadError::Unavailable)?;
-        if !regular(&before) || cap_fs_ext::MetadataExt::dev(&before)!=self.root_device {
+        if !regular(&before) || cap_fs_ext::MetadataExt::dev(&before) != self.root_device {
             return Err(ReadError::UnsafeFile);
         }
         if before.len() > limit {
             return Err(ReadError::TooLarge(before.len()));
         }
         after_open();
-        let mut content=Some(Vec::new());
-        let mut count=0u64;
-        let mut hasher=Sha256::new();
-        let mut buffer=[0u8;65_536];
-        let mut limited=(&mut file).take(limit+1);
+        let mut content = Some(Vec::new());
+        let mut count = 0u64;
+        let mut hasher = Sha256::new();
+        let mut buffer = [0u8; 65_536];
+        let mut limited = (&mut file).take(limit + 1);
         loop {
-            let read=limited.read(&mut buffer).map_err(|_| ReadError::Unavailable)?;
-            if read==0 {break;}
-            count+=read as u64;
-            if count > limit {return Err(ReadError::TooLarge(count));}
+            let read = limited
+                .read(&mut buffer)
+                .map_err(|_| ReadError::Unavailable)?;
+            if read == 0 {
+                break;
+            }
+            count += read as u64;
+            if count > limit {
+                return Err(ReadError::TooLarge(count));
+            }
             hasher.update(&buffer[..read]);
             if count <= MAX_BYTES {
-                if let Some(bytes)=content.as_mut() {bytes.extend_from_slice(&buffer[..read]);}
-            } else {content=None;}
+                if let Some(bytes) = content.as_mut() {
+                    bytes.extend_from_slice(&buffer[..read]);
+                }
+            } else {
+                content = None;
+            }
         }
         let after = file.metadata().map_err(|_| ReadError::Unavailable)?;
         let current_parent = self.directory(&parts[..parts.len() - 1])?;
@@ -508,7 +621,11 @@ impl WorkspaceReader {
         {
             return Err(ReadError::Changed);
         }
-        Ok(ComparedFile {bytes:count as usize,sha256:format!("sha256:{}",hex::encode(hasher.finalize())),content})
+        Ok(ComparedFile {
+            bytes: count as usize,
+            sha256: format!("sha256:{}", hex::encode(hasher.finalize())),
+            content,
+        })
     }
 }
 
@@ -524,16 +641,11 @@ fn validate_secret_tree(
     let before = directory
         .dir_metadata()
         .map_err(|_| ReadError::Unavailable)?;
-    if !before.is_dir()
-        || reparse(&before)
-        || cap_fs_ext::MetadataExt::dev(&before) != root_device
+    if !before.is_dir() || reparse(&before) || cap_fs_ext::MetadataExt::dev(&before) != root_device
     {
         return Err(ReadError::UnsafeFile);
     }
-    for entry in directory
-        .entries()
-        .map_err(|_| ReadError::Unavailable)?
-    {
+    for entry in directory.entries().map_err(|_| ReadError::Unavailable)? {
         *inspected_entries = inspected_entries
             .checked_add(1)
             .ok_or(ReadError::TooManyEntries)?;
@@ -573,9 +685,7 @@ fn validate_secret_tree(
             return Err(ReadError::UnsafeFile);
         }
     }
-    let after = directory
-        .dir_metadata()
-        .map_err(|_| ReadError::Changed)?;
+    let after = directory.dir_metadata().map_err(|_| ReadError::Changed)?;
     if !same_file(&before, &after) || before.modified().ok() != after.modified().ok() {
         return Err(ReadError::Changed);
     }
@@ -612,80 +722,117 @@ mod tests {
 
     #[test]
     fn inventory_recurses_and_excludes_only_declared_secrets() {
-        let f=Fixture::new();let reader=f.reader();
+        let f = Fixture::new();
+        let reader = f.reader();
         fs::create_dir_all(f.0.join("src/deep")).unwrap();
         fs::create_dir_all(f.0.join("private-data/nested")).unwrap();
-        fs::write(f.0.join("private-data/nested/hidden"),b"secret").unwrap();
-        fs::write(f.0.join(".env"),b"secret").unwrap();
-        fs::write(f.0.join("z"),b"").unwrap();
-        fs::write(f.0.join("src/deep/a"),b"file").unwrap();
-        assert_eq!(reader.comparison_inventory(),Ok(ComparisonInventory {
-            files:vec!["src/deep/a".into(),"z".into()],excluded_secrets:2}));
-        assert_eq!(reader.inventory_checked(5,||{}),Err(ReadError::TooManyEntries));
-        assert_eq!(reader.inventory_checked(6,||{}).unwrap().files.len(),2);
-        fs::hard_link(f.0.join("z"),f.0.join("alias")).unwrap();
-        assert_eq!(reader.comparison_inventory(),Err(ReadError::UnsafeFile));
+        fs::write(f.0.join("private-data/nested/hidden"), b"secret").unwrap();
+        fs::write(f.0.join(".env"), b"secret").unwrap();
+        fs::write(f.0.join("z"), b"").unwrap();
+        fs::write(f.0.join("src/deep/a"), b"file").unwrap();
+        assert_eq!(
+            reader.comparison_inventory(),
+            Ok(ComparisonInventory {
+                files: vec!["src/deep/a".into(), "z".into()],
+                excluded_secrets: 2
+            })
+        );
+        assert_eq!(
+            reader.inventory_checked(5, || {}),
+            Err(ReadError::TooManyEntries)
+        );
+        assert_eq!(reader.inventory_checked(6, || {}).unwrap().files.len(), 2);
+        fs::hard_link(f.0.join("z"), f.0.join("alias")).unwrap();
+        assert_eq!(reader.comparison_inventory(), Err(ReadError::UnsafeFile));
     }
 
     #[test]
     fn inventory_rejects_directory_mutation_and_never_returns_partial_paths() {
-        let f=Fixture::new();let reader=f.reader();
+        let f = Fixture::new();
+        let reader = f.reader();
         fs::create_dir(f.0.join("nested")).unwrap();
-        fs::write(f.0.join("nested/old"),b"old").unwrap();
-        assert_eq!(reader.inventory_checked(MAX_INVENTORY_ENTRIES,|| {
-            fs::remove_file(f.0.join("nested/old")).unwrap();
-            fs::remove_dir(f.0.join("nested")).unwrap();
-        }),Err(ReadError::Changed));
+        fs::write(f.0.join("nested/old"), b"old").unwrap();
+        assert_eq!(
+            reader.inventory_checked(MAX_INVENTORY_ENTRIES, || {
+                fs::remove_file(f.0.join("nested/old")).unwrap();
+                fs::remove_dir(f.0.join("nested")).unwrap();
+            }),
+            Err(ReadError::Changed)
+        );
     }
 
     #[cfg(unix)]
     #[test]
     fn inventory_rejects_invalid_names_instead_of_omitting_them() {
-        let f=Fixture::new();let reader=f.reader();
-        fs::write(f.0.join("bad:name"),b"").unwrap();
-        assert_eq!(reader.comparison_inventory(),Err(ReadError::InvalidPath));
+        let f = Fixture::new();
+        let reader = f.reader();
+        fs::write(f.0.join("bad:name"), b"").unwrap();
+        assert_eq!(reader.comparison_inventory(), Err(ReadError::InvalidPath));
     }
 
     #[test]
     fn comparison_hashes_all_bytes_without_retaining_large_content() {
-        let f=Fixture::new();let reader=f.reader();
-        let bytes=vec![b'x';65_537];fs::write(f.0.join("large"),&bytes).unwrap();
-        let value=reader.read_comparison_version("large",MAX_COMPARISON_BYTES).unwrap().unwrap();
-        assert_eq!(value.bytes,bytes.len());assert_eq!(value.sha256,crate::audit_hash::sha256_tagged(&bytes));
+        let f = Fixture::new();
+        let reader = f.reader();
+        let bytes = vec![b'x'; 65_537];
+        fs::write(f.0.join("large"), &bytes).unwrap();
+        let value = reader
+            .read_comparison_version("large", MAX_COMPARISON_BYTES)
+            .unwrap()
+            .unwrap();
+        assert_eq!(value.bytes, bytes.len());
+        assert_eq!(value.sha256, crate::audit_hash::sha256_tagged(&bytes));
         assert!(value.content.is_none());
-        assert_eq!(reader.read("large"),Err(ReadError::TooLarge(65_537)));
-        assert!(matches!(reader.read_comparison_version("large",65_536),Err(ReadError::TooLarge(65_537))));
-        fs::write(f.0.join("empty"),b"").unwrap();
-        let empty=reader.read_comparison_version("empty",0).unwrap().unwrap();
-        assert_eq!(empty.content,Some(vec![]));assert_eq!(empty.sha256,crate::audit_hash::sha256_tagged(b""));
-        assert!(reader.read_comparison_version("missing",0).unwrap().is_none());
+        assert_eq!(reader.read("large"), Err(ReadError::TooLarge(65_537)));
+        assert!(matches!(
+            reader.read_comparison_version("large", 65_536),
+            Err(ReadError::TooLarge(65_537))
+        ));
+        fs::write(f.0.join("empty"), b"").unwrap();
+        let empty = reader.read_comparison_version("empty", 0).unwrap().unwrap();
+        assert_eq!(empty.content, Some(vec![]));
+        assert_eq!(empty.sha256, crate::audit_hash::sha256_tagged(b""));
+        assert!(reader
+            .read_comparison_version("missing", 0)
+            .unwrap()
+            .is_none());
     }
 
     #[test]
     fn comparison_rejects_growth_and_truncation_without_partial_hash() {
-        let f=Fixture::new();let reader=f.reader();
-        fs::write(f.0.join("file"),vec![b'a';65_537]).unwrap();
-        assert!(matches!(reader.read_file_checked("file",MAX_COMPARISON_BYTES, || {
-            fs::write(f.0.join("file"),vec![b'b';65_538]).unwrap();
-        }),Err(ReadError::Changed)));
-        assert!(matches!(reader.read_file_checked("file",MAX_COMPARISON_BYTES, || {
-            fs::write(f.0.join("file"),b"short").unwrap();
-        }),Err(ReadError::Changed)));
+        let f = Fixture::new();
+        let reader = f.reader();
+        fs::write(f.0.join("file"), vec![b'a'; 65_537]).unwrap();
+        assert!(matches!(
+            reader.read_file_checked("file", MAX_COMPARISON_BYTES, || {
+                fs::write(f.0.join("file"), vec![b'b'; 65_538]).unwrap();
+            }),
+            Err(ReadError::Changed)
+        ));
+        assert!(matches!(
+            reader.read_file_checked("file", MAX_COMPARISON_BYTES, || {
+                fs::write(f.0.join("file"), b"short").unwrap();
+            }),
+            Err(ReadError::Changed)
+        ));
     }
 
     #[test]
     fn absence_recheck_rejects_created_file_and_replaced_parent() {
-        let f=Fixture::new();
+        let f = Fixture::new();
         fs::create_dir(f.0.join("parent")).unwrap();
-        let reader=f.reader();
-        assert_eq!(reader.read_version_checked("parent/file", || {
-            fs::write(f.0.join("parent/file"),b"appeared").unwrap();
-        }),Err(ReadError::Changed));
+        let reader = f.reader();
+        assert_eq!(
+            reader.read_version_checked("parent/file", || {
+                fs::write(f.0.join("parent/file"), b"appeared").unwrap();
+            }),
+            Err(ReadError::Changed)
+        );
         fs::remove_file(f.0.join("parent/file")).unwrap();
-        let replaced=reader.read_version_checked("parent/file", || {
-            let rename=fs::rename(f.0.join("parent"),f.0.join("old-parent"));
+        let replaced = reader.read_version_checked("parent/file", || {
+            let rename = fs::rename(f.0.join("parent"), f.0.join("old-parent"));
             #[cfg(windows)]
-            assert_eq!(rename.unwrap_err().raw_os_error(),Some(32));
+            assert_eq!(rename.unwrap_err().raw_os_error(), Some(32));
             #[cfg(not(windows))]
             {
                 rename.unwrap();
@@ -693,10 +840,10 @@ mod tests {
             }
         });
         #[cfg(windows)]
-        assert_eq!(replaced,Ok(None)); // 開いたdirectoryの改名自体をOSが拒否する。
+        assert_eq!(replaced, Ok(None)); // 開いたdirectoryの改名自体をOSが拒否する。
         #[cfg(not(windows))]
-        assert_eq!(replaced,Err(ReadError::Changed));
-        assert_eq!(reader.read_version("parent/file"),Ok(None));
+        assert_eq!(replaced, Err(ReadError::Changed));
+        assert_eq!(reader.read_version("parent/file"), Ok(None));
     }
 
     #[test]
@@ -774,13 +921,18 @@ mod tests {
     fn registered_secret_file_or_tree_with_hardlink_alias_is_rejected() {
         let file_fixture = Fixture::new();
         fs::create_dir(file_fixture.0.join("private")).unwrap();
-        fs::write(file_fixture.0.join("private/secret.txt"), b"synthetic secret").unwrap();
+        fs::write(
+            file_fixture.0.join("private/secret.txt"),
+            b"synthetic secret",
+        )
+        .unwrap();
         fs::hard_link(
             file_fixture.0.join("private/secret.txt"),
             file_fixture.0.join("public-alias.txt"),
         )
         .unwrap();
-        let file_root = Dir::open_ambient_dir(&file_fixture.0, cap_std::ambient_authority()).unwrap();
+        let file_root =
+            Dir::open_ambient_dir(&file_fixture.0, cap_std::ambient_authority()).unwrap();
         assert!(matches!(
             WorkspaceReader::from_registered_dir(file_root, &["private/secret.txt".into()]),
             Err(ReadError::UnsafeFile)
@@ -788,14 +940,18 @@ mod tests {
 
         let tree_fixture = Fixture::new();
         fs::create_dir_all(tree_fixture.0.join("private/secrets/nested")).unwrap();
-        fs::write(tree_fixture.0.join("private/secrets/nested/token"), b"synthetic secret")
-            .unwrap();
+        fs::write(
+            tree_fixture.0.join("private/secrets/nested/token"),
+            b"synthetic secret",
+        )
+        .unwrap();
         fs::hard_link(
             tree_fixture.0.join("private/secrets/nested/token"),
             tree_fixture.0.join("public-alias.txt"),
         )
         .unwrap();
-        let tree_root = Dir::open_ambient_dir(&tree_fixture.0, cap_std::ambient_authority()).unwrap();
+        let tree_root =
+            Dir::open_ambient_dir(&tree_fixture.0, cap_std::ambient_authority()).unwrap();
         assert!(matches!(
             WorkspaceReader::from_registered_dir(tree_root, &["private/secrets".into()]),
             Err(ReadError::UnsafeFile)
@@ -806,11 +962,10 @@ mod tests {
     fn missing_registered_secret_path_remains_valid() {
         let fixture = Fixture::new();
         let root = Dir::open_ambient_dir(&fixture.0, cap_std::ambient_authority()).unwrap();
-        assert!(WorkspaceReader::from_registered_dir(
-            root,
-            &["future/private/secret.txt".into()]
-        )
-        .is_ok());
+        assert!(
+            WorkspaceReader::from_registered_dir(root, &["future/private/secret.txt".into()])
+                .is_ok()
+        );
     }
 
     #[test]
@@ -842,6 +997,9 @@ mod tests {
             fs::write(f.0.join(format!("file-{i}")), b"").unwrap();
         }
         assert_eq!(reader.list(""), Err(ReadError::TooManyEntries));
-        assert_eq!(reader.comparison_inventory(),Err(ReadError::TooManyEntries));
+        assert_eq!(
+            reader.comparison_inventory(),
+            Err(ReadError::TooManyEntries)
+        );
     }
 }

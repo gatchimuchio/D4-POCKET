@@ -756,7 +756,8 @@ mod tests {
             std::process::id()
         ));
         let _ = std::fs::remove_dir_all(&store);
-        let mut broker = Broker::new_persistent("host-switch-negative", &store).expect("永続Broker");
+        let mut broker =
+            Broker::new_persistent("host-switch-negative", &store).expect("永続Broker");
         let unknown = switch(
             &mut broker,
             "host-switch-unknown",
@@ -778,8 +779,10 @@ mod tests {
             std::process::id()
         ));
         let _ = std::fs::remove_dir_all(&store);
-        let mut broker = Broker::new_persistent("host-switch-positive", &store).expect("永続Broker");
-        for (request_id, host_id) in [("host-register-a", "host-a"), ("host-register-b", "host-b")] {
+        let mut broker =
+            Broker::new_persistent("host-switch-positive", &store).expect("永続Broker");
+        for (request_id, host_id) in [("host-register-a", "host-a"), ("host-register-b", "host-b")]
+        {
             let response = register(
                 &mut broker,
                 request_id,
@@ -809,7 +812,10 @@ mod tests {
             assert_eq!(body["権限生成"], "なし");
             assert_eq!(body["authority_strip"], true);
             assert_eq!(body["承認状態"], "not_reused");
-            assert_eq!(body["再利用禁止"], json!(["Permission", "Approval", "Authority"]));
+            assert_eq!(
+                body["再利用禁止"],
+                json!(["Permission", "Approval", "Authority"])
+            );
         }
         let _ = std::fs::remove_dir_all(store);
     }

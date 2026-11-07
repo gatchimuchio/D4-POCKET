@@ -98,6 +98,7 @@ class _McpTransport implements BrokerTransport {
   String listedEvidence = 'INTERNAL_STATE';
   String executionState = 'ready';
   String displayName = 'fixture server';
+  Map<String, Object?>? agentResultContextOverride;
   final toolMetadata = <String, Object?>{
     'tool_id': 'tool-${List<String>.filled(142, "a").join()}',
     'name': 'tool-fixture',
@@ -210,6 +211,11 @@ class _McpTransport implements BrokerTransport {
           '版': 1,
           'MCP接続一覧': connections,
           '件数': connections.length,
+          'Agent能力hash': connections.isEmpty
+              ? null
+              : 'sha256:${List<String>.filled(64, 'f').join()}',
+          'Agent能力件数': connections.isEmpty ? 0 : 1,
+          'Agent能力状態': connections.isEmpty ? 'unsupported' : 'available',
           '公開範囲': 'metadata_only',
           '証拠種別': 'INTERNAL_STATE',
         },
@@ -271,6 +277,18 @@ class _McpTransport implements BrokerTransport {
           '公開範囲': 'hash_only',
           '証拠種別': 'LIVE_RUNTIME',
           '監査ID': 'audit-mcp-tool-call',
+          if (payload.containsKey('source_agent_task_id') ||
+              agentResultContextOverride != null)
+            'Agent結果context': agentResultContextOverride ??
+                {
+                  '状態': 'available',
+                  'result_id':
+                      'mcp-agent-result-${List<String>.filled(32, 'c').join()}',
+                  'context_hash':
+                      'sha256:${List<String>.filled(64, 'd').join()}',
+                  'tool_result_hash':
+                      'sha256:${List<String>.filled(64, 'b').join()}',
+                },
         },
       };
     }
@@ -595,6 +613,22 @@ void main() {
     );
   });
 
+  test('Agent能力hashは現在の接続済みToolがある場合だけ返す', () async {
+    final transport = _McpTransport();
+    final hash =
+        await McpConnectionClient(transport).agentCapabilitySnapshotHash();
+
+    expect(hash, 'sha256:${List<String>.filled(64, 'f').join()}');
+    expect(transport.operations, ['MCP接続一覧']);
+
+    final unavailable = _McpTransport()..connected = false;
+    await expectLater(
+      McpConnectionClient(unavailable).agentCapabilitySnapshotHash(),
+      throwsA(isA<BrokerClientException>()),
+    );
+    expect(unavailable.operations, ['MCP接続一覧']);
+  });
+
   test('MCP clientはnative確認後のTool receiptをhash-onlyで検証する', () async {
     final transport = _McpTransport();
     final client = McpConnectionClient(transport);
@@ -619,6 +653,82 @@ void main() {
       '名前': 'tool-fixture',
       'arguments': {'query': 'needle'},
     });
+  });
+
+  test('Agent連続Tool receiptは元Taskとresult context hashを束縛し本文を返さない', () async {
+    final transport = _McpTransport();
+    final client = McpConnectionClient(transport);
+    final receipt = await client.callTool(
+      serverId: 'mcp-fixture',
+      tool: McpToolSummary(
+        toolId: transport.toolMetadata['tool_id']! as String,
+        name: transport.toolMetadata['name']! as String,
+        inputSchemaHash: transport.toolMetadata['input_schema_hash']! as String,
+      ),
+      arguments: const {'query': 'needle'},
+      sourceAgentTaskId: 'task-source-123',
+      sourceAgentResultHash: 'sha256:${List<String>.filled(64, 'e').join()}',
+    );
+
+    expect(receipt.agentResultContext?.status, 'available');
+    expect(receipt.agentResultContext?.resultId,
+        'mcp-agent-result-${List<String>.filled(32, 'c').join()}');
+    expect(receipt.agentResultContext?.contextHash,
+        'sha256:${List<String>.filled(64, 'd').join()}');
+    expect(receipt.agentResultContext?.toolResultHash, receipt.resultHash);
+    expect(
+        transport.payloads.single?['source_agent_task_id'], 'task-source-123');
+    expect(transport.payloads.single?['source_agent_result_hash'],
+        'sha256:${List<String>.filled(64, 'e').join()}');
+    expect(
+        transport.payloads.toString(), isNot(contains('SECRET_RESULT_MARKER')));
+  });
+
+  test('Agent連続Tool receiptは不正context・出自なしcontextを拒否する', () async {
+    final transport = _McpTransport()
+      ..agentResultContextOverride = {
+        '状態': 'available',
+        'result_id': 'mcp-agent-result-invalid',
+        'context_hash': 'not-a-hash',
+        'tool_result_hash': 'sha256:${List<String>.filled(64, 'b').join()}',
+      };
+    final client = McpConnectionClient(transport);
+    await expectLater(
+      client.callTool(
+        serverId: 'mcp-fixture',
+        tool: McpToolSummary(
+          toolId: transport.toolMetadata['tool_id']! as String,
+          name: transport.toolMetadata['name']! as String,
+          inputSchemaHash:
+              transport.toolMetadata['input_schema_hash']! as String,
+        ),
+        arguments: const {'query': 'needle'},
+        sourceAgentTaskId: 'task-source-123',
+        sourceAgentResultHash: 'sha256:${List<String>.filled(64, 'e').join()}',
+      ),
+      throwsA(isA<BrokerClientException>()),
+    );
+
+    final contextWithoutSource = _McpTransport()
+      ..agentResultContextOverride = {
+        '状態': 'available',
+        'result_id': 'mcp-agent-result-${List<String>.filled(32, 'c').join()}',
+        'context_hash': 'sha256:${List<String>.filled(64, 'd').join()}',
+        'tool_result_hash': 'sha256:${List<String>.filled(64, 'b').join()}',
+      };
+    await expectLater(
+      McpConnectionClient(contextWithoutSource).callTool(
+        serverId: 'mcp-fixture',
+        tool: McpToolSummary(
+          toolId: contextWithoutSource.toolMetadata['tool_id']! as String,
+          name: contextWithoutSource.toolMetadata['name']! as String,
+          inputSchemaHash:
+              contextWithoutSource.toolMetadata['input_schema_hash']! as String,
+        ),
+        arguments: const {'query': 'needle'},
+      ),
+      throwsA(isA<BrokerClientException>()),
+    );
   });
 
   testWidgets('Desktop panelは一覧後にOwner確認付きBroker接続と切断を要求する', (tester) async {

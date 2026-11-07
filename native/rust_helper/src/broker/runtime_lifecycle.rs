@@ -609,7 +609,7 @@ impl RuntimeLifecycleRegistry {
             execution_payload_hash,
             now_epoch_seconds,
         )
-            .map(|_| ())
+        .map(|_| ())
     }
 
     /// Broker直列処理中に、adapter呼出しの直前で全統治条件を再照合する。
@@ -899,9 +899,7 @@ fn canonical_execution_payload_hash(
         "操作": action.as_str(),
         "承認ID": approval_id,
     });
-    sha256_tagged(
-        &serde_json::to_vec(&payload).unwrap_or_else(|_| b"null".to_vec()),
-    )
+    sha256_tagged(&serde_json::to_vec(&payload).unwrap_or_else(|_| b"null".to_vec()))
 }
 
 fn approval_projection(approval: &LifecycleApproval, governance: &LifecycleGovernance) -> Value {
@@ -1314,11 +1312,7 @@ mod tests {
     }
 
     fn execution_hash(action: LifecycleAction, approval: &Value) -> String {
-        canonical_execution_payload_hash(
-            approval["承認ID"].as_str().unwrap(),
-            "fixture",
-            action,
-        )
+        canonical_execution_payload_hash(approval["承認ID"].as_str().unwrap(), "fixture", action)
     }
 
     #[test]
@@ -1433,8 +1427,14 @@ mod tests {
         let mut registry = RuntimeLifecycleRegistry::with_terminal_quarantines(restored);
         let unregistered_status = registry.status_body("fixture", 100).unwrap();
         assert_eq!(unregistered_status["状態"], "quarantined");
-        assert!(unregistered_status["操作一覧"].as_array().unwrap().is_empty());
-        assert!(unregistered_status["承認一覧"].as_array().unwrap().is_empty());
+        assert!(unregistered_status["操作一覧"]
+            .as_array()
+            .unwrap()
+            .is_empty());
+        assert!(unregistered_status["承認一覧"]
+            .as_array()
+            .unwrap()
+            .is_empty());
         registry
             .register_trusted(
                 "fixture",

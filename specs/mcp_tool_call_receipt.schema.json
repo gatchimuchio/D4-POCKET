@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/gui-shell/schemas/mcp_tool_call_receipt.schema.json",
   "title": "MCP Tool実行receipt（McpToolCallReceipt）",
-  "description": "LIVE_RUNTIME実行結果の存在とhashだけを返し、Tool結果本文を返さない。",
+  "description": "LIVE_RUNTIME実行結果のhashだけを返す。Agent連続用のTool本文はBroker内で期限付き・一回限り保持し、opaque参照だけを返す。",
   "type": "object",
   "required": [
     "版", "契約種別", "ServerID", "ToolID", "名前", "arguments_hash", "result_hash",
@@ -34,6 +34,33 @@
     "権限生成": { "const": "Broker内一回限りPermissionを消費" },
     "公開範囲": { "const": "hash_only" },
     "証拠種別": { "const": "LIVE_RUNTIME" },
-    "監査ID": { "type": "string", "minLength": 1 }
+    "監査ID": { "type": "string", "minLength": 1 },
+    "Agent結果context": {
+      "type": "object",
+      "required": ["状態", "result_id", "context_hash", "tool_result_hash"],
+      "additionalProperties": false,
+      "properties": {
+        "状態": { "enum": ["available", "unsupported", "unavailable"] },
+        "result_id": {
+          "type": ["string", "null"],
+          "pattern": "^mcp-agent-result-[a-f0-9]{32}$"
+        },
+        "context_hash": {
+          "type": ["string", "null"],
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "tool_result_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "状態": { "const": "available" } }, "required": ["状態"] },
+          "then": { "properties": { "result_id": { "type": "string" }, "context_hash": { "type": "string" } } }
+        },
+        {
+          "if": { "properties": { "状態": { "enum": ["unsupported", "unavailable"] } }, "required": ["状態"] },
+          "then": { "properties": { "result_id": { "type": "null" }, "context_hash": { "type": "null" } } }
+        }
+      ]
+    }
   }
 }

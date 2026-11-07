@@ -28,19 +28,7 @@ impl std::fmt::Debug for SupervisedChild {
 pub(super) fn spawn(command: Command) -> io::Result<SupervisedChild> {
     #[cfg(windows)]
     {
-        use std::os::windows::{io::AsRawHandle, process::CommandExt};
-
-        let mut command = command;
-        let job = gui_shell_process_supervision::Job::create()?;
-        command.creation_flags(gui_shell_process_supervision::CREATE_SUSPENDED);
-        let mut child = command.spawn()?;
-        if let Err(error) = job.assign_and_resume(child.id(), child.as_raw_handle()) {
-            let _ = job.terminate_and_wait();
-            let _ = child.kill();
-            let _ = child.wait();
-            return Err(error);
-        }
-        Ok(SupervisedChild { child, job })
+        spawn_windows(command, 0)
     }
     #[cfg(target_os = "macos")]
     {
@@ -71,6 +59,39 @@ pub(super) fn spawn(command: Command) -> io::Result<SupervisedChild> {
     #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
     {
         command.spawn().map(|child| SupervisedChild { child })
+    }
+}
+
+/// stdio接続専用のchildを、Windowsではconsole windowなしで監督下に起動する。
+pub(super) fn spawn_non_interactive(command: Command) -> io::Result<SupervisedChild> {
+    #[cfg(windows)]
+    {
+        spawn_windows(command, gui_shell_process_supervision::CREATE_NO_WINDOW)
+    }
+    #[cfg(not(windows))]
+    {
+        spawn(command)
+    }
+}
+
+#[cfg(windows)]
+fn spawn_windows(command: Command, additional_creation_flags: u32) -> io::Result<SupervisedChild> {
+    {
+        use std::os::windows::{io::AsRawHandle, process::CommandExt};
+
+        let mut command = command;
+        let job = gui_shell_process_supervision::Job::create()?;
+        command.creation_flags(
+            gui_shell_process_supervision::CREATE_SUSPENDED | additional_creation_flags,
+        );
+        let mut child = command.spawn()?;
+        if let Err(error) = job.assign_and_resume(child.id(), child.as_raw_handle()) {
+            let _ = job.terminate_and_wait();
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(error);
+        }
+        Ok(SupervisedChild { child, job })
     }
 }
 
@@ -464,11 +485,48 @@ mod unix_tests {
 mod tests {
     use super::*;
     use std::fs;
+    use std::io::Read;
     use std::process::Stdio;
     use std::thread;
     use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
     const READY_MARKER: &str = "GUI_SHELL_SUPERVISED_CHILD_READY";
+
+    #[test]
+    fn non_interactive_child_has_no_console_and_keeps_stdio() {
+        let system_root = std::env::var_os("SystemRoot").expect("Windows SystemRoot");
+        let powershell = std::path::PathBuf::from(system_root)
+            .join("System32")
+            .join("WindowsPowerShell")
+            .join("v1.0")
+            .join("powershell.exe");
+        let script = "Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class D4ConsoleProbe { [DllImport(\"kernel32.dll\")] public static extern IntPtr GetConsoleWindow(); }'; [Console]::WriteLine([D4ConsoleProbe]::GetConsoleWindow().ToInt64())";
+        let mut command = Command::new(powershell);
+        command
+            .args([
+                "-NoLogo",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                script,
+            ])
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null());
+        let mut child = spawn_non_interactive(command).expect("consoleなしstdio child");
+        let mut output = String::new();
+        child
+            .child
+            .stdout
+            .take()
+            .expect("stdout pipe")
+            .read_to_string(&mut output)
+            .expect("console handleを読む");
+        let status = child.child.wait().expect("PowerShell終了");
+        child.stop_descendants().expect("監督Jobを閉じる");
+        assert!(status.success(), "PowerShell失敗: {output}");
+        assert_eq!(output.trim(), "0", "childにconsole windowが割り当てられた");
+    }
 
     #[test]
     fn cancellation_terminates_the_supervised_child() {

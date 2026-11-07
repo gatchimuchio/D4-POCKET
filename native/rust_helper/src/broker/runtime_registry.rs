@@ -117,7 +117,11 @@ impl RuntimeResourceRegistry {
             return Ok(unknown_observation(runtime_id, entry, observed_at_millis));
         };
         let Some(expected_creation) = entry.binding.creation_time_100ns else {
-            invalidate_binding(entry, "binding_mismatch", "PID作成時刻の結合情報が欠落しています");
+            invalidate_binding(
+                entry,
+                "binding_mismatch",
+                "PID作成時刻の結合情報が欠落しています",
+            );
             return Ok(unknown_observation(runtime_id, entry, observed_at_millis));
         };
 
@@ -200,25 +204,25 @@ fn bind_at_registration(target: Option<SocketAddr>) -> RuntimeBinding {
         if *target.ip() != Ipv4Addr::LOCALHOST || target.port() == 0 {
             return unbound("アダプター観測対象が明示IPv4 loopbackではありません");
         }
-        let (second_pid, second_sample) = match verify_registration_binding(
-            || listener_owner_pid(target),
-            capture_process,
-        ) {
-            Ok(binding) => binding,
-            Err(RegistrationBindingError::Unbound(reason)) => return unbound(reason),
-            Err(RegistrationBindingError::Exited(reason)) => {
-                return RuntimeBinding {
-                    status: "exited",
-                    basis: "loopback_tcp_listener_owner_pid",
-                    target: None,
-                    pid: None,
-                    creation_time_100ns: None,
-                    creation_time_unix_millis: None,
-                    reason: Some(reason),
+        let (second_pid, second_sample) =
+            match verify_registration_binding(|| listener_owner_pid(target), capture_process) {
+                Ok(binding) => binding,
+                Err(RegistrationBindingError::Unbound(reason)) => return unbound(reason),
+                Err(RegistrationBindingError::Exited(reason)) => {
+                    return RuntimeBinding {
+                        status: "exited",
+                        basis: "loopback_tcp_listener_owner_pid",
+                        target: None,
+                        pid: None,
+                        creation_time_100ns: None,
+                        creation_time_unix_millis: None,
+                        reason: Some(reason),
+                    }
                 }
-            }
-        };
-        let Some(creation_time_unix_millis) = filetime_to_unix_millis(second_sample.creation_time_100ns) else {
+            };
+        let Some(creation_time_unix_millis) =
+            filetime_to_unix_millis(second_sample.creation_time_100ns)
+        else {
             return unbound("process作成時刻をUnix時刻へ安全に変換できませんでした");
         };
         return RuntimeBinding {
@@ -248,8 +252,7 @@ fn bind_at_registration(target: Option<SocketAddr>) -> RuntimeBinding {
 
 #[cfg(windows)]
 fn listener_owner_pid(target: SocketAddrV4) -> Result<Option<u32>, ()> {
-    gui_shell_windows_runtime_observation::loopback_tcp_listener_owner_pid(target)
-        .map_err(|_| ())
+    gui_shell_windows_runtime_observation::loopback_tcp_listener_owner_pid(target).map_err(|_| ())
 }
 
 enum RegistrationBindingError {
@@ -346,10 +349,9 @@ fn capture_current_binding(
     expected_pid: u32,
     expected_creation: u64,
 ) -> Result<ProcessSample, CurrentBindingError> {
-    let target = entry
-        .binding
-        .target
-        .ok_or(CurrentBindingError::Mismatch("登録済みloopback endpointが欠落しています"))?;
+    let target = entry.binding.target.ok_or(CurrentBindingError::Mismatch(
+        "登録済みloopback endpointが欠落しています",
+    ))?;
     verify_current_binding_sample(
         expected_pid,
         expected_creation,
@@ -376,9 +378,8 @@ where
             "登録済みloopback endpointの所有processが一致しません",
         ));
     }
-    let first_sample = process_sample(expected_pid).map_err(|_| {
-        CurrentBindingError::Exited("登録済みprocessを再確認できません")
-    })?;
+    let first_sample = process_sample(expected_pid)
+        .map_err(|_| CurrentBindingError::Exited("登録済みprocessを再確認できません"))?;
     if first_sample.creation_time_100ns != expected_creation {
         return Err(CurrentBindingError::Mismatch(
             "PID再利用またはprocess生成時刻の不一致を検出しました",
@@ -452,7 +453,10 @@ fn unknown_observation(
     entry: &RuntimeRegistration,
     observed_at_millis: i64,
 ) -> RuntimeResourceObservation {
-    let reason = entry.binding.reason.unwrap_or("実行系processの結合を確認できませんでした");
+    let reason = entry
+        .binding
+        .reason
+        .unwrap_or("実行系processの結合を確認できませんでした");
     RuntimeResourceObservation {
         body: json!({
             "版": 1,
@@ -532,10 +536,16 @@ fn all_unknown_metrics(reason: &'static str) -> Value {
 
 fn error_rate_metric(stats: 実行系資源統計) -> Value {
     if stats.完了要求数 == 0 {
-        return unknown("INTERNAL_STATE", "完了した対話記録がないためエラー率を測定できません");
+        return unknown(
+            "INTERNAL_STATE",
+            "完了した対話記録がないためエラー率を測定できません",
+        );
     }
     if stats.失敗要求数 > stats.完了要求数 {
-        return unknown("INTERNAL_STATE", "完了要求数と失敗要求数の統計が矛盾しています");
+        return unknown(
+            "INTERNAL_STATE",
+            "完了要求数と失敗要求数の統計が矛盾しています",
+        );
     }
     if stats.完了要求数 > MAX_EXACT_INTEGER || stats.失敗要求数 > MAX_EXACT_INTEGER {
         return unknown("INTERNAL_STATE", "エラー率を安全な精度で計算できません");
@@ -586,9 +596,8 @@ fn cpu_percent_from_raw(
         return None;
     }
     let delta_cpu_100ns = current_cpu_100ns - previous_cpu_100ns;
-    let percent = (delta_cpu_100ns as f64) * 100.0
-        / (elapsed_100ns as f64)
-        / (logical_processors as f64);
+    let percent =
+        (delta_cpu_100ns as f64) * 100.0 / (elapsed_100ns as f64) / (logical_processors as f64);
     if !percent.is_finite() || !(0.0..=100.0).contains(&percent) {
         return None;
     }
@@ -665,8 +674,12 @@ mod tests {
     fn 返却sampleの後にendpoint所有者が変化した場合は観測を拒否する() {
         let expected_pid = 4242;
         let expected_creation = WINDOWS_UNIX_EPOCH_OFFSET_100NS + 10_000;
-        let mut owners = vec![Ok(Some(expected_pid)), Ok(Some(expected_pid)), Ok(Some(9999))]
-            .into_iter();
+        let mut owners = vec![
+            Ok(Some(expected_pid)),
+            Ok(Some(expected_pid)),
+            Ok(Some(9999)),
+        ]
+        .into_iter();
         let mut sampled = 0;
         let result = verify_current_binding_sample(
             expected_pid,
@@ -757,9 +770,11 @@ mod tests {
         assert!(observation.body["結合"]["PID作成時刻UnixMillis"].is_null());
         assert!(entry.binding.target.is_none());
         assert_eq!(observation.body["短期履歴"], json!([]));
-        assert!(observation.body["計測"].as_object().unwrap().values().all(|metric| {
-            metric["状態"] == "unknown" && metric["値"].is_null()
-        }));
+        assert!(observation.body["計測"]
+            .as_object()
+            .unwrap()
+            .values()
+            .all(|metric| { metric["状態"] == "unknown" && metric["値"].is_null() }));
     }
 
     #[test]

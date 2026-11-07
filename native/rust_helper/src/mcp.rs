@@ -9,6 +9,7 @@ use crate::audit_hash::sha256_tagged;
 use serde_json::{json, Map, Value};
 use std::collections::BTreeSet;
 use std::fmt;
+use zeroize::Zeroizing;
 
 pub const MODERN_PROTOCOL_VERSION: &str = "2026-07-28";
 pub const LEGACY_PROTOCOL_VERSION: &str = "2025-11-25";
@@ -21,6 +22,8 @@ const MAX_TOOL_SCHEMA_DEPTH: usize = 64;
 const MAX_TOOL_ARGUMENT_BYTES: usize = 32 * 1024;
 const MAX_TOOL_ARGUMENT_NODES: usize = 2048;
 const MAX_TOOL_ARGUMENT_DEPTH: usize = 32;
+const MAX_TOOL_DESCRIPTION_BYTES: usize = 4 * 1024;
+pub const MAX_AGENT_TOOL_RESULT_TEXT_BYTES: usize = 32 * 1024;
 #[cfg(test)]
 const MCP_JSON_SCHEMA_DIALECT: &str = "https://json-schema.org/draft/2020-12/schema";
 
@@ -439,6 +442,7 @@ fn parse_server_info(value: Option<&Value>) -> Result<(Option<String>, Option<St
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct McpTool {
     pub name: String,
+    pub description: String,
     pub tool_id: String,
     pub input_schema_hash: String,
     input_schema: Value,
@@ -473,7 +477,28 @@ pub struct McpToolCallSummary {
     pub content_types: Vec<String>,
 }
 
+/// Broker-internal result data. `text_content` is never serialized into an IPC receipt.
+pub struct McpToolCallOutput {
+    pub summary: McpToolCallSummary,
+    pub text_content: Option<Zeroizing<String>>,
+}
+
 impl McpCatalog {
+    pub fn agent_capability_projection(&self, server_id: &str) -> Vec<Value> {
+        self.tools
+            .iter()
+            .map(|tool| {
+                json!({
+                    "server_id": server_id,
+                    "tool_id": tool.tool_id,
+                    "name": tool.name,
+                    "description": tool.description,
+                    "input_schema": tool.input_schema,
+                })
+            })
+            .collect()
+    }
+
     pub fn to_metadata_projection(
         &self,
         server_id: &str,
@@ -678,12 +703,30 @@ pub fn parse_tools_response(message: &McpJsonRpcMessage) -> Result<Vec<McpTool>,
             McpError::new("mcp_tool_schema_invalid", "MCP Tool inputSchemaがない")
         })?;
         validate_tool_input_schema(input_schema)?;
+        let description = match object.get("description") {
+            None => String::new(),
+            Some(Value::String(value))
+                if value.as_bytes().len() <= MAX_TOOL_DESCRIPTION_BYTES
+                    && !value.chars().any(|character| {
+                        character.is_control() && !matches!(character, '\n' | '\t')
+                    }) =>
+            {
+                value.clone()
+            }
+            Some(_) => {
+                return Err(McpError::new(
+                    "mcp_tool_description_invalid",
+                    "MCP Tool descriptionが不正または上限超過",
+                ));
+            }
+        };
         let tool_id = format!(
             "tool-{}",
             hex::encode(sha256_tagged(name.as_bytes()).as_bytes())
         );
         tools.push(McpTool {
             name: name.to_string(),
+            description,
             tool_id,
             input_schema_hash: hash_value(input_schema)?,
             input_schema: input_schema.clone(),
@@ -844,6 +887,58 @@ pub fn summarize_tool_call_result(
         result_hash,
         is_error: result.get("isError") == Some(&Value::Bool(true)),
         content_types,
+    })
+}
+
+pub fn inspect_tool_call_output(
+    message: &McpJsonRpcMessage,
+) -> Result<McpToolCallOutput, McpError> {
+    let summary = summarize_tool_call_result(message)?;
+    let result = message
+        .result
+        .as_ref()
+        .and_then(Value::as_object)
+        .expect("summary validation checked result object");
+    let text_content = if summary.is_error || result.contains_key("structuredContent") {
+        None
+    } else {
+        let blocks = result
+            .get("content")
+            .and_then(Value::as_array)
+            .expect("summary validation checked content array");
+        if blocks.iter().all(|block| {
+            block.as_object().and_then(|object| object.get("type"))
+                == Some(&Value::String("text".to_string()))
+        }) {
+            let mut text = Zeroizing::new(String::new());
+            for block in blocks {
+                let content = block
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .expect("summary validation checked text block");
+                if !text.is_empty() {
+                    text.push('\n');
+                }
+                text.push_str(content);
+                if text.as_bytes().len() > MAX_AGENT_TOOL_RESULT_TEXT_BYTES {
+                    return Ok(McpToolCallOutput {
+                        summary,
+                        text_content: None,
+                    });
+                }
+            }
+            if text.is_empty() {
+                None
+            } else {
+                Some(text)
+            }
+        } else {
+            None
+        }
+    };
+    Ok(McpToolCallOutput {
+        summary,
+        text_content,
     })
 }
 
@@ -1537,6 +1632,102 @@ mod tests {
         assert!(!serde_json::to_string(&summary)
             .expect("要約JSON")
             .contains("SENSITIVE_OUTPUT_MARKER"));
+    }
+
+    #[test]
+    fn agent_capability_projection_contains_validated_description_and_schema_as_untrusted_metadata()
+    {
+        let catalog = catalog_with_tools(json!({"tools": [{
+            "name": "lookup",
+            "description": "Find a public record.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {"query": {"type": "string"}},
+                "required": ["query"],
+                "additionalProperties": false
+            }
+        }]}));
+        let projection = catalog.agent_capability_projection("server-a");
+        assert_eq!(projection.len(), 1);
+        assert_eq!(projection[0]["server_id"], "server-a");
+        assert_eq!(projection[0]["name"], "lookup");
+        assert_eq!(projection[0]["description"], "Find a public record.");
+        assert_eq!(
+            projection[0]["input_schema"]["properties"]["query"]["type"],
+            "string"
+        );
+        assert!(!serde_json::to_string(&projection)
+            .expect("Agent capability JSON")
+            .contains("permission"));
+    }
+
+    #[test]
+    fn agent_tool_result_projection_is_plain_text_only_and_bounded() {
+        let plain_text = response(
+            4,
+            json!({
+                "content": [
+                    {"type":"text", "text":"first"},
+                    {"type":"text", "text":"second"}
+                ],
+                "isError": false
+            }),
+        );
+        let output = inspect_tool_call_output(&plain_text).expect("plain text");
+        assert_eq!(
+            output.text_content.as_deref().map(String::as_str),
+            Some("first\nsecond")
+        );
+        assert_eq!(output.summary.content_types, ["text", "text"]);
+
+        let structured = response(
+            5,
+            json!({
+                "content": [{"type":"text", "text":"not handoff eligible"}],
+                "structuredContent": {"value":"not handoff eligible"},
+                "isError": false
+            }),
+        );
+        assert!(inspect_tool_call_output(&structured)
+            .expect("valid MCP response")
+            .text_content
+            .is_none());
+
+        let oversized = response(
+            6,
+            json!({
+                "content": [{"type":"text", "text":"x".repeat(MAX_AGENT_TOOL_RESULT_TEXT_BYTES + 1)}],
+                "isError": false
+            }),
+        );
+        assert!(inspect_tool_call_output(&oversized)
+            .expect("valid but over handoff limit")
+            .text_content
+            .is_none());
+    }
+
+    #[test]
+    fn mcp_tool_description_is_bounded_and_control_checked() {
+        for description in [
+            Value::String("x".repeat(MAX_TOOL_DESCRIPTION_BYTES + 1)),
+            Value::String("unsafe\u{0007}description".to_string()),
+            Value::Bool(true),
+        ] {
+            let message = response(
+                7,
+                json!({"tools": [{
+                    "name": "lookup",
+                    "description": description,
+                    "inputSchema": {"type":"object"}
+                }]}),
+            );
+            assert_eq!(
+                parse_tools_response(&message)
+                    .expect_err("description不正")
+                    .code,
+                "mcp_tool_description_invalid"
+            );
+        }
     }
 
     #[test]

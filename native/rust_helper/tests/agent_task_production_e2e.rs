@@ -377,8 +377,7 @@ mod windows {
                 .any(|event| event.event_id == event_id));
         }
         assert!(persisted.audit_log.events().iter().any(|event| {
-            event.event_id == preflight["audit_event_id"]
-                && event.operation == "Agent作業要求検査"
+            event.event_id == preflight["audit_event_id"] && event.operation == "Agent作業要求検査"
         }));
         assert!(persisted.audit_log.events().iter().any(|event| {
             event.event_id == unauthorized_task["audit_event_id"]

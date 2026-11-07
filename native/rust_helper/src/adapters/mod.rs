@@ -25,8 +25,7 @@ impl ProviderModelSelection {
             && !self.model_id.is_empty()
             && self.model_id.len() <= 128
             && self.model_id.bytes().enumerate().all(|(index, byte)| {
-                byte.is_ascii_alphanumeric()
-                    || (index > 0 && b"._:/-".contains(&byte))
+                byte.is_ascii_alphanumeric() || (index > 0 && b"._:/-".contains(&byte))
             })
             && match self.authentication_source.as_str() {
                 "codex_cli_managed" => self.credential_id.is_none(),
@@ -75,16 +74,16 @@ pub(crate) fn create_cli_adapter(
         return Err("Provider／Model選択が不正".to_owned());
     }
     match adapter_id {
-        "codex-cli" if provider_model_selection.provider_id == "openai_codex_cli" => {
-            Ok(std::sync::Arc::new(
+        "codex-cli" if provider_model_selection.provider_id == "openai_codex_cli" => Ok(
+            std::sync::Arc::new(
                 codex_cli::CodexCliAdapter::new_with_provider_authentication(
                     executable,
                     workspace,
                     &provider_model_selection.model_id,
                     provider_model_selection.credential_id(),
                 )?,
-            ) as std::sync::Arc<dyn crate::broker::dialogue::実行系Adapter>)
-        }
+            ) as std::sync::Arc<dyn crate::broker::dialogue::実行系Adapter>,
+        ),
         _ => Err("未対応のCLI Adapter ID".to_owned()),
     }
 }

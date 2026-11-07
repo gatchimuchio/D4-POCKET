@@ -17,6 +17,28 @@
       "maxProperties": 256,
       "propertyNames": { "not": { "pattern": "(?i)(authority|permission|approval|capability|credential|secret|password|token|api[_-]?key|authorization)" } },
       "additionalProperties": true
+    },
+    "source_agent_task_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+      "description": "提案元Agent Task。Brokerは保存済みTask結果と完全一致を再検証する。"
+    },
+    "source_agent_result_hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "description": "提案元Task結果hash。Tool実行Permissionではない。"
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": { "required": ["source_agent_task_id"] },
+      "then": { "required": ["source_agent_result_hash"] }
+    },
+    {
+      "if": { "required": ["source_agent_result_hash"] },
+      "then": { "required": ["source_agent_task_id"] }
+    }
+  ]
 }

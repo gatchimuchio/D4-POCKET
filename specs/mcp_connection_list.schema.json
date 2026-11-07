@@ -3,7 +3,7 @@
   "$id": "https://example.invalid/gui-shell/schemas/mcp_connection_list.schema.json",
   "title": "MCP接続一覧（McpConnectionList）",
   "type": "object",
-  "required": ["版", "MCP接続一覧", "件数", "公開範囲", "証拠種別"],
+  "required": ["版", "MCP接続一覧", "件数", "Agent能力hash", "Agent能力件数", "Agent能力状態", "公開範囲", "証拠種別"],
   "additionalProperties": false,
   "properties": {
     "版": { "const": 1 },
@@ -13,6 +13,13 @@
       "items": { "$ref": "#/$defs/receipt" }
     },
     "件数": { "type": "integer", "minimum": 0, "maximum": 128 },
+    "Agent能力hash": {
+      "type": ["string", "null"],
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "description": "Brokerの現在catalog snapshot識別値。単独ではTool実行権限を持たない。"
+    },
+    "Agent能力件数": { "type": "integer", "minimum": 0, "maximum": 32768 },
+    "Agent能力状態": { "enum": ["available", "unsupported"] },
     "公開範囲": { "const": "metadata_only" },
     "証拠種別": { "const": "INTERNAL_STATE" }
   },

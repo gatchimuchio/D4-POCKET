@@ -7,7 +7,7 @@
 
 use super::*;
 use crate::audit_hash::sha256_tagged;
-use crate::broker::dialogue::{対話開始監査hash, 識別子生成, 評価対話進捗};
+use crate::broker::dialogue::{対話開始監査hash, 評価対話進捗, 識別子生成};
 use crate::broker::evaluation_lab::evaluate_case_public_projection;
 use serde_json::{json, Map, Value};
 use std::collections::{BTreeMap, BTreeSet};
@@ -210,7 +210,8 @@ impl Broker {
             }
         };
         if manifests.iter().any(|manifest| {
-            manifest.dataset_id == registration.dataset_id && manifest.revision == registration.revision
+            manifest.dataset_id == registration.dataset_id
+                && manifest.revision == registration.revision
         }) {
             return self.reject_with_payload_hash(
                 request_id,
@@ -327,12 +328,9 @@ impl Broker {
                 EVIDENCE_SOURCE_INTERNAL_STATE,
                 &canonical_payload_hash(Some(&manifest)),
             ) {
-                Ok(event) if event.event_id == audit_id => success_response(
-                    request_id,
-                    OPERATION,
-                    event.event_id,
-                    manifest,
-                ),
+                Ok(event) if event.event_id == audit_id => {
+                    success_response(request_id, OPERATION, event.event_id, manifest)
+                }
                 _ => self.audit_store_failed_response(
                     request_id,
                     OPERATION,
@@ -373,9 +371,15 @@ impl Broker {
             );
         }
         match operation {
-            "評価Dataset一覧" => self.評価Dataset一覧処理(request_id, payload, payload_hash),
-            "評価実験開始" => self.評価実験開始処理(request_id, payload, payload_hash),
-            "評価実験状態" => self.評価実験状態処理(request_id, payload, payload_hash),
+            "評価Dataset一覧" => {
+                self.評価Dataset一覧処理(request_id, payload, payload_hash)
+            }
+            "評価実験開始" => {
+                self.評価実験開始処理(request_id, payload, payload_hash)
+            }
+            "評価実験状態" => {
+                self.評価実験状態処理(request_id, payload, payload_hash)
+            }
             "評価比較" => self.評価比較処理(request_id, payload, payload_hash),
             _ => self.reject_with_payload_hash(
                 request_id,
@@ -438,7 +442,12 @@ impl Broker {
             )
             .is_err()
         {
-            return self.audit_store_failed_response(request_id, OPERATION, "監査失敗", "監査修復後に再確認してください");
+            return self.audit_store_failed_response(
+                request_id,
+                OPERATION,
+                "監査失敗",
+                "監査修復後に再確認してください",
+            );
         }
         // 通常UIへはDatasetごとの現行revisionだけを返す。旧revisionは監査chain内の
         // immutable recordとしてのみ保持し、UIのDataset ID重複を発生させない。
@@ -463,16 +472,37 @@ impl Broker {
         let (dataset_id, runtimes) = match start_request(payload) {
             Ok(value) => value,
             Err(reason) => {
-                return self.reject_with_payload_hash(request_id, OPERATION, "要求不正", reason, true, payload_hash)
+                return self.reject_with_payload_hash(
+                    request_id,
+                    OPERATION,
+                    "要求不正",
+                    reason,
+                    true,
+                    payload_hash,
+                )
             }
         };
         let log = match self.評価検証済み監査() {
             Ok(value) => value,
-            Err(()) => return self.audit_store_failed_response(request_id, OPERATION, "監査失敗", "監査修復後に評価実験を開始してください"),
+            Err(()) => {
+                return self.audit_store_failed_response(
+                    request_id,
+                    OPERATION,
+                    "監査失敗",
+                    "監査修復後に評価実験を開始してください",
+                )
+            }
         };
         let manifests = match evaluation_manifests(&log) {
             Ok(value) => value,
-            Err(_) => return self.audit_store_failed_response(request_id, OPERATION, "監査失敗", "評価Dataset記録を検証できません"),
+            Err(_) => {
+                return self.audit_store_failed_response(
+                    request_id,
+                    OPERATION,
+                    "監査失敗",
+                    "評価Dataset記録を検証できません",
+                )
+            }
         };
         let Some(manifest) = manifests
             .iter()
@@ -480,21 +510,59 @@ impl Broker {
             .max_by_key(|value| value.revision)
             .cloned()
         else {
-            return self.reject_with_payload_hash(request_id, OPERATION, "評価Dataset不在", "登録済み評価Datasetを指定してください", true, payload_hash);
+            return self.reject_with_payload_hash(
+                request_id,
+                OPERATION,
+                "評価Dataset不在",
+                "登録済み評価Datasetを指定してください",
+                true,
+                payload_hash,
+            );
         };
         let registration = match self.評価privateDataset読取(&manifest) {
             Ok(value) => value,
-            Err(reason) => return self.reject_with_payload_hash(request_id, OPERATION, "評価Dataset読取失敗", reason, true, payload_hash),
+            Err(reason) => {
+                return self.reject_with_payload_hash(
+                    request_id,
+                    OPERATION,
+                    "評価Dataset読取失敗",
+                    reason,
+                    true,
+                    payload_hash,
+                )
+            }
         };
-        if registration.cases.len().saturating_mul(runtimes.len()) > self.対話.評価要求可能数() {
-            return self.reject_with_payload_hash(request_id, OPERATION, "対話枠不足", "既存の対話を完了または中止してから評価実験を開始してください", true, payload_hash);
+        if registration.cases.len().saturating_mul(runtimes.len()) > self.対話.評価要求可能数()
+        {
+            return self.reject_with_payload_hash(
+                request_id,
+                OPERATION,
+                "対話枠不足",
+                "既存の対話を完了または中止してから評価実験を開始してください",
+                true,
+                payload_hash,
+            );
         }
         for runtime_id in &runtimes {
             if self.ライフサイクル.is_terminally_quarantined(runtime_id) {
-                return self.reject_with_payload_hash(request_id, OPERATION, "実行系隔離", "terminal隔離中の実行系は評価できません", true, payload_hash);
+                return self.reject_with_payload_hash(
+                    request_id,
+                    OPERATION,
+                    "実行系隔離",
+                    "terminal隔離中の実行系は評価できません",
+                    true,
+                    payload_hash,
+                );
             }
             if !self.対話.登録済み(runtime_id) {
-                return self.reject_with_payload_hash(request_id, OPERATION, "実行系不在", "登録済み実行系だけを評価対象に指定してください", true, payload_hash);
+                return self.reject_with_payload_hash(
+                    request_id,
+                    OPERATION,
+                    "実行系不在",
+                    "登録済み実行系だけを評価対象に指定してください",
+                    true,
+                    payload_hash,
+                );
             }
         }
         if self
@@ -508,32 +576,67 @@ impl Broker {
             )
             .is_err()
         {
-            return self.audit_store_failed_response(request_id, OPERATION, "監査失敗", "監査修復後に評価実験を開始してください");
+            return self.audit_store_failed_response(
+                request_id,
+                OPERATION,
+                "監査失敗",
+                "監査修復後に評価実験を開始してください",
+            );
         }
         let experiment_id = match 識別子生成() {
             Ok(value) => value,
-            Err(_) => return self.reject_with_payload_hash(request_id, OPERATION, "乱数失敗", "評価実験IDを生成できません", true, payload_hash),
+            Err(_) => {
+                return self.reject_with_payload_hash(
+                    request_id,
+                    OPERATION,
+                    "乱数失敗",
+                    "評価実験IDを生成できません",
+                    true,
+                    payload_hash,
+                )
+            }
         };
         let mut plans = Vec::with_capacity(registration.cases.len() * runtimes.len());
         for case in &registration.cases {
             for runtime_id in &runtimes {
-                let (session, session_audit_id, session_start_request_audit_id) = match self.評価対話操作(
-                    request_id,
-                    "対話開始",
-                    &json!({"実行系ID": runtime_id}),
-                ) {
+                let (session, session_audit_id, session_start_request_audit_id) = match self
+                    .評価対話操作(request_id, "対話開始", &json!({"実行系ID": runtime_id}))
+                {
                     Ok(value) => value,
                     Err(reason) => {
                         self.評価対話取消(&plans, request_id);
-                        return self.reject_with_payload_hash(request_id, OPERATION, "対話作成失敗", reason, true, payload_hash);
+                        return self.reject_with_payload_hash(
+                            request_id,
+                            OPERATION,
+                            "対話作成失敗",
+                            reason,
+                            true,
+                            payload_hash,
+                        );
                     }
                 };
-                let Some(session_id) = session.get("対話セッションID").and_then(Value::as_str).filter(|value| valid_identifier(value)).map(str::to_owned) else {
+                let Some(session_id) = session
+                    .get("対話セッションID")
+                    .and_then(Value::as_str)
+                    .filter(|value| valid_identifier(value))
+                    .map(str::to_owned)
+                else {
                     self.評価対話取消(&plans, request_id);
-                    if let Some(recovered_session_id) = self.評価対話監査対象(&session_audit_id, "対話開始") {
-                        self.評価対話を取消して終了(request_id, None, &recovered_session_id);
+                    if let Some(recovered_session_id) =
+                        self.評価対話監査対象(&session_audit_id, "対話開始")
+                    {
+                        self.評価対話を取消して終了(
+                            request_id,
+                            None,
+                            &recovered_session_id,
+                        );
                     }
-                    return self.audit_store_failed_response(request_id, OPERATION, "監査失敗", "対話Sessionを確定できません");
+                    return self.audit_store_failed_response(
+                        request_id,
+                        OPERATION,
+                        "監査失敗",
+                        "対話Sessionを確定できません",
+                    );
                 };
                 if self
                     .評価対話監査対象(&session_audit_id, "対話開始")
@@ -554,18 +657,22 @@ impl Broker {
                     "入力": case.input,
                 });
                 let send_payload_hash = canonical_payload_hash(Some(&send_payload));
-                let (pending, pending_audit_id, send_request_audit_id) = match self.評価対話操作(
-                    request_id,
-                    "対話送信",
-                    &send_payload,
-                ) {
-                    Ok(value) => value,
-                    Err(reason) => {
-                        self.評価対話取消(&plans, request_id);
-                        self.評価対話を取消して終了(request_id, None, &session_id);
-                        return self.reject_with_payload_hash(request_id, OPERATION, "対話作成失敗", reason, true, payload_hash);
-                    }
-                };
+                let (pending, pending_audit_id, send_request_audit_id) =
+                    match self.評価対話操作(request_id, "対話送信", &send_payload) {
+                        Ok(value) => value,
+                        Err(reason) => {
+                            self.評価対話取消(&plans, request_id);
+                            self.評価対話を取消して終了(request_id, None, &session_id);
+                            return self.reject_with_payload_hash(
+                                request_id,
+                                OPERATION,
+                                "対話作成失敗",
+                                reason,
+                                true,
+                                payload_hash,
+                            );
+                        }
+                    };
                 if !self.audit_log.events().iter().any(|event| {
                     event.event_id == send_request_audit_id
                         && send_request_event_matches(event, request_id, &send_payload_hash)
@@ -579,15 +686,26 @@ impl Broker {
                         "対話送信要求監査を確定できません",
                     );
                 }
-                let Some(request_id_value) = pending.get("要求ID").and_then(Value::as_str).filter(|value| valid_identifier(value)).map(str::to_owned) else {
+                let Some(request_id_value) = pending
+                    .get("要求ID")
+                    .and_then(Value::as_str)
+                    .filter(|value| valid_identifier(value))
+                    .map(str::to_owned)
+                else {
                     self.評価対話取消(&plans, request_id);
-                    let recovered_request_id = self.評価対話監査対象(&pending_audit_id, "対話送信");
+                    let recovered_request_id =
+                        self.評価対話監査対象(&pending_audit_id, "対話送信");
                     self.評価対話を取消して終了(
                         request_id,
                         recovered_request_id.as_deref(),
                         &session_id,
                     );
-                    return self.audit_store_failed_response(request_id, OPERATION, "監査失敗", "対話要求を確定できません");
+                    return self.audit_store_failed_response(
+                        request_id,
+                        OPERATION,
+                        "監査失敗",
+                        "対話要求を確定できません",
+                    );
                 };
                 let Some(request_hash) = pending
                     .get("要求hash")
@@ -596,7 +714,11 @@ impl Broker {
                     .map(str::to_owned)
                 else {
                     self.評価対話取消(&plans, request_id);
-                    self.評価対話を取消して終了(request_id, Some(&request_id_value), &session_id);
+                    self.評価対話を取消して終了(
+                        request_id,
+                        Some(&request_id_value),
+                        &session_id,
+                    );
                     return self.audit_store_failed_response(
                         request_id,
                         OPERATION,
@@ -606,27 +728,35 @@ impl Broker {
                 };
                 let (isolation_audit_id, isolation_request_audit_id) =
                     match self.評価対話隔離(request_id, &request_id_value) {
-                    Ok((recorded, received))
-                        if valid_audit_id(&recorded) && valid_audit_id(&received) =>
-                    {
-                        (recorded, received)
-                    }
-                    _ => {
-                        self.評価対話取消(&plans, request_id);
-                        self.評価対話を取消して終了(request_id, Some(&request_id_value), &session_id);
-                        return self.audit_store_failed_response(
-                            request_id,
-                            OPERATION,
-                            "監査失敗",
-                            "評価対話の通常取得隔離を確定できません",
-                        );
-                    }
-                };
+                        Ok((recorded, received))
+                            if valid_audit_id(&recorded) && valid_audit_id(&received) =>
+                        {
+                            (recorded, received)
+                        }
+                        _ => {
+                            self.評価対話取消(&plans, request_id);
+                            self.評価対話を取消して終了(
+                                request_id,
+                                Some(&request_id_value),
+                                &session_id,
+                            );
+                            return self.audit_store_failed_response(
+                                request_id,
+                                OPERATION,
+                                "監査失敗",
+                                "評価対話の通常取得隔離を確定できません",
+                            );
+                        }
+                    };
                 let creation = match self.評価対話進捗(request_id, &request_id_value) {
                     Ok(value) => value,
                     Err(_) => {
                         self.評価対話取消(&plans, request_id);
-                        self.評価対話を取消して終了(request_id, Some(&request_id_value), &session_id);
+                        self.評価対話を取消して終了(
+                            request_id,
+                            Some(&request_id_value),
+                            &session_id,
+                        );
                         return self.audit_store_failed_response(
                             request_id,
                             OPERATION,
@@ -643,7 +773,11 @@ impl Broker {
                     .map(str::to_owned)
                 else {
                     self.評価対話取消(&plans, request_id);
-                    self.評価対話を取消して終了(request_id, Some(&request_id_value), &session_id);
+                    self.評価対話を取消して終了(
+                        request_id,
+                        Some(&request_id_value),
+                        &session_id,
+                    );
                     return self.audit_store_failed_response(
                         request_id,
                         OPERATION,
@@ -725,7 +859,12 @@ impl Broker {
         });
         if !valid_experiment(&public) {
             self.評価対話取消(&plans, request_id);
-            return self.audit_store_failed_response(request_id, OPERATION, "監査失敗", "評価実験公開recordを確定できません");
+            return self.audit_store_failed_response(
+                request_id,
+                OPERATION,
+                "監査失敗",
+                "評価実験公開recordを確定できません",
+            );
         }
         let encoded = public.to_string();
         let audit = self.append_audit(
@@ -737,16 +876,29 @@ impl Broker {
             &canonical_payload_hash(Some(&public)),
         );
         match audit {
-            Ok(event)
-                if event.event_id
-                    == public["実験監査ID"].as_str().unwrap_or_default() => {
-                let id = public["評価ExperimentID"].as_str().expect("検証済み").to_owned();
-                self.評価.active.insert(id, ActiveExperiment { public: public.clone(), cases: registration.cases, plans });
+            Ok(event) if event.event_id == public["実験監査ID"].as_str().unwrap_or_default() => {
+                let id = public["評価ExperimentID"]
+                    .as_str()
+                    .expect("検証済み")
+                    .to_owned();
+                self.評価.active.insert(
+                    id,
+                    ActiveExperiment {
+                        public: public.clone(),
+                        cases: registration.cases,
+                        plans,
+                    },
+                );
                 success_response(request_id, OPERATION, event.event_id, public)
             }
             _ => {
                 self.評価対話取消(&plans, request_id);
-                self.audit_store_failed_response(request_id, OPERATION, "監査失敗", "作成済み対話を中止し監査修復後に再試行してください")
+                self.audit_store_failed_response(
+                    request_id,
+                    OPERATION,
+                    "監査失敗",
+                    "作成済み対話を中止し監査修復後に再試行してください",
+                )
             }
         }
     }
@@ -760,21 +912,54 @@ impl Broker {
         const OPERATION: &str = "評価実験状態";
         let experiment_id = match experiment_request(payload) {
             Ok(value) => value,
-            Err(reason) => return self.reject_with_payload_hash(request_id, OPERATION, "要求不正", reason, true, payload_hash),
+            Err(reason) => {
+                return self.reject_with_payload_hash(
+                    request_id,
+                    OPERATION,
+                    "要求不正",
+                    reason,
+                    true,
+                    payload_hash,
+                )
+            }
         };
         if self
-            .append_audit(request_id, OPERATION, "received", "評価実験の安全な状態projectionを要求", EVIDENCE_SOURCE_INTERNAL_STATE, payload_hash)
+            .append_audit(
+                request_id,
+                OPERATION,
+                "received",
+                "評価実験の安全な状態projectionを要求",
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+                payload_hash,
+            )
             .is_err()
         {
-            return self.audit_store_failed_response(request_id, OPERATION, "監査失敗", "監査修復後に評価状態を再確認してください");
+            return self.audit_store_failed_response(
+                request_id,
+                OPERATION,
+                "監査失敗",
+                "監査修復後に評価状態を再確認してください",
+            );
         }
         let mut control = std::mem::take(&mut self.評価);
         let result = control.status(self, request_id, &experiment_id);
         self.評価 = control;
         match result {
             Ok(body) => accept_safe_body(self, request_id, OPERATION, body),
-            Err("監査失敗") => self.audit_store_failed_response(request_id, OPERATION, "監査失敗", "監査修復後に評価状態を再確認してください"),
-            Err(reason) => self.reject_with_payload_hash(request_id, OPERATION, "評価実験不在", reason, true, payload_hash),
+            Err("監査失敗") => self.audit_store_failed_response(
+                request_id,
+                OPERATION,
+                "監査失敗",
+                "監査修復後に評価状態を再確認してください",
+            ),
+            Err(reason) => self.reject_with_payload_hash(
+                request_id,
+                OPERATION,
+                "評価実験不在",
+                reason,
+                true,
+                payload_hash,
+            ),
         }
     }
 
@@ -787,13 +972,34 @@ impl Broker {
         const OPERATION: &str = "評価比較";
         let experiment_id = match experiment_request(payload) {
             Ok(value) => value,
-            Err(reason) => return self.reject_with_payload_hash(request_id, OPERATION, "要求不正", reason, true, payload_hash),
+            Err(reason) => {
+                return self.reject_with_payload_hash(
+                    request_id,
+                    OPERATION,
+                    "要求不正",
+                    reason,
+                    true,
+                    payload_hash,
+                )
+            }
         };
         if self
-            .append_audit(request_id, OPERATION, "received", "評価結果のRuntime集計比較を要求。権限やrelease判断は生成しない", EVIDENCE_SOURCE_INTERNAL_STATE, payload_hash)
+            .append_audit(
+                request_id,
+                OPERATION,
+                "received",
+                "評価結果のRuntime集計比較を要求。権限やrelease判断は生成しない",
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+                payload_hash,
+            )
             .is_err()
         {
-            return self.audit_store_failed_response(request_id, OPERATION, "監査失敗", "監査修復後に評価比較を再実行してください");
+            return self.audit_store_failed_response(
+                request_id,
+                OPERATION,
+                "監査失敗",
+                "監査修復後に評価比較を再実行してください",
+            );
         }
         let mut control = std::mem::take(&mut self.評価);
         let result = control.comparison(self, request_id, &experiment_id);
@@ -802,13 +1008,39 @@ impl Broker {
             Ok(body) => {
                 let encoded = body.to_string();
                 let expected_id = body["比較監査ID"].as_str().unwrap_or_default();
-                match self.append_audit(request_id, OPERATION, "accepted", &format!("評価比較記録:{encoded}"), EVIDENCE_SOURCE_INTERNAL_STATE, &canonical_payload_hash(Some(&body))) {
-                    Ok(event) if event.event_id == expected_id => success_response(request_id, OPERATION, event.event_id, body),
-                    _ => self.audit_store_failed_response(request_id, OPERATION, "監査失敗", "評価比較監査を確定できません"),
+                match self.append_audit(
+                    request_id,
+                    OPERATION,
+                    "accepted",
+                    &format!("評価比較記録:{encoded}"),
+                    EVIDENCE_SOURCE_INTERNAL_STATE,
+                    &canonical_payload_hash(Some(&body)),
+                ) {
+                    Ok(event) if event.event_id == expected_id => {
+                        success_response(request_id, OPERATION, event.event_id, body)
+                    }
+                    _ => self.audit_store_failed_response(
+                        request_id,
+                        OPERATION,
+                        "監査失敗",
+                        "評価比較監査を確定できません",
+                    ),
                 }
             }
-            Err("監査失敗") => self.audit_store_failed_response(request_id, OPERATION, "監査失敗", "監査修復後に評価比較を再実行してください"),
-            Err(reason) => self.reject_with_payload_hash(request_id, OPERATION, "評価比較不能", reason, true, payload_hash),
+            Err("監査失敗") => self.audit_store_failed_response(
+                request_id,
+                OPERATION,
+                "監査失敗",
+                "監査修復後に評価比較を再実行してください",
+            ),
+            Err(reason) => self.reject_with_payload_hash(
+                request_id,
+                OPERATION,
+                "評価比較不能",
+                reason,
+                true,
+                payload_hash,
+            ),
         }
     }
 
@@ -822,7 +1054,10 @@ impl Broker {
         (log == self.audit_log).then_some(log).ok_or(())
     }
 
-    fn 評価privateDataset読取(&self, manifest: &DatasetManifest) -> Result<PrivateRegistration, &'static str> {
+    fn 評価privateDataset読取(
+        &self,
+        manifest: &DatasetManifest,
+    ) -> Result<PrivateRegistration, &'static str> {
         #[cfg(not(windows))]
         {
             let _ = manifest;
@@ -830,7 +1065,10 @@ impl Broker {
         }
         #[cfg(windows)]
         {
-            let store = self.protected_store.as_ref().ok_or("Windows ProtectedStoreが未登録です")?;
+            let store = self
+                .protected_store
+                .as_ref()
+                .ok_or("Windows ProtectedStoreが未登録です")?;
             let secret = store
                 .read(
                     crate::protected_store::Purpose::Evaluation,
@@ -841,7 +1079,9 @@ impl Broker {
             let raw: Value = serde_json::from_slice(secret.as_bytes())
                 .map_err(|_| "評価Datasetのprivate形式が不正です")?;
             let registration = parse_registration(&raw)?;
-            if registration.dataset_id != manifest.dataset_id || registration.revision != manifest.revision {
+            if registration.dataset_id != manifest.dataset_id
+                || registration.revision != manifest.revision
+            {
                 return Err("評価DatasetのIDまたはrevisionが監査manifestと不一致です");
             }
             if canonical_payload_hash(Some(&raw)) != manifest.definition_hash {
@@ -867,8 +1107,8 @@ impl Broker {
                 "評価実験が既存対話統治経路を要求",
                 EVIDENCE_SOURCE_INTERNAL_STATE,
                 &payload_hash,
-        )
-        .map_err(|_| "監査失敗")?;
+            )
+            .map_err(|_| "監査失敗")?;
         let received_audit_id = received.event_id.clone();
         let mut last_audit_id = received.event_id;
         // `記録保存`は既存workのrecorded eventも追加し得る。開始・送信の異常応答を
@@ -878,7 +1118,14 @@ impl Broker {
         let mut dialogue = std::mem::take(&mut self.対話);
         let result = dialogue.操作(operation, payload, false, now, &mut |reason, id, hash| {
             let event = self
-                .append_audit(id, operation, "recorded", reason, EVIDENCE_SOURCE_INTERNAL_STATE, hash)
+                .append_audit(
+                    id,
+                    operation,
+                    "recorded",
+                    reason,
+                    EVIDENCE_SOURCE_INTERNAL_STATE,
+                    hash,
+                )
                 .map_err(|_| 対話失敗::監査失敗)?;
             if (operation == "対話開始" && reason == "対話開始")
                 || (operation == "対話送信" && reason == "対話承認待ち作成")
@@ -898,10 +1145,10 @@ impl Broker {
                 )
             })
             .map_err(|error| match error {
-            対話失敗::監査失敗 => "監査失敗",
-            対話失敗::隔離済み => "実行系隔離",
-            _ => "既存対話統治経路が要求を拒否しました",
-        })
+                対話失敗::監査失敗 => "監査失敗",
+                対話失敗::隔離済み => "実行系隔離",
+                _ => "既存対話統治経路が要求を拒否しました",
+            })
     }
 
     /// C5が作成した対話だけを、通常の対話取得・UI投影から隔離する。
@@ -912,32 +1159,38 @@ impl Broker {
         request_id: &str,
     ) -> Result<(String, String), &'static str> {
         let payload = json!({"要求ID": request_id});
-        let received = self.append_audit(
-            outer_request_id,
-            "評価対話隔離",
-            "received",
-            "評価実験が既存対話を通常取得から隔離するよう要求",
-            EVIDENCE_SOURCE_INTERNAL_STATE,
-            &canonical_payload_hash(Some(&payload)),
-        )
-        .map_err(|_| "監査失敗")?;
+        let received = self
+            .append_audit(
+                outer_request_id,
+                "評価対話隔離",
+                "received",
+                "評価実験が既存対話を通常取得から隔離するよう要求",
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+                &canonical_payload_hash(Some(&payload)),
+            )
+            .map_err(|_| "監査失敗")?;
         let mut dialogue = std::mem::take(&mut self.対話);
         let result = dialogue.評価隔離(request_id);
         self.対話 = dialogue;
         result.map_err(|_| "評価対話隔離に失敗")?;
-        let event = self.append_audit(
-            request_id,
-            "評価対話隔離",
-            "recorded",
-            "評価専用対話を通常の対話取得から隔離",
-            EVIDENCE_SOURCE_INTERNAL_STATE,
-            &canonical_payload_hash(Some(&payload)),
-        )
-        .map_err(|_| "監査失敗")?;
+        let event = self
+            .append_audit(
+                request_id,
+                "評価対話隔離",
+                "recorded",
+                "評価専用対話を通常の対話取得から隔離",
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+                &canonical_payload_hash(Some(&payload)),
+            )
+            .map_err(|_| "監査失敗")?;
         Ok((event.event_id, received.event_id))
     }
 
-    fn 評価対話進捗(&mut self, outer_request_id: &str, request_id: &str) -> Result<評価対話進捗, &'static str> {
+    fn 評価対話進捗(
+        &mut self,
+        outer_request_id: &str,
+        request_id: &str,
+    ) -> Result<評価対話進捗, &'static str> {
         let payload = json!({"要求ID": request_id});
         let received = self
             .append_audit(
@@ -954,7 +1207,14 @@ impl Broker {
         let mut dialogue = std::mem::take(&mut self.対話);
         let result = dialogue.評価進捗(request_id, now, &mut |reason, id, hash| {
             let event = self
-                .append_audit(id, "対話取得", "recorded", reason, EVIDENCE_SOURCE_INTERNAL_STATE, hash)
+                .append_audit(
+                    id,
+                    "対話取得",
+                    "recorded",
+                    reason,
+                    EVIDENCE_SOURCE_INTERNAL_STATE,
+                    hash,
+                )
                 .map_err(|_| 対話失敗::監査失敗)?;
             last_audit_id = event.event_id.clone();
             Ok(event.event_id)
@@ -966,7 +1226,11 @@ impl Broker {
 
     fn 評価対話取消(&mut self, plans: &[EvaluationPlan], outer_request_id: &str) {
         for plan in plans {
-            self.評価対話を取消して終了(outer_request_id, Some(&plan.request_id), &plan.session_id);
+            self.評価対話を取消して終了(
+                outer_request_id,
+                Some(&plan.request_id),
+                &plan.session_id,
+            );
         }
     }
 
@@ -1021,7 +1285,12 @@ impl Broker {
 }
 
 impl EvaluationControl {
-    fn status(&mut self, broker: &mut Broker, request_id: &str, experiment_id: &str) -> Result<Value, &'static str> {
+    fn status(
+        &mut self,
+        broker: &mut Broker,
+        request_id: &str,
+        experiment_id: &str,
+    ) -> Result<Value, &'static str> {
         if let Some(experiment) = self.active.get_mut(experiment_id) {
             drive_experiment(broker, request_id, experiment)?;
             return public_status_body(experiment);
@@ -1029,7 +1298,12 @@ impl EvaluationControl {
         recovered_status(broker, experiment_id)
     }
 
-    fn comparison(&mut self, broker: &mut Broker, _request_id: &str, experiment_id: &str) -> Result<Value, &'static str> {
+    fn comparison(
+        &mut self,
+        broker: &mut Broker,
+        _request_id: &str,
+        experiment_id: &str,
+    ) -> Result<Value, &'static str> {
         if let Some(experiment) = self.active.get(experiment_id) {
             return comparison_from_active(broker, experiment);
         }
@@ -1068,7 +1342,10 @@ fn drive_experiment(
             }
             continue;
         }
-        if broker.ライフサイクル.is_terminally_quarantined(&plan.runtime_id) {
+        if broker
+            .ライフサイクル
+            .is_terminally_quarantined(&plan.runtime_id)
+        {
             // C4隔離は外部実行の停止を保証しない。解放済み対話を取得し直したり
             // 終了監査IDを推測したりせず、既存対話のworker受信側が実際に回収されるまで
             // pendingを残し、計画と既存監査から確認できる値だけで中断を記録する。
@@ -1133,7 +1410,10 @@ fn drive_experiment(
             continue;
         }
         let progress = broker.評価対話進捗(outer_request_id, &plan.request_id)?;
-        if progress.要求ID != plan.request_id || progress.実行系ID != plan.runtime_id || progress.対話セッションID != plan.session_id {
+        if progress.要求ID != plan.request_id
+            || progress.実行系ID != plan.runtime_id
+            || progress.対話セッションID != plan.session_id
+        {
             return Err("監査失敗");
         }
         plan.state = progress.状態.clone();
@@ -1153,7 +1433,10 @@ fn drive_experiment(
             .ok_or("監査失敗")?;
         let start_audit = optional_audit(execution.get("開始監査ID"))?;
         let end_audit = optional_audit(execution.get("終了監査ID"))?;
-        let output_status = dialogue_result.get("状態").and_then(Value::as_str).unwrap_or("失敗");
+        let output_status = dialogue_result
+            .get("状態")
+            .and_then(Value::as_str)
+            .unwrap_or("失敗");
         let response_hash_available = dialogue_result
             .get("応答hash")
             .and_then(Value::as_str)
@@ -1205,7 +1488,9 @@ fn drive_experiment(
         };
         if evaluator_results.is_empty()
             || evaluator_results.len() > MAX_EVALUATORS_PER_CASE
-            || evaluator_results.iter().any(|value| !valid_evaluator_result(value))
+            || evaluator_results
+                .iter()
+                .any(|value| !valid_evaluator_result(value))
         {
             return Err("監査失敗");
         }
@@ -1371,7 +1656,11 @@ fn public_status_body(experiment: &ActiveExperiment) -> Result<Value, &'static s
         left["実行系ID"]
             .as_str()
             .cmp(&right["実行系ID"].as_str())
-            .then_with(|| left["評価CaseID"].as_str().cmp(&right["評価CaseID"].as_str()))
+            .then_with(|| {
+                left["評価CaseID"]
+                    .as_str()
+                    .cmp(&right["評価CaseID"].as_str())
+            })
     });
     Ok(json!({"版": EVALUATION_VERSION, "評価実験": experiment.public, "公開結果一覧": results}))
 }
@@ -1394,9 +1683,7 @@ fn recovered_status(broker: &Broker, experiment_id: &str) -> Result<Value, &'sta
         experiment["終了時刻UnixMillis"] = Value::Null;
     } else {
         let any_interrupted = results.iter().any(|result| result["判定"] == "中断");
-        let any_unevaluable = results
-            .iter()
-            .any(|result| result["判定"] == "評価不能");
+        let any_unevaluable = results.iter().any(|result| result["判定"] == "評価不能");
         experiment["状態"] = json!(if any_interrupted {
             "中断"
         } else if any_unevaluable {
@@ -1432,18 +1719,28 @@ fn recovered_status(broker: &Broker, experiment_id: &str) -> Result<Value, &'sta
     }))
 }
 
-fn comparison_from_active(broker: &Broker, experiment: &ActiveExperiment) -> Result<Value, &'static str> {
+fn comparison_from_active(
+    broker: &Broker,
+    experiment: &ActiveExperiment,
+) -> Result<Value, &'static str> {
     if !experiment_is_finalized(experiment) {
         return Err("全CaseとRuntimeの終端結果および対話終了が確定するまで比較できません");
     }
-    let aggregates = aggregate_results(&experiment.public, experiment.plans.iter().filter_map(|plan| plan.result.as_ref()))?;
+    let aggregates = aggregate_results(
+        &experiment.public,
+        experiment
+            .plans
+            .iter()
+            .filter_map(|plan| plan.result.as_ref()),
+    )?;
     let differences = active_differences(experiment)?;
     comparison_body(broker, &experiment.public, aggregates, differences)
 }
 
 fn comparison_from_recovered(broker: &Broker, experiment_id: &str) -> Result<Value, &'static str> {
     let log = broker.評価検証済み監査().map_err(|_| "監査失敗")?;
-    let experiment = recovered_experiment(&log, experiment_id)?.ok_or("指定評価Experimentがありません")?;
+    let experiment =
+        recovered_experiment(&log, experiment_id)?.ok_or("指定評価Experimentがありません")?;
     let results = recovered_results(&log, &experiment)?;
     if results.len() != expected_result_count(&experiment.public)? {
         return Err("全CaseとRuntimeの終端結果が監査から復元できるまで比較できません");
@@ -1483,9 +1780,7 @@ fn experiment_is_finalized(experiment: &ActiveExperiment) -> bool {
         && experiment
             .plans
             .iter()
-            .all(|plan| {
-                plan.result.is_some() && !plan.cleanup_pending && plan.cleanup_verified
-            })
+            .all(|plan| plan.result.is_some() && !plan.cleanup_pending && plan.cleanup_verified)
 }
 
 fn comparison_body(
@@ -1522,12 +1817,21 @@ fn comparison_body(
         "比較監査ID": audit_id,
         "証拠種別": EVIDENCE_SOURCE_INTERNAL_STATE,
     });
-    valid_comparison(&body).then_some(body).ok_or("比較recordを確定できません")
+    valid_comparison(&body)
+        .then_some(body)
+        .ok_or("比較recordを確定できません")
 }
 
-fn aggregate_results<'a>(experiment: &Value, results: impl Iterator<Item = &'a Value>) -> Result<Vec<Value>, &'static str> {
-    let runtimes = experiment["対象Runtime一覧"].as_array().ok_or("評価Experimentが不正です")?;
-    let case_count = experiment["計画Case数"].as_u64().ok_or("評価Experimentが不正です")?;
+fn aggregate_results<'a>(
+    experiment: &Value,
+    results: impl Iterator<Item = &'a Value>,
+) -> Result<Vec<Value>, &'static str> {
+    let runtimes = experiment["対象Runtime一覧"]
+        .as_array()
+        .ok_or("評価Experimentが不正です")?;
+    let case_count = experiment["計画Case数"]
+        .as_u64()
+        .ok_or("評価Experimentが不正です")?;
     let experiment_id = experiment["評価ExperimentID"]
         .as_str()
         .ok_or("評価Experimentが不正です")?;
@@ -1549,7 +1853,9 @@ fn aggregate_results<'a>(experiment: &Value, results: impl Iterator<Item = &'a V
         {
             return Err("評価結果記録がExperimentと不一致です");
         }
-        let runtime = result["実行系ID"].as_str().ok_or("評価結果記録を検証できません")?;
+        let runtime = result["実行系ID"]
+            .as_str()
+            .ok_or("評価結果記録を検証できません")?;
         if !runtimes.iter().any(|value| value.as_str() == Some(runtime)) {
             return Err("評価結果記録の実行系がExperimentにありません");
         }
@@ -1601,8 +1907,12 @@ fn aggregate_results<'a>(experiment: &Value, results: impl Iterator<Item = &'a V
     Ok(output)
 }
 
-fn active_differences(experiment: &ActiveExperiment) -> Result<(&'static str, &'static str, &'static str), &'static str> {
-    let runtimes = experiment.public["対象Runtime一覧"].as_array().ok_or("評価Experimentが不正です")?;
+fn active_differences(
+    experiment: &ActiveExperiment,
+) -> Result<(&'static str, &'static str, &'static str), &'static str> {
+    let runtimes = experiment.public["対象Runtime一覧"]
+        .as_array()
+        .ok_or("評価Experimentが不正です")?;
     let mut route = "same";
     let mut reference = "same";
     let mut capability = "same";
@@ -1614,22 +1924,36 @@ fn active_differences(experiment: &ActiveExperiment) -> Result<(&'static str, &'
         let mut observations = Vec::new();
         for runtime in runtimes {
             let runtime = runtime.as_str().ok_or("評価Experimentが不正です")?;
-            let observation = experiment.plans.iter().find(|plan| {
-                plan.case_id == case_id && plan.runtime_id == runtime
-            }).and_then(|plan| plan.observation.as_ref());
+            let observation = experiment
+                .plans
+                .iter()
+                .find(|plan| plan.case_id == case_id && plan.runtime_id == runtime)
+                .and_then(|plan| plan.observation.as_ref());
             let Some(observation) = observation else {
                 return Ok(("unknown", "unknown", "unknown"));
             };
             observations.push(observation);
         }
-        route = merge_difference(route, observations.iter().map(|value| value.route.as_deref()))?;
-        reference = merge_difference(reference, observations.iter().map(|value| value.reference.as_deref()))?;
-        capability = merge_difference(capability, observations.iter().map(|value| value.capability.as_deref()))?;
+        route = merge_difference(
+            route,
+            observations.iter().map(|value| value.route.as_deref()),
+        )?;
+        reference = merge_difference(
+            reference,
+            observations.iter().map(|value| value.reference.as_deref()),
+        )?;
+        capability = merge_difference(
+            capability,
+            observations.iter().map(|value| value.capability.as_deref()),
+        )?;
     }
     Ok((route, reference, capability))
 }
 
-fn merge_difference<'a>(current: &'static str, values: impl Iterator<Item = Option<&'a str>>) -> Result<&'static str, &'static str> {
+fn merge_difference<'a>(
+    current: &'static str,
+    values: impl Iterator<Item = Option<&'a str>>,
+) -> Result<&'static str, &'static str> {
     if current == "unknown" {
         return Ok(current);
     }
@@ -1637,25 +1961,51 @@ fn merge_difference<'a>(current: &'static str, values: impl Iterator<Item = Opti
     if values.iter().any(|value| value.is_none()) {
         return Ok("unknown");
     }
-    let first = values.first().and_then(|value| *value).ok_or("比較値がありません")?;
-    Ok(if values.iter().all(|value| *value == Some(first)) { current } else { "different" })
+    let first = values
+        .first()
+        .and_then(|value| *value)
+        .ok_or("比較値がありません")?;
+    Ok(if values.iter().all(|value| *value == Some(first)) {
+        current
+    } else {
+        "different"
+    })
 }
 
 fn observation_fingerprints(result: &Value) -> ObservationFingerprints {
     if result.get("表示範囲").and_then(Value::as_str) != Some("full") {
-        return ObservationFingerprints { route: None, reference: None, capability: None };
+        return ObservationFingerprints {
+            route: None,
+            reference: None,
+            capability: None,
+        };
     }
     ObservationFingerprints {
-        route: result.get("経路").map(|value| canonical_payload_hash(Some(value))),
-        reference: result.get("参照").map(|value| canonical_payload_hash(Some(value))),
-        capability: result.get("能力").map(|value| canonical_payload_hash(Some(value))),
+        route: result
+            .get("経路")
+            .map(|value| canonical_payload_hash(Some(value))),
+        reference: result
+            .get("参照")
+            .map(|value| canonical_payload_hash(Some(value))),
+        capability: result
+            .get("能力")
+            .map(|value| canonical_payload_hash(Some(value))),
     }
 }
 
 fn refresh_experiment_public(experiment: &mut ActiveExperiment, now_millis: i64) {
-    let result_count = experiment.plans.iter().filter(|plan| plan.result.is_some()).count();
+    let result_count = experiment
+        .plans
+        .iter()
+        .filter(|plan| plan.result.is_some())
+        .count();
     experiment.public["結果数"] = json!(result_count);
-    let started = experiment.plans.iter().filter_map(|plan| plan.result.as_ref()).filter_map(|result| result["開始監査ID"].as_str()).next();
+    let started = experiment
+        .plans
+        .iter()
+        .filter_map(|plan| plan.result.as_ref())
+        .filter_map(|result| result["開始監査ID"].as_str())
+        .next();
     if started.is_some() && experiment.public["開始時刻UnixMillis"].is_null() {
         experiment.public["開始時刻UnixMillis"] = json!(now_millis);
     }
@@ -1743,7 +2093,9 @@ fn persisted_plan_record_value(
     Ok(value)
 }
 
-fn parse_persisted_plan_record(value: &Value) -> Result<PersistedEvaluationPlanRecord, &'static str> {
+fn parse_persisted_plan_record(
+    value: &Value,
+) -> Result<PersistedEvaluationPlanRecord, &'static str> {
     let object = exact_object(
         value,
         &[
@@ -1997,7 +2349,9 @@ fn result_matches_plan(
     let start_id = result["開始監査ID"].as_str();
     let end_id = result["終了監査ID"].as_str();
     let c4_terminal_interruption = result["結果状態"] == "中止"
-        && result["実行系隔離予約監査ID"].as_str().is_some_and(valid_audit_id);
+        && result["実行系隔離予約監査ID"]
+            .as_str()
+            .is_some_and(valid_audit_id);
     // C4の予約付き中止だけは、隔離が既存対話の終端監査を代替しないことを明示した
     // 例外として終了監査なしを保持する。他のResultを対話終端なしで復元・比較へ
     // 進めることは許可しない。
@@ -2022,7 +2376,10 @@ fn result_matches_plan(
     Ok(())
 }
 
-fn created_dialogue_event_matches(event: &BrokerAuditEvent, plan: &PersistedEvaluationPlan) -> bool {
+fn created_dialogue_event_matches(
+    event: &BrokerAuditEvent,
+    plan: &PersistedEvaluationPlan,
+) -> bool {
     event.operation == "対話送信"
         && event.decision == "recorded"
         && event.request_id == plan.request_id
@@ -2059,8 +2416,7 @@ fn session_start_request_event_matches(
         && event.request_id == outer_request_id
         && event.reason == "評価実験が既存対話統治経路を要求"
         && event.evidence_source == EVIDENCE_SOURCE_INTERNAL_STATE
-        && event.payload_hash
-            == canonical_payload_hash(Some(&json!({"実行系ID": plan.runtime_id})))
+        && event.payload_hash == canonical_payload_hash(Some(&json!({"実行系ID": plan.runtime_id})))
 }
 
 fn send_request_event_matches(
@@ -2086,8 +2442,7 @@ fn isolation_request_event_matches(
         && event.request_id == outer_request_id
         && event.reason == "評価実験が既存対話を通常取得から隔離するよう要求"
         && event.evidence_source == EVIDENCE_SOURCE_INTERNAL_STATE
-        && event.payload_hash
-            == canonical_payload_hash(Some(&json!({"要求ID": plan.request_id})))
+        && event.payload_hash == canonical_payload_hash(Some(&json!({"要求ID": plan.request_id})))
 }
 
 fn start_event_visibility(
@@ -2144,8 +2499,9 @@ fn terminal_event_matches(event: &BrokerAuditEvent, plan: &PersistedEvaluationPl
         return false;
     }
     match (event.operation.as_str(), event.reason.as_str()) {
-        ("対話中止", "対話中止 実行系の停止は保証しない")
-        | ("対話承認", "対話worker起動失敗") => event.payload_hash == plan.request_hash,
+        ("対話中止", "対話中止 実行系の停止は保証しない") | ("対話承認", "対話worker起動失敗") => {
+            event.payload_hash == plan.request_hash
+        }
         (_, "対話期限超過") if dialogue_progress_operation(&event.operation) => {
             event.payload_hash == plan.request_hash
         }
@@ -2279,7 +2635,9 @@ fn validate_recovered_result_causality(
         None => None,
     };
     let c4_terminal_interruption = result["結果状態"] == "中止"
-        && result["実行系隔離予約監査ID"].as_str().is_some_and(valid_audit_id);
+        && result["実行系隔離予約監査ID"]
+            .as_str()
+            .is_some_and(valid_audit_id);
     if !c4_terminal_interruption && end_index.is_none() {
         return Err("C4隔離以外の評価結果に対話終了監査がありません");
     }
@@ -2294,7 +2652,10 @@ fn validate_recovered_result_causality(
                     && terminal_quarantine_reservation_event_matches(event, &plan.runtime_id)
             })
             .collect::<Vec<_>>();
-        match (result["実行系隔離予約監査ID"].as_str(), reservations.as_slice()) {
+        match (
+            result["実行系隔離予約監査ID"].as_str(),
+            reservations.as_slice(),
+        ) {
             (None, []) if result["実行系隔離予約監査ID"].is_null() => {}
             (Some(reservation_id), [(_, reservation)])
                 if reservation.event_id == reservation_id => {}
@@ -2303,8 +2664,8 @@ fn validate_recovered_result_causality(
     }
     if result["結果状態"] == "成功" {
         let end_index = end_index.ok_or("成功した評価結果に終端監査がありません")?;
-        let start_visibility = start_visibility
-            .ok_or("成功した評価結果にowner表示範囲承認がありません")?;
+        let start_visibility =
+            start_visibility.ok_or("成功した評価結果にowner表示範囲承認がありません")?;
         let response_hash = result["応答hash"]
             .as_str()
             .filter(|value| valid_hash(value))
@@ -2499,7 +2860,9 @@ fn terminal_dialogue_audit_ids(
         return Err("terminal隔離前の対話作成監査相関が不正です");
     }
     let (isolation_index, isolation) = audit_event_with_index(log, &plan.isolation_audit_id)?;
-    if created_index >= isolation_index || !isolation_event_matches(isolation, &persisted_plan(plan)) {
+    if created_index >= isolation_index
+        || !isolation_event_matches(isolation, &persisted_plan(plan))
+    {
         return Err("terminal隔離前の対話隔離監査相関が不正です");
     }
     let matching = |event: &&BrokerAuditEvent| {
@@ -2512,9 +2875,7 @@ fn terminal_dialogue_audit_ids(
         .iter()
         .enumerate()
         .filter(|(index, event)| *index > isolation_index && matching(event))
-        .filter(|event| {
-            start_event_matches(event.1, &persisted_plan(plan))
-        })
+        .filter(|event| start_event_matches(event.1, &persisted_plan(plan)))
         .collect::<Vec<_>>();
     if starts.len() > 1 {
         return Err("terminal隔離前の対話開始監査が重複しています");
@@ -2524,9 +2885,7 @@ fn terminal_dialogue_audit_ids(
         .iter()
         .enumerate()
         .filter(|(index, event)| *index > isolation_index && matching(event))
-        .filter(|event| {
-            terminal_event_matches(event.1, &persisted_plan(plan))
-        })
+        .filter(|event| terminal_event_matches(event.1, &persisted_plan(plan)))
         .collect::<Vec<_>>();
     if ends.len() > 1 {
         return Err("terminal隔離前の対話終了監査が重複しています");
@@ -2596,8 +2955,8 @@ fn recovered_experiment(
                     .reason
                     .strip_prefix("評価Experiment開始記録:")
                     .ok_or("評価Experiment監査reasonが不正です")?;
-                let value: Value = serde_json::from_str(raw)
-                    .map_err(|_| "評価Experiment記録を検証できません")?;
+                let value: Value =
+                    serde_json::from_str(raw).map_err(|_| "評価Experiment記録を検証できません")?;
                 if !valid_experiment(&value)
                     || event.event_id != value["実験監査ID"]
                     || event.evidence_source != EVIDENCE_SOURCE_INTERNAL_STATE
@@ -2622,7 +2981,8 @@ fn recovered_experiment(
     let plan_audit_id = public["計画監査ID"]
         .as_str()
         .ok_or("評価Experiment計画監査IDがありません")?;
-    let Some((plan_index, plan_request_id, plan_record)) = plan_records.remove(plan_audit_id) else {
+    let Some((plan_index, plan_request_id, plan_record)) = plan_records.remove(plan_audit_id)
+    else {
         return Err("評価Experiment計画監査recordがありません");
     };
     if plan_index >= experiment_index || plan_request_id != experiment_request_id {
@@ -2688,8 +3048,7 @@ fn recovered_results(
             .reason
             .strip_prefix("評価結果記録:")
             .ok_or("評価結果監査reasonが不正です")?;
-        let value: Value = serde_json::from_str(raw)
-            .map_err(|_| "評価結果記録を検証できません")?;
+        let value: Value = serde_json::from_str(raw).map_err(|_| "評価結果記録を検証できません")?;
         if !valid_result(&value) {
             return Err("評価結果記録を検証できません");
         }
@@ -2742,7 +3101,8 @@ fn evaluation_manifests(log: &BrokerAuditLog) -> Result<Vec<DatasetManifest>, &'
             .reason
             .strip_prefix("評価Dataset登録記録:")
             .ok_or("評価Dataset監査reasonが不正です")?;
-        let value: Value = serde_json::from_str(raw).map_err(|_| "評価Dataset記録を検証できません")?;
+        let value: Value =
+            serde_json::from_str(raw).map_err(|_| "評価Dataset記録を検証できません")?;
         let manifest = parse_manifest(value)?;
         if event.event_id != manifest.value["作成監査ID"]
             || event.evidence_source != EVIDENCE_SOURCE_INTERNAL_STATE
@@ -2760,12 +3120,29 @@ fn evaluation_manifests(log: &BrokerAuditLog) -> Result<Vec<DatasetManifest>, &'
         latest_revision.insert(manifest.dataset_id.clone(), manifest.revision);
         manifests.push(manifest);
     }
-    manifests.sort_by(|left, right| left.dataset_id.cmp(&right.dataset_id).then(left.revision.cmp(&right.revision)));
+    manifests.sort_by(|left, right| {
+        left.dataset_id
+            .cmp(&right.dataset_id)
+            .then(left.revision.cmp(&right.revision))
+    });
     Ok(manifests)
 }
 
 fn parse_registration(value: &Value) -> Result<PrivateRegistration, &'static str> {
-    let object = exact_object(value, &["版", "評価DatasetID", "revision", "公開表示名", "登録者種別", "登録経路", "評価用途", "評価方式", "非公開CasePayload一覧"])?;
+    let object = exact_object(
+        value,
+        &[
+            "版",
+            "評価DatasetID",
+            "revision",
+            "公開表示名",
+            "登録者種別",
+            "登録経路",
+            "評価用途",
+            "評価方式",
+            "非公開CasePayload一覧",
+        ],
+    )?;
     if object.get("版").and_then(Value::as_u64) != Some(EVALUATION_VERSION)
         || object.get("登録者種別").and_then(Value::as_str) != Some("owner")
         || object.get("登録経路").and_then(Value::as_str) != Some("owner_control")
@@ -2775,9 +3152,17 @@ fn parse_registration(value: &Value) -> Result<PrivateRegistration, &'static str
         return Err("評価Datasetの固定fieldが不正です");
     }
     let dataset_id = required_identifier(object, "評価DatasetID")?;
-    let revision = object.get("revision").and_then(Value::as_u64).filter(|value| *value >= 1).ok_or("評価Dataset revisionが不正です")?;
+    let revision = object
+        .get("revision")
+        .and_then(Value::as_u64)
+        .filter(|value| *value >= 1)
+        .ok_or("評価Dataset revisionが不正です")?;
     let public_name = bounded_string(object.get("公開表示名"), 128, "公開表示名が不正です")?;
-    let cases = object.get("非公開CasePayload一覧").and_then(Value::as_array).filter(|value| !value.is_empty() && value.len() <= MAX_DATASETS_CASES).ok_or("評価Case一覧が不正です")?;
+    let cases = object
+        .get("非公開CasePayload一覧")
+        .and_then(Value::as_array)
+        .filter(|value| !value.is_empty() && value.len() <= MAX_DATASETS_CASES)
+        .ok_or("評価Case一覧が不正です")?;
     let mut output = Vec::with_capacity(cases.len());
     let mut case_ids = BTreeSet::new();
     let mut orders = BTreeSet::new();
@@ -2789,24 +3174,43 @@ fn parse_registration(value: &Value) -> Result<PrivateRegistration, &'static str
         output.push(case);
     }
     output.sort_by_key(|case| case.order);
-    Ok(PrivateRegistration { dataset_id, revision, public_name, cases: output })
+    Ok(PrivateRegistration {
+        dataset_id,
+        revision,
+        public_name,
+        cases: output,
+    })
 }
 
 fn parse_private_case(value: &Value) -> Result<PrivateCase, &'static str> {
-    let object = exact_object(value, &["評価CaseID", "順序", "公開表示名", "入力", "評価器設定"])?;
+    let object = exact_object(
+        value,
+        &["評価CaseID", "順序", "公開表示名", "入力", "評価器設定"],
+    )?;
     let case_id = required_identifier(object, "評価CaseID")?;
-    let order = object.get("順序").and_then(Value::as_u64).filter(|value| (1..=MAX_DATASETS_CASES as u64).contains(value)).ok_or("評価Case順序が不正です")?;
+    let order = object
+        .get("順序")
+        .and_then(Value::as_u64)
+        .filter(|value| (1..=MAX_DATASETS_CASES as u64).contains(value))
+        .ok_or("評価Case順序が不正です")?;
     let _ = bounded_string(
         object.get("公開表示名"),
         128,
         "評価Case公開表示名が不正です",
     )?;
-    let input = exact_object(object.get("入力").ok_or("評価Case入力が不正です")?, &["内容表示範囲", "本文"])?;
+    let input = exact_object(
+        object.get("入力").ok_or("評価Case入力が不正です")?,
+        &["内容表示範囲", "本文"],
+    )?;
     if input.get("内容表示範囲").and_then(Value::as_str) != Some("full") {
         return Err("評価Case入力の表示範囲が不正です");
     }
     let body = bounded_string(input.get("本文"), 4096, "評価Case入力本文が不正です")?;
-    let evaluators = object.get("評価器設定").and_then(Value::as_array).filter(|value| !value.is_empty() && value.len() <= MAX_EVALUATORS_PER_CASE).ok_or("評価器設定が不正です")?;
+    let evaluators = object
+        .get("評価器設定")
+        .and_then(Value::as_array)
+        .filter(|value| !value.is_empty() && value.len() <= MAX_EVALUATORS_PER_CASE)
+        .ok_or("評価器設定が不正です")?;
     let mut evaluator_ids = BTreeSet::new();
     for evaluator in evaluators {
         let id = validate_private_evaluator(evaluator)?;
@@ -2827,7 +3231,18 @@ fn validate_private_evaluator(value: &Value) -> Result<String, &'static str> {
     let object = exact_object(value, &["評価器ID", "種類", "設定"])?;
     let id = required_identifier(object, "評価器ID")?;
     let kind = bounded_string(object.get("種類"), 64, "評価器種類が不正です")?;
-    if !matches!(kind.as_str(), "exact" | "contains" | "regex" | "json_schema" | "reference_count" | "route" | "status" | "capability" | "latency_threshold") {
+    if !matches!(
+        kind.as_str(),
+        "exact"
+            | "contains"
+            | "regex"
+            | "json_schema"
+            | "reference_count"
+            | "route"
+            | "status"
+            | "capability"
+            | "latency_threshold"
+    ) {
         return Err("評価器種類が未対応です");
     }
     let setting = object.get("設定").ok_or("評価器設定が不正です")?;
@@ -2845,23 +3260,69 @@ fn validate_private_evaluator(value: &Value) -> Result<String, &'static str> {
     };
     let setting = exact_object(setting, fields)?;
     match kind.as_str() {
-        "exact" => { bounded_string(setting.get("期待本文"), 65_536, "exact設定が不正です")?; }
-        "contains" | "regex" => { bounded_string(setting.get(if kind == "contains" { "期待断片" } else { "パターン" }), 8192, "文字列評価器設定が不正です")?; }
-        "json_schema" => { if !setting.get("期待Schema").is_some_and(Value::is_object) { return Err("JSON Schema設定が不正です"); } }
+        "exact" => {
+            bounded_string(setting.get("期待本文"), 65_536, "exact設定が不正です")?;
+        }
+        "contains" | "regex" => {
+            bounded_string(
+                setting.get(if kind == "contains" {
+                    "期待断片"
+                } else {
+                    "パターン"
+                }),
+                8192,
+                "文字列評価器設定が不正です",
+            )?;
+        }
+        "json_schema" => {
+            if !setting.get("期待Schema").is_some_and(Value::is_object) {
+                return Err("JSON Schema設定が不正です");
+            }
+        }
         "reference_count" => {
-            let min = setting.get("最小数").and_then(Value::as_u64).filter(|value| *value <= 64).ok_or("参照数設定が不正です")?;
-            let max = setting.get("最大数").and_then(Value::as_u64).filter(|value| *value <= 64 && *value >= min).ok_or("参照数設定が不正です")?;
+            let min = setting
+                .get("最小数")
+                .and_then(Value::as_u64)
+                .filter(|value| *value <= 64)
+                .ok_or("参照数設定が不正です")?;
+            let max = setting
+                .get("最大数")
+                .and_then(Value::as_u64)
+                .filter(|value| *value <= 64 && *value >= min)
+                .ok_or("参照数設定が不正です")?;
             let _ = max;
         }
-        "route" => { bounded_string(setting.get("期待経路"), 256, "経路設定が不正です")?; }
+        "route" => {
+            bounded_string(setting.get("期待経路"), 256, "経路設定が不正です")?;
+        }
         "status" => {
-            if !matches!(setting.get("期待状態").and_then(Value::as_str), Some("成功" | "保留" | "失敗" | "中止")) { return Err("状態設定が不正です"); }
+            if !matches!(
+                setting.get("期待状態").and_then(Value::as_str),
+                Some("成功" | "保留" | "失敗" | "中止")
+            ) {
+                return Err("状態設定が不正です");
+            }
         }
         "capability" => {
-            let values = setting.get("必要能力一覧").and_then(Value::as_array).filter(|value| !value.is_empty() && value.len() <= 64).ok_or("能力設定が不正です")?;
-            if values.iter().any(|value| bounded_string(Some(value), 256, "能力設定が不正です").is_err()) { return Err("能力設定が不正です"); }
+            let values = setting
+                .get("必要能力一覧")
+                .and_then(Value::as_array)
+                .filter(|value| !value.is_empty() && value.len() <= 64)
+                .ok_or("能力設定が不正です")?;
+            if values
+                .iter()
+                .any(|value| bounded_string(Some(value), 256, "能力設定が不正です").is_err())
+            {
+                return Err("能力設定が不正です");
+            }
         }
-        "latency_threshold" => { setting.get("最大Millis").and_then(Value::as_u64).filter(|value| *value <= 86_400_000).ok_or("遅延設定が不正です")?; }
+        "latency_threshold" => {
+            setting
+                .get("最大Millis")
+                .and_then(Value::as_u64)
+                .filter(|value| *value <= 86_400_000)
+                .ok_or("遅延設定が不正です")?;
+        }
         _ => return Err("評価器種類が未対応です"),
     }
     Ok(id)
@@ -2876,7 +3337,11 @@ fn public_manifest(
     audit_id: &str,
 ) -> Result<Value, &'static str> {
     let definition_hash = canonical_payload_hash(Some(raw));
-    let cases = registration.cases.iter().map(|case| json!({"評価CaseID": case.case_id, "定義hash": case.definition_hash})).collect::<Vec<_>>();
+    let cases = registration
+        .cases
+        .iter()
+        .map(|case| json!({"評価CaseID": case.case_id, "定義hash": case.definition_hash}))
+        .collect::<Vec<_>>();
     let value = json!({
         "版": EVALUATION_VERSION,
         "評価DatasetID": registration.dataset_id,
@@ -2892,16 +3357,26 @@ fn public_manifest(
         "作成監査ID": audit_id,
         "証拠種別": EVIDENCE_SOURCE_INTERNAL_STATE,
     });
-    valid_manifest(&value).then_some(value).ok_or("公開manifestが不正です")
+    valid_manifest(&value)
+        .then_some(value)
+        .ok_or("公開manifestが不正です")
 }
 
 fn parse_manifest(value: Value) -> Result<DatasetManifest, &'static str> {
-    if !valid_manifest(&value) { return Err("評価Dataset公開manifestが不正です"); }
+    if !valid_manifest(&value) {
+        return Err("評価Dataset公開manifestが不正です");
+    }
     Ok(DatasetManifest {
-        dataset_id: value["評価DatasetID"].as_str().unwrap_or_default().to_owned(),
+        dataset_id: value["評価DatasetID"]
+            .as_str()
+            .unwrap_or_default()
+            .to_owned(),
         revision: value["revision"].as_u64().unwrap_or_default(),
         definition_hash: value["定義hash"].as_str().unwrap_or_default().to_owned(),
-        storage_id: value["非公開保管ID"].as_str().unwrap_or_default().to_owned(),
+        storage_id: value["非公開保管ID"]
+            .as_str()
+            .unwrap_or_default()
+            .to_owned(),
         ciphertext_hash: value["暗号文hash"].as_str().unwrap_or_default().to_owned(),
         value,
     })
@@ -2909,14 +3384,25 @@ fn parse_manifest(value: Value) -> Result<DatasetManifest, &'static str> {
 
 fn start_request(value: &Value) -> Result<(String, Vec<String>), &'static str> {
     let object = exact_object(value, &["版", "評価DatasetID", "対象Runtime一覧"])?;
-    if object.get("版").and_then(Value::as_u64) != Some(EVALUATION_VERSION) { return Err("評価実験開始の版が不正です"); }
+    if object.get("版").and_then(Value::as_u64) != Some(EVALUATION_VERSION) {
+        return Err("評価実験開始の版が不正です");
+    }
     let id = required_identifier(object, "評価DatasetID")?;
-    let runtimes = object.get("対象Runtime一覧").and_then(Value::as_array).filter(|value| !value.is_empty() && value.len() <= MAX_TARGET_RUNTIMES).ok_or("評価対象Runtime一覧が不正です")?;
+    let runtimes = object
+        .get("対象Runtime一覧")
+        .and_then(Value::as_array)
+        .filter(|value| !value.is_empty() && value.len() <= MAX_TARGET_RUNTIMES)
+        .ok_or("評価対象Runtime一覧が不正です")?;
     let mut unique = BTreeSet::new();
     let mut output = Vec::with_capacity(runtimes.len());
     for runtime in runtimes {
-        let runtime = runtime.as_str().filter(|value| 実行系ID妥当(value)).ok_or("評価対象RuntimeIDが不正です")?;
-        if !unique.insert(runtime) { return Err("評価対象RuntimeIDが重複しています"); }
+        let runtime = runtime
+            .as_str()
+            .filter(|value| 実行系ID妥当(value))
+            .ok_or("評価対象RuntimeIDが不正です")?;
+        if !unique.insert(runtime) {
+            return Err("評価対象RuntimeIDが重複しています");
+        }
         output.push(runtime.to_owned());
     }
     Ok((id, output))
@@ -2924,15 +3410,24 @@ fn start_request(value: &Value) -> Result<(String, Vec<String>), &'static str> {
 
 fn experiment_request(value: &Value) -> Result<String, &'static str> {
     let object = exact_object(value, &["版", "評価ExperimentID"])?;
-    if object.get("版").and_then(Value::as_u64) != Some(EVALUATION_VERSION) { return Err("評価Experiment要求の版が不正です"); }
+    if object.get("版").and_then(Value::as_u64) != Some(EVALUATION_VERSION) {
+        return Err("評価Experiment要求の版が不正です");
+    }
     required_identifier(object, "評価ExperimentID")
 }
 
 fn empty_version_payload(value: &Value) -> bool {
-    exact_object(value, &["版"]).ok().is_some_and(|object| object.get("版").and_then(Value::as_u64) == Some(EVALUATION_VERSION))
+    exact_object(value, &["版"])
+        .ok()
+        .is_some_and(|object| object.get("版").and_then(Value::as_u64) == Some(EVALUATION_VERSION))
 }
 
-fn success_response(request_id: &str, operation: &str, audit_event_id: String, body: Value) -> BrokerResponse {
+fn success_response(
+    request_id: &str,
+    operation: &str,
+    audit_event_id: String,
+    body: Value,
+) -> BrokerResponse {
     BrokerResponse {
         request_id: request_id.to_owned(),
         operation: operation.to_owned(),
@@ -2946,39 +3441,90 @@ fn success_response(request_id: &str, operation: &str, audit_event_id: String, b
     }
 }
 
-fn accept_safe_body(broker: &mut Broker, request_id: &str, operation: &str, body: Value) -> BrokerResponse {
-    match broker.append_audit(request_id, operation, "accepted", "評価ラボの安全な運用観測projectionを返却。Authority、release、security判断を生成しない", EVIDENCE_SOURCE_INTERNAL_STATE, &canonical_payload_hash(Some(&body))) {
+fn accept_safe_body(
+    broker: &mut Broker,
+    request_id: &str,
+    operation: &str,
+    body: Value,
+) -> BrokerResponse {
+    match broker.append_audit(
+        request_id,
+        operation,
+        "accepted",
+        "評価ラボの安全な運用観測projectionを返却。Authority、release、security判断を生成しない",
+        EVIDENCE_SOURCE_INTERNAL_STATE,
+        &canonical_payload_hash(Some(&body)),
+    ) {
         Ok(event) => success_response(request_id, operation, event.event_id, body),
-        Err(_) => broker.audit_store_failed_response(request_id, operation, "監査失敗", "監査修復後に再確認してください"),
+        Err(_) => broker.audit_store_failed_response(
+            request_id,
+            operation,
+            "監査失敗",
+            "監査修復後に再確認してください",
+        ),
     }
 }
 
-fn exact_object<'a>(value: &'a Value, fields: &[&str]) -> Result<&'a Map<String, Value>, &'static str> {
+fn exact_object<'a>(
+    value: &'a Value,
+    fields: &[&str],
+) -> Result<&'a Map<String, Value>, &'static str> {
     let object = value.as_object().ok_or("object形式が必要です")?;
-    if object.len() != fields.len() || fields.iter().any(|field| !object.contains_key(*field)) || object.keys().any(|field| !fields.contains(&field.as_str())) {
+    if object.len() != fields.len()
+        || fields.iter().any(|field| !object.contains_key(*field))
+        || object.keys().any(|field| !fields.contains(&field.as_str()))
+    {
         return Err("許可されないfieldがあります");
     }
     Ok(object)
 }
 
 fn required_identifier(object: &Map<String, Value>, field: &str) -> Result<String, &'static str> {
-    object.get(field).and_then(Value::as_str).filter(|value| valid_identifier(value)).map(str::to_owned).ok_or("IDが不正です")
+    object
+        .get(field)
+        .and_then(Value::as_str)
+        .filter(|value| valid_identifier(value))
+        .map(str::to_owned)
+        .ok_or("IDが不正です")
 }
 
-fn bounded_string(value: Option<&Value>, max: usize, error: &'static str) -> Result<String, &'static str> {
-    value.and_then(Value::as_str).filter(|value| !value.is_empty() && value.chars().count() <= max).map(str::to_owned).ok_or(error)
+fn bounded_string(
+    value: Option<&Value>,
+    max: usize,
+    error: &'static str,
+) -> Result<String, &'static str> {
+    value
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty() && value.chars().count() <= max)
+        .map(str::to_owned)
+        .ok_or(error)
 }
 
 fn valid_identifier(value: &str) -> bool {
-    value.len() == 32 && value.bytes().all(|value| value.is_ascii_digit() || (b'a'..=b'f').contains(&value))
+    value.len() == 32
+        && value
+            .bytes()
+            .all(|value| value.is_ascii_digit() || (b'a'..=b'f').contains(&value))
 }
 
 fn valid_hash(value: &str) -> bool {
-    value.len() == 71 && value.starts_with("sha256:") && value.as_bytes()[7..].iter().all(|value| value.is_ascii_digit() || (b'a'..=b'f').contains(value))
+    value.len() == 71
+        && value.starts_with("sha256:")
+        && value.as_bytes()[7..]
+            .iter()
+            .all(|value| value.is_ascii_digit() || (b'a'..=b'f').contains(value))
 }
 
 fn valid_audit_id(value: &str) -> bool {
-    !value.is_empty() && value.len() <= 256 && value.as_bytes().first().is_some_and(u8::is_ascii_alphanumeric) && value.bytes().all(|value| value.is_ascii_alphanumeric() || matches!(value, b'_' | b'.' | b':' | b'-'))
+    !value.is_empty()
+        && value.len() <= 256
+        && value
+            .as_bytes()
+            .first()
+            .is_some_and(u8::is_ascii_alphanumeric)
+        && value.bytes().all(|value| {
+            value.is_ascii_alphanumeric() || matches!(value, b'_' | b'.' | b':' | b'-')
+        })
 }
 
 fn optional_audit(value: Option<&Value>) -> Result<Value, &'static str> {
@@ -2990,28 +3536,114 @@ fn optional_audit(value: Option<&Value>) -> Result<Value, &'static str> {
 }
 
 fn storage_id(dataset_id: &str, revision: u64) -> String {
-    sha256_tagged(format!("GUI-Shell:evaluation-private:v1:{dataset_id}:{revision}").as_bytes())[7..39].to_owned()
+    sha256_tagged(format!("GUI-Shell:evaluation-private:v1:{dataset_id}:{revision}").as_bytes())
+        [7..39]
+        .to_owned()
 }
 
 fn valid_manifest(value: &Value) -> bool {
-    let Ok(object) = exact_object(value, &["版", "評価DatasetID", "revision", "定義hash", "非公開保管ID", "暗号文hash", "公開表示名", "Case数", "Case一覧", "公開範囲", "作成時刻UnixMillis", "作成監査ID", "証拠種別"]) else { return false; };
+    let Ok(object) = exact_object(
+        value,
+        &[
+            "版",
+            "評価DatasetID",
+            "revision",
+            "定義hash",
+            "非公開保管ID",
+            "暗号文hash",
+            "公開表示名",
+            "Case数",
+            "Case一覧",
+            "公開範囲",
+            "作成時刻UnixMillis",
+            "作成監査ID",
+            "証拠種別",
+        ],
+    ) else {
+        return false;
+    };
     object.get("版").and_then(Value::as_u64) == Some(EVALUATION_VERSION)
-        && object.get("評価DatasetID").and_then(Value::as_str).is_some_and(valid_identifier)
-        && object.get("revision").and_then(Value::as_u64).is_some_and(|value| value >= 1)
-        && object.get("定義hash").and_then(Value::as_str).is_some_and(valid_hash)
-        && object.get("非公開保管ID").and_then(Value::as_str).is_some_and(valid_identifier)
-        && object.get("暗号文hash").and_then(Value::as_str).is_some_and(valid_hash)
-        && object.get("公開表示名").and_then(Value::as_str).is_some_and(|value| !value.is_empty() && value.chars().count() <= 128)
-        && object.get("Case数").and_then(Value::as_u64).is_some_and(|value| (1..=MAX_DATASETS_CASES as u64).contains(&value))
-        && object.get("Case一覧").and_then(Value::as_array).is_some_and(|values| values.len() == object["Case数"].as_u64().unwrap_or_default() as usize && values.iter().all(|case| exact_object(case, &["評価CaseID", "定義hash"]).ok().is_some_and(|case| case.get("評価CaseID").and_then(Value::as_str).is_some_and(valid_identifier) && case.get("定義hash").and_then(Value::as_str).is_some_and(valid_hash))))
+        && object
+            .get("評価DatasetID")
+            .and_then(Value::as_str)
+            .is_some_and(valid_identifier)
+        && object
+            .get("revision")
+            .and_then(Value::as_u64)
+            .is_some_and(|value| value >= 1)
+        && object
+            .get("定義hash")
+            .and_then(Value::as_str)
+            .is_some_and(valid_hash)
+        && object
+            .get("非公開保管ID")
+            .and_then(Value::as_str)
+            .is_some_and(valid_identifier)
+        && object
+            .get("暗号文hash")
+            .and_then(Value::as_str)
+            .is_some_and(valid_hash)
+        && object
+            .get("公開表示名")
+            .and_then(Value::as_str)
+            .is_some_and(|value| !value.is_empty() && value.chars().count() <= 128)
+        && object
+            .get("Case数")
+            .and_then(Value::as_u64)
+            .is_some_and(|value| (1..=MAX_DATASETS_CASES as u64).contains(&value))
+        && object
+            .get("Case一覧")
+            .and_then(Value::as_array)
+            .is_some_and(|values| {
+                values.len() == object["Case数"].as_u64().unwrap_or_default() as usize
+                    && values.iter().all(|case| {
+                        exact_object(case, &["評価CaseID", "定義hash"])
+                            .ok()
+                            .is_some_and(|case| {
+                                case.get("評価CaseID")
+                                    .and_then(Value::as_str)
+                                    .is_some_and(valid_identifier)
+                                    && case
+                                        .get("定義hash")
+                                        .and_then(Value::as_str)
+                                        .is_some_and(valid_hash)
+                            })
+                    })
+            })
         && object.get("公開範囲").and_then(Value::as_str) == Some("hash_only")
-        && object.get("作成時刻UnixMillis").and_then(Value::as_i64).is_some_and(|value| value >= 0)
-        && object.get("作成監査ID").and_then(Value::as_str).is_some_and(valid_audit_id)
+        && object
+            .get("作成時刻UnixMillis")
+            .and_then(Value::as_i64)
+            .is_some_and(|value| value >= 0)
+        && object
+            .get("作成監査ID")
+            .and_then(Value::as_str)
+            .is_some_and(valid_audit_id)
         && object.get("証拠種別").and_then(Value::as_str) == Some(EVIDENCE_SOURCE_INTERNAL_STATE)
 }
 
 fn valid_experiment(value: &Value) -> bool {
-    let Ok(object) = exact_object(value, &["版", "評価ExperimentID", "評価DatasetID", "Dataset定義hash", "対象Runtime一覧", "状態", "計画Case数", "結果数", "作成時刻UnixMillis", "開始時刻UnixMillis", "終了時刻UnixMillis", "計画監査ID", "実験監査ID", "証拠種別"]) else { return false; };
+    let Ok(object) = exact_object(
+        value,
+        &[
+            "版",
+            "評価ExperimentID",
+            "評価DatasetID",
+            "Dataset定義hash",
+            "対象Runtime一覧",
+            "状態",
+            "計画Case数",
+            "結果数",
+            "作成時刻UnixMillis",
+            "開始時刻UnixMillis",
+            "終了時刻UnixMillis",
+            "計画監査ID",
+            "実験監査ID",
+            "証拠種別",
+        ],
+    ) else {
+        return false;
+    };
     let Some(case_count) = object
         .get("計画Case数")
         .and_then(Value::as_u64)
@@ -3028,18 +3660,36 @@ fn valid_experiment(value: &Value) -> bool {
     let Some(result_count) = object.get("結果数").and_then(Value::as_u64) else {
         return false;
     };
-    let state = object.get("状態").and_then(Value::as_str).unwrap_or_default();
+    let state = object
+        .get("状態")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
     let started_at = object.get("開始時刻UnixMillis").and_then(Value::as_i64);
     let finished_at = object.get("終了時刻UnixMillis").and_then(Value::as_i64);
     object.get("版").and_then(Value::as_u64) == Some(EVALUATION_VERSION)
-        && object.get("評価ExperimentID").and_then(Value::as_str).is_some_and(valid_identifier)
-        && object.get("評価DatasetID").and_then(Value::as_str).is_some_and(valid_identifier)
-        && object.get("Dataset定義hash").and_then(Value::as_str).is_some_and(valid_hash)
+        && object
+            .get("評価ExperimentID")
+            .and_then(Value::as_str)
+            .is_some_and(valid_identifier)
+        && object
+            .get("評価DatasetID")
+            .and_then(Value::as_str)
+            .is_some_and(valid_identifier)
+        && object
+            .get("Dataset定義hash")
+            .and_then(Value::as_str)
+            .is_some_and(valid_hash)
         && valid_runtime_list(object.get("対象Runtime一覧"))
-        && matches!(state, "準備済み" | "承認待ち" | "実行中" | "完了" | "中断" | "評価不能")
+        && matches!(
+            state,
+            "準備済み" | "承認待ち" | "実行中" | "完了" | "中断" | "評価不能"
+        )
         && result_count <= 1024
         && result_count <= expected_result_count
-        && object.get("作成時刻UnixMillis").and_then(Value::as_i64).is_some_and(|value| value >= 0)
+        && object
+            .get("作成時刻UnixMillis")
+            .and_then(Value::as_i64)
+            .is_some_and(|value| value >= 0)
         && optional_nonnegative_int(object.get("開始時刻UnixMillis"))
         && optional_nonnegative_int(object.get("終了時刻UnixMillis"))
         && match (started_at, finished_at) {
@@ -3053,8 +3703,14 @@ fn valid_experiment(value: &Value) -> bool {
             started_at,
             finished_at,
         )
-        && object.get("計画監査ID").and_then(Value::as_str).is_some_and(valid_audit_id)
-        && object.get("実験監査ID").and_then(Value::as_str).is_some_and(valid_audit_id)
+        && object
+            .get("計画監査ID")
+            .and_then(Value::as_str)
+            .is_some_and(valid_audit_id)
+        && object
+            .get("実験監査ID")
+            .and_then(Value::as_str)
+            .is_some_and(valid_audit_id)
         && object.get("計画監査ID") != object.get("実験監査ID")
         && object.get("証拠種別").and_then(Value::as_str) == Some(EVIDENCE_SOURCE_INTERNAL_STATE)
 }
@@ -3073,9 +3729,7 @@ fn valid_experiment_state(
         // 全Resultが監査済みでも既存対話の終了回収中であれば、完了へ昇格しない。
         "実行中" => finished_at.is_none(),
         "完了" => {
-            result_count == expected_result_count
-                && started_at.is_some()
-                && finished_at.is_some()
+            result_count == expected_result_count && started_at.is_some() && finished_at.is_some()
         }
         // owner承認前の期限超過など、開始監査なしで終端する評価不能もある。
         "評価不能" => result_count == expected_result_count && finished_at.is_some(),
@@ -3102,18 +3756,75 @@ fn valid_runtime_list(value: Option<&Value>) -> bool {
 }
 
 fn valid_result(value: &Value) -> bool {
-    let Ok(object) = exact_object(value, &["版", "評価ExperimentID", "評価DatasetID", "Dataset定義hash", "評価CaseID", "実行系ID", "対話要求ID", "対話セッションID", "作成監査ID", "開始監査ID", "終了監査ID", "実行系隔離予約監査ID", "評価監査ID", "結果状態", "判定", "評価器判定一覧", "実行時刻UnixMillis", "LatencyMillis", "応答hash", "証拠種別"]) else { return false; };
+    let Ok(object) = exact_object(
+        value,
+        &[
+            "版",
+            "評価ExperimentID",
+            "評価DatasetID",
+            "Dataset定義hash",
+            "評価CaseID",
+            "実行系ID",
+            "対話要求ID",
+            "対話セッションID",
+            "作成監査ID",
+            "開始監査ID",
+            "終了監査ID",
+            "実行系隔離予約監査ID",
+            "評価監査ID",
+            "結果状態",
+            "判定",
+            "評価器判定一覧",
+            "実行時刻UnixMillis",
+            "LatencyMillis",
+            "応答hash",
+            "証拠種別",
+        ],
+    ) else {
+        return false;
+    };
     object.get("版").and_then(Value::as_u64) == Some(EVALUATION_VERSION)
-        && ["評価ExperimentID", "評価DatasetID", "評価CaseID", "対話要求ID", "対話セッションID"].iter().all(|field| object.get(*field).and_then(Value::as_str).is_some_and(valid_identifier))
-        && object.get("Dataset定義hash").and_then(Value::as_str).is_some_and(valid_hash)
-        && object.get("実行系ID").and_then(Value::as_str).is_some_and(実行系ID妥当)
-        && object.get("作成監査ID").and_then(Value::as_str).is_some_and(valid_audit_id)
+        && [
+            "評価ExperimentID",
+            "評価DatasetID",
+            "評価CaseID",
+            "対話要求ID",
+            "対話セッションID",
+        ]
+        .iter()
+        .all(|field| {
+            object
+                .get(*field)
+                .and_then(Value::as_str)
+                .is_some_and(valid_identifier)
+        })
+        && object
+            .get("Dataset定義hash")
+            .and_then(Value::as_str)
+            .is_some_and(valid_hash)
+        && object
+            .get("実行系ID")
+            .and_then(Value::as_str)
+            .is_some_and(実行系ID妥当)
+        && object
+            .get("作成監査ID")
+            .and_then(Value::as_str)
+            .is_some_and(valid_audit_id)
         && optional_audit(object.get("開始監査ID")).is_ok()
         && optional_audit(object.get("終了監査ID")).is_ok()
         && optional_audit(object.get("実行系隔離予約監査ID")).is_ok()
-        && object.get("評価監査ID").and_then(Value::as_str).is_some_and(valid_audit_id)
-        && object.get("結果状態").and_then(Value::as_str).is_some_and(|value| matches!(value, "成功" | "失敗" | "中止" | "評価不能"))
-        && object.get("判定").and_then(Value::as_str).is_some_and(|value| matches!(value, "成立" | "不成立" | "評価不能" | "中断"))
+        && object
+            .get("評価監査ID")
+            .and_then(Value::as_str)
+            .is_some_and(valid_audit_id)
+        && object
+            .get("結果状態")
+            .and_then(Value::as_str)
+            .is_some_and(|value| matches!(value, "成功" | "失敗" | "中止" | "評価不能"))
+        && object
+            .get("判定")
+            .and_then(Value::as_str)
+            .is_some_and(|value| matches!(value, "成立" | "不成立" | "評価不能" | "中断"))
         && match (
             object.get("結果状態").and_then(Value::as_str),
             object.get("判定").and_then(Value::as_str),
@@ -3124,9 +3835,17 @@ fn valid_result(value: &Value) -> bool {
         }
         && match object.get("結果状態").and_then(Value::as_str) {
             Some("成功") => {
-                object.get("開始監査ID").and_then(Value::as_str).is_some_and(valid_audit_id)
-                    && object.get("終了監査ID").and_then(Value::as_str).is_some_and(valid_audit_id)
-                    && object.get("実行系隔離予約監査ID").is_some_and(Value::is_null)
+                object
+                    .get("開始監査ID")
+                    .and_then(Value::as_str)
+                    .is_some_and(valid_audit_id)
+                    && object
+                        .get("終了監査ID")
+                        .and_then(Value::as_str)
+                        .is_some_and(valid_audit_id)
+                    && object
+                        .get("実行系隔離予約監査ID")
+                        .is_some_and(Value::is_null)
             }
             Some("中止") => true,
             Some("失敗" | "評価不能") => object
@@ -3134,8 +3853,18 @@ fn valid_result(value: &Value) -> bool {
                 .is_some_and(Value::is_null),
             _ => false,
         }
-        && object.get("評価器判定一覧").and_then(Value::as_array).is_some_and(|values| !values.is_empty() && values.len() <= MAX_EVALUATORS_PER_CASE && values.iter().all(valid_evaluator_result))
-        && object.get("実行時刻UnixMillis").and_then(Value::as_i64).is_some_and(|value| value >= 0)
+        && object
+            .get("評価器判定一覧")
+            .and_then(Value::as_array)
+            .is_some_and(|values| {
+                !values.is_empty()
+                    && values.len() <= MAX_EVALUATORS_PER_CASE
+                    && values.iter().all(valid_evaluator_result)
+            })
+        && object
+            .get("実行時刻UnixMillis")
+            .and_then(Value::as_i64)
+            .is_some_and(|value| value >= 0)
         && optional_nonnegative_int(object.get("LatencyMillis"))
         && match object.get("応答hash") {
             Some(Value::Null) => object.get("結果状態").and_then(Value::as_str) != Some("成功"),
@@ -3148,16 +3877,46 @@ fn valid_result(value: &Value) -> bool {
 /// 通常IPCとFlutterが扱うのは、内部Resultから明示的に縮約したこの形だけである。
 /// C4予約、対話request/session、応答hash、開始終了監査を混入させない。
 fn valid_public_result_projection(value: &Value) -> bool {
-    let Ok(object) = exact_object(value, &["評価ExperimentID", "評価DatasetID", "評価CaseID", "実行系ID", "判定", "評価器判定一覧", "LatencyMillis", "総合hash", "評価監査ID"]) else { return false; };
+    let Ok(object) = exact_object(
+        value,
+        &[
+            "評価ExperimentID",
+            "評価DatasetID",
+            "評価CaseID",
+            "実行系ID",
+            "判定",
+            "評価器判定一覧",
+            "LatencyMillis",
+            "総合hash",
+            "評価監査ID",
+        ],
+    ) else {
+        return false;
+    };
     let Some(evaluators) = object.get("評価器判定一覧").and_then(Value::as_array) else {
         return false;
     };
     let mut evaluator_ids = BTreeSet::new();
-    object.get("評価ExperimentID").and_then(Value::as_str).is_some_and(valid_identifier)
-        && object.get("評価DatasetID").and_then(Value::as_str).is_some_and(valid_identifier)
-        && object.get("評価CaseID").and_then(Value::as_str).is_some_and(valid_identifier)
-        && object.get("実行系ID").and_then(Value::as_str).is_some_and(実行系ID妥当)
-        && object.get("判定").and_then(Value::as_str).is_some_and(|value| matches!(value, "成立" | "不成立" | "評価不能" | "中断"))
+    object
+        .get("評価ExperimentID")
+        .and_then(Value::as_str)
+        .is_some_and(valid_identifier)
+        && object
+            .get("評価DatasetID")
+            .and_then(Value::as_str)
+            .is_some_and(valid_identifier)
+        && object
+            .get("評価CaseID")
+            .and_then(Value::as_str)
+            .is_some_and(valid_identifier)
+        && object
+            .get("実行系ID")
+            .and_then(Value::as_str)
+            .is_some_and(実行系ID妥当)
+        && object
+            .get("判定")
+            .and_then(Value::as_str)
+            .is_some_and(|value| matches!(value, "成立" | "不成立" | "評価不能" | "中断"))
         && !evaluators.is_empty()
         && evaluators.len() <= MAX_EVALUATORS_PER_CASE
         && evaluators.iter().all(|item| {
@@ -3168,20 +3927,88 @@ fn valid_public_result_projection(value: &Value) -> bool {
                     .is_some_and(|id| evaluator_ids.insert(id))
         })
         && optional_nonnegative_int(object.get("LatencyMillis"))
-        && object.get("総合hash").and_then(Value::as_str).is_some_and(valid_hash)
-        && object.get("評価監査ID").and_then(Value::as_str).is_some_and(valid_audit_id)
+        && object
+            .get("総合hash")
+            .and_then(Value::as_str)
+            .is_some_and(valid_hash)
+        && object
+            .get("評価監査ID")
+            .and_then(Value::as_str)
+            .is_some_and(valid_audit_id)
 }
 
 fn valid_evaluator_result(value: &Value) -> bool {
-    let Ok(object) = exact_object(value, &["評価器ID", "種類", "判定", "理由code"]) else { return false; };
-    object.get("評価器ID").and_then(Value::as_str).is_some_and(valid_identifier)
-        && object.get("種類").and_then(Value::as_str).is_some_and(|value| matches!(value, "exact" | "contains" | "regex" | "json_schema" | "reference_count" | "route" | "status" | "capability" | "latency_threshold"))
-        && object.get("判定").and_then(Value::as_str).is_some_and(|value| matches!(value, "成立" | "不成立" | "評価不能" | "中断"))
-        && object.get("理由code").and_then(Value::as_str).is_some_and(|value| matches!(value, "一致" | "不一致" | "入力不足" | "応答不正" | "根拠不足" | "閾値超過" | "中止" | "監査失敗" | "評価器不正"))
+    let Ok(object) = exact_object(value, &["評価器ID", "種類", "判定", "理由code"]) else {
+        return false;
+    };
+    object
+        .get("評価器ID")
+        .and_then(Value::as_str)
+        .is_some_and(valid_identifier)
+        && object
+            .get("種類")
+            .and_then(Value::as_str)
+            .is_some_and(|value| {
+                matches!(
+                    value,
+                    "exact"
+                        | "contains"
+                        | "regex"
+                        | "json_schema"
+                        | "reference_count"
+                        | "route"
+                        | "status"
+                        | "capability"
+                        | "latency_threshold"
+                )
+            })
+        && object
+            .get("判定")
+            .and_then(Value::as_str)
+            .is_some_and(|value| matches!(value, "成立" | "不成立" | "評価不能" | "中断"))
+        && object
+            .get("理由code")
+            .and_then(Value::as_str)
+            .is_some_and(|value| {
+                matches!(
+                    value,
+                    "一致"
+                        | "不一致"
+                        | "入力不足"
+                        | "応答不正"
+                        | "根拠不足"
+                        | "閾値超過"
+                        | "中止"
+                        | "監査失敗"
+                        | "評価器不正"
+                )
+            })
 }
 
 fn valid_comparison(value: &Value) -> bool {
-    let Ok(object) = exact_object(value, &["版", "比較ID", "評価DatasetID", "Dataset定義hash", "実験一覧", "計画Case数", "成立数", "不成立数", "評価不能数", "中断数", "比較時刻UnixMillis", "経路差", "参照差", "能力差", "比較監査ID", "証拠種別"]) else { return false; };
+    let Ok(object) = exact_object(
+        value,
+        &[
+            "版",
+            "比較ID",
+            "評価DatasetID",
+            "Dataset定義hash",
+            "実験一覧",
+            "計画Case数",
+            "成立数",
+            "不成立数",
+            "評価不能数",
+            "中断数",
+            "比較時刻UnixMillis",
+            "経路差",
+            "参照差",
+            "能力差",
+            "比較監査ID",
+            "証拠種別",
+        ],
+    ) else {
+        return false;
+    };
     let Some(case_count) = object
         .get("計画Case数")
         .and_then(Value::as_u64)
@@ -3200,23 +4027,49 @@ fn valid_comparison(value: &Value) -> bool {
         return false;
     };
     object.get("版").and_then(Value::as_u64) == Some(EVALUATION_VERSION)
-        && object.get("比較ID").and_then(Value::as_str).is_some_and(valid_identifier)
-        && object.get("評価DatasetID").and_then(Value::as_str).is_some_and(valid_identifier)
+        && object
+            .get("比較ID")
+            .and_then(Value::as_str)
+            .is_some_and(valid_identifier)
+        && object
+            .get("評価DatasetID")
+            .and_then(Value::as_str)
+            .is_some_and(valid_identifier)
         && valid_comparison_entries(entries, case_count, dataset_definition_hash)
-        && ["成立数", "不成立数", "評価不能数", "中断数"].iter().all(|field| object.get(*field).and_then(Value::as_u64).is_some_and(|value| value <= 1024))
+        && ["成立数", "不成立数", "評価不能数", "中断数"]
+            .iter()
+            .all(|field| {
+                object
+                    .get(*field)
+                    .and_then(Value::as_u64)
+                    .is_some_and(|value| value <= 1024)
+            })
         && comparison_totals_match(object, entries)
-        && object.get("比較時刻UnixMillis").and_then(Value::as_i64).is_some_and(|value| value >= 0)
-        && ["経路差", "参照差", "能力差"].iter().all(|field| object.get(*field).and_then(Value::as_str).is_some_and(|value| matches!(value, "same" | "different" | "unknown")))
-        && object.get("比較監査ID").and_then(Value::as_str).is_some_and(valid_audit_id)
+        && object
+            .get("比較時刻UnixMillis")
+            .and_then(Value::as_i64)
+            .is_some_and(|value| value >= 0)
+        && ["経路差", "参照差", "能力差"].iter().all(|field| {
+            object
+                .get(*field)
+                .and_then(Value::as_str)
+                .is_some_and(|value| matches!(value, "same" | "different" | "unknown"))
+        })
+        && object
+            .get("比較監査ID")
+            .and_then(Value::as_str)
+            .is_some_and(valid_audit_id)
         && object.get("証拠種別").and_then(Value::as_str) == Some(EVIDENCE_SOURCE_INTERNAL_STATE)
 }
 
 const EVALUATION_COUNT_FIELDS: [&str; 4] = ["成立数", "不成立数", "評価不能数", "中断数"];
 
 fn evaluation_count_total(value: &Value) -> Option<u64> {
-    EVALUATION_COUNT_FIELDS.iter().try_fold(0u64, |total, field| {
-        value.get(*field)?.as_u64()?.checked_add(total)
-    })
+    EVALUATION_COUNT_FIELDS
+        .iter()
+        .try_fold(0u64, |total, field| {
+            value.get(*field)?.as_u64()?.checked_add(total)
+        })
 }
 
 fn comparison_totals_match(object: &Map<String, Value>, entries: &[Value]) -> bool {
@@ -3238,7 +4091,8 @@ fn valid_comparison_entries(
     case_count: u64,
     dataset_definition_hash: &str,
 ) -> bool {
-    if values.len() < 2 || values.len() > MAX_TARGET_RUNTIMES || !values.iter().all(valid_aggregate) {
+    if values.len() < 2 || values.len() > MAX_TARGET_RUNTIMES || !values.iter().all(valid_aggregate)
+    {
         return false;
     }
     let Some(experiment_id) = values
@@ -3259,11 +4113,41 @@ fn valid_comparison_entries(
 }
 
 fn valid_aggregate(value: &Value) -> bool {
-    let Ok(object) = exact_object(value, &["評価ExperimentID", "実行系ID", "Dataset定義hash", "成立数", "不成立数", "評価不能数", "中断数", "平均LatencyMillis"]) else { return false; };
-    object.get("評価ExperimentID").and_then(Value::as_str).is_some_and(valid_identifier)
-        && object.get("実行系ID").and_then(Value::as_str).is_some_and(実行系ID妥当)
-        && object.get("Dataset定義hash").and_then(Value::as_str).is_some_and(valid_hash)
-        && ["成立数", "不成立数", "評価不能数", "中断数"].iter().all(|field| object.get(*field).and_then(Value::as_u64).is_some_and(|value| value <= 1024))
+    let Ok(object) = exact_object(
+        value,
+        &[
+            "評価ExperimentID",
+            "実行系ID",
+            "Dataset定義hash",
+            "成立数",
+            "不成立数",
+            "評価不能数",
+            "中断数",
+            "平均LatencyMillis",
+        ],
+    ) else {
+        return false;
+    };
+    object
+        .get("評価ExperimentID")
+        .and_then(Value::as_str)
+        .is_some_and(valid_identifier)
+        && object
+            .get("実行系ID")
+            .and_then(Value::as_str)
+            .is_some_and(実行系ID妥当)
+        && object
+            .get("Dataset定義hash")
+            .and_then(Value::as_str)
+            .is_some_and(valid_hash)
+        && ["成立数", "不成立数", "評価不能数", "中断数"]
+            .iter()
+            .all(|field| {
+                object
+                    .get(*field)
+                    .and_then(Value::as_u64)
+                    .is_some_and(|value| value <= 1024)
+            })
         && match object.get("平均LatencyMillis") {
             Some(Value::Null) => true,
             Some(Value::Number(number)) => number
@@ -3274,13 +4158,16 @@ fn valid_aggregate(value: &Value) -> bool {
 }
 
 fn optional_nonnegative_int(value: Option<&Value>) -> bool {
-    matches!(value, Some(Value::Null)) || value.and_then(Value::as_i64).is_some_and(|value| value >= 0)
+    matches!(value, Some(Value::Null))
+        || value
+            .and_then(Value::as_i64)
+            .is_some_and(|value| value >= 0)
 }
 
 #[cfg(all(test, windows))]
 mod tests {
     use super::*;
-    use crate::broker::dialogue::{対話要求, 実行結果};
+    use crate::broker::dialogue::{実行結果, 対話要求};
     use crate::broker::runtime_lifecycle::{
         LifecycleAdapter, LifecycleAdapterFailure, LifecycleAdapterResult, LifecycleState,
     };
@@ -3402,7 +4289,8 @@ mod tests {
     fn read_test_file(path: &std::path::Path) -> Vec<u8> {
         let mut file = std::fs::File::open(path).expect("試験用ファイルを開ける");
         let mut bytes = Vec::new();
-        file.read_to_end(&mut bytes).expect("試験用ファイルを読める");
+        file.read_to_end(&mut bytes)
+            .expect("試験用ファイルを読める");
         bytes
     }
 
@@ -3413,17 +4301,18 @@ mod tests {
             .open(path)
             .expect("上書きする試験用ファイルを開ける");
         file.write_all(bytes).expect("試験用ファイルを上書きできる");
-        file.sync_all().expect("上書き後の試験用ファイルを同期できる");
+        file.sync_all()
+            .expect("上書き後の試験用ファイルを同期できる");
     }
 
     fn test_broker(root: &std::path::Path) -> (Broker, Arc<AtomicUsize>) {
         let audit = root.join("audit");
         let vault = root.join("vault");
         std::fs::create_dir(&vault).expect("vault");
-        let mut broker = Broker::new_persistent("evaluation-session", &audit).expect("永続化Brokerを作成できる");
+        let mut broker =
+            Broker::new_persistent("evaluation-session", &audit).expect("永続化Brokerを作成できる");
         broker.current_epoch_seconds_override = Some(
-            super::super::parse_issued_at_epoch_seconds("2026-06-01T00:00:30Z")
-                .expect("epoch"),
+            super::super::parse_issued_at_epoch_seconds("2026-06-01T00:00:30Z").expect("epoch"),
         );
         broker
             .保管先起動登録(&vault, true, &[audit.clone()])
@@ -3450,11 +4339,10 @@ mod tests {
         let audit = root.join("audit");
         let vault = root.join("vault");
         std::fs::create_dir(&vault).expect("vault");
-        let mut broker = Broker::new_persistent("evaluation-session", &audit)
-            .expect("永続化Brokerを作成できる");
+        let mut broker =
+            Broker::new_persistent("evaluation-session", &audit).expect("永続化Brokerを作成できる");
         broker.current_epoch_seconds_override = Some(
-            super::super::parse_issued_at_epoch_seconds("2026-06-01T00:00:30Z")
-                .expect("epoch"),
+            super::super::parse_issued_at_epoch_seconds("2026-06-01T00:00:30Z").expect("epoch"),
         );
         broker
             .保管先起動登録(&vault, true, &[audit.clone()])
@@ -3486,10 +4374,7 @@ mod tests {
         broker.処理(request, owner)
     }
 
-    fn c4_terminal_quarantine(
-        broker: &mut Broker,
-        counter: usize,
-    ) -> Value {
+    fn c4_terminal_quarantine(broker: &mut Broker, counter: usize) -> Value {
         broker
             .ライフサイクル試験登録("fixture-a", Arc::new(EvaluationLifecycleAdapter))
             .expect("C4 lifecycle fixtureを登録できる");
@@ -3526,7 +4411,12 @@ mod tests {
     }
 
     fn accepted(response: BrokerResponse) -> Value {
-        assert_eq!(response.status, BrokerStatus::Accepted, "{:?}", response.error);
+        assert_eq!(
+            response.status,
+            BrokerStatus::Accepted,
+            "{:?}",
+            response.error
+        );
         response.body.expect("受理応答の本文がある")
     }
 
@@ -3593,7 +4483,9 @@ mod tests {
         assert_eq!(manifest["公開範囲"], "hash_only");
         assert!(!manifest.to_string().contains(private_input));
         assert!(!manifest.to_string().contains(private_expected));
-        let storage_id = manifest["非公開保管ID"].as_str().expect("非公開保管IDがある");
+        let storage_id = manifest["非公開保管ID"]
+            .as_str()
+            .expect("非公開保管IDがある");
         let ciphertext = read_test_file(&vault.join(format!("evaluation-{storage_id}.dpapi")));
         assert!(!String::from_utf8_lossy(&ciphertext).contains(private_input));
         assert!(!String::from_utf8_lossy(&ciphertext).contains(private_expected));
@@ -3622,9 +4514,16 @@ mod tests {
             }),
             false,
         ));
-        let experiment_id = started["評価ExperimentID"].as_str().expect("評価実験IDがある").to_owned();
+        let experiment_id = started["評価ExperimentID"]
+            .as_str()
+            .expect("評価実験IDがある")
+            .to_owned();
         assert_eq!(started["状態"], "承認待ち");
-        assert_eq!(calls.load(Ordering::SeqCst), 0, "C5開始はowner承認前にAdapterを呼ばない");
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            0,
+            "C5開始はowner承認前にAdapterを呼ばない"
+        );
         let incomplete_comparison = call(
             &mut broker,
             6,
@@ -3658,14 +4557,20 @@ mod tests {
         let pending = waiting["要求"].as_array().expect("承認待ち要求一覧がある");
         assert_eq!(pending.len(), 2, "CaseごとRuntimeごとの独立要求");
         let pending_text = waiting.to_string();
-        for hidden in [private_input, private_expected, "evaluation-private-wire-receipt"] {
+        for hidden in [
+            private_input,
+            private_expected,
+            "evaluation-private-wire-receipt",
+        ] {
             assert!(
                 !pending_text.contains(hidden),
                 "C5隔離対話のowner承認待ち一覧へprivate本文を再投影しない: {hidden}"
             );
         }
         for item in pending {
-            let request = item["要求"].as_object().expect("隔離要求projectionがobject");
+            let request = item["要求"]
+                .as_object()
+                .expect("隔離要求projectionがobject");
             assert_eq!(request.len(), 2);
             assert!(request.contains_key("要求ID"));
             assert!(request.contains_key("実行系ID"));
@@ -3688,7 +4593,10 @@ mod tests {
                     owner,
                 );
                 assert_eq!(denied.status, BrokerStatus::Rejected);
-                assert_eq!(denied.error.expect("通常対話取得が拒否される").code, "権限拒否");
+                assert_eq!(
+                    denied.error.expect("通常対話取得が拒否される").code,
+                    "権限拒否"
+                );
             }
         }
         let first = pending.first().expect("最初の評価対話がある");
@@ -3756,8 +4664,18 @@ mod tests {
         assert_eq!(status["評価実験"]["状態"], "完了");
         assert_eq!(status["公開結果一覧"].as_array().map_or(0, Vec::len), 2);
         let public = status.to_string();
-        for hidden in [private_input, private_expected, "evaluation-private-wire-receipt", "対話要求ID", "対話セッションID", "応答hash"] {
-            assert!(!public.contains(hidden), "公開状態に非公開値を含めない: {hidden}");
+        for hidden in [
+            private_input,
+            private_expected,
+            "evaluation-private-wire-receipt",
+            "対話要求ID",
+            "対話セッションID",
+            "応答hash",
+        ] {
+            assert!(
+                !public.contains(hidden),
+                "公開状態に非公開値を含めない: {hidden}"
+            );
         }
         let comparison = accepted(call(
             &mut broker,
@@ -3770,8 +4688,15 @@ mod tests {
         assert_eq!(comparison["参照差"], "same");
         assert_eq!(comparison["能力差"], "same");
         let audit = serde_json::to_string(broker.audit_events()).expect("監査JSONを直列化できる");
-        for hidden in [private_input, private_expected, "evaluation-private-wire-receipt"] {
-            assert!(!audit.contains(hidden), "監査にprivate本文を含めない: {hidden}");
+        for hidden in [
+            private_input,
+            private_expected,
+            "evaluation-private-wire-receipt",
+        ] {
+            assert!(
+                !audit.contains(hidden),
+                "監査にprivate本文を含めない: {hidden}"
+            );
         }
         let active = broker
             .評価
@@ -3861,8 +4786,7 @@ mod tests {
         let mut recovered = Broker::new_persistent("evaluation-session", &root.join("audit"))
             .expect("永続化Brokerを再起動できる");
         recovered.current_epoch_seconds_override = Some(
-            super::super::parse_issued_at_epoch_seconds("2026-06-01T00:02:00Z")
-                .expect("epoch"),
+            super::super::parse_issued_at_epoch_seconds("2026-06-01T00:02:00Z").expect("epoch"),
         );
         let restored = accepted(call(
             &mut recovered,
@@ -3974,7 +4898,9 @@ mod tests {
         ));
         assert_eq!(recovered_status["評価実験"]["結果数"], 1);
         assert_eq!(
-            recovered_status["公開結果一覧"].as_array().map_or(0, Vec::len),
+            recovered_status["公開結果一覧"]
+                .as_array()
+                .map_or(0, Vec::len),
             1
         );
         drop(recovered);
@@ -4061,11 +4987,9 @@ mod tests {
             .plans
             .first()
             .expect("評価計画がある");
-        let (session_request_index, _) = audit_event_with_index(
-            &broker.audit_log,
-            &plan.session_start_request_audit_id,
-        )
-        .expect("C5 Session開始要求監査がある");
+        let (session_request_index, _) =
+            audit_event_with_index(&broker.audit_log, &plan.session_start_request_audit_id)
+                .expect("C5 Session開始要求監査がある");
         let (session_start_index, _) =
             audit_event_with_index(&broker.audit_log, &plan.session_start_audit_id)
                 .expect("C5 Session開始監査がある");
@@ -4081,7 +5005,11 @@ mod tests {
             })
             .map(|(index, _)| index)
             .collect::<Vec<_>>();
-        assert_eq!(normal_completion_indices.len(), 1, "通常対話終端監査が一意にある");
+        assert_eq!(
+            normal_completion_indices.len(),
+            1,
+            "通常対話終端監査が一意にある"
+        );
         assert!(
             session_request_index < normal_completion_indices[0]
                 && normal_completion_indices[0] < session_start_index,
@@ -4092,8 +5020,7 @@ mod tests {
         let mut recovered = Broker::new_persistent("evaluation-session", &root.join("audit"))
             .expect("監査からBrokerを再起動できる");
         recovered.current_epoch_seconds_override = Some(
-            super::super::parse_issued_at_epoch_seconds("2026-06-01T00:02:00Z")
-                .expect("epoch"),
+            super::super::parse_issued_at_epoch_seconds("2026-06-01T00:02:00Z").expect("epoch"),
         );
         let restored = accepted(call(
             &mut recovered,
@@ -4103,7 +5030,12 @@ mod tests {
             false,
         ));
         assert_eq!(restored["評価実験"]["状態"], "中断");
-        assert_eq!(restored["公開結果一覧"].as_array().map_or(usize::MAX, Vec::len), 0);
+        assert_eq!(
+            restored["公開結果一覧"]
+                .as_array()
+                .map_or(usize::MAX, Vec::len),
+            0
+        );
         drop(recovered);
         std::fs::remove_dir_all(root).expect("cleanup");
     }
@@ -4168,7 +5100,10 @@ mod tests {
             .active
             .get(&experiment_id)
             .expect("稼働中の評価実験がある");
-        let result = experiment.plans[0].result.as_ref().expect("記録済み結果がある");
+        let result = experiment.plans[0]
+            .result
+            .as_ref()
+            .expect("記録済み結果がある");
         assert_eq!(result["結果状態"], "中止");
         assert_eq!(result["判定"], "中断");
         assert!(result["評価器判定一覧"]
@@ -4176,8 +5111,14 @@ mod tests {
             .expect("評価器判定一覧がある")
             .iter()
             .all(|value| value["判定"] == "中断" && value["理由code"] == "中止"));
-        let aggregates = aggregate_results(&experiment.public, experiment.plans.iter().filter_map(|plan| plan.result.as_ref()))
-            .expect("中断結果を集計できる");
+        let aggregates = aggregate_results(
+            &experiment.public,
+            experiment
+                .plans
+                .iter()
+                .filter_map(|plan| plan.result.as_ref()),
+        )
+        .expect("中断結果を集計できる");
         assert_eq!(aggregates[0]["中断数"], 1);
         assert_eq!(aggregates[0]["評価不能数"], 0);
         let plan = persisted_plan(&experiment.plans[0]);
@@ -4479,8 +5420,7 @@ mod tests {
                 json!({"版": 1, "評価ExperimentID": experiment_id}),
                 false,
             ));
-            if status["評価実験"]["状態"] == "中断"
-                && broker.対話.評価要求可能数() == 64
+            if status["評価実験"]["状態"] == "中断" && broker.対話.評価要求可能数() == 64
             {
                 final_status = Some(status);
                 break;
@@ -4564,8 +5504,7 @@ mod tests {
         let mut recovered = Broker::new_persistent("evaluation-session", &root.join("audit"))
             .expect("永続化Brokerを再起動できる");
         recovered.current_epoch_seconds_override = Some(
-            super::super::parse_issued_at_epoch_seconds("2026-06-01T00:02:00Z")
-                .expect("epoch"),
+            super::super::parse_issued_at_epoch_seconds("2026-06-01T00:02:00Z").expect("epoch"),
         );
         let restored = accepted(call(
             &mut recovered,
@@ -4673,15 +5612,17 @@ mod tests {
                 json!({"版": 1, "評価ExperimentID": experiment_id}),
                 false,
             ));
-            if status["評価実験"]["状態"] == "中断"
-                && broker.対話.評価要求可能数() == 64
+            if status["評価実験"]["状態"] == "中断" && broker.対話.評価要求可能数() == 64
             {
                 final_status = Some(status);
                 break;
             }
             std::thread::sleep(Duration::from_millis(2));
         }
-        assert!(final_status.is_some(), "terminal隔離のworker受信側が回収される");
+        assert!(
+            final_status.is_some(),
+            "terminal隔離のworker受信側が回収される"
+        );
         let comparison_after_recovery = call(
             &mut broker,
             121,
@@ -4710,7 +5651,9 @@ mod tests {
             private_dataset("private-tamper-input", "approved evaluation response"),
             true,
         ));
-        let storage_id = manifest["非公開保管ID"].as_str().expect("非公開保管IDがある");
+        let storage_id = manifest["非公開保管ID"]
+            .as_str()
+            .expect("非公開保管IDがある");
         let path = vault.join(format!("evaluation-{storage_id}.dpapi"));
         let mut ciphertext = read_test_file(&path);
         ciphertext[0] ^= 1;
@@ -4737,8 +5680,8 @@ mod tests {
                 json!({}),
                 true,
             ))["要求"]
-            .as_array()
-            .map_or(0, Vec::len),
+                .as_array()
+                .map_or(0, Vec::len),
             0
         );
         drop(broker);
@@ -4780,8 +5723,8 @@ mod tests {
                 json!({}),
                 true,
             ))["要求"]
-            .as_array()
-            .map_or(0, Vec::len),
+                .as_array()
+                .map_or(0, Vec::len),
             0
         );
         drop(broker);
@@ -4800,7 +5743,8 @@ mod tests {
             true,
         ));
         assert_eq!(revision_one["revision"], 1);
-        let mut revision_three = private_dataset("revision-three-input", "approved evaluation response");
+        let mut revision_three =
+            private_dataset("revision-three-input", "approved evaluation response");
         revision_three["revision"] = json!(3);
         let revision_three = accepted(call(
             &mut broker,
@@ -4822,7 +5766,10 @@ mod tests {
         );
         assert_eq!(rejected.status, BrokerStatus::Rejected);
         assert_eq!(
-            rejected.error.expect("評価用データ集合の版後退が拒否される").code,
+            rejected
+                .error
+                .expect("評価用データ集合の版後退が拒否される")
+                .code,
             "評価Dataset revision後退"
         );
         let listed = accepted(call(
@@ -4832,7 +5779,9 @@ mod tests {
             json!({"版": 1}),
             false,
         ));
-        let datasets = listed["評価Dataset一覧"].as_array().expect("評価用データ集合一覧がある");
+        let datasets = listed["評価Dataset一覧"]
+            .as_array()
+            .expect("評価用データ集合一覧がある");
         assert_eq!(datasets.len(), 1);
         assert_eq!(datasets[0]["revision"], 3);
         drop(broker);
@@ -4903,8 +5852,7 @@ mod tests {
                 json!({"版": 1, "評価ExperimentID": experiment_id}),
                 false,
             ));
-            if status["評価実験"]["状態"] == "中断"
-                && broker.対話.評価要求可能数() == 64
+            if status["評価実験"]["状態"] == "中断" && broker.対話.評価要求可能数() == 64
             {
                 final_status = Some(status);
                 break;
@@ -4946,8 +5894,7 @@ mod tests {
         let mut recovered = Broker::new_persistent("evaluation-session", &root.join("audit"))
             .expect("C4隔離後の監査からBrokerを再起動できる");
         recovered.current_epoch_seconds_override = Some(
-            super::super::parse_issued_at_epoch_seconds("2026-06-01T00:02:00Z")
-                .expect("epoch"),
+            super::super::parse_issued_at_epoch_seconds("2026-06-01T00:02:00Z").expect("epoch"),
         );
         let restored = accepted(call(
             &mut recovered,
@@ -5136,7 +6083,11 @@ mod tests {
                 false,
             ));
             assert_eq!(status["評価実験"]["状態"], "中断");
-            assert_eq!(broker.対話.評価要求可能数(), 64, "round {index} の回収後容量");
+            assert_eq!(
+                broker.対話.評価要求可能数(),
+                64,
+                "round {index} の回収後容量"
+            );
         }
         assert_eq!(broker.対話.評価要求可能数(), 64);
         drop(broker);

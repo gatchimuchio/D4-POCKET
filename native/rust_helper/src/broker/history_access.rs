@@ -311,6 +311,9 @@ mod tests {
             .unwrap();
         assert!(response.get("page").is_none());
         assert_eq!(response["grant"]["runtime_id"], "runtime-a");
-        assert_eq!(response["task_page"]["entries"][0]["record"]["task_id"], task_id);
+        assert_eq!(
+            response["task_page"]["entries"][0]["record"]["task_id"],
+            task_id
+        );
     }
 }

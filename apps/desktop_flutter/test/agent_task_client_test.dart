@@ -40,6 +40,80 @@ void main() {
     expect(transport.requests.single['payload'], _request.toPayload());
   });
 
+  test('MCP能力snapshotと結果参照はTask要求へhash付きで送る', () async {
+    const request = AgentTaskRequest(
+      runtimeId: 'codex-local',
+      sessionId: _session,
+      workspaceId: 'workspace-local',
+      instruction: 'Tool結果を使って続行する',
+      mcpCapabilitySnapshotHash: _instructionHash,
+      mcpResultId: 'mcp-agent-result-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      mcpResultHash: _resultHash,
+    );
+    final transport = _FakeBrokerTransport([
+      _accepted('Agent作業要求検査', {
+        '版': 1,
+        '状態': '要求検査済み',
+        '実行状態': '未実行',
+        'Permission状態': '未付与',
+        'Approval状態': '未取得',
+        '実行系ID': request.runtimeId,
+        '対話セッションID': request.sessionId,
+        '作業領域ID': request.workspaceId,
+        '指示hash': _instructionHash,
+      }),
+    ]);
+
+    await AgentTaskClient(transport).inspect(request);
+
+    expect(transport.requests.single['payload'], request.toPayload());
+    expect(transport.requests.single['payload'], {
+      'agent_runtime_id': request.runtimeId,
+      'session_id': request.sessionId,
+      'workspace_id': request.workspaceId,
+      'instruction': request.instruction,
+      'mcp_capability_snapshot_hash': _instructionHash,
+      'mcp_result_id': request.mcpResultId,
+      'mcp_result_hash': _resultHash,
+    });
+  });
+
+  test('不正または片側だけのMCP参照はBrokerへ送信しない', () async {
+    const invalidRequests = [
+      AgentTaskRequest(
+        runtimeId: 'codex-local',
+        sessionId: _session,
+        workspaceId: 'workspace-local',
+        instruction: '不正snapshot',
+        mcpCapabilitySnapshotHash: 'sha256:bad',
+      ),
+      AgentTaskRequest(
+        runtimeId: 'codex-local',
+        sessionId: _session,
+        workspaceId: 'workspace-local',
+        instruction: '結果hashが欠落',
+        mcpResultId: 'mcp-agent-result-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      ),
+      AgentTaskRequest(
+        runtimeId: 'codex-local',
+        sessionId: _session,
+        workspaceId: 'workspace-local',
+        instruction: '不正result ID',
+        mcpResultId: 'mcp-agent-result-invalid',
+        mcpResultHash: _resultHash,
+      ),
+    ];
+    final transport = _FakeBrokerTransport([]);
+
+    for (final request in invalidRequests) {
+      await expectLater(
+        AgentTaskClient(transport).inspect(request),
+        throwsA(isA<BrokerClientException>()),
+      );
+    }
+    expect(transport.operations, isEmpty);
+  });
+
   test('未対応gateはTask本文を表示せずPermission／Approvalへ進まない', () async {
     final transport = _FakeBrokerTransport([
       {
@@ -63,17 +137,26 @@ void main() {
   });
 
   test('Workspace Permission receiptはSchemaと現在要求への結合を照合する', () async {
+    const request = AgentTaskRequest(
+      runtimeId: 'codex-local',
+      sessionId: _session,
+      workspaceId: 'workspace-local',
+      instruction: '後続Task',
+      mcpCapabilitySnapshotHash: _instructionHash,
+      mcpResultId: 'mcp-agent-result-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      mcpResultHash: _resultHash,
+    );
     final transport = _FakeBrokerTransport([
       _accepted('AgentTaskWorkspacePermissionGrant', _permissionReceipt()),
     ]);
 
-    await AgentTaskClient(transport).grantWorkspacePermission(_request);
+    await AgentTaskClient(transport).grantWorkspacePermission(request);
 
     expect(transport.operations, ['AgentTaskWorkspacePermissionGrant']);
     expect(transport.requests.single['payload'], {
-      'agent_runtime_id': _request.runtimeId,
-      'session_id': _request.sessionId,
-      'workspace_id': _request.workspaceId,
+      'agent_runtime_id': request.runtimeId,
+      'session_id': request.sessionId,
+      'workspace_id': request.workspaceId,
     });
   });
 

@@ -33,6 +33,31 @@
       "maxLength": 32768,
       "pattern": "\\S",
       "description": "Agentへ渡す要求本文。権限・承認・監査識別子・実行path・commandを含めない。"
+    },
+    "mcp_capability_snapshot_hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "description": "Brokerが再検証してTask本文へ追加する、現在MCP能力一覧のhash。権限を与えない。"
+    },
+    "mcp_result_id": {
+      "type": "string",
+      "pattern": "^mcp-agent-result-[a-f0-9]{32}$",
+      "description": "Broker内の同一Agent／Session／Workspaceへ束縛した一回限りMCP Tool結果参照。"
+    },
+    "mcp_result_hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "description": "MCP Tool結果contextのhash。参照値だけでは結果取得・権限・Approvalを与えない。"
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": { "required": ["mcp_result_id"] },
+      "then": { "required": ["mcp_result_hash"] }
+    },
+    {
+      "if": { "required": ["mcp_result_hash"] },
+      "then": { "required": ["mcp_result_id"] }
+    }
+  ]
 }

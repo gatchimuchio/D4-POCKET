@@ -261,7 +261,11 @@ fn MCP接続はCredential_refの未知fieldとServer不一致をprocess起動前
     let mut unknown_field = valid.clone();
     let credential_reference = valid
         .as_object()
-        .and_then(|object| object.keys().find(|key| key.split_whitespace().count() == 2))
+        .and_then(|object| {
+            object
+                .keys()
+                .find(|key| key.split_whitespace().count() == 2)
+        })
         .expect("Credential参照key")
         .clone();
     let forbidden_field = ["secret", "value"].join("_");

@@ -248,7 +248,9 @@ pub(super) fn markers(
     let mut result = None;
     let mut reconciled = None;
     for (index, e) in log.events().iter().enumerate().filter(|(_, e)| {
-        (e.operation == "対話部分保存破棄" && matches!(e.decision.as_str(), "recorded" | "accepted")) || (e.operation == "対話部分破棄中断確認" && e.decision == "accepted")
+        (e.operation == "対話部分保存破棄"
+            && matches!(e.decision.as_str(), "recorded" | "accepted"))
+            || (e.operation == "対話部分破棄中断確認" && e.decision == "accepted")
     }) {
         if e.operation == "対話部分破棄中断確認" {
             let raw = e
@@ -284,20 +286,17 @@ pub(super) fn markers(
                 || v["観測時刻"].as_u64().is_none()
                 || result.is_some()
                 || reconciled.is_some()
-                || !intent.as_ref().is_some_and(|i| v["部分保存破棄承認監査ID"] == i.0)
+                || !intent
+                    .as_ref()
+                    .is_some_and(|i| v["部分保存破棄承認監査ID"] == i.0)
             {
                 return Err("復旧照合と未確定削除の対応が不正");
             }
-            let before: Vec<_> = log
-                .events()
-                .iter()
-                .take(index)
-                .collect();
+            let before: Vec<_> = log.events().iter().take(index).collect();
             if !before.iter().any(|e| v["観測監査head"] == e.event_hash) {
                 return Err("復旧観測の監査headが不正");
             }
-            let request =
-                serde_json::json!({"要求ID":*target,"要求hash":entry["result_evidence"]["要求hash"],"部分保存破棄承認監査ID":v["部分保存破棄承認監査ID"]});
+            let request = serde_json::json!({"要求ID":*target,"要求hash":entry["result_evidence"]["要求hash"],"部分保存破棄承認監査ID":v["部分保存破棄承認監査ID"]});
             let hash = sha256_tagged(request.to_string().as_bytes());
             if !before.iter().any(|r| {
                 r.operation == e.operation

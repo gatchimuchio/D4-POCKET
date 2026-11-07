@@ -7,7 +7,9 @@
 
 use super::compose_center;
 use super::dialogue::識別子生成;
-use super::protocol::{Broker, BrokerResponse, BrokerStatus, OwnerConfirmationSource, EVIDENCE_SOURCE_INTERNAL_STATE};
+use super::protocol::{
+    Broker, BrokerResponse, BrokerStatus, OwnerConfirmationSource, EVIDENCE_SOURCE_INTERNAL_STATE,
+};
 use super::update_center::{self, UpdatePackageSource, UpdateTrust};
 use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
 use cap_std::fs::{Dir, OpenOptions};
@@ -124,7 +126,10 @@ pub(crate) fn target_platform_label(platform: &str) -> Option<&'static str> {
 
 /// Owner dialogへ渡す表示情報をBrokerと同じContract検査から作る。
 /// 任意のpayload文字列やmetadataをダイアログ本文へ直接埋め込まない。
-pub(crate) fn owner_confirmation_summary(payload: &Value, payload_hash: &str) -> Result<OwnerConfirmationSummary, String> {
+pub(crate) fn owner_confirmation_summary(
+    payload: &Value,
+    payload_hash: &str,
+) -> Result<OwnerConfirmationSummary, String> {
     let request = parse_request(payload)?;
     let manifest = compose_center::parse_manifest(&request.compose_manifest)?;
     let manifest_value = serde_json::to_value(manifest)
@@ -376,24 +381,20 @@ pub(super) fn export(
         .desktop_export_root
         .as_ref()
         .expect("固定Export保存先を事前確認済み");
-    let manifest_file = match write_manifest_file(
-        export_root,
-        export_root_path,
-        app_id,
-        &manifest_bytes,
-    ) {
-        Ok(file) => file,
-        Err(reason) => {
-            return broker.reject_with_payload_hash(
-                request_id,
-                OPERATION,
-                "gui_shell_export_file_write_failed",
-                &reason,
-                true,
-                payload_hash,
-            )
-        }
-    };
+    let manifest_file =
+        match write_manifest_file(export_root, export_root_path, app_id, &manifest_bytes) {
+            Ok(file) => file,
+            Err(reason) => {
+                return broker.reject_with_payload_hash(
+                    request_id,
+                    OPERATION,
+                    "gui_shell_export_file_write_failed",
+                    &reason,
+                    true,
+                    payload_hash,
+                )
+            }
+        };
     let confirmation_reason = match owner_confirmation {
         OwnerConfirmationSource::DesktopNativeConfirmation => "OwnerがRust Desktop起動器のネイティブ確認でpayload hashを確認して明示許可。新規Manifest fileを固定Export directoryに作成し、file hashをAuditEventへ結合。実行可能App、binary pruning、build、installer、署名は未実行。Credential、Permission、Approval、Audit chainは継承しない",
         #[cfg(feature = "r2-e2e")]
@@ -517,7 +518,12 @@ fn write_manifest_file_with_cleanup(
 ) -> Result<ManifestFile, String> {
     let random_suffix = app_id
         .strip_prefix("d4-pocket-app-")
-        .filter(|suffix| suffix.len() == 32 && suffix.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()))
+        .filter(|suffix| {
+            suffix.len() == 32
+                && suffix
+                    .bytes()
+                    .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+        })
         .ok_or_else(|| "Broker生成のApp identityが不正なためfileを作成しない".to_string())?;
     if bytes.is_empty() || bytes.len() > MAX_MANIFEST_FILE_BYTES {
         return Err("Manifest fileが空または保存上限超過のため作成しない".to_string());
@@ -525,7 +531,10 @@ fn write_manifest_file_with_cleanup(
     let file_name = format!("d4-pocket-app-{random_suffix}.json");
     let temporary_name = format!(".{random_suffix}.manifest.tmp");
     let mut options = OpenOptions::new();
-    options.write(true).create_new(true).follow(FollowSymlinks::No);
+    options
+        .write(true)
+        .create_new(true)
+        .follow(FollowSymlinks::No);
     let mut file = match root.open_with(&temporary_name, &options) {
         Ok(file) => file,
         Err(_) => return Err("Manifest一時fileを新規作成できない".to_string()),
@@ -556,7 +565,11 @@ fn write_manifest_file_with_cleanup(
         path: root_path.join(file_name).to_string_lossy().into_owned(),
         sha256: crate::audit_hash::sha256_tagged(bytes),
         byte_length: bytes.len(),
-        temporary_file_status: if cleanup_pending { "cleanup_pending" } else { "removed" },
+        temporary_file_status: if cleanup_pending {
+            "cleanup_pending"
+        } else {
+            "removed"
+        },
         temporary_file_name: temporary_name,
         recovery_action: if cleanup_pending {
             "owner_review_and_remove_after_hash_verification"
@@ -795,10 +808,9 @@ fn normalize_update_trust(
 }
 
 fn parse_request(value: &Value) -> Result<ExportRequest, String> {
-    if value
-        .as_object()
-        .is_some_and(|object| object.contains_key("update_trust") && value["update_trust"].is_null())
-    {
+    if value.as_object().is_some_and(|object| {
+        object.contains_key("update_trust") && value["update_trust"].is_null()
+    }) {
         return Err("update_trustは省略するか、有効な設定objectを指定する".to_string());
     }
     let request: ExportRequest = serde_json::from_value(value.clone())
@@ -923,7 +935,10 @@ mod tests {
             artifact.recovery_action,
             "owner_review_and_remove_after_hash_verification"
         );
-        assert_eq!(fs::read(&artifact.path).unwrap(), b"manifest with cleanup pending");
+        assert_eq!(
+            fs::read(&artifact.path).unwrap(),
+            b"manifest with cleanup pending"
+        );
         assert!(canonical.join(&artifact.temporary_file_name).exists());
         root.remove_file(&artifact.temporary_file_name).unwrap();
         drop(root);
@@ -965,8 +980,14 @@ mod tests {
                 .all(|byte| { byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte) }));
         }
         assert_eq!(body["export_manifest"]["audit_store"]["inherited"], false);
-        assert_eq!(body["export_manifest"]["app_identity"]["target_platform"], "windows");
-        assert_eq!(body["export_manifest"]["distribution_metadata"]["target_platform"], "windows");
+        assert_eq!(
+            body["export_manifest"]["app_identity"]["target_platform"],
+            "windows"
+        );
+        assert_eq!(
+            body["export_manifest"]["distribution_metadata"]["target_platform"],
+            "windows"
+        );
         assert_eq!(body["build_status"], "not_started");
         assert_eq!(body["manifest_file_status"], "written");
         assert_eq!(body["manifest_file"]["temporary_file_status"], "removed");
@@ -978,7 +999,10 @@ mod tests {
             body["manifest_file"]["sha256"]
         );
         let file_document: Value = serde_json::from_slice(&manifest_bytes).unwrap();
-        assert_eq!(file_document["manifest"]["app_identity"], body["export_manifest"]["app_identity"]);
+        assert_eq!(
+            file_document["manifest"]["app_identity"],
+            body["export_manifest"]["app_identity"]
+        );
         assert_eq!(body["credential_inherited"], false);
         assert_eq!(body["permission_inherited"], false);
         assert_eq!(body["approval_inherited"], false);
@@ -1065,7 +1089,8 @@ mod tests {
         let summary = owner_confirmation_summary(
             &request_payload,
             "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(summary.display_name, "D4 Pocket危険名");
         assert_eq!(summary.export_id, "export-test");
         assert_eq!(summary.target_platform, "windows");
@@ -1082,7 +1107,10 @@ mod tests {
         request_payload["target_platform"] = Value::from("linux");
         let linux_summary = owner_confirmation_summary(&request_payload, "sha256:linux").unwrap();
         assert_eq!(linux_summary.target_platform, "linux");
-        assert_eq!(target_platform_label(&linux_summary.target_platform), Some("Linux"));
+        assert_eq!(
+            target_platform_label(&linux_summary.target_platform),
+            Some("Linux")
+        );
         request_payload["target_platform"] = Value::from("android");
         assert!(owner_confirmation_summary(&request_payload, "sha256:invalid").is_err());
     }
@@ -1110,8 +1138,7 @@ mod tests {
         assert_eq!(response.status, BrokerStatus::Accepted);
         let body = response.body.unwrap();
         let manifest_path = body["manifest_file"]["path"].as_str().unwrap();
-        let manifest: Value =
-            serde_json::from_slice(&fs::read(manifest_path).unwrap()).unwrap();
+        let manifest: Value = serde_json::from_slice(&fs::read(manifest_path).unwrap()).unwrap();
         assert_eq!(manifest["update_trust"]["版"], 2);
         assert_eq!(manifest["update_trust"]["algorithm"], "Ed25519");
         assert_eq!(
@@ -1148,7 +1175,8 @@ mod tests {
     fn RustネイティブOwner確認だけがDesktop書出しを受理し監査へ起点を残す() {
         let mut broker = Broker::new("session-1");
         let export_root = configure_export_root(&mut broker, "native-owner");
-        let mut request: Value = serde_json::from_str(&owner_request(&mut broker, payload())).unwrap();
+        let mut request: Value =
+            serde_json::from_str(&owner_request(&mut broker, payload())).unwrap();
         request["metadata"] = json!({"client": "desktop_flutter"});
         let response = broker.desktop_owner_operation_json(&request.to_string());
         assert_eq!(response.status, BrokerStatus::Accepted);
@@ -1175,13 +1203,20 @@ mod tests {
         });
         let rejected = broker.desktop_owner_operation_json(&unrelated.to_string());
         assert_eq!(rejected.status, BrokerStatus::Rejected);
-        assert_eq!(rejected.error.unwrap().code, "desktop_owner_operation_invalid");
+        assert_eq!(
+            rejected.error.unwrap().code,
+            "desktop_owner_operation_invalid"
+        );
 
-        let mut request: Value = serde_json::from_str(&owner_request(&mut broker, payload())).unwrap();
+        let mut request: Value =
+            serde_json::from_str(&owner_request(&mut broker, payload())).unwrap();
         request["metadata"] = json!({"client": "desktop_flutter", "owner": true});
         let rejected = broker.desktop_owner_operation_json(&request.to_string());
         assert_eq!(rejected.status, BrokerStatus::Rejected);
-        assert_eq!(rejected.error.unwrap().code, "desktop_owner_operation_invalid");
+        assert_eq!(
+            rejected.error.unwrap().code,
+            "desktop_owner_operation_invalid"
+        );
     }
 
     #[test]
@@ -1320,9 +1355,13 @@ mod tests {
         let raw = desktop_owner_request(&mut broker, payload());
         let response = broker.desktop_owner_operation_json(&raw);
         assert_eq!(response.status, BrokerStatus::Rejected);
-        assert_eq!(response.error.unwrap().code, "gui_shell_export_target_unavailable");
-        assert!(broker.audit_events().iter().any(|event| {
-            event.operation == OPERATION && event.decision == "rejected"
-        }));
+        assert_eq!(
+            response.error.unwrap().code,
+            "gui_shell_export_target_unavailable"
+        );
+        assert!(broker
+            .audit_events()
+            .iter()
+            .any(|event| { event.operation == OPERATION && event.decision == "rejected" }));
     }
 }

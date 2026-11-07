@@ -5,9 +5,7 @@
 //! Schema相当の構造と境界を再検証し、受理結果だけを監査へ記録する。
 #![allow(non_snake_case)]
 
-use super::protocol::{
-    Broker, BrokerResponse, BrokerStatus, EVIDENCE_SOURCE_INTERNAL_STATE,
-};
+use super::protocol::{Broker, BrokerResponse, BrokerStatus, EVIDENCE_SOURCE_INTERNAL_STATE};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::BTreeSet;
@@ -230,11 +228,11 @@ pub(super) fn preview(
             })
         })
         .collect();
-    let diff = manifest_diff(
-        input.current_manifest.as_ref(),
-        &input.candidate_manifest,
-    );
-    let current_version = input.current_manifest.as_ref().map(|manifest| manifest.version);
+    let diff = manifest_diff(input.current_manifest.as_ref(), &input.candidate_manifest);
+    let current_version = input
+        .current_manifest
+        .as_ref()
+        .map(|manifest| manifest.version);
     BrokerResponse {
         request_id: request_id.to_string(),
         operation: OP_PREVIEW.to_string(),
@@ -365,10 +363,7 @@ fn manifest_diff(base: Option<&ComposeManifest>, candidate: &ComposeManifest) ->
 }
 
 fn list_delta(base: Option<&[String]>, candidate: &[String]) -> (Vec<String>, Vec<String>) {
-    let old: BTreeSet<&String> = base
-        .unwrap_or(&[])
-        .iter()
-        .collect();
+    let old: BTreeSet<&String> = base.unwrap_or(&[]).iter().collect();
     let new: BTreeSet<&String> = candidate.iter().collect();
     (
         new.difference(&old).map(|value| (*value).clone()).collect(),
@@ -392,9 +387,9 @@ fn validate_manifest(manifest: ComposeManifest) -> Result<ComposeManifest, Strin
         ("機能要件", &manifest.capability_requirements, 64usize),
     ] {
         if values.len() > limit
-            || values.iter().any(|value| {
-                value.trim().is_empty() || value.chars().count() > 128
-            })
+            || values
+                .iter()
+                .any(|value| value.trim().is_empty() || value.chars().count() > 128)
             || values.iter().collect::<BTreeSet<_>>().len() != values.len()
         {
             return Err(format!("{label}選択が不正または重複している"));
@@ -424,7 +419,9 @@ fn validate_manifest(manifest: ComposeManifest) -> Result<ComposeManifest, Strin
     .iter()
     .any(|value| value.as_str() != "none")
     {
-        return Err("Credential、Permission、Approval、Authority、Audit chainの継承を拒否".to_string());
+        return Err(
+            "Credential、Permission、Approval、Authority、Audit chainの継承を拒否".to_string(),
+        );
     }
     if manifest.output_mode != "manifest_only" {
         return Err("構成出力はmanifest_onlyだけを受け付ける".to_string());
@@ -435,9 +432,9 @@ fn validate_manifest(manifest: ComposeManifest) -> Result<ComposeManifest, Strin
 fn valid_identifier(value: &str) -> bool {
     !value.is_empty()
         && value.chars().count() <= 64
-        && value
-            .chars()
-            .all(|character| character.is_ascii_alphanumeric() || matches!(character, '.' | '_' | '-'))
+        && value.chars().all(|character| {
+            character.is_ascii_alphanumeric() || matches!(character, '.' | '_' | '-')
+        })
 }
 
 fn valid_locale(value: &str) -> bool {
@@ -447,8 +444,12 @@ fn valid_locale(value: &str) -> bool {
     parts.next().is_none()
         && language.len() == 2
         && region.len() == 2
-        && language.chars().all(|character| character.is_ascii_alphabetic())
-        && region.chars().all(|character| character.is_ascii_alphabetic())
+        && language
+            .chars()
+            .all(|character| character.is_ascii_alphabetic())
+        && region
+            .chars()
+            .all(|character| character.is_ascii_alphabetic())
 }
 
 #[cfg(test)]
@@ -543,7 +544,10 @@ mod tests {
         let mut broker = Broker::new("session-1");
         let mut invalid_locale = manifest();
         invalid_locale["settings"]["locale"] = Value::from("ja");
-        assert_eq!(call(&mut broker, invalid_locale).status, BrokerStatus::Rejected);
+        assert_eq!(
+            call(&mut broker, invalid_locale).status,
+            BrokerStatus::Rejected
+        );
 
         let mut duplicate = manifest();
         duplicate["agent_ids"] = json!(["codex", "codex"]);
@@ -574,7 +578,10 @@ mod tests {
         assert_eq!(body["export_status"], "not_started");
         assert_eq!(body["version_preview"]["rollback_available"], false);
         assert_eq!(body["diff"]["runtime_added"][0], "gui_shell_rust_broker");
-        assert_eq!(body["permission_requirements"][0]["permission_status"], "not_generated");
+        assert_eq!(
+            body["permission_requirements"][0]["permission_status"],
+            "not_generated"
+        );
     }
 
     #[test]
@@ -596,11 +603,18 @@ mod tests {
     fn Previewは権限継承と未知fieldを拒否する() {
         let mut broker = Broker::new("session-1");
         let mut invalid = preview_payload(Value::Null, manifest());
-        invalid["candidate_manifest"]["inheritance_policy"]["permission"] = Value::from("permission.read");
-        assert_eq!(call_preview(&mut broker, invalid).status, BrokerStatus::Rejected);
+        invalid["candidate_manifest"]["inheritance_policy"]["permission"] =
+            Value::from("permission.read");
+        assert_eq!(
+            call_preview(&mut broker, invalid).status,
+            BrokerStatus::Rejected
+        );
 
         let mut unknown = preview_payload(Value::Null, manifest());
         unknown["candidate_manifest"]["secret"] = Value::from("credential");
-        assert_eq!(call_preview(&mut broker, unknown).status, BrokerStatus::Rejected);
+        assert_eq!(
+            call_preview(&mut broker, unknown).status,
+            BrokerStatus::Rejected
+        );
     }
 }

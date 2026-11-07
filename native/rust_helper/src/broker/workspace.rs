@@ -1,13 +1,16 @@
 //! 作業領域の現在Permissionと読取。rootの選択やowner認証は所有しない。
 #![allow(non_snake_case)]
 
-use std::collections::BTreeMap;
-use std::time::{Duration, Instant};
+use super::dialogue::識別子生成;
+use crate::{
+    audit_hash::sha256_tagged,
+    workspace_reader::{EntryKind, WorkspaceReader},
+};
 use cap_std::fs::Dir;
 use serde::Deserialize;
 use serde_json::{json, Value};
-use crate::{audit_hash::sha256_tagged, workspace_reader::{EntryKind, WorkspaceReader}};
-use super::dialogue::識別子生成;
+use std::collections::BTreeMap;
+use std::time::{Duration, Instant};
 
 type Audit<'a> = dyn FnMut(&str, &str) -> Result<(), &'static str> + 'a;
 
@@ -23,7 +26,9 @@ mod tests;
 
 impl std::fmt::Debug for WorkspaceRegistry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("WorkspaceRegistry").field("登録数", &self.entries.len()).finish()
+        f.debug_struct("WorkspaceRegistry")
+            .field("登録数", &self.entries.len())
+            .finish()
     }
 }
 
@@ -178,8 +183,12 @@ fn parse<T: serde::de::DeserializeOwned>(value: &Value) -> Result<T, &'static st
     serde_json::from_value(value.clone()).map_err(|_| "作業領域要求の構造が不正")
 }
 fn identifier(id: &str) -> bool {
-    !id.is_empty() && id.len() <= 128 && id.as_bytes()[0].is_ascii_alphanumeric()
-        && id.bytes().all(|b| b.is_ascii_alphanumeric() || b"_.-".contains(&b))
+    !id.is_empty()
+        && id.len() <= 128
+        && id.as_bytes()[0].is_ascii_alphanumeric()
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"_.-".contains(&b))
 }
 fn digest(value: &Value) -> String {
     sha256_tagged(value.to_string().as_bytes())
@@ -191,7 +200,8 @@ pub(crate) fn owner_confirmation_summary(operation: &str, payload: &Value) -> Op
     let (id, hash, detail) = match operation {
         "作業領域承認" => {
             let p: Approval = parse(payload).ok()?;
-            if !["none", "hash_only", "summary", "redacted", "full"].contains(&p.表示範囲.as_str()) {
+            if !["none", "hash_only", "summary", "redacted", "full"].contains(&p.表示範囲.as_str())
+            {
                 return None;
             }
             let detail = format!("現在登録に限定した5分の読取許可を要求します。\n内容露出: {}\nfullは登録済みsecret除外以外の本文を画面へ返せます。一般的な秘密検出ではありません。", p.表示範囲);
@@ -208,8 +218,13 @@ pub(crate) fn owner_confirmation_summary(operation: &str, payload: &Value) -> Op
         }
         _ => return None,
     };
-    if !identifier(&id) || hash.len() != 71 || !hash.starts_with("sha256:")
-        || !hash[7..].bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
+    if !identifier(&id)
+        || hash.len() != 71
+        || !hash.starts_with("sha256:")
+        || !hash[7..]
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    {
         return None;
     }
     Some(format!("Workspace操作: {operation}\nWorkspace ID: {id}\n登録hash: {hash}\n{detail}\n\nBrokerが現在登録・期限・登録handle・secret境界・Auditを再評価します。Task実行・書込権は付与しません。Credential・Agent trust・OSアクセス範囲を生成しません。"))
@@ -242,10 +257,18 @@ impl WorkspaceRegistry {
     }
 
     pub(crate) fn response_current(&self, body: &Value, now: i64) -> bool {
-        if self.last_now.is_some_and(|last| now < last) {return false;}
-        body["作業領域ID"].as_str().and_then(|id| self.entries.get(id))
-            .and_then(|entry| entry.grant.as_ref()).is_some_and(|grant|
-                now < grant.expires && Instant::now() < grant.deadline && body["approval_id"] == grant.id)
+        if self.last_now.is_some_and(|last| now < last) {
+            return false;
+        }
+        body["作業領域ID"]
+            .as_str()
+            .and_then(|id| self.entries.get(id))
+            .and_then(|entry| entry.grant.as_ref())
+            .is_some_and(|grant| {
+                now < grant.expires
+                    && Instant::now() < grant.deadline
+                    && body["approval_id"] == grant.id
+            })
     }
     /// 信頼済み起動制御面が渡すhandleを保持する。登録だけでは読取許可を作らない。
     pub(crate) fn register(
@@ -257,75 +280,133 @@ impl WorkspaceRegistry {
         ancestry: Option<Vec<super::workspace_root::DirectoryIdentity>>,
         audit: &mut Audit<'_>,
     ) -> Result<(), &'static str> {
-        if !identifier(id) || !identifier(runtime) || self.entries.contains_key(id) || self.entries.len() >= 16 {
+        if !identifier(id)
+            || !identifier(runtime)
+            || self.entries.contains_key(id)
+            || self.entries.len() >= 16
+        {
             return Err("作業領域の登録指定が不正または上限超過");
         }
-        let identity=root.dir_metadata().map_err(|_| "作業領域のroot識別子を確認できない")?;
-        let root_device=cap_fs_ext::MetadataExt::dev(&identity);
-        let root_file_id=cap_fs_ext::MetadataExt::ino(&identity);
+        let identity = root
+            .dir_metadata()
+            .map_err(|_| "作業領域のroot識別子を確認できない")?;
+        let root_device = cap_fs_ext::MetadataExt::dev(&identity);
+        let root_file_id = cap_fs_ext::MetadataExt::ino(&identity);
         if root_file_id == 0 {
             return Err("root file IDが未観測のため作業領域登録を拒否");
         }
-        let root_identity=super::workspace_root::DirectoryIdentity {device:root_device,file_id:root_file_id};
-        let (root_ancestry,root_ancestry_complete)=match ancestry {
+        let root_identity = super::workspace_root::DirectoryIdentity {
+            device: root_device,
+            file_id: root_file_id,
+        };
+        let (root_ancestry, root_ancestry_complete) = match ancestry {
             Some(ancestry)
                 if !ancestry.is_empty()
-                    && ancestry.len()>=2
-                    && ancestry.len()<=65
-                    && ancestry.last()==Some(&root_identity)
-                    && ancestry.iter().all(|identity|identity.file_id!=0) => (ancestry,true),
+                    && ancestry.len() >= 2
+                    && ancestry.len() <= 65
+                    && ancestry.last() == Some(&root_identity)
+                    && ancestry.iter().all(|identity| identity.file_id != 0) =>
+            {
+                (ancestry, true)
+            }
             Some(_) => return Err("作業領域の親子識別範囲が不正または未観測"),
-            None => (vec![root_identity],false),
+            None => (vec![root_identity], false),
         };
-        let other_runtimes:Vec<&RegisteredWorkspace>=self.entries.values()
-            .filter(|entry|entry.runtime!=runtime).collect();
-        if other_runtimes.iter().any(|entry| {
-            entry.root_device == root_device && entry.root_file_id == root_file_id
-        }) {
+        let other_runtimes: Vec<&RegisteredWorkspace> = self
+            .entries
+            .values()
+            .filter(|entry| entry.runtime != runtime)
+            .collect();
+        if other_runtimes
+            .iter()
+            .any(|entry| entry.root_device == root_device && entry.root_file_id == root_file_id)
+        {
             return Err("別Agentとの同一物理作業領域共有を拒否");
         }
-        if other_runtimes.iter().any(|entry|!entry.root_ancestry_complete) || (!other_runtimes.is_empty()&&!root_ancestry_complete) {
+        if other_runtimes
+            .iter()
+            .any(|entry| !entry.root_ancestry_complete)
+            || (!other_runtimes.is_empty() && !root_ancestry_complete)
+        {
             return Err("別AgentとのWorkspace分離範囲を確認できないため登録を拒否");
         }
         if other_runtimes.iter().any(|entry| {
-            let existing_root=super::workspace_root::DirectoryIdentity {
-                device:entry.root_device,
-                file_id:entry.root_file_id,
+            let existing_root = super::workspace_root::DirectoryIdentity {
+                device: entry.root_device,
+                file_id: entry.root_file_id,
             };
-            entry.root_ancestry.contains(&root_identity)
-                || root_ancestry.contains(&existing_root)
+            entry.root_ancestry.contains(&root_identity) || root_ancestry.contains(&existing_root)
         }) {
             return Err("別Agentとの親子Workspace範囲重複を拒否");
         }
-        let reader = WorkspaceReader::from_registered_dir(root, secrets).map_err(|_| "作業領域の除外指定が不正")?;
-        let recovery_binding_hash = digest(&json!({"実行系ID":runtime,"作業領域ID":id,"除外":secrets,
+        let reader = WorkspaceReader::from_registered_dir(root, secrets)
+            .map_err(|_| "作業領域の除外指定が不正")?;
+        let recovery_binding_hash = digest(
+            &json!({"実行系ID":runtime,"作業領域ID":id,"除外":secrets,
             "root_device":root_device,"root_file_id":root_file_id,
-            "root_ancestry":root_ancestry.iter().map(|identity|json!({"device":identity.device,"file_id":identity.file_id})).collect::<Vec<_>>()}));
+            "root_ancestry":root_ancestry.iter().map(|identity|json!({"device":identity.device,"file_id":identity.file_id})).collect::<Vec<_>>()}),
+        );
         let nonce = 識別子生成().map_err(|_| "登録識別子を生成できない")?;
-        let registration_hash = digest(&json!({"実行系ID":runtime,"作業領域ID":id,"登録識別子":nonce,"除外":secrets,
+        let registration_hash = digest(
+            &json!({"実行系ID":runtime,"作業領域ID":id,"登録識別子":nonce,"除外":secrets,
             "root_device":root_device,"root_file_id":root_file_id,
-            "root_ancestry":root_ancestry.iter().map(|identity|json!({"device":identity.device,"file_id":identity.file_id})).collect::<Vec<_>>()}));
+            "root_ancestry":root_ancestry.iter().map(|identity|json!({"device":identity.device,"file_id":identity.file_id})).collect::<Vec<_>>()}),
+        );
         audit("作業領域登録・Permission拒否", &registration_hash)?;
-        self.entries.insert(id.into(), RegisteredWorkspace {
-            runtime:runtime.into(),root_device,root_file_id,root_ancestry,root_ancestry_complete,registration_hash,recovery_binding_hash,reader,grant:None,baseline:None,
-        });
+        self.entries.insert(
+            id.into(),
+            RegisteredWorkspace {
+                runtime: runtime.into(),
+                root_device,
+                root_file_id,
+                root_ancestry,
+                root_ancestry_complete,
+                registration_hash,
+                recovery_binding_hash,
+                reader,
+                grant: None,
+                baseline: None,
+            },
+        );
         Ok(())
     }
 
-    pub(crate) fn operate(&mut self, operation: &str, payload: &Value, owner: bool, now: i64, audit: &mut Audit<'_>) -> Result<Value, &'static str> {
+    pub(crate) fn operate(
+        &mut self,
+        operation: &str,
+        payload: &Value,
+        owner: bool,
+        now: i64,
+        audit: &mut Audit<'_>,
+    ) -> Result<Value, &'static str> {
         if self.last_now.is_some_and(|last| now < last) {
-            for entry in self.entries.values_mut() {entry.grant = None;entry.baseline = None;}
+            for entry in self.entries.values_mut() {
+                entry.grant = None;
+                entry.baseline = None;
+            }
             return Err("時計後退を検出したため読取承認を失効");
         }
         self.last_now = Some(now);
         for entry in self.entries.values_mut() {
-            if entry.grant.as_ref().is_some_and(|g| now >= g.expires || Instant::now() >= g.deadline) {entry.grant = None;}
+            if entry
+                .grant
+                .as_ref()
+                .is_some_and(|g| now >= g.expires || Instant::now() >= g.deadline)
+            {
+                entry.grant = None;
+            }
         }
-        if matches!(operation, "作業領域承認" | "作業領域失効" | "作業領域基準点保存" | "作業領域全体基準点保存") && !owner {
+        if matches!(
+            operation,
+            "作業領域承認" | "作業領域失効" | "作業領域基準点保存" | "作業領域全体基準点保存"
+        ) && !owner
+        {
             return Err("owner制御資格が必要");
         }
         if operation == "作業領域一覧" {
-            if !payload.as_object().is_some_and(|v| v.is_empty()) {return Err("作業領域一覧の入力が不正");}
+            if !payload.as_object().is_some_and(|v| v.is_empty()) {
+                return Err("作業領域一覧の入力が不正");
+            }
             return Ok(json!({"作業領域":self.entries.iter().map(|(id,e)| {
                 let grant = e.grant.as_ref().filter(|g| now < g.expires);
                 json!({"作業領域ID":id,"実行系ID":e.runtime,"登録hash":e.registration_hash,
@@ -335,84 +416,219 @@ impl WorkspaceRegistry {
         }
         if operation == "作業領域承認" {
             let p: Approval = parse(payload)?;
-            if !["none","hash_only","summary","redacted","full"].contains(&p.表示範囲.as_str()) {return Err("表示範囲が不正");}
-            let entry = self.entries.get_mut(&p.作業領域ID).ok_or("作業領域が未登録")?;
-            if p.登録hash != entry.registration_hash {return Err("登録hashが一致しない");}
+            if !["none", "hash_only", "summary", "redacted", "full"].contains(&p.表示範囲.as_str())
+            {
+                return Err("表示範囲が不正");
+            }
+            let entry = self
+                .entries
+                .get_mut(&p.作業領域ID)
+                .ok_or("作業領域が未登録")?;
+            if p.登録hash != entry.registration_hash {
+                return Err("登録hashが一致しない");
+            }
             let id = 識別子生成().map_err(|_| "承認識別子を生成できない")?;
             let expires = now.checked_add(300).ok_or("承認期限が不正")?;
             let body = json!({"作業領域ID":p.作業領域ID,"approval_id":id,"permission_id":format!("workspace.inspect.{id}"),
                 "capability_id":"workspace.inspect","recovery_id":"workspace.reapprove","有効期限":expires,"表示範囲":p.表示範囲});
             audit("ownerが現在登録の読取を承認", &digest(&body))?;
-            entry.grant = Some(Grant {id,visibility:p.表示範囲,expires,deadline:Instant::now()+Duration::from_secs(300)});
+            entry.grant = Some(Grant {
+                id,
+                visibility: p.表示範囲,
+                expires,
+                deadline: Instant::now() + Duration::from_secs(300),
+            });
             return Ok(body);
         }
         if operation == "作業領域失効" {
             let p: Revocation = parse(payload)?;
-            let entry = self.entries.get_mut(&p.作業領域ID).ok_or("作業領域が未登録")?;
-            if p.登録hash != entry.registration_hash {return Err("登録hashが一致しない");}
+            let entry = self
+                .entries
+                .get_mut(&p.作業領域ID)
+                .ok_or("作業領域が未登録")?;
+            if p.登録hash != entry.registration_hash {
+                return Err("登録hashが一致しない");
+            }
             entry.grant = None;
             entry.baseline = None;
             audit("作業領域PermissionとApprovalを失効", &digest(payload))?;
             return Ok(json!({"作業領域ID":p.作業領域ID,"承認状態":"revoked"}));
         }
-        if matches!(operation,"作業領域基準点保存" | "作業領域全体基準点保存") {
-            let whole=operation=="作業領域全体基準点保存";
-            let p: Capture = if whole {let v:Revocation=parse(payload)?;Capture {作業領域ID:v.作業領域ID,登録hash:v.登録hash,相対paths:vec![]}} else {parse(payload)?};
-            let entry=self.entries.get_mut(&p.作業領域ID).ok_or("作業領域が未登録")?;
-            let grant=entry.grant.as_ref().filter(|g| now < g.expires && Instant::now() < g.deadline && g.visibility == "full").ok_or("基準点保存には現在のfull読取承認が必要")?;
-            if p.登録hash != entry.registration_hash || (!whole && p.相対paths.is_empty()) || p.相対paths.len() > 128 {return Err("基準点の登録指定または範囲が不正");}
-            let mut paths=std::collections::BTreeSet::new();
-            for path in &p.相対paths {
-                entry.reader.validate_relative_path(path,false).map_err(|_| "基準点pathが不正または除外対象")?;
-                if !paths.insert(path.clone()) {return Err("基準点pathが重複");}
-            }
-            entry.baseline=None;
-            audit("ownerの現在承認と基準点取得範囲を照合", &digest(payload))?;
-            let inventory=if whole {Some(entry.reader.comparison_inventory().map_err(|_| "全体探索が不成立")?)} else {None};
-            if let Some(v)=&inventory {paths.extend(v.files.iter().cloned());}
-            let mut retained=0usize;
-            let mut files=BTreeMap::new();
-            let mut remaining=crate::workspace_reader::MAX_COMPARISON_BYTES;
-            for path in paths {
-                if Instant::now() >= grant.deadline {return Err("基準点取得中に承認期限超過");}
-                let mut bytes=entry.reader.read_comparison_version(&path,remaining).map_err(|_| "基準点fileの取得拒否または上限超過")?;
-                remaining-=bytes.as_ref().map(|v|v.bytes as u64).unwrap_or(0);
-                if whole && bytes.is_none() {return Err("全体基準点の取得中にfileが消失");}
-                if let Some(v)=bytes.as_mut() {
-                    let size=v.content.as_ref().map(|b|b.len()).unwrap_or(0);
-                    if retained+size>8*1024*1024 {v.content=None;} else {retained+=size;}
+        if matches!(operation, "作業領域基準点保存" | "作業領域全体基準点保存")
+        {
+            let whole = operation == "作業領域全体基準点保存";
+            let p: Capture = if whole {
+                let v: Revocation = parse(payload)?;
+                Capture {
+                    作業領域ID: v.作業領域ID,
+                    登録hash: v.登録hash,
+                    相対paths: vec![],
                 }
-                files.insert(path,bytes);
+            } else {
+                parse(payload)?
+            };
+            let entry = self
+                .entries
+                .get_mut(&p.作業領域ID)
+                .ok_or("作業領域が未登録")?;
+            let grant = entry
+                .grant
+                .as_ref()
+                .filter(|g| {
+                    now < g.expires && Instant::now() < g.deadline && g.visibility == "full"
+                })
+                .ok_or("基準点保存には現在のfull読取承認が必要")?;
+            if p.登録hash != entry.registration_hash
+                || (!whole && p.相対paths.is_empty())
+                || p.相対paths.len() > 128
+            {
+                return Err("基準点の登録指定または範囲が不正");
             }
-            if let Some(before)=&inventory {
-                if &entry.reader.comparison_inventory().map_err(|_| "基準点取得後の探索が不成立")? != before {return Err("全体基準点の探索範囲が変化");}
+            let mut paths = std::collections::BTreeSet::new();
+            for path in &p.相対paths {
+                entry
+                    .reader
+                    .validate_relative_path(path, false)
+                    .map_err(|_| "基準点pathが不正または除外対象")?;
+                if !paths.insert(path.clone()) {
+                    return Err("基準点pathが重複");
+                }
             }
-            let metadata:BTreeMap<_,_>=files.iter().map(|(path,bytes)|(path,bytes.as_ref().map(|v|json!({"bytes":v.bytes,"sha256":v.sha256})))).collect();
-            let nonce=識別子生成().map_err(|_| "基準点識別子を生成できない")?;
-            let hash=digest(&json!({"version":1,"登録hash":entry.registration_hash,"nonce":nonce,"作成時刻":now,"whole":whole,"excluded_secrets":inventory.as_ref().map(|v|v.excluded_secrets),"files":metadata}));
-            let body=json!({"version":1,"operation":operation,"要求hash":digest(payload),"作業領域ID":p.作業領域ID,
+            entry.baseline = None;
+            audit("ownerの現在承認と基準点取得範囲を照合", &digest(payload))?;
+            let inventory = if whole {
+                Some(
+                    entry
+                        .reader
+                        .comparison_inventory()
+                        .map_err(|_| "全体探索が不成立")?,
+                )
+            } else {
+                None
+            };
+            if let Some(v) = &inventory {
+                paths.extend(v.files.iter().cloned());
+            }
+            let mut retained = 0usize;
+            let mut files = BTreeMap::new();
+            let mut remaining = crate::workspace_reader::MAX_COMPARISON_BYTES;
+            for path in paths {
+                if Instant::now() >= grant.deadline {
+                    return Err("基準点取得中に承認期限超過");
+                }
+                let mut bytes = entry
+                    .reader
+                    .read_comparison_version(&path, remaining)
+                    .map_err(|_| "基準点fileの取得拒否または上限超過")?;
+                remaining -= bytes.as_ref().map(|v| v.bytes as u64).unwrap_or(0);
+                if whole && bytes.is_none() {
+                    return Err("全体基準点の取得中にfileが消失");
+                }
+                if let Some(v) = bytes.as_mut() {
+                    let size = v.content.as_ref().map(|b| b.len()).unwrap_or(0);
+                    if retained + size > 8 * 1024 * 1024 {
+                        v.content = None;
+                    } else {
+                        retained += size;
+                    }
+                }
+                files.insert(path, bytes);
+            }
+            if let Some(before) = &inventory {
+                if &entry
+                    .reader
+                    .comparison_inventory()
+                    .map_err(|_| "基準点取得後の探索が不成立")?
+                    != before
+                {
+                    return Err("全体基準点の探索範囲が変化");
+                }
+            }
+            let metadata: BTreeMap<_, _> = files
+                .iter()
+                .map(|(path, bytes)| {
+                    (
+                        path,
+                        bytes
+                            .as_ref()
+                            .map(|v| json!({"bytes":v.bytes,"sha256":v.sha256})),
+                    )
+                })
+                .collect();
+            let nonce = 識別子生成().map_err(|_| "基準点識別子を生成できない")?;
+            let hash = digest(
+                &json!({"version":1,"登録hash":entry.registration_hash,"nonce":nonce,"作成時刻":now,"whole":whole,"excluded_secrets":inventory.as_ref().map(|v|v.excluded_secrets),"files":metadata}),
+            );
+            let body = json!({"version":1,"operation":operation,"要求hash":digest(payload),"作業領域ID":p.作業領域ID,
                 "実行系ID":entry.runtime,"登録hash":entry.registration_hash,"approval_id":grant.id,"有効期限":grant.expires,
                 "表示範囲":grant.visibility,"projection":{"基準点hash":hash,"対象数":files.len()}});
             audit("指定範囲の基準点を確定", &digest(&body))?;
-            if Instant::now() >= grant.deadline {return Err("基準点監査中に承認期限超過");}
-            entry.baseline=Some(Baseline {whole,hash,files});
+            if Instant::now() >= grant.deadline {
+                return Err("基準点監査中に承認期限超過");
+            }
+            entry.baseline = Some(Baseline { whole, hash, files });
             return Ok(body);
         }
-        if !matches!(operation, "作業領域ツリー" | "作業領域読取" | "作業領域差分" | "作業領域復旧プレビュー" | "作業領域比較範囲" | "作業領域変更一覧") {return Err("作業領域操作が不正");}
-        let (p,baseline_hash) = if matches!(operation,"作業領域差分" | "作業領域復旧プレビュー" | "作業領域変更一覧") {
-            let value:DiffSelection=parse(payload)?;
-            (Selection {作業領域ID:value.作業領域ID,相対path:value.相対path},Some(value.基準点hash))
-        } else {(parse::<Selection>(payload)?,None)};
+        if !matches!(
+            operation,
+            "作業領域ツリー"
+                | "作業領域読取"
+                | "作業領域差分"
+                | "作業領域復旧プレビュー"
+                | "作業領域比較範囲"
+                | "作業領域変更一覧"
+        ) {
+            return Err("作業領域操作が不正");
+        }
+        let (p, baseline_hash) = if matches!(
+            operation,
+            "作業領域差分" | "作業領域復旧プレビュー" | "作業領域変更一覧"
+        ) {
+            let value: DiffSelection = parse(payload)?;
+            (
+                Selection {
+                    作業領域ID: value.作業領域ID,
+                    相対path: value.相対path,
+                },
+                Some(value.基準点hash),
+            )
+        } else {
+            (parse::<Selection>(payload)?, None)
+        };
         let entry = self.entries.get(&p.作業領域ID).ok_or("作業領域が未登録")?;
-        let grant = entry.grant.as_ref().filter(|g| now < g.expires).ok_or("現在の作業領域読取承認が必要")?;
-        if matches!(operation,"作業領域比較範囲" | "作業領域変更一覧") && !p.相対path.is_empty() {return Err("比較範囲にpath指定は不要");}
-        entry.reader.validate_relative_path(&p.相対path, matches!(operation, "作業領域ツリー" | "作業領域比較範囲" | "作業領域変更一覧")).map_err(|_| "相対pathが不正または除外対象")?;
-        let baseline=if let Some(hash)=baseline_hash.as_ref() {
-            let baseline=entry.baseline.as_ref().ok_or("現在登録の基準点が必要")?;
-            if hash != &baseline.hash || (!baseline.whole && !baseline.files.contains_key(&p.相対path)) {return Err("基準点hashまたは指定範囲が不一致");}
-            if operation=="作業領域変更一覧" && !baseline.whole {return Err("全体基準点が必要");}
+        let grant = entry
+            .grant
+            .as_ref()
+            .filter(|g| now < g.expires)
+            .ok_or("現在の作業領域読取承認が必要")?;
+        if matches!(operation, "作業領域比較範囲" | "作業領域変更一覧") && !p.相対path.is_empty()
+        {
+            return Err("比較範囲にpath指定は不要");
+        }
+        entry
+            .reader
+            .validate_relative_path(
+                &p.相対path,
+                matches!(
+                    operation,
+                    "作業領域ツリー" | "作業領域比較範囲" | "作業領域変更一覧"
+                ),
+            )
+            .map_err(|_| "相対pathが不正または除外対象")?;
+        let baseline = if let Some(hash) = baseline_hash.as_ref() {
+            let baseline = entry.baseline.as_ref().ok_or("現在登録の基準点が必要")?;
+            if hash != &baseline.hash
+                || (!baseline.whole && !baseline.files.contains_key(&p.相対path))
+            {
+                return Err("基準点hashまたは指定範囲が不一致");
+            }
+            if operation == "作業領域変更一覧" && !baseline.whole {
+                return Err("全体基準点が必要");
+            }
             Some(baseline)
-        } else {None};
+        } else {
+            None
+        };
         let binding = json!({"作業領域ID":p.作業領域ID,"実行系ID":entry.runtime,"登録hash":entry.registration_hash,
             "approval_id":grant.id,"permission_id":format!("workspace.inspect.{}",grant.id),
             "capability_id":"workspace.inspect","recovery_id":"workspace.reapprove","要求":payload});
@@ -420,52 +636,104 @@ impl WorkspaceRegistry {
         // 内容を許可しないprojectionでは、filesystemへの不要な取得も行わない。
         let projection = match grant.visibility.as_str() {
             "none" => Value::Null,
-            "summary" | "redacted" => json!({"説明":"この表示範囲に提供できる承認済み内容はありません"}),
+            "summary" | "redacted" => {
+                json!({"説明":"この表示範囲に提供できる承認済み内容はありません"})
+            }
             "full" | "hash_only" => {
                 let data = if operation == "作業領域比較範囲" {
                     json!({"基準点hash":entry.baseline.as_ref().map(|v|v.hash.as_str()),"相対paths":entry.baseline.as_ref().map(|v|v.files.keys().collect::<Vec<_>>()).unwrap_or_default()})
-                } else if operation=="作業領域変更一覧" {
-                    let baseline=baseline.ok_or("全体基準点が必要")?;
-                    let inventory=entry.reader.comparison_inventory().map_err(|_| "変更探索が不成立")?;
-                    let mut paths:std::collections::BTreeSet<_>=inventory.files.iter().cloned().collect();
+                } else if operation == "作業領域変更一覧" {
+                    let baseline = baseline.ok_or("全体基準点が必要")?;
+                    let inventory = entry
+                        .reader
+                        .comparison_inventory()
+                        .map_err(|_| "変更探索が不成立")?;
+                    let mut paths: std::collections::BTreeSet<_> =
+                        inventory.files.iter().cloned().collect();
                     paths.extend(baseline.files.keys().cloned());
-                    let mut remaining=crate::workspace_reader::MAX_COMPARISON_BYTES;
-                    let mut changes=Vec::new();let mut unchanged=0;
+                    let mut remaining = crate::workspace_reader::MAX_COMPARISON_BYTES;
+                    let mut changes = Vec::new();
+                    let mut unchanged = 0;
                     for path in paths {
-                        if Instant::now()>=grant.deadline {return Err("変更探索中に承認期限超過");}
-                        let after=entry.reader.read_comparison_version(&path,remaining).map_err(|_| "変更対象の取得拒否")?;
-                        remaining-=after.as_ref().map(|v|v.bytes as u64).unwrap_or(0);
-                        let before=baseline.files.get(&path).and_then(|v|v.as_ref());
-                        let state=match (before,after.as_ref()) {
-                            (None,None)=>return Err("探索中に新規fileが消失"),
-                            (None,Some(_))=>Some("added"),
-                            (Some(_),None)=>Some("deleted"),
-                            (Some(a),Some(b)) if a.bytes!=b.bytes || a.sha256!=b.sha256=>Some("modified"),
-                            _=>None,
+                        if Instant::now() >= grant.deadline {
+                            return Err("変更探索中に承認期限超過");
+                        }
+                        let after = entry
+                            .reader
+                            .read_comparison_version(&path, remaining)
+                            .map_err(|_| "変更対象の取得拒否")?;
+                        remaining -= after.as_ref().map(|v| v.bytes as u64).unwrap_or(0);
+                        let before = baseline.files.get(&path).and_then(|v| v.as_ref());
+                        let state = match (before, after.as_ref()) {
+                            (None, None) => return Err("探索中に新規fileが消失"),
+                            (None, Some(_)) => Some("added"),
+                            (Some(_), None) => Some("deleted"),
+                            (Some(a), Some(b)) if a.bytes != b.bytes || a.sha256 != b.sha256 => {
+                                Some("modified")
+                            }
+                            _ => None,
                         };
-                        if let Some(status)=state {changes.push(json!({"path":path,"status":status}));} else {unchanged+=1;}
+                        if let Some(status) = state {
+                            changes.push(json!({"path":path,"status":status}));
+                        } else {
+                            unchanged += 1;
+                        }
                     }
-                    if entry.reader.comparison_inventory().map_err(|_| "変更取得後の探索が不成立")? != inventory {return Err("変更取得中に探索範囲が変化");}
+                    if entry
+                        .reader
+                        .comparison_inventory()
+                        .map_err(|_| "変更取得後の探索が不成立")?
+                        != inventory
+                    {
+                        return Err("変更取得中に探索範囲が変化");
+                    }
                     json!({"基準点hash":baseline.hash,"changes":changes,"unchanged":unchanged,"excluded_secrets":inventory.excluded_secrets})
-                } else if let Some(baseline)=baseline {
-                    let after=entry.reader.read_comparison_version(&p.相対path,crate::workspace_reader::MAX_COMPARISON_BYTES).map_err(|_| "比較fileの取得拒否または上限超過")?;
-                    let before=baseline.files.get(&p.相対path).and_then(|v|v.as_ref());
-                    if operation=="作業領域復旧プレビュー" {
-                        let diff=crate::workspace_diff::generate_versions(after.as_ref(),before);
-                        let action=if diff.kind==crate::workspace_diff::DiffKind::Unchanged {"none"}
-                            else if before.is_none() {"remove"} else if after.is_none() {"recreate"} else {"replace"};
+                } else if let Some(baseline) = baseline {
+                    let after = entry
+                        .reader
+                        .read_comparison_version(
+                            &p.相対path,
+                            crate::workspace_reader::MAX_COMPARISON_BYTES,
+                        )
+                        .map_err(|_| "比較fileの取得拒否または上限超過")?;
+                    let before = baseline.files.get(&p.相対path).and_then(|v| v.as_ref());
+                    if operation == "作業領域復旧プレビュー" {
+                        let diff = crate::workspace_diff::generate_versions(after.as_ref(), before);
+                        let action = if diff.kind == crate::workspace_diff::DiffKind::Unchanged {
+                            "none"
+                        } else if before.is_none() {
+                            "remove"
+                        } else if after.is_none() {
+                            "recreate"
+                        } else {
+                            "replace"
+                        };
                         json!({"基準点hash":baseline.hash,"diff":diff,"action":action,
                             "baseline_content_available":before.is_none_or(|v|v.content.is_some()),"execution_permitted":false})
-                    } else {json!({"基準点hash":baseline.hash,"diff":crate::workspace_diff::generate_versions(before,after.as_ref())})}
+                    } else {
+                        json!({"基準点hash":baseline.hash,"diff":crate::workspace_diff::generate_versions(before,after.as_ref())})
+                    }
                 } else if operation == "作業領域ツリー" {
-                    let items = entry.reader.list(&p.相対path).map_err(|_| "作業領域を安全に列挙できない")?;
+                    let items = entry
+                        .reader
+                        .list(&p.相対path)
+                        .map_err(|_| "作業領域を安全に列挙できない")?;
                     json!({"entries":items.into_iter().map(|v|json!({"path":v.path,"kind":match v.kind {EntryKind::File=>"file",EntryKind::Directory=>"directory"},"bytes":v.bytes})).collect::<Vec<_>>()})
                 } else {
-                    let bytes = entry.reader.read(&p.相対path).map_err(|_| "作業領域fileを安全に読めない")?;
-                    let text = std::str::from_utf8(&bytes).ok().filter(|_| !bytes.contains(&0));
+                    let bytes = entry
+                        .reader
+                        .read(&p.相対path)
+                        .map_err(|_| "作業領域fileを安全に読めない")?;
+                    let text = std::str::from_utf8(&bytes)
+                        .ok()
+                        .filter(|_| !bytes.contains(&0));
                     json!({"path":p.相対path,"bytes":bytes.len(),"sha256":sha256_tagged(&bytes),"binary":text.is_none(),"text":text})
                 };
-                if grant.visibility == "full" {data} else {json!({"sha256":digest(&data)})}
+                if grant.visibility == "full" {
+                    data
+                } else {
+                    json!({"sha256":digest(&data)})
+                }
             }
             _ => return Err("現在の表示範囲が不正"),
         };
@@ -473,7 +741,9 @@ impl WorkspaceRegistry {
             "作業領域ID":p.作業領域ID,"実行系ID":entry.runtime,"登録hash":entry.registration_hash,
             "有効期限":grant.expires,"表示範囲":grant.visibility,"approval_id":grant.id,"projection":projection});
         audit("作業領域の取得projectionを確定", &digest(&body))?;
-        if Instant::now() >= grant.deadline {return Err("取得中に読取承認が期限超過");}
+        if Instant::now() >= grant.deadline {
+            return Err("取得中に読取承認が期限超過");
+        }
         Ok(body)
     }
 }

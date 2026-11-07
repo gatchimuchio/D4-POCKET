@@ -181,9 +181,15 @@ bool ReadLine(HANDLE pipe, std::string* response,
   return false;
 }
 
+bool IsRetryablePipeAvailabilityError(DWORD error) {
+  return error == ERROR_FILE_NOT_FOUND || error == ERROR_PIPE_BUSY ||
+         error == ERROR_SEM_TIMEOUT;
+}
+
 PipeResult Exchange(const std::wstring& pipe_name, const std::string& request) {
   // This only classifies the transport timeout; Rust retains all authority decisions.
-  const DWORD timeout_ms = RequiresOwnerConfirmationPipeTimeout(request)
+  const bool owner_confirmation = RequiresOwnerConfirmationPipeTimeout(request);
+  const DWORD timeout_ms = owner_confirmation
                                ? kOwnerConfirmationPipeTimeoutMs
                                : kDefaultPipeTimeoutMs;
   const auto deadline = std::chrono::steady_clock::now() +
@@ -191,12 +197,47 @@ PipeResult Exchange(const std::wstring& pipe_name, const std::string& request) {
   if (!IsValidPipeName(pipe_name) || request.empty() || request.size() > kMaxRequestBytes) {
     return {};
   }
-  const DWORD wait_ms = RemainingMilliseconds(deadline);
-  if (wait_ms == 0 || !WaitNamedPipeW(pipe_name.c_str(), wait_ms)) return {};
-  UniqueHandle pipe(CreateFileW(pipe_name.c_str(), GENERIC_READ | GENERIC_WRITE, 0,
-                                nullptr, OPEN_EXISTING, FILE_FLAG_OVERLAPPED,
-                                nullptr));
-  if (pipe.get() == INVALID_HANDLE_VALUE) return {};
+  HANDLE pipe_handle = INVALID_HANDLE_VALUE;
+  while (pipe_handle == INVALID_HANDLE_VALUE) {
+    const DWORD wait_ms = RemainingMilliseconds(deadline);
+    if (wait_ms == 0) return {};
+    if (!WaitNamedPipeW(pipe_name.c_str(), wait_ms)) {
+      const DWORD error = GetLastError();
+      if (!IsRetryablePipeAvailabilityError(error) ||
+          RemainingMilliseconds(deadline) == 0) {
+        return {};
+      }
+      // The server recreates a single pipe instance after each request. Windows
+      // may report ERROR_FILE_NOT_FOUND during that gap even with a timeout.
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      continue;
+    }
+    pipe_handle = CreateFileW(pipe_name.c_str(), GENERIC_READ | GENERIC_WRITE, 0,
+                              nullptr, OPEN_EXISTING, FILE_FLAG_OVERLAPPED,
+                              nullptr);
+    if (pipe_handle == INVALID_HANDLE_VALUE) {
+      const DWORD error = GetLastError();
+      if (!IsRetryablePipeAvailabilityError(error) ||
+          RemainingMilliseconds(deadline) == 0) {
+        return {};
+      }
+      // WaitNamedPipe and CreateFile are not atomic; retry only transient
+      // availability races and keep access or validation failures fail-closed.
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+  }
+  UniqueHandle pipe(pipe_handle);
+  if (owner_confirmation) {
+    ULONG server_process_id = 0;
+    // Grant only foreground activation to the OS-identified Broker owner so its
+    // Rust native Owner dialog can appear above this user-initiated Flutter call.
+    // This does not grant or decide Broker authority.
+    if (!GetNamedPipeServerProcessId(pipe.get(), &server_process_id) ||
+        server_process_id == 0 ||
+        !AllowSetForegroundWindow(server_process_id)) {
+      return {};
+    }
+  }
   std::string framed(request);
   framed.push_back('\n');
   if (!WriteAll(pipe.get(), framed, deadline)) return {};

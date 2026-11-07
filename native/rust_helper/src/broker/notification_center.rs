@@ -308,9 +308,7 @@ fn action(
                     .insert(request.notification_id.clone(), value);
             }
             None => {
-                broker
-                    .notification_states
-                    .remove(&request.notification_id);
+                broker.notification_states.remove(&request.notification_id);
             }
         }
         return broker.audit_store_failed_response(
@@ -338,12 +336,7 @@ fn action(
     )
 }
 
-fn read_all(
-    broker: &mut Broker,
-    payload: &Value,
-    request_id: &str,
-    hash: &str,
-) -> BrokerResponse {
+fn read_all(broker: &mut Broker, payload: &Value, request_id: &str, hash: &str) -> BrokerResponse {
     let request: ReadAllRequest = match serde_json::from_value::<ReadAllRequest>(payload.clone()) {
         Ok(request) if request.version == VERSION => request,
         _ => {
@@ -415,13 +408,7 @@ fn read_all(
 
 fn project_notifications(broker: &Broker) -> Vec<NotificationRecord> {
     let mut result = Vec::new();
-    for event in broker
-        .audit_log
-        .events()
-        .iter()
-        .rev()
-        .take(MAX_AUDIT_SCAN)
-    {
+    for event in broker.audit_log.events().iter().rev().take(MAX_AUDIT_SCAN) {
         let Some((source, target)) = source_for_operation(&event.operation) else {
             continue;
         };
@@ -558,7 +545,9 @@ fn severity_for(source: &str, decision: &str) -> &'static str {
 fn validate_state(state: &NotificationState) -> Result<(), String> {
     if state.notification_id.is_empty()
         || state.notification_id.len() > 256
-        || !state.notification_id.starts_with("notification-broker-audit-")
+        || !state
+            .notification_id
+            .starts_with("notification-broker-audit-")
         || state.notification_hash.len() != 71
         || !state.notification_hash.starts_with("sha256:")
         || !state.notification_hash[7..]
@@ -643,7 +632,9 @@ mod tests {
         assert_eq!(records.len(), 1);
         assert_eq!(records[0].source, "Update");
         assert_eq!(records[0].severity, "warning");
-        assert!(!serde_json::to_string(&records[0]).unwrap().contains("secret-reason"));
+        assert!(!serde_json::to_string(&records[0])
+            .unwrap()
+            .contains("secret-reason"));
     }
 
     #[test]

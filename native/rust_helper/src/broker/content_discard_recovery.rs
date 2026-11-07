@@ -123,7 +123,11 @@ impl Broker {
         }
     }
     #[cfg(windows)]
-    pub(super) fn 部分破棄中断照合確定(&mut self, id: &str, body: Value) -> BrokerResponse {
+    pub(super) fn 部分破棄中断照合確定(
+        &mut self,
+        id: &str,
+        body: Value,
+    ) -> BrokerResponse {
         let op = "対話部分破棄中断確認";
         let encoded = body.to_string();
         match self.append_audit(

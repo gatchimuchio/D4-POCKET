@@ -86,7 +86,9 @@ fn 全private用途は固有の暗号文とentropyを使い目的間の転用を
         let path = root.join(format!("{prefix}-{id}.dpapi"));
         let ciphertext = std::fs::read(&path).unwrap();
         assert!(
-            ciphertext.windows(plaintext.len()).all(|window| window != plaintext),
+            ciphertext
+                .windows(plaintext.len())
+                .all(|window| window != plaintext),
             "{prefix} purposeの同一路にplaintextを保存してはならない"
         );
         assert_eq!(

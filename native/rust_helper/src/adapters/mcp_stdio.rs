@@ -5,10 +5,10 @@
 #![allow(non_snake_case)]
 
 use crate::mcp::{
-    legacy_initialize_request, modern_discover_request, notification_line, parse_discovery,
-    parse_prompts_response, parse_resources_response, parse_tools_response,
-    summarize_tool_call_result, McpCatalog, McpError, McpJsonRpcMessage, McpProtocolEra,
-    McpToolCallSummary,
+    inspect_tool_call_output, legacy_initialize_request, modern_discover_request,
+    notification_line, parse_discovery, parse_prompts_response, parse_resources_response,
+    parse_tools_response, McpCatalog, McpError, McpJsonRpcMessage, McpProtocolEra,
+    McpToolCallOutput,
 };
 use std::env;
 use std::io::{BufRead, BufReader, Write};
@@ -125,7 +125,7 @@ impl McpStdioConnection {
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null());
-        let mut child = super::process_tree::spawn(command).map_err(|_| {
+        let mut child = super::process_tree::spawn_non_interactive(command).map_err(|_| {
             McpError::new(
                 "mcp_server_unavailable",
                 "監督下でMCP stdio Serverを起動できない",
@@ -255,7 +255,7 @@ impl McpStdioConnection {
         tool_id: &str,
         name: &str,
         arguments: &serde_json::Value,
-    ) -> Result<McpToolCallSummary, McpError> {
+    ) -> Result<McpToolCallOutput, McpError> {
         self.catalog
             .validate_tool_identity_and_call(tool_id, name, arguments)?;
         let id = self.next_request_id;
@@ -269,7 +269,7 @@ impl McpStdioConnection {
             serde_json::json!({"name": name, "arguments": arguments}),
         )?;
         let response = self.request(id, line)?;
-        summarize_tool_call_result(&response)
+        inspect_tool_call_output(&response)
     }
 
     fn request(&mut self, expected_id: u64, line: Vec<u8>) -> Result<McpJsonRpcMessage, McpError> {
@@ -618,9 +618,10 @@ echo {"jsonrpc":"2.0","id":1,"result":{"resultType":"complete","supportedVersion
             .expect("Tool一覧")
             .tool_id
             .clone();
-        let summary = connection
+        let output = connection
             .call_tool(&tool, "echo", &serde_json::json!({"text":"request"}))
             .expect("一回限りtools/call");
+        let summary = output.summary;
         assert_eq!(summary.content_types, vec!["text".to_string()]);
         assert!(!summary.is_error);
         assert!(summary.result_hash.starts_with("sha256:"));

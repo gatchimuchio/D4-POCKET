@@ -381,12 +381,21 @@ fn stored_regression_case_deletions(
             {
                 return Err(());
             }
-            let received = log.events().get(index.checked_sub(1).ok_or(())?).ok_or(())?;
+            let received = log
+                .events()
+                .get(index.checked_sub(1).ok_or(())?)
+                .ok_or(())?;
             let recovery_request = json!({"版": 1, "回帰CaseID": result.case_id});
             if received.event_hash != result.observed_audit_head
                 || received.operation != RECOVERY_OPERATION
                 || received.request_id != event.request_id
-                || !receive_is_bound(log, index, RECOVERY_OPERATION, &event.request_id, &recovery_request)
+                || !receive_is_bound(
+                    log,
+                    index,
+                    RECOVERY_OPERATION,
+                    &event.request_id,
+                    &recovery_request,
+                )
             {
                 return Err(());
             }
@@ -439,16 +448,16 @@ fn stored_regression_cases(
                 return Err(());
             }
         }
-        if deletion.as_ref().is_some_and(|state| state.pending.is_some()) {
+        if deletion
+            .as_ref()
+            .is_some_and(|state| state.pending.is_some())
+        {
             continue;
         }
         if deletion.as_ref().is_some_and(|state| state.deleted) {
             continue;
         }
-        if deletion
-            .as_ref()
-            .is_some_and(|state| !state.retryable)
-        {
+        if deletion.as_ref().is_some_and(|state| !state.retryable) {
             return Err(());
         }
         if total >= after && page.len() < limit {
@@ -588,9 +597,18 @@ fn contains_secret_marker(value: &str) -> bool {
 fn contains_secret_marker_in_registration(value: &登録指定) -> bool {
     contains_secret_marker(&value.公開表示名)
         || contains_secret_marker(&value.入力.本文)
-        || value.必要条件.iter().any(|item| contains_secret_marker(item))
-        || value.禁止条件.iter().any(|item| contains_secret_marker(item))
-        || value.必要参照.iter().any(|item| contains_secret_marker(item))
+        || value
+            .必要条件
+            .iter()
+            .any(|item| contains_secret_marker(item))
+        || value
+            .禁止条件
+            .iter()
+            .any(|item| contains_secret_marker(item))
+        || value
+            .必要参照
+            .iter()
+            .any(|item| contains_secret_marker(item))
         || contains_secret_marker(&value.期待経路)
 }
 
@@ -606,12 +624,14 @@ fn valid_registration(value: &登録指定) -> bool {
         && value.入力.本文.chars().count() <= 4096
         && value.必要条件.len() <= 16
         && value.禁止条件.len() <= 16
-        && value.必要条件.iter().all(|item| {
-            !item.trim().is_empty() && item.chars().count() <= 512
-        })
-        && value.禁止条件.iter().all(|item| {
-            !item.trim().is_empty() && item.chars().count() <= 512
-        })
+        && value
+            .必要条件
+            .iter()
+            .all(|item| !item.trim().is_empty() && item.chars().count() <= 512)
+        && value
+            .禁止条件
+            .iter()
+            .all(|item| !item.trim().is_empty() && item.chars().count() <= 512)
         && matches!(value.期待状態.as_str(), "成功" | "保留")
         && value.必要参照.len() <= 64
         && value
@@ -1284,16 +1304,12 @@ impl Broker {
                     payload_hash,
                 );
             }
-            match self
-                .protected_store
-                .as_ref()
-                .map(|store| {
-                    store.inspect(
-                        crate::protected_store::Purpose::Regression,
-                        &record.storage_id,
-                    )
-                })
-            {
+            match self.protected_store.as_ref().map(|store| {
+                store.inspect(
+                    crate::protected_store::Purpose::Regression,
+                    &record.storage_id,
+                )
+            }) {
                 Some(Ok(None)) => {}
                 Some(Ok(Some((actual_hash, _)))) if actual_hash == record.ciphertext_hash => {
                     return self.reject_with_payload_hash(
@@ -1718,9 +1734,7 @@ mod tests {
 
     #[cfg(windows)]
     fn append_pending_delete(
-        broker: &mut Broker,
-        record: &公開記録,
-        request_id: &str,
+        broker: &mut Broker, record: &公開記録, request_id: &str
     ) -> String {
         let request = json!({
             "版": 1,
@@ -2166,7 +2180,10 @@ mod tests {
             "定義hash": record.definition_hash,
             "暗号文hash": record.ciphertext_hash,
         });
-        assert_eq!(delete_case(&mut broker, delete_request, true).status, BrokerStatus::Accepted);
+        assert_eq!(
+            delete_case(&mut broker, delete_request, true).status,
+            BrokerStatus::Accepted
+        );
         drop(broker);
         std::fs::remove_dir_all(root).expect("cleanup");
 
@@ -2196,7 +2213,10 @@ mod tests {
         let listing = list(&mut broker, json!({"版":1,"after":0,"limit":10}), false);
         assert_eq!(listing.status, BrokerStatus::Accepted, "{listing:?}");
         assert_eq!(listing.body.expect("不在Case除外一覧")["合計件数"], 0);
-        assert_eq!(recover_delete(&mut broker, &case_id, true).status, BrokerStatus::Rejected);
+        assert_eq!(
+            recover_delete(&mut broker, &case_id, true).status,
+            BrokerStatus::Rejected
+        );
         drop(broker);
         std::fs::remove_dir_all(root).expect("cleanup");
     }

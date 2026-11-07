@@ -103,6 +103,7 @@ class McpToolCallReceipt {
     required this.contentTypes,
     required this.connectionState,
     required this.auditId,
+    this.agentResultContext,
   });
 
   final String serverId;
@@ -114,6 +115,21 @@ class McpToolCallReceipt {
   final List<String> contentTypes;
   final String connectionState;
   final String auditId;
+  final McpAgentResultContext? agentResultContext;
+}
+
+class McpAgentResultContext {
+  const McpAgentResultContext({
+    required this.status,
+    required this.resultId,
+    required this.contextHash,
+    required this.toolResultHash,
+  });
+
+  final String status;
+  final String? resultId;
+  final String? contextHash;
+  final String toolResultHash;
 }
 
 class McpConnectionClient {
@@ -492,6 +508,27 @@ class McpConnectionClient {
   }
 
   Future<List<McpConnectionSummary>> list() async {
+    final body = await _listBody();
+    final rawConnections = body['MCP接続一覧'];
+    return List.unmodifiable((rawConnections as List).map(_connectionSummary));
+  }
+
+  Future<String> agentCapabilitySnapshotHash() async {
+    final body = await _listBody();
+    final hash = body['Agent能力hash'];
+    if (body['Agent能力状態'] != 'available' ||
+        body['Agent能力件数'] is! int ||
+        (body['Agent能力件数'] as int) <= 0 ||
+        hash is! String ||
+        !RegExp(r'^sha256:[a-f0-9]{64}$').hasMatch(hash)) {
+      throw const BrokerClientException(
+        'Agentへ提示可能な接続中MCP Tool能力がありません',
+      );
+    }
+    return hash;
+  }
+
+  Future<Map<String, Object?>> _listBody() async {
     final response = await _transport.request(
       'MCP接続一覧',
       payload: const {'版': 1},
@@ -501,6 +538,9 @@ class McpConnectionClient {
       '版',
       'MCP接続一覧',
       '件数',
+      'Agent能力hash',
+      'Agent能力件数',
+      'Agent能力状態',
       '公開範囲',
       '証拠種別',
     };
@@ -516,10 +556,18 @@ class McpConnectionClient {
     final count = body['件数'];
     if (rawConnections is! List ||
         rawConnections.length > 128 ||
-        count != rawConnections.length) {
+        count != rawConnections.length ||
+        body['Agent能力件数'] is! int ||
+        (body['Agent能力件数'] as int) < 0 ||
+        !const {'available', 'unsupported'}.contains(body['Agent能力状態']) ||
+        (body['Agent能力状態'] == 'available' &&
+            (body['Agent能力hash'] is! String ||
+                !RegExp(r'^sha256:[a-f0-9]{64}$')
+                    .hasMatch(body['Agent能力hash'] as String))) ||
+        (body['Agent能力状態'] == 'unsupported' && body['Agent能力hash'] != null)) {
       throw const BrokerClientException('MCP接続一覧の件数が不正です');
     }
-    return List.unmodifiable(rawConnections.map(_connectionSummary));
+    return body;
   }
 
   Future<void> disconnect(String serverId) async {
@@ -571,11 +619,18 @@ class McpConnectionClient {
     required String serverId,
     required McpToolSummary tool,
     required Map<String, Object?> arguments,
+    String? sourceAgentTaskId,
+    String? sourceAgentResultHash,
   }) async {
     if (!_validIdentifier(serverId) ||
         !RegExp(r'^tool-[a-f0-9]{142}$').hasMatch(tool.toolId) ||
         !_safeMetadataName(tool.name) ||
-        utf8.encode(jsonEncode(arguments)).length > 32 * 1024) {
+        utf8.encode(jsonEncode(arguments)).length > 32 * 1024 ||
+        (sourceAgentTaskId == null) != (sourceAgentResultHash == null) ||
+        (sourceAgentTaskId != null && !_validIdentifier(sourceAgentTaskId)) ||
+        (sourceAgentResultHash != null &&
+            !RegExp(r'^sha256:[a-f0-9]{64}$')
+                .hasMatch(sourceAgentResultHash))) {
       throw const BrokerClientException('MCP Tool実行要求が不正または上限超過です');
     }
     final response = await _transport.request(
@@ -587,10 +642,14 @@ class McpConnectionClient {
         'ToolID': tool.toolId,
         '名前': tool.name,
         'arguments': arguments,
+        if (sourceAgentTaskId != null)
+          'source_agent_task_id': sourceAgentTaskId,
+        if (sourceAgentResultHash != null)
+          'source_agent_result_hash': sourceAgentResultHash,
       },
     );
     final body = _acceptedBody(response, 'MCP Tool実行');
-    const fields = {
+    const requiredFields = {
       '版',
       '契約種別',
       'ServerID',
@@ -612,10 +671,11 @@ class McpConnectionClient {
       '証拠種別',
       '監査ID',
     };
+    const allowedFields = {...requiredFields, 'Agent結果context'};
     final contentTypes = body['content_types'];
     final contentCount = body['content_count'];
-    if (body.length != fields.length ||
-        !body.keys.toSet().containsAll(fields) ||
+    if (!body.keys.toSet().containsAll(requiredFields) ||
+        body.keys.any((key) => !allowedFields.contains(key)) ||
         body['版'] != 1 ||
         body['契約種別'] != 'MCP Tool実行receipt' ||
         body['ServerID'] != serverId ||
@@ -652,6 +712,50 @@ class McpConnectionClient {
         (body['監査ID'] as String).isEmpty) {
       throw const BrokerClientException('MCP Tool実行receiptの境界が不正です');
     }
+    McpAgentResultContext? agentResultContext;
+    final rawAgentResultContext = body['Agent結果context'];
+    if (rawAgentResultContext != null) {
+      if (sourceAgentTaskId == null ||
+          rawAgentResultContext is! Map ||
+          rawAgentResultContext.keys.any((key) => key is! String)) {
+        throw const BrokerClientException('Agent結果contextの境界が不正です');
+      }
+      final context = Map<String, Object?>.from(rawAgentResultContext);
+      const contextFields = {
+        '状態',
+        'result_id',
+        'context_hash',
+        'tool_result_hash',
+      };
+      final status = context['状態'];
+      final resultId = context['result_id'];
+      final contextHash = context['context_hash'];
+      final toolResultHash = context['tool_result_hash'];
+      final available = status == 'available';
+      final unavailable = const {'unsupported', 'unavailable'}.contains(status);
+      if (context.length != contextFields.length ||
+          !context.keys.toSet().containsAll(contextFields) ||
+          (!available && !unavailable) ||
+          toolResultHash != body['result_hash'] ||
+          (available &&
+              (resultId is! String ||
+                  !RegExp(r'^mcp-agent-result-[a-f0-9]{32}$')
+                      .hasMatch(resultId) ||
+                  contextHash is! String ||
+                  !RegExp(r'^sha256:[a-f0-9]{64}$').hasMatch(contextHash))) ||
+          (unavailable && (resultId != null || contextHash != null))) {
+        throw const BrokerClientException('Agent結果contextの境界が不正です');
+      }
+      agentResultContext = McpAgentResultContext(
+        status: status as String,
+        resultId: resultId as String?,
+        contextHash: contextHash as String?,
+        toolResultHash: toolResultHash as String,
+      );
+    }
+    if (sourceAgentTaskId != null && agentResultContext == null) {
+      throw const BrokerClientException('Agent実行に結び付くMCP結果contextがありません');
+    }
     return McpToolCallReceipt(
       serverId: serverId,
       toolId: tool.toolId,
@@ -662,6 +766,7 @@ class McpConnectionClient {
       contentTypes: List.unmodifiable(contentTypes.cast<String>()),
       connectionState: body['接続状態'] as String,
       auditId: body['監査ID'] as String,
+      agentResultContext: agentResultContext,
     );
   }
 

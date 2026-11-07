@@ -25,18 +25,28 @@ class AgentTaskRequest {
     required this.sessionId,
     required this.workspaceId,
     required this.instruction,
+    this.mcpCapabilitySnapshotHash,
+    this.mcpResultId,
+    this.mcpResultHash,
   });
 
   final String runtimeId;
   final String sessionId;
   final String workspaceId;
   final String instruction;
+  final String? mcpCapabilitySnapshotHash;
+  final String? mcpResultId;
+  final String? mcpResultHash;
 
   Map<String, Object?> toPayload() => {
         'agent_runtime_id': runtimeId,
         'session_id': sessionId,
         'workspace_id': workspaceId,
         'instruction': instruction,
+        if (mcpCapabilitySnapshotHash != null)
+          'mcp_capability_snapshot_hash': mcpCapabilitySnapshotHash,
+        if (mcpResultId != null) 'mcp_result_id': mcpResultId,
+        if (mcpResultHash != null) 'mcp_result_hash': mcpResultHash,
       };
 
   void validate() {
@@ -44,7 +54,14 @@ class AgentTaskRequest {
         !_sessionId.hasMatch(sessionId) ||
         !_runtimeId.hasMatch(workspaceId) ||
         instruction.trim().isEmpty ||
-        instruction.runes.length > 32768) {
+        instruction.runes.length > 32768 ||
+        (mcpCapabilitySnapshotHash != null &&
+            !_hash.hasMatch(mcpCapabilitySnapshotHash!)) ||
+        (mcpResultId != null &&
+            !RegExp(r'^mcp-agent-result-[a-f0-9]{32}$')
+                .hasMatch(mcpResultId!)) ||
+        (mcpResultId == null) != (mcpResultHash == null) ||
+        (mcpResultHash != null && !_hash.hasMatch(mcpResultHash!))) {
       throw const BrokerClientException('Agent Task要求の形式が不正です');
     }
   }

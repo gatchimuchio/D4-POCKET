@@ -394,6 +394,41 @@ impl Broker {
         .map_err(|_| ())
     }
 
+    pub(super) fn MCP資格情報有効確認(&self, credential_id: &str, target: &str) -> bool {
+        credential_ledger(&self.audit_log).is_ok_and(|ledger| {
+            ledger.entries.iter().any(|entry| {
+                entry.public.credential_id == credential_id
+                    && entry.public.purpose == "mcp_transport"
+                    && entry.public.target == target
+                    && entry.public.status == "有効"
+                    && entry.public.revoked_at.is_none()
+            })
+        })
+    }
+
+    pub(super) fn MCP資格情報秘密値取得(
+        &self,
+        credential_id: &str,
+        target: &str,
+    ) -> Result<zeroize::Zeroizing<Vec<u8>>, ()> {
+        let ledger = credential_ledger(&self.audit_log).map_err(|_| ())?;
+        let entry = ledger
+            .entries
+            .into_iter()
+            .find(|entry| {
+                entry.public.credential_id == credential_id
+                    && entry.public.purpose == "mcp_transport"
+                    && entry.public.target == target
+                    && entry.public.status == "有効"
+                    && entry.public.revoked_at.is_none()
+            })
+            .ok_or(())?;
+        self.資格情報保存先()
+            .ok_or(())?
+            .読取(&entry.storage_id, &entry.public.ciphertext_hash)
+            .map_err(|_| ())
+    }
+
     pub(super) fn 資格情報登録処理(
         &mut self,
         request_id: &str,
