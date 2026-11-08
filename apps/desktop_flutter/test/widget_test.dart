@@ -3278,6 +3278,405 @@ void main() {
     expect(find.textContaining('PRIVATE_TASK_SENTINEL'), findsNothing);
   });
 
+  testWidgets('Agent CenterはTask完了後にMCP結果依存Taskを自動でBrokerへ接続する',
+      (WidgetTester tester) async {
+    const runtimeId = 'codex-auto-mcp';
+    const workspaceId = 'workspace-auto-mcp';
+    const sessionId = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const sourceTaskId = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    const followupTaskId = 'cccccccccccccccccccccccccccccccc';
+    const sourceInstructionHash =
+        'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const followupInstructionHash =
+        'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    const sourceResultHash =
+        'sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc';
+    const toolResultHash =
+        'sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd';
+    const contextHash =
+        'sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
+    const capabilityHash =
+        'sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
+    const toolId =
+        'tool-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const resultId = 'mcp-agent-result-11111111111111111111111111111111';
+    const serverId = 'mcp-auto-fixture';
+    const toolName = 'lookup';
+
+    Map<String, Object?> taskRecord({
+      required String taskId,
+      required String instructionHash,
+      required String status,
+      String? resultHash,
+    }) =>
+        {
+          'task_id': taskId,
+          'record_version': 2,
+          'agent_runtime_id': runtimeId,
+          'session_id': sessionId,
+          'workspace_id': workspaceId,
+          'description': 'Agent作業Task（結果本文とWorkspace差分は別の権限経路）',
+          'instruction_hash': instructionHash,
+          'status': status,
+          'audit_event_id': 'audit-$taskId-$status',
+          if (resultHash != null) 'result_hash': resultHash,
+          'result_content_available': resultHash != null,
+        };
+
+    Map<String, Object?> capabilityList() => {
+          'request_id': 'test-mcp-capability-list',
+          'operation': 'MCP接続一覧',
+          'status': 'accepted',
+          'evidence_source': 'INTERNAL_STATE',
+          'audit_event_id': 'audit-mcp-capability-list',
+          'error': null,
+          'health': null,
+          'body': {
+            '版': 1,
+            'MCP接続一覧': [
+              {
+                '版': 1,
+                '契約種別': 'MCP外部概念射影',
+                'Server': {'server_id': serverId, '表示名': '試験MCP'},
+                'Transport': {'kind': 'stdio'},
+                'Tool': [
+                  {
+                    'tool_id': toolId,
+                    'name': toolName,
+                    'description_summary': '',
+                    'input_schema_hash': capabilityHash,
+                    'risk': 'unknown',
+                    'status': {'status': 'supported', 'reason': 'fixture'},
+                  },
+                ],
+                'Resource': <Object?>[],
+                'Prompt': <Object?>[],
+                'Credential ref': <String, Object?>{},
+                'Trust': <String, Object?>{},
+                'Capability diff': <String, Object?>{},
+                '権限生成': 'なし',
+                '公開範囲': 'metadata_only',
+                '証拠種別': 'INTERNAL_STATE',
+                '接続状態': 'connected',
+                '能力ID': 'mcp.connection.connect',
+                '権限ID': 'permission.mcp.connection.connect',
+                '承認状態': 'owner_control_approved',
+                '復旧ID': 'recover-mcp-connection',
+                '接続監査ID': 'audit-mcp-connection',
+                '実行状態': 'ready',
+              },
+            ],
+            '件数': 1,
+            'Agent能力hash': capabilityHash,
+            'Agent能力件数': 1,
+            'Agent能力状態': 'available',
+            '公開範囲': 'metadata_only',
+            '証拠種別': 'INTERNAL_STATE',
+          },
+          'shutdown_requested': false,
+        };
+
+    Map<String, Object?> permissionReceipt(String permissionId) =>
+        _brokerAcceptedBody('AgentTaskWorkspacePermissionGrant', {
+          'permission_id': permissionId,
+          'agent_runtime_id': runtimeId,
+          'session_id': sessionId,
+          'workspace_id': workspaceId,
+          'workspace_registration_hash': sourceResultHash,
+          'operation': 'agent_task.execute',
+          'scope': 'session_workspace_once',
+          'decision': 'allow',
+          'source': 'owner',
+          'expires_at_epoch_seconds': 1900000000,
+          'use_limit': 1,
+          'uses_remaining': 1,
+          'status': 'active',
+        });
+
+    Map<String, Object?> ownerApproval(String instructionHash) =>
+        _brokerAcceptedBody('AgentTaskOwnerApprovalGrant', {
+          '状態': 'Owner Approval発行済み',
+          '実行状態': '未実行',
+          '実行系ID': runtimeId,
+          '対話セッションID': sessionId,
+          '作業領域ID': workspaceId,
+          '指示hash': instructionHash,
+          '実行条件hash': contextHash,
+          '適用ポリシー': 'gui-shell-agent-task-sandbox-v1-max-runtime-900s',
+          'expires_at_epoch_seconds': 1900000000,
+          'use_limit': 1,
+          'uses_remaining': 1,
+          'status': 'issued_unconsumed',
+        });
+
+    final mcpProposal = jsonEncode({
+      'd4_mcp_tool_request': {
+        'server_id': serverId,
+        'tool_id': toolId,
+        'name': toolName,
+        'arguments': {'query': 'Tokyo'},
+      },
+    });
+    final transport = _FakeBrokerTransport([
+      _brokerHealthResponse(),
+      _brokerHostCapabilityResponse(),
+      _brokerHostListResponse(),
+      _brokerAdapterListResponse(),
+      _brokerAgentAdapterListResponse(),
+      _brokerDialogueSessionListResponse(),
+      _brokerAcceptedBody('normalize_payload', {'quarantined': false}),
+      _brokerAcceptedBody('content_projection', {'redacted_payload': {}}),
+      _brokerAcceptedBody('approval_edit', {'ok': false}),
+      _brokerCommandSuspendedResponse(),
+      _brokerAcceptedBody('AgentCLI実行系作業領域登録', {
+        'runtime_id': runtimeId,
+        'workspace_id': workspaceId,
+        'registration_lifetime': 'broker_process',
+        'task_execution': 'supported',
+        'permission_generated': false,
+        'approval_generated': false,
+        'credential_value_accepted': false,
+      }),
+      _brokerAcceptedBody('対話開始', {
+        '対話セッションID': sessionId,
+        '実行系ID': runtimeId,
+        '状態': '利用中',
+      }),
+      _brokerDialogueSessionListResponse(sessions: [
+        {
+          '対話セッションID': sessionId,
+          '実行系ID': runtimeId,
+          '状態': '利用中',
+          '作成監査ID': 'audit-session-created-auto-mcp',
+          '作業領域ID': workspaceId,
+          '作業領域結合監査ID': 'audit-workspace-bound-auto-mcp',
+        },
+      ]),
+      capabilityList(),
+      _brokerAcceptedBody('Agent作業要求検査', {
+        '版': 1,
+        '状態': '要求検査済み',
+        '実行状態': '未実行',
+        'Permission状態': '未付与',
+        'Approval状態': '未取得',
+        '実行系ID': runtimeId,
+        '対話セッションID': sessionId,
+        '作業領域ID': workspaceId,
+        '指示hash': sourceInstructionHash,
+      }),
+      permissionReceipt('11111111111111111111111111111111'),
+      ownerApproval(sourceInstructionHash),
+      _brokerAcceptedBody(
+          'AgentTask実行',
+          taskRecord(
+            taskId: sourceTaskId,
+            instructionHash: sourceInstructionHash,
+            status: 'running',
+          )),
+      _brokerAcceptedBody(
+          'AgentTask状態',
+          taskRecord(
+            taskId: sourceTaskId,
+            instructionHash: sourceInstructionHash,
+            status: 'completed',
+            resultHash: sourceResultHash,
+          )),
+      _brokerAcceptedBody('AgentTask結果表示承認', {
+        'task_id': sourceTaskId,
+        'result_hash': sourceResultHash,
+        'content_visibility': 'full',
+        'approval_id': 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+        'expires_at_epoch_seconds': 1900000000,
+        'use_limit': 1,
+        'uses_remaining': 1,
+      }),
+      _brokerAcceptedBody('AgentTask結果取得', {
+        'task_id': sourceTaskId,
+        'result_hash': sourceResultHash,
+        'content_visibility': 'full',
+        'projection': {'result_hash': sourceResultHash, 'text': mcpProposal},
+      }),
+      capabilityList(),
+      {
+        ..._brokerAcceptedBody('MCP Tool実行', {
+          '版': 1,
+          '契約種別': 'MCP Tool実行receipt',
+          'ServerID': serverId,
+          'ToolID': toolId,
+          '名前': toolName,
+          'arguments_hash': sourceResultHash,
+          'result_hash': toolResultHash,
+          'Tool error': false,
+          'content_count': 1,
+          'content_types': ['text'],
+          '接続状態': 'connected',
+          '能力ID': 'mcp.tool.call',
+          '権限ID': 'permission.mcp.tool.call.one_shot',
+          '承認状態': 'native_owner_confirmed',
+          '承認監査ID': 'audit-mcp-tool-owner-approval',
+          '復旧ID': 'inspect-mcp-tool-side-effect',
+          '権限生成': 'Broker内一回限りPermissionを消費',
+          '公開範囲': 'hash_only',
+          '証拠種別': 'LIVE_RUNTIME',
+          '監査ID': 'audit-mcp-tool-call',
+          'Agent結果context': {
+            '状態': 'available',
+            'result_id': resultId,
+            'context_hash': contextHash,
+            'tool_result_hash': toolResultHash,
+          },
+        })
+      },
+      _brokerAcceptedBody('Agent作業要求検査', {
+        '版': 1,
+        '状態': '要求検査済み',
+        '実行状態': '未実行',
+        'Permission状態': '未付与',
+        'Approval状態': '未取得',
+        '実行系ID': runtimeId,
+        '対話セッションID': sessionId,
+        '作業領域ID': workspaceId,
+        '指示hash': followupInstructionHash,
+      }),
+      permissionReceipt('22222222222222222222222222222222'),
+      ownerApproval(followupInstructionHash),
+      _brokerAcceptedBody(
+          'AgentTask実行',
+          taskRecord(
+            taskId: followupTaskId,
+            instructionHash: followupInstructionHash,
+            status: 'running',
+          )),
+      _brokerAcceptedBody(
+          'AgentTask状態',
+          taskRecord(
+            taskId: followupTaskId,
+            instructionHash: followupInstructionHash,
+            status: 'completed',
+          )),
+    ]);
+    final client = await ShellCoreClient.product(transport: transport);
+
+    await tester.pumpWidget(
+      MaterialApp(home: Scaffold(body: AgentCenter(client: client))),
+    );
+    await tester.tap(find.text('登録を開始'));
+    await tester.pumpAndSettle();
+    final registrationFields = find.byType(TextFormField);
+    await tester.enterText(registrationFields.at(0), 'gpt-test-01');
+    await tester.enterText(registrationFields.at(1), runtimeId);
+    await tester.enterText(
+        registrationFields.at(2), r'C:\Tools\Codex\codex.exe');
+    await tester.enterText(registrationFields.at(3), workspaceId);
+    await tester.enterText(
+        registrationFields.at(4), r'C:\d4-auto-mcp-workspace');
+    await tester.enterText(registrationFields.at(5), '.env');
+    await tester.tap(find.text('native Owner確認へ進む'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('登録Workspaceで対話Sessionを開始'));
+    await tester.pumpAndSettle();
+
+    final preflight = find.text('Task実行能力を事前検査（実行なし）');
+    await tester.ensureVisible(preflight);
+    await tester.tap(preflight);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField), 'MCP結果で次の確認を行う');
+    await tester.tap(find.text('現在のMCP Tool能力をAgentへ提示する'));
+    await tester.pump();
+    await tester.tap(find.text('Broker事前検査'));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Workspace PermissionのOwner確認'));
+    await tester.tap(find.text('Workspace PermissionのOwner確認'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Task一回ApprovalのOwner確認'));
+    await tester.tap(find.text('Task一回ApprovalのOwner確認'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Taskを一回実行'));
+    await tester.tap(find.text('Taskを一回実行'));
+    await tester.pumpAndSettle();
+
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+
+    final taskStarts = transport.requests
+        .where((request) => request['operation'] == 'AgentTask実行')
+        .toList(growable: false);
+    expect(taskStarts, hasLength(2));
+    for (final request in taskStarts) {
+      final payload = request['payload']! as Map<String, Object?>;
+      expect(payload['agent_runtime_id'], runtimeId);
+      expect(payload['session_id'], sessionId);
+      expect(payload['workspace_id'], workspaceId);
+      expect(payload, isNot(contains('permission_id')));
+      expect(payload, isNot(contains('approval_id')));
+    }
+    final toolCall = transport.requests.singleWhere(
+      (request) => request['operation'] == 'MCP Tool実行',
+    );
+    final toolPayload = toolCall['payload']! as Map<String, Object?>;
+    expect(toolPayload['source_agent_task_id'], sourceTaskId);
+    expect(toolPayload['source_agent_result_hash'], sourceResultHash);
+    final followupInspection = transport.requests.singleWhere(
+      (request) =>
+          request['operation'] == 'Agent作業要求検査' &&
+          ((request['payload']! as Map)['mcp_result_id'] == resultId),
+    );
+    final followupPayload =
+        followupInspection['payload']! as Map<String, Object?>;
+    expect(followupPayload['runtime_id'], isNull);
+    expect(followupPayload['agent_runtime_id'], runtimeId);
+    expect(followupPayload['session_id'], sessionId);
+    expect(followupPayload['workspace_id'], workspaceId);
+    expect(followupPayload['mcp_result_hash'], contextHash);
+    expect(followupPayload['mcp_capability_snapshot_hash'], capabilityHash);
+    expect(
+      transport.operations.where(
+          (operation) => operation == 'AgentTaskWorkspacePermissionGrant'),
+      hasLength(2),
+    );
+    final issuedPermissionIds = transport.returnedResponses
+        .where((response) =>
+            response['operation'] == 'AgentTaskWorkspacePermissionGrant')
+        .map((response) =>
+            ((response['body']! as Map<String, Object?>)['permission_id']))
+        .toSet();
+    expect(
+      issuedPermissionIds,
+      equals({
+        '11111111111111111111111111111111',
+        '22222222222222222222222222222222',
+      }),
+    );
+    expect(
+      transport.operations
+          .where((operation) => operation == 'AgentTaskOwnerApprovalGrant'),
+      hasLength(2),
+    );
+    expect(
+      transport.operations,
+      containsAllInOrder([
+        'AgentTask実行',
+        'AgentTask状態',
+        'AgentTask結果表示承認',
+        'AgentTask結果取得',
+        'MCP接続一覧',
+        'MCP Tool実行',
+        'Agent作業要求検査',
+        'AgentTaskWorkspacePermissionGrant',
+        'AgentTaskOwnerApprovalGrant',
+        'AgentTask実行',
+      ]),
+    );
+    expect(find.textContaining(followupTaskId), findsWidgets);
+    expect(find.text('AgentのMCP Tool提案をBroker照合・native承認'), findsNothing);
+    expect(find.text('未信頼MCP結果を同じAgentの新Taskへ渡す'), findsNothing);
+    expect(find.textContaining('AGENT_AUTO_MCP_SECRET'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   test('Broker対話sessionの重複IDまたは未知内容fieldは製品snapshotを閉鎖する', () async {
     final valid = {
       '対話セッションID': _testSessionId('c'),
