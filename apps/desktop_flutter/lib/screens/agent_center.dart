@@ -68,6 +68,30 @@ class _AgentTaskUiState {
   String? mcpFollowupTaskId;
   bool mcpContinuationStarted = false;
   final Set<String> monitoredTaskIds = {};
+  Timer? monitorTimer;
+  Completer<void>? monitorDelayCompleter;
+
+  Future<void> waitForMonitorDelay(Duration delay) {
+    cancelMonitorDelay();
+    final completer = Completer<void>();
+    monitorDelayCompleter = completer;
+    monitorTimer = Timer(delay, () {
+      if (identical(monitorDelayCompleter, completer)) {
+        monitorTimer = null;
+        monitorDelayCompleter = null;
+      }
+      if (!completer.isCompleted) completer.complete();
+    });
+    return completer.future;
+  }
+
+  void cancelMonitorDelay() {
+    monitorTimer?.cancel();
+    monitorTimer = null;
+    final completer = monitorDelayCompleter;
+    monitorDelayCompleter = null;
+    if (completer != null && !completer.isCompleted) completer.complete();
+  }
 }
 
 class _AgentTaskDraft {
@@ -165,6 +189,9 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
   @override
   void dispose() {
     _clearAllResultProjections();
+    for (final task in _agentTasks.values) {
+      task.cancelMonitorDelay();
+    }
     _agentTasks.clear();
     _taskPreflightStatus.clear();
     WidgetsBinding.instance.removeObserver(this);
@@ -1168,15 +1195,34 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     final transport = widget.client.brokerTransport;
     if (transport == null) return;
 
+    if (initialTask.status == 'completed') {
+      if (allowMcpContinuation && !state.mcpContinuationStarted) {
+        state.mcpContinuationStarted = true;
+        await _runAgentMcpContinuation(session, state, initialTask);
+      }
+      return;
+    }
+    if (!const {'pending', 'running'}.contains(initialTask.status)) return;
+
     final deadline = DateTime.now().add(const Duration(minutes: 16));
     final monitorStarted = DateTime.now();
     var delay = const Duration(seconds: 2);
     while (mounted && DateTime.now().isBefore(deadline)) {
-      await Future<void>.delayed(delay);
+      await state.waitForMonitorDelay(delay);
       if (!mounted ||
           !identical(_agentTasks[session.sessionId], state) ||
           state.record?.taskId != taskId ||
           !_sessionStillMatchesRegistration(session)) {
+        return;
+      }
+      if (!const {'pending', 'running'}.contains(state.record?.status)) {
+        final currentTask = state.record;
+        if (allowMcpContinuation &&
+            currentTask?.status == 'completed' &&
+            !state.mcpContinuationStarted) {
+          state.mcpContinuationStarted = true;
+          await _runAgentMcpContinuation(session, state, currentTask!);
+        }
         return;
       }
       if (_taskPreflightSession != null) continue;
@@ -1385,6 +1431,9 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     });
     try {
       state.record = await AgentTaskClient(transport).state(taskId);
+      if (!const {'pending', 'running'}.contains(state.record!.status)) {
+        state.cancelMonitorDelay();
+      }
       if (!mounted) return;
       setState(() {
         _taskPreflightStatus[session.sessionId] =
