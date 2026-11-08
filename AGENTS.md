@@ -1,6 +1,6 @@
 # D4Pocket エージェント実装・監査規定
 
-本書はD4Pocket（旧GUI-Shell）のAI実装エージェントが守るリポジトリ共通規律である。QE方法論・工程・2026-10-22の是正工程の詳細は、採用記録付きの現行QE方法論3点（`docs/QE_2026-10-22/`）を適用する。2026-11-05に採用された統合製品要求・工程・施工指示は`docs/QE_2026-11-05/`を適用し、既存の製品要求、安全境界、権限、復旧、OS別証拠、Git運用を保持する。BLUE側のHDS-BRAIN実装、192小単位、別リポジトリの成果や書込み権限は移植しない。
+本書はD4Pocket（旧GUI-Shell）のAI実装エージェントが守るリポジトリ共通規律である。QE方法論・工程・2026-10-22の是正工程の詳細は、採用記録付きの現行QE方法論3点（`docs/QE_2026-10-22/`）を適用する。現在の製品要求・工程・施工指示は、採用記録付きの`docs/QE_2026-11-08/`を適用する。2026-11-05／06の統合製品文書は当時の要求・判断・証拠として保持し、現行状態を上書きしない。既存の製品要求、安全境界、権限、復旧、OS別証拠、Git運用を保持する。BLUE側のHDS-BRAIN実装、192小単位、別リポジトリの成果や書込み権限は移植しない。
 
 ## 第I部 共通基底規律
 
@@ -754,7 +754,7 @@ QEは要求・設計・実装・観測・是正を通じた上位思想である
 
 ### 29. rev5製品・B工程の現況と施工境界
 
-rev5／緩衝基盤の製品Acceptance履歴と証拠には`docs/REV5_PRODUCT_PROGRESS.md`を、2026-11-05統合工程の状態には`docs/QE_2026-11-05/進捗.md`を参照する。以下の2026-10-12、2026-10-19記述は履歴snapshotであり、現在の施工境界として使わない。
+rev5／緩衝基盤の製品Acceptance履歴と証拠には`docs/REV5_PRODUCT_PROGRESS.md`を、現在のW00〜W08工程状態には`docs/QE_2026-11-08/進捗.md`を参照する。2026-11-05／06の統合製品進捗は当時の状態として保持する。以下の2026-10-12、2026-10-19記述は履歴snapshotであり、現在の施工境界として使わない。
 
 履歴snapshot（2026-10-12）: P2 Compare／P3 Handoff／P12 Windows／P13 Mobile・Non-Windowsは局所CLOSED、B0〜B3はCLOSED、B4-L1／B4-L2は局所CLOSED、当時のB4全体はOPEN。B4統合製品経路は2026-10-17に限定Acceptanceを満たしてCLOSEDとなった。詳細は現行進捗とB4記録を参照する。
 
@@ -774,6 +774,6 @@ Windows normal Release／Codex CLIのW01/G1に限り`task_execution=supported`�
 
 Linux nativeは完全対応が必須の独立Desktop製品対象であり、その実装・工程開始は2026-10-12詳細案の採否に依存しない。QE方法論・工程・`D4-AUD-20261022`是正工程の現行正本は、Owner採用済みの[2026-10-22統合3点](docs/QE_2026-10-22/採用記録.md)とする。これらはrev5の製品機能要求を欠落なく置換したものではないため、rev5・既存Contract／Schema・緩衝補遺の要求意味、既存CLOSED／FAIL、製品状態、Release Gateを保持する。3点内で候補・未採用と明記されたIDや詳細工程はその区分も保持し、Linux必須性を弱めず、黙って拘束的Acceptanceへ昇格させない。正式Q0〜Q7、通常Release capability、Owner GOは既存の開始条件を維持する。
 
-2026-11-05統合製品3点は、Owner指示により採用された当時のD4-N01〜N11／W00〜W08要求・状態・証拠として保持する。現在の製品正本は2026-11-08三点セットであり、[採用記録](docs/QE_2026-11-08/採用記録.md)と[進捗](docs/QE_2026-11-08/進捗.md)を参照する。W00=`SCOPED_PASS`、W01/G1=`CLOSED`（Windows normal Release／Codex CLI限定）、W02/G2=`OPEN`、W03〜W08=`PLANNED`。W01限定`task_execution=supported`以外のCapability、`release_ready`、正式QA、Owner GOは各独立条件の成立前に拡張しない。2026-11-08三点は2026-10-22 QE方法論を置換せず、rev5／緩衝基盤、既存CLOSED／FAIL、Final QA、Owner GOの履歴・責任を保持する。
+2026-11-05統合製品3点と2026-11-06改訂は、Ownerが当時採用したD4-N01〜N11／W00〜W08要求・状態・証拠として保持する。現在の製品要求・工程・施工指示は2026-11-08三点セットであり、[採用記録](docs/QE_2026-11-08/採用記録.md)と、現HEADの状態を示す[進捗](docs/QE_2026-11-08/進捗.md)を参照する。最新進捗に記録されたW00=`SCOPED_PASS`、W01/G1=`CLOSED`（Windows normal Release／Codex CLI限定）、W02/G2=`OPEN`、W03〜W08=`PLANNED`を維持する。W01限定`task_execution=supported`以外のCapability、`release_ready`、正式QA、Owner GOは各独立条件の成立前に拡張しない。2026-11-08三点は2026-10-22 QE方法論を置換せず、rev5／緩衝基盤、既存CLOSED／FAIL、Final QA、Owner GOの履歴・責任を保持する。
 
 D4Pocket固有のremoteバックアップ正本は`refs/tags/codex/backup-main`と`refs/tags/codex/backup-main-prev`。BLUE側の`refs/heads`へ自動変更しない。D4の手動`workflow_dispatch`限定Actions運用、direct-main、単一writer、Shell Core／Broker authority、各OSの証拠区分を保持する。LinuxはWindows・macOSと並ぶ独立Desktop対象だが、native製品の実接続・導入・Release・保証が実証済みとは主張しない。既存試験・Release Gateを省略せず、作業開始時に現物と正本を再読する。
