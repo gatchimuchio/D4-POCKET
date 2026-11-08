@@ -238,12 +238,16 @@ fn valid_task_arguments(arguments: &[String]) -> bool {
             TASK_PERMISSION_PROFILE_SUFFIX[1].to_owned(),
         ])
         .collect::<Vec<_>>();
+    let expected_task_configs = ["approval_policy=\"never\"".to_owned()]
+        .into_iter()
+        .chain(expected_task_profile)
+        .collect::<Vec<_>>();
     if (has_provider_key
         && (configs.len() < provider_settings.len()
             || configs[..provider_settings.len()] != provider_settings))
-        || configs.len() != expected_task_profile.len() + 1 + provider_offset
-        || configs[provider_offset..provider_offset + expected_task_profile.len()]
-            != expected_task_profile
+        || configs.len() != expected_task_configs.len() + 1 + provider_offset
+        || configs[provider_offset..provider_offset + expected_task_configs.len()]
+            != expected_task_configs
                 .iter()
                 .map(String::as_str)
                 .collect::<Vec<_>>()

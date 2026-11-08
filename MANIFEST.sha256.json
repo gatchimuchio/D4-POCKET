@@ -1396,7 +1396,7 @@
     },
     {
       "path": "docs/QE_2026-11-08/\u9032\u6357.md",
-      "sha256": "0ae415ff4c0e8e223c30d3f9a270336aba4daeadefb6b0d91f78895be81dddb9"
+      "sha256": "e54265011c5f265c336920a2d434c6539f7e1c189ea36f79769bd214fbee3cd2"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -3576,7 +3576,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/mcp_stdio.rs",
-      "sha256": "f8cd47bb6286e0feb3b996497fd6e51b0b5c1c57d622fbc56144c8ee51e894cd"
+      "sha256": "54093b6ff713e4febfaae1787ed730a13b08a1614883e50d4e94e1c1e2696922"
     },
     {
       "path": "native/rust_helper/src/adapters/minidora.rs",
@@ -3728,7 +3728,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/mcp_center.rs",
-      "sha256": "26714393cd9795ca24d2bfe135a06cf77da0f41dab745294e90711fd89f84247"
+      "sha256": "457f6dee5bdc18ffed922aacfb7e072cf1cc245c3f97de8f483d510fc74c78a5"
     },
     {
       "path": "native/rust_helper/src/broker/mod.rs",
@@ -3932,7 +3932,7 @@
     },
     {
       "path": "native/rust_helper/tests/fixtures/fake_codex_cli.rs",
-      "sha256": "0dc0d67c9003ec3bf6c77717bd9f14f220109564c0523afadd1ab41c4401623d"
+      "sha256": "d6cd49d75dd5a47862708e4e618e9b41e76e951840ae2a99098be3cdf17a518b"
     },
     {
       "path": "native/rust_helper/tests/protected_data.rs",

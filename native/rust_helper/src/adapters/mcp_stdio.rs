@@ -631,6 +631,76 @@ echo {"jsonrpc":"2.0","id":1,"result":{"resultType":"complete","supportedVersion
     }
 
     #[test]
+    fn MCP_Tool応答前にServerが異常終了したら結果不明として停止し再送しない() {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("時計")
+            .as_nanos();
+        let workspace = std::env::temp_dir().join(format!(
+            "gui-shell-mcp-abnormal-exit-{}-{nonce}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&workspace).expect("試験用作業領域を作成");
+        let system_root =
+            PathBuf::from(env::var_os(SYSTEM_ROOT_ENVIRONMENT_KEY).expect("システム領域を取得"));
+        let executable = system_root.join("System32").join("cmd.exe");
+        let calls_path = workspace.join("calls.log");
+        let script = r#"@echo off
+setlocal EnableDelayedExpansion
+set /p request=
+echo !request! | findstr /c:"server/discover" > nul
+if errorlevel 1 exit /b 31
+echo {"jsonrpc":"2.0","id":1,"result":{"resultType":"complete","supportedVersions":["__PROTOCOL_VERSION__"],"capabilities":{"tools":{}}}}
+set /p request=
+echo !request! | findstr /c:"tools/list" > nul
+if errorlevel 1 exit /b 32
+echo {"jsonrpc":"2.0","id":2,"result":{"resultType":"complete","tools":[{"name":"echo","inputSchema":{"type":"object","properties":{"text":{"type":"string"}},"required":["text"],"additionalProperties":false}}]}}
+set /p request=
+echo !request! | findstr /c:"tools/call" > nul
+if errorlevel 1 exit /b 33
+>>"__CALLS_PATH__" echo call
+exit /b 47
+"#
+        .replace("__PROTOCOL_VERSION__", crate::mcp::MODERN_PROTOCOL_VERSION)
+        .replace("__CALLS_PATH__", &calls_path.to_string_lossy());
+        let script_path = workspace.join("mcp-server.cmd");
+        fs::write(&script_path, script).expect("異常終了fixtureを書き込む");
+        let arguments = vec![
+            "/D".to_string(),
+            "/C".to_string(),
+            script_path.to_string_lossy().into_owned(),
+        ];
+        let mut connection = McpStdioConnection::connect(&executable, &arguments, &workspace)
+            .expect("異常終了fixtureのCatalogを取得");
+        let tool_id = connection.catalog().tools[0].tool_id.clone();
+
+        let error =
+            match connection.call_tool(&tool_id, "echo", &serde_json::json!({"text":"once"})) {
+                Err(error) => error,
+                Ok(_) => panic!("応答前に終了したServerを成功として扱った"),
+            };
+        assert_eq!(error.code, "mcp_server_unavailable");
+        assert_eq!(
+            fs::read_to_string(&calls_path)
+                .expect("送信済みcall記録")
+                .lines()
+                .count(),
+            1,
+            "異常終了後にTool呼出しを自動再送しない"
+        );
+        connection
+            .terminate()
+            .expect("終了済みServer process群を正常回収");
+        assert!(connection
+            .child
+            .try_wait()
+            .expect("root終了状態を確認")
+            .is_some());
+        drop(connection);
+        fs::remove_dir_all(workspace).expect("試験用作業領域を除去");
+    }
+
+    #[test]
     fn MCP_stdio_Serverのprocess群をBroker監督下で起動し終了する() {
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)

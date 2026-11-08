@@ -1079,14 +1079,25 @@ pub(super) fn call_tool(
     let output = match call_result {
         Ok(output) => output,
         Err(_error) => {
-            if let Some(entry) = broker.mcp_connections.get_mut(&request.server_id) {
-                quarantine(entry);
-            }
+            let stop_result = broker
+                .mcp_connections
+                .get_mut(&request.server_id)
+                .map(quarantine_and_stop);
+            let (error_code, error_message) = match stop_result {
+                Some(Ok(())) => (
+                    "mcp_tool_result_unknown",
+                    "送信後の結果を確定できない。接続と子process群を隔離・停止し、外部副作用をownerが確認してから再接続する",
+                ),
+                Some(Err(_)) | None => (
+                    "mcp_process_termination_failed",
+                    "Tool結果不明後のMCP子process群の停止を確認できない。接続を隔離し、権限を与えずprocess停止を復旧する",
+                ),
+            };
             return broker.reject_with_payload_hash(
                 request_id,
                 OP_TOOL_CALL,
-                "mcp_tool_result_unknown",
-                "送信後の結果を確定できない。接続を隔離し、外部副作用をownerが確認してから切断・再接続する",
+                error_code,
+                error_message,
                 true,
                 payload_hash,
             );
@@ -1225,14 +1236,21 @@ pub(super) fn call_tool(
             if let Some((result_id, _)) = pending_agent_result.as_ref() {
                 broker.mcp_agent_results.remove(result_id);
             }
-            if let Some(entry) = broker.mcp_connections.get_mut(&request.server_id) {
-                quarantine(entry);
-            }
+            let process_stopped = broker
+                .mcp_connections
+                .get_mut(&request.server_id)
+                .map(quarantine_and_stop)
+                .is_some_and(|result| result.is_ok());
+            let message = if process_stopped {
+                "Tool応答後のAuditを確定できない。接続と子process群を隔離・停止し、結果を未確定としてowner確認を要求する"
+            } else {
+                "Tool応答後のAudit確定に失敗し、接続隔離後もMCP子process群の停止を確認できない。権限を与えず停止を復旧する"
+            };
             return broker.audit_store_failed_response(
                 request_id,
                 OP_TOOL_CALL,
                 "mcp_audit_append_failed",
-                "Tool応答後のAuditを確定できない。接続を隔離し結果を未確定としてowner確認を要求する",
+                message,
             );
         }
     };
@@ -1264,6 +1282,12 @@ fn quarantine(entry: &mut McpConnectionEntry) {
     entry.quarantined = true;
     entry.projection["接続状態"] = Value::String("quarantined".to_string());
     entry.projection["実行状態"] = Value::String("quarantined".to_string());
+}
+
+#[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+fn quarantine_and_stop(entry: &mut McpConnectionEntry) -> Result<(), McpError> {
+    quarantine(entry);
+    entry.connection.terminate()
 }
 
 pub(super) fn disconnect(
@@ -1706,6 +1730,14 @@ mod tests {
         });
         assert!(parse_request(&request(configured.clone())).is_ok());
         assert!(parse_request(&request(missing_reference())).is_ok());
+        let mut required_credential_missing = missing_reference();
+        required_credential_missing["required"] = json!(true);
+        assert_eq!(
+            parse_request(&request(required_credential_missing))
+                .expect_err("必須Credentialなしでは接続要求を受理しない")
+                .code,
+            "mcp_credential_unavailable"
+        );
 
         for name in [
             "PATH",
@@ -1737,7 +1769,7 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
-    fn broker_mcp_credential_to_audited_tool_call_uses_live_stdio_and_hash_only_result() {
+    fn broker_mcp_credential_to_audited_tool_call_times_out_once_and_quarantines() {
         use std::time::{SystemTime, UNIX_EPOCH};
 
         const SECRET: &str = "synthetic-p6-mcp-secret-not-real";
@@ -1816,7 +1848,6 @@ set /p request=
 echo !request! | findstr /c:"tools/call" > nul
 if errorlevel 1 exit /b 45
 >>"__CALLS_PATH__" echo call
-echo {"jsonrpc":"2.0","id":4,"error":{"code":-32603,"message":"synthetic provider failure"}}
 "%SystemRoot%\System32\ping.exe" -t 127.0.0.1 > nul
 "#
             .replace("__SECRET__", SECRET)
@@ -2024,30 +2055,40 @@ echo {"jsonrpc":"2.0","id":4,"error":{"code":-32603,"message":"synthetic provide
             "失効CredentialのAgent要求は外部MCP childへ送らない"
         );
 
-        let mut abnormal_result_request = tool_request.clone();
-        abnormal_result_request["arguments"] = json!({"text": "trigger-error"});
-        let abnormal_result = broker_test_native_owner_operation(
+        let mut timeout_request = tool_request.clone();
+        timeout_request["arguments"] = json!({"text": "trigger-timeout"});
+        let timeout_started = std::time::Instant::now();
+        let timed_out = broker_test_native_owner_operation(
             &mut broker,
             BrokerOperation::MCPTool実行,
-            abnormal_result_request.clone(),
+            timeout_request.clone(),
         );
-        assert_eq!(abnormal_result.status, BrokerStatus::Rejected);
+        let timeout_elapsed = timeout_started.elapsed();
+        assert!(
+            timeout_elapsed >= std::time::Duration::from_secs(4),
+            "stdio応答期限より先に終了した: {timeout_elapsed:?}"
+        );
+        assert_eq!(timed_out.status, BrokerStatus::Rejected);
         assert_eq!(
-            abnormal_result
-                .error
-                .as_ref()
-                .map(|error| error.code.as_str()),
+            timed_out.error.as_ref().map(|error| error.code.as_str()),
             Some("mcp_tool_result_unknown"),
-            "JSON-RPC error応答を結果不明として扱い自動再送しない"
+            "期限内に応答を得られないTool呼出しを結果不明として扱う"
         );
         assert!(broker
             .mcp_connections
             .get(SERVER)
             .is_some_and(|entry| entry.quarantined));
+        assert!(
+            broker
+                .mcp_connections
+                .get_mut(SERVER)
+                .is_some_and(|entry| !entry.connection.is_alive()),
+            "結果不明のMCP応答期限後は子process群を直ちに停止する"
+        );
         let quarantined_retry = broker_test_native_owner_operation(
             &mut broker,
             BrokerOperation::MCPTool実行,
-            abnormal_result_request,
+            timeout_request,
         );
         assert_eq!(quarantined_retry.status, BrokerStatus::Rejected);
         assert_eq!(
