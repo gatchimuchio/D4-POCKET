@@ -343,6 +343,10 @@
       "sha256": "f63284e8bc45f5479ad37da0e73b357bbe057f791fcd2cf06961ad221db2d7fb"
     },
     {
+      "path": "apps/desktop_flutter/lib/services/agent_task_execution_coordinator.dart",
+      "sha256": "2f23e20bb391c2a64ea6d83d2f8a3624575e910466e4dd300a5eda1ae3567ed9"
+    },
+    {
       "path": "apps/desktop_flutter/lib/services/ai_edit_client.dart",
       "sha256": "cb978289a5c23af7d292b578ce680926a58a804d236cd3aae0d46df987112954"
     },
@@ -1396,7 +1400,7 @@
     },
     {
       "path": "docs/QE_2026-11-08/\u9032\u6357.md",
-      "sha256": "7a9a763821b031cc4dadeea9b15fcd64b982b39bf741f49f6c8c79c916ac99be"
+      "sha256": "0258d32c99fc91cea9279624a5178549e9305b019cecaba4bc280c1dd742a070"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -3740,7 +3744,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/mcp_center.rs",
-      "sha256": "338ad0b21c321ab6a7927fcc3107e15ecfde7f9ee53ebee08ad8ccf04f93ae66"
+      "sha256": "7696f8d3eca547bdbaaf143b1c19e39d63cfbfcc7b48d453a49e1a0ed213b57c"
     },
     {
       "path": "native/rust_helper/src/broker/mod.rs",
@@ -3764,7 +3768,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "62451274447fab5f59b16bb26d4171d9e2b50c6fa7e928e47d5318c7b8687b68"
+      "sha256": "cce3798ded7f549837bd28c5d32313104f82c6898c14508bc5b7c60e07eab192"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",

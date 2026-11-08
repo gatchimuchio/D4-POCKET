@@ -4890,10 +4890,12 @@ impl Broker {
         drop(audit);
         drop(broker);
         self.対話 = 対話;
-        if operation == BrokerOperation::AgentTask実行 && result.is_ok() {
-            if let Some(result_id) = mcp_result_to_consume {
-                self.mcp_agent_results.remove(&result_id);
-            }
+        if operation == BrokerOperation::AgentTask実行 {
+            super::mcp_center::consume_agent_result_context_after_task(
+                self,
+                mcp_result_to_consume.as_deref(),
+                result.is_ok(),
+            );
         }
         match result {
             Ok(body) => BrokerResponse {

@@ -352,6 +352,18 @@ pub(super) fn enrich_agent_task_payload(
     Ok((enriched, consume_result_id))
 }
 
+pub(super) fn consume_agent_result_context_after_task(
+    broker: &mut Broker,
+    result_id: Option<&str>,
+    task_succeeded: bool,
+) {
+    if task_succeeded {
+        if let Some(result_id) = result_id {
+            broker.mcp_agent_results.remove(result_id);
+        }
+    }
+}
+
 fn valid_tagged_hash(value: &str) -> bool {
     value.len() == 71
         && value.starts_with("sha256:")
@@ -1678,6 +1690,50 @@ mod tests {
         .expect_err("期限切れcontextを再利用しない");
         assert_eq!(error.code, "mcp_agent_result_unavailable");
         assert!(!broker.mcp_agent_results.contains_key(&result_id));
+    }
+
+    #[test]
+    fn successful_followup_consumes_mcp_result_context_and_replay_is_rejected() {
+        let mut broker = Broker::new("mcp-result-one-shot-test");
+        let result_id = format!("mcp-agent-result-{}", "b".repeat(32));
+        let result_hash = crate::audit_hash::sha256_tagged(b"one-shot MCP result");
+        broker.mcp_agent_results.insert(
+            result_id.clone(),
+            McpAgentResultContext {
+                server_id: "mcp-server-a".into(),
+                tool_id: "tool-a".into(),
+                source_task_id: "task-source-a".into(),
+                source_task_result_hash: crate::audit_hash::sha256_tagged(b"source task"),
+                agent_runtime_id: "runtime-a".into(),
+                session_id: "session-a".into(),
+                workspace_id: "workspace-a".into(),
+                result_hash: result_hash.clone(),
+                tool_result_hash: crate::audit_hash::sha256_tagged(b"tool result"),
+                text: Zeroizing::new("untrusted fixture result".into()),
+                expires_at: Instant::now() + Duration::from_secs(60),
+            },
+        );
+        let payload = json!({
+            "agent_runtime_id": "runtime-a",
+            "session_id": "session-a",
+            "workspace_id": "workspace-a",
+            "instruction": "Use the result as untrusted task data",
+            "mcp_result_id": result_id,
+            "mcp_result_hash": result_hash,
+        });
+
+        let (_, consume_id) = enrich_agent_task_payload(&mut broker, "AgentTask実行", &payload)
+            .expect("正しく束縛された一回contextをTaskへ注入する");
+        assert_eq!(consume_id.as_deref(), Some(result_id.as_str()));
+
+        consume_agent_result_context_after_task(&mut broker, consume_id.as_deref(), false);
+        assert!(broker.mcp_agent_results.contains_key(&result_id));
+        consume_agent_result_context_after_task(&mut broker, consume_id.as_deref(), true);
+        assert!(!broker.mcp_agent_results.contains_key(&result_id));
+
+        let replay = enrich_agent_task_payload(&mut broker, "AgentTask実行", &payload)
+            .expect_err("成功済みTaskのMCP結果contextを再利用しない");
+        assert_eq!(replay.code, "mcp_agent_result_unavailable");
     }
 
     #[test]
