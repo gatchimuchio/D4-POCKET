@@ -3417,6 +3417,8 @@ void main() {
         'arguments': {'query': 'Tokyo'},
       },
     });
+    var agentCenterActive = true;
+    late StateSetter updateHost;
     final transport = _FakeBrokerTransport([
       _brokerHealthResponse(),
       _brokerHostCapabilityResponse(),
@@ -3554,11 +3556,27 @@ void main() {
             instructionHash: followupInstructionHash,
             status: 'completed',
           )),
-    ]);
+    ], onRequest: (operation) {
+      if (operation == 'AgentTask状態' && agentCenterActive) {
+        updateHost(() => agentCenterActive = false);
+      }
+    });
     final client = await ShellCoreClient.product(transport: transport);
 
     await tester.pumpWidget(
-      MaterialApp(home: Scaffold(body: AgentCenter(client: client))),
+      MaterialApp(
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) {
+              updateHost = setState;
+              return AgentCenter(
+                client: client,
+                active: agentCenterActive,
+              );
+            },
+          ),
+        ),
+      ),
     );
     await tester.tap(find.text('登録を開始'));
     await tester.pumpAndSettle();
@@ -3605,6 +3623,11 @@ void main() {
         .where((request) => request['operation'] == 'AgentTask実行')
         .toList(growable: false);
     expect(taskStarts, hasLength(2));
+    expect(
+      agentCenterActive,
+      isFalse,
+      reason: 'UIタブが非選択でも自動MCP後続処理を継続する',
+    );
     for (final request in taskStarts) {
       final payload = request['payload']! as Map<String, Object?>;
       expect(payload['agent_runtime_id'], runtimeId);
@@ -4256,9 +4279,10 @@ void main() {
 }
 
 class _FakeBrokerTransport implements BrokerTransport {
-  _FakeBrokerTransport(this._responses);
+  _FakeBrokerTransport(this._responses, {this.onRequest});
 
   final List<Map<String, Object?>> _responses;
+  final void Function(String operation)? onRequest;
   final List<String> operations = [];
   final List<Map<String, Object?>> requests = [];
   final List<Map<String, Object?>> returnedResponses = [];
@@ -4272,6 +4296,7 @@ class _FakeBrokerTransport implements BrokerTransport {
   }) async {
     operations.add(operation);
     requests.add({'operation': operation, 'payload': payload});
+    onRequest?.call(operation);
     if (linuxProviderCredentialFixture && operation == '資格情報登録') {
       final registration = payload!;
       _linuxProviderCredential = {

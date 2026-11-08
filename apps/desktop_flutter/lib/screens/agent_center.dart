@@ -1323,15 +1323,16 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
               identical(_agentTasks[session.sessionId], state) &&
               state.record?.taskId == sourceTask.taskId &&
               _sessionStillMatchesRegistration(session) &&
-              !_active) {
+              !_appActive) {
             await Future<void>.delayed(const Duration(seconds: 1));
           }
           if (!mounted ||
               !identical(_agentTasks[session.sessionId], state) ||
               state.record?.taskId != sourceTask.taskId ||
+              !_appActive ||
               !_sessionStillMatchesRegistration(session)) {
             throw const BrokerClientException(
-              'native Owner確認の前にAgent Sessionまたは表示対象が失効しました',
+              'native Owner確認の前にアプリまたはAgent Sessionが失効しました',
             );
           }
         },
