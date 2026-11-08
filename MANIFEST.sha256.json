@@ -1396,7 +1396,7 @@
     },
     {
       "path": "docs/QE_2026-11-08/\u9032\u6357.md",
-      "sha256": "e54265011c5f265c336920a2d434c6539f7e1c189ea36f79769bd214fbee3cd2"
+      "sha256": "7b13f121478f1327f29547aa5b3b3e9ea0fa5e618605371a27ca5730b99641c3"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -3728,7 +3728,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/mcp_center.rs",
-      "sha256": "457f6dee5bdc18ffed922aacfb7e072cf1cc245c3f97de8f483d510fc74c78a5"
+      "sha256": "338ad0b21c321ab6a7927fcc3107e15ecfde7f9ee53ebee08ad8ccf04f93ae66"
     },
     {
       "path": "native/rust_helper/src/broker/mod.rs",

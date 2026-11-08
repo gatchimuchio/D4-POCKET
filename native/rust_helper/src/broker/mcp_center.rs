@@ -1906,6 +1906,20 @@ if errorlevel 1 exit /b 45
         assert_eq!(tool["name"], "echo");
         let tool_id = tool["tool_id"].as_str().expect("Broker発行Tool ID");
 
+        let stale_task_context = json!({
+            "instruction": "現在のCatalogで検索結果を確認する",
+            "mcp_capability_snapshot_hash":
+                crate::audit_hash::sha256_tagged(b"stale MCP capability snapshot"),
+        });
+        let stale_snapshot =
+            enrich_agent_task_payload(&mut broker, "AgentTask実行", &stale_task_context)
+                .expect_err("Task検査後に変化したMCP Catalogを拒否");
+        assert_eq!(stale_snapshot.code, "mcp_capability_snapshot_stale");
+        assert!(
+            !calls_path.exists(),
+            "stale CatalogではAgent TaskまたはMCP Tool作用へ進まない"
+        );
+
         let tool_request = json!({
             "版": 1,
             "操作": "実行",
