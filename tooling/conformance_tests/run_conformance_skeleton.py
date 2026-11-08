@@ -52,7 +52,11 @@ from tooling.schema_check.check_schemas import parse_json_text, validate_instanc
 from tooling.release_smoke import run_release_smokes
 from tooling.evidence_bundle import build_evidence_bundle, validate_evidence_bundle
 from tooling.manifest import build_manifest, matches_forbidden, working_tree_eol_errors
-from tooling.packaging_portability_check import portable_path_errors, run_check
+from tooling.packaging_portability_check import (
+    portable_path_errors,
+    prepare_extracted_source_git_index,
+    run_check,
+)
 from tooling.release_gate_check import (
     BLOCKER_CAUSE_CATEGORIES,
     CURRENT_FACING_RELEASE_DOCS,
@@ -65,6 +69,7 @@ from tooling.release_gate_check import (
     registry_blocker_names,
     unresolved_active_blockers,
     unresolved_windows_technical_complete_blockers,
+    workplan_acceptance_errors,
 )
 from tooling.shell_snapshot import build_shell_snapshot
 from tooling.validate_all import (
@@ -3840,6 +3845,50 @@ def test_release_blocker_registry_controls_strict_release() -> list[str]:
     return errors
 
 
+def test_strict_release_requires_current_n_w_consumer_evidence() -> list[str]:
+    errors = []
+    with tempfile.TemporaryDirectory(prefix="d4p-release-acceptance-") as temporary:
+        root = Path(temporary)
+        progress_directory = root / "docs" / "current"
+        progress_directory.mkdir(parents=True)
+        (progress_directory / "evidence.md").write_text("accepted evidence\n", encoding="utf-8")
+        phase_rows = []
+        for index in range(9):
+            phase_id = f"W{index:02d}"
+            status = "SCOPED_PASS" if phase_id == "W00" else "CLOSED"
+            phase_rows.append(f"| {phase_id}/G{index} | `{status}` | [evidence](evidence.md) |")
+        requirement_rows = [
+            f"| N{index:02d} | W00 | `CLOSED` | [evidence](evidence.md) |"
+            for index in range(1, 12)
+        ]
+        complete_ledger = "\n".join(phase_rows + requirement_rows)
+        if workplan_acceptance_errors(complete_ledger, root, progress_directory):
+            errors.append("すべてのN/W consumerとlocal evidenceが成立したledgerを拒否した")
+
+        incomplete = complete_ledger.replace("| W02/G2 | `CLOSED`", "| W02/G2 | `OPEN`", 1)
+        if not any("W02" in error for error in workplan_acceptance_errors(incomplete, root, progress_directory)):
+            errors.append("未完了W02をstrict releaseが拒否しなかった")
+
+        missing_phase = "\n".join(row for row in phase_rows if not row.startswith("| W07/")) + "\n" + "\n".join(requirement_rows)
+        if not any("W07" in error for error in workplan_acceptance_errors(missing_phase, root, progress_directory)):
+            errors.append("ledgerから欠落したW07をstrict releaseが拒否しなかった")
+
+        no_evidence = complete_ledger.replace("[evidence](evidence.md)", "[evidence](missing.md)", 1)
+        if not any("W00" in error and "evidence" in error for error in workplan_acceptance_errors(no_evidence, root, progress_directory)):
+            errors.append("存在しないlocal evidenceをstrict releaseが受理した")
+    current_progress = ROOT / "docs" / "QE_2026-11-08" / "進捗.md"
+    if current_progress.is_file():
+        current_errors = workplan_acceptance_errors(current_progress.read_text(encoding="utf-8"), ROOT)
+        if not any("W02" in error for error in current_errors):
+            errors.append("現行のW02 OPEN状態をrelease acceptanceが拒否しなかった")
+    else:
+        errors.append("現行N/W acceptance progressがなく、strict releaseの適用を確認できない")
+    gate_source = (ROOT / "tooling" / "release_gate_check.py").read_text(encoding="utf-8")
+    if "if args.strict_release:" not in gate_source or "workplan_acceptance_errors(current_progress, ROOT)" not in gate_source:
+        errors.append("strict release CLIが現行N/W consumer ledgerを実行しない")
+    return errors
+
+
 def test_release_facing_docs_sync_release_blockers_to_registry() -> list[str]:
     errors = release_blocker_doc_sync_errors()
     registry_names = registry_blocker_names()
@@ -3911,6 +3960,8 @@ def test_packaging_portability_checker_exists() -> list[str]:
             "DEFAULT_SUBPROCESS_TIMEOUT_SECONDS = 180",
             "UTF8_GOVERNANCE_PATH_ALLOWLIST",
             "UTF8_GOVERNANCE_PATH_PREFIXES",
+            "SOURCE_DOCUMENT_PATH_PREFIXES",
+            "prepare_extracted_source_git_index",
             "timeout=timeout_seconds",
             "subprocess.TimeoutExpired",
             "が次の秒数後にタイムアウト",
@@ -3932,6 +3983,31 @@ def test_packaging_portability_checker_exists() -> list[str]:
     errors.extend(portable_path_errors([path for path in tracked_paths if path.exists()]))
     if "packaging_portability_check" not in validate_all.read_text(encoding="utf-8"):
         errors.append("validate_all.pyがpackaging portability checkを実行していない")
+    return errors
+
+
+def test_packaging_source_snapshot_initializes_file_inventory() -> list[str]:
+    errors = []
+    with tempfile.TemporaryDirectory(prefix="d4p-source-snapshot-") as temporary:
+        root = Path(temporary)
+        document = root / "docs" / "QE記録.md"
+        document.parent.mkdir(parents=True)
+        document.write_text("Source文書\n", encoding="utf-8")
+        errors.extend(prepare_extracted_source_git_index(root))
+        if errors:
+            return ["展開したsource snapshotへGit file inventoryを作成できない: " + "; ".join(errors)]
+        listed = subprocess.run(
+            ["git", "ls-files", "-z"],
+            cwd=root,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        if listed.returncode != 0:
+            return ["一時source snapshotのtracked file inventoryを読めない"]
+        paths = listed.stdout.decode("utf-8").split("\0")
+        if "docs/QE記録.md" not in paths:
+            errors.append("日本語名のsource文書が一時Git inventoryに保持されない")
     return errors
 
 
@@ -6988,15 +7064,20 @@ def test_packaging_portability_utf8_governance_allowlist_is_exact() -> list[str]
             + "; ".join(qc_document_errors)
         )
 
-    unregistered_qc_errors = portable_path_errors(
-        [ROOT / "docs" / "緩衝基盤_rev5補遺_QC_未登録" / "資料.md"]
+    current_qe_document_errors = portable_path_errors(
+        [ROOT / "docs" / "QE_2026-11-08" / "03_D4Pocket_Codex施工指示書_20261108.md"]
     )
-    if not unregistered_qc_errors:
-        errors.append("未登録のQC文書path prefixが許可された")
+    if current_qe_document_errors:
+        errors.append(
+            "Repository source文書のUTF-8 pathが拒否された: "
+            + "; ".join(current_qe_document_errors)
+        )
 
-    unregistered_errors = portable_path_errors([ROOT / "規定" / "未登録規定.md"])
+    unregistered_errors = portable_path_errors(
+        [ROOT / "apps" / "desktop_flutter" / "lib" / "未登録画面.dart"]
+    )
     if not unregistered_errors:
-        errors.append("未登録の非ASCII pathが許可された")
+        errors.append("source文書外の未登録非ASCII pathが許可された")
 
     control_errors = portable_path_errors([ROOT / "docs" / "control\npath.md"])
     if not control_errors:
@@ -10678,7 +10759,7 @@ def test_linux_debian_setup_package_is_manual_and_non_authoritative() -> list[st
     required_files = (writer_path, runtime_tests_path, workflow_path, contract_path)
     if any(path.is_symlink() or not path.is_file() for path in required_files):
         return [
-            "Debian Setup bootstrap producer／test／manual workflow／contractが通常fileとして揃っていない"
+            "Debian Setupの初期構成の生成処理・試験・手動実行設定・契約が通常のファイルとして揃っていない"
         ]
 
     writer = writer_path.read_text(encoding="utf-8")
@@ -12795,10 +12876,12 @@ def main() -> int:
         test_validate_all_subprocess_start_failure_is_structured,
         test_validate_all_strict_release_runs_release_gate_strict_scan,
         test_release_blocker_registry_controls_strict_release,
+        test_strict_release_requires_current_n_w_consumer_evidence,
         test_release_facing_docs_sync_release_blockers_to_registry,
         test_release_gate_scans_ipc_threat_model,
         test_release_claim_detection_ignores_nonclaims_and_keeps_positive_detection,
         test_packaging_portability_checker_exists,
+        test_packaging_source_snapshot_initializes_file_inventory,
         test_packaging_portability_subprocess_output_is_utf8_safe,
         test_packaging_portability_utf8_governance_allowlist_is_exact,
         書庫展開で日本語名と内容を保持する,

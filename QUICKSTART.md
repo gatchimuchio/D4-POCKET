@@ -3,7 +3,8 @@
 D4 Pocketは開発中の汎用AI Runtime／Agent操作基盤です。以下は**ソースコードから実装・契約を検証するための手順**であり、正式出荷製品のインストール案内ではありません。
 
 - プロジェクト概要・技術的特徴：[README.md](README.md)
-- 最新工程と実測：[docs/REV5_PRODUCT_PROGRESS.md](docs/REV5_PRODUCT_PROGRESS.md)
+- 現行工程・最新状態：[docs/QE_2026-11-08/進捗.md](docs/QE_2026-11-08/進捗.md)
+- rev5の製品受入れ履歴：[docs/REV5_PRODUCT_PROGRESS.md](docs/REV5_PRODUCT_PROGRESS.md)
 - 安全・権限・Git運用：[AGENTS.md](AGENTS.md)
 - 出荷判断：[RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md)
 
@@ -63,6 +64,6 @@ powershell -ExecutionPolicy Bypass -File scripts\launch_owner_desktop.ps1
 - Windowsの<code>FEATURE COMPLETE</code>は正式Releaseではありません。
 - P13 Mobile／Non-Windowsの有限Product Build受入は、実端末・署名・配布保証ではありません。
 - B4の有限製品経路受入は2026-10-17にCLOSEDです。対象は`r2-e2e` staged buildとlocalhost合成APIによる一経路であり、通常Release・installed provenance・緩衝作用の独立照合を意味しません。次工程はB5自己適用QCです。
-- 通常Releaseは<code>task_execution=unsupported</code>、<code>release_ready=false</code>。Human ownerの独立GOも未成立です。
+- Windows normal Release／Codex CLIのW01/G1に限り<code>task_execution=supported</code>です。他Runtime／OSの能力とW02以降は未成立のままです。<code>release_ready=false</code>、16件のRelease Blocker、Ownerの独立GO未成立を維持します。
 
-製品主張の射程は[CLAIM.md](CLAIM.md)、作業の現行状態は[進捗](docs/REV5_PRODUCT_PROGRESS.md)、歴史的な試験結果は[VALIDATION.txt](VALIDATION.txt)へ分離して確認します。
+製品主張の射程は[CLAIM.md](CLAIM.md)、現行工程は[進捗](docs/QE_2026-11-08/進捗.md)、rev5の受入れ履歴は[REV5_PRODUCT_PROGRESS.md](docs/REV5_PRODUCT_PROGRESS.md)、歴史的な試験結果は[VALIDATION.txt](VALIDATION.txt)で確認します。

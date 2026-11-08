@@ -100,7 +100,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "8f90491d0cc2bfa70db5cf495ec3f5a2f682fae953b3976fd0925bab346b41a2"
+      "sha256": "a105b2ad7905345e955cc2c583814b03e25af0e046626909e43254528a4c3fff"
     },
     {
       "path": "AUDIT.md",
@@ -116,7 +116,7 @@
     },
     {
       "path": "CLAIM.md",
-      "sha256": "3619f63cd5e1ae9d309190457f3c122f29dc41fed4c19f8b81c348ec3bed58fd"
+      "sha256": "ac169cc5cb96f251412af426e45b11fd204bd304a48d3a4608a02253c75e1f0d"
     },
     {
       "path": "COMPATIBILITY_MATRIX.md",
@@ -160,19 +160,19 @@
     },
     {
       "path": "QUICKSTART.md",
-      "sha256": "0012a76cf217a7e727ea403a3f0c8cfdee4827734a902db2c29c515c48693293"
+      "sha256": "2fc6ea9071b9ef25b362705f00e847210c3612511cf0ffe0a658f19903610c60"
     },
     {
       "path": "README.md",
-      "sha256": "072fcca80716b2044d4e523d46d69a1d5b0e50ceee65f399fd9d1f12ea8395f7"
+      "sha256": "21be9141da77d8666f4d97e3e6fcab1593afbfe3160b6422bbb19e6da125f3f3"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "88fbc5ad4958d0d43b4720eda65f7f1fe720aa8175d85de98d953f067adbcc1d"
+      "sha256": "d6693f2fefe84021dbc47fa7b9f07da0ea977c1a21e5fd216609488c00f1f709"
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "bcfbf87f868328d6e4dbb4d8473fc4aedc81d4a055e6b20958d9bbaf19292658"
+      "sha256": "9789882c7ef5d171d8b408b4dc06babf5c563a4ac9f74ee2d9c5e5dd04cfd78c"
     },
     {
       "path": "SECURITY.md",
@@ -1367,6 +1367,30 @@
       "sha256": "5c1cdb6993c3d99da87b5b2aad12aa55cf617f5eae898ebf32e903f15aeb76df"
     },
     {
+      "path": "docs/QE_2026-11-08/01_D4Pocket_\u7d71\u5408\u88fd\u54c1\u5b9f\u88c5\u4ed5\u69d8\u66f8_20261108.md",
+      "sha256": "138f2183fc09ee0eccf576846a7bd2aae822f238abae6008ee382ff5aae1c7cc"
+    },
+    {
+      "path": "docs/QE_2026-11-08/02_D4Pocket_\u7d71\u5408\u958b\u767a\u5de5\u7a0b\u8868_20261108.md",
+      "sha256": "aa9e1c7e75cad5e165655bc42d89a4470b892047bd15d1b620f7c7a0af3a95f5"
+    },
+    {
+      "path": "docs/QE_2026-11-08/03_D4Pocket_Codex\u65bd\u5de5\u6307\u793a\u66f8_20261108.md",
+      "sha256": "e6730e5e8d027229ea2b9c331ed74eb30f62a086aa5f5a62702039cb18bbc548"
+    },
+    {
+      "path": "docs/QE_2026-11-08/W02-B01_\u767b\u9332\u5f8cUI\u505c\u6b62\u89b3\u6e2c_20261108.md",
+      "sha256": "296dd92e637442b3b028bf66f9f54226f810d7a6abcec7454f501397747ba32a"
+    },
+    {
+      "path": "docs/QE_2026-11-08/\u63a1\u7528\u8a18\u9332.md",
+      "sha256": "0940beeb1dfeb7d43d293a8fec7161fe497750c93a9991fe59307847896e5ae2"
+    },
+    {
+      "path": "docs/QE_2026-11-08/\u9032\u6357.md",
+      "sha256": "36099a1d42092bb013f72c31e924f6ccd407a25eae4c37d07a49591caf1b1627"
+    },
+    {
       "path": "docs/RELEASE_VALIDATION.md",
       "sha256": "4dcc0dfb17332bd291e3f5b08c9b6f3ee13dd891b9aebdb68b74cab6e5a6dea5"
     },
@@ -1580,7 +1604,7 @@
     },
     {
       "path": "docs/specs/gui-shell-spec-v1.md",
-      "sha256": "fe8fb02986f6cc64ecf6084a07b1a70808a7d51c58fb2d3e7be9358136f9c31a"
+      "sha256": "4c931023f1c04eec502f8f66bb763c0b7caab7a534b0c9266b981c05d687f6b5"
     },
     {
       "path": "docs/specs/host-operation-surface.md",
@@ -5128,7 +5152,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "ed647a9bf77eb5f393b022475b20292f30c455614884749ff455f6cccbd3c246"
+      "sha256": "03c4af8d2b70b4e6425158aca23c61f1adb15d8cc7b12a5e8e791bf87ec210b2"
     },
     {
       "path": "tooling/conformance_tests/test_final_development_audit.py",
@@ -5248,7 +5272,7 @@
     },
     {
       "path": "tooling/packaging_portability_check.py",
-      "sha256": "9c4741c1d1e1de225b9aa3f1c89a71ba55e65517c45ce2156e7cdcf509e4a0cf"
+      "sha256": "bbcf7ccc5dd6119dcd06f4e14c69fc90af30257bfb6fdf3ecc57bfcceb088eea"
     },
     {
       "path": "tooling/performance_validation.py",
@@ -5264,7 +5288,7 @@
     },
     {
       "path": "tooling/release_gate_check.py",
-      "sha256": "19005530667a91fa10a68376f992726ba39e814b52209b9ad95e5a791f50cfe2"
+      "sha256": "d46842b536cf2c294c7b603c10d9aaf3373c4387be541dd61b230633f47ee623"
     },
     {
       "path": "tooling/release_runtime_assertions.py",
@@ -5376,7 +5400,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "08e15874868cee2d0da06be450a7f81a1ce0fdbc2fff61a8dbc6958f1eb07ab7"
+      "sha256": "91de3a69d206b76530183d269562d51e5eb54bd1468344babe309f91a0c827f7"
     }
   ]
 }

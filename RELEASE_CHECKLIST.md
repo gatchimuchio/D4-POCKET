@@ -1,12 +1,12 @@
 # リリースチェックリスト
 
-## 現行の対象と関門（2026-10-22）
+## 現行の対象と関門（2026-11-08）
 
-製品対象はWindows／macOS／LinuxのDesktopとAndroid／iOSのMobile。現行状態は[rev5進捗](docs/REV5_PRODUCT_PROGRESS.md)と`release_blockers.registry.json`を正本とし、現在18項目中16項目がactiveである。旧v1.0欄のLinux補助対象・Mobile範囲外・macOS環境不在という当時の記述から、現行の対象を縮小しない。以下の旧欄は測定時点の状態・結果を保持するもので、安全検査や引き継いだ出荷関門を解除しない。
+製品対象はWindows／macOS／LinuxのDesktopとAndroid／iOSのMobile。現行工程・状態は[2026-11-08進捗](docs/QE_2026-11-08/進捗.md)、rev5受入れ履歴は[REV5_PRODUCT_PROGRESS.md](docs/REV5_PRODUCT_PROGRESS.md)、出荷関門は`release_blockers.registry.json`を参照する。現在18項目中16項目がunresolvedである。旧v1.0欄のLinux補助対象・Mobile範囲外・macOS環境不在という当時の記述から、現行の対象を縮小しない。以下の旧欄は測定時点の状態・結果を保持するもので、安全検査や引き継いだ出荷関門を解除しない。
 
 Windows B4はstaged `r2-e2e`の有限経路に限定してCLOSED、B5はOPEN。run #55（source `1e57a828`）はRust試験572成功／0失敗／13除外でもcapture判定でworkflow FAILし、Broker build／IPC smokeはSKIP。Linux run #107（source `bf2a51ac`）の成功はUbuntu 24.04／Xvfb・X11の導入済みGTK製品・合成MCPだけで、同runの資格情報保管・更新等の受入れstepは対象外SKIPである。別run #77／#94の限定成功はそれぞれのsourceに結合する。[F03実績文書対応](docs/QE_2026-10-22/F03_実績文書対応.md)に各実行の射程を示す。
 
-通常Release `task_execution=unsupported`、`release_ready=false`、正式Q0〜Q7 `DEFERRED`を維持する。Windows installed-path正式証拠、Linux全製品対応、物理端末・正式配布、署名・Audit鍵・Owner GO等の未閉包は元台帳で管理する。本文の履歴PASSやこの文書同期だけで関門を閉じない。
+W01/G1のWindows normal Release／Codex CLIに限り`task_execution=supported`であり、W02/G2はOPEN。他Runtime／OSの能力は対象別証拠がない限り未成立とする。`release_ready=false`、正式Q0〜Q7 `DEFERRED`を維持する。Windows installed-path正式証拠、Linux全製品対応、物理端末・正式配布、署名・Audit鍵・Owner GO等の未閉包は元台帳で管理する。本文の履歴PASSやこの文書同期だけで関門を閉じない。
 
 ## rev5 Final QAの既知制約記録（2026-10-07）
 

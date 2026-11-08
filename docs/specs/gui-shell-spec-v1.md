@@ -4,11 +4,15 @@ Status: 実装に伴って更新する仕様（living implementation specificati
 Scope: desktop-first Runtime Operation Shell / LLM が読む実装制約
 Release claim: この仕様は、完成製品の release readiness を主張しない。
 
+## 現行製品目的との関係
+
+現行の製品主語・要求・工程・状態は、Owner指示で採用された[`docs/QE_2026-11-08/`](../QE_2026-11-08/)を正本とする。本仕様は、同正本で置き換えられていない技術責任範囲を保持する。AI／Agentが能力を発見・要求・実行し、結果を次の判断へ使う。GUIは使用者の観測・許可・停止・復旧の面であり、Tool実行と後続Taskの必須制御主体ではない。
+
 この文書は GUI-Shell v1.0 の規範的な実装仕様である。Phase 0 Lock 文書は技術選定と設計姿勢を固定し、この文書は Codex、外部 LLM、第三者の実装者が GUI-Shell を拡張するときに維持すべき実装制約を固定する。
 
 ## 1. 目的
 
-GUI-Shell は、統一された GUI から AI Runtime、Agent、Tool、Local Service を操作する desktop-first Runtime Operation Shell である。
+GUI-Shell は、AI／AgentがRuntime、Tool、Local Service等の能力を利用して仕事を遂行するためのRuntime Operation Shell基盤である。統一GUIは使用者の観測・権限設定・停止・復旧に用い、AIの能力実行を必須の手動GUI操作列へ委譲しない。
 
 GUI-Shell は BLUE-TANUKI 専用 GUI ではない（`not a BLUE-TANUKI-specific GUI`）。
 

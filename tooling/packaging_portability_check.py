@@ -28,6 +28,7 @@ UTF8_GOVERNANCE_PATH_PREFIXES = (
     "docs/総合機能拡張_rev1/",
     "docs/緩衝基盤_rev5補遺_QC/",
 )
+SOURCE_DOCUMENT_PATH_PREFIXES = ("docs/",)
 
 
 def portable_path_errors(paths: list[Path]) -> list[str]:
@@ -38,13 +39,20 @@ def portable_path_errors(paths: list[Path]) -> list[str]:
             rel in UTF8_GOVERNANCE_PATH_ALLOWLIST
             or any(rel.startswith(prefix) for prefix in UTF8_GOVERNANCE_PATH_PREFIXES)
         )
+        source_document_path = any(
+            rel.startswith(prefix) for prefix in SOURCE_DOCUMENT_PATH_PREFIXES
+        )
+        if any(ord(character) < 32 for character in rel):
+            errors.append(f"portableではないpackaged path: {rel}")
+            continue
         try:
             rel.encode("ascii")
         except UnicodeEncodeError:
-            if not allowlisted_utf8_path:
+            if not allowlisted_utf8_path and not source_document_path:
                 errors.append(f"非ASCIIのpackaged path: {rel}")
-        if any(ord(character) < 32 for character in rel) or (
+        if (
             not allowlisted_utf8_path
+            and not source_document_path
             and any(ord(character) >= 127 for character in rel)
         ):
             errors.append(f"portableではないpackaged path: {rel}")
@@ -110,6 +118,17 @@ def run_check(
     return [f"{command_label(command)} が失敗: {output}"]
 
 
+def prepare_extracted_source_git_index(repository_root: Path) -> list[str]:
+    """展開したソースの検査に使う一時索引を作り、収録ファイルを列挙する。"""
+    git = shutil.which("git")
+    if git is None:
+        return ["展開したSource検査に必要なgitがPATHにない"]
+    errors = run_check(repository_root, [git, "init", "--quiet"])
+    if errors:
+        return errors
+    return run_check(repository_root, [git, "add", "--all"])
+
+
 def main() -> int:
     source_files, errors = expected_files()
     errors.extend(portable_path_errors(source_files))
@@ -164,7 +183,12 @@ def main() -> int:
             print(f"  - 展開に失敗: {completed.stdout.strip()}")
             return 1
 
-        errors = []
+        errors = prepare_extracted_source_git_index(extract_root)
+        if errors:
+            print("packaging portability checkが失敗:")
+            for error in errors:
+                print(f"  - {error}")
+            return 1
         errors.extend(run_check(extract_root, [sys.executable, "tooling/manifest.py", "--check"]))
         errors.extend(run_check(extract_root, [sys.executable, "tooling/conformance_tests/run_conformance_skeleton.py"]))
         errors.extend(run_check(extract_root, [sys.executable, "tooling/release_gate_check.py"]))

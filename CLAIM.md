@@ -1,12 +1,12 @@
 # GUI Shell の主張境界
 
-## 現行の主張と証拠（2026-10-22）
+## 現行の主張と証拠（2026-11-08）
 
-現行製品はD4 Pocketで、Windows／macOS／LinuxのDesktopとAndroid／iOSのMobileを対象とする。Windows-firstは優先順位であり、Linuxを開発用の補助対象へ限定しない。現在の製品状態は[rev5進捗](docs/REV5_PRODUCT_PROGRESS.md)、是正・施工方法は[2026-10-22 QE正本](docs/QE_2026-10-22/採用記録.md)、出荷関門は`release_blockers.registry.json`を参照する。
+現行製品はD4 Pocketで、Windows／macOS／LinuxのDesktopとAndroid／iOSのMobileを対象とする。Windows-firstは優先順位であり、Linuxを開発用の補助対象へ限定しない。現行の製品要求・工程・状態は[2026-11-08進捗](docs/QE_2026-11-08/進捗.md)、rev5受入れ履歴は[REV5_PRODUCT_PROGRESS.md](docs/REV5_PRODUCT_PROGRESS.md)、QE施工方法は[2026-10-22 QE正本](docs/QE_2026-10-22/採用記録.md)、出荷関門は`release_blockers.registry.json`を参照する。
 
 Windows B4は2026-10-17のstaged `r2-e2e`・合成APIを使った単一Task経路の範囲でCLOSED、B5はOPEN。Linux run #107はsource `bf2a51ac955eb5b9d7b6ecccdf0a21ee0875b96c`、Ubuntu 24.04／Xvfb・X11の導入済みGTK製品と合成MCP serverに限定したPASSである。前後のOwner拒否／別要求の許可、一回Tool実行、hash主体の結果、Audit、切断を示す。一般Linux環境、Wayland描画、全機能・正式署名／配布の保証へは昇格しない。P13のmacOS／Android／iOSも有限受入れの範囲でCLOSEDであり、物理端末保証・正式配布は別の関門である。
 
-後続Windows run #55はRust試験572成功／0失敗／13除外の一方、capture判定でworkflow FAIL、後続Broker build／IPC smokeはSKIPだった。`FQ-TEST-LOOPBACK`／B5 OPEN、通常Release `task_execution=unsupported`、`release_ready=false`、正式Q0〜Q7 `DEFERRED`を保持する。対象commit・環境・結果の対応は[F03実績文書対応](docs/QE_2026-10-22/F03_実績文書対応.md)に記録する。
+後続Windows run #55はRust試験572成功／0失敗／13除外の一方、capture判定でworkflow FAIL、後続Broker build／IPC smokeはSKIPだった。`FQ-TEST-LOOPBACK`／B5 OPENを保持する。W01/G1のWindows normal Release／Codex CLI限定経路のみ`task_execution=supported`であり、W02/G2はOPEN。`release_ready=false`、正式Q0〜Q7 `DEFERRED`、他Runtime／OSの未成立範囲を維持する。対象commit・環境・結果の対応は[F03実績文書対応](docs/QE_2026-10-22/F03_実績文書対応.md)と[現行進捗](docs/QE_2026-11-08/進捗.md)に記録する。
 
 以下の旧v1.0／rev2欄は、その時点の実装・検査・範囲・判断を保存した履歴である。「現在」等の語も当時を指し、現行の製品状態や対象OSの除外根拠にはしない。安全・Authority・Approval・Audit・Recovery・Content Exposureと、引き継がれた出荷条件は保持する。
 

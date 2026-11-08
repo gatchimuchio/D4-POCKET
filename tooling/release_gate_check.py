@@ -12,6 +12,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 RELEASE_BLOCKERS_REGISTRY = ROOT / "release_blockers.registry.json"
+CURRENT_ACCEPTANCE_PROGRESS = ROOT / "docs" / "QE_2026-11-08" / "進捗.md"
+REQUIRED_WORK_PHASES = tuple(f"W{index:02d}" for index in range(9))
+REQUIRED_PRODUCT_REQUIREMENTS = tuple(f"N{index:02d}" for index in range(1, 12))
 WINDOWS_EVIDENCE_STATUS_SOURCE = "windows_release_evidence"
 BLOCKER_CAUSE_CATEGORIES = frozenset(
     {
@@ -351,6 +354,101 @@ def effective_release_blocker(blocker: dict, windows_results: dict[str, object])
     return effective
 
 
+def workplan_acceptance_errors(
+    markdown: str,
+    repository_root: Path = ROOT,
+    progress_directory: Path | None = None,
+) -> list[str]:
+    """Global strict release requires every current N/W consumer to be closed with local evidence."""
+    phases: dict[str, tuple[str, str]] = {}
+    requirements: dict[str, tuple[str, tuple[str, ...], str]] = {}
+    status_pattern = re.compile(r"\b(SCOPED_PASS|CLOSED|IN_PROGRESS|PLANNED|OPEN|BLOCKED|FAILED|FAIL)\b")
+    errors: list[str] = []
+    evidence_base = progress_directory or CURRENT_ACCEPTANCE_PROGRESS.parent
+
+    for line in markdown.splitlines():
+        if not line.lstrip().startswith("|"):
+            continue
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if not cells:
+            continue
+        phase_match = re.fullmatch(r"(W\d{2})(?:/[^|]+)?", cells[0])
+        requirement_match = re.fullmatch(r"(N\d{2})", cells[0])
+        if phase_match and len(cells) >= 3:
+            phase_id = phase_match.group(1)
+            if phase_id in phases:
+                errors.append(f"current release acceptance ledgerで{phase_id}が重複")
+            status_match = status_pattern.search(cells[1])
+            phases[phase_id] = (
+                status_match.group(1) if status_match else "INVALID",
+                cells[-1],
+            )
+        elif requirement_match and len(cells) >= 4:
+            requirement_id = requirement_match.group(1)
+            if requirement_id in requirements:
+                errors.append(f"current release acceptance ledgerで{requirement_id}が重複")
+            dependencies = tuple(dict.fromkeys(re.findall(r"\bW\d{2}\b", cells[1])))
+            status_match = status_pattern.search(cells[2])
+            requirements[requirement_id] = (
+                status_match.group(1) if status_match else "INVALID",
+                dependencies,
+                cells[-1],
+            )
+
+    for phase_id in REQUIRED_WORK_PHASES:
+        row = phases.get(phase_id)
+        if row is None:
+            errors.append(f"current release acceptance ledgerに{phase_id}がない")
+            continue
+        status, evidence_cell = row
+        accepted_status = status in ({"SCOPED_PASS", "CLOSED"} if phase_id == "W00" else {"CLOSED"})
+        if not accepted_status:
+            errors.append(f"current release acceptance {phase_id}が未完了: {status}")
+        elif not _has_existing_local_evidence(evidence_cell, repository_root, evidence_base):
+            errors.append(f"current release acceptance {phase_id}に存在するlocal evidence参照がない")
+
+    for requirement_id in REQUIRED_PRODUCT_REQUIREMENTS:
+        row = requirements.get(requirement_id)
+        if row is None:
+            errors.append(f"current release acceptance ledgerに{requirement_id}がない")
+            continue
+        status, dependencies, evidence_cell = row
+        if status != "CLOSED":
+            errors.append(f"current product requirement {requirement_id}が未完了: {status}")
+            continue
+        if not dependencies:
+            errors.append(f"current product requirement {requirement_id}にW phase dependencyがない")
+        for phase_id in dependencies:
+            dependency = phases.get(phase_id)
+            if dependency is None or dependency[0] not in ({"SCOPED_PASS", "CLOSED"} if phase_id == "W00" else {"CLOSED"}):
+                errors.append(f"current product requirement {requirement_id}が未完了の{phase_id}に依存している")
+        if not _has_existing_local_evidence(evidence_cell, repository_root, evidence_base):
+            errors.append(f"current product requirement {requirement_id}に存在するlocal evidence参照がない")
+
+    return errors
+
+
+def _has_existing_local_evidence(
+    cell: str,
+    repository_root: Path,
+    progress_directory: Path,
+) -> bool:
+    for target in re.findall(r"\[[^\]]+\]\(([^)]+)\)", cell):
+        if re.match(r"https?://", target, flags=re.IGNORECASE):
+            continue
+        target_path = target.split("#", 1)[0]
+        if not target_path:
+            continue
+        resolved = (progress_directory / target_path).resolve(strict=False)
+        try:
+            resolved.relative_to(repository_root.resolve())
+        except ValueError:
+            continue
+        if resolved.is_file():
+            return True
+    return False
+
+
 def _metadata_values(block: str, key: str) -> list[str]:
     values: list[str] = []
     for match in re.finditer(rf"(?im)^\s*{re.escape(key)}\s*:\s*(.+?)\s*$", block):
@@ -464,16 +562,24 @@ def main() -> int:
             combined += "\n" + path.read_text(encoding="utf-8")
         errors.extend(scan_file(path))
 
-    errors.extend(registry_errors())
-    if not errors:
+    registry_validation_errors = registry_errors()
+    errors.extend(registry_validation_errors)
+    if args.strict_release:
+        try:
+            current_progress = CURRENT_ACCEPTANCE_PROGRESS.read_text(encoding="utf-8")
+        except OSError as exc:
+            errors.append(f"current N/W acceptance progressを読めない: {exc}")
+        else:
+            errors.extend(workplan_acceptance_errors(current_progress, ROOT))
+    if not registry_validation_errors:
         errors.extend(release_blocker_doc_sync_errors())
-    if args.technical_complete and not errors:
+    if args.technical_complete and not registry_validation_errors:
         for blocker in unresolved_windows_technical_complete_blockers():
             errors.append(
                 "Windows Technical Completeのblockerが未解決: "
                 f"{blocker['name']} - {blocker['reason']}"
             )
-    elif args.strict_release and not errors:
+    elif args.strict_release and not registry_validation_errors:
         track = None if args.release_track == "all" else args.release_track
         for blocker in unresolved_active_blockers(track):
             errors.append(
