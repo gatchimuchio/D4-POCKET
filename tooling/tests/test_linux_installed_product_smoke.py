@@ -39,6 +39,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _bounded_owner_text_diagnostics,
     _assert_secret_absent_from_files,
     _catalog_failure_diagnostics,
+    _process_environment_value,
     _click_accessible_by_coordinates,
     _component_center,
     _capture_gtk_dialog_screenshot,
@@ -911,6 +912,44 @@ class InstalledCatalogFetchStatusTests(unittest.TestCase):
         self.assertEqual(diagnostics["helper_count"], 0)
         self.assertIn('"operation": "更新候補取得"', rendered)
         self.assertNotIn("secret-test", rendered)
+
+    def test_process_environment_value_reads_only_a_unique_named_entry(self) -> None:
+        module = "tooling.tests.linux_installed_product_smoke.Path.read_bytes"
+        with patch(module, return_value=b"HOME=/home/test\0GUI_SHELL_R2_E2E_UPDATE_CA_PEM=/run/test/server.pem\0"):
+            self.assertEqual(
+                _process_environment_value(123, "GUI_SHELL_R2_E2E_UPDATE_CA_PEM"),
+                "/run/test/server.pem",
+            )
+        with patch(module, return_value=b"GUI_SHELL_R2_E2E_UPDATE_CA_PEM=/run/a\0GUI_SHELL_R2_E2E_UPDATE_CA_PEM=/run/b\0"):
+            self.assertIsNone(
+                _process_environment_value(123, "GUI_SHELL_R2_E2E_UPDATE_CA_PEM")
+            )
+
+    def test_failure_diagnostics_confirm_ca_delivery_without_returning_the_path(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            helper = root / "gui_shell_linux_broker"
+            helper.write_bytes(b"fixture")
+            audit_path = root / "audit.jsonl"
+            audit_path.write_text("", encoding="utf-8")
+            expected = "/run/d4p-acceptance/update-server/server.pem"
+            with (
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._processes_using",
+                    return_value={123},
+                ),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke._process_environment_value",
+                    return_value=expected,
+                ),
+            ):
+                diagnostics = _catalog_failure_diagnostics(
+                    helper, set(), audit_path, expected
+                )
+
+        rendered = json.dumps(diagnostics, ensure_ascii=False)
+        self.assertTrue(diagnostics["run_test_ca_path_reached_helper"])
+        self.assertNotIn(expected, rendered)
 
 
 class InstalledOwnerSummaryTests(unittest.TestCase):

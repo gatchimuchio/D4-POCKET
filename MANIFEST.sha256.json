@@ -5384,7 +5384,7 @@
     },
     {
       "path": "tooling/tests/linux_installed_product_smoke.py",
-      "sha256": "1324aaab9ed8c17c07cecaefbd34a77a9d47ff0027149a924c43afe16e306a4f"
+      "sha256": "b38cb684afe9bade7af7b58102273d468644e0b83fdf1157d23ec846a65eea37"
     },
     {
       "path": "tooling/tests/linux_update_https_server.py",
@@ -5412,7 +5412,7 @@
     },
     {
       "path": "tooling/tests/test_linux_installed_product_smoke.py",
-      "sha256": "bc6971261294823090c8e01a366930fa666f117ddd46237c2ced61c71a821a5e"
+      "sha256": "a0a195d9243961640a1b6a5176942f631c06d07d3ea489e3c13cba38397f6e4b"
     },
     {
       "path": "tooling/tests/test_linux_portable_archive.py",

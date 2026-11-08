@@ -109,6 +109,23 @@ def _processes_using(executables: set[Path]) -> set[int]:
     return found
 
 
+def _process_environment_value(pid: int, name: str) -> str | None:
+    if not name.isascii() or not name:
+        return None
+    try:
+        entries = Path(f"/proc/{pid}/environ").read_bytes().split(b"\0")
+    except (OSError, ProcessLookupError):
+        return None
+    prefix = name.encode("ascii") + b"="
+    values = [entry[len(prefix) :] for entry in entries if entry.startswith(prefix)]
+    if len(values) != 1:
+        return None
+    try:
+        return values[0].decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+
+
 def _update_source_host(same_source_candidate: bool) -> str:
     return SAME_SOURCE_UPDATE_HOST if same_source_candidate else "raw.githubusercontent.com"
 
@@ -440,9 +457,19 @@ def _observe_linux_audit_store(store: Path) -> dict[str, object]:
 
 
 def _catalog_failure_diagnostics(
-    helper: Path, preexisting: set[int], audit_path: Path
+    helper: Path,
+    preexisting: set[int],
+    audit_path: Path,
+    expected_update_ca_path: str | None = None,
 ) -> dict[str, object]:
     helper_pids = _processes_using({helper.resolve()}) - preexisting
+    update_ca_reached_helper: bool | None = None
+    if expected_update_ca_path is not None:
+        update_ca_reached_helper = any(
+            _process_environment_value(pid, SAME_SOURCE_UPDATE_CA_ENV)
+            == expected_update_ca_path
+            for pid in helper_pids
+        )
     recent_audit: list[dict[str, object]] = []
     try:
         lines = audit_path.read_text(encoding="utf-8").splitlines()[-6:]
@@ -465,6 +492,7 @@ def _catalog_failure_diagnostics(
     return {
         "helper_alive": bool(helper_pids),
         "helper_count": len(helper_pids),
+        "run_test_ca_path_reached_helper": update_ca_reached_helper,
         "recent_audit": recent_audit,
     }
 
@@ -10091,7 +10119,10 @@ def run_installed_smoke(
                 raise RuntimeError("Owner拒否後にManifestまたは一時fileが作成されました")
 
             before_catalog = _catalog_failure_diagnostics(
-                helper, preexisting, broker_state / "store/audit.jsonl"
+                helper,
+                preexisting,
+                broker_state / "store/audit.jsonl",
+                environment.get(SAME_SOURCE_UPDATE_CA_ENV),
             )
             print(
                 "一覧取得直前の通信状態="
@@ -10105,7 +10136,10 @@ def run_installed_smoke(
                 )
             except RuntimeError as error:
                 diagnostics = _catalog_failure_diagnostics(
-                    helper, preexisting, broker_state / "store/audit.jsonl"
+                    helper,
+                    preexisting,
+                    broker_state / "store/audit.jsonl",
+                    environment.get(SAME_SOURCE_UPDATE_CA_ENV),
                 )
                 diagnostics["helper_exit"] = _helper_exit_diagnostics(app_log)
                 raise RuntimeError(
