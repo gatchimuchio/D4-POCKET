@@ -143,6 +143,7 @@ class AgentMcpTaskController {
         ) ||
         arguments is! Map ||
         arguments.keys.any((key) => key is! String) ||
+        arguments.length > 32 ||
         utf8.encode(jsonEncode(arguments)).length > 32 * 1024) {
       throw const BrokerClientException('Agent MCP提案の値または上限が不正です');
     }

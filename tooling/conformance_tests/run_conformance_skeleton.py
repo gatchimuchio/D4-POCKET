@@ -159,6 +159,7 @@ REQUIRED_SCHEMA_NAMES = {
     "mcp_connection",
     "mcp_connection_receipt",
     "mcp_tool_call",
+    "agent_mcp_tool_request",
     "mcp_tool_call_receipt",
     "mcp_connection_list",
     "mcp_disconnect",
@@ -6366,6 +6367,52 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
         if token not in source:
             不整合.append(f"C9 MCP接続／切断の統治済み経路がない: {token}")
     return 不整合
+
+
+def AgentTaskMCPTool提案Contractと境界を検査する() -> list[str]:
+    errors: list[str] = []
+    schema = load_schema("agent_mcp_tool_request.schema.json")
+    valid = load_contract_fixture("agent_mcp_tool_request.valid.json")
+    if validate_instance(valid, schema):
+        errors.append("Agent MCP Tool提案のvalid fixtureが専用Schemaに適合しない")
+    request = valid.get("d4_mcp_tool_request", {})
+    if not isinstance(request, dict) or set(request) != {"server_id", "tool_id", "name", "arguments"}:
+        errors.append("Agent MCP Tool提案が固定field集合ではない")
+    if not isinstance(request, dict) or not isinstance(request.get("arguments"), dict):
+        errors.append("Agent MCP Tool提案argumentsがobjectではない")
+    elif len(request["arguments"]) > 32:
+        errors.append("Agent MCP Tool提案argumentsが32 propertyを超過する")
+
+    for name in (
+        "invalid/agent_mcp_tool_request_unknown_field.invalid.json",
+        "invalid/agent_mcp_tool_request_too_many_arguments.invalid.json",
+    ):
+        try:
+            candidate = load_contract_fixture(name)
+        except (OSError, json.JSONDecodeError) as exc:
+            errors.append(f"Agent MCP Tool提案negative fixtureを読めない: {name}: {exc}")
+            continue
+        if not validate_instance(candidate, schema):
+            errors.append(f"Agent MCP Tool提案Schemaがnegative fixtureを受理する: {name}")
+
+    rust = (RUST_HELPER / "src" / "broker" / "dialogue.rs").read_text(encoding="utf-8")
+    mcp_center = (RUST_HELPER / "src" / "broker" / "mcp_center.rs").read_text(encoding="utf-8")
+    mcp_runtime = (RUST_HELPER / "src" / "mcp.rs").read_text(encoding="utf-8")
+    dart = (ROOT / "apps" / "desktop_flutter" / "lib" / "services" / "agent_mcp_task_controller.dart").read_text(encoding="utf-8")
+    contract = (DOC_SPECS / "mcp-contract.md").read_text(encoding="utf-8")
+    for token, source, label in (
+        ("MAX_AGENT_MCP_TOOL_REQUEST_BYTES", rust, "Rust提案byte上限"),
+        ("agent_mcp_tool_request.schema.json", rust, "Rust実行時専用Schema検証"),
+        ("consume_agent_mcp_tool_proposal", mcp_center, "Broker保存結果hash／一回照合"),
+        ("validate_tool_identity_and_call", mcp_center, "Brokerの現在Catalog照合"),
+        ("validate_tool_call", mcp_runtime, "現在Catalog inputSchema検証"),
+        ("arguments.length > 32", dart, "Flutter提案property上限"),
+        ("権限生成", contract, "日本語意味正本のAuthority境界"),
+        ("LIVE_PRODUCT", contract, "製品証拠との分離"),
+    ):
+        if token not in source:
+            errors.append(f"{label}が現行consumerまたは契約へ接続されていない")
+    return errors
 
 
 def A2A接続センターの統治経路と境界を検査する() -> list[str]:
@@ -12904,6 +12951,7 @@ def main() -> int:
         MCP外部概念射影の契約と境界を検査する,
         A2A外部概念射影の契約と境界を検査する,
         MCP接続センターの統治経路と境界を検査する,
+        AgentTaskMCPTool提案Contractと境界を検査する,
         A2A接続センターの統治経路と境界を検査する,
         複数Host_registryの統治経路と境界を検査する,
         Host操作面の観測境界とHost間非混線を検査する,

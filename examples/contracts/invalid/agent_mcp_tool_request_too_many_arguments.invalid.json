@@ -1,0 +1,15 @@
+{
+  "d4_mcp_tool_request": {
+    "server_id": "mcp-fixture",
+    "tool_id": "tool-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "name": "lookup",
+    "arguments": {
+      "p01": 1, "p02": 2, "p03": 3, "p04": 4, "p05": 5, "p06": 6,
+      "p07": 7, "p08": 8, "p09": 9, "p10": 10, "p11": 11, "p12": 12,
+      "p13": 13, "p14": 14, "p15": 15, "p16": 16, "p17": 17, "p18": 18,
+      "p19": 19, "p20": 20, "p21": 21, "p22": 22, "p23": 23, "p24": 24,
+      "p25": 25, "p26": 26, "p27": 27, "p28": 28, "p29": 29, "p30": 30,
+      "p31": 31, "p32": 32, "p33": 33
+    }
+  }
+}

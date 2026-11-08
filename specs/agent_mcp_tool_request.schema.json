@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/agent_mcp_tool_request.schema.json",
+  "title": "Agent MCP Tool提案",
+  "description": "Agent Task結果に含まれる未信頼のTool提案。Authorityを生成せず、Brokerが現在CatalogとPermission／Approvalを再評価する。",
+  "type": "object",
+  "required": ["d4_mcp_tool_request"],
+  "additionalProperties": false,
+  "properties": {
+    "d4_mcp_tool_request": {
+      "type": "object",
+      "required": ["server_id", "tool_id", "name", "arguments"],
+      "additionalProperties": false,
+      "properties": {
+        "server_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "tool_id": { "type": "string", "pattern": "^tool-[a-f0-9]{142}$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "arguments": {
+          "type": "object",
+          "maxProperties": 32,
+          "additionalProperties": true,
+          "description": "未信頼入力。Brokerは呼出し直前に現在CatalogのinputSchemaとAuthority禁止条件を再検証する。"
+        }
+      }
+    }
+  }
+}

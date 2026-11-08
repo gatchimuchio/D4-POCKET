@@ -57,12 +57,18 @@ Brokerは、受信payloadのraw hashを保持し、未知field、接続／Tool�
 
 送信は現接続のMCP stdio childに`tools/call`を一度だけ行う。response ID、JSON-RPC形状、結果型、結果上限を検査する。呼出し後のtimeout、応答ID不一致、malformed／unsupported result、結果Audit確定失敗は結果不明として接続を隔離し、自動再送しない。Ownerが結果を照合した後、明示切断・再接続するまで次のTool呼出しを拒否する。
 
-Tool出力本文は、text・image・audio・resource link・embedded resource・structured contentのいずれもBrokerが保存・返却せず、snapshot、Audit reason、error、log、traceへ複写しない。Receiptは結果hash、`isError`相当の成否、content件数／型だけを`hash_only`で返す。したがって、この経路は操作者の一回限りTool実行と実行結果の存在確認までであり、結果本文をAgentへ渡す経路ではない。結果の安全な取得・redaction・Content Exposure承認が成立するまで、AgentによるMCP Tool利用と結果本文表示は未対応の`release_blocker`とする。
+通常のTool receiptは結果hash、`isError`相当の成否、content件数／型だけを`hash_only`で返し、Tool本文を通常response、snapshot、Audit reason、error、log、traceへ複写しない。Agent Taskへの限定結果handoffは下記W02契約の別経路であり、UI／Auditへの本文公開を許可しない。
 
 ## 実装範囲
 
-C8の作業単位はSchema、正常／負例fixture、Conformanceを追加した。C9はstdio discovery、connect、metadata list、Windows owner切断に加え、native Owner確認・一回Permission・Catalog preflight・stdio `tools/call`・hash-only result receiptをRust Broker経路へ接続する。Windows stdioへの限定Credential注入は別Owner確認・保管庫照合・Auditを経て接続する。Tool結果本文をAgentへ渡すContent Exposure経路、MCP以外のCredential注入、Resource／Prompt本文取得、Streamable HTTP、OAuth、外部MCP実物Test Harness、非Windows process群監督は未接続であり、`release_blocker`として保持する。
+C8／C9の当時の作業単位はSchema、fixture、Conformance、stdio discovery／接続、metadata list、Windows Owner切断、native Owner確認、一回Permission、Catalog preflight、stdio `tools/call`、hash-only result receiptをRust Broker経路へ接続した。Windows stdioへの限定Credential注入は別Owner確認・保管庫照合・Auditを経て接続した。C9記録時点では、Tool結果のAgent handoff、MCP以外のCredential注入、Resource／Prompt本文取得、Streamable HTTP、OAuth、外部MCP実物Test Harness、非Windows process群監督は未接続だった。これは当時の範囲記録であり、現行W02の状態は下記契約と`docs/QE_2026-11-08/進捗.md`で判定する。
 
 P13のMac追加範囲は`macos-mcp-center.md`を責任正本とする。Credentialなしの接続／Tool／明示切断とD4所有process group停止だけを追加し、Windowsの全子孫・異常終了保証へ昇格しない。上記C9当時の非Windows未接続は履歴であり、Macの現在範囲は有限Acceptanceの証拠で判定する。Mac Credential注入、Agent引渡し、別group／crash保証はこの単位では未成立のまま保持する。
 
 追加のMac MCP資格情報結合は`macos-mcp-credential-binding.md`（CLOSED）の独立consumerとする。公開ID・用途・対象・環境変数名だけを既存wireへ送り、現在Keychain recordをBrokerが再評価する。上記資格情報なしMCPのCLOSED条件は再開せず、追加consumerの有限受入れだけで判定する。
+
+## 2026-11-09 W02 Agent提案入力の現行契約
+
+Agent Task結果に含める`d4_mcp_tool_request`はMCP wire protocolや実行要求そのものではなく、未信頼の提案入力である。形状と上限は`specs/agent_mcp_tool_request.schema.json`で固定し、未知fieldを拒否し、提案全体を32 KiB、argumentsのtop-level propertyを32件までに制限する。この提案からPermission、Approval、Credential、Trust、Capabilityを生成しない。
+
+Rust Brokerは保存済み完了Task結果のhash・有効期限・一回消費を照合してから提案を解析する。実際のTool送信直前には現在CatalogのTool identityとinputSchema、Authority禁止条件を再評価し、製品使用者のTool Permission／native Owner確認を独立して要求する。結果依存の後続Taskにも新しいPermissionとApprovalを要求する。Schema／fixture／局所実行はこの契約の整合だけを示し、実Codexから実Tool、同Agentの結果依存後続Taskへ至る`LIVE_PRODUCT`やW02/G2の成立を示さない。

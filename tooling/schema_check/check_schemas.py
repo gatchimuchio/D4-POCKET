@@ -89,6 +89,7 @@ REQUIRED = {
     "mcp_connection.schema.json",
     "mcp_connection_receipt.schema.json",
     "mcp_tool_call.schema.json",
+    "agent_mcp_tool_request.schema.json",
     "mcp_tool_call_receipt.schema.json",
     "mcp_connection_list.schema.json",
     "mcp_disconnect.schema.json",
@@ -376,6 +377,10 @@ def validate_instance(value, schema: dict, path: str = "$", root: dict | None = 
                 errors.append(f"{path}: containsの一致数が範囲外")
 
     if isinstance(value, dict):
+        if "minProperties" in schema and len(value) < schema["minProperties"]:
+            errors.append(f"{path}: minPropertiesを下回る")
+        if "maxProperties" in schema and len(value) > schema["maxProperties"]:
+            errors.append(f"{path}: maxPropertiesを超過")
         required = schema.get("required", [])
         for key in required:
             if key not in value:

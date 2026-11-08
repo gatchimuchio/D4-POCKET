@@ -498,6 +498,41 @@ struct AgentMcpToolRequest {
     arguments: Value,
 }
 
+const MAX_AGENT_MCP_TOOL_REQUEST_BYTES: usize = 32 * 1024;
+
+fn parse_agent_mcp_tool_request(
+    result_body: &str,
+) -> Result<AgentMcpToolRequestEnvelope, &'static str> {
+    if result_body.len() > MAX_AGENT_MCP_TOOL_REQUEST_BYTES {
+        return Err("agent_tool_proposal_invalid");
+    }
+    let value: Value =
+        serde_json::from_str(result_body).map_err(|_| "agent_tool_proposal_invalid")?;
+    let schema: Value = serde_json::from_str(include_str!(
+        "../../../../specs/agent_mcp_tool_request.schema.json"
+    ))
+    .map_err(|_| "agent_tool_proposal_invalid")?;
+    jsonschema::draft202012::meta::validate(&schema).map_err(|_| "agent_tool_proposal_invalid")?;
+    let validator = jsonschema::options()
+        .with_draft(jsonschema::Draft::Draft202012)
+        .build(&schema)
+        .map_err(|_| "agent_tool_proposal_invalid")?;
+    if !validator.is_valid(&value) {
+        return Err("agent_tool_proposal_invalid");
+    }
+    let proposal: AgentMcpToolRequestEnvelope =
+        serde_json::from_value(value).map_err(|_| "agent_tool_proposal_invalid")?;
+    let request = &proposal.d4_mcp_tool_request;
+    if request.server_id.len() > 128
+        || request.name.len() > 256
+        || request.server_id.chars().any(char::is_control)
+        || request.name.chars().any(char::is_control)
+    {
+        return Err("agent_tool_proposal_invalid");
+    }
+    Ok(proposal)
+}
+
 pub(crate) struct AgentTaskToolProvenance {
     pub(crate) runtime_id: String,
     pub(crate) session_id: String,
@@ -1306,8 +1341,7 @@ impl 対話制御 {
             .result_body
             .as_deref()
             .ok_or("source_task_result_unavailable")?;
-        let proposal: AgentMcpToolRequestEnvelope =
-            serde_json::from_str(result_body).map_err(|_| "agent_tool_proposal_invalid")?;
+        let proposal = parse_agent_mcp_tool_request(result_body)?;
         if proposal.d4_mcp_tool_request.server_id != server_id
             || proposal.d4_mcp_tool_request.tool_id != tool_id
             || proposal.d4_mcp_tool_request.name != name
@@ -4068,10 +4102,11 @@ mod tests {
     #[test]
     fn AgentTaskMCPTool要求は保存済み完了結果へhashで束縛して一回だけ消費する() {
         let arguments = json!({"query": "public-record"});
+        let tool_id = format!("tool-{}", "a".repeat(142));
         let proposal = json!({
             "d4_mcp_tool_request": {
                 "server_id": "mcp-server-a",
-                "tool_id": "tool-a",
+                "tool_id": tool_id,
                 "name": "lookup",
                 "arguments": arguments,
             }
@@ -4091,7 +4126,7 @@ mod tests {
                 &task_id,
                 &result_hash,
                 "mcp-server-a",
-                "tool-a",
+                &tool_id,
                 "lookup",
                 &json!({"query": "forged-record"}),
             ),
@@ -4107,7 +4142,7 @@ mod tests {
                 &task_id,
                 &result_hash,
                 "mcp-server-a",
-                "tool-a",
+                &tool_id,
                 "lookup",
                 &arguments,
             )
@@ -4122,12 +4157,60 @@ mod tests {
                 &task_id,
                 &provenance.result_hash,
                 "mcp-server-a",
-                "tool-a",
+                &tool_id,
                 "lookup",
                 &arguments,
             ),
             Err("source_task_not_eligible")
         ));
+    }
+
+    #[test]
+    fn AgentTaskMCPTool提案は専用Schemaとbyte上限を満たさなければ拒否する() {
+        let valid = json!({
+            "d4_mcp_tool_request": {
+                "server_id": "mcp-server-a",
+                "tool_id": format!("tool-{}", "a".repeat(142)),
+                "name": "lookup",
+                "arguments": {"query": "public-record"}
+            }
+        });
+        assert!(parse_agent_mcp_tool_request(&valid.to_string()).is_ok());
+
+        let unknown = json!({
+            "d4_mcp_tool_request": {
+                "server_id": "mcp-server-a",
+                "tool_id": format!("tool-{}", "a".repeat(142)),
+                "name": "lookup",
+                "arguments": {"query": "public-record"},
+                "permission": "allow"
+            }
+        });
+        assert_eq!(
+            parse_agent_mcp_tool_request(&unknown.to_string()).unwrap_err(),
+            "agent_tool_proposal_invalid"
+        );
+
+        let too_many_arguments = (0..33)
+            .map(|index| (format!("p{index:02}"), json!(index)))
+            .collect::<serde_json::Map<String, Value>>();
+        let oversized_arguments = json!({
+            "d4_mcp_tool_request": {
+                "server_id": "mcp-server-a",
+                "tool_id": format!("tool-{}", "a".repeat(142)),
+                "name": "lookup",
+                "arguments": too_many_arguments
+            }
+        });
+        assert_eq!(
+            parse_agent_mcp_tool_request(&oversized_arguments.to_string()).unwrap_err(),
+            "agent_tool_proposal_invalid"
+        );
+        assert_eq!(
+            parse_agent_mcp_tool_request(&" ".repeat(MAX_AGENT_MCP_TOOL_REQUEST_BYTES + 1))
+                .unwrap_err(),
+            "agent_tool_proposal_invalid"
+        );
     }
 
     #[test]

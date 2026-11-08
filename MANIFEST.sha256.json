@@ -336,7 +336,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/agent_mcp_task_controller.dart",
-      "sha256": "bab514258fd0c24f71a90d37bd91c7ca1ef33cc78c11d3a260d232b46301c969"
+      "sha256": "98abccadf68b93dc2fffe40841b22112480b41eebc76805745a8761527c4176e"
     },
     {
       "path": "apps/desktop_flutter/lib/services/agent_task_client.dart",
@@ -616,7 +616,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/agent_mcp_task_controller_test.dart",
-      "sha256": "6b719c7b31b1cc9b69492ccf4caecad815c3c5c4e490a933d85753825dd636f0"
+      "sha256": "db94b9f238ad071e2ffdfbe6c14b47ce12b086b91c99d20cf30db464551e00a5"
     },
     {
       "path": "apps/desktop_flutter/test/agent_task_client_test.dart",
@@ -1396,7 +1396,7 @@
     },
     {
       "path": "docs/QE_2026-11-08/\u9032\u6357.md",
-      "sha256": "ace82039992869e90b5285258cfd5e7aed22bb95cd77341eafa276a5a775d53e"
+      "sha256": "a95c28510a26b5b120c8f5ef29e33fd79fb783866f1725315e0b25126b50f60e"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1680,7 +1680,7 @@
     },
     {
       "path": "docs/specs/mcp-contract.md",
-      "sha256": "80183767e6e3a1eab2e150bd31fbf70483a2dd9f008f01a83bba8209c29548c0"
+      "sha256": "d7dcb447d8f331859a7bb2f6cacd24e731069d68fa4075a9142e40d521534276"
     },
     {
       "path": "docs/specs/mobile-surface.md",
@@ -1913,6 +1913,10 @@
     {
       "path": "examples/contracts/agent_handoff_package.valid.json",
       "sha256": "12154d910a0b7449bcc7913d2a9dc6e1be4cac0b1dcbec5beb721716841a61ca"
+    },
+    {
+      "path": "examples/contracts/agent_mcp_tool_request.valid.json",
+      "sha256": "645913e456db80cdfc55f8e6ab80d0bebc8b16306e42c17487449b54967ce55b"
     },
     {
       "path": "examples/contracts/agent_runtime.valid.json",
@@ -2277,6 +2281,14 @@
     {
       "path": "examples/contracts/invalid/agent_handoff_package_authority.invalid.json",
       "sha256": "b661b4b52ed0a60fa46804b250a0ae5750059480aa8e10524391b3d6e8ebf7b9"
+    },
+    {
+      "path": "examples/contracts/invalid/agent_mcp_tool_request_too_many_arguments.invalid.json",
+      "sha256": "bf4c37a827ffc455f897542fcd52ccbc0a9598914c83f39a6b267f5c137be13d"
+    },
+    {
+      "path": "examples/contracts/invalid/agent_mcp_tool_request_unknown_field.invalid.json",
+      "sha256": "390cd10f61ddae031bbcb1ce6bb170e4b67f760d4477509416bd43d6d4c9bda7"
     },
     {
       "path": "examples/contracts/invalid/agent_runtime_workspace_not_required.invalid.json",
@@ -3688,7 +3700,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/dialogue.rs",
-      "sha256": "bb60d7477bb9c968ff36bf3554d78c10a7674e0f6ed83a37b37cd4a036794174"
+      "sha256": "5a80e1ffd4162e9774e435f311c7b6002d6533aa9a0c43f8ba45ff5d8f410c2a"
     },
     {
       "path": "native/rust_helper/src/broker/evaluation_control.rs",
@@ -4503,6 +4515,10 @@
       "sha256": "d86d35a5fc5458ee69c0ca1f697ac215cf26974575d9771e9d01dcc81f979c9e"
     },
     {
+      "path": "specs/agent_mcp_tool_request.schema.json",
+      "sha256": "55819055dde334d959b3db1f1dbbb19586606210aac044dc135f24d4fef5a221"
+    },
+    {
       "path": "specs/agent_runtime.schema.json",
       "sha256": "e9b52c906f1d6717d3ef84fc01f21e14529426eda83410f9a95370c65b4ef35a"
     },
@@ -5160,7 +5176,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "03c4af8d2b70b4e6425158aca23c61f1adb15d8cc7b12a5e8e791bf87ec210b2"
+      "sha256": "6b4b106a0927c32a5dda22f37fa846104f518c07fd1ff6a96eb05dd7dd23630b"
     },
     {
       "path": "tooling/conformance_tests/test_final_development_audit.py",
@@ -5312,7 +5328,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "ecb8ad804503d1186a0d6205c8eabfb0ef3253243b0f5f981c8fdfe1d56e7507"
+      "sha256": "b1caa1eeb0d88e574293df05d60453d40cf7009fd1b6120754109a0ff251e7c6"
     },
     {
       "path": "tooling/shell_snapshot.py",

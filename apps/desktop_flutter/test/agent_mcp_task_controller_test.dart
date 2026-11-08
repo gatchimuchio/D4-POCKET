@@ -65,6 +65,16 @@ void main() {
           'arguments': <String, Object?>{},
         },
       }),
+      jsonEncode({
+        'd4_mcp_tool_request': {
+          'server_id': 'mcp-fixture',
+          'tool_id': _toolId,
+          'name': 'lookup',
+          'arguments': Map<String, Object?>.fromEntries(
+            List.generate(33, (index) => MapEntry('p$index', index)),
+          ),
+        },
+      }),
     ]) {
       expect(
         () => AgentMcpTaskController.parseProposal(invalid),

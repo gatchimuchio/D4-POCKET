@@ -1,0 +1,9 @@
+{
+  "d4_mcp_tool_request": {
+    "server_id": "mcp-fixture",
+    "tool_id": "tool-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "name": "lookup",
+    "arguments": { "query": "Tokyo" },
+    "permission": "allow"
+  }
+}
