@@ -78,6 +78,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _verify_live_audit,
     _verify_workspace_projection,
     _update_source_host,
+    _same_source_update_ca_environment,
     _visible_mcp_credential_ids,
     _installed_acceptance_runtime_directory,
     _wait_for_workspace_projection,
@@ -849,6 +850,35 @@ class InstalledCatalogFetchStatusTests(unittest.TestCase):
     def test_owner_source_host_tracks_same_source_candidate(self) -> None:
         self.assertEqual(_update_source_host(False), "raw.githubusercontent.com")
         self.assertEqual(_update_source_host(True), LINUX_UPDATE_TEST_HOST)
+
+    def test_same_source_update_ca_is_bound_to_run_owned_server_certificate(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            server_root = root / "update-server"
+            server_root.mkdir()
+            certificate = server_root / "server.pem"
+            certificate.write_bytes(b"run-owned public test CA")
+            with patch.dict(
+                "os.environ",
+                {"GUI_SHELL_R2_E2E_UPDATE_CA_PEM": str(certificate.resolve())},
+            ):
+                self.assertEqual(
+                    _same_source_update_ca_environment(root),
+                    {"GUI_SHELL_R2_E2E_UPDATE_CA_PEM": str(certificate.resolve())},
+                )
+
+    def test_same_source_update_ca_rejects_path_outside_run_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "run-root"
+            root.mkdir()
+            outside = Path(temporary) / "server.pem"
+            outside.write_bytes(b"not run-owned")
+            with patch.dict(
+                "os.environ",
+                {"GUI_SHELL_R2_E2E_UPDATE_CA_PEM": str(outside.resolve())},
+            ):
+                with self.assertRaisesRegex(RuntimeError, "run所有"):
+                    _same_source_update_ca_environment(root)
 
     def test_failure_diagnostics_expose_process_and_audit_metadata_only(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -30,6 +30,7 @@ AUDIT_ID = "audit-store-22222222222222222222222222222222"
 UPDATE_ID = "linux-installed-catalog-display"
 UPDATE_VERSION = "0.1.2"
 FIRST_INSTALL_UPDATE_ID = "linux-installed-first-install"
+SAME_SOURCE_UPDATE_CA_ENV = "GUI_SHELL_R2_E2E_UPDATE_CA_PEM"
 WINDOW_TITLE = "D4 Pocket powered by GUI Shell"
 OWNER_DIALOG_TITLE = "D4 Pocket Owner確認"
 UNINSTALL_BUTTON = "D4 Pocketをアンインストール"
@@ -110,6 +111,27 @@ def _processes_using(executables: set[Path]) -> set[int]:
 
 def _update_source_host(same_source_candidate: bool) -> str:
     return SAME_SOURCE_UPDATE_HOST if same_source_candidate else "raw.githubusercontent.com"
+
+
+def _same_source_update_ca_environment(temp_root: Path) -> dict[str, str]:
+    configured = os.environ.get(SAME_SOURCE_UPDATE_CA_ENV)
+    update_root = temp_root / "update-server"
+    certificate = update_root / "server.pem"
+    if (
+        not configured
+        or update_root.is_symlink()
+        or not update_root.is_dir()
+        or certificate.is_symlink()
+        or not certificate.is_file()
+    ):
+        raise RuntimeError("same-source update CAがrun所有の通常fileではありません")
+    metadata = certificate.lstat()
+    if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1 or not 0 < metadata.st_size <= 16 * 1024:
+        raise RuntimeError("same-source update CAのfile属性が不正です")
+    resolved = certificate.resolve(strict=True)
+    if Path(configured) != resolved:
+        raise RuntimeError("same-source update CAがrun所有の固定pathと一致しません")
+    return {SAME_SOURCE_UPDATE_CA_ENV: str(resolved)}
 
 
 def _linux_broker_process_role(arguments: list[bytes]) -> str | None:
@@ -8895,6 +8917,8 @@ def run_installed_smoke(
             "CARGO_TARGET_DIR": str(temp_root / "linux-installed-cargo-target"),
         }
     )
+    if update_candidate_package is not None:
+        environment.update(_same_source_update_ca_environment(temp_root))
 
     window_manager: subprocess.Popen[bytes] | None = None
     desktop_process: subprocess.Popen[bytes] | None = None
