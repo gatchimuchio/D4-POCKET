@@ -53,10 +53,10 @@ bash scripts/launch_owner_desktop.sh
 ```
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\launch_owner_desktop.ps1
+powershell -NoProfile -File scripts\launch_owner_desktop.ps1
 ```
 
-これらは開発・診断用の起動経路であり、Installed-path最終証拠、署名済み配布物、Release readinessを生成しません。実行前に[AGENTS.md](AGENTS.md)、[CONFIG.md](CONFIG.md)、[セキュリティ方針](SECURITY.md)を確認してください。
+これらは開発・診断用の起動経路であり、Installed-path最終証拠、署名済み配布物、Release readinessを生成しません。実行ポリシーが許可する通常のPowerShell経路で起動してください。ポリシーに拒否された場合は迂回せず、実行環境の制約として扱います。実行前に[AGENTS.md](AGENTS.md)、[CONFIG.md](CONFIG.md)、[セキュリティ方針](SECURITY.md)を確認してください。
 
 ## 4. 判断を混同しない
 

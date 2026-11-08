@@ -686,7 +686,7 @@ Product UI完成をcontract完成として扱わない。
 
 第I部の優先順位modelの範囲内で、リポジトリ固有の現行指針を次の順に使用する。
 
-1. 作業対象についてユーザーが明示した最新版の仕様・工程表・実装指示書と、それへ同期した現行進捗。2026-11-05統合製品工程は`docs/QE_2026-11-05/`の採用記録付き3点と進捗がD4-N01〜N11／W00〜W08の対象・Acceptance・状態を決める。
+1. 作業対象についてユーザーが明示した最新版の仕様・工程表・実装指示書と、それへ同期した現行進捗。現在のD4-N01〜N11／W00〜W08の対象・Acceptance・状態は、2026-11-08統合製品3点の採用記録と現行進捗が決める。2026-11-05／06文書は当時の要求・判断・証拠として保持し、現行状態を上書きしない。
 2. `docs/specs/adapter-conformance.md`、`docs/specs/content-exposure-policy.md`、`docs/specs/approval-visibility-boundary.md`および関連する`docs/specs/`契約。`docs/specs/gui-shell-spec-v1.md`は基盤仕様として扱い、最新版の現行指示で置き換えられていない技術責任範囲にだけ適用する。
 3. `specs/*.schema.json`
 4. `tooling/conformance_tests/`

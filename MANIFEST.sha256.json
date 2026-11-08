@@ -100,7 +100,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "28e0eac0e2fb248aa05cc86ca637d357ec9ce7e93db7bf57aacf5e726e286399"
+      "sha256": "dd00d212a1a5cdeb469fec0440da23f89e952b2e9700f54dd6d5c2ea56aa0a21"
     },
     {
       "path": "AUDIT.md",
@@ -160,7 +160,7 @@
     },
     {
       "path": "QUICKSTART.md",
-      "sha256": "2fc6ea9071b9ef25b362705f00e847210c3612511cf0ffe0a658f19903610c60"
+      "sha256": "4fff67b97458483821301e34146474af435314dba205c9d9d4dd543a37a68c16"
     },
     {
       "path": "README.md",
@@ -1400,7 +1400,7 @@
     },
     {
       "path": "docs/QE_2026-11-08/\u9032\u6357.md",
-      "sha256": "0258d32c99fc91cea9279624a5178549e9305b019cecaba4bc280c1dd742a070"
+      "sha256": "e66aeb11cec3d3e099f9e98ddee1670ceaba0dddd0e1a497b6c5c7f65db48a8e"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
