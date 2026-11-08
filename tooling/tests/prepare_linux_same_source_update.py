@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -19,6 +20,15 @@ from tooling.export_linux_product import validate_build_evidence
 from tooling.tests.create_linux_update_catalog_fixture import (
     write_product_acceptance_catalog,
 )
+
+
+def _safe_exception_summary(error: Exception) -> str:
+    message = re.sub(
+        r"(?i)(?:[a-z]:[\\/]|\\\\|/)[^\s\"'<>]+",
+        "<path>",
+        str(error),
+    )
+    return message[:500] or type(error).__name__
 
 
 def _regular_file(path: Path, label: str) -> Path:
@@ -128,7 +138,11 @@ def main() -> int:
             args.bundle, args.output_root, args.private_key, args.build_evidence, args.source_commit
         )
     except (OSError, ValueError, json.JSONDecodeError, subprocess.CalledProcessError) as error:
-        print(f"same-source Linux update candidate作成を停止: {type(error).__name__}", file=sys.stderr)
+        print(
+            "same-source Linux update candidate作成を停止: "
+            f"{type(error).__name__}: {_safe_exception_summary(error)}",
+            file=sys.stderr,
+        )
         return 1
     print(json.dumps(result, ensure_ascii=False, separators=(",", ":")))
     return 0

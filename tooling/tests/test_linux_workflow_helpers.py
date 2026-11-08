@@ -8,6 +8,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from tooling.tests.prepare_linux_same_source_update import _safe_exception_summary
+
 
 ROOT = Path(__file__).resolve().parents[2]
 EXPORT_HELPER = ROOT / "tooling/linux_export_workflow.py"
@@ -36,6 +38,15 @@ def digest(path: Path) -> str:
 
 
 class LinuxWorkflowHelperTests(unittest.TestCase):
+    def test_same_source_candidate_diagnostic_redacts_absolute_paths(self) -> None:
+        summary = _safe_exception_summary(
+            ValueError("invalid evidence at /home/runner/work/private/output and C:\\Users\\runner\\private")
+        )
+        self.assertIn("invalid evidence at", summary)
+        self.assertIn("<path>", summary)
+        self.assertNotIn("/home/runner", summary)
+        self.assertNotIn("C:\\Users\\runner", summary)
+
     def test_verify_build_result_and_rejects_wrong_source(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
