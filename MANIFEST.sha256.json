@@ -220,7 +220,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/agent_center.dart",
-      "sha256": "81a94979f0d35ab614532a0ac426bc654a9b4089b3a655eea132a47fde143424"
+      "sha256": "04e2b52e634f0daf2b7483db7de58ee11d2782f5fc6126dc1cbeada5d8ffb390"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/approval_center.dart",
@@ -333,6 +333,10 @@
     {
       "path": "apps/desktop_flutter/lib/services/agent_handoff.dart",
       "sha256": "e01290f1106c1b933a6cc03f6ee75866e8f09ee6cf67e9150e161fede20c1701"
+    },
+    {
+      "path": "apps/desktop_flutter/lib/services/agent_mcp_task_controller.dart",
+      "sha256": "bab514258fd0c24f71a90d37bd91c7ca1ef33cc78c11d3a260d232b46301c969"
     },
     {
       "path": "apps/desktop_flutter/lib/services/agent_task_client.dart",
@@ -611,6 +615,10 @@
       "sha256": "9411ad00085f9db3be6bfc3dc66d793bbba9717f70ab12fb6d1e603bc1459f7b"
     },
     {
+      "path": "apps/desktop_flutter/test/agent_mcp_task_controller_test.dart",
+      "sha256": "6c08df7711378a0b1f7c009c5a0ac7e14e374966f88cb64cf0c7cc17db1c4b6a"
+    },
+    {
       "path": "apps/desktop_flutter/test/agent_task_client_test.dart",
       "sha256": "bb59d1eda26281a313be2ee2b3c467a8c3144aecdf671f0230de3b2849dbdd25"
     },
@@ -712,7 +720,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "08fdd152ce978e291b9266d0a14a6cee1345465497b214fbec4ebef97f748c6e"
+      "sha256": "bd035c3115e035c4a92bc26421cb65d0db3d543339f666983225377e488b8d0c"
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
@@ -1380,7 +1388,7 @@
     },
     {
       "path": "docs/QE_2026-11-08/W02-B01_\u767b\u9332\u5f8cUI\u505c\u6b62\u89b3\u6e2c_20261108.md",
-      "sha256": "296dd92e637442b3b028bf66f9f54226f810d7a6abcec7454f501397747ba32a"
+      "sha256": "3016db30fc87926085ac3edda6dd7096823055b23f9866782842674424126a26"
     },
     {
       "path": "docs/QE_2026-11-08/\u63a1\u7528\u8a18\u9332.md",
@@ -1388,7 +1396,7 @@
     },
     {
       "path": "docs/QE_2026-11-08/\u9032\u6357.md",
-      "sha256": "36099a1d42092bb013f72c31e924f6ccd407a25eae4c37d07a49591caf1b1627"
+      "sha256": "4cbb5abf6b85e80089379280cfc340a8e215f4e70ba8359f3b547eeb57030b46"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",

@@ -856,8 +856,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Task状態: running'), findsOneWidget);
 
-    await tester.ensureVisible(find.text('Task状態を更新'));
-    await tester.tap(find.text('Task状態を更新'));
+    await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
     expect(find.text('Task状態: completed'), findsOneWidget);
     final taskStatusRegion = find.byWidgetPredicate(
