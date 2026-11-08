@@ -434,7 +434,7 @@ jobs:
               --temp-root "$D4P_EXPORT_ROOT" \
               --acceptance-root "$acceptance_root" \
               --initial-package "$product_package" \
-              --candidate-package "$output_root/D4Pocket-linux-update.d4pkg" \
+              --candidate-package "$D4P_EXPORT_ROOT/D4Pocket-linux-update.d4pkg" \
               --catalog "$D4P_EXPORT_ROOT/update-server/updates.json" \
               --update-signing-key "$D4P_EXPORT_ROOT/test-update-private.der" \
               --build-evidence "$output_root/d4_pocket_linux_export_build.json" \

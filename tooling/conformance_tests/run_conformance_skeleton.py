@@ -12309,6 +12309,15 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
     if workflow_path.is_symlink() or not workflow_path.is_file():
         return ["Linux Export build用の通常file workflowがない"]
     workflow = workflow_path.read_text(encoding="utf-8")
+    missing = []
+    candidate_prepare_path = ROOT / "tooling/tests/prepare_linux_same_source_update.py"
+    if candidate_prepare_path.is_symlink() or not candidate_prepare_path.is_file():
+        return ["Linux same-source update candidate準備器が通常fileではない"]
+    candidate_prepare = candidate_prepare_path.read_text(encoding="utf-8")
+    if 'package_path = output_root / "D4Pocket-linux-update.d4pkg"' not in candidate_prepare:
+        missing.append("same-source update candidateのproducer pathが固定されていない")
+    if '--candidate-package "$D4P_EXPORT_ROOT/D4Pocket-linux-update.d4pkg"' not in workflow:
+        missing.append("same-source update candidate producerとinstalled consumerのpathが一致しない")
     helper_commands = (
         "tooling/linux_export_workflow.py verify-build-result",
         "tooling/linux_export_workflow.py verify-portable-archive",
