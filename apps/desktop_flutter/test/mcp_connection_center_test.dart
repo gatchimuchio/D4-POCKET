@@ -15,6 +15,8 @@ class _McpTransport implements BrokerTransport {
   final operations = <String>[];
   final payloads = <Map<String, Object?>?>[];
   bool connected = true;
+  bool toolError = false;
+  String toolConnectionState = 'connected';
   final credentialMetadata = <Map<String, Object?>>[
     {
       '版': 1,
@@ -266,10 +268,10 @@ class _McpTransport implements BrokerTransport {
           '名前': payload['名前'],
           'arguments_hash': 'sha256:${List<String>.filled(64, "a").join()}',
           'result_hash': 'sha256:${List<String>.filled(64, "b").join()}',
-          'Tool error': false,
+          'Tool error': toolError,
           'content_count': 1,
           'content_types': ['text'],
-          '接続状態': 'connected',
+          '接続状態': toolConnectionState,
           '能力ID': 'mcp.tool.call',
           '権限ID': 'permission.mcp.tool.call.one_shot',
           '承認状態': 'native_owner_confirmed',
@@ -731,6 +733,35 @@ void main() {
       ),
       throwsA(isA<BrokerClientException>()),
     );
+  });
+
+  test('Agent連続Tool receiptはTool errorまたはquarantine状態でavailable contextを拒否する',
+      () async {
+    for (final invalidState in [
+      (toolError: true, connectionState: 'connected'),
+      (toolError: false, connectionState: 'quarantined'),
+    ]) {
+      final transport = _McpTransport()
+        ..toolError = invalidState.toolError
+        ..toolConnectionState = invalidState.connectionState;
+      await expectLater(
+        McpConnectionClient(transport).callTool(
+          serverId: 'mcp-fixture',
+          tool: McpToolSummary(
+            toolId: transport.toolMetadata['tool_id']! as String,
+            name: transport.toolMetadata['name']! as String,
+            inputSchemaHash:
+                transport.toolMetadata['input_schema_hash']! as String,
+          ),
+          arguments: const {'query': 'needle'},
+          sourceAgentTaskId: 'task-source-123',
+          sourceAgentResultHash:
+              'sha256:${List<String>.filled(64, 'e').join()}',
+        ),
+        throwsA(isA<BrokerClientException>()),
+      );
+      expect(transport.operations, ['MCP Tool実行']);
+    }
   });
 
   testWidgets('Desktop panelは一覧後にOwner確認付きBroker接続と切断を要求する', (tester) async {

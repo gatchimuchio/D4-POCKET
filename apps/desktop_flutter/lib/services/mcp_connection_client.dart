@@ -736,6 +736,8 @@ class McpConnectionClient {
       if (context.length != contextFields.length ||
           !context.keys.toSet().containsAll(contextFields) ||
           (!available && !unavailable) ||
+          (available &&
+              (body['Tool error'] != false || body['接続状態'] != 'connected')) ||
           toolResultHash != body['result_hash'] ||
           (available &&
               (resultId is! String ||

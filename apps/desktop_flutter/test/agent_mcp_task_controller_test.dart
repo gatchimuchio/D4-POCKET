@@ -190,11 +190,12 @@ void main() {
     ]);
   });
 
-  test('Toolに結果contextがない場合はPermission/Approvalなしで止める', () async {
+  test('Tool errorのunsupported contextではPermission/Approvalなしで止める', () async {
     final responses = _successfulResponses();
     final receipt = responses[3]['body']! as Map<String, Object?>;
+    receipt['Tool error'] = true;
     receipt['Agent結果context'] = {
-      '状態': 'unavailable',
+      '状態': 'unsupported',
       'result_id': null,
       'context_hash': null,
       'tool_result_hash': _toolResultHash,
@@ -214,6 +215,33 @@ void main() {
     );
 
     expect(outcome.kind, AgentMcpTaskOutcomeKind.toolResultUnavailable);
+    expect(transport.operations, [
+      'AgentTask結果表示承認',
+      'AgentTask結果取得',
+      'MCP接続一覧',
+      'MCP Tool実行',
+    ]);
+  });
+
+  test('Tool errorをavailable context付きで返されたら後続Taskを開始しない', () async {
+    final responses = _successfulResponses();
+    (responses[3]['body']! as Map<String, Object?>)['Tool error'] = true;
+    final transport = _FakeBrokerTransport(responses);
+    final controller = AgentMcpTaskController(
+      tasks: AgentTaskClient(transport),
+      mcp: McpConnectionClient(transport),
+    );
+
+    await expectLater(
+      controller.continueAfter(
+        sourceRequest: _sourceRequest,
+        sourceTask: _sourceTask,
+        isCurrent: () => true,
+        waitForOwnerReview: () async {},
+        onUpdate: (_) {},
+      ),
+      throwsA(isA<BrokerClientException>()),
+    );
     expect(transport.operations, [
       'AgentTask結果表示承認',
       'AgentTask結果取得',
