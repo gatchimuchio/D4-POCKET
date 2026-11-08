@@ -37,6 +37,52 @@ def _regular_file(path: Path, label: str) -> Path:
     return path.resolve(strict=True)
 
 
+def _build_evidence_validation_inputs(
+    evidence: dict[str, object], output_root: Path
+) -> tuple[Path, Path | None, bytes | None]:
+    product_output = output_root / "output"
+    if product_output.is_symlink() or not product_output.is_dir():
+        raise ValueError("Linux build outputは通常directoryではありません")
+    product_output = product_output.resolve(strict=True)
+
+    package_record = evidence.get("package")
+    if not isinstance(package_record, dict):
+        raise ValueError("Linux build evidenceにD4PKG recordがありません")
+    package_name = package_record.get("file_name")
+    if (
+        not isinstance(package_name, str)
+        or not package_name
+        or Path(package_name).name != package_name
+        or "/" in package_name
+        or "\\" in package_name
+    ):
+        raise ValueError("Linux build evidenceのD4PKG file名が不正です")
+    package_path = _regular_file(product_output / package_name, "Linux build D4PKG")
+
+    archive_record = evidence.get("portable_archive")
+    if archive_record is None:
+        return package_path, None, None
+    if not isinstance(archive_record, dict):
+        raise ValueError("Linux build evidenceのportable archive recordが不正です")
+    archive_name = archive_record.get("file_name")
+    if (
+        not isinstance(archive_name, str)
+        or not archive_name
+        or Path(archive_name).name != archive_name
+        or "/" in archive_name
+        or "\\" in archive_name
+    ):
+        raise ValueError("Linux build evidenceのportable archive file名が不正です")
+    archive_path = _regular_file(
+        product_output / archive_name, "Linux portable archive"
+    )
+    readme_path = _regular_file(
+        ROOT / "installer" / "linux" / "PORTABLE_README_ja.txt",
+        "Linux portable archive README",
+    )
+    return package_path, archive_path, readme_path.read_bytes()
+
+
 def _prepare(bundle: Path, output_root: Path, private_key: Path, build_evidence: Path, source_commit: str) -> dict[str, object]:
     if bundle.is_symlink() or not bundle.is_dir():
         raise ValueError("Linux release bundleは通常directoryではありません")
@@ -59,13 +105,20 @@ def _prepare(bundle: Path, output_root: Path, private_key: Path, build_evidence:
     ):
         raise ValueError("same-source update packageとbundleはRepository外のrun rootに限ります")
     evidence = json.loads(build_evidence.read_text(encoding="utf-8"))
+    if not isinstance(evidence, dict):
+        raise ValueError("Linux build evidenceはobjectではありません")
     if evidence.get("target_platform") != "linux" or evidence.get("source_commit") != source_commit:
         raise ValueError("Linux release bundle evidenceが指定source commitと一致しません")
+    package_path, archive_path, readme_raw = _build_evidence_validation_inputs(
+        evidence, output_root
+    )
     validate_build_evidence(
         evidence,
         bundle,
-        output_root / "output" / "D4Pocket-linux.d4pkg",
+        package_path,
         (bundle / "product_manifest.json").read_bytes(),
+        archive_path,
+        readme_raw,
     )
     update_server_root = output_root / "update-server"
     if update_server_root.exists() or update_server_root.is_symlink():

@@ -8,7 +8,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tooling.tests.prepare_linux_same_source_update import _safe_exception_summary
+from tooling.tests.prepare_linux_same_source_update import (
+    _build_evidence_validation_inputs,
+    _safe_exception_summary,
+)
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -46,6 +49,47 @@ class LinuxWorkflowHelperTests(unittest.TestCase):
         self.assertIn("<path>", summary)
         self.assertNotIn("/home/runner", summary)
         self.assertNotIn("C:\\Users\\runner", summary)
+
+    def test_same_source_candidate_revalidates_exported_portable_archive(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = root / "output"
+            output.mkdir()
+            package = output / "D4Pocket-linux.d4pkg"
+            package.write_bytes(b"D4PKG01\n")
+            archive = output / "D4Pocket-0.1.1-linux-x64-portable.tar.gz"
+            archive.write_bytes(b"portable archive")
+
+            package_path, archive_path, readme_raw = _build_evidence_validation_inputs(
+                {
+                    "package": {"file_name": package.name},
+                    "portable_archive": {"file_name": archive.name},
+                },
+                root,
+            )
+
+            self.assertEqual(package_path, package.resolve())
+            self.assertEqual(archive_path, archive.resolve())
+            self.assertEqual(
+                readme_raw,
+                (ROOT / "installer" / "linux" / "PORTABLE_README_ja.txt").read_bytes(),
+            )
+
+    def test_same_source_candidate_rejects_portable_archive_path_escape(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = root / "output"
+            output.mkdir()
+            package = output / "D4Pocket-linux.d4pkg"
+            package.write_bytes(b"D4PKG01\n")
+            with self.assertRaisesRegex(ValueError, "portable archive file名"):
+                _build_evidence_validation_inputs(
+                    {
+                        "package": {"file_name": package.name},
+                        "portable_archive": {"file_name": "../outside.tar.gz"},
+                    },
+                    root,
+                )
 
     def test_verify_build_result_and_rejects_wrong_source(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

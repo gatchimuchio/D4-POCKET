@@ -5392,7 +5392,7 @@
     },
     {
       "path": "tooling/tests/prepare_linux_same_source_update.py",
-      "sha256": "79b7198461b59b322f64186adabb5b5b80fbd364bcaa7bd14a203477c2356f58"
+      "sha256": "8ff026e35c425e7811c3fdc880c770968f872c1077e0712606a189999e8d327a"
     },
     {
       "path": "tooling/tests/run_linux_same_source_update_acceptance.py",
@@ -5428,7 +5428,7 @@
     },
     {
       "path": "tooling/tests/test_linux_workflow_helpers.py",
-      "sha256": "5b4a563aaa759d51aedbce37167356303819e4033131a8930c1f9071c958ba99"
+      "sha256": "0569578e9a96ecded4ac9eee27cc07d6241569233264e356cbf976ef25d8bb59"
     },
     {
       "path": "tooling/ui_snapshot_tests/README.md",
