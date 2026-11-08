@@ -193,11 +193,11 @@
     },
     {
       "path": "ROADMAP.md",
-      "責任": "2026-11-08統合製品工程W00〜W08と現行進捗への入口、既存rev5／緩衝基盤／Release Gateの保持。時系列履歴は現行状態を上書きしない"
+      "責任": "2026-11-09 v3統合製品工程と全体BUILD施工線A〜Jへの入口。旧工程記録は履歴"
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "責任": "rev5 Product-Firstと緩衝基盤の機能受入れ・過去phase証拠を保持する。現行W工程状態はdocs/QE_2026-11-08/進捗.mdを参照する"
+      "責任": "rev5 Product-Firstと緩衝基盤の機能受入れ・過去phase証拠を保持する。現行施工線A〜JとW受入状態はdocs/QE_2026-11-09/進捗.mdを参照する"
     },
     {
       "path": "docs/QE_2026-10-22/採用記録.md",
@@ -237,23 +237,23 @@
     },
     {
       "path": "docs/QE_2026-11-08/採用記録.md",
-      "責任": "Owner指示による現行統合製品3点の採用、受領原本hash、旧版履歴と2026-10-22 QE方法論・rev5・安全・Release Gateとの責任境界"
+      "責任": "2026-11-08三点の当時の採用履歴・受領原本hash。現行正本は2026-11-09 v3"
     },
     {
       "path": "docs/QE_2026-11-08/01_D4Pocket_統合製品実装仕様書_20261108.md",
-      "責任": "現行D4 Pocket製品要求、AI能力実行主体・五役の分離、D4-N01〜N11、責任・安全・受入れ境界"
+      "責任": "2026-11-08版製品要求・責任分離・受入れ境界の履歴。現行要求は2026-11-09 v3仕様書"
     },
     {
       "path": "docs/QE_2026-11-08/02_D4Pocket_統合開発工程表_20261108.md",
-      "責任": "現行W00〜W08工程、依存順・Gate・各工程の受入れと既存履歴の保持"
+      "責任": "2026-11-08版W00〜W08工程・逐次工程観測の履歴。現行全体BUILD工程は2026-11-09 v3工程表"
     },
     {
       "path": "docs/QE_2026-11-08/03_D4Pocket_Codex施工指示書_20261108.md",
-      "責任": "現行Codex施工委任、再同期・W02施工・以降工程・検証・direct-main Git閉包"
+      "責任": "2026-11-08版施工指示・判断・証拠の履歴。現行施工指示は2026-11-09 v3"
     },
     {
       "path": "docs/QE_2026-11-08/進捗.md",
-      "責任": "現行製品工程W00〜W08の状態、基準検査、次のBUILD_BATCH、release_readyとBlockerの維持"
+      "責任": "2026-11-08採用時からの当時の工程状態・作業証拠の履歴。現行状態は2026-11-09 v3"
     },
     {
       "path": "docs/緩衝基盤_rev5補遺_QC/採用記録.md",
@@ -444,13 +444,13 @@
       "責任": "Windows Desktop Flutter要求のRust-owned transport、起動child PID照合、既存Broker再利用、資格・権限非継承と未実装証拠境界"
     },
     {
-     "path": "specs/setup_doctor_report.schema.json",
-     "責任": "Rust Brokerが生成・永続化するSetup Doctor報告の構造、根拠区分、非権限性"
-   },
+      "path": "specs/setup_doctor_report.schema.json",
+      "責任": "Rust Brokerが生成・永続化するSetup Doctor報告の構造、根拠区分、非権限性"
+    },
     {
-     "path": "specs/first_run_configuration.schema.json",
-     "責任": "D4 Pocket初回UI設定の固定既定値、Broker固定store、権限・資格情報を含まない構造"
-   },
+      "path": "specs/first_run_configuration.schema.json",
+      "責任": "D4 Pocket初回UI設定の固定既定値、Broker固定store、権限・資格情報を含まない構造"
+    },
     {
       "path": "specs/first_run_configuration_request.schema.json",
       "責任": "初回設定取得要求の版固定、任意path・資格・権限field拒否"
@@ -590,6 +590,26 @@
     {
       "path": "docs/specs/workspace-inspection.md",
       "責任": "C1の作業領域取得・内部差分・表示境界・履歴・復旧接続の責任と証拠範囲"
+    },
+    {
+      "path": "docs/QE_2026-11-09/採用記録.md",
+      "責任": "2026-11-09 v3三点のユーザー指示による採用、受領原本hash、現行正本と過去履歴の境界"
+    },
+    {
+      "path": "docs/QE_2026-11-09/01_D4Pocket_統合製品実装仕様書_v3_20261109.md",
+      "責任": "現行D4 Pocket v3製品要求、D4-N01〜N11、五役分離、統合製品の不変安全・Authority契約"
+    },
+    {
+      "path": "docs/QE_2026-11-09/02_D4Pocket_統合開発工程表_v3_20261109.md",
+      "責任": "現行一巡全体BUILD工程、施工線A〜J、W00〜W08受入座標、全体BUILDと後段QC／QA"
+    },
+    {
+      "path": "docs/QE_2026-11-09/03_D4Pocket_Codex施工指示書_v3_20261109.md",
+      "責任": "現行v3施工委任、開発施工／製品認可／責任者決裁の分離、BUILD_BATCHとGit閉包"
+    },
+    {
+      "path": "docs/QE_2026-11-09/進捗.md",
+      "責任": "現行v3基準HEAD、全体BUILD施工線A〜J、W Gate・Release・B5/B6の状態と証拠履歴"
     }
   ],
   "責任地図": {

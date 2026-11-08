@@ -1,8 +1,8 @@
 # GUI Shell ロードマップ
 
-## 現行統合製品工程（2026-11-08）
+## 現行統合製品工程（2026-11-09 v3）
 
-Owner指示により採用した現行製品仕様・工程・Codex施工指示は[`docs/QE_2026-11-08/`](docs/QE_2026-11-08/)を参照する。現在の状態は[進捗](docs/QE_2026-11-08/進捗.md)。W00は`SCOPED_PASS`、W01/G1はWindows normal Release／Codex CLI限定で`CLOSED`、W02/G2は`OPEN`。W01限定経路のみ`task_execution=supported`であり、W02以降と他Runtime／OSの成立を意味しない。`release_ready=false`、16件unresolved、Q0〜Q7 `DEFERRED`を維持する。2026-11-05三点とW00／W01記録は当時の判断・証拠として保持し、現行状態を上書きしない。
+ユーザー指示により採用した現行仕様・工程・Codex施工指示はdocs/QE_2026-11-09/に保存し、採用記録と現行進捗を参照する。施工線A〜Jを同じ全体BUILD期間で並行して進める。W00〜W08、P／B／Q等は受入座標・履歴であり、番号順の施工待ちにしない。初期状態はW00=SCOPED_PASS、W01/G1=CLOSED（Windows normal Release／Codex CLI限定）、W02/G2=OPEN、B5=OPEN、B6未完了、Q0〜Q7=DEFERRED、release_ready=false。Release Blockerは18件中16件unresolved／2件resolved。2026-11-08以前の採用記録・進捗は履歴として保持し、現行状態を上書きしない。
 
 QE段階・BUILD_BATCH・結合後QC／QAの方法論はOwner採用済みの[`docs/QE_2026-10-22/`](docs/QE_2026-10-22/)に従う。rev5製品要求、既存P／B／Qの履歴、緩衝基盤、Release Gateは保持し、この追補は過去の限定CLOSED／FAILを遡及変更しない。以下の時系列記録は履歴であり、上記現行工程の状態を上書きしない。
 

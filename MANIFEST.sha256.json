@@ -100,7 +100,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "dd00d212a1a5cdeb469fec0440da23f89e952b2e9700f54dd6d5c2ea56aa0a21"
+      "sha256": "9cdd13eac66f2146bb4ac48e9934463b4ffaf3c55afd38198364ebf69e93c2ff"
     },
     {
       "path": "AUDIT.md",
@@ -160,11 +160,11 @@
     },
     {
       "path": "QUICKSTART.md",
-      "sha256": "4fff67b97458483821301e34146474af435314dba205c9d9d4dd543a37a68c16"
+      "sha256": "65c9e55ebaea7be6ddee48691896aa53bd04a9d844ee7faa986d6f8267fc44d3"
     },
     {
       "path": "README.md",
-      "sha256": "21be9141da77d8666f4d97e3e6fcab1593afbfe3160b6422bbb19e6da125f3f3"
+      "sha256": "52b6b65f0fabdac55abe8c8377b0ed75a11ff5ef42be41b90d847731297a4666"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -172,7 +172,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "9789882c7ef5d171d8b408b4dc06babf5c563a4ac9f74ee2d9c5e5dd04cfd78c"
+      "sha256": "7e54a44b96dd41353e85a46fe350e9db004562785ecb53047d737957abe74b12"
     },
     {
       "path": "SECURITY.md",
@@ -1401,6 +1401,26 @@
     {
       "path": "docs/QE_2026-11-08/\u9032\u6357.md",
       "sha256": "e66aeb11cec3d3e099f9e98ddee1670ceaba0dddd0e1a497b6c5c7f65db48a8e"
+    },
+    {
+      "path": "docs/QE_2026-11-09/01_D4Pocket_\u7d71\u5408\u88fd\u54c1\u5b9f\u88c5\u4ed5\u69d8\u66f8_v3_20261109.md",
+      "sha256": "f059751239c2e8cbc2319c21457cf66aca1a960b38e818b4814313ebdc2b75b6"
+    },
+    {
+      "path": "docs/QE_2026-11-09/02_D4Pocket_\u7d71\u5408\u958b\u767a\u5de5\u7a0b\u8868_v3_20261109.md",
+      "sha256": "745bbfd3ba1801d17398df71e43fbd3aa2c1b9b498453e02d98ad4d4f7d5af94"
+    },
+    {
+      "path": "docs/QE_2026-11-09/03_D4Pocket_Codex\u65bd\u5de5\u6307\u793a\u66f8_v3_20261109.md",
+      "sha256": "9f99895d79b580c3657f2d45b2369d790c685399fd03be3e8957198cd102a70d"
+    },
+    {
+      "path": "docs/QE_2026-11-09/\u63a1\u7528\u8a18\u9332.md",
+      "sha256": "b35d4dc7fee34e82fb71f11d3e230b2d8929061d749bd75abf1f9e8aab8f7cc1"
+    },
+    {
+      "path": "docs/QE_2026-11-09/\u9032\u6357.md",
+      "sha256": "8d4eeada710f95eaddf41e70ef1963e93cd422037725563bacf57b6b73e4a194"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -5180,7 +5200,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "6b4b106a0927c32a5dda22f37fa846104f518c07fd1ff6a96eb05dd7dd23630b"
+      "sha256": "326df89c8c7ee7fbe56383772c7fa9d44d512fcac38753640e352568ad730370"
     },
     {
       "path": "tooling/conformance_tests/test_final_development_audit.py",
@@ -5316,7 +5336,7 @@
     },
     {
       "path": "tooling/release_gate_check.py",
-      "sha256": "d46842b536cf2c294c7b603c10d9aaf3373c4387be541dd61b230633f47ee623"
+      "sha256": "e9a495d94023714b5319de320cdbcf31a543e5faa1bbca4c651f5e19b73e11fe"
     },
     {
       "path": "tooling/release_runtime_assertions.py",
@@ -5428,7 +5448,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "91de3a69d206b76530183d269562d51e5eb54bd1468344babe309f91a0c827f7"
+      "sha256": "9280f00897f677b0ff23155e64ceae231ea0549eddac1bb76a387da50fe18cf1"
     }
   ]
 }

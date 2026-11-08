@@ -7,9 +7,9 @@ AIエージェントが高度になるほど、次に難しくなるのは「何
 
 名前のとおり目指すのは、異なる能力やRuntimeを必要に応じて取り出し、安全に組み合わせられる**エージェントのための四次元ポケット**。特定のLLMやBLUE-TANUKI専用のフロントエンドではありません。
 
-[現行工程](docs/QE_2026-11-08/進捗.md) · [rev5受入れ履歴](docs/REV5_PRODUCT_PROGRESS.md) · [クイックスタート](QUICKSTART.md) · [アーキテクチャ仕様](docs/specs/gui-shell-spec-v1.md) · [責任境界](CLAIM.md) · [エージェント向け開発規則](AGENTS.md)
+[現行工程](docs/QE_2026-11-09/進捗.md) · [rev5受入れ履歴](docs/REV5_PRODUCT_PROGRESS.md) · [クイックスタート](QUICKSTART.md) · [アーキテクチャ仕様](docs/specs/gui-shell-spec-v1.md) · [責任境界](CLAIM.md) · [エージェント向け開発規則](AGENTS.md)
 
-> **開発中 — 製品リリース未宣言。** 現行工程は[2026-11-08統合製品3点](docs/QE_2026-11-08/進捗.md)です。W00=`SCOPED_PASS`、W01=`CLOSED`（Windows normal Release／Codex CLI限定）、W02=`OPEN`で、実Codex→実MCP Tool→同Agentの結果依存TaskとUI応答停止の原因を確認しています。W01の`task_execution=supported`は同経路に限り、他Runtime／OSの一般能力や正式installed全体は未成立です。Linux nativeは必須の独立Desktop対象です。`release_ready=false`、16件のRelease Blocker、Q0〜Q7 `DEFERRED`を維持します。過去の製品受入れ範囲は[rev5進捗](docs/REV5_PRODUCT_PROGRESS.md)を参照してください。
+> **開発中 — 製品リリース未宣言。** 現行施工正本は[2026-11-09統合製品3点 v3](docs/QE_2026-11-09/進捗.md)です。施工線A〜Jを同じ全体BUILD期間で並行して進め、W00〜W08は受入座標として扱います。W00=SCOPED_PASS、W01=CLOSED（Windows normal Release／Codex CLI限定）、W02=OPEN。実Codex→実MCP Tool→同Agentの結果依存TaskとUI停止原因は未成立／未解明です。Linux nativeを含む全対象OSを必須製品対象として維持します。release_ready=false、18件中16件のRelease Blocker未解決、Q0〜Q7 DEFERREDです。過去の製品受入れ範囲は[rev5進捗](docs/REV5_PRODUCT_PROGRESS.md)を参照してください。
 
 ## D4 Pocketが変えようとしていること
 
