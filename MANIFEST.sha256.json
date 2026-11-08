@@ -76,7 +76,7 @@
     },
     {
       "path": ".github/workflows/linux-manual-export-build.yml",
-      "sha256": "d2d6bdf6419e3662cc96f08b5a9c29bcb3811817eb8d9747072ad8257b19c3b8"
+      "sha256": "4e60ad20e6d174682e869195727eaccaeace780048c92c3211000be53cad59e6"
     },
     {
       "path": ".github/workflows/linux-manual-rust-validation.yml",
@@ -448,11 +448,11 @@
     },
     {
       "path": "apps/desktop_flutter/linux/runner/CMakeLists.txt",
-      "sha256": "2c069c98cc0220bdef015d231c9017017f7eb9c94a6075a359ca5314ded9c24c"
+      "sha256": "3c9b029d8916ba9e6254343f622245fa35e287ac026f2350c683855809a9275d"
     },
     {
       "path": "apps/desktop_flutter/linux/runner/broker_process_channel.cc",
-      "sha256": "311c5ed6cedb59f8da433278a517982fceef4ec230878bd4fa500151132766ca"
+      "sha256": "7b286ebaac1022b56cc33be5da6b651926f8ce27026636456afff64747f09e10"
     },
     {
       "path": "apps/desktop_flutter/linux/runner/broker_process_channel.h",
@@ -1420,7 +1420,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "8d4eeada710f95eaddf41e70ef1963e93cd422037725563bacf57b6b73e4a194"
+      "sha256": "649db74c86d35615077a74e68464d2f0b9fe61db1edd8b9ee2cef611fee39866"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -3816,7 +3816,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
-      "sha256": "09755c96cb9ab397caee37e04eab88510662351d5bab048f0f10df96c49864a0"
+      "sha256": "663bf3fbd50f66cb3b2f559d7a727ebd8d9490ad0d16a6182d783d40b1ad272c"
     },
     {
       "path": "native/rust_helper/src/broker/update_download/windows_dns.rs",
@@ -3868,7 +3868,7 @@
     },
     {
       "path": "native/rust_helper/src/linux_desktop_launcher.rs",
-      "sha256": "8096d4ddaa8238380c94b152ef4f1f88e2b72c1398507cdedf3abde13e99fde0"
+      "sha256": "4c7de43e861ca82bfe31205b47c96708a29c9a5a228d47ff470086cbe07444e6"
     },
     {
       "path": "native/rust_helper/src/linux_desktop_worker.rs",
@@ -5200,7 +5200,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "326df89c8c7ee7fbe56383772c7fa9d44d512fcac38753640e352568ad730370"
+      "sha256": "50fadc3c6cc8ed4db2c21a5202cc8e039c1da669c2166274fd71729a0badb1f2"
     },
     {
       "path": "tooling/conformance_tests/test_final_development_audit.py",
@@ -5280,7 +5280,7 @@
     },
     {
       "path": "tooling/linux_export_workflow.py",
-      "sha256": "cc899592b38c15da13e1647f1351dabc2ae5494293aa6e8fa47f7312e8856584"
+      "sha256": "2da39c1d43a8a52d25b2a06c1954ec865e7a1d99614ab779885cd4a70c94a2a5"
     },
     {
       "path": "tooling/linux_installed_acceptance_summary.py",
@@ -5368,7 +5368,7 @@
     },
     {
       "path": "tooling/tests/create_linux_update_catalog_fixture.py",
-      "sha256": "580defceb9ba045dfc442038bb20b595c3892853c346c846d2380533b0277188"
+      "sha256": "22c6910c5d8546ac3c327d9431b290e07c6005f5c6ddea68d450b7f3780124de"
     },
     {
       "path": "tooling/tests/fixtures/linux-update-catalog/linux-installed-catalog-display.pkg",
@@ -5384,7 +5384,7 @@
     },
     {
       "path": "tooling/tests/linux_installed_product_smoke.py",
-      "sha256": "7ee7bab61004f09301226fce2f02f10578f47362279f3e3f4a15b642a116a04d"
+      "sha256": "2515f10796fca40988a5bdf9241ad29777d52f3bae848ce4f70153fbd3efbb71"
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",
@@ -5400,7 +5400,7 @@
     },
     {
       "path": "tooling/tests/test_linux_installed_product_smoke.py",
-      "sha256": "0908ee37280cbfc3b803f844b0ecad99a6306de1dce347008c9a8b531e69f70f"
+      "sha256": "0fd3c49d83618089d7d545cc309d3ab8846d95fe90177bfcd6c4af5cf866e156"
     },
     {
       "path": "tooling/tests/test_linux_portable_archive.py",
@@ -5412,11 +5412,11 @@
     },
     {
       "path": "tooling/tests/test_linux_update_catalog_fixture.py",
-      "sha256": "be8b5e13a5b6ab022c26740bd4cc7b94b07b7949025a7c5f6d510570d320afa2"
+      "sha256": "eabc94adff83591e51769d43c488a4cbb95e62b30107a2dd1b0b7603eb479daf"
     },
     {
       "path": "tooling/tests/test_linux_workflow_helpers.py",
-      "sha256": "39f2845764fc6e6ee9635d6b253605108c7f04ecadf43be9b7489643d61f72da"
+      "sha256": "b700a60d79ce165139cc689e97eb380cdaac0bd4a33fc419fb0385d5118b276a"
     },
     {
       "path": "tooling/ui_snapshot_tests/README.md",

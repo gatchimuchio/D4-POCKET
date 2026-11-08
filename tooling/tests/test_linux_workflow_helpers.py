@@ -56,6 +56,27 @@ class LinuxWorkflowHelperTests(unittest.TestCase):
             invalid = run_helper(EXPORT_HELPER, "verify-build-result", str(root), "source-2", "agent_task_supervision")
             self.assertNotEqual(invalid.returncode, 0)
 
+    def test_debian_lifecycle_is_a_verification_build_only_for_that_scope(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            package = root / "D4Pocket-linux.d4pkg"
+            package.write_bytes(b"package")
+            for scope, expected in (("debian_setup_lifecycle", True), ("product_build", False)):
+                write_json(root / "d4_pocket_linux_export_build.json", {
+                    "target_platform": "linux",
+                    "source_commit": "source-1",
+                    "artifact_tree_sha256": "a" * 64,
+                    "signed": False,
+                    "formal_distribution_claimed": False,
+                    "package": {"installed_product_verified": False, "sha256": digest(package)},
+                    "cmake_configure_arguments": [
+                        "-DD4_LINUX_R2_E2E_TEST_BUILD=" + ("ON" if expected else "OFF")
+                    ],
+                })
+                result = run_helper(EXPORT_HELPER, "verify-build-result", str(root), "source-1", scope)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(f'"r2_e2e_test_build":{str(expected).lower()}', result.stdout)
+
     def test_verify_portable_archive_and_rejects_bad_digest(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

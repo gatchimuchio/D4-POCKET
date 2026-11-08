@@ -7202,7 +7202,7 @@ def _trigger_update_action_from_installed_ui(
 
 
 def _trigger_catalog_fetch_from_installed_ui(
-    environment: dict[str, str], window_id: str
+    environment: dict[str, str], window_id: str, source_host: str = "raw.githubusercontent.com"
 ) -> dict[str, str]:
     window = _open_update_center_from_installed_ui(environment, window_id)
     command = _find_operable_accessible("配布元から候補取得", root=window, timeout=10)
@@ -7214,14 +7214,14 @@ def _trigger_catalog_fetch_from_installed_ui(
     _find_accessible(
         "現在のBroker trustで検証済み", root=window, timeout=10
     )
-    _find_accessible("配布元=raw.githubusercontent.com", root=window, timeout=10)
+    _find_accessible(f"配布元={source_host}", root=window, timeout=10)
     _find_accessible("Brokerが署名検証済み候補を取得しました（1件）。", root=window, timeout=10)
     if not candidate.name:
         raise RuntimeError("Update Centerに候補表示がありません")
     return {
         "candidate": candidate.name,
         "signature": "verified_by_current_broker_trust",
-        "source": "raw.githubusercontent.com",
+        "source": source_host,
         "package_downloaded": "download-and-apply-follows-in-this-acceptance",
     }
 
@@ -7479,13 +7479,27 @@ def _installed_update_download_stage_activate(
     desktop_entry: Path,
     audit_path: Path,
     product_paths: set[Path],
+    candidate_package: Path | None = None,
+    candidate_catalog: Path | None = None,
 ) -> dict[str, object]:
-    fixture_package = (
-        ROOT
-        / "tooling/tests/fixtures/linux-update-catalog"
-        / f"{UPDATE_ID}.pkg"
-    ).resolve(strict=True)
-    package_bytes = fixture_package.read_bytes()
+    if (candidate_package is None) != (candidate_catalog is None):
+        raise RuntimeError("同一source updateではpackageとcatalogを対で指定してください")
+    acceptance_product_candidate = candidate_package is not None
+    candidate_package = (
+        _resolve_regular_package(candidate_package)
+        if candidate_package is not None
+        else (
+            ROOT
+            / "tooling/tests/fixtures/linux-update-catalog"
+            / f"{UPDATE_ID}.pkg"
+        ).resolve(strict=True)
+    )
+    candidate_catalog = (
+        candidate_catalog.resolve(strict=True)
+        if candidate_catalog is not None
+        else ROOT / "tooling/tests/fixtures/linux-update-catalog/updates.json"
+    )
+    package_bytes = candidate_package.read_bytes()
     package_hash = hashlib.sha256(package_bytes).hexdigest()
     store_root = audit_path.parent
     package_store = store_root / "update_packages"
@@ -7500,7 +7514,9 @@ def _installed_update_download_stage_activate(
         "Linux製品の署名検査済み更新packageを取得しますか？",
         f"更新ID: {UPDATE_ID}",
         f"提供版: {UPDATE_VERSION}",
-        "取得host: raw.githubusercontent.com",
+        "取得host: updates.d4p-test.example"
+        if acceptance_product_candidate
+        else "取得host: raw.githubusercontent.com",
         package_hash,
         str(len(package_bytes)),
     )
@@ -7582,9 +7598,7 @@ def _installed_update_download_stage_activate(
         timeout=30,
     )
     package_document = json.loads(
-        (ROOT / "tooling/tests/fixtures/linux-update-catalog/updates.json").read_text(
-            encoding="utf-8"
-        )
+        candidate_catalog.read_text(encoding="utf-8")
     )["候補"][0]
     signed_bytes = bytes.fromhex(package_document["署名対象"])
     signed_candidate = json.loads(signed_bytes)
@@ -7684,6 +7698,8 @@ def _installed_update_download_stage_activate(
         "active_record": activated_record,
         "package_sha256": package_hash,
         "package_size_bytes": len(package_bytes),
+        "payload_is_product_d4pkg": acceptance_product_candidate,
+        "catalog_path": candidate_catalog.name,
         "staged_file_count": len(expected_stage_files),
         "download_rejected_then_owner_approved": True,
         "stage_rejected_then_owner_approved": True,
@@ -8724,6 +8740,8 @@ def run_installed_smoke(
     build_evidence_path: Path | None = None,
     bundle_root: Path | None = None,
     source_commit: str | None = None,
+    update_candidate_package: Path | None = None,
+    update_catalog: Path | None = None,
 ) -> None:
     needs_x11 = acceptance_scope not in {
         "wayland_rendering",
@@ -8739,7 +8757,25 @@ def run_installed_smoke(
     package = _resolve_regular_package(package)
     update_package = _resolve_regular_package(update_package)
     if temp_root not in update_package.parents:
-        raise RuntimeError("rollback fixture packageがrun固有一時root外です")
+        raise RuntimeError("initial／rollback seed D4PKGがrun固有一時root外です")
+    if (update_candidate_package is None) != (update_catalog is None):
+        raise RuntimeError("same-source update packageとcatalogは対で指定してください")
+    if update_candidate_package is not None and acceptance_scope != "debian_setup_lifecycle":
+        raise RuntimeError("same-source update candidateはDebian Setup lifecycle専用です")
+    if update_candidate_package is not None:
+        update_candidate_package = _resolve_regular_package(update_candidate_package)
+        if temp_root not in update_candidate_package.parents:
+            raise RuntimeError("same-source update packageがrun固有一時root外です")
+    if update_catalog is not None:
+        if update_catalog.is_symlink() or not update_catalog.is_file():
+            raise RuntimeError("same-source update catalogが通常fileではありません")
+        update_catalog = update_catalog.resolve(strict=True)
+        if temp_root not in update_catalog.parents:
+            raise RuntimeError("same-source update catalogがrun固有一時root外です")
+    if acceptance_scope == "debian_setup_lifecycle" and (
+        update_candidate_package is None or update_catalog is None
+    ):
+        raise RuntimeError("Debian Setup lifecycleにはsame-source update package／catalogが必要です")
     if acceptance_scope not in {
         "update_lifecycle",
         "debian_setup_first_install",
@@ -10035,7 +10071,11 @@ def run_installed_smoke(
             )
             try:
                 catalog_evidence = _trigger_catalog_fetch_from_installed_ui(
-                    environment, window_id
+                    environment,
+                    window_id,
+                    "updates.d4p-test.example"
+                    if update_candidate_package is not None
+                    else "raw.githubusercontent.com",
                 )
             except RuntimeError as error:
                 diagnostics = _catalog_failure_diagnostics(
@@ -10055,6 +10095,8 @@ def run_installed_smoke(
                 desktop_entry=entries[0],
                 audit_path=broker_state / "store/audit.jsonl",
                 product_paths=product_paths,
+                candidate_package=update_candidate_package,
+                candidate_catalog=update_catalog,
             )
             record = update_evidence.get("active_record")
             if not isinstance(record, dict):
@@ -10598,6 +10640,8 @@ def main() -> int:
     parser.add_argument("--acceptance-root", type=Path, required=True)
     parser.add_argument("--private-key", type=Path, required=True)
     parser.add_argument("--update-package", type=Path, required=True)
+    parser.add_argument("--update-candidate-package", type=Path)
+    parser.add_argument("--update-catalog", type=Path)
     parser.add_argument(
         "--acceptance-scope",
         choices=(
@@ -10636,6 +10680,8 @@ def main() -> int:
             args.build_evidence,
             args.bundle_root,
             args.source_commit,
+            args.update_candidate_package,
+            args.update_catalog,
         )
     except Exception as error:
         call_path = _safe_exception_call_path(error)

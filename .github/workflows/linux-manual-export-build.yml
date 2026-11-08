@@ -171,6 +171,9 @@ jobs:
           python3 tooling/tests/create_linux_update_catalog_fixture.py --private-key "$D4P_EXPORT_ROOT/test-update-private.der"
           git diff --exit-code -- tooling/tests/fixtures/linux-update-catalog/updates.json tooling/tests/fixtures/linux-update-catalog/linux-installed-catalog-display.pkg
           catalog_base_url="https://raw.githubusercontent.com/gatchimuchio/D4-POCKET/${GITHUB_SHA}/tooling/tests/fixtures/linux-update-catalog"
+          if [ '${{ inputs.acceptance_scope }}' = 'debian_setup_lifecycle' ]; then
+            catalog_base_url='https://updates.d4p-test.example/d4/stable'
+          fi
           fixture_arguments=(
             --output-dir "$fixture_root"
             --update-trust-public-key-der "$D4P_EXPORT_ROOT/test-update-public.der"
@@ -186,7 +189,7 @@ jobs:
             --output-dir "$output_root"
             --allow-verification-branch
           )
-          if [ '${{ inputs.acceptance_scope }}' = 'agent_task_supervision' ] || [ '${{ inputs.acceptance_scope }}' = 'agent_task_crash_recovery' ] || [ '${{ inputs.acceptance_scope }}' = 'provider_credential_binding' ]; then
+          if [ '${{ inputs.acceptance_scope }}' = 'agent_task_supervision' ] || [ '${{ inputs.acceptance_scope }}' = 'agent_task_crash_recovery' ] || [ '${{ inputs.acceptance_scope }}' = 'provider_credential_binding' ] || [ '${{ inputs.acceptance_scope }}' = 'debian_setup_lifecycle' ]; then
             export_arguments+=(--r2-e2e-test-build)
           fi
           python3 tooling/export_linux_product.py "${export_arguments[@]}"
@@ -194,6 +197,15 @@ jobs:
             --source-dir "$output_root/bundle" \
             --output "$output_root/D4Pocket-linux-rollback.d4pkg" \
             --product-version 0.1.1
+          if [ '${{ inputs.acceptance_scope }}' = 'debian_setup_lifecycle' ]; then
+            python3 tooling/tests/prepare_linux_same_source_update.py \
+              --bundle "$output_root/bundle" \
+              --output-root "$D4P_EXPORT_ROOT" \
+              --private-key "$D4P_EXPORT_ROOT/test-update-private.der" \
+              --build-evidence "$output_root/d4_pocket_linux_export_build.json" \
+              --source-commit "$GITHUB_SHA" \
+              | tee "$D4P_EXPORT_ROOT/update-candidate-result.json"
+          fi
           python3 tooling/linux_export_workflow.py verify-build-result "$output_root" "$(git rev-parse HEAD)" '${{ inputs.acceptance_scope }}' | tee "$D4P_EXPORT_ROOT/build-result.json"
           python3 -m unittest tooling.tests.test_linux_workflow_helpers
           python3 -m unittest tooling.tests.test_linux_gtk_bundle_smoke
@@ -257,7 +269,7 @@ jobs:
             elif [ '${{ inputs.acceptance_scope }}' = 'debian_setup_first_install' ]; then
               printf -- '- APT-installed Setup UIからの初回Broker導入Acceptanceを専用stepで実行します。従来のbootstrap package更新／rollback Acceptanceは再実行しません。\n'
             elif [ '${{ inputs.acceptance_scope }}' = 'debian_setup_lifecycle' ]; then
-              printf -- '- APT-installed Setup初回導入からinstalled Update Centerのdownload／stage／activation／rollback、Export、Uninstallまでを同じrunで接続するD4-LNX-T06統合acceptanceを専用stepで実行します。更新candidateは既存の非実行test fixtureです。\n'
+              printf -- '- APT-installed Setup初回導入からinstalled Update Centerのdownload／stage／activation／rollback、Export、Uninstallまでを同じrunで接続するD4-LNX-T06統合acceptanceを専用stepで実行します。更新candidateは同じsource bundleから生成する実D4PKGです。\n'
             else
               printf -- '- Runtime smoke: portable product Rust launcher opened and normally closed its Flutter GTK window under Xvfb/X11; Wayland run used Weston headless/Pixman, verified the live launcher GTK process successfully connected to the isolated Wayland socket using external connect-syscall observation, then stopped the owned process group. No debug environment variable was required or forwarded through the frontend allowlist. Both used an initially absent XDG_DATA_HOME and verified cleanup.\n'
               printf -- '- Scope: portable first-launch, Linux GTK X11 window close, and Wayland socket-connect smoke only; the Wayland check does not prove surface rendering. This build is not signed Install/Owner activation, installed-version handoff, production compositor coverage, formal distribution, or runtime Manifest consumption.\n'
@@ -417,19 +429,33 @@ jobs:
           test "$(dpkg-query -S /opt/d4-pocket/setup/gui_shell_desktop_launcher | cut -d: -f1)" = d4-pocket-setup
           test "$(dpkg-query -S /usr/share/applications/d4-pocket-setup.desktop | cut -d: -f1)" = d4-pocket-setup
           grep -Fx 'Exec=/opt/d4-pocket/setup/gui_shell_desktop_launcher' /usr/share/applications/d4-pocket-setup.desktop
-          dbus-run-session -- xvfb-run -a python3 tooling/tests/linux_installed_product_smoke.py \
-            --package "$product_package" \
-            --temp-root "$D4P_EXPORT_ROOT" \
-            --acceptance-root "$acceptance_root" \
-            --private-key "$D4P_EXPORT_ROOT/test-update-private.der" \
-            --update-package "$product_package" \
-            --acceptance-scope '${{ inputs.acceptance_scope }}' 2>&1 | tee "$D4P_EXPORT_ROOT/debian-setup-acceptance-output.log"
-          python3 tooling/linux_debian_setup_workflow.py validate-installed-acceptance "$D4P_EXPORT_ROOT/debian-setup-acceptance-output.log" '${{ inputs.acceptance_scope }}' "$product_package_sha"
+          if [ '${{ inputs.acceptance_scope }}' = 'debian_setup_lifecycle' ]; then
+            python3 tooling/tests/run_linux_same_source_update_acceptance.py \
+              --temp-root "$D4P_EXPORT_ROOT" \
+              --acceptance-root "$acceptance_root" \
+              --initial-package "$product_package" \
+              --candidate-package "$output_root/D4Pocket-linux-update.d4pkg" \
+              --catalog "$D4P_EXPORT_ROOT/update-server/updates.json" \
+              --update-signing-key "$D4P_EXPORT_ROOT/test-update-private.der" \
+              --build-evidence "$output_root/d4_pocket_linux_export_build.json" \
+              --candidate-evidence "$D4P_EXPORT_ROOT/update-candidate-result.json" \
+              --source-commit "$source_commit" \
+              2>&1 | tee "$D4P_EXPORT_ROOT/debian-setup-acceptance-output.log"
+          else
+            dbus-run-session -- xvfb-run -a python3 tooling/tests/linux_installed_product_smoke.py \
+              --package "$product_package" \
+              --temp-root "$D4P_EXPORT_ROOT" \
+              --acceptance-root "$acceptance_root" \
+              --private-key "$D4P_EXPORT_ROOT/test-update-private.der" \
+              --update-package "$product_package" \
+              --acceptance-scope '${{ inputs.acceptance_scope }}' 2>&1 | tee "$D4P_EXPORT_ROOT/debian-setup-acceptance-output.log"
+            python3 tooling/linux_debian_setup_workflow.py validate-installed-acceptance "$D4P_EXPORT_ROOT/debian-setup-acceptance-output.log" '${{ inputs.acceptance_scope }}' "$product_package_sha"
+          fi
           test "$(dpkg-query -W -f='${Status}' d4-pocket-setup)" = 'install ok installed'
           if [ '${{ inputs.acceptance_scope }}' = 'debian_setup_lifecycle' ]; then
             printf '\n- Linux integrated Setup lifecycle: Ubuntu 24.04 amd64; source `%s`; APT Setup `.deb` SHA-256 `%s`; initial product D4PKG SHA-256 `%s`; bundle tree `%s`。\n' \
               "$source_commit" "$package_sha" "$product_package_sha" "$artifact_tree_sha" >> "$GITHUB_STEP_SUMMARY"
-            printf -- '- LIVE_RUNTIME: APT-installed Setup first-installed same-run product D4PKG v0.1.1; then installed Update Center staged and activated test v0.1.2, rolled back to v0.1.1, and completed installed Export/Uninstall with user-data preservation, Audit, and owned-process cleanup. The remote update payload remains a non-executable acceptance fixture, so this does not close the full same-source update requirement. Initial cache and Owner decisions use run-scoped test fixtures.\n' >> "$GITHUB_STEP_SUMMARY"
+            printf -- '- LIVE_RUNTIME: APT-installed Setup installed same-run D4PKG v0.1.1; installed Update Center fetched a same-bundle-source product D4PKG v0.1.2 over a run-owned TLS endpoint, verified its exact hash/signature, staged/activated after separate Owner approvals, rolled back to v0.1.1, then completed installed Export/Uninstall with user-data preservation, durable Audit, and owned-process cleanup. TLS root, update signature, and Owner decisions use run-only test identities; formal signing/distribution is not claimed.\n' >> "$GITHUB_STEP_SUMMARY"
             printf -- '- Scope does not establish physical desktop behavior, formal signing/distribution, general Linux support, or release readiness.\n' >> "$GITHUB_STEP_SUMMARY"
           else
             printf '\n- Linux first-install product path: Ubuntu 24.04 amd64; source `%s`; APT Setup `.deb` SHA-256 `%s`; product D4PKG SHA-256 `%s`; bundle tree `%s`。\n' \

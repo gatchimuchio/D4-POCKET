@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.13)
 project(runner LANGUAGES CXX)
 
 option(D4_LINUX_R2_E2E_TEST_BUILD
-  "Enable the local-only Linux installed Agent Task acceptance build"
+  "Enable the local-only Linux installed product acceptance build"
   OFF)
 
 # Define the application target. To change its name, change BINARY_NAME in the

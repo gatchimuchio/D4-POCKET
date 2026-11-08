@@ -92,6 +92,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _open_agent_center_from_installed_ui,
     _open_installed_codex_registration,
     _verify_uninstalled_state,
+    _trigger_catalog_fetch_from_installed_ui,
     _trigger_update_action_from_installed_ui,
     _wait_for_catalog_fetch_status,
     _wait_for_gtk_dialog_closed,
@@ -822,6 +823,26 @@ class InstalledCatalogFetchStatusTests(unittest.TestCase):
         root = self.Node("window", [self.Node(status)])
         with self.assertRaisesRegex(RuntimeError, "0件"):
             _wait_for_catalog_fetch_status(root)
+
+    def test_installed_fetch_projection_uses_explicit_test_source_host(self) -> None:
+        module = "tooling.tests.linux_installed_product_smoke"
+        window = object()
+        candidate = types.SimpleNamespace(name="0.1.2 (candidate)")
+        with (
+            patch(f"{module}._open_update_center_from_installed_ui", return_value=window),
+            patch(f"{module}._find_operable_accessible", return_value=object()),
+            patch(f"{module}._activate_accessible"),
+            patch(f"{module}._wait_for_catalog_fetch_status"),
+            patch(f"{module}._find_accessible", side_effect=[candidate, object(), object(), object()]) as find,
+        ):
+            evidence = _trigger_catalog_fetch_from_installed_ui(
+                {"DISPLAY": ":99"}, "123", "updates.d4p-test.example"
+            )
+
+        self.assertEqual(evidence["source"], "updates.d4p-test.example")
+        find.assert_any_call(
+            "配布元=updates.d4p-test.example", root=window, timeout=10
+        )
 
     def test_failure_diagnostics_expose_process_and_audit_metadata_only(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

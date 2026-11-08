@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -158,8 +159,9 @@ def _sign_with_public_test_key(private_key: Path, signed_bytes: bytes) -> bytes:
     return signature
 
 
-def build_catalog(package: bytes, private_key: Path) -> bytes:
-    package_hash = hashlib.sha256(package).hexdigest()
+def build_catalog_from_identity(
+    package_hash: str, package_size_bytes: int, private_key: Path
+) -> bytes:
     signed_document = {
         "版": 2,
         "更新ID": UPDATE_ID,
@@ -168,7 +170,7 @@ def build_catalog(package: bytes, private_key: Path) -> bytes:
         "channel": "stable",
         "内容概要": SUMMARY,
         "package_sha256": package_hash,
-        "package_size_bytes": len(package),
+        "package_size_bytes": package_size_bytes,
         "rollback可能": True,
     }
     signed_bytes = _compact_json(signed_document)
@@ -181,6 +183,12 @@ def build_catalog(package: bytes, private_key: Path) -> bytes:
     return (
         json.dumps({"版": 1, "候補": [candidate]}, ensure_ascii=False, indent=2) + "\n"
     ).encode("utf-8")
+
+
+def build_catalog(package: bytes, private_key: Path) -> bytes:
+    return build_catalog_from_identity(
+        hashlib.sha256(package).hexdigest(), len(package), private_key
+    )
 
 
 def _atomic_write(path: Path, content: bytes) -> None:
@@ -227,6 +235,80 @@ def write_fixture(private_key: Path | None = None) -> dict[str, Any]:
     }
 
 
+def write_product_acceptance_catalog(
+    package_path: Path, output_dir: Path, private_key: Path | None
+) -> dict[str, Any]:
+    if package_path.is_symlink() or not package_path.is_file():
+        raise ValueError("更新candidateが通常fileではありません")
+    if output_dir.is_symlink() or not output_dir.is_dir():
+        raise ValueError("acceptance配布directoryは通常directoryである必要があります")
+    package_path = package_path.resolve(strict=True)
+    output_dir = output_dir.resolve(strict=True)
+    if output_dir.is_relative_to(ROOT):
+        raise ValueError("acceptance配布directoryはRepository外に限ります")
+    metadata = package_path.stat()
+    if metadata.st_size < 13 or metadata.st_size > 4 * 1024 * 1024 * 1024:
+        raise ValueError("更新candidateのbyte長がD4PKG上限外です")
+    with package_path.open("rb") as source:
+        header = source.read(12)
+        if len(header) != 12 or header[:8] != b"D4PKG01\n":
+            raise ValueError("更新candidateがD4PKG01ではありません")
+        manifest_length = int.from_bytes(header[8:12], "little")
+        if manifest_length == 0 or manifest_length > 4 * 1024 * 1024:
+            raise ValueError("更新candidateのmanifest長が上限外です")
+        manifest_bytes = source.read(manifest_length)
+    if len(manifest_bytes) != manifest_length:
+        raise ValueError("更新candidateのmanifestが途中で終了しています")
+    manifest = json.loads(manifest_bytes.decode("utf-8"))
+    if (
+        manifest.get("version") != 1
+        or manifest.get("product") != "D4 Pocket"
+        or manifest.get("product_version") != OFFERED_VERSION
+        or manifest.get("app_id") != APP_ID
+        or manifest.get("audit_store_id") != AUDIT_ID
+        or manifest.get("target_platform") != "linux"
+        or not isinstance(manifest.get("files"), list)
+        or not manifest["files"]
+    ):
+        raise ValueError("更新candidateのProduct Manifest identityが不一致です")
+
+    digest = hashlib.sha256()
+    with package_path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    package_hash = digest.hexdigest()
+    package_output = output_dir / f"{UPDATE_ID}.pkg"
+    catalog_output = output_dir / "updates.json"
+    if package_output.exists() or package_output.is_symlink() or catalog_output.exists() or catalog_output.is_symlink():
+        raise ValueError("acceptance配布directoryに既存fileがあります")
+    shutil.copyfile(package_path, package_output, follow_symlinks=False)
+    copied_hash = hashlib.sha256()
+    with package_output.open("rb") as copied:
+        for chunk in iter(lambda: copied.read(1024 * 1024), b""):
+            copied_hash.update(chunk)
+    if copied_hash.hexdigest() != package_hash or package_output.stat().st_size != metadata.st_size:
+        package_output.unlink(missing_ok=True)
+        raise ValueError("配布用D4PKGのbyte/hashが元candidateと一致しません")
+    if private_key is None:
+        with tempfile.TemporaryDirectory(prefix="d4p-linux-update-key-") as temporary:
+            key_path = Path(temporary) / "published-rfc8032-test.der"
+            key_path.write_bytes(PUBLISHED_TEST_PRIVATE_KEY_DER)
+            catalog = build_catalog_from_identity(package_hash, metadata.st_size, key_path)
+    else:
+        catalog = build_catalog_from_identity(package_hash, metadata.st_size, private_key)
+    _atomic_write(catalog_output, catalog)
+    return {
+        "acceptance_catalog": True,
+        "payload_is_d4pkg_with_product_manifest": True,
+        "product_version": OFFERED_VERSION,
+        "package_path": str(package_output),
+        "package_sha256": package_hash,
+        "package_size_bytes": metadata.st_size,
+        "catalog_path": str(catalog_output),
+        "signing_identity": "published RFC 8032 test vector; never production trust",
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -234,10 +316,20 @@ def main() -> int:
         type=Path,
         help="RFC 8032試験ベクトル用DER鍵（任意）。省略時は公開試験ベクトルを使います",
     )
+    parser.add_argument("--product-package", type=Path)
+    parser.add_argument("--acceptance-output-dir", type=Path)
     args = parser.parse_args()
+    if (args.product_package is None) != (args.acceptance_output_dir is None):
+        parser.error("--product-packageと--acceptance-output-dirは同時に指定してください")
     print(
         json.dumps(
-            write_fixture(args.private_key),
+            write_fixture(args.private_key)
+            if args.product_package is None
+            else write_product_acceptance_catalog(
+                args.product_package,
+                args.acceptance_output_dir,
+                args.private_key,
+            ),
             ensure_ascii=False,
             separators=(",", ":"),
         )

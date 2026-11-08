@@ -7188,6 +7188,39 @@ def test_rust_helper_does_not_expose_hidden_authority_paths() -> list[str]:
     errors = []
     for path in sorted((RUST_HELPER / "src").rglob("*.rs")):
         text = path.read_text(encoding="utf-8").split("#[cfg(test)]", 1)[0]
+        scan_text = text
+        if path.as_posix().endswith(
+            "native/rust_helper/src/broker/update_download.rs"
+        ):
+            test_ca = re.search(
+                r'(?ms)^#\[cfg\(feature = "r2-e2e"\)\]\n'
+                r"fn r2_e2e_update_roots\(.*?^\}",
+                text,
+            )
+            if test_ca is None:
+                errors.append("update downloadのtest CA読込がr2-e2e専用境界にない")
+            else:
+                bounded_test_ca = re.sub(r"\s+", "", test_ca.group(0))
+                required_test_ca = (
+                    "ifhost!=R2_E2E_UPDATE_HOST{returnOk(Vec::new());}",
+                    "std::env::var_os(R2_E2E_UPDATE_CA_ENV)",
+                    "path.is_absolute()",
+                    "std::fs::symlink_metadata(&path)",
+                    "!metadata.is_file()",
+                    "metadata.file_type().is_symlink()",
+                    "metadata.len()==0",
+                    "metadata.len()>16*1024",
+                    "Certificate::from_pem(&pem)",
+                    "Ok(vec![certificate])",
+                )
+                for token in required_test_ca:
+                    if token not in bounded_test_ca:
+                        errors.append(
+                            f"r2-e2e test CA読込の限定条件がない: {token}"
+                        )
+                if bounded_test_ca.count("std::fs::read(") != 1:
+                    errors.append("r2-e2e test CA読込のfile readが一意でない")
+                scan_text = text[: test_ca.start()] + text[test_ca.end() :]
         for pattern in forbidden:
             if pattern == "reqwest::" and path.as_posix().endswith(
                 (
@@ -7197,11 +7230,11 @@ def test_rust_helper_does_not_expose_hidden_authority_paths() -> list[str]:
                 )
             ):
                 if path.name != "update_download.rs" and "reqwest::" in re.sub(
-                    r"reqwest::Url::parse", "", text
+                    r"reqwest::Url::parse", "", scan_text
                 ):
                     errors.append(f"{path} はURL解析以外のreqwest経路を追加した")
                 continue
-            if pattern in text:
+            if pattern in scan_text:
                 errors.append(f"{path} が禁止されたhelper authority patternを使う: {pattern}")
     return errors
 
@@ -7233,10 +7266,13 @@ def test_update_download_transport_is_broker_owned_and_bounded() -> list[str]:
         "PackageDisposition::RepairedCorrupt",
         ".rename(temporary_name, directory, final_name)",
         "fn package_entry_is_replaceable(",
-        "build_download_client(host, &addresses, &[], MAX_DOWNLOAD_TIME)?",
+        "build_update_download_client(host, &addresses, MAX_DOWNLOAD_TIME)?",
         "let remaining = deadline.saturating_duration_since(std::time::Instant::now());",
         "if remaining.is_zero()",
-        "build_download_client(host, &addresses, &[], remaining)?",
+        "build_update_download_client(host, &addresses, remaining)?",
+        "#[cfg(not(feature = \"r2-e2e\"))]",
+        "let additional_roots: Vec<Certificate> = Vec::new();",
+        "build_download_client(host, addresses, &additional_roots, timeout)",
     )
     errors = [
         f"Broker download transportの必須境界がない: {token}"

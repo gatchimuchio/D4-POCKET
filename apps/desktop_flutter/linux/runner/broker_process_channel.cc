@@ -32,6 +32,7 @@ const char* const kR2E2eEnvironmentNames[] = {
     "GUI_SHELL_R2_E2E_RESPONSES_PORT",
     "GUI_SHELL_R2_E2E_CODEX_HOME",
     "GUI_SHELL_R2_E2E_TASK_EXECUTION_LIMIT_MS",
+    "GUI_SHELL_R2_E2E_UPDATE_CA_PEM",
 };
 #if defined(D4_LINUX_R2_E2E_TEST_BUILD)
 std::map<std::string, std::string> r2_e2e_environment;
@@ -804,6 +805,7 @@ class BrokerContext {
         "GUI_SHELL_R2_E2E_RESPONSES_PORT",
         "GUI_SHELL_R2_E2E_CODEX_HOME",
         "GUI_SHELL_R2_E2E_TASK_EXECUTION_LIMIT_MS",
+        "GUI_SHELL_R2_E2E_UPDATE_CA_PEM",
 #endif
         nullptr};
     gchar** environment = g_new0(gchar*, G_N_ELEMENTS(allowed_environment));

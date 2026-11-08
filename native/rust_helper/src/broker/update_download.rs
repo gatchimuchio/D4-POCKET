@@ -29,6 +29,11 @@ const DNS_RESOLUTION_TIMEOUT: Duration = Duration::from_secs(15);
 const COPY_BUFFER_BYTES: usize = 64 * 1024;
 const PROGRESS_QUANTUM_BYTES: u64 = 4 * 1024 * 1024;
 
+#[cfg(feature = "r2-e2e")]
+const R2_E2E_UPDATE_HOST: &str = "updates.d4p-test.example";
+#[cfg(feature = "r2-e2e")]
+const R2_E2E_UPDATE_CA_ENV: &str = "GUI_SHELL_R2_E2E_UPDATE_CA_PEM";
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct DownloadedPackage {
     pub(crate) file_name: String,
@@ -259,7 +264,7 @@ where
     }
     let host = url.host_str().ok_or(DownloadError::InvalidRequest)?;
     let addresses = resolve_public_addresses(host, 443, cancel, deadline)?;
-    let client = build_download_client(host, &addresses, &[], MAX_DOWNLOAD_TIME)?;
+    let client = build_update_download_client(host, &addresses, MAX_DOWNLOAD_TIME)?;
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -306,7 +311,7 @@ pub(crate) fn fetch_update_catalog(
         return Err(DownloadError::TimedOut);
     }
     super::update_center::set_catalog_panic_stage(9);
-    let client = build_download_client(host, &addresses, &[], remaining)?;
+    let client = build_update_download_client(host, &addresses, remaining)?;
     super::update_center::set_catalog_panic_stage(10);
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -372,6 +377,41 @@ fn build_download_client(
         builder = builder.add_root_certificate(certificate.clone());
     }
     builder.build().map_err(|_| DownloadError::Network)
+}
+
+fn build_update_download_client(
+    host: &str,
+    addresses: &[SocketAddr],
+    timeout: Duration,
+) -> Result<Client, DownloadError> {
+    #[cfg(feature = "r2-e2e")]
+    let additional_roots = r2_e2e_update_roots(host)?;
+    #[cfg(not(feature = "r2-e2e"))]
+    let additional_roots: Vec<Certificate> = Vec::new();
+    build_download_client(host, addresses, &additional_roots, timeout)
+}
+
+#[cfg(feature = "r2-e2e")]
+fn r2_e2e_update_roots(host: &str) -> Result<Vec<Certificate>, DownloadError> {
+    if host != R2_E2E_UPDATE_HOST {
+        return Ok(Vec::new());
+    }
+    let path = std::env::var_os(R2_E2E_UPDATE_CA_ENV)
+        .filter(|value| !value.is_empty())
+        .map(std::path::PathBuf::from)
+        .filter(|path| path.is_absolute())
+        .ok_or(DownloadError::Network)?;
+    let metadata = std::fs::symlink_metadata(&path).map_err(|_| DownloadError::Network)?;
+    if !metadata.is_file()
+        || metadata.file_type().is_symlink()
+        || metadata.len() == 0
+        || metadata.len() > 16 * 1024
+    {
+        return Err(DownloadError::Network);
+    }
+    let pem = std::fs::read(path).map_err(|_| DownloadError::Network)?;
+    let certificate = Certificate::from_pem(&pem).map_err(|_| DownloadError::Network)?;
+    Ok(vec![certificate])
 }
 
 async fn receive_bounded_document(
@@ -753,6 +793,10 @@ fn resolve_public_addresses(
     if std::time::Instant::now() >= deadline {
         return Err(DownloadError::TimedOut);
     }
+    #[cfg(feature = "r2-e2e")]
+    if let Some(address) = r2_e2e_update_address(host, port) {
+        return Ok(vec![address]);
+    }
     let resolved = if let Ok(address) = host.parse::<IpAddr>() {
         vec![SocketAddr::new(address, port)]
     } else {
@@ -786,6 +830,11 @@ fn resolve_public_addresses(
         return Err(DownloadError::NameResolution);
     }
     Ok(addresses.into_iter().collect())
+}
+
+#[cfg(feature = "r2-e2e")]
+fn r2_e2e_update_address(host: &str, port: u16) -> Option<SocketAddr> {
+    (host == R2_E2E_UPDATE_HOST && port == 443).then(|| SocketAddr::from(([127, 0, 0, 1], 443)))
 }
 
 fn is_public_address(address: IpAddr) -> bool {
@@ -885,6 +934,22 @@ mod tests {
                 is_public_address(address),
                 "unexpectedly blocked: {address}"
             );
+        }
+    }
+
+    #[cfg(feature = "r2-e2e")]
+    #[test]
+    fn acceptance_loopback_override_is_fixed_to_the_test_host_and_https_port() {
+        assert_eq!(
+            r2_e2e_update_address(R2_E2E_UPDATE_HOST, 443),
+            Some(SocketAddr::from(([127, 0, 0, 1], 443)))
+        );
+        for (host, port) in [
+            ("updates.example.com", 443),
+            (R2_E2E_UPDATE_HOST, 8443),
+            ("127.0.0.1", 443),
+        ] {
+            assert_eq!(r2_e2e_update_address(host, port), None);
         }
     }
 

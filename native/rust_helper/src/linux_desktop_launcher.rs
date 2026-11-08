@@ -44,6 +44,7 @@ const R2_E2E_FRONTEND_ENVIRONMENT_ALLOWLIST: &[&str] = &[
     "GUI_SHELL_R2_E2E_RESPONSES_PORT",
     "GUI_SHELL_R2_E2E_CODEX_HOME",
     "GUI_SHELL_R2_E2E_TASK_EXECUTION_LIMIT_MS",
+    "GUI_SHELL_R2_E2E_UPDATE_CA_PEM",
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -939,6 +940,10 @@ mod tests {
             (
                 OsString::from("GUI_SHELL_R2_E2E_TASK_EXECUTION_LIMIT_MS"),
                 OsString::from("25000"),
+            ),
+            (
+                OsString::from("GUI_SHELL_R2_E2E_UPDATE_CA_PEM"),
+                OsString::from("/tmp/d4p/update-test-ca.pem"),
             ),
         ]);
         assert!(selected.iter().any(|(name, value)| {

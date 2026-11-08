@@ -8,7 +8,7 @@ def verify_build_result() -> None:
     root = pathlib.Path(sys.argv[1])
     evidence = json.loads((root / "d4_pocket_linux_export_build.json").read_text())
     package = root / "D4Pocket-linux.d4pkg"
-    expected_test_build = sys.argv[3] in {"agent_task_supervision", "agent_task_crash_recovery", "provider_credential_binding"}
+    expected_test_build = sys.argv[3] in {"agent_task_supervision", "agent_task_crash_recovery", "provider_credential_binding", "debian_setup_lifecycle"}
     assert evidence["target_platform"] == "linux"
     assert evidence["source_commit"] == sys.argv[2]
     assert evidence["signed"] is False and evidence["formal_distribution_claimed"] is False
