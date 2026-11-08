@@ -73,6 +73,7 @@ RUST_AUDIT_TEST = (
 )
 
 if __package__:
+    from .linux_update_https_server import TEST_HOST as SAME_SOURCE_UPDATE_HOST
     from .linux_gtk_bundle_smoke import (
         _capture_weston_frame,
         _different_pixel_count,
@@ -82,6 +83,7 @@ if __package__:
         _terminate_group,
     )
 else:
+    from linux_update_https_server import TEST_HOST as SAME_SOURCE_UPDATE_HOST
     from linux_gtk_bundle_smoke import (
         _capture_weston_frame,
         _different_pixel_count,
@@ -104,6 +106,10 @@ def _processes_using(executables: set[Path]) -> set[int]:
         if running in executables:
             found.add(int(entry.name))
     return found
+
+
+def _update_source_host(same_source_candidate: bool) -> str:
+    return SAME_SOURCE_UPDATE_HOST if same_source_candidate else "raw.githubusercontent.com"
 
 
 def _linux_broker_process_role(arguments: list[bytes]) -> str | None:
@@ -7514,9 +7520,7 @@ def _installed_update_download_stage_activate(
         "Linux製品の署名検査済み更新packageを取得しますか？",
         f"更新ID: {UPDATE_ID}",
         f"提供版: {UPDATE_VERSION}",
-        "取得host: updates.d4p-test.example"
-        if acceptance_product_candidate
-        else "取得host: raw.githubusercontent.com",
+        f"取得host: {_update_source_host(acceptance_product_candidate)}",
         package_hash,
         str(len(package_bytes)),
     )
@@ -9082,7 +9086,7 @@ def run_installed_smoke(
                 "Linux製品の署名検査済み更新packageを取得しますか？",
                 f"更新ID: {FIRST_INSTALL_UPDATE_ID}",
                 f"提供版: {product_version}",
-                "取得host: raw.githubusercontent.com",
+                f"取得host: {_update_source_host(update_candidate_package is not None)}",
                 package_hash,
                 str(len(package_bytes)),
             )
@@ -10073,9 +10077,7 @@ def run_installed_smoke(
                 catalog_evidence = _trigger_catalog_fetch_from_installed_ui(
                     environment,
                     window_id,
-                    "updates.d4p-test.example"
-                    if update_candidate_package is not None
-                    else "raw.githubusercontent.com",
+                    _update_source_host(update_candidate_package is not None),
                 )
             except RuntimeError as error:
                 diagnostics = _catalog_failure_diagnostics(
