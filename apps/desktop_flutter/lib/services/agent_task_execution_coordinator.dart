@@ -1,0 +1,220 @@
+import 'dart:async';
+import 'dart:collection';
+
+import 'agent_mcp_task_controller.dart';
+import 'agent_task_client.dart';
+import 'broker_client.dart' show BrokerClientException, BrokerTransport;
+import 'mcp_connection_client.dart';
+
+typedef AgentTaskExecutionUpdateHandler = FutureOr<void> Function(
+    AgentTaskExecutionUpdate update);
+
+/// A view-neutral consumer for completed Agent Tasks and MCP continuation.
+///
+/// The application creates one coordinator above its screens. Views may observe
+/// updates, but disposing or switching a view does not own or stop the run.
+/// Permission, Approval, native Owner confirmation, Tool execution and Audit
+/// remain Broker operations.
+class AgentTaskExecutionCoordinator {
+  AgentTaskExecutionCoordinator(this._transport);
+
+  static const _maximumRememberedTaskIds = 2048;
+  static const _maximumMonitorDuration = Duration(minutes: 16);
+
+  final BrokerTransport _transport;
+  final LinkedHashSet<String> _rememberedTaskIds = LinkedHashSet<String>();
+  final Map<String, _TaskRun> _runs = {};
+  final Map<String, String> _currentTaskBySession = {};
+  bool _disposed = false;
+
+  /// Starts observation of a Broker Task and, when requested by the Agent,
+  /// consumes its MCP request and starts the result-dependent follow-up Task.
+  /// The returned Future ends after a terminal Task or after the continuation
+  /// has started. A follow-up Task is monitored independently in the background.
+  Future<void> observeStartedTask({
+    required AgentTaskRequest request,
+    required AgentTaskRecord task,
+    required AgentTaskExecutionUpdateHandler onUpdate,
+    bool allowMcpContinuation = true,
+  }) async {
+    if (_disposed || !_remember(task.taskId)) return;
+    final priorTaskId = _currentTaskBySession[request.sessionId];
+    if (priorTaskId != null && priorTaskId != task.taskId) {
+      _runs[priorTaskId]?.active = false;
+    }
+    _currentTaskBySession[request.sessionId] = task.taskId;
+    final run = _TaskRun(
+      request: request,
+      initialTask: task,
+      allowMcpContinuation: allowMcpContinuation,
+      onUpdate: onUpdate,
+    );
+    _runs[task.taskId] = run;
+    try {
+      await _monitor(run);
+    } finally {
+      if (identical(_runs[task.taskId], run)) _runs.remove(task.taskId);
+    }
+  }
+
+  /// Stops this application's observation. It does not issue a Task cancel;
+  /// Broker process supervision owns execution shutdown and recovery.
+  void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    for (final run in _runs.values) {
+      run.active = false;
+    }
+    _runs.clear();
+    _currentTaskBySession.clear();
+  }
+
+  bool _remember(String taskId) {
+    if (_rememberedTaskIds.contains(taskId)) return false;
+    if (_rememberedTaskIds.length >= _maximumRememberedTaskIds) {
+      _rememberedTaskIds.remove(_rememberedTaskIds.first);
+    }
+    _rememberedTaskIds.add(taskId);
+    return true;
+  }
+
+  bool _isCurrent(_TaskRun run) =>
+      !_disposed &&
+      run.active &&
+      _currentTaskBySession[run.request.sessionId] == run.initialTask.taskId &&
+      identical(_runs[run.initialTask.taskId], run);
+
+  Future<void> _monitor(_TaskRun run) async {
+    var current = run.initialTask;
+    await _emit(run, task: current);
+    if (!_isCurrent(run)) return;
+
+    if (const {'pending', 'running'}.contains(current.status)) {
+      final started = DateTime.now();
+      var delay = const Duration(seconds: 2);
+      while (_isCurrent(run) &&
+          DateTime.now().difference(started) < _maximumMonitorDuration &&
+          const {'pending', 'running'}.contains(current.status)) {
+        await Future<void>.delayed(delay);
+        if (!_isCurrent(run)) return;
+        try {
+          current = await AgentTaskClient(_transport).state(current.taskId);
+          await _emit(run, task: current);
+        } on Object catch (error) {
+          await _emit(run, message: _errorMessage(error));
+        }
+        if (!_isCurrent(run)) return;
+        if (const {'pending', 'running'}.contains(current.status)) {
+          final elapsed = DateTime.now().difference(started);
+          delay = elapsed < const Duration(seconds: 12)
+              ? const Duration(seconds: 2)
+              : elapsed < const Duration(minutes: 1)
+                  ? const Duration(seconds: 5)
+                  : const Duration(seconds: 15);
+        }
+      }
+      if (const {'pending', 'running'}.contains(current.status)) {
+        await _emit(
+          run,
+          error: '自動監視の上限時間を過ぎました。Broker Taskは保持されています。',
+        );
+        return;
+      }
+    }
+
+    if (current.status != 'completed' ||
+        !run.allowMcpContinuation ||
+        run.request.mcpCapabilitySnapshotHash == null ||
+        !_isCurrent(run)) {
+      return;
+    }
+
+    await _continueAfterTask(run, current);
+  }
+
+  Future<void> _continueAfterTask(
+    _TaskRun run,
+    AgentTaskRecord sourceTask,
+  ) async {
+    try {
+      final outcome = await AgentMcpTaskController(
+        tasks: AgentTaskClient(_transport),
+        mcp: McpConnectionClient(_transport),
+      ).continueAfter(
+        sourceRequest: run.request,
+        sourceTask: sourceTask,
+        isCurrent: () => _isCurrent(run),
+        onUpdate: (update) => _emit(run, mcpUpdate: update),
+      );
+      if (!_isCurrent(run)) return;
+      final followup = outcome.followupTask;
+      final followupRequest = outcome.followupRequest;
+      if (followup == null || followupRequest == null) return;
+      unawaited(
+        observeStartedTask(
+          request: followupRequest,
+          task: followup,
+          allowMcpContinuation: false,
+          onUpdate: run.onUpdate,
+        ),
+      );
+    } on Object catch (error) {
+      await _emit(run, error: _errorMessage(error));
+    }
+  }
+
+  Future<void> _emit(
+    _TaskRun run, {
+    AgentTaskRecord? task,
+    AgentMcpTaskUpdate? mcpUpdate,
+    String? message,
+    String? error,
+  }) async {
+    if (!_isCurrent(run)) return;
+    try {
+      await run.onUpdate(
+        AgentTaskExecutionUpdate(
+          task: task,
+          mcpUpdate: mcpUpdate,
+          message: message,
+          error: error,
+        ),
+      );
+    } on Object {
+      // A detached or failed view observer must not own execution progression.
+    }
+  }
+
+  static String _errorMessage(Object error) => error is BrokerClientException
+      ? error.message
+      : 'Broker Taskの自動処理に失敗しました。安全のため自動再送はしていません。';
+}
+
+class AgentTaskExecutionUpdate {
+  const AgentTaskExecutionUpdate({
+    this.task,
+    this.mcpUpdate,
+    this.message,
+    this.error,
+  });
+
+  final AgentTaskRecord? task;
+  final AgentMcpTaskUpdate? mcpUpdate;
+  final String? message;
+  final String? error;
+}
+
+class _TaskRun {
+  _TaskRun({
+    required this.request,
+    required this.initialTask,
+    required this.allowMcpContinuation,
+    required this.onUpdate,
+  });
+
+  final AgentTaskRequest request;
+  final AgentTaskRecord initialTask;
+  final bool allowMcpContinuation;
+  final AgentTaskExecutionUpdateHandler onUpdate;
+  bool active = true;
+}

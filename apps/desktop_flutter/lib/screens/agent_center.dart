@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart'
 import '../models/generated_contracts.dart';
 import '../services/agent_task_client.dart';
 import '../services/agent_mcp_task_controller.dart';
+import '../services/agent_task_execution_coordinator.dart';
 import '../services/agent_handoff.dart';
 import '../services/broker_client.dart'
     show BrokerClientException, BrokerTransport, brokerPayloadHash;
@@ -25,10 +26,16 @@ import 'shared.dart';
 import 'workspace_inspector.dart';
 
 class AgentCenter extends StatefulWidget {
-  const AgentCenter({super.key, required this.client, this.active = true});
+  const AgentCenter({
+    super.key,
+    required this.client,
+    this.active = true,
+    this.taskExecutionCoordinator,
+  });
 
   final ShellCoreClient client;
   final bool active;
+  final AgentTaskExecutionCoordinator? taskExecutionCoordinator;
 
   @override
   State<AgentCenter> createState() => _AgentCenterState();
@@ -66,32 +73,6 @@ class _AgentTaskUiState {
   String? refreshError;
   String? mcpContinuationStatus;
   String? mcpFollowupTaskId;
-  bool mcpContinuationStarted = false;
-  final Set<String> monitoredTaskIds = {};
-  Timer? monitorTimer;
-  Completer<void>? monitorDelayCompleter;
-
-  Future<void> waitForMonitorDelay(Duration delay) {
-    cancelMonitorDelay();
-    final completer = Completer<void>();
-    monitorDelayCompleter = completer;
-    monitorTimer = Timer(delay, () {
-      if (identical(monitorDelayCompleter, completer)) {
-        monitorTimer = null;
-        monitorDelayCompleter = null;
-      }
-      if (!completer.isCompleted) completer.complete();
-    });
-    return completer.future;
-  }
-
-  void cancelMonitorDelay() {
-    monitorTimer?.cancel();
-    monitorTimer = null;
-    final completer = monitorDelayCompleter;
-    monitorDelayCompleter = null;
-    if (completer != null && !completer.isCompleted) completer.complete();
-  }
 }
 
 class _AgentTaskDraft {
@@ -162,6 +143,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
   AgentHandoffPackage? _handoffPreview;
   late List<AgentSessionRecord> _sessions;
   final List<_CodexRegistrationInput> _registrations = [];
+  AgentTaskExecutionCoordinator? _ownedTaskExecutionCoordinator;
 
   _CodexRegistrationInput? get _registered =>
       _registrations.isEmpty ? null : _registrations.last;
@@ -170,6 +152,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _createOwnedTaskExecutionCoordinator();
     final snapshot = widget.client.getSnapshot();
     _sessions = widget.client.mode == 'broker'
         ? List<AgentSessionRecord>.of(snapshot.agentSessions)
@@ -189,11 +172,10 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
   @override
   void dispose() {
     _clearAllResultProjections();
-    for (final task in _agentTasks.values) {
-      task.cancelMonitorDelay();
-    }
     _agentTasks.clear();
     _taskPreflightStatus.clear();
+    _ownedTaskExecutionCoordinator?.dispose();
+    _ownedTaskExecutionCoordinator = null;
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -208,8 +190,22 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
   @override
   void didUpdateWidget(covariant AgentCenter oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.taskExecutionCoordinator != widget.taskExecutionCoordinator ||
+        oldWidget.client.brokerTransport != widget.client.brokerTransport) {
+      _ownedTaskExecutionCoordinator?.dispose();
+      _ownedTaskExecutionCoordinator = null;
+      _createOwnedTaskExecutionCoordinator();
+    }
     if (oldWidget.active != widget.active && !widget.active) {
       _clearAllResultProjections();
+    }
+  }
+
+  void _createOwnedTaskExecutionCoordinator() {
+    if (widget.taskExecutionCoordinator != null) return;
+    final transport = widget.client.brokerTransport;
+    if (transport != null) {
+      _ownedTaskExecutionCoordinator = AgentTaskExecutionCoordinator(transport);
     }
   }
 
@@ -1172,246 +1168,106 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
         !const {'pending', 'running', 'completed'}.contains(task.status)) {
       return;
     }
-    unawaited(
-      _monitorAgentTask(
-        session,
-        state,
-        task,
-        allowMcpContinuation:
-            state.mcpCapabilitySnapshotHash != null &&
-            !state.mcpContinuationStarted,
-      ),
+    _observeAgentTask(
+      session,
+      state,
+      state.lastStartedRequest ?? state.originalRequest,
+      task,
+      allowMcpContinuation: state.mcpCapabilitySnapshotHash != null,
     );
   }
 
-  Future<void> _monitorAgentTask(
+  void _observeAgentTask(
     AgentSessionRecord session,
     _AgentTaskUiState state,
+    AgentTaskRequest request,
     AgentTaskRecord initialTask, {
     required bool allowMcpContinuation,
-  }) async {
-    final taskId = initialTask.taskId;
-    if (!state.monitoredTaskIds.add(taskId)) return;
-    final transport = widget.client.brokerTransport;
-    if (transport == null) return;
-
-    if (initialTask.status == 'completed') {
-      if (allowMcpContinuation && !state.mcpContinuationStarted) {
-        state.mcpContinuationStarted = true;
-        await _runAgentMcpContinuation(session, state, initialTask);
-      }
-      return;
-    }
-    if (!const {'pending', 'running'}.contains(initialTask.status)) return;
-
-    final deadline = DateTime.now().add(const Duration(minutes: 16));
-    final monitorStarted = DateTime.now();
-    var delay = const Duration(seconds: 2);
-    while (mounted && DateTime.now().isBefore(deadline)) {
-      await state.waitForMonitorDelay(delay);
-      if (!mounted ||
-          !identical(_agentTasks[session.sessionId], state) ||
-          state.record?.taskId != taskId ||
-          !_sessionStillMatchesRegistration(session)) {
-        return;
-      }
-      if (!const {'pending', 'running'}.contains(state.record?.status)) {
-        final currentTask = state.record;
-        if (allowMcpContinuation &&
-            currentTask?.status == 'completed' &&
-            !state.mcpContinuationStarted) {
-          state.mcpContinuationStarted = true;
-          await _runAgentMcpContinuation(session, state, currentTask!);
-        }
-        return;
-      }
-      if (_taskPreflightSession != null) continue;
-
-      setState(() {
-        _taskPreflightSession = session.sessionId;
-        _taskPreflightStatus[session.sessionId] =
-            'Broker Task状態を自動確認中です（Task操作ボタンは不要です）。';
-      });
-      try {
-        final updated = await AgentTaskClient(transport).state(taskId);
-        if (!mounted ||
-            !identical(_agentTasks[session.sessionId], state) ||
-            state.record?.taskId != taskId) {
-          return;
-        }
-        setState(() {
-          state.record = updated;
-          state.refreshError = null;
-          _taskPreflightStatus[session.sessionId] =
-              'Broker Task状態: ${updated.status}。';
-        });
-      } on Object catch (error) {
-        if (mounted && identical(_agentTasks[session.sessionId], state)) {
-          final message = error is BrokerClientException
-              ? error.message
-              : 'Broker Task状態を確認できません。';
-          setState(() {
-            state.refreshError = message;
-            _taskPreflightStatus[session.sessionId] = message;
-          });
-        }
-      } finally {
-        if (mounted && _taskPreflightSession == session.sessionId) {
-          setState(() => _taskPreflightSession = null);
-        }
-      }
-
-      final updated = state.record;
-      if (updated == null || updated.taskId != taskId) return;
-      if (!const {'pending', 'running'}.contains(updated.status)) {
-        if (allowMcpContinuation &&
-            updated.status == 'completed' &&
-            !state.mcpContinuationStarted) {
-          state.mcpContinuationStarted = true;
-          await _runAgentMcpContinuation(session, state, updated);
-        }
-        return;
-      }
-      final elapsed = DateTime.now().difference(monitorStarted);
-      delay = elapsed < const Duration(seconds: 12)
-          ? const Duration(seconds: 2)
-          : elapsed < const Duration(minutes: 1)
-          ? const Duration(seconds: 5)
-          : const Duration(seconds: 15);
-    }
-    if (mounted && identical(_agentTasks[session.sessionId], state)) {
-      setState(() {
-        state.refreshError = '自動監視の上限時間を過ぎました。Task状態を手動更新してください。';
-        _taskPreflightStatus[session.sessionId] = state.refreshError!;
-      });
-    }
-  }
-
-  Future<void> _runAgentMcpContinuation(
-    AgentSessionRecord session,
-    _AgentTaskUiState state,
-    AgentTaskRecord sourceTask,
-  ) async {
-    final transport = widget.client.brokerTransport;
-    if (transport == null ||
-        state.mcpCapabilitySnapshotHash == null ||
-        !identical(_agentTasks[session.sessionId], state)) {
-      return;
-    }
-    final sourceRequest = state.lastStartedRequest ?? state.originalRequest;
-    state.mcpSourceTaskRecord = sourceTask;
-    setState(() {
-      _taskPreflightSession = session.sessionId;
-      state.mcpContinuationStatus = '結果依存MCP処理を開始します。';
-      _taskPreflightStatus[session.sessionId] = state.mcpContinuationStatus!;
-    });
-    try {
-      final controller = AgentMcpTaskController(
-        tasks: AgentTaskClient(transport),
-        mcp: McpConnectionClient(transport),
-      );
-      final outcome = await controller.continueAfter(
-        sourceRequest: sourceRequest,
-        sourceTask: sourceTask,
-        isCurrent: () =>
-            mounted &&
-            identical(_agentTasks[session.sessionId], state) &&
-            state.record?.taskId == sourceTask.taskId &&
-            _sessionStillMatchesRegistration(session),
-        waitForOwnerReview: () async {
-          while (mounted &&
-              identical(_agentTasks[session.sessionId], state) &&
-              state.record?.taskId == sourceTask.taskId &&
-              _sessionStillMatchesRegistration(session) &&
-              !_appActive) {
-            await Future<void>.delayed(const Duration(seconds: 1));
-          }
+  }) {
+    final coordinator = widget.taskExecutionCoordinator ??
+        _ownedTaskExecutionCoordinator;
+    if (coordinator == null) return;
+    if (allowMcpContinuation) state.mcpSourceTaskRecord = initialTask;
+    unawaited(
+      coordinator.observeStartedTask(
+        request: request,
+        task: initialTask,
+        allowMcpContinuation: allowMcpContinuation,
+        onUpdate: (update) async {
           if (!mounted ||
               !identical(_agentTasks[session.sessionId], state) ||
-              state.record?.taskId != sourceTask.taskId ||
-              !_appActive ||
-              !_sessionStillMatchesRegistration(session)) {
-            throw const BrokerClientException(
-              'native Owner確認の前にアプリまたはAgent Sessionが失効しました',
-            );
-          }
-        },
-        onUpdate: (update) async {
-          if (!mounted || !identical(_agentTasks[session.sessionId], state)) {
+              (state.record?.taskId != null &&
+                  state.record!.taskId != initialTask.taskId &&
+                  state.record!.taskId != state.mcpFollowupTaskId)) {
             return;
           }
           setState(() {
-            state.mcpContinuationStatus = update.message;
-            _taskPreflightStatus[session.sessionId] = update.message;
-            if (update.projection case final projection?) {
-              state.resultProjection = projection;
-              _resultClearTimer?.cancel();
-              _resultClearTimer = Timer(const Duration(minutes: 5), () {
-                if (!mounted) return;
-                _clearAllResultProjections();
-                setState(() {
-                  state.mcpContinuationStatus = '結果本文の表示期限を過ぎたため消去しました。';
-                  _taskPreflightStatus[session.sessionId] =
-                      state.mcpContinuationStatus!;
-                });
-              });
-            }
-            if (update.toolReceipt case final receipt?) {
-              state.mcpToolCallReceipt = receipt;
-              state.incomingMcpResult = receipt.agentResultContext;
-            }
-            if (update.followupRequest case final request?) {
-              state.request = request;
-            }
-            if (update.followupPreflight case final preflight?) {
-              state.permissionStatus = preflight.permissionStatus;
-              state.approvalStatus = preflight.approvalStatus;
-            }
-            if (update.stage == AgentMcpTaskStage.workspacePermissionGranted) {
-              state.permissionStatus = '新規発行済み';
-            }
-            if (update.stage == AgentMcpTaskStage.taskOwnerApprovalGranted) {
-              state.approvalStatus = '新規発行済み';
-            }
-            if (update.followupTask case final task?) {
-              state.mcpSourceTaskRecord = sourceTask;
-              state.lastStartedRequest = update.followupRequest;
-              state.mcpFollowupTaskId = task.taskId;
+            if (update.task case final task?) {
               state.record = task;
-              state.request = null;
-              state.permissionStatus = 'Task開始時に一回消費';
-              state.approvalStatus = 'Task開始時に一回消費';
-              state.terminalObservedAt = null;
+              if (const {'completed', 'failed', 'cancelled', 'quarantined'}
+                  .contains(task.status)) {
+                state.terminalObservedAt = DateTime.now();
+              }
+            }
+            if (update.mcpUpdate case final mcpUpdate?) {
+              state.mcpContinuationStatus = mcpUpdate.message;
+              _taskPreflightStatus[session.sessionId] = mcpUpdate.message;
+              if (mcpUpdate.projection case final projection?) {
+                state.resultProjection = projection;
+                _resultClearTimer?.cancel();
+                _resultClearTimer = Timer(const Duration(minutes: 5), () {
+                  if (!mounted) return;
+                  _clearAllResultProjections();
+                  setState(() {
+                    state.mcpContinuationStatus =
+                        '結果本文の表示期限を過ぎたため消去しました。';
+                    _taskPreflightStatus[session.sessionId] =
+                        state.mcpContinuationStatus!;
+                  });
+                });
+              }
+              if (mcpUpdate.toolReceipt case final receipt?) {
+                state.mcpToolCallReceipt = receipt;
+                state.incomingMcpResult = receipt.agentResultContext;
+              }
+              if (mcpUpdate.followupRequest case final followupRequest?) {
+                state.request = followupRequest;
+              }
+              if (mcpUpdate.followupPreflight case final preflight?) {
+                state.permissionStatus = preflight.permissionStatus;
+                state.approvalStatus = preflight.approvalStatus;
+              }
+              if (mcpUpdate.stage == AgentMcpTaskStage.workspacePermissionGranted) {
+                state.permissionStatus = '新規発行済み';
+              }
+              if (mcpUpdate.stage == AgentMcpTaskStage.taskOwnerApprovalGranted) {
+                state.approvalStatus = '新規発行済み';
+              }
+              if (mcpUpdate.followupTask case final task?) {
+                state.mcpFollowupTaskId = task.taskId;
+                state.lastStartedRequest = mcpUpdate.followupRequest;
+                state.record = task;
+                state.request = null;
+                state.permissionStatus = 'Task開始時に一回消費';
+                state.approvalStatus = 'Task開始時に一回消費';
+                state.terminalObservedAt = null;
+              }
+            }
+            if (update.message case final message?) {
+              state.mcpContinuationStatus = message;
+              _taskPreflightStatus[session.sessionId] = message;
+            }
+            if (update.error case final error?) {
+              state.mcpContinuationStatus = '停止: $error';
+              state.refreshError = error;
+              _taskPreflightStatus[session.sessionId] =
+                  state.mcpContinuationStatus!;
             }
           });
           await WidgetsBinding.instance.endOfFrame;
         },
-      );
-      if (!mounted || !identical(_agentTasks[session.sessionId], state)) return;
-      if (outcome.followupTask case final followup?) {
-        unawaited(
-          _monitorAgentTask(
-            session,
-            state,
-            followup,
-            allowMcpContinuation: false,
-          ),
-        );
-      }
-    } on Object catch (error) {
-      if (!mounted || !identical(_agentTasks[session.sessionId], state)) return;
-      final message = error is BrokerClientException
-          ? error.message
-          : '結果依存MCP処理を停止しました。自動再送はしていません。';
-      setState(() {
-        state.mcpContinuationStatus = '停止: $message';
-        _taskPreflightStatus[session.sessionId] = state.mcpContinuationStatus!;
-      });
-    } finally {
-      if (mounted && _taskPreflightSession == session.sessionId) {
-        setState(() => _taskPreflightSession = null);
-      }
-    }
+      ),
+    );
   }
 
   Future<void> _refreshAgentTask(AgentSessionRecord session) async {
@@ -1432,9 +1288,6 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     });
     try {
       state.record = await AgentTaskClient(transport).state(taskId);
-      if (!const {'pending', 'running'}.contains(state.record!.status)) {
-        state.cancelMonitorDelay();
-      }
       if (!mounted) return;
       setState(() {
         _taskPreflightStatus[session.sessionId] =

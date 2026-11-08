@@ -31,6 +31,7 @@ import 'screens/setup_doctor.dart';
 import 'screens/trust_center.dart';
 import 'services/runtime_resource_client.dart';
 import 'services/runtime_lifecycle_client.dart';
+import 'services/agent_task_execution_coordinator.dart';
 import 'services/evaluation_client.dart';
 import 'services/global_search_index.dart';
 import 'services/shell_core_client.dart';
@@ -260,17 +261,37 @@ class _ShellHomePageState extends State<ShellHomePage> {
   bool _trayWindowVisible = false;
   bool _trayRefreshInFlight = false;
   int _trayProjectionGeneration = 0;
+  AgentTaskExecutionCoordinator? _agentTaskExecutionCoordinator;
 
   @override
   void initState() {
     super.initState();
+    final transport = widget.client.brokerTransport;
+    if (transport != null) {
+      _agentTaskExecutionCoordinator = AgentTaskExecutionCoordinator(transport);
+    }
     _trayClient = WindowsTrayClient();
     unawaited(_initializeWindowsTray());
   }
 
   @override
+  void didUpdateWidget(covariant ShellHomePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(
+      oldWidget.client.brokerTransport,
+      widget.client.brokerTransport,
+    )) {
+      _agentTaskExecutionCoordinator?.dispose();
+      final transport = widget.client.brokerTransport;
+      _agentTaskExecutionCoordinator =
+          transport == null ? null : AgentTaskExecutionCoordinator(transport);
+    }
+  }
+
+  @override
   void dispose() {
     _trayRefreshTimer?.cancel();
+    _agentTaskExecutionCoordinator?.dispose();
     unawaited(_trayClient.dispose());
     super.dispose();
   }
@@ -408,7 +429,11 @@ class _ShellHomePageState extends State<ShellHomePage> {
             widget.runtimeLifecycleConnect ?? connectRuntimeLifecycleClient,
       ),
       AuthorityMap(client: widget.client),
-      AgentCenter(client: widget.client, active: selectedIndex == 5),
+      AgentCenter(
+        client: widget.client,
+        active: selectedIndex == 5,
+        taskExecutionCoordinator: _agentTaskExecutionCoordinator,
+      ),
       ApprovalCenter(client: widget.client),
       AuditViewer(client: widget.client),
       RecoveryCenter(client: widget.client),

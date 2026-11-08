@@ -161,7 +161,6 @@ class AgentMcpTaskController {
     required AgentTaskRequest sourceRequest,
     required AgentTaskRecord sourceTask,
     required bool Function() isCurrent,
-    required Future<void> Function() waitForOwnerReview,
     required FutureOr<void> Function(AgentMcpTaskUpdate update) onUpdate,
   }) async {
     sourceRequest.validate();
@@ -186,9 +185,9 @@ class AgentMcpTaskController {
         message: 'MCP要求の照合に必要なTask全文についてnative Owner確認を待っています。',
       ),
     );
-    await waitForOwnerReview();
     _requireCurrent(isCurrent);
     final exposure = await _tasks.grantResultExposure(sourceTask, 'full');
+    _requireCurrent(isCurrent);
     final projection = await _tasks.readResult(exposure);
     _requireCurrent(isCurrent);
     if (projection.taskId != sourceTask.taskId ||
@@ -253,7 +252,6 @@ class AgentMcpTaskController {
         message: 'Tool名とargumentsを表示しています。実行はnative Owner確認後だけです。',
       ),
     );
-    await waitForOwnerReview();
     _requireCurrent(isCurrent);
     final receipt = await _mcp.callTool(
       serverId: proposal.serverId,
@@ -333,7 +331,6 @@ class AgentMcpTaskController {
         message: '後続Task専用Workspace Permissionのnative Owner確認を待っています。',
       ),
     );
-    await waitForOwnerReview();
     _requireCurrent(isCurrent);
     await _tasks.grantWorkspacePermission(followupRequest);
     _requireCurrent(isCurrent);
@@ -353,7 +350,6 @@ class AgentMcpTaskController {
         message: '後続Task専用Owner Approvalのnative確認を待っています。',
       ),
     );
-    await waitForOwnerReview();
     _requireCurrent(isCurrent);
     await _tasks.grantOwnerApproval(followupRequest);
     _requireCurrent(isCurrent);

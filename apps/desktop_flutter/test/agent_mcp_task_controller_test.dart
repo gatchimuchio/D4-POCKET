@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -5,6 +6,7 @@ import 'package:gui_shell_ui/runtime_dialogue_client.dart'
     show BrokerClientException, BrokerTransport;
 
 import 'package:gui_shell_desktop/services/agent_mcp_task_controller.dart';
+import 'package:gui_shell_desktop/services/agent_task_execution_coordinator.dart';
 import 'package:gui_shell_desktop/services/agent_task_client.dart';
 import 'package:gui_shell_desktop/services/mcp_connection_client.dart';
 
@@ -86,7 +88,6 @@ void main() {
   test('結果→実Tool→新Permission/Approval→同Agent後続Taskを一回だけ接続する', () async {
     final transport = _FakeBrokerTransport(_successfulResponses());
     final updates = <AgentMcpTaskUpdate>[];
-    var ownerReviewWaits = 0;
     final controller = AgentMcpTaskController(
       tasks: AgentTaskClient(transport),
       mcp: McpConnectionClient(transport),
@@ -96,14 +97,12 @@ void main() {
       sourceRequest: _sourceRequest,
       sourceTask: _sourceTask,
       isCurrent: () => true,
-      waitForOwnerReview: () async => ownerReviewWaits++,
       onUpdate: updates.add,
     );
 
     expect(outcome.kind, AgentMcpTaskOutcomeKind.followupStarted);
     expect(outcome.toolReceipt?.auditId, 'audit-mcp-tool-call');
     expect(outcome.followupTask?.taskId, _followupTaskId);
-    expect(ownerReviewWaits, 4);
     expect(transport.operations, [
       'AgentTask結果表示承認',
       'AgentTask結果取得',
@@ -152,6 +151,71 @@ void main() {
     expect(followupInspection['payload'], isNot(contains('approval_id')));
   });
 
+  test('Agent Task継続は画面observerから独立してBroker経路を続行する', () async {
+    final transport = _FakeBrokerTransport(_successfulResponses());
+    final coordinator = AgentTaskExecutionCoordinator(transport);
+
+    await coordinator.observeStartedTask(
+      request: _sourceRequest,
+      task: _sourceTask,
+      onUpdate: (_) {},
+    );
+
+    expect(transport.operations, [
+      'AgentTask結果表示承認',
+      'AgentTask結果取得',
+      'MCP接続一覧',
+      'MCP Tool実行',
+      'Agent作業要求検査',
+      'AgentTaskWorkspacePermissionGrant',
+      'AgentTaskOwnerApprovalGrant',
+      'AgentTask実行',
+    ]);
+    expect(transport.requests.last['payload'],
+        containsPair('mcp_result_id', _resultId));
+    expect(transport.requests.last['payload'],
+        containsPair('mcp_result_hash', _contextHash));
+
+    coordinator.dispose();
+  });
+
+  test('同一SessionでTaskが置き換わると旧継続をBroker副作用前に止める', () async {
+    final resultGrantGate = Completer<void>();
+    final requestStarted = Completer<void>();
+    final transport = _FakeBrokerTransport(
+      _successfulResponses(),
+      blockedRequests: {'AgentTask結果表示承認': resultGrantGate},
+      requestStarted: requestStarted,
+    );
+    final coordinator = AgentTaskExecutionCoordinator(transport);
+    final oldRun = coordinator.observeStartedTask(
+      request: _sourceRequest,
+      task: _sourceTask,
+      onUpdate: (_) {},
+    );
+    await requestStarted.future.timeout(const Duration(seconds: 1));
+
+    await coordinator.observeStartedTask(
+      request: _sourceRequest,
+      task: const AgentTaskRecord(
+        taskId: _followupTaskId,
+        runtimeId: 'codex-local',
+        sessionId: _session,
+        workspaceId: 'workspace-local',
+        instructionHash: _instructionHash,
+        status: 'completed',
+        auditEventId: 'audit-new-current-task',
+      ),
+      allowMcpContinuation: false,
+      onUpdate: (_) {},
+    );
+    resultGrantGate.complete();
+    await oldRun;
+
+    expect(transport.operations, ['AgentTask結果表示承認']);
+    coordinator.dispose();
+  });
+
   test('通常のTask結果ではMCPやPermission/Approvalを要求しない', () async {
     final responses = _successfulResponses(resultText: 'Task完了しました。');
     responses.removeRange(2, responses.length);
@@ -165,7 +229,6 @@ void main() {
       sourceRequest: _sourceRequest,
       sourceTask: _sourceTask,
       isCurrent: () => true,
-      waitForOwnerReview: () async {},
       onUpdate: (_) {},
     );
 
@@ -188,7 +251,6 @@ void main() {
         sourceRequest: _sourceRequest,
         sourceTask: _sourceTask,
         isCurrent: () => true,
-        waitForOwnerReview: () async {},
         onUpdate: (_) {},
       ),
       throwsA(isA<BrokerClientException>()),
@@ -220,7 +282,6 @@ void main() {
       sourceRequest: _sourceRequest,
       sourceTask: _sourceTask,
       isCurrent: () => true,
-      waitForOwnerReview: () async {},
       onUpdate: (_) {},
     );
 
@@ -247,7 +308,6 @@ void main() {
         sourceRequest: _sourceRequest,
         sourceTask: _sourceTask,
         isCurrent: () => true,
-        waitForOwnerReview: () async {},
         onUpdate: (_) {},
       ),
       throwsA(isA<BrokerClientException>()),
@@ -274,7 +334,6 @@ void main() {
         sourceRequest: _sourceRequest,
         sourceTask: _sourceTask,
         isCurrent: () => true,
-        waitForOwnerReview: () async {},
         onUpdate: (_) {},
       ),
       throwsA(isA<BrokerClientException>()),
@@ -300,7 +359,6 @@ void main() {
         sourceRequest: _sourceRequest,
         sourceTask: _sourceTask,
         isCurrent: () => false,
-        waitForOwnerReview: () async {},
         onUpdate: (_) {},
       ),
       throwsA(isA<BrokerClientException>()),
@@ -326,7 +384,6 @@ void main() {
         sourceRequest: _sourceRequest,
         sourceTask: _sourceTask,
         isCurrent: () => current,
-        waitForOwnerReview: () async {},
         onUpdate: (_) {},
       ),
       throwsA(isA<BrokerClientException>()),
@@ -533,10 +590,17 @@ Map<String, Object?> _accepted(
     };
 
 class _FakeBrokerTransport implements BrokerTransport {
-  _FakeBrokerTransport(this.responses, {this.afterRequest});
+  _FakeBrokerTransport(
+    this.responses, {
+    this.afterRequest,
+    this.blockedRequests = const {},
+    this.requestStarted,
+  });
 
   final List<Map<String, Object?>> responses;
   final void Function(String operation)? afterRequest;
+  final Map<String, Completer<void>> blockedRequests;
+  final Completer<void>? requestStarted;
   final operations = <String>[];
   final requests = <Map<String, Object?>>[];
 
@@ -547,6 +611,10 @@ class _FakeBrokerTransport implements BrokerTransport {
   }) async {
     operations.add(operation);
     requests.add({'operation': operation, 'payload': payload});
+    final started = requestStarted;
+    if (started != null && !started.isCompleted) started.complete();
+    final blockedRequest = blockedRequests[operation];
+    if (blockedRequest != null) await blockedRequest.future;
     if (responses.isEmpty) throw StateError('No fake response for $operation');
     final response = responses.removeAt(0);
     afterRequest?.call(operation);

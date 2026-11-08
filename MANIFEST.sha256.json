@@ -208,7 +208,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
-      "sha256": "cc88dff19ff2b4ea3a4ce646f07d15767faaf3e1aa05ee2c2ff076a7f1139206"
+      "sha256": "e8e289ce132d8438c78cca2567423d3b197a471ba929d7ee55efa2b38122c820"
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
@@ -220,7 +220,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/agent_center.dart",
-      "sha256": "08916e0ac2d4cdc631d8275ce69af1fef2550a4ec59273a60488974894c6284c"
+      "sha256": "bd0da4b990e174c3278ebb79d9186a4fd6fc83f7c452e05cb00070c8c9b550ac"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/approval_center.dart",
@@ -336,7 +336,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/agent_mcp_task_controller.dart",
-      "sha256": "98abccadf68b93dc2fffe40841b22112480b41eebc76805745a8761527c4176e"
+      "sha256": "77077ac717ccd1faa6ff0e64392071f8f3d456e4d23ba1e244b0431166cdcefc"
     },
     {
       "path": "apps/desktop_flutter/lib/services/agent_task_client.dart",
@@ -616,7 +616,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/agent_mcp_task_controller_test.dart",
-      "sha256": "db94b9f238ad071e2ffdfbe6c14b47ce12b086b91c99d20cf30db464551e00a5"
+      "sha256": "9fe954fea50777c3a570077afd22a7a5eef88c6765305e50ee7ca469b8d29019"
     },
     {
       "path": "apps/desktop_flutter/test/agent_task_client_test.dart",
@@ -1396,7 +1396,7 @@
     },
     {
       "path": "docs/QE_2026-11-08/\u9032\u6357.md",
-      "sha256": "a95c28510a26b5b120c8f5ef29e33fd79fb783866f1725315e0b25126b50f60e"
+      "sha256": "7a9a763821b031cc4dadeea9b15fcd64b982b39bf741f49f6c8c79c916ac99be"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1680,7 +1680,7 @@
     },
     {
       "path": "docs/specs/mcp-contract.md",
-      "sha256": "d7dcb447d8f331859a7bb2f6cacd24e731069d68fa4075a9142e40d521534276"
+      "sha256": "8dcbc792e6c18dd583c7f538e827e1beb240cf1e70db143c0bf4543dabcc0eee"
     },
     {
       "path": "docs/specs/mobile-surface.md",
