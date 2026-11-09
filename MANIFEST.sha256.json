@@ -172,7 +172,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "7e54a44b96dd41353e85a46fe350e9db004562785ecb53047d737957abe74b12"
+      "sha256": "5b7f74d8ae416daec88bdf60bff3865eb9e476a2a1d6a950cadf3950b9cca270"
     },
     {
       "path": "SECURITY.md",
@@ -1420,7 +1420,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "effa3d8716b4ef0cc80923106e0040c4e9512bf30a8565f1efa9f8ba5b43ee1c"
+      "sha256": "76d34c913a8590bb88dedd1e148db7a3c26be245e435ed57b435723c4120df50"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1440,7 +1440,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "450226d71caf1ed06f068f11c3d5f28dc9b9bcfc8331495b99f7eeb0f054cafb"
+      "sha256": "544b2d9a960ec5aba14a1785bfe29a4952841a372e1d03d309d9cd274802fad8"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
