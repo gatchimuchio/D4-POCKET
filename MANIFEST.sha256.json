@@ -77,7 +77,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "0c3962312db994774565fe00cefca4b26f0443966d1be605fe8112f1aa13f22d"
+      "sha256": "dfb5cb8ec1017647d8122e4fc5dfca9cc932cfc65b8382f1964e20447a80a803"
     },
     {
       "path": ".github/workflows/linux-manual-export-build.yml",
@@ -1425,7 +1425,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "d21992694a71974567654fcbe258046db66b2af4b0a68bf388e00c2090348f99"
+      "sha256": "5d8dc560cb1db90afb0cff2a82300f92d3e0b98ccb043d02b8025fdab5bfcfe7"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -3924,6 +3924,10 @@
       "sha256": "25973c50c24139a655ec5278f928db8c3f0843dbe694ddfc3ba71ad46b9de116"
     },
     {
+      "path": "native/rust_helper/src/mcp_task_tool_stdio.rs",
+      "sha256": "c3a07f050e3cdd38730e4125324d3168ff7d0c6144c55c246617e97c5130759a"
+    },
+    {
       "path": "native/rust_helper/src/network.rs",
       "sha256": "17ce6a2eb2b2a77336954cf70ce31d559300292893d1f15c1492c8c03fb46a9d"
     },
@@ -3985,7 +3989,7 @@
     },
     {
       "path": "native/rust_helper/tests/fixtures/fake_codex_cli.rs",
-      "sha256": "d6cd49d75dd5a47862708e4e618e9b41e76e951840ae2a99098be3cdf17a518b"
+      "sha256": "2bf8849959cd0e2b03d8347366374e0e6e96e509b1e51843cf0c2e07c97f8cca"
     },
     {
       "path": "native/rust_helper/tests/protected_data.rs",

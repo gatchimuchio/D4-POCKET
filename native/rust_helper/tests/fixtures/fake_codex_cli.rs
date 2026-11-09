@@ -40,12 +40,12 @@ fn main() {
         return;
     }
 
-    if !valid_task_arguments(&arguments) {
-        process::exit(41);
-    }
     let Some(workspace) = argument_after(&arguments, "--cd").map(PathBuf::from) else {
         process::exit(42);
     };
+    if !valid_task_arguments(&arguments, &workspace) {
+        process::exit(41);
+    }
     let model_id = argument_after(&arguments, "--model");
     let model_flag_count = arguments
         .iter()
@@ -175,7 +175,7 @@ fn persistent_descendant(heartbeat_path: &Path) -> ! {
     }
 }
 
-fn valid_task_arguments(arguments: &[String]) -> bool {
+fn valid_task_arguments(arguments: &[String], workspace: &Path) -> bool {
     if !arguments.iter().any(|argument| argument == "exec")
         || !arguments.last().is_some_and(|argument| argument == "-")
         || !contains_pair(arguments, "--json", "--ephemeral")
@@ -240,6 +240,12 @@ fn valid_task_arguments(arguments: &[String]) -> bool {
         .collect::<Vec<_>>();
     let expected_task_configs = ["approval_policy=\"never\"".to_owned()]
         .into_iter()
+        .chain(workspace.ancestors().map(|ancestor| {
+            format!(
+                "projects.{:?}.trust_level=\"untrusted\"",
+                ancestor.to_str().unwrap_or_default()
+            )
+        }))
         .chain(expected_task_profile)
         .collect::<Vec<_>>();
     if (has_provider_key
