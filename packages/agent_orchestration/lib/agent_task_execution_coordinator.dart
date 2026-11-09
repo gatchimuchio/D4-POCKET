@@ -33,10 +33,11 @@ class AgentTaskExecutionCoordinator {
   final Map<String, String> _currentTaskBySession = {};
   bool _disposed = false;
 
-  /// Starts observation of a Broker Task and, when requested by the Agent,
-  /// consumes its MCP request and starts the result-dependent follow-up Task.
-  /// The returned Future ends after a terminal Task or after the continuation
-  /// has started. A follow-up Task is monitored independently in the background.
+  /// Broker Taskを監視し、Agentの完了結果が要求したMCP Toolを実行する。
+  /// 結果依存の後続Taskは毎回新しいBroker Taskとして開始し、その完了結果が
+  /// 次のToolを要求した場合も同じ処理を続ける。
+  /// 戻り値のFutureはTask終端時または継続開始後に完了する。
+  /// 後続Taskは独立して監視する。
   Future<void> observeStartedTask({
     required AgentTaskRequest request,
     required AgentTaskRecord task,
@@ -158,7 +159,7 @@ class AgentTaskExecutionCoordinator {
         observeStartedTask(
           request: followupRequest,
           task: followup,
-          allowMcpContinuation: false,
+          allowMcpContinuation: true,
           onUpdate: run.onUpdate,
         ),
       );

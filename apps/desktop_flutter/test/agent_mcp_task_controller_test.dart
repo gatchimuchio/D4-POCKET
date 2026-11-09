@@ -179,6 +179,137 @@ void main() {
     coordinator.dispose();
   });
 
+  test('AIは複数のMCP結果に応じて後続Taskを続け各回で認可を取り直す', () async {
+    final secondResultId =
+        'mcp-agent-result-${List<String>.filled(32, '9').join()}';
+    final secondResultHash = 'sha256:${List<String>.filled(64, 'a').join()}';
+    final secondContextHash = 'sha256:${List<String>.filled(64, 'b').join()}';
+    final finalTaskId = List<String>.filled(32, '6').join();
+    final secondPermissionId = List<String>.filled(32, 'd').join();
+    final responses = _successfulResponses();
+    final firstFollowup = responses.last['body']! as Map<String, Object?>;
+    firstFollowup['status'] = 'completed';
+    firstFollowup['audit_event_id'] = 'audit-first-followup-complete';
+    firstFollowup['result_hash'] = secondResultHash;
+    firstFollowup['result_content_available'] = true;
+
+    final secondRound = _successfulResponses(
+      resultText: jsonEncode({
+        'd4_mcp_tool_request': {
+          'server_id': 'mcp-fixture',
+          'tool_id': _toolId,
+          'name': 'lookup',
+          'arguments': {'query': 'followup result'},
+        },
+      }),
+    );
+    Map<String, Object?> responseBody(int index) =>
+        secondRound[index]['body']! as Map<String, Object?>;
+
+    responseBody(0)
+      ..['task_id'] = _followupTaskId
+      ..['result_hash'] = secondResultHash
+      ..['approval_id'] = List<String>.filled(32, '7').join();
+    final secondProjection =
+        responseBody(1)['projection']! as Map<String, Object?>;
+    secondProjection['result_hash'] = secondResultHash;
+    responseBody(1)
+      ..['task_id'] = _followupTaskId
+      ..['result_hash'] = secondResultHash;
+    final secondReceipt = responseBody(3);
+    secondReceipt['arguments_hash'] = secondResultHash;
+    secondReceipt['result_hash'] = _conditionsHash;
+    secondReceipt['監査ID'] = 'audit-second-mcp-tool-call';
+    secondReceipt['承認監査ID'] = 'audit-second-mcp-tool-approval';
+    secondReceipt['Agent結果context'] = {
+      '状態': 'available',
+      'result_id': secondResultId,
+      'context_hash': secondContextHash,
+      'tool_result_hash': _conditionsHash,
+    };
+    responseBody(5)['permission_id'] = secondPermissionId;
+    responseBody(7)
+      ..['task_id'] = finalTaskId
+      ..['status'] = 'failed'
+      ..['audit_event_id'] = 'audit-second-followup-failed'
+      ..['result_content_available'] = false;
+    responses.addAll(secondRound);
+
+    final transport = _FakeBrokerTransport(responses);
+    final coordinator = AgentTaskExecutionCoordinator(transport);
+    final terminalTask = Completer<AgentTaskRecord>();
+
+    await coordinator.observeStartedTask(
+      request: _sourceRequest,
+      task: _sourceTask,
+      onUpdate: (update) {
+        final task = update.task;
+        if (task?.taskId == finalTaskId &&
+            task?.status == 'failed' &&
+            !terminalTask.isCompleted) {
+          terminalTask.complete(task!);
+        }
+      },
+    );
+    await terminalTask.future.timeout(
+      const Duration(seconds: 2),
+      onTimeout: () => throw StateError(
+        '終端Task未観測: operations=${transport.operations.length}',
+      ),
+    );
+
+    const oneTurn = [
+      'AgentTask結果表示承認',
+      'AgentTask結果取得',
+      'MCP接続一覧',
+      'MCP Tool実行',
+      'Agent作業要求検査',
+      'AgentTaskWorkspacePermissionGrant',
+      'AgentTaskOwnerApprovalGrant',
+      'AgentTask実行',
+    ];
+    expect(transport.operations, [...oneTurn, ...oneTurn]);
+    expect(
+      transport.requests
+          .where((entry) => entry['operation'] == 'MCP Tool実行')
+          .map((entry) => (entry['payload']! as Map)['source_agent_task_id'])
+          .toList(),
+      [_sourceTaskId, _followupTaskId],
+    );
+    expect(
+      transport.requests
+          .where((entry) => entry['operation'] == 'MCP Tool実行')
+          .map(
+              (entry) => (entry['payload']! as Map)['source_agent_result_hash'])
+          .toList(),
+      [_sourceResultHash, secondResultHash],
+    );
+    final followupRequests = transport.requests
+        .where((entry) => entry['operation'] == 'AgentTask実行')
+        .map((entry) => entry['payload']! as Map)
+        .toList();
+    expect(followupRequests, hasLength(2));
+    expect(followupRequests[0]['mcp_result_id'], _resultId);
+    expect(followupRequests[1]['mcp_result_id'], secondResultId);
+    expect(followupRequests[0]['mcp_result_hash'], _contextHash);
+    expect(followupRequests[1]['mcp_result_hash'], secondContextHash);
+    for (final request in followupRequests) {
+      expect(request, isNot(contains('permission_id')));
+      expect(request, isNot(contains('approval_id')));
+    }
+    expect(
+      transport.operations.where(
+          (operation) => operation == 'AgentTaskWorkspacePermissionGrant'),
+      hasLength(2),
+    );
+    expect(
+      transport.operations
+          .where((operation) => operation == 'AgentTaskOwnerApprovalGrant'),
+      hasLength(2),
+    );
+    coordinator.dispose();
+  });
+
   test('disposeは待機中のTask監視pollを解除しBroker Taskを取消しない', () async {
     final transport = _FakeBrokerTransport([]);
     final coordinator = AgentTaskExecutionCoordinator(transport);
