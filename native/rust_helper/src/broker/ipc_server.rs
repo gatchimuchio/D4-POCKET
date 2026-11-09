@@ -781,6 +781,182 @@ mod tests {
         text
     }
 
+    struct TestDirectory(PathBuf);
+
+    impl TestDirectory {
+        fn new() -> Self {
+            Self(temporary_directory())
+        }
+    }
+
+    impl Drop for TestDirectory {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    struct TestBrokerServer {
+        shutdown: Arc<AtomicBool>,
+        thread: Option<std::thread::JoinHandle<Result<(), BrokerServerError>>>,
+    }
+
+    impl TestBrokerServer {
+        fn stop(&mut self) -> Result<(), &'static str> {
+            self.shutdown.store(true, Ordering::Release);
+            let thread = self.thread.take().ok_or("Broker停止済み")?;
+            thread
+                .join()
+                .map_err(|_| "Broker thread panic")?
+                .map_err(|_| "Broker停止失敗")
+        }
+    }
+
+    impl Drop for TestBrokerServer {
+        fn drop(&mut self) {
+            self.shutdown.store(true, Ordering::Release);
+            if let Some(thread) = self.thread.take() {
+                let _ = thread.join();
+            }
+        }
+    }
+
+    #[test]
+    #[ignore = "手動LIVE_RUNTIME: 実Rust Brokerと共通Dart consumerのloopback interop"]
+    fn shared_dart_mcp_client_authenticates_against_live_broker_live_runtime() {
+        use std::io::Write as _;
+        use std::process::{Command, Stdio};
+        use std::time::Instant;
+        use zeroize::Zeroize;
+
+        let root = TestDirectory::new();
+        let store_dir = root.0.join("store");
+        let session_file = root.0.join("normal.json");
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let thread_shutdown = Arc::clone(&shutdown);
+        let thread_store = store_dir.clone();
+        let thread_session = session_file.clone();
+        let (ready_tx, ready_rx) = std::sync::mpsc::sync_channel(1);
+        let thread = std::thread::spawn(move || {
+            run_loopback_server_cancellable(
+                BrokerServerConfig::new(thread_store, thread_session),
+                thread_shutdown,
+                ready_tx,
+            )
+        });
+        let mut broker = TestBrokerServer {
+            shutdown,
+            thread: Some(thread),
+        };
+        ready_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("実Brokerがloopbackをlistenする");
+
+        let mut endpoint: BrokerEndpoint =
+            serde_json::from_slice(&std::fs::read(&session_file).expect("normal endpointを読む"))
+                .expect("normal endpointの形式");
+        assert_eq!(endpoint.credential_role, BrokerCredentialRole::Normal);
+        assert_eq!(endpoint.host, "127.0.0.1");
+        assert_eq!(endpoint.transport, "authenticated_loopback_tcp");
+        let mut invalid_secret = random_hex(32).expect("negative資格を生成");
+        while invalid_secret == endpoint.session_secret {
+            invalid_secret = random_hex(32).expect("異なるnegative資格を再生成");
+        }
+        let mut invalid_endpoint = endpoint.clone();
+        invalid_endpoint.session_secret = invalid_secret;
+
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let repo_root = manifest_dir
+            .parent()
+            .and_then(|path| path.parent())
+            .expect("repository root")
+            .to_path_buf();
+        let app_dir = repo_root.join("apps/desktop_flutter");
+        let probe_script = app_dir.join("test/support/real_broker_mcp_probe.dart");
+        let package_config = std::env::var_os("D4P_DART_PACKAGE_CONFIG")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| app_dir.join(".dart_tool/package_config.json"));
+        let dart_executable = std::env::var_os("D4P_DART_EXECUTABLE")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("dart"));
+        assert!(probe_script.is_file(), "共通Dart Broker probeがない");
+        assert!(
+            package_config.is_file(),
+            "Flutter pub get後のDart package configが必要"
+        );
+
+        let mut child = Command::new(dart_executable)
+            .arg(format!("--packages={}", package_config.display()))
+            .arg("test/support/real_broker_mcp_probe.dart")
+            .current_dir(&app_dir)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("Dart probeを起動する");
+        {
+            let mut stdin = child.stdin.take().expect("Dart probe stdin");
+            serde_json::to_writer(&mut stdin, &endpoint).expect("normal endpointをstdinへ渡す");
+            stdin.write_all(b"\n").expect("stdin frameを区切る");
+            serde_json::to_writer(&mut stdin, &invalid_endpoint)
+                .expect("negative endpointをstdinへ渡す");
+            stdin.write_all(b"\n").expect("stdinを閉じるframe");
+        }
+
+        let deadline = Instant::now() + Duration::from_secs(60);
+        loop {
+            if child.try_wait().expect("Dart probe状態").is_some() {
+                break;
+            }
+            if Instant::now() >= deadline {
+                let _ = child.kill();
+                let _ = child.wait();
+                panic!("Dart probeが60秒以内に終了しない");
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        let output = child.wait_with_output().expect("Dart probe出力");
+        assert!(output.status.success(), "Dart probeが失敗した");
+        assert_eq!(
+            String::from_utf8_lossy(&output.stdout).trim(),
+            "D4P_REAL_BROKER_DART_PROBE_PASS",
+            "Dart probeの固定結果が一致しない"
+        );
+
+        broker.stop().expect("実Brokerを正常停止する");
+        let audit_text = read_audit(&store_dir.join("audit.jsonl"));
+        assert!(!audit_text.contains(&endpoint.session_secret));
+        assert!(!audit_text.contains(&invalid_endpoint.session_secret));
+        let audit_events: Vec<serde_json::Value> = audit_text
+            .lines()
+            .map(|line| serde_json::from_str(line).expect("Audit JSON"))
+            .collect();
+        assert_eq!(
+            audit_events
+                .iter()
+                .filter(|event| {
+                    event["operation"] == "MCP接続一覧" && event["decision"] == "accepted"
+                })
+                .count(),
+            1,
+            "実BrokerがDart consumerのnormal要求を一度だけ受理する"
+        );
+        assert_eq!(
+            audit_events
+                .iter()
+                .filter(|event| {
+                    event["request_id"] == "ipc-request"
+                        && event["operation"] == "unknown"
+                        && event["decision"] == "rejected"
+                        && event["reason"] == "broker_authentication_failed"
+                })
+                .count(),
+            1,
+            "不正normal資格を実Brokerが拒否してAuditへ記録する"
+        );
+        endpoint.session_secret.zeroize();
+        invalid_endpoint.session_secret.zeroize();
+    }
+
     fn workspace_settings(
         runtime_id: &str,
         roots: &[&std::path::Path],

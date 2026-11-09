@@ -639,6 +639,10 @@
       "sha256": "b5e573d9861388395945de59be59ffc5d0a7286c679cb35c07301acb76933b7e"
     },
     {
+      "path": "apps/desktop_flutter/test/authenticated_loopback_broker_transport_test.dart",
+      "sha256": "e864c60c78d2a5288e29f3fbd41db4883ce9ce95566021e302cce45247eaef6d"
+    },
+    {
       "path": "apps/desktop_flutter/test/broker_client_payload_hash_test.dart",
       "sha256": "ef8dc9318dc6059a3a9714d687cd26e90f6d8384f55e90ee763ceb64eefd4a99"
     },
@@ -721,6 +725,10 @@
     {
       "path": "apps/desktop_flutter/test/settings_install_flow_test.dart",
       "sha256": "deaba0f20f3295bdcbf8173ac10c14e23dc1baefae6104e2d04cc1264b7609d7"
+    },
+    {
+      "path": "apps/desktop_flutter/test/support/real_broker_mcp_probe.dart",
+      "sha256": "e17ca6cfd5bea617ee10a1b1edafede97bfc6f171a8a7817546578c42da4b6b7"
     },
     {
       "path": "apps/desktop_flutter/test/support/test_broker_tcp_transport.dart",
@@ -1428,7 +1436,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "8a4016fb4486c5450d2f4605fe4b2c947c0848f31e7d5807c4c19b34e6b4e4c0"
+      "sha256": "76e31f7f4bf2697022804dfd143f99bbdfb43f384ecfd96bf4039a24c0406355"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -3780,7 +3788,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/ipc_server.rs",
-      "sha256": "eca8d7ba7bca271d3461ea8cdaa4c07252bfd750b5eac6e5980772e0b853701b"
+      "sha256": "d0f7998992ba541e97c32c3af66cc251552cdec7d5732c8dac5bd1dfbf701fd9"
     },
     {
       "path": "native/rust_helper/src/broker/json_input.rs",
@@ -4305,6 +4313,22 @@
     {
       "path": "packages/broker_contract/pubspec.yaml",
       "sha256": "c62c1ed01e8cc58dd25cbd26037331f11bb4fa13165b868e6c3e58d83ff08f92"
+    },
+    {
+      "path": "packages/broker_ipc_client/README.md",
+      "sha256": "2bab07a19e7d15a12439e36b9d1f3c7d8bf903150eb5806f381753c6dc30ef31"
+    },
+    {
+      "path": "packages/broker_ipc_client/lib/broker_ipc_client.dart",
+      "sha256": "0e11e9988491f6ebfac99c945b9138c98d1aae445ff31ab839b8fa631f26b451"
+    },
+    {
+      "path": "packages/broker_ipc_client/lib/src/authenticated_loopback_broker_transport.dart",
+      "sha256": "762a3b14a38c5097a3bdadf84fe214b3843eac2b34288eb66a4bf04b4e857302"
+    },
+    {
+      "path": "packages/broker_ipc_client/pubspec.yaml",
+      "sha256": "9fb0dde652362e40571a52c13bded9090e90c5e2225bb89fff97c29719d7685a"
     },
     {
       "path": "packages/gui_shell_ui/README.md",
