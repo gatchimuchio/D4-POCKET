@@ -3056,7 +3056,6 @@ void main() {
     expect(grantOperations,
         {'AgentTaskWorkspacePermissionGrant', 'AgentTaskOwnerApprovalGrant'});
     await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pump(const Duration(seconds: 2));
   });
 
   testWidgets('Agent CenterはSession結合後のTask unsupportedを事前検査しgrantへ進まない',
@@ -3414,7 +3413,6 @@ void main() {
     );
     expect(find.textContaining('PRIVATE_TASK_SENTINEL'), findsNothing);
     await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pump(const Duration(seconds: 2));
   });
 
   testWidgets('Agent CenterはTask完了後にMCP結果依存Taskを自動でBrokerへ接続する',

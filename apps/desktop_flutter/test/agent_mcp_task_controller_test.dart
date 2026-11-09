@@ -179,6 +179,76 @@ void main() {
     coordinator.dispose();
   });
 
+  test('disposeは待機中のTask監視pollを解除しBroker Taskを取消しない', () async {
+    final transport = _FakeBrokerTransport([]);
+    final coordinator = AgentTaskExecutionCoordinator(transport);
+    final firstUpdate = Completer<void>();
+    final monitoring = coordinator.observeStartedTask(
+      request: _sourceRequest,
+      task: const AgentTaskRecord(
+        taskId: _sourceTaskId,
+        runtimeId: 'codex-local',
+        sessionId: _session,
+        workspaceId: 'workspace-local',
+        instructionHash: _instructionHash,
+        status: 'running',
+        auditEventId: 'audit-pending-monitor-dispose',
+      ),
+      allowMcpContinuation: false,
+      onUpdate: (_) {
+        if (!firstUpdate.isCompleted) firstUpdate.complete();
+      },
+    );
+
+    await firstUpdate.future.timeout(const Duration(seconds: 1));
+    coordinator.dispose();
+    await monitoring.timeout(const Duration(seconds: 1));
+
+    expect(transport.operations, isEmpty);
+  });
+
+  test('同SessionのTask置換は旧Task監視pollを解除する', () async {
+    final transport = _FakeBrokerTransport([]);
+    final coordinator = AgentTaskExecutionCoordinator(transport);
+    final firstUpdate = Completer<void>();
+    final oldMonitoring = coordinator.observeStartedTask(
+      request: _sourceRequest,
+      task: const AgentTaskRecord(
+        taskId: _sourceTaskId,
+        runtimeId: 'codex-local',
+        sessionId: _session,
+        workspaceId: 'workspace-local',
+        instructionHash: _instructionHash,
+        status: 'running',
+        auditEventId: 'audit-replaced-monitor',
+      ),
+      allowMcpContinuation: false,
+      onUpdate: (_) {
+        if (!firstUpdate.isCompleted) firstUpdate.complete();
+      },
+    );
+    await firstUpdate.future.timeout(const Duration(seconds: 1));
+
+    await coordinator.observeStartedTask(
+      request: _sourceRequest,
+      task: const AgentTaskRecord(
+        taskId: _followupTaskId,
+        runtimeId: 'codex-local',
+        sessionId: _session,
+        workspaceId: 'workspace-local',
+        instructionHash: _instructionHash,
+        status: 'completed',
+        auditEventId: 'audit-current-replacement-task',
+      ),
+      allowMcpContinuation: false,
+      onUpdate: (_) {},
+    );
+    await oldMonitoring.timeout(const Duration(seconds: 1));
+
+    expect(transport.operations, isEmpty);
+    coordinator.dispose();
+  });
+
   test('未完了の画面observer FutureはTask継続を停止しない', () async {
     final observerGate = Completer<void>();
     var observed = 0;

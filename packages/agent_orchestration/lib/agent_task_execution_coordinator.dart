@@ -46,7 +46,7 @@ class AgentTaskExecutionCoordinator {
     if (_disposed || !_remember(task.taskId)) return;
     final priorTaskId = _currentTaskBySession[request.sessionId];
     if (priorTaskId != null && priorTaskId != task.taskId) {
-      _runs[priorTaskId]?.active = false;
+      _runs[priorTaskId]?.stop();
     }
     _currentTaskBySession[request.sessionId] = task.taskId;
     final run = _TaskRun(
@@ -69,7 +69,7 @@ class AgentTaskExecutionCoordinator {
     if (_disposed) return;
     _disposed = true;
     for (final run in _runs.values) {
-      run.active = false;
+      run.stop();
     }
     _runs.clear();
     _currentTaskBySession.clear();
@@ -101,7 +101,7 @@ class AgentTaskExecutionCoordinator {
       while (_isCurrent(run) &&
           DateTime.now().difference(started) < _maximumMonitorDuration &&
           const {'pending', 'running'}.contains(current.status)) {
-        await Future<void>.delayed(delay);
+        await run.wait(delay);
         if (!_isCurrent(run)) return;
         try {
           current = await AgentTaskClient(_transport).state(current.taskId);
@@ -225,4 +225,32 @@ class _TaskRun {
   final bool allowMcpContinuation;
   final AgentTaskExecutionUpdateHandler onUpdate;
   bool active = true;
+  Timer? _pollTimer;
+  Completer<void>? _pollWaiter;
+
+  Future<void> wait(Duration delay) {
+    if (!active) return Future<void>.value();
+    final waiter = Completer<void>();
+    late final Timer timer;
+    timer = Timer(delay, () {
+      if (identical(_pollWaiter, waiter)) {
+        _pollTimer = null;
+        _pollWaiter = null;
+      }
+      if (!waiter.isCompleted) waiter.complete();
+    });
+    _pollTimer = timer;
+    _pollWaiter = waiter;
+    return waiter.future;
+  }
+
+  void stop() {
+    if (!active) return;
+    active = false;
+    _pollTimer?.cancel();
+    _pollTimer = null;
+    final waiter = _pollWaiter;
+    _pollWaiter = null;
+    if (waiter != null && !waiter.isCompleted) waiter.complete();
+  }
 }
