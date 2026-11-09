@@ -194,19 +194,19 @@
       "blocks_release": true,
       "blocks_windows_technical_complete": false,
       "latest_evidence": {
-        "date": "2026-11-02",
+        "date": "2026-11-09",
         "result": "PASS",
-        "workflow_run": "https://github.com/gatchimuchio/D4-POCKET/actions/runs/41359281663",
-        "source_commit": "8f630c05e989c668b234611d2dd89bd0e14ffe22",
-        "scope": "手動workflow_dispatch run 41359281663。Ubuntu 24.04 hosted runnerでdebian_setup_lifecycleを実行。APT-installed Setupから同run製品D4PKG v0.1.1を初回導入し、installed Update Centerのv0.1.2更新受入れ、v0.1.1 rollback、Export／Uninstallまで通した。D4PKG SHA-256 a1a86897e865a6a1b563ef3430c516d9d9557d1dd4a7bffbf79763cadf064648。Audit 191件のBroker再起動後読戻し、user data／Audit store保持、所有process停止を確認。",
-        "limits": "update payloadは1,809 byteの非実行Acceptance fixtureで、同一source製品update packageではない。run内cache／Owner fixtureを使うXvfb／X11 LIVE_RUNTIME限定であり、実desktop／Wayland、正式署名配布、Linux native製品全体を証明しない。linux_native_product_support=unresolved、通常Release task_execution=unsupported、release_ready=falseを維持する。"
+        "workflow_run": "https://github.com/gatchimuchio/D4-POCKET/actions/runs/42550697559",
+        "source_commit": "8daf296e065ec87830b6e4a4736e378d2d978182",
+        "scope": "manual workflow_dispatch run 42550697559。Ubuntu 24.04 hosted runnerのdebian_setup_lifecycleで同run bundle由来の製品D4PKG v0.1.1をAPT-installed Setupから導入し、installed Update Centerが同一bundle由来v0.1.2をrun-owned HTTPS sourceから取得した。native Owner確認、hash／signature検証、stage／activation、v0.1.1 rollback、Export／Uninstall、durable Auditとowned-process cleanupを確認。初回package SHA-256 9daf31ee2808e707d692562065e5ee64d8df7a3dbc8d0f570d635c59e00c3c88、update package SHA-256 638da117f0b1e4a495432cf72f9d689a8459a44325fad296a6a63f4b6574c25b。",
+        "limits": "run-scoped test identityとUbuntu hosted Xvfbを使う限定LIVE_RUNTIME acceptance。AT-SPI上の表示面は確認したが画面描画は未確認。正式署名配布、実desktop／Waylandの対象範囲、Linux必須consumer全体、通常Release task capabilityを証明しない。linux_native_product_support=unresolved、通常Release task_execution=unsupported、release_ready=falseを維持する。"
       },
       "previous_passed_evidence": {
         "date": "2026-11-02",
         "result": "PASS",
-        "workflow_run": "https://github.com/gatchimuchio/D4-POCKET/actions/runs/41333200330",
-        "source_commit": "c8320cc162449c8e6b76433509a0ad2c0aa6cc98",
-        "scope": "Ubuntu 22.04 installed productのprovider_credential_binding限定run。GTK UIから隔離Secret Serviceへ合成keyを登録し、Permission 1件とOwner Approval 1件を消費して実Codex CLI Taskを完了、Workspaceへ書き込んだ。secret／Workspace外read拒否、Provider keyのtool環境・Audit非露出、scratch cleanup、Audit再読込、owned process cleanupを確認した。loopback fixtureであり、外部Providerには接続していない。詳細はdocs/REV5_PRODUCT_PROGRESS.mdを参照。"
+        "workflow_run": "https://github.com/gatchimuchio/D4-POCKET/actions/runs/41359281663",
+        "source_commit": "8f630c05e989c668b234611d2dd89bd0e14ffe22",
+        "scope": "Ubuntu 24.04 hosted runnerのdebian_setup_lifecycle。APT-installed Setupから同run製品D4PKG v0.1.1を初回導入し、installed Update Centerのfixture v0.1.2更新、v0.1.1 rollback、Export／Uninstallまで通した。Audit 191件のBroker再起動後読戻し、user data／Audit store保持、所有process停止を確認。update payloadは1,809 byteの非実行fixtureで、同一source製品update packageではない。Xvfb／X11限定。詳細はdocs/REV5_PRODUCT_PROGRESS.mdを参照。"
       },
       "previous_failed_evidence": {
         "date": "2026-11-02",
@@ -216,8 +216,8 @@
         "scope": "debian_setup_lifecycleのinstalled runtimeは最終Acceptance JSONを出力したが、workflow harnessが空のcapture fileをparseして失敗した。",
         "disposition": "製品動作のFAILとは分類せず、FAIL履歴として保持する。両streamをcaptureしscope一致のJSON recordを抽出する修正後、同scopeのrun 41359281663がPASSした。"
       },
-      "reason": "Linux native DesktopはWindows／macOSと同列の必須製品対象である。最新のAPT-installed Setup lifecycle run #41359281663は初回導入、Update Centerのv0.1.2受入れ、rollback、Export／Uninstall、191件のAudit読戻しの限定PASSである。ただしupdate payloadは1,809 byteの非実行Acceptance fixtureであり、同一source／manifest／hashから生成した製品update packageではない。Provider credential binding run #41333200330、portable_archive run #249、MCP Credential binding run #248、Agent Task #190、crash recovery #237、A2A metadata #231、runtime provenance #192、Wayland rendering #193、Credential Vault #194、MCP child／Tool、Update Center #77は各限定範囲の証拠である。完全なbuild→package→install→first-run→update／rollback→uninstall、実desktop／compositor、通常Release Task capability、正式署名配布、Linux必須consumer全体は未成立。Linux native blockerはunresolved、通常Release task_execution=unsupported、release_ready=falseを維持する。",
-      "required_action": "成立済みMCP child／Toolの受入れ済みscopeは再現可能な回帰がない限り再試験しない。正式Installerと署名配布は未成立範囲として保持する。次はD4-LNX-T06の同一source／manifest／hashによる製品update packageをinstalled Update Centerが実取得・stage・activateし、rollbackとuninstallまで同じcandidateで通る統合経路を閉じる。Linux受入れ表に残る実desktop／compositor範囲、通常Release Task capability条件、その他の未成立な必須consumerも完了まで保持する。全必須条件が成立するまでLinux blockerとrelease gateを維持する。"
+      "reason": "Linux native DesktopはWindows／macOSと同列の必須製品対象である。最新のUbuntu 24.04 hosted run #277は同一run source bundle由来の製品packageでinstalled Setup→HTTPS Update→stage／activation→rollback→Export／Uninstallを通した限定PASSである。#274〜#276のFAILは現行進捗に保持し、Audit cursorのstale event誤採用等の受入れharness原因を修正して同一scopeを通した。Provider credential binding run #41333200330、従来fixture lifecycle run #41359281663、portable_archive run #249、MCP Credential binding run #248、Agent Task #190、crash recovery #237、A2A metadata #231、runtime provenance #192、Wayland rendering #193、Credential Vault #194、MCP child／Tool、Update Center #77はそれぞれ限定範囲の証拠である。run #277はhosted Xvfb／test identity範囲で、正式署名配布、実desktop／Wayland描画、Linux必須consumer全体、通常Release Task capabilityを証明しない。Linux native blockerはunresolved、通常Release task_execution=unsupported、release_ready=falseを維持する。",
+      "required_action": "成立済みMCP child／Toolの受入れ済みscopeとD4-LNX-T06の同一source installed update lifecycleは再現可能な回帰がない限り再試験しない。Linux受入れ表の実desktop／compositor範囲、通常Release Task capability条件、その他の未成立なLinux必須consumerを現行契約に沿って施工・検証する。正式Installerと署名配布はrelease blockerとして保持する。対象OS・compositor・source・artifactを固定し、既に成立済み範囲を再試験しない。Linux必須consumerと必要証拠がすべて成立するまでblockerとrelease gateを維持する。"
     },
     {
       "name": "rev2_mobile_device_evidence",
