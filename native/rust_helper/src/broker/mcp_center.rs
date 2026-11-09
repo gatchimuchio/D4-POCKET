@@ -2225,6 +2225,198 @@ if errorlevel 1 exit /b 45
     }
 
     #[cfg(windows)]
+    #[test]
+    fn mcp_catalog_compose_rechecks_current_connection_and_rejects_stale_selection() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        const SERVER: &str = "compose-mcp-fixture";
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let temp_root = TestTempRoot(std::env::temp_dir().join(format!(
+            "gui-shell-compose-mcp-{}-{nonce}",
+            std::process::id()
+        )));
+        let root = &temp_root.0;
+        let audit_root = root.join("audit");
+        let workspace = root.join("workspace");
+        std::fs::create_dir_all(&workspace).expect("MCP作業領域を作成");
+        let mut broker =
+            Broker::new_persistent("session-1", &audit_root).expect("永続Brokerを作成");
+
+        let script_path = workspace.join("mcp-server.cmd");
+        let script = format!(
+            r#"@echo off
+setlocal EnableDelayedExpansion
+set /p request=
+echo !request! | findstr /c:"server/discover" > nul
+if errorlevel 1 exit /b 42
+echo {{"jsonrpc":"2.0","id":1,"result":{{"resultType":"complete","supportedVersions":["{}"],"capabilities":{{"tools":{{}}}}}},"_meta":{{"io.modelcontextprotocol/serverInfo":{{"name":"compose-fixture","version":"1"}}}}}}
+set /p request=
+echo !request! | findstr /c:"tools/list" > nul
+if errorlevel 1 exit /b 43
+echo {{"jsonrpc":"2.0","id":2,"result":{{"resultType":"complete","tools":[{{"name":"echo","inputSchema":{{"type":"object","properties":{{}},"additionalProperties":false}}}}]}}}}
+"%SystemRoot%\System32\ping.exe" -t 127.0.0.1 > nul
+"#,
+            crate::mcp::MODERN_PROTOCOL_VERSION
+        );
+        std::fs::write(&script_path, script).expect("MCP fixture scriptを書き込む");
+        let executable = std::env::var_os("SystemRoot")
+            .map(std::path::PathBuf::from)
+            .expect("Windows環境根を取得")
+            .join("System32")
+            .join("cmd.exe");
+        let connect = json!({
+            "版": 1,
+            "操作": "接続",
+            "ServerID": SERVER,
+            "実行file": executable.to_string_lossy(),
+            "引数": ["/D", "/C", script_path.to_string_lossy()],
+            "workspace": workspace.to_string_lossy(),
+            "Transport": "stdio",
+            "Credential ref": {
+                "credential_id": "00000000000000000000000000000000",
+                "purpose": "mcp_transport",
+                "target": SERVER,
+                "required": false,
+                "status": "missing"
+            }
+        });
+        let connected = broker_test_operation(&mut broker, BrokerOperation::MCP接続, connect, true);
+        assert_eq!(connected.status, BrokerStatus::Accepted, "{connected:?}");
+
+        let listed = broker_test_operation(
+            &mut broker,
+            BrokerOperation::MCP接続一覧,
+            json!({"版": 1}),
+            false,
+        );
+        assert_eq!(listed.status, BrokerStatus::Accepted, "{listed:?}");
+        let tool_id = listed.body.as_ref().unwrap()["MCP接続一覧"][0]["Tool"][0]["tool_id"]
+            .as_str()
+            .expect("Broker CatalogのTool ID")
+            .to_string();
+        assert_eq!(tool_id.len(), 147);
+
+        let manifest = |server_id: &str, selected_tool_ids: Vec<String>| {
+            json!({
+                "version": 1,
+                "compose_id": "compose-mcp-catalog-test",
+                "display_name": "MCP Catalog fixture",
+                "runtime_ids": [],
+                "agent_ids": [],
+                "tool_ids": selected_tool_ids,
+                "mcp_connection_ids": [server_id],
+                "theme": {"theme_id": "d4-pocket", "mode": "system"},
+                "capability_requirements": [],
+                "settings": {
+                    "locale": "ja-JP",
+                    "density": "comfortable",
+                    "content_visibility": "summary"
+                },
+                "inheritance_policy": {
+                    "authority": "none",
+                    "permission": "none",
+                    "approval": "none",
+                    "credential": "none",
+                    "audit_chain": "none"
+                },
+                "output_mode": "manifest_only"
+            })
+        };
+        let selected = manifest(SERVER, vec![tool_id.clone()]);
+        let composed = broker_test_operation(
+            &mut broker,
+            BrokerOperation::GuiShell構成,
+            selected.clone(),
+            false,
+        );
+        assert_eq!(composed.status, BrokerStatus::Accepted, "{composed:?}");
+        assert_eq!(composed.evidence_source, EVIDENCE_SOURCE_INTERNAL_STATE);
+        assert_eq!(
+            composed.body.as_ref().unwrap()["permission_generated"],
+            false
+        );
+        assert_eq!(
+            composed.body.as_ref().unwrap()["compose_manifest"]["tool_ids"][0],
+            tool_id
+        );
+
+        let preview = broker_test_operation(
+            &mut broker,
+            BrokerOperation::GuiShell構成Preview,
+            json!({
+                "version": 1,
+                "current_manifest": Value::Null,
+                "candidate_manifest": selected,
+                "build_target": "windows",
+                "preview_mode": "version_rollback"
+            }),
+            false,
+        );
+        assert_eq!(preview.status, BrokerStatus::Accepted, "{preview:?}");
+        assert_eq!(preview.evidence_source, EVIDENCE_SOURCE_INTERNAL_STATE);
+
+        let unknown_tool = manifest(SERVER, vec![format!("tool-{}", "b".repeat(142))]);
+        let rejected_tool = broker_test_operation(
+            &mut broker,
+            BrokerOperation::GuiShell構成,
+            unknown_tool,
+            false,
+        );
+        assert_eq!(rejected_tool.status, BrokerStatus::Rejected);
+        assert_eq!(
+            rejected_tool
+                .error
+                .as_ref()
+                .map(|error| error.code.as_str()),
+            Some("gui_shell_compose_catalog_mismatch")
+        );
+
+        let unknown_server = manifest("compose-unregistered", Vec::new());
+        let rejected_server = broker_test_operation(
+            &mut broker,
+            BrokerOperation::GuiShell構成,
+            unknown_server,
+            false,
+        );
+        assert_eq!(rejected_server.status, BrokerStatus::Rejected);
+        assert_eq!(
+            rejected_server
+                .error
+                .as_ref()
+                .map(|error| error.code.as_str()),
+            Some("gui_shell_compose_catalog_mismatch")
+        );
+
+        let disconnected = broker_test_operation(
+            &mut broker,
+            BrokerOperation::MCP切断,
+            json!({"版": 1, "操作": "切断", "ServerID": SERVER}),
+            true,
+        );
+        assert_eq!(
+            disconnected.status,
+            BrokerStatus::Accepted,
+            "{disconnected:?}"
+        );
+        let stale = broker_test_operation(
+            &mut broker,
+            BrokerOperation::GuiShell構成,
+            manifest(SERVER, vec![tool_id]),
+            false,
+        );
+        assert_eq!(stale.status, BrokerStatus::Rejected);
+        assert_eq!(
+            stale.error.as_ref().map(|error| error.code.as_str()),
+            Some("gui_shell_compose_catalog_mismatch")
+        );
+        drop(broker);
+        drop(temp_root);
+    }
+
+    #[cfg(windows)]
     fn broker_test_operation(
         broker: &mut Broker,
         operation: BrokerOperation,

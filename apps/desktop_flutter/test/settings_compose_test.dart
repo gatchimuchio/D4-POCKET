@@ -113,8 +113,9 @@ void main() {
 
       await _enter(tester, 'compose-runtime-ids', 'runtime.local');
       await _enter(tester, 'compose-agent-ids', 'agent.codex');
-      await _enter(tester, 'compose-tool-ids', 'tool.notes');
-      await _enter(tester, 'compose-mcp-ids', 'mcp.local');
+      await _tap(tester, 'compose-mcp-catalog-refresh');
+      await _tap(tester, 'compose-mcp-server-mcp.local');
+      await _tap(tester, 'compose-mcp-tool-${transport.composeToolId}');
       await _enter(
         tester,
         'compose-capability-requirements',
@@ -128,8 +129,19 @@ void main() {
       final compose = transport.lastPayload('GUI Shell構成');
       expect(compose['runtime_ids'], ['runtime.local']);
       expect(compose['agent_ids'], ['agent.codex']);
-      expect(compose['tool_ids'], ['tool.notes']);
+      expect(compose['tool_ids'], [transport.composeToolId]);
       expect(compose['mcp_connection_ids'], ['mcp.local']);
+      expect(
+        transport.requests
+            .where((request) => request['operation'] == 'MCP接続一覧'),
+        hasLength(1),
+      );
+      expect(
+        transport.requests
+            .where((request) => request['operation'] == 'MCP Tool実行'),
+        isEmpty,
+        reason: 'Compose Catalog選択はTool実行やPermissionを発生させない',
+      );
       expect(compose['theme'], {'theme_id': 'd4-pocket', 'mode': 'dark'});
       expect(compose['capability_requirements'], [
         'runtime.read',
@@ -240,6 +252,7 @@ Future<void> _tap(WidgetTester tester, String key) async {
 
 class _ComposeScreenTransport implements BrokerTransport {
   final List<Map<String, Object?>> requests = [];
+  final String composeToolId = 'tool-${List<String>.filled(142, "a").join()}';
 
   Map<String, Object?> lastPayload(String operation) => requests
           .lastWhere((request) => request['operation'] == operation)['payload']!
@@ -254,6 +267,7 @@ class _ComposeScreenTransport implements BrokerTransport {
     final body = switch (operation) {
       'プロファイル一覧' => <String, Object?>{'Profiles': <Object?>[]},
       '更新一覧' => <String, Object?>{'更新一覧': <Object?>[]},
+      'MCP接続一覧' => _mcpConnectionListBody(),
       '更新候補取得' => <String, Object?>{
           '状態': 'updated',
           '候補件数': 2,
@@ -285,7 +299,55 @@ class _ComposeScreenTransport implements BrokerTransport {
     };
     return {
       'status': 'accepted',
+      if (operation == 'MCP接続一覧') 'evidence_source': 'INTERNAL_STATE',
       'body': body,
     };
   }
+
+  Map<String, Object?> _mcpConnectionListBody() => {
+        '版': 1,
+        'MCP接続一覧': [
+          {
+            '版': 1,
+            '契約種別': 'MCP外部概念射影',
+            'Server': {'server_id': 'mcp.local', '表示名': 'Fixture MCP'},
+            'Transport': {'kind': 'stdio'},
+            'Tool': [
+              {
+                'tool_id': composeToolId,
+                'name': 'echo',
+                'description_summary': '',
+                'input_schema_hash':
+                    'sha256:${List<String>.filled(64, "b").join()}',
+                'risk': 'unknown',
+                'status': {
+                  'status': 'supported',
+                  'reason': 'fixture MCP schema',
+                },
+              },
+            ],
+            'Resource': <Object?>[],
+            'Prompt': <Object?>[],
+            'Credential ref': <String, Object?>{},
+            'Trust': <String, Object?>{},
+            'Capability diff': <String, Object?>{},
+            '権限生成': 'なし',
+            '公開範囲': 'metadata_only',
+            '証拠種別': 'INTERNAL_STATE',
+            '接続状態': 'connected',
+            '実行状態': 'ready',
+            '能力ID': 'mcp.connection.connect',
+            '権限ID': 'permission.mcp.connection.connect',
+            '承認状態': 'owner_control_approved',
+            '復旧ID': 'recover-mcp-connection',
+            '接続監査ID': 'audit-mcp-fixture',
+          },
+        ],
+        '件数': 1,
+        'Agent能力hash': 'sha256:${List<String>.filled(64, "c").join()}',
+        'Agent能力件数': 1,
+        'Agent能力状態': 'available',
+        '公開範囲': 'metadata_only',
+        '証拠種別': 'INTERNAL_STATE',
+      };
 }

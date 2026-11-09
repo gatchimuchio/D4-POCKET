@@ -10080,6 +10080,36 @@ def agent_handoff_package_errors(package: dict) -> list[str]:
     return errors
 
 
+def test_mcp_catalog_tool_id_matches_broker_generated_identity() -> list[str]:
+    receipt = load_contract_fixture("mcp_connection_receipt.valid.json")
+    connection_list = load_contract_fixture("mcp_connection_list.valid.json")
+    receipt_schema = load_schema("mcp_connection_receipt.schema.json")
+    list_schema = load_schema("mcp_connection_list.schema.json")
+    errors = []
+
+    if any((
+        len(tool.get("tool_id", "")) != 147
+        for tool in receipt.get("Tool", [])
+        if isinstance(tool, dict)
+    )):
+        errors.append("MCP接続Receipt fixtureのTool IDがBroker生成147文字ではない")
+    if validate_instance(receipt, receipt_schema):
+        errors.append("MCP接続Receipt SchemaがBroker生成147文字Tool IDを拒否した")
+    if validate_instance(connection_list, list_schema):
+        errors.append("MCP接続一覧SchemaがBroker生成147文字Tool IDを拒否した")
+
+    for tool_id in ("tool-" + "a" * 141, "tool-" + "a" * 143, "tool-not-hex"):
+        invalid_receipt = copy.deepcopy(receipt)
+        invalid_list = copy.deepcopy(connection_list)
+        invalid_receipt["Tool"][0]["tool_id"] = tool_id
+        invalid_list["MCP接続一覧"][0]["Tool"][0]["tool_id"] = tool_id
+        if not validate_instance(invalid_receipt, receipt_schema):
+            errors.append(f"MCP接続Receipt Schemaが不正Tool IDを受け入れた: length={len(tool_id)}")
+        if not validate_instance(invalid_list, list_schema):
+            errors.append(f"MCP接続一覧Schemaが不正Tool IDを受け入れた: length={len(tool_id)}")
+    return errors
+
+
 def test_gui_shell_compose_is_manifest_only_and_non_inheriting() -> list[str]:
     compose = load_contract_fixture("gui_shell_compose.valid.json")
     receipt = load_contract_fixture("gui_shell_compose_receipt.valid.json")
@@ -10088,6 +10118,24 @@ def test_gui_shell_compose_is_manifest_only_and_non_inheriting() -> list[str]:
     errors = []
     errors.extend(validate_instance(compose, compose_schema))
     errors.extend(validate_instance(receipt, receipt_schema))
+    valid_mcp_tool_id = "tool-" + "a" * 142
+    long_tool_compose = copy.deepcopy(compose)
+    long_tool_compose["tool_ids"] = [valid_mcp_tool_id]
+    long_tool_compose["mcp_connection_ids"] = ["mcp.fixture"]
+    if validate_instance(long_tool_compose, compose_schema):
+        errors.append("GUI Shell構成SchemaがBroker生成147文字Tool IDを拒否した")
+    long_tool_receipt = copy.deepcopy(receipt)
+    long_tool_receipt["compose_manifest"]["tool_ids"] = [valid_mcp_tool_id]
+    if validate_instance(long_tool_receipt, receipt_schema):
+        errors.append("GUI Shell構成Receipt Schemaが147文字Tool IDを拒否した")
+    oversized_tool_compose = copy.deepcopy(long_tool_compose)
+    oversized_tool_compose["tool_ids"] = ["tool-" + "a" * 143]
+    if not validate_instance(oversized_tool_compose, compose_schema):
+        errors.append("GUI Shell構成Schemaが148文字Tool IDを受け入れた")
+    oversized_tool_receipt = copy.deepcopy(long_tool_receipt)
+    oversized_tool_receipt["compose_manifest"]["tool_ids"] = ["tool-" + "a" * 143]
+    if not validate_instance(oversized_tool_receipt, receipt_schema):
+        errors.append("GUI Shell構成Receipt Schemaが148文字Tool IDを受け入れた")
     if compose.get("output_mode") != "manifest_only":
         errors.append("GUI Shell構成がManifest-onlyではない")
     policy = compose.get("inheritance_policy", {})
@@ -10143,6 +10191,21 @@ def test_gui_shell_preview_is_read_only_and_non_rollback() -> list[str]:
     errors = []
     errors.extend(validate_instance(request, request_schema))
     errors.extend(validate_instance(receipt, receipt_schema))
+    long_tool_preview = copy.deepcopy(request)
+    long_tool_preview["candidate_manifest"]["tool_ids"] = ["tool-" + "a" * 142]
+    long_tool_preview["candidate_manifest"]["mcp_connection_ids"] = ["mcp.fixture"]
+    if validate_instance(long_tool_preview, request_schema):
+        errors.append("GUI Shell Preview SchemaがBroker生成147文字Tool IDを拒否した")
+    oversized_tool_preview = copy.deepcopy(long_tool_preview)
+    oversized_tool_preview["candidate_manifest"]["tool_ids"] = ["tool-" + "a" * 143]
+    if not validate_instance(oversized_tool_preview, request_schema):
+        errors.append("GUI Shell Preview Schemaが148文字Tool IDを受け入れた")
+    long_tool_preview_receipt = copy.deepcopy(receipt)
+    long_tool_preview_receipt["candidate_manifest"]["tool_ids"] = [
+        "tool-" + "a" * 142
+    ]
+    if validate_instance(long_tool_preview_receipt, receipt_schema):
+        errors.append("GUI Shell Preview Receipt Schemaが147文字Tool IDを拒否した")
     if request.get("preview_mode") != "version_rollback":
         errors.append("GUI Shell Previewの版・rollbackモードが固定されていない")
     if receipt.get("build_status") != "not_started" or receipt.get("export_status") != "not_started":
@@ -10242,6 +10305,22 @@ def test_gui_shell_export_is_new_identity_and_non_inheriting() -> list[str]:
     errors.extend(validate_instance(request, request_schema))
     errors.extend(validate_instance(receipt, receipt_schema))
     errors.extend(validate_instance(manifest_file, manifest_file_schema))
+    long_tool_request = copy.deepcopy(request)
+    long_tool_request["compose_manifest"]["tool_ids"] = ["tool-" + "a" * 142]
+    if validate_instance(long_tool_request, request_schema):
+        errors.append("GUI Shell Export要求Schemaが147文字Tool IDを拒否した")
+    long_tool_manifest_file = copy.deepcopy(manifest_file)
+    long_tool_manifest_file["manifest"]["adapter_configuration"]["tool_ids"] = [
+        "tool-" + "a" * 142
+    ]
+    if validate_instance(long_tool_manifest_file, manifest_file_schema):
+        errors.append("独立App Manifest Schemaが147文字Tool IDを拒否した")
+    long_tool_receipt = copy.deepcopy(receipt)
+    long_tool_receipt["export_manifest"]["adapter_configuration"]["tool_ids"] = [
+        "tool-" + "a" * 142
+    ]
+    if validate_instance(long_tool_receipt, receipt_schema):
+        errors.append("GUI Shell Export Receipt Schemaが147文字Tool IDを拒否した")
     if request.get("target_platform") not in {"windows", "linux", "macos"} or request.get("export_mode") != "manifest_file":
         errors.append("GUI Shell書出しの対象platformまたはManifest file契約が不正")
     if (
@@ -13059,6 +13138,7 @@ def main() -> int:
         test_agent_adapter_probe_is_read_only_and_fail_closed,
         test_agent_comparison_projection_is_isolated_and_non_authoritative,
         test_agent_handoff_projection_requires_reassessment_and_redaction,
+        test_mcp_catalog_tool_id_matches_broker_generated_identity,
         test_gui_shell_compose_is_manifest_only_and_non_inheriting,
         test_gui_shell_preview_is_read_only_and_non_rollback,
         test_gui_shell_edit_proposal_is_owner_review_only,

@@ -93,6 +93,17 @@ pub(super) fn compose(
             )
         }
     };
+    if let Err(reason) = validate_catalog_selection(broker, &manifest) {
+        return broker.reject_with_payload_hash(
+            request_id,
+            OP_COMPOSE,
+            "gui_shell_compose_catalog_mismatch",
+            &reason,
+            true,
+            payload_hash,
+        );
+    }
+    let evidence_source = EVIDENCE_SOURCE_INTERNAL_STATE;
 
     let manifest_value = match serde_json::to_value(&manifest) {
         Ok(value) => value,
@@ -112,7 +123,7 @@ pub(super) fn compose(
         OP_COMPOSE,
         "accepted",
         "構成Manifestだけを生成。build、App identity、Credential、Permission、Approval、Audit chainを継承しない",
-        EVIDENCE_SOURCE_INTERNAL_STATE,
+        evidence_source,
         payload_hash,
     ) {
         Ok(event) => event,
@@ -130,7 +141,7 @@ pub(super) fn compose(
         request_id: request_id.to_string(),
         operation: OP_COMPOSE.to_string(),
         status: BrokerStatus::Accepted,
-        evidence_source: EVIDENCE_SOURCE_INTERNAL_STATE.to_string(),
+        evidence_source: evidence_source.to_string(),
         audit_event_id: audit.event_id.clone(),
         error: None,
         health: None,
@@ -150,7 +161,7 @@ pub(super) fn compose(
                 "credential": "none",
                 "audit_chain": "none"
             },
-            "evidence_source": EVIDENCE_SOURCE_INTERNAL_STATE,
+            "evidence_source": evidence_source,
             "audit_id": audit.event_id,
         })),
         shutdown_requested: broker.shutdown_requested,
@@ -177,6 +188,17 @@ pub(super) fn preview(
             )
         }
     };
+    if let Err(reason) = validate_catalog_selection(broker, &input.candidate_manifest) {
+        return broker.reject_with_payload_hash(
+            request_id,
+            OP_PREVIEW,
+            "gui_shell_preview_catalog_mismatch",
+            &reason,
+            true,
+            payload_hash,
+        );
+    }
+    let evidence_source = EVIDENCE_SOURCE_INTERNAL_STATE;
     let candidate_value = match serde_json::to_value(&input.candidate_manifest) {
         Ok(value) => value,
         Err(_) => {
@@ -203,7 +225,7 @@ pub(super) fn preview(
         OP_PREVIEW,
         "accepted",
         "構成、機能要件、差分、版rollbackをPreview。build、Export、rollback、権限生成は実行しない",
-        EVIDENCE_SOURCE_INTERNAL_STATE,
+        evidence_source,
         payload_hash,
     ) {
         Ok(event) => event,
@@ -237,7 +259,7 @@ pub(super) fn preview(
         request_id: request_id.to_string(),
         operation: OP_PREVIEW.to_string(),
         status: BrokerStatus::Accepted,
-        evidence_source: EVIDENCE_SOURCE_INTERNAL_STATE.to_string(),
+        evidence_source: evidence_source.to_string(),
         audit_event_id: audit.event_id.clone(),
         error: None,
         health: None,
@@ -268,7 +290,7 @@ pub(super) fn preview(
                 "credential": "none",
                 "audit_chain": "none"
             },
-            "evidence_source": EVIDENCE_SOURCE_INTERNAL_STATE,
+            "evidence_source": evidence_source,
             "audit_id": audit.event_id,
         })),
         shutdown_requested: broker.shutdown_requested,
@@ -279,6 +301,38 @@ pub(super) fn parse_manifest(value: &Value) -> Result<ComposeManifest, String> {
     let manifest: ComposeManifest = serde_json::from_value(value.clone())
         .map_err(|_| "GUI Shell構成の構造が不正または禁止fieldがある".to_string())?;
     validate_manifest(manifest)
+}
+
+pub(super) fn validate_catalog_selection(
+    broker: &mut Broker,
+    manifest: &ComposeManifest,
+) -> Result<(), String> {
+    let mut available_tools = BTreeSet::new();
+    for server_id in &manifest.mcp_connection_ids {
+        let entry = broker
+            .mcp_connections
+            .get_mut(server_id)
+            .ok_or_else(|| "選択したMCP接続が現在のBroker Catalogにありません".to_string())?;
+        if entry.quarantined || !entry.connection.is_alive() {
+            return Err("選択したMCP接続が利用可能状態ではありません".to_string());
+        }
+        available_tools.extend(
+            entry
+                .connection
+                .catalog()
+                .tools
+                .iter()
+                .map(|tool| tool.tool_id.clone()),
+        );
+    }
+    if manifest
+        .tool_ids
+        .iter()
+        .any(|tool_id| !available_tools.contains(tool_id))
+    {
+        return Err("選択したToolが選択中の現在MCP Catalogにありません".to_string());
+    }
+    Ok(())
 }
 
 fn parse_preview(value: &Value) -> Result<PreviewInput, String> {
@@ -379,17 +433,22 @@ fn validate_manifest(manifest: ComposeManifest) -> Result<ComposeManifest, Strin
     {
         return Err("構成ID、版、表示名が不正".to_string());
     }
-    for (label, values, limit) in [
-        ("実行基盤", &manifest.runtime_ids, 32usize),
-        ("エージェント", &manifest.agent_ids, 32usize),
-        ("ツール", &manifest.tool_ids, 64usize),
-        ("MCP接続", &manifest.mcp_connection_ids, 32usize),
-        ("機能要件", &manifest.capability_requirements, 64usize),
+    for (label, values, limit, max_length) in [
+        ("実行基盤", &manifest.runtime_ids, 32usize, 128usize),
+        ("エージェント", &manifest.agent_ids, 32usize, 128usize),
+        ("ツール", &manifest.tool_ids, 64usize, 147usize),
+        ("MCP接続", &manifest.mcp_connection_ids, 32usize, 128usize),
+        (
+            "機能要件",
+            &manifest.capability_requirements,
+            64usize,
+            128usize,
+        ),
     ] {
         if values.len() > limit
             || values
                 .iter()
-                .any(|value| value.trim().is_empty() || value.chars().count() > 128)
+                .any(|value| value.trim().is_empty() || value.chars().count() > max_length)
             || values.iter().collect::<BTreeSet<_>>().len() != values.len()
         {
             return Err(format!("{label}選択が不正または重複している"));
@@ -552,6 +611,32 @@ mod tests {
         let mut duplicate = manifest();
         duplicate["agent_ids"] = json!(["codex", "codex"]);
         assert_eq!(call(&mut broker, duplicate).status, BrokerStatus::Rejected);
+    }
+
+    #[test]
+    fn mcp_catalog_tool_ids_accept_147_and_reject_unknown_server() {
+        let valid_tool_id = format!("tool-{}", "a".repeat(142));
+        let oversized_tool_id = format!("tool-{}", "a".repeat(143));
+        let mut valid = manifest();
+        valid["tool_ids"] = json!([valid_tool_id]);
+        assert!(
+            parse_manifest(&valid).is_ok(),
+            "147文字の実Tool IDを受理する"
+        );
+
+        let mut oversized = manifest();
+        oversized["tool_ids"] = json!([oversized_tool_id]);
+        assert!(parse_manifest(&oversized).is_err(), "148文字は拒否する");
+
+        let mut broker = Broker::new("session-1");
+        let mut unregistered = valid;
+        unregistered["mcp_connection_ids"] = json!(["unknown-mcp"]);
+        let response = call(&mut broker, unregistered);
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(
+            response.error.as_ref().map(|error| error.code.as_str()),
+            Some("gui_shell_compose_catalog_mismatch")
+        );
     }
 
     #[test]

@@ -227,6 +227,16 @@ pub(super) fn export(
             )
         }
     };
+    if let Err(reason) = compose_center::validate_catalog_selection(broker, &manifest) {
+        return broker.reject_with_payload_hash(
+            request_id,
+            OPERATION,
+            "gui_shell_export_catalog_mismatch",
+            &reason,
+            true,
+            payload_hash,
+        );
+    }
     let manifest_value = match serde_json::to_value(manifest) {
         Ok(value) => value,
         Err(_) => {
@@ -863,6 +873,36 @@ mod tests {
 
     fn payload() -> Value {
         json!({"version": 1, "export_id": "export-test", "compose_manifest": manifest(), "target_platform": "windows", "export_mode": "manifest_file", "distribution_channel": "local"})
+    }
+
+    #[test]
+    fn mcp_catalog_export_rejects_unknown_reference_before_file_write() {
+        let mut broker = Broker::new("session-1");
+        let root = configure_export_root(&mut broker, "unknown-mcp-catalog");
+        let mut request = payload();
+        request["compose_manifest"]["mcp_connection_ids"] = json!(["mcp.unregistered"]);
+        let response = export(
+            &mut broker,
+            "export-unknown-mcp-catalog",
+            &request,
+            true,
+            OwnerConfirmationSource::OwnerCredential,
+            "sha256:fixture-payload-hash",
+        );
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(
+            response.error.as_ref().map(|error| error.code.as_str()),
+            Some("gui_shell_export_catalog_mismatch")
+        );
+        assert!(
+            fs::read_dir(&root)
+                .expect("書出しdirectoryを確認")
+                .next()
+                .is_none(),
+            "未知CatalogのManifest fileを作らない"
+        );
+        drop(broker);
+        fs::remove_dir_all(root).expect("試験用書出しdirectoryを削除");
     }
 
     fn configure_export_root(broker: &mut Broker, label: &str) -> PathBuf {

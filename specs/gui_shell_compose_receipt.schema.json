@@ -44,7 +44,7 @@
         "display_name": {"type": "string", "minLength": 1, "maxLength": 128},
         "runtime_ids": {"type": "array", "uniqueItems": true, "maxItems": 32, "items": {"type": "string", "minLength": 1, "maxLength": 128}},
         "agent_ids": {"type": "array", "uniqueItems": true, "maxItems": 32, "items": {"type": "string", "minLength": 1, "maxLength": 128}},
-        "tool_ids": {"type": "array", "uniqueItems": true, "maxItems": 64, "items": {"type": "string", "minLength": 1, "maxLength": 128}},
+        "tool_ids": {"type": "array", "uniqueItems": true, "maxItems": 64, "items": {"type": "string", "minLength": 1, "maxLength": 147}},
         "mcp_connection_ids": {"type": "array", "uniqueItems": true, "maxItems": 32, "items": {"type": "string", "minLength": 1, "maxLength": 128}},
         "theme": {
           "type": "object",

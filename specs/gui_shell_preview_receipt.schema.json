@@ -14,13 +14,13 @@
         { "type": "null" },
         {
           "type": "object", "required": ["version", "compose_id", "display_name", "runtime_ids", "agent_ids", "tool_ids", "mcp_connection_ids", "theme", "capability_requirements", "settings", "inheritance_policy", "output_mode"], "additionalProperties": false,
-          "properties": { "version": {}, "compose_id": {}, "display_name": {}, "runtime_ids": {}, "agent_ids": {}, "tool_ids": {}, "mcp_connection_ids": {}, "theme": {}, "capability_requirements": {}, "settings": {}, "inheritance_policy": {}, "output_mode": {} }
+          "properties": { "version": {}, "compose_id": {}, "display_name": {}, "runtime_ids": {}, "agent_ids": {}, "tool_ids": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 147 } }, "mcp_connection_ids": {}, "theme": {}, "capability_requirements": {}, "settings": {}, "inheritance_policy": {}, "output_mode": {} }
         }
       ]
     },
     "candidate_manifest": {
       "type": "object", "required": ["version", "compose_id", "display_name", "runtime_ids", "agent_ids", "tool_ids", "mcp_connection_ids", "theme", "capability_requirements", "settings", "inheritance_policy", "output_mode"], "additionalProperties": false,
-      "properties": { "version": {}, "compose_id": {}, "display_name": {}, "runtime_ids": {}, "agent_ids": {}, "tool_ids": {}, "mcp_connection_ids": {}, "theme": {}, "capability_requirements": {}, "settings": {}, "inheritance_policy": {}, "output_mode": {} }
+      "properties": { "version": {}, "compose_id": {}, "display_name": {}, "runtime_ids": {}, "agent_ids": {}, "tool_ids": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 147 } }, "mcp_connection_ids": {}, "theme": {}, "capability_requirements": {}, "settings": {}, "inheritance_policy": {}, "output_mode": {} }
     },
     "build_target": { "enum": ["windows", "desktop", "mobile"] },
     "preview_mode": { "const": "version_rollback" },

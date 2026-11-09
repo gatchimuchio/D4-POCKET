@@ -602,6 +602,21 @@ void main() {
       throwsA(isA<BrokerClientException>()),
     );
 
+    final malformedToolId = _McpTransport()
+      ..toolMetadata['tool_id'] = 'tool-not-a-broker-id';
+    await expectLater(
+      McpConnectionClient(malformedToolId).list(),
+      throwsA(isA<BrokerClientException>()),
+    );
+
+    final oversizedToolId = _McpTransport()
+      ..toolMetadata['tool_id'] =
+          'tool-${List<String>.filled(143, 'a').join()}';
+    await expectLater(
+      McpConnectionClient(oversizedToolId).list(),
+      throwsA(isA<BrokerClientException>()),
+    );
+
     final leakedResourceUri = _McpTransport()
       ..resourceMetadata['uri'] = 'file:///secret/resource';
     await expectLater(

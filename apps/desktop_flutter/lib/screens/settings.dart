@@ -12,6 +12,7 @@ import '../models/generated_contracts.dart';
 import '../services/ai_edit_client.dart';
 import '../services/compose_client.dart';
 import '../services/export_client.dart';
+import '../services/mcp_connection_client.dart';
 import '../services/profile_client.dart';
 import '../services/shell_core_client.dart';
 import '../services/update_client.dart';
@@ -66,6 +67,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _dangerousOnly = false;
   bool _phaseReleaseOnly = false;
   late final ProfileClient? _profileClient;
+  late final McpConnectionClient? _composeMcpCatalogClient;
   late final ComposeClient? _composeClient;
   late final ExportClient? _exportClient;
   late final AiEditClient? _aiEditClient;
@@ -79,8 +81,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String? _profileMessage;
   String? _exportedProfile;
   String? _composeMessage;
+  String? _composeCatalogMessage;
   String? _composedManifest;
   String? _previewJson;
+  List<McpConnectionSummary> _composeMcpConnections = const [];
+  final Set<String> _selectedComposeMcpConnectionIds = <String>{};
+  final Set<String> _selectedComposeToolIds = <String>{};
+  bool _composeCatalogLoading = false;
   String? _exportMessage;
   String? _exportReceipt;
   bool _exportInProgress = false;
@@ -96,10 +103,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final TextEditingController _composeRuntimeIdsController =
       TextEditingController();
   final TextEditingController _composeAgentIdsController =
-      TextEditingController();
-  final TextEditingController _composeToolIdsController =
-      TextEditingController();
-  final TextEditingController _composeMcpIdsController =
       TextEditingController();
   final TextEditingController _composeCapabilityRequirementsController =
       TextEditingController(text: 'runtime.read\nagent.metadata');
@@ -126,8 +129,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _composeNameController.dispose();
     _composeRuntimeIdsController.dispose();
     _composeAgentIdsController.dispose();
-    _composeToolIdsController.dispose();
-    _composeMcpIdsController.dispose();
     _composeCapabilityRequirementsController.dispose();
     _exportUpdatePublicKeyController.dispose();
     _exportUpdateSourceController.dispose();
@@ -173,6 +174,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _profileClient = widget.client.brokerTransport == null
         ? null
         : ProfileClient(widget.client.brokerTransport!);
+    _composeMcpCatalogClient = widget.client.brokerTransport == null
+        ? null
+        : McpConnectionClient(widget.client.brokerTransport!);
     _composeClient = widget.client.brokerTransport == null
         ? null
         : ComposeClient(widget.client.brokerTransport!);
@@ -353,7 +357,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 8),
           const Text(
-            '各欄は1行につき1つのManifest参照IDです。候補一覧の取得や実在性・接続・信頼の確認は行いません。IDやCapability要件は権限を付与せず、重複などの契約検証はBrokerが行います。',
+            'MCP候補は現在Brokerが保持するmetadata-only Catalogから取得します。候補metadataは未信頼で、Trust・Permission・Approval・Authorityを付与しません。Compose時にもBrokerが接続中Catalogを再照合します。',
           ),
           const SizedBox(height: 8),
           TextField(
@@ -378,27 +382,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          TextField(
-            key: const ValueKey('compose-tool-ids'),
-            controller: _composeToolIdsController,
-            minLines: 1,
-            maxLines: 3,
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-              labelText: 'Tool参照ID（任意・1行に1つ）',
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            key: const ValueKey('compose-mcp-ids'),
-            controller: _composeMcpIdsController,
-            minLines: 1,
-            maxLines: 3,
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-              labelText: 'MCP接続参照ID（任意・1行に1つ）',
-            ),
-          ),
+          _composeMcpCatalogPanel(),
           const SizedBox(height: 8),
           const Text('UI構成（Manifest上の要求。実際の権限は生成しません）'),
           Wrap(
@@ -513,18 +497,174 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Map<String, Object?> _composeManifest() => buildComposeManifestDraft(
-        composeId: _composeIdController.text,
-        displayName: _composeNameController.text,
-        runtimeIds: _composeRuntimeIdsController.text,
-        agentIds: _composeAgentIdsController.text,
-        toolIds: _composeToolIdsController.text,
-        mcpConnectionIds: _composeMcpIdsController.text,
-        themeMode: _composeThemeMode,
-        density: _composeDensity,
-        contentVisibility: _composeContentVisibility,
-        capabilityRequirements: _composeCapabilityRequirementsController.text,
+  Map<String, Object?> _composeManifest() {
+    final toolIds = _selectedComposeToolIds.toList()..sort();
+    final connectionIds = _selectedComposeMcpConnectionIds.toList()..sort();
+    return buildComposeManifestDraft(
+      composeId: _composeIdController.text,
+      displayName: _composeNameController.text,
+      runtimeIds: _composeRuntimeIdsController.text,
+      agentIds: _composeAgentIdsController.text,
+      toolIds: toolIds.join('\n'),
+      mcpConnectionIds: connectionIds.join('\n'),
+      themeMode: _composeThemeMode,
+      density: _composeDensity,
+      contentVisibility: _composeContentVisibility,
+      capabilityRequirements: _composeCapabilityRequirementsController.text,
+    );
+  }
+
+  Widget _composeMcpCatalogPanel() {
+    final client = _composeMcpCatalogClient;
+    final availableTools = _selectedComposeToolCatalog();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        FilledButton.icon(
+          key: const ValueKey('compose-mcp-catalog-refresh'),
+          onPressed: client == null || _composeCatalogLoading
+              ? null
+              : _refreshComposeMcpCatalog,
+          icon: _composeCatalogLoading
+              ? const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.refresh),
+          label: const Text('BrokerのMCP Catalogを更新'),
+        ),
+        if (_composeCatalogMessage != null) ...[
+          const SizedBox(height: 4),
+          Text(_composeCatalogMessage!),
+        ],
+        if (_composeMcpConnections.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Text('Catalog未取得です。接続中のBroker Catalogを更新してください。'),
+          )
+        else ...[
+          for (final connection in _composeMcpConnections)
+            CheckboxListTile(
+              key: ValueKey('compose-mcp-server-${connection.serverId}'),
+              contentPadding: EdgeInsets.zero,
+              value: _selectedComposeMcpConnectionIds
+                  .contains(connection.serverId),
+              onChanged: connection.connectionState == 'connected' &&
+                      connection.executionState == 'ready'
+                  ? (selected) => _setComposeMcpConnectionSelected(
+                        connection,
+                        selected ?? false,
+                      )
+                  : null,
+              title: Text(connection.displayName),
+              subtitle: Text(
+                'Server ID: ${connection.serverId} / ${connection.toolCount} Tool / ${connection.executionState} / Trustは未確立',
+              ),
+              controlAffinity: ListTileControlAffinity.leading,
+            ),
+          if (_selectedComposeMcpConnectionIds.isNotEmpty &&
+              availableTools.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 4),
+              child: Text('選択したMCP接続に選べるToolがありません。'),
+            ),
+          for (final tool in availableTools.values)
+            CheckboxListTile(
+              key: ValueKey('compose-mcp-tool-${tool.toolId}'),
+              contentPadding: const EdgeInsets.only(left: 24),
+              value: _selectedComposeToolIds.contains(tool.toolId),
+              onChanged: (selected) {
+                setState(() {
+                  if (selected ?? false) {
+                    _selectedComposeToolIds.add(tool.toolId);
+                  } else {
+                    _selectedComposeToolIds.remove(tool.toolId);
+                  }
+                });
+              },
+              title: Text(tool.name),
+              subtitle: const Text('Broker Catalogのmetadata。実行権限は付与されません。'),
+              controlAffinity: ListTileControlAffinity.leading,
+            ),
+        ],
+      ],
+    );
+  }
+
+  Map<String, McpToolSummary> _selectedComposeToolCatalog() {
+    final tools = <String, McpToolSummary>{};
+    for (final connection in _composeMcpConnections) {
+      if (!_selectedComposeMcpConnectionIds.contains(connection.serverId) ||
+          connection.connectionState != 'connected' ||
+          connection.executionState != 'ready') {
+        continue;
+      }
+      for (final tool in connection.tools) {
+        tools.putIfAbsent(tool.toolId, () => tool);
+      }
+    }
+    final sorted = tools.keys.toList()..sort();
+    return {for (final toolId in sorted) toolId: tools[toolId]!};
+  }
+
+  void _setComposeMcpConnectionSelected(
+    McpConnectionSummary connection,
+    bool selected,
+  ) {
+    setState(() {
+      if (selected) {
+        _selectedComposeMcpConnectionIds.add(connection.serverId);
+      } else {
+        _selectedComposeMcpConnectionIds.remove(connection.serverId);
+      }
+      final availableToolIds = _selectedComposeToolCatalog().keys.toSet();
+      _selectedComposeToolIds.removeWhere(
+        (toolId) => !availableToolIds.contains(toolId),
       );
+    });
+  }
+
+  Future<void> _refreshComposeMcpCatalog() async {
+    final client = _composeMcpCatalogClient;
+    if (client == null || _composeCatalogLoading) return;
+    setState(() {
+      _composeCatalogLoading = true;
+      _composeCatalogMessage = null;
+    });
+    try {
+      final connections = await client.list();
+      if (!mounted) return;
+      setState(() {
+        _composeMcpConnections = connections;
+        final readyIds = connections
+            .where((connection) =>
+                connection.connectionState == 'connected' &&
+                connection.executionState == 'ready')
+            .map((connection) => connection.serverId)
+            .toSet();
+        _selectedComposeMcpConnectionIds.removeWhere(
+          (serverId) => !readyIds.contains(serverId),
+        );
+        final availableToolIds = _selectedComposeToolCatalog().keys.toSet();
+        _selectedComposeToolIds.removeWhere(
+          (toolId) => !availableToolIds.contains(toolId),
+        );
+        _composeCatalogMessage =
+            'Brokerから${connections.length}件を取得しました。metadataは未信頼で、選択結果はBrokerが再照合します。';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _composeMcpConnections = const [];
+        _selectedComposeMcpConnectionIds.clear();
+        _selectedComposeToolIds.clear();
+        _composeCatalogMessage =
+            'Broker MCP Catalogを取得できません。接続状態を確認して再試行してください。';
+      });
+    } finally {
+      if (mounted) setState(() => _composeCatalogLoading = false);
+    }
+  }
 
   Future<void> _runCompose(ComposeClient client) async {
     try {
@@ -931,8 +1071,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ? Map<String, Object?>.from(body['rollback状態']! as Map)
               : null;
           final installedProduct = rollbackState?['現在版'] is Map;
-          final uninstallAvailable =
-              body['製品アンインストール操作'] == 'available';
+          final uninstallAvailable = body['製品アンインストール操作'] == 'available';
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

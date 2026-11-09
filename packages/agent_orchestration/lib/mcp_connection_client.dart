@@ -918,7 +918,7 @@ class McpConnectionClient {
         final risk = tool['risk'];
         final status = tool['status'];
         if (toolId is! String ||
-            !RegExp(r'^tool-[a-f0-9]{1,251}$').hasMatch(toolId) ||
+            !RegExp(r'^tool-[a-f0-9]{142}$').hasMatch(toolId) ||
             name is! String ||
             !_safeMetadataName(name) ||
             description != '' ||
