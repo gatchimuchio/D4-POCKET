@@ -27,6 +27,12 @@ class AcceptanceUpdateHandler(http.server.BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     def do_GET(self) -> None:
+        if self.path == "/d4/stable/updates.json":
+            self.server.record_event("HTTP_GET_CATALOG")  # type: ignore[attr-defined]
+        elif self.path == "/d4/stable/linux-installed-catalog-display.pkg":
+            self.server.record_event("HTTP_GET_PACKAGE")  # type: ignore[attr-defined]
+        else:
+            self.server.record_event("HTTP_GET_OTHER")  # type: ignore[attr-defined]
         if self.headers.get("Host") != TEST_HOST or self.path not in ALLOWED_FILES:
             self._reply(404, b"not found\n", "text/plain")
             return
@@ -68,6 +74,10 @@ class AcceptanceUpdateHandler(http.server.BaseHTTPRequestHandler):
             self.end_headers()
             while chunk := source.read(1024 * 1024):
                 self.wfile.write(chunk)
+            if filename == "updates.json":
+                self.server.record_event("HTTP_RESPONSE_COMPLETE_CATALOG")  # type: ignore[attr-defined]
+            else:
+                self.server.record_event("HTTP_RESPONSE_COMPLETE_PACKAGE")  # type: ignore[attr-defined]
         self.close_connection = True
 
     def do_HEAD(self) -> None:
@@ -89,6 +99,42 @@ class AcceptanceUpdateHandler(http.server.BaseHTTPRequestHandler):
 class AcceptanceUpdateServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     daemon_threads = True
     allow_reuse_address = False
+
+    def record_event(self, event: str) -> None:
+        if event in {
+            "TLS_ACCEPT",
+            "TLS_ACCEPT_FAILURE",
+            "HTTP_GET_CATALOG",
+            "HTTP_GET_PACKAGE",
+            "HTTP_GET_OTHER",
+            "HTTP_RESPONSE_COMPLETE_CATALOG",
+            "HTTP_RESPONSE_COMPLETE_PACKAGE",
+        }:
+            print(f"UPDATE_SERVER_EVENT {event}", flush=True)
+
+    def get_request(self):
+        try:
+            request, client_address = super().get_request()
+        except OSError as error:
+            reason = getattr(error, "reason", None)
+            if (
+                not isinstance(reason, str)
+                or not reason.isascii()
+                or not reason.replace("_", "").isalnum()
+            ):
+                reason = "other"
+            self.record_event("TLS_ACCEPT_FAILURE")
+            print(f"UPDATE_SERVER_TLS_REASON {reason[:80]}", flush=True)
+            raise
+        self.record_event("TLS_ACCEPT")
+        return request, client_address
+
+    def handle_error(self, _request, _client_address) -> None:
+        error = sys.exc_info()[1]
+        name = type(error).__name__ if error is not None else "unknown"
+        if not name.isascii() or not name.isalnum():
+            name = "other"
+        print(f"UPDATE_SERVER_HANDLER_FAILURE {name}", flush=True)
 
 
 def main() -> int:

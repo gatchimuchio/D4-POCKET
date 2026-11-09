@@ -774,17 +774,7 @@ where
 }
 
 fn map_reqwest_error(error: reqwest::Error) -> DownloadError {
-    let timed_out = error.is_timeout();
-    #[cfg(feature = "r2-e2e")]
-    if std::env::var_os(R2_E2E_UPDATE_CA_ENV).is_some() {
-        let connect_error = error.is_connect();
-        let detail = error.without_url().to_string();
-        let bounded_detail: String = detail.chars().take(512).collect();
-        eprintln!(
-            "R2 E2E update transport failure: connect={connect_error} timeout={timed_out} detail={bounded_detail}"
-        );
-    }
-    if timed_out {
+    if error.is_timeout() {
         DownloadError::TimedOut
     } else {
         DownloadError::Network
