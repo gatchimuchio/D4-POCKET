@@ -3816,7 +3816,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
-      "sha256": "663bf3fbd50f66cb3b2f559d7a727ebd8d9490ad0d16a6182d783d40b1ad272c"
+      "sha256": "50da79deaf2c1b9d606f1002319440f2e5867854d083a7e873fbe95afc2bbc0e"
     },
     {
       "path": "native/rust_helper/src/broker/update_download/windows_dns.rs",
