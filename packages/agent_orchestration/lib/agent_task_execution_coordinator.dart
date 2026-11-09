@@ -150,6 +150,7 @@ class AgentTaskExecutionCoordinator {
             sourceTask: sourceTask,
             isCurrent: () => _isCurrent(run),
             onUpdate: (update) => _emit(run, mcpUpdate: update),
+            onSessionNotice: (message) => _emitSessionNotice(run, message),
           );
       if (!_isCurrent(run)) return;
       final followup = outcome.followupTask;
@@ -165,6 +166,17 @@ class AgentTaskExecutionCoordinator {
       );
     } on Object catch (error) {
       _emit(run, error: _errorMessage(error));
+    }
+  }
+
+  Future<void> _emitSessionNotice(_TaskRun run, String message) async {
+    if (_disposed) return;
+    try {
+      await run.onUpdate(
+        AgentTaskExecutionUpdate(sessionRecoveryNotice: message),
+      );
+    } on Object {
+      // Recovery notices are informational and never own execution progression.
     }
   }
 
@@ -205,12 +217,14 @@ class AgentTaskExecutionUpdate {
     this.mcpUpdate,
     this.message,
     this.error,
+    this.sessionRecoveryNotice,
   });
 
   final AgentTaskRecord? task;
   final AgentMcpTaskUpdate? mcpUpdate;
   final String? message;
   final String? error;
+  final String? sessionRecoveryNotice;
 }
 
 class _TaskRun {

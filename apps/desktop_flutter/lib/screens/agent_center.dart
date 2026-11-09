@@ -1340,9 +1340,12 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
         task: initialTask,
         allowMcpContinuation: allowMcpContinuation,
         onUpdate: (update) {
+          final hasSessionRecoveryNotice =
+              update.sessionRecoveryNotice != null;
           if (!mounted ||
               !identical(_agentTasks[session.sessionId], state) ||
-              (state.record?.taskId != null &&
+              (!hasSessionRecoveryNotice &&
+                  state.record?.taskId != null &&
                   state.record!.taskId != initialTask.taskId &&
                   state.record!.taskId != state.mcpFollowupTaskId)) {
             return;
@@ -1402,6 +1405,10 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
             if (update.message case final message?) {
               state.mcpContinuationStatus = message;
               _taskPreflightStatus[session.sessionId] = message;
+            }
+            if (update.sessionRecoveryNotice case final notice?) {
+              state.mcpContinuationStatus = notice;
+              _taskPreflightStatus[session.sessionId] = notice;
             }
             if (update.error case final error?) {
               state.mcpContinuationStatus = '停止: $error';
