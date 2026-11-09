@@ -3055,6 +3055,8 @@ void main() {
         .toSet();
     expect(grantOperations,
         {'AgentTaskWorkspacePermissionGrant', 'AgentTaskOwnerApprovalGrant'});
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 2));
   });
 
   testWidgets('Agent CenterはSession結合後のTask unsupportedを事前検査しgrantへ進まない',
@@ -3264,6 +3266,12 @@ void main() {
         'AgentTask状態',
         taskRecord(status: 'completed', resultHash: resultHash),
       ),
+      // Coordinator polling and the explicit UI refresh each consume one
+      // Broker state response; keep the following Approval response aligned.
+      _brokerAcceptedBody(
+        'AgentTask状態',
+        taskRecord(status: 'completed', resultHash: resultHash),
+      ),
       _brokerAcceptedBody('AgentTask結果表示承認', {
         'task_id': taskId,
         'result_hash': resultHash,
@@ -3393,6 +3401,10 @@ void main() {
           'AgentTask結果表示承認',
           'AgentTask結果取得',
         ]));
+    expect(
+      transport.operations.where((operation) => operation == 'AgentTask状態'),
+      hasLength(2),
+    );
     final approvalRequest = transport.requests.firstWhere(
       (request) => request['operation'] == 'AgentTaskOwnerApprovalGrant',
     );
@@ -3401,6 +3413,8 @@ void main() {
       '合成のTask指示（秘密情報なし）',
     );
     expect(find.textContaining('PRIVATE_TASK_SENTINEL'), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 2));
   });
 
   testWidgets('Agent CenterはTask完了後にMCP結果依存Taskを自動でBrokerへ接続する',
