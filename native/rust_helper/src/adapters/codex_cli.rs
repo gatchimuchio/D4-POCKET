@@ -11,9 +11,13 @@ use crate::broker::dialogue::{
     実行系Adapter, 実行結果, 対話失敗, 対話要求, AgentTaskAdapterExecution,
     AgentTaskScratchObservation,
 };
+use crate::mcp_task_tool_stdio::{
+    validate_proposal, TASK_TOOL_NAME, TASK_TOOL_SERVER_ARGUMENT, TASK_TOOL_SERVER_NAME,
+};
 use cap_fs_ext::DirExt;
 use cap_std::fs::Dir;
 use serde_json::{json, Value};
+use std::collections::BTreeSet;
 use std::env;
 #[cfg(all(feature = "r2-e2e", not(test)))]
 use std::fs;
@@ -334,6 +338,7 @@ impl CodexCliAdapter {
         };
         let before_state_hash = temp_environment.before_state_hash.clone();
         let after_state_hash = temp_environment.after_state_hash.clone();
+        let mcp_enabled = context.mcp_capability_snapshot_hash.is_some();
         #[cfg(any(test, feature = "r2-e2e"))]
         let result = run_agent_task(
             &self.executable,
@@ -346,6 +351,7 @@ impl CodexCliAdapter {
             credential.as_deref().map(Vec::as_slice),
             cancel,
             deadline,
+            mcp_enabled,
             self.test_responses_api.as_ref(),
         );
         #[cfg(not(any(test, feature = "r2-e2e")))]
@@ -360,6 +366,7 @@ impl CodexCliAdapter {
             credential.as_deref().map(Vec::as_slice),
             cancel,
             deadline,
+            mcp_enabled,
         );
         let tool_exit_code = result.as_ref().ok().map(|_| 0);
         #[cfg(feature = "r2-e2e")]
@@ -418,6 +425,7 @@ impl CodexCliAdapter {
             CodexSandbox::ReadOnly,
             None,
             &[],
+            false,
             None,
         )?;
         #[cfg(not(any(test, feature = "r2-e2e")))]
@@ -431,6 +439,7 @@ impl CodexCliAdapter {
             CodexSandbox::ReadOnly,
             None,
             &[],
+            false,
         )?;
         let stdout = child.child.stdout.take().ok_or(対話失敗::通信失敗)?;
         let stderr = child.child.stderr.take().ok_or(対話失敗::通信失敗)?;
@@ -917,6 +926,23 @@ fn valid_model_id(value: &str) -> bool {
         })
 }
 
+/// `--ignore-user-config`はCodexのproject configを無視しないため、
+/// 作業領域とその祖先をこのTask実行中だけuntrustedへ固定する。
+/// これによりWorkspace由来のMCP server・hook・ruleを実行経路へ入れない。
+fn untrusted_project_config_overrides(workspace: &Path) -> Result<Vec<String>, 対話失敗> {
+    if !workspace.is_absolute() {
+        return Err(対話失敗::要求不正);
+    }
+    workspace
+        .ancestors()
+        .map(|ancestor| {
+            let path = ancestor.to_str().ok_or(対話失敗::要求不正)?;
+            let key = serde_json::to_string(path).map_err(|_| 対話失敗::要求不正)?;
+            Ok(format!("projects.{key}.trust_level=\"untrusted\""))
+        })
+        .collect()
+}
+
 fn valid_credential_id(value: &str) -> bool {
     value.len() == 32
         && value
@@ -1165,11 +1191,12 @@ fn spawn_codex_task(
     sandbox: CodexSandbox,
     scratch: Option<&WorkspaceTaskScratch>,
     secret_paths: &[String],
+    enable_mcp_task_tool: bool,
     #[cfg(any(test, feature = "r2-e2e"))] test_responses_api: Option<&CodexCliTestResponses>,
 ) -> Result<process_tree::SupervisedChild, 対話失敗> {
     let workspace_guard = pin_registered_workspace(workspace, expected_workspace)?;
     #[cfg(any(test, feature = "r2-e2e"))]
-    let task_command = build_codex_command_with_model(
+    let task_command = build_codex_command_with_model_and_task_tool(
         executable,
         workspace,
         sandbox,
@@ -1177,10 +1204,11 @@ fn spawn_codex_task(
         secret_paths,
         model_id,
         provider_credential,
+        enable_mcp_task_tool,
         test_responses_api,
     )?;
     #[cfg(not(any(test, feature = "r2-e2e")))]
-    let task_command = build_codex_command_with_model(
+    let task_command = build_codex_command_with_model_and_task_tool(
         executable,
         workspace,
         sandbox,
@@ -1188,6 +1216,7 @@ fn spawn_codex_task(
         secret_paths,
         model_id,
         provider_credential,
+        enable_mcp_task_tool,
     )?;
     if matches!(sandbox, CodexSandbox::WorkspaceWrite) {
         // Scratch作成後のWorkspace変化をもう一度確認し、CLI起動直前の秘密別名を拒否する。
@@ -1246,6 +1275,7 @@ fn build_codex_command(
     )
 }
 
+#[cfg(test)]
 fn build_codex_command_with_model(
     executable: &Path,
     workspace: &Path,
@@ -1256,9 +1286,38 @@ fn build_codex_command_with_model(
     provider_credential: Option<&[u8]>,
     #[cfg(any(test, feature = "r2-e2e"))] test_responses_api: Option<&CodexCliTestResponses>,
 ) -> Result<Command, 対話失敗> {
+    build_codex_command_with_model_and_task_tool(
+        executable,
+        workspace,
+        sandbox,
+        scratch,
+        secret_paths,
+        model_id,
+        provider_credential,
+        false,
+        #[cfg(any(test, feature = "r2-e2e"))]
+        test_responses_api,
+    )
+}
+
+fn build_codex_command_with_model_and_task_tool(
+    executable: &Path,
+    workspace: &Path,
+    sandbox: CodexSandbox,
+    scratch: Option<&Path>,
+    secret_paths: &[String],
+    model_id: Option<&str>,
+    provider_credential: Option<&[u8]>,
+    enable_mcp_task_tool: bool,
+    #[cfg(any(test, feature = "r2-e2e"))] test_responses_api: Option<&CodexCliTestResponses>,
+) -> Result<Command, 対話失敗> {
     if model_id.is_some_and(|model| !valid_model_id(model)) {
         return Err(対話失敗::要求不正);
     }
+    if enable_mcp_task_tool && !matches!(sandbox, CodexSandbox::WorkspaceWrite) {
+        return Err(対話失敗::要求不正);
+    }
+    let project_config_overrides = untrusted_project_config_overrides(workspace)?;
     let task_temporary_environment = scratch
         .map(|path| TaskTemporaryEnvironment::bind(workspace, path))
         .transpose()?;
@@ -1328,6 +1387,9 @@ fn build_codex_command_with_model(
         // D4 Brokerが指示hashへ束縛した一回Owner Approvalを消費してからTaskを起動する。
         // CLI自身の二重確認は行わず、直後の専用permission profileで作用範囲を制限する。
         task_command.arg("-c").arg("approval_policy=\"never\"");
+        for setting in project_config_overrides {
+            task_command.arg("-c").arg(setting);
+        }
         for setting in TASK_PERMISSION_PROFILE_PREFIX_OVERRIDES
             .iter()
             .chain(TASK_PERMISSION_PROFILE_PLATFORM_OVERRIDES.iter())
@@ -1351,6 +1413,27 @@ fn build_codex_command_with_model(
     }
     if let Some(task_temporary_environment) = task_temporary_environment {
         task_temporary_environment.apply(&mut task_command);
+    }
+    if enable_mcp_task_tool {
+        let helper = env::current_exe().map_err(|_| 対話失敗::通信失敗)?;
+        let helper = helper.to_str().ok_or(対話失敗::要求不正)?;
+        let helper = serde_json::to_string(helper).map_err(|_| 対話失敗::要求不正)?;
+        let arguments = serde_json::to_string(&[TASK_TOOL_SERVER_ARGUMENT])
+            .map_err(|_| 対話失敗::要求不正)?;
+        let enabled_tools =
+            serde_json::to_string(&[TASK_TOOL_NAME]).map_err(|_| 対話失敗::要求不正)?;
+        let mcp_server_overrides = [
+            format!("mcp_servers.d4p_task_request.command={helper}"),
+            format!("mcp_servers.d4p_task_request.args={arguments}"),
+            "mcp_servers.d4p_task_request.enabled=true".to_owned(),
+            "mcp_servers.d4p_task_request.required=true".to_owned(),
+            format!("mcp_servers.d4p_task_request.enabled_tools={enabled_tools}"),
+            "mcp_servers.d4p_task_request.default_tools_approval_mode=\"auto\"".to_owned(),
+            "mcp_servers.d4p_task_request.startup_timeout_sec=5".to_owned(),
+        ];
+        for setting in mcp_server_overrides {
+            task_command.arg("-c").arg(setting);
+        }
     }
     task_command.args(["exec", "--json", "--ephemeral", "--ignore-user-config"]);
     if let Some(model_id) = model_id {
@@ -1462,6 +1545,7 @@ fn run_agent_task(
     provider_credential: Option<&[u8]>,
     cancel: &AtomicBool,
     deadline: Instant,
+    mcp_enabled: bool,
     #[cfg(any(test, feature = "r2-e2e"))] test_responses_api: Option<&CodexCliTestResponses>,
 ) -> Result<String, 対話失敗> {
     if Instant::now() >= deadline {
@@ -1481,6 +1565,7 @@ fn run_agent_task(
         CodexSandbox::WorkspaceWrite,
         Some(scratch),
         secret_paths,
+        mcp_enabled,
         test_responses_api,
     )?;
     #[cfg(not(any(test, feature = "r2-e2e")))]
@@ -1494,6 +1579,7 @@ fn run_agent_task(
         CodexSandbox::WorkspaceWrite,
         Some(scratch),
         secret_paths,
+        mcp_enabled,
     )?;
     let stdout = child.child.stdout.take().ok_or(対話失敗::通信失敗)?;
     let stderr = child.child.stderr.take().ok_or(対話失敗::通信失敗)?;
@@ -1557,7 +1643,7 @@ fn run_agent_task(
         }
         return Err(対話失敗::通信失敗);
     }
-    let parsed = parse_jsonl(&stdout);
+    let parsed = parse_jsonl_with_mcp(&stdout);
     #[cfg(any(test, feature = "r2-e2e"))]
     if let (Some(test_api), Err(_)) = (test_responses_api, &parsed) {
         #[cfg(feature = "r2-e2e")]
@@ -1568,7 +1654,11 @@ fn run_agent_task(
             loopback_test_safe_failure_summary(status.code(), &stdout, &_stderr)
         );
     }
-    parsed.map(|(message, _)| message)
+    let (message, _, proposal) = parsed?;
+    if let Some(proposal) = proposal {
+        return Ok(proposal);
+    }
+    Ok(message)
 }
 
 #[cfg(any(test, feature = "r2-e2e"))]
@@ -1777,10 +1867,17 @@ fn bounded_read<R: Read>(mut reader: R) -> Result<Vec<u8>, ()> {
 }
 
 fn parse_jsonl(output: &[u8]) -> Result<(String, String), 対話失敗> {
+    let (message, thread_id, _) = parse_jsonl_with_mcp(output)?;
+    Ok((message, thread_id))
+}
+
+fn parse_jsonl_with_mcp(output: &[u8]) -> Result<(String, String, Option<String>), 対話失敗> {
     let text = std::str::from_utf8(output).map_err(|_| 対話失敗::応答不正)?;
     let mut final_text = None;
     let mut thread_id = None;
     let mut turn_completed = false;
+    let mut task_mcp_call_ids = BTreeSet::new();
+    let mut task_mcp_proposal = None;
     for line in text.lines().filter(|line| !line.trim().is_empty()) {
         let value: Value = serde_json::from_str(line).map_err(|_| 対話失敗::応答不正)?;
         match value.get("type").and_then(Value::as_str) {
@@ -1791,9 +1888,37 @@ fn parse_jsonl(output: &[u8]) -> Result<(String, String), 対話失敗> {
                     .filter(|value| !value.is_empty())
                     .map(str::to_owned);
             }
-            Some("item.completed") => {
+            Some("item.started") | Some("item.completed") => {
                 let item = value.get("item").ok_or(対話失敗::応答不正)?;
-                if item.get("type").and_then(Value::as_str) == Some("agent_message") {
+                let is_task_mcp_call = item.get("type").and_then(Value::as_str)
+                    == Some("mcp_tool_call")
+                    && item.get("server").and_then(Value::as_str) == Some(TASK_TOOL_SERVER_NAME)
+                    && item.get("tool").and_then(Value::as_str) == Some(TASK_TOOL_NAME);
+                if is_task_mcp_call {
+                    let item_id = item
+                        .get("id")
+                        .and_then(Value::as_str)
+                        .ok_or(対話失敗::応答不正)?;
+                    task_mcp_call_ids.insert(item_id.to_owned());
+                    if task_mcp_call_ids.len() > 1 {
+                        return Err(対話失敗::応答不正);
+                    }
+                    if value.get("type").and_then(Value::as_str) == Some("item.completed")
+                        && item.get("status").and_then(Value::as_str) == Some("completed")
+                    {
+                        if task_mcp_proposal.is_some() {
+                            return Err(対話失敗::応答不正);
+                        }
+                        let arguments = item.get("arguments").ok_or(対話失敗::応答不正)?;
+                        task_mcp_proposal = Some(
+                            validate_proposal(&json!({"d4_mcp_tool_request": arguments}))
+                                .ok_or(対話失敗::応答不正)?,
+                        );
+                    }
+                }
+                if value.get("type").and_then(Value::as_str) == Some("item.completed")
+                    && item.get("type").and_then(Value::as_str) == Some("agent_message")
+                {
                     let message = item
                         .get("text")
                         .and_then(Value::as_str)
@@ -1816,6 +1941,7 @@ fn parse_jsonl(output: &[u8]) -> Result<(String, String), 対話失敗> {
     Ok((
         final_text.ok_or(対話失敗::応答不正)?,
         thread_id.unwrap_or_else(|| "unknown".into()),
+        task_mcp_proposal,
     ))
 }
 
@@ -1856,6 +1982,7 @@ mod tests {
             task_id: "task-fixture".into(),
             runtime_id: "runtime-fixture".into(),
             workspace_id: "workspace-fixture".into(),
+            mcp_capability_snapshot_hash: None,
             recovery_binding_hash: format!("sha256:{}", "a".repeat(64)),
             root_identity: identity,
             secret_paths: vec!["private/credential-backup.txt".into()],
@@ -1864,7 +1991,7 @@ mod tests {
     }
 
     #[test]
-    fn 実物jsonlのfinal_messageだけを本文へ射影する() {
+    fn mcp_task_tool_stdio_jsonl_通常応答のfinal_messageだけを本文へ射影する() {
         let output =
             br#"{"type":"thread.started","thread_id":"01a0cd58-c4fc-7221-8d25-dc52d12ba3fd"}
 {"type":"turn.started"}
@@ -1880,7 +2007,43 @@ mod tests {
     }
 
     #[test]
-    fn 不完全または失敗eventを成功へ昇格しない() {
+    fn mcp_task_tool_stdio_jsonl_MCP_callイベントからBroker検証用の要求だけを回収する() {
+        let output = format!(
+            "{{\"type\":\"item.started\",\"item\":{{\"id\":\"mcp_0\",\"type\":\"mcp_tool_call\",\"server\":\"{TASK_TOOL_SERVER_NAME}\",\"tool\":\"{TASK_TOOL_NAME}\",\"status\":\"in_progress\"}}}}\n\
+             {{\"type\":\"item.completed\",\"item\":{{\"id\":\"mcp_0\",\"type\":\"mcp_tool_call\",\"server\":\"{TASK_TOOL_SERVER_NAME}\",\"tool\":\"{TASK_TOOL_NAME}\",\"arguments\":{{\"server_id\":\"server-fixture\",\"tool_id\":\"tool-{}\",\"name\":\"read_fixture\",\"arguments\":{{\"query\":\"fixture\"}}}},\"status\":\"completed\",\"result\":{{\"content\":[{{\"type\":\"text\",\"text\":\"queued\"}}]}}}}}}\n\
+             {{\"type\":\"item.completed\",\"item\":{{\"id\":\"message_0\",\"type\":\"agent_message\",\"text\":\"Request submitted\"}}}}\n\
+             {{\"type\":\"turn.completed\"}}",
+            "a".repeat(142)
+        );
+        let (message, thread_id, proposal) = parse_jsonl_with_mcp(output.as_bytes()).unwrap();
+        assert_eq!(message, "Request submitted");
+        assert_eq!(thread_id, "unknown");
+        let proposal: Value = serde_json::from_str(&proposal.unwrap()).unwrap();
+        assert_eq!(proposal["d4_mcp_tool_request"]["name"], "read_fixture");
+    }
+
+    #[test]
+    fn mcp_task_tool_stdio_jsonl_MCP_callを複数回またはAuthority字段付きで受理しない() {
+        let id_a = format!("{{\"type\":\"item.started\",\"item\":{{\"id\":\"a\",\"type\":\"mcp_tool_call\",\"server\":\"{TASK_TOOL_SERVER_NAME}\",\"tool\":\"{TASK_TOOL_NAME}\"}}}}\n");
+        let id_b = format!("{{\"type\":\"item.started\",\"item\":{{\"id\":\"b\",\"type\":\"mcp_tool_call\",\"server\":\"{TASK_TOOL_SERVER_NAME}\",\"tool\":\"{TASK_TOOL_NAME}\"}}}}\n");
+        let duplicate = format!("{id_a}{id_b}{{\"type\":\"turn.completed\"}}");
+        assert_eq!(
+            parse_jsonl_with_mcp(duplicate.as_bytes()),
+            Err(対話失敗::応答不正)
+        );
+
+        let authority = format!(
+            "{{\"type\":\"item.completed\",\"item\":{{\"id\":\"mcp_0\",\"type\":\"mcp_tool_call\",\"server\":\"{TASK_TOOL_SERVER_NAME}\",\"tool\":\"{TASK_TOOL_NAME}\",\"arguments\":{{\"server_id\":\"server-fixture\",\"tool_id\":\"tool-{}\",\"name\":\"read_fixture\",\"arguments\":{{}},\"permission\":\"owner\"}},\"status\":\"completed\"}}}}\n{{\"type\":\"item.completed\",\"item\":{{\"id\":\"message_0\",\"type\":\"agent_message\",\"text\":\"ignored\"}}}}\n{{\"type\":\"turn.completed\"}}",
+            "a".repeat(142)
+        );
+        assert_eq!(
+            parse_jsonl_with_mcp(authority.as_bytes()),
+            Err(対話失敗::応答不正)
+        );
+    }
+
+    #[test]
+    fn mcp_task_tool_stdio_jsonl_不完全または失敗eventを成功へ昇格しない() {
         assert_eq!(
             parse_jsonl(br#"{"type":"turn.completed"}"#),
             Err(対話失敗::応答不正)
@@ -2135,6 +2298,90 @@ mod tests {
         assert_eq!(metadata["authentication"]["method"], "codex_cli_managed");
         assert_eq!(metadata["authentication"]["status"], "unknown");
         assert_eq!(metadata["authentication"]["secret_value_present"], false);
+    }
+
+    #[cfg(any(windows, target_os = "linux"))]
+    #[test]
+    fn mcp_task_tool_stdio_config_能力がBrokerから束縛されたTaskだけへ単一の提案Toolを公開する() {
+        let root = codex_cli_fixture::FixtureTempDirectory::create();
+        let workspace = root.path().join("workspace");
+        let scratch = workspace.join(".d4p-task-scratch");
+        fs::create_dir_all(&scratch).unwrap();
+        let executable = std::env::current_exe().unwrap();
+        let command = build_codex_command_with_model_and_task_tool(
+            &executable,
+            &workspace,
+            CodexSandbox::WorkspaceWrite,
+            Some(&scratch),
+            &[],
+            None,
+            None,
+            true,
+            None,
+        )
+        .expect("BrokerがCapabilityへ束縛したMCP要求設定");
+        let args = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().to_string())
+            .collect::<Vec<_>>();
+        let exec_index = args.iter().position(|arg| arg == "exec").unwrap();
+        let project_trust_settings = args[..exec_index]
+            .windows(2)
+            .filter(|pair| pair[0] == "-c")
+            .map(|pair| pair[1].as_str())
+            .filter(|setting| setting.starts_with("projects."))
+            .collect::<Vec<_>>();
+        let workspace_key = serde_json::to_string(workspace.to_str().unwrap()).unwrap();
+        assert!(project_trust_settings
+            .contains(&format!("projects.{workspace_key}.trust_level=\"untrusted\"").as_str()));
+        assert_eq!(
+            project_trust_settings.len(),
+            workspace.ancestors().count(),
+            "Codexが選ぶrootがWorkspaceの祖先でもproject configを無効化する"
+        );
+        let settings = args[..exec_index]
+            .windows(2)
+            .filter(|pair| pair[0] == "-c")
+            .map(|pair| pair[1].as_str())
+            .filter(|setting| setting.starts_with("mcp_servers.d4p_task_request."))
+            .collect::<Vec<_>>();
+        assert_eq!(settings.len(), 7);
+        assert!(settings.iter().any(|setting| {
+            setting.starts_with("mcp_servers.d4p_task_request.command=")
+                && setting.contains("gui_shell")
+        }));
+        assert!(settings.iter().any(|setting| {
+            *setting
+                == format!("mcp_servers.d4p_task_request.args=[\"{TASK_TOOL_SERVER_ARGUMENT}\"]")
+        }));
+        assert!(settings.iter().any(|setting| {
+            *setting == format!("mcp_servers.d4p_task_request.enabled_tools=[\"{TASK_TOOL_NAME}\"]")
+        }));
+        assert!(settings
+            .iter()
+            .any(|setting| *setting == "mcp_servers.d4p_task_request.required=true"));
+        assert!(settings.iter().any(|setting| {
+            *setting == "mcp_servers.d4p_task_request.default_tools_approval_mode=\"auto\""
+        }));
+        assert!(command.get_envs().all(|(name, value)| {
+            name != "D4P_TASK_MCP_SUBMISSION_TOKEN"
+                && name != "D4P_TASK_MCP_SUBMISSION_ADDRESS"
+                && value.map_or(true, |value| {
+                    !value.to_string_lossy().contains("submission")
+                })
+        }));
+        assert!(build_codex_command_with_model_and_task_tool(
+            &executable,
+            &workspace,
+            CodexSandbox::ReadOnly,
+            None,
+            &[],
+            None,
+            None,
+            true,
+            None,
+        )
+        .is_err());
     }
 
     #[test]
@@ -3187,6 +3434,7 @@ exit 0
                 CodexSandbox::WorkspaceWrite,
                 Some(&scratch),
                 &secrets,
+                false,
                 None,
             ),
             Err(対話失敗::作業領域不在)

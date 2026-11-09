@@ -2,6 +2,14 @@
 
 #[cfg(target_os = "linux")]
 fn main() {
+    match gui_shell_rust_helper::mcp_task_tool_stdio::maybe_run_stdio_from_process() {
+        Ok(true) => return,
+        Ok(false) => {}
+        Err(_) => {
+            eprintln!("D4 PocketのMCP Task要求受付を安全に終了しました。");
+            std::process::exit(1);
+        }
+    }
     let mut arguments = std::env::args_os().skip(1);
     if let Some(argument) = arguments.next() {
         if arguments.next().is_some()

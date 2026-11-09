@@ -1913,6 +1913,7 @@ impl 対話制御 {
                     task_id: task_id.clone(),
                     runtime_id: request.agent_runtime_id.clone(),
                     workspace_id: request.workspace_id.clone(),
+                    mcp_capability_snapshot_hash: request.mcp_capability_snapshot_hash.clone(),
                     recovery_binding_hash: binding.recovery_binding_hash().to_string(),
                     root_identity: binding.root_directory_identity(),
                     secret_paths: binding.secret_paths().to_vec(),

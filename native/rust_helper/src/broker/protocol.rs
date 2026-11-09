@@ -7106,6 +7106,7 @@ mod tests {
                 task_id: "fixture-task".into(),
                 runtime_id: "fixture-runtime".into(),
                 workspace_id: "fixture-workspace".into(),
+                mcp_capability_snapshot_hash: None,
                 recovery_binding_hash: binding.recovery_binding_hash().to_owned(),
                 root_identity: binding.root_directory_identity(),
                 secret_paths: binding.secret_paths().to_vec(),

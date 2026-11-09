@@ -37,6 +37,7 @@ pub mod macos_desktop_worker;
 #[cfg(any(target_os = "macos", test))]
 mod macos_workspace_selection;
 pub(crate) mod mcp;
+pub mod mcp_task_tool_stdio;
 pub mod network;
 pub mod process;
 pub mod product_package;
