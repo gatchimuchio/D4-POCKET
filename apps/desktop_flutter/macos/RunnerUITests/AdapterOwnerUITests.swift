@@ -303,11 +303,7 @@ final class AdapterOwnerUITests: XCTestCase {
       format: "label CONTAINS %@ OR value CONTAINS %@", "macos-mcp-public-result", "macos-mcp-public-result")).firstMatch.exists)
     // 公開画像とAX縦位置が不一致だった。新consumerは可視Server行から切断を操作する。
     do {
-      if credentialBinding {
-        try clickMcpCredentialDisconnect(app)
-      } else {
-        try mcpPublicText(app, "切断", click: true, scrollUp: true)
-      }
+      try clickMcpPublicDisconnect(app)
     } catch {
       if credentialBinding {
         let disconnect = app.buttons["切断"]
@@ -334,9 +330,9 @@ final class AdapterOwnerUITests: XCTestCase {
     XCTAssertTrue(app.wait(for: .notRunning, timeout: 10))
   }
 
-  private func clickMcpCredentialDisconnect(_ app: XCUIApplication) throws {
-    // 現行ListTileの既知trailing buttonの横位置と、可視の合成Server名の縦位置を結合する。
-    // 公開画像でAX縦位置が更新されない実観測。AXだけを可視性の証拠にしない。
+  private func clickMcpPublicDisconnect(_ app: XCUIApplication) throws {
+    // 2文字のbutton labelをVision OCRで読むのではなく、公開Server行の可視位置と
+    // 現行ListTileの既知trailing button横位置を結合し、秘密・別Serverを誤操作しない。
     guard !app.sheets.firstMatch.exists, !app.secureTextFields.firstMatch.exists else {
       throw failure("秘密入力中に切断を操作しない")
     }
