@@ -86,7 +86,7 @@ class AgentTaskExecutionCoordinator {
 
   Future<void> _monitor(_TaskRun run) async {
     var current = run.initialTask;
-    await _emit(run, task: current);
+    _emit(run, task: current);
     if (!_isCurrent(run)) return;
 
     if (const {'pending', 'running'}.contains(current.status)) {
@@ -99,9 +99,9 @@ class AgentTaskExecutionCoordinator {
         if (!_isCurrent(run)) return;
         try {
           current = await AgentTaskClient(_transport).state(current.taskId);
-          await _emit(run, task: current);
+          _emit(run, task: current);
         } on Object catch (error) {
-          await _emit(run, message: _errorMessage(error));
+          _emit(run, message: _errorMessage(error));
         }
         if (!_isCurrent(run)) return;
         if (const {'pending', 'running'}.contains(current.status)) {
@@ -114,7 +114,7 @@ class AgentTaskExecutionCoordinator {
         }
       }
       if (const {'pending', 'running'}.contains(current.status)) {
-        await _emit(
+        _emit(
           run,
           error: '自動監視の上限時間を過ぎました。Broker Taskは保持されています。',
         );
@@ -159,29 +159,33 @@ class AgentTaskExecutionCoordinator {
         ),
       );
     } on Object catch (error) {
-      await _emit(run, error: _errorMessage(error));
+      _emit(run, error: _errorMessage(error));
     }
   }
 
-  Future<void> _emit(
+  void _emit(
     _TaskRun run, {
     AgentTaskRecord? task,
     AgentMcpTaskUpdate? mcpUpdate,
     String? message,
     String? error,
-  }) async {
+  }) {
     if (!_isCurrent(run)) return;
     try {
-      await run.onUpdate(
-        AgentTaskExecutionUpdate(
-          task: task,
-          mcpUpdate: mcpUpdate,
-          message: message,
-          error: error,
-        ),
+      unawaited(
+        Future<void>.sync(
+          () => run.onUpdate(
+            AgentTaskExecutionUpdate(
+              task: task,
+              mcpUpdate: mcpUpdate,
+              message: message,
+              error: error,
+            ),
+          ),
+        ).catchError((Object _) {}),
       );
     } on Object {
-      // A detached or failed view observer must not own execution progression.
+      // A failed view observer must not own execution progression.
     }
   }
 

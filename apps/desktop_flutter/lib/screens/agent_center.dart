@@ -1193,7 +1193,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
         request: request,
         task: initialTask,
         allowMcpContinuation: allowMcpContinuation,
-        onUpdate: (update) async {
+        onUpdate: (update) {
           if (!mounted ||
               !identical(_agentTasks[session.sessionId], state) ||
               (state.record?.taskId != null &&
@@ -1264,7 +1264,6 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
                   state.mcpContinuationStatus!;
             }
           });
-          await WidgetsBinding.instance.endOfFrame;
         },
       ),
     );

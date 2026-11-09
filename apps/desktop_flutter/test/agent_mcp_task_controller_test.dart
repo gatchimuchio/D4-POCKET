@@ -179,6 +179,38 @@ void main() {
     coordinator.dispose();
   });
 
+  test('未完了の画面observer FutureはTask継続を停止しない', () async {
+    final observerGate = Completer<void>();
+    var observed = 0;
+    final coordinator = AgentTaskExecutionCoordinator(
+      _FakeBrokerTransport(_successfulResponses()),
+    );
+
+    await coordinator
+        .observeStartedTask(
+          request: _sourceRequest,
+          task: const AgentTaskRecord(
+            taskId: _followupTaskId,
+            runtimeId: 'codex-local',
+            sessionId: _session,
+            workspaceId: 'workspace-local',
+            instructionHash: _instructionHash,
+            status: 'completed',
+            auditEventId: 'audit-completed-without-continuation',
+          ),
+          allowMcpContinuation: false,
+          onUpdate: (_) {
+            observed++;
+            return observerGate.future;
+          },
+        )
+        .timeout(const Duration(seconds: 1));
+
+    expect(observed, 1);
+    observerGate.complete();
+    coordinator.dispose();
+  });
+
   test('同一SessionでTaskが置き換わると旧継続をBroker副作用前に止める', () async {
     final resultGrantGate = Completer<void>();
     final requestStarted = Completer<void>();
