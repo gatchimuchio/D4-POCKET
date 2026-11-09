@@ -10294,6 +10294,14 @@ def test_gui_shell_edit_proposal_is_owner_review_only() -> list[str]:
     )
     if not validate_instance(invalid_receipt, receipt_schema):
         errors.append("GUI Shell編集提案Receiptがapply完了を受け入れた")
+    missing_count_receipt = json.loads(
+        (
+            INVALID_CONTRACT_EXAMPLES
+            / "gui_shell_edit_proposal_receipt_missing_count.invalid.json"
+        ).read_text(encoding="utf-8")
+    )
+    if not validate_instance(missing_count_receipt, receipt_schema):
+        errors.append("GUI Shell編集提案Receiptが変更予定件数の欠落を受け入れた")
     for name in ("ipc_request", "ipc_response"):
         operations = load_schema(f"{name}.schema.json")["properties"]["operation"]["enum"]
         if "GUI Shell編集提案" not in operations:

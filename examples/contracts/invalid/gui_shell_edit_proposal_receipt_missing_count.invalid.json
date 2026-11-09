@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "operation": "GUI Shell編集提案",
+  "status": "accepted",
+  "edit_id": "edit-invalid-count",
+  "scope": "ui",
+  "target_paths": ["apps/desktop_flutter/lib/main.dart"],
+  "execution_mode": "proposal_only",
+  "review_required": true,
+  "apply_status": "not_started",
+  "files_written": false,
+  "permission_generated": false,
+  "approval_state": "owner_review_required",
+  "authority_strip": true,
+  "evidence_source": "INTERNAL_STATE",
+  "instruction_hash": "sha256:example",
+  "audit_id": "audit-edit-invalid-count"
+}

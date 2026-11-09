@@ -3,7 +3,7 @@
   "$id": "https://example.invalid/gui-shell/schemas/gui_shell_edit_proposal_receipt.schema.json",
   "title": "GUI Shell編集提案応答",
   "type": "object",
-  "required": ["version", "operation", "status", "edit_id", "scope", "target_paths", "execution_mode", "review_required", "apply_status", "files_written", "permission_generated", "approval_state", "authority_strip", "evidence_source", "instruction_hash", "audit_id"],
+  "required": ["version", "operation", "status", "edit_id", "scope", "target_paths", "expected_change_count", "execution_mode", "review_required", "apply_status", "files_written", "permission_generated", "approval_state", "authority_strip", "evidence_source", "instruction_hash", "audit_id"],
   "additionalProperties": false,
   "properties": {
     "version": { "const": 1 },

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gui_shell_desktop/screens/settings.dart';
+import 'package:gui_shell_desktop/services/broker_client.dart'
+    show brokerPayloadHash;
 import 'package:gui_shell_desktop/services/shell_core_client.dart';
 import 'package:gui_shell_ui/runtime_dialogue_client.dart' show BrokerTransport;
 
@@ -381,9 +383,24 @@ class _ComposeScreenTransport implements BrokerTransport {
           },
         },
       'GUI Shell編集提案' => <String, Object?>{
+          'version': 1,
+          'operation': operation,
+          'status': 'accepted',
+          'edit_id': payload!['edit_id'],
+          'scope': payload['scope'],
+          'target_paths': payload['target_paths'],
+          'expected_change_count':
+              (payload['expected_changes']! as List).length,
           'execution_mode': 'proposal_only',
           'review_required': true,
+          'apply_status': 'not_started',
           'files_written': false,
+          'permission_generated': false,
+          'approval_state': 'owner_review_required',
+          'authority_strip': true,
+          'evidence_source': 'INTERNAL_STATE',
+          'instruction_hash': brokerPayloadHash(payload),
+          'audit_id': 'audit-compose-ai-edit',
         },
       _ => <String, Object?>{},
     };
@@ -394,6 +411,10 @@ class _ComposeScreenTransport implements BrokerTransport {
       if (operation == 'GUI Shell構成Catalog')
         'evidence_source': 'INTERNAL_STATE',
       if (operation == 'MCP Tool実行') 'evidence_source': 'LIVE_RUNTIME',
+      if (operation == 'GUI Shell編集提案') 'evidence_source': 'INTERNAL_STATE',
+      if (operation == 'GUI Shell編集提案')
+        'audit_event_id': 'audit-compose-ai-edit',
+      'error': null,
       'body': body,
     };
   }

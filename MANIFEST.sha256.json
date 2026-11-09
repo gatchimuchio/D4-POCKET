@@ -353,7 +353,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/ai_edit_client.dart",
-      "sha256": "cb978289a5c23af7d292b578ce680926a58a804d236cd3aae0d46df987112954"
+      "sha256": "06b6d278437cfff218ad1351ca2dcf4c78cad46eea60f15dad3898e157cbea81"
     },
     {
       "path": "apps/desktop_flutter/lib/services/broker_client.dart",
@@ -633,7 +633,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/ai_edit_client_test.dart",
-      "sha256": "bb8a31a43d733f12277446e7432a4296a5111488e2df9560d75f7f93960e5403"
+      "sha256": "b5e573d9861388395945de59be59ffc5d0a7286c679cb35c07301acb76933b7e"
     },
     {
       "path": "apps/desktop_flutter/test/broker_client_payload_hash_test.dart",
@@ -713,7 +713,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/settings_compose_test.dart",
-      "sha256": "6fcbed19dc35099dfbdc41deb77fdadd71d34c8d618eedb57ac95af71248bd98"
+      "sha256": "5c6a4e362ecc8cbeb869e6ba3652686593f02b714c2a2ea0795c4273ca2e833b"
     },
     {
       "path": "apps/desktop_flutter/test/settings_install_flow_test.dart",
@@ -1425,7 +1425,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "45eb62ac6ac68d937e929655970ba9550524de24137b46bb6cee3a7040386263"
+      "sha256": "6d722945927f295b3002af1296a02db8c1a3b6d9cdd457ab9cc6d13bc0cf88ed"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -4821,7 +4821,7 @@
     },
     {
       "path": "specs/gui_shell_edit_proposal_receipt.schema.json",
-      "sha256": "cfc3306ac25b3575b4846b57353d183067e3b4446a0d8ea2dc3537279d7eb425"
+      "sha256": "0e28c0a4367b00e79766d709b97acf2e7d786e2524569f384586aac3d9a5bc04"
     },
     {
       "path": "specs/gui_shell_export.schema.json",
@@ -5273,7 +5273,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "a596f3fd96dc2662562bfc087598dfbc00f1cb7bbef88cf790a23a31058466e8"
+      "sha256": "5e2969936bae30a31f9a8dc404a1349f5b5d0796d16bc57309f6d5dca296eb4a"
     },
     {
       "path": "tooling/conformance_tests/test_final_development_audit.py",
