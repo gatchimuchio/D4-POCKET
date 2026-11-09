@@ -34,7 +34,7 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
   String _requestedVisibility = 'hash_only';
   int _generation = 0;
   int _activeGeneration = 0;
-  Timer? _timer;
+  Timer? _viewMaintenanceTimer;
   final _elapsed = Stopwatch()..start();
   int _nextCheck = 0;
   int _viewLimit = 0;
@@ -43,24 +43,6 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _timer = Timer.periodic(const Duration(milliseconds: 100), (_) {
-      if (!_isActive || !mounted) return;
-      if (_view != null &&
-          (!_view!.registration.current(DateTime.now()) ||
-              _elapsed.elapsedMilliseconds >= _viewLimit)) {
-        _generation++;
-        setState(() {
-          _view = null;
-          _busy = false;
-          _message = '表示期限を過ぎました。登録状態を更新してください。';
-        });
-      }
-      if (_view != null &&
-          !_busy &&
-          _elapsed.elapsedMilliseconds >= _nextCheck) {
-        _refresh(preserve: true);
-      }
-    });
     if (_isActive) _refresh();
   }
 
@@ -69,6 +51,7 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
     _activeGeneration++;
     _active = state == AppLifecycleState.resumed;
     _generation++;
+    _cancelViewMaintenance();
     setState(() {
       _view = null;
       _busy = false;
@@ -84,12 +67,14 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
     if (oldWidget.client != widget.client ||
         oldWidget.runtimeId != widget.runtimeId ||
         oldWidget.workspaceId != widget.workspaceId) {
+      _cancelViewMaintenance();
       _generation++;
       _view = null;
       _registrations = [];
       _selected = null;
       _refresh();
     } else if (oldWidget.active != widget.active) {
+      _cancelViewMaintenance();
       _activeGeneration++;
       _generation++;
       _view = null;
@@ -105,13 +90,78 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
   @override
   void dispose() {
     _generation++;
-    _timer?.cancel();
+    _cancelViewMaintenance();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
+  void _cancelViewMaintenance() {
+    _viewMaintenanceTimer?.cancel();
+    _viewMaintenanceTimer = null;
+  }
+
+  void _scheduleViewMaintenance() {
+    _cancelViewMaintenance();
+    final view = _view;
+    if (!_isActive || _busy || view == null) return;
+
+    final now = DateTime.now();
+    final elapsed = _elapsed.elapsedMilliseconds;
+    if (!view.registration.current(now) || elapsed >= _viewLimit) {
+      _expireView();
+      return;
+    }
+
+    var delayMilliseconds = _nextCheck - elapsed;
+    final viewRemaining = _viewLimit - elapsed;
+    if (viewRemaining < delayMilliseconds) {
+      delayMilliseconds = viewRemaining;
+    }
+    final registrationRemaining =
+        view.registration.expires! * 1000 - now.millisecondsSinceEpoch;
+    if (registrationRemaining < delayMilliseconds) {
+      delayMilliseconds = registrationRemaining;
+    }
+    if (delayMilliseconds < 1) delayMilliseconds = 1;
+
+    _viewMaintenanceTimer = Timer(
+      Duration(milliseconds: delayMilliseconds),
+      _maintainView,
+    );
+  }
+
+  void _maintainView() {
+    _viewMaintenanceTimer = null;
+    if (!mounted || !_isActive || _busy) return;
+    final view = _view;
+    if (view == null) return;
+
+    if (!view.registration.current(DateTime.now()) ||
+        _elapsed.elapsedMilliseconds >= _viewLimit) {
+      _expireView();
+      return;
+    }
+    if (_elapsed.elapsedMilliseconds >= _nextCheck) {
+      _refresh(preserve: true);
+      return;
+    }
+    _scheduleViewMaintenance();
+  }
+
+  void _expireView() {
+    if (!mounted || _view == null) return;
+    _cancelViewMaintenance();
+    _generation++;
+    setState(() {
+      _view = null;
+      _busy = false;
+      _message = '表示期限を過ぎました。登録状態を更新してください。';
+    });
+  }
+
   Future<void> _refresh({bool preserve = false}) async {
     if (!_isActive) return;
+    _cancelViewMaintenance();
     final previous = preserve ? _view : null;
     final generation = ++_generation;
     setState(() {
@@ -171,6 +221,7 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
           _busy = false;
           _nextCheck = _elapsed.elapsedMilliseconds + 2000;
         });
+        _scheduleViewMaintenance();
       }
     }
   }
@@ -181,6 +232,7 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
       bool preview = false,
       String? baselineHash}) async {
     if (!_isActive) return;
+    _cancelViewMaintenance();
     final generation = ++_generation;
     setState(() {
       _diffPaired = false;
@@ -214,12 +266,14 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
           _busy = false;
           _nextCheck = _elapsed.elapsedMilliseconds + 2000;
         });
+        _scheduleViewMaintenance();
       }
     }
   }
 
   Future<void> _approveContent(WorkspaceRegistration registration) async {
     if (!_isActive || _busy) return;
+    _cancelViewMaintenance();
     final generation = ++_generation;
     final activeGeneration = _activeGeneration;
     setState(() {
@@ -278,6 +332,7 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
 
   Future<void> _revokeContent(WorkspaceRegistration registration) async {
     if (!_isActive || _busy) return;
+    _cancelViewMaintenance();
     final generation = ++_generation;
     setState(() {
       _busy = true;
@@ -315,6 +370,7 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
 
   Future<void> _captureWholeBaseline(WorkspaceRegistration registration) async {
     if (!_isActive || _busy) return;
+    _cancelViewMaintenance();
     final generation = ++_generation;
     setState(() {
       _busy = true;
@@ -339,6 +395,7 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
           _busy = false;
           _nextCheck = _elapsed.elapsedMilliseconds + 2000;
         });
+        _scheduleViewMaintenance();
       }
     }
   }

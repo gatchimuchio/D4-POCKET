@@ -786,6 +786,32 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
+  testWidgets('短いWorkspace読取期限では最短timer到達時に本文を破棄する',
+      (tester) async {
+    final broker = TestBroker()
+      ..expires = DateTime.now().millisecondsSinceEpoch ~/ 1000 + 3;
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: SingleChildScrollView(
+                child: WorkspaceInspector(client: WorkspaceClient(broker))))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('workspace-a'));
+    await tester.pumpAndSettle();
+    await _scrollRootTo(tester, find.text('file.txt'));
+    await tester.tap(find.text('file.txt'));
+    await tester.pumpAndSettle();
+    expect(find.text('本文'), findsOneWidget);
+
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 3200)));
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pumpAndSettle();
+
+    expect(find.text('本文'), findsNothing);
+    expect(find.text('表示期限を過ぎました。登録状態を更新してください。'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('基準点の対象から統合差分と左右比較を切り替える', (tester) async {
     final broker = TestBroker();
     await tester.pumpWidget(MaterialApp(
