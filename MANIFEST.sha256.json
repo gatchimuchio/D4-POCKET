@@ -18,6 +18,9 @@
       "packages/agent_orchestration/**/*.md",
       "packages/broker_contract/**/*.dart",
       "packages/broker_contract/**/*.yaml",
+      "packages/broker_ipc_client/**/*.dart",
+      "packages/broker_ipc_client/**/*.yaml",
+      "packages/broker_ipc_client/**/*.md",
       "native/rust_helper/Cargo.toml",
       "native/rust_helper/Cargo.lock",
       "native/rust_helper/src/**/*.rs",
@@ -605,11 +608,11 @@
     },
     {
       "path": "apps/desktop_flutter/pubspec.lock",
-      "sha256": "5ed6de48aace8e646ed1a7e861ae5dcc3cc1bf68df4afd50cf7195f98baa00e0"
+      "sha256": "c3487042f1b6e212d254ef4b7496fe8c598148b3251a3cfa65b31610209d091b"
     },
     {
       "path": "apps/desktop_flutter/pubspec.yaml",
-      "sha256": "667b0f01f7c51547fadd6f830ef45f3803ea50cc50f840b68b9ac6a99aef4720"
+      "sha256": "aff3f4b649ed785d06be63ada98f73033101e2c60f8848ffb38c175a2267ca82"
     },
     {
       "path": "apps/desktop_flutter/test/a2a_connection_center_test.dart",
@@ -1425,7 +1428,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "b0d6578f5e6ac96cb420761acdb243209828059e7c07fe14ff61445755047afd"
+      "sha256": "8a4016fb4486c5450d2f4605fe4b2c947c0848f31e7d5807c4c19b34e6b4e4c0"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -4201,7 +4204,7 @@
     },
     {
       "path": "packages/agent_orchestration/README.md",
-      "sha256": "e88d2eb879d71880fbeee03100cf007408f9af2880660f1d9a7967ea8fab5eb3"
+      "sha256": "4e8bc4d891a1236ea6238bca07f0d32055cd92263affdf7289ea551be41038ce"
     },
     {
       "path": "packages/agent_orchestration/lib/agent_mcp_task_controller.dart",
@@ -5277,7 +5280,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "ff532bb6683d5088cc0248cd54cd5d56002617cc44fa3eb964cc5b5f523eaf53"
+      "sha256": "e23512c078727aac8d1bd765eca25ae2eacac9dbb8978421a009a214792eda79"
     },
     {
       "path": "tooling/conformance_tests/test_final_development_audit.py",
@@ -5369,7 +5372,7 @@
     },
     {
       "path": "tooling/manifest.py",
-      "sha256": "c7d2a560ea91ca9c70a12a68ac954d1774a82007f2ca6c520fdbb4d1c9aa9998"
+      "sha256": "e46c1188a0f409cbf4e5cc7e049d2d076d45bd934f77155af5498a9a291a239a"
     },
     {
       "path": "tooling/manual_workflow_check.py",

@@ -1,17 +1,7 @@
-# Agent Orchestration
+# Agent実行調整
 
-This pure Dart package contains the shared Agent Task client, Task monitor,
-MCP proposal controller, and result-dependent continuation flow. It has no
-Flutter or `dart:ui` dependency. Desktop UI code adapts the host OS value and
-existing authenticated Broker transport at the application boundary.
+このpure Dart packageは、Agent Task client、Task監視、MCP提案controller、結果に依存する継続処理を共有する。Flutterと`dart:ui`には依存しない。Desktop UIはhost OS値と既存の認証Broker transportをアプリ境界で適合させる。
 
-The package does not grant Permission or Approval, store credentials, execute
-MCP tools directly, or finalize Audit. Sensitive operations are requests to
-`BrokerTransport`; the Broker revalidates its current state and remains the
-authority source. A fake transport can exercise the consumer contract but is
-not evidence of a live Broker or installed product path.
+このpackageはPermission／Approvalを付与せず、資格情報を保管せず、MCP Toolを直接実行せず、Auditを確定しない。sensitive operationは`BrokerTransport`への要求であり、Brokerが現在状態を再評価して権限源であり続ける。fake transportによる試験はconsumer契約を検査できるが、実Brokerまたはinstalled product経路の証拠ではない。
 
-An independent Dart host can depend on this package and provide its own
-`BrokerTransport` implementation. That implementation must use an existing
-authenticated Broker route; implementing this interface alone grants no
-execution authority.
+独立Dart hostは、信頼されたnative hostから既存normal-authenticated loopback接続情報を受け取った場合、`broker_ipc_client`を利用できる。このclientは接続情報fileを読まず、Owner資格を受け取らず、native Owner確認も実行しない。Owner確認を要する操作は、引き続き各platformの既存native経路へ委譲する。socket fixtureまたは注入された`BrokerTransport`だけでは、実Broker／製品経路の成立を示さない。

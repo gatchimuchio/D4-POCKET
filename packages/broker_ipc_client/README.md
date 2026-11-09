@@ -1,0 +1,11 @@
+# Broker IPCクライアント
+
+このpure Dart packageは、既存の`authenticated_loopback_tcp` Broker接続を使う非Flutterクライアントである。接続情報は信頼されたnative hostから受け取り、このpackage自身は接続情報fileやruntime pathを探索せず、資格情報供給機能も公開しない。
+
+受け付ける接続情報は`credential_role=normal`だけで、接続先は`127.0.0.1`に固定する。Broker session IDと正規payload hashを送信し、応答の要求相関と設定済みbyte上限を検査する。要求内容や資格情報を記録しない。`dispose()`は可変secret bufferを上書きするが、Dart VM内の全複製を消去できるとは保証しない。
+
+このtransportはnative Owner確認を実行しない。該当する操作を送信前に拒否し、Owner資格の受け入れや代替経路を持たない。Brokerが全要求の最終権限源であり、通常認証と正しいpayload hashだけでPermission、Approval、操作権限が得られることはない。
+
+Flutter Desktopは既存のnative launcher relayを引き続き使用する。このpackageは、host境界から認可済みnormal接続情報を受け取った信頼済み非GUI host向けである。endpoint secretをAgent process、UI、snapshot、Audit本文、error、log、traceへ渡してはならない。
+
+現在の接続情報受け渡しはpackage APIの入力契約である。製品hostからの実接続情報供給、native Owner確認との統合、実Brokerによる動作は別途未成立であり、fixture結果を製品経路の証拠として扱わない。

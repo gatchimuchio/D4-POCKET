@@ -6423,6 +6423,44 @@ def AgentTaskMCPTool提案Contractと境界を検査する() -> list[str]:
         errors.append("Agent orchestration packageがFlutter／dart:uiへ依存している")
     if "abstract class BrokerTransport" not in broker_contract:
         errors.append("runtime-neutral BrokerTransport契約がない")
+    ipc_client_root = ROOT / "packages" / "broker_ipc_client"
+    ipc_client_sources = [
+        (ipc_client_root / "lib" / "broker_ipc_client.dart").read_text(encoding="utf-8"),
+        (ipc_client_root / "lib" / "src" / "authenticated_loopback_broker_transport.dart").read_text(encoding="utf-8"),
+    ]
+    if any("package:flutter/" in source or "dart:ui" in source for source in ipc_client_sources):
+        errors.append("runtime-neutral Broker IPC clientがFlutter／dart:uiへ依存している")
+    ipc_client = ipc_client_sources[1]
+    desktop_broker_client = (
+        ROOT / "apps" / "desktop_flutter" / "lib" / "services" / "broker_client.dart"
+    ).read_text(encoding="utf-8")
+    desktop_owner_match = re.search(
+        r"const _nativeOwnerConfirmationOperations = <String>\{(.*?)\};",
+        desktop_broker_client,
+        re.DOTALL,
+    )
+    ipc_owner_match = re.search(
+        r"const _nativeConfirmationOperations = <String>\{(.*?)\};",
+        ipc_client,
+        re.DOTALL,
+    )
+    if desktop_owner_match is None or ipc_owner_match is None:
+        errors.append("Desktop／非GUI Broker clientのnative Owner操作集合を照合できない")
+    else:
+        desktop_owner_operations = set(re.findall(r"'([^']+)'", desktop_owner_match.group(1)))
+        ipc_owner_operations = set(re.findall(r"'([^']+)'", ipc_owner_match.group(1)))
+        for operation in sorted(desktop_owner_operations - ipc_owner_operations):
+            errors.append(f"非GUI Broker clientがnative Owner操作を拒否しない: {operation}")
+    for token, label in (
+        ("credential_role", "通常資格role検査"),
+        ("authenticated_loopback_tcp", "既存認証loopback transport"),
+        ("InternetAddress.loopbackIPv4", "IPv4 loopback限定接続"),
+        ("session_secret", "受領した通常資格の限定利用"),
+        ("native Owner確認を実行できません", "native Owner操作のfail-closed"),
+        ("response['request_id'] != requestId", "応答要求ID相関"),
+    ):
+        if token not in ipc_client:
+            errors.append(f"runtime-neutral Broker IPC clientの{label}がない")
     contract = (DOC_SPECS / "mcp-contract.md").read_text(encoding="utf-8")
     for token, source, label in (
         ("MAX_AGENT_MCP_TOOL_REQUEST_BYTES", rust, "Rust提案byte上限"),

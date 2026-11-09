@@ -31,6 +31,13 @@ packages:
       relative: true
     source: path
     version: "0.1.0"
+  broker_ipc_client:
+    dependency: "direct dev"
+    description:
+      path: "../../packages/broker_ipc_client"
+      relative: true
+    source: path
+    version: "0.1.0"
   characters:
     dependency: transitive
     description:
