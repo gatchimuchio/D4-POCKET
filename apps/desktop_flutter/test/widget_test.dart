@@ -21,6 +21,7 @@ import 'package:gui_shell_desktop/screens/settings.dart';
 import 'package:gui_shell_desktop/screens/setup_doctor.dart';
 import 'package:gui_shell_desktop/screens/shared.dart';
 import 'package:gui_shell_desktop/screens/trust_center.dart';
+import 'package:gui_shell_desktop/services/agent_task_execution_coordinator.dart';
 import 'package:gui_shell_desktop/services/broker_client.dart';
 import 'package:gui_shell_desktop/services/shell_core_client.dart';
 
@@ -3557,11 +3558,13 @@ void main() {
             status: 'completed',
           )),
     ], onRequest: (operation) {
-      if (operation == 'AgentTask状態' && agentCenterActive) {
+      if (operation == 'MCP接続一覧' && agentCenterActive) {
         updateHost(() => agentCenterActive = false);
       }
     });
     final client = await ShellCoreClient.product(transport: transport);
+    final taskExecutionCoordinator = AgentTaskExecutionCoordinator(transport);
+    addTearDown(taskExecutionCoordinator.dispose);
 
     await tester.pumpWidget(
       MaterialApp(
@@ -3572,6 +3575,7 @@ void main() {
               return AgentCenter(
                 client: client,
                 active: agentCenterActive,
+                taskExecutionCoordinator: taskExecutionCoordinator,
               );
             },
           ),

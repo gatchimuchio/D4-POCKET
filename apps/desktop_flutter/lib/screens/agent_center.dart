@@ -8,7 +8,7 @@ import 'package:flutter/foundation.dart'
 
 import '../models/generated_contracts.dart';
 import '../services/agent_task_client.dart';
-import '../services/agent_mcp_task_controller.dart';
+import '../services/agent_mcp_task_controller.dart' show AgentMcpTaskStage;
 import '../services/agent_task_execution_coordinator.dart';
 import '../services/agent_handoff.dart';
 import '../services/broker_client.dart'
@@ -1368,105 +1368,6 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _executeAgentMcpToolProposal(AgentSessionRecord session) async {
-    final transport = widget.client.brokerTransport;
-    final state = _agentTasks[session.sessionId];
-    final task = state?.record;
-    final projection = state?.resultProjection;
-    if (transport == null ||
-        state == null ||
-        task == null ||
-        task.status != 'completed' ||
-        task.resultHash == null ||
-        state.mcpCapabilitySnapshotHash == null ||
-        projection?.visibility != 'full' ||
-        projection?.text == null ||
-        _taskPreflightSession != null ||
-        !_sessionStillMatchesRegistration(session)) {
-      return;
-    }
-    final sourceTaskId = task.taskId;
-    final sourceResultHash = task.resultHash!;
-    final resultGeneration = _resultGeneration;
-    setState(() {
-      _taskPreflightSession = session.sessionId;
-      _taskPreflightStatus[session.sessionId] =
-          'Agent提案を現在のMCP Catalogと照合中です。実行前にnative Owner確認を行います。';
-    });
-    try {
-      final proposal = AgentMcpTaskController.parseProposal(projection!.text!);
-      if (proposal == null) {
-        throw const BrokerClientException('Agent Task結果にMCP Tool要求がありません');
-      }
-      final mcp = McpConnectionClient(transport);
-      final connections = await mcp.list();
-      final servers = connections
-          .where((connection) => connection.serverId == proposal.serverId)
-          .toList(growable: false);
-      if (servers.length != 1 ||
-          servers.single.connectionState != 'connected' ||
-          servers.single.executionState != 'ready') {
-        throw const BrokerClientException('提案先MCP Serverが現在の接続Catalogで利用できません');
-      }
-      final tools = servers.single.tools
-          .where(
-            (tool) =>
-                tool.toolId == proposal.toolId && tool.name == proposal.name,
-          )
-          .toList(growable: false);
-      if (tools.length != 1) {
-        throw const BrokerClientException(
-          'Agent提案のToolが現在のServer Catalogと一致しません',
-        );
-      }
-      final receipt = await mcp.callTool(
-        serverId: proposal.serverId,
-        tool: tools.single,
-        arguments: proposal.arguments,
-        sourceAgentTaskId: sourceTaskId,
-        sourceAgentResultHash: sourceResultHash,
-      );
-      if (!mounted ||
-          !_active ||
-          resultGeneration != _resultGeneration ||
-          !identical(_agentTasks[session.sessionId], state) ||
-          state.record?.taskId != sourceTaskId) {
-        return;
-      }
-      setState(() {
-        state.mcpToolCallReceipt = receipt;
-        final resultContext = receipt.agentResultContext;
-        _taskPreflightStatus[session.sessionId] =
-            resultContext?.status == 'available'
-            ? 'MCP Toolをnative Owner確認付きで実行し、未信頼結果をBroker内の一回contextへ保持しました。次のTaskに別Permission／Approvalが必要です。'
-            : 'MCP Toolは実行されましたが、Agentへ渡せるテキスト結果contextはありません（${resultContext?.status ?? 'unknown'}）。';
-      });
-    } on Object catch (error) {
-      if (!mounted) return;
-      final message = error is BrokerClientException
-          ? error.message
-          : 'Agent MCP提案の照合またはTool実行に失敗しました。';
-      setState(() => _taskPreflightStatus[session.sessionId] = message);
-    } finally {
-      if (mounted) setState(() => _taskPreflightSession = null);
-    }
-  }
-
-  Future<void> _continueAgentWithMcpResult(AgentSessionRecord session) async {
-    final state = _agentTasks[session.sessionId];
-    final result = state?.mcpToolCallReceipt?.agentResultContext;
-    if (state == null ||
-        result == null ||
-        result.status != 'available' ||
-        result.resultId == null ||
-        result.contextHash == null ||
-        _taskPreflightSession != null ||
-        !_sessionStillMatchesRegistration(session)) {
-      return;
-    }
-    await _inspectTask(session, mcpResult: result);
-  }
-
   Future<void> _cancelAgentTask(AgentSessionRecord session) async {
     final transport = widget.client.brokerTransport;
     final state = _agentTasks[session.sessionId];
@@ -1672,24 +1573,6 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
             SelectableText(text, key: const ValueKey('agent-task-result-text')),
         ],
       ],
-      if (taskState.mcpCapabilitySnapshotHash != null &&
-          task?.taskId == taskState.resultProjection?.taskId &&
-          taskState.mcpFollowupTaskId == null &&
-          taskState.resultProjection?.visibility == 'full' &&
-          taskState.resultProjection?.text != null)
-        OutlinedButton(
-          key: ValueKey('agent-mcp-proposal-${session.sessionId}'),
-          onPressed: busy ? null : () => _executeAgentMcpToolProposal(session),
-          child: const Text('AgentのMCP Tool提案をBroker照合・native承認'),
-        ),
-      if (taskState.mcpToolCallReceipt?.agentResultContext?.status ==
-              'available' &&
-          taskState.mcpFollowupTaskId == null)
-        OutlinedButton(
-          key: ValueKey('agent-mcp-followup-${session.sessionId}'),
-          onPressed: busy ? null : () => _continueAgentWithMcpResult(session),
-          child: const Text('未信頼MCP結果を同じAgentの新Taskへ渡す'),
-        ),
     ];
   }
 
