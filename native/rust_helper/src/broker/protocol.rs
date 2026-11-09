@@ -611,6 +611,8 @@ pub enum BrokerOperation {
     プロファイル一覧,
     #[serde(rename = "GUI Shell構成")]
     GuiShell構成,
+    #[serde(rename = "GUI Shell構成Catalog")]
+    GuiShell構成Catalog,
     #[serde(rename = "GUI Shell構成Preview")]
     GuiShell構成Preview,
     #[serde(rename = "GUI Shell編集提案")]
@@ -794,6 +796,7 @@ impl BrokerOperation {
             BrokerOperation::プロファイルimport => "プロファイルimport",
             BrokerOperation::プロファイル一覧 => "プロファイル一覧",
             BrokerOperation::GuiShell構成 => "GUI Shell構成",
+            BrokerOperation::GuiShell構成Catalog => "GUI Shell構成Catalog",
             BrokerOperation::GuiShell構成Preview => "GUI Shell構成Preview",
             BrokerOperation::GuiShell編集提案 => "GUI Shell編集提案",
             BrokerOperation::GuiShell書出し => "GUI Shell書出し",
@@ -1718,6 +1721,12 @@ impl Broker {
 
     pub fn handle(&mut self, envelope: BrokerRequestEnvelope) -> BrokerResponse {
         self.処理(envelope, false)
+    }
+
+    pub(super) fn compose_runtime_agent_catalog(
+        &self,
+    ) -> Result<super::dialogue::ComposeRuntimeAgentCatalog, super::dialogue::対話失敗> {
+        self.対話.compose_catalog_snapshot()
     }
 
     pub fn 実行系登録(
@@ -2727,6 +2736,12 @@ impl Broker {
                 &request_id,
                 envelope.payload.as_ref().unwrap_or(&Value::Null),
                 owner,
+                &payload_hash,
+            ),
+            BrokerOperation::GuiShell構成Catalog => super::compose_center::catalog(
+                self,
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
                 &payload_hash,
             ),
             BrokerOperation::GuiShell構成Preview => super::compose_center::preview(

@@ -88,6 +88,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final Set<String> _selectedComposeMcpConnectionIds = <String>{};
   final Set<String> _selectedComposeToolIds = <String>{};
   bool _composeCatalogLoading = false;
+  List<String> _composeRuntimeIds = const [];
+  List<ComposeAgentCatalogEntry> _composeAgentCatalog = const [];
+  final Set<String> _selectedComposeRuntimeIds = <String>{};
+  final Set<String> _selectedComposeAgentIds = <String>{};
+  bool _composeRuntimeAgentCatalogLoaded = false;
+  bool _composeRuntimeAgentCatalogLoading = false;
+  String? _composeRuntimeAgentCatalogMessage;
   String? _exportMessage;
   String? _exportReceipt;
   bool _exportInProgress = false;
@@ -100,12 +107,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       TextEditingController(text: 'd4-pocket-local');
   final TextEditingController _composeNameController =
       TextEditingController(text: 'D4 Pocket ローカル構成');
-  final TextEditingController _composeRuntimeIdsController =
-      TextEditingController();
-  final TextEditingController _composeAgentIdsController =
-      TextEditingController();
   final TextEditingController _composeCapabilityRequirementsController =
-      TextEditingController(text: 'runtime.read\nagent.metadata');
+      TextEditingController();
   final TextEditingController _exportUpdatePublicKeyController =
       TextEditingController();
   final TextEditingController _exportUpdateSourceController =
@@ -127,8 +130,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _profileNameController.dispose();
     _composeIdController.dispose();
     _composeNameController.dispose();
-    _composeRuntimeIdsController.dispose();
-    _composeAgentIdsController.dispose();
     _composeCapabilityRequirementsController.dispose();
     _exportUpdatePublicKeyController.dispose();
     _exportUpdateSourceController.dispose();
@@ -360,27 +361,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             'MCP候補は現在Brokerが保持するmetadata-only Catalogから取得します。候補metadataは未信頼で、Trust・Permission・Approval・Authorityを付与しません。Compose時にもBrokerが接続中Catalogを再照合します。',
           ),
           const SizedBox(height: 8),
-          TextField(
-            key: const ValueKey('compose-runtime-ids'),
-            controller: _composeRuntimeIdsController,
-            minLines: 1,
-            maxLines: 3,
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-              labelText: 'Runtime参照ID（任意・1行に1つ）',
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            key: const ValueKey('compose-agent-ids'),
-            controller: _composeAgentIdsController,
-            minLines: 1,
-            maxLines: 3,
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-              labelText: 'Agent参照ID（任意・1行に1つ）',
-            ),
-          ),
+          _composeRuntimeAgentCatalogPanel(),
           const SizedBox(height: 8),
           _composeMcpCatalogPanel(),
           const SizedBox(height: 8),
@@ -468,7 +449,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             decoration: const InputDecoration(
               border: OutlineInputBorder(),
               labelText: '機能要件ID（任意・1行に1つ）',
-              helperText: '要求の記録だけを行い、PermissionやAuthorityは生成しません。',
+              helperText:
+                  '選択中の全Agentが現在metadataでsupportedと宣言した要件だけ受理されます。PermissionやAuthorityは生成しません。',
             ),
           ),
           const SizedBox(height: 8),
@@ -498,13 +480,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Map<String, Object?> _composeManifest() {
+    final runtimeIds = _selectedComposeRuntimeIds.toList()..sort();
+    final agentIds = _selectedComposeAgentIds.toList()..sort();
     final toolIds = _selectedComposeToolIds.toList()..sort();
     final connectionIds = _selectedComposeMcpConnectionIds.toList()..sort();
     return buildComposeManifestDraft(
       composeId: _composeIdController.text,
       displayName: _composeNameController.text,
-      runtimeIds: _composeRuntimeIdsController.text,
-      agentIds: _composeAgentIdsController.text,
+      runtimeIds: runtimeIds.join('\n'),
+      agentIds: agentIds.join('\n'),
       toolIds: toolIds.join('\n'),
       mcpConnectionIds: connectionIds.join('\n'),
       themeMode: _composeThemeMode,
@@ -512,6 +496,155 @@ class _SettingsScreenState extends State<SettingsScreen> {
       contentVisibility: _composeContentVisibility,
       capabilityRequirements: _composeCapabilityRequirementsController.text,
     );
+  }
+
+  Widget _composeRuntimeAgentCatalogPanel() {
+    final client = _composeClient;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        FilledButton.icon(
+          key: const ValueKey('compose-runtime-agent-catalog-refresh'),
+          onPressed: client == null || _composeRuntimeAgentCatalogLoading
+              ? null
+              : _refreshComposeRuntimeAgentCatalog,
+          icon: _composeRuntimeAgentCatalogLoading
+              ? const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.refresh),
+          label: const Text('BrokerのRuntime／Agent Catalogを更新'),
+        ),
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 6),
+          child: Text(
+            'Broker現在登録のRuntimeとAgentを選びます。Agent metadataは未信頼の互換情報で、Permission・Trust・Approval・Authorityを与えません。',
+          ),
+        ),
+        if (_composeRuntimeAgentCatalogMessage != null)
+          Text(_composeRuntimeAgentCatalogMessage!),
+        if (!_composeRuntimeAgentCatalogLoaded)
+          const Text('Catalog未取得です。現在登録を更新してください。')
+        else if (_composeRuntimeIds.isEmpty)
+          const Text('現在Brokerへ登録されたRuntimeがありません。')
+        else ...[
+          for (final runtimeId in _composeRuntimeIds)
+            CheckboxListTile(
+              key: ValueKey('compose-runtime-$runtimeId'),
+              contentPadding: EdgeInsets.zero,
+              value: _selectedComposeRuntimeIds.contains(runtimeId),
+              onChanged: (selected) => _setComposeRuntimeSelected(
+                runtimeId,
+                selected ?? false,
+              ),
+              title: Text(runtimeId),
+              subtitle: const Text('Brokerの現在登録。実行Permissionは生成しません。'),
+              controlAffinity: ListTileControlAffinity.leading,
+            ),
+          if (_composeAgentCatalog.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 4),
+              child: Text('Agent metadataを公開するRuntimeはありません。'),
+            )
+          else
+            for (final entry in _composeAgentCatalog)
+              CheckboxListTile(
+                key: ValueKey('compose-agent-${entry.agent.agentId}'),
+                contentPadding: const EdgeInsets.only(left: 24),
+                value: _selectedComposeAgentIds.contains(entry.agent.agentId),
+                onChanged:
+                    !const {'ready', 'degraded'}.contains(entry.agent.status)
+                        ? null
+                        : (selected) => _setComposeAgentSelected(
+                              entry,
+                              selected ?? false,
+                            ),
+                title: Text('${entry.agent.agentId} (${entry.agent.provider})'),
+                subtitle: Text(
+                  'Runtime: ${entry.runtimeId} / Model: ${entry.agent.model} / 状態: ${entry.agent.status} / Capability: ${entry.agent.capabilities.map((capability) => '${capability.capabilityId}=${capability.status}').join(', ')} / metadataは未信頼',
+                ),
+                controlAffinity: ListTileControlAffinity.leading,
+              ),
+        ],
+      ],
+    );
+  }
+
+  void _setComposeRuntimeSelected(String runtimeId, bool selected) {
+    setState(() {
+      if (selected) {
+        _selectedComposeRuntimeIds.add(runtimeId);
+      } else {
+        _selectedComposeRuntimeIds.remove(runtimeId);
+        _selectedComposeAgentIds.removeWhere(
+          (agentId) => _composeAgentCatalog.any(
+            (entry) =>
+                entry.agent.agentId == agentId && entry.runtimeId == runtimeId,
+          ),
+        );
+      }
+    });
+  }
+
+  void _setComposeAgentSelected(
+    ComposeAgentCatalogEntry entry,
+    bool selected,
+  ) {
+    setState(() {
+      if (selected) {
+        _selectedComposeRuntimeIds.add(entry.runtimeId);
+        _selectedComposeAgentIds.add(entry.agent.agentId);
+      } else {
+        _selectedComposeAgentIds.remove(entry.agent.agentId);
+      }
+    });
+  }
+
+  Future<void> _refreshComposeRuntimeAgentCatalog() async {
+    final client = _composeClient;
+    if (client == null || _composeRuntimeAgentCatalogLoading) return;
+    setState(() {
+      _composeRuntimeAgentCatalogLoading = true;
+      _composeRuntimeAgentCatalogMessage = null;
+    });
+    try {
+      final catalog = await client.refreshRuntimeAgentCatalog();
+      if (!mounted) return;
+      setState(() {
+        _composeRuntimeIds = catalog.runtimeIds;
+        _composeAgentCatalog = catalog.agents;
+        final availableRuntimeIds = catalog.runtimeIds.toSet();
+        _selectedComposeRuntimeIds.removeWhere(
+          (runtimeId) => !availableRuntimeIds.contains(runtimeId),
+        );
+        final agentsById = {
+          for (final entry in catalog.agents) entry.agent.agentId: entry,
+        };
+        _selectedComposeAgentIds.removeWhere((agentId) {
+          final entry = agentsById[agentId];
+          return entry == null ||
+              !_selectedComposeRuntimeIds.contains(entry.runtimeId) ||
+              !const {'ready', 'degraded'}.contains(entry.agent.status);
+        });
+        _composeRuntimeAgentCatalogLoaded = true;
+        _composeRuntimeAgentCatalogMessage =
+            'BrokerからRuntime ${catalog.runtimeIds.length}件、Agent ${catalog.agents.length}件を取得しました。Compose時にもBrokerが現在登録を再照合します。';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _composeRuntimeIds = const [];
+        _composeAgentCatalog = const [];
+        _selectedComposeRuntimeIds.clear();
+        _selectedComposeAgentIds.clear();
+        _composeRuntimeAgentCatalogLoaded = false;
+        _composeRuntimeAgentCatalogMessage =
+            'Broker Runtime／Agent Catalogを取得できません。接続状態を確認して再試行してください。';
+      });
+    } finally {
+      if (mounted) setState(() => _composeRuntimeAgentCatalogLoading = false);
+    }
   }
 
   Widget _composeMcpCatalogPanel() {

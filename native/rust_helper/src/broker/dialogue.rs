@@ -426,6 +426,16 @@ fn agent_metadata_projection(
         .collect())
 }
 
+pub(super) struct ComposeAgentCatalogEntry {
+    pub runtime_id: String,
+    pub metadata: Value,
+}
+
+pub(super) struct ComposeRuntimeAgentCatalog {
+    pub runtime_ids: Vec<String>,
+    pub agents: Vec<ComposeAgentCatalogEntry>,
+}
+
 /// Broker内の対話記録から得る統計。OS測定値ではなく、現在processの権限や健全性を示さない。
 #[derive(Debug, Clone, Copy, Default)]
 pub(crate) struct 実行系資源統計 {
@@ -1291,6 +1301,22 @@ impl 対話制御 {
         }
         self.実行系.insert(ID.to_owned(), adapter);
         Ok(())
+    }
+
+    pub(super) fn compose_catalog_snapshot(
+        &self,
+    ) -> Result<ComposeRuntimeAgentCatalog, 対話失敗> {
+        let agents = agent_adapter_projection(&self.実行系)?
+            .into_iter()
+            .map(|(runtime_id, metadata)| ComposeAgentCatalogEntry {
+                runtime_id,
+                metadata,
+            })
+            .collect();
+        Ok(ComposeRuntimeAgentCatalog {
+            runtime_ids: self.実行系.keys().cloned().collect(),
+            agents,
+        })
     }
 
     /// 起動制御面が、直後の登録監査に失敗した新規登録だけを取り消す。

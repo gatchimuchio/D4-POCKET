@@ -1399,12 +1399,15 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('GUI Shell構成').hitTestable(), findsOneWidget);
-    final runtimeIds = find.byKey(const ValueKey('compose-runtime-ids'));
-    await tester.ensureVisible(runtimeIds);
-    await tester.enterText(runtimeIds, 'fixture-runtime');
-    final agentIds = find.byKey(const ValueKey('compose-agent-ids'));
-    await tester.ensureVisible(agentIds);
-    await tester.enterText(agentIds, 'fixture-agent');
+    final catalogRefresh =
+        find.byKey(const ValueKey('compose-runtime-agent-catalog-refresh'));
+    await tester.ensureVisible(catalogRefresh);
+    await tester.tap(catalogRefresh);
+    await tester.pumpAndSettle();
+    final agent = find.byKey(const ValueKey('compose-agent-fixture-agent'));
+    await tester.ensureVisible(agent);
+    await tester.tap(agent);
+    await tester.pumpAndSettle();
     final composeButton = find.byKey(const ValueKey('compose-manifest-button'));
     await tester.ensureVisible(composeButton);
     await tester.tap(composeButton);
@@ -1449,9 +1452,15 @@ void main() {
     expect(
       transport.operations.where(
         (operation) =>
-            operation == 'GUI Shell構成' || operation == 'GUI Shell書出し',
+            operation == 'GUI Shell構成Catalog' ||
+            operation == 'GUI Shell構成' ||
+            operation == 'GUI Shell書出し',
       ),
-      ['GUI Shell構成', 'GUI Shell書出し'],
+      [
+        'GUI Shell構成Catalog',
+        'GUI Shell構成',
+        'GUI Shell書出し',
+      ],
     );
     expect(
         find.textContaining('fixture://d4-pocket/export.json'), findsWidgets);
@@ -2238,7 +2247,8 @@ void main() {
       required String auditId,
       required int workingSetBytes,
     }) {
-      Map<String, Object?> measured(num value, {String source = 'LIVE_RUNTIME'}) =>
+      Map<String, Object?> measured(num value,
+              {String source = 'LIVE_RUNTIME'}) =>
           {'状態': 'measured', '値': value, '証拠種別': source};
       Map<String, Object?> unknown(String reason) => {
             '状態': 'unknown',
@@ -2268,8 +2278,7 @@ void main() {
         '計測': {
           '稼働時間Millis': measured(30000),
           'CPU累積時間Millis': measured(3000),
-          'CPU利用率Percent':
-              measured(runtimeId == 'codex-agent-a' ? 25.5 : 6.25),
+          'CPU利用率Percent': measured(runtimeId == 'codex-agent-a' ? 25.5 : 6.25),
           'RAMWorkingSetBytes': measured(workingSetBytes),
           'RAMPrivateBytes': measured(workingSetBytes ~/ 2),
           'DiskIOBytes': unknown('未対応'),
@@ -2294,6 +2303,7 @@ void main() {
         'shutdown_requested': false,
       };
     }
+
     Map<String, Object?> taskRecord({
       required String taskId,
       required String runtimeId,
@@ -2519,7 +2529,8 @@ void main() {
         'projection': {
           'result_hash': resultHashA,
           'text': jsonEncode({
-            'result_summary': 'candidate patch body: add isolated implementation',
+            'result_summary':
+                'candidate patch body: add isolated implementation',
             'artifacts': [
               {'name': 'patch.txt', 'content': 'candidate patch body'},
             ],
@@ -2644,11 +2655,14 @@ void main() {
     await tester.ensureVisible(observeResources);
     await tester.tap(observeResources);
     await tester.pumpAndSettle();
-    expect(find.textContaining('A/B各Runtimeの観測を別々のAudit IDで取得しました'), findsOneWidget);
+    expect(find.textContaining('A/B各Runtimeの観測を別々のAudit IDで取得しました'),
+        findsOneWidget);
     expect(find.text('CPU利用率: 25.5 % (LIVE_RUNTIME)'), findsOneWidget);
-    expect(find.text('RAM Working Set: 8192 bytes (LIVE_RUNTIME)'), findsOneWidget);
+    expect(find.text('RAM Working Set: 8192 bytes (LIVE_RUNTIME)'),
+        findsOneWidget);
     expect(find.text('CPU利用率: 6.25 % (LIVE_RUNTIME)'), findsOneWidget);
-    expect(find.text('RAM Working Set: 16384 bytes (LIVE_RUNTIME)'), findsOneWidget);
+    expect(find.text('RAM Working Set: 16384 bytes (LIVE_RUNTIME)'),
+        findsOneWidget);
     expect(find.text('観測Audit ID: audit-resource-a'), findsOneWidget);
     expect(find.text('観測Audit ID: audit-resource-b'), findsOneWidget);
     expect(find.textContaining('Task専用計測ではありません'), findsOneWidget);
@@ -4776,6 +4790,38 @@ class _ComposeExportNavigationTransport implements BrokerTransport {
   }) async {
     operations.add(operation);
     requests.add({'operation': operation, 'payload': payload});
+    if (operation == 'GUI Shell構成Catalog') {
+      return {
+        'request_id': 'fixture-compose-catalog',
+        'operation': operation,
+        'status': 'accepted',
+        'evidence_source': 'INTERNAL_STATE',
+        'audit_event_id': 'fixture-compose-catalog-audit',
+        'error': null,
+        'body': {
+          'version': 1,
+          'runtime_ids': ['fixture-runtime'],
+          'agents': [
+            {
+              'runtime_id': 'fixture-runtime',
+              'metadata': {
+                'adapter_id': 'fixture-adapter',
+                'agent_id': 'fixture-agent',
+                'provider': 'Fixture provider',
+                'version': '1.0.0',
+                'model': 'fixture-model',
+                'status': 'ready',
+                'capabilities': [],
+              },
+            },
+          ],
+          'evidence_source': 'INTERNAL_STATE',
+          'authority_strip': true,
+          'permission_generated': false,
+        },
+        'shutdown_requested': false,
+      };
+    }
     if (operation == 'GUI Shell構成') {
       return {
         'request_id': 'fixture-compose',

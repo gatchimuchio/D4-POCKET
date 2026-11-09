@@ -111,15 +111,15 @@ void main() {
       expect(initialLayoutError, isNull, reason: '初期表示');
       expect(find.text('D4 Pocket 製品版: 開発版'), findsOneWidget);
 
-      await _enter(tester, 'compose-runtime-ids', 'runtime.local');
-      await _enter(tester, 'compose-agent-ids', 'agent.codex');
+      await _tap(tester, 'compose-runtime-agent-catalog-refresh');
+      await _tap(tester, 'compose-agent-agent.codex');
       await _tap(tester, 'compose-mcp-catalog-refresh');
       await _tap(tester, 'compose-mcp-server-mcp.local');
       await _tap(tester, 'compose-mcp-tool-${transport.composeToolId}');
       await _enter(
         tester,
         'compose-capability-requirements',
-        'runtime.read\nagent.metadata',
+        'task_execution',
       );
       await _select(tester, 'compose-theme-mode', '暗い');
       await _select(tester, 'compose-density', 'コンパクト');
@@ -144,8 +144,7 @@ void main() {
       );
       expect(compose['theme'], {'theme_id': 'd4-pocket', 'mode': 'dark'});
       expect(compose['capability_requirements'], [
-        'runtime.read',
-        'agent.metadata',
+        'task_execution',
       ]);
       expect(compose['settings'], {
         'locale': 'ja-JP',
@@ -267,6 +266,35 @@ class _ComposeScreenTransport implements BrokerTransport {
     final body = switch (operation) {
       'プロファイル一覧' => <String, Object?>{'Profiles': <Object?>[]},
       '更新一覧' => <String, Object?>{'更新一覧': <Object?>[]},
+      'GUI Shell構成Catalog' => <String, Object?>{
+          'version': 1,
+          'runtime_ids': ['runtime.local'],
+          'agents': [
+            {
+              'runtime_id': 'runtime.local',
+              'metadata': {
+                'adapter_id': 'adapter.codex.fixture',
+                'agent_id': 'agent.codex',
+                'provider': 'fixture-provider',
+                'version': '1.0.0',
+                'model': 'fixture-model',
+                'status': 'ready',
+                'capabilities': [
+                  {
+                    'capability_id': 'task_execution',
+                    'support': {
+                      'status': 'supported',
+                      'reason': 'fixture compatibility only',
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+          'evidence_source': 'INTERNAL_STATE',
+          'authority_strip': true,
+          'permission_generated': false,
+        },
       'MCP接続一覧' => _mcpConnectionListBody(),
       '更新候補取得' => <String, Object?>{
           '状態': 'updated',
@@ -299,7 +327,10 @@ class _ComposeScreenTransport implements BrokerTransport {
     };
     return {
       'status': 'accepted',
+      'operation': operation,
       if (operation == 'MCP接続一覧') 'evidence_source': 'INTERNAL_STATE',
+      if (operation == 'GUI Shell構成Catalog')
+        'evidence_source': 'INTERNAL_STATE',
       'body': body,
     };
   }

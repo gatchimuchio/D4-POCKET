@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "runtime_ids": ["runtime.fixture"],
+  "agents": [],
+  "evidence_source": "INTERNAL_STATE",
+  "authority_strip": true,
+  "permission_generated": true
+}

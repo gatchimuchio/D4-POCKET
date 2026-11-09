@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/gui_shell_compose_catalog.schema.json",
+  "title": "GUI Shell構成用Runtime／Agent Catalog投影",
+  "type": "object",
+  "required": [
+    "version",
+    "runtime_ids",
+    "agents",
+    "evidence_source",
+    "authority_strip",
+    "permission_generated"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {"const": 1},
+    "runtime_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 64,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128,
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$(?![\\s\\S])"
+      }
+    },
+    "agents": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "required": ["runtime_id", "metadata"],
+        "additionalProperties": false,
+        "properties": {
+          "runtime_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$(?![\\s\\S])"
+          },
+          "metadata": {"$ref": "agent_adapter.schema.json"}
+        }
+      }
+    },
+    "evidence_source": {"const": "INTERNAL_STATE"},
+    "authority_strip": {"const": true},
+    "permission_generated": {"const": false}
+  }
+}

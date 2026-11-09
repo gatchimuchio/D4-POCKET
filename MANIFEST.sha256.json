@@ -301,7 +301,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/settings.dart",
-      "sha256": "b100cf3c89d19ea29d5cb67791383979a888009fd2622274c0ab589b2e520fdd"
+      "sha256": "aa9f96226c29906dc4c1f6e6321cc53e6048c61ccce51726549ec811e124aa0f"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/setup_doctor.dart",
@@ -361,7 +361,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/compose_client.dart",
-      "sha256": "f3370eaed6da9b66b194864b24428513e0c4afb0d82d918a2c530377d878f1e4"
+      "sha256": "0c2853b2135c94b0d04c6db3be91a22bce6626b8391085b841e536e658422475"
     },
     {
       "path": "apps/desktop_flutter/lib/services/evaluation_client.dart",
@@ -713,7 +713,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/settings_compose_test.dart",
-      "sha256": "9ada5f2a64a5fb973ccf36d91ec20393f0513413ceb234253aecfd8136a1a29d"
+      "sha256": "5edd3c8f44a40f9b1cf869f227b3e1b49f2b72a0de588dee8dbbe3f029267004"
     },
     {
       "path": "apps/desktop_flutter/test/settings_install_flow_test.dart",
@@ -729,7 +729,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "4c3d11ab2cbf3ae98cf2425262500121935dd38b5542c7afd7a0acb74bcbdbd9"
+      "sha256": "337dab721c06cc4ca4709ef0cc3749e53ad6699e28fc0da38d4aaeb30239e025"
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
@@ -1425,7 +1425,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "026cf2ebd630eaa406b7e824ad085ad137806d1bbd19a366f06480882bf03ad0"
+      "sha256": "23cb931e31fb8b926455aa539ce9baf6490467d427856595ceb1a09305326fe9"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -3681,7 +3681,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/compose_center.rs",
-      "sha256": "468c0072d5dde547ce9d46d93bed221f0e431b335490c58c2de0e953c34a568f"
+      "sha256": "8f3d76ea6a94836631164df4ecf28009c2682057deb31e1f0ac0bd17682c4afa"
     },
     {
       "path": "native/rust_helper/src/broker/content_access.rs",
@@ -3729,7 +3729,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/dialogue.rs",
-      "sha256": "5a80e1ffd4162e9774e435f311c7b6002d6533aa9a0c43f8ba45ff5d8f410c2a"
+      "sha256": "719330fc0089bdcf2ff5300253c0a896023f4b7d7ae90f836ff6724870837e24"
     },
     {
       "path": "native/rust_helper/src/broker/evaluation_control.rs",
@@ -3745,7 +3745,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/export_center.rs",
-      "sha256": "263bd6253cb3bdb8baf3f17bf430b754d5ec5338ca59a4b35304f22168e677db"
+      "sha256": "4af38d3e40e96f32de30951816f6d9dbfe9b8173cfc16d63b8a561ab3bde79cf"
     },
     {
       "path": "native/rust_helper/src/broker/history_access.rs",
@@ -3793,7 +3793,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "7f5fe55f7ad576559636271387b1fbf9372abf81f069f46a7d3e14ddfce6b68a"
+      "sha256": "0b1ace6b48de8d3a6efb171c30386c03e138520860892ef48cc12c697340a638"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -3845,7 +3845,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "15e27625eb4842e965f9d8f8c23f7cb6ea2a70e1f5bf4f424abf10cee233c6c0"
+      "sha256": "4f1502da44f001b4dc1a14af811e1d9d530c645adc13d5edc70ea646641b3ee7"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -4873,11 +4873,11 @@
     },
     {
       "path": "specs/ipc_request.schema.json",
-      "sha256": "94dae410b6247597b54cfac093856f200c23407250b40d9505cb233bfbd05ab1"
+      "sha256": "7227ec188639bda62a2bf3a3e933725cfaf4fadc5f2e4edcf81f24aa8d0310b1"
     },
     {
       "path": "specs/ipc_response.schema.json",
-      "sha256": "d232f9613d9e0c981675af3636bc936fb73b542617756626b327cd17e14611ce"
+      "sha256": "479657bec85ace18fa46fafd0618e6467c340c90f91e82cdecb29f15637a914d"
     },
     {
       "path": "specs/linux_workspace_selection.schema.json",
@@ -5253,7 +5253,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "72e988bf0cebcc06f36f25303b4e7c0d27d77005a4d6b99b45e284b78e927aad"
+      "sha256": "fe0337bd815b9273a9a5134ee60a0128015ab84a072ae051f3ff9d5410ea51e2"
     },
     {
       "path": "tooling/conformance_tests/test_final_development_audit.py",

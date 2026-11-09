@@ -225,6 +225,7 @@ REQUIRED_SCHEMA_NAMES = {
     "agent_handoff_package",
     "gui_shell_compose",
     "gui_shell_compose_receipt",
+    "gui_shell_compose_catalog",
     "gui_shell_preview",
     "gui_shell_preview_receipt",
     "gui_shell_edit_proposal",
@@ -346,6 +347,7 @@ BROKER_REQUIRED_SCHEMAS = {
     "windows_tray_projection.schema.json",
     "gui_shell_compose.schema.json",
     "gui_shell_compose_receipt.schema.json",
+    "gui_shell_compose_catalog.schema.json",
     "gui_shell_preview.schema.json",
     "gui_shell_preview_receipt.schema.json",
     "gui_shell_edit_proposal.schema.json",
@@ -10115,9 +10117,17 @@ def test_gui_shell_compose_is_manifest_only_and_non_inheriting() -> list[str]:
     receipt = load_contract_fixture("gui_shell_compose_receipt.valid.json")
     compose_schema = load_schema("gui_shell_compose.schema.json")
     receipt_schema = load_schema("gui_shell_compose_receipt.schema.json")
+    catalog_schema = load_schema("gui_shell_compose_catalog.schema.json")
     errors = []
     errors.extend(validate_instance(compose, compose_schema))
     errors.extend(validate_instance(receipt, receipt_schema))
+    runtime_agent_catalog = load_contract_fixture("gui_shell_compose_catalog.valid.json")
+    errors.extend(validate_instance(runtime_agent_catalog, catalog_schema))
+    authority_catalog = load_contract_fixture(
+        "invalid/gui_shell_compose_catalog_authority.invalid.json"
+    )
+    if not validate_instance(authority_catalog, catalog_schema):
+        errors.append("GUI Shell構成CatalogがPermission生成を受け入れた")
     valid_mcp_tool_id = "tool-" + "a" * 142
     long_tool_compose = copy.deepcopy(compose)
     long_tool_compose["tool_ids"] = [valid_mcp_tool_id]
@@ -10168,6 +10178,8 @@ def test_gui_shell_compose_is_manifest_only_and_non_inheriting() -> list[str]:
         operations = load_schema(f"{name}.schema.json")["properties"]["operation"]["enum"]
         if "GUI Shell構成" not in operations:
             errors.append(f"{name}にGUI Shell構成操作がない")
+        if "GUI Shell構成Catalog" not in operations:
+            errors.append(f"{name}にGUI Shell構成Catalog操作がない")
     source = (RUST_HELPER / "src" / "broker" / "compose_center.rs").read_text(
         encoding="utf-8"
     )
