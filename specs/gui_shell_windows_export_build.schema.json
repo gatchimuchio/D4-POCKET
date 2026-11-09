@@ -140,12 +140,13 @@
     "rust_build_arguments": { "type": "array", "minItems": 6, "items": { "type": "string", "minLength": 1 } },
     "rust_compile_time_identity": {
       "type": "object",
-      "required": ["source", "app_id", "audit_store_id"],
+      "required": ["source", "app_id", "audit_store_id", "manifest_sha256"],
       "additionalProperties": false,
       "properties": {
         "source": { "const": "schema_validated_manifest" },
         "app_id": { "type": "string", "pattern": "^d4-pocket-app-[0-9a-f]{32}$" },
-        "audit_store_id": { "type": "string", "pattern": "^audit-store-[0-9a-f]{32}$" }
+        "audit_store_id": { "type": "string", "pattern": "^audit-store-[0-9a-f]{32}$" },
+        "manifest_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
       }
     },
     "rust_compile_time_update_trust": {
@@ -184,7 +185,10 @@
     "manifest_copied_byte_for_byte": { "const": true },
     "build_receipt_excluded_from_artifact_inventory": { "const": true },
     "standalone_app_verified": { "const": false },
-    "runtime_manifest_consumed": { "const": false },
+    "runtime_manifest_consumed": {
+      "const": false,
+      "description": "Build evidence has no observed product launch. A source-level launcher consumer does not make this flag true; actual runtime consumption needs separate LIVE_RUNTIME or LIVE_PRODUCT evidence."
+    },
     "binary_pruning_verified": { "const": false },
     "formal_distribution_claimed": { "const": false },
     "signed": { "const": false },

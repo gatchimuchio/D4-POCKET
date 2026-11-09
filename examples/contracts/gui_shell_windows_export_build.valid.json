@@ -44,7 +44,8 @@
   "rust_compile_time_identity": {
     "source": "schema_validated_manifest",
     "app_id": "d4-pocket-app-11111111111111111111111111111111",
-    "audit_store_id": "audit-store-22222222222222222222222222222222"
+    "audit_store_id": "audit-store-22222222222222222222222222222222",
+    "manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
   },
   "rust_compile_time_update_trust": {
     "source": "not_configured",

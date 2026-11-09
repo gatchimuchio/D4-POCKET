@@ -3374,10 +3374,11 @@ def test_windows_stage_uses_terminal_free_native_launcher() -> list[str]:
         "GUI_SHELL_PRODUCT_AUDIT_STORE_ID",
         "%LOCALAPPDATA%\\D4Pocket\\apps\\<App ID>\\stores\\<Audit store ID>",
         "旧runtimeからのcopy／migration／継承は行わない",
-        "Developer専用の`tooling/export_windows_product.py`はSchema検証済みManifestから両IDをRust Release buildのcompile-time入力へ渡し",
-        "このbuild補助はruntime Manifest消費やOwner承認済みproduction Export pathではない",
-        "現行Developer専用Export build toolは識別子ごとに分離したCargo target directoryを使い",
-        "compile-time identityはFlutter childへ渡さない",
+        "Developer専用の`tooling/export_windows_product.py`はSchema検証済みManifestから両IDとManifest全体のSHA-256をRust Release buildのcompile-time入力へ渡す",
+        "このbuild補助はOwner承認済みproduction Export pathではない",
+        "Cargo target directoryはApp ID／Audit Store ID／Manifest hashの組ごとに分離する",
+        "Windows Export起動器は固定siblingの`product_manifest.json`をBroker／Flutter開始前に読み取り検査する",
+        "compile-time identityとManifest hashはFlutter childへ渡さない",
     ):
         if token not in launcher_doc:
             errors.append(f"Windows起動仕様にExport runtime identity境界がない: {token}")
@@ -11047,6 +11048,22 @@ def test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative() ->
     evidence = load_contract_fixture("gui_shell_windows_export_build.valid.json")
     schema = load_schema("gui_shell_windows_export_build.schema.json")
     errors: list[str] = []
+    launcher_source = (
+        ROOT / "native" / "rust_helper" / "src" / "desktop_launcher.rs"
+    ).read_text(encoding="utf-8")
+    for token, label in (
+        ("EMBEDDED_PRODUCT_MANIFEST_SHA256", "compile-time Manifest hash pin"),
+        ("verify_product_manifest_file", "fixed sibling Manifest verification"),
+        ("FILE_FLAG_OPEN_REPARSE_POINT", "reparse pointを通さないManifest読取"),
+        ("MAX_PRODUCT_MANIFEST_BYTES", "bounded Manifest読取"),
+        ("PRODUCT_MANIFEST_HASH_MISMATCH", "差替え時のfail-closed"),
+    ):
+        if token not in launcher_source:
+            errors.append(f"Windows Export起動器に{label}が接続されない")
+    package_check = launcher_source.find("let layout = resolve_package_layout(&launcher_exe)?;")
+    broker_start = launcher_source.find("let mut broker = RunningBroker::start(", package_check)
+    if package_check < 0 or broker_start < 0 or package_check > broker_start:
+        errors.append("通常Windows起動でpackage／Manifest検査より先にBrokerを起動する")
     with tempfile.TemporaryDirectory(prefix="d4p-product-version-") as temporary:
         source_root = Path(temporary)
         pubspec = source_root / "apps" / "desktop_flutter" / "pubspec.yaml"
@@ -11107,6 +11124,7 @@ def test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative() ->
         "GITHUB_TOKEN": "secret-marker",
         "AWS_SECRET_ACCESS_KEY": "secret-marker",
         "GUI_SHELL_PRODUCT_APP_ID": "inherited-product-id",
+        "GUI_SHELL_PRODUCT_MANIFEST_SHA256": "inherited-manifest-pin",
         "GUI_SHELL_UPDATE_TRUST_JSON": "inherited-update-trust",
         "CARGO_HOME": "credential-bearing-user-cache",
     }
@@ -11119,6 +11137,7 @@ def test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative() ->
         or "GITHUB_TOKEN" in flutter_environment
         or "AWS_SECRET_ACCESS_KEY" in flutter_environment
         or "GUI_SHELL_PRODUCT_APP_ID" in flutter_environment
+        or "GUI_SHELL_PRODUCT_MANIFEST_SHA256" in flutter_environment
         or "CARGO_HOME" in flutter_environment
         or flutter_environment.get("PUB_CACHE") != "isolated-pub-cache"
     ):
@@ -11128,6 +11147,7 @@ def test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative() ->
             "CARGO_HOME": "isolated-cargo-home",
             "GUI_SHELL_PRODUCT_APP_ID": "d4-pocket-app-" + "1" * 32,
             "GUI_SHELL_PRODUCT_AUDIT_STORE_ID": "audit-store-" + "2" * 32,
+            "GUI_SHELL_PRODUCT_MANIFEST_SHA256": "a" * 64,
             "GUI_SHELL_UPDATE_TRUST_JSON": '{"test":true}',
         },
         inherited=inherited,
@@ -11136,6 +11156,7 @@ def test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative() ->
         rust_environment.get("CARGO_HOME") != "isolated-cargo-home"
         or rust_environment.get("GUI_SHELL_PRODUCT_APP_ID") != "d4-pocket-app-" + "1" * 32
         or rust_environment.get("GUI_SHELL_PRODUCT_AUDIT_STORE_ID") != "audit-store-" + "2" * 32
+        or rust_environment.get("GUI_SHELL_PRODUCT_MANIFEST_SHA256") != "a" * 64
         or rust_environment.get("GUI_SHELL_UPDATE_TRUST_JSON") != '{"test":true}'
         or "GITHUB_TOKEN" in rust_environment
         or "AWS_SECRET_ACCESS_KEY" in rust_environment
@@ -11146,6 +11167,7 @@ def test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative() ->
             "CARGO_HOME": "isolated-cargo-home",
             "GUI_SHELL_PRODUCT_APP_ID": "d4-pocket-app-" + "1" * 32,
             "GUI_SHELL_PRODUCT_AUDIT_STORE_ID": "audit-store-" + "2" * 32,
+            "GUI_SHELL_PRODUCT_MANIFEST_SHA256": "a" * 64,
         },
         inherited=inherited,
     )
@@ -11156,12 +11178,31 @@ def test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative() ->
         temporary_root = Path(temporary)
         app_id = "d4-pocket-app-" + "1" * 32
         audit_store_id = "audit-store-" + "2" * 32
-        cargo_target = _cargo_target_directory(temporary_root, app_id, audit_store_id)
-        distinct_target = _cargo_target_directory(
-            temporary_root, app_id, "audit-store-" + "3" * 32
+        manifest_sha256 = "a" * 64
+        cargo_target = _cargo_target_directory(
+            temporary_root, app_id, audit_store_id, manifest_sha256
         )
-        if cargo_target == distinct_target or app_id in str(cargo_target) or audit_store_id in str(cargo_target):
-            errors.append("Cargo target directoryがApp／Audit identity pairごとに短く分離されない")
+        distinct_target = _cargo_target_directory(
+            temporary_root,
+            app_id,
+            "audit-store-" + "3" * 32,
+            manifest_sha256,
+        )
+        distinct_manifest_target = _cargo_target_directory(
+            temporary_root, app_id, audit_store_id, "b" * 64
+        )
+        if (
+            cargo_target in {distinct_target, distinct_manifest_target}
+            or distinct_target == distinct_manifest_target
+            or app_id in str(cargo_target)
+            or audit_store_id in str(cargo_target)
+        ):
+            errors.append("Cargo target directoryがApp／Audit／Manifest identityごとに短く分離されない")
+        try:
+            _cargo_target_directory(temporary_root, app_id, audit_store_id, "invalid")
+            errors.append("Cargo target identityが不正なManifest hashを受理する")
+        except ValueError:
+            pass
         try:
             _validate_cargo_target_path(cargo_target)
         except ValueError as exc:
@@ -11314,6 +11355,7 @@ def test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative() ->
         good["audit_store_id"] = source_manifest["manifest"]["audit_store"]["store_id"]
         good["rust_compile_time_identity"]["app_id"] = good["app_id"]
         good["rust_compile_time_identity"]["audit_store_id"] = good["audit_store_id"]
+        good["rust_compile_time_identity"]["manifest_sha256"] = good["source_manifest_sha256"]
         product_version = product_version_from_source(ROOT)
         good["flutter_build_arguments"].append(
             f"--dart-define=GUI_SHELL_PRODUCT_VERSION={product_version}"
@@ -11333,6 +11375,9 @@ def test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative() ->
         configured_good["source_manifest_sha256"] = hashlib.sha256(
             configured_manifest_raw
         ).hexdigest()
+        configured_good["rust_compile_time_identity"]["manifest_sha256"] = (
+            configured_good["source_manifest_sha256"]
+        )
         (
             configured_good["artifact_files"],
             configured_good["artifact_total_bytes"],
@@ -11516,6 +11561,14 @@ def test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative() ->
         try:
             validate_build_evidence(manifest_mismatch, bundle)
             errors.append("Manifest内App IDとExport build evidenceの不一致を受理する")
+        except ValueError:
+            pass
+
+        pin_mismatch = copy.deepcopy(good)
+        pin_mismatch["rust_compile_time_identity"]["manifest_sha256"] = "0" * 64
+        try:
+            validate_build_evidence(pin_mismatch, bundle)
+            errors.append("Rust compile-time Manifest pinとsource Manifest hashの不一致を受理する")
         except ValueError:
             pass
 

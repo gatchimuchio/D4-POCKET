@@ -206,8 +206,14 @@ def _build_child_environment(
     return result
 
 
-def _cargo_target_directory(temporary_root: Path, app_id: str, audit_store_id: str) -> Path:
-    identity = f"{app_id}\0{audit_store_id}".encode("utf-8")
+def _cargo_target_directory(
+    temporary_root: Path, app_id: str, audit_store_id: str, manifest_sha256: str
+) -> Path:
+    if len(manifest_sha256) != 64 or any(
+        character not in "0123456789abcdef" for character in manifest_sha256
+    ):
+        raise ValueError("compile-time Manifest SHA-256が不正である")
+    identity = f"{app_id}\0{audit_store_id}\0{manifest_sha256}".encode("utf-8")
     identity_key = hashlib.sha256(identity).hexdigest()
     return temporary_root / "c" / identity_key
 
@@ -548,8 +554,9 @@ def validate_build_evidence(evidence: dict[str, Any], artifact_root: Path) -> No
         "source": "schema_validated_manifest",
         "app_id": evidence["app_id"],
         "audit_store_id": evidence["audit_store_id"],
+        "manifest_sha256": evidence["source_manifest_sha256"],
     }:
-        raise ValueError("Rust compile-time identityがExport Manifestと一致しない")
+        raise ValueError("Rust compile-time identity／Manifest pinがExport Manifestと一致しない")
     artifact_files, total_bytes, tree_hash = _artifact_inventory(
         artifact_root, excluded_paths=frozenset({RECEIPT_NAME})
     )
@@ -734,7 +741,9 @@ def build_portable_bundle(
                 flutter_project / "build" / "windows" / "x64" / "runner" / "Release"
             )
 
-            target_dir = _cargo_target_directory(temporary_root, app_id, audit_store_id)
+            target_dir = _cargo_target_directory(
+                temporary_root, app_id, audit_store_id, manifest_hash
+            )
             _validate_cargo_target_path(target_dir)
             rust_arguments = [
                 "build",
@@ -753,6 +762,7 @@ def build_portable_bundle(
                 "CARGO_HOME": str(temporary_root / "g"),
                 "GUI_SHELL_PRODUCT_APP_ID": app_id,
                 "GUI_SHELL_PRODUCT_AUDIT_STORE_ID": audit_store_id,
+                "GUI_SHELL_PRODUCT_MANIFEST_SHA256": manifest_hash,
             }
             if "update_trust" in manifest_file:
                 rust_overrides["GUI_SHELL_UPDATE_TRUST_JSON"] = json.dumps(
@@ -837,6 +847,7 @@ def build_portable_bundle(
                 "source": "schema_validated_manifest",
                 "app_id": app_id,
                 "audit_store_id": audit_store_id,
+                "manifest_sha256": manifest_hash,
             },
             "rust_compile_time_update_trust": _update_trust_summary(manifest_file),
             "build_duration_ms": elapsed_ms,

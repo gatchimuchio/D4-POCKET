@@ -43,6 +43,10 @@ const EXPORT_DIRECTORY_NAME: &str = "exports";
 const EMBEDDED_PRODUCT_APP_ID: Option<&str> = option_env!("GUI_SHELL_PRODUCT_APP_ID");
 const EMBEDDED_PRODUCT_AUDIT_STORE_ID: Option<&str> =
     option_env!("GUI_SHELL_PRODUCT_AUDIT_STORE_ID");
+const EMBEDDED_PRODUCT_MANIFEST_SHA256: Option<&str> =
+    option_env!("GUI_SHELL_PRODUCT_MANIFEST_SHA256");
+const MAX_PRODUCT_MANIFEST_BYTES: u64 = 65_536;
+const FILE_FLAG_OPEN_REPARSE_POINT: u32 = 0x0020_0000;
 const FRONTEND_ENVIRONMENT_ALLOWLIST: &[&str] = &[
     "APPDATA",
     "LOCALAPPDATA",
@@ -832,7 +836,185 @@ fn checked_file(path: &Path, boundary: &Path) -> Result<PathBuf, DesktopLaunchEr
     Ok(canonical)
 }
 
+fn is_sha256_hex(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn validate_product_manifest_bytes(
+    raw: &[u8],
+    expected_sha256: &str,
+    identity: &ProductRuntimeIdentity,
+) -> Result<(), DesktopLaunchError> {
+    if !is_sha256_hex(expected_sha256) {
+        return Err(DesktopLaunchError::new(
+            "PRODUCT_MANIFEST_PIN_INVALID",
+            "製品Manifestのbuild identityを検証できません。製品を再生成してください。",
+        ));
+    }
+    if raw.len() as u64 > MAX_PRODUCT_MANIFEST_BYTES
+        || hex::encode(Sha256::digest(raw)) != expected_sha256
+    {
+        return Err(DesktopLaunchError::new(
+            "PRODUCT_MANIFEST_HASH_MISMATCH",
+            "製品Manifestがこの製品buildと一致しません。製品を再生成してください。",
+        ));
+    }
+    let value: Value = serde_json::from_slice(raw).map_err(|_| {
+        DesktopLaunchError::new(
+            "PRODUCT_MANIFEST_INVALID",
+            "製品Manifestの構成を検証できません。製品を再生成してください。",
+        )
+    })?;
+    let manifest = value.get("manifest").ok_or_else(|| {
+        DesktopLaunchError::new(
+            "PRODUCT_MANIFEST_INVALID",
+            "製品Manifestの構成を検証できません。製品を再生成してください。",
+        )
+    })?;
+    let identity_matches = value.get("version").and_then(Value::as_u64) == Some(1)
+        && value.get("product").and_then(Value::as_str) == Some("D4 Pocket")
+        && manifest
+            .get("app_identity")
+            .and_then(|item| item.get("app_id"))
+            .and_then(Value::as_str)
+            == Some(identity.app_id.as_str())
+        && manifest
+            .get("app_identity")
+            .and_then(|item| item.get("target_platform"))
+            .and_then(Value::as_str)
+            == Some("windows")
+        && manifest
+            .get("distribution_metadata")
+            .and_then(|item| item.get("target_platform"))
+            .and_then(Value::as_str)
+            == Some("windows")
+        && manifest
+            .get("audit_store")
+            .and_then(|item| item.get("store_id"))
+            .and_then(Value::as_str)
+            == Some(identity.audit_store_id.as_str())
+        && manifest
+            .get("audit_store")
+            .and_then(|item| item.get("inherited"))
+            .and_then(Value::as_bool)
+            == Some(false);
+    let no_authority_inheritance = manifest.get("inheritance_policy").is_some_and(|policy| {
+        [
+            "authority",
+            "permission",
+            "approval",
+            "credential",
+            "audit_chain",
+        ]
+        .iter()
+        .all(|field| policy.get(field).and_then(Value::as_str) == Some("none"))
+    });
+    let module_plan_is_non_authoritative = manifest
+        .get("module_plan")
+        .and_then(|plan| plan.get("binary_pruning_status"))
+        .and_then(Value::as_str)
+        == Some("not_applied");
+    if !identity_matches || !no_authority_inheritance || !module_plan_is_non_authoritative {
+        return Err(DesktopLaunchError::new(
+            "PRODUCT_MANIFEST_INVALID",
+            "製品Manifestのidentityまたは非継承条件を検証できません。製品を再生成してください。",
+        ));
+    }
+    Ok(())
+}
+
+fn verify_product_manifest_file(
+    root: &Path,
+    expected_sha256: &str,
+    identity: &ProductRuntimeIdentity,
+) -> Result<(), DesktopLaunchError> {
+    if !is_sha256_hex(expected_sha256) {
+        return Err(DesktopLaunchError::new(
+            "PRODUCT_MANIFEST_PIN_INVALID",
+            "製品Manifestのbuild identityを検証できません。製品を再生成してください。",
+        ));
+    }
+    let path = root.join("product_manifest.json");
+    let mut options = OpenOptions::new();
+    options.read(true);
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        options.custom_flags(FILE_FLAG_OPEN_REPARSE_POINT);
+    }
+    let file = options.open(path).map_err(|_| {
+        DesktopLaunchError::new(
+            "PRODUCT_MANIFEST_MISSING",
+            "製品Manifestを読み取れません。製品を再生成してください。",
+        )
+    })?;
+    let metadata = file.metadata().map_err(|_| {
+        DesktopLaunchError::new(
+            "PRODUCT_MANIFEST_INVALID",
+            "製品Manifestの配置を検証できません。製品を再生成してください。",
+        )
+    })?;
+    if !metadata.is_file()
+        || is_reparse_point(&metadata)
+        || metadata.len() > MAX_PRODUCT_MANIFEST_BYTES
+    {
+        return Err(DesktopLaunchError::new(
+            "PRODUCT_MANIFEST_INVALID",
+            "製品Manifestの配置またはサイズが不正です。製品を再生成してください。",
+        ));
+    }
+    let mut raw = Vec::with_capacity(metadata.len() as usize);
+    file.take(MAX_PRODUCT_MANIFEST_BYTES + 1)
+        .read_to_end(&mut raw)
+        .map_err(|_| {
+            DesktopLaunchError::new(
+                "PRODUCT_MANIFEST_INVALID",
+                "製品Manifestを読み取れません。製品を再生成してください。",
+            )
+        })?;
+    validate_product_manifest_bytes(&raw, expected_sha256, identity)
+}
+
 fn resolve_package_layout(launcher_exe: &Path) -> Result<PackageLayout, DesktopLaunchError> {
+    let identity = compiled_product_runtime_identity()?;
+    resolve_package_layout_with_product_contract(
+        launcher_exe,
+        identity.as_ref(),
+        EMBEDDED_PRODUCT_MANIFEST_SHA256,
+    )
+}
+
+fn resolve_package_layout_with_product_contract(
+    launcher_exe: &Path,
+    identity: Option<&ProductRuntimeIdentity>,
+    manifest_sha256: Option<&str>,
+) -> Result<PackageLayout, DesktopLaunchError> {
+    match (identity, manifest_sha256) {
+        (Some(_), Some(hash)) => {
+            if !is_sha256_hex(hash) {
+                return Err(DesktopLaunchError::new(
+                    "PRODUCT_MANIFEST_PIN_INVALID",
+                    "製品Manifestのbuild identityを検証できません。製品を再生成してください。",
+                ));
+            }
+        }
+        (Some(_), None) => {
+            return Err(DesktopLaunchError::new(
+                "PRODUCT_MANIFEST_PIN_MISSING",
+                "製品Manifestのbuild identityがありません。製品を再生成してください。",
+            ));
+        }
+        (None, Some(_)) => {
+            return Err(DesktopLaunchError::new(
+                "PRODUCT_RUNTIME_IDENTITY_INVALID",
+                "書出しAppの保存領域identityが不正です。製品を再生成してください。",
+            ));
+        }
+        (None, None) => {}
+    }
     let launcher = fs::canonicalize(launcher_exe).map_err(|_| {
         DesktopLaunchError::new("LAUNCHER_PATH_INVALID", "起動元を確認できません。")
     })?;
@@ -842,6 +1024,9 @@ fn resolve_package_layout(launcher_exe: &Path) -> Result<PackageLayout, DesktopL
     let root = fs::canonicalize(root).map_err(|_| {
         DesktopLaunchError::new("PACKAGE_ROOT_MISSING", "製品の配置先を確認できません。")
     })?;
+    if let (Some(identity), Some(hash)) = (identity, manifest_sha256) {
+        verify_product_manifest_file(&root, hash, identity)?;
+    }
     let app_dir = checked_directory(&root.join("app"), &root)?;
     let broker_dir = checked_directory(&root.join("broker"), &root)?;
     let app_exe = checked_file(&app_dir.join("gui_shell_desktop.exe"), &app_dir)?;
@@ -4337,6 +4522,34 @@ mod tests {
         path
     }
 
+    fn product_manifest_fixture(identity: &ProductRuntimeIdentity) -> Vec<u8> {
+        serde_json::to_vec(&json!({
+            "version": 1,
+            "product": "D4 Pocket",
+            "export_id": "export-launcher-test",
+            "manifest": {
+                "app_identity": {
+                    "app_id": identity.app_id.as_str(),
+                    "target_platform": "windows"
+                },
+                "audit_store": {
+                    "store_id": identity.audit_store_id.as_str(),
+                    "inherited": false
+                },
+                "distribution_metadata": {"target_platform": "windows"},
+                "inheritance_policy": {
+                    "authority": "none",
+                    "permission": "none",
+                    "approval": "none",
+                    "credential": "none",
+                    "audit_chain": "none"
+                },
+                "module_plan": {"binary_pruning_status": "not_applied"}
+            }
+        }))
+        .expect("試験用Manifestデータを生成する")
+    }
+
     #[cfg(all(windows, feature = "r2-e2e"))]
     const LAUNCHER_CRASH_OWNER_ROOT_ENV: &str = "GUI_SHELL_R2_E2E_LAUNCHER_OWNER_ROOT";
     #[cfg(all(windows, feature = "r2-e2e"))]
@@ -5186,6 +5399,10 @@ mod tests {
                 OsString::from("GUI_SHELL_PRODUCT_AUDIT_STORE_ID"),
                 OsString::from("audit-store-0123456789abcdef0123456789abcdef"),
             ),
+            (
+                OsString::from("GUI_SHELL_PRODUCT_MANIFEST_SHA256"),
+                OsString::from("a".repeat(64)),
+            ),
         ];
         let mut command = Command::new(command_exe);
         configure_frontend_environment(
@@ -5223,6 +5440,8 @@ mod tests {
                 "親process環境が子processへ漏れた: {marker}"
             );
         }
+        assert!(!environment.contains("gui_shell_product_manifest_sha256="));
+        assert!(!environment.contains(&"a".repeat(64)));
     }
 
     fn endpoint() -> BrokerEndpoint {
@@ -5353,6 +5572,152 @@ mod tests {
         let error =
             resolve_package_layout(&root.join("gui_shell_desktop_launcher.exe")).unwrap_err();
         assert_eq!(error.code, "PACKAGE_FILE_MISSING");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn product_manifest_is_hash_identity_and_non_inheritance_bound() {
+        let identity = ProductRuntimeIdentity {
+            app_id: "d4-pocket-app-11111111111111111111111111111111".into(),
+            audit_store_id: "audit-store-22222222222222222222222222222222".into(),
+        };
+        let raw = product_manifest_fixture(&identity);
+        let pin = hex::encode(Sha256::digest(&raw));
+        validate_product_manifest_bytes(&raw, &pin, &identity).unwrap();
+
+        let other_identity = ProductRuntimeIdentity {
+            app_id: "d4-pocket-app-33333333333333333333333333333333".into(),
+            audit_store_id: identity.audit_store_id.clone(),
+        };
+        assert_eq!(
+            validate_product_manifest_bytes(&raw, &pin, &other_identity)
+                .unwrap_err()
+                .code,
+            "PRODUCT_MANIFEST_INVALID"
+        );
+
+        let mut modified = raw.clone();
+        modified.push(b' ');
+        assert_eq!(
+            validate_product_manifest_bytes(&modified, &pin, &identity)
+                .unwrap_err()
+                .code,
+            "PRODUCT_MANIFEST_HASH_MISMATCH"
+        );
+
+        for field in [
+            "authority",
+            "permission",
+            "approval",
+            "credential",
+            "audit_chain",
+        ] {
+            let mut inherited = serde_json::from_slice::<Value>(&raw).unwrap();
+            inherited["manifest"]["inheritance_policy"][field] = json!("copy");
+            let inherited_raw = serde_json::to_vec(&inherited).unwrap();
+            let inherited_pin = hex::encode(Sha256::digest(&inherited_raw));
+            assert_eq!(
+                validate_product_manifest_bytes(&inherited_raw, &inherited_pin, &identity)
+                    .unwrap_err()
+                    .code,
+                "PRODUCT_MANIFEST_INVALID",
+                "Manifestの継承設定を拒否する"
+            );
+        }
+
+        let mut pruning = serde_json::from_slice::<Value>(&raw).unwrap();
+        pruning["manifest"]["module_plan"]["binary_pruning_status"] = json!("applied");
+        let pruning_raw = serde_json::to_vec(&pruning).unwrap();
+        let pruning_pin = hex::encode(Sha256::digest(&pruning_raw));
+        assert_eq!(
+            validate_product_manifest_bytes(&pruning_raw, &pruning_pin, &identity)
+                .unwrap_err()
+                .code,
+            "PRODUCT_MANIFEST_INVALID"
+        );
+
+        assert_eq!(
+            validate_product_manifest_bytes(&raw, &"A".repeat(64), &identity)
+                .unwrap_err()
+                .code,
+            "PRODUCT_MANIFEST_PIN_INVALID"
+        );
+    }
+
+    #[test]
+    fn product_package_requires_the_pinned_sibling_manifest_before_layout_use() {
+        let root = test_root("product-layout");
+        let app = root.join("app");
+        let broker = root.join("broker");
+        fs::create_dir_all(app.join("data")).unwrap();
+        fs::create_dir_all(&broker).unwrap();
+        for path in [
+            app.join("gui_shell_desktop.exe"),
+            app.join("flutter_windows.dll"),
+            app.join("data").join("app.so"),
+        ] {
+            fs::write(path, b"test artifact").unwrap();
+        }
+        fs::write(app.join("data").join("icudtl.dat"), b"icu").unwrap();
+        fs::create_dir(app.join("data").join("flutter_assets")).unwrap();
+        fs::write(broker.join("gui_shell_rust_helper.exe"), b"test broker").unwrap();
+        let launcher = root.join("gui_shell_desktop_launcher.exe");
+        fs::write(&launcher, b"test launcher").unwrap();
+        let identity = ProductRuntimeIdentity {
+            app_id: "d4-pocket-app-11111111111111111111111111111111".into(),
+            audit_store_id: "audit-store-22222222222222222222222222222222".into(),
+        };
+        let manifest_path = root.join("product_manifest.json");
+        let raw = product_manifest_fixture(&identity);
+        let pin = hex::encode(Sha256::digest(&raw));
+
+        assert_eq!(
+            resolve_package_layout_with_product_contract(&launcher, Some(&identity), None)
+                .unwrap_err()
+                .code,
+            "PRODUCT_MANIFEST_PIN_MISSING"
+        );
+        assert_eq!(
+            resolve_package_layout_with_product_contract(&launcher, None, Some(&pin))
+                .unwrap_err()
+                .code,
+            "PRODUCT_RUNTIME_IDENTITY_INVALID"
+        );
+        assert_eq!(
+            resolve_package_layout_with_product_contract(&launcher, Some(&identity), Some(&pin))
+                .unwrap_err()
+                .code,
+            "PRODUCT_MANIFEST_MISSING"
+        );
+
+        fs::write(&manifest_path, &raw).unwrap();
+        let layout =
+            resolve_package_layout_with_product_contract(&launcher, Some(&identity), Some(&pin))
+                .unwrap();
+        assert_eq!(
+            layout.app_exe,
+            fs::canonicalize(app.join("gui_shell_desktop.exe")).unwrap()
+        );
+
+        fs::write(&manifest_path, b"{}").unwrap();
+        assert_eq!(
+            resolve_package_layout_with_product_contract(&launcher, Some(&identity), Some(&pin))
+                .unwrap_err()
+                .code,
+            "PRODUCT_MANIFEST_HASH_MISMATCH"
+        );
+
+        fs::write(
+            &manifest_path,
+            vec![b' '; MAX_PRODUCT_MANIFEST_BYTES as usize + 1],
+        )
+        .unwrap();
+        assert_eq!(
+            resolve_package_layout_with_product_contract(&launcher, Some(&identity), Some(&pin))
+                .unwrap_err()
+                .code,
+            "PRODUCT_MANIFEST_INVALID"
+        );
         fs::remove_dir_all(root).unwrap();
     }
 
