@@ -342,7 +342,7 @@ def assert_broker_client_uses_runner_pipe_channel() -> RuntimeAssertion:
     required = [
         "MethodChannel('gui_shell/broker')",
         "invokeMethod<String>('request'",
-        "_payloadHash(payload)",
+        "broker_contract.buildBrokerRequestEnvelope(",
     ]
     missing = [token for token in required if token not in text]
     forbidden = [
@@ -378,15 +378,28 @@ def assert_broker_client_uses_runner_pipe_channel() -> RuntimeAssertion:
 
 
 def assert_broker_client_binds_payload_hash_to_payload() -> RuntimeAssertion:
-    text = _read("apps/desktop_flutter/lib/services/broker_client.dart")
-    required = ["_payloadHash(payload)", "_canonicalizeJsonValue", "_sha256Tagged"]
-    missing = [token for token in required if token not in text]
+    client = _read("apps/desktop_flutter/lib/services/broker_client.dart")
+    contract = _read("packages/broker_contract/lib/broker_request_envelope.dart")
+    missing = [
+        f"broker client: {token}"
+        for token in ["broker_contract.buildBrokerRequestEnvelope("]
+        if token not in client
+    ] + [
+        f"Broker contract: {token}"
+        for token in [
+            "'payload_hash': brokerPayloadHash(payload)",
+            "String brokerPayloadHash(Map<String, Object?>? payload)",
+            "jsonEncode(_canonicalizeJsonValue(payload))",
+            "_sha256Tagged(utf8.encode(canonicalJson))",
+        ]
+        if token not in contract
+    ]
     fixed_hash = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-    if missing or fixed_hash in text:
+    if missing or fixed_hash in client or fixed_hash in contract:
         pieces = []
         if missing:
             pieces.append("欠落: " + ", ".join(missing))
-        if fixed_hash in text:
+        if fixed_hash in client or fixed_hash in contract:
             pieces.append("固定dummy payload_hashが残っている")
         return _fail(
             "broker_client_binds_payload_hash_to_payload",
@@ -397,7 +410,7 @@ def assert_broker_client_binds_payload_hash_to_payload() -> RuntimeAssertion:
     return _pass(
         "broker_client_binds_payload_hash_to_payload",
         "CONFIG",
-        "BrokerClientは固定dummy hashを送らず、canonical JSON payloadからpayload_hashを計算する。",
+        "BrokerClientは共有Broker contractを使い、canonical JSON payloadからpayload_hashを計算する。",
         "Rust brokerのpayload hash mismatch testを合格状態に保つ。",
     )
 

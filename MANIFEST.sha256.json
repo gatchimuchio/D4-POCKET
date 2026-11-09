@@ -357,7 +357,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/broker_client.dart",
-      "sha256": "f516c4acd8e19972f33baa323497732753ac27ef78f0eb34706d4dd36c67226f"
+      "sha256": "65b8eea72f52ee0518c6d10d62be065a275a148085bece179dd099fd504dd060"
     },
     {
       "path": "apps/desktop_flutter/lib/services/compose_client.dart",
@@ -637,7 +637,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/broker_client_payload_hash_test.dart",
-      "sha256": "2ceb515017c474281142da98e94eb464499d30a9abd443ec8846547cf7c7d6b8"
+      "sha256": "ef8dc9318dc6059a3a9714d687cd26e90f6d8384f55e90ee763ceb64eefd4a99"
     },
     {
       "path": "apps/desktop_flutter/test/c27_performance_validation_test.dart",
@@ -1425,7 +1425,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "9dd870167a2c192541d6bf2d69c7d7abb30b6f523157df7d2a06fbd67418326d"
+      "sha256": "6a106cf5de3089b8a6ea273748a3b56858909aa44b9f9a8be355d4b3f92f81d5"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -5385,7 +5385,7 @@
     },
     {
       "path": "tooling/release_runtime_assertions.py",
-      "sha256": "fd646a775d01b8386c6c8d090b44df4cb6a4b3b420efed6afa52d91f997a2f6c"
+      "sha256": "c6429774e98b4e99b1da4e59ffe15c4628e02187a9b80ff19089ea42e41e0601"
     },
     {
       "path": "tooling/release_smoke.py",

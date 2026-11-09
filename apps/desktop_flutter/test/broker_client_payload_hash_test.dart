@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/services.dart';
+import 'package:broker_contract/broker_request_envelope.dart'
+    as broker_contract;
 import 'package:gui_shell_desktop/services/broker_client.dart';
 
 void main() {
@@ -95,6 +97,44 @@ void main() {
       brokerPayloadHashForTest(null),
       'sha256:74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b',
     );
+  });
+
+  test('共有Broker envelopeはpayload hashを結合しAuthority fieldを生成しない', () {
+    final payload = <String, Object?>{'version': 1};
+    final envelope = broker_contract.buildBrokerRequestEnvelope(
+      requestId: 'runtime-neutral-request-1',
+      operation: 'health',
+      nonce: 'runtime-neutral-nonce-1',
+      issuedAt: '2026-11-09T00:00:00Z',
+      metadata: const {'client': 'runtime-neutral-test'},
+      payload: payload,
+    );
+
+    expect(
+      envelope.keys.toSet(),
+      {
+        'request_id',
+        'operation',
+        'payload_hash',
+        'nonce',
+        'issued_at',
+        'metadata',
+        'payload',
+      },
+    );
+    expect(
+      envelope['payload_hash'],
+      broker_contract.brokerPayloadHash(payload),
+    );
+    for (final forbidden in [
+      'session_id',
+      'session_secret',
+      'credential_role',
+      'permission_id',
+      'approval_id',
+    ]) {
+      expect(envelope, isNot(contains(forbidden)));
+    }
   });
 
   test('payload_hash canonicalizes object key order', () {
