@@ -1425,7 +1425,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "6096d99e53aef049f691348d615d7c2f18d1fae561aeda5a91c05894ce636ffc"
+      "sha256": "489820cafc46f3765822d8b48b415fcb171469398901ecd01ced0e2680eea00e"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -2770,6 +2770,10 @@
     {
       "path": "examples/contracts/invalid/mcp_tool_call_bad_tool_id.invalid.json",
       "sha256": "1ac6187cf7f1ff0dd9abfcb1523359d9bb252b312c36420a1bc59d1af3e26dca"
+    },
+    {
+      "path": "examples/contracts/invalid/mcp_tool_call_compose_authority.invalid.json",
+      "sha256": "145a14733bab9b61370737fa5e63ab08285ed6dac0f8fd122874e3c4190ce0bd"
     },
     {
       "path": "examples/contracts/invalid/mcp_tool_call_receipt_full_content.invalid.json",
