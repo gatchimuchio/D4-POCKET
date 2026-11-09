@@ -649,6 +649,7 @@ class McpConnectionClient {
     required Map<String, Object?> arguments,
     String? sourceAgentTaskId,
     String? sourceAgentResultHash,
+    Map<String, Object?>? composeManifest,
   }) async {
     if (!_validIdentifier(serverId) ||
         !RegExp(r'^tool-[a-f0-9]{142}$').hasMatch(tool.toolId) ||
@@ -656,6 +657,8 @@ class McpConnectionClient {
         utf8.encode(jsonEncode(arguments)).length > 32 * 1024 ||
         (sourceAgentTaskId == null) != (sourceAgentResultHash == null) ||
         (sourceAgentTaskId != null && !_validIdentifier(sourceAgentTaskId)) ||
+        (composeManifest != null &&
+            utf8.encode(jsonEncode(composeManifest)).length > 32 * 1024) ||
         (sourceAgentResultHash != null &&
             !RegExp(
               r'^sha256:[a-f0-9]{64}$',
@@ -675,6 +678,7 @@ class McpConnectionClient {
           'source_agent_task_id': sourceAgentTaskId,
         if (sourceAgentResultHash != null)
           'source_agent_result_hash': sourceAgentResultHash,
+        if (composeManifest != null) 'compose_manifest': composeManifest,
       },
     );
     final body = _acceptedBody(response, 'MCP Tool実行');

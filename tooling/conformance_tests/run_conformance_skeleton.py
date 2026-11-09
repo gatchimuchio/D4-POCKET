@@ -6206,6 +6206,7 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
         "mcp_disconnect_receipt_wrong_evidence.invalid.json",
         "mcp_tool_call_authority.invalid.json",
         "mcp_tool_call_bad_tool_id.invalid.json",
+        "mcp_tool_call_compose_authority.invalid.json",
         "mcp_tool_call_unknown_field.invalid.json",
         "mcp_tool_call_receipt_full_content.invalid.json",
     )

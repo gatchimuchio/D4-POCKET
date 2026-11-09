@@ -138,6 +138,8 @@ struct ToolCallRequest {
     source_agent_task_id: Option<String>,
     #[serde(default, rename = "source_agent_result_hash")]
     source_agent_result_hash: Option<String>,
+    #[serde(default, rename = "compose_manifest")]
+    compose_manifest: Option<Value>,
 }
 
 struct OneShotMcpPermission {
@@ -881,12 +883,39 @@ pub(super) fn call_tool(
             )
         }
     };
+    let composition = match request.compose_manifest.as_ref() {
+        Some(manifest) => match super::compose_center::validate_mcp_tool_composition(
+            broker,
+            manifest,
+            &request.server_id,
+            &request.tool_id,
+        ) {
+            Ok(binding) => Some(binding),
+            Err(_) => return broker.reject_with_payload_hash(
+                request_id,
+                OP_TOOL_CALL,
+                "mcp_tool_compose_selection_invalid",
+                "Composeで選択した現在のRuntime／Agent／MCP Tool構成を確認できないため送信しない",
+                true,
+                payload_hash,
+            ),
+        },
+        None => None,
+    };
+    let composition_audit = composition.as_ref().map_or_else(String::new, |binding| {
+        format!(
+            " 構成識別子={} 構成内容の要約値={}",
+            binding.compose_id, binding.manifest_hash
+        )
+    });
     if broker
         .append_audit(
             request_id,
             OP_TOOL_CALL,
             "received",
-            "Rust起動器のnative Owner確認後にTool要求を受信。引数本文は記録しない",
+            &format!(
+                "Rust起動器のnative Owner確認後にTool要求を受信。引数本文は記録しない{composition_audit}"
+            ),
             EVIDENCE_SOURCE_INTERNAL_STATE,
             payload_hash,
         )
@@ -1027,8 +1056,8 @@ pub(super) fn call_tool(
             OP_TOOL_CALL,
             "started",
             &format!(
-                "Capability=mcp.tool.call Permission={} consumed=true Approval={} RecoveryAction=inspect-mcp-tool-side-effect; MCP tools/callを同一接続へ一度だけ送信{}",
-                permission.id, approval_event.event_id, source_audit
+                "Capability=mcp.tool.call Permission={} consumed=true Approval={} RecoveryAction=inspect-mcp-tool-side-effect; MCP tools/callを同一接続へ一度だけ送信{}{}",
+                permission.id, approval_event.event_id, source_audit, composition_audit
             ),
             EVIDENCE_SOURCE_INTERNAL_STATE,
             payload_hash,
@@ -1767,6 +1796,38 @@ mod tests {
         let summary = desktop_owner_summary(OP_TOOL_CALL, &call).unwrap();
         assert!(!summary.contains("公開fixture本文"));
         assert!(summary.contains("一回Permission"));
+        let composed_call = json!({
+            "版": 1,
+            "操作": "実行",
+            "ServerID": "fixture-mcp-server",
+            "ToolID": format!("tool-{}", "a".repeat(142)),
+            "名前": "echo",
+            "arguments": {"text": "公開fixture本文"},
+            "compose_manifest": {
+                "version": 1,
+                "compose_id": "owner-compose",
+                "display_name": "Owner Compose",
+                "runtime_ids": ["runtime.fixture"],
+                "agent_ids": ["agent.fixture"],
+                "tool_ids": [format!("tool-{}", "a".repeat(142))],
+                "mcp_connection_ids": ["fixture-mcp-server"],
+                "theme": {"theme_id": "d4-pocket", "mode": "system"},
+                "capability_requirements": [],
+                "settings": {"locale": "ja-JP", "density": "comfortable", "content_visibility": "summary"},
+                "inheritance_policy": {
+                    "authority": "none", "permission": "none", "approval": "none",
+                    "credential": "none", "audit_chain": "none"
+                },
+                "output_mode": "manifest_only"
+            }
+        });
+        let composed_summary = desktop_owner_summary(OP_TOOL_CALL, &composed_call).unwrap();
+        assert!(composed_summary.contains("Compose ID: owner-compose"));
+        assert!(composed_summary.contains("Runtime 1件・Agent 1件・Tool 1件"));
+        assert!(!composed_summary.contains("公開fixture本文"));
+        let mut unselected = composed_call.clone();
+        unselected["compose_manifest"]["tool_ids"] = json!([]);
+        assert!(desktop_owner_summary(OP_TOOL_CALL, &unselected).is_none());
         let stop = json!({"版":1,"操作":"切断","ServerID":"fixture-mcp-server"});
         assert!(desktop_owner_summary(OP_DISCONNECT, &stop)
             .unwrap()
@@ -2241,6 +2302,8 @@ if errorlevel 1 exit /b 45
         let root = &temp_root.0;
         let audit_root = root.join("audit");
         let workspace = root.join("workspace");
+        let calls_path = workspace.join("calls.log");
+        let calls_path_text = calls_path.to_string_lossy().into_owned();
         std::fs::create_dir_all(&workspace).expect("MCP作業領域を作成");
         let mut broker =
             Broker::new_persistent("session-1", &audit_root).expect("永続Brokerを作成");
@@ -2257,10 +2320,16 @@ set /p request=
 echo !request! | findstr /c:"tools/list" > nul
 if errorlevel 1 exit /b 43
 echo {{"jsonrpc":"2.0","id":2,"result":{{"resultType":"complete","tools":[{{"name":"echo","inputSchema":{{"type":"object","properties":{{}},"additionalProperties":false}}}}]}}}}
+set /p request=
+echo !request! | findstr /c:"tools/call" > nul
+if errorlevel 1 exit /b 44
+>>"__CALLS_PATH__" echo call
+echo {{"jsonrpc":"2.0","id":3,"result":{{"resultType":"complete","content":[{{"type":"text","text":"compose-selected-tool-result"}}],"isError":false}}}}
 "%SystemRoot%\System32\ping.exe" -t 127.0.0.1 > nul
 "#,
             crate::mcp::MODERN_PROTOCOL_VERSION
-        );
+        )
+        .replace("__CALLS_PATH__", &calls_path_text);
         std::fs::write(&script_path, script).expect("MCP fixture scriptを書き込む");
         let executable = std::env::var_os("SystemRoot")
             .map(std::path::PathBuf::from)
@@ -2342,6 +2411,71 @@ echo {{"jsonrpc":"2.0","id":2,"result":{{"resultType":"complete","tools":[{{"nam
             composed.body.as_ref().unwrap()["compose_manifest"]["tool_ids"][0],
             tool_id
         );
+
+        let mut stale_runtime = selected.clone();
+        stale_runtime["runtime_ids"] = json!(["compose-stale-runtime"]);
+        let stale_composed_tool_call = broker_test_native_owner_operation(
+            &mut broker,
+            BrokerOperation::MCPTool実行,
+            json!({
+                "版": 1,
+                "操作": "実行",
+                "ServerID": SERVER,
+                "ToolID": tool_id,
+                "名前": "echo",
+                "arguments": {},
+                "compose_manifest": stale_runtime,
+            }),
+        );
+        assert_eq!(stale_composed_tool_call.status, BrokerStatus::Rejected);
+        assert_eq!(
+            stale_composed_tool_call
+                .error
+                .as_ref()
+                .map(|error| error.code.as_str()),
+            Some("mcp_tool_compose_selection_invalid"),
+            "現在CatalogにないCompose RuntimeはTool送信前に拒否する"
+        );
+        assert!(
+            !calls_path.exists(),
+            "stale Compose selectionは外部作用しない"
+        );
+
+        let composed_tool_call = broker_test_native_owner_operation(
+            &mut broker,
+            BrokerOperation::MCPTool実行,
+            json!({
+                "版": 1,
+                "操作": "実行",
+                "ServerID": SERVER,
+                "ToolID": tool_id,
+                "名前": "echo",
+                "arguments": {},
+                "compose_manifest": composed.body.as_ref().unwrap()["compose_manifest"],
+            }),
+        );
+        assert_eq!(
+            composed_tool_call.status,
+            BrokerStatus::Accepted,
+            "{composed_tool_call:?}"
+        );
+        assert_eq!(
+            composed_tool_call.evidence_source,
+            EVIDENCE_SOURCE_LIVE_RUNTIME
+        );
+        assert_eq!(
+            std::fs::read_to_string(&calls_path)
+                .expect("Composeから呼び出したfixture MCP作用記録")
+                .lines()
+                .count(),
+            1,
+            "選択済みCompose Toolだけを同じBroker/MCP作用経路から一度実行する"
+        );
+        assert!(broker.audit_events().iter().any(|event| {
+            event.operation == OP_TOOL_CALL
+                && event.reason.contains("構成識別子=compose-mcp-catalog-test")
+                && event.reason.contains("構成内容の要約値=sha256:")
+        }));
 
         let preview = broker_test_operation(
             &mut broker,
@@ -2516,6 +2650,14 @@ fn parse_tool_call_request(payload: &Value) -> Result<ToolCallRequest, McpError>
             .source_agent_result_hash
             .as_deref()
             .is_some_and(|hash| !valid_tagged_hash(hash))
+        || request.compose_manifest.as_ref().is_some_and(|manifest| {
+            super::compose_center::mcp_tool_composition_owner_summary(
+                manifest,
+                &request.server_id,
+                &request.tool_id,
+            )
+            .is_err()
+        })
     {
         return Err(McpError::new(
             "mcp_tool_call_request_invalid",
@@ -2526,7 +2668,6 @@ fn parse_tool_call_request(payload: &Value) -> Result<ToolCallRequest, McpError>
 }
 
 /// Desktop native確認の公開表示。承認・catalog適合・実行資格は既存Brokerが別途再評価する。
-#[cfg(any(target_os = "linux", target_os = "macos", test))]
 pub(crate) fn desktop_owner_summary(operation: &str, payload: &Value) -> Option<String> {
     match operation {
         OP_CONNECT => {
@@ -2556,6 +2697,11 @@ pub(crate) fn desktop_owner_summary(operation: &str, payload: &Value) -> Option<
         OP_TOOL_CALL => {
             let request = parse_tool_call_request(payload).ok()?;
             let hash = super::protocol::canonical_payload_hash(Some(&request.arguments));
+            let composition = composed_tool_owner_summary(
+                request.compose_manifest.as_ref(),
+                &request.server_id,
+                &request.tool_id,
+            )?;
             let agent_source = match (
                 request.source_agent_task_id.as_deref(),
                 request.source_agent_result_hash.as_deref(),
@@ -2565,10 +2711,25 @@ pub(crate) fn desktop_owner_summary(operation: &str, payload: &Value) -> Option<
                 ),
                 _ => String::new(),
             };
-            Some(format!("このToolを現在Serverへ一回だけ実行します。\nServer ID: {}\nTool: {} ({})\n引数: {}項目\n引数hash: {hash}{agent_source}\n前画面のJSON argumentsを確認してください。秘密値を含めないでください。Brokerが現在Catalog／Schemaを再検査し、一回PermissionとAuditを確定します。結果本文はFlutter／receiptへ公開せずhashだけを返します。外部副作用は取消できず、結果不明時は隔離・自動再送なしです。",
+            Some(format!("このToolを現在Serverへ一回だけ実行します。\nServer ID: {}\nTool: {} ({})\n引数: {}項目\n引数hash: {hash}{agent_source}{composition}\n前画面のJSON argumentsを確認してください。秘密値を含めないでください。Brokerが現在Catalog／Schemaを再検査し、一回PermissionとAuditを確定します。結果本文はFlutter／receiptへ公開せずhashだけを返します。外部副作用は取消できず、結果不明時は隔離・自動再送なしです。",
                 request.server_id, request.name, request.tool_id, request.arguments.as_object()?.len()))
         }
         _ => None,
+    }
+}
+
+pub(crate) fn composed_tool_owner_summary(
+    compose_manifest: Option<&Value>,
+    server_id: &str,
+    tool_id: &str,
+) -> Option<String> {
+    match compose_manifest {
+        Some(manifest) => {
+            super::compose_center::mcp_tool_composition_owner_summary(manifest, server_id, tool_id)
+                .ok()
+                .map(|summary| format!("\n{summary}"))
+        }
+        None => Some(String::new()),
     }
 }
 

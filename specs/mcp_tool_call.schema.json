@@ -18,6 +18,10 @@
       "propertyNames": { "not": { "pattern": "(?i)(authority|permission|approval|capability|credential|secret|password|token|api[_-]?key|authorization)" } },
       "additionalProperties": true
     },
+    "compose_manifest": {
+      "$ref": "gui_shell_compose.schema.json",
+      "description": "Composeからの呼出しではBrokerが現在Catalogと選択Server／Toolを再検査する。Manifestから権限を継承しない。"
+    },
     "source_agent_task_id": {
       "type": "string",
       "minLength": 1,

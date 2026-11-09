@@ -160,6 +160,44 @@ void main() {
         'audit_chain': 'none',
       });
 
+      final composeToolAction = find.byKey(
+        ValueKey('compose-tool-run-${transport.composeToolId}'),
+      );
+      await tester.ensureVisible(composeToolAction);
+      expect(tester.widget<IconButton>(composeToolAction).onPressed, isNotNull);
+      final composeNameField = find.byWidgetPredicate(
+        (widget) =>
+            widget is TextField && widget.decoration?.labelText == '構成表示名',
+      );
+      await tester.enterText(composeNameField, '編集後の構成');
+      await tester.pump();
+      expect(tester.widget<IconButton>(composeToolAction).onPressed, isNull);
+      await tester.enterText(
+        composeNameField,
+        compose['display_name']! as String,
+      );
+      await tester.pump();
+      await tester.ensureVisible(composeToolAction);
+      await tester.pumpAndSettle();
+      expect(tester.widget<IconButton>(composeToolAction).onPressed, isNotNull);
+      await tester.tap(composeToolAction);
+      await tester.pumpAndSettle();
+      await _enter(
+        tester,
+        'compose-tool-action-arguments',
+        '{"query":"needle"}',
+      );
+      await _tap(tester, 'compose-tool-action-submit');
+      final composedToolCall = transport.lastPayload('MCP Tool実行');
+      expect(composedToolCall['ServerID'], 'mcp.local');
+      expect(composedToolCall['ToolID'], transport.composeToolId);
+      expect(composedToolCall['arguments'], {'query': 'needle'});
+      expect(composedToolCall['compose_manifest'], compose);
+      expect(
+        find.textContaining('Compose構成から既存MCP Toolを実行しました'),
+        findsOneWidget,
+      );
+
       await _tap(tester, 'compose-preview-button');
       final preview = transport.lastPayload('GUI Shell構成Preview');
       expect(preview['current_manifest'], compose);
@@ -296,12 +334,36 @@ class _ComposeScreenTransport implements BrokerTransport {
           'permission_generated': false,
         },
       'MCP接続一覧' => _mcpConnectionListBody(),
+      'MCP Tool実行' => <String, Object?>{
+          '版': 1,
+          '契約種別': 'MCP Tool実行receipt',
+          'ServerID': 'mcp.local',
+          'ToolID': composeToolId,
+          '名前': 'echo',
+          'arguments_hash': 'sha256:${List<String>.filled(64, 'a').join()}',
+          'result_hash': 'sha256:${List<String>.filled(64, 'b').join()}',
+          'Tool error': false,
+          'content_count': 1,
+          'content_types': ['text'],
+          '接続状態': 'connected',
+          '能力ID': 'mcp.tool.call',
+          '権限ID': 'permission.mcp.tool.call.one_shot',
+          '承認状態': 'native_owner_confirmed',
+          '承認監査ID': 'audit-compose-approval',
+          '復旧ID': 'inspect-mcp-tool-side-effect',
+          '権限生成': 'Broker内一回限りPermissionを消費',
+          '公開範囲': 'hash_only',
+          '証拠種別': 'LIVE_RUNTIME',
+          '監査ID': 'audit-compose-tool-call',
+        },
       '更新候補取得' => <String, Object?>{
           '状態': 'updated',
           '候補件数': 2,
         },
       'GUI Shell構成' => <String, Object?>{
-          'compose_manifest': payload,
+          'compose_manifest': Map<String, Object?>.fromEntries(
+            payload!.entries.toList().reversed,
+          ),
           'build_status': 'not_started',
           'app_identity_status': 'not_generated',
           'permission_generated': false,
@@ -331,6 +393,7 @@ class _ComposeScreenTransport implements BrokerTransport {
       if (operation == 'MCP接続一覧') 'evidence_source': 'INTERNAL_STATE',
       if (operation == 'GUI Shell構成Catalog')
         'evidence_source': 'INTERNAL_STATE',
+      if (operation == 'MCP Tool実行') 'evidence_source': 'LIVE_RUNTIME',
       'body': body,
     };
   }

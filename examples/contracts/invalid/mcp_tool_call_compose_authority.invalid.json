@@ -1,0 +1,28 @@
+{
+  "版": 1,
+  "操作": "実行",
+  "ServerID": "mcp-fixture",
+  "ToolID": "tool-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "名前": "search",
+  "arguments": {"query": "needle"},
+  "compose_manifest": {
+    "version": 1,
+    "compose_id": "d4-pocket-search",
+    "display_name": "D4 Pocket検索",
+    "runtime_ids": ["runtime.codex"],
+    "agent_ids": ["agent.codex"],
+    "tool_ids": ["tool-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
+    "mcp_connection_ids": ["mcp-fixture"],
+    "theme": {"theme_id": "d4-pocket", "mode": "system"},
+    "capability_requirements": [],
+    "settings": {"locale": "ja-JP", "density": "comfortable", "content_visibility": "summary"},
+    "inheritance_policy": {
+      "authority": "none",
+      "permission": "permission.mcp.tool.call",
+      "approval": "none",
+      "credential": "none",
+      "audit_chain": "none"
+    },
+    "output_mode": "manifest_only"
+  }
+}

@@ -301,7 +301,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/settings.dart",
-      "sha256": "aa9f96226c29906dc4c1f6e6321cc53e6048c61ccce51726549ec811e124aa0f"
+      "sha256": "2404b632ae32305952c5f3ddc8e2c658e380b44c655ef50877591006eb732367"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/setup_doctor.dart",
@@ -713,7 +713,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/settings_compose_test.dart",
-      "sha256": "5edd3c8f44a40f9b1cf869f227b3e1b49f2b72a0de588dee8dbbe3f029267004"
+      "sha256": "6fcbed19dc35099dfbdc41deb77fdadd71d34c8d618eedb57ac95af71248bd98"
     },
     {
       "path": "apps/desktop_flutter/test/settings_install_flow_test.dart",
@@ -1425,7 +1425,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "23cb931e31fb8b926455aa539ce9baf6490467d427856595ceb1a09305326fe9"
+      "sha256": "6096d99e53aef049f691348d615d7c2f18d1fae561aeda5a91c05894ce636ffc"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -2144,6 +2144,10 @@
       "sha256": "5934152a64d469f9c2f9fe1c092d710454a329060bebda4c9f02ef4c7a056bb3"
     },
     {
+      "path": "examples/contracts/gui_shell_compose_catalog.valid.json",
+      "sha256": "7f3db6f817460ac18fd1d8e10cf2f80082286e1795efadd6405d1cad0223ab30"
+    },
+    {
       "path": "examples/contracts/gui_shell_compose_receipt.valid.json",
       "sha256": "35ccc5558e36e96f88b6d0bd315a4ebbc2de6935d06a752a4bfa56f8189d74ec"
     },
@@ -2562,6 +2566,10 @@
     {
       "path": "examples/contracts/invalid/gui_shell_compose_authority.invalid.json",
       "sha256": "9766a14d5291eb712a88add9315247fe97535cff9fff577f7f02c95eb02133f7"
+    },
+    {
+      "path": "examples/contracts/invalid/gui_shell_compose_catalog_authority.invalid.json",
+      "sha256": "adc37f489ce8b12e27d1a036e2e2c488a2e1d457a57fe7bfaae0a60d7651d2b8"
     },
     {
       "path": "examples/contracts/invalid/gui_shell_compose_receipt_authority.invalid.json",
@@ -3181,7 +3189,7 @@
     },
     {
       "path": "examples/contracts/mcp_tool_call.valid.json",
-      "sha256": "a040279240c2e215d1902d07cf42821605d783a442e02ebdf14d11ddaf3c6239"
+      "sha256": "ef29d7b9a498dba60a3ac9e6d7ef484f49b84ad18d8e29a01d23be37fcc2abce"
     },
     {
       "path": "examples/contracts/mcp_tool_call_receipt.valid.json",
@@ -3681,7 +3689,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/compose_center.rs",
-      "sha256": "8f3d76ea6a94836631164df4ecf28009c2682057deb31e1f0ac0bd17682c4afa"
+      "sha256": "8446ebbe4a2379d305a8f1f6402172921dbd720b4349482a2caae0a8b24e713f"
     },
     {
       "path": "native/rust_helper/src/broker/content_access.rs",
@@ -3769,7 +3777,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/mcp_center.rs",
-      "sha256": "dbd19d67c74cf78b276fe5ffe36ec528f2e0dab00c1b6191f9502a2903589045"
+      "sha256": "4d21f7df1e5ca42d2edcceaf38e3c8ee87da37ffda5ef18e1a3c543c31525c6e"
     },
     {
       "path": "native/rust_helper/src/broker/mod.rs",
@@ -3845,7 +3853,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "4f1502da44f001b4dc1a14af811e1d9d530c645adc13d5edc70ea646641b3ee7"
+      "sha256": "48aaa69b199045d1436fa2b47391610aa3e754149e89e49c8acf1446217c243d"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -4201,7 +4209,7 @@
     },
     {
       "path": "packages/agent_orchestration/lib/mcp_connection_client.dart",
-      "sha256": "304b82e5a421aa131452672c7e11882e827a16125f8699deb931b91855293596"
+      "sha256": "a88e4f6ad9a89c0e14887b64620907366bbe44733cf03d53f552284378edacdb"
     },
     {
       "path": "packages/agent_orchestration/lib/runtime_platform.dart",
@@ -4792,6 +4800,10 @@
       "sha256": "5e473a17523857775a196639a8fce79e638e6115713f65ba2fa7d8d05da6a840"
     },
     {
+      "path": "specs/gui_shell_compose_catalog.schema.json",
+      "sha256": "b1f7d3db4231f110bd6059c780ba250108a5ed92be6771dafd72e8021c914398"
+    },
+    {
       "path": "specs/gui_shell_compose_receipt.schema.json",
       "sha256": "26de6ea04bf780e4ca8ec9f6891e38d34536a4e71e9890c772b58ec0df022738"
     },
@@ -4933,7 +4945,7 @@
     },
     {
       "path": "specs/mcp_tool_call.schema.json",
-      "sha256": "60854bdd8e4bebf4fcfbdb2405cc76b9ee82fcf5c971d93ae5f071c9bbc41ca9"
+      "sha256": "1cef5fed36a91cf98a9696deabcc403736f0615a93ea1573ad6153096bc85d11"
     },
     {
       "path": "specs/mcp_tool_call_receipt.schema.json",
@@ -5253,7 +5265,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "fe0337bd815b9273a9a5134ee60a0128015ab84a072ae051f3ff9d5410ea51e2"
+      "sha256": "a596f3fd96dc2662562bfc087598dfbc00f1cb7bbef88cf790a23a31058466e8"
     },
     {
       "path": "tooling/conformance_tests/test_final_development_audit.py",

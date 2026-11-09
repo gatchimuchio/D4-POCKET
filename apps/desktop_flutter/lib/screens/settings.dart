@@ -19,6 +19,26 @@ import '../services/update_client.dart';
 import 'mcp_connection_center.dart';
 import 'shared.dart';
 
+bool _jsonContractEquals(Object? left, Object? right) {
+  if (left is Map && right is Map) {
+    if (left.length != right.length ||
+        left.keys.any((key) => !right.containsKey(key))) {
+      return false;
+    }
+    return left.keys.every(
+      (key) => _jsonContractEquals(left[key], right[key]),
+    );
+  }
+  if (left is List && right is List) {
+    if (left.length != right.length) return false;
+    for (var index = 0; index < left.length; index++) {
+      if (!_jsonContractEquals(left[index], right[index])) return false;
+    }
+    return true;
+  }
+  return left == right;
+}
+
 const guiShellProductVersion = String.fromEnvironment(
   'GUI_SHELL_PRODUCT_VERSION',
   defaultValue: '開発版',
@@ -88,6 +108,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final Set<String> _selectedComposeMcpConnectionIds = <String>{};
   final Set<String> _selectedComposeToolIds = <String>{};
   bool _composeCatalogLoading = false;
+  bool _composeToolCallInProgress = false;
   List<String> _composeRuntimeIds = const [];
   List<ComposeAgentCatalogEntry> _composeAgentCatalog = const [];
   final Set<String> _selectedComposeRuntimeIds = <String>{};
@@ -333,6 +354,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: TextField(
                   controller: _composeIdController,
                   decoration: const InputDecoration(labelText: '構成識別子'),
+                  onChanged: (_) => setState(() {}),
                 ),
               ),
               SizedBox(
@@ -340,6 +362,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: TextField(
                   controller: _composeNameController,
                   decoration: const InputDecoration(labelText: '構成表示名'),
+                  onChanged: (_) => setState(() {}),
                 ),
               ),
               FilledButton.icon(
@@ -452,6 +475,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               helperText:
                   '選択中の全Agentが現在metadataでsupportedと宣言した要件だけ受理されます。PermissionやAuthorityは生成しません。',
             ),
+            onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 8),
           const SectionList(
@@ -717,6 +741,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
               },
               title: Text(tool.name),
               subtitle: const Text('Broker Catalogのmetadata。実行権限は付与されません。'),
+              secondary: IconButton(
+                key: ValueKey('compose-tool-run-${tool.toolId}'),
+                tooltip: '現在Compose済みの構成からこのMCP Toolを実行',
+                onPressed: _composeToolCallInProgress ||
+                        !_acceptedComposeMatchesDraft ||
+                        !_selectedComposeToolIds.contains(tool.toolId) ||
+                        _selectedComposeToolConnection(tool.toolId) == null
+                    ? null
+                    : () => _runComposedTool(
+                          _selectedComposeToolConnection(tool.toolId)!,
+                          tool,
+                        ),
+                icon: _composeToolCallInProgress
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.play_arrow),
+              ),
               controlAffinity: ListTileControlAffinity.leading,
             ),
         ],
@@ -738,6 +781,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
     final sorted = tools.keys.toList()..sort();
     return {for (final toolId in sorted) toolId: tools[toolId]!};
+  }
+
+  bool get _acceptedComposeMatchesDraft =>
+      _lastAcceptedComposeManifest != null &&
+      _jsonContractEquals(
+        _lastAcceptedComposeManifest,
+        _composeManifest(),
+      );
+
+  McpConnectionSummary? _selectedComposeToolConnection(String toolId) {
+    final matches = _composeMcpConnections.where((connection) =>
+        _selectedComposeMcpConnectionIds.contains(connection.serverId) &&
+        connection.connectionState == 'connected' &&
+        connection.executionState == 'ready' &&
+        connection.tools.any((tool) => tool.toolId == toolId));
+    final selected = matches.toList(growable: false);
+    return selected.length == 1 ? selected.single : null;
   }
 
   void _setComposeMcpConnectionSelected(
@@ -811,6 +871,114 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _setComposeMessage('Manifestだけを作成しました。buildとApp identity生成は未実行です。');
     } catch (error) {
       _setComposeMessage('GUI Shell構成に失敗しました: $error');
+    }
+  }
+
+  Future<void> _runComposedTool(
+    McpConnectionSummary connection,
+    McpToolSummary tool,
+  ) async {
+    final client = _composeMcpCatalogClient;
+    final manifest = _lastAcceptedComposeManifest;
+    if (client == null ||
+        manifest == null ||
+        !_acceptedComposeMatchesDraft ||
+        !_selectedComposeMcpConnectionIds.contains(connection.serverId) ||
+        !_selectedComposeToolIds.contains(tool.toolId)) {
+      _setComposeMessage(
+          '現在の選択と一致するCompose受理済みManifestがありません。先に構成Manifestを作り直してください。');
+      return;
+    }
+
+    final controller = TextEditingController(text: '{}');
+    try {
+      final navigator = Navigator.of(context, rootNavigator: true);
+      final route = DialogRoute<String>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text('Compose構成から${tool.name}を実行'),
+          content: SizedBox(
+            width: 560,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('構成識別子: ${manifest['compose_id']}'),
+                Text('接続先識別子: ${connection.serverId} / 操作識別子: ${tool.toolId}'),
+                const SizedBox(height: 8),
+                const Text(
+                  'argumentsを確認してください。送信後は既存Brokerのnative Owner確認、現在Catalog／Schema再検査、一回限りPermission、Auditを通ります。秘密値を入力しないでください。',
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  key: const ValueKey('compose-tool-action-arguments'),
+                  controller: controller,
+                  minLines: 4,
+                  maxLines: 10,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'JSON形式の引数',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('キャンセル'),
+            ),
+            FilledButton(
+              key: const ValueKey('compose-tool-action-submit'),
+              onPressed: () => Navigator.pop(dialogContext, controller.text),
+              child: Text(defaultTargetPlatform == TargetPlatform.macOS
+                  ? 'Mac native Owner確認へ'
+                  : defaultTargetPlatform == TargetPlatform.linux
+                      ? 'Linux native Owner確認へ'
+                      : 'Windows native Owner確認へ'),
+            ),
+          ],
+        ),
+      );
+      final raw = await navigator.push(route);
+      await route.completed;
+      if (raw == null || !mounted) return;
+
+      final Object? decoded;
+      try {
+        decoded = jsonDecode(raw);
+      } on FormatException {
+        _setComposeMessage('argumentsは正しいJSON objectではありません。Toolは送信していません。');
+        return;
+      }
+      if (decoded is! Map ||
+          decoded.keys.any((key) => key is! String) ||
+          utf8.encode(jsonEncode(decoded)).length > 32 * 1024) {
+        _setComposeMessage('argumentsの形式またはbyte上限が不正です。Toolは送信していません。');
+        return;
+      }
+
+      setState(() {
+        _composeToolCallInProgress = true;
+        _composeMessage = '既存Brokerのnative Owner確認へ要求しています。';
+      });
+      final receipt = await client.callTool(
+        serverId: connection.serverId,
+        tool: tool,
+        arguments: Map<String, Object?>.from(decoded),
+        composeManifest: manifest,
+      );
+      _setComposeMessage(
+        'Compose構成から既存MCP Toolを実行しました。result hash: ${receipt.resultHash} / content: ${receipt.contentTypes.join(', ')} / Audit: ${receipt.auditId}${receipt.toolError ? ' / Tool側error=true' : ''}。本文は表示していません。',
+      );
+    } catch (error) {
+      _setComposeMessage(
+          'ComposeからのMCP Tool実行に失敗しました。Brokerの拒否・Audit状態を確認してください: $error');
+    } finally {
+      controller.dispose();
+      if (mounted && _composeToolCallInProgress) {
+        setState(() => _composeToolCallInProgress = false);
+      }
     }
   }
 

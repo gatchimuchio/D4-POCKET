@@ -173,6 +173,7 @@ enum DesktopOwnerOperationSummary {
         arguments_hash: String,
         source_agent_task_id: Option<String>,
         source_agent_result_hash: Option<String>,
+        compose_summary: String,
         payload_hash: String,
     },
     UpdateDownload {
@@ -341,6 +342,8 @@ struct McpToolCallOwnerRequest {
     source_agent_task_id: Option<String>,
     #[serde(default, rename = "source_agent_result_hash")]
     source_agent_result_hash: Option<String>,
+    #[serde(default, rename = "compose_manifest")]
+    compose_manifest: Option<serde_json::Value>,
 }
 
 #[derive(Deserialize)]
@@ -1780,6 +1783,11 @@ fn owner_operation_candidate_with_product_identity(
             }
             let arguments = request.arguments.as_object()?;
             let arguments_hash = sha256_tagged(&serde_json::to_vec(&request.arguments).ok()?);
+            let compose_summary = crate::broker::mcp_center::composed_tool_owner_summary(
+                request.compose_manifest.as_ref(),
+                &request.server_id,
+                &request.tool_id,
+            )?;
             DesktopOwnerOperationSummary::McpToolCall {
                 server_id: request.server_id,
                 tool_id: request.tool_id,
@@ -1788,6 +1796,7 @@ fn owner_operation_candidate_with_product_identity(
                 arguments_hash,
                 source_agent_task_id: request.source_agent_task_id,
                 source_agent_result_hash: request.source_agent_result_hash,
+                compose_summary,
                 payload_hash,
             }
         }
@@ -2635,6 +2644,7 @@ fn owner_confirmation_text_for_identity(
             arguments_hash,
             source_agent_task_id,
             source_agent_result_hash,
+            compose_summary,
             payload_hash,
         } => {
             let agent_source = match (source_agent_task_id, source_agent_result_hash) {
@@ -2646,7 +2656,7 @@ fn owner_confirmation_text_for_identity(
                 _ => String::new(),
             };
             format!(
-                "このMCP Toolを指定Serverへ一度だけ実行しますか？\n\nServer ID: {}\nTool: {} ({})\narguments: {}項目\narguments hash: {}{agent_source}\n\n前画面でJSON arguments全文と対象Server／Toolを確認してから判断してください。ここでは引数本文もTool結果本文も表示しません。秘密値をargumentsへ含めないでください。Brokerは現在CatalogとJSON Schemaを再検査し、この呼出しだけの一回限りPermissionを消費してAuditを記録します。MCP Server側の外部副作用は取り消せません。送信後に結果を確定できない場合は接続を隔離し、自動再送しません。ownerが外部状態を確認してから切断・再接続してください。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
+                "このMCP Toolを指定Serverへ一度だけ実行しますか？\n\nServer ID: {}\nTool: {} ({})\narguments: {}項目\narguments hash: {}{agent_source}{compose_summary}\n\n前画面でJSON arguments全文と対象Server／Toolを確認してから判断してください。ここでは引数本文もTool結果本文も表示しません。秘密値をargumentsへ含めないでください。Brokerは現在CatalogとJSON Schemaを再検査し、この呼出しだけの一回限りPermissionを消費してAuditを記録します。MCP Server側の外部副作用は取り消せません。送信後に結果を確定できない場合は接続を隔離し、自動再送しません。ownerが外部状態を確認してから切断・再接続してください。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
                 owner_confirmation_value(server_id),
                 owner_confirmation_value(name),
                 owner_confirmation_value(tool_id),
@@ -7574,7 +7584,24 @@ mod tests {
             "名前": "search",
             "arguments": {"query": "SENSITIVE_ARGUMENT_MARKER"},
             "source_agent_task_id": "task-source-123",
-            "source_agent_result_hash": format!("sha256:{}", "e".repeat(64))
+            "source_agent_result_hash": format!("sha256:{}", "e".repeat(64)),
+            "compose_manifest": {
+                "version": 1,
+                "compose_id": "owner-compose-test",
+                "display_name": "Owner Compose Test",
+                "runtime_ids": ["runtime.fixture"],
+                "agent_ids": ["agent.fixture"],
+                "tool_ids": [tool_id],
+                "mcp_connection_ids": ["mcp-fixture"],
+                "theme": {"theme_id": "d4-pocket", "mode": "system"},
+                "capability_requirements": [],
+                "settings": {"locale": "ja-JP", "density": "comfortable", "content_visibility": "summary"},
+                "inheritance_policy": {
+                    "authority": "none", "permission": "none", "approval": "none",
+                    "credential": "none", "audit_chain": "none"
+                },
+                "output_mode": "manifest_only"
+            }
         });
         let input = serde_json::json!({
             "request_id": "desktop-mcp-tool-call",
@@ -7608,6 +7635,8 @@ mod tests {
         assert!(confirmation.contains("task-source-123"));
         assert!(confirmation.contains(&format!("sha256:{}", "e".repeat(64))));
         assert!(confirmation.contains("期限付き・一回限り"));
+        assert!(confirmation.contains("Compose ID: owner-compose-test"));
+        assert!(confirmation.contains("Runtime 1件・Agent 1件・Tool 1件"));
         assert!(!confirmation.contains("SENSITIVE_ARGUMENT_MARKER"));
 
         let mut escalated = payload.clone();
@@ -7618,6 +7647,19 @@ mod tests {
             "payload_hash": canonical_payload_hash(Some(&escalated)),
             "payload": escalated,
             "nonce": "desktop-mcp-tool-call-escalated-nonce",
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {"client": "desktop_flutter"}
+        });
+        assert!(owner_operation_candidate(request.to_string().as_bytes(), &endpoint).is_none());
+
+        let mut unselected_compose_tool = payload.clone();
+        unselected_compose_tool["compose_manifest"]["tool_ids"] = serde_json::json!([]);
+        let request = serde_json::json!({
+            "request_id": "desktop-mcp-tool-call-compose-unselected",
+            "operation": "MCP Tool実行",
+            "payload_hash": canonical_payload_hash(Some(&unselected_compose_tool)),
+            "payload": unselected_compose_tool,
+            "nonce": "desktop-mcp-tool-call-compose-unselected-nonce",
             "issued_at": BrokerRequestEnvelope::current_issued_at(),
             "metadata": {"client": "desktop_flutter"}
         });

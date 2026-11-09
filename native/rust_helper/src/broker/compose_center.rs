@@ -57,6 +57,15 @@ pub(super) struct ComposeManifest {
     output_mode: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct McpToolComposition {
+    pub(super) compose_id: String,
+    pub(super) manifest_hash: String,
+    pub(super) runtime_count: usize,
+    pub(super) agent_count: usize,
+    pub(super) tool_count: usize,
+}
+
 pub(super) fn catalog(
     broker: &mut Broker,
     request_id: &str,
@@ -385,6 +394,59 @@ pub(super) fn parse_manifest(value: &Value) -> Result<ComposeManifest, String> {
     let manifest: ComposeManifest = serde_json::from_value(value.clone())
         .map_err(|_| "GUI Shell構成の構造が不正または禁止fieldがある".to_string())?;
     validate_manifest(manifest)
+}
+
+fn parse_mcp_tool_composition(
+    value: &Value,
+    server_id: &str,
+    tool_id: &str,
+) -> Result<(ComposeManifest, McpToolComposition), String> {
+    let manifest = parse_manifest(value)?;
+    if !manifest
+        .mcp_connection_ids
+        .iter()
+        .any(|selected| selected == server_id)
+        || !manifest.tool_ids.iter().any(|selected| selected == tool_id)
+    {
+        return Err("Compose構成に現在のMCP Server／Toolの組合せが含まれていません".to_string());
+    }
+    let bytes = serde_json::to_vec(&manifest)
+        .map_err(|_| "Compose構成のhashを確定できません".to_string())?;
+    let binding = McpToolComposition {
+        compose_id: manifest.compose_id.clone(),
+        manifest_hash: crate::audit_hash::sha256_tagged(&bytes),
+        runtime_count: manifest.runtime_ids.len(),
+        agent_count: manifest.agent_ids.len(),
+        tool_count: manifest.tool_ids.len(),
+    };
+    Ok((manifest, binding))
+}
+
+pub(super) fn validate_mcp_tool_composition(
+    broker: &mut Broker,
+    value: &Value,
+    server_id: &str,
+    tool_id: &str,
+) -> Result<McpToolComposition, String> {
+    let (manifest, binding) = parse_mcp_tool_composition(value, server_id, tool_id)?;
+    validate_catalog_selection(broker, &manifest)?;
+    Ok(binding)
+}
+
+pub(super) fn mcp_tool_composition_owner_summary(
+    value: &Value,
+    server_id: &str,
+    tool_id: &str,
+) -> Result<String, String> {
+    let (_, binding) = parse_mcp_tool_composition(value, server_id, tool_id)?;
+    Ok(format!(
+        "Compose ID: {} / Runtime {}件・Agent {}件・Tool {}件 / 構成hash: {}",
+        binding.compose_id,
+        binding.runtime_count,
+        binding.agent_count,
+        binding.tool_count,
+        binding.manifest_hash
+    ))
 }
 
 pub(super) fn validate_catalog_selection(
