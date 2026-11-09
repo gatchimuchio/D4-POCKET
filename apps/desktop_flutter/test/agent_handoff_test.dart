@@ -73,6 +73,42 @@ AgentTaskResultProjection _result({
     );
 
 void main() {
+  test('Compareのtest申告はfull結果の標準形式だけから未検証値として投影する', () {
+    expect(
+      _result().agentClaimedTestResult,
+      'Agent申告: test passed（未検証）',
+    );
+    expect(
+      _result(visibility: 'hash_only').agentClaimedTestResult,
+      isNull,
+    );
+    expect(
+      _result(text: 'not-json').agentClaimedTestResult,
+      isNull,
+    );
+    expect(
+      AgentTaskResultProjection(
+        taskId: _sourceTask,
+        resultHash: _differentHash,
+        visibility: 'full',
+        projection: _result().projection,
+      ).agentClaimedTestResult,
+      isNull,
+    );
+    expect(
+      _result(
+        text: jsonEncode({
+          'result_summary': 'summary',
+          'artifacts': <Object?>[],
+          'changed_files': <Object?>[],
+          'diff': '',
+          'test_result': 'x' * 2049,
+        }),
+      ).agentClaimedTestResult,
+      isNull,
+    );
+  });
+
   test('Handoff packageは明示Task contextと承認済み公開成果だけを新規Task入力へ渡す', () {
     final package = AgentHandoffPackage.fromSource(
       source: _session(
@@ -155,7 +191,7 @@ void main() {
         throwsA(isA<BrokerClientException>()));
     expect(
       () => create(
-        result: const AgentTaskResultProjection(
+        result: AgentTaskResultProjection(
           taskId: _sourceTask,
           resultHash: _differentHash,
           visibility: 'full',

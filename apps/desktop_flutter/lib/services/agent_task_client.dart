@@ -132,21 +132,67 @@ class AgentTaskResultApproval {
 }
 
 class AgentTaskResultProjection {
-  const AgentTaskResultProjection({
+  AgentTaskResultProjection({
     required this.taskId,
     required this.resultHash,
     required this.visibility,
     required this.projection,
-  });
+  }) : agentClaimedTestResult = _readAgentClaimedTestResult(
+          visibility,
+          resultHash,
+          projection,
+        );
 
   final String taskId;
   final String resultHash;
   final String visibility;
   final Object? projection;
+  final String? agentClaimedTestResult;
 
   String? get text => projection is Map<String, Object?>
       ? (projection as Map<String, Object?>)['text'] as String?
       : null;
+}
+
+String? _readAgentClaimedTestResult(
+  String visibility,
+  String resultHash,
+  Object? projection,
+) {
+  if (visibility != 'full' || projection is! Map<String, Object?>) {
+    return null;
+  }
+  if (projection.length != 2 ||
+      projection['result_hash'] != resultHash ||
+      !projection.keys.toSet().containsAll(const {'result_hash', 'text'})) {
+    return null;
+  }
+  final resultText = projection['text'];
+  if (resultText is! String || utf8.encode(resultText).length > 1048576) {
+    return null;
+  }
+  final Object? decoded;
+  try {
+    decoded = jsonDecode(resultText);
+  } on FormatException {
+    return null;
+  }
+  if (decoded is! Map<String, Object?> ||
+      decoded.length != 5 ||
+      !decoded.keys.toSet().containsAll(const {
+        'result_summary',
+        'artifacts',
+        'changed_files',
+        'diff',
+        'test_result',
+      })) {
+    return null;
+  }
+  final claim = decoded['test_result'];
+  if (claim is! String || claim.trim().isEmpty || claim.runes.length > 2048) {
+    return null;
+  }
+  return claim;
 }
 
 class AgentTaskClient {

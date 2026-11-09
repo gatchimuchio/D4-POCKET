@@ -2518,7 +2518,15 @@ void main() {
         'content_visibility': 'full',
         'projection': {
           'result_hash': resultHashA,
-          'text': 'candidate patch body: add isolated implementation',
+          'text': jsonEncode({
+            'result_summary': 'candidate patch body: add isolated implementation',
+            'artifacts': [
+              {'name': 'patch.txt', 'content': 'candidate patch body'},
+            ],
+            'changed_files': ['lib/candidate.dart'],
+            'diff': '+candidate patch body',
+            'test_result': 'A: test passed（Agent申告・未検証）',
+          }),
         },
       }),
       _brokerAcceptedBody('Agent作業要求検査', {
@@ -2627,7 +2635,7 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.text('Task専用のTest実行record／Resource計測: unknown'),
+      find.text('Broker独立test実行record／Task専用Resource計測: unknown'),
       findsNWidgets(2),
     );
 
@@ -2682,6 +2690,18 @@ void main() {
     await tester.tap(showResultA);
     await tester.pumpAndSettle();
     expect(find.textContaining('candidate patch body'), findsOneWidget);
+    expect(
+      find.text('Agent申告test（未検証）: A: test passed（Agent申告・未検証）'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Agent申告test（未検証）: 全文はBroker承認後に表示'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Broker独立test実行record／Task専用Resource計測: unknown'),
+      findsNWidgets(2),
+    );
 
     final prepareApply =
         find.byKey(const ValueKey('prepare-selected-result-apply'));

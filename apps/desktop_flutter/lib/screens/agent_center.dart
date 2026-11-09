@@ -1760,6 +1760,17 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     required VoidCallback onSelect,
   }) {
     final task = state?.record;
+    final projection = state?.resultProjection;
+    final projectionMatchesTask = task != null &&
+        projection?.visibility == 'full' &&
+        projection?.taskId == task.taskId &&
+        projection?.resultHash == task.resultHash;
+    final claimedTestResult = projectionMatchesTask
+        ? projection!.agentClaimedTestResult
+        : null;
+    final claimedTestText = projectionMatchesTask
+        ? claimedTestResult ?? '構造化申告なし'
+        : '全文はBroker承認後に表示';
     return Card(
       key: ValueKey('compare-result-$sessionId'),
       child: Padding(
@@ -1779,7 +1790,8 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
             ] else
               const Text('Task ID／結果hash／終端Audit／時間: unknown'),
             const Text('Changed files／diff: 対応Workspace Inspectorで別途承認後に確認'),
-            const Text('Task専用のTest実行record／Resource計測: unknown'),
+            const Text('Broker独立test実行record／Task専用Resource計測: unknown'),
+            Text('Agent申告test（未検証）: $claimedTestText'),
             if (task?.status == 'completed')
               ChoiceChip(
                 key: ValueKey('select-compare-result-$sessionId'),
