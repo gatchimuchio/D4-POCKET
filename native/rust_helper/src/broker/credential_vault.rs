@@ -1322,7 +1322,7 @@ mod macos_provider_credential_tests {
                 &id,
                 &canonical_payload_hash(None),
             )
-            .expect("現在のKeychain recordだけを短命読取");
+            .unwrap_or_else(|_| panic!("現在のKeychain recordだけを短命読取"));
         assert!(used.as_slice() == secret.as_bytes());
         drop(used);
 
