@@ -59,7 +59,7 @@ const FRONTEND_ENVIRONMENT_ALLOWLIST: &[&str] = &[
 const AGENT_CLI_REGISTRATION_NOTICE: &str = "このr2-e2e専用検証buildでは、loopback試験portと隔離CODEX_HOMEが有効な場合にTask実行Capabilityがsupportedになります。Task API接続先は環境指定の127.0.0.1偽Responses API用portです。登録自体はTaskを実行せず、Permission、Approval、Trust、Credentialを生成・保存しません。Task用Workspace PermissionとTaskごとのOwner Approvalは別のOwner確認が必要です。Credential実値を使用せず、合成Workspaceだけで試験してください。Broker終了時に登録は消えます。";
 
 #[cfg(not(feature = "r2-e2e"))]
-const AGENT_CLI_REGISTRATION_NOTICE: &str = "Taskは実行せず、Task実行能力はunsupportedのままです。Permission、Approval、Trust、Credentialを生成・保存しません。Broker終了時に登録は消えます。";
+const AGENT_CLI_REGISTRATION_NOTICE: &str = "この登録操作ではTaskを実行せず、Permission、Approval、Trust、Credentialを生成・保存しません。Task実行Capabilityの状態表示は実行権限を付与しません。Taskには別のWorkspace PermissionとTaskごとのOwner Approvalが必要です。Broker終了時に登録は消えます。";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum DesktopOwnerOperationSummary {
@@ -6885,7 +6885,7 @@ mod tests {
             assert!(!text.contains("Task実行能力はunsupported"));
         }
         #[cfg(not(feature = "r2-e2e"))]
-        assert!(text.contains("Task実行能力はunsupported"));
+        assert!(text.contains("Task実行Capabilityの状態表示は実行権限を付与しません"));
         assert!(text.contains("Permission、Approval、Trust、Credentialを生成・保存しません"));
     }
 

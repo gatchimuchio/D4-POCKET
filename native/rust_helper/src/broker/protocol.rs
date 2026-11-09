@@ -151,7 +151,7 @@ pub(crate) fn agent_cli_registration_summary(payload: &Value) -> Option<String> 
     };
     let scope = crate::adapters::cli_adapter_confirmation_scope(&request.adapter_id)?;
     Some(format!(
-        "Agent CLI実行系とWorkspaceを、このBroker起動中だけ登録します。\nAdapter: {}\nRuntime: {}\nCLI実行file: {}\nCLI検査範囲: {}\nWorkspace ID: {}\nWorkspace root: {}\n除外する秘密path: {}\n提供元／模型: {} / {}\n{}\n\nOwner承認後にCLI probe processを起動し、{} 境界を確認できない場合は登録を拒否します。Task・模型要求・Workspace変更は行わず、Permission・Approval・Trust・Credentialを生成しません。Task実行能力はunsupportedのままです。登録は終了時に消えます。",
+        "Agent CLI実行系とWorkspaceを、このBroker起動中だけ登録します。\nAdapter: {}\nRuntime: {}\nCLI実行file: {}\nCLI検査範囲: {}\nWorkspace ID: {}\nWorkspace root: {}\n除外する秘密path: {}\n提供元／模型: {} / {}\n{}\n\nOwner承認後にCLI probe processを起動し、{} 境界を確認できない場合は登録を拒否します。Task・模型要求・Workspace変更は行わず、Permission・Approval・Trust・Credentialを生成しません。Task実行Capabilityの状態表示は実行権限を付与しません。Taskには別のWorkspace PermissionとTaskごとのOwner Approvalが必要です。登録は終了時に消えます。",
         request.adapter_id, request.runtime_id, request.cli_path, scope, request.workspace_id,
         request.workspace_root, request.secret_paths.join(" / "),
         request.provider_model_selection.provider_id, request.provider_model_selection.model_id,
@@ -6082,13 +6082,18 @@ mod tests {
 
     #[test]
     fn agent_cli_owner_summary_does_not_claim_another_platforms_boundary() {
+        let (cli_path, workspace_root) = if cfg!(windows) {
+            (r"C:\Tools\Codex\codex.exe", r"C:\d4p-summary-test")
+        } else {
+            ("/usr/bin/codex", "/tmp/d4p-summary-test")
+        };
         let payload = json!({
             "version": 1,
             "adapter_id": "codex-cli",
             "runtime_id": "runtime-summary-test",
-            "cli_path": "/usr/bin/codex",
+            "cli_path": cli_path,
             "workspace_id": "workspace-summary-test",
-            "workspace_root": "/tmp/d4p-summary-test",
+            "workspace_root": workspace_root,
             "secret_paths": [".env"],
             "provider_model_selection": {
                 "version": 1,
@@ -6100,6 +6105,8 @@ mod tests {
         });
         let summary = agent_cli_registration_summary(&payload).unwrap();
         assert!(summary.contains("Permission・Approval・Trust・Credentialを生成しません"));
+        assert!(summary.contains("Task実行Capabilityの状態表示は実行権限を付与しません"));
+        assert!(!summary.contains("Task実行能力はunsupportedのままです"));
         #[cfg(target_os = "linux")]
         {
             assert!(summary.contains("LinuxのWorkspace root"));
@@ -6110,6 +6117,12 @@ mod tests {
         {
             assert!(summary.contains("APFS root"));
             assert!(summary.contains("App Sandbox"));
+        }
+        #[cfg(windows)]
+        {
+            assert!(!summary.contains("LinuxのWorkspace root"));
+            assert!(!summary.contains("APFS root"));
+            assert!(!summary.contains("App Sandbox"));
         }
     }
 
@@ -6142,7 +6155,7 @@ mod tests {
         assert!(summary.contains(&format!("資格情報ID: {credential_id}")));
         assert!(summary.contains("提供元／模型: openai_codex_cli / o3"));
         assert!(summary.contains("Permission・Approval・Trust・Credentialを生成しません"));
-        assert!(summary.contains("Task実行能力はunsupportedのままです"));
+        assert!(summary.contains("Task実行Capabilityの状態表示は実行権限を付与しません"));
     }
 
     #[test]
