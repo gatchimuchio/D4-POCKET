@@ -6332,7 +6332,8 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
     main = (RUST_HELPER / "src" / "main.rs").read_text(encoding="utf-8")
     desktop_launcher = (RUST_HELPER / "src" / "desktop_launcher.rs").read_text(encoding="utf-8")
     desktop_broker_client = (ROOT / "apps" / "desktop_flutter" / "lib" / "services" / "broker_client.dart").read_text(encoding="utf-8")
-    mcp_client = (ROOT / "apps" / "desktop_flutter" / "lib" / "services" / "mcp_connection_client.dart").read_text(encoding="utf-8")
+    mcp_client = (ROOT / "packages" / "agent_orchestration" / "lib" / "mcp_connection_client.dart").read_text(encoding="utf-8")
+    mcp_desktop_adapter = (ROOT / "apps" / "desktop_flutter" / "lib" / "services" / "mcp_connection_client.dart").read_text(encoding="utf-8")
     mcp_screen = (ROOT / "apps" / "desktop_flutter" / "lib" / "screens" / "mcp_connection_center.dart").read_text(encoding="utf-8")
     for token, source in (
         ("BrokerOperation::MCP切断", rust_protocol),
@@ -6356,6 +6357,10 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
         ("_resourceSummaries", mcp_client),
         ("class McpPromptSummary", mcp_client),
         ("_promptSummaries", mcp_client),
+        ("AgentRuntimePlatform", mcp_client),
+        ("package:broker_contract/broker_transport.dart", mcp_client),
+        ("defaultTargetPlatform", mcp_desktop_adapter),
+        ("super(platform: _agentRuntimePlatform(defaultTargetPlatform))", mcp_desktop_adapter),
         ("MCP接続を開始", mcp_screen),
         ("対象ServerのCredential metadata一覧を取得", mcp_screen),
         ("確認して実行", mcp_screen),
@@ -6398,7 +6403,22 @@ def AgentTaskMCPTool提案Contractと境界を検査する() -> list[str]:
     rust = (RUST_HELPER / "src" / "broker" / "dialogue.rs").read_text(encoding="utf-8")
     mcp_center = (RUST_HELPER / "src" / "broker" / "mcp_center.rs").read_text(encoding="utf-8")
     mcp_runtime = (RUST_HELPER / "src" / "mcp.rs").read_text(encoding="utf-8")
-    dart = (ROOT / "apps" / "desktop_flutter" / "lib" / "services" / "agent_mcp_task_controller.dart").read_text(encoding="utf-8")
+    dart = (ROOT / "packages" / "agent_orchestration" / "lib" / "agent_mcp_task_controller.dart").read_text(encoding="utf-8")
+    runtime_package = (ROOT / "packages" / "agent_orchestration" / "pubspec.yaml").read_text(encoding="utf-8")
+    runtime_sources = [
+        (ROOT / "packages" / "agent_orchestration" / "lib" / name).read_text(encoding="utf-8")
+        for name in (
+            "agent_mcp_task_controller.dart",
+            "agent_task_client.dart",
+            "agent_task_execution_coordinator.dart",
+            "mcp_connection_client.dart",
+        )
+    ]
+    broker_contract = (ROOT / "packages" / "broker_contract" / "lib" / "broker_transport.dart").read_text(encoding="utf-8")
+    if any("package:flutter/" in source or "dart:ui" in source for source in runtime_sources):
+        errors.append("Agent orchestration packageがFlutter／dart:uiへ依存している")
+    if "abstract class BrokerTransport" not in broker_contract:
+        errors.append("runtime-neutral BrokerTransport契約がない")
     contract = (DOC_SPECS / "mcp-contract.md").read_text(encoding="utf-8")
     for token, source, label in (
         ("MAX_AGENT_MCP_TOOL_REQUEST_BYTES", rust, "Rust提案byte上限"),
@@ -6406,7 +6426,8 @@ def AgentTaskMCPTool提案Contractと境界を検査する() -> list[str]:
         ("consume_agent_mcp_tool_proposal", mcp_center, "Broker保存結果hash／一回照合"),
         ("validate_tool_identity_and_call", mcp_center, "Brokerの現在Catalog照合"),
         ("validate_tool_call", mcp_runtime, "現在Catalog inputSchema検証"),
-        ("arguments.length > 32", dart, "Flutter提案property上限"),
+        ("arguments.length > 32", dart, "Agent提案property上限"),
+        ("BrokerTransport", runtime_package, "runtime-neutral Agent orchestration package"),
         ("権限生成", contract, "日本語意味正本のAuthority境界"),
         ("LIVE_PRODUCT", contract, "製品証拠との分離"),
     ):

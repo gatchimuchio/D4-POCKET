@@ -13,6 +13,11 @@
       "examples/**/*.json",
       "apps/desktop_flutter/lib/**/*.dart",
       "apps/desktop_flutter/test/**/*.dart",
+      "packages/agent_orchestration/**/*.dart",
+      "packages/agent_orchestration/**/*.yaml",
+      "packages/agent_orchestration/**/*.md",
+      "packages/broker_contract/**/*.dart",
+      "packages/broker_contract/**/*.yaml",
       "native/rust_helper/Cargo.toml",
       "native/rust_helper/Cargo.lock",
       "native/rust_helper/src/**/*.rs",
@@ -336,15 +341,15 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/agent_mcp_task_controller.dart",
-      "sha256": "77077ac717ccd1faa6ff0e64392071f8f3d456e4d23ba1e244b0431166cdcefc"
+      "sha256": "9de5cbb5847f417ad7893bc1a3a6d6f204cb53361fecc2bca63d29d7df4c0b60"
     },
     {
       "path": "apps/desktop_flutter/lib/services/agent_task_client.dart",
-      "sha256": "84d084df757dbb4c00e494d9e23c986c2dbd182675fc33192b85d51e5e4be238"
+      "sha256": "8a15148189cf0cbbf0d80127883ded2ff126af7094e0838d47f2b095a5a6e5d3"
     },
     {
       "path": "apps/desktop_flutter/lib/services/agent_task_execution_coordinator.dart",
-      "sha256": "19b4f5710e4d5ab2126478e76fb38b14304361be245f4ad6f0a47cdfb23e822d"
+      "sha256": "ad6bdeb371887a3d282199d8370bc2a5b81a973ed016467fa8b0d5e9ba2efe69"
     },
     {
       "path": "apps/desktop_flutter/lib/services/ai_edit_client.dart",
@@ -376,7 +381,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/mcp_connection_client.dart",
-      "sha256": "1a9d095a2b829b53b81def04f2022dddbc261ecb5ac0502662f2238df5a8b842"
+      "sha256": "a0253fad23c22e51f5bc66afc76f9ba9d6615cffe95a53ea346ac7e09781936d"
     },
     {
       "path": "apps/desktop_flutter/lib/services/notification_client.dart",
@@ -600,11 +605,11 @@
     },
     {
       "path": "apps/desktop_flutter/pubspec.lock",
-      "sha256": "3322181ba78d0338948355e2083bb2125ad2cb1a96f273f010181f85535f5edd"
+      "sha256": "5ed6de48aace8e646ed1a7e861ae5dcc3cc1bf68df4afd50cf7195f98baa00e0"
     },
     {
       "path": "apps/desktop_flutter/pubspec.yaml",
-      "sha256": "60c7e0c236aa27da4a18b5b4c87680bcce71578f4f8ebc30fc24e089714cd93a"
+      "sha256": "667b0f01f7c51547fadd6f830ef45f3803ea50cc50f840b68b9ac6a99aef4720"
     },
     {
       "path": "apps/desktop_flutter/test/a2a_connection_center_test.dart",
@@ -1420,7 +1425,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "0dc1ccef88791ccff0b8a168a8f9c8cd2bbaa7065c06ec495d2ddb7d06b2c4fd"
+      "sha256": "9dd870167a2c192541d6bf2d69c7d7abb30b6f523157df7d2a06fbd67418326d"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -4175,6 +4180,38 @@
       "sha256": "b125c2500303c6a49da8ea76860ca98380ba8f35bb662dacf2178e39e212c160"
     },
     {
+      "path": "packages/agent_orchestration/README.md",
+      "sha256": "e88d2eb879d71880fbeee03100cf007408f9af2880660f1d9a7967ea8fab5eb3"
+    },
+    {
+      "path": "packages/agent_orchestration/lib/agent_mcp_task_controller.dart",
+      "sha256": "ddda8d22a893a3d5ee7271e60a761f8ab306584b4153bd70c36f74af97736709"
+    },
+    {
+      "path": "packages/agent_orchestration/lib/agent_orchestration.dart",
+      "sha256": "2c7102b45f8c5acbf841eab28d3b0d600e789859122acf502f4aaba9e54896c3"
+    },
+    {
+      "path": "packages/agent_orchestration/lib/agent_task_client.dart",
+      "sha256": "874a1418ba3798360e73ca2fc023fb7df4fed9985147dc045f17db11e0384453"
+    },
+    {
+      "path": "packages/agent_orchestration/lib/agent_task_execution_coordinator.dart",
+      "sha256": "e3417565ce9b2456b682ee9f15de945c9c826aeacbed18601c352961880f5e5f"
+    },
+    {
+      "path": "packages/agent_orchestration/lib/mcp_connection_client.dart",
+      "sha256": "f081f762af19b07f950221e6f65f1f5ae3574a3a3c279b6d3156d69aa59c12fb"
+    },
+    {
+      "path": "packages/agent_orchestration/lib/runtime_platform.dart",
+      "sha256": "ef99586a54dea63a707ee0bb0703d3d0f6e2440324fc3d9343da146779ac9147"
+    },
+    {
+      "path": "packages/agent_orchestration/pubspec.yaml",
+      "sha256": "ab65148756526ec3169d22b8f42532ffc4cb6033c34d7f20b303b2041e1a9eab"
+    },
+    {
       "path": "packages/agent_runtime/__init__.py",
       "sha256": "1ddf8af459b1890cc249c7849c1b377eab81ee754b7bb56015e05b2d3697cb8e"
     },
@@ -4231,6 +4268,14 @@
       "sha256": "e94edd4bed5384a8375a87e6cac85f500a8c28746979268e1e6d783426e75b17"
     },
     {
+      "path": "packages/broker_contract/lib/broker_transport.dart",
+      "sha256": "fa09a2ec3d0963462ad3856f9c4a16c39f1f659bf91f6a0685410e626453e583"
+    },
+    {
+      "path": "packages/broker_contract/pubspec.yaml",
+      "sha256": "c62c1ed01e8cc58dd25cbd26037331f11bb4fa13165b868e6c3e58d83ff08f92"
+    },
+    {
       "path": "packages/gui_shell_ui/README.md",
       "sha256": "9723aa90be156482b7eb9d1492a31d76895dd18eacf807aae3cbb780582ac72c"
     },
@@ -4268,7 +4313,7 @@
     },
     {
       "path": "packages/gui_shell_ui/lib/src/broker_transport.dart",
-      "sha256": "f7775e58004aec642dae0d58545f6e6d35c452c87a216dba35da23f8df9e9729"
+      "sha256": "eaf12f8a576b2a51db245db56009a463252b249f49fdd895caba0bf0a59e57ac"
     },
     {
       "path": "packages/gui_shell_ui/lib/src/evaluation_client.dart",
@@ -4304,7 +4349,7 @@
     },
     {
       "path": "packages/gui_shell_ui/pubspec.yaml",
-      "sha256": "638fd9fb9be705e9ffd766ef52ead55dd27891190337a10e46ecd6abd3c6ceb2"
+      "sha256": "c089f03805ca365b7e688e0350e8f7b62f7bd77c63a984f4a76de5f022c37619"
     },
     {
       "path": "packages/gui_shell_ui/test/evaluation_client_test.dart",
@@ -5200,7 +5245,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "3dd433796e3926fc7ee08c65651796c8df789ea2882761b30ff2aa655b38a51c"
+      "sha256": "2998c9b9028a861da5e0fee2a18db488d88f7d866de980d410493de10ff16fc6"
     },
     {
       "path": "tooling/conformance_tests/test_final_development_audit.py",
@@ -5292,7 +5337,7 @@
     },
     {
       "path": "tooling/manifest.py",
-      "sha256": "0f09b770f4c099b872c949dd507bfebd717bc6a24c953ca7f036d4775a784e5f"
+      "sha256": "c7d2a560ea91ca9c70a12a68ac954d1774a82007f2ca6c520fdbb4d1c9aa9998"
     },
     {
       "path": "tooling/manual_workflow_check.py",

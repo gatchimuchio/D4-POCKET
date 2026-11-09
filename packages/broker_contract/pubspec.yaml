@@ -1,0 +1,7 @@
+name: broker_contract
+description: Runtime-neutral request contract for the authenticated D4 Pocket Broker.
+publish_to: "none"
+version: 0.1.0
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"

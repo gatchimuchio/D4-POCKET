@@ -1,0 +1,11 @@
+name: agent_orchestration
+description: Runtime-neutral Agent Task and MCP orchestration over BrokerTransport.
+publish_to: "none"
+version: 0.1.0
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  broker_contract:
+    path: ../broker_contract
