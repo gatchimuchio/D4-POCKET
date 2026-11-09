@@ -310,6 +310,46 @@ void main() {
     coordinator.dispose();
   });
 
+  test('後続TaskのOwner Approval拒否後はTaskを開始しない', () async {
+    final responses = _successfulResponses();
+    responses[6] = {
+      'operation': 'AgentTaskOwnerApprovalGrant',
+      'status': 'rejected',
+      'audit_event_id': 'audit-followup-owner-declined',
+      'error': {'code': 'owner_denied', 'message': 'Owner declined'},
+    };
+    final transport = _FakeBrokerTransport(responses);
+    final coordinator = AgentTaskExecutionCoordinator(transport);
+    final refusal = Completer<AgentTaskExecutionUpdate>();
+
+    await coordinator.observeStartedTask(
+      request: _sourceRequest,
+      task: _sourceTask,
+      onUpdate: (update) {
+        if (update.error != null && !refusal.isCompleted) {
+          refusal.complete(update);
+        }
+      },
+    );
+    final update = await refusal.future.timeout(const Duration(seconds: 2));
+
+    expect(update.error, contains('Agent Task操作がBrokerで拒否されました'));
+    expect(
+      transport.operations,
+      [
+        'AgentTask結果表示承認',
+        'AgentTask結果取得',
+        'MCP接続一覧',
+        'MCP Tool実行',
+        'Agent作業要求検査',
+        'AgentTaskWorkspacePermissionGrant',
+        'AgentTaskOwnerApprovalGrant',
+      ],
+    );
+    expect(transport.operations, isNot(contains('AgentTask実行')));
+    coordinator.dispose();
+  });
+
   test('disposeは待機中のTask監視pollを解除しBroker Taskを取消しない', () async {
     final transport = _FakeBrokerTransport([]);
     final coordinator = AgentTaskExecutionCoordinator(transport);
