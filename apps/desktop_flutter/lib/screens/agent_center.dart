@@ -20,6 +20,8 @@ import '../services/mcp_connection_client.dart'
         McpCredentialSummary,
         McpToolCallReceipt;
 import '../services/runtime_dialogue_client.dart' show RuntimeDialogueClient;
+import '../services/runtime_resource_client.dart'
+    show RuntimeResourceClient, RuntimeResourceObservation;
 import '../services/shell_core_client.dart';
 import '../services/agent_coordination.dart';
 import 'shared.dart';
@@ -118,6 +120,13 @@ class _AgentComparisonUiState {
       );
 }
 
+class _ComparisonRuntimeResourceState {
+  const _ComparisonRuntimeResourceState({this.observation, this.error});
+
+  final RuntimeResourceObservation? observation;
+  final String? error;
+}
+
 class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
   bool _registrationPending = false;
   bool _sessionPending = false;
@@ -135,6 +144,11 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
   String? _comparisonStatus;
   String? _comparisonApplyStatus;
   _AgentComparisonUiState? _comparison;
+  bool _comparisonResourcePending = false;
+  int _comparisonResourceGeneration = 0;
+  String? _comparisonResourceStatus;
+  _ComparisonRuntimeResourceState? _comparisonResourceA;
+  _ComparisonRuntimeResourceState? _comparisonResourceB;
   bool _showCompareWorkspaceInspectors = false;
   bool _handoffPending = false;
   String? _handoffSourceSessionId;
@@ -190,6 +204,13 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
   @override
   void didUpdateWidget(covariant AgentCenter oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.client.brokerTransport != widget.client.brokerTransport) {
+      _comparisonResourceGeneration++;
+      _comparisonResourcePending = false;
+      _comparisonResourceStatus = null;
+      _comparisonResourceA = null;
+      _comparisonResourceB = null;
+    }
     if (oldWidget.taskExecutionCoordinator != widget.taskExecutionCoordinator ||
         oldWidget.client.brokerTransport != widget.client.brokerTransport) {
       _ownedTaskExecutionCoordinator?.dispose();
@@ -474,6 +495,11 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
       _comparison = null;
       _comparisonStatus = null;
       _comparisonApplyStatus = null;
+      _comparisonResourceGeneration++;
+      _comparisonResourcePending = false;
+      _comparisonResourceStatus = null;
+      _comparisonResourceA = null;
+      _comparisonResourceB = null;
       if (_comparisonApplyTargetSessionId == nextA ||
           _comparisonApplyTargetSessionId == nextB) {
         final targets = _availableApplyTargets(nextA, nextB);
@@ -637,9 +663,14 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
       return;
     }
     final transport = widget.client.brokerTransport!;
+    _comparisonResourceGeneration++;
     setState(() {
       _comparisonPending = true;
       _comparisonStatus = 'Agent A/BのTask開始要求をBrokerへ同時送信しています。';
+      _comparisonResourcePending = false;
+      _comparisonResourceStatus = null;
+      _comparisonResourceA = null;
+      _comparisonResourceB = null;
     });
 
     try {
@@ -684,6 +715,121 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
 
   String _comparisonStartFailure(Object? outcome) =>
       outcome is BrokerClientException ? outcome.message : '開始結果不明';
+
+  Future<void> _observeComparisonResources() async {
+    if (_comparisonResourcePending) return;
+    final comparison = _comparison;
+    final transport = widget.client.brokerTransport;
+    final agentA = _sessionById(comparison?.agentASessionId);
+    final agentB = _sessionById(comparison?.agentBSessionId);
+    if (comparison == null || agentA == null || agentB == null) {
+      setState(() {
+        _comparisonResourceStatus =
+            '比較対象の現在Runtimeを確定できないため観測を停止しました。';
+      });
+      return;
+    }
+    if (transport == null) {
+      setState(() {
+        _comparisonResourceStatus = '安全BrokerがないためRuntime観測を停止しました。';
+      });
+      return;
+    }
+
+    final generation = ++_comparisonResourceGeneration;
+    setState(() {
+      _comparisonResourcePending = true;
+      _comparisonResourceStatus = 'Agent A/BのRuntimeをBrokerで並行観測しています。';
+      _comparisonResourceA = null;
+      _comparisonResourceB = null;
+    });
+
+    Future<_ComparisonRuntimeResourceState> observe(
+      AgentSessionRecord session,
+    ) async {
+      try {
+        return _ComparisonRuntimeResourceState(
+          observation: await RuntimeResourceClient(transport)
+              .observe(session.agentRuntimeId),
+        );
+      } on BrokerClientException catch (error) {
+        return _ComparisonRuntimeResourceState(error: error.message);
+      } on Object {
+        return const _ComparisonRuntimeResourceState(
+          error: 'Runtime資源観測を取得できません。',
+        );
+      }
+    }
+
+    try {
+      final outcomes = await Future.wait([
+        observe(agentA),
+        observe(agentB),
+      ]);
+      if (!mounted || generation != _comparisonResourceGeneration) return;
+      final successCount = outcomes
+          .where((outcome) => outcome.observation != null)
+          .length;
+      setState(() {
+        _comparisonResourceA = outcomes[0];
+        _comparisonResourceB = outcomes[1];
+        _comparisonResourceStatus = switch (successCount) {
+          2 => 'A/B各Runtimeの観測を別々のAudit IDで取得しました。Task専用計測ではありません。',
+          1 => '片側のRuntime観測だけを取得しました。各結果とAudit IDを確認してください。',
+          _ => 'A/B両Runtimeの観測に失敗しました。各結果を確認してください。',
+        };
+      });
+    } finally {
+      if (mounted && generation == _comparisonResourceGeneration) {
+        setState(() => _comparisonResourcePending = false);
+      }
+    }
+  }
+
+  Widget _comparisonRuntimeResourceCard(
+    String label,
+    _ComparisonRuntimeResourceState? state,
+  ) {
+    final observation = state?.observation;
+    String metricValue(String key, String unit) {
+      if (observation == null) return 'unknown';
+      final metric = observation.metric(key);
+      if (!metric.isMeasured) {
+        return 'unknown: ${metric.reason}';
+      }
+      return '${metric.value} $unit (${metric.evidenceSource})';
+    }
+
+    return SizedBox(
+      width: 340,
+      child: BorderedPanel(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+            if (state?.error case final error?) Text('観測失敗: $error'),
+            if (observation == null && state?.error == null)
+              const Text('未取得'),
+            if (observation != null) ...[
+              Text('Runtime ID: ${observation.runtimeId}'),
+              Text('Process結合: ${observation.binding.status}'),
+              Text(
+                '観測時刻: ${DateTime.fromMillisecondsSinceEpoch(observation.observedAtUnixMillis, isUtc: true).toLocal().toIso8601String()}',
+              ),
+              Text('CPU利用率: ${metricValue('CPU利用率Percent', '%')}'),
+              Text(
+                'RAM Working Set: ${metricValue('RAMWorkingSetBytes', 'bytes')}',
+              ),
+              Text('RAM Private: ${metricValue('RAMPrivateBytes', 'bytes')}'),
+              Text('観測Audit ID: ${observation.auditId}'),
+              if (observation.binding.reason case final reason?)
+                Text('結合理由: $reason'),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 
   Future<void> _refreshAgentComparison() async {
     final comparison = _comparison;
@@ -1633,7 +1779,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
             ] else
               const Text('Task ID／結果hash／終端Audit／時間: unknown'),
             const Text('Changed files／diff: 対応Workspace Inspectorで別途承認後に確認'),
-            const Text('Test実行record／Resource実測値: unknown'),
+            const Text('Task専用のTest実行record／Resource計測: unknown'),
             if (task?.status == 'completed')
               ChoiceChip(
                 key: ValueKey('select-compare-result-$sessionId'),
@@ -2066,6 +2212,34 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
                   onSelect: () =>
                       _selectComparisonResult(activeComparison.agentBSessionId),
                 ),
+                OutlinedButton.icon(
+                  key: const ValueKey('observe-agent-comparison-resources'),
+                  onPressed: _comparisonResourcePending
+                      ? null
+                      : _observeComparisonResources,
+                  icon: const Icon(Icons.monitor_heart_outlined),
+                  label: Text(
+                    _comparisonResourcePending
+                        ? 'Runtime観測中'
+                        : 'A/BのRuntime資源を観測',
+                  ),
+                ),
+                if (_comparisonResourceStatus case final status?)
+                  Text(status),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    _comparisonRuntimeResourceCard(
+                      'Agent A Runtime観測',
+                      _comparisonResourceA,
+                    ),
+                    _comparisonRuntimeResourceCard(
+                      'Agent B Runtime観測',
+                      _comparisonResourceB,
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 8),
                 const Text('適用先Agent Session（A/Bとは別Workspace）'),
                 DropdownButton<String>(
@@ -2121,7 +2295,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
                   title: '比較計測の範囲',
                   rows: [
                     'UI観測時間: 開始要求からterminal状態を確認するまで。Broker実行時間の実測値ではありません。',
-                    'Resource: runtime実測値は未提供のためunknown',
+                    'Resource: 上のBroker観測はRuntime単位です。Task専用の使用量はunknown',
                     'Test result: 独立したBroker実行recordは未提供。Agent自己申告は未検証',
                     'Changed files／diff: 各Workspace Inspectorの読取Approval・基準点・Content Exposureで独立確認します。',
                     '片側のfailure／cancelは他方へ伝播しません。Taskごとに個別取消できます。',

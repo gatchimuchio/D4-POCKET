@@ -2233,6 +2233,67 @@ void main() {
         'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
     const resultHashB =
         'sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc';
+    Map<String, Object?> resourceResponse({
+      required String runtimeId,
+      required String auditId,
+      required int workingSetBytes,
+    }) {
+      Map<String, Object?> measured(num value, {String source = 'LIVE_RUNTIME'}) =>
+          {'状態': 'measured', '値': value, '証拠種別': source};
+      Map<String, Object?> unknown(String reason) => {
+            '状態': 'unknown',
+            '値': null,
+            '証拠種別': 'INTERNAL_STATE',
+            '理由': reason,
+          };
+      final body = <String, Object?>{
+        '版': 1,
+        '実行系ID': runtimeId,
+        '観測時刻UnixMillis': 1700000001000,
+        '観測監査ID': auditId,
+        '結合': {
+          '状態': 'bound',
+          '根拠': 'loopback_tcp_listener_owner_pid',
+          'PID': runtimeId == 'codex-agent-a' ? 4201 : 4202,
+          'PID作成時刻UnixMillis': 1700000000000,
+          '登録時刻UnixMillis': 1700000000000,
+          '登録監査ID': 'registration-$runtimeId',
+        },
+        '統治': {
+          '能力ID': 'runtime.resource.observe',
+          '権限ID': 'permission.runtime.resource.observe',
+          '承認状態': 'not_required',
+          '復旧ID': 'recover-runtime-resource-binding',
+        },
+        '計測': {
+          '稼働時間Millis': measured(30000),
+          'CPU累積時間Millis': measured(3000),
+          'CPU利用率Percent':
+              measured(runtimeId == 'codex-agent-a' ? 25.5 : 6.25),
+          'RAMWorkingSetBytes': measured(workingSetBytes),
+          'RAMPrivateBytes': measured(workingSetBytes ~/ 2),
+          'DiskIOBytes': unknown('未対応'),
+          'NetworkIOBytes': unknown('未対応'),
+          'GPU利用率Percent': unknown('未対応'),
+          'VRAMBytes': unknown('未対応'),
+          '処理中要求数': measured(0, source: 'INTERNAL_STATE'),
+          '平均応答Millis': unknown('未対応'),
+          '失敗要求数': measured(0, source: 'INTERNAL_STATE'),
+        },
+        '短期履歴': <Object?>[],
+      };
+      return {
+        'request_id': 'test-resource-$runtimeId',
+        'operation': '実行系資源観測',
+        'status': 'accepted',
+        'evidence_source': 'LIVE_RUNTIME',
+        'audit_event_id': auditId,
+        'error': null,
+        'health': null,
+        'body': body,
+        'shutdown_requested': false,
+      };
+    }
     Map<String, Object?> taskRecord({
       required String taskId,
       required String runtimeId,
@@ -2432,6 +2493,16 @@ void main() {
           resultHash: resultHashB,
         ),
       ),
+      resourceResponse(
+        runtimeId: 'codex-agent-a',
+        auditId: 'audit-resource-a',
+        workingSetBytes: 8192,
+      ),
+      resourceResponse(
+        runtimeId: 'codex-agent-b',
+        auditId: 'audit-resource-b',
+        workingSetBytes: 16384,
+      ),
       _brokerAcceptedBody('AgentTask結果表示承認', {
         'task_id': taskA,
         'result_hash': resultHashA,
@@ -2551,8 +2622,39 @@ void main() {
     expect(find.text('Task状態: completed'), findsNWidgets(4));
     expect(find.textContaining('audit-task-a-complete'), findsNWidgets(3));
     expect(find.textContaining('audit-task-b-complete'), findsNWidgets(3));
-    expect(find.text('Resource: runtime実測値は未提供のためunknown'), findsOneWidget);
-    expect(find.text('Test実行record／Resource実測値: unknown'), findsNWidgets(2));
+    expect(
+      find.text('Resource: 上のBroker観測はRuntime単位です。Task専用の使用量はunknown'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Task専用のTest実行record／Resource計測: unknown'),
+      findsNWidgets(2),
+    );
+
+    final observeResources =
+        find.byKey(const ValueKey('observe-agent-comparison-resources'));
+    await tester.ensureVisible(observeResources);
+    await tester.tap(observeResources);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('A/B各Runtimeの観測を別々のAudit IDで取得しました'), findsOneWidget);
+    expect(find.text('CPU利用率: 25.5 % (LIVE_RUNTIME)'), findsOneWidget);
+    expect(find.text('RAM Working Set: 8192 bytes (LIVE_RUNTIME)'), findsOneWidget);
+    expect(find.text('CPU利用率: 6.25 % (LIVE_RUNTIME)'), findsOneWidget);
+    expect(find.text('RAM Working Set: 16384 bytes (LIVE_RUNTIME)'), findsOneWidget);
+    expect(find.text('観測Audit ID: audit-resource-a'), findsOneWidget);
+    expect(find.text('観測Audit ID: audit-resource-b'), findsOneWidget);
+    expect(find.textContaining('Task専用計測ではありません'), findsOneWidget);
+    final resourceRequests = transport.requests
+        .where((request) => request['operation'] == '実行系資源観測')
+        .toList(growable: false);
+    expect(resourceRequests, hasLength(2));
+    expect(
+      resourceRequests.map((request) => request['payload']).toList(),
+      [
+        {'版': 1, '実行系ID': 'codex-agent-a'},
+        {'版': 1, '実行系ID': 'codex-agent-b'},
+      ],
+    );
 
     final selectedA = find.byKey(
       const ValueKey('select-compare-result-$sessionA'),
@@ -2633,6 +2735,8 @@ void main() {
         {sessionA, sessionB});
     expect(starts.take(2).map((request) => request['workspace_id']).toSet(),
         {'workspace-agent-a', 'workspace-agent-b'});
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 2));
   });
 
   testWidgets('Agent Centerはfull承認結果を別Sessionへ引き継ぎ、新規grantを要求する',
