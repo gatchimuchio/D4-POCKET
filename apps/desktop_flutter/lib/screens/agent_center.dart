@@ -2863,10 +2863,30 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
     ],
   );
 
-  Future<void> _registerLinuxProviderCredential() async {
+  Future<void> _registerLinuxProviderCredential() =>
+      _registerProviderCredential(
+        expectedPlatform: TargetPlatform.linux,
+        register: (client, credentialId) => client.registerLinuxNativeProviderCredential(
+          credentialId: credentialId,
+        ),
+      );
+
+  Future<void> _registerWindowsProviderCredential() =>
+      _registerProviderCredential(
+        expectedPlatform: TargetPlatform.windows,
+        register: (client, credentialId) => client.registerWindowsNativeProviderCredential(
+          credentialId: credentialId,
+        ),
+      );
+
+  Future<void> _registerProviderCredential({
+    required TargetPlatform expectedPlatform,
+    required Future<void> Function(McpConnectionClient client, String credentialId)
+        register,
+  }) async {
     final transport = widget.transport;
     if (transport == null ||
-        defaultTargetPlatform != TargetPlatform.linux ||
+        defaultTargetPlatform != expectedPlatform ||
         _providerCredentialRegistrationPending) {
       return;
     }
@@ -2881,9 +2901,7 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
     });
     final client = McpConnectionClient(transport);
     try {
-      await client.registerLinuxNativeProviderCredential(
-        credentialId: credentialId,
-      );
+      await register(client, credentialId);
       final credentials = await client.listProviderCredentials();
       if (!mounted) return;
       final registered = credentials.any(
@@ -2956,11 +2974,15 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
                   subtitle: Text(
                     defaultTargetPlatform == TargetPlatform.linux
                         ? 'Linuxではnative入力から資格情報を登録できます。'
+                        : defaultTargetPlatform == TargetPlatform.windows
+                            ? 'Windows native入力から資格情報を登録できます。'
                         : '資格情報は未登録です。この画面からの登録は未対応です。',
                   ),
                 ),
                 if (defaultTargetPlatform == TargetPlatform.linux)
                   _linuxProviderCredentialRegistrationButton(),
+                if (defaultTargetPlatform == TargetPlatform.windows)
+                  _windowsProviderCredentialRegistrationButton(),
                 if (_providerCredentialRegistrationMessage != null)
                   Text(_providerCredentialRegistrationMessage!),
               ],
@@ -2995,6 +3017,8 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
               ),
               if (defaultTargetPlatform == TargetPlatform.linux)
                 _linuxProviderCredentialRegistrationButton(),
+              if (defaultTargetPlatform == TargetPlatform.windows)
+                _windowsProviderCredentialRegistrationButton(),
               if (_providerCredentialRegistrationMessage != null)
                 Text(_providerCredentialRegistrationMessage!),
             ],
@@ -3007,6 +3031,25 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
     onPressed: _providerCredentialRegistrationPending
         ? null
         : _registerLinuxProviderCredential,
+    icon: _providerCredentialRegistrationPending
+        ? const SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        : const Icon(Icons.key_outlined),
+    label: Text(
+      _providerCredentialRegistrationPending
+          ? 'native入力を待っています'
+          : 'OpenAI API keyをnative入力で登録',
+    ),
+  );
+
+  Widget _windowsProviderCredentialRegistrationButton() => TextButton.icon(
+    key: const ValueKey('windows-provider-credential-register'),
+    onPressed: _providerCredentialRegistrationPending
+        ? null
+        : _registerWindowsProviderCredential,
     icon: _providerCredentialRegistrationPending
         ? const SizedBox(
             width: 16,

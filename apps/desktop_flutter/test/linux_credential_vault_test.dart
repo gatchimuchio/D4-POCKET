@@ -9,6 +9,7 @@ class _LinuxCredentialTransport implements BrokerTransport {
   final payloads = <Map<String, Object?>?>[];
   Map<String, Object?>? entry;
   String? receiptPurposeOverride;
+  String storage = 'linux_secret_service';
 
   @override
   Future<Map<String, Object?>> request(String operation,
@@ -21,7 +22,7 @@ class _LinuxCredentialTransport implements BrokerTransport {
         '用途': receiptPurposeOverride ?? payload['用途'],
         '接続対象': payload['接続対象'],
         '種類': 'api_key',
-        '保管方式': 'linux_secret_service',
+        '保管方式': storage,
         '状態': '有効',
         '作成時刻UnixMillis': 1000,
         '最終使用時刻UnixMillis': null,
@@ -94,7 +95,7 @@ void main() {
     expect(transport.payloads.toString(), isNot(contains('秘密値')));
   });
 
-  test('Provider Credential native registration is unavailable off Linux',
+  test('Linux Provider Credential native registration is unavailable off Linux',
       () async {
     debugDefaultTargetPlatformOverride = TargetPlatform.windows;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
@@ -106,6 +107,57 @@ void main() {
       throwsA(isA<BrokerClientException>()),
     );
     expect(transport.payloads, isEmpty);
+  });
+
+  test('Windows Provider Credential登録は公開metadataだけを送りDPAPI receiptを固定する',
+      () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final transport = _LinuxCredentialTransport()..storage = 'windows_dpapi';
+    final client = McpConnectionClient(transport);
+
+    await client.registerWindowsNativeProviderCredential(
+      credentialId: 'f' * 32,
+    );
+
+    expect(transport.payloads.single, {
+      '版': 1,
+      '資格情報ID': 'f' * 32,
+      '用途': 'provider_api_key',
+      '接続対象': 'openai_codex_cli',
+      '種類': 'api_key',
+    });
+    expect(
+      (await client.listProviderCredentials()).single.storage,
+      'windows_dpapi',
+    );
+    expect(transport.payloads.toString(), isNot(contains('秘密値')));
+  });
+
+  test('Windows Provider Credential登録は他platformでIPCを開始しない', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final transport = _LinuxCredentialTransport();
+
+    await expectLater(
+      McpConnectionClient(transport)
+          .registerWindowsNativeProviderCredential(credentialId: '1' * 32),
+      throwsA(isA<BrokerClientException>()),
+    );
+    expect(transport.payloads, isEmpty);
+  });
+
+  test('Windows Provider Credential登録は別保管方式のreceiptを拒否する', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final transport = _LinuxCredentialTransport();
+
+    await expectLater(
+      McpConnectionClient(transport)
+          .registerWindowsNativeProviderCredential(credentialId: '2' * 32),
+      throwsA(isA<BrokerClientException>()),
+    );
+    expect(transport.payloads.single!['用途'], 'provider_api_key');
   });
 
   test('Linux Provider Credential registration rejects a mismatched receipt',

@@ -228,7 +228,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/agent_center.dart",
-      "sha256": "91dcb5c9854c7365b7247ecb933915826c59fad23fca63d024731e43c2b398bd"
+      "sha256": "98e2131cdf40e343770ef1d445b1ea8e397a84611a945cbf50ddcca18168329f"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/approval_center.dart",
@@ -680,7 +680,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/linux_credential_vault_test.dart",
-      "sha256": "82c157cd4787066bd4566f2c584f9c21a47bb713bfcb250332b7f4b1a55324c2"
+      "sha256": "83572ff419010c495929031071c4499dc0624dc0ebc567f07470f98874111de8"
     },
     {
       "path": "apps/desktop_flutter/test/macos_credential_vault_test.dart",
@@ -740,7 +740,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "337dab721c06cc4ca4709ef0cc3749e53ad6699e28fc0da38d4aaeb30239e025"
+      "sha256": "62a59f7f6c4d47044f52e5998c83c43b1d916999e383f67adbe377695b1c408f"
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
@@ -1436,7 +1436,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "07d6479ed89b449ff21dd3b3ca8831fee3ecaaa5c67e3328f75e0e505e113ca5"
+      "sha256": "1565764c05d1cebf68f24095ee7dcc0a3b6ded7d0dbc6545bbaaf47c1198253f"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1592,7 +1592,7 @@
     },
     {
       "path": "docs/specs/credential-vault.md",
-      "sha256": "0112917d451a75370f4f3257c72aede078bac2c4d58d0213af8d8774116d9d5e"
+      "sha256": "966077a69311bcf81786e3158e4d717ddf1f42df508b42c5892173663cfb550c"
     },
     {
       "path": "docs/specs/desktop-broker-channel.md",
@@ -3596,7 +3596,7 @@
     },
     {
       "path": "native/rust_helper/Cargo.toml",
-      "sha256": "4018fa9e737c0ebc3820bd2ccb0a50127e9a013dde3cc017bc62f5cc008e86c8"
+      "sha256": "a254e971efe99b0490c00512e7d9c32602e9cef40a3ba17f3b89b0bc382ea2c5"
     },
     {
       "path": "native/rust_helper/README.md",
@@ -3872,7 +3872,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "a4bac350ee1aa4eb01acf60437a753f3cc95b498396ddcaaf6ec5f9ed0b03fd0"
+      "sha256": "0bf6c3a6aaf49ec43118f3dfd0e0b0bd41176fb201a2fc9ee37b25ed336f6e40"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -3892,7 +3892,7 @@
     },
     {
       "path": "native/rust_helper/src/lib.rs",
-      "sha256": "e1073884693f24f680e5107b07ef9f3fe75656454951b6ea64ddbc09bf944440"
+      "sha256": "62a158c4c5d65d5133c07a0631f13d330690ff9a7b4ef6c6c365fcca5a7cf9ed"
     },
     {
       "path": "native/rust_helper/src/linux_credential_input.rs",
@@ -3973,6 +3973,10 @@
     {
       "path": "native/rust_helper/src/update_verification.rs",
       "sha256": "179df0c06b88cfa208d983f842a13939625a0ddcd8d8df91e16269acf1699909"
+    },
+    {
+      "path": "native/rust_helper/src/windows_credential_input.rs",
+      "sha256": "d1fa2f06ee6211a5181b2d8af7f1af090883135063ac34d364f139a7704e4390"
     },
     {
       "path": "native/rust_helper/src/workspace_diff.rs",
@@ -4232,7 +4236,7 @@
     },
     {
       "path": "packages/agent_orchestration/lib/mcp_connection_client.dart",
-      "sha256": "a88e4f6ad9a89c0e14887b64620907366bbe44733cf03d53f552284378edacdb"
+      "sha256": "e409235020431291c0facaebc648a321e958cfe1292a07ae2ce6afa25a999aa2"
     },
     {
       "path": "packages/agent_orchestration/lib/runtime_platform.dart",

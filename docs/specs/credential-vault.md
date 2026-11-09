@@ -30,6 +30,12 @@ normal IPC、Flutter、Adapter metadata、Profile、History、MCP metadata、A2A
 
 同じ資格情報IDの再登録は拒否する。暗号文は`create_new`で作成し、既存fileを上書きしない。作成後のAudit確定に失敗した場合は新規暗号文を削除して成功へ昇格させず、削除も失敗した場合は保管復旧が必要な状態として停止する。
 
+### Windows Agent CenterからのProvider key登録
+
+WindowsのCodex登録画面は、ランダムCredential IDと固定metadata（`provider_api_key`／`openai_codex_cli`／`api_key`）だけを既存の認証Broker要求として送る。Rust起動器は、PID照合済みnamed pipeから受けた要求envelope、現在時刻、nonce、metadata、payload hash、固定targetを検査した場合だけ、masked native入力を開く。入力値はRust内で短命に保持し、別個のnative Owner確認後に限って既存BrokerのOwner操作queueへ渡す。Brokerが現在の登録契約、ID重複、Audit状態、ProtectedStoreを再検査し、現在のWindowsユーザーDPAPIで保管する。Flutter／Dart、通常IPC、Owner確認表示、一覧receipt、Audit、error／log／traceへ秘密値を渡さない。cancel、期限切れ、nonce再利用、形式不正、Owner拒否またはqueue拒否では登録を成立させない。
+
+このAgent Center接続のsource／fixture実装は、Windows installed productでのnative入力・実DPAPI登録・実Auditを証明しない。実資格情報を使うOwner操作と導入済み製品の証拠は別途必要であり、Provider接続・Task能力・通常Release状態はこのUIから変更しない。
+
 ## 内容露出
 
 秘密値はBroker response、通常IPC、Flutter snapshot、Audit reason、error、log、trace、test artifactへ投影しない。通常一覧の証拠源はBrokerの検証済み内部Auditと実保管fileのmetadata照合であり、file欠落・改変・link・共有競合は部分一覧へ変換せず拒否する。

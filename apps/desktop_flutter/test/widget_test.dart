@@ -2144,6 +2144,58 @@ void main() {
     expect(tester.takeException(), isNull);
   }, variant: TargetPlatformVariant.only(TargetPlatform.linux));
 
+  testWidgets('Windows Agent CenterからProvider key登録をnative経路へ渡し秘密欄を作らない',
+      (WidgetTester tester) async {
+    final transport = _FakeBrokerTransport([
+      _brokerHealthResponse(),
+      _brokerHostCapabilityResponse(),
+      _brokerHostListResponse(),
+      _brokerAdapterListResponse(),
+      _brokerAgentAdapterListResponse(),
+      _brokerDialogueSessionListResponse(),
+      _brokerAcceptedBody('normalize_payload', {'quarantined': false}),
+      _brokerAcceptedBody('content_projection', {'redacted_payload': {}}),
+      _brokerAcceptedBody('approval_edit', {'ok': false}),
+      _brokerCommandSuspendedResponse(),
+    ])
+      ..windowsProviderCredentialFixture = true;
+    final client = await ShellCoreClient.product(transport: transport);
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: AgentCenter(client: client)),
+    ));
+
+    await tester.tap(find.text('登録を開始'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('D4 Pocket資格情報保管庫'));
+    await tester.tap(find.text('D4 Pocket資格情報保管庫'));
+    await tester.pumpAndSettle();
+    final nativeRegisterButton =
+        find.byKey(const ValueKey('windows-provider-credential-register'));
+    await tester.ensureVisible(nativeRegisterButton);
+    await tester.tap(nativeRegisterButton);
+    await tester.pumpAndSettle();
+
+    final credentialRequest = transport.requests
+        .singleWhere((request) => request['operation'] == '資格情報登録');
+    final credentialPayload = credentialRequest['payload']! as Map;
+    expect(credentialPayload.keys.toSet(), {'版', '資格情報ID', '用途', '接続対象', '種類'});
+    expect(credentialPayload['用途'], 'provider_api_key');
+    expect(credentialPayload['接続対象'], 'openai_codex_cli');
+    expect(credentialPayload['種類'], 'api_key');
+    expect(credentialPayload.containsKey('秘密値'), isFalse);
+    final registrationReceipt = transport.returnedResponses.singleWhere(
+      (response) => response['operation'] == '資格情報登録',
+    )['body'] as Map;
+    expect(registrationReceipt['保管方式'], 'windows_dpapi');
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is TextField && widget.obscureText,
+      ),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.windows));
+
   testWidgets('Agent CenterはCompare用に異なるRuntimeとWorkspaceを複数登録状態として保持する',
       (WidgetTester tester) async {
     Map<String, Object?> registrationResponse(
@@ -4441,7 +4493,15 @@ class _FakeBrokerTransport implements BrokerTransport {
   final List<Map<String, Object?>> requests = [];
   final List<Map<String, Object?>> returnedResponses = [];
   bool linuxProviderCredentialFixture = false;
+  bool windowsProviderCredentialFixture = false;
   Map<String, Object?>? _linuxProviderCredential;
+
+  bool get _providerCredentialFixture =>
+      linuxProviderCredentialFixture || windowsProviderCredentialFixture;
+
+  String get _providerCredentialStorage => windowsProviderCredentialFixture
+      ? 'windows_dpapi'
+      : 'linux_secret_service';
 
   @override
   Future<Map<String, Object?>> request(
@@ -4451,7 +4511,7 @@ class _FakeBrokerTransport implements BrokerTransport {
     operations.add(operation);
     requests.add({'operation': operation, 'payload': payload});
     onRequest?.call(operation);
-    if (linuxProviderCredentialFixture && operation == '資格情報登録') {
+    if (_providerCredentialFixture && operation == '資格情報登録') {
       final registration = payload!;
       _linuxProviderCredential = {
         '版': 1,
@@ -4459,7 +4519,7 @@ class _FakeBrokerTransport implements BrokerTransport {
         '用途': registration['用途'],
         '接続対象': registration['接続対象'],
         '種類': registration['種類'],
-        '保管方式': 'linux_secret_service',
+        '保管方式': _providerCredentialStorage,
         '状態': '有効',
         '作成時刻UnixMillis': 1000,
         '最終使用時刻UnixMillis': null,
@@ -4481,7 +4541,7 @@ class _FakeBrokerTransport implements BrokerTransport {
       returnedResponses.add(response);
       return response;
     }
-    if (linuxProviderCredentialFixture && operation == '資格情報一覧') {
+    if (_providerCredentialFixture && operation == '資格情報一覧') {
       final response = {
         'request_id': 'test-資格情報一覧',
         'operation': operation,

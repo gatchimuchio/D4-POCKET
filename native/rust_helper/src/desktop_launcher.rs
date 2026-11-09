@@ -1,5 +1,6 @@
 //! Windows向けDesktop起動管理。権限判断はBrokerに残し、FlutterへBroker資格を渡さない。
 
+use std::collections::BTreeSet;
 use std::ffi::{OsStr, OsString};
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
@@ -140,6 +141,12 @@ enum DesktopOwnerOperationSummary {
         created_audit_id: String,
         payload_hash: String,
     },
+    ProviderCredentialRegistration {
+        credential_id: String,
+        purpose: String,
+        target: String,
+        public_payload_hash: String,
+    },
     McpConnect {
         server_id: String,
         executable: String,
@@ -199,6 +206,46 @@ enum DesktopOwnerOperationSummary {
     ProductUninstall {
         payload_hash: String,
     },
+}
+
+const MAX_PROVIDER_CREDENTIAL_INPUT_REQUEST_BYTES: usize = 8 * 1024;
+const MAX_PROVIDER_CREDENTIAL_NONCES: usize = 2048;
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ProviderCredentialInputPayload {
+    #[serde(rename = "版")]
+    version: u8,
+    #[serde(rename = "資格情報ID")]
+    credential_id: String,
+    #[serde(rename = "用途")]
+    purpose: String,
+    #[serde(rename = "接続対象")]
+    target: String,
+    #[serde(rename = "種類")]
+    kind: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ProviderCredentialInputCandidate {
+    request_id: String,
+    nonce: String,
+    issued_at: String,
+    credential_id: String,
+    purpose: String,
+    target: String,
+    public_payload_hash: String,
+}
+
+struct PreparedProviderCredentialRegistration {
+    request_json: Zeroizing<String>,
+    summary: DesktopOwnerOperationSummary,
+}
+
+enum ProviderCredentialInterception {
+    ContinueNormally,
+    Respond(Vec<u8>),
+    AbortChannel,
 }
 
 #[derive(Deserialize)]
@@ -1527,6 +1574,192 @@ fn normalize_channel_request(input: &[u8], session_id: &str) -> Vec<u8> {
     serde_json::to_vec(&value).unwrap_or_else(|_| input.to_vec())
 }
 
+fn provider_credential_input_candidate(
+    input: &[u8],
+    endpoint: &BrokerEndpoint,
+) -> Option<ProviderCredentialInputCandidate> {
+    if input.is_empty()
+        || input.len() > MAX_PROVIDER_CREDENTIAL_INPUT_REQUEST_BYTES
+        || input.len() > endpoint.max_request_bytes
+    {
+        return None;
+    }
+    let input = std::str::from_utf8(input).ok()?;
+    let envelope = BrokerRequestEnvelope::from_json_str(input).ok()?;
+    let request_id = envelope.request_id.as_deref()?;
+    let nonce = envelope.nonce.as_deref()?;
+    let issued_at = envelope.issued_at.as_deref()?;
+    if envelope.session_id.is_some()
+        || envelope.operation.as_ref() != Some(&BrokerOperation::資格情報登録)
+        || !safe_owner_text(request_id, 256)
+        || !safe_owner_text(nonce, 256)
+        || !request_issued_at_is_current(issued_at)
+        || envelope.metadata.len() != 1
+        || envelope.metadata[0].key != "client"
+        || envelope.metadata[0].value != "desktop_flutter"
+    {
+        return None;
+    }
+    let public_payload_hash = canonical_payload_hash(envelope.payload.as_ref());
+    if envelope.payload_hash.as_deref() != Some(public_payload_hash.as_str()) {
+        return None;
+    }
+    let payload: ProviderCredentialInputPayload =
+        serde_json::from_value(envelope.payload.clone()?).ok()?;
+    if payload.version != 1
+        || !valid_credential_identifier(&payload.credential_id)
+        || payload.purpose != "provider_api_key"
+        || payload.target != "openai_codex_cli"
+        || payload.kind != "api_key"
+    {
+        return None;
+    }
+    Some(ProviderCredentialInputCandidate {
+        request_id: request_id.to_owned(),
+        nonce: nonce.to_owned(),
+        issued_at: issued_at.to_owned(),
+        credential_id: payload.credential_id,
+        purpose: payload.purpose,
+        target: payload.target,
+        public_payload_hash,
+    })
+}
+
+fn safe_owner_text(value: &str, max_bytes: usize) -> bool {
+    !value.is_empty() && value.len() <= max_bytes && !value.chars().any(char::is_control)
+}
+
+fn valid_credential_identifier(value: &str) -> bool {
+    value.len() == 32
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn reserve_provider_credential_nonce(
+    seen: &mut BTreeSet<String>,
+    candidate: &ProviderCredentialInputCandidate,
+) -> bool {
+    if seen.len() >= MAX_PROVIDER_CREDENTIAL_NONCES || seen.contains(&candidate.nonce) {
+        return false;
+    }
+    seen.insert(candidate.nonce.clone())
+}
+
+fn build_private_provider_credential_registration(
+    input: &[u8],
+    endpoint: &BrokerEndpoint,
+    candidate: &ProviderCredentialInputCandidate,
+    mut secret: Zeroizing<String>,
+) -> Option<PreparedProviderCredentialRegistration> {
+    if secret.is_empty()
+        || secret.len() > 16 * 1024
+        || secret.chars().any(char::is_control)
+        || !request_issued_at_is_current(&candidate.issued_at)
+    {
+        return None;
+    }
+    let mut request: Value = serde_json::from_slice(input).ok()?;
+    if request.get("request_id").and_then(Value::as_str) != Some(candidate.request_id.as_str())
+        || request.get("nonce").and_then(Value::as_str) != Some(candidate.nonce.as_str())
+        || request.get("issued_at").and_then(Value::as_str) != Some(candidate.issued_at.as_str())
+    {
+        return None;
+    }
+    let mut payload = json!({
+        "版": 1,
+        "操作": "追加",
+        "資格情報ID": candidate.credential_id.as_str(),
+        "用途": candidate.purpose.as_str(),
+        "接続対象": candidate.target.as_str(),
+        "種類": "api_key",
+        "保管方式": "windows_dpapi",
+        "登録者種別": "owner",
+        "登録経路": "owner_control",
+        "秘密値": secret.as_str(),
+    });
+    let registration_payload_hash = canonical_payload_hash(Some(&payload));
+    request["session_id"] = json!(endpoint.session_id);
+    request["payload_hash"] = json!(registration_payload_hash);
+    request["payload"] = std::mem::replace(&mut payload, Value::Null);
+    let request_json = Zeroizing::new(request.to_string());
+    if let Some(Value::Object(payload)) = request.get_mut("payload") {
+        if let Some(Value::String(secret_copy)) = payload.get_mut("秘密値") {
+            secret_copy.zeroize();
+        }
+    }
+    secret.zeroize();
+    Some(PreparedProviderCredentialRegistration {
+        request_json,
+        summary: DesktopOwnerOperationSummary::ProviderCredentialRegistration {
+            credential_id: candidate.credential_id.clone(),
+            purpose: candidate.purpose.clone(),
+            target: candidate.target.clone(),
+            public_payload_hash: candidate.public_payload_hash.clone(),
+        },
+    })
+}
+
+fn intercept_provider_credential_registration<FInput, FConfirm>(
+    input: &[u8],
+    endpoint: &BrokerEndpoint,
+    owner_operations: &mpsc::SyncSender<DesktopOwnerOperationRequest>,
+    seen_nonces: &mut BTreeSet<String>,
+    mut enter_secret: FInput,
+    mut confirm_owner_operation: FConfirm,
+) -> ProviderCredentialInterception
+where
+    FInput: FnMut(&ProviderCredentialInputCandidate) -> Option<Zeroizing<String>>,
+    FConfirm: FnMut(&DesktopOwnerOperationSummary) -> bool,
+{
+    let Some(candidate) = provider_credential_input_candidate(input, endpoint) else {
+        return ProviderCredentialInterception::ContinueNormally;
+    };
+    if !reserve_provider_credential_nonce(seen_nonces, &candidate) {
+        return ProviderCredentialInterception::ContinueNormally;
+    }
+    let Some(secret) = enter_secret(&candidate) else {
+        return ProviderCredentialInterception::ContinueNormally;
+    };
+    let Some(prepared) =
+        build_private_provider_credential_registration(input, endpoint, &candidate, secret)
+    else {
+        return ProviderCredentialInterception::ContinueNormally;
+    };
+    if !confirm_owner_operation(&prepared.summary)
+        || !request_issued_at_is_current(&candidate.issued_at)
+    {
+        return ProviderCredentialInterception::ContinueNormally;
+    }
+
+    let (reply, response) = mpsc::sync_channel(1);
+    let mut request_json = prepared.request_json;
+    let owner_request = DesktopOwnerOperationRequest {
+        request_json: std::mem::take(&mut *request_json),
+        download_confirmation: None,
+        apply_confirmation: None,
+        activation_confirmation: None,
+        product_repair_confirmation: None,
+        product_uninstall_confirmation: None,
+        reply,
+    };
+    match owner_operations.try_send(owner_request) {
+        Ok(()) => match response.recv() {
+            Ok(response) => match response.to_json_string() {
+                Ok(response) => ProviderCredentialInterception::Respond(response.into_bytes()),
+                Err(_) => ProviderCredentialInterception::AbortChannel,
+            },
+            Err(_) => ProviderCredentialInterception::AbortChannel,
+        },
+        Err(
+            mpsc::TrySendError::Full(mut request) | mpsc::TrySendError::Disconnected(mut request),
+        ) => {
+            request.request_json.zeroize();
+            ProviderCredentialInterception::ContinueNormally
+        }
+    }
+}
+
 #[cfg(test)]
 fn relay_channel_frame(
     frame: gui_shell_windows_broker_channel::PipeFrame,
@@ -2164,6 +2397,7 @@ fn relay_channel_frame_with_owner_operations<F>(
 where
     F: FnMut(&DesktopOwnerOperationSummary) -> bool,
 {
+    let mut seen_provider_credential_nonces = BTreeSet::new();
     relay_channel_frame_with_product_launch(
         frame,
         endpoint,
@@ -2173,6 +2407,7 @@ where
         false,
         None,
         None,
+        &mut seen_provider_credential_nonces,
         confirm_owner_operation,
     )
 }
@@ -2186,6 +2421,7 @@ fn relay_channel_frame_with_product_launch<F>(
     installed_path_verified: bool,
     product_identity: Option<&ProductRuntimeIdentity>,
     uninstall_ticket: Option<&Mutex<Option<String>>>,
+    seen_provider_credential_nonces: &mut BTreeSet<String>,
     mut confirm_owner_operation: F,
 ) -> Option<Vec<u8>>
 where
@@ -2195,6 +2431,23 @@ where
         gui_shell_windows_broker_channel::PipeFrame::Line(bytes) => {
             cancel_product_uninstall_ticket_for_request(&bytes, uninstall_ticket)?;
             if let Some(owner_operations) = owner_operations {
+                match intercept_provider_credential_registration(
+                    &bytes,
+                    endpoint,
+                    owner_operations,
+                    seen_provider_credential_nonces,
+                    |candidate| {
+                        crate::windows_credential_input::enter_provider_secret(
+                            &candidate.credential_id,
+                            &candidate.target,
+                        )
+                    },
+                    &mut confirm_owner_operation,
+                ) {
+                    ProviderCredentialInterception::Respond(response) => return Some(response),
+                    ProviderCredentialInterception::AbortChannel => return None,
+                    ProviderCredentialInterception::ContinueNormally => {}
+                }
                 if let Some((request_json, summary)) =
                     owner_operation_candidate_with_product_identity(
                         &bytes,
@@ -2994,6 +3247,18 @@ fn owner_confirmation_text_for_identity(
             owner_confirmation_value(ciphertext_hash),
             payload_hash
         ),
+        DesktopOwnerOperationSummary::ProviderCredentialRegistration {
+            credential_id,
+            purpose,
+            target,
+            public_payload_hash,
+        } => format!(
+            "入力したProvider資格情報をWindows DPAPI保管庫へ登録しますか？\n\nCredential ID: {}\n用途: {}\n接続対象: {}\n保管方式: 現在のWindowsユーザーDPAPI\n\n秘密値はこの確認画面・Flutter・Auditへ表示しません。登録のみを行い、Provider接続、Permission、Approval、Agent trustは付与しません。Brokerが登録契約・重複ID・現在のAudit状態を再検査します。\n\n公開要求hash:\n{}",
+            owner_confirmation_value(credential_id),
+            owner_confirmation_value(purpose),
+            owner_confirmation_value(target),
+            public_payload_hash
+        ),
     }
 }
 
@@ -3009,6 +3274,7 @@ fn run_channel_server(
     owner_operations: mpsc::SyncSender<DesktopOwnerOperationRequest>,
     product_identity: Option<ProductRuntimeIdentity>,
 ) -> Result<(), BrokerServerError> {
+    let mut seen_provider_credential_nonces = BTreeSet::new();
     gui_shell_windows_broker_channel::run_server(
         pipe_name,
         expected_client_pid,
@@ -3026,6 +3292,7 @@ fn run_channel_server(
                 installed_path_verified,
                 product_identity.as_ref(),
                 Some(&uninstall_ticket),
+                &mut seen_provider_credential_nonces,
                 |summary| confirm_owner_operation(summary, product_identity.as_ref()),
             )
         },
@@ -5454,6 +5721,199 @@ mod tests {
             transport: "authenticated_loopback_tcp".into(),
             max_request_bytes: MAX_REQUEST_BYTES,
         }
+    }
+
+    fn provider_credential_input_request(request_id: &str, nonce: &str) -> Value {
+        let payload = json!({
+            "版": 1,
+            "資格情報ID": "0123456789abcdef0123456789abcdef",
+            "用途": "provider_api_key",
+            "接続対象": "openai_codex_cli",
+            "種類": "api_key",
+        });
+        json!({
+            "request_id": request_id,
+            "operation": "資格情報登録",
+            "payload_hash": canonical_payload_hash(Some(&payload)),
+            "nonce": nonce,
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {"client": "desktop_flutter"},
+            "payload": payload,
+        })
+    }
+
+    #[test]
+    fn provider_credential_input_accepts_only_fresh_fixed_public_metadata() {
+        let endpoint = endpoint();
+        let request = provider_credential_input_request("credential-window-test", "nonce-1");
+        let bytes = request.to_string().into_bytes();
+        let candidate = provider_credential_input_candidate(&bytes, &endpoint).unwrap();
+        assert_eq!(candidate.purpose, "provider_api_key");
+        assert_eq!(candidate.target, "openai_codex_cli");
+
+        let mut extra_secret =
+            provider_credential_input_request("credential-window-test", "nonce-2");
+        extra_secret["payload"]["秘密値"] = json!("secret-marker");
+        extra_secret["payload_hash"] = json!(canonical_payload_hash(extra_secret.get("payload")));
+        assert!(provider_credential_input_candidate(
+            extra_secret.to_string().as_bytes(),
+            &endpoint
+        )
+        .is_none());
+
+        let mut wrong_target =
+            provider_credential_input_request("credential-window-test", "nonce-3");
+        wrong_target["payload"]["接続対象"] = json!("other-provider");
+        wrong_target["payload_hash"] = json!(canonical_payload_hash(wrong_target.get("payload")));
+        assert!(provider_credential_input_candidate(
+            wrong_target.to_string().as_bytes(),
+            &endpoint
+        )
+        .is_none());
+
+        let mut stale = provider_credential_input_request("credential-window-test", "nonce-4");
+        stale["issued_at"] = json!("2000-01-01T00:00:00Z");
+        assert!(
+            provider_credential_input_candidate(stale.to_string().as_bytes(), &endpoint).is_none()
+        );
+    }
+
+    #[test]
+    fn provider_credential_registration_private_payload_is_bound_and_owner_summary_is_secret_free()
+    {
+        let endpoint = endpoint();
+        let request = provider_credential_input_request("credential-window-test", "nonce-build");
+        let bytes = request.to_string().into_bytes();
+        let candidate = provider_credential_input_candidate(&bytes, &endpoint).unwrap();
+        let secret = "synthetic-provider-key-never-project";
+        let prepared = build_private_provider_credential_registration(
+            &bytes,
+            &endpoint,
+            &candidate,
+            Zeroizing::new(secret.to_owned()),
+        )
+        .unwrap();
+        let private: Value = serde_json::from_str(&prepared.request_json).unwrap();
+        assert_eq!(private["session_id"], endpoint.session_id);
+        assert_eq!(private["payload"]["秘密値"], secret);
+        assert_eq!(private["payload"]["保管方式"], "windows_dpapi");
+        assert_eq!(private["payload"]["登録者種別"], "owner");
+        assert_eq!(private["payload"]["登録経路"], "owner_control");
+        assert_eq!(
+            private["payload_hash"],
+            canonical_payload_hash(private.get("payload"))
+        );
+        let summary = owner_confirmation_text(&prepared.summary);
+        assert!(summary.contains("windows_dpapi") || summary.contains("DPAPI"));
+        assert!(!summary.contains(secret));
+        assert_eq!(
+            prepared.summary,
+            DesktopOwnerOperationSummary::ProviderCredentialRegistration {
+                credential_id: candidate.credential_id,
+                purpose: "provider_api_key".into(),
+                target: "openai_codex_cli".into(),
+                public_payload_hash: candidate.public_payload_hash,
+            }
+        );
+    }
+
+    #[test]
+    fn provider_credential_input_replay_and_owner_decline_never_enqueue_secret() {
+        let endpoint = endpoint();
+        let request = provider_credential_input_request("credential-window-test", "nonce-once");
+        let bytes = request.to_string().into_bytes();
+        let (owner_sender, owner_receiver) = mpsc::sync_channel(1);
+        let mut seen = BTreeSet::new();
+        let mut input_calls = 0;
+        let result = intercept_provider_credential_registration(
+            &bytes,
+            &endpoint,
+            &owner_sender,
+            &mut seen,
+            |_| {
+                input_calls += 1;
+                Some(Zeroizing::new("synthetic-provider-key".into()))
+            },
+            |_| false,
+        );
+        assert!(matches!(
+            result,
+            ProviderCredentialInterception::ContinueNormally
+        ));
+        assert!(matches!(
+            owner_receiver.try_recv(),
+            Err(mpsc::TryRecvError::Empty)
+        ));
+
+        let replay_result = intercept_provider_credential_registration(
+            &bytes,
+            &endpoint,
+            &owner_sender,
+            &mut seen,
+            |_| {
+                input_calls += 1;
+                Some(Zeroizing::new("synthetic-provider-key".into()))
+            },
+            |_| true,
+        );
+        assert!(matches!(
+            replay_result,
+            ProviderCredentialInterception::ContinueNormally
+        ));
+        assert_eq!(input_calls, 1);
+        assert!(matches!(
+            owner_receiver.try_recv(),
+            Err(mpsc::TryRecvError::Empty)
+        ));
+    }
+
+    #[test]
+    fn provider_credential_registration_uses_the_existing_owner_broker_queue() {
+        let endpoint = endpoint();
+        let request = provider_credential_input_request("credential-window-test", "nonce-route");
+        let bytes = request.to_string().into_bytes();
+        let secret = "synthetic-provider-key-never-project";
+        let (owner_sender, owner_receiver) = mpsc::sync_channel::<DesktopOwnerOperationRequest>(1);
+        let owner_thread = thread::spawn(move || {
+            let mut request: DesktopOwnerOperationRequest = owner_receiver.recv().unwrap();
+            let private: Value = serde_json::from_str(&request.request_json).unwrap();
+            assert_eq!(private["payload"]["秘密値"], secret);
+            request.request_json.zeroize();
+            request
+                .reply
+                .send(crate::broker::protocol::BrokerResponse {
+                    request_id: "credential-window-test".into(),
+                    operation: "資格情報登録".into(),
+                    status: crate::broker::protocol::BrokerStatus::Accepted,
+                    evidence_source: "FIXTURE".into(),
+                    audit_event_id: "fixture-credential-audit".into(),
+                    error: None,
+                    health: None,
+                    body: Some(json!({"保管方式":"windows_dpapi", "公開範囲":"metadata_only"})),
+                    shutdown_requested: false,
+                })
+                .unwrap();
+        });
+        let mut seen = BTreeSet::new();
+        let result = intercept_provider_credential_registration(
+            &bytes,
+            &endpoint,
+            &owner_sender,
+            &mut seen,
+            |_| Some(Zeroizing::new(secret.to_owned())),
+            |summary| {
+                let text = owner_confirmation_text(summary);
+                assert!(!text.contains(secret));
+                true
+            },
+        );
+        owner_thread.join().unwrap();
+        let ProviderCredentialInterception::Respond(response) = result else {
+            panic!("native資格情報要求はBroker応答を受け取る必要がある");
+        };
+        let response = String::from_utf8(response).unwrap();
+        assert!(response.contains("windows_dpapi"));
+        assert!(!response.contains(secret));
     }
 
     fn desktop_export_request(request_id: &str, nonce: &str) -> serde_json::Value {

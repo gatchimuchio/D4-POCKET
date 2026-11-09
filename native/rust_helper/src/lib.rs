@@ -6,6 +6,8 @@ pub mod desktop_launcher;
 pub(crate) mod product_bootstrapper;
 #[cfg(windows)]
 pub mod protected_store;
+#[cfg(windows)]
+mod windows_credential_input;
 
 pub(crate) mod a2a;
 pub mod adapters;

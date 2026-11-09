@@ -178,6 +178,20 @@ class McpConnectionClient {
     );
   }
 
+  Future<void> registerWindowsNativeProviderCredential({
+    required String credentialId,
+  }) async {
+    if (platform != AgentRuntimePlatform.windows) {
+      throw const BrokerClientException('Provider資格情報のnative登録はWindowsのみ対応です');
+    }
+    await _registerNativeCredential(
+      credentialId: credentialId,
+      purpose: 'provider_api_key',
+      targetServerId: 'openai_codex_cli',
+      expectedStorage: 'windows_dpapi',
+    );
+  }
+
   Future<void> _registerNativeCredential({
     required String credentialId,
     required String purpose,
