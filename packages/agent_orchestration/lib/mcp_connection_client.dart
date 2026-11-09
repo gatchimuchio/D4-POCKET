@@ -178,6 +178,20 @@ class McpConnectionClient {
     );
   }
 
+  Future<void> registerMacNativeProviderCredential({
+    required String credentialId,
+  }) async {
+    if (platform != AgentRuntimePlatform.macos) {
+      throw const BrokerClientException('Provider資格情報のnative登録はmacOSのみ対応です');
+    }
+    await _registerNativeCredential(
+      credentialId: credentialId,
+      purpose: 'provider_api_key',
+      targetServerId: 'openai_codex_cli',
+      expectedStorage: 'macos_keychain',
+    );
+  }
+
   Future<void> registerWindowsNativeProviderCredential({
     required String credentialId,
   }) async {

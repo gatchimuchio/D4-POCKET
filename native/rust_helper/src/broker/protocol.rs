@@ -1455,11 +1455,11 @@ impl Broker {
         let provider_credential_available = match request.provider_model_selection.credential_id() {
             None => true,
             Some(credential_id) => {
-                #[cfg(any(windows, target_os = "linux"))]
+                #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
                 {
                     self.提供元資格情報参照確認(credential_id)
                 }
-                #[cfg(not(any(windows, target_os = "linux")))]
+                #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
                 {
                     let _ = credential_id;
                     false
@@ -4868,7 +4868,7 @@ impl Broker {
         };
         let mut provider_credential =
             |runtime_id: &str, provider_id: &str, credential_id: &str, use_hash: &str| {
-                #[cfg(any(windows, target_os = "linux"))]
+                #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
                 {
                     match broker.borrow_mut().提供元資格情報使用処理(
                         request_id,
@@ -4886,7 +4886,7 @@ impl Broker {
                         }
                     }
                 }
-                #[cfg(not(any(windows, target_os = "linux")))]
+                #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
                 {
                     let _ = (runtime_id, provider_id, credential_id, use_hash);
                     Err(対話失敗::権限拒否)

@@ -2879,6 +2879,14 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
         ),
       );
 
+  Future<void> _registerMacProviderCredential() =>
+      _registerProviderCredential(
+        expectedPlatform: TargetPlatform.macOS,
+        register: (client, credentialId) => client.registerMacNativeProviderCredential(
+          credentialId: credentialId,
+        ),
+      );
+
   Future<void> _registerProviderCredential({
     required TargetPlatform expectedPlatform,
     required Future<void> Function(McpConnectionClient client, String credentialId)
@@ -2976,13 +2984,17 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
                         ? 'Linuxではnative入力から資格情報を登録できます。'
                         : defaultTargetPlatform == TargetPlatform.windows
                             ? 'Windows native入力から資格情報を登録できます。'
-                        : '資格情報は未登録です。この画面からの登録は未対応です。',
+                        : defaultTargetPlatform == TargetPlatform.macOS
+                            ? 'macOS native入力からKeychainへ登録できます。'
+                            : '資格情報は未登録です。この画面からの登録は未対応です。',
                   ),
                 ),
                 if (defaultTargetPlatform == TargetPlatform.linux)
                   _linuxProviderCredentialRegistrationButton(),
                 if (defaultTargetPlatform == TargetPlatform.windows)
                   _windowsProviderCredentialRegistrationButton(),
+                if (defaultTargetPlatform == TargetPlatform.macOS)
+                  _macProviderCredentialRegistrationButton(),
                 if (_providerCredentialRegistrationMessage != null)
                   Text(_providerCredentialRegistrationMessage!),
               ],
@@ -3019,6 +3031,8 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
                 _linuxProviderCredentialRegistrationButton(),
               if (defaultTargetPlatform == TargetPlatform.windows)
                 _windowsProviderCredentialRegistrationButton(),
+              if (defaultTargetPlatform == TargetPlatform.macOS)
+                _macProviderCredentialRegistrationButton(),
               if (_providerCredentialRegistrationMessage != null)
                 Text(_providerCredentialRegistrationMessage!),
             ],
@@ -3050,6 +3064,25 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
     onPressed: _providerCredentialRegistrationPending
         ? null
         : _registerWindowsProviderCredential,
+    icon: _providerCredentialRegistrationPending
+        ? const SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        : const Icon(Icons.key_outlined),
+    label: Text(
+      _providerCredentialRegistrationPending
+          ? 'native入力を待っています'
+          : 'OpenAI API keyをnative入力で登録',
+    ),
+  );
+
+  Widget _macProviderCredentialRegistrationButton() => TextButton.icon(
+    key: const ValueKey('macos-provider-credential-register'),
+    onPressed: _providerCredentialRegistrationPending
+        ? null
+        : _registerMacProviderCredential,
     icon: _providerCredentialRegistrationPending
         ? const SizedBox(
             width: 16,

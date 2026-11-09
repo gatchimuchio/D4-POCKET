@@ -2196,6 +2196,72 @@ void main() {
     expect(tester.takeException(), isNull);
   }, variant: TargetPlatformVariant.only(TargetPlatform.windows));
 
+  testWidgets('macOS Agent CenterからProvider keyをnative登録してID参照へ接続する',
+      (WidgetTester tester) async {
+    const syntheticSecret = 'synthetic-provider-key-never-project';
+    final transport = _FakeBrokerTransport([
+      _brokerHealthResponse(),
+      _brokerHostCapabilityResponse(),
+      _brokerHostListResponse(),
+      _brokerAdapterListResponse(),
+      _brokerAgentAdapterListResponse(),
+      _brokerDialogueSessionListResponse(),
+      _brokerAcceptedBody('normalize_payload', {'quarantined': false}),
+      _brokerAcceptedBody('content_projection', {'redacted_payload': {}}),
+      _brokerAcceptedBody('approval_edit', {'ok': false}),
+      _brokerCommandSuspendedResponse(),
+    ])
+      ..macosProviderCredentialFixture = true;
+    final client = await ShellCoreClient.product(transport: transport);
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: AgentCenter(client: client)),
+    ));
+
+    await tester.tap(find.text('登録を開始'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('D4 Pocket資格情報保管庫'));
+    await tester.tap(find.text('D4 Pocket資格情報保管庫'));
+    await tester.pumpAndSettle();
+    final nativeRegisterButton =
+        find.byKey(const ValueKey('macos-provider-credential-register'));
+    await tester.ensureVisible(nativeRegisterButton);
+    await tester.tap(nativeRegisterButton);
+    await tester.pumpAndSettle();
+
+    final credentialRequest = transport.requests
+        .singleWhere((request) => request['operation'] == '資格情報登録');
+    final credentialPayload = credentialRequest['payload']! as Map;
+    expect(credentialPayload.keys.toSet(), {'版', '資格情報ID', '用途', '接続対象', '種類'});
+    expect(credentialPayload['用途'], 'provider_api_key');
+    expect(credentialPayload['接続対象'], 'openai_codex_cli');
+    expect(credentialPayload['種類'], 'api_key');
+    expect(credentialPayload.containsKey('秘密値'), isFalse);
+    final registrationReceipt = transport.returnedResponses.singleWhere(
+      (response) => response['operation'] == '資格情報登録',
+    )['body'] as Map;
+    expect(registrationReceipt['保管方式'], 'macos_keychain');
+
+    final fields = find.byType(TextFormField);
+    await tester.enterText(fields.at(0), 'model-macos-test');
+    await tester.enterText(fields.at(1), 'macos-provider-vault-fixture');
+    await tester.enterText(fields.at(2), '/usr/bin/codex');
+    await tester.enterText(
+        fields.at(3), 'workspace-macos-provider-vault-fixture');
+    await tester.enterText(fields.at(4), '/tmp/d4-macos-workspace');
+    await tester.tap(find.text('native Owner確認へ進む'));
+    await tester.pumpAndSettle();
+
+    final agentRequest = transport.requests
+        .singleWhere((request) => request['operation'] == 'AgentCLI実行系作業領域登録');
+    final selection =
+        (agentRequest['payload']! as Map)['provider_model_selection'] as Map;
+    expect(selection['authentication_source'], 'broker_credential_vault');
+    expect(selection['credential_id'], credentialPayload['資格情報ID']);
+    expect(selection['automatic_fallback'], isFalse);
+    expect(transport.requests.toString(), isNot(contains(syntheticSecret)));
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
   testWidgets('Agent CenterはCompare用に異なるRuntimeとWorkspaceを複数登録状態として保持する',
       (WidgetTester tester) async {
     Map<String, Object?> registrationResponse(
@@ -4494,14 +4560,19 @@ class _FakeBrokerTransport implements BrokerTransport {
   final List<Map<String, Object?>> returnedResponses = [];
   bool linuxProviderCredentialFixture = false;
   bool windowsProviderCredentialFixture = false;
+  bool macosProviderCredentialFixture = false;
   Map<String, Object?>? _linuxProviderCredential;
 
   bool get _providerCredentialFixture =>
-      linuxProviderCredentialFixture || windowsProviderCredentialFixture;
+      linuxProviderCredentialFixture ||
+      windowsProviderCredentialFixture ||
+      macosProviderCredentialFixture;
 
   String get _providerCredentialStorage => windowsProviderCredentialFixture
       ? 'windows_dpapi'
-      : 'linux_secret_service';
+      : macosProviderCredentialFixture
+          ? 'macos_keychain'
+          : 'linux_secret_service';
 
   @override
   Future<Map<String, Object?>> request(

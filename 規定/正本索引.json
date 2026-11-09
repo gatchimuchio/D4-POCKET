@@ -488,6 +488,10 @@
       "責任": "P13 native秘密入力、別個Owner確認、既存登録・一覧・失効、Keychain保存先と秘密非公開の有限受入れ"
     },
     {
+      "path": "docs/specs/macos-provider-credential-binding.md",
+      "責任": "macOSのCodex Provider API key登録から承認済みTask時Keychain読取・使用Audit・失効後拒否への限定consumer"
+    },
+    {
       "path": "docs/specs/macos-mcp-center.md",
       "責任": "P13 MacのMCP接続・Tool・切断、同一要求のnative Owner確認、既存Broker・所有process group・hash-only結果の有限受入れ"
     },

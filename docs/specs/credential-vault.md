@@ -4,9 +4,9 @@
 
 資格情報保管庫は、Runtime、Tool、MCP、A2Aなどの接続に使う秘密値を、D4 Pocket / GUI-ShellのBrokerが管理するための境界である。資格情報の存在や参照はPermissionを生成せず、資格情報ID、接続対象、種類、保管方式だけを通常画面へ投影する。
 
-この契約で接続済みの範囲は、owner control経路からの新規追加、通常IPCからの安全なmetadata一覧、Windows／macOS／Linux MCP stdio接続への限定利用、およびnative Owner確認付き論理失効である。Runtime一般、Agent、Tool、A2Aへの注入、更新、暗号文の物理削除、接続先変更、物理削除Recoveryは未接続であり、未完成のまま保管庫完成とは扱わない。
+この契約で接続済みの範囲は、owner control経路からの新規追加、通常IPCからの安全なmetadata一覧、Windows／macOS／Linux MCP stdio接続への限定利用、native Owner確認付き論理失効、およびCodex CLI Provider API keyの対象限定利用である。Provider利用は`openai_codex_cli`の承認済みCodex Taskに限り、Windows DPAPI／Linux Secret Serviceに加え、macOS Keychainは`macos-provider-credential-binding.md`の独立consumerで扱う。Runtime一般、任意Agent、Tool、A2Aへの注入、更新、暗号文の物理削除、接続先変更、物理削除Recoveryは未接続であり、未完成のまま保管庫完成とは扱わない。
 
-P13のMac登録・Keychain保管・論理失効の現在範囲は`macos-credential-vault.md`のCLOSED受入れを正本とする。本書のC9当時のWindows限定・Keychain未接続は履歴である。Mac MCPへの追加consumerは`macos-mcp-credential-binding.md`（CLOSED）へ限定し、公開ID参照・別個native確認・現在recordの再照合から対象stdio環境一つへ結合する。Linuxデスクトップ版はGTK native入力→別個Owner確認→既存Broker→ユーザーSecret Service default collectionの限定経路を追加した。Agent CenterのCodex登録画面からLinux Provider資格情報登録を開始する場合、FlutterはランダムID・固定用途`provider_api_key`・固定対象`openai_codex_cli`・種類`api_key`だけを既存登録要求へ渡し、秘密入力とOwner確認は既存Rust GTK経路で完結する。登録receiptを検査した後、metadata-only一覧で同じIDを確認できた場合だけProvider選択へ接続する。このUI接続はProvider実行・通常Release Task能力・正式配布の受入れではなく、Linux Provider／Agent／A2Aへの秘密注入が成立したとも扱わない。
+P13のMac登録・Keychain保管・論理失効の有限受入れは`macos-credential-vault.md`を正本とする。本書のC9当時のWindows限定・Keychain未接続は履歴である。Mac MCP接続の資格情報consumerは`macos-mcp-credential-binding.md`（CLOSED）へ限定し、公開ID参照・別個native確認・現在recordの再照合から対象stdio環境一つへ結合する。Mac Codex Provider利用は別契約`macos-provider-credential-binding.md`で、MCP結合の範囲を広げない。Windows／Linux／macOSのAgent Centerは、固定用途`provider_api_key`・固定対象`openai_codex_cli`・種類`api_key`だけを既存登録要求へ渡し、秘密入力とOwner確認は各OSの既存native経路で完結する。登録receiptを検査した後、metadata-only一覧で同じIDを確認できた場合だけProvider選択へ接続する。この選択はPermission、Approval、Trust、Task capabilityを生成せず、通常ReleaseのTask capabilityや正式配布の成立を意味しない。
 
 ## 登録境界
 

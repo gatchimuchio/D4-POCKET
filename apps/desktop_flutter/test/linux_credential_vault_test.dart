@@ -134,6 +134,57 @@ void main() {
     expect(transport.payloads.toString(), isNot(contains('秘密値')));
   });
 
+  test('macOS Provider Credential登録は公開metadataだけを送りKeychain receiptを固定する',
+      () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final transport = _LinuxCredentialTransport()..storage = 'macos_keychain';
+    final client = McpConnectionClient(transport);
+
+    await client.registerMacNativeProviderCredential(credentialId: 'a' * 32);
+
+    expect(transport.payloads.single, {
+      '版': 1,
+      '資格情報ID': 'a' * 32,
+      '用途': 'provider_api_key',
+      '接続対象': 'openai_codex_cli',
+      '種類': 'api_key',
+    });
+    expect(
+      (await client.listProviderCredentials()).single.storage,
+      'macos_keychain',
+    );
+    expect(transport.payloads.toString(), isNot(contains('秘密値')));
+  });
+
+  test('macOS Provider Credential登録は他platformでIPCを開始しない', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final transport = _LinuxCredentialTransport();
+
+    await expectLater(
+      McpConnectionClient(transport)
+          .registerMacNativeProviderCredential(credentialId: 'b' * 32),
+      throwsA(isA<BrokerClientException>()),
+    );
+    expect(transport.payloads, isEmpty);
+  });
+
+  test('macOS Provider Credential登録は別purposeのreceiptを拒否する', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final transport = _LinuxCredentialTransport()
+      ..storage = 'macos_keychain'
+      ..receiptPurposeOverride = 'mcp_transport';
+
+    await expectLater(
+      McpConnectionClient(transport)
+          .registerMacNativeProviderCredential(credentialId: 'c' * 32),
+      throwsA(isA<BrokerClientException>()),
+    );
+    expect(transport.payloads.single!['用途'], 'provider_api_key');
+  });
+
   test('Windows Provider Credential登録は他platformでIPCを開始しない', () async {
     debugDefaultTargetPlatformOverride = TargetPlatform.linux;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);

@@ -136,7 +136,7 @@ struct ProviderCredentialUseRecord {
     used_at: i64,
 }
 
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_os = "macos"))]
 pub(super) enum ProviderCredentialUseFailure {
     Denied,
     Audit,
@@ -158,7 +158,7 @@ struct CredentialLedger {
 }
 
 impl Broker {
-    #[cfg(any(windows, target_os = "linux"))]
+    #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
     pub(super) fn 提供元資格情報参照確認(&self, credential_id: &str) -> bool {
         credential_ledger(&self.audit_log).is_ok_and(|ledger| {
             ledger.entries.iter().any(|entry| {
@@ -172,7 +172,7 @@ impl Broker {
         })
     }
 
-    #[cfg(any(windows, target_os = "linux"))]
+    #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
     pub(super) fn 提供元資格情報使用処理(
         &mut self,
         request_id: &str,
@@ -1203,6 +1203,169 @@ mod macos_mcp_binding_tests {
         );
         drop(broker);
         std::fs::remove_dir_all(root).unwrap();
+    }
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod macos_provider_credential_tests {
+    use super::*;
+    use crate::broker::credential_storage::{資格情報保存先, MacOSCredentialStore};
+    use std::os::unix::fs::PermissionsExt;
+
+    struct Cleanup {
+        store: MacOSCredentialStore,
+        id: String,
+        hash: String,
+        active: bool,
+        root: std::path::PathBuf,
+    }
+
+    impl Cleanup {
+        fn remove_created_item(&mut self) -> bool {
+            let removed = self.store.新規破棄(&self.id, &self.hash);
+            self.active = !removed;
+            removed
+        }
+    }
+
+    impl Drop for Cleanup {
+        fn drop(&mut self) {
+            if self.active {
+                let _ = self.store.新規破棄(&self.id, &self.hash);
+            }
+            let _ = std::fs::remove_dir_all(&self.root);
+        }
+    }
+
+    #[test]
+    fn macos_provider_keychain_read_is_target_bound_audited_and_revocation_blocks() {
+        let mut random = [0_u8; 32];
+        getrandom::getrandom(&mut random).unwrap();
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "d4-macos-provider-credential-{}-{stamp}",
+            std::process::id()
+        ));
+        std::fs::create_dir(&root).unwrap();
+        std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let vault = root.join("vault");
+        std::fs::create_dir(&vault).unwrap();
+        std::fs::set_permissions(&vault, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let canonical_vault = vault.canonicalize().unwrap();
+        let namespace =
+            crate::audit_hash::sha256_tagged(canonical_vault.to_str().unwrap().as_bytes())
+                .strip_prefix("sha256:")
+                .unwrap()
+                .to_owned();
+        let cleanup_store = MacOSCredentialStore::new(namespace).unwrap();
+        let id = hex::encode(random)[..32].to_owned();
+        let secret = "synthetic-macos-provider-key-not-operational";
+        let mut broker =
+            Broker::new_persistent("macos-provider-credential-test", root.join("audit")).unwrap();
+        broker.macos資格情報保存先を初期化(&vault).unwrap();
+
+        let registration = json!({
+            "版":1,"操作":"追加","資格情報ID":id,"用途":"provider_api_key",
+            "接続対象":"openai_codex_cli","種類":"api_key","保管方式":"macos_keychain",
+            "登録者種別":"owner","登録経路":"owner_control","秘密値":secret
+        });
+        let added = broker.資格情報登録処理(
+            "macos-provider-register",
+            &registration,
+            true,
+            &canonical_payload_hash(Some(&registration)),
+        );
+        assert_eq!(added.status, super::super::protocol::BrokerStatus::Accepted);
+        let receipt = added.body.expect("公開metadata receipt");
+        assert_eq!(receipt["保管方式"], "macos_keychain");
+        assert!(!receipt.to_string().contains(secret));
+        let ciphertext_hash = receipt["暗号文hash"].as_str().unwrap().to_owned();
+        let mut cleanup = Cleanup {
+            store: cleanup_store,
+            id: id.clone(),
+            hash: ciphertext_hash.clone(),
+            active: true,
+            root: root.clone(),
+        };
+
+        assert!(broker.提供元資格情報参照確認(&id));
+        assert!(!broker.提供元資格情報参照確認(&"8".repeat(32)));
+        assert!(matches!(
+            broker.提供元資格情報使用処理(
+                "macos-provider-wrong-target",
+                "runtime-macos-provider",
+                "another_provider",
+                &id,
+                &canonical_payload_hash(None),
+            ),
+            Err(ProviderCredentialUseFailure::Denied)
+        ));
+        assert!(matches!(
+            broker.提供元資格情報使用処理(
+                "macos-provider-unknown-id",
+                "runtime-macos-provider",
+                "openai_codex_cli",
+                &"8".repeat(32),
+                &canonical_payload_hash(None),
+            ),
+            Err(ProviderCredentialUseFailure::Denied)
+        ));
+        let used = broker
+            .提供元資格情報使用処理(
+                "macos-provider-approved-use",
+                "runtime-macos-provider",
+                "openai_codex_cli",
+                &id,
+                &canonical_payload_hash(None),
+            )
+            .expect("現在のKeychain recordだけを短命読取");
+        assert!(used.as_slice() == secret.as_bytes());
+        drop(used);
+
+        let ledger = credential_ledger(&broker.audit_log).unwrap();
+        assert!(ledger.last_use.contains_key(&id));
+        let audit = serde_json::to_string(&broker.audit_events()).unwrap();
+        assert!(audit.contains("提供元資格情報使用"));
+        assert!(audit.contains(&id));
+        assert!(!audit.contains(secret));
+
+        let revoke = json!({
+            "版":1,"資格情報ID":id,"用途":"provider_api_key",
+            "接続対象":"openai_codex_cli","暗号文hash":ciphertext_hash,
+            "作成監査ID":receipt["作成監査ID"]
+        });
+        let revoked = broker.資格情報失効処理(
+            "macos-provider-revoke",
+            &revoke,
+            true,
+            &canonical_payload_hash(Some(&revoke)),
+        );
+        assert_eq!(
+            revoked.status,
+            super::super::protocol::BrokerStatus::Accepted
+        );
+        assert!(!broker.提供元資格情報参照確認(&id));
+        assert!(matches!(
+            broker.提供元資格情報使用処理(
+                "macos-provider-after-revoke",
+                "runtime-macos-provider",
+                "openai_codex_cli",
+                &id,
+                &canonical_payload_hash(None),
+            ),
+            Err(ProviderCredentialUseFailure::Denied)
+        ));
+        assert!(
+            cleanup.remove_created_item(),
+            "試験が作成したKeychain itemを回収"
+        );
+        assert!(cleanup.store.点検(&id).unwrap().is_none());
+        drop(broker);
+        drop(cleanup);
     }
 }
 

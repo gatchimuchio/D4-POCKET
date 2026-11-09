@@ -17,6 +17,7 @@ name: Apple platform 手動補助build
           - macos_workspace_selection
           - macos_agent_cli_selection
           - macos_credential_vault
+          - macos_provider_credential
           - macos_mcp_center
           - macos_mcp_credential_binding
           - macos_a2a_center
@@ -395,6 +396,54 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: macos-credential-${{ github.sha }}
+          path: evidence/
+          retention-days: 3
+          if-no-files-found: error
+  macos-provider-credential:
+    if: ${{ inputs.target == 'macos_provider_credential' }}
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - name: 対象commitを取得
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: macOS Keychain Provider consumerを検証
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          { git rev-parse HEAD; sw_vers; xcodebuild -version; } > evidence/environment.txt
+          rustup toolchain install 1.95.0 --profile minimal
+          cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib macos_provider_credential_tests:: -- --test-threads=1 2>&1 | tee evidence/provider-keychain-runtime-test.txt
+          cargo +1.95.0 build --locked --manifest-path native/rust_helper/Cargo.toml --bin gui_shell_macos_broker 2>&1 | tee evidence/broker-build.txt
+          cargo +1.95.0 build --locked --manifest-path native/macos_owner/Cargo.toml --lib 2>&1 | tee evidence/native-owner-build.txt
+      - name: macOS Agent Center Provider registration consumer
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch 3.44.0 https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          test "$(git -C "$RUNNER_TEMP/flutter" rev-parse HEAD)" = 559ffa3f75e7402d65a8def9c28389a9b2e6fe42
+          export PATH="$RUNNER_TEMP/flutter/bin:$PATH"
+          cd apps/desktop_flutter
+          flutter pub get 2>&1 | tee ../../evidence/pub-get.txt
+          dart analyze lib/services/mcp_connection_client.dart lib/screens/agent_center.dart test/linux_credential_vault_test.dart test/widget_test.dart 2>&1 | tee ../../evidence/dart-analyze.txt
+          flutter test --no-pub test/linux_credential_vault_test.dart 2>&1 | tee ../../evidence/provider-client-tests.txt
+          flutter test --no-pub test/widget_test.dart --plain-name 'macOS Agent CenterからProvider keyをnative登録してID参照へ接続する' 2>&1 | tee ../../evidence/provider-agent-center-test.txt
+          flutter build macos --debug --no-pub 2>&1 | tee ../../evidence/macos-build.txt
+          cd ../..
+      - name: 限定結果とKeychain回収を確認
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'macos_provider_keychain_read_is_target_bound_audited_and_revocation_blocks ... ok' evidence/provider-keychain-runtime-test.txt
+          git diff --exit-code -- apps/desktop_flutter
+      - name: 限定証拠を保存
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: macos-provider-credential-${{ github.sha }}
           path: evidence/
           retention-days: 3
           if-no-files-found: error
