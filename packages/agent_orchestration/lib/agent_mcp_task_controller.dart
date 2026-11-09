@@ -372,6 +372,14 @@ class AgentMcpTaskController {
     );
     _requireCurrent(isCurrent);
     final followupTask = await _tasks.start(followupRequest);
+    if (!isCurrent()) {
+      if (const {'pending', 'running'}.contains(followupTask.status)) {
+        await _tasks.cancel(followupTask.taskId);
+      }
+      throw const BrokerClientException(
+        '後続TaskのBroker受理後に元TaskまたはSessionが失効したため、Task取消要求を送信しました。停止完了はBroker状態の再確認が必要です',
+      );
+    }
     await emit(
       AgentMcpTaskUpdate(
         stage: AgentMcpTaskStage.followupTaskStarted,

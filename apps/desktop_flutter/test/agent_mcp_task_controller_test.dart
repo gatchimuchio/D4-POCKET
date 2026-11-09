@@ -489,6 +489,71 @@ void main() {
     coordinator.dispose();
   });
 
+  test('後続Taskの開始応答待ち中にSessionが置き換われば受理Taskを取消す', () async {
+    final taskStartGate = Completer<void>();
+    final taskStartRequested = Completer<void>();
+    final responses = _successfulResponses()
+      ..add(
+        _accepted('AgentTask取消', {
+          'task_id': _followupTaskId,
+          'record_version': 2,
+          'agent_runtime_id': 'codex-local',
+          'session_id': _session,
+          'workspace_id': 'workspace-local',
+          'description': 'Agent作業Task（結果本文とWorkspace差分は別の権限経路）',
+          'instruction_hash': _instructionHash,
+          'status': 'running',
+          'audit_event_id': 'audit-stale-followup-cancel',
+          'result_content_available': false,
+        }),
+      );
+    final transport = _FakeBrokerTransport(
+      responses,
+      blockedRequests: {'AgentTask実行': taskStartGate},
+      requestStarted: taskStartRequested,
+    );
+    final coordinator = AgentTaskExecutionCoordinator(transport);
+    final oldRun = coordinator.observeStartedTask(
+      request: _sourceRequest,
+      task: _sourceTask,
+      onUpdate: (_) {},
+    );
+
+    await taskStartRequested.future.timeout(const Duration(seconds: 1));
+    await coordinator.observeStartedTask(
+      request: _sourceRequest,
+      task: const AgentTaskRecord(
+        taskId: '99999999999999999999999999999999',
+        runtimeId: 'codex-local',
+        sessionId: _session,
+        workspaceId: 'workspace-local',
+        instructionHash: _instructionHash,
+        status: 'completed',
+        auditEventId: 'audit-replacement-task',
+      ),
+      allowMcpContinuation: false,
+      onUpdate: (_) {},
+    );
+
+    taskStartGate.complete();
+    await oldRun.timeout(const Duration(seconds: 1));
+
+    expect(transport.operations, [
+      'AgentTask結果表示承認',
+      'AgentTask結果取得',
+      'MCP接続一覧',
+      'MCP Tool実行',
+      'Agent作業要求検査',
+      'AgentTaskWorkspacePermissionGrant',
+      'AgentTaskOwnerApprovalGrant',
+      'AgentTask実行',
+      'AgentTask取消',
+    ]);
+    final cancelRequest = transport.requests.last;
+    expect(cancelRequest['payload'], {'task_id': _followupTaskId});
+    coordinator.dispose();
+  });
+
   test('通常のTask結果ではMCPやPermission/Approvalを要求しない', () async {
     final responses = _successfulResponses(resultText: 'Task完了しました。');
     responses.removeRange(2, responses.length);
@@ -885,9 +950,11 @@ class _FakeBrokerTransport implements BrokerTransport {
     operations.add(operation);
     requests.add({'operation': operation, 'payload': payload});
     final started = requestStarted;
-    if (started != null && !started.isCompleted) started.complete();
     final blockedRequest = blockedRequests[operation];
-    if (blockedRequest != null) await blockedRequest.future;
+    if (blockedRequest != null) {
+      if (started != null && !started.isCompleted) started.complete();
+      await blockedRequest.future;
+    }
     if (responses.isEmpty) throw StateError('No fake response for $operation');
     final response = responses.removeAt(0);
     afterRequest?.call(operation);
