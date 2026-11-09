@@ -5421,18 +5421,53 @@ def _run_installed_agent_task_acceptance(
                         timeout=wait_seconds,
                     )
                 except RuntimeError as error:
+                    status_wait = str(error)
+                    _prefix, separator, payload = status_wait.partition(": ")
+                    if separator:
+                        try:
+                            status_wait = json.loads(payload)
+                        except json.JSONDecodeError:
+                            status_wait = {"message": status_wait[:512]}
+                    else:
+                        status_wait = {"message": status_wait[:512]}
+                    fixture_snapshot = responses_server.snapshot()
+                    fixture_scenarios = fixture_snapshot.get("scenarios")
+                    fixture_summary = {
+                        "model_requests": fixture_snapshot.get("model_requests"),
+                        "rejections": fixture_snapshot.get("rejections"),
+                        "agent_task_diagnostics": fixture_snapshot.get(
+                            "agent_task_diagnostics"
+                        ),
+                        "scenarios": [
+                            {
+                                key: row.get(key)
+                                for key in (
+                                    "name",
+                                    "posts",
+                                    "tool_calls",
+                                    "tool_outputs",
+                                    "authorization_match_requests",
+                                )
+                            }
+                            for row in fixture_scenarios
+                            if isinstance(row, dict)
+                        ]
+                        if isinstance(fixture_scenarios, list)
+                        else [],
+                    }
                     raise RuntimeError(
                         "installed deadline Taskの終端状態がAcceptanceと一致しません: "
                         + json.dumps(
                             {
-                                "status_wait": str(error),
-                                "responses_fixture": responses_server.snapshot(),
+                                "status_wait": status_wait,
+                                "responses_fixture": fixture_summary,
                                 "task_history": _installed_task_history_diagnostics(
                                     audit_store, task_ids[-1]
                                 ),
                             },
                             ensure_ascii=False,
                             sort_keys=True,
+                            indent=2,
                         )
                     ) from None
             _wait_installed_task_status(
