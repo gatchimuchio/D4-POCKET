@@ -35,6 +35,8 @@ from tooling.tests.linux_installed_product_smoke import (
     _linux_runtime_artifact_inventory,
     _verify_linux_installed_artifact_provenance,
     _host_registration_audit_evidence,
+    _latest_audit_event_id,
+    _wait_for_audit_event,
     _answer_owner_dialog,
     _bounded_owner_text_diagnostics,
     _assert_secret_absent_from_files,
@@ -3661,6 +3663,74 @@ class LinuxHostRegistrationAuditTests(unittest.TestCase):
                 with self.assertRaises(RuntimeError) as caught:
                     _host_registration_audit_evidence(with_authority)
                 self.assertIn(operation, str(caught.exception))
+
+
+class InstalledAuditCursorTests(unittest.TestCase):
+    def test_wait_ignores_prior_matching_event_and_accepts_new_download_event(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            audit_path = Path(directory) / "audit.jsonl"
+            prior = {
+                "event_id": "broker-audit-20",
+                "request_id": "update-download-old:result",
+                "operation": "更新download要求",
+                "decision": "completed",
+                "reason": "既存packageの一致を記録",
+                "evidence_source": "LIVE_RUNTIME",
+            }
+            audit_path.write_text(
+                json.dumps(prior, ensure_ascii=False) + "\n", encoding="utf-8"
+            )
+            cursor = _latest_audit_event_id(audit_path)
+            self.assertEqual(cursor, "broker-audit-20")
+
+            with self.assertRaisesRegex(RuntimeError, "terminal event"):
+                _wait_for_audit_event(
+                    audit_path,
+                    "更新download要求",
+                    "completed",
+                    evidence_source="LIVE_RUNTIME",
+                    after_event_id=cursor,
+                    reason_contains="download完了を記録",
+                    timeout=0.01,
+                )
+
+            current = {
+                "event_id": "broker-audit-21",
+                "request_id": "update-download-new:result",
+                "operation": "更新download要求",
+                "decision": "completed",
+                "reason": "download完了を記録",
+                "evidence_source": "LIVE_RUNTIME",
+            }
+            with audit_path.open("a", encoding="utf-8") as audit_file:
+                audit_file.write(json.dumps(current, ensure_ascii=False) + "\n")
+            observed = _wait_for_audit_event(
+                audit_path,
+                "更新download要求",
+                "completed",
+                evidence_source="LIVE_RUNTIME",
+                after_event_id=cursor,
+                reason_contains="download完了を記録",
+                timeout=0.1,
+            )
+            self.assertEqual(observed["event_id"], "broker-audit-21")
+
+    def test_rejects_non_monotonic_audit_cursor(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            audit_path = Path(directory) / "audit.jsonl"
+            audit_path.write_text(
+                "\n".join(
+                    json.dumps(event)
+                    for event in (
+                        {"event_id": "broker-audit-4"},
+                        {"event_id": "broker-audit-3"},
+                    )
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(RuntimeError, "単調増加"):
+                _latest_audit_event_id(audit_path)
 
 
 class LinuxInstalledOwnerEvidenceTests(unittest.TestCase):

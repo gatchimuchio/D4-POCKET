@@ -7495,14 +7495,60 @@ def _wait_for_owner_dialog_closed(
     raise RuntimeError("native Owner確認dialogが閉じませんでした")
 
 
+def _audit_event_sequence(event_id: object) -> int | None:
+    if not isinstance(event_id, str):
+        return None
+    match = re.fullmatch(r"broker-audit-(\d+)", event_id)
+    if match is None:
+        return None
+    sequence = int(match.group(1))
+    return sequence if sequence > 0 else None
+
+
+def _latest_audit_event_id(audit_path: Path) -> str | None:
+    try:
+        lines = audit_path.read_text(encoding="utf-8").splitlines()
+    except FileNotFoundError:
+        return None
+    except (OSError, UnicodeError) as error:
+        raise RuntimeError("installed Audit cursorを読み取れません") from error
+
+    latest_event_id: str | None = None
+    latest_sequence = 0
+    for line in lines:
+        if not line:
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError as error:
+            raise RuntimeError("installed Audit cursorに不正なJSON行があります") from error
+        if not isinstance(event, dict):
+            raise RuntimeError("installed Audit cursorのevent形状が不正です")
+        event_id = event.get("event_id")
+        sequence = _audit_event_sequence(event_id)
+        if sequence is None or sequence <= latest_sequence:
+            raise RuntimeError("installed Audit cursorのevent IDが単調増加していません")
+        latest_event_id = event_id
+        latest_sequence = sequence
+    return latest_event_id
+
+
 def _wait_for_audit_event(
     audit_path: Path,
     operation: str,
     decision: str,
     *,
     evidence_source: str | None = None,
+    after_event_id: str | None = None,
+    reason_contains: str | None = None,
     timeout: float = 90.0,
 ) -> dict[str, object]:
+    after_sequence = (
+        _audit_event_sequence(after_event_id) if after_event_id is not None else None
+    )
+    if after_event_id is not None and after_sequence is None:
+        raise ValueError("Audit event cursorが不正です")
+
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
@@ -7514,12 +7560,19 @@ def _wait_for_audit_event(
         except (OSError, UnicodeError, json.JSONDecodeError):
             events = []
         for event in reversed(events):
+            event_sequence = _audit_event_sequence(event.get("event_id"))
+            reason = event.get("reason")
             if (
-                event.get("operation") == operation
+                (after_sequence is None or (event_sequence or 0) > after_sequence)
+                and event.get("operation") == operation
                 and event.get("decision") == decision
                 and (
                     evidence_source is None
                     or event.get("evidence_source") == evidence_source
+                )
+                and (
+                    reason_contains is None
+                    or (isinstance(reason, str) and reason_contains in reason)
                 )
             ):
                 return event
@@ -7592,6 +7645,7 @@ def _installed_update_download_stage_activate(
     if record_path.read_bytes() != record_before or desktop_entry.read_bytes() != entry_before:
         raise RuntimeError("download Owner拒否がinstalled product状態を変更しました")
 
+    download_audit_cursor = _latest_audit_event_id(audit_path)
     _trigger_update_action_from_installed_ui(
         environment, window_id, "download", row_marker=candidate_row
     )
@@ -7604,6 +7658,8 @@ def _installed_update_download_stage_activate(
         "更新download要求",
         "completed",
         evidence_source="LIVE_RUNTIME",
+        after_event_id=download_audit_cursor,
+        reason_contains="download完了を記録",
     )
     package_metadata = downloaded_package.lstat()
     if (
@@ -7643,6 +7699,7 @@ def _installed_update_download_stage_activate(
     ):
         raise RuntimeError("stage Owner拒否がpackage／installed product状態を変更しました")
 
+    stage_audit_cursor = _latest_audit_event_id(audit_path)
     _trigger_update_action_from_installed_ui(
         environment,
         window_id,
@@ -7686,7 +7743,14 @@ def _installed_update_download_stage_activate(
             "libexec/gui_shell_linux_broker",
         }
     )
-    _wait_for_audit_event(audit_path, "更新適用要求", "completed")
+    _wait_for_audit_event(
+        audit_path,
+        "更新適用要求",
+        "completed",
+        evidence_source="INTERNAL_STATE",
+        after_event_id=stage_audit_cursor,
+        reason_contains="完全展開・package／file digest一致を記録",
+    )
 
     stage_record_before_activation = record_path.read_bytes()
     active_pids = _processes_using(product_paths)
@@ -7721,6 +7785,7 @@ def _installed_update_download_stage_activate(
     ):
         raise RuntimeError("activation Owner拒否がstage／record／entry／processを変更しました")
 
+    activation_audit_cursor = _latest_audit_event_id(audit_path)
     _trigger_update_action_from_installed_ui(
         environment,
         window_id,
@@ -7750,7 +7815,14 @@ def _installed_update_download_stage_activate(
         or not all(_group_exists(group) for group in active_groups)
     ):
         raise RuntimeError("Owner-confirmed activation record／entry／process／cleanupが不正です")
-    _wait_for_audit_event(audit_path, "更新有効版切替要求", "completed")
+    _wait_for_audit_event(
+        audit_path,
+        "更新有効版切替要求",
+        "completed",
+        evidence_source="INTERNAL_STATE",
+        after_event_id=activation_audit_cursor,
+        reason_contains="desktop_entry=registered launch=not_started",
+    )
     return {
         "active_record": activated_record,
         "package_sha256": package_hash,
@@ -9171,16 +9243,20 @@ def run_installed_smoke(
                 or desktop_entry.exists()
             ):
                 raise RuntimeError("初回download Owner拒否後にpackage／製品状態が変更されました")
+            download_audit_path = audit_store / "audit.jsonl"
+            download_audit_cursor = _latest_audit_event_id(download_audit_path)
             _trigger_update_action_from_installed_ui(
                 environment, window_id, "download", row_marker=candidate_row
             )
             _answer_owner_dialog(environment, "許可", expected_summary_markers=download_markers)
             _find_accessible("download jobを開始しました", timeout=20)
             download_event = _wait_for_audit_event(
-                audit_store / "audit.jsonl",
+                download_audit_path,
                 "更新download要求",
                 "completed",
                 evidence_source="LIVE_RUNTIME",
+                after_event_id=download_audit_cursor,
+                reason_contains="既存packageの一致を記録",
             )
             if "既存packageの一致を記録" not in download_event.get("reason", ""):
                 raise RuntimeError("Brokerが既存cache packageを再検証したAudit理由がありません")
@@ -9210,6 +9286,7 @@ def run_installed_smoke(
                 or package_store.read_bytes() != package_bytes
             ):
                 raise RuntimeError("初回stage Owner拒否後に製品状態が変更されました")
+            stage_audit_cursor = _latest_audit_event_id(audit_store / "audit.jsonl")
             _trigger_update_action_from_installed_ui(
                 environment, window_id, "未起動版へ展開", row_marker=candidate_row
             )
@@ -9244,7 +9321,14 @@ def run_installed_smoke(
                     "libexec/gui_shell_linux_broker",
                 }
             )
-            _wait_for_audit_event(audit_store / "audit.jsonl", "更新適用要求", "completed")
+            _wait_for_audit_event(
+                audit_store / "audit.jsonl",
+                "更新適用要求",
+                "completed",
+                evidence_source="INTERNAL_STATE",
+                after_event_id=stage_audit_cursor,
+                reason_contains="完全展開・package／file digest一致を記録",
+            )
 
             activation_markers = (
                 "Linux製品の署名検査済みstageを有効版に切り替え",
@@ -9272,16 +9356,19 @@ def run_installed_smoke(
                 or not all(_group_exists(group) for group in stage_groups)
             ):
                 raise RuntimeError("初回activation Owner拒否後にstage／record／entry／processが変化しました")
+            audit_path = audit_store / "audit.jsonl"
+            activation_audit_cursor = _latest_audit_event_id(audit_path)
             _trigger_update_action_from_installed_ui(
                 environment, window_id, "インストール", row_marker=candidate_row
             )
             _answer_owner_dialog(environment, "許可", expected_summary_markers=activation_markers)
-            audit_path = audit_store / "audit.jsonl"
             _wait_for_audit_event(
                 audit_path,
                 "更新有効版切替要求",
                 "completed",
                 evidence_source="INTERNAL_STATE",
+                after_event_id=activation_audit_cursor,
+                reason_contains="desktop_entry=registered launch=not_started",
             )
             handoff_deadline = time.monotonic() + 120
             installed_window: str | None = None
