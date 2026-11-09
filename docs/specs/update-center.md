@@ -76,6 +76,8 @@ Brokerは現行active versionのcontent-addressed stageへ既存の再開reader�
 
 Brokerの更新一覧は、現行候補との照合に成功したactive version descriptorを、Rollback先がまだない初回導入後も`現在版`へ投影する。recordなしの`unavailable + 現在版=null`だけを初回Install候補として表示し、active versionがある場合はUpdate／限定Repair操作、状態が`unknown`なら有効版切替を無効化する。未起動版展開と限定Repairは、現在のdownload jobが同じ更新ID・候補hash・package SHA-256で`downloaded`の場合だけUIから要求可能とする。有効版切替は同候補のstage要求が`version_staged`で受理された後だけ画面内で有効化する。この画面内stage印は表示制御だけでAuthorityではなく、Brokerは各要求時に署名、package内容、stage、固定導入先、Owner確認を再検証する。download job／画面内stage印はprocess内状態なので、再起動後は再download・冪等stage要求でBrokerが既存package／stageを再検証してから進む。
 
+`製品アンインストール操作`はrollback候補metadataとは独立し、Brokerが導入先を検証済みの場合に限り`available`を返す。これによりrollback状態が`unknown`でも、設定画面はUninstall要求を表示できる。表示projectionは削除権限ではなく、実要求は引き続きRust起動器のoperation別native Owner確認、Brokerの導入先・製品identity・固定root再照合、Auditを通す。未導入または導入先未検証の場合は`suspended`とし、UIは要求を表示しない。
+
 Update Centerの状態変更操作は同時に一件だけ実行する。要求中はdownload、stage、active version切替、延期、rollback、Uninstall、catalog取得を無効化し、二重送信を防ぐ。Brokerの初回Install切替応答が`Accepted`で`起動=after_current_exit`を示す場合だけ、Flutterは登録済み版を起動するための必須終了を要求する。これは初回Installに限る通常終了経路で、導入済み版からのUpdate、Rollback、拒否応答へ拡張しない。Rust起動器は正常終了後、Broker停止・process終了・instance lock解放を待ち、固定product rootのactive record、launcher、package layoutを再検証してから導入版を限定環境で起動する。終了が拒否された／失敗した場合、active version recordとStart Menu登録が既に成立した事実を更新失敗と誤表示せず、画面を操作可能に戻してStart Menuからの起動を案内する。UIの終了応答や画面内stateは起動許可・Authorityを生成しない。
 
 ## 検証対象

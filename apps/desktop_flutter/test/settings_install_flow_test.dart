@@ -67,6 +67,10 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
+    expect(
+      find.widgetWithText(OutlinedButton, 'D4 Pocketをアンインストール'),
+      findsNothing,
+    );
     final stageButton = find.text('未起動版へ展開');
     await tester.ensureVisible(stageButton);
     await tester.tap(stageButton);
@@ -200,6 +204,66 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('導入pathが検証済みならrollback状態不明でもUninstallを表示する', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final transport = _InstallFlowTransport(
+      installed: true,
+      rollbackCurrentVersionAvailable: false,
+    );
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SettingsScreen(client: ShellCoreClient.mock(transport: transport)),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('起動項目を修復'), findsNothing);
+    expect(
+      find.widgetWithText(OutlinedButton, 'D4 Pocketをアンインストール'),
+      findsOneWidget,
+    );
+    expect(
+      transport.operations.where((operation) => operation == '製品アンインストール要求'),
+      isEmpty,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('rollback候補だけではUninstallを表示しない', (tester) async {
+    tester.view.physicalSize = const Size(1200, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final transport = _InstallFlowTransport(
+      installed: true,
+      uninstallAvailable: false,
+    );
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SettingsScreen(client: ShellCoreClient.mock(transport: transport)),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('起動項目を修復'), findsOneWidget);
+    expect(
+      find.widgetWithText(OutlinedButton, 'D4 Pocketをアンインストール'),
+      findsNothing,
+    );
+    expect(
+      transport.operations.where((operation) => operation == '製品アンインストール要求'),
+      isEmpty,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('起動項目修復はBrokerへ一度だけ要求し、修復結果を表示する', (
     tester,
   ) async {
@@ -239,10 +303,17 @@ void main() {
 }
 
 class _InstallFlowTransport implements BrokerTransport {
-  _InstallFlowTransport({this.installed = false, this.repairGate});
+  _InstallFlowTransport({
+    this.installed = false,
+    this.repairGate,
+    this.rollbackCurrentVersionAvailable = true,
+    bool? uninstallAvailable,
+  }) : uninstallAvailable = uninstallAvailable ?? installed;
 
   final bool installed;
   final Completer<void>? repairGate;
+  final bool rollbackCurrentVersionAvailable;
+  final bool uninstallAvailable;
 
   static const _packageHash =
       'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -289,9 +360,13 @@ class _InstallFlowTransport implements BrokerTransport {
           },
           '適用実行': 'available',
           'rollback実行': 'suspended',
+          '製品アンインストール操作':
+              uninstallAvailable ? 'available' : 'suspended',
           'rollback状態': {
-            '状態': 'unavailable',
-            '現在版': installed
+            '状態': installed && !rollbackCurrentVersionAvailable
+                ? 'unknown'
+                : 'unavailable',
+            '現在版': installed && rollbackCurrentVersionAvailable
                 ? {
                     '更新ID': _updateId,
                     '候補hash': _candidateHash,

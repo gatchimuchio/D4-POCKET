@@ -931,6 +931,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ? Map<String, Object?>.from(body['rollback状態']! as Map)
               : null;
           final installedProduct = rollbackState?['現在版'] is Map;
+          final uninstallAvailable =
+              body['製品アンインストール操作'] == 'available';
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -965,6 +967,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const Text(
                   '現行版が検証できる場合に、欠損した固定root起動器とOS起動項目だけを復元します。破損した版本体や有効版記録は上書きしません。',
                 ),
+              ],
+              if (uninstallAvailable) ...[
                 const SizedBox(height: 8),
                 OutlinedButton.icon(
                   onPressed: _updateOperationInProgress

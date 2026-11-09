@@ -2211,6 +2211,7 @@ fn list(broker: &mut Broker, payload: &Value, request_id: &str, hash: &str) -> B
             "適用実行": "suspended",
             "rollback実行": if rollback_available { "available" } else { "suspended" },
             "rollback状態": rollback,
+            "製品アンインストール操作": if broker.desktop_install_path_verified { "available" } else { "suspended" },
             "証拠種別": EVIDENCE_SOURCE_INTERNAL_STATE,
         }),
         hash,
@@ -7303,6 +7304,34 @@ mod tests {
             listed.body.unwrap()["更新一覧"][0]["取得元"],
             json!({"状態": "ineligible", "URL": null})
         );
+    }
+
+    #[test]
+    fn update_list_exposes_uninstall_for_verified_installed_path_without_rollback_metadata() {
+        let mut portable_broker = Broker::new("session-1");
+        let portable_list = call(
+            &mut portable_broker,
+            BrokerOperation::更新一覧,
+            json!({"版": 1}),
+        );
+        assert_eq!(portable_list.status, BrokerStatus::Accepted);
+        assert_eq!(
+            portable_list.body.as_ref().unwrap()["製品アンインストール操作"],
+            "suspended"
+        );
+
+        let mut installed_broker = Broker::new("session-1");
+        installed_broker.desktop_install_path_verified = true;
+        let installed_list = call(
+            &mut installed_broker,
+            BrokerOperation::更新一覧,
+            json!({"版": 1}),
+        );
+        let body = installed_list.body.expect("更新一覧");
+        assert_eq!(installed_list.status, BrokerStatus::Accepted);
+        assert_eq!(body["製品アンインストール操作"], "available");
+        assert_eq!(body["rollback状態"]["状態"], "unknown");
+        assert!(body["rollback状態"]["現在版"].is_null());
     }
 
     #[test]
