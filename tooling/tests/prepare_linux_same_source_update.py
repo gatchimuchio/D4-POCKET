@@ -141,25 +141,74 @@ def _prepare(bundle: Path, output_root: Path, private_key: Path, build_evidence:
     ):
         raise ValueError("同一bundle D4PKGと署名catalogのidentityが一致しません")
 
+    certificate_authority = update_server_root / "ca.pem"
+    private_ca_key = update_server_root / "ca.key"
     certificate = update_server_root / "server.pem"
     private_tls_key = update_server_root / "server.key"
+    certificate_request = update_server_root / "server.csr"
+    certificate_extensions = update_server_root / "server-extensions.cnf"
+    ca_serial = update_server_root / "ca.srl"
     subprocess.run(
         [
             "openssl", "req", "-x509", "-newkey", "rsa:2048", "-sha256",
-            "-nodes", "-days", "2", "-keyout", str(private_tls_key),
-            "-out", str(certificate), "-subj", "/CN=updates.d4p-test.example",
-            "-addext", "subjectAltName=DNS:updates.d4p-test.example",
-            "-addext", "basicConstraints=critical,CA:TRUE",
-            "-addext", "keyUsage=critical,digitalSignature,keyCertSign,keyEncipherment",
-            "-addext", "extendedKeyUsage=serverAuth",
+            "-nodes", "-days", "2", "-keyout", str(private_ca_key),
+            "-out", str(certificate_authority), "-subj", "/CN=D4 Pocket Linux Acceptance CA",
+            "-addext", "basicConstraints=critical,CA:TRUE,pathlen:0",
+            "-addext", "keyUsage=critical,keyCertSign,cRLSign",
+            "-addext", "subjectKeyIdentifier=hash",
         ],
         check=True,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
     )
-    private_key_metadata = private_tls_key.lstat()
-    if private_key_metadata.st_mode & 0o077:
-        raise ValueError("run-scoped TLS private keyのfile permissionが広すぎます")
+    subprocess.run(
+        [
+            "openssl", "req", "-new", "-newkey", "rsa:2048", "-sha256", "-nodes",
+            "-keyout", str(private_tls_key), "-out", str(certificate_request),
+            "-subj", "/CN=updates.d4p-test.example",
+        ],
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+    )
+    certificate_extensions.write_text(
+        "[server_cert]\n"
+        "basicConstraints=critical,CA:FALSE\n"
+        "keyUsage=critical,digitalSignature,keyEncipherment\n"
+        "extendedKeyUsage=serverAuth\n"
+        "subjectAltName=DNS:updates.d4p-test.example\n"
+        "subjectKeyIdentifier=hash\n"
+        "authorityKeyIdentifier=keyid,issuer\n",
+        encoding="ascii",
+    )
+    subprocess.run(
+        [
+            "openssl", "x509", "-req", "-in", str(certificate_request),
+            "-CA", str(certificate_authority), "-CAkey", str(private_ca_key),
+            "-CAcreateserial", "-out", str(certificate), "-days", "2", "-sha256",
+            "-extfile", str(certificate_extensions), "-extensions", "server_cert",
+        ],
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+    )
+    subprocess.run(
+        [
+            "openssl", "verify", "-CAfile", str(certificate_authority),
+            "-purpose", "sslserver", "-verify_hostname", "updates.d4p-test.example",
+            str(certificate),
+        ],
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+    )
+    for private_key in (private_ca_key, private_tls_key):
+        if private_key.lstat().st_mode & 0o077:
+            raise ValueError("run-scoped TLS private keyのfile permissionが広すぎます")
+    private_ca_key.unlink()
+    certificate_request.unlink()
+    certificate_extensions.unlink()
+    ca_serial.unlink()
     return {
         "evidence_type": "linux_same_source_update_candidate",
         "source_commit": source_commit,
@@ -173,7 +222,7 @@ def _prepare(bundle: Path, output_root: Path, private_key: Path, build_evidence:
             Path(catalog_record["catalog_path"]).read_bytes()
         ).hexdigest(),
         "signing_identity": catalog_record["signing_identity"],
-        "tls_identity": "run-scoped self-signed test CA for exact acceptance host",
+        "tls_identity": "run-scoped test CA with host-specific server leaf certificate",
         "formal_distribution_claimed": False,
     }
 

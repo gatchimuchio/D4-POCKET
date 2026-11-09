@@ -44,6 +44,9 @@ RUST_HELPER_EXIT_CLASS_TEST = (
 RUST_CATALOG_TLS_PROVIDER_TEST = (
     "broker::update_download::tests::catalog_client_builds_with_the_explicit_ring_crypto_provider"
 )
+RUST_SAME_SOURCE_TLS_TEST = (
+    "broker::update_download::tests::same_source_catalog_client_accepts_the_run_scoped_ca_and_host_certificate"
+)
 RUST_STAGE_TEST = (
     "broker::update_center::tests::linux_installed_acceptance_stages_real_export_and_registers_entry"
 )
@@ -133,7 +136,7 @@ def _update_source_host(same_source_candidate: bool) -> str:
 def _same_source_update_ca_environment(temp_root: Path) -> dict[str, str]:
     configured = os.environ.get(SAME_SOURCE_UPDATE_CA_ENV)
     update_root = temp_root / "update-server"
-    certificate = update_root / "server.pem"
+    certificate = update_root / "ca.pem"
     if (
         not configured
         or update_root.is_symlink()
@@ -8739,7 +8742,11 @@ def _group_exists(group: int) -> bool:
 
 
 def _run_rust_test(
-    name: str, environment: dict[str, str], private_key_path: Path
+    name: str,
+    environment: dict[str, str],
+    private_key_path: Path,
+    *,
+    features: tuple[str, ...] = (),
 ) -> None:
     runner_home = Path(os.environ.get("HOME") or Path.home())
     test_environment = environment | {
@@ -8751,12 +8758,11 @@ def _run_rust_test(
     test_environment.setdefault(
         "RUSTUP_HOME", os.environ.get("RUSTUP_HOME", str(runner_home / ".rustup"))
     )
-    completed = subprocess.run(
+    command = ["cargo", "+1.95.0", "test", "--locked"]
+    if features:
+        command.extend(["--features", ",".join(features)])
+    command.extend(
         [
-            "cargo",
-            "+1.95.0",
-            "test",
-            "--locked",
             "--manifest-path",
             str(ROOT / "native/rust_helper/Cargo.toml"),
             "--lib",
@@ -8765,7 +8771,10 @@ def _run_rust_test(
             "--ignored",
             "--exact",
             "--test-threads=1",
-        ],
+        ]
+    )
+    completed = subprocess.run(
+        command,
         cwd=ROOT,
         env=test_environment,
         capture_output=True,
@@ -9023,6 +9032,13 @@ def run_installed_smoke(
             _run_rust_test(RUST_CATALOG_RELAY_TIMEOUT_TEST, environment, private_key_path)
             _run_rust_test(RUST_HELPER_EXIT_CLASS_TEST, environment, private_key_path)
             _run_rust_test(RUST_CATALOG_TLS_PROVIDER_TEST, environment, private_key_path)
+        if acceptance_scope == "debian_setup_lifecycle":
+            _run_rust_test(
+                RUST_SAME_SOURCE_TLS_TEST,
+                environment,
+                private_key_path,
+                features=("linux-desktop-broker", "r2-e2e"),
+            )
         if acceptance_scope in {
             "debian_setup_first_install",
             "debian_setup_lifecycle",

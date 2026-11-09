@@ -852,12 +852,12 @@ class InstalledCatalogFetchStatusTests(unittest.TestCase):
         self.assertEqual(_update_source_host(False), "raw.githubusercontent.com")
         self.assertEqual(_update_source_host(True), LINUX_UPDATE_TEST_HOST)
 
-    def test_same_source_update_ca_is_bound_to_run_owned_server_certificate(self) -> None:
+    def test_same_source_update_ca_is_bound_to_run_owned_ca_certificate(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             server_root = root / "update-server"
             server_root.mkdir()
-            certificate = server_root / "server.pem"
+            certificate = server_root / "ca.pem"
             certificate.write_bytes(b"run-owned public test CA")
             with patch.dict(
                 "os.environ",
@@ -915,10 +915,10 @@ class InstalledCatalogFetchStatusTests(unittest.TestCase):
 
     def test_process_environment_value_reads_only_a_unique_named_entry(self) -> None:
         module = "tooling.tests.linux_installed_product_smoke.Path.read_bytes"
-        with patch(module, return_value=b"HOME=/home/test\0GUI_SHELL_R2_E2E_UPDATE_CA_PEM=/run/test/server.pem\0"):
+        with patch(module, return_value=b"HOME=/home/test\0GUI_SHELL_R2_E2E_UPDATE_CA_PEM=/run/test/ca.pem\0"):
             self.assertEqual(
                 _process_environment_value(123, "GUI_SHELL_R2_E2E_UPDATE_CA_PEM"),
-                "/run/test/server.pem",
+                "/run/test/ca.pem",
             )
         with patch(module, return_value=b"GUI_SHELL_R2_E2E_UPDATE_CA_PEM=/run/a\0GUI_SHELL_R2_E2E_UPDATE_CA_PEM=/run/b\0"):
             self.assertIsNone(
@@ -932,7 +932,7 @@ class InstalledCatalogFetchStatusTests(unittest.TestCase):
             helper.write_bytes(b"fixture")
             audit_path = root / "audit.jsonl"
             audit_path.write_text("", encoding="utf-8")
-            expected = "/run/d4p-acceptance/update-server/server.pem"
+            expected = "/run/d4p-acceptance/update-server/ca.pem"
             with (
                 patch(
                     "tooling.tests.linux_installed_product_smoke._processes_using",

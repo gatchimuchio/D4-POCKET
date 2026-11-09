@@ -177,7 +177,7 @@ def _run(args: argparse.Namespace) -> dict[str, object]:
     pid_file = update_root / "server.pid"
     result_file = root / "same-source-update-acceptance.json"
     environment = os.environ.copy()
-    environment[CA_ENV] = str((update_root / "server.pem").resolve(strict=True))
+    environment[CA_ENV] = str((update_root / "ca.pem").resolve(strict=True))
     server_log_handle = server_log.open("wb")
     server: subprocess.Popen[bytes] | None = None
     try:
@@ -209,7 +209,7 @@ def _run(args: argparse.Namespace) -> dict[str, object]:
         subprocess.run(
             [
                 "curl", "--fail", "--silent", "--show-error",
-                "--cacert", str(update_root / "server.pem"),
+                "--cacert", str(update_root / "ca.pem"),
                 "--resolve", "updates.d4p-test.example:443:127.0.0.1",
                 "https://updates.d4p-test.example/d4/stable/updates.json",
                 "--output", "/dev/null",

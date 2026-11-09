@@ -1484,6 +1484,31 @@ mod tests {
         assert!(result.is_ok());
     }
 
+    #[cfg(feature = "r2-e2e")]
+    #[test]
+    #[ignore = "Linux same-source installed acceptanceでrun-scoped TLS trustを確認する"]
+    fn same_source_catalog_client_accepts_the_run_scoped_ca_and_host_certificate() {
+        let host = R2_E2E_UPDATE_HOST;
+        let address = r2_e2e_update_address(host, 443)
+            .expect("same-source acceptance hostはloopback TLSへ固定される");
+        let client = build_update_download_client(host, &[address], CATALOG_TIMEOUT)
+            .expect("run-scoped CAから同一source用TLS clientを構築する");
+        let url = Url::parse(&format!("https://{host}/d4/stable/updates.json")).unwrap();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let response = runtime
+            .block_on(client.get(url).send())
+            .unwrap_or_else(|error| panic!("run-scoped TLS server証明書を検証できない: {error:?}"));
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = runtime
+            .block_on(response.bytes())
+            .expect("TLS受信後のcatalog bodyを読む");
+        assert!(!body.is_empty());
+        assert!(body.len() <= MAX_CATALOG_BYTES);
+    }
+
     #[test]
     fn local_tls_server_repairs_only_after_verified_package_bytes() {
         let bytes = b"locally served signed package";
