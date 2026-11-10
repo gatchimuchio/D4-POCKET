@@ -18,6 +18,7 @@ from tooling.export_linux_product import (
     _require_clean_source,
     _toolchain,
     build_linux_product,
+    validate_build_evidence,
     main as linux_export_main,
 )
 from tooling.export_windows_product import validate_export_inputs
@@ -400,6 +401,10 @@ class LinuxExportBuildTests(unittest.TestCase):
             self.assertEqual(evidence["source_commit"], source_commit)
             self.assertEqual(evidence["compile_time_identity"]["app_id"], APP_ID)
             self.assertEqual(evidence["compile_time_identity"]["audit_store_id"], AUDIT_ID)
+            self.assertEqual(
+                evidence["compile_time_identity"]["manifest_sha256"],
+                evidence["source_manifest_sha256"],
+            )
             self.assertFalse(evidence["authority_boundary"]["owner_authorization_verified"])
             self.assertFalse(evidence["signed"])
             self.assertFalse(evidence["formal_distribution_claimed"])
@@ -432,6 +437,10 @@ class LinuxExportBuildTests(unittest.TestCase):
             ))
             self.assertIn(f"-DD4_PRODUCT_APP_ID={APP_ID}", cmake_configure)
             self.assertIn(f"-DD4_PRODUCT_AUDIT_STORE_ID={AUDIT_ID}", cmake_configure)
+            self.assertIn(
+                f"-DD4_PRODUCT_MANIFEST_SHA256={evidence['source_manifest_sha256']}",
+                cmake_configure,
+            )
             self.assertIn("-DD4_LINUX_R2_E2E_TEST_BUILD=OFF", cmake_configure)
             self.assertNotIn("-DD4_LINUX_R2_E2E_TEST_BUILD=ON", cmake_configure)
             schema = json.loads(
@@ -440,6 +449,26 @@ class LinuxExportBuildTests(unittest.TestCase):
                 )
             )
             self.assertEqual(validate_instance(evidence, schema), [])
+            manifest_raw = manifest.read_bytes()
+            invalid_pin = json.loads(json.dumps(evidence))
+            invalid_pin["compile_time_identity"]["manifest_sha256"] = "0" * 64
+            with self.assertRaisesRegex(ValueError, "compile-time identity"):
+                validate_build_evidence(
+                    invalid_pin,
+                    output / "bundle",
+                    output / "D4Pocket-linux.d4pkg",
+                    manifest_raw,
+                )
+            invalid_source_pin = json.loads(json.dumps(evidence))
+            invalid_source_pin["source_manifest_sha256"] = "0" * 64
+            invalid_source_pin["compile_time_identity"]["manifest_sha256"] = "0" * 64
+            with self.assertRaisesRegex(ValueError, "source Manifest hash"):
+                validate_build_evidence(
+                    invalid_source_pin,
+                    output / "bundle",
+                    output / "D4Pocket-linux.d4pkg",
+                    manifest_raw,
+                )
 
     def test_failed_native_build_never_publishes_partial_output(self) -> None:
         with tempfile.TemporaryDirectory(prefix="d4p-linux-export-fail-") as temporary:

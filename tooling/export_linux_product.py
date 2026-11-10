@@ -465,10 +465,14 @@ def validate_build_evidence(
         raise ValueError("Linux Export build evidenceがSchemaに適合しない")
     app_id = evidence["app_id"]
     audit_store_id = evidence["audit_store_id"]
+    expected_manifest_hash = hashlib.sha256(manifest_raw).hexdigest()
+    if evidence["source_manifest_sha256"] != expected_manifest_hash:
+        raise ValueError("build evidenceのsource Manifest hashが入力fileと一致しない")
     if evidence["compile_time_identity"] != {
         "source": "schema_validated_manifest",
         "app_id": app_id,
         "audit_store_id": audit_store_id,
+        "manifest_sha256": evidence["source_manifest_sha256"],
     }:
         raise ValueError("compile-time identityがBroker Export Manifestと一致しない")
     records, total_bytes, tree_hash = _artifact_inventory(bundle)
@@ -642,6 +646,7 @@ def build_linux_product(
                 f"-DCMAKE_INSTALL_PREFIX={bundle}",
                 f"-DD4_PRODUCT_APP_ID={app_id}",
                 f"-DD4_PRODUCT_AUDIT_STORE_ID={audit_store_id}",
+                f"-DD4_PRODUCT_MANIFEST_SHA256={manifest_hash}",
                 f"-DD4_LINUX_R2_E2E_TEST_BUILD={'ON' if r2_e2e_test_build else 'OFF'}",
             ]
             subprocess.run(
@@ -738,6 +743,7 @@ def build_linux_product(
                     "source": "schema_validated_manifest",
                     "app_id": app_id,
                     "audit_store_id": audit_store_id,
+                    "manifest_sha256": manifest_hash,
                 },
                 "compile_time_update_trust": _update_trust_summary(manifest_file),
                 "build_duration_ms": elapsed_ms,

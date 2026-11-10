@@ -141,9 +141,9 @@ class LinuxInstalledRuntimeProvenanceTests(unittest.TestCase):
                 "audit_store": {"store_id": self.audit_store_id},
             }
         }
-        (self.bundle / "product_manifest.json").write_text(
-            json.dumps(manifest, separators=(",", ":")), encoding="utf-8"
-        )
+        manifest_raw = json.dumps(manifest, separators=(",", ":")).encode("utf-8")
+        (self.bundle / "product_manifest.json").write_bytes(manifest_raw)
+        self.manifest_sha256 = hashlib.sha256(manifest_raw).hexdigest()
         (self.bundle / "gui_shell_desktop").write_bytes(b"runner artifact")
         (self.bundle / "gui_shell_desktop_launcher").write_bytes(b"launcher artifact")
         helper_dir = self.bundle / "libexec"
@@ -190,10 +190,12 @@ class LinuxInstalledRuntimeProvenanceTests(unittest.TestCase):
                     "formal_distribution_claimed": False,
                     "app_id": self.app_id,
                     "audit_store_id": self.audit_store_id,
+                    "source_manifest_sha256": self.manifest_sha256,
                     "compile_time_identity": {
                         "source": "schema_validated_manifest",
                         "app_id": self.app_id,
                         "audit_store_id": self.audit_store_id,
+                        "manifest_sha256": self.manifest_sha256,
                     },
                     "artifact_files": files,
                     "artifact_total_bytes": total_bytes,
@@ -253,6 +255,21 @@ class LinuxInstalledRuntimeProvenanceTests(unittest.TestCase):
         self.assertEqual(result["runtime_identity"]["app_id"], self.app_id)
         self.assertEqual(result["runtime_identity"]["audit_store_id"], self.audit_store_id)
         self.assertEqual(result["component_sha256"]["broker"], hashlib.sha256(b"broker artifact").hexdigest())
+
+    def test_rejects_compile_time_manifest_pin_mismatch(self) -> None:
+        evidence = json.loads(self.evidence_path.read_text(encoding="utf-8"))
+        evidence["compile_time_identity"]["manifest_sha256"] = "0" * 64
+        self.evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
+        with self.assertRaisesRegex(RuntimeError, "compile-time product identity"):
+            self.verify()
+
+    def test_rejects_manifest_hash_mismatch_against_bundle_inventory(self) -> None:
+        evidence = json.loads(self.evidence_path.read_text(encoding="utf-8"))
+        evidence["source_manifest_sha256"] = "0" * 64
+        evidence["compile_time_identity"]["manifest_sha256"] = "0" * 64
+        self.evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
+        with self.assertRaisesRegex(RuntimeError, "inventory／Manifest hash"):
+            self.verify()
 
     def test_rejects_build_evidence_from_another_source_commit(self) -> None:
         with self.assertRaisesRegex(RuntimeError, "source"):

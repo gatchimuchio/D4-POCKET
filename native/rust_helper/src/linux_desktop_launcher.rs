@@ -3,6 +3,7 @@
 use crate::linux_product_bundle::{self, VerifiedBundle};
 use rustix::fs::{flock, FlockOperation};
 use rustix::process::{kill_process_group, test_kill_process_group, Pid, Signal};
+use sha2::{Digest, Sha256};
 use std::ffi::OsString;
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
@@ -15,6 +16,9 @@ use zeroize::{Zeroize, Zeroizing};
 
 pub(crate) const LAUNCH_NONCE_ENV: &str = "D4P_LAUNCH_NONCE";
 const UNINSTALL_TICKET_PREFIX: &str = "product-uninstall-";
+const MAX_PRODUCT_MANIFEST_BYTES: u64 = 65_536;
+const EMBEDDED_PRODUCT_MANIFEST_SHA256: Option<&str> =
+    option_env!("GUI_SHELL_PRODUCT_MANIFEST_SHA256");
 
 const FRONTEND_ENVIRONMENT_ALLOWLIST: &[&str] = &[
     "HOME",
@@ -292,6 +296,25 @@ fn resolve_launch_plan(
     identity: Option<&(String, String)>,
     product_data_home: Option<&Path>,
 ) -> Result<LaunchPlan, LinuxLaunchError> {
+    resolve_launch_plan_with_manifest_pin(
+        current_launcher,
+        identity,
+        product_data_home,
+        EMBEDDED_PRODUCT_MANIFEST_SHA256,
+    )
+}
+
+fn resolve_launch_plan_with_manifest_pin(
+    current_launcher: &Path,
+    identity: Option<&(String, String)>,
+    product_data_home: Option<&Path>,
+    manifest_pin: Option<&str>,
+) -> Result<LaunchPlan, LinuxLaunchError> {
+    match (identity, manifest_pin) {
+        (None, None) => {}
+        (Some(_), Some(pin)) if valid_hex(pin, 64) => {}
+        _ => return Err(failure("製品identityとManifest hash pinを確認できません。")),
+    }
     let Some((app_id, audit_store_id)) = identity else {
         return linux_product_bundle::from_launcher(current_launcher)
             .map(LaunchPlan::RunBundle)
@@ -315,6 +338,8 @@ fn resolve_launch_plan(
         })?;
         let bundle = linux_product_bundle::from_launcher(&active_launcher)
             .map_err(|_| failure("D4 Pocketの有効版bundleが不正です。"))?;
+        // 固定root launcherのManifest pinは旧有効版と一致しない場合がある。
+        // 実際に起動するversioned launcherが自分のsibling Manifestを検証する。
         return Ok(LaunchPlan::DispatchToActiveVersion(bundle));
     }
 
@@ -325,6 +350,7 @@ fn resolve_launch_plan(
             if fs::canonicalize(current_launcher).ok().as_deref()
                 == Some(active_launcher.as_path()) =>
         {
+            verify_product_manifest(&bundle.root, app_id, audit_store_id, manifest_pin)?;
             Ok(LaunchPlan::RunBundle(bundle))
         }
         Some(_) => Err(failure(
@@ -333,10 +359,138 @@ fn resolve_launch_plan(
         None if bundle.versioned_launcher.is_some()
             && !is_product_versioned_launcher_path(current_launcher, app_id) =>
         {
+            verify_product_manifest(&bundle.root, app_id, audit_store_id, manifest_pin)?;
             Ok(LaunchPlan::RunInitialInstallBundle(bundle))
         }
         None => Err(failure("初回導入bundleに固定Linux launcherがありません。")),
     }
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    format!("{:x}", Sha256::digest(bytes))
+}
+
+fn verify_product_manifest(
+    bundle_root: &Path,
+    app_id: &str,
+    audit_store_id: &str,
+    manifest_pin: Option<&str>,
+) -> Result<(), LinuxLaunchError> {
+    let pin = manifest_pin
+        .filter(|value| valid_hex(value, 64))
+        .ok_or_else(|| failure("製品Manifestの固定hashを確認できません。"))?;
+    let path = bundle_root.join("product_manifest.json");
+    let mut file = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW)
+        .open(&path)
+        .map_err(|_| failure("製品Manifestを安全に開けません。"))?;
+    let before = file
+        .metadata()
+        .map_err(|_| failure("製品Manifestを検査できません。"))?;
+    if !before.is_file()
+        || before.nlink() != 1
+        || before.len() == 0
+        || before.len() > MAX_PRODUCT_MANIFEST_BYTES
+    {
+        return Err(failure("製品Manifestのfile形式またはsizeが不正です。"));
+    }
+    let mut bytes = Vec::with_capacity(before.len() as usize);
+    Read::take(&mut file, MAX_PRODUCT_MANIFEST_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|_| failure("製品Manifestを読み取れません。"))?;
+    let after = file
+        .metadata()
+        .map_err(|_| failure("製品Manifestの読取状態を確認できません。"))?;
+    let path_after = fs::symlink_metadata(&path)
+        .map_err(|_| failure("製品Manifestのfile identityを確認できません。"))?;
+    if bytes.is_empty()
+        || bytes.len() as u64 > MAX_PRODUCT_MANIFEST_BYTES
+        || bytes.len() as u64 != before.len()
+        || before.dev() != after.dev()
+        || before.ino() != after.ino()
+        || after.nlink() != 1
+        || after.dev() != path_after.dev()
+        || after.ino() != path_after.ino()
+        || path_after.nlink() != 1
+        || !path_after.is_file()
+        || path_after.file_type().is_symlink()
+    {
+        return Err(failure(
+            "製品Manifestのfile identityまたはsizeが変化しました。",
+        ));
+    }
+    if sha256_hex(&bytes) != pin {
+        return Err(failure("製品Manifestのhashが製品identityと一致しません。"));
+    }
+    let value: serde_json::Value = serde_json::from_slice(&bytes)
+        .map_err(|_| failure("製品Manifestの形式を確認できません。"))?;
+    let manifest = value
+        .get("manifest")
+        .and_then(serde_json::Value::as_object)
+        .ok_or_else(|| failure("製品Manifestの構造を確認できません。"))?;
+    let app_identity = manifest
+        .get("app_identity")
+        .and_then(serde_json::Value::as_object)
+        .ok_or_else(|| failure("製品ManifestのApp identityを確認できません。"))?;
+    let audit_store = manifest
+        .get("audit_store")
+        .and_then(serde_json::Value::as_object)
+        .ok_or_else(|| failure("製品ManifestのAudit storeを確認できません。"))?;
+    let distribution = manifest
+        .get("distribution_metadata")
+        .and_then(serde_json::Value::as_object)
+        .ok_or_else(|| failure("製品Manifestのtargetを確認できません。"))?;
+    let inheritance = manifest
+        .get("inheritance_policy")
+        .and_then(serde_json::Value::as_object)
+        .ok_or_else(|| failure("製品Manifestの非継承条件を確認できません。"))?;
+    let module_plan = manifest
+        .get("module_plan")
+        .and_then(serde_json::Value::as_object)
+        .ok_or_else(|| failure("製品ManifestのModule planを確認できません。"))?;
+    let inherits_no_authority = [
+        "authority",
+        "permission",
+        "approval",
+        "credential",
+        "audit_chain",
+    ]
+    .iter()
+    .all(|key| inheritance.get(*key).and_then(serde_json::Value::as_str) == Some("none"));
+    if value.get("version").and_then(serde_json::Value::as_u64) != Some(1)
+        || value.get("product").and_then(serde_json::Value::as_str) != Some("D4 Pocket")
+        || app_identity
+            .get("app_id")
+            .and_then(serde_json::Value::as_str)
+            != Some(app_id)
+        || app_identity
+            .get("target_platform")
+            .and_then(serde_json::Value::as_str)
+            != Some("linux")
+        || audit_store
+            .get("store_id")
+            .and_then(serde_json::Value::as_str)
+            != Some(audit_store_id)
+        || audit_store
+            .get("inherited")
+            .and_then(serde_json::Value::as_bool)
+            != Some(false)
+        || distribution
+            .get("target_platform")
+            .and_then(serde_json::Value::as_str)
+            != Some("linux")
+        || !inherits_no_authority
+        || module_plan
+            .get("binary_pruning_status")
+            .and_then(serde_json::Value::as_str)
+            != Some("not_applied")
+    {
+        return Err(failure(
+            "製品Manifestのidentityまたは安全境界が一致しません。",
+        ));
+    }
+    Ok(())
 }
 
 fn is_product_versioned_launcher_path(launcher: &Path, app_id: &str) -> bool {
@@ -720,7 +874,33 @@ mod tests {
         fs::set_permissions(path, fs::Permissions::from_mode(0o755)).unwrap();
     }
 
-    fn write_bundle(root: &Path) {
+    fn test_manifest_value() -> serde_json::Value {
+        serde_json::json!({
+            "version": 1,
+            "product": "D4 Pocket",
+            "export_id": "manifest-fixture",
+            "manifest": {
+                "app_identity": {"app_id": APP_ID, "target_platform": "linux"},
+                "audit_store": {"store_id": AUDIT_ID, "inherited": false},
+                "distribution_metadata": {"target_platform": "linux"},
+                "inheritance_policy": {
+                    "authority": "none",
+                    "permission": "none",
+                    "approval": "none",
+                    "credential": "none",
+                    "audit_chain": "none"
+                },
+                "module_plan": {"binary_pruning_status": "not_applied"}
+            }
+        })
+    }
+
+    fn write_manifest_bytes(root: &Path, bytes: &[u8]) -> String {
+        fs::write(root.join("product_manifest.json"), bytes).unwrap();
+        sha256_hex(bytes)
+    }
+
+    fn write_bundle(root: &Path) -> String {
         fs::create_dir_all(root.join("libexec")).unwrap();
         write_executable(&root.join("gui_shell_desktop"), b"#!/bin/sh\nexit 0\n");
         write_executable(
@@ -731,13 +911,26 @@ mod tests {
             &root.join("gui_shell_desktop_launcher"),
             b"#! /bin/sh\nexit 0\n",
         );
-        fs::write(root.join("product_manifest.json"), b"product manifest").unwrap();
+        let bytes = serde_json::to_vec(&test_manifest_value()).unwrap();
+        write_manifest_bytes(root, &bytes)
+    }
+
+    fn assert_manifest_rejected(value: serde_json::Value, label: &str) {
+        let root = unique_root(label);
+        fs::create_dir_all(&root).unwrap();
+        let bytes = serde_json::to_vec(&value).unwrap();
+        let pin = write_manifest_bytes(&root, &bytes);
+        assert!(
+            verify_product_manifest(&root, APP_ID, AUDIT_ID, Some(&pin)).is_err(),
+            "{label}"
+        );
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
     fn development_launcher_accepts_only_its_adjacent_bundle() {
         let root = unique_root("development");
-        write_bundle(&root);
+        let _manifest_pin = write_bundle(&root);
         let plan =
             resolve_launch_plan(&root.join("gui_shell_desktop_launcher"), None, None).unwrap();
         assert!(matches!(plan, LaunchPlan::RunBundle(_)));
@@ -750,13 +943,14 @@ mod tests {
         let local_app_data = unique_root("first-install-data");
         let portable_root = unique_root("first-install-bundle");
         fs::create_dir_all(&local_app_data).unwrap();
-        write_bundle(&portable_root);
+        let manifest_pin = write_bundle(&portable_root);
         let identity = (APP_ID.to_owned(), AUDIT_ID.to_owned());
         assert!(matches!(
-            resolve_launch_plan(
+            resolve_launch_plan_with_manifest_pin(
                 &portable_root.join("gui_shell_desktop_launcher"),
                 Some(&identity),
                 Some(&local_app_data),
+                Some(&manifest_pin),
             ),
             Ok(LaunchPlan::RunInitialInstallBundle(_))
         ));
@@ -768,10 +962,11 @@ mod tests {
             b"{\"invalid\":true}",
         )
         .unwrap();
-        assert!(resolve_launch_plan(
+        assert!(resolve_launch_plan_with_manifest_pin(
             &portable_root.join("gui_shell_desktop_launcher"),
             Some(&identity),
             Some(&local_app_data),
+            Some(&manifest_pin),
         )
         .is_err());
         fs::remove_dir_all(local_app_data).unwrap();
@@ -782,7 +977,7 @@ mod tests {
     fn installed_handoff_cleans_only_its_bound_ticket_when_child_fails() {
         let root = unique_root("handoff-uninstall-failure");
         let runtime = unique_root("handoff-uninstall-runtime");
-        write_bundle(&root);
+        let _manifest_pin = write_bundle(&root);
         write_executable(
             &root.join("gui_shell_desktop_launcher"),
             b"#!/bin/sh\nexit 1\n",
@@ -815,7 +1010,7 @@ mod tests {
         let version_root = product_root
             .join("versions")
             .join(format!("1.2.3-{package_hash}"));
-        write_bundle(&version_root);
+        let _active_manifest_pin = write_bundle(&version_root);
 
         let root_dir = Dir::open_ambient_dir(&product_root, cap_std::ambient_authority()).unwrap();
         let versions_dir =
@@ -837,20 +1032,23 @@ mod tests {
         drop(root_dir);
 
         let identity = (APP_ID.to_owned(), AUDIT_ID.to_owned());
-        let plan = resolve_launch_plan(
+        let older_root_manifest_pin = "c".repeat(64);
+        let plan = resolve_launch_plan_with_manifest_pin(
             &product_root.join("gui_shell_desktop_launcher"),
             Some(&identity),
             Some(&local_app_data),
+            Some(&older_root_manifest_pin),
         )
         .unwrap();
         assert!(matches!(plan, LaunchPlan::DispatchToActiveVersion(_)));
-        assert!(resolve_launch_plan(
+        assert!(resolve_launch_plan_with_manifest_pin(
             &product_root.join("gui_shell_desktop_launcher"),
             Some(&(
                 APP_ID.to_owned(),
                 "audit-store-33333333333333333333333333333333".into()
             )),
             Some(&local_app_data),
+            Some(&older_root_manifest_pin),
         )
         .is_err());
         fs::remove_dir_all(local_app_data).unwrap();
@@ -864,7 +1062,7 @@ mod tests {
         let version_root = product_root
             .join("versions")
             .join(format!("1.2.3-{package_hash}"));
-        write_bundle(&version_root);
+        let active_manifest_pin = write_bundle(&version_root);
         let root_dir = Dir::open_ambient_dir(&product_root, cap_std::ambient_authority()).unwrap();
         let versions_dir =
             Dir::open_ambient_dir(product_root.join("versions"), cap_std::ambient_authority())
@@ -886,25 +1084,169 @@ mod tests {
         let identity = (APP_ID.to_owned(), AUDIT_ID.to_owned());
         let active_launcher = version_root.join("gui_shell_desktop_launcher");
         assert!(matches!(
-            resolve_launch_plan(&active_launcher, Some(&identity), Some(&local_app_data)),
+            resolve_launch_plan_with_manifest_pin(
+                &active_launcher,
+                Some(&identity),
+                Some(&local_app_data),
+                Some(&active_manifest_pin),
+            ),
             Ok(LaunchPlan::RunBundle(_))
         ));
         let portable_root = unique_root("stale-portable");
-        write_bundle(&portable_root);
-        assert!(resolve_launch_plan(
+        let stale_manifest_pin = write_bundle(&portable_root);
+        assert!(resolve_launch_plan_with_manifest_pin(
             &portable_root.join("gui_shell_desktop_launcher"),
             Some(&identity),
             Some(&local_app_data),
+            Some(&stale_manifest_pin),
         )
         .is_err());
         fs::remove_dir_all(portable_root).unwrap();
         let other_root = unique_root("other-data");
         fs::create_dir_all(&other_root).unwrap();
-        assert!(
-            resolve_launch_plan(&active_launcher, Some(&identity), Some(&other_root),).is_err()
-        );
+        assert!(resolve_launch_plan_with_manifest_pin(
+            &active_launcher,
+            Some(&identity),
+            Some(&other_root),
+            Some(&active_manifest_pin),
+        )
+        .is_err());
         fs::remove_dir_all(other_root).unwrap();
         fs::remove_dir_all(local_app_data).unwrap();
+    }
+
+    #[test]
+    fn product_manifest_pin_is_required_and_checked_before_launch_plan() {
+        let root = unique_root("manifest-pin");
+        let data_home = unique_root("manifest-pin-data");
+        fs::create_dir_all(&data_home).unwrap();
+        let manifest_pin = write_bundle(&root);
+        let identity = (APP_ID.to_owned(), AUDIT_ID.to_owned());
+        let launcher = root.join("gui_shell_desktop_launcher");
+        assert!(resolve_launch_plan_with_manifest_pin(
+            &launcher,
+            Some(&identity),
+            Some(&data_home),
+            None,
+        )
+        .is_err());
+        assert!(
+            resolve_launch_plan_with_manifest_pin(&launcher, None, None, Some(&manifest_pin),)
+                .is_err()
+        );
+        assert!(resolve_launch_plan_with_manifest_pin(
+            &launcher,
+            Some(&identity),
+            Some(&data_home),
+            Some(&"0".repeat(64)),
+        )
+        .is_err());
+        assert!(matches!(
+            resolve_launch_plan_with_manifest_pin(
+                &launcher,
+                Some(&identity),
+                Some(&data_home),
+                Some(&manifest_pin),
+            ),
+            Ok(LaunchPlan::RunInitialInstallBundle(_))
+        ));
+        let mut changed = fs::read(root.join("product_manifest.json")).unwrap();
+        changed.push(b' ');
+        fs::write(root.join("product_manifest.json"), changed).unwrap();
+        assert!(resolve_launch_plan_with_manifest_pin(
+            &launcher,
+            Some(&identity),
+            Some(&data_home),
+            Some(&manifest_pin),
+        )
+        .is_err());
+        fs::remove_dir_all(data_home).unwrap();
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn product_manifest_rejects_malformed_oversized_missing_and_symlink_files() {
+        let malformed = unique_root("manifest-malformed");
+        fs::create_dir_all(&malformed).unwrap();
+        let malformed_pin = write_manifest_bytes(&malformed, b"{");
+        assert!(
+            verify_product_manifest(&malformed, APP_ID, AUDIT_ID, Some(&malformed_pin)).is_err()
+        );
+        fs::remove_dir_all(malformed).unwrap();
+
+        let oversized = unique_root("manifest-oversized");
+        fs::create_dir_all(&oversized).unwrap();
+        let large = vec![b'x'; MAX_PRODUCT_MANIFEST_BYTES as usize + 1];
+        let large_pin = write_manifest_bytes(&oversized, &large);
+        assert!(verify_product_manifest(&oversized, APP_ID, AUDIT_ID, Some(&large_pin)).is_err());
+        fs::remove_dir_all(oversized).unwrap();
+
+        let missing = unique_root("manifest-missing");
+        fs::create_dir_all(&missing).unwrap();
+        assert!(
+            verify_product_manifest(&missing, APP_ID, AUDIT_ID, Some(&"a".repeat(64))).is_err()
+        );
+        fs::remove_dir_all(missing).unwrap();
+
+        let symlink_root = unique_root("manifest-symlink");
+        fs::create_dir_all(&symlink_root).unwrap();
+        let outside = unique_root("manifest-outside");
+        fs::write(
+            &outside,
+            serde_json::to_vec(&test_manifest_value()).unwrap(),
+        )
+        .unwrap();
+        std::os::unix::fs::symlink(&outside, symlink_root.join("product_manifest.json")).unwrap();
+        assert!(verify_product_manifest(
+            &symlink_root,
+            APP_ID,
+            AUDIT_ID,
+            Some(&sha256_hex(&fs::read(&outside).unwrap())),
+        )
+        .is_err());
+        fs::remove_dir_all(symlink_root).unwrap();
+        fs::remove_file(outside).unwrap();
+    }
+
+    #[test]
+    fn product_manifest_rejects_identity_target_inheritance_and_pruning_mismatch() {
+        let mut value = test_manifest_value();
+        value["manifest"]["app_identity"]["app_id"] =
+            serde_json::json!("d4-pocket-app-33333333333333333333333333333333");
+        assert_manifest_rejected(value, "manifest-wrong-app");
+
+        let mut value = test_manifest_value();
+        value["manifest"]["app_identity"]["target_platform"] = serde_json::json!("windows");
+        assert_manifest_rejected(value, "manifest-wrong-app-target");
+
+        let mut value = test_manifest_value();
+        value["manifest"]["audit_store"]["store_id"] =
+            serde_json::json!("audit-store-33333333333333333333333333333333");
+        assert_manifest_rejected(value, "manifest-wrong-audit");
+
+        let mut value = test_manifest_value();
+        value["manifest"]["audit_store"]["inherited"] = serde_json::json!(true);
+        assert_manifest_rejected(value, "manifest-inherited-audit");
+
+        let mut value = test_manifest_value();
+        value["manifest"]["distribution_metadata"]["target_platform"] = serde_json::json!("macos");
+        assert_manifest_rejected(value, "manifest-wrong-distribution");
+
+        for field in [
+            "authority",
+            "permission",
+            "approval",
+            "credential",
+            "audit_chain",
+        ] {
+            let mut value = test_manifest_value();
+            value["manifest"]["inheritance_policy"][field] = serde_json::json!("inherited");
+            assert_manifest_rejected(value, &format!("manifest-inherited-{field}"));
+        }
+
+        let mut value = test_manifest_value();
+        value["manifest"]["module_plan"]["binary_pruning_status"] = serde_json::json!("applied");
+        assert_manifest_rejected(value, "manifest-pruning-claimed");
     }
 
     #[test]

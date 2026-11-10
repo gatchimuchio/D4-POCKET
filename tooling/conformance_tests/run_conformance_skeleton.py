@@ -11985,6 +11985,7 @@ def test_gui_shell_linux_export_build_is_hash_bound_and_non_authoritative() -> l
         "-DCMAKE_INSTALL_PREFIX=",
         "-DD4_PRODUCT_APP_ID=",
         "-DD4_PRODUCT_AUDIT_STORE_ID=",
+        "-DD4_PRODUCT_MANIFEST_SHA256={manifest_hash}",
         "write_product_package(",
         "validate_build_evidence(evidence, bundle, package_path, manifest_raw)",
         "os.rename(staging_root, output)",
@@ -12592,6 +12593,8 @@ def test_linux_product_launcher_is_built_and_bundle_bound() -> list[str]:
     gtk_smoke = (ROOT / "tooling/tests/linux_gtk_bundle_smoke.py").read_text(encoding="utf-8")
     gtk_smoke_tests = (ROOT / "tooling/tests/test_linux_gtk_bundle_smoke.py").read_text(encoding="utf-8")
     export_workflow = (ROOT / ".github/workflows/linux-manual-export-build.yml").read_text(encoding="utf-8")
+    linux_exporter = (ROOT / "tooling/export_linux_product.py").read_text(encoding="utf-8")
+    linux_export_schema = (ROOT / "specs/gui_shell_linux_export_build.schema.json").read_text(encoding="utf-8")
     errors = []
 
     for text, tokens, label in (
@@ -12602,6 +12605,13 @@ def test_linux_product_launcher_is_built_and_bundle_bound() -> list[str]:
             launcher,
             (
                 "linux_product_bundle::from_launcher",
+                "GUI_SHELL_PRODUCT_MANIFEST_SHA256",
+                "verify_product_manifest(",
+                "MAX_PRODUCT_MANIFEST_BYTES",
+                "libc::O_CLOEXEC | libc::O_NOFOLLOW",
+                "product_manifest_pin_is_required_and_checked_before_launch_plan",
+                "product_manifest_rejects_malformed_oversized_missing_and_symlink_files",
+                "product_manifest_rejects_identity_target_inheritance_and_pruning_mismatch",
                 "is_fixed_installed_entrypoint",
                 "resolve_active_version_launcher_if_present",
                 "RunInitialInstallBundle",
@@ -12631,7 +12641,9 @@ def test_linux_product_launcher_is_built_and_bundle_bound() -> list[str]:
         (
             cmake,
             (
-                "D4_PRODUCT_APP_ID and D4_PRODUCT_AUDIT_STORE_ID must be set together",
+                "D4 product App ID, Audit store ID, and Manifest SHA-256 must be set together",
+                "GUI_SHELL_PRODUCT_MANIFEST_SHA256=${D4_PRODUCT_MANIFEST_SHA256}",
+                "^[0-9a-f]+$",
                 "LINUX_DESKTOP_LAUNCHER",
                 'install(PROGRAMS "${LINUX_DESKTOP_LAUNCHER}"',
             ),
@@ -12645,6 +12657,20 @@ def test_linux_product_launcher_is_built_and_bundle_bound() -> list[str]:
                 '"${LINUX_DESKTOP_LAUNCHER}"',
             ),
             "CMake Rust binary build",
+        ),
+        (
+            linux_exporter,
+            (
+                "-DD4_PRODUCT_MANIFEST_SHA256={manifest_hash}",
+                '"manifest_sha256": manifest_hash',
+                '"manifest_sha256": evidence["source_manifest_sha256"]',
+            ),
+            "Linux Export Manifest hash pin",
+        ),
+        (
+            linux_export_schema,
+            ('"manifest_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }',),
+            "Linux Export build evidence Schema",
         ),
         (runner, ('"XDG_DATA_HOME"',), "XDG product root environment"),
         (
@@ -12907,6 +12933,8 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
         'operation.startswith("Agent Task中断回復")',
         '"codex_home_after_broker_restart": "fresh_run_owned_empty_fixture"',
         '"task_recovery_status": "suspended"',
+        '"manifest_sha256": manifest_sha256',
+        'manifest_record.get("sha256") != manifest_sha256',
     ):
         if token not in smoke:
             missing.append(f"installed Linux smoke: {token}")

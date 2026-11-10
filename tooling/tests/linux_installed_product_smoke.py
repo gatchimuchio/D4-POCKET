@@ -259,10 +259,14 @@ def _verify_linux_installed_artifact_provenance(
         or evidence.get("formal_distribution_claimed") is not False
     ):
         raise RuntimeError("Linux build evidenceのtarget／source／unsigned scopeが不一致です")
+    manifest_sha256 = evidence.get("source_manifest_sha256")
+    if not isinstance(manifest_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", manifest_sha256):
+        raise RuntimeError("build evidenceのProduct Manifest hashが不正です")
     expected_identity = {
         "source": "schema_validated_manifest",
         "app_id": app_id,
         "audit_store_id": audit_store_id,
+        "manifest_sha256": manifest_sha256,
     }
     if (
         evidence.get("app_id") != app_id
@@ -277,12 +281,18 @@ def _verify_linux_installed_artifact_provenance(
     installed_records, installed_bytes, installed_tree = (
         _linux_runtime_artifact_inventory(stage)
     )
+    manifest_record = next(
+        (item for item in bundle_records if item.get("path") == "product_manifest.json"),
+        None,
+    )
     if (
         evidence.get("artifact_files") != bundle_records
         or evidence.get("artifact_total_bytes") != bundle_bytes
         or evidence.get("artifact_tree_sha256") != bundle_tree
+        or not isinstance(manifest_record, dict)
+        or manifest_record.get("sha256") != manifest_sha256
     ):
-        raise RuntimeError("build evidenceとexport bundle inventoryが一致しません")
+        raise RuntimeError("build evidenceとexport bundle inventory／Manifest hashが一致しません")
     if installed_records != bundle_records or installed_bytes != bundle_bytes:
         raise RuntimeError("installed stageのfile／hash inventoryがexport bundleと不一致です")
 

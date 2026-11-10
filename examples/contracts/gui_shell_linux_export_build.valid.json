@@ -49,12 +49,13 @@
   },
   "pub_get_arguments": ["pub", "get", "--enforce-lockfile"],
   "flutter_build_arguments": ["build", "linux", "--release", "--no-pub", "--config-only"],
-  "cmake_configure_arguments": ["-S", "<isolated-source>/apps/desktop_flutter/linux", "-B", "<isolated-build>/release", "-G", "Ninja", "-DCMAKE_BUILD_TYPE=Release", "-DFLUTTER_TARGET_PLATFORM=linux-x64", "-DCMAKE_INSTALL_PREFIX=<bundle>", "-DD4_PRODUCT_APP_ID=d4-pocket-app-11111111111111111111111111111111", "-DD4_PRODUCT_AUDIT_STORE_ID=audit-store-22222222222222222222222222222222"],
+  "cmake_configure_arguments": ["-S", "<isolated-source>/apps/desktop_flutter/linux", "-B", "<isolated-build>/release", "-G", "Ninja", "-DCMAKE_BUILD_TYPE=Release", "-DFLUTTER_TARGET_PLATFORM=linux-x64", "-DCMAKE_INSTALL_PREFIX=<bundle>", "-DD4_PRODUCT_APP_ID=d4-pocket-app-11111111111111111111111111111111", "-DD4_PRODUCT_AUDIT_STORE_ID=audit-store-22222222222222222222222222222222", "-DD4_PRODUCT_MANIFEST_SHA256=dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"],
   "cmake_build_arguments": ["--build", "<isolated-build>/release", "--target", "install"],
   "compile_time_identity": {
     "source": "schema_validated_manifest",
     "app_id": "d4-pocket-app-11111111111111111111111111111111",
-    "audit_store_id": "audit-store-22222222222222222222222222222222"
+    "audit_store_id": "audit-store-22222222222222222222222222222222",
+    "manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
   },
   "compile_time_update_trust": {
     "source": "not_configured",

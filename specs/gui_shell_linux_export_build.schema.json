@@ -86,12 +86,13 @@
     "cmake_build_arguments": { "$ref": "#/$defs/argumentList" },
     "compile_time_identity": {
       "type": "object",
-      "required": ["source", "app_id", "audit_store_id"],
+      "required": ["source", "app_id", "audit_store_id", "manifest_sha256"],
       "additionalProperties": false,
       "properties": {
         "source": { "const": "schema_validated_manifest" },
         "app_id": { "type": "string", "pattern": "^d4-pocket-app-[0-9a-f]{32}$" },
-        "audit_store_id": { "type": "string", "pattern": "^audit-store-[0-9a-f]{32}$" }
+        "audit_store_id": { "type": "string", "pattern": "^audit-store-[0-9a-f]{32}$" },
+        "manifest_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
       }
     },
     "compile_time_update_trust": {
