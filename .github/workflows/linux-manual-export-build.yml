@@ -17,6 +17,7 @@ name: Linux manual product build and installed acceptance
           - host_registration
           - workspace_selection
           - agent_task_supervision
+          - agent_task_normal_release
           - agent_task_crash_recovery
           - provider_credential_binding
           - runtime_provenance
@@ -80,7 +81,7 @@ jobs:
 
       - name: Codex Linux sandbox capability gate
         id: codex_sandbox
-        if: ${{ inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_task_crash_recovery' || inputs.acceptance_scope == 'provider_credential_binding' }}
+        if: ${{ inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_task_normal_release' || inputs.acceptance_scope == 'agent_task_crash_recovery' || inputs.acceptance_scope == 'provider_credential_binding' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -488,7 +489,7 @@ jobs:
           fi
 
       - name: 固定版Linux Codex CLIを検証rootへ取得
-        if: ${{ inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_task_crash_recovery' || inputs.acceptance_scope == 'provider_credential_binding' }}
+        if: ${{ inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_task_normal_release' || inputs.acceptance_scope == 'agent_task_crash_recovery' || inputs.acceptance_scope == 'provider_credential_binding' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -682,8 +683,8 @@ jobs:
             printf -- '- Scope: Ubuntu 24.04 hosted Xvfb／X11, unsigned test-identity installed product, automated AT-SPI／keyboard and a run-owned interface-only Codex CLI fixture. This does not establish Wayland rendering, real desktop-session coverage, Agent Task execution／Recovery, formal signing／distribution, or full Linux product completion.\n'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: installed GTK UIでAgent Task process／scratch supervisionを受入れる
-        if: ${{ inputs.acceptance_scope == 'agent_task_supervision' && steps.codex_sandbox.outputs.available == 'true' }}
+      - name: installed GTK UIでAgent Task completion／supervisionを受入れる
+        if: ${{ (inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_task_normal_release') && steps.codex_sandbox.outputs.available == 'true' }}
         shell: bash
         env:
           GUI_SHELL_PRODUCT_APP_ID: d4-pocket-app-11111111111111111111111111111111
@@ -691,21 +692,22 @@ jobs:
           D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE: ${{ runner.temp }}/d4p-linux-export-${{ github.run_id }}-${{ github.run_attempt }}/output/D4Pocket-linux-rollback.d4pkg
         run: |
           set -euo pipefail
+          acceptance_scope='${{ inputs.acceptance_scope }}'
           test_package="$D4P_EXPORT_ROOT/output/D4Pocket-linux.d4pkg"
-          acceptance_root="$D4P_EXPORT_ROOT/installed-agent-task-acceptance"
+          acceptance_root="$D4P_EXPORT_ROOT/installed-$acceptance_scope-acceptance"
           dbus-run-session -- xvfb-run -a python3 tooling/tests/linux_installed_product_smoke.py \
             --package "$test_package" \
             --temp-root "$D4P_EXPORT_ROOT" \
             --acceptance-root "$acceptance_root" \
             --private-key "$D4P_EXPORT_ROOT/test-update-private.der" \
             --update-package "$D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE" \
-            --acceptance-scope agent_task_supervision \
+            --acceptance-scope "$acceptance_scope" \
             --codex-cli "$D4P_LINUX_TASK_CODEX_CLI"
-          {
-            printf '\n- Installed Agent Task acceptance uses the real pinned Codex CLI interface against a run-owned loopback Responses fixture, without provider credentials or external model access. It exercises the installed GTK UI, native Owner confirmation, production Broker, one-use Workspace Permission and per-Task Approval, Linux process guardian, WorkspaceTaskScratch, Audit, and Task status.\n'
-            printf -- '- Required cases: successful bounded Workspace write and normal scratch cleanup; active Task cancellation with descendant stop and scratch cleanup; Broker-enforced deadline with descendant stop, failed terminal state, and scratch cleanup. Secret canaries and outside-Workspace target remain denied; previous Approval is not reused.\n'
-            printf -- '- This is a dedicated unsigned verification build with the fixed synthetic App/Audit identity. It is not a normal Release, distribution artifact, real-model result, Wayland GUI proof, or release-readiness claim.\n'
-          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$acceptance_scope" = 'agent_task_normal_release' ]; then
+            printf '\n- LIVE_PRODUCT／normal Release: installed GTK／Broker→pinned Codex CLI→local no-auth Responses fixture; Task／Workspace write／durable Audit PASS. No `r2-e2e` or operational Credential. Ubuntu 24.04 Xvfb／X11 only; no distribution／release claim.\n' >> "$GITHUB_STEP_SUMMARY"
+          else
+            printf '\n- LIVE_PRODUCT／r2-e2e supervision: complete／cancel／deadline, secret／outside deny, process／scratch cleanup, Audit. Ubuntu 22.04 Xvfb／X11, synthetic identity; no release claim.\n' >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: installed GTK UIからSecret Service Provider認証のAgent Taskを受入れる
         if: ${{ inputs.acceptance_scope == 'provider_credential_binding' && steps.codex_sandbox.outputs.available == 'true' }}

@@ -12707,7 +12707,12 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
         "Agent Task LIVE_RUNTIME: NOT_RUN",
         "steps.codex_sandbox.outputs.available == 'true'",
         "inputs.acceptance_scope == 'agent_task_supervision'",
-        "--acceptance-scope agent_task_supervision",
+        "agent_task_normal_release",
+        "inputs.acceptance_scope == 'agent_task_normal_release'",
+        "acceptance_scope='${{ inputs.acceptance_scope }}'",
+        '--acceptance-scope "$acceptance_scope"',
+        "installed GTK UIでAgent Task completion／supervisionを受入れる",
+        "LIVE_PRODUCT／normal Release:",
         "agent_task_crash_recovery",
         "inputs.acceptance_scope == 'agent_task_crash_recovery'",
         "--acceptance-scope agent_task_crash_recovery",
@@ -12751,6 +12756,17 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
         "require_host_registration=True",
         "_host_registration_audit_evidence(events)",
         "def _run_installed_agent_task_crash_recovery_acceptance(",
+        "def _write_normal_release_codex_config(",
+        'CODEX_SYSTEM_CONFIG_PATH = Path("/etc/codex/config.toml")',
+        "def _install_normal_release_codex_system_config(",
+        "def _remove_normal_release_codex_system_config(",
+        'environment["CODEX_HOME"] = str(agent_task_codex_home)',
+        'if any(agent_task_codex_home.iterdir()):',
+        'normal_release_system_config = (',
+        "_remove_normal_release_codex_system_config(",
+        'normal_release=acceptance_scope == "agent_task_normal_release"',
+        '"loopback_requests_without_authorization"',
+        "positive_only = provider_secret is not None or normal_release",
         "def _linux_broker_process_role(arguments: list[bytes]) -> str | None:",
         "--internal-process-group-guardian-v1",
         "guardian_identity[0] != guardian_pid",
@@ -12785,6 +12801,23 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
             missing.append(f"installed Linux Host navigation: {token}")
     if "pull_request:" in workflow or "push:" in workflow:
         missing.append("manual trigger only")
+    feature_gate = workflow.find("export_arguments+=(--r2-e2e-test-build)")
+    if feature_gate < 0:
+        missing.append("r2-e2e build feature gate is absent")
+    else:
+        feature_gate_start = workflow.rfind("if [", 0, feature_gate)
+        feature_gate_text = workflow[feature_gate_start:feature_gate]
+        if "agent_task_normal_release" in feature_gate_text:
+            missing.append("normal Release Task scope selects the r2-e2e build feature")
+    if "agent_task_normal_release" in workflow[workflow.find("runs-on:"):workflow.find("timeout-minutes:")]:
+        missing.append("normal Release Task scope is not kept on the standard Ubuntu runner")
+    codex_cli_source = (ROOT / "native/rust_helper/src/adapters/codex_cli.rs").read_text(
+        encoding="utf-8"
+    )
+    if '--ignore-user-config' not in codex_cli_source:
+        missing.append("normal Release installed Task no longer exercises the current CLI user-config boundary")
+    if "_write_normal_release_codex_home_config" in smoke:
+        missing.append("normal Release fixture incorrectly relies on CODEX_HOME user config")
     return [f"Linux Export build workflowに固定・scope・cleanup条件がない: {token}" for token in missing]
 
 

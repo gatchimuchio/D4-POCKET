@@ -3964,6 +3964,162 @@ def _normalize_r2_e2e_diagnostic(payload: object) -> dict[str, object] | None:
     }
 
 
+def _write_normal_release_codex_config(config_path: Path, port: int) -> Path:
+    if (
+        not config_path.is_absolute()
+        or config_path.is_symlink()
+        or not config_path.parent.is_dir()
+        or config_path.parent.is_symlink()
+        or config_path.exists()
+        or not 1 <= port <= 65535
+    ):
+        raise RuntimeError("normal Release Codex system fixture設定のpath／portが不正です")
+    contents = (
+        'model = "o3"\n'
+        'model_provider = "d4p_loopback_probe"\n'
+        "check_for_update_on_startup = false\n"
+        "\n"
+        "[model_providers.d4p_loopback_probe]\n"
+        'name = "D4 Pocket loopback probe"\n'
+        f'base_url = "http://127.0.0.1:{port}/v1"\n'
+        'wire_api = "responses"\n'
+        "requires_openai_auth = false\n"
+        "supports_websockets = false\n"
+        "request_max_retries = 0\n"
+        "stream_max_retries = 2\n"
+        "\n"
+        "[features]\n"
+        "apps = false\n"
+        "plugins = false\n"
+        "\n"
+        "[analytics]\n"
+        "enabled = false\n"
+    )
+    descriptor = os.open(
+        config_path,
+        os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0),
+        0o600,
+    )
+    with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as stream:
+        stream.write(contents)
+        stream.flush()
+        os.fsync(stream.fileno())
+    if (
+        config_path.is_symlink()
+        or not config_path.is_file()
+        or (os.name == "posix" and stat.S_IMODE(config_path.stat().st_mode) != 0o600)
+    ):
+        raise RuntimeError("normal Release Codex system config.tomlの種別／modeが不正です")
+    return config_path
+
+
+CODEX_SYSTEM_CONFIG_PATH = Path("/etc/codex/config.toml")
+
+
+def _run_linux_sudo_install(arguments: list[str]) -> None:
+    try:
+        result = subprocess.run(
+            ["sudo", "-n", *arguments],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=15,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise RuntimeError("temporary Codex system config操作を開始できません") from error
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"temporary Codex system config操作が終了code {result.returncode} で失敗しました"
+        )
+
+
+def _remove_normal_release_codex_system_config(
+    state: tuple[Path, bool, str],
+) -> None:
+    target, created_parent, expected_sha256 = state
+    expected_target = CODEX_SYSTEM_CONFIG_PATH
+    if not created_parent or target != expected_target or target.is_symlink():
+        raise RuntimeError("temporary Codex system configのcleanup対象が一致しません")
+    if target.exists():
+        if not target.is_file():
+            raise RuntimeError("temporary Codex system configが通常fileではありません")
+        if target.stat().st_size > 4096:
+            raise RuntimeError("temporary Codex system configのsizeが上限を超えています")
+        observed_sha256 = hashlib.sha256(target.read_bytes()).hexdigest()
+        if observed_sha256 != expected_sha256:
+            raise RuntimeError("temporary Codex system configが設置後に変更されています")
+        _run_linux_sudo_install(["rm", "--", str(target)])
+    if created_parent and target.parent.exists():
+        if target.parent.is_symlink() or not target.parent.is_dir():
+            raise RuntimeError("temporary Codex system config directoryの種別が変化しました")
+        _run_linux_sudo_install(["rmdir", "--", str(target.parent)])
+    if target.exists() or target.is_symlink():
+        raise RuntimeError("temporary Codex system configを撤去できません")
+
+
+def _install_normal_release_codex_system_config(
+    config_path: Path,
+) -> tuple[Path, bool, str]:
+    if not sys.platform.startswith("linux"):
+        raise RuntimeError("Codex system config受入はLinux専用です")
+    resolved_source = config_path.resolve(strict=True)
+    if (
+        resolved_source != config_path
+        or config_path.is_symlink()
+        or not config_path.is_file()
+    ):
+        raise RuntimeError("Codex system config sourceが通常fileではありません")
+    target = CODEX_SYSTEM_CONFIG_PATH
+    parent = target.parent
+    if target.exists() or target.is_symlink():
+        raise RuntimeError("既存のCodex system configを上書きしません")
+    if parent.is_symlink() or parent.exists():
+        raise RuntimeError("既存のCodex system config directoryを変更しません")
+    expected_sha256 = hashlib.sha256(config_path.read_bytes()).hexdigest()
+    created_parent = False
+    state = (target, created_parent, expected_sha256)
+    try:
+        # Claim a fresh, root-only directory before placing the file. This makes
+        # the fixed system path run-owned and prevents an unprivileged process
+        # from racing a pre-existing /etc/codex/config.toml into the install.
+        _run_linux_sudo_install(["mkdir", "-m", "0700", "--", str(parent)])
+        created_parent = True
+        state = (target, created_parent, expected_sha256)
+        if (
+            parent.is_symlink()
+            or not parent.is_dir()
+            or stat.S_IMODE(parent.stat().st_mode) != 0o700
+            or parent.stat().st_uid != 0
+        ):
+            raise RuntimeError("Codex system config directoryの所有／modeが不正です")
+        _run_linux_sudo_install(
+            ["install", "-m", "0644", "--", str(config_path), str(target)]
+        )
+        if (
+            target.is_symlink()
+            or not target.is_file()
+            or stat.S_IMODE(target.stat().st_mode) != 0o644
+            or target.stat().st_uid != 0
+        ):
+            raise RuntimeError("Codex system config install後のfile所有／modeが不正です")
+        if hashlib.sha256(target.read_bytes()).hexdigest() != expected_sha256:
+            raise RuntimeError("Codex system config install後のSHA-256が一致しません")
+        _run_linux_sudo_install(["chmod", "0755", "--", str(parent)])
+        if stat.S_IMODE(parent.stat().st_mode) != 0o755:
+            raise RuntimeError("Codex system config directoryを公開可能modeにできません")
+        return state
+    except Exception:
+        if created_parent:
+            try:
+                _remove_normal_release_codex_system_config(state)
+            except Exception as cleanup_error:
+                raise RuntimeError(
+                    "temporary Codex system config installとrollbackの両方が失敗しました"
+                ) from cleanup_error
+        raise
+
+
 class _LinuxAgentTaskResponsesServer:
     """Codex Responses wire fixture bound to loopback and one active Task at a time."""
 
@@ -5126,7 +5282,11 @@ def _run_installed_agent_task_acceptance(
     acceptance_root: Path,
     task_execution_limit_ms: int,
     provider_secret: str | None = None,
+    normal_release: bool = False,
 ) -> dict[str, object]:
+    positive_only = provider_secret is not None or normal_release
+    if provider_secret is not None and normal_release:
+        raise RuntimeError("通常ReleaseとProvider資格情報Acceptanceは分離してください")
     if not 0 < task_execution_limit_ms < LINUX_AGENT_TASK_INITIAL_TOOL_YIELD_MS:
         raise RuntimeError(
             "deadline acceptanceにはAgent初回tool待機より短いBroker期限が必要です"
@@ -5192,7 +5352,7 @@ def _run_installed_agent_task_acceptance(
 
     scenarios = (
         (("complete", "completed", 90.0),)
-        if provider_secret is not None
+        if positive_only
         else (
             ("complete", "completed", 90.0),
             ("cancel", "cancelled", 30.0),
@@ -5500,7 +5660,7 @@ def _run_installed_agent_task_acceptance(
         require_agent_task=True,
         expected_agent_task_statuses=(
             ("completed",)
-            if provider_secret is not None
+            if positive_only
             else ("cancelled", "completed", "failed")
         ),
     )
@@ -5508,7 +5668,7 @@ def _run_installed_agent_task_acceptance(
     loopback = responses_server.snapshot()
     expected_scenarios = (
         {"complete": (2, 1, 1)}
-        if provider_secret is not None
+        if positive_only
         else {
             "complete": (2, 1, 1),
             "cancel": (1, 1, 0),
@@ -5529,6 +5689,12 @@ def _run_installed_agent_task_acceptance(
         raise RuntimeError("loopback Responses fixtureが不正・外部要求を観測しました")
     if {row["name"] for row in observed_scenarios} != set(expected_scenarios):
         raise RuntimeError("loopback Responses fixtureで必須Task scenarioが揃っていません")
+    if normal_release and any(
+        int(row.get("authorization_match_requests", 0)) < 2
+        for row in observed_scenarios
+        if isinstance(row, dict)
+    ):
+        raise RuntimeError("通常Release Codex CLIのloopback要求でAuthorizationなしを確認できません")
     if provider_secret is not None:
         if provider_credential_id is None:
             raise RuntimeError("Provider Credential IDが登録経路から得られません")
@@ -5579,6 +5745,12 @@ def _run_installed_agent_task_acceptance(
         )
     ):
         raise RuntimeError("Agent Taskがsecret／Workspace外へwrite probeを作成しました")
+    codex_home_value = environment.get("CODEX_HOME") or environment.get(
+        "GUI_SHELL_R2_E2E_CODEX_HOME"
+    )
+    if not codex_home_value:
+        raise RuntimeError("Codex CLIの隔離homeがありません")
+    codex_home = Path(codex_home_value)
     for canary in (
         "D4P_SYNTHETIC_SECRET_CANARY=must-not-be-readable",
         "D4P_SYNTHETIC_SECRET_CANARY=outside-workspace",
@@ -5587,7 +5759,6 @@ def _run_installed_agent_task_acceptance(
             audit_store,
             canary,
         )
-        codex_home = Path(environment["GUI_SHELL_R2_E2E_CODEX_HOME"])
         _assert_secret_absent_from_files(codex_home, canary)
         app_log = acceptance_root / "installed-app.log"
         if app_log.is_file() and canary.encode("utf-8") in app_log.read_bytes():
@@ -5598,7 +5769,7 @@ def _run_installed_agent_task_acceptance(
             provider_secret,
         )
         _assert_secret_absent_from_files(
-            Path(environment["GUI_SHELL_R2_E2E_CODEX_HOME"]),
+            codex_home,
             provider_secret,
         )
         _assert_secret_absent_from_files(
@@ -5612,12 +5783,22 @@ def _run_installed_agent_task_acceptance(
         "task_scenarios": list(expected_scenarios),
         "terminal_statuses": (
             ["completed"]
-            if provider_secret is not None
+            if positive_only
             else ["completed", "cancelled", "failed"]
+        ),
+        "normal_release_task": normal_release,
+        "loopback_requests_without_authorization": (
+            sum(
+                int(row.get("authorization_match_requests", 0))
+                for row in loopback.get("scenarios", [])
+                if isinstance(row, dict)
+            )
+            if normal_release
+            else None
         ),
         "workspace_write": (workspace / "agent-task-result.json").is_file(),
         "secret_and_outside_reads_denied": True,
-        "descendant_groups_stopped": len(process_groups) == (0 if provider_secret is not None else 2),
+        "descendant_groups_stopped": len(process_groups) == (0 if positive_only else 2),
         "workspace_task_scratch_removed": not list(workspace.glob(".d4p-tmp-*")),
         "scratch_recovery_journal": scratch_state,
         "task_id_count": len(task_ids),
@@ -8961,6 +9142,7 @@ def run_installed_smoke(
         "host_registration",
         "workspace_selection",
         "agent_task_supervision",
+        "agent_task_normal_release",
         "agent_task_crash_recovery",
         "provider_credential_binding",
         "runtime_provenance",
@@ -8994,6 +9176,7 @@ def run_installed_smoke(
         raise RuntimeError("installed acceptance rootがrun固有一時root外です")
     if acceptance_scope in {
         "agent_task_supervision",
+        "agent_task_normal_release",
         "agent_task_crash_recovery",
         "provider_credential_binding",
     }:
@@ -9080,34 +9263,57 @@ def run_installed_smoke(
     installed_helper: Path | None = None
     responses_server: _LinuxAgentTaskResponsesServer | None = None
     task_group_cleanup_error: Exception | None = None
+    normal_release_system_config: tuple[Path, bool, str] | None = None
+    normal_release_system_config_cleanup_error: Exception | None = None
     task_execution_limit_ms = LINUX_AGENT_TASK_DEADLINE_TEST_LIMIT_MS
     app_log = acceptance_root / "installed-app.log"
     first_install_evidence: dict[str, object] | None = None
     try:
         if acceptance_scope in {
             "agent_task_supervision",
+            "agent_task_normal_release",
             "agent_task_crash_recovery",
             "provider_credential_binding",
         }:
             if resolved_codex_cli is None:
                 raise RuntimeError("Agent Task acceptanceのCodex CLI pathがありません")
-            synthetic_root = acceptance_root / "D4Pocket-R2-E2E-SYNTHETIC"
-            synthetic_root.mkdir(mode=0o700)
-            (synthetic_root / "OWNER-APPROVED-SYNTHETIC.txt").write_text(
-                "Run-owned test identity; synthetic run-only credential only; no operational provider credentials.\n",
-                encoding="utf-8",
+            normal_release_task = acceptance_scope == "agent_task_normal_release"
+            synthetic_root = acceptance_root / (
+                "D4Pocket-LINUX-NORMAL-RELEASE"
+                if normal_release_task
+                else "D4Pocket-R2-E2E-SYNTHETIC"
             )
+            synthetic_root.mkdir(mode=0o700)
+            if not normal_release_task:
+                (synthetic_root / "OWNER-APPROVED-SYNTHETIC.txt").write_text(
+                    "Run-owned test identity; synthetic run-only credential only; no operational provider credentials.\n",
+                    encoding="utf-8",
+                )
             agent_task_codex_home = synthetic_root / "codex-home"
             agent_task_codex_home.mkdir(mode=0o700)
             responses_server = _LinuxAgentTaskResponsesServer()
             responses_server.start()
-            environment.update(
-                {
-                    "GUI_SHELL_R2_E2E_RESPONSES_PORT": str(responses_server.port),
-                    "GUI_SHELL_R2_E2E_CODEX_HOME": str(agent_task_codex_home),
-                    "GUI_SHELL_R2_E2E_TASK_EXECUTION_LIMIT_MS": str(task_execution_limit_ms),
-                }
-            )
+            if normal_release_task:
+                system_config_source = synthetic_root / "normal-release-system-config.toml"
+                _write_normal_release_codex_config(
+                    system_config_source, responses_server.port
+                )
+                normal_release_system_config = (
+                    _install_normal_release_codex_system_config(system_config_source)
+                )
+                environment["CODEX_HOME"] = str(agent_task_codex_home)
+                if any(agent_task_codex_home.iterdir()):
+                    raise RuntimeError("normal Release用CODEX_HOMEが空ではありません")
+                if any(name.startswith("GUI_SHELL_R2_E2E_") for name in environment):
+                    raise RuntimeError("通常Release Acceptanceへr2-e2e環境変数が混入しています")
+            else:
+                environment.update(
+                    {
+                        "GUI_SHELL_R2_E2E_RESPONSES_PORT": str(responses_server.port),
+                        "GUI_SHELL_R2_E2E_CODEX_HOME": str(agent_task_codex_home),
+                        "GUI_SHELL_R2_E2E_TASK_EXECUTION_LIMIT_MS": str(task_execution_limit_ms),
+                    }
+                )
         if acceptance_scope in {
             "credential_vault",
             "mcp_credential_binding",
@@ -9130,6 +9336,7 @@ def run_installed_smoke(
             "host_registration",
             "workspace_selection",
             "agent_task_supervision",
+            "agent_task_normal_release",
             "agent_task_crash_recovery",
             "provider_credential_binding",
             "runtime_provenance",
@@ -10068,6 +10275,7 @@ def run_installed_smoke(
 
             if acceptance_scope in {
                 "agent_task_supervision",
+                "agent_task_normal_release",
                 "provider_credential_binding",
             }:
                 if resolved_codex_cli is None or responses_server is None:
@@ -10085,6 +10293,7 @@ def run_installed_smoke(
                         if acceptance_scope == "provider_credential_binding"
                         else None
                     ),
+                    normal_release=acceptance_scope == "agent_task_normal_release",
                 )
                 current_window_id = _visible_product_window(environment)
                 if current_window_id is None:
@@ -10107,7 +10316,8 @@ def run_installed_smoke(
                     require_agent_task=True,
                     expected_agent_task_statuses=(
                         ("completed",)
-                        if acceptance_scope == "provider_credential_binding"
+                        if acceptance_scope
+                        in {"provider_credential_binding", "agent_task_normal_release"}
                         else ("cancelled", "completed", "failed")
                     ),
                 )
@@ -10121,7 +10331,11 @@ def run_installed_smoke(
                             (
                                 "provider_credential_binding"
                                 if acceptance_scope == "provider_credential_binding"
-                                else "agent_task_supervision"
+                                else (
+                                    "agent_task_normal_release"
+                                    if acceptance_scope == "agent_task_normal_release"
+                                    else "agent_task_supervision"
+                                )
                             ): agent_task_evidence,
                             "durable_audit_after_normal_exit": durable_audit,
                             "installed_app_exit": "normal_window_close_and_owned_process_cleanup",
@@ -10635,6 +10849,7 @@ def run_installed_smoke(
         primary_acceptance_error = sys.exc_info()[1]
         if acceptance_scope in {
             "agent_task_supervision",
+            "agent_task_normal_release",
             "agent_task_crash_recovery",
             "provider_credential_binding",
         }:
@@ -10680,8 +10895,18 @@ def run_installed_smoke(
             )
         if secret_service_process is not None and secret_service_process.poll() is None:
             _terminate_group(secret_service_process)
+        if normal_release_system_config is not None:
+            try:
+                _remove_normal_release_codex_system_config(
+                    normal_release_system_config
+                )
+            except Exception as error:
+                normal_release_system_config_cleanup_error = error
         if secret_service_process is not None and secret_service_process.poll() is None:
-            raise RuntimeError("run固有Secret Service processを停止できません")
+            raise RuntimeError(
+                "run固有Secret Service processを停止できません; "
+                "temporary Codex system config cleanup was attempted"
+            )
         if task_group_cleanup_error is not None:
             primary_summary: dict[str, object] = {
                 "error_type": (
@@ -10753,6 +10978,10 @@ def run_installed_smoke(
                     task_group_cleanup_error
                 ),
             }
+            if normal_release_system_config_cleanup_error is not None:
+                cleanup_summary["system_config_cleanup_error_type"] = type(
+                    normal_release_system_config_cleanup_error
+                ).__name__
             cleanup_message = str(task_group_cleanup_error)
             cleanup_prefix = (
                 "Agent Task process group cleanupで一つ以上の失敗を確認しました: "
@@ -10825,6 +11054,10 @@ def run_installed_smoke(
                     "cleanup_error_type": type(cleanup_error).__name__,
                     "cleanup_operation": cleanup_operation,
                 }
+                if normal_release_system_config_cleanup_error is not None:
+                    cleanup_summary["system_config_cleanup_error_type"] = type(
+                        normal_release_system_config_cleanup_error
+                    ).__name__
                 cleanup_errno = getattr(cleanup_error, "errno", None)
                 if isinstance(cleanup_errno, int):
                     cleanup_summary["cleanup_errno"] = cleanup_errno
@@ -10833,6 +11066,21 @@ def run_installed_smoke(
                     + json.dumps(cleanup_summary, ensure_ascii=True, sort_keys=True)
                 ) from cleanup_error
             raise
+        if normal_release_system_config_cleanup_error is not None:
+            cleanup_summary = {
+                "primary_error_type": (
+                    type(primary_acceptance_error).__name__
+                    if primary_acceptance_error is not None
+                    else "none"
+                ),
+                "system_config_cleanup_error_type": type(
+                    normal_release_system_config_cleanup_error
+                ).__name__,
+            }
+            raise RuntimeError(
+                "normal Release temporary Codex system config cleanupが成立しません: "
+                + json.dumps(cleanup_summary, ensure_ascii=True, sort_keys=True)
+            ) from normal_release_system_config_cleanup_error
 
 
 def main() -> int:
@@ -10857,6 +11105,7 @@ def main() -> int:
             "host_registration",
             "workspace_selection",
             "agent_task_supervision",
+            "agent_task_normal_release",
             "agent_task_crash_recovery",
             "provider_credential_binding",
             "runtime_provenance",

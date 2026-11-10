@@ -34,6 +34,9 @@ from tooling.tests.linux_installed_product_smoke import (
     _linux_broker_process_role,
     _linux_runtime_artifact_inventory,
     _verify_linux_installed_artifact_provenance,
+    _install_normal_release_codex_system_config,
+    _remove_normal_release_codex_system_config,
+    _write_normal_release_codex_config,
     _host_registration_audit_evidence,
     _latest_audit_event_id,
     _wait_for_audit_event,
@@ -5317,6 +5320,225 @@ class LinuxAgentTaskFailureDiagnosticsTests(unittest.TestCase):
         )
         self.assertEqual(snapshot["rejections"], ["unsafe_diagnostic_rejected"])
         self.assertNotIn("PRIVATE_SECRET", json.dumps(snapshot, ensure_ascii=False))
+
+
+class NormalReleaseCodexConfigTests(unittest.TestCase):
+    def test_writes_loopback_only_provider_config_without_credentials(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-normal-release-codex-config-") as temporary:
+            config_path = Path(temporary) / "normal-release-system-config.toml"
+
+            config = _write_normal_release_codex_config(config_path, 23456)
+            contents = config.read_text(encoding="utf-8")
+
+            self.assertEqual(config, config_path)
+            self.assertIn('model_provider = "d4p_loopback_probe"', contents)
+            self.assertIn('base_url = "http://127.0.0.1:23456/v1"', contents)
+            self.assertIn('wire_api = "responses"', contents)
+            self.assertIn("requires_openai_auth = false", contents)
+            self.assertIn("check_for_update_on_startup = false", contents)
+            self.assertIn("apps = false", contents)
+            self.assertIn("plugins = false", contents)
+            self.assertIn("enabled = false", contents)
+            self.assertNotRegex(contents, r"(?i)(api_key|access_token|env_key)")
+            if os.name == "posix":
+                self.assertEqual(stat.S_IMODE(config.stat().st_mode), 0o600)
+
+    def test_rejects_invalid_port_without_creating_config(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-normal-release-invalid-port-") as temporary:
+            config_path = Path(temporary) / "normal-release-system-config.toml"
+
+            with self.assertRaises(RuntimeError):
+                _write_normal_release_codex_config(config_path, 65536)
+
+            self.assertFalse(config_path.exists())
+
+    def test_rejects_existing_config_without_overwriting(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-normal-release-config-existing-") as temporary:
+            config_path = Path(temporary) / "normal-release-system-config.toml"
+            config_path.write_text("preserve me", encoding="utf-8")
+
+            with self.assertRaises(RuntimeError):
+                _write_normal_release_codex_config(config_path, 23456)
+
+            self.assertEqual(config_path.read_text(encoding="utf-8"), "preserve me")
+
+
+@unittest.skipUnless(sys.platform.startswith("linux"), "Linux filesystem semantics are required")
+class NormalReleaseCodexSystemConfigInstallTests(unittest.TestCase):
+    def _mock_sudo_commands(self, parent: Path, target: Path, source: Path):
+        def execute(arguments: list[str]) -> None:
+            operation = arguments[0]
+            if operation == "mkdir":
+                parent.mkdir(mode=0o700, parents=True)
+                os.chmod(parent, 0o700)
+            elif operation == "install":
+                import shutil
+
+                shutil.copyfile(source, target)
+                os.chmod(target, 0o644)
+            elif operation == "chmod":
+                os.chmod(parent, 0o755)
+            elif operation == "rm":
+                target.unlink()
+            elif operation == "rmdir":
+                parent.rmdir()
+            else:
+                self.fail(f"unexpected privileged operation: {operation}")
+
+        return execute
+
+    def test_installs_verifies_and_removes_only_the_run_owned_config(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-normal-release-system-install-") as temporary:
+            root = Path(temporary)
+            parent = root / "etc/codex"
+            target = parent / "config.toml"
+            source = root / "normal-release-system-config.toml"
+            _write_normal_release_codex_config(source, 23456)
+            commands: list[list[str]] = []
+            execute = self._mock_sudo_commands(parent, target, source)
+
+            def run(arguments: list[str]) -> None:
+                commands.append(arguments)
+                execute(arguments)
+
+            real_stat = Path.stat
+            with (
+                patch("tooling.tests.linux_installed_product_smoke.sys.platform", "linux"),
+                patch("tooling.tests.linux_installed_product_smoke.CODEX_SYSTEM_CONFIG_PATH", target),
+                patch("tooling.tests.linux_installed_product_smoke._run_linux_sudo_install", side_effect=run),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke.Path.stat",
+                    autospec=True,
+                ) as path_stat,
+            ):
+                def fake_root_stat(path: Path, *args, **kwargs):
+                    actual = real_stat(path, *args, **kwargs)
+                    return types.SimpleNamespace(
+                        st_mode=actual.st_mode,
+                        st_uid=0,
+                        st_size=actual.st_size,
+                    )
+
+                path_stat.side_effect = fake_root_stat
+                state = _install_normal_release_codex_system_config(source)
+                self.assertEqual(state[0], target)
+                self.assertTrue(state[1])
+                self.assertEqual(target.read_bytes(), source.read_bytes())
+                _remove_normal_release_codex_system_config(state)
+
+            self.assertFalse(target.exists())
+            self.assertFalse(parent.exists())
+            self.assertEqual(
+                [command[0] for command in commands],
+                ["mkdir", "install", "chmod", "rm", "rmdir"],
+            )
+
+    def test_refuses_existing_system_config_directory_without_mutation(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-normal-release-system-existing-") as temporary:
+            root = Path(temporary)
+            parent = root / "etc/codex"
+            parent.mkdir(parents=True)
+            target = parent / "config.toml"
+            source = root / "normal-release-system-config.toml"
+            _write_normal_release_codex_config(source, 23456)
+            with (
+                patch("tooling.tests.linux_installed_product_smoke.sys.platform", "linux"),
+                patch("tooling.tests.linux_installed_product_smoke.CODEX_SYSTEM_CONFIG_PATH", target),
+                patch("tooling.tests.linux_installed_product_smoke._run_linux_sudo_install") as run,
+            ):
+                with self.assertRaisesRegex(RuntimeError, "既存のCodex system config directory"):
+                    _install_normal_release_codex_system_config(source)
+            run.assert_not_called()
+            self.assertEqual(list(parent.iterdir()), [])
+
+    def test_rolls_back_owned_directory_after_install_command_failure(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-normal-release-system-rollback-") as temporary:
+            root = Path(temporary)
+            parent = root / "etc/codex"
+            target = parent / "config.toml"
+            source = root / "normal-release-system-config.toml"
+            _write_normal_release_codex_config(source, 23456)
+            commands: list[str] = []
+
+            def run(arguments: list[str]) -> None:
+                commands.append(arguments[0])
+                if arguments[0] == "mkdir":
+                    parent.mkdir(mode=0o700, parents=True)
+                    os.chmod(parent, 0o700)
+                elif arguments[0] == "install":
+                    raise RuntimeError("synthetic install failure")
+                elif arguments[0] == "rmdir":
+                    parent.rmdir()
+                else:
+                    self.fail(f"unexpected privileged operation: {arguments[0]}")
+
+            real_stat = Path.stat
+            with (
+                patch("tooling.tests.linux_installed_product_smoke.sys.platform", "linux"),
+                patch("tooling.tests.linux_installed_product_smoke.CODEX_SYSTEM_CONFIG_PATH", target),
+                patch("tooling.tests.linux_installed_product_smoke._run_linux_sudo_install", side_effect=run),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke.Path.stat",
+                    autospec=True,
+                ) as path_stat,
+            ):
+                def fake_root_stat(path: Path, *args, **kwargs):
+                    actual = real_stat(path, *args, **kwargs)
+                    return types.SimpleNamespace(
+                        st_mode=actual.st_mode,
+                        st_uid=0,
+                        st_size=actual.st_size,
+                    )
+
+                path_stat.side_effect = fake_root_stat
+                with self.assertRaisesRegex(RuntimeError, "synthetic install failure"):
+                    _install_normal_release_codex_system_config(source)
+
+            self.assertEqual(commands, ["mkdir", "install", "rmdir"])
+            self.assertFalse(parent.exists())
+            self.assertFalse(target.exists())
+
+    def test_refuses_to_remove_system_config_changed_after_install(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-normal-release-system-changed-") as temporary:
+            root = Path(temporary)
+            parent = root / "etc/codex"
+            target = parent / "config.toml"
+            source = root / "normal-release-system-config.toml"
+            _write_normal_release_codex_config(source, 23456)
+            execute = self._mock_sudo_commands(parent, target, source)
+            commands: list[str] = []
+
+            def run(arguments: list[str]) -> None:
+                commands.append(arguments[0])
+                execute(arguments)
+
+            real_stat = Path.stat
+            with (
+                patch("tooling.tests.linux_installed_product_smoke.sys.platform", "linux"),
+                patch("tooling.tests.linux_installed_product_smoke.CODEX_SYSTEM_CONFIG_PATH", target),
+                patch("tooling.tests.linux_installed_product_smoke._run_linux_sudo_install", side_effect=run),
+                patch(
+                    "tooling.tests.linux_installed_product_smoke.Path.stat",
+                    autospec=True,
+                ) as path_stat,
+            ):
+                def fake_root_stat(path: Path, *args, **kwargs):
+                    actual = real_stat(path, *args, **kwargs)
+                    return types.SimpleNamespace(
+                        st_mode=actual.st_mode,
+                        st_uid=0,
+                        st_size=actual.st_size,
+                    )
+
+                path_stat.side_effect = fake_root_stat
+                state = _install_normal_release_codex_system_config(source)
+                target.write_text("preserve changed file", encoding="utf-8")
+                with self.assertRaisesRegex(RuntimeError, "設置後に変更されています"):
+                    _remove_normal_release_codex_system_config(state)
+
+            self.assertEqual(target.read_text(encoding="utf-8"), "preserve changed file")
+            self.assertTrue(parent.is_dir())
+            self.assertEqual(commands, ["mkdir", "install", "chmod"])
 
 
 @unittest.skipUnless(sys.platform.startswith("linux"), "Linux filesystem semantics are required")
