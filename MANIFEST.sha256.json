@@ -108,7 +108,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "9cdd13eac66f2146bb4ac48e9934463b4ffaf3c55afd38198364ebf69e93c2ff"
+      "sha256": "ae39876330e7bc1a770c6fca0b0a6268e4e7353303b947910409aed939afb18d"
     },
     {
       "path": "AUDIT.md",
@@ -128,7 +128,7 @@
     },
     {
       "path": "COMPATIBILITY_MATRIX.md",
-      "sha256": "092ddae492f94470987dbabe14d3c4c1a9a29e58fbfd2eba5a31a3b10832ae77"
+      "sha256": "1640a5a3c1bad63e5f065239079698fe05bb286d9bb1df43908cc996a7b048ae"
     },
     {
       "path": "CONFIG.md",
@@ -172,7 +172,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "52b6b65f0fabdac55abe8c8377b0ed75a11ff5ef42be41b90d847731297a4666"
+      "sha256": "852e669e51cb7f91850b06a8ac82f129bd8c413be68bbe81e5986086fa474ddc"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -1436,7 +1436,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "33e350e0855ce16e74f11da5d83f9d2727980b939a584e7c54dc6cd0176179c2"
+      "sha256": "e52d9d61d6c917415071dbc096210c21cbe57a6f274c2d9c80009a84d3f3d5d4"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1456,7 +1456,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "544b2d9a960ec5aba14a1785bfe29a4952841a372e1d03d309d9cd274802fad8"
+      "sha256": "ca6b3c80bc7b393c95aa441df4a7e70a1afe6568ec2c4eab5abf66a5bac4f60a"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -4568,7 +4568,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "2cf95e914739ffa70dce4ccfdb15f690c10762cc854709645dfe9f6db023a1e3"
+      "sha256": "53e2714b8bd8dd2d7e095db6a8fe41e4c674c3c4f8bae2d4947c19eac7890146"
     },
     {
       "path": "requirements-dev.txt",
@@ -5316,7 +5316,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "c0bac484a47798333ca7bbec440d47ff96a95c1dcfc9d00486d73002c78de2d7"
+      "sha256": "467d9a035947c28549212847eea7542d675ea40dfce335c8520b3cad57e31ff3"
     },
     {
       "path": "tooling/conformance_tests/test_final_development_audit.py",

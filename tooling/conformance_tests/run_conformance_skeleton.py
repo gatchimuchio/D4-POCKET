@@ -7484,7 +7484,6 @@ def test_update_download_transport_is_broker_owned_and_bounded() -> list[str]:
 
 def test_codex_cli_adapter_is_broker_governed_and_bounded() -> list[str]:
     adapter_path = RUST_HELPER / "src" / "adapters" / "codex_cli.rs"
-    cargo_manifest_path = RUST_HELPER / "Cargo.toml"
     broker_path = RUST_HELPER / "src" / "broker" / "ipc_server.rs"
     workspace_path = RUST_HELPER / "src" / "broker" / "workspace.rs"
     dialogue_path = RUST_HELPER / "src" / "broker" / "dialogue.rs"
@@ -7493,7 +7492,6 @@ def test_codex_cli_adapter_is_broker_governed_and_bounded() -> list[str]:
     if not adapter_path.is_file():
         return ["Codex CLI Adapter sourceが存在しない"]
     adapter = adapter_path.read_text(encoding="utf-8")
-    cargo_manifest = cargo_manifest_path.read_text(encoding="utf-8")
     broker = broker_path.read_text(encoding="utf-8")
     workspace = workspace_path.read_text(encoding="utf-8")
     dialogue = dialogue_path.read_text(encoding="utf-8")
@@ -7545,16 +7543,37 @@ def test_codex_cli_adapter_is_broker_governed_and_bounded() -> list[str]:
     for token in task_required:
         if token not in adapter:
             errors.append(f"Codex Agent Task境界または未検証gateがない: {token}")
-    explicit_unsupported_gate = 'task_execution", "support": {"status": "unsupported"' in adapter
-    isolated_e2e_unsupported_gate = (
-        '[features]\ndefault = []\n# Local-only integrated R2 test build. Never use for product distribution.\nr2-e2e = []'
-        in cargo_manifest
-        and '#[cfg(not(all(feature = "r2-e2e", not(test))))]' in adapter
-        and 'let task_execution_capability = json!({' in adapter
-        and '"status": "unsupported"' in adapter
+    capability_impl = adapter.partition("fn codex_cli_task_execution_capability(")[2].partition(
+        '\n#[cfg(any(test, feature = "r2-e2e"))]'
+    )[0]
+    capability_matrix_test = adapter.partition(
+        "fn codex_task_capability_is_scoped_to_platform_and_build_conditions()"
+    )[2].partition("\n    #[test]")[0]
+    capability_impl_tokens = (
+        "if !workspace_write_interface",
+        "if test_build",
+        "if r2_e2e_build",
+        "if debug_build",
+        "CodexCliTaskPlatform::Windows => (",
+        "CodexCliTaskPlatform::Linux => (",
+        "CodexCliTaskPlatform::Other => (",
+        '"unsupported"',
+        '"supported"',
+        "loopback_fixture_configured",
     )
-    if not explicit_unsupported_gate and not isolated_e2e_unsupported_gate:
-        errors.append("Codex Agent Taskの通常Release unsupported gateが既定のまま保たれない")
+    capability_test_tokens = (
+        "CodexCliTaskPlatform::Windows,",
+        "CodexCliTaskPlatform::Linux,",
+        "CodexCliTaskPlatform::Other,",
+        '"supported",',
+        '"unsupported",',
+    )
+    if (
+        any(token not in capability_impl for token in capability_impl_tokens)
+        or '"status": task_execution_status' not in adapter
+        or any(token not in capability_matrix_test for token in capability_test_tokens)
+    ):
+        errors.append("Codex Agent TaskのOS／build別Capability matrixまたは負例gateが維持されない")
     linux_filesystem_override = re.search(
         r'#\[cfg\(target_os = "linux"\)\]\s*let filesystem_override = \{(?P<body>.*?)\n\s*\};',
         adapter,

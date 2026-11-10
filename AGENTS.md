@@ -762,7 +762,7 @@ rev5／緩衝基盤の製品Acceptance履歴と証拠にはdocs/REV5_PRODUCT_PRO
 
 CLOSEDを理由なく再施工しない。Linux未実装をP13やWindows B4の局所完了記録へ遡及させない。B3の153原因対応行の分類を全原因の解消や全緩衝作用の実証と呼ばない。既存R2-A〜H、`FQ-TEST-LOOPBACK`、取得不能証拠の残余を維持する。
 
-Windows normal Release／Codex CLIのW01/G1に限り`task_execution=supported`を維持する。他Runtime／OSは個別証拠がない限り未成立とする。`release_ready=false`、release blocker、正式なPublisher／署名／鍵／Owner GOは不変とする。
+W01/G1のCLOSED範囲はWindows normal Release／Codex CLIに限る。別個のLinux normal Release／Codex CLI能力は、2026-11-10の能力行列、run #282のnormal Release build、run #283のinstalled Task process／scratch supervision（r2-e2e test build）で`task_execution=supported`を確認した。run #283は通常Release installed Taskや外部Provider接続の証拠ではなく、Linux全体製品Acceptanceも未成立である。他Runtime／OSは個別証拠がない限り未成立とする。`release_ready=false`、release blocker、正式なPublisher／署名／鍵／Owner GOは不変とする。
 
 ### 30. 緩衝基盤補遺とQEへの継承
 
