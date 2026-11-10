@@ -587,6 +587,7 @@ void main() {
       const endpoint = 'http://127.0.0.1:9080/card';
       const artifactId = 'artifact-fixture-1';
       const visibleText = 'untrusted-artifact-visible-only';
+      A2aTaskQueryResult? transferredArtifact;
       final artifactHash = 'sha256:${List<String>.filled(64, 'a').join()}';
       final contentHash = 'sha256:${List<String>.filled(64, 'b').join()}';
       final receipt = _receipt();
@@ -630,7 +631,12 @@ void main() {
         ),
       ]);
       await tester.pumpWidget(MaterialApp(
-        home: Scaffold(body: A2aConnectionCenter(transport: transport)),
+        home: Scaffold(
+          body: A2aConnectionCenter(
+            transport: transport,
+            onPrepareAgentTask: (source) => transferredArtifact = source,
+          ),
+        ),
       ));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField).at(0), 'fixture-agent');
@@ -670,6 +676,19 @@ void main() {
       expect(find.text(visibleText), findsOneWidget);
       expect(jsonEncode(transport.payloads), isNot(contains(visibleText)));
       expect(find.textContaining('保存・Audit本文記録はありません'), findsOneWidget);
+      final transfer = find.byKey(
+        const ValueKey('handoff-a2a-artifact-to-agent-center'),
+      );
+      await tester.ensureVisible(transfer);
+      await tester.tap(transfer);
+      await tester.pumpAndSettle();
+      expect(transferredArtifact?.taskId, 'remote-task-42');
+      expect(transferredArtifact?.selectedArtifact?.parts, [visibleText]);
+      expect(find.text(visibleText), findsNothing);
+      expect(
+        transport.operations.where((item) => item == 'A2Aタスク状態取得'),
+        hasLength(2),
+      );
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }

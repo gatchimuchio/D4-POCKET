@@ -110,6 +110,7 @@ class A2aTaskQueryResult {
     required this.status,
     required this.agentId,
     required this.taskId,
+    required this.interfaceHash,
     required this.state,
     required this.artifactCount,
     required this.historyCount,
@@ -122,6 +123,7 @@ class A2aTaskQueryResult {
   final String status;
   final String agentId;
   final String taskId;
+  final String interfaceHash;
   final String? state;
   final int? artifactCount;
   final int? historyCount;
@@ -457,6 +459,7 @@ class A2aConnectionClient {
         status: 'unknown',
         agentId: normalizedId,
         taskId: taskId,
+        interfaceHash: body['interface_hash'] as String,
         state: null,
         artifactCount: null,
         historyCount: null,
@@ -595,6 +598,7 @@ class A2aConnectionClient {
       status: 'accepted',
       agentId: normalizedId,
       taskId: taskId,
+      interfaceHash: body['interface_hash'] as String,
       state: result['state'] as String,
       artifactCount: result['artifact_count'] as int,
       historyCount: 0,

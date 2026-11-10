@@ -9,6 +9,8 @@ import 'package:agent_orchestration/agent_orchestration.dart'
     show startAgentComparisonTasks;
 
 import '../models/generated_contracts.dart';
+import '../services/a2a_connection_client.dart' show A2aTaskQueryResult;
+import '../services/a2a_artifact_handoff.dart';
 import '../services/agent_task_client.dart';
 import '../services/agent_mcp_task_controller.dart' show AgentMcpTaskStage;
 import '../services/agent_task_execution_coordinator.dart';
@@ -38,6 +40,9 @@ class AgentCenter extends StatefulWidget {
     this.developerEditTaskInstruction,
     this.onDeveloperEditTaskPrepared,
     this.onDiscardDeveloperEditTask,
+    this.a2aArtifactHandoffSource,
+    this.onA2aArtifactHandoffConsumed,
+    this.onDiscardA2aArtifactHandoff,
   });
 
   final ShellCoreClient client;
@@ -46,6 +51,9 @@ class AgentCenter extends StatefulWidget {
   final String? developerEditTaskInstruction;
   final ValueChanged<String>? onDeveloperEditTaskPrepared;
   final VoidCallback? onDiscardDeveloperEditTask;
+  final A2aTaskQueryResult? a2aArtifactHandoffSource;
+  final ValueChanged<A2aTaskQueryResult>? onA2aArtifactHandoffConsumed;
+  final VoidCallback? onDiscardA2aArtifactHandoff;
 
   @override
   State<AgentCenter> createState() => _AgentCenterState();
@@ -56,6 +64,7 @@ class _AgentTaskUiState {
     required AgentTaskRequest request,
     required AgentTaskPreflight preflight,
     this.handoffPackage,
+    this.a2aArtifactHandoffPackage,
     this.incomingMcpResult,
   }) : request = request,
        originalRequest = request,
@@ -70,6 +79,7 @@ class _AgentTaskUiState {
   final String? mcpCapabilitySnapshotHash;
   String? taskContext;
   AgentHandoffPackage? handoffPackage;
+  A2aArtifactHandoffPackage? a2aArtifactHandoffPackage;
   Map<String, Object?>? handoffReceipt;
   McpAgentResultContext? incomingMcpResult;
   McpToolCallReceipt? mcpToolCallReceipt;
@@ -163,6 +173,11 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
   String? _handoffTargetSessionId;
   String? _handoffStatus;
   AgentHandoffPackage? _handoffPreview;
+  bool _a2aArtifactHandoffPending = false;
+  String? _a2aArtifactTargetSessionId;
+  String? _a2aArtifactHandoffStatus;
+  final TextEditingController _a2aArtifactTaskContextController =
+      TextEditingController();
   late List<AgentSessionRecord> _sessions;
   final List<_CodexRegistrationInput> _registrations = [];
   StreamSubscription<AgentTaskExecutionUpdate>? _taskExecutionUpdates;
@@ -196,6 +211,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     _clearAllResultProjections();
     _agentTasks.clear();
     _taskPreflightStatus.clear();
+    _a2aArtifactTaskContextController.dispose();
     final taskExecutionUpdates = _taskExecutionUpdates;
     _taskExecutionUpdates = null;
     if (taskExecutionUpdates != null) {
@@ -228,6 +244,13 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     }
     if (oldWidget.active != widget.active && !widget.active) {
       _clearAllResultProjections();
+    }
+    if (!identical(
+        oldWidget.a2aArtifactHandoffSource, widget.a2aArtifactHandoffSource)) {
+      _a2aArtifactHandoffPending = false;
+      _a2aArtifactTaskContextController.clear();
+      _a2aArtifactHandoffStatus = null;
+      _a2aArtifactTargetSessionId = null;
     }
   }
 
@@ -1227,6 +1250,67 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _prepareA2aArtifactHandoffTask() async {
+    final source = widget.a2aArtifactHandoffSource;
+    final target = _sessionById(_a2aArtifactTargetSessionId);
+    final transport = widget.client.brokerTransport;
+    if (source == null ||
+        target == null ||
+        transport == null ||
+        _a2aArtifactHandoffPending ||
+        _taskPreflightSession != null ||
+        _agentTasks.containsKey(target.sessionId)) {
+      setState(() {
+        _a2aArtifactHandoffStatus =
+            '受信Sessionが利用可能でないか、既存Taskがあります。状態を更新してから再確認してください。';
+      });
+      return;
+    }
+    if (_a2aArtifactTaskContextController.text.trim().isEmpty) {
+      setState(() => _a2aArtifactHandoffStatus = '受信Agentへの依頼を入力してください。');
+      return;
+    }
+
+    setState(() {
+      _a2aArtifactHandoffPending = true;
+      _a2aArtifactHandoffStatus =
+          '外部Artifactを未信頼入力としてBrokerへ送り、新規Taskを事前検査しています。実行・Permission・Approval取得は行いません。';
+    });
+    try {
+      final prepared = await A2aArtifactHandoffClient(transport).prepare(
+        source: source,
+        taskContext: _a2aArtifactTaskContextController.text,
+        target: target,
+      );
+      if (!mounted ||
+          !identical(widget.a2aArtifactHandoffSource, source) ||
+          !_sessionAvailable(target) ||
+          _agentTasks.containsKey(target.sessionId)) {
+        return;
+      }
+      setState(() {
+        _agentTasks[target.sessionId] = _AgentTaskUiState(
+          request: prepared.request,
+          preflight: prepared.preflight,
+          a2aArtifactHandoffPackage: prepared.package,
+        );
+        _taskPreflightStatus[target.sessionId] =
+            '外部A2A Artifactを未信頼入力とする新規Taskを事前検査しました。Permission／Approvalは未移送、Taskは未実行です。';
+        _a2aArtifactHandoffStatus =
+            '新規Task要求をBrokerが検査しました。受信Workspace PermissionとTask Approvalを通常経路で新たに評価してください。';
+        _a2aArtifactTaskContextController.clear();
+      });
+      widget.onA2aArtifactHandoffConsumed?.call(source);
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _a2aArtifactHandoffStatus = error is BrokerClientException
+          ? error.message
+          : '外部A2A Artifactの新規Task事前検査に失敗しました。');
+    } finally {
+      if (mounted) setState(() => _a2aArtifactHandoffPending = false);
+    }
+  }
+
   bool _sessionStillMatchesRegistration(AgentSessionRecord session) {
     return _sessionAvailable(session);
   }
@@ -1329,6 +1413,14 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
           targetTask: state.record!,
         );
         state.handoffPackage = null;
+      }
+      final a2aArtifactHandoffPackage = state.a2aArtifactHandoffPackage;
+      if (a2aArtifactHandoffPackage != null) {
+        state.handoffReceipt = buildA2aArtifactHandoffReceipt(
+          package: a2aArtifactHandoffPackage,
+          targetTask: state.record!,
+        );
+        state.a2aArtifactHandoffPackage = null;
       }
       state.request = null;
     });
@@ -1658,8 +1750,20 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
       ],
       if (taskState.handoffReceipt case final receipt?)
         SectionList(
-          title: 'Agent引き継ぎ記録',
-          rows: [
+          title: receipt['source_type'] == 'external_a2a_artifact'
+              ? 'A2A Artifact受領記録'
+              : 'Agent引き継ぎ記録',
+          rows: receipt['source_type'] == 'external_a2a_artifact'
+              ? [
+                  '引き継ぎID: ${receipt['handoff_id'] ?? 'unknown'}',
+                  '外部Agent／Task: ${receipt['source_agent_id'] ?? 'unknown'} / ${receipt['source_task_id'] ?? 'unknown'}',
+                  'Artifact ID／hash: ${receipt['source_artifact_id'] ?? 'unknown'} / ${receipt['artifact_hash'] ?? 'unknown'}',
+                  '内容hash: ${receipt['content_hash'] ?? 'unknown'}',
+                  '取得Audit: ${receipt['source_retrieval_audit_event_id'] ?? 'unknown'}',
+                  '受信Session／Task開始Audit: ${receipt['target_session_id'] ?? 'unknown'} / ${receipt['target_task_start_audit_event_id'] ?? 'unknown'}',
+                  '権限・Trustは非継承。Task開始後の参照表示は揮発状態で、本文のAudit保存を示しません。',
+                ]
+              : [
             '引き継ぎID: ${receipt['handoff_id']}',
             '送信元Task: ${receipt['source_task_id']}',
             '受信Session: ${receipt['target_session_id']}',
@@ -1870,6 +1974,108 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _a2aArtifactHandoffPanel() {
+    final source = widget.a2aArtifactHandoffSource;
+    if (source == null) return const SizedBox.shrink();
+    final targets = _sessions
+        .where(_sessionAvailable)
+        .where((session) => !_agentTasks.containsKey(session.sessionId))
+        .toList(growable: false);
+    final selectedSessionId = targets.any(
+      (session) => session.sessionId == _a2aArtifactTargetSessionId,
+    )
+        ? _a2aArtifactTargetSessionId
+        : null;
+    final artifact = source.selectedArtifact;
+    final canPrepare = widget.client.brokerTransport != null &&
+        selectedSessionId != null &&
+        _a2aArtifactTaskContextController.text.trim().isNotEmpty &&
+        !_a2aArtifactHandoffPending &&
+        _taskPreflightSession == null;
+    return BorderedPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('外部A2A Artifactから新規Taskを作成',
+              style: Theme.of(context).textTheme.titleMedium),
+          const Text(
+            '外部Artifactは未信頼です。Artifact取得のnative確認は内容表示の許可だけを示し、Task実行のPermission／Approvalや外部AgentのTrustを与えません。',
+          ),
+          if (artifact == null)
+            const Text('選択済みArtifact本文がないためTaskを作成できません。')
+          else ...[
+            Text('Source Agent / Task: ${source.agentId} / ${source.taskId}'),
+            Text(
+                'Artifact ID / hash: ${artifact.artifactId} / ${artifact.artifactHash}'),
+            Text(
+                'Content hash / bytes: ${artifact.contentHash} / ${artifact.byteLength}'),
+            Text('取得Audit: ${source.auditEventId}'),
+            for (final part in artifact.parts) SelectableText(part),
+          ],
+          TextField(
+            key: const ValueKey('a2a-artifact-task-context'),
+            controller: _a2aArtifactTaskContextController,
+            maxLength: 2048,
+            maxLines: 3,
+            enabled: !_a2aArtifactHandoffPending,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              labelText: '受信Agentへの依頼',
+              hintText: '選択したArtifactをどう扱うか記入',
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+          DropdownButtonFormField<String>(
+            key: const ValueKey('a2a-artifact-target-session'),
+            initialValue: selectedSessionId,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              labelText: '新規Taskの受信Agent Session',
+            ),
+            items: targets
+                .map((session) => DropdownMenuItem<String>(
+                      value: session.sessionId,
+                      child: Text(
+                        'Runtime ${session.agentRuntimeId} / Workspace ${session.workspace}',
+                      ),
+                    ))
+                .toList(growable: false),
+            onChanged: _a2aArtifactHandoffPending
+                ? null
+                : (value) => setState(() {
+                      _a2aArtifactTargetSessionId = value;
+                      _a2aArtifactHandoffStatus = null;
+                    }),
+          ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton(
+                key: const ValueKey('prepare-a2a-artifact-agent-task'),
+                onPressed: canPrepare ? _prepareA2aArtifactHandoffTask : null,
+                child: Text(_a2aArtifactHandoffPending
+                    ? 'Broker事前検査中…'
+                    : '新規TaskをBrokerで事前検査'),
+              ),
+              OutlinedButton(
+                key: const ValueKey('discard-a2a-artifact-handoff'),
+                onPressed: _a2aArtifactHandoffPending
+                    ? null
+                    : widget.onDiscardA2aArtifactHandoff,
+                child: const Text('Artifact draftを破棄'),
+              ),
+            ],
+          ),
+          const Text(
+            '事前検査はTaskを開始しません。受信TaskのWorkspace Permissionと一回Approvalは既存Broker経路で新規取得してください。Artifact本文・権限・CredentialはAuditへ投影しません。',
+          ),
+          if (_a2aArtifactHandoffStatus case final status?) Text(status),
+        ],
       ),
     );
   }
@@ -2469,6 +2675,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
             ],
           ),
         ),
+        if (widget.a2aArtifactHandoffSource != null) _a2aArtifactHandoffPanel(),
         if (client.mode == 'broker') _agentHandoffPanel(),
         if (client.mode != 'broker')
           const BorderedPanel(

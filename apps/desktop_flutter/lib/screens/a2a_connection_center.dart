@@ -6,9 +6,14 @@ import '../services/a2a_connection_client.dart';
 import 'shared.dart';
 
 class A2aConnectionCenter extends StatefulWidget {
-  const A2aConnectionCenter({super.key, required this.transport});
+  const A2aConnectionCenter({
+    super.key,
+    required this.transport,
+    this.onPrepareAgentTask,
+  });
 
   final BrokerTransport? transport;
+  final ValueChanged<A2aTaskQueryResult>? onPrepareAgentTask;
 
   @override
   State<A2aConnectionCenter> createState() => _A2aConnectionCenterState();
@@ -317,6 +322,20 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
                           ],
                         ),
                       ),
+                    if (widget.onPrepareAgentTask != null &&
+                        _taskQueryResult!.selectedArtifact != null) ...[
+                      const Text(
+                        'Agent Centerへ渡す操作はTask dataの移送だけです。新規TaskのPermission／Approvalを引き継がず、ここではTaskを実行しません。',
+                      ),
+                      OutlinedButton.icon(
+                        key: const ValueKey(
+                            'handoff-a2a-artifact-to-agent-center'),
+                        onPressed:
+                            _gettingTask ? null : _prepareAgentTaskFromArtifact,
+                        icon: const Icon(Icons.call_made),
+                        label: const Text('選択ArtifactをAgent Centerの新規Taskへ渡す'),
+                      ),
+                    ],
                   ],
                 ],
               ],
@@ -581,6 +600,25 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
     } finally {
       if (mounted) setState(() => _gettingTask = false);
     }
+  }
+
+  void _prepareAgentTaskFromArtifact() {
+    final callback = widget.onPrepareAgentTask;
+    final source = _taskQueryResult;
+    if (callback == null ||
+        source == null ||
+        source.status != 'accepted' ||
+        source.state != 'completed' ||
+        source.selectedArtifact == null ||
+        _gettingTask) {
+      return;
+    }
+    setState(() {
+      _taskQueryResult = null;
+      _sendMessageStatus =
+          '選択ArtifactをAgent Centerの揮発Task draftへ移しました。新規Taskは未検査・未実行です。';
+    });
+    callback(source);
   }
 
   void _clearPendingTask() {

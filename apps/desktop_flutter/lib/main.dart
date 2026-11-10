@@ -31,6 +31,7 @@ import 'screens/setup_doctor.dart';
 import 'screens/trust_center.dart';
 import 'services/runtime_resource_client.dart';
 import 'services/runtime_lifecycle_client.dart';
+import 'services/a2a_connection_client.dart' show A2aTaskQueryResult;
 import 'services/agent_task_execution_coordinator.dart';
 import 'services/evaluation_client.dart';
 import 'services/global_search_index.dart';
@@ -255,6 +256,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
   int _composeCenterFocusRequest = 0;
   int _exportCenterFocusRequest = 0;
   String? _pendingAiEditTaskInstruction;
+  A2aTaskQueryResult? _pendingA2aArtifactHandoff;
   _ShellViewMode viewMode = _ShellViewMode.ownerUse;
   _ShellNavigationGroup navigationGroup = _ShellNavigationGroup.all;
   late final WindowsTrayClient _trayClient;
@@ -437,6 +439,9 @@ class _ShellHomePageState extends State<ShellHomePage> {
         developerEditTaskInstruction: _pendingAiEditTaskInstruction,
         onDeveloperEditTaskPrepared: _consumeAiEditTaskInstruction,
         onDiscardDeveloperEditTask: _discardAiEditTaskInstruction,
+        a2aArtifactHandoffSource: _pendingA2aArtifactHandoff,
+        onA2aArtifactHandoffConsumed: _consumeA2aArtifactHandoff,
+        onDiscardA2aArtifactHandoff: _discardA2aArtifactHandoff,
       ),
       ApprovalCenter(client: widget.client),
       AuditViewer(client: widget.client),
@@ -498,7 +503,10 @@ class _ShellHomePageState extends State<ShellHomePage> {
         HostOperationCenter(client: widget.client)
       else
         const SizedBox.shrink(),
-      A2aConnectionCenter(transport: widget.client.brokerTransport),
+      A2aConnectionCenter(
+        transport: widget.client.brokerTransport,
+        onPrepareAgentTask: _openA2aArtifactHandoff,
+      ),
     ];
     final pageEntries = _pageEntries();
     final visiblePageEntries = pageEntries
@@ -886,6 +894,34 @@ class _ShellHomePageState extends State<ShellHomePage> {
   void _discardAiEditTaskInstruction() {
     if (_pendingAiEditTaskInstruction == null) return;
     setState(() => _pendingAiEditTaskInstruction = null);
+  }
+
+  void _openA2aArtifactHandoff(A2aTaskQueryResult source) {
+    final matches = _pageEntries().where((entry) => entry.index == 5);
+    if (matches.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Agent CenterがないためArtifactを渡せません。')),
+      );
+      return;
+    }
+    final page = matches.first;
+    setState(() {
+      _pendingA2aArtifactHandoff = source;
+      selectedIndex = page.index;
+      if (!navigationGroup.includes(page.group)) {
+        navigationGroup = page.group;
+      }
+    });
+  }
+
+  void _consumeA2aArtifactHandoff(A2aTaskQueryResult source) {
+    if (!identical(_pendingA2aArtifactHandoff, source)) return;
+    setState(() => _pendingA2aArtifactHandoff = null);
+  }
+
+  void _discardA2aArtifactHandoff() {
+    if (_pendingA2aArtifactHandoff == null) return;
+    setState(() => _pendingA2aArtifactHandoff = null);
   }
 
   void _setNavigationGroup(_ShellNavigationGroup group) {

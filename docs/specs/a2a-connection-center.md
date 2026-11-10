@@ -99,7 +99,7 @@ Desktopの`A2A接続センター`は、必須`shell.agent_operation`に含まれ
 
 - 導入済み製品を使った実外部HTTPS endpointへの接続・Message送信証拠、OAuth／API keyなどの認証実行
 - Task lifecycle polling／完了判定、未選択Artifact本文、file/data Artifact本文、Stream購読、cancel、A2A transport sessionの再接続、quarantine
-- 外部Agent比較、複数Agent同一Workspace隔離、Handoff
+- 実外部Agent間比較、異種Runtime間のArtifact交換、installed product経路で完了するHandoff。選択済みA2A text ArtifactからローカルAgent Task事前検査への接続は別節のlocal fixture範囲であり、外部Agent実動を証明しない
 - 実A2A Test Harness、Windows installed productでの接続証拠、長時間運用・障害注入
 
 残る外部transport／Agentでの送信実証、Task lifecycle／完了判定／cancel等、Trust審査、正式配布の制約はrelease blockerまたは後続P7／P12／Final QAの各現行gateで分類する。本書の一回Message送信と手動一回状態照会はProduct Build範囲であり、外部Agentでの成功、Task完了、installed productでの実A2A運用やD4 Pocket全体の完成を主張しない。
@@ -117,3 +117,15 @@ timeout、Broker crash、応答不正、Audit結果確定失敗は成功にせ�
 通常のGetTask照会はmetadata-onlyのまま、最大32件のArtifact manifest（ID、hash、part数、text-only判定、64 KiB内のUTF-8 byte数）を表示する。Artifact本文、名前、説明、任意metadataは一覧へ出さない。操作者がcompleted Taskのsafe text-only Artifactを一件選ぶと、同じTaskへの新しいGetTask要求でそのArtifact IDと前回hashを束縛する。Rust native Owner確認には対象Agent／接続先／Task ID／Artifact ID／hashを表示し、Brokerは同じpayload hashに束縛した一回Permissionを消費する。Task completed、現在hash一致、text parts合計64 KiB以下、制御・方向偽装文字なしの場合のみ全文を返す。file/data/未知partはunsupportedとして拒否する。
 
 本文は未信頼内容としてSelectableTextで画面表示し、画面stateのvolatile値にだけ保持する。Auditには要求hash・ID hash・response／Artifact／content hash・byte countを記録し、本文は保存しない。履歴、Workspace、snapshot、log、traceへ書かない。Widget破棄、Agent／Task切替、新Message、次のTask照会開始、要求失敗で画面projectionから消去する。再取得は毎回新しいnative Owner確認と一回Permissionを要する。対象はWindows／Linux Desktopであり、macOS native A2A Owner契約は変更しない。
+
+## C16補完: 選択済みtext Artifactを新規ローカルAgent Taskへ渡す
+
+Windows／Linux DesktopのA2A Artifact選択表示から、操作者の明示操作でvolatileなArtifact resultをAgent Centerへ渡せる。受信Agent Sessionは自動選択せず、利用中のSessionを操作者が明示選択する。受信Taskに対するoperator requestも別途入力する。Artifact本文は未信頼データとして表示し、Artifact内の指示・権限主張を受信Taskの範囲やAuthorityへ変換しない。
+
+引継ぎ前に、source Taskがcompleted、history countが0、選択ArtifactのID／hash／content hashが有効でmanifestと一致し、全partsが安全なtextで合計64 KiB以内、target Sessionが現在利用中でRuntime／Session／Workspace識別が有効なことを確認する。Artifact text parts、source Agent／Task／interface hash／result hash／取得Audit ID、Artifact ID／hash、operator request、受信Session／Runtime／Workspaceを一つの未信頼Task instructionへ束縛する。受信Task要求の上限は既存AgentTaskRequestの32,768 runesを維持する。file／data Artifact、履歴あり、hash不一致、unsafe text、古い受信Session、上限超過はBroker送信前に拒否する。
+
+引継ぎ操作が呼ぶBroker operationは、通常IPC上の既存Agent作業要求検査だけである。新規Workspace Permission、Task Owner Approval、Task startは行わない。検査成功後も、受信先の現在のWorkspace Permissionと一回限りTask Approvalは既存Broker経路から新たに評価・発行しなければTaskを開始できない。Artifact表示のnative Owner確認は内容表示の許可に限り、外部Agent Trust、Task実行Authority、Credential、過去のPermission／Approvalを継承しない。Broker検査拒否・応答不一致・通信失敗ではTask stateを作成せず、grant／startを呼ばない。
+
+取得本文とTask draftは画面・Agent Centerのvolatile stateだけに置き、保存、snapshot、log、trace、Audit bodyへ複製しない。受信Taskが後に通常の新規Permission／Approvalを通って開始した場合、Agent Centerはsource／targetのID、hash、既存Audit参照とAuthority非継承状態だけを揮発表示する。この表示は新しいAudit eventの生成やdurableなreceipt保存を意味せず、Artifact本文を含めない。macOS native A2A Owner contractおよびCredential経路は変更しない。
+
+この接続はFlutter Fake Broker／WidgetのFIXTUREで検証する。実外部Agentとの交換、installed product、異種Runtime間のTask実行、Windows／macOS native confirmation、Task完了後の実A2A Handoffは別の未成立範囲に残る。
