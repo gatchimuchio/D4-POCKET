@@ -38,7 +38,8 @@ concurrency:
 
 jobs:
   export-build:
-    runs-on: ${{ (inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_task_crash_recovery' || inputs.acceptance_scope == 'provider_credential_binding') && 'ubuntu-22.04' || 'ubuntu-24.04' }}
+    # The hosted Ubuntu 24.04 image denies bubblewrap loopback setup for Task scopes; keep those on the previously capable Ubuntu 22.04 image.
+    runs-on: ${{ (inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_task_normal_release' || inputs.acceptance_scope == 'agent_task_crash_recovery' || inputs.acceptance_scope == 'provider_credential_binding') && 'ubuntu-22.04' || 'ubuntu-24.04' }}
     timeout-minutes: 120
     steps:
       - name: 対象commitをclean checkout
@@ -123,7 +124,7 @@ jobs:
           clang --version | head -n 1
           weston --version
           runner_label="ubuntu-24.04"
-          if [ '${{ inputs.acceptance_scope }}' = 'agent_task_supervision' ] || [ '${{ inputs.acceptance_scope }}' = 'agent_task_crash_recovery' ] || [ '${{ inputs.acceptance_scope }}' = 'provider_credential_binding' ]; then
+          if [ '${{ inputs.acceptance_scope }}' = 'agent_task_supervision' ] || [ '${{ inputs.acceptance_scope }}' = 'agent_task_normal_release' ] || [ '${{ inputs.acceptance_scope }}' = 'agent_task_crash_recovery' ] || [ '${{ inputs.acceptance_scope }}' = 'provider_credential_binding' ]; then
             runner_label="ubuntu-22.04"
           fi
           {
@@ -704,7 +705,7 @@ jobs:
             --acceptance-scope "$acceptance_scope" \
             --codex-cli "$D4P_LINUX_TASK_CODEX_CLI"
           if [ "$acceptance_scope" = 'agent_task_normal_release' ]; then
-            printf '\n- LIVE_PRODUCT／normal Release: installed GTK／Broker→pinned Codex CLI→local no-auth Responses fixture; Task／Workspace write／durable Audit PASS. No `r2-e2e` or operational Credential. Ubuntu 24.04 Xvfb／X11 only; no distribution／release claim.\n' >> "$GITHUB_STEP_SUMMARY"
+            printf '\n- LIVE_PRODUCT／normal Release: installed GTK／Broker→pinned Codex CLI→local no-auth Responses fixture; Task／Workspace write／durable Audit PASS. No `r2-e2e` or operational Credential. Ubuntu 22.04 Xvfb／X11 only; no distribution／release claim.\n' >> "$GITHUB_STEP_SUMMARY"
           else
             printf '\n- LIVE_PRODUCT／r2-e2e supervision: complete／cancel／deadline, secret／outside deny, process／scratch cleanup, Audit. Ubuntu 22.04 Xvfb／X11, synthetic identity; no release claim.\n' >> "$GITHUB_STEP_SUMMARY"
           fi

@@ -12675,7 +12675,8 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
     smoke = smoke_path.read_text(encoding="utf-8")
     required = (
         "'on':\n  workflow_dispatch:",
-        "runs-on: ${{ (inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_task_crash_recovery' || inputs.acceptance_scope == 'provider_credential_binding') && 'ubuntu-22.04' || 'ubuntu-24.04' }}",
+        "runs-on: ${{ (inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_task_normal_release' || inputs.acceptance_scope == 'agent_task_crash_recovery' || inputs.acceptance_scope == 'provider_credential_binding') && 'ubuntu-22.04' || 'ubuntu-24.04' }}",
+        "[ '${{ inputs.acceptance_scope }}' = 'agent_task_supervision' ] || [ '${{ inputs.acceptance_scope }}' = 'agent_task_normal_release' ] || [ '${{ inputs.acceptance_scope }}' = 'agent_task_crash_recovery' ] || [ '${{ inputs.acceptance_scope }}' = 'provider_credential_binding' ]",
         'runner_label="ubuntu-24.04"',
         'runner_label="ubuntu-22.04"',
         "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
@@ -12809,8 +12810,9 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
         feature_gate_text = workflow[feature_gate_start:feature_gate]
         if "agent_task_normal_release" in feature_gate_text:
             missing.append("normal Release Task scope selects the r2-e2e build feature")
-    if "agent_task_normal_release" in workflow[workflow.find("runs-on:"):workflow.find("timeout-minutes:")]:
-        missing.append("normal Release Task scope is not kept on the standard Ubuntu runner")
+    runner_expression = workflow[workflow.find("runs-on:"):workflow.find("timeout-minutes:")]
+    if "agent_task_normal_release" not in runner_expression or "&& 'ubuntu-22.04'" not in runner_expression:
+        missing.append("normal Release Task scope must use Ubuntu 22.04 hosted runner with rootless sandbox support")
     codex_cli_source = (ROOT / "native/rust_helper/src/adapters/codex_cli.rs").read_text(
         encoding="utf-8"
     )
