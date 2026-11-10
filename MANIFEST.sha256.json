@@ -228,7 +228,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/agent_center.dart",
-      "sha256": "9be9743c95a06647c36e2e0fd1a546ef28d8c5933f4623c908aed2ccc025768c"
+      "sha256": "b2f8983992ee33621345c727adc929d45ef1e628dce0451ad950581d08ae3d81"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/approval_center.dart",
@@ -628,7 +628,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/agent_mcp_task_controller_test.dart",
-      "sha256": "d14cfe2386e57eb613f159a3974714a6bc779c01809e84ba6e68e8714ad830b1"
+      "sha256": "489499ba26d84a712847fd356588825b10cd608fb250614692e1ef61dc0506a8"
     },
     {
       "path": "apps/desktop_flutter/test/agent_task_client_test.dart",
@@ -740,7 +740,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "874f9fbdc96e9369f0ba3e414c699224f0be52ba4fab9b60dcb138db0ed94ad8"
+      "sha256": "3303bb358c34580c50aa213d29e3edd8cf7049d2d290a5ec665f9c69cbb9d146"
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
@@ -1436,7 +1436,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "45c78e00dae51018eaaaaade03d67884361c746969e0471f7fc98b445e07e90d"
+      "sha256": "e99ae471ac230db5f95cef11d3eb9b653c2f480681c321968bb09c86e80af0c9"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -4220,7 +4220,7 @@
     },
     {
       "path": "packages/agent_orchestration/README.md",
-      "sha256": "4e8bc4d891a1236ea6238bca07f0d32055cd92263affdf7289ea551be41038ce"
+      "sha256": "b2a8f483ccc2ff68c4c68e53aa532cf0f6255cc12f794fbefb0c997d9c5e225e"
     },
     {
       "path": "packages/agent_orchestration/lib/agent_mcp_task_controller.dart",
@@ -4236,7 +4236,7 @@
     },
     {
       "path": "packages/agent_orchestration/lib/agent_task_execution_coordinator.dart",
-      "sha256": "0de5ff64099acd9a044ec3fab233d506db46a5da11999ef950b26e1fb9d0ceb6"
+      "sha256": "66d0f5b5921a8a8f4c17b79828648c9c4e68dd6531f4d3b8d88894eb75227579"
     },
     {
       "path": "packages/agent_orchestration/lib/mcp_connection_client.dart",

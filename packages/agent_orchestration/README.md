@@ -2,6 +2,8 @@
 
 このpure Dart packageは、Agent Task client、Task監視、MCP提案controller、結果に依存する継続処理を共有する。Flutterと`dart:ui`には依存しない。Desktop UIはhost OS値と既存の認証Broker transportをアプリ境界で適合させる。
 
+`AgentTaskExecutionCoordinator`の`updates`は、セッションIDとsource Task IDを持つ非永続の表示通知streamである。Agent Centerはconsumerとして購読し、画面callbackの完了・画面選択状態をBroker Tool作用や後続Taskの進行条件にしない。表示側が非表示または非activeの間に到着した全文結果projectionは画面stateへ保持しない。Coordinator自体はアプリhostの寿命内で動き、UI表示とは別にBroker Taskの状態確認と継続要求を担当する。
+
 このpackageはPermission／Approvalを付与せず、資格情報を保管せず、MCP Toolを直接実行せず、Auditを確定しない。sensitive operationは`BrokerTransport`への要求であり、Brokerが現在状態を再評価して権限源であり続ける。fake transportによる試験はconsumer契約を検査できるが、実Brokerまたはinstalled product経路の証拠ではない。
 
 独立Dart hostは、信頼されたnative hostから既存normal-authenticated loopback接続情報を受け取った場合、`broker_ipc_client`を利用できる。このclientは接続情報fileを読まず、Owner資格を受け取らず、native Owner確認も実行しない。Owner確認を要する操作は、引き続き各platformの既存native経路へ委譲する。socket fixtureまたは注入された`BrokerTransport`だけでは、実Broker／製品経路の成立を示さない。

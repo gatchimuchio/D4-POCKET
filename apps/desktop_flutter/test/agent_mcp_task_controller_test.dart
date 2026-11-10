@@ -154,11 +154,12 @@ void main() {
   test('Agent Task継続は画面observerから独立してBroker経路を続行する', () async {
     final transport = _FakeBrokerTransport(_successfulResponses());
     final coordinator = AgentTaskExecutionCoordinator(transport);
+    final updates = <AgentTaskExecutionUpdate>[];
+    final subscription = coordinator.updates.listen(updates.add);
 
     await coordinator.observeStartedTask(
       request: _sourceRequest,
       task: _sourceTask,
-      onUpdate: (_) {},
     );
 
     expect(transport.operations, [
@@ -175,8 +176,17 @@ void main() {
         containsPair('mcp_result_id', _resultId));
     expect(transport.requests.last['payload'],
         containsPair('mcp_result_hash', _contextHash));
+    expect(
+      updates.any((update) =>
+          update.sessionId == _session &&
+          update.sourceTaskId == _sourceTaskId &&
+          update.mcpUpdate?.stage == AgentMcpTaskStage.followupTaskStarted),
+      isTrue,
+      reason: '画面callbackなしでBroker継続と表示通知を分離する',
+    );
 
     coordinator.dispose();
+    await subscription.cancel();
   });
 
   test('AIは複数のMCP結果に応じて後続Taskを続け各回で認可を取り直す', () async {

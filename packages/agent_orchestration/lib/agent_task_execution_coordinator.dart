@@ -27,11 +27,17 @@ class AgentTaskExecutionCoordinator {
   static const _maximumMonitorDuration = Duration(minutes: 16);
 
   final BrokerTransport _transport;
+  final StreamController<AgentTaskExecutionUpdate> _updates =
+      StreamController<AgentTaskExecutionUpdate>.broadcast();
   final AgentRuntimePlatform platform;
   final LinkedHashSet<String> _rememberedTaskIds = LinkedHashSet<String>();
   final Map<String, _TaskRun> _runs = {};
   final Map<String, String> _currentTaskBySession = {};
   bool _disposed = false;
+
+  /// Task継続の実行とは独立した、表示側向けの一時通知stream。
+  /// listenerの有無や処理時間はBroker要求・後続Taskを制御しない。
+  Stream<AgentTaskExecutionUpdate> get updates => _updates.stream;
 
   /// Broker Taskを監視し、Agentの完了結果が要求したMCP Toolを実行する。
   /// 結果依存の後続Taskは毎回新しいBroker Taskとして開始し、その完了結果が
@@ -41,7 +47,7 @@ class AgentTaskExecutionCoordinator {
   Future<void> observeStartedTask({
     required AgentTaskRequest request,
     required AgentTaskRecord task,
-    required AgentTaskExecutionUpdateHandler onUpdate,
+    AgentTaskExecutionUpdateHandler? onUpdate,
     bool allowMcpContinuation = true,
   }) async {
     if (_disposed || !_remember(task.taskId)) return;
@@ -74,6 +80,7 @@ class AgentTaskExecutionCoordinator {
     }
     _runs.clear();
     _currentTaskBySession.clear();
+    unawaited(_updates.close());
   }
 
   bool _remember(String taskId) {
@@ -171,10 +178,16 @@ class AgentTaskExecutionCoordinator {
 
   Future<void> _emitSessionNotice(_TaskRun run, String message) async {
     if (_disposed) return;
+    final update = AgentTaskExecutionUpdate(
+      sessionId: run.request.sessionId,
+      sourceTaskId: run.initialTask.taskId,
+      sessionRecoveryNotice: message,
+    );
+    _publishToStream(update);
+    final observer = run.onUpdate;
+    if (observer == null) return;
     try {
-      await run.onUpdate(
-        AgentTaskExecutionUpdate(sessionRecoveryNotice: message),
-      );
+      await observer(update);
     } on Object {
       // Recovery notices are informational and never own execution progression.
     }
@@ -188,21 +201,32 @@ class AgentTaskExecutionCoordinator {
     String? error,
   }) {
     if (!_isCurrent(run)) return;
+    final update = AgentTaskExecutionUpdate(
+      sessionId: run.request.sessionId,
+      sourceTaskId: run.initialTask.taskId,
+      task: task,
+      mcpUpdate: mcpUpdate,
+      message: message,
+      error: error,
+    );
+    _publishToStream(update);
+    final observer = run.onUpdate;
+    if (observer == null) return;
     try {
       unawaited(
-        Future<void>.sync(
-          () => run.onUpdate(
-            AgentTaskExecutionUpdate(
-              task: task,
-              mcpUpdate: mcpUpdate,
-              message: message,
-              error: error,
-            ),
-          ),
-        ).catchError((Object _) {}),
+        Future<void>.sync(() => observer(update)).catchError((Object _) {}),
       );
     } on Object {
       // A failed view observer must not own execution progression.
+    }
+  }
+
+  void _publishToStream(AgentTaskExecutionUpdate update) {
+    if (_updates.isClosed) return;
+    try {
+      _updates.add(update);
+    } on Object {
+      // A display listener cannot interrupt orchestration.
     }
   }
 
@@ -213,6 +237,8 @@ class AgentTaskExecutionCoordinator {
 
 class AgentTaskExecutionUpdate {
   const AgentTaskExecutionUpdate({
+    this.sessionId,
+    this.sourceTaskId,
     this.task,
     this.mcpUpdate,
     this.message,
@@ -220,6 +246,8 @@ class AgentTaskExecutionUpdate {
     this.sessionRecoveryNotice,
   });
 
+  final String? sessionId;
+  final String? sourceTaskId;
   final AgentTaskRecord? task;
   final AgentMcpTaskUpdate? mcpUpdate;
   final String? message;
@@ -238,7 +266,7 @@ class _TaskRun {
   final AgentTaskRequest request;
   final AgentTaskRecord initialTask;
   final bool allowMcpContinuation;
-  final AgentTaskExecutionUpdateHandler onUpdate;
+  final AgentTaskExecutionUpdateHandler? onUpdate;
   bool active = true;
   Timer? _pollTimer;
   Completer<void>? _pollWaiter;

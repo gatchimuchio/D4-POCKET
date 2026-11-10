@@ -4021,7 +4021,7 @@ void main() {
         'server_id': serverId,
         'tool_id': toolId,
         'name': toolName,
-        'arguments': {'query': 'Tokyo'},
+        'arguments': {'query': 'AGENT_AUTO_MCP_RESULT_SENTINEL'},
       },
     });
     var agentCenterActive = true;
@@ -4164,7 +4164,7 @@ void main() {
             status: 'completed',
           )),
     ], onRequest: (operation) {
-      if (operation == 'MCP接続一覧' && agentCenterActive) {
+      if (operation == 'AgentTask結果表示承認' && agentCenterActive) {
         updateHost(() => agentCenterActive = false);
       }
     });
@@ -4307,6 +4307,7 @@ void main() {
     expect(find.text('AgentのMCP Tool提案をBroker照合・native承認'), findsNothing);
     expect(find.text('未信頼MCP結果を同じAgentの新Taskへ渡す'), findsNothing);
     expect(find.textContaining('AGENT_AUTO_MCP_SECRET'), findsNothing);
+    expect(find.textContaining('AGENT_AUTO_MCP_RESULT_SENTINEL'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
