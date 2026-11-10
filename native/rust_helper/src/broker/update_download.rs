@@ -2,7 +2,9 @@
 
 use cap_fs_ext::{FollowSymlinks, MetadataExt as CapMetadataExt, OpenOptionsFollowExt};
 use cap_std::fs::{Dir, OpenOptions};
-use reqwest::header::{ACCEPT_ENCODING, CONTENT_ENCODING, CONTENT_LENGTH, TRANSFER_ENCODING};
+use reqwest::header::{
+    ACCEPT, ACCEPT_ENCODING, CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE, TRANSFER_ENCODING,
+};
 use reqwest::{redirect, retry, Certificate, Client, Response, StatusCode, Url};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
@@ -11,6 +13,8 @@ use std::io::{Read, Write};
 use std::net::ToSocketAddrs;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::atomic::{AtomicBool, Ordering};
+#[cfg(any(not(windows), test))]
+use std::sync::mpsc;
 use std::time::Duration;
 
 use super::product_install::is_cap_reparse_point;
@@ -21,6 +25,9 @@ mod windows_dns;
 
 const MAX_PACKAGE_BYTES: u64 = 4 * 1024 * 1024 * 1024;
 const MAX_CATALOG_BYTES: usize = 64 * 1024;
+const MAX_A2A_CARD_BYTES: usize = 1024 * 1024;
+const MAX_A2A_HEADER_BYTES: usize = 16 * 1024;
+const MAX_A2A_HEADER_COUNT: usize = 64;
 const MAX_DOWNLOAD_TIME: Duration = Duration::from_secs(24 * 60 * 60);
 pub(crate) const CATALOG_TIMEOUT: Duration = Duration::from_secs(30);
 const READ_TIMEOUT: Duration = Duration::from_secs(60);
@@ -28,6 +35,9 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(20);
 const DNS_RESOLUTION_TIMEOUT: Duration = Duration::from_secs(15);
 const COPY_BUFFER_BYTES: usize = 64 * 1024;
 const PROGRESS_QUANTUM_BYTES: u64 = 4 * 1024 * 1024;
+
+#[cfg(not(windows))]
+static SYSTEM_DNS_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
 
 #[cfg(feature = "r2-e2e")]
 const R2_E2E_UPDATE_HOST: &str = "updates.d4p-test.example";
@@ -330,6 +340,107 @@ pub(crate) fn fetch_update_catalog(
     })
 }
 
+pub(crate) fn fetch_a2a_agent_card_document(
+    url_text: &str,
+    deadline: std::time::Instant,
+) -> Result<Vec<u8>, DownloadError> {
+    if url_text.len() > 2048 || std::time::Instant::now() >= deadline {
+        return Err(if std::time::Instant::now() >= deadline {
+            DownloadError::TimedOut
+        } else {
+            DownloadError::InvalidRequest
+        });
+    }
+    let url = Url::parse(url_text).map_err(|_| DownloadError::InvalidRequest)?;
+    let raw_authority = url_text
+        .split_once("://")
+        .map(|(_, remainder)| remainder.split('/').next().unwrap_or_default())
+        .ok_or(DownloadError::InvalidRequest)?;
+    if url.scheme() != "https"
+        || url.host_str().is_none()
+        || url.username() != ""
+        || url.password().is_some()
+        || raw_authority.contains('@')
+        || raw_authority.contains('%')
+        || !raw_authority.is_ascii()
+        || url.query().is_some()
+        || url.fragment().is_some()
+    {
+        return Err(DownloadError::InvalidRequest);
+    }
+    let host = url
+        .host_str()
+        .ok_or(DownloadError::InvalidRequest)?
+        .to_owned();
+    let port = url
+        .port_or_known_default()
+        .ok_or(DownloadError::InvalidRequest)?;
+    let addresses = resolve_public_addresses(&host, port, &AtomicBool::new(false), deadline)?;
+    fetch_a2a_agent_card_document_with_addresses(
+        url,
+        &host,
+        &addresses,
+        &[],
+        MAX_A2A_CARD_BYTES,
+        deadline,
+    )
+}
+
+fn fetch_a2a_agent_card_document_with_addresses(
+    url: Url,
+    host: &str,
+    addresses: &[SocketAddr],
+    additional_roots: &[Certificate],
+    max_bytes: usize,
+    deadline: std::time::Instant,
+) -> Result<Vec<u8>, DownloadError> {
+    if max_bytes == 0 || max_bytes > MAX_A2A_CARD_BYTES || addresses.is_empty() {
+        return Err(DownloadError::InvalidRequest);
+    }
+    let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+    if remaining.is_zero() {
+        return Err(DownloadError::TimedOut);
+    }
+    let client = build_download_client_with_header_limit(
+        host,
+        addresses,
+        additional_roots,
+        remaining,
+        MAX_A2A_HEADER_COUNT,
+    )?;
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|_| DownloadError::Network)?;
+    runtime.block_on(async {
+        let response = client
+            .get(url)
+            .header(ACCEPT, "application/json")
+            .header(ACCEPT_ENCODING, "identity")
+            .send()
+            .await
+            .map_err(map_reqwest_error)?;
+        if !a2a_response_headers_within_bound(response.headers()) {
+            return Err(DownloadError::InvalidHeaders);
+        }
+        let content_types = response.headers().get_all(CONTENT_TYPE);
+        if content_types.iter().count() != 1
+            || !content_types
+                .iter()
+                .next()
+                .and_then(|value| value.to_str().ok())
+                .is_some_and(|value| {
+                    value.split(';').next().is_some_and(|media_type| {
+                        media_type.trim().eq_ignore_ascii_case("application/json")
+                    })
+                })
+        {
+            return Err(DownloadError::InvalidHeaders);
+        }
+        receive_bounded_document(response, max_bytes, deadline).await
+    })
+}
+
 fn parse_source_url(url_text: &str) -> Result<Url, DownloadError> {
     let url = Url::parse(url_text).map_err(|_| DownloadError::InvalidRequest)?;
     let raw_authority = url_text
@@ -357,6 +468,16 @@ fn build_download_client(
     additional_roots: &[Certificate],
     timeout: Duration,
 ) -> Result<Client, DownloadError> {
+    build_download_client_with_header_limit(host, addresses, additional_roots, timeout, 0)
+}
+
+fn build_download_client_with_header_limit(
+    host: &str,
+    addresses: &[SocketAddr],
+    additional_roots: &[Certificate],
+    timeout: Duration,
+    max_headers: usize,
+) -> Result<Client, DownloadError> {
     if rustls::crypto::CryptoProvider::get_default().is_none() {
         let _ = rustls::crypto::ring::default_provider().install_default();
     }
@@ -373,6 +494,9 @@ fn build_download_client(
         .read_timeout(READ_TIMEOUT)
         .resolve_to_addrs(host, addresses)
         .http1_only();
+    if max_headers > 0 {
+        builder = builder.http1_max_headers(max_headers);
+    }
     for certificate in additional_roots {
         builder = builder.add_root_certificate(certificate.clone());
     }
@@ -462,6 +586,22 @@ async fn receive_bounded_document(
         return Err(DownloadError::TimedOut);
     }
     Ok(bytes)
+}
+
+fn a2a_response_headers_within_bound(headers: &reqwest::header::HeaderMap) -> bool {
+    if headers.iter().count() > MAX_A2A_HEADER_COUNT {
+        return false;
+    }
+    headers
+        .iter()
+        .try_fold(0usize, |total, (name, value)| {
+            total
+                .checked_add(name.as_str().len())
+                .and_then(|total| total.checked_add(value.as_bytes().len()))
+                .and_then(|total| total.checked_add(4))
+                .filter(|total| *total <= MAX_A2A_HEADER_BYTES)
+        })
+        .is_some()
 }
 
 async fn receive_package<F>(
@@ -813,10 +953,12 @@ fn resolve_public_addresses(
         }
         #[cfg(not(windows))]
         {
-            (host, port)
-                .to_socket_addrs()
-                .map_err(|_| DownloadError::NameResolution)?
-                .collect()
+            resolve_system_addresses(
+                host,
+                port,
+                cancel,
+                deadline.min(std::time::Instant::now() + DNS_RESOLUTION_TIMEOUT),
+            )?
         }
     };
     let mut addresses = BTreeSet::new();
@@ -832,9 +974,106 @@ fn resolve_public_addresses(
     Ok(addresses.into_iter().collect())
 }
 
+#[cfg(any(not(windows), test))]
+struct SystemDnsWorkerGuard(&'static AtomicBool);
+
+#[cfg(any(not(windows), test))]
+impl Drop for SystemDnsWorkerGuard {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::Release);
+    }
+}
+
+#[cfg(not(windows))]
+fn resolve_system_addresses(
+    host: &str,
+    port: u16,
+    cancel: &AtomicBool,
+    deadline: std::time::Instant,
+) -> Result<Vec<SocketAddr>, DownloadError> {
+    resolve_system_addresses_with(
+        host,
+        port,
+        cancel,
+        deadline,
+        &SYSTEM_DNS_IN_FLIGHT,
+        |host, port| {
+            (host, port)
+                .to_socket_addrs()
+                .map(|addresses| addresses.collect())
+                .map_err(|_| DownloadError::NameResolution)
+        },
+    )
+}
+
+#[cfg(any(not(windows), test))]
+fn resolve_system_addresses_with<F>(
+    host: &str,
+    port: u16,
+    cancel: &AtomicBool,
+    deadline: std::time::Instant,
+    in_flight: &'static AtomicBool,
+    resolver: F,
+) -> Result<Vec<SocketAddr>, DownloadError>
+where
+    F: FnOnce(&str, u16) -> Result<Vec<SocketAddr>, DownloadError> + Send + 'static,
+{
+    if cancel.load(Ordering::Acquire) {
+        return Err(DownloadError::Cancelled);
+    }
+    if std::time::Instant::now() >= deadline {
+        return Err(DownloadError::TimedOut);
+    }
+    in_flight
+        .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+        .map_err(|_| DownloadError::ResolverBusy)?;
+    let (reply, result) = mpsc::sync_channel(1);
+    let worker_host = host.to_string();
+    if std::thread::Builder::new()
+        .name("d4p-bounded-system-dns".into())
+        .spawn(move || {
+            let _guard = SystemDnsWorkerGuard(in_flight);
+            let outcome = resolver(&worker_host, port);
+            let _ = reply.send(outcome);
+        })
+        .is_err()
+    {
+        in_flight.store(false, Ordering::Release);
+        return Err(DownloadError::Network);
+    }
+    loop {
+        if cancel.load(Ordering::Acquire) {
+            return Err(DownloadError::Cancelled);
+        }
+        let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+        if remaining.is_zero() {
+            return Err(DownloadError::TimedOut);
+        }
+        match result.recv_timeout(remaining.min(Duration::from_millis(25))) {
+            Ok(outcome) => return outcome,
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
+            Err(mpsc::RecvTimeoutError::Disconnected) => return Err(DownloadError::Network),
+        }
+    }
+}
+
 #[cfg(feature = "r2-e2e")]
 fn r2_e2e_update_address(host: &str, port: u16) -> Option<SocketAddr> {
     (host == R2_E2E_UPDATE_HOST && port == 443).then(|| SocketAddr::from(([127, 0, 0, 1], 443)))
+}
+
+fn is_iana_2001_global_exception(ip: std::net::Ipv6Addr) -> bool {
+    let segments = ip.segments();
+    if segments[0] != 0x2001 || segments[1] > 0x01ff {
+        return false;
+    }
+    (segments[1] == 1
+        && segments[2..7].iter().all(|segment| *segment == 0)
+        && (1..=3).contains(&segments[7]))
+        || segments[1] == 3
+        || (segments[1] == 4 && segments[2] == 0x0112)
+        || (0x20..=0x2f).contains(&segments[1])
+        || (0x30..=0x3f).contains(&segments[1])
 }
 
 fn is_public_address(address: IpAddr) -> bool {
@@ -858,13 +1097,16 @@ fn is_public_address(address: IpAddr) -> bool {
         }
         IpAddr::V6(ip) => {
             let octets = ip.octets();
-            // Global unicastだけを許可し、protocol割当て、文書例、
-            // 非公開宛先を符号化または中継し得る6to4範囲を除外する。
+            // Global unicastだけを許可し、IANAの2001::/23は明示された
+            // global reachability例外以外を拒否する。文書例と6to4も除外する。
             (octets[0] & 0xe0) == 0x20
                 && !(octets[0] == 0x20
                     && octets[1] == 0x01
-                    && ((octets[2] == 0x0d && octets[3] == 0xb8)
-                        || (octets[2] == 0x00 && octets[3] <= 0x01)))
+                    && octets[2] == 0x0d
+                    && octets[3] == 0xb8)
+                && !(ip.segments()[0] == 0x2001
+                    && ip.segments()[1] <= 0x01ff
+                    && !is_iana_2001_global_exception(ip))
                 && !(octets[0] == 0x20 && octets[1] == 0x02)
                 && !(octets[0] == 0x3f && (octets[1] & 0xf0) == 0xf0)
         }
@@ -885,6 +1127,10 @@ mod tests {
     use std::net::{Ipv4Addr, TcpListener};
     use std::sync::Arc;
     use std::thread;
+
+    // 全件試験の負荷でWindowsの試験用TLS確立が遅れる場合がある。
+    // 製品のA2A要求期限は8秒のまま。
+    const A2A_TLS_FIXTURE_TIMEOUT: Duration = Duration::from_secs(30);
 
     fn temporary_directory(label: &str) -> std::path::PathBuf {
         let mut random = [0u8; 8];
@@ -919,6 +1165,12 @@ mod tests {
             "fc00::1",
             "fe80::1",
             "2001:db8::1",
+            "2001:1::4",
+            "2001:2::1",
+            "2001:10::1",
+            "2001:4:113::1",
+            "2001:1f:ffff:ffff:ffff:ffff:ffff:ffff",
+            "2001:1ff::1",
             "2002::1",
             "3fff::1",
         ] {
@@ -928,7 +1180,20 @@ mod tests {
                 "unexpectedly public: {address}"
             );
         }
-        for address in ["8.8.8.8", "1.1.1.1", "2606:4700:4700::1111"] {
+        for address in [
+            "8.8.8.8",
+            "1.1.1.1",
+            "2001:1::1",
+            "2001:1::2",
+            "2001:1::3",
+            "2001:3::1",
+            "2001:4:112::1",
+            "2001:20::1",
+            "2001:2f:ffff:ffff:ffff:ffff:ffff:ffff",
+            "2001:30::1",
+            "2001:3f:ffff:ffff:ffff:ffff:ffff:ffff",
+            "2606:4700:4700::1111",
+        ] {
             let address: IpAddr = address.parse().unwrap();
             assert!(
                 is_public_address(address),
@@ -1278,7 +1543,29 @@ mod tests {
         path: &'static str,
         bytes: &'static [u8],
         timeout: Duration,
-    ) -> (Client, Url, thread::JoinHandle<Result<String, String>>) {
+    ) -> (
+        Client,
+        Url,
+        thread::JoinHandle<Result<String, String>>,
+        Certificate,
+        Vec<SocketAddr>,
+    ) {
+        local_tls_response_endpoint(path, bytes, timeout, "200 OK", "application/json")
+    }
+
+    fn local_tls_response_endpoint(
+        path: &'static str,
+        bytes: &'static [u8],
+        timeout: Duration,
+        status: &'static str,
+        content_type: &'static str,
+    ) -> (
+        Client,
+        Url,
+        thread::JoinHandle<Result<String, String>>,
+        Certificate,
+        Vec<SocketAddr>,
+    ) {
         let certified = rcgen::generate_simple_self_signed(vec!["localhost".to_string()]).unwrap();
         let server_config = rustls::ServerConfig::builder()
             .with_no_client_auth()
@@ -1345,7 +1632,7 @@ mod tests {
             }
             write!(
                 tls,
-                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                "HTTP/1.1 {status}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
                 bytes.len()
             )
             .map_err(|error| {
@@ -1385,20 +1672,194 @@ mod tests {
                     }
                 }
             };
+            let authorization_header = request.lines().any(|line| {
+                line.split_once(':').is_some_and(|(name, _)| {
+                    name.eq_ignore_ascii_case("authorization")
+                        || name.eq_ignore_ascii_case("proxy-authorization")
+                })
+            });
             Ok(format!(
-                "peer={peer}; local={local}; response=written; peer_close={peer_close}"
+                "peer={peer}; local={local}; response=written; peer_close={peer_close}; authorization_header={authorization_header}"
             ))
         });
         let root = Certificate::from_der(certified.cert.der().as_ref()).unwrap();
-        let client = build_download_client("localhost", &[address], &[root], timeout).unwrap();
+        let client =
+            build_download_client("localhost", &[address], &[root.clone()], timeout).unwrap();
         let url = Url::parse(&format!("https://localhost:{}{path}", address.port())).unwrap();
-        (client, url, server)
+        (client, url, server, root, vec![address])
+    }
+
+    #[test]
+    fn a2a_https_agent_card_accepts_verified_local_fixture_and_never_sends_credentials() {
+        let bytes = br#"{"name":"fixture-agent"}"#;
+        let (_client, url, server, root, addresses) = local_tls_endpoint(
+            "/.well-known/agent-card.json",
+            bytes,
+            A2A_TLS_FIXTURE_TIMEOUT,
+        );
+        let result = fetch_a2a_agent_card_document_with_addresses(
+            url,
+            "localhost",
+            &addresses,
+            &[root],
+            MAX_A2A_CARD_BYTES,
+            std::time::Instant::now() + A2A_TLS_FIXTURE_TIMEOUT,
+        );
+        let observation = server.join().unwrap();
+        assert!(
+            observation.is_ok(),
+            "TLS fixture failed before producing the expected response: {observation:?}; client result: {result:?}"
+        );
+        assert_eq!(result.unwrap(), bytes);
+        let observation = observation.unwrap();
+        assert!(observation.contains("authorization_header=false"));
+    }
+
+    #[test]
+    fn a2a_https_agent_card_rejects_untrusted_certificate() {
+        let bytes = br#"{"name":"fixture-agent"}"#;
+        let (_client, url, server, _, addresses) =
+            local_tls_endpoint("/card", bytes, A2A_TLS_FIXTURE_TIMEOUT);
+        let unrelated =
+            rcgen::generate_simple_self_signed(vec!["other.example".to_string()]).unwrap();
+        let unrelated_root = Certificate::from_der(unrelated.cert.der().as_ref()).unwrap();
+        let error = fetch_a2a_agent_card_document_with_addresses(
+            url,
+            "localhost",
+            &addresses,
+            &[unrelated_root],
+            MAX_A2A_CARD_BYTES,
+            std::time::Instant::now() + A2A_TLS_FIXTURE_TIMEOUT,
+        )
+        .unwrap_err();
+        assert_eq!(error, DownloadError::Network);
+        assert!(server.join().unwrap().is_err());
+    }
+
+    #[test]
+    fn a2a_https_agent_card_rejects_redirect_wrong_media_type_and_oversize() {
+        for (status, content_type, body, max_bytes, expected) in [
+            (
+                "302 Found",
+                "application/json",
+                b"{}".as_slice(),
+                MAX_A2A_CARD_BYTES,
+                DownloadError::RedirectOrUnexpectedStatus,
+            ),
+            (
+                "200 OK",
+                "text/html",
+                b"{}".as_slice(),
+                MAX_A2A_CARD_BYTES,
+                DownloadError::InvalidHeaders,
+            ),
+            (
+                "200 OK",
+                "application/json",
+                b"12345".as_slice(),
+                4,
+                DownloadError::DocumentTooLarge,
+            ),
+        ] {
+            let (_client, url, server, root, addresses) = local_tls_response_endpoint(
+                "/card",
+                body,
+                A2A_TLS_FIXTURE_TIMEOUT,
+                status,
+                content_type,
+            );
+            let result = fetch_a2a_agent_card_document_with_addresses(
+                url,
+                "localhost",
+                &addresses,
+                &[root],
+                max_bytes,
+                std::time::Instant::now() + A2A_TLS_FIXTURE_TIMEOUT,
+            );
+            let observation = server.join().unwrap();
+            assert!(
+                observation.is_ok(),
+                "TLS fixture failed before producing the expected response: {observation:?}; expected client result: {expected:?}; actual: {result:?}"
+            );
+            assert_eq!(result.unwrap_err(), expected);
+        }
+    }
+
+    #[test]
+    fn a2a_response_header_budget_enforces_total_bytes_and_field_count() {
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert(CONTENT_TYPE, "application/json".parse().unwrap());
+        assert!(a2a_response_headers_within_bound(&headers));
+
+        let padding = "x".repeat(MAX_A2A_HEADER_BYTES);
+        headers.insert(
+            reqwest::header::HeaderName::from_static("x-padding"),
+            reqwest::header::HeaderValue::from_str(&padding).unwrap(),
+        );
+        assert!(!a2a_response_headers_within_bound(&headers));
+
+        let mut headers = reqwest::header::HeaderMap::new();
+        for index in 0..=MAX_A2A_HEADER_COUNT {
+            headers.insert(
+                reqwest::header::HeaderName::from_bytes(format!("x-{index}").as_bytes()).unwrap(),
+                "v".parse().unwrap(),
+            );
+        }
+        assert!(!a2a_response_headers_within_bound(&headers));
+    }
+
+    #[test]
+    fn a2a_https_public_address_resolution_rejects_loopback_before_connecting() {
+        assert_eq!(
+            fetch_a2a_agent_card_document(
+                "https://127.0.0.1/card",
+                std::time::Instant::now() + Duration::from_secs(1),
+            )
+            .unwrap_err(),
+            DownloadError::NonPublicAddress
+        );
+    }
+
+    #[test]
+    fn system_dns_deadline_limits_wait_and_fails_closed_while_worker_is_stuck() {
+        static TEST_DNS_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
+        let in_flight = &TEST_DNS_IN_FLIGHT;
+        let started = std::time::Instant::now();
+        let error = resolve_system_addresses_with(
+            "slow.invalid",
+            443,
+            &AtomicBool::new(false),
+            started + Duration::from_millis(10),
+            in_flight,
+            |_, _| {
+                thread::sleep(Duration::from_millis(120));
+                Ok(vec![SocketAddr::from(([8, 8, 8, 8], 443))])
+            },
+        )
+        .unwrap_err();
+        assert_eq!(error, DownloadError::TimedOut);
+        assert!(started.elapsed() < Duration::from_millis(100));
+        assert_eq!(
+            resolve_system_addresses_with(
+                "second.invalid",
+                443,
+                &AtomicBool::new(false),
+                std::time::Instant::now() + Duration::from_secs(1),
+                in_flight,
+                |_, _| panic!("同時resolver workerを起動しない"),
+            )
+            .unwrap_err(),
+            DownloadError::ResolverBusy
+        );
+        thread::sleep(Duration::from_millis(150));
+        assert!(!in_flight.load(Ordering::Acquire));
     }
 
     #[test]
     fn bounded_catalog_fetch_accepts_small_https_document() {
         let bytes = r#"{"版":1,"候補":[]}"#.as_bytes();
-        let (client, url, server) = local_tls_endpoint("/updates.json", bytes, CATALOG_TIMEOUT);
+        let (client, url, server, _, _) =
+            local_tls_endpoint("/updates.json", bytes, CATALOG_TIMEOUT);
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
@@ -1433,7 +1894,8 @@ mod tests {
     #[test]
     fn bounded_catalog_fetch_rejects_declared_document_over_limit() {
         let bytes = b"oversized";
-        let (client, url, server) = local_tls_endpoint("/updates.json", bytes, CATALOG_TIMEOUT);
+        let (client, url, server, _, _) =
+            local_tls_endpoint("/updates.json", bytes, CATALOG_TIMEOUT);
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
@@ -1516,7 +1978,7 @@ mod tests {
     fn local_tls_server_repairs_only_after_verified_package_bytes() {
         let bytes = b"locally served signed package";
         let digest = hex::encode(Sha256::digest(bytes));
-        let (client, url, server) = local_tls_endpoint("/update.pkg", bytes, CATALOG_TIMEOUT);
+        let (client, url, server, _, _) = local_tls_endpoint("/update.pkg", bytes, CATALOG_TIMEOUT);
         let path = temporary_directory("update-local-tls");
         let directory = Dir::open_ambient_dir(&path, cap_std::ambient_authority()).unwrap();
         std::fs::write(path.join(format!("{digest}.pkg")), vec![b'x'; bytes.len()]).unwrap();
@@ -1565,7 +2027,7 @@ mod tests {
         let response_bytes = b"wrong-content";
         let trusted_bytes = b"right-content";
         let trusted_digest = hex::encode(Sha256::digest(trusted_bytes));
-        let (client, url, server) =
+        let (client, url, server, _, _) =
             local_tls_endpoint("/update.pkg", response_bytes, CATALOG_TIMEOUT);
         let path = temporary_directory("update-package-repair-failed-transfer");
         let directory = Dir::open_ambient_dir(&path, cap_std::ambient_authority()).unwrap();

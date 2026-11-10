@@ -6583,6 +6583,7 @@ def A2A接続センターの統治経路と境界を検査する() -> list[str]:
         不整合.append("C16 receiptがcredential実値の存在を許可している")
 
     rust_a2a = (RUST_HELPER / "src" / "a2a.rs").read_text(encoding="utf-8")
+    rust_download = (RUST_HELPER / "src" / "broker" / "update_download.rs").read_text(encoding="utf-8")
     rust_center = (RUST_HELPER / "src" / "broker" / "a2a_center.rs").read_text(encoding="utf-8")
     owner_cli = (RUST_HELPER / "src" / "owner_cli.rs").read_text(encoding="utf-8")
     protocol = (RUST_HELPER / "src" / "broker" / "protocol.rs").read_text(encoding="utf-8")
@@ -6590,8 +6591,9 @@ def A2A接続センターの統治経路と境界を検査する() -> list[str]:
     ipc_request = (SPECS / "ipc_request.schema.json").read_text(encoding="utf-8")
     ipc_response = (SPECS / "ipc_response.schema.json").read_text(encoding="utf-8")
     for token, source in (
-        ("a2a_https_unavailable", rust_a2a),
+        ("fetch_a2a_agent_card_document(uri", rust_a2a),
         ("a2a_http_non_loopback", rust_a2a),
+        ("a2a_https_non_public_address", rust_a2a),
         ("Content-Length", rust_a2a),
         ("secret_value_present", rust_a2a),
         ("supportedInterfaces", rust_a2a),
@@ -6616,6 +6618,24 @@ def A2A接続センターの統治経路と境界を検査する() -> list[str]:
         ("load_persistent_connections", rust_center + protocol),
         ("a2a_connections.json", store),
         ("MalformedA2aState", store + rust_center),
+        ("fetch_a2a_agent_card_document_with_addresses", rust_download),
+        ("https_only(true)", rust_download),
+        ("no_proxy()", rust_download),
+        ("redirect(redirect::Policy::none())", rust_download),
+        ("retry(retry::never())", rust_download),
+        ("resolve_to_addrs(host, addresses)", rust_download),
+        ("http1_only()", rust_download),
+        ("MAX_A2A_CARD_BYTES", rust_download),
+        ("MAX_A2A_HEADER_BYTES", rust_download),
+        ("MAX_A2A_HEADER_COUNT", rust_download),
+        ("a2a_https_agent_card_rejects_untrusted_certificate", rust_download),
+        ("a2a_https_agent_card_rejects_redirect_wrong_media_type_and_oversize", rust_download),
+        ("a2a_https_public_address_resolution_rejects_loopback_before_connecting", rust_download),
+        ("is_iana_2001_global_exception", rust_download),
+        ("2001:2::1", rust_download),
+        ("2001:10::1", rust_download),
+        ("2001:1::1", rust_download),
+        ("2001:20::1", rust_download),
     ):
         if token not in source:
             不整合.append(f"C16実装に統治境界tokenがない: {token}")
@@ -7388,13 +7408,52 @@ def test_update_download_transport_is_broker_owned_and_bounded() -> list[str]:
         required_resolver = (
             "deadline.min(std::time::Instant::now()+DNS_RESOLUTION_TIMEOUT)",
             "windows_dns::resolve(",
-            "to_socket_addrs()",
+            "resolve_system_addresses(",
         )
         errors.extend(
             f"Broker DNS resolverの期限・platform境界がない: {token}"
             for token in required_resolver
             if token not in resolver
         )
+    system_resolver_match = re.search(
+        r"(?ms)^fn resolve_system_addresses_with<F>\(.*?^\}\s*$",
+        (RUST_HELPER / "src" / "broker" / "update_download.rs").read_text(
+            encoding="utf-8"
+        ),
+    )
+    if system_resolver_match is None:
+        errors.append("POSIX system DNSの期限付き制限関数がない")
+    else:
+        system_resolver = re.sub(r"\s+", "", system_resolver_match.group(0))
+        required_system_resolver = (
+            "in_flight.compare_exchange(false,true,Ordering::AcqRel,Ordering::Acquire)",
+            "mpsc::sync_channel(1)",
+            "result.recv_timeout(remaining.min(Duration::from_millis(25)))",
+            "SystemDnsWorkerGuard(in_flight)",
+            "DownloadError::ResolverBusy",
+        )
+        errors.extend(
+            f"POSIX system DNSの期限・worker上限がない: {token}"
+            for token in required_system_resolver
+            if re.sub(r"\s+", "", token) not in system_resolver
+        )
+    if "system_dns_deadline_limits_wait_and_fails_closed_while_worker_is_stuck" not in (
+        RUST_HELPER / "src" / "broker" / "update_download.rs"
+    ).read_text(encoding="utf-8"):
+        errors.append("POSIXの名前解決停止時の期限／作業thread再増殖否定試験がない")
+    system_resolver_driver = re.search(
+        r"(?ms)^fn resolve_system_addresses\(.*?^\}\s*$",
+        (RUST_HELPER / "src" / "broker" / "update_download.rs").read_text(
+            encoding="utf-8"
+        ),
+    )
+    if system_resolver_driver is None:
+        errors.append("POSIX system DNSのresolver接続関数がない")
+    else:
+        system_driver = re.sub(r"\s+", "", system_resolver_driver.group(0))
+        for token in ("resolve_system_addresses_with(", "to_socket_addrs()"):
+            if re.sub(r"\s+", "", token) not in system_driver:
+                errors.append(f"POSIX system DNSの期限付き接続がない: {token}")
     dns_helper = (ROOT / "native" / "windows_dns" / "src" / "lib.rs").read_text(
         encoding="utf-8"
     ).split("#[cfg(test)]", 1)[0]

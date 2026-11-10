@@ -61,9 +61,10 @@ class A2aConnectionClient {
   }) async {
     final normalizedId = agentId.trim();
     final normalizedUri = agentCardUri.trim();
-    if (!_validAgentId(normalizedId) || !_validLoopbackUri(normalizedUri)) {
+    final transport = _transportForAgentCardUri(normalizedUri);
+    if (!_validAgentId(normalizedId) || transport == null) {
       throw const BrokerClientException(
-        'Agent IDまたはloopback HTTP Agent Card URIが不正です',
+        'Agent IDまたはA2A Agent Card URIが不正です',
       );
     }
 
@@ -73,7 +74,7 @@ class A2aConnectionClient {
       'AgentID': normalizedId,
       'Agent Card URI': normalizedUri,
       'protocol_version': '1.0',
-      'Transport': 'http',
+      'Transport': transport,
       'Credential ref': {
         'credential_id': '00000000000000000000000000000000',
         'purpose': 'A2A接続',
@@ -419,7 +420,7 @@ class A2aConnectionClient {
         !bidiControls.contains(rune));
   }
 
-  static bool _validLoopbackUri(String value) {
+  static String? _transportForAgentCardUri(String value) {
     if (value.isEmpty ||
         value.length > 2048 ||
         value.contains('@') ||
@@ -427,30 +428,47 @@ class A2aConnectionClient {
         value.contains('#') ||
         value.contains('\\') ||
         value.codeUnits.any((unit) => unit <= 0x20 || unit >= 0x7f)) {
-      return false;
+      return null;
     }
     final uri = Uri.tryParse(value);
     if (uri == null ||
-        uri.scheme != 'http' ||
+        !{'http', 'https'}.contains(uri.scheme) ||
         uri.userInfo.isNotEmpty ||
         uri.hasQuery ||
         uri.hasFragment ||
         uri.host.isEmpty ||
+        uri.host.contains(':') ||
+        uri.host.contains('%') ||
         uri.port < 1 ||
         uri.port > 65535 ||
         uri.path.length > 1024 ||
         uri.path.codeUnits.any((unit) => unit < 0x21 || unit > 0x7e)) {
-      return false;
+      return null;
     }
-    final octets = uri.host.split('.');
-    if (octets.length != 4 ||
-        octets.any((item) =>
-            item.isEmpty ||
-            item.length > 3 ||
-            int.tryParse(item) == null ||
-            int.parse(item) > 255)) {
-      return false;
+    final ipv4 = uri.host.split('.');
+    final isIpv4 = ipv4.length == 4 &&
+        ipv4.every((item) {
+          final octet = int.tryParse(item);
+          return item.isNotEmpty &&
+              item.length <= 3 &&
+              octet != null &&
+              octet <= 255;
+        });
+    if (uri.scheme == 'http') {
+      if (!isIpv4 || int.parse(ipv4.first) != 127) return null;
+      return 'http';
     }
-    return int.parse(octets.first) == 127;
+    if (isIpv4) return 'https';
+    final labels = uri.host.split('.');
+    if (uri.host.length > 253 ||
+        labels.any((label) =>
+            label.isEmpty ||
+            label.length > 63 ||
+            label.startsWith('-') ||
+            label.endsWith('-') ||
+            !RegExp(r'^[A-Za-z0-9-]+$').hasMatch(label))) {
+      return null;
+    }
+    return 'https';
   }
 }

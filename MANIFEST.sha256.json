@@ -180,7 +180,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "5b7f74d8ae416daec88bdf60bff3865eb9e476a2a1d6a950cadf3950b9cca270"
+      "sha256": "f71bd93142873e523aaa41510a5e0524ff7171dd696d679f96a6ec269f998ed9"
     },
     {
       "path": "SECURITY.md",
@@ -224,7 +224,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/a2a_connection_center.dart",
-      "sha256": "cbb3b5f558e1494b8e32808c90b5c61c68fe75c2cacc2eb1529bd58313ab993c"
+      "sha256": "00aa50b26983a63d06fb3a37548c3b504b13372a58b744f8f80c105b02c7e979"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/agent_center.dart",
@@ -332,7 +332,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/a2a_connection_client.dart",
-      "sha256": "6306cde1621c42b29426ca6eae83f4af99375ed76100f1fbcfff91f52a574d4b"
+      "sha256": "0a43f38c0e18fc91f5b4394d850d0ba078d64425a2c57623de085e22284828f4"
     },
     {
       "path": "apps/desktop_flutter/lib/services/agent_coordination.dart",
@@ -616,7 +616,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/a2a_connection_center_test.dart",
-      "sha256": "9945b1458190919f3665f62055f174b6e1155dcc3016beab2e7810c7561ea844"
+      "sha256": "a1212ed4d940a60f8bd969f062050561c71ec75667f8b037f07a2f53b7583317"
     },
     {
       "path": "apps/desktop_flutter/test/agent_coordination_test.dart",
@@ -1436,7 +1436,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "02aa9e882e9bf83f96ffd8caec24fa8e1f0aec805a17260b5d5f5bd1c4daca95"
+      "sha256": "5557013079c922faa7c1d0e17d8c308b93a26750f57822a3fb704c2edbd18ef4"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1544,7 +1544,7 @@
     },
     {
       "path": "docs/specs/a2a-connection-center.md",
-      "sha256": "0d3b34ab78f9b4497bd4947b257e9048e4709cfc92fda284080625be3ee2189a"
+      "sha256": "0e8281565fc9a9b8af25ab28e974dcb78d870cda9b91d9dbe9791e2a69edbf08"
     },
     {
       "path": "docs/specs/a2a-contract.md",
@@ -3644,7 +3644,7 @@
     },
     {
       "path": "native/rust_helper/src/a2a.rs",
-      "sha256": "b38589a59f73478b11d5288fd8dd3068c445c09cbe4b710abf92f9d24da5e103"
+      "sha256": "6d227d9d7c5f0a4a2687104617d9ebfec5a696e64cded6f7fe637b108483b674"
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
@@ -3692,7 +3692,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/a2a_center.rs",
-      "sha256": "16957c714cc3af15310bd1c07359c1ee43301fd0f873dcaf9d202043528930d1"
+      "sha256": "de6376d5a25c02031acfbf83052e62f8dcf521fefcadd0b5352bd94c8f9e58c1"
     },
     {
       "path": "native/rust_helper/src/broker/adapter_center.rs",
@@ -3856,7 +3856,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
-      "sha256": "93341a8695586ac6c6e858d9c22fb8aa7217933b4d1c548cfd439854c721501d"
+      "sha256": "89b44beaba14e49a95628f698987f4febaacc66d80da3e872cd704334d57401e"
     },
     {
       "path": "native/rust_helper/src/broker/update_download/windows_dns.rs",
@@ -3880,7 +3880,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "0bf6c3a6aaf49ec43118f3dfd0e0b0bd41176fb201a2fc9ee37b25ed336f6e40"
+      "sha256": "49306a7605098240fa2b508f7607d15b652a27b4e62306804cc7e57fea05c8ac"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -3928,7 +3928,7 @@
     },
     {
       "path": "native/rust_helper/src/macos_desktop_owner.rs",
-      "sha256": "4b68ba92bbbb2c81d7f40be50eb5db689e23e4cea5156912e727d69fdeee901d"
+      "sha256": "0c70203680f59e64e001688c1eae537a1eacde7cd2136ef6b3911d10edf6a56a"
     },
     {
       "path": "native/rust_helper/src/macos_desktop_worker.rs",
@@ -4584,7 +4584,7 @@
     },
     {
       "path": "specs/a2a_connection.schema.json",
-      "sha256": "869b598bcb8a10a2e2dc7e8681669f81b6c075cda8cd989a073e437fff0d3d83"
+      "sha256": "81f84456458a7c342c952963fff295df781581a5ad0e6921f7086a10d55c548c"
     },
     {
       "path": "specs/a2a_connection_list.schema.json",
@@ -5316,7 +5316,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "d87cba32a386d83f24e9cec3e4d332975159972a2931b0b87713c5049b84755f"
+      "sha256": "c0bac484a47798333ca7bbec440d47ff96a95c1dcfc9d00486d73002c78de2d7"
     },
     {
       "path": "tooling/conformance_tests/test_final_development_audit.py",

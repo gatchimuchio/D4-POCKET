@@ -5,6 +5,7 @@
 #![allow(non_snake_case)]
 
 use crate::audit_hash::sha256_tagged;
+use crate::broker::update_download::{fetch_a2a_agent_card_document, DownloadError};
 use serde_json::{json, Map, Value};
 use std::io::{Read, Write};
 use std::net::{IpAddr, TcpStream, ToSocketAddrs};
@@ -47,7 +48,12 @@ pub(crate) fn fetch_agent_card(
 ) -> Result<Value, A2aError> {
     let endpoint = parse_endpoint(uri)?;
     validate_credential_ref(credential_ref, agent_id)?;
-    let raw = http_get(&endpoint)?;
+    let raw = if endpoint.scheme == "http" {
+        http_get(&endpoint)?
+    } else {
+        fetch_a2a_agent_card_document(uri, Instant::now() + Duration::from_secs(8))
+            .map_err(map_https_error)?
+    };
     let card_text = std::str::from_utf8(&raw)
         .map_err(|_| A2aError::new("a2a_card_invalid_json", "A2A Agent CardがUTF-8ではない"))?;
     let card: Value = crate::broker::json_input::read_unique(card_text).map_err(|_| {
@@ -76,12 +82,6 @@ fn parse_endpoint(uri: &str) -> Result<Endpoint, A2aError> {
             "A2A接続はhttpまたはhttpsだけを受け付ける",
         ));
     }
-    if scheme == "https" {
-        return Err(A2aError::new(
-            "a2a_https_unavailable",
-            "C16の現行Rust helperはhttps Agent Card取得を未接続とする",
-        ));
-    }
     if remainder.contains('@') || remainder.contains('#') || remainder.contains('?') {
         return Err(A2aError::new(
             "a2a_endpoint_invalid",
@@ -106,7 +106,10 @@ fn parse_endpoint(uri: &str) -> Result<Endpoint, A2aError> {
             })?,
         )
     } else {
-        (authority.to_string(), 80)
+        (
+            authority.to_string(),
+            if scheme == "https" { 443 } else { 80 },
+        )
     };
     if port == 0 || host.is_empty() || host.len() > 255 || host.contains(':') || path.len() > 1024 {
         return Err(A2aError::new(
@@ -120,17 +123,29 @@ fn parse_endpoint(uri: &str) -> Result<Endpoint, A2aError> {
             "A2A Agent Card URIのpathは空白のないASCII URI表記が必要",
         ));
     }
-    let ip = host.parse::<IpAddr>().map_err(|_| {
-        A2aError::new(
-            "a2a_http_non_loopback",
-            "httpのA2A接続はloopback IPへ限定する",
-        )
-    })?;
-    if !ip.is_loopback() {
-        return Err(A2aError::new(
-            "a2a_http_non_loopback",
-            "httpのA2A接続はloopbackへ限定する",
-        ));
+    match scheme.as_str() {
+        "http" => {
+            let ip = host.parse::<IpAddr>().map_err(|_| {
+                A2aError::new(
+                    "a2a_http_non_loopback",
+                    "httpのA2A接続はloopback IPへ限定する",
+                )
+            })?;
+            if !ip.is_loopback() {
+                return Err(A2aError::new(
+                    "a2a_http_non_loopback",
+                    "httpのA2A接続はloopback IPへ限定する",
+                ));
+            }
+        }
+        "https" if valid_https_host(&host) => {}
+        "https" => {
+            return Err(A2aError::new(
+                "a2a_endpoint_invalid",
+                "httpsのA2A接続先host表記が不正",
+            ));
+        }
+        _ => unreachable!("schemeは先行検査済み"),
     }
     Ok(Endpoint {
         scheme,
@@ -139,6 +154,53 @@ fn parse_endpoint(uri: &str) -> Result<Endpoint, A2aError> {
         authority: authority.to_string(),
         path,
     })
+}
+
+fn valid_https_host(host: &str) -> bool {
+    if host.parse::<IpAddr>().is_ok() {
+        return host.is_ascii();
+    }
+    host.is_ascii()
+        && host.len() <= 253
+        && host.split('.').all(|label| {
+            !label.is_empty()
+                && label.len() <= 63
+                && !label.starts_with('-')
+                && !label.ends_with('-')
+                && label
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+        })
+}
+
+pub(crate) fn transport_name(uri: &str) -> Result<&'static str, A2aError> {
+    let endpoint = parse_endpoint(uri)?;
+    Ok(if endpoint.scheme == "https" {
+        "https"
+    } else {
+        "http"
+    })
+}
+
+fn map_https_error(error: DownloadError) -> A2aError {
+    match error {
+        DownloadError::NonPublicAddress => A2aError::new(
+            "a2a_https_non_public_address",
+            "https A2A接続先がpublic IP範囲ではない",
+        ),
+        DownloadError::TimedOut => A2aError::new("a2a_timeout", "https Agent Card取得が期限を超過"),
+        DownloadError::DocumentTooLarge
+        | DownloadError::InvalidHeaders
+        | DownloadError::RedirectOrUnexpectedStatus
+        | DownloadError::SizeMismatch => A2aError::new(
+            "a2a_response_invalid",
+            "https Agent Card応答のstatus、headerまたはsizeが不正",
+        ),
+        DownloadError::InvalidRequest => {
+            A2aError::new("a2a_endpoint_invalid", "https Agent Card接続先が不正")
+        }
+        _ => A2aError::new("a2a_connection_failed", "https Agent Cardへ接続できない"),
+    }
 }
 
 pub(crate) fn owner_confirmation_target(
@@ -760,10 +822,13 @@ mod tests {
         }
     }
     #[test]
-    fn httpsと非loopbackとuserinfoを現行境界で拒否する() {
+    fn httpsを許可し_HTTP外部hostと不正hostとuserinfoを拒否する() {
+        let https = parse_endpoint("https://agent.example/card").expect("HTTPS endpoint");
+        assert_eq!(https.scheme, "https");
+        assert_eq!(https.port, 443);
         assert_eq!(
-            parse_endpoint("https://example.com/card").unwrap_err().code,
-            "a2a_https_unavailable"
+            transport_name("https://agent.example:8443/card").unwrap(),
+            "https"
         );
         assert_eq!(
             parse_endpoint("http://example.com/card").unwrap_err().code,
@@ -775,6 +840,18 @@ mod tests {
                 .code,
             "a2a_endpoint_invalid"
         );
+        for uri in [
+            "https://-invalid.example/card",
+            "https://invalid-.example/card",
+            "https://bad_host.example/card",
+            "https://agent.example/card?token=secret-marker",
+            "https://agent.example/card#fragment",
+        ] {
+            assert_eq!(
+                parse_endpoint(uri).unwrap_err().code,
+                "a2a_endpoint_invalid"
+            );
+        }
         for uri in [
             "http://127.0.0.1/card?token=secret-marker",
             "http://127.0.0.1/card#fragment",

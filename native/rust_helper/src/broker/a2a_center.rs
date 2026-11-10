@@ -955,11 +955,12 @@ fn parse_request(payload: &Value) -> Result<ConnectionRequest, A2aError> {
         || request.operation != "接続"
         || !valid_agent_id(&request.agent_id)
         || request.protocol_version != PROTOCOL_VERSION
-        || request.transport != "http"
+        || crate::a2a::transport_name(&request.agent_card_uri).ok()
+            != Some(request.transport.as_str())
     {
         return Err(A2aError::new(
             "a2a_connection_request_invalid",
-            "A2A接続payloadの値または現行transport境界が不正",
+            "A2A接続payloadの値またはURIとtransportの対応が不正",
         ));
     }
     Ok(request)
@@ -1138,7 +1139,7 @@ mod tests {
     }
 
     #[test]
-    fn A2A接続要求のAuthorityとHTTPSを拒否する() {
+    fn A2A接続要求はURIと一致するtransportだけを受理する() {
         let mut authority = valid_payload();
         authority["AgentID"] = Value::String("agent/authority".to_string());
         assert_eq!(
@@ -1146,9 +1147,15 @@ mod tests {
             "a2a_connection_request_invalid"
         );
         let mut https = valid_payload();
+        https["Agent Card URI"] =
+            Value::String("https://agent.example/.well-known/agent-card.json".to_string());
         https["Transport"] = Value::String("https".to_string());
+        assert_eq!(parse_request(&https).unwrap().transport, "https");
+        https["Transport"] = Value::String("http".to_string());
         assert_eq!(
-            parse_request(&https).expect_err("未対応transport").code,
+            parse_request(&https)
+                .expect_err("URIと不一致のtransport")
+                .code,
             "a2a_connection_request_invalid"
         );
     }

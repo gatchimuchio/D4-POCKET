@@ -47,13 +47,32 @@ void main() {
     expect(jsonEncode(transport.payloads), isNot(contains('Authorization')));
   });
 
-  test('外部host・HTTPS・userinfo・query・fragmentは送信前に拒否する', () async {
+  test('HTTPS Agent Card要求はhttps transportとしてnative Brokerへ束縛する', () async {
+    final transport = _A2aTransport([
+      _response('A2A接続', 'audit-a2a-connect', _receipt(),
+          evidence: 'INTERNAL_STATE'),
+    ]);
+    await A2aConnectionClient(transport).connect(
+      agentId: 'fixture-agent',
+      agentCardUri: 'https://agent.example/.well-known/agent-card.json',
+    );
+
+    expect(transport.operations, ['A2A接続']);
+    expect(transport.payloads.single?['Transport'], 'https');
+    expect(
+      transport.payloads.single?['Agent Card URI'],
+      'https://agent.example/.well-known/agent-card.json',
+    );
+  });
+
+  test('public HTTP・不正host・userinfo・query・fragmentは送信前に拒否する', () async {
     final transport = _A2aTransport(const []);
     final client = A2aConnectionClient(transport);
     for (final uri in [
       'http://192.168.1.9:9080/card',
-      'https://127.0.0.1:9080/card',
       'http://user@127.0.0.1:9080/card',
+      'https://user@agent.example/card',
+      'https://bad_host.example/card',
       'http://127.0.0.1:9080/card?token=secret-marker',
       'http://127.0.0.1:9080/card#fragment',
       'http://127.0.0.1:9080/card with-space',

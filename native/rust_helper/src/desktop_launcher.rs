@@ -2974,12 +2974,20 @@ fn owner_confirmation_text_for_identity(
             agent_id,
             target,
             payload_hash,
-        } => format!(
-            "指定したloopback A2A Agent Cardのmetadataを取得しますか？\n\nAgent ID: {}\n取得先: {}\nTransport: HTTP（loopback IP限定）\n\nCredential実値は受け取らず、Task送信・Message送信・Workspace変更は行いません。Agent Cardは未信頼metadataとして記録し、Trustはpending reviewのままです。外部Agentの宣言からPermission、Approval、Authorityを生成しません。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
-            owner_confirmation_value(agent_id),
-            owner_confirmation_value(target),
-            payload_hash
-        ),
+        } => {
+            let transport_description = if target.starts_with("https://") {
+                "HTTPS（OS既定CAで証明書検証、public IPへ接続、redirectなし）"
+            } else {
+                "HTTP（IPv4 loopback限定）"
+            };
+            format!(
+                "指定したA2A Agent Cardのmetadataを取得しますか？\n\nAgent ID: {}\n取得先: {}\nTransport: {}\n\nCredential実値は受け取らず、Task送信・Message送信・Workspace変更は行いません。Agent Cardは未信頼metadataとして記録し、Trustはpending reviewのままです。外部Agentの宣言からPermission、Approval、Authorityを生成しません。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
+                owner_confirmation_value(agent_id),
+                owner_confirmation_value(target),
+                transport_description,
+                payload_hash
+            )
+        }
         DesktopOwnerOperationSummary::AdapterManagement {
             operation,
             adapter_id,
@@ -7823,7 +7831,7 @@ mod tests {
             target,
             payload_hash,
         });
-        assert!(confirmation.contains("loopback IP限定"));
+        assert!(confirmation.contains("IPv4 loopback限定"));
         assert!(confirmation.contains("Trustはpending review"));
         assert!(confirmation.contains("Task送信"));
         assert!(!confirmation.contains("credential_value"));
@@ -7831,8 +7839,9 @@ mod tests {
         for uri in [
             "http://127.0.0.1:9080/card?token=secret-marker",
             "http://192.0.2.7:9080/card",
-            "https://127.0.0.1:9080/card",
             "http://user@127.0.0.1:9080/card",
+            "https://user@agent.example/card",
+            "https://agent.example/card?token=secret-marker",
         ] {
             let mut invalid_payload = payload.clone();
             invalid_payload["Agent Card URI"] = serde_json::json!(uri);
@@ -7848,7 +7857,7 @@ mod tests {
             );
         }
 
-        let mut secret_payload = payload;
+        let mut secret_payload = payload.clone();
         secret_payload["Credential ref"]["secret_value"] = serde_json::json!("secret-marker");
         let secret_request = desktop_owner_request(
             "A2A接続",
@@ -7859,6 +7868,24 @@ mod tests {
         assert!(
             owner_operation_candidate(secret_request.to_string().as_bytes(), &endpoint).is_none()
         );
+
+        let mut https_payload = payload;
+        https_payload["Agent Card URI"] =
+            serde_json::json!("https://agent.example/.well-known/agent-card.json");
+        https_payload["Transport"] = serde_json::json!("https");
+        let https_request = desktop_owner_request(
+            "A2A接続",
+            "desktop-a2a-https-connect",
+            "desktop-a2a-https-connect-nonce",
+            https_payload,
+        );
+        let (_, https_summary) =
+            owner_operation_candidate(https_request.to_string().as_bytes(), &endpoint)
+                .expect("証明書検証付きHTTPS Agent Cardもnative Owner確認を要求する");
+        let https_confirmation = owner_confirmation_text(&https_summary);
+        assert!(https_confirmation.contains("OS既定CAで証明書検証"));
+        assert!(https_confirmation.contains("public IPへ接続"));
+        assert!(https_confirmation.contains("redirectなし"));
     }
 
     #[test]

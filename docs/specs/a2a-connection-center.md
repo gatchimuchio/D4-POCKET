@@ -4,7 +4,9 @@
 
 C16の最初の完結単位は、owner controlからA2A Agent Cardを取得し、接続receiptへboundedな`metadata_only`として射影する経路である。外部Agentの宣言を自動信頼せず、接続成功とTrust、Permission、Approval、Authorityを分離する。
 
-現行Transportは、Rust helperのloopback IPv4 HTTP取得だけである。userinfo、query、fragment、空白または非ASCIIを含むpathを拒否する。HTTPS、外部公開HTTP、redirect、Transfer-Encoding、Content-Encoding、重複Content-Length、巨大header、巨大body、credential実値を受け付けない。Agent Cardのendpointはhashだけを保存する。
+現行TransportはRust helperが所有するloopback IPv4 HTTPとpublic HTTPSである。HTTPはloopback IPv4だけを許可し、HTTPSはOS既定の証明書信頼storeでhost／certificateを検証する。HTTPSのDNS結果は全件をpublic IP検査し、解決した固定addressへ接続する。private addressが一件でも含まれる場合は拒否する。HTTPSではproxy、redirect、自動retry、HTTP/2を使わず、HTTP/1、`Accept: application/json`、`Accept-Encoding: identity`で取得する。userinfo、query、fragment、空白または非ASCIIを含むhost／path、Transfer-Encoding、Content-Encoding、重複Content-Length、不正なstatus／Content-Type、16 KiB超または64 field超のheader、1 MiB超のbody、credential実値を拒否する。bodyは8秒期限内に読み切る。OSの名前解決呼出しが期限内に戻らない場合もBroker要求は期限で終了し、追加のresolver workerを起動せずfail-closedにする。HTTPSのinterface URLはhashだけを保存する。
+
+IPv6の`2001::/23` special-purpose親範囲は、IANA registryでより具体的なallocationが`Globally Reachable=true`とされる場合だけ許可する。対象は`2001:1::1/128`〜`2001:1::3/128`、`2001:3::/32`、`2001:4:112::/48`、`2001:20::/28`、`2001:30::/28`である。それ以外の親範囲内アドレス、benchmarkingの`2001:2::/48`、deprecatedな`2001:10::/28`は拒否する。[IANA IPv6 Special-Purpose Address Space](https://www.iana.org/assignments/iana-ipv6-special-registry)。この判定関数は更新取得経路でも共有される。
 
 Agent Card内の各`supportedInterfaces`では`url`と`protocolVersion`を検証する。interface URL実値は保存・表示せず、`interface_hash`、protocol binding／version、transportだけをmetadataへ射影する。Task／Message consumerは未接続のため、宣言されたinterfaceとstreamingは`unsupported`を返す。metadataを実行可能性へ昇格しない。
 
@@ -18,7 +20,7 @@ Desktop A2A接続センター
   → 認証済みBroker IPC
   → A2A接続
   → Rust A2A helper
-  → loopback HTTP Agent Card
+  → loopback HTTPまたは証明書検証済みpublic HTTPS Agent Card
   → Agent Card検証
   → LIVE_RUNTIME metadata-only receipt
 
@@ -31,7 +33,7 @@ owner control
   → A2A接続
   → Rust Security Broker
   → Rust A2A helper
-  → loopback HTTP Agent Card
+  → loopback HTTPまたは証明書検証済みpublic HTTPS Agent Card
   → Agent Card検証
   → LIVE_RUNTIME metadata-only receipt
 
@@ -76,7 +78,7 @@ Desktopの`A2A接続センター`は、必須`shell.agent_operation`に含まれ
 
 ## 現行未接続範囲
 
-- HTTPSのTLS接続、公開endpoint discovery、OAuth／API keyなどの認証実行
+- 導入済み製品を使った実外部HTTPS endpointへの接続証拠、OAuth／API keyなどの認証実行
 - Task送信、Message送信、Artifact本文取得、Stream購読、cancel、A2A transport sessionの再接続、quarantine
 - 外部Agent比較、複数Agent同一Workspace隔離、Handoff
 - 実A2A Test Harness、Windows installed productでの接続証拠、長時間運用・障害注入

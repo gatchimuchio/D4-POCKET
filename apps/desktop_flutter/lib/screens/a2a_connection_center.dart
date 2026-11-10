@@ -50,8 +50,8 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
       children: [
         const BorderedPanel(
           child: Text(
-            'Agent Cardは未信頼の外部metadataとして扱います。接続先はloopback IPv4のHTTPに限り、'
-            'Rust Broker経由で接続ごとにnative Owner確認を行います。Credential値は扱わず、'
+            'Agent Cardは未信頼の外部metadataとして扱います。HTTPはloopback IPv4に限定し、'
+            'HTTPSは証明書を検証しpublic IPへ接続します。Rust Broker経由で接続ごとにnative Owner確認を行います。Credential値は扱わず、'
             '接続だけでTrust・Permission・Approval・Authorityは生成しません。'
             'Task、Message、Artifact、Streamの実行・取得はこの画面では行いません。',
           ),
@@ -65,7 +65,7 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('loopback Agent Card登録',
+                Text('Agent Card登録',
                     style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 8),
                 TextField(

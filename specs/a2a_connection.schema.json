@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/gui-shell/schemas/a2a_connection.schema.json",
   "title": "A2A接続要求（A2aConnection）",
-  "description": "owner controlからloopback HTTPのA2A Agent Cardを取得する要求。Credential実値、Authority、Approvalは含めない。",
+  "description": "owner controlからloopback HTTPまたは証明書検証付きpublic HTTPSでA2A Agent Cardを取得する要求。Credential実値、Authority、Approvalは含めない。",
   "type": "object",
   "required": ["版", "操作", "AgentID", "Agent Card URI", "protocol_version", "Transport", "Credential ref"],
   "additionalProperties": false,
@@ -12,7 +12,7 @@
     "AgentID": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$(?![\\s\\S])" },
     "Agent Card URI": { "type": "string", "minLength": 1, "maxLength": 2048 },
     "protocol_version": { "const": "1.0" },
-    "Transport": { "const": "http" },
+    "Transport": { "enum": ["http", "https"] },
     "Credential ref": {
       "type": "object",
       "required": ["credential_id", "purpose", "target", "required", "status"],

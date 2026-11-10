@@ -728,8 +728,13 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
     } else if operation == "A2A接続" {
         let (agent, target) =
             crate::broker::a2a_center::owner_confirmation_summary(payload).ok()?;
+        let transport = if target.starts_with("https://") {
+            "HTTPS（OS既定CAで証明書検証、public IPへ接続、redirectなし）"
+        } else {
+            "HTTP（IPv4 loopback限定）"
+        };
         format!(
-            "外部Agentの宣言情報だけを取得します。\nAgent ID: {agent}\n接続先: {target}\n要求hash: {hash}\n\nAgent Cardは未信頼metadataです。Trust・Task Permission・Approval・Credentialを生成せず、Task実行を行いません。Brokerが現在の要求と永続Auditを再評価します。"
+            "外部Agentの宣言情報だけを取得します。\nAgent ID: {agent}\n接続先: {target}\nTransport: {transport}\n要求hash: {hash}\n\nAgent Cardは未信頼metadataです。Trust・Task Permission・Approval・Credentialを生成せず、Task実行を行いません。Brokerが現在の要求と永続Auditを再評価します。"
         )
     } else if matches!(operation, "MCP接続" | "MCP切断" | "MCP Tool実行") {
         let summary = macos_owner_summary(operation, payload)?;
@@ -1195,10 +1200,21 @@ mod a2a_tests {
             .summary
             .contains(valid["payload_hash"].as_str().unwrap()));
         assert!(current.summary.contains("未信頼metadata"));
+        assert!(current.summary.contains("IPv4 loopback限定"));
         assert_eq!(current.response_timeout, Duration::from_secs(10));
         let normalized: serde_json::Value = serde_json::from_str(&current.request).unwrap();
         assert_eq!(normalized["payload"], valid["payload"]);
         assert_eq!(normalized["session_id"], "fixture-session");
+
+        let mut https = valid.clone();
+        https["payload"]["Agent Card URI"] =
+            json!("https://agent.example/.well-known/agent-card.json");
+        https["payload"]["Transport"] = json!("https");
+        https["payload_hash"] = json!(canonical_payload_hash(https.get("payload")));
+        let https_candidate = candidate(&serde_json::to_vec(&https).unwrap(), &endpoint).unwrap();
+        assert!(https_candidate.summary.contains("OS既定CAで証明書検証"));
+        assert!(https_candidate.summary.contains("public IPへ接続"));
+        assert!(https_candidate.summary.contains("redirectなし"));
         for key in ["session_id", "approval"] {
             let mut invalid = valid.clone();
             invalid[key] = json!(true);
