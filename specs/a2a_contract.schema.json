@@ -121,10 +121,12 @@
           "maxItems": 8,
           "items": {
             "type": "object",
-            "required": ["binding", "transport", "status", "reason"],
+            "required": ["binding", "protocol_version", "interface_hash", "transport", "status", "reason"],
             "additionalProperties": false,
             "properties": {
               "binding": { "enum": ["jsonrpc", "grpc", "http_rest", "unknown"] },
+              "protocol_version": { "type": "string", "minLength": 1, "maxLength": 128 },
+              "interface_hash": { "$ref": "#/$defs/hash" },
               "transport": { "enum": ["https", "http", "unknown"] },
               "status": { "enum": ["supported", "unsupported", "unknown"] },
               "reason": { "type": "string", "minLength": 1, "maxLength": 512 }

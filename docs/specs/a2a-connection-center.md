@@ -6,6 +6,10 @@ C16の最初の完結単位は、owner controlからA2A Agent Cardを取得し�
 
 現行Transportは、Rust helperのloopback IPv4 HTTP取得だけである。userinfo、query、fragment、空白または非ASCIIを含むpathを拒否する。HTTPS、外部公開HTTP、redirect、Transfer-Encoding、Content-Encoding、重複Content-Length、巨大header、巨大body、credential実値を受け付けない。Agent Cardのendpointはhashだけを保存する。
 
+Agent Card内の各`supportedInterfaces`では`url`と`protocolVersion`を検証する。interface URL実値は保存・表示せず、`interface_hash`、protocol binding／version、transportだけをmetadataへ射影する。Task／Message consumerは未接続のため、宣言されたinterfaceとstreamingは`unsupported`を返す。metadataを実行可能性へ昇格しない。
+
+従来の保存receiptは起動時に読み取り専用で保守的に整形する。旧版にはinterface URLが保存されていないため`interface_hash=null`、protocol version／status=`unknown`へ降格し、`restored_pending_review`／`owner_reapproval_required`を保持する。旧履歴から接続・Trust・Permission・Approvalを再生成しない。
+
 ## 実行経路
 
 ```text

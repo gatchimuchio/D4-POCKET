@@ -34,7 +34,7 @@ fn main() -> io::Result<()> {
                 }
                 let body = serde_json::to_vec(&serde_json::json!({
                     "name":"Mac A2A fixture","description":"Public test declaration only",
-                    "version":"1.0.0","supportedInterfaces":[{"protocolBinding":"JSONRPC","protocolVersion":"1.0"}],
+                    "version":"1.0.0","supportedInterfaces":[{"url":"http://127.0.0.1:34101/rpc","protocolBinding":"JSONRPC","protocolVersion":"1.0"}],
                     "capabilities":{"streaming":false,"pushNotifications":false,"stateTransitionHistory":false,"extendedAgentCard":false},
                     "securitySchemes":{},"skills":[]
                 }))?;

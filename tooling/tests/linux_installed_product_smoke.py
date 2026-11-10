@@ -6941,7 +6941,11 @@ def _run_installed_a2a_metadata_acceptance(
         "description": "Run-owned local Agent Card metadata fixture",
         "version": "1.0.0",
         "supportedInterfaces": [
-            {"protocolBinding": "JSONRPC", "protocolVersion": "1.0"}
+            {
+                "url": "http://127.0.0.1:34102/rpc",
+                "protocolBinding": "JSONRPC",
+                "protocolVersion": "1.0",
+            }
         ],
         "capabilities": {
             "streaming": False,

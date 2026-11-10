@@ -224,7 +224,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/a2a_connection_center.dart",
-      "sha256": "a3ff065ec71b328eb6786a83136e9cb22abbc4c83621d6ab2fafa7bccea2ae99"
+      "sha256": "dd12c89e5a7b1f7a0f06e74ae46507cdd9d6b182e98d9813ad2e1e6145bb1e76"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/agent_center.dart",
@@ -332,7 +332,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/a2a_connection_client.dart",
-      "sha256": "f4fc79dc4699bcddb2a46dff83f2ac791932e8865be605a78e9e733fc89d07c2"
+      "sha256": "6306cde1621c42b29426ca6eae83f4af99375ed76100f1fbcfff91f52a574d4b"
     },
     {
       "path": "apps/desktop_flutter/lib/services/agent_coordination.dart",
@@ -616,7 +616,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/a2a_connection_center_test.dart",
-      "sha256": "703e1be9e7a3a7b16ea0208819c235b7029f3249c8adb299d6f7de05ec76d481"
+      "sha256": "ef6f72b5abc9eaabc3ba8ab5862f4b84043b016a41fef79bb9d8c73b42f625ef"
     },
     {
       "path": "apps/desktop_flutter/test/agent_coordination_test.dart",
@@ -1436,7 +1436,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "e7e71691531d4333a6c3b718fccc8c63290e88d4e5c85d54ec4c030ef15ce970"
+      "sha256": "a247f4f456b8701fed697a8fc0d5538aa689cc901db04c11755ca199e718c534"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1544,11 +1544,11 @@
     },
     {
       "path": "docs/specs/a2a-connection-center.md",
-      "sha256": "97dc91c6395a238e4796505adc4eaccbd66d7d8f05a4656a389ac01702f57c9c"
+      "sha256": "5d11414974d4df3c9ad7851611e7d012f82c2df2e27b9b4d440306b8991ed603"
     },
     {
       "path": "docs/specs/a2a-contract.md",
-      "sha256": "69673d8a33e1a14718513aa1b40051aed89eb464978ea8a46b4d1ed428c43251"
+      "sha256": "5af04179a2fedbce3cc034982796ec02de3b9223250df01c89d8815274db3b14"
     },
     {
       "path": "docs/specs/adapter-conformance.md",
@@ -1896,11 +1896,11 @@
     },
     {
       "path": "examples/contracts/a2a_connection_receipt.valid.json",
-      "sha256": "57e67b0516cfa3d77c92f8e5e8ddaf4e77bf4e5347dd6011449c309265f657a5"
+      "sha256": "3675c91a7de1ea4a2e5ce3ca9e9f488bb350e329b37ad58c5caa993ea03c6ca4"
     },
     {
       "path": "examples/contracts/a2a_contract.valid.json",
-      "sha256": "f0121bf4bf8a37e1a67597f51053dbf2453a0a6798d7922c194205e091634772"
+      "sha256": "9493de831666618e4a9bec87ae28edd3bee4dc5013f0a20c353a6c09f706b46d"
     },
     {
       "path": "examples/contracts/action_envelope.valid.json",
@@ -3616,7 +3616,7 @@
     },
     {
       "path": "native/rust_helper/examples/macos_a2a_fixture.rs",
-      "sha256": "001ba26239209a5afbeb54fc4beea2d79002ecf5a7baca87ed265b0eda2828b2"
+      "sha256": "fc2a7f0cc14b19d53d0a623ca74bd97fb7db1b9c76d835e09788e9d5744c1d84"
     },
     {
       "path": "native/rust_helper/examples/macos_mcp_fixture.rs",
@@ -3640,7 +3640,7 @@
     },
     {
       "path": "native/rust_helper/src/a2a.rs",
-      "sha256": "34d799942042aef254ada530bbcd8884468a91a5c59cc456a4e661c39375b253"
+      "sha256": "b38589a59f73478b11d5288fd8dd3068c445c09cbe4b710abf92f9d24da5e103"
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
@@ -3688,7 +3688,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/a2a_center.rs",
-      "sha256": "c941a90e8218ef82697fc5cdf991f11ce1a5b8eaf7e6290e15d1462c624b3dce"
+      "sha256": "397b692d3e57047b25c23deba5bb94d0cbbd10487df6e994ac2514c63660b7f5"
     },
     {
       "path": "native/rust_helper/src/broker/adapter_center.rs",
@@ -4588,11 +4588,11 @@
     },
     {
       "path": "specs/a2a_connection_receipt.schema.json",
-      "sha256": "863c584af02455e92e0d310a366371c9cc2fb6337e9ee235cdedfaa88852a423"
+      "sha256": "fee46f962adcb983255592d20b98a4098d82b56013e0a91bb7876d325569c256"
     },
     {
       "path": "specs/a2a_contract.schema.json",
-      "sha256": "6a5daf6f110fa5a6420a23b564f7dfbbee84f99736fcd4aa151d1c0383e98277"
+      "sha256": "1f13cbc3a053fbad02c803e3e4d492e8f4d16975cdf7eeeb3db2805375bcde49"
     },
     {
       "path": "specs/action_envelope.schema.json",
@@ -5312,7 +5312,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "e23512c078727aac8d1bd765eca25ae2eacac9dbb8978421a009a214792eda79"
+      "sha256": "8f148ab7553ffeebdd29d80edf21c6f4748e026bb35b5c514938bf98bdd0adc3"
     },
     {
       "path": "tooling/conformance_tests/test_final_development_audit.py",
@@ -5496,7 +5496,7 @@
     },
     {
       "path": "tooling/tests/linux_installed_product_smoke.py",
-      "sha256": "2d440470a208d5ed7ad24fda2f0b903dc2a791ead48a104fa31dc8a769d2d2e6"
+      "sha256": "bd84149f92f109e61c15ea0e0c8c58e970c19cb0178461b67aa2b34d7149f45a"
     },
     {
       "path": "tooling/tests/linux_update_https_server.py",

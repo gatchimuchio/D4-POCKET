@@ -6552,6 +6552,28 @@ def A2A接続センターの統治経路と境界を検査する() -> list[str]:
     card = receipt.get("Agent Card", {})
     if "endpoint" in card or "uri" in card or "Agent Card URI" in card:
         不整合.append("C16 receiptがAgent Card endpoint実値を保持している")
+    interfaces = card.get("supported_interfaces", [])
+    if not isinstance(interfaces, list) or not interfaces or len(interfaces) > 8:
+        不整合.append("C16 receiptのsupported interface一覧がboundedでない")
+    else:
+        for interface in interfaces:
+            if not isinstance(interface, dict):
+                不整合.append("C16 receiptのsupported interfaceがobjectではない")
+                continue
+            if set(interface) != {
+                "binding",
+                "protocol_version",
+                "interface_hash",
+                "transport",
+                "status",
+                "reason",
+            }:
+                不整合.append("C16 receiptのsupported interface fieldが不正")
+                continue
+            if interface.get("status") == "supported":
+                不整合.append("未接続のA2A Task／Message consumerをsupportedとしている")
+            if not str(interface.get("interface_hash", "")).startswith("sha256:"):
+                不整合.append("C16 receiptのinterface endpoint hashがない")
     authentication = card.get("authentication", {})
     if authentication.get("secret_value_present") is not False:
         不整合.append("C16 receiptがcredential実値の存在を許可している")
@@ -6569,6 +6591,10 @@ def A2A接続センターの統治経路と境界を検査する() -> list[str]:
         ("Content-Length", rust_a2a),
         ("secret_value_present", rust_a2a),
         ("supportedInterfaces", rust_a2a),
+        ("supportedInterfaces.url", rust_a2a),
+        ("supportedInterfaces.protocolVersion", rust_a2a),
+        ("a2a_interface_url_invalid", rust_a2a),
+        ("interface_hash", rust_a2a + rust_center),
         ("a2a_owner_required", rust_center),
         ("a2a_normal_channel_required", rust_center),
         ("recover-a2a-connection", rust_center),

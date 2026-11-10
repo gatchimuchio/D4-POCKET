@@ -57,11 +57,13 @@
         "supported_interfaces": {
           "type": "array", "minItems": 1, "maxItems": 8,
           "items": {
-            "type": "object", "required": ["binding", "transport", "status", "reason"], "additionalProperties": false,
+            "type": "object", "required": ["binding", "protocol_version", "interface_hash", "transport", "status", "reason"], "additionalProperties": false,
             "properties": {
               "binding": { "enum": ["jsonrpc", "grpc", "http_rest", "unknown"] },
+              "protocol_version": { "type": "string", "minLength": 1, "maxLength": 128 },
+              "interface_hash": { "oneOf": [{ "$ref": "#/$defs/hash" }, { "type": "null" }] },
               "transport": { "enum": ["http", "https", "unknown"] },
-              "status": { "enum": ["supported", "unsupported", "unknown"] },
+              "status": { "enum": ["unsupported", "unknown"] },
               "reason": { "type": "string", "minLength": 1, "maxLength": 512 }
             }
           }

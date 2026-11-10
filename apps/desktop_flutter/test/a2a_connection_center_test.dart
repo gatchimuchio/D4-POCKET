@@ -82,6 +82,47 @@ void main() {
     );
   });
 
+  test('runtime consumer未接続の宣言interfaceをsupportedとして表示しない', () async {
+    final receipt = _receipt();
+    final interfaces = (receipt['Agent Card']
+        as Map<String, Object?>)['supported_interfaces'] as List<Object?>;
+    (interfaces.single as Map<String, Object?>)['status'] = 'supported';
+    final transport = _A2aTransport([
+      _response('A2A接続', 'audit-a2a-connect', receipt,
+          evidence: 'INTERNAL_STATE'),
+    ]);
+
+    await expectLater(
+      A2aConnectionClient(transport).connect(
+        agentId: 'fixture-agent',
+        agentCardUri: 'http://127.0.0.1:9080/card',
+      ),
+      throwsA(isA<BrokerClientException>()),
+    );
+  });
+
+  test('旧保存metadataのunknown interface hashをunknownのまま表示できる', () async {
+    final receipt = _receipt();
+    final interfaces = (receipt['Agent Card']
+        as Map<String, Object?>)['supported_interfaces'] as List<Object?>;
+    final interface = interfaces.single as Map<String, Object?>;
+    interface['protocol_version'] = 'unknown';
+    interface['interface_hash'] = null;
+    interface['status'] = 'unknown';
+    final transport = _A2aTransport([
+      _response('A2A接続', 'audit-a2a-connect', receipt,
+          evidence: 'INTERNAL_STATE'),
+    ]);
+
+    final connected = await A2aConnectionClient(transport).connect(
+      agentId: 'fixture-agent',
+      agentCardUri: 'http://127.0.0.1:9080/card',
+    );
+
+    expect(connected.supportedInterfaces.single.interfaceHash, isNull);
+    expect(connected.supportedInterfaces.single.status, 'unknown');
+  });
+
   test('Agent Cardの表示metadataに行区切りや方向制御があれば表示を拒否する', () async {
     for (final hostileText in [
       'Agent\nTrust: verified',
@@ -132,7 +173,8 @@ void main() {
     expect(transport.operations, ['A2A接続一覧', 'A2A接続', 'A2A接続一覧']);
     expect(find.textContaining('Fixture Agent'), findsOneWidget);
     expect(find.textContaining('未審査（pending_review）'), findsOneWidget);
-    expect(find.textContaining('sha256:'), findsOneWidget);
+    expect(find.textContaining('sha256:'), findsNWidgets(2));
+    expect(find.textContaining('接続方式照合値: sha256:'), findsOneWidget);
     expect(find.text(endpoint), findsNothing);
     expect(
       tester.widget<TextField>(find.byType(TextField).at(1)).controller!.text,
@@ -220,8 +262,22 @@ Map<String, Object?> _receipt() => {
         'description_summary': '未信頼の試験metadata',
         'version': '1.0-test',
         'endpoint_hash': 'sha256:${List<String>.filled(64, 'a').join()}',
-        'supported_interfaces': const [],
-        'capabilities': const {},
+        'supported_interfaces': <Map<String, Object?>>[
+          {
+            'binding': 'jsonrpc',
+            'protocol_version': '1.0',
+            'interface_hash': 'sha256:${List<String>.filled(64, 'b').join()}',
+            'transport': 'http',
+            'status': 'unsupported',
+            'reason': 'Task／Message consumer未接続',
+          },
+        ],
+        'capabilities': {
+          'streaming': false,
+          'push_notifications': false,
+          'state_transition_history': false,
+          'extended_agent_card': false,
+        },
         'skills': const [],
         'authentication': {
           'schemes': const [],

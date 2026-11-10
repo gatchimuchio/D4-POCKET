@@ -9,7 +9,7 @@
     "version": "1.0.0",
     "endpoint_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
     "supported_interfaces": [
-      { "binding": "jsonrpc", "transport": "https", "status": "unknown", "reason": "C16で実物interfaceを確認する" }
+      { "binding": "jsonrpc", "protocol_version": "1.0", "interface_hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444", "transport": "https", "status": "unsupported", "reason": "Task／Messageの実行consumerは未接続" }
     ],
     "capabilities": {
       "streaming": true,

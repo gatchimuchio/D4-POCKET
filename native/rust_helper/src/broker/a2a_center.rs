@@ -43,8 +43,8 @@ fn decode_state(state: &Value) -> Result<BTreeMap<String, Value>, String> {
     }
     let mut result = BTreeMap::new();
     for value in values {
-        let agent_id = validate_persisted_receipt(value)?;
-        let mut restored = value.clone();
+        let mut restored = normalize_legacy_receipt(value)?;
+        let agent_id = validate_persisted_receipt(&restored)?;
         let restored_object = restored
             .as_object_mut()
             .ok_or_else(|| "A2A接続receiptがobjectではない".to_string())?;
@@ -65,6 +65,66 @@ fn decode_state(state: &Value) -> Result<BTreeMap<String, Value>, String> {
         }
     }
     Ok(result)
+}
+
+fn normalize_legacy_receipt(value: &Value) -> Result<Value, String> {
+    let mut normalized = value.clone();
+    let Some(interfaces) = normalized
+        .get_mut("Agent Card")
+        .and_then(Value::as_object_mut)
+        .and_then(|card| card.get_mut("supported_interfaces"))
+        .and_then(Value::as_array_mut)
+    else {
+        return Ok(normalized);
+    };
+    for interface in interfaces {
+        let Some(object) = interface.as_object_mut() else {
+            continue;
+        };
+        let legacy_keys = ["binding", "transport", "status", "reason"];
+        let is_legacy = object.len() == legacy_keys.len()
+            && object.keys().all(|key| legacy_keys.contains(&key.as_str()));
+        if !is_legacy {
+            continue;
+        }
+        let valid = object
+            .get("binding")
+            .and_then(Value::as_str)
+            .is_some_and(|value| ["jsonrpc", "grpc", "http_rest", "unknown"].contains(&value))
+            && object
+                .get("transport")
+                .and_then(Value::as_str)
+                .is_some_and(|value| ["http", "https", "unknown"].contains(&value))
+            && object
+                .get("status")
+                .and_then(Value::as_str)
+                .is_some_and(|value| ["supported", "unsupported", "unknown"].contains(&value))
+            && object
+                .get("reason")
+                .and_then(Value::as_str)
+                .is_some_and(|value| {
+                    !value.is_empty()
+                        && value.chars().count() <= 512
+                        && !value.chars().any(char::is_control)
+                });
+        if !valid {
+            return Err("旧版A2A interface metadataが不正".to_string());
+        }
+        object.insert(
+            "protocol_version".to_string(),
+            Value::String("unknown".to_string()),
+        );
+        object.insert("interface_hash".to_string(), Value::Null);
+        object.insert("status".to_string(), Value::String("unknown".to_string()));
+        object.insert(
+            "reason".to_string(),
+            Value::String(
+                "旧版保存metadataにはinterface URLがないため、endpoint identityと実行状態はunknown"
+                    .to_string(),
+            ),
+        );
+    }
+    Ok(normalized)
 }
 
 fn state_value(connections: &BTreeMap<String, Value>) -> Value {
@@ -352,14 +412,54 @@ fn validate_card(value: Option<&Value>, agent_id: &str) -> Result<(), String> {
         let object = interface
             .as_object()
             .ok_or_else(|| "A2A interfaceがobjectではない".to_string())?;
-        if object.len() != 4
-            || object
-                .keys()
-                .any(|key| !["binding", "transport", "status", "reason"].contains(&key.as_str()))
-            || object.get("binding").and_then(Value::as_str).is_none()
-            || object.get("transport").and_then(Value::as_str).is_none()
-            || object.get("status").and_then(Value::as_str).is_none()
-            || object.get("reason").and_then(Value::as_str).is_none()
+        if object.len() != 6
+            || object.keys().any(|key| {
+                ![
+                    "binding",
+                    "protocol_version",
+                    "interface_hash",
+                    "transport",
+                    "status",
+                    "reason",
+                ]
+                .contains(&key.as_str())
+            })
+            || !object
+                .get("binding")
+                .and_then(Value::as_str)
+                .is_some_and(|value| ["jsonrpc", "grpc", "http_rest", "unknown"].contains(&value))
+            || !object
+                .get("protocol_version")
+                .and_then(Value::as_str)
+                .is_some_and(|value| {
+                    !value.is_empty()
+                        && value.chars().count() <= 128
+                        && !value.chars().any(char::is_control)
+                })
+            || !match (
+                object.get("interface_hash"),
+                object.get("status").and_then(Value::as_str),
+            ) {
+                (Some(Value::String(hash)), Some("unsupported" | "unknown")) => valid_hash(hash),
+                (Some(Value::Null), Some("unknown")) => true,
+                _ => false,
+            }
+            || !object
+                .get("transport")
+                .and_then(Value::as_str)
+                .is_some_and(|value| ["http", "https", "unknown"].contains(&value))
+            || !object
+                .get("status")
+                .and_then(Value::as_str)
+                .is_some_and(|value| ["unsupported", "unknown"].contains(&value))
+            || !object
+                .get("reason")
+                .and_then(Value::as_str)
+                .is_some_and(|value| {
+                    !value.is_empty()
+                        && value.chars().count() <= 512
+                        && !value.chars().any(char::is_control)
+                })
         {
             return Err("A2A interfaceのmetadataが不正".to_string());
         }
@@ -939,7 +1039,7 @@ mod tests {
             "name": "外部Agent例",
             "description": "接続試験用Agent Card",
             "version": "1.0.0",
-            "supportedInterfaces": [{"protocolBinding": "JSONRPC", "protocolVersion": "1.0"}],
+            "supportedInterfaces": [{"url": format!("http://{address}/rpc"), "protocolBinding": "JSONRPC", "protocolVersion": "1.0"}],
             "capabilities": {"streaming": false, "pushNotifications": false, "stateTransitionHistory": false, "extendedAgentCard": false},
             "securitySchemes": {},
             "skills": []
@@ -1113,5 +1213,33 @@ mod tests {
             .expect_err("malformed stateを拒否");
         assert!(matches!(error, BrokerStoreError::MalformedA2aState(_)));
         let _ = std::fs::remove_dir_all(store);
+    }
+
+    #[test]
+    fn 旧版interface保存stateはAuthorityを継承せずunknownへ復元する() {
+        let mut legacy: Value = serde_json::from_str(include_str!(
+            "../../../../examples/contracts/a2a_connection_receipt.valid.json"
+        ))
+        .expect("旧版receipt fixture");
+        let interface = &mut legacy["Agent Card"]["supported_interfaces"][0];
+        interface
+            .as_object_mut()
+            .unwrap()
+            .remove("protocol_version");
+        interface.as_object_mut().unwrap().remove("interface_hash");
+        interface["status"] = Value::String("supported".to_string());
+        interface["reason"] = Value::String("旧版Agent Card宣言".to_string());
+        assert!(validate_persisted_receipt(&legacy).is_err());
+
+        let state = json!({ "版": VERSION, "connections": [legacy] });
+        let restored = decode_state(&state).expect("旧版stateの保守的projection");
+        let receipt = &restored["remote-agent-example"];
+        let projected = &receipt["Agent Card"]["supported_interfaces"][0];
+        assert_eq!(projected["protocol_version"], "unknown");
+        assert_eq!(projected["interface_hash"], Value::Null);
+        assert_eq!(projected["status"], "unknown");
+        assert_eq!(receipt["承認状態"], "owner_reapproval_required");
+        assert_eq!(receipt["接続状態"], "restored_pending_review");
+        assert_eq!(receipt["証拠種別"], EVIDENCE_SOURCE_INTERNAL_STATE);
     }
 }

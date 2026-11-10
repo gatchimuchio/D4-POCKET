@@ -446,6 +446,13 @@ fn project_agent_card(
         let interface = interface
             .as_object()
             .ok_or_else(|| A2aError::new("a2a_card_invalid", "A2A interfaceがobjectではない"))?;
+        let interface_url = bounded_string(interface.get("url"), "supportedInterfaces.url", 2048)?;
+        let protocol_version = bounded_string(
+            interface.get("protocolVersion"),
+            "supportedInterfaces.protocolVersion",
+            128,
+        )?;
+        let (transport, interface_hash) = hash_interface_endpoint(&interface_url)?;
         let binding = interface
             .get("protocolBinding")
             .and_then(Value::as_str)
@@ -457,8 +464,12 @@ fn project_agent_card(
             _ => "unknown",
         };
         projected_interfaces.push(json!({
-            "binding": binding, "transport": endpoint.scheme, "status": "supported",
-            "reason": "A2A Agent Cardのinterface宣言を確認"
+            "binding": binding,
+            "protocol_version": protocol_version,
+            "interface_hash": interface_hash,
+            "transport": transport,
+            "status": "unsupported",
+            "reason": "interface URLとprotocolVersionは検証済み。Task／Messageの実行consumerは未接続"
         }));
     }
     let capabilities = object
@@ -501,7 +512,7 @@ fn project_agent_card(
     let streams = if streaming {
         vec![json!({
             "stream_id": format!("{agent_id}-stream"), "task_id": format!("{agent_id}-card"), "mode": "sse",
-            "status": {"status": "supported", "reason": "Agent Cardがstreamingを宣言。実購読は未開始"},
+            "status": {"status": "unsupported", "reason": "Agent Cardはstreamingを宣言するが、実購読consumerは未接続"},
             "event_types": ["task_status_update", "artifact_update"], "resumable": false, "authority_strip": true
         })]
     } else {
@@ -522,6 +533,87 @@ fn project_agent_card(
         "Capability diff": {"status": "not_evaluated", "added": [], "removed": [], "changed": [], "requires_operator_review": true, "evidence_source": "LIVE_RUNTIME"},
         "権限生成": "なし", "authority_strip": true, "公開範囲": "metadata_only", "証拠種別": "LIVE_RUNTIME"
     }))
+}
+
+fn hash_interface_endpoint(uri: &str) -> Result<(String, String), A2aError> {
+    let invalid = || {
+        A2aError::new(
+            "a2a_interface_url_invalid",
+            "A2A supported interface URLの形式が不正",
+        )
+    };
+    if uri.is_empty()
+        || uri.len() > MAX_URI_BYTES
+        || !uri.is_ascii()
+        || uri.bytes().any(|byte| !(b'!'..=b'~').contains(&byte))
+        || uri
+            .chars()
+            .any(|value| matches!(value, '@' | '?' | '#' | '\\'))
+    {
+        return Err(invalid());
+    }
+    let (scheme, remainder) = uri.split_once("://").ok_or_else(invalid)?;
+    let transport = match scheme.to_ascii_lowercase().as_str() {
+        "http" => "http",
+        "https" => "https",
+        _ => return Err(invalid()),
+    };
+    let (authority, path) = match remainder.split_once('/') {
+        Some((authority, path)) => (authority, format!("/{path}")),
+        None => (remainder, String::new()),
+    };
+    if authority.is_empty() || path.len() > 1024 || !path.is_ascii() {
+        return Err(invalid());
+    }
+    if path
+        .bytes()
+        .any(|byte| !(b'!'..=b'~').contains(&byte) || matches!(byte, b'?' | b'#' | b'\\'))
+    {
+        return Err(invalid());
+    }
+
+    let valid_host = |host: &str| {
+        if host.parse::<IpAddr>().is_ok() {
+            return true;
+        }
+        host.len() <= 255
+            && !host.is_empty()
+            && host.split('.').all(|label| {
+                !label.is_empty()
+                    && label.len() <= 63
+                    && label
+                        .bytes()
+                        .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+                    && label
+                        .as_bytes()
+                        .first()
+                        .is_some_and(|byte| byte.is_ascii_alphanumeric())
+                    && label
+                        .as_bytes()
+                        .last()
+                        .is_some_and(|byte| byte.is_ascii_alphanumeric())
+            })
+    };
+    let valid_port = |port: &str| port.parse::<u16>().is_ok_and(|value| value != 0);
+    let valid_authority = if let Some(rest) = authority.strip_prefix('[') {
+        let (address, suffix) = rest.split_once(']').ok_or_else(invalid)?;
+        if address.parse::<std::net::Ipv6Addr>().is_err() {
+            false
+        } else if suffix.is_empty() {
+            true
+        } else {
+            suffix.strip_prefix(':').is_some_and(valid_port)
+        }
+    } else if let Some((host, port)) = authority.rsplit_once(':') {
+        !host.contains(':') && valid_host(host) && valid_port(port)
+    } else {
+        valid_host(authority)
+    };
+    if !valid_authority {
+        return Err(invalid());
+    }
+
+    Ok((transport.to_string(), sha256_tagged(uri.as_bytes())))
 }
 
 fn bounded_string(value: Option<&Value>, field: &str, max: usize) -> Result<String, A2aError> {
@@ -603,7 +695,7 @@ mod tests {
         json!({"credential_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "purpose": "A2A接続", "target": "remote-agent-example", "required": false, "status": "missing"})
     }
     fn card() -> Value {
-        json!({"name": "外部Agent例", "description": "外部Agentの宣言情報", "version": "1.0.0", "supportedInterfaces": [{"protocolBinding": "JSONRPC", "protocolVersion": "1.0"}], "capabilities": {"streaming": true, "pushNotifications": false, "stateTransitionHistory": true, "extendedAgentCard": false}, "securitySchemes": {"oauth2": {}}, "skills": [{"id": "summarize", "name": "要約", "description": "要約", "tags": ["summary"], "inputModes": ["text/plain"], "outputModes": ["text/plain"]}]})
+        json!({"name": "外部Agent例", "description": "外部Agentの宣言情報", "version": "1.0.0", "supportedInterfaces": [{"url": "http://127.0.0.1:8090/rpc", "protocolBinding": "JSONRPC", "protocolVersion": "1.0"}], "capabilities": {"streaming": true, "pushNotifications": false, "stateTransitionHistory": true, "extendedAgentCard": false}, "securitySchemes": {"oauth2": {}}, "skills": [{"id": "summarize", "name": "要約", "description": "要約", "tags": ["summary"], "inputModes": ["text/plain"], "outputModes": ["text/plain"]}]})
     }
     #[test]
     fn Agent_Cardをmetadata_onlyへ射影し秘密とendpointを返さない() {
@@ -621,9 +713,51 @@ mod tests {
         assert_eq!(projected["Trust"]["state"], "pending_review");
         assert!(projected["Agent Card"].get("endpoint").is_none());
         assert_eq!(
+            projected["Agent Card"]["supported_interfaces"][0]["transport"],
+            "http"
+        );
+        assert_eq!(
+            projected["Agent Card"]["supported_interfaces"][0]["protocol_version"],
+            "1.0"
+        );
+        assert_eq!(
+            projected["Agent Card"]["supported_interfaces"][0]["status"],
+            "unsupported"
+        );
+        assert_eq!(
+            projected["Agent Card"]["supported_interfaces"][0]["interface_hash"],
+            sha256_tagged(b"http://127.0.0.1:8090/rpc")
+        );
+        assert!(!projected.to_string().contains("127.0.0.1:8090/rpc"));
+        assert_eq!(projected["Stream"][0]["status"]["status"], "unsupported");
+        assert_eq!(
             projected["Agent Card"]["authentication"]["secret_value_present"],
             false
         );
+    }
+
+    #[test]
+    fn interface_URLに秘密や危険なauthorityを含めない() {
+        for uri in [
+            "https://agent.example/rpc?token=secret-marker",
+            "https://user@agent.example/rpc",
+            "https://agent.example/rpc#fragment",
+            "file://agent.example/rpc",
+            "https://-invalid.example/rpc",
+        ] {
+            let mut value = card();
+            value["supportedInterfaces"][0]["url"] = Value::String(uri.to_string());
+            let error = project_agent_card(
+                &parse_endpoint("http://127.0.0.1:8080/card").unwrap(),
+                &value,
+                "remote-agent-example",
+                "1.0",
+                &credential(),
+            )
+            .unwrap_err();
+            assert_eq!(error.code, "a2a_interface_url_invalid");
+            assert!(!error.message.contains("secret-marker"));
+        }
     }
     #[test]
     fn httpsと非loopbackとuserinfoを現行境界で拒否する() {

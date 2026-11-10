@@ -231,6 +231,12 @@ class _A2aConnectionTile extends StatelessWidget {
             Text('説明（未信頼metadata）: ${connection.descriptionSummary}'),
             Text('版: ${connection.version}'),
             Text('接続先hash: ${connection.endpointHash}'),
+            for (final interface in connection.supportedInterfaces) ...[
+              Text(
+                  'A2A接続方式: ${interface.binding} / Protocol版: ${interface.protocolVersion} / 通信方式: ${interface.transport} / 実行状態: ${interface.status}'),
+              Text('接続方式照合値: ${interface.interfaceHash ?? '不明'}'),
+              Text('状態理由（未信頼metadata）: ${interface.reason}'),
+            ],
             Text('接続状態: ${restored ? '再確認が必要' : '接続済み'}'),
             Text(
                 '証拠: ${connection.evidenceSource} / 承認: ${connection.approvalState}'),

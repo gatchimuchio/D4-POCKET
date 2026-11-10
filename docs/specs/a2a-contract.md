@@ -16,6 +16,8 @@ Stream
 
 Agent CardはAgentの宣言情報であり、接続先はhashだけを保持する。説明、skill、interface、capability、認証schemeはboundedなmetadataとして扱い、endpoint実値、authorization header、token、秘密値、raw contentを保存しない。MessageとArtifactのpartsはkind、件数、hash、content visibilityだけを保持する。
 
+`supportedInterfaces`は各`url`と`protocolVersion`を検証し、接続先実値を`interface_hash`へ射影する。A2A Task／Message consumerが実接続されていない間は、Agent Cardが宣言していてもinterfaceを`unsupported`として扱い、metadataから実行可能性を導出しない。query、fragment、userinfoを含むinterface URLは拒否し、値をerrorやAuditへ出さない。
+
 ## Authority境界
 
 ```text

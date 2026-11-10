@@ -1,6 +1,24 @@
 import 'package:gui_shell_ui/runtime_dialogue_client.dart'
     show BrokerClientException, BrokerTransport;
 
+class A2aSupportedInterface {
+  const A2aSupportedInterface({
+    required this.binding,
+    required this.protocolVersion,
+    required this.interfaceHash,
+    required this.transport,
+    required this.status,
+    required this.reason,
+  });
+
+  final String binding;
+  final String protocolVersion;
+  final String? interfaceHash;
+  final String transport;
+  final String status;
+  final String reason;
+}
+
 class A2aConnectionSummary {
   const A2aConnectionSummary({
     required this.agentId,
@@ -8,6 +26,7 @@ class A2aConnectionSummary {
     required this.descriptionSummary,
     required this.version,
     required this.endpointHash,
+    required this.supportedInterfaces,
     required this.connectionState,
     required this.evidenceSource,
     required this.approvalState,
@@ -20,6 +39,7 @@ class A2aConnectionSummary {
   final String descriptionSummary;
   final String version;
   final String endpointHash;
+  final List<A2aSupportedInterface> supportedInterfaces;
   final String connectionState;
   final String evidenceSource;
   final String approvalState;
@@ -217,6 +237,51 @@ class A2aConnectionClient {
       throw const BrokerClientException(
           'A2A Agent Cardのmetadata projectionが不正です');
     }
+    final rawInterfaces = card['supported_interfaces'];
+    if (rawInterfaces is! List ||
+        rawInterfaces.isEmpty ||
+        rawInterfaces.length > 8) {
+      throw const BrokerClientException('A2A interface一覧が不正です');
+    }
+    final supportedInterfaces = rawInterfaces.map((value) {
+      final interface = _object(value, 'supported interface');
+      const interfaceFields = {
+        'binding',
+        'protocol_version',
+        'interface_hash',
+        'transport',
+        'status',
+        'reason',
+      };
+      final binding = interface['binding'];
+      final protocolVersion = interface['protocol_version'];
+      final interfaceHash = interface['interface_hash'];
+      final transport = interface['transport'];
+      final status = interface['status'];
+      final reason = interface['reason'];
+      if (interface.length != interfaceFields.length ||
+          interface.keys.any((key) => !interfaceFields.contains(key)) ||
+          !{'jsonrpc', 'grpc', 'http_rest', 'unknown'}.contains(binding) ||
+          protocolVersion is! String ||
+          !_validExternalText(protocolVersion, 128) ||
+          (interfaceHash != null &&
+              (interfaceHash is! String || !_validSha256(interfaceHash))) ||
+          (interfaceHash == null && status != 'unknown') ||
+          !{'http', 'https', 'unknown'}.contains(transport) ||
+          !{'unsupported', 'unknown'}.contains(status) ||
+          reason is! String ||
+          !_validExternalText(reason, 512)) {
+        throw const BrokerClientException('A2A interface projectionが不正です');
+      }
+      return A2aSupportedInterface(
+        binding: binding as String,
+        protocolVersion: protocolVersion,
+        interfaceHash: interfaceHash as String?,
+        transport: transport as String,
+        status: status as String,
+        reason: reason,
+      );
+    }).toList(growable: false);
 
     final trust = _object(receipt['Trust'], 'Trust');
     if (trust.length != 4 ||
@@ -305,6 +370,7 @@ class A2aConnectionClient {
       descriptionSummary: description,
       version: version,
       endpointHash: endpointHash,
+      supportedInterfaces: List.unmodifiable(supportedInterfaces),
       connectionState: state as String,
       evidenceSource: evidence as String,
       approvalState: approval as String,
