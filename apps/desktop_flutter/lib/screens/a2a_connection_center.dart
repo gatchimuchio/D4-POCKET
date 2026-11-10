@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:gui_shell_ui/runtime_dialogue_client.dart' show BrokerTransport;
 
@@ -23,9 +24,14 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
   bool _loading = false;
   bool _connecting = false;
   bool _sendingMessage = false;
+  bool _gettingTask = false;
   String? _selectedAgentId;
   String? _message;
   String? _sendMessageStatus;
+  String? _pendingTaskAgentId;
+  String? _pendingTaskInterfaceUri;
+  String? _pendingTaskInterfaceHash;
+  String? _pendingTaskId;
 
   @override
   void initState() {
@@ -64,6 +70,9 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
     )
         ? _selectedAgentId
         : null;
+    final supportsNativeTaskQuery =
+        defaultTargetPlatform == TargetPlatform.windows ||
+            defaultTargetPlatform == TargetPlatform.linux;
     return ShellPage(
       title: 'A2A接続センター',
       evidenceTitle: 'A2A Connection Center',
@@ -72,9 +81,9 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
           child: Text(
             'Agent Cardは未信頼の外部metadataとして扱います。HTTPはloopback IPv4に限定し、'
             'HTTPSは証明書を検証しpublic IPへ接続します。接続と各Message送信はRust Broker経由でnative Owner確認を行います。'
-            'Message送信は無認証のA2A v1.0 JSON-RPC interfaceだけに対応し、Credential値を扱いません。'
+            'Message送信と手動Task状態照会は無認証のA2A v1.0 JSON-RPC interfaceだけに対応し、Credential値を扱いません。'
             'Trust・Permission・Approval・Authorityは接続metadataから生成しません。外部本文は表示せずhashと限定metadataだけを返します。'
-            'Artifact本文、Stream、GetTask、cancelは未対応です。',
+            'Task状態照会はWindows/Linuxでのみ各回Owner確認を行い、履歴を取得しません。',
           ),
         ),
         if (client == null)
@@ -91,7 +100,7 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
                 const SizedBox(height: 8),
                 TextField(
                   controller: _agentIdController,
-                  enabled: !_loading && !_connecting,
+                  enabled: !_loading && !_connecting && !_gettingTask,
                   maxLength: 128,
                   decoration: const InputDecoration(
                     border: OutlineInputBorder(),
@@ -101,7 +110,7 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
                 const SizedBox(height: 8),
                 TextField(
                   controller: _agentCardUriController,
-                  enabled: !_loading && !_connecting,
+                  enabled: !_loading && !_connecting && !_gettingTask,
                   maxLength: 2048,
                   autocorrect: false,
                   enableSuggestions: false,
@@ -121,13 +130,16 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
                   runSpacing: 8,
                   children: [
                     FilledButton.icon(
-                      onPressed: _loading || _connecting ? null : _connect,
+                      onPressed: _loading || _connecting || _gettingTask
+                          ? null
+                          : _connect,
                       icon: const Icon(Icons.link),
                       label: Text(_connecting ? '接続中…' : 'Owner確認して接続'),
                     ),
                     OutlinedButton.icon(
-                      onPressed:
-                          _loading || _connecting ? null : _loadConnections,
+                      onPressed: _loading || _connecting || _gettingTask
+                          ? null
+                          : _loadConnections,
                       icon: const Icon(Icons.refresh),
                       label: const Text('一覧を更新'),
                     ),
@@ -170,14 +182,25 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
                           ),
                         ),
                     ],
-                    onChanged: _sendingMessage || _connecting || _loading
+                    onChanged: _sendingMessage ||
+                            _connecting ||
+                            _loading ||
+                            _gettingTask
                         ? null
-                        : (value) => setState(() => _selectedAgentId = value),
+                        : (value) => setState(() {
+                              _selectedAgentId = value;
+                              if (_pendingTaskAgentId != value) {
+                                _clearPendingTask();
+                              }
+                            }),
                   ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: _interfaceUriController,
-                    enabled: !_sendingMessage && !_connecting && !_loading,
+                    enabled: !_sendingMessage &&
+                        !_connecting &&
+                        !_loading &&
+                        !_gettingTask,
                     maxLength: 2048,
                     autocorrect: false,
                     enableSuggestions: false,
@@ -191,7 +214,10 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
                   const SizedBox(height: 8),
                   TextField(
                     controller: _messageController,
-                    enabled: !_sendingMessage && !_connecting && !_loading,
+                    enabled: !_sendingMessage &&
+                        !_connecting &&
+                        !_loading &&
+                        !_gettingTask,
                     maxLength: 1024,
                     minLines: 2,
                     maxLines: 6,
@@ -205,7 +231,8 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
                     onPressed: selectedAgentId == null ||
                             _sendingMessage ||
                             _connecting ||
-                            _loading
+                            _loading ||
+                            _gettingTask
                         ? null
                         : _sendMessage,
                     icon: _sendingMessage
@@ -221,6 +248,30 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
                 if (_sendMessageStatus != null) ...[
                   const SizedBox(height: 12),
                   Semantics(liveRegion: true, child: Text(_sendMessageStatus!)),
+                ],
+                if (_pendingTaskId != null) ...[
+                  const SizedBox(height: 8),
+                  Text('送信後のTask ID（memory-only）: $_pendingTaskId'),
+                  if (supportsNativeTaskQuery)
+                    OutlinedButton.icon(
+                      onPressed: _gettingTask ||
+                              _loading ||
+                              _connecting ||
+                              _sendingMessage
+                          ? null
+                          : _getTask,
+                      icon: _gettingTask
+                          ? const SizedBox.square(
+                              dimension: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.query_stats),
+                      label: Text(_gettingTask
+                          ? '状態取得中…'
+                          : 'native Owner確認してTask状態を一回取得'),
+                    )
+                  else
+                    const Text('macOSの現行A2A native Owner契約ではTask取得は未対応です。'),
                 ],
               ],
             ),
@@ -258,7 +309,7 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
 
   Future<void> _loadConnections() async {
     final client = _client;
-    if (client == null || _loading || _connecting) return;
+    if (client == null || _loading || _connecting || _gettingTask) return;
     setState(() {
       _loading = true;
       _message = null;
@@ -276,6 +327,15 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
                 interface.protocolVersion == '1.0'))) {
           _selectedAgentId = null;
         }
+        if (_pendingTaskAgentId != null &&
+            !connections.any((connection) =>
+                connection.agentId == _pendingTaskAgentId &&
+                connection.connectionState == 'connected' &&
+                connection.supportedInterfaces.any((interface) =>
+                    interface.status == 'supported' &&
+                    interface.interfaceHash == _pendingTaskInterfaceHash))) {
+          _clearPendingTask();
+        }
         _message = 'Brokerのmetadata-only一覧を更新しました。';
       });
     } on Object {
@@ -290,7 +350,7 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
 
   Future<void> _connect() async {
     final client = _client;
-    if (client == null || _loading || _connecting) return;
+    if (client == null || _loading || _connecting || _gettingTask) return;
     setState(() {
       _connecting = true;
       _message = '要求をBrokerへ送信しています。native Owner確認後に接続します。';
@@ -336,13 +396,16 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
         agentId == null ||
         _loading ||
         _connecting ||
+        _gettingTask ||
         _sendingMessage) {
       return;
     }
     setState(() {
       _sendingMessage = true;
+      _clearPendingTask();
       _sendMessageStatus = '要求をBrokerへ送信しています。native確認後、一回だけ実行します。';
     });
+    final requestedInterfaceUri = _interfaceUriController.text;
     try {
       final result = await client.sendMessage(
         agentId: agentId,
@@ -354,6 +417,14 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
         _sendMessageStatus = result.status == 'unknown'
             ? '送信結果は不明です。二重送信防止のため再送しません。Audit=${result.auditEventId}'
             : 'A2A Message応答を受理しました（Task完了ではありません）。kind=${result.resultKind} / state=${result.remoteState ?? 'unknown'} / id=${result.remoteId} / result hash=${result.resultHash} / Audit=${result.auditEventId}';
+        if (result.status == 'accepted' &&
+            result.resultKind == 'task' &&
+            result.remoteId != null) {
+          _pendingTaskAgentId = agentId;
+          _pendingTaskInterfaceUri = requestedInterfaceUri;
+          _pendingTaskInterfaceHash = result.interfaceHash;
+          _pendingTaskId = result.remoteId;
+        }
       });
     } on Object {
       if (!mounted) return;
@@ -366,6 +437,55 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
       _messageController.clear();
       if (mounted) setState(() => _sendingMessage = false);
     }
+  }
+
+  Future<void> _getTask() async {
+    final client = _client;
+    final agentId = _pendingTaskAgentId;
+    final interfaceUri = _pendingTaskInterfaceUri;
+    final taskId = _pendingTaskId;
+    if (client == null ||
+        agentId == null ||
+        interfaceUri == null ||
+        taskId == null ||
+        _gettingTask ||
+        _loading ||
+        _connecting ||
+        _sendingMessage) {
+      return;
+    }
+    setState(() {
+      _gettingTask = true;
+      _sendMessageStatus = 'Task状態取得をBrokerへ送信しています。native Owner確認後に一回だけ照会します。';
+    });
+    try {
+      final result = await client.getTask(
+        agentId: agentId,
+        interfaceUri: interfaceUri,
+        taskId: taskId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _sendMessageStatus = result.status == 'unknown'
+            ? 'Task状態は不明です。自動再取得しません。手動再照会には新しいOwner確認が必要です。Audit=${result.auditEventId}'
+            : 'Task metadataを取得しました。state=${result.state} / artifact count=${result.artifactCount} / history count=0 / response hash=${result.resultHash} / Audit=${result.auditEventId}';
+      });
+    } on Object {
+      if (!mounted) return;
+      setState(() {
+        _sendMessageStatus =
+            'Task状態を確定できませんでした。自動再取得しません。再照会には新しいnative Owner確認が必要です。';
+      });
+    } finally {
+      if (mounted) setState(() => _gettingTask = false);
+    }
+  }
+
+  void _clearPendingTask() {
+    _pendingTaskAgentId = null;
+    _pendingTaskInterfaceUri = null;
+    _pendingTaskInterfaceHash = null;
+    _pendingTaskId = null;
   }
 }
 

@@ -1,0 +1,22 @@
+{
+  "版": 1,
+  "AgentID": "remote-agent-example",
+  "interface_hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+  "status": "accepted",
+  "result": {
+    "kind": "task",
+    "task_id": "task-fixture-1",
+    "context_id": null,
+    "state": "working",
+    "artifact_count": 0,
+    "history_count": 0,
+    "result_hash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+    "status_message": "private-task-body-marker"
+  },
+  "Trust": "pending_review",
+  "権限生成": "なし",
+  "authority_strip": true,
+  "公開範囲": "metadata_only",
+  "履歴公開": false,
+  "Credential使用": false
+}

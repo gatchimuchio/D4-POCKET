@@ -417,11 +417,11 @@
     },
     {
       "path": "docs/specs/a2a-contract.md",
-      "責任": "C15 A2A Agent Card・Task・Message・Artifact・Streamのmetadata_only射影、Authority Strip、Trust非生成、実接続分離。C16一回SendMessageは別契約へ接続"
+      "責任": "C15 A2A Agent Card・Task・Message・Artifact・Streamのmetadata_only射影、Authority Strip、Trust非生成、実接続分離。C16一回SendMessageと手動一回GetTask状態照会は別契約へ接続"
     },
     {
       "path": "docs/specs/a2a-connection-center.md",
-      "責任": "C16 A2A Agent Card接続・metadata-only receipt・復元再確認と、無認証JSON-RPC v1.0 SendMessage一回送信のnative Owner・一回Permission・Audit・unknown境界。Task polling、Artifact、Stream、Credential実行は後続"
+      "責任": "C16 A2A Agent Card接続・metadata-only receipt・復元再確認、JSON-RPC v1.0 SendMessage一回送信、Windows／Linux Desktop限定の手動GetTask一回状態照会。native Owner・一回Permission・Audit・unknown・本文非露出境界。Task lifecycle、Artifact、Stream、Credential実行は後続"
     },
     {
       "path": "specs/a2a_message_send_request.schema.json",
@@ -430,6 +430,14 @@
     {
       "path": "specs/a2a_message_send_response.schema.json",
       "責任": "C16 A2A一回Message送信のaccepted／unknown bounded result、本文非露出、Trust非昇格、再送禁止契約"
+    },
+    {
+      "path": "specs/a2a_task_get_request.schema.json",
+      "責任": "C16補完の手動一回GetTask要求。Task IDとAgent／interfaceを束縛し、Permission、Approval、Credential、Authorityを受け付けない"
+    },
+    {
+      "path": "specs/a2a_task_get_response.schema.json",
+      "責任": "C16補完の手動一回GetTask bounded状態結果またはunknown。空履歴、本文非露出、Trust非昇格、権限非生成"
     },
     {
       "path": "docs/specs/host-registry.md",

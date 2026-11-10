@@ -169,6 +169,12 @@ enum DesktopOwnerOperationSummary {
         message_hash: String,
         payload_hash: String,
     },
+    A2aGetTask {
+        agent_id: String,
+        target: String,
+        task_id: String,
+        payload_hash: String,
+    },
     McpDisconnect {
         server_id: String,
         payload_hash: String,
@@ -1835,6 +1841,16 @@ fn owner_operation_candidate_with_product_identity(
                 payload_hash,
             }
         }
+        BrokerOperation::A2Aタスク状態取得 => {
+            let (agent_id, target, task_id) =
+                crate::broker::a2a_center::owner_get_task_confirmation_summary(payload).ok()?;
+            DesktopOwnerOperationSummary::A2aGetTask {
+                agent_id,
+                target,
+                task_id,
+                payload_hash,
+            }
+        }
         operation @ (BrokerOperation::アダプター検証
         | BrokerOperation::アダプター有効化
         | BrokerOperation::アダプター無効化
@@ -3029,6 +3045,26 @@ fn owner_confirmation_text_for_identity(
                 transport,
                 display_message,
                 message_hash,
+                payload_hash
+            )
+        }
+        DesktopOwnerOperationSummary::A2aGetTask {
+            agent_id,
+            target,
+            task_id,
+            payload_hash,
+        } => {
+            let transport = if target.starts_with("https://") {
+                "HTTPS（OS既定CA、public IP固定、redirectなし）"
+            } else {
+                "HTTP（IPv4 loopback限定）"
+            };
+            format!(
+                "未信頼の外部A2A AgentからTask状態metadataを一回取得しますか？\n\nAgent ID: {}\n接続先: {}\nTransport: {}\nTask ID: {}\n\n履歴は要求せず、Task状態・件数・response hashだけを返します。Task／Artifact本文、Credential、Permission、Approval、Trust、Authorityを表示・生成しません。各取得に新しい一回限りPermissionを要求し、再取得は新しいnative Owner確認が必要です。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
+                owner_confirmation_value(agent_id),
+                owner_confirmation_value(target),
+                transport,
+                owner_confirmation_value(task_id),
                 payload_hash
             )
         }
@@ -8018,6 +8054,79 @@ mod tests {
                     .is_none()
             );
         }
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn A2A_GetTask確認はAgent_interface_TaskIDを固定しTask本文を要求しない() {
+        let endpoint = BrokerEndpoint {
+            host: "127.0.0.1".into(),
+            port: 43123,
+            session_id: "desktop-session".into(),
+            session_secret: "not-used-by-candidate".into(),
+            credential_role: BrokerCredentialRole::Owner,
+            transport: "tcp".into(),
+            max_request_bytes: MAX_REQUEST_BYTES,
+        };
+        let payload = serde_json::json!({
+            "版": 1,
+            "操作": "状態取得",
+            "AgentID": "remote-agent-fixture",
+            "Interface URI": "http://127.0.0.1:9080/rpc",
+            "TaskID": "task-fixture-42"
+        });
+        let request = desktop_owner_request(
+            "A2Aタスク状態取得",
+            "desktop-a2a-get-task",
+            "desktop-a2a-get-task-nonce",
+            payload.clone(),
+        );
+        let (normalized, summary) =
+            owner_operation_candidate(request.to_string().as_bytes(), &endpoint)
+                .expect("GetTaskはnative Owner確認へ進む");
+        let normalized = BrokerRequestEnvelope::from_json_str(&normalized).unwrap();
+        assert_eq!(normalized.session_id.as_deref(), Some("desktop-session"));
+        assert_eq!(normalized.payload, Some(payload));
+        let DesktopOwnerOperationSummary::A2aGetTask {
+            agent_id,
+            target,
+            task_id,
+            payload_hash,
+        } = summary
+        else {
+            panic!("GetTaskは専用native確認summaryを使う")
+        };
+        assert_eq!(agent_id, "remote-agent-fixture");
+        assert_eq!(target, "http://127.0.0.1:9080/rpc");
+        assert_eq!(task_id, "task-fixture-42");
+        assert_eq!(payload_hash, request["payload_hash"]);
+        let prompt = owner_confirmation_text(&DesktopOwnerOperationSummary::A2aGetTask {
+            agent_id,
+            target,
+            task_id,
+            payload_hash,
+        });
+        assert!(prompt.contains("履歴は要求せず"));
+        assert!(prompt.contains("Task状態metadataを一回取得"));
+        assert!(prompt.contains("再取得は新しいnative Owner確認が必要"));
+        assert!(prompt.contains("Task／Artifact本文"));
+        assert!(prompt.contains("Credential"));
+        assert!(!prompt.contains("remote-task-secret"));
+
+        let invalid_payload = serde_json::json!({
+            "版": 1,
+            "操作": "状態取得",
+            "AgentID": "remote-agent-fixture",
+            "Interface URI": "http://127.0.0.1:9080/rpc",
+            "TaskID": "task\u{202e}spoof"
+        });
+        let invalid = desktop_owner_request(
+            "A2Aタスク状態取得",
+            "desktop-a2a-get-task-invalid",
+            "desktop-a2a-get-task-invalid-nonce",
+            invalid_payload,
+        );
+        assert!(owner_operation_candidate(invalid.to_string().as_bytes(), &endpoint).is_none());
     }
 
     #[test]

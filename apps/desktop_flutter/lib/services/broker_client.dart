@@ -19,6 +19,7 @@ const _nativeOwnerConfirmationOperations = <String>{
   '資格情報失効',
   'A2A接続',
   'A2Aメッセージ送信',
+  'A2Aタスク状態取得',
   'MCP接続',
   'MCP切断',
   'MCP Tool実行',

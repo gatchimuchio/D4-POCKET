@@ -6521,6 +6521,8 @@ def A2A接続センターの統治経路と境界を検査する() -> list[str]:
         "a2a_connection_list",
         "a2a_message_send_request",
         "a2a_message_send_response",
+        "a2a_task_get_request",
+        "a2a_task_get_response",
     ):
         schema = load_schema(name + ".schema.json")
         valid = load_contract_fixture(name + ".valid.json")
@@ -6535,6 +6537,10 @@ def A2A接続センターの統治経路と境界を検査する() -> list[str]:
         "a2a_connection_list_wrong_evidence.invalid.json",
         "a2a_message_send_request.invalid.json",
         "a2a_message_send_response.invalid.json",
+        "a2a_task_get_request.invalid.json",
+        "a2a_task_get_response_history.invalid.json",
+        "a2a_task_get_response_authority.invalid.json",
+        "a2a_task_get_response_raw.invalid.json",
     )
     invalid_schema_names = {
         invalid_names[0]: "a2a_connection",
@@ -6543,6 +6549,10 @@ def A2A接続センターの統治経路と境界を検査する() -> list[str]:
         invalid_names[3]: "a2a_connection_list",
         invalid_names[4]: "a2a_message_send_request",
         invalid_names[5]: "a2a_message_send_response",
+        invalid_names[6]: "a2a_task_get_request",
+        invalid_names[7]: "a2a_task_get_response",
+        invalid_names[8]: "a2a_task_get_response",
+        invalid_names[9]: "a2a_task_get_response",
     }
     for name in invalid_names:
         try:
@@ -6573,6 +6583,24 @@ def A2A接続センターの統治経路と境界を検査する() -> list[str]:
         != {"kind", "task_id", "context_id", "state", "artifact_count", "history_count", "result_hash"}
     ):
         不整合.append("C16 A2A SendMessage応答がbounded projectionまたは非継承境界を満たさない")
+    task_request = load_contract_fixture("a2a_task_get_request.valid.json")
+    if task_request.get("操作") != "状態取得" or set(task_request) != {
+        "版", "操作", "AgentID", "Interface URI", "TaskID"
+    }:
+        不整合.append("C16補完 A2A GetTask要求が固定fieldまたは状態取得操作でない")
+    task_result = load_contract_fixture("a2a_task_get_response.valid.json")
+    if (
+        task_result.get("status") != "accepted"
+        or task_result.get("Trust") != "pending_review"
+        or task_result.get("権限生成") != "なし"
+        or task_result.get("authority_strip") is not True
+        or task_result.get("履歴公開") is not False
+        or task_result.get("Credential使用") is not False
+        or task_result.get("result", {}).get("history_count") != 0
+        or set(task_result.get("result", {}))
+        != {"kind", "task_id", "context_id", "state", "artifact_count", "history_count", "result_hash"}
+    ):
+        不整合.append("C16補完 A2A GetTask応答が履歴なしのbounded metadata境界を満たさない")
     receipt = load_contract_fixture("a2a_connection_receipt.valid.json")
     if (
         receipt.get("権限生成") != "なし"
@@ -6647,6 +6675,13 @@ def A2A接続センターの統治経路と境界を検査する() -> list[str]:
         ("A2A接続設定に禁止fieldがある", owner_cli),
         ("A2A接続", protocol + ipc_request + ipc_response),
         ("A2Aメッセージ送信", protocol + ipc_request + ipc_response + rust_center),
+        ("A2Aタスク状態取得", protocol + ipc_request + ipc_response + rust_center),
+        ("recover_interrupted_get_tasks", rust_center + protocol),
+        ("historyLength", rust_a2a + rust_center),
+        ("owner_get_task_confirmation_summary", rust_center + (RUST_HELPER / "src" / "desktop_launcher.rs").read_text(encoding="utf-8")),
+        ("a2a_task_query_outcome_unknown", rust_center),
+        ("getTask(", (ROOT / "apps/desktop_flutter/lib/services/a2a_connection_client.dart").read_text(encoding="utf-8")),
+        ("native Owner確認してTask状態を一回取得", (ROOT / "apps/desktop_flutter/lib/screens/a2a_connection_center.dart").read_text(encoding="utf-8")),
         ("A2A接続一覧", protocol + ipc_request + ipc_response),
         ("restored_pending_review", rust_center),
         ("owner_reapproval_required", rust_center),
@@ -6677,6 +6712,12 @@ def A2A接続センターの統治経路と境界を検査する() -> list[str]:
     ):
         if token not in source:
             不整合.append(f"C16実装に統治境界tokenがない: {token}")
+    mac_owner = (RUST_HELPER / "src" / "macos_desktop_owner.rs").read_text(encoding="utf-8")
+    mac_swift = (ROOT / "apps/desktop_flutter/macos/Runner/BrokerProcessChannel.swift").read_text(encoding="utf-8")
+    if '"A2Aタスク状態取得"' not in mac_owner or '#[cfg(target_os = "linux")]' not in mac_owner:
+        不整合.append("C16補完 GetTask native Owner候補のLinux限定境界がない")
+    if "A2Aタスク状態取得" in mac_swift:
+        不整合.append("C16補完 GetTaskをmacOS native channelへ追加している")
     return 不整合
 
 
@@ -9543,6 +9584,7 @@ def test_agent_task_owner_confirmation_wait_uses_native_operation_timeout() -> l
         "資格情報失効",
         "A2A接続",
         "A2Aメッセージ送信",
+        "A2Aタスク状態取得",
         "MCP接続",
         "MCP切断",
         "MCP Tool実行",

@@ -73,6 +73,28 @@ class A2aMessageSendResult {
   final String? resultHash;
 }
 
+class A2aTaskQueryResult {
+  const A2aTaskQueryResult({
+    required this.status,
+    required this.agentId,
+    required this.taskId,
+    required this.state,
+    required this.artifactCount,
+    required this.historyCount,
+    required this.resultHash,
+    required this.auditEventId,
+  });
+
+  final String status;
+  final String agentId;
+  final String taskId;
+  final String? state;
+  final int? artifactCount;
+  final int? historyCount;
+  final String? resultHash;
+  final String auditEventId;
+}
+
 class A2aConnectionClient {
   const A2aConnectionClient(this._transport);
 
@@ -312,6 +334,121 @@ class A2aConnectionClient {
       remoteId: remoteId,
       remoteState: remoteState,
       resultHash: resultHash as String,
+    );
+  }
+
+  Future<A2aTaskQueryResult> getTask({
+    required String agentId,
+    required String interfaceUri,
+    required String taskId,
+  }) async {
+    final normalizedId = agentId.trim();
+    final normalizedUri = interfaceUri.trim();
+    if (!_validAgentId(normalizedId) ||
+        !_validInterfaceUri(normalizedUri) ||
+        !_validExternalText(taskId, 256) ||
+        taskId.trim().isEmpty) {
+      throw const BrokerClientException('A2A Task照会の対象が不正です');
+    }
+    final response = await _transport.request(
+      'A2Aタスク状態取得',
+      payload: {
+        '版': 1,
+        '操作': '状態取得',
+        'AgentID': normalizedId,
+        'Interface URI': normalizedUri,
+        'TaskID': taskId,
+      },
+    );
+    if (response['operation'] != 'A2Aタスク状態取得' ||
+        response['audit_event_id'] is! String ||
+        !_validAuditId(response['audit_event_id'] as String) ||
+        response['evidence_source'] != 'LIVE_RUNTIME') {
+      throw const BrokerClientException('A2A Task照会応答の識別または証拠が不正です');
+    }
+    final body = _object(response['body'], 'A2A Task照会応答');
+    const bodyFields = {
+      '版',
+      'AgentID',
+      'interface_hash',
+      'status',
+      'result',
+      'Trust',
+      '権限生成',
+      'authority_strip',
+      '公開範囲',
+      '履歴公開',
+      'Credential使用',
+    };
+    if (body.length != bodyFields.length ||
+        body.keys.any((key) => !bodyFields.contains(key)) ||
+        body['版'] != 1 ||
+        body['AgentID'] != normalizedId ||
+        body['interface_hash'] is! String ||
+        !_validSha256(body['interface_hash'] as String) ||
+        body['Trust'] != 'pending_review' ||
+        body['権限生成'] != 'なし' ||
+        body['authority_strip'] != true ||
+        body['公開範囲'] != 'metadata_only' ||
+        body['履歴公開'] != false ||
+        body['Credential使用'] != false) {
+      throw const BrokerClientException('A2A Task照会応答の安全metadataが不正です');
+    }
+    if (body['status'] == 'unknown') {
+      if (response['status'] != 'suspended' ||
+          response['error'] is! Map ||
+          (response['error'] as Map)['code'] !=
+              'a2a_task_query_outcome_unknown' ||
+          body['result'] != null) {
+        throw const BrokerClientException('A2A Task照会のunknown応答が不正です');
+      }
+      return A2aTaskQueryResult(
+        status: 'unknown',
+        agentId: normalizedId,
+        taskId: taskId,
+        state: null,
+        artifactCount: null,
+        historyCount: null,
+        resultHash: null,
+        auditEventId: response['audit_event_id'] as String,
+      );
+    }
+    if (body['status'] != 'accepted' ||
+        response['status'] != 'accepted' ||
+        response['error'] != null) {
+      throw const BrokerClientException('A2A Task状態を取得できませんでした');
+    }
+    final result = _object(body['result'], 'A2A Task metadata');
+    const resultFields = {
+      'kind',
+      'task_id',
+      'context_id',
+      'state',
+      'artifact_count',
+      'history_count',
+      'result_hash',
+    };
+    if (result.length != resultFields.length ||
+        result.keys.any((key) => !resultFields.contains(key)) ||
+        result['kind'] != 'task' ||
+        result['task_id'] != taskId ||
+        !_nullableExternalText(result['context_id'], 256) ||
+        !_validRemoteTaskState(result['state']) ||
+        !_boundedCount(result['artifact_count'], 64) ||
+        result['history_count'] != 0 ||
+        result['result_hash'] is! String ||
+        !_validSha256(result['result_hash'] as String)) {
+      throw const BrokerClientException('A2A Task metadata projectionが不正です');
+    }
+    return A2aTaskQueryResult(
+      status: 'accepted',
+      agentId: normalizedId,
+      taskId: taskId,
+      state: result['state'] as String,
+      artifactCount: result['artifact_count'] as int,
+      historyCount: 0,
+      resultHash: result['result_hash'] as String,
+      auditEventId: response['audit_event_id'] as String,
     );
   }
 

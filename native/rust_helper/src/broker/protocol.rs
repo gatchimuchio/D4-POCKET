@@ -575,6 +575,8 @@ pub enum BrokerOperation {
     A2A接続一覧,
     #[serde(rename = "A2Aメッセージ送信")]
     A2Aメッセージ送信,
+    #[serde(rename = "A2Aタスク状態取得")]
+    A2Aタスク状態取得,
     #[serde(rename = "Host登録")]
     Host登録,
     #[serde(rename = "Host一覧")]
@@ -780,6 +782,7 @@ impl BrokerOperation {
             BrokerOperation::A2A接続 => "A2A接続",
             BrokerOperation::A2A接続一覧 => "A2A接続一覧",
             BrokerOperation::A2Aメッセージ送信 => "A2Aメッセージ送信",
+            BrokerOperation::A2Aタスク状態取得 => "A2Aタスク状態取得",
             BrokerOperation::Host登録 => "Host登録",
             BrokerOperation::Host一覧 => "Host一覧",
             BrokerOperation::Host切替 => "Host切替",
@@ -1270,6 +1273,7 @@ impl Broker {
         };
         broker.recover_interrupted_agent_tasks()?;
         super::a2a_center::recover_interrupted_sends(&mut broker)?;
+        super::a2a_center::recover_interrupted_get_tasks(&mut broker)?;
         Ok(broker)
     }
 
@@ -2002,6 +2006,7 @@ impl Broker {
                 BrokerOperation::GuiShell書出し
                     | BrokerOperation::A2A接続
                     | BrokerOperation::A2Aメッセージ送信
+                    | BrokerOperation::A2Aタスク状態取得
                     | BrokerOperation::アダプター導入
                     | BrokerOperation::アダプター検証
                     | BrokerOperation::アダプター有効化
@@ -2203,6 +2208,7 @@ impl Broker {
                 ))
             || envelope.operation == Some(BrokerOperation::A2A接続)
             || envelope.operation == Some(BrokerOperation::A2Aメッセージ送信)
+            || envelope.operation == Some(BrokerOperation::A2Aタスク状態取得)
         {
             if !export_confirmation.permits_agent_task_owner_operation(envelope.operation.as_ref())
             {
@@ -2210,7 +2216,7 @@ impl Broker {
                     &request_id,
                     &operation,
                     "desktop_native_owner_confirmation_required",
-                    "Agent Task権限・Approval・結果表示、Workspace読取・比較制御、MCP Tool実行、A2A接続・Message送信はRust Desktopのnative Owner確認経路だけで許可します",
+                    "Agent Task権限・Approval・結果表示、Workspace読取・比較制御、MCP Tool実行、A2A接続・Message送信・Task状態取得はRust Desktopのnative Owner確認経路だけで許可します",
                     true,
                     envelope.payload_hash.as_deref().unwrap_or("unknown"),
                 );
@@ -2688,6 +2694,13 @@ impl Broker {
                 &payload_hash,
             ),
             BrokerOperation::A2Aメッセージ送信 => super::a2a_center::send_message(
+                self,
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
+            BrokerOperation::A2Aタスク状態取得 => super::a2a_center::get_task(
                 self,
                 &request_id,
                 envelope.payload.as_ref().unwrap_or(&Value::Null),
@@ -9412,6 +9425,81 @@ mod tests {
             .any(|event| event.reason.contains("fixture message")));
         drop(desktop_broker);
         std::fs::remove_dir_all(store_root).expect("A2A send test store cleanup");
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn A2A_GetTaskはDesktop_native確認以外から到達できない() {
+        let payload = json!({
+            "版": 1,
+            "操作": "状態取得",
+            "AgentID": "native-confirmation-fixture",
+            "Interface URI": "http://127.0.0.1:9080/rpc",
+            "TaskID": "task-fixture-1"
+        });
+        let mut normal_request =
+            BrokerRequestEnvelope::health("a2a-get-normal", "a2a-get-normal-nonce");
+        normal_request.session_id = Some("session-1".to_string());
+        normal_request.operation = Some(BrokerOperation::A2Aタスク状態取得);
+        normal_request.payload = Some(payload.clone());
+        normal_request.issued_at = Some("2026-06-01T00:00:30Z".to_string());
+        normal_request.refresh_payload_hash();
+
+        let mut normal_broker = test_broker();
+        let normal = normal_broker.handle(normal_request.clone());
+        assert_eq!(normal.status, BrokerStatus::Rejected);
+        assert_eq!(
+            normal.error.as_ref().map(|error| error.code.as_str()),
+            Some("desktop_native_owner_confirmation_required")
+        );
+
+        let owner_envelope = json!({
+            "request_id": "a2a-get-owner-credential",
+            "session_id": "session-1",
+            "operation": "A2Aタスク状態取得",
+            "payload": payload,
+            "payload_hash": normal_request.payload_hash,
+            "nonce": "a2a-get-owner-credential-nonce",
+            "issued_at": "2026-06-01T00:00:30Z",
+            "metadata": {}
+        });
+        let mut owner_broker = test_broker();
+        let owner = owner_broker.owner要求処理(&owner_envelope.to_string());
+        assert_eq!(owner.status, BrokerStatus::Rejected);
+        assert_eq!(
+            owner.error.as_ref().map(|error| error.code.as_str()),
+            Some("desktop_native_owner_confirmation_required")
+        );
+
+        let desktop_envelope = json!({
+            "request_id": "a2a-get-desktop-confirmed",
+            "session_id": "session-1",
+            "operation": "A2Aタスク状態取得",
+            "payload": normal_request.payload,
+            "payload_hash": normal_request.payload_hash,
+            "nonce": "a2a-get-desktop-confirmed-nonce",
+            "issued_at": "2026-06-01T00:00:30Z",
+            "metadata": {"client": "desktop_flutter"}
+        });
+        let store_root = temp_store_dir("a2a-get-desktop-native-confirmation");
+        let mut desktop_broker = test_broker();
+        desktop_broker.state_store = BrokerStateStore::durable_file_store(
+            BrokerPersistentStore::open_or_create(&store_root, "session-1")
+                .expect("A2A GetTask durable store")
+                .0,
+        );
+        let desktop = desktop_broker.desktop_owner_operation_json(&desktop_envelope.to_string());
+        assert_eq!(desktop.status, BrokerStatus::Rejected);
+        assert_eq!(
+            desktop.error.as_ref().map(|error| error.code.as_str()),
+            Some("a2a_connection_missing")
+        );
+        assert!(!desktop_broker
+            .audit_events()
+            .iter()
+            .any(|event| event.reason.contains("task-fixture-1")));
+        drop(desktop_broker);
+        std::fs::remove_dir_all(store_root).expect("A2A GetTask test store cleanup");
     }
 
     #[test]

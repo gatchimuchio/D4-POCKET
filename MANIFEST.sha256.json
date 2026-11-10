@@ -224,7 +224,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/a2a_connection_center.dart",
-      "sha256": "aa44b47b742b9b1134ca4a99418225f336f8c4f142b8c322ba65a6dd497cd7d8"
+      "sha256": "d7671a541de59c396b328883fcee407203737a15fdcac704bdb6eb25652680d7"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/agent_center.dart",
@@ -332,7 +332,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/a2a_connection_client.dart",
-      "sha256": "9d0404daaebe53081f3908fb41ea1e3fd362f7ec25af2206eb699290e2bbade3"
+      "sha256": "3e4f148ef5cf20221da088e926497d318a599c0951f1dd954233eb2d217126bf"
     },
     {
       "path": "apps/desktop_flutter/lib/services/agent_coordination.dart",
@@ -360,7 +360,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/broker_client.dart",
-      "sha256": "72099b34cb9971b41912f616c12e6339a8904a38c75bd0a8ffb487e6e4e5b27f"
+      "sha256": "1c67daaea2ca89bad524e0cacf2aadcbe062724cd399da56484f38fc1d8bcdbb"
     },
     {
       "path": "apps/desktop_flutter/lib/services/compose_client.dart",
@@ -616,7 +616,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/a2a_connection_center_test.dart",
-      "sha256": "d021de12f57eb1c542797e8ce84dd9af69a751a4b475515b0709dfe8ecadd255"
+      "sha256": "a363febc2750c164ca94fc11f4c444a6a3b04f02ebea2e285cc687247d5a2e48"
     },
     {
       "path": "apps/desktop_flutter/test/agent_coordination_test.dart",
@@ -796,7 +796,7 @@
     },
     {
       "path": "apps/desktop_flutter/windows/runner/broker_pipe_controller.cpp",
-      "sha256": "774f577572a143783504b45fd7103ccb93c737d1030bd9d1fdddf3cb2c1bfbf4"
+      "sha256": "7da80dad62f727b3b5df86297a26ac57d7f25312c2949fa8bf51740452302f7e"
     },
     {
       "path": "apps/desktop_flutter/windows/runner/broker_pipe_controller.h",
@@ -1436,7 +1436,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "3484f494796f2df9972873b9f805cfb10669d741a834bb69a731e80e63b4fe40"
+      "sha256": "141a6e0a55c471b1715158b5746b90ae824746e96ba30af4474be61cca90535a"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1544,11 +1544,11 @@
     },
     {
       "path": "docs/specs/a2a-connection-center.md",
-      "sha256": "0245ff6cb43b5ece340a951293ba3e47406d9ffb6f8a5e0dbbc7f9b6aaee2282"
+      "sha256": "d31f0e89adce0e64906171c82a37c3aeceaec88d2ae6000cc728c45c9433158e"
     },
     {
       "path": "docs/specs/a2a-contract.md",
-      "sha256": "b9929fae13fdda1866a3fb15f79611f28abc2f4ac5826e98c9cf45d40f3500be"
+      "sha256": "239ba9fcfe89307776ed009f84d0950a1d0b41292a164b24d48ceef4dfca4ce0"
     },
     {
       "path": "docs/specs/adapter-conformance.md",
@@ -1909,6 +1909,14 @@
     {
       "path": "examples/contracts/a2a_message_send_response.valid.json",
       "sha256": "44c8d68c2b5c478b45c1decf7ff9888b8f192efc8afc6752a80a7b09324c8142"
+    },
+    {
+      "path": "examples/contracts/a2a_task_get_request.valid.json",
+      "sha256": "d9c08113817e0e8cc76f93450ba2ff03627fbff0fd6edfcb8adbbad8987936b8"
+    },
+    {
+      "path": "examples/contracts/a2a_task_get_response.valid.json",
+      "sha256": "67bb9b344699680458ca81bd3c0eb8c2a2d34650c51bef68580f124dc1f69370"
     },
     {
       "path": "examples/contracts/action_envelope.valid.json",
@@ -2285,6 +2293,22 @@
     {
       "path": "examples/contracts/invalid/a2a_message_send_response.invalid.json",
       "sha256": "b392b53f8258462967387e3c9f975aa8601c341066a0d6c3cd2f64eb0057afe7"
+    },
+    {
+      "path": "examples/contracts/invalid/a2a_task_get_request.invalid.json",
+      "sha256": "ae845211934aeb080401e7d761367757fb2c46dddf4ac1b789617e67d6e9cfe2"
+    },
+    {
+      "path": "examples/contracts/invalid/a2a_task_get_response_authority.invalid.json",
+      "sha256": "ef57fa2140d6992d23f3cf1fbc2e166f9ba54410d6c0e2baa54cec17d5d4e652"
+    },
+    {
+      "path": "examples/contracts/invalid/a2a_task_get_response_history.invalid.json",
+      "sha256": "1bab209c510f404cf28dd498848638a77ad4ff04210763b8f5c9ef68ead174a5"
+    },
+    {
+      "path": "examples/contracts/invalid/a2a_task_get_response_raw.invalid.json",
+      "sha256": "93d507f096aec5786c541d1fcd014f0d78aa3c73d9731406a490c0a83a60b80b"
     },
     {
       "path": "examples/contracts/invalid/action_envelope_missing_relation.invalid.json",
@@ -3664,7 +3688,7 @@
     },
     {
       "path": "native/rust_helper/src/a2a.rs",
-      "sha256": "0bbae66bdd1a7258a20e150a523c9c0efec19553a81fa75a0874c41bee36fd79"
+      "sha256": "33f96eeeb7550af5214d094fc84a5be1ff1d44dc75b9086e1ed9d166f6121d89"
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
@@ -3712,7 +3736,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/a2a_center.rs",
-      "sha256": "f3deb27b0e2fb88f8ddb7cdaaa50ee3dd5e5c6991bea59b71d3e4685b414d4d9"
+      "sha256": "0c48a6432f4ca4a86ce98950d21d212fe40d3fa71f0a1b26bcda4fe0add59ac5"
     },
     {
       "path": "native/rust_helper/src/broker/adapter_center.rs",
@@ -3848,7 +3872,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "edeb32602c981eca3a499a83594dc54cc86b5b255e0c52c20998c4064a9c2da6"
+      "sha256": "649ec3ab0a805747d8bdc4c457586f95534f4769cf8f635f1883a719ca28acd6"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -3900,7 +3924,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "4cfa6033a8195a1a84a11f4bf833191cc46c474e5638a2ca5d7ddd975e1f9ef9"
+      "sha256": "8ea7a0e8edf4a4576d045f8f3225360fd675d7dba76ebffba2efa8308bb032d6"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -3948,7 +3972,7 @@
     },
     {
       "path": "native/rust_helper/src/macos_desktop_owner.rs",
-      "sha256": "0e246f426c541eedb89abc1552b27354dd33af7b6ef50ab219b071093b46d0ce"
+      "sha256": "ff627ad040bbb61edfa19233a7d4eb26cd7ed79d26c4ece2a659f782f7fd6fbb"
     },
     {
       "path": "native/rust_helper/src/macos_desktop_worker.rs",
@@ -4360,7 +4384,7 @@
     },
     {
       "path": "packages/broker_ipc_client/lib/src/authenticated_loopback_broker_transport.dart",
-      "sha256": "953e8ee43a6287038ec8e4e031c93f4cdb209519abc80d3f6fae7f350d6c1f2a"
+      "sha256": "0c0108782dccfb5b9205abd212d9344873c6c283ebeecfafe5df26648b0f62d0"
     },
     {
       "path": "packages/broker_ipc_client/pubspec.yaml",
@@ -4629,6 +4653,14 @@
     {
       "path": "specs/a2a_message_send_response.schema.json",
       "sha256": "747d8203b0e783716851e06e58bc7a3dfb8921dd8e797d8e8eeafeb59813e75f"
+    },
+    {
+      "path": "specs/a2a_task_get_request.schema.json",
+      "sha256": "956537832578ae183eaa30e3dc4482ca7d0eaaf5889c7f9cda546c07b60ae369"
+    },
+    {
+      "path": "specs/a2a_task_get_response.schema.json",
+      "sha256": "0038079566fe4559fe49d351bcf32b03c12b25cb9fb1cdce1a69cce1737900ad"
     },
     {
       "path": "specs/action_envelope.schema.json",
@@ -4968,11 +5000,11 @@
     },
     {
       "path": "specs/ipc_request.schema.json",
-      "sha256": "1b85f78364dfaf98c81520b3a24e863110a9c2bc74c3fbd513299df04245075e"
+      "sha256": "486f2a5168aed382ead94c446af43f04e9589cd6a0e2f3f7038617febbc8ed6c"
     },
     {
       "path": "specs/ipc_response.schema.json",
-      "sha256": "54432074a33303cc7da781dd19ee011e069656b9f8e99e9e3be01aeadd319d72"
+      "sha256": "bdf1923773ad6beb09c8f905a314e05d2667f2ccf5d39c1965191c48ea60d99a"
     },
     {
       "path": "specs/linux_workspace_selection.schema.json",
@@ -5348,7 +5380,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "aeaf4231abc3b45df2ede15b285562d372f11ef5af9c969e56bdaf8defe13e40"
+      "sha256": "320bb872648f277ffb964bf0f897bfd62c4dcf4284c1431337c1d45af7003ef1"
     },
     {
       "path": "tooling/conformance_tests/test_final_development_audit.py",
@@ -5500,7 +5532,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "93ef4073be989ed3064c53266648dfe240ad255ccf6e4fe240d6b7243bf4126e"
+      "sha256": "b63f073a3c41b84a3a872e9626d1c47ffd2585f274b8e999d1f4407d3aed0bc6"
     },
     {
       "path": "tooling/shell_snapshot.py",
@@ -5608,7 +5640,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "787c88441c1814446c0b801653c32e243c9b9310a1739f597f661b8acc132755"
+      "sha256": "02787b1cf779d18e571b55717cbd244d832f1a4d94df9ffa78a6164c5b8ad81b"
     }
   ]
 }

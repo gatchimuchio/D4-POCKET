@@ -621,6 +621,24 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
         let summary = update.summary.clone();
         update_owner_candidate = Some(update);
         summary
+    } else if operation == "A2Aタスク状態取得" {
+        #[cfg(target_os = "linux")]
+        {
+            let (agent, target, task_id) =
+                crate::broker::a2a_center::owner_get_task_confirmation_summary(payload).ok()?;
+            let transport = if target.starts_with("https://") {
+                "HTTPS（OS既定CAで証明書検証、public IP固定、redirectなし）"
+            } else {
+                "HTTP（IPv4 loopback限定）"
+            };
+            format!(
+                "未信頼の外部A2A AgentからTask状態metadataを一回取得しますか？\nAgent ID: {agent}\n接続先: {target}\nTransport: {transport}\nTask ID: {task_id}\n要求hash: {hash}\n\n履歴は要求せず、Task状態・件数・response hashだけを返します。Task／Artifact本文、Credential、Permission、Approval、Trust、Authorityを表示・生成しません。各取得に新しい一回限りPermissionを要求し、再取得は新しいnative Owner確認が必要です。"
+            )
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            return None;
+        }
     } else if operation == "製品起動項目修復要求" {
         #[cfg(target_os = "linux")]
         {
@@ -835,8 +853,10 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
             20
         } else if matches!(operation, "MCP接続" | "MCP切断" | "MCP Tool実行") {
             35
-        } else if matches!(operation, "A2A接続" | "A2Aメッセージ送信") {
-            // 接続・送信の有限timeoutとAudit待機。Messageは応答不明でも再送しない。
+        } else if matches!(operation, "A2A接続" | "A2Aメッセージ送信")
+            || (cfg!(target_os = "linux") && operation == "A2Aタスク状態取得")
+        {
+            // A2Aは有限timeout。Task状態取得は一回限りで自動再取得しない。
             25
         } else {
             4
@@ -1360,6 +1380,48 @@ mod a2a_tests {
             .unwrap()
             .is_some());
         worker.join().unwrap();
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn A2A_GetTask_nativeOwnerはLinuxのみへ接続する() {
+        let endpoint = BrokerEndpoint {
+            host: "127.0.0.1".into(),
+            port: 1,
+            session_id: "fixture-session".into(),
+            session_secret: "synthetic-only".into(),
+            credential_role: BrokerCredentialRole::Normal,
+            transport: "tcp".into(),
+            max_request_bytes: 65536,
+        };
+        let payload = json!({
+            "版": 1,
+            "操作": "状態取得",
+            "AgentID": "platform-a2a-fixture",
+            "Interface URI": "http://127.0.0.1:34101/rpc",
+            "TaskID": "task-platform-fixture"
+        });
+        let frame = json!({
+            "request_id":"platform-get-task-request",
+            "nonce":"platform-get-task-nonce",
+            "issued_at":BrokerRequestEnvelope::current_issued_at(),
+            "operation":"A2Aタスク状態取得",
+            "metadata":{"client":"desktop_flutter"},
+            "payload_hash":canonical_payload_hash(Some(&payload)),
+            "payload":payload
+        });
+        let bytes = serde_json::to_vec(&frame).unwrap();
+        #[cfg(target_os = "linux")]
+        {
+            let confirmation =
+                candidate(&bytes, &endpoint).expect("Linux A2A GetTask native確認候補");
+            assert!(confirmation.summary.contains("platform-a2a-fixture"));
+            assert!(confirmation.summary.contains("task-platform-fixture"));
+            assert!(confirmation.summary.contains("履歴は要求せず"));
+            assert_eq!(confirmation.response_timeout, Duration::from_secs(25));
+        }
+        #[cfg(target_os = "macos")]
+        assert!(candidate(&bytes, &endpoint).is_none());
     }
 }
 

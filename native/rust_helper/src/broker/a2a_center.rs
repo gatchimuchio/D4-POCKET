@@ -1,7 +1,7 @@
 //! C16 A2A接続センターのBroker経路。
 //!
-//! Agent Card discoveryと、無認証A2A v1.0 JSON-RPC SendMessageのBroker経路。
-//! Credential注入、Artifact本文、Stream購読は未接続とする。
+//! Agent Card discoveryと、無認証A2A v1.0 JSON-RPC SendMessage／GetTaskのBroker経路。
+//! Credential注入、Task／Artifact本文、Stream購読は未接続とする。
 #![allow(non_snake_case)]
 
 use super::protocol::{Broker, BrokerResponse, BrokerStatus, EVIDENCE_SOURCE_INTERNAL_STATE};
@@ -14,6 +14,7 @@ use std::collections::BTreeMap;
 const OP_CONNECT: &str = "A2A接続";
 const OP_LIST: &str = "A2A接続一覧";
 const OP_SEND_MESSAGE: &str = "A2Aメッセージ送信";
+const OP_GET_TASK: &str = "A2Aタスク状態取得";
 const VERSION: u64 = 1;
 const PROTOCOL_VERSION: &str = "1.0";
 const MAX_CONNECTIONS: usize = 64;
@@ -35,31 +36,47 @@ struct SendMessageRequest {
     message: String,
 }
 
-struct OneShotA2aMessagePermission {
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct GetTaskRequest {
+    #[serde(rename = "版")]
+    version: u64,
+    #[serde(rename = "操作")]
+    operation: String,
+    #[serde(rename = "AgentID")]
+    agent_id: String,
+    #[serde(rename = "Interface URI")]
+    interface_uri: String,
+    #[serde(rename = "TaskID")]
+    task_id: String,
+}
+
+struct OneShotA2aPermission {
     permission_id: String,
     request_id: String,
     agent_id: String,
     interface_hash: String,
-    message_hash: String,
+    binding_hash: String,
     expires_at: std::time::Instant,
     consumed: bool,
 }
 
-impl OneShotA2aMessagePermission {
+impl OneShotA2aPermission {
     fn issue(
+        operation_prefix: &str,
         request_id: &str,
         agent_id: &str,
         interface_hash: &str,
-        message_hash: &str,
+        binding_hash: &str,
     ) -> Option<Self> {
         let mut nonce = [0u8; 16];
         getrandom::getrandom(&mut nonce).ok()?;
         Some(Self {
-            permission_id: format!("a2a-message-{}", hex::encode(nonce)),
+            permission_id: format!("{operation_prefix}{}", hex::encode(nonce)),
             request_id: request_id.to_string(),
             agent_id: agent_id.to_string(),
             interface_hash: interface_hash.to_string(),
-            message_hash: message_hash.to_string(),
+            binding_hash: binding_hash.to_string(),
             expires_at: std::time::Instant::now() + std::time::Duration::from_secs(15),
             consumed: false,
         })
@@ -70,14 +87,14 @@ impl OneShotA2aMessagePermission {
         request_id: &str,
         agent_id: &str,
         interface_hash: &str,
-        message_hash: &str,
+        binding_hash: &str,
     ) -> bool {
         if self.consumed
             || std::time::Instant::now() >= self.expires_at
             || self.request_id != request_id
             || self.agent_id != agent_id
             || self.interface_hash != interface_hash
-            || self.message_hash != message_hash
+            || self.binding_hash != binding_hash
         {
             return false;
         }
@@ -1072,9 +1089,17 @@ fn validate_send_message_target(
     broker: &Broker,
     request: &SendMessageRequest,
 ) -> Result<String, A2aError> {
+    validate_registered_interface(broker, &request.agent_id, &request.interface_uri)
+}
+
+fn validate_registered_interface(
+    broker: &Broker,
+    agent_id: &str,
+    interface_uri: &str,
+) -> Result<String, A2aError> {
     let receipt = broker
         .a2a_connections
-        .get(&request.agent_id)
+        .get(agent_id)
         .ok_or_else(|| A2aError::new("a2a_connection_missing", "A2A接続receiptがない"))?;
     if receipt.get("接続状態").and_then(Value::as_str) != Some("connected")
         || receipt.get("証拠種別").and_then(Value::as_str) != Some("LIVE_RUNTIME")
@@ -1110,7 +1135,7 @@ fn validate_send_message_target(
             "現行A2A Message送信はCredentialを使用しないinterfaceに限定",
         ));
     }
-    let (transport, interface_hash) = crate::a2a::interface_identity(&request.interface_uri)?;
+    let (transport, interface_hash) = crate::a2a::interface_identity(interface_uri)?;
     let interfaces = card
         .get("supported_interfaces")
         .and_then(Value::as_array)
@@ -1130,6 +1155,27 @@ fn validate_send_message_target(
         ));
     }
     Ok(interface_hash)
+}
+
+fn parse_get_task_request(payload: &Value) -> Result<GetTaskRequest, A2aError> {
+    let request: GetTaskRequest = serde_json::from_value(payload.clone()).map_err(|_| {
+        A2aError::new(
+            "a2a_task_request_invalid",
+            "A2A Task取得payloadの構造が不正",
+        )
+    })?;
+    if request.version != VERSION
+        || request.operation != "状態取得"
+        || !valid_agent_id(&request.agent_id)
+        || !crate::a2a::valid_task_id(&request.task_id)
+    {
+        return Err(A2aError::new(
+            "a2a_task_request_invalid",
+            "A2A Task取得payloadの値が不正",
+        ));
+    }
+    crate::a2a::transport_name(&request.interface_uri)?;
+    Ok(request)
 }
 
 pub(super) fn send_message(
@@ -1207,7 +1253,8 @@ pub(super) fn send_message(
             "A2A Message送信のOwner確認Auditを確定できない",
         );
     }
-    let mut permission = match OneShotA2aMessagePermission::issue(
+    let mut permission = match OneShotA2aPermission::issue(
+        "a2a-message-",
         request_id,
         &request.agent_id,
         &interface_hash,
@@ -1348,6 +1395,309 @@ pub(super) fn send_message(
     }
 }
 
+pub(super) fn get_task(
+    broker: &mut Broker,
+    request_id: &str,
+    payload: &Value,
+    owner: bool,
+    payload_hash: &str,
+) -> BrokerResponse {
+    if !owner {
+        return broker.reject_with_payload_hash(
+            request_id,
+            OP_GET_TASK,
+            "a2a_native_owner_required",
+            "A2A Task状態取得は各要求に対するnative Owner確認が必要",
+            true,
+            payload_hash,
+        );
+    }
+    if !broker.state_store.persistence_ready() {
+        return broker.reject_with_payload_hash(
+            request_id,
+            OP_GET_TASK,
+            "broker_persistence_unavailable",
+            "A2A Task状態取得には永続Auditが必要",
+            true,
+            payload_hash,
+        );
+    }
+    let request = match parse_get_task_request(payload) {
+        Ok(request) => request,
+        Err(error) => return reject_get_task(broker, request_id, error, payload_hash),
+    };
+    let interface_hash =
+        match validate_registered_interface(broker, &request.agent_id, &request.interface_uri) {
+            Ok(hash) => hash,
+            Err(error) => return reject_get_task(broker, request_id, error, payload_hash),
+        };
+    let task_id_hash = crate::audit_hash::sha256_tagged(request.task_id.as_bytes());
+    if broker
+        .append_audit(
+            request_id,
+            OP_GET_TASK,
+            "received",
+            &format!(
+                "A2A GetTask要求を受信。AgentID={} interface_hash={} task_id_hash={}。Task ID実値・URI・response本文はAuditへ保存しない",
+                request.agent_id, interface_hash, task_id_hash
+            ),
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
+        )
+        .is_err()
+    {
+        return broker.audit_store_failed_response(
+            request_id,
+            OP_GET_TASK,
+            "a2a_audit_append_failed",
+            "A2A Task取得の受信Auditを確定できない",
+        );
+    }
+    if broker
+        .append_audit(
+            request_id,
+            OP_GET_TASK,
+            "owner_confirmed",
+            "native Owner確認が現在の要求hash・対象Agent・Task ID hashに一致。再利用しない",
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
+        )
+        .is_err()
+    {
+        return broker.audit_store_failed_response(
+            request_id,
+            OP_GET_TASK,
+            "a2a_audit_append_failed",
+            "A2A Task取得のOwner確認Auditを確定できない",
+        );
+    }
+    let mut permission = match OneShotA2aPermission::issue(
+        "a2a-task-get-",
+        request_id,
+        &request.agent_id,
+        &interface_hash,
+        &task_id_hash,
+    ) {
+        Some(permission) => permission,
+        None => {
+            return broker.reject_with_payload_hash(
+                request_id,
+                OP_GET_TASK,
+                "a2a_permission_unavailable",
+                "一回限りA2A Task取得Permissionを発行できない",
+                true,
+                payload_hash,
+            )
+        }
+    };
+    if broker
+        .append_audit(
+            request_id,
+            OP_GET_TASK,
+            "permission_issued",
+            &format!(
+                "一回限りPermissionを発行。permission_id={} AgentID={} interface_hash={} task_id_hash={}。永続化せず、再利用しない",
+                permission.permission_id, request.agent_id, interface_hash, task_id_hash
+            ),
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
+        )
+        .is_err()
+    {
+        return broker.audit_store_failed_response(
+            request_id,
+            OP_GET_TASK,
+            "a2a_audit_append_failed",
+            "A2A Task取得PermissionのAuditを確定できない",
+        );
+    }
+    if !permission.consume(
+        request_id,
+        &request.agent_id,
+        &interface_hash,
+        &task_id_hash,
+    ) {
+        return broker.reject_with_payload_hash(
+            request_id,
+            OP_GET_TASK,
+            "a2a_permission_binding_invalid",
+            "A2A Task取得Permissionの対象が一致しない",
+            false,
+            payload_hash,
+        );
+    }
+    if broker
+        .append_audit(
+            request_id,
+            OP_GET_TASK,
+            "started",
+            "一回限りPermissionを消費。A2A GetTaskを一回だけ実行し、historyLength=0でbounded metadataだけを受け取る",
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
+        )
+        .is_err()
+    {
+        return broker.audit_store_failed_response(
+            request_id,
+            OP_GET_TASK,
+            "a2a_audit_append_failed",
+            "A2A Task取得の開始Auditを確定できず、外部読取を行わない",
+        );
+    }
+    match crate::a2a::get_task(
+        &request.interface_uri,
+        &request.task_id,
+        std::time::Instant::now() + std::time::Duration::from_secs(15),
+    ) {
+        Ok(result) => {
+            let result_hash = result
+                .get("result_hash")
+                .and_then(Value::as_str)
+                .unwrap_or("unknown");
+            let body = json!({
+                "版": VERSION,
+                "AgentID": request.agent_id,
+                "interface_hash": interface_hash,
+                "status": "accepted",
+                "result": result,
+                "Trust": "pending_review",
+                "権限生成": "なし",
+                "authority_strip": true,
+                "公開範囲": "metadata_only",
+                "履歴公開": false,
+                "Credential使用": false
+            });
+            let event = match broker.append_audit(
+                request_id,
+                OP_GET_TASK,
+                "accepted",
+                &format!(
+                    "A2A GetTask metadataを受領。AgentID={} interface_hash={} task_id_hash={} result_hash={}。履歴・Task本文・Artifact本文は保存・投影しない",
+                    request.agent_id, interface_hash, task_id_hash, result_hash
+                ),
+                "LIVE_RUNTIME",
+                payload_hash,
+            ) {
+                Ok(event) => event,
+                Err(_) => {
+                    return broker.audit_store_failed_response(
+                        request_id,
+                        OP_GET_TASK,
+                        "a2a_audit_append_failed",
+                        "A2A Task応答後のAuditを確定できない。metadataを成功として返さない",
+                    )
+                }
+            };
+            BrokerResponse {
+                request_id: request_id.to_string(),
+                operation: OP_GET_TASK.to_string(),
+                status: BrokerStatus::Accepted,
+                evidence_source: "LIVE_RUNTIME".to_string(),
+                audit_event_id: event.event_id,
+                error: None,
+                health: None,
+                body: Some(body),
+                shutdown_requested: broker.shutdown_requested,
+            }
+        }
+        Err(error) if error.code == "a2a_remote_task_rejected" => broker.reject_with_payload_hash(
+            request_id,
+            OP_GET_TASK,
+            "a2a_remote_task_rejected",
+            "外部AgentがTask状態取得を拒否した。外部応答本文は表示しない",
+            true,
+            payload_hash,
+        ),
+        Err(error) => unknown_get_task(
+            broker,
+            request_id,
+            &request.agent_id,
+            &interface_hash,
+            &task_id_hash,
+            payload_hash,
+            error.code,
+        ),
+    }
+}
+
+fn reject_get_task(
+    broker: &mut Broker,
+    request_id: &str,
+    error: A2aError,
+    payload_hash: &str,
+) -> BrokerResponse {
+    broker.reject_with_payload_hash(
+        request_id,
+        OP_GET_TASK,
+        error.code,
+        &error.message,
+        true,
+        payload_hash,
+    )
+}
+
+fn unknown_get_task(
+    broker: &mut Broker,
+    request_id: &str,
+    agent_id: &str,
+    interface_hash: &str,
+    task_id_hash: &str,
+    payload_hash: &str,
+    failure_code: &str,
+) -> BrokerResponse {
+    let body = json!({
+        "版": VERSION,
+        "AgentID": agent_id,
+        "interface_hash": interface_hash,
+        "status": "unknown",
+        "result": Value::Null,
+        "Trust": "pending_review",
+        "権限生成": "なし",
+        "authority_strip": true,
+        "公開範囲": "metadata_only",
+        "履歴公開": false,
+        "Credential使用": false
+    });
+    let event = match broker.append_audit(
+        request_id,
+        OP_GET_TASK,
+        "unknown",
+        &format!(
+            "A2A GetTask結果不明。failure_code={} AgentID={} interface_hash={} task_id_hash={}。自動再取得せず、手動再取得にも新Owner確認と一回Permissionを要求",
+            failure_code, agent_id, interface_hash, task_id_hash
+        ),
+        "LIVE_RUNTIME",
+        payload_hash,
+    ) {
+        Ok(event) => event,
+        Err(_) => {
+            return broker.audit_store_failed_response(
+                request_id,
+                OP_GET_TASK,
+                "a2a_audit_append_failed",
+                "A2A Task取得の結果不明Auditを確定できない",
+            )
+        }
+    };
+    BrokerResponse {
+        request_id: request_id.to_string(),
+        operation: OP_GET_TASK.to_string(),
+        status: BrokerStatus::Suspended,
+        evidence_source: "LIVE_RUNTIME".to_string(),
+        audit_event_id: event.event_id,
+        error: Some(super::protocol::BrokerError {
+            code: "a2a_task_query_outcome_unknown".to_string(),
+            message: "A2A Taskの状態を確認できませんでした。自動再取得はせず、再試行には新しいOwner確認が必要です。".to_string(),
+            recoverable: true,
+            audit_event_required: true,
+            fail_closed: true,
+        }),
+        health: None,
+        body: Some(body),
+        shutdown_requested: broker.shutdown_requested,
+    }
+}
+
 fn reject_send_message(
     broker: &mut Broker,
     request_id: &str,
@@ -1458,6 +1808,37 @@ pub(crate) fn recover_interrupted_sends(broker: &mut Broker) -> Result<(), Broke
     Ok(())
 }
 
+pub(crate) fn recover_interrupted_get_tasks(broker: &mut Broker) -> Result<(), BrokerStoreError> {
+    let mut started = BTreeMap::<String, String>::new();
+    let mut terminal = std::collections::BTreeSet::<String>::new();
+    for event in broker.audit_log.events() {
+        if event.operation != OP_GET_TASK {
+            continue;
+        }
+        if event.decision == "started" {
+            started.insert(event.request_id.clone(), event.payload_hash.clone());
+        } else if ["accepted", "unknown", "rejected", "suspended"]
+            .contains(&event.decision.as_str())
+        {
+            terminal.insert(event.request_id.clone());
+        }
+    }
+    for (request_id, payload_hash) in started {
+        if terminal.contains(&request_id) {
+            continue;
+        }
+        broker.append_audit(
+            &request_id,
+            OP_GET_TASK,
+            "unknown",
+            "Broker再起動時にA2A GetTaskの終端Auditがないため結果不明として隔離。自動再取得しない",
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            &payload_hash,
+        )?;
+    }
+    Ok(())
+}
+
 fn parse_request(payload: &Value) -> Result<ConnectionRequest, A2aError> {
     let request: ConnectionRequest = serde_json::from_value(payload.clone()).map_err(|_| {
         A2aError::new(
@@ -1503,6 +1884,14 @@ pub(crate) fn owner_send_message_confirmation_summary(
         request.message,
         message_hash,
     ))
+}
+
+pub(crate) fn owner_get_task_confirmation_summary(
+    payload: &Value,
+) -> Result<(String, String, String), String> {
+    let request = parse_get_task_request(payload).map_err(|error| error.message)?;
+    crate::a2a::transport_name(&request.interface_uri).map_err(|error| error.message)?;
+    Ok((request.agent_id, request.interface_uri, request.task_id))
 }
 
 fn valid_agent_id(value: &str) -> bool {
@@ -1552,6 +1941,57 @@ mod tests {
         fn drop(&mut self) {
             let _ = std::fs::remove_dir_all(&self.0);
         }
+    }
+
+    #[test]
+    fn A2A_GetTask再起動時startedだけならunknownへ一度だけ閉じる() {
+        let store = TestStore::new("a2a-get-task-recovery");
+        let request_id = "a2a-get-task-interrupted";
+        let payload_hash =
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        let mut broker =
+            Broker::new_persistent("a2a-get-task-before-restart", &store.0).expect("永続Broker");
+        broker
+            .append_audit(
+                request_id,
+                OP_GET_TASK,
+                "started",
+                "fixture started task_id_hash=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+                payload_hash,
+            )
+            .expect("GetTask開始Audit");
+        drop(broker);
+
+        let recovered =
+            Broker::new_persistent("a2a-get-task-after-restart", &store.0).expect("再起動後の復旧");
+        let recovery_events: Vec<_> = recovered
+            .audit_events()
+            .iter()
+            .filter(|event| {
+                event.request_id == request_id
+                    && event.operation == OP_GET_TASK
+                    && event.decision == "unknown"
+            })
+            .collect();
+        assert_eq!(recovery_events.len(), 1);
+        assert!(!recovery_events[0].reason.contains("fixture-task-id"));
+        drop(recovered);
+
+        let reopened = Broker::new_persistent("a2a-get-task-after-recovery", &store.0)
+            .expect("recovery idempotence");
+        assert_eq!(
+            reopened
+                .audit_events()
+                .iter()
+                .filter(|event| {
+                    event.request_id == request_id
+                        && event.operation == OP_GET_TASK
+                        && event.decision == "unknown"
+                })
+                .count(),
+            1
+        );
     }
 
     fn spawn_agent_card_fixture(
@@ -1699,7 +2139,7 @@ mod tests {
         let address = listener.local_addr().expect("fixture address");
         let card_uri = format!("http://{address}/.well-known/agent-card.json");
         let interface_uri = format!("http://{address}/rpc");
-        let worker = std::thread::spawn(move || -> Result<(Value, Value), String> {
+        let worker = std::thread::spawn(move || -> Result<(Value, Value, Value), String> {
             fn read_request(stream: &mut std::net::TcpStream) -> Result<(String, Vec<u8>), String> {
                 let mut bytes = Vec::new();
                 let mut chunk = [0u8; 1024];
@@ -1840,7 +2280,34 @@ mod tests {
             }))
             .map_err(|error| error.to_string())?;
             respond(&mut unknown_stream, &stale_response)?;
-            Ok((request, unknown_request))
+            let (mut task_stream, _) = listener.accept().map_err(|error| error.to_string())?;
+            task_stream
+                .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+                .map_err(|error| error.to_string())?;
+            task_stream
+                .set_write_timeout(Some(std::time::Duration::from_secs(5)))
+                .map_err(|error| error.to_string())?;
+            let (task_header, task_body) = read_request(&mut task_stream)?;
+            if !task_header.starts_with("POST /rpc HTTP/1.1\r\n") {
+                return Err("A2A GetTask HTTP method mismatch".into());
+            }
+            let task_request: Value =
+                serde_json::from_slice(&task_body).map_err(|error| error.to_string())?;
+            if task_request["method"] != "GetTask"
+                || task_request["params"]["id"] != "fixture-task-1"
+                || task_request["params"]["historyLength"] != 0
+            {
+                return Err("A2A GetTask parameters mismatch".into());
+            }
+            let task_response = serde_json::to_vec(&json!({
+                "jsonrpc":"2.0", "id":task_request["id"], "result":{
+                    "kind":"task", "id":"fixture-task-1", "contextId":"fixture-context-1",
+                    "status":{"state":"TASK_STATE_COMPLETED","message":{"parts":[{"text":"private-get-task-marker"}]}},
+                    "artifacts":[{"parts":[{"text":"private-get-task-marker"}]}], "history":[]
+                }
+            })).map_err(|error| error.to_string())?;
+            respond(&mut task_stream, &task_response)?;
+            Ok((request, unknown_request, task_request))
         });
 
         let mut connection_payload = valid_payload();
@@ -1892,7 +2359,21 @@ mod tests {
             true,
             "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
         );
-        let (request, uncertain_request) = worker
+        let task_payload = json!({
+            "版": 1,
+            "操作": "状態取得",
+            "AgentID": "remote-agent-example",
+            "Interface URI": interface_uri,
+            "TaskID": "fixture-task-1"
+        });
+        let task_result = get_task(
+            &mut broker,
+            "a2a-get-task-positive-request",
+            &task_payload,
+            true,
+            "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        );
+        let (request, uncertain_request, task_request) = worker
             .join()
             .expect("SendMessage fixture thread")
             .expect("fixture requests");
@@ -1928,11 +2409,23 @@ mod tests {
         assert!(!uncertain_body
             .to_string()
             .contains("uncertain-response-private"));
+        assert_eq!(task_result.status, BrokerStatus::Accepted);
+        assert_eq!(task_request["method"], "GetTask");
+        let task_body = task_result.body.expect("bounded GetTask response");
+        assert_eq!(task_body["status"], "accepted");
+        assert_eq!(task_body["result"]["task_id"], "fixture-task-1");
+        assert_eq!(task_body["result"]["state"], "completed");
+        assert_eq!(task_body["result"]["history_count"], 0);
+        assert_eq!(task_body["履歴公開"], false);
+        assert_eq!(task_body["Credential使用"], false);
+        assert!(!task_body.to_string().contains("private-get-task-marker"));
         assert!(broker.audit_events().iter().all(|event| {
             !event.reason.contains(secret_message)
                 && !event.reason.contains("uncertain fixture message")
                 && !event.reason.contains("private-response-marker")
                 && !event.reason.contains("uncertain-response-private")
+                && !event.reason.contains("private-get-task-marker")
+                && !event.reason.contains("fixture-task-1")
                 && !event.reason.contains(&interface_uri)
         }));
         for decision in [
@@ -1953,6 +2446,19 @@ mod tests {
         assert_eq!(
             broker.a2a_connections["remote-agent-example"]["Trust"]["state"],
             "pending_review"
+        );
+
+        let denied_task = get_task(
+            &mut broker,
+            "a2a-get-task-no-owner",
+            &task_payload,
+            false,
+            "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        );
+        assert_eq!(denied_task.status, BrokerStatus::Rejected);
+        assert_eq!(
+            denied_task.error.as_ref().map(|error| error.code.as_str()),
+            Some("a2a_native_owner_required")
         );
 
         let denied = send_message(

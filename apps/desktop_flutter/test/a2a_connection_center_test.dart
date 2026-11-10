@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gui_shell_desktop/screens/a2a_connection_center.dart';
@@ -189,6 +190,66 @@ void main() {
     expect(transport.operations, ['A2Aメッセージ送信']);
   });
 
+  test('GetTaskはTask ID完全一致・history zero・metadata-only応答だけを受理する', () async {
+    final transport = _A2aTransport([
+      _taskGetResponse('audit-a2a-task-get', taskId: 'remote-task-42'),
+    ]);
+    final result = await A2aConnectionClient(transport).getTask(
+      agentId: 'fixture-agent',
+      interfaceUri: 'http://127.0.0.1:9080/rpc',
+      taskId: 'remote-task-42',
+    );
+    expect(result.status, 'accepted');
+    expect(result.state, 'working');
+    expect(result.historyCount, 0);
+    expect(transport.operations, ['A2Aタスク状態取得']);
+    expect(transport.payloads.single, {
+      '版': 1,
+      '操作': '状態取得',
+      'AgentID': 'fixture-agent',
+      'Interface URI': 'http://127.0.0.1:9080/rpc',
+      'TaskID': 'remote-task-42',
+    });
+
+    final mismatch =
+        _taskGetResponse('audit-a2a-task-mismatch', taskId: 'different-task');
+    await expectLater(
+      A2aConnectionClient(_A2aTransport([mismatch])).getTask(
+        agentId: 'fixture-agent',
+        interfaceUri: 'http://127.0.0.1:9080/rpc',
+        taskId: 'remote-task-42',
+      ),
+      throwsA(isA<BrokerClientException>()),
+    );
+    final leaked =
+        _taskGetResponse('audit-a2a-task-leak', taskId: 'remote-task-42');
+    final leakedBody = Map<String, Object?>.from(leaked['body'] as Map);
+    leakedBody['private_payload'] = 'remote-task-secret-marker';
+    leaked['body'] = leakedBody;
+    await expectLater(
+      A2aConnectionClient(_A2aTransport([leaked])).getTask(
+        agentId: 'fixture-agent',
+        interfaceUri: 'http://127.0.0.1:9080/rpc',
+        taskId: 'remote-task-42',
+      ),
+      throwsA(isA<BrokerClientException>()),
+    );
+  });
+
+  test('GetTaskの結果unknownでも自動再照会しない', () async {
+    final transport = _A2aTransport([
+      _taskGetUnknown('audit-a2a-task-unknown'),
+    ]);
+    final result = await A2aConnectionClient(transport).getTask(
+      agentId: 'fixture-agent',
+      interfaceUri: 'http://127.0.0.1:9080/rpc',
+      taskId: 'remote-task-42',
+    );
+    expect(result.status, 'unknown');
+    expect(result.state, isNull);
+    expect(transport.operations, ['A2Aタスク状態取得']);
+  });
+
   test('旧保存metadataのunknown interface hashをunknownのまま表示できる', () async {
     final receipt = _receipt();
     final interfaces = (receipt['Agent Card']
@@ -368,6 +429,81 @@ void main() {
         isEmpty);
   });
 
+  testWidgets('Task状態はWindowsの明示操作だけで一回照会し状態metadataを表示する', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    try {
+      const endpoint = 'http://127.0.0.1:9080/card';
+      final receipt = _receipt();
+      final transport = _A2aTransport([
+        _response('A2A接続一覧', 'audit-empty', _listBody(const []),
+            evidence: 'INTERNAL_STATE'),
+        _response('A2A接続', 'audit-a2a-connect', receipt,
+            evidence: 'INTERNAL_STATE'),
+        _response('A2A接続一覧', 'audit-a2a-list', _listBody([receipt]),
+            evidence: 'INTERNAL_STATE'),
+        _sendResponse('audit-a2a-send-task', agentId: 'fixture-agent', result: {
+          'kind': 'task',
+          'task_id': 'remote-task-42',
+          'context_id': null,
+          'state': 'submitted',
+          'artifact_count': 0,
+          'history_count': 1,
+          'result_hash': 'sha256:${List<String>.filled(64, 'c').join()}',
+        }),
+        _taskGetResponse('audit-a2a-task-get', taskId: 'remote-task-42'),
+      ]);
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(body: A2aConnectionCenter(transport: transport)),
+      ));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).at(0), 'fixture-agent');
+      await tester.enterText(find.byType(TextField).at(1), endpoint);
+      await tester.tap(find.text('Owner確認して接続'));
+      await tester.pumpAndSettle();
+      final dropdown = find.byType(DropdownButtonFormField<String>);
+      await tester.ensureVisible(dropdown);
+      await tester.tap(dropdown);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Fixture Agent (fixture-agent)').last);
+      await tester.pumpAndSettle();
+      await tester.enterText(
+          find.byType(TextField).at(2), 'http://127.0.0.1:9080/rpc');
+      await tester.enterText(find.byType(TextField).at(3), 'fixture message');
+      await tester.tap(find.text('native Owner確認して一回送信'));
+      await tester.pumpAndSettle();
+      expect(
+          transport.operations, ['A2A接続一覧', 'A2A接続', 'A2A接続一覧', 'A2Aメッセージ送信']);
+      expect(find.textContaining('Task ID（memory-only）: remote-task-42'),
+          findsOneWidget);
+      final getTaskButton = find.text('native Owner確認してTask状態を一回取得');
+      await tester.ensureVisible(getTaskButton);
+      await tester.tap(getTaskButton);
+      await tester.pumpAndSettle();
+      expect(transport.operations.last, 'A2Aタスク状態取得');
+      expect(transport.payloads.last?['TaskID'], 'remote-task-42');
+      expect(transport.payloads.last?['Interface URI'],
+          'http://127.0.0.1:9080/rpc');
+      expect(find.textContaining('state=working'), findsOneWidget);
+      expect(jsonEncode(transport.payloads), isNot(contains('private-task')));
+      final operationsAfterQuery = List<String>.from(transport.operations);
+      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(body: A2aConnectionCenter(transport: transport)),
+      ));
+      await tester.pumpAndSettle();
+      expect(find.text('native Owner確認してTask状態を一回取得'), findsOneWidget);
+      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(body: A2aConnectionCenter(transport: transport)),
+      ));
+      await tester.pumpAndSettle();
+      expect(find.text('native Owner確認してTask状態を一回取得'), findsNothing);
+      expect(transport.operations, operationsAfterQuery);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
   testWidgets('復元pending receiptを新しいOwner確認で再検証できる', (tester) async {
     const endpoint = 'http://127.0.0.1:9081/card';
     final pending = _receipt()
@@ -472,6 +608,58 @@ Map<String, Object?> _sendResponse(
         'authority_strip': true,
         '公開範囲': 'metadata_only',
         '再送可能': false,
+      },
+    };
+
+Map<String, Object?> _taskGetResponse(String auditId,
+        {required String taskId}) =>
+    {
+      'operation': 'A2Aタスク状態取得',
+      'status': 'accepted',
+      'error': null,
+      'evidence_source': 'LIVE_RUNTIME',
+      'audit_event_id': auditId,
+      'body': {
+        '版': 1,
+        'AgentID': 'fixture-agent',
+        'interface_hash': 'sha256:${List<String>.filled(64, 'b').join()}',
+        'status': 'accepted',
+        'result': {
+          'kind': 'task',
+          'task_id': taskId,
+          'context_id': 'context-fixture-1',
+          'state': 'working',
+          'artifact_count': 1,
+          'history_count': 0,
+          'result_hash': 'sha256:${List<String>.filled(64, 'c').join()}',
+        },
+        'Trust': 'pending_review',
+        '権限生成': 'なし',
+        'authority_strip': true,
+        '公開範囲': 'metadata_only',
+        '履歴公開': false,
+        'Credential使用': false,
+      },
+    };
+
+Map<String, Object?> _taskGetUnknown(String auditId) => {
+      'operation': 'A2Aタスク状態取得',
+      'status': 'suspended',
+      'error': {'code': 'a2a_task_query_outcome_unknown'},
+      'evidence_source': 'LIVE_RUNTIME',
+      'audit_event_id': auditId,
+      'body': {
+        '版': 1,
+        'AgentID': 'fixture-agent',
+        'interface_hash': 'sha256:${List<String>.filled(64, 'b').join()}',
+        'status': 'unknown',
+        'result': null,
+        'Trust': 'pending_review',
+        '権限生成': 'なし',
+        'authority_strip': true,
+        '公開範囲': 'metadata_only',
+        '履歴公開': false,
+        'Credential使用': false,
       },
     };
 

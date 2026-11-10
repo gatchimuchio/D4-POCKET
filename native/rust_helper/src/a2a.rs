@@ -1,5 +1,5 @@
-//! A2A v1.0 Agent Card取得とJSON-RPC SendMessageのbounded transport。
-//! 認証credential、Artifact本文、Stream購読は扱わない。
+//! A2A v1.0 Agent Card取得、JSON-RPC SendMessage／GetTaskのbounded transport。
+//! 認証credential、Task本文、Artifact本文、Stream購読は扱わない。
 #![allow(non_snake_case)]
 
 use crate::audit_hash::sha256_tagged;
@@ -239,6 +239,108 @@ pub(crate) fn send_message(
     project_send_message_response(&raw, &request_id)
 }
 
+pub(crate) fn get_task(uri: &str, task_id: &str, deadline: Instant) -> Result<Value, A2aError> {
+    let endpoint = parse_endpoint(uri)?;
+    if !valid_task_id(task_id) || Instant::now() >= deadline {
+        return Err(A2aError::new(
+            "a2a_task_request_invalid",
+            "A2A Task IDまたは要求期限が不正",
+        ));
+    }
+    let mut request_id_bytes = [0u8; 16];
+    getrandom::getrandom(&mut request_id_bytes)
+        .map_err(|_| A2aError::new("a2a_task_id_unavailable", "A2A識別値を生成できない"))?;
+    let request_id = format!("d4p-get-task-{}", hex::encode(request_id_bytes));
+    let request = json!({
+        "jsonrpc": "2.0",
+        "id": request_id,
+        "method": "GetTask",
+        "params": { "id": task_id, "historyLength": 0 }
+    });
+    let request_bytes = serde_json::to_vec(&request)
+        .map_err(|_| A2aError::new("a2a_task_request_invalid", "A2A要求を構成できない"))?;
+    if request_bytes.len() > MAX_JSON_RPC_BYTES {
+        return Err(A2aError::new(
+            "a2a_task_request_invalid",
+            "A2A JSON-RPC requestの上限を超過",
+        ));
+    }
+    let raw = if endpoint.scheme == "http" {
+        http_exchange(&endpoint, "POST", &request_bytes)?
+    } else {
+        crate::broker::update_download::send_a2a_json_rpc_document(uri, &request_bytes, deadline)
+            .map_err(map_https_error)?
+    };
+    project_get_task_response(&raw, &request_id, task_id)
+}
+
+pub(crate) fn valid_task_id(value: &str) -> bool {
+    !value.trim().is_empty()
+        && value.chars().count() <= 256
+        && !value.chars().any(|character| {
+            character.is_control()
+                || matches!(
+                    character,
+                    '\u{061c}'
+                        | '\u{200e}'
+                        | '\u{200f}'
+                        | '\u{2028}'
+                        | '\u{2029}'
+                        | '\u{202a}'..='\u{202e}'
+                        | '\u{2066}'..='\u{2069}'
+                )
+        })
+}
+
+fn project_get_task_response(
+    raw: &[u8],
+    request_id: &str,
+    expected_task_id: &str,
+) -> Result<Value, A2aError> {
+    let raw_text = std::str::from_utf8(raw)
+        .map_err(|_| A2aError::new("a2a_response_invalid", "A2A応答がUTF-8ではない"))?;
+    let response: Value = crate::broker::json_input::read_unique(raw_text)
+        .map_err(|_| A2aError::new("a2a_response_invalid", "A2A JSON-RPC応答が不正"))?;
+    let object = response
+        .as_object()
+        .ok_or_else(|| A2aError::new("a2a_response_invalid", "A2A JSON-RPC応答がobjectではない"))?;
+    if object.get("jsonrpc").and_then(Value::as_str) != Some("2.0")
+        || object.get("id").and_then(Value::as_str) != Some(request_id)
+    {
+        return Err(A2aError::new(
+            "a2a_response_invalid",
+            "A2A JSON-RPC応答のversionまたはrequest IDが一致しない",
+        ));
+    }
+    if object.contains_key("error") {
+        if object.len() != 3 || object.get("result").is_some() {
+            return Err(A2aError::new(
+                "a2a_response_invalid",
+                "A2A JSON-RPC error応答のfieldが不正",
+            ));
+        }
+        return Err(A2aError::new(
+            "a2a_remote_task_rejected",
+            "外部AgentがA2A Task取得を拒否した",
+        ));
+    }
+    if object.len() != 3
+        || object
+            .keys()
+            .any(|key| !["jsonrpc", "id", "result"].contains(&key.as_str()))
+    {
+        return Err(A2aError::new(
+            "a2a_response_invalid",
+            "A2A JSON-RPC応答に未知または欠落fieldがある",
+        ));
+    }
+    let response_hash = sha256_tagged(raw);
+    let task = object
+        .get("result")
+        .ok_or_else(|| A2aError::new("a2a_response_invalid", "A2A Task resultがない"))?;
+    project_task_metadata(task, &response_hash, Some(expected_task_id), true)
+}
+
 fn project_send_message_response(raw: &[u8], request_id: &str) -> Result<Value, A2aError> {
     let raw_text = std::str::from_utf8(raw)
         .map_err(|_| A2aError::new("a2a_response_invalid", "A2A応答がUTF-8ではない"))?;
@@ -298,58 +400,7 @@ fn project_send_message_response(raw: &[u8], request_id: &str) -> Result<Value, 
     }
     let response_hash = sha256_tagged(raw);
     if let Some(task) = result.get("task") {
-        let task = task.as_object().ok_or_else(|| {
-            A2aError::new("a2a_response_invalid", "A2A Task resultがobjectではない")
-        })?;
-        if task.keys().any(|key| {
-            ![
-                "kind",
-                "id",
-                "contextId",
-                "status",
-                "artifacts",
-                "history",
-                "metadata",
-            ]
-            .contains(&key.as_str())
-        }) {
-            return Err(A2aError::new(
-                "a2a_response_invalid",
-                "A2A Task resultに未知fieldがある",
-            ));
-        }
-        if task.get("kind").and_then(Value::as_str) != Some("task") {
-            return Err(A2aError::new("a2a_response_invalid", "A2A Task kindが不正"));
-        }
-        let task_id = bounded_external_id(task.get("id"), "Task id")?;
-        let context_id = optional_external_id(task.get("contextId"), "Task contextId")?;
-        let status = task
-            .get("status")
-            .and_then(Value::as_object)
-            .ok_or_else(|| {
-                A2aError::new("a2a_response_invalid", "A2A Task statusがobjectではない")
-            })?;
-        if status
-            .keys()
-            .any(|key| !["state", "message", "timestamp"].contains(&key.as_str()))
-        {
-            return Err(A2aError::new(
-                "a2a_response_invalid",
-                "A2A Task statusに未知fieldがある",
-            ));
-        }
-        let state = project_task_state(status.get("state"))?;
-        let artifact_count = bounded_optional_array_len(task.get("artifacts"), "artifacts", 64)?;
-        let history_count = bounded_optional_array_len(task.get("history"), "history", 64)?;
-        Ok(json!({
-            "kind": "task",
-            "task_id": task_id,
-            "context_id": context_id,
-            "state": state,
-            "artifact_count": artifact_count,
-            "history_count": history_count,
-            "result_hash": response_hash,
-        }))
+        project_task_metadata(task, &response_hash, None, false)
     } else {
         let message = result["message"].as_object().ok_or_else(|| {
             A2aError::new("a2a_response_invalid", "A2A Message resultがobjectではない")
@@ -406,13 +457,95 @@ fn project_send_message_response(raw: &[u8], request_id: &str) -> Result<Value, 
     }
 }
 
+fn project_task_metadata(
+    task_value: &Value,
+    response_hash: &str,
+    expected_task_id: Option<&str>,
+    require_empty_history: bool,
+) -> Result<Value, A2aError> {
+    let task = task_value
+        .as_object()
+        .ok_or_else(|| A2aError::new("a2a_response_invalid", "A2A Task resultがobjectではない"))?;
+    if task.keys().any(|key| {
+        ![
+            "kind",
+            "id",
+            "contextId",
+            "status",
+            "artifacts",
+            "history",
+            "metadata",
+        ]
+        .contains(&key.as_str())
+    }) {
+        return Err(A2aError::new(
+            "a2a_response_invalid",
+            "A2A Task resultに未知fieldがある",
+        ));
+    }
+    if task.get("kind").and_then(Value::as_str) != Some("task") {
+        return Err(A2aError::new("a2a_response_invalid", "A2A Task kindが不正"));
+    }
+    let task_id = bounded_external_id(task.get("id"), "Task id")?;
+    if expected_task_id.is_some_and(|expected| expected != task_id) {
+        return Err(A2aError::new(
+            "a2a_response_invalid",
+            "A2A Task response IDが要求IDと一致しない",
+        ));
+    }
+    let context_id = optional_external_id(task.get("contextId"), "Task contextId")?;
+    let status = task
+        .get("status")
+        .and_then(Value::as_object)
+        .ok_or_else(|| A2aError::new("a2a_response_invalid", "A2A Task statusがobjectではない"))?;
+    if status
+        .keys()
+        .any(|key| !["state", "message", "timestamp"].contains(&key.as_str()))
+    {
+        return Err(A2aError::new(
+            "a2a_response_invalid",
+            "A2A Task statusに未知fieldがある",
+        ));
+    }
+    let state = project_task_state(status.get("state"))?;
+    let artifact_count = bounded_optional_array_len(task.get("artifacts"), "artifacts", 64)?;
+    let history_count = bounded_optional_array_len(task.get("history"), "history", 64)?;
+    if require_empty_history && history_count != 0 {
+        return Err(A2aError::new(
+            "a2a_response_invalid",
+            "A2A GetTaskはhistoryLength=0を超える履歴を返した",
+        ));
+    }
+    Ok(json!({
+        "kind": "task",
+        "task_id": task_id,
+        "context_id": context_id,
+        "state": state,
+        "artifact_count": artifact_count,
+        "history_count": history_count,
+        "result_hash": response_hash,
+    }))
+}
+
 fn bounded_external_id(value: Option<&Value>, field: &str) -> Result<String, A2aError> {
     value
         .and_then(Value::as_str)
         .filter(|value| {
             !value.is_empty()
                 && value.chars().count() <= 256
-                && !value.chars().any(char::is_control)
+                && !value.chars().any(|character| {
+                    character.is_control()
+                        || matches!(
+                            character,
+                            '\u{061c}'
+                                | '\u{200e}'
+                                | '\u{200f}'
+                                | '\u{2028}'
+                                | '\u{2029}'
+                                | '\u{202a}'..='\u{202e}'
+                                | '\u{2066}'..='\u{2069}'
+                        )
+                })
         })
         .map(str::to_owned)
         .ok_or_else(|| A2aError::new("a2a_response_invalid", format!("A2A {field}が不正")))
@@ -1354,6 +1487,156 @@ mod tests {
                 .expect_err("JSON-RPC errorを拒否");
         assert_eq!(error.code, "a2a_remote_rejected");
         assert!(!error.message.contains("response-secret-marker"));
+    }
+
+    #[test]
+    fn A2A_GetTaskは応答IDと要求TaskIDを照合し履歴と本文を返さない() {
+        let sentinel = "remote-task-body-secret";
+        let response = json!({
+            "jsonrpc":"2.0", "id":"request-get-1", "result":{
+                "kind":"task", "id":"task-exact", "contextId":"context-1",
+                "status":{"state":"TASK_STATE_WORKING","message":{"parts":[{"text":sentinel}]}},
+                "artifacts":[{"parts":[{"text":sentinel}]}], "history":[],
+                "metadata":{"secret":sentinel}
+            }
+        });
+        let projected = project_get_task_response(
+            &serde_json::to_vec(&response).unwrap(),
+            "request-get-1",
+            "task-exact",
+        )
+        .expect("GetTask bounded projection");
+        assert_eq!(projected["task_id"], "task-exact");
+        assert_eq!(projected["state"], "working");
+        assert_eq!(projected["artifact_count"], 1);
+        assert_eq!(projected["history_count"], 0);
+        assert!(!projected.to_string().contains(sentinel));
+
+        let mut stale_task = response.clone();
+        stale_task["result"]["id"] = json!("other-task");
+        assert_eq!(
+            project_get_task_response(
+                &serde_json::to_vec(&stale_task).unwrap(),
+                "request-get-1",
+                "task-exact",
+            )
+            .unwrap_err()
+            .code,
+            "a2a_response_invalid"
+        );
+        let mut unexpected_history = response.clone();
+        unexpected_history["result"]["history"] = json!([{"text":sentinel}]);
+        let error = project_get_task_response(
+            &serde_json::to_vec(&unexpected_history).unwrap(),
+            "request-get-1",
+            "task-exact",
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "a2a_response_invalid");
+        assert!(!error.message.contains(sentinel));
+        assert!(!valid_task_id("task\u{202e}spoof"));
+        let mut bidi_id = response.clone();
+        bidi_id["result"]["id"] = json!("task\u{202e}spoof");
+        assert_eq!(
+            project_get_task_response(
+                &serde_json::to_vec(&bidi_id).unwrap(),
+                "request-get-1",
+                "task\u{202e}spoof",
+            )
+            .unwrap_err()
+            .code,
+            "a2a_response_invalid"
+        );
+    }
+
+    #[test]
+    fn loopback_A2A_GetTaskはhistoryLength_zeroを送りTask状態だけを返す() {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+        use std::thread;
+
+        let listener = TcpListener::bind("127.0.0.1:0").expect("loopback GetTask待受");
+        let address = listener.local_addr().expect("loopback address");
+        let server = thread::spawn(move || -> Result<Value, String> {
+            let (mut stream, _) = listener.accept().map_err(|error| error.to_string())?;
+            stream
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .map_err(|error| error.to_string())?;
+            stream
+                .set_write_timeout(Some(Duration::from_secs(5)))
+                .map_err(|error| error.to_string())?;
+            let mut request = Vec::new();
+            let mut chunk = [0u8; 1024];
+            let header_end = loop {
+                let size = stream.read(&mut chunk).map_err(|error| error.to_string())?;
+                if size == 0 || request.len() + size > MAX_JSON_RPC_BYTES + MAX_HEADER_BYTES {
+                    return Err("GetTask request truncated or oversized".into());
+                }
+                request.extend_from_slice(&chunk[..size]);
+                if let Some(position) = request.windows(4).position(|part| part == b"\r\n\r\n") {
+                    break position + 4;
+                }
+            };
+            let header =
+                std::str::from_utf8(&request[..header_end]).map_err(|error| error.to_string())?;
+            if !header.starts_with("POST /rpc HTTP/1.1\r\n")
+                || !header
+                    .lines()
+                    .any(|line| line.eq_ignore_ascii_case("A2A-Version: 1.0"))
+            {
+                return Err("GetTask header mismatch".into());
+            }
+            let content_length = header
+                .lines()
+                .find_map(|line| {
+                    let (name, value) = line.split_once(':')?;
+                    name.eq_ignore_ascii_case("Content-Length")
+                        .then(|| value.trim().parse::<usize>().ok())?
+                })
+                .ok_or_else(|| "Content-Length missing".to_string())?;
+            while request.len() < header_end + content_length {
+                let size = stream.read(&mut chunk).map_err(|error| error.to_string())?;
+                if size == 0 {
+                    return Err("GetTask body truncated".into());
+                }
+                request.extend_from_slice(&chunk[..size]);
+            }
+            let body: Value =
+                serde_json::from_slice(&request[header_end..header_end + content_length])
+                    .map_err(|error| error.to_string())?;
+            let response_body = serde_json::to_vec(&json!({
+                "jsonrpc":"2.0", "id":body["id"], "result":{
+                    "kind":"task", "id":"task-query-fixture", "contextId":"context-1",
+                    "status":{"state":"TASK_STATE_COMPLETED","message":{"parts":[{"text":"private-task-body"}]}},
+                    "artifacts":[], "history":[]
+                }
+            })).map_err(|error| error.to_string())?;
+            let response = format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", response_body.len());
+            stream
+                .write_all(response.as_bytes())
+                .map_err(|error| error.to_string())?;
+            stream
+                .write_all(&response_body)
+                .map_err(|error| error.to_string())?;
+            stream.flush().map_err(|error| error.to_string())?;
+            Ok(body)
+        });
+        let projected = get_task(
+            &format!("http://{address}/rpc"),
+            "task-query-fixture",
+            Instant::now() + Duration::from_secs(5),
+        )
+        .expect("loopback GetTask bounded result");
+        let request = server
+            .join()
+            .expect("GetTask server panic")
+            .expect("request valid");
+        assert_eq!(request["method"], "GetTask");
+        assert_eq!(request["params"]["id"], "task-query-fixture");
+        assert_eq!(request["params"]["historyLength"], 0);
+        assert_eq!(projected["state"], "completed");
+        assert_eq!(projected["history_count"], 0);
+        assert!(!projected.to_string().contains("private-task-body"));
     }
 
     #[test]
