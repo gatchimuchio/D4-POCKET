@@ -387,11 +387,13 @@ impl BrokerPersistentStore {
                 "broker A2A connection stateがbounded上限を超過".to_string(),
             ));
         }
-        atomic_write(&self.a2a_path, serialized.as_bytes()).map_err(|error| {
-            BrokerStoreError::Io(format!(
+        if let Err(error) = atomic_write(&self.a2a_path, serialized.as_bytes()) {
+            let _ = fs::remove_file(self.a2a_path.with_extension("tmp"));
+            return Err(BrokerStoreError::Io(format!(
                 "broker A2A connection stateの書込みに失敗: {error}"
-            ))
-        })
+            )));
+        }
+        Ok(())
     }
 
     pub fn load_host_state(&self) -> Result<Value, BrokerStoreError> {

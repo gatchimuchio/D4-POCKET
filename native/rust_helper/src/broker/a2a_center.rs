@@ -141,6 +141,12 @@ fn persist(broker: &Broker) -> Result<(), String> {
         .map_err(|error| error.message())
 }
 
+fn is_restored_pending_review(receipt: &Value) -> bool {
+    receipt.get("接続状態").and_then(Value::as_str) == Some("restored_pending_review")
+        && receipt.get("証拠種別").and_then(Value::as_str) == Some(EVIDENCE_SOURCE_INTERNAL_STATE)
+        && receipt.get("承認状態").and_then(Value::as_str) == Some("owner_reapproval_required")
+}
+
 fn validate_persisted_receipt(value: &Value) -> Result<String, String> {
     let object = value
         .as_object()
@@ -694,17 +700,22 @@ pub(super) fn connect(
             )
         }
     };
-    if broker.a2a_connections.contains_key(&request.agent_id) {
-        return broker.reject_with_payload_hash(
-            request_id,
-            OP_CONNECT,
-            "a2a_connection_duplicate",
-            "同じA2A Agent IDを再接続できない",
-            true,
-            payload_hash,
-        );
-    }
-    if broker.a2a_connections.len() >= MAX_CONNECTIONS {
+    let previous_receipt = match broker.a2a_connections.get(&request.agent_id) {
+        Some(receipt) if is_restored_pending_review(receipt) => Some(receipt.clone()),
+        Some(_) => {
+            return broker.reject_with_payload_hash(
+                request_id,
+                OP_CONNECT,
+                "a2a_connection_duplicate",
+                "現在有効な同じA2A Agent IDを重複登録できない",
+                true,
+                payload_hash,
+            )
+        }
+        None => None,
+    };
+    let is_revalidation = previous_receipt.is_some();
+    if broker.a2a_connections.len() >= MAX_CONNECTIONS && !is_revalidation {
         return broker.reject_with_payload_hash(
             request_id,
             OP_CONNECT,
@@ -719,7 +730,11 @@ pub(super) fn connect(
             request_id,
             OP_CONNECT,
             "received",
-            "owner controlからA2A Agent Card取得要求を受信。URI実値とCredential実値はAuditへ保存しない",
+            if is_revalidation {
+                "owner controlによる再確認後、復元済みA2A metadata receiptの再検証要求を受信。URI実値とCredential実値はAuditへ保存しない"
+            } else {
+                "owner controlからA2A Agent Card取得要求を受信。URI実値とCredential実値はAuditへ保存しない"
+            },
             EVIDENCE_SOURCE_INTERNAL_STATE,
             payload_hash,
         )
@@ -776,7 +791,12 @@ pub(super) fn connect(
         OP_CONNECT,
         "accepted",
         &format!(
-            "A2A Agent Card metadataを受理。AgentID={}",
+            "A2A Agent Card metadataを{}。AgentID={}",
+            if is_revalidation {
+                "fresh owner controlにより再検証"
+            } else {
+                "新規受理"
+            },
             request.agent_id
         ),
         EVIDENCE_SOURCE_INTERNAL_STATE,
@@ -803,7 +823,13 @@ pub(super) fn connect(
         .a2a_connections
         .insert(request.agent_id.clone(), receipt.clone());
     if let Err(reason) = persist(broker) {
-        broker.a2a_connections.remove(&request.agent_id);
+        if let Some(previous_receipt) = previous_receipt {
+            broker
+                .a2a_connections
+                .insert(request.agent_id.clone(), previous_receipt);
+        } else {
+            broker.a2a_connections.remove(&request.agent_id);
+        }
         return broker.audit_store_failed_response(
             request_id,
             OP_CONNECT,
@@ -981,6 +1007,110 @@ fn reject_a2a_error(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    struct TestStore(std::path::PathBuf);
+
+    impl TestStore {
+        fn new(name: &str) -> Self {
+            let path =
+                std::env::temp_dir().join(format!("gui-shell-{name}-{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&path);
+            Self(path)
+        }
+    }
+
+    impl Drop for TestStore {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn spawn_agent_card_fixture(
+        status: u16,
+        display_name: &'static str,
+    ) -> (String, std::thread::JoinHandle<Result<(), String>>) {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+
+        let listener = TcpListener::bind("127.0.0.1:0").expect("loopback Agent Card待受");
+        let address = listener.local_addr().expect("Agent Card接続先");
+        let uri = format!("http://{address}/.well-known/agent-card.json");
+        let body = if status == 200 {
+            json!({
+                "name": display_name,
+                "description": "A2A receipt revalidation fixture",
+                "version": "1.0.0",
+                "supportedInterfaces": [{
+                    "url": format!("http://{address}/rpc"),
+                    "protocolBinding": "JSONRPC",
+                    "protocolVersion": "1.0"
+                }],
+                "capabilities": {
+                    "streaming": false,
+                    "pushNotifications": false,
+                    "stateTransitionHistory": false,
+                    "extendedAgentCard": false
+                },
+                "securitySchemes": {},
+                "skills": []
+            })
+        } else {
+            json!({"error": "fixture not found"})
+        };
+        let body = serde_json::to_vec(&body).expect("Agent Card試験用JSON");
+        let worker = std::thread::spawn(move || -> Result<(), String> {
+            let (mut stream, peer) = listener
+                .accept()
+                .map_err(|error| format!("Agent Card fixture accept失敗: {error}"))?;
+            stream
+                .set_read_timeout(Some(std::time::Duration::from_secs(10)))
+                .map_err(|error| format!("peer={peer}; read timeout設定失敗: {error}"))?;
+            stream
+                .set_write_timeout(Some(std::time::Duration::from_secs(10)))
+                .map_err(|error| format!("peer={peer}; write timeout設定失敗: {error}"))?;
+            let mut request = Vec::new();
+            let mut chunk = [0u8; 512];
+            while !request.windows(4).any(|value| value == b"\r\n\r\n") {
+                let size = stream
+                    .read(&mut chunk)
+                    .map_err(|error| format!("peer={peer}; HTTP request読取失敗: {error}"))?;
+                if size == 0 || request.len().saturating_add(size) >= 8192 {
+                    return Err(format!(
+                        "peer={peer}; HTTP requestがheader前に終了または上限超過"
+                    ));
+                }
+                request.extend_from_slice(&chunk[..size]);
+            }
+            let status_text = if status == 200 {
+                "200 OK"
+            } else {
+                "404 Not Found"
+            };
+            let mut response = format!(
+                "HTTP/1.1 {status_text}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                body.len()
+            )
+            .into_bytes();
+            response.extend_from_slice(&body);
+            stream
+                .write_all(&response)
+                .map_err(|error| format!("peer={peer}; HTTP response write失敗: {error}"))?;
+            stream
+                .flush()
+                .map_err(|error| format!("peer={peer}; HTTP response flush失敗: {error}"))?;
+            stream
+                .shutdown(std::net::Shutdown::Write)
+                .map_err(|error| format!("peer={peer}; HTTP response shutdown失敗: {error}"))?;
+            let mut client_close = [0; 1];
+            match stream.read(&mut client_close) {
+                Ok(0) => Ok(()),
+                Err(error) if error.kind() == std::io::ErrorKind::ConnectionReset => Ok(()),
+                Ok(size) => Err(format!("peer={peer}; 予期しない追加request bytes={size}")),
+                Err(error) => Err(format!("peer={peer}; client close観測失敗: {error}")),
+            }
+        });
+        (uri, worker)
+    }
 
     fn valid_payload() -> Value {
         json!({
@@ -1196,6 +1326,152 @@ mod tests {
             .expect("永続storeのA2A接続state");
         assert!(!persisted.to_string().contains("http://127.0.0.1"));
         let _ = std::fs::remove_dir_all(store);
+    }
+
+    #[test]
+    fn 再起動後pending_receiptだけを新Owner確認で再検証し失敗時は保持する() {
+        let store = TestStore::new("a2a-revalidation");
+        let mut broker =
+            Broker::new_persistent("a2a-revalidation-initial", &store.0).expect("初回永続Broker");
+        let (initial_uri, initial_worker) = spawn_agent_card_fixture(200, "初回Agent");
+        let mut payload = valid_payload();
+        payload["Agent Card URI"] = Value::String(initial_uri);
+        let initial = connect(
+            &mut broker,
+            "a2a-revalidation-initial-connect",
+            &payload,
+            true,
+            "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        );
+        assert!(initial_worker.join().expect("初回fixture worker").is_ok());
+        assert_eq!(initial.status, BrokerStatus::Accepted);
+        let initial_receipt = initial.body.expect("初回接続receipt");
+        assert_eq!(initial_receipt["接続状態"], "connected");
+        drop(broker);
+
+        let mut restarted =
+            Broker::new_persistent("a2a-revalidation-restarted", &store.0).expect("再起動Broker");
+        let pending_receipt = restarted
+            .a2a_connections
+            .get("remote-agent-example")
+            .expect("復元receipt")
+            .clone();
+        assert!(is_restored_pending_review(&pending_receipt));
+
+        let denied_without_owner = connect(
+            &mut restarted,
+            "a2a-revalidation-no-owner",
+            &valid_payload(),
+            false,
+            "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        );
+        assert_eq!(denied_without_owner.status, BrokerStatus::Rejected);
+        assert_eq!(
+            restarted.a2a_connections.get("remote-agent-example"),
+            Some(&pending_receipt)
+        );
+
+        let (failed_uri, failed_worker) = spawn_agent_card_fixture(404, "失敗Agent");
+        let mut failed_payload = valid_payload();
+        failed_payload["Agent Card URI"] = Value::String(failed_uri);
+        let fetch_failed = connect(
+            &mut restarted,
+            "a2a-revalidation-fetch-failed",
+            &failed_payload,
+            true,
+            "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+        );
+        assert!(failed_worker.join().expect("404応答を返す試験処理").is_ok());
+        assert_eq!(fetch_failed.status, BrokerStatus::Rejected);
+        assert_eq!(
+            restarted.a2a_connections.get("remote-agent-example"),
+            Some(&pending_receipt)
+        );
+
+        let state_path = store.0.join("a2a_connections.json");
+        let preserved_path = store.0.join("a2a_connections.revalidation-preserved");
+        let persisted_before_failure = std::fs::read(&state_path).expect("既存永続receipt読取");
+        std::fs::rename(&state_path, &preserved_path).expect("既存永続receipt保全");
+        std::fs::create_dir(&state_path).expect("永続先を一時的にdirectory化");
+        let (persistence_uri, persistence_worker) = spawn_agent_card_fixture(200, "永続失敗Agent");
+        let mut persistence_payload = valid_payload();
+        persistence_payload["Agent Card URI"] = Value::String(persistence_uri);
+        let persistence_failed = connect(
+            &mut restarted,
+            "a2a-revalidation-persist-failed",
+            &persistence_payload,
+            true,
+            "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+        );
+        assert!(persistence_worker
+            .join()
+            .expect("永続化失敗時の応答試験処理")
+            .is_ok());
+        assert_eq!(persistence_failed.status, BrokerStatus::Suspended);
+        assert_eq!(
+            persistence_failed
+                .error
+                .as_ref()
+                .map(|error| error.code.as_str()),
+            Some("a2a_persistence_failed")
+        );
+        assert_eq!(
+            restarted.a2a_connections.get("remote-agent-example"),
+            Some(&pending_receipt)
+        );
+        let temp_path = state_path.with_extension("tmp");
+        assert!(!temp_path.exists(), "永続失敗時のatomic temp残留");
+        std::fs::remove_dir(&state_path).expect("一時directory cleanup");
+        std::fs::rename(&preserved_path, &state_path).expect("既存receipt復元");
+        assert_eq!(
+            std::fs::read(&state_path).expect("保全receipt再読取"),
+            persisted_before_failure
+        );
+        drop(restarted);
+
+        let mut retried =
+            Broker::new_persistent("a2a-revalidation-retry", &store.0).expect("再試行Broker");
+        let (fresh_uri, fresh_worker) = spawn_agent_card_fixture(200, "再検証済みAgent");
+        let mut fresh_payload = valid_payload();
+        fresh_payload["Agent Card URI"] = Value::String(fresh_uri.clone());
+        let revalidated = connect(
+            &mut retried,
+            "a2a-revalidation-success",
+            &fresh_payload,
+            true,
+            "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+        );
+        assert!(fresh_worker.join().expect("再検証応答試験処理").is_ok());
+        assert_eq!(revalidated.status, BrokerStatus::Accepted);
+        let fresh_receipt = revalidated.body.expect("再検証receipt");
+        assert_eq!(fresh_receipt["接続状態"], "connected");
+        assert_eq!(fresh_receipt["証拠種別"], "LIVE_RUNTIME");
+        assert_eq!(fresh_receipt["承認状態"], "owner_control_approved");
+        assert_ne!(fresh_receipt["接続監査ID"], initial_receipt["接続監査ID"]);
+        assert_eq!(
+            retried.a2a_connections.get("remote-agent-example"),
+            Some(&fresh_receipt)
+        );
+
+        let active_duplicate = connect(
+            &mut retried,
+            "a2a-revalidation-active-duplicate",
+            &fresh_payload,
+            true,
+            "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+        );
+        assert_eq!(active_duplicate.status, BrokerStatus::Rejected);
+        assert_eq!(
+            active_duplicate
+                .error
+                .as_ref()
+                .map(|error| error.code.as_str()),
+            Some("a2a_connection_duplicate")
+        );
+        assert_eq!(
+            retried.a2a_connections.get("remote-agent-example"),
+            Some(&fresh_receipt)
+        );
     }
 
     #[test]

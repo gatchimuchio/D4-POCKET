@@ -208,6 +208,58 @@ void main() {
 
     expect(find.textContaining('接続metadataを受理しました'), findsNothing);
     expect(find.textContaining('成功表示はしていません'), findsOneWidget);
+    expect(
+      tester.widget<TextField>(find.byType(TextField).at(1)).controller!.text,
+      isEmpty,
+    );
+  });
+
+  testWidgets('復元pending receiptを新しいOwner確認で再検証できる', (tester) async {
+    const endpoint = 'http://127.0.0.1:9081/card';
+    final pending = _receipt()
+      ..['証拠種別'] = 'INTERNAL_STATE'
+      ..['接続状態'] = 'restored_pending_review'
+      ..['承認状態'] = 'owner_reapproval_required';
+    final renewed = _receipt()..['接続監査ID'] = 'audit-a2a-revalidated';
+    final transport = _A2aTransport([
+      _response(
+        'A2A接続一覧',
+        'audit-pending-list',
+        _listBody([pending]),
+        evidence: 'INTERNAL_STATE',
+      ),
+      _response('A2A接続', 'audit-a2a-revalidated', renewed,
+          evidence: 'INTERNAL_STATE'),
+      _response(
+        'A2A接続一覧',
+        'audit-renewed-list',
+        _listBody([renewed]),
+        evidence: 'INTERNAL_STATE',
+      ),
+    ]);
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: A2aConnectionCenter(transport: transport)),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('接続状態: 再確認が必要'), findsOneWidget);
+    expect(find.textContaining('過去の承認は再利用しません'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField).at(0), 'fixture-agent');
+    await tester.enterText(find.byType(TextField).at(1), endpoint);
+    await tester.tap(find.text('Owner確認して接続'));
+    await tester.pumpAndSettle();
+
+    expect(transport.operations, ['A2A接続一覧', 'A2A接続', 'A2A接続一覧']);
+    expect(transport.payloads[1]?['AgentID'], 'fixture-agent');
+    expect(transport.payloads[1]?['Agent Card URI'], endpoint);
+    expect(find.textContaining('接続metadataを受理しました'), findsOneWidget);
+    expect(find.text(endpoint), findsNothing);
+    expect(
+      tester.widget<TextField>(find.byType(TextField).at(1)).controller!.text,
+      isEmpty,
+    );
+    expect(find.textContaining('接続状態: 接続済み'), findsOneWidget);
   });
 }
 

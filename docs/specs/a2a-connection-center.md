@@ -41,7 +41,7 @@ owner control
   → INTERNAL_STATE metadata-only一覧
 ```
 
-接続要求の受信・Agent Card取得・受理・通常一覧返却は永続Auditを要求する。同じAgentIDの再接続は拒否し、一覧は64件、応答bodyは1MiB、headerは16KiB、接続・読取期限はboundedとする。接続先URIの実値はreceipt、Audit reason、CLI表示へ投影しない。
+接続要求の受信・Agent Card取得・受理・通常一覧返却は永続Auditを要求する。有効な`connected` receiptと同じAgentIDの重複接続は拒否する。例外は、復元時にBroker自身が設定した`restored_pending_review`／`owner_reapproval_required`／`INTERNAL_STATE`の三条件が一致するreceiptだけである。この場合も、同じAgentIDと新しいAgent Card URIを明示した別要求についてfresh native Owner確認を行い、その要求に対してAgent Cardを再取得・再検証する。過去のOwner承認・Permission・Approvalは再利用しない。Agent Card取得、Auditまたは永続化の失敗時は既存のpending receiptを保持する。一覧は64件、応答bodyは1MiB、headerは16KiB、接続・読取期限はboundedとする。接続先URIの実値はreceipt、Audit reason、CLI表示へ投影しない。
 
 接続receiptの一覧はBroker session memoryへ展開し、`a2a_connections.json`へbounded metadataとして永続化する。永続Auditと接続stateは再起動時にstrict検証する。復元後はlive connectionではなく、再承認が必要な内部状態として扱う。
 
@@ -49,9 +49,11 @@ owner control
 
 Brokerの永続storeへ`a2a_connections.json`を追加し、接続receiptのbounded metadataだけをatomic writeする。起動時は版、件数、receiptの固定field、Agent Cardのidentity、endpoint hash、credential ref、秘密値非保持を再検証し、malformedまたは未知fieldはBroker起動をfail-closedにする。
 
-復元は外部Agentへの再接続やTask実行を意味しない。復元されたreceiptは`接続状態=restored_pending_review`、`証拠種別=INTERNAL_STATE`、`承認状態=owner_reapproval_required`へ降格する。過去のowner承認、履歴、metadataから現在のApproval、Permission、Authorityを生成しない。URI実値、credential実値、raw contentはstate fileへ保存しない。
+復元は外部Agentへの自動再接続やTask実行を意味しない。復元されたreceiptは`接続状態=restored_pending_review`、`証拠種別=INTERNAL_STATE`、`承認状態=owner_reapproval_required`へ降格する。過去のowner承認、履歴、metadataから現在のApproval、Permission、Authorityを生成しない。URI実値、credential実値、raw contentはstate fileへ保存しない。
 
-現時点の復元は接続registryの表示状態を復元する単位であり、TLS再接続、再検証、quarantine、disconnect、Task送信を実行しない。これらは別のrelease_blockerである。
+pending receiptの復帰操作は、画面から同じAgentIDと現在確認したAgent Card URIを入力し、各要求に束縛されたnative Owner確認後に実行する。Brokerは対象receiptの三条件を再確認してから新しいAgent Cardを取得し、永続Auditと接続stateを更新する。新規・復帰のいずれもOwner確認を省略しない。取得・監査・永続化が失敗した場合、既存pending receiptはメモリ上・永続store上とも維持し、旧承認を有効化しない。このmetadata receipt更新は、A2A transport sessionの再確立や外部Task／Message／Artifact／Stream作用を意味しない。
+
+通常の復元は接続registryの表示状態を復元する単位である。一般のTLS再接続、quarantine、disconnect、Task送信は実行せず、別のrelease_blockerとして扱う。
 
 ## Authorityと内容露出
 
@@ -66,7 +68,7 @@ Brokerの永続storeへ`a2a_connections.json`を追加し、接続receiptのboun
 
 Trustはpending_review、Capability diffはnot_evaluatedとしてoperator reviewを要求する。Agent Cardの能力、skill、認証scheme、streaming宣言は説明情報であり、Task実行資格、Permission、Approval、Credential実値を生成しない。Task、Message、Artifactのraw本文は取得・保存・表示しない。
 
-A2A接続一覧は通常IPCだけが参照できる。Owner操作channelでの一覧、Flutterからの直接network接続、Adapter metadataからの接続、履歴やProfileからの再利用は許可しない。Desktop画面の新規接続要求はRust起動器のnative Owner確認後に既存Brokerへ渡す。接続一覧と表示はBroker metadata projectionだけを使う。
+A2A接続一覧は通常IPCだけが参照できる。Owner操作channelでの一覧、Flutterからの直接network接続、Adapter metadataからの接続、履歴やProfileからの再利用は許可しない。Desktop画面の新規接続およびpending receipt再検証要求は、現在のAgentID・URIを示すRust起動器のnative Owner確認後に既存Brokerへ渡す。接続一覧と表示はBroker metadata projectionだけを使う。
 
 Desktopの`A2A接続センター`は、必須`shell.agent_operation`に含まれ、Agent IDとAgent Card URIの入力、Broker接続一覧、接続metadata表示を提供する。接続URI実値はnative Owner確認の対象表示後、Flutterの入力欄から消去する。画面は接続をTrustへ昇格させず、Task／Message／Artifact／Streamの操作を提供しない。Agent Card由来の表示文字列は未信頼metadataと明示し、行制御・方向制御文字を含むprojectionは表示前に拒否する。
 
@@ -75,7 +77,7 @@ Desktopの`A2A接続センター`は、必須`shell.agent_operation`に含まれ
 ## 現行未接続範囲
 
 - HTTPSのTLS接続、公開endpoint discovery、OAuth／API keyなどの認証実行
-- Task送信、Message送信、Artifact本文取得、Stream購読、cancel、再接続、quarantine
+- Task送信、Message送信、Artifact本文取得、Stream購読、cancel、A2A transport sessionの再接続、quarantine
 - 外部Agent比較、複数Agent同一Workspace隔離、Handoff
 - 実A2A Test Harness、Windows installed productでの接続証拠、長時間運用・障害注入
 

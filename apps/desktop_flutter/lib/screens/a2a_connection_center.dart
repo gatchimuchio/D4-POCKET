@@ -90,6 +90,10 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
                     helperText: 'HTTPS、外部host、query、fragment、userinfoは受け付けません。',
                   ),
                 ),
+                const SizedBox(height: 4),
+                const Text(
+                  '再起動後に「再確認が必要」と表示されたreceiptは、同じAgent IDと現在のAgent Card URIを入力し、native Owner確認後に再検証できます。過去の承認は再利用しません。',
+                ),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
@@ -183,7 +187,6 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
         agentCardUri: _agentCardUriController.text,
       );
       if (!mounted) return;
-      _agentCardUriController.clear();
       setState(() {
         _message =
             '接続metadataを受理しました。Trustは未審査のままです。Audit=${receipt.connectionAuditId}';
@@ -205,7 +208,10 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
         _message = 'A2A接続を確認できませんでした。受理receiptがないため成功表示はしていません。';
       });
     } finally {
-      if (mounted) setState(() => _connecting = false);
+      if (mounted) {
+        _agentCardUriController.clear();
+        setState(() => _connecting = false);
+      }
     }
   }
 }

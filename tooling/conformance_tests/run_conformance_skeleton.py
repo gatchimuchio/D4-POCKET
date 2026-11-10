@@ -6497,6 +6497,10 @@ def A2A接続センターの統治経路と境界を検査する() -> list[str]:
         "Task送信",
         "Credential実値",
         "release_blocker",
+        "restored_pending_review",
+        "owner_reapproval_required",
+        "fresh native Owner確認",
+        "既存のpending receipt",
     )
     for token in required_tokens:
         if token not in specification_text:
@@ -6606,6 +6610,9 @@ def A2A接続センターの統治経路と境界を検査する() -> list[str]:
         ("A2A接続一覧", protocol + ipc_request + ipc_response),
         ("restored_pending_review", rust_center),
         ("owner_reapproval_required", rust_center),
+        ("is_restored_pending_review", rust_center),
+        ("a2a_connection_duplicate", rust_center),
+        ("a2a_persistence_failed", rust_center),
         ("load_persistent_connections", rust_center + protocol),
         ("a2a_connections.json", store),
         ("MalformedA2aState", store + rust_center),
