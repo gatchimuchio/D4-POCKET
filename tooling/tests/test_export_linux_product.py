@@ -49,6 +49,42 @@ class LinuxExportInputTests(unittest.TestCase):
         self.assertNotIn("shell.host_operations", plan.excluded_optional_ids)
         self.assertTrue(dart_defines(plan)["GUI_SHELL_MODULE_HOST_OPERATIONS"])
 
+    def test_trace_inspector_export_selects_dependency_flutter_defines(self) -> None:
+        receipt_raw, manifest_raw = linux_export_pair()
+        _, _, plan, _, _ = validate_export_inputs(
+            receipt_raw, manifest_raw, target_platform="linux"
+        )
+
+        self.assertEqual(plan.requested_optional_ids, ("shell.trace_inspector",))
+        self.assertEqual(
+            set(plan.included_optional_ids),
+            {"shell.observability", "shell.trace_inspector"},
+        )
+        self.assertEqual(
+            set(plan.excluded_optional_ids),
+            {
+                "shell.setup_doctor",
+                "shell.history",
+                "shell.evaluation_lab",
+                "shell.host_capabilities",
+                "shell.notifications",
+                "shell.host_operations",
+            },
+        )
+        self.assertEqual(
+            dart_defines(plan),
+            {
+                "GUI_SHELL_MODULE_SETUP_DOCTOR": False,
+                "GUI_SHELL_MODULE_HISTORY": False,
+                "GUI_SHELL_MODULE_EVALUATION_LAB": False,
+                "GUI_SHELL_MODULE_HOST_CAPABILITIES": False,
+                "GUI_SHELL_MODULE_NOTIFICATIONS": False,
+                "GUI_SHELL_MODULE_OBSERVABILITY": True,
+                "GUI_SHELL_MODULE_TRACE_INSPECTOR": True,
+                "GUI_SHELL_MODULE_HOST_OPERATIONS": False,
+            },
+        )
+
     def test_main_reports_value_error_detail_for_build_failure(self) -> None:
         stderr = io.StringIO()
         arguments = [
