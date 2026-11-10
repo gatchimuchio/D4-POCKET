@@ -1436,7 +1436,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "ec5900b7401c8ed2d733ae65d7263965d584cf379a5eee708d88f2a358a75e43"
+      "sha256": "3484f494796f2df9972873b9f805cfb10669d741a834bb69a731e80e63b4fe40"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1903,6 +1903,14 @@
       "sha256": "9493de831666618e4a9bec87ae28edd3bee4dc5013f0a20c353a6c09f706b46d"
     },
     {
+      "path": "examples/contracts/a2a_message_send_request.valid.json",
+      "sha256": "502336ce996a51ffd25e59aa8b106318ebac1f58605ce54549691db3f190cd8d"
+    },
+    {
+      "path": "examples/contracts/a2a_message_send_response.valid.json",
+      "sha256": "44c8d68c2b5c478b45c1decf7ff9888b8f192efc8afc6752a80a7b09324c8142"
+    },
+    {
       "path": "examples/contracts/action_envelope.valid.json",
       "sha256": "2408235370cd8038a9206ec21f64a210464ae4375436a0f4ee2e281d7593a198"
     },
@@ -2251,6 +2259,10 @@
       "sha256": "611e2d699a09d42ded6a3e54289b8f52cac314494270d49c54ea7c9cf1091991"
     },
     {
+      "path": "examples/contracts/invalid/a2a_connection_receipt_security_requirement_supported.invalid.json",
+      "sha256": "8b1a1abbb40df2baa1cbc7ab2bba9aeb366e5428d948c7e1a17f89e8dbc381ad"
+    },
+    {
       "path": "examples/contracts/invalid/a2a_contract_authority_escalation.invalid.json",
       "sha256": "c25706fa803715fdbbb0ab97620c4214a4065e3c9c3a9605f12c0b899505167e"
     },
@@ -2265,6 +2277,14 @@
     {
       "path": "examples/contracts/invalid/a2a_contract_secret.invalid.json",
       "sha256": "9de710126d46349476c56a892cfacd22c6975583169282d94be89b959b5ad554"
+    },
+    {
+      "path": "examples/contracts/invalid/a2a_message_send_request.invalid.json",
+      "sha256": "b0f4f2a5c6a10232206081a6cc91b5b1c98aaa6f3b38160db5f96819e722d4ac"
+    },
+    {
+      "path": "examples/contracts/invalid/a2a_message_send_response.invalid.json",
+      "sha256": "b392b53f8258462967387e3c9f975aa8601c341066a0d6c3cd2f64eb0057afe7"
     },
     {
       "path": "examples/contracts/invalid/action_envelope_missing_relation.invalid.json",
@@ -4601,6 +4621,14 @@
     {
       "path": "specs/a2a_contract.schema.json",
       "sha256": "1f13cbc3a053fbad02c803e3e4d492e8f4d16975cdf7eeeb3db2805375bcde49"
+    },
+    {
+      "path": "specs/a2a_message_send_request.schema.json",
+      "sha256": "4623b6731d44eaa0df4b8a09b09076a4de356c7c4a87b388f327d916ed02983b"
+    },
+    {
+      "path": "specs/a2a_message_send_response.schema.json",
+      "sha256": "747d8203b0e783716851e06e58bc7a3dfb8921dd8e797d8e8eeafeb59813e75f"
     },
     {
       "path": "specs/action_envelope.schema.json",
