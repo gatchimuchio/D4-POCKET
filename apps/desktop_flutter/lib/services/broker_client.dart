@@ -18,6 +18,7 @@ const _nativeOwnerConfirmationOperations = <String>{
   '回帰Case削除中断確認',
   '資格情報失効',
   'A2A接続',
+  'A2Aメッセージ送信',
   'MCP接続',
   'MCP切断',
   'MCP Tool実行',
@@ -52,7 +53,7 @@ Duration brokerRequestTimeoutForOperation(String operation) =>
                     {'MCP接続', 'MCP切断', 'MCP Tool実行'}.contains(operation)
                 ? const Duration(seconds: 335)
                 : defaultTargetPlatform == TargetPlatform.macOS &&
-                        operation == 'A2A接続'
+                        {'A2A接続', 'A2Aメッセージ送信'}.contains(operation)
                     ? const Duration(seconds: 315)
                     : operation == '資格情報登録'
                         ? const Duration(seconds: 610)

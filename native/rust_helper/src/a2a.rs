@@ -1,7 +1,5 @@
-//! A2A Agent Cardのowner制御取得とmetadata-only射影。
-//!
-//! C16ではAgent Cardの取得・検証だけを行う。認証credentialの注入、Task送信、
-//! Message送信、Artifact本文、Stream購読はBroker接続センターへ持ち込まない。
+//! A2A v1.0 Agent Card取得とJSON-RPC SendMessageのbounded transport。
+//! 認証credential、Artifact本文、Stream購読は扱わない。
 #![allow(non_snake_case)]
 
 use crate::audit_hash::sha256_tagged;
@@ -15,6 +13,8 @@ const MAX_URI_BYTES: usize = 2048;
 const MAX_HEADER_BYTES: usize = 16 * 1024;
 const MAX_RESPONSE_BYTES: usize = 1024 * 1024;
 const MAX_STRING_CHARS: usize = 1024;
+const MAX_SEND_MESSAGE_BYTES: usize = 4 * 1024;
+const MAX_JSON_RPC_BYTES: usize = 64 * 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct A2aError {
@@ -182,6 +182,282 @@ pub(crate) fn transport_name(uri: &str) -> Result<&'static str, A2aError> {
     })
 }
 
+pub(crate) fn interface_identity(uri: &str) -> Result<(String, String), A2aError> {
+    hash_interface_endpoint(uri)
+}
+
+pub(crate) fn send_message(
+    uri: &str,
+    message_text: &str,
+    deadline: Instant,
+) -> Result<Value, A2aError> {
+    let endpoint = parse_endpoint(uri)?;
+    if message_text.is_empty()
+        || message_text.len() > MAX_SEND_MESSAGE_BYTES
+        || message_text.chars().any(|character| character == '\0')
+        || Instant::now() >= deadline
+    {
+        return Err(A2aError::new(
+            "a2a_message_invalid",
+            "A2A messageが空、上限超過または期限切れ",
+        ));
+    }
+    let mut request_id_bytes = [0u8; 16];
+    let mut message_id_bytes = [0u8; 16];
+    getrandom::getrandom(&mut request_id_bytes)
+        .and_then(|_| getrandom::getrandom(&mut message_id_bytes))
+        .map_err(|_| A2aError::new("a2a_message_id_unavailable", "A2A識別値を生成できない"))?;
+    let request_id = format!("d4p-{}", hex::encode(request_id_bytes));
+    let message_id = format!("d4p-{}", hex::encode(message_id_bytes));
+    let request = json!({
+        "jsonrpc": "2.0",
+        "id": request_id,
+        "method": "SendMessage",
+        "params": {
+            "message": {
+                "kind": "message",
+                "messageId": message_id,
+                "role": "ROLE_USER",
+                "parts": [{ "kind": "text", "text": message_text }]
+            }
+        }
+    });
+    let request_bytes = serde_json::to_vec(&request)
+        .map_err(|_| A2aError::new("a2a_message_invalid", "A2A messageを構成できない"))?;
+    if request_bytes.len() > MAX_JSON_RPC_BYTES {
+        return Err(A2aError::new(
+            "a2a_message_invalid",
+            "A2A JSON-RPC requestの上限を超過",
+        ));
+    }
+    let raw = if endpoint.scheme == "http" {
+        http_exchange(&endpoint, "POST", &request_bytes)?
+    } else {
+        crate::broker::update_download::send_a2a_json_rpc_document(uri, &request_bytes, deadline)
+            .map_err(map_https_error)?
+    };
+    project_send_message_response(&raw, &request_id)
+}
+
+fn project_send_message_response(raw: &[u8], request_id: &str) -> Result<Value, A2aError> {
+    let raw_text = std::str::from_utf8(raw)
+        .map_err(|_| A2aError::new("a2a_response_invalid", "A2A応答がUTF-8ではない"))?;
+    let response: Value = crate::broker::json_input::read_unique(raw_text)
+        .map_err(|_| A2aError::new("a2a_response_invalid", "A2A JSON-RPC応答が不正"))?;
+    let object = response
+        .as_object()
+        .ok_or_else(|| A2aError::new("a2a_response_invalid", "A2A JSON-RPC応答がobjectではない"))?;
+    if object.get("jsonrpc").and_then(Value::as_str) != Some("2.0")
+        || object.get("id").and_then(Value::as_str) != Some(request_id)
+    {
+        return Err(A2aError::new(
+            "a2a_response_invalid",
+            "A2A JSON-RPC応答のversionまたはrequest IDが一致しない",
+        ));
+    }
+    if object.contains_key("error") {
+        if object.len() != 3 || object.get("result").is_some() {
+            return Err(A2aError::new(
+                "a2a_response_invalid",
+                "A2A JSON-RPC error応答のfieldが不正",
+            ));
+        }
+        return Err(A2aError::new(
+            "a2a_remote_rejected",
+            "外部AgentがA2A messageを拒否した",
+        ));
+    }
+    if object.len() != 3
+        || object
+            .keys()
+            .any(|key| !["jsonrpc", "id", "result"].contains(&key.as_str()))
+    {
+        return Err(A2aError::new(
+            "a2a_response_invalid",
+            "A2A JSON-RPC応答に未知または欠落fieldがある",
+        ));
+    }
+    let result = object
+        .get("result")
+        .and_then(Value::as_object)
+        .ok_or_else(|| {
+            A2aError::new(
+                "a2a_response_invalid",
+                "A2A SendMessage resultがobjectではない",
+            )
+        })?;
+    if result.len() != 1
+        || result
+            .keys()
+            .any(|key| !["task", "message"].contains(&key.as_str()))
+    {
+        return Err(A2aError::new(
+            "a2a_response_invalid",
+            "A2A SendMessage resultはTaskまたはMessageの一方だけを含む必要がある",
+        ));
+    }
+    let response_hash = sha256_tagged(raw);
+    if let Some(task) = result.get("task") {
+        let task = task.as_object().ok_or_else(|| {
+            A2aError::new("a2a_response_invalid", "A2A Task resultがobjectではない")
+        })?;
+        if task.keys().any(|key| {
+            ![
+                "kind",
+                "id",
+                "contextId",
+                "status",
+                "artifacts",
+                "history",
+                "metadata",
+            ]
+            .contains(&key.as_str())
+        }) {
+            return Err(A2aError::new(
+                "a2a_response_invalid",
+                "A2A Task resultに未知fieldがある",
+            ));
+        }
+        if task.get("kind").and_then(Value::as_str) != Some("task") {
+            return Err(A2aError::new("a2a_response_invalid", "A2A Task kindが不正"));
+        }
+        let task_id = bounded_external_id(task.get("id"), "Task id")?;
+        let context_id = optional_external_id(task.get("contextId"), "Task contextId")?;
+        let status = task
+            .get("status")
+            .and_then(Value::as_object)
+            .ok_or_else(|| {
+                A2aError::new("a2a_response_invalid", "A2A Task statusがobjectではない")
+            })?;
+        if status
+            .keys()
+            .any(|key| !["state", "message", "timestamp"].contains(&key.as_str()))
+        {
+            return Err(A2aError::new(
+                "a2a_response_invalid",
+                "A2A Task statusに未知fieldがある",
+            ));
+        }
+        let state = project_task_state(status.get("state"))?;
+        let artifact_count = bounded_optional_array_len(task.get("artifacts"), "artifacts", 64)?;
+        let history_count = bounded_optional_array_len(task.get("history"), "history", 64)?;
+        Ok(json!({
+            "kind": "task",
+            "task_id": task_id,
+            "context_id": context_id,
+            "state": state,
+            "artifact_count": artifact_count,
+            "history_count": history_count,
+            "result_hash": response_hash,
+        }))
+    } else {
+        let message = result["message"].as_object().ok_or_else(|| {
+            A2aError::new("a2a_response_invalid", "A2A Message resultがobjectではない")
+        })?;
+        if message.keys().any(|key| {
+            ![
+                "kind",
+                "messageId",
+                "contextId",
+                "taskId",
+                "role",
+                "parts",
+                "metadata",
+                "extensions",
+                "referenceTaskIds",
+            ]
+            .contains(&key.as_str())
+        }) {
+            return Err(A2aError::new(
+                "a2a_response_invalid",
+                "A2A Message resultに未知fieldがある",
+            ));
+        }
+        if message.get("kind").and_then(Value::as_str) != Some("message") {
+            return Err(A2aError::new(
+                "a2a_response_invalid",
+                "A2A Message kindが不正",
+            ));
+        }
+        let message_id = bounded_external_id(message.get("messageId"), "Message messageId")?;
+        let context_id = optional_external_id(message.get("contextId"), "Message contextId")?;
+        let task_id = optional_external_id(message.get("taskId"), "Message taskId")?;
+        let role = message
+            .get("role")
+            .and_then(Value::as_str)
+            .filter(|value| matches!(*value, "ROLE_AGENT" | "ROLE_USER"))
+            .ok_or_else(|| A2aError::new("a2a_response_invalid", "A2A Message roleが不正"))?;
+        let part_count = bounded_optional_array_len(message.get("parts"), "parts", 64)?;
+        if part_count == 0 {
+            return Err(A2aError::new(
+                "a2a_response_invalid",
+                "A2A Message partsが空",
+            ));
+        }
+        Ok(json!({
+            "kind": "message",
+            "message_id": message_id,
+            "context_id": context_id,
+            "task_id": task_id,
+            "role": role,
+            "part_count": part_count,
+            "result_hash": response_hash,
+        }))
+    }
+}
+
+fn bounded_external_id(value: Option<&Value>, field: &str) -> Result<String, A2aError> {
+    value
+        .and_then(Value::as_str)
+        .filter(|value| {
+            !value.is_empty()
+                && value.chars().count() <= 256
+                && !value.chars().any(char::is_control)
+        })
+        .map(str::to_owned)
+        .ok_or_else(|| A2aError::new("a2a_response_invalid", format!("A2A {field}が不正")))
+}
+
+fn optional_external_id(value: Option<&Value>, field: &str) -> Result<Option<String>, A2aError> {
+    match value {
+        None => Ok(None),
+        Some(value) => bounded_external_id(Some(value), field).map(Some),
+    }
+}
+
+fn bounded_optional_array_len(
+    value: Option<&Value>,
+    field: &str,
+    max: usize,
+) -> Result<usize, A2aError> {
+    match value {
+        None => Ok(0),
+        Some(Value::Array(values)) if values.len() <= max => Ok(values.len()),
+        _ => Err(A2aError::new(
+            "a2a_response_invalid",
+            format!("A2A {field}の件数が上限外"),
+        )),
+    }
+}
+
+fn project_task_state(value: Option<&Value>) -> Result<&'static str, A2aError> {
+    let state = value
+        .and_then(Value::as_str)
+        .ok_or_else(|| A2aError::new("a2a_response_invalid", "A2A Task stateが不正"))?;
+    match state {
+        "TASK_STATE_UNSPECIFIED" | "unspecified" => Ok("unknown"),
+        "TASK_STATE_SUBMITTED" | "submitted" => Ok("submitted"),
+        "TASK_STATE_WORKING" | "working" => Ok("working"),
+        "TASK_STATE_COMPLETED" | "completed" => Ok("completed"),
+        "TASK_STATE_FAILED" | "failed" => Ok("failed"),
+        "TASK_STATE_CANCELED" | "canceled" => Ok("canceled"),
+        "TASK_STATE_INPUT_REQUIRED" | "input_required" => Ok("input_required"),
+        "TASK_STATE_REJECTED" | "rejected" => Ok("rejected"),
+        "TASK_STATE_AUTH_REQUIRED" | "auth_required" => Ok("auth_required"),
+        _ => Ok("unknown"),
+    }
+}
+
 fn map_https_error(error: DownloadError) -> A2aError {
     match error {
         DownloadError::NonPublicAddress => A2aError::new(
@@ -270,6 +546,16 @@ fn validate_credential_ref(value: &Value, agent_id: &str) -> Result<(), A2aError
 }
 
 fn http_get(endpoint: &Endpoint) -> Result<Vec<u8>, A2aError> {
+    http_exchange(endpoint, "GET", &[])
+}
+
+fn http_exchange(endpoint: &Endpoint, method: &str, body: &[u8]) -> Result<Vec<u8>, A2aError> {
+    if !matches!(method, "GET" | "POST") || body.len() > MAX_JSON_RPC_BYTES {
+        return Err(A2aError::new(
+            "a2a_request_invalid",
+            "A2A HTTP要求の形式が不正",
+        ));
+    }
     let socket = format!("{}:{}", endpoint.host, endpoint.port)
         .to_socket_addrs()
         .map_err(|_| {
@@ -288,9 +574,16 @@ fn http_get(endpoint: &Endpoint) -> Result<Vec<u8>, A2aError> {
     stream
         .set_write_timeout(Some(Duration::from_millis(250)))
         .map_err(|_| A2aError::new("a2a_connection_failed", "A2A送信期限を設定できない"))?;
+    let protocol_headers = if method == "POST" {
+        "Content-Type: application/json\r\nA2A-Version: 1.0\r\n"
+    } else {
+        ""
+    };
     let request = format!(
-        "GET {} HTTP/1.1\r\nHost: {}\r\nAccept: application/json\r\nConnection: close\r\nUser-Agent: D4-Pocket-A2A/1\r\n\r\n",
-        endpoint.path, endpoint.authority
+        "{method} {} HTTP/1.1\r\nHost: {}\r\nAccept: application/json\r\nAccept-Encoding: identity\r\n{protocol_headers}Content-Length: {}\r\nConnection: close\r\nUser-Agent: D4-Pocket-A2A/1\r\n\r\n",
+        endpoint.path,
+        endpoint.authority,
+        body.len()
     );
     stream
         .write_all(request.as_bytes())
@@ -298,6 +591,14 @@ fn http_get(endpoint: &Endpoint) -> Result<Vec<u8>, A2aError> {
     stream
         .flush()
         .map_err(|_| A2aError::new("a2a_connection_failed", "A2A Agent Card要求をflushできない"))?;
+    if !body.is_empty() {
+        stream
+            .write_all(body)
+            .map_err(|_| A2aError::new("a2a_connection_failed", "A2A message要求を送信できない"))?;
+        stream.flush().map_err(|_| {
+            A2aError::new("a2a_connection_failed", "A2A message要求をflushできない")
+        })?;
+    }
     let response_started_at = Instant::now();
     let deadline = response_started_at + Duration::from_secs(5);
     let mut bytes = Vec::new();
@@ -367,7 +668,15 @@ fn http_get(endpoint: &Endpoint) -> Result<Vec<u8>, A2aError> {
             }
             let mut length = None;
             let mut content_type = None;
+            let mut header_count = 0usize;
             for line in lines {
+                header_count += 1;
+                if header_count > 64 {
+                    return Err(A2aError::new(
+                        "a2a_response_invalid",
+                        "A2A HTTP header field数が多すぎる",
+                    ));
+                }
                 let (name, value) = line.split_once(':').ok_or_else(|| {
                     A2aError::new("a2a_response_invalid", "A2A HTTP headerが不正")
                 })?;
@@ -488,6 +797,36 @@ fn project_agent_card(
     let name = bounded_string(object.get("name"), "name", 256)?;
     let description = bounded_string(object.get("description"), "description", 1024)?;
     let version = bounded_string(object.get("version"), "version", 128)?;
+    let schemes = match object.get("securitySchemes") {
+        Some(Value::Object(value)) => {
+            if value.len() > 16 {
+                return Err(A2aError::new(
+                    "a2a_card_invalid",
+                    "A2A Agent Card security scheme数が多すぎる",
+                ));
+            }
+            let mut names = Vec::with_capacity(value.len());
+            for name in value.keys() {
+                if name.is_empty() || name.chars().count() > 128 {
+                    return Err(A2aError::new(
+                        "a2a_card_invalid",
+                        "A2A Agent Card security scheme名の長さが不正",
+                    ));
+                }
+                names.push(name.clone());
+            }
+            names
+        }
+        Some(_) => {
+            return Err(A2aError::new(
+                "a2a_card_invalid",
+                "A2A Agent Card securitySchemesがobjectではない",
+            ));
+        }
+        None => Vec::new(),
+    };
+    let security_requirements_present = card_has_security_requirements(object);
+    let unauthenticated = schemes.is_empty() && !security_requirements_present;
     let interfaces = object
         .get("supportedInterfaces")
         .and_then(Value::as_array)
@@ -525,13 +864,28 @@ fn project_agent_card(
             "http+json" | "http_rest" => "http_rest",
             _ => "unknown",
         };
+        let executable = binding == "jsonrpc"
+            && protocol_version == "1.0"
+            && unauthenticated
+            && parse_endpoint(&interface_url).is_ok();
+        let (status, reason) = if executable {
+            (
+                "supported",
+                "認証情報なしのA2A v1.0 JSON-RPC SendMessage consumerを接続済み",
+            )
+        } else {
+            (
+                "unsupported",
+                "A2A v1.0 JSON-RPC SendMessage条件（interface、認証、接続先）を満たさない",
+            )
+        };
         projected_interfaces.push(json!({
             "binding": binding,
             "protocol_version": protocol_version,
             "interface_hash": interface_hash,
             "transport": transport,
-            "status": "unsupported",
-            "reason": "interface URLとprotocolVersionは検証済み。Task／Messageの実行consumerは未接続"
+            "status": status,
+            "reason": reason
         }));
     }
     let capabilities = object
@@ -549,28 +903,6 @@ fn project_agent_card(
     let extended_agent_card =
         bool_field_alias(capabilities, "extendedAgentCard", "extended_agent_card");
     let skills = project_skills(object.get("skills"))?;
-    let schemes = match object.get("securitySchemes").and_then(Value::as_object) {
-        Some(value) => {
-            if value.len() > 16 {
-                return Err(A2aError::new(
-                    "a2a_card_invalid",
-                    "A2A Agent Card security scheme数が多すぎる",
-                ));
-            }
-            let mut names = Vec::with_capacity(value.len());
-            for name in value.keys() {
-                if name.is_empty() || name.chars().count() > 128 {
-                    return Err(A2aError::new(
-                        "a2a_card_invalid",
-                        "A2A Agent Card security scheme名の長さが不正",
-                    ));
-                }
-                names.push(name.clone());
-            }
-            names
-        }
-        None => Vec::new(),
-    };
     let streams = if streaming {
         vec![json!({
             "stream_id": format!("{agent_id}-stream"), "task_id": format!("{agent_id}-card"), "mode": "sse",
@@ -587,7 +919,7 @@ fn project_agent_card(
             "endpoint_hash": sha256_tagged(format!("{}://{}{}", endpoint.scheme, endpoint.authority, endpoint.path).as_bytes()),
             "supported_interfaces": projected_interfaces,
             "capabilities": {"streaming": streaming, "push_notifications": push_notifications, "state_transition_history": state_transition_history, "extended_agent_card": extended_agent_card},
-            "skills": skills, "authentication": {"schemes": schemes, "credential_ref": credential_ref, "secret_value_present": false},
+            "skills": skills, "authentication": {"schemes": schemes, "credential_ref": credential_ref, "secret_value_present": false, "security_requirements_present": security_requirements_present},
             "origin": "live_runtime", "status": "discovered"
         },
         "Task": [], "Message": [], "Artifact": [], "Stream": streams,
@@ -595,6 +927,31 @@ fn project_agent_card(
         "Capability diff": {"status": "not_evaluated", "added": [], "removed": [], "changed": [], "requires_operator_review": true, "evidence_source": "LIVE_RUNTIME"},
         "権限生成": "なし", "authority_strip": true, "公開範囲": "metadata_only", "証拠種別": "LIVE_RUNTIME"
     }))
+}
+
+fn security_requirement_field_present(value: Option<&Value>) -> bool {
+    match value {
+        None => false,
+        Some(Value::Array(requirements)) => !requirements.is_empty(),
+        Some(_) => true,
+    }
+}
+
+fn card_has_security_requirements(card: &Map<String, Value>) -> bool {
+    if security_requirement_field_present(card.get("securityRequirements"))
+        || security_requirement_field_present(card.get("security"))
+    {
+        return true;
+    }
+    match card.get("skills") {
+        Some(Value::Array(skills)) => skills.iter().any(|skill| {
+            skill.as_object().is_none_or(|skill| {
+                security_requirement_field_present(skill.get("securityRequirements"))
+            })
+        }),
+        // project_skills rejects these shapes. Keep eligibility fail-closed as well.
+        Some(_) | None => true,
+    }
 }
 
 fn hash_interface_endpoint(uri: &str) -> Result<(String, String), A2aError> {
@@ -799,6 +1156,73 @@ mod tests {
     }
 
     #[test]
+    #[allow(non_snake_case)]
+    fn A2A_send_securityRequirementsがrootとskillで認証要件を拒否する() {
+        let endpoint = parse_endpoint("http://127.0.0.1:8080/card").unwrap();
+        let mut unauthenticated = card();
+        unauthenticated["securitySchemes"] = json!({});
+        let projected = project_agent_card(
+            &endpoint,
+            &unauthenticated,
+            "remote-agent-example",
+            "1.0",
+            &credential(),
+        )
+        .unwrap();
+        assert_eq!(
+            projected["Agent Card"]["authentication"]["security_requirements_present"],
+            false
+        );
+        assert_eq!(
+            projected["Agent Card"]["supported_interfaces"][0]["status"],
+            "supported"
+        );
+
+        for skill_level in [false, true] {
+            let mut protected = unauthenticated.clone();
+            let requirements = json!([{ "oauth2": ["send"] }]);
+            if skill_level {
+                protected["skills"][0]["securityRequirements"] = requirements;
+            } else {
+                protected["securityRequirements"] = requirements;
+            }
+            let projected = project_agent_card(
+                &endpoint,
+                &protected,
+                "remote-agent-example",
+                "1.0",
+                &credential(),
+            )
+            .unwrap();
+            assert_eq!(
+                projected["Agent Card"]["authentication"]["security_requirements_present"], true,
+                "skill_level={skill_level}"
+            );
+            assert_eq!(
+                projected["Agent Card"]["supported_interfaces"][0]["status"], "unsupported",
+                "skill_level={skill_level}"
+            );
+        }
+
+        for malformed in [Value::String("invalid".into()), Value::Null] {
+            let mut protected = unauthenticated.clone();
+            protected["securityRequirements"] = malformed;
+            let projected = project_agent_card(
+                &endpoint,
+                &protected,
+                "remote-agent-example",
+                "1.0",
+                &credential(),
+            )
+            .unwrap();
+            assert_eq!(
+                projected["Agent Card"]["supported_interfaces"][0]["status"],
+                "unsupported"
+            );
+        }
+    }
+
+    #[test]
     fn interface_URLに秘密や危険なauthorityを含めない() {
         for uri in [
             "https://agent.example/rpc?token=secret-marker",
@@ -863,6 +1287,176 @@ mod tests {
                 "a2a_endpoint_invalid"
             );
         }
+    }
+
+    #[test]
+    fn A2A_send応答はTaskとMessageをbounded_projectionし本文を返さない() {
+        let sentinel = "remote-private-body-marker";
+        let task = json!({
+            "jsonrpc":"2.0", "id":"request-1", "result":{"task":{
+                "kind":"task", "id":"task-1", "contextId":"context-1",
+                "status":{"state":"TASK_STATE_WORKING", "message":{"kind":"message", "messageId":"m-1", "role":"ROLE_AGENT", "parts":[{"kind":"text","text":sentinel}]}},
+                "artifacts":[{"artifactId":"a-1","parts":[{"kind":"text","text":sentinel}]}],
+                "history":[{"kind":"message","messageId":"m-2","role":"ROLE_AGENT","parts":[{"kind":"text","text":sentinel}]}],
+                "metadata":{"private":sentinel}
+            }}
+        });
+        let raw = serde_json::to_vec(&task).unwrap();
+        let projected = project_send_message_response(&raw, "request-1").unwrap();
+        assert_eq!(projected["kind"], "task");
+        assert_eq!(projected["task_id"], "task-1");
+        assert_eq!(projected["state"], "working");
+        assert_eq!(projected["artifact_count"], 1);
+        assert_eq!(projected["history_count"], 1);
+        assert!(!projected.to_string().contains(sentinel));
+
+        let message = json!({
+            "jsonrpc":"2.0", "id":"request-2", "result":{"message":{
+                "kind":"message", "messageId":"message-1", "contextId":"context-2",
+                "role":"ROLE_AGENT", "parts":[{"kind":"text","text":sentinel}],
+                "metadata":{"private":sentinel}
+            }}
+        });
+        let projected =
+            project_send_message_response(&serde_json::to_vec(&message).unwrap(), "request-2")
+                .unwrap();
+        assert_eq!(projected["kind"], "message");
+        assert_eq!(projected["message_id"], "message-1");
+        assert_eq!(projected["part_count"], 1);
+        assert!(!projected.to_string().contains(sentinel));
+    }
+
+    #[test]
+    fn A2A_send応答のstale_id_errorと曖昧な結果を拒否する() {
+        let response = json!({"jsonrpc":"2.0","id":"other-request","result":{"message":{
+            "kind":"message","messageId":"m-1","role":"ROLE_AGENT","parts":[{"kind":"text","text":"response-secret-marker"}]
+        }}});
+        let error =
+            project_send_message_response(&serde_json::to_vec(&response).unwrap(), "request-1")
+                .expect_err("stale request IDを拒否");
+        assert_eq!(error.code, "a2a_response_invalid");
+        assert!(!error.message.contains("response-secret-marker"));
+
+        let ambiguous = json!({"jsonrpc":"2.0","id":"request-1","result":{
+            "task":{"kind":"task","id":"t-1","status":{"state":"working"}},
+            "message":{"kind":"message","messageId":"m-1","role":"ROLE_AGENT","parts":[{"kind":"text","text":"response-secret-marker"}]}
+        }});
+        assert_eq!(
+            project_send_message_response(&serde_json::to_vec(&ambiguous).unwrap(), "request-1")
+                .unwrap_err()
+                .code,
+            "a2a_response_invalid"
+        );
+
+        let rejected = json!({"jsonrpc":"2.0","id":"request-1","error":{"code":-32000,"message":"response-secret-marker"}});
+        let error =
+            project_send_message_response(&serde_json::to_vec(&rejected).unwrap(), "request-1")
+                .expect_err("JSON-RPC errorを拒否");
+        assert_eq!(error.code, "a2a_remote_rejected");
+        assert!(!error.message.contains("response-secret-marker"));
+    }
+
+    #[test]
+    fn loopback_A2A_sendはv1_headerを送り応答をbounded_projectionする() {
+        use std::net::TcpListener;
+        use std::thread;
+
+        let listener = TcpListener::bind("127.0.0.1:0").expect("loopback SendMessage待受");
+        let address = listener.local_addr().expect("loopback address");
+        let server = thread::spawn(move || -> Result<Value, String> {
+            let (mut stream, _) = listener.accept().map_err(|error| error.to_string())?;
+            stream
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .map_err(|error| error.to_string())?;
+            stream
+                .set_write_timeout(Some(Duration::from_secs(5)))
+                .map_err(|error| error.to_string())?;
+            let mut request = Vec::new();
+            let mut chunk = [0u8; 1024];
+            let header_end = loop {
+                let size = stream.read(&mut chunk).map_err(|error| error.to_string())?;
+                if size == 0
+                    || request.len().saturating_add(size) > MAX_JSON_RPC_BYTES + MAX_HEADER_BYTES
+                {
+                    return Err("request header/body truncated or oversized".into());
+                }
+                request.extend_from_slice(&chunk[..size]);
+                if let Some(position) = request.windows(4).position(|window| window == b"\r\n\r\n")
+                {
+                    break position + 4;
+                }
+            };
+            let header =
+                std::str::from_utf8(&request[..header_end]).map_err(|error| error.to_string())?;
+            if !header.starts_with("POST /rpc HTTP/1.1\r\n")
+                || !header
+                    .lines()
+                    .any(|line| line.eq_ignore_ascii_case("A2A-Version: 1.0"))
+                || !header
+                    .lines()
+                    .any(|line| line.eq_ignore_ascii_case("Content-Type: application/json"))
+            {
+                return Err("SendMessage HTTP method or required headers mismatch".into());
+            }
+            let content_length = header
+                .lines()
+                .find_map(|line| {
+                    line.strip_prefix("Content-Length: ")
+                        .and_then(|value| value.parse::<usize>().ok())
+                })
+                .ok_or_else(|| "Content-Length missing".to_string())?;
+            while request.len() < header_end + content_length {
+                let size = stream.read(&mut chunk).map_err(|error| error.to_string())?;
+                if size == 0 {
+                    return Err("SendMessage body truncated".into());
+                }
+                request.extend_from_slice(&chunk[..size]);
+            }
+            if request.len() != header_end + content_length {
+                return Err("unexpected request tail".into());
+            }
+            let body: Value = serde_json::from_slice(&request[header_end..])
+                .map_err(|error| error.to_string())?;
+            if body["method"] != "SendMessage"
+                || body["params"]["message"]["parts"][0]["text"] != "fixture-user-message"
+            {
+                return Err("A2A SendMessage JSON-RPC request mismatch".into());
+            }
+            let response_body = serde_json::to_vec(&json!({
+                "jsonrpc":"2.0", "id":body["id"], "result":{"task":{
+                    "kind":"task", "id":"fixture-task", "contextId":"fixture-context",
+                    "status":{"state":"TASK_STATE_SUBMITTED","message":{"kind":"message","messageId":"fixture-response","role":"ROLE_AGENT","parts":[{"kind":"text","text":"fixture-response-secret"}]}},
+                    "artifacts":[], "history":[]
+                }}
+            })).map_err(|error| error.to_string())?;
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                response_body.len()
+            );
+            stream
+                .write_all(response.as_bytes())
+                .map_err(|error| error.to_string())?;
+            stream
+                .write_all(&response_body)
+                .map_err(|error| error.to_string())?;
+            stream.flush().map_err(|error| error.to_string())?;
+            Ok(body)
+        });
+        let uri = format!("http://{address}/rpc");
+        let projected = send_message(
+            &uri,
+            "fixture-user-message",
+            Instant::now() + Duration::from_secs(5),
+        )
+        .expect("loopback SendMessage response");
+        let request = server
+            .join()
+            .expect("loopback server thread")
+            .expect("valid SendMessage request");
+        assert_eq!(request["params"]["message"]["role"], "ROLE_USER");
+        assert_eq!(projected["kind"], "task");
+        assert_eq!(projected["task_id"], "fixture-task");
+        assert!(!projected.to_string().contains("fixture-response-secret"));
     }
 
     #[test]

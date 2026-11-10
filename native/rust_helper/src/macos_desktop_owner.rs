@@ -736,6 +736,21 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
         format!(
             "外部Agentの宣言情報だけを取得します。\nAgent ID: {agent}\n接続先: {target}\nTransport: {transport}\n要求hash: {hash}\n\nAgent Cardは未信頼metadataです。Trust・Task Permission・Approval・Credentialを生成せず、Task実行を行いません。Brokerが現在の要求と永続Auditを再評価します。"
         )
+    } else if operation == "A2Aメッセージ送信" {
+        let (agent, target, message, message_hash) =
+            crate::broker::a2a_center::owner_send_message_confirmation_summary(payload).ok()?;
+        let display_message = message
+            .replace('\r', "␍")
+            .replace('\n', "␊")
+            .replace('\t', "␉");
+        let transport = if target.starts_with("https://") {
+            "HTTPS（OS既定CAで証明書検証、public IP固定、redirectなし）"
+        } else {
+            "HTTP（IPv4 loopback限定）"
+        };
+        format!(
+            "未信頼の外部A2A AgentへMessageを一回送信しますか？\nAgent ID: {agent}\n接続先: {target}\nTransport: {transport}\nMessage（改行␊・復帰␍・tab␉を可視表示）:\n「{display_message}」\nMessage hash: {message_hash}\n要求hash: {hash}\n\nTrustはpending reviewのままです。Credentialを使わず、Task完了・Artifact取得・Authority付与を行いません。応答不明時は自動再送しません。送信本文全体を確認してください。"
+        )
     } else if matches!(operation, "MCP接続" | "MCP切断" | "MCP Tool実行") {
         let summary = macos_owner_summary(operation, payload)?;
         format!("{summary}\n要求hash: {hash}")
@@ -820,9 +835,9 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
             20
         } else if matches!(operation, "MCP接続" | "MCP切断" | "MCP Tool実行") {
             35
-        } else if operation == "A2A接続" {
-            // 既存の接続2秒＋読取5秒とAuditの有限待機。再送しない。
-            10
+        } else if matches!(operation, "A2A接続" | "A2Aメッセージ送信") {
+            // 接続・送信の有限timeoutとAudit待機。Messageは応答不明でも再送しない。
+            25
         } else {
             4
         }),
@@ -1255,6 +1270,86 @@ mod a2a_tests {
                     evidence_source: "FIXTURE".into(),
                     audit_event_id: "fixture-audit".into(),
                     error: None,
+                    health: None,
+                    body: None,
+                    shutdown_requested: false,
+                })
+                .unwrap();
+        });
+        assert!(dispatch(&bytes, &endpoint, &sender, &mut |_| true)
+            .unwrap()
+            .is_some());
+        worker.join().unwrap();
+    }
+
+    #[test]
+    fn macos_A2A_send_messageは本文を表示し同一要求だけをnative_receiverへ渡す() {
+        let endpoint = BrokerEndpoint {
+            host: "127.0.0.1".into(),
+            port: 1,
+            session_id: "fixture-session".into(),
+            session_secret: "synthetic-only".into(),
+            credential_role: BrokerCredentialRole::Normal,
+            transport: "tcp".into(),
+            max_request_bytes: 65536,
+        };
+        let payload = json!({
+            "版": 1,
+            "操作": "送信",
+            "AgentID": "mac-a2a-send-fixture",
+            "Interface URI": "http://127.0.0.1:34101/rpc",
+            "Message": "line one\nline two"
+        });
+        let frame = json!({
+            "request_id":"send-request",
+            "nonce":"send-nonce",
+            "issued_at":BrokerRequestEnvelope::current_issued_at(),
+            "operation":"A2Aメッセージ送信",
+            "metadata":{"client":"desktop_flutter"},
+            "payload_hash":canonical_payload_hash(Some(&payload)),
+            "payload":payload
+        });
+        let bytes = serde_json::to_vec(&frame).unwrap();
+        let current = candidate(&bytes, &endpoint).expect("Message送信native candidate");
+        assert_eq!(current.response_timeout, Duration::from_secs(25));
+        assert!(current.summary.contains("mac-a2a-send-fixture"));
+        assert!(current.summary.contains("line one␊line two"));
+        assert!(current.summary.contains("pending review"));
+        assert!(current.summary.contains("自動再送しません"));
+        let normalized: serde_json::Value = serde_json::from_str(&current.request).unwrap();
+        assert_eq!(normalized["session_id"], "fixture-session");
+        assert_eq!(normalized["payload"], frame["payload"]);
+
+        let mut invalid = frame.clone();
+        invalid["payload"]["Message"] = json!("line\u{202e}marker");
+        invalid["payload_hash"] = json!(canonical_payload_hash(invalid.get("payload")));
+        assert!(candidate(&serde_json::to_vec(&invalid).unwrap(), &endpoint).is_none());
+
+        let (sender, receiver) = mpsc::sync_channel(1);
+        assert!(dispatch(&bytes, &endpoint, &sender, &mut |_| false)
+            .unwrap()
+            .is_none());
+        assert!(receiver.try_recv().is_err());
+
+        let worker = std::thread::spawn(move || {
+            let received: DesktopOwnerOperationRequest = receiver.recv().unwrap();
+            let request: serde_json::Value = serde_json::from_str(&received.request_json).unwrap();
+            assert_eq!(request["payload"]["Message"], "line one\nline two");
+            received
+                .reply
+                .send(crate::broker::protocol::BrokerResponse {
+                    request_id: "send-request".into(),
+                    operation: "A2Aメッセージ送信".into(),
+                    status: crate::broker::protocol::BrokerStatus::Rejected,
+                    evidence_source: "FIXTURE".into(),
+                    audit_event_id: "send-audit-fixture".into(),
+                    error: Some(crate::broker::protocol::BrokerError {
+                        code: "a2a_connection_missing".into(),
+                        message: "fixture only".into(),
+                        recoverable: false,
+                        audit_event_required: true,
+                        fail_closed: true,
+                    }),
                     health: None,
                     body: None,
                     shutdown_requested: false,

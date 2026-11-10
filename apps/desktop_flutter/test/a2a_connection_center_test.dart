@@ -101,7 +101,7 @@ void main() {
     );
   });
 
-  test('runtime consumer未接続の宣言interfaceをsupportedとして表示しない', () async {
+  test('Brokerが接続済みと判定したinterfaceはTrust pending_reviewのまま表示する', () async {
     final receipt = _receipt();
     final interfaces = (receipt['Agent Card']
         as Map<String, Object?>)['supported_interfaces'] as List<Object?>;
@@ -111,13 +111,82 @@ void main() {
           evidence: 'INTERNAL_STATE'),
     ]);
 
-    await expectLater(
-      A2aConnectionClient(transport).connect(
-        agentId: 'fixture-agent',
-        agentCardUri: 'http://127.0.0.1:9080/card',
-      ),
-      throwsA(isA<BrokerClientException>()),
+    final connected = await A2aConnectionClient(transport).connect(
+      agentId: 'fixture-agent',
+      agentCardUri: 'http://127.0.0.1:9080/card',
     );
+    expect(connected.supportedInterfaces.single.status, 'supported');
+    expect(connected.approvalState, 'owner_control_approved');
+  });
+
+  test('Message送信はBroker応答のbounded metadataだけを返す', () async {
+    const rawMessage = 'loopback-send-fixture';
+    final transport = _A2aTransport([
+      _sendResponse(
+        'audit-a2a-send',
+        agentId: 'fixture-agent',
+        result: {
+          'kind': 'task',
+          'task_id': 'remote-task-42',
+          'context_id': null,
+          'state': 'working',
+          'artifact_count': 0,
+          'history_count': 1,
+          'result_hash': 'sha256:${List<String>.filled(64, 'c').join()}',
+        },
+      ),
+    ]);
+    final result = await A2aConnectionClient(transport).sendMessage(
+      agentId: 'fixture-agent',
+      interfaceUri: 'http://127.0.0.1:9080/rpc',
+      message: rawMessage,
+    );
+
+    expect(result.status, 'accepted');
+    expect(result.resultKind, 'task');
+    expect(result.remoteState, 'working');
+    expect(result.remoteId, 'remote-task-42');
+    expect(result.auditEventId, 'audit-a2a-send');
+    expect(transport.operations, ['A2Aメッセージ送信']);
+    expect(transport.payloads.single?['AgentID'], 'fixture-agent');
+    expect(transport.payloads.single?['Interface URI'],
+        'http://127.0.0.1:9080/rpc');
+    expect(transport.payloads.single?['Message'], rawMessage);
+    expect(result.remoteId, 'remote-task-42');
+  });
+
+  test('外部作用のunknown応答は再送可能にしない', () async {
+    final transport = _A2aTransport([
+      {
+        'operation': 'A2Aメッセージ送信',
+        'status': 'suspended',
+        'error': {'code': 'a2a_message_outcome_unknown'},
+        'evidence_source': 'LIVE_RUNTIME',
+        'audit_event_id': 'audit-a2a-unknown',
+        'body': {
+          '版': 1,
+          'AgentID': 'fixture-agent',
+          'interface_hash': 'sha256:${List<String>.filled(64, 'b').join()}',
+          'status': 'unknown',
+          'message_hash': 'sha256:${List<String>.filled(64, 'd').join()}',
+          'result': null,
+          'Trust': 'pending_review',
+          '権限生成': 'なし',
+          'authority_strip': true,
+          '公開範囲': 'metadata_only',
+          '再送可能': false,
+        },
+      },
+    ]);
+
+    final result = await A2aConnectionClient(transport).sendMessage(
+      agentId: 'fixture-agent',
+      interfaceUri: 'http://127.0.0.1:9080/rpc',
+      message: 'uncertain-send',
+    );
+    expect(result.status, 'unknown');
+    expect(result.auditEventId, 'audit-a2a-unknown');
+    expect(transport.operations, ['A2Aメッセージ送信']);
   });
 
   test('旧保存metadataのunknown interface hashをunknownのまま表示できる', () async {
@@ -233,6 +302,72 @@ void main() {
     );
   });
 
+  testWidgets('送信画面はnative確認経由のMessageを一回投入し本文を結果表示しない', (tester) async {
+    const endpoint = 'http://127.0.0.1:9080/card';
+    const message = 'send-this-to-fixture-only';
+    final receipt = _receipt();
+    final transport = _A2aTransport([
+      _response('A2A接続一覧', 'audit-empty', _listBody(const []),
+          evidence: 'INTERNAL_STATE'),
+      _response('A2A接続', 'audit-a2a-connect', receipt,
+          evidence: 'INTERNAL_STATE'),
+      _response(
+        'A2A接続一覧',
+        'audit-a2a-list',
+        _listBody([receipt]),
+        evidence: 'INTERNAL_STATE',
+      ),
+      _sendResponse(
+        'audit-a2a-send',
+        agentId: 'fixture-agent',
+        result: {
+          'kind': 'message',
+          'message_id': 'remote-message-7',
+          'context_id': null,
+          'task_id': null,
+          'role': 'ROLE_AGENT',
+          'part_count': 1,
+          'result_hash': 'sha256:${List<String>.filled(64, 'c').join()}',
+        },
+      ),
+    ]);
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: A2aConnectionCenter(transport: transport)),
+    ));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).at(0), 'fixture-agent');
+    await tester.enterText(find.byType(TextField).at(1), endpoint);
+    await tester.tap(find.text('Owner確認して接続'));
+    await tester.pumpAndSettle();
+    final agentDropdown = find.byType(DropdownButtonFormField<String>);
+    await tester.ensureVisible(agentDropdown);
+    await tester.tap(agentDropdown);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Fixture Agent (fixture-agent)').last);
+    await tester.pumpAndSettle();
+    final interfaceUriField = find.byType(TextField).at(2);
+    await tester.ensureVisible(interfaceUriField);
+    await tester.enterText(interfaceUriField, 'http://127.0.0.1:9080/rpc');
+    final messageField = find.byType(TextField).at(3);
+    await tester.ensureVisible(messageField);
+    await tester.enterText(messageField, message);
+    final sendButton = find.text('native Owner確認して一回送信');
+    await tester.ensureVisible(sendButton);
+    await tester.tap(sendButton);
+    await tester.pumpAndSettle();
+
+    expect(transport.operations.last, 'A2Aメッセージ送信');
+    expect(transport.payloads.last?['Message'], message);
+    expect(find.textContaining('remote-message-7'), findsOneWidget);
+    expect(find.text(message), findsNothing);
+    expect(
+        tester.widget<TextField>(find.byType(TextField).at(2)).controller!.text,
+        isEmpty);
+    expect(
+        tester.widget<TextField>(find.byType(TextField).at(3)).controller!.text,
+        isEmpty);
+  });
+
   testWidgets('復元pending receiptを新しいOwner確認で再検証できる', (tester) async {
     const endpoint = 'http://127.0.0.1:9081/card';
     final pending = _receipt()
@@ -314,6 +449,32 @@ Map<String, Object?> _response(
       'body': body,
     };
 
+Map<String, Object?> _sendResponse(
+  String auditId, {
+  required String agentId,
+  required Map<String, Object?> result,
+}) =>
+    {
+      'operation': 'A2Aメッセージ送信',
+      'status': 'accepted',
+      'error': null,
+      'evidence_source': 'LIVE_RUNTIME',
+      'audit_event_id': auditId,
+      'body': {
+        '版': 1,
+        'AgentID': agentId,
+        'interface_hash': 'sha256:${List<String>.filled(64, 'b').join()}',
+        'status': 'accepted',
+        'message_hash': 'sha256:${List<String>.filled(64, 'd').join()}',
+        'result': result,
+        'Trust': 'pending_review',
+        '権限生成': 'なし',
+        'authority_strip': true,
+        '公開範囲': 'metadata_only',
+        '再送可能': false,
+      },
+    };
+
 Map<String, Object?> _listBody(List<Map<String, Object?>> receipts) => {
       '版': 1,
       'A2A接続一覧': receipts,
@@ -339,8 +500,8 @@ Map<String, Object?> _receipt() => {
             'protocol_version': '1.0',
             'interface_hash': 'sha256:${List<String>.filled(64, 'b').join()}',
             'transport': 'http',
-            'status': 'unsupported',
-            'reason': 'Task／Message consumer未接続',
+            'status': 'supported',
+            'reason': '無認証A2A v1.0 JSON-RPC SendMessage接続済み',
           },
         ],
         'capabilities': {

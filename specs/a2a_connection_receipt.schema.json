@@ -29,6 +29,40 @@
     "復旧ID": { "const": "recover-a2a-connection" },
     "接続監査ID": { "type": "string", "minLength": 1, "maxLength": 256 }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "Agent Card": {
+            "properties": {
+              "supported_interfaces": {
+                "contains": {
+                  "properties": { "status": { "const": "supported" } },
+                  "required": ["status"]
+                }
+              }
+            },
+            "required": ["authentication", "supported_interfaces"]
+          }
+        },
+        "required": ["Agent Card"]
+      },
+      "then": {
+        "properties": {
+          "Agent Card": {
+            "properties": {
+              "authentication": {
+                "properties": { "security_requirements_present": { "const": false } },
+                "required": ["security_requirements_present"]
+              }
+            },
+            "required": ["authentication"]
+          }
+        },
+        "required": ["Agent Card"]
+      }
+    }
+  ],
   "$defs": {
     "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$(?![\\s\\S])" },
     "hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])" },
@@ -63,7 +97,7 @@
               "protocol_version": { "type": "string", "minLength": 1, "maxLength": 128 },
               "interface_hash": { "oneOf": [{ "$ref": "#/$defs/hash" }, { "type": "null" }] },
               "transport": { "enum": ["http", "https", "unknown"] },
-              "status": { "enum": ["unsupported", "unknown"] },
+              "status": { "enum": ["supported", "unsupported", "unknown"] },
               "reason": { "type": "string", "minLength": 1, "maxLength": 512 }
             }
           }
@@ -83,7 +117,8 @@
           "properties": {
             "schemes": { "type": "array", "maxItems": 16, "items": { "type": "string", "minLength": 1, "maxLength": 128 } },
             "credential_ref": { "$ref": "#/$defs/credential_ref" },
-            "secret_value_present": { "const": false }
+            "secret_value_present": { "const": false },
+            "security_requirements_present": { "type": "boolean" }
           }
         },
         "origin": { "const": "live_runtime" },

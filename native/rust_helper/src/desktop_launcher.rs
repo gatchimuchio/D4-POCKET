@@ -162,6 +162,13 @@ enum DesktopOwnerOperationSummary {
         target: String,
         payload_hash: String,
     },
+    A2aSendMessage {
+        agent_id: String,
+        target: String,
+        message: String,
+        message_hash: String,
+        payload_hash: String,
+    },
     McpDisconnect {
         server_id: String,
         payload_hash: String,
@@ -1817,6 +1824,17 @@ fn owner_operation_candidate_with_product_identity(
                 payload_hash,
             }
         }
+        BrokerOperation::A2Aメッセージ送信 => {
+            let (agent_id, target, message, message_hash) =
+                crate::broker::a2a_center::owner_send_message_confirmation_summary(payload).ok()?;
+            DesktopOwnerOperationSummary::A2aSendMessage {
+                agent_id,
+                target,
+                message,
+                message_hash,
+                payload_hash,
+            }
+        }
         operation @ (BrokerOperation::アダプター検証
         | BrokerOperation::アダプター有効化
         | BrokerOperation::アダプター無効化
@@ -2985,6 +3003,32 @@ fn owner_confirmation_text_for_identity(
                 owner_confirmation_value(agent_id),
                 owner_confirmation_value(target),
                 transport_description,
+                payload_hash
+            )
+        }
+        DesktopOwnerOperationSummary::A2aSendMessage {
+            agent_id,
+            target,
+            message,
+            message_hash,
+            payload_hash,
+        } => {
+            let display_message = message
+                .replace('\r', "␍")
+                .replace('\n', "␊")
+                .replace('\t', "␉");
+            let transport = if target.starts_with("https://") {
+                "HTTPS（OS既定CA、public IP固定、redirectなし）"
+            } else {
+                "HTTP（IPv4 loopback限定）"
+            };
+            format!(
+                "未信頼の外部A2A AgentへMessageを一回送信しますか？\n\nAgent ID: {}\n接続先: {}\nTransport: {}\nMessage（改行␊・復帰␍・tab␉を可視表示）:\n「{}」\nMessage hash: {}\n\nこれは外部作用です。Trustはpending reviewのままです。Credentialを使わず、Task完了・Artifact取得・Authority付与を行いません。応答不明時に自動再送しません。送信本文全体を確認してください。\n\npayload hash:\n{}",
+                owner_confirmation_value(agent_id),
+                owner_confirmation_value(target),
+                transport,
+                display_message,
+                message_hash,
                 payload_hash
             )
         }
@@ -7886,6 +7930,94 @@ mod tests {
         assert!(https_confirmation.contains("OS既定CAで証明書検証"));
         assert!(https_confirmation.contains("public IPへ接続"));
         assert!(https_confirmation.contains("redirectなし"));
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn A2A_send_message確認は本文全体をhashへ束縛し危険文字を拒否する() {
+        let endpoint = BrokerEndpoint {
+            host: "127.0.0.1".into(),
+            port: 43123,
+            session_id: "desktop-session".into(),
+            session_secret: "not-used-by-candidate".into(),
+            credential_role: BrokerCredentialRole::Owner,
+            transport: "tcp".into(),
+            max_request_bytes: MAX_REQUEST_BYTES,
+        };
+        let message = "first line\nsecond\rthird\ttab";
+        let payload = serde_json::json!({
+            "版": 1,
+            "操作": "送信",
+            "AgentID": "remote-agent-fixture",
+            "Interface URI": "http://127.0.0.1:9080/rpc",
+            "Message": message,
+        });
+        let request = desktop_owner_request(
+            "A2Aメッセージ送信",
+            "desktop-a2a-send",
+            "desktop-a2a-send-nonce",
+            payload.clone(),
+        );
+        let (normalized, summary) =
+            owner_operation_candidate(request.to_string().as_bytes(), &endpoint)
+                .expect("A2A Message送信はnative確認へ進む");
+        let normalized = BrokerRequestEnvelope::from_json_str(&normalized).unwrap();
+        assert_eq!(normalized.session_id.as_deref(), Some("desktop-session"));
+        assert_eq!(normalized.payload, Some(payload));
+        let DesktopOwnerOperationSummary::A2aSendMessage {
+            agent_id,
+            target,
+            message: confirmed_message,
+            message_hash,
+            payload_hash,
+        } = summary
+        else {
+            panic!("A2A Messageは専用native確認summaryを使う")
+        };
+        assert_eq!(agent_id, "remote-agent-fixture");
+        assert_eq!(target, "http://127.0.0.1:9080/rpc");
+        assert_eq!(confirmed_message, message);
+        assert_eq!(payload_hash, request["payload_hash"]);
+        assert_eq!(
+            message_hash,
+            crate::audit_hash::sha256_tagged(message.as_bytes())
+        );
+        let prompt = owner_confirmation_text(&DesktopOwnerOperationSummary::A2aSendMessage {
+            agent_id,
+            target,
+            message: confirmed_message,
+            message_hash,
+            payload_hash,
+        });
+        assert!(prompt.contains("first line␊second␍third␉tab"));
+        assert!(prompt.contains("Message hash:"));
+        assert!(prompt.contains("応答不明時に自動再送しません"));
+        assert!(!prompt.contains("first line\nsecond\rthird\ttab"));
+
+        let oversized_message = "x".repeat(4097);
+        for invalid in [
+            "message\u{202e}marker",
+            "message\u{0000}marker",
+            oversized_message.as_str(),
+        ] {
+            let mut invalid_payload = serde_json::json!({
+                "版": 1,
+                "操作": "送信",
+                "AgentID": "remote-agent-fixture",
+                "Interface URI": "http://127.0.0.1:9080/rpc",
+                "Message": invalid,
+            });
+            let invalid_request = desktop_owner_request(
+                "A2Aメッセージ送信",
+                "desktop-a2a-send-invalid",
+                "desktop-a2a-send-invalid-nonce",
+                std::mem::take(&mut invalid_payload),
+            );
+            assert!(
+                owner_operation_candidate(invalid_request.to_string().as_bytes(), &endpoint)
+                    .is_none()
+            );
+        }
     }
 
     #[test]

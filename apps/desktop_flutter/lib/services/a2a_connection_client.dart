@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:gui_shell_ui/runtime_dialogue_client.dart'
     show BrokerClientException, BrokerTransport;
 
@@ -45,6 +47,30 @@ class A2aConnectionSummary {
   final String approvalState;
   final String trustReason;
   final String connectionAuditId;
+}
+
+class A2aMessageSendResult {
+  const A2aMessageSendResult({
+    required this.status,
+    required this.agentId,
+    required this.interfaceHash,
+    required this.messageHash,
+    required this.auditEventId,
+    required this.resultKind,
+    required this.remoteId,
+    required this.remoteState,
+    required this.resultHash,
+  });
+
+  final String status;
+  final String agentId;
+  final String interfaceHash;
+  final String messageHash;
+  final String auditEventId;
+  final String? resultKind;
+  final String? remoteId;
+  final String? remoteState;
+  final String? resultHash;
 }
 
 class A2aConnectionClient {
@@ -129,6 +155,205 @@ class A2aConnectionClient {
     }
     return List.unmodifiable(connections);
   }
+
+  Future<A2aMessageSendResult> sendMessage({
+    required String agentId,
+    required String interfaceUri,
+    required String message,
+  }) async {
+    final normalizedId = agentId.trim();
+    final normalizedUri = interfaceUri.trim();
+    if (!_validAgentId(normalizedId) || !_validInterfaceUri(normalizedUri)) {
+      throw const BrokerClientException('A2A Agentまたはinterface URIが不正です');
+    }
+    if (message.trim().isEmpty ||
+        utf8.encode(message).length > 4096 ||
+        message.runes.length > 1024 ||
+        message.runes.any((rune) =>
+            (rune < 0x20 && rune != 0x09 && rune != 0x0a && rune != 0x0d) ||
+            (rune >= 0x202a && rune <= 0x202e) ||
+            (rune >= 0x2066 && rune <= 0x2069) ||
+            rune == 0x061c ||
+            rune == 0x200e ||
+            rune == 0x200f)) {
+      throw const BrokerClientException('A2A Messageが空、上限超過または表示安全境界外です');
+    }
+    final response = await _transport.request(
+      'A2Aメッセージ送信',
+      payload: {
+        '版': 1,
+        '操作': '送信',
+        'AgentID': normalizedId,
+        'Interface URI': normalizedUri,
+        'Message': message,
+      },
+    );
+    if (response['operation'] != 'A2Aメッセージ送信' ||
+        response['audit_event_id'] is! String ||
+        !_validAuditId(response['audit_event_id'] as String) ||
+        response['evidence_source'] != 'LIVE_RUNTIME') {
+      throw const BrokerClientException('A2A送信応答の識別または証拠が不正です');
+    }
+    final bodyValue = response['body'];
+    if (bodyValue is! Map || bodyValue.keys.any((key) => key is! String)) {
+      throw const BrokerClientException('A2A送信応答のmetadataがありません');
+    }
+    final body = Map<String, Object?>.from(bodyValue);
+    const fields = {
+      '版',
+      'AgentID',
+      'interface_hash',
+      'status',
+      'message_hash',
+      'result',
+      'Trust',
+      '権限生成',
+      'authority_strip',
+      '公開範囲',
+      '再送可能',
+    };
+    final status = body['status'];
+    if (body.length != fields.length ||
+        body.keys.any((key) => !fields.contains(key)) ||
+        body['版'] != 1 ||
+        body['AgentID'] != normalizedId ||
+        body['interface_hash'] is! String ||
+        !_validSha256(body['interface_hash'] as String) ||
+        body['message_hash'] is! String ||
+        !_validSha256(body['message_hash'] as String) ||
+        body['Trust'] != 'pending_review' ||
+        body['権限生成'] != 'なし' ||
+        body['authority_strip'] != true ||
+        body['公開範囲'] != 'metadata_only' ||
+        body['再送可能'] != false) {
+      throw const BrokerClientException('A2A送信応答の安全metadataが不正です');
+    }
+    if (status == 'unknown') {
+      if (response['status'] != 'suspended' ||
+          response['error'] is! Map ||
+          (response['error'] as Map)['code'] != 'a2a_message_outcome_unknown' ||
+          body['result'] != null) {
+        throw const BrokerClientException('A2A送信の不明状態が不正です');
+      }
+      return A2aMessageSendResult(
+        status: 'unknown',
+        agentId: normalizedId,
+        interfaceHash: body['interface_hash'] as String,
+        messageHash: body['message_hash'] as String,
+        auditEventId: response['audit_event_id'] as String,
+        resultKind: null,
+        remoteId: null,
+        remoteState: null,
+        resultHash: null,
+      );
+    }
+    if (status != 'accepted' ||
+        response['status'] != 'accepted' ||
+        response['error'] != null) {
+      throw const BrokerClientException('A2A送信はBrokerに受理されませんでした');
+    }
+    final result = _object(body['result'], 'A2A result');
+    final kind = result['kind'];
+    final resultHash = result['result_hash'];
+    if (!_validSha256(resultHash is String ? resultHash : '') ||
+        (kind != 'task' && kind != 'message')) {
+      throw const BrokerClientException('A2A result projectionが不正です');
+    }
+    String? remoteId;
+    String? remoteState;
+    if (kind == 'task') {
+      if (result.keys.any((key) => !{
+                'kind',
+                'task_id',
+                'context_id',
+                'state',
+                'artifact_count',
+                'history_count',
+                'result_hash',
+              }.contains(key)) ||
+          result['task_id'] is! String ||
+          !_validExternalText(result['task_id'] as String, 256) ||
+          !_nullableExternalText(result['context_id'], 256) ||
+          !_validRemoteTaskState(result['state']) ||
+          !_boundedCount(result['artifact_count'], 64) ||
+          !_boundedCount(result['history_count'], 64)) {
+        throw const BrokerClientException('A2A Task metadata projectionが不正です');
+      }
+      remoteId = result['task_id'] as String;
+      remoteState = result['state'] as String;
+    } else {
+      if (result.keys.any((key) => !{
+                'kind',
+                'message_id',
+                'context_id',
+                'task_id',
+                'role',
+                'part_count',
+                'result_hash',
+              }.contains(key)) ||
+          result['message_id'] is! String ||
+          !_validExternalText(result['message_id'] as String, 256) ||
+          !_nullableExternalText(result['context_id'], 256) ||
+          !_nullableExternalText(result['task_id'], 256) ||
+          !{'ROLE_AGENT', 'ROLE_USER'}.contains(result['role']) ||
+          !_boundedCount(result['part_count'], 64)) {
+        throw const BrokerClientException(
+            'A2A Message metadata projectionが不正です');
+      }
+      remoteId = result['message_id'] as String;
+    }
+    return A2aMessageSendResult(
+      status: 'accepted',
+      agentId: normalizedId,
+      interfaceHash: body['interface_hash'] as String,
+      messageHash: body['message_hash'] as String,
+      auditEventId: response['audit_event_id'] as String,
+      resultKind: kind as String,
+      remoteId: remoteId,
+      remoteState: remoteState,
+      resultHash: resultHash as String,
+    );
+  }
+
+  static bool _validInterfaceUri(String value) {
+    if (value.isEmpty ||
+        value.length > 2048 ||
+        value.runes.any((rune) => rune <= 0x20 || rune >= 0x7f)) {
+      return false;
+    }
+    final uri = Uri.tryParse(value);
+    if (uri == null ||
+        uri.userInfo.isNotEmpty ||
+        uri.hasQuery ||
+        uri.hasFragment ||
+        uri.host.isEmpty ||
+        !{'http', 'https'}.contains(uri.scheme)) {
+      return false;
+    }
+    if (uri.scheme == 'http') return uri.host.startsWith('127.');
+    return true;
+  }
+
+  static bool _nullableExternalText(Object? value, int maxLength) =>
+      value == null ||
+      (value is String && _validExternalText(value, maxLength));
+
+  static bool _validRemoteTaskState(Object? value) =>
+      value is String &&
+      {
+        'unknown',
+        'submitted',
+        'working',
+        'completed',
+        'failed',
+        'canceled',
+        'input_required',
+        'rejected',
+        'auth_required'
+      }.contains(value);
+
+  static bool _boundedCount(Object? value, int max) =>
+      value is int && value >= 0 && value <= max;
 
   static Map<String, Object?> _acceptedBody(
     Map<String, Object?> response,
@@ -269,7 +494,7 @@ class A2aConnectionClient {
               (interfaceHash is! String || !_validSha256(interfaceHash))) ||
           (interfaceHash == null && status != 'unknown') ||
           !{'http', 'https', 'unknown'}.contains(transport) ||
-          !{'unsupported', 'unknown'}.contains(status) ||
+          !{'supported', 'unsupported', 'unknown'}.contains(status) ||
           reason is! String ||
           !_validExternalText(reason, 512)) {
         throw const BrokerClientException('A2A interface projectionが不正です');

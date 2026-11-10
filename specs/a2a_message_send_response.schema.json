@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/a2a_message_send_response.schema.json",
+  "title": "A2A一回Message送信結果（A2aMessageSendResult）",
+  "description": "SendMessageのacceptedまたは外部作用後のunknown結果。raw本文、Credential、Authority、Permissionは含めない。",
+  "type": "object",
+  "required": ["版", "AgentID", "interface_hash", "status", "message_hash", "result", "Trust", "権限生成", "authority_strip", "公開範囲", "再送可能"],
+  "additionalProperties": false,
+  "properties": {
+    "版": { "const": 1 },
+    "AgentID": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$(?![\\s\\S])" },
+    "interface_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])" },
+    "status": { "enum": ["accepted", "unknown"] },
+    "message_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])" },
+    "result": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "task_id", "context_id", "state", "artifact_count", "history_count", "result_hash"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "task" },
+            "task_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+            "context_id": { "type": ["string", "null"], "maxLength": 256 },
+            "state": { "enum": ["unknown", "submitted", "working", "completed", "failed", "canceled", "input_required", "rejected", "auth_required"] },
+            "artifact_count": { "type": "integer", "minimum": 0, "maximum": 64 },
+            "history_count": { "type": "integer", "minimum": 0, "maximum": 64 },
+            "result_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "message_id", "context_id", "task_id", "role", "part_count", "result_hash"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "message" },
+            "message_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+            "context_id": { "type": ["string", "null"], "maxLength": 256 },
+            "task_id": { "type": ["string", "null"], "maxLength": 256 },
+            "role": { "enum": ["ROLE_AGENT", "ROLE_USER"] },
+            "part_count": { "type": "integer", "minimum": 1, "maximum": 64 },
+            "result_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])" }
+          }
+        },
+        { "type": "null" }
+      ]
+    },
+    "Trust": { "const": "pending_review" },
+    "権限生成": { "const": "なし" },
+    "authority_strip": { "const": true },
+    "公開範囲": { "const": "metadata_only" },
+    "再送可能": { "const": false }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "unknown" } }, "required": ["status"] },
+      "then": { "properties": { "result": { "type": "null" } } }
+    },
+    {
+      "if": { "properties": { "status": { "const": "accepted" } }, "required": ["status"] },
+      "then": { "properties": { "result": { "oneOf": [{ "type": "object", "properties": { "kind": { "const": "task" } } }, { "type": "object", "properties": { "kind": { "const": "message" } } }] } } }
+    }
+  ]
+}

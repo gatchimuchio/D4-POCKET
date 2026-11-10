@@ -10,7 +10,7 @@
     "version": "1.0.0",
     "endpoint_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
     "supported_interfaces": [
-      { "binding": "jsonrpc", "protocol_version": "1.0", "interface_hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444", "transport": "http", "status": "unsupported", "reason": "Task／Messageの実行consumerは未接続" }
+      { "binding": "jsonrpc", "protocol_version": "1.0", "interface_hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444", "transport": "http", "status": "supported", "reason": "認証情報なしのA2A v1.0 JSON-RPC SendMessage consumerを接続済み" }
     ],
     "capabilities": {
       "streaming": false,
@@ -28,7 +28,8 @@
         "required": false,
         "status": "missing"
       },
-      "secret_value_present": false
+      "secret_value_present": false,
+      "security_requirements_present": false
     },
     "origin": "live_runtime",
     "status": "discovered"

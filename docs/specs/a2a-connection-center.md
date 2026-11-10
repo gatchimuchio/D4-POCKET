@@ -2,13 +2,13 @@
 
 ## 対象
 
-C16の最初の完結単位は、owner controlからA2A Agent Cardを取得し、接続receiptへboundedな`metadata_only`として射影する経路である。外部Agentの宣言を自動信頼せず、接続成功とTrust、Permission、Approval、Authorityを分離する。
+C16では、owner controlからA2A Agent Cardを取得し、接続receiptへboundedな`metadata_only`として射影する経路に加え、接続済み・無認証JSON-RPC v1.0 interfaceへの一回Message送信を扱う。外部Agentの宣言を自動信頼せず、接続成功とTrust、Permission、Approval、Authorityを分離する。
 
 現行TransportはRust helperが所有するloopback IPv4 HTTPとpublic HTTPSである。HTTPはloopback IPv4だけを許可し、HTTPSはOS既定の証明書信頼storeでhost／certificateを検証する。HTTPSのDNS結果は全件をpublic IP検査し、解決した固定addressへ接続する。private addressが一件でも含まれる場合は拒否する。HTTPSではproxy、redirect、自動retry、HTTP/2を使わず、HTTP/1、`Accept: application/json`、`Accept-Encoding: identity`で取得する。userinfo、query、fragment、空白または非ASCIIを含むhost／path、Transfer-Encoding、Content-Encoding、重複Content-Length、不正なstatus／Content-Type、16 KiB超または64 field超のheader、1 MiB超のbody、credential実値を拒否する。bodyは8秒期限内に読み切る。OSの名前解決呼出しが期限内に戻らない場合もBroker要求は期限で終了し、追加のresolver workerを起動せずfail-closedにする。HTTPSのinterface URLはhashだけを保存する。
 
 IPv6の`2001::/23` special-purpose親範囲は、IANA registryでより具体的なallocationが`Globally Reachable=true`とされる場合だけ許可する。対象は`2001:1::1/128`〜`2001:1::3/128`、`2001:3::/32`、`2001:4:112::/48`、`2001:20::/28`、`2001:30::/28`である。それ以外の親範囲内アドレス、benchmarkingの`2001:2::/48`、deprecatedな`2001:10::/28`は拒否する。[IANA IPv6 Special-Purpose Address Space](https://www.iana.org/assignments/iana-ipv6-special-registry)。この判定関数は更新取得経路でも共有される。
 
-Agent Card内の各`supportedInterfaces`では`url`と`protocolVersion`を検証する。interface URL実値は保存・表示せず、`interface_hash`、protocol binding／version、transportだけをmetadataへ射影する。Task／Message consumerは未接続のため、宣言されたinterfaceとstreamingは`unsupported`を返す。metadataを実行可能性へ昇格しない。
+Agent Card内の各`supportedInterfaces`では`url`と`protocolVersion`を検証する。interface URL実値は保存・表示せず、`interface_hash`、protocol binding／version、transportだけをmetadataへ射影する。A2A v1.0 rootの`securityRequirements`と各skillの`securityRequirements`を調べ、その要件または`securitySchemes`があるinterfaceは`unsupported`にする。該当fieldが不正形の場合も要件ありとして扱う。receiptにはraw要件を保存せず、`security_requirements_present`だけを投影する。要件がなく、他の条件も満たすinterfaceには一回`SendMessage` consumerを接続するが、Task polling／完了判定、Artifact本文、Stream consumerは未接続のままである。Agent Cardの宣言自体を実行可能性の証拠へ昇格しない。
 
 従来の保存receiptは起動時に読み取り専用で保守的に整形する。旧版にはinterface URLが保存されていないため`interface_hash=null`、protocol version／status=`unknown`へ降格し、`restored_pending_review`／`owner_reapproval_required`を保持する。旧履歴から接続・Trust・Permission・Approvalを再生成しない。
 
@@ -41,6 +41,15 @@ owner control
   → A2A接続一覧
   → Broker内部接続状態
   → INTERNAL_STATE metadata-only一覧
+
+Desktop A2A接続センター
+  → Rust起動器の本文全体native Owner確認
+  → 認証済みBroker IPC
+  → 一回Permissionの発行・消費
+  → Rust A2A helper
+  → 現在receipt hashに一致する無認証JSON-RPC v1.0 SendMessageを一回
+  → bounded Task／Message metadata projectionまたは結果不明
+  → 永続Audit
 ```
 
 接続要求の受信・Agent Card取得・受理・通常一覧返却は永続Auditを要求する。有効な`connected` receiptと同じAgentIDの重複接続は拒否する。例外は、復元時にBroker自身が設定した`restored_pending_review`／`owner_reapproval_required`／`INTERNAL_STATE`の三条件が一致するreceiptだけである。この場合も、同じAgentIDと新しいAgent Card URIを明示した別要求についてfresh native Owner確認を行い、その要求に対してAgent Cardを再取得・再検証する。過去のOwner承認・Permission・Approvalは再利用しない。Agent Card取得、Auditまたは永続化の失敗時は既存のpending receiptを保持する。一覧は64件、応答bodyは1MiB、headerは16KiB、接続・読取期限はboundedとする。接続先URIの実値はreceipt、Audit reason、CLI表示へ投影しない。
@@ -57,6 +66,16 @@ pending receiptの復帰操作は、画面から同じAgentIDと現在確認し�
 
 通常の復元は接続registryの表示状態を復元する単位である。一般のTLS再接続、quarantine、disconnect、Task送信は実行せず、別のrelease_blockerとして扱う。
 
+## C16補完: 一回A2A Message送信
+
+この追加経路は、現在の`connected`／`LIVE_RUNTIME` receipt、未信頼`pending_review` Trust、hashが完全一致する`JSONRPC`／protocol version `1.0` interfaceだけへ、本文1件を`SendMessage`として送る。Credential schemeまたはsecurity requirementを宣言するAgentは送信対象にしない。HTTPSは既存のpublic-IP固定・証明書検証経路、HTTPはIPv4 loopbackに限定する。A2A v1.0の`A2A-Version: 1.0`とJSON-RPC 2.0を使い、Task polling、streaming、retry、redirect、credential、file/data partは扱わない。
+
+各送信には新しい要求hashへ束縛したRust native Owner確認を要求し、対象Agent、送信先、本文全体（改行・復帰・tabを可視表示）、本文hash、外部作用、再送禁止を表示する。Brokerは一回Permissionを現在のrequest ID／Agent／interface hash／本文hashに束縛して発行・即時消費し、永続Auditの`started`確定後にだけ送信する。同じ許可・履歴・Trustから後続Permissionを作らない。Trustは`pending_review`、権限生成なしを維持する。
+
+成功応答はJSON-RPC request IDを照合し、TaskまたはMessageの一方だけを受理する。応答からID、state、part／artifact／history件数、response hashなどbounded metadataだけを投影し、raw応答、Message本文、Artifact本文は保存・表示しない。Taskの`accepted`／`submitted`は完了を意味しない。外部作用後にtimeout、通信切断、JSON不正、request ID不一致またはAudit確定失敗が起きた場合は`unknown`／`suspended`として再送可能をfalseにし、自動再送しない。Broker再起動時に`started`のままterminal Auditがない要求もunknownへ回復し、再実行しない。
+
+この操作はowner control経路のみで受け付け、通常IPC・Owner credential・Flutter直接networkからは実行できない。Flutterは要求をBrokerへ運ぶだけであり、Permission、Approval、Authorityを決定しない。Windows／macOS／Linux Desktopのnative確認面は同一要求を確認し、送信要求を既存Broker receiverへ一回だけ渡す。
+
 ## Authorityと内容露出
 
 - Agent CardはTrustを生成しない
@@ -68,19 +87,19 @@ pending receiptの復帰操作は、画面から同じAgentIDと現在確認し�
 - 権限生成=なし
 - 公開範囲=metadata_only
 
-Trustはpending_review、Capability diffはnot_evaluatedとしてoperator reviewを要求する。Agent Cardの能力、skill、認証scheme、streaming宣言は説明情報であり、Task実行資格、Permission、Approval、Credential実値を生成しない。Task、Message、Artifactのraw本文は取得・保存・表示しない。
+Trustはpending_review、Capability diffはnot_evaluatedとしてoperator reviewを要求する。Agent Cardの能力、skill、認証scheme、streaming宣言は説明情報であり、Task実行資格、Permission、Approval、Credential実値を生成しない。送信本文はnative確認と一回作用のためだけに扱い、Audit、receipt、結果projectionへ複製しない。外部応答のTask／Message／Artifact raw本文は保存・表示しない。
 
 A2A接続一覧は通常IPCだけが参照できる。Owner操作channelでの一覧、Flutterからの直接network接続、Adapter metadataからの接続、履歴やProfileからの再利用は許可しない。Desktop画面の新規接続およびpending receipt再検証要求は、現在のAgentID・URIを示すRust起動器のnative Owner確認後に既存Brokerへ渡す。接続一覧と表示はBroker metadata projectionだけを使う。
 
-Desktopの`A2A接続センター`は、必須`shell.agent_operation`に含まれ、Agent IDとAgent Card URIの入力、Broker接続一覧、接続metadata表示を提供する。接続URI実値はnative Owner確認の対象表示後、Flutterの入力欄から消去する。画面は接続をTrustへ昇格させず、Task／Message／Artifact／Streamの操作を提供しない。Agent Card由来の表示文字列は未信頼metadataと明示し、行制御・方向制御文字を含むprojectionは表示前に拒否する。
+Desktopの`A2A接続センター`は、必須`shell.agent_operation`に含まれ、Agent IDとAgent Card URIの入力、Broker接続一覧、接続metadata表示、一回Message送信を提供する。接続URI実値はnative Owner確認の対象表示後、Flutterの入力欄から消去する。Message送信は接続済みreceiptに対応するAgentとinterfaceを選び、各要求で送信本文全体をnative確認した上でBrokerへ送る。本文は要求完了後に入力欄から消去する。画面は接続をTrustへ昇格させず、Task polling／完了判定、Artifact本文取得、Stream、retryを提供しない。Agent Card由来の表示文字列は未信頼metadataと明示し、行制御・方向制御文字を含むprojectionは表示前に拒否する。
 
 接続要求のCredential refは`credential_id`、`purpose`、`target`、`required`、`status`の固定5 fieldだけを受け付ける。IDは小文字hex 32桁、purposeは`A2A接続`、targetは同一要求のAgent ID、requiredは`false`、statusは`missing`に限る。未知fieldおよび秘密値fieldは拒否する。この参照からCredential保管庫を検索せず、credential実値を解決・注入しない。
 
 ## 現行未接続範囲
 
-- 導入済み製品を使った実外部HTTPS endpointへの接続証拠、OAuth／API keyなどの認証実行
-- Task送信、Message送信、Artifact本文取得、Stream購読、cancel、A2A transport sessionの再接続、quarantine
+- 導入済み製品を使った実外部HTTPS endpointへの接続・Message送信証拠、OAuth／API keyなどの認証実行
+- Task polling／完了判定、Artifact本文取得、Stream購読、cancel、A2A transport sessionの再接続、quarantine
 - 外部Agent比較、複数Agent同一Workspace隔離、Handoff
 - 実A2A Test Harness、Windows installed productでの接続証拠、長時間運用・障害注入
 
-残るtransport、Task等の実作用、Trust審査、外部接続や正式配布の制約はrelease blockerまたは後続P7／P12／Final QAの各現行gateで分類する。本書のloopback接続単位は、Desktop入力面からnative Owner確認・Broker・metadata-only projectionまでを接続するProduct Build範囲であり、installed productでの実A2A運用やD4 Pocket全体の完成を主張しない。
+残る外部transport／Agentでの送信実証、Task polling等の実作用、Trust審査、正式配布の制約はrelease blockerまたは後続P7／P12／Final QAの各現行gateで分類する。本書のA2A Message送信は一回のprotocol作用とbounded応答投影までのProduct Build範囲であり、外部Agentでの成功、Task完了、installed productでの実A2A運用やD4 Pocket全体の完成を主張しない。

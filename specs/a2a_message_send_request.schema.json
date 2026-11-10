@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/a2a_message_send_request.schema.json",
+  "title": "A2A一回Message送信要求（A2aMessageSendRequest）",
+  "description": "接続済み無認証JSON-RPC v1.0 interfaceへの一回送信要求。認証情報、Permission、Approval、Trust、Authorityを受け付けない。",
+  "type": "object",
+  "required": ["版", "操作", "AgentID", "Interface URI", "Message"],
+  "additionalProperties": false,
+  "properties": {
+    "版": { "const": 1 },
+    "操作": { "const": "送信" },
+    "AgentID": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$(?![\\s\\S])" },
+    "Interface URI": { "type": "string", "minLength": 1, "maxLength": 2048, "pattern": "^https?://" },
+    "Message": { "type": "string", "minLength": 1, "maxLength": 1024, "description": "最大4 KiB UTF-8。空白だけ、NUL、その他の禁止制御文字および方向制御文字はBroker／native Owner境界で拒否する。" }
+  }
+}

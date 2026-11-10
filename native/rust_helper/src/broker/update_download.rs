@@ -386,6 +386,107 @@ pub(crate) fn fetch_a2a_agent_card_document(
     )
 }
 
+pub(crate) fn send_a2a_json_rpc_document(
+    url_text: &str,
+    request_body: &[u8],
+    deadline: std::time::Instant,
+) -> Result<Vec<u8>, DownloadError> {
+    if url_text.len() > 2048
+        || request_body.is_empty()
+        || request_body.len() > 64 * 1024
+        || std::time::Instant::now() >= deadline
+    {
+        return Err(if std::time::Instant::now() >= deadline {
+            DownloadError::TimedOut
+        } else {
+            DownloadError::InvalidRequest
+        });
+    }
+    let url = Url::parse(url_text).map_err(|_| DownloadError::InvalidRequest)?;
+    let raw_authority = url_text
+        .split_once("://")
+        .map(|(_, remainder)| remainder.split('/').next().unwrap_or_default())
+        .ok_or(DownloadError::InvalidRequest)?;
+    if url.scheme() != "https"
+        || url.host_str().is_none()
+        || url.username() != ""
+        || url.password().is_some()
+        || raw_authority.contains('@')
+        || raw_authority.contains('%')
+        || !raw_authority.is_ascii()
+        || url.query().is_some()
+        || url.fragment().is_some()
+    {
+        return Err(DownloadError::InvalidRequest);
+    }
+    let host = url
+        .host_str()
+        .ok_or(DownloadError::InvalidRequest)?
+        .to_owned();
+    let port = url
+        .port_or_known_default()
+        .ok_or(DownloadError::InvalidRequest)?;
+    let addresses = resolve_public_addresses(&host, port, &AtomicBool::new(false), deadline)?;
+    send_a2a_json_rpc_document_with_addresses(url, &host, &addresses, request_body, deadline)
+}
+
+fn send_a2a_json_rpc_document_with_addresses(
+    url: Url,
+    host: &str,
+    addresses: &[SocketAddr],
+    request_body: &[u8],
+    deadline: std::time::Instant,
+) -> Result<Vec<u8>, DownloadError> {
+    if request_body.is_empty() || request_body.len() > 64 * 1024 || addresses.is_empty() {
+        return Err(DownloadError::InvalidRequest);
+    }
+    let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+    if remaining.is_zero() {
+        return Err(DownloadError::TimedOut);
+    }
+    let client = build_download_client_with_header_limit(
+        host,
+        addresses,
+        &[],
+        remaining,
+        MAX_A2A_HEADER_COUNT,
+    )?;
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|_| DownloadError::Network)?;
+    runtime.block_on(async {
+        let response = client
+            .post(url)
+            .header(ACCEPT, "application/json")
+            .header(ACCEPT_ENCODING, "identity")
+            .header(CONTENT_TYPE, "application/json")
+            .header("A2A-Version", "1.0")
+            .body(request_body.to_vec())
+            .send()
+            .await
+            .map_err(map_reqwest_error)?;
+        if !a2a_response_headers_within_bound(response.headers()) {
+            return Err(DownloadError::InvalidHeaders);
+        }
+        let content_types = response.headers().get_all(CONTENT_TYPE);
+        if content_types.iter().count() != 1
+            || !content_types
+                .iter()
+                .next()
+                .and_then(|value| value.to_str().ok())
+                .is_some_and(|value| {
+                    value.split(';').next().is_some_and(|media_type| {
+                        media_type.trim().eq_ignore_ascii_case("application/json")
+                    })
+                })
+        {
+            return Err(DownloadError::InvalidHeaders);
+        }
+        receive_bounded_document(response, MAX_A2A_CARD_BYTES, deadline).await
+    })
+}
+
 fn fetch_a2a_agent_card_document_with_addresses(
     url: Url,
     host: &str,

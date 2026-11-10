@@ -573,6 +573,8 @@ pub enum BrokerOperation {
     A2A接続,
     #[serde(rename = "A2A接続一覧")]
     A2A接続一覧,
+    #[serde(rename = "A2Aメッセージ送信")]
+    A2Aメッセージ送信,
     #[serde(rename = "Host登録")]
     Host登録,
     #[serde(rename = "Host一覧")]
@@ -777,6 +779,7 @@ impl BrokerOperation {
             BrokerOperation::MCPTool実行 => "MCP Tool実行",
             BrokerOperation::A2A接続 => "A2A接続",
             BrokerOperation::A2A接続一覧 => "A2A接続一覧",
+            BrokerOperation::A2Aメッセージ送信 => "A2Aメッセージ送信",
             BrokerOperation::Host登録 => "Host登録",
             BrokerOperation::Host一覧 => "Host一覧",
             BrokerOperation::Host切替 => "Host切替",
@@ -1266,6 +1269,7 @@ impl Broker {
             desktop_first_run_configuration: None,
         };
         broker.recover_interrupted_agent_tasks()?;
+        super::a2a_center::recover_interrupted_sends(&mut broker)?;
         Ok(broker)
     }
 
@@ -1997,6 +2001,7 @@ impl Broker {
             Some(
                 BrokerOperation::GuiShell書出し
                     | BrokerOperation::A2A接続
+                    | BrokerOperation::A2Aメッセージ送信
                     | BrokerOperation::アダプター導入
                     | BrokerOperation::アダプター検証
                     | BrokerOperation::アダプター有効化
@@ -2197,6 +2202,7 @@ impl Broker {
                     Some(BrokerOperation::MCP接続 | BrokerOperation::MCP切断)
                 ))
             || envelope.operation == Some(BrokerOperation::A2A接続)
+            || envelope.operation == Some(BrokerOperation::A2Aメッセージ送信)
         {
             if !export_confirmation.permits_agent_task_owner_operation(envelope.operation.as_ref())
             {
@@ -2204,7 +2210,7 @@ impl Broker {
                     &request_id,
                     &operation,
                     "desktop_native_owner_confirmation_required",
-                    "Agent Task権限・Approval・結果表示、Workspace読取・比較制御、MCP Tool実行、A2A接続はRust Desktopのnative Owner確認経路だけで許可します",
+                    "Agent Task権限・Approval・結果表示、Workspace読取・比較制御、MCP Tool実行、A2A接続・Message送信はRust Desktopのnative Owner確認経路だけで許可します",
                     true,
                     envelope.payload_hash.as_deref().unwrap_or("unknown"),
                 );
@@ -2675,6 +2681,13 @@ impl Broker {
                 &payload_hash,
             ),
             BrokerOperation::A2A接続一覧 => super::a2a_center::list(
+                self,
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
+            BrokerOperation::A2Aメッセージ送信 => super::a2a_center::send_message(
                 self,
                 &request_id,
                 envelope.payload.as_ref().unwrap_or(&Value::Null),
@@ -9277,7 +9290,7 @@ mod tests {
         normal_request.session_id = Some("session-1".to_string());
         normal_request.operation = Some(BrokerOperation::A2A接続);
         normal_request.payload = Some(payload.clone());
-        normal_request.issued_at = Some(BrokerRequestEnvelope::current_issued_at());
+        normal_request.issued_at = Some("2026-06-01T00:00:30Z".to_string());
         normal_request.refresh_payload_hash();
 
         let mut normal_broker = test_broker();
@@ -9295,7 +9308,7 @@ mod tests {
             "payload": payload,
             "payload_hash": normal_request.payload_hash,
             "nonce": "a2a-owner-credential-nonce",
-            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "issued_at": "2026-06-01T00:00:30Z",
             "metadata": {}
         });
         let mut owner_broker = test_broker();
@@ -9313,7 +9326,7 @@ mod tests {
             "payload": normal_request.payload,
             "payload_hash": normal_request.payload_hash,
             "nonce": "a2a-desktop-confirmed-nonce",
-            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "issued_at": "2026-06-01T00:00:30Z",
             "metadata": {"client": "desktop_flutter"}
         });
         let mut desktop_broker = test_broker();
@@ -9324,6 +9337,81 @@ mod tests {
             Some("desktop_native_owner_confirmation_required")
         );
         assert!(desktop_broker.a2a_connections.is_empty());
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn A2A_send_messageはDesktop_native確認以外から到達できない() {
+        let payload = json!({
+            "版": 1,
+            "操作": "送信",
+            "AgentID": "native-confirmation-fixture",
+            "Interface URI": "http://127.0.0.1:1/rpc",
+            "Message": "fixture message"
+        });
+        let mut normal_request =
+            BrokerRequestEnvelope::health("a2a-send-normal", "a2a-send-normal-nonce");
+        normal_request.session_id = Some("session-1".to_string());
+        normal_request.operation = Some(BrokerOperation::A2Aメッセージ送信);
+        normal_request.payload = Some(payload.clone());
+        normal_request.issued_at = Some("2026-06-01T00:00:30Z".to_string());
+        normal_request.refresh_payload_hash();
+
+        let mut normal_broker = test_broker();
+        let normal = normal_broker.handle(normal_request.clone());
+        assert_eq!(normal.status, BrokerStatus::Rejected);
+        assert_eq!(
+            normal.error.as_ref().map(|error| error.code.as_str()),
+            Some("desktop_native_owner_confirmation_required")
+        );
+
+        let owner_envelope = json!({
+            "request_id": "a2a-send-owner-credential",
+            "session_id": "session-1",
+            "operation": "A2Aメッセージ送信",
+            "payload": payload,
+            "payload_hash": normal_request.payload_hash,
+            "nonce": "a2a-send-owner-credential-nonce",
+            "issued_at": "2026-06-01T00:00:30Z",
+            "metadata": {}
+        });
+        let mut owner_broker = test_broker();
+        let owner = owner_broker.owner要求処理(&owner_envelope.to_string());
+        assert_eq!(owner.status, BrokerStatus::Rejected);
+        assert_eq!(
+            owner.error.as_ref().map(|error| error.code.as_str()),
+            Some("desktop_native_owner_confirmation_required")
+        );
+
+        let desktop_envelope = json!({
+            "request_id": "a2a-send-desktop-confirmed",
+            "session_id": "session-1",
+            "operation": "A2Aメッセージ送信",
+            "payload": normal_request.payload,
+            "payload_hash": normal_request.payload_hash,
+            "nonce": "a2a-send-desktop-confirmed-nonce",
+            "issued_at": "2026-06-01T00:00:30Z",
+            "metadata": {"client": "desktop_flutter"}
+        });
+        let store_root = temp_store_dir("a2a-send-desktop-native-confirmation");
+        let mut desktop_broker = test_broker();
+        desktop_broker.state_store = BrokerStateStore::durable_file_store(
+            BrokerPersistentStore::open_or_create(&store_root, "session-1")
+                .expect("A2A send test durable store")
+                .0,
+        );
+        let desktop = desktop_broker.desktop_owner_operation_json(&desktop_envelope.to_string());
+        assert_eq!(desktop.status, BrokerStatus::Rejected);
+        assert_eq!(
+            desktop.error.as_ref().map(|error| error.code.as_str()),
+            Some("a2a_connection_missing")
+        );
+        assert!(!desktop_broker
+            .audit_events()
+            .iter()
+            .any(|event| event.reason.contains("fixture message")));
+        drop(desktop_broker);
+        std::fs::remove_dir_all(store_root).expect("A2A send test store cleanup");
     }
 
     #[test]

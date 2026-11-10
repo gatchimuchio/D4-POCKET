@@ -34,6 +34,12 @@ artifact `11559657002`（69782 bytes）、SHA-256 `604a5c5fcf2fd591230194d0ca48c
 
 検証command: `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib macos_a2a_ -- --test-threads=1`（Windows 1 PASS）、Mac同commandに`+1.95.0`（1 PASS）、`cargo check --locked --manifest-path native/rust_helper/Cargo.toml --example macos_a2a_fixture`（PASS）、`python -X utf8 tooling/schema_check/check_schemas.py`（166／162／213 PASS）、`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`（242 PASS）。Mac対象解析／Widget／通常build／XCTest commandは同sourceの専用workflowに固定する。Windows必須`cargo test --locked --manifest-path native/rust_helper/Cargo.toml --no-fail-fast -- --test-threads=1`はlib FAIL、他target PASS。短縮lib再確認は514 PASS／1 FAIL／12 ignored、既知loopback対象だけの再実行はPASSだが全体FAILを上書きしない。両appの`flutter analyze --no-pub`、`python -X utf8 tooling/日本語基底監査.py --strict`の既存FAILも下記履歴に保持する。追加QAを開始しない。
 
+## 後続C16追加操作: 一回A2A Message送信
+
+この後続操作はMAC-A2A-1〜3のCLOSED接続acceptanceを再開・変更しない。責任契約は`a2a-connection-center.md`であり、macOS追加面は同じRust native確認・既存Owner receiverだけを利用する。対象payloadを本文全体・Agent・interface・hash付きで表示し、確認後に既存Brokerへ一回渡す。Flutter／Swiftに承認bool、秘密値、Credential、別経路を導入しない。BrokerがTrust／Permission／Approval／Auditを現在条件で再評価し、結果不明時に再送しない。
+
+本追記は経路契約の同期であり、macOS product acceptanceのPASSではない。現行candidateのbounded testはFIXTURE、macOS installed/runtime送信はNOT_RUNとし、製品受入れは後続の現行工程で別判定する。過去のMAC-A2A CLOSED試験を繰り返さない。
+
 ## 検証履歴（当時の状態）
 
 source 91b303eのrun 37797262060はUI開始前のnative準備中に中止した。URI消去の検収でAX値取得不能を空文字へ補完しないよう、実String取得・実空文字・公開URI不在を同時に要求するharness修正を先に行う。入力値のlog／dumpは出さず、既定のURI消去条件を正しく判定するための修正で、受入れ条件は増やさない。

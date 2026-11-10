@@ -6515,7 +6515,13 @@ def A2A接続センターの統治経路と境界を検査する() -> list[str]:
         if not any(item.get("path") == "docs/specs/a2a-connection-center.md" for item in current_sources if isinstance(item, dict)):
             不整合.append("C16 A2A接続センター正本が正本索引へ登録されていない")
 
-    for name in ("a2a_connection", "a2a_connection_receipt", "a2a_connection_list"):
+    for name in (
+        "a2a_connection",
+        "a2a_connection_receipt",
+        "a2a_connection_list",
+        "a2a_message_send_request",
+        "a2a_message_send_response",
+    ):
         schema = load_schema(name + ".schema.json")
         valid = load_contract_fixture(name + ".valid.json")
         failures = validate_instance(valid, schema)
@@ -6525,12 +6531,18 @@ def A2A接続センターの統治経路と境界を検査する() -> list[str]:
     invalid_names = (
         "a2a_connection_authority.invalid.json",
         "a2a_connection_receipt_raw_endpoint.invalid.json",
+        "a2a_connection_receipt_security_requirement_supported.invalid.json",
         "a2a_connection_list_wrong_evidence.invalid.json",
+        "a2a_message_send_request.invalid.json",
+        "a2a_message_send_response.invalid.json",
     )
     invalid_schema_names = {
         invalid_names[0]: "a2a_connection",
         invalid_names[1]: "a2a_connection_receipt",
-        invalid_names[2]: "a2a_connection_list",
+        invalid_names[2]: "a2a_connection_receipt",
+        invalid_names[3]: "a2a_connection_list",
+        invalid_names[4]: "a2a_message_send_request",
+        invalid_names[5]: "a2a_message_send_response",
     }
     for name in invalid_names:
         try:
@@ -6544,6 +6556,23 @@ def A2A接続センターの統治経路と境界を検査する() -> list[str]:
     request = load_contract_fixture("a2a_connection.valid.json")
     if request.get("Transport") != "http" or request.get("Credential ref", {}).get("required") is not False:
         不整合.append("C16接続要求が現行loopback HTTP／credential ref境界ではない")
+    send_request = load_contract_fixture("a2a_message_send_request.valid.json")
+    if (
+        send_request.get("操作") != "送信"
+        or set(send_request) != {"版", "操作", "AgentID", "Interface URI", "Message"}
+    ):
+        不整合.append("C16 A2A SendMessage要求が固定fieldまたは送信操作でない")
+    send_result = load_contract_fixture("a2a_message_send_response.valid.json")
+    if (
+        send_result.get("status") != "accepted"
+        or send_result.get("Trust") != "pending_review"
+        or send_result.get("権限生成") != "なし"
+        or send_result.get("authority_strip") is not True
+        or send_result.get("再送可能") is not False
+        or set(send_result.get("result", {}))
+        != {"kind", "task_id", "context_id", "state", "artifact_count", "history_count", "result_hash"}
+    ):
+        不整合.append("C16 A2A SendMessage応答がbounded projectionまたは非継承境界を満たさない")
     receipt = load_contract_fixture("a2a_connection_receipt.valid.json")
     if (
         receipt.get("権限生成") != "なし"
@@ -6574,8 +6603,14 @@ def A2A接続センターの統治経路と境界を検査する() -> list[str]:
             }:
                 不整合.append("C16 receiptのsupported interface fieldが不正")
                 continue
-            if interface.get("status") == "supported":
-                不整合.append("未接続のA2A Task／Message consumerをsupportedとしている")
+            if interface.get("status") == "supported" and (
+                interface.get("binding") != "jsonrpc"
+                or interface.get("protocol_version") != "1.0"
+                or interface.get("transport") not in {"http", "https"}
+                or card.get("authentication", {}).get("schemes") != []
+                or card.get("authentication", {}).get("security_requirements_present") is not False
+            ):
+                不整合.append("C16 A2A supported interfaceが無認証JSON-RPC v1.0 SendMessage条件外")
             if not str(interface.get("interface_hash", "")).startswith("sha256:"):
                 不整合.append("C16 receiptのinterface endpoint hashがない")
     authentication = card.get("authentication", {})
@@ -6596,6 +6631,8 @@ def A2A接続センターの統治経路と境界を検査する() -> list[str]:
         ("a2a_https_non_public_address", rust_a2a),
         ("Content-Length", rust_a2a),
         ("secret_value_present", rust_a2a),
+        ("securityRequirements", rust_a2a),
+        ("security_requirements_present", rust_a2a + rust_center),
         ("supportedInterfaces", rust_a2a),
         ("supportedInterfaces.url", rust_a2a),
         ("supportedInterfaces.protocolVersion", rust_a2a),
@@ -6609,6 +6646,7 @@ def A2A接続センターの統治経路と境界を検査する() -> list[str]:
         ("A2A接続公開投影", owner_cli),
         ("A2A接続設定に禁止fieldがある", owner_cli),
         ("A2A接続", protocol + ipc_request + ipc_response),
+        ("A2Aメッセージ送信", protocol + ipc_request + ipc_response + rust_center),
         ("A2A接続一覧", protocol + ipc_request + ipc_response),
         ("restored_pending_review", rust_center),
         ("owner_reapproval_required", rust_center),
@@ -9504,6 +9542,7 @@ def test_agent_task_owner_confirmation_wait_uses_native_operation_timeout() -> l
         "回帰Case削除中断確認",
         "資格情報失効",
         "A2A接続",
+        "A2Aメッセージ送信",
         "MCP接続",
         "MCP切断",
         "MCP Tool実行",
@@ -13116,7 +13155,7 @@ def macos_a2a接続の限定責任経路を検査する() -> list[str]:
     required = {
         "docs/specs/macos-a2a-center.md": ["MAC-A2A-1", "MAC-A2A-3", "metadata-only", "pending_review"],
         "native/rust_helper/src/macos_desktop_owner.rs": ['operation == "A2A接続"', "a2a_center::owner_confirmation_summary", "macos_a2a_同一要求"],
-        "apps/desktop_flutter/macos/Runner/BrokerProcessChannel.swift": ['operation == "A2A接続" ? 315', "result(response)"],
+        "apps/desktop_flutter/macos/Runner/BrokerProcessChannel.swift": ['let a2aOperation = ["A2A接続", "A2Aメッセージ送信"].contains(operation ?? "")', "result(response)"],
         ".github/workflows/apple-manual-build.yml": ["macos_a2a_center", "testProductMacA2aCenter", "D4_A2A_FIXTURE_SERVED_ONCE"],
     }
     errors = []

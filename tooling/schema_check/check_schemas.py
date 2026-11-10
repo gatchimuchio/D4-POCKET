@@ -97,6 +97,8 @@ REQUIRED = {
     "a2a_connection.schema.json",
     "a2a_connection_receipt.schema.json",
     "a2a_connection_list.schema.json",
+    "a2a_message_send_request.schema.json",
+    "a2a_message_send_response.schema.json",
     "host_registration.schema.json",
     "host_receipt.schema.json",
     "host_list.schema.json",

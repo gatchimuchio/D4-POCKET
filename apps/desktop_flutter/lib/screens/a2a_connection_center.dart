@@ -16,11 +16,16 @@ class A2aConnectionCenter extends StatefulWidget {
 class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
   final _agentIdController = TextEditingController();
   final _agentCardUriController = TextEditingController();
+  final _interfaceUriController = TextEditingController();
+  final _messageController = TextEditingController();
   late final A2aConnectionClient? _client;
   List<A2aConnectionSummary> _connections = const [];
   bool _loading = false;
   bool _connecting = false;
+  bool _sendingMessage = false;
+  String? _selectedAgentId;
   String? _message;
+  String? _sendMessageStatus;
 
   @override
   void initState() {
@@ -38,12 +43,27 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
   void dispose() {
     _agentIdController.dispose();
     _agentCardUriController.dispose();
+    _interfaceUriController.dispose();
+    _messageController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final client = _client;
+    final sendableConnections = _connections
+        .where((connection) =>
+            connection.connectionState == 'connected' &&
+            connection.supportedInterfaces.any((interface) =>
+                interface.status == 'supported' &&
+                interface.binding == 'jsonrpc' &&
+                interface.protocolVersion == '1.0'))
+        .toList(growable: false);
+    final selectedAgentId = sendableConnections.any(
+      (connection) => connection.agentId == _selectedAgentId,
+    )
+        ? _selectedAgentId
+        : null;
     return ShellPage(
       title: 'A2A接続センター',
       evidenceTitle: 'A2A Connection Center',
@@ -51,9 +71,10 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
         const BorderedPanel(
           child: Text(
             'Agent Cardは未信頼の外部metadataとして扱います。HTTPはloopback IPv4に限定し、'
-            'HTTPSは証明書を検証しpublic IPへ接続します。Rust Broker経由で接続ごとにnative Owner確認を行います。Credential値は扱わず、'
-            '接続だけでTrust・Permission・Approval・Authorityは生成しません。'
-            'Task、Message、Artifact、Streamの実行・取得はこの画面では行いません。',
+            'HTTPSは証明書を検証しpublic IPへ接続します。接続と各Message送信はRust Broker経由でnative Owner確認を行います。'
+            'Message送信は無認証のA2A v1.0 JSON-RPC interfaceだけに対応し、Credential値を扱いません。'
+            'Trust・Permission・Approval・Authorityは接続metadataから生成しません。外部本文は表示せずhashと限定metadataだけを返します。'
+            'Artifact本文、Stream、GetTask、cancelは未対応です。',
           ),
         ),
         if (client == null)
@@ -123,6 +144,91 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Text('A2A Message送信',
+                    style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 6),
+                const Text(
+                  '各送信を個別にnative Owner確認します。Agent ID・interface hash・本文hashへ束縛した一回限りPermissionを消費します。応答が不明な場合は再送しません。',
+                ),
+                const SizedBox(height: 8),
+                if (sendableConnections.isEmpty)
+                  const Text('送信可能な無認証 JSON-RPC v1.0 interfaceが登録されていません。')
+                else ...[
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedAgentId,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      labelText: '送信先Agent',
+                    ),
+                    items: [
+                      for (final connection in sendableConnections)
+                        DropdownMenuItem(
+                          value: connection.agentId,
+                          child: Text(
+                            '${connection.displayName} (${connection.agentId})',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                    onChanged: _sendingMessage || _connecting || _loading
+                        ? null
+                        : (value) => setState(() => _selectedAgentId = value),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _interfaceUriController,
+                    enabled: !_sendingMessage && !_connecting && !_loading,
+                    maxLength: 2048,
+                    autocorrect: false,
+                    enableSuggestions: false,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      labelText: 'Agent CardのsupportedInterfaces.url',
+                      helperText:
+                          '登録receiptのinterface hashと完全一致するURIを指定します。HTTPはloopback IPv4のみ。',
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _messageController,
+                    enabled: !_sendingMessage && !_connecting && !_loading,
+                    maxLength: 1024,
+                    minLines: 2,
+                    maxLines: 6,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      labelText: '送信Message（最大1024文字 / UTF-8 4 KiB）',
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  FilledButton.icon(
+                    onPressed: selectedAgentId == null ||
+                            _sendingMessage ||
+                            _connecting ||
+                            _loading
+                        ? null
+                        : _sendMessage,
+                    icon: _sendingMessage
+                        ? const SizedBox.square(
+                            dimension: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.send),
+                    label:
+                        Text(_sendingMessage ? '送信中…' : 'native Owner確認して一回送信'),
+                  ),
+                ],
+                if (_sendMessageStatus != null) ...[
+                  const SizedBox(height: 12),
+                  Semantics(liveRegion: true, child: Text(_sendMessageStatus!)),
+                ],
+              ],
+            ),
+          ),
+          BorderedPanel(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Row(
                   children: [
                     Expanded(
@@ -162,6 +268,14 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
       if (!mounted) return;
       setState(() {
         _connections = connections;
+        if (!_connections.any((connection) =>
+            connection.agentId == _selectedAgentId &&
+            connection.supportedInterfaces.any((interface) =>
+                interface.status == 'supported' &&
+                interface.binding == 'jsonrpc' &&
+                interface.protocolVersion == '1.0'))) {
+          _selectedAgentId = null;
+        }
         _message = 'Brokerのmetadata-only一覧を更新しました。';
       });
     } on Object {
@@ -212,6 +326,45 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
         _agentCardUriController.clear();
         setState(() => _connecting = false);
       }
+    }
+  }
+
+  Future<void> _sendMessage() async {
+    final client = _client;
+    final agentId = _selectedAgentId;
+    if (client == null ||
+        agentId == null ||
+        _loading ||
+        _connecting ||
+        _sendingMessage) {
+      return;
+    }
+    setState(() {
+      _sendingMessage = true;
+      _sendMessageStatus = '要求をBrokerへ送信しています。native確認後、一回だけ実行します。';
+    });
+    try {
+      final result = await client.sendMessage(
+        agentId: agentId,
+        interfaceUri: _interfaceUriController.text,
+        message: _messageController.text,
+      );
+      if (!mounted) return;
+      setState(() {
+        _sendMessageStatus = result.status == 'unknown'
+            ? '送信結果は不明です。二重送信防止のため再送しません。Audit=${result.auditEventId}'
+            : 'A2A Message応答を受理しました（Task完了ではありません）。kind=${result.resultKind} / state=${result.remoteState ?? 'unknown'} / id=${result.remoteId} / result hash=${result.resultHash} / Audit=${result.auditEventId}';
+      });
+    } on Object {
+      if (!mounted) return;
+      setState(() {
+        _sendMessageStatus =
+            'Brokerから確定応答を得られませんでした。外部作用の結果が不明な場合は再送せず、Auditを確認してください。';
+      });
+    } finally {
+      _interfaceUriController.clear();
+      _messageController.clear();
+      if (mounted) setState(() => _sendingMessage = false);
     }
   }
 }

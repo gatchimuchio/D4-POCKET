@@ -1,7 +1,7 @@
 //! C16 A2A接続センターのBroker経路。
 //!
-//! Agent Cardをowner controlから取得し、metadata-onlyの接続receiptへ射影する。
-//! A2AのTask送信、Message送信、Artifact本文、Stream購読、Credential注入は未接続とする。
+//! Agent Card discoveryと、無認証A2A v1.0 JSON-RPC SendMessageのBroker経路。
+//! Credential注入、Artifact本文、Stream購読は未接続とする。
 #![allow(non_snake_case)]
 
 use super::protocol::{Broker, BrokerResponse, BrokerStatus, EVIDENCE_SOURCE_INTERNAL_STATE};
@@ -13,9 +13,78 @@ use std::collections::BTreeMap;
 
 const OP_CONNECT: &str = "A2A接続";
 const OP_LIST: &str = "A2A接続一覧";
+const OP_SEND_MESSAGE: &str = "A2Aメッセージ送信";
 const VERSION: u64 = 1;
 const PROTOCOL_VERSION: &str = "1.0";
 const MAX_CONNECTIONS: usize = 64;
+const MAX_MESSAGE_BYTES: usize = 4 * 1024;
+const MAX_MESSAGE_CHARS: usize = 1024;
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SendMessageRequest {
+    #[serde(rename = "版")]
+    version: u64,
+    #[serde(rename = "操作")]
+    operation: String,
+    #[serde(rename = "AgentID")]
+    agent_id: String,
+    #[serde(rename = "Interface URI")]
+    interface_uri: String,
+    #[serde(rename = "Message")]
+    message: String,
+}
+
+struct OneShotA2aMessagePermission {
+    permission_id: String,
+    request_id: String,
+    agent_id: String,
+    interface_hash: String,
+    message_hash: String,
+    expires_at: std::time::Instant,
+    consumed: bool,
+}
+
+impl OneShotA2aMessagePermission {
+    fn issue(
+        request_id: &str,
+        agent_id: &str,
+        interface_hash: &str,
+        message_hash: &str,
+    ) -> Option<Self> {
+        let mut nonce = [0u8; 16];
+        getrandom::getrandom(&mut nonce).ok()?;
+        Some(Self {
+            permission_id: format!("a2a-message-{}", hex::encode(nonce)),
+            request_id: request_id.to_string(),
+            agent_id: agent_id.to_string(),
+            interface_hash: interface_hash.to_string(),
+            message_hash: message_hash.to_string(),
+            expires_at: std::time::Instant::now() + std::time::Duration::from_secs(15),
+            consumed: false,
+        })
+    }
+
+    fn consume(
+        &mut self,
+        request_id: &str,
+        agent_id: &str,
+        interface_hash: &str,
+        message_hash: &str,
+    ) -> bool {
+        if self.consumed
+            || std::time::Instant::now() >= self.expires_at
+            || self.request_id != request_id
+            || self.agent_id != agent_id
+            || self.interface_hash != interface_hash
+            || self.message_hash != message_hash
+        {
+            return false;
+        }
+        self.consumed = true;
+        true
+    }
+}
 
 pub(super) fn load_persistent_connections(
     store: &BrokerPersistentStore,
@@ -446,7 +515,9 @@ fn validate_card(value: Option<&Value>, agent_id: &str) -> Result<(), String> {
                 object.get("interface_hash"),
                 object.get("status").and_then(Value::as_str),
             ) {
-                (Some(Value::String(hash)), Some("unsupported" | "unknown")) => valid_hash(hash),
+                (Some(Value::String(hash)), Some("supported" | "unsupported" | "unknown")) => {
+                    valid_hash(hash)
+                }
                 (Some(Value::Null), Some("unknown")) => true,
                 _ => false,
             }
@@ -457,7 +528,7 @@ fn validate_card(value: Option<&Value>, agent_id: &str) -> Result<(), String> {
             || !object
                 .get("status")
                 .and_then(Value::as_str)
-                .is_some_and(|value| ["unsupported", "unknown"].contains(&value))
+                .is_some_and(|value| ["supported", "unsupported", "unknown"].contains(&value))
             || !object
                 .get("reason")
                 .and_then(Value::as_str)
@@ -543,11 +614,20 @@ fn validate_card(value: Option<&Value>, agent_id: &str) -> Result<(), String> {
         .get("authentication")
         .and_then(Value::as_object)
         .ok_or_else(|| "A2A authenticationがobjectではない".to_string())?;
-    if authentication.len() != 3
+    if !(3..=4).contains(&authentication.len())
         || authentication.keys().any(|key| {
-            !["schemes", "credential_ref", "secret_value_present"].contains(&key.as_str())
+            ![
+                "schemes",
+                "credential_ref",
+                "secret_value_present",
+                "security_requirements_present",
+            ]
+            .contains(&key.as_str())
         })
         || authentication.get("secret_value_present") != Some(&Value::Bool(false))
+        || authentication
+            .get("security_requirements_present")
+            .is_some_and(|value| !value.is_boolean())
     {
         return Err("A2A authenticationのmetadataが不正".to_string());
     }
@@ -563,6 +643,23 @@ fn validate_card(value: Option<&Value>, agent_id: &str) -> Result<(), String> {
         })
     {
         return Err("A2A authentication schemesのmetadataが不正".to_string());
+    }
+    for interface in interfaces {
+        let interface = interface.as_object().expect("A2A interfaceは先行検査済み");
+        if interface.get("status").and_then(Value::as_str) == Some("supported")
+            && (interface.get("binding").and_then(Value::as_str) != Some("jsonrpc")
+                || interface.get("protocol_version").and_then(Value::as_str)
+                    != Some(PROTOCOL_VERSION)
+                || !schemes.is_empty()
+                || authentication.get("security_requirements_present") != Some(&Value::Bool(false))
+                || interface.get("reason").and_then(Value::as_str)
+                    != Some("認証情報なしのA2A v1.0 JSON-RPC SendMessage consumerを接続済み"))
+        {
+            return Err(
+                "A2A supported interfaceは無認証JSON-RPC v1.0 SendMessage consumerだけを表す"
+                    .to_string(),
+            );
+        }
     }
     let credential = authentication
         .get("credential_ref")
@@ -944,6 +1041,423 @@ pub(super) fn list(
     }
 }
 
+fn parse_send_message_request(payload: &Value) -> Result<SendMessageRequest, A2aError> {
+    let request: SendMessageRequest = serde_json::from_value(payload.clone()).map_err(|_| {
+        A2aError::new(
+            "a2a_message_request_invalid",
+            "A2A message payloadの構造が不正",
+        )
+    })?;
+    if request.version != VERSION
+        || request.operation != "送信"
+        || !valid_agent_id(&request.agent_id)
+        || request.message.trim().is_empty()
+        || request.message.len() > MAX_MESSAGE_BYTES
+        || request.message.chars().count() > MAX_MESSAGE_CHARS
+        || request.message.chars().any(|character| {
+            (character.is_control() && !matches!(character, '\n' | '\r' | '\t'))
+                || matches!(character, '\u{061c}' | '\u{200e}' | '\u{200f}' | '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}')
+        })
+    {
+        return Err(A2aError::new(
+            "a2a_message_request_invalid",
+            "A2A message payloadの値またはbounded本文が不正",
+        ));
+    }
+    crate::a2a::transport_name(&request.interface_uri)?;
+    Ok(request)
+}
+
+fn validate_send_message_target(
+    broker: &Broker,
+    request: &SendMessageRequest,
+) -> Result<String, A2aError> {
+    let receipt = broker
+        .a2a_connections
+        .get(&request.agent_id)
+        .ok_or_else(|| A2aError::new("a2a_connection_missing", "A2A接続receiptがない"))?;
+    if receipt.get("接続状態").and_then(Value::as_str) != Some("connected")
+        || receipt.get("証拠種別").and_then(Value::as_str) != Some("LIVE_RUNTIME")
+        || receipt.get("承認状態").and_then(Value::as_str) != Some("owner_control_approved")
+        || receipt
+            .get("Trust")
+            .and_then(|value| value.get("state"))
+            .and_then(Value::as_str)
+            != Some("pending_review")
+    {
+        return Err(A2aError::new(
+            "a2a_connection_revalidation_required",
+            "A2A接続receiptは再確認またはOperator reviewが必要",
+        ));
+    }
+    let card = receipt
+        .get("Agent Card")
+        .and_then(Value::as_object)
+        .ok_or_else(|| A2aError::new("a2a_connection_invalid", "A2A Agent Card receiptが不正"))?;
+    let authentication = card
+        .get("authentication")
+        .and_then(Value::as_object)
+        .ok_or_else(|| A2aError::new("a2a_connection_invalid", "A2A認証metadataが不正"))?;
+    if authentication
+        .get("schemes")
+        .and_then(Value::as_array)
+        .is_none_or(|items| !items.is_empty())
+        || authentication.get("security_requirements_present") != Some(&Value::Bool(false))
+        || authentication.get("secret_value_present") != Some(&Value::Bool(false))
+    {
+        return Err(A2aError::new(
+            "a2a_authentication_unsupported",
+            "現行A2A Message送信はCredentialを使用しないinterfaceに限定",
+        ));
+    }
+    let (transport, interface_hash) = crate::a2a::interface_identity(&request.interface_uri)?;
+    let interfaces = card
+        .get("supported_interfaces")
+        .and_then(Value::as_array)
+        .ok_or_else(|| A2aError::new("a2a_connection_invalid", "A2A interface receiptが不正"))?;
+    let matched = interfaces.iter().any(|interface| {
+        interface.get("binding").and_then(Value::as_str) == Some("jsonrpc")
+            && interface.get("protocol_version").and_then(Value::as_str) == Some(PROTOCOL_VERSION)
+            && interface.get("transport").and_then(Value::as_str) == Some(transport.as_str())
+            && interface.get("status").and_then(Value::as_str) == Some("supported")
+            && interface.get("interface_hash").and_then(Value::as_str)
+                == Some(interface_hash.as_str())
+    });
+    if !matched {
+        return Err(A2aError::new(
+            "a2a_interface_not_supported",
+            "現在のAgent Cardに一致する無認証A2A v1.0 JSON-RPC interfaceがない",
+        ));
+    }
+    Ok(interface_hash)
+}
+
+pub(super) fn send_message(
+    broker: &mut Broker,
+    request_id: &str,
+    payload: &Value,
+    owner: bool,
+    payload_hash: &str,
+) -> BrokerResponse {
+    if !owner {
+        return broker.reject_with_payload_hash(
+            request_id,
+            OP_SEND_MESSAGE,
+            "a2a_native_owner_required",
+            "A2A Message送信は各送信内容に対するnative Owner確認が必要",
+            true,
+            payload_hash,
+        );
+    }
+    if !broker.state_store.persistence_ready() {
+        return broker.reject_with_payload_hash(
+            request_id,
+            OP_SEND_MESSAGE,
+            "broker_persistence_unavailable",
+            "A2A Message送信には永続Auditが必要",
+            true,
+            payload_hash,
+        );
+    }
+    let request = match parse_send_message_request(payload) {
+        Ok(request) => request,
+        Err(error) => return reject_send_message(broker, request_id, error, payload_hash),
+    };
+    let interface_hash = match validate_send_message_target(broker, &request) {
+        Ok(hash) => hash,
+        Err(error) => return reject_send_message(broker, request_id, error, payload_hash),
+    };
+    let message_hash = crate::audit_hash::sha256_tagged(request.message.as_bytes());
+    if broker
+        .append_audit(
+            request_id,
+            OP_SEND_MESSAGE,
+            "received",
+            &format!(
+                "A2A SendMessage要求を受信。AgentID={} interface_hash={} message_hash={}。本文・URI・CredentialはAuditへ保存しない",
+                request.agent_id, interface_hash, message_hash
+            ),
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
+        )
+        .is_err()
+    {
+        return broker.audit_store_failed_response(
+            request_id,
+            OP_SEND_MESSAGE,
+            "a2a_audit_append_failed",
+            "A2A Message送信の受信Auditを確定できない",
+        );
+    }
+    if broker
+        .append_audit(
+            request_id,
+            OP_SEND_MESSAGE,
+            "owner_confirmed",
+            "native Owner確認が現在の要求hash・対象Agent・本文hashに一致。再利用しない",
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
+        )
+        .is_err()
+    {
+        return broker.audit_store_failed_response(
+            request_id,
+            OP_SEND_MESSAGE,
+            "a2a_audit_append_failed",
+            "A2A Message送信のOwner確認Auditを確定できない",
+        );
+    }
+    let mut permission = match OneShotA2aMessagePermission::issue(
+        request_id,
+        &request.agent_id,
+        &interface_hash,
+        &message_hash,
+    ) {
+        Some(permission) => permission,
+        None => {
+            return broker.reject_with_payload_hash(
+                request_id,
+                OP_SEND_MESSAGE,
+                "a2a_permission_unavailable",
+                "一回限りA2A Message Permissionを発行できない",
+                true,
+                payload_hash,
+            )
+        }
+    };
+    if broker
+        .append_audit(
+            request_id,
+            OP_SEND_MESSAGE,
+            "permission_issued",
+            &format!(
+                "一回限りPermissionを発行。permission_id={} AgentID={} interface_hash={} message_hash={}。永続化せず、再利用しない",
+                permission.permission_id, request.agent_id, interface_hash, message_hash
+            ),
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
+        )
+        .is_err()
+    {
+        return broker.audit_store_failed_response(
+            request_id,
+            OP_SEND_MESSAGE,
+            "a2a_audit_append_failed",
+            "A2A Message PermissionのAuditを確定できない",
+        );
+    }
+    if !permission.consume(
+        request_id,
+        &request.agent_id,
+        &interface_hash,
+        &message_hash,
+    ) {
+        return broker.reject_with_payload_hash(
+            request_id,
+            OP_SEND_MESSAGE,
+            "a2a_permission_binding_invalid",
+            "A2A Message Permissionの対象が一致しない",
+            false,
+            payload_hash,
+        );
+    }
+    if broker
+        .append_audit(
+            request_id,
+            OP_SEND_MESSAGE,
+            "started",
+            "一回限りPermissionを消費。A2A SendMessageを一回だけ実行し、応答不明時は再送しない",
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
+        )
+        .is_err()
+    {
+        return broker.audit_store_failed_response(
+            request_id,
+            OP_SEND_MESSAGE,
+            "a2a_audit_append_failed",
+            "A2A Message送信の開始Auditを確定できず、外部作用を行わない",
+        );
+    }
+    let result = crate::a2a::send_message(
+        &request.interface_uri,
+        &request.message,
+        std::time::Instant::now() + std::time::Duration::from_secs(15),
+    );
+    match result {
+        Ok(result) => {
+            let result_hash = result
+                .get("result_hash")
+                .and_then(Value::as_str)
+                .unwrap_or("unknown");
+            let body = json!({
+                "版": VERSION,
+                "AgentID": request.agent_id,
+                "interface_hash": interface_hash,
+                "status": "accepted",
+                "message_hash": message_hash,
+                "result": result,
+                "Trust": "pending_review",
+                "権限生成": "なし",
+                "authority_strip": true,
+                "公開範囲": "metadata_only",
+                "再送可能": false
+            });
+            let event = match broker.append_audit(
+                request_id,
+                OP_SEND_MESSAGE,
+                "accepted",
+                &format!(
+                    "A2A SendMessage応答を受領。AgentID={} result_hash={}。外部応答本文は保存・投影せず、Task完了とは扱わない",
+                    request.agent_id, result_hash
+                ),
+                "LIVE_RUNTIME",
+                payload_hash,
+            ) {
+                Ok(event) => event,
+                Err(_) => {
+                    return broker.audit_store_failed_response(
+                        request_id,
+                        OP_SEND_MESSAGE,
+                        "a2a_audit_append_failed",
+                        "外部応答後のAuditを確定できない。再送せず結果不明とする",
+                    )
+                }
+            };
+            BrokerResponse {
+                request_id: request_id.to_string(),
+                operation: OP_SEND_MESSAGE.to_string(),
+                status: BrokerStatus::Accepted,
+                evidence_source: "LIVE_RUNTIME".to_string(),
+                audit_event_id: event.event_id,
+                error: None,
+                health: None,
+                body: Some(body),
+                shutdown_requested: broker.shutdown_requested,
+            }
+        }
+        Err(error) => unknown_send_message(
+            broker,
+            request_id,
+            &request.agent_id,
+            &interface_hash,
+            &message_hash,
+            payload_hash,
+            error.code,
+        ),
+    }
+}
+
+fn reject_send_message(
+    broker: &mut Broker,
+    request_id: &str,
+    error: A2aError,
+    payload_hash: &str,
+) -> BrokerResponse {
+    broker.reject_with_payload_hash(
+        request_id,
+        OP_SEND_MESSAGE,
+        error.code,
+        &error.message,
+        true,
+        payload_hash,
+    )
+}
+
+fn unknown_send_message(
+    broker: &mut Broker,
+    request_id: &str,
+    agent_id: &str,
+    interface_hash: &str,
+    message_hash: &str,
+    payload_hash: &str,
+    failure_code: &str,
+) -> BrokerResponse {
+    let body = json!({
+        "版": VERSION,
+        "AgentID": agent_id,
+        "interface_hash": interface_hash,
+        "message_hash": message_hash,
+        "status": "unknown",
+        "result": Value::Null,
+        "Trust": "pending_review",
+        "権限生成": "なし",
+        "authority_strip": true,
+        "公開範囲": "metadata_only",
+        "再送可能": false
+    });
+    let event = match broker.append_audit(
+        request_id,
+        OP_SEND_MESSAGE,
+        "unknown",
+        &format!(
+            "A2A SendMessageの外部結果は不明。failure_code={} AgentID={} interface_hash={} message_hash={}。再送禁止",
+            failure_code, agent_id, interface_hash, message_hash
+        ),
+        "LIVE_RUNTIME",
+        payload_hash,
+    ) {
+        Ok(event) => event,
+        Err(_) => {
+            return broker.audit_store_failed_response(
+                request_id,
+                OP_SEND_MESSAGE,
+                "a2a_audit_append_failed",
+                "A2A Message送信の結果不明Auditを確定できない。再送禁止",
+            )
+        }
+    };
+    BrokerResponse {
+        request_id: request_id.to_string(),
+        operation: OP_SEND_MESSAGE.to_string(),
+        status: BrokerStatus::Suspended,
+        evidence_source: "LIVE_RUNTIME".to_string(),
+        audit_event_id: event.event_id,
+        error: Some(super::protocol::BrokerError {
+            code: "a2a_message_outcome_unknown".to_string(),
+            message: "外部AgentへのMessage送信結果は不明です。二重送信防止のため自動再送しません。"
+                .to_string(),
+            recoverable: false,
+            audit_event_required: true,
+            fail_closed: true,
+        }),
+        health: None,
+        body: Some(body),
+        shutdown_requested: broker.shutdown_requested,
+    }
+}
+
+pub(crate) fn recover_interrupted_sends(broker: &mut Broker) -> Result<(), BrokerStoreError> {
+    let mut started = BTreeMap::<String, String>::new();
+    let mut terminal = std::collections::BTreeSet::<String>::new();
+    for event in broker.audit_log.events() {
+        if event.operation != OP_SEND_MESSAGE {
+            continue;
+        }
+        if event.decision == "started" {
+            started.insert(event.request_id.clone(), event.payload_hash.clone());
+        } else if ["accepted", "unknown", "rejected", "suspended"]
+            .contains(&event.decision.as_str())
+        {
+            terminal.insert(event.request_id.clone());
+        }
+    }
+    for (request_id, payload_hash) in started {
+        if terminal.contains(&request_id) {
+            continue;
+        }
+        broker.append_audit(
+            &request_id,
+            OP_SEND_MESSAGE,
+            "unknown",
+            "Broker再起動時にA2A SendMessageの終端Auditがないため結果不明として隔離。自動再送しない",
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            &payload_hash,
+        )?;
+    }
+    Ok(())
+}
+
 fn parse_request(payload: &Value) -> Result<ConnectionRequest, A2aError> {
     let request: ConnectionRequest = serde_json::from_value(payload.clone()).map_err(|_| {
         A2aError::new(
@@ -975,6 +1489,20 @@ pub(crate) fn owner_confirmation_summary(payload: &Value) -> Result<(String, Str
     )
     .map_err(|error| error.message)?;
     Ok((request.agent_id, target))
+}
+
+pub(crate) fn owner_send_message_confirmation_summary(
+    payload: &Value,
+) -> Result<(String, String, String, String), String> {
+    let request = parse_send_message_request(payload).map_err(|error| error.message)?;
+    crate::a2a::transport_name(&request.interface_uri).map_err(|error| error.message)?;
+    let message_hash = crate::audit_hash::sha256_tagged(request.message.as_bytes());
+    Ok((
+        request.agent_id,
+        request.interface_uri,
+        request.message,
+        message_hash,
+    ))
 }
 
 fn valid_agent_id(value: &str) -> bool {
@@ -1157,6 +1685,287 @@ mod tests {
                 .expect_err("URIと不一致のtransport")
                 .code,
             "a2a_connection_request_invalid"
+        );
+    }
+
+    #[test]
+    fn A2A_send_messageはnative_owner必須でAuditが本文を保存しない() {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+
+        let store = TestStore::new("a2a-send-positive");
+        let mut broker = Broker::new_persistent("a2a-send-positive", &store.0).expect("永続Broker");
+        let listener = TcpListener::bind("127.0.0.1:0").expect("Agent Card／Message fixture");
+        let address = listener.local_addr().expect("fixture address");
+        let card_uri = format!("http://{address}/.well-known/agent-card.json");
+        let interface_uri = format!("http://{address}/rpc");
+        let worker = std::thread::spawn(move || -> Result<(Value, Value), String> {
+            fn read_request(stream: &mut std::net::TcpStream) -> Result<(String, Vec<u8>), String> {
+                let mut bytes = Vec::new();
+                let mut chunk = [0u8; 1024];
+                let header_end = loop {
+                    let size = stream.read(&mut chunk).map_err(|error| error.to_string())?;
+                    if size == 0 || bytes.len().saturating_add(size) > 20 * 1024 {
+                        return Err("HTTP request header/body truncated or oversized".into());
+                    }
+                    bytes.extend_from_slice(&chunk[..size]);
+                    if let Some(position) = bytes.windows(4).position(|part| part == b"\r\n\r\n") {
+                        break position + 4;
+                    }
+                };
+                let header = std::str::from_utf8(&bytes[..header_end])
+                    .map_err(|error| error.to_string())?
+                    .to_owned();
+                let length = header
+                    .lines()
+                    .find_map(|line| {
+                        line.strip_prefix("Content-Length: ")
+                            .and_then(|value| value.parse::<usize>().ok())
+                    })
+                    .unwrap_or(0);
+                while bytes.len() < header_end + length {
+                    let size = stream.read(&mut chunk).map_err(|error| error.to_string())?;
+                    if size == 0 {
+                        return Err("HTTP request body truncated".into());
+                    }
+                    bytes.extend_from_slice(&chunk[..size]);
+                }
+                if bytes.len() != header_end + length {
+                    return Err("HTTP request contains trailing bytes".into());
+                }
+                Ok((header, bytes[header_end..].to_vec()))
+            }
+            fn respond(stream: &mut std::net::TcpStream, body: &[u8]) -> Result<(), String> {
+                let header = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    body.len()
+                );
+                stream
+                    .write_all(header.as_bytes())
+                    .map_err(|error| error.to_string())?;
+                stream.write_all(body).map_err(|error| error.to_string())?;
+                stream.flush().map_err(|error| error.to_string())?;
+                stream
+                    .shutdown(std::net::Shutdown::Write)
+                    .map_err(|error| error.to_string())?;
+                let mut close = [0u8; 1];
+                match stream.read(&mut close) {
+                    Ok(0) => Ok(()),
+                    Err(error) if error.kind() == std::io::ErrorKind::ConnectionReset => Ok(()),
+                    Ok(_) => Err("client sent unexpected data after response".into()),
+                    Err(error) => Err(error.to_string()),
+                }
+            }
+
+            let (mut card_stream, _) = listener.accept().map_err(|error| error.to_string())?;
+            card_stream
+                .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+                .map_err(|error| error.to_string())?;
+            card_stream
+                .set_write_timeout(Some(std::time::Duration::from_secs(5)))
+                .map_err(|error| error.to_string())?;
+            let (card_header, card_body) = read_request(&mut card_stream)?;
+            if !card_header.starts_with("GET /.well-known/agent-card.json HTTP/1.1\r\n")
+                || !card_body.is_empty()
+            {
+                return Err("Agent Card GET mismatch".into());
+            }
+            let card = serde_json::to_vec(&json!({
+                "name":"A2A Send fixture", "description":"bounded fixture", "version":"1.0.0",
+                "supportedInterfaces":[{"url":format!("http://{address}/rpc"),"protocolBinding":"JSONRPC","protocolVersion":"1.0"}],
+                "capabilities":{"streaming":false,"pushNotifications":false,"stateTransitionHistory":false,"extendedAgentCard":false},
+                "securitySchemes":{},"skills":[]
+            }))
+            .map_err(|error| error.to_string())?;
+            respond(&mut card_stream, &card)?;
+
+            let (mut send_stream, _) = listener.accept().map_err(|error| error.to_string())?;
+            send_stream
+                .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+                .map_err(|error| error.to_string())?;
+            send_stream
+                .set_write_timeout(Some(std::time::Duration::from_secs(5)))
+                .map_err(|error| error.to_string())?;
+            let (send_header, send_body) = read_request(&mut send_stream)?;
+            if !send_header.starts_with("POST /rpc HTTP/1.1\r\n")
+                || !send_header
+                    .lines()
+                    .any(|line| line.eq_ignore_ascii_case("A2A-Version: 1.0"))
+                || !send_header
+                    .lines()
+                    .any(|line| line.eq_ignore_ascii_case("Content-Type: application/json"))
+            {
+                return Err("A2A v1.0 SendMessage header mismatch".into());
+            }
+            let request: Value =
+                serde_json::from_slice(&send_body).map_err(|error| error.to_string())?;
+            if request["method"] != "SendMessage"
+                || request["params"]["message"]["parts"][0]["text"] != "fixture user message"
+            {
+                return Err("SendMessage method or message mismatch".into());
+            }
+            let response = serde_json::to_vec(&json!({
+                "jsonrpc":"2.0", "id":request["id"], "result":{"task":{
+                    "kind":"task", "id":"fixture-task-1", "contextId":"fixture-context-1",
+                    "status":{"state":"TASK_STATE_SUBMITTED","message":{"kind":"message","messageId":"fixture-response","role":"ROLE_AGENT","parts":[{"kind":"text","text":"private-response-marker"}]}},
+                    "artifacts":[],"history":[]
+                }}
+            }))
+            .map_err(|error| error.to_string())?;
+            respond(&mut send_stream, &response)?;
+
+            let (mut unknown_stream, _) = listener.accept().map_err(|error| error.to_string())?;
+            unknown_stream
+                .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+                .map_err(|error| error.to_string())?;
+            unknown_stream
+                .set_write_timeout(Some(std::time::Duration::from_secs(5)))
+                .map_err(|error| error.to_string())?;
+            let (unknown_header, unknown_body) = read_request(&mut unknown_stream)?;
+            if !unknown_header.starts_with("POST /rpc HTTP/1.1\r\n") {
+                return Err("uncertain SendMessage HTTP method mismatch".into());
+            }
+            let unknown_request: Value =
+                serde_json::from_slice(&unknown_body).map_err(|error| error.to_string())?;
+            if unknown_request["params"]["message"]["parts"][0]["text"]
+                != "uncertain fixture message"
+            {
+                return Err("uncertain SendMessage body mismatch".into());
+            }
+            let stale_response = serde_json::to_vec(&json!({
+                "jsonrpc":"2.0", "id":"stale-request-id", "result":{"message":{
+                    "kind":"message", "messageId":"stale-response",
+                    "role":"ROLE_AGENT", "parts":[{"kind":"text","text":"uncertain-response-private"}]
+                }}
+            }))
+            .map_err(|error| error.to_string())?;
+            respond(&mut unknown_stream, &stale_response)?;
+            Ok((request, unknown_request))
+        });
+
+        let mut connection_payload = valid_payload();
+        connection_payload["Agent Card URI"] = Value::String(card_uri);
+        let connected = connect(
+            &mut broker,
+            "a2a-send-connect",
+            &connection_payload,
+            true,
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        );
+        assert_eq!(
+            connected.status,
+            BrokerStatus::Accepted,
+            "{:?}",
+            connected.error
+        );
+        let receipt = broker
+            .a2a_connections
+            .get("remote-agent-example")
+            .expect("connected receipt");
+        assert_eq!(
+            receipt["Agent Card"]["supported_interfaces"][0]["status"],
+            "supported"
+        );
+        assert_eq!(receipt["Trust"]["state"], "pending_review");
+
+        let secret_message = "fixture user message";
+        let send_payload = json!({
+            "版": 1,
+            "操作": "送信",
+            "AgentID": "remote-agent-example",
+            "Interface URI": interface_uri,
+            "Message": secret_message
+        });
+        let response = send_message(
+            &mut broker,
+            "a2a-send-positive-request",
+            &send_payload,
+            true,
+            "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        );
+        let mut uncertain_payload = send_payload.clone();
+        uncertain_payload["Message"] = Value::String("uncertain fixture message".into());
+        let uncertain = send_message(
+            &mut broker,
+            "a2a-send-unknown-request",
+            &uncertain_payload,
+            true,
+            "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        );
+        let (request, uncertain_request) = worker
+            .join()
+            .expect("SendMessage fixture thread")
+            .expect("fixture requests");
+        assert_eq!(request["params"]["message"]["role"], "ROLE_USER");
+        assert_eq!(
+            response.status,
+            BrokerStatus::Accepted,
+            "{:?}",
+            response.error
+        );
+        let body = response.body.expect("bounded Message result");
+        assert_eq!(body["status"], "accepted");
+        assert_eq!(body["Trust"], "pending_review");
+        assert_eq!(body["権限生成"], "なし");
+        assert_eq!(body["再送可能"], false);
+        assert_eq!(body["result"]["kind"], "task");
+        assert_eq!(body["result"]["task_id"], "fixture-task-1");
+        assert!(!body.to_string().contains(secret_message));
+        assert!(!body.to_string().contains("private-response-marker"));
+        assert_eq!(uncertain_request["method"], "SendMessage");
+        assert_eq!(uncertain.status, BrokerStatus::Suspended);
+        assert_eq!(
+            uncertain.error.as_ref().map(|error| error.code.as_str()),
+            Some("a2a_message_outcome_unknown")
+        );
+        let uncertain_body = uncertain.body.expect("unknown Message result");
+        assert_eq!(uncertain_body["status"], "unknown");
+        assert_eq!(uncertain_body["result"], Value::Null);
+        assert_eq!(uncertain_body["再送可能"], false);
+        assert!(!uncertain_body
+            .to_string()
+            .contains("uncertain fixture message"));
+        assert!(!uncertain_body
+            .to_string()
+            .contains("uncertain-response-private"));
+        assert!(broker.audit_events().iter().all(|event| {
+            !event.reason.contains(secret_message)
+                && !event.reason.contains("uncertain fixture message")
+                && !event.reason.contains("private-response-marker")
+                && !event.reason.contains("uncertain-response-private")
+                && !event.reason.contains(&interface_uri)
+        }));
+        for decision in [
+            "received",
+            "owner_confirmed",
+            "permission_issued",
+            "started",
+            "accepted",
+            "unknown",
+        ] {
+            assert!(
+                broker.audit_events().iter().any(|event| {
+                    event.operation == OP_SEND_MESSAGE && event.decision == decision
+                }),
+                "missing A2A send Audit decision: {decision}"
+            );
+        }
+        assert_eq!(
+            broker.a2a_connections["remote-agent-example"]["Trust"]["state"],
+            "pending_review"
+        );
+
+        let denied = send_message(
+            &mut broker,
+            "a2a-send-no-owner",
+            &send_payload,
+            false,
+            "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        );
+        assert_eq!(denied.status, BrokerStatus::Rejected);
+        assert_eq!(
+            denied.error.as_ref().map(|error| error.code.as_str()),
+            Some("a2a_native_owner_required")
         );
     }
 
