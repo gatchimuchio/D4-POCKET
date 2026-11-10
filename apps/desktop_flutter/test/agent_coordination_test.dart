@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:agent_orchestration/agent_orchestration.dart'
+    show startAgentComparisonTasks;
 
 import 'package:gui_shell_desktop/models/generated_contracts.dart';
 import 'package:gui_shell_desktop/services/agent_task_client.dart';

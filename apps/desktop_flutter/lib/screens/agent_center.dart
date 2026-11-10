@@ -5,6 +5,8 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
+import 'package:agent_orchestration/agent_orchestration.dart'
+    show startAgentComparisonTasks;
 
 import '../models/generated_contracts.dart';
 import '../services/agent_task_client.dart';

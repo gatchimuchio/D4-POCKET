@@ -228,7 +228,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/agent_center.dart",
-      "sha256": "5bb9d6bd9e6246040d611ddff1a04b3c7ebd20a0c688fcfa9b82897f07e52521"
+      "sha256": "0edd5ebf962572858b012d174aac2c1c6e80d765cafa0d1424d94ac2bd04b9d1"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/approval_center.dart",
@@ -336,7 +336,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/agent_coordination.dart",
-      "sha256": "49426b8d72da210517f2290fd40c03f56e5375a885ef28b4f0fde4ef37efb6b3"
+      "sha256": "b470ac08073d6c3711705aa802e89248e6bda042e21983a3d0e1e4d1a4cc6d8f"
     },
     {
       "path": "apps/desktop_flutter/lib/services/agent_handoff.dart",
@@ -620,7 +620,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/agent_coordination_test.dart",
-      "sha256": "0c5595993f0d6c0d64b3a1d6419971fe7c555fa5797de26acf9f6134be17f699"
+      "sha256": "261fd1d27932032ad53e488beb4e2e8f133cd55d75a16a7df5421e6a90779266"
     },
     {
       "path": "apps/desktop_flutter/test/agent_handoff_test.dart",
@@ -1436,7 +1436,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "04336d78b90e2335ef19b51225c1894f0ffbd3b1c9e5e0641170e8b623fe74fa"
+      "sha256": "ff7a47d89c248859bfd63dd97c2232809377368ff0228578b5c8050b956b99a1"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -4224,7 +4224,7 @@
     },
     {
       "path": "packages/agent_orchestration/README.md",
-      "sha256": "b2a8f483ccc2ff68c4c68e53aa532cf0f6255cc12f794fbefb0c997d9c5e225e"
+      "sha256": "b5d9e1e62cf8cd64371f2f47017a561397dc4c45f5e4d26cb4f33f479bfbc27e"
     },
     {
       "path": "packages/agent_orchestration/lib/agent_mcp_task_controller.dart",
@@ -4232,7 +4232,7 @@
     },
     {
       "path": "packages/agent_orchestration/lib/agent_orchestration.dart",
-      "sha256": "2c7102b45f8c5acbf841eab28d3b0d600e789859122acf502f4aaba9e54896c3"
+      "sha256": "ee9e429ba51d9bd717449df3cde6510a5337203ec4e67c9323776254349fbda3"
     },
     {
       "path": "packages/agent_orchestration/lib/agent_task_client.dart",
