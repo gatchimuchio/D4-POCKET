@@ -3209,8 +3209,7 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-
-  testWidgets('Agent Centerは外部Artifactを未信頼入力として新規Task事前検査だけに渡す',
+  testWidgets('Agent Centerは外部Artifactを未信頼入力として渡し新規権限後だけ受領記録を表示する',
       (WidgetTester tester) async {
     const sessionId = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
     final interfaceHash = 'sha256:${List<String>.filled(64, 'a').join()}';
@@ -3249,6 +3248,48 @@ void main() {
         '対話セッションID': sessionId,
         '作業領域ID': 'workspace-a',
         '指示hash': 'sha256:${List<String>.filled(64, 'e').join()}',
+      }),
+      _brokerAcceptedBody('AgentTaskWorkspacePermissionGrant', {
+        'permission_id': '11111111111111111111111111111111',
+        'agent_runtime_id': 'codex-a',
+        'session_id': sessionId,
+        'workspace_id': 'workspace-a',
+        'workspace_registration_hash':
+            'sha256:${List<String>.filled(64, 'f').join()}',
+        'operation': 'agent_task.execute',
+        'scope': 'session_workspace_once',
+        'decision': 'allow',
+        'source': 'owner',
+        'expires_at_epoch_seconds': 1900000000,
+        'use_limit': 1,
+        'uses_remaining': 1,
+        'status': 'active',
+      }),
+      _brokerAcceptedBody('AgentTaskOwnerApprovalGrant', {
+        '状態': 'Owner Approval発行済み',
+        '実行状態': '未実行',
+        '実行系ID': 'codex-a',
+        '対話セッションID': sessionId,
+        '作業領域ID': 'workspace-a',
+        '指示hash': 'sha256:${List<String>.filled(64, 'e').join()}',
+        '実行条件hash': 'sha256:${List<String>.filled(64, 'f').join()}',
+        '適用ポリシー': 'gui-shell-agent-task-sandbox-v1-max-runtime-900s',
+        'expires_at_epoch_seconds': 1900000000,
+        'use_limit': 1,
+        'uses_remaining': 1,
+        'status': 'issued_unconsumed',
+      }),
+      _brokerAcceptedBody('AgentTask実行', {
+        'task_id': '22222222222222222222222222222222',
+        'record_version': 2,
+        'agent_runtime_id': 'codex-a',
+        'session_id': sessionId,
+        'workspace_id': 'workspace-a',
+        'description': 'Agent作業Task（結果本文とWorkspace差分は別の権限経路）',
+        'instruction_hash': 'sha256:${List<String>.filled(64, 'e').join()}',
+        'status': 'running',
+        'audit_event_id': 'audit-a2a-target-task-start',
+        'result_content_available': false,
       }),
     ]);
     final client = await ShellCoreClient.product(transport: transport);
@@ -3368,7 +3409,117 @@ void main() {
       isNot(contains('AgentTaskOwnerApprovalGrant')),
     );
     expect(transport.operations, isNot(contains('AgentTask実行')));
-    expect(find.textContaining('Permission／Approvalは未移送、Taskは未実行'), findsOneWidget);
+    expect(find.textContaining('Permission／Approvalは未移送、Taskは未実行'),
+        findsOneWidget);
+
+    final freshAuthorizationRequests = transport.requests.length;
+    final permissionButton =
+        find.byKey(const ValueKey('agent-task-permission-$sessionId'));
+    await tester.ensureVisible(permissionButton);
+    await tester.tap(permissionButton);
+    await tester.pumpAndSettle();
+    expect(
+      transport.requests.length,
+      freshAuthorizationRequests + 1,
+      reason: 'Workspace PermissionはHandoffとは別に新規要求される',
+    );
+    expect(
+      transport.operations.where((operation) =>
+          operation == 'AgentTaskOwnerApprovalGrant' ||
+          operation == 'AgentTask実行'),
+      isEmpty,
+    );
+    final permissionRequest = transport.requests.singleWhere(
+      (request) => request['operation'] == 'AgentTaskWorkspacePermissionGrant',
+    );
+    expect(permissionRequest['payload'], {
+      'agent_runtime_id': 'codex-a',
+      'session_id': sessionId,
+      'workspace_id': 'workspace-a',
+    });
+    final approvalButton =
+        find.byKey(const ValueKey('agent-task-approval-$sessionId'));
+    expect(approvalButton, findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('agent-task-start-$sessionId')),
+      findsNothing,
+    );
+
+    await tester.ensureVisible(approvalButton);
+    await tester.tap(approvalButton);
+    await tester.pumpAndSettle();
+    expect(
+      transport.requests.length,
+      freshAuthorizationRequests + 2,
+      reason: 'Task Approvalは新規Workspace Permission後にだけ要求される',
+    );
+    expect(transport.operations, isNot(contains('AgentTask実行')));
+    final approvalRequest = transport.requests.singleWhere(
+      (request) => request['operation'] == 'AgentTaskOwnerApprovalGrant',
+    );
+    expect(approvalRequest['payload'], payload);
+    expect(approvalRequest['payload'], isNot(contains('permission_id')));
+    expect(approvalRequest['payload'], isNot(contains('approval_id')));
+    final startButton =
+        find.byKey(const ValueKey('agent-task-start-$sessionId'));
+    expect(startButton, findsOneWidget);
+
+    await tester.ensureVisible(startButton);
+    await tester.tap(startButton);
+    await tester.pumpAndSettle();
+    expect(
+      transport.requests.length,
+      freshAuthorizationRequests + 3,
+      reason: '受領記録は新しいBroker要求やAudit eventを生成しない',
+    );
+    expect(find.text('Task状態: running'), findsOneWidget);
+    final taskOperations = transport.operations.where((operation) => const {
+          'Agent作業要求検査',
+          'AgentTaskWorkspacePermissionGrant',
+          'AgentTaskOwnerApprovalGrant',
+          'AgentTask実行',
+        }.contains(operation));
+    expect(taskOperations, [
+      'Agent作業要求検査',
+      'AgentTaskWorkspacePermissionGrant',
+      'AgentTaskOwnerApprovalGrant',
+      'AgentTask実行',
+    ]);
+    final taskStartRequest = transport.requests.singleWhere(
+      (request) => request['operation'] == 'AgentTask実行',
+    );
+    final startedPayload = taskStartRequest['payload']! as Map;
+    expect(startedPayload['instruction'], instruction);
+    expect(startedPayload, isNot(contains('permission_id')));
+    expect(startedPayload, isNot(contains('approval_id')));
+
+    final receiptTitle = find.text('A2A Artifact受領記録');
+    expect(receiptTitle, findsOneWidget);
+    final receiptSection = find.ancestor(
+      of: receiptTitle,
+      matching: find.byWidgetPredicate(
+        (widget) => widget.runtimeType.toString() == 'SectionList',
+      ),
+    );
+    expect(receiptSection, findsOneWidget);
+    final receiptText = tester
+        .widgetList<Text>(
+          find.descendant(of: receiptSection, matching: find.byType(Text)),
+        )
+        .map((widget) => widget.data ?? '')
+        .join('\n');
+    expect(
+        receiptText, contains('外部Agent／Task: external-agent / remote-task-42'));
+    expect(
+        receiptText, contains('Artifact ID／hash: artifact-1 / $artifactHash'));
+    expect(receiptText, contains('取得Audit: audit-a2a-artifact-retrieval'));
+    expect(
+      receiptText,
+      contains(
+          '受信Session／Task開始Audit: $sessionId / audit-a2a-target-task-start'),
+    );
+    expect(receiptText, contains('権限・Trustは非継承'));
+    expect(receiptText, isNot(contains(artifactText)));
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
@@ -3918,12 +4069,6 @@ void main() {
         'AgentTask状態',
         taskRecord(status: 'completed', resultHash: resultHash),
       ),
-      // Coordinator polling and the explicit UI refresh each consume one
-      // Broker state response; keep the following Approval response aligned.
-      _brokerAcceptedBody(
-        'AgentTask状態',
-        taskRecord(status: 'completed', resultHash: resultHash),
-      ),
       _brokerAcceptedBody('AgentTask結果表示承認', {
         'task_id': taskId,
         'result_hash': resultHash,
@@ -4015,10 +4160,13 @@ void main() {
       findsOneWidget,
     );
     expect(find.textContaining('AGENT_REPORT_PRIVATE_SENTINEL'), findsNothing);
-    final visibilityDropdown = find.byType(DropdownButton<String>).last;
+    final visibilityDropdown =
+        find.byKey(const ValueKey('agent-task-visibility-$sessionId'));
+    expect(visibilityDropdown, findsOneWidget);
     await tester.tap(visibilityDropdown);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('full').last);
+    expect(find.text('full'), findsOneWidget);
+    await tester.tap(find.text('full'));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('native Owner確認後に結果を表示'));
     await tester.tap(find.text('native Owner確認後に結果を表示'));
@@ -4055,7 +4203,7 @@ void main() {
         ]));
     expect(
       transport.operations.where((operation) => operation == 'AgentTask状態'),
-      hasLength(2),
+      hasLength(1),
     );
     final approvalRequest = transport.requests.firstWhere(
       (request) => request['operation'] == 'AgentTaskOwnerApprovalGrant',
