@@ -257,6 +257,59 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('Composeは同じAgent型のRuntime instanceを1行で選択し対応先を維持する', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final transport = _ComposeScreenTransport();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SettingsScreen(
+            client: ShellCoreClient.mock(transport: transport),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _tap(tester, 'compose-runtime-agent-catalog-refresh');
+    expect(find.byKey(const ValueKey('compose-agent-agent.codex')),
+        findsOneWidget);
+    expect(find.textContaining('runtime.local=fixture-model'), findsOneWidget);
+    expect(find.textContaining('runtime.local.secondary=fixture-model-b'),
+        findsOneWidget);
+
+    await _tap(tester, 'compose-runtime-runtime.local');
+    await _tap(tester, 'compose-runtime-runtime.local.secondary');
+    await _tap(tester, 'compose-agent-agent.codex');
+    await _tap(tester, 'compose-manifest-button');
+    expect(transport.lastPayload('GUI Shell構成')['runtime_ids'], [
+      'runtime.local',
+      'runtime.local.secondary',
+    ]);
+    expect(transport.lastPayload('GUI Shell構成')['agent_ids'], ['agent.codex']);
+
+    await _tap(tester, 'compose-runtime-runtime.local');
+    expect(
+      tester
+          .widget<CheckboxListTile>(
+            find.byKey(const ValueKey('compose-agent-agent.codex')),
+          )
+          .value,
+      isTrue,
+    );
+    await _tap(tester, 'compose-manifest-button');
+    expect(transport.lastPayload('GUI Shell構成')['runtime_ids'], [
+      'runtime.local.secondary',
+    ]);
+    expect(transport.lastPayload('GUI Shell構成')['agent_ids'], ['agent.codex']);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 Future<void> _enter(WidgetTester tester, String key, String value) async {
@@ -308,7 +361,7 @@ class _ComposeScreenTransport implements BrokerTransport {
       '更新一覧' => <String, Object?>{'更新一覧': <Object?>[]},
       'GUI Shell構成Catalog' => <String, Object?>{
           'version': 1,
-          'runtime_ids': ['runtime.local'],
+          'runtime_ids': ['runtime.local', 'runtime.local.secondary'],
           'agents': [
             {
               'runtime_id': 'runtime.local',
@@ -318,6 +371,26 @@ class _ComposeScreenTransport implements BrokerTransport {
                 'provider': 'fixture-provider',
                 'version': '1.0.0',
                 'model': 'fixture-model',
+                'status': 'ready',
+                'capabilities': [
+                  {
+                    'capability_id': 'task_execution',
+                    'support': {
+                      'status': 'supported',
+                      'reason': 'fixture compatibility only',
+                    },
+                  },
+                ],
+              },
+            },
+            {
+              'runtime_id': 'runtime.local.secondary',
+              'metadata': {
+                'adapter_id': 'adapter.codex.fixture',
+                'agent_id': 'agent.codex',
+                'provider': 'fixture-provider',
+                'version': '1.0.0',
+                'model': 'fixture-model-b',
                 'status': 'ready',
                 'capabilities': [
                   {

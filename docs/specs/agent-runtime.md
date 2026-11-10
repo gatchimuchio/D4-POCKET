@@ -2,6 +2,12 @@
 
 Agent Runtime は第一級の Runtime type である。Shell Core の Permission、Approval、Audit、Recovery の各 semantics によって制御しなければならない。
 
+## Agent型とRuntime instanceの識別
+
+`adapter_id`と`agent_id`はAdapter／Agentの型識別子であり、起動中の個別接続を識別するものではない。個々の独立起動・接続・Session・Workspaceの束縛にはBrokerが割り当てた`runtime_id`を使う。同じ型のAgentを別Runtime／Session／Workspaceへ複数登録し、Compare等で独立実行できる。Catalogは各`runtime_id`との対応を保持し、型IDの重複だけを理由に独立instanceを拒否してはならない。
+
+一方、同じ`agent_id`を異なる`adapter_id`へ割り当てる型衝突は拒否する。Runtime IDは各Catalog entryで一意でなければならない。ComposeでAgent型を選ぶ場合、選択中Runtimeのうち一つ以上にそのAgent型の`ready`／`degraded` instanceが必要であり、要求Capabilityは選択された該当instanceのいずれかが`supported`を宣言する必要がある。Runtime IDを伴わないAgent型一覧では、metadataが異なる同一型を具体的な能力・模型の主張へ潰さず、型identityだけを保持する保守的summaryへ集約する。Runtimeごとの差異を表示・選択するconsumerはRuntime IDを含むCatalogを使う。
+
 中核 record:
 
 - `AgentRuntime`

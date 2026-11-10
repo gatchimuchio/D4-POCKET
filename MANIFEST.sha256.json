@@ -304,7 +304,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/settings.dart",
-      "sha256": "2404b632ae32305952c5f3ddc8e2c658e380b44c655ef50877591006eb732367"
+      "sha256": "37448414a310bedb32de34d5771f6109f55ee5d19ba7663b5500cd76b6f3c4f0"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/setup_doctor.dart",
@@ -364,7 +364,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/compose_client.dart",
-      "sha256": "0c2853b2135c94b0d04c6db3be91a22bce6626b8391085b841e536e658422475"
+      "sha256": "b22a16feff3674d9e32ab6b32705433308e3e4ba78f6a5620a49a5613d7d6533"
     },
     {
       "path": "apps/desktop_flutter/lib/services/evaluation_client.dart",
@@ -652,7 +652,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/compose_client_test.dart",
-      "sha256": "1bbdd5d3a20c0d0753e9919add041b7868a3f35ccf9befd1320c4bdfaff2f021"
+      "sha256": "c90817f391b28ff2bb9c2fe5f5221751709303dc2eb6cae375e05352ed1ce934"
     },
     {
       "path": "apps/desktop_flutter/test/evaluation_lab_test.dart",
@@ -720,7 +720,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/settings_compose_test.dart",
-      "sha256": "5c6a4e362ecc8cbeb869e6ba3652686593f02b714c2a2ea0795c4273ca2e833b"
+      "sha256": "ba1fff334434dcc96bb5f0e77945aaaabbf0ea73e96ab919d6884df94090df5f"
     },
     {
       "path": "apps/desktop_flutter/test/settings_install_flow_test.dart",
@@ -1436,7 +1436,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "34152e27f6738d82c9a930a40941fbcd726dffa57feec2b318155841492a5104"
+      "sha256": "7fb380f7f7b470e327651624af5cb55f66e5601ca3f13a7d97cc621d54242183"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1564,7 +1564,7 @@
     },
     {
       "path": "docs/specs/agent-runtime.md",
-      "sha256": "b901d94bcdc4826d2a66088e484a58692f0a9bcf997fbbe3d0b6e84d78efba21"
+      "sha256": "65189be6d91042b687254bc13131aa3e591e987a9d0c644514f686ea54c815d6"
     },
     {
       "path": "docs/specs/agent-task-history.md",
@@ -3712,7 +3712,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/compose_center.rs",
-      "sha256": "8446ebbe4a2379d305a8f1f6402172921dbd720b4349482a2caae0a8b24e713f"
+      "sha256": "ad5a30d77f2fda5327afc2e555fb208358099591d0922b42c0c9c6e985ef0670"
     },
     {
       "path": "native/rust_helper/src/broker/content_access.rs",
@@ -3760,7 +3760,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/dialogue.rs",
-      "sha256": "55b71c2f395b7d0d14171662e4ac678136b4d3c45f155c08c45548b094ddc621"
+      "sha256": "afc303a45bf8399684210e35f3f42a77ddedd9d16654c8e790619192c3c0058f"
     },
     {
       "path": "native/rust_helper/src/broker/evaluation_control.rs",

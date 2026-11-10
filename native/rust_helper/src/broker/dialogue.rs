@@ -398,20 +398,31 @@ fn agent_support_valid(value: &AgentSupportMetadata) -> bool {
         && agent_text_valid(&value.reason)
 }
 
+fn record_agent_type_binding(
+    bindings: &mut BTreeMap<String, String>,
+    metadata: &AgentAdapterMetadata,
+) -> Result<(), 対話失敗> {
+    match bindings.get(&metadata.agent_id) {
+        Some(adapter_id) if adapter_id != &metadata.adapter_id => Err(対話失敗::応答不正),
+        Some(_) => Ok(()),
+        None => {
+            bindings.insert(metadata.agent_id.clone(), metadata.adapter_id.clone());
+            Ok(())
+        }
+    }
+}
+
 fn agent_adapter_projection(
     adapters: &BTreeMap<String, Arc<dyn 実行系Adapter>>,
 ) -> Result<Vec<(String, Value)>, 対話失敗> {
-    let mut adapter_ids = BTreeSet::new();
-    let mut agent_ids = BTreeSet::new();
+    let mut agent_type_bindings = BTreeMap::new();
     let mut projection = Vec::new();
     for (runtime_id, adapter) in adapters {
         let Some(metadata) = adapter.agent_metadata() else {
             continue;
         };
         let validated = AgentAdapterMetadata::read(&metadata)?;
-        if !adapter_ids.insert(validated.adapter_id) || !agent_ids.insert(validated.agent_id) {
-            return Err(対話失敗::応答不正);
-        }
+        record_agent_type_binding(&mut agent_type_bindings, &validated)?;
         projection.push((runtime_id.clone(), metadata));
     }
     Ok(projection)
@@ -420,10 +431,79 @@ fn agent_adapter_projection(
 fn agent_metadata_projection(
     adapters: &BTreeMap<String, Arc<dyn 実行系Adapter>>,
 ) -> Result<Vec<Value>, 対話失敗> {
-    Ok(agent_adapter_projection(adapters)?
-        .into_iter()
-        .map(|(_, metadata)| metadata)
-        .collect())
+    let mut by_agent_type = BTreeMap::<String, Vec<Value>>::new();
+    for (_, metadata) in agent_adapter_projection(adapters)? {
+        let validated = AgentAdapterMetadata::read(&metadata)?;
+        by_agent_type
+            .entry(validated.agent_id)
+            .or_default()
+            .push(metadata);
+    }
+    by_agent_type
+        .into_values()
+        .map(|records| {
+            let Some(first) = records.first() else {
+                return Err(対話失敗::応答不正);
+            };
+            if records.iter().all(|metadata| metadata == first) {
+                return Ok(first.clone());
+            }
+
+            let identity = AgentAdapterMetadata::read(first)?;
+            for metadata in records.iter().skip(1) {
+                let candidate = AgentAdapterMetadata::read(metadata)?;
+                if candidate.adapter_id != identity.adapter_id
+                    || candidate.agent_id != identity.agent_id
+                    || candidate.provider != identity.provider
+                    || candidate.provider_id != identity.provider_id
+                {
+                    return Err(対話失敗::応答不正);
+                }
+            }
+
+            // Agent一覧はRuntime IDを持たない型単位の表示であるため、
+            // instance metadataの相違を具体的な能力・模型の主張へ潰さない。
+            // 型identityだけを保持した保守的summaryへ正規化する。
+            let reason = "複数Runtimeのmetadata差異を型一覧で個別表示できないため不明";
+            let unknown = json!({"status":"unknown", "reason":reason});
+            let summary = json!({
+                "adapter_id": identity.adapter_id,
+                "agent_id": identity.agent_id,
+                "provider": identity.provider,
+                "provider_id": identity.provider_id,
+                "version": "unknown",
+                "model": "unknown",
+                "status": "degraded",
+                "capabilities": [],
+                "workspace_requirements": {
+                    "mode": "required",
+                    "boundary_policy": "deny_outside_workspace",
+                    "secret_paths": []
+                },
+                "provider_health": unknown.clone(),
+                "tool_support": unknown.clone(),
+                "mcp_support": unknown.clone(),
+                "session_support": unknown.clone(),
+                "cancellation_support": unknown.clone(),
+                "usage_metrics_support": unknown.clone(),
+                "cost_metrics_support": unknown.clone(),
+                "authentication": {
+                    "method": "unknown",
+                    "status": "unknown",
+                    "secret_value_present": false
+                },
+                "host_requirements": {
+                    "platforms": ["unknown"],
+                    "network_scope": "unknown",
+                    "process_spawn": unknown
+                },
+                "evidence_source": "INTERNAL_STATE",
+                "evidence_reason": reason
+            });
+            AgentAdapterMetadata::read(&summary)?;
+            Ok(summary)
+        })
+        .collect()
 }
 
 pub(super) struct ComposeAgentCatalogEntry {
@@ -815,8 +895,7 @@ fn Agent実行系ID取得(
         .values()
         .map(|session| session.実行系ID.as_str())
         .collect::<BTreeSet<_>>();
-    let mut adapter_ids = BTreeSet::new();
-    let mut agent_ids = BTreeSet::new();
+    let mut agent_type_bindings = BTreeMap::new();
     let mut agent_runtime_ids = BTreeSet::new();
     for runtime_id in candidates {
         let Some(adapter) = adapters.get(runtime_id) else {
@@ -826,9 +905,7 @@ fn Agent実行系ID取得(
             continue;
         };
         let validated = AgentAdapterMetadata::read(&metadata)?;
-        if !adapter_ids.insert(validated.adapter_id) || !agent_ids.insert(validated.agent_id) {
-            return Err(対話失敗::応答不正);
-        }
+        record_agent_type_binding(&mut agent_type_bindings, &validated)?;
         agent_runtime_ids.insert(runtime_id.to_owned());
     }
     Ok(agent_runtime_ids)
@@ -3479,6 +3556,37 @@ mod tests {
             対話開始監査hash(&session.対話セッションID, &session.実行系ID),
             sha256_tagged(legacy_body.to_string().as_bytes())
         );
+    }
+
+    struct 型metadata差分試験Adapter {
+        model: String,
+    }
+
+    impl 実行系Adapter for 型metadata差分試験Adapter {
+        fn 接続対象(&self) -> String {
+            "複数Runtime metadata試験専用".into()
+        }
+
+        fn agent_metadata(&self) -> Option<Value> {
+            let mut metadata: Value = serde_json::from_str(include_str!(
+                "../../../../examples/contracts/agent_adapter.valid.json"
+            ))
+            .expect("Agent接続例を読み込む");
+            metadata["adapter_id"] = json!("dialogue-test-adapter");
+            metadata["agent_id"] = json!("dialogue-test-agent");
+            metadata["model"] = json!(self.model);
+            Some(metadata)
+        }
+
+        fn 応答(
+            &self,
+            _request: &対話要求,
+            _cancel: &AtomicBool,
+            _deadline: Instant,
+            _raw_received: &mut Vec<Vec<u8>>,
+        ) -> Result<実行結果, 対話失敗> {
+            Err(対話失敗::AgentTask非対応)
+        }
     }
 
     struct 試験Adapter {
@@ -6237,6 +6345,68 @@ mod tests {
         assert_eq!(
             操作(&mut c, "対話開始", json!({"実行系ID":"left"}), false),
             Err(対話失敗::要求不正)
+        );
+    }
+
+    #[test]
+    fn 同じAgent型の複数Runtimeを別個に一覧表示しAgent型一覧は重複しない() {
+        let (mut c, left_calls) = 準備(false, false, false);
+        let right_calls = Arc::new(AtomicUsize::new(0));
+        c.登録(
+            "right",
+            Arc::new(試験Adapter {
+                回数: right_calls.clone(),
+                provider_credential_id: None,
+                provider_credential_forward_count: None,
+                失敗: false,
+                別session: false,
+                遅延: false,
+                Agentmetadata有効: true,
+            }),
+        )
+        .unwrap();
+
+        let left_session = 開始(&mut c, "left");
+        let right_session = 開始(&mut c, "right");
+        let sessions = 操作(&mut c, "対話セッション一覧", json!({}), false).unwrap();
+        let listed_sessions = sessions["対話セッション"].as_array().unwrap();
+        assert_eq!(listed_sessions.len(), 2);
+        assert!(listed_sessions.iter().any(|session| {
+            session["対話セッションID"] == left_session && session["実行系ID"] == "left"
+        }));
+        assert!(listed_sessions.iter().any(|session| {
+            session["対話セッションID"] == right_session && session["実行系ID"] == "right"
+        }));
+
+        let agents = 操作(&mut c, "Agent一覧", json!({}), false).unwrap();
+        assert_eq!(agents["Agent"].as_array().unwrap().len(), 1);
+        assert_eq!(agents["Agent"][0]["agent_id"], "dialogue-test-agent");
+        assert_eq!(left_calls.load(Ordering::SeqCst), 0);
+        assert_eq!(right_calls.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn Agent型一覧はRuntimeごとに異なる模型metadataを不明summaryへ集約する() {
+        let (mut c, _) = 準備(false, false, false);
+        c.登録(
+            "right",
+            Arc::new(型metadata差分試験Adapter {
+                model: "another-model".into(),
+            }),
+        )
+        .unwrap();
+
+        let agents = 操作(&mut c, "Agent一覧", json!({}), false).unwrap();
+        let agent_types = agents["Agent"].as_array().unwrap();
+        assert_eq!(agent_types.len(), 1);
+        assert_eq!(agent_types[0]["agent_id"], "dialogue-test-agent");
+        assert_eq!(agent_types[0]["adapter_id"], "dialogue-test-adapter");
+        assert_eq!(agent_types[0]["model"], "unknown");
+        assert_eq!(agent_types[0]["status"], "degraded");
+        assert_eq!(agent_types[0]["capabilities"], json!([]));
+        assert_eq!(
+            agent_types[0]["authentication"]["secret_value_present"],
+            false
         );
     }
 

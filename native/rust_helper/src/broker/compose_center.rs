@@ -468,48 +468,49 @@ pub(super) fn validate_catalog_selection(
     {
         return Err("選択したRuntimeが現在のBroker登録Catalogにありません".to_string());
     }
-    let agents_by_id = runtime_agent_catalog
-        .agents
-        .iter()
-        .filter_map(|entry| {
-            entry
-                .metadata
-                .get("agent_id")
-                .and_then(Value::as_str)
-                .map(|agent_id| (agent_id, entry))
-        })
-        .collect::<BTreeMap<_, _>>();
-    let mut selected_agents = Vec::with_capacity(manifest.agent_ids.len());
+    let mut agents_by_id: BTreeMap<&str, Vec<_>> = BTreeMap::new();
+    for entry in &runtime_agent_catalog.agents {
+        if let Some(agent_id) = entry.metadata.get("agent_id").and_then(Value::as_str) {
+            agents_by_id.entry(agent_id).or_default().push(entry);
+        }
+    }
+    let mut selected_agent_instances = Vec::with_capacity(manifest.agent_ids.len());
     for agent_id in &manifest.agent_ids {
-        let entry = agents_by_id
+        let entries = agents_by_id
             .get(agent_id.as_str())
             .ok_or_else(|| "選択したAgentが現在のBroker登録Catalogにありません".to_string())?;
-        if !available_runtime_ids.contains(entry.runtime_id.as_str())
-            || !manifest.runtime_ids.contains(&entry.runtime_id)
-        {
+        let selected_instances = entries
+            .iter()
+            .copied()
+            .filter(|entry| {
+                available_runtime_ids.contains(entry.runtime_id.as_str())
+                    && manifest.runtime_ids.contains(&entry.runtime_id)
+                    && matches!(
+                        entry.metadata["status"].as_str(),
+                        Some("ready" | "degraded")
+                    )
+            })
+            .collect::<Vec<_>>();
+        if selected_instances.is_empty() {
             return Err("選択Agentに対応する現在Runtimeが構成へ含まれていません".to_string());
         }
-        if !matches!(
-            entry.metadata["status"].as_str(),
-            Some("ready" | "degraded")
-        ) {
-            return Err("選択Agentは現在の構成対象として利用可能状態ではありません".to_string());
-        }
-        selected_agents.push(*entry);
+        selected_agent_instances.push(selected_instances);
     }
-    if !manifest.capability_requirements.is_empty() && selected_agents.is_empty() {
+    if !manifest.capability_requirements.is_empty() && selected_agent_instances.is_empty() {
         return Err("Capability互換条件には少なくとも1つの現在Agent選択が必要です".to_string());
     }
     for capability_id in &manifest.capability_requirements {
-        for agent in &selected_agents {
-            let supported = agent.metadata["capabilities"]
-                .as_array()
-                .is_some_and(|capabilities| {
-                    capabilities.iter().any(|capability| {
-                        capability["capability_id"].as_str() == Some(capability_id)
-                            && capability["support"]["status"].as_str() == Some("supported")
+        for instances in &selected_agent_instances {
+            let supported = instances.iter().any(|agent| {
+                agent.metadata["capabilities"]
+                    .as_array()
+                    .is_some_and(|capabilities| {
+                        capabilities.iter().any(|capability| {
+                            capability["capability_id"].as_str() == Some(capability_id)
+                                && capability["support"]["status"].as_str() == Some("supported")
+                        })
                     })
-                });
+            });
             if !supported {
                 return Err(format!(
                     "選択AgentがCapability互換条件をsupportedとして宣言していません: {capability_id}"
@@ -759,16 +760,33 @@ mod tests {
         agent_id: &str,
         capability_status: &str,
     ) {
+        register_agent_with_model(
+            broker,
+            runtime_id,
+            agent_id,
+            capability_status,
+            "fixture-model",
+        );
+    }
+
+    fn register_agent_with_model(
+        broker: &mut Broker,
+        runtime_id: &str,
+        agent_id: &str,
+        capability_status: &str,
+        model: &str,
+    ) {
         let mut metadata: Value = serde_json::from_str(include_str!(
             "../../../../examples/contracts/agent_adapter.valid.json"
         ))
-        .expect("Agent Adapter fixture");
+        .expect("Agent Adapter試験資料");
         metadata["adapter_id"] = json!(format!("{agent_id}-adapter"));
         metadata["agent_id"] = json!(agent_id);
+        metadata["model"] = json!(model);
         metadata["status"] = json!("ready");
         metadata["capabilities"] = json!([{
             "capability_id": "task_execution",
-            "support": {"status": capability_status, "reason": "Compose compatibility fixture"}
+            "support": {"status": capability_status, "reason": "Compose互換性試験"}
         }]);
         broker
             .実行系登録(
@@ -869,6 +887,51 @@ mod tests {
     }
 
     #[test]
+    fn ComposeCatalogは同じAgent型を複数Runtimeに対応付ける() {
+        let mut broker = Broker::new("session-1");
+        register_agent_with_model(&mut broker, "codex-a", "codex", "supported", "model-a");
+        register_agent_with_model(&mut broker, "codex-b", "codex", "supported", "model-b");
+
+        let response = call_catalog(&mut broker, json!({}));
+        assert_eq!(response.status, BrokerStatus::Accepted);
+        let body = response.body.expect("複数Runtime Catalog本文");
+        assert_eq!(body["runtime_ids"], json!(["codex-a", "codex-b"]));
+        assert_eq!(body["agents"].as_array().unwrap().len(), 2);
+        assert_eq!(body["agents"][0]["runtime_id"], "codex-a");
+        assert_eq!(body["agents"][1]["runtime_id"], "codex-b");
+        assert_eq!(body["agents"][0]["metadata"]["adapter_id"], "codex-adapter");
+        assert_eq!(body["agents"][1]["metadata"]["agent_id"], "codex");
+        assert_eq!(body["agents"][0]["metadata"]["model"], "model-a");
+        assert_eq!(body["agents"][1]["metadata"]["model"], "model-b");
+        assert_eq!(body["authority_strip"], true);
+        assert_eq!(body["permission_generated"], false);
+    }
+
+    #[test]
+    fn ComposeCatalogは同じAgentIDを異なるAdapter型のRuntimeへ束縛する登録を拒否する() {
+        let mut broker = Broker::new("session-1");
+        register_agent(&mut broker, "codex-a", "codex", "supported");
+        let mut metadata: Value = serde_json::from_str(include_str!(
+            "../../../../examples/contracts/agent_adapter.valid.json"
+        ))
+        .expect("Agent Adapter試験資料");
+        metadata["adapter_id"] = json!("unrelated-adapter");
+        metadata["agent_id"] = json!("codex");
+        broker
+            .実行系登録(
+                "other-runtime",
+                Arc::new(ComposeCatalogAdapter {
+                    metadata: Some(metadata),
+                }),
+            )
+            .expect("別Runtime登録自体は成功");
+
+        let response = call_catalog(&mut broker, json!({}));
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(response.body, None);
+    }
+
+    #[test]
     fn ComposeCatalogは投影上限を超えるRuntime一覧を拒否する() {
         let mut broker = Broker::new("session-1");
         for index in 0..65 {
@@ -933,6 +996,33 @@ mod tests {
         assert_eq!(
             call(&mut unsupported, unsupported_requirement).status,
             BrokerStatus::Rejected
+        );
+    }
+
+    #[test]
+    fn Composeは選択した複数Runtimeの同一Agent型から利用可能な対応先を解決する() {
+        let mut broker = Broker::new("session-1");
+        register_agent(&mut broker, "codex-a", "codex", "supported");
+        register_agent(&mut broker, "codex-b", "codex", "unknown");
+
+        let mut supported_instance = manifest();
+        supported_instance["runtime_ids"] = json!(["codex-a"]);
+        supported_instance["agent_ids"] = json!(["codex"]);
+        supported_instance["capability_requirements"] = json!(["task_execution"]);
+        assert_eq!(
+            call(&mut broker, supported_instance).status,
+            BrokerStatus::Accepted,
+            "未選択instanceのmetadataが選択instanceへ干渉しない"
+        );
+
+        let mut unknown_instance = manifest();
+        unknown_instance["runtime_ids"] = json!(["codex-b"]);
+        unknown_instance["agent_ids"] = json!(["codex"]);
+        unknown_instance["capability_requirements"] = json!(["task_execution"]);
+        assert_eq!(
+            call(&mut broker, unknown_instance).status,
+            BrokerStatus::Rejected,
+            "選択instance自身がCapabilityをsupportedと宣言しない場合は拒否する"
         );
     }
 

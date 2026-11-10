@@ -83,6 +83,63 @@ void main() {
     expect(receipt['version_preview'], isA<Map>());
   });
 
+  test('Compose Catalogは同じAgent型の別Runtime instanceを保持する', () async {
+    final transport = _FakeComposeTransport(_catalogResponse(
+      runtimeIds: const ['codex-a', 'codex-b'],
+      agents: [
+        _agentEntry(
+          'codex-a',
+          adapterId: 'codex-cli',
+          agentId: 'codex',
+          model: 'model-a',
+        ),
+        _agentEntry(
+          'codex-b',
+          adapterId: 'codex-cli',
+          agentId: 'codex',
+          model: 'model-b',
+        ),
+      ],
+    ));
+
+    final catalog = await ComposeClient(transport).refreshRuntimeAgentCatalog();
+
+    expect(catalog.runtimeIds, ['codex-a', 'codex-b']);
+    expect(catalog.agents, hasLength(2));
+    expect(
+        catalog.agents.map((entry) => entry.runtimeId), ['codex-a', 'codex-b']);
+    expect(
+        catalog.agents.map((entry) => entry.agent.agentId), ['codex', 'codex']);
+    expect(catalog.agents.map((entry) => entry.agent.model),
+        ['model-a', 'model-b']);
+  });
+
+  test('Compose CatalogはRuntime重複とAgent型IDの別Adapter衝突を拒否する', () async {
+    final duplicateRuntime = _FakeComposeTransport(_catalogResponse(
+      runtimeIds: const ['codex-a'],
+      agents: [
+        _agentEntry('codex-a', adapterId: 'codex-cli', agentId: 'codex'),
+        _agentEntry('codex-a', adapterId: 'codex-cli', agentId: 'codex'),
+      ],
+    ));
+    await expectLater(
+      ComposeClient(duplicateRuntime).refreshRuntimeAgentCatalog(),
+      throwsA(isA<BrokerClientException>()),
+    );
+
+    final conflictingAgentType = _FakeComposeTransport(_catalogResponse(
+      runtimeIds: const ['codex-a', 'other'],
+      agents: [
+        _agentEntry('codex-a', adapterId: 'codex-cli', agentId: 'codex'),
+        _agentEntry('other', adapterId: 'other-adapter', agentId: 'codex'),
+      ],
+    ));
+    await expectLater(
+      ComposeClient(conflictingAgentType).refreshRuntimeAgentCatalog(),
+      throwsA(isA<BrokerClientException>()),
+    );
+  });
+
   test('構成参照IDは空行と前後空白だけを整理し重複はBroker検証へ残す', () {
     expect(
       composeReferenceIdsFromLines(
@@ -125,6 +182,43 @@ void main() {
     });
   });
 }
+
+Map<String, Object?> _catalogResponse({
+  required List<String> runtimeIds,
+  required List<Map<String, Object?>> agents,
+}) =>
+    {
+      'status': 'accepted',
+      'operation': 'GUI Shell構成Catalog',
+      'evidence_source': 'INTERNAL_STATE',
+      'body': {
+        'version': 1,
+        'runtime_ids': runtimeIds,
+        'agents': agents,
+        'evidence_source': 'INTERNAL_STATE',
+        'authority_strip': true,
+        'permission_generated': false,
+      },
+    };
+
+Map<String, Object?> _agentEntry(
+  String runtimeId, {
+  required String adapterId,
+  required String agentId,
+  String model = 'fixture-model',
+}) =>
+    {
+      'runtime_id': runtimeId,
+      'metadata': {
+        'adapter_id': adapterId,
+        'agent_id': agentId,
+        'provider': 'OpenAI',
+        'version': '1.0.0',
+        'model': model,
+        'status': 'ready',
+        'capabilities': <Object?>[],
+      },
+    };
 
 class _FakeComposeTransport implements BrokerTransport {
   _FakeComposeTransport(this.response);

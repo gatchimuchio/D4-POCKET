@@ -524,6 +524,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _composeRuntimeAgentCatalogPanel() {
     final client = _composeClient;
+    final agentsById = <String, List<ComposeAgentCatalogEntry>>{};
+    for (final entry in _composeAgentCatalog) {
+      agentsById.putIfAbsent(entry.agent.agentId, () => []).add(entry);
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -572,21 +576,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Text('Agent metadataを公開するRuntimeはありません。'),
             )
           else
-            for (final entry in _composeAgentCatalog)
+            for (final group in agentsById.entries)
               CheckboxListTile(
-                key: ValueKey('compose-agent-${entry.agent.agentId}'),
+                key: ValueKey('compose-agent-${group.key}'),
                 contentPadding: const EdgeInsets.only(left: 24),
-                value: _selectedComposeAgentIds.contains(entry.agent.agentId),
-                onChanged:
-                    !const {'ready', 'degraded'}.contains(entry.agent.status)
-                        ? null
-                        : (selected) => _setComposeAgentSelected(
-                              entry,
-                              selected ?? false,
-                            ),
-                title: Text('${entry.agent.agentId} (${entry.agent.provider})'),
+                value: _selectedComposeAgentIds.contains(group.key),
+                onChanged: !group.value.any(
+                  (entry) =>
+                      const {'ready', 'degraded'}.contains(entry.agent.status),
+                )
+                    ? null
+                    : (selected) =>
+                        _setComposeAgentSelected(group.key, selected ?? false),
+                title:
+                    Text('${group.key} (${group.value.first.agent.provider})'),
                 subtitle: Text(
-                  'Runtime: ${entry.runtimeId} / Model: ${entry.agent.model} / 状態: ${entry.agent.status} / Capability: ${entry.agent.capabilities.map((capability) => '${capability.capabilityId}=${capability.status}').join(', ')} / metadataは未信頼',
+                  'Runtime／Model／状態: ${group.value.map((entry) => '${entry.runtimeId}=${entry.agent.model} (${entry.agent.status})').join(' / ')} / Capability: ${group.value.first.agent.capabilities.map((capability) => '${capability.capabilityId}=${capability.status}').join(', ')} / metadataは未信頼',
                 ),
                 controlAffinity: ListTileControlAffinity.leading,
               ),
@@ -602,25 +607,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
       } else {
         _selectedComposeRuntimeIds.remove(runtimeId);
         _selectedComposeAgentIds.removeWhere(
-          (agentId) => _composeAgentCatalog.any(
+          (agentId) => !_composeAgentCatalog.any(
             (entry) =>
-                entry.agent.agentId == agentId && entry.runtimeId == runtimeId,
+                entry.agent.agentId == agentId &&
+                _selectedComposeRuntimeIds.contains(entry.runtimeId) &&
+                const {'ready', 'degraded'}.contains(entry.agent.status),
           ),
         );
       }
     });
   }
 
-  void _setComposeAgentSelected(
-    ComposeAgentCatalogEntry entry,
-    bool selected,
-  ) {
+  void _setComposeAgentSelected(String agentId, bool selected) {
     setState(() {
       if (selected) {
-        _selectedComposeRuntimeIds.add(entry.runtimeId);
-        _selectedComposeAgentIds.add(entry.agent.agentId);
+        final compatibleEntries = _composeAgentCatalog
+            .where(
+              (entry) =>
+                  entry.agent.agentId == agentId &&
+                  const {'ready', 'degraded'}.contains(entry.agent.status),
+            )
+            .toList(growable: false);
+        if (compatibleEntries.isEmpty) return;
+        if (!compatibleEntries.any(
+          (entry) => _selectedComposeRuntimeIds.contains(entry.runtimeId),
+        )) {
+          _selectedComposeRuntimeIds.add(compatibleEntries.first.runtimeId);
+        }
+        _selectedComposeAgentIds.add(agentId);
       } else {
-        _selectedComposeAgentIds.remove(entry.agent.agentId);
+        _selectedComposeAgentIds.remove(agentId);
       }
     });
   }
@@ -642,18 +658,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _selectedComposeRuntimeIds.removeWhere(
           (runtimeId) => !availableRuntimeIds.contains(runtimeId),
         );
-        final agentsById = {
-          for (final entry in catalog.agents) entry.agent.agentId: entry,
-        };
         _selectedComposeAgentIds.removeWhere((agentId) {
-          final entry = agentsById[agentId];
-          return entry == null ||
-              !_selectedComposeRuntimeIds.contains(entry.runtimeId) ||
-              !const {'ready', 'degraded'}.contains(entry.agent.status);
+          return !catalog.agents.any(
+            (entry) =>
+                entry.agent.agentId == agentId &&
+                _selectedComposeRuntimeIds.contains(entry.runtimeId) &&
+                const {'ready', 'degraded'}.contains(entry.agent.status),
+          );
         });
         _composeRuntimeAgentCatalogLoaded = true;
+        final agentTypeCount =
+            catalog.agents.map((entry) => entry.agent.agentId).toSet().length;
         _composeRuntimeAgentCatalogMessage =
-            'BrokerからRuntime ${catalog.runtimeIds.length}件、Agent ${catalog.agents.length}件を取得しました。Compose時にもBrokerが現在登録を再照合します。';
+            'BrokerからRuntime ${catalog.runtimeIds.length}件、Agent型 $agentTypeCount件／Runtime対応 ${catalog.agents.length}件を取得しました。Compose時にもBrokerが現在登録を再照合します。';
       });
     } catch (_) {
       if (!mounted) return;

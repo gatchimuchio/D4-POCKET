@@ -80,8 +80,7 @@ class ComposeClient {
       runtimeIds.add(value);
     }
     final agents = <ComposeAgentCatalogEntry>[];
-    final agentIds = <String>{};
-    final adapterIds = <String>{};
+    final adapterByAgentId = <String, String>{};
     final agentRuntimeIds = <String>{};
     for (final value in rawAgents) {
       if (value is! Map) {
@@ -101,10 +100,13 @@ class ComposeClient {
       final agent = AgentAdapterRecord.fromJson(
         Map<String, Object?>.from(metadata),
       );
+      final existingAdapterId = adapterByAgentId.putIfAbsent(
+        agent.agentId,
+        () => agent.adapterId,
+      );
       if (agent.agentId.isEmpty ||
           agent.adapterId.isEmpty ||
-          !agentIds.add(agent.agentId) ||
-          !adapterIds.add(agent.adapterId) ||
+          existingAdapterId != agent.adapterId ||
           !agentRuntimeIds.add(runtimeId) ||
           !const {'ready', 'degraded', 'unavailable', 'unsupported'}
               .contains(agent.status)) {
