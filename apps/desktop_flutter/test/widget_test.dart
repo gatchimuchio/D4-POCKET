@@ -3291,11 +3291,14 @@ void main() {
     expect(find.textContaining('Task実行・状態は未接続'), findsNothing);
   });
 
-  testWidgets('AI Editの別Task受渡しは固定proposalをBroker事前検査だけへ送る',
+  testWidgets('AI Editの別Taskは固定proposalを事前検査し個別認可後に実行する',
       (WidgetTester tester) async {
     const sessionId = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    const taskId = 'cccccccccccccccccccccccccccccccc';
     const runtimeId = 'codex-r2-synthetic';
     const workspaceId = 'workspace-r2-synthetic';
+    const resultHash =
+        'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
     final proposalInstruction = jsonEncode({
       'context_type': 'gui_shell_ai_edit_proposal',
       'proposal': {
@@ -3325,6 +3328,19 @@ void main() {
       'instruction': proposalInstruction,
     };
     final taskInstructionHash = brokerPayloadHash(taskPayload);
+    Map<String, Object?> taskRecord({required String status}) => {
+          'task_id': taskId,
+          'record_version': 2,
+          'agent_runtime_id': runtimeId,
+          'session_id': sessionId,
+          'workspace_id': workspaceId,
+          'description': 'Agent作業Task（結果本文とWorkspace差分は別の権限経路）',
+          'instruction_hash': taskInstructionHash,
+          'status': status,
+          'audit_event_id': 'audit-ai-edit-task-$status',
+          if (status == 'completed') 'result_hash': resultHash,
+          'result_content_available': status == 'completed',
+        };
     final transport = _FakeBrokerTransport([
       _brokerHealthResponse(),
       _brokerHostCapabilityResponse(),
@@ -3384,6 +3400,39 @@ void main() {
         '作業領域ID': workspaceId,
         '指示hash': taskInstructionHash,
       }),
+      _brokerAcceptedBody('AgentTaskWorkspacePermissionGrant', {
+        'permission_id': 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+        'agent_runtime_id': runtimeId,
+        'session_id': sessionId,
+        'workspace_id': workspaceId,
+        'workspace_registration_hash':
+            'sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+        'operation': 'agent_task.execute',
+        'scope': 'session_workspace_once',
+        'decision': 'allow',
+        'source': 'owner',
+        'expires_at_epoch_seconds': 1900000000,
+        'use_limit': 1,
+        'uses_remaining': 1,
+        'status': 'active',
+      }),
+      _brokerAcceptedBody('AgentTaskOwnerApprovalGrant', {
+        '状態': 'Owner Approval発行済み',
+        '実行状態': '未実行',
+        '実行系ID': runtimeId,
+        '対話セッションID': sessionId,
+        '作業領域ID': workspaceId,
+        '指示hash': taskInstructionHash,
+        '実行条件hash': resultHash,
+        '適用ポリシー': 'gui-shell-agent-task-sandbox-v1-max-runtime-900s',
+        'expires_at_epoch_seconds': 1900000000,
+        'use_limit': 1,
+        'uses_remaining': 1,
+        'status': 'issued_unconsumed',
+      }),
+      _brokerAcceptedBody('AgentTask実行', taskRecord(status: 'running')),
+      _brokerAcceptedBody('AgentTask状態', taskRecord(status: 'completed')),
+      _brokerAcceptedBody('AgentTask状態', taskRecord(status: 'completed')),
     ]);
     final client = await ShellCoreClient.product(transport: transport);
     String? pendingInstruction = proposalInstruction;
@@ -3505,6 +3554,78 @@ void main() {
     expect(transport.operations, isNot(contains('AgentTask実行')));
     expect(find.textContaining('Permission=未付与'), findsOneWidget);
     expect(find.textContaining('Approval=未取得'), findsOneWidget);
+
+    final permissionButton = find.text('Workspace PermissionのOwner確認');
+    expect(permissionButton, findsOneWidget);
+    expect(find.text('Task一回ApprovalのOwner確認'), findsNothing);
+    await tester.ensureVisible(permissionButton);
+    await tester.tap(permissionButton);
+    await tester.pumpAndSettle();
+    final approvalButton = find.text('Task一回ApprovalのOwner確認');
+    expect(approvalButton, findsOneWidget);
+    final taskStartButton = find.text('Taskを一回実行');
+    expect(taskStartButton, findsNothing);
+    await tester.ensureVisible(approvalButton);
+    await tester.tap(approvalButton);
+    await tester.pumpAndSettle();
+    expect(taskStartButton, findsOneWidget);
+    expect(
+      transport.operations,
+      isNot(contains('AgentTask実行')),
+      reason: '独立Owner Approvalを行う前にTaskを開始しない',
+    );
+
+    await tester.ensureVisible(taskStartButton);
+    await tester.tap(taskStartButton);
+    await tester.pumpAndSettle();
+    expect(find.text('タスク: running（Task ID $taskId）'), findsOneWidget);
+    expect(pendingInstruction, isNull);
+    expect(find.textContaining(proposalInstruction), findsNothing);
+    final permissionRequests = transport.requests
+        .where((request) =>
+            request['operation'] == 'AgentTaskWorkspacePermissionGrant')
+        .toList(growable: false);
+    expect(permissionRequests, hasLength(1));
+    final permissionPayload = permissionRequests.single['payload']! as Map;
+    expect(permissionPayload, {
+      'agent_runtime_id': runtimeId,
+      'session_id': sessionId,
+      'workspace_id': workspaceId,
+    });
+    final approvalRequests = transport.requests
+        .where((request) =>
+            request['operation'] == 'AgentTaskOwnerApprovalGrant')
+        .toList(growable: false);
+    expect(approvalRequests, hasLength(1));
+    expect(approvalRequests.single['payload'], taskPayload);
+    final taskStartRequests = transport.requests
+        .where((request) => request['operation'] == 'AgentTask実行')
+        .toList(growable: false);
+    expect(taskStartRequests, hasLength(1));
+    final startedTask = taskStartRequests.single['payload']! as Map;
+    expect(startedTask['agent_runtime_id'], runtimeId);
+    expect(startedTask['session_id'], sessionId);
+    expect(startedTask['workspace_id'], workspaceId);
+    expect(startedTask['instruction'], proposalInstruction);
+    expect(startedTask, hasLength(taskPayload.length));
+
+    final statusButton = find.text('Task状態を更新');
+    await tester.ensureVisible(statusButton);
+    await tester.tap(statusButton);
+    await tester.pumpAndSettle();
+    expect(find.text('タスク: completed（Task ID $taskId）'), findsOneWidget);
+    expect(find.textContaining(resultHash), findsOneWidget);
+    expect(
+      transport.operations,
+      containsAllInOrder([
+        'Agent作業要求検査',
+        'Agent作業要求検査',
+        'AgentTaskWorkspacePermissionGrant',
+        'AgentTaskOwnerApprovalGrant',
+        'AgentTask実行',
+        'AgentTask状態',
+      ]),
+    );
     expect(tester.takeException(), isNull);
   });
 
