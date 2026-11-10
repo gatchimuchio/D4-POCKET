@@ -55,4 +55,50 @@ void main() {
       expect(rightVisible, 1);
     });
   }
+
+  testWidgets('非表示中は実行状態の照会を止め、復帰時に再開する', (tester) async {
+    tester.view.physicalSize = const Size(1400, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final pollWait = Completer<void>();
+    final f = fixture.DialogueFixture()..pollWait = pollWait;
+    Widget screen(bool active) => MaterialApp(
+        home: Scaffold(
+            body: RuntimeDialogueScreen(
+                key: const ValueKey('runtime-dialogue-lifecycle'),
+                connect: () async => RuntimeDialogueClient(f),
+                active: active)));
+
+    await tester.pumpWidget(screen(true));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'ライフサイクル確認');
+    await tester.ensureVisible(find.byKey(const ValueKey('dialogue-send')));
+    await tester.tap(find.byKey(const ValueKey('dialogue-send')));
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(screen(false));
+    await tester.pump(const Duration(seconds: 4));
+    expect(f.calls.where((call) => call == '対話取得'), isEmpty);
+
+    await tester.pumpWidget(screen(true));
+    await tester.pumpAndSettle();
+    expect(f.calls.where((call) => call == '対話取得'), hasLength(1));
+
+    await tester.pumpWidget(screen(false));
+    await tester.pump(const Duration(seconds: 4));
+    expect(f.calls.where((call) => call == '対話取得'), hasLength(1));
+
+    f.complete = true;
+    pollWait.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('leftの応答'), findsNothing);
+
+    await tester.pumpWidget(screen(true));
+    await tester.pumpAndSettle();
+    expect(f.calls.where((call) => call == '対話取得'), hasLength(2));
+    expect(find.text('leftの応答'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+  });
 }

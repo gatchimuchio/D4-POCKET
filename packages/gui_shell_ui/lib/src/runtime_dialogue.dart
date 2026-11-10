@@ -37,6 +37,7 @@ class _Conversation {
   bool pending = false;
   bool busy = false;
   bool polling = false;
+  Timer? pollTimer;
 }
 
 class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
@@ -51,14 +52,11 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
   bool _connecting = false;
   bool _compare = false;
   bool _sending = false;
-  Timer? _timer;
 
   @override
   void initState() {
     super.initState();
-    unawaited(_connect());
-    _timer =
-        Timer.periodic(const Duration(seconds: 1), (_) => unawaited(_poll()));
+    if (widget.active) unawaited(_connect());
   }
 
   Future<void> _connect() async {
@@ -69,7 +67,9 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
     });
     try {
       final client = widget.client ?? await widget.connect();
+      if (!mounted || !widget.active) return;
       final runtimes = await client.runtimes();
+      if (!mounted || !widget.active) return;
       Map<String, List<String>> workspaceIds = const {};
       String? workspaceWarning;
       if (widget.workspaceSelectionSupported) {
@@ -81,7 +81,7 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
       } else {
         workspaceWarning = 'この接続面はWorkspace選択に未対応です。Agent対話開始はBrokerが拒否します。';
       }
-      if (!mounted) return;
+      if (!mounted || !widget.active) return;
       setState(() {
         _client = client;
         _runtimes = runtimes;
@@ -91,11 +91,16 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
         _right.runtime ??= runtimes.length > 1 ? runtimes[1] : null;
       });
     } catch (_) {
-      if (mounted) {
+      if (mounted && widget.active) {
         setState(() => _connectionError = 'brokerに接続できません。起動と通常接続資格を確認してください。');
       }
     } finally {
+      final retryAfterActivation = mounted &&
+          widget.active &&
+          _client == null &&
+          _connectionError == null;
       if (mounted) setState(() => _connecting = false);
+      if (retryAfterActivation) unawaited(_connect());
     }
   }
 
@@ -179,6 +184,7 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
       }
     } finally {
       if (mounted) setState(() => side.busy = false);
+      _schedulePoll(side);
     }
   }
 
@@ -208,7 +214,24 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
   }
 
   Future<void> _poll() async {
+    if (!mounted || !widget.active) return;
     await Future.wait([_pollSide(_left), _pollSide(_right)]);
+  }
+
+  void _schedulePoll(_Conversation side) {
+    if (!mounted ||
+        !widget.active ||
+        !side.pending ||
+        side.busy ||
+        side.polling ||
+        side.request == null ||
+        side.pollTimer != null) {
+      return;
+    }
+    side.pollTimer = Timer(const Duration(seconds: 1), () {
+      side.pollTimer = null;
+      if (mounted && widget.active) unawaited(_pollSide(side));
+    });
   }
 
   Future<void> _pollSide(_Conversation side) async {
@@ -226,7 +249,12 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
     side.polling = true;
     try {
       final progress = await client.poll(request, side.runtime!, side.session!);
-      if (!mounted || side.request != request || !side.pending) return;
+      if (!mounted ||
+          !widget.active ||
+          side.request != request ||
+          !side.pending) {
+        return;
+      }
       setState(() {
         side.state = progress.state;
         side.result = progress.result;
@@ -235,7 +263,7 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
         side.pending = progress.result == null;
       });
     } catch (_) {
-      if (mounted && side.request == request && side.pending) {
+      if (mounted && widget.active && side.request == request && side.pending) {
         setState(() {
           side.error = '応答を取得できません。接続・監査を確認してください。本文の表示は保留しています。';
           side.result = null;
@@ -244,6 +272,7 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
       }
     } finally {
       side.polling = false;
+      _schedulePoll(side);
     }
   }
 
@@ -254,6 +283,8 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
     try {
       await _client!.cancel(side.request!);
       if (mounted) {
+        side.pollTimer?.cancel();
+        side.pollTimer = null;
         setState(() {
           side.pending = false;
           side.result = null;
@@ -340,6 +371,12 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
   @override
   void didUpdateWidget(covariant RuntimeDialogueScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!widget.active && oldWidget.active) {
+      for (final side in [_left, _right]) {
+        side.pollTimer?.cancel();
+        side.pollTimer = null;
+      }
+    }
     if (widget.active && !oldWidget.active) {
       if (_client == null) {
         unawaited(_connect());
@@ -351,9 +388,12 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
 
   @override
   void dispose() {
-    _timer?.cancel();
     _input.dispose();
     final client = _client;
+    for (final side in [_left, _right]) {
+      side.pollTimer?.cancel();
+      side.pollTimer = null;
+    }
     if (client != null) {
       for (final side in [_left, _right]) {
         if (side.pending && side.request != null) {

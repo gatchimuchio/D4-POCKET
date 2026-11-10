@@ -453,7 +453,10 @@ class _ShellHomePageState extends State<ShellHomePage> {
         onPrepareAiEditTask: _openAiEditTask,
       ),
       if (_dialogueVisited)
-        RuntimeDialogueScreen(readOnly: viewMode == _ShellViewMode.demo)
+        RuntimeDialogueScreen(
+          active: selectedIndex == 12,
+          readOnly: viewMode == _ShellViewMode.demo,
+        )
       else
         const SizedBox.shrink(),
       if (kGuiShellModuleHistory &&
