@@ -1436,7 +1436,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "e52d9d61d6c917415071dbc096210c21cbe57a6f274c2d9c80009a84d3f3d5d4"
+      "sha256": "dcc192b3648f9656bf183fda61c59f4907aba62cb0c24fe6adde0663336ef354"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -4568,7 +4568,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "53e2714b8bd8dd2d7e095db6a8fe41e4c674c3c4f8bae2d4947c19eac7890146"
+      "sha256": "522a58039440c2a7b57ae14d974fbdab4389ee2d39a082517177d1340a27ccd5"
     },
     {
       "path": "requirements-dev.txt",
