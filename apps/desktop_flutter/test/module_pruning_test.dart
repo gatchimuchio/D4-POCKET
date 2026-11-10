@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gui_shell_desktop/main.dart';
+import 'package:gui_shell_desktop/services/shell_core_client.dart';
+import 'package:gui_shell_ui/runtime_dialogue_client.dart' show BrokerTransport;
 
 void main() {
   const allOptionalModulesEnabled = kGuiShellModuleSetupDoctor &&
@@ -85,6 +87,97 @@ void main() {
     }
   });
 
+  if (kGuiShellModuleObservability) {
+    testWidgets('選択されたObservability ModuleはBroker consumerの値を表示する',
+        (tester) async {
+      final fixture = _ObservationFixtureTransport();
+      await tester.pumpWidget(
+        GuiShellDesktopApp(client: ShellCoreClient.mock(transport: fixture)),
+      );
+
+      await _openNavigation(tester, '観測');
+      await tester.pumpAndSettle();
+
+      final observationPayloads = <Map<String, Object?>>[
+        for (var index = 0; index < fixture.operations.length; index++)
+          if (fixture.operations[index] == '観測一覧') fixture.payloads[index],
+      ];
+      expect(observationPayloads, hasLength(2));
+      expect(
+        observationPayloads.map((payload) => payload['上限']),
+        unorderedEquals([200, 256]),
+      );
+      expect(observationPayloads.every((payload) => payload['版'] == 1), isTrue);
+      expect(find.text('Span: 1'), findsOneWidget);
+      expect(find.text('Trace: 1'), findsOneWidget);
+      expect(find.text('Metric: 1'), findsOneWidget);
+      expect(find.text('Fixture Metric: 3 count (measured)'), findsOneWidget);
+      expect(
+          find.textContaining('Broker / fixture-observation'), findsOneWidget);
+      expect(find.textContaining('Audit=責任・安全・証拠'), findsOneWidget);
+      expect(find.textContaining('権限生成: なし'), findsOneWidget);
+    });
+  }
+
+  if (kGuiShellModuleTraceInspector) {
+    testWidgets('選択されたTrace Inspectorはbounded Broker結果を表示する', (tester) async {
+      final fixture = _ObservationFixtureTransport();
+      await tester.pumpWidget(
+        GuiShellDesktopApp(client: ShellCoreClient.mock(transport: fixture)),
+      );
+
+      await _openNavigation(tester, '追跡');
+      await tester.pumpAndSettle();
+
+      final observationPayloads = <Map<String, Object?>>[
+        for (var index = 0; index < fixture.operations.length; index++)
+          if (fixture.operations[index] == '観測一覧') fixture.payloads[index],
+      ];
+      expect(observationPayloads, hasLength(2));
+      expect(
+        observationPayloads.map((payload) => payload['上限']),
+        unorderedEquals([200, 256]),
+      );
+      expect(observationPayloads.every((payload) => payload['版'] == 1), isTrue);
+      expect(find.text('Trace: 1'), findsOneWidget);
+      expect(find.text('Span: 1'), findsOneWidget);
+      expect(find.text('Broker / fixture-observation / completed'),
+          findsOneWidget);
+      final traceDropdown = find.byType(DropdownButton<String?>);
+      expect(traceDropdown, findsOneWidget);
+      final dropdownWidget =
+          tester.widget<DropdownButton<String?>>(traceDropdown);
+      expect(
+        dropdownWidget.items!.map((item) => item.value),
+        contains('module-trace-fixture'),
+      );
+      await tester.tap(traceDropdown);
+      await tester.pumpAndSettle();
+      expect(find.text('module-trace-fixture'), findsWidgets);
+      await tester.tap(find.text('module-trace-fixture').last);
+      await tester.pumpAndSettle();
+      final filteredPayloads = <Map<String, Object?>>[
+        for (var index = 0; index < fixture.operations.length; index++)
+          if (fixture.operations[index] == '観測一覧' &&
+              fixture.payloads[index]['TraceID'] == 'module-trace-fixture')
+            fixture.payloads[index],
+      ];
+      expect(filteredPayloads, hasLength(1));
+      expect(filteredPayloads.single['上限'], 256);
+      expect(
+        find.textContaining('関連Audit: audit-observation-fixture'),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          'Trace表示からPermission、Approval、Authority、Capability、Credentialを生成しません。',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Broker接続がないため'), findsNothing);
+    });
+  }
+
   if (allOptionalModulesEnabled) {
     test('全optional Moduleは互換性のため既定で有効', () {
       expect(allOptionalModulesEnabled, isTrue);
@@ -144,4 +237,56 @@ Future<void> _openNavigation(WidgetTester tester, String label) async {
   rail.onDestinationSelected!(destinationIndex);
   await tester.pumpAndSettle();
   expect(tester.takeException(), isNull, reason: '$labelの画面表示');
+}
+
+class _ObservationFixtureTransport implements BrokerTransport {
+  final operations = <String>[];
+  final payloads = <Map<String, Object?>>[];
+
+  @override
+  Future<Map<String, Object?>> request(
+    String operation, {
+    Map<String, Object?>? payload,
+  }) async {
+    operations.add(operation);
+    payloads.add(Map<String, Object?>.from(payload ?? const {}));
+    return {
+      'status': 'accepted',
+      'body': {
+        '版': 1,
+        'Span一覧': [
+          {
+            'TraceID': 'module-trace-fixture',
+            'SpanID': 'module-span-fixture',
+            '対象': 'Broker',
+            '操作': 'fixture-observation',
+            '状態': 'completed',
+            '所要Millis': 12,
+            '関連監査ID': 'audit-observation-fixture',
+            '証拠種別': 'INTERNAL_STATE',
+            '開始EpochMillis': 1700000000000,
+            '終了EpochMillis': 1700000000012,
+          },
+        ],
+        'Trace一覧': [
+          {'TraceID': 'module-trace-fixture'},
+        ],
+        'Metric一覧': [
+          {
+            'MetricID': 'fixture-metric-1',
+            '名称': 'Fixture Metric',
+            '値': 3,
+            '単位': 'count',
+            '状態': 'measured',
+          },
+        ],
+        '件数': 1,
+        '証拠種別': 'INTERNAL_STATE',
+        '観測範囲': 'broker_audit_finalization',
+        'Auditとの責任分離': 'Audit=責任・安全・証拠; Observation=性能・挙動・運用状態',
+        'OpenTelemetry export': 'unsupported',
+        '権限生成': 'なし',
+      },
+    };
+  }
 }
