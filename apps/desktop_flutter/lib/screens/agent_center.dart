@@ -163,7 +163,6 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
   AgentHandoffPackage? _handoffPreview;
   late List<AgentSessionRecord> _sessions;
   final List<_CodexRegistrationInput> _registrations = [];
-  AgentTaskExecutionCoordinator? _ownedTaskExecutionCoordinator;
   StreamSubscription<AgentTaskExecutionUpdate>? _taskExecutionUpdates;
 
   _CodexRegistrationInput? get _registered =>
@@ -173,7 +172,6 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _createOwnedTaskExecutionCoordinator();
     _subscribeTaskExecutionUpdates();
     final snapshot = widget.client.getSnapshot();
     _sessions = widget.client.mode == 'broker'
@@ -201,8 +199,6 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     if (taskExecutionUpdates != null) {
       unawaited(taskExecutionUpdates.cancel());
     }
-    _ownedTaskExecutionCoordinator?.dispose();
-    _ownedTaskExecutionCoordinator = null;
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -226,9 +222,6 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     }
     if (oldWidget.taskExecutionCoordinator != widget.taskExecutionCoordinator ||
         oldWidget.client.brokerTransport != widget.client.brokerTransport) {
-      _ownedTaskExecutionCoordinator?.dispose();
-      _ownedTaskExecutionCoordinator = null;
-      _createOwnedTaskExecutionCoordinator();
       _subscribeTaskExecutionUpdates();
     }
     if (oldWidget.active != widget.active && !widget.active) {
@@ -236,20 +229,11 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     }
   }
 
-  void _createOwnedTaskExecutionCoordinator() {
-    if (widget.taskExecutionCoordinator != null) return;
-    final transport = widget.client.brokerTransport;
-    if (transport != null) {
-      _ownedTaskExecutionCoordinator = AgentTaskExecutionCoordinator(transport);
-    }
-  }
-
   void _subscribeTaskExecutionUpdates() {
     final prior = _taskExecutionUpdates;
     _taskExecutionUpdates = null;
     if (prior != null) unawaited(prior.cancel());
-    final coordinator =
-        widget.taskExecutionCoordinator ?? _ownedTaskExecutionCoordinator;
+    final coordinator = widget.taskExecutionCoordinator;
     if (coordinator == null) return;
     _taskExecutionUpdates = coordinator.updates.listen(
       _handleTaskExecutionUpdate,
@@ -1369,8 +1353,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     AgentTaskRecord initialTask, {
     required bool allowMcpContinuation,
   }) {
-    final coordinator = widget.taskExecutionCoordinator ??
-        _ownedTaskExecutionCoordinator;
+    final coordinator = widget.taskExecutionCoordinator;
     if (coordinator == null) return;
     if (allowMcpContinuation) state.mcpSourceTaskRecord = initialTask;
     unawaited(

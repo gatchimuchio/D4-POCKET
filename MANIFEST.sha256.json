@@ -216,7 +216,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
-      "sha256": "811f04102c56efc96b873de14d6ce1af302f6c08f94fd78fdc5e6c6b331a7e4b"
+      "sha256": "cb269e79bafec7744676289b7b53cd4ebf442dc682eb9bef4eec8ffff91b464b"
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
@@ -228,7 +228,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/agent_center.dart",
-      "sha256": "b2f8983992ee33621345c727adc929d45ef1e628dce0451ad950581d08ae3d81"
+      "sha256": "5bb9d6bd9e6246040d611ddff1a04b3c7ebd20a0c688fcfa9b82897f07e52521"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/approval_center.dart",
@@ -300,7 +300,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/runtime_dialogue.dart",
-      "sha256": "1ef7a72362cef67478be24f56ae1866adbfa06ed9c6fa3836b843eb3e6b3a7ce"
+      "sha256": "85e0a864c3aa1102746cc455b7c0f7c85a2e326bad547239d5e43d1e5c107d32"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/settings.dart",
@@ -1436,7 +1436,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "5557013079c922faa7c1d0e17d8c308b93a26750f57822a3fb704c2edbd18ef4"
+      "sha256": "33e350e0855ce16e74f11da5d83f9d2727980b939a584e7c54dc6cd0176179c2"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -4400,7 +4400,7 @@
     },
     {
       "path": "packages/gui_shell_ui/lib/src/runtime_dialogue.dart",
-      "sha256": "059785ed7ffdf493949392e439bf9be00f6f92511d3d3a5c065012247b334d3f"
+      "sha256": "cddb5336637152febe0916c26880e7947db1e3a03f415045477869d6ed79a449"
     },
     {
       "path": "packages/gui_shell_ui/lib/src/runtime_dialogue_client.dart",
@@ -4432,7 +4432,7 @@
     },
     {
       "path": "packages/gui_shell_ui/test/runtime_dialogue_independent_poll_test.dart",
-      "sha256": "5f14f77f5c51ba8faac21a219e498e98a4a48d7cdfa5d321b337593c969f1080"
+      "sha256": "0766a81060b69afb5e32c9dee19f3ed1e7ad262c37d42136edaea8d1e1ba026d"
     },
     {
       "path": "packages/gui_shell_ui/test/runtime_dialogue_test.dart",
