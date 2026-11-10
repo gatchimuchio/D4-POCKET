@@ -33,11 +33,17 @@ class AgentCenter extends StatefulWidget {
     required this.client,
     this.active = true,
     this.taskExecutionCoordinator,
+    this.developerEditTaskInstruction,
+    this.onDeveloperEditTaskPrepared,
+    this.onDiscardDeveloperEditTask,
   });
 
   final ShellCoreClient client;
   final bool active;
   final AgentTaskExecutionCoordinator? taskExecutionCoordinator;
+  final String? developerEditTaskInstruction;
+  final ValueChanged<String>? onDeveloperEditTaskPrepared;
+  final VoidCallback? onDiscardDeveloperEditTask;
 
   @override
   State<AgentCenter> createState() => _AgentCenterState();
@@ -403,10 +409,19 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     if (transport == null || !_sessionAvailable(session)) {
       return;
     }
+    final developerEditTaskInstruction =
+        widget.developerEditTaskInstruction;
+    final isDeveloperEditTask =
+        developerEditTaskInstruction != null && mcpResult == null;
     final draft = await showDialog<_AgentTaskDraft>(
       context: context,
-      builder: (context) =>
-          _AgentTaskInstructionDialog(mcpResultTransfer: mcpResult != null),
+      builder: (context) => _AgentTaskInstructionDialog(
+        mcpResultTransfer: mcpResult != null,
+        developerEditTask: isDeveloperEditTask,
+        initialInstruction: isDeveloperEditTask
+            ? developerEditTaskInstruction
+            : null,
+      ),
     );
     if (!mounted || draft == null) return;
     String? capabilitySnapshotHash;
@@ -452,6 +467,10 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
         _taskPreflightStatus[session.sessionId] =
             'Broker事前検査済み。Permission=${result.permissionStatus}、Approval=${result.approvalStatus}。${mcpResult == null ? '' : '結果は未信頼データで、Permission／Approvalは継承しません。'}';
       });
+      if (isDeveloperEditTask &&
+          draft.instruction == developerEditTaskInstruction) {
+        widget.onDeveloperEditTaskPrepared?.call(draft.instruction);
+      }
     } on Object catch (error) {
       if (!mounted) return;
       final message = error is BrokerClientException
@@ -1989,6 +2008,31 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     return ShellPage(
       title: 'エージェントセンター',
       children: [
+        if (widget.developerEditTaskInstruction != null)
+          BorderedPanel(
+            key: const ValueKey('agent-ai-edit-task-draft'),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'AI編集提案からの別Task',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  '提案は未信頼のTask文脈として扱います。対象Sessionで通常Brokerの要求事前検査だけを行います。Permission／Approval／Credential／Trustは継承せず、ここではTaskを開始しません。target_pathsはアクセス制御ではなく、実際の範囲はWorkspace Permissionで決まります。',
+                ),
+                if (widget.onDiscardDeveloperEditTask != null) ...[
+                  const SizedBox(height: 8),
+                  OutlinedButton(
+                    key: const ValueKey('agent-ai-edit-task-discard'),
+                    onPressed: widget.onDiscardDeveloperEditTask,
+                    child: const Text('下書きを破棄'),
+                  ),
+                ],
+              ],
+            ),
+          ),
         if (client.mode == 'broker')
           BorderedPanel(
             child: Column(
@@ -2440,12 +2484,16 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
                 ),
                 if (_sessionAvailable(session)) ...[
                   OutlinedButton(
-                    onPressed: _taskPreflightSession == session.sessionId
+                    onPressed: _taskPreflightSession == session.sessionId ||
+                            (widget.developerEditTaskInstruction != null &&
+                                _taskPreflightSession != null)
                         ? null
                         : () => _inspectTask(session),
                     child: Text(
                       _taskPreflightSession == session.sessionId
                           ? 'Broker事前検査中'
+                          : widget.developerEditTaskInstruction != null
+                          ? '提案を別Taskとして事前検査'
                           : 'Task実行能力を事前検査（実行なし）',
                     ),
                   ),
@@ -3103,11 +3151,15 @@ class _AgentTaskInstructionDialog extends StatefulWidget {
     this.comparison = false,
     this.applySelectedResult = false,
     this.mcpResultTransfer = false,
+    this.developerEditTask = false,
+    this.initialInstruction,
   });
 
   final bool comparison;
   final bool applySelectedResult;
   final bool mcpResultTransfer;
+  final bool developerEditTask;
+  final String? initialInstruction;
 
   @override
   State<_AgentTaskInstructionDialog> createState() =>
@@ -3117,8 +3169,16 @@ class _AgentTaskInstructionDialog extends StatefulWidget {
 class _AgentTaskInstructionDialogState
     extends State<_AgentTaskInstructionDialog> {
   final _formKey = GlobalKey<FormState>();
-  final _instruction = TextEditingController();
+  late final TextEditingController _instruction;
   bool _requestMcpCapabilities = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _instruction = TextEditingController(
+      text: widget.initialInstruction ?? '',
+    );
+  }
 
   @override
   void dispose() {
@@ -3135,6 +3195,8 @@ class _AgentTaskInstructionDialogState
           ? 'Compare Taskを入力'
           : widget.mcpResultTransfer
           ? 'MCP結果を受け取るTaskを指定'
+          : widget.developerEditTask
+          ? 'AI編集提案を別Taskとして事前検査'
           : 'Agent Task能力の事前検査',
     ),
     content: SizedBox(
@@ -3151,6 +3213,8 @@ class _AgentTaskInstructionDialogState
                   ? '本文はBrokerへ2つの独立Session要求として送信されます。API key、password、secretは入力しないでください。この操作は事前検査だけで、Permission／Approval／Taskは発行・実行しません。'
                   : widget.mcpResultTransfer
                   ? 'Broker内の一回限りMCP結果を未信頼データとして同じAgent Sessionへ渡します。Workspace PermissionとTask Approvalは新規に必要です。'
+                  : widget.developerEditTask
+                  ? '確認済みproposalを固定内容の未信頼contextとして通常のBroker要求検査へ送ります。この操作は別Taskの事前検査だけです。target_pathsはアクセス制御ではなく、実際の範囲はWorkspace Permissionで決まります。Permission／Approval／Credentialは継承せず、ファイル書込み・Permission発行・Approval発行・Task実行はしません。'
                   : '本文はBrokerへ送信されます。API key、password、secretは入力しないでください。この操作はCapabilityの事前検査だけで、Permission／Approval／Taskを発行・実行しません。',
             ),
             const SizedBox(height: 12),
@@ -3159,7 +3223,13 @@ class _AgentTaskInstructionDialogState
               minLines: 3,
               maxLines: 8,
               maxLength: 32768,
-              decoration: const InputDecoration(labelText: 'Task指示'),
+              readOnly: widget.developerEditTask,
+              decoration: InputDecoration(
+                labelText: 'Task指示',
+                helperText: widget.developerEditTask
+                    ? '審査済みproposalから生成した固定内容'
+                    : null,
+              ),
               validator: (value) =>
                   value == null ||
                       value.trim().isEmpty ||
@@ -3169,7 +3239,8 @@ class _AgentTaskInstructionDialogState
             ),
             if (!widget.comparison &&
                 !widget.applySelectedResult &&
-                !widget.mcpResultTransfer) ...[
+                !widget.mcpResultTransfer &&
+                !widget.developerEditTask) ...[
               const SizedBox(height: 8),
               CheckboxListTile(
                 value: _requestMcpCapabilities,
@@ -3205,6 +3276,8 @@ class _AgentTaskInstructionDialogState
         child: Text(
           widget.applySelectedResult
               ? '適用先Taskを事前検査'
+              : widget.developerEditTask
+              ? '提案を別Taskとして事前検査'
               : widget.comparison
               ? '両Agentを事前検査'
               : widget.mcpResultTransfer

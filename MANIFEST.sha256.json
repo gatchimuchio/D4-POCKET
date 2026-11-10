@@ -216,7 +216,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
-      "sha256": "e8e289ce132d8438c78cca2567423d3b197a471ba929d7ee55efa2b38122c820"
+      "sha256": "811f04102c56efc96b873de14d6ce1af302f6c08f94fd78fdc5e6c6b331a7e4b"
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
@@ -228,7 +228,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/agent_center.dart",
-      "sha256": "0d1c1ddc57ddacb7f3762acd09394e6953828988d0b8250f0513f43fd2beffff"
+      "sha256": "9be9743c95a06647c36e2e0fd1a546ef28d8c5933f4623c908aed2ccc025768c"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/approval_center.dart",
@@ -304,7 +304,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/settings.dart",
-      "sha256": "37448414a310bedb32de34d5771f6109f55ee5d19ba7663b5500cd76b6f3c4f0"
+      "sha256": "48aa7424d8d5a9ab53f44764394a2046dced19cc4f4bbe3a74672d31232532c1"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/setup_doctor.dart",
@@ -356,7 +356,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/ai_edit_client.dart",
-      "sha256": "06b6d278437cfff218ad1351ca2dcf4c78cad46eea60f15dad3898e157cbea81"
+      "sha256": "44b7185e92bc52252fddc38a0b09db22d2680e4a261716252739531cd4bf2924"
     },
     {
       "path": "apps/desktop_flutter/lib/services/broker_client.dart",
@@ -720,7 +720,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/settings_compose_test.dart",
-      "sha256": "ba1fff334434dcc96bb5f0e77945aaaabbf0ea73e96ab919d6884df94090df5f"
+      "sha256": "85ede7be4caecc5bab34951a0211f108b71ddca593791a511b8ce756efd785f7"
     },
     {
       "path": "apps/desktop_flutter/test/settings_install_flow_test.dart",
@@ -740,7 +740,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "e3ebd57b6c6d9e16e06298cb30b743b39bbbbdc784b4403b1dfa191bcbe91b1e"
+      "sha256": "d72142e623fb67f3b0106cab48113a5288a2aace9dbcdb4bcf2ae8e62ce5c764"
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
@@ -1436,7 +1436,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "7fb380f7f7b470e327651624af5cb55f66e5601ca3f13a7d97cc621d54242183"
+      "sha256": "fbc397628e5bc94234b448a65e443c71d173442bf10272d3eb84c4d4517bbe28"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1632,7 +1632,7 @@
     },
     {
       "path": "docs/specs/gui-shell-ai-edit.md",
-      "sha256": "30e01b946cce3cee284c94a66800fe2e1ddf3d475f458620c0c7b59aa0923694"
+      "sha256": "a0c88c5ce1e0b2e5971c6ac5d71585ec921853ccfcabde0517d2f6aa219b3e0c"
     },
     {
       "path": "docs/specs/gui-shell-compose.md",

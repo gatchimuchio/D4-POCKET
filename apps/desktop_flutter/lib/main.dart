@@ -254,6 +254,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
   int _mcpCenterFocusRequest = 0;
   int _composeCenterFocusRequest = 0;
   int _exportCenterFocusRequest = 0;
+  String? _pendingAiEditTaskInstruction;
   _ShellViewMode viewMode = _ShellViewMode.ownerUse;
   _ShellNavigationGroup navigationGroup = _ShellNavigationGroup.all;
   late final WindowsTrayClient _trayClient;
@@ -433,6 +434,9 @@ class _ShellHomePageState extends State<ShellHomePage> {
         client: widget.client,
         active: selectedIndex == 5,
         taskExecutionCoordinator: _agentTaskExecutionCoordinator,
+        developerEditTaskInstruction: _pendingAiEditTaskInstruction,
+        onDeveloperEditTaskPrepared: _consumeAiEditTaskInstruction,
+        onDiscardDeveloperEditTask: _discardAiEditTaskInstruction,
       ),
       ApprovalCenter(client: widget.client),
       AuditViewer(client: widget.client),
@@ -446,6 +450,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
         focusMcpCenterRequest: _mcpCenterFocusRequest,
         focusComposeCenterRequest: _composeCenterFocusRequest,
         focusExportCenterRequest: _exportCenterFocusRequest,
+        onPrepareAiEditTask: _openAiEditTask,
       ),
       if (_dialogueVisited)
         RuntimeDialogueScreen(readOnly: viewMode == _ShellViewMode.demo)
@@ -851,6 +856,34 @@ class _ShellHomePageState extends State<ShellHomePage> {
   }
 
   void _openAgentSetup() => _selectPage(5);
+
+  void _openAiEditTask(String instruction) {
+    final matches = _pageEntries().where((entry) => entry.index == 5);
+    if (matches.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('この書出し構成にはAgent Centerがありません。')),
+      );
+      return;
+    }
+    final page = matches.first;
+    setState(() {
+      _pendingAiEditTaskInstruction = instruction;
+      selectedIndex = 5;
+      if (!navigationGroup.includes(page.group)) {
+        navigationGroup = page.group;
+      }
+    });
+  }
+
+  void _consumeAiEditTaskInstruction(String instruction) {
+    if (_pendingAiEditTaskInstruction != instruction) return;
+    setState(() => _pendingAiEditTaskInstruction = null);
+  }
+
+  void _discardAiEditTaskInstruction() {
+    if (_pendingAiEditTaskInstruction == null) return;
+    setState(() => _pendingAiEditTaskInstruction = null);
+  }
 
   void _setNavigationGroup(_ShellNavigationGroup group) {
     final pageEntries = _pageEntries()

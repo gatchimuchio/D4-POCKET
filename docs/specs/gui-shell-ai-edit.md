@@ -15,3 +15,9 @@ Owner資格経路から編集指示、対象path、予定変更を認証済みRu
 ## 自動適用禁止
 
 現行単位の`execution_mode`は`proposal_only`、`review_required=true`、`apply_status=not_started`、`files_written=false`に固定する。編集Agentの提案をそのままapplyせず、Owner／Developerが差分、Contract、テスト、監査、権限境界を確認してから、別の明示的な開発作業として実装する。自己承認、Permission生成、Approval迂回、秘密値取得は行わない。
+
+## Agent Centerへの別Task受け渡し
+
+Settingsの編集提案画面は受理Receipt後、指示本文、対象path、予定変更、指示hash、Audit IDをOwner／Developerが確認できる。明示的な確認後、本文とReceipt参照を未信頼contextとしてAgent Centerへ渡し、登録済みSessionの選択後に既存Agent作業要求検査だけを行う。Agent Centerの事前検査Dialogでは内容を固定表示し、MCP能力追加を要求しない。
+
+この受け渡しはproposalの自動applyではなく、独立した通常Broker Task要求の準備である。受け渡し自体はPermission、Approval、Credential、Agent trust、Task実行を生成・継承しない。target_pathsはTaskの希望範囲であり、OSまたはBrokerのアクセス境界ではない。実際のアクセス範囲はBroker Workspace Permissionが決める。Task指示は対象path内に限定し、必要範囲が合わない場合は書込み前に停止してOwner／Developerへ報告する。通常Broker経路で現在のWorkspace PermissionとTaskごとの一回Owner Approvalを別々に取得する。Task事前検査が成功するまで下書きを保持し、取消・Broker拒否時は下書きを消費しない。受理後もファイル変更や実行完了と誤表示しない。

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gui_shell_desktop/screens/settings.dart';
@@ -257,6 +259,108 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('AI Editは内容確認後にだけ未信頼Task下書きをAgent Centerへ渡す', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final transport = _ComposeScreenTransport();
+    String? preparedTaskInstruction;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SettingsScreen(
+            client: ShellCoreClient.mock(transport: transport),
+            onPrepareAiEditTask: (instruction) {
+              preparedTaskInstruction = instruction;
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _tap(tester, 'compose-ai-edit-button');
+    final proposal = transport.lastPayload('GUI Shell編集提案');
+    expect(proposal['execution_mode'], 'proposal_only');
+    expect(proposal['self_approval'], isFalse);
+    expect(preparedTaskInstruction, isNull);
+
+    await _tap(tester, 'compose-ai-edit-review-button');
+    final dialog = find.byType(AlertDialog);
+    expect(find.descendant(of: dialog, matching: find.text('GUI Shell編集提案を確認')),
+        findsOneWidget);
+    expect(
+      find.descendant(
+        of: dialog,
+        matching: find.textContaining('構成Preview結果へ対象platformを表示する'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: dialog,
+        matching: find
+            .textContaining('apps/desktop_flutter/lib/screens/settings.dart'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: dialog,
+        matching: find.textContaining(brokerPayloadHash(proposal)),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+          of: dialog, matching: find.text('Audit ID: audit-compose-ai-edit')),
+      findsOneWidget,
+    );
+    await tester.tap(find.descendant(of: dialog, matching: find.text('戻る')));
+    await tester.pumpAndSettle();
+    expect(preparedTaskInstruction, isNull);
+
+    await _tap(tester, 'compose-ai-edit-review-button');
+    await tester
+        .tap(find.byKey(const ValueKey('compose-ai-edit-review-confirm')));
+    await tester.pumpAndSettle();
+    expect(preparedTaskInstruction, isNotNull);
+    final taskEnvelope = jsonDecode(preparedTaskInstruction!) as Map;
+    final handedProposal = taskEnvelope['proposal'] as Map;
+    final handling = taskEnvelope['handling'] as Map;
+    expect(taskEnvelope['context_type'], 'gui_shell_ai_edit_proposal');
+    expect(handedProposal['instruction'], proposal['instruction']);
+    expect(handedProposal['target_paths'], proposal['target_paths']);
+    expect(handedProposal['instruction_hash'], brokerPayloadHash(proposal));
+    expect(handedProposal['audit_id'], 'audit-compose-ai-edit');
+    expect(handedProposal['execution_mode'], 'proposal_only');
+    expect(handling['proposal_content_is_untrusted'], isTrue);
+    expect(handling['authority_inheritance'], 'none');
+    expect(handling['permission_inheritance'], 'none');
+    expect(handling['approval_inheritance'], 'none');
+    expect(handling['credential_inheritance'], 'none');
+    expect(handling['trust_inheritance'], 'none');
+    expect(
+      transport.requests
+          .where((request) => request['operation'] == 'GUI Shell編集提案'),
+      hasLength(1),
+    );
+    expect(
+      transport.requests.any((request) => {
+            'Agent作業要求検査',
+            'AgentTaskWorkspacePermissionGrant',
+            'AgentTaskOwnerApprovalGrant',
+            'AgentTask実行',
+          }.contains(request['operation'])),
+      isFalse,
+      reason: 'Settings確認は下書きを渡すだけでAgent Taskや権限操作を始めない',
+    );
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('Composeは同じAgent型のRuntime instanceを1行で選択し対応先を維持する', (
     tester,

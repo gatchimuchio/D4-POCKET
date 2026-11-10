@@ -54,6 +54,7 @@ class SettingsScreen extends StatefulWidget {
     this.focusMcpCenterRequest = 0,
     this.focusComposeCenterRequest = 0,
     this.focusExportCenterRequest = 0,
+    this.onPrepareAiEditTask,
   });
 
   final ShellCoreClient client;
@@ -64,6 +65,7 @@ class SettingsScreen extends StatefulWidget {
   final int focusMcpCenterRequest;
   final int focusComposeCenterRequest;
   final int focusExportCenterRequest;
+  final ValueChanged<String>? onPrepareAiEditTask;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -121,6 +123,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _exportInProgress = false;
   String? _aiEditMessage;
   String? _aiEditReceipt;
+  AiEditProposalReview? _aiEditProposal;
+  bool _aiEditInProgress = false;
   String? _updateMessage;
   bool _checkingUpdateCatalog = false;
   bool _updateOperationInProgress = false;
@@ -1238,10 +1242,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 8),
           FilledButton.icon(
             key: const ValueKey('compose-ai-edit-button'),
-            onPressed: () => _runAiEdit(client),
-            icon: const Icon(Icons.rate_review_outlined),
-            label: const Text('編集提案を送信'),
+            onPressed: _aiEditInProgress ? null : () => _runAiEdit(client),
+            icon: _aiEditInProgress
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.rate_review_outlined),
+            label: Text(_aiEditInProgress ? 'Broker応答待ち' : '編集提案を送信'),
           ),
+          if (_aiEditProposal != null) ...[
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              key: const ValueKey('compose-ai-edit-review-button'),
+              onPressed: widget.onPrepareAiEditTask == null
+                  ? null
+                  : _reviewAiEditProposal,
+              icon: const Icon(Icons.fact_check_outlined),
+              label: const Text('提案内容を確認して別Taskへ'),
+            ),
+            if (widget.onPrepareAiEditTask == null)
+              const Text('Agent CenterとのTask連携がありません。提案はこの画面に保持されています。'),
+          ],
           if (_aiEditMessage != null) ...[
             const SizedBox(height: 8),
             Text(_aiEditMessage!),
@@ -1256,24 +1279,124 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _runAiEdit(AiEditClient client) async {
+    if (_aiEditInProgress) return;
+    final instruction = _editInstructionController.text.trim();
+    final targetPaths = _editTargetPathController.text
+        .split(',')
+        .map((path) => path.trim())
+        .where((path) => path.isNotEmpty)
+        .toList(growable: false);
+    const expectedChanges = [
+      'Owner／Developerが内容を確認してから実装を開始する',
+    ];
+    final editId =
+        'settings-edit-${DateTime.now().toUtc().microsecondsSinceEpoch.toRadixString(16)}';
+    setState(() {
+      _aiEditInProgress = true;
+      _aiEditProposal = null;
+      _aiEditReceipt = null;
+      _aiEditMessage = null;
+    });
     try {
-      final targetPaths = _editTargetPathController.text
-          .split(',')
-          .map((path) => path.trim())
-          .where((path) => path.isNotEmpty)
-          .toList(growable: false);
       final receipt = await client.propose(
-        editId: 'settings-edit-proposal',
+        editId: editId,
         scope: 'composition',
-        instruction: _editInstructionController.text.trim(),
+        instruction: instruction,
         targetPaths: targetPaths,
-        expectedChanges: const ['Owner／Developerが内容を確認してから実装を開始する'],
+        expectedChanges: expectedChanges,
       );
-      _aiEditReceipt = aiEditJson(receipt);
-      _setAiEditMessage('編集提案を審査待ちで記録しました。file変更と自動applyは行っていません。');
+      if (!mounted) return;
+      final instructionHash = receipt['instruction_hash'];
+      final auditId = receipt['audit_id'];
+      if (instructionHash is! String || auditId is! String) {
+        throw const FormatException('proposal receiptにhashまたはAudit IDがありません');
+      }
+      setState(() {
+        _aiEditProposal = AiEditProposalReview(
+          editId: editId,
+          scope: 'composition',
+          instruction: instruction,
+          targetPaths: targetPaths,
+          expectedChanges: expectedChanges,
+          instructionHash: instructionHash,
+          auditId: auditId,
+        );
+        _aiEditReceipt = aiEditJson(receipt);
+        _aiEditMessage =
+            '編集提案を審査待ちで記録しました。file変更、Permission、Approval、自動applyは行っていません。';
+      });
     } catch (error) {
-      _setAiEditMessage('GUI Shell編集提案に失敗しました: $error');
+      if (mounted) {
+        _setAiEditMessage('GUI Shell編集提案に失敗しました: $error');
+      }
+    } finally {
+      if (mounted) setState(() => _aiEditInProgress = false);
     }
+  }
+
+  Future<void> _reviewAiEditProposal() async {
+    final proposal = _aiEditProposal;
+    final onPrepareTask = widget.onPrepareAiEditTask;
+    if (proposal == null || onPrepareTask == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('GUI Shell編集提案を確認'),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 620, maxHeight: 560),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                    'これはproposal-onlyの要求です。ここではファイルを書かず、別Task要求の事前検査へ渡すだけです。'),
+                const SizedBox(height: 8),
+                const Text(
+                  '対象pathはTaskの希望範囲であり、アクセス制御ではありません。実際のアクセス範囲はBrokerのWorkspace Permissionで別途決まります。',
+                ),
+                const SizedBox(height: 12),
+                Text('識別子: ${proposal.editId}'),
+                Text('範囲: ${proposal.scope}'),
+                const SizedBox(height: 8),
+                const Text('編集指示'),
+                SelectableText(proposal.instruction),
+                const SizedBox(height: 8),
+                const Text('対象path'),
+                SelectableText(proposal.targetPaths.join('\n')),
+                const SizedBox(height: 8),
+                const Text('予定変更'),
+                SelectableText(proposal.expectedChanges.join('\n')),
+                const SizedBox(height: 8),
+                SelectableText('Instruction hash: ${proposal.instructionHash}'),
+                SelectableText('Audit ID: ${proposal.auditId}'),
+                const SizedBox(height: 8),
+                const Text(
+                  '確認後はAgent Centerで対象Sessionを選び、通常のBroker事前検査を行います。Permission／Approval／Credentialは引き継がれず、Task開始にも別途必要です。',
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('戻る'),
+          ),
+          FilledButton(
+            key: const ValueKey('compose-ai-edit-review-confirm'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('内容を確認してAgent Centerへ'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) return;
+    onPrepareTask(proposal.toImplementationTaskInstruction());
+    setState(() {
+      _aiEditMessage =
+          '提案内容を未信頼の下書きとしてAgent Centerへ渡しました。Broker事前検査までで、ファイル変更とTask実行はありません。';
+    });
   }
 
   void _setAiEditMessage(String message) {

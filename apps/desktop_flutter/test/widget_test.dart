@@ -3291,6 +3291,223 @@ void main() {
     expect(find.textContaining('Task実行・状態は未接続'), findsNothing);
   });
 
+  testWidgets('AI Editの別Task受渡しは固定proposalをBroker事前検査だけへ送る',
+      (WidgetTester tester) async {
+    const sessionId = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    const runtimeId = 'codex-r2-synthetic';
+    const workspaceId = 'workspace-r2-synthetic';
+    final proposalInstruction = jsonEncode({
+      'context_type': 'gui_shell_ai_edit_proposal',
+      'proposal': {
+        'edit_id': 'settings-edit-fixture',
+        'scope': 'composition',
+        'instruction': '構成Preview結果へ対象platformを表示する',
+        'target_paths': ['apps/desktop_flutter/lib/screens/settings.dart'],
+        'expected_changes': ['Owner／Developer確認後の別Task'],
+        'instruction_hash':
+            'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        'audit_id': 'audit-ai-edit-fixture',
+        'execution_mode': 'proposal_only',
+      },
+      'handling': {
+        'proposal_content_is_untrusted': true,
+        'authority_inheritance': 'none',
+        'permission_inheritance': 'none',
+        'approval_inheritance': 'none',
+        'credential_inheritance': 'none',
+        'trust_inheritance': 'none',
+      },
+    });
+    final taskPayload = {
+      'agent_runtime_id': runtimeId,
+      'session_id': sessionId,
+      'workspace_id': workspaceId,
+      'instruction': proposalInstruction,
+    };
+    final taskInstructionHash = brokerPayloadHash(taskPayload);
+    final transport = _FakeBrokerTransport([
+      _brokerHealthResponse(),
+      _brokerHostCapabilityResponse(),
+      _brokerHostListResponse(),
+      _brokerAdapterListResponse(),
+      _brokerAgentAdapterListResponse(),
+      _brokerDialogueSessionListResponse(),
+      _brokerAcceptedBody('normalize_payload', {'quarantined': false}),
+      _brokerAcceptedBody('content_projection', {'redacted_payload': {}}),
+      _brokerAcceptedBody('approval_edit', {'ok': false}),
+      _brokerCommandSuspendedResponse(),
+      _brokerAcceptedBody('AgentCLI実行系作業領域登録', {
+        'runtime_id': runtimeId,
+        'workspace_id': workspaceId,
+        'registration_lifetime': 'broker_process',
+        'task_execution': 'supported',
+        'permission_generated': false,
+        'approval_generated': false,
+        'credential_value_accepted': false,
+      }),
+      _brokerAcceptedBody('対話開始', {
+        '対話セッションID': sessionId,
+        '実行系ID': runtimeId,
+        '状態': '利用中',
+      }),
+      _brokerDialogueSessionListResponse(sessions: [
+        {
+          '対話セッションID': sessionId,
+          '実行系ID': runtimeId,
+          '状態': '利用中',
+          '作成監査ID': 'audit-session-created-r2',
+          '作業領域ID': workspaceId,
+          '作業領域結合監査ID': 'audit-workspace-bound-r2',
+        },
+      ]),
+      {
+        'request_id': 'test-ai-edit-preflight-rejected',
+        'operation': 'Agent作業要求検査',
+        'status': 'rejected',
+        'evidence_source': 'INTERNAL_STATE',
+        'audit_event_id': 'audit-ai-edit-preflight-rejected',
+        'error': {
+          'code': 'AgentTask実行非対応',
+          'message': 'PRIVATE_TASK_SENTINEL',
+        },
+        'body': null,
+        'shutdown_requested': false,
+      },
+      _brokerAcceptedBody('Agent作業要求検査', {
+        '版': 1,
+        '状態': '要求検査済み',
+        '実行状態': '未実行',
+        'Permission状態': '未付与',
+        'Approval状態': '未取得',
+        '実行系ID': runtimeId,
+        '対話セッションID': sessionId,
+        '作業領域ID': workspaceId,
+        '指示hash': taskInstructionHash,
+      }),
+    ]);
+    final client = await ShellCoreClient.product(transport: transport);
+    String? pendingInstruction = proposalInstruction;
+    String? acceptedInstruction;
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: StatefulBuilder(
+          builder: (context, setParentState) => AgentCenter(
+            client: client,
+            developerEditTaskInstruction: pendingInstruction,
+            onDeveloperEditTaskPrepared: (instruction) {
+              if (instruction != pendingInstruction) return;
+              acceptedInstruction = instruction;
+              setParentState(() => pendingInstruction = null);
+            },
+            onDiscardDeveloperEditTask: () {
+              setParentState(() => pendingInstruction = null);
+            },
+          ),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('登録を開始'));
+    await tester.pumpAndSettle();
+    final registrationFields = find.byType(TextFormField);
+    await tester.enterText(registrationFields.at(0), 'model-ai-edit-fixture');
+    await tester.enterText(registrationFields.at(1), runtimeId);
+    await tester.enterText(
+      registrationFields.at(2),
+      r'C:\Tools\Codex\codex.exe',
+    );
+    await tester.enterText(registrationFields.at(3), workspaceId);
+    await tester.enterText(
+      registrationFields.at(4),
+      r'C:\d4-ai-edit-workspace',
+    );
+    await tester.enterText(registrationFields.at(5), '.env');
+    await tester.tap(find.text('native Owner確認へ進む'));
+    await tester.pumpAndSettle();
+    final startSessionButton = find.text('登録Workspaceで対話Sessionを開始');
+    await tester.ensureVisible(startSessionButton);
+    await tester.tap(startSessionButton);
+    await tester.pumpAndSettle();
+    expect(find.text(sessionId), findsOneWidget);
+    expect(
+        find.byKey(const ValueKey('agent-ai-edit-task-draft')), findsOneWidget);
+
+    final preflightButton = find.text('提案を別Taskとして事前検査');
+    await tester.ensureVisible(preflightButton);
+    await tester.tap(preflightButton);
+    await tester.pumpAndSettle();
+    final dialog = find.byType(AlertDialog);
+    final instructionField = find.descendant(
+      of: dialog,
+      matching: find.byType(TextFormField),
+    );
+    final taskInstructionField = find.descendant(
+      of: dialog,
+      matching: find.byType(TextField),
+    );
+    expect(tester.widget<TextField>(taskInstructionField).readOnly, isTrue);
+    expect(find.text('現在のMCP Tool能力をAgentへ提示する'), findsNothing);
+    expect(tester.widget<TextFormField>(instructionField).controller!.text,
+        proposalInstruction);
+    await tester.tap(
+      find.descendant(
+        of: dialog,
+        matching: find.text('提案を別Taskとして事前検査'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('AgentTask実行非対応'), findsOneWidget);
+    expect(find.textContaining('PRIVATE_TASK_SENTINEL'), findsNothing);
+    expect(pendingInstruction, proposalInstruction);
+    expect(
+        find.byKey(const ValueKey('agent-ai-edit-task-draft')), findsOneWidget);
+    expect(
+      transport.operations,
+      isNot(contains('AgentTaskWorkspacePermissionGrant')),
+    );
+    expect(
+        transport.operations, isNot(contains('AgentTaskOwnerApprovalGrant')));
+    expect(transport.operations, isNot(contains('AgentTask実行')));
+
+    await tester.ensureVisible(preflightButton);
+    await tester.tap(preflightButton);
+    await tester.pumpAndSettle();
+    final retryDialog = find.byType(AlertDialog);
+    await tester.tap(
+      find.descendant(
+        of: retryDialog,
+        matching: find.text('提案を別Taskとして事前検査'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final preflightRequests = transport.requests
+        .where((request) => request['operation'] == 'Agent作業要求検査')
+        .toList(growable: false);
+    expect(preflightRequests, hasLength(2));
+    for (final request in preflightRequests) {
+      final payload = request['payload']! as Map;
+      expect(payload['agent_runtime_id'], runtimeId);
+      expect(payload['session_id'], sessionId);
+      expect(payload['workspace_id'], workspaceId);
+      expect(payload['instruction'], proposalInstruction);
+      expect(payload, hasLength(taskPayload.length));
+    }
+    expect(acceptedInstruction, proposalInstruction);
+    expect(pendingInstruction, isNull);
+    expect(
+        find.byKey(const ValueKey('agent-ai-edit-task-draft')), findsNothing);
+    expect(transport.operations,
+        isNot(contains('AgentTaskWorkspacePermissionGrant')));
+    expect(
+        transport.operations, isNot(contains('AgentTaskOwnerApprovalGrant')));
+    expect(transport.operations, isNot(contains('AgentTask実行')));
+    expect(find.textContaining('Permission=未付与'), findsOneWidget);
+    expect(find.textContaining('Approval=未取得'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Agent CenterはBroker事前検査後に分離Owner確認とTask状態照会を使う',
       (WidgetTester tester) async {
     const sessionId = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
