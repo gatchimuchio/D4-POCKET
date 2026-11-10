@@ -1436,7 +1436,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "ab99abc869a85d979862ec5adea1005eec504879f2895ce284bb55e029dd81d5"
+      "sha256": "45c78e00dae51018eaaaaade03d67884361c746969e0471f7fc98b445e07e90d"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1564,7 +1564,7 @@
     },
     {
       "path": "docs/specs/agent-runtime.md",
-      "sha256": "65189be6d91042b687254bc13131aa3e591e987a9d0c644514f686ea54c815d6"
+      "sha256": "dc5c4c394971b4d7e7715f3334208345860a9ea2efeed5c3cf4472d2dbd8bb25"
     },
     {
       "path": "docs/specs/agent-task-history.md",
@@ -3712,7 +3712,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/compose_center.rs",
-      "sha256": "ad5a30d77f2fda5327afc2e555fb208358099591d0922b42c0c9c6e985ef0670"
+      "sha256": "019b010743e5176496e03276054821e37db9b72495a15e2ec1ac4cd54570af94"
     },
     {
       "path": "native/rust_helper/src/broker/content_access.rs",

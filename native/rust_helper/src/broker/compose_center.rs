@@ -494,6 +494,27 @@ pub(super) fn validate_catalog_selection(
         if selected_instances.is_empty() {
             return Err("選択Agentに対応する現在Runtimeが構成へ含まれていません".to_string());
         }
+        if !manifest.tool_ids.is_empty()
+            && !selected_instances.iter().any(|agent| {
+                let task_execution =
+                    agent.metadata["capabilities"]
+                        .as_array()
+                        .is_some_and(|capabilities| {
+                            capabilities.iter().any(|capability| {
+                                capability["capability_id"].as_str() == Some("task_execution")
+                                    && capability["support"]["status"].as_str() == Some("supported")
+                            })
+                        });
+                task_execution
+                    && agent.metadata["tool_support"]["status"].as_str() == Some("supported")
+                    && agent.metadata["mcp_support"]["status"].as_str() == Some("supported")
+            })
+        {
+            return Err(
+                "選択Agentの同一Runtime instanceがtask_execution・tool_support・mcp_supportをすべてsupportedとして宣言していません"
+                    .to_string(),
+            );
+        }
         selected_agent_instances.push(selected_instances);
     }
     if !manifest.capability_requirements.is_empty() && selected_agent_instances.is_empty() {
@@ -776,6 +797,45 @@ mod tests {
         capability_status: &str,
         model: &str,
     ) {
+        register_agent_with_tool_compatibility_and_model(
+            broker,
+            runtime_id,
+            agent_id,
+            capability_status,
+            model,
+            "unsupported",
+            "unsupported",
+        );
+    }
+
+    fn register_agent_with_tool_compatibility(
+        broker: &mut Broker,
+        runtime_id: &str,
+        agent_id: &str,
+        task_execution_status: &str,
+        tool_status: &str,
+        mcp_status: &str,
+    ) {
+        register_agent_with_tool_compatibility_and_model(
+            broker,
+            runtime_id,
+            agent_id,
+            task_execution_status,
+            "fixture-model",
+            tool_status,
+            mcp_status,
+        );
+    }
+
+    fn register_agent_with_tool_compatibility_and_model(
+        broker: &mut Broker,
+        runtime_id: &str,
+        agent_id: &str,
+        task_execution_status: &str,
+        model: &str,
+        tool_status: &str,
+        mcp_status: &str,
+    ) {
         let mut metadata: Value = serde_json::from_str(include_str!(
             "../../../../examples/contracts/agent_adapter.valid.json"
         ))
@@ -786,8 +846,16 @@ mod tests {
         metadata["status"] = json!("ready");
         metadata["capabilities"] = json!([{
             "capability_id": "task_execution",
-            "support": {"status": capability_status, "reason": "Compose互換性試験"}
+            "support": {"status": task_execution_status, "reason": "Compose互換性試験"}
         }]);
+        metadata["tool_support"] = json!({
+            "status": tool_status,
+            "reason": "Compose互換性試験"
+        });
+        metadata["mcp_support"] = json!({
+            "status": mcp_status,
+            "reason": "Compose互換性試験"
+        });
         broker
             .実行系登録(
                 runtime_id,
@@ -1023,6 +1091,91 @@ mod tests {
             call(&mut broker, unknown_instance).status,
             BrokerStatus::Rejected,
             "選択instance自身がCapabilityをsupportedと宣言しない場合は拒否する"
+        );
+    }
+
+    #[test]
+    fn ComposeのMCP_Tool要件は選択Agent同一Runtimeの実行・Tool・MCP対応を要求する() {
+        let manifest_with_tool = || {
+            let mut value = manifest();
+            value["runtime_ids"] = json!(["fixture-runtime"]);
+            value["agent_ids"] = json!(["fixture-agent"]);
+            value["tool_ids"] = json!(["tool-fixture"]);
+            value
+        };
+
+        for (task_status, tool_status, mcp_status) in [
+            ("supported", "unsupported", "supported"),
+            ("supported", "unknown", "supported"),
+            ("supported", "supported", "unsupported"),
+            ("supported", "supported", "unknown"),
+            ("unknown", "supported", "supported"),
+            ("unsupported", "supported", "supported"),
+        ] {
+            let mut broker = Broker::new("session-incompatible");
+            register_agent_with_tool_compatibility(
+                &mut broker,
+                "fixture-runtime",
+                "fixture-agent",
+                task_status,
+                tool_status,
+                mcp_status,
+            );
+            let error = validate_catalog_selection(
+                &mut broker,
+                &parse_manifest(&manifest_with_tool()).unwrap(),
+            )
+            .expect_err("選択Agentに未成立の依存があればComposeを拒否する");
+            assert!(
+                error.contains("task_execution・tool_support・mcp_support"),
+                "互換性を拒否した理由が明確: {error}"
+            );
+        }
+
+        let mut split = Broker::new("session-split-runtime-support");
+        register_agent_with_tool_compatibility(
+            &mut split,
+            "runtime-tool-only",
+            "fixture-agent",
+            "supported",
+            "supported",
+            "unsupported",
+        );
+        register_agent_with_tool_compatibility(
+            &mut split,
+            "runtime-mcp-only",
+            "fixture-agent",
+            "supported",
+            "unsupported",
+            "supported",
+        );
+        let mut split_manifest = manifest_with_tool();
+        split_manifest["runtime_ids"] = json!(["runtime-tool-only", "runtime-mcp-only"]);
+        let error =
+            validate_catalog_selection(&mut split, &parse_manifest(&split_manifest).unwrap())
+                .expect_err("別Runtime instanceの能力を寄せ集めてTool互換と判定しない");
+        assert!(
+            error.contains("task_execution・tool_support・mcp_support"),
+            "Runtimeをまたいだ能力の寄せ集めを拒否した理由が明確: {error}"
+        );
+
+        let mut compatible = Broker::new("session-compatible");
+        register_agent_with_tool_compatibility(
+            &mut compatible,
+            "fixture-runtime",
+            "fixture-agent",
+            "supported",
+            "supported",
+            "supported",
+        );
+        let error = validate_catalog_selection(
+            &mut compatible,
+            &parse_manifest(&manifest_with_tool()).unwrap(),
+        )
+        .expect_err("Catalog未登録Toolは後段の現在MCP Catalog検査で拒否する");
+        assert_eq!(
+            error, "選択したToolが選択中の現在MCP Catalogにありません",
+            "3能力を同一instanceが宣言すれば互換性検査を通過する"
         );
     }
 

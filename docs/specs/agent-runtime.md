@@ -8,6 +8,8 @@ Agent Runtime は第一級の Runtime type である。Shell Core の Permission
 
 一方、同じ`agent_id`を異なる`adapter_id`へ割り当てる型衝突は拒否する。Runtime IDは各Catalog entryで一意でなければならない。ComposeでAgent型を選ぶ場合、選択中Runtimeのうち一つ以上にそのAgent型の`ready`／`degraded` instanceが必要であり、要求Capabilityは選択された該当instanceのいずれかが`supported`を宣言する必要がある。Runtime IDを伴わないAgent型一覧では、metadataが異なる同一型を具体的な能力・模型の主張へ潰さず、型identityだけを保持する保守的summaryへ集約する。Runtimeごとの差異を表示・選択するconsumerはRuntime IDを含むCatalogを使う。
 
+ComposeでAgentとMCP Toolを同時に選択する場合、Tool選択から生じる依存として、選択した同一Runtime instanceが`task_execution` Capability、`tool_support`、`mcp_support`の全てを`supported`と宣言していることをBrokerが要求する。別instance間で宣言を寄せ集めず、`unknown`／`unsupported`／欠落は拒否する。このmetadataは構成互換性の照合だけに使い、Tool実行Permission、Approval、Trust、Authorityを生成しない。Compose／Preview時とTool作用直前に現在Catalogで再照合する。Agentを含まないTool単独の構成はAgent互換性を主張しない。
+
 中核 record:
 
 - `AgentRuntime`
