@@ -15,6 +15,9 @@ const MAX_RESPONSE_BYTES: usize = 1024 * 1024;
 const MAX_STRING_CHARS: usize = 1024;
 const MAX_SEND_MESSAGE_BYTES: usize = 4 * 1024;
 const MAX_JSON_RPC_BYTES: usize = 64 * 1024;
+const MAX_TASK_ARTIFACTS: usize = 32;
+const MAX_ARTIFACT_PARTS: usize = 32;
+const MAX_ARTIFACT_TEXT_BYTES: usize = 64 * 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct A2aError {
@@ -239,7 +242,12 @@ pub(crate) fn send_message(
     project_send_message_response(&raw, &request_id)
 }
 
-pub(crate) fn get_task(uri: &str, task_id: &str, deadline: Instant) -> Result<Value, A2aError> {
+pub(crate) fn get_task(
+    uri: &str,
+    task_id: &str,
+    artifact_selection: Option<(&str, &str)>,
+    deadline: Instant,
+) -> Result<Value, A2aError> {
     let endpoint = parse_endpoint(uri)?;
     if !valid_task_id(task_id) || Instant::now() >= deadline {
         return Err(A2aError::new(
@@ -271,7 +279,7 @@ pub(crate) fn get_task(uri: &str, task_id: &str, deadline: Instant) -> Result<Va
         crate::broker::update_download::send_a2a_json_rpc_document(uri, &request_bytes, deadline)
             .map_err(map_https_error)?
     };
-    project_get_task_response(&raw, &request_id, task_id)
+    project_get_task_response_with_artifact(&raw, &request_id, task_id, artifact_selection)
 }
 
 pub(crate) fn valid_task_id(value: &str) -> bool {
@@ -296,6 +304,15 @@ fn project_get_task_response(
     raw: &[u8],
     request_id: &str,
     expected_task_id: &str,
+) -> Result<Value, A2aError> {
+    project_get_task_response_with_artifact(raw, request_id, expected_task_id, None)
+}
+
+fn project_get_task_response_with_artifact(
+    raw: &[u8],
+    request_id: &str,
+    expected_task_id: &str,
+    artifact_selection: Option<(&str, &str)>,
 ) -> Result<Value, A2aError> {
     let raw_text = std::str::from_utf8(raw)
         .map_err(|_| A2aError::new("a2a_response_invalid", "A2A応答がUTF-8ではない"))?;
@@ -338,7 +355,14 @@ fn project_get_task_response(
     let task = object
         .get("result")
         .ok_or_else(|| A2aError::new("a2a_response_invalid", "A2A Task resultがない"))?;
-    project_task_metadata(task, &response_hash, Some(expected_task_id), true)
+    project_task_metadata(
+        task,
+        &response_hash,
+        Some(expected_task_id),
+        true,
+        true,
+        artifact_selection,
+    )
 }
 
 fn project_send_message_response(raw: &[u8], request_id: &str) -> Result<Value, A2aError> {
@@ -400,7 +424,7 @@ fn project_send_message_response(raw: &[u8], request_id: &str) -> Result<Value, 
     }
     let response_hash = sha256_tagged(raw);
     if let Some(task) = result.get("task") {
-        project_task_metadata(task, &response_hash, None, false)
+        project_task_metadata(task, &response_hash, None, false, false, None)
     } else {
         let message = result["message"].as_object().ok_or_else(|| {
             A2aError::new("a2a_response_invalid", "A2A Message resultがobjectではない")
@@ -462,6 +486,8 @@ fn project_task_metadata(
     response_hash: &str,
     expected_task_id: Option<&str>,
     require_empty_history: bool,
+    include_artifact_manifest: bool,
+    artifact_selection: Option<(&str, &str)>,
 ) -> Result<Value, A2aError> {
     let task = task_value
         .as_object()
@@ -516,7 +542,12 @@ fn project_task_metadata(
             "A2A GetTaskはhistoryLength=0を超える履歴を返した",
         ));
     }
-    Ok(json!({
+    let (artifact_manifest, selected_artifact) = if include_artifact_manifest {
+        project_task_artifacts(task, state, artifact_selection)?
+    } else {
+        (None, None)
+    };
+    let mut projection = json!({
         "kind": "task",
         "task_id": task_id,
         "context_id": context_id,
@@ -524,7 +555,178 @@ fn project_task_metadata(
         "artifact_count": artifact_count,
         "history_count": history_count,
         "result_hash": response_hash,
-    }))
+    });
+    if let Some(manifest) = artifact_manifest {
+        projection["artifact_manifest"] = manifest;
+        projection["selected_artifact"] = selected_artifact.unwrap_or(Value::Null);
+    }
+    Ok(projection)
+}
+
+fn project_task_artifacts(
+    task: &Map<String, Value>,
+    state: &'static str,
+    selection: Option<(&str, &str)>,
+) -> Result<(Option<Value>, Option<Value>), A2aError> {
+    let artifacts = task
+        .get("artifacts")
+        .and_then(Value::as_array)
+        .map(Vec::as_slice)
+        .unwrap_or_default();
+    if artifacts.len() > MAX_TASK_ARTIFACTS {
+        return Err(A2aError::new(
+            "a2a_response_invalid",
+            "A2A Task Artifact件数が上限を超過",
+        ));
+    }
+    let mut ids = std::collections::BTreeSet::new();
+    let mut manifest = Vec::with_capacity(artifacts.len());
+    let mut selected = None;
+    for artifact in artifacts {
+        let object = artifact
+            .as_object()
+            .ok_or_else(|| A2aError::new("a2a_response_invalid", "A2A Artifactがobjectではない"))?;
+        if object.keys().any(|key| {
+            ![
+                "artifactId",
+                "name",
+                "description",
+                "parts",
+                "metadata",
+                "extensions",
+            ]
+            .contains(&key.as_str())
+        }) {
+            return Err(A2aError::new(
+                "a2a_response_invalid",
+                "A2A Artifactに未知fieldがある",
+            ));
+        }
+        let artifact_id = bounded_external_id(object.get("artifactId"), "Artifact artifactId")?;
+        if !ids.insert(artifact_id.clone()) {
+            return Err(A2aError::new(
+                "a2a_response_invalid",
+                "A2A Taskに重複Artifact IDがある",
+            ));
+        }
+        let parts = object
+            .get("parts")
+            .and_then(Value::as_array)
+            .filter(|parts| !parts.is_empty() && parts.len() <= MAX_ARTIFACT_PARTS)
+            .ok_or_else(|| {
+                A2aError::new(
+                    "a2a_response_invalid",
+                    "A2A Artifact partsが不正または上限超過",
+                )
+            })?;
+        let serialized = serde_json::to_vec(artifact)
+            .map_err(|_| A2aError::new("a2a_response_invalid", "A2A Artifactをhash化できない"))?;
+        let artifact_hash = sha256_tagged(&serialized);
+        let text_parts = text_artifact_parts(parts);
+        let (text_only, text_bytes) = match &text_parts {
+            Some(parts) => {
+                let bytes = parts.iter().map(|part| part.len()).sum::<usize>();
+                if bytes <= MAX_ARTIFACT_TEXT_BYTES {
+                    (true, Some(bytes))
+                } else {
+                    (false, None)
+                }
+            }
+            None => (false, None),
+        };
+        manifest.push(json!({
+            "artifact_id": artifact_id.clone(),
+            "artifact_hash": artifact_hash.clone(),
+            "part_count": parts.len(),
+            "text_only": text_only,
+            "text_bytes": text_bytes,
+        }));
+        if let Some((selected_id, selected_hash)) = selection {
+            if artifact_id == selected_id {
+                if artifact_hash != selected_hash {
+                    return Err(A2aError::new(
+                        "a2a_artifact_changed",
+                        "A2A Artifact hashが一覧取得時から変化",
+                    ));
+                }
+                if state != "completed" {
+                    return Err(A2aError::new(
+                        "a2a_artifact_not_ready",
+                        "A2A Artifact全文表示はTask完了後に限る",
+                    ));
+                }
+                let text_parts = text_parts
+                    .filter(|parts| {
+                        parts.iter().map(|part| part.len()).sum::<usize>()
+                            <= MAX_ARTIFACT_TEXT_BYTES
+                            && parts.iter().all(|part| safe_artifact_text(part))
+                    })
+                    .ok_or_else(|| {
+                        A2aError::new(
+                            "a2a_artifact_unsupported",
+                            "A2A Artifactは上限内の安全なtext partsだけを表示できる",
+                        )
+                    })?;
+                let content_bytes = text_parts.iter().map(|part| part.len()).sum::<usize>();
+                let content_hash =
+                    sha256_tagged(&serde_json::to_vec(&text_parts).map_err(|_| {
+                        A2aError::new("a2a_response_invalid", "A2A Artifact本文hashを計算できない")
+                    })?);
+                selected = Some(json!({
+                    "artifact_id": artifact_id,
+                    "artifact_hash": artifact_hash,
+                    "content_hash": content_hash,
+                    "byte_length": content_bytes,
+                    "parts": text_parts,
+                }));
+            }
+        }
+    }
+    if let Some((selected_id, _)) = selection {
+        if selected.is_none() || !ids.contains(selected_id) {
+            return Err(A2aError::new(
+                "a2a_artifact_not_found",
+                "現在のA2A Taskに選択Artifactがない",
+            ));
+        }
+    }
+    Ok((Some(Value::Array(manifest)), selected))
+}
+
+fn text_artifact_parts(parts: &[Value]) -> Option<Vec<String>> {
+    let mut result = Vec::with_capacity(parts.len());
+    for part in parts {
+        let object = part.as_object()?;
+        if object.get("kind").and_then(Value::as_str) != Some("text")
+            || object
+                .keys()
+                .any(|key| !["kind", "text", "metadata", "extensions"].contains(&key.as_str()))
+        {
+            return None;
+        }
+        let text = object.get("text")?.as_str()?;
+        if !safe_artifact_text(text) {
+            return None;
+        }
+        result.push(text.to_string());
+    }
+    Some(result)
+}
+
+fn safe_artifact_text(text: &str) -> bool {
+    text.chars().all(|character| {
+        (!character.is_control() || matches!(character, '\n' | '\r' | '\t'))
+            && !matches!(
+                character,
+                '\u{061c}'
+                    | '\u{200e}'
+                    | '\u{200f}'
+                    | '\u{2028}'
+                    | '\u{2029}'
+                    | '\u{202a}'..='\u{202e}'
+                    | '\u{2066}'..='\u{2069}'
+            )
+    })
 }
 
 fn bounded_external_id(value: Option<&Value>, field: &str) -> Result<String, A2aError> {
@@ -1496,7 +1698,7 @@ mod tests {
             "jsonrpc":"2.0", "id":"request-get-1", "result":{
                 "kind":"task", "id":"task-exact", "contextId":"context-1",
                 "status":{"state":"TASK_STATE_WORKING","message":{"parts":[{"text":sentinel}]}},
-                "artifacts":[{"parts":[{"text":sentinel}]}], "history":[],
+                "artifacts":[{"artifactId":"artifact-1","parts":[{"kind":"text","text":sentinel}],"metadata":{"secret":sentinel}}], "history":[],
                 "metadata":{"secret":sentinel}
             }
         });
@@ -1509,6 +1711,12 @@ mod tests {
         assert_eq!(projected["task_id"], "task-exact");
         assert_eq!(projected["state"], "working");
         assert_eq!(projected["artifact_count"], 1);
+        assert_eq!(
+            projected["artifact_manifest"][0]["artifact_id"],
+            "artifact-1"
+        );
+        assert_eq!(projected["artifact_manifest"][0]["text_only"], true);
+        assert_eq!(projected["selected_artifact"], Value::Null);
         assert_eq!(projected["history_count"], 0);
         assert!(!projected.to_string().contains(sentinel));
 
@@ -1547,6 +1755,97 @@ mod tests {
             .code,
             "a2a_response_invalid"
         );
+    }
+
+    #[test]
+    fn A2A_GetTask選択Artifactは完了textだけhash一致後に全文を返す() {
+        let text = "bounded external result";
+        let artifact = json!({
+            "artifactId":"artifact-exact",
+            "name":"ignored untrusted display metadata",
+            "parts":[{"kind":"text","text":text}],
+            "metadata":{"secret":"must-not-project"}
+        });
+        let artifact_hash =
+            sha256_tagged(&serde_json::to_vec(&artifact).expect("canonical Artifact bytes"));
+        let response = json!({
+            "jsonrpc":"2.0", "id":"request-artifact-1", "result":{
+                "kind":"task", "id":"task-exact", "contextId":"context-1",
+                "status":{"state":"TASK_STATE_COMPLETED"},
+                "artifacts":[artifact], "history":[],
+                "metadata":{"secret":"must-not-project"}
+            }
+        });
+        let raw = serde_json::to_vec(&response).unwrap();
+        let metadata = project_get_task_response(&raw, "request-artifact-1", "task-exact")
+            .expect("Artifact manifest only");
+        assert_eq!(
+            metadata["artifact_manifest"][0]["artifact_hash"],
+            artifact_hash
+        );
+        assert_eq!(metadata["selected_artifact"], Value::Null);
+        assert!(!metadata.to_string().contains(text));
+        assert!(!metadata.to_string().contains("must-not-project"));
+
+        let selected = project_get_task_response_with_artifact(
+            &raw,
+            "request-artifact-1",
+            "task-exact",
+            Some(("artifact-exact", artifact_hash.as_str())),
+        )
+        .expect("explicit full content projection");
+        assert_eq!(selected["selected_artifact"]["parts"][0], text);
+        assert_eq!(
+            selected["selected_artifact"]["content_hash"],
+            sha256_tagged(&serde_json::to_vec(&vec![text]).unwrap())
+        );
+        assert_eq!(selected["selected_artifact"]["byte_length"], text.len());
+        assert!(!selected["selected_artifact"]
+            .to_string()
+            .contains("must-not-project"));
+
+        assert_eq!(
+            project_get_task_response_with_artifact(
+                &raw,
+                "request-artifact-1",
+                "task-exact",
+                Some((
+                    "artifact-exact",
+                    "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+                )),
+            )
+            .unwrap_err()
+            .code,
+            "a2a_artifact_changed"
+        );
+
+        let file_artifact = json!({
+            "artifactId":"artifact-file",
+            "parts":[{"kind":"file","file":{"uri":"file:///secret"}}]
+        });
+        let file_hash = sha256_tagged(&serde_json::to_vec(&file_artifact).unwrap());
+        let mut file_response = response.clone();
+        file_response["result"]["artifacts"] = json!([file_artifact]);
+        let error = project_get_task_response_with_artifact(
+            &serde_json::to_vec(&file_response).unwrap(),
+            "request-artifact-1",
+            "task-exact",
+            Some(("artifact-file", &file_hash)),
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "a2a_artifact_unsupported");
+        assert!(!error.message.contains("file:///secret"));
+
+        let mut working = response;
+        working["result"]["status"]["state"] = json!("TASK_STATE_WORKING");
+        let error = project_get_task_response_with_artifact(
+            &serde_json::to_vec(&working).unwrap(),
+            "request-artifact-1",
+            "task-exact",
+            Some(("artifact-exact", &artifact_hash)),
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "a2a_artifact_not_ready");
     }
 
     #[test]
@@ -1624,6 +1923,7 @@ mod tests {
         let projected = get_task(
             &format!("http://{address}/rpc"),
             "task-query-fixture",
+            None,
             Instant::now() + Duration::from_secs(5),
         )
         .expect("loopback GetTask bounded result");

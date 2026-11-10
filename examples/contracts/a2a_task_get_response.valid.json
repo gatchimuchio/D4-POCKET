@@ -10,7 +10,9 @@
     "state": "working",
     "artifact_count": 0,
     "history_count": 0,
-    "result_hash": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+    "result_hash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+    "artifact_manifest": [],
+    "selected_artifact": null
   },
   "Trust": "pending_review",
   "権限生成": "なし",

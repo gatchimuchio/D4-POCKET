@@ -6541,6 +6541,9 @@ def A2A接続センターの統治経路と境界を検査する() -> list[str]:
         "a2a_task_get_response_history.invalid.json",
         "a2a_task_get_response_authority.invalid.json",
         "a2a_task_get_response_raw.invalid.json",
+        "a2a_task_get_request_missing_artifact_hash.invalid.json",
+        "a2a_task_get_response_unselected_body.invalid.json",
+        "a2a_task_get_response_artifact_not_completed.invalid.json",
     )
     invalid_schema_names = {
         invalid_names[0]: "a2a_connection",
@@ -6553,6 +6556,9 @@ def A2A接続センターの統治経路と境界を検査する() -> list[str]:
         invalid_names[7]: "a2a_task_get_response",
         invalid_names[8]: "a2a_task_get_response",
         invalid_names[9]: "a2a_task_get_response",
+        invalid_names[10]: "a2a_task_get_request",
+        invalid_names[11]: "a2a_task_get_response",
+        invalid_names[12]: "a2a_task_get_response",
     }
     for name in invalid_names:
         try:
@@ -6589,6 +6595,10 @@ def A2A接続センターの統治経路と境界を検査する() -> list[str]:
     }:
         不整合.append("C16補完 A2A GetTask要求が固定fieldまたは状態取得操作でない")
     task_result = load_contract_fixture("a2a_task_get_response.valid.json")
+    task_fields = {
+        "kind", "task_id", "context_id", "state", "artifact_count",
+        "history_count", "result_hash", "artifact_manifest", "selected_artifact",
+    }
     if (
         task_result.get("status") != "accepted"
         or task_result.get("Trust") != "pending_review"
@@ -6596,11 +6606,45 @@ def A2A接続センターの統治経路と境界を検査する() -> list[str]:
         or task_result.get("authority_strip") is not True
         or task_result.get("履歴公開") is not False
         or task_result.get("Credential使用") is not False
+        or task_result.get("公開範囲") != "metadata_only"
         or task_result.get("result", {}).get("history_count") != 0
-        or set(task_result.get("result", {}))
-        != {"kind", "task_id", "context_id", "state", "artifact_count", "history_count", "result_hash"}
+        or task_result.get("result", {}).get("selected_artifact") is not None
+        or set(task_result.get("result", {})) != task_fields
+        or task_result.get("result", {}).get("artifact_count") != len(task_result.get("result", {}).get("artifact_manifest", []))
     ):
-        不整合.append("C16補完 A2A GetTask応答が履歴なしのbounded metadata境界を満たさない")
+        不整合.append("A2A Artifact選択 GetTask metadata応答が履歴なし・未選択本文なしのbounded境界を満たさない")
+    artifact_request = load_contract_fixture("a2a_task_get_artifact_request.valid.json")
+    artifact_response = load_contract_fixture("a2a_task_get_artifact_response.valid.json")
+    request_failures = validate_instance(artifact_request, load_schema("a2a_task_get_request.schema.json"))
+    response_failures = validate_instance(artifact_response, load_schema("a2a_task_get_response.schema.json"))
+    if request_failures or response_failures:
+        不整合.append("A2A Artifact選択のvalid fixtureがschema不適合: " + "; ".join(request_failures + response_failures))
+    selected_result = artifact_response.get("result", {})
+    selected_artifact = selected_result.get("selected_artifact", {})
+    manifest = selected_result.get("artifact_manifest", [])
+    parts = selected_artifact.get("parts", [])
+    expected_content_hash = "sha256:" + hashlib.sha256(json.dumps(parts, ensure_ascii=False, separators=(",", ":")).encode("utf-8")).hexdigest()
+    if (
+        set(artifact_request) != {"版", "操作", "AgentID", "Interface URI", "TaskID", "ArtifactID", "Artifact hash"}
+        or artifact_request.get("ArtifactID") != selected_artifact.get("artifact_id")
+        or artifact_request.get("Artifact hash") != selected_artifact.get("artifact_hash")
+        or artifact_response.get("公開範囲") != "full"
+        or selected_result.get("state") != "completed"
+        or selected_artifact.get("content_hash") != expected_content_hash
+        or selected_artifact.get("byte_length") != sum(len(part.encode("utf-8")) for part in parts)
+        or selected_result.get("artifact_count") != len(manifest)
+        or len(manifest) != 1
+        or manifest[0].get("artifact_id") != selected_artifact.get("artifact_id")
+        or manifest[0].get("artifact_hash") != selected_artifact.get("artifact_hash")
+        or manifest[0].get("text_only") is not True
+        or manifest[0].get("text_bytes") != selected_artifact.get("byte_length")
+        or artifact_response.get("Trust") != "pending_review"
+        or artifact_response.get("権限生成") != "なし"
+        or artifact_response.get("authority_strip") is not True
+        or artifact_response.get("履歴公開") is not False
+        or artifact_response.get("Credential使用") is not False
+    ):
+        不整合.append("A2A Artifact応答が選択hash・完了Task・text本文上限またはAuthority境界を満たさない")
     receipt = load_contract_fixture("a2a_connection_receipt.valid.json")
     if (
         receipt.get("権限生成") != "なし"
@@ -6681,7 +6725,10 @@ def A2A接続センターの統治経路と境界を検査する() -> list[str]:
         ("owner_get_task_confirmation_summary", rust_center + (RUST_HELPER / "src" / "desktop_launcher.rs").read_text(encoding="utf-8")),
         ("a2a_task_query_outcome_unknown", rust_center),
         ("getTask(", (ROOT / "apps/desktop_flutter/lib/services/a2a_connection_client.dart").read_text(encoding="utf-8")),
-        ("native Owner確認してTask状態を一回取得", (ROOT / "apps/desktop_flutter/lib/screens/a2a_connection_center.dart").read_text(encoding="utf-8")),
+        ("native Owner確認してTask状態・Artifact一覧を一回取得", (ROOT / "apps/desktop_flutter/lib/screens/a2a_connection_center.dart").read_text(encoding="utf-8")),
+        ("native Owner確認してこのtext Artifactを全文表示", (ROOT / "apps/desktop_flutter/lib/screens/a2a_connection_center.dart").read_text(encoding="utf-8")),
+        ("Artifact hash", (ROOT / "apps/desktop_flutter/lib/services/a2a_connection_client.dart").read_text(encoding="utf-8")),
+        ("a2a_artifact_changed", (ROOT / "native/rust_helper/src/a2a.rs").read_text(encoding="utf-8")),
         ("A2A接続一覧", protocol + ipc_request + ipc_response),
         ("restored_pending_review", rust_center),
         ("owner_reapproval_required", rust_center),

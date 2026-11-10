@@ -1,0 +1,8 @@
+{
+  "版": 1,
+  "操作": "状態取得",
+  "AgentID": "remote-agent-example",
+  "Interface URI": "http://127.0.0.1:9080/rpc",
+  "TaskID": "task-fixture-1",
+  "ArtifactID": "artifact-fixture-1"
+}

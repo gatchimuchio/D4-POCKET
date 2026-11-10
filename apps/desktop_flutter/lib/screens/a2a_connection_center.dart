@@ -32,6 +32,7 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
   String? _pendingTaskInterfaceUri;
   String? _pendingTaskInterfaceHash;
   String? _pendingTaskId;
+  A2aTaskQueryResult? _taskQueryResult;
 
   @override
   void initState() {
@@ -82,8 +83,8 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
             'Agent Cardは未信頼の外部metadataとして扱います。HTTPはloopback IPv4に限定し、'
             'HTTPSは証明書を検証しpublic IPへ接続します。接続と各Message送信はRust Broker経由でnative Owner確認を行います。'
             'Message送信と手動Task状態照会は無認証のA2A v1.0 JSON-RPC interfaceだけに対応し、Credential値を扱いません。'
-            'Trust・Permission・Approval・Authorityは接続metadataから生成しません。外部本文は表示せずhashと限定metadataだけを返します。'
-            'Task状態照会はWindows/Linuxでのみ各回Owner確認を行い、履歴を取得しません。',
+            'Trust・Permission・Approval・Authorityは接続metadataから生成しません。Taskの履歴・Artifact本文は通常照会では表示しません。'
+            '完了Taskのtext Artifactだけ、Windows/Linuxで毎回native Owner確認を経て上限付き全文表示できます。file/dataは未対応で保存しません。',
           ),
         ),
         if (client == null)
@@ -268,10 +269,55 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
                           : const Icon(Icons.query_stats),
                       label: Text(_gettingTask
                           ? '状態取得中…'
-                          : 'native Owner確認してTask状態を一回取得'),
+                          : 'native Owner確認してTask状態・Artifact一覧を一回取得'),
                     )
                   else
                     const Text('macOSの現行A2A native Owner契約ではTask取得は未対応です。'),
+                  if (_taskQueryResult?.status == 'accepted') ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Task state=${_taskQueryResult!.state ?? 'unknown'} / history=0 / response hash=${_taskQueryResult!.resultHash ?? 'unknown'}',
+                    ),
+                    for (final artifact in _taskQueryResult!.artifacts) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        'Artifact ID=${artifact.artifactId} / hash=${artifact.artifactHash} / parts=${artifact.partCount} / text bytes=${artifact.textBytes?.toString() ?? 'unknown'}',
+                      ),
+                      if (artifact.textOnly &&
+                          artifact.textBytes != null &&
+                          _taskQueryResult!.state == 'completed' &&
+                          supportsNativeTaskQuery)
+                        OutlinedButton.icon(
+                          onPressed: _gettingTask ||
+                                  _loading ||
+                                  _connecting ||
+                                  _sendingMessage
+                              ? null
+                              : () => _getArtifact(artifact),
+                          icon: const Icon(Icons.visibility),
+                          label: const Text(
+                              'native Owner確認してこのtext Artifactを全文表示'),
+                        )
+                      else
+                        const Text('全文表示不可（Task未完了、非text、危険文字、または64 KiB上限超過）。'),
+                    ],
+                    if (_taskQueryResult!.selectedArtifact case final selected?)
+                      BorderedPanel(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('外部Artifact本文（未信頼・全文表示）'),
+                            Text(
+                              'Artifact hash=${selected.artifactHash} / content hash=${selected.contentHash} / ${selected.byteLength} bytes',
+                            ),
+                            for (final part in selected.parts) ...[
+                              const SizedBox(height: 8),
+                              SelectableText(part),
+                            ],
+                          ],
+                        ),
+                      ),
+                  ],
                 ],
               ],
             ),
@@ -414,6 +460,7 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
       );
       if (!mounted) return;
       setState(() {
+        _taskQueryResult = null;
         _sendMessageStatus = result.status == 'unknown'
             ? '送信結果は不明です。二重送信防止のため再送しません。Audit=${result.auditEventId}'
             : 'A2A Message応答を受理しました（Task完了ではありません）。kind=${result.resultKind} / state=${result.remoteState ?? 'unknown'} / id=${result.remoteId} / result hash=${result.resultHash} / Audit=${result.auditEventId}';
@@ -456,7 +503,9 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
     }
     setState(() {
       _gettingTask = true;
-      _sendMessageStatus = 'Task状態取得をBrokerへ送信しています。native Owner確認後に一回だけ照会します。';
+      _taskQueryResult = null;
+      _sendMessageStatus =
+          'Task状態・Artifact一覧をBrokerへ送信しています。native Owner確認後に一回だけ照会します。';
     });
     try {
       final result = await client.getTask(
@@ -466,6 +515,7 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
       );
       if (!mounted) return;
       setState(() {
+        _taskQueryResult = result.status == 'accepted' ? result : null;
         _sendMessageStatus = result.status == 'unknown'
             ? 'Task状態は不明です。自動再取得しません。手動再照会には新しいOwner確認が必要です。Audit=${result.auditEventId}'
             : 'Task metadataを取得しました。state=${result.state} / artifact count=${result.artifactCount} / history count=0 / response hash=${result.resultHash} / Audit=${result.auditEventId}';
@@ -481,11 +531,64 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
     }
   }
 
+  Future<void> _getArtifact(A2aArtifactManifestItem artifact) async {
+    final client = _client;
+    final agentId = _pendingTaskAgentId;
+    final interfaceUri = _pendingTaskInterfaceUri;
+    final taskId = _pendingTaskId;
+    if (client == null ||
+        agentId == null ||
+        interfaceUri == null ||
+        taskId == null ||
+        _taskQueryResult == null ||
+        !_taskQueryResult!.artifacts.any((item) =>
+            item.artifactId == artifact.artifactId &&
+            item.artifactHash == artifact.artifactHash &&
+            item.textOnly) ||
+        _gettingTask ||
+        _loading ||
+        _connecting ||
+        _sendingMessage) {
+      return;
+    }
+    setState(() {
+      _gettingTask = true;
+      _taskQueryResult = null;
+      _sendMessageStatus =
+          '選択Artifactをhash照合してBrokerへ要求しています。native Owner確認後、text全文を一回だけ表示します。';
+    });
+    try {
+      final result = await client.getTask(
+        agentId: agentId,
+        interfaceUri: interfaceUri,
+        taskId: taskId,
+        artifactId: artifact.artifactId,
+        artifactHash: artifact.artifactHash,
+      );
+      if (!mounted) return;
+      setState(() {
+        _taskQueryResult = result;
+        _sendMessageStatus =
+            '選択Artifactを現在hashと照合し、揮発状態で全文表示しました。保存・Audit本文記録はありません。Audit=${result.auditEventId}';
+      });
+    } on Object {
+      if (!mounted) return;
+      setState(() {
+        _taskQueryResult = null;
+        _sendMessageStatus =
+            'Artifactを安全に表示できませんでした。自動再取得しません。新しいOwner確認を含む明示操作が必要です。';
+      });
+    } finally {
+      if (mounted) setState(() => _gettingTask = false);
+    }
+  }
+
   void _clearPendingTask() {
     _pendingTaskAgentId = null;
     _pendingTaskInterfaceUri = null;
     _pendingTaskInterfaceHash = null;
     _pendingTaskId = null;
+    _taskQueryResult = null;
   }
 }
 

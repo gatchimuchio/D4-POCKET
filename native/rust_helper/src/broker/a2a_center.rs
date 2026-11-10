@@ -49,6 +49,10 @@ struct GetTaskRequest {
     interface_uri: String,
     #[serde(rename = "TaskID")]
     task_id: String,
+    #[serde(rename = "ArtifactID")]
+    artifact_id: Option<String>,
+    #[serde(rename = "Artifact hash")]
+    artifact_hash: Option<String>,
 }
 
 struct OneShotA2aPermission {
@@ -1168,6 +1172,15 @@ fn parse_get_task_request(payload: &Value) -> Result<GetTaskRequest, A2aError> {
         || request.operation != "状態取得"
         || !valid_agent_id(&request.agent_id)
         || !crate::a2a::valid_task_id(&request.task_id)
+        || request
+            .artifact_id
+            .as_deref()
+            .is_some_and(|value| !crate::a2a::valid_task_id(value))
+        || request
+            .artifact_hash
+            .as_deref()
+            .is_some_and(|value| !valid_sha256_hash(value))
+        || request.artifact_id.is_some() != request.artifact_hash.is_some()
     {
         return Err(A2aError::new(
             "a2a_task_request_invalid",
@@ -1176,6 +1189,14 @@ fn parse_get_task_request(payload: &Value) -> Result<GetTaskRequest, A2aError> {
     }
     crate::a2a::transport_name(&request.interface_uri)?;
     Ok(request)
+}
+
+fn valid_sha256_hash(value: &str) -> bool {
+    value.len() == 71
+        && value.starts_with("sha256:")
+        && value.as_bytes()[7..]
+            .iter()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
 }
 
 pub(super) fn send_message(
@@ -1432,14 +1453,21 @@ pub(super) fn get_task(
             Err(error) => return reject_get_task(broker, request_id, error, payload_hash),
         };
     let task_id_hash = crate::audit_hash::sha256_tagged(request.task_id.as_bytes());
+    let artifact_id_hash = request
+        .artifact_id
+        .as_deref()
+        .map(|value| crate::audit_hash::sha256_tagged(value.as_bytes()));
     if broker
         .append_audit(
             request_id,
             OP_GET_TASK,
             "received",
             &format!(
-                "A2A GetTask要求を受信。AgentID={} interface_hash={} task_id_hash={}。Task ID実値・URI・response本文はAuditへ保存しない",
-                request.agent_id, interface_hash, task_id_hash
+                "A2A GetTask要求を受信。AgentID={} interface_hash={} task_id_hash={} artifact_id_hash={}。Task／Artifact ID実値・URI・本文はAuditへ保存しない",
+                request.agent_id,
+                interface_hash,
+                task_id_hash,
+                artifact_id_hash.as_deref().unwrap_or("none")
             ),
             EVIDENCE_SOURCE_INTERNAL_STATE,
             payload_hash,
@@ -1476,7 +1504,7 @@ pub(super) fn get_task(
         request_id,
         &request.agent_id,
         &interface_hash,
-        &task_id_hash,
+        payload_hash,
     ) {
         Some(permission) => permission,
         None => {
@@ -1511,12 +1539,7 @@ pub(super) fn get_task(
             "A2A Task取得PermissionのAuditを確定できない",
         );
     }
-    if !permission.consume(
-        request_id,
-        &request.agent_id,
-        &interface_hash,
-        &task_id_hash,
-    ) {
+    if !permission.consume(request_id, &request.agent_id, &interface_hash, payload_hash) {
         return broker.reject_with_payload_hash(
             request_id,
             OP_GET_TASK,
@@ -1531,7 +1554,11 @@ pub(super) fn get_task(
             request_id,
             OP_GET_TASK,
             "started",
-            "一回限りPermissionを消費。A2A GetTaskを一回だけ実行し、historyLength=0でbounded metadataだけを受け取る",
+            if request.artifact_id.is_some() {
+                "一回限りPermissionを消費。A2A GetTaskからhash一致するtext Artifactだけを一回取得し、bounded full表示へ渡す"
+            } else {
+                "一回限りPermissionを消費。A2A GetTaskを一回だけ実行し、historyLength=0でbounded metadataを受け取る"
+            },
             EVIDENCE_SOURCE_INTERNAL_STATE,
             payload_hash,
         )
@@ -1547,6 +1574,10 @@ pub(super) fn get_task(
     match crate::a2a::get_task(
         &request.interface_uri,
         &request.task_id,
+        request
+            .artifact_id
+            .as_deref()
+            .zip(request.artifact_hash.as_deref()),
         std::time::Instant::now() + std::time::Duration::from_secs(15),
     ) {
         Ok(result) => {
@@ -1554,6 +1585,20 @@ pub(super) fn get_task(
                 .get("result_hash")
                 .and_then(Value::as_str)
                 .unwrap_or("unknown");
+            let selected_artifact = result.get("selected_artifact");
+            let selected_artifact_hash = selected_artifact
+                .and_then(|value| value.get("artifact_hash"))
+                .and_then(Value::as_str)
+                .unwrap_or("none");
+            let selected_content_hash = selected_artifact
+                .and_then(|value| value.get("content_hash"))
+                .and_then(Value::as_str)
+                .unwrap_or("none");
+            let selected_byte_length = selected_artifact
+                .and_then(|value| value.get("byte_length"))
+                .and_then(Value::as_u64)
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "none".to_string());
             let body = json!({
                 "版": VERSION,
                 "AgentID": request.agent_id,
@@ -1563,7 +1608,7 @@ pub(super) fn get_task(
                 "Trust": "pending_review",
                 "権限生成": "なし",
                 "authority_strip": true,
-                "公開範囲": "metadata_only",
+                "公開範囲": if request.artifact_id.is_some() { "full" } else { "metadata_only" },
                 "履歴公開": false,
                 "Credential使用": false
             });
@@ -1572,8 +1617,15 @@ pub(super) fn get_task(
                 OP_GET_TASK,
                 "accepted",
                 &format!(
-                    "A2A GetTask metadataを受領。AgentID={} interface_hash={} task_id_hash={} result_hash={}。履歴・Task本文・Artifact本文は保存・投影しない",
-                    request.agent_id, interface_hash, task_id_hash, result_hash
+                    "A2A GetTask結果を受領。AgentID={} interface_hash={} task_id_hash={} artifact_id_hash={} result_hash={} selected_artifact_hash={} content_hash={} byte_length={}。Artifact本文はAuditへ保存しない",
+                    request.agent_id,
+                    interface_hash,
+                    task_id_hash,
+                    artifact_id_hash.as_deref().unwrap_or("none"),
+                    result_hash,
+                    selected_artifact_hash,
+                    selected_content_hash,
+                    selected_byte_length
                 ),
                 "LIVE_RUNTIME",
                 payload_hash,
@@ -1599,6 +1651,9 @@ pub(super) fn get_task(
                 body: Some(body),
                 shutdown_requested: broker.shutdown_requested,
             }
+        }
+        Err(error) if error.code.starts_with("a2a_artifact_") => {
+            reject_get_task(broker, request_id, error, payload_hash)
         }
         Err(error) if error.code == "a2a_remote_task_rejected" => broker.reject_with_payload_hash(
             request_id,
@@ -1888,10 +1943,16 @@ pub(crate) fn owner_send_message_confirmation_summary(
 
 pub(crate) fn owner_get_task_confirmation_summary(
     payload: &Value,
-) -> Result<(String, String, String), String> {
+) -> Result<(String, String, String, Option<String>, Option<String>), String> {
     let request = parse_get_task_request(payload).map_err(|error| error.message)?;
     crate::a2a::transport_name(&request.interface_uri).map_err(|error| error.message)?;
-    Ok((request.agent_id, request.interface_uri, request.task_id))
+    Ok((
+        request.agent_id,
+        request.interface_uri,
+        request.task_id,
+        request.artifact_id,
+        request.artifact_hash,
+    ))
 }
 
 fn valid_agent_id(value: &str) -> bool {
@@ -2139,7 +2200,16 @@ mod tests {
         let address = listener.local_addr().expect("fixture address");
         let card_uri = format!("http://{address}/.well-known/agent-card.json");
         let interface_uri = format!("http://{address}/rpc");
-        let worker = std::thread::spawn(move || -> Result<(Value, Value, Value), String> {
+        let remote_artifact = json!({
+            "artifactId": "fixture-artifact-1",
+            "parts": [{"kind": "text", "text": "private-get-task-marker"}],
+            "metadata": {"private": "artifact-metadata-marker"}
+        });
+        let remote_artifact_hash = crate::audit_hash::sha256_tagged(
+            &serde_json::to_vec(&remote_artifact).expect("fixture Artifact serialization"),
+        );
+        let worker_artifact = remote_artifact.clone();
+        let worker = std::thread::spawn(move || -> Result<(Value, Value, Value, Value), String> {
             fn read_request(stream: &mut std::net::TcpStream) -> Result<(String, Vec<u8>), String> {
                 let mut bytes = Vec::new();
                 let mut chunk = [0u8; 1024];
@@ -2303,11 +2373,45 @@ mod tests {
                 "jsonrpc":"2.0", "id":task_request["id"], "result":{
                     "kind":"task", "id":"fixture-task-1", "contextId":"fixture-context-1",
                     "status":{"state":"TASK_STATE_COMPLETED","message":{"parts":[{"text":"private-get-task-marker"}]}},
-                    "artifacts":[{"parts":[{"text":"private-get-task-marker"}]}], "history":[]
+                    "artifacts":[worker_artifact.clone()], "history":[]
                 }
             })).map_err(|error| error.to_string())?;
             respond(&mut task_stream, &task_response)?;
-            Ok((request, unknown_request, task_request))
+
+            let (mut selected_stream, _) = listener.accept().map_err(|error| error.to_string())?;
+            selected_stream
+                .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+                .map_err(|error| error.to_string())?;
+            selected_stream
+                .set_write_timeout(Some(std::time::Duration::from_secs(5)))
+                .map_err(|error| error.to_string())?;
+            let (selected_header, selected_body) = read_request(&mut selected_stream)?;
+            if !selected_header.starts_with("POST /rpc HTTP/1.1\r\n") {
+                return Err("selected A2A GetTask HTTP method mismatch".into());
+            }
+            let selected_task_request: Value =
+                serde_json::from_slice(&selected_body).map_err(|error| error.to_string())?;
+            if selected_task_request["method"] != "GetTask"
+                || selected_task_request["params"]["id"] != "fixture-task-1"
+                || selected_task_request["params"]["historyLength"] != 0
+            {
+                return Err("selected A2A GetTask parameters mismatch".into());
+            }
+            let selected_response = serde_json::to_vec(&json!({
+                "jsonrpc":"2.0", "id":selected_task_request["id"], "result":{
+                    "kind":"task", "id":"fixture-task-1", "contextId":"fixture-context-1",
+                    "status":{"state":"TASK_STATE_COMPLETED"},
+                    "artifacts":[worker_artifact], "history":[]
+                }
+            }))
+            .map_err(|error| error.to_string())?;
+            respond(&mut selected_stream, &selected_response)?;
+            Ok((
+                request,
+                unknown_request,
+                task_request,
+                selected_task_request,
+            ))
         });
 
         let mut connection_payload = valid_payload();
@@ -2373,7 +2477,23 @@ mod tests {
             true,
             "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
         );
-        let (request, uncertain_request, task_request) = worker
+        let artifact_payload = json!({
+            "版": 1,
+            "操作": "状態取得",
+            "AgentID": "remote-agent-example",
+            "Interface URI": interface_uri,
+            "TaskID": "fixture-task-1",
+            "ArtifactID": "fixture-artifact-1",
+            "Artifact hash": remote_artifact_hash
+        });
+        let artifact_result = get_task(
+            &mut broker,
+            "a2a-get-task-artifact-positive-request",
+            &artifact_payload,
+            true,
+            "sha256:abababababababababababababababababababababababababababababababab",
+        );
+        let (request, uncertain_request, task_request, selected_task_request) = worker
             .join()
             .expect("SendMessage fixture thread")
             .expect("fixture requests");
@@ -2419,12 +2539,34 @@ mod tests {
         assert_eq!(task_body["履歴公開"], false);
         assert_eq!(task_body["Credential使用"], false);
         assert!(!task_body.to_string().contains("private-get-task-marker"));
+        assert!(!task_body.to_string().contains("artifact-metadata-marker"));
+        assert_eq!(
+            task_body["result"]["artifact_manifest"][0]["artifact_id"],
+            "fixture-artifact-1"
+        );
+        assert_eq!(task_body["result"]["selected_artifact"], Value::Null);
+        assert_eq!(selected_task_request["method"], "GetTask");
+        assert_eq!(artifact_result.status, BrokerStatus::Accepted);
+        let artifact_body = artifact_result.body.expect("explicit selected Artifact");
+        assert_eq!(artifact_body["公開範囲"], "full");
+        assert_eq!(
+            artifact_body["result"]["selected_artifact"]["parts"][0],
+            "private-get-task-marker"
+        );
+        assert_eq!(
+            artifact_body["result"]["selected_artifact"]["artifact_hash"],
+            remote_artifact_hash
+        );
+        assert!(!artifact_body
+            .to_string()
+            .contains("artifact-metadata-marker"));
         assert!(broker.audit_events().iter().all(|event| {
             !event.reason.contains(secret_message)
                 && !event.reason.contains("uncertain fixture message")
                 && !event.reason.contains("private-response-marker")
                 && !event.reason.contains("uncertain-response-private")
                 && !event.reason.contains("private-get-task-marker")
+                && !event.reason.contains("artifact-metadata-marker")
                 && !event.reason.contains("fixture-task-1")
                 && !event.reason.contains(&interface_uri)
         }));
@@ -2443,6 +2585,10 @@ mod tests {
                 "missing A2A send Audit decision: {decision}"
             );
         }
+        assert!(broker
+            .audit_events()
+            .iter()
+            .any(|event| { event.operation == OP_GET_TASK && event.decision == "accepted" }));
         assert_eq!(
             broker.a2a_connections["remote-agent-example"]["Trust"]["state"],
             "pending_review"

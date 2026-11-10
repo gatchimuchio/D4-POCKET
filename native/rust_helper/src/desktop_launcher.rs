@@ -173,6 +173,8 @@ enum DesktopOwnerOperationSummary {
         agent_id: String,
         target: String,
         task_id: String,
+        artifact_id: Option<String>,
+        artifact_hash: Option<String>,
         payload_hash: String,
     },
     McpDisconnect {
@@ -1842,12 +1844,14 @@ fn owner_operation_candidate_with_product_identity(
             }
         }
         BrokerOperation::A2Aタスク状態取得 => {
-            let (agent_id, target, task_id) =
+            let (agent_id, target, task_id, artifact_id, artifact_hash) =
                 crate::broker::a2a_center::owner_get_task_confirmation_summary(payload).ok()?;
             DesktopOwnerOperationSummary::A2aGetTask {
                 agent_id,
                 target,
                 task_id,
+                artifact_id,
+                artifact_hash,
                 payload_hash,
             }
         }
@@ -3052,6 +3056,8 @@ fn owner_confirmation_text_for_identity(
             agent_id,
             target,
             task_id,
+            artifact_id,
+            artifact_hash,
             payload_hash,
         } => {
             let transport = if target.starts_with("https://") {
@@ -3059,14 +3065,27 @@ fn owner_confirmation_text_for_identity(
             } else {
                 "HTTP（IPv4 loopback限定）"
             };
-            format!(
-                "未信頼の外部A2A AgentからTask状態metadataを一回取得しますか？\n\nAgent ID: {}\n接続先: {}\nTransport: {}\nTask ID: {}\n\n履歴は要求せず、Task状態・件数・response hashだけを返します。Task／Artifact本文、Credential、Permission、Approval、Trust、Authorityを表示・生成しません。各取得に新しい一回限りPermissionを要求し、再取得は新しいnative Owner確認が必要です。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
-                owner_confirmation_value(agent_id),
-                owner_confirmation_value(target),
-                transport,
-                owner_confirmation_value(task_id),
-                payload_hash
-            )
+            if let (Some(artifact_id), Some(artifact_hash)) = (artifact_id, artifact_hash) {
+                format!(
+                    "未信頼の外部A2A Agentから選択Artifactのtext本文を一回取得し、画面へ全文表示しますか？\n\nAgent ID: {}\n接続先: {}\nTransport: {}\nTask ID: {}\nArtifact ID: {}\nArtifact hash: {}\n\nTask完了済み、現在のArtifact hash一致、text parts合計64 KiB以下の場合だけ選択本文を表示します。GetTask応答に他Artifact本文やfile/dataが含まれる場合も、選択した安全なtext以外はprojectionから除外し、画面・Audit・Workspaceへ出しません。履歴は要求せずCredentialも使いません。全文は画面内の揮発状態だけで扱い、Artifactから権限を生成しません。新しい一回Permissionを消費します。\n\npayload hash:\n{}",
+                    owner_confirmation_value(agent_id),
+                    owner_confirmation_value(target),
+                    transport,
+                    owner_confirmation_value(task_id),
+                    owner_confirmation_value(artifact_id),
+                    artifact_hash,
+                    payload_hash
+                )
+            } else {
+                format!(
+                    "未信頼の外部A2A AgentからTask状態metadataとArtifact一覧を一回取得しますか？\n\nAgent ID: {}\n接続先: {}\nTransport: {}\nTask ID: {}\n\nGetTask応答にArtifact partsが含まれる場合も、画面へ返すのはTask状態とArtifact ID/hash/type/size、response hashだけです。Artifact本文はprojection・Audit・Workspaceへ出しません。Credential、Approval、Trust、Authorityを生成しません。各取得に新しい一回限りPermissionを要求し、再取得は新しいnative Owner確認が必要です。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
+                    owner_confirmation_value(agent_id),
+                    owner_confirmation_value(target),
+                    transport,
+                    owner_confirmation_value(task_id),
+                    payload_hash
+                )
+            }
         }
         DesktopOwnerOperationSummary::AdapterManagement {
             operation,
@@ -8091,6 +8110,8 @@ mod tests {
             agent_id,
             target,
             task_id,
+            artifact_id,
+            artifact_hash,
             payload_hash,
         } = summary
         else {
@@ -8099,19 +8120,61 @@ mod tests {
         assert_eq!(agent_id, "remote-agent-fixture");
         assert_eq!(target, "http://127.0.0.1:9080/rpc");
         assert_eq!(task_id, "task-fixture-42");
+        assert_eq!(artifact_id, None);
+        assert_eq!(artifact_hash, None);
         assert_eq!(payload_hash, request["payload_hash"]);
         let prompt = owner_confirmation_text(&DesktopOwnerOperationSummary::A2aGetTask {
             agent_id,
             target,
             task_id,
+            artifact_id,
+            artifact_hash,
             payload_hash,
         });
-        assert!(prompt.contains("履歴は要求せず"));
-        assert!(prompt.contains("Task状態metadataを一回取得"));
+        assert!(prompt.contains("Task状態metadataとArtifact一覧"));
+        assert!(prompt.contains("GetTask応答にArtifact partsが含まれる場合も"));
         assert!(prompt.contains("再取得は新しいnative Owner確認が必要"));
         assert!(prompt.contains("Task／Artifact本文"));
         assert!(prompt.contains("Credential"));
         assert!(!prompt.contains("remote-task-secret"));
+
+        let mut selected_payload = payload.clone();
+        selected_payload["ArtifactID"] = serde_json::json!("artifact-fixture-42");
+        selected_payload["Artifact hash"] = serde_json::json!(format!("sha256:{}", "c".repeat(64)));
+        let selected_request = desktop_owner_request(
+            "A2Aタスク状態取得",
+            "desktop-a2a-get-task-artifact",
+            "desktop-a2a-get-task-artifact-nonce",
+            selected_payload,
+        );
+        let (_, selected_summary) =
+            owner_operation_candidate(selected_request.to_string().as_bytes(), &endpoint)
+                .expect("選択Artifact要求はfresh native確認");
+        let DesktopOwnerOperationSummary::A2aGetTask {
+            agent_id,
+            target,
+            task_id,
+            artifact_id,
+            artifact_hash,
+            payload_hash,
+        } = selected_summary
+        else {
+            panic!("Artifact取得もGetTask専用native確認summaryを使う")
+        };
+        let selected_prompt = owner_confirmation_text(&DesktopOwnerOperationSummary::A2aGetTask {
+            agent_id,
+            target,
+            task_id,
+            artifact_id,
+            artifact_hash,
+            payload_hash,
+        });
+        assert!(selected_prompt.contains("artifact-fixture-42"));
+        assert!(selected_prompt.contains(&"c".repeat(64)));
+        assert!(selected_prompt.contains("64 KiB以下"));
+        assert!(selected_prompt.contains("画面内の揮発状態だけ"));
+        assert!(selected_prompt.contains("Credential"));
+        assert!(!selected_prompt.contains("artifact-private-body"));
 
         let invalid_payload = serde_json::json!({
             "版": 1,

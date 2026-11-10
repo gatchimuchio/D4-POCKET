@@ -2,49 +2,351 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/gui-shell/schemas/a2a_task_get_response.schema.json",
   "title": "A2A一回Task状態取得結果（A2aTaskGetResult）",
-  "description": "一回取得したTask状態のbounded metadata、または結果不明。Task本文、履歴、Artifact本文、Credential、Authorityを含めない。",
+  "description": "履歴を含まないbounded Task metadataとArtifact manifest、または利用者がfresh native Owner確認後に選択したcompleted Taskのtext-only Artifact全文を返す。raw応答、未選択本文、file/data、Credential、Authorityを含めない。",
   "type": "object",
-  "required": ["版", "AgentID", "interface_hash", "status", "result", "Trust", "権限生成", "authority_strip", "公開範囲", "履歴公開", "Credential使用"],
+  "required": [
+    "版",
+    "AgentID",
+    "interface_hash",
+    "status",
+    "result",
+    "Trust",
+    "権限生成",
+    "authority_strip",
+    "公開範囲",
+    "履歴公開",
+    "Credential使用"
+  ],
   "additionalProperties": false,
   "properties": {
-    "版": { "const": 1 },
-    "AgentID": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$(?![\\s\\S])" },
-    "interface_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])" },
-    "status": { "enum": ["accepted", "unknown"] },
+    "版": {
+      "const": 1
+    },
+    "AgentID": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$(?![\\s\\S])"
+    },
+    "interface_hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+    },
+    "status": {
+      "enum": [
+        "accepted",
+        "unknown"
+      ]
+    },
     "result": {
       "oneOf": [
         {
           "type": "object",
-          "required": ["kind", "task_id", "context_id", "state", "artifact_count", "history_count", "result_hash"],
+          "required": [
+            "kind",
+            "task_id",
+            "context_id",
+            "state",
+            "artifact_count",
+            "history_count",
+            "result_hash",
+            "artifact_manifest",
+            "selected_artifact"
+          ],
           "additionalProperties": false,
           "properties": {
-            "kind": { "const": "task" },
-            "task_id": { "type": "string", "minLength": 1, "maxLength": 256 },
-            "context_id": { "type": ["string", "null"], "maxLength": 256 },
-            "state": { "enum": ["unknown", "submitted", "working", "completed", "failed", "canceled", "input_required", "rejected", "auth_required"] },
-            "artifact_count": { "type": "integer", "minimum": 0, "maximum": 64 },
-            "history_count": { "const": 0 },
-            "result_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])" }
+            "kind": {
+              "const": "task"
+            },
+            "task_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "context_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 256
+            },
+            "state": {
+              "enum": [
+                "unknown",
+                "submitted",
+                "working",
+                "completed",
+                "failed",
+                "canceled",
+                "input_required",
+                "rejected",
+                "auth_required"
+              ]
+            },
+            "artifact_count": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 32
+            },
+            "history_count": {
+              "const": 0
+            },
+            "result_hash": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+            },
+            "artifact_manifest": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "object",
+                "required": [
+                  "artifact_id",
+                  "artifact_hash",
+                  "part_count",
+                  "text_only",
+                  "text_bytes"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "artifact_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "artifact_hash": {
+                    "type": "string",
+                    "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+                  },
+                  "part_count": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 32
+                  },
+                  "text_only": {
+                    "type": "boolean"
+                  },
+                  "text_bytes": {
+                    "oneOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 65536
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": {
+                        "text_only": {
+                          "const": true
+                        }
+                      },
+                      "required": [
+                        "text_only"
+                      ]
+                    },
+                    "then": {
+                      "properties": {
+                        "text_bytes": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "text_only": {
+                          "const": false
+                        }
+                      },
+                      "required": [
+                        "text_only"
+                      ]
+                    },
+                    "then": {
+                      "properties": {
+                        "text_bytes": {
+                          "type": "null"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "selected_artifact": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "artifact_id",
+                    "artifact_hash",
+                    "content_hash",
+                    "byte_length",
+                    "parts"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "artifact_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 256
+                    },
+                    "artifact_hash": {
+                      "type": "string",
+                      "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+                    },
+                    "content_hash": {
+                      "type": "string",
+                      "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+                    },
+                    "byte_length": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 65536
+                    },
+                    "parts": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 32,
+                      "items": {
+                        "type": "string",
+                        "maxLength": 65536
+                      }
+                    }
+                  }
+                }
+              ]
+            }
           }
         },
-        { "type": "null" }
+        {
+          "type": "null"
+        }
       ]
     },
-    "Trust": { "const": "pending_review" },
-    "権限生成": { "const": "なし" },
-    "authority_strip": { "const": true },
-    "公開範囲": { "const": "metadata_only" },
-    "履歴公開": { "const": false },
-    "Credential使用": { "const": false }
+    "Trust": {
+      "const": "pending_review"
+    },
+    "権限生成": {
+      "const": "なし"
+    },
+    "authority_strip": {
+      "const": true
+    },
+    "公開範囲": {
+      "enum": [
+        "metadata_only",
+        "full"
+      ]
+    },
+    "履歴公開": {
+      "const": false
+    },
+    "Credential使用": {
+      "const": false
+    }
   },
   "allOf": [
     {
-      "if": { "properties": { "status": { "const": "unknown" } }, "required": ["status"] },
-      "then": { "properties": { "result": { "type": "null" } } }
+      "if": {
+        "properties": {
+          "status": {
+            "const": "unknown"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "type": "null"
+          },
+          "公開範囲": {
+            "const": "metadata_only"
+          }
+        }
+      }
     },
     {
-      "if": { "properties": { "status": { "const": "accepted" } }, "required": ["status"] },
-      "then": { "properties": { "result": { "type": "object" } } }
+      "if": {
+        "properties": {
+          "status": {
+            "const": "accepted"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "公開範囲": {
+            "const": "metadata_only"
+          }
+        },
+        "required": [
+          "公開範囲"
+        ]
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "properties": {
+              "selected_artifact": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "公開範囲": {
+            "const": "full"
+          }
+        },
+        "required": [
+          "公開範囲"
+        ]
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "properties": {
+              "state": {
+                "const": "completed"
+              },
+              "selected_artifact": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
     }
   ]
 }

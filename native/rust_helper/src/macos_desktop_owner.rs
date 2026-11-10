@@ -624,16 +624,22 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
     } else if operation == "A2Aタスク状態取得" {
         #[cfg(target_os = "linux")]
         {
-            let (agent, target, task_id) =
+            let (agent, target, task_id, artifact_id, artifact_hash) =
                 crate::broker::a2a_center::owner_get_task_confirmation_summary(payload).ok()?;
             let transport = if target.starts_with("https://") {
                 "HTTPS（OS既定CAで証明書検証、public IP固定、redirectなし）"
             } else {
                 "HTTP（IPv4 loopback限定）"
             };
-            format!(
-                "未信頼の外部A2A AgentからTask状態metadataを一回取得しますか？\nAgent ID: {agent}\n接続先: {target}\nTransport: {transport}\nTask ID: {task_id}\n要求hash: {hash}\n\n履歴は要求せず、Task状態・件数・response hashだけを返します。Task／Artifact本文、Credential、Permission、Approval、Trust、Authorityを表示・生成しません。各取得に新しい一回限りPermissionを要求し、再取得は新しいnative Owner確認が必要です。"
-            )
+            if let (Some(artifact_id), Some(artifact_hash)) = (artifact_id, artifact_hash) {
+                format!(
+                    "未信頼の外部A2A Agentから選択Artifactのtext本文を一回取得し、画面へ全文表示しますか？\nAgent ID: {agent}\n接続先: {target}\nTransport: {transport}\nTask ID: {task_id}\nArtifact ID: {artifact_id}\nArtifact hash: {artifact_hash}\n要求hash: {hash}\n\nTask完了済み、現在のArtifact hash一致、text parts合計64 KiB以下の場合だけ選択本文を表示します。GetTask応答に他Artifact本文やfile/dataが含まれる場合もあり、受信自体を防ぐselectorはありません。履歴はhistoryLength=0で要求し、履歴が返れば拒否します。選択した安全なtext以外は画面・Audit・Workspaceへ投影／保存せず、Credentialは使用せず、Artifactから権限を生成しません。全文は画面内の揮発状態だけで扱います。新しい一回Permissionを消費します。"
+                )
+            } else {
+                format!(
+                    "未信頼の外部A2A AgentからTask状態metadataとArtifact一覧を一回取得しますか？\nAgent ID: {agent}\n接続先: {target}\nTransport: {transport}\nTask ID: {task_id}\n要求hash: {hash}\n\nGetTask応答にArtifact partsが含まれる場合も、画面へ返すのはTask状態とArtifact ID/hash/type/size、response hashだけです。Artifact本文はprojection・Audit・Workspaceへ出しません。Credential、Approval、Trust、Authorityを生成しません。各取得に新しい一回限りPermissionを要求し、再取得は新しいnative Owner確認が必要です。"
+                )
+            }
         }
         #[cfg(not(target_os = "linux"))]
         {
@@ -1417,8 +1423,39 @@ mod a2a_tests {
                 candidate(&bytes, &endpoint).expect("Linux A2A GetTask native確認候補");
             assert!(confirmation.summary.contains("platform-a2a-fixture"));
             assert!(confirmation.summary.contains("task-platform-fixture"));
-            assert!(confirmation.summary.contains("履歴は要求せず"));
+            assert!(confirmation
+                .summary
+                .contains("Task状態metadataとArtifact一覧"));
+            assert!(confirmation
+                .summary
+                .contains("GetTask応答にArtifact partsが含まれる場合も"));
             assert_eq!(confirmation.response_timeout, Duration::from_secs(25));
+
+            let mut selected_payload = payload.clone();
+            selected_payload["ArtifactID"] = json!("platform-artifact-fixture");
+            selected_payload["Artifact hash"] = json!(format!("sha256:{}", "a".repeat(64)));
+            let selected_frame = json!({
+                "request_id":"platform-get-selected-artifact",
+                "nonce":"platform-get-selected-artifact-nonce",
+                "issued_at":BrokerRequestEnvelope::current_issued_at(),
+                "operation":"A2Aタスク状態取得",
+                "metadata":{"client":"desktop_flutter"},
+                "payload_hash":canonical_payload_hash(Some(&selected_payload)),
+                "payload":selected_payload
+            });
+            let selected = candidate(&serde_json::to_vec(&selected_frame).unwrap(), &endpoint)
+                .expect("Linuxの選択Artifactにもfresh native確認");
+            assert!(selected.summary.contains("platform-artifact-fixture"));
+            assert!(selected.summary.contains(&"a".repeat(64)));
+            assert!(selected.summary.contains("全文表示"));
+            assert!(selected.summary.contains("Credentialは使用せず"));
+            assert!(selected
+                .summary
+                .contains("受信自体を防ぐselectorはありません"));
+            assert!(selected.summary.contains("履歴が返れば拒否"));
+            assert!(!selected
+                .summary
+                .contains("file/data／履歴／Credentialは取得しません"));
         }
         #[cfg(target_os = "macos")]
         assert!(candidate(&bytes, &endpoint).is_none());

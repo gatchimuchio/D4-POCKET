@@ -2,15 +2,95 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/gui-shell/schemas/a2a_task_get_request.schema.json",
   "title": "A2A一回Task状態取得要求（A2aTaskGetRequest）",
-  "description": "Task IDへ束縛した、無認証A2A v1.0 JSON-RPC GetTask要求。履歴、Credential、Authorityを要求しない。",
+  "description": "Task IDへ束縛した無認証A2A v1.0 JSON-RPC GetTask要求。履歴、Credential、Authorityを要求しない。選択Artifact全文取得ではArtifactIDと一覧取得時hashを必ず組で指定し、新規Owner確認・Permissionへ束縛する。",
   "type": "object",
-  "required": ["版", "操作", "AgentID", "Interface URI", "TaskID"],
+  "required": [
+    "版",
+    "操作",
+    "AgentID",
+    "Interface URI",
+    "TaskID"
+  ],
   "additionalProperties": false,
   "properties": {
-    "版": { "const": 1 },
-    "操作": { "const": "状態取得" },
-    "AgentID": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$(?![\\s\\S])" },
-    "Interface URI": { "type": "string", "minLength": 1, "maxLength": 2048, "pattern": "^https?://" },
-    "TaskID": { "type": "string", "minLength": 1, "maxLength": 256, "description": "SendMessageが返した未信頼Task ID。Brokerが現在のAgent receipt、interface hash、要求IDを再検証する。" }
-  }
+    "版": {
+      "const": 1
+    },
+    "操作": {
+      "const": "状態取得"
+    },
+    "AgentID": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$(?![\\s\\S])"
+    },
+    "Interface URI": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048,
+      "pattern": "^https?://"
+    },
+    "TaskID": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "description": "SendMessageが返した未信頼Task ID。Brokerが現在のAgent receipt、interface hash、要求IDを再検証する。"
+    },
+    "ArtifactID": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "description": "metadata一覧から利用者が明示選択した未信頼Artifact ID。Artifact hashとの組が必須。"
+    },
+    "Artifact hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])",
+      "description": "metadata一覧で観測したArtifact全体hash。現在のGetTask応答と一致する場合だけtext本文を返す。"
+    }
+  },
+  "dependentRequired": {
+    "ArtifactID": [
+      "Artifact hash"
+    ],
+    "Artifact hash": [
+      "ArtifactID"
+    ]
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "ArtifactID": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ArtifactID"
+        ]
+      },
+      "then": {
+        "required": [
+          "Artifact hash"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "Artifact hash": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "Artifact hash"
+        ]
+      },
+      "then": {
+        "required": [
+          "ArtifactID"
+        ]
+      }
+    }
+  ]
 }

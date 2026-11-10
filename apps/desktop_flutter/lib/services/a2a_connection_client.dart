@@ -73,6 +73,38 @@ class A2aMessageSendResult {
   final String? resultHash;
 }
 
+class A2aArtifactManifestItem {
+  const A2aArtifactManifestItem({
+    required this.artifactId,
+    required this.artifactHash,
+    required this.partCount,
+    required this.textOnly,
+    required this.textBytes,
+  });
+
+  final String artifactId;
+  final String artifactHash;
+  final int partCount;
+  final bool textOnly;
+  final int? textBytes;
+}
+
+class A2aSelectedArtifact {
+  const A2aSelectedArtifact({
+    required this.artifactId,
+    required this.artifactHash,
+    required this.contentHash,
+    required this.byteLength,
+    required this.parts,
+  });
+
+  final String artifactId;
+  final String artifactHash;
+  final String contentHash;
+  final int byteLength;
+  final List<String> parts;
+}
+
 class A2aTaskQueryResult {
   const A2aTaskQueryResult({
     required this.status,
@@ -83,6 +115,8 @@ class A2aTaskQueryResult {
     required this.historyCount,
     required this.resultHash,
     required this.auditEventId,
+    this.artifacts = const [],
+    this.selectedArtifact,
   });
 
   final String status;
@@ -93,6 +127,8 @@ class A2aTaskQueryResult {
   final int? historyCount;
   final String? resultHash;
   final String auditEventId;
+  final List<A2aArtifactManifestItem> artifacts;
+  final A2aSelectedArtifact? selectedArtifact;
 }
 
 class A2aConnectionClient {
@@ -341,24 +377,38 @@ class A2aConnectionClient {
     required String agentId,
     required String interfaceUri,
     required String taskId,
+    String? artifactId,
+    String? artifactHash,
   }) async {
     final normalizedId = agentId.trim();
     final normalizedUri = interfaceUri.trim();
+    final selectingArtifact = artifactId != null || artifactHash != null;
     if (!_validAgentId(normalizedId) ||
         !_validInterfaceUri(normalizedUri) ||
-        !_validExternalText(taskId, 256) ||
-        taskId.trim().isEmpty) {
-      throw const BrokerClientException('A2A Task照会の対象が不正です');
+        !_validSafeExternalText(taskId, 256) ||
+        taskId.trim().isEmpty ||
+        (selectingArtifact &&
+            (artifactId == null ||
+                artifactHash == null ||
+                !_validSafeExternalText(artifactId, 256) ||
+                artifactId.trim().isEmpty ||
+                !_validSha256(artifactHash)))) {
+      throw const BrokerClientException('A2A Task/Artifact照会の対象が不正です');
+    }
+    final payload = <String, Object?>{
+      '版': 1,
+      '操作': '状態取得',
+      'AgentID': normalizedId,
+      'Interface URI': normalizedUri,
+      'TaskID': taskId,
+    };
+    if (selectingArtifact) {
+      payload['ArtifactID'] = artifactId;
+      payload['Artifact hash'] = artifactHash;
     }
     final response = await _transport.request(
       'A2Aタスク状態取得',
-      payload: {
-        '版': 1,
-        '操作': '状態取得',
-        'AgentID': normalizedId,
-        'Interface URI': normalizedUri,
-        'TaskID': taskId,
-      },
+      payload: payload,
     );
     if (response['operation'] != 'A2Aタスク状態取得' ||
         response['audit_event_id'] is! String ||
@@ -389,13 +439,14 @@ class A2aConnectionClient {
         body['Trust'] != 'pending_review' ||
         body['権限生成'] != 'なし' ||
         body['authority_strip'] != true ||
-        body['公開範囲'] != 'metadata_only' ||
         body['履歴公開'] != false ||
         body['Credential使用'] != false) {
       throw const BrokerClientException('A2A Task照会応答の安全metadataが不正です');
     }
     if (body['status'] == 'unknown') {
-      if (response['status'] != 'suspended' ||
+      if (selectingArtifact ||
+          body['公開範囲'] != 'metadata_only' ||
+          response['status'] != 'suspended' ||
           response['error'] is! Map ||
           (response['error'] as Map)['code'] !=
               'a2a_task_query_outcome_unknown' ||
@@ -415,7 +466,8 @@ class A2aConnectionClient {
     }
     if (body['status'] != 'accepted' ||
         response['status'] != 'accepted' ||
-        response['error'] != null) {
+        response['error'] != null ||
+        body['公開範囲'] != (selectingArtifact ? 'full' : 'metadata_only')) {
       throw const BrokerClientException('A2A Task状態を取得できませんでした');
     }
     final result = _object(body['result'], 'A2A Task metadata');
@@ -427,6 +479,8 @@ class A2aConnectionClient {
       'artifact_count',
       'history_count',
       'result_hash',
+      'artifact_manifest',
+      'selected_artifact',
     };
     if (result.length != resultFields.length ||
         result.keys.any((key) => !resultFields.contains(key)) ||
@@ -440,6 +494,103 @@ class A2aConnectionClient {
         !_validSha256(result['result_hash'] as String)) {
       throw const BrokerClientException('A2A Task metadata projectionが不正です');
     }
+    final rawArtifacts = result['artifact_manifest'];
+    if (rawArtifacts is! List || rawArtifacts.length > 32) {
+      throw const BrokerClientException('A2A Artifact一覧が不正です');
+    }
+    final artifactIds = <String>{};
+    final artifacts = <A2aArtifactManifestItem>[];
+    for (final raw in rawArtifacts) {
+      final item = _object(raw, 'A2A Artifact metadata');
+      const fields = {
+        'artifact_id',
+        'artifact_hash',
+        'part_count',
+        'text_only',
+        'text_bytes',
+      };
+      final id = item['artifact_id'];
+      final hash = item['artifact_hash'];
+      final parts = item['part_count'];
+      final textOnly = item['text_only'];
+      final textBytes = item['text_bytes'];
+      if (item.length != fields.length ||
+          item.keys.any((key) => !fields.contains(key)) ||
+          id is! String ||
+          !_validSafeExternalText(id, 256) ||
+          !artifactIds.add(id) ||
+          hash is! String ||
+          !_validSha256(hash) ||
+          !_boundedCount(parts, 32) ||
+          parts == 0 ||
+          textOnly is! bool ||
+          (textBytes != null &&
+              (textBytes is! int || textBytes < 0 || textBytes > 65536)) ||
+          (textOnly && (textBytes is! int || textBytes > 65536)) ||
+          (!textOnly && textBytes is int && textBytes <= 65536)) {
+        throw const BrokerClientException('A2A Artifact metadataが不正です');
+      }
+      artifacts.add(A2aArtifactManifestItem(
+        artifactId: id,
+        artifactHash: hash,
+        partCount: parts as int,
+        textOnly: textOnly,
+        textBytes: textBytes as int?,
+      ));
+    }
+    final rawSelected = result['selected_artifact'];
+    A2aSelectedArtifact? selected;
+    if (selectingArtifact) {
+      final value = _object(rawSelected, '選択A2A Artifact');
+      const fields = {
+        'artifact_id',
+        'artifact_hash',
+        'content_hash',
+        'byte_length',
+        'parts',
+      };
+      final parts = value['parts'];
+      final matchingManifest = artifacts
+          .where((item) =>
+              item.artifactId == artifactId &&
+              item.artifactHash == artifactHash)
+          .toList(growable: false);
+      if (value.length != fields.length ||
+          value.keys.any((key) => !fields.contains(key)) ||
+          value['artifact_id'] != artifactId ||
+          value['artifact_hash'] != artifactHash ||
+          value['content_hash'] is! String ||
+          !_validSha256(value['content_hash'] as String) ||
+          value['byte_length'] is! int ||
+          (value['byte_length'] as int) < 0 ||
+          (value['byte_length'] as int) > 65536 ||
+          result['state'] != 'completed' ||
+          parts is! List ||
+          parts.isEmpty ||
+          parts.length > 32 ||
+          parts.any((part) => part is! String || !_safeArtifactText(part)) ||
+          parts.cast<String>().fold<int>(
+                  0, (sum, part) => sum + utf8.encode(part).length) !=
+              value['byte_length'] ||
+          matchingManifest.length != 1 ||
+          !matchingManifest.single.textOnly ||
+          matchingManifest.single.textBytes != value['byte_length'] ||
+          matchingManifest.single.partCount != parts.length) {
+        throw const BrokerClientException('A2A Artifact全文projectionが不正です');
+      }
+      selected = A2aSelectedArtifact(
+        artifactId: artifactId!,
+        artifactHash: artifactHash!,
+        contentHash: value['content_hash'] as String,
+        byteLength: value['byte_length'] as int,
+        parts: List<String>.unmodifiable(parts.cast<String>()),
+      );
+    } else if (rawSelected != null) {
+      throw const BrokerClientException('未選択Artifactの本文をBroker応答が含んでいます');
+    }
+    if (result['artifact_count'] != artifacts.length) {
+      throw const BrokerClientException('A2A Artifact件数と一覧が一致しません');
+    }
     return A2aTaskQueryResult(
       status: 'accepted',
       agentId: normalizedId,
@@ -449,7 +600,35 @@ class A2aConnectionClient {
       historyCount: 0,
       resultHash: result['result_hash'] as String,
       auditEventId: response['audit_event_id'] as String,
+      artifacts: List<A2aArtifactManifestItem>.unmodifiable(artifacts),
+      selectedArtifact: selected,
     );
+  }
+
+  static bool _validSafeExternalText(String value, int maxChars) =>
+      value.isNotEmpty &&
+      value.runes.length <= maxChars &&
+      _safeArtifactText(value);
+
+  static bool _safeArtifactText(String value) {
+    for (final rune in value.runes) {
+      if ((rune < 0x20 || (rune >= 0x7f && rune <= 0x9f)) &&
+          rune != 0x09 &&
+          rune != 0x0a &&
+          rune != 0x0d) {
+        return false;
+      }
+      if (rune == 0x061c ||
+          rune == 0x200e ||
+          rune == 0x200f ||
+          rune == 0x2028 ||
+          rune == 0x2029 ||
+          (rune >= 0x202a && rune <= 0x202e) ||
+          (rune >= 0x2066 && rune <= 0x2069)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   static bool _validInterfaceUri(String value) {

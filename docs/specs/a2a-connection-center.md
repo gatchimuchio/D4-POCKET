@@ -8,7 +8,7 @@ C16では、owner controlからA2A Agent Cardを取得し、接続receiptへboun
 
 IPv6の`2001::/23` special-purpose親範囲は、IANA registryでより具体的なallocationが`Globally Reachable=true`とされる場合だけ許可する。対象は`2001:1::1/128`〜`2001:1::3/128`、`2001:3::/32`、`2001:4:112::/48`、`2001:20::/28`、`2001:30::/28`である。それ以外の親範囲内アドレス、benchmarkingの`2001:2::/48`、deprecatedな`2001:10::/28`は拒否する。[IANA IPv6 Special-Purpose Address Space](https://www.iana.org/assignments/iana-ipv6-special-registry)。この判定関数は更新取得経路でも共有される。
 
-Agent Card内の各`supportedInterfaces`では`url`と`protocolVersion`を検証する。interface URL実値は保存・表示せず、`interface_hash`、protocol binding／version、transportだけをmetadataへ射影する。A2A v1.0 rootの`securityRequirements`と各skillの`securityRequirements`を調べ、その要件または`securitySchemes`があるinterfaceは`unsupported`にする。該当fieldが不正形の場合も要件ありとして扱う。receiptにはraw要件を保存せず、`security_requirements_present`だけを投影する。要件がなく、他の条件も満たすinterfaceには一回`SendMessage` consumerを接続する。Task応答への手動一回`GetTask`照会は下記C16補完に限り、Task lifecycle polling／完了判定、Artifact本文、Stream consumerは未接続のままである。Agent Cardの宣言自体を実行可能性の証拠へ昇格しない。
+Agent Card内の各`supportedInterfaces`では`url`と`protocolVersion`を検証する。interface URL実値は保存・表示せず、`interface_hash`、protocol binding／version、transportだけをmetadataへ射影する。A2A v1.0 rootの`securityRequirements`と各skillの`securityRequirements`を調べ、その要件または`securitySchemes`があるinterfaceは`unsupported`にする。該当fieldが不正形の場合も要件ありとして扱う。receiptにはraw要件を保存せず、`security_requirements_present`だけを投影する。要件がなく、他の条件も満たすinterfaceには一回`SendMessage` consumerを接続する。Task応答への手動一回`GetTask`照会は下記C16補完に限り、Task lifecycle polling／完了判定、file/data Artifact本文、Stream consumerは未接続のままである。Agent Cardの宣言自体を実行可能性の証拠へ昇格しない。
 
 従来の保存receiptは起動時に読み取り専用で保守的に整形する。旧版にはinterface URLが保存されていないため`interface_hash=null`、protocol version／status=`unknown`へ降格し、`restored_pending_review`／`owner_reapproval_required`を保持する。旧履歴から接続・Trust・Permission・Approvalを再生成しない。
 
@@ -91,14 +91,14 @@ Trustはpending_review、Capability diffはnot_evaluatedとしてoperator review
 
 A2A接続一覧は通常IPCだけが参照できる。Owner操作channelでの一覧、Flutterからの直接network接続、Adapter metadataからの接続、履歴やProfileからの再利用は許可しない。Desktop画面の新規接続およびpending receipt再検証要求は、現在のAgentID・URIを示すRust起動器のnative Owner確認後に既存Brokerへ渡す。接続一覧と表示はBroker metadata projectionだけを使う。
 
-Desktopの`A2A接続センター`は、必須`shell.agent_operation`に含まれ、Agent IDとAgent Card URIの入力、Broker接続一覧、接続metadata表示、一回Message送信を提供する。接続URI実値はnative Owner確認の対象表示後、Flutterの入力欄から消去する。Message送信は接続済みreceiptに対応するAgentとinterfaceを選び、各要求で送信本文全体をnative確認した上でBrokerへ送る。本文は要求完了後に入力欄から消去する。画面は接続をTrustへ昇格させず、Task polling／完了判定、Artifact本文取得、Stream、retryを提供しない。Agent Card由来の表示文字列は未信頼metadataと明示し、行制御・方向制御文字を含むprojectionは表示前に拒否する。
+Desktopの`A2A接続センター`は、必須`shell.agent_operation`に含まれ、Agent IDとAgent Card URIの入力、Broker接続一覧、接続metadata表示、一回Message送信を提供する。接続URI実値はnative Owner確認の対象表示後、Flutterの入力欄から消去する。Message送信は接続済みreceiptに対応するAgentとinterfaceを選び、各要求で送信本文全体をnative確認した上でBrokerへ送る。本文は要求完了後に入力欄から消去する。画面は接続をTrustへ昇格させず、Task polling／完了判定、未選択／file／data Artifact本文、Stream、retryを提供しない。completed Taskのtext-only Artifactは利用者の明示選択と毎回のnative Owner確認後だけ全文を表示し、画面内の揮発状態から保存・Audit・Workspaceへ複製しない。Agent Card由来の表示文字列は未信頼metadataと明示し、行制御・方向制御文字を含むprojectionは表示前に拒否する。
 
 接続要求のCredential refは`credential_id`、`purpose`、`target`、`required`、`status`の固定5 fieldだけを受け付ける。IDは小文字hex 32桁、purposeは`A2A接続`、targetは同一要求のAgent ID、requiredは`false`、statusは`missing`に限る。未知fieldおよび秘密値fieldは拒否する。この参照からCredential保管庫を検索せず、credential実値を解決・注入しない。
 
 ## 現行未接続範囲
 
 - 導入済み製品を使った実外部HTTPS endpointへの接続・Message送信証拠、OAuth／API keyなどの認証実行
-- Task lifecycle polling／完了判定、Artifact本文取得、Stream購読、cancel、A2A transport sessionの再接続、quarantine
+- Task lifecycle polling／完了判定、未選択Artifact本文、file/data Artifact本文、Stream購読、cancel、A2A transport sessionの再接続、quarantine
 - 外部Agent比較、複数Agent同一Workspace隔離、Handoff
 - 実A2A Test Harness、Windows installed productでの接続証拠、長時間運用・障害注入
 
@@ -108,6 +108,12 @@ Desktopの`A2A接続センター`は、必須`shell.agent_operation`に含まれ
 
 Windows／Linux Desktopでは、Message送信結果がTaskである場合に限り、送信で返ったTask IDをvolatile UI stateとして保持し、画面上の明示操作で一回の`GetTask`照会を開始できる。Task IDは接続先・Agent IDとともに現在の操作へ束縛し、Agent切替、新規Message送信、receipt失効／復元、対象interface hash変更で破棄する。起動後に永続復元しない。
 
-照会は通常Broker経路からnative Owner確認を要求する。各回で永続Auditと一回消費Permissionを新規発行し、現在のconnection receiptおよびinterface hashを照合する。要求はA2A v1.0 `GetTask`、`historyLength=0`に限定し、Task ID一致と空履歴を検査する。Task state、context ID、Artifact件数、履歴件数0、response hash以外を投影しない。raw status message、history、Artifact、Credential、Authority fieldは拒否または破棄し、AuditにはTask ID実値・URI・本文を保存せずTask ID hashだけを記録する。
+照会は通常Broker経路からnative Owner確認を要求する。各回で永続Auditと一回消費Permissionを新規発行し、現在のconnection receiptおよびinterface hashを照合する。要求はA2A v1.0 `GetTask`、`historyLength=0`に限定し、Task ID一致と空履歴を検査する。Task state、context ID、Artifact件数、履歴件数0、response hash以外を投影しない。raw status message、history、未選択Artifact本文、Credential、Authority fieldは拒否または破棄し、AuditにはTask ID実値・URI・本文を保存せずTask ID hashだけを記録する。
 
-timeout、Broker crash、応答不正、Audit結果確定失敗は成功にせずunknown／SUSPENDへ閉じ、自動retry・pollingをしない。Ownerが画面上で明示的に再照会した場合も、新しいOwner確認とPermissionを要求する。macOS native A2A contractにはこの操作を追加せず、macOS UIは未対応と表示する。本補完は外部Task完了判定、Artifact本文取得、Stream、cancel、installed／external Agent QAを成立させない。
+timeout、Broker crash、応答不正、Audit結果確定失敗は成功にせずunknown／SUSPENDへ閉じ、自動retry・pollingをしない。Ownerが画面上で明示的に再照会した場合も、新しいOwner確認とPermissionを要求する。macOS native A2A contractにはこの操作を追加せず、macOS UIは未対応と表示する。本補完は外部Task完了判定、Artifact全文表示、Stream、cancel、installed／external Agent QAを成立させない。
+
+## A2A Artifact選択表示
+
+通常のGetTask照会はmetadata-onlyのまま、最大32件のArtifact manifest（ID、hash、part数、text-only判定、64 KiB内のUTF-8 byte数）を表示する。Artifact本文、名前、説明、任意metadataは一覧へ出さない。操作者がcompleted Taskのsafe text-only Artifactを一件選ぶと、同じTaskへの新しいGetTask要求でそのArtifact IDと前回hashを束縛する。Rust native Owner確認には対象Agent／接続先／Task ID／Artifact ID／hashを表示し、Brokerは同じpayload hashに束縛した一回Permissionを消費する。Task completed、現在hash一致、text parts合計64 KiB以下、制御・方向偽装文字なしの場合のみ全文を返す。file/data/未知partはunsupportedとして拒否する。
+
+本文は未信頼内容としてSelectableTextで画面表示し、画面stateのvolatile値にだけ保持する。Auditには要求hash・ID hash・response／Artifact／content hash・byte countを記録し、本文は保存しない。履歴、Workspace、snapshot、log、traceへ書かない。Widget破棄、Agent／Task切替、新Message、次のTask照会開始、要求失敗で画面projectionから消去する。再取得は毎回新しいnative Owner確認と一回Permissionを要する。対象はWindows／Linux Desktopであり、macOS native A2A Owner契約は変更しない。

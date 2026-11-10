@@ -236,6 +236,81 @@ void main() {
     );
   });
 
+  test('GetTaskは選択Artifactだけをfresh requestで全文表示し本文をmetadata結果へ漏らさない', () async {
+    const artifactId = 'artifact-output-1';
+    final artifactHash = 'sha256:${List<String>.filled(64, 'a').join()}';
+    final contentHash = 'sha256:${List<String>.filled(64, 'd').join()}';
+    final metadata = await A2aConnectionClient(_A2aTransport([
+      _taskGetResponse(
+        'audit-a2a-artifacts',
+        taskId: 'remote-task-42',
+        state: 'completed',
+        artifactManifest: [
+          {
+            'artifact_id': artifactId,
+            'artifact_hash': artifactHash,
+            'part_count': 1,
+            'text_only': true,
+            'text_bytes': 19,
+          },
+        ],
+      ),
+    ])).getTask(
+      agentId: 'fixture-agent',
+      interfaceUri: 'http://127.0.0.1:9080/rpc',
+      taskId: 'remote-task-42',
+    );
+    expect(metadata.artifacts.single.artifactId, artifactId);
+    expect(metadata.artifacts.single.textOnly, isTrue);
+    expect(metadata.selectedArtifact, isNull);
+
+    const visibleText = 'private result body';
+    final transport = _A2aTransport([
+      _taskGetArtifactResponse(
+        'audit-a2a-artifact-full',
+        taskId: 'remote-task-42',
+        artifactId: artifactId,
+        artifactHash: artifactHash,
+        contentHash: contentHash,
+        parts: const [visibleText],
+      ),
+    ]);
+    final result = await A2aConnectionClient(transport).getTask(
+      agentId: 'fixture-agent',
+      interfaceUri: 'http://127.0.0.1:9080/rpc',
+      taskId: 'remote-task-42',
+      artifactId: artifactId,
+      artifactHash: artifactHash,
+    );
+    expect(result.selectedArtifact?.parts, [visibleText]);
+    expect(result.selectedArtifact?.contentHash, contentHash);
+    expect(transport.payloads.single?['ArtifactID'], artifactId);
+    expect(transport.payloads.single?['Artifact hash'], artifactHash);
+    expect(jsonEncode(transport.payloads), isNot(contains(visibleText)));
+
+    final forged = _taskGetResponse(
+      'audit-a2a-artifact-forged',
+      taskId: 'remote-task-42',
+    );
+    final forgedBody = forged['body'] as Map<String, Object?>;
+    final forgedResult = forgedBody['result'] as Map<String, Object?>;
+    forgedResult['selected_artifact'] = {
+      'artifact_id': artifactId,
+      'artifact_hash': artifactHash,
+      'content_hash': contentHash,
+      'byte_length': visibleText.length,
+      'parts': [visibleText],
+    };
+    await expectLater(
+      A2aConnectionClient(_A2aTransport([forged])).getTask(
+        agentId: 'fixture-agent',
+        interfaceUri: 'http://127.0.0.1:9080/rpc',
+        taskId: 'remote-task-42',
+      ),
+      throwsA(isA<BrokerClientException>()),
+    );
+  });
+
   test('GetTaskの結果unknownでも自動再照会しない', () async {
     final transport = _A2aTransport([
       _taskGetUnknown('audit-a2a-task-unknown'),
@@ -475,7 +550,7 @@ void main() {
           transport.operations, ['A2A接続一覧', 'A2A接続', 'A2A接続一覧', 'A2Aメッセージ送信']);
       expect(find.textContaining('Task ID（memory-only）: remote-task-42'),
           findsOneWidget);
-      final getTaskButton = find.text('native Owner確認してTask状態を一回取得');
+      final getTaskButton = find.text('native Owner確認してTask状態・Artifact一覧を一回取得');
       await tester.ensureVisible(getTaskButton);
       await tester.tap(getTaskButton);
       await tester.pumpAndSettle();
@@ -483,7 +558,7 @@ void main() {
       expect(transport.payloads.last?['TaskID'], 'remote-task-42');
       expect(transport.payloads.last?['Interface URI'],
           'http://127.0.0.1:9080/rpc');
-      expect(find.textContaining('state=working'), findsOneWidget);
+      expect(find.textContaining('Task state=working'), findsOneWidget);
       expect(jsonEncode(transport.payloads), isNot(contains('private-task')));
       final operationsAfterQuery = List<String>.from(transport.operations);
       debugDefaultTargetPlatformOverride = TargetPlatform.linux;
@@ -491,14 +566,110 @@ void main() {
         home: Scaffold(body: A2aConnectionCenter(transport: transport)),
       ));
       await tester.pumpAndSettle();
-      expect(find.text('native Owner確認してTask状態を一回取得'), findsOneWidget);
+      expect(
+          find.text('native Owner確認してTask状態・Artifact一覧を一回取得'), findsOneWidget);
       debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
       await tester.pumpWidget(MaterialApp(
         home: Scaffold(body: A2aConnectionCenter(transport: transport)),
       ));
       await tester.pumpAndSettle();
-      expect(find.text('native Owner確認してTask状態を一回取得'), findsNothing);
+      expect(find.text('native Owner確認してTask状態・Artifact一覧を一回取得'), findsNothing);
       expect(transport.operations, operationsAfterQuery);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('Linuxで選択したcompleted text Artifactだけをfresh要求後に表示する',
+      (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    try {
+      const endpoint = 'http://127.0.0.1:9080/card';
+      const artifactId = 'artifact-fixture-1';
+      const visibleText = 'untrusted-artifact-visible-only';
+      final artifactHash = 'sha256:${List<String>.filled(64, 'a').join()}';
+      final contentHash = 'sha256:${List<String>.filled(64, 'b').join()}';
+      final receipt = _receipt();
+      final transport = _A2aTransport([
+        _response('A2A接続一覧', 'audit-empty', _listBody(const []),
+            evidence: 'INTERNAL_STATE'),
+        _response('A2A接続', 'audit-a2a-connect', receipt,
+            evidence: 'INTERNAL_STATE'),
+        _response('A2A接続一覧', 'audit-a2a-list', _listBody([receipt]),
+            evidence: 'INTERNAL_STATE'),
+        _sendResponse('audit-a2a-send-task', agentId: 'fixture-agent', result: {
+          'kind': 'task',
+          'task_id': 'remote-task-42',
+          'context_id': null,
+          'state': 'submitted',
+          'artifact_count': 0,
+          'history_count': 1,
+          'result_hash': 'sha256:${List<String>.filled(64, 'c').join()}',
+        }),
+        _taskGetResponse(
+          'audit-a2a-task-metadata',
+          taskId: 'remote-task-42',
+          state: 'completed',
+          artifactManifest: [
+            {
+              'artifact_id': artifactId,
+              'artifact_hash': artifactHash,
+              'part_count': 1,
+              'text_only': true,
+              'text_bytes': utf8.encode(visibleText).length,
+            },
+          ],
+        ),
+        _taskGetArtifactResponse(
+          'audit-a2a-task-artifact',
+          taskId: 'remote-task-42',
+          artifactId: artifactId,
+          artifactHash: artifactHash,
+          contentHash: contentHash,
+          parts: const [visibleText],
+        ),
+      ]);
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(body: A2aConnectionCenter(transport: transport)),
+      ));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).at(0), 'fixture-agent');
+      await tester.enterText(find.byType(TextField).at(1), endpoint);
+      await tester.tap(find.text('Owner確認して接続'));
+      await tester.pumpAndSettle();
+      final dropdown = find.byType(DropdownButtonFormField<String>);
+      await tester.ensureVisible(dropdown);
+      await tester.tap(dropdown);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Fixture Agent (fixture-agent)').last);
+      await tester.pumpAndSettle();
+      await tester.enterText(
+          find.byType(TextField).at(2), 'http://127.0.0.1:9080/rpc');
+      await tester.enterText(find.byType(TextField).at(3), 'fixture message');
+      await tester.ensureVisible(find.text('native Owner確認して一回送信'));
+      await tester.tap(find.text('native Owner確認して一回送信'));
+      await tester.pumpAndSettle();
+
+      final query = find.text('native Owner確認してTask状態・Artifact一覧を一回取得');
+      await tester.ensureVisible(query);
+      await tester.tap(query);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Artifact ID=artifact-fixture-1'),
+          findsOneWidget);
+      expect(find.text(visibleText), findsNothing);
+      final show = find.text('native Owner確認してこのtext Artifactを全文表示');
+      await tester.ensureVisible(show);
+      await tester.tap(show);
+      await tester.pumpAndSettle();
+
+      expect(
+          transport.operations.where((item) => item == 'A2Aタスク状態取得').length, 2);
+      expect(transport.payloads[4]?['ArtifactID'], isNull);
+      expect(transport.payloads[5]?['ArtifactID'], artifactId);
+      expect(transport.payloads[5]?['Artifact hash'], artifactHash);
+      expect(find.text(visibleText), findsOneWidget);
+      expect(jsonEncode(transport.payloads), isNot(contains(visibleText)));
+      expect(find.textContaining('保存・Audit本文記録はありません'), findsOneWidget);
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }
@@ -611,8 +782,12 @@ Map<String, Object?> _sendResponse(
       },
     };
 
-Map<String, Object?> _taskGetResponse(String auditId,
-        {required String taskId}) =>
+Map<String, Object?> _taskGetResponse(
+  String auditId, {
+  required String taskId,
+  String state = 'working',
+  List<Map<String, Object?>> artifactManifest = const [],
+}) =>
     {
       'operation': 'A2Aタスク状態取得',
       'status': 'accepted',
@@ -628,10 +803,12 @@ Map<String, Object?> _taskGetResponse(String auditId,
           'kind': 'task',
           'task_id': taskId,
           'context_id': 'context-fixture-1',
-          'state': 'working',
-          'artifact_count': 1,
+          'state': state,
+          'artifact_count': artifactManifest.length,
           'history_count': 0,
           'result_hash': 'sha256:${List<String>.filled(64, 'c').join()}',
+          'artifact_manifest': artifactManifest,
+          'selected_artifact': null,
         },
         'Trust': 'pending_review',
         '権限生成': 'なし',
@@ -641,6 +818,43 @@ Map<String, Object?> _taskGetResponse(String auditId,
         'Credential使用': false,
       },
     };
+
+Map<String, Object?> _taskGetArtifactResponse(
+  String auditId, {
+  required String taskId,
+  required String artifactId,
+  required String artifactHash,
+  required String contentHash,
+  required List<String> parts,
+}) {
+  final response = _taskGetResponse(
+    auditId,
+    taskId: taskId,
+    state: 'completed',
+    artifactManifest: [
+      {
+        'artifact_id': artifactId,
+        'artifact_hash': artifactHash,
+        'part_count': parts.length,
+        'text_only': true,
+        'text_bytes':
+            parts.fold<int>(0, (sum, part) => sum + utf8.encode(part).length),
+      },
+    ],
+  );
+  final body = response['body'] as Map<String, Object?>;
+  body['公開範囲'] = 'full';
+  final result = body['result'] as Map<String, Object?>;
+  result['selected_artifact'] = {
+    'artifact_id': artifactId,
+    'artifact_hash': artifactHash,
+    'content_hash': contentHash,
+    'byte_length':
+        parts.fold<int>(0, (sum, part) => sum + utf8.encode(part).length),
+    'parts': parts,
+  };
+  return response;
+}
 
 Map<String, Object?> _taskGetUnknown(String auditId) => {
       'operation': 'A2Aタスク状態取得',

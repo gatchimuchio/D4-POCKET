@@ -1,0 +1,39 @@
+{
+  "版": 1,
+  "AgentID": "remote-agent-example",
+  "interface_hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+  "status": "accepted",
+  "result": {
+    "kind": "task",
+    "task_id": "task-fixture-1",
+    "context_id": "context-fixture-1",
+    "state": "completed",
+    "artifact_count": 1,
+    "history_count": 0,
+    "result_hash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+    "artifact_manifest": [
+      {
+        "artifact_id": "artifact-fixture-1",
+        "artifact_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "part_count": 1,
+        "text_only": true,
+        "text_bytes": 28
+      }
+    ],
+    "selected_artifact": {
+      "artifact_id": "artifact-fixture-1",
+      "artifact_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "content_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "byte_length": 28,
+      "parts": [
+        "untrusted artifact fixture text"
+      ]
+    }
+  },
+  "Trust": "pending_review",
+  "権限生成": "なし",
+  "authority_strip": true,
+  "公開範囲": "metadata_only",
+  "履歴公開": false,
+  "Credential使用": false
+}
