@@ -4080,16 +4080,17 @@ def _install_normal_release_codex_system_config(
     created_parent = False
     state = (target, created_parent, expected_sha256)
     try:
-        # Claim a fresh, root-only directory before placing the file. This makes
-        # the fixed system path run-owned and prevents an unprivileged process
-        # from racing a pre-existing /etc/codex/config.toml into the install.
-        _run_linux_sudo_install(["mkdir", "-m", "0700", "--", str(parent)])
+        # Claim a fresh root-owned directory at its final non-writable mode
+        # before placing the file. This prevents an unprivileged process from
+        # racing the fixed path while still allowing this process to verify
+        # the no-secret system config and its digest.
+        _run_linux_sudo_install(["mkdir", "-m", "0755", "--", str(parent)])
         created_parent = True
         state = (target, created_parent, expected_sha256)
         if (
             parent.is_symlink()
             or not parent.is_dir()
-            or stat.S_IMODE(parent.stat().st_mode) != 0o700
+            or stat.S_IMODE(parent.stat().st_mode) != 0o755
             or parent.stat().st_uid != 0
         ):
             raise RuntimeError("Codex system config directoryの所有／modeが不正です")
@@ -4105,9 +4106,6 @@ def _install_normal_release_codex_system_config(
             raise RuntimeError("Codex system config install後のfile所有／modeが不正です")
         if hashlib.sha256(target.read_bytes()).hexdigest() != expected_sha256:
             raise RuntimeError("Codex system config install後のSHA-256が一致しません")
-        _run_linux_sudo_install(["chmod", "0755", "--", str(parent)])
-        if stat.S_IMODE(parent.stat().st_mode) != 0o755:
-            raise RuntimeError("Codex system config directoryを公開可能modeにできません")
         return state
     except Exception:
         if created_parent:

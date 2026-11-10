@@ -5369,15 +5369,14 @@ class NormalReleaseCodexSystemConfigInstallTests(unittest.TestCase):
         def execute(arguments: list[str]) -> None:
             operation = arguments[0]
             if operation == "mkdir":
-                parent.mkdir(mode=0o700, parents=True)
-                os.chmod(parent, 0o700)
+                parent.mkdir(mode=0o755, parents=True)
+                os.chmod(parent, 0o755)
             elif operation == "install":
+                self.assertEqual(stat.S_IMODE(parent.stat().st_mode), 0o755)
                 import shutil
 
                 shutil.copyfile(source, target)
                 os.chmod(target, 0o644)
-            elif operation == "chmod":
-                os.chmod(parent, 0o755)
             elif operation == "rm":
                 target.unlink()
             elif operation == "rmdir":
@@ -5423,6 +5422,7 @@ class NormalReleaseCodexSystemConfigInstallTests(unittest.TestCase):
                 state = _install_normal_release_codex_system_config(source)
                 self.assertEqual(state[0], target)
                 self.assertTrue(state[1])
+                self.assertEqual(stat.S_IMODE(parent.stat().st_mode), 0o755)
                 self.assertEqual(target.read_bytes(), source.read_bytes())
                 _remove_normal_release_codex_system_config(state)
 
@@ -5430,8 +5430,9 @@ class NormalReleaseCodexSystemConfigInstallTests(unittest.TestCase):
             self.assertFalse(parent.exists())
             self.assertEqual(
                 [command[0] for command in commands],
-                ["mkdir", "install", "chmod", "rm", "rmdir"],
+                ["mkdir", "install", "rm", "rmdir"],
             )
+            self.assertEqual(commands[0][1:3], ["-m", "0755"])
 
     def test_refuses_existing_system_config_directory_without_mutation(self) -> None:
         with tempfile.TemporaryDirectory(prefix="d4p-normal-release-system-existing-") as temporary:
@@ -5463,8 +5464,8 @@ class NormalReleaseCodexSystemConfigInstallTests(unittest.TestCase):
             def run(arguments: list[str]) -> None:
                 commands.append(arguments[0])
                 if arguments[0] == "mkdir":
-                    parent.mkdir(mode=0o700, parents=True)
-                    os.chmod(parent, 0o700)
+                    parent.mkdir(mode=0o755, parents=True)
+                    os.chmod(parent, 0o755)
                 elif arguments[0] == "install":
                     raise RuntimeError("synthetic install failure")
                 elif arguments[0] == "rmdir":
@@ -5538,7 +5539,7 @@ class NormalReleaseCodexSystemConfigInstallTests(unittest.TestCase):
 
             self.assertEqual(target.read_text(encoding="utf-8"), "preserve changed file")
             self.assertTrue(parent.is_dir())
-            self.assertEqual(commands, ["mkdir", "install", "chmod"])
+            self.assertEqual(commands, ["mkdir", "install"])
 
 
 @unittest.skipUnless(sys.platform.startswith("linux"), "Linux filesystem semantics are required")
