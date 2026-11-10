@@ -1436,7 +1436,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "a57acb7086c38624d8a264c70ff3b5af514f410087b82c91ef15bfbcf04aed71"
+      "sha256": "d5cef4acae45163eefeb3836e3fda8a38e499a226c701faa1dcdd9f74c93358f"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1911,6 +1911,14 @@
       "sha256": "44c8d68c2b5c478b45c1decf7ff9888b8f192efc8afc6752a80a7b09324c8142"
     },
     {
+      "path": "examples/contracts/a2a_task_get_artifact_request.valid.json",
+      "sha256": "8a8180d747d79d385a5ee14bc4a34e30b45c27f5829de999d3e40792b46b94fe"
+    },
+    {
+      "path": "examples/contracts/a2a_task_get_artifact_response.valid.json",
+      "sha256": "67260c2fc7db1219cd51c2a5283edfda5e2cfe1b561e633e5e8814d05a6be4b3"
+    },
+    {
       "path": "examples/contracts/a2a_task_get_request.valid.json",
       "sha256": "d9c08113817e0e8cc76f93450ba2ff03627fbff0fd6edfcb8adbbad8987936b8"
     },
@@ -2299,6 +2307,14 @@
       "sha256": "ae845211934aeb080401e7d761367757fb2c46dddf4ac1b789617e67d6e9cfe2"
     },
     {
+      "path": "examples/contracts/invalid/a2a_task_get_request_missing_artifact_hash.invalid.json",
+      "sha256": "960cba57b09cd0f85923de3abbda8b32b658fdc989fde10651def7692828663c"
+    },
+    {
+      "path": "examples/contracts/invalid/a2a_task_get_response_artifact_not_completed.invalid.json",
+      "sha256": "15c99b36fcbd6e94c5ec250424ad227dcb63daec1a0da586472622075ac9361f"
+    },
+    {
       "path": "examples/contracts/invalid/a2a_task_get_response_authority.invalid.json",
       "sha256": "ef57fa2140d6992d23f3cf1fbc2e166f9ba54410d6c0e2baa54cec17d5d4e652"
     },
@@ -2309,6 +2325,10 @@
     {
       "path": "examples/contracts/invalid/a2a_task_get_response_raw.invalid.json",
       "sha256": "93d507f096aec5786c541d1fcd014f0d78aa3c73d9731406a490c0a83a60b80b"
+    },
+    {
+      "path": "examples/contracts/invalid/a2a_task_get_response_unselected_body.invalid.json",
+      "sha256": "8f8dfac5d544632b080113ebefdcaa296a16b7d45722f9ecf378c528264f5ba4"
     },
     {
       "path": "examples/contracts/invalid/action_envelope_missing_relation.invalid.json",
