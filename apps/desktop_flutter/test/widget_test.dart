@@ -2821,7 +2821,24 @@ void main() {
     await tester.ensureVisible(showResultA);
     await tester.tap(showResultA);
     await tester.pumpAndSettle();
-    expect(find.textContaining('candidate patch body'), findsOneWidget);
+    expect(find.textContaining('candidate patch body'), findsWidgets);
+    expect(
+      find.text(
+        'Agent申告summary（未検証）: candidate patch body: add isolated implementation',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Agent申告changed files（未検証）: lib/candidate.dart'),
+      findsOneWidget,
+    );
+    final compareDiffA = find.byKey(
+      const ValueKey('compare-result-diff-$sessionA'),
+    );
+    await tester.ensureVisible(compareDiffA);
+    await tester.tap(compareDiffA);
+    await tester.pumpAndSettle();
+    expect(find.text('+candidate patch body'), findsOneWidget);
     expect(
       find.text('Agent申告test（未検証）: A: test passed（Agent申告・未検証）'),
       findsOneWidget,

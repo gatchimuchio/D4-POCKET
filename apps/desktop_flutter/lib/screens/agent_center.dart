@@ -1801,6 +1801,9 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
         projection?.visibility == 'full' &&
         projection?.taskId == task.taskId &&
         projection?.resultHash == task.resultHash;
+    final declaredResult = projectionMatchesTask
+        ? projection!.declaredResult
+        : null;
     final claimedTestResult = projectionMatchesTask
         ? projection!.agentClaimedTestResult
         : null;
@@ -1825,7 +1828,37 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
               Text('UI観測時間: $duration'),
             ] else
               const Text('Task ID／結果hash／終端Audit／時間: unknown'),
-            const Text('Changed files／diff: 対応Workspace Inspectorで別途承認後に確認'),
+            if (projectionMatchesTask && declaredResult != null) ...[
+              Text('Agent申告summary（未検証）: ${declaredResult.summary}'),
+              Text(
+                'Agent申告changed files（未検証）: '
+                '${declaredResult.changedFiles.isEmpty ? 'なし' : declaredResult.changedFiles.join('、')}',
+              ),
+              if (declaredResult.diff.isEmpty)
+                const Text('Agent申告diff（未検証）: なし')
+              else
+                ExpansionTile(
+                  key: ValueKey('compare-result-diff-$sessionId'),
+                  tilePadding: EdgeInsets.zero,
+                  title: const Text('Agent申告diff（未検証）を表示'),
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: SelectableText(declaredResult.diff),
+                    ),
+                  ],
+                ),
+            ] else if (projectionMatchesTask)
+              const Text(
+                '承認済み結果の形式または項目上限が不正なため比較表示を停止しました。',
+              )
+            else
+              const Text(
+                'Agent申告summary／changed files／diff: 全文のBroker承認後に表示',
+              ),
+            const Text(
+              '実WorkspaceのChanged files／diffはWorkspace Inspectorで別途承認して確認',
+            ),
             const Text('Broker独立test実行record／Task専用Resource計測: unknown'),
             Text('Agent申告test（未検証）: $claimedTestText'),
             if (task?.status == 'completed')

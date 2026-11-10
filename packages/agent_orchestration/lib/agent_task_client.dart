@@ -133,13 +133,27 @@ class AgentTaskResultApproval {
   final String approvalId;
 }
 
+class AgentTaskDeclaredResult {
+  const AgentTaskDeclaredResult({
+    required this.summary,
+    required this.changedFiles,
+    required this.diff,
+    required this.testResult,
+  });
+
+  final String summary;
+  final List<String> changedFiles;
+  final String diff;
+  final String testResult;
+}
+
 class AgentTaskResultProjection {
   AgentTaskResultProjection({
     required this.taskId,
     required this.resultHash,
     required this.visibility,
     required this.projection,
-  }) : agentClaimedTestResult = _readAgentClaimedTestResult(
+  }) : declaredResult = _readAgentTaskDeclaredResult(
          visibility,
          resultHash,
          projection,
@@ -149,14 +163,16 @@ class AgentTaskResultProjection {
   final String resultHash;
   final String visibility;
   final Object? projection;
-  final String? agentClaimedTestResult;
+  final AgentTaskDeclaredResult? declaredResult;
+
+  String? get agentClaimedTestResult => declaredResult?.testResult;
 
   String? get text => projection is Map<String, Object?>
       ? (projection as Map<String, Object?>)['text'] as String?
       : null;
 }
 
-String? _readAgentClaimedTestResult(
+AgentTaskDeclaredResult? _readAgentTaskDeclaredResult(
   String visibility,
   String resultHash,
   Object? projection,
@@ -190,11 +206,65 @@ String? _readAgentClaimedTestResult(
       })) {
     return null;
   }
-  final claim = decoded['test_result'];
-  if (claim is! String || claim.trim().isEmpty || claim.runes.length > 2048) {
+  final summary = _boundedAgentResultText(decoded['result_summary'], 2048);
+  final diff = decoded['diff'];
+  final testResult = _boundedAgentResultText(decoded['test_result'], 2048);
+  final rawArtifacts = decoded['artifacts'];
+  final rawChangedFiles = decoded['changed_files'];
+  if (summary == null ||
+      diff is! String ||
+      diff.runes.length > 8192 ||
+      testResult == null ||
+      rawArtifacts is! List ||
+      rawArtifacts.length > 8 ||
+      rawChangedFiles is! List ||
+      rawChangedFiles.length > 64) {
     return null;
   }
-  return claim;
+
+  for (final raw in rawArtifacts) {
+    if (raw is! Map<String, Object?> ||
+        raw.length != 2 ||
+        !raw.keys.toSet().containsAll(const {'name', 'content'}) ||
+        _boundedAgentResultText(raw['name'], 256) == null ||
+        _boundedAgentResultText(raw['content'], 8192) == null) {
+      return null;
+    }
+  }
+
+  final changedFiles = <String>[];
+  for (final raw in rawChangedFiles) {
+    if (raw is! String || raw.length > 512 || !_isSafeAgentResultPath(raw)) {
+      return null;
+    }
+    changedFiles.add(raw);
+  }
+
+  return AgentTaskDeclaredResult(
+    summary: summary,
+    changedFiles: List.unmodifiable(changedFiles),
+    diff: diff,
+    testResult: testResult,
+  );
+}
+
+String? _boundedAgentResultText(Object? value, int maximumRunes) =>
+    value is String &&
+        value.trim().isNotEmpty &&
+        value.runes.length <= maximumRunes
+    ? value
+    : null;
+
+bool _isSafeAgentResultPath(String value) {
+  if (value.isEmpty ||
+      value.startsWith('/') ||
+      value.contains('\\') ||
+      value.contains(':') ||
+      value.runes.any((rune) => rune < 0x20 || rune == 0x7f)) {
+    return false;
+  }
+  final parts = value.split('/');
+  return parts.every((part) => part.isNotEmpty && part != '.' && part != '..');
 }
 
 class AgentTaskClient {

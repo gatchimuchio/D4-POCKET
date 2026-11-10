@@ -228,7 +228,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/agent_center.dart",
-      "sha256": "0edd5ebf962572858b012d174aac2c1c6e80d765cafa0d1424d94ac2bd04b9d1"
+      "sha256": "abc12acbb5f62d8404a45c74671a8fdf2a56494396f6f2957d612bb28ba95f4d"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/approval_center.dart",
@@ -620,7 +620,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/agent_coordination_test.dart",
-      "sha256": "261fd1d27932032ad53e488beb4e2e8f133cd55d75a16a7df5421e6a90779266"
+      "sha256": "fb89e5ade4ef02566708de42c96efc35294fce534669254611a45c2ed5850c17"
     },
     {
       "path": "apps/desktop_flutter/test/agent_handoff_test.dart",
@@ -740,7 +740,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "3303bb358c34580c50aa213d29e3edd8cf7049d2d290a5ec665f9c69cbb9d146"
+      "sha256": "deff5d50c5ed027d5d4b04c557a0c1a5c8505287e40948547d3b5ec25f1f1d6e"
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
@@ -1436,7 +1436,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "ff7a47d89c248859bfd63dd97c2232809377368ff0228578b5c8050b956b99a1"
+      "sha256": "70c41bc12efe99c09f7078a22a0c72b8ed232a85a5d0f5ed4a9688bce7800918"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -4227,6 +4227,10 @@
       "sha256": "b5d9e1e62cf8cd64371f2f47017a561397dc4c45f5e4d26cb4f33f479bfbc27e"
     },
     {
+      "path": "packages/agent_orchestration/lib/agent_comparison_coordinator.dart",
+      "sha256": "9232f74c9cb4276bddaaa00a584bf47ef301cdfad2c5dbf432bb4b5725cfb6a6"
+    },
+    {
       "path": "packages/agent_orchestration/lib/agent_mcp_task_controller.dart",
       "sha256": "905c9efe7a14af5e04b07750d5d15dfb9fa67e350238fcddb5afa1a0fccc113d"
     },
@@ -4236,7 +4240,7 @@
     },
     {
       "path": "packages/agent_orchestration/lib/agent_task_client.dart",
-      "sha256": "874a1418ba3798360e73ca2fc023fb7df4fed9985147dc045f17db11e0384453"
+      "sha256": "74b9b16d6c073defb6217fc5d7ccea8e9010cb11cba86756092cd6b5348263fe"
     },
     {
       "path": "packages/agent_orchestration/lib/agent_task_execution_coordinator.dart",

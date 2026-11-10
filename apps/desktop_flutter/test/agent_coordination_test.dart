@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:agent_orchestration/agent_orchestration.dart'
@@ -36,6 +37,56 @@ AgentSessionRecord _session(
 }
 
 void main() {
+  test('Compareはfull承認・結果hash一致時だけ上限付きAgent申告成果を投影する', () {
+    const resultHash =
+        'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    AgentTaskResultProjection projection({
+      String visibility = 'full',
+      String? projectedHash,
+      List<Object?> changedFiles = const ['lib/result.dart'],
+      String diff = '+result',
+    }) =>
+        AgentTaskResultProjection(
+          taskId: 'task-compare-result',
+          resultHash: resultHash,
+          visibility: visibility,
+          projection: {
+            'result_hash': projectedHash ?? resultHash,
+            'text': jsonEncode({
+              'result_summary': '実装結果の要約',
+              'artifacts': [
+                {'name': 'patch.txt', 'content': '公開差分'},
+              ],
+              'changed_files': changedFiles,
+              'diff': diff,
+              'test_result': 'Agent申告: test passed（未検証）',
+            }),
+          },
+        );
+
+    final visible = projection();
+    expect(visible.declaredResult?.summary, '実装結果の要約');
+    expect(visible.declaredResult?.changedFiles, ['lib/result.dart']);
+    expect(visible.declaredResult?.diff, '+result');
+    expect(
+      visible.agentClaimedTestResult,
+      'Agent申告: test passed（未検証）',
+    );
+    expect(projection(visibility: 'summary').declaredResult, isNull);
+    expect(
+      projection(
+        projectedHash:
+            'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      ).declaredResult,
+      isNull,
+    );
+    expect(
+      projection(changedFiles: const ['../private/token.txt']).declaredResult,
+      isNull,
+    );
+    expect(projection(diff: 'x' * 8193).declaredResult, isNull);
+  });
+
   test('Compareは両Taskを並行開始し片側失敗を他方へ伝播させない', () async {
     const instruction = '同一の合成Task';
     const sessionA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
