@@ -52,6 +52,90 @@ const TASK_FILESYSTEM_OVERRIDE_PREFIX: &str =
 const TASK_FILESYSTEM_OVERRIDE_PREFIX: &str =
     "permissions.d4p-agent-task.filesystem={\":root\"=\"deny\",\":minimal\"=\"read\",\":workspace_roots\"={";
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CodexCliTaskPlatform {
+    Windows,
+    Linux,
+    Other,
+}
+
+impl CodexCliTaskPlatform {
+    fn current() -> Self {
+        if cfg!(windows) {
+            Self::Windows
+        } else if cfg!(target_os = "linux") {
+            Self::Linux
+        } else {
+            Self::Other
+        }
+    }
+}
+
+fn codex_cli_task_execution_capability(
+    platform: CodexCliTaskPlatform,
+    test_build: bool,
+    debug_build: bool,
+    r2_e2e_build: bool,
+    loopback_fixture_configured: bool,
+    workspace_write_interface: bool,
+) -> (&'static str, &'static str) {
+    if !workspace_write_interface {
+        return (
+            "unsupported",
+            "登録したCodex CLIでworkspace-write interfaceを確認できない",
+        );
+    }
+    if test_build {
+        return (
+            "unsupported",
+            "unit test buildでは製品Agent Task capabilityを公開しない",
+        );
+    }
+    if r2_e2e_build {
+        if !matches!(
+            platform,
+            CodexCliTaskPlatform::Windows | CodexCliTaskPlatform::Linux
+        ) {
+            return (
+                "unsupported",
+                "このOSではCodex CLI Agent Task Adapterを使用できない",
+            );
+        }
+        return if loopback_fixture_configured {
+            (
+                "supported",
+                "R2統合検証build内のrun-owned loopback fixtureに限定したTask実行",
+            )
+        } else {
+            (
+                "unsupported",
+                "R2統合検証buildのloopback fixture条件が設定されていない",
+            )
+        };
+    }
+    if debug_build {
+        return (
+            "unsupported",
+            "debug buildでは製品Agent Task capabilityを公開しない",
+        );
+    }
+
+    match platform {
+        CodexCliTaskPlatform::Windows => (
+            "supported",
+            "Windows normal ReleaseのBroker Agent Task経路はW01/G1の限定条件で受入れ済み。Provider接続状態は別評価",
+        ),
+        CodexCliTaskPlatform::Linux => (
+            "supported",
+            "Linux normal ReleaseのCodex CLI Workspace-writeとprocess-group監督経路をBrokerへ接続。Provider接続とLinux製品全体の受入れは別評価",
+        ),
+        CodexCliTaskPlatform::Other => (
+            "unsupported",
+            "このOS向けCodex CLI Agent Task経路は未対応",
+        ),
+    }
+}
+
 #[cfg(any(test, feature = "r2-e2e"))]
 struct CodexCliTestResponses {
     port: u16,
@@ -644,49 +728,23 @@ impl 実行系Adapter for CodexCliAdapter {
     }
 
     fn agent_metadata(&self) -> Option<Value> {
-        #[cfg(all(feature = "r2-e2e", not(test)))]
-        let task_execution_capability = if self.test_responses_api.is_some() {
-            json!({
-                "capability_id": "task_execution",
-                "support": {
-                    "status": "supported",
-                    "reason": "決定論的なlocalhost偽APIを使うR2統合検証build内だけのTask実行"
-                }
-            })
-        } else {
-            json!({
-                "capability_id": "task_execution",
-                "support": {
-                    "status": "unsupported",
-                    "reason": "R2統合検証buildのloopback試験条件が設定されていない"
-                }
-            })
-        };
-        #[cfg(all(
-            target_os = "windows",
-            not(test),
-            not(debug_assertions),
-            not(feature = "r2-e2e")
-        ))]
+        #[cfg(any(test, feature = "r2-e2e"))]
+        let loopback_fixture_configured = self.test_responses_api.is_some();
+        #[cfg(not(any(test, feature = "r2-e2e")))]
+        let loopback_fixture_configured = false;
+        let (task_execution_status, task_execution_reason) = codex_cli_task_execution_capability(
+            CodexCliTaskPlatform::current(),
+            cfg!(test),
+            cfg!(debug_assertions),
+            cfg!(feature = "r2-e2e"),
+            loopback_fixture_configured,
+            self.workspace_write_interface,
+        );
         let task_execution_capability = json!({
             "capability_id": "task_execution",
             "support": {
-                "status": "supported",
-                "reason": "Windows normal ReleaseのBroker Agent Task経路がG1条件で検証済み。他OSは別途未検証"
-            }
-        });
-        #[cfg(not(all(feature = "r2-e2e", not(test))))]
-        #[cfg(not(all(
-            target_os = "windows",
-            not(test),
-            not(debug_assertions),
-            not(feature = "r2-e2e")
-        )))]
-        let task_execution_capability = json!({
-            "capability_id": "task_execution",
-            "support": {
-                "status": "unsupported",
-                "reason": "このOS／build条件の通常Release Task経路は未検証"
+                "status": task_execution_status,
+                "reason": task_execution_reason
             }
         });
         Some(json!({
@@ -727,7 +785,7 @@ impl 実行系Adapter for CodexCliAdapter {
                 "process_spawn": {"status": "unsupported", "reason": "汎用command dispatchはBrokerで停止中"}
             },
             "evidence_source": "LIVE_RUNTIME",
-            "evidence_reason": "起動時にversion/help interfaceを実物確認したが、write-capable task経路は実証前のためunsupported"
+            "evidence_reason": "登録時に実Codex CLIのversion/help interfaceを確認する。Task capabilityはOS／build条件で限定し、Provider接続状態は別にunknownとして扱う"
         }))
     }
 
@@ -3504,6 +3562,114 @@ exit 0
             .find(|capability| capability["capability_id"] == "task_execution")
             .unwrap();
         assert_eq!(task_execution["support"]["status"], "unsupported");
+    }
+
+    #[test]
+    fn codex_task_capability_is_scoped_to_platform_and_build_conditions() {
+        let cases = [
+            (
+                CodexCliTaskPlatform::Windows,
+                false,
+                false,
+                false,
+                false,
+                true,
+                "supported",
+            ),
+            (
+                CodexCliTaskPlatform::Linux,
+                false,
+                false,
+                false,
+                false,
+                true,
+                "supported",
+            ),
+            (
+                CodexCliTaskPlatform::Other,
+                false,
+                false,
+                false,
+                false,
+                true,
+                "unsupported",
+            ),
+            (
+                CodexCliTaskPlatform::Linux,
+                false,
+                true,
+                false,
+                false,
+                true,
+                "unsupported",
+            ),
+            (
+                CodexCliTaskPlatform::Linux,
+                true,
+                false,
+                false,
+                false,
+                true,
+                "unsupported",
+            ),
+            (
+                CodexCliTaskPlatform::Linux,
+                false,
+                false,
+                true,
+                false,
+                true,
+                "unsupported",
+            ),
+            (
+                CodexCliTaskPlatform::Linux,
+                false,
+                false,
+                true,
+                true,
+                true,
+                "supported",
+            ),
+            (
+                CodexCliTaskPlatform::Linux,
+                false,
+                false,
+                false,
+                false,
+                false,
+                "unsupported",
+            ),
+            (
+                CodexCliTaskPlatform::Other,
+                false,
+                false,
+                true,
+                true,
+                true,
+                "unsupported",
+            ),
+        ];
+
+        for (
+            platform,
+            test_build,
+            debug_build,
+            r2_e2e_build,
+            loopback_fixture_configured,
+            workspace_write_interface,
+            expected,
+        ) in cases
+        {
+            let (status, _) = codex_cli_task_execution_capability(
+                platform,
+                test_build,
+                debug_build,
+                r2_e2e_build,
+                loopback_fixture_configured,
+                workspace_write_interface,
+            );
+            assert_eq!(status, expected, "platform={platform:?}");
+        }
     }
 
     #[test]
