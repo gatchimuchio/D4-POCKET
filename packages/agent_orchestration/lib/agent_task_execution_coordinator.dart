@@ -11,6 +11,12 @@ import 'runtime_platform.dart';
 typedef AgentTaskExecutionUpdateHandler =
     FutureOr<void> Function(AgentTaskExecutionUpdate update);
 
+typedef _AgentTaskScope = ({
+  String runtimeId,
+  String sessionId,
+  String workspaceId,
+});
+
 /// A view-neutral consumer for completed Agent Tasks and MCP continuation.
 ///
 /// The application creates one coordinator above its screens. Views may observe
@@ -32,7 +38,7 @@ class AgentTaskExecutionCoordinator {
   final AgentRuntimePlatform platform;
   final LinkedHashSet<String> _rememberedTaskIds = LinkedHashSet<String>();
   final Map<String, _TaskRun> _runs = {};
-  final Map<String, String> _currentTaskBySession = {};
+  final Map<_AgentTaskScope, String> _currentTaskByScope = {};
   bool _disposed = false;
 
   /// Task継続の実行とは独立した、表示側向けの一時通知stream。
@@ -51,11 +57,12 @@ class AgentTaskExecutionCoordinator {
     bool allowMcpContinuation = true,
   }) async {
     if (_disposed || !_remember(task.taskId)) return;
-    final priorTaskId = _currentTaskBySession[request.sessionId];
+    final scope = _scopeFor(request);
+    final priorTaskId = _currentTaskByScope[scope];
     if (priorTaskId != null && priorTaskId != task.taskId) {
       _runs[priorTaskId]?.stop();
     }
-    _currentTaskBySession[request.sessionId] = task.taskId;
+    _currentTaskByScope[scope] = task.taskId;
     final run = _TaskRun(
       request: request,
       initialTask: task,
@@ -79,7 +86,7 @@ class AgentTaskExecutionCoordinator {
       run.stop();
     }
     _runs.clear();
-    _currentTaskBySession.clear();
+    _currentTaskByScope.clear();
     unawaited(_updates.close());
   }
 
@@ -95,8 +102,14 @@ class AgentTaskExecutionCoordinator {
   bool _isCurrent(_TaskRun run) =>
       !_disposed &&
       run.active &&
-      _currentTaskBySession[run.request.sessionId] == run.initialTask.taskId &&
+      _currentTaskByScope[_scopeFor(run.request)] == run.initialTask.taskId &&
       identical(_runs[run.initialTask.taskId], run);
+
+  static _AgentTaskScope _scopeFor(AgentTaskRequest request) => (
+    runtimeId: request.runtimeId,
+    sessionId: request.sessionId,
+    workspaceId: request.workspaceId,
+  );
 
   Future<void> _monitor(_TaskRun run) async {
     var current = run.initialTask;

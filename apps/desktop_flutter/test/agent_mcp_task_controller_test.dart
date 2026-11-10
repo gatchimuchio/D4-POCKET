@@ -430,6 +430,82 @@ void main() {
     coordinator.dispose();
   });
 
+  test('同じSession識別子でも別Runtime／WorkspaceのTask監視は独立する', () async {
+    const scopes = [
+      (
+        runtimeId: 'codex-first',
+        workspaceId: 'workspace-shared',
+        taskId: '11111111111111111111111111111111',
+        auditId: 'audit-first-task-state',
+      ),
+      (
+        runtimeId: 'codex-second',
+        workspaceId: 'workspace-shared',
+        taskId: '22222222222222222222222222222222',
+        auditId: 'audit-second-task-state',
+      ),
+      (
+        runtimeId: 'codex-first',
+        workspaceId: 'workspace-other',
+        taskId: '33333333333333333333333333333333',
+        auditId: 'audit-third-task-state',
+      ),
+    ];
+    final transport = _FakeBrokerTransport(
+      scopes
+          .map(
+            (scope) => _accepted('AgentTask状態', {
+              'task_id': scope.taskId,
+              'record_version': 2,
+              'agent_runtime_id': scope.runtimeId,
+              'session_id': _session,
+              'workspace_id': scope.workspaceId,
+              'description': 'Agent作業Task（結果本文とWorkspace差分は別の権限経路）',
+              'instruction_hash': _instructionHash,
+              'status': 'failed',
+              'audit_event_id': scope.auditId,
+              'result_content_available': false,
+            }),
+          )
+          .toList(),
+    );
+    final coordinator = AgentTaskExecutionCoordinator(transport);
+    final runs = scopes
+        .map(
+          (scope) => coordinator.observeStartedTask(
+            request: AgentTaskRequest(
+              runtimeId: scope.runtimeId,
+              sessionId: _session,
+              workspaceId: scope.workspaceId,
+              instruction:
+                  'Runtime ${scope.runtimeId}のWorkspace ${scope.workspaceId}のTask',
+            ),
+            task: AgentTaskRecord(
+              taskId: scope.taskId,
+              runtimeId: scope.runtimeId,
+              sessionId: _session,
+              workspaceId: scope.workspaceId,
+              instructionHash: _instructionHash,
+              status: 'running',
+              auditEventId: 'audit-${scope.taskId}-start',
+            ),
+            allowMcpContinuation: false,
+          ),
+        )
+        .toList();
+
+    await Future.wait(runs).timeout(
+      const Duration(seconds: 5),
+    );
+
+    final stateRequests = transport.requests
+        .where((request) => request['operation'] == 'AgentTask状態')
+        .map((request) => (request['payload']! as Map)['task_id'])
+        .toSet();
+    expect(stateRequests, scopes.map((scope) => scope.taskId).toSet());
+    coordinator.dispose();
+  });
+
   test('未完了の画面observer FutureはTask継続を停止しない', () async {
     final observerGate = Completer<void>();
     var observed = 0;
