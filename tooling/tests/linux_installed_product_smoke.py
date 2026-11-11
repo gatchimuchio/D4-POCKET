@@ -4013,6 +4013,7 @@ def _normalize_r2_e2e_diagnostic(payload: object) -> dict[str, object] | None:
         r'stdout_http_status=(none|[45]\d\d); '
         r'stderr_class=(empty|sandbox_setup|authentication|configuration|permission|'
         r'transport|missing_dependency|other); stderr_bytes=(\d+); '
+        r'mcp_task_tool_enabled=(true|false); '
         r'mcp_stdio_started=(true|false); mcp_stdio_initialized=(true|false); '
         r'mcp_stdio_tools_list=(true|false); mcp_spawn_failure=(true|false)',
         summary,
@@ -4026,6 +4027,7 @@ def _normalize_r2_e2e_diagnostic(payload: object) -> dict[str, object] | None:
         http_status,
         stderr_class,
         stderr_bytes,
+        mcp_task_tool_enabled,
         mcp_stdio_started,
         mcp_stdio_initialized,
         mcp_stdio_tools_list,
@@ -4046,6 +4048,7 @@ def _normalize_r2_e2e_diagnostic(payload: object) -> dict[str, object] | None:
         "stdout_http_status": None if http_status == "none" else int(http_status),
         "stderr_class": stderr_class,
         "stderr_bytes": byte_count,
+        "mcp_task_tool_enabled": mcp_task_tool_enabled == "true",
         "mcp_stdio_started": mcp_stdio_started == "true",
         "mcp_stdio_initialized": mcp_stdio_initialized == "true",
         "mcp_stdio_tools_list": mcp_stdio_tools_list == "true",
@@ -5447,6 +5450,7 @@ def _normalize_stored_r2_e2e_diagnostic(payload: object) -> dict[str, object] | 
             "stdout_http_status",
             "stderr_class",
             "stderr_bytes",
+            "mcp_task_tool_enabled",
             "mcp_stdio_started",
             "mcp_stdio_initialized",
             "mcp_stdio_tools_list",
@@ -5465,6 +5469,7 @@ def _normalize_stored_r2_e2e_diagnostic(payload: object) -> dict[str, object] | 
             f"stdout_http_status={status if status is not None else 'none'}; "
             f"stderr_class={payload.get('stderr_class')}; "
             f"stderr_bytes={payload.get('stderr_bytes')}; "
+            f"mcp_task_tool_enabled={str(payload.get('mcp_task_tool_enabled')).lower()}; "
             f"mcp_stdio_started={str(payload.get('mcp_stdio_started')).lower()}; "
             f"mcp_stdio_initialized={str(payload.get('mcp_stdio_initialized')).lower()}; "
             f"mcp_stdio_tools_list={str(payload.get('mcp_stdio_tools_list')).lower()}; "
