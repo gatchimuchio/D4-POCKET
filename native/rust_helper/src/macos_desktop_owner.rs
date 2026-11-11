@@ -77,6 +77,12 @@ struct AgentTaskOwnerApprovalRequest {
     session_id: String,
     workspace_id: String,
     instruction: String,
+    #[serde(default)]
+    mcp_capability_snapshot_hash: Option<String>,
+    #[serde(default)]
+    mcp_result_id: Option<String>,
+    #[serde(default)]
+    mcp_result_hash: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -109,6 +115,12 @@ fn valid_sha256(value: &str) -> bool {
         && value[7..]
             .bytes()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn valid_mcp_result_id(value: &str) -> bool {
+    value
+        .strip_prefix("mcp-agent-result-")
+        .is_some_and(valid_task_id)
 }
 
 fn linux_update_owner_candidate(
@@ -690,6 +702,19 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
             || !valid_task_scope_identifier(&request.workspace_id)
             || request.instruction.trim().is_empty()
             || request.instruction.chars().count() > 32_768
+            || request
+                .mcp_capability_snapshot_hash
+                .as_deref()
+                .is_some_and(|value| !valid_sha256(value))
+            || request
+                .mcp_result_id
+                .as_deref()
+                .is_some_and(|value| !valid_mcp_result_id(value))
+            || request
+                .mcp_result_hash
+                .as_deref()
+                .is_some_and(|value| !valid_sha256(value))
+            || request.mcp_result_id.is_some() != request.mcp_result_hash.is_some()
         {
             return None;
         }
@@ -1554,7 +1579,10 @@ mod task_owner_tests {
             "agent_runtime_id": "codex-runtime",
             "session_id": "session-0123456789abcdef",
             "workspace_id": "workspace-project",
-            "instruction": instruction
+            "instruction": instruction,
+            "mcp_capability_snapshot_hash": format!("sha256:{}", "a".repeat(64)),
+            "mcp_result_id": "mcp-agent-result-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "mcp_result_hash": format!("sha256:{}", "b".repeat(64))
         });
         let valid = request("AgentTaskOwnerApprovalGrant", payload.clone());
         let bytes = serde_json::to_vec(&valid).unwrap();
@@ -1564,8 +1592,29 @@ mod task_owner_tests {
         assert!(summary.contains(&crate::audit_hash::sha256_tagged(instruction.as_bytes())));
         assert!(summary.contains(valid["payload_hash"].as_str().unwrap()));
         assert!(!summary.contains(instruction));
+        assert!(!summary.contains(payload["mcp_capability_snapshot_hash"].as_str().unwrap()));
+        assert!(!summary.contains(payload["mcp_result_id"].as_str().unwrap()));
+        assert!(!summary.contains(payload["mcp_result_hash"].as_str().unwrap()));
 
-        let mut extra = payload;
+        let mut invalid_snapshot = payload.clone();
+        invalid_snapshot["mcp_capability_snapshot_hash"] = json!("sha256:invalid");
+        let invalid = request("AgentTaskOwnerApprovalGrant", invalid_snapshot);
+        assert!(candidate(&serde_json::to_vec(&invalid).unwrap(), &endpoint()).is_none());
+
+        let mut invalid_result_id = payload.clone();
+        invalid_result_id["mcp_result_id"] = json!("mcp-agent-result-invalid");
+        let invalid = request("AgentTaskOwnerApprovalGrant", invalid_result_id);
+        assert!(candidate(&serde_json::to_vec(&invalid).unwrap(), &endpoint()).is_none());
+
+        let mut unpaired_result = payload.clone();
+        unpaired_result
+            .as_object_mut()
+            .unwrap()
+            .remove("mcp_result_id");
+        let invalid = request("AgentTaskOwnerApprovalGrant", unpaired_result);
+        assert!(candidate(&serde_json::to_vec(&invalid).unwrap(), &endpoint()).is_none());
+
+        let mut extra = payload.clone();
         extra["authority"] = json!("owner");
         let invalid = request("AgentTaskOwnerApprovalGrant", extra);
         assert!(candidate(&serde_json::to_vec(&invalid).unwrap(), &endpoint()).is_none());
@@ -1631,7 +1680,10 @@ mod task_owner_tests {
             "agent_runtime_id": "codex-runtime",
             "session_id": "session-0123456789abcdef",
             "workspace_id": "workspace-project",
-            "instruction": "Review this bounded test task"
+            "instruction": "Review this bounded test task",
+            "mcp_capability_snapshot_hash": format!("sha256:{}", "c".repeat(64)),
+            "mcp_result_id": "mcp-agent-result-eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "mcp_result_hash": format!("sha256:{}", "f".repeat(64))
         });
         let valid = request("AgentTaskOwnerApprovalGrant", payload.clone());
         let bytes = serde_json::to_vec(&valid).unwrap();
