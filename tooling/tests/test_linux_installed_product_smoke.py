@@ -798,8 +798,12 @@ class AccessibleActionResolutionTests(unittest.TestCase):
         self.assertEqual(find_accessible.call_args_list[0].args, ("D4 Pocket powered by GUI Shell",))
         self.assertEqual(find_accessible.call_args_list[1].args, ("コマンドパレット",))
         find_operable.assert_called_once_with("target", root=window, timeout=2)
-        focused_lookup.assert_called_once_with(
-            "target", root=window, context_node=palette
+        self.assertEqual(
+            focused_lookup.call_args_list,
+            [
+                call("target", root=window),
+                call("target", root=window, context_node=palette),
+            ],
         )
         self.assertEqual(actions.invoked, [1])
         self.assertEqual(

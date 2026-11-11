@@ -1179,16 +1179,20 @@ def _accessibility_debug(node, *, max_ancestors: int = 5) -> str:
         except Exception:
             action_names = []
         try:
-            showing = current.getState().contains(pyatspi.STATE_SHOWING)
+            state = current.getState()
+            showing = state.contains(pyatspi.STATE_SHOWING)
+            focused = state.contains(pyatspi.STATE_FOCUSED)
         except Exception:
             showing = "unknown"
+            focused = "unknown"
         try:
             bounds = current.queryComponent().getExtents(pyatspi.DESKTOP_COORDS)
             extents = f"{bounds.x},{bounds.y},{bounds.width},{bounds.height}"
         except Exception as error:
             extents = f"unavailable:{type(error).__name__}"
         details.append(
-            f"depth={depth},role={role},showing={showing},bounds={extents},actions={action_names}"
+            f"depth={depth},role={role},showing={showing},focused={focused},"
+            f"bounds={extents},actions={action_names}"
         )
         current = _accessible_parent(current)
         if current is None:
@@ -8558,23 +8562,34 @@ def _activate_named_control_by_keyboard(
         if context_marker is not None
         else None
     )
+    focus_action_status = "not_applicable"
+    focus_after_action_contextless = False
+    focus_after_action_contextual = False
     if context_node is not None:
         try:
             candidate = _find_operable_accessible(name, root=window, timeout=2)
             actions = candidate.queryAction()
+            focus_action_status = "unavailable"
             for action_index in range(actions.nActions):
                 if actions.getName(action_index).lower() == "focus":
-                    if actions.doAction(action_index):
-                        time.sleep(0.05)
+                    focus_action_status = (
+                        "accepted" if actions.doAction(action_index) else "rejected"
+                    )
                     break
-        except Exception:
-            pass
-        if (
+            if focus_action_status == "accepted":
+                time.sleep(0.05)
+        except Exception as error:
+            focus_action_status = f"error:{type(error).__name__}"
+        focus_after_action_contextless = (
+            _focused_named_accessible(name, root=window) is not None
+        )
+        focus_after_action_contextual = (
             _focused_named_accessible(
                 name, root=window, context_node=context_node
             )
             is not None
-        ):
+        )
+        if focus_after_action_contextual:
             subprocess.run(
                 ["xdotool", "key", "--clearmodifiers", "Return"],
                 env=environment,
@@ -8606,9 +8621,21 @@ def _activate_named_control_by_keyboard(
             timeout=5,
         )
         time.sleep(0.05)
+    focus_after_tabs_contextless = (
+        _focused_named_accessible(name, root=window) is not None
+    )
+    focus_after_tabs_contextual = (
+        _focused_named_accessible(name, root=window, context_node=context_node)
+        is not None
+    )
     target = _find_accessible(name, timeout=2)
     raise RuntimeError(
         f"GTK keyboard traversalで可視focusを確認できません: {name}; "
+        f"focus_action={focus_action_status},"
+        f"after_action_contextless={focus_after_action_contextless},"
+        f"after_action_contextual={focus_after_action_contextual},"
+        f"after_tabs_contextless={focus_after_tabs_contextless},"
+        f"after_tabs_contextual={focus_after_tabs_contextual}; "
         f"{_accessibility_debug(target)}"
     )
 
