@@ -645,17 +645,20 @@ class AccessibleActionResolutionTests(unittest.TestCase):
                     window,
                     window,
                     object(),
+                    object(),
                     fresh_window,
                     fresh_window,
                 ),
             ) as find_accessible,
             patch(
-                "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
-                return_value=object(),
+                "tooling.tests.linux_installed_product_smoke._find_operable_accessible"
             ) as find_operable,
             patch(
                 "tooling.tests.linux_installed_product_smoke._activate_accessible"
             ) as activate,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._activate_named_control_by_keyboard"
+            ) as activate_keyboard,
             patch(
                 "tooling.tests.linux_installed_product_smoke.subprocess.run"
             ) as run,
@@ -669,20 +672,23 @@ class AccessibleActionResolutionTests(unittest.TestCase):
             [
                 call("D4 Pocket powered by GUI Shell", timeout=10),
                 call("コマンドパレット", root=window, timeout=10),
+                call(
+                    "MCP接続一覧とOwner確認付き切断を開く",
+                    root=window,
+                    timeout=10,
+                ),
                 call("MCP接続センター", timeout=10),
                 call("D4 Pocket powered by GUI Shell", timeout=10),
                 call("MCP接続センター", root=fresh_window, timeout=10),
             ],
         )
-        find_operable.assert_called_once_with(
-            "MCP接続一覧とOwner確認付き切断を開く",
-            root=window,
-            timeout=10,
-        )
-        activate.assert_called_once_with(
-            find_operable.return_value,
+        find_operable.assert_not_called()
+        activate.assert_not_called()
+        activate_keyboard.assert_called_once_with(
             "MCP接続一覧とOwner確認付き切断を開く",
             {},
+            "0x42",
+            context_marker="コマンドパレット",
         )
         self.assertEqual(
             [entry.args[0] for entry in run.call_args_list],

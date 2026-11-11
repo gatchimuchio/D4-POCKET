@@ -1566,14 +1566,16 @@ def _open_mcp_center_from_installed_ui(
         check=True,
         timeout=5,
     )
-    command = _find_operable_accessible(
-        "MCP接続一覧とOwner確認付き切断を開く",
-        root=window,
-        timeout=10,
+    command_label = "MCP接続一覧とOwner確認付き切断を開く"
+    _find_accessible(command_label, root=window, timeout=10)
+    # AT-SPI actionが成功を返してもhosted GTK上で候補が残ることがある。
+    # コマンドパレット内で対象行へfocusが移ったことを確認してからEnterを送る。
+    _activate_named_control_by_keyboard(
+        command_label,
+        environment,
+        window_id,
+        context_marker="コマンドパレット",
     )
-    # AT-SPIで表示候補の操作部品を特定して選ぶ。文字列検索後のEnter送信では
-    # GTK上で候補が表示されたまま遷移しない場合があった。
-    _activate_accessible(command, "MCP接続一覧とOwner確認付き切断を開く", environment)
     # コマンドパレットのdialogを閉じると、古いAT-SPI
     # 部分木が無効になることがある。desktopから移動先を特定してから、
     # controlを調べる呼出元へ返す前に製品windowを再取得する。
