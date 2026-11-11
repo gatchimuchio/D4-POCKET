@@ -5446,6 +5446,7 @@ def _prepare_and_start_installed_agent_task(
     workspace_id: str,
     instruction: str,
     request_mcp_capabilities: bool = False,
+    diagnostic_audit_path: Path | None = None,
 ) -> None:
     inspect = _find_operable_accessible(
         "Task実行能力を事前検査（実行なし）", root=window, timeout=15
@@ -5496,6 +5497,8 @@ def _prepare_and_start_installed_agent_task(
         environment,
         "許可",
         context="Agent Task一回Owner Approval",
+        diagnostic_root=window,
+        diagnostic_audit_path=diagnostic_audit_path,
         expected_summary_markers=(
             "このAgent Taskに一回限りのOwner Approvalを発行しますか？",
             f"Runtime ID: {runtime_id}",
@@ -7515,6 +7518,7 @@ def _run_installed_agent_mcp_followup_acceptance(
         workspace_id=workspace_id,
         instruction=task_instruction,
         request_mcp_capabilities=True,
+        diagnostic_audit_path=audit_store / "audit.jsonl",
     )
     source_task_id = _wait_for_installed_task_id(
         window, previously_visible_task_ids=previous_task_ids, timeout=15.0
@@ -8869,6 +8873,13 @@ def _owner_dialog_timeout_diagnostics(
         kinds[expected_titles.get(name, "other")] += 1
 
     statuses: list[str] = []
+    task_action_states: set[str] = set()
+    safe_task_statuses = {
+        "Broker応答を確認中です。": "request_pending",
+        "Brokerの承認状態を更新しました。実行状態は未確認です。": "request_accepted",
+        "Broker Task操作に失敗しました。": "generic_broker_failure",
+        "Owner Approval receiptが不正です": "invalid_receipt",
+    }
     if diagnostic_root is not None:
         allowed_statuses = (
             "MCP接続は確定していません",
@@ -8881,8 +8892,50 @@ def _owner_dialog_timeout_diagnostics(
                 normalized = " ".join(name.split())
                 if any(normalized.startswith(value) for value in allowed_statuses):
                     statuses.append(normalized[:160])
+                task_action_state = safe_task_statuses.get(normalized)
+                if task_action_state is not None:
+                    task_action_states.add(task_action_state)
         except Exception:
             statuses.append("<accessible-state-unavailable>")
+    task_audit_status = "<unavailable>"
+    if diagnostic_audit_path is not None:
+        try:
+            task_events = []
+            for line in diagnostic_audit_path.read_text(encoding="utf-8").splitlines():
+                if not line:
+                    continue
+                event = json.loads(line)
+                if (
+                    isinstance(event, dict)
+                    and event.get("operation") == "AgentTaskOwnerApprovalGrant"
+                ):
+                    task_events.append(event)
+            if task_events:
+                issue_reason = (
+                    "Agent Task本文hash・実行条件hashへのOwner Approval発行"
+                    "（native確認・Task未実行）"
+                )
+                received = sum(
+                    event.get("decision") == "received"
+                    and event.get("reason") == "対話操作を受信"
+                    for event in task_events
+                )
+                issued = sum(
+                    event.get("decision") == "recorded"
+                    and event.get("reason") == issue_reason
+                    for event in task_events
+                )
+                rejected = sum(event.get("decision") == "rejected" for event in task_events)
+                denied = sum(event.get("decision") == "denied" for event in task_events)
+                other = len(task_events) - received - issued - rejected - denied
+                task_audit_status = (
+                    f"received:{received},issued:{issued},rejected:{rejected},"
+                    f"denied:{denied},other:{other}"
+                )
+            else:
+                task_audit_status = "<no_task_approval_event>"
+        except (OSError, UnicodeError, json.JSONDecodeError, TypeError):
+            task_audit_status = "<unavailable_or_malformed>"
     audit_status = "<unavailable>"
     if diagnostic_audit_path is not None:
         try:
@@ -8922,6 +8975,10 @@ def _owner_dialog_timeout_diagnostics(
         + ("|".join(dict.fromkeys(statuses[-4:])) if statuses else "<none-observed>")
         + "; mcp_connect_audit="
         + audit_status
+        + "; task_action_state="
+        + (",".join(sorted(task_action_states)) if task_action_states else "<no_allowlisted_status>")
+        + "; task_owner_approval_audit="
+        + task_audit_status
     )
 
 

@@ -3485,20 +3485,39 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             "",
             [
                 Node("MCP接続は確定していません"),
+                Node("Broker応答を確認中です。"),
                 Node("untrusted fixture content must not be logged"),
             ],
         )
         with tempfile.TemporaryDirectory() as directory:
             audit_path = Path(directory) / "audit.jsonl"
+            events = [
+                {
+                    "operation": "MCP接続",
+                    "decision": "rejected",
+                    "reason": "MCP接続にはowner controlが必要",
+                    "untrusted": "fixture secret marker must not be logged",
+                },
+                {
+                    "operation": "AgentTaskOwnerApprovalGrant",
+                    "decision": "received",
+                    "reason": "対話操作を受信",
+                    "payload": "task secret marker must not be logged",
+                },
+                {
+                    "operation": "AgentTaskOwnerApprovalGrant",
+                    "decision": "recorded",
+                    "reason": "Agent Task本文hash・実行条件hashへのOwner Approval発行（native確認・Task未実行）",
+                },
+                {
+                    "operation": "AgentTaskOwnerApprovalGrant",
+                    "decision": "rejected",
+                    "reason": "task secret marker must not be logged",
+                },
+            ]
             audit_path.write_text(
-                json.dumps(
-                    {
-                        "operation": "MCP接続",
-                        "decision": "rejected",
-                        "reason": "MCP接続にはowner controlが必要",
-                        "untrusted": "fixture secret marker must not be logged",
-                    },
-                    ensure_ascii=False,
+                "\n".join(
+                    json.dumps(event, ensure_ascii=False) for event in events
                 ),
                 encoding="utf-8",
             )
@@ -3535,6 +3554,12 @@ class LinuxInstalledDesktopEntryTests(unittest.TestCase):
             diagnostics,
         )
         self.assertNotIn("fixture secret marker", diagnostics)
+        self.assertIn("task_action_state=request_pending", diagnostics)
+        self.assertIn(
+            "task_owner_approval_audit=received:1,issued:1,rejected:1,denied:0,other:0",
+            diagnostics,
+        )
+        self.assertNotIn("task secret marker", diagnostics)
 
     def test_log_tail_is_bounded_and_masks_isolated_roots(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
