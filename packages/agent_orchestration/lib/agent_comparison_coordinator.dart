@@ -6,6 +6,34 @@ import 'agent_task_client.dart' show AgentTaskRecord, AgentTaskRequest;
 typedef AgentTaskStarter =
     Future<AgentTaskRecord> Function(AgentTaskRequest request);
 
+/// Compareの取消待機をSession単位で分離し、同じSessionの二重要求だけを防ぐ。
+class AgentTaskCancellationGate {
+  final Set<String> _pendingSessionIds = <String>{};
+
+  bool get hasPending => _pendingSessionIds.isNotEmpty;
+
+  bool isPending(String sessionId) => _pendingSessionIds.contains(sessionId);
+
+  bool tryBegin(String sessionId) =>
+      sessionId.isNotEmpty && _pendingSessionIds.add(sessionId);
+
+  Future<T?> runIfAvailable<T>(
+    String sessionId,
+    Future<T> Function() action,
+  ) async {
+    if (!tryBegin(sessionId)) return null;
+    try {
+      return await action();
+    } finally {
+      finish(sessionId);
+    }
+  }
+
+  void finish(String sessionId) {
+    _pendingSessionIds.remove(sessionId);
+  }
+}
+
 class AgentComparisonTaskOutcome {
   const AgentComparisonTaskOutcome({this.record, this.error});
 

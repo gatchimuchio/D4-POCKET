@@ -3,7 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:agent_orchestration/agent_orchestration.dart'
-    show startAgentComparisonTasks;
+    show AgentTaskCancellationGate, startAgentComparisonTasks;
 
 import 'package:gui_shell_desktop/models/generated_contracts.dart';
 import 'package:gui_shell_desktop/services/agent_task_client.dart';
@@ -37,6 +37,48 @@ AgentSessionRecord _session(
 }
 
 void main() {
+  test('Compare取消はA/Bを並行実行し、同Session重複を拒否して個別に解放する', () async {
+    const sessionA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const sessionB = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    final gate = AgentTaskCancellationGate();
+    final cancelA = Completer<String>();
+    final cancelB = Completer<String>();
+    var duplicateCalls = 0;
+
+    final requestA = gate.runIfAvailable(sessionA, () => cancelA.future);
+    expect(gate.isPending(sessionA), isTrue);
+
+    final duplicate = await gate.runIfAvailable(sessionA, () async {
+      duplicateCalls++;
+      return 'duplicate';
+    });
+    expect(duplicate, isNull);
+    expect(duplicateCalls, 0);
+
+    final requestB = gate.runIfAvailable(sessionB, () => cancelB.future);
+    expect(gate.isPending(sessionA), isTrue);
+    expect(gate.isPending(sessionB), isTrue);
+    expect(gate.hasPending, isTrue);
+
+    cancelB.complete('cancelled-b');
+    expect(await requestB, 'cancelled-b');
+    expect(gate.isPending(sessionB), isFalse);
+    expect(gate.isPending(sessionA), isTrue);
+
+    final failedRequest = gate.runIfAvailable(sessionB, () async {
+      throw StateError('cancel failed');
+    });
+    expect(gate.isPending(sessionB), isTrue);
+    await expectLater(failedRequest, throwsStateError);
+    expect(gate.isPending(sessionB), isFalse);
+    expect(gate.isPending(sessionA), isTrue);
+
+    cancelA.complete('cancelled-a');
+    expect(await requestA, 'cancelled-a');
+    expect(gate.hasPending, isFalse);
+    expect(gate.tryBegin(''), isFalse);
+  });
+
   test('Compareはfull承認・結果hash一致時だけ上限付きAgent申告成果を投影する', () {
     const resultHash =
         'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';

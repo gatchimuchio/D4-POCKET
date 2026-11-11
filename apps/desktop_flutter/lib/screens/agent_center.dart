@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
 import 'package:agent_orchestration/agent_orchestration.dart'
-    show startAgentComparisonTasks;
+    show AgentTaskCancellationGate, startAgentComparisonTasks;
 
 import '../models/generated_contracts.dart';
 import '../services/a2a_connection_client.dart' show A2aTaskQueryResult;
@@ -153,6 +153,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
   int _resultGeneration = 0;
   Timer? _resultClearTimer;
   String? _taskPreflightSession;
+  final _taskCancellationGate = AgentTaskCancellationGate();
   String? _registrationStatus;
   final Map<String, String> _taskPreflightStatus = {};
   final Map<String, _AgentTaskUiState> _agentTasks = {};
@@ -559,7 +560,11 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
   }
 
   Future<void> _prepareAgentComparison() async {
-    if (_comparisonPending || _taskPreflightSession != null) return;
+    if (_comparisonPending ||
+        _taskPreflightSession != null ||
+        _taskCancellationGate.hasPending) {
+      return;
+    }
     final agentA = _sessionById(_comparisonAgentASessionId);
     final agentB = _sessionById(_comparisonAgentBSessionId);
     if (agentA == null || agentB == null) {
@@ -699,6 +704,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
         requestA.sessionId == requestB.sessionId ||
         requestA.workspaceId == requestB.workspaceId ||
         _taskPreflightSession != null ||
+        _taskCancellationGate.hasPending ||
         _comparisonPending) {
       setState(
         () => _comparisonStatus =
@@ -891,6 +897,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     if (transport == null ||
         comparison == null ||
         _taskPreflightSession != null ||
+        _taskCancellationGate.hasPending ||
         (recordA == null && recordB == null)) {
       return;
     }
@@ -973,6 +980,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     final targetState = target == null ? null : _agentTasks[target.sessionId];
     if (_comparisonPending ||
         _taskPreflightSession != null ||
+        _taskCancellationGate.hasPending ||
         comparison == null ||
         source == null ||
         target == null ||
@@ -1350,6 +1358,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
         state == null ||
         request == null ||
         _taskPreflightSession != null ||
+        _taskCancellationGate.isPending(session.sessionId) ||
         !_taskSessionStillMatches(session, request)) {
       return;
     }
@@ -1551,6 +1560,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
         state == null ||
         taskId == null ||
         _taskPreflightSession != null ||
+        _taskCancellationGate.isPending(session.sessionId) ||
         !_sessionStillMatchesRegistration(session)) {
       return;
     }
@@ -1587,6 +1597,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
         task.status != 'completed' ||
         !task.resultContentAvailable ||
         _taskPreflightSession != null ||
+        _taskCancellationGate.isPending(session.sessionId) ||
         !_sessionStillMatchesRegistration(session)) {
       return;
     }
@@ -1648,19 +1659,28 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     if (transport == null ||
         state == null ||
         taskId == null ||
-        _taskPreflightSession != null ||
+        _taskPreflightSession == session.sessionId ||
+        _taskCancellationGate.isPending(session.sessionId) ||
         !_sessionStillMatchesRegistration(session) ||
         !const {'pending', 'running'}.contains(state.record!.status)) {
       return;
     }
     setState(() {
-      _taskPreflightSession = session.sessionId;
       _taskPreflightStatus[session.sessionId] = '取消要求をBrokerへ送信中です。';
     });
     try {
-      state.record = await AgentTaskClient(transport).cancel(taskId);
-      if (!mounted) return;
+      final cancelled = await _taskCancellationGate.runIfAvailable(
+        session.sessionId,
+        () => AgentTaskClient(transport).cancel(taskId),
+      );
+      if (!mounted ||
+          cancelled == null ||
+          !identical(_agentTasks[session.sessionId], state) ||
+          state.record?.taskId != taskId) {
+        return;
+      }
       setState(() {
+        state.record = cancelled;
         _taskPreflightStatus[session.sessionId] =
             '取消要求を記録しました。停止完了はBroker状態の再確認が必要です。';
       });
@@ -1671,7 +1691,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
           : 'Task取消要求に失敗しました。';
       setState(() => _taskPreflightStatus[session.sessionId] = message);
     } finally {
-      if (mounted) setState(() => _taskPreflightSession = null);
+      if (mounted) setState(() {});
     }
   }
 
@@ -1679,7 +1699,8 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     final taskState = _agentTasks[session.sessionId];
     if (taskState == null) return const [];
     final task = taskState.record;
-    final busy = _taskPreflightSession == session.sessionId;
+    final busy = _taskPreflightSession == session.sessionId ||
+        _taskCancellationGate.isPending(session.sessionId);
     final comparisonMember =
         _comparison != null &&
         {
@@ -1809,8 +1830,13 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
         ),
       if (task != null && const {'pending', 'running'}.contains(task.status))
         OutlinedButton(
+          key: ValueKey('agent-task-cancel-${session.sessionId}'),
           onPressed: busy ? null : () => _cancelAgentTask(session),
-          child: const Text('Task停止を要求'),
+          child: Text(
+            _taskCancellationGate.isPending(session.sessionId)
+                ? '取消応答待ち'
+                : 'Task停止を要求',
+          ),
         ),
       if (task?.status == 'completed') ...[
         const SizedBox(height: 8),
@@ -2735,16 +2761,19 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
                 if (_sessionAvailable(session)) ...[
                   OutlinedButton(
                     onPressed: _taskPreflightSession == session.sessionId ||
+                            _taskCancellationGate.isPending(session.sessionId) ||
                             (widget.developerEditTaskInstruction != null &&
                                 _taskPreflightSession != null)
                         ? null
                         : () => _inspectTask(session),
                     child: Text(
-                      _taskPreflightSession == session.sessionId
-                          ? 'Broker事前検査中'
-                          : widget.developerEditTaskInstruction != null
-                          ? '提案を別Taskとして事前検査'
-                          : 'Task実行能力を事前検査（実行なし）',
+                      _taskCancellationGate.isPending(session.sessionId)
+                          ? '取消応答待ち'
+                          : _taskPreflightSession == session.sessionId
+                              ? 'Broker事前検査中'
+                              : widget.developerEditTaskInstruction != null
+                                  ? '提案を別Taskとして事前検査'
+                                  : 'Task実行能力を事前検査（実行なし）',
                     ),
                   ),
                   if (_taskPreflightStatus[session.sessionId] != null)

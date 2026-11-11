@@ -228,7 +228,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/agent_center.dart",
-      "sha256": "cf143a7f11995ee02fcffb62373bcb3f98f158a2d5265a0d220f2e9808ae31bc"
+      "sha256": "82909b9d094ebf0e9b3a33636aed80ccc085b4f62cef340a529801c6839571a7"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/approval_center.dart",
@@ -628,7 +628,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/agent_coordination_test.dart",
-      "sha256": "fb89e5ade4ef02566708de42c96efc35294fce534669254611a45c2ed5850c17"
+      "sha256": "73a0db1c6c37f9f6ca868d4cb5f695c7352ab157d616fad5aec00f814b120a0e"
     },
     {
       "path": "apps/desktop_flutter/test/agent_handoff_test.dart",
@@ -748,7 +748,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "76a7099e56fa9f0d36ff9c563b9afa32d8d09c6445a1eb5e2712e603f268ce96"
+      "sha256": "1c1567bd1c53e8aa71f488c55eb00477f8ebcf6563b94272afc2df39a5058d95"
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
@@ -1444,7 +1444,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "40c37dbf465943d1e9e7a48a195dbcc0de47cac91b01f925c8760bc5b1c6f9b8"
+      "sha256": "981662a18318b21d896f35ca6fce1b533f59d935b3020291246767e65c58d548"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -4300,7 +4300,7 @@
     },
     {
       "path": "packages/agent_orchestration/lib/agent_comparison_coordinator.dart",
-      "sha256": "9232f74c9cb4276bddaaa00a584bf47ef301cdfad2c5dbf432bb4b5725cfb6a6"
+      "sha256": "37f42ab64c94e827c5a6ef9ebdc49294c5bbb2f96792094758b7b317be71daea"
     },
     {
       "path": "packages/agent_orchestration/lib/agent_mcp_task_controller.dart",
