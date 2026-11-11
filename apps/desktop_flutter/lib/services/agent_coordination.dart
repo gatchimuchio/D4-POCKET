@@ -1,4 +1,6 @@
 import '../models/generated_contracts.dart';
+import 'package:agent_orchestration/agent_task_client.dart'
+    show AgentTaskRecord, AgentTaskResultProjection;
 
 class AgentComparisonProjection {
   const AgentComparisonProjection({
@@ -74,6 +76,214 @@ class AgentComparisonProjection {
       sessionIds: sessionIds,
     );
   }
+}
+
+/// Compare選択結果の適用元と適用先を固定する不変snapshot。
+///
+/// 未信頼の結果本文はデータとしてのみ保持し、Permission／Approval等の
+/// Authorityは保持しない。
+class AgentSelectedResultApplySnapshot {
+  AgentSelectedResultApplySnapshot.capture({
+    required this.agentASessionId,
+    required this.agentBSessionId,
+    required this.selectedSessionId,
+    required this.comparisonInstructionHash,
+    required this.comparisonStartedAt,
+    required AgentSessionRecord agentA,
+    required AgentSessionRecord agentB,
+    required AgentSessionRecord source,
+    required AgentSessionRecord target,
+    required AgentTaskRecord sourceTask,
+    required AgentTaskResultProjection sourceResult,
+    required AgentTaskRecord? targetTask,
+  })  : _agentA = _ComparisonApplySessionBinding(agentA),
+        _agentB = _ComparisonApplySessionBinding(agentB),
+        _source = _ComparisonApplySessionBinding(source),
+        _target = _ComparisonApplySessionBinding(target),
+        _sourceTask = _ComparisonApplyTaskBinding(sourceTask),
+        _sourceResult = _ComparisonApplyResultBinding(sourceResult),
+        _targetTask =
+            targetTask == null ? null : _ComparisonApplyTaskBinding(targetTask);
+
+  final String agentASessionId;
+  final String agentBSessionId;
+  final String selectedSessionId;
+  final String comparisonInstructionHash;
+  final DateTime? comparisonStartedAt;
+  final _ComparisonApplySessionBinding _agentA;
+  final _ComparisonApplySessionBinding _agentB;
+  final _ComparisonApplySessionBinding _source;
+  final _ComparisonApplySessionBinding _target;
+  final _ComparisonApplyTaskBinding _sourceTask;
+  final _ComparisonApplyResultBinding _sourceResult;
+  final _ComparisonApplyTaskBinding? _targetTask;
+
+  String get sourceRuntimeId => _source.agentRuntimeId;
+  String get sourceSessionId => _source.sessionId;
+  String get sourceWorkspace => _source.workspace;
+  String get sourceTaskId => _sourceTask.taskId;
+  String? get resultHash => _sourceResult.resultHash;
+  String? get resultText => _sourceResult.text;
+  String get targetRuntimeId => _target.agentRuntimeId;
+  String get targetSessionId => _target.sessionId;
+  String get targetWorkspace => _target.workspace;
+
+  bool matchesCurrent({
+    required String? currentAgentASessionId,
+    required String? currentAgentBSessionId,
+    required String? currentSelectedSessionId,
+    required String? currentComparisonInstructionHash,
+    required DateTime? currentComparisonStartedAt,
+    required List<AgentSessionRecord> currentSessions,
+    required AgentTaskRecord? currentSourceTask,
+    required AgentTaskResultProjection? currentSourceResult,
+    required AgentTaskRecord? currentTargetTask,
+    required bool currentTargetHasRequest,
+  }) {
+    if (currentAgentASessionId != agentASessionId ||
+        currentAgentBSessionId != agentBSessionId ||
+        currentSelectedSessionId != selectedSessionId ||
+        currentComparisonInstructionHash != comparisonInstructionHash ||
+        currentComparisonStartedAt != comparisonStartedAt ||
+        selectedSessionId != sourceSessionId ||
+        (selectedSessionId != agentASessionId &&
+            selectedSessionId != agentBSessionId) ||
+        currentTargetHasRequest) {
+      return false;
+    }
+
+    final agentA = _uniqueCurrentSession(currentSessions, _agentA);
+    final agentB = _uniqueCurrentSession(currentSessions, _agentB);
+    final source = _uniqueCurrentSession(currentSessions, _source);
+    final target = _uniqueCurrentSession(currentSessions, _target);
+    if (agentA == null || agentB == null || source == null || target == null) {
+      return false;
+    }
+
+    final expectedTargetTask = _targetTask;
+    final targetTaskMatches = expectedTargetTask == null
+        ? currentTargetTask == null
+        : expectedTargetTask.matches(currentTargetTask);
+    if (!_sourceTask.matches(currentSourceTask) ||
+        !_sourceResult.matches(currentSourceResult) ||
+        !targetTaskMatches ||
+        !_sourceTask.isCompletedFor(_source) ||
+        _sourceTask.taskId != _sourceResult.taskId ||
+        _sourceTask.resultHash == null ||
+        _sourceTask.resultHash != _sourceResult.resultHash ||
+        _sourceResult.visibility != 'full' ||
+        _sourceResult.text == null ||
+        (expectedTargetTask != null &&
+            !expectedTargetTask.isBoundTo(_target))) {
+      return false;
+    }
+
+    return AgentComparisonProjection.fromSessions([
+      agentA,
+      agentB,
+      target,
+    ]).available;
+  }
+}
+
+AgentSessionRecord? _uniqueCurrentSession(
+  List<AgentSessionRecord> sessions,
+  _ComparisonApplySessionBinding expected,
+) {
+  final matches = sessions
+      .where((session) => session.sessionId == expected.sessionId)
+      .toList(growable: false);
+  if (matches.length != 1 || !expected.matches(matches.single)) return null;
+  return matches.single;
+}
+
+class _ComparisonApplySessionBinding {
+  _ComparisonApplySessionBinding(AgentSessionRecord session)
+      : sessionId = session.sessionId,
+        agentRuntimeId = session.agentRuntimeId,
+        status = session.status,
+        workspace = session.workspace,
+        workspaceAuditEventId = session.workspaceAuditEventId;
+
+  final String sessionId;
+  final String agentRuntimeId;
+  final String status;
+  final String workspace;
+  final String workspaceAuditEventId;
+
+  bool matches(AgentSessionRecord session) =>
+      status == '利用中' &&
+      session.sessionId == sessionId &&
+      session.agentRuntimeId == agentRuntimeId &&
+      session.status == status &&
+      session.workspace == workspace &&
+      session.workspaceAuditEventId == workspaceAuditEventId;
+}
+
+class _ComparisonApplyTaskBinding {
+  _ComparisonApplyTaskBinding(AgentTaskRecord task)
+      : taskId = task.taskId,
+        runtimeId = task.runtimeId,
+        sessionId = task.sessionId,
+        workspaceId = task.workspaceId,
+        instructionHash = task.instructionHash,
+        status = task.status,
+        auditEventId = task.auditEventId,
+        resultHash = task.resultHash,
+        resultContentAvailable = task.resultContentAvailable;
+
+  final String taskId;
+  final String runtimeId;
+  final String sessionId;
+  final String workspaceId;
+  final String instructionHash;
+  final String status;
+  final String auditEventId;
+  final String? resultHash;
+  final bool resultContentAvailable;
+
+  bool matches(AgentTaskRecord? task) =>
+      task != null &&
+      task.taskId == taskId &&
+      task.runtimeId == runtimeId &&
+      task.sessionId == sessionId &&
+      task.workspaceId == workspaceId &&
+      task.instructionHash == instructionHash &&
+      task.status == status &&
+      task.auditEventId == auditEventId &&
+      task.resultHash == resultHash &&
+      task.resultContentAvailable == resultContentAvailable;
+
+  bool isCompletedFor(_ComparisonApplySessionBinding session) =>
+      status == 'completed' &&
+      runtimeId == session.agentRuntimeId &&
+      sessionId == session.sessionId &&
+      workspaceId == session.workspace;
+
+  bool isBoundTo(_ComparisonApplySessionBinding session) =>
+      runtimeId == session.agentRuntimeId &&
+      sessionId == session.sessionId &&
+      workspaceId == session.workspace;
+}
+
+class _ComparisonApplyResultBinding {
+  _ComparisonApplyResultBinding(AgentTaskResultProjection result)
+      : taskId = result.taskId,
+        resultHash = result.resultHash,
+        visibility = result.visibility,
+        text = result.text;
+
+  final String taskId;
+  final String resultHash;
+  final String visibility;
+  final String? text;
+
+  bool matches(AgentTaskResultProjection? result) =>
+      result != null &&
+      result.taskId == taskId &&
+      result.resultHash == resultHash &&
+      result.visibility == visibility &&
+      result.text == text;
 }
 
 bool _isComparisonId(String value) {

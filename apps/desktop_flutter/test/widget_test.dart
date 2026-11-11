@@ -2517,6 +2517,55 @@ void main() {
           'status': 'issued_unconsumed',
         };
 
+    Map<String, Object?> selectedResultApproval() =>
+        _brokerAcceptedBody('AgentTask結果表示承認', {
+          'task_id': taskA,
+          'result_hash': resultHashA,
+          'content_visibility': 'full',
+          'approval_id': '11111111111111111111111111111111',
+          'expires_at_epoch_seconds': 1900000000,
+          'use_limit': 1,
+          'uses_remaining': 1,
+        });
+    Map<String, Object?> selectedResultProjection() =>
+        _brokerAcceptedBody('AgentTask結果取得', {
+          'task_id': taskA,
+          'result_hash': resultHashA,
+          'content_visibility': 'full',
+          'projection': {
+            'result_hash': resultHashA,
+            'text': jsonEncode({
+              'result_summary':
+                  'candidate patch body: add isolated implementation',
+              'artifacts': [
+                {'name': 'patch.txt', 'content': 'candidate patch body'},
+              ],
+              'changed_files': ['lib/candidate.dart'],
+              'diff': '+candidate patch body',
+              'test_result': 'A: test passed（Agent申告・未検証）',
+            }),
+          },
+        });
+    Map<String, Object?> applyTaskPreflight() =>
+        _brokerAcceptedBody('Agent作業要求検査', {
+          '版': 1,
+          '状態': '要求検査済み',
+          '実行状態': '未実行',
+          'Permission状態': '未付与',
+          'Approval状態': '未取得',
+          '実行系ID': runtimeId,
+          '対話セッションID': sessionC,
+          '作業領域ID': 'workspace-agent-c',
+          '指示hash': instructionHash,
+        });
+    var pauseApplyInspection = false;
+    var trackApplyInspectionResponse = false;
+    var applyInspectionLifecycleInvalidations = 0;
+    final applyInspectionStarted = Completer<void>();
+    final releaseApplyInspection = Completer<void>();
+    final applyInspectionReleased = Completer<void>();
+    final applyInspectionResponseReceived = Completer<void>();
+
     final transport = _FakeBrokerTransport([
       _brokerHealthResponse(),
       _brokerHostCapabilityResponse(),
@@ -2657,44 +2706,14 @@ void main() {
         auditId: 'audit-resource-shared',
         workingSetBytes: 8192,
       ),
-      _brokerAcceptedBody('AgentTask結果表示承認', {
-        'task_id': taskA,
-        'result_hash': resultHashA,
-        'content_visibility': 'full',
-        'approval_id': '11111111111111111111111111111111',
-        'expires_at_epoch_seconds': 1900000000,
-        'use_limit': 1,
-        'uses_remaining': 1,
-      }),
-      _brokerAcceptedBody('AgentTask結果取得', {
-        'task_id': taskA,
-        'result_hash': resultHashA,
-        'content_visibility': 'full',
-        'projection': {
-          'result_hash': resultHashA,
-          'text': jsonEncode({
-            'result_summary':
-                'candidate patch body: add isolated implementation',
-            'artifacts': [
-              {'name': 'patch.txt', 'content': 'candidate patch body'},
-            ],
-            'changed_files': ['lib/candidate.dart'],
-            'diff': '+candidate patch body',
-            'test_result': 'A: test passed（Agent申告・未検証）',
-          }),
-        },
-      }),
-      _brokerAcceptedBody('Agent作業要求検査', {
-        '版': 1,
-        '状態': '要求検査済み',
-        '実行状態': '未実行',
-        'Permission状態': '未付与',
-        'Approval状態': '未取得',
-        '実行系ID': runtimeId,
-        '対話セッションID': sessionC,
-        '作業領域ID': 'workspace-agent-c',
-        '指示hash': instructionHash,
-      }),
+      for (var exposure = 0; exposure < 2; exposure++) ...[
+        selectedResultApproval(),
+        selectedResultProjection(),
+      ],
+      applyTaskPreflight(),
+      selectedResultApproval(),
+      selectedResultProjection(),
+      applyTaskPreflight(),
       _brokerAcceptedBody(
         'AgentTaskWorkspacePermissionGrant',
         permissionReceipt(
@@ -2736,6 +2755,19 @@ void main() {
         tester.binding.handleAppLifecycleStateChanged(
           AppLifecycleState.resumed,
         );
+      }
+    }, beforeResponse: (operation) async {
+      if (operation == 'Agent作業要求検査' && pauseApplyInspection) {
+        pauseApplyInspection = false;
+        applyInspectionLifecycleInvalidations++;
+        applyInspectionStarted.complete();
+        await releaseApplyInspection.future;
+        applyInspectionReleased.complete();
+      }
+    }, afterResponse: (operation) {
+      if (operation == 'Agent作業要求検査' && trackApplyInspectionResponse) {
+        trackApplyInspectionResponse = false;
+        applyInspectionResponseReceived.complete();
       }
     });
     final client = await ShellCoreClient.product(transport: transport);
@@ -2911,6 +2943,94 @@ void main() {
         find.byKey(const ValueKey('prepare-selected-result-apply'));
     await tester.ensureVisible(prepareApply);
     expect(tester.widget<OutlinedButton>(prepareApply).onPressed, isNotNull);
+    await tester.tap(prepareApply);
+    await tester.pumpAndSettle();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    await tester.enterText(
+      find.byType(TextFormField),
+      'このcandidate patchだけを適用する',
+    );
+    await tester.tap(find.text('適用先Taskを事前検査'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('比較元・選択結果・適用先のいずれかが変化したため停止しました。'),
+      findsOneWidget,
+    );
+    expect(
+      transport.requests.where((request) {
+        final payload = request['payload'] as Map?;
+        return request['operation'] == 'Agent作業要求検査' &&
+            payload?['session_id'] == sessionC;
+      }),
+      isEmpty,
+    );
+
+    await tester.ensureVisible(showResultA);
+    await tester.tap(showResultA);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('candidate patch body'), findsWidgets);
+
+    await tester.ensureVisible(prepareApply);
+    await tester.tap(prepareApply);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byType(TextFormField),
+      'このcandidate patchだけを適用する',
+    );
+    pauseApplyInspection = true;
+    trackApplyInspectionResponse = true;
+    await tester.tap(find.text('適用先Taskを事前検査'));
+    await applyInspectionStarted.future;
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    expect(
+      find.byKey(const ValueKey('agent-task-result-text')),
+      findsNothing,
+    );
+    releaseApplyInspection.complete();
+    await applyInspectionReleased.future;
+    await applyInspectionResponseReceived.future;
+    await tester.pump();
+    await tester.pumpAndSettle();
+    expect(applyInspectionLifecycleInvalidations, 1);
+    expect(
+      find.byKey(const ValueKey('agent-task-result-text')),
+      findsNothing,
+    );
+    expect(find.byType(AgentCenter), findsOneWidget);
+    await tester.ensureVisible(prepareApply);
+    for (var settle = 0; settle < 5; settle++) {
+      await tester.pump(const Duration(milliseconds: 1));
+    }
+    await tester.pumpAndSettle();
+    expect(
+      transport.returnedResponses.where(
+        (response) => response['operation'] == 'Agent作業要求検査',
+      ),
+      hasLength(3),
+    );
+    expect(
+      find.text('事前検査中に比較元・選択結果・適用先が変化したため停止しました。'),
+      findsOneWidget,
+    );
+    expect(
+      transport.requests.where((request) {
+        final payload = request['payload'] as Map?;
+        return request['operation'] == 'Agent作業要求検査' &&
+            payload?['session_id'] == sessionC;
+      }),
+      hasLength(1),
+    );
+
+    await tester.ensureVisible(showResultA);
+    await tester.tap(showResultA);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('candidate patch body'), findsWidgets);
+
+    await tester.ensureVisible(prepareApply);
     await tester.tap(prepareApply);
     await tester.pumpAndSettle();
     await tester.enterText(
@@ -5563,11 +5683,17 @@ void main() {
 }
 
 class _FakeBrokerTransport implements BrokerTransport {
-  _FakeBrokerTransport(this._responses, {this.onRequest, this.beforeResponse});
+  _FakeBrokerTransport(
+    this._responses, {
+    this.onRequest,
+    this.beforeResponse,
+    this.afterResponse,
+  });
 
   final List<Map<String, Object?>> _responses;
   final void Function(String operation)? onRequest;
   final Future<void> Function(String operation)? beforeResponse;
+  final void Function(String operation)? afterResponse;
   final List<String> operations = [];
   final List<Map<String, Object?>> requests = [];
   final List<Map<String, Object?>> returnedResponses = [];
@@ -5669,6 +5795,7 @@ class _FakeBrokerTransport implements BrokerTransport {
     }
     final response = _responses.removeAt(0);
     returnedResponses.add(response);
+    afterResponse?.call(operation);
     return response;
   }
 }

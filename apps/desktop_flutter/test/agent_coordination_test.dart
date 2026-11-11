@@ -332,4 +332,133 @@ void main() {
     expect(duplicateRuntime.available, isTrue);
     expect(duplicateRuntime.statusMessage, contains('同じRuntime IDも比較できます'));
   });
+
+  test('Compare結果ApplyのsnapshotはSession・Task・本文の変更を拒否する', () {
+    const sessionA = 'agent-a';
+    const sessionB = 'agent-b';
+    const sessionTarget = 'agent-target';
+    final resultHash = 'sha256:${'a' * 64}';
+    final sessions = [
+      _session(
+        sessionA,
+        'workspace-a',
+        agentRuntimeId: 'codex-cli',
+        status: '利用中',
+      ),
+      _session(
+        sessionB,
+        'workspace-b',
+        agentRuntimeId: 'codex-cli',
+        status: '利用中',
+      ),
+      _session(
+        sessionTarget,
+        'workspace-target',
+        agentRuntimeId: 'codex-cli',
+        status: '利用中',
+      ),
+    ];
+    final sourceTask = AgentTaskRecord(
+      taskId: 'task-a',
+      runtimeId: 'codex-cli',
+      sessionId: sessionA,
+      workspaceId: 'workspace-a',
+      instructionHash: 'sha256:${'b' * 64}',
+      status: 'completed',
+      auditEventId: 'audit-task-a',
+      resultHash: resultHash,
+      resultContentAvailable: true,
+    );
+    AgentTaskResultProjection result(String text) => AgentTaskResultProjection(
+          taskId: 'task-a',
+          resultHash: resultHash,
+          visibility: 'full',
+          projection: {'result_hash': resultHash, 'text': text},
+        );
+    final sourceResult = result('candidate result');
+    final startedAt = DateTime.utc(2026, 11, 12);
+    final snapshot = AgentSelectedResultApplySnapshot.capture(
+      agentASessionId: sessionA,
+      agentBSessionId: sessionB,
+      selectedSessionId: sessionA,
+      comparisonInstructionHash: 'sha256:${'c' * 64}',
+      comparisonStartedAt: startedAt,
+      agentA: sessions[0],
+      agentB: sessions[1],
+      source: sessions[0],
+      target: sessions[2],
+      sourceTask: sourceTask,
+      sourceResult: sourceResult,
+      targetTask: null,
+    );
+
+    bool current({
+      String? selected,
+      String? selectedA,
+      String? selectedB,
+      String? instructionHash,
+      DateTime? started,
+      List<AgentSessionRecord>? liveSessions,
+      AgentTaskRecord? liveTask,
+      AgentTaskResultProjection? liveResult,
+      AgentTaskRecord? targetTask,
+      bool targetHasRequest = false,
+    }) =>
+        snapshot.matchesCurrent(
+          currentAgentASessionId: selectedA ?? sessionA,
+          currentAgentBSessionId: selectedB ?? sessionB,
+          currentSelectedSessionId: selected ?? sessionA,
+          currentComparisonInstructionHash:
+              instructionHash ?? 'sha256:${'c' * 64}',
+          currentComparisonStartedAt: started ?? startedAt,
+          currentSessions: liveSessions ?? sessions,
+          currentSourceTask: liveTask ?? sourceTask,
+          currentSourceResult: liveResult ?? sourceResult,
+          currentTargetTask: targetTask,
+          currentTargetHasRequest: targetHasRequest,
+        );
+
+    expect(current(), isTrue);
+    expect(current(selected: sessionB), isFalse);
+    expect(current(selectedA: sessionB), isFalse);
+    expect(
+        current(started: startedAt.add(const Duration(seconds: 1))), isFalse);
+    expect(
+      current(
+        liveTask: AgentTaskRecord(
+          taskId: 'task-replaced',
+          runtimeId: 'codex-cli',
+          sessionId: sessionA,
+          workspaceId: 'workspace-a',
+          instructionHash: sourceTask.instructionHash,
+          status: 'completed',
+          auditEventId: sourceTask.auditEventId,
+          resultHash: resultHash,
+          resultContentAvailable: true,
+        ),
+      ),
+      isFalse,
+    );
+    expect(current(liveResult: result('changed body with same hash')), isFalse);
+    expect(current(targetHasRequest: true), isFalse);
+    expect(
+      current(
+        liveSessions: [
+          sessions[0],
+          sessions[1],
+          _session(
+            sessionTarget,
+            'workspace-replaced',
+            agentRuntimeId: 'codex-cli',
+            status: '利用中',
+          ),
+        ],
+      ),
+      isFalse,
+    );
+    expect(
+      current(liveSessions: [...sessions, sessions[2]]),
+      isFalse,
+    );
+  });
 }

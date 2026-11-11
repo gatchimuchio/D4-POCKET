@@ -1074,6 +1074,39 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
       return;
     }
 
+    final snapshot = AgentSelectedResultApplySnapshot.capture(
+      agentASessionId: comparison.agentASessionId,
+      agentBSessionId: comparison.agentBSessionId,
+      selectedSessionId: selectedSessionId!,
+      comparisonInstructionHash: comparison.instructionHash,
+      comparisonStartedAt: comparison.startedAt,
+      agentA: agentA,
+      agentB: agentB,
+      source: source,
+      target: target,
+      sourceTask: sourceTask,
+      sourceResult: projection,
+      targetTask: targetState?.record,
+    );
+    bool snapshotIsCurrent() {
+      final currentComparison = _comparison;
+      final currentTargetState = _agentTasks[snapshot.targetSessionId];
+      if (!identical(currentTargetState, targetState)) return false;
+      return snapshot.matchesCurrent(
+        currentAgentASessionId: currentComparison?.agentASessionId,
+        currentAgentBSessionId: currentComparison?.agentBSessionId,
+        currentSelectedSessionId: currentComparison?.selectedSessionId,
+        currentComparisonInstructionHash: currentComparison?.instructionHash,
+        currentComparisonStartedAt: currentComparison?.startedAt,
+        currentSessions: _sessions,
+        currentSourceTask: _agentTasks[snapshot.sourceSessionId]?.record,
+        currentSourceResult:
+            _agentTasks[snapshot.sourceSessionId]?.resultProjection,
+        currentTargetTask: currentTargetState?.record,
+        currentTargetHasRequest: currentTargetState?.request != null,
+      );
+    }
+
     setState(() {
       _comparisonPending = true;
       _comparisonApplyStatus = '適用先TaskのOwner指示を待っています。';
@@ -1091,8 +1124,15 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
       });
       return;
     }
-    final resultHash = sourceTask.resultHash;
-    final resultText = projection.text;
+    if (!snapshotIsCurrent()) {
+      setState(() {
+        _comparisonPending = false;
+        _comparisonApplyStatus = '比較元・選択結果・適用先のいずれかが変化したため停止しました。';
+      });
+      return;
+    }
+    final resultHash = snapshot.resultHash;
+    final resultText = snapshot.resultText;
     if (resultHash == null || resultText == null) {
       setState(() {
         _comparisonPending = false;
@@ -1101,9 +1141,9 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
       return;
     }
     final transfer = jsonEncode({
-      'source_runtime_id': source.agentRuntimeId,
-      'source_session_id': source.sessionId,
-      'source_task_id': sourceTask.taskId,
+      'source_runtime_id': snapshot.sourceRuntimeId,
+      'source_session_id': snapshot.sourceSessionId,
+      'source_task_id': snapshot.sourceTaskId,
       'source_result_hash': resultHash,
       'untrusted_selected_result': resultText,
       'owner_apply_instruction': applyDraft.instruction.trim(),
@@ -1114,9 +1154,9 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
         'owner_apply_instructionの範囲だけ実行し、Permission／Approvalを推定・継承しないでください。\n'
         '$transfer';
     final request = AgentTaskRequest(
-      runtimeId: target.agentRuntimeId,
-      sessionId: target.sessionId,
-      workspaceId: target.workspace,
+      runtimeId: snapshot.targetRuntimeId,
+      sessionId: snapshot.targetSessionId,
+      workspaceId: snapshot.targetWorkspace,
       instruction: instruction,
     );
     try {
@@ -1138,18 +1178,19 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     }
     try {
       final preflight = await AgentTaskClient(transport).inspect(request);
-      if (!mounted ||
-          !_sessionAvailable(target) ||
-          _comparison?.selectedSessionId != selectedSessionId ||
-          sourceState?.resultProjection?.resultHash != resultHash) {
+      if (!mounted) return;
+      if (!snapshotIsCurrent()) {
+        setState(
+          () => _comparisonApplyStatus = '事前検査中に比較元・選択結果・適用先が変化したため停止しました。',
+        );
         return;
       }
       setState(() {
-        _agentTasks[target.sessionId] = _AgentTaskUiState(
+        _agentTasks[snapshot.targetSessionId] = _AgentTaskUiState(
           request: request,
           preflight: preflight,
         );
-        _taskPreflightStatus[target.sessionId] =
+        _taskPreflightStatus[snapshot.targetSessionId] =
             '選択結果を適用先Task要求へ封入しました。Permission／Approvalは移送されていません。';
         _comparisonApplyStatus =
             '適用先Taskを事前検査しました。Workspace PermissionとTask Approvalを新規に取得してください。';
