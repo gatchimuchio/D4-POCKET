@@ -251,7 +251,8 @@ mod tests {
     }
 
     #[test]
-    fn native_stdio_exposes_one_non_authoritative_tool_and_only_returns_an_acknowledgement() {
+    fn mcp_task_tool_stdio_exposes_one_non_authoritative_tool_and_only_returns_an_acknowledgement()
+    {
         let mut input = String::new();
         input.push_str(r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#);
         input.push('\n');

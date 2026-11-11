@@ -1444,7 +1444,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "6b5841bd94524fd62540c325adfbbe81b8a3a0207bdae13756cad8c7208e7248"
+      "sha256": "e9105f1966527fb22039bb467180783ea8e95146b40b77478a6bde313e024146"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -3720,7 +3720,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
-      "sha256": "fb2535304f04481fe896b9dbd40bb124d5e7aa229ef1c0a923c1411674ff4e3c"
+      "sha256": "3418c80c24f6c5851531a79c750997f288bd16cc83fc8ddd676c759a636f2b4a"
     },
     {
       "path": "native/rust_helper/src/adapters/mcp_stdio.rs",
@@ -4020,7 +4020,7 @@
     },
     {
       "path": "native/rust_helper/src/mcp_task_tool_stdio.rs",
-      "sha256": "c3a07f050e3cdd38730e4125324d3168ff7d0c6144c55c246617e97c5130759a"
+      "sha256": "b03a8f821571e8ba860bbdad4319a1653d5c229344cc9656940a46849333dc63"
     },
     {
       "path": "native/rust_helper/src/network.rs",

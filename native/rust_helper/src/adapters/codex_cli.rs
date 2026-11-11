@@ -1478,14 +1478,14 @@ fn build_codex_command_with_model_and_task_tool(
         let helper = serde_json::to_string(helper).map_err(|_| 対話失敗::要求不正)?;
         let arguments = serde_json::to_string(&[TASK_TOOL_SERVER_ARGUMENT])
             .map_err(|_| 対話失敗::要求不正)?;
-        let enabled_tools =
-            serde_json::to_string(&[TASK_TOOL_NAME]).map_err(|_| 対話失敗::要求不正)?;
+        // This dedicated server advertises exactly one fixed, non-authoritative
+        // request tool. Keep that allowlist in its own tools/list contract instead
+        // of depending on Codex CLI's optional per-server enabled_tools filter.
         let mcp_server_overrides = [
             format!("mcp_servers.d4p_task_request.command={helper}"),
             format!("mcp_servers.d4p_task_request.args={arguments}"),
             "mcp_servers.d4p_task_request.enabled=true".to_owned(),
             "mcp_servers.d4p_task_request.required=true".to_owned(),
-            format!("mcp_servers.d4p_task_request.enabled_tools={enabled_tools}"),
             "mcp_servers.d4p_task_request.default_tools_approval_mode=\"auto\"".to_owned(),
             "mcp_servers.d4p_task_request.startup_timeout_sec=5".to_owned(),
         ];
@@ -2403,7 +2403,7 @@ mod tests {
             .map(|pair| pair[1].as_str())
             .filter(|setting| setting.starts_with("mcp_servers.d4p_task_request."))
             .collect::<Vec<_>>();
-        assert_eq!(settings.len(), 7);
+        assert_eq!(settings.len(), 6);
         assert!(settings.iter().any(|setting| {
             setting.starts_with("mcp_servers.d4p_task_request.command=")
                 && setting.contains("gui_shell")
@@ -2412,9 +2412,9 @@ mod tests {
             *setting
                 == format!("mcp_servers.d4p_task_request.args=[\"{TASK_TOOL_SERVER_ARGUMENT}\"]")
         }));
-        assert!(settings.iter().any(|setting| {
-            *setting == format!("mcp_servers.d4p_task_request.enabled_tools=[\"{TASK_TOOL_NAME}\"]")
-        }));
+        assert!(settings
+            .iter()
+            .all(|setting| !setting.contains(".enabled_tools=")));
         assert!(settings
             .iter()
             .any(|setting| *setting == "mcp_servers.d4p_task_request.required=true"));
