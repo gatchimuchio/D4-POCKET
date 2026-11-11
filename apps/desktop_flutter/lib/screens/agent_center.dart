@@ -791,9 +791,12 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     }
 
     final generation = ++_comparisonResourceGeneration;
+    final sharedRuntime = agentA.agentRuntimeId == agentB.agentRuntimeId;
     setState(() {
       _comparisonResourcePending = true;
-      _comparisonResourceStatus = 'Agent A/BのRuntimeをBrokerで並行観測しています。';
+      _comparisonResourceStatus = sharedRuntime
+          ? '同一Runtime IDの共有資源値をBrokerで一度だけ観測しています。'
+          : 'Agent A/BのRuntimeをBrokerで並行観測しています。';
       _comparisonResourceA = null;
       _comparisonResourceB = null;
     });
@@ -816,22 +819,34 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     }
 
     try {
-      final outcomes = await Future.wait([
-        observe(agentA),
-        observe(agentB),
-      ]);
+      late final _ComparisonRuntimeResourceState outcomeA;
+      _ComparisonRuntimeResourceState? outcomeB;
+      if (sharedRuntime) {
+        outcomeA = await observe(agentA);
+      } else {
+        final outcomes = await Future.wait([
+          observe(agentA),
+          observe(agentB),
+        ]);
+        outcomeA = outcomes[0];
+        outcomeB = outcomes[1];
+      }
       if (!mounted || generation != _comparisonResourceGeneration) return;
-      final successCount = outcomes
-          .where((outcome) => outcome.observation != null)
+      final successCount = [outcomeA, outcomeB]
+          .where((outcome) => outcome?.observation != null)
           .length;
       setState(() {
-        _comparisonResourceA = outcomes[0];
-        _comparisonResourceB = outcomes[1];
-        _comparisonResourceStatus = switch (successCount) {
-          2 => 'A/B各Runtimeの観測を別々のAudit IDで取得しました。Task専用計測ではありません。',
-          1 => '片側のRuntime観測だけを取得しました。各結果とAudit IDを確認してください。',
-          _ => 'A/B両Runtimeの観測に失敗しました。各結果を確認してください。',
-        };
+        _comparisonResourceA = outcomeA;
+        _comparisonResourceB = outcomeB;
+        _comparisonResourceStatus = sharedRuntime
+            ? successCount == 1
+                ? 'A/B共有Runtimeの資源値を一度観測しました。Task個別の使用量はunknownです。'
+                : 'A/B共有Runtimeの資源観測に失敗しました。Task個別の使用量はunknownです。'
+            : switch (successCount) {
+                2 => 'A/B各Runtimeの観測を別々のAudit IDで取得しました。Task専用計測ではありません。',
+                1 => '片側のRuntime観測だけを取得しました。各結果とAudit IDを確認してください。',
+                _ => 'A/B両Runtimeの観測に失敗しました。各結果を確認してください。',
+              };
       });
     } finally {
       if (mounted && generation == _comparisonResourceGeneration) {
@@ -1015,7 +1030,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     if (!pair.available) {
       setState(
         () => _comparisonApplyStatus =
-            '適用先は比較Agent双方と別Runtime／Workspaceである必要があります。',
+            '適用先Session／Workspaceは比較Agent双方と独立している必要があります。',
       );
       return;
     }
@@ -2220,6 +2235,13 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
         ? null
         : AgentComparisonProjection.fromSessions([selectedA, selectedB]);
     final activeComparison = _comparison;
+    final comparisonAgentA =
+        _sessionById(activeComparison?.agentASessionId);
+    final comparisonAgentB =
+        _sessionById(activeComparison?.agentBSessionId);
+    final comparisonSharesRuntime = comparisonAgentA != null &&
+        comparisonAgentB != null &&
+        comparisonAgentA.agentRuntimeId == comparisonAgentB.agentRuntimeId;
     final compareStateA = activeComparison == null
         ? null
         : _agentTasks[activeComparison.agentASessionId];
@@ -2409,7 +2431,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
               Text('複数Agent比較', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 8),
               const Text(
-                'Brokerが確認した別Runtime／Workspace／Sessionを選びます。同じTask本文を各Sessionへ独立送信し、それぞれのPermissionとApprovalを別に保ちます。',
+                'Brokerが確認した独立Session／Workspaceを選びます。同じRuntimeのCodexを複数instanceで使えます。同じTask本文を各Sessionへ独立送信し、それぞれのPermissionとApprovalを別に保ちます。',
               ),
               const SizedBox(height: 8),
               const Text('比較対象A'),
@@ -2559,6 +2581,8 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
                   label: Text(
                     _comparisonResourcePending
                         ? 'Runtime観測中'
+                        : comparisonSharesRuntime
+                        ? 'A/B共有Runtime資源を観測'
                         : 'A/BのRuntime資源を観測',
                   ),
                 ),
@@ -2569,13 +2593,16 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
                   runSpacing: 12,
                   children: [
                     _comparisonRuntimeResourceCard(
-                      'Agent A Runtime観測',
+                      comparisonSharesRuntime
+                          ? 'Agent A/B共有Runtime観測'
+                          : 'Agent A Runtime観測',
                       _comparisonResourceA,
                     ),
-                    _comparisonRuntimeResourceCard(
-                      'Agent B Runtime観測',
-                      _comparisonResourceB,
-                    ),
+                    if (!comparisonSharesRuntime)
+                      _comparisonRuntimeResourceCard(
+                        'Agent B Runtime観測',
+                        _comparisonResourceB,
+                      ),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -2645,7 +2672,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
                 title: '安全境界',
                 rows: [
                   selectedPair?.available == true
-                      ? '選択したRuntime／Workspace／Sessionは相互に重複せず、Task操作時にBrokerが再照合します。'
+                      ? 'Session／Workspaceは独立し、Runtimeは同一でも比較できます。各TaskをBrokerが個別に再照合します。'
                       : '比較条件が成立していません',
                   'Authority・Permission・Approval・Credentialは共有・移送しない',
                 ],

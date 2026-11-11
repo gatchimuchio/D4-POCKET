@@ -41,7 +41,8 @@ class AgentComparisonTaskOutcome {
   final Object? error;
 }
 
-/// 同一指示を独立したRuntime／Session／WorkspaceのTaskとして同時に開始する。
+/// 同一指示を独立したSession／WorkspaceのTaskとして同時に開始する。
+/// 同じRuntimeでも、Brokerが別々のTask実行として認可・起動する。
 /// 片側の開始失敗は他方へ伝播させず、Authority判断は各Broker要求に委ねる。
 Future<List<AgentComparisonTaskOutcome>> startAgentComparisonTasks({
   required AgentTaskStarter start,
@@ -51,11 +52,10 @@ Future<List<AgentComparisonTaskOutcome>> startAgentComparisonTasks({
   agentA.validate();
   agentB.validate();
   if (agentA.instruction != agentB.instruction ||
-      agentA.runtimeId == agentB.runtimeId ||
       agentA.sessionId == agentB.sessionId ||
       agentA.workspaceId == agentB.workspaceId) {
     throw const BrokerClientException(
-      'Compare要求は同一Task本文と独立したRuntime／Session／Workspaceが必要です',
+      'Compare要求は同一Task本文と独立したSession／Workspaceが必要です',
     );
   }
 

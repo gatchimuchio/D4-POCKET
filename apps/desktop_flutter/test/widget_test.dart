@@ -2349,8 +2349,9 @@ void main() {
         isTrue);
   });
 
-  testWidgets('Agent Centerは独立2 Taskを開始・比較し一方だけを選択する',
+  testWidgets('同じCodex RuntimeのA/B Taskと選択結果の適用を独立scopeで開始する',
       (WidgetTester tester) async {
+    const runtimeId = 'codex-agent-shared';
     const sessionA = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
     const sessionB = 'cccccccccccccccccccccccccccccccc';
     const sessionC = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -2498,7 +2499,7 @@ void main() {
       _brokerDialogueSessionListResponse(sessions: [
         {
           '対話セッションID': sessionA,
-          '実行系ID': 'codex-agent-a',
+          '実行系ID': runtimeId,
           '状態': '利用中',
           '作成監査ID': 'audit-session-a',
           '作業領域ID': 'workspace-agent-a',
@@ -2506,7 +2507,7 @@ void main() {
         },
         {
           '対話セッションID': sessionB,
-          '実行系ID': 'codex-agent-b',
+          '実行系ID': runtimeId,
           '状態': '利用中',
           '作成監査ID': 'audit-session-b',
           '作業領域ID': 'workspace-agent-b',
@@ -2514,7 +2515,7 @@ void main() {
         },
         {
           '対話セッションID': sessionC,
-          '実行系ID': 'codex-agent-c',
+          '実行系ID': runtimeId,
           '状態': '利用中',
           '作成監査ID': 'audit-session-c',
           '作業領域ID': 'workspace-agent-c',
@@ -2526,8 +2527,8 @@ void main() {
       _brokerAcceptedBody('approval_edit', {'ok': false}),
       _brokerCommandSuspendedResponse(),
       for (final side in [
-        ('codex-agent-a', sessionA, 'workspace-agent-a'),
-        ('codex-agent-b', sessionB, 'workspace-agent-b'),
+        (runtimeId, sessionA, 'workspace-agent-a'),
+        (runtimeId, sessionB, 'workspace-agent-b'),
       ])
         _brokerAcceptedBody('Agent作業要求検査', {
           '版': 1,
@@ -2543,7 +2544,7 @@ void main() {
       _brokerAcceptedBody(
         'AgentTaskWorkspacePermissionGrant',
         permissionReceipt(
-          runtimeId: 'codex-agent-a',
+          runtimeId: runtimeId,
           sessionId: sessionA,
           workspaceId: 'workspace-agent-a',
           registrationHash:
@@ -2553,7 +2554,7 @@ void main() {
       _brokerAcceptedBody(
         'AgentTaskWorkspacePermissionGrant',
         permissionReceipt(
-          runtimeId: 'codex-agent-b',
+          runtimeId: runtimeId,
           sessionId: sessionB,
           workspaceId: 'workspace-agent-b',
           registrationHash:
@@ -2563,7 +2564,7 @@ void main() {
       _brokerAcceptedBody(
         'AgentTaskOwnerApprovalGrant',
         approvalReceipt(
-          runtimeId: 'codex-agent-a',
+          runtimeId: runtimeId,
           sessionId: sessionA,
           workspaceId: 'workspace-agent-a',
           executionHash: resultHashA,
@@ -2572,7 +2573,7 @@ void main() {
       _brokerAcceptedBody(
         'AgentTaskOwnerApprovalGrant',
         approvalReceipt(
-          runtimeId: 'codex-agent-b',
+          runtimeId: runtimeId,
           sessionId: sessionB,
           workspaceId: 'workspace-agent-b',
           executionHash: resultHashB,
@@ -2582,7 +2583,7 @@ void main() {
         'AgentTask実行',
         taskRecord(
           taskId: taskA,
-          runtimeId: 'codex-agent-a',
+          runtimeId: runtimeId,
           sessionId: sessionA,
           workspaceId: 'workspace-agent-a',
           status: 'running',
@@ -2593,7 +2594,7 @@ void main() {
         'AgentTask実行',
         taskRecord(
           taskId: taskB,
-          runtimeId: 'codex-agent-b',
+          runtimeId: runtimeId,
           sessionId: sessionB,
           workspaceId: 'workspace-agent-b',
           status: 'running',
@@ -2604,7 +2605,7 @@ void main() {
         'AgentTask状態',
         taskRecord(
           taskId: taskA,
-          runtimeId: 'codex-agent-a',
+          runtimeId: runtimeId,
           sessionId: sessionA,
           workspaceId: 'workspace-agent-a',
           status: 'completed',
@@ -2616,7 +2617,7 @@ void main() {
         'AgentTask状態',
         taskRecord(
           taskId: taskB,
-          runtimeId: 'codex-agent-b',
+          runtimeId: runtimeId,
           sessionId: sessionB,
           workspaceId: 'workspace-agent-b',
           status: 'completed',
@@ -2625,14 +2626,9 @@ void main() {
         ),
       ),
       resourceResponse(
-        runtimeId: 'codex-agent-a',
-        auditId: 'audit-resource-a',
+        runtimeId: runtimeId,
+        auditId: 'audit-resource-shared',
         workingSetBytes: 8192,
-      ),
-      resourceResponse(
-        runtimeId: 'codex-agent-b',
-        auditId: 'audit-resource-b',
-        workingSetBytes: 16384,
       ),
       _brokerAcceptedBody('AgentTask結果表示承認', {
         'task_id': taskA,
@@ -2667,7 +2663,7 @@ void main() {
         '実行状態': '未実行',
         'Permission状態': '未付与',
         'Approval状態': '未取得',
-        '実行系ID': 'codex-agent-c',
+        '実行系ID': runtimeId,
         '対話セッションID': sessionC,
         '作業領域ID': 'workspace-agent-c',
         '指示hash': instructionHash,
@@ -2675,7 +2671,7 @@ void main() {
       _brokerAcceptedBody(
         'AgentTaskWorkspacePermissionGrant',
         permissionReceipt(
-          runtimeId: 'codex-agent-c',
+          runtimeId: runtimeId,
           sessionId: sessionC,
           workspaceId: 'workspace-agent-c',
           registrationHash:
@@ -2685,7 +2681,7 @@ void main() {
       _brokerAcceptedBody(
         'AgentTaskOwnerApprovalGrant',
         approvalReceipt(
-          runtimeId: 'codex-agent-c',
+          runtimeId: runtimeId,
           sessionId: sessionC,
           workspaceId: 'workspace-agent-c',
           executionHash: resultHashA,
@@ -2695,7 +2691,7 @@ void main() {
         'AgentTask実行',
         taskRecord(
           taskId: taskC,
-          runtimeId: 'codex-agent-c',
+          runtimeId: runtimeId,
           sessionId: sessionC,
           workspaceId: 'workspace-agent-c',
           status: 'running',
@@ -2753,6 +2749,25 @@ void main() {
     expect(find.text('Task状態: running'), findsNWidgets(4));
     expect(
         transport.operations.where((op) => op == 'AgentTask実行'), hasLength(2));
+    final comparisonTaskRequests = transport.requests
+        .where((request) => request['operation'] == 'AgentTask実行')
+        .take(2)
+        .map((request) => request['payload']! as Map<String, Object?>)
+        .toList(growable: false);
+    expect(
+      comparisonTaskRequests
+          .map((request) => request['agent_runtime_id'])
+          .toSet(),
+      {runtimeId},
+    );
+    expect(
+      comparisonTaskRequests.map((request) => request['session_id']).toSet(),
+      {sessionA, sessionB},
+    );
+    expect(
+      comparisonTaskRequests.map((request) => request['workspace_id']).toSet(),
+      {'workspace-agent-a', 'workspace-agent-b'},
+    );
 
     await tester.ensureVisible(
       find.byKey(const ValueKey('refresh-agent-comparison')),
@@ -2776,26 +2791,24 @@ void main() {
     await tester.ensureVisible(observeResources);
     await tester.tap(observeResources);
     await tester.pumpAndSettle();
-    expect(find.textContaining('A/B各Runtimeの観測を別々のAudit IDで取得しました'),
-        findsOneWidget);
-    expect(find.text('CPU利用率: 25.5 % (LIVE_RUNTIME)'), findsOneWidget);
+    expect(
+      find.textContaining('A/B共有Runtimeの資源値を一度観測しました'),
+      findsOneWidget,
+    );
+    expect(find.text('Agent A/B共有Runtime観測'), findsOneWidget);
     expect(find.text('RAM Working Set: 8192 bytes (LIVE_RUNTIME)'),
         findsOneWidget);
     expect(find.text('CPU利用率: 6.25 % (LIVE_RUNTIME)'), findsOneWidget);
-    expect(find.text('RAM Working Set: 16384 bytes (LIVE_RUNTIME)'),
-        findsOneWidget);
-    expect(find.text('観測Audit ID: audit-resource-a'), findsOneWidget);
-    expect(find.text('観測Audit ID: audit-resource-b'), findsOneWidget);
-    expect(find.textContaining('Task専用計測ではありません'), findsOneWidget);
+    expect(find.text('観測Audit ID: audit-resource-shared'), findsOneWidget);
+    expect(find.textContaining('Task個別の使用量はunknown'), findsOneWidget);
     final resourceRequests = transport.requests
         .where((request) => request['operation'] == '実行系資源観測')
         .toList(growable: false);
-    expect(resourceRequests, hasLength(2));
+    expect(resourceRequests, hasLength(1));
     expect(
       resourceRequests.map((request) => request['payload']).toList(),
       [
-        {'版': 1, '実行系ID': 'codex-agent-a'},
-        {'版': 1, '実行系ID': 'codex-agent-b'},
+        {'版': 1, '実行系ID': runtimeId},
       ],
     );
 
@@ -3626,7 +3639,9 @@ void main() {
       const ValueKey('a2a-artifact-target-session'),
     );
     expect(
-      tester.widget<DropdownButtonFormField<String>>(targetSelector).initialValue,
+      tester
+          .widget<DropdownButtonFormField<String>>(targetSelector)
+          .initialValue,
       isNull,
     );
     expect(
@@ -4215,8 +4230,8 @@ void main() {
       'workspace_id': workspaceId,
     });
     final approvalRequests = transport.requests
-        .where((request) =>
-            request['operation'] == 'AgentTaskOwnerApprovalGrant')
+        .where(
+            (request) => request['operation'] == 'AgentTaskOwnerApprovalGrant')
         .toList(growable: false);
     expect(approvalRequests, hasLength(1));
     expect(approvalRequests.single['payload'], taskPayload);

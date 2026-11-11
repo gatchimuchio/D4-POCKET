@@ -129,18 +129,18 @@ void main() {
     expect(projection(diff: 'x' * 8193).declaredResult, isNull);
   });
 
-  test('Compareは両Taskを並行開始し片側失敗を他方へ伝播させない', () async {
+  test('同じRuntimeのCompare Taskを並行開始し片側失敗を他方へ伝播させない', () async {
     const instruction = '同一の合成Task';
     const sessionA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
     const sessionB = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
     const requestA = AgentTaskRequest(
-      runtimeId: 'codex-a',
+      runtimeId: 'codex-cli',
       sessionId: sessionA,
       workspaceId: 'workspace-a',
       instruction: instruction,
     );
     const requestB = AgentTaskRequest(
-      runtimeId: 'codex-b',
+      runtimeId: 'codex-cli',
       sessionId: sessionB,
       workspaceId: 'workspace-b',
       instruction: instruction,
@@ -162,7 +162,7 @@ void main() {
 
     second.complete(const AgentTaskRecord(
       taskId: 'cccccccccccccccccccccccccccccccc',
-      runtimeId: 'codex-b',
+      runtimeId: 'codex-cli',
       sessionId: sessionB,
       workspaceId: 'workspace-b',
       instructionHash:
@@ -180,18 +180,18 @@ void main() {
     expect(outcomes[1].error, isNull);
   });
 
-  test('CompareはTask不一致または共有識別子ならdispatch前に拒否する', () async {
+  test('CompareはTask本文不一致をdispatch前に拒否する', () async {
     const sessionA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
     const sessionB = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
     var dispatchCount = 0;
     const requestA = AgentTaskRequest(
-      runtimeId: 'codex-a',
+      runtimeId: 'codex-cli',
       sessionId: sessionA,
       workspaceId: 'workspace-a',
       instruction: 'Task A',
     );
     const requestB = AgentTaskRequest(
-      runtimeId: 'codex-b',
+      runtimeId: 'codex-cli',
       sessionId: sessionB,
       workspaceId: 'workspace-b',
       instruction: 'Task B',
@@ -211,6 +211,46 @@ void main() {
     expect(dispatchCount, 0);
   });
 
+  test('Compareは共有SessionまたはWorkspaceをdispatch前に拒否する', () async {
+    const sessionA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const sessionB = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    const requestA = AgentTaskRequest(
+      runtimeId: 'codex-cli',
+      sessionId: sessionA,
+      workspaceId: 'workspace-a',
+      instruction: '同じTask',
+    );
+    var dispatchCount = 0;
+
+    for (final requestB in [
+      const AgentTaskRequest(
+        runtimeId: 'codex-cli',
+        sessionId: sessionA,
+        workspaceId: 'workspace-b',
+        instruction: '同じTask',
+      ),
+      const AgentTaskRequest(
+        runtimeId: 'codex-cli',
+        sessionId: sessionB,
+        workspaceId: 'workspace-a',
+        instruction: '同じTask',
+      ),
+    ]) {
+      await expectLater(
+        startAgentComparisonTasks(
+          agentA: requestA,
+          agentB: requestB,
+          start: (_) async {
+            dispatchCount++;
+            throw StateError('共有scopeをdispatchしてはならない');
+          },
+        ),
+        throwsA(isA<BrokerClientException>()),
+      );
+    }
+    expect(dispatchCount, 0);
+  });
+
   test('Agent比較は二つの独立Workspaceだけを対象にする', () {
     final single = AgentComparisonProjection.fromSessions([
       _session('a', 'workspace-a'),
@@ -218,11 +258,11 @@ void main() {
     expect(single.available, isFalse);
 
     final isolated = AgentComparisonProjection.fromSessions([
-      _session('a', 'workspace-a'),
-      _session('b', 'workspace-b'),
+      _session('a', 'workspace-a', agentRuntimeId: 'codex-cli'),
+      _session('b', 'workspace-b', agentRuntimeId: 'codex-cli'),
     ]);
     expect(isolated.available, isTrue);
-    expect(isolated.statusMessage, contains('Agent runtime IDとWorkspace参照'));
+    expect(isolated.statusMessage, contains('同じRuntime IDも比較できます'));
     expect(isolated.statusMessage, contains('実行時の隔離は未検証'));
 
     final contaminated = AgentComparisonProjection.fromSessions([
@@ -270,7 +310,7 @@ void main() {
     expect(tooMany.statusMessage, contains('8件'));
   });
 
-  test('Agent比較は識別不能または重複したAgent実行系を拒否する', () {
+  test('Agent比較は識別不能Runtimeを拒否し同一Runtimeを許容する', () {
     final missingRuntime = AgentComparisonProjection.fromSessions([
       _session('agent-one', 'workspace-a', agentRuntimeId: ''),
       _session('agent-two', 'workspace-b'),
@@ -289,7 +329,7 @@ void main() {
       _session('agent-one', 'workspace-a', agentRuntimeId: 'codex-cli'),
       _session('agent-two', 'workspace-b', agentRuntimeId: 'codex-cli'),
     ]);
-    expect(duplicateRuntime.available, isFalse);
-    expect(duplicateRuntime.statusMessage, contains('同一Agent実行系'));
+    expect(duplicateRuntime.available, isTrue);
+    expect(duplicateRuntime.statusMessage, contains('同じRuntime IDも比較できます'));
   });
 }

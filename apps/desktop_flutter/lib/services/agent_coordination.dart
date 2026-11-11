@@ -60,13 +60,6 @@ class AgentComparisonProjection {
         sessionIds: sessionIds,
       );
     }
-    if (agentRuntimeIds.toSet().length != agentRuntimeIds.length) {
-      return AgentComparisonProjection(
-        available: false,
-        statusMessage: '同一Agent実行系の重複を検出したため比較を停止しました。',
-        sessionIds: sessionIds,
-      );
-    }
     if (workspaces.length != sessions.length) {
       return AgentComparisonProjection(
         available: false,
@@ -76,7 +69,8 @@ class AgentComparisonProjection {
     }
     return AgentComparisonProjection(
       available: true,
-      statusMessage: 'Agent runtime IDとWorkspace参照が重複していない公開投影です。実行時の隔離は未検証です。',
+      statusMessage:
+          'SessionとWorkspace参照は独立しています。同じRuntime IDも比較できます。実行時の隔離は未検証です。',
       sessionIds: sessionIds,
     );
   }

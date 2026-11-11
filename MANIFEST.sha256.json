@@ -228,7 +228,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/agent_center.dart",
-      "sha256": "82909b9d094ebf0e9b3a33636aed80ccc085b4f62cef340a529801c6839571a7"
+      "sha256": "6f0b438fbe841bf933b4ac04e5f3b1a7ecdcf1f0831cdc5e51dfe33f4c84ae2e"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/approval_center.dart",
@@ -340,7 +340,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/agent_coordination.dart",
-      "sha256": "b470ac08073d6c3711705aa802e89248e6bda042e21983a3d0e1e4d1a4cc6d8f"
+      "sha256": "01961e174551da23a91f84d3e2f965d6604cdde05c7856a5964219445989d528"
     },
     {
       "path": "apps/desktop_flutter/lib/services/agent_handoff.dart",
@@ -628,7 +628,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/agent_coordination_test.dart",
-      "sha256": "73a0db1c6c37f9f6ca868d4cb5f695c7352ab157d616fad5aec00f814b120a0e"
+      "sha256": "8c38bc06d97a42ef3638ff193b951be30e99dd7afd8d129f341c5215bd5f178f"
     },
     {
       "path": "apps/desktop_flutter/test/agent_handoff_test.dart",
@@ -748,7 +748,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "1c1567bd1c53e8aa71f488c55eb00477f8ebcf6563b94272afc2df39a5058d95"
+      "sha256": "e15b62ad21a74b6bf18d963ead11f56d91609c4b0a3cdd55159ad1c3a46f1da4"
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
@@ -1444,7 +1444,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "e9105f1966527fb22039bb467180783ea8e95146b40b77478a6bde313e024146"
+      "sha256": "c7aa42badf783e644f9938b0358d67862a63fb7f6868806a567bbbec171050f5"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -4296,11 +4296,11 @@
     },
     {
       "path": "packages/agent_orchestration/README.md",
-      "sha256": "b5d9e1e62cf8cd64371f2f47017a561397dc4c45f5e4d26cb4f33f479bfbc27e"
+      "sha256": "9306a2008311ee6a53ebac64bd1ede9ef4d1a2a9fa162660f7f3e2de1c76e37f"
     },
     {
       "path": "packages/agent_orchestration/lib/agent_comparison_coordinator.dart",
-      "sha256": "37f42ab64c94e827c5a6ef9ebdc49294c5bbb2f96792094758b7b317be71daea"
+      "sha256": "7198bc013fc4849aa63a5147c1b9f69115a53d4748fdb895404289f21812a55b"
     },
     {
       "path": "packages/agent_orchestration/lib/agent_mcp_task_controller.dart",
