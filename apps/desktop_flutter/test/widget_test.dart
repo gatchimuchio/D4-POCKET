@@ -554,6 +554,8 @@ void main() {
       'diff': '+# Agent申告diff',
       'test_result': 'Agent申告test結果（独立検証なし）',
     });
+    final exposureApprovalRequested = Completer<void>();
+    final releaseExposureApproval = Completer<void>();
     tester.view.physicalSize = const Size(1200, 1000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -776,7 +778,18 @@ void main() {
         'grant': historyGrant,
         'page': null,
       }),
-    ]);
+    ], onRequest: (operation) {
+      if (operation == 'AgentTask結果表示承認') {
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.inactive,
+        );
+      }
+    }, beforeResponse: (operation) async {
+      if (operation == 'AgentTask結果表示承認') {
+        exposureApprovalRequested.complete();
+        await releaseExposureApproval.future;
+      }
+    });
     final client = await ShellCoreClient.product(transport: transport);
     expect(client.mode, 'broker');
     expect(client.initialUiConfiguration.locale, 'ja-JP');
@@ -903,7 +916,21 @@ void main() {
     );
     await tester.ensureVisible(showResult);
     await tester.tap(showResult);
+    await exposureApprovalRequested.future;
+    await tester.pump();
+    expect(transport.operations, contains('AgentTask結果表示承認'));
+    expect(transport.operations, isNot(contains('AgentTask結果取得')));
+    expect(find.textContaining(resultSummary), findsNothing);
+
+    releaseExposureApproval.complete();
+    await tester.pump();
+    await tester.pump();
+    expect(transport.operations, isNot(contains('AgentTask結果取得')));
+    expect(find.textContaining(resultSummary), findsNothing);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pumpAndSettle();
+    expect(transport.operations, contains('AgentTask結果取得'));
     expect(find.textContaining(resultSummary), findsOneWidget);
     final projectedResult = jsonDecode(
       tester

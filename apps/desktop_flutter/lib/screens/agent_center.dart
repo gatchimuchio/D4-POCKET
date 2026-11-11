@@ -150,6 +150,8 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
   bool _sessionPending = false;
   bool _comparisonPending = false;
   bool _appActive = true;
+  Completer<bool>? _pendingAppResume;
+  String? _pendingResultExposureSessionId;
   int _resultGeneration = 0;
   int _resultContextGeneration = 0;
   Timer? _resultClearTimer;
@@ -210,6 +212,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _completePendingAppResume(false);
     _clearAllResultProjections();
     _agentTasks.clear();
     _taskPreflightStatus.clear();
@@ -226,10 +229,14 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _appActive = state == AppLifecycleState.resumed;
+    if (_appActive) _completePendingAppResume(true);
     // A native Owner confirmation may briefly deactivate the Flutter window.
-    // Clear already-rendered content, but let the in-flight, task-bound
-    // exposure continue after the app resumes.
-    _clearAllResultProjections(invalidatePendingExposure: false);
+    // Clear already-rendered content, but preserve only the context belonging
+    // to the in-flight, task-bound exposure until that request settles.
+    _clearAllResultProjections(
+      preserveTaskContextForSession: _pendingResultExposureSessionId,
+      invalidatePendingExposure: false,
+    );
     if (mounted) setState(() {});
   }
 
@@ -248,6 +255,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
       _subscribeTaskExecutionUpdates();
     }
     if (oldWidget.active != widget.active && !widget.active) {
+      _completePendingAppResume(false);
       _clearAllResultProjections();
     }
     if (!identical(
@@ -271,6 +279,29 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
   }
 
   bool get _active => widget.active && _appActive;
+
+  void _completePendingAppResume(bool resumed) {
+    final pending = _pendingAppResume;
+    _pendingAppResume = null;
+    if (pending != null && !pending.isCompleted) pending.complete(resumed);
+  }
+
+  Future<bool> _waitForAppResume() async {
+    if (_appActive) return true;
+    if (!mounted || !widget.active) return false;
+    final pending = Completer<bool>();
+    _pendingAppResume = pending;
+    try {
+      return await pending.future.timeout(
+        const Duration(seconds: 30),
+        onTimeout: () => false,
+      );
+    } on Object {
+      return false;
+    } finally {
+      if (identical(_pendingAppResume, pending)) _pendingAppResume = null;
+    }
+  }
 
   void _clearAllResultProjections({
     String? preserveTaskContextForSession,
@@ -1630,6 +1661,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
       preserveTaskContextForSession: session.sessionId,
       invalidatePendingExposure: false,
     );
+    _pendingResultExposureSessionId = session.sessionId;
     final resultContextGeneration = _resultContextGeneration;
     setState(() {
       _taskPreflightSession = session.sessionId;
@@ -1639,6 +1671,29 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     try {
       final client = AgentTaskClient(transport);
       final approval = await client.grantResultExposure(task, visibility);
+      if (!mounted ||
+          !identical(_agentTasks[session.sessionId], state) ||
+          !widget.active ||
+          resultContextGeneration != _resultContextGeneration ||
+          state.record?.taskId != taskId ||
+          state.resultVisibility != visibility ||
+          !_sessionStillMatchesRegistration(session)) {
+        return;
+      }
+      if (!_appActive) {
+        final resumed = await _waitForAppResume();
+        if (!resumed) {
+          if (mounted &&
+              identical(_agentTasks[session.sessionId], state) &&
+              resultContextGeneration == _resultContextGeneration) {
+            setState(() {
+              _taskPreflightStatus[session.sessionId] =
+                  'アプリ復帰を確認できないため結果本文は取得しませんでした。';
+            });
+          }
+          return;
+        }
+      }
       if (!mounted ||
           !identical(_agentTasks[session.sessionId], state) ||
           !_active ||
@@ -1682,6 +1737,9 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
         _taskPreflightStatus[session.sessionId] = message;
       });
     } finally {
+      if (_pendingResultExposureSessionId == session.sessionId) {
+        _pendingResultExposureSessionId = null;
+      }
       if (mounted) setState(() => _taskPreflightSession = null);
     }
   }
