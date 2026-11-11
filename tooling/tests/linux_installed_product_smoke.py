@@ -8558,6 +8558,31 @@ def _activate_named_control_by_keyboard(
         if context_marker is not None
         else None
     )
+    if context_node is not None:
+        try:
+            candidate = _find_operable_accessible(name, root=window, timeout=2)
+            actions = candidate.queryAction()
+            for action_index in range(actions.nActions):
+                if actions.getName(action_index).lower() == "focus":
+                    if actions.doAction(action_index):
+                        time.sleep(0.05)
+                    break
+        except Exception:
+            pass
+        if (
+            _focused_named_accessible(
+                name, root=window, context_node=context_node
+            )
+            is not None
+        ):
+            subprocess.run(
+                ["xdotool", "key", "--clearmodifiers", "Return"],
+                env=environment,
+                check=True,
+                timeout=5,
+            )
+            return
+
     for index in range(max_tabs + 1):
         if (
             _focused_named_accessible(
