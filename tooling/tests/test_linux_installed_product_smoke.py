@@ -4725,6 +4725,10 @@ class InstalledTaskStatusPollingTests(unittest.TestCase):
                         "stdout_http_status": None,
                         "stderr_class": "configuration",
                         "stderr_bytes": 42,
+                        "mcp_stdio_started": False,
+                        "mcp_stdio_initialized": False,
+                        "mcp_stdio_tools_list": False,
+                        "mcp_spawn_failure": False,
                     },
                     {
                         "stage": "codex_cli_exit",
@@ -4734,6 +4738,10 @@ class InstalledTaskStatusPollingTests(unittest.TestCase):
                         "stdout_http_status": 401,
                         "stderr_class": "empty",
                         "stderr_bytes": 0,
+                        "mcp_stdio_started": False,
+                        "mcp_stdio_initialized": False,
+                        "mcp_stdio_tools_list": False,
+                        "mcp_spawn_failure": False,
                     },
                 ],
                 "rejections": [],
@@ -4908,6 +4916,10 @@ class InstalledTaskStatusPollingTests(unittest.TestCase):
                         "stdout_http_status": None,
                         "stderr_class": "empty",
                         "stderr_bytes": 0,
+                        "mcp_stdio_started": False,
+                        "mcp_stdio_initialized": False,
+                        "mcp_stdio_tools_list": False,
+                        "mcp_spawn_failure": False,
                     }
                 ],
                 "scenarios": [
@@ -5735,19 +5747,25 @@ class LinuxAgentTaskFailureDiagnosticsTests(unittest.TestCase):
                     "kind": "cli_failure",
                     "summary": 'exit_code=Some(2); stdout_event_types=["error", "other"]; '
                     "stdout_error_class=other; stdout_http_status=none; "
-                    "stderr_class=configuration; stderr_bytes=52",
+                    "stderr_class=configuration; stderr_bytes=52; "
+                    "mcp_stdio_started=false; mcp_stdio_initialized=false; "
+                    "mcp_stdio_tools_list=false; mcp_spawn_failure=false",
                 },
                 {
                     "kind": "cli_failure",
                     "summary": 'exit_code=Some(1); stdout_event_types=["turn.failed"]; '
                     "stdout_error_class=model_unavailable; stdout_http_status=404; "
-                    "stderr_class=empty; stderr_bytes=0",
+                    "stderr_class=empty; stderr_bytes=0; "
+                    "mcp_stdio_started=false; mcp_stdio_initialized=false; "
+                    "mcp_stdio_tools_list=false; mcp_spawn_failure=false",
                 },
                 {
                     "kind": "cli_failure",
                     "summary": 'exit_code=Some(1); stdout_event_types=["error"]; '
                     "stdout_error_class=authentication; stdout_http_status=none; "
-                    "stderr_class=empty; stderr_bytes=0",
+                    "stderr_class=empty; stderr_bytes=0; "
+                    "mcp_stdio_started=false; mcp_stdio_initialized=false; "
+                    "mcp_stdio_tools_list=false; mcp_spawn_failure=false",
                 },
                 {
                     "kind": "os_failure",
@@ -5788,6 +5806,10 @@ class LinuxAgentTaskFailureDiagnosticsTests(unittest.TestCase):
                     "stdout_http_status": None,
                     "stderr_class": "configuration",
                     "stderr_bytes": 52,
+                    "mcp_stdio_started": False,
+                    "mcp_stdio_initialized": False,
+                    "mcp_stdio_tools_list": False,
+                    "mcp_spawn_failure": False,
                 },
                 {
                     "stage": "codex_cli_exit",
@@ -5797,6 +5819,10 @@ class LinuxAgentTaskFailureDiagnosticsTests(unittest.TestCase):
                     "stdout_http_status": 404,
                     "stderr_class": "empty",
                     "stderr_bytes": 0,
+                    "mcp_stdio_started": False,
+                    "mcp_stdio_initialized": False,
+                    "mcp_stdio_tools_list": False,
+                    "mcp_spawn_failure": False,
                 },
                 {
                     "stage": "codex_cli_exit",
@@ -5806,6 +5832,10 @@ class LinuxAgentTaskFailureDiagnosticsTests(unittest.TestCase):
                     "stdout_http_status": None,
                     "stderr_class": "empty",
                     "stderr_bytes": 0,
+                    "mcp_stdio_started": False,
+                    "mcp_stdio_initialized": False,
+                    "mcp_stdio_tools_list": False,
+                    "mcp_spawn_failure": False,
                 },
                 {"stage": "codex_process_spawn", "os_error_kind": "NotFound"},
             ],

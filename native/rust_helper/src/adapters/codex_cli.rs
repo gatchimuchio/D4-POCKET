@@ -1435,7 +1435,9 @@ fn build_codex_command_with_model_and_task_tool(
             .env("https_proxy", &proxy)
             .env("all_proxy", &proxy)
             .env("no_proxy", "127.0.0.1,localhost")
-            .env("RUST_LOG", "warn");
+            // Capture only the MCP stdio launcher's fixed diagnostic markers. The
+            // failure report below reduces stderr to allowlisted booleans/classes.
+            .env("RUST_LOG", "warn,rmcp_client::stdio_server_launcher=info");
     }
     if matches!(sandbox, CodexSandbox::WorkspaceWrite) {
         // 作用先はBrokerがTask単位で予約したscratchだけ。ここでは認可しない。
@@ -1742,8 +1744,20 @@ fn loopback_test_safe_failure_summary(
         .collect::<Vec<_>>();
     let (stdout_error_class, stdout_http_status) = summarize_loopback_test_stdout_error(&events);
     let stderr_class = classify_loopback_test_stderr(stderr);
+    let stderr_text = String::from_utf8_lossy(stderr).to_ascii_lowercase();
+    let mcp_stdio_started = stderr_text.contains("d4p_r2_e2e_mcp_stdio_event=started");
+    let mcp_stdio_initialized = stderr_text.contains("d4p_r2_e2e_mcp_stdio_event=initialize");
+    let mcp_stdio_tools_list = stderr_text.contains("d4p_r2_e2e_mcp_stdio_event=tools_list");
+    let mcp_spawn_failure = [
+        "failed to spawn mcp server",
+        "failed to start mcp server",
+        "could not spawn mcp server",
+        "could not start mcp server",
+    ]
+    .iter()
+    .any(|marker| stderr_text.contains(marker));
     format!(
-        "exit_code={exit_code:?}; stdout_event_types={event_types:?}; stdout_error_class={stdout_error_class}; stdout_http_status={}; stderr_class={stderr_class}; stderr_bytes={}",
+        "exit_code={exit_code:?}; stdout_event_types={event_types:?}; stdout_error_class={stdout_error_class}; stdout_http_status={}; stderr_class={stderr_class}; stderr_bytes={}; mcp_stdio_started={mcp_stdio_started}; mcp_stdio_initialized={mcp_stdio_initialized}; mcp_stdio_tools_list={mcp_stdio_tools_list}; mcp_spawn_failure={mcp_spawn_failure}",
         stdout_http_status
             .map(|status| status.to_string())
             .unwrap_or_else(|| "none".to_owned()),
@@ -2114,13 +2128,17 @@ mod tests {
     fn loopback失敗診断は本文と生エラーを出さず分類だけを示す() {
         let stdout = br#"{"type":"error","message":"PRIVATE_TASK_AND_SECRET","code":"unknown_sensitive_code"}
 {"type":"provider.internal-private-event"}"#;
-        let stderr = b"invalid TOML at PRIVATE_LOCAL_PATH api_key=PRIVATE_SECRET";
+        let stderr = b"invalid TOML at PRIVATE_LOCAL_PATH api_key=PRIVATE_SECRET; MCP server stderr: D4P_R2_E2E_MCP_STDIO_EVENT=started; D4P_R2_E2E_MCP_STDIO_EVENT=initialize";
         let summary = loopback_test_safe_failure_summary(Some(2), stdout, stderr);
 
         assert!(summary.contains("exit_code=Some(2)"));
         assert!(summary.contains("stdout_event_types=[\"error\", \"other\"]"));
         assert!(summary.contains("stdout_error_class=other; stdout_http_status=none"));
         assert!(summary.contains("stderr_class=configuration"));
+        assert!(summary.contains("mcp_stdio_started=true"));
+        assert!(summary.contains("mcp_stdio_initialized=true"));
+        assert!(summary.contains("mcp_stdio_tools_list=false"));
+        assert!(summary.contains("mcp_spawn_failure=false"));
         assert!(!summary.contains("PRIVATE_TASK_AND_SECRET"));
         assert!(!summary.contains("unknown_sensitive_code"));
         assert!(!summary.contains("PRIVATE_LOCAL_PATH"));

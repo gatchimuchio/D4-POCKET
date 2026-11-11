@@ -8105,7 +8105,7 @@ mod tests {
                 .expect("GetTaskはnative Owner確認へ進む");
         let normalized = BrokerRequestEnvelope::from_json_str(&normalized).unwrap();
         assert_eq!(normalized.session_id.as_deref(), Some("desktop-session"));
-        assert_eq!(normalized.payload, Some(payload));
+        assert_eq!(normalized.payload, Some(payload.clone()));
         let DesktopOwnerOperationSummary::A2aGetTask {
             agent_id,
             target,

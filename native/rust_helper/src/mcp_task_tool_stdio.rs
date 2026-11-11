@@ -28,11 +28,27 @@ pub fn maybe_run_stdio_from_process() -> Result<bool, &'static str> {
         return Err("MCP Task serverの起動引数が不正です。");
     }
 
+    e2e_diagnostic_event("started");
     let stdin = io::stdin();
     let stdout = io::stdout();
     serve_stdio(stdin.lock(), stdout.lock())?;
+    e2e_diagnostic_event("stopped");
     Ok(true)
 }
+
+#[cfg(feature = "r2-e2e")]
+fn e2e_diagnostic_event(event: &'static str) {
+    if matches!(
+        event,
+        "started" | "initialize" | "tools_list" | "tools_call" | "stopped"
+    ) {
+        // Fixed marker only: never log MCP input, result, path, or credential data.
+        eprintln!("D4P_R2_E2E_MCP_STDIO_EVENT={event}");
+    }
+}
+
+#[cfg(not(feature = "r2-e2e"))]
+fn e2e_diagnostic_event(_event: &'static str) {}
 
 fn serve_stdio<R: BufRead, W: Write>(mut input: R, mut output: W) -> Result<(), &'static str> {
     let mut submitted = false;
@@ -76,23 +92,32 @@ fn handle_request(request: &Value, submitted: &mut bool) -> Option<Value> {
     }
 
     let result = match method {
-        "initialize" => json!({
-            "protocolVersion": "2025-06-18",
-            "capabilities": {"tools": {"listChanged": false}},
-            "serverInfo": {"name": "d4-pocket-task-request", "version": "1"}
-        }),
+        "initialize" => {
+            e2e_diagnostic_event("initialize");
+            json!({
+                "protocolVersion": "2025-06-18",
+                "capabilities": {"tools": {"listChanged": false}},
+                "serverInfo": {"name": "d4-pocket-task-request", "version": "1"}
+            })
+        }
         "ping" => json!({}),
-        "tools/list" => json!({"tools": [task_request_tool()]}),
-        "tools/call" => match submit_tool_request(request.get("params"), submitted) {
-            Ok(()) => json!({
-                "content": [{"type": "text", "text": "D4 Pocketが権限を持たないMCP Tool要求を一件受け付けました。このserverは外部MCP serverへ接続しません。まず現在のTaskが終了します。その後、Brokerが最新Catalogを再検査し、native Owner確認・一回限りPermission・Auditを確認してから実Toolを実行します。実結果は別途認可された後続Taskへ渡されます。この応答は外部Toolの実結果ではありません。"}],
-                "isError": false
-            }),
-            Err(message) => json!({
-                "content": [{"type": "text", "text": message}],
-                "isError": true
-            }),
-        },
+        "tools/list" => {
+            e2e_diagnostic_event("tools_list");
+            json!({"tools": [task_request_tool()]})
+        }
+        "tools/call" => {
+            e2e_diagnostic_event("tools_call");
+            match submit_tool_request(request.get("params"), submitted) {
+                Ok(()) => json!({
+                    "content": [{"type": "text", "text": "D4 Pocketが権限を持たないMCP Tool要求を一件受け付けました。このserverは外部MCP serverへ接続しません。まず現在のTaskが終了します。その後、Brokerが最新Catalogを再検査し、native Owner確認・一回限りPermission・Auditを確認してから実Toolを実行します。実結果は別途認可された後続Taskへ渡されます。この応答は外部Toolの実結果ではありません。"}],
+                    "isError": false
+                }),
+                Err(message) => json!({
+                    "content": [{"type": "text", "text": message}],
+                    "isError": true
+                }),
+            }
+        }
         _ => return Some(json_rpc_error(id, -32601, "未対応のJSON-RPC methodです。")),
     };
     Some(json!({"jsonrpc": "2.0", "id": id, "result": result}))
