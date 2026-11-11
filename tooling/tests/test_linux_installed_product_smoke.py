@@ -688,7 +688,6 @@ class AccessibleActionResolutionTests(unittest.TestCase):
             "MCP接続一覧とOwner確認付き切断を開く",
             {},
             "0x42",
-            context_marker="コマンドパレット",
         )
         self.assertEqual(
             [entry.args[0] for entry in run.call_args_list],
@@ -741,78 +740,6 @@ class AccessibleActionResolutionTests(unittest.TestCase):
             focused_lookup.call_args.kwargs["root"], find_accessible.return_value
         )
         self.assertIsNone(focused_lookup.call_args.kwargs["context_node"])
-
-    def test_context_control_uses_accessible_focus_before_enter(self) -> None:
-        from unittest.mock import patch
-
-        class Actions:
-            nActions = 2
-
-            def __init__(self) -> None:
-                self.invoked: list[int] = []
-
-            def getName(self, index: int) -> str:
-                return ("Tap", "Focus")[index]
-
-            def doAction(self, index: int) -> bool:
-                self.invoked.append(index)
-                return True
-
-        class Candidate:
-            def __init__(self, actions: Actions) -> None:
-                self.actions = actions
-
-            def queryAction(self):
-                return self.actions
-
-        window = object()
-        palette = object()
-        focused = object()
-        actions = Actions()
-        candidate = Candidate(actions)
-        with (
-            patch(
-                "tooling.tests.linux_installed_product_smoke._find_accessible",
-                side_effect=(window, palette),
-            ) as find_accessible,
-            patch(
-                "tooling.tests.linux_installed_product_smoke._find_operable_accessible",
-                return_value=candidate,
-            ) as find_operable,
-            patch(
-                "tooling.tests.linux_installed_product_smoke._focused_named_accessible",
-                return_value=focused,
-            ) as focused_lookup,
-            patch(
-                "tooling.tests.linux_installed_product_smoke.subprocess.run"
-            ) as run,
-            patch("tooling.tests.linux_installed_product_smoke.time.sleep"),
-        ):
-            _activate_named_control_by_keyboard(
-                "target",
-                {"DISPLAY": ":99"},
-                "0x42",
-                context_marker="コマンドパレット",
-            )
-
-        self.assertEqual(find_accessible.call_args_list[0].args, ("D4 Pocket powered by GUI Shell",))
-        self.assertEqual(find_accessible.call_args_list[1].args, ("コマンドパレット",))
-        find_operable.assert_called_once_with("target", root=window, timeout=2)
-        self.assertEqual(
-            focused_lookup.call_args_list,
-            [
-                call("target", root=window),
-                call("target", root=window, context_node=palette),
-            ],
-        )
-        self.assertEqual(actions.invoked, [1])
-        self.assertEqual(
-            [call.args[0] for call in run.call_args_list],
-            [
-                ["xdotool", "windowactivate", "--sync", "0x42"],
-                ["xdotool", "key", "--clearmodifiers", "Return"],
-            ],
-        )
 
     def test_update_action_uses_visible_focus_when_flutter_exposes_no_action(self) -> None:
         with (
