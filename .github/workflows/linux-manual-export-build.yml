@@ -17,6 +17,7 @@ name: Linux manual product build and installed acceptance
           - host_registration
           - workspace_selection
           - agent_task_supervision
+          - agent_mcp_followup
           - agent_task_normal_release
           - agent_task_crash_recovery
           - provider_credential_binding
@@ -39,7 +40,7 @@ concurrency:
 jobs:
   export-build:
     # The hosted Ubuntu 24.04 image denies bubblewrap loopback setup for Task scopes; keep those on the previously capable Ubuntu 22.04 image.
-    runs-on: ${{ (inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_task_normal_release' || inputs.acceptance_scope == 'agent_task_crash_recovery' || inputs.acceptance_scope == 'provider_credential_binding') && 'ubuntu-22.04' || 'ubuntu-24.04' }}
+    runs-on: ${{ (inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_mcp_followup' || inputs.acceptance_scope == 'agent_task_normal_release' || inputs.acceptance_scope == 'agent_task_crash_recovery' || inputs.acceptance_scope == 'provider_credential_binding') && 'ubuntu-22.04' || 'ubuntu-24.04' }}
     timeout-minutes: 120
     steps:
       - name: 対象commitをclean checkout
@@ -82,7 +83,7 @@ jobs:
 
       - name: Codex Linux sandbox capability gate
         id: codex_sandbox
-        if: ${{ inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_task_normal_release' || inputs.acceptance_scope == 'agent_task_crash_recovery' || inputs.acceptance_scope == 'provider_credential_binding' }}
+        if: ${{ inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_mcp_followup' || inputs.acceptance_scope == 'agent_task_normal_release' || inputs.acceptance_scope == 'agent_task_crash_recovery' || inputs.acceptance_scope == 'provider_credential_binding' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -99,6 +100,13 @@ jobs:
             cat "$probe_log"
             exit 1
           fi
+
+      - name: Agent MCP follow-up acceptance requires LIVE_RUNTIME sandbox
+        if: ${{ inputs.acceptance_scope == 'agent_mcp_followup' && steps.codex_sandbox.outputs.available != 'true' }}
+        shell: bash
+        run: |
+          echo 'agent_mcp_followup cannot pass without the real Codex sandbox; LIVE_RUNTIME was not executed.'
+          exit 1
 
       - name: Flutter／Rust toolchainを固定
         shell: bash
@@ -124,7 +132,7 @@ jobs:
           clang --version | head -n 1
           weston --version
           runner_label="ubuntu-24.04"
-          if [ '${{ inputs.acceptance_scope }}' = 'agent_task_supervision' ] || [ '${{ inputs.acceptance_scope }}' = 'agent_task_normal_release' ] || [ '${{ inputs.acceptance_scope }}' = 'agent_task_crash_recovery' ] || [ '${{ inputs.acceptance_scope }}' = 'provider_credential_binding' ]; then
+          if [ '${{ inputs.acceptance_scope }}' = 'agent_task_supervision' ] || [ '${{ inputs.acceptance_scope }}' = 'agent_mcp_followup' ] || [ '${{ inputs.acceptance_scope }}' = 'agent_task_normal_release' ] || [ '${{ inputs.acceptance_scope }}' = 'agent_task_crash_recovery' ] || [ '${{ inputs.acceptance_scope }}' = 'provider_credential_binding' ]; then
             runner_label="ubuntu-22.04"
           fi
           {
@@ -191,7 +199,7 @@ jobs:
             --output-dir "$output_root"
             --allow-verification-branch
           )
-          if [ '${{ inputs.acceptance_scope }}' = 'agent_task_supervision' ] || [ '${{ inputs.acceptance_scope }}' = 'agent_task_crash_recovery' ] || [ '${{ inputs.acceptance_scope }}' = 'provider_credential_binding' ] || [ '${{ inputs.acceptance_scope }}' = 'debian_setup_lifecycle' ]; then
+          if [ '${{ inputs.acceptance_scope }}' = 'agent_task_supervision' ] || [ '${{ inputs.acceptance_scope }}' = 'agent_mcp_followup' ] || [ '${{ inputs.acceptance_scope }}' = 'agent_task_crash_recovery' ] || [ '${{ inputs.acceptance_scope }}' = 'provider_credential_binding' ] || [ '${{ inputs.acceptance_scope }}' = 'debian_setup_lifecycle' ]; then
             export_arguments+=(--r2-e2e-test-build)
           fi
           python3 tooling/export_linux_product.py "${export_arguments[@]}"
@@ -490,7 +498,7 @@ jobs:
           fi
 
       - name: 固定版Linux Codex CLIを検証rootへ取得
-        if: ${{ inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_task_normal_release' || inputs.acceptance_scope == 'agent_task_crash_recovery' || inputs.acceptance_scope == 'provider_credential_binding' }}
+        if: ${{ inputs.acceptance_scope == 'agent_task_supervision' || inputs.acceptance_scope == 'agent_mcp_followup' || inputs.acceptance_scope == 'agent_task_normal_release' || inputs.acceptance_scope == 'agent_task_crash_recovery' || inputs.acceptance_scope == 'provider_credential_binding' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -709,6 +717,27 @@ jobs:
           else
             printf '\n- LIVE_PRODUCT／r2-e2e supervision: complete／cancel／deadline, secret／outside deny, process／scratch cleanup, Audit. Ubuntu 22.04 Xvfb／X11, synthetic identity; no release claim.\n' >> "$GITHUB_STEP_SUMMARY"
           fi
+
+      - name: installed GTK UIで実MCP結果依存の同一Agent Task継続を受入れる
+        if: ${{ inputs.acceptance_scope == 'agent_mcp_followup' && steps.codex_sandbox.outputs.available == 'true' }}
+        shell: bash
+        env:
+          GUI_SHELL_PRODUCT_APP_ID: d4-pocket-app-11111111111111111111111111111111
+          GUI_SHELL_PRODUCT_AUDIT_STORE_ID: audit-store-22222222222222222222222222222222
+          D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE: ${{ runner.temp }}/d4p-linux-export-${{ github.run_id }}-${{ github.run_attempt }}/output/D4Pocket-linux-rollback.d4pkg
+        run: |
+          set -euo pipefail
+          test_package="$D4P_EXPORT_ROOT/output/D4Pocket-linux.d4pkg"
+          acceptance_root="$D4P_EXPORT_ROOT/installed-agent_mcp_followup-acceptance"
+          dbus-run-session -- xvfb-run -a python3 tooling/tests/linux_installed_product_smoke.py \
+            --package "$test_package" \
+            --temp-root "$D4P_EXPORT_ROOT" \
+            --acceptance-root "$acceptance_root" \
+            --private-key "$D4P_EXPORT_ROOT/test-update-private.der" \
+            --update-package "$D4P_LINUX_ACCEPTANCE_UPDATE_PACKAGE" \
+            --acceptance-scope agent_mcp_followup \
+            --codex-cli "$D4P_LINUX_TASK_CODEX_CLI"
+          printf '\n- LIVE_PRODUCT／r2-e2e: installed GTK／BrokerからCodex CLIがtask-scoped MCP requestを提案し、Owner-approved real MCP Tool resultをfresh Permission／Approval付きsame-Agent Taskが実際に受け取る一巡を実行。run-owned synthetic identityとlocal MCP／Responses fixture。normal Releaseやrelease readinessの証拠ではない。\n' >> "$GITHUB_STEP_SUMMARY"
 
       - name: installed GTK UIからSecret Service Provider認証のAgent Taskを受入れる
         if: ${{ inputs.acceptance_scope == 'provider_credential_binding' && steps.codex_sandbox.outputs.available == 'true' }}

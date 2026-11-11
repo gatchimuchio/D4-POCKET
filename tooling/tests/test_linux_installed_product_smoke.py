@@ -4888,6 +4888,80 @@ class AgentTaskAuditAcceptanceTests(unittest.TestCase):
         self.assertIn("expected_task_terminal_records", extra_scenario["failed_checks"])
         self.assertIn("expected_terminal_statuses", extra_scenario["failed_checks"])
 
+    def test_two_completed_tasks_require_two_scratch_cleanup_records(self) -> None:
+        task_ids = ("task-mcp-source", "task-mcp-followup")
+        starts = [
+            {
+                "task_id": task_id,
+                "request_hash": "sha256:" + str(index + 1) * 64,
+            }
+            for index, task_id in enumerate(task_ids)
+        ]
+        terminals = [
+            {"task_id": task_id, "status": "completed"} for task_id in task_ids
+        ]
+        events: list[dict[str, object]] = []
+        for index in range(2):
+            events.extend(
+                (
+                    {
+                        "operation": "AgentTaskWorkspacePermissionGrant",
+                        "decision": "received",
+                        "reason": "対話操作を受信",
+                        "request_id": f"permission-request-{index}",
+                    },
+                    {
+                        "operation": "AgentTaskWorkspacePermissionGrant",
+                        "decision": "recorded",
+                        "reason": "Agent Task用Workspace Permission発行（native Owner確認・Task未実行）",
+                        "payload_hash": "sha256:" + str(index + 3) * 64,
+                    },
+                    {
+                        "operation": "AgentTaskOwnerApprovalGrant",
+                        "decision": "received",
+                        "reason": "対話操作を受信",
+                        "request_id": f"approval-request-{index}",
+                    },
+                    {
+                        "operation": "AgentTaskOwnerApprovalGrant",
+                        "decision": "recorded",
+                        "reason": "Agent Task本文hash・実行条件hashへのOwner Approval発行（native確認・Task未実行）",
+                        "payload_hash": "sha256:" + str(index + 5) * 64,
+                    },
+                )
+            )
+        scratch = [
+            {"scratch_cleanup_completed": True},
+            {"scratch_cleanup_completed": True},
+        ]
+
+        passed = _agent_task_audit_acceptance_diagnostics(
+            starts,
+            terminals,
+            events,
+            scratch,
+            expected_terminal_statuses=("completed", "completed"),
+            expected_scratch_cleanup_count=2,
+        )
+        self.assertEqual(passed["failed_checks"], [])
+        self.assertEqual(
+            passed["counts"]["scratch_cleanup_confirmations"], 2
+        )
+
+        missing_cleanup = _agent_task_audit_acceptance_diagnostics(
+            starts,
+            terminals,
+            events,
+            scratch[:1],
+            expected_terminal_statuses=("completed", "completed"),
+            expected_scratch_cleanup_count=2,
+        )
+        self.assertEqual(
+            missing_cleanup["failed_checks"],
+            ["expected_scratch_cleanup_confirmations"],
+        )
+
+
     def test_failure_diagnostics_show_only_bounded_counts(self) -> None:
         task_ids = ("PRIVATE_TASK_A", "PRIVATE_TASK_B", "PRIVATE_TASK_C")
         statuses = ("completed", "cancelled", "failed")
@@ -5014,6 +5088,155 @@ class LinuxAgentTaskResponsesFixtureTests(unittest.TestCase):
         self.assertEqual(snapshot["rejections"], [])
         self.assertEqual(snapshot["scenarios"][0]["tool_outputs"], 1)
         self.assertEqual(snapshot["scenarios"][0]["posts"], 2)
+
+    def test_fixture_round_trips_namespaced_mcp_request_without_storing_raw_output(self) -> None:
+        server = _LinuxAgentTaskResponsesServer()
+        self.addCleanup(server.close)
+        proposal = {
+            "server_id": "linux-installed-mcp-followup",
+            "tool_id": "tool-" + "a" * 142,
+            "name": "echo",
+            "arguments": {"text": "installed-mcp-public-input"},
+        }
+        descriptor = {
+            "type": "function",
+            "namespace": "d4p_task_request",
+            "name": "d4_submit_mcp_tool_request",
+        }
+        server.configure(
+            "mcp_proposal",
+            "",
+            Path("/tmp/workspace"),
+            mcp_tool_request=proposal,
+        )
+        events = server._response_events({"input": [], "tools": [descriptor]})
+        call = next(
+            event["item"]
+            for event in events
+            if event["type"] == "response.output_item.done"
+            and isinstance(event.get("item"), dict)
+            and event["item"].get("type") == "function_call"
+        )
+        self.assertEqual(call["namespace"], "d4p_task_request")
+        self.assertEqual(call["name"], "d4_submit_mcp_tool_request")
+        self.assertEqual(json.loads(call["arguments"]), proposal)
+        self.assertEqual(call["status"], "completed")
+
+        public_request_receipt = "D4 Pocket accepted one untrusted proposal; no external call yet."
+        final = server._response_events(
+            {
+                "input": [
+                    {
+                        "type": "function_call_output",
+                        "call_id": call["call_id"],
+                        "output": public_request_receipt,
+                    }
+                ],
+                "tools": [descriptor],
+            }
+        )
+        self.assertIn("response.completed", [event["type"] for event in final])
+        snapshot = server.snapshot()
+        scenario = snapshot["scenarios"][0]
+        self.assertEqual(snapshot["rejections"], [])
+        self.assertEqual(scenario["mcp_function_calls"], 1)
+        self.assertEqual(scenario["mcp_function_outputs"], 1)
+        self.assertEqual(
+            scenario["tool_output_sha256"],
+            hashlib.sha256(public_request_receipt.encode()).hexdigest(),
+        )
+        self.assertTrue(scenario["request_shapes"][0]["task_mcp_tool_offered"])
+        self.assertNotIn(public_request_receipt, json.dumps(snapshot))
+        self.assertNotIn("installed-mcp-public-input", json.dumps(snapshot))
+
+    def test_fixture_followup_requires_result_marker_and_rejects_secret_input(self) -> None:
+        marker = "D4P_MCP_RESULT_PROBE_0123456789abcdef0123456789abcdef"
+        descriptor = {
+            "type": "function",
+            "namespace": "d4p_task_request",
+            "name": "d4_submit_mcp_tool_request",
+        }
+        server = _LinuxAgentTaskResponsesServer()
+        self.addCleanup(server.close)
+        server.configure(
+            "mcp_followup",
+            "",
+            Path("/tmp/workspace"),
+            required_input_marker=marker,
+        )
+        request = {
+            "input": [
+                {
+                    "role": "user",
+                    "content": [{"type": "input_text", "text": marker}],
+                }
+            ],
+            "tools": [descriptor],
+        }
+        events = server._response_events(request)
+        self.assertIn("response.completed", [event["type"] for event in events])
+        snapshot = server.snapshot()
+        scenario = snapshot["scenarios"][0]
+        self.assertEqual(snapshot["rejections"], [])
+        self.assertTrue(scenario["required_input_marker_observed"])
+        self.assertRegex(scenario["mcp_input_sha256"], r"^[0-9a-f]{64}$")
+        self.assertNotIn(marker, json.dumps(snapshot))
+
+        secret_server = _LinuxAgentTaskResponsesServer()
+        self.addCleanup(secret_server.close)
+        secret_server.configure(
+            "mcp_followup",
+            "",
+            Path("/tmp/workspace"),
+            required_input_marker=marker,
+        )
+        with self.assertRaisesRegex(RuntimeError, "secret canary exposed"):
+            secret_server._response_events(
+                {
+                    "input": [
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "input_text",
+                                    "text": marker
+                                    + " D4P_SYNTHETIC_SECRET_CANARY=do-not-send",
+                                }
+                            ],
+                        }
+                    ],
+                    "tools": [descriptor],
+                }
+            )
+        rejected_snapshot = secret_server.snapshot()
+        self.assertEqual(
+            rejected_snapshot["rejections"],
+            ["synthetic_secret_canary_in_followup_request"],
+        )
+        self.assertNotIn("do-not-send", json.dumps(rejected_snapshot))
+
+    def test_fixture_rejects_namespaced_mcp_call_when_tool_is_not_offered(self) -> None:
+        server = _LinuxAgentTaskResponsesServer()
+        self.addCleanup(server.close)
+        server.configure(
+            "mcp_proposal",
+            "",
+            Path("/tmp/workspace"),
+            mcp_tool_request={
+                "server_id": "linux-installed-mcp-followup",
+                "tool_id": "tool-" + "a" * 142,
+                "name": "echo",
+                "arguments": {"text": "installed-mcp-public-input"},
+            },
+        )
+        with self.assertRaisesRegex(RuntimeError, "not offered"):
+            server._response_events(
+                {"input": [], "tools": [{"name": "exec_command"}]}
+            )
+        self.assertEqual(
+            server.snapshot()["rejections"],
+            ["task_mcp_namespace_function_not_offered"],
+        )
 
     def test_crash_fixture_records_tool_call_without_tool_result(self) -> None:
         server = _LinuxAgentTaskResponsesServer()
