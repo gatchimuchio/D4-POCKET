@@ -12,7 +12,11 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
-from tooling.build_module_pruned_windows import dart_defines
+from tooling.build_module_pruned_windows import (
+    MODULE_DEFINE_NAMES,
+    _load_catalog,
+    dart_defines,
+)
 from tooling.export_linux_product import (
     _linux_build_environment,
     _require_clean_source,
@@ -35,6 +39,7 @@ PAYLOADS = {
     "gui_shell_desktop": b"runner",
     "gui_shell_desktop_launcher": b"launcher",
     "lib/libflutter_linux_gtk.so": b"flutter",
+    "lib/libapp.so": b"aot-image",
     "libexec/gui_shell_linux_broker": b"broker",
 }
 
@@ -401,9 +406,77 @@ class LinuxExportBuildTests(unittest.TestCase):
             commands: list[list[str]] = []
             command_environments: list[dict[str, str]] = []
 
-            def run(command: list[str], **kwargs: Any) -> None:
+            def run(command: list[str], **kwargs: Any) -> Any:
                 commands.append(command)
                 command_environments.append(kwargs["env"])
+                if "--analyze-size" in command:
+                    input_directory = Path(next(
+                        value.split("=", 1)[1]
+                        for value in command
+                        if value.startswith("--code-size-directory=")
+                    ))
+                    (input_directory / "snapshot.linux-x64.json").write_bytes(b"snapshot")
+                    (input_directory / "trace.linux-x64.json").write_bytes(b"trace")
+                    define_values = {
+                        value.split("=", 2)[1]: value.rsplit("=", 1)[1]
+                        for value in command
+                        if value.startswith("--dart-define=GUI_SHELL_MODULE_")
+                    }
+                    catalog = _load_catalog()
+                    included_ids = {
+                        module["module_id"]
+                        for module in catalog["optional_modules"]
+                        if define_values.get(
+                            "GUI_SHELL_MODULE_" + MODULE_DEFINE_NAMES[module["module_id"]],
+                            "true",
+                        ) == "true"
+                    }
+                    aot_root = {
+                        "n": "libapp.so (Dart AOT)",
+                        "value": len(PAYLOADS["lib/libapp.so"]),
+                        "children": [],
+                    }
+                    for module in catalog["optional_modules"]:
+                        if module["module_id"] not in included_ids:
+                            continue
+                        for surface in module["source_surfaces"]:
+                            relative = Path(surface).relative_to("apps/desktop_flutter/lib")
+                            path = (
+                                "package:gui_shell_desktop",
+                                "package:gui_shell_desktop",
+                                *relative.parts,
+                            )
+                            node = aot_root
+                            for part in path:
+                                children = node.setdefault("children", [])
+                                child = next(
+                                    (item for item in children if item.get("n") == part),
+                                    None,
+                                )
+                                if child is None:
+                                    child = {"n": part, "children": []}
+                                    children.append(child)
+                                node = child
+                    project = Path(kwargs["cwd"])
+                    profile_aot = (
+                        project / "build/linux/x64/release/bundle/lib/libapp.so"
+                    )
+                    profile_aot.parent.mkdir(parents=True, exist_ok=True)
+                    profile_aot.write_bytes(PAYLOADS["lib/libapp.so"])
+                    devtools = Path(kwargs["env"]["HOME"]) / ".flutter-devtools"
+                    devtools.mkdir()
+                    report_path = devtools / "linux-code-size-analysis.json"
+                    report_path.write_text(
+                        json.dumps({"type": "linux", "children": [aot_root]}),
+                        encoding="utf-8",
+                    )
+                    return SimpleNamespace(
+                        returncode=0,
+                        stdout=(
+                            "A summary of your Linux bundle analysis can be found at: "
+                            f"{report_path}\n"
+                        ),
+                    )
                 if "--build" in command:
                     bundle_arg = next(
                         value.split("=", 1)[1]
@@ -413,6 +486,7 @@ class LinuxExportBuildTests(unittest.TestCase):
                     self._create_fake_bundle(Path(bundle_arg))
                 elif "-DCMAKE_INSTALL_PREFIX=" in " ".join(command):
                     configure_args.extend(command)
+                return SimpleNamespace(returncode=0, stdout="")
 
             def write_archive(_commit: str, archive_path: Path) -> str:
                 archive_path.write_bytes(b"synthetic-git-archive")
@@ -455,7 +529,20 @@ class LinuxExportBuildTests(unittest.TestCase):
                 for command, environment in zip(commands, command_environments, strict=True)
                 if command[0] == tool_paths["flutter"]
             ]
-            self.assertEqual(len(flutter_commands), 2)
+            self.assertEqual(len(flutter_commands), 3)
+            analyzed = next(command for command, _ in flutter_commands if "--analyze-size" in command)
+            self.assertIn("--release", analyzed)
+            self.assertIn("--no-pub", analyzed)
+            self.assertTrue(evidence["aot_surface_analysis"]["image_matches_export"])
+            self.assertEqual(
+                evidence["aot_surface_analysis"]["aot_surface_libraries"],
+                evidence["aot_surface_analysis"]["included_source_surfaces"],
+            )
+            self.assertEqual(
+                len(evidence["aot_surface_analysis"]["excluded_source_surfaces"]),
+                6,
+            )
+            self.assertFalse(evidence["binary_pruning_verified"])
             self.assertTrue(
                 all(environment["CI"] == "true" for _, environment in flutter_commands)
             )
@@ -495,6 +582,37 @@ class LinuxExportBuildTests(unittest.TestCase):
                     output / "D4Pocket-linux.d4pkg",
                     manifest_raw,
                 )
+            invalid_aot_surfaces = json.loads(json.dumps(evidence))
+            invalid_aot_surfaces["aot_surface_analysis"]["aot_surface_libraries"] = []
+            with self.assertRaisesRegex(ValueError, "source surface"):
+                validate_build_evidence(
+                    invalid_aot_surfaces,
+                    output / "bundle",
+                    output / "D4Pocket-linux.d4pkg",
+                    manifest_raw,
+                )
+            invalid_aot_image = json.loads(json.dumps(evidence))
+            invalid_aot_image["aot_surface_analysis"]["exported_aot_image_sha256"] = "0" * 64
+            with self.assertRaisesRegex(ValueError, "identityが一致しない"):
+                validate_build_evidence(
+                    invalid_aot_image,
+                    output / "bundle",
+                    output / "D4Pocket-linux.d4pkg",
+                    manifest_raw,
+                )
+            analysis_report = output / "analysis" / "linux-code-size-analysis.json"
+            original_report = analysis_report.read_bytes()
+            analysis_report.write_bytes(original_report + b" ")
+            try:
+                with self.assertRaisesRegex(ValueError, "report hash／size"):
+                    validate_build_evidence(
+                        evidence,
+                        output / "bundle",
+                        output / "D4Pocket-linux.d4pkg",
+                        manifest_raw,
+                    )
+            finally:
+                analysis_report.write_bytes(original_report)
             invalid_source_pin = json.loads(json.dumps(evidence))
             invalid_source_pin["source_manifest_sha256"] = "0" * 64
             invalid_source_pin["compile_time_identity"]["manifest_sha256"] = "0" * 64

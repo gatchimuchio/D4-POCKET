@@ -1652,7 +1652,7 @@
     },
     {
       "path": "docs/specs/gui-shell-module-pruning.md",
-      "sha256": "57ce1e25c273c9bb4d1bb83d360e4fea51fa5bc105601e51f3da9a705039d3b4"
+      "sha256": "325995b2cc9545b17f6c021c12ba233df84ebc28bdee73af3f51713e8869cbbe"
     },
     {
       "path": "docs/specs/gui-shell-preview.md",
@@ -2220,7 +2220,7 @@
     },
     {
       "path": "examples/contracts/gui_shell_linux_export_build.valid.json",
-      "sha256": "479846e17b419a415155c078c81b5eeb0668b6d2132c02cee8422db252b2c129"
+      "sha256": "260cc4efa40daff6f413db7763bc12c98fe4e4e80aa2e7cedf46a336a2ed0396"
     },
     {
       "path": "examples/contracts/gui_shell_module_build_evidence.valid.json",
@@ -4972,7 +4972,7 @@
     },
     {
       "path": "specs/gui_shell_linux_export_build.schema.json",
-      "sha256": "c90bea580a178417a1032e74652f6ed42bcf7fd85ba67208f78fc4019aa0b7f8"
+      "sha256": "a530d507987f963836a6a16b6b2db12b3f635cd917a188976393198b85f9a171"
     },
     {
       "path": "specs/gui_shell_module_build_evidence.schema.json",
@@ -5408,7 +5408,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "7b9d23836404b7e5d05735ab5f6767afa1f556341be2c50646dd5625105a9b93"
+      "sha256": "57ef2903b126782bdac4b861841a75bcfabf8fba524937c32d10fc5b8ed13c1f"
     },
     {
       "path": "tooling/conformance_tests/test_final_development_audit.py",
@@ -5452,7 +5452,7 @@
     },
     {
       "path": "tooling/export_linux_product.py",
-      "sha256": "ebc5922eca26e548c56062f2878ae7e31a47bac1cfb19c96d47f648cd9afd891"
+      "sha256": "381cb7271f88cbdd825e5177bb9c3dbe1ff3ed09f27cbf335eb6d460c608e94d"
     },
     {
       "path": "tooling/export_windows_product.py",
@@ -5608,7 +5608,7 @@
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",
-      "sha256": "145ca107de89292008ee56af6c5c491ce0ca2e5cf40bc9fa01ad894669d3ebbd"
+      "sha256": "5fc789ea4bf803b4f715f2fa2f2fdd78e8cecb1cdde8e595a60b5a376e9c0833"
     },
     {
       "path": "tooling/tests/test_linux_deb_setup_package.py",

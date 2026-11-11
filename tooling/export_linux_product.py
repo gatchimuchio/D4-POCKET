@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from tooling.build_module_pruned_windows import dart_defines
+from tooling.build_module_pruned_windows import _load_catalog, dart_defines
 from tooling.export_windows_product import (
     CREDENTIAL_SCAN_STATUS,
     MAX_INPUT_BYTES,
@@ -53,6 +53,10 @@ PORTABLE_ARCHIVE_ROOT = "D4Pocket"
 PORTABLE_ARCHIVE_TARGET = "ubuntu-24.04-x86_64"
 PORTABLE_README_MEMBER = "README-linux-ja.txt"
 PORTABLE_README_MAX_BYTES = 32 * 1024
+SIZE_ANALYSIS_SENTINEL = "A summary of your Linux bundle analysis can be found at:"
+SIZE_ANALYSIS_MAX_BYTES = 50_000_000
+AOT_REPORT_ROOT = "libapp.so (Dart AOT)"
+PACKAGE_REPORT_ROOT = ("package:gui_shell_desktop", "package:gui_shell_desktop")
 ISOLATED_ENVIRONMENT_ALLOWLIST = {
     "PATH",
     "LANG",
@@ -223,6 +227,198 @@ def _sha256_file(path: Path) -> str:
         for chunk in iter(lambda: source.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _aot_report_root(report: dict[str, Any]) -> dict[str, Any]:
+    roots: list[dict[str, Any]] = []
+    pending: list[Any] = [report]
+    while pending:
+        value = pending.pop()
+        if isinstance(value, dict):
+            if value.get("n") == AOT_REPORT_ROOT:
+                roots.append(value)
+            pending.extend(value.values())
+        elif isinstance(value, list):
+            pending.extend(value)
+    if len(roots) != 1:
+        raise ValueError("Flutter Linux size-analysis reportにDart AOT treeが一意に存在しない")
+    return roots[0]
+
+
+def _aot_surface_libraries(
+    report: dict[str, Any], catalog: dict[str, Any]
+) -> list[str]:
+    """Flutter Linux AOT report内のCatalog対象Dart libraryだけを列挙する。"""
+    targets: dict[str, tuple[str, ...]] = {}
+    lib_root = PurePosixPath("apps/desktop_flutter/lib")
+    for module in catalog["optional_modules"]:
+        for surface in module["source_surfaces"]:
+            source = PurePosixPath(surface)
+            try:
+                relative = source.relative_to(lib_root)
+            except ValueError as error:
+                raise ValueError(
+                    f"Catalog surfaceがDesktop Flutter lib外にある: {surface}"
+                ) from error
+            if not relative.parts or source.suffix != ".dart":
+                raise ValueError(f"Catalog surfaceがDart library pathではない: {surface}")
+            targets[surface] = (*PACKAGE_REPORT_ROOT, *relative.parts)
+
+    found: set[str] = set()
+    pending: list[tuple[Any, tuple[str, ...]]] = [(_aot_report_root(report), ())]
+    while pending:
+        value, ancestors = pending.pop()
+        if isinstance(value, dict):
+            name = value.get("n")
+            path = (*ancestors, name) if isinstance(name, str) else ancestors
+            for surface, target in targets.items():
+                if len(path) >= len(target) and path[-len(target) :] == target:
+                    found.add(surface)
+            pending.extend((child, path) for child in value.values())
+        elif isinstance(value, list):
+            pending.extend((child, ancestors) for child in value)
+    return sorted(found)
+
+
+def _module_source_surfaces(
+    catalog: dict[str, Any], included_module_ids: set[str]
+) -> tuple[list[str], list[str]]:
+    included = sorted(
+        surface
+        for module in catalog["optional_modules"]
+        if module["module_id"] in included_module_ids
+        for surface in module["source_surfaces"]
+    )
+    excluded = sorted(
+        surface
+        for module in catalog["optional_modules"]
+        if module["module_id"] not in included_module_ids
+        for surface in module["source_surfaces"]
+    )
+    return included, excluded
+
+
+def _validate_aot_surface_selection(
+    report: dict[str, Any],
+    catalog: dict[str, Any],
+    included_module_ids: set[str],
+) -> tuple[list[str], list[str]]:
+    actual = _aot_surface_libraries(report, catalog)
+    expected, excluded = _module_source_surfaces(catalog, included_module_ids)
+    if actual != expected:
+        missing = sorted(set(expected) - set(actual))
+        unexpected = sorted(set(actual) - set(expected))
+        raise ValueError(
+            "Flutter Linux Release AOT libraryがModule選択と一致しない: "
+            f"missing={missing}, unexpected={unexpected}"
+        )
+    return actual, excluded
+
+
+def _size_analysis_report_path(output: str, isolated_home: Path) -> Path:
+    matches = [
+        line.split(SIZE_ANALYSIS_SENTINEL, 1)[1].strip()
+        for line in output.splitlines()
+        if SIZE_ANALYSIS_SENTINEL in line
+    ]
+    if not matches or not matches[-1]:
+        raise ValueError("FlutterがLinux size-analysis report pathを出力しなかった")
+    report_path = Path(matches[-1].strip('"'))
+    if not report_path.is_absolute():
+        raise ValueError("Flutter size-analysis report pathが絶対pathではない")
+    devtools_root = isolated_home / ".flutter-devtools"
+    root_metadata = devtools_root.lstat()
+    if stat.S_ISLNK(root_metadata.st_mode) or not stat.S_ISDIR(root_metadata.st_mode):
+        raise ValueError("Flutter size-analysis directoryが通常directoryではない")
+    metadata = report_path.lstat()
+    if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode):
+        raise ValueError("Flutter size-analysis reportが通常fileではない")
+    if metadata.st_size <= 0 or metadata.st_size > SIZE_ANALYSIS_MAX_BYTES:
+        raise ValueError("Flutter size-analysis reportが空か50 MB上限を超えている")
+    try:
+        report_path.resolve(strict=True).relative_to(devtools_root.resolve(strict=True))
+    except (OSError, ValueError) as error:
+        raise ValueError("Flutter size-analysis reportが隔離DevTools directory外にある") from error
+    return report_path
+
+
+def _size_analysis_input_records(directory: Path) -> list[dict[str, Any]]:
+    snapshots = sorted(directory.glob("snapshot.*.json"))
+    traces = sorted(directory.glob("trace.*.json"))
+    if (
+        len(snapshots) != 1
+        or len(traces) != 1
+        or snapshots[0].name != "snapshot.linux-x64.json"
+        or traces[0].name != "trace.linux-x64.json"
+    ):
+        raise ValueError("Flutter Linux size-analysis snapshot／traceが一意に揃わない")
+    records: list[dict[str, Any]] = []
+    for path in [*snapshots, *traces]:
+        metadata = path.lstat()
+        if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode):
+            raise ValueError("Flutter size-analysis入力が通常fileではない")
+        if metadata.st_size <= 0 or metadata.st_size > SIZE_ANALYSIS_MAX_BYTES:
+            raise ValueError("Flutter size-analysis入力が空か50 MB上限を超えている")
+        records.append(
+            {
+                "name": path.name,
+                "size_bytes": metadata.st_size,
+                "sha256": _sha256_file(path),
+            }
+        )
+    return records
+
+
+def _capture_linux_aot_surface_analysis(
+    *,
+    output: str,
+    isolated_home: Path,
+    input_directory: Path,
+    build_directory: Path,
+    staging_root: Path,
+    catalog: dict[str, Any],
+    included_module_ids: set[str],
+) -> dict[str, Any]:
+    report_path = _size_analysis_report_path(output, isolated_home)
+    report_raw = _read_regular_file(
+        report_path, SIZE_ANALYSIS_MAX_BYTES, "Flutter Linux size-analysis report"
+    )
+    report = _parse_json_bytes(report_raw)
+    if not isinstance(report, dict) or report.get("type") != "linux":
+        raise ValueError("Flutter size-analysis reportがLinux形式ではない")
+    aot_root = _aot_report_root(report)
+    profile_aot = build_directory / "bundle" / "lib" / "libapp.so"
+    profile_metadata = profile_aot.lstat()
+    if stat.S_ISLNK(profile_metadata.st_mode) or not stat.S_ISREG(profile_metadata.st_mode):
+        raise ValueError("Flutter Release outputに通常のlibapp.soがない")
+    if aot_root.get("value") != profile_metadata.st_size:
+        raise ValueError("Flutter AOT reportのsizeが同じbuildのlibapp.soと一致しない")
+    surfaces, excluded_surfaces = _validate_aot_surface_selection(
+        report, catalog, included_module_ids
+    )
+    analysis_directory = staging_root / "analysis"
+    analysis_directory.mkdir(mode=0o700, exist_ok=True)
+    report_destination = analysis_directory / "linux-code-size-analysis.json"
+    with report_destination.open("xb") as destination:
+        destination.write(report_raw)
+        destination.flush()
+        os.fsync(destination.fileno())
+    report_record = {
+        "path": "analysis/linux-code-size-analysis.json",
+        "size_bytes": len(report_raw),
+        "sha256": hashlib.sha256(report_raw).hexdigest(),
+    }
+    included_surfaces, _ = _module_source_surfaces(catalog, included_module_ids)
+    return {
+        "scope": "flutter_linux_x64_release_aot_catalog_surfaces",
+        "report": report_record,
+        "inputs": _size_analysis_input_records(input_directory),
+        "aot_surface_libraries": surfaces,
+        "included_source_surfaces": included_surfaces,
+        "excluded_source_surfaces": excluded_surfaces,
+        "profiled_aot_image_size_bytes": profile_metadata.st_size,
+        "profiled_aot_image_sha256": _sha256_file(profile_aot),
+    }
 
 
 def _write_source_archive(commit: str, archive_path: Path) -> str:
@@ -451,6 +647,71 @@ def _validate_portable_archive(
         raise ValueError("Linux portable archiveを安全に検証できない") from error
 
 
+def _validate_aot_surface_evidence(
+    evidence: dict[str, Any], bundle: Path
+) -> None:
+    analysis = evidence["aot_surface_analysis"]
+    output_root = bundle.parent
+    analysis_directory = output_root / "analysis"
+    directory_metadata = analysis_directory.lstat()
+    if stat.S_ISLNK(directory_metadata.st_mode) or not stat.S_ISDIR(directory_metadata.st_mode):
+        raise ValueError("Linux Export AOT analysis directoryが通常directoryではない")
+    report_record = analysis["report"]
+    relative = PurePosixPath(report_record["path"])
+    if (
+        relative.is_absolute()
+        or not relative.parts
+        or any(part in {"", ".", ".."} for part in relative.parts)
+    ):
+        raise ValueError("Linux Export AOT report pathが安全な相対pathではない")
+    report_path = output_root.joinpath(*relative.parts)
+    report_raw = _read_regular_file(
+        report_path, SIZE_ANALYSIS_MAX_BYTES, "Linux Export AOT report"
+    )
+    if (
+        len(report_raw) != report_record["size_bytes"]
+        or hashlib.sha256(report_raw).hexdigest() != report_record["sha256"]
+    ):
+        raise ValueError("Linux Export AOT report hash／sizeがevidenceと一致しない")
+    report = _parse_json_bytes(report_raw)
+    if not isinstance(report, dict) or report.get("type") != "linux":
+        raise ValueError("Linux Export AOT reportのplatformが一致しない")
+    catalog = _load_catalog()
+    included_ids = set(evidence["module_plan"]["included_module_ids"])
+    actual, excluded = _validate_aot_surface_selection(report, catalog, included_ids)
+    included, _ = _module_source_surfaces(catalog, included_ids)
+    if (
+        analysis["aot_surface_libraries"] != actual
+        or analysis["included_source_surfaces"] != included
+        or analysis["excluded_source_surfaces"] != excluded
+    ):
+        raise ValueError("Linux Export AOT source surface記録がModulePlan／reportと一致しない")
+    aot_record = next(
+        (record for record in evidence["artifact_files"] if record["path"] == "lib/libapp.so"),
+        None,
+    )
+    if aot_record is None:
+        raise ValueError("Linux Export artifact inventoryにlibapp.soがない")
+    aot_root = _aot_report_root(report)
+    if (
+        analysis["profiled_aot_image_size_bytes"] != aot_record["size_bytes"]
+        or analysis["exported_aot_image_size_bytes"] != aot_record["size_bytes"]
+        or analysis["profiled_aot_image_sha256"] != aot_record["sha256"]
+        or analysis["exported_aot_image_sha256"] != aot_record["sha256"]
+        or analysis["image_matches_export"] is not True
+        or aot_root.get("value") != aot_record["size_bytes"]
+    ):
+        raise ValueError("Linux Export AOT report／profile／bundle libapp.so identityが一致しない")
+    input_records = analysis["inputs"]
+    if {record["name"] for record in input_records} != {
+        "snapshot.linux-x64.json",
+        "trace.linux-x64.json",
+    }:
+        raise ValueError("Linux Export AOT analysis input setが不完全")
+    if len({record["name"] for record in input_records}) != len(input_records):
+        raise ValueError("Linux Export AOT analysis input nameが重複している")
+
+
 def validate_build_evidence(
     evidence: dict[str, Any],
     bundle: Path,
@@ -494,6 +755,17 @@ def validate_build_evidence(
         or parsed_manifest["manifest"]["app_identity"]["target_platform"] != "linux"
     ):
         raise ValueError("bundle Manifest identity／targetがbuild evidenceと一致しない")
+    manifest_module_plan = parsed_manifest["manifest"]["module_plan"]
+    for evidence_key, manifest_key in (
+        ("selection_mode", "selection_mode"),
+        ("requested_optional_module_ids", "requested_optional_module_ids"),
+        ("unprunable_core_ids", "unprunable_core_ids"),
+        ("included_module_ids", "included_module_ids"),
+        ("excluded_optional_module_ids", "excluded_optional_module_ids"),
+    ):
+        if evidence["module_plan"][evidence_key] != manifest_module_plan[manifest_key]:
+            raise ValueError("Linux Export ModulePlanがManifestと一致しない")
+    _validate_aot_surface_evidence(evidence, bundle)
     if _update_trust_summary(parsed_manifest) != evidence["compile_time_update_trust"]:
         raise ValueError("Rust compile-time update trustがManifestと一致しない")
     scan = _scan_credential_inventory(bundle, records, total_bytes, tree_hash)
@@ -617,6 +889,62 @@ def build_linux_product(
                 env=flutter_environment,
                 check=True,
             )
+            catalog = _load_catalog()
+            included_module_ids = set(plan.included_optional_ids)
+            dart_define_arguments = [
+                f"--dart-define={name}={str(enabled).lower()}"
+                for name, enabled in defines.items()
+            ]
+            size_analysis_input_directory = temporary_root / "size-analysis-inputs"
+            size_analysis_input_directory.mkdir(mode=0o700)
+            flutter_size_analysis_arguments = [
+                "build",
+                "linux",
+                "--release",
+                "--no-pub",
+                "--target-platform=linux-x64",
+                "--analyze-size",
+                f"--code-size-directory={size_analysis_input_directory}",
+                *dart_define_arguments,
+                f"--dart-define=GUI_SHELL_PRODUCT_VERSION={product_version}",
+            ]
+            size_analysis_result = subprocess.run(
+                [paths["flutter"], *flutter_size_analysis_arguments],
+                cwd=flutter_project,
+                env=flutter_environment,
+                check=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
+            size_analysis_output = size_analysis_result.stdout or ""
+            if size_analysis_result.returncode != 0:
+                if size_analysis_output:
+                    sys.stdout.write(size_analysis_output)
+                raise subprocess.CalledProcessError(
+                    size_analysis_result.returncode,
+                    [paths["flutter"], *flutter_size_analysis_arguments],
+                    output=size_analysis_output,
+                )
+            for line in size_analysis_output.splitlines():
+                if (
+                    SIZE_ANALYSIS_SENTINEL in line
+                    or "libapp.so (Dart AOT)" in line
+                    or line.startswith("✓ Built ")
+                ):
+                    print(line)
+            aot_surface_analysis = _capture_linux_aot_surface_analysis(
+                output=size_analysis_output,
+                isolated_home=isolated_home,
+                input_directory=size_analysis_input_directory,
+                build_directory=build_dir,
+                staging_root=staging_root,
+                catalog=catalog,
+                included_module_ids=included_module_ids,
+            )
+
             flutter_arguments = [
                 "build",
                 "linux",
@@ -624,10 +952,7 @@ def build_linux_product(
                 "--no-pub",
                 "--target-platform=linux-x64",
                 "--config-only",
-                *[
-                    f"--dart-define={name}={str(enabled).lower()}"
-                    for name, enabled in defines.items()
-                ],
+                *dart_define_arguments,
                 f"--dart-define=GUI_SHELL_PRODUCT_VERSION={product_version}",
             ]
             subprocess.run(
@@ -664,6 +989,28 @@ def build_linux_product(
             )
             if not bundle.is_dir() or bundle.is_symlink():
                 raise ValueError("CMake installが固定Linux bundleを生成しなかった")
+            exported_aot = bundle / "lib" / "libapp.so"
+            exported_aot_metadata = exported_aot.lstat()
+            if (
+                stat.S_ISLNK(exported_aot_metadata.st_mode)
+                or not stat.S_ISREG(exported_aot_metadata.st_mode)
+            ):
+                raise ValueError("Linux Export bundleに通常のlibapp.soがない")
+            exported_aot_hash = _sha256_file(exported_aot)
+            if (
+                exported_aot_metadata.st_size
+                != aot_surface_analysis["profiled_aot_image_size_bytes"]
+                or exported_aot_hash
+                != aot_surface_analysis["profiled_aot_image_sha256"]
+            ):
+                raise ValueError(
+                    "size-analysis対象libapp.soと最終Export bundleのfile identityが一致しない"
+                )
+            aot_surface_analysis["exported_aot_image_size_bytes"] = (
+                exported_aot_metadata.st_size
+            )
+            aot_surface_analysis["exported_aot_image_sha256"] = exported_aot_hash
+            aot_surface_analysis["image_matches_export"] = True
             manifest_target = bundle / "product_manifest.json"
             if manifest_target.exists() or manifest_target.is_symlink():
                 raise ValueError("build bundleに入力Manifest名と衝突するfileがある")
@@ -734,9 +1081,11 @@ def build_linux_product(
                     "included_module_ids": list(plan.included_module_ids),
                     "excluded_optional_module_ids": list(plan.excluded_optional_ids),
                 },
+                "aot_surface_analysis": aot_surface_analysis,
                 "toolchain": toolchain,
                 "pub_get_arguments": pub_arguments,
                 "flutter_build_arguments": flutter_arguments,
+                "flutter_size_analysis_arguments": flutter_size_analysis_arguments,
                 "cmake_configure_arguments": cmake_configure_arguments,
                 "cmake_build_arguments": cmake_build_arguments,
                 "compile_time_identity": {

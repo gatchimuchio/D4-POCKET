@@ -11951,6 +11951,20 @@ def test_gui_shell_linux_export_build_is_hash_bound_and_non_authoritative() -> l
     errors = []
     if validate_instance(evidence, schema):
         errors.append("Linux Export buildの正常証拠がSchemaに適合しない")
+    aot_analysis = evidence.get("aot_surface_analysis", {})
+    aot_artifact = next(
+        (record for record in evidence.get("artifact_files", []) if record.get("path") == "lib/libapp.so"),
+        None,
+    )
+    if (
+        aot_artifact is None
+        or aot_analysis.get("image_matches_export") is not True
+        or aot_analysis.get("profiled_aot_image_size_bytes") != aot_artifact.get("size_bytes")
+        or aot_analysis.get("exported_aot_image_size_bytes") != aot_artifact.get("size_bytes")
+        or aot_analysis.get("profiled_aot_image_sha256") != aot_artifact.get("sha256")
+        or aot_analysis.get("exported_aot_image_sha256") != aot_artifact.get("sha256")
+    ):
+        errors.append("Linux Export AOT image evidenceがbundle identityへ結合されない")
     for field, value, label in (
         (("target_platform",), "windows", "別platform build"),
         (("authority_boundary", "owner_authorization_verified"), True, "Owner承認"),
@@ -11981,6 +11995,9 @@ def test_gui_shell_linux_export_build_is_hash_bound_and_non_authoritative() -> l
         "target_platform=\"linux\"",
         "_write_source_archive(commit, archive_path)",
         "--target-platform=linux-x64",
+        "--analyze-size",
+        "_capture_linux_aot_surface_analysis(",
+        "_validate_aot_surface_evidence(evidence, bundle)",
         "--config-only",
         "-DCMAKE_INSTALL_PREFIX=",
         "-DD4_PRODUCT_APP_ID=",
