@@ -61,7 +61,6 @@ class AgentHandoffPackage {
         task.runtimeId != source.agentRuntimeId ||
         task.workspaceId != source.workspace ||
         source.sessionId == target.sessionId ||
-        source.agentRuntimeId == target.agentRuntimeId ||
         source.workspace == target.workspace ||
         source.status != '利用中' ||
         target.status != '利用中' ||

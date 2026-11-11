@@ -3370,7 +3370,7 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
   });
 
-  testWidgets('Agent Centerはfull承認結果を別Sessionへ引き継ぎ、新規grantを要求する',
+  testWidgets('Agent Centerは同一Runtimeの独立Sessionへfull結果を引き継ぎ、新規grantを要求する',
       (WidgetTester tester) async {
     const sessionA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
     const sessionB = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
@@ -3412,7 +3412,7 @@ void main() {
     }) =>
         {
           'permission_id': sessionId,
-          'agent_runtime_id': sessionId == sessionA ? 'codex-a' : 'codex-b',
+          'agent_runtime_id': 'codex-a',
           'session_id': sessionId,
           'workspace_id': workspaceId,
           'workspace_registration_hash': registrationHash,
@@ -3431,7 +3431,7 @@ void main() {
         {
           '状態': 'Owner Approval発行済み',
           '実行状態': '未実行',
-          '実行系ID': sessionId == sessionA ? 'codex-a' : 'codex-b',
+          '実行系ID': 'codex-a',
           '対話セッションID': sessionId,
           '作業領域ID': sessionId == sessionA ? 'workspace-a' : 'workspace-b',
           '指示hash': instructionHash,
@@ -3460,7 +3460,7 @@ void main() {
         },
         {
           '対話セッションID': sessionB,
-          '実行系ID': 'codex-b',
+          '実行系ID': 'codex-a',
           '状態': '利用中',
           '作成監査ID': 'audit-session-b',
           '作業領域ID': 'workspace-b',
@@ -3528,7 +3528,7 @@ void main() {
         '実行状態': '未実行',
         'Permission状態': '未付与',
         'Approval状態': '未取得',
-        '実行系ID': 'codex-b',
+        '実行系ID': 'codex-a',
         '対話セッションID': sessionB,
         '作業領域ID': 'workspace-b',
         '指示hash': instructionHash,
@@ -3550,7 +3550,7 @@ void main() {
         'AgentTask実行',
         taskRecord(
           taskId: targetTask,
-          runtimeId: 'codex-b',
+          runtimeId: 'codex-a',
           sessionId: sessionB,
           workspaceId: 'workspace-b',
           status: 'running',

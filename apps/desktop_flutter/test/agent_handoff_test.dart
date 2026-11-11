@@ -121,7 +121,7 @@ void main() {
       result: _result(),
       target: _session(
         sessionId: _targetSession,
-        runtimeId: 'codex-b',
+        runtimeId: 'codex-a',
         workspace: 'workspace-b',
       ),
     );
@@ -148,7 +148,7 @@ void main() {
       package: package,
       targetTask: const AgentTaskRecord(
         taskId: 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
-        runtimeId: 'codex-b',
+        runtimeId: 'codex-a',
         sessionId: _targetSession,
         workspaceId: 'workspace-b',
         instructionHash: _resultHash,
@@ -204,7 +204,17 @@ void main() {
       () => create(
         target: _session(
           sessionId: _targetSession,
-          runtimeId: 'codex-a',
+          runtimeId: 'codex-b',
+          workspace: 'workspace-a',
+        ),
+      ),
+      throwsA(isA<BrokerClientException>()),
+    );
+    expect(
+      () => create(
+        target: _session(
+          sessionId: _sourceSession,
+          runtimeId: 'codex-b',
           workspace: 'workspace-b',
         ),
       ),

@@ -1229,7 +1229,6 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
         .where((target) {
           return _sessionAvailable(target) &&
               target.sessionId != source.sessionId &&
-              target.agentRuntimeId != source.agentRuntimeId &&
               target.workspace != source.workspace &&
               !_agentTasks.containsKey(target.sessionId);
         })

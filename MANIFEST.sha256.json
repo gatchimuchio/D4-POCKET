@@ -228,7 +228,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/agent_center.dart",
-      "sha256": "6fde93a2bd844f893da7ff529fdd697a60a31d43a73549589bed4b12bac68cf0"
+      "sha256": "0becf7bdd7621660bfd0f71a4b947f08e8306b66ea83495e40d0510444b8cc88"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/approval_center.dart",
@@ -344,7 +344,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/agent_handoff.dart",
-      "sha256": "e01290f1106c1b933a6cc03f6ee75866e8f09ee6cf67e9150e161fede20c1701"
+      "sha256": "19b11df907d850046dde97c5715f2c979054b5f8e84aa1270abdf84179638ce6"
     },
     {
       "path": "apps/desktop_flutter/lib/services/agent_mcp_task_controller.dart",
@@ -632,7 +632,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/agent_handoff_test.dart",
-      "sha256": "bb1786f7202a77ecdfd345fca937df7b7a946ecd4ec66d2da94951f4dbab976f"
+      "sha256": "b769dc9900b7689bd07ffa92da013ed7a90aadae5279a112cb1cb5daaa6da7e0"
     },
     {
       "path": "apps/desktop_flutter/test/agent_mcp_task_controller_test.dart",
@@ -748,7 +748,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "d8e687e568124f3cdf3317dfc059df9d9e7f93d1f3e2231410e290d98aff8100"
+      "sha256": "86d4dacbd04c794dae9ea4cc2c0d930d367921464f88a621bdbd0738a739f23d"
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
@@ -1444,7 +1444,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "ef61578a31e4bee8f50335916b564bbc0c41fbc557a94a8b1b4cc72025ef19f8"
+      "sha256": "1fc873bbbe0858f61f6e6c6154e97fbe146f34fbb4c0dea14bc5c688e2d4e27d"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
