@@ -1559,6 +1559,10 @@
       "sha256": "78ae2ef68cddad529498c06f514a2d8f13d311472dbe2426d8973ef08a29d298"
     },
     {
+      "path": "docs/specs/a2a-streaming.md",
+      "sha256": "9f6290c24cf7c66df14ddba47b5d01b62289f1e8ea660c13c82879e68589290a"
+    },
+    {
       "path": "docs/specs/adapter-conformance.md",
       "sha256": "095717a3e0ef2745953c3c9fd952814220483e7f1f7b120ae77c9a0045316461"
     },
@@ -1917,6 +1921,14 @@
     {
       "path": "examples/contracts/a2a_message_send_response.valid.json",
       "sha256": "44c8d68c2b5c478b45c1decf7ff9888b8f192efc8afc6752a80a7b09324c8142"
+    },
+    {
+      "path": "examples/contracts/a2a_stream_send_request.valid.json",
+      "sha256": "422579fb4b2e96402cca962d960fe50fb2ce39e0a32a864d307b050e1ae9c467"
+    },
+    {
+      "path": "examples/contracts/a2a_stream_send_response.valid.json",
+      "sha256": "2411c367adcb6eb447ac2d4e0a53cfb8df57d7b4d7a6f52ae79d8e2f5cd2c6b1"
     },
     {
       "path": "examples/contracts/a2a_task_get_artifact_request.valid.json",
@@ -2309,6 +2321,14 @@
     {
       "path": "examples/contracts/invalid/a2a_message_send_response.invalid.json",
       "sha256": "b392b53f8258462967387e3c9f975aa8601c341066a0d6c3cd2f64eb0057afe7"
+    },
+    {
+      "path": "examples/contracts/invalid/a2a_stream_send_request.invalid.json",
+      "sha256": "8b312753279c1247f74173f9753915e61079ed330cdbf876b1b230fa4c0f1414"
+    },
+    {
+      "path": "examples/contracts/invalid/a2a_stream_send_response.invalid.json",
+      "sha256": "b4fa9bf27e5125644bf081d5e336f7fc14165a7c8b1e431b10731cb0ff9b2d31"
     },
     {
       "path": "examples/contracts/invalid/a2a_task_get_request.invalid.json",
@@ -4681,6 +4701,14 @@
     {
       "path": "specs/a2a_message_send_response.schema.json",
       "sha256": "747d8203b0e783716851e06e58bc7a3dfb8921dd8e797d8e8eeafeb59813e75f"
+    },
+    {
+      "path": "specs/a2a_stream_send_request.schema.json",
+      "sha256": "3d93a5d5683b2f716a511b350572d65297c1350bbd48ca793c27057a1e12c92e"
+    },
+    {
+      "path": "specs/a2a_stream_send_response.schema.json",
+      "sha256": "23688d81b26f812713d0818ce3deb992a8d1d1a2dc36aa63aa1d21f42fe87cfa"
     },
     {
       "path": "specs/a2a_task_get_request.schema.json",
