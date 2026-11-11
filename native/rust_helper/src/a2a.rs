@@ -1,5 +1,5 @@
-//! A2A v1.0 Agent Card取得、JSON-RPC SendMessage／GetTaskのbounded transport。
-//! 認証credential、Task本文、Artifact本文、Stream購読は扱わない。
+//! A2A v1.0 Agent Card取得、JSON-RPC SendMessage／GetTask／SendStreamingMessageのbounded transport。
+//! 認証credentialと外部raw contentの保存は扱わない。
 #![allow(non_snake_case)]
 
 use crate::audit_hash::sha256_tagged;
@@ -18,6 +18,7 @@ const MAX_JSON_RPC_BYTES: usize = 64 * 1024;
 const MAX_TASK_ARTIFACTS: usize = 32;
 const MAX_ARTIFACT_PARTS: usize = 32;
 const MAX_ARTIFACT_TEXT_BYTES: usize = 64 * 1024;
+const MAX_A2A_STREAM_EVENTS: usize = 32;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct A2aError {
@@ -240,6 +241,62 @@ pub(crate) fn send_message(
             .map_err(map_https_error)?
     };
     project_send_message_response(&raw, &request_id)
+}
+
+pub(crate) fn send_stream(
+    uri: &str,
+    message_text: &str,
+    deadline: Instant,
+) -> Result<Value, A2aError> {
+    let _endpoint = parse_endpoint(uri)?;
+    if message_text.trim().is_empty()
+        || message_text.len() > MAX_SEND_MESSAGE_BYTES
+        || message_text.chars().any(|character| {
+            character == '\0'
+                || (character.is_control() && !matches!(character, '\n' | '\r' | '\t'))
+                || matches!(character, '\u{061c}' | '\u{200e}' | '\u{200f}' | '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}')
+        })
+        || Instant::now() >= deadline
+    {
+        return Err(A2aError::new(
+            "a2a_stream_request_invalid",
+            "A2A Stream要求の本文または期限が不正",
+        ));
+    }
+    let mut request_id_bytes = [0u8; 16];
+    let mut message_id_bytes = [0u8; 16];
+    getrandom::getrandom(&mut request_id_bytes)
+        .and_then(|_| getrandom::getrandom(&mut message_id_bytes))
+        .map_err(|_| A2aError::new("a2a_stream_id_unavailable", "A2A識別値を生成できない"))?;
+    let request_id = format!("d4p-stream-{}", hex::encode(request_id_bytes));
+    let message_id = format!("d4p-stream-msg-{}", hex::encode(message_id_bytes));
+    let request = json!({
+        "jsonrpc": "2.0",
+        "id": request_id,
+        "method": "SendStreamingMessage",
+        "params": {
+            "message": {
+                "messageId": message_id,
+                "role": "ROLE_USER",
+                "parts": [{ "text": message_text }]
+            }
+        }
+    });
+    let request_bytes = serde_json::to_vec(&request)
+        .map_err(|_| A2aError::new("a2a_stream_request_invalid", "A2A Stream要求を構成できない"))?;
+    if request_bytes.len() > MAX_JSON_RPC_BYTES {
+        return Err(A2aError::new(
+            "a2a_stream_request_invalid",
+            "A2A Stream JSON-RPC requestの上限を超過",
+        ));
+    }
+    let raw = crate::broker::update_download::send_a2a_json_rpc_stream_document(
+        uri,
+        &request_bytes,
+        deadline,
+    )
+    .map_err(map_a2a_stream_transport_error)?;
+    project_stream_response(&raw, &request_id)
 }
 
 pub(crate) fn get_task(
@@ -479,6 +536,719 @@ fn project_send_message_response(raw: &[u8], request_id: &str) -> Result<Value, 
             "result_hash": response_hash,
         }))
     }
+}
+
+fn map_a2a_stream_transport_error(error: DownloadError) -> A2aError {
+    match error {
+        DownloadError::TimedOut => A2aError::new("a2a_timeout", "A2A Streamが15秒の期限を超過"),
+        DownloadError::DocumentTooLarge => {
+            A2aError::new("a2a_stream_too_large", "A2A Streamが64 KiB上限を超過")
+        }
+        DownloadError::NonPublicAddress => A2aError::new(
+            "a2a_https_non_public_address",
+            "https A2A接続先がpublic IP範囲ではない",
+        ),
+        DownloadError::InvalidRequest => {
+            A2aError::new("a2a_endpoint_invalid", "A2A Stream接続先が不正")
+        }
+        DownloadError::InvalidHeaders | DownloadError::RedirectOrUnexpectedStatus => {
+            A2aError::new("a2a_stream_response_invalid", "A2A Stream応答headerが不正")
+        }
+        _ => A2aError::new(
+            "a2a_stream_transport_failed",
+            "A2A Stream通信を完了できない",
+        ),
+    }
+}
+
+fn project_stream_response(raw: &[u8], request_id: &str) -> Result<Value, A2aError> {
+    if raw.is_empty() || raw.len() > 64 * 1024 {
+        return Err(A2aError::new(
+            "a2a_stream_response_invalid",
+            "A2A Streamの応答長が不正",
+        ));
+    }
+    let text = std::str::from_utf8(raw)
+        .map_err(|_| A2aError::new("a2a_stream_response_invalid", "A2A StreamがUTF-8ではない"))?;
+    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
+    let mut events = Vec::new();
+    let mut data_lines = Vec::<&str>::new();
+    for raw_line in text.split_terminator('\n') {
+        let line = raw_line.strip_suffix('\r').unwrap_or(raw_line);
+        if line.contains('\r') {
+            return Err(A2aError::new(
+                "a2a_stream_response_invalid",
+                "A2A Streamの行区切りが不正",
+            ));
+        }
+        if line.is_empty() {
+            if !data_lines.is_empty() {
+                if events.len() >= MAX_A2A_STREAM_EVENTS {
+                    return Err(A2aError::new(
+                        "a2a_stream_event_limit",
+                        "A2A Streamが32 event上限を超過",
+                    ));
+                }
+                events.push(data_lines.join("\n"));
+                data_lines.clear();
+            }
+            continue;
+        }
+        if line.starts_with(':') {
+            continue;
+        }
+        let (field, value) = line.split_once(':').unwrap_or((line, ""));
+        if field != "data" {
+            return Err(A2aError::new(
+                "a2a_stream_response_invalid",
+                "A2A Streamの未対応SSE fieldを拒否",
+            ));
+        }
+        data_lines.push(value.strip_prefix(' ').unwrap_or(value));
+    }
+    if !data_lines.is_empty() {
+        return Err(A2aError::new(
+            "a2a_stream_response_invalid",
+            "A2A Streamの最終eventが区切られていない",
+        ));
+    }
+    if events.is_empty() {
+        return Err(A2aError::new(
+            "a2a_stream_response_invalid",
+            "A2A Streamにeventがない",
+        ));
+    }
+
+    let mut projections = Vec::with_capacity(events.len());
+    let mut stream_kind = None;
+    let mut terminal_state = None;
+    let mut task_identity: Option<(String, Option<String>)> = None;
+    for (index, event_data) in events.iter().enumerate() {
+        if terminal_state.is_some() {
+            return Err(A2aError::new(
+                "a2a_stream_response_invalid",
+                "A2A Streamが終端event後に追加eventを含む",
+            ));
+        }
+        let response: Value = crate::broker::json_input::read_unique(event_data).map_err(|_| {
+            A2aError::new(
+                "a2a_stream_response_invalid",
+                "A2A Stream JSON-RPC eventが不正",
+            )
+        })?;
+        let response = response.as_object().ok_or_else(|| {
+            A2aError::new(
+                "a2a_stream_response_invalid",
+                "A2A Stream eventがobjectではない",
+            )
+        })?;
+        if response.len() != 3
+            || response.get("jsonrpc").and_then(Value::as_str) != Some("2.0")
+            || response.get("id").and_then(Value::as_str) != Some(request_id)
+            || response
+                .keys()
+                .any(|key| !["jsonrpc", "id", "result"].contains(&key.as_str()))
+        {
+            return Err(A2aError::new(
+                "a2a_stream_response_invalid",
+                "A2A Stream JSON-RPC version、request ID、またはfieldが不正",
+            ));
+        }
+        let result = response
+            .get("result")
+            .and_then(Value::as_object)
+            .ok_or_else(|| {
+                A2aError::new(
+                    "a2a_stream_response_invalid",
+                    "A2A Stream resultがobjectではない",
+                )
+            })?;
+        if result.len() != 1 {
+            return Err(A2aError::new(
+                "a2a_stream_response_invalid",
+                "A2A StreamResponseは一つのvariantだけを要求",
+            ));
+        }
+        let event_hash = sha256_tagged(event_data.as_bytes());
+        let (variant, value) = result.iter().next().expect("one result variant");
+        let (projection, kind, terminal) = match variant.as_str() {
+            "task" if index == 0 => {
+                let (projection, task_id, context_id, state) =
+                    project_stream_task(value, &event_hash)?;
+                let terminal = is_terminal_task_state(state);
+                task_identity = Some((task_id, context_id));
+                (projection, "task", terminal.then_some(state.to_string()))
+            }
+            "message" if index == 0 && events.len() == 1 => {
+                (project_stream_message(value, &event_hash)?, "message", None)
+            }
+            "statusUpdate" if index > 0 && stream_kind_is_task(&projections) => {
+                let (projection, state, event_task_id, event_context_id) =
+                    project_stream_status_update(value, &event_hash)?;
+                ensure_stream_task_identity(
+                    task_identity.as_ref(),
+                    &event_task_id,
+                    event_context_id.as_deref(),
+                )?;
+                let terminal = is_terminal_task_state(&state).then_some(state);
+                (projection, "task", terminal)
+            }
+            "artifactUpdate" if index > 0 && stream_kind_is_task(&projections) => {
+                let (projection, event_task_id, event_context_id) =
+                    project_stream_artifact_update(value, &event_hash)?;
+                ensure_stream_task_identity(
+                    task_identity.as_ref(),
+                    &event_task_id,
+                    event_context_id.as_deref(),
+                )?;
+                (projection, "task", None)
+            }
+            _ => {
+                return Err(A2aError::new(
+                    "a2a_stream_response_invalid",
+                    "A2A StreamResponse variantが未対応",
+                ))
+            }
+        };
+        projections.push(projection);
+        stream_kind = Some(kind);
+        terminal_state = terminal;
+    }
+    let stream_kind = stream_kind
+        .ok_or_else(|| A2aError::new("a2a_stream_response_invalid", "A2A Streamにeventがない"))?;
+    if stream_kind == "task" && terminal_state.is_none() {
+        return Err(A2aError::new(
+            "a2a_stream_nonterminal",
+            "A2A StreamはTaskの終端状態を確認できないため結果不明",
+        ));
+    }
+    Ok(json!({
+        "stream_kind": stream_kind,
+        "state": terminal_state,
+        "event_count": projections.len(),
+        "events": projections,
+        "result_hash": sha256_tagged(raw),
+    }))
+}
+
+fn stream_kind_is_task(projections: &[Value]) -> bool {
+    projections
+        .first()
+        .and_then(|event| event.get("kind"))
+        .and_then(Value::as_str)
+        == Some("task")
+}
+
+fn is_terminal_task_state(state: &str) -> bool {
+    matches!(state, "completed" | "failed" | "canceled" | "rejected")
+}
+
+fn ensure_stream_task_identity(
+    task_identity: Option<&(String, Option<String>)>,
+    event_task_id: &str,
+    event_context_id: Option<&str>,
+) -> Result<(), A2aError> {
+    let Some((task_id, context_id)) = task_identity else {
+        return Err(A2aError::new(
+            "a2a_stream_response_invalid",
+            "A2A Stream eventに先行Taskがない",
+        ));
+    };
+    if task_id != event_task_id || context_id.as_deref() != event_context_id {
+        return Err(A2aError::new(
+            "a2a_stream_response_invalid",
+            "A2A Stream eventが先行Taskの識別子と一致しない",
+        ));
+    }
+    Ok(())
+}
+
+fn project_stream_task(
+    value: &Value,
+    event_hash: &str,
+) -> Result<(Value, String, Option<String>, &'static str), A2aError> {
+    let task = value.as_object().ok_or_else(|| {
+        A2aError::new(
+            "a2a_stream_response_invalid",
+            "A2A Stream Taskがobjectではない",
+        )
+    })?;
+    if task.keys().any(|key| {
+        ![
+            "id",
+            "contextId",
+            "status",
+            "artifacts",
+            "history",
+            "metadata",
+        ]
+        .contains(&key.as_str())
+    }) {
+        return Err(A2aError::new(
+            "a2a_stream_response_invalid",
+            "A2A Stream Taskに未知fieldがある",
+        ));
+    }
+    let task_id = bounded_external_id(task.get("id"), "Stream Task id")?;
+    let context_id = optional_external_id(task.get("contextId"), "Stream Task contextId")?;
+    let status = task
+        .get("status")
+        .and_then(Value::as_object)
+        .ok_or_else(|| {
+            A2aError::new(
+                "a2a_stream_response_invalid",
+                "A2A Stream Task statusが不正",
+            )
+        })?;
+    if status
+        .keys()
+        .any(|key| !["state", "message", "timestamp"].contains(&key.as_str()))
+        || status
+            .get("message")
+            .is_some_and(|message| !message.is_object())
+        || status
+            .get("timestamp")
+            .is_some_and(|timestamp| timestamp.as_str().is_none())
+        || task
+            .get("metadata")
+            .is_some_and(|metadata| !metadata.is_object())
+    {
+        return Err(A2aError::new(
+            "a2a_stream_response_invalid",
+            "A2A Stream Task statusまたはmetadataが不正",
+        ));
+    }
+    let state = project_task_state(status.get("state"))?;
+    let artifacts =
+        bounded_optional_array_len(task.get("artifacts"), "artifacts", MAX_TASK_ARTIFACTS)?;
+    if let Some(values) = task.get("artifacts").and_then(Value::as_array) {
+        for artifact in values {
+            validate_stream_artifact(artifact)?;
+        }
+    }
+    let history = bounded_optional_array_len(task.get("history"), "history", 64)?;
+    if let Some(values) = task.get("history").and_then(Value::as_array) {
+        for message in values {
+            project_stream_message(message, event_hash)?;
+        }
+    }
+    Ok((
+        json!({
+            "kind": "task",
+            "task_id_hash": sha256_tagged(task_id.as_bytes()),
+            "context_id_hash": context_id.as_deref().map(|id| sha256_tagged(id.as_bytes())),
+            "state": state,
+            "artifact_count": artifacts,
+            "history_count": history,
+            "event_hash": event_hash,
+        }),
+        task_id,
+        context_id,
+        state,
+    ))
+}
+
+fn project_stream_message(message: &Value, event_hash: &str) -> Result<Value, A2aError> {
+    let message = message.as_object().ok_or_else(|| {
+        A2aError::new(
+            "a2a_stream_response_invalid",
+            "A2A Stream Messageがobjectではない",
+        )
+    })?;
+    if message.keys().any(|key| {
+        ![
+            "messageId",
+            "contextId",
+            "taskId",
+            "role",
+            "parts",
+            "metadata",
+            "extensions",
+            "referenceTaskIds",
+        ]
+        .contains(&key.as_str())
+    }) {
+        return Err(A2aError::new(
+            "a2a_stream_response_invalid",
+            "A2A Stream Message fieldまたはkindが不正",
+        ));
+    }
+    let message_id = bounded_external_id(message.get("messageId"), "Message messageId")?;
+    let task_id = optional_external_id(message.get("taskId"), "Message taskId")?;
+    let context_id = optional_external_id(message.get("contextId"), "Message contextId")?;
+    let role = message
+        .get("role")
+        .and_then(Value::as_str)
+        .filter(|value| matches!(*value, "ROLE_AGENT" | "ROLE_USER"))
+        .ok_or_else(|| {
+            A2aError::new(
+                "a2a_stream_response_invalid",
+                "A2A Stream Message roleが不正",
+            )
+        })?;
+    let parts = message
+        .get("parts")
+        .and_then(Value::as_array)
+        .ok_or_else(|| A2aError::new("a2a_stream_response_invalid", "Message partsが不正"))?;
+    let part_count = validate_stream_parts(parts, 64)?.len();
+    if part_count == 0 {
+        return Err(A2aError::new(
+            "a2a_stream_response_invalid",
+            "A2A Stream Message partsが空",
+        ));
+    }
+    if message
+        .get("metadata")
+        .is_some_and(|metadata| !metadata.is_object())
+        || message.get("extensions").is_some_and(|extensions| {
+            extensions.as_array().is_none_or(|items| {
+                items.len() > 64
+                    || items
+                        .iter()
+                        .any(|item| item.as_str().is_none_or(|text| text.len() > 2048))
+            })
+        })
+        || message.get("referenceTaskIds").is_some_and(|ids| {
+            ids.as_array().is_none_or(|items| {
+                items.len() > 64
+                    || items
+                        .iter()
+                        .any(|id| id.as_str().is_none_or(|text| text.len() > 256))
+            })
+        })
+    {
+        return Err(A2aError::new(
+            "a2a_stream_response_invalid",
+            "A2A Stream Message metadataまたはreferenceTaskIdsが不正",
+        ));
+    }
+    Ok(json!({
+        "kind": "message",
+        "message_id_hash": sha256_tagged(message_id.as_bytes()),
+        "task_id_hash": task_id.map(|id| sha256_tagged(id.as_bytes())),
+        "context_id_hash": context_id.map(|id| sha256_tagged(id.as_bytes())),
+        "role": role,
+        "part_count": part_count,
+        "event_hash": event_hash,
+    }))
+}
+
+fn project_stream_status_update(
+    update: &Value,
+    event_hash: &str,
+) -> Result<(Value, String, String, Option<String>), A2aError> {
+    let update = update.as_object().ok_or_else(|| {
+        A2aError::new(
+            "a2a_stream_response_invalid",
+            "A2A statusUpdateがobjectではない",
+        )
+    })?;
+    if update
+        .keys()
+        .any(|key| !["taskId", "contextId", "status", "metadata"].contains(&key.as_str()))
+    {
+        return Err(A2aError::new(
+            "a2a_stream_response_invalid",
+            "A2A statusUpdateに未知fieldがある",
+        ));
+    }
+    let task_id = bounded_external_id(update.get("taskId"), "statusUpdate taskId")?;
+    let context_id = bounded_external_id(update.get("contextId"), "statusUpdate contextId")?;
+    let status = update
+        .get("status")
+        .and_then(Value::as_object)
+        .ok_or_else(|| {
+            A2aError::new(
+                "a2a_stream_response_invalid",
+                "A2A statusUpdate statusが不正",
+            )
+        })?;
+    if status
+        .keys()
+        .any(|key| !["state", "message", "timestamp"].contains(&key.as_str()))
+    {
+        return Err(A2aError::new(
+            "a2a_stream_response_invalid",
+            "A2A statusUpdate statusに未知fieldがある",
+        ));
+    }
+    let state = project_task_state(status.get("state"))?;
+    if status
+        .get("message")
+        .is_some_and(|message| !message.is_object())
+        || update
+            .get("metadata")
+            .is_some_and(|metadata| !metadata.is_object())
+    {
+        return Err(A2aError::new(
+            "a2a_stream_response_invalid",
+            "A2A statusUpdateのMessageまたはmetadataが不正",
+        ));
+    }
+    Ok((
+        json!({
+            "kind": "statusUpdate",
+            "task_id_hash": sha256_tagged(task_id.as_bytes()),
+            "context_id_hash": sha256_tagged(context_id.as_bytes()),
+            "state": state,
+            "event_hash": event_hash,
+        }),
+        state.to_string(),
+        task_id,
+        Some(context_id),
+    ))
+}
+
+fn project_stream_artifact_update(
+    update: &Value,
+    event_hash: &str,
+) -> Result<(Value, String, Option<String>), A2aError> {
+    let update = update.as_object().ok_or_else(|| {
+        A2aError::new(
+            "a2a_stream_response_invalid",
+            "A2A artifactUpdateがobjectではない",
+        )
+    })?;
+    if update.keys().any(|key| {
+        ![
+            "taskId",
+            "contextId",
+            "artifact",
+            "append",
+            "lastChunk",
+            "metadata",
+        ]
+        .contains(&key.as_str())
+    }) {
+        return Err(A2aError::new(
+            "a2a_stream_response_invalid",
+            "A2A artifactUpdateに未知fieldがある",
+        ));
+    }
+    let task_id = bounded_external_id(update.get("taskId"), "artifactUpdate taskId")?;
+    let context_id = bounded_external_id(update.get("contextId"), "artifactUpdate contextId")?;
+    let artifact = update
+        .get("artifact")
+        .and_then(Value::as_object)
+        .ok_or_else(|| {
+            A2aError::new(
+                "a2a_stream_response_invalid",
+                "A2A artifactUpdate artifactが不正",
+            )
+        })?;
+    validate_stream_artifact(&Value::Object(artifact.clone()))?;
+    if artifact.keys().any(|key| {
+        ![
+            "artifactId",
+            "name",
+            "description",
+            "parts",
+            "metadata",
+            "extensions",
+        ]
+        .contains(&key.as_str())
+    }) {
+        return Err(A2aError::new(
+            "a2a_stream_response_invalid",
+            "A2A stream Artifactに未知fieldがある",
+        ));
+    }
+    let artifact_id =
+        bounded_external_id(artifact.get("artifactId"), "stream Artifact artifactId")?;
+    let parts = artifact
+        .get("parts")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            A2aError::new(
+                "a2a_stream_response_invalid",
+                "A2A stream Artifact partsが不正",
+            )
+        })?;
+    if parts.is_empty() || parts.len() > MAX_ARTIFACT_PARTS {
+        return Err(A2aError::new(
+            "a2a_stream_response_invalid",
+            "A2A stream Artifact part件数が上限外",
+        ));
+    }
+    let part_kinds = validate_stream_parts(parts, MAX_ARTIFACT_PARTS)?;
+    let append = optional_bool_field(update, "append", false)?;
+    let last_chunk = optional_bool_field(update, "lastChunk", false)?;
+    if artifact
+        .get("metadata")
+        .is_some_and(|metadata| !metadata.is_object())
+        || artifact
+            .get("extensions")
+            .is_some_and(|extensions| !extensions.is_array())
+        || update
+            .get("metadata")
+            .is_some_and(|metadata| !metadata.is_object())
+    {
+        return Err(A2aError::new(
+            "a2a_stream_response_invalid",
+            "A2A Artifact metadataまたはextensionsが不正",
+        ));
+    }
+    Ok((
+        json!({
+            "kind": "artifactUpdate",
+            "task_id_hash": sha256_tagged(task_id.as_bytes()),
+            "context_id_hash": sha256_tagged(context_id.as_bytes()),
+            "artifact_id_hash": sha256_tagged(artifact_id.as_bytes()),
+            "part_count": parts.len(),
+            "part_kinds": part_kinds,
+            "append": append,
+            "last_chunk": last_chunk,
+            "event_hash": event_hash,
+        }),
+        task_id,
+        Some(context_id),
+    ))
+}
+
+fn validate_stream_artifact(value: &Value) -> Result<(), A2aError> {
+    let artifact = value.as_object().ok_or_else(|| {
+        A2aError::new(
+            "a2a_stream_response_invalid",
+            "A2A Stream Artifactがobjectではない",
+        )
+    })?;
+    if artifact.keys().any(|key| {
+        ![
+            "artifactId",
+            "name",
+            "description",
+            "parts",
+            "metadata",
+            "extensions",
+        ]
+        .contains(&key.as_str())
+    }) {
+        return Err(A2aError::new(
+            "a2a_stream_response_invalid",
+            "A2A Stream Artifactに未知fieldがある",
+        ));
+    }
+    bounded_external_id(artifact.get("artifactId"), "Stream Artifact artifactId")?;
+    let parts = artifact
+        .get("parts")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            A2aError::new(
+                "a2a_stream_response_invalid",
+                "A2A Stream Artifact partsが不正",
+            )
+        })?;
+    validate_stream_parts(parts, MAX_ARTIFACT_PARTS)?;
+    let valid_string = |field: &str, max: usize| {
+        artifact
+            .get(field)
+            .is_none_or(|value| value.as_str().is_some_and(|text| text.len() <= max))
+    };
+    if !valid_string("name", 1024)
+        || !valid_string("description", 2048)
+        || artifact
+            .get("metadata")
+            .is_some_and(|metadata| !metadata.is_object())
+        || artifact.get("extensions").is_some_and(|extensions| {
+            extensions.as_array().is_none_or(|items| {
+                items.len() > 64
+                    || items
+                        .iter()
+                        .any(|item| item.as_str().is_none_or(|text| text.len() > 2048))
+            })
+        })
+    {
+        return Err(A2aError::new(
+            "a2a_stream_response_invalid",
+            "A2A Stream Artifact metadataが不正",
+        ));
+    }
+    Ok(())
+}
+
+fn optional_bool_field(
+    object: &Map<String, Value>,
+    field: &str,
+    default: bool,
+) -> Result<bool, A2aError> {
+    match object.get(field) {
+        None => Ok(default),
+        Some(value) => value.as_bool().ok_or_else(|| {
+            A2aError::new(
+                "a2a_stream_response_invalid",
+                format!("A2A {field}がboolではない"),
+            )
+        }),
+    }
+}
+
+fn validate_stream_parts(parts: &[Value], maximum: usize) -> Result<Vec<&'static str>, A2aError> {
+    if parts.is_empty() || parts.len() > maximum {
+        return Err(A2aError::new(
+            "a2a_stream_response_invalid",
+            "A2A Stream partsの件数が上限外",
+        ));
+    }
+    let mut kinds = Vec::with_capacity(parts.len());
+    for part in parts {
+        let part = part.as_object().ok_or_else(|| {
+            A2aError::new(
+                "a2a_stream_response_invalid",
+                "A2A Stream Partがobjectではない",
+            )
+        })?;
+        if part.keys().any(|key| {
+            ![
+                "text",
+                "raw",
+                "url",
+                "data",
+                "metadata",
+                "filename",
+                "mediaType",
+            ]
+            .contains(&key.as_str())
+        }) {
+            return Err(A2aError::new(
+                "a2a_stream_response_invalid",
+                "A2A Stream Partに未知fieldがある",
+            ));
+        }
+        let variants = ["text", "raw", "url", "data"]
+            .into_iter()
+            .filter(|key| part.contains_key(*key))
+            .collect::<Vec<_>>();
+        if variants.len() != 1
+            || part
+                .get("metadata")
+                .is_some_and(|metadata| !metadata.is_object())
+            || part
+                .get("filename")
+                .is_some_and(|value| value.as_str().is_none_or(|text| text.len() > 512))
+            || part
+                .get("mediaType")
+                .is_some_and(|value| value.as_str().is_none_or(|text| text.len() > 256))
+        {
+            return Err(A2aError::new(
+                "a2a_stream_response_invalid",
+                "A2A Stream Partのvariantまたはmetadataが不正",
+            ));
+        }
+        let kind = match variants[0] {
+            "text" if part["text"].is_string() => "text",
+            "raw" if part["raw"].is_string() => "raw",
+            "url" if part["url"].is_string() => "url",
+            "data" => "data",
+            _ => {
+                return Err(A2aError::new(
+                    "a2a_stream_response_invalid",
+                    "A2A Stream Partの型が不正",
+                ))
+            }
+        };
+        kinds.push(kind);
+    }
+    Ok(kinds)
 }
 
 fn project_task_metadata(
@@ -2199,5 +2969,261 @@ mod tests {
                 .code,
             "a2a_credential_ref_invalid"
         );
+    }
+
+    #[test]
+    fn A2A_Streamは終端状態までmetadataだけをbounded投影する() {
+        let events = [
+            json!({
+                "jsonrpc":"2.0", "id":"stream-fixture",
+                "result":{"task":{
+                    "id":"task-private-id", "contextId":"context-private-id",
+                    "status":{"state":"TASK_STATE_WORKING"}, "artifacts":[], "history":[]
+                }}
+            }),
+            json!({
+                "jsonrpc":"2.0", "id":"stream-fixture",
+                "result":{"artifactUpdate":{
+                    "taskId":"task-private-id", "contextId":"context-private-id",
+                    "artifact":{"artifactId":"artifact-private-id","parts":[{"text":"private-stream-body"}]},
+                    "append":false, "lastChunk":true
+                }}
+            }),
+            json!({
+                "jsonrpc":"2.0", "id":"stream-fixture",
+                "result":{"statusUpdate":{
+                    "taskId":"task-private-id", "contextId":"context-private-id",
+                    "status":{"state":"TASK_STATE_COMPLETED"}
+                }}
+            }),
+        ];
+        let raw = events
+            .iter()
+            .map(|event| format!("data: {}\n\n", event))
+            .collect::<String>();
+        let projected = project_stream_response(raw.as_bytes(), "stream-fixture")
+            .expect("bounded terminal stream projection");
+        assert_eq!(projected["stream_kind"], "task");
+        assert_eq!(projected["state"], "completed");
+        assert_eq!(projected["event_count"], 3);
+        assert_eq!(projected["events"][1]["kind"], "artifactUpdate");
+        assert_eq!(projected["events"][1]["part_kinds"][0], "text");
+        assert_eq!(projected["events"][2]["kind"], "statusUpdate");
+        for private_value in [
+            "private-stream-body",
+            "artifact-private-id",
+            "task-private-id",
+            "context-private-id",
+        ] {
+            assert!(!projected.to_string().contains(private_value));
+        }
+    }
+
+    #[test]
+    fn A2A_Streamは非終端_request不一致variant超過をunknownに閉じる() {
+        let task = json!({
+            "jsonrpc":"2.0", "id":"stream-fixture",
+            "result":{"task":{"id":"task", "contextId":"context", "status":{"state":"working"}, "artifacts":[], "history":[]}}
+        });
+        let nonterminal = json!({
+            "jsonrpc":"2.0", "id":"stream-fixture",
+            "result":{"statusUpdate":{
+                "taskId":"task", "contextId":"context", "status":{"state":"working"}
+            }}
+        });
+        let raw = format!("data: {task}\n\ndata: {nonterminal}\n\n");
+        assert_eq!(
+            project_stream_response(raw.as_bytes(), "stream-fixture")
+                .expect_err("nonterminal stream must not become accepted")
+                .code,
+            "a2a_stream_nonterminal"
+        );
+
+        let mismatch = format!(
+            "data: {}\n\n",
+            json!({
+                "jsonrpc":"2.0", "id":"different-request",
+                "result":{"statusUpdate":{
+                    "taskId":"task", "contextId":"context", "status":{"state":"completed"}
+                }}
+            })
+        );
+        assert_eq!(
+            project_stream_response(mismatch.as_bytes(), "stream-fixture")
+                .expect_err("stale request ID")
+                .code,
+            "a2a_stream_response_invalid"
+        );
+
+        let duplicate_variant = format!(
+            "data: {}\n\n",
+            json!({
+                "jsonrpc":"2.0", "id":"stream-fixture",
+                "result":{
+                    "message":{"messageId":"m","role":"ROLE_AGENT","parts":[{"text":"private"}]},
+                    "task":{"kind":"task","id":"t","status":{"state":"completed"}}
+                }
+            })
+        );
+        assert_eq!(
+            project_stream_response(duplicate_variant.as_bytes(), "stream-fixture")
+                .expect_err("oneof duplicate")
+                .code,
+            "a2a_stream_response_invalid"
+        );
+
+        let too_many = (0..=MAX_A2A_STREAM_EVENTS)
+            .map(|_| format!("data: {nonterminal}\n\n"))
+            .collect::<String>();
+        assert_eq!(
+            project_stream_response(too_many.as_bytes(), "stream-fixture")
+                .expect_err("event count bound")
+                .code,
+            "a2a_stream_event_limit"
+        );
+    }
+
+    #[test]
+    fn A2A_Stream_message_onlyは本文を除外して一eventで閉じる() {
+        let response = json!({
+            "jsonrpc":"2.0", "id":"stream-fixture",
+            "result":{"message":{
+                "messageId":"private-message-id", "role":"ROLE_AGENT",
+                "parts":[{"text":"private-message-body"}]
+            }}
+        });
+        let raw = format!("data: {response}\n\n");
+        let projected = project_stream_response(raw.as_bytes(), "stream-fixture")
+            .expect("message-only streaming response");
+        assert_eq!(projected["stream_kind"], "message");
+        assert!(projected["state"].is_null());
+        assert_eq!(projected["event_count"], 1);
+        for secret in ["private-message-id", "private-message-body"] {
+            assert!(!projected.to_string().contains(secret));
+        }
+        let extra = format!("{raw}data: {response}\n\n");
+        assert_eq!(
+            project_stream_response(extra.as_bytes(), "stream-fixture")
+                .expect_err("message-only stream must contain one event")
+                .code,
+            "a2a_stream_response_invalid"
+        );
+    }
+
+    #[test]
+    fn loopback_A2A_Streamは一回SendStreamingMessageを実行しmetadataだけを返す() {
+        use std::net::TcpListener;
+        use std::thread;
+
+        let listener = TcpListener::bind("127.0.0.1:0").expect("stream loopback listener");
+        let address = listener.local_addr().expect("stream listener address");
+        let server = thread::spawn(move || -> Result<Value, String> {
+            let (mut stream, _) = listener.accept().map_err(|error| error.to_string())?;
+            stream
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .map_err(|error| error.to_string())?;
+            let mut request = Vec::new();
+            let mut chunk = [0u8; 2048];
+            let header_end = loop {
+                let size = stream.read(&mut chunk).map_err(|error| error.to_string())?;
+                if size == 0
+                    || request.len().saturating_add(size) > MAX_JSON_RPC_BYTES + MAX_HEADER_BYTES
+                {
+                    return Err("A2A Stream request header/body truncated or oversized".into());
+                }
+                request.extend_from_slice(&chunk[..size]);
+                if let Some(position) = request.windows(4).position(|window| window == b"\r\n\r\n")
+                {
+                    break position + 4;
+                }
+            };
+            let header =
+                std::str::from_utf8(&request[..header_end]).map_err(|error| error.to_string())?;
+            if !header.starts_with("POST /rpc HTTP/1.1\r\n")
+                || !header
+                    .lines()
+                    .any(|line| line.eq_ignore_ascii_case("accept: text/event-stream"))
+                || !header
+                    .lines()
+                    .any(|line| line.eq_ignore_ascii_case("A2A-Version: 1.0"))
+                || !header
+                    .lines()
+                    .any(|line| line.eq_ignore_ascii_case("Content-Type: application/json"))
+            {
+                return Err("A2A Stream request method or protocol headers mismatch".into());
+            }
+            let content_length = header
+                .lines()
+                .find_map(|line| {
+                    line.split_once(':').and_then(|(name, value)| {
+                        name.eq_ignore_ascii_case("content-length")
+                            .then(|| value.trim().parse::<usize>().ok())
+                            .flatten()
+                    })
+                })
+                .ok_or_else(|| "A2A Stream Content-Length missing".to_string())?;
+            while request.len() < header_end + content_length {
+                let size = stream.read(&mut chunk).map_err(|error| error.to_string())?;
+                if size == 0 {
+                    return Err("A2A Stream request body truncated".into());
+                }
+                request.extend_from_slice(&chunk[..size]);
+            }
+            let body: Value =
+                serde_json::from_slice(&request[header_end..header_end + content_length])
+                    .map_err(|error| error.to_string())?;
+            let message = &body["params"]["message"];
+            let part = &message["parts"][0];
+            if body["method"] != "SendStreamingMessage"
+                || body["jsonrpc"] != "2.0"
+                || message.get("kind").is_some()
+                || part.get("kind").is_some()
+                || body["params"]["message"]["parts"][0]["text"] != "stream-fixture-message"
+            {
+                return Err("A2A SendStreamingMessage request mismatch".into());
+            }
+            let initial_data = json!({
+                "jsonrpc":"2.0", "id":body["id"],
+                "result":{"task":{"id":"fixture-private-task", "contextId":"fixture-private-context",
+                    "status":{"state":"TASK_STATE_WORKING"}, "artifacts":[], "history":[]}}
+            })
+            .to_string();
+            let terminal_data = json!({
+                "jsonrpc":"2.0", "id":body["id"],
+                "result":{"statusUpdate":{
+                    "taskId":"fixture-private-task", "contextId":"fixture-private-context",
+                    "status":{"state":"TASK_STATE_COMPLETED"}
+                }}
+            })
+            .to_string();
+            let response_body = format!("data: {initial_data}\n\ndata: {terminal_data}\n\n");
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                response_body.len()
+            );
+            stream
+                .write_all(response.as_bytes())
+                .map_err(|error| error.to_string())?;
+            stream
+                .write_all(response_body.as_bytes())
+                .map_err(|error| error.to_string())?;
+            stream.flush().map_err(|error| error.to_string())?;
+            Ok(body)
+        });
+        let projected = send_stream(
+            &format!("http://{address}/rpc"),
+            "stream-fixture-message",
+            Instant::now() + Duration::from_secs(15),
+        )
+        .expect("loopback A2A Stream response");
+        let request = server
+            .join()
+            .expect("A2A Stream server thread")
+            .expect("valid A2A Stream request");
+        assert_eq!(request["params"]["message"]["role"], "ROLE_USER");
+        assert_eq!(projected["stream_kind"], "task");
+        assert_eq!(projected["state"], "completed");
+        assert_eq!(projected["event_count"], 2);
+        assert!(!projected.to_string().contains("fixture-private-task"));
     }
 }

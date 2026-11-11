@@ -577,6 +577,8 @@ pub enum BrokerOperation {
     A2Aメッセージ送信,
     #[serde(rename = "A2Aタスク状態取得")]
     A2Aタスク状態取得,
+    #[serde(rename = "A2Aストリーム送信")]
+    A2Aストリーム送信,
     #[serde(rename = "Host登録")]
     Host登録,
     #[serde(rename = "Host一覧")]
@@ -783,6 +785,7 @@ impl BrokerOperation {
             BrokerOperation::A2A接続一覧 => "A2A接続一覧",
             BrokerOperation::A2Aメッセージ送信 => "A2Aメッセージ送信",
             BrokerOperation::A2Aタスク状態取得 => "A2Aタスク状態取得",
+            BrokerOperation::A2Aストリーム送信 => "A2Aストリーム送信",
             BrokerOperation::Host登録 => "Host登録",
             BrokerOperation::Host一覧 => "Host一覧",
             BrokerOperation::Host切替 => "Host切替",
@@ -1274,6 +1277,7 @@ impl Broker {
         broker.recover_interrupted_agent_tasks()?;
         super::a2a_center::recover_interrupted_sends(&mut broker)?;
         super::a2a_center::recover_interrupted_get_tasks(&mut broker)?;
+        super::a2a_center::recover_interrupted_stream_sends(&mut broker)?;
         Ok(broker)
     }
 
@@ -2007,6 +2011,7 @@ impl Broker {
                     | BrokerOperation::A2A接続
                     | BrokerOperation::A2Aメッセージ送信
                     | BrokerOperation::A2Aタスク状態取得
+                    | BrokerOperation::A2Aストリーム送信
                     | BrokerOperation::アダプター導入
                     | BrokerOperation::アダプター検証
                     | BrokerOperation::アダプター有効化
@@ -2209,6 +2214,7 @@ impl Broker {
             || envelope.operation == Some(BrokerOperation::A2A接続)
             || envelope.operation == Some(BrokerOperation::A2Aメッセージ送信)
             || envelope.operation == Some(BrokerOperation::A2Aタスク状態取得)
+            || envelope.operation == Some(BrokerOperation::A2Aストリーム送信)
         {
             if !export_confirmation.permits_agent_task_owner_operation(envelope.operation.as_ref())
             {
@@ -2216,7 +2222,7 @@ impl Broker {
                     &request_id,
                     &operation,
                     "desktop_native_owner_confirmation_required",
-                    "Agent Task権限・Approval・結果表示、Workspace読取・比較制御、MCP Tool実行、A2A接続・Message送信・Task状態取得はRust Desktopのnative Owner確認経路だけで許可します",
+                    "Agent Task権限・Approval・結果表示、Workspace読取・比較制御、MCP Tool実行、A2A接続・Message送信・Task状態取得・Stream送信はRust Desktopのnative Owner確認経路だけで許可します",
                     true,
                     envelope.payload_hash.as_deref().unwrap_or("unknown"),
                 );
@@ -2701,6 +2707,13 @@ impl Broker {
                 &payload_hash,
             ),
             BrokerOperation::A2Aタスク状態取得 => super::a2a_center::get_task(
+                self,
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
+            BrokerOperation::A2Aストリーム送信 => super::a2a_center::send_stream(
                 self,
                 &request_id,
                 envelope.payload.as_ref().unwrap_or(&Value::Null),
@@ -9500,6 +9513,51 @@ mod tests {
             .any(|event| event.reason.contains("task-fixture-1")));
         drop(desktop_broker);
         std::fs::remove_dir_all(store_root).expect("A2A GetTask test store cleanup");
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn A2A_StreamはOwnerCredentialからNativeConfirmationを迂回できない() {
+        let payload = json!({
+            "版": 1,
+            "操作": "stream_send",
+            "AgentID": "native-confirmation-fixture",
+            "Interface URI": "http://127.0.0.1:9080/rpc",
+            "Message": "fixture stream"
+        });
+        let mut normal_request =
+            BrokerRequestEnvelope::health("a2a-stream-normal", "a2a-stream-normal-nonce");
+        normal_request.session_id = Some("session-1".to_string());
+        normal_request.operation = Some(BrokerOperation::A2Aストリーム送信);
+        normal_request.payload = Some(payload.clone());
+        normal_request.issued_at = Some("2026-06-01T00:00:30Z".to_string());
+        normal_request.refresh_payload_hash();
+
+        let mut normal_broker = test_broker();
+        let normal = normal_broker.handle(normal_request.clone());
+        assert_eq!(normal.status, BrokerStatus::Rejected);
+        assert_eq!(
+            normal.error.as_ref().map(|error| error.code.as_str()),
+            Some("desktop_native_owner_confirmation_required")
+        );
+
+        let owner_envelope = json!({
+            "request_id": "a2a-stream-owner-credential",
+            "session_id": "session-1",
+            "operation": "A2Aストリーム送信",
+            "payload": payload,
+            "payload_hash": normal_request.payload_hash,
+            "nonce": "a2a-stream-owner-credential-nonce",
+            "issued_at": "2026-06-01T00:00:30Z",
+            "metadata": {}
+        });
+        let mut owner_broker = test_broker();
+        let owner = owner_broker.owner要求処理(&owner_envelope.to_string());
+        assert_eq!(owner.status, BrokerStatus::Rejected);
+        assert_eq!(
+            owner.error.as_ref().map(|error| error.code.as_str()),
+            Some("desktop_native_owner_confirmation_required")
+        );
     }
 
     #[test]

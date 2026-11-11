@@ -1,0 +1,30 @@
+{
+  "版": 1,
+  "AgentID": "remote-agent-example",
+  "interface_hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+  "message_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+  "status": "accepted",
+  "result": {
+    "stream_kind": "message",
+    "state": null,
+    "event_count": 1,
+    "events": [
+      {
+        "kind": "message",
+        "message_id_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "task_id_hash": null,
+        "context_id_hash": null,
+        "role": "ROLE_AGENT",
+        "part_count": 1,
+        "event_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "raw_text": "must-not-be-projected"
+      }
+    ],
+    "result_hash": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+  },
+  "Trust": "pending_review",
+  "権限生成": "なし",
+  "authority_strip": true,
+  "公開範囲": "metadata_only",
+  "再送可能": false
+}

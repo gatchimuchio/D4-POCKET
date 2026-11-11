@@ -40,9 +40,13 @@ Taskの状態、Messageのrole、Artifactのstatus、Streamのevent typeは外�
 
 各collectionは件数をboundedにし、unknown／unsupportedを0や成功へ置換しない。Streamは接続済みを意味せず、C16で実物interface、認証、timeout、取消、再接続、失敗隔離を確認する。
 
+## v1.0 Stream送信の追加契約
+
+C16のSendMessage／手動GetTask契約を変更せず、A2A v1.0 `SendStreamingMessage`の限定consumerを別契約に定める。要求の一回作用、SSE oneof順序、Message-only終端、Task終端、unknown・再送禁止、metadata-only結果、権限境界は[`a2a-streaming.md`](a2a-streaming.md)を意味正本とする。旧版`kind` discriminatorや`final` booleanを要求せず、`SubscribeToTask`、Credential、再接続、pollingは追加しない。
+
 ## 未接続範囲
 
-OAuth／API key等のCredentialを要する送信、送信後のTask lifecycle追跡・follow-up、未選択／file／data Artifact本文、Stream購読、再接続、quarantine、複数Agent比較、Handoffは現行の後続gateに残す。C15のSchema／fixture／Conformance、またはC16の一回loopback `SendMessage`だけで実外部Agent運用やD4 Pocketの製品完成を主張しない。
+OAuth／API key等のCredentialを要する送信、送信後のTask lifecycle follow-up、未選択／file／data Artifact本文、`SubscribeToTask`、再接続、quarantine、複数Agent比較、Handoffは現行の後続gateに残す。C15のSchema／fixture／Conformance、C16の一回loopback `SendMessage`、限定Stream送信だけで実外部Agent運用やD4 Pocketの製品完成を主張しない。
 
 C15で未成立の機能範囲は`release_blocker`として追跡する。限定されたC16送信経路のProduct Build evidenceを外部Agent運用・製品受入へ昇格させない。
 

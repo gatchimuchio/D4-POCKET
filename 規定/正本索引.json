@@ -421,7 +421,11 @@
     },
     {
       "path": "docs/specs/a2a-connection-center.md",
-      "責任": "C16 A2A Agent Card接続・metadata-only receipt・復元再確認、JSON-RPC v1.0 SendMessage一回送信、Windows／Linux Desktop限定の手動GetTask一回状態照会。native Owner・一回Permission・Audit・unknown・本文非露出境界。Task lifecycle、Artifact、Stream、Credential実行は後続"
+      "責任": "C16 A2A Agent Card接続・metadata-only receipt・復元再確認、JSON-RPC v1.0 SendMessage一回送信、Windows／Linux Desktop限定の手動GetTask一回状態照会と限定Stream consumerのUI接続。native Owner・一回Permission・Audit・unknown・本文非露出境界"
+    },
+    {
+      "path": "docs/specs/a2a-streaming.md",
+      "責任": "A2A v1.0 SendStreamingMessageのWindows／Linux Desktop限定consumer、SSE event順序とterminal判定、native Owner・一回Permission・Audit・unknown・本文非露出・Authority境界"
     },
     {
       "path": "specs/a2a_message_send_request.schema.json",
@@ -438,6 +442,14 @@
     {
       "path": "specs/a2a_task_get_response.schema.json",
       "責任": "C16補完の手動一回GetTask bounded状態結果またはunknown。空履歴、本文非露出、Trust非昇格、権限非生成"
+    },
+    {
+      "path": "specs/a2a_stream_send_request.schema.json",
+      "責任": "A2A v1.0一回Stream送信要求の固定field、本文上限とAuthority field拒否契約"
+    },
+    {
+      "path": "specs/a2a_stream_send_response.schema.json",
+      "責任": "A2A v1.0 SSEのaccepted terminal／Message-onlyまたはunknown bounded projection。event本文と外部ID実値の非露出、Trust非昇格、再送禁止"
     },
     {
       "path": "docs/specs/host-registry.md",

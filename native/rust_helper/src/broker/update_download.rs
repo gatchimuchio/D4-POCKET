@@ -28,6 +28,7 @@ const MAX_CATALOG_BYTES: usize = 64 * 1024;
 const MAX_A2A_CARD_BYTES: usize = 1024 * 1024;
 const MAX_A2A_HEADER_BYTES: usize = 16 * 1024;
 const MAX_A2A_HEADER_COUNT: usize = 64;
+const MAX_A2A_STREAM_BYTES: usize = 64 * 1024;
 const MAX_DOWNLOAD_TIME: Duration = Duration::from_secs(24 * 60 * 60);
 pub(crate) const CATALOG_TIMEOUT: Duration = Duration::from_secs(30);
 const READ_TIMEOUT: Duration = Duration::from_secs(60);
@@ -428,6 +429,173 @@ pub(crate) fn send_a2a_json_rpc_document(
         .ok_or(DownloadError::InvalidRequest)?;
     let addresses = resolve_public_addresses(&host, port, &AtomicBool::new(false), deadline)?;
     send_a2a_json_rpc_document_with_addresses(url, &host, &addresses, request_body, deadline)
+}
+
+pub(crate) fn send_a2a_json_rpc_stream_document(
+    url_text: &str,
+    request_body: &[u8],
+    deadline: std::time::Instant,
+) -> Result<Vec<u8>, DownloadError> {
+    if url_text.len() > 2048
+        || request_body.is_empty()
+        || request_body.len() > 64 * 1024
+        || std::time::Instant::now() >= deadline
+    {
+        return Err(if std::time::Instant::now() >= deadline {
+            DownloadError::TimedOut
+        } else {
+            DownloadError::InvalidRequest
+        });
+    }
+    let url = Url::parse(url_text).map_err(|_| DownloadError::InvalidRequest)?;
+    let raw_authority = url_text
+        .split_once("://")
+        .map(|(_, remainder)| remainder.split('/').next().unwrap_or_default())
+        .ok_or(DownloadError::InvalidRequest)?;
+    if !matches!(url.scheme(), "http" | "https")
+        || url.host_str().is_none()
+        || url.username() != ""
+        || url.password().is_some()
+        || raw_authority.contains('@')
+        || raw_authority.contains('%')
+        || !raw_authority.is_ascii()
+        || url.query().is_some()
+        || url.fragment().is_some()
+    {
+        return Err(DownloadError::InvalidRequest);
+    }
+    let host = url
+        .host_str()
+        .ok_or(DownloadError::InvalidRequest)?
+        .to_owned();
+    let port = url
+        .port_or_known_default()
+        .ok_or(DownloadError::InvalidRequest)?;
+    let addresses = if url.scheme() == "https" {
+        resolve_public_addresses(&host, port, &AtomicBool::new(false), deadline)?
+    } else {
+        match host.parse::<IpAddr>() {
+            Ok(IpAddr::V4(address)) if address.is_loopback() => {
+                vec![SocketAddr::new(IpAddr::V4(address), port)]
+            }
+            _ => return Err(DownloadError::InvalidRequest),
+        }
+    };
+    send_a2a_json_rpc_stream_document_with_addresses(url, &host, &addresses, request_body, deadline)
+}
+
+fn send_a2a_json_rpc_stream_document_with_addresses(
+    url: Url,
+    host: &str,
+    addresses: &[SocketAddr],
+    request_body: &[u8],
+    deadline: std::time::Instant,
+) -> Result<Vec<u8>, DownloadError> {
+    if request_body.is_empty() || request_body.len() > 64 * 1024 || addresses.is_empty() {
+        return Err(DownloadError::InvalidRequest);
+    }
+    let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+    if remaining.is_zero() {
+        return Err(DownloadError::TimedOut);
+    }
+    let client = build_a2a_stream_client(host, addresses, remaining)?;
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|_| DownloadError::Network)?;
+    runtime.block_on(async {
+        let mut response = client
+            .post(url)
+            .header(ACCEPT, "text/event-stream")
+            .header(ACCEPT_ENCODING, "identity")
+            .header(CONTENT_TYPE, "application/json")
+            .header("A2A-Version", "1.0")
+            .body(request_body.to_vec())
+            .send()
+            .await
+            .map_err(map_reqwest_error)?;
+        if response.status() != StatusCode::OK
+            || !a2a_response_headers_within_bound(response.headers())
+        {
+            return Err(DownloadError::RedirectOrUnexpectedStatus);
+        }
+        let content_types = response.headers().get_all(CONTENT_TYPE);
+        if content_types.iter().count() != 1
+            || !content_types
+                .iter()
+                .next()
+                .and_then(|value| value.to_str().ok())
+                .is_some_and(|value| {
+                    value.split(';').next().is_some_and(|media_type| {
+                        media_type.trim().eq_ignore_ascii_case("text/event-stream")
+                    })
+                })
+            || response.headers().get(CONTENT_ENCODING).is_some()
+            || (response.headers().get(CONTENT_LENGTH).is_some()
+                && response.headers().get(TRANSFER_ENCODING).is_some())
+            || response
+                .headers()
+                .get(CONTENT_LENGTH)
+                .and_then(|value| value.to_str().ok())
+                .and_then(|value| value.parse::<usize>().ok())
+                .is_some_and(|length| length > MAX_A2A_STREAM_BYTES)
+        {
+            return Err(DownloadError::InvalidHeaders);
+        }
+        let mut bytes = Vec::new();
+        loop {
+            if std::time::Instant::now() >= deadline {
+                return Err(DownloadError::TimedOut);
+            }
+            let Some(chunk) = response.chunk().await.map_err(map_reqwest_error)? else {
+                break;
+            };
+            if bytes
+                .len()
+                .checked_add(chunk.len())
+                .is_none_or(|total| total > MAX_A2A_STREAM_BYTES)
+            {
+                return Err(DownloadError::DocumentTooLarge);
+            }
+            bytes.extend_from_slice(&chunk);
+        }
+        if bytes.is_empty() {
+            return Err(DownloadError::InvalidHeaders);
+        }
+        if std::time::Instant::now() >= deadline {
+            return Err(DownloadError::TimedOut);
+        }
+        Ok(bytes)
+    })
+}
+
+fn build_a2a_stream_client(
+    host: &str,
+    addresses: &[SocketAddr],
+    timeout: Duration,
+) -> Result<Client, DownloadError> {
+    if addresses.is_empty() {
+        return Err(DownloadError::InvalidRequest);
+    }
+    if rustls::crypto::CryptoProvider::get_default().is_none() {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+    }
+    if rustls::crypto::CryptoProvider::get_default().is_none() {
+        return Err(DownloadError::Network);
+    }
+    Client::builder()
+        .https_only(false)
+        .no_proxy()
+        .redirect(redirect::Policy::none())
+        .retry(retry::never())
+        .connect_timeout(CONNECT_TIMEOUT.min(timeout))
+        .timeout(timeout)
+        .read_timeout(READ_TIMEOUT.min(timeout))
+        .resolve_to_addrs(host, addresses)
+        .http1_only()
+        .http1_max_headers(MAX_A2A_HEADER_COUNT)
+        .build()
+        .map_err(|_| DownloadError::Network)
 }
 
 fn send_a2a_json_rpc_document_with_addresses(

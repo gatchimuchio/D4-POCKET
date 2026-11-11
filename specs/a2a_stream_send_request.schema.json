@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/a2a_stream_send_request.schema.json",
+  "title": "A2A SendStreamingMessage要求（A2aStreamSendRequest）",
+  "description": "接続済み・streaming宣言済みの無認証JSON-RPC v1.0 interfaceへ一回送信する。各要求にnative Owner確認と一回Permissionを必要とし、再送しない。",
+  "type": "object",
+  "required": ["版", "操作", "AgentID", "Interface URI", "Message"],
+  "additionalProperties": false,
+  "properties": {
+    "版": { "const": 1 },
+    "操作": { "const": "stream_send" },
+    "AgentID": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$(?![\\s\\S])" },
+    "Interface URI": { "type": "string", "minLength": 1, "maxLength": 2048, "pattern": "^https?://" },
+    "Message": { "type": "string", "minLength": 1, "maxLength": 1024, "description": "Broker/native Ownerで最大4 KiB UTF-8、空白だけ、禁止制御文字、方向制御文字を拒否する。" }
+  }
+}

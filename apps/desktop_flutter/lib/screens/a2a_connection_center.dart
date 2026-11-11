@@ -38,6 +38,7 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
   String? _pendingTaskInterfaceHash;
   String? _pendingTaskId;
   A2aTaskQueryResult? _taskQueryResult;
+  A2aStreamSendResult? _streamResult;
 
   @override
   void initState() {
@@ -76,6 +77,14 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
     )
         ? _selectedAgentId
         : null;
+    final selectedConnection = selectedAgentId == null
+        ? null
+        : sendableConnections.firstWhere(
+            (connection) => connection.agentId == selectedAgentId,
+          );
+    final supportsNativeStream =
+        defaultTargetPlatform == TargetPlatform.windows ||
+            defaultTargetPlatform == TargetPlatform.linux;
     final supportsNativeTaskQuery =
         defaultTargetPlatform == TargetPlatform.windows ||
             defaultTargetPlatform == TargetPlatform.linux;
@@ -195,6 +204,7 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
                         ? null
                         : (value) => setState(() {
                               _selectedAgentId = value;
+                              _streamResult = null;
                               if (_pendingTaskAgentId != value) {
                                 _clearPendingTask();
                               }
@@ -250,10 +260,52 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
                     label:
                         Text(_sendingMessage ? '送信中…' : 'native Owner確認して一回送信'),
                   ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    key: const ValueKey('a2a-send-stream'),
+                    onPressed: selectedAgentId == null ||
+                            selectedConnection?.streaming != true ||
+                            !supportsNativeStream ||
+                            _sendingMessage ||
+                            _connecting ||
+                            _loading ||
+                            _gettingTask
+                        ? null
+                        : _sendStream,
+                    icon: const Icon(Icons.stream),
+                    label: const Text('native Owner確認してStreamを一回送信'),
+                  ),
+                  if (!supportsNativeStream)
+                    const Text(
+                        '現行A2A Stream native Owner経路はWindows/Linux Desktopのみ対応です。'),
+                  if (selectedConnection?.streaming != true)
+                    const Text('選択AgentはAgent Cardでstreamingを宣言していません。'),
                 ],
                 if (_sendMessageStatus != null) ...[
                   const SizedBox(height: 12),
                   Semantics(liveRegion: true, child: Text(_sendMessageStatus!)),
+                ],
+                if (_streamResult != null) ...[
+                  const SizedBox(height: 8),
+                  BorderedPanel(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(_streamResult!.status == 'unknown'
+                            ? 'Stream結果不明（自動再接続・再送なし）'
+                            : _streamResult!.streamKind == 'message'
+                                ? 'Message-only streamを受理（Task完了を意味しません）'
+                                : 'Task stream終端を観測（外部Taskの状態表示のみ）'),
+                        Text(
+                          'state=${_streamResult!.state ?? '該当なし'} / events=${_streamResult!.eventCount ?? 'unknown'} / result hash=${_streamResult!.resultHash ?? 'unknown'} / Audit=${_streamResult!.auditEventId}',
+                        ),
+                        for (final event in _streamResult!.events)
+                          Text(
+                            '${event.kind}: state=${event.state ?? '該当なし'}, parts=${event.partCount ?? '該当なし'}, hash=${event.eventHash}',
+                          ),
+                      ],
+                    ),
+                  ),
                 ],
                 if (_pendingTaskId != null) ...[
                   const SizedBox(height: 8),
@@ -467,6 +519,7 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
     }
     setState(() {
       _sendingMessage = true;
+      _streamResult = null;
       _clearPendingTask();
       _sendMessageStatus = '要求をBrokerへ送信しています。native確認後、一回だけ実行します。';
     });
@@ -497,6 +550,56 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
       setState(() {
         _sendMessageStatus =
             'Brokerから確定応答を得られませんでした。外部作用の結果が不明な場合は再送せず、Auditを確認してください。';
+      });
+    } finally {
+      _interfaceUriController.clear();
+      _messageController.clear();
+      if (mounted) setState(() => _sendingMessage = false);
+    }
+  }
+
+  Future<void> _sendStream() async {
+    final client = _client;
+    final agentId = _selectedAgentId;
+    if (client == null ||
+        agentId == null ||
+        _loading ||
+        _connecting ||
+        _gettingTask ||
+        _sendingMessage ||
+        !_connections.any((connection) =>
+            connection.agentId == agentId &&
+            connection.connectionState == 'connected' &&
+            connection.streaming)) {
+      return;
+    }
+    setState(() {
+      _sendingMessage = true;
+      _clearPendingTask();
+      _streamResult = null;
+      _sendMessageStatus =
+          '要求をBrokerへ送信しています。native Owner確認後、一回だけ実行し、終端eventまたは期限まで読み取ります。';
+    });
+    try {
+      final result = await client.sendStream(
+        agentId: agentId,
+        interfaceUri: _interfaceUriController.text,
+        message: _messageController.text,
+      );
+      if (!mounted) return;
+      setState(() {
+        _streamResult = result;
+        _taskQueryResult = null;
+        _sendMessageStatus = result.status == 'unknown'
+            ? 'Stream結果は不明です。重複作用防止のため再接続・再送しません。Audit=${result.auditEventId}'
+            : 'Streamを一回処理しました。event本文とTask/Message IDは画面へ表示せず、Authorityも生成しません。Audit=${result.auditEventId}';
+      });
+    } on Object {
+      if (!mounted) return;
+      setState(() {
+        _streamResult = null;
+        _sendMessageStatus =
+            'Stream結果を確定できませんでした。外部作用の結果が不明な場合は再接続・再送せず、Auditを確認してください。';
       });
     } finally {
       _interfaceUriController.clear();

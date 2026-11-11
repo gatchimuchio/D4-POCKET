@@ -335,6 +335,8 @@ BROKER_REQUIRED_SCHEMAS = {
     "a2a_connection.schema.json",
     "a2a_connection_receipt.schema.json",
     "a2a_connection_list.schema.json",
+    "a2a_stream_send_request.schema.json",
+    "a2a_stream_send_response.schema.json",
     "host_registration.schema.json",
     "host_receipt.schema.json",
     "host_list.schema.json",
@@ -6523,6 +6525,8 @@ def A2A接続センターの統治経路と境界を検査する() -> list[str]:
         "a2a_message_send_response",
         "a2a_task_get_request",
         "a2a_task_get_response",
+    "a2a_stream_send_request",
+    "a2a_stream_send_response",
     ):
         schema = load_schema(name + ".schema.json")
         valid = load_contract_fixture(name + ".valid.json")
@@ -6765,6 +6769,155 @@ def A2A接続センターの統治経路と境界を検査する() -> list[str]:
         不整合.append("C16補完 GetTask native Owner候補のLinux限定境界がない")
     if "A2Aタスク状態取得" in mac_swift:
         不整合.append("C16補完 GetTaskをmacOS native channelへ追加している")
+    return 不整合
+
+
+def A2Aストリーム送信の契約と境界を検査する() -> list[str]:
+    不整合: list[str] = []
+    specification = DOC_SPECS / "a2a-streaming.md"
+    if not specification.exists():
+        return ["A2A Streamの日本語意味正本がない"]
+    specification_text = specification.read_text(encoding="utf-8")
+    for token in (
+        "SendStreamingMessage",
+        "A2A protocol v1.0",
+        "JSON-RPC 2.0",
+        "kind: message",
+        "Windows／Linux Desktop",
+        "streaming=true",
+        "native Owner確認",
+        "一回限りPermission",
+        "64 KiB",
+        "32 event",
+        "unknown",
+        "再送・再接続",
+        "metadata-only",
+        "SubscribeToTask",
+        "D4 PocketのTask完了",
+    ):
+        if token not in specification_text:
+            不整合.append(f"A2A Stream意味正本に境界がない: {token}")
+
+    try:
+        canonical_index = json.loads((ROOT / "規定" / "正本索引.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        不整合.append("A2A Stream正本索引を読めない")
+    else:
+        current_sources = canonical_index.get("現行正本", [])
+        required_paths = {
+            "docs/specs/a2a-streaming.md",
+            "specs/a2a_stream_send_request.schema.json",
+            "specs/a2a_stream_send_response.schema.json",
+        }
+        indexed_paths = {
+            item.get("path") for item in current_sources if isinstance(item, dict)
+        }
+        for missing in sorted(required_paths - indexed_paths):
+            不整合.append(f"A2A Stream正本索引に登録がない: {missing}")
+
+    request_schema = load_schema("a2a_stream_send_request.schema.json")
+    response_schema = load_schema("a2a_stream_send_response.schema.json")
+    request = load_contract_fixture("a2a_stream_send_request.valid.json")
+    response = load_contract_fixture("a2a_stream_send_response.valid.json")
+    for label, value, schema in (
+        ("要求", request, request_schema),
+        ("Task Stream応答", response, response_schema),
+    ):
+        failures = validate_instance(value, schema)
+        if failures:
+            不整合.extend(f"A2A Stream {label} valid fixtureが拒否された: {failure}" for failure in failures)
+
+    if (
+        request.get("操作") != "stream_send"
+        or set(request) != {"版", "操作", "AgentID", "Interface URI", "Message"}
+        or response.get("status") != "accepted"
+        or response.get("Trust") != "pending_review"
+        or response.get("権限生成") != "なし"
+        or response.get("authority_strip") is not True
+        or response.get("公開範囲") != "metadata_only"
+        or response.get("再送可能") is not False
+    ):
+        不整合.append("A2A Streamの要求fieldまたはAuthority境界が不正")
+
+    message_only = copy.deepcopy(response)
+    message_only["result"] = {
+        "stream_kind": "message",
+        "state": None,
+        "event_count": 1,
+        "events": [{
+            "kind": "message",
+            "message_id_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+            "task_id_hash": None,
+            "context_id_hash": None,
+            "role": "ROLE_AGENT",
+            "part_count": 1,
+            "event_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        }],
+        "result_hash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+    }
+    if validate_instance(message_only, response_schema):
+        不整合.append("A2A v1.0 Message-only Stream valid shapeが拒否された")
+
+    invalid_schemas = {
+        "a2a_stream_send_request.invalid.json": request_schema,
+        "a2a_stream_send_response.invalid.json": response_schema,
+    }
+    for name, schema in invalid_schemas.items():
+        try:
+            invalid = load_contract_fixture("invalid/" + name)
+        except (OSError, json.JSONDecodeError) as exc:
+            不整合.append(f"A2A Stream negative fixtureを読めない: {name}: {exc}")
+            continue
+        if not validate_instance(invalid, schema):
+            不整合.append(f"A2A Stream negative fixtureを受理している: {name}")
+
+    rust_a2a = (RUST_HELPER / "src" / "a2a.rs").read_text(encoding="utf-8")
+    rust_download = (RUST_HELPER / "src" / "broker" / "update_download.rs").read_text(encoding="utf-8")
+    rust_center = (RUST_HELPER / "src" / "broker" / "a2a_center.rs").read_text(encoding="utf-8")
+    protocol = (RUST_HELPER / "src" / "broker" / "protocol.rs").read_text(encoding="utf-8")
+    owner = (RUST_HELPER / "src" / "desktop_launcher.rs").read_text(encoding="utf-8")
+    flutter = (DESKTOP_FLUTTER / "lib" / "services" / "a2a_connection_client.dart").read_text(encoding="utf-8")
+    screen = (DESKTOP_FLUTTER / "lib" / "screens" / "a2a_connection_center.dart").read_text(encoding="utf-8")
+    mac_owner = (RUST_HELPER / "src" / "macos_desktop_owner.rs").read_text(encoding="utf-8")
+    mac_swift = (DESKTOP_FLUTTER / "macos" / "Runner" / "BrokerProcessChannel.swift").read_text(encoding="utf-8")
+    for token, source in (
+        ("SendStreamingMessage", rust_a2a),
+        ("project_stream_response", rust_a2a),
+        ("MAX_A2A_STREAM_EVENTS", rust_a2a),
+        ("send_a2a_json_rpc_stream_document", rust_a2a + rust_download),
+        ("ACCEPT", rust_download),
+        ("text/event-stream", rust_download),
+        ("A2Aストリーム送信", protocol + rust_center + owner),
+        ("owner_confirmed", rust_center),
+        ("permission_issued", rust_center),
+        ("recover_interrupted_stream_sends", rust_center + protocol),
+        ("streaming", rust_center + flutter + screen),
+        ("native Owner確認してStreamを一回送信", screen),
+        ("a2a_stream_outcome_unknown", rust_center + flutter),
+        ("A2Aストリーム送信", mac_owner),
+    ):
+        if token not in source:
+            不整合.append(f"A2A Streamの実consumer接続がない: {token}")
+    try:
+        stream_sender = rust_a2a.split("pub(crate) fn send_stream(", 1)[1].split(
+            "pub(crate) fn get_task(", 1
+        )[0]
+        stream_request = stream_sender.split("let request = json!({", 1)[1].split(
+            "let request_bytes", 1
+        )[0]
+    except IndexError:
+        不整合.append("A2A Stream JSON-RPC request constructionを切り出せない")
+    else:
+        if '"jsonrpc": "2.0"' not in stream_request:
+            不整合.append("A2A Stream requestがJSON-RPC 2.0ではない")
+        if '"kind"' in stream_request:
+            不整合.append("A2A Stream requestがv0.3形式kind discriminatorを送信する")
+    if '"A2Aストリーム送信"' in mac_swift:
+        不整合.append("A2A Stream native Owner操作がmacOS channelへ拡張されている")
+    if 'if !cfg!(any(target_os = "windows", target_os = "linux"))' not in rust_center:
+        不整合.append("A2A Stream consumerにWindows／Linux Desktop限定guardがない")
+    if "A2A_StreamはOwnerCredentialからNativeConfirmationを迂回できない" not in protocol:
+        不整合.append("A2A StreamのOwnerCredential否定試験がない")
     return 不整合
 
 
@@ -13571,6 +13724,7 @@ def main() -> int:
         MCP接続センターの統治経路と境界を検査する,
         AgentTaskMCPTool提案Contractと境界を検査する,
         A2A接続センターの統治経路と境界を検査する,
+        A2Aストリーム送信の契約と境界を検査する,
         複数Host_registryの統治経路と境界を検査する,
         Host操作面の観測境界とHost間非混線を検査する,
         Adapter管理操作の統治境界を検査する,

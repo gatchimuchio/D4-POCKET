@@ -9,6 +9,79 @@ import 'package:gui_shell_ui/runtime_dialogue_client.dart'
     show BrokerClientException, BrokerTransport;
 
 void main() {
+  test('A2A v1.0 streaming capabilityを読み取る', () async {
+    final receipt = _receipt(streaming: true);
+    final summary = await A2aConnectionClient(_A2aTransport([
+      _response('A2A接続', 'audit-a2a-connect', receipt,
+          evidence: 'INTERNAL_STATE'),
+    ])).connect(
+      agentId: 'fixture-agent',
+      agentCardUri: 'http://127.0.0.1:9080/card',
+    );
+    expect(summary.streaming, isTrue);
+  });
+
+  test('A2A StreamはTask終端とMessage-onlyをmetadataだけで区別する', () async {
+    final taskTransport = _A2aTransport([
+      _streamSendResponse('audit-a2a-stream-task'),
+    ]);
+    final taskResult = await A2aConnectionClient(taskTransport).sendStream(
+      agentId: 'fixture-agent',
+      interfaceUri: 'http://127.0.0.1:9080/rpc',
+      message: 'private-request-message',
+    );
+    expect(taskResult.status, 'accepted');
+    expect(taskResult.streamKind, 'task');
+    expect(taskResult.state, 'completed');
+    expect(
+        taskResult.events.map((event) => event.kind), ['task', 'statusUpdate']);
+    expect(taskResult.events.map((event) => event.eventHash).join(),
+        isNot(contains('private-task-id')));
+    expect(taskTransport.operations, ['A2Aストリーム送信']);
+    expect(taskTransport.payloads.single?['操作'], 'stream_send');
+
+    final messageResult = await A2aConnectionClient(_A2aTransport([
+      _streamSendResponse('audit-a2a-stream-message', streamKind: 'message'),
+    ])).sendStream(
+      agentId: 'fixture-agent',
+      interfaceUri: 'http://127.0.0.1:9080/rpc',
+      message: 'private-request-message',
+    );
+    expect(messageResult.streamKind, 'message');
+    expect(messageResult.state, isNull);
+    expect(messageResult.events.single.kind, 'message');
+  });
+
+  test('A2A Stream unknownは再送せず、非終端Task結果を受理しない', () async {
+    final unknown = {
+      'operation': 'A2Aストリーム送信',
+      'status': 'suspended',
+      'error': {'code': 'a2a_stream_outcome_unknown'},
+      'evidence_source': 'LIVE_RUNTIME',
+      'audit_event_id': 'audit-a2a-stream-unknown',
+      'body': _streamResponseBody('fixture-agent', status: 'unknown'),
+    };
+    final transport = _A2aTransport([unknown]);
+    final unknownResult = await A2aConnectionClient(transport).sendStream(
+      agentId: 'fixture-agent',
+      interfaceUri: 'http://127.0.0.1:9080/rpc',
+      message: 'private-request-message',
+    );
+    expect(unknownResult.status, 'unknown');
+    expect(transport.operations, ['A2Aストリーム送信']);
+
+    await expectLater(
+      A2aConnectionClient(_A2aTransport([
+        _streamSendResponse('audit-a2a-stream-nonterminal', state: 'working'),
+      ])).sendStream(
+        agentId: 'fixture-agent',
+        interfaceUri: 'http://127.0.0.1:9080/rpc',
+        message: 'private-request-message',
+      ),
+      throwsA(isA<BrokerClientException>()),
+    );
+  });
+
   test('loopback接続と一覧だけをBrokerへ送り資格情報実値を含めない', () async {
     final receipt = _receipt();
     final transport = _A2aTransport([
@@ -580,6 +653,67 @@ void main() {
     }
   });
 
+  testWidgets('Windows A2Aセンターはstreaming宣言Agentに一回Stream送信を表示する',
+      (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    try {
+      const endpoint = 'http://127.0.0.1:9080/card';
+      const message = 'private-stream-request';
+      final receipt = _receipt(streaming: true);
+      final transport = _A2aTransport([
+        _response('A2A接続一覧', 'audit-empty', _listBody(const []),
+            evidence: 'INTERNAL_STATE'),
+        _response('A2A接続', 'audit-a2a-connect', receipt,
+            evidence: 'INTERNAL_STATE'),
+        _response('A2A接続一覧', 'audit-a2a-stream-list', _listBody([receipt]),
+            evidence: 'INTERNAL_STATE'),
+        _streamSendResponse('audit-a2a-stream-result'),
+      ]);
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(body: A2aConnectionCenter(transport: transport)),
+      ));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).at(0), 'fixture-agent');
+      await tester.enterText(find.byType(TextField).at(1), endpoint);
+      await tester.tap(find.text('Owner確認して接続'));
+      await tester.pumpAndSettle();
+      final dropdown = find.byType(DropdownButtonFormField<String>);
+      await tester.ensureVisible(dropdown);
+      await tester.tap(dropdown);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Fixture Agent (fixture-agent)').last);
+      await tester.pumpAndSettle();
+      await tester.enterText(
+          find.byType(TextField).at(2), 'http://127.0.0.1:9080/rpc');
+      await tester.enterText(find.byType(TextField).at(3), message);
+      final streamButton = find.byKey(const ValueKey('a2a-send-stream'));
+      await tester.ensureVisible(streamButton);
+      expect(tester.widget<OutlinedButton>(streamButton).onPressed, isNotNull);
+      await tester.tap(streamButton);
+      await tester.pumpAndSettle();
+
+      expect(transport.operations.last, 'A2Aストリーム送信');
+      expect(transport.payloads.last?['Message'], message);
+      expect(find.textContaining('Task stream終端を観測'), findsOneWidget);
+      expect(find.text(message), findsNothing);
+      expect(find.textContaining('private-task-id'), findsNothing);
+      expect(
+          tester
+              .widget<TextField>(find.byType(TextField).at(2))
+              .controller!
+              .text,
+          isEmpty);
+      expect(
+          tester
+              .widget<TextField>(find.byType(TextField).at(3))
+              .controller!
+              .text,
+          isEmpty);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
   testWidgets('Linuxで選択したcompleted text Artifactだけをfresh要求後に表示する',
       (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.linux;
@@ -904,7 +1038,91 @@ Map<String, Object?> _listBody(List<Map<String, Object?>> receipts) => {
       '証拠種別': 'INTERNAL_STATE',
     };
 
-Map<String, Object?> _receipt() => {
+Map<String, Object?> _streamResponseBody(
+  String agentId, {
+  required String status,
+  String streamKind = 'task',
+  String state = 'completed',
+}) =>
+    {
+      '版': 1,
+      'AgentID': agentId,
+      'interface_hash': 'sha256:${List<String>.filled(64, 'b').join()}',
+      'message_hash': 'sha256:${List<String>.filled(64, 'd').join()}',
+      'status': status,
+      'result': status == 'unknown'
+          ? null
+          : {
+              'stream_kind': streamKind,
+              'state': streamKind == 'message' ? null : state,
+              'event_count': streamKind == 'message' ? 1 : 2,
+              'events': streamKind == 'message'
+                  ? [
+                      {
+                        'kind': 'message',
+                        'message_id_hash':
+                            'sha256:${List<String>.filled(64, 'e').join()}',
+                        'task_id_hash': null,
+                        'context_id_hash': null,
+                        'role': 'ROLE_AGENT',
+                        'part_count': 1,
+                        'event_hash':
+                            'sha256:${List<String>.filled(64, 'f').join()}',
+                      }
+                    ]
+                  : [
+                      {
+                        'kind': 'task',
+                        'task_id_hash':
+                            'sha256:${List<String>.filled(64, '1').join()}',
+                        'context_id_hash':
+                            'sha256:${List<String>.filled(64, '2').join()}',
+                        'state': 'working',
+                        'artifact_count': 0,
+                        'history_count': 0,
+                        'event_hash':
+                            'sha256:${List<String>.filled(64, '3').join()}',
+                      },
+                      {
+                        'kind': 'statusUpdate',
+                        'task_id_hash':
+                            'sha256:${List<String>.filled(64, '1').join()}',
+                        'context_id_hash':
+                            'sha256:${List<String>.filled(64, '2').join()}',
+                        'state': state,
+                        'event_hash':
+                            'sha256:${List<String>.filled(64, '4').join()}',
+                      }
+                    ],
+              'result_hash': 'sha256:${List<String>.filled(64, '5').join()}',
+            },
+      'Trust': 'pending_review',
+      '権限生成': 'なし',
+      'authority_strip': true,
+      '公開範囲': 'metadata_only',
+      '再送可能': false,
+    };
+
+Map<String, Object?> _streamSendResponse(
+  String auditId, {
+  String streamKind = 'task',
+  String state = 'completed',
+}) =>
+    {
+      'operation': 'A2Aストリーム送信',
+      'status': 'accepted',
+      'error': null,
+      'evidence_source': 'LIVE_RUNTIME',
+      'audit_event_id': auditId,
+      'body': _streamResponseBody(
+        'fixture-agent',
+        status: 'accepted',
+        streamKind: streamKind,
+        state: state,
+      ),
+    };
+
+Map<String, Object?> _receipt({bool streaming = false}) => {
       '版': 1,
       '契約種別': 'A2A外部概念射影',
       'protocol_version': '1.0',
@@ -926,7 +1144,7 @@ Map<String, Object?> _receipt() => {
           },
         ],
         'capabilities': {
-          'streaming': false,
+          'streaming': streaming,
           'push_notifications': false,
           'state_transition_history': false,
           'extended_agent_card': false,

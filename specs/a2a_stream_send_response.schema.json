@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/a2a_stream_send_response.schema.json",
+  "title": "A2A SendStreamingMessage結果（A2aStreamSendResult）",
+  "description": "SSEから得たStreamResponseのmetadata-only投影。Message/Artifact body、外部ID実値、Credential、Trust、Permission、Approval、Authorityは含めず、unknownは再接続・再送しない。",
+  "type": "object",
+  "required": ["版", "AgentID", "interface_hash", "message_hash", "status", "result", "Trust", "権限生成", "authority_strip", "公開範囲", "再送可能"],
+  "additionalProperties": false,
+  "properties": {
+    "版": { "const": 1 },
+    "AgentID": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$(?![\\s\\S])" },
+    "interface_hash": { "$ref": "#/$defs/hash" },
+    "message_hash": { "$ref": "#/$defs/hash" },
+    "status": { "enum": ["accepted", "unknown"] },
+    "result": { "oneOf": [{ "$ref": "#/$defs/taskStream" }, { "$ref": "#/$defs/messageStream" }, { "type": "null" }] },
+    "Trust": { "const": "pending_review" },
+    "権限生成": { "const": "なし" },
+    "authority_strip": { "const": true },
+    "公開範囲": { "const": "metadata_only" },
+    "再送可能": { "const": false }
+  },
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])" },
+    "taskEvent": {
+      "type": "object",
+      "required": ["kind", "task_id_hash", "context_id_hash", "state", "artifact_count", "history_count", "event_hash"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "task" },
+        "task_id_hash": { "$ref": "#/$defs/hash" },
+        "context_id_hash": { "oneOf": [{ "$ref": "#/$defs/hash" }, { "type": "null" }] },
+        "state": { "$ref": "#/$defs/state" },
+        "artifact_count": { "type": "integer", "minimum": 0, "maximum": 32 },
+        "history_count": { "type": "integer", "minimum": 0, "maximum": 64 },
+        "event_hash": { "$ref": "#/$defs/hash" }
+      }
+    },
+    "messageEvent": {
+      "type": "object",
+      "required": ["kind", "message_id_hash", "task_id_hash", "context_id_hash", "role", "part_count", "event_hash"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "message" },
+        "message_id_hash": { "$ref": "#/$defs/hash" },
+        "task_id_hash": { "oneOf": [{ "$ref": "#/$defs/hash" }, { "type": "null" }] },
+        "context_id_hash": { "oneOf": [{ "$ref": "#/$defs/hash" }, { "type": "null" }] },
+        "role": { "enum": ["ROLE_AGENT", "ROLE_USER"] },
+        "part_count": { "type": "integer", "minimum": 1, "maximum": 64 },
+        "event_hash": { "$ref": "#/$defs/hash" }
+      }
+    },
+    "statusEvent": {
+      "type": "object",
+      "required": ["kind", "task_id_hash", "context_id_hash", "state", "event_hash"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "statusUpdate" },
+        "task_id_hash": { "$ref": "#/$defs/hash" },
+        "context_id_hash": { "$ref": "#/$defs/hash" },
+        "state": { "$ref": "#/$defs/state" },
+        "event_hash": { "$ref": "#/$defs/hash" }
+      }
+    },
+    "artifactEvent": {
+      "type": "object",
+      "required": ["kind", "task_id_hash", "context_id_hash", "artifact_id_hash", "part_count", "part_kinds", "append", "last_chunk", "event_hash"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "artifactUpdate" },
+        "task_id_hash": { "$ref": "#/$defs/hash" },
+        "context_id_hash": { "$ref": "#/$defs/hash" },
+        "artifact_id_hash": { "$ref": "#/$defs/hash" },
+        "part_count": { "type": "integer", "minimum": 1, "maximum": 32 },
+        "part_kinds": { "type": "array", "minItems": 1, "maxItems": 32, "items": { "enum": ["text", "raw", "url", "data"] } },
+        "append": { "type": "boolean" },
+        "last_chunk": { "type": "boolean" },
+        "event_hash": { "$ref": "#/$defs/hash" }
+      }
+    },
+    "state": { "enum": ["unknown", "submitted", "working", "completed", "failed", "canceled", "input_required", "rejected", "auth_required"] },
+    "taskStream": {
+      "type": "object",
+      "required": ["stream_kind", "state", "event_count", "events", "result_hash"],
+      "additionalProperties": false,
+      "properties": {
+        "stream_kind": { "const": "task" },
+        "state": { "enum": ["completed", "failed", "canceled", "rejected"] },
+        "event_count": { "type": "integer", "minimum": 1, "maximum": 32 },
+        "events": { "type": "array", "minItems": 1, "maxItems": 32, "items": { "oneOf": [{ "$ref": "#/$defs/taskEvent" }, { "$ref": "#/$defs/statusEvent" }, { "$ref": "#/$defs/artifactEvent" }] } },
+        "result_hash": { "$ref": "#/$defs/hash" }
+      }
+    },
+    "messageStream": {
+      "type": "object",
+      "required": ["stream_kind", "state", "event_count", "events", "result_hash"],
+      "additionalProperties": false,
+      "properties": {
+        "stream_kind": { "const": "message" },
+        "state": { "type": "null" },
+        "event_count": { "const": 1 },
+        "events": { "type": "array", "minItems": 1, "maxItems": 1, "items": { "$ref": "#/$defs/messageEvent" } },
+        "result_hash": { "$ref": "#/$defs/hash" }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "unknown" } }, "required": ["status"] },
+      "then": { "properties": { "result": { "type": "null" } } }
+    },
+    {
+      "if": { "properties": { "status": { "const": "accepted" } }, "required": ["status"] },
+      "then": { "properties": { "result": { "oneOf": [{ "$ref": "#/$defs/taskStream" }, { "$ref": "#/$defs/messageStream" }] } } }
+    }
+  ]
+}

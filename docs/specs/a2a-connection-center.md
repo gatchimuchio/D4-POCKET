@@ -8,7 +8,7 @@ C16では、owner controlからA2A Agent Cardを取得し、接続receiptへboun
 
 IPv6の`2001::/23` special-purpose親範囲は、IANA registryでより具体的なallocationが`Globally Reachable=true`とされる場合だけ許可する。対象は`2001:1::1/128`〜`2001:1::3/128`、`2001:3::/32`、`2001:4:112::/48`、`2001:20::/28`、`2001:30::/28`である。それ以外の親範囲内アドレス、benchmarkingの`2001:2::/48`、deprecatedな`2001:10::/28`は拒否する。[IANA IPv6 Special-Purpose Address Space](https://www.iana.org/assignments/iana-ipv6-special-registry)。この判定関数は更新取得経路でも共有される。
 
-Agent Card内の各`supportedInterfaces`では`url`と`protocolVersion`を検証する。interface URL実値は保存・表示せず、`interface_hash`、protocol binding／version、transportだけをmetadataへ射影する。A2A v1.0 rootの`securityRequirements`と各skillの`securityRequirements`を調べ、その要件または`securitySchemes`があるinterfaceは`unsupported`にする。該当fieldが不正形の場合も要件ありとして扱う。receiptにはraw要件を保存せず、`security_requirements_present`だけを投影する。要件がなく、他の条件も満たすinterfaceには一回`SendMessage` consumerを接続する。Task応答への手動一回`GetTask`照会は下記C16補完に限り、Task lifecycle polling／完了判定、file/data Artifact本文、Stream consumerは未接続のままである。Agent Cardの宣言自体を実行可能性の証拠へ昇格しない。
+Agent Card内の各`supportedInterfaces`では`url`と`protocolVersion`を検証する。interface URL実値は保存・表示せず、`interface_hash`、protocol binding／version、transportだけをmetadataへ射影する。A2A v1.0 rootの`securityRequirements`と各skillの`securityRequirements`を調べ、その要件または`securitySchemes`があるinterfaceは`unsupported`にする。該当fieldが不正形の場合も要件ありとして扱う。receiptにはraw要件を保存せず、`security_requirements_present`だけを投影する。要件がなく、他の条件も満たすinterfaceには一回`SendMessage` consumerを接続する。Task応答への手動一回`GetTask`照会は下記C16補完に限る。Stream consumerは別契約[`a2a-streaming.md`](a2a-streaming.md)に限定して追加し、C16のSendMessage／GetTask条件や既存結果を変更しない。Agent Cardの宣言自体を実行可能性の証拠へ昇格しない。
 
 従来の保存receiptは起動時に読み取り専用で保守的に整形する。旧版にはinterface URLが保存されていないため`interface_hash=null`、protocol version／status=`unknown`へ降格し、`restored_pending_review`／`owner_reapproval_required`を保持する。旧履歴から接続・Trust・Permission・Approvalを再生成しない。
 
@@ -68,7 +68,7 @@ pending receiptの復帰操作は、画面から同じAgentIDと現在確認し�
 
 ## C16補完: 一回A2A Message送信
 
-この追加経路は、現在の`connected`／`LIVE_RUNTIME` receipt、未信頼`pending_review` Trust、hashが完全一致する`JSONRPC`／protocol version `1.0` interfaceだけへ、本文1件を`SendMessage`として送る。Credential schemeまたはsecurity requirementを宣言するAgentは送信対象にしない。HTTPSは既存のpublic-IP固定・証明書検証経路、HTTPはIPv4 loopbackに限定する。A2A v1.0の`A2A-Version: 1.0`とJSON-RPC 2.0を使い、Task polling、streaming、retry、redirect、credential、file/data partは扱わない。
+この追加経路は、現在の`connected`／`LIVE_RUNTIME` receipt、未信頼`pending_review` Trust、hashが完全一致する`JSONRPC`／protocol version `1.0` interfaceだけへ、本文1件を`SendMessage`として送る。Credential schemeまたはsecurity requirementを宣言するAgentは送信対象にしない。HTTPSは既存のpublic-IP固定・証明書検証経路、HTTPはIPv4 loopbackに限定する。A2A v1.0の`A2A-Version: 1.0`とJSON-RPC 2.0を使い、Task polling、retry、redirect、credential、file/data partは扱わない。Stream送信は別契約[`a2a-streaming.md`](a2a-streaming.md)に従う。
 
 各送信には新しい要求hashへ束縛したRust native Owner確認を要求し、対象Agent、送信先、本文全体（改行・復帰・tabを可視表示）、本文hash、外部作用、再送禁止を表示する。Brokerは一回Permissionを現在のrequest ID／Agent／interface hash／本文hashに束縛して発行・即時消費し、永続Auditの`started`確定後にだけ送信する。同じ許可・履歴・Trustから後続Permissionを作らない。Trustは`pending_review`、権限生成なしを維持する。
 
@@ -129,3 +129,8 @@ Windows／Linux DesktopのA2A Artifact選択表示から、操作者の明示操
 取得本文とTask draftは画面・Agent Centerのvolatile stateだけに置き、保存、snapshot、log、trace、Audit bodyへ複製しない。受信Taskが後に通常の新規Permission／Approvalを通って開始した場合、Agent Centerはsource／targetのID、hash、既存Audit参照とAuthority非継承状態だけを揮発表示する。この表示は新しいAudit eventの生成やdurableなreceipt保存を意味せず、Artifact本文を含めない。macOS native A2A Owner contractおよびCredential経路は変更しない。
 
 この接続はFlutter Fake Broker／WidgetのFIXTUREで検証する。実外部Agentとの交換、installed product、異種Runtime間のTask実行、Windows／macOS native confirmation、Task完了後の実A2A Handoffは別の未成立範囲に残る。
+# A2A v1.0 Stream送信
+
+C16の接続・SendMessage・手動GetTaskは維持し、A2A v1.0 `SendStreamingMessage`を別consumerとして追加する。対象はnative Owner経路のあるWindows／Linux Desktopに限る。Agent Cardの`streaming=true`だけでは実行可能にならず、Brokerは現在の接続とinterfaceを再評価する。native Owner確認、永続Audit、一回Permissionを用い、送信・再接続・再送は各一回以下とする。
+
+Stream結果の契約、A2A v1.0 SSE oneof、message-only／terminal Task判定、制限値、unknown、metadata-only投影は[`a2a-streaming.md`](a2a-streaming.md)を参照する。`SubscribeToTask`、macOS、Mobile、Credential利用、本文表示、外部結果のD4 Pocket Taskへの取込みは対象外。C16の既存Acceptanceと履歴をStreamの局所試験で書き換えない。

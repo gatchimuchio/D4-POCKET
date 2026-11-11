@@ -101,6 +101,8 @@ REQUIRED = {
     "a2a_message_send_response.schema.json",
     "a2a_task_get_request.schema.json",
     "a2a_task_get_response.schema.json",
+    "a2a_stream_send_request.schema.json",
+    "a2a_stream_send_response.schema.json",
     "host_registration.schema.json",
     "host_receipt.schema.json",
     "host_list.schema.json",

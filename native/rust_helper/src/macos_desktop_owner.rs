@@ -800,6 +800,28 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
         format!(
             "未信頼の外部A2A AgentへMessageを一回送信しますか？\nAgent ID: {agent}\n接続先: {target}\nTransport: {transport}\nMessage（改行␊・復帰␍・tab␉を可視表示）:\n「{display_message}」\nMessage hash: {message_hash}\n要求hash: {hash}\n\nTrustはpending reviewのままです。Credentialを使わず、Task完了・Artifact取得・Authority付与を行いません。応答不明時は自動再送しません。送信本文全体を確認してください。"
         )
+    } else if operation == "A2Aストリーム送信" {
+        #[cfg(target_os = "linux")]
+        {
+            let (agent, target, message, message_hash) =
+                crate::broker::a2a_center::owner_stream_send_confirmation_summary(payload).ok()?;
+            let display_message = message
+                .replace('\r', "␍")
+                .replace('\n', "␊")
+                .replace('\t', "␉");
+            let transport = if target.starts_with("https://") {
+                "HTTPS（OS既定CAで証明書検証、public IP固定、redirectなし）"
+            } else {
+                "HTTP（IPv4 loopback限定）"
+            };
+            format!(
+                "未信頼の外部A2A AgentへStream Messageを一回送信し、終端eventまで購読しますか？\nAgent ID: {agent}\n接続先: {target}\nTransport: {transport}\nMessage（改行␊・復帰␍・tab␉を可視表示）:\n「{display_message}」\nMessage hash: {message_hash}\n要求hash: {hash}\n\n最大15秒・64 KiB・32 eventです。Message／Artifact本文は画面・Auditへ投影せず、Credentialを使いません。外部Task状態をGUI-ShellのTask完了やAuthorityへ変換せず、応答不明時は自動再接続・再送しません。Trustはpending reviewのままです。"
+            )
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            return None;
+        }
     } else if matches!(operation, "MCP接続" | "MCP切断" | "MCP Tool実行") {
         let summary = macos_owner_summary(operation, payload)?;
         format!("{summary}\n要求hash: {hash}")
@@ -885,9 +907,10 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
         } else if matches!(operation, "MCP接続" | "MCP切断" | "MCP Tool実行") {
             35
         } else if matches!(operation, "A2A接続" | "A2Aメッセージ送信")
-            || (cfg!(target_os = "linux") && operation == "A2Aタスク状態取得")
+            || (cfg!(target_os = "linux")
+                && matches!(operation, "A2Aタスク状態取得" | "A2Aストリーム送信"))
         {
-            // A2Aは有限timeout。Task状態取得は一回限りで自動再取得しない。
+            // A2A操作は有限timeout。一回限りで自動再取得・再送しない。
             25
         } else {
             4

@@ -1,0 +1,7 @@
+{
+  "版": 1,
+  "操作": "stream_send",
+  "AgentID": "remote-agent-example",
+  "Interface URI": "http://127.0.0.1:9080/rpc",
+  "Message": "bounded fixture request"
+}

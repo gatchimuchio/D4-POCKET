@@ -29,6 +29,7 @@ class A2aConnectionSummary {
     required this.version,
     required this.endpointHash,
     required this.supportedInterfaces,
+    required this.streaming,
     required this.connectionState,
     required this.evidenceSource,
     required this.approvalState,
@@ -42,6 +43,7 @@ class A2aConnectionSummary {
   final String version;
   final String endpointHash;
   final List<A2aSupportedInterface> supportedInterfaces;
+  final bool streaming;
   final String connectionState;
   final String evidenceSource;
   final String approvalState;
@@ -71,6 +73,46 @@ class A2aMessageSendResult {
   final String? remoteId;
   final String? remoteState;
   final String? resultHash;
+}
+
+class A2aStreamEventSummary {
+  const A2aStreamEventSummary({
+    required this.kind,
+    required this.eventHash,
+    required this.state,
+    required this.partCount,
+  });
+
+  final String kind;
+  final String eventHash;
+  final String? state;
+  final int? partCount;
+}
+
+class A2aStreamSendResult {
+  const A2aStreamSendResult({
+    required this.status,
+    required this.agentId,
+    required this.interfaceHash,
+    required this.messageHash,
+    required this.auditEventId,
+    required this.streamKind,
+    required this.state,
+    required this.eventCount,
+    required this.resultHash,
+    required this.events,
+  });
+
+  final String status;
+  final String agentId;
+  final String interfaceHash;
+  final String messageHash;
+  final String auditEventId;
+  final String? streamKind;
+  final String? state;
+  final int? eventCount;
+  final String? resultHash;
+  final List<A2aStreamEventSummary> events;
 }
 
 class A2aArtifactManifestItem {
@@ -372,6 +414,296 @@ class A2aConnectionClient {
       remoteId: remoteId,
       remoteState: remoteState,
       resultHash: resultHash as String,
+    );
+  }
+
+  Future<A2aStreamSendResult> sendStream({
+    required String agentId,
+    required String interfaceUri,
+    required String message,
+  }) async {
+    final normalizedId = agentId.trim();
+    final normalizedUri = interfaceUri.trim();
+    if (!_validAgentId(normalizedId) || !_validInterfaceUri(normalizedUri)) {
+      throw const BrokerClientException('AgentまたはA2A interface URIが不正です');
+    }
+    if (message.trim().isEmpty ||
+        utf8.encode(message).length > 4096 ||
+        message.runes.length > 1024 ||
+        message.runes.any((rune) =>
+            (rune < 0x20 && rune != 0x09 && rune != 0x0a && rune != 0x0d) ||
+            (rune >= 0x202a && rune <= 0x202e) ||
+            (rune >= 0x2066 && rune <= 0x2069) ||
+            rune == 0x061c ||
+            rune == 0x200e ||
+            rune == 0x200f)) {
+      throw const BrokerClientException(
+          'A2A Stream Messageが空、上限超過または表示安全境界外です');
+    }
+    final response = await _transport.request(
+      'A2Aストリーム送信',
+      payload: {
+        '版': 1,
+        '操作': 'stream_send',
+        'AgentID': normalizedId,
+        'Interface URI': normalizedUri,
+        'Message': message,
+      },
+    );
+    if (response['operation'] != 'A2Aストリーム送信' ||
+        response['audit_event_id'] is! String ||
+        !_validAuditId(response['audit_event_id'] as String) ||
+        response['evidence_source'] != 'LIVE_RUNTIME') {
+      throw const BrokerClientException('A2A Stream応答の識別または証拠が不正です');
+    }
+    final body = _object(response['body'], 'Stream応答');
+    const fields = {
+      '版',
+      'AgentID',
+      'interface_hash',
+      'message_hash',
+      'status',
+      'result',
+      'Trust',
+      '権限生成',
+      'authority_strip',
+      '公開範囲',
+      '再送可能',
+    };
+    if (body.length != fields.length ||
+        body.keys.any((key) => !fields.contains(key)) ||
+        body['版'] != 1 ||
+        body['AgentID'] != normalizedId ||
+        body['interface_hash'] is! String ||
+        !_validSha256(body['interface_hash'] as String) ||
+        body['message_hash'] is! String ||
+        !_validSha256(body['message_hash'] as String) ||
+        body['Trust'] != 'pending_review' ||
+        body['権限生成'] != 'なし' ||
+        body['authority_strip'] != true ||
+        body['公開範囲'] != 'metadata_only' ||
+        body['再送可能'] != false) {
+      throw const BrokerClientException('A2A Stream応答の安全metadataが不正です');
+    }
+    final status = body['status'];
+    if (status == 'unknown') {
+      if (response['status'] != 'suspended' ||
+          response['error'] is! Map ||
+          (response['error'] as Map)['code'] != 'a2a_stream_outcome_unknown' ||
+          body['result'] != null) {
+        throw const BrokerClientException('A2A Streamのunknown応答が不正です');
+      }
+      return A2aStreamSendResult(
+        status: 'unknown',
+        agentId: normalizedId,
+        interfaceHash: body['interface_hash'] as String,
+        messageHash: body['message_hash'] as String,
+        auditEventId: response['audit_event_id'] as String,
+        streamKind: null,
+        state: null,
+        eventCount: null,
+        resultHash: null,
+        events: const [],
+      );
+    }
+    if (status != 'accepted' ||
+        response['status'] != 'accepted' ||
+        response['error'] != null) {
+      throw const BrokerClientException('A2A StreamはBrokerに受理されませんでした');
+    }
+    final result = _object(body['result'], 'Stream metadata');
+    const resultFields = {
+      'stream_kind',
+      'state',
+      'event_count',
+      'events',
+      'result_hash'
+    };
+    final streamKind = result['stream_kind'];
+    final state = result['state'];
+    final rawEvents = result['events'];
+    if (result.length != resultFields.length ||
+        result.keys.any((key) => !resultFields.contains(key)) ||
+        !{'task', 'message'}.contains(streamKind) ||
+        (streamKind == 'task' &&
+            (!_validRemoteTaskState(state) ||
+                !{'completed', 'failed', 'canceled', 'rejected'}
+                    .contains(state))) ||
+        (streamKind == 'message' && state != null) ||
+        rawEvents is! List ||
+        rawEvents.isEmpty ||
+        rawEvents.length > 32 ||
+        result['event_count'] != rawEvents.length ||
+        result['result_hash'] is! String ||
+        !_validSha256(result['result_hash'] as String)) {
+      throw const BrokerClientException('A2A Stream終端projectionが不正です');
+    }
+    final events = <A2aStreamEventSummary>[];
+    for (final rawEvent in rawEvents) {
+      final event = _object(rawEvent, 'Stream event');
+      final kind = event['kind'];
+      final eventHash = event['event_hash'];
+      if (kind is! String ||
+          !{'task', 'message', 'statusUpdate', 'artifactUpdate'}
+              .contains(kind) ||
+          eventHash is! String ||
+          !_validSha256(eventHash)) {
+        throw const BrokerClientException('A2A Stream event headerが不正です');
+      }
+      String? eventState;
+      int? partCount;
+      const commonIds = {'task_id_hash', 'context_id_hash'};
+      switch (kind) {
+        case 'task':
+          const expected = {
+            'kind',
+            'task_id_hash',
+            'context_id_hash',
+            'state',
+            'artifact_count',
+            'history_count',
+            'event_hash'
+          };
+          eventState =
+              event['state'] is String ? event['state'] as String : null;
+          if (event.length != expected.length ||
+              event.keys.any((key) => !expected.contains(key)) ||
+              !_validSha256(event['task_id_hash'] is String
+                  ? event['task_id_hash'] as String
+                  : '') ||
+              !_nullableSha256(event['context_id_hash']) ||
+              !_validRemoteTaskState(eventState) ||
+              !_boundedCount(event['artifact_count'], 32) ||
+              !_boundedCount(event['history_count'], 64)) {
+            throw const BrokerClientException(
+                'A2A Stream Task event projectionが不正です');
+          }
+          break;
+        case 'message':
+          const expected = {
+            'kind',
+            'message_id_hash',
+            ...commonIds,
+            'role',
+            'part_count',
+            'event_hash'
+          };
+          partCount =
+              event['part_count'] is int ? event['part_count'] as int : null;
+          if (event.length != expected.length ||
+              event.keys.any((key) => !expected.contains(key)) ||
+              !_validSha256(event['message_id_hash'] is String
+                  ? event['message_id_hash'] as String
+                  : '') ||
+              !_nullableSha256(event['task_id_hash']) ||
+              !_nullableSha256(event['context_id_hash']) ||
+              event['role'] is! String ||
+              !{'ROLE_AGENT', 'ROLE_USER'}.contains(event['role']) ||
+              !_boundedCount(partCount, 64) ||
+              partCount == 0) {
+            throw const BrokerClientException(
+                'A2A Stream Message event projectionが不正です');
+          }
+          break;
+        case 'statusUpdate':
+          const expected = {'kind', ...commonIds, 'state', 'event_hash'};
+          eventState =
+              event['state'] is String ? event['state'] as String : null;
+          if (event.length != expected.length ||
+              event.keys.any((key) => !expected.contains(key)) ||
+              !_validSha256(event['task_id_hash'] is String
+                  ? event['task_id_hash'] as String
+                  : '') ||
+              !_validSha256(event['context_id_hash'] is String
+                  ? event['context_id_hash'] as String
+                  : '') ||
+              !_validRemoteTaskState(eventState)) {
+            throw const BrokerClientException(
+                'A2A Stream status event projectionが不正です');
+          }
+          break;
+        case 'artifactUpdate':
+          const expected = {
+            'kind',
+            ...commonIds,
+            'artifact_id_hash',
+            'part_count',
+            'part_kinds',
+            'append',
+            'last_chunk',
+            'event_hash'
+          };
+          partCount =
+              event['part_count'] is int ? event['part_count'] as int : null;
+          final partKinds = event['part_kinds'];
+          if (event.length != expected.length ||
+              event.keys.any((key) => !expected.contains(key)) ||
+              !_validSha256(event['task_id_hash'] is String
+                  ? event['task_id_hash'] as String
+                  : '') ||
+              !_validSha256(event['context_id_hash'] is String
+                  ? event['context_id_hash'] as String
+                  : '') ||
+              !_validSha256(event['artifact_id_hash'] is String
+                  ? event['artifact_id_hash'] as String
+                  : '') ||
+              !_boundedCount(partCount, 32) ||
+              partCount == 0 ||
+              partKinds is! List ||
+              partKinds.length != partCount ||
+              partKinds.any((kind) =>
+                  kind is! String ||
+                  !{'text', 'raw', 'url', 'data'}.contains(kind)) ||
+              event['append'] is! bool ||
+              event['last_chunk'] is! bool) {
+            throw const BrokerClientException(
+                'A2A Stream Artifact event projectionが不正です');
+          }
+          break;
+      }
+      events.add(A2aStreamEventSummary(
+        kind: kind,
+        eventHash: eventHash,
+        state: eventState,
+        partCount: partCount,
+      ));
+    }
+    final isMessageOnly = streamKind == 'message' &&
+        events.length == 1 &&
+        events.single.kind == 'message';
+    final lastEvent = events.last;
+    final terminalEventIndexes = events.indexed
+        .where((item) =>
+            (item.$2.kind == 'task' || item.$2.kind == 'statusUpdate') &&
+            {'completed', 'failed', 'canceled', 'rejected'}
+                .contains(item.$2.state))
+        .map((item) => item.$1)
+        .toList(growable: false);
+    final isTerminalTaskStream = streamKind == 'task' &&
+        events.first.kind == 'task' &&
+        events.indexed.skip(1).every((item) =>
+            item.$2.kind == 'statusUpdate' ||
+            item.$2.kind == 'artifactUpdate') &&
+        (lastEvent.kind == 'task' || lastEvent.kind == 'statusUpdate') &&
+        {'completed', 'failed', 'canceled', 'rejected'}
+            .contains(lastEvent.state) &&
+        lastEvent.state == state &&
+        terminalEventIndexes.length == 1 &&
+        terminalEventIndexes.single == events.length - 1;
+    if (!isMessageOnly && !isTerminalTaskStream) {
+      throw const BrokerClientException('A2A Streamが終端状態ではありません');
+    }
+    return A2aStreamSendResult(
+      status: 'accepted',
+      agentId: normalizedId,
+      interfaceHash: body['interface_hash'] as String,
+      messageHash: body['message_hash'] as String,
+      auditEventId: response['audit_event_id'] as String,
+      streamKind: streamKind as String,
+      state: state as String?,
+      eventCount: rawEvents.length,
+      resultHash: result['result_hash'] as String,
+      events: List.unmodifiable(events),
     );
   }
 
@@ -783,6 +1115,18 @@ class A2aConnectionClient {
       throw const BrokerClientException(
           'A2A Agent Cardのmetadata projectionが不正です');
     }
+    final capabilities = _object(card['capabilities'], 'capabilities');
+    const capabilityNames = {
+      'streaming',
+      'push_notifications',
+      'state_transition_history',
+      'extended_agent_card',
+    };
+    if (capabilities.length != capabilityNames.length ||
+        capabilities.keys.any((key) => !capabilityNames.contains(key)) ||
+        capabilityNames.any((key) => capabilities[key] is! bool)) {
+      throw const BrokerClientException('A2A capability projectionが不正です');
+    }
     final rawInterfaces = card['supported_interfaces'];
     if (rawInterfaces is! List ||
         rawInterfaces.isEmpty ||
@@ -917,6 +1261,7 @@ class A2aConnectionClient {
       version: version,
       endpointHash: endpointHash,
       supportedInterfaces: List.unmodifiable(supportedInterfaces),
+      streaming: capabilities['streaming'] as bool,
       connectionState: state as String,
       evidenceSource: evidence as String,
       approvalState: approval as String,
@@ -940,6 +1285,9 @@ class A2aConnectionClient {
 
   static bool _validSha256(String value) =>
       RegExp(r'^sha256:[a-f0-9]{64}$').hasMatch(value);
+
+  static bool _nullableSha256(Object? value) =>
+      value == null || (value is String && _validSha256(value));
 
   static bool _validExternalText(String value, int maxLength) {
     const bidiControls = {
