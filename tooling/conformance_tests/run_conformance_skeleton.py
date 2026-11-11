@@ -11237,8 +11237,9 @@ def test_linux_debian_setup_package_is_manual_and_non_authoritative() -> list[st
     writer_path = ROOT / "tooling/package_linux_deb_setup.py"
     runtime_tests_path = ROOT / "tooling/tests/test_linux_deb_setup_package.py"
     workflow_path = ROOT / ".github/workflows/linux-manual-export-build.yml"
+    build_script_path = ROOT / "tooling/linux_manual_export_build.sh"
     contract_path = ROOT / "docs/specs/linux-product-package.md"
-    required_files = (writer_path, runtime_tests_path, workflow_path, contract_path)
+    required_files = (writer_path, runtime_tests_path, workflow_path, build_script_path, contract_path)
     if any(path.is_symlink() or not path.is_file() for path in required_files):
         return [
             "Debian Setupの初期構成の生成処理・試験・手動実行設定・契約が通常のファイルとして揃っていない"
@@ -11247,6 +11248,7 @@ def test_linux_debian_setup_package_is_manual_and_non_authoritative() -> list[st
     writer = writer_path.read_text(encoding="utf-8")
     tests = runtime_tests_path.read_text(encoding="utf-8")
     workflow = workflow_path.read_text(encoding="utf-8")
+    build_script = build_script_path.read_text(encoding="utf-8")
     contract = contract_path.read_text(encoding="utf-8")
     errors: list[str] = []
     for token, label in (
@@ -11287,7 +11289,7 @@ def test_linux_debian_setup_package_is_manual_and_non_authoritative() -> list[st
         "sudo apt-get purge --yes d4-pocket-setup",
         "failed APT test cleanup of package-owned files",
     ):
-        if token not in workflow:
+        if token not in workflow + "\n" + build_script:
             errors.append(f"Debian Setup acceptanceに必要なmanual lifecycle確認がない: {token}")
     if "workflow_dispatch:" not in workflow or "pull_request:" in workflow or "push:" in workflow:
         errors.append("Debian Setup acceptanceがmanual workflow_dispatchに限定されない")
@@ -12610,6 +12612,7 @@ def test_linux_product_launcher_is_built_and_bundle_bound() -> list[str]:
     gtk_smoke = (ROOT / "tooling/tests/linux_gtk_bundle_smoke.py").read_text(encoding="utf-8")
     gtk_smoke_tests = (ROOT / "tooling/tests/test_linux_gtk_bundle_smoke.py").read_text(encoding="utf-8")
     export_workflow = (ROOT / ".github/workflows/linux-manual-export-build.yml").read_text(encoding="utf-8")
+    export_build_script = (ROOT / "tooling/linux_manual_export_build.sh").read_text(encoding="utf-8")
     linux_exporter = (ROOT / "tooling/export_linux_product.py").read_text(encoding="utf-8")
     linux_export_schema = (ROOT / "specs/gui_shell_linux_export_build.schema.json").read_text(encoding="utf-8")
     errors = []
@@ -12726,7 +12729,7 @@ def test_linux_product_launcher_is_built_and_bundle_bound() -> list[str]:
             "Wayland socket connection smoke matcher tests",
         ),
         (
-            export_workflow,
+            export_workflow + "\n" + export_build_script,
             (
                 "workflow_dispatch:",
                 '--launcher "$output_root/bundle/gui_shell_desktop_launcher"',
@@ -12804,6 +12807,10 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
         return ["Linux Export build用の通常file workflowがない"]
     workflow = workflow_path.read_text(encoding="utf-8")
     missing = []
+    build_script_path = ROOT / "tooling/linux_manual_export_build.sh"
+    if build_script_path.is_symlink() or not build_script_path.is_file():
+        return ["Linux Export build用のscope別実行scriptが通常fileではない"]
+    build_script = build_script_path.read_text(encoding="utf-8")
     candidate_prepare_path = ROOT / "tooling/tests/prepare_linux_same_source_update.py"
     if candidate_prepare_path.is_symlink() or not candidate_prepare_path.is_file():
         return ["Linux same-source update candidate準備器が通常fileではない"]
@@ -12854,10 +12861,8 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
         "fetch-depth: 0",
         "559ffa3f75e7402d65a8def9c28389a9b2e6fe42",
         "rustup toolchain install 1.95.0",
-        "tooling/tests/create_linux_export_fixture.py",
-        "fixture_arguments+=(--include-host-operations)",
-        "tooling/export_linux_product.py",
-        "python3 -m unittest tooling.tests.test_linux_installed_product_smoke",
+        "D4P_ACCEPTANCE_SCOPE: ${{ inputs.acceptance_scope }}",
+        "run: bash tooling/linux_manual_export_build.sh",
         "D4P_EXPORT_ROOT",
         "rm -rf -- \"$D4P_EXPORT_ROOT\"",
         "installed-product acceptance",
@@ -12895,6 +12900,32 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
         "--acceptance-scope agent_task_crash_recovery",
     )
     missing = [token for token in required if token not in workflow]
+    build_required = (
+        'case "${D4P_ACCEPTANCE_SCOPE:-}" in',
+        "*) printf '%s\\n' 'unsupported Linux acceptance scope' >&2; exit 2 ;;",
+        "tooling/tests/create_linux_export_fixture.py",
+        'fixture_arguments+=(--include-host-operations)',
+        "tooling/export_linux_product.py",
+        "python3 -m unittest tooling.tests.test_linux_installed_product_smoke",
+        'if [ "$D4P_ACCEPTANCE_SCOPE" = \'host_registration\' ]; then',
+        'export_arguments+=(--r2-e2e-test-build)',
+    )
+    for token in build_required:
+        if token not in build_script:
+            missing.append(f"Linux export build script lacks scope/build contract: {token}")
+    options_match = re.search(
+        r"(?m)^        options:\s*\n((?:^          - [a-z0-9_]+\s*\n)+)", workflow
+    )
+    scope_case = re.search(
+        r'(?m)^case "\$\{D4P_ACCEPTANCE_SCOPE:-\}" in\n\s*([^\n]*)', build_script
+    )
+    if options_match is None or scope_case is None:
+        missing.append("workflow input and extracted script must declare a readable scope set")
+    else:
+        workflow_scopes = re.findall(r"^          - ([a-z0-9_]+)\s*$", options_match.group(1), re.M)
+        script_scopes = scope_case.group(1).partition(")")[0].split("|")
+        if workflow_scopes != script_scopes:
+            missing.append("extracted script scope allowlist differs from manual workflow choices")
     for token in (
         "def _run_installed_mcp_tool_acceptance(",
         "require_mcp=True",
@@ -12973,7 +13004,7 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
     ):
         if token not in product_ui:
             missing.append(f"installed Linux Host UI command: {token}")
-    if "if [ '${{ inputs.acceptance_scope }}' = 'host_registration' ]; then" not in workflow:
+    if 'if [ "$D4P_ACCEPTANCE_SCOPE" = \'host_registration\' ]; then' not in build_script:
         missing.append("installed Linux Host scope selects the Host operations module")
     for token in (
         'host_query = "Host"',
@@ -12986,12 +13017,12 @@ def test_linux_export_build_workflow_is_manual_pinned_and_cleaned() -> list[str]
             missing.append(f"installed Linux Host navigation: {token}")
     if "pull_request:" in workflow or "push:" in workflow:
         missing.append("manual trigger only")
-    feature_gate = workflow.find("export_arguments+=(--r2-e2e-test-build)")
+    feature_gate = build_script.find("export_arguments+=(--r2-e2e-test-build)")
     if feature_gate < 0:
         missing.append("r2-e2e build feature gate is absent")
     else:
-        feature_gate_start = workflow.rfind("if [", 0, feature_gate)
-        feature_gate_text = workflow[feature_gate_start:feature_gate]
+        feature_gate_start = build_script.rfind("if [", 0, feature_gate)
+        feature_gate_text = build_script[feature_gate_start:feature_gate]
         if "agent_task_normal_release" in feature_gate_text:
             missing.append("normal Release Task scope selects the r2-e2e build feature")
     runner_expression = workflow[workflow.find("runs-on:"):workflow.find("timeout-minutes:")]

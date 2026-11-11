@@ -84,7 +84,7 @@
     },
     {
       "path": ".github/workflows/linux-manual-export-build.yml",
-      "sha256": "ae7e39599e5ac6eaefab68667335958e0199c5afffe8de104e2b781fae20a0f9"
+      "sha256": "35a2bc16131f9766d846f2695c04ec00fae039a4a83e119f5dc759efc7805ec4"
     },
     {
       "path": ".github/workflows/linux-manual-rust-validation.yml",
@@ -228,7 +228,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/agent_center.dart",
-      "sha256": "6f0b438fbe841bf933b4ac04e5f3b1a7ecdcf1f0831cdc5e51dfe33f4c84ae2e"
+      "sha256": "43e14e66c5b837589e2e5f1c1ff135ff141c967b5bcc4cf7274ec45c9a2c24a5"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/approval_center.dart",
@@ -748,7 +748,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "e15b62ad21a74b6bf18d963ead11f56d91609c4b0a3cdd55159ad1c3a46f1da4"
+      "sha256": "0dbc7776e99672f8997f6d327d24e74e9e41668796117240d13d0e8581a25d8d"
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
@@ -820,7 +820,7 @@
     },
     {
       "path": "apps/desktop_flutter/windows/runner/main.cpp",
-      "sha256": "93f650e83e4a5aaaa71686768478e58368ab56e69fb7bd22ea69dba6faff7a46"
+      "sha256": "60a5854674e31fe9127080e6e507acbbc9e925329c4955021787a00299ba1109"
     },
     {
       "path": "apps/desktop_flutter/windows/runner/resource.h",
@@ -852,7 +852,7 @@
     },
     {
       "path": "apps/desktop_flutter/windows/runner/win32_window.cpp",
-      "sha256": "41bb69c1d0af4785d9ac374ad3436255eba5b33282d2682170f0876598214d5b"
+      "sha256": "e0947f94d7c47b681970ab2f6d3e324c6e838402c7afb248ff5adeb8cbfa9f8d"
     },
     {
       "path": "apps/desktop_flutter/windows/runner/win32_window.h",
@@ -1444,7 +1444,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "c876ad9a028422439901d762500f25f54a50d8b26e8383ac3da21b863b939279"
+      "sha256": "e1c4431811f6b68cdacaeee2d25f419cef6b293156113c766dc824ff367a4ae3"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -5408,7 +5408,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "46e313dc6a4a3257fa3bc3927f54ef3df7cb390cc84c9a90eec995465e509f74"
+      "sha256": "daa34942e521f7e1954d9f69dcbb8b4cec9ef4a30a2776f187e684ea39cc1d72"
     },
     {
       "path": "tooling/conformance_tests/test_final_development_audit.py",
@@ -5493,6 +5493,10 @@
     {
       "path": "tooling/linux_installed_acceptance_summary.py",
       "sha256": "98ddde1ee4307c26bd16bc04dc36c6454f72d111ce03b902d74cfc28aa548349"
+    },
+    {
+      "path": "tooling/linux_manual_export_build.sh",
+      "sha256": "874576deb7e37d26f4e987d043426440691668345e0d8c6079890af710be2d6d"
     },
     {
       "path": "tooling/long_run_validation.py",
