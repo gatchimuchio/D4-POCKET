@@ -7467,12 +7467,14 @@ def _run_installed_agent_mcp_followup_acceptance(
         "許可",
         context="installed MCP Agent Runtime／Workspace registration",
         expected_summary_markers=(
-            "Agent CLI実行系と作業領域を、このDesktop起動中だけBrokerへ登録しますか？",
-            f"Runtime ID: {runtime_id}",
-            f"CLI実行file: {codex_cli}",
+            "Agent CLI実行系とWorkspaceを、このBroker起動中だけ登録します。",
+            f"Runtime: {runtime_id}",
+            "CLI実行file: <path>",
             f"Workspace ID: {workspace_id}",
-            f"Workspace root: {task_workspace}",
-            "Permission、Approval、Trust、Credentialを生成・保存しません。",
+            "Workspace root: <path>",
+            "除外する秘密path: .env / private/token.txt",
+            "Task・模型要求・Workspace変更は行わず",
+            "Permission・Approval・Trust・Credentialを生成しません。",
         ),
     )
     _wait_for_owner_dialog_closed(environment)
