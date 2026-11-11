@@ -4731,6 +4731,7 @@ class InstalledTaskStatusPollingTests(unittest.TestCase):
                         "stderr_bytes": 0,
                     },
                 ],
+                "rejections": [],
                 "scenarios": [
                     {
                         "name": "mcp_proposal",
@@ -4740,6 +4741,15 @@ class InstalledTaskStatusPollingTests(unittest.TestCase):
                         "mcp_function_calls": 0,
                         "mcp_function_outputs": 0,
                         "required_input_marker_observed": False,
+                        "request_shapes": [
+                            {
+                                "input_items": 1,
+                                "function_call_output_items": 0,
+                                "exec_command_offered": True,
+                                "task_mcp_tool_offered": False,
+                                "task_mcp_tool_descriptors": [],
+                            }
+                        ],
                     }
                 ],
             }
@@ -4821,6 +4831,65 @@ class InstalledTaskStatusPollingTests(unittest.TestCase):
         )
         self.assertEqual(diagnostics, {"state": "invalid", "records": []})
         self.assertNotIn("SYNTHETIC_SECRET_CANARY", json.dumps(diagnostics))
+
+    def test_response_fixture_diagnostics_classify_request_shape_without_raw_tool_data(
+        self,
+    ) -> None:
+        responses_server = types.SimpleNamespace(
+            snapshot=lambda: {
+                "agent_task_diagnostics": [],
+                "rejections": [
+                    "task_mcp_namespace_function_not_offered",
+                    "PRIVATE_SERVER_LABEL_CANARY",
+                ],
+                "scenarios": [
+                    {
+                        "name": "mcp_proposal",
+                        "posts": 3,
+                        "tool_calls": 0,
+                        "tool_outputs": 0,
+                        "mcp_function_calls": 0,
+                        "mcp_function_outputs": 0,
+                        "required_input_marker_observed": False,
+                        "request_shapes": [
+                            {
+                                "input_items": 2,
+                                "function_call_output_items": 0,
+                                "exec_command_offered": True,
+                                "task_mcp_tool_offered": False,
+                                "task_mcp_tool_descriptors": [
+                                    {
+                                        "type": "function",
+                                        "name": "mcp__d4p_task_request__d4_submit_mcp_tool_request",
+                                        "server_label": "d4p_task_request",
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+        diagnostics = _installed_task_response_fixture_diagnostics(
+            responses_server, "mcp_proposal", 0
+        )
+        rendered = json.dumps(diagnostics, ensure_ascii=False, sort_keys=True)
+        self.assertEqual(diagnostics["state"], "read")
+        self.assertEqual(
+            diagnostics["fixture_rejection_counts"],
+            {"task_mcp_namespace_function_not_offered": 1},
+        )
+        self.assertEqual(diagnostics["unknown_fixture_rejection_count"], 1)
+        self.assertEqual(
+            diagnostics["request_shapes"][0]["task_mcp_tool_descriptors"][0][
+                "name_class"
+            ],
+            "namespaced_expected",
+        )
+        self.assertNotIn("PRIVATE_SERVER_LABEL_CANARY", rendered)
+        self.assertNotIn(
+            "mcp__d4p_task_request__d4_submit_mcp_tool_request", rendered
+        )
 
     def test_response_fixture_diagnostics_reject_unhashable_event_values(self) -> None:
         responses_server = types.SimpleNamespace(

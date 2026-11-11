@@ -4523,6 +4523,8 @@ class _LinuxAgentTaskResponsesServer:
                     tool.get("name") == tool_name
                     or tool.get("namespace") == tool_namespace
                     or tool.get("server_label") == tool_namespace
+                    or tool.get("name")
+                    == f"mcp__{tool_namespace}__{tool_name}"
                 )
             ]
             offers_task_mcp_tool = any(
@@ -5477,6 +5479,98 @@ def _normalize_stored_r2_e2e_diagnostic(payload: object) -> dict[str, object] | 
     return None
 
 
+def _normalize_response_fixture_request_shapes(
+    payload: object,
+) -> list[dict[str, object]] | None:
+    if not isinstance(payload, list) or len(payload) > 32:
+        return None
+    expected_shape_fields = {
+        "input_items",
+        "function_call_output_items",
+        "exec_command_offered",
+        "task_mcp_tool_offered",
+        "task_mcp_tool_descriptors",
+    }
+    descriptor_fields = {"type", "name", "namespace", "server", "server_label"}
+    normalized: list[dict[str, object]] = []
+    for row in payload:
+        if not isinstance(row, dict) or set(row) != expected_shape_fields:
+            return None
+        counts = (row.get("input_items"), row.get("function_call_output_items"))
+        if any(
+            type(value) is not int or not 0 <= value <= 1_000_000
+            for value in counts
+        ):
+            return None
+        if type(row.get("exec_command_offered")) is not bool or type(
+            row.get("task_mcp_tool_offered")
+        ) is not bool:
+            return None
+        descriptors = row.get("task_mcp_tool_descriptors")
+        if not isinstance(descriptors, list) or len(descriptors) > 4:
+            return None
+        safe_descriptors: list[dict[str, str]] = []
+        for descriptor in descriptors:
+            if not isinstance(descriptor, dict) or not set(descriptor).issubset(
+                descriptor_fields
+            ):
+                return None
+
+            def classify(
+                value: object, expected: str, *, namespaced: str | None = None
+            ) -> str:
+                if value is None:
+                    return "absent"
+                if not isinstance(value, str) or len(value) > 512:
+                    return "non_string"
+                if value == expected:
+                    return "expected"
+                if namespaced is not None and value == namespaced:
+                    return "namespaced_expected"
+                return "other"
+
+            tool_namespace = "d4p_task_request"
+            tool_name = "d4_submit_mcp_tool_request"
+            type_value = descriptor.get("type")
+            type_class = (
+                "absent"
+                if "type" not in descriptor
+                else type_value
+                if isinstance(type_value, str)
+                and type_value in {"function", "mcp"}
+                else "other"
+            )
+            safe_descriptors.append(
+                {
+                    "type_class": type_class,
+                    "name_class": classify(
+                        descriptor.get("name"),
+                        tool_name,
+                        namespaced=f"mcp__{tool_namespace}__{tool_name}",
+                    ),
+                    "namespace_class": classify(
+                        descriptor.get("namespace"), tool_namespace
+                    ),
+                    "server_class": classify(
+                        descriptor.get("server"), tool_namespace
+                    ),
+                    "server_label_class": classify(
+                        descriptor.get("server_label"), tool_namespace
+                    ),
+                }
+            )
+        normalized.append(
+            {
+                "input_items": row["input_items"],
+                "function_call_output_items": row["function_call_output_items"],
+                "exec_command_offered": row["exec_command_offered"],
+                "task_mcp_tool_offered": row["task_mcp_tool_offered"],
+                "task_mcp_tool_descriptors": safe_descriptors,
+            }
+        )
+    return normalized
+
+
 def _installed_task_response_fixture_diagnostics(
     responses_server: _LinuxAgentTaskResponsesServer,
     scenario_name: str,
@@ -5519,6 +5613,49 @@ def _installed_task_response_fixture_diagnostics(
     if len(matching) != 1:
         return {"state": "scenario_unavailable", "records": records}
     row = matching[0]
+    request_shapes = _normalize_response_fixture_request_shapes(
+        row.get("request_shapes")
+    )
+    raw_rejections = snapshot.get("rejections")
+    if (
+        request_shapes is None
+        or not isinstance(raw_rejections, list)
+        or len(raw_rejections) > 4096
+    ):
+        return {"state": "invalid", "records": []}
+    known_rejections = {
+        "authorization_mismatch",
+        "blocked_connect_request",
+        "diagnostic_authorization_header",
+        "diagnostic_limit_exceeded",
+        "malformed_diagnostic",
+        "malformed_request",
+        "mcp_result_marker_missing_from_followup_input",
+        "request_without_active_task",
+        "responses_input_not_array",
+        "synthetic_secret_canary_in_followup_request",
+        "synthetic_secret_canary_in_tool_output",
+        "task_mcp_function_output_mismatch",
+        "task_mcp_function_output_not_text",
+        "task_mcp_namespace_function_not_offered",
+        "task_mcp_proposal_missing",
+        "tool_output_call_id_mismatch",
+        "tool_output_not_text",
+        "unexpected_delete",
+        "unexpected_mcp_followup_request_count",
+        "unexpected_mcp_proposal_request_sequence",
+        "unexpected_post",
+        "unexpected_put",
+        "unexpected_response_request_shape",
+        "unsafe_diagnostic_rejected",
+    }
+    rejection_counts: dict[str, int] = {}
+    unknown_rejection_count = max(0, len(raw_rejections) - 128)
+    for reason in raw_rejections[:128]:
+        if isinstance(reason, str) and reason in known_rejections:
+            rejection_counts[reason] = rejection_counts.get(reason, 0) + 1
+        else:
+            unknown_rejection_count += 1
     count_fields = (
         "posts",
         "tool_calls",
@@ -5542,6 +5679,9 @@ def _installed_task_response_fixture_diagnostics(
             "mcp_function_outputs": row["mcp_function_outputs"],
             "required_input_marker_observed": row["required_input_marker_observed"],
         },
+        "request_shapes": request_shapes,
+        "fixture_rejection_counts": dict(sorted(rejection_counts.items())),
+        "unknown_fixture_rejection_count": unknown_rejection_count,
         "records": records,
     }
 

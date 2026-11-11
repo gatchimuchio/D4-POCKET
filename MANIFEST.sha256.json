@@ -84,7 +84,7 @@
     },
     {
       "path": ".github/workflows/linux-manual-export-build.yml",
-      "sha256": "9f22b7eaac3384f11bbd1b2115910ace67395bfc55849a6f5a96aa8505082930"
+      "sha256": "ae7e39599e5ac6eaefab68667335958e0199c5afffe8de104e2b781fae20a0f9"
     },
     {
       "path": ".github/workflows/linux-manual-rust-validation.yml",
@@ -1444,7 +1444,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "cc19e2017cc65e93f46b03e8afd0da426b86eeb1b7797ce1e73d8c434d794a2a"
+      "sha256": "6e2362ca6f68cfcda5ac643fd5ab6a87ceb7abff41f94f3c5dda6c99713c253f"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -4000,7 +4000,7 @@
     },
     {
       "path": "native/rust_helper/src/macos_desktop_owner.rs",
-      "sha256": "d80cbaa117125533b901811608010a7ac168cc812fff0706a38f432b813cab27"
+      "sha256": "33ffd0897e5c174a4795d2265ef2660ed302fcbd0ecc077516691efdb38add35"
     },
     {
       "path": "native/rust_helper/src/macos_desktop_worker.rs",
@@ -5408,7 +5408,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "57ef2903b126782bdac4b861841a75bcfabf8fba524937c32d10fc5b8ed13c1f"
+      "sha256": "46e313dc6a4a3257fa3bc3927f54ef3df7cb390cc84c9a90eec995465e509f74"
     },
     {
       "path": "tooling/conformance_tests/test_final_development_audit.py",
@@ -5488,7 +5488,7 @@
     },
     {
       "path": "tooling/linux_export_workflow.py",
-      "sha256": "2da39c1d43a8a52d25b2a06c1954ec865e7a1d99614ab779885cd4a70c94a2a5"
+      "sha256": "b975470759d629959b6db3f364f778d0c4aa9fdf933d5d4b530f66baee8f7402"
     },
     {
       "path": "tooling/linux_installed_acceptance_summary.py",
@@ -5592,7 +5592,7 @@
     },
     {
       "path": "tooling/tests/linux_installed_product_smoke.py",
-      "sha256": "b37b3c20c92d2bb9ca1c57e74da29e4bc51ccab1addf96d539560c0408857bdf"
+      "sha256": "8086da66d93815116a84cc057a2fdee9baa99c1384a18be4ba36d76bdb0eda9f"
     },
     {
       "path": "tooling/tests/linux_update_https_server.py",
@@ -5620,7 +5620,7 @@
     },
     {
       "path": "tooling/tests/test_linux_installed_product_smoke.py",
-      "sha256": "61d52232faf27239b3661005f0fc5d6149f11acf49a736243ad3eaeecc5212e2"
+      "sha256": "ff23fb2e9301623569f50ac62d7d307c4bd9c751472c32668ba16f076b946f3b"
     },
     {
       "path": "tooling/tests/test_linux_portable_archive.py",
