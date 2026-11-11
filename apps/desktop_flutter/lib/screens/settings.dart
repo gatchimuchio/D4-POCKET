@@ -147,6 +147,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       TextEditingController(text: '構成Preview結果へ対象platformを表示する');
   final TextEditingController _editTargetPathController = TextEditingController(
       text: 'apps/desktop_flutter/lib/screens/settings.dart');
+  final TextEditingController _editExpectedChangesController =
+      TextEditingController();
 
   @override
   void dispose() {
@@ -160,6 +162,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _exportUpdateSourceController.dispose();
     _editInstructionController.dispose();
     _editTargetPathController.dispose();
+    _editExpectedChangesController.dispose();
     super.dispose();
   }
 
@@ -1240,6 +1243,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           const SizedBox(height: 8),
+          TextField(
+            key: const ValueKey('compose-ai-edit-expected-changes'),
+            controller: _editExpectedChangesController,
+            minLines: 2,
+            maxLines: 4,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              labelText: '予定変更（1行ごと）',
+              helperText: '変更内容を1行ずつ入力してください（最大32項目）',
+            ),
+          ),
+          const SizedBox(height: 8),
           FilledButton.icon(
             key: const ValueKey('compose-ai-edit-button'),
             onPressed: _aiEditInProgress ? null : () => _runAiEdit(client),
@@ -1286,9 +1301,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
         .map((path) => path.trim())
         .where((path) => path.isNotEmpty)
         .toList(growable: false);
-    const expectedChanges = [
-      'Owner／Developerが内容を確認してから実装を開始する',
-    ];
+    final expectedChanges = _editExpectedChangesController.text
+        .split(RegExp(r'\r?\n'))
+        .map((change) => change.trim())
+        .where((change) => change.isNotEmpty)
+        .toList(growable: false);
+    if (expectedChanges.isEmpty) {
+      _rejectAiEditInput('予定変更を1行以上入力してください。');
+      return;
+    }
+    if (expectedChanges.length > 32 ||
+        expectedChanges.any(
+          (change) => change.runes.length > 240 || change.contains('\u0000'),
+        )) {
+      _rejectAiEditInput('予定変更は32項目以内、各240文字以内で入力してください。');
+      return;
+    }
     final editId =
         'settings-edit-${DateTime.now().toUtc().microsecondsSinceEpoch.toRadixString(16)}';
     setState(() {
@@ -1401,6 +1429,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _setAiEditMessage(String message) {
     if (mounted) setState(() => _aiEditMessage = message);
+  }
+
+  void _rejectAiEditInput(String message) {
+    if (!mounted) return;
+    setState(() {
+      _aiEditProposal = null;
+      _aiEditReceipt = null;
+      _aiEditMessage = message;
+    });
   }
 
   void _setComposeMessage(String message) {

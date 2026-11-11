@@ -251,11 +251,20 @@ void main() {
         ],
       });
 
+      await _enter(
+        tester,
+        'compose-ai-edit-expected-changes',
+        'Previewで対象platformを表示する\n現行の権限境界を維持する',
+      );
       await _tap(tester, 'compose-ai-edit-button');
       final proposal = transport.lastPayload('GUI Shell編集提案');
       expect(proposal['execution_mode'], 'proposal_only');
       expect(proposal['self_approval'], isFalse);
       expect(proposal['repository_rules_acknowledged'], isTrue);
+      expect(proposal['expected_changes'], [
+        'Previewで対象platformを表示する',
+        '現行の権限境界を維持する',
+      ]);
       expect(tester.takeException(), isNull);
     },
   );
@@ -283,10 +292,19 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await _enter(
+      tester,
+      'compose-ai-edit-expected-changes',
+      'Previewで対象platformを表示する\n権限境界を変更しない',
+    );
     await _tap(tester, 'compose-ai-edit-button');
     final proposal = transport.lastPayload('GUI Shell編集提案');
     expect(proposal['execution_mode'], 'proposal_only');
     expect(proposal['self_approval'], isFalse);
+    expect(proposal['expected_changes'], [
+      'Previewで対象platformを表示する',
+      '権限境界を変更しない',
+    ]);
     expect(preparedTaskInstruction, isNull);
 
     await _tap(tester, 'compose-ai-edit-review-button');
@@ -305,6 +323,15 @@ void main() {
         of: dialog,
         matching: find
             .textContaining('apps/desktop_flutter/lib/screens/settings.dart'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: dialog,
+        matching: find.textContaining(
+          'Previewで対象platformを表示する\n権限境界を変更しない',
+        ),
       ),
       findsOneWidget,
     );
@@ -335,6 +362,7 @@ void main() {
     expect(taskEnvelope['context_type'], 'gui_shell_ai_edit_proposal');
     expect(handedProposal['instruction'], proposal['instruction']);
     expect(handedProposal['target_paths'], proposal['target_paths']);
+    expect(handedProposal['expected_changes'], proposal['expected_changes']);
     expect(handedProposal['instruction_hash'], brokerPayloadHash(proposal));
     expect(handedProposal['audit_id'], 'audit-compose-ai-edit');
     expect(handedProposal['execution_mode'], 'proposal_only');
@@ -358,6 +386,49 @@ void main() {
           }.contains(request['operation'])),
       isFalse,
       reason: 'Settings確認は下書きを渡すだけでAgent Taskや権限操作を始めない',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('AI Editは空または上限外の予定変更をBrokerへ送らない', (tester) async {
+    tester.view.physicalSize = const Size(800, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final transport = _ComposeScreenTransport();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SettingsScreen(
+            client: ShellCoreClient.mock(transport: transport),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _tap(tester, 'compose-ai-edit-button');
+    expect(find.text('予定変更を1行以上入力してください。'), findsOneWidget);
+
+    await _enter(
+      tester,
+      'compose-ai-edit-expected-changes',
+      List<String>.generate(33, (index) => '変更項目$index').join('\n'),
+    );
+    await _tap(tester, 'compose-ai-edit-button');
+    expect(find.text('予定変更は32項目以内、各240文字以内で入力してください。'), findsOneWidget);
+
+    await _enter(
+      tester,
+      'compose-ai-edit-expected-changes',
+      List<String>.filled(241, 'あ').join(),
+    );
+    await _tap(tester, 'compose-ai-edit-button');
+    expect(find.text('予定変更は32項目以内、各240文字以内で入力してください。'), findsOneWidget);
+    expect(
+      transport.requests
+          .where((request) => request['operation'] == 'GUI Shell編集提案'),
+      isEmpty,
     );
     expect(tester.takeException(), isNull);
   });
