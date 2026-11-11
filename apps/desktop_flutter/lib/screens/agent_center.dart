@@ -151,6 +151,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
   bool _comparisonPending = false;
   bool _appActive = true;
   int _resultGeneration = 0;
+  int _resultContextGeneration = 0;
   Timer? _resultClearTimer;
   String? _taskPreflightSession;
   final _taskCancellationGate = AgentTaskCancellationGate();
@@ -225,7 +226,10 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _appActive = state == AppLifecycleState.resumed;
-    _clearAllResultProjections();
+    // A native Owner confirmation may briefly deactivate the Flutter window.
+    // Clear already-rendered content, but let the in-flight, task-bound
+    // exposure continue after the app resumes.
+    _clearAllResultProjections(invalidatePendingExposure: false);
     if (mounted) setState(() {});
   }
 
@@ -268,8 +272,12 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
 
   bool get _active => widget.active && _appActive;
 
-  void _clearAllResultProjections({String? preserveTaskContextForSession}) {
+  void _clearAllResultProjections({
+    String? preserveTaskContextForSession,
+    bool invalidatePendingExposure = true,
+  }) {
     _resultGeneration++;
+    if (invalidatePendingExposure) _resultContextGeneration++;
     _resultClearTimer?.cancel();
     _resultClearTimer = null;
     for (final entry in _agentTasks.entries) {
@@ -1620,8 +1628,9 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     final visibility = state.resultVisibility;
     _clearAllResultProjections(
       preserveTaskContextForSession: session.sessionId,
+      invalidatePendingExposure: false,
     );
-    final resultGeneration = _resultGeneration;
+    final resultContextGeneration = _resultContextGeneration;
     setState(() {
       _taskPreflightSession = session.sessionId;
       _taskPreflightStatus[session.sessionId] =
@@ -1630,6 +1639,16 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     try {
       final client = AgentTaskClient(transport);
       final approval = await client.grantResultExposure(task, visibility);
+      if (!mounted ||
+          !identical(_agentTasks[session.sessionId], state) ||
+          !_active ||
+          resultContextGeneration != _resultContextGeneration ||
+          state.record?.taskId != taskId ||
+          state.resultVisibility != visibility ||
+          !_sessionStillMatchesRegistration(session)) {
+        return;
+      }
+      final resultGeneration = _resultGeneration;
       final projection = await client.readResult(approval);
       if (!mounted ||
           !identical(_agentTasks[session.sessionId], state) ||

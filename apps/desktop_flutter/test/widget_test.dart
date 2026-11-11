@@ -2698,7 +2698,19 @@ void main() {
           auditId: 'audit-task-c-start',
         ),
       ),
-    ]);
+    ], onRequest: (operation) {
+      if (operation == 'AgentTask結果表示承認') {
+        // The native Owner confirmation can briefly deactivate the Flutter
+        // window. Returning to the Agent Center must not discard the newly
+        // approved, task-bound result projection.
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.inactive,
+        );
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+      }
+    });
     final client = await ShellCoreClient.product(transport: transport);
 
     await tester.pumpWidget(MaterialApp(

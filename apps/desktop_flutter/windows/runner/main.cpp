@@ -35,11 +35,20 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   window.SetQuitOnClose(true);
 
   ::MSG msg;
-  while (::GetMessage(&msg, nullptr, 0, 0)) {
+  int exit_code = EXIT_SUCCESS;
+  while (true) {
+    const BOOL message_result = ::GetMessage(&msg, nullptr, 0, 0);
+    if (message_result == -1) {
+      // GetMessage uses -1 for failure. Treating it as true spins while
+      // repeatedly dispatching an invalid/stale MSG and starves the UI thread.
+      exit_code = EXIT_FAILURE;
+      break;
+    }
+    if (message_result == 0) break;
     ::TranslateMessage(&msg);
     ::DispatchMessage(&msg);
   }
 
   ::CoUninitialize();
-  return EXIT_SUCCESS;
+  return exit_code;
 }
