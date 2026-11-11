@@ -1222,6 +1222,10 @@ Windows Computer Useはこの2個目の同名Flutter windowをtargetable window�
 
 P9 portable bundleのWindows再起動時、Computer Use helperは同名製品windowを対象可能な窓として返さなかった。process path／parentは対象bundleを識別できたが、視覚的な画面確認は主張しない。P10の機能受入れはcompile-time define、製品build記録、Widget試験の範囲で閉じる。AOT／binaryの意味上の除去、Rust／第三者依存の除去、サイズ、cold startup、実行時resource、最終統合製品上の再確認は`docs/FINAL_QA_QUEUE.md`と既存release blockerへ送る。`binary_pruning_verified=false`は維持する。現行phaseは直ちにP11 Windows Productizationとする。
 
+#### 補助測定（2026-11-11、Linux WSL2 fixture）
+
+P10の機能上の除外CLOSEDは保持する。別のsame-source Linux Release fixture比較では、全optional 8件からTrace Inspectorと依存Observabilityを選択したとき、libapp.soが8,078,224 bytesから7,783,312 bytesへ294,912 bytes（3.65%）減り、bundle inventoryは53,766,771 bytesから53,473,069 bytesへ293,702 bytes（0.55%）減った。Ubuntu 24.04.5 WSL2／Xvfb GTK window-close smokeは両variantでPASSした。Owner authorization／installed product／Linux native desktop／cold startup／実行時resourceは未成立であり、size差だけではbinary pruningの意味上の除去を証明しない。FQ-MODULE-PRUNINGは未解決、binary_pruning_verified=falseを維持する。詳細なartifact hashとcommandはdocs/QE_2026-11-09/進捗.mdの2026-11-11追補に記録する。
+
 ### P11 Windows製品化 — CLOSED（rev5製品機能受入れ）
 
 P11のInstaller entryは、P9 portable ZIPをbootstrapとしてD4 Pocketを起動し、製品内Update CenterからBroker所有trustで検証されたpackageをdownloadして初回Installする経路と定義した。別個のMSI／Setup.exeや署名済みrelease artifactを作成したとは主張しない。利用者のInstall操作はRust Brokerのnative Owner確認、固定product root、durable Audit、active version record、Start Menu登録、終了後の導入版起動引継ぎを通る。Uninstaller、first-run／Setup Doctor、Update、Rollback、固定root／payload欠損の限定Repair、version表示も既存製品経路へ接続済み。
