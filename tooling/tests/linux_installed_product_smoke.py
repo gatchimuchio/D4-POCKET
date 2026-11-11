@@ -5164,6 +5164,7 @@ def _wait_installed_task_status(
     *,
     task_id: str,
     timeout: float,
+    diagnostic_audit_path: Path | None = None,
 ) -> str:
     deadline = time.monotonic() + timeout
     last_snapshot = ""
@@ -5201,6 +5202,8 @@ def _wait_installed_task_status(
             )
         )
         visible_statuses[:] = list(dict.fromkeys(visible_statuses))[-6:]
+        if current_task_status in {"completed", "failed", "cancelled", "quarantined"}:
+            break
         try:
             refresh = _find_operable_accessible(
                 "Task状態を更新",
@@ -5222,6 +5225,10 @@ def _wait_installed_task_status(
         "refresh_control_seen": refresh_control_seen,
         "refresh_attempts": refresh_attempts,
     }
+    if diagnostic_audit_path is not None:
+        diagnostics["task_history"] = _installed_task_history_diagnostics(
+            diagnostic_audit_path.parent, task_id
+        )
     raise RuntimeError(
         f"installed Agent Taskが{expected_status}へ遷移しませんでした: "
         + json.dumps(diagnostics, ensure_ascii=False, sort_keys=True)
@@ -7524,7 +7531,12 @@ def _run_installed_agent_mcp_followup_acceptance(
         window, previously_visible_task_ids=previous_task_ids, timeout=15.0
     )
     source_snapshot = _wait_installed_task_status(
-        environment, window, "completed", task_id=source_task_id, timeout=90.0
+        environment,
+        window,
+        "completed",
+        task_id=source_task_id,
+        timeout=90.0,
+        diagnostic_audit_path=audit_store / "audit.jsonl",
     )
     source_result_hash_match = re.search(
         r"結果hash:\s*(sha256:[0-9a-f]{64})", source_snapshot
@@ -7618,7 +7630,12 @@ def _run_installed_agent_mcp_followup_acceptance(
     if followup_task_id == source_task_id:
         raise RuntimeError("実MCP結果を受け取る後続Taskがfresh Task IDではありません")
     followup_snapshot = _wait_installed_task_status(
-        environment, window, "completed", task_id=followup_task_id, timeout=90.0
+        environment,
+        window,
+        "completed",
+        task_id=followup_task_id,
+        timeout=90.0,
+        diagnostic_audit_path=audit_store / "audit.jsonl",
     )
     if result_marker in _accessible_snapshot(_find_accessible(WINDOW_TITLE, timeout=10)):
         raise RuntimeError("実MCP結果本文がAgent Centerのaccessibility projectionへ露出しました")

@@ -4702,6 +4702,56 @@ class InstalledTaskStatusPollingTests(unittest.TestCase):
         self.assertNotIn("RAW_PRIVATE_TASK_TEXT", str(caught.exception))
 
 
+    def test_status_wait_stops_on_terminal_failure_and_adds_bounded_audit_classification(
+        self,
+    ) -> None:
+        window = object()
+        audit_path = Path("/diagnostic/audit.jsonl")
+        private_text = "RAW_PRIVATE_TASK_TEXT"
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_accessible",
+                return_value=window,
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._linux_installed_task_status_observation",
+                return_value=(None, "failed", ["running", "failed"]),
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._accessible_snapshot",
+                return_value="Task識別子: task-test" + chr(10) + "Task状態: failed" + chr(10) + private_text,
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke._find_operable_accessible"
+            ) as refresh,
+            patch("tooling.tests.linux_installed_product_smoke.time.sleep") as sleep,
+            patch(
+                "tooling.tests.linux_installed_product_smoke._installed_task_history_diagnostics",
+                return_value={
+                    "state": "read",
+                    "terminal_records": [
+                        {"status": "failed", "failure_class": "応答不正"}
+                    ],
+                },
+            ) as audit_diagnostics,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "応答不正") as caught:
+                _wait_installed_task_status(
+                    {},
+                    window,
+                    "completed",
+                    task_id="task-test",
+                    timeout=90.0,
+                    diagnostic_audit_path=audit_path,
+                )
+        rendered = str(caught.exception)
+        self.assertIn('"current_task_status": "failed"', rendered)
+        self.assertNotIn(private_text, rendered)
+        refresh.assert_not_called()
+        sleep.assert_not_called()
+        audit_diagnostics.assert_called_once_with(audit_path.parent, "task-test")
+
+
 class AgentTaskAuditAcceptanceTests(unittest.TestCase):
     def test_three_independent_terminal_tasks_and_scratch_cleanup_are_audited(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
