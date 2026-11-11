@@ -66,6 +66,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _register_linux_provider_credential_in_installed_dialog,
     _installed_task_write_failure_diagnostics,
     _installed_task_history_diagnostics,
+    _installed_task_response_fixture_diagnostics,
     _stop_linux_agent_task_process_group,
     _linux_processes_with_task_nonce,
     _review_single_installed_mcp_tool_arguments,
@@ -4708,6 +4709,41 @@ class InstalledTaskStatusPollingTests(unittest.TestCase):
         window = object()
         audit_path = Path("/diagnostic/audit.jsonl")
         private_text = "RAW_PRIVATE_TASK_TEXT"
+        responses_server = types.SimpleNamespace(
+            snapshot=lambda: {
+                "agent_task_diagnostics": [
+                    {
+                        "stage": "codex_cli_exit",
+                        "exit_code": "Some(2)",
+                        "stdout_event_types": ["error"],
+                        "stdout_error_class": "other",
+                        "stdout_http_status": None,
+                        "stderr_class": "configuration",
+                        "stderr_bytes": 42,
+                    },
+                    {
+                        "stage": "codex_cli_exit",
+                        "exit_code": "Some(1)",
+                        "stdout_event_types": ["error"],
+                        "stdout_error_class": "authentication",
+                        "stdout_http_status": 401,
+                        "stderr_class": "empty",
+                        "stderr_bytes": 0,
+                    },
+                ],
+                "scenarios": [
+                    {
+                        "name": "mcp_proposal",
+                        "posts": 1,
+                        "tool_calls": 0,
+                        "tool_outputs": 0,
+                        "mcp_function_calls": 0,
+                        "mcp_function_outputs": 0,
+                        "required_input_marker_observed": False,
+                    }
+                ],
+            }
+        )
         with (
             patch(
                 "tooling.tests.linux_installed_product_smoke._find_accessible",
@@ -4743,13 +4779,80 @@ class InstalledTaskStatusPollingTests(unittest.TestCase):
                     task_id="task-test",
                     timeout=90.0,
                     diagnostic_audit_path=audit_path,
+                    diagnostic_response_fixture=(
+                        responses_server,
+                        "mcp_proposal",
+                        1,
+                    ),
                 )
         rendered = str(caught.exception)
         self.assertIn('"current_task_status": "failed"', rendered)
+        self.assertIn('"stdout_error_class": "authentication"', rendered)
+        self.assertIn('"responses_posts": 1', rendered)
         self.assertNotIn(private_text, rendered)
         refresh.assert_not_called()
         sleep.assert_not_called()
         audit_diagnostics.assert_called_once_with(audit_path.parent, "task-test")
+
+    def test_response_fixture_diagnostics_reject_unbounded_fields(self) -> None:
+        responses_server = types.SimpleNamespace(
+            snapshot=lambda: {
+                "agent_task_diagnostics": [
+                    {
+                        "stage": "codex_cli_exit",
+                        "detail": "SYNTHETIC_SECRET_CANARY",
+                    }
+                ],
+                "scenarios": [
+                    {
+                        "name": "mcp_proposal",
+                        "posts": 0,
+                        "tool_calls": 0,
+                        "tool_outputs": 0,
+                        "mcp_function_calls": 0,
+                        "mcp_function_outputs": 0,
+                        "required_input_marker_observed": False,
+                    }
+                ],
+            }
+        )
+        diagnostics = _installed_task_response_fixture_diagnostics(
+            responses_server, "mcp_proposal", 0
+        )
+        self.assertEqual(diagnostics, {"state": "invalid", "records": []})
+        self.assertNotIn("SYNTHETIC_SECRET_CANARY", json.dumps(diagnostics))
+
+    def test_response_fixture_diagnostics_reject_unhashable_event_values(self) -> None:
+        responses_server = types.SimpleNamespace(
+            snapshot=lambda: {
+                "agent_task_diagnostics": [
+                    {
+                        "stage": "codex_cli_exit",
+                        "exit_code": "Some(1)",
+                        "stdout_event_types": [{}],
+                        "stdout_error_class": "none",
+                        "stdout_http_status": None,
+                        "stderr_class": "empty",
+                        "stderr_bytes": 0,
+                    }
+                ],
+                "scenarios": [
+                    {
+                        "name": "mcp_proposal",
+                        "posts": 0,
+                        "tool_calls": 0,
+                        "tool_outputs": 0,
+                        "mcp_function_calls": 0,
+                        "mcp_function_outputs": 0,
+                        "required_input_marker_observed": False,
+                    }
+                ],
+            }
+        )
+        diagnostics = _installed_task_response_fixture_diagnostics(
+            responses_server, "mcp_proposal", 0
+        )
+        self.assertEqual(diagnostics, {"state": "invalid", "records": []})
 
 
 class AgentTaskAuditAcceptanceTests(unittest.TestCase):

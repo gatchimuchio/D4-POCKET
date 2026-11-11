@@ -5165,6 +5165,9 @@ def _wait_installed_task_status(
     task_id: str,
     timeout: float,
     diagnostic_audit_path: Path | None = None,
+    diagnostic_response_fixture: tuple[
+        _LinuxAgentTaskResponsesServer, str, int
+    ] | None = None,
 ) -> str:
     deadline = time.monotonic() + timeout
     last_snapshot = ""
@@ -5228,6 +5231,12 @@ def _wait_installed_task_status(
     if diagnostic_audit_path is not None:
         diagnostics["task_history"] = _installed_task_history_diagnostics(
             diagnostic_audit_path.parent, task_id
+        )
+    if diagnostic_response_fixture is not None:
+        diagnostics["responses_fixture"] = (
+            _installed_task_response_fixture_diagnostics(
+                *diagnostic_response_fixture
+            )
         )
     raise RuntimeError(
         f"installed Agent Taskが{expected_status}へ遷移しませんでした: "
@@ -5405,6 +5414,136 @@ def _installed_task_history_diagnostics(store: Path, task_id: str) -> dict[str, 
             }
         )
     return {"state": "read", "terminal_records": terminal_records[-1:]}
+
+
+def _normalize_stored_r2_e2e_diagnostic(payload: object) -> dict[str, object] | None:
+    if not isinstance(payload, dict) or not isinstance(payload.get("stage"), str):
+        return None
+    stage = payload["stage"]
+    if stage == "codex_cli_exit":
+        expected = {
+            "stage",
+            "exit_code",
+            "stdout_event_types",
+            "stdout_error_class",
+            "stdout_http_status",
+            "stderr_class",
+            "stderr_bytes",
+        }
+        if set(payload) != expected:
+            return None
+        event_types = payload.get("stdout_event_types")
+        if not isinstance(event_types, list) or len(event_types) > 32:
+            return None
+        status = payload.get("stdout_http_status")
+        summary = (
+            f"exit_code={payload.get('exit_code')}; "
+            f"stdout_event_types={json.dumps(event_types)}; "
+            f"stdout_error_class={payload.get('stdout_error_class')}; "
+            f"stdout_http_status={status if status is not None else 'none'}; "
+            f"stderr_class={payload.get('stderr_class')}; "
+            f"stderr_bytes={payload.get('stderr_bytes')}"
+        )
+        return _normalize_r2_e2e_diagnostic(
+            {"kind": "cli_failure", "summary": summary}
+        )
+    if stage in {
+        "secret_path_validation",
+        "scratch_create",
+        "temporary_environment_bind",
+        "codex_task_execution",
+        "scratch_cleanup",
+    } and set(payload) == {"stage", "failure_class"}:
+        return _normalize_r2_e2e_diagnostic(
+            {
+                "kind": "task_failure",
+                "stage": stage,
+                "failure_class": payload.get("failure_class"),
+            }
+        )
+    if stage in {"codex_process_spawn", "codex_stdin_write"} and set(payload) == {
+        "stage",
+        "os_error_kind",
+    }:
+        return _normalize_r2_e2e_diagnostic(
+            {
+                "kind": "os_failure",
+                "stage": stage,
+                "os_error_kind": payload.get("os_error_kind"),
+            }
+        )
+    if stage == "codex_stdin_pipe_missing" and set(payload) == {"stage"}:
+        return _normalize_r2_e2e_diagnostic({"kind": "missing_stdin_pipe"})
+    return None
+
+
+def _installed_task_response_fixture_diagnostics(
+    responses_server: _LinuxAgentTaskResponsesServer,
+    scenario_name: str,
+    first_diagnostic_index: int,
+) -> dict[str, object]:
+    if (
+        not isinstance(scenario_name, str)
+        or scenario_name not in {"mcp_proposal", "mcp_followup"}
+        or type(first_diagnostic_index) is not int
+        or first_diagnostic_index < 0
+    ):
+        return {"state": "invalid", "records": []}
+    try:
+        snapshot = responses_server.snapshot()
+    except Exception:
+        return {"state": "unavailable", "records": []}
+    if not isinstance(snapshot, dict):
+        return {"state": "invalid", "records": []}
+    raw_records = snapshot.get("agent_task_diagnostics")
+    scenarios = snapshot.get("scenarios")
+    if (
+        not isinstance(raw_records, list)
+        or len(raw_records) > 32
+        or first_diagnostic_index > len(raw_records)
+        or not isinstance(scenarios, list)
+        or len(scenarios) > 32
+    ):
+        return {"state": "invalid", "records": []}
+    records: list[dict[str, object]] = []
+    for raw in raw_records[first_diagnostic_index:][-8:]:
+        normalized = _normalize_stored_r2_e2e_diagnostic(raw)
+        if normalized is None:
+            return {"state": "invalid", "records": []}
+        records.append(normalized)
+    matching = [
+        row
+        for row in scenarios
+        if isinstance(row, dict) and row.get("name") == scenario_name
+    ]
+    if len(matching) != 1:
+        return {"state": "scenario_unavailable", "records": records}
+    row = matching[0]
+    count_fields = (
+        "posts",
+        "tool_calls",
+        "tool_outputs",
+        "mcp_function_calls",
+        "mcp_function_outputs",
+    )
+    if any(
+        type(row.get(field)) is not int or not 0 <= row[field] <= 1_000_000
+        for field in count_fields
+    ) or type(row.get("required_input_marker_observed")) is not bool:
+        return {"state": "invalid", "records": []}
+    return {
+        "state": "read",
+        "scenario": scenario_name,
+        "scenario_counts": {
+            "responses_posts": row["posts"],
+            "tool_calls": row["tool_calls"],
+            "tool_outputs": row["tool_outputs"],
+            "mcp_function_calls": row["mcp_function_calls"],
+            "mcp_function_outputs": row["mcp_function_outputs"],
+            "required_input_marker_observed": row["required_input_marker_observed"],
+        },
+        "records": records,
+    }
 
 
 def _installed_task_write_failure_diagnostics(
@@ -7515,6 +7654,9 @@ def _run_installed_agent_mcp_followup_acceptance(
         mcp_tool_request=proposal,
         final_message="Task MCP request was submitted; no external tool result is included.",
     )
+    source_diagnostic_index = len(
+        responses_server.snapshot()["agent_task_diagnostics"]
+    )
     previous_task_ids = _linux_installed_visible_task_ids(
         deadline=time.monotonic() + 5.0
     )
@@ -7537,6 +7679,11 @@ def _run_installed_agent_mcp_followup_acceptance(
         task_id=source_task_id,
         timeout=90.0,
         diagnostic_audit_path=audit_store / "audit.jsonl",
+        diagnostic_response_fixture=(
+            responses_server,
+            "mcp_proposal",
+            source_diagnostic_index,
+        ),
     )
     source_result_hash_match = re.search(
         r"結果hash:\s*(sha256:[0-9a-f]{64})", source_snapshot
@@ -7577,6 +7724,9 @@ def _run_installed_agent_mcp_followup_acceptance(
         task_workspace,
         required_input_marker=result_marker,
         final_message="The approved follow-up received and evaluated the actual MCP result.",
+    )
+    followup_diagnostic_index = len(
+        responses_server.snapshot()["agent_task_diagnostics"]
     )
     _answer_owner_dialog(
         environment,
@@ -7636,6 +7786,11 @@ def _run_installed_agent_mcp_followup_acceptance(
         task_id=followup_task_id,
         timeout=90.0,
         diagnostic_audit_path=audit_store / "audit.jsonl",
+        diagnostic_response_fixture=(
+            responses_server,
+            "mcp_followup",
+            followup_diagnostic_index,
+        ),
     )
     if result_marker in _accessible_snapshot(_find_accessible(WINDOW_TITLE, timeout=10)):
         raise RuntimeError("実MCP結果本文がAgent Centerのaccessibility projectionへ露出しました")
