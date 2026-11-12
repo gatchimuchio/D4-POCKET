@@ -1444,7 +1444,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "b570b71008c3c8aba536b7ec53f8a7314839a6e1debbbf4c91a1c60b9e72e725"
+      "sha256": "521fb4e95a2c317a4bff0d59841124f9b7664c50fdcf8dda1b8ab92d73f5914a"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -3740,7 +3740,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
-      "sha256": "1750df56df7f1ba1a191cdfbbc744350abdbb67ed752729ec87689ea4beefa72"
+      "sha256": "c75912d2e7f5eb3bb72010b3b76e24f74acead16c8692b598fd90eb387df53d8"
     },
     {
       "path": "native/rust_helper/src/adapters/mcp_stdio.rs",
@@ -5624,7 +5624,7 @@
     },
     {
       "path": "tooling/tests/linux_installed_product_smoke.py",
-      "sha256": "4c94bf9591d6c95b258638070e13cd3eb0280ecc95b6b6538b21ef02a240bfe7"
+      "sha256": "7b6db3a1ac3df86b4cc7cf7f5f3113e16e2200bbfe4305eaa1d507a92a85f266"
     },
     {
       "path": "tooling/tests/linux_update_https_server.py",
@@ -5652,7 +5652,7 @@
     },
     {
       "path": "tooling/tests/test_linux_installed_product_smoke.py",
-      "sha256": "174a0510a623c0ee3a2a89707280706daf3c78b1cb1ca7bf6d16af0553573999"
+      "sha256": "50a252682cfb2f315554f1a4144371c71fd883046ed08a67c4a610029afdb989"
     },
     {
       "path": "tooling/tests/test_linux_portable_archive.py",

@@ -1789,6 +1789,40 @@ fn loopback_test_safe_failure_summary(
 #[cfg(any(test, feature = "r2-e2e"))]
 fn loopback_test_safe_mcp_projection_summary(stdout: &[u8]) -> Value {
     let mut summary = json!({
+        "jsonl_nonempty_line_count": 0,
+        "jsonl_json_object_count": 0,
+        "jsonl_invalid_or_nonobject_line_count": 0,
+        "event_type_counts": {
+            "thread_started": 0,
+            "turn_started": 0,
+            "item_started": 0,
+            "item_completed": 0,
+            "turn_completed": 0,
+            "turn_failed": 0,
+            "error": 0,
+            "other": 0,
+            "missing": 0,
+        },
+        "item_type_counts": {
+            "agent_message": 0,
+            "mcp_tool_call": 0,
+            "function_call": 0,
+            "function_call_output": 0,
+            "dynamic_tool_call": 0,
+            "command_execution": 0,
+            "reasoning": 0,
+            "web_search_call": 0,
+            "other": 0,
+            "missing": 0,
+        },
+        "top_level_key_presence": {
+            "item": false,
+            "output_item": false,
+            "response": false,
+            "data": false,
+            "result": false,
+            "output": false,
+        },
         "candidate_item_count": 0,
         "mcp_tool_call_item_seen": false,
         "mcp_tool_call_completed_event_seen": false,
@@ -1807,13 +1841,46 @@ fn loopback_test_safe_mcp_projection_summary(stdout: &[u8]) -> Value {
     let qualified_function_name = format!("mcp__{TASK_TOOL_SERVER_NAME}__{TASK_TOOL_NAME}");
     let mut candidate_item_count = 0usize;
     for line in stdout.split(|byte| *byte == b'\n').take(256) {
+        if line.iter().all(u8::is_ascii_whitespace) {
+            continue;
+        }
+        increment_bounded_json_count(&mut summary, "jsonl_nonempty_line_count");
         let Ok(event) = serde_json::from_slice::<Value>(line) else {
+            increment_bounded_json_count(&mut summary, "jsonl_invalid_or_nonobject_line_count");
             continue;
         };
+        let Some(event_object) = event.as_object() else {
+            increment_bounded_json_count(&mut summary, "jsonl_invalid_or_nonobject_line_count");
+            continue;
+        };
+        increment_bounded_json_count(&mut summary, "jsonl_json_object_count");
+        let event_type = event_object.get("type").and_then(Value::as_str);
+        increment_bounded_json_category(
+            &mut summary,
+            "event_type_counts",
+            safe_jsonl_event_type_category(event_type),
+        );
+        for key in [
+            "item",
+            "output_item",
+            "response",
+            "data",
+            "result",
+            "output",
+        ] {
+            if event_object.contains_key(key) {
+                summary["top_level_key_presence"][key] = json!(true);
+            }
+        }
         let Some(item) = event.get("item").and_then(Value::as_object) else {
             continue;
         };
         let item_type = item.get("type").and_then(Value::as_str);
+        increment_bounded_json_category(
+            &mut summary,
+            "item_type_counts",
+            safe_jsonl_item_type_category(item_type),
+        );
         if !matches!(item_type, Some("mcp_tool_call" | "function_call")) {
             continue;
         }
@@ -1860,6 +1927,60 @@ fn loopback_test_safe_mcp_projection_summary(stdout: &[u8]) -> Value {
     }
     summary["candidate_item_count"] = json!(candidate_item_count);
     summary
+}
+
+#[cfg(any(test, feature = "r2-e2e"))]
+fn safe_jsonl_event_type_category(event_type: Option<&str>) -> &'static str {
+    match event_type {
+        Some("thread.started") => "thread_started",
+        Some("turn.started") => "turn_started",
+        Some("item.started") => "item_started",
+        Some("item.completed") => "item_completed",
+        Some("turn.completed") => "turn_completed",
+        Some("turn.failed") => "turn_failed",
+        Some("error") => "error",
+        Some(_) => "other",
+        None => "missing",
+    }
+}
+
+#[cfg(any(test, feature = "r2-e2e"))]
+fn safe_jsonl_item_type_category(item_type: Option<&str>) -> &'static str {
+    match item_type {
+        Some("agent_message") => "agent_message",
+        Some("mcp_tool_call") => "mcp_tool_call",
+        Some("function_call") => "function_call",
+        Some("function_call_output") => "function_call_output",
+        Some("dynamic_tool_call") => "dynamic_tool_call",
+        Some("command_execution") => "command_execution",
+        Some("reasoning") => "reasoning",
+        Some("web_search_call") => "web_search_call",
+        Some(_) => "other",
+        None => "missing",
+    }
+}
+
+#[cfg(any(test, feature = "r2-e2e"))]
+fn increment_bounded_json_count(summary: &mut Value, field: &str) {
+    let next = summary
+        .get(field)
+        .and_then(Value::as_u64)
+        .unwrap_or_default()
+        .saturating_add(1)
+        .min(256);
+    summary[field] = json!(next);
+}
+
+#[cfg(any(test, feature = "r2-e2e"))]
+fn increment_bounded_json_category(summary: &mut Value, group: &str, category: &str) {
+    let next = summary
+        .get(group)
+        .and_then(|value| value.get(category))
+        .and_then(Value::as_u64)
+        .unwrap_or_default()
+        .saturating_add(1)
+        .min(256);
+    summary[group][category] = json!(next);
 }
 
 #[cfg(any(test, feature = "r2-e2e"))]
@@ -2298,6 +2419,12 @@ mod tests {
         );
         let summary = loopback_test_safe_mcp_projection_summary(stdout.as_bytes());
 
+        assert_eq!(summary["jsonl_nonempty_line_count"], 2);
+        assert_eq!(summary["jsonl_json_object_count"], 2);
+        assert_eq!(summary["event_type_counts"]["item_completed"], 1);
+        assert_eq!(summary["event_type_counts"]["turn_completed"], 1);
+        assert_eq!(summary["item_type_counts"]["mcp_tool_call"], 1);
+        assert_eq!(summary["top_level_key_presence"]["item"], true);
         assert_eq!(summary["candidate_item_count"], 1);
         assert_eq!(summary["mcp_tool_call_item_seen"], true);
         assert_eq!(summary["mcp_tool_call_completed_event_seen"], true);
@@ -2309,6 +2436,34 @@ mod tests {
         assert!(!rendered.contains("PRIVATE_SERVER"));
         assert!(!rendered.contains("PRIVATE_TOOL"));
         assert!(!rendered.contains("PRIVATE_TASK"));
+    }
+
+    #[test]
+    fn loopback診断は未知イベントを固定分類し内容を保持しない() {
+        let stdout = concat!(
+            "{\"type\":\"turn.started\",\"output_item\":{\"type\":\"dynamic_tool_call\",\"name\":\"PRIVATE_NAME\"}}\n",
+            "{\"type\":\"future_private_event\",\"item\":{\"type\":\"vendor_private_type\",\"id\":\"PRIVATE_ID\"}}\n",
+            "{\"type\":\"turn.completed\",\"response\":{\"output\":[]}}\n",
+            "not-json\n",
+        );
+        let summary = loopback_test_safe_mcp_projection_summary(stdout.as_bytes());
+
+        assert_eq!(summary["jsonl_nonempty_line_count"], 4);
+        assert_eq!(summary["jsonl_json_object_count"], 3);
+        assert_eq!(summary["jsonl_invalid_or_nonobject_line_count"], 1);
+        assert_eq!(summary["event_type_counts"]["turn_started"], 1);
+        assert_eq!(summary["event_type_counts"]["turn_completed"], 1);
+        assert_eq!(summary["event_type_counts"]["other"], 1);
+        assert_eq!(summary["item_type_counts"]["other"], 1);
+        assert_eq!(summary["top_level_key_presence"]["output_item"], true);
+        assert_eq!(summary["top_level_key_presence"]["response"], true);
+        assert_eq!(summary["candidate_item_count"], 0);
+
+        let rendered = summary.to_string();
+        assert!(!rendered.contains("future_private_event"));
+        assert!(!rendered.contains("vendor_private_type"));
+        assert!(!rendered.contains("PRIVATE_NAME"));
+        assert!(!rendered.contains("PRIVATE_ID"));
     }
 
     #[test]

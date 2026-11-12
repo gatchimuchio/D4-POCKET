@@ -3990,6 +3990,98 @@ _R2_E2E_MCP_PROJECTION_BOOL_FIELDS = (
     "function_call_qualified_name_matches",
     "arguments_object_seen",
 )
+_R2_E2E_MCP_PROJECTION_COUNT_FIELDS = (
+    "jsonl_nonempty_line_count",
+    "jsonl_json_object_count",
+    "jsonl_invalid_or_nonobject_line_count",
+    "candidate_item_count",
+)
+_R2_E2E_MCP_EVENT_TYPE_CATEGORIES = (
+    "thread_started",
+    "turn_started",
+    "item_started",
+    "item_completed",
+    "turn_completed",
+    "turn_failed",
+    "error",
+    "other",
+    "missing",
+)
+_R2_E2E_MCP_ITEM_TYPE_CATEGORIES = (
+    "agent_message",
+    "mcp_tool_call",
+    "function_call",
+    "function_call_output",
+    "dynamic_tool_call",
+    "command_execution",
+    "reasoning",
+    "web_search_call",
+    "other",
+    "missing",
+)
+_R2_E2E_MCP_TOP_LEVEL_KEY_FIELDS = (
+    "item",
+    "output_item",
+    "response",
+    "data",
+    "result",
+    "output",
+)
+
+
+def _is_safe_r2_e2e_mcp_projection_summary(summary: object) -> bool:
+    expected = {
+        *_R2_E2E_MCP_PROJECTION_COUNT_FIELDS,
+        *_R2_E2E_MCP_PROJECTION_BOOL_FIELDS,
+        "event_type_counts",
+        "item_type_counts",
+        "top_level_key_presence",
+    }
+    if not isinstance(summary, dict) or set(summary) != expected:
+        return False
+    if any(
+        type(summary.get(field)) is not int or not 0 <= summary[field] <= 256
+        for field in _R2_E2E_MCP_PROJECTION_COUNT_FIELDS[:-1]
+    ):
+        return False
+    if type(summary.get("candidate_item_count")) is not int or not 0 <= summary[
+        "candidate_item_count"
+    ] <= 32:
+        return False
+    if any(
+        type(summary.get(field)) is not bool
+        for field in _R2_E2E_MCP_PROJECTION_BOOL_FIELDS
+    ):
+        return False
+    for field, categories in (
+        ("event_type_counts", _R2_E2E_MCP_EVENT_TYPE_CATEGORIES),
+        ("item_type_counts", _R2_E2E_MCP_ITEM_TYPE_CATEGORIES),
+    ):
+        counts = summary.get(field)
+        if (
+            not isinstance(counts, dict)
+            or set(counts) != set(categories)
+            or any(
+                type(counts.get(category)) is not int
+                or not 0 <= counts[category] <= 256
+                for category in categories
+            )
+        ):
+            return False
+    key_presence = summary.get("top_level_key_presence")
+    if (
+        not isinstance(key_presence, dict)
+        or set(key_presence) != set(_R2_E2E_MCP_TOP_LEVEL_KEY_FIELDS)
+        or any(type(key_presence.get(field)) is not bool for field in _R2_E2E_MCP_TOP_LEVEL_KEY_FIELDS)
+    ):
+        return False
+    json_object_count = summary["jsonl_json_object_count"]
+    return (
+        summary["jsonl_nonempty_line_count"]
+        == json_object_count + summary["jsonl_invalid_or_nonobject_line_count"]
+        and sum(summary["event_type_counts"].values()) == json_object_count
+        and sum(summary["item_type_counts"].values()) <= json_object_count
+    )
 
 
 def _normalize_r2_e2e_diagnostic(payload: object) -> dict[str, object] | None:
@@ -4071,17 +4163,7 @@ def _normalize_r2_e2e_diagnostic(payload: object) -> dict[str, object] | None:
         if set(payload) != {"kind", "summary"}:
             return None
         summary = payload.get("summary")
-        expected = {"candidate_item_count", *_R2_E2E_MCP_PROJECTION_BOOL_FIELDS}
-        if (
-            not isinstance(summary, dict)
-            or set(summary) != expected
-            or type(summary.get("candidate_item_count")) is not int
-            or not 0 <= summary["candidate_item_count"] <= 32
-            or any(
-                type(summary.get(field)) is not bool
-                for field in _R2_E2E_MCP_PROJECTION_BOOL_FIELDS
-            )
-        ):
+        if not _is_safe_r2_e2e_mcp_projection_summary(summary):
             return None
         return {"stage": "codex_cli_mcp_projection", **summary}
     if kind != "cli_failure" or set(payload) != {"kind", "summary"}:
@@ -5575,16 +5657,8 @@ def _normalize_stored_r2_e2e_diagnostic(payload: object) -> dict[str, object] | 
         return None
     stage = payload["stage"]
     if stage == "codex_cli_mcp_projection":
-        expected = {"stage", "candidate_item_count", *_R2_E2E_MCP_PROJECTION_BOOL_FIELDS}
-        if (
-            set(payload) != expected
-            or type(payload.get("candidate_item_count")) is not int
-            or not 0 <= payload["candidate_item_count"] <= 32
-            or any(
-                type(payload.get(field)) is not bool
-                for field in _R2_E2E_MCP_PROJECTION_BOOL_FIELDS
-            )
-        ):
+        summary = {key: value for key, value in payload.items() if key != "stage"}
+        if not _is_safe_r2_e2e_mcp_projection_summary(summary):
             return None
         return dict(payload)
     if stage == "codex_cli_exit":
