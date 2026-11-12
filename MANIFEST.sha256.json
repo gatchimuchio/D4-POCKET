@@ -1444,7 +1444,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "4836671a96c15da45b70bff093dc18252b2eeb5113eca05ae88fef4e4ed3bea4"
+      "sha256": "52053a4242a1a74b158a9f2b74673f1299bb17b3d75b41da3b251a6dd459ba67"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -5624,7 +5624,7 @@
     },
     {
       "path": "tooling/tests/linux_installed_product_smoke.py",
-      "sha256": "e1ac2831e4106c3e0d74e659afc072eae3dee5cf5b79579b4a06dc5d302ff8fa"
+      "sha256": "067afb6b0c3c8ae1dc6580b698f0bc875a47c2816b55ea64424228dc3b7e9394"
     },
     {
       "path": "tooling/tests/linux_update_https_server.py",

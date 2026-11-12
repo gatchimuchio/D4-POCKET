@@ -8029,10 +8029,12 @@ def _run_installed_agent_mcp_followup_acceptance(
     )
     _wait_for_owner_dialog_closed(environment)
     window = _find_accessible(WINDOW_TITLE, timeout=10)
+    # MCP continuation projects the approved source result; it does not use the separate
+    # manual "show result" button's status banner.
     _find_accessible(
-        "native Ownerが許可したAgent報告を表示中です。内容・test主張は未検証です。",
+        f"表示範囲: full・Task {source_task_id}",
         root=window,
-        timeout=15,
+        timeout=30,
     )
     proposal_snapshot = _accessible_snapshot(window)
     for value in (server_id, tool_id, MCP_PUBLIC_INPUT):
