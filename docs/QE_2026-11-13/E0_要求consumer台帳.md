@@ -414,7 +414,7 @@ N11は`OPEN`。ValidatorとRelease Gateは一部のRegistry/Windows evidence/man
 | P12 | 製品全体統合。REV5進捗ではWindows側`FEATURE COMPLETE`。正式release/Owner GOと分離された製品機能統合の履歴。 | v4仕様S05の直接対応はN01/N09/N10、関連能力K19。Phase 39〜45はC27〜C34のQC/回帰/文書/出荷範囲に関連。単一施工線へ閉じない。 | Windows product entry→Task/result/operation UI→OS product lifecycle。実TaskはN01、operation/observation/recoveryはN09、installed OS distribution/lifecycleはN10の現ConsumerとSHA節へ分割記録。 | `FEATURE COMPLETE`を正式Release/QAへ昇格しない。v4 N01/N09/N10は`OPEN`、Q0〜Q7は`DEFERRED`、`release_ready=false`。統合後の全候補・全OS acceptanceは未成立。 |
 | P13 | Mobile / Non-Windows Product Build。REV5履歴は2026-10-09に有限Product Build acceptanceを閉鎖したと要約する。旧Acceptanceの詳細evidence identity/classは本照合資料から`UNKNOWN`。 | v4仕様S05の直接対応はN10、関連能力K17。Phase 35/36はC24〜C26範囲に関連。施工線H/I。Linux native必須性は別途現行AGENTS/v4正本に従う。 | Linux/macOS Desktop、Android/iOS Mobile runner/native transport→Rust Broker／OS capability→installed product lifecycle。OS別source、package、workflow候補とSHAはN10節。 | 旧P13閉鎖を現行五OS標準installed QAへ移さない。Linux nativeは完全対応必須で、WSL/Xvfb/Headlessだけでは成立しない。Android/iOS実機を前提にせずEmulator/Simulator等を用いる。N10は`OPEN`、`linux_native_product_support`、`rev2_mobile_distribution`、`rev2_mobile_device_evidence`を保持。 |
 
-P0〜P13全14 IDの旧要求範囲・限定statusをv4 N/K/Consumerへ接続した。これは旧statusの書換え、v4 acceptance、N01〜N11のCLOSED、E0完了のいずれも意味しない。C0〜C34のID別Source→Consumer crosswalkを記録したが、各行の完全なE0-04列、Phase0〜45、K01〜K20、N11 Evidence結合は継続する。P0/P1/P4の直接対応はv4仕様S05の明示mappingへ合わせて訂正し、旧statusは変更していない。P13の詳細evidence identity/classは`UNKNOWN`として保持する。
+P0〜P13全14 IDの旧要求範囲・限定statusをv4 N/K/Consumerへ接続した。これは旧statusの書換え、v4 acceptance、N01〜N11のCLOSED、E0完了のいずれも意味しない。C0〜C34、Phase0〜45、K01〜K20のSource→Consumer/scope mappingを記録した。各行の完全なE0-04列・N11 Evidence結合は継続する。P0/P1/P4の直接対応はv4仕様S05の明示mappingへ合わせて訂正し、旧statusは変更していない。P13の詳細evidence identity/classは`UNKNOWN`として保持する。
 
 ## 旧C0〜C6のv4 Source→Consumer crosswalk（E0差分）
 
@@ -720,7 +720,94 @@ C15〜C23の旧statusはrev1履歴として保持した。source/schema/test blo
 | C34 | `tooling/evidence_bundle.py` | `68dead851236b0f1b69899151c37371e593ff3f9` |
 | C34 | `tooling/release_runtime_assertions.py` | `0a0a351fe17151ad86517bd0a965358f40c61490` |
 
-C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline上で一致させた。旧C24〜C34のsource/test resultは履歴を保持し、本単位で製品試験は実行していない。とくにC28の8時間FAIL、C33の総合installed FAIL、C34未着手をPASSへ読み替えない。C0〜C34の35 IDは旧要求crosswalk済みだが、E0-04全項目の全数充填、Phase/K/Buffer/Q/FQ/W全数接続、v4標準OS QA、N11 evidence結合は未完で、E0およびN10/N11は`OPEN`を維持する。
+C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline上で一致させた。旧C24〜C34のsource/test resultは履歴を保持し、本単位で製品試験は実行していない。とくにC28の8時間FAIL、C33の総合installed FAIL、C34未着手をPASSへ読み替えない。C0〜C34の35 IDとPhase0〜45/K01〜K20のv4 scope mappingは記録済み。E0-04全項目の充填、Buffer/Q/FQ/W全数Consumer接続、v4標準OS QA、N11 evidence結合は未完で、E0およびN10/N11は`OPEN`を維持する。
+
+## v4対応：Phase 0〜45とK01〜K20のSource→Consumer crosswalk
+
+本節は、`docs/D4_POCKET_PHASE_MAPPING.md`の旧Phase 0〜45→C対応を履歴として保持したまま、現行v4の要求N、施工線A〜J、製品能力K、既存Consumerへ接続する。Phaseは旧工程範囲、Cは旧rev1との範囲関係であり、どちらもv4 Acceptanceや状態を移転しない。P0〜P13は本台帳の先行P crosswalkがv4仕様S05の直接mappingを記録済みであり、根拠のないPhase→P対応は追加しない。
+
+各行のProducer/Consumer、契約、Source SHA、TestClass、証拠範囲は参照先N01〜N11の現行追跡・SHA表を正本とする。参照行にないPhase固有のSource/Test/Evidenceは`UNKNOWN`、本crosswalkで新規発行したPhase/K Acceptance Evidence IDは`NONE`。これはE0-04全列が埋まった意味ではない。`Nxx`の状態・`BUILD_GAP`・`OPEN`は参照する現行N行の値であり、Phase/KをPASS/CLOSEDへ昇格しない。A〜Jは工程表R03の同時施工線で、Phase順の逐次施工を意味しない。Source/Fixtureの存在やmapping検査は製品実作用・E3 BUILD_COVERED・OS QAを証明しない。
+
+### Phase 0〜45
+
+| 旧Phase／主題／旧C | v4関連N／施工線A〜J／関連K | 現行Producer→Consumer参照 | 現状・残余境界 |
+|---|---|---|---|
+| Phase 0 基準状態固定／C0 | N11／J／K19 | current main・Registry・Source→E0台帳／Manifest／Release Gate（N11） | 現HEADを作業単位ごとに再観測する。旧C0値は履歴。manifest整合はruntime・製品Acceptanceではない。 |
+| Phase 1 製品境界／C31 | N11／J／K19 | v4 S00/S10→採用記録・進捗・正本索引・製品文書（N11） | 要求境界・文書は現在の正本で管理。文書整合だけでは製品runtime consumerは成立しない。 |
+| Phase 2 接続先能力の観測／C17 | N03/N04／B・C／K01/K06/K11 | Runtime/Host Catalog→Rust Broker registry→Runtime/Host Center（N03/N04） | Host表示はmetadata registry。Trust、Permission、remote Taskを生成しない。 |
+| Phase 3 Agent接続契約／D4追加 | N01/N03／A・B／K01/K06 | Runtime/Agent要求→Adapter Contract・Broker capability検査（N01/N03） | Codex CLIの限定Task履歴を別Runtimeへ拡張しない。二つ目の独立Task RuntimeはBUILD_GAP。 |
+| Phase 4 Agent起動器／D4追加 | N01/N03／A・B／K01/K06 | Agent登録・実interface probe→Broker登録Adapter→Task runner（N01/N03） | Codex CLI接続sourceと限定証拠はある。未対応Runtimeは拒否し、起動器sourceを一般Provider acceptanceにしない。 |
+| Phase 5 Agent操作表示盤／C1 | N01/N09／A・C／K01/K13 | Agent Center→AgentTaskClient/Broker→Task state/result projection（N01/N09） | Desktop sourceはWIRED、W01はWindows/Codex CLI限定LIVE_PRODUCT履歴。現行全OS・candidate AcceptanceはOPEN。 |
+| Phase 6 作業領域検査／C1 | N09／C／K03 | Workspace Inspector→Workspace client/Broker tree/read/change/diff/history（N09） | Workspace/baseline diffと完了Taskのdiff/resultは別consumer。全Workspace・大容量・Task result投影の残差を保持。 |
+| Phase 7 Compare/AgentTask/Session/Workspace結合／C1・C30 | N01/N02/N04／A・B・C／K01/K02/K03/K08 | Agent Center/Coordinator→独立Session/WorkspaceごとのTask preflight・Broker認可・Tool/Result（N01/N02/N04） | Desktop orchestration sourceはWIRED。別Workspaceの実隔離・同時installed Task・cross-agent contamination・結果適用は未Acceptance、W03 OPEN。 |
+| Phase 8 Agent引継ぎ／C30 | N04／B／K02/K11 | 承認済result/artifact→Handoff package→別Session/Workspaceの新Broker Task preflight（N04-Handoff） | context/artifact/diff/testはbounded/untrusted。Permission/Approval/Credential/Trust/hidden stateを移さず、受信側で再評価。installed Handoffは未確認。 |
+| Phase 9 実行履歴／C2 | N09／C／K03/K10 | Broker execution state→History client/UI（N09） | bounded metadata projection。HistoryはApprovalではなく、履歴本文の全面表示も保証しない。 |
+| Phase 10 再実行・分岐／C2 | N09／C／K03/K05 | History selection→新Task/Evaluation request（N09） | 新規Taskとして現在条件で検査。過去履歴からPermission/Approvalを再利用しない。全OS実作用は未成立。 |
+| Phase 11 実行系資源監視／C3 | N09／C／K04/K10 | Process/resource source→Broker snapshot→Resource UI（N09） | 未取得値はunknown。Fixture/internal snapshotを実installed CPU/RAM/I/O/GPU性能保証へ昇格しない。 |
+| Phase 12 実行系ライフサイクル／C4 | N01/N03/N09／A・B・C／K01/K04/K06 | Runtime/Task lifecycle request→Broker/Adapter process control→state/UI/Audit（N01/N03/N09） | Source action・status projectionと各OS installed process supervisionは別。非対応・停止結果不明は成功扱いしない。 |
+| Phase 13 評価ラボ／C5 | N09/N11／C・J／K05/K19 | Dataset/Case→Broker Evaluation Lab→bounded result/history（N09） | Evaluation/evaluator sourceはある。評価値やLLM Judge単独を実Runtime比較・製品品質保証へ昇格しない。 |
+| Phase 14 回帰事例登録／C6 | N09/N11／C・J／K05/K19 | approved dialogue/result receipt→Broker case registration→protected store/metadata list（C6・N09） | case登録sourceの存在とfixture/conformance履歴に限定。private caseを通常一覧/Auditへ露出せず、C6の局所履歴を現v4 Acceptanceにしない。 |
+| Phase 15 Provider/Model設定／D4追加 | N03／B／K06 | Provider/Model選択→Runtime Catalog/Adapter binding（N03） | 表示・登録sourceだけでは実Runtime呼出しでない。第二RuntimeのTask/失敗/権限証拠はBUILD_GAP。 |
+| Phase 16 資格情報保管庫／C7 | N02/N05／A・B・F／K07/K08 | Owner/native credential operation→Rust Broker/OS vault→対象MCP/Provider利用（N02/N05） | 秘密値をFlutter/log/Auditへ返さない。Source/TestClassはN02/N05参照。全OSのinstalled vault証拠は未成立。 |
+| Phase 17 MCP接続契約／C8 | N02/N05／A・D／K08 | MCP Server/Tool contract→current Catalog/Schema→Broker Tool call（N02/N05） | Metadata≠Authority。Tool作用は現Catalog/権限/Auditを再検査。contract/sourceはinstalled external MCP acceptanceではない。 |
+| Phase 18 MCP試験基盤／C8・C9 | N02/N05/N08/N11／A・D・F・J／K08/K19/K20 | Fake MCP server/negative fixture→Broker Tool/Conformance validators（N02/N05/N08/N11） | Fake serverはfixture。manual workflowやfixture testの存在をexternal MCP実作用にしない。本単位で再実行していない。 |
+| Phase 19 MCP接続管理／C9 | N02/N05／A・D／K08 | MCP Center→Broker connect/catalog/call/disconnect→untrusted result projection（N02/N05） | source capabilityはあるが現candidateの実server→同Agent後続Task→Auditは未成立。失敗/曖昧結果は停止・隔離。 |
+| Phase 20 運用Profile／C10 | N09/N11／C・J／K09 | Profile設定/apply request→Audit intent/current configuration review（P crosswalk・N11） | ProfileはPermissionではない。現sourceから実RuntimeへProfileを適用するconsumerは特定できずBUILD_GAP/UNKNOWNとして維持。 |
+| Phase 21 更新管理／C11 | N10/N11／G・H・I・J／K09/K16/K17 | signed update/package→OS product installer/update/rollback/repair lifecycle（N10） | Windows/Linux source候補あり、他OSにもsource/workflow候補あり。一般配布・同一candidate lifecycle・署名identityは未成立。 |
+| Phase 22 通知管理／C12 | N09／C／K10/K13 | Broker notification event→notification client/desktop/mobile projection（N09） | NotificationはApproval/Auditではない。Windows toast欠落等、OS/consumer差はN09記録に従う。 |
+| Phase 23 稼働観測／C13・C14 | N09/N11／C・J／K04/K10 | Runtime/Broker observation and Trace→UI; formal Audit remains separate（N09/N11） | Resource/Trace/MetricはAuditではない。内部span欠落やresource unknownを保持し、表示sourceから全runtime計測を推論しない。 |
+| Phase 24 A2A接続契約／C15 | N04／B／K11 | A2A Card/Task/Message/Artifact/Stream contract→Broker operation validators（N04-A2A） | External metadata/Card≠Trust。作用ごとのOwner/Permission/AuditおよびOS範囲をN04の現行境界に従う。 |
+| Phase 25 A2A接続管理／C16 | N04／B／K11 | A2A Center→Broker card/message/stream/get-task operations（N04-A2A） | Windows/Linux sourceと限定operationがあるが、同一installed candidateでの外部Agent一気通貫は未成立。macOSはmetadata-only。 |
+| Phase 26 複数Host管理／C17・C18 | N03/N04／B・C／K01/K11 | Host registration/list/display→Broker metadata registry/Host Center（N04-A2A/Host） | Host registryはremote connection/Trust/Permission/Taskを作らない。Host越境Task consumerはBUILD_GAP。 |
+| Phase 27 Adapter管理／C19 | N03/N05／B・D／K06/K12 | Adapter catalog/manage request→Broker catalog/compatibility projection（C19・N03/N05） | 現C19 crosswalkはmetadata管理まで。外部artifact/filesystem/process作用や完全lifecycleをsource mappingだけで認定しない。 |
+| Phase 28 Windows操作面／C18・C20〜C23 | N09/N10／C・G／K13/K16 | Flutter/Runner operation surfaces→Broker tray/notification/search/recovery/process consumers（N09） | Desktop surface sourceと表示はある。installed product、実Taskとの同一ID結合、未接続operationはN09/N10 residualに従う。 |
+| Phase 29 GUI-Shell構成作成／D4追加 | N05／D／K14 | selected Runtime/Agent/Tool Catalog→Compose request→Broker manifest validation（N05） | manifest-only≠実作用。Capability宣言は未信頼metadataで、Runtime権限を生成しない。 |
+| Phase 30 構成差分確認／D4追加 | N05/N06／D・E／K14/K15 | Compose manifest/config→bounded diff/preview→export consumer（N05/N06） | Preview/diffは構成意図の投影。runtime構成消費・binary/module効果は別で、未確認をBUILD_GAP/UNKNOWNに残す。 |
+| Phase 31 AI編集提案／D4追加 | N07／D／K14 | AI proposal/result→independent review/test Task→Broker controlled apply/rollback candidate（N07） | Proposal≠apply。独立審査結果とBroker-controlled apply/rollbackはBUILD_GAP。AuthorityをAIへ渡さない。 |
+| Phase 32 Windows独立App書出し／D4追加 | N06/N10／E・G／K15/K16 | Compose config→Exporter/identity/manifest/launcher→standalone product/install candidate（N06/N10） | Builder/sourceの存在だけ。独立Appの構成消費・正規installer・実Taskは未成立。 |
+| Phase 33 機能単位選択・除去／D4追加 | N06／E／K15 | module selection/manifest→exporter/build graph→binary/resource comparison | Module pruningの受入れは未成立。実binary/resource除去はfalse/未測定のまま維持し、安全Coreを省かない。 |
+| Phase 34 製品配布／C33・C34 | N10/N11／G・H・I・J／K16/K17 | OS package/artifact→installer→first-run→Broker/Task→update/repair/rollback/uninstall; evidence→Gate（N10/N11） | C33の旧Windows installed total FAILを保持。現candidate dossier不在、標準OS配布経路・Owner identity/署名・GOは未成立。 |
+| Phase 35 Mobile統合／C24・C26 | N01/N02/N10／I／K17 | Flutter projection→native Device Link service→Rust Broker read-only allowlist (N10/C24) | Mobile Task/MCP start consumerはBUILD_GAP。Emulator/Simulator sourceはあるが本単位未実行。Physical deviceを必須条件に戻さない。 |
+| Phase 36 Apple/Linux補助検証／C25・C26 | N10/N11／H・I・J／K17 | workflow_dispatch Apple/Android source＋Linux native package/GUI consumer（N10） | workflow定義と実行結果を分離し、本単位未実行。Linux nativeは必須製品対象。WSL/Xvfb/headlessだけでnative GUI/installをPASSにしない。 |
+| Phase 37 MINIDORA接続口／D4追加 | N03／B／K18 | external Runtime Adapter/HTTP boundary→Broker Runtime catalog and Task capability check（N03） | MINIDORAは接続Runtime。Codex以外のTask capabilityは未成立、MINIDORA内部実装はShell Coreへ持ち込まずproduction依存にしない。 |
+| Phase 38 MINIDORA段階統合／D4追加 | N03/N08／B・F／K18/K20 | optional Runtime module→reference/parity/failure-isolation/fallback gate | 将来のmodule単位置換候補。Parity等の証拠前に切替せず、現在のproduction pathへ依存を追加しない。 |
+| Phase 39 長時間運用／C28 | N11／F・J／K19/K20 | long-run runner→Broker/fixture/runtime observation→bounded report and failure classification（C28） | 旧8h試行22.766秒FAILを維持。current installed long-runはNOT_RUN。本crosswalkでは再試験しない。 |
+| Phase 40 障害注入／C29 | N11／F・J／K19/K20 | failure injector→Broker/MCP/A2A/Credential/Audit fixture responses（C29） | 旧8件は開発用fixture範囲。external service/installed product全OSの耐障害PASSへ拡張しない。 |
+| Phase 41 性能評価／C27 | N09/N11／C・J／K04/K19 | generated snapshot/projection/diff watchdog→local perf validator/widget test（C27） | INTERNAL_STATE/FIXTURE範囲。installed startup/frame/GPU/long-run/real Runtime SLAは未測定。 |
+| Phase 42 全数回帰／C30・C32 | N11／J／K19 | local regression matrix/old static audit→validator/conformance entry（C30/C32） | Matrix/audit sourceの存在や局所PASSは全OS実物QC/QAではない。現行候補の実Runtime/installed試験は別状態。 |
+| Phase 43 文書・ブランド統合／C31 | N11／J／K19 | current v4 documents/README/release docs→Manifest/Conformance/Release Gate (N11) | C31の旧文書同期statusは履歴。現文書のhash整合と製品runtime/release成立を区別する。 |
+| Phase 44 Windows最大到達／C32・C33 | N10/N11／G・J／K16/K19 | installed app/Broker/Setup Doctor→Windows evidence collector/Registry (N10/N11) | 旧C33 total FAIL保持。現candidate installed evidence未収集。旧copy/旧commit evidenceを再結合しない。 |
+| Phase 45 正式公開／C34 | N10/N11／G・H・I・J／K16/K17/K19 | five-OS candidate/package/evidence→strict gate/Release Registry→responsible owner decision（N10/N11） | 16 unresolved／2 resolved、release_ready=false。Publisher/signing/Audit production key/Final GOは未成立のまま。 |
+
+### 製品能力K01〜K20
+
+| K／S05能力 | v4関連N／施工線A〜J | 現行Producer→Consumer参照 | Source状態・残余・証拠境界 |
+|---|---|---|---|
+| K01 Runtime Catalog/Agent/Task/Session/Workspace/state/Launcher/IPC/Broker/Capability | N01/N03/N04／A・B・C | Runtime/Agent registry→Agent Center/Runtime Center→Rust Broker/Dialogue/Adapter→Task result/state（N01/N03） | Desktop Task source WIRED、Windows W01限定履歴あり。第二Task Runtime/Mobile TaskはBUILD_GAP、現五OS全体はOPEN。 |
+| K02 独立Compare/Handoff/Workspace分離/同時Task/選択適用/Authority非継承 | N04／B・C | Compare coordinator/Handoff package→per-Agent Task preflight→selected result/new target Task（N04） | UI/source wiringあり。installed cross-agent contamination、cancellation/failure isolation、filesystem isolation/Auditの実証未成立。 |
+| K03 Workspace Inspector/tree/diff/history/rerun/branch/recovery | N01/N09／C | Workspace UI→Broker tree/read/change-list/diff/history/recovery projection（N09） | Source候補あり。Task-result diffとbaseline diffの差を保持し、全Workspace/履歴/Recoveryの実consumerはOPEN。 |
+| K04 PID/CPU/RAM/I/O/Latency/error/optional GPU/lifecycle | N09／C | Broker process/resource/lifecycle source→bounded UI snapshot（N09） | 未取得値はunknown。internal snapshotを実測値/Performance Acceptanceへ昇格せず、installed process metrics・GPU等未成立。 |
+| K05 Eval/Dataset/Case/regression/deterministic evaluator/Runtime compare | N09/N11／C・J | Evaluation Lab/Dataset/Case→Broker evaluation→bounded result/history（N09） | Source/wiring区分はN09参照。LLM Judge単独を保証にせず、実Runtime横断比較と全要求評価は未成立。 |
+| K06 Provider/Model/Runtime Adapter管理・選択・失敗・unsupported | N03／B | Provider/Runtime Catalog→Adapter capability check→Broker Task dispatch/reject（N03） | Codex CLIは限定実装・証拠。MINIDORA Task非対応は明示reject、第二の実Task RuntimeはBUILD_GAP。 |
+| K07 Credential Vault/secret boundary/OS protection/lifecycle | N02/N05／A・B・F | native Owner operation→Broker credential metadata/OS vault→対象Tool/provider request（N02/N05） | 秘密のprojection/log/Audit非露出を維持。全OSのsecure storage/installed taskとの一体証拠は未成立。 |
+| K08 MCP server/transport/tool/resource/prompt/Center/isolation/AI consumption | N02/N05／A・D | MCP Center/Catalog→Broker connect/call/credential binding→Tool result→同Agent follow-up context（N02/N05） | Desktop source WIRED、fixture testsあり。installed same-candidate real MCP→result-dependent Task→Auditは未成立、MobileはBUILD_GAP。 |
+| K09 Profile/Channel/signed update/rollback/repair | N09/N10/N11／C・G・H・I・J | Profile config/apply intent→Audit/config; signed package/update→OS installer/update center（N10/N11） | Profileの実Runtime consumerは特定されずBUILD_GAP/UNKNOWN。update sourceと製品lifecycle/正式署名は別で、配布証拠未成立。 |
+| K10 Notification/Trace/MetricとAuditの分離 | N09/N11／C・J | Broker observation/notification→Flutter UI; Audit remains separate Broker store/finalizer（N09/N11） | notification/trace/metricはAuditに昇格しない。OS toast・complete spans・全画面同一Task projectionに残差。 |
+| K11 A2A Card/Task/Message/Stream/Artifact/Host/identity/Trust | N04／B | A2A/Host UI→Broker operation/Host metadata registry (N04) | 外部metadataからTrustを生成しない。OS別作用を分離し、macOS metadata-only、Host越境Task/外部installed E2E未成立。 |
+| K12 Adapter Publisher/version/hash/signature/risk/compat/quarantine/update/stop | N03/N05／B・D | Adapter catalog/manage operation→Broker registry/compatibility and risk projection（C19/N03/N05） | C19 sourceはmetadata管理範囲。署名・隔離・更新・停止の全lifecycle実consumerとinstalled proofは全数未確認/OPEN。 |
+| K13 Desktop Tray/quick stop/Palette/Search/Agent Center/Problems/Evidence/Recovery/Settings | N09／C | Flutter/Native surface→Broker Task/history/notification/recovery/search/tray handlers（N09） | Surface sourceと個別projectionはある。同一実Task/installed UI→stop/recovery/EvidenceのE2Eは未成立。 |
+| K14 Compose/Preview/AI Edit/diff/independent review/controlled apply | N05/N07／D | Capability Catalog→Compose manifest/MCP Tool; AI proposal→independent review/apply candidate（N05/N07） | Composeはmanifest/source経路、AI Editはproposal/audit。independent review resultとBroker controlled apply/rollbackはBUILD_GAP。 |
+| K15 Export/module selection/pruning/identity/Broker/Installer/config consumption | N06/N10／E・G・H・I | Compose config→Exporter→identity/manifest/launcher/package/runtime candidate（N06/N10） | identity/manifest sourceあり。runtime config consumption、independent installed app、binary/resource pruningは未成立。 |
+| K16 Windows install/first-run/Setup Doctor/update/rollback/repair/uninstall | N10/N11／G・J | Windows artifact/staging→installed app/Broker→collector/Release Gate（N10/N11） | Build/staging/collector sourceあり。一般利用installer-first-run lifecycleとcurrent candidate evidence不足、Registry blocker unresolved。 |
+| K17 Linux native/macOS/Android/iOS IPC/protection/Device Link/GUI/install | N10およびN01/N02 Mobile／G・H・I | OS native bridge/package→Flutter/Core/Broker/Device Link→standard installed consumer (N10) | Linux nativeは必須。workflow/source候補はOS別だが標準package/installed lifecycle未成立。Mobile Task/MCPはBUILD_GAP、物理端末は不要。 |
+| K18 MINIDORA等の外部Runtime/contract接続 | N03/N08／B・F | external Runtime Adapter→Broker Catalog/Task capability/timeout/failure path（N03） | Adapterは外部接続境界。MINIDORA内部実装をCoreへ輸入せず、現production dependencyやTask supportを偽装しない。 |
+| K19 long-run/performance/fault/full regression/docs/release | N09/N11／C・J | local validator/evidence/Manifest/Registry→Conformance/Release Gate (N11) | local validator/source coverageあり。旧C27〜C34限定PASS/FAILは保持。installed product QA/8h/strict releaseは未成立。 |
+| K20 Buffer/root causes/B0〜B6/self-application/side effects/equivalence | N08／F | OS/dependency/cache/process/network cause→Buffer mediation→original Task/Audit/Recovery（N08） | N08 source is Codex CLI TEMP/scratch限定。B0〜B4の限定closedを保持、B5 OPEN/B6未成立、全OS意味・副作用同等性は未検証。 |
+
+#### Phase/K crosswalkの判定
+
+旧Phase 0〜45の46 ID、K01〜K20の20 IDを、現v4 N01〜N11・R03 A〜J・正本Consumerへ対応付けた。旧C番号との対応は履歴範囲として保持し、P0〜P13は別のv4 S05 direct mappingに従う。Source SHA/TestClassは参照N節、Phase/K固有Evidence IDはNONE、個別の完全E0-04行は未充足のものをUNKNOWNとして残す。ここでのmappingは範囲・Consumer参照の整備だけであり、N/K/Phase Acceptance、E3 BUILD_COVERED、全OS QC/QAをCLOSEDにしない。N11 Evidence ID・Blocker・全OS artifact/standard guaranteesとの行単位結合、BUF/B/Q/FQ/W/QE/AUD全数照合は次工程に残る。
+
 
 ## 実装ファイルの初期目録（CODE_PRESENTのみ）
 
@@ -745,9 +832,9 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 | 新規要求 N01〜N11 | 11 | v4仕様S04 | 初期Producer/Consumer差分を記録。契約・否定・OS・証拠の全項目は未完 |
 | 全体施工線 A〜J | 10 | v4工程表R03・Codex指示I04 | 全線同時BUILDのproducer/consumerと現行実装配置を全数照合中 |
 | 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13の旧履歴→v4 scope/Consumer crosswalkを記録。詳細Contract/OS/Evidence、P13の旧evidence identity/classは未完／UNKNOWN |
-| 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのSource→Consumer crosswalkを記録。個々の全E0-04列、v4 Acceptance／Evidence、Phase/K結合は継続 |
-| D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | C対応は範囲関係のみ。現在のProducer/Consumer・状態照合が未完 |
-| 製品能力 K01〜K20 | 20 | v4仕様S05 | 必須Consumer、OS対象、実装位置、GapのID別照合が未完 |
+| 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのSource→Consumer crosswalkを記録。個々の全E0-04列とv4 Acceptance／Evidence/N11結合は継続 |
+| D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDをv4 N01〜N11/A〜J/Kへcrosswalk済み。Phase固有E0-04全field、Evidence ID/Blocker、Acceptanceは未完 |
+| 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K別の完全E0-04 field、OS/Evidence/Blocker確認は継続 |
 | Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 元要求と現在の各実Consumer・副作用証拠の対応が未完 |
 | Buffer工程 B0〜B6 | 7 | `docs/緩衝基盤_rev5補遺_QC/`・v4仕様S06 | B0〜B4の限定CLOSEDを保持、B5 OPEN、B6未成立。詳細Consumer照合が未完 |
 | QE/監査 D4-QE-R01〜R13／D4-LNX-T01〜T08／D4-AUD-F01〜F07 | 13／8／7 | `docs/QE_2026-10-22/`・各採用記録 | 旧証拠と現在の実装/Validatorへの接続が未完 |
@@ -789,11 +876,11 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 
 ## 次のE0照合作業
 
-1. 旧C0〜C34 crosswalkは記録済み。各行の完全なE0-04 field／N11 Evidence ID／Blocker結合を充填し、既存CLOSED・FAILは再試験なしで履歴保持する。
-2. `docs/D4_POCKET_PHASE_MAPPING.md`のPhase0〜45とP0〜P13・K01〜K20をv4 N/A〜Jへ一意または多対多で接続し、範囲対応と実作用を分ける。
-3. BUF-R/T、B0〜B6、D4-QE/LNX/AUD、Q/FQ/W、18 blockerを現Registry・Contract・Validator・実Consumerへ接続する。
-4. `docs/specs/`、`specs/`、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを取り、各行のSourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
-5. N10 source mappingで各OSの実装・配布候補・workflow/test・限定履歴を記録。保証対象のversion/arch/resource/package条件は公式条件と実測から別途固定し、未知を`UNKNOWN`にする。
-6. N11のRegistry/validator/QA queue consumer mappingは本節へ記録済み。旧ID（P/C/Phase/K/BUF/B/Q/FQ/W/QE/AUD）の全数照合、各IDからN11 evidence/gateへの結合、全Producer/Consumer inventoryは未完のまま残り、E0を閉じる前に埋める。
+1. N/P/C/Phase/Kの各要求行へ完全なE0-04 field、N11 Evidence ID、Blocker、OS対象/Artifactを結合する。既存CLOSED/FAILは履歴保持し、再試験しない。
+2. BUF-R01〜R09、BUF-T01〜T24、B0〜B6を現Registry・Contract・Validator・実Consumer・副作用Evidenceへ照合する。
+3. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
+4. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
+5. N10の各OS標準候補・配布・実装・workflow/test・限定履歴を記録する。保証version/arch/resource/package条件は公式条件と実測から固定し、未知をUNKNOWNにする。
+6. N11 Evidence/Registry/validator/QA queue consumer mappingに全ID・全OS artifactを接続する。Acceptance/E3 BUILD_COVERED/E4 QC/E5 QA/E6 Release判定は正本工程の順序と区分を維持する。
 
 上記未完了のため、E0は`OPEN`。E1全体BUILDの網羅、BUILD_COVERED、QC/QA、Releaseの成立は主張しない。
