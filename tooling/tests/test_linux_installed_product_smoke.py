@@ -67,6 +67,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _installed_task_write_failure_diagnostics,
     _installed_task_history_diagnostics,
     _installed_task_response_fixture_diagnostics,
+    _mcp_proposal_function_output_text,
     _normalize_response_fixture_request_shapes,
     _safe_response_function_output_shape,
     _linux_x11_window_presence_diagnostics,
@@ -5097,7 +5098,7 @@ class InstalledTaskStatusPollingTests(unittest.TestCase):
             and event["item"].get("type") == "function_call"
         )
         private_value = "PRIVATE_FUNCTION_OUTPUT_CANARY"
-        with self.assertRaisesRegex(RuntimeError, "task MCP function output missing"):
+        with self.assertRaisesRegex(RuntimeError, "function output has unsupported shape"):
             server._response_events(
                 {
                     "input": [
@@ -5117,6 +5118,10 @@ class InstalledTaskStatusPollingTests(unittest.TestCase):
         )
         rendered = json.dumps(diagnostics, ensure_ascii=False, sort_keys=True)
         self.assertEqual(diagnostics["state"], "read")
+        self.assertEqual(
+            diagnostics["fixture_rejection_counts"],
+            {"task_mcp_function_output_unsupported_shape": 1},
+        )
         self.assertEqual(
             diagnostics["request_shapes"][1]["function_call_output_shapes"],
             [
@@ -5662,6 +5667,148 @@ class LinuxAgentTaskResponsesFixtureTests(unittest.TestCase):
         self.assertTrue(scenario["request_shapes"][0]["task_mcp_tool_offered"])
         self.assertNotIn(public_request_receipt, json.dumps(snapshot))
         self.assertNotIn("installed-mcp-public-input", json.dumps(snapshot))
+
+    def test_fixture_accepts_bounded_responses_text_content_array(self) -> None:
+        server = _LinuxAgentTaskResponsesServer()
+        self.addCleanup(server.close)
+        proposal = {
+            "server_id": "linux-installed-mcp-followup",
+            "tool_id": "tool-" + "c" * 142,
+            "name": "echo",
+            "arguments": {"text": "installed-mcp-public-input"},
+        }
+        descriptor = {
+            "type": "function",
+            "namespace": "d4p_task_request",
+            "name": "d4_submit_mcp_tool_request",
+        }
+        server.configure(
+            "mcp_proposal",
+            "",
+            Path("/tmp/workspace"),
+            mcp_tool_request=proposal,
+        )
+        call_event = next(
+            event["item"]
+            for event in server._response_events({"input": [], "tools": [descriptor]})
+            if event["type"] == "response.output_item.done"
+            and isinstance(event.get("item"), dict)
+            and event["item"].get("type") == "function_call"
+        )
+        text_parts = [
+            "D4 Pocket accepted one untrusted proposal;",
+            "no external call has happened yet.",
+        ]
+        output = [
+            {"type": "input_text", "text": text_parts[0]},
+            {
+                "type": "input_text",
+                "text": text_parts[1],
+                "prompt_cache_breakpoint": {"mode": "explicit", "ttl": "30m"},
+            },
+        ]
+        final = server._response_events(
+            {
+                "input": [
+                    {
+                        "type": "function_call_output",
+                        "call_id": call_event["call_id"],
+                        "output": output,
+                    }
+                ],
+                "tools": [descriptor],
+            }
+        )
+        self.assertIn("response.completed", [event["type"] for event in final])
+        snapshot = server.snapshot()
+        scenario = snapshot["scenarios"][0]
+        self.assertEqual(snapshot["rejections"], [])
+        self.assertEqual(scenario["mcp_function_outputs"], 1)
+        self.assertEqual(
+            scenario["tool_output_sha256"],
+            hashlib.sha256("\n".join(text_parts).encode()).hexdigest(),
+        )
+        self.assertNotIn(text_parts[0], json.dumps(snapshot))
+        self.assertNotIn(text_parts[1], json.dumps(snapshot))
+
+    def test_fixture_rejects_secret_canary_in_text_content_array_without_echo(self) -> None:
+        server = _LinuxAgentTaskResponsesServer()
+        self.addCleanup(server.close)
+        descriptor = {
+            "type": "function",
+            "namespace": "d4p_task_request",
+            "name": "d4_submit_mcp_tool_request",
+        }
+        server.configure(
+            "mcp_proposal",
+            "",
+            Path("/tmp/workspace"),
+            mcp_tool_request={
+                "server_id": "linux-installed-mcp-followup",
+                "tool_id": "tool-" + "d" * 142,
+                "name": "echo",
+                "arguments": {"text": "installed-mcp-public-input"},
+            },
+        )
+        call_event = next(
+            event["item"]
+            for event in server._response_events({"input": [], "tools": [descriptor]})
+            if event["type"] == "response.output_item.done"
+            and isinstance(event.get("item"), dict)
+            and event["item"].get("type") == "function_call"
+        )
+        secret = "D4P_SYNTHETIC_SECRET_CANARY=do-not-forward"
+        with self.assertRaisesRegex(RuntimeError, "secret canary exposed"):
+            server._response_events(
+                {
+                    "input": [
+                        {
+                            "type": "function_call_output",
+                            "call_id": call_event["call_id"],
+                            "output": [{"type": "input_text", "text": secret}],
+                        }
+                    ],
+                    "tools": [descriptor],
+                }
+            )
+        snapshot = server.snapshot()
+        self.assertEqual(
+            snapshot["rejections"], ["synthetic_secret_canary_in_tool_output"]
+        )
+        self.assertNotIn(secret, json.dumps(snapshot))
+
+    def test_mcp_function_output_text_accepts_only_bounded_text_blocks(self) -> None:
+        self.assertEqual(
+            _mcp_proposal_function_output_text(
+                [
+                    {"type": "input_text", "text": "first"},
+                    {"type": "input_text", "text": "second"},
+                ]
+            ),
+            "first\nsecond",
+        )
+        self.assertIsNone(
+            _mcp_proposal_function_output_text(
+                [{"type": "input_image", "file_id": "file-safe", "detail": "low"}]
+            )
+        )
+        self.assertIsNone(
+            _mcp_proposal_function_output_text(
+                [{"type": "input_text", "text": "text", "extra": "unapproved"}]
+            )
+        )
+        self.assertIsNone(_mcp_proposal_function_output_text("x" * (64 * 1024 + 1)))
+        self.assertIsNone(
+            _mcp_proposal_function_output_text(
+                [
+                    {
+                        "type": "input_text",
+                        "text": "text",
+                        "prompt_cache_breakpoint": {"mode": "unexpected"},
+                    }
+                ]
+            )
+        )
 
     def test_fixture_followup_requires_result_marker_and_rejects_secret_input(self) -> None:
         marker = "D4P_MCP_RESULT_PROBE_0123456789abcdef0123456789abcdef"

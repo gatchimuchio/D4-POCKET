@@ -4806,16 +4806,19 @@ class _LinuxAgentTaskResponsesServer:
                         self._rejections.append("task_mcp_function_output_mismatch")
                         raise RuntimeError("task MCP function output mismatch")
                     output_text = tool_outputs[0].get("output")
-                    if not isinstance(output_text, str):
-                        self._rejections.append("task_mcp_function_output_not_text")
-                        raise RuntimeError("task MCP function output missing")
-                    if "D4P_SYNTHETIC_SECRET_CANARY" in output_text:
+                    normalized_output = _mcp_proposal_function_output_text(output_text)
+                    if normalized_output is None:
+                        self._rejections.append(
+                            "task_mcp_function_output_unsupported_shape"
+                        )
+                        raise RuntimeError("task MCP function output has unsupported shape")
+                    if "D4P_SYNTHETIC_SECRET_CANARY" in normalized_output:
                         self._rejections.append("synthetic_secret_canary_in_tool_output")
                         raise RuntimeError("secret canary exposed")
                     scenario["mcp_function_outputs"] = 1
                     scenario["tool_outputs"] = 1
                     scenario["tool_output_sha256"] = hashlib.sha256(
-                        output_text.encode("utf-8", errors="replace")
+                        normalized_output.encode("utf-8")
                     ).hexdigest()
                     return _responses_final_message_events(
                         posts,
@@ -6009,6 +6012,55 @@ def _safe_response_function_output_shape(value: object) -> dict[str, object]:
     }
 
 
+def _mcp_proposal_function_output_text(output: object) -> str | None:
+    """Accept bounded text-only Responses function output for this fixture."""
+    if isinstance(output, str):
+        parts = [output]
+    elif isinstance(output, list) and 1 <= len(output) <= 8:
+        parts = []
+        for item in output:
+            if (
+                not isinstance(item, dict)
+                or set(item) not in (
+                    {"type", "text"},
+                    {"type", "text", "prompt_cache_breakpoint"},
+                )
+                or item.get("type") != "input_text"
+                or not isinstance(item.get("text"), str)
+            ):
+                return None
+            if "prompt_cache_breakpoint" in item:
+                breakpoint = item["prompt_cache_breakpoint"]
+                if breakpoint is not None:
+                    if (
+                        not isinstance(breakpoint, dict)
+                        or not set(breakpoint).issubset({"mode", "ttl"})
+                        or breakpoint.get("mode", "explicit") != "explicit"
+                        or (
+                            "ttl" in breakpoint
+                            and (
+                                not isinstance(breakpoint["ttl"], str)
+                                or breakpoint["ttl"] not in {"30m", "12h"}
+                            )
+                        )
+                    ):
+                        return None
+            parts.append(item["text"])
+    else:
+        return None
+
+    normalized = "\n".join(parts)
+    if not normalized.strip():
+        return None
+    try:
+        encoded = normalized.encode("utf-8")
+    except UnicodeEncodeError:
+        return None
+    if len(encoded) > 64 * 1024:
+        return None
+    return normalized
+
+
 def _installed_task_response_fixture_diagnostics(
     responses_server: _LinuxAgentTaskResponsesServer,
     scenario_name: str,
@@ -6074,7 +6126,7 @@ def _installed_task_response_fixture_diagnostics(
         "synthetic_secret_canary_in_followup_request",
         "synthetic_secret_canary_in_tool_output",
         "task_mcp_function_output_mismatch",
-        "task_mcp_function_output_not_text",
+        "task_mcp_function_output_unsupported_shape",
         "task_mcp_namespace_function_not_offered",
         "task_mcp_proposal_missing",
         "tool_output_call_id_mismatch",
