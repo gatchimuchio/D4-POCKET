@@ -704,6 +704,17 @@ class HistoryContentGrant {
   final String id, request, auditId, eventHash;
   final int expires, _started;
   final Stopwatch _clock;
+  Duration get untilExpiry {
+    final wallClockRemaining =
+        expires * 1000 - DateTime.now().millisecondsSinceEpoch;
+    final monotonicRemaining =
+        expires * 1000 - _started - _clock.elapsedMilliseconds;
+    final remaining = wallClockRemaining < monotonicRemaining
+        ? wallClockRemaining
+        : monotonicRemaining;
+    return Duration(milliseconds: remaining > 0 ? remaining : 0);
+  }
+
   bool get current {
     final now = DateTime.now().millisecondsSinceEpoch;
     return now >= _started &&

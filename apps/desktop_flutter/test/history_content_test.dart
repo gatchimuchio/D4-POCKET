@@ -116,6 +116,11 @@ void main() {
           c.content(e, grant), throwsA(isA<BrokerClientException>()));
     }
   });
+  test('保存内容承認の残り時間は壁時計と単調時計の早い方に制限する', () async {
+    final grant = (await HistoryClient(ContentFixture()).contentStatus())!;
+    expect(grant.untilExpiry, greaterThan(Duration.zero));
+    expect(grant.untilExpiry, lessThanOrEqualTo(const Duration(minutes: 1)));
+  });
   testWidgets('内容は失効と背景化で消え遅延応答から復活しない', (tester) async {
     for (final background in [false, true]) {
       final f = ContentFixture();
@@ -149,14 +154,14 @@ void main() {
     final f = ContentFixture();
     final c = HistoryClient(f);
     final e = await entry(c);
-    f.contentExpiry = DateTime.now().millisecondsSinceEpoch ~/ 1000 + 5;
+    f.contentExpiry = DateTime.now().millisecondsSinceEpoch ~/ 1000 + 1;
     await tester.pumpWidget(
         MaterialApp(home: HistoryContentDialog(client: c, entry: e)));
     await tester.pumpAndSettle();
     expect(find.text('保存された応答'), findsOneWidget);
-    await tester
-        .runAsync(() => Future<void>.delayed(const Duration(seconds: 5)));
-    await tester.pump(const Duration(milliseconds: 150));
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 1200)));
+    await tester.pump(const Duration(seconds: 1));
     expect(find.text('保存された応答'), findsNothing);
     await tester.pumpWidget(const SizedBox());
   });

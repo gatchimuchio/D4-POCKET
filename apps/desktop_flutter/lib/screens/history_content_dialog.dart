@@ -23,17 +23,15 @@ class _HistoryContentDialogState extends State<HistoryContentDialog>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _expiry = Timer.periodic(const Duration(milliseconds: 100), (_) {
-      if (mounted && _content != null && !_content!.grant.current) {
-        _clear('閲覧期限を過ぎました。閉じて再承認してください。');
-      }
-    });
     _load();
   }
 
   void _clear(String message) {
     _generation++;
+    _expiry?.cancel();
+    _expiry = null;
     _poll?.cancel();
+    _poll = null;
     setState(() {
       _content = null;
       _checking = false;
@@ -56,6 +54,7 @@ class _HistoryContentDialogState extends State<HistoryContentDialog>
         _checking = false;
         _message = '現在承認の期限内だけ表示します。';
       });
+      _scheduleExpiry(content.grant);
       _schedule();
     } catch (_) {
       if (mounted && generation == _generation) {
@@ -65,7 +64,23 @@ class _HistoryContentDialogState extends State<HistoryContentDialog>
   }
 
   void _schedule() {
+    _poll?.cancel();
     _poll = Timer(const Duration(seconds: 2), _check);
+  }
+
+  void _scheduleExpiry(HistoryContentGrant grant) {
+    _expiry?.cancel();
+    final content = _content;
+    if (!mounted || content == null || !content.grant.same(grant)) return;
+    _expiry = Timer(grant.untilExpiry, () {
+      final current = _content;
+      if (!mounted || current == null || !current.grant.same(grant)) return;
+      if (grant.current) {
+        _scheduleExpiry(grant);
+        return;
+      }
+      _clear('閲覧期限を過ぎました。閉じて再承認してください。');
+    });
   }
 
   Future<void> _check() async {
