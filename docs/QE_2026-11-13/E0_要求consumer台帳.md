@@ -414,7 +414,7 @@ N11は`OPEN`。ValidatorとRelease Gateは一部のRegistry/Windows evidence/man
 | P12 | 製品全体統合。REV5進捗ではWindows側`FEATURE COMPLETE`。正式release/Owner GOと分離された製品機能統合の履歴。 | v4仕様S05の直接対応はN01/N09/N10、関連能力K19。Phase 39〜45はC27〜C34のQC/回帰/文書/出荷範囲に関連。単一施工線へ閉じない。 | Windows product entry→Task/result/operation UI→OS product lifecycle。実TaskはN01、operation/observation/recoveryはN09、installed OS distribution/lifecycleはN10の現ConsumerとSHA節へ分割記録。 | `FEATURE COMPLETE`を正式Release/QAへ昇格しない。v4 N01/N09/N10は`OPEN`、Q0〜Q7は`DEFERRED`、`release_ready=false`。統合後の全候補・全OS acceptanceは未成立。 |
 | P13 | Mobile / Non-Windows Product Build。REV5履歴は2026-10-09に有限Product Build acceptanceを閉鎖したと要約する。旧Acceptanceの詳細evidence identity/classは本照合資料から`UNKNOWN`。 | v4仕様S05の直接対応はN10、関連能力K17。Phase 35/36はC24〜C26範囲に関連。施工線H/I。Linux native必須性は別途現行AGENTS/v4正本に従う。 | Linux/macOS Desktop、Android/iOS Mobile runner/native transport→Rust Broker／OS capability→installed product lifecycle。OS別source、package、workflow候補とSHAはN10節。 | 旧P13閉鎖を現行五OS標準installed QAへ移さない。Linux nativeは完全対応必須で、WSL/Xvfb/Headlessだけでは成立しない。Android/iOS実機を前提にせずEmulator/Simulator等を用いる。N10は`OPEN`、`linux_native_product_support`、`rev2_mobile_distribution`、`rev2_mobile_device_evidence`を保持。 |
 
-P0〜P13全14 IDの旧要求範囲・限定statusをv4 N/K/Consumerへ接続した。これは旧statusの書換え、v4 acceptance、N01〜N11のCLOSED、E0完了のいずれも意味しない。C0〜C23のID別source crosswalkを下記へ記録した。C24〜C34、Phase0〜45、K01〜K20の全数照合と各行の完全なE0-04列は継続する。P0/P1/P4の直接対応はv4仕様S05の明示mappingへ合わせて訂正し、旧statusは変更していない。P13の詳細evidence identity/classは`UNKNOWN`として保持する。
+P0〜P13全14 IDの旧要求範囲・限定statusをv4 N/K/Consumerへ接続した。これは旧statusの書換え、v4 acceptance、N01〜N11のCLOSED、E0完了のいずれも意味しない。C0〜C34のID別Source→Consumer crosswalkを記録したが、各行の完全なE0-04列、Phase0〜45、K01〜K20、N11 Evidence結合は継続する。P0/P1/P4の直接対応はv4仕様S05の明示mappingへ合わせて訂正し、旧statusは変更していない。P13の詳細evidence identity/classは`UNKNOWN`として保持する。
 
 ## 旧C0〜C6のv4 Source→Consumer crosswalk（E0差分）
 
@@ -462,7 +462,7 @@ C6のsource hashは現HEAD `b2e20c2a16e2f324f3848ecc06203103755ceabf`上のGit b
 
 Related test source: `packages/gui_shell_ui/test/regression_case_client_test.dart`、`regression_case_owner_client_test.dart`、`apps/desktop_flutter/test/runtime_dialogue_test.dart`、`tooling/conformance_tests/run_conformance_skeleton.py`内のC6 contract検査。TestClassはDart unit/widget・schema/conformance sourceで、今回のSource mappingでは未実行。Broker receipt/listは旧contract上`INTERNAL_STATE`、削除後ProtectedStore観測は`LIVE_RUNTIME`と明示される。実installed Owner操作・Windows artifact provenanceへ証拠を昇格しない。
 
-C0〜C6の7 IDについて、旧要求・Phase・旧statusを変更せずv4の直接N/Kとconsumer/gapへ接続した。これはC0〜C6 acceptanceの再判定、C1〜C6の製品完了、N09/N11のCLOSED、E0全数完了ではない。続くC7〜C14およびC15〜C23を下記crosswalkで照合し、C24〜C34を未照合として継続する。
+C0〜C6の7 IDについて、旧要求・Phase・旧statusを変更せずv4の直接N/Kとconsumer/gapへ接続した。これはC0〜C6 acceptanceの再判定、C1〜C6の製品完了、N09/N11のCLOSED、E0全数完了ではない。C7〜C14、C15〜C23、C24〜C34の後続crosswalkも記録し、C0〜C34全35 IDの旧ID対応付けを完了した。全E0-04列の充足、Phase/K/Buffer/Q/FQ/W照合、N11 Evidence結合とE0完了は別途継続する。
 
 ## 旧C7〜C14のv4 Source→Consumer crosswalk（E0差分）
 
@@ -637,7 +637,90 @@ C7〜C14のSource/Schema/test blob SHAは現行source baselineへ固定した。
 | C23 | `docs/specs/desktop-ux-integration.md` | `b73ec534c2b4df94ca7eb52be5d7929cf0a20aa1` |
 | C21–23 | `apps/desktop_flutter/test/widget_test.dart` | `f4e9c7b93f832ba2a2cefee779fd12426f240b04` |
 
-C15〜C23の旧statusはrev1履歴として保持した。source/schema/test blob SHAとSource→Consumer対応は現行候補の同一性を示すだけで、test実行や製品Acceptance evidenceではない。A2A／Host／Adapter／Desktop surfaceの製品受入れは未判定、N03/N04/N09/N10および関連KのOPEN状態を維持する。C0〜C23の24 IDをcrosswalk済み、C24〜C34とPhase/K等の全数照合は未完である。
+C15〜C23の旧statusはrev1履歴として保持した。source/schema/test blob SHAとSource→Consumer対応は現行候補の同一性を示すだけで、test実行や製品Acceptance evidenceではない。A2A／Host／Adapter／Desktop surfaceの製品受入れは未判定、N03/N04/N09/N10および関連KのOPEN状態を維持する。C0〜C34の35 IDはcrosswalk済みだが、全E0-04列、Phase/K等の全数照合とE0完了は未成立である。
+
+## 旧C24〜C34のv4 Source→Consumer crosswalk（E0差分）
+
+旧C24〜C34の要求、Phase、進捗statusはrev1履歴として保持し、再判定・書換えをしない。以下のsource観測baselineはmain `d45fa6109fa6300ed42449ea03a93bfe25f7ae95`。v4対応はS04/S05・R03上の対応関係であり、旧statusはN/K受入れへ昇格しない。Test sourceは存在と種類だけを示し、このmapping単位では`NOT_RUN`。Phase対応は`docs/D4_POCKET_PHASE_MAPPING.md`。
+
+| 旧ID／Phase | 主語・目的／rev1履歴status | v4対応 | 現行Producer→Consumer・契約・source状態 | 否定・停止・Authority・Recovery | OS・TestClass・Evidence・残差 |
+|---|---|---|---|---|---|
+| C24／Phase 35 | Mobile補助操作面。旧進捗は9画面、通知summary、Runtime／資源／履歴metadata、MCP未観測、停止receipt、Recovery導線、Device Link/Broker read-only接続、Conformance・Mobile/Rust試験を記録。実機・TLS／Windows installed連携は未取得。 | N09/N10、K03/K04/K13/K17。 | Mobile画面→`MobileProjectionClient`／`DeviceLinkClient`→OS-native Device Link TLS service→既存Rust Broker read-only handler。Agent statusもmetadata projection。新Authority経路を増やさない。 | Approval画面はowner操作の表示に限定。MCPは未観測。停止は`executed=false`・owner reapproval receiptで実停止なし。履歴本文・Credential実値・Workspace pathを返さず、資源unknownを0にしない。Agent metadataはTask capabilityやTrustではない。 | Android Kotlin／iOS Swift native source、Flutter client/widget tests、Android Emulator/iOS Simulator workflow sourceあり。本単位`NOT_RUN`。Hostのlive inventory、Mobile AgentTask開始、各標準OS installed product／Device Link統合は未成立。物理端末はv4必須条件ではなく、標準Emulator／Simulator evidenceも本単位では未実行。 |
+| C25／Phase 36 | Apple補助検証。rev1履歴は`workflow_dispatch`のMac build補助を保持し、Windows hostからの起動実証・現行commitのmacOS/iOS Simulator evidenceは未取得。 | N10/N11、K17/K19。 | `.github/workflows/apple-manual-build.yml`にmacOS/iOS target別manual build・test入口がある。workflow定義は実行結果ではなく、target OS consumerへの補助経路。 | Dispatch入力があることだけでOS build成功・製品実行・署名・配布を主張しない。失敗時はworkflow結果を対象SHA／runner／targetごとに限定し、release readinessへ昇格させない。 | macOS runner／iOS Simulator候補のmanual source。workflowは本単位`NOT_RUN`。現行candidateのmacOS／iOS標準installed evidence、正式署名／notarization／配布は未成立。物理iPhone要件へ戻さない。 |
+| C26／Phase 35・36 | Android build回帰。rev1履歴ではWindows Flutter analyze、32試験、debug APK/AAB buildをPASS。Android install／launch、native安全保管、正式署名は未取得。 | N10/N11、K17。 | Android Gradle設定と`android-manual-emulator.yml`はAPI 35 Google APIs x86_64 Emulator、Flutter analyze/test、debug APK/AAB build、Emulator install/launch、native Device Link product flowを記述する。これは実行可能なmanual validation consumerで、当該workflowの現candidate結果ではない。 | Debug APK/AAB・source testは署名済通常配布やKeystore保証ではない。Native Device Linkの拒否／秘密境界はBroker/OS経路で維持し、MobileからAgentTask／MCP Tool作用を生成しない。 | Windows過去debug buildは`SOURCE`／`FIXTURE`履歴。Emulator workflow sourceあり、本単位`NOT_RUN`。現行candidate Emulator installed path、更新／撤去、標準配布identityは未成立。物理Androidは凍結条件と独立してEmulator検証を利用できるが、ここでは実行していない。 |
+| C27／Phase 41 | 開発用全数性能・UI停止監視。旧履歴はsnapshot、Flutter projection、4096行差分等のbounded測定をPASSし、実installed起動・GPU frame・8時間・実Runtime負荷を未測定と記録。 | N09/N11、K19。 | `performance_validation.py`→generated snapshot／`c27_performance_validation_test.dart`のFlutter projection／表示処理をwatchdog測定する。現consumerは内部snapshotとfixtureであり、実installed product telemetryではない。 | watchdog超過を失敗として返し、resource unknownを0にしない。fixture／内部計測の成功をLIVE_RUNTIME、性能SLA、GPU frame保証へ昇格しない。 | TestClassは`INTERNAL_STATE`＋`FIXTURE`の開発測定。test sourceは本単位`NOT_RUN`。実installed cold/warm startup、実画面frame、GPU、実Agent/MCP/A2A負荷は未成立。 |
+| C28／Phase 39 | Windows長時間運転。旧履歴は実Broker IPCの短時間smoke／120秒stressをPASS、clean commitの8時間試行が開始22.766秒で失敗したと保持。 | N01/N08/N11、K19/K20。 | `long_run_validation.py`は8時間実行option、Broker restart／network disconnect等の監督、結果JSON／failure classificationを持つ。Runtime HTTP応答はlocalhost fixture。短時間smokeと8h candidate runは別consumer/evidence。 | timeout、client受信未確認、Audit/state失敗を成功へ読み替えない。fixture serverのflush記録はclient受信証明ではない。資源不明を0にせず、期限後の資格file cleanupは固定回数だけ再試行し、未成功ならfailed。 | Brokerは`LIVE_RUNTIME`を限定観測し、Runtimeは`FIXTURE`、resourceは`INTERNAL_STATE`。8時間の旧FAILは保持し、PASSへ変更しない。current installed productの8h／実Runtime負荷は未成立。本mapping単位では長時間試験を再実行しない。 |
+| C29／Phase 40 | 開発用障害注入。旧進捗はRuntime/Broker/MCP/A2A/Credential/store/Audit/stateの8件をPASS、installed／外部サービス証拠なしと記録。 | N01/N02/N04/N05/N08/N11、K19/K20。 | `failure_injection_validation.py`が実Broker IPCとlocal MCP stdio／A2A loopback fixtureへ限定障害を注入し、失敗を成功・権限・Audit・Recoveryへ昇格しないことを検査する。 | deny/fail-closed、曖昧結果停止、再送禁止、credential非露出を期待する。fixture・開発Validatorの成功を実外部Runtime／MCP／A2Aやinstalled製品の異常系へ転用しない。 | TestClassはlocal Broker／`FIXTURE`中心。spec／script sourceあり、本単位`NOT_RUN`。実installed fault injection、外部service、全OS標準packageのfailure/recoveryは未成立。 |
+| C30／Phase 7・8・42 | Local全数回帰matrix。旧履歴はTrust／Authority／Permission／Approval／Audit／Recovery／Evidence／Runtime／Agent／Dialogue／Compare／Device Link群の回帰実装、実Runtime・実Agent・実端末・installed product未成立を記録。 | N11/K19。個々のregression行は対象N/Kのconsumerへ結合する。 | `full_regression_validation.py`は固定された開発回帰matrixを実行し、`full-regression-validation.md`とConformanceがentry／分類を検査する。これは全要求の実物QAや全OS installed回帰とは別。 | unknown／不正入力・権限昇格・Audit/Recovery境界違反を拒否するが、matrixの列挙やexit 0だけで未実行consumerをPASSにしない。TestClass、対象SHA、OS、NOT_RUN範囲を分離。 | Local source/regression／Conformance。現candidateの全製品testは本単位`NOT_RUN`。外部Runtime／Agent、標準VM/Emulator/Simulator installed path、Windows owner physical evidence、FQ/Q正式QAは未成立。 |
+| C31／Phase 1・43 | 製品文書同期。旧履歴はREADME／ROADMAP／GUI操作面／SECURITY／CONFIG／MOBILE_STATUS／COMPATIBILITY_MATRIX／REV2_PROGRESSをC24〜C30のscope・残差へ同期した記録。 | N11/K19。文書は仕様／工程／進捗／Release判断の説明consumer。 | 旧対象文書は現repoに存在する。現状の施工正本は`docs/QE_2026-11-13/`三点・採用記録・進捗、製品各文書はREADME、ROADMAP、GUI_OPERATION_SURFACES、SECURITY、CONFIG、MOBILE_STATUS、COMPATIBILITY_MATRIX、REV2_PROGRESS。文書更新は実consumer動作の代替ではない。 | 旧文書やC31記載がv4正本・現HEADと競合した場合、現v4を優先し、過去status／failureは履歴として残す。未成立を文言変更でPASS化しない。 | Markdown／Registry/Manifest consumer。過去の文書更新statusはその時点の履歴であり、現在の五OS製品QAやrelease成立を示さない。本文の現行整合はこのcrosswalk以外の全ファイル監査を完了した意味ではない。 |
+| C32／Phase 42・44 | rev1 C0〜C31対応表の最終開発監査。旧履歴はchecker／Conformance PASS、C32〜C34・installed product・external/physical evidence・release未成立。 | N11/K19。 | `final-development-audit.json`の監査母集団はC0〜C31。`final_development_audit.py`は必須field、参照path、C番号、残余risk分類を照合し、C32〜C34を未監査として明示する。 | report `passed`は対応表構造／参照整合のみで、C0〜C31製品挙動・実Acceptance・release_readyを証明しない。owner GOを生成しない。 | TestClassはstructure/Conformance。監査tool／unittest sourceは本単位`NOT_RUN`。v4 E0全ID、P/Phase/K/BUF/Q/FQ/W/OS/Artifactの一体監査は未成立。 |
+| C33／Phase 34・44 | Windows最大到達点。旧履歴はRelease build／Broker smoke／collector／ConformanceをPASSした一方、Windows installed product総合evidenceはUI surface、Setup Doctor path、外部Audit anchorによりfailed。 | N10/N11、K16/K19。 | `stage_installed_app.ps1`→installed app/Broker→`collect_installed_smoke.ps1`／`windows_release_evidence.py`／`release_smoke.py`が候補経路。現registry consumerはcurrent installed evidence fileを要求する。tracked proof-pack内の旧Windows evidence copyはsource commit `28a700f…`・2026-06-07由来で、現main candidateではない。`release_evidence/`には`.gitkeep`以外の現candidate bundleがない。 | Collectorはsource／artifact／profile／runtime/config/audit pathのprovenanceを検査する。過去のsubgate PASSを総合PASSへ合成せず、古い証拠や別commitのartifactを現候補へ再結合しない。Windows Owner physical confirmationとAudit anchorは別々に保持。 | Windows release source・旧`EXTERNAL_EVIDENCE` copyあり。ただし旧C33 total status failed、現candidate installed product evidenceなし。本単位`NOT_RUN`。通常installer→first-run→Task→update/repair/rollback/uninstall、clean source identity、Windows所有者PC確認は未成立。 |
+| C34／Phase 45 | 正式release前作業。rev1進捗は未着手。原要求はPublisher identity、正式署名、Audit offline signature、実機／標準OS evidence、strict release、Owner GOを含む。 | N10/N11、K16/K17/K19。 | `release_blockers.registry.json`→`release_gate_check.py`／Strict Release／`FINAL_QA_QUEUE.md`／`RELEASE_CHECKLIST.md`がrelease decision candidateを検査する。Gateは証拠・blockerを評価するがPublisher identity、production key、offline signature、Owner GO自体は作らない。 | 18 blockerの16 unresolved／2 resolvedと`release_ready=false`を維持。正式identity／署名鍵／Audit production key／公開／Owner GOは本人決裁と必要資格なしに実行しない。技術的release prepは独立作業として継続可能。 | Registry／Validator sourceはあるがC34実施・strict release・配布・Owner GOは未成立。responsible decision／production credential項目は未取得のまま。ここではstatus変更もrelease actionも行わない。 |
+
+### C24〜C34 source blob SHA・test source
+
+下記blob SHAは照合基準main `d45fa6109fa6300ed42449ea03a93bfe25f7ae95`の値。source／validator／過去evidence fileの同一性を固定し、動作や現行candidate受入れを証明しない。旧C24〜C34のstatus・FAILは`docs/総合機能拡張_rev1/`の履歴値のまま維持する。
+
+| 旧C範囲 | Source file | Blob SHA |
+|---|---|---|
+| C24 | `docs/specs/mobile-surface.md` | `071ee69485ede6f792d303dd7fea615d1d912607` |
+| C24 | `apps/mobile_flutter/lib/services/mobile_projection_client.dart` | `ba82e4ddeaa5692793237a1bc3258ce53b7aa3ed` |
+| C24 | `apps/mobile_flutter/lib/services/device_link_client.dart` | `e8c49337127cb7f62fad248988b99707c5e49219` |
+| C24 | `apps/mobile_flutter/lib/screens/device_connection.dart` | `4adb15803bf6b208c13aca930bb5496f03b4d6b8` |
+| C24 | `apps/mobile_flutter/lib/screens/agent_status.dart` | `52e4907897c2bb3674bb8523204a787d3a6cb002` |
+| C24 | `apps/mobile_flutter/test/mobile_projection_client_test.dart` | `74661d2f2e58046a83e99f711435e4c1b2a74b08` |
+| C24 | `apps/mobile_flutter/test/device_link_test.dart` | `509b4febc424d1c0fd330b71529b00457b5cf429` |
+| C24 | `apps/mobile_flutter/android/app/src/main/kotlin/com/example/gui_shell_mobile/DeviceLinkNativeService.kt` | `0fd3c6f5bd09e7a18df9fefe97e2e7bb9e9da706` |
+| C24 | `apps/mobile_flutter/ios/Runner/DeviceLinkNativeService.swift` | `9d185729c439934dce0553b490f2fcd1f7b28a0d` |
+| C24 | `specs/mobile_agent_list.schema.json` | `61558ea30f269c886d40f414cfe31bda09fa5d11` |
+| C24 | `specs/mobile_workspace_selection.schema.json` | `6963dbea6db4e876340ea40bbd13a394fae92e23` |
+| C25 | `.github/workflows/apple-manual-build.yml` | `ed60235da7b35cdfaac23a9fd2d07023e1d29843` |
+| C26 | `.github/workflows/android-manual-emulator.yml` | `f0c1ecb7185c91375adfbbdbfaf49e55a2672b57` |
+| C26 | `apps/mobile_flutter/android/app/build.gradle.kts` | `fe96edfa0f714c2d2be509ce3bc21bec6253a714` |
+| C26 | `apps/mobile_flutter/android/app/src/androidTest/kotlin/com/example/gui_shell_mobile/NativeDeviceLinkProductFlowTest.kt` | `4f4a79e0bd80b1f5eb280857dec7a7d5df12258c` |
+| C27 | `docs/specs/performance-validation.md` | `6746542d94a1f417d443f1a3992779e6480e74ed` |
+| C27 | `tooling/performance_validation.py` | `d0744916a8be65e10b61a453864bb8b80318241e` |
+| C27 | `apps/desktop_flutter/test/c27_performance_validation_test.dart` | `e833fbd760a8d2e6c4c90e4c6bee6a8c3cb7cff1` |
+| C28 | `docs/specs/long-run-validation.md` | `ebba5dc1cc97fa69525502d12dfc059e89023380` |
+| C28 | `tooling/long_run_validation.py` | `00d1ec4fa0a7b7fea4ef678a94a56f20367a243c` |
+| C28 | `tooling/conformance_tests/test_long_run_validation.py` | `3976e57497d86aa8a3ca612758227c091db617cb` |
+| C29 | `docs/specs/failure-injection-validation.md` | `14d2a946f424b0e800a4a271c51da8b5f797dfac` |
+| C29 | `tooling/failure_injection_validation.py` | `cace434de47d60f7f848656f229336d8293908ff` |
+| C29–30 | `tooling/conformance_tests/run_conformance_skeleton.py` | `c6f31d8cb561b48513c6784e54c85969c9cb953e` |
+| C30 | `docs/specs/full-regression-validation.md` | `dd5953d3bea595c2f25474ed0a9c42cf01ff51e3` |
+| C30 | `tooling/full_regression_validation.py` | `8a33a9fab9ecbc18119302ae312201d41618012e` |
+| C31 | `README.md` | `38664991fe614acfc516eb6743dde6dce754191c` |
+| C31 | `ROADMAP.md` | `6a922a38cca617690bc08297274e907f0425b722` |
+| C31 | `docs/GUI_OPERATION_SURFACES.md` | `4b48d55a69866dd0e1b3180e2192fc9efcc90598` |
+| C31 | `SECURITY.md` | `6784fb68043aaceccc6d063b253c5d7d50210065` |
+| C31 | `CONFIG.md` | `7349ca355614fa265a80c104f2be3b3503a92590` |
+| C31 | `MOBILE_STATUS.md` | `476b565a3f583be52ef58966f67c51abbb774aa8` |
+| C31 | `COMPATIBILITY_MATRIX.md` | `c4885d5b67202712c0bcdecc6da634cb778cd6d3` |
+| C31 | `docs/REV2_PROGRESS.md` | `56f0f168b22d1e64303db2bc6f2c66668393dba2` |
+| C31 | `docs/QE_2026-11-13/進捗.md` | `d75e96eb788a6f980465575337a1afcca3dc135c` |
+| C32 | `docs/specs/final-development-audit.json` | `8126944c55339a3be272af5ba183a9bc2e3517dc` |
+| C32 | `docs/specs/final-development-audit.md` | `cc3734d7647dbbbbd27bad49153f775bfc980f3f` |
+| C32 | `tooling/final_development_audit.py` | `913c81bc22f71bc5bb3447fa4f4bd266326932ec` |
+| C32 | `tooling/conformance_tests/test_final_development_audit.py` | `628c77a50adf867e87b4e4a893d5e691df8111d1` |
+| C32 | `docs/総合機能拡張_rev1/受領記録.json` | `e8433d4b4769200c00f1aa0c6e1b4c7671229352` |
+| C32 | `docs/総合機能拡張_rev1/進捗.md` | `1392588f0cd5273013578e84d8e33c5c9dc9a01a` |
+| C33 | `docs/WINDOWS_RELEASE_PLAN.md` | `5d4c35f8c9599c9f38b7c02ae475710e8c5a64e8` |
+| C33 | `docs/WINDOWS_RELEASE_EVIDENCE.md` | `9c836b028c352da8d37f9feae53dcb27b537199d` |
+| C33 | `tooling/windows_release_evidence.py` | `6f7957c6193c86c7bc15165e743f11651464f29c` |
+| C33 | `tooling/release_smoke.py` | `e9f38cea998a31bbf9272880dbf4965de5eb0113` |
+| C33 | `installer/windows/stage_installed_app.ps1` | `c6d0797299624d69b71042416400b2f454787cc7` |
+| C33 | `installer/windows/collect_installed_smoke.ps1` | `92c4720e82eb0af91002659c742f8e03b15aa2de` |
+| C33 | `installer/windows/collect_broker_smoke.ps1` | `f5f8abfad981d64c30a6cf1f4e9eafde1b43c357` |
+| C33 | `openai_submission_assets/windows_proof_pack/evidence_copies/windows_installed_smoke.json` | `7f7f1742460e31c89ecc353fb4b9411c1118f5a5` |
+| C34 | `tooling/release_gate_check.py` | `22a8d7bfe9adb259f44ce8501fb215652e1d58c6` |
+| C34 | `release_blockers.registry.json` | `244adc04a01e7b406c4ebcdeb829f7077d4aa35f` |
+| C34 | `docs/FINAL_QA_QUEUE.md` | `7b332cccab70bb68aa1ff4f8e23acc0e816d8282` |
+| C34 | `docs/RELEASE_VALIDATION.md` | `b4b0462e628ad8176264473879dedb1f6201da7c` |
+| C34 | `RELEASE_CHECKLIST.md` | `35f31043a9311d49c94acdc9631e30b61949c65d` |
+| C34 | `tooling/evidence_bundle.py` | `68dead851236b0f1b69899151c37371e593ff3f9` |
+| C34 | `tooling/release_runtime_assertions.py` | `0a0a351fe17151ad86517bd0a965358f40c61490` |
+
+C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline上で一致させた。旧C24〜C34のsource/test resultは履歴を保持し、本単位で製品試験は実行していない。とくにC28の8時間FAIL、C33の総合installed FAIL、C34未着手をPASSへ読み替えない。C0〜C34の35 IDは旧要求crosswalk済みだが、E0-04全項目の全数充填、Phase/K/Buffer/Q/FQ/W全数接続、v4標準OS QA、N11 evidence結合は未完で、E0およびN10/N11は`OPEN`を維持する。
 
 ## 実装ファイルの初期目録（CODE_PRESENTのみ）
 
@@ -662,7 +745,7 @@ C15〜C23の旧statusはrev1履歴として保持した。source/schema/test blo
 | 新規要求 N01〜N11 | 11 | v4仕様S04 | 初期Producer/Consumer差分を記録。契約・否定・OS・証拠の全項目は未完 |
 | 全体施工線 A〜J | 10 | v4工程表R03・Codex指示I04 | 全線同時BUILDのproducer/consumerと現行実装配置を全数照合中 |
 | 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13の旧履歴→v4 scope/Consumer crosswalkを記録。詳細Contract/OS/Evidence、P13の旧evidence identity/classは未完／UNKNOWN |
-| 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C23の24 IDはID別crosswalkを記録。C24〜C34の旧仕様/工程/進捗→現Consumerと全E0-04列は未照合 |
+| 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのSource→Consumer crosswalkを記録。個々の全E0-04列、v4 Acceptance／Evidence、Phase/K結合は継続 |
 | D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | C対応は範囲関係のみ。現在のProducer/Consumer・状態照合が未完 |
 | 製品能力 K01〜K20 | 20 | v4仕様S05 | 必須Consumer、OS対象、実装位置、GapのID別照合が未完 |
 | Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 元要求と現在の各実Consumer・副作用証拠の対応が未完 |
@@ -706,7 +789,7 @@ C15〜C23の旧statusはrev1履歴として保持した。source/schema/test blo
 
 ## 次のE0照合作業
 
-1. `docs/総合機能拡張_rev1/`のC24〜C34原文・工程・進捗をID単位で照合し、既存実装・Consumer・履歴statusを埋める。C0〜C23の記録は補強対象が出ない限り再試験しない。
+1. 旧C0〜C34 crosswalkは記録済み。各行の完全なE0-04 field／N11 Evidence ID／Blocker結合を充填し、既存CLOSED・FAILは再試験なしで履歴保持する。
 2. `docs/D4_POCKET_PHASE_MAPPING.md`のPhase0〜45とP0〜P13・K01〜K20をv4 N/A〜Jへ一意または多対多で接続し、範囲対応と実作用を分ける。
 3. BUF-R/T、B0〜B6、D4-QE/LNX/AUD、Q/FQ/W、18 blockerを現Registry・Contract・Validator・実Consumerへ接続する。
 4. `docs/specs/`、`specs/`、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを取り、各行のSourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
