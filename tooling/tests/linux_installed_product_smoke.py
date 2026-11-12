@@ -8391,7 +8391,7 @@ def _run_installed_agent_mcp_followup_acceptance(
             f"Tool: echo ({tool_id})",
             f"Agent source Task: {source_task_id}",
             f"Agent result hash: {source_result_hash}",
-            "arguments hash:",
+            MCP_OWNER_ARGUMENT_HASH_MARKER,
         ),
     )
     _wait_for_owner_dialog_closed(environment)

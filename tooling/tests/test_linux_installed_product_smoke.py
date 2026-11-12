@@ -1075,6 +1075,19 @@ class InstalledOwnerSummaryTests(unittest.TestCase):
         self.assertIn("MCP_OWNER_ARGUMENT_HASH_MARKER,", acceptance)
         self.assertIn("MCP_OWNER_NO_CREDENTIAL_MARKER,", acceptance)
 
+    def test_agent_mcp_followup_owner_approval_uses_broker_hash_label(self) -> None:
+        root = Path(__file__).resolve().parents[2]
+        acceptance = (root / "tooling/tests/linux_installed_product_smoke.py").read_text(
+            encoding="utf-8"
+        )
+        start = acceptance.index(
+            'context="Agent起点MCP Toolのfresh Owner Approval"'
+        )
+        end = acceptance.index("    _wait_for_owner_dialog_closed(environment)", start)
+        owner_approval = acceptance[start:end]
+        self.assertIn("MCP_OWNER_ARGUMENT_HASH_MARKER", owner_approval)
+        self.assertNotIn('"arguments hash:"', owner_approval)
+
     def test_installed_mcp_owner_summary_is_accepted_before_decision(self) -> None:
         server_id = "linux-installed-mcp-fixture"
         executable = "/usr/bin/python3"

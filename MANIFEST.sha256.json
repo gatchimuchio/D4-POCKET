@@ -1444,7 +1444,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "0d7de2a4f714acab259b942aa7e42fb312aba1b08b4e5c580a83b3f169571b2a"
+      "sha256": "6cb4645854818f234e906b0d0d24fdf1fe316c15224261dd16f954660be15ffa"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -5624,7 +5624,7 @@
     },
     {
       "path": "tooling/tests/linux_installed_product_smoke.py",
-      "sha256": "d23b3caad68c88cfe7671bedd00aaf35e58ea35f9a0ca0fe4102769ea09a65cf"
+      "sha256": "c407193afca754714d9a66f664e9fab344aa59e630f51492853caafb79d82ae2"
     },
     {
       "path": "tooling/tests/linux_update_https_server.py",
@@ -5652,7 +5652,7 @@
     },
     {
       "path": "tooling/tests/test_linux_installed_product_smoke.py",
-      "sha256": "6f6b5306896ae1e1d057fb3970ed008c38113f6342ee705a841ac0e3b7f37d88"
+      "sha256": "bb95acc6a160ff692d6149b1844f7bf0157168fea7ae53ef5b62533801665dfb"
     },
     {
       "path": "tooling/tests/test_linux_portable_archive.py",
