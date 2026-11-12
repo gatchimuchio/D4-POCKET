@@ -392,9 +392,9 @@ blob SHAは照合HEAD `d32d053c702f834201784428ad597f321977580c`上の値。
 
 N11は`OPEN`。ValidatorとRelease Gateは一部のRegistry/Windows evidence/manifest/conformanceを実際に消費するが、全製品要求・旧ID・OS Artifact・結果/停止/Recovery・証拠class・所有者判断を同一candidateで束ねる統合consumerは未成立。18件のstatus、Q0〜Q7の履歴、`release_ready=false`は変更しない。N11 mappingはE0完了、BUILD_COVERED、QC/QA、Releaseを意味しない。
 
-## P0〜P4 旧製品要求→v4 Consumer crosswalk（E0差分）
+## P0〜P13 旧製品要求→v4 Consumer crosswalk（E0差分）
 
-照合HEADは`4a530e883e75153ac735252b08dd4775e8e36dc7`、製品source比較基準は`d503a4ef6daac8942abd1cb011442ce28c78ec55`。旧P statusは[REV5製品進捗](../REV5_PRODUCT_PROGRESS.md)の当時のProduct Build境界で保持し、v4のN/K/Workstream statusへ昇格しない。Consumer sourceとblob SHAは、表が指すN01〜N10追跡節および該当Source SHA表を参照する。今回の作業は文書source mappingのみで、製品testは`NOT_RUN`。
+照合HEADは`9c6dfadc5d8a63b8e96f79ddd340de05c2963fef`、製品source比較基準は`d503a4ef6daac8942abd1cb011442ce28c78ec55`。旧P statusは[REV5製品進捗](../REV5_PRODUCT_PROGRESS.md)の当時のProduct Build境界で保持し、v4のN/K/Workstream statusへ昇格しない。v4仕様S05のP別直接mappingと、旧Phase/C対応は別の軸として記録する。Consumer sourceとblob SHAは、表が指すN01〜N10追跡節および該当Source SHA表を参照する。今回の作業は文書source mappingのみで、製品testは`NOT_RUN`。
 
 | 旧ID | 旧要求／履歴status | v4 scope対応 | 現行Producer→Consumer／source参照 | 旧証拠classとv4残余 |
 |---|---|---|---|---|
@@ -408,8 +408,12 @@ N11は`OPEN`。ValidatorとRelease Gateは一部のRegistry/Windows evidence/man
 | P7 | A2A / Multi-Host / Adapter管理。旧rev5でProduct Build `CLOSED`。A2A、Host metadata/capability、接続性、degraded mode、local/remote Runtime区別。 | v4仕様S05の直接対応はN03/N04。関連能力はK11/K12。Phase 24〜27（C15〜C19範囲）。施工線B/F。 | Runtime/AdapterとAgent Center/A2A UI→Broker Runtime/Host/A2A consumer。実Runtime capability・A2A action・Host境界のsourceとhashはN03/N04節。 | 旧P7の決定的fixture/限定接続をinstalled external-agent保証へ昇格しない。現v4 N03/N04・W03は`OPEN`。二つ目の実Runtime Task、外部Agent action、Host間Workspace/Authority隔離、Mac/Mobileの同等作用は未成立またはunsupported。 |
 | P8 | GUI-Shell Compose。旧rev5で製品構築受入れ`CLOSED`。Capability/Dependency選択、Manifest/preview、AI edit proposalと制御適用を区別。 | v4仕様S05の直接対応はN05/N07。関連能力はK14。Phase 29〜31はD4追加範囲で、同等のrev1 C工程を主張しない。施工線D。 | Catalog/Compose UI→Broker compatibility check/Manifest→MCP Tool consumerはN05節。AI proposal→別Workspaceの審査Task→controlled apply/rollback候補はN07節。 | 現ConsumerはManifestの独立Appによる完全消費を示さず、AI Editはproposal/Task準備が中心でBroker-controlled apply/rollbackに`BUILD_GAP`。旧Product Build statusのまま、v4 N05/N07・W04/W05は`OPEN`。 |
 | P9 | Standalone Export。旧rev5で製品構築受入れ`CLOSED`。構成から新identity/Manifest/選択moduleを持つ独立Appを出力する。 | v4仕様S05の直接対応はN06。関連能力はK15。Phase 32はD4追加範囲。Phase 33のModule pruning (P10)と分離する。施工線E。 | Export UI→Broker receipt/Manifest→Windows/Linux Developer Exporter→Launcher。現source/hashとManifest consumption/pruning limitはN06節。 | 旧Exporter/Product Build証拠は独立installed製品の実動作ではない。runtime manifest consumption、normal installer/installed runは未成立、`standalone_app_verified=false`。v4 N06/W05は`OPEN`。P10のbinary/resource除去も本IDへ統合しない。 |
+| P10 | Module Selection / Pruning。旧rev5で機能上の除外範囲を`CLOSED`。選択dependency closure、compile-time UI除外、必須画面保持。 | v4仕様S05の直接対応はN06、関連能力K15。Phase 33のD4追加範囲で、同等のrev1 C工程なし。施工線E/F。 | Export Module plan→build define/receipt→Flutter UIの除外経路。Exporter/Launcherへの現source接続とhashはN06節。 | 旧plan/Widgetは`CONFIG`/`FIXTURE`。AOT/binary実除去、Rust/third-party dependency pruning、size/resourceの意味保証は未成立。`binary_pruning_verified=false`、FQ-MODULE-PRUNING／`rev2_module_pruning_binary_and_measurement`を保持。v4 N06/W05は`OPEN`。 |
+| P11 | Windows Productization。旧rev5で製品機能受入れ`CLOSED`。P9 portable ZIPをbootstrapに使うBroker-owned Install/Update/Repair/Rollback/Uninstall導線。 | v4仕様S05の直接対応はN10、関連能力K16。Phase 34はC33/C34の配布範囲と関連。施工線G/F。 | Windows package/portable→bootstrap/Update Center→Broker product install/update→Launcher/Setup Doctor。現候補source・package役割・workflow・hashはN10節。 | 旧acceptanceはMSI/Setup.exeやsigned release artifact作成を主張しない。v4 N10は`OPEN`で、一般配布・同一candidateのinstalled lifecycle・署名/Publisher identityは未成立。`rev2_desktop_product_distribution`と`windows_distribution_identity`を保持。 |
+| P12 | 製品全体統合。REV5進捗ではWindows側`FEATURE COMPLETE`。正式release/Owner GOと分離された製品機能統合の履歴。 | v4仕様S05の直接対応はN01/N09/N10、関連能力K19。Phase 39〜45はC27〜C34のQC/回帰/文書/出荷範囲に関連。単一施工線へ閉じない。 | Windows product entry→Task/result/operation UI→OS product lifecycle。実TaskはN01、operation/observation/recoveryはN09、installed OS distribution/lifecycleはN10の現ConsumerとSHA節へ分割記録。 | `FEATURE COMPLETE`を正式Release/QAへ昇格しない。v4 N01/N09/N10は`OPEN`、Q0〜Q7は`DEFERRED`、`release_ready=false`。統合後の全候補・全OS acceptanceは未成立。 |
+| P13 | Mobile / Non-Windows Product Build。REV5履歴は2026-10-09に有限Product Build acceptanceを閉鎖したと要約する。旧Acceptanceの詳細evidence identity/classは本照合資料から`UNKNOWN`。 | v4仕様S05の直接対応はN10、関連能力K17。Phase 35/36はC24〜C26範囲に関連。施工線H/I。Linux native必須性は別途現行AGENTS/v4正本に従う。 | Linux/macOS Desktop、Android/iOS Mobile runner/native transport→Rust Broker／OS capability→installed product lifecycle。OS別source、package、workflow候補とSHAはN10節。 | 旧P13閉鎖を現行五OS標準installed QAへ移さない。Linux nativeは完全対応必須で、WSL/Xvfb/Headlessだけでは成立しない。Android/iOS実機を前提にせずEmulator/Simulator等を用いる。N10は`OPEN`、`linux_native_product_support`、`rev2_mobile_distribution`、`rev2_mobile_device_evidence`を保持。 |
 
-P0〜P9は旧要求範囲・限定statusをv4 N/K/Consumerへ接続した。これは旧statusの書換え、v4 acceptance、N01〜N11のCLOSED、E0完了のいずれも意味しない。P10〜P13、C0〜C34、Phase0〜45、K01〜K20の全数照合と各行の完全なE0-04列は継続する。P0/P1の直接対応はv4仕様S05の明示mappingへ合わせて修正し、旧statusは変更していない。
+P0〜P13全14 IDの旧要求範囲・限定statusをv4 N/K/Consumerへ接続した。これは旧statusの書換え、v4 acceptance、N01〜N11のCLOSED、E0完了のいずれも意味しない。C0〜C34、Phase0〜45、K01〜K20の全数照合と各行の完全なE0-04列は継続する。P0/P1/P4の直接対応はv4仕様S05の明示mappingへ合わせて訂正し、旧statusは変更していない。P13の詳細evidence identity/classは`UNKNOWN`として保持する。
 
 ## 実装ファイルの初期目録（CODE_PRESENTのみ）
 
@@ -433,7 +437,7 @@ P0〜P9は旧要求範囲・限定statusをv4 N/K/Consumerへ接続した。こ�
 |---|---:|---|---|
 | 新規要求 N01〜N11 | 11 | v4仕様S04 | 初期Producer/Consumer差分を記録。契約・否定・OS・証拠の全項目は未完 |
 | 全体施工線 A〜J | 10 | v4工程表R03・Codex指示I04 | 全線同時BUILDのproducer/consumerと現行実装配置を全数照合中 |
-| 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P9の旧履歴→v4 scope/Consumer crosswalkを記録。P10〜P13と全IDの完全なContract/OS/Evidence列は未完 |
+| 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13の旧履歴→v4 scope/Consumer crosswalkを記録。詳細Contract/OS/Evidence、P13の旧evidence identity/classは未完／UNKNOWN |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | 旧仕様・工程・進捗の全項目から現Consumerへの照合が未完 |
 | D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | C対応は範囲関係のみ。現在のProducer/Consumer・状態照合が未完 |
 | 製品能力 K01〜K20 | 20 | v4仕様S05 | 必須Consumer、OS対象、実装位置、GapのID別照合が未完 |
@@ -478,12 +482,11 @@ P0〜P9は旧要求範囲・限定statusをv4 N/K/Consumerへ接続した。こ�
 
 ## 次のE0照合作業
 
-1. P10〜P13を旧Product Build progress・受入証拠からv4 N/K/Workstream/ConsumerへID単位で照合する。P0〜P9の旧statusと限定evidenceは記録済み。
-2. `docs/総合機能拡張_rev1/`のC0〜C34原文・工程・進捗をID単位で照合し、既存実装・Consumer・履歴statusを埋める。
-3. `docs/D4_POCKET_PHASE_MAPPING.md`のPhase0〜45とP0〜P13・K01〜K20をv4 N/A〜Jへ一意または多対多で接続し、範囲対応と実作用を分ける。
-4. BUF-R/T、B0〜B6、D4-QE/LNX/AUD、Q/FQ/W、18 blockerを現Registry・Contract・Validator・実Consumerへ接続する。
-5. `docs/specs/`、`specs/`、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを取り、各行のSourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
-6. N10 source mappingで各OSの実装・配布候補・workflow/test・限定履歴を記録。保証対象のversion/arch/resource/package条件は公式条件と実測から別途固定し、未知を`UNKNOWN`にする。
-7. N11のRegistry/validator/QA queue consumer mappingは本節へ記録済み。旧ID（P/C/Phase/K/BUF/B/Q/FQ/W/QE/AUD）の全数照合、各IDからN11 evidence/gateへの結合、全Producer/Consumer inventoryは未完のまま残り、E0を閉じる前に埋める。
+1. `docs/総合機能拡張_rev1/`のC0〜C34原文・工程・進捗をID単位で照合し、既存実装・Consumer・履歴statusを埋める。
+2. `docs/D4_POCKET_PHASE_MAPPING.md`のPhase0〜45とP0〜P13・K01〜K20をv4 N/A〜Jへ一意または多対多で接続し、範囲対応と実作用を分ける。
+3. BUF-R/T、B0〜B6、D4-QE/LNX/AUD、Q/FQ/W、18 blockerを現Registry・Contract・Validator・実Consumerへ接続する。
+4. `docs/specs/`、`specs/`、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを取り、各行のSourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
+5. N10 source mappingで各OSの実装・配布候補・workflow/test・限定履歴を記録。保証対象のversion/arch/resource/package条件は公式条件と実測から別途固定し、未知を`UNKNOWN`にする。
+6. N11のRegistry/validator/QA queue consumer mappingは本節へ記録済み。旧ID（P/C/Phase/K/BUF/B/Q/FQ/W/QE/AUD）の全数照合、各IDからN11 evidence/gateへの結合、全Producer/Consumer inventoryは未完のまま残り、E0を閉じる前に埋める。
 
 上記未完了のため、E0は`OPEN`。E1全体BUILDの網羅、BUILD_COVERED、QC/QA、Releaseの成立は主張しない。
