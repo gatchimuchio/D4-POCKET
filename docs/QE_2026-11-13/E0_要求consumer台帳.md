@@ -63,7 +63,7 @@ LedgerのE0-04列は、現ID、旧ID、原文参照、対象、目的、Producer
 | N06 | 独立App Exportと選択Moduleの実除去 | Brokerが新規App/Audit identity・Manifest・Module依存planを作る。Windows/Linux Developer ExporterとLauncherはManifest hash/identityを扱う。Flutter UI Moduleのcompile-time define/AOT比較も存在する。 | `OPEN`。runtime evidenceは`runtime_manifest_consumed=false`、`standalone_app_verified=false`、`binary_pruning_verified=false`。Rust/第三者Module除去、構成による実機能変化、cold-start/resource測定、独立Installer/installed evidenceに`BUILD_GAP`。 |
 | N07 | AI Edit proposalを別主体で審査しcontrolled apply/rollback | owner proposalのAudit、提案由来を束縛した別Workspace Taskの事前検査、fresh Permission/Approvalの通常経路はsource接続あり。 | `OPEN`。独立審査結果をapply前に確定するTask／Broker状態と、proposal由来の変更を照合するcontrolled apply/rollbackが`BUILD_GAP`。 |
 | N08 | Bufferが元Taskの意味を保ってOS/依存差を調停 | Codex CLI Task専用Workspace scratch・TEMP/TMP束縛・journal Recoveryと、Task終端の非権限Buffer記録はsource接続あり。 | `OPEN`。実装は限定的なCodex TEMP/scratch調停。全OS/依存差、独立した前後意味・副作用比較、B5自己適用・B6全Consumerは未成立／`BUILD_GAP`。 |
-| N09 | UIから実Task、結果、観測、停止・Recoveryを操作 | Agent Center等の一部Broker投影は存在。結果/Diff/Eval/Resource/Recoveryの全Consumer接続は未確定。 | `OPEN`。通常製品入口から実Broker stateと結果の往復を追跡する |
+| N09 | UIから実Task、結果、観測、停止・Recoveryを操作 | Desktop Agent CenterはBrokerのTask start/state/cancel/resultをTask IDへ束縛。Workspace Inspector、History、Eval、Resource、Observation、Notificationにも個別のBroker consumerがある。Trayは停止要求のみ。旧対応はP0/P5/P12、C1..6/C12..14/C20..23、K03/K04/K05/K10/K13。 | 部分`WIRED`。同一TaskへのDiff/Eval/Resource/Trace/Audit/Recovery/Searchの結合は未成立。Audit/Problems/Recovery/Searchは起動時snapshot由来、History replay/branchはDialogue新規要求でAgentTask再生ではない。AgentTask pause/resume/restart未実装。MobileにAgentTask操作なし。W02-B01 UI応答停止の原因は`UNKNOWN`。N09/W00は`OPEN`／`BUILD_GAP`。 |
 | N10 | Windows/macOS/Linux/Android/iOSで通常導入・利用・更新・撤去 | Windows/Linuxのscope限定installed証拠と他OSの個別実装・試験履歴がある。v4標準OS全件のRelease候補証拠は未成立。 | `OPEN`。OS/arch/version/package/実行環境を固定し、未実装package経路を特定する |
 | N11 | 全要求・Source・Consumer・証拠・Blocker・Release判断の結合 | Registry、Conformance、進捗、既存証拠は存在。v4全要求consumer ledgerは本書を含め未完成。 | `OPEN`。全IDをSource/Consumer/否定/Recovery/OS/Evidenceへ結び、18 blockerと同期する |
 
@@ -220,6 +220,73 @@ blob SHAは照合HEAD `03f7b92d4dc67a544e8fa1e9bbaac5d3d912723e`の値。各file
 | `examples/contracts/invalid/buffer_intervention_record_authority.invalid.json` | `981178ad70376fa633a76a686ed6e7d12287095d` |
 | `examples/contracts/invalid/buffer_intervention_record_unproven_absorption.invalid.json` | `073dbfd11943588e045360dcce2009ae7245ebbf` |
 | `tooling/conformance_tests/run_conformance_skeleton.py` | `c6f31d8cb561b48513c6784e54c85969c9cb953e` |
+
+## N09 製品操作・観測・復旧 Source→Consumer追跡（E0差分）
+
+照合HEADは`3d7213f1a36ad5f938f9602040570ac4777d1af0`。下記のSourceSHAは同HEAD上のblob値で、N09のSource追跡中に製品コードは変更していない。`WIRED`はコード上のProducer→Consumer接続のみを表し、installed product Acceptanceではない。既存fixture/widget/unit testは本source mapping単位では未実行。N09はW00に属するv4要求として`OPEN`を維持する。
+
+| Surface | 現行Producer→Consumerと作用 | 境界・N09との差分 |
+|---|---|---|
+| Agent Center／実Task | Desktopの通常製品navigationからAgent Center→`AgentTaskClient.inspect/start/state/cancel`→Rust Broker `AgentTask実行/状態/取消`→Task ID付き状態・result hashへ接続。完了本文は同じTask ID/result hashの一回Content Exposure Approval後に取得し、表示投影を5分で消去する。Cancel UIは要求を送り、Brokerの終端状態を再確認する。 | 実Task開始・状態・取消・結果の限定経路は`WIRED`。Task単位のpause/resume/restart operationはない。Agent Centerの状態接続はTask IDに束縛されるが、他の観測画面すべてを同一Taskへ統合してはいない。 |
+| Workspace／Diff／Recovery preview | Agent Center内のWorkspace Inspector→`WorkspaceClient`→Brokerの登録Workspace一覧、承認範囲付きtree/read/compare/change-list/diff/recovery-preview/whole-baseline operation。応答はWorkspace ID・登録hash・Approval・表示範囲へ結合し、可視性に応じて`LIVE_RUNTIME`または`INTERNAL_STATE`を要求する。 | Workspace実体の限定読取・比較は`WIRED`。Diffと変更一覧はWorkspace／baseline基準で、完了Task IDへ結び付くTask差分Artifactではない。Recovery previewは実復旧実行ではない。 |
+| History／再実行／分岐 | History画面→`HistoryClient`→Brokerの現在History grant、Dialogue履歴、AgentTask履歴metadata。Task履歴はTask ID・result hash等の履歴投影で、本文・現在権限・稼働状態を表示しない。Dialogue replay/branchは参照Audit ID/hashと新入力から新しい要求を作る。 | Ownerの現在承認・Runtime binding・期限を再照合し、Task履歴読取とDialogue内容表示を区別する。Replay/branchは新しい承認待ちDialogueであり、AgentTaskの再生・pause/restartでも旧Authorityの再利用でもない。 |
+| Evaluation／Resource | Evaluation Lab→`EvaluationClient`→Broker `evaluation_control`のDataset/Experiment/status/compare。実行時はDatasetのCaseごとに既存Dialogue sessionを作成し、決定論的Evaluatorで比較する。Resource client→Broker `実行系資源観測`はRuntime IDを指定し、実測またはunknownを返す。 | 個別consumerは`WIRED`だが、Evaluation ExperimentおよびRuntime resource observationにAgentTask IDの束縛はなく、同一Taskのtest結果／資源とは扱えない。評価はPermission/Audit/release判断を生成しない。 |
+| Observation／Trace／Notification | `ObservationCenter`はBroker Audit finalization後にbounded spanを作り、Observation/Trace画面は一覧を取得する。各spanはBroker operationと関連Audit IDを持つ。Notification CenterはAudit eventからsummaryだけを作り、既読／破棄はID/hashへ束縛する。 | Observationは最大1024 span保持・一応答最大256、現在は一span一traceで親なし。Trace IDはBroker内で採番され、Task IDではない。Notificationはsummary/navigation onlyで権限を作らず、raw payloadを出さない。Observation/Auditは責任が分離される。 |
+| Audit／Problems／Recovery／Search | `ShellCoreClient.product`は起動時Broker応答から一つの`ShellSnapshot`を作る。Audit Viewer、Problems、Recovery、Dashboard等は`getSnapshot()`を参照する。Global Searchは同snapshotのbounded in-memory indexを検索する。 | Audit Viewerの一覧は起動時health/host/catalog/session/probe応答から作った投影であり、永続Audit chainのTask単位検索ではない。Problems/Recoveryも同snapshotで、Task crash後のlive Recovery catalogではない。Global SearchはBroker検索・最新Task/History検索ではない。 |
+| Tray／Runtime lifecycle | Windows Trayはsnapshotを定期投影し、open/navigationとBroker `全Runtime停止要求`を持つ。要求応答は`停止実行済み=false`、Owner再承認待ち。別のRuntime CenterはBroker Runtime lifecycle status/approval/executeでstart/stop/restart/pause/resume/quarantineを操作する。 | Tray stopは実停止でなくOwner承認要求である。Runtime lifecycleのpause/restartはRuntime単位で、同一AgentTaskのpause/restartとは異なる。TrayはWindows固有、定期snapshotはTask IDに結び付かない。 |
+| Mobile／UI応答 | Mobile Device Linkは限定operation allowlistでRuntime/Agent/Workspace/Dialogue metadata、Runtime resource/lifecycle state、通知summary、History、全Runtime stop request等を扱う。stopは停止を実行せずOwner再承認待ち。過去W02-B01にはWindows UI processの`Responding=False`とCPU増加が記録され、fake Broker widgetでは再現せず、原因は不明。 | Device Link allowlistに`AgentTask実行/状態/取消/結果`はなく、Mobileは同一AgentTaskの実行・回復consumerではない。UI応答停止は実観測履歴があるが根因修正・同条件installed再検証は未成立。 |
+
+### N09 状態・TestClass・Evidence
+
+Agent Center TaskとWorkspace/History/Evaluation/Resource/Observation/Notificationの個別source consumerは`WIRED`。要件N09が要求する同一Task単位の操作・結果・diff/eval/resource/trace/audit/recovery/search結合、AgentTask pause/resume/restart/replay、全体の停止・Recovery画面、Windows UI応答停止根因是正には`BUILD_GAP`または`UNKNOWN`を保持する。Runtime lifecycle機能やDialogue replayをAgentTask操作へ読み替えない。旧対応IDはP0/P5/P12、C1..6/C12..14/C20..23、K03/K04/K05/K10/K13（v4仕様S05・工程表R03線C）。
+
+該当test sourceは`apps/desktop_flutter/test/agent_task_client_test.dart`、`history_screen_test.dart`、`workspace_inspector_test.dart`、`evaluation_lab_test.dart`、`runtime_resource_test.dart`、`runtime_lifecycle_test.dart`、`observation_client_test.dart`、`notification_client_test.dart`、`global_search_index_test.dart`、`widget_test.dart`、`apps/mobile_flutter/test/mobile_projection_client_test.dart`／`resource_overview_test.dart`、`packages/gui_shell_ui/test/evaluation_client_test.dart`／`runtime_resource_client_test.dart`／`runtime_lifecycle_client_test.dart`、およびRust Broker source内のunit tests。TestClassは`UNIT`／`FIXTURE`／`WIDGET`。本mappingでは全testを`NOT_RUN`。過去W02-B01のlimited Windows UI runtime observationは`docs/QE_2026-11-05/W02_作業記録_20261107.md`に残す。旧widget成功をinstalled UI root causeの修正証拠にしない。
+
+### N09 Source SHA・該当ファイル
+
+blob SHAは照合HEAD `3d7213f1a36ad5f938f9602040570ac4777d1af0`上の値。
+
+| source file | blob SHA |
+|---|---|
+| `apps/desktop_flutter/lib/main.dart` | `6109c821ab5dc809224bec5234c4c59db1d5f988` |
+| `apps/desktop_flutter/lib/screens/agent_center.dart` | `2472faeb31a64d624423c30a0a30d0f153d2e2a3` |
+| `apps/desktop_flutter/lib/services/agent_task_client.dart` | `f54cefac29eba3dcf383bba19b4f64ee682e6217` |
+| `apps/desktop_flutter/lib/services/agent_task_execution_coordinator.dart` | `5d8f48d0557bdcb1af838239abf9651893bce7f1` |
+| `apps/desktop_flutter/lib/screens/workspace_inspector.dart` | `a02c95ec5062583f9c37523fbaf604a8d2da107e` |
+| `apps/desktop_flutter/lib/services/workspace_client.dart` | `870b48e8f4bbd648bcfebc5886addca3784bcfaf` |
+| `apps/desktop_flutter/lib/screens/history_screen.dart` | `dacc4c0ca15325c7f597cd1827a6455fb8ab5560` |
+| `packages/gui_shell_ui/lib/src/history_client.dart` | `7f14ec2caf8b1e383bbf93483ae052100f921ae7` |
+| `native/rust_helper/src/broker/history_access.rs` | `c004056b45c2f26859bf7f70a9ff2b632e358523` |
+| `native/rust_helper/src/broker/execution_history.rs` | `8eeb1c26d06a9e4b01806413a4bfa8c2a73357d6` |
+| `apps/desktop_flutter/lib/screens/evaluation_lab.dart` | `b74b3e96e7cd746874d1e19e05175548a5c66192` |
+| `packages/gui_shell_ui/lib/src/evaluation_client.dart` | `3fe93e4a19bcba7c825f2a6e887f96f00016aa75` |
+| `native/rust_helper/src/broker/evaluation_control.rs` | `570485772c3fce43d170d031f1769b7617214d40` |
+| `native/rust_helper/src/broker/evaluation_lab.rs` | `3645202da2597e5f63cf9ef96a891e9ae801e2b2` |
+| `apps/desktop_flutter/lib/screens/runtime_center.dart` | `d2c7af172073d2b10c76a6416b90f011f10e95db` |
+| `packages/gui_shell_ui/lib/src/runtime_resource_client.dart` | `3a8e611b94136e27f6d132e550a49bcbaf586eaf` |
+| `packages/gui_shell_ui/lib/src/runtime_lifecycle_client.dart` | `d34d773ec25f21bb682577faa7688d350921f059` |
+| `apps/desktop_flutter/lib/screens/observability_center.dart` | `497fe25368b9b108d62bee921d454145b712b657` |
+| `apps/desktop_flutter/lib/screens/trace_inspector.dart` | `c196c8e20786d151edc4b709b71dd3b8fa88812b` |
+| `apps/desktop_flutter/lib/services/observation_client.dart` | `97a28fb5aadd82c77028d74928bb7fa86a0220cc` |
+| `native/rust_helper/src/broker/observation_center.rs` | `62896e497a0d78267020db6bae2ecadf704fa1fb` |
+| `apps/desktop_flutter/lib/screens/notifications.dart` | `850ac48a96ccff94b64b154a4e38d608aabb5d3c` |
+| `apps/desktop_flutter/lib/services/notification_client.dart` | `746c74805ef5b80febf020306daeb360ff43b4e6` |
+| `native/rust_helper/src/broker/notification_center.rs` | `ca6828a33baf94abd7101781d9730b22daca4a78` |
+| `apps/desktop_flutter/lib/screens/audit_viewer.dart` | `21119c9b12cf6929a09a917195158c02a76a07f5` |
+| `apps/desktop_flutter/lib/screens/problems_panel.dart` | `be2b95ba68356df91d770be634e55b93dd399199` |
+| `apps/desktop_flutter/lib/screens/recovery_center.dart` | `4eeda112b05af3dc3289e0f962fabda85b157bdf` |
+| `apps/desktop_flutter/lib/services/shell_core_client.dart` | `f08db061bd15649ff7c2fc3fc9e37184433cbf18` |
+| `apps/desktop_flutter/lib/services/global_search_index.dart` | `f71d2f6c4563b011fa3621ea3aee596bffb099f0` |
+| `apps/desktop_flutter/lib/services/windows_tray_client.dart` | `cf8214ceb95fa1b24c7eed4f14b312bda80e0b15` |
+| `apps/mobile_flutter/lib/services/device_link_client.dart` | `e8c49337127cb7f62fad248988b99707c5e49219` |
+| `apps/mobile_flutter/lib/services/mobile_projection_client.dart` | `ba82e4ddeaa5692793237a1bc3258ce53b7aa3ed` |
+| `apps/mobile_flutter/lib/screens/history.dart` | `afa685cac135d4e113b9ea3e66aa4d2c934d8674` |
+| `apps/mobile_flutter/lib/screens/resource_overview.dart` | `322af6bc2935c571017dab3f03b9c7a0cea7c616` |
+| `apps/mobile_flutter/lib/screens/notifications.dart` | `243c59c321cb1cbff39cc6cc993bd01d589c760f` |
+| `apps/mobile_flutter/lib/screens/emergency_stop.dart` | `4d861a1ad64bcb5a73e024e07cf25b58aa3bcfc2` |
+| `native/rust_helper/src/broker/device_link.rs` | `c2e1ff88ff34a5764b2b4fb1d3f7abd8727e5c51` |
+| `native/rust_helper/src/broker/protocol.rs` | `9b2076d5f31ca6d77f1f87973d1b394aaf751961` |
+| `native/rust_helper/src/broker/dialogue.rs` | `c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999` |
 
 ## 実装ファイルの初期目録（CODE_PRESENTのみ）
 
