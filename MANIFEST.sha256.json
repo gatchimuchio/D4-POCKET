@@ -1444,7 +1444,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "9ad47f61596db64e4bd48190b53f937afe1db260025132068900748c4c3b776d"
+      "sha256": "934e3e95c8975cfa4efa6a67052c4cb3d63e6b7862cc26eed44e8ae8d6d099ae"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -3740,7 +3740,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
-      "sha256": "e0a6a1ef9710bcd7616e87c330376d80380c1617ad48d304b770f762dc0297a2"
+      "sha256": "90db42ec0102b885ca88a7c3e22792a984da7b5de8417ed4ba5850d139cfb342"
     },
     {
       "path": "native/rust_helper/src/adapters/mcp_stdio.rs",

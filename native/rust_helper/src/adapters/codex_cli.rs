@@ -2276,6 +2276,12 @@ mod tests {
     const BRACE_SECRET_GLOB: &str = "private/x[{]y[}].json";
     const BRACE_SECRET_SUBTREE_GLOB: &str = "private/x[{]y[}].json/**";
 
+    fn codex_command_test_paths() -> (PathBuf, PathBuf) {
+        let executable = std::env::current_exe().expect("absolute test executable");
+        let workspace = std::env::temp_dir().join("d4p-codex-command-workspace");
+        (executable, workspace)
+    }
+
     fn debug_task_context(
         context: &crate::broker::agent_task_scratch::AgentTaskScratchContext,
     ) -> String {
@@ -2639,9 +2645,10 @@ mod tests {
 
     #[test]
     fn 選択ModelをCodex実物interface引数へ固定しfallbackしない() {
+        let (executable, workspace) = codex_command_test_paths();
         let command = build_codex_command_with_model(
-            Path::new(r"C:\codex.exe"),
-            Path::new(r"C:\workspace"),
+            &executable,
+            &workspace,
             CodexSandbox::ReadOnly,
             None,
             &[],
@@ -2662,8 +2669,8 @@ mod tests {
             1
         );
         assert!(build_codex_command_with_model(
-            Path::new(r"C:\codex.exe"),
-            Path::new(r"C:\workspace"),
+            &executable,
+            &workspace,
             CodexSandbox::ReadOnly,
             None,
             &[],
@@ -2806,14 +2813,17 @@ mod tests {
 
     #[test]
     fn loopbackProviderは合成Credentialがある時だけenv_keyを要求する() {
+        let (executable, workspace) = codex_command_test_paths();
         let unauthenticated = CodexCliTestResponses {
             port: 43129,
-            codex_home: PathBuf::from(r"C:\synthetic\codex-home"),
+            codex_home: std::env::temp_dir()
+                .join("d4p-codex-command-test")
+                .join("codex-home"),
             requires_openai_auth: false,
         };
         let unauthenticated_command = build_codex_command_with_model(
-            Path::new(r"C:\codex.exe"),
-            Path::new(r"C:\workspace"),
+            &executable,
+            &workspace,
             CodexSandbox::ReadOnly,
             None,
             &[],
@@ -2838,8 +2848,8 @@ mod tests {
             ..unauthenticated
         };
         let authenticated_command = build_codex_command_with_model(
-            Path::new(r"C:\codex.exe"),
-            Path::new(r"C:\workspace"),
+            &executable,
+            &workspace,
             CodexSandbox::ReadOnly,
             None,
             &[],
@@ -2866,10 +2876,11 @@ mod tests {
 
     #[test]
     fn Broker資格情報はCodex親processだけへ渡しtool環境から除外する() {
+        let (executable, workspace) = codex_command_test_paths();
         let canary = "synthetic-provider-key-never-in-argv";
         let command = build_codex_command_with_model(
-            Path::new(r"C:\codex.exe"),
-            Path::new(r"C:\workspace"),
+            &executable,
+            &workspace,
             CodexSandbox::ReadOnly,
             None,
             &[],
@@ -2904,8 +2915,8 @@ mod tests {
             "秘密値をCLI argumentへ載せない"
         );
         assert!(build_codex_command_with_model(
-            Path::new(r"C:\codex.exe"),
-            Path::new(r"C:\workspace"),
+            &executable,
+            &workspace,
             CodexSandbox::ReadOnly,
             None,
             &[],
