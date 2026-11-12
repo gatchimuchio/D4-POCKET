@@ -65,7 +65,7 @@ LedgerのE0-04列は、現ID、旧ID、原文参照、対象、目的、Producer
 | N08 | Bufferが元Taskの意味を保ってOS/依存差を調停 | Codex CLI Task専用Workspace scratch・TEMP/TMP束縛・journal Recoveryと、Task終端の非権限Buffer記録はsource接続あり。 | `OPEN`。実装は限定的なCodex TEMP/scratch調停。全OS/依存差、独立した前後意味・副作用比較、B5自己適用・B6全Consumerは未成立／`BUILD_GAP`。 |
 | N09 | UIから実Task、結果、観測、停止・Recoveryを操作 | Desktop Agent CenterはBrokerのTask start/state/cancel/resultをTask IDへ束縛。Workspace Inspector、History、Eval、Resource、Observation、Notificationにも個別のBroker consumerがある。Trayは停止要求のみ。旧対応はP0/P5/P12、C1..6/C12..14/C20..23、K03/K04/K05/K10/K13。 | 部分`WIRED`。同一TaskへのDiff/Eval/Resource/Trace/Audit/Recovery/Searchの結合は未成立。Audit/Problems/Recovery/Searchは起動時snapshot由来、History replay/branchはDialogue新規要求でAgentTask再生ではない。AgentTask pause/resume/restart未実装。MobileにAgentTask操作なし。W02-B01 UI応答停止の原因は`UNKNOWN`。N09/W00は`OPEN`／`BUILD_GAP`。 |
 | N10 | Windows/macOS/Linux/Android/iOSで通常導入・利用・更新・撤去 | Windows/LinuxにはExport・portable/bootstrap/updateの部分経路、macOS/Android/iOSにはnative/UI・debug/Simulator build経路がある。一般利用者のOS正規配布からinstalled実Task・更新/復旧/撤去まで結ぶ現Release候補は未成立。 | `OPEN`。OS別source・package役割・既存test/evidence・不足を下記へ記録。標準保証のversion/arch/package/最低資源と各OSの一貫したinstalled lifecycleは未確定。 |
-| N11 | 全要求・Source・Consumer・証拠・Blocker・Release判断の結合 | Registry、Conformance、進捗、既存証拠は存在。v4全要求consumer ledgerは本書を含め未完成。 | `OPEN`。全IDをSource/Consumer/否定/Recovery/OS/Evidenceへ結び、18 blockerと同期する |
+| N11 | 全要求・Source・Consumer・証拠・Blocker・Release判断の結合 | Registry、Release Gate、Manifest、Windows evidence validator、development evidence bundle、Conformance、Final QA Queueは存在する。各々の責任と制約を下記に追跡。release_evidenceには`.gitkeep`以外の現候補evidenceがない。 | `OPEN`。E0全ID・実Consumer・否定/Recovery/OS/Evidence結合が未完。18 blockerは16 unresolved/2 resolved、`release_ready=false`。Q0〜Q7は`DEFERRED`。 |
 
 ## N03/N04 現行Source→Consumer追跡（E0差分）
 
@@ -354,6 +354,44 @@ blob SHAは照合HEAD `3d7213f1a36ad5f938f9602040570ac4777d1af0`上の値。
 
 N10は`OPEN`。OS別の実consumer sourceと一部のpackage/lifecycle部品は確認できたが、通常利用者向け配布から初回設定・基本サービス・実AI仕事・Update/Repair/Rollback/Uninstallまでを同一のcurrent candidateで通した証拠が全5 OSに揃っていない。未知の標準version/arch/最低資源を創作せず、個々のcandidate値と保証対象を分けて保持する。N10 source mappingはE0全数照合、E1全体BUILD、BUILD_COVERED、QE_QC/QA、Releaseを閉じない。
 
+## N11 Evidence/QC/QA/Release Source→Consumer追跡（E0差分）
+
+照合HEADは`d32d053c702f834201784428ad597f321977580c`、製品source比較基準は`d503a4ef6daac8942abd1cb011442ce28c78ec55`。N10/N11台帳更新はrelease validator・runtime・schemaを変更していない。ここではvalidatorの実Consumerと証拠範囲を記録する。静的条件・fixture/conformance passを実Release candidateのLIVE_RUNTIME/EXTERNAL_EVIDENCEへ読み替えない。
+
+| 面 | Producer→Consumer／現物 | 現在成立していること | N11差分／証拠限界 |
+|---|---|---|---|
+| 要求受入ledger | `docs/QE_2026-11-13/進捗.md`のN01〜N11/W00〜W08行→`tooling/release_gate_check.py::workplan_acceptance_errors`。 | strict releaseはN01〜N11を全て`CLOSED`、W01〜W08を`CLOSED`、W00は`SCOPED_PASS`/`CLOSED`とし、N行はW phase dependencyおよび既存local evidence参照を要求する。 | 現行N01〜N11/W02〜W08はOPEN。現在のN11や旧ID crosswalk全数接続、実candidate evidenceは未成立。Strict gateの条件定義は製品完成の証拠ではない。 |
+| Release Registry | `release_blockers.registry.json`→`release_gate_check.py::registry_errors`／`unresolved_active_blockers`／`effective_release_blocker`→strict release/Windows Technical Complete判定。 | 18 IDの一意性、必須field、classification/cause/scope、manualまたは`windows_release_evidence`のstatus source、active状態を検査。動的Windows resultは正式evidence validatorから再評価する。現状態は16 unresolved/2 resolved、`release_ready=false`。 | 旧resolved 2件は履歴statusとして保持。他16件は未解決。Registry自体のvalidityは個々の要求の完成証拠ではなく、Owner GOや正式配布資格を生成しない。 |
+| Windows installed evidence | `release_evidence/windows_installed_smoke.json`→`tooling/windows_release_evidence.py`→4件のWindows evidence-sourced blockers。Validatorはsource commit、artifact hash、profile/runtime path、process/UI、Setup Doctor、Broker/Audit、bundle provenance等を確認する。 | Windows向けinstalled evidenceをfield単位で分類し、`LIVE_RUNTIME`/`EXTERNAL_EVIDENCE`とstatic `CONFIG`を区別するconsumerはある。 | 現release_evidenceには`.gitkeep`だけでinstalled evidence fileなし。4 Windows blockerは未解決。Validatorのunit/conformance coverageは実installed acceptanceではない。 |
+| Evidence Bundle | `tooling/evidence_bundle.py::build_evidence_bundle`→Windows validator／Release Runtime Assertions／Release Smoke／Shell Snapshot／Setup Doctor。 | 自動生成projectionは`classification=development_evidence`、`release_ready=false`を固定し、authority境界とblockerを含める。 | 5OSのartifact/evidenceを統合したRelease dossierではなく、all-N/P/C/Phase/BUF/Q/FQを結合するN11 acceptance validatorでもない。現candidate evidenceの代用にしない。 |
+| Source Manifest | Git追跡file一覧→`tooling/manifest.py` SHA-256 manifest→`MANIFEST.sha256.json`。 | tracked source fileの存在・hash・重複・EOL/coverageを機械検査。現在1415 filesを記録。 | 内容が現Sourceと同一である証拠に限る。producer→consumer接続、runtime provenance、意味契約、OS実行を証明しない。 |
+| Conformance | `tooling/conformance_tests/run_conformance_skeleton.py`内のregistry strict-gate、N/W evidence、release-doc sync、evidence bundle non-authoritative、Windows validator、manifest等のnamed checks。 | Registry/validatorとrelease-facing文書の形・fixture応答を検査する実行入口がある。 | test functionが存在することと、現在のRelease evidenceがあることは別。本N11 source mappingでは個別機能試験は`NOT_RUN`。全skeleton実行結果は検査時の対象commitとfixture範囲に限定する。 |
+| Final QA / C32 Audit | `docs/FINAL_QA_QUEUE.md`のQ0〜Q7・FQ履歴、`tooling/final_development_audit.py`→`docs/specs/final-development-audit.json`／rev1 receipt/progress。 | Final QA Queueは`DEFERRED`。Q0/Q1の記録は旧candidate `ab746d4b...`の履歴。C32 audit toolは旧C0〜C31対応表の必須欄・参照path/classificationを静的検査する。 | 旧証拠をv4 current candidateへ転記しない。C32 static tableはC0〜C34全体、N/P/Phase/K/BUF/Q/FQ/OSの全consumerを結ぶものではない。正式Q0〜Q7はE0〜E3/BUILD_COVERED後。 |
+
+N11関連source testは`test_release_blocker_registry_controls_strict_release`、`test_strict_release_requires_current_n_w_consumer_evidence`、`test_release_facing_docs_sync_release_blockers_to_registry`、`test_evidence_bundle_is_development_classified_and_non_authoritative`、`test_manifest_integrity_tooling_exists`、Windows Release Evidence validator tests等。区分は主に`CONFIG`/`FIXTURE`/`INTERNAL_STATE`で、対象のreal installed flowを実行する`LIVE_RUNTIME`ではない。`release_gate_check.py --strict-release`、Windows evidence generation、Q0〜Q7、全OS candidate QAは本N11 mappingでは`NOT_RUN`。
+
+### N11 Source SHA
+
+blob SHAは照合HEAD `d32d053c702f834201784428ad597f321977580c`上の値。
+
+| source file | blob SHA |
+|---|---|
+| `release_blockers.registry.json` | `244adc04a01e7b406c4ebcdeb829f7077d4aa35f` |
+| `tooling/release_gate_check.py` | `22a8d7bfe9adb259f44ce8501fb215652e1d58c6` |
+| `tooling/manifest.py` | `aa4525ff20293cb8641e5598a2439561a3bfbd3b` |
+| `tooling/evidence_bundle.py` | `68dead851236b0f1b69899151c37371e593ff3f9` |
+| `tooling/windows_release_evidence.py` | `6f7957c6193c86c7bc15165e743f11651464f29c` |
+| `tooling/release_runtime_assertions.py` | `0a0a351fe17151ad86517bd0a965358f40c61490` |
+| `tooling/release_smoke.py` | `e9f38cea998a31bbf9272880dbf4965de5eb0113` |
+| `tooling/final_development_audit.py` | `913c81bc22f71bc5bb3447fa4f4bd266326932ec` |
+| `tooling/conformance_tests/run_conformance_skeleton.py` | `c6f31d8cb561b48513c6784e54c85969c9cb953e` |
+| `docs/FINAL_QA_QUEUE.md` | `7b332cccab70bb68aa1ff4f8e23acc0e816d8282` |
+| `docs/RELEASE_VALIDATION.md` | `b4b0462e628ad8176264473879dedb1f6201da7c` |
+| `docs/specs/final-development-audit.md` | `cc3734d7647dbbbbd27bad49153f775bfc980f3f` |
+| `docs/specs/final-development-audit.json` | `8126944c55339a3be272af5ba183a9bc2e3517dc` |
+
+N11は`OPEN`。ValidatorとRelease Gateは一部のRegistry/Windows evidence/manifest/conformanceを実際に消費するが、全製品要求・旧ID・OS Artifact・結果/停止/Recovery・証拠class・所有者判断を同一candidateで束ねる統合consumerは未成立。18件のstatus、Q0〜Q7の履歴、`release_ready=false`は変更しない。N11 mappingはE0完了、BUILD_COVERED、QC/QA、Releaseを意味しない。
+
 ## 実装ファイルの初期目録（CODE_PRESENTのみ）
 
 下記は`d503a4ef6daac8942abd1cb011442ce28c78ec55`時点のパス存在・責務候補を読み取った初期目録である。名前・コードの存在だけではProducer→Consumer接続、installed/runtime実作用、Acceptanceを証明しない。各行の`WIRED`、実作用、正常/否定/Recovery、Evidence、OS別状態は未照合なら`UNKNOWN`。
@@ -426,6 +464,6 @@ N10は`OPEN`。OS別の実consumer sourceと一部のpackage/lifecycle部品は�
 3. BUF-R/T、B0〜B6、D4-QE/LNX/AUD、Q/FQ/W、18 blockerを現Registry・Contract・Validator・実Consumerへ接続する。
 4. `docs/specs/`、`specs/`、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを取り、各行のSourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
 5. N10 source mappingで各OSの実装・配布候補・workflow/test・限定履歴を記録。保証対象のversion/arch/resource/package条件は公式条件と実測から別途固定し、未知を`UNKNOWN`にする。
-6. 次のsource mappingはN11のEvidence/Validator/Registry consumer。旧ID（P/C/Phase/K/BUF/B/Q/FQ/W/QE/AUD）の全数照合とN11への接続を残し、N10やE0の完了を先取りしない。
+6. N11のRegistry/validator/QA queue consumer mappingは本節へ記録済み。旧ID（P/C/Phase/K/BUF/B/Q/FQ/W/QE/AUD）の全数照合、各IDからN11 evidence/gateへの結合、全Producer/Consumer inventoryは未完のまま残り、E0を閉じる前に埋める。
 
 上記未完了のため、E0は`OPEN`。E1全体BUILDの網羅、BUILD_COVERED、QC/QA、Releaseの成立は主張しない。
