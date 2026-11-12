@@ -186,6 +186,190 @@ class AgentSelectedResultApplySnapshot {
   }
 }
 
+/// AI Editの完了結果を独立Workspaceへ渡す直前の不変snapshot。
+///
+/// 提案由来情報・結果本文は由来照合用の未信頼データであり、Authorityを
+/// 保持しない。適用先Taskは通常のBroker事前検査と新規認可を通る。
+class AgentAiEditResultApplySnapshot {
+  AgentAiEditResultApplySnapshot.capture({
+    required AgentSessionRecord source,
+    required AgentSessionRecord target,
+    required AgentTaskRecord sourceTask,
+    required AgentTaskResultProjection sourceResult,
+    required this.aiEditTaskId,
+    required this.preflightInstructionHash,
+    required this.proposalEditId,
+    required this.proposalPayloadHash,
+    required this.proposalAuditId,
+  })  : _source = _AiEditApplySessionBinding(source),
+        _target = _AiEditApplySessionBinding(target),
+        _sourceTask = _AiEditApplyTaskBinding(sourceTask),
+        _sourceResult = _AiEditApplyResultBinding(sourceResult);
+
+  final String aiEditTaskId;
+  final String preflightInstructionHash;
+  final String proposalEditId;
+  final String proposalPayloadHash;
+  final String proposalAuditId;
+  final _AiEditApplySessionBinding _source;
+  final _AiEditApplySessionBinding _target;
+  final _AiEditApplyTaskBinding _sourceTask;
+  final _AiEditApplyResultBinding _sourceResult;
+
+  String get sourceRuntimeId => _source.runtimeId;
+  String get sourceSessionId => _source.sessionId;
+  String get sourceWorkspace => _source.workspace;
+  String get sourceTaskId => _sourceTask.taskId;
+  String get resultHash => _sourceResult.resultHash;
+  String? get resultText => _sourceResult.text;
+  String get targetRuntimeId => _target.runtimeId;
+  String get targetSessionId => _target.sessionId;
+  String get targetWorkspace => _target.workspace;
+
+  bool matchesCurrent({
+    required List<AgentSessionRecord> currentSessions,
+    required AgentTaskRecord? currentSourceTask,
+    required AgentTaskResultProjection? currentSourceResult,
+    required AgentTaskRecord? currentTargetTask,
+    required bool currentTargetHasRequest,
+    required String? currentAiEditTaskId,
+    required String? currentPreflightInstructionHash,
+    required String? currentProposalEditId,
+    required String? currentProposalPayloadHash,
+    required String? currentProposalAuditId,
+  }) {
+    if (currentTargetHasRequest ||
+        currentTargetTask != null ||
+        currentAiEditTaskId != aiEditTaskId ||
+        currentPreflightInstructionHash != preflightInstructionHash ||
+        currentProposalEditId != proposalEditId ||
+        currentProposalPayloadHash != proposalPayloadHash ||
+        currentProposalAuditId != proposalAuditId ||
+        aiEditTaskId != _sourceTask.taskId ||
+        preflightInstructionHash != _sourceTask.instructionHash ||
+        proposalEditId.isEmpty ||
+        proposalPayloadHash.isEmpty ||
+        proposalAuditId.isEmpty) {
+      return false;
+    }
+
+    final source = _uniqueAiEditApplySession(currentSessions, _source);
+    final target = _uniqueAiEditApplySession(currentSessions, _target);
+    if (source == null ||
+        target == null ||
+        !_sourceTask.matches(currentSourceTask) ||
+        !_sourceResult.matches(currentSourceResult) ||
+        !_sourceTask.isCompletedFor(_source) ||
+        _sourceTask.taskId != _sourceResult.taskId ||
+        _sourceTask.resultHash != _sourceResult.resultHash ||
+        !_sourceTask.resultContentAvailable ||
+        _sourceResult.visibility != 'full' ||
+        _sourceResult.text == null ||
+        _sourceResult.text!.isEmpty ||
+        _source.sessionId == _target.sessionId ||
+        _source.workspace == _target.workspace) {
+      return false;
+    }
+
+    return AgentComparisonProjection.fromSessions([source, target]).available;
+  }
+}
+
+AgentSessionRecord? _uniqueAiEditApplySession(
+  List<AgentSessionRecord> sessions,
+  _AiEditApplySessionBinding expected,
+) {
+  final matches = sessions
+      .where((session) => session.sessionId == expected.sessionId)
+      .toList(growable: false);
+  if (matches.length != 1 || !expected.matches(matches.single)) return null;
+  return matches.single;
+}
+
+class _AiEditApplySessionBinding {
+  _AiEditApplySessionBinding(AgentSessionRecord session)
+      : sessionId = session.sessionId,
+        runtimeId = session.agentRuntimeId,
+        status = session.status,
+        workspace = session.workspace,
+        workspaceAuditEventId = session.workspaceAuditEventId;
+
+  final String sessionId;
+  final String runtimeId;
+  final String status;
+  final String workspace;
+  final String workspaceAuditEventId;
+
+  bool matches(AgentSessionRecord session) =>
+      status == '利用中' &&
+      session.sessionId == sessionId &&
+      session.agentRuntimeId == runtimeId &&
+      session.status == status &&
+      session.workspace == workspace &&
+      session.workspaceAuditEventId == workspaceAuditEventId;
+}
+
+class _AiEditApplyTaskBinding {
+  _AiEditApplyTaskBinding(AgentTaskRecord task)
+      : taskId = task.taskId,
+        runtimeId = task.runtimeId,
+        sessionId = task.sessionId,
+        workspaceId = task.workspaceId,
+        instructionHash = task.instructionHash,
+        status = task.status,
+        auditEventId = task.auditEventId,
+        resultHash = task.resultHash,
+        resultContentAvailable = task.resultContentAvailable;
+
+  final String taskId;
+  final String runtimeId;
+  final String sessionId;
+  final String workspaceId;
+  final String instructionHash;
+  final String status;
+  final String auditEventId;
+  final String? resultHash;
+  final bool resultContentAvailable;
+
+  bool matches(AgentTaskRecord? task) =>
+      task != null &&
+      task.taskId == taskId &&
+      task.runtimeId == runtimeId &&
+      task.sessionId == sessionId &&
+      task.workspaceId == workspaceId &&
+      task.instructionHash == instructionHash &&
+      task.status == status &&
+      task.auditEventId == auditEventId &&
+      task.resultHash == resultHash &&
+      task.resultContentAvailable == resultContentAvailable;
+
+  bool isCompletedFor(_AiEditApplySessionBinding session) =>
+      status == 'completed' &&
+      runtimeId == session.runtimeId &&
+      sessionId == session.sessionId &&
+      workspaceId == session.workspace;
+}
+
+class _AiEditApplyResultBinding {
+  _AiEditApplyResultBinding(AgentTaskResultProjection result)
+      : taskId = result.taskId,
+        resultHash = result.resultHash,
+        visibility = result.visibility,
+        text = result.text;
+
+  final String taskId;
+  final String resultHash;
+  final String visibility;
+  final String? text;
+
+  bool matches(AgentTaskResultProjection? result) =>
+      result != null &&
+      result.taskId == taskId &&
+      result.resultHash == resultHash &&
+      result.visibility == visibility &&
+      result.text == text;
+}
+
 AgentSessionRecord? _uniqueCurrentSession(
   List<AgentSessionRecord> sessions,
   _ComparisonApplySessionBinding expected,

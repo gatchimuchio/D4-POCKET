@@ -461,4 +461,133 @@ void main() {
       isFalse,
     );
   });
+
+  test('AI Edit結果Applyは提案・完了Task・full結果・別Workspaceを再照合する', () {
+    const sourceId = 'ai-edit-source';
+    const targetId = 'ai-edit-target';
+    const resultHash =
+        'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const instructionHash =
+        'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    const proposalHash =
+        'sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc';
+    const proposalAuditId = 'audit-ai-edit-proposal';
+    const editId = 'edit-ai-edit-test';
+    const sourceTaskId = 'task-ai-edit-result';
+    final sessions = [
+      _session(
+        sourceId,
+        'workspace-ai-edit-source',
+        agentRuntimeId: 'codex-cli',
+        status: '利用中',
+      ),
+      _session(
+        targetId,
+        'workspace-ai-edit-target',
+        agentRuntimeId: 'codex-cli',
+        status: '利用中',
+      ),
+    ];
+    const sourceTask = AgentTaskRecord(
+      taskId: sourceTaskId,
+      runtimeId: 'codex-cli',
+      sessionId: sourceId,
+      workspaceId: 'workspace-ai-edit-source',
+      instructionHash: instructionHash,
+      status: 'completed',
+      auditEventId: 'audit-ai-edit-complete',
+      resultHash: resultHash,
+      resultContentAvailable: true,
+    );
+    AgentTaskResultProjection result({
+      String text = 'reviewed candidate diff',
+      String visibility = 'full',
+    }) =>
+        AgentTaskResultProjection(
+          taskId: sourceTaskId,
+          resultHash: resultHash,
+          visibility: visibility,
+          projection: {'result_hash': resultHash, 'text': text},
+        );
+    final sourceResult = result();
+    final snapshot = AgentAiEditResultApplySnapshot.capture(
+      source: sessions[0],
+      target: sessions[1],
+      sourceTask: sourceTask,
+      sourceResult: sourceResult,
+      aiEditTaskId: sourceTaskId,
+      preflightInstructionHash: instructionHash,
+      proposalEditId: editId,
+      proposalPayloadHash: proposalHash,
+      proposalAuditId: proposalAuditId,
+    );
+
+    bool current({
+      List<AgentSessionRecord>? liveSessions,
+      AgentTaskRecord? liveTask,
+      AgentTaskResultProjection? liveResult,
+      AgentTaskRecord? targetTask,
+      bool targetHasRequest = false,
+      String? aiEditTaskId,
+      String? preflightHash,
+      String? liveEditId,
+      String? liveProposalHash,
+      String? liveAuditId,
+    }) =>
+        snapshot.matchesCurrent(
+          currentSessions: liveSessions ?? sessions,
+          currentSourceTask: liveTask ?? sourceTask,
+          currentSourceResult: liveResult ?? sourceResult,
+          currentTargetTask: targetTask,
+          currentTargetHasRequest: targetHasRequest,
+          currentAiEditTaskId: aiEditTaskId ?? sourceTaskId,
+          currentPreflightInstructionHash: preflightHash ?? instructionHash,
+          currentProposalEditId: liveEditId ?? editId,
+          currentProposalPayloadHash: liveProposalHash ?? proposalHash,
+          currentProposalAuditId: liveAuditId ?? proposalAuditId,
+        );
+
+    expect(snapshot.sourceTaskId, sourceTaskId);
+    expect(snapshot.resultHash, resultHash);
+    expect(snapshot.resultText, 'reviewed candidate diff');
+    expect(current(), isTrue);
+    expect(current(aiEditTaskId: 'different-task'), isFalse);
+    expect(current(preflightHash: 'different-instruction'), isFalse);
+    expect(current(liveEditId: 'different-proposal'), isFalse);
+    expect(current(liveProposalHash: 'different-hash'), isFalse);
+    expect(current(liveAuditId: 'different-audit'), isFalse);
+    expect(
+        current(liveResult: result(text: 'changed body, same hash')), isFalse);
+    expect(current(liveResult: result(visibility: 'summary')), isFalse);
+    expect(current(targetHasRequest: true), isFalse);
+    expect(
+      current(
+          targetTask: const AgentTaskRecord(
+        taskId: 'unexpected-target-task',
+        runtimeId: 'codex-cli',
+        sessionId: targetId,
+        workspaceId: 'workspace-ai-edit-target',
+        instructionHash: instructionHash,
+        status: 'completed',
+        auditEventId: 'audit-unexpected-target',
+        resultHash: resultHash,
+        resultContentAvailable: true,
+      )),
+      isFalse,
+    );
+    expect(
+      current(
+        liveSessions: [
+          sessions[0],
+          _session(
+            targetId,
+            sessions[0].workspace,
+            agentRuntimeId: 'codex-cli',
+            status: '利用中',
+          ),
+        ],
+      ),
+      isFalse,
+    );
+  });
 }

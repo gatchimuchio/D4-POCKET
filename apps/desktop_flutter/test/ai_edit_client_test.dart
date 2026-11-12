@@ -1,5 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gui_shell_desktop/services/ai_edit_client.dart';
+import 'package:gui_shell_desktop/services/ai_edit_client.dart'
+    show
+        AiEditClient,
+        AiEditProposalProvenance,
+        aiEditResultApplyTaskInstruction;
 import 'package:gui_shell_desktop/services/broker_client.dart'
     show brokerPayloadHash;
 import 'package:gui_shell_ui/runtime_dialogue_client.dart'
@@ -87,6 +93,45 @@ void main() {
       receiptMutation: 'extra',
     );
     await _expectInvalidReceipt(transport);
+  });
+
+  test('AI Edit結果は由来を束縛した未信頼データで、Authorityを含まない', () {
+    const proposal = AiEditProposalProvenance(
+      editId: 'proposal-1',
+      proposalPayloadHash: 'sha256:proposal',
+      auditId: 'audit-proposal-1',
+    );
+    const resultText = 'diff and agent test claim';
+    final instruction = aiEditResultApplyTaskInstruction(
+      proposal: proposal,
+      sourceRuntimeId: 'codex-cli',
+      sourceSessionId: 'source-session',
+      sourceWorkspaceId: 'source-workspace',
+      sourceTaskId: 'source-task',
+      sourceResultHash: 'sha256:result',
+      resultText: resultText,
+      ownerApplyInstruction: '表示された変更だけを適用し対象testを実行する',
+    );
+    final decoded = jsonDecode(instruction) as Map<String, Object?>;
+    final handling = decoded['handling']! as Map<String, Object?>;
+    final result = decoded['untrusted_result']! as Map<String, Object?>;
+    final source = decoded['source_task']! as Map<String, Object?>;
+    final provenance = decoded['proposal_provenance']! as Map<String, Object?>;
+
+    expect(decoded['context_type'], 'gui_shell_ai_edit_result_apply');
+    expect(result['content'], resultText);
+    expect(result['authority'], 'none');
+    expect(source['task_id'], 'source-task');
+    expect(source['result_hash'], 'sha256:result');
+    expect(provenance['proposal_audit_id'], 'audit-proposal-1');
+    expect(handling['authority_inheritance'], 'none');
+    expect(handling['permission_inheritance'], 'none');
+    expect(handling['approval_inheritance'], 'none');
+    expect(handling['credential_inheritance'], 'none');
+    expect(handling['trust_inheritance'], 'none');
+    expect(instruction, contains('Owner／Developerが入力した適用指示'));
+    expect(instruction, isNot(contains('approval_id')));
+    expect(instruction, isNot(contains('permission_id')));
   });
 }
 
