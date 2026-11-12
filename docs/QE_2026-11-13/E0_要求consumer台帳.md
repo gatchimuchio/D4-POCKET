@@ -34,6 +34,22 @@ LedgerのE0-04列は、現ID、旧ID、原文参照、対象、目的、Producer
 | N10 | Windows/macOS/Linux/Android/iOSで通常導入・利用・更新・撤去 | Windows/Linuxのscope限定installed証拠と他OSの個別実装・試験履歴がある。v4標準OS全件のRelease候補証拠は未成立。 | `OPEN`。OS/arch/version/package/実行環境を固定し、未実装package経路を特定する |
 | N11 | 全要求・Source・Consumer・証拠・Blocker・Release判断の結合 | Registry、Conformance、進捗、既存証拠は存在。v4全要求consumer ledgerは本書を含め未完成。 | `OPEN`。全IDをSource/Consumer/否定/Recovery/OS/Evidenceへ結び、18 blockerと同期する |
 
+## 実装ファイルの初期目録（CODE_PRESENTのみ）
+
+下記は`d503a4ef6daac8942abd1cb011442ce28c78ec55`時点のパス存在・責務候補を読み取った初期目録である。名前・コードの存在だけではProducer→Consumer接続、installed/runtime実作用、Acceptanceを証明しない。各行の`WIRED`、実作用、正常/否定/Recovery、Evidence、OS別状態は未照合なら`UNKNOWN`。
+
+| 線／要求 | Producer・UI候補 | Broker／native候補 | 実Consumer・残余 |
+|---|---|---|---|
+| A／N01・N02 | `apps/desktop_flutter/lib/screens/agent_center.dart`、`services/agent_task_execution_coordinator.dart`、`agent_task_client.dart`、`agent_mcp_task_controller.dart` | `native/rust_helper/src/broker/ipc_server.rs`、`broker/agent_task_scratch.rs`、`adapters/codex_cli.rs`、`mcp_task_tool_stdio.rs`、`adapters/mcp_stdio.rs`、`broker/mcp_center.rs` | Codex CLIとBrokerの履歴はある。現行installed候補の完全なTask→Tool→同Agent follow-up→結果/Audit/Recovery call graphとv4 acceptanceは`UNKNOWN` |
+| B／N03・N04 | `runtime_center.dart`、`agent_coordination.dart`、`agent_handoff.dart`、`a2a_connection_client.dart`、`a2a_artifact_handoff.dart` | `broker/runtime_registry.rs`、`adapters/codex_cli.rs`、`adapters/minidora.rs`、`broker/a2a_center.rs` | Adapter/Compare/A2A関連コードは存在する。二つ目の独立実Runtimeの実Task、外部A2A作用、host越境拒否、fresh authorityの現consumerは`UNKNOWN` |
+| D／N05 | `compose_client.dart` とCompose UI | `broker/compose_center.rs` | Manifest/Compose層は存在する。Runtime/Agent/Tool実Catalogから元Toolの製品作用までの接続は`UNKNOWN` |
+| E／N06 | `export_client.dart` とExport UI | `broker/export_center.rs`、`product_package.rs`、`linux_product_bundle.rs` | Export/Package codeは存在する。独立製品がManifestを消費すること、未選択Moduleのbinary/resource除去・測定は`UNKNOWN` |
+| D／N07 | `ai_edit_client.dart` とAI Edit UI | `broker/ai_edit_center.rs` | Rust fileは`proposal_only`・自動applyなしの申告を記録する。別主体の検査からcontrolled apply/rollbackへ至る実製品経路は`UNKNOWN` |
+| F／N08 | Repository内の`native/`、`packages/`、`tooling/`で`buffer`／`mediat`／`reconcil`／`arbitrat`を含むfile名は見つからなかった | 上記検索は名前照合に限定 | Buffer作用が別名の実装へあるかは未確認。不存在・Gapとは判定しない。B5/B6とのconsumer対応は`UNKNOWN` |
+| C／N09 | Agent Center、Workspace Inspector、History、Evaluation、Observability、Problems、Recovery、Audit、TraceのFlutter screen/service files | 対応候補として`broker/history_access.rs`、`execution_history.rs`、`evaluation_lab.rs`、`observation_center.rs`、`notification_center.rs`、`content_recovery.rs`、`audit.rs` | 個別画面・Broker moduleは存在する。実Task IDを共有したend-to-end表示、failure/restart/notification/stop consumerは`UNKNOWN` |
+| G/H/I／N10 | Windows/Linux/macOS Desktop runners、`apps/mobile_flutter` Dart/Android Kotlin/iOS Swift source | `native/rust_helper/src/desktop_launcher.rs`、Linux/macOS launcher・worker、Mobile Device Link native services | Windows installerに複数PowerShell収集/配置scriptがある。`installer/linux/README.md`・`installer/macos/README.md`はあるが、当該installer root内にpackage builderは見当たらない。別locationを含む正規package経路は`UNKNOWN` |
+| J／N11 | `docs/QE_2026-11-13/`、README/Checklist/Progress | `tooling/manifest.py`、`tooling/release_gate_check.py`、`tooling/conformance_tests/run_conformance_skeleton.py`、`release_blockers.registry.json` | v4正本/Registry/validatorの参照は同期済み。E0全ID/Consumer/Evidence validator・完全なrelease candidate結合は`UNKNOWN` |
+
 ## 要求母集団・照合状態
 
 | 母集団 | 件数 | 正本・原典 | v4 E0状態 |
