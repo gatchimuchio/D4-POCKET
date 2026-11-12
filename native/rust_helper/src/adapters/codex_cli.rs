@@ -1492,6 +1492,15 @@ fn build_codex_command_with_model_and_task_tool(
         let helper = serde_json::to_string(helper).map_err(|_| 対話失敗::要求不正)?;
         let arguments = serde_json::to_string(&[TASK_TOOL_SERVER_ARGUMENT])
             .map_err(|_| 対話失敗::要求不正)?;
+        let direct_only_namespace = format!("mcp__{TASK_TOOL_SERVER_NAME}");
+        let direct_only_namespaces = serde_json::to_string(&[direct_only_namespace])
+            .map_err(|_| 対話失敗::要求不正)?;
+        // Keep this Broker proposal Tool out of Code Mode's nested exec surface:
+        // Codex CLI's exec JSON stream must expose its structured outcome to D4.
+        // This only changes model-facing tool routing; Broker approval remains authoritative.
+        task_command.arg("-c").arg(format!(
+            "features.code_mode.direct_only_tool_namespaces={direct_only_namespaces}"
+        ));
         // This dedicated server advertises exactly one fixed, non-authoritative
         // request tool. Keep that allowlist in its own tools/list contract instead
         // of depending on Codex CLI's optional per-server enabled_tools filter.
@@ -2726,6 +2735,20 @@ mod tests {
             .filter(|setting| setting.starts_with("mcp_servers.d4p_task_request."))
             .collect::<Vec<_>>();
         assert_eq!(settings.len(), 6);
+        let direct_only_settings = args[..exec_index]
+            .windows(2)
+            .filter(|pair| pair[0] == "-c")
+            .map(|pair| pair[1].as_str())
+            .filter(|setting| {
+                setting.starts_with("features.code_mode.direct_only_tool_namespaces=")
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            direct_only_settings,
+            [format!(
+                "features.code_mode.direct_only_tool_namespaces=[\"mcp__{TASK_TOOL_SERVER_NAME}\"]"
+            )]
+        );
         assert!(settings.iter().any(|setting| {
             setting.starts_with("mcp_servers.d4p_task_request.command=")
                 && setting.contains("gui_shell")
@@ -2762,6 +2785,23 @@ mod tests {
             None,
         )
         .is_err());
+
+        let ordinary_task = build_codex_command_with_model_and_task_tool(
+            &executable,
+            &workspace,
+            CodexSandbox::WorkspaceWrite,
+            Some(&scratch),
+            &[],
+            None,
+            None,
+            false,
+            None,
+        )
+        .expect("MCP Toolなしの通常Task");
+        assert!(ordinary_task.get_args().all(|arg| {
+            !arg.to_string_lossy()
+                .starts_with("features.code_mode.direct_only_tool_namespaces=")
+        }));
     }
 
     #[test]
