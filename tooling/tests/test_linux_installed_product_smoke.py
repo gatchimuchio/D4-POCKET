@@ -68,6 +68,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _installed_task_history_diagnostics,
     _installed_task_response_fixture_diagnostics,
     _normalize_response_fixture_request_shapes,
+    _linux_x11_window_presence_diagnostics,
     _stop_linux_agent_task_process_group,
     _linux_processes_with_task_nonce,
     _review_single_installed_mcp_tool_arguments,
@@ -4349,6 +4350,125 @@ class LinuxAgentTaskFailureCleanupTests(unittest.TestCase):
         finally:
             child.kill()
             child.wait(timeout=5)
+
+
+class LinuxX11WindowPresenceDiagnosticsTests(unittest.TestCase):
+    def test_fixed_title_queries_return_only_visibility_booleans(self) -> None:
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke.shutil.which",
+                return_value="/usr/bin/xdotool",
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke.subprocess.run",
+                side_effect=(
+                    subprocess.CompletedProcess(
+                        args=[],
+                        returncode=0,
+                        stdout=b"9223372036854775807\n",
+                        stderr=b"",
+                    ),
+                    subprocess.CompletedProcess(
+                        args=[], returncode=1, stdout=b"", stderr=b""
+                    ),
+                ),
+            ) as run,
+        ):
+            diagnostics = _linux_x11_window_presence_diagnostics(
+                {"DISPLAY": ":99", "PATH": "/usr/bin"}
+            )
+
+        self.assertEqual(
+            diagnostics,
+            {
+                "state": "read",
+                "product_window_visible": True,
+                "owner_dialog_visible": False,
+            },
+        )
+        self.assertEqual(run.call_count, 2)
+        self.assertNotIn("9223372036854775807", json.dumps(diagnostics))
+        self.assertNotIn(WINDOW_TITLE, json.dumps(diagnostics))
+
+    def test_missing_xdotool_is_non_fatal_and_explicit(self) -> None:
+        with patch(
+            "tooling.tests.linux_installed_product_smoke.shutil.which",
+            return_value=None,
+        ) as which:
+            diagnostics = _linux_x11_window_presence_diagnostics(
+                {"DISPLAY": ":99", "PATH": "/usr/bin"}
+            )
+
+        self.assertEqual(diagnostics, {"state": "unavailable"})
+        which.assert_called_once_with("xdotool", path="/usr/bin")
+
+    def test_wayland_does_not_run_x11_probe(self) -> None:
+        with patch(
+            "tooling.tests.linux_installed_product_smoke.subprocess.run"
+        ) as run:
+            diagnostics = _linux_x11_window_presence_diagnostics(
+                {
+                    "WAYLAND_DISPLAY": "wayland-0",
+                    "XDG_SESSION_TYPE": "wayland",
+                }
+            )
+
+        self.assertEqual(diagnostics, {"state": "not_applicable"})
+        run.assert_not_called()
+
+    def test_probe_failure_is_bounded_and_does_not_report_raw_error(self) -> None:
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke.shutil.which",
+                return_value="/usr/bin/xdotool",
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke.subprocess.run",
+                side_effect=subprocess.TimeoutExpired("xdotool", 2),
+            ) as run,
+        ):
+            diagnostics = _linux_x11_window_presence_diagnostics(
+                {"DISPLAY": ":99", "PATH": "/usr/bin"}
+            )
+
+        self.assertEqual(
+            diagnostics,
+            {
+                "state": "query_failed",
+                "product_window_visible": None,
+                "owner_dialog_visible": None,
+            },
+        )
+        self.assertEqual(run.call_count, 2)
+        self.assertNotIn("TimeoutExpired", json.dumps(diagnostics))
+
+    def test_search_error_is_unknown_instead_of_invisible(self) -> None:
+        private_path = b"/private/display/path"
+        with (
+            patch(
+                "tooling.tests.linux_installed_product_smoke.shutil.which",
+                return_value="/usr/bin/xdotool",
+            ),
+            patch(
+                "tooling.tests.linux_installed_product_smoke.subprocess.run",
+                return_value=subprocess.CompletedProcess(
+                    args=[], returncode=1, stdout=b"", stderr=private_path
+                ),
+            ),
+        ):
+            diagnostics = _linux_x11_window_presence_diagnostics(
+                {"DISPLAY": ":99", "PATH": "/usr/bin"}
+            )
+
+        self.assertEqual(
+            diagnostics,
+            {
+                "state": "query_failed",
+                "product_window_visible": None,
+                "owner_dialog_visible": None,
+            },
+        )
+        self.assertNotIn(private_path.decode(), json.dumps(diagnostics))
 
 
 class InstalledTaskStatusPollingTests(unittest.TestCase):

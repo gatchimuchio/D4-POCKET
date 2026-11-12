@@ -578,6 +578,57 @@ def _visible_product_window(environment: dict[str, str]) -> str | None:
     return values[0] if values else None
 
 
+def _linux_x11_window_presence_diagnostics(
+    environment: dict[str, str],
+) -> dict[str, bool | None | str]:
+    if _is_wayland_environment(environment):
+        return {"state": "not_applicable"}
+
+    xdotool = shutil.which("xdotool", path=environment.get("PATH"))
+    if xdotool is None:
+        return {"state": "unavailable"}
+
+    observations: dict[str, bool | None | str] = {}
+    query_failed = False
+    for key, title in (
+        ("product_window_visible", WINDOW_TITLE),
+        ("owner_dialog_visible", OWNER_DIALOG_TITLE),
+    ):
+        try:
+            result = subprocess.run(
+                [
+                    xdotool,
+                    "search",
+                    "--onlyvisible",
+                    "--name",
+                    f"^{re.escape(title)}$",
+                ],
+                env=environment,
+                capture_output=True,
+                check=False,
+                timeout=2,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            observations[key] = None
+            query_failed = True
+            continue
+
+        identifiers = result.stdout.decode("ascii", errors="ignore").splitlines()
+        if any(re.fullmatch(r"(?:0x)?[0-9a-fA-F]+", value) is None for value in identifiers):
+            observations[key] = None
+            query_failed = True
+        elif result.returncode == 0:
+            observations[key] = bool(identifiers)
+        elif result.returncode == 1 and not identifiers and not result.stderr:
+            observations[key] = False
+        else:
+            observations[key] = None
+            query_failed = True
+
+    observations["state"] = "query_failed" if query_failed else "read"
+    return observations
+
+
 def _scroll_product_page_down(environment: dict[str, str], window_id: str) -> None:
     if re.fullmatch(r"(?:0x)?[0-9a-fA-F]+", window_id) is None:
         raise RuntimeError("製品window IDが不正なため画面をscrollできません")
@@ -5294,6 +5345,9 @@ def _wait_installed_task_status(
         "refresh_control_seen": refresh_control_seen,
         "refresh_attempts": refresh_attempts,
     }
+    diagnostics["x11_window_presence"] = _linux_x11_window_presence_diagnostics(
+        environment
+    )
     if diagnostic_audit_path is not None:
         diagnostics["task_history"] = _installed_task_history_diagnostics(
             diagnostic_audit_path.parent, task_id
