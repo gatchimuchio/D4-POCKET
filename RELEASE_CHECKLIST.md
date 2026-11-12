@@ -1,12 +1,14 @@
 # リリースチェックリスト
 
-## 現行の対象と関門（2026-11-08）
+## v4の現行対象と関門（2026-11-13）
 
-製品対象はWindows／macOS／LinuxのDesktopとAndroid／iOSのMobile。現行工程・状態は[2026-11-08進捗](docs/QE_2026-11-08/進捗.md)、rev5受入れ履歴は[REV5_PRODUCT_PROGRESS.md](docs/REV5_PRODUCT_PROGRESS.md)、出荷関門は`release_blockers.registry.json`を参照する。現在18項目中16項目がunresolvedである。旧v1.0欄のLinux補助対象・Mobile範囲外・macOS環境不在という当時の記述から、現行の対象を縮小しない。以下の旧欄は測定時点の状態・結果を保持するもので、安全検査や引き継いだ出荷関門を解除しない。
+製品対象はWindows／macOS／LinuxのDesktopとAndroid／iOSのMobile。現行工程・状態は[v4進捗](docs/QE_2026-11-13/進捗.md)、rev5受入れ履歴は[REV5_PRODUCT_PROGRESS.md](docs/REV5_PRODUCT_PROGRESS.md)、出荷関門は`release_blockers.registry.json`を参照する。現在18項目中16項目がunresolvedである。v4では非Windows物理端末を必須条件にせず、宣言した標準OSのinstalled製品をVM/hosted/Emulator/Simulatorで検証する。Windows所有実機での完成品確認は記録する。署名・Publisher identity・配布資格・Owner GOは独立関門のまま維持する。以下の旧欄は測定時点の状態・結果を保持し、v4候補の実証へ転記しない。
 
 Windows B4はstaged `r2-e2e`の有限経路に限定してCLOSED、B5はOPEN。run #55（source `1e57a828`）はRust試験572成功／0失敗／13除外でもcapture判定でworkflow FAILし、Broker build／IPC smokeはSKIP。Linux run #107（source `bf2a51ac`）の成功はUbuntu 24.04／Xvfb・X11の導入済みGTK製品・合成MCPだけで、同runの資格情報保管・更新等の受入れstepは対象外SKIPである。別run #77／#94の限定成功はそれぞれのsourceに結合する。[F03実績文書対応](docs/QE_2026-10-22/F03_実績文書対応.md)に各実行の射程を示す。
 
-W01/G1のWindows normal Release／Codex CLIに限り`task_execution=supported`であり、W02/G2はOPEN。他Runtime／OSの能力は対象別証拠がない限り未成立とする。`release_ready=false`、正式Q0〜Q7 `DEFERRED`を維持する。Windows installed-path正式証拠、Linux全製品対応、物理端末・正式配布、署名・Audit鍵・Owner GO等の未閉包は元台帳で管理する。本文の履歴PASSやこの文書同期だけで関門を閉じない。
+W01/G1のWindows normal Release／Codex CLIに限り`task_execution=supported`であり、W02/G2はOPEN。他Runtime／OSの能力は対象別証拠がない限り未成立とする。`release_ready=false`、正式Q0〜Q7 `DEFERRED`を維持する。Windows installed-path正式証拠、Linux全製品対応、Mobile標準環境installed QA、正式配布、署名・Audit鍵・Owner GO等の未閉包は元台帳で管理する。本文の履歴PASSやこの文書同期だけで関門を閉じない。
+
+## v3／rev5までの検証記録（履歴）
 
 ## rev5 Final QAの既知制約記録（2026-10-07）
 
@@ -16,9 +18,9 @@ W01/G1のWindows normal Release／Codex CLIに限り`task_execution=supported`�
   required_action: 現行Flutterが当該APIを削除する前に`RadioGroup`／`initialValue`へ移行し、Desktop analyzerを再実行する。
   blocks_release: no
 
-## rev2の証拠履歴（2026-09-10）
+## rev2の証拠履歴（2026-09-10、非現行）
 
-以下の旧Desktop v1.0記録は過去の基準面を含む。現行owner rev2ではMobile・端末連携・Android・Apple補助buildも作業対象であり、旧post_v1_scopeを理由に未完了を除外しない。現在の要求別監査は `docs/REV2_PROGRESS.md`、Mobile状態は `MOBILE_STATUS.md` を参照する。
+以下の旧Desktop v1.0記録は過去の基準面を含む。当時のowner rev2ではMobile・端末連携・Android・Apple補助buildも作業対象であり、旧post_v1_scopeを理由に未完了を除外しない扱いだった。当時の要求別監査は `docs/REV2_PROGRESS.md`、Mobile状態は `MOBILE_STATUS.md` に記録されている。
 
 macOS projectは追加済みで、手動補助run 34446194013（commit 27b8713fd1a9ecdb81abe1d4225b99b26bda84ba）でmacOS開発app・iOS Simulator appとMac Rust64単体・5統合がPASSした。「macOS validation environmentがない」という旧記録は、この補助buildの取得前を指す。実機での起動・安全保管・対話は未確認でありrelease_blockerである。実機の製品supportや完成を主張しない。
 
@@ -52,7 +54,8 @@ Windows-first product path と LLM-readable substrate の demonstration path を
   classification: release_blocker
   registry_id: rev2_mobile_flutter_native_device_link_boundary
   reason: Dart直接経路は廃止し、Android Kotlin／iOS Swiftのnative招待・Keychain／Keystore・TLS経路とnative Workspace選択面を実装済み。iOS Simulator buildとnative XCTest 8件は手動Actions run #22でPASSしたが、実端末のOS保管・実TLS・lifecycle、Brokerとのnative LIVE_RUNTIME接続は未確認。過去Dart経路やSimulator fixtureだけではproduction経路の成立を証明しない。
-  required_action: 秘密をDart/debug VM/log/artifactへ渡さないplatform-native harnessでBroker到達・拒否・失効・background停止を検証し、Workspace識別子の限定開示とBrokerのRuntime再照合を確認する。Android実機凍結・物理端末証拠・正式配布gateは別途維持する。
+  historical: true
+  required_action: （旧v3時点の記録。現行v4条件はregistry_id=rev2_mobile_flutter_native_device_link_boundaryに従う。）
   blocks_release: yes
 
 - item: D4 Pocket 更新取得のDNS期限・破損package Recovery・installed updateが未成立

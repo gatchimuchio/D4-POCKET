@@ -1,20 +1,24 @@
 # Mobile 状態
 
-## rev5の現行到達点（2026-10-22照合）
+## v4の現在の対象・受入状態（2026-11-13）
 
-Android／iOSは必須のMobile製品対象で、P13の有限Product Build受入れは2026-10-09にCLOSEDである。個々のsource・hosted／Emulator／Simulator・対象機能は[rev5進捗](docs/REV5_PRODUCT_PROGRESS.md)のP13受入記録へ結合する。現在のmainを本更新時に端末上で再試験した意味ではない。物理端末の安全保管・TLS・lifecycle、正式identity／署名／配布は別の`release_blocker`であり、Android実機検証凍結も維持する。
+Android／iOSは必須のMobile製品対象である。現行要求は[2026-11-13 v4採用記録](docs/QE_2026-11-13/採用記録.md)、現行状態は[v4進捗](docs/QE_2026-11-13/進捗.md)、Mobile受入移行は[差分台帳](docs/QE_2026-11-13/差分移行台帳.md)を参照する。v4の標準Android Emulator／iOS Simulatorへinstalled製品を導入するQAとSource/Artifact identityは未成立。非Windows物理端末の取得や試験は施工開始・製品QAの必須条件ではない。正式identity／署名／配布は別のrelease blockerとして維持する。過去のP13・端末状態は以下の履歴であり、v4候補の証拠ではない。
+
+## rev5時点の到達点（履歴、2026-10-22照合）
+
+Android／iOSは必須のMobile製品対象で、P13の有限Product Build受入れは2026-10-09にCLOSEDであった。個々のsource・hosted／Emulator／Simulator・対象機能は[rev5進捗](docs/REV5_PRODUCT_PROGRESS.md)のP13受入記録へ結合する。この履歴はv4候補のOS別QAを示さない。物理端末の安全保管・TLS・lifecycle、正式identity／署名／配布が未確認だった当時の範囲を保持する。
 
 Flutterは公開状態と要求、Android Kotlin／iOS Swiftはnative保管とtransport、既存Rust BrokerはAuthority／Permission／Approval／Audit／Recoveryを担う。旧Dart直接経路の成功は現行native経路の証拠にしない。Linux run #107の導入済みGTK・合成MCP検査もMobile TLS／資格情報／実機の証拠ではない。[F03実績文書対応](docs/QE_2026-10-22/F03_実績文書対応.md)を参照する。
 
-下記の2026-09-25以前の検査・未確認事項は当時の履歴であり、iOS native compile未確認等を現在のP13状態へ転記しない。物理端末・正式配布の現行未閉包は`release_blockers.registry.json`を参照する。B4の限定CLOSED、B5 OPEN、正式Q0〜Q7 `DEFERRED`、通常Release `task_execution=unsupported`／`release_ready=false`は変更しない。
+下記の2026-09-25以前の検査・未確認事項は当時の履歴であり、iOS native compile未確認等を現在のv4状態へ転記しない。v4の現行未閉包は`release_blockers.registry.json`とv4進捗を参照する。B5 OPEN、B6未成立、正式Q0〜Q7 `DEFERRED`、`release_ready=false`を維持する。
 
 ## D4 Pocket rev2 境界確認履歴（2026-09-25）
 
 旧Dart製品client、資格モデル、安全保管API、SecureSocket、招待をDartへ注入するdebug VM integration harnessを廃止した。Flutterは固定MethodChannelを通じて状態projectionとallowlist済みBroker operationだけを送受信する。Android Kotlin／iOS Swiftへnative store・serviceを実装し、`local_delete`は資格削除と同じOS保護状態へ最大32件の非権威回復記録を保存する。Flutterにはversionだけで読む固定methodと、秘密fieldを拒む限定表示を追加した。Flutter試験16件・analyzeは成功。現行のAndroid sourceは対象のMobileアプリと共有UI計117ファイルを一時検証先へ複製し、内容hash差分0件を確認した検証先で、`gradlew.bat clean :app:testDebugUnitTest :app:assembleDebug --no-daemon --offline --console=plain`が成功した。JUnit 8件はすべて成功し、debug APKは146,311,641 bytes、SHA-256 `2D40701A90A518261D5E9E7E5E96AADF036D1A78354B9181B0E001E9A6632129`。これは現行sourceの隔離clean build証拠で、実機・実TLS・製品releaseの証拠ではない。元OneDrive作業場所の除外対象`apps/mobile_flutter/build`には親からの`Everyone Deny DeleteSubdirectoriesAndFiles`が継承され、標準出力先では後片付けとresource生成が`AccessDenied`となる。ACLは変更せず、一時検証先で試験した。iOS native sourceは追加済みだがApple toolchain compile／XCTest未確認。実TLS・Keystore/Keychain実機動作は未検証である。Flutterからnative foreground状態を偽装できる`set_foreground` channelは設けない。
 
-- `release_blocker`: rev2_mobile_flutter_native_device_link_boundary。Androidの隔離clean build、unit test 8件、debug APK buildは成功した。iOS native compile／XCTest、Rust Brokerへのnative LIVE_RUNTIME harness、実機のOS保管・TLS・lifecycle証拠は未成立。local_delete記録は端末内INTERNAL_STATEだけでDesktop Audit chain・失効証明ではない。
+- 当時のrelease blocker記録: rev2_mobile_flutter_native_device_link_boundary。Androidの隔離clean build、unit test 8件、debug APK buildは成功した。iOS native compile／XCTest、Rust Brokerへのnative LIVE_RUNTIME harness、実機のOS保管・TLS・lifecycle証拠は未成立。local_delete記録は端末内INTERNAL_STATEだけでDesktop Audit chain・失効証明ではない。現在のv4受入れ状態は冒頭とregistryを参照する。
 - `known_limitation`: OneDrive内の除外対象Android build outputに削除deny ACLが継承され、標準Gradle output pathで後片付け／resource packagingが失敗する。ACLを変更せず、hash照合した一時検証先でclean build／test／APKを検証した。in-place buildが必要な場合だけACL管理者の判断を得る。blocks_release: no。
-- Android実機検証凍結、rev2_mobile_device_evidence、正式配布blockerは維持する。Flutter/Kotlin unit test・APK build・emulator起動は実機証拠へ昇格しない。
+- 当時はAndroid実機検証凍結、rev2_mobile_device_evidence、正式配布blockerを維持していた。Flutter/Kotlin unit test・APK build・emulator起動は実機証拠へ昇格しないという当時の判定であり、現行v4の標準Emulator／Simulator受入れ条件を上書きしない。
 - 旧Dart client・Simulator integrationのPASSは履歴のまま保持し、現行native経路の適合根拠に使用しない。
 
 ## C31の状態履歴（2026-09-24）
@@ -23,7 +27,7 @@ Mobileは既存の9画面を保持し、C24で通知summary、Runtime lifecycle�
 
 Windows hostではMobile Flutterの解析と試験、Android debug APK／AABのbuildを確認している。C30のDevice Link行はcontract・失効・背景遷移fixtureでPASSしたが、実端末、native secure storage、TLS実接続、Windows installed productからのMobile連携、正式署名・配布は証明していない。
 
-- `release_blocker`: Android／iOS実機、native安全保管、OS lifecycle、Windows installed productとのMobile連携、正式識別子・署名・配布、owner GO、正式release。
+- 当時のrelease blocker記録: Android／iOS実機、native安全保管、OS lifecycle、Windows installed productとのMobile連携、正式識別子・署名・配布、owner GO、正式release。
 - `known_limitation`: Mobileはowner操作とMCP live一覧を持たず、Device Link／比較のlocal fixtureは実端末・外部Runtimeの証拠ではない。
 
 ## rev2開始時の対象（履歴）
@@ -32,9 +36,11 @@ Windows hostではMobile Flutterの解析と試験、Android debug APK／AABのb
 
 既存6画面を保持し、実行系対話・接続先Host・端末結合・設定を追加した。共有表示は `packages/gui_shell_ui`、暗号化端末経路はDesktop Rust brokerを通る。Flutterと端末metadataは権限源にならない。Mobileのpubspec.lockは追跡済みであり、既存MANIFESTの除外規約とは別である。
 
-## Android実機検証の凍結（2026-09-11）
+## Android実機検証凍結の記録（2026-09-11、履歴）
 
-owner指示により、Androidの実機install・launch・端末結合・対話・安全保管・lifecycle検証を凍結する。再開指示まで端末接続を要求せず、実機検証を実施しない。ビルド済みAPK/AABとhost上の検証結果は保持する。凍結は実機合格やrelease許可を意味せず、未検証のrelease_blockerを保持する。iOS実機検証はこの凍結指示の対象外である。
+この時点の物理端末検証凍結は履歴として保持する。v4では物理Android/iOS端末の検証を要求せず、標準Emulator／Simulator上のinstalled製品QAへ移行した。この変更はAndroid実機を使う許可ではなく、v4の施工・受入れに物理端末を要求しないという意味である。
+
+当時のowner指示により、Androidの実機install・launch・端末結合・対話・安全保管・lifecycle検証を凍結していた。これはv4の現行標準Emulator／Simulator受入れ条件を制約しない。ビルド済みAPK/AABとhost上の検証結果は履歴として保持する。凍結は実機合格やrelease許可を意味しなかった。iOS実機検証はこの凍結指示の対象外だった。
 
 ## 旧Dart経路を含む検証履歴（現行native証拠へ転用しない）
 
@@ -43,16 +49,18 @@ owner指示により、Androidの実機install・launch・端末結合・対話�
 - Android開発APK/AABのbuild、APK署名・alignment・manifest、bundletoolによるAAB消費はPASS。
 - iOS Simulator appは手動補助run `34446194013`、commit `27b8713fd1a9ecdb81abe1d4225b99b26bda84ba` でbuild成功。実機起動を証明しない。
 
-## 未完了項目
+## 未完了項目（旧rev2時点の履歴）
 
 - item: Android/iOS実機のinstall・launch・結合・対話・安全保管・lifecycle
+  historical: true
   registry_id: rev2_mobile_device_evidence
   classification: release_blocker
   reason: Android実機検証はowner指示で凍結中。iOS実機の証拠も未取得。host上のDart実通信とfixtureはOS安全保管や端末画面の証拠ではない。
-  required_action: Androidはownerの再開指示後に検証する。iOSを含む各platformの実機で資格保存・再起動・Host照合・対話・失効・復帰を測定する。
+  required_action: （旧rev2時点の履歴。現行v4の受入れはrelease_blockers.registry.jsonの標準Emulator／Simulator条件に従い、物理端末を要求しない。）
   blocks_release: yes
 
 - item: 正式配布識別子・署名・配布経路
+  historical: true
   registry_id: rev2_mobile_distribution
   classification: release_blocker
   reason: 開発識別子を使用中。AABの汎用JAR stream検証差の警告も保持する。

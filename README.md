@@ -7,9 +7,9 @@ AIエージェントが高度になるほど、次に難しくなるのは「何
 
 名前のとおり目指すのは、異なる能力やRuntimeを必要に応じて取り出し、安全に組み合わせられる**エージェントのための四次元ポケット**。特定のLLMやBLUE-TANUKI専用のフロントエンドではありません。
 
-[現行工程](docs/QE_2026-11-09/進捗.md) · [rev5受入れ履歴](docs/REV5_PRODUCT_PROGRESS.md) · [クイックスタート](QUICKSTART.md) · [アーキテクチャ仕様](docs/specs/gui-shell-spec-v1.md) · [責任境界](CLAIM.md) · [エージェント向け開発規則](AGENTS.md)
+[現行工程](docs/QE_2026-11-13/進捗.md) · [v4採用記録](docs/QE_2026-11-13/採用記録.md) · [rev5受入れ履歴](docs/REV5_PRODUCT_PROGRESS.md) · [クイックスタート](QUICKSTART.md) · [アーキテクチャ仕様](docs/specs/gui-shell-spec-v1.md) · [責任境界](CLAIM.md) · [エージェント向け開発規則](AGENTS.md)
 
-> **開発中 — 製品リリース未宣言。** 現行施工正本は[2026-11-09統合製品3点 v3](docs/QE_2026-11-09/進捗.md)です。施工線A〜Jを同じ全体BUILD期間で並行して進め、W00〜W08は受入座標として扱います。W00=SCOPED_PASS、W01=CLOSED（Windows normal Release／Codex CLI限定）、W02=OPENです。Linux normal Release／Codex CLIの`task_execution=supported`は限定能力証拠で確認済みですが、Linux全体製品Acceptanceは未成立です。実Codex→実MCP Tool→同Agentの結果依存TaskとUI停止原因は未成立／未解明です。Linux nativeを含む全対象OSを必須製品対象として維持します。release_ready=false、18件中16件のRelease Blocker未解決、Q0〜Q7 DEFERREDです。過去の製品受入れ範囲は[rev5進捗](docs/REV5_PRODUCT_PROGRESS.md)を参照してください。
+> **開発中 — 製品リリース未宣言。** 現行施工正本は[2026-11-13統合製品3点 v4](docs/QE_2026-11-13/進捗.md)です。E0要求照合から全体BUILDへ進み、A〜Jを同じ製造期間に投入します。W00〜W08は受入座標で、施工順の待機列ではありません。W00=SCOPED_PASS、W01=CLOSED（Windows normal Release／Codex CLI限定）、W02=OPEN。旧局所PASSはv4の別OS・別候補の受入れへ自動転記しません。Linux nativeを含む五OSは必須製品対象です。OS別の標準環境installed製品試験は未成立で、非Windows物理端末を前提にしません。`release_ready=false`、18件中16件のRelease Blocker未解決、正式Q0〜Q7=DEFERREDです。過去の製品受入れ範囲は[v3進捗](docs/QE_2026-11-09/進捗.md)と[rev5進捗](docs/REV5_PRODUCT_PROGRESS.md)を参照してください。
 
 ## D4 Pocketが変えようとしていること
 
@@ -31,7 +31,7 @@ AIエージェントが高度になるほど、次に難しくなるのは「何
 |---|---|---|
 | **Windowsデスクトップ版** | W01/G1をWindows normal Release／Codex CLI限定でCLOSED。Windowsの`task_execution=supported`を確認 | W02/G2、正式installed lifecycle、他Runtimeとの統合、正式Release、owner GO。Linuxの能力状態は下記のLinux欄を参照 |
 | **Agent比較／引継ぎ** | P2複数Agent比較、P3 Agent引継ぎのProduct Build受入CLOSED | すべての実Agent・実環境での一般保証 |
-| **モバイル（Android／iOS）** | P13の有限Product Build受入は2026-10-09にCLOSED。Android Emulator・iOS Simulator等の限定証拠を保持 | 物理端末保証、OS別の正式配布・署名・identity |
+| **モバイル（Android／iOS）** | v4の標準Emulator／Simulatorでinstalled製品を検証する対象 | v4候補のinstalled QA、正式配布・署名・identity。過去P13証拠はその時点の履歴 |
 | **Linuxデスクトップ版** | 完全対応が必須。既存のWorkspace、Agent Task／Recovery、provenance、MCP Credential、archive、Wayland、Setup lifecycleの限定受入れを保持。run #282でLinux normal Release build、run #283でinstalled GTK UIからTask完了・cancel・deadline／process／scratch supervisionを限定PASS。Linux normal Release／Codex CLIの`task_execution=supported`を確認 | #283は`r2-e2e` test build・Ubuntu 22.04.5 Xvfb／X11・loopback fixture。normal Release installed Task、実Provider、実desktop／全compositor、残る必須consumer、正式配布・署名は未受入れ。`linux_native_product_support=unresolved` |
 | **緩衝基盤とAgent Task** | B0〜B4は有限受入れCLOSED、B5はOPEN。#54の3回PASSは履歴として保持。後続#55（source `1e57a828`）はRust全target 572成功／0失敗／13除外の一方、capture判定でworkflow FAIL。後続Broker build／IPC smokeはSKIP。`BUF-T04`部分観測、`BUF-T05`／`BUF-T06`OPEN、`BUF-T23`局所PASS。詳細は[B5記録](docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md) | OneDrive警告との因果、loopback/TLS failureの根因、Q4の長期／反復／資源影響、現行SAC policy全体、通常Release installed Taskの一気通貫証拠、正式配布・実機保証 |
 | **正式な出荷判断** | Release GateとOwner判断を独立に保持。W02〜W08は未成立 | Linuxを含むnormal Release能力の限定成立は製品全体のrelease readinessを意味しない。正式署名／配布と残存必須条件は未成立。`release_ready=false`、16 Blocker unresolved |

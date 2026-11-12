@@ -3,7 +3,7 @@
 D4 Pocketは開発中の汎用AI Runtime／Agent操作基盤です。以下は**ソースコードから実装・契約を検証するための手順**であり、正式出荷製品のインストール案内ではありません。
 
 - プロジェクト概要・技術的特徴：[README.md](README.md)
-- 現行工程・最新状態：[docs/QE_2026-11-09/進捗.md](docs/QE_2026-11-09/進捗.md)
+- 現行工程・最新状態：[docs/QE_2026-11-13/進捗.md](docs/QE_2026-11-13/進捗.md)
 - rev5の製品受入れ履歴：[docs/REV5_PRODUCT_PROGRESS.md](docs/REV5_PRODUCT_PROGRESS.md)
 - 安全・権限・Git運用：[AGENTS.md](AGENTS.md)
 - 出荷判断：[RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md)
@@ -42,7 +42,7 @@ python -X utf8 tooling/validate_all.py --flutter-step desktop_flutter_test --des
 
 2026年10月11日のB4-L2ではRust直列test 569 passed / 0 failed / 13 ignoredを記録。一方、Flutter analyzerは既存deprecated info 5件、`cargo fmt --check`は既存の形式差分により終了値1を記録しています。これらの履歴を無言でPASSへ変換しないでください。現在の個別事実と必要な検証対象は[進捗](docs/REV5_PRODUCT_PROGRESS.md)を確認してください。
 
-Mobileはrev5のP13でAndroid Emulator／iOS Simulator等の有限受入を実施していますが、物理端末での正式保証・配布を意味しません。
+Mobileはv4でAndroid Emulator／iOS Simulator等へinstalled製品を導入して検証します。過去のP13受入れは当時の範囲に属し、v4候補のQA・正式配布を成立させません。物理端末検証を非Windows施工の停止条件にしません。
 
 ## 3. 開発時のOwner操作
 
@@ -66,4 +66,4 @@ powershell -NoProfile -File scripts\launch_owner_desktop.ps1
 - B4の有限製品経路受入は2026-10-17にCLOSEDです。対象は`r2-e2e` staged buildとlocalhost合成APIによる一経路であり、通常Release・installed provenance・緩衝作用の独立照合を意味しません。次工程はB5自己適用QCです。
 - Windows normal Release／Codex CLIのW01/G1に限り<code>task_execution=supported</code>です。他Runtime／OSの能力とW02以降は未成立のままです。<code>release_ready=false</code>、16件のRelease Blocker、Ownerの独立GO未成立を維持します。
 
-製品主張の射程は[CLAIM.md](CLAIM.md)、現行工程は[進捗](docs/QE_2026-11-09/進捗.md)、rev5の受入れ履歴は[REV5_PRODUCT_PROGRESS.md](docs/REV5_PRODUCT_PROGRESS.md)、歴史的な試験結果は[VALIDATION.txt](VALIDATION.txt)で確認します。
+製品主張の射程は[CLAIM.md](CLAIM.md)、現行工程は[進捗](docs/QE_2026-11-13/進捗.md)、v3の採用時状態は[旧進捗](docs/QE_2026-11-09/進捗.md)、rev5の受入れ履歴は[REV5_PRODUCT_PROGRESS.md](docs/REV5_PRODUCT_PROGRESS.md)、歴史的な試験結果は[VALIDATION.txt](VALIDATION.txt)で確認します。

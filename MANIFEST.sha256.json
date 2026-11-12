@@ -108,7 +108,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "ae39876330e7bc1a770c6fca0b0a6268e4e7353303b947910409aed939afb18d"
+      "sha256": "4c56a4a9f1741c8b7eb466adfc7049786500b9991bf190a829e759a1d80b1fae"
     },
     {
       "path": "AUDIT.md",
@@ -124,11 +124,11 @@
     },
     {
       "path": "CLAIM.md",
-      "sha256": "ac169cc5cb96f251412af426e45b11fd204bd304a48d3a4608a02253c75e1f0d"
+      "sha256": "f00cc1ad4e3cfcdee6c9522a290e206ef602cc2d2c11ea7f3aa17c6f4d3dfca6"
     },
     {
       "path": "COMPATIBILITY_MATRIX.md",
-      "sha256": "1640a5a3c1bad63e5f065239079698fe05bb286d9bb1df43908cc996a7b048ae"
+      "sha256": "5a18bc28e20e8ed5b356bb3583720b0f0118365e98d7370f5acd42d08040ff8b"
     },
     {
       "path": "CONFIG.md",
@@ -160,7 +160,7 @@
     },
     {
       "path": "MOBILE_STATUS.md",
-      "sha256": "18208dfa524f9aa2e5ad10ac0ac1408bfd7f10bf28aeafe655fe62c4de7286a0"
+      "sha256": "e4928e13f7fa0c21b57dd0ff87fc8fcbe6058ec063baf242e1ccd635262b8b64"
     },
     {
       "path": "NOTICE",
@@ -168,19 +168,19 @@
     },
     {
       "path": "QUICKSTART.md",
-      "sha256": "65c9e55ebaea7be6ddee48691896aa53bd04a9d844ee7faa986d6f8267fc44d3"
+      "sha256": "2f4d988dd782511133ac9df31f5e22c0818df6930f919c1866350db30f35ce6f"
     },
     {
       "path": "README.md",
-      "sha256": "852e669e51cb7f91850b06a8ac82f129bd8c413be68bbe81e5986086fa474ddc"
+      "sha256": "8b2d656c4c581085cca36dd96cc418a96725aaa44521d7e22c03d2f51205f575"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "d6693f2fefe84021dbc47fa7b9f07da0ea977c1a21e5fd216609488c00f1f709"
+      "sha256": "e4439deda55aa42ea47fdf84bbecea05208e5e17c013b37f1a345919672a2e11"
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "f71bd93142873e523aaa41510a5e0524ff7171dd696d679f96a6ec269f998ed9"
+      "sha256": "c811323c49008d33728664e6b7dfbf111940997a73eb4669bb9e14cdc27ce22a"
     },
     {
       "path": "SECURITY.md",
@@ -1288,7 +1288,7 @@
     },
     {
       "path": "docs/FINAL_QA_QUEUE.md",
-      "sha256": "e34af10ed8f9ed96552f2f870758d9ad4277109714ee5d3df1f032dc7f6228c0"
+      "sha256": "25c8da78402624e646f0ca72f1caf6b7fb067e9d80a8ccfc15dee8469b188578"
     },
     {
       "path": "docs/FIRST_RUN.md",
@@ -1445,6 +1445,30 @@
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
       "sha256": "0cdff6ca8462da5ecd9cb8014527664cbea352004480056bf8b77bfb333dddce"
+    },
+    {
+      "path": "docs/QE_2026-11-13/01_D4Pocket_\u7d71\u5408\u88fd\u54c1\u5b9f\u88c5\u4ed5\u69d8\u66f8_v4.md",
+      "sha256": "8ceedf21f881a783e35ee8642673faaeef949465343df65e63dc21b04ee5a3ef"
+    },
+    {
+      "path": "docs/QE_2026-11-13/02_D4Pocket_\u7d71\u5408\u958b\u767a\u5de5\u7a0b\u8868_v4.md",
+      "sha256": "54f1b3e207ec884cbaa67233aef22d0cada2dd0d28fb66e23da91ffbc5c7f721"
+    },
+    {
+      "path": "docs/QE_2026-11-13/03_D4Pocket_Codex\u65bd\u5de5\u6307\u793a\u66f8_v4.md",
+      "sha256": "334a79cbc8f7b17d81d27c040c451586c70ad1d355e9b45d6de758dd1aa4f55f"
+    },
+    {
+      "path": "docs/QE_2026-11-13/\u5dee\u5206\u79fb\u884c\u53f0\u5e33.md",
+      "sha256": "1d040c9ff17fc47f88dc5da550bdad20a5c976f8c76a7463ae0b3cb09ad7e250"
+    },
+    {
+      "path": "docs/QE_2026-11-13/\u63a1\u7528\u8a18\u9332.md",
+      "sha256": "7a72d078d3d239d66e30332256a35a8019b731005424c75e59fc31beaa60c116"
+    },
+    {
+      "path": "docs/QE_2026-11-13/\u9032\u6357.md",
+      "sha256": "270148557c105aba4e1ddc6ebe084e1ab0a95ca75c7cb282a3e972d9d75b9a3b"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -4664,7 +4688,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "522a58039440c2a7b57ae14d974fbdab4389ee2d39a082517177d1340a27ccd5"
+      "sha256": "11a1f0854a54cdee44735e37eada75f3d3a21ac0fbd9d7e69c00301cf2025548"
     },
     {
       "path": "requirements-dev.txt",
@@ -5436,7 +5460,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "8bd946fe132775ebefe1376554ea00081e10440b4e75ed840eebf459d1b39343"
+      "sha256": "21e4e6678f177d8ff44847f210bf5aab886c753fcf9512b156cf9d82daa00d4d"
     },
     {
       "path": "tooling/conformance_tests/test_final_development_audit.py",
@@ -5576,7 +5600,7 @@
     },
     {
       "path": "tooling/release_gate_check.py",
-      "sha256": "e9a495d94023714b5319de320cdbcf31a543e5faa1bbca4c651f5e19b73e11fe"
+      "sha256": "e695f0084dc18072f2059d34393e6b37a6819a285c704fcf7bf7bc1f846a7949"
     },
     {
       "path": "tooling/release_runtime_assertions.py",
@@ -5700,7 +5724,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "b15fba2a657bcd322e3c4b91f43aab141b6a2213cd361777015d29d9a0b5030b"
+      "sha256": "7105600ad8f57228e6fc2a150ebd92cbbf8a4c3ad8570487c131893e84a24319"
     }
   ]
 }

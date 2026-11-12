@@ -225,12 +225,20 @@
       "status_source": "manual",
       "active": true,
       "classification": "release_blocker",
-      "cause_category": "physical_device_evidence",
+      "cause_category": "platform_evidence",
+      "legacy_cause_category": "physical_device_evidence",
+      "v4_migration": {
+        "source": "D4-QE-SPEC-20261113-V4 S02/S07; D4-QE-ROADMAP-20261113-V4 R07/R10",
+        "legacy_requirement": "物理Android/iOS端末での実測",
+        "current_acceptance": "宣言対象の標準Android Emulator/iOS Simulatorへ同一SourceSHAに由来するinstalled製品候補を導入し、Artifact identity、native安全境界、Task/結果、Lifecycle、回復を対象条件付きで検証する",
+        "status": "pending_standard_os_evidence",
+        "history_preserved": true
+      },
       "release_tracks": ["mobile"],
       "blocks_release": true,
       "blocks_windows_technical_complete": false,
       "reason": "Android実機検証は2026-09-11のowner指示で凍結中。iOSを含む実機のinstall・起動・結合・対話・安全保管・lifecycleの実測は未取得。",
-      "required_action": "Androidはownerの再開指示後に実機検証を行う。凍結を合格とせず、iOSを含む未検証の実機証拠を取得する。"
+      "required_action": "v4で宣言するAndroid ABI/APIとiOS Simulator対象を固定し、同一SourceSHAに結合したinstalled製品相当候補を標準Emulator／Simulatorへ導入する。インストール・初回起動・native Device Link／秘密境界・Broker Task・Lifecycle／停止／復旧と、配布候補identityの対応を実測して証拠化する。物理端末証拠は要求せず、未取得の標準環境証拠がある間はunresolvedを維持する。"
     },
     {
       "name": "rev2_mobile_distribution",
@@ -3544,7 +3552,7 @@
         "artifact_sha256": "90ff1cce5a16d6fe24eee97ea01906a9f9acb1b8c13dc32b196d4018621bffc0",
         "artifact_expires_at": "2026-10-10T08:20:41Z"
       },
-      "required_action": "P13の残る製品機能差分を進める。Workspace選択・対話ID結合、拒否・失効・background停止の最終platform保証はFinal QAで検証する。Android／iOSのCLOSED基本製品経路を証拠強化だけのために再開しない。実機証拠はowner指示に従いAndroid凍結解除後に取得する。in-place Android buildが必要な場合はACL管理者の判断を得る。端末内local_recovery_auditはDesktop AuditEventへ昇格させない。production identityと各platformのrelease evidenceは別途維持する。"
+      "required_action": "v4の標準Android Emulator／iOS Simulatorでinstalled製品からWorkspace選択・対話ID結合、拒否・失効・background停止をBrokerまで検証し、秘密をDart/debug VM/log/artifactへ出さない。端末内local_recovery_auditはDesktop AuditEventへ昇格させない。production identityと各platformのrelease evidenceは別途維持する。物理端末実測はこの受入条件に含めない。"
     }
   ]
 }

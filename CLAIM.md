@@ -1,12 +1,14 @@
 # GUI Shell の主張境界
 
-## 現行の主張と証拠（2026-11-08）
+## v4の現行主張・保証範囲（2026-11-13）
 
-現行製品はD4 Pocketで、Windows／macOS／LinuxのDesktopとAndroid／iOSのMobileを対象とする。Windows-firstは優先順位であり、Linuxを開発用の補助対象へ限定しない。現行の製品要求・工程・状態は[2026-11-08進捗](docs/QE_2026-11-08/進捗.md)、rev5受入れ履歴は[REV5_PRODUCT_PROGRESS.md](docs/REV5_PRODUCT_PROGRESS.md)、QE施工方法は[2026-10-22 QE正本](docs/QE_2026-10-22/採用記録.md)、出荷関門は`release_blockers.registry.json`を参照する。
+現行製品はD4 Pocketで、Windows／macOS／LinuxのDesktopとAndroid／iOSのMobileを必須対象とする。Windows-firstは優先順位であり、Linuxを開発用の補助対象へ限定しない。現行の製品要求・工程・状態は[v4採用記録](docs/QE_2026-11-13/採用記録.md)と[v4進捗](docs/QE_2026-11-13/進捗.md)、rev5受入れ履歴は[REV5_PRODUCT_PROGRESS.md](docs/REV5_PRODUCT_PROGRESS.md)、QE施工方法は[2026-10-22 QE正本](docs/QE_2026-10-22/採用記録.md)、出荷関門は`release_blockers.registry.json`を参照する。v4の標準OS installed製品QAは未成立であり、過去の局所実証をv4候補へ転記しない。非Windows物理端末を要求しない。
+
+## v3時点の製品証拠（履歴、2026-11-08）
 
 Windows B4は2026-10-17のstaged `r2-e2e`・合成APIを使った単一Task経路の範囲でCLOSED、B5はOPEN。Linux run #107はsource `bf2a51ac955eb5b9d7b6ecccdf0a21ee0875b96c`、Ubuntu 24.04／Xvfb・X11の導入済みGTK製品と合成MCP serverに限定したPASSである。前後のOwner拒否／別要求の許可、一回Tool実行、hash主体の結果、Audit、切断を示す。一般Linux環境、Wayland描画、全機能・正式署名／配布の保証へは昇格しない。P13のmacOS／Android／iOSも有限受入れの範囲でCLOSEDであり、物理端末保証・正式配布は別の関門である。
 
-後続Windows run #55はRust試験572成功／0失敗／13除外の一方、capture判定でworkflow FAIL、後続Broker build／IPC smokeはSKIPだった。`FQ-TEST-LOOPBACK`／B5 OPENを保持する。W01/G1のWindows normal Release／Codex CLI限定経路のみ`task_execution=supported`であり、W02/G2はOPEN。`release_ready=false`、正式Q0〜Q7 `DEFERRED`、他Runtime／OSの未成立範囲を維持する。対象commit・環境・結果の対応は[F03実績文書対応](docs/QE_2026-10-22/F03_実績文書対応.md)と[現行進捗](docs/QE_2026-11-08/進捗.md)に記録する。
+後続Windows run #55はRust試験572成功／0失敗／13除外の一方、capture判定でworkflow FAIL、後続Broker build／IPC smokeはSKIPだった。`FQ-TEST-LOOPBACK`／B5 OPENを保持する。W01/G1のWindows normal Release／Codex CLI限定経路のみ`task_execution=supported`であり、W02/G2はOPEN。`release_ready=false`、正式Q0〜Q7 `DEFERRED`、他Runtime／OSの未成立範囲を維持する。対象commit・環境・結果の対応は[F03実績文書対応](docs/QE_2026-10-22/F03_実績文書対応.md)と[v3進捗](docs/QE_2026-11-09/進捗.md)に記録する。この記述はv3当時の履歴である。
 
 以下の旧v1.0／rev2欄は、その時点の実装・検査・範囲・判断を保存した履歴である。「現在」等の語も当時を指し、現行の製品状態や対象OSの除外根拠にはしない。安全・Authority・Approval・Audit・Recovery・Content Exposureと、引き継がれた出荷条件は保持する。
 
@@ -14,9 +16,9 @@ Windows B4は2026-10-17のstaged `r2-e2e`・合成APIを使った単一Task経�
 
 通常production起動からのBroker統治machine-readable Setup Doctor exportは未接続である。過去にcollector注入環境変数で得たproduct-shaped JSONは通常production pathの証拠ではなく、現行Rust起動器はその注入環境変数をFlutter childから除去する。PowerShell collectorもexternal probeに限る。この項目は下記の過去記録に優先し、native Windows product evidenceとともに`release_blocker`を維持する。
 
-## rev2の証拠履歴（2026-09-10）
+## rev2の証拠履歴（2026-09-10、非現行）
 
-以下の旧Desktop v1.0記録は過去の基準面を含む。現行owner rev2ではMobile・端末連携・Android・Apple補助buildも作業対象であり、旧post_v1_scopeを理由に未完了を除外しない。現在の要求別監査は `docs/REV2_PROGRESS.md`、Mobile状態は `MOBILE_STATUS.md` を参照する。
+以下の旧Desktop v1.0記録は過去の基準面を含む。当時のowner rev2ではMobile・端末連携・Android・Apple補助buildも作業対象であり、旧post_v1_scopeを理由に未完了を除外しない扱いだった。当時の要求別監査は `docs/REV2_PROGRESS.md`、Mobile状態は `MOBILE_STATUS.md` に記録されている。
 
 macOS projectは追加済みで、手動補助run 34446194013（commit 27b8713fd1a9ecdb81abe1d4225b99b26bda84ba）でmacOS開発app・iOS Simulator appとMac Rust64単体・5統合がPASSした。「macOS validation environmentがない」という旧記録は、この補助buildの取得前を指す。実機での起動・安全保管・対話は未確認でありrelease_blockerである。実機の製品supportや完成を主張しない。
 
@@ -207,8 +209,8 @@ LLM-readable substrate の定義、範囲を限定した Reference Extension の
 - item: D4 Pocket rev2 MobileのDevice LinkがFlutter禁止境界に未適合
   classification: release_blocker
   registry_id: rev2_mobile_flutter_native_device_link_boundary
-  reason: Dart直接の招待・資格・TLS／安全保管経路は廃止し、Android Kotlin／iOS Swiftのnative handler・OS保管・TLS clientとnative Workspace選択面を実装済み。iOS Simulator buildとnative XCTest 8件は手動run #22でPASSしたが、実機保管・TLS・lifecycleとBroker接続のruntime証拠は未成立。過去Dart経路のPASSは現行適合証拠ではない。
-  required_action: 招待・資格をDart/debug VM/log/artifactへ渡さないplatform-native test harnessでBroker実接続・拒否・失効・background停止を検証する。Android実機凍結・物理端末証拠・正式配布gateは別途維持する。
+  reason: v3時点のiOS Simulator build／native XCTestと過去の接続結果はそのscopeに限る。v4候補の標準Android Emulator／iOS Simulator上のinstalled製品からnative Device Link・Broker接続・Lifecycleまでの統合証拠は未成立。物理端末は現行の受入条件ではない。
+  required_action: v4宣言対象のEmulator／Simulatorへinstalled製品候補を導入し、秘密をDart/debug VM/log/artifactへ出さず、Broker実接続・拒否・失効・background停止とWorkspace識別子の限定開示を検証する。正式配布資格は別blockerとして維持する。
   blocks_release: yes
 ~~~
 

@@ -12,7 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 RELEASE_BLOCKERS_REGISTRY = ROOT / "release_blockers.registry.json"
-CURRENT_ACCEPTANCE_PROGRESS = ROOT / "docs" / "QE_2026-11-09" / "進捗.md"
+CURRENT_ACCEPTANCE_PROGRESS = ROOT / "docs" / "QE_2026-11-13" / "進捗.md"
 REQUIRED_WORK_PHASES = tuple(f"W{index:02d}" for index in range(9))
 REQUIRED_PRODUCT_REQUIREMENTS = tuple(f"N{index:02d}" for index in range(1, 12))
 WINDOWS_EVIDENCE_STATUS_SOURCE = "windows_release_evidence"
@@ -21,7 +21,6 @@ BLOCKER_CAUSE_CATEGORIES = frozenset(
         "technical_blocker",
         "interoperability_evidence",
         "platform_evidence",
-        "physical_device_evidence",
         "distribution_identity",
         "production_secret",
         "owner_decision",
@@ -261,6 +260,21 @@ def registry_errors() -> list[str]:
             errors.append(f"release blocker {name or index}にreasonがない")
         if not isinstance(blocker.get("required_action"), str) or not blocker.get("required_action"):
             errors.append(f"release blocker {name or index}にrequired_actionがない")
+        if name == "rev2_mobile_device_evidence":
+            migration = blocker.get("v4_migration")
+            if blocker.get("cause_category") != "platform_evidence":
+                errors.append("rev2_mobile_device_evidenceはv4のplatform_evidenceへ移行しなければならない")
+            if blocker.get("legacy_cause_category") != "physical_device_evidence":
+                errors.append("rev2_mobile_device_evidenceの旧原因分類履歴が保持されていない")
+            if not isinstance(migration, dict) or migration.get("history_preserved") is not True:
+                errors.append("rev2_mobile_device_evidenceのv4移行記録または旧履歴保持がない")
+            elif not all(
+                token in str(migration.get("current_acceptance", ""))
+                for token in ("Emulator", "Simulator", "installed")
+            ):
+                errors.append("rev2_mobile_device_evidenceの現行受入れが標準installed環境を定義していない")
+            if "物理端末証拠は要求せず" not in str(blocker.get("required_action", "")):
+                errors.append("rev2_mobile_device_evidenceのrequired_actionがv4物理端末非必須条件と不整合")
     return errors
 
 

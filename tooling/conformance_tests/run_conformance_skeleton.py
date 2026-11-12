@@ -3817,6 +3817,22 @@ def test_release_blocker_registry_controls_strict_release() -> list[str]:
         errors.append("Mobile専用blockerがWindows 1.0 release判定へ混入する")
     if not mobile_only.issubset(mobile_release_names):
         errors.append("Mobile専用blockerがMobile release scopeから欠落している")
+    mobile_device_evidence = next(
+        (item for item in blockers if item.get("name") == "rev2_mobile_device_evidence"),
+        {},
+    )
+    mobile_migration = mobile_device_evidence.get("v4_migration", {})
+    if mobile_device_evidence.get("cause_category") != "platform_evidence":
+        errors.append("v4採用後もMobile evidence blockerが物理端末原因のまま")
+    if mobile_device_evidence.get("legacy_cause_category") != "physical_device_evidence":
+        errors.append("Mobile evidence blockerの旧原因分類履歴が消失した")
+    if mobile_migration.get("history_preserved") is not True or not all(
+        token in str(mobile_migration.get("current_acceptance", ""))
+        for token in ("Emulator", "Simulator", "installed")
+    ):
+        errors.append("Mobile evidence blockerが標準OS installed検証へ移行されていない")
+    if "物理端末証拠は要求せず" not in mobile_device_evidence.get("required_action", ""):
+        errors.append("Mobile evidence blockerのcurrent actionが物理端末非必須と整合しない")
     if not {
         "comprehensive_extension_rev1_completion",
         "windows_installer_first_run_smoke",
@@ -3882,7 +3898,7 @@ def test_strict_release_requires_current_n_w_consumer_evidence() -> list[str]:
         no_evidence = complete_ledger.replace("[evidence](evidence.md)", "[evidence](missing.md)", 1)
         if not any("W00" in error and "evidence" in error for error in workplan_acceptance_errors(no_evidence, root, progress_directory)):
             errors.append("存在しないlocal evidenceをstrict releaseが受理した")
-    current_progress = ROOT / "docs" / "QE_2026-11-09" / "進捗.md"
+    current_progress = ROOT / "docs" / "QE_2026-11-13" / "進捗.md"
     if current_progress.is_file():
         current_errors = workplan_acceptance_errors(current_progress.read_text(encoding="utf-8"), ROOT)
         if not any("W02" in error for error in current_errors):
@@ -7507,7 +7523,7 @@ def test_packaging_portability_utf8_governance_allowlist_is_exact() -> list[str]
         )
 
     current_qe_document_errors = portable_path_errors(
-        [ROOT / "docs" / "QE_2026-11-09" / "03_D4Pocket_Codex施工指示書_v3_20261109.md"]
+        [ROOT / "docs" / "QE_2026-11-13" / "03_D4Pocket_Codex施工指示書_v4.md"]
     )
     if current_qe_document_errors:
         errors.append(
