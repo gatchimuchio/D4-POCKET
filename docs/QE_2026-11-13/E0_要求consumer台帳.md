@@ -36,7 +36,7 @@ LedgerのE0-04列は、現ID、旧ID、原文参照、対象、目的、Producer
 
 ### Source SHA・該当ファイル
 
-以下のblob SHAは全てSourceSHA `d503a4ef6daac8942abd1cb011442ce28c78ec55`から取得した。現行main `1d899866431b5a5ddaaab2d83bd172a8f9b5b68d`までの当該file差分は0。
+以下のblob SHAはSourceSHA `d503a4ef6daac8942abd1cb011442ce28c78ec55`から取得した。照合時HEAD `4e3265d41319eacceffd2208ad3afecfa27b2739`時点で当該file差分は0。
 
 | source file | blob SHA |
 |---|---|
@@ -53,8 +53,12 @@ LedgerのE0-04列は、現ID、旧ID、原文参照、対象、目的、Producer
 | `native/rust_helper/src/broker/protocol.rs` | `9b2076d5f31ca6d77f1f87973d1b394aaf751961` |
 | `native/rust_helper/src/broker/dialogue.rs` | `c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999` |
 | `native/rust_helper/src/broker/device_link.rs` | `c2e1ff88ff34a5764b2b4fb1d3f7abd8727e5c51` |
-| N03 | 独立した異種Runtimeを共通Task/Result契約で使用 | Codex Runtime経路は存在。2種類以上の独立実Runtimeが同一契約を通る範囲は未確定。 | `OPEN`。Runtime、版、実行Consumer、失敗・unsupported範囲を確認する |
-| N04 | Compare／Handoff／A2Aの実作用と権限非継承 | Compare/Handoff/A2Aのコード・試験・履歴がある。要求全体に対する接続・LIVE_PRODUCT範囲は未確定。 | `OPEN`。分離Workspace/Session、成果選択、Artifact限定転送、再認可を照合する |
+### N03〜N11 初期差分
+
+| ID | v4要求 | 現行Producer→Consumerの観測 | v4状態／残り |
+|---|---|---|---|
+| N03 | 独立した異種Runtimeを共通Task/Result契約で使用 | Codex CLIはBrokerのAgent Task Adapter。MINIDORAは共通対話AdapterだがAgent Task methodを実装せず、既定unsupported。Desktop登録UIはCodex CLIのみ。 | `OPEN`。二つ目の独立したTask-capable Runtime、能力選択・拒否・結果・権限の製品経路と実Runtime証拠が不足（`BUILD_GAP`）。 |
+| N04 | Compare／Handoff／A2Aの実作用と権限非継承 | Compare/Handoff/A2A source consumerはある。Compare実行時隔離、外部Agent連携、Artifact転送、Host越境は現installed候補の一貫した実証なし。Hostはmetadata registry。 | `OPEN`。source接続と実作用証拠を分離し、Compare/Handoff/A2A/Hostの残件を照合する。 |
 | N05 | Capability CatalogからComposeを経て元Toolを実行 | Compose Contract/Manifest/UI経路がある。旧W00は実Catalog照合・元Tool Consumerを`BUILD_GAP`と記録。 | `OPEN`。現HEADでCatalog→検査→実作用まで再追跡する |
 | N06 | 独立App Exportと選択Moduleの実除去 | Export Manifest、bundle、Module選択処理の履歴がある。独立製品の構成消費・全対象binary/resourceの除去状態は未確定。 | `OPEN`。identity/Broker/Runtime/Installerと実生成物の結合を照合する |
 | N07 | AI Edit proposalを別主体で審査しcontrolled apply/rollback | AI Edit proposal-only経路が存在。Proposal以後の独立検査・認可Apply・Rollbackの統合状態は未確定。 | `OPEN`。自己承認禁止とBroker-controlled applyを追跡する |
@@ -62,6 +66,43 @@ LedgerのE0-04列は、現ID、旧ID、原文参照、対象、目的、Producer
 | N09 | UIから実Task、結果、観測、停止・Recoveryを操作 | Agent Center等の一部Broker投影は存在。結果/Diff/Eval/Resource/Recoveryの全Consumer接続は未確定。 | `OPEN`。通常製品入口から実Broker stateと結果の往復を追跡する |
 | N10 | Windows/macOS/Linux/Android/iOSで通常導入・利用・更新・撤去 | Windows/Linuxのscope限定installed証拠と他OSの個別実装・試験履歴がある。v4標準OS全件のRelease候補証拠は未成立。 | `OPEN`。OS/arch/version/package/実行環境を固定し、未実装package経路を特定する |
 | N11 | 全要求・Source・Consumer・証拠・Blocker・Release判断の結合 | Registry、Conformance、進捗、既存証拠は存在。v4全要求consumer ledgerは本書を含め未完成。 | `OPEN`。全IDをSource/Consumer/否定/Recovery/OS/Evidenceへ結び、18 blockerと同期する |
+
+## N03/N04 現行Source→Consumer追跡（E0差分）
+
+照合Sourceは `d503a4ef6daac8942abd1cb011442ce28c78ec55`。調査開始HEAD `4e3265d41319eacceffd2208ad3afecfa27b2739`時点で、下表の製品source差分は0。`WIRED`はコードの接続状態、`BUILD_GAP`は要求Consumerの不存在または未接続、`FIXTURE`は試験区分であり、installed product受入れを意味しない。
+
+| ID | Producer→Consumer／契約 | 正常作用・source状態 | 否定／停止／Recovery・Authority | OS／試験区分／Evidence／残余 |
+|---|---|---|---|---|
+| N03 | `main.rs`の`--codex-runtime`／`--minidora-runtime`→`ipc_server.rs`が各実装をBrokerへ登録→`dialogue.rs`の共通`実行系Adapter`→`protocol.rs`の`AgentTask実行`→選択Adapter。CodexはCLI Taskを実装。MINIDORAは`/health`、`/api/capabilities`、`/api/chat`、`/api/trace/{id}`を用いる対話Adapter。 | Codex CLI→Broker Agent Taskはsource上`WIRED`。MINIDORAは同じ対話契約へ接続するが、Agent Taskは実装していない。traitの既定は`AgentTask実行対応=false`かつ`AgentTask非対応`を返し、MINIDORAのimplにTask overrideはない。ゆえに二つ目のTask Runtimeは`BUILD_GAP`で、2系統のCODE_PRESENTを2種の実Taskと数えない。 | BrokerはAgent Task要求時に現在AdapterのTask capabilityを検査し、未対応を拒否する。MINIDORAの未実装能力がmetadataで昇格しない。MINIDORA対話はloopback限定、期限・取消・HTTP status/header/body長・JSON/trace結合不正を拒否する。Permission/ApprovalはBrokerが所有。 | Rust fixtureはMINIDORAの対話境界とCodex Adapterを対象にするが、本作業で未実行。W01/G1はWindows normal ReleaseのCodex CLI限定証拠で、MINIDORAのTask証拠ではない。N03/W03/G3は`OPEN`。`--minidora-runtime`はBroker起動引数で、Desktop Runtime Centerは一覧/資源/lifecycle表示、Agent Centerの登録入口はCodex CLIのみ。MINIDORAのGUI登録・Task-capable導入経路、二つ目のRuntimeの実Task/失敗/Authority evidence、Provider/Capability差の製品表示、五OSの標準packageは未成立。Mobile Runtime Task consumerも未確認。 |
+| N04-Compare | Agent Centerのactive Session選択→独立Workspace検査→同じTask本文で2件の`AgentTaskClient.inspect`→各SessionのPermission/Approval確認→`startAgentComparisonTasks`が2つのBroker Task要求を並列開始。状態/結果はTask IDごとに別々に照会。完了結果を選択し、比較A/Bと別の第三Session/Workspaceへ未信頼結果を封入した新規Taskを事前検査する。 | UI/Coordinator/Broker要求はsource上`WIRED`。Workspace/Session IDの独立性検査、各Taskの別認可、片側開始例外の他側への非伝播、selected resultのhash/Task bindingがある。選択結果のApplyは直接Workspaceへ書かず、独立した適用先Agent Taskとして再評価する。 | 片側の開始・結果照会失敗は他側へ伝播させず、曖昧な開始結果は再送しない。Session別cancel gateを使用。選択・Apply時はsource Task/result/target stateの変化を再照合。結果本文は未信頼データ。画面もTask test主張を未検証、Task固有資源値をunknownと表示する。ただし投影上のID/Workspace相違は実filesystem隔離のLIVE証拠ではない。 | `agent_coordination_test.dart`、Agent Center widget、Coordinatorの試験は`FIXTURE`／Widget。過去の同一Runtime Compare source試験履歴はinstalled隔離証拠にしない。v4 W03/G3は`OPEN`。installed同一候補での同時実行、cross-agent contamination、失敗/取消分離、selected result適用/Auditの一気通貫Evidenceは未確認。 |
+| N04-Handoff | 完了済みsource Taskの承認済みfull result→`AgentHandoffPackage`（task context/result/artifact/changed files/diff/test resultをbounded化）→別Runtime/Session/Workspace向け新規AgentTask request→Broker preflight→通常Permission/Approval後のTask consumer。外部A2A選択済みArtifactも別のhandoff packageとして新Task preflightへ送る。 | Internal HandoffとA2A Artifactのpackage/preflight sourceは`WIRED`。source/targetのSession・Workspace分離、approved result/hash束縛、変更検知、Artifact本文の未信頼明示、Permission/Approval/Credential/Trust/hidden stateを含めない契約がある。preflight自体はTask実行を行わず、受信Taskで再認可する。 | source/target/result変化、未完了結果、hash/size/path/schema不正を拒否。HandoffはAuthorityを移送しない。A2A Artifactはcompleted Taskから明示選択されたtext-only bounded Artifactに限定。A2A側の未確定外部作用はunknown/suspendedとし、再送しない。 | `agent_handoff_test.dart`、`a2a_artifact_handoff_test.dart`、Agent Center Widgetは`FIXTURE`。v3線Bではfake Broker/widgetとlocal fixture範囲を記録、実外部Agent・installed Handoff/A2A Artifact消費は未成立。N04/W03/G3=`OPEN`（[v3線B履歴](../QE_2026-11-09/進捗.md)）。 |
+| N04-A2A/Host | Desktop A2A UI→`A2aConnectionClient`→Broker operation→`a2a_center.rs`→`a2a.rs`のAgent Card/SendMessage/SendStreamingMessage/GetTask・選択Artifact network call。Host CenterはHost登録/一覧/表示切替のmetadata registry。 | Rust BrokerにA2A network consumerがある。Agent Card登録はnative Owner確認とAuditを通る。SendMessage/Stream/GetTaskは各要求のnative Owner確認・現在endpoint/payload結合one-shot Permission・Audit後に作用する。A2A metadataはTrust/Authorityを生成しない。Host code自身はremote接続、Permission、Approval、Credential、Task権限を生成しない。 | Message/Stream/GetTaskの曖昧な非冪等結果はunknownとして停止し再送しない。外部本文/Artifactは未信頼入力。macOSは現AGENTS規則によりIPv4 loopback Agent Card/metadata限定で、Message/Task/Artifact/Stream作用を有効化しない。 | Windows/LinuxのRust network sourceは存在するが、実外部Agentが同一installed candidateでCard→作用→Artifact→受信Task→Auditまで通る証拠は未成立。macOSはmetadata-only、Mobile consumerは未確認。既存A2A Rust loopback／Flutter fake Broker/widgetは`FIXTURE`。Host越境TaskはConsumerがなく`BUILD_GAP`。W03/G3=`OPEN`。本単位ではRuntime testを実行していない。 |
+
+### N03/N04 Source SHA・該当ファイル
+
+以下のblob SHAは全て同じSourceSHA `d503a4ef6daac8942abd1cb011442ce28c78ec55`から取得。照合時HEAD `4e3265d41319eacceffd2208ad3afecfa27b2739`時点で当該file差分は0。既存test pathはfixture/Widget区分の確認用であり、本作業では実行していない。
+
+| source file | blob SHA |
+|---|---|
+| `native/rust_helper/src/main.rs` | `b0a5df285db357172e7970074d7a67189f3384a3` |
+| `native/rust_helper/src/adapters/mod.rs` | `06c540a59437b903b3f045b5aafb3790c21103bd` |
+| `native/rust_helper/src/adapters/codex_cli.rs` | `e5c9d1581ae9a1c0a3ae7fcfa626fdca6fea6d28` |
+| `native/rust_helper/src/adapters/minidora.rs` | `31c756ac7c9a264d73ed0e9654dbae599be83921` |
+| `native/rust_helper/src/broker/ipc_server.rs` | `58a404b920ef5905e174668ec2de0e04a9e8b044` |
+| `native/rust_helper/src/broker/dialogue.rs` | `c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999` |
+| `native/rust_helper/src/broker/protocol.rs` | `9b2076d5f31ca6d77f1f87973d1b394aaf751961` |
+| `native/rust_helper/src/a2a.rs` | `9d7c6d9ab938ad5178d6ca46b3933dc3e61c6061` |
+| `native/rust_helper/src/broker/a2a_center.rs` | `73ad601abd64a33ccefde4b73ab5f9dc4f728504` |
+| `native/rust_helper/src/broker/host_center.rs` | `c27707faa61e5270b1c6d79e3ee3c5fe6ccd0bf8` |
+| `apps/desktop_flutter/lib/screens/runtime_center.dart` | `d2c7af172073d2b10c76a6416b90f011f10e95db` |
+| `apps/desktop_flutter/lib/screens/agent_center.dart` | `2472faeb31a64d624423c30a0a30d0f153d2e2a3` |
+| `apps/desktop_flutter/lib/services/agent_coordination.dart` | `bdc13464f0e42b740a2bca3b7e8828a5019056d0` |
+| `packages/agent_orchestration/lib/agent_comparison_coordinator.dart` | `6b5deaacb500a23e6bfdc37649d61ebc0d885127` |
+| `apps/desktop_flutter/lib/services/agent_handoff.dart` | `a85110d96cbade732ae0e1bfea2529f03f37523c` |
+| `apps/desktop_flutter/lib/services/a2a_connection_client.dart` | `19335054afe35bc06597629d92ca2e635ce50069` |
+| `apps/desktop_flutter/lib/services/a2a_artifact_handoff.dart` | `e7e2f3454e2843f1d4f4e7b5aedfa55014cde05c` |
+
+関連test source: `native/rust_helper/src/adapters/minidora.rs`、`native/rust_helper/src/broker/dialogue.rs`、`native/rust_helper/src/broker/a2a_center.rs`、`native/rust_helper/src/broker/protocol.rs`のRust test、`apps/desktop_flutter/test/agent_coordination_test.dart`、`agent_handoff_test.dart`、`a2a_connection_center_test.dart`、`a2a_artifact_handoff_test.dart`。これらはE0 source mappingで確認した既存対象で、今回のRuntime/installed acceptance結果ではない。
 
 ## 実装ファイルの初期目録（CODE_PRESENTのみ）
 
