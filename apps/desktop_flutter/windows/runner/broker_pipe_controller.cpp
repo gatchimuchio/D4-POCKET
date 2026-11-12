@@ -19,6 +19,7 @@ constexpr size_t kMaxResponseBytes = 4 * 1024 * 1024;
 constexpr size_t kMaxConcurrentRequests = 4;
 constexpr DWORD kDefaultPipeTimeoutMs = 5000;
 constexpr DWORD kOwnerConfirmationPipeTimeoutMs = 310000;
+constexpr DWORD kA2aOwnerConfirmationPipeTimeoutMs = 320000;
 constexpr wchar_t kPipePrefix[] = L"\\\\.\\pipe\\D4PocketBroker-";
 // UTF-8 operation values mirrored from broker_client.dart.
 constexpr const char* kOwnerConfirmationOperationValues[] = {
@@ -30,6 +31,7 @@ constexpr const char* kOwnerConfirmationOperationValues[] = {
     "\x41\x32\x41\xE6\x8E\xA5\xE7\xB6\x9A",
     "\x41\x32\x41\xE3\x83\xA1\xE3\x83\x83\xE3\x82\xBB\xE3\x83\xBC\xE3\x82\xB8\xE9\x80\x81\xE4\xBF\xA1",
     "\x41\x32\x41\xE3\x82\xBF\xE3\x82\xB9\xE3\x82\xAF\xE7\x8A\xB6\xE6\x85\x8B\xE5\x8F\x96\xE5\xBE\x97",
+    "\x41\x32\x41\xE3\x82\xB9\xE3\x83\x88\xE3\x83\xAA\xE3\x83\xBC\xE3\x83\xA0\xE9\x80\x81\xE4\xBF\xA1",
     "\x4D\x43\x50\xE6\x8E\xA5\xE7\xB6\x9A",
     "\x4D\x43\x50\xE5\x88\x87\xE6\x96\xAD",
     "\x4D\x43\x50\x20\x54\x6F\x6F\x6C\xE5\xAE\x9F\xE8\xA1\x8C",
@@ -53,15 +55,31 @@ constexpr const char* kOwnerConfirmationOperationValues[] = {
     "\x41\x67\x65\x6E\x74\x43\x4C\x49\xE5\xAE\x9F\xE8\xA1\x8C\xE7\xB3\xBB\xE4\xBD\x9C\xE6\xA5\xAD\xE9\xA0\x98\xE5\x9F\x9F\xE7\x99\xBB\xE9\x8C\xB2",
 };
 
-bool RequiresOwnerConfirmationPipeTimeout(const std::string& request) {
+constexpr const char* kA2aOwnerConfirmationOperationValues[] = {
+    "\x41\x32\x41\xE6\x8E\xA5\xE7\xB6\x9A",
+    "\x41\x32\x41\xE3\x83\xA1\xE3\x83\x83\xE3\x82\xBB\xE3\x83\xBC\xE3\x82\xB8\xE9\x80\x81\xE4\xBF\xA1",
+    "\x41\x32\x41\xE3\x82\xBF\xE3\x82\xB9\xE3\x82\xAF\xE7\x8A\xB6\xE6\x85\x8B\xE5\x8F\x96\xE5\xBE\x97",
+    "\x41\x32\x41\xE3\x82\xB9\xE3\x83\x88\xE3\x83\xAA\xE3\x83\xBC\xE3\x83\xA0\xE9\x80\x81\xE4\xBF\xA1",
+};
+
+bool HasOperation(const std::string& request, const char* operation) {
   const auto operation_key = request.find("\"operation\":");
   if (operation_key == std::string::npos) return false;
   const size_t operation_value = operation_key + sizeof("\"operation\":") - 1;
+  const std::string encoded_value = std::string("\"") + operation + "\"";
+  return request.compare(operation_value, encoded_value.size(), encoded_value) == 0;
+}
+
+bool RequiresOwnerConfirmationPipeTimeout(const std::string& request) {
   for (const char* operation : kOwnerConfirmationOperationValues) {
-    const std::string encoded_value = std::string("\"") + operation + "\"";
-    if (request.compare(operation_value, encoded_value.size(), encoded_value) == 0) {
-      return true;
-    }
+    if (HasOperation(request, operation)) return true;
+  }
+  return false;
+}
+
+bool RequiresA2aOwnerConfirmationPipeTimeout(const std::string& request) {
+  for (const char* operation : kA2aOwnerConfirmationOperationValues) {
+    if (HasOperation(request, operation)) return true;
   }
   return false;
 }
@@ -191,9 +209,10 @@ bool IsRetryablePipeAvailabilityError(DWORD error) {
 PipeResult Exchange(const std::wstring& pipe_name, const std::string& request) {
   // This only classifies the transport timeout; Rust retains all authority decisions.
   const bool owner_confirmation = RequiresOwnerConfirmationPipeTimeout(request);
-  const DWORD timeout_ms = owner_confirmation
-                               ? kOwnerConfirmationPipeTimeoutMs
-                               : kDefaultPipeTimeoutMs;
+  const DWORD timeout_ms = RequiresA2aOwnerConfirmationPipeTimeout(request)
+                               ? kA2aOwnerConfirmationPipeTimeoutMs
+                               : owner_confirmation ? kOwnerConfirmationPipeTimeoutMs
+                                                    : kDefaultPipeTimeoutMs;
   const auto deadline = std::chrono::steady_clock::now() +
                         std::chrono::milliseconds(timeout_ms);
   if (!IsValidPipeName(pipe_name) || request.empty() || request.size() > kMaxRequestBytes) {

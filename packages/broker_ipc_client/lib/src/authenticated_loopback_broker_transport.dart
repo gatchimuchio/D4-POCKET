@@ -29,6 +29,7 @@ const _nativeConfirmationOperations = <String>{
   'A2A接続',
   'A2Aメッセージ送信',
   'A2Aタスク状態取得',
+  'A2Aストリーム送信',
   'MCP接続',
   'MCP切断',
   'MCP Tool実行',
@@ -132,8 +133,8 @@ class AuthenticatedLoopbackBrokerTransport implements BrokerTransport {
     BrokerOperationTimeout? timeoutForOperation,
     this.connectTimeout = const Duration(seconds: 3),
     this.maxResponseBytes = _maximumResponseBytes,
-  }) : _endpoint = endpoint,
-       _timeoutForOperation = timeoutForOperation ?? _defaultRequestTimeout {
+  })  : _endpoint = endpoint,
+        _timeoutForOperation = timeoutForOperation ?? _defaultRequestTimeout {
     if (connectTimeout <= Duration.zero ||
         maxResponseBytes < 64 ||
         maxResponseBytes > _maximumResponseBytes) {
@@ -244,18 +245,19 @@ class AuthenticatedLoopbackBrokerTransport implements BrokerTransport {
 }
 
 Duration _defaultRequestTimeout(String operation) => switch (operation) {
-  'MCP接続' || 'MCP切断' || 'MCP Tool実行' => const Duration(seconds: 305),
-  'AgentTaskWorkspacePermissionGrant' ||
-  'AgentTaskOwnerApprovalGrant' ||
-  'AgentTask結果表示承認' ||
-  '作業領域承認' ||
-  '作業領域失効' ||
-  '作業領域基準点保存' ||
-  '作業領域全体基準点保存' => const Duration(seconds: 305),
-  '資格情報登録' => const Duration(seconds: 610),
-  '更新候補取得' => const Duration(seconds: 40),
-  _ => const Duration(seconds: 5),
-};
+      'MCP接続' || 'MCP切断' || 'MCP Tool実行' => const Duration(seconds: 305),
+      'AgentTaskWorkspacePermissionGrant' ||
+      'AgentTaskOwnerApprovalGrant' ||
+      'AgentTask結果表示承認' ||
+      '作業領域承認' ||
+      '作業領域失効' ||
+      '作業領域基準点保存' ||
+      '作業領域全体基準点保存' =>
+        const Duration(seconds: 305),
+      '資格情報登録' => const Duration(seconds: 610),
+      '更新候補取得' => const Duration(seconds: 40),
+      _ => const Duration(seconds: 5),
+    };
 
 Future<List<int>> _readResponseLine(
   Socket socket,

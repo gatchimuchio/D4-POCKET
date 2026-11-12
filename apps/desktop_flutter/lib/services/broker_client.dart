@@ -20,6 +20,7 @@ const _nativeOwnerConfirmationOperations = <String>{
   'A2A接続',
   'A2Aメッセージ送信',
   'A2Aタスク状態取得',
+  'A2Aストリーム送信',
   'MCP接続',
   'MCP切断',
   'MCP Tool実行',
@@ -46,27 +47,42 @@ const _nativeOwnerConfirmationOperations = <String>{
 Duration brokerRequestTimeoutForOperation(String operation) =>
     operation == '更新候補取得'
         ? const Duration(seconds: 40)
-        : (defaultTargetPlatform == TargetPlatform.macOS ||
+        : (defaultTargetPlatform == TargetPlatform.windows ||
                     defaultTargetPlatform == TargetPlatform.linux) &&
-                operation == 'Host登録'
-            ? const Duration(seconds: 305)
-            : defaultTargetPlatform == TargetPlatform.macOS &&
-                    {'MCP接続', 'MCP切断', 'MCP Tool実行'}.contains(operation)
-                ? const Duration(seconds: 335)
+                const {
+                  'A2A接続',
+                  'A2Aメッセージ送信',
+                  'A2Aタスク状態取得',
+                  'A2Aストリーム送信',
+                }.contains(operation)
+            ? const Duration(seconds: 325)
+            : (defaultTargetPlatform == TargetPlatform.macOS ||
+                        defaultTargetPlatform == TargetPlatform.linux) &&
+                    operation == 'Host登録'
+                ? const Duration(seconds: 305)
                 : defaultTargetPlatform == TargetPlatform.macOS &&
-                        {'A2A接続', 'A2Aメッセージ送信'}.contains(operation)
-                    ? const Duration(seconds: 315)
-                    : operation == '資格情報登録'
-                        ? const Duration(seconds: 610)
-                        : (operation == '作業領域OS選択' ||
-                                operation == 'AgentCLI実行fileOS選択')
-                            ? const Duration(seconds: 305)
-                            : operation == 'AgentCLI実行系作業領域登録'
-                                ? const Duration(seconds: 320)
-                                : _nativeOwnerConfirmationOperations
-                                        .contains(operation)
+                        {'MCP接続', 'MCP切断', 'MCP Tool実行'}.contains(operation)
+                    ? const Duration(seconds: 335)
+                    : defaultTargetPlatform == TargetPlatform.macOS &&
+                            {'A2A接続', 'A2Aメッセージ送信'}.contains(operation)
+                        ? const Duration(seconds: 315)
+                        : defaultTargetPlatform == TargetPlatform.macOS &&
+                                {
+                                  'A2Aタスク状態取得',
+                                  'A2Aストリーム送信',
+                                }.contains(operation)
+                            ? const Duration(seconds: 5)
+                            : operation == '資格情報登録'
+                                ? const Duration(seconds: 610)
+                                : (operation == '作業領域OS選択' ||
+                                        operation == 'AgentCLI実行fileOS選択')
                                     ? const Duration(seconds: 305)
-                                    : const Duration(seconds: 5);
+                                    : operation == 'AgentCLI実行系作業領域登録'
+                                        ? const Duration(seconds: 320)
+                                        : _nativeOwnerConfirmationOperations
+                                                .contains(operation)
+                                            ? const Duration(seconds: 305)
+                                            : const Duration(seconds: 5);
 
 class BrokerClient implements BrokerTransport {
   BrokerClient._(this._channel);

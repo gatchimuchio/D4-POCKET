@@ -9804,6 +9804,7 @@ def test_agent_task_owner_confirmation_wait_uses_native_operation_timeout() -> l
         "A2A接続",
         "A2Aメッセージ送信",
         "A2Aタスク状態取得",
+        "A2Aストリーム送信",
         "MCP接続",
         "MCP切断",
         "MCP Tool実行",
@@ -9826,6 +9827,12 @@ def test_agent_task_owner_confirmation_wait_uses_native_operation_timeout() -> l
         "アダプター隔離",
         "アダプター削除",
     )
+    a2a_owner_operations = (
+        "A2A接続",
+        "A2Aメッセージ送信",
+        "A2Aタスク状態取得",
+        "A2Aストリーム送信",
+    )
     owner_set_match = re.search(
         r"const _nativeOwnerConfirmationOperations = <String>\{(.*?)\};",
         broker_client,
@@ -9837,6 +9844,22 @@ def test_agent_task_owner_confirmation_wait_uses_native_operation_timeout() -> l
         client_operations = re.findall(r"'([^']+)'", owner_set_match.group(1))
         if set(client_operations) != set(owner_operations):
             errors.append("FlutterとWindows Runnerのnative Owner確認operation集合が一致しない")
+    a2a_timeout_match = re.search(
+        r"constexpr const char\* kA2aOwnerConfirmationOperationValues\[\] = \{(.*?)\};",
+        runner,
+        re.DOTALL,
+    )
+    if a2a_timeout_match is None:
+        errors.append("Windows RunnerのA2A長時間native確認operation集合がない")
+    else:
+        for operation in a2a_owner_operations:
+            encoded_operation = "".join(
+                f"\\x{byte:02X}" for byte in operation.encode("utf-8")
+            )
+            if encoded_operation not in a2a_timeout_match.group(1):
+                errors.append(
+                    f"Windows RunnerのA2A長時間timeout集合からoperationが欠落: {operation}"
+                )
     for operation in owner_operations:
         if operation not in broker_client:
             errors.append(f"Agent Task native Owner確認operationをDesktop待機対象に含めない: {operation}")
@@ -9849,6 +9872,8 @@ def test_agent_task_owner_confirmation_wait_uses_native_operation_timeout() -> l
         errors.append("Desktop Broker要求のnative Owner確認待ちと通常待ちを区別しない")
     if (
         "RequiresOwnerConfirmationPipeTimeout(request)" not in runner
+        or "RequiresA2aOwnerConfirmationPipeTimeout(request)" not in runner
+        or "kA2aOwnerConfirmationPipeTimeoutMs = 320000" not in runner
         or 'request.find("\\\"operation\\\":")' not in runner
         or "request.compare(operation_value" not in runner
     ):

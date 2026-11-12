@@ -10,16 +10,39 @@ import 'package:gui_shell_desktop/services/broker_client.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('Mac A2AはOwner確認と既存HTTP取得の有限待機だけを共有する', () {
+  test('A2A native要求はOwner確認・HTTP応答・Runner待機の合算期限を待つ', () {
     debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
     expect(brokerRequestTimeoutForOperation('A2A接続'),
         const Duration(seconds: 315));
+    expect(brokerRequestTimeoutForOperation('A2Aメッセージ送信'),
+        const Duration(seconds: 315));
+    expect(brokerRequestTimeoutForOperation('A2Aタスク状態取得'),
+        const Duration(seconds: 5));
+    expect(brokerRequestTimeoutForOperation('A2Aストリーム送信'),
+        const Duration(seconds: 5));
     expect(brokerRequestTimeoutForOperation('A2A接続一覧'),
         const Duration(seconds: 5));
     debugDefaultTargetPlatformOverride = TargetPlatform.windows;
-    expect(brokerRequestTimeoutForOperation('A2A接続'),
-        const Duration(seconds: 305));
+    for (final operation in [
+      'A2A接続',
+      'A2Aメッセージ送信',
+      'A2Aタスク状態取得',
+      'A2Aストリーム送信',
+    ]) {
+      expect(brokerRequestTimeoutForOperation(operation),
+          const Duration(seconds: 325));
+    }
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    for (final operation in [
+      'A2A接続',
+      'A2Aメッセージ送信',
+      'A2Aタスク状態取得',
+      'A2Aストリーム送信',
+    ]) {
+      expect(brokerRequestTimeoutForOperation(operation),
+          const Duration(seconds: 325));
+    }
   });
 
   test('更新カタログ取得はBrokerの外部取得期限を待ち、他操作は短い既定期限を保つ', () {
