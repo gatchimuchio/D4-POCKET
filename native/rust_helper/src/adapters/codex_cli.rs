@@ -667,8 +667,9 @@ fn report_r2_e2e_cli_failure(
     exit_code: Option<i32>,
     stdout: &[u8],
     stderr: &[u8],
+    mcp_enabled: bool,
 ) {
-    let summary = loopback_test_safe_failure_summary(exit_code, stdout, stderr);
+    let summary = loopback_test_safe_failure_summary(exit_code, stdout, stderr, mcp_enabled);
     send_r2_e2e_diagnostic(test_api, json!({"kind": "cli_failure", "summary": summary}));
 }
 
@@ -1435,7 +1436,9 @@ fn build_codex_command_with_model_and_task_tool(
             .env("https_proxy", &proxy)
             .env("all_proxy", &proxy)
             .env("no_proxy", "127.0.0.1,localhost")
-            .env("RUST_LOG", "warn");
+            // Capture only the MCP stdio launcher and helper's fixed diagnostic markers.
+            // The failure summary below reduces stderr to allowlisted classes/booleans.
+            .env("RUST_LOG", "warn,rmcp_client::stdio_server_launcher=info");
     }
     if matches!(sandbox, CodexSandbox::WorkspaceWrite) {
         // 作用先はBrokerがTask単位で予約したscratchだけ。ここでは認可しない。
@@ -1692,11 +1695,11 @@ fn run_agent_task(
         #[cfg(any(test, feature = "r2-e2e"))]
         if let Some(test_api) = test_responses_api {
             #[cfg(feature = "r2-e2e")]
-            report_r2_e2e_cli_failure(test_api, status.code(), &stdout, &_stderr);
+            report_r2_e2e_cli_failure(test_api, status.code(), &stdout, &_stderr, mcp_enabled);
             #[cfg(test)]
             eprintln!(
                 "D4P_R2_E2E_AGENT_TASK_CLI_FAILURE {}",
-                loopback_test_safe_failure_summary(status.code(), &stdout, &_stderr)
+                loopback_test_safe_failure_summary(status.code(), &stdout, &_stderr, mcp_enabled)
             );
         }
         return Err(対話失敗::通信失敗);
@@ -1705,11 +1708,11 @@ fn run_agent_task(
     #[cfg(any(test, feature = "r2-e2e"))]
     if let (Some(test_api), Err(_)) = (test_responses_api, &parsed) {
         #[cfg(feature = "r2-e2e")]
-        report_r2_e2e_cli_failure(test_api, status.code(), &stdout, &_stderr);
+        report_r2_e2e_cli_failure(test_api, status.code(), &stdout, &_stderr, mcp_enabled);
         #[cfg(test)]
         eprintln!(
             "D4P_R2_E2E_AGENT_TASK_CLI_FAILURE {}",
-            loopback_test_safe_failure_summary(status.code(), &stdout, &_stderr)
+            loopback_test_safe_failure_summary(status.code(), &stdout, &_stderr, mcp_enabled)
         );
     }
     let (message, _, proposal) = parsed?;
@@ -1724,6 +1727,7 @@ fn loopback_test_safe_failure_summary(
     exit_code: Option<i32>,
     stdout: &[u8],
     stderr: &[u8],
+    mcp_enabled: bool,
 ) -> String {
     let events = stdout
         .split(|byte| *byte == b'\n')
@@ -1742,13 +1746,37 @@ fn loopback_test_safe_failure_summary(
         .collect::<Vec<_>>();
     let (stdout_error_class, stdout_http_status) = summarize_loopback_test_stdout_error(&events);
     let stderr_class = classify_loopback_test_stderr(stderr);
+    let mcp_stdio_started =
+        loopback_test_stderr_has_marker(stderr, b"d4p_r2_e2e_mcp_stdio_event=started");
+    let mcp_stdio_initialized =
+        loopback_test_stderr_has_marker(stderr, b"d4p_r2_e2e_mcp_stdio_event=initialize");
+    let mcp_stdio_tools_list =
+        loopback_test_stderr_has_marker(stderr, b"d4p_r2_e2e_mcp_stdio_event=tools_list");
+    let mcp_stdio_tools_call =
+        loopback_test_stderr_has_marker(stderr, b"d4p_r2_e2e_mcp_stdio_event=tools_call");
+    let mcp_spawn_failure = [
+        b"failed to spawn mcp server".as_slice(),
+        b"failed to start mcp server".as_slice(),
+        b"could not spawn mcp server".as_slice(),
+        b"could not start mcp server".as_slice(),
+    ]
+    .iter()
+    .any(|marker| loopback_test_stderr_has_marker(stderr, marker));
     format!(
-        "exit_code={exit_code:?}; stdout_event_types={event_types:?}; stdout_error_class={stdout_error_class}; stdout_http_status={}; stderr_class={stderr_class}; stderr_bytes={}",
+        "exit_code={exit_code:?}; stdout_event_types={event_types:?}; stdout_error_class={stdout_error_class}; stdout_http_status={}; stderr_class={stderr_class}; stderr_bytes={}; mcp_task_tool_enabled={mcp_enabled}; mcp_stdio_started={mcp_stdio_started}; mcp_stdio_initialized={mcp_stdio_initialized}; mcp_stdio_tools_list={mcp_stdio_tools_list}; mcp_stdio_tools_call={mcp_stdio_tools_call}; mcp_spawn_failure={mcp_spawn_failure}",
         stdout_http_status
             .map(|status| status.to_string())
             .unwrap_or_else(|| "none".to_owned()),
         stderr.len()
     )
+}
+
+#[cfg(any(test, feature = "r2-e2e"))]
+fn loopback_test_stderr_has_marker(stderr: &[u8], marker: &[u8]) -> bool {
+    !marker.is_empty()
+        && stderr
+            .windows(marker.len())
+            .any(|window| window.eq_ignore_ascii_case(marker))
 }
 
 #[cfg(any(test, feature = "r2-e2e"))]
@@ -2114,23 +2142,51 @@ mod tests {
     fn loopback失敗診断は本文と生エラーを出さず分類だけを示す() {
         let stdout = br#"{"type":"error","message":"PRIVATE_TASK_AND_SECRET","code":"unknown_sensitive_code"}
 {"type":"provider.internal-private-event"}"#;
-        let stderr = b"invalid TOML at PRIVATE_LOCAL_PATH api_key=PRIVATE_SECRET";
-        let summary = loopback_test_safe_failure_summary(Some(2), stdout, stderr);
+        let stderr = b"invalid TOML at PRIVATE_LOCAL_PATH api_key=PRIVATE_SECRET; D4P_R2_E2E_MCP_STDIO_EVENT=started; D4P_R2_E2E_MCP_STDIO_EVENT=initialize";
+        let summary = loopback_test_safe_failure_summary(Some(2), stdout, stderr, true);
 
         assert!(summary.contains("exit_code=Some(2)"));
         assert!(summary.contains("stdout_event_types=[\"error\", \"other\"]"));
         assert!(summary.contains("stdout_error_class=other; stdout_http_status=none"));
         assert!(summary.contains("stderr_class=configuration"));
+        assert!(summary.contains("mcp_task_tool_enabled=true"));
+        assert!(summary.contains("mcp_stdio_started=true"));
+        assert!(summary.contains("mcp_stdio_initialized=true"));
+        assert!(summary.contains("mcp_stdio_tools_list=false"));
+        assert!(summary.contains("mcp_stdio_tools_call=false"));
+        assert!(summary.contains("mcp_spawn_failure=false"));
         assert!(!summary.contains("PRIVATE_TASK_AND_SECRET"));
         assert!(!summary.contains("unknown_sensitive_code"));
         assert!(!summary.contains("PRIVATE_LOCAL_PATH"));
         assert!(!summary.contains("PRIVATE_SECRET"));
+
+        let tools_list = loopback_test_safe_failure_summary(
+            Some(1),
+            stdout,
+            b"D4P_R2_E2E_MCP_STDIO_EVENT=started; D4P_R2_E2E_MCP_STDIO_EVENT=initialize; D4P_R2_E2E_MCP_STDIO_EVENT=tools_list; D4P_R2_E2E_MCP_STDIO_EVENT=tools_call",
+            true,
+        );
+        assert!(tools_list.contains("mcp_stdio_started=true"));
+        assert!(tools_list.contains("mcp_stdio_initialized=true"));
+        assert!(tools_list.contains("mcp_stdio_tools_list=true"));
+        assert!(tools_list.contains("mcp_stdio_tools_call=true"));
+        assert!(!tools_list.contains("PRIVATE_TASK_AND_SECRET"));
+
+        let spawn_failure = loopback_test_safe_failure_summary(
+            Some(1),
+            stdout,
+            b"could not start MCP server at PRIVATE_PATH api_key=PRIVATE_SECRET",
+            true,
+        );
+        assert!(spawn_failure.contains("mcp_spawn_failure=true"));
+        assert!(!spawn_failure.contains("PRIVATE_PATH"));
+        assert!(!spawn_failure.contains("PRIVATE_SECRET"));
     }
 
     #[test]
     fn loopback失敗診断は許可分類とHTTP状態だけを抽出する() {
         let stdout = br#"{"type":"turn.failed","error":{"type":"api_error","code":"model_not_found","status_code":404,"message":"private model name and credential"}}"#;
-        let summary = loopback_test_safe_failure_summary(Some(1), stdout, b"");
+        let summary = loopback_test_safe_failure_summary(Some(1), stdout, b"", false);
 
         assert!(summary.contains("stdout_error_class=model_unavailable; stdout_http_status=404"));
         assert!(!summary.contains("private model name"));
@@ -2138,7 +2194,7 @@ mod tests {
         assert!(!summary.contains("model_not_found"));
 
         let missing_key = br#"{"type":"error","message":"Required environment variable OPENAI_API_KEY is missing; PRIVATE_DETAIL"}"#;
-        let summary = loopback_test_safe_failure_summary(Some(1), missing_key, b"");
+        let summary = loopback_test_safe_failure_summary(Some(1), missing_key, b"", false);
         assert!(summary.contains("stdout_error_class=authentication"));
         assert!(!summary.contains("OPENAI_API_KEY"));
         assert!(!summary.contains("PRIVATE_DETAIL"));

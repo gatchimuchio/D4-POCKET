@@ -4012,14 +4012,29 @@ def _normalize_r2_e2e_diagnostic(payload: object) -> dict[str, object] | None:
         r'invalid_request|timeout|transport|service_error|other); '
         r'stdout_http_status=(none|[45]\d\d); '
         r'stderr_class=(empty|sandbox_setup|authentication|configuration|permission|'
-        r'transport|missing_dependency|other); stderr_bytes=(\d+)',
+        r'transport|missing_dependency|other); stderr_bytes=(\d+); '
+        r'mcp_task_tool_enabled=(true|false); mcp_stdio_started=(true|false); '
+        r'mcp_stdio_initialized=(true|false); mcp_stdio_tools_list=(true|false); '
+        r'mcp_stdio_tools_call=(true|false); '
+        r'mcp_spawn_failure=(true|false)',
         summary,
     )
     if match is None:
         return None
-    exit_code, event_json, stdout_error_class, http_status, stderr_class, stderr_bytes = (
-        match.groups()
-    )
+    (
+        exit_code,
+        event_json,
+        stdout_error_class,
+        http_status,
+        stderr_class,
+        stderr_bytes,
+        mcp_task_tool_enabled,
+        mcp_stdio_started,
+        mcp_stdio_initialized,
+        mcp_stdio_tools_list,
+        mcp_stdio_tools_call,
+        mcp_spawn_failure,
+    ) = match.groups()
     try:
         event_types = json.loads(event_json)
         byte_count = int(stderr_bytes)
@@ -4035,6 +4050,12 @@ def _normalize_r2_e2e_diagnostic(payload: object) -> dict[str, object] | None:
         "stdout_http_status": None if http_status == "none" else int(http_status),
         "stderr_class": stderr_class,
         "stderr_bytes": byte_count,
+        "mcp_task_tool_enabled": mcp_task_tool_enabled == "true",
+        "mcp_stdio_started": mcp_stdio_started == "true",
+        "mcp_stdio_initialized": mcp_stdio_initialized == "true",
+        "mcp_stdio_tools_list": mcp_stdio_tools_list == "true",
+        "mcp_stdio_tools_call": mcp_stdio_tools_call == "true",
+        "mcp_spawn_failure": mcp_spawn_failure == "true",
     }
 
 
@@ -5432,8 +5453,26 @@ def _normalize_stored_r2_e2e_diagnostic(payload: object) -> dict[str, object] | 
             "stdout_http_status",
             "stderr_class",
             "stderr_bytes",
+            "mcp_task_tool_enabled",
+            "mcp_stdio_started",
+            "mcp_stdio_initialized",
+            "mcp_stdio_tools_list",
+            "mcp_stdio_tools_call",
+            "mcp_spawn_failure",
         }
         if set(payload) != expected:
+            return None
+        if any(
+            type(payload.get(field)) is not bool
+            for field in (
+                "mcp_task_tool_enabled",
+                "mcp_stdio_started",
+                "mcp_stdio_initialized",
+                "mcp_stdio_tools_list",
+                "mcp_stdio_tools_call",
+                "mcp_spawn_failure",
+            )
+        ):
             return None
         event_types = payload.get("stdout_event_types")
         if not isinstance(event_types, list) or len(event_types) > 32:
@@ -5445,7 +5484,13 @@ def _normalize_stored_r2_e2e_diagnostic(payload: object) -> dict[str, object] | 
             f"stdout_error_class={payload.get('stdout_error_class')}; "
             f"stdout_http_status={status if status is not None else 'none'}; "
             f"stderr_class={payload.get('stderr_class')}; "
-            f"stderr_bytes={payload.get('stderr_bytes')}"
+            f"stderr_bytes={payload.get('stderr_bytes')}; "
+            f"mcp_task_tool_enabled={str(payload.get('mcp_task_tool_enabled')).lower()}; "
+            f"mcp_stdio_started={str(payload.get('mcp_stdio_started')).lower()}; "
+            f"mcp_stdio_initialized={str(payload.get('mcp_stdio_initialized')).lower()}; "
+            f"mcp_stdio_tools_list={str(payload.get('mcp_stdio_tools_list')).lower()}; "
+            f"mcp_stdio_tools_call={str(payload.get('mcp_stdio_tools_call')).lower()}; "
+            f"mcp_spawn_failure={str(payload.get('mcp_spawn_failure')).lower()}"
         )
         return _normalize_r2_e2e_diagnostic(
             {"kind": "cli_failure", "summary": summary}
