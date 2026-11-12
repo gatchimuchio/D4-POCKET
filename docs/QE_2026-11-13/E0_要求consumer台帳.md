@@ -806,8 +806,70 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 
 #### Phase/K crosswalkの判定
 
-旧Phase 0〜45の46 ID、K01〜K20の20 IDを、現v4 N01〜N11・R03 A〜J・正本Consumerへ対応付けた。旧C番号との対応は履歴範囲として保持し、P0〜P13は別のv4 S05 direct mappingに従う。Source SHA/TestClassは参照N節、Phase/K固有Evidence IDはNONE、個別の完全E0-04行は未充足のものをUNKNOWNとして残す。ここでのmappingは範囲・Consumer参照の整備だけであり、N/K/Phase Acceptance、E3 BUILD_COVERED、全OS QC/QAをCLOSEDにしない。N11 Evidence ID・Blocker・全OS artifact/standard guaranteesとの行単位結合、BUF/B/Q/FQ/W/QE/AUD全数照合は次工程に残る。
+旧Phase 0〜45の46 ID、K01〜K20の20 IDを、現v4 N01〜N11・R03 A〜J・正本Consumerへ対応付けた。旧C番号との対応は履歴範囲として保持し、P0〜P13は別のv4 S05 direct mappingに従う。Source SHA/TestClassは参照N節、Phase/K固有Evidence IDはNONE、個別の完全E0-04行は未充足のものをUNKNOWNとして残す。ここでのmappingは範囲・Consumer参照の整備だけであり、N/K/Phase Acceptance、E3 BUILD_COVERED、全OS QC/QAをCLOSEDにしない。N11 Evidence ID・Blocker・全OS artifact/standard guaranteesとの行単位結合、BUF-R/Tの個別E0-04欄、B0〜B6、Q/FQ/W/QE/AUD全数照合は次工程に残る。
 
+
+## v4対応：BUF-R01〜R09／BUF-T01〜T24 Source→Consumer crosswalk
+
+要求原文はv4仕様S06（採用原本SHA-256 8CEEDF21F881A783E35EE8642673FAAEEF949465343DF65E63DC21B04EE5A3EF）および緩衝基盤実装仕様書§2.1/§8.3（current git blob 2d0e98fb0b58ceec65244fde6a8fbf8e27c49b7e、SHA-256 A354E8493EE3A86DD480FCEF256FD9BDB569631B5735B3155FAC41EA77E38473）に固定する。以下は要求ID全33件の固有目的・現Consumer・状態境界を明示する。実装fileごとの現行blob SHAはN08/N10/N11各SHA表、過去自己適用evidenceはdocs/緩衝基盤_rev5補遺_QC/B5_自己適用.mdと採用記録を参照する。
+
+### E0-04共通field値と適用範囲
+
+| E0-04 field | このcrosswalkで共通に使う値 |
+|---|---|
+| 対象／目的 | 独立したOS・Toolchain・API・Filesystem・process・証拠境界間の干渉。元の要求・成功条件を保った実行可能な調停、または安全に不成立を確定する。 |
+| Producer→Consumer | 失敗を生む上位要求／実行環境／Tool→D4 Buffer観測・判定→既存Rust Broker/Adapter/隔離runner→元Toolの作用・結果→Task/Audit/RecoveryまたはN11 Evidence/Gate。項目ごとの具体Consumerは下表。 |
+| 契約／正常・否定作用 | 適用可能なTask-bound非権限 buffer_intervention_record v2／source、Runtime、Workspace、結果・証拠hash。適格なら記録済み調停後に元Toolを実行し、結果を独立照合。不明・unsupported・Authority不足・意味不一致・証拠不一致時は変換/成功判定を拒否し、現Brokerのdeny/fail-closedを維持。Rust生成recordのruntime Schema validation・独立readbackは未確認。 |
+| 停止／Recovery | Broker Task failure/suspend、既存Audit・Task scratch journal/recoveryへ接続する範囲はN08を参照。開発用isolated runner cleanupは製品Task recoveryと別。Buffer record単体はAuthority/Permission/Approvalを生成せず、Recovery成功の証拠にもならない。項目別OS保証はUNKNOWNを許す。 |
+| 標準OS候補／配布物 | Windows/macOS/Linux native/Android/iOSをv4対象とする。候補・未確定version/arch/GUI/security/resource/package/update/removalはN10表を参照。一般配布物の受入れは未成立で値はUNKNOWN。WSL/Xvfb/fixtureをLinux native受入れに使わない。 |
+| 既存実装／E0-05 | REWIREとして記録できるのはCodex CLI TaskのWorkspaceTaskScratch、TEMP/TMP binding、Broker journal/Audit、限定隔離Cargo/Flutter runner。9要求・24試験全体の自動吸収は存在しない。個別根因ごとのREUSE_EXACT/REWIRE/REIMPLEMENT/REMOVE_CONFIRMED_NONREQUIREMENT/UNKNOWN確定はB0/B3全数対応待ちでUNKNOWN。 |
+| SourceSHA／TestClass／Evidence ID | 原要求SHAは本節冒頭。現source SHAとUNIT/FIXTURE/CONFORMANCE/限定LIVE_RUNTIMEの分類は各N source tableおよびB5履歴に限定。今回のcrosswalkでは製品Evidence IDを発行しない（NONE）。未列挙field/file/hashはUNKNOWN。今回の製品Runtime試験はNOT_RUN。 |
+| Blocker／状態／残余 | 現在のE0/N08/N10/N11をOPENのまま保持。該当する既存FQ-TEST-LOOPBACK等のIDだけを参照し、新規Release blockerは作成しない。各行の残余は下表を適用。 |
+
+### BUF-R01〜R09（要求意味→現Consumer）
+
+| ID／原要求 | 現Consumer・作用主体 | 現在の実装／証拠区分 | v4 status／BUILD_GAP・残余 |
+|---|---|---|---|
+| BUF-R01 全ボトルネックと欠測を取得可能範囲付きで全件追跡 | 履歴/Actions/source→B0原因台帳・不足証拠一覧→E0/N11要求・Evidence registry | B0台帳に履歴と欠測範囲はある。取得可能な全失敗・構想・原因の横断統合は未完。DOC/HISTORY。 | OPEN。B0の限定CLOSEDを全母集団完了へ広げない。全cause inventoryとsource provenanceが残る。 |
+| BUF-R02 報告ではなく成立可能な下位操作を緩衝層が実際に行う | OS/Toolchain差→Buffer→Broker許可Tool→元Tool結果 | N08のCodex Task scratch/TEMP bindingは限定作用。診断/Buffer recordだけでは実調停でなく、汎用実作用はBUILD_GAP。 | OPEN。原因別の有効変換・隔離・再構成、元Tool実行・結果実測が未成立。 |
+| BUF-R03 新しい言語・OS・依存・外部Toolにも責任モデルを適用 | Runtime/OS別Adapter→同一Broker/Buffer contract→該当Tool | N08はCodex CLI、dev runnersはCargo/Flutterの限定経路。全OS/言語/Toolの汎用実Consumerは未接続。 | OPEN。error-code一覧化を汎用性と見なさず、OS別実装/配布/standard environmentが未完。 |
+| BUF-R04 要求・結果・権限・成功条件の意味と同等性を保持 | intervention pre/post observation→元Tool result/独立照合→Task finalization | buffer_intervention_record v2とfixtureはある。after hashは予定値生成の場合があり、Schema runtime validation・独立readback/意味比較は未確認。 | OPEN。同等性が証明されない変換を適用しない。元目的・実結果を結ぶ実作用比較が未成立。 |
+| BUF-R05 Broker Authority/Permission/Approval/Audit/Recovery/Content Exposure/Host/Workspaceを維持 | Buffer request→既存Rust Brokerの既存Task認可・scope・Audit・Recovery | Codex scratch observationはBroker照合/Audit/hash-only projectionに接続。全介入pathのBroker強制・全OS統合は未確認。 | OPEN。Buffer自身はauthorityを持たず、現在の許可なし・Audit不能は拒否。 |
+| BUF-R06 同原因の調査反復・人手介入を減らすが障害を隠さない | error/cause registry→再利用可能な介入選択→Tool result・failure report | B0記録と限定isolated runnersあり。反復/人手工数の前後測定や、一般的cause-reuse consumerは見つからない。 | OPEN。失敗隠蔽・false PASS・retryだけのroot-cause closureを禁止。削減効果未測定。 |
+| BUF-R07 D4Pocket自身の実開発・検査へ自己適用 | D4 source/build/test task→isolated Cargo/Flutter runner→same-source artifact/result/cleanup | run_cargo_isolated.py、IsolatedFlutterWorkspace、B5のWindows局所記録あり。別条件・複数環境・全開発consumerは未接続。 | OPEN。B5自己適用の局所結果を保持、全体の同条件因果比較・副作用/別境界転移は未完。 |
+| BUF-R08 要求から設計・実装・検査・是正・配布まで品質責任を連続させる | v4 E0〜E6 / A〜J BUILD→QE_QC→QE_QA→Release Review | AGENTS/v4工程/進捗/台帳がprocess consumer。文書整合は製品QC/QAではない。 | OPEN。局所施工QCと全体統合QC/標準OS QA/Owner Release decisionを分離し、Q0〜Q7を勝手に開始しない。 |
+| BUF-R09 品質不適合を要求・設計・境界・検査方法まで根因へ戻す | 失敗/evidence→B0 cause row→B1 design→implementation/test correction→matched observation | B0/B1/B5 cause/evidence docs and local test harnesses. Cause update is record-driven; no generic product feedback consumer. | OPEN。根因未確定をUNKNOWNのまま保持し、下流移転・反証・同条件再観測を行う。 |
+
+### BUF-T01〜T24（試験要求→現試験Consumer）
+
+| ID／要求する検査 | test producer→actual/intended Consumer | 現証拠・TestClass | v4 status／残余・欠損 |
+|---|---|---|---|
+| BUF-T01 観測母集団全数・未取得履歴・重複原因 | history/action/source inventory→B0 cause ledger/E0 ID registry | B0 source records; DOC/HISTORY, current full population test NOT_RUN | OPEN。取得可能範囲/欠測/duplicate-cause linkageの網羅未判定。 |
+| BUF-T02 version/ABI/dependency graph conflict・lockfile非改変 | Cargo/Flutter/API dependency input→isolated build/test & lock validation | Cargo isolated runner and tooling tests exist; UNIT/FIXTURE, this unit NOT_RUN | OPEN。矛盾時の実隔離/拒否・元Tool resultは全OSで未証明。 |
+| BUF-T03 API/Schema roundtrip and mismatch rejection | schema/record producer→schema checker/Conformance plus runtime consumer | Schema valid/invalid fixtures and static Conformance exist; runtime record validation absent in N08 trace | OPEN。runtime roundtrip/equivalence and no-op on mismatch not demonstrated. |
+| BUF-T04 OneDrive/Flutter failure reproduction, safe isolation, source identity | Flutter source→validate_all.py/IsolatedFlutterWorkspace→build/test output | B5 historical same-source/path observations; UNIT/FIXTURE and limited LIVE_RUNTIME. OneDrive SyncEngine final result/source-cause unknown. | OPEN/partial history. No current candidate same-command causal comparison or SyncEngine proof. |
+| BUF-T05 loopback/TLS intermittent failure by initial condition; retry PASS is not cause closure | Rust fixture client/server + probe→Pktmon parser/workflow summary and failure ledger | B5 captured RST locally and hosted run #55 parser failed to decode expected tuple; test/log records are limited LIVE_RUNTIME/FIXTURE. | OPEN; existing FQ-TEST-LOOPBACK preserved. Origin/direction/common cause remain UNKNOWN; same probe/source is not repeated absent discriminating conditions. |
+| BUF-T06 Smart App Control/OS signature rejection without bypass | OS policy/Cargo generated binary→normal isolated runner/Code Integrity observation | B5 non-admin Windows cargo check --all-targets local PASS; CiTool inventory denied; Apple signing/sandbox not inspected. LIVE_RUNTIME limited. | OPEN/partial. Do not relax OS protection. Other OS/package/signature path unverified. |
+| BUF-T07 Workspace/Host root, secret, alias, hardlink, TOCTOU escape rejection | root/path input→Broker Workspace/Host binding and scratch capability checks | N08 Rust tests and installed Linux test source include security/recovery cases; UNIT/FIXTURE/SOURCE only here. | OPEN. No current all-OS installed mediation boundary test; new product test NOT_RUN. |
+| BUF-T08 Permission/Approval/Audit/Credential absent must deny | authorization/credential state→Rust Broker request/Task/tool operation | Existing Broker denial/secret tests in N08 source list; UNIT/FIXTURE, no run in this mapping. | OPEN. Buffer cannot grant authority; current installed full path and all OS still unverified. |
+| BUF-T09 crash/cancel/deadline/descendants/scratch cleanup | Task/process event→Broker process supervisor, WorkspaceTaskScratch journal and Recovery | Rust Codex/agent scratch/process tests and Linux installed smoke source exist; source/tests not executed here. | OPEN. Keep OS-specific guarantee scoped; no cross-OS product completion claimed. |
+| BUF-T10 Task/parallel Task/Host state, authority, cache isolation | Task/Host identity→task-bound scratch/environment/cache and Broker | Codex CLI task-isolation Rust test source and N08 consumer; UNIT/FIXTURE source only. | OPEN. Installed parallel multi-Host noncontamination remains unproved. |
+| BUF-T11 cache/lock/partial/corrupt state isolate and recover | cache/lock/artifact state→Cargo/Flutter isolation or package-update recovery consumer | Cargo/Flutter runner implementation; specific universal Buffer test/evidence identity UNKNOWN. | OPEN. Separate legitimate shared cache from per-task output; corrupt/partial rollback and cross-project effects unverified. |
+| BUF-T12 abnormal Tool exit/log not hidden/meaning-changing repair rejected | original Tool exit/output→Codex adapter→Broker Dialogue/terminal result | Codex adapter and Dialogue tests, UNIT/FIXTURE source; B5 historical test runs are version-scoped. | OPEN. End-to-end meaning retention after real failure not tested in this work unit. |
+| BUF-T13 build/test versus installed product and OS evidence class separation | test/build artifacts→N11 Manifest/Evidence Bundle/Release Gate | Existing manifest/evidence validators; B5 limited Windows/Android historical evidence. | OPEN. Current crosswalk emits no product evidence; candidate/OS identity joining incomplete. |
+| BUF-T14 export/install/update/rollback artifact hash and identity binding | artifact producer→Exporter/Installer/Updater/rollback and N10/N11 evidence consumers | N06/N10/N11 sources in canonical SHA tables; no complete one-candidate lifecycle in this mapping. | OPEN. Artifact/source/runtime identity not yet joined across each distribution path. |
+| BUF-T15 before/after intervention comparison, transfer, regression/performance cost | matched source/input/Host/Toolchain→before/after action/result/state/resource comparison | B5 includes limited path cleanup comparison; resource/long-run Q4 conditions remain deferred/not run. | OPEN/partial history. No general matched acceptance and downstream/overhead measure. |
+| BUF-T16 D4 source/Toolchain pin and self-application | main source/locked toolchain→isolated D4 dev/test runner and result | B5 has several target-commit/fingerprint/toolchain-scoped entries; not all current paths. | OPEN. This unit ran documentation checks only; source self-application is not complete. |
+| BUF-T17 missing Adapter/unknown cause/OS denial must stop safely | capability/environment/error input→Broker capability check/deny and observable failure | Broker unsupported/deny tests and N08 code source, UNIT/FIXTURE references only. | OPEN. Unknown cause remains unresolved; no silent fallback or success inference. |
+| BUF-T18 Q1–Q6 integration and Q0 candidate freeze | versioned result→FINAL_QA_QUEUE/Q0–Q7/Release Gate | Q0–Q7 are DEFERRED; strict final candidate evidence not run. | OPEN/deferred by current stage. Do not begin formal Q stages from this crosswalk. |
+| BUF-T19 requirement→design→source→product action→measured result traceability | source requirement→E0 ledger/N11 evidence identity/gate | This table adds only scope/consumer links; Manifest/Conformance check document integrity, not product effect. | OPEN. End-to-end evidence ID/source/artifact/runtime/result link remains incomplete. |
+| BUF-T20 contrary/unknown observations update causal model and intervention | failed observation→B0/B1 cause hypothesis→design/test correction | B0 cause ledger and B1 design QC docs; causal updates exist for selected historical events, not full population. | OPEN. Root cause and selected interventions remain unknown/unvalidated for many rows. |
+| BUF-T21 pre-change observation→correction→post-change measurement→local acceptance | BUILD_BATCH process→source/tests/progress ledger and return path | AGENTS/v4 progress/process rules; current unit is document mapping only. | OPEN. Does not establish product behavior or close a software implementation task. |
+| BUF-T22 matched conditions; retry/location/assertion changes not causal proof | before/after condition fingerprints→B5 observation comparison | B5 partial matched records and explicit unclosed cases; UNIT/LIVE_RUNTIME historical scope. | OPEN/partial. Avoid claim from retry, path change, or relaxed oracle alone. |
+| BUF-T23 no transfer to other boundary, resource, authority, operation burden | Buffer output→next process/product consumer + resource/cleanup/failure observations | B5 T23 has one bounded local PASS about Flutter snapshots/shared Pub cache; long-run/multiproject/Q4 remains outstanding. | Current v4 OPEN; preserve old B5 local PASS only in its exact scope. General transfer and resource effects unverified. |
+| BUF-T24 bind historical QC/Q0/Q1 and new candidate evidence to version | old records+commit/hash→N11 versioned evidence/Manifest/Registry | Old evidence hash identities retained in source histories; this mapping issued no evidence ID and Q0 remains deferred. | OPEN. No old PASS/FAIL may be attached to a new candidate. |
+
+この33行はID別scope/Consumer/既存証拠境界の照合であり、BUF-R/T Acceptance、B0〜B6判定、E0完了を意味しない。N08限定source、開発runner、fixture、文書/Registry consumerを製品Bufferの一般保証と数えない。BUF-R/T各IDの残る個別E0-04欄（対象/目的/Producer/Consumer/契約/作用/否定/Recovery/OS/配布/実装分類/SourceSHA/TestClass/Evidence/Blocker/状態/残余）の確定はN08/N10/N11のCanonical source rowsへ結合し、未知はUNKNOWNのままとする。今回のB0〜B6進捗状態は変更しない。
 
 ## 実装ファイルの初期目録（CODE_PRESENTのみ）
 
@@ -835,7 +897,7 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのSource→Consumer crosswalkを記録。個々の全E0-04列とv4 Acceptance／Evidence/N11結合は継続 |
 | D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDをv4 N01〜N11/A〜J/Kへcrosswalk済み。Phase固有E0-04全field、Evidence ID/Blocker、Acceptanceは未完 |
 | 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K別の完全E0-04 field、OS/Evidence/Blocker確認は継続 |
-| Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 元要求と現在の各実Consumer・副作用証拠の対応が未完 |
+| Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 33 IDのscope/Consumer/現証拠境界をcrosswalk。個別完全E0-04欄・全根因/effect/evidenceは未完 |
 | Buffer工程 B0〜B6 | 7 | `docs/緩衝基盤_rev5補遺_QC/`・v4仕様S06 | B0〜B4の限定CLOSEDを保持、B5 OPEN、B6未成立。詳細Consumer照合が未完 |
 | QE/監査 D4-QE-R01〜R13／D4-LNX-T01〜T08／D4-AUD-F01〜F07 | 13／8／7 | `docs/QE_2026-10-22/`・各採用記録 | 旧証拠と現在の実装/Validatorへの接続が未完 |
 | Q0〜Q7、FQ群、W00〜W08 | 8／13／9 | v4工程表R05〜R08、`docs/FINAL_QA_QUEUE.md`、進捗履歴 | Q0〜Q7はDEFERRED。FQ/W各IDの現在Consumer・証拠・残余の照合が未完 |
@@ -877,7 +939,7 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 ## 次のE0照合作業
 
 1. N/P/C/Phase/Kの各要求行へ完全なE0-04 field、N11 Evidence ID、Blocker、OS対象/Artifactを結合する。既存CLOSED/FAILは履歴保持し、再試験しない。
-2. BUF-R01〜R09、BUF-T01〜T24、B0〜B6を現Registry・Contract・Validator・実Consumer・副作用Evidenceへ照合する。
+2. BUF-R/T crosswalkをCanonical N08/N10/N11 source SHA・各IDの完全E0-04 field・B5 evidenceへ結合する。続けてB0〜B6の工程・状態・受入Consumer・証拠を照合する。
 3. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 4. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
 5. N10の各OS標準候補・配布・実装・workflow/test・限定履歴を記録する。保証version/arch/resource/package条件は公式条件と実測から固定し、未知をUNKNOWNにする。
