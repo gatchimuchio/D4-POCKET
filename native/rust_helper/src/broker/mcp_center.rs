@@ -1011,6 +1011,28 @@ pub(super) fn call_tool(
         arguments_hash: arguments_hash.clone(),
         consumed: false,
     };
+    if let (Some(task_id), Some(result_hash)) = (
+        request.source_agent_task_id.as_deref(),
+        request.source_agent_result_hash.as_deref(),
+    ) {
+        if let Err(code) = broker.validate_agent_mcp_tool_proposal(
+            task_id,
+            result_hash,
+            &request.server_id,
+            &request.tool_id,
+            &request.name,
+            &request.arguments,
+        ) {
+            return broker.reject_with_payload_hash(
+                request_id,
+                OP_TOOL_CALL,
+                code,
+                "Agentの保存済みTask結果とMCP Tool要求が一致しない、期限切れ、または再利用済み",
+                true,
+                payload_hash,
+            );
+        }
+    }
     let approval_event = match broker.append_audit(
         request_id,
         OP_TOOL_CALL,
@@ -1042,37 +1064,6 @@ pub(super) fn call_tool(
             payload_hash,
         );
     }
-    let source_audit = match (
-        request.source_agent_task_id.as_deref(),
-        request.source_agent_result_hash.as_deref(),
-    ) {
-        (Some(task_id), Some(result_hash)) => {
-            format!(" source_task_id={task_id} source_task_result_hash={result_hash}")
-        }
-        _ => String::new(),
-    };
-    if broker
-        .append_audit(
-            request_id,
-            OP_TOOL_CALL,
-            "started",
-            &format!(
-                "Capability=mcp.tool.call Permission={} consumed=true Approval={} RecoveryAction=inspect-mcp-tool-side-effect; MCP tools/callを同一接続へ一度だけ送信{}{}",
-                permission.id, approval_event.event_id, source_audit, composition_audit
-            ),
-            EVIDENCE_SOURCE_INTERNAL_STATE,
-            payload_hash,
-        )
-        .is_err()
-    {
-        return broker.audit_store_failed_response(
-            request_id,
-            OP_TOOL_CALL,
-            "mcp_audit_append_failed",
-            "MCP Tool実行開始Auditを確定できないため送信しない",
-        );
-    }
-
     let agent_provenance = match (
         request.source_agent_task_id.as_deref(),
         request.source_agent_result_hash.as_deref(),
@@ -1109,6 +1100,37 @@ pub(super) fn call_tool(
             "Brokerが照合したAgent Task結果hashと要求sourceが一致しないため実行しない",
             true,
             payload_hash,
+        );
+    }
+
+    let source_audit = match (
+        request.source_agent_task_id.as_deref(),
+        request.source_agent_result_hash.as_deref(),
+    ) {
+        (Some(task_id), Some(result_hash)) => {
+            format!(" source_task_id={task_id} source_task_result_hash={result_hash}")
+        }
+        _ => String::new(),
+    };
+    if broker
+        .append_audit(
+            request_id,
+            OP_TOOL_CALL,
+            "started",
+            &format!(
+                "Capability=mcp.tool.call Permission={} consumed=true Approval={} RecoveryAction=inspect-mcp-tool-side-effect; MCP tools/callを同一接続へ一度だけ送信{}{}",
+                permission.id, approval_event.event_id, source_audit, composition_audit
+            ),
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
+        )
+        .is_err()
+    {
+        return broker.audit_store_failed_response(
+            request_id,
+            OP_TOOL_CALL,
+            "mcp_audit_append_failed",
+            "MCP Tool実行開始Auditを確定できないため送信しない",
         );
     }
 
@@ -2090,6 +2112,50 @@ if errorlevel 1 exit /b 45
             !calls_path.exists(),
             "Tool不在／引数不正では外部MCP childへ一度も送信しない"
         );
+        let invalid_source_request_id = format!("p6-mcp-native-{}", broker.audit_events().len());
+        let invalid_source = broker_test_native_owner_operation(
+            &mut broker,
+            BrokerOperation::MCPTool実行,
+            json!({
+                "版": 1,
+                "操作": "実行",
+                "ServerID": SERVER,
+                "ToolID": tool_id,
+                "名前": "echo",
+                "arguments": {"text": "must not reach an MCP tool without a source Task"},
+                "source_agent_task_id": "missing-agent-task",
+                "source_agent_result_hash": crate::audit_hash::sha256_tagged(
+                    b"unavailable source task result"
+                ),
+            }),
+        );
+        assert_eq!(invalid_source.status, BrokerStatus::Rejected);
+        assert_eq!(
+            invalid_source
+                .error
+                .as_ref()
+                .map(|error| error.code.as_str()),
+            Some("source_task_unavailable")
+        );
+        let invalid_source_events = broker
+            .audit_events()
+            .iter()
+            .filter(|event| event.request_id == invalid_source_request_id)
+            .collect::<Vec<_>>();
+        assert!(invalid_source_events
+            .iter()
+            .any(|event| event.decision == "rejected"));
+        assert!(
+            !invalid_source_events
+                .iter()
+                .any(|event| event.decision == "approved" || event.decision == "started"),
+            "Brokerがsource Taskの保存結果を照合する前に承認・実行開始を記録しない"
+        );
+        assert!(
+            !calls_path.exists(),
+            "存在しないsource Taskを結合した要求を外部MCP childへ送信しない"
+        );
+
         let call = broker_test_native_owner_operation(
             &mut broker,
             BrokerOperation::MCPTool実行,

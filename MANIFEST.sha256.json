@@ -1444,7 +1444,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "92c2e410eced95c97e8050159ec28389fb03532a84ed2f7bbedf848636ff1b77"
+      "sha256": "ddacbe00bc8b71474687dac01e24430519d28b68cad7cfe4ac6d9151a775e722"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -3856,7 +3856,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/dialogue.rs",
-      "sha256": "e72982c2ad84b1767f0d506e20e4b0b0a164a62561097edfbe0cd73e3e0a5768"
+      "sha256": "13ceb43b6bd0268b3dce2066ef230767fa66ce170c76d09db90279589d6d802b"
     },
     {
       "path": "native/rust_helper/src/broker/evaluation_control.rs",
@@ -3896,7 +3896,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/mcp_center.rs",
-      "sha256": "55d6bc09ddd841447bbb7af593462303f835fb136a7225eb50f7a51390866c3f"
+      "sha256": "05190173a565bf50e4abae568da92353006f4ef48cb8536ac60235ad54f3a34b"
     },
     {
       "path": "native/rust_helper/src/broker/mod.rs",
@@ -3920,7 +3920,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "972a7f31b897c8bc50e103e574b8216643562e4a51d63e0680e91b25d2654a88"
+      "sha256": "3df80607ab1a8d512e8c653db1f5f99f216c096ff3db1575658f01a16568ba46"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",

@@ -1436,7 +1436,7 @@ impl 対話制御 {
         self.実行系.remove(実行系ID);
     }
 
-    pub(crate) fn consume_agent_mcp_tool_proposal(
+    pub(crate) fn validate_agent_mcp_tool_proposal(
         &mut self,
         task_id: &str,
         result_hash: &str,
@@ -1448,7 +1448,7 @@ impl 対話制御 {
         self.AgentTask結果本文回収();
         let task = self
             .agent_tasks
-            .get_mut(task_id)
+            .get(task_id)
             .ok_or("source_task_unavailable")?;
         if task.status != "completed"
             || task.result_hash.as_deref() != Some(result_hash)
@@ -1472,13 +1472,37 @@ impl 対話制御 {
         {
             return Err("agent_tool_proposal_mismatch");
         }
-        task.mcp_tool_request_consumed = true;
         Ok(AgentTaskToolProvenance {
             runtime_id: task.runtime_id.clone(),
             session_id: task.session_id.clone(),
             workspace_id: task.workspace_id.clone(),
             result_hash: result_hash.to_owned(),
         })
+    }
+
+    pub(crate) fn consume_agent_mcp_tool_proposal(
+        &mut self,
+        task_id: &str,
+        result_hash: &str,
+        server_id: &str,
+        tool_id: &str,
+        name: &str,
+        arguments: &Value,
+    ) -> Result<AgentTaskToolProvenance, &'static str> {
+        let provenance = self.validate_agent_mcp_tool_proposal(
+            task_id,
+            result_hash,
+            server_id,
+            tool_id,
+            name,
+            arguments,
+        )?;
+        let task = self
+            .agent_tasks
+            .get_mut(task_id)
+            .ok_or("source_task_unavailable")?;
+        task.mcp_tool_request_consumed = true;
+        Ok(provenance)
     }
 
     pub fn 操作(
@@ -4284,7 +4308,7 @@ mod tests {
         task.mcp_capability_snapshot_hash = Some(sha256_tagged(b"capability-snapshot"));
 
         assert!(matches!(
-            control.consume_agent_mcp_tool_proposal(
+            control.validate_agent_mcp_tool_proposal(
                 &task_id,
                 &result_hash,
                 "mcp-server-a",
@@ -4296,7 +4320,21 @@ mod tests {
         ));
         assert!(
             !control.agent_tasks[&task_id].mcp_tool_request_consumed,
-            "引数不一致では一回消費を確定しない"
+            "引数不一致の事前検証では一回消費を確定しない"
+        );
+        control
+            .validate_agent_mcp_tool_proposal(
+                &task_id,
+                &result_hash,
+                "mcp-server-a",
+                &tool_id,
+                "lookup",
+                &arguments,
+            )
+            .expect("有効な提案を消費前に事前検証");
+        assert!(
+            !control.agent_tasks[&task_id].mcp_tool_request_consumed,
+            "事前検証だけでは提案を消費しない"
         );
 
         let provenance = control

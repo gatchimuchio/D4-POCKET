@@ -5069,6 +5069,25 @@ impl Broker {
         self.shutdown_requested
     }
 
+    pub(super) fn validate_agent_mcp_tool_proposal(
+        &mut self,
+        task_id: &str,
+        result_hash: &str,
+        server_id: &str,
+        tool_id: &str,
+        name: &str,
+        arguments: &Value,
+    ) -> Result<super::dialogue::AgentTaskToolProvenance, &'static str> {
+        self.対話.validate_agent_mcp_tool_proposal(
+            task_id,
+            result_hash,
+            server_id,
+            tool_id,
+            name,
+            arguments,
+        )
+    }
+
     pub(super) fn consume_agent_mcp_tool_proposal(
         &mut self,
         task_id: &str,
