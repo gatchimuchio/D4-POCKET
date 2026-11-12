@@ -32,6 +32,7 @@ import 'screens/trust_center.dart';
 import 'services/runtime_resource_client.dart';
 import 'services/runtime_lifecycle_client.dart';
 import 'services/a2a_connection_client.dart' show A2aTaskQueryResult;
+import 'services/ai_edit_client.dart' show AiEditProposalReview;
 import 'services/agent_task_execution_coordinator.dart';
 import 'services/evaluation_client.dart';
 import 'services/global_search_index.dart';
@@ -255,7 +256,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
   int _mcpCenterFocusRequest = 0;
   int _composeCenterFocusRequest = 0;
   int _exportCenterFocusRequest = 0;
-  String? _pendingAiEditTaskInstruction;
+  AiEditProposalReview? _pendingAiEditProposal;
   A2aTaskQueryResult? _pendingA2aArtifactHandoff;
   _ShellViewMode viewMode = _ShellViewMode.ownerUse;
   _ShellNavigationGroup navigationGroup = _ShellNavigationGroup.all;
@@ -436,9 +437,9 @@ class _ShellHomePageState extends State<ShellHomePage> {
         client: widget.client,
         active: selectedIndex == 5,
         taskExecutionCoordinator: _agentTaskExecutionCoordinator,
-        developerEditTaskInstruction: _pendingAiEditTaskInstruction,
-        onDeveloperEditTaskPrepared: _consumeAiEditTaskInstruction,
-        onDiscardDeveloperEditTask: _discardAiEditTaskInstruction,
+        developerEditProposal: _pendingAiEditProposal,
+        onDeveloperEditProposalPrepared: _consumeAiEditProposal,
+        onDiscardDeveloperEditProposal: _discardAiEditProposal,
         a2aArtifactHandoffSource: _pendingA2aArtifactHandoff,
         onA2aArtifactHandoffConsumed: _consumeA2aArtifactHandoff,
         onDiscardA2aArtifactHandoff: _discardA2aArtifactHandoff,
@@ -455,7 +456,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
         focusMcpCenterRequest: _mcpCenterFocusRequest,
         focusComposeCenterRequest: _composeCenterFocusRequest,
         focusExportCenterRequest: _exportCenterFocusRequest,
-        onPrepareAiEditTask: _openAiEditTask,
+        onPrepareAiEditTask: _openAiEditProposal,
       ),
       if (_dialogueVisited)
         RuntimeDialogueScreen(
@@ -868,7 +869,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
 
   void _openAgentSetup() => _selectPage(5);
 
-  void _openAiEditTask(String instruction) {
+  void _openAiEditProposal(AiEditProposalReview proposal) {
     final matches = _pageEntries().where((entry) => entry.index == 5);
     if (matches.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -878,7 +879,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
     }
     final page = matches.first;
     setState(() {
-      _pendingAiEditTaskInstruction = instruction;
+      _pendingAiEditProposal = proposal;
       selectedIndex = 5;
       if (!navigationGroup.includes(page.group)) {
         navigationGroup = page.group;
@@ -886,14 +887,14 @@ class _ShellHomePageState extends State<ShellHomePage> {
     });
   }
 
-  void _consumeAiEditTaskInstruction(String instruction) {
-    if (_pendingAiEditTaskInstruction != instruction) return;
-    setState(() => _pendingAiEditTaskInstruction = null);
+  void _consumeAiEditProposal(AiEditProposalReview proposal) {
+    if (!identical(_pendingAiEditProposal, proposal)) return;
+    setState(() => _pendingAiEditProposal = null);
   }
 
-  void _discardAiEditTaskInstruction() {
-    if (_pendingAiEditTaskInstruction == null) return;
-    setState(() => _pendingAiEditTaskInstruction = null);
+  void _discardAiEditProposal() {
+    if (_pendingAiEditProposal == null) return;
+    setState(() => _pendingAiEditProposal = null);
   }
 
   void _openA2aArtifactHandoff(A2aTaskQueryResult source) {

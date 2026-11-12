@@ -65,7 +65,7 @@ class SettingsScreen extends StatefulWidget {
   final int focusMcpCenterRequest;
   final int focusComposeCenterRequest;
   final int focusExportCenterRequest;
-  final ValueChanged<String>? onPrepareAiEditTask;
+  final ValueChanged<AiEditProposalReview>? onPrepareAiEditTask;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -1420,7 +1420,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
     if (!mounted || confirmed != true) return;
-    onPrepareTask(proposal.toImplementationTaskInstruction());
+    onPrepareTask(proposal);
     setState(() {
       _aiEditMessage =
           '提案内容を未信頼の下書きとしてAgent Centerへ渡しました。Broker事前検査までで、ファイル変更とTask実行はありません。';

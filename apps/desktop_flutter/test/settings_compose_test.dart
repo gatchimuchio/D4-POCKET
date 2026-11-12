@@ -283,8 +283,9 @@ void main() {
         home: Scaffold(
           body: SettingsScreen(
             client: ShellCoreClient.mock(transport: transport),
-            onPrepareAiEditTask: (instruction) {
-              preparedTaskInstruction = instruction;
+            onPrepareAiEditTask: (proposal) {
+              preparedTaskInstruction =
+                  proposal.toImplementationTaskInstruction();
             },
           ),
         ),

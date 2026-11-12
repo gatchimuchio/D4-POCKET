@@ -15,6 +15,8 @@ import '../services/agent_task_client.dart';
 import '../services/agent_mcp_task_controller.dart' show AgentMcpTaskStage;
 import '../services/agent_task_execution_coordinator.dart';
 import '../services/agent_handoff.dart';
+import '../services/ai_edit_client.dart'
+    show AiEditProposalProvenance, AiEditProposalReview;
 import '../services/broker_client.dart'
     show BrokerClientException, BrokerTransport, brokerPayloadHash;
 import '../services/mcp_connection_client.dart'
@@ -37,9 +39,9 @@ class AgentCenter extends StatefulWidget {
     required this.client,
     this.active = true,
     this.taskExecutionCoordinator,
-    this.developerEditTaskInstruction,
-    this.onDeveloperEditTaskPrepared,
-    this.onDiscardDeveloperEditTask,
+    this.developerEditProposal,
+    this.onDeveloperEditProposalPrepared,
+    this.onDiscardDeveloperEditProposal,
     this.a2aArtifactHandoffSource,
     this.onA2aArtifactHandoffConsumed,
     this.onDiscardA2aArtifactHandoff,
@@ -48,9 +50,9 @@ class AgentCenter extends StatefulWidget {
   final ShellCoreClient client;
   final bool active;
   final AgentTaskExecutionCoordinator? taskExecutionCoordinator;
-  final String? developerEditTaskInstruction;
-  final ValueChanged<String>? onDeveloperEditTaskPrepared;
-  final VoidCallback? onDiscardDeveloperEditTask;
+  final AiEditProposalReview? developerEditProposal;
+  final ValueChanged<AiEditProposalReview>? onDeveloperEditProposalPrepared;
+  final VoidCallback? onDiscardDeveloperEditProposal;
   final A2aTaskQueryResult? a2aArtifactHandoffSource;
   final ValueChanged<A2aTaskQueryResult>? onA2aArtifactHandoffConsumed;
   final VoidCallback? onDiscardA2aArtifactHandoff;
@@ -66,8 +68,10 @@ class _AgentTaskUiState {
     this.handoffPackage,
     this.a2aArtifactHandoffPackage,
     this.incomingMcpResult,
+    this.aiEditProvenance,
   }) : request = request,
        originalRequest = request,
+       preflightInstructionHash = preflight.instructionHash,
        mcpCapabilitySnapshotHash = request.mcpCapabilitySnapshotHash,
        taskContext = request.instruction,
        permissionStatus = preflight.permissionStatus,
@@ -75,6 +79,7 @@ class _AgentTaskUiState {
 
   AgentTaskRequest? request;
   final AgentTaskRequest originalRequest;
+  final String preflightInstructionHash;
   AgentTaskRequest? lastStartedRequest;
   final String? mcpCapabilitySnapshotHash;
   String? taskContext;
@@ -82,6 +87,8 @@ class _AgentTaskUiState {
   A2aArtifactHandoffPackage? a2aArtifactHandoffPackage;
   Map<String, Object?>? handoffReceipt;
   McpAgentResultContext? incomingMcpResult;
+  final AiEditProposalProvenance? aiEditProvenance;
+  String? aiEditTaskId;
   McpToolCallReceipt? mcpToolCallReceipt;
   String permissionStatus;
   String approvalStatus;
@@ -478,8 +485,9 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     if (transport == null || !_sessionAvailable(session)) {
       return;
     }
+    final developerEditProposal = widget.developerEditProposal;
     final developerEditTaskInstruction =
-        widget.developerEditTaskInstruction;
+        developerEditProposal?.toImplementationTaskInstruction();
     final isDeveloperEditTask =
         developerEditTaskInstruction != null && mcpResult == null;
     final draft = await showDialog<_AgentTaskDraft>(
@@ -493,6 +501,12 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
       ),
     );
     if (!mounted || draft == null) return;
+    final requestedAiEditProposal =
+        isDeveloperEditTask &&
+            draft.instruction == developerEditTaskInstruction &&
+            identical(widget.developerEditProposal, developerEditProposal)
+        ? developerEditProposal
+        : null;
     String? capabilitySnapshotHash;
     if (draft.requestMcpCapabilities) {
       try {
@@ -527,18 +541,23 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     try {
       final result = await AgentTaskClient(transport).inspect(request);
       if (!mounted) return;
+      final aiEditProposalForTask =
+          requestedAiEditProposal != null &&
+              identical(widget.developerEditProposal, requestedAiEditProposal)
+          ? requestedAiEditProposal
+          : null;
       setState(() {
         _agentTasks[session.sessionId] = _AgentTaskUiState(
           request: request,
           preflight: result,
           incomingMcpResult: mcpResult,
+          aiEditProvenance: aiEditProposalForTask?.toProvenance(),
         );
         _taskPreflightStatus[session.sessionId] =
             'Broker事前検査済み。Permission=${result.permissionStatus}、Approval=${result.approvalStatus}。${mcpResult == null ? '' : '結果は未信頼データで、Permission／Approvalは継承しません。'}';
       });
-      if (isDeveloperEditTask &&
-          draft.instruction == developerEditTaskInstruction) {
-        widget.onDeveloperEditTaskPrepared?.call(draft.instruction);
+      if (aiEditProposalForTask != null) {
+        widget.onDeveloperEditProposalPrepared?.call(aiEditProposalForTask);
       }
     } on Object catch (error) {
       if (!mounted) return;
@@ -1507,8 +1526,17 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
           'Workspace PermissionとTask Owner ApprovalをBrokerで確認できません',
         );
       }
-      state.lastStartedRequest = state.request;
-      state.record = await client.start(state.request!);
+      final startedRequest = state.request!;
+      final startedTask = await client.start(startedRequest);
+      state.lastStartedRequest = startedRequest;
+      state.record = startedTask;
+      state.aiEditTaskId = state.aiEditProvenance != null &&
+              startedTask.instructionHash == state.preflightInstructionHash &&
+              startedTask.runtimeId == startedRequest.runtimeId &&
+              startedTask.sessionId == startedRequest.sessionId &&
+              startedTask.workspaceId == startedRequest.workspaceId
+          ? startedTask.taskId
+          : null;
       final handoffPackage = state.handoffPackage;
       if (handoffPackage != null) {
         state.handoffReceipt = buildAgentHandoffReceipt(
@@ -2022,6 +2050,14 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
   List<String> _taskEvidenceRows(AgentSessionRecord session) {
     final taskState = _agentTasks[session.sessionId];
     final task = taskState?.record;
+    final aiEditProvenance = taskState?.aiEditProvenance;
+    final aiEditTaskBound = taskState != null &&
+        task != null &&
+        taskState.aiEditTaskId == task.taskId &&
+        task.instructionHash == taskState.preflightInstructionHash &&
+        task.runtimeId == taskState.originalRequest.runtimeId &&
+        task.sessionId == taskState.originalRequest.sessionId &&
+        task.workspaceId == taskState.originalRequest.workspaceId;
     final workspace = session.workspace.trim();
     return [
       workspace.isEmpty
@@ -2030,6 +2066,10 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
       task == null
           ? 'タスク: Broker記録は未取得（Taskが存在しない証拠ではありません）'
           : 'タスク: ${task.status}（Task ID ${task.taskId}）',
+      if (aiEditProvenance != null && task != null)
+        aiEditTaskBound
+            ? 'AI Edit出所: Task ${task.taskId} / 提案 ${aiEditProvenance.editId} / 提案Audit ID ${aiEditProvenance.auditId} / 提案要求payload hash ${aiEditProvenance.proposalPayloadHash} / Task指示hash ${task.instructionHash}（事前検査hash ${taskState.preflightInstructionHash}と一致。出所情報のみで適用承認ではありません）'
+            : 'AI Edit出所: Broker事前検査とTask記録のhash結合を確認できません。出所を権限として扱いません。',
       if (taskState?.mcpSourceTaskRecord case final source?)
         'MCP要求元Task: ${source.taskId}（結果hash ${source.resultHash ?? 'unknown'}）',
       if (taskState?.mcpFollowupTaskId case final followup?)
@@ -2422,7 +2462,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     return ShellPage(
       title: 'エージェントセンター',
       children: [
-        if (widget.developerEditTaskInstruction != null)
+        if (widget.developerEditProposal != null)
           BorderedPanel(
             key: const ValueKey('agent-ai-edit-task-draft'),
             child: Column(
@@ -2436,11 +2476,11 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
                 const Text(
                   '提案は未信頼のTask文脈として扱います。対象Sessionで通常Brokerの要求事前検査だけを行います。Permission／Approval／Credential／Trustは継承せず、ここではTaskを開始しません。target_pathsはアクセス制御ではなく、実際の範囲はWorkspace Permissionで決まります。',
                 ),
-                if (widget.onDiscardDeveloperEditTask != null) ...[
+                if (widget.onDiscardDeveloperEditProposal != null) ...[
                   const SizedBox(height: 8),
                   OutlinedButton(
                     key: const ValueKey('agent-ai-edit-task-discard'),
-                    onPressed: widget.onDiscardDeveloperEditTask,
+                    onPressed: widget.onDiscardDeveloperEditProposal,
                     child: const Text('下書きを破棄'),
                   ),
                 ],
@@ -2906,7 +2946,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
                   OutlinedButton(
                     onPressed: _taskPreflightSession == session.sessionId ||
                             _taskCancellationGate.isPending(session.sessionId) ||
-                            (widget.developerEditTaskInstruction != null &&
+                            (widget.developerEditProposal != null &&
                                 _taskPreflightSession != null)
                         ? null
                         : () => _inspectTask(session),
@@ -2915,7 +2955,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
                           ? '取消応答待ち'
                           : _taskPreflightSession == session.sessionId
                               ? 'Broker事前検査中'
-                              : widget.developerEditTaskInstruction != null
+                              : widget.developerEditProposal != null
                                   ? '提案を別Taskとして事前検査'
                                   : 'Task実行能力を事前検査（実行なし）',
                     ),

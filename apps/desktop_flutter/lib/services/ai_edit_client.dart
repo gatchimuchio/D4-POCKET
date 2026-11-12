@@ -128,6 +128,12 @@ class AiEditProposalReview {
   final String instructionHash;
   final String auditId;
 
+  AiEditProposalProvenance toProvenance() => AiEditProposalProvenance(
+        editId: editId,
+        proposalPayloadHash: instructionHash,
+        auditId: auditId,
+      );
+
   String toImplementationTaskInstruction() => aiEditJson({
         'context_type': 'gui_shell_ai_edit_proposal',
         'proposal': {
@@ -158,6 +164,18 @@ class AiEditProposalReview {
           ],
         },
       });
+}
+
+class AiEditProposalProvenance {
+  const AiEditProposalProvenance({
+    required this.editId,
+    required this.proposalPayloadHash,
+    required this.auditId,
+  });
+
+  final String editId;
+  final String proposalPayloadHash;
+  final String auditId;
 }
 
 String aiEditJson(Map<String, Object?> value) =>

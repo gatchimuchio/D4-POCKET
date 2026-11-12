@@ -24,6 +24,8 @@ import 'package:gui_shell_desktop/screens/shared.dart';
 import 'package:gui_shell_desktop/screens/trust_center.dart';
 import 'package:gui_shell_desktop/services/a2a_connection_client.dart'
     show A2aArtifactManifestItem, A2aSelectedArtifact, A2aTaskQueryResult;
+import 'package:gui_shell_desktop/services/ai_edit_client.dart'
+    show AiEditProposalReview;
 import 'package:gui_shell_desktop/services/agent_task_execution_coordinator.dart';
 import 'package:gui_shell_desktop/services/broker_client.dart';
 import 'package:gui_shell_desktop/services/shell_core_client.dart';
@@ -4095,28 +4097,17 @@ void main() {
     const workspaceId = 'workspace-r2-synthetic';
     const resultHash =
         'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
-    final proposalInstruction = jsonEncode({
-      'context_type': 'gui_shell_ai_edit_proposal',
-      'proposal': {
-        'edit_id': 'settings-edit-fixture',
-        'scope': 'composition',
-        'instruction': '構成Preview結果へ対象platformを表示する',
-        'target_paths': ['apps/desktop_flutter/lib/screens/settings.dart'],
-        'expected_changes': ['Owner／Developer確認後の別Task'],
-        'instruction_hash':
-            'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-        'audit_id': 'audit-ai-edit-fixture',
-        'execution_mode': 'proposal_only',
-      },
-      'handling': {
-        'proposal_content_is_untrusted': true,
-        'authority_inheritance': 'none',
-        'permission_inheritance': 'none',
-        'approval_inheritance': 'none',
-        'credential_inheritance': 'none',
-        'trust_inheritance': 'none',
-      },
-    });
+    final proposal = AiEditProposalReview(
+      editId: 'settings-edit-fixture',
+      scope: 'composition',
+      instruction: '構成Preview結果へ対象platformを表示する',
+      targetPaths: const ['apps/desktop_flutter/lib/screens/settings.dart'],
+      expectedChanges: const ['Owner／Developer確認後の別Task'],
+      instructionHash:
+          'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      auditId: 'audit-ai-edit-fixture',
+    );
+    final proposalInstruction = proposal.toImplementationTaskInstruction();
     final taskPayload = {
       'agent_runtime_id': runtimeId,
       'session_id': sessionId,
@@ -4124,6 +4115,7 @@ void main() {
       'instruction': proposalInstruction,
     };
     final taskInstructionHash = brokerPayloadHash(taskPayload);
+    expect(taskInstructionHash, isNot(proposal.instructionHash));
     Map<String, Object?> taskRecord({required String status}) => {
           'task_id': taskId,
           'record_version': 2,
@@ -4231,22 +4223,22 @@ void main() {
       _brokerAcceptedBody('AgentTask状態', taskRecord(status: 'completed')),
     ]);
     final client = await ShellCoreClient.product(transport: transport);
-    String? pendingInstruction = proposalInstruction;
-    String? acceptedInstruction;
+    AiEditProposalReview? pendingProposal = proposal;
+    AiEditProposalReview? acceptedProposal;
 
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
         body: StatefulBuilder(
           builder: (context, setParentState) => AgentCenter(
             client: client,
-            developerEditTaskInstruction: pendingInstruction,
-            onDeveloperEditTaskPrepared: (instruction) {
-              if (instruction != pendingInstruction) return;
-              acceptedInstruction = instruction;
-              setParentState(() => pendingInstruction = null);
+            developerEditProposal: pendingProposal,
+            onDeveloperEditProposalPrepared: (preparedProposal) {
+              if (!identical(preparedProposal, pendingProposal)) return;
+              acceptedProposal = preparedProposal;
+              setParentState(() => pendingProposal = null);
             },
-            onDiscardDeveloperEditTask: () {
-              setParentState(() => pendingInstruction = null);
+            onDiscardDeveloperEditProposal: () {
+              setParentState(() => pendingProposal = null);
             },
           ),
         ),
@@ -4304,7 +4296,7 @@ void main() {
 
     expect(find.textContaining('AgentTask実行非対応'), findsOneWidget);
     expect(find.textContaining('PRIVATE_TASK_SENTINEL'), findsNothing);
-    expect(pendingInstruction, proposalInstruction);
+    expect(pendingProposal, same(proposal));
     expect(
         find.byKey(const ValueKey('agent-ai-edit-task-draft')), findsOneWidget);
     expect(
@@ -4339,8 +4331,8 @@ void main() {
       expect(payload['instruction'], proposalInstruction);
       expect(payload, hasLength(taskPayload.length));
     }
-    expect(acceptedInstruction, proposalInstruction);
-    expect(pendingInstruction, isNull);
+    expect(acceptedProposal, same(proposal));
+    expect(pendingProposal, isNull);
     expect(
         find.byKey(const ValueKey('agent-ai-edit-task-draft')), findsNothing);
     expect(transport.operations,
@@ -4375,7 +4367,17 @@ void main() {
     await tester.tap(taskStartButton);
     await tester.pumpAndSettle();
     expect(find.text('タスク: running（Task ID $taskId）'), findsOneWidget);
-    expect(pendingInstruction, isNull);
+    expect(pendingProposal, isNull);
+    expect(
+      find.textContaining('AI Edit出所: Task $taskId'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        '提案Audit ID audit-ai-edit-fixture / 提案要求payload hash ${proposal.instructionHash} / Task指示hash $taskInstructionHash（事前検査hash $taskInstructionHashと一致。出所情報のみで適用承認ではありません）',
+      ),
+      findsOneWidget,
+    );
     expect(find.textContaining(proposalInstruction), findsNothing);
     final permissionRequests = transport.requests
         .where((request) =>
