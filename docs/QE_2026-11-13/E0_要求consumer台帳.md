@@ -59,8 +59,8 @@ LedgerのE0-04列は、現ID、旧ID、原文参照、対象、目的、Producer
 |---|---|---|---|
 | N03 | 独立した異種Runtimeを共通Task/Result契約で使用 | Codex CLIはBrokerのAgent Task Adapter。MINIDORAは共通対話AdapterだがAgent Task methodを実装せず、既定unsupported。Desktop登録UIはCodex CLIのみ。 | `OPEN`。二つ目の独立したTask-capable Runtime、能力選択・拒否・結果・権限の製品経路と実Runtime証拠が不足（`BUILD_GAP`）。 |
 | N04 | Compare／Handoff／A2Aの実作用と権限非継承 | Compare/Handoff/A2A source consumerはある。Compare実行時隔離、外部Agent連携、Artifact転送、Host越境は現installed候補の一貫した実証なし。Hostはmetadata registry。 | `OPEN`。source接続と実作用証拠を分離し、Compare/Handoff/A2A/Hostの残件を照合する。 |
-| N05 | Capability CatalogからComposeを経て元Toolを実行 | Compose Contract/Manifest/UI経路がある。旧W00は実Catalog照合・元Tool Consumerを`BUILD_GAP`と記録。 | `OPEN`。現HEADでCatalog→検査→実作用まで再追跡する |
-| N06 | 独立App Exportと選択Moduleの実除去 | Export Manifest、bundle、Module選択処理の履歴がある。独立製品の構成消費・全対象binary/resourceの除去状態は未確定。 | `OPEN`。identity/Broker/Runtime/Installerと実生成物の結合を照合する |
+| N05 | Capability CatalogからComposeを経て元Toolを実行 | 現行BrokerのRuntime/Agent metadata投影と接続中MCP CatalogをCompose前後で再照合。Settings UIは受理済みManifestを`MCP Tool実行`へ渡し、Brokerが同じManifestを再検査して元Toolを呼ぶ。旧W00のsource gapは現source上解消。 | `OPEN`。source `WIRED`。CapabilityはAdapterの未信頼宣言metadataで、専用の正規Capability Registryとの接続は未確認。Windows fixture test sourceは存在するが未実行。実installed product evidenceは未成立。 |
+| N06 | 独立App Exportと選択Moduleの実除去 | Brokerが新規App/Audit identity・Manifest・Module依存planを作る。Windows/Linux Developer ExporterとLauncherはManifest hash/identityを扱う。Flutter UI Moduleのcompile-time define/AOT比較も存在する。 | `OPEN`。runtime evidenceは`runtime_manifest_consumed=false`、`standalone_app_verified=false`、`binary_pruning_verified=false`。Rust/第三者Module除去、構成による実機能変化、cold-start/resource測定、独立Installer/installed evidenceに`BUILD_GAP`。 |
 | N07 | AI Edit proposalを別主体で審査しcontrolled apply/rollback | AI Edit proposal-only経路が存在。Proposal以後の独立検査・認可Apply・Rollbackの統合状態は未確定。 | `OPEN`。自己承認禁止とBroker-controlled applyを追跡する |
 | N08 | Bufferが元Taskの意味を保ってOS/依存差を調停 | B0〜B4の限定範囲は履歴CLOSED、B5はOPEN、B6は未成立。 | `OPEN`。B5自己適用、B6全Consumer、副作用・fail-closed経路を対応する |
 | N09 | UIから実Task、結果、観測、停止・Recoveryを操作 | Agent Center等の一部Broker投影は存在。結果/Diff/Eval/Resource/Recoveryの全Consumer接続は未確定。 | `OPEN`。通常製品入口から実Broker stateと結果の往復を追跡する |
@@ -104,6 +104,69 @@ LedgerのE0-04列は、現ID、旧ID、原文参照、対象、目的、Producer
 
 関連test source: `native/rust_helper/src/adapters/minidora.rs`、`native/rust_helper/src/broker/dialogue.rs`、`native/rust_helper/src/broker/a2a_center.rs`、`native/rust_helper/src/broker/protocol.rs`のRust test、`apps/desktop_flutter/test/agent_coordination_test.dart`、`agent_handoff_test.dart`、`a2a_connection_center_test.dart`、`a2a_artifact_handoff_test.dart`。これらはE0 source mappingで確認した既存対象で、今回のRuntime/installed acceptance結果ではない。
 
+## N05/N06 現行Source→Consumer追跡（E0差分）
+
+照合HEADは`06db10a8411c7c9f7e9913c01e8b2ff82b7c75e8`、製品コード比較基準は`d503a4ef6daac8942abd1cb011442ce28c78ec55`。列挙したN05/N06製品source・schema・test fileは基準からの差分0。Source traceだけを行い、Rust/Flutter/Exporter/product testはこの作業単位で実行していない。`WIRED`はsource call graph、`FIXTURE`はtest fixture、どちらもinstalled product acceptanceではない。
+
+### N05 Capability/Compose
+
+| 項目 | 現行観測 |
+|---|---|
+| Producer→Consumer | `settings.dart::_refreshComposeRuntimeAgentCatalog`はBrokerから現在登録Runtime/Agentを取得し、`_refreshComposeMcpCatalog`は接続済MCPとToolを取得する。`_runCompose`は選択内容を`compose_client.dart`経由でBroker `GUI Shell構成`へ送る。受理Manifestとdraftが一致するときだけ選択Tool操作を有効化し、`_runComposedTool`が`McpConnectionClient.callTool(..., composeManifest: manifest)`を呼ぶ。 |
+| Catalog/source | `Broker::compose_runtime_agent_catalog`→`dialogue.rs::compose_catalog_snapshot`は現Broker登録AdapterのRuntime IDと`agent_adapter_projection`から作る。metadata形状とAdapter/Agent bindingを検査する。Compose capabilityはこのAgent Adapter metadata内の宣言値であり、CapabilityのAuthorityではない。MCP Tool候補は現在の接続Catalogから取得する。汎用`specs/capability.schema.json`はPython `shell_core/runtime_state.py`から参照されるが、Rust Compose Catalogのruntime consumerではない。 |
+| 互換・危険条件 | `compose_center::validate_catalog_selection`はRuntime ID、選択Agentと同一Runtimeのready/degraded状態、Capability宣言、Tool選択時の同一Agent instance上の`task_execution/tool_support/mcp_support`、生存かつ非隔離のMCP接続、現在Catalog内のTool IDを確認する。欠落・不整合はreject。Composeは`manifest_only`を返し、App identity/Permissionを作らずAuthority類を継承しない。 |
+| 実作用・Authority | `MCP Tool実行`は同じManifestを受け、現在Runtime/Agent/MCP/Toolを再照合する。Rust native Owner確認と永続Audit、Tool schema/identity検査、一回Permission/Auditの後に現在接続の元MCP Toolを呼び、result hashとbounded metadataを返す。Flutterは本文を表示しない。Agent metadata/CatalogからTrust・Permission・Approvalは生成しない。 |
+| 否定・停止 | Composeはunknown Runtime/Agent/Capability、unsupported capability、選択instanceをまたぐ互換性寄せ集め、unknown/stale MCP/Toolを拒否する。MCP実行時もManifest選択が古ければTool送信前に拒否し、Owner/Audit/Permission不成立時は作用しない。 |
+| Test class / evidence | `compose_center.rs`には現在Catalog/互換性/同一instance/manifest-only/権限非継承のRust testがある。Windows限定`mcp_center.rs::mcp_catalog_compose_rechecks_current_connection_and_rejects_stale_selection`はBrokerから子`cmd.exe` fixture MCPへ接続し、stale選択拒否とselected Tool一回呼出しを検査するsourceがある。Flutterの`compose_client_test.dart`と`settings_compose_test.dart`はclient/widget fixture。全て本単位`NOT_RUN`。子process fixtureの`LIVE_RUNTIME`ラベルはfixtureを製品runtime証拠へ変換しない。 |
+| 契約差分・残余 | 現行施工正本v4 S04/N05は現在Catalog→互換/権限→実Tool作用を要求し、これが優先する。補助的な`docs/specs/gui-shell-compose.md`には参照ID入力・候補発見/実在確認なしという旧記述が残るため、E1文書同期で更新する。Sourceはv4要求の一部consumerまで`WIRED`だが、Adapter capability宣言が実能力と一致するか、AI自身の実要求、同一installed candidateの実MCP副作用/結果/Auditは`UNKNOWN`。この文書差分は現N05 blockerへ追加しない。N05/W04/G4は`OPEN`。 |
+
+### N06 Standalone Export/Module
+
+| 項目 | 現行観測 |
+|---|---|
+| Producer→Consumer | Settings Export UIは選択Compose Manifest、platform、optional Module IDsを`export_client.dart`から既存Brokerへ渡す。`export_center.rs`は固定Export directoryへManifest file/Receiptを作る。Windows/Linux Developer ExporterはReceipt+Manifestのhash/schema/targetを検証してportable bundleを組み立て、Desktop Launcherはbundle内`product_manifest.json`とcompile-time identityを照合する。 |
+| 新規identity / 安全境界 | Broker Exportは新規App IDとAudit store IDを作り、Authority/Permission/Approval/Credential/Audit chainを継承しない。任意path/overwriteを認めず、native Owner確認とAuditを使う。LauncherもApp/Audit identity・platform・非継承条件を検査する。これは独立identityのsource接続であり、独立起動製品の実証ではない。 |
+| Module plan | `resolve_module_plan`は固定Catalogから必須/安全保持Module、重複/未知/必須Module選択、依存閉包を検査し、選択/除外IDをManifest/Receiptへ記録する。`binary_pruning_status`は`not_applied`。Launcherも現Manifestでこの値を要求する。 |
+| Build/runtime接続 | Windows/Linux ExporterはManifestをhash-boundでbundleへbyte-for-byte格納し、App/Audit identity等をbuildへ渡すが、build evidenceは`runtime_manifest_consumed=false`を明記する。LauncherのManifest consumerは固定hash・identity・非継承条件検査であり、ComposeのRuntime/Agent/Tool/Capability/optional Module構成に応じてruntime機能を構成するconsumerではない。生成物証拠はWindows `standalone_app_verified=false`、Linux `formal_distribution_claimed=false`、両者`binary_pruning_verified=false`。 |
+| Pruning / 計測 | `build_module_pruned_windows.py`のcompile-time defineはFlutter UI surfaceに限定され、安全Core/Rust/third-party moduleをpruneしない。Windows AOT comparisonはsurface reportを作るが`runtime_unverified`、cold start/resource comparisonは未測定、`binary_pruning_verified=false`。Linux ExporterもFlutter AOT report/surface一致とartifact hashまでで、意味上の除外・runtime消費・resource減は保証しない。 |
+| Test class / evidence | `export_center.rs`にはnew identity/non-inheritance、固定保存、Module dependency closure、unknown/duplicate/required module拒否等のRust unit testがある。`tooling/tests/test_export_linux_product.py`と`test_linux_portable_archive.py`はExporter/build/archive test（build pathはsubprocess mock/fixtureを含む）。`run_conformance_skeleton.py`にはcontract/static evidence validatorがある。いずれも本単位`NOT_RUN`であり、現在のinstalled独立製品の起動・構成消費・pruning証拠ではない。 |
+| 残余 / 状態 | Compose/runtime manifestを実消費して機能を構成する独立App consumer、正規Installer/installed run、選択外機能のbinary/resourceからの除去と必要機能保持、実測比較は`BUILD_GAP`。署名はS04の別条件。N06/W05/G5は`OPEN`。release blocker `rev2_export_owner_ui_authority_path`、`rev2_module_pruning_binary_and_measurement`を維持する。 |
+
+### N05/N06 Source SHA・該当ファイル
+
+下表のblob SHAは全て製品基準`d503a4ef6daac8942abd1cb011442ce28c78ec55`から取得した。source群は照合HEAD `06db10a8411c7c9f7e9913c01e8b2ff82b7c75e8`まで差分なし。
+
+| source file | blob SHA |
+|---|---|
+| `docs/specs/gui-shell-compose.md` | `6b43bb80f73d4268e734ac0afbc58b33ba07339f` |
+| `docs/specs/gui-shell-export.md` | `3d7a1156e4bf095e4f6a64792b6e1683c14f9b17` |
+| `docs/specs/gui-shell-module-pruning.md` | `5568c677be30402d709cc365b79eceb0e96ce831` |
+| `specs/agent_adapter.schema.json` | `e0792589a2bae168ba221af4f4f9abb505815c12` |
+| `specs/gui_shell_compose.schema.json` | `89b3d8e0e09c802d555fd6fee233daebc0fec045` |
+| `specs/gui_shell_compose_catalog.schema.json` | `f9c76f5fa87bfb0866f33745dcd5a8a4e74864d5` |
+| `specs/gui_shell_export.schema.json` | `8b96d344ac0f6a54011237be8b2d85964be48c4b` |
+| `specs/gui_shell_export_manifest.schema.json` | `bf136b1a1daa258d33af3635ee414a2d4312bec5` |
+| `specs/gui_shell_module_catalog.json` | `339cb8894b25ae963956e582c42b9e8fcc0d3931` |
+| `specs/gui_shell_module_catalog.schema.json` | `bd54dd7903a1734ea4027d3f780b7a2b49e10c8e` |
+| `apps/desktop_flutter/lib/screens/settings.dart` | `66374ec4157d573939e7f9cc5c36aecf5d65e251` |
+| `apps/desktop_flutter/lib/services/compose_client.dart` | `8f9657d866b007a4d2212abefca4df9add81a702` |
+| `apps/desktop_flutter/lib/services/export_client.dart` | `70d77edc6beb9e209e6b362219d1b22d69375489` |
+| `native/rust_helper/src/broker/compose_center.rs` | `d80658fd9a342140acc35560b2e4c4e4ae97d888` |
+| `native/rust_helper/src/broker/dialogue.rs` | `c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999` |
+| `native/rust_helper/src/broker/mcp_center.rs` | `8f9ab897bdc625e448241ebd9b46f995cd1f22f6` |
+| `native/rust_helper/src/broker/export_center.rs` | `477e44d86ebf18d2b004a7294c9cdb14e35aa0f0` |
+| `native/rust_helper/src/desktop_launcher.rs` | `6a9f335de07fa474ca10043aea63ad6e988b572d` |
+| `native/rust_helper/src/linux_desktop_launcher.rs` | `f58fb226f21093c2d1f062259d394b4f8ec022f6` |
+| `tooling/export_windows_product.py` | `31856179881a5a5aae1ba4451732e6de6cd7f338` |
+| `tooling/export_linux_product.py` | `47fe9a3032a5b2680e3f7d39b7cd64120ac83843` |
+| `tooling/build_module_pruned_windows.py` | `490aae7209ea5988f8e2cdcb05fe092b3d29504a` |
+| `tooling/compare_module_builds_windows.py` | `09d926b9c6b611cd59e524cc947ce2dce1c81247` |
+| `tooling/tests/test_export_linux_product.py` | `079a187de49cf8b2fb6a7ddadb4175d6916163d1` |
+| `tooling/tests/test_linux_portable_archive.py` | `c04ac3c5d6d58396f650e9530b6731c6bb2037d6` |
+| `tooling/conformance_tests/run_conformance_skeleton.py` | `a4b69353e43f21be0a12cc46cd565fee69a9691e` |
+| `apps/desktop_flutter/test/compose_client_test.dart` | `c3fe30faa668482e5a4e42b2f5f5e5b218a01dc8` |
+| `apps/desktop_flutter/test/settings_compose_test.dart` | `a78353f93617cc7b17391549ea256f007a7acdb1` |
+
 ## 実装ファイルの初期目録（CODE_PRESENTのみ）
 
 下記は`d503a4ef6daac8942abd1cb011442ce28c78ec55`時点のパス存在・責務候補を読み取った初期目録である。名前・コードの存在だけではProducer→Consumer接続、installed/runtime実作用、Acceptanceを証明しない。各行の`WIRED`、実作用、正常/否定/Recovery、Evidence、OS別状態は未照合なら`UNKNOWN`。
@@ -112,8 +175,8 @@ LedgerのE0-04列は、現ID、旧ID、原文参照、対象、目的、Producer
 |---|---|---|---|
 | A／N01・N02 | `apps/desktop_flutter/lib/screens/agent_center.dart`、`services/agent_task_execution_coordinator.dart`、`agent_task_client.dart`、`agent_mcp_task_controller.dart` | `native/rust_helper/src/broker/ipc_server.rs`、`broker/agent_task_scratch.rs`、`adapters/codex_cli.rs`、`mcp_task_tool_stdio.rs`、`adapters/mcp_stdio.rs`、`broker/mcp_center.rs` | Codex CLIとBrokerの履歴はある。現行installed候補の完全なTask→Tool→同Agent follow-up→結果/Audit/Recovery call graphとv4 acceptanceは`UNKNOWN` |
 | B／N03・N04 | `runtime_center.dart`、`agent_coordination.dart`、`agent_handoff.dart`、`a2a_connection_client.dart`、`a2a_artifact_handoff.dart` | `broker/runtime_registry.rs`、`adapters/codex_cli.rs`、`adapters/minidora.rs`、`broker/a2a_center.rs` | Adapter/Compare/A2A関連コードは存在する。二つ目の独立実Runtimeの実Task、外部A2A作用、host越境拒否、fresh authorityの現consumerは`UNKNOWN` |
-| D／N05 | `compose_client.dart` とCompose UI | `broker/compose_center.rs` | Manifest/Compose層は存在する。Runtime/Agent/Tool実Catalogから元Toolの製品作用までの接続は`UNKNOWN` |
-| E／N06 | `export_client.dart` とExport UI | `broker/export_center.rs`、`product_package.rs`、`linux_product_bundle.rs` | Export/Package codeは存在する。独立製品がManifestを消費すること、未選択Moduleのbinary/resource除去・測定は`UNKNOWN` |
+| D／N05 | `settings.dart`のRuntime/Agent/MCP Catalog更新→Compose受理→選択Tool操作、`compose_client.dart`、`mcp_connection_client.dart` | `broker/dialogue.rs`の現登録Adapter snapshot、`broker/compose_center.rs`のcompatibility check、`broker/mcp_center.rs::call_tool` | 現在Catalog→Manifest→同じBrokerのMCP実作用はsource `WIRED`。Capability metadataは未信頼宣言で、実Provider能力を独立測定するものではない。fixtureとinstalled evidenceは別区分 |
+| E／N06 | Export UI→`export_client.dart`→Broker Manifest/Receipt→Windows/Linux Developer Exporter→product launcher | `broker/export_center.rs`、`desktop_launcher.rs`、`linux_desktop_launcher.rs`、`export_windows_product.py`、`export_linux_product.py` | 新規identityとManifest/Module planはsource `WIRED`。runtimeは構成を実消費せず、証拠がruntime consumption/pruningをfalseと明記。実独立製品・Installer・binary/resource除去は`BUILD_GAP` |
 | D／N07 | `ai_edit_client.dart` とAI Edit UI | `broker/ai_edit_center.rs` | Rust fileは`proposal_only`・自動applyなしの申告を記録する。別主体の検査からcontrolled apply/rollbackへ至る実製品経路は`UNKNOWN` |
 | F／N08 | Repository内の`native/`、`packages/`、`tooling/`で`buffer`／`mediat`／`reconcil`／`arbitrat`を含むfile名は見つからなかった | 上記検索は名前照合に限定 | Buffer作用が別名の実装へあるかは未確認。不存在・Gapとは判定しない。B5/B6とのconsumer対応は`UNKNOWN` |
 | C／N09 | Agent Center、Workspace Inspector、History、Evaluation、Observability、Problems、Recovery、Audit、TraceのFlutter screen/service files | 対応候補として`broker/history_access.rs`、`execution_history.rs`、`evaluation_lab.rs`、`observation_center.rs`、`notification_center.rs`、`content_recovery.rs`、`audit.rs` | 個別画面・Broker moduleは存在する。実Task IDを共有したend-to-end表示、failure/restart/notification/stop consumerは`UNKNOWN` |
