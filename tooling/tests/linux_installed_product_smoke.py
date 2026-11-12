@@ -3975,6 +3975,23 @@ def _responses_final_message_events(
     return _add_responses_sequence_numbers(events)
 
 
+_R2_E2E_MCP_PROJECTION_BOOL_FIELDS = (
+    "mcp_tool_call_item_seen",
+    "mcp_tool_call_completed_event_seen",
+    "mcp_tool_call_status_completed_seen",
+    "mcp_tool_call_server_matches",
+    "mcp_tool_call_server_label_matches",
+    "mcp_tool_call_server_name_matches",
+    "mcp_tool_call_tool_matches",
+    "mcp_tool_call_name_matches",
+    "function_call_item_seen",
+    "function_call_namespace_matches",
+    "function_call_name_matches",
+    "function_call_qualified_name_matches",
+    "arguments_object_seen",
+)
+
+
 def _normalize_r2_e2e_diagnostic(payload: object) -> dict[str, object] | None:
     if not isinstance(payload, dict) or not isinstance(payload.get("kind"), str):
         return None
@@ -4050,6 +4067,23 @@ def _normalize_r2_e2e_diagnostic(payload: object) -> dict[str, object] | None:
         if set(payload) != {"kind"}:
             return None
         return {"stage": "codex_stdin_pipe_missing"}
+    if kind == "cli_mcp_projection":
+        if set(payload) != {"kind", "summary"}:
+            return None
+        summary = payload.get("summary")
+        expected = {"candidate_item_count", *_R2_E2E_MCP_PROJECTION_BOOL_FIELDS}
+        if (
+            not isinstance(summary, dict)
+            or set(summary) != expected
+            or type(summary.get("candidate_item_count")) is not int
+            or not 0 <= summary["candidate_item_count"] <= 32
+            or any(
+                type(summary.get(field)) is not bool
+                for field in _R2_E2E_MCP_PROJECTION_BOOL_FIELDS
+            )
+        ):
+            return None
+        return {"stage": "codex_cli_mcp_projection", **summary}
     if kind != "cli_failure" or set(payload) != {"kind", "summary"}:
         return None
     summary = payload.get("summary")
@@ -5540,6 +5574,19 @@ def _normalize_stored_r2_e2e_diagnostic(payload: object) -> dict[str, object] | 
     if not isinstance(payload, dict) or not isinstance(payload.get("stage"), str):
         return None
     stage = payload["stage"]
+    if stage == "codex_cli_mcp_projection":
+        expected = {"stage", "candidate_item_count", *_R2_E2E_MCP_PROJECTION_BOOL_FIELDS}
+        if (
+            set(payload) != expected
+            or type(payload.get("candidate_item_count")) is not int
+            or not 0 <= payload["candidate_item_count"] <= 32
+            or any(
+                type(payload.get(field)) is not bool
+                for field in _R2_E2E_MCP_PROJECTION_BOOL_FIELDS
+            )
+        ):
+            return None
+        return dict(payload)
     if stage == "codex_cli_exit":
         expected = {
             "stage",
@@ -8046,7 +8093,17 @@ def _run_installed_agent_mcp_followup_acceptance(
     if not all(proposal_marker_presence.values()):
         raise RuntimeError(
             "Task MCP提案の承認済み表示に要求値が不足しています: "
-            + json.dumps(proposal_marker_presence, sort_keys=True)
+            + json.dumps(
+                {
+                    "proposal_marker_presence": proposal_marker_presence,
+                    "source_task_runtime": _installed_task_response_fixture_diagnostics(
+                        responses_server,
+                        "mcp_proposal",
+                        source_diagnostic_index,
+                    ),
+                },
+                sort_keys=True,
+            )
         )
     if result_marker in proposal_snapshot:
         raise RuntimeError("Task MCP提案表示へ外部Tool結果が混入しました")

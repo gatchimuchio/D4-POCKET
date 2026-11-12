@@ -674,6 +674,17 @@ fn report_r2_e2e_cli_failure(
 }
 
 #[cfg(feature = "r2-e2e")]
+fn report_r2_e2e_mcp_projection(test_api: &CodexCliTestResponses, stdout: &[u8]) {
+    send_r2_e2e_diagnostic(
+        test_api,
+        json!({
+            "kind": "cli_mcp_projection",
+            "summary": loopback_test_safe_mcp_projection_summary(stdout),
+        }),
+    );
+}
+
+#[cfg(feature = "r2-e2e")]
 fn send_r2_e2e_diagnostic(test_api: &CodexCliTestResponses, payload: Value) {
     let Ok(body) = serde_json::to_vec(&payload) else {
         return;
@@ -1704,6 +1715,10 @@ fn run_agent_task(
         }
         return Err(対話失敗::通信失敗);
     }
+    #[cfg(feature = "r2-e2e")]
+    if let Some(test_api) = test_responses_api {
+        report_r2_e2e_mcp_projection(test_api, &stdout);
+    }
     let parsed = parse_jsonl_with_mcp(&stdout);
     #[cfg(any(test, feature = "r2-e2e"))]
     if let (Some(test_api), Err(_)) = (test_responses_api, &parsed) {
@@ -1769,6 +1784,82 @@ fn loopback_test_safe_failure_summary(
             .unwrap_or_else(|| "none".to_owned()),
         stderr.len()
     )
+}
+
+#[cfg(any(test, feature = "r2-e2e"))]
+fn loopback_test_safe_mcp_projection_summary(stdout: &[u8]) -> Value {
+    let mut summary = json!({
+        "candidate_item_count": 0,
+        "mcp_tool_call_item_seen": false,
+        "mcp_tool_call_completed_event_seen": false,
+        "mcp_tool_call_status_completed_seen": false,
+        "mcp_tool_call_server_matches": false,
+        "mcp_tool_call_server_label_matches": false,
+        "mcp_tool_call_server_name_matches": false,
+        "mcp_tool_call_tool_matches": false,
+        "mcp_tool_call_name_matches": false,
+        "function_call_item_seen": false,
+        "function_call_namespace_matches": false,
+        "function_call_name_matches": false,
+        "function_call_qualified_name_matches": false,
+        "arguments_object_seen": false,
+    });
+    let qualified_function_name = format!("mcp__{TASK_TOOL_SERVER_NAME}__{TASK_TOOL_NAME}");
+    let mut candidate_item_count = 0usize;
+    for line in stdout.split(|byte| *byte == b'\n').take(256) {
+        let Ok(event) = serde_json::from_slice::<Value>(line) else {
+            continue;
+        };
+        let Some(item) = event.get("item").and_then(Value::as_object) else {
+            continue;
+        };
+        let item_type = item.get("type").and_then(Value::as_str);
+        if !matches!(item_type, Some("mcp_tool_call" | "function_call")) {
+            continue;
+        }
+        candidate_item_count = candidate_item_count.saturating_add(1).min(32);
+        if item.get("arguments").is_some_and(Value::is_object) {
+            summary["arguments_object_seen"] = json!(true);
+        }
+        if item_type == Some("mcp_tool_call") {
+            summary["mcp_tool_call_item_seen"] = json!(true);
+            if event.get("type").and_then(Value::as_str) == Some("item.completed") {
+                summary["mcp_tool_call_completed_event_seen"] = json!(true);
+            }
+            if item.get("status").and_then(Value::as_str) == Some("completed") {
+                summary["mcp_tool_call_status_completed_seen"] = json!(true);
+            }
+            if item.get("server").and_then(Value::as_str) == Some(TASK_TOOL_SERVER_NAME) {
+                summary["mcp_tool_call_server_matches"] = json!(true);
+            }
+            if item.get("server_label").and_then(Value::as_str) == Some(TASK_TOOL_SERVER_NAME) {
+                summary["mcp_tool_call_server_label_matches"] = json!(true);
+            }
+            if item.get("server_name").and_then(Value::as_str) == Some(TASK_TOOL_SERVER_NAME) {
+                summary["mcp_tool_call_server_name_matches"] = json!(true);
+            }
+            if item.get("tool").and_then(Value::as_str) == Some(TASK_TOOL_NAME) {
+                summary["mcp_tool_call_tool_matches"] = json!(true);
+            }
+            if item.get("name").and_then(Value::as_str) == Some(TASK_TOOL_NAME) {
+                summary["mcp_tool_call_name_matches"] = json!(true);
+            }
+        }
+        if item_type == Some("function_call") {
+            summary["function_call_item_seen"] = json!(true);
+            if item.get("namespace").and_then(Value::as_str) == Some(TASK_TOOL_SERVER_NAME) {
+                summary["function_call_namespace_matches"] = json!(true);
+            }
+            if item.get("name").and_then(Value::as_str) == Some(TASK_TOOL_NAME) {
+                summary["function_call_name_matches"] = json!(true);
+            }
+            if item.get("name").and_then(Value::as_str) == Some(qualified_function_name.as_str()) {
+                summary["function_call_qualified_name_matches"] = json!(true);
+            }
+        }
+    }
+    summary["candidate_item_count"] = json!(candidate_item_count);
+    summary
 }
 
 #[cfg(any(test, feature = "r2-e2e"))]
@@ -2198,6 +2289,26 @@ mod tests {
         assert!(summary.contains("stdout_error_class=authentication"));
         assert!(!summary.contains("OPENAI_API_KEY"));
         assert!(!summary.contains("PRIVATE_DETAIL"));
+    }
+
+    #[test]
+    fn loopback成功診断はCodexの固定MCPイベント一致だけを記録する() {
+        let stdout = format!(
+            "{{\"type\":\"item.completed\",\"item\":{{\"id\":\"mcp_0\",\"type\":\"mcp_tool_call\",\"server\":\"{TASK_TOOL_SERVER_NAME}\",\"tool\":\"{TASK_TOOL_NAME}\",\"arguments\":{{\"server_id\":\"PRIVATE_SERVER\",\"tool_id\":\"PRIVATE_TOOL\",\"arguments\":{{\"text\":\"PRIVATE_TASK\"}}}},\"status\":\"completed\"}}}}\n{{\"type\":\"turn.completed\"}}"
+        );
+        let summary = loopback_test_safe_mcp_projection_summary(stdout.as_bytes());
+
+        assert_eq!(summary["candidate_item_count"], 1);
+        assert_eq!(summary["mcp_tool_call_item_seen"], true);
+        assert_eq!(summary["mcp_tool_call_completed_event_seen"], true);
+        assert_eq!(summary["mcp_tool_call_status_completed_seen"], true);
+        assert_eq!(summary["mcp_tool_call_server_matches"], true);
+        assert_eq!(summary["mcp_tool_call_tool_matches"], true);
+        assert_eq!(summary["arguments_object_seen"], true);
+        let rendered = summary.to_string();
+        assert!(!rendered.contains("PRIVATE_SERVER"));
+        assert!(!rendered.contains("PRIVATE_TOOL"));
+        assert!(!rendered.contains("PRIVATE_TASK"));
     }
 
     #[test]

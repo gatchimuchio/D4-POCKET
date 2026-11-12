@@ -6034,6 +6034,25 @@ class LinuxAgentTaskFailureDiagnosticsTests(unittest.TestCase):
                     "stage": "codex_process_spawn",
                     "os_error_kind": "NotFound",
                 },
+                {
+                    "kind": "cli_mcp_projection",
+                    "summary": {
+                        "candidate_item_count": 2,
+                        "mcp_tool_call_item_seen": True,
+                        "mcp_tool_call_completed_event_seen": True,
+                        "mcp_tool_call_status_completed_seen": True,
+                        "mcp_tool_call_server_matches": True,
+                        "mcp_tool_call_server_label_matches": False,
+                        "mcp_tool_call_server_name_matches": False,
+                        "mcp_tool_call_tool_matches": True,
+                        "mcp_tool_call_name_matches": False,
+                        "function_call_item_seen": False,
+                        "function_call_namespace_matches": False,
+                        "function_call_name_matches": False,
+                        "function_call_qualified_name_matches": False,
+                        "arguments_object_seen": True,
+                    },
+                },
                 {"kind": "task_failure", "stage": "scratch_create", "detail": "PRIVATE_SECRET"},
             ]
             responses: list[int] = []
@@ -6055,7 +6074,7 @@ class LinuxAgentTaskFailureDiagnosticsTests(unittest.TestCase):
         finally:
             server.close()
 
-        self.assertEqual(responses, [200, 200, 200, 200, 200, 400])
+        self.assertEqual(responses, [200, 200, 200, 200, 200, 200, 400])
         self.assertEqual(
             snapshot["agent_task_diagnostics"],
             [
@@ -6106,6 +6125,23 @@ class LinuxAgentTaskFailureDiagnosticsTests(unittest.TestCase):
                     "mcp_spawn_failure": False,
                 },
                 {"stage": "codex_process_spawn", "os_error_kind": "NotFound"},
+                {
+                    "stage": "codex_cli_mcp_projection",
+                    "candidate_item_count": 2,
+                    "mcp_tool_call_item_seen": True,
+                    "mcp_tool_call_completed_event_seen": True,
+                    "mcp_tool_call_status_completed_seen": True,
+                    "mcp_tool_call_server_matches": True,
+                    "mcp_tool_call_server_label_matches": False,
+                    "mcp_tool_call_server_name_matches": False,
+                    "mcp_tool_call_tool_matches": True,
+                    "mcp_tool_call_name_matches": False,
+                    "function_call_item_seen": False,
+                    "function_call_namespace_matches": False,
+                    "function_call_name_matches": False,
+                    "function_call_qualified_name_matches": False,
+                    "arguments_object_seen": True,
+                },
             ],
         )
         self.assertEqual(snapshot["rejections"], ["unsafe_diagnostic_rejected"])
