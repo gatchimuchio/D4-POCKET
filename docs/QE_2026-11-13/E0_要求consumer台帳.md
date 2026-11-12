@@ -61,8 +61,8 @@ LedgerのE0-04列は、現ID、旧ID、原文参照、対象、目的、Producer
 | N04 | Compare／Handoff／A2Aの実作用と権限非継承 | Compare/Handoff/A2A source consumerはある。Compare実行時隔離、外部Agent連携、Artifact転送、Host越境は現installed候補の一貫した実証なし。Hostはmetadata registry。 | `OPEN`。source接続と実作用証拠を分離し、Compare/Handoff/A2A/Hostの残件を照合する。 |
 | N05 | Capability CatalogからComposeを経て元Toolを実行 | 現行BrokerのRuntime/Agent metadata投影と接続中MCP CatalogをCompose前後で再照合。Settings UIは受理済みManifestを`MCP Tool実行`へ渡し、Brokerが同じManifestを再検査して元Toolを呼ぶ。旧W00のsource gapは現source上解消。 | `OPEN`。source `WIRED`。CapabilityはAdapterの未信頼宣言metadataで、専用の正規Capability Registryとの接続は未確認。Windows fixture test sourceは存在するが未実行。実installed product evidenceは未成立。 |
 | N06 | 独立App Exportと選択Moduleの実除去 | Brokerが新規App/Audit identity・Manifest・Module依存planを作る。Windows/Linux Developer ExporterとLauncherはManifest hash/identityを扱う。Flutter UI Moduleのcompile-time define/AOT比較も存在する。 | `OPEN`。runtime evidenceは`runtime_manifest_consumed=false`、`standalone_app_verified=false`、`binary_pruning_verified=false`。Rust/第三者Module除去、構成による実機能変化、cold-start/resource測定、独立Installer/installed evidenceに`BUILD_GAP`。 |
-| N07 | AI Edit proposalを別主体で審査しcontrolled apply/rollback | AI Edit proposal-only経路が存在。Proposal以後の独立検査・認可Apply・Rollbackの統合状態は未確定。 | `OPEN`。自己承認禁止とBroker-controlled applyを追跡する |
-| N08 | Bufferが元Taskの意味を保ってOS/依存差を調停 | B0〜B4の限定範囲は履歴CLOSED、B5はOPEN、B6は未成立。 | `OPEN`。B5自己適用、B6全Consumer、副作用・fail-closed経路を対応する |
+| N07 | AI Edit proposalを別主体で審査しcontrolled apply/rollback | owner proposalのAudit、提案由来を束縛した別Workspace Taskの事前検査、fresh Permission/Approvalの通常経路はsource接続あり。 | `OPEN`。独立審査結果をapply前に確定するTask／Broker状態と、proposal由来の変更を照合するcontrolled apply/rollbackが`BUILD_GAP`。 |
+| N08 | Bufferが元Taskの意味を保ってOS/依存差を調停 | Codex CLI Task専用Workspace scratch・TEMP/TMP束縛・journal Recoveryと、Task終端の非権限Buffer記録はsource接続あり。 | `OPEN`。実装は限定的なCodex TEMP/scratch調停。全OS/依存差、独立した前後意味・副作用比較、B5自己適用・B6全Consumerは未成立／`BUILD_GAP`。 |
 | N09 | UIから実Task、結果、観測、停止・Recoveryを操作 | Agent Center等の一部Broker投影は存在。結果/Diff/Eval/Resource/Recoveryの全Consumer接続は未確定。 | `OPEN`。通常製品入口から実Broker stateと結果の往復を追跡する |
 | N10 | Windows/macOS/Linux/Android/iOSで通常導入・利用・更新・撤去 | Windows/Linuxのscope限定installed証拠と他OSの個別実装・試験履歴がある。v4標準OS全件のRelease候補証拠は未成立。 | `OPEN`。OS/arch/version/package/実行環境を固定し、未実装package経路を特定する |
 | N11 | 全要求・Source・Consumer・証拠・Blocker・Release判断の結合 | Registry、Conformance、進捗、既存証拠は存在。v4全要求consumer ledgerは本書を含め未完成。 | `OPEN`。全IDをSource/Consumer/否定/Recovery/OS/Evidenceへ結び、18 blockerと同期する |
@@ -167,6 +167,60 @@ LedgerのE0-04列は、現ID、旧ID、原文参照、対象、目的、Producer
 | `apps/desktop_flutter/test/compose_client_test.dart` | `c3fe30faa668482e5a4e42b2f5f5e5b218a01dc8` |
 | `apps/desktop_flutter/test/settings_compose_test.dart` | `a78353f93617cc7b17391549ea256f007a7acdb1` |
 
+## N07/N08 現行Source→Consumer追跡（E0差分）
+
+照合HEADは`03f7b92d4dc67a544e8fa1e9bbaac5d3d912723e`、製品source比較基準は`d503a4ef6daac8942abd1cb011442ce28c78ec55`。本節の製品sourceとFlutter/Rust test fileは基準HEADから差分なし。`tooling/conformance_tests/run_conformance_skeleton.py`だけはsource基準後に更新されているため現blob SHAを別記した。ここはE0 source traceで、列挙testは全て本作業単位`NOT_RUN`。`WIRED`／`FIXTURE`はinstalled product acceptanceを意味しない。
+
+### N07 AI Edit
+
+| 項目 | 現行観測 |
+|---|---|
+| Producer→Consumer | `settings.dart`のAI Edit提案は`AiEditClient.propose`から`GUI Shell編集提案`をBrokerへ送る。受理後は`main.dart`からAgent Centerへ渡り、`AiEditProposalReview.toImplementationTaskInstruction`を含むAgent Taskを事前検査する。Task完了結果の適用準備は`AgentAiEditResultApplySnapshot`が提案ID/hash/Audit、元Taskと完了result hash、現在のsource/target Sessionを束縛し、異なるWorkspaceの未使用Sessionで再照合する。適用側は`AgentTaskClient.inspect`まででTaskを開始せず、通常Agent TaskのPermissionと一回Approvalを別途取得した後に開始する。 |
+| Broker境界 | `ai_edit_center.rs::propose`はOwner経路限定、unknown field／非許可path／自己承認／非`proposal_only`を拒否する。Proposal本文はAuditへ保存せずpayload hashを記録し、file／Permission／Approvalは変更しない。結果・提案は未信頼contextで、source provenanceはApprovalにならない。Apply対象のstale source/result/sessionは事前検査前後のsnapshot比較で停止する。 |
+| 要求との差・Gap | 最初のproposal Taskは通常Agent Taskとして実装作業へ進み得る。後段の別Workspace Taskには適用先fileの独立調査・test指示が含まれるが、審査結果をapply前に独立成果物として確定するBroker状態／Consumerではなく、同じTaskに調査・適用を委ねる指示である。適用後の実changed file/diffをproposal由来とBrokerが照合する専用operation、AI Edit専用Rollback/Recovery Consumerも見つからない。proposal受理とTask事前検査は`WIRED`、S04の独立審査→承認→controlled apply/rollback全体は`BUILD_GAP`。N07/W05/G5は`OPEN`。 |
+| 否定／Authority | Brokerは通常資格での提案、自己承認、秘密pathを拒否する。Apply contextはAuthority/Permission/Approval/Credential/Trust非継承。異なるtarget Session/Workspace、fresh Task Permission/Approval、Owner apply instructionを使い、apply preparation中はTaskを開始しない。 |
+| TestClass / Evidence | Rust `ai_edit_center.rs` owner-only/proposal-only/secret-path negative unit tests、Flutter `ai_edit_client_test.dart` receipt/hash/Audit/untrusted-data tests、`agent_coordination_test.dart` snapshot-binding test、`agent_task_client_test.dart` unused-session condition test、`widget_test.dart` fake Brokerでのproposal/preflight/別Workspace準備testが存在。`UNIT`／`FIXTURE`。実Agentによる独立review、専用Broker apply/rollback、installed product evidenceはこのsource群で確認できない。 |
+| OS／状態 | 調査したsourceはFlutter Desktop設定・Agent Centerと共通Rust Broker。MobileのAI Edit consumer、各OS installed path/identityは`UNKNOWN`。Source traceのためRust/Flutter product testsは`NOT_RUN`。N07は部分`WIRED`、受入`OPEN`。 |
+
+### N08 Buffer／調停
+
+| 項目 | 現行観測 |
+|---|---|
+| Producer→Consumer | `codex_cli.rs`のAgent Task workerはWorkspace直下へTask-bound `WorkspaceTaskScratch`を作り、Broker journalへ予約／directory identityを保存する。`TaskTemporaryEnvironment`はHost `TEMP/TMP`、Linuxでは`TMPDIR`もscratchへ設定し、Codex sandbox環境overrideを生成する。Task終了時にcleanupし、observationをBrokerへ返す。`dialogue.rs::AgentTask進捗反映`はTask/runtime/Workspace/recovery binding/root identity/cleanupを突合後、version 2 Buffer記録とAudit、terminal Task historyを作り、Task stateへstatus/hash/Audit IDだけ投影する。Agent Centerはhash-only projectionを表示する。 |
+| Contract／Recovery | `buffer_intervention_record.schema.json` v2は非権限記録と`作用後未照合`／独立照合条件を定義し、valid/authority-injection/unproven-absorption fixtureをstatic conformanceが検査する。`agent_task_scratch.rs`は最大件数付きjournal、Task/runtime/Workspace/recovery bindingとroot/scratch identityの一致を確認して再起動後に回収する。`runtime_content_reconciliation.schema.json`と`runtime_content_discard_reconciliation.schema.json`は削除中断時のOwner recovery照合契約であり、N08の意味調停consumerには数えない。 |
+| 観測範囲・誠実性 | 現行Rustは成功結果にscratch observationがあれば`作用後未照合`／`同等性未証明`のBuffer記録を作る。調停成功へは昇格しない。`TaskTemporaryEnvironment`のafter hashは予定値から構成され、別OS実体の後状態を独立readbackした値ではない。Adapter自身のcleanup結果は記録するが、記録だけでは元Taskとの意味同等性を証明しない。Rust生成記録を実行時にJSON Schemaへ通すconsumerもsource上確認できない。汎用Broker成功経路ではobservationが`None`ならBuffer記録を作らず、全Adapterへの必須強制ではない。 |
+| 否定／Failure | Scratch作成／cleanup失敗はTaskを失敗させ、journalを残してRecoveryへつなぐ。Brokerがobservation binding不一致、Tool結果不整合、Buffer記録/Audit不能を検出した場合はTaskを隔離し、結果本文を投影しない。journal recoveryはruntime/Workspace/binding/root/directory identity不一致やunsafe pathを削除せず保留する。 |
+| 既存Runtime証拠 | `docs/REV3_PROGRESS.md`の過去installed候補ではMxC `mxc_appcontainer` TEMP write失敗が複数記録され、別runではchild中write PASSでもTaskは別のcontinuation timeoutでfailed、probe cleanupは`not_attempted`だった。別記録のD4-owned `.d4p-tmp-*` journalが空でもMxC TEMP物理削除は未証明。これらは限定`LIVE_RUNTIME`＋`FIXTURE`履歴であり、N08全体PASSへ昇格しない。MxC AppContainer TEMPとD4-owned WorkspaceTaskScratchは別責任境界として保持する。 |
+| TestClass / Gap / 状態 | `codex_cli.rs`にenvironment binding、cleanup failure/Recovery、並行Task isolation tests、`agent_task_scratch.rs`にrestart recovery/identity mismatch tests、`dialogue.rs`にobservation mismatch/Audit failure/terminal projection tests、`protocol.rs`にBroker crash/restart scratch recovery tests、Flutter Agent Task state/UI hash-only projection tests、static schema fixturesが存在。Rust unit/fixture/conformanceは本単位`NOT_RUN`。既存実装はCodex Task scratch/TEMPの限定調停であり、全OS/API/ABI/toolchain/cache/process/network/OneDrive原因母集団、調停前後の同条件効果・副作用比較、B5自己適用、B6全Consumer/QCは未成立。B0〜B4の限定CLOSED、B5 `OPEN`、B6未成立を維持し、N08/W08/G7は`OPEN`。 |
+
+### N07/N08 Source SHA・該当ファイル
+
+blob SHAは照合HEAD `03f7b92d4dc67a544e8fa1e9bbaac5d3d912723e`の値。各fileとroleの詳細は上記traceを参照する。
+
+| source/test/contract file | blob SHA |
+|---|---|
+| `apps/desktop_flutter/lib/services/ai_edit_client.dart` | `ba5e62311a02749d2f9fe0e4e72e2b0d4e0a497d` |
+| `apps/desktop_flutter/lib/services/agent_coordination.dart` | `bdc13464f0e42b740a2bca3b7e8828a5019056d0` |
+| `apps/desktop_flutter/lib/services/agent_task_client.dart` | `f54cefac29eba3dcf383bba19b4f64ee682e6217` |
+| `apps/desktop_flutter/lib/screens/settings.dart` | `66374ec4157d573939e7f9cc5c36aecf5d65e251` |
+| `apps/desktop_flutter/lib/screens/agent_center.dart` | `2472faeb31a64d624423c30a0a30d0f153d2e2a3` |
+| `apps/desktop_flutter/lib/main.dart` | `6109c821ab5dc809224bec5234c4c59db1d5f988` |
+| `native/rust_helper/src/broker/ai_edit_center.rs` | `7a1c2418dc6f71e14fc971385b6f4f2454d55b1c` |
+| `native/rust_helper/src/broker/dialogue.rs` | `c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999` |
+| `native/rust_helper/src/adapters/codex_cli.rs` | `e5c9d1581ae9a1c0a3ae7fcfa626fdca6fea6d28` |
+| `native/rust_helper/src/broker/agent_task_scratch.rs` | `de743cd819fb4533c9c3070c4e7bcae82e42d938` |
+| `native/rust_helper/src/broker/execution_history.rs` | `8eeb1c26d06a9e4b01806413a4bfa8c2a73357d6` |
+| `native/rust_helper/src/broker/protocol.rs` | `9b2076d5f31ca6d77f1f87973d1b394aaf751961` |
+| `apps/desktop_flutter/test/ai_edit_client_test.dart` | `c5ecd0353fdc811ec7c4d52a9c2b7d10e1d01723` |
+| `apps/desktop_flutter/test/agent_coordination_test.dart` | `6783e87a492d8436a855a7088b7cece38d122bd5` |
+| `apps/desktop_flutter/test/agent_task_client_test.dart` | `0477a0bbbb321082494b6b55711815d34419fdd9` |
+| `apps/desktop_flutter/test/widget_test.dart` | `f4e9c7b93f832ba2a2cefee779fd12426f240b04` |
+| `specs/buffer_intervention_record.schema.json` | `26a1fa8ee9d010f18c157f5d3b66b9b34bdf94d5` |
+| `examples/contracts/buffer_intervention_record.valid.json` | `3ebaf07e8a6241f9e44b8c78fefa45fa23523abf` |
+| `examples/contracts/invalid/buffer_intervention_record_authority.invalid.json` | `981178ad70376fa633a76a686ed6e7d12287095d` |
+| `examples/contracts/invalid/buffer_intervention_record_unproven_absorption.invalid.json` | `073dbfd11943588e045360dcce2009ae7245ebbf` |
+| `tooling/conformance_tests/run_conformance_skeleton.py` | `c6f31d8cb561b48513c6784e54c85969c9cb953e` |
+
 ## 実装ファイルの初期目録（CODE_PRESENTのみ）
 
 下記は`d503a4ef6daac8942abd1cb011442ce28c78ec55`時点のパス存在・責務候補を読み取った初期目録である。名前・コードの存在だけではProducer→Consumer接続、installed/runtime実作用、Acceptanceを証明しない。各行の`WIRED`、実作用、正常/否定/Recovery、Evidence、OS別状態は未照合なら`UNKNOWN`。
@@ -177,8 +231,8 @@ LedgerのE0-04列は、現ID、旧ID、原文参照、対象、目的、Producer
 | B／N03・N04 | `runtime_center.dart`、`agent_coordination.dart`、`agent_handoff.dart`、`a2a_connection_client.dart`、`a2a_artifact_handoff.dart` | `broker/runtime_registry.rs`、`adapters/codex_cli.rs`、`adapters/minidora.rs`、`broker/a2a_center.rs` | Adapter/Compare/A2A関連コードは存在する。二つ目の独立実Runtimeの実Task、外部A2A作用、host越境拒否、fresh authorityの現consumerは`UNKNOWN` |
 | D／N05 | `settings.dart`のRuntime/Agent/MCP Catalog更新→Compose受理→選択Tool操作、`compose_client.dart`、`mcp_connection_client.dart` | `broker/dialogue.rs`の現登録Adapter snapshot、`broker/compose_center.rs`のcompatibility check、`broker/mcp_center.rs::call_tool` | 現在Catalog→Manifest→同じBrokerのMCP実作用はsource `WIRED`。Capability metadataは未信頼宣言で、実Provider能力を独立測定するものではない。fixtureとinstalled evidenceは別区分 |
 | E／N06 | Export UI→`export_client.dart`→Broker Manifest/Receipt→Windows/Linux Developer Exporter→product launcher | `broker/export_center.rs`、`desktop_launcher.rs`、`linux_desktop_launcher.rs`、`export_windows_product.py`、`export_linux_product.py` | 新規identityとManifest/Module planはsource `WIRED`。runtimeは構成を実消費せず、証拠がruntime consumption/pruningをfalseと明記。実独立製品・Installer・binary/resource除去は`BUILD_GAP` |
-| D／N07 | `ai_edit_client.dart` とAI Edit UI | `broker/ai_edit_center.rs` | Rust fileは`proposal_only`・自動applyなしの申告を記録する。別主体の検査からcontrolled apply/rollbackへ至る実製品経路は`UNKNOWN` |
-| F／N08 | Repository内の`native/`、`packages/`、`tooling/`で`buffer`／`mediat`／`reconcil`／`arbitrat`を含むfile名は見つからなかった | 上記検索は名前照合に限定 | Buffer作用が別名の実装へあるかは未確認。不存在・Gapとは判定しない。B5/B6とのconsumer対応は`UNKNOWN` |
+| D／N07 | `settings.dart`／`ai_edit_client.dart`からproposalをBroker記録し、`main.dart`経由でAgent CenterのTaskへ受け渡す。適用側は`AgentAiEditResultApplySnapshot`が元Task/result/proposalと別Session/Workspaceを再照合する。 | `broker/ai_edit_center.rs`と通常`dialogue.rs` Agent Task経路 | proposal-only/Audit、結果由来・別Workspace束縛、fresh Task preflightはsource `WIRED`。独立審査結果、Broker-controlled diff apply/rollbackは`BUILD_GAP`。 |
+| F／N08 | `adapters/codex_cli.rs`のWorkspaceTaskScratch/TEMP mediation | `broker/agent_task_scratch.rs`、`dialogue.rs` Buffer record/Audit、`execution_history.rs` | Codex CLI限定のTEMP/scratch作用・回復記録はsource `WIRED`。広域原因Consumer、意味/副作用同等性、B5/B6統合は`BUILD_GAP`。初期のfilename-only検索によるUNKNOWNは本差分で精査済み。 |
 | C／N09 | Agent Center、Workspace Inspector、History、Evaluation、Observability、Problems、Recovery、Audit、TraceのFlutter screen/service files | 対応候補として`broker/history_access.rs`、`execution_history.rs`、`evaluation_lab.rs`、`observation_center.rs`、`notification_center.rs`、`content_recovery.rs`、`audit.rs` | 個別画面・Broker moduleは存在する。実Task IDを共有したend-to-end表示、failure/restart/notification/stop consumerは`UNKNOWN` |
 | G/H/I／N10 | Windows/Linux/macOS Desktop runners、`apps/mobile_flutter` Dart/Android Kotlin/iOS Swift source | `native/rust_helper/src/desktop_launcher.rs`、Linux/macOS launcher・worker、Mobile Device Link native services | Windows installerに複数PowerShell収集/配置scriptがある。`installer/linux/README.md`・`installer/macos/README.md`はあるが、当該installer root内にpackage builderは見当たらない。別locationを含む正規package経路は`UNKNOWN` |
 | J／N11 | `docs/QE_2026-11-13/`、README/Checklist/Progress | `tooling/manifest.py`、`tooling/release_gate_check.py`、`tooling/conformance_tests/run_conformance_skeleton.py`、`release_blockers.registry.json` | v4正本/Registry/validatorの参照は同期済み。E0全ID/Consumer/Evidence validator・完全なrelease candidate結合は`UNKNOWN` |
