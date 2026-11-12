@@ -4691,6 +4691,10 @@ class _LinuxAgentTaskResponsesServer:
                 for item in input_items
                 if isinstance(item, dict) and item.get("type") == "function_call_output"
             ]
+            function_output_shapes = [
+                _safe_response_function_output_shape(item.get("output"))
+                for item in tool_outputs[:4]
+            ]
             tools = request.get("tools")
             offers_exec = isinstance(tools, list) and any(
                 isinstance(tool, dict) and tool.get("name") == "exec_command"
@@ -4769,6 +4773,7 @@ class _LinuxAgentTaskResponsesServer:
                 {
                     "input_items": len(input_items),
                     "function_call_output_items": len(tool_outputs),
+                    "function_call_output_shapes": function_output_shapes,
                     "exec_command_offered": offers_exec,
                     "task_mcp_tool_offered": offers_task_mcp_tool,
                     "task_mcp_tool_descriptors": task_tool_descriptors[:4],
@@ -5750,6 +5755,7 @@ def _normalize_response_fixture_request_shapes(
     expected_shape_fields = {
         "input_items",
         "function_call_output_items",
+        "function_call_output_shapes",
         "exec_command_offered",
         "task_mcp_tool_offered",
         "task_mcp_tool_descriptors",
@@ -5776,6 +5782,81 @@ def _normalize_response_fixture_request_shapes(
             row.get("task_mcp_tool_offered")
         ) is not bool:
             return None
+        output_shapes = row.get("function_call_output_shapes")
+        if (
+            not isinstance(output_shapes, list)
+            or len(output_shapes) > 4
+            or len(output_shapes) != min(row["function_call_output_items"], 4)
+        ):
+            return None
+        safe_output_shapes: list[dict[str, object]] = []
+        output_kinds = {"array", "boolean", "null", "number", "object", "other", "string"}
+        output_type_classes = {
+            "absent", "audio", "error", "image", "input_text", "json",
+            "other", "output_text", "refusal", "resource_link", "text",
+        }
+        output_keys = {"content", "error", "result", "structuredContent", "text", "type"}
+        for shape in output_shapes:
+            kind_value = shape.get("kind") if isinstance(shape, dict) else None
+            type_class_value = shape.get("type_class") if isinstance(shape, dict) else None
+            content_kind_value = shape.get("content_kind") if isinstance(shape, dict) else None
+            if (
+                not isinstance(shape, dict)
+                or set(shape)
+                != {
+                    "kind",
+                    "known_keys",
+                    "type_class",
+                    "content_kind",
+                    "content_type_classes",
+                    "array_item_kinds",
+                    "array_item_type_classes",
+                }
+                or not isinstance(kind_value, str)
+                or kind_value not in output_kinds
+                or not isinstance(type_class_value, str)
+                or type_class_value not in output_type_classes
+                or not isinstance(content_kind_value, str)
+                or content_kind_value not in output_kinds | {"absent"}
+            ):
+                return None
+            known_keys = shape.get("known_keys")
+            content_type_classes = shape.get("content_type_classes")
+            array_item_kinds = shape.get("array_item_kinds")
+            array_item_type_classes = shape.get("array_item_type_classes")
+            if (
+                not isinstance(known_keys, list)
+                or len(known_keys) > len(output_keys)
+                or any(not isinstance(key, str) or key not in output_keys for key in known_keys)
+                or len(set(known_keys)) != len(known_keys)
+                or not isinstance(content_type_classes, list)
+                or len(content_type_classes) > 8
+                or any(
+                    not isinstance(value, str) or value not in output_type_classes
+                    for value in content_type_classes
+                )
+                or not isinstance(array_item_kinds, list)
+                or len(array_item_kinds) > 8
+                or any(not isinstance(value, str) or value not in output_kinds for value in array_item_kinds)
+                or not isinstance(array_item_type_classes, list)
+                or len(array_item_type_classes) > 8
+                or any(
+                    not isinstance(value, str) or value not in output_type_classes
+                    for value in array_item_type_classes
+                )
+            ):
+                return None
+            safe_output_shapes.append(
+                {
+                    "kind": kind_value,
+                    "known_keys": sorted(known_keys),
+                    "type_class": type_class_value,
+                    "content_kind": content_kind_value,
+                    "content_type_classes": list(content_type_classes),
+                    "array_item_kinds": list(array_item_kinds),
+                    "array_item_type_classes": list(array_item_type_classes),
+                }
+            )
         descriptors = row.get("task_mcp_tool_descriptors")
         if not isinstance(descriptors, list) or len(descriptors) > 4:
             return None
@@ -5866,12 +5947,66 @@ def _normalize_response_fixture_request_shapes(
             {
                 "input_items": row["input_items"],
                 "function_call_output_items": row["function_call_output_items"],
+                "function_call_output_shapes": safe_output_shapes,
                 "exec_command_offered": row["exec_command_offered"],
                 "task_mcp_tool_offered": row["task_mcp_tool_offered"],
                 "task_mcp_tool_descriptors": safe_descriptors,
             }
         )
     return normalized
+
+
+def _safe_response_function_output_shape(value: object) -> dict[str, object]:
+    """Summarize a function output's structure without retaining its values."""
+
+    def kind(candidate: object) -> str:
+        if candidate is None:
+            return "null"
+        if type(candidate) is bool:
+            return "boolean"
+        if isinstance(candidate, str):
+            return "string"
+        if isinstance(candidate, list):
+            return "array"
+        if isinstance(candidate, dict):
+            return "object"
+        if type(candidate) in {int, float}:
+            return "number"
+        return "other"
+
+    allowed_keys = {"content", "error", "result", "structuredContent", "text", "type"}
+    allowed_types = {
+        "audio", "error", "image", "input_text", "json", "output_text",
+        "refusal", "resource_link", "text",
+    }
+
+    def type_class(candidate: object) -> str:
+        if not isinstance(candidate, dict) or "type" not in candidate:
+            return "absent"
+        value_type = candidate.get("type")
+        if not isinstance(value_type, str):
+            return "other"
+        return value_type if value_type in allowed_types else "other"
+
+    known_keys = sorted(
+        key for key in allowed_keys if isinstance(value, dict) and key in value
+    )
+    content = value.get("content") if isinstance(value, dict) and "content" in value else None
+    content_types = (
+        [type_class(item) for item in content[:8]] if isinstance(content, list) else []
+    )
+    array_items = value[:8] if isinstance(value, list) else []
+    return {
+        "kind": kind(value),
+        "known_keys": known_keys,
+        "type_class": type_class(value),
+        "content_kind": (
+            kind(content) if isinstance(value, dict) and "content" in value else "absent"
+        ),
+        "content_type_classes": content_types,
+        "array_item_kinds": [kind(item) for item in array_items],
+        "array_item_type_classes": [type_class(item) for item in array_items],
+    }
 
 
 def _installed_task_response_fixture_diagnostics(

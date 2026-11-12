@@ -68,6 +68,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _installed_task_history_diagnostics,
     _installed_task_response_fixture_diagnostics,
     _normalize_response_fixture_request_shapes,
+    _safe_response_function_output_shape,
     _linux_x11_window_presence_diagnostics,
     _stop_linux_agent_task_process_group,
     _linux_processes_with_task_nonce,
@@ -4883,6 +4884,7 @@ class InstalledTaskStatusPollingTests(unittest.TestCase):
                             {
                                 "input_items": 1,
                                 "function_call_output_items": 0,
+                                "function_call_output_shapes": [],
                                 "exec_command_offered": True,
                                 "task_mcp_tool_offered": False,
                                 "task_mcp_tool_descriptors": [],
@@ -4993,6 +4995,7 @@ class InstalledTaskStatusPollingTests(unittest.TestCase):
                             {
                                 "input_items": 2,
                                 "function_call_output_items": 0,
+                                "function_call_output_shapes": [],
                                 "exec_command_offered": True,
                                 "task_mcp_tool_offered": False,
                                 "task_mcp_tool_descriptors": [
@@ -5038,6 +5041,7 @@ class InstalledTaskStatusPollingTests(unittest.TestCase):
                 {
                     "input_items": 0,
                     "function_call_output_items": 0,
+                    "function_call_output_shapes": [],
                     "exec_command_offered": True,
                     "task_mcp_tool_offered": False,
                     "task_mcp_tool_descriptors": [
@@ -5063,6 +5067,90 @@ class InstalledTaskStatusPollingTests(unittest.TestCase):
             [{"type_class": "function", "name_class": "other"}],
         )
         self.assertNotIn(private_tool_name, rendered)
+
+    def test_response_fixture_output_shape_hides_structured_tool_output_values(self) -> None:
+        server = _LinuxAgentTaskResponsesServer()
+        self.addCleanup(server.close)
+        proposal = {
+            "server_id": "linux-installed-mcp-followup",
+            "tool_id": "tool-" + "b" * 142,
+            "name": "echo",
+            "arguments": {"text": "public-input-marker"},
+        }
+        descriptor = {
+            "type": "function",
+            "namespace": "d4p_task_request",
+            "name": "d4_submit_mcp_tool_request",
+        }
+        server.configure(
+            "mcp_proposal",
+            "",
+            Path("/tmp/workspace"),
+            mcp_tool_request=proposal,
+        )
+        events = server._response_events({"input": [], "tools": [descriptor]})
+        call_item = next(
+            event["item"]
+            for event in events
+            if event["type"] == "response.output_item.done"
+            and isinstance(event.get("item"), dict)
+            and event["item"].get("type") == "function_call"
+        )
+        private_value = "PRIVATE_FUNCTION_OUTPUT_CANARY"
+        with self.assertRaisesRegex(RuntimeError, "task MCP function output missing"):
+            server._response_events(
+                {
+                    "input": [
+                        {
+                            "type": "function_call_output",
+                            "call_id": call_item["call_id"],
+                            "output": {
+                                "content": [{"type": "text", "text": private_value}]
+                            },
+                        }
+                    ],
+                    "tools": [descriptor],
+                }
+            )
+        diagnostics = _installed_task_response_fixture_diagnostics(
+            server, "mcp_proposal", 0
+        )
+        rendered = json.dumps(diagnostics, ensure_ascii=False, sort_keys=True)
+        self.assertEqual(diagnostics["state"], "read")
+        self.assertEqual(
+            diagnostics["request_shapes"][1]["function_call_output_shapes"],
+            [
+                {
+                    "kind": "object",
+                    "known_keys": ["content"],
+                    "type_class": "absent",
+                    "content_kind": "array",
+                    "content_type_classes": ["text"],
+                    "array_item_kinds": [],
+                    "array_item_type_classes": [],
+                }
+            ],
+        )
+        self.assertNotIn(private_value, rendered)
+
+    def test_response_fixture_output_shape_classifies_array_items_without_values(self) -> None:
+        private_value = "PRIVATE_ARRAY_OUTPUT_CANARY"
+        shape = _safe_response_function_output_shape(
+            [{"type": "text", "text": private_value}]
+        )
+        self.assertEqual(
+            shape,
+            {
+                "kind": "array",
+                "known_keys": [],
+                "type_class": "absent",
+                "content_kind": "absent",
+                "content_type_classes": [],
+                "array_item_kinds": ["object"],
+                "array_item_type_classes": ["text"],
+            },
+        )
+        self.assertNotIn(private_value, json.dumps(shape))
 
     def test_response_fixture_diagnostics_reject_unhashable_event_values(self) -> None:
         responses_server = types.SimpleNamespace(
