@@ -89,6 +89,26 @@ pub(crate) fn agent_task_audit_record(
     Ok(Some(record))
 }
 
+/// AI Editの適用先Session再利用を拒否するため、Task本文を投影せず開始履歴だけを照合する。
+pub(crate) fn task_session_has_history(
+    log: &BrokerAuditLog,
+    runtime_id: &str,
+    session_id: &str,
+) -> Result<bool, &'static str> {
+    if !valid_id(runtime_id) || !valid_id(session_id) {
+        return Err("Agent Task履歴照合の識別子が不正");
+    }
+    let mut found = false;
+    for event in log.events() {
+        if let Some(record) = agent_task_audit_record(event)? {
+            if record.runtime_id == runtime_id && record.session_id == session_id {
+                found = true;
+            }
+        }
+    }
+    Ok(found)
+}
+
 pub(crate) fn encode_agent_task_audit(
     record: &AgentTaskHistoryAuditRecord,
 ) -> Result<(String, String), &'static str> {
@@ -709,6 +729,37 @@ mod tests {
             buffer_intervention_status: None,
             buffer_intervention_audit_event_id: None,
         }
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn AI_Edit適用先Session履歴は対象を限定し破損時にfail_closedする() {
+        let mut log = BrokerAuditLog::default();
+        let task_id = "history-task-01";
+        let record = task_history_start(task_id, "runtime-a");
+        let (reason, digest) = encode_agent_task_audit(&record).unwrap();
+        log.append(
+            task_id,
+            "AgentTask実行",
+            "recorded",
+            &reason,
+            "INTERNAL_STATE",
+            &digest,
+        );
+
+        assert!(task_session_has_history(&log, "runtime-a", "session-a").unwrap());
+        assert!(!task_session_has_history(&log, "runtime-b", "session-a").unwrap());
+        assert!(!task_session_has_history(&log, "runtime-a", "session-b").unwrap());
+
+        log.append(
+            "malformed-task",
+            "AgentTask実行",
+            "recorded",
+            &format!("{AGENT_TASK_HISTORY_PREFIX}{{}}"),
+            "INTERNAL_STATE",
+            &sha256_tagged(b"wrong hash"),
+        );
+        assert!(task_session_has_history(&log, "runtime-a", "session-a").is_err());
     }
 
     #[test]

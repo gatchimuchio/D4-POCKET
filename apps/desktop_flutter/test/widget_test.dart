@@ -4135,6 +4135,7 @@ void main() {
       'session_id': targetSessionId,
       'workspace_id': targetWorkspaceId,
       'instruction': applyTaskInstruction,
+      'require_unused_task_session': true,
     };
     final applyTaskInstructionHash = brokerPayloadHash(applyTaskPayload);
     Map<String, Object?> taskRecord({required String status}) => {

@@ -566,6 +566,8 @@ struct Agent作業要求 {
     workspace_id: String,
     instruction: String,
     #[serde(default)]
+    require_unused_task_session: Option<bool>,
+    #[serde(default)]
     mcp_capability_snapshot_hash: Option<String>,
     #[serde(default)]
     mcp_result_id: Option<String>,
@@ -840,9 +842,10 @@ fn AgentTask実行条件hash(
     workspace_id: &str,
     registration_hash: &str,
     permission_id: &str,
+    require_unused_task_session: bool,
 ) -> String {
     let material = format!(
-        "gui-shell-agent-task-execution-conditions-v1\0{runtime_id}\0{session_id}\0{workspace_id}\0{registration_hash}\0{permission_id}\0{AGENT_TASK_EXECUTION_POLICY}"
+        "gui-shell-agent-task-execution-conditions-v2\0{runtime_id}\0{session_id}\0{workspace_id}\0{registration_hash}\0{permission_id}\0require_unused_task_session={require_unused_task_session}\0{AGENT_TASK_EXECUTION_POLICY}"
     );
     sha256_tagged(material.as_bytes())
 }
@@ -1150,6 +1153,21 @@ impl 対話制御 {
             .is_some_and(|metadata| metadata.task_execution_supported())
     }
 
+    pub(crate) fn agent_task_session_is_current(
+        &self,
+        runtime_id: &str,
+        session_id: &str,
+        workspace_id: &str,
+        registration_hash: &str,
+    ) -> bool {
+        self.セッション.get(session_id).is_some_and(|session| {
+            session.状態 == "利用中"
+                && session.実行系ID == runtime_id
+                && session.作業領域ID.as_deref() == Some(workspace_id)
+                && session.作業領域登録hash.as_deref() == Some(registration_hash)
+        })
+    }
+
     pub(crate) fn 登録件数(&self) -> usize {
         self.実行系.len()
     }
@@ -1294,6 +1312,7 @@ impl 対話制御 {
         workspace_id: &str,
         registration_hash: &str,
         instruction_hash: &str,
+        require_unused_task_session: bool,
         now: i64,
     ) -> bool {
         self.agent_task_permissions
@@ -1316,6 +1335,7 @@ impl 対話制御 {
                                 workspace_id,
                                 registration_hash,
                                 &grant.permission_id,
+                                require_unused_task_session,
                             )
                 })
             })
@@ -1569,6 +1589,7 @@ impl 対話制御 {
                     || !Agent作業要求識別子妥当(&request.workspace_id)
                     || request.instruction.trim().is_empty()
                     || request.instruction.chars().count() > 32_768
+                    || request.require_unused_task_session == Some(false)
                     || !Agent作業Context参照妥当(&request)
                 {
                     return Err(対話失敗::要求不正);
@@ -1618,6 +1639,7 @@ impl 対話制御 {
                     &request.workspace_id,
                     binding.registration_hash(),
                     &instruction_hash,
+                    request.require_unused_task_session.unwrap_or(false),
                     現在,
                 ) {
                     "有効"
@@ -1733,6 +1755,7 @@ impl 対話制御 {
                     || !Agent作業要求識別子妥当(&request.workspace_id)
                     || request.instruction.trim().is_empty()
                     || request.instruction.chars().count() > 32_768
+                    || request.require_unused_task_session == Some(false)
                     || !Agent作業Context参照妥当(&request)
                 {
                     return Err(対話失敗::要求不正);
@@ -1786,6 +1809,7 @@ impl 対話制御 {
                     &request.workspace_id,
                     binding.registration_hash(),
                     &permission.permission_id,
+                    request.require_unused_task_session.unwrap_or(false),
                 );
                 let expires_at_epoch_seconds = 現在.saturating_add(300);
                 監査(
@@ -1825,6 +1849,7 @@ impl 対話制御 {
                     || !Agent作業要求識別子妥当(&request.workspace_id)
                     || request.instruction.trim().is_empty()
                     || request.instruction.chars().count() > 32_768
+                    || request.require_unused_task_session == Some(false)
                     || !Agent作業Context参照妥当(&request)
                 {
                     return Err(対話失敗::要求不正);
@@ -1894,6 +1919,7 @@ impl 対話制御 {
                     &request.workspace_id,
                     binding.registration_hash(),
                     &instruction_hash,
+                    request.require_unused_task_session.unwrap_or(false),
                     現在,
                 ) {
                     return Err(対話失敗::権限拒否);
@@ -1953,6 +1979,7 @@ impl 対話制御 {
                             &request.workspace_id,
                             binding.registration_hash(),
                             &permission_id,
+                            request.require_unused_task_session.unwrap_or(false),
                         ),
                     })
                     .to_string()
@@ -4740,6 +4767,7 @@ mod tests {
                 "fixture-workspace-left",
                 &registration_hash,
                 &instruction_hash,
+                false,
                 100,
             ));
             assert_eq!(
@@ -4777,6 +4805,7 @@ mod tests {
                 "fixture-workspace-left",
                 &registration_hash,
                 &instruction_hash,
+                false,
                 100,
             ));
 
@@ -4796,6 +4825,7 @@ mod tests {
                         "fixture-workspace-left",
                         &grant.workspace_registration_hash,
                         &grant.permission_id,
+                        false,
                     ),
                 );
 
@@ -4819,6 +4849,7 @@ mod tests {
                 "fixture-workspace-left",
                 &registration_hash,
                 &instruction_hash,
+                false,
                 100,
             ));
             assert_eq!(

@@ -4881,6 +4881,73 @@ impl Broker {
         } else {
             None
         };
+        if matches!(
+            operation,
+            BrokerOperation::Agent作業要求検査
+                | BrokerOperation::AgentTaskOwnerApprovalGrant
+                | BrokerOperation::AgentTask実行
+        ) && effective_payload
+            .get("require_unused_task_session")
+            .and_then(Value::as_bool)
+            == Some(true)
+        {
+            let runtime_id = effective_payload
+                .get("agent_runtime_id")
+                .and_then(Value::as_str);
+            let session_id = effective_payload.get("session_id").and_then(Value::as_str);
+            let workspace_id = effective_payload
+                .get("workspace_id")
+                .and_then(Value::as_str);
+            let (Some(runtime_id), Some(session_id), Some(workspace_id)) =
+                (runtime_id, session_id, workspace_id)
+            else {
+                return self.reject_with_payload_hash(
+                    request_id,
+                    operation.as_str(),
+                    "agent_task_apply_binding_invalid",
+                    "未使用Session条件の対象を確認できないため停止しました",
+                    true,
+                    payload_hash,
+                );
+            };
+            let session_is_current = workspace_binding.as_ref().is_some_and(|binding| {
+                self.対話.agent_task_session_is_current(
+                    runtime_id,
+                    session_id,
+                    workspace_id,
+                    binding.registration_hash(),
+                )
+            });
+            if session_is_current {
+                match super::execution_history::task_session_has_history(
+                    &self.audit_log,
+                    runtime_id,
+                    session_id,
+                ) {
+                    Ok(false) => {}
+                    Ok(true) => {
+                        return self.reject_with_payload_hash(
+                            request_id,
+                            operation.as_str(),
+                            "agent_task_session_already_used",
+                            "AI Edit適用先Sessionに既存Agent Task履歴があるため停止しました",
+                            true,
+                            payload_hash,
+                        );
+                    }
+                    Err(_) => {
+                        return self.reject_with_payload_hash(
+                            request_id,
+                            operation.as_str(),
+                            "agent_task_history_unavailable",
+                            "BrokerがAgent Task履歴を検証できないため適用準備を停止しました",
+                            true,
+                            payload_hash,
+                        );
+                    }
+                }
+            }
+        }
         let mut 対話 = std::mem::take(&mut self.対話);
         let now = self.current_epoch_seconds();
         let scratch_journal = self.agent_task_scratch.clone();
@@ -10075,7 +10142,7 @@ mod 端末統治試験 {
     }
     #[test]
     #[allow(non_snake_case)]
-    fn Agent作業要求検査は現行SessionとWorkspaceだけを照合し本文を露出せず未実行を明示する() {
+    fn AI_Edit適用Taskは未使用Sessionを耐久Task履歴で再確認し本文を露出しない() {
         let mut e = 環境生成();
         let mut metadata: Value = serde_json::from_str(include_str!(
             "../../../../examples/contracts/agent_adapter.valid.json"
@@ -10127,6 +10194,7 @@ mod 端末統治試験 {
             "session_id":session_id,
             "workspace_id":"fixture-task-workspace",
             "instruction":instruction,
+            "require_unused_task_session":true,
         });
         let accepted = 通常要求(
             &mut e.broker,
@@ -10148,6 +10216,22 @@ mod 端末統治試験 {
         let audit = serde_json::to_string(e.broker.audit_events()).unwrap();
         assert!(!output.contains(instruction));
         assert!(!audit.contains(instruction));
+
+        let mut false_unused_session = payload.clone();
+        false_unused_session["require_unused_task_session"] = json!(false);
+        let rejected_false_unused_session = 通常要求(
+            &mut e.broker,
+            BrokerOperation::Agent作業要求検査,
+            false_unused_session,
+        );
+        assert_eq!(rejected_false_unused_session.status, BrokerStatus::Rejected);
+        assert_eq!(
+            rejected_false_unused_session
+                .error
+                .as_ref()
+                .map(|error| error.code.as_str()),
+            Some("要求不正")
+        );
 
         let permission_payload = json!({
             "agent_runtime_id":"fixture-agent",
@@ -10250,7 +10334,7 @@ mod 端末統治試験 {
                 .map(|error| error.code.as_str()),
             Some("desktop_native_owner_confirmation_required")
         );
-        let native_approval_request = json!({
+        let native_approval_request_json = json!({
             "request_id": "agent-task-owner-approval-native",
             "session_id": "device-test",
             "operation": "AgentTaskOwnerApprovalGrant",
@@ -10262,7 +10346,7 @@ mod 端末統治試験 {
         });
         let approval = e
             .broker
-            .desktop_owner_operation_json(&native_approval_request.to_string());
+            .desktop_owner_operation_json(&native_approval_request_json.to_string());
         assert_eq!(approval.status, BrokerStatus::Accepted);
         let approval_receipt = approval.body.as_ref().unwrap();
         assert_eq!(approval_receipt["実行状態"], "未実行");
@@ -10283,7 +10367,7 @@ mod 端末統治試験 {
         }));
         let replayed_approval = e
             .broker
-            .desktop_owner_operation_json(&native_approval_request.to_string());
+            .desktop_owner_operation_json(&native_approval_request_json.to_string());
         assert_eq!(replayed_approval.status, BrokerStatus::Rejected);
         assert_eq!(
             replayed_approval
@@ -10306,6 +10390,22 @@ mod 端末統治試験 {
         assert_eq!(
             permission_preflight.body.as_ref().unwrap()["Approval状態"],
             "有効"
+        );
+        let mut relaxed_session_policy = payload.clone();
+        relaxed_session_policy
+            .as_object_mut()
+            .unwrap()
+            .remove("require_unused_task_session");
+        let relaxed_policy_preflight = 通常要求(
+            &mut e.broker,
+            BrokerOperation::Agent作業要求検査,
+            relaxed_session_policy,
+        );
+        assert_eq!(relaxed_policy_preflight.status, BrokerStatus::Accepted);
+        assert_eq!(
+            relaxed_policy_preflight.body.as_ref().unwrap()["Approval状態"],
+            "未取得",
+            "Owner Approvalの実行条件hashは未使用Session条件へ束縛する",
         );
         let mut changed_instruction = payload.clone();
         changed_instruction["instruction"] = json!("変更されたTask本文");
@@ -10396,6 +10496,80 @@ mod 端末統治試験 {
         assert_eq!(
             rejected.error.as_ref().map(|error| error.code.as_str()),
             Some("要求不正")
+        );
+
+        let prior_task_id = "prior-agent-task-for-apply";
+        let prior_task = super::super::execution_history::AgentTaskHistoryAuditRecord {
+            version: 1,
+            stage: "start".into(),
+            task_id: prior_task_id.into(),
+            runtime_id: "fixture-agent".into(),
+            session_id: session_id.into(),
+            workspace_id: "fixture-task-workspace".into(),
+            instruction_hash: crate::audit_hash::sha256_tagged(b"prior instruction"),
+            request_hash: crate::audit_hash::sha256_tagged(b"prior request"),
+            created_at: e.broker.current_epoch_seconds(),
+            status: "running".into(),
+            updated_at: e.broker.current_epoch_seconds(),
+            result_hash: None,
+            failure_class: None,
+            start_audit_event_id: None,
+            buffer_intervention_record_hash: None,
+            buffer_intervention_status: None,
+            buffer_intervention_audit_event_id: None,
+        };
+        let (history_reason, history_hash) =
+            super::super::execution_history::encode_agent_task_audit(&prior_task)
+                .expect("履歴条件を満たすTask開始Auditを構築");
+        e.broker
+            .append_audit(
+                prior_task_id,
+                "AgentTask実行",
+                "recorded",
+                &history_reason,
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+                &history_hash,
+            )
+            .expect("Broker Auditへ既存Task開始を記録");
+
+        let reused_session = 通常要求(
+            &mut e.broker,
+            BrokerOperation::Agent作業要求検査,
+            payload.clone(),
+        );
+        assert_eq!(reused_session.status, BrokerStatus::Rejected);
+        assert_eq!(
+            reused_session
+                .error
+                .as_ref()
+                .map(|error| error.code.as_str()),
+            Some("agent_task_session_already_used")
+        );
+
+        let mut reused_approval_request = native_approval_request_json.clone();
+        reused_approval_request["request_id"] = json!("agent-task-owner-approval-used-session");
+        reused_approval_request["nonce"] = json!("agent-task-owner-approval-used-session-nonce");
+        let reused_approval = e
+            .broker
+            .desktop_owner_operation_json(&reused_approval_request.to_string());
+        assert_eq!(reused_approval.status, BrokerStatus::Rejected);
+        assert_eq!(
+            reused_approval
+                .error
+                .as_ref()
+                .map(|error| error.code.as_str()),
+            Some("agent_task_session_already_used")
+        );
+
+        let reused_start = 通常要求(
+            &mut e.broker,
+            BrokerOperation::AgentTask実行,
+            payload.clone(),
+        );
+        assert_eq!(reused_start.status, BrokerStatus::Rejected);
+        assert_eq!(
+            reused_start.error.as_ref().map(|error| error.code.as_str()),
+            Some("agent_task_session_already_used")
         );
 
         let ended_session = 通常要求(

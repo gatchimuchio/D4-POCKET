@@ -9567,6 +9567,25 @@ def test_agent_task_request_cannot_carry_authority_or_dialogue_approval() -> lis
         if validate_instance(candidate, schema) == []:
             errors.append("Agent作業要求の空白または上限超過instructionを拒否しない")
 
+    apply_target = {**valid, "require_unused_task_session": True}
+    if validate_instance(apply_target, schema):
+        errors.append("AI Edit適用先の未使用Session条件が有効なAgent Task要求として受理されない")
+    if validate_instance({**valid, "require_unused_task_session": False}, schema) == []:
+        errors.append("未使用Session条件のfalse偽装を受理した")
+
+    task_broker = (ROOT / "native/rust_helper/src/broker/protocol.rs").read_text(
+        encoding="utf-8"
+    )
+    task_history = (ROOT / "native/rust_helper/src/broker/execution_history.rs").read_text(
+        encoding="utf-8"
+    )
+    if (
+        '"require_unused_task_session"' not in task_broker
+        or "task_session_has_history" not in task_broker
+        or "task_session_has_history" not in task_history
+    ):
+        errors.append("AI Editの未使用Session条件がBroker耐久Task履歴へ接続されていない")
+
     contract_text = (DOC_SPECS / "agent-runtime.md").read_text(encoding="utf-8")
     if "対話Approval" not in contract_text:
         errors.append("Agent Runtime正本が対話Approvalと作業Task Approvalの分離を定義しない")

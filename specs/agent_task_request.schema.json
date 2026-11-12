@@ -48,6 +48,11 @@
       "type": "string",
       "pattern": "^sha256:[a-f0-9]{64}$",
       "description": "MCP Tool結果contextのhash。参照値だけでは結果取得・権限・Approvalを与えない。"
+    },
+    "require_unused_task_session": {
+      "type": "boolean",
+      "const": true,
+      "description": "適用先SessionにAgent Task開始Audit履歴がないことをBrokerが事前検査・Owner Approval・Task開始で再確認する。Task履歴本文は露出しない。PermissionやApprovalを生成しない。"
     }
   },
   "allOf": [

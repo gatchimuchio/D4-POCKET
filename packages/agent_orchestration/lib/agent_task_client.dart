@@ -29,6 +29,7 @@ class AgentTaskRequest {
     this.mcpCapabilitySnapshotHash,
     this.mcpResultId,
     this.mcpResultHash,
+    this.requireUnusedTaskSession = false,
   });
 
   final String runtimeId;
@@ -38,6 +39,7 @@ class AgentTaskRequest {
   final String? mcpCapabilitySnapshotHash;
   final String? mcpResultId;
   final String? mcpResultHash;
+  final bool requireUnusedTaskSession;
 
   Map<String, Object?> toPayload() => {
     'agent_runtime_id': runtimeId,
@@ -48,6 +50,7 @@ class AgentTaskRequest {
       'mcp_capability_snapshot_hash': mcpCapabilitySnapshotHash,
     if (mcpResultId != null) 'mcp_result_id': mcpResultId,
     if (mcpResultHash != null) 'mcp_result_hash': mcpResultHash,
+    if (requireUnusedTaskSession) 'require_unused_task_session': true,
   };
 
   void validate() {

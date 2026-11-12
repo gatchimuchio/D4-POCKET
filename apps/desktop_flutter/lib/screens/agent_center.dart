@@ -1388,6 +1388,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
             'owner_apply_instructionの範囲だけを通常BrokerのPermission／Approvalで実行してください。'
             'この要求はTask事前検査であり、今は書込み・Task開始をしません。\n'
             '$taskContext',
+        requireUnusedTaskSession: true,
       );
       try {
         request.validate();

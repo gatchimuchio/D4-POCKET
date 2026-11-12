@@ -16,6 +16,20 @@ const _resultHash =
     'sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
 
 void main() {
+  test('AI Edit適用Taskだけ未使用Session条件を要求へ結合する', () {
+    const applyRequest = AgentTaskRequest(
+      runtimeId: 'codex-local',
+      sessionId: _session,
+      workspaceId: 'workspace-local',
+      instruction: '結果を別の新規Sessionで扱う',
+      requireUnusedTaskSession: true,
+    );
+
+    expect(applyRequest.toPayload()['require_unused_task_session'], isTrue);
+    expect(_request.toPayload().containsKey('require_unused_task_session'),
+        isFalse);
+  });
+
   test('事前検査はBrokerの要求・hash・未実行状態を厳密に照合する', () async {
     final transport = _FakeBrokerTransport([
       _accepted('Agent作業要求検査', {

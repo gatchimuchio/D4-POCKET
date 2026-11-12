@@ -228,7 +228,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/agent_center.dart",
-      "sha256": "4dab163f8e23474ad7ffd2456a4378efd8130ffe37abdedbb23e78504b5233d4"
+      "sha256": "545dffca839870b03763eeeea1a222db38710e8ee598b9daf7d9e981757fed3c"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/approval_center.dart",
@@ -640,7 +640,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/agent_task_client_test.dart",
-      "sha256": "bb59d1eda26281a313be2ee2b3c467a8c3144aecdf671f0230de3b2849dbdd25"
+      "sha256": "eb168474cd146b2d1f12d9d119b24555fcc18c52c83b3f0b6951043570018984"
     },
     {
       "path": "apps/desktop_flutter/test/ai_edit_client_test.dart",
@@ -748,7 +748,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "f44bbf01ef9581ba09febd879cd3f16fadac731d84e0a37473157efd28ceb9b9"
+      "sha256": "822301342e07b6c21ee793dfc757e650f071f02cd3859a94e54590ea5500236d"
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
@@ -1444,7 +1444,7 @@
     },
     {
       "path": "docs/QE_2026-11-09/\u9032\u6357.md",
-      "sha256": "8648deab6b5f3d0e8edc24faa764d83a00afab482258c38e9e8483ee8a179fb5"
+      "sha256": "1ef8e3d971998fe31362b440bd02539d5dc9270a515b088e8c2a28d3b5249e9e"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1644,7 +1644,7 @@
     },
     {
       "path": "docs/specs/gui-shell-ai-edit.md",
-      "sha256": "5587c70e4099d2b009fd550862b937a1b5f6867aa68d8c94edbce0037a7b8c41"
+      "sha256": "8f46f26de46dcd0619fab7ec5b8f9f5fad8be6adb19c2a7fe699fc3631e13f89"
     },
     {
       "path": "docs/specs/gui-shell-compose.md",
@@ -3856,7 +3856,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/dialogue.rs",
-      "sha256": "afc303a45bf8399684210e35f3f42a77ddedd9d16654c8e790619192c3c0058f"
+      "sha256": "e72982c2ad84b1767f0d506e20e4b0b0a164a62561097edfbe0cd73e3e0a5768"
     },
     {
       "path": "native/rust_helper/src/broker/evaluation_control.rs",
@@ -3868,7 +3868,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/execution_history.rs",
-      "sha256": "f4f629da778bf3ce97f04184936dabfda651d4d1b03d37e5f4fe72ef17b47a1b"
+      "sha256": "0590ccb9f2053bdb2716cbb7bad5d8bfb635b612c461bbe05e1bf62fc525e31d"
     },
     {
       "path": "native/rust_helper/src/broker/export_center.rs",
@@ -3920,7 +3920,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "f57ed9030bbd1a0fa5d1a3b5b6ecbea8fdc471ec0660fd0d565798fcdef4250b"
+      "sha256": "972a7f31b897c8bc50e103e574b8216643562e4a51d63e0680e91b25d2654a88"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -4332,7 +4332,7 @@
     },
     {
       "path": "packages/agent_orchestration/lib/agent_task_client.dart",
-      "sha256": "74b9b16d6c073defb6217fc5d7ccea8e9010cb11cba86756092cd6b5348263fe"
+      "sha256": "a0e396c7a22c75338728c577a1c9d9a77265e9c08fb12cc98acf6777545e20f2"
     },
     {
       "path": "packages/agent_orchestration/lib/agent_task_execution_coordinator.dart",
@@ -4804,7 +4804,7 @@
     },
     {
       "path": "specs/agent_task_request.schema.json",
-      "sha256": "f9b4fc40c62de834ed7705205cbf4afc52ec36a43caa95950f1398bdfcba1aab"
+      "sha256": "9c983d3e4c17c4d4849cbf83bb1cd7342fedfd5d13f10684f4865f55a6cba9df"
     },
     {
       "path": "specs/agent_task_scratch_recovery.schema.json",
@@ -5436,7 +5436,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "5ae12eb3e75514b2c5f5c014d8ceef0261197f8543387d8b2281f613f5dba69d"
+      "sha256": "77c95f338ea9cd6c3b8a1d25b6386b218c15fb533f0b51165998ce7c40f6afa8"
     },
     {
       "path": "tooling/conformance_tests/test_final_development_audit.py",
