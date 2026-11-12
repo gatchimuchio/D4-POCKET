@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/gui-shell/schemas/gui_shell_windows_export_build.schema.json",
-  "title": "D4 Pocket Windows Export build記録",
+  "title": "D4 Pocket Windows Export build記録 v2",
   "type": "object",
   "required": [
     "version",
@@ -19,6 +19,7 @@
     "audit_store_id",
     "authority_boundary",
     "module_plan",
+    "aot_surface_analysis",
     "toolchain",
     "pub_get_arguments",
     "flutter_build_arguments",
@@ -45,7 +46,7 @@
   ],
   "additionalProperties": false,
   "properties": {
-    "version": { "const": 1 },
+    "version": { "const": 2 },
     "evidence_type": { "const": "d4_pocket_windows_export_build" },
     "evidence_source": { "const": "INTERNAL_STATE" },
     "product": { "const": "D4 Pocket" },
@@ -121,6 +122,57 @@
           "uniqueItems": true,
           "items": { "enum": ["shell.setup_doctor", "shell.history", "shell.evaluation_lab", "shell.host_capabilities", "shell.notifications", "shell.observability", "shell.trace_inspector", "shell.host_operations"] }
         }
+      }
+    },
+    "aot_surface_analysis": {
+      "type": "object",
+      "required": [
+        "scope",
+        "report_size_bytes",
+        "report_sha256",
+        "aot_surface_libraries",
+        "included_source_surfaces",
+        "excluded_source_surfaces",
+        "profiled_aot_image_size_bytes",
+        "exported_aot_image_size_bytes",
+        "profiled_aot_image_sha256",
+        "exported_aot_image_sha256",
+        "image_matches_export"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "scope": { "const": "flutter_windows_x64_release_aot_catalog_surfaces" },
+        "report_size_bytes": { "type": "integer", "minimum": 1, "maximum": 50000000 },
+        "report_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "aot_surface_libraries": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^apps/desktop_flutter/lib/screens/[A-Za-z0-9_.-]+\\.dart$"
+          }
+        },
+        "included_source_surfaces": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^apps/desktop_flutter/lib/screens/[A-Za-z0-9_.-]+\\.dart$"
+          }
+        },
+        "excluded_source_surfaces": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^apps/desktop_flutter/lib/screens/[A-Za-z0-9_.-]+\\.dart$"
+          }
+        },
+        "profiled_aot_image_size_bytes": { "type": "integer", "minimum": 1 },
+        "exported_aot_image_size_bytes": { "type": "integer", "minimum": 1 },
+        "profiled_aot_image_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "exported_aot_image_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "image_matches_export": { "const": true }
       }
     },
     "toolchain": {

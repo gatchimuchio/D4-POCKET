@@ -11777,6 +11777,21 @@ def test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative() ->
         good = copy.deepcopy(evidence)
         good["source_manifest_sha256"] = hashlib.sha256(manifest_raw).hexdigest()
         good["artifact_files"], good["artifact_total_bytes"], good["artifact_tree_sha256"] = _artifact_inventory(bundle)
+        aot_record = next(
+            item for item in good["artifact_files"] if item["path"] == "app/data/app.so"
+        )
+        good["aot_surface_analysis"]["profiled_aot_image_size_bytes"] = aot_record[
+            "size_bytes"
+        ]
+        good["aot_surface_analysis"]["exported_aot_image_size_bytes"] = aot_record[
+            "size_bytes"
+        ]
+        good["aot_surface_analysis"]["profiled_aot_image_sha256"] = aot_record[
+            "sha256"
+        ]
+        good["aot_surface_analysis"]["exported_aot_image_sha256"] = aot_record[
+            "sha256"
+        ]
         good["credential_artifact_scan"] = scan_credential_artifacts(
             bundle, expected_tree_sha256=good["artifact_tree_sha256"]
         )
@@ -11793,6 +11808,22 @@ def test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative() ->
             f"--dart-define=GUI_SHELL_PRODUCT_VERSION={product_version}"
         )
         validate_build_evidence(good, bundle)
+        invalid_aot_identity = copy.deepcopy(good)
+        invalid_aot_identity["aot_surface_analysis"]["exported_aot_image_sha256"] = (
+            "0" * 64
+        )
+        try:
+            validate_build_evidence(invalid_aot_identity, bundle)
+            errors.append("Windows ExportのAOT image hash不一致を受理する")
+        except ValueError:
+            pass
+        invalid_aot_surface = copy.deepcopy(good)
+        invalid_aot_surface["aot_surface_analysis"]["aot_surface_libraries"] = []
+        try:
+            validate_build_evidence(invalid_aot_surface, bundle)
+            errors.append("Windows ExportのAOT surfaceとModulePlanの不一致を受理する")
+        except ValueError:
+            pass
 
         product_manifest_path = bundle / "product_manifest.json"
         configured_summary = {

@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "evidence_type": "d4_pocket_windows_export_build",
   "evidence_source": "INTERNAL_STATE",
   "product": "D4 Pocket",
@@ -31,6 +31,32 @@
     "included_module_ids": ["core.security_broker", "core.cryptography", "core.audit_finality", "core.credentials", "core.os_controls", "core.permission_enforcement", "core.approval_enforcement", "core.content_exposure", "shell.dashboard", "shell.runtime_operation", "shell.agent_operation", "shell.authority", "shell.approval", "shell.audit", "shell.recovery", "shell.problems", "shell.evidence", "shell.settings", "shell.observability", "shell.trace_inspector"],
     "excluded_optional_module_ids": ["shell.setup_doctor", "shell.history", "shell.evaluation_lab", "shell.host_capabilities", "shell.notifications", "shell.host_operations"]
   },
+  "aot_surface_analysis": {
+    "scope": "flutter_windows_x64_release_aot_catalog_surfaces",
+    "report_size_bytes": 9929485,
+    "report_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+    "aot_surface_libraries": [
+      "apps/desktop_flutter/lib/screens/observability_center.dart",
+      "apps/desktop_flutter/lib/screens/trace_inspector.dart"
+    ],
+    "included_source_surfaces": [
+      "apps/desktop_flutter/lib/screens/observability_center.dart",
+      "apps/desktop_flutter/lib/screens/trace_inspector.dart"
+    ],
+    "excluded_source_surfaces": [
+      "apps/desktop_flutter/lib/screens/evaluation_lab.dart",
+      "apps/desktop_flutter/lib/screens/history_screen.dart",
+      "apps/desktop_flutter/lib/screens/host_capability_center.dart",
+      "apps/desktop_flutter/lib/screens/host_operation_center.dart",
+      "apps/desktop_flutter/lib/screens/notifications.dart",
+      "apps/desktop_flutter/lib/screens/setup_doctor.dart"
+    ],
+    "profiled_aot_image_size_bytes": 4096,
+    "exported_aot_image_size_bytes": 4096,
+    "profiled_aot_image_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "exported_aot_image_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "image_matches_export": true
+  },
   "toolchain": {
     "flutter": "3.44.0",
     "dart": "3.12.0",
@@ -39,7 +65,7 @@
     "rustc": "rustc 1.95.0"
   },
   "pub_get_arguments": ["--suppress-analytics", "pub", "get", "--enforce-lockfile"],
-  "flutter_build_arguments": ["build", "windows", "--release", "--no-pub", "--dart-define=GUI_SHELL_MODULE_TRACE_INSPECTOR=true"],
+  "flutter_build_arguments": ["build", "windows", "--release", "--no-pub", "--analyze-size", "--dart-define=GUI_SHELL_MODULE_TRACE_INSPECTOR=true"],
   "rust_build_arguments": ["build", "--release", "--locked", "--bin", "gui_shell_rust_helper", "--bin", "gui_shell_desktop_launcher"],
   "rust_compile_time_identity": {
     "source": "schema_validated_manifest",

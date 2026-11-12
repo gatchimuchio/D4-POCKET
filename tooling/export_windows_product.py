@@ -29,6 +29,12 @@ from tooling.build_module_pruned_windows import (
     dart_defines,
     resolve_module_plan,
 )
+from tooling.compare_module_builds_windows import (
+    AOT_REPORT_ROOT as WINDOWS_AOT_REPORT_ROOT,
+    _aot_surface_libraries as _windows_aot_surface_libraries,
+    _analysis_report_path as _windows_analysis_report_path,
+    _console_write as _write_flutter_output,
+)
 from tooling.schema_check.check_schemas import validate_instance
 
 
@@ -42,6 +48,7 @@ RECEIPT_NAME = "d4_pocket_build_receipt.json"
 MAX_CARGO_LINKER_PATH_CHARS = 240
 CREDENTIAL_SCAN_CHUNK_BYTES = 1024 * 1024
 CREDENTIAL_SCAN_OVERLAP_BYTES = 1024
+MAX_SIZE_ANALYSIS_BYTES = 50_000_000
 CREDENTIAL_SCAN_STATUS = "passed_known_patterns"
 CREDENTIAL_PATTERNS = (
     ("aws_access_key_id", re.compile(rb"(?:AKIA|ASIA)[A-Z0-9]{16}")),
@@ -546,6 +553,153 @@ def _scan_credential_inventory(
     }
 
 
+def _aot_report_roots(report: dict[str, Any]) -> list[dict[str, Any]]:
+    roots: list[dict[str, Any]] = []
+    pending: list[Any] = [report]
+    while pending:
+        value = pending.pop()
+        if isinstance(value, dict):
+            if value.get("n") == WINDOWS_AOT_REPORT_ROOT:
+                roots.append(value)
+            pending.extend(value.values())
+        elif isinstance(value, list):
+            pending.extend(value)
+    return roots
+
+
+def _module_source_surfaces(
+    catalog: dict[str, Any], included_module_ids: set[str]
+) -> tuple[list[str], list[str]]:
+    included = sorted(
+        surface
+        for module in catalog["optional_modules"]
+        if module["module_id"] in included_module_ids
+        for surface in module["source_surfaces"]
+    )
+    excluded = sorted(
+        surface
+        for module in catalog["optional_modules"]
+        if module["module_id"] not in included_module_ids
+        for surface in module["source_surfaces"]
+    )
+    return included, excluded
+
+
+def _capture_windows_aot_surface_analysis(
+    *,
+    output: str,
+    flutter_release: Path,
+    bundle_root: Path,
+    catalog: dict[str, Any],
+    included_module_ids: set[str],
+) -> dict[str, Any]:
+    report_path = _windows_analysis_report_path(output)
+    report_raw = _read_regular_file(
+        report_path, MAX_SIZE_ANALYSIS_BYTES, "Flutter Windows size-analysis report"
+    )
+    report = _parse_json_bytes(report_raw)
+    if not isinstance(report, dict) or report.get("type") != "windows":
+        raise ValueError("Flutter size-analysis reportがWindows形式ではない")
+    roots = _aot_report_roots(report)
+    if len(roots) != 1:
+        raise ValueError("Flutter Windows size-analysis reportにDart AOT treeが一意に存在しない")
+
+    actual_surfaces = _windows_aot_surface_libraries(report, catalog)
+    expected_surfaces, excluded_surfaces = _module_source_surfaces(
+        catalog, included_module_ids
+    )
+    if actual_surfaces != expected_surfaces:
+        missing = sorted(set(expected_surfaces) - set(actual_surfaces))
+        unexpected = sorted(set(actual_surfaces) - set(expected_surfaces))
+        raise ValueError(
+            "Flutter Windows Release AOT libraryがModule選択と一致しない: "
+            f"missing={missing}, unexpected={unexpected}"
+        )
+
+    profile_image = flutter_release / "data" / "app.so"
+    bundle_image = bundle_root / "app" / "data" / "app.so"
+    image_records: list[tuple[Path, os.stat_result, str]] = []
+    for path, label in (
+        (profile_image, "Flutter Windows Release output app.so"),
+        (bundle_image, "Export bundle app.so"),
+    ):
+        metadata = path.lstat()
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or stat.S_ISLNK(metadata.st_mode)
+            or _is_reparse_point(metadata)
+        ):
+            raise ValueError(f"{label}が通常fileではない")
+        image_records.append((path, metadata, _sha256_file(path)))
+    profile_metadata = image_records[0][1]
+    bundle_metadata = image_records[1][1]
+    profile_hash = image_records[0][2]
+    bundle_hash = image_records[1][2]
+    if (
+        roots[0].get("value") != profile_metadata.st_size
+        or profile_metadata.st_size != bundle_metadata.st_size
+        or profile_hash != bundle_hash
+    ):
+        raise ValueError(
+            "Flutter AOT report／profile／Export bundle app.so identityが一致しない"
+        )
+
+    included_source_surfaces, _ = _module_source_surfaces(
+        catalog, included_module_ids
+    )
+    return {
+        "scope": "flutter_windows_x64_release_aot_catalog_surfaces",
+        "report_size_bytes": len(report_raw),
+        "report_sha256": _sha256(report_raw),
+        "aot_surface_libraries": actual_surfaces,
+        "included_source_surfaces": included_source_surfaces,
+        "excluded_source_surfaces": excluded_surfaces,
+        "profiled_aot_image_size_bytes": profile_metadata.st_size,
+        "exported_aot_image_size_bytes": bundle_metadata.st_size,
+        "profiled_aot_image_sha256": profile_hash,
+        "exported_aot_image_sha256": bundle_hash,
+        "image_matches_export": True,
+    }
+
+
+def _validate_windows_aot_surface_evidence(
+    evidence: dict[str, Any], artifact_files: list[dict[str, Any]]
+) -> None:
+    analysis = evidence["aot_surface_analysis"]
+    if "--analyze-size" not in evidence["flutter_build_arguments"]:
+        raise ValueError("Windows ExportでFlutter AOT size analysisを実行していない")
+    catalog = _validate_catalog(
+        _parse_json_bytes(
+            _read_regular_file(CATALOG_PATH, MAX_INPUT_BYTES, "Module一覧")
+        )
+    )
+    optional_ids = {item["module_id"] for item in catalog["optional_modules"]}
+    included_ids = set(evidence["module_plan"]["included_module_ids"]) & optional_ids
+    included_surfaces, excluded_surfaces = _module_source_surfaces(
+        catalog, included_ids
+    )
+    aot_record = next(
+        (record for record in artifact_files if record["path"] == "app/data/app.so"),
+        None,
+    )
+    if aot_record is None:
+        raise ValueError("Windows Export artifact inventoryにdata/app.soがない")
+    if (
+        analysis["aot_surface_libraries"] != included_surfaces
+        or analysis["included_source_surfaces"] != included_surfaces
+        or analysis["excluded_source_surfaces"] != excluded_surfaces
+    ):
+        raise ValueError("Windows Export AOT source surface記録がModulePlanと一致しない")
+    if (
+        analysis["profiled_aot_image_size_bytes"] != aot_record["size_bytes"]
+        or analysis["exported_aot_image_size_bytes"] != aot_record["size_bytes"]
+        or analysis["profiled_aot_image_sha256"] != aot_record["sha256"]
+        or analysis["exported_aot_image_sha256"] != aot_record["sha256"]
+        or analysis["image_matches_export"] is not True
+    ):
+        raise ValueError("Windows Export AOT image evidenceがbundle identityへ結合されない")
+
+
 def validate_build_evidence(evidence: dict[str, Any], artifact_root: Path) -> None:
     errors = validate_instance(evidence, _schema(BUILD_SCHEMA.name))
     if errors:
@@ -566,6 +720,7 @@ def validate_build_evidence(evidence: dict[str, Any], artifact_root: Path) -> No
         or tree_hash != evidence["artifact_tree_sha256"]
     ):
         raise ValueError("Export build evidenceとportable bundle file inventoryが一致しない")
+    _validate_windows_aot_surface_evidence(evidence, artifact_files)
     product_manifest = _parse_json_bytes(
         _read_regular_file(
             artifact_root / "product_manifest.json", MAX_MANIFEST_BYTES, "製品Manifest"
@@ -721,6 +876,7 @@ def build_portable_bundle(
                 "windows",
                 "--release",
                 "--no-pub",
+                "--analyze-size",
                 *[
                     f"--dart-define={name}={str(enabled).lower()}"
                     for name, enabled in define_map.items()
@@ -731,12 +887,26 @@ def build_portable_bundle(
             flutter_arguments.append(
                 f"--dart-define=GUI_SHELL_PRODUCT_VERSION={product_version}"
             )
-            subprocess.run(
+            flutter_build = subprocess.run(
                 [flutter, *flutter_arguments],
                 cwd=flutter_project,
                 env=flutter_environment,
-                check=True,
+                check=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
             )
+            flutter_build_output = flutter_build.stdout or ""
+            if flutter_build_output:
+                _write_flutter_output(flutter_build_output)
+            if flutter_build.returncode != 0:
+                raise subprocess.CalledProcessError(
+                    flutter_build.returncode,
+                    [flutter, *flutter_arguments],
+                    output=flutter_build_output,
+                )
             flutter_release = (
                 flutter_project / "build" / "windows" / "x64" / "runner" / "Release"
             )
@@ -781,6 +951,20 @@ def build_portable_bundle(
             _copy_bundle(
                 flutter_release, helper_exe, launcher_exe, manifest_raw, staging_root
             )
+            catalog = _validate_catalog(
+                _parse_json_bytes(
+                    _read_regular_file(
+                        CATALOG_PATH, MAX_INPUT_BYTES, "Module一覧"
+                    )
+                )
+            )
+            aot_surface_analysis = _capture_windows_aot_surface_analysis(
+                output=flutter_build_output,
+                flutter_release=flutter_release,
+                bundle_root=staging_root,
+                catalog=catalog,
+                included_module_ids=set(plan.included_optional_ids),
+            )
         artifact_files, total_bytes, tree_hash = _artifact_inventory(staging_root)
         credential_scan = _scan_credential_inventory(
             staging_root, artifact_files, total_bytes, tree_hash
@@ -791,7 +975,7 @@ def build_portable_bundle(
             _parse_json_bytes(_read_regular_file(CATALOG_PATH, MAX_INPUT_BYTES, "Module一覧"))
         )
         evidence = {
-            "version": 1,
+            "version": 2,
             "evidence_type": "d4_pocket_windows_export_build",
             "evidence_source": "INTERNAL_STATE",
             "product": "D4 Pocket",
@@ -823,6 +1007,7 @@ def build_portable_bundle(
                 "included_module_ids": list(plan.included_module_ids),
                 "excluded_optional_module_ids": list(plan.excluded_optional_ids),
             },
+            "aot_surface_analysis": aot_surface_analysis,
             "toolchain": {
                 **flutter_versions,
                 "cargo": cargo_version,

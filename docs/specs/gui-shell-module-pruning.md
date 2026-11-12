@@ -59,6 +59,8 @@ python tooling/compare_module_builds_windows.py `
 
 この比較は`INTERNAL_STATE`の開発証拠である。AOT report上でCatalog対象library nodeが選択と一致することは、そのFlutter compiler reportにおける当該library nodeの有無を示す。画面意味全体の不存在、共有symbolの不存在、別artifact・別toolchainへの一般化、起動時挙動、Rust／third-party Module除去、安全Coreの最終製品内保持、独立製品成立までは証明しない。したがって`binary_pruning_verified=false`を維持し、`semantic_pruning_status`も`flutter_aot_report_surface_libraries_match_selection; runtime_unverified`と範囲限定する。Cold startupと実行時resourceは測らない。build所要時間を製品startup性能へ読み替えない。
 
+Windows Export build receipt v2は選択Manifestで同じFlutter Release buildにAOT size analysisを適用し、Windows AOT reportのCatalog surface集合とModulePlan、reportのAOT image size、Flutter build outputのdata/app.so、portable bundleのapp/data/app.soを照合する。Receiptにはreport hash／size、含有・除外surface、AOT imageのsize／hashを記録し、後続のpackage validatorもbundle inventoryと照合する。これはExport artifact内のFlutter AOT Catalog surfaceとimage同一性を示すINTERNAL_STATE証拠である。実際の選択機能の操作、安全Core保持、Runtime挙動、cold startup、resource、署名・配布の証拠ではないため、binary_pruning_verified=falseとFQ-MODULE-PRUNINGを維持する。
+
 ## Linux Developer ExportのFlutter AOT surface証拠
 
 `tooling/export_linux_product.py`は、解決済みModulePlanと同一のDart defineを使ってFlutter Linux x64 Releaseを`--analyze-size`付きでbuildし、Flutterが出力したLinux size-analysis reportをExport出力の`analysis/linux-code-size-analysis.json`へ保存する。証拠にはreport・snapshot・traceのhashとsize、Catalogのinclude／exclude source surface、AOT `libapp.so`のsize／SHA-256を記録する。reportのCatalog surface選択はModulePlanと一致しなければExportを失敗させる。さらに解析buildの`libapp.so`と、identity-bound CMake installで生成した最終bundleの`lib/libapp.so`がsize／SHA-256の両方で一致することを確認する。
