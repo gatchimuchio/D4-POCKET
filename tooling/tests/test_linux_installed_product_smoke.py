@@ -67,6 +67,7 @@ from tooling.tests.linux_installed_product_smoke import (
     _installed_task_write_failure_diagnostics,
     _installed_task_history_diagnostics,
     _installed_task_response_fixture_diagnostics,
+    _normalize_response_fixture_request_shapes,
     _stop_linux_agent_task_process_group,
     _linux_processes_with_task_nonce,
     _review_single_installed_mcp_tool_arguments,
@@ -4908,6 +4909,41 @@ class InstalledTaskStatusPollingTests(unittest.TestCase):
             "mcp__d4p_task_request__d4_submit_mcp_tool_request", rendered
         )
 
+    def test_response_fixture_diagnostics_classify_namespace_group_without_raw_tool_data(
+        self,
+    ) -> None:
+        private_tool_name = "PRIVATE_NESTED_TOOL_CANARY"
+        normalized = _normalize_response_fixture_request_shapes(
+            [
+                {
+                    "input_items": 0,
+                    "function_call_output_items": 0,
+                    "exec_command_offered": True,
+                    "task_mcp_tool_offered": False,
+                    "task_mcp_tool_descriptors": [
+                        {
+                            "type": "namespace",
+                            "name": "mcp__d4p_task_request",
+                            "tools": [
+                                {"type": "function", "name": private_tool_name}
+                            ],
+                        }
+                    ],
+                }
+            ]
+        )
+        self.assertIsNotNone(normalized)
+        assert normalized is not None
+        descriptor = normalized[0]["task_mcp_tool_descriptors"][0]
+        rendered = json.dumps(normalized, ensure_ascii=False, sort_keys=True)
+        self.assertEqual(descriptor["type_class"], "namespace")
+        self.assertEqual(descriptor["name_class"], "namespace_expected")
+        self.assertEqual(
+            descriptor["tools"],
+            [{"type_class": "function", "name_class": "other"}],
+        )
+        self.assertNotIn(private_tool_name, rendered)
+
     def test_response_fixture_diagnostics_reject_unhashable_event_values(self) -> None:
         responses_server = types.SimpleNamespace(
             snapshot=lambda: {
@@ -5507,6 +5543,100 @@ class LinuxAgentTaskResponsesFixtureTests(unittest.TestCase):
             server.snapshot()["rejections"],
             ["task_mcp_namespace_function_not_offered"],
         )
+
+    def test_fixture_accepts_current_codex_namespace_group_mcp_tool(self) -> None:
+        server = _LinuxAgentTaskResponsesServer()
+        self.addCleanup(server.close)
+        server.configure(
+            "mcp_proposal",
+            "",
+            Path("/tmp/workspace"),
+            mcp_tool_request={
+                "server_id": "linux-installed-mcp-followup",
+                "tool_id": "tool-" + "a" * 142,
+                "name": "echo",
+                "arguments": {"text": "installed-mcp-public-input"},
+            },
+        )
+        events = server._response_events(
+            {
+                "input": [],
+                "tools": [
+                    {"type": "function", "name": "exec_command"},
+                    {
+                        "type": "namespace",
+                        "name": "mcp__d4p_task_request",
+                        "tools": [
+                            {
+                                "type": "function",
+                                "name": "d4_submit_mcp_tool_request",
+                                "parameters": {"type": "object"},
+                            }
+                        ],
+                    },
+                ],
+            }
+        )
+        snapshot = server.snapshot()
+        call_item = next(
+            event["item"]
+            for event in events
+            if event["type"] == "response.output_item.done"
+            and isinstance(event.get("item"), dict)
+            and event["item"].get("type") == "function_call"
+        )
+        self.assertEqual(call_item["namespace"], "d4p_task_request")
+        self.assertEqual(call_item["name"], "d4_submit_mcp_tool_request")
+        self.assertTrue(
+            snapshot["scenarios"][0]["request_shapes"][0]["task_mcp_tool_offered"]
+        )
+        self.assertEqual(snapshot["scenarios"][0]["mcp_function_calls"], 1)
+        self.assertNotIn("parameters", json.dumps(snapshot))
+
+    def test_fixture_rejects_ambiguous_codex_namespace_group_mcp_tool(self) -> None:
+        invalid_nested_tools = [
+            [
+                {"type": "function", "name": "d4_submit_mcp_tool_request"},
+                {"type": "function", "name": "unapproved_extra_tool"},
+            ],
+            [
+                {"type": "function", "name": "d4_submit_mcp_tool_request"},
+                {"type": "function", "name": "d4_submit_mcp_tool_request"},
+            ],
+        ]
+        for nested_tools in invalid_nested_tools:
+            with self.subTest(nested_tool_count=len(nested_tools)):
+                server = _LinuxAgentTaskResponsesServer()
+                self.addCleanup(server.close)
+                server.configure(
+                    "mcp_proposal",
+                    "",
+                    Path("/tmp/workspace"),
+                    mcp_tool_request={
+                        "server_id": "linux-installed-mcp-followup",
+                        "tool_id": "tool-" + "a" * 142,
+                        "name": "echo",
+                        "arguments": {"text": "installed-mcp-public-input"},
+                    },
+                )
+                with self.assertRaisesRegex(RuntimeError, "not offered"):
+                    server._response_events(
+                        {
+                            "input": [],
+                            "tools": [
+                                {"type": "function", "name": "exec_command"},
+                                {
+                                    "type": "namespace",
+                                    "name": "mcp__d4p_task_request",
+                                    "tools": nested_tools,
+                                },
+                            ],
+                        }
+                    )
+                self.assertEqual(
+                    server.snapshot()["rejections"],
+                    ["task_mcp_namespace_function_not_offered"],
+                )
 
     def test_crash_fixture_records_tool_call_without_tool_result(self) -> None:
         server = _LinuxAgentTaskResponsesServer()

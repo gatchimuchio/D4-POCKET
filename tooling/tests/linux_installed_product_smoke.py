@@ -4549,12 +4549,54 @@ class _LinuxAgentTaskResponsesServer:
                     == f"mcp__{tool_namespace}__{tool_name}"
                 )
             ]
-            offers_task_mcp_tool = any(
+            namespace_tool_name = f"mcp__{tool_namespace}"
+            tool_descriptors = tools if isinstance(tools, list) else []
+            for tool in tool_descriptors:
+                if (
+                    not isinstance(tool, dict)
+                    or tool.get("type") != "namespace"
+                    or tool.get("name") != namespace_tool_name
+                ):
+                    continue
+                nested_tools = tool.get("tools")
+                matching_nested_tools = [
+                    {"type": "function", "name": tool_name}
+                    for nested in (nested_tools if isinstance(nested_tools, list) else [])
+                    if isinstance(nested, dict)
+                    and nested.get("type") == "function"
+                    and nested.get("name") == tool_name
+                ]
+                task_tool_descriptors.append(
+                    {
+                        "type": "namespace",
+                        "name": namespace_tool_name,
+                        "tools": matching_nested_tools[:4],
+                    }
+                )
+            offers_flat_task_mcp_tool = any(
                 isinstance(tool, dict)
                 and tool.get("type") == "function"
                 and tool.get("name") == tool_name
                 and tool.get("namespace") == tool_namespace
-                for tool in (tools if isinstance(tools, list) else [])
+                for tool in tool_descriptors
+            )
+            namespace_descriptors = [
+                tool
+                for tool in tool_descriptors
+                if isinstance(tool, dict)
+                and tool.get("type") == "namespace"
+                and tool.get("name") == namespace_tool_name
+            ]
+            offers_namespace_task_mcp_tool = (
+                len(namespace_descriptors) == 1
+                and isinstance(namespace_descriptors[0].get("tools"), list)
+                and len(namespace_descriptors[0]["tools"]) == 1
+                and isinstance(namespace_descriptors[0]["tools"][0], dict)
+                and namespace_descriptors[0]["tools"][0].get("type") == "function"
+                and namespace_descriptors[0]["tools"][0].get("name") == tool_name
+            )
+            offers_task_mcp_tool = (
+                offers_flat_task_mcp_tool or offers_namespace_task_mcp_tool
             )
             cast_shapes.append(
                 {
@@ -5537,7 +5579,14 @@ def _normalize_response_fixture_request_shapes(
         "task_mcp_tool_offered",
         "task_mcp_tool_descriptors",
     }
-    descriptor_fields = {"type", "name", "namespace", "server", "server_label"}
+    descriptor_fields = {
+        "type",
+        "name",
+        "namespace",
+        "server",
+        "server_label",
+        "tools",
+    }
     normalized: list[dict[str, object]] = []
     for row in payload:
         if not isinstance(row, dict) or set(row) != expected_shape_fields:
@@ -5555,7 +5604,7 @@ def _normalize_response_fixture_request_shapes(
         descriptors = row.get("task_mcp_tool_descriptors")
         if not isinstance(descriptors, list) or len(descriptors) > 4:
             return None
-        safe_descriptors: list[dict[str, str]] = []
+        safe_descriptors: list[dict[str, object]] = []
         for descriptor in descriptors:
             if not isinstance(descriptor, dict) or not set(descriptor).issubset(
                 descriptor_fields
@@ -5583,28 +5632,61 @@ def _normalize_response_fixture_request_shapes(
                 if "type" not in descriptor
                 else type_value
                 if isinstance(type_value, str)
-                and type_value in {"function", "mcp"}
+                and type_value in {"function", "mcp", "namespace"}
                 else "other"
             )
-            safe_descriptors.append(
-                {
-                    "type_class": type_class,
-                    "name_class": classify(
-                        descriptor.get("name"),
-                        tool_name,
-                        namespaced=f"mcp__{tool_namespace}__{tool_name}",
-                    ),
-                    "namespace_class": classify(
-                        descriptor.get("namespace"), tool_namespace
-                    ),
-                    "server_class": classify(
-                        descriptor.get("server"), tool_namespace
-                    ),
-                    "server_label_class": classify(
-                        descriptor.get("server_label"), tool_namespace
-                    ),
-                }
+            name_class = classify(
+                descriptor.get("name"),
+                tool_name,
+                namespaced=f"mcp__{tool_namespace}__{tool_name}",
             )
+            if (
+                type_class == "namespace"
+                and descriptor.get("name") == f"mcp__{tool_namespace}"
+            ):
+                name_class = "namespace_expected"
+            safe_descriptor: dict[str, object] = {
+                "type_class": type_class,
+                "name_class": name_class,
+                "namespace_class": classify(
+                    descriptor.get("namespace"), tool_namespace
+                ),
+                "server_class": classify(descriptor.get("server"), tool_namespace),
+                "server_label_class": classify(
+                    descriptor.get("server_label"), tool_namespace
+                ),
+            }
+            if "tools" in descriptor:
+                nested_tools = descriptor.get("tools")
+                if not isinstance(nested_tools, list) or len(nested_tools) > 4:
+                    return None
+                safe_nested_tools: list[dict[str, str]] = []
+                for nested in nested_tools:
+                    if (
+                        not isinstance(nested, dict)
+                        or set(nested) != {"type", "name"}
+                        or not isinstance(nested.get("type"), str)
+                        or len(nested["type"]) > 512
+                        or not isinstance(nested.get("name"), str)
+                        or len(nested["name"]) > 512
+                    ):
+                        return None
+                    safe_nested_tools.append(
+                        {
+                            "type_class": (
+                                "function"
+                                if nested["type"] == "function"
+                                else "other"
+                            ),
+                            "name_class": classify(
+                                nested["name"],
+                                tool_name,
+                                namespaced=f"mcp__{tool_namespace}__{tool_name}",
+                            ),
+                        }
+                    )
+                safe_descriptor["tools"] = safe_nested_tools
+            safe_descriptors.append(safe_descriptor)
         normalized.append(
             {
                 "input_items": row["input_items"],
@@ -7887,13 +7969,14 @@ def _run_installed_agent_mcp_followup_acceptance(
             f"Task ID: {source_task_id}",
             f"確定結果hash: {source_result_hash}",
             "Content Exposure: full",
-            "Auditには本文を保存しません。",
+            "Audit",
+            "本文を保存しません。",
         ),
     )
     _wait_for_owner_dialog_closed(environment)
     window = _find_accessible(WINDOW_TITLE, timeout=10)
     _find_accessible(
-        "承認済みTask結果を表示し、提案を照合しています。",
+        "native Ownerが許可したAgent報告を表示中です。内容・test主張は未検証です。",
         root=window,
         timeout=15,
     )
