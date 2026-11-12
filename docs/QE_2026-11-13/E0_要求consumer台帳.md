@@ -64,7 +64,7 @@ LedgerのE0-04列は、現ID、旧ID、原文参照、対象、目的、Producer
 | N07 | AI Edit proposalを別主体で審査しcontrolled apply/rollback | owner proposalのAudit、提案由来を束縛した別Workspace Taskの事前検査、fresh Permission/Approvalの通常経路はsource接続あり。 | `OPEN`。独立審査結果をapply前に確定するTask／Broker状態と、proposal由来の変更を照合するcontrolled apply/rollbackが`BUILD_GAP`。 |
 | N08 | Bufferが元Taskの意味を保ってOS/依存差を調停 | Codex CLI Task専用Workspace scratch・TEMP/TMP束縛・journal Recoveryと、Task終端の非権限Buffer記録はsource接続あり。 | `OPEN`。実装は限定的なCodex TEMP/scratch調停。全OS/依存差、独立した前後意味・副作用比較、B5自己適用・B6全Consumerは未成立／`BUILD_GAP`。 |
 | N09 | UIから実Task、結果、観測、停止・Recoveryを操作 | Desktop Agent CenterはBrokerのTask start/state/cancel/resultをTask IDへ束縛。Workspace Inspector、History、Eval、Resource、Observation、Notificationにも個別のBroker consumerがある。Trayは停止要求のみ。旧対応はP0/P5/P12、C1..6/C12..14/C20..23、K03/K04/K05/K10/K13。 | 部分`WIRED`。同一TaskへのDiff/Eval/Resource/Trace/Audit/Recovery/Searchの結合は未成立。Audit/Problems/Recovery/Searchは起動時snapshot由来、History replay/branchはDialogue新規要求でAgentTask再生ではない。AgentTask pause/resume/restart未実装。MobileにAgentTask操作なし。W02-B01 UI応答停止の原因は`UNKNOWN`。N09/W00は`OPEN`／`BUILD_GAP`。 |
-| N10 | Windows/macOS/Linux/Android/iOSで通常導入・利用・更新・撤去 | Windows/Linuxのscope限定installed証拠と他OSの個別実装・試験履歴がある。v4標準OS全件のRelease候補証拠は未成立。 | `OPEN`。OS/arch/version/package/実行環境を固定し、未実装package経路を特定する |
+| N10 | Windows/macOS/Linux/Android/iOSで通常導入・利用・更新・撤去 | Windows/LinuxにはExport・portable/bootstrap/updateの部分経路、macOS/Android/iOSにはnative/UI・debug/Simulator build経路がある。一般利用者のOS正規配布からinstalled実Task・更新/復旧/撤去まで結ぶ現Release候補は未成立。 | `OPEN`。OS別source・package役割・既存test/evidence・不足を下記へ記録。標準保証のversion/arch/package/最低資源と各OSの一貫したinstalled lifecycleは未確定。 |
 | N11 | 全要求・Source・Consumer・証拠・Blocker・Release判断の結合 | Registry、Conformance、進捗、既存証拠は存在。v4全要求consumer ledgerは本書を含め未完成。 | `OPEN`。全IDをSource/Consumer/否定/Recovery/OS/Evidenceへ結び、18 blockerと同期する |
 
 ## N03/N04 現行Source→Consumer追跡（E0差分）
@@ -288,6 +288,72 @@ blob SHAは照合HEAD `3d7213f1a36ad5f938f9602040570ac4777d1af0`上の値。
 | `native/rust_helper/src/broker/protocol.rs` | `9b2076d5f31ca6d77f1f87973d1b394aaf751961` |
 | `native/rust_helper/src/broker/dialogue.rs` | `c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999` |
 
+## N10 標準OS導入・利用・更新・撤去 Source→Consumer追跡（E0差分）
+
+照合HEADは`2c220a4bdb06fff26471393422b063c9735811cc`。製品source比較基準は`d503a4ef6daac8942abd1cb011442ce28c78ec55`で、v4文書採用・台帳作業は以下の製品sourceを変更していない。`WIRED`は確認できたコード上のProducer→Consumer接続だけを意味し、一般利用者向け配布・installed lifecycle・対象OSの合格を意味しない。本単位はE0 source mappingであり、N10 acceptance test、現在候補の実OS QA、出荷適格性は`NOT_RUN`／未成立のまま扱う。
+
+| OS | Producer→Consumer／現物 | 配布・導入・初回利用・更新/復旧/撤去の観測 | TestClass／Evidence／N10差分 |
+|---|---|---|---|
+| Windows | Desktop Flutter→Windows Runner→Rust `desktop_launcher`／認証Broker。`product_install.rs`／`update_center.rs`にはper-user install/update操作がある。Export builder、portable packager、D4PKG01 product packagerも存在する。 | `stage_installed_app.ps1`はDeveloper／release-evidence用staging。Export ZIPはportable配置物、D4PKG01はupdate packageで、一般利用者向け`.exe` installerとは異なる。manual workflowはsynthetic Receipt/Manifestから未署名bundleを作るだけで、workflow内にinstalled-product起動・Owner認可・Update/Rollback/Uninstallはない。W01/G1のWindows normal Release実Taskは限定履歴であり、通常installerの一貫した初回利用証拠ではない。 | workflowは`workflow_dispatch`のbuild fixture。N10実導入は`NOT_RUN`。`windows_installer_first_run_smoke`、`windows_setup_doctor_smoke`、`windows_broker_installed_smoke`、`windows_evidence_provenance_isolation`、`windows_distribution_identity`等が未解決。 |
+| Linux | Linux export builder→固定bundle／Rust `linux_product_bundle`・launcher→Broker `product_install`／`update_center`。D4PKG01 writerはLinux host上のbundle梱包を行い、APT setup package builderも別に存在する。 | 現portable `tar.gz`候補はUbuntu 24.04 LTS／x86_64のunsigned開発archive。`d4-pocket-setup` `.deb`はbootstrap UI配置用で製品本体packageではない。D4PKG01は更新payloadで、OS package manager向け製品installerと同じものではない。manual Linux workflowにはinstalled GTK/X11・Wayland等のscopeがあるが、この台帳作業では未起動。過去run #77等のlimited Xvfb/X11、run #286のUbuntu 22.04 hosted evidenceは旧commit・限定scopeで、現候補の一般配布／実desktop／Wayland／全lifecycleへ昇格しない。 | package/smoke unit sourceとmanual workflowは存在。現行N10 acceptanceは`NOT_RUN`。`linux_native_product_support` unresolved。WSL/WSLg/Xvfb/headlessはnative standard desktop acceptanceへ読み替えない。 |
+| macOS | macOS Flutter Runner→Rust `macos_desktop_worker`／`macos_desktop_owner`。App bundle設定とOwner UI test sourceがある。共有ProductPackagePlatform/update pathはWindows/Linuxのみ。 | `installer/macos/README.md`はproduct installerをv1後の計画と記載。bundle IDは`com.example.guiShellDesktop`のplaceholder。manual Apple workflowは`macos-15`上のdebug build/XCTest/UI scopeで、正式`.app`配布、署名/notarization、installed Update/Rollback/Uninstallは示さない。 | UI/XCTest sourceは存在するがN10 standard distribution lifecycleは`NOT_RUN`。release OS range/arch/package/identity/最低resourceも未固定。 |
+| Android | Flutter Mobile→Kotlin `MainActivity`／native Device Link service→Rust Broker transport。Gradle・native product-flow instrumentation testがある。 | manual workflowはAPI 35 Google APIs x86_64 Emulatorを起動し、debug AABをbuildしdebug APKをinstallする。`applicationId`はplaceholder、`minSdk`/`targetSdk`はFlutter既定値参照。正式署名配布、store/一般配布、更新・復旧・撤去を結ぶ候補は未成立。N01/N02でMobile AgentTask/MCP作用consumerも`BUILD_GAP`。 | Emulator/debug build・native test sourceはあるが、今回workflowは実行していない。標準API/ABI・distribution identity・最低resource・N10 lifecycleは`UNKNOWN`／`NOT_RUN`。 |
+| iOS | Flutter Mobile→Swift `DeviceLinkNativeService`／Keychain／Rust Broker transport。Xcode projectとDevice Link UI test sourceがある。 | `IPHONEOS_DEPLOYMENT_TARGET=13.0`はsource設定であり製品の保証範囲確定ではない。manual Apple workflowはiPhone 16 Pro／iOS 18.5 Simulator向けdebug UI scopeを持つが、device配布IPA、store経路、署名/entitlementを含むUpdate/Repair/Uninstall実証はない。Simulator artifactとdevice配布artifactは別対象。Bundle IDはplaceholder。 | Simulator UI test sourceはあるが今回workflowは実行していない。配布用identity/署名、保証OS範囲、最低resource、installed lifecycleは`UNKNOWN`／`NOT_RUN`。N01/N02のMobile Task/MCP consumerも`BUILD_GAP`。 |
+
+#### OS標準候補と実証範囲の更新
+
+| OS | 現source・workflowから確認できる候補値 | 未確定値／現時点で言えないこと |
+|---|---|---|
+| Windows | workflow runner `windows-2025`。Portable ZIPとD4PKG01 update payload。設計代表下限8GB RAMはv4の候補条件。 | 対象Windows edition/build・arch・一般installer/package・Publisher identity・実測最低資源・現候補のinstalled lifecycle。 |
+| Linux | portable archiveのUbuntu 24.04 LTS／x86_64候補。APT bootstrap packageはUbuntu 24.04／amd64。manual workflowは通常scopeでUbuntu 24.04、bwrap制約のTask scopeだけUbuntu 22.04。 | 保証distro/version/arch集合、native X11/Wayland範囲、正式product package形式、最低資源、一般配布条件。hosted/Xvfb/WSL履歴はnative GUI保証ではない。 |
+| macOS | manual build runner `macos-15`、source deployment target 10.15、placeholder bundle ID。 | 発売対象OS範囲/arch、通常配布形式、署名/notarization identity、minimum resource、適法な標準QA媒体。deployment target単独でsupported範囲を固定しない。 |
+| Android | Emulator image API 35／Google APIs／x86_64、source `compileSdk=37`。 | 保証API範囲、Flutterから継承されるmin/target SDKの実値、配布ABI/identity、resource下限。compileSdk/Emulator imageはsupport範囲ではない。 |
+| iOS | UI test workflowのiPhone 16 Pro／iOS 18.5 Simulator、source deployment target 13.0。 | 保証iOS範囲/Simulator arch、device配布形式・署名/entitlement、minimum resource。Simulator成功をdevice artifact実行へ拡張しない。 |
+
+#### N10に関係するSource SHA
+
+全blob SHAは照合HEAD `2c220a4bdb06fff26471393422b063c9735811cc`上の値。
+
+| OS/範囲 | source file | blob SHA |
+|---|---|---|
+| 共通 | `native/rust_helper/src/product_package.rs` | `a2deb2b6e77bc00ae8d01cd5ca306ee63baa20e5` |
+| 共通 | `native/rust_helper/src/product_bootstrapper.rs` | `3b0495dfc9a1937ba64f3f99c95ae4cc739ddc69` |
+| Windows | `installer/windows/README.md` | `46287d463b38b1093a29e9818c0f0bfd99465393` |
+| Windows | `installer/windows/stage_installed_app.ps1` | `c6d0797299624d69b71042416400b2f454787cc7` |
+| Windows | `tooling/export_windows_product.py` | `31856179881a5a5aae1ba4451732e6de6cd7f338` |
+| Windows | `tooling/package_windows_portable.py` | `d6cfba6941da10fbae35228e7137d7f87f8d3889` |
+| Windows | `tooling/package_windows_product.py` | `c6f9155f2457ef0d89ecb711fa94424fbb1501ee` |
+| Windows | `native/rust_helper/src/broker/product_install.rs` | `c91115bdf88dd28e5f3445e7ed66127902909677` |
+| Windows | `native/rust_helper/src/broker/update_center.rs` | `f6fc98155fcd476765b60d382a680c7f7c6d675e` |
+| Windows | `.github/workflows/windows-manual-export-build.yml` | `f8255269ad70a63f329b6abb78f6da3d62cde960` |
+| Linux | `installer/linux/README.md` | `25e80411d6ca8f96e6d70718d59c19e7dc6a58e3` |
+| Linux | `tooling/export_linux_product.py` | `47fe9a3032a5b2680e3f7d39b7cd64120ac83843` |
+| Linux | `tooling/package_linux_product.py` | `0d32d04ec5b43e1815b3664a323c17db79bc928a` |
+| Linux | `tooling/package_linux_deb_setup.py` | `e7a057b2f3db2fca8bbe91401e25d71fb88ceca3` |
+| Linux | `native/rust_helper/src/linux_product_bundle.rs` | `f71ed312c629e81914c61180baeb9723b315a69a` |
+| Linux | `native/rust_helper/src/linux_desktop_launcher.rs` | `f58fb226f21093c2d1f062259d394b4f8ec022f6` |
+| Linux | `tooling/tests/linux_installed_product_smoke.py` | `8020ed8d1d68d59cff6acf70c55856fdeb2125e3` |
+| Linux | `tooling/tests/test_linux_installed_product_smoke.py` | `dc94f9b782d3699810bbe50230a5e9510a5739f7` |
+| Linux | `tooling/tests/test_linux_product_package.py` | `3bb3b520d3c4d15b1f4d43993c8cddb0f0c08ee1` |
+| Linux | `.github/workflows/linux-manual-export-build.yml` | `8d59dd1e9e54a9a4ebb16992f59a402c1ab77c67` |
+| macOS | `installer/macos/README.md` | `b3f3326fa37e9977c47cb0efc7702294a6e1d33a` |
+| macOS | `apps/desktop_flutter/macos/Runner/Configs/AppInfo.xcconfig` | `b278481bc9b75d1851c11fa67313a2c6cd64c1e3` |
+| macOS | `native/rust_helper/src/macos_desktop_worker.rs` | `09fa26563fc671e07f23c73f7dd2a7f2cf3fed7e` |
+| macOS | `native/rust_helper/src/macos_desktop_owner.rs` | `31e13a57fcde422878fae63083bd323e07f482ec` |
+| macOS | `apps/desktop_flutter/macos/RunnerUITests/AdapterOwnerUITests.swift` | `eeab11b1123165a8f82da55ebbb014eab8803862` |
+| macOS/iOS | `.github/workflows/apple-manual-build.yml` | `ed60235da7b35cdfaac23a9fd2d07023e1d29843` |
+| Android | `apps/mobile_flutter/android/app/build.gradle.kts` | `fe96edfa0f714c2d2be509ce3bc21bec6253a714` |
+| Android | `apps/mobile_flutter/android/app/src/main/kotlin/com/example/gui_shell_mobile/MainActivity.kt` | `5c0e28f0ad371f80671d26072bd1c1a134a881d9` |
+| Android | `apps/mobile_flutter/android/app/src/androidTest/kotlin/com/example/gui_shell_mobile/NativeDeviceLinkProductFlowTest.kt` | `4f4a79e0bd80b1f5eb280857dec7a7d5df12258c` |
+| Android | `.github/workflows/android-manual-emulator.yml` | `f0c1ecb7185c91375adfbbdbfaf49e55a2672b57` |
+| iOS | `apps/mobile_flutter/ios/Runner.xcodeproj/project.pbxproj` | `73876a3b79b5ee5bd50dea0428764f1632dfcb19` |
+| iOS | `apps/mobile_flutter/ios/Runner/DeviceLinkNativeService.swift` | `9d185729c439934dce0553b490f2fcd1f7b28a0d` |
+| iOS | `apps/mobile_flutter/ios/RunnerUITests/DeviceLinkProductUITests.swift` | `b74c1f4a846c07eed9b6ae9244ac18b4f1030eec` |
+
+対象test sourceの分類は、Linux package/smoke `UNIT`/hosted `LIVE_PRODUCT`、macOS/iOS `XCTest/UI`、Android instrumentation/Emulator、各manual workflow `workflow_dispatch`。本mappingでは列挙testもworkflowも未実行。過去のWindows W01/G1、Linux #77/#286等は元commit・実行媒体・scopeを保持した限定履歴であり、current N10 Release candidateへ転記しない。Linux以外の物理端末が不要であることは、標準VM/Emulator/Simulator上の実installed QAを省く意味ではない。
+
+N10は`OPEN`。OS別の実consumer sourceと一部のpackage/lifecycle部品は確認できたが、通常利用者向け配布から初回設定・基本サービス・実AI仕事・Update/Repair/Rollback/Uninstallまでを同一のcurrent candidateで通した証拠が全5 OSに揃っていない。未知の標準version/arch/最低資源を創作せず、個々のcandidate値と保証対象を分けて保持する。N10 source mappingはE0全数照合、E1全体BUILD、BUILD_COVERED、QE_QC/QA、Releaseを閉じない。
+
 ## 実装ファイルの初期目録（CODE_PRESENTのみ）
 
 下記は`d503a4ef6daac8942abd1cb011442ce28c78ec55`時点のパス存在・責務候補を読み取った初期目録である。名前・コードの存在だけではProducer→Consumer接続、installed/runtime実作用、Acceptanceを証明しない。各行の`WIRED`、実作用、正常/否定/Recovery、Evidence、OS別状態は未照合なら`UNKNOWN`。
@@ -347,11 +413,11 @@ blob SHAは照合HEAD `3d7213f1a36ad5f938f9602040570ac4777d1af0`上の値。
 
 | OS | v4で必要な実行対象 | 初期候補・既知条件 | 未確定（`UNKNOWN`） |
 |---|---|---|---|
-| Windows | 通常installer→installed Desktop→実Task→Update/撤去。所有PCで完成品確認 | Windows VM/clean user profile。8GB級PCを設計代表下限へ含める | Windows edition/build、CPU arch、installer identity、最低資源の実測値 |
-| Linux | Linux native package/installer→GUI session→Broker/Task→Update/Uninstall | native distro full VM/hosted desktop。X11/Waylandは宣言別。WSL/WSLg/Xvfb単独をnative完成へ使わない | distro/version、arch、Wayland/X11保証範囲、package形式、最低資源 |
-| macOS | 通常配布→installed app→Keychain/sandbox/Task→Update/撤去 | 適法なmacOS VM/hosted GUIと実native API | OS version、arch、配布形式、最低資源、仮想実行可能な環境 |
-| Android | 通常配布→Emulator installed app→Keystore/Device Link/Broker Task/更新 | Android Emulator | API level、ABI、Emulator image、配布候補identity、最低資源 |
-| iOS | Apple許容配布→Simulator installed app→Keychain/Device Link/Task | iOS Simulator。Simulator artifactと配布artifactを別識別 | OS version、simulator arch、配布形式、署名/Entitlement差分、最低資源 |
+| Windows | 一般installer→installed Desktop→実Task→Update/Repair/Rollback/Uninstall。所有PCで完成品確認 | 現source候補: portable ZIP、D4PKG01 update payload、`windows-2025` manual bundle build。8GB級PCは設計代表下限候補。 | edition/build、arch、一般installer形式、Publisher identity、最低資源実測、installed lifecycle evidence |
+| Linux | 対象distro package/installer→native GUI session→Broker/Task→Update/Repair/Rollback/Uninstall | Ubuntu 24.04 LTS/x86_64 portable `tar.gz`、Ubuntu 24.04/amd64 bootstrap `.deb`、D4PKG01 update payload。Manual workflow通常scopeは24.04、bwrap制約scopeは22.04。 | 保証distro/versions/arch、native X11/Wayland範囲、product package形式、最低資源、current installed QA |
+| macOS | 通常配布→installed app→Keychain/sandbox/Task→Update/Repair/Rollback/Uninstall | `macos-15` manual debug/UI workflow、source deployment target 10.15。 | 保証OS範囲/arch、通常配布形式、署名/notarization identity、最低資源、適法なQA媒体 |
+| Android | 通常配布→Emulator installed app→Keystore/Device Link/Broker Task/更新・撤去 | API 35 Google APIs x86_64 Emulator、source compileSdk 37、debug APK/AAB build/install。 | supported API/ABI、min/target SDK実値、配布identity/署名、最低資源、installed lifecycle |
+| iOS | Apple許容配布→Simulator installed app→Keychain/Device Link/Broker Task/更新・撤去 | iPhone 16 Pro／iOS 18.5 Simulator UI scope、source deployment target 13.0。 | supported OS/Simulator arch、device配布形式・署名/Entitlement、最低資源、installed lifecycle |
 
 ## 次のE0照合作業
 
@@ -359,6 +425,7 @@ blob SHAは照合HEAD `3d7213f1a36ad5f938f9602040570ac4777d1af0`上の値。
 2. `docs/D4_POCKET_PHASE_MAPPING.md`のPhase0〜45とP0〜P13・K01〜K20をv4 N/A〜Jへ一意または多対多で接続し、範囲対応と実作用を分ける。
 3. BUF-R/T、B0〜B6、D4-QE/LNX/AUD、Q/FQ/W、18 blockerを現Registry・Contract・Validator・実Consumerへ接続する。
 4. `docs/specs/`、`specs/`、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを取り、各行のSourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
-5. 五OSの宣言標準環境候補を固定可能な公式仕様・既存対応から抽出する。未宣言のversion/arch/resource値を推測せず`UNKNOWN`にする。
+5. N10 source mappingで各OSの実装・配布候補・workflow/test・限定履歴を記録。保証対象のversion/arch/resource/package条件は公式条件と実測から別途固定し、未知を`UNKNOWN`にする。
+6. 次のsource mappingはN11のEvidence/Validator/Registry consumer。旧ID（P/C/Phase/K/BUF/B/Q/FQ/W/QE/AUD）の全数照合とN11への接続を残し、N10やE0の完了を先取りしない。
 
 上記未完了のため、E0は`OPEN`。E1全体BUILDの網羅、BUILD_COVERED、QC/QA、Releaseの成立は主張しない。
