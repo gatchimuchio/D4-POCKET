@@ -666,6 +666,10 @@
     {
       "path": "docs/QE_2026-11-13/進捗.md",
       "責任": "現行v4 HEAD、E0〜E6、N/A/Wの状態、Blocker、復旧点と施工履歴"
+    },
+    {
+      "path": "docs/QE_2026-11-13/E0_要求consumer台帳.md",
+      "責任": "現行v4 E0の要求・旧ID・Producer/Consumer・OS候補・Evidence・Blockerの照合状態。UNKNOWNと未完了を明示する作業台帳"
     }
   ],
   "責任地図": {

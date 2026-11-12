@@ -1459,6 +1459,10 @@
       "sha256": "334a79cbc8f7b17d81d27c040c451586c70ad1d355e9b45d6de758dd1aa4f55f"
     },
     {
+      "path": "docs/QE_2026-11-13/E0_\u8981\u6c42consumer\u53f0\u5e33.md",
+      "sha256": "abd66bbcf3f02c6b5e07a1ddc2134a3f4f43276d97a76448d4306839ccc397bd"
+    },
+    {
       "path": "docs/QE_2026-11-13/\u5dee\u5206\u79fb\u884c\u53f0\u5e33.md",
       "sha256": "1d040c9ff17fc47f88dc5da550bdad20a5c976f8c76a7463ae0b3cb09ad7e250"
     },
@@ -1468,7 +1472,7 @@
     },
     {
       "path": "docs/QE_2026-11-13/\u9032\u6357.md",
-      "sha256": "270148557c105aba4e1ddc6ebe084e1ab0a95ca75c7cb282a3e972d9d75b9a3b"
+      "sha256": "d191542f3bcbb049c417aa13be074b4ee8d9ff71b379043970e25bc7ef7638d8"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -5724,7 +5728,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "7105600ad8f57228e6fc2a150ebd92cbbf8a4c3ad8570487c131893e84a24319"
+      "sha256": "16f91841993609d7b73ff541a63f0a54ca99f6f423b836bf0694469ca558dcce"
     }
   ]
 }
