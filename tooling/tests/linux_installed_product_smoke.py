@@ -8037,9 +8037,17 @@ def _run_installed_agent_mcp_followup_acceptance(
         timeout=30,
     )
     proposal_snapshot = _accessible_snapshot(window)
-    for value in (server_id, tool_id, MCP_PUBLIC_INPUT):
-        if value not in proposal_snapshot:
-            raise RuntimeError("Task MCP提案の承認済み表示にTool要求の値がありません")
+    proposal_marker_presence = {
+        "server_id": server_id in proposal_snapshot,
+        "tool_id": tool_id in proposal_snapshot,
+        "public_input": MCP_PUBLIC_INPUT in proposal_snapshot,
+        "proposal_envelope": '"d4_mcp_tool_request"' in proposal_snapshot,
+    }
+    if not all(proposal_marker_presence.values()):
+        raise RuntimeError(
+            "Task MCP提案の承認済み表示に要求値が不足しています: "
+            + json.dumps(proposal_marker_presence, sort_keys=True)
+        )
     if result_marker in proposal_snapshot:
         raise RuntimeError("Task MCP提案表示へ外部Tool結果が混入しました")
 
