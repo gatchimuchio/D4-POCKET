@@ -74,7 +74,17 @@ class _TraceInspectorState extends State<TraceInspector> {
               }
               if (snapshot.hasError) {
                 return BorderedPanel(
-                  child: Text('Trace一覧を取得できません: ${snapshot.error}'),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Trace一覧を取得できません: ${snapshot.error}'),
+                      const SizedBox(height: 8),
+                      OutlinedButton(
+                        onPressed: () => setState(_refresh),
+                        child: const Text('再試行'),
+                      ),
+                    ],
+                  ),
                 );
               }
               return _tracePanel(snapshot.data ?? const {});

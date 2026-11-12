@@ -61,7 +61,17 @@ class _ObservabilityCenterState extends State<ObservabilityCenter> {
               }
               if (snapshot.hasError) {
                 return BorderedPanel(
-                  child: Text('観測一覧を取得できません: ${snapshot.error}'),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('観測一覧を取得できません: ${snapshot.error}'),
+                      const SizedBox(height: 8),
+                      OutlinedButton(
+                        onPressed: () => setState(_refresh),
+                        child: const Text('再試行'),
+                      ),
+                    ],
+                  ),
                 );
               }
               return _observationPanel(snapshot.data ?? const {});

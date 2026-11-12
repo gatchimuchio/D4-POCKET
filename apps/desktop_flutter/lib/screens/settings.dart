@@ -220,6 +220,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
         : UpdateClient(widget.client.brokerTransport!);
     _refreshProfiles();
     _updatesFuture = widget.active ? _updateClient?.list() : null;
+    if (widget.focusUpdateCenterRequest > 0) {
+      _focusSettingsSection(_updateCenterKey);
+    }
+    if (widget.focusComposeCenterRequest > 0) {
+      _focusSettingsSection(_composeCenterKey);
+    }
+    if (widget.focusExportCenterRequest > 0) {
+      _focusSettingsSection(_exportCenterKey);
+    }
   }
 
   @override

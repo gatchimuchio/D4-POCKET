@@ -47,23 +47,28 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
     super.initState();
     final transport = widget.transport;
     _client = transport == null ? null : McpConnectionClient(transport);
+    if (widget.focusRequest > 0) _focusPanel();
   }
 
   @override
   void didUpdateWidget(covariant McpConnectionCenterPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.focusRequest != widget.focusRequest) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        final targetContext = _titleKey.currentContext;
-        if (!mounted || targetContext == null) return;
-        Scrollable.ensureVisible(
-          targetContext,
-          alignment: 0.12,
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOutCubic,
-        );
-      });
+      _focusPanel();
     }
+  }
+
+  void _focusPanel() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final targetContext = _titleKey.currentContext;
+      if (!mounted || targetContext == null) return;
+      Scrollable.ensureVisible(
+        targetContext,
+        alignment: 0.12,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+      );
+    });
   }
 
   @override

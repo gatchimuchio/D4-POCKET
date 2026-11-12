@@ -583,11 +583,6 @@ void main() {
       _brokerAcceptedBody('content_projection', {'redacted_payload': {}}),
       _brokerAcceptedBody('approval_edit', {'ok': false}),
       _brokerCommandSuspendedResponse(),
-      _brokerAcceptedBody('プロファイル一覧', {}),
-      _brokerAcceptedBody('通知一覧', {}),
-      _brokerAcceptedBody('観測一覧', {}),
-      _brokerAcceptedBody('観測一覧', {}),
-      _brokerAcceptedBody('A2A接続一覧', {}),
       _brokerAcceptedBody('AgentCLI実行系作業領域登録', {
         'runtime_id': 'codex-p12-synthetic',
         'workspace_id': 'workspace-p12-synthetic',
@@ -1084,11 +1079,6 @@ void main() {
       _brokerAcceptedBody('content_projection', {'redacted_payload': {}}),
       _brokerAcceptedBody('approval_edit', {'ok': false}),
       _brokerCommandSuspendedResponse(),
-      _brokerAcceptedBody('プロファイル一覧', {}),
-      _brokerAcceptedBody('通知一覧', {}),
-      _brokerAcceptedBody('観測一覧', {}),
-      _brokerAcceptedBody('観測一覧', {}),
-      _brokerAcceptedBody('A2A接続一覧', {}),
       for (final session in [
         (sessionA, 'codex-p12-agent-a', 'workspace-p12-agent-a'),
         (sessionB, 'codex-p12-agent-b', 'workspace-p12-agent-b'),

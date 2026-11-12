@@ -251,6 +251,7 @@ class ShellHomePage extends StatefulWidget {
 
 class _ShellHomePageState extends State<ShellHomePage> {
   int selectedIndex = 0;
+  final Set<int> _visitedPageIndexes = {0};
   bool _dialogueVisited = false;
   int _updateCenterFocusRequest = 0;
   int _mcpCenterFocusRequest = 0;
@@ -509,6 +510,13 @@ class _ShellHomePageState extends State<ShellHomePage> {
         onPrepareAgentTask: _openA2aArtifactHandoff,
       ),
     ];
+    final retainedPages = List<Widget>.generate(
+      pages.length,
+      (index) => _visitedPageIndexes.contains(index)
+          ? pages[index]
+          : const SizedBox.shrink(),
+      growable: false,
+    );
     final pageEntries = _pageEntries();
     final visiblePageEntries = pageEntries
         .where((page) => navigationGroup.includes(page.group))
@@ -750,7 +758,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
                       const VerticalDivider(width: 1),
                       Expanded(
                           child: IndexedStack(
-                              index: selectedIndex, children: pages)),
+                              index: selectedIndex, children: retainedPages)),
                     ],
                   ),
                 ),
@@ -838,6 +846,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
   void _openProductSetup() {
     setState(() {
       selectedIndex = 11;
+      _visitedPageIndexes.add(selectedIndex);
       navigationGroup = _ShellNavigationGroup.settings;
       _updateCenterFocusRequest++;
     });
@@ -846,6 +855,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
   void _openMcpCenter() {
     setState(() {
       selectedIndex = 11;
+      _visitedPageIndexes.add(selectedIndex);
       navigationGroup = _ShellNavigationGroup.settings;
       _mcpCenterFocusRequest++;
     });
@@ -854,6 +864,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
   void _openComposeCenter() {
     setState(() {
       selectedIndex = 11;
+      _visitedPageIndexes.add(selectedIndex);
       navigationGroup = _ShellNavigationGroup.settings;
       _composeCenterFocusRequest++;
     });
@@ -862,6 +873,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
   void _openExportCenter() {
     setState(() {
       selectedIndex = 11;
+      _visitedPageIndexes.add(selectedIndex);
       navigationGroup = _ShellNavigationGroup.settings;
       _exportCenterFocusRequest++;
     });
@@ -881,6 +893,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
     setState(() {
       _pendingAiEditProposal = proposal;
       selectedIndex = 5;
+      _visitedPageIndexes.add(selectedIndex);
       if (!navigationGroup.includes(page.group)) {
         navigationGroup = page.group;
       }
@@ -909,6 +922,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
     setState(() {
       _pendingA2aArtifactHandoff = source;
       selectedIndex = page.index;
+      _visitedPageIndexes.add(selectedIndex);
       if (!navigationGroup.includes(page.group)) {
         navigationGroup = page.group;
       }
@@ -937,6 +951,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
       navigationGroup = group;
       if (!currentPageIsVisible) {
         selectedIndex = pageEntries.first.index;
+        _visitedPageIndexes.add(selectedIndex);
       }
     });
   }
@@ -952,6 +967,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
     final page = matches.first;
     setState(() {
       selectedIndex = index;
+      _visitedPageIndexes.add(index);
       if (!navigationGroup.includes(page.group)) {
         navigationGroup = page.group;
       }

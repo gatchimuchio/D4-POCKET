@@ -95,6 +95,11 @@ void main() {
         GuiShellDesktopApp(client: ShellCoreClient.mock(transport: fixture)),
       );
 
+      expect(
+        fixture.operations.where((operation) => operation == '観測一覧'),
+        isEmpty,
+        reason: '未訪問の観測画面はBrokerへ照会しない',
+      );
       await _openNavigation(tester, '観測');
       await tester.pumpAndSettle();
 
@@ -102,11 +107,8 @@ void main() {
         for (var index = 0; index < fixture.operations.length; index++)
           if (fixture.operations[index] == '観測一覧') fixture.payloads[index],
       ];
-      expect(observationPayloads, hasLength(2));
-      expect(
-        observationPayloads.map((payload) => payload['上限']),
-        unorderedEquals([200, 256]),
-      );
+      expect(observationPayloads, hasLength(1));
+      expect(observationPayloads.single['上限'], 200);
       expect(observationPayloads.every((payload) => payload['版'] == 1), isTrue);
       expect(find.text('Span: 1'), findsOneWidget);
       expect(find.text('Trace: 1'), findsOneWidget);
@@ -126,6 +128,11 @@ void main() {
         GuiShellDesktopApp(client: ShellCoreClient.mock(transport: fixture)),
       );
 
+      expect(
+        fixture.operations.where((operation) => operation == '観測一覧'),
+        isEmpty,
+        reason: '未訪問の追跡画面はBrokerへ照会しない',
+      );
       await _openNavigation(tester, '追跡');
       await tester.pumpAndSettle();
 
@@ -133,11 +140,8 @@ void main() {
         for (var index = 0; index < fixture.operations.length; index++)
           if (fixture.operations[index] == '観測一覧') fixture.payloads[index],
       ];
-      expect(observationPayloads, hasLength(2));
-      expect(
-        observationPayloads.map((payload) => payload['上限']),
-        unorderedEquals([200, 256]),
-      );
+      expect(observationPayloads, hasLength(1));
+      expect(observationPayloads.single['上限'], 256);
       expect(observationPayloads.every((payload) => payload['版'] == 1), isTrue);
       expect(find.text('Trace: 1'), findsOneWidget);
       expect(find.text('Span: 1'), findsOneWidget);
@@ -175,6 +179,67 @@ void main() {
         findsOneWidget,
       );
       expect(find.textContaining('Broker接続がないため'), findsNothing);
+
+      await _openNavigation(tester, '概要');
+      await _openNavigation(tester, '追跡');
+      await tester.pumpAndSettle();
+      expect(
+        fixture.operations.where((operation) => operation == '観測一覧'),
+        hasLength(2),
+        reason: '訪問済み画面は保持し、戻るたびに再照会しない',
+      );
+    });
+  }
+
+  if (kGuiShellModuleObservability) {
+    testWidgets('観測一覧の失敗後にBroker要求を再試行できる', (tester) async {
+      final fixture = _ObservationFixtureTransport(failFirstObservation: true);
+      await tester.pumpWidget(
+        GuiShellDesktopApp(client: ShellCoreClient.mock(transport: fixture)),
+      );
+
+      await _openNavigation(tester, '観測');
+      await tester.pumpAndSettle();
+      expect(find.textContaining('観測一覧を取得できません:'), findsOneWidget);
+      expect(find.text('再試行'), findsOneWidget);
+      expect(
+        fixture.operations.where((operation) => operation == '観測一覧'),
+        hasLength(1),
+      );
+
+      await tester.tap(find.text('再試行'));
+      await tester.pumpAndSettle();
+      expect(find.text('Metric: 1'), findsOneWidget);
+      expect(
+        fixture.operations.where((operation) => operation == '観測一覧'),
+        hasLength(2),
+      );
+    });
+  }
+
+  if (kGuiShellModuleTraceInspector) {
+    testWidgets('Trace一覧の失敗後にBroker要求を再試行できる', (tester) async {
+      final fixture = _ObservationFixtureTransport(failFirstObservation: true);
+      await tester.pumpWidget(
+        GuiShellDesktopApp(client: ShellCoreClient.mock(transport: fixture)),
+      );
+
+      await _openNavigation(tester, '追跡');
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Trace一覧を取得できません:'), findsOneWidget);
+      expect(find.text('再試行'), findsOneWidget);
+      expect(
+        fixture.operations.where((operation) => operation == '観測一覧'),
+        hasLength(1),
+      );
+
+      await tester.tap(find.text('再試行'));
+      await tester.pumpAndSettle();
+      expect(find.text('Trace: 1'), findsOneWidget);
+      expect(
+        fixture.operations.where((operation) => operation == '観測一覧'),
+        hasLength(2),
+      );
     });
   }
 
@@ -240,6 +305,9 @@ Future<void> _openNavigation(WidgetTester tester, String label) async {
 }
 
 class _ObservationFixtureTransport implements BrokerTransport {
+  _ObservationFixtureTransport({this.failFirstObservation = false});
+
+  bool failFirstObservation;
   final operations = <String>[];
   final payloads = <Map<String, Object?>>[];
 
@@ -250,6 +318,10 @@ class _ObservationFixtureTransport implements BrokerTransport {
   }) async {
     operations.add(operation);
     payloads.add(Map<String, Object?>.from(payload ?? const {}));
+    if (operation == '観測一覧' && failFirstObservation) {
+      failFirstObservation = false;
+      throw StateError('fixture observation failure');
+    }
     return {
       'status': 'accepted',
       'body': {
