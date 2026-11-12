@@ -231,6 +231,7 @@ blob SHAは照合HEAD `03f7b92d4dc67a544e8fa1e9bbaac5d3d912723e`の値。各file
 | Workspace／Diff／Recovery preview | Agent Center内のWorkspace Inspector→`WorkspaceClient`→Brokerの登録Workspace一覧、承認範囲付きtree/read/compare/change-list/diff/recovery-preview/whole-baseline operation。応答はWorkspace ID・登録hash・Approval・表示範囲へ結合し、可視性に応じて`LIVE_RUNTIME`または`INTERNAL_STATE`を要求する。 | Workspace実体の限定読取・比較は`WIRED`。Diffと変更一覧はWorkspace／baseline基準で、完了Task IDへ結び付くTask差分Artifactではない。Recovery previewは実復旧実行ではない。 |
 | History／再実行／分岐 | History画面→`HistoryClient`→Brokerの現在History grant、Dialogue履歴、AgentTask履歴metadata。Task履歴はTask ID・result hash等の履歴投影で、本文・現在権限・稼働状態を表示しない。Dialogue replay/branchは参照Audit ID/hashと新入力から新しい要求を作る。 | Ownerの現在承認・Runtime binding・期限を再照合し、Task履歴読取とDialogue内容表示を区別する。Replay/branchは新しい承認待ちDialogueであり、AgentTaskの再生・pause/restartでも旧Authorityの再利用でもない。 |
 | Evaluation／Resource | Evaluation Lab→`EvaluationClient`→Broker `evaluation_control`のDataset/Experiment/status/compare。実行時はDatasetのCaseごとに既存Dialogue sessionを作成し、決定論的Evaluatorで比較する。Resource client→Broker `実行系資源観測`はRuntime IDを指定し、実測またはunknownを返す。 | 個別consumerは`WIRED`だが、Evaluation ExperimentおよびRuntime resource observationにAgentTask IDの束縛はなく、同一Taskのtest結果／資源とは扱えない。評価はPermission/Audit/release判断を生成しない。 |
+| Regression Case（旧C6） | 完了Dialogue paneが送信時Broker発行の要求ID/hashを保持し、ownerがredacted入力・条件等を明示した登録要求を作る。Rust起動器のoperation別native確認→既存Broker `回帰Case登録`→現在の対話result receipt／終了Audit／hashを再照合→Windows ProtectedStoreへprivate保存。通常IPCの`回帰Case一覧`はmetadata projectionのみ。削除／中断Recoveryも別のowner operation。 | source contractとproducer→consumerは`WIRED`。CaseはC5 Evaluation Datasetへ自動importされず、private定義を通常一覧・Audit・native確認へ返さない。回帰Case登録sourceの存在・fixture/conformanceはinstalled Owner操作やN09の同一AgentTask結合を証明しない。詳細はC6 crosswalkとSource SHA表。 |
 | Observation／Trace／Notification | `ObservationCenter`はBroker Audit finalization後にbounded spanを作り、Observation/Trace画面は一覧を取得する。各spanはBroker operationと関連Audit IDを持つ。Notification CenterはAudit eventからsummaryだけを作り、既読／破棄はID/hashへ束縛する。 | Observationは最大1024 span保持・一応答最大256、現在は一span一traceで親なし。Trace IDはBroker内で採番され、Task IDではない。Notificationはsummary/navigation onlyで権限を作らず、raw payloadを出さない。Observation/Auditは責任が分離される。 |
 | Audit／Problems／Recovery／Search | `ShellCoreClient.product`は起動時Broker応答から一つの`ShellSnapshot`を作る。Audit Viewer、Problems、Recovery、Dashboard等は`getSnapshot()`を参照する。Global Searchは同snapshotのbounded in-memory indexを検索する。 | Audit Viewerの一覧は起動時health/host/catalog/session/probe応答から作った投影であり、永続Audit chainのTask単位検索ではない。Problems/Recoveryも同snapshotで、Task crash後のlive Recovery catalogではない。Global SearchはBroker検索・最新Task/History検索ではない。 |
 | Tray／Runtime lifecycle | Windows Trayはsnapshotを定期投影し、open/navigationとBroker `全Runtime停止要求`を持つ。要求応答は`停止実行済み=false`、Owner再承認待ち。別のRuntime CenterはBroker Runtime lifecycle status/approval/executeでstart/stop/restart/pause/resume/quarantineを操作する。 | Tray stopは実停止でなくOwner承認要求である。Runtime lifecycleのpause/restartはRuntime単位で、同一AgentTaskのpause/restartとは異なる。TrayはWindows固有、定期snapshotはTask IDに結び付かない。 |
@@ -238,7 +239,7 @@ blob SHAは照合HEAD `03f7b92d4dc67a544e8fa1e9bbaac5d3d912723e`の値。各file
 
 ### N09 状態・TestClass・Evidence
 
-Agent Center TaskとWorkspace/History/Evaluation/Resource/Observation/Notificationの個別source consumerは`WIRED`。要件N09が要求する同一Task単位の操作・結果・diff/eval/resource/trace/audit/recovery/search結合、AgentTask pause/resume/restart/replay、全体の停止・Recovery画面、Windows UI応答停止根因是正には`BUILD_GAP`または`UNKNOWN`を保持する。Runtime lifecycle機能やDialogue replayをAgentTask操作へ読み替えない。旧対応IDはP0/P5/P12、C1..6/C12..14/C20..23、K03/K04/K05/K10/K13（v4仕様S05・工程表R03線C）。
+Agent Center TaskとWorkspace/History/Evaluation/Resource/Observation/Notification/Regression Caseの個別source consumerは`WIRED`。要件N09が要求する同一Task単位の操作・結果・diff/eval/resource/trace/audit/recovery/search結合、AgentTask pause/resume/restart/replay、全体の停止・Recovery画面、Windows UI応答停止根因是正には`BUILD_GAP`または`UNKNOWN`を保持する。Runtime lifecycle機能やDialogue replayをAgentTask操作へ読み替えない。Regression Caseは完了Runtime Dialogueからのowner管理登録であり、同一AgentTaskの結果接続・C5 Dataset import・installed owner操作の証拠を別途要する。旧対応IDはP0/P5/P12、C1..6/C12..14/C20..23、K03/K04/K05/K10/K13（v4仕様S05・工程表R03線C）。
 
 該当test sourceは`apps/desktop_flutter/test/agent_task_client_test.dart`、`history_screen_test.dart`、`workspace_inspector_test.dart`、`evaluation_lab_test.dart`、`runtime_resource_test.dart`、`runtime_lifecycle_test.dart`、`observation_client_test.dart`、`notification_client_test.dart`、`global_search_index_test.dart`、`widget_test.dart`、`apps/mobile_flutter/test/mobile_projection_client_test.dart`／`resource_overview_test.dart`、`packages/gui_shell_ui/test/evaluation_client_test.dart`／`runtime_resource_client_test.dart`／`runtime_lifecycle_client_test.dart`、およびRust Broker source内のunit tests。TestClassは`UNIT`／`FIXTURE`／`WIDGET`。本mappingでは全testを`NOT_RUN`。過去W02-B01のlimited Windows UI runtime observationは`docs/QE_2026-11-05/W02_作業記録_20261107.md`に残す。旧widget成功をinstalled UI root causeの修正証拠にしない。
 
@@ -413,7 +414,55 @@ N11は`OPEN`。ValidatorとRelease Gateは一部のRegistry/Windows evidence/man
 | P12 | 製品全体統合。REV5進捗ではWindows側`FEATURE COMPLETE`。正式release/Owner GOと分離された製品機能統合の履歴。 | v4仕様S05の直接対応はN01/N09/N10、関連能力K19。Phase 39〜45はC27〜C34のQC/回帰/文書/出荷範囲に関連。単一施工線へ閉じない。 | Windows product entry→Task/result/operation UI→OS product lifecycle。実TaskはN01、operation/observation/recoveryはN09、installed OS distribution/lifecycleはN10の現ConsumerとSHA節へ分割記録。 | `FEATURE COMPLETE`を正式Release/QAへ昇格しない。v4 N01/N09/N10は`OPEN`、Q0〜Q7は`DEFERRED`、`release_ready=false`。統合後の全候補・全OS acceptanceは未成立。 |
 | P13 | Mobile / Non-Windows Product Build。REV5履歴は2026-10-09に有限Product Build acceptanceを閉鎖したと要約する。旧Acceptanceの詳細evidence identity/classは本照合資料から`UNKNOWN`。 | v4仕様S05の直接対応はN10、関連能力K17。Phase 35/36はC24〜C26範囲に関連。施工線H/I。Linux native必須性は別途現行AGENTS/v4正本に従う。 | Linux/macOS Desktop、Android/iOS Mobile runner/native transport→Rust Broker／OS capability→installed product lifecycle。OS別source、package、workflow候補とSHAはN10節。 | 旧P13閉鎖を現行五OS標準installed QAへ移さない。Linux nativeは完全対応必須で、WSL/Xvfb/Headlessだけでは成立しない。Android/iOS実機を前提にせずEmulator/Simulator等を用いる。N10は`OPEN`、`linux_native_product_support`、`rev2_mobile_distribution`、`rev2_mobile_device_evidence`を保持。 |
 
-P0〜P13全14 IDの旧要求範囲・限定statusをv4 N/K/Consumerへ接続した。これは旧statusの書換え、v4 acceptance、N01〜N11のCLOSED、E0完了のいずれも意味しない。C0〜C34、Phase0〜45、K01〜K20の全数照合と各行の完全なE0-04列は継続する。P0/P1/P4の直接対応はv4仕様S05の明示mappingへ合わせて訂正し、旧statusは変更していない。P13の詳細evidence identity/classは`UNKNOWN`として保持する。
+P0〜P13全14 IDの旧要求範囲・限定statusをv4 N/K/Consumerへ接続した。これは旧statusの書換え、v4 acceptance、N01〜N11のCLOSED、E0完了のいずれも意味しない。C0〜C6のID別source crosswalkを下記へ追加したが、C7〜C34、Phase0〜45、K01〜K20の全数照合と各行の完全なE0-04列は継続する。P0/P1/P4の直接対応はv4仕様S05の明示mappingへ合わせて訂正し、旧statusは変更していない。P13の詳細evidence identity/classは`UNKNOWN`として保持する。
+
+## 旧C0〜C6のv4 Source→Consumer crosswalk（E0差分）
+
+旧rev1の仕様・工程・進捗は当時の要求範囲と履歴statusを確認する資料として読み、現在statusはv4 S04/S05、工程表R03、現行Source→Consumerへ接続した。C0〜C6の旧statusは変更しない。v4 target statusはN11/C0のbaseline記録を含め、製品受入は未成立のままである。Phase対応は`docs/D4_POCKET_PHASE_MAPPING.md`の既存逆引きを参照した。
+
+| 旧ID／Phase | 旧要求とrev1時点のstatus・証拠 | v4対応 | 現在のProducer→Consumer／確認できる状態 | v4で残る差分・証拠限界 |
+|---|---|---|---|---|
+| C0／Phase 0 | clean `main` baseline、backup、Schema/Conformance、Rust/Flutter、release blockerを記録。進捗表は「基準検証保存・先行検証整理中」。保存記録のsource commitは`c5aa1ec06c2074b93ca2475abdf9938557699d2d`、`validate_all.py --desktop-platform windows --include-mobile-release` exit 0／開発17項目PASS。Schema 36、Conformance 150、Rust 63+IPC5+checkpoint8、Flutter検査を含む。外部log pathとSHAは旧進捗に記録済み。 | N11／工程表R03の線J。これは製品機能Consumerでなく、baseline・証拠・Gateの管理対象。 | 旧baseline記録→本E0台帳／root `MANIFEST.sha256.json`／`tooling/manifest.py`／`tooling/release_gate_check.py`。旧source SHA・旧検査scopeは履歴として保持する。 | 旧baselineは現v4候補の検査ではない。再実行・v4 PASSへの転記をしない。N11/E0は`OPEN`で、現在のcandidate証拠・全OS QA・Release判定は別途未成立。 |
+| C1／Phase 5・6 | Workspace Inspector：File Tree、Diff、Tool/Shell履歴、Test結果、Approval/Audit、rollback候補。旧進捗は読取・範囲基準点・diff UI接続、全Workspace探索・巨大file比較・実履歴・rollback preview未完。 | N09、K03/K13。 | Workspace Inspector→`WorkspaceClient`→Broker tree/read/compare/change-list/diff/recovery-preview。N09のWorkspace行とSource SHA表を参照。source上の個別consumerは`WIRED`。 | 現DiffはWorkspace/baseline基準で完了TaskのDiff Artifactではない。Recovery previewは復旧作用ではない。旧全探索・巨大file等の残差とN09のTask binding gapを保持。 |
+| C2／Phase 9・10 | History、再実行、分岐：新要求・新識別子・新Audit、古いApproval/PermissionやUI stateの継承拒否。旧進捗は実履歴・新承認による再実行/分岐・保存内容閲覧を接続、保存/破棄Recoveryと全体判定未完。 | N09、K03。 | History UI→`HistoryClient`→Broker History/Dialogue/AgentTask metadata。Dialogue replay/branchは参照Auditと新入力から新要求を作る。 | Dialogue replay/branchはAgentTaskの再実行ではない。旧承認・Permissionの継承に使わない。Task history/結果表示と同一AgentTaskのreplay・Recovery統合は`BUILD_GAP`/`UNKNOWN`。 |
+| C3／Phase 11 | Runtime別process/CPU/RAM/Disk/Network/uptime、取得可能時のみGPU、履歴chart。旧進捗はWindows開発経路・Broker観測・Flutter表示・隔離実MINIDORA接続まで記録し、installed/releaseと非Windows物理実機を未取得とした。 | N09、K04/K10。installed OSの受入媒体はN10。 | Runtime Center Resource→`RuntimeResourceClient`→Broker `実行系資源観測`／`RuntimeResourceRegistry`。実測不能値はunknownとし、Source/Evidence境界はN09に記録。 | ResourceはRuntime ID単位でAgentTask IDへ束縛されず、Task test/result指標ではない。旧物理実機待ちはv4のN10標準VM/Emulator/Simulator installed QAに置換し、Linux nativeを含むOS対象自体は保持。N09/N10は`OPEN`。 |
+| C4／Phase 12 | Capability-first lifecycle start/stop/restart/pause/resume/quarantineをBroker Authority経路で操作。旧進捗はBroker統治、専用IPC、debug画面、development fixtureでの限定実接続を記録。 | N09、K04/K13。installed OSの受入媒体はN10。 | Runtime Center lifecycle UI→Broker Runtime lifecycle status/approval/execute→登録Adapter。旧進捗にあるdebug fixtureの履歴はそのscopeに保持。 | Runtime lifecycleはRuntime単位で、同一AgentTaskのpause/restartとは別機能。production Adapter・installed OSの実作用は未成立。旧物理実機待ちは現v4 OS標準QA待ちへ移行し、物理非Windows deviceを必須条件にしない。 |
+| C5／Phase 13 | 評価Dataset/Case/Evaluator/Experiment/Result/Comparison。旧進捗はWindows Broker、owner専用Dataset、決定論評価器、UIとSchema/Conformance/Rust/Flutterの当時検査を記録。実稼働Runtimeの受入とreleaseは未成立。 | N09、K05。 | Evaluation Lab→`EvaluationClient`→Broker `evaluation_control`、Dataset/Experiment/status/compare、既存Dialogue承認経路。詳細はN09 Evaluation/Resource行。 | Evaluationは同一AgentTask IDのtest結果を評価していない。旧検査数・debug画面は現v4 installed QAではない。Runtime横断比較と同一candidate acceptanceはOPEN。 |
+| C6／Phase 14 | 完了Dialogueから明示redaction済みRegression Caseをowner登録。旧進捗はBroker証跡照合、Windows ProtectedStore、hash-only receipt、metadata一覧、Owner確認付きdelete/recoveryのsource/component接続を記録。installed Owner操作未証明、C5 Dataset revisionへのimport未完。 | N09、K05（Regression Case/Evaluation）。Dialogueの実Task/result producerはN01との境界確認が必要。 | Runtime Dialogue pane→送信receiptの要求ID/hash→ownerの明示redacted Case→Rust launcher native confirmation→Broker `回帰Case登録`→結果receipt/終了Audit再照合→Windows ProtectedStore。通常一覧はmetadata only。Current specs/source SHAは次表。 | 旧C6はRuntime Dialogueからの登録で、N09同一AgentTaskのTask bindingを証明しない。C5 Datasetへの自動importは禁止・未実装（独立owner操作/revisionが必要）。Installed product上のOwner登録/delete/recovery実作用は未証明。native confirmationはWindows本人性証明ではない。 |
+
+C6のsource hashは現HEAD `b2e20c2a16e2f324f3848ecc06203103755ceabf`上のGit blob SHA。ここではpath/consumerの同一性を記録し、実行・Acceptanceを意味しない。
+
+| Source | Blob SHA |
+|---|---|
+| `docs/specs/regression-case.md` | `ce58a891facfca9f1e8e498e13bf983011350ba3` |
+| `specs/runtime_dialogue_submission_receipt.schema.json` | `204b7871ab08539c16da2431541a5764b023f1fe` |
+| `specs/regression_case_registration.schema.json` | `04165813e2791196c38fe515c84b4e1adeefd000` |
+| `specs/regression_case_receipt.schema.json` | `3defc85eab0e8ed4ebac4ba85a1a5b83de6016a4` |
+| `specs/regression_case_list_request.schema.json` | `72ded3ae0e37214b442811ba973bdf4a490aa854` |
+| `specs/regression_case_list.schema.json` | `a7f99f9784b287b7bb21678bc12ab531debf5af0` |
+| `specs/regression_case_delete_request.schema.json` | `7ed67c02cb4796da94adc6dd0b1674f4b8a91ca4` |
+| `specs/regression_case_delete_receipt.schema.json` | `d051f4e795f8c05051356b0f1d1dc89947db3633` |
+| `specs/regression_case_delete_recovery_request.schema.json` | `c69d71ef2f07a2a7090ba3d0d648448c60ca1c4e` |
+| `specs/regression_case_delete_recovery_receipt.schema.json` | `b9b1de18f811bc03f38d5dfaa497f673e335e496` |
+| `native/rust_helper/src/broker/regression_case.rs` | `cf229213a54f0eaa512781fb417692506bf06775` |
+| `native/rust_helper/src/broker/protocol.rs` | `9b2076d5f31ca6d77f1f87973d1b394aaf751961` |
+| `native/rust_helper/src/broker/ipc_server.rs` | `58a404b920ef5905e174668ec2de0e04a9e8b044` |
+| `native/rust_helper/src/desktop_launcher.rs` | `6a9f335de07fa474ca10043aea63ad6e988b572d` |
+| `packages/gui_shell_ui/lib/src/runtime_dialogue_client.dart` | `44f810aa2509a8a28ddf2933a5491528f3b07147` |
+| `packages/gui_shell_ui/lib/src/runtime_dialogue.dart` | `f78083b376f80d06f284387bb8b7aa2d769141bf` |
+| `packages/gui_shell_ui/lib/src/regression_case_owner_client.dart` | `1f1d10cecca70dff2075bed1e5f331267e0ea296` |
+| `packages/gui_shell_ui/lib/src/regression_case_client.dart` | `f14bd4aeda1d6f3262cdb1be4b924884d7128e5b` |
+| `apps/desktop_flutter/lib/screens/runtime_dialogue.dart` | `803edd0a687acdfd00e19898fbb5ba6b85ce1449` |
+| `apps/desktop_flutter/lib/services/runtime_dialogue_client.dart` | `a0853ee7327cafa60ee89b0c5ee49312b73c46c4` |
+| `apps/desktop_flutter/lib/services/regression_case_client.dart` | `c29054e8b6256b15f097bd5e7de57b9cf2117e3a` |
+| `packages/gui_shell_ui/test/regression_case_owner_client_test.dart` | `48a895c5a2f139eb2823df67f4aad3e1b8639748` |
+| `packages/gui_shell_ui/test/regression_case_client_test.dart` | `a30a002abf021730f0ba09e66126ebbb2a39e12a` |
+| `apps/desktop_flutter/test/runtime_dialogue_test.dart` | `899912f92ee3751f8616632d434e04f95ee5ef77` |
+| `tooling/conformance_tests/run_conformance_skeleton.py` | `c6f31d8cb561b48513c6784e54c85969c9cb953e` |
+
+Related test source: `packages/gui_shell_ui/test/regression_case_client_test.dart`、`regression_case_owner_client_test.dart`、`apps/desktop_flutter/test/runtime_dialogue_test.dart`、`tooling/conformance_tests/run_conformance_skeleton.py`内のC6 contract検査。TestClassはDart unit/widget・schema/conformance sourceで、今回のSource mappingでは未実行。Broker receipt/listは旧contract上`INTERNAL_STATE`、削除後ProtectedStore観測は`LIVE_RUNTIME`と明示される。実installed Owner操作・Windows artifact provenanceへ証拠を昇格しない。
+
+C0〜C6の7 IDについて、旧要求・Phase・旧statusを変更せずv4の直接N/Kとconsumer/gapへ接続した。これはC0〜C6 acceptanceの再判定、C1〜C6の製品完了、N09/N11のCLOSED、E0全数完了ではない。C7〜C34は未照合で継続する。
 
 ## 実装ファイルの初期目録（CODE_PRESENTのみ）
 
@@ -438,7 +487,7 @@ P0〜P13全14 IDの旧要求範囲・限定statusをv4 N/K/Consumerへ接続し�
 | 新規要求 N01〜N11 | 11 | v4仕様S04 | 初期Producer/Consumer差分を記録。契約・否定・OS・証拠の全項目は未完 |
 | 全体施工線 A〜J | 10 | v4工程表R03・Codex指示I04 | 全線同時BUILDのproducer/consumerと現行実装配置を全数照合中 |
 | 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13の旧履歴→v4 scope/Consumer crosswalkを記録。詳細Contract/OS/Evidence、P13の旧evidence identity/classは未完／UNKNOWN |
-| 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | 旧仕様・工程・進捗の全項目から現Consumerへの照合が未完 |
+| 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C6の7 IDはID別crosswalkを記録。C7〜C34の旧仕様/工程/進捗→現Consumerと全E0-04列は未照合 |
 | D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | C対応は範囲関係のみ。現在のProducer/Consumer・状態照合が未完 |
 | 製品能力 K01〜K20 | 20 | v4仕様S05 | 必須Consumer、OS対象、実装位置、GapのID別照合が未完 |
 | Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 元要求と現在の各実Consumer・副作用証拠の対応が未完 |
@@ -482,7 +531,7 @@ P0〜P13全14 IDの旧要求範囲・限定statusをv4 N/K/Consumerへ接続し�
 
 ## 次のE0照合作業
 
-1. `docs/総合機能拡張_rev1/`のC0〜C34原文・工程・進捗をID単位で照合し、既存実装・Consumer・履歴statusを埋める。
+1. `docs/総合機能拡張_rev1/`のC7〜C34原文・工程・進捗をID単位で照合し、既存実装・Consumer・履歴statusを埋める。C0〜C6の記録は補強対象が出ない限り再試験しない。
 2. `docs/D4_POCKET_PHASE_MAPPING.md`のPhase0〜45とP0〜P13・K01〜K20をv4 N/A〜Jへ一意または多対多で接続し、範囲対応と実作用を分ける。
 3. BUF-R/T、B0〜B6、D4-QE/LNX/AUD、Q/FQ/W、18 blockerを現Registry・Contract・Validator・実Consumerへ接続する。
 4. `docs/specs/`、`specs/`、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを取り、各行のSourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
