@@ -1509,7 +1509,10 @@ fn build_codex_command_with_model_and_task_tool(
             format!("mcp_servers.d4p_task_request.args={arguments}"),
             "mcp_servers.d4p_task_request.enabled=true".to_owned(),
             "mcp_servers.d4p_task_request.required=true".to_owned(),
-            "mcp_servers.d4p_task_request.default_tools_approval_mode=\"auto\"".to_owned(),
+            // This dedicated server only queues a non-authoritative proposal.
+            // Broker-native Owner approval and one-shot Permission still gate
+            // every external MCP call, so the CLI must not add a second prompt.
+            "mcp_servers.d4p_task_request.default_tools_approval_mode=\"approve\"".to_owned(),
             "mcp_servers.d4p_task_request.startup_timeout_sec=5".to_owned(),
         ];
         for setting in mcp_server_overrides {
@@ -2771,7 +2774,7 @@ mod tests {
             .iter()
             .any(|setting| *setting == "mcp_servers.d4p_task_request.required=true"));
         assert!(settings.iter().any(|setting| {
-            *setting == "mcp_servers.d4p_task_request.default_tools_approval_mode=\"auto\""
+            *setting == "mcp_servers.d4p_task_request.default_tools_approval_mode=\"approve\""
         }));
         assert!(command.get_envs().all(|(name, value)| {
             name != "D4P_TASK_MCP_SUBMISSION_TOKEN"

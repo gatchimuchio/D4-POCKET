@@ -4789,7 +4789,7 @@ class _LinuxAgentTaskResponsesServer:
                     return _responses_namespace_function_call_events(
                         posts,
                         call_id=call_id,
-                        namespace=tool_namespace,
+                        namespace=f"mcp__{tool_namespace}",
                         name=tool_name,
                         arguments=proposal,
                     )

@@ -5543,7 +5543,7 @@ class LinuxAgentTaskResponsesFixtureTests(unittest.TestCase):
             and isinstance(event.get("item"), dict)
             and event["item"].get("type") == "function_call"
         )
-        self.assertEqual(call["namespace"], "d4p_task_request")
+        self.assertEqual(call["namespace"], "mcp__d4p_task_request")
         self.assertEqual(call["name"], "d4_submit_mcp_tool_request")
         self.assertEqual(json.loads(call["arguments"]), proposal)
         self.assertEqual(call["status"], "completed")
@@ -5705,7 +5705,7 @@ class LinuxAgentTaskResponsesFixtureTests(unittest.TestCase):
             and isinstance(event.get("item"), dict)
             and event["item"].get("type") == "function_call"
         )
-        self.assertEqual(call_item["namespace"], "d4p_task_request")
+        self.assertEqual(call_item["namespace"], "mcp__d4p_task_request")
         self.assertEqual(call_item["name"], "d4_submit_mcp_tool_request")
         self.assertTrue(
             snapshot["scenarios"][0]["request_shapes"][0]["task_mcp_tool_offered"]
