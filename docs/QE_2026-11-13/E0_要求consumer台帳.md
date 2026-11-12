@@ -414,7 +414,7 @@ N11は`OPEN`。ValidatorとRelease Gateは一部のRegistry/Windows evidence/man
 | P12 | 製品全体統合。REV5進捗ではWindows側`FEATURE COMPLETE`。正式release/Owner GOと分離された製品機能統合の履歴。 | v4仕様S05の直接対応はN01/N09/N10、関連能力K19。Phase 39〜45はC27〜C34のQC/回帰/文書/出荷範囲に関連。単一施工線へ閉じない。 | Windows product entry→Task/result/operation UI→OS product lifecycle。実TaskはN01、operation/observation/recoveryはN09、installed OS distribution/lifecycleはN10の現ConsumerとSHA節へ分割記録。 | `FEATURE COMPLETE`を正式Release/QAへ昇格しない。v4 N01/N09/N10は`OPEN`、Q0〜Q7は`DEFERRED`、`release_ready=false`。統合後の全候補・全OS acceptanceは未成立。 |
 | P13 | Mobile / Non-Windows Product Build。REV5履歴は2026-10-09に有限Product Build acceptanceを閉鎖したと要約する。旧Acceptanceの詳細evidence identity/classは本照合資料から`UNKNOWN`。 | v4仕様S05の直接対応はN10、関連能力K17。Phase 35/36はC24〜C26範囲に関連。施工線H/I。Linux native必須性は別途現行AGENTS/v4正本に従う。 | Linux/macOS Desktop、Android/iOS Mobile runner/native transport→Rust Broker／OS capability→installed product lifecycle。OS別source、package、workflow候補とSHAはN10節。 | 旧P13閉鎖を現行五OS標準installed QAへ移さない。Linux nativeは完全対応必須で、WSL/Xvfb/Headlessだけでは成立しない。Android/iOS実機を前提にせずEmulator/Simulator等を用いる。N10は`OPEN`、`linux_native_product_support`、`rev2_mobile_distribution`、`rev2_mobile_device_evidence`を保持。 |
 
-P0〜P13全14 IDの旧要求範囲・限定statusをv4 N/K/Consumerへ接続した。これは旧statusの書換え、v4 acceptance、N01〜N11のCLOSED、E0完了のいずれも意味しない。C0〜C6のID別source crosswalkを下記へ追加したが、C7〜C34、Phase0〜45、K01〜K20の全数照合と各行の完全なE0-04列は継続する。P0/P1/P4の直接対応はv4仕様S05の明示mappingへ合わせて訂正し、旧statusは変更していない。P13の詳細evidence identity/classは`UNKNOWN`として保持する。
+P0〜P13全14 IDの旧要求範囲・限定statusをv4 N/K/Consumerへ接続した。これは旧statusの書換え、v4 acceptance、N01〜N11のCLOSED、E0完了のいずれも意味しない。C0〜C23のID別source crosswalkを下記へ記録した。C24〜C34、Phase0〜45、K01〜K20の全数照合と各行の完全なE0-04列は継続する。P0/P1/P4の直接対応はv4仕様S05の明示mappingへ合わせて訂正し、旧statusは変更していない。P13の詳細evidence identity/classは`UNKNOWN`として保持する。
 
 ## 旧C0〜C6のv4 Source→Consumer crosswalk（E0差分）
 
@@ -462,7 +462,7 @@ C6のsource hashは現HEAD `b2e20c2a16e2f324f3848ecc06203103755ceabf`上のGit b
 
 Related test source: `packages/gui_shell_ui/test/regression_case_client_test.dart`、`regression_case_owner_client_test.dart`、`apps/desktop_flutter/test/runtime_dialogue_test.dart`、`tooling/conformance_tests/run_conformance_skeleton.py`内のC6 contract検査。TestClassはDart unit/widget・schema/conformance sourceで、今回のSource mappingでは未実行。Broker receipt/listは旧contract上`INTERNAL_STATE`、削除後ProtectedStore観測は`LIVE_RUNTIME`と明示される。実installed Owner操作・Windows artifact provenanceへ証拠を昇格しない。
 
-C0〜C6の7 IDについて、旧要求・Phase・旧statusを変更せずv4の直接N/Kとconsumer/gapへ接続した。これはC0〜C6 acceptanceの再判定、C1〜C6の製品完了、N09/N11のCLOSED、E0全数完了ではない。続くC7〜C14は下記crosswalkで照合し、C15〜C34を未照合として継続する。
+C0〜C6の7 IDについて、旧要求・Phase・旧statusを変更せずv4の直接N/Kとconsumer/gapへ接続した。これはC0〜C6 acceptanceの再判定、C1〜C6の製品完了、N09/N11のCLOSED、E0全数完了ではない。続くC7〜C14およびC15〜C23を下記crosswalkで照合し、C24〜C34を未照合として継続する。
 
 ## 旧C7〜C14のv4 Source→Consumer crosswalk（E0差分）
 
@@ -551,6 +551,94 @@ C0〜C6の7 IDについて、旧要求・Phase・旧statusを変更せずv4の�
 
 C7〜C14のSource/Schema/test blob SHAは現行source baselineへ固定した。上記test sourceはUNIT／FIXTURE／WIDGET／CONFORMANCEのコード存在であり、この作業単位ではNOT_RUN。C7〜C14のinstalled／実OS acceptance Evidenceは新規発行していない。C7〜C14の旧statusはrev1履歴のまま、v4 N01/N02/N05/N09/N10、K07〜K10/K13/K16はそれぞれの現行ledgerでOPENを維持する。
 
+## 旧C15〜C23のv4 Source→Consumer crosswalk（E0差分）
+
+旧C15〜C23の要求文・Phase対応・rev1進捗statusは履歴として保持し、書き換えない。以下のsource観測baselineはmain `3c188ae54de6ea353490a60d91c1a75757d06e74`。v4対応はS04/S05およびR03上の関係を示すもので、旧statusをN/K受入れへ昇格しない。旧Phase対応は`docs/D4_POCKET_PHASE_MAPPING.md`。Evidence IDのない製品受入れは`UNKNOWN`、記載test sourceはコードの存在であり本mapping単位では`NOT_RUN`。
+
+| 旧ID／Phase | 主語・目的／rev1履歴 | v4対応 | 現行Producer→Consumer・契約・source状態 | 否定・停止・Authority・Recovery | OS・TestClass・Evidence・残差 |
+|---|---|---|---|---|---|
+| C15／Phase 24 | A2A Contract。Agent Card／Task／Message／Artifact／Streamのmetadata-only Schema、fixture、Authority Strip、Trust非生成を接続した履歴。実interface・作用は当時未完。 | N04、K11。選択済みtext ArtifactのhandoffはK02とも関係する。 | A2A契約SchemaとRust `a2a`／Broker `a2a_center` consumerがある。現sourceはbounded Agent Card・SendMessage・SendStreamingMessage・GetTask経路へ拡張されている。Contract／Schemaの存在だけを外部Agent相互運用の受入れとしない。 | Agent Card／metadata／CapabilityはTrust・Permission・Approval・Authorityを生成しない。本文やArtifactは未信頼入力。未知・不正な構造と曖昧な外部作用は拒否または`unknown/suspended`で停止し、自動再送しない。 | Desktop sourceはWindows/Linuxでnetwork作用を持つ。macOSは現行規則によりloopback Agent Card／metadata-only、Message等の作用なし。Mobile consumer未確認。Schema／Rust／Flutter fixture test sourceあり、本単位`NOT_RUN`。外部Agent installed evidenceなし。 |
+| C16／Phase 25 | A2A接続センター。旧進捗はOwner Agent Card取得、loopback HTTP、receipt／一覧／永続metadata、秘密・endpoint・Authority拒否を記録し、HTTPS／作用／Artifact／Stream／quarantine／Desktop画面を未完としていた。 | N04、K11、K02。 | Flutter A2A Center→`A2aConnectionClient`→Rust Broker `a2a_center`→`a2a.rs`。現sourceには各要求のnative確認・one-shot Permission・Auditを伴うSendMessage／Stream／GetTaskもある。選択済みtext Artifactは別のHandoff package／Task preflightへ渡すsourceがあるが、外部Agent installed end-to-endではない。 | 要求hash・現在endpoint・payloadを束縛し、外部作用後のtimeout／不正応答／Audit不確定は再送不能で停止する。外部内容をAuthorityとして扱わず、Handoff先でfresh Permission／Approvalを要求する。Credential実値注入は未対応。 | Windows/Linuxのbounded HTTP(S) source、macOS metadata-only、Mobile unknown。Rust loopback／Flutter fake Broker・widget／Handoff fixture sourceあり、本単位`NOT_RUN`。同一installed candidateでの外部接続→作用→Artifact→受信Task→Audit証拠なし。 |
+| C17／Phase 2・26 | 複数Host registry。Owner登録、通常一覧、hash-only identity、bounded永続化、再起動fail-closedを実装した履歴。C18 UIへ接続。 | N04、K11。 | Owner controlのHost登録→Rust `host_center`→bounded `hosts.json`／Audit、通常IPCの一覧→metadata projection。Host identity／Runtime・Agent数は登録metadataであり、remote live consumerはない。 | Host／identity hash／登録時Trust／countはTrustやPermissionを生成しない。登録は`pending_review`・metadata-only。壊れたstate／unknown field等はBroker起動時fail-closed。Host間Authorityは共有しない。 | Desktop Broker registry source。Rust unit／Flutter fixture sourceあり、本単位`NOT_RUN`。live remote discovery／接続／失効・quarantine、installed Host証拠なし。 |
+| C18／Phase 26・28 | Host操作面。Host一覧／状態／Trust表示、Host切替、Runtime／Agent観測境界、Host間非混線を接続した履歴。live再接続・Trust検証・remote discoveryは未完。 | N04、N09、K11、K13。 | Flutter `HostOperationCenter`／`HostCapabilityCenter`→Host registration client→Broker Host list／switch／capability consumer。Host切替は表示contextであり、個別remote Runtime／Agent列挙やTask routeではない。Broker現在Hostと一致しないHostは未観測として表示する。 | 別HostへPermission／Approval／Credential／Authorityを持ち越さない。登録metadataからTrust verifiedや接続を推定しない。未知Host・不一致receipt・native Owner拒否は切替成功へ昇格しない。 | Desktop UI source。Linux/macOS公開metadata登録経路のsourceあり。Widget／client fixture sourceあり、本単位`NOT_RUN`。remote Host再接続・Host越境Task consumerなし（`BUILD_GAP`）、installed evidenceなし。 |
+| C19／Phase 27 | Adapter管理。Catalog、Broker Owner操作、署名検査／隔離、Desktop Runtime Centerを接続した履歴。外部artifact作用・installed evidenceは未完。 | N03、N10、K06、K12。 | Runtime Center→通常Broker IPC／限定Owner経路→Rust `adapter_center`→bounded catalog／Audit。署名検査・enable等はcatalog recordを更新する。現契約では外部artifact download／filesystem install・delete／process startを行わない。 | Adapter／Manifest metadata・署名宣言・catalog状態はPermission／Approval／Credential／Trustを生成しない。未検証Adapterはenable拒否。隔離Runtime IDはTask/lifecycle再利用しない。 | Desktop UI／Broker source。`widget_test.dart`を含むtest sourceは本単位`NOT_RUN`。外部artifactの実作用と各OS installed lifecycleは未成立。 |
+| C20／Phase 28 | Windows native tray。表示／前面化／status・件数projection／stop request receipt／exit入口を接続した履歴。installed product・実Runtime停止は未完。 | N09、N10、K13。 | Windows tray controller→Flutter `windows_tray_client`／Broker-derived projection。停止操作はowner再確認待ちの要求receiptを返し、trayからprocess killやRuntime停止を実行しない。終了はDesktop UI exitであり、Runtime停止完了を意味しない。 | 取得不能値を0にしない。stop receiptは`executed=false`を保ち、UI要求を停止成功・Permission・Approvalとして扱わない。 | Windows native sourceのみ。Flutter client test sourceあり、本単位`NOT_RUN`。Windows installed lifecycle evidenceなし。非Windows tray未提供は既存scopeとして保持し、Linux Desktop対応全体の可否へ一般化しない。 |
+| C21／Phase 28 | Command Palette。rev1当時のscopeを実装し、全機能実行とWindows installed実証を未完とした履歴。 | N09、K13。 | `main.dart`のCtrl+K／Ctrl+P→最大30件の画面候補→既存surface navigation。MCP／Credential／Update／Host等の項目は各画面を開く入口であり、処理を直接実行しない。 | 選択は画面遷移だけ。通常IPC、Owner control、filesystem、process、network、Credentialへ直接到達せず、Permission／Approval／Authorityを生成しない。 | Desktop Flutter widget source/testあり、本単位`NOT_RUN`。実Runtime操作やinstalled keyboard evidenceへ昇格しない。 |
+| C22／Phase 28 | Global Search。boundedな表示用snapshot／surface entryを検索する旧scopeを実装し、live横断取得・installed実証を未完とした履歴。 | N09、K13。 | `ShellSnapshot`→`GlobalSearchIndex`→全体検索UI。query 128文字、index 512件、結果30件にbounded。Broker由来と確認できないsnapshotは不明と表示し、固定surface entryは操作面の存在だけを示す。 | read-only navigation。対話本文、Approval/Audit raw payload、秘密値、任意pathをindexしない。検索結果はBroker live query・権限・承認・作用を起動しない。 | Desktop Flutter unit/widget sourceあり、本単位`NOT_RUN`。live cross-Broker searchとinstalled evidenceなし。 |
+| C23／Phase 28 | Desktop UX統合。既存画面を論理グループへ整理し、画面到達性・UI境界を維持する旧scopeを実装した履歴。Windows installed実証は未完。 | N09、N10、K13。 | `main.dart`のNavigationRail group selection→Flutter内表示状態→既存screen navigation。現specは21画面を全体表示で保持し、運用／安全／開発／設定へ絞り込む。palette／search等からの遷移も維持する。 | グループ選択はUI stateのみ。画面、権限、Broker経路を削除・変更せず、filesystem／process／network／Credentialへ到達しない。 | Desktop Flutter widget sourceあり、本単位`NOT_RUN`。Windows installed UI evidenceおよび他OSの標準installed UX evidenceは未成立。Mobile navは別範囲。 |
+
+### C15〜C23 source blob SHA・test source
+
+下記Git blob SHAは照合基準main `3c188ae54de6ea353490a60d91c1a75757d06e74`の値。これらは仕様・schema・source・test fileの同一性を固定するもので、実行やinstalled acceptanceを証明しない。重複する`main.dart`／`widget_test.dart`は一度だけ記載する。
+
+| 旧C範囲 | Source file | Blob SHA |
+|---|---|---|
+| C15–16 | `docs/specs/a2a-contract.md` | `abe32b25bf7c186faf6e1beb3ae3f5d754de61c5` |
+| C15–16 | `docs/specs/a2a-connection-center.md` | `a2f815d61aed80b4e1f619c0a2f947960d7bd317` |
+| C15–16 | `docs/specs/a2a-streaming.md` | `2b1cd55f29cd9c7f4af177d2703b677071e9e96a` |
+| C15–16 | `docs/specs/macos-a2a-center.md` | `6f5bc7444f2e406aa5c7d21d1aea1f7599c743ad` |
+| C15 | `specs/a2a_contract.schema.json` | `8c7f50bb7fb12dde41293727e5dc9109445d1bc3` |
+| C16 | `specs/a2a_connection.schema.json` | `1dbbe44e54b302a1196d7e4e55f1cae35cda569b` |
+| C16 | `specs/a2a_connection_list.schema.json` | `ee18b204349b025464ca3af8adaa355add34e650` |
+| C16 | `specs/a2a_connection_receipt.schema.json` | `f63fd0d61b6200cdd8cc4b23d5cf7968a82fa5c5` |
+| C16 | `specs/a2a_message_send_request.schema.json` | `0a5f87250f17a88b6be55e7838d32b8e9114bbed` |
+| C16 | `specs/a2a_message_send_response.schema.json` | `23ee690e0ce350ac94c64d86f6920afb63c199f6` |
+| C16 | `specs/a2a_stream_send_request.schema.json` | `e0a0841f2fd9f7e92e0fb8a036ebaa6852e198d8` |
+| C16 | `specs/a2a_stream_send_response.schema.json` | `a526fed89fb5b3766a03c52444a338060caf16cc` |
+| C16 | `specs/a2a_task_get_request.schema.json` | `df11a5fd3291de0ae379694c6c1b49de51f2f157` |
+| C16 | `specs/a2a_task_get_response.schema.json` | `56a55f348d6b0ba7cb0092ee7ea2b4ec809e5360` |
+| C15–16 | `native/rust_helper/src/a2a.rs` | `9d7c6d9ab938ad5178d6ca46b3933dc3e61c6061` |
+| C16 | `native/rust_helper/src/broker/a2a_center.rs` | `73ad601abd64a33ccefde4b73ab5f9dc4f728504` |
+| C16 | `apps/desktop_flutter/lib/screens/a2a_connection_center.dart` | `2716d1c2fa22a184044e6f4e2eb401cb33c6e011` |
+| C16 | `apps/desktop_flutter/lib/services/a2a_connection_client.dart` | `19335054afe35bc06597629d92ca2e635ce50069` |
+| C16 | `apps/desktop_flutter/lib/services/a2a_artifact_handoff.dart` | `e7e2f3454e2843f1d4f4e7b5aedfa55014cde05c` |
+| C15–16 | `apps/desktop_flutter/test/a2a_connection_center_test.dart` | `5ebdbb4cee62e581062370ed6c305c36df89b7e2` |
+| C16 | `apps/desktop_flutter/test/a2a_artifact_handoff_test.dart` | `e47005320917f59dfa55ae1e04c4b99d452676de` |
+| C17–18 | `docs/specs/host-registry.md` | `a8a94c5c656ca74e016294bd708525bc1909aa34` |
+| C18 | `docs/specs/host-operation-surface.md` | `149ee962e8d464615ec375d9baa81c1d1b0e7679` |
+| C18 | `docs/specs/macos-host-registration.md` | `c7b379163a4aec66ef8cfe178034439afae1fcd8` |
+| C17 | `specs/host_registration.schema.json` | `8bed26fb2fe8f8e296c1d3404978f3215d571240` |
+| C17 | `specs/host_receipt.schema.json` | `237a84717cf27d000357d0dac53d33dd6f535766` |
+| C17 | `specs/host_list.schema.json` | `93880c43b04a5408c033bf351ee695073e54664a` |
+| C18 | `specs/host_switch.schema.json` | `01e5fc7322e8d4d2c9142375e7641fc4255148d5` |
+| C18 | `specs/host_switch_receipt.schema.json` | `cb60df0b174a38c871e0e8835c65537a17d022fb` |
+| C18 | `specs/host_capability.schema.json` | `6b721b5ab7842edc7df6562bc56fdd5b73d5de79` |
+| C17 | `native/rust_helper/src/broker/host_center.rs` | `c27707faa61e5270b1c6d79e3ee3c5fe6ccd0bf8` |
+| C18 | `native/rust_helper/src/broker/host_capability.rs` | `08a82c7e52947439229447dc82b69097af67ba1f` |
+| C18 | `apps/desktop_flutter/lib/screens/host_operation_center.dart` | `e16605e6bb39bbfc12806e6154e08d6fbab1b93b` |
+| C18 | `apps/desktop_flutter/lib/screens/host_capability_center.dart` | `e8fa774a435e713a3b75b0d33f00bd500b0a2d7f` |
+| C17–18 | `apps/desktop_flutter/lib/services/host_registration_client.dart` | `3bc3b45bddddf4e1131e051acb3cdee599ca4d3d` |
+| C17–18 | `apps/desktop_flutter/test/host_registration_test.dart` | `74ab39e078bf72214a3bbe84f69ebc77fceb2493` |
+| C19 | `docs/specs/adapter-management-surface.md` | `d13859c61b7042d7d5492feea1cdbc1662eee398` |
+| C19 | `docs/specs/adapter-conformance.md` | `e095d9f3bf9d4e6931dac193a304f43d75355c3d` |
+| C19 | `specs/adapter.schema.json` | `0fee764bc04ad524665e4be2b02828dcdb488f73` |
+| C19 | `specs/adapter_manifest.schema.json` | `116f5830983d195f501cc344a25990d58bf323c0` |
+| C19 | `specs/adapter_management_manifest.schema.json` | `1f1b75c7d4299c96fcf5039b652d718f7805cd2d` |
+| C19 | `specs/adapter_management_list.schema.json` | `530bc79a6a5117bb29d0de9e0932e3c40d8d785d` |
+| C19 | `specs/adapter_management_request.schema.json` | `2c9c98d0c60603adfaa246f9efa4753bfc0e7597` |
+| C19 | `specs/adapter_management_receipt.schema.json` | `7b43a2d2b74c5bd0a931ead66f32f55663919b04` |
+| C19 | `native/rust_helper/src/broker/adapter_center.rs` | `66575bb77e4a375dca4f8488f97df442960bb5a9` |
+| C19 | `apps/desktop_flutter/lib/screens/runtime_center.dart` | `d2c7af172073d2b10c76a6416b90f011f10e95db` |
+| C19 | `apps/desktop_flutter/test/widget_test.dart` | `f4e9c7b93f832ba2a2cefee779fd12426f240b04` |
+| C20 | `docs/specs/windows-tray-surface.md` | `c7f9317e26b16098301989a8f4b5eaa11540e714` |
+| C20 | `specs/windows_tray_projection.schema.json` | `5c3975e03b34281a0f202374cf91127357f2a1e0` |
+| C20 | `specs/tray_stop_request.schema.json` | `579755262940027079b37ef859e6d2f32a071cc0` |
+| C20 | `specs/tray_stop_response.schema.json` | `d6cce063d5deaf7104b97ef67f4efb14f780cc72` |
+| C20 | `apps/desktop_flutter/lib/services/windows_tray_client.dart` | `cf8214ceb95fa1b24c7eed4f14b312bda80e0b15` |
+| C20 | `apps/desktop_flutter/windows/runner/tray_controller.h` | `67ec337a335b948115559394ad5b55bffadb7502` |
+| C20 | `apps/desktop_flutter/windows/runner/tray_controller.cpp` | `2676afcc76e5c6e53fff2dd00d0fbb3ae531ccc1` |
+| C20 | `apps/desktop_flutter/test/windows_tray_client_test.dart` | `0b24e07221087e43355ac465ca4ace73a48af31e` |
+| C21 | `docs/specs/command-palette-surface.md` | `05867c94592a66b3a0d788d6f29456bb9ba6bc15` |
+| C21–23 | `apps/desktop_flutter/lib/main.dart` | `6109c821ab5dc809224bec5234c4c59db1d5f988` |
+| C21 | `apps/desktop_flutter/test/module_pruning_test.dart` | `20470e523c2640b681e54c51f9c6749ee35f5e05` |
+| C22 | `docs/specs/global-search-surface.md` | `1a74b337e239dc7c23cf70d2f6dbc6f55ac5234e` |
+| C22 | `apps/desktop_flutter/lib/services/global_search_index.dart` | `f71d2f6c4563b011fa3621ea3aee596bffb099f0` |
+| C22 | `apps/desktop_flutter/test/global_search_index_test.dart` | `2b96129f13ab11bd38afb0aba5e9a5b07d8eb3e3` |
+| C23 | `docs/specs/desktop-ux-integration.md` | `b73ec534c2b4df94ca7eb52be5d7929cf0a20aa1` |
+| C21–23 | `apps/desktop_flutter/test/widget_test.dart` | `f4e9c7b93f832ba2a2cefee779fd12426f240b04` |
+
+C15〜C23の旧statusはrev1履歴として保持した。source/schema/test blob SHAとSource→Consumer対応は現行候補の同一性を示すだけで、test実行や製品Acceptance evidenceではない。A2A／Host／Adapter／Desktop surfaceの製品受入れは未判定、N03/N04/N09/N10および関連KのOPEN状態を維持する。C0〜C23の24 IDをcrosswalk済み、C24〜C34とPhase/K等の全数照合は未完である。
+
 ## 実装ファイルの初期目録（CODE_PRESENTのみ）
 
 下記は`d503a4ef6daac8942abd1cb011442ce28c78ec55`時点のパス存在・責務候補を読み取った初期目録である。名前・コードの存在だけではProducer→Consumer接続、installed/runtime実作用、Acceptanceを証明しない。各行の`WIRED`、実作用、正常/否定/Recovery、Evidence、OS別状態は未照合なら`UNKNOWN`。
@@ -574,7 +662,7 @@ C7〜C14のSource/Schema/test blob SHAは現行source baselineへ固定した。
 | 新規要求 N01〜N11 | 11 | v4仕様S04 | 初期Producer/Consumer差分を記録。契約・否定・OS・証拠の全項目は未完 |
 | 全体施工線 A〜J | 10 | v4工程表R03・Codex指示I04 | 全線同時BUILDのproducer/consumerと現行実装配置を全数照合中 |
 | 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13の旧履歴→v4 scope/Consumer crosswalkを記録。詳細Contract/OS/Evidence、P13の旧evidence identity/classは未完／UNKNOWN |
-| 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C14の15 IDはID別crosswalkを記録。C15〜C34の旧仕様/工程/進捗→現Consumerと全E0-04列は未照合 |
+| 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C23の24 IDはID別crosswalkを記録。C24〜C34の旧仕様/工程/進捗→現Consumerと全E0-04列は未照合 |
 | D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | C対応は範囲関係のみ。現在のProducer/Consumer・状態照合が未完 |
 | 製品能力 K01〜K20 | 20 | v4仕様S05 | 必須Consumer、OS対象、実装位置、GapのID別照合が未完 |
 | Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 元要求と現在の各実Consumer・副作用証拠の対応が未完 |
@@ -618,7 +706,7 @@ C7〜C14のSource/Schema/test blob SHAは現行source baselineへ固定した。
 
 ## 次のE0照合作業
 
-1. `docs/総合機能拡張_rev1/`のC15〜C34原文・工程・進捗をID単位で照合し、既存実装・Consumer・履歴statusを埋める。C0〜C14の記録は補強対象が出ない限り再試験しない。
+1. `docs/総合機能拡張_rev1/`のC24〜C34原文・工程・進捗をID単位で照合し、既存実装・Consumer・履歴statusを埋める。C0〜C23の記録は補強対象が出ない限り再試験しない。
 2. `docs/D4_POCKET_PHASE_MAPPING.md`のPhase0〜45とP0〜P13・K01〜K20をv4 N/A〜Jへ一意または多対多で接続し、範囲対応と実作用を分ける。
 3. BUF-R/T、B0〜B6、D4-QE/LNX/AUD、Q/FQ/W、18 blockerを現Registry・Contract・Validator・実Consumerへ接続する。
 4. `docs/specs/`、`specs/`、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを取り、各行のSourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
