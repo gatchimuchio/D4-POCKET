@@ -3629,6 +3629,33 @@ Phase36のE0-04欄を全21項目で記録する。84件（84 unique path）のSo
 
 Phase37のE0-04欄を全21項目で記録し、24件（24 unique path）のSourceSHAを編集前main `1cd0bc2828f519682fb2688b4b339323b6832829`のGit blobへ結合する。MINIDORAの対話AdapterとAgent Task非対応を分け、内実輸入・production dependencyを追加しない。N03／W03／G3、Registry blocker18件、`release_ready=false`は維持し、新Evidence／Blockerなし。MINIDORA実接続・Agent Task・Rust／Flutter product tests・五OS QAはNOT_RUN。
 
+
+##### Phase 38 個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 現行v4 N03／N08、S05 K18／K20、工程R03-B／Fに接続するD4追加範囲。旧Phase38の照合単位であり、新しい製品Acceptance IDではない。 |
+| 旧ID | `docs/D4_POCKET_PHASE_MAPPING.md` Phase 38「MINIDORA段階統合」。rev1に同一の独立C工程はない。Phase37の外部Runtime接続口と、将来の段階統合候補を区別する。 |
+| 原文参照 | 現行v4仕様S04 N03／S05 K18・K20／S06 N08、工程R03線B・F、施工指示I02-07／I04-B／I04-F／I05、および現行Phase対応表。v4採用仕様SHA-256=`8CEEDF21F881A783E35EE8642673FAAEEF949465343DF65E63DC21B04EE5A3EF`。旧Phase38行の「referenceとの一致試験等」は将来範囲の記述。現行v4 3点セットは置換対象・受入値を有限に定義しておらず、本mappingで条件を追加しない。 |
+| 対象 | MINIDORAの外部Runtime接続と、将来検討する意味処理moduleの段階置換境界。現行は公開HTTP対話Adapterであり、Shell Core内のMINIDORA内部処理module、切替機構、module parity consumerは確認できない。 |
+| 目的 | MINIDORA非公開実装をShell Coreへ複製せず、Runtime／Bufferの既存契約とBroker責任境界を保ったまま、旧Phase38の将来範囲と現Consumerの差を識別する。現production pathへ依存を追加しない。 |
+| 生成元（`Producer`） | 現行の固定reference sourceは`tooling/minidora_live_check.py`がpinするMINIDORA commit `3400a3bb68b37efa1dc14ee8aaa28fda779bf1f8`。開発用serverが公開HTTP APIを提供し、BrokerのRuntime対話要求を受ける。置換候補moduleの生成元は現sourceに存在しない。 |
+| 実Consumer | `main.rs`／`ipc_server.rs`から登録される`MinidoraAdapter`は`/health`・`/api/capabilities`・`/api/chat`等を呼ぶ外部対話境界。`runtime_dialogue_client.dart`はRuntime Center要求をBrokerへ送る。`dialogue.rs`はAgent TaskでRuntime metadataと実Adapter methodをともに検査する。`minidora_live_check.py`は固定referenceを2 instance起動してBroker対話を行うが、module置換比較consumerではない。`run_authority_parity.py`はAuthority parity用で、MINIDORA意味出力のparityではない。 |
+| 契約／Data | 現行公開API版`MINIDORA-PRODUCT-API-v1`、Runtime／Agent Adapter／Agent TaskのJSON Schema、Broker対話要求・応答、N08の非権限`buffer_intervention_record` v2。reference commitは検査source上で固定される。module input/output vector、意味同等性schema、module切替receiptは現行consumerとして未確認。Capability metadataはAuthorityを生成しない。 |
+| 正常時作用 | 開発用`minidora_live_check.py`には固定referenceをRust Brokerへ接続して実対話する`LIVE_RUNTIME`検査経路がある。現行production Adapterは外部Runtimeとの対話だけを行う。代替moduleの参照出力との比較・段階切替・結果切戻しconsumerはない。本mappingではlive checkを実行していない。 |
+| 否定時作用 | 現在のAdapterはloopback／API version／HTTP・JSON・session／trace／期限・cancelを検査する。Agent Taskは既定unsupportedまたは実Adapter methodなしならBrokerが拒否する。candidate moduleの不一致・malformed output・failure-isolation・fallbackを比較して切替可否を決める実consumerは未確認。 |
+| 停止／Recovery | 現行対話失敗とTask非対応はBroker経路で失敗／拒否し、Authorityを引き継がない。N08のjournal／scratch RecoveryはCodex CLI Task限定で、MINIDORA moduleのfailure isolationやfallbackを回復するものではない。module交換後のRecovery consumerはない。 |
+| 標準OS候補 | v4対象のWindows／Linux native／macOS／Android／iOSを維持。`minidora_live_check.py`の参照server＋Rust Brokerは開発用経路で、5 OS installed module integrationやLinux native配布・GUI保証を示さない。OS別module候補・標準保証値はUNKNOWN。 |
+| 配布物 | D4製品にMINIDORA内部moduleの同梱・置換bundleはない。`--minidora-runtime`は外部loopback Runtime登録用で、通常配布・installed module switch・rollbackを提供しない。 |
+| 既存実装 | Rust `MinidoraAdapter`と固定referenceを利用する開発用live harness、Broker共通対話／Agent Task能力検査、Codex CLI Task Adapterと限定WorkspaceTaskScratch/Buffer consumerがある。`tooling/broker_parity/run_authority_parity.py`はauthority検査。MINIDORA内部の意味module／module parity／切替consumerは確認できない。 |
+| BUILD_GAP | 旧Phase38が示す将来reference比較をmodule置換へ結ぶconsumerは現行sourceにない。固定reference対話harnessは存在するが、代替moduleの比較・切替を行わない。現行v4のmodule置換Acceptanceは未定義としてUNKNOWNに保ち、既存N03/N08 OPEN範囲を維持して新Blockerを追加しない。 |
+| ソース識別値（`SourceSHA`） | 照合HEAD=`b76552b44f90e958e0e98797dd278a68be0e471f`。以下38 pathのGit blobを編集前HEADとworking treeで個別一致確認：`AGENTS.md`=`1eafcadd129fd01f1f2f683594c381605ed7d48d`<br>`docs/QE_2026-11-13/01_D4Pocket_統合製品実装仕様書_v4.md`=`352c53180cbad07888beb956aad0fb2a58074c58`<br>`docs/QE_2026-11-13/02_D4Pocket_統合開発工程表_v4.md`=`d32dd251e5f7cbb97d92f6e7540d6b6ed0ecec05`<br>`docs/QE_2026-11-13/03_D4Pocket_Codex施工指示書_v4.md`=`49447973e88c50a09b2f4978adfed84fd464c6d0`<br>`docs/QE_2026-11-13/採用記録.md`=`f159c1aa6ea5bc6e80e0877d8068f7e44da4c4d3`<br>`docs/QE_2026-11-13/E0_要求consumer台帳.md`=`87472a85ce41fb6434c5a1204bbb9fff5beeb026`<br>`docs/QE_2026-11-13/進捗.md`=`f549c6cbd7b92e11a2276778f57b4fa39d987869`<br>`docs/D4_POCKET_PHASE_MAPPING.md`=`064ea334f86b137d94fba2370d2a2fd732f6e972`<br>`docs/緩衝基盤_rev5補遺_QC/実装仕様書.md`=`2d0e98fb0b58ceec65244fde6a8fbf8e27c49b7e`<br>`docs/緩衝基盤_rev5補遺_QC/工程表.md`=`a5092b7b77361f147ce1f188bee71081a1aa8490`<br>`docs/緩衝基盤_rev5補遺_QC/B0_原因対応台帳.md`=`299c68b3a5266ab4b1946f4b06caa9e4069274a9`<br>`docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md`=`8a25f3ddacada889ba95de1d4761af77a074d26b`<br>`docs/緩衝基盤_rev5補遺_QC/B4_製品接続設計.md`=`7d74b5fbfa2f31a774513c8bc9214caa7fa775a1`<br>`docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md`=`16081537b6699c176144e32ca97d6bdd20d98866`<br>`apps/desktop_flutter/lib/screens/agent_center.dart`=`2472faeb31a64d624423c30a0a30d0f153d2e2a3`<br>`apps/desktop_flutter/lib/screens/runtime_center.dart`=`d2c7af172073d2b10c76a6416b90f011f10e95db`<br>`apps/desktop_flutter/lib/services/agent_task_client.dart`=`f54cefac29eba3dcf383bba19b4f64ee682e6217`<br>`apps/desktop_flutter/lib/services/runtime_dialogue_client.dart`=`a0853ee7327cafa60ee89b0c5ee49312b73c46c4`<br>`native/rust_helper/src/main.rs`=`b0a5df285db357172e7970074d7a67189f3384a3`<br>`native/rust_helper/src/adapters/mod.rs`=`06c540a59437b903b3f045b5aafb3790c21103bd`<br>`native/rust_helper/src/adapters/minidora.rs`=`31c756ac7c9a264d73ed0e9654dbae599be83921`<br>`native/rust_helper/src/adapters/codex_cli.rs`=`e5c9d1581ae9a1c0a3ae7fcfa626fdca6fea6d28`<br>`native/rust_helper/src/broker/adapter_center.rs`=`66575bb77e4a375dca4f8488f97df442960bb5a9`<br>`native/rust_helper/src/broker/agent_task_scratch.rs`=`de743cd819fb4533c9c3070c4e7bcae82e42d938`<br>`native/rust_helper/src/broker/dialogue.rs`=`c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999`<br>`native/rust_helper/src/broker/ipc_server.rs`=`58a404b920ef5905e174668ec2de0e04a9e8b044`<br>`native/rust_helper/src/broker/protocol.rs`=`9b2076d5f31ca6d77f1f87973d1b394aaf751961`<br>`native/rust_helper/src/broker/runtime_registry.rs`=`9ff28610862586a599848d75f9e891a6c6cadf2f`<br>`native/rust_helper/tests/agent_task_production_e2e.rs`=`fdc7565aa58fa7466e6e24e5492321e8015567eb`<br>`native/rust_helper/tests/agent_task_crash_recovery_e2e.rs`=`23517fcfe8ef94b2357a94e04879d423c3360501`<br>`tooling/minidora_live_check.py`=`400bf04a05480ffaf77e4960dbf5abdd0904427f`<br>`tooling/broker_parity/run_authority_parity.py`=`4f0fd65cbb1fb9bdcc4223d05d0915a50e8b0f78`<br>`specs/runtime.schema.json`=`bdef33f26fe06b334eb6f94124930fd08594bbc9`<br>`specs/agent_runtime.schema.json`=`b8e031e53f582048211f0e1a6deeb2e5cb87e4fb`<br>`specs/agent_adapter.schema.json`=`e0792589a2bae168ba221af4f4f9abb505815c12`<br>`specs/agent_task.schema.json`=`a552389072088d6cd42b3588fefda332be4ae6b6`<br>`specs/agent_task_request.schema.json`=`cb25bb3684656bfd670ea5832bbb7fc5988845b6`<br>`specs/buffer_intervention_record.schema.json`=`26a1fa8ee9d010f18c157f5d3b66b9b34bdf94d5`。 |
+| 試験区分（`TestClass`） | `SOURCE`／既存`UNIT`・`FIXTURE`と、pin済み外部referenceを起動する開発用`LIVE_RUNTIME` harness sourceを確認。HarnessはRuntime対話・Broker境界を対象にし、MINIDORA module parity／Agent Task実装を証明しない。本mapping単位でRust／Flutter／live harnessは未実行。 |
+| 証拠ID（`Evidence ID`） | `NONE`。Source→Consumer mappingのみ。固定reference harness sourceの存在を実行済みLIVE_RUNTIME evidenceへ昇格しない。 |
+| 阻害要因（`Blocker`） | N03／W03／G3とN08／W08／G7はOPEN。Release Registry 18件（16 unresolved／2 resolved）、`release_ready=false`を維持。K18／K20への直接Blocker・Evidence結合はN11の残作業。新規Blocker／Evidenceなし。 |
+| 状態 | Phase38のE0-04全21項目と38 SourceSHAを現mainへ結合済み。Phase38のmodule置換Acceptance、N03／N08／K18／K20、E0全体はOPEN。 |
+| 残余 | 現行v4ではmodule置換対象・比較値・切替条件が未定義のためUNKNOWNに残す。旧版の詳細gateを自動継承せず、reference live harnessの実対話を置換Acceptanceへ昇格しない。N03／N08の既存残件、N11 Evidence／Blocker／五OS Artifact結合を継続。 |
+
 ### 製品能力K01〜K20
 
 | K／S05能力 | v4関連N／施工線A〜J | 現行Producer→Consumer参照 | Source状態・残余・証拠境界 |
@@ -5172,7 +5199,7 @@ Phase37のE0-04欄を全21項目で記録し、24件（24 unique path）のSourc
 | 全体施工線 A〜J | 10 | v4工程表R03・Codex指示I04 | 全線同時BUILDのproducer/consumerと現行実装配置を全数照合中 |
 | 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13は全E0-04 fieldを個別記録。P13旧aggregate evidence identity/classは`UNKNOWN`。N11 Evidence/Blocker/OS Artifact全数結合は未完 |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのE0-04 21 fieldを個別記録。旧status維持、N11 Evidence/Blocker/OS Artifact結合と製品Acceptanceは継続 |
-| D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜37はE0-04全21 fieldを個別記録、Phase 38〜45は個別field未完。Evidence/Blocker/OS Artifact結合・Acceptance未完 |
+| D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜38はE0-04全21 fieldを個別記録、Phase 39〜45は個別field未完。Evidence/Blocker/OS Artifact結合・Acceptance未完 |
 | 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K別の完全E0-04 field、OS/Evidence/Blocker確認は継続 |
 | Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 33 IDのscope/Consumer/現証拠境界と各21 fieldを記録。BUF-R/T Acceptance、cause/effectの全件結合、N11 evidence、OS artifactとの結合は未完 |
 | Buffer工程 B0〜B6 | 7 | `docs/緩衝基盤_rev5補遺_QC/`・v4仕様S06 | B0〜B4の限定CLOSEDを保持、B5 OPEN、B6未成立。詳細Consumer照合が未完 |
@@ -5216,7 +5243,7 @@ Phase37のE0-04欄を全21項目で記録し、24件（24 unique path）のSourc
 ## 次のE0照合作業
 
 1. N01〜N10のE0-04 21項目は現行SourceSHAへ個別照合済み。各製品AcceptanceはOPENのまま維持し、N10の五OS実導入・利用・更新・Recovery QAは後続の製品Acceptanceに残す。
-2. C0〜C34個別field記録を維持し、Phase 38〜45／K01〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
+2. C0〜C34個別field記録を維持し、Phase 39〜45／K01〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
 3. BUF-R/TのSourceSHAとConsumer scopeは記録済み。AcceptanceはOPEN。B0〜B6の状態を保持し、原因→effect、N08/N10/N11、OS/Artifact/evidence結合を続ける。
 4. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 5. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
