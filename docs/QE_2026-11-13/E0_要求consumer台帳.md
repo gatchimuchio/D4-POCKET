@@ -3754,7 +3754,7 @@ Phase37のE0-04欄を全21項目で記録し、24件（24 unique path）のSourc
 | K12 Adapter Publisher/version/hash/signature/risk/compat/quarantine/update/stop | N03/N05／B・D | Desktop Runtime Center→Windows/macOS/Linux native Owner→Rust Broker Adapter Center→署名・state・quarantine consumer | 三Desktop OSのsource経路、署名検査と隔離時のBroker拒否を確認。外部artifact lifecycle、active process stop／Recovery、K12 Mobile管理consumer、installed acceptanceは未成立。K12はOPEN。 |
 | K13 Desktop Tray/quick stop/Palette/Search/Agent Center/Problems/Evidence/Recovery/Settings | N09／C | Flutter/Native surface→Broker Task・起動時ShellSnapshot・notification・recovery/search/tray projection（N09） | Agent CenterのTask start/state/cancel、SettingsのBroker client、Windows trayのbounded stop receiptはsource接続。Problems/Evidence/Recovery/Searchは起動時snapshot消費。Paletteは仕様のnavigation-onlyに対しtarget/path/commandをClipboardへ写す差分がある。同一Taskの結果・停止・Recovery・Evidence統合およびinstalled UI証拠は未成立。 |
 | K14 Compose/Preview/AI Edit/diff/independent review/controlled apply | N05/N07／D | Settings Compose/Preview→Rust Broker→MCP Tool; AI proposal→Agent Center Task/result／Workspace Inspector（N05/N07） | Desktop sourceはCompose／Preview／MCP Toolとproposal／Task事前検査までWIRED。Previewはrollbackを実行せず、proposalと審査結果・適用差分の独立結合、Broker controlled apply／rollbackはBUILD_GAP。Mobile consumer・installed artifact結合はなし。 |
-| K15 Export/module selection/pruning/identity/Broker/Installer/config consumption | N06/N10／E・G・H・I | Compose config→Exporter→identity/manifest/launcher/package/runtime candidate（N06/N10） | identity/manifest sourceあり。runtime config consumption、independent installed app、binary/resource pruningは未成立。 |
+| K15 Export/module selection/pruning/identity/Broker/Installer/config consumption | N06/N10／E・G・H・I | Compose config→Exporter→identity/manifest/launcher/package/runtime candidate（N06/N10） | E0-04全21項目を編集前main `4f1eab7e9520e7a6ee68ceba266433ec5ef175d9`へ記録。44 source blobはN06 source表と全一致。runtime config consumption、independent installed app、binary/resource pruningは未成立。 |
 | K16 Windows install/first-run/Setup Doctor/update/rollback/repair/uninstall | N10/N11／G・J | Windows artifact/staging→installed app/Broker→collector/Release Gate（N10/N11） | Build/staging/collector sourceあり。一般利用installer-first-run lifecycleとcurrent candidate evidence不足、Registry blocker unresolved。 |
 | K17 Linux native/macOS/Android/iOS IPC/protection/Device Link/GUI/install | N10およびN01/N02 Mobile／G・H・I | OS native bridge/package→Flutter/Core/Broker/Device Link→standard installed consumer (N10) | Linux nativeは必須。workflow/source候補はOS別だが標準package/installed lifecycle未成立。Mobile Task/MCPはBUILD_GAP、物理端末は不要。 |
 | K18 MINIDORA等の外部Runtime/contract接続 | N03/N08／B・F | external Runtime Adapter→Broker Catalog/Task capability/timeout/failure path（N03） | Adapterは外部接続境界。MINIDORA内部実装をCoreへ輸入せず、現production dependencyやTask supportを偽装しない。 |
@@ -6513,7 +6513,33 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 | specs/gui_shell_preview.schema.json | c8aa1c4b54f3395e603fbaae143ac9d8005c4659 |
 | specs/workspace_diff.schema.json | 1389ad85c48e263e688ab6dfa5276f96eb26fef0 |
 
-## 要求母集団・照合状態
+### K15 E0-04 21項目の個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | K15 Export／Module選択・除外／独立identity／Broker／Installer／構成消費。v4仕様S05 K15、N06/N10、工程表施工線E・G・H・I。 |
+| 旧ID | rev5 P9 Standalone Export／P10 Module Selection・Pruning、D4 Phase 32 Export／Phase 33 pruning。Windows・OS別製品導入のP11およびPhase 34以降はN10/K16/K17へ分離し、旧CLOSED／FAILと限定証拠を当時の条件のまま保持する。 |
+| 元原文／正本参照 | 採用v4仕様S04 N06・N10／S05 K15、工程表R02 E0-04・R03線E/G/H/I・R06、施工指示I02・I04-E/G/H/I・I10。Composeから選択構成を消費する独立App、別identity/Broker/Runtime/Package、不要Moduleのbinary/resource実除去と必要機能保持を要求する。サイズ・起動・資源の実測はE4。署名／Publisher identityは別条件。 |
+| 対象 | Desktop SettingsのExport UI／ExportClient、Rust Broker Export Center、固定Manifest／Receiptと新App・Audit-store identity、Windows/Linux Exporter・package writer、Desktop/Linux LauncherのManifest検証、Module catalog／dependency plan／Windows UI pruning tooling。macOSのBroker target metadataとAndroid/iOS target拒否を含む。OS正規Installerの導入・更新・撤去QAはN10/K16/K17に分ける。 |
+| 目的 | Composeの選択構成と新identityを束縛したManifestを生成し、Permission／Approval／Credential／既存Audit chain等を継承しない独立Appが、そのRuntime／Adapter／Capability／Tool／Module設定を実消費して必要機能を動かす。選択外の機能をbinary/resourceから除き、安全Coreを保持する。Manifest／portable bundleの生成だけを独立Product完成としない。 |
+| 生成元（Producer） | SettingsのExport要求がaccepted Compose Manifest、target、optional Module選択、distribution channel、任意の公開Update-trust metadataをExportClient経由でBrokerへ渡す。Brokerは現在のCompose/catalogと固定Module catalogを検査し、新App ID／Audit-store ID、non-inheritance条件、dependency planを持つManifest／Receiptを固定Export directoryへ生成する。 |
+| 実Consumer | Broker Export Centerは要求を検査して新identity・Manifest file・Receipt・Auditを生成する。Windows/Linux ExporterはReceipt／ManifestのSchema、hash、target、identity、module planを検査し、Manifestをbundle/packageへ格納する。Windows/Linux Launcherは固定hash・target・App/Audit identity・non-inheritance条件・`binary_pruning_status=not_applied`を検査する。LauncherによるCompose Runtime／Agent／Tool設定のruntime構成消費は確認できない。 |
+| 契約／データ | `gui_shell_export`／`gui_shell_export_manifest`／`gui_shell_export_receipt`、module catalog/build/comparison evidence、Windows/Linux Export build、Windows/Linux product-package manifest Schema。ManifestはApp/Audit-store identity、settings、Runtime/Adapter ID、Capability requirement、target/channel、Module planを持つ。Authority／Permission／Approval／Credential実値／既存Audit chainは含めず、CredentialをBundleしない。 |
+| 通常時作用 | Brokerは新ID・hash-bound Manifest file／Receiptとrequired／unprunable security-core／optional Module dependency closureを生成する。Windows/Linuxのdeveloper Exporter・package writerは整合するportable bundle／packageとbuild evidenceを作成し、LauncherはManifestとidentityの整合性を起動前に検査する。これらは選択構成で独立Runtimeを起動する動作を示さない。 |
+| 否定時作用 | malformed/stale Compose catalog、unknown／duplicate／required Module、未知／循環依存、Manifest／Receipt hash・target・identity不一致、`binary_pruning_status`偽装、symlink/reparseや不正package inventoryを拒否する。Brokerは任意保存path／overwriteとAndroid/iOS Export targetを拒否する。LauncherはManifest検証失敗時にProduct起動を拒否する。 |
+| 停止／復旧 | Brokerは要求受理／Manifest作成／完了Auditを束縛し、Audit・Manifest write・cleanup不整合を成功Receiptへ昇格しない。Exporter/package build不整合はbundle受入れを止める。Launcherは不正Manifestで起動しない。選択構成によるruntime切替、独立App実行時の復旧、旧版rollback／installer recoveryは本mappingで成立確認せず、N10/E4へ送る。 |
+| 標準OS候補 | Windows/Linuxは現在Export build consumerを持つ。macOSはBroker target metadataがあるが通常Export build/Installer consumerは未接続。Android/iOSはBrokerでExport targetを拒否し、Mobile Export consumerなし。Linux nativeは必須製品対象。distro/version/arch、GUI/session、resource閾値および正規配布候補の保証値はN10で管理し、portable／WSL／fixtureをinstalled合格へ転用しない。 |
+| 配布物 | Source上の候補はWindows portable ZIP／D4PKG update payload、Linux portable `tar.gz`／D4PKG update payload／bootstrap-only setup `.deb`。現Export build evidenceはInstaller未開始、未署名、formal distribution未主張（Windows `standalone_app_verified=false`、両OS `runtime_manifest_consumed=false`／`binary_pruning_verified=false`）。portable／update payload／bootstrap `.deb`を一般利用者向け独立製品Installerと扱わない。 |
+| 既存実装 | `export_center.rs`の新identity／Manifest／依存plan／Owner・Audit境界、Windows/Linux Exporterとpackage writerのhash・identity検査、Desktop/Linux LauncherのManifest hash/identity確認、unprunable core／依存閉包／invalid selection拒否、Windows Flutter UI compile-time define／AOT comparison sourceを確認した。 |
+| BUILD_GAP | ManifestのRuntime／Agent／Tool／Capability設定を独立Appのruntime configurationへ変換・消費する実consumerがない。Module catalogはoptional Flutter UI surface中心で完全な機能／依存closureを表さない。Windows compile-time define/AOT evidenceはUI surface限定でruntime未検証・resource未測定、Rust／third-partyおよびLinux binary pruningなし。選択構成で動く独立installed App、通常利用者向けInstaller、除外後の必要機能・Authority・Broker・Audit・Runtime同一候補検証も未成立。E4で実測するサイズ／起動／資源を先取りしない。 |
+| ソース識別値（`SourceSHA`） | 編集前main=`4f1eab7e9520e7a6ee68ceba266433ec5ef175d9`。44 unique source／contract／test／package/validator pathはN06の`N06 SourceSHA`表に列挙された対象と同一。各`HEAD:<path>` blobを現在基準へ個別再照合し44/44一致、missing/mismatch 0。表はソース同一性のみで実行証拠ではない。 |
+| 試験区分（`TestClass`） | 既存source区分はRust Export Center／Launcher UNIT、Flutter Fake-Broker UNIT/widget、Linux Exporter/package unit/integration、Windows UI pruning／AOT comparison path。E0照合ではこれらのtestを再実行しておらず、すべて`NOT_RUN`。SOURCE／Schema／fixtureの存在をinstalled Product・runtime設定消費・binary pruningの証拠へ昇格しない。 |
+| 証拠ID | `NONE`。本単位はSource→Consumer mapping。過去P9/P10の局所CLOSED、portable build、UI除外/AOT比較は履歴上の限定条件に保持し、N06独立App acceptanceへ転記しない。 |
+| 既存阻止要件（`Blocker`） | 既存W05/G5およびRegistry `rev2_export_owner_ui_authority_path`・`rev2_module_pruning_binary_and_measurement`をOPENのまま参照。Installer lifecycleはN10/K16/K17の既存範囲。Registry 18件（16 unresolved／2 resolved）、`release_ready=false`。新規Blocker／Acceptanceを追加しない。 |
+| 状態 | K15 E0-04全21 fieldを編集前mainへ記録し、N06の44 source blobが同一であることを現行HEAD上で確認した。K15/N06/N10/W05/G5/E0および製品AcceptanceはOPEN。旧P9/P10／Phase 32/33のstatusは変更しない。 |
+| 残余 | Manifestのruntime構成消費、独立Appとしての通常導入・実Task、OS別正式Installer、Module binary/resource実除去と必須機能・安全Core保持の同一候補計測が残る。macOS/Mobile Export consumerなし。Windows/Linux installer lifecycleはN10/K16/K17、resource/size/startup計測はE4。 |
+
+### 要求母集団・照合状態
 
 | 母集団 | 件数 | 正本・原典 | v4 E0状態 |
 |---|---:|---|---|
@@ -6522,7 +6548,7 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 | 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13は全E0-04 fieldを個別記録。P13旧aggregate evidence identity/classは`UNKNOWN`。N11 Evidence/Blocker/OS Artifact全数結合は未完 |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのE0-04 21 fieldを個別記録。旧status維持、N11 Evidence/Blocker/OS Artifact結合と製品Acceptanceは継続 |
 | D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜45はE0-04全21 fieldを個別記録。Evidence/Blocker/OS Artifact全数結合・Acceptance未完 |
-| 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K01〜K14はE0-04全21 fieldとSourceSHAを個別記録済み。K15〜K20の個別fieldとN11 Evidence/Blocker/OS Artifact結合は継続 |
+| 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K01〜K15はE0-04全21 fieldとSourceSHAを個別記録済み。K16〜K20の個別fieldとN11 Evidence/Blocker/OS Artifact結合は継続 |
 | Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 33 IDのscope/Consumer/現証拠境界と各21 fieldを記録。BUF-R/T Acceptance、cause/effectの全件結合、N11 evidence、OS artifactとの結合は未完 |
 | Buffer工程 B0〜B6 | 7 | `docs/緩衝基盤_rev5補遺_QC/`・v4仕様S06 | B0〜B4の限定CLOSEDを保持、B5 OPEN、B6未成立。詳細Consumer照合が未完 |
 | QE/監査 D4-QE-R01〜R13／D4-LNX-T01〜T08／D4-AUD-F01〜F07 | 13／8／7 | `docs/QE_2026-10-22/`・各採用記録 | 旧証拠と現在の実装/Validatorへの接続が未完 |
@@ -6565,7 +6591,7 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 ## 次のE0照合作業
 
 1. N01〜N10のE0-04 21項目は現行SourceSHAへ個別照合済み。各製品AcceptanceはOPENのまま維持し、N10の五OS実導入・利用・更新・Recovery QAは後続の製品Acceptanceに残す。
-2. C0〜C34およびPhase 0〜45の個別field記録を維持し、K01〜K14のSource mappingを再試験せず、K15〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
+2. C0〜C34およびPhase 0〜45の個別field記録を維持し、K01〜K15のSource mappingを再試験せず、K16〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
 3. BUF-R/TのSourceSHAとConsumer scopeは記録済み。AcceptanceはOPEN。B0〜B6の状態を保持し、原因→effect、N08/N10/N11、OS/Artifact/evidence結合を続ける。
 4. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 5. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
