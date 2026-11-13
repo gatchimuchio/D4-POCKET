@@ -2143,8 +2143,6 @@ C15〜C23のE0-04個別mappingは文書上完了。旧C15〜C23 status、N03/N04
 
 ## 旧C24〜C34のv4 Source→Consumer crosswalk（E0差分）
 
-## 旧C24〜C34のv4 Source→Consumer crosswalk（E0差分）
-
 旧C24〜C34の要求、Phase、進捗statusはrev1履歴として保持し、再判定・書換えをしない。以下のsource観測baselineはmain `d45fa6109fa6300ed42449ea03a93bfe25f7ae95`。v4対応はS04/S05・R03上の対応関係であり、旧statusはN/K受入れへ昇格しない。Test sourceは存在と種類だけを示し、このmapping単位では`NOT_RUN`。Phase対応は`docs/D4_POCKET_PHASE_MAPPING.md`。
 
 | 旧ID／Phase | 主語・目的／rev1履歴status | v4対応 | 現行Producer→Consumer・契約・source状態 | 否定・停止・Authority・Recovery | OS・TestClass・Evidence・残差 |
@@ -2224,7 +2222,299 @@ C15〜C23のE0-04個別mappingは文書上完了。旧C15〜C23 status、N03/N04
 | C34 | `tooling/evidence_bundle.py` | `68dead851236b0f1b69899151c37371e593ff3f9` |
 | C34 | `tooling/release_runtime_assertions.py` | `0a0a351fe17151ad86517bd0a965358f40c61490` |
 
-C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline上で一致させた。旧C24〜C34のsource/test resultは履歴を保持し、本単位で製品試験は実行していない。とくにC28の8時間FAIL、C33の総合installed FAIL、C34未着手をPASSへ読み替えない。C0〜C34の35 IDとPhase0〜45/K01〜K20のv4 scope mappingは記録済み。E0-04全項目の充填、Buffer/Q/FQ/W全数Consumer接続、v4標準OS QA、N11 evidence結合は未完で、E0およびN10/N11は`OPEN`を維持する。
+C24〜C34の歴史的SourceSHA表はbaseline main d45fa6109fa6300ed42449ea03a93bfe25f7ae95を固定する。編集前main 9c3838e8f06c5d2233830fab8b6ea23982a28860で56/56 pathを再確認し、55/56 blobはbaselineと一致、C31の進捗文書だけ後続更新を確認した。現行Source→ConsumerとE0-04全21 fieldは次節に記録する。旧C28の8時間FAIL、C33の総合installed FAIL、C34未着手をPASSへ読み替えず、旧test結果は履歴に保つ。製品testはこのmapping単位でNOT_RUN。C0〜C34の35 IDとPhase0〜45/K01〜K20のscope mappingは記録済みだが、Buffer/Q/FQ/W全field、標準OS QA、N11 evidence結合が残り、E0・N10・N11はOPEN。
+
+### C24〜C34 E0-04全21項目の現行Source→Consumer照合（2026-11-13）
+
+照合基準は編集前のcurrent main 9c3838e8f06c5d2233830fab8b6ea23982a28860。旧SourceSHA tableの56 pathを現HEADへ再照合し、全path存在、55/56 baseline blob一致を確認した。唯一の後続差分はC31のdocs/QE_2026-11-13/進捗.mdで、旧値d75e96eb788a6f980465575337a1afcca3dc135cから編集前HEADのd67d0199e48458510defd765499ff3d1054d0442へ更新されている。各C rowのSourceSHAは直前のpath／baseline blob tableとこの差分注記を組み合わせて固定する。旧C status／失敗・限定PASS、N/K／Registry状態は変更せず、現行製品受入Evidence IDは発行しない。
+
+#### C24 Mobile補助操作面／Device Link
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 旧C24 Mobile操作・Device Link投影。v4 N09/N10、K03/K04/K13/K17。 |
+| 旧ID | 総合機能拡張rev1 C24／Phase 35。9画面、通知summary、Runtime／資源／履歴metadata、MCP未観測、停止receipt、Recovery導線の履歴。 |
+| 原文参照 | rev1実装仕様・工程表・進捗C24、docs/D4_POCKET_PHASE_MAPPING.md Phase 35、v4仕様S01/S02/S04 N09・N10/S05 K03・K04・K13・K17、docs/specs/mobile-surface.md。 |
+| 対象 | `Mobile` Flutter投影とAndroid `Kotlin`／`iOS` `Swift` `Device` `Link` clientからDesktop `Rust` Brokerのread-`only` allowlistへ接続する範囲。 |
+| 目的 | Task実行AuthorityをMobileへ移さず、登録済みDesktopの許可された状態・識別子だけを利用者へ表示する。 |
+| 生成元（Producer） | 利用者のMobile画面操作、登録済みDevice Link endpoint、Desktop Brokerの限定projection。 |
+| 実Consumer | `MobileProjectionClient`／`DeviceLinkClient`→`Android`／`iOS` `native` `DeviceLink` `service`→既存TLS `transport`→`Rust` `Broker` `read-only` `handler`→`bounded` Flutter表示。 |
+| 契約／Data | mobile-surface契約、mobile_agent_list.schema.json、mobile_workspace_selection.schema.json。Runtime／Workspace識別子等のallowlist投影。 |
+| 正常時作用 | 認証済み接続で許可されたmetadataだけを取得し表示する。Agent statusはmetadataでありTrustやTask capabilityではない。 |
+| 否定時作用 | 未知／malformed識別子、TLS・登録・scope不一致、未許可fieldを拒否。秘密実値、履歴本文、Workspace pathを出さず、取得不能resourceはunknownとする。 |
+| 停止／Recovery | 失効・transport／Broker異常・応答不一致時はprojectionを停止しunknown／errorを表示する。停止receipt executed=falseはTask実停止ではなく、自動再送もしない。 |
+| 標準OS候補 | MobileはAndroid EmulatorとiOS Simulator、接続先Desktopは宣言対象のWindows／macOS／Linux native。Emulator／Simulator実測は本mappingで未実施。 |
+| 配布物 | 独立配布物なし。将来のD4 Pocket Mobile AppのAndroid／iOS標準配布artifact。正式identity／署名は別Release条件。 |
+| 既存実装 | `Flutter` `projection`/`client`、`Kotlin`／`Swift` `Device` `Link` `service`、`read-only` `Rust` `Broker` `handlers`、`Schemas`、`Flutter`／`Android`／`iOS` `workflow` sourceがある。 |
+| BUILD_GAP | MobileからAgentTask／MCP実作用を開始する経路、live host inventory、現候補の標準Emulator／Simulator installed lifecycleとDesktop Device Link結合が未成立。 |
+| ソース識別値（SourceSHA） | 旧C24 SourceSHA tableの11 pathは変更前main 9c3838e8f06c5d2233830fab8b6ea23982a28860で11/11 blob一致。対象pathは同表に固定。 |
+| 試験区分（TestClass） | Schema／Flutter UNIT・WIDGET／FIXTURE、Android／iOS workflow source。旧試験結果は履歴。本mappingの製品・workflow実行はNOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。Source、fixture、旧限定試験を現候補Acceptanceへ昇格しない。 |
+| 阻害要因（Blocker） | 既存Registryのrev2_mobile_device_evidence、rev2_mobile_flutter_native_device_link_boundary、rev2_mobile_distributionはunresolved。comprehensive_extension_rev1_completionもunresolved。statusは変更しない。 |
+| 状態 | C24のE0-04 21 fieldを記録。旧C24履歴を維持。N09／N10／N11／E0はOPEN。 |
+| 残余 | 標準Emulator／Simulator installed product、Desktop接続との一体動作、OS native秘密・Lifecycle、Broker権限外操作拒否、N11 Artifact結合。 |
+
+#### C25 Apple補助workflow
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 旧C25 Apple補助検証。v4 N10/N11、K17/K19。 |
+| 旧ID | 総合機能拡張rev1 C25／Phase 36。apple-manual-build.ymlのworkflow_dispatch補助経路を保持し、当時のWindows host起動・現行target証拠なし。 |
+| 原文参照 | rev1工程表・進捗C25、docs/D4_POCKET_PHASE_MAPPING.md Phase 36、v4仕様S02/S04 N10・N11/S05 K17・K19、.github/workflows/apple-manual-build.yml。 |
+| 対象 | 手動起動のmacOS／iOS target build・test補助経路と、その結果をcandidate・OS別に記録する範囲。 |
+| 目的 | Windows上にないApple OS環境の検査を手動runnerで補い、Source／target／artifact／実行結果の同一性を保つ。 |
+| 生成元（Producer） | 明示的workflow_dispatchと固定されたsource commit／target選択。 |
+| 実Consumer | apple-manual-build.ymlのmacOS runner jobsとiOS Simulator向けbuild／test job。workflow definitionがconsumerであり、dispatch記録は別の実行結果。 |
+| 契約／Data | workflow_dispatch inputs、checked-out commit、target OS／simulator、build／test result、artifact metadata。Secretsや署名資格を新設・表示しない。 |
+| 正常時作用 | 指定commit・targetでjobが完了すれば当該build／testだけの補助証拠を保存する。installed product／署名／配布成功へ昇格しない。 |
+| 否定時作用 | 未知target、checkout hash不一致、build／test失敗、artifact欠落を失敗として扱い、未実行jobをPASSにしない。 |
+| 停止／Recovery | runner不足・job failure・証拠不整合では対象の補助検証を停止し、正確なrun・commit・targetを残す。retryだけで根因解消としない。 |
+| 標準OS候補 | macOS native VM／適法hosted GUI、iOS Simulator。workflow sourceは実行済み保証ではなく、物理iPhoneを必須条件に戻さない。 |
+| 配布物 | 検証用build／test artifact。macOS正式bundle、署名済iOS distribution artifact、Store配布とは別。 |
+| 既存実装 | apple-manual-build.ymlにmanual target別入口が存在する。 |
+| BUILD_GAP | 現candidateのmanual run結果、GUI installed execution、Source／Artifact identity結合、署名／notarization／distributionは未成立。 |
+| ソース識別値（SourceSHA） | 旧C25 SourceSHA tableの1 pathは変更前main 9c3838e8f06c5d2233830fab8b6ea23982a28860で1/1 blob一致。 |
+| 試験区分（TestClass） | WORKFLOW_SOURCE／SOURCE。現candidate workflow実行・Apple OS product試験はNOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。workflow sourceをOS実行証拠にしない。 |
+| 阻害要因（Blocker） | C25専用Registry IDなし。comprehensive_extension_rev1_completionはunresolved。iOS配布面ではrev2_mobile_device_evidence／rev2_mobile_distributionの履歴statusもunresolved。 |
+| 状態 | C25 E0-04 mapping記録済み。過去workflow statusは維持。N10／N11／E0 OPEN。 |
+| 残余 | 現候補macOS／iOS Simulator build・test、installed GUI／lifecycle、配布artifact identity・署名条件とN11結合。 |
+
+#### C26 Android build／Emulator回帰
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 旧C26 Android build回帰。v4 N10/N11、K17。 |
+| 旧ID | 総合機能拡張rev1 C26／Phase 35・36。Flutter analyze・32試験・debug APK／AAB buildの過去PASSを保持。Android install／launch・正式署名は未取得。 |
+| 原文参照 | rev1工程表・進捗C26、docs/D4_POCKET_PHASE_MAPPING.md Phase 35／36、v4仕様S02/S04 N10/S05 K17、android-manual-emulator.yml、NativeDeviceLinkProductFlowTest.kt。 |
+| 対象 | `Android` `manual` workflowのFlutter検査、`debug` `package` `build`、`API` 35 `Google` `APIs` `x86_64` `Emulator` `install`／`launch`／`native` `Device` `Link` `test`。 |
+| 目的 | 開発用Android経路のbuild・Emulator実行を再現し、結果の対象commit／API／ABI／artifact範囲を限定して記録する。 |
+| 生成元（Producer） | android-manual-emulator.ymlのworkflow_dispatch、Gradle／Flutter build、Emulator test invocation。 |
+| 実Consumer | `GitHub` `Actions` `Android` `runner`／`Emulator`、`Flutter` `analyzer`/`tests`、`Gradle` `debug` `APK`／`AAB`、`NativeDeviceLinkProductFlowTest`。 |
+| 契約／Data | `workflow` `inputs`、`API` 35／`x86_64` `system` `image`、`debug` `artifact` `SHA`、`install`／`launch`／`JUnit` `results`、`Device` `Link` `boundary` `contract`。 |
+| 正常時作用 | 同一run内のbuildとEmulator testが成功した範囲だけを保存する。debug packageは正式署名・配布物と別に扱う。 |
+| 否定時作用 | build／install／launch／test errorを失敗として保持。credential／TLS／native identity不一致を成功化せず、Flutter metadataからAuthorityを作らない。 |
+| 停止／Recovery | Emulator起動・install・native serviceが失敗したら当該jobを終了し、target・log・artifactを区別。正式配布・production keyへ進まない。 |
+| 標準OS候補 | Android Emulator API 35 Google APIs x86_64はworkflow候補。Android標準release OS／ABI matrixの適合は未検証。 |
+| 配布物 | 過去debug APK／AAB、およびworkflowのdebug APK／AAB artifact。正式Android package identity／署名とは異なる。 |
+| 既存実装 | Gradle設定、`manual` `Emulator` `workflow`、`native` `Device` `Link` `instrumented` `test` sourceがある。 |
+| BUILD_GAP | 現candidate workflow実行、標準Emulator installed lifecycle、KeyStore／Permission／update／uninstall、正式配布identityは未成立。 |
+| ソース識別値（SourceSHA） | 旧C26 SourceSHA tableの3 pathは変更前main 9c3838e8f06c5d2233830fab8b6ea23982a28860で3/3 blob一致。 |
+| 試験区分（TestClass） | WORKFLOW_SOURCE／Flutter UNIT／FIXTURE／debug buildの旧SOURCE履歴。今回のworkflow・製品試験はNOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。過去debug buildやtest sourceをcurrent installed Acceptanceにしない。 |
+| 阻害要因（Blocker） | rev2_mobile_device_evidence、rev2_mobile_distribution、rev2_mobile_flutter_native_device_link_boundaryがunresolved。全能力blocker comprehensive_extension_rev1_completionもunresolved。 |
+| 状態 | C26 E0-04 mapping記録済み。過去debug build範囲のみ履歴保持。N10／N11／E0 OPEN。 |
+| 残余 | 現候補Emulator install／launch、OS native secret／Device Link／lifecycle、正式artifact identity、更新・撤去、N11結合。 |
+
+#### C27 性能／UI停止watchdog
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 旧C27 開発用性能・UI停止監視。v4 N09/N11、K19。 |
+| 旧ID | 総合機能拡張rev1 C27／Phase 41。snapshot、Flutter projection、4096行diffのbounded測定PASS履歴を保持。 |
+| 原文参照 | rev1工程表・進捗C27、docs/D4_POCKET_PHASE_MAPPING.md Phase 41、v4仕様S04 N09／S05 K19、docs/specs/performance-validation.md。 |
+| 対象 | performance_validation.pyから生成する内部snapshotとc27_performance_validation_test.dartのFlutter projection／diff watchdog測定。 |
+| 目的 | 開発中の限定処理で計測値とwatchdog失敗を検出する。 |
+| 生成元（Producer） | 開発validatorが生成するsnapshot／bounded diff入力とFlutter test操作。 |
+| 実Consumer | `tooling`/`performance_validation.py`→`generated` `snapshot`／`c27_performance_validation_test.dart`→`Flutter` `projection`・`watchdog` `result`。 |
+| 契約／Data | 性能検査仕様のcase・測定結果・threshold・duration・resource state。欠測resourceはunknownで保持。 |
+| 正常時作用 | fixture／内部stateの処理時間とdiff範囲を測り、watchdog内に終わった事実だけを報告する。 |
+| 否定時作用 | threshold超過・stall・invalid snapshotをfailureにする。unknown resourceを0へ置換しない。 |
+| 停止／Recovery | watchdog超過で該当caseを停止し失敗を記録。内部測定からruntime healthやrecovery成功を推定しない。 |
+| 標準OS候補 | 旧測定は開発環境／Flutter test。v4対象五OSの標準installed performance matrixはE4/E5まで未固定・未測定。 |
+| 配布物 | 独立配布物なし。開発validator／Flutter test。 |
+| 既存実装 | performance_validation.py、Flutter test、性能検査仕様がある。 |
+| BUILD_GAP | installed cold/warm startup、実画面frame／GPU、実Agent／MCP／A2A負荷、OS別Resource SLAと同一candidate証拠は未成立。 |
+| ソース識別値（SourceSHA） | 旧C27 SourceSHA tableの3 pathは変更前main 9c3838e8f06c5d2233830fab8b6ea23982a28860で3/3 blob一致。 |
+| 試験区分（TestClass） | INTERNAL_STATE／FIXTUREの限定開発測定。過去sourceの実行結果は履歴。本mappingでのtestはNOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。限定watchdog PASSを製品性能QA／SLAにしない。 |
+| 阻害要因（Blocker） | 専用C27 Registry IDはなし。comprehensive_extension_rev1_completionはunresolved。全体性能の正式証拠はQ4／R14後段に属する。 |
+| 状態 | C27の旧限定PASS範囲を保持。C27 E0-04 mapping記録済み、N09／N11／E0 OPEN。 |
+| 残余 | 統合候補での実測、資源／frame／startup条件固定、標準OS別結果とN11 artifact／evidence結合。 |
+
+#### C28 長時間運転／通信監視
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 旧C28 長時間運用検証基盤。v4 N01/N08/N11、K19/K20。 |
+| 旧ID | 総合機能拡張rev1 C28／Phase 39。短時間Broker IPC smoke／120秒stressは限定PASS。clean-source 8時間試行は22.766秒でFAILした履歴を保持。 |
+| 原文参照 | rev1工程表・進捗C28、docs/D4_POCKET_PHASE_MAPPING.md Phase 39、v4仕様S04 N01/N08/N11・S05 K19/K20、docs/specs/long-run-validation.md、FQ-INTEGRATED。 |
+| 対象 | long_run_validation.pyの8時間run option、Broker restart／network monitor、localhost Runtime fixture、結果JSON／failure classification。 |
+| 目的 | 候補の長時間挙動と失敗を計測し、clientが確認していない応答・Audit／state不整合を成功にしない。 |
+| 生成元（Producer） | 長時間runner、`Broker` `IPC`、`localhost` `HTTP` `Runtime` `fixture`、監督対象のrestart／`network` `events`。 |
+| 実Consumer | long_run_validation.pyがBroker IPCとfixture応答を監督し、result JSON／failure classifierを作る。 |
+| 契約／Data | long-run-validation.mdのduration、stage、heartbeat、client response、Audit／state、resource sample、cleanup status。 |
+| 正常時作用 | 各観測済みstageとclient受信、永続state、cleanupを区別して報告する。120秒stress PASSは8時間結果へ適用しない。 |
+| 否定時作用 | timeout、未確認client receive、fixture／Audit/state異常、resource不明、cleanup未成立をFAIL／UNKNOWNとして保持する。 |
+| 停止／Recovery | 再起動後のidentity／Audit不整合やcleanup失敗は中断し、bounded cleanupの最終状態を記録。自動retryだけで復旧PASSにしない。 |
+| 標準OS候補 | 旧8h runはWindows development environment、Broker LIVE_RUNTIMEとRuntime FIXTUREが混在。v4五OS installed candidateの長時間試験は未実施。 |
+| 配布物 | 独立配布物なし。開発長時間runnerとfixture。 |
+| 既存実装 | long_run_validation.py、仕様、Conformance test source、Broker IPCとlocalhost fixtureの限定経路がある。 |
+| BUILD_GAP | 8h成功、現候補installed product、実外部Runtime負荷、全OS資源・永続state・process recoveryの一体測定が未成立。旧FAILの原因解消もこのmappingでは再試験しない。 |
+| ソース識別値（SourceSHA） | 旧C28 SourceSHA tableの3 pathは変更前main 9c3838e8f06c5d2233830fab8b6ea23982a28860で3/3 blob一致。 |
+| 試験区分（TestClass） | 過去Broker IPCは限定LIVE_RUNTIME、RuntimeはFIXTURE、resourceはINTERNAL_STATE。8時間FAILを含む旧履歴のみ。本mappingのrunはNOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。旧8時間FAILを消去・再分類せず、current candidate evidenceも発行しない。 |
+| 阻害要因（Blocker） | 専用C28 Registry IDはなし。comprehensive_extension_rev1_completionはunresolved。正式長期／耐久試験はQ4等の全体QC工程。 |
+| 状態 | C28の8h historical FAILと短時間限定PASSを保持。E0-04 mapping記録済み、N01／N08／N11／E0 OPEN。 |
+| 残余 | 8時間同一candidate実行、client受信とAudit／state／resourceの連続観測、失敗根因とcleanup、N11連結。 |
+
+#### C29 障害注入validator
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 旧C29 開発用障害注入。v4 N01/N02/N04/N05/N08/N11、K19/K20。 |
+| 旧ID | 総合機能拡張rev1 C29／Phase 40。Runtime／Broker／MCP／A2A／Credential／store／Audit／stateの8分類試験PASSを履歴保持。 |
+| 原文参照 | rev1工程表・進捗C29、docs/D4_POCKET_PHASE_MAPPING.md Phase 40、v4仕様S04 N01/N02/N04/N05/N08/N11、docs/specs/failure-injection-validation.md。 |
+| 対象 | failure_injection_validation.pyの開発用Broker IPC、local MCP stdio／A2A loopback fixtureに限定した故障投入と判定。 |
+| 目的 | 障害・応答不確定・Credential／Audit失敗を成功、Authority、再送へ昇格させないことを局所検査する。 |
+| 生成元（Producer） | failure injectorが作るBroker／fixture fault caseと失敗応答。 |
+| 実Consumer | failure_injection_validation.py→Rust Broker IPCおよびlocal MCP／A2A fixture→case result／failure classification。 |
+| 契約／Data | failure-injection-validation.mdのfault class、expected deny／suspend、Audit／Recovery outcome、credential-safe output。 |
+| 正常時作用 | 故障caseが期待する拒否・停止・bounded reportを返した場合だけ、その開発caseの期待値をPASSにする。 |
+| 否定時作用 | 曖昧結果をsuccess、Permission／Approval、Audit、Recoveryへ進めない。credential非露出、非再送を維持。 |
+| 停止／Recovery | Audit不可、応答不明、state破損などでは対象case／作用を停止。fixtureの応答を外部serviceの再現と扱わない。 |
+| 標準OS候補 | Local development hostとBroker test harness。五OS標準installed productのfault injectionは未実施。 |
+| 配布物 | 独立配布物なし。開発validator／local fixtures。 |
+| 既存実装 | failure_injection_validation.py、failure-injection-validation.md、Broker IPC／MCP／A2A fixture sourceがある。 |
+| BUILD_GAP | 外部Runtime／MCP／A2Aやinstalled candidateのfailure、OS process／network／storage障害と製品Recoveryの一体検査は未成立。 |
+| ソース識別値（SourceSHA） | 旧C29専用2 pathとC29–30共有Conformance pathは変更前main 9c3838e8f06c5d2233830fab8b6ea23982a28860で3 reference全てblob一致。 |
+| 試験区分（TestClass） | LOCAL_BROKER／UNIT／FIXTURE中心。8旧caseの限定PASS履歴を保持。本mappingのvalidator実行はNOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。旧fixture PASSをinstalled／external failure evidenceへ流用しない。 |
+| 阻害要因（Blocker） | 専用C29 Registry IDはなし。comprehensive_extension_rev1_completionはunresolved。各機能別既存Blockerのstatusは不変。 |
+| 状態 | 旧C29の8開発用case PASS履歴を保持。E0-04 mapping記録済み、現行関連NとE0 OPEN。 |
+| 残余 | production／installed failure behavior、external service cases、process descendant cleanup、Audit／Recovery、五OS証拠結合。 |
+
+#### C30 全数回帰matrix
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 旧C30 Local全数回帰matrix。v4 N11/K19。各回帰caseは該当N/K consumerにも接続する。 |
+| 旧ID | 総合機能拡張rev1 C30／Phase 7・8・42。Trust／Authority／Permission／Approval／Audit／Recovery／Evidence／Runtime／Agent／Dialogue／Compare／Device Linkの開発matrix履歴。 |
+| 原文参照 | rev1工程表・進捗C30、docs/D4_POCKET_PHASE_MAPPING.md Phase 7／8／42、v4仕様S03 ARC-J／S04 N11／S05 K19、docs/specs/full-regression-validation.md。 |
+| 対象 | full_regression_validation.pyと固定local regression entries、Conformanceによるentry／classification形状確認。 |
+| 目的 | 既知の安全・状態・Runtime・Agent等のlocal回帰を分類して、狭い開発検査を再現できるようにする。 |
+| 生成元（Producer） | 手動実行のlocal regression validatorと各entryの既存unit／fixture/assertion結果。 |
+| 実Consumer | `full_regression_validation.py`→`full-regression-validation.md` `matrix`→`Conformance` `entry`/`classification` `check`。 |
+| 契約／Data | 固定matrix entry、requirement／test reference、scope／OS／evidence class／result。全OS installed resultは含まれない。 |
+| 正常時作用 | 対象entryを列挙し、その実行済み検査結果だけを集約する。未実行consumerは未確認のまま残す。 |
+| 否定時作用 | unknown input、missing path／entry、classification欠落、権限昇格・Audit／Recovery違反をrejectまたはfailedとして示す。 |
+| 停止／Recovery | matrix／validator failureを成功へ隠さず、影響testに限定して修正する。実製品のprocess／OS recoveryを模擬済みにしない。 |
+| 標準OS候補 | Local source／Conformance hostが対象。v4標準五OS installed regression suiteは全体E4/E5に未到達。 |
+| 配布物 | 独立配布物なし。開発validator、matrix文書、test references。 |
+| 既存実装 | full_regression_validation.py、matrix仕様、Conformance validatorがある。 |
+| BUILD_GAP | 全必須要求・実consumer・OS packageを同一Release candidateへ結合した横断regressionは未成立。外部Runtime／Agentとinstalled productは対象外。 |
+| ソース識別値（SourceSHA） | 旧C30専用2 pathとC29–30共有Conformance pathは変更前main 9c3838e8f06c5d2233830fab8b6ea23982a28860で3 reference全てblob一致。 |
+| 試験区分（TestClass） | LOCAL_REGRESSION／CONFORMANCE source。旧履歴の実装範囲を保持。本mappingのvalidator・製品regressionはNOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。matrix構造やexit codeだけで全要求・全OS QAを証明しない。 |
+| 阻害要因（Blocker） | 専用C30 Registry IDはなし。comprehensive_extension_rev1_completionはunresolved。既存個別Blockerはその条件ごとに維持。 |
+| 状態 | C30 E0-04 mapping記録済み。旧matrix履歴を維持。N11／E0 OPEN。 |
+| 残余 | matrix全要求の実consumer結合、current candidate result、標準OS installed／external runtime証拠、N11 Evidence／Artifact統合。 |
+
+#### C31 文書・製品claim同期
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 旧C31 製品文書更新。v4 N11/K19。 |
+| 旧ID | 総合機能拡張rev1 C31／Phase 1・43。README／ROADMAP／GUI操作面／SECURITY／CONFIG／MOBILE_STATUS／COMPATIBILITY_MATRIX／REV2_PROGRESSを当時のC24〜C30 scopeへ同期した履歴。 |
+| 原文参照 | rev1工程表・進捗C31、docs/D4_POCKET_PHASE_MAPPING.md Phase 1／43、v4仕様S00/S10/N11/K19、docs/QE_2026-11-13/採用記録.md。 |
+| 対象 | 製品文書と要求・source・実結果・OS保証・Release gate間の説明整合。 |
+| 目的 | 使い方・対応OS・機能・証拠の公開説明を現行正本と実在consumerに一致させ、古いstatus／failureを歴史として保持する。 |
+| 生成元（Producer） | 現行v4正本、実装／検証結果、Registry／Manifest状態、過去進捗。 |
+| 実Consumer | README／ROADMAP／GUI_OPERATION_SURFACES／SECURITY／CONFIG／MOBILE_STATUS／COMPATIBILITY_MATRIX／REV2_PROGRESS／現v4進捗→Manifest／Conformance／Release Gateと利用者説明。 |
+| 契約／Data | 版、採用hash、source／artifact identity、evidence class、OS scope、OPEN／FAIL／NOT_RUN、Release blocker。文言はruntime能力を生成しない。 |
+| 正常時作用 | 現行の確認済状態に限定して文書へ反映し、過去記録は追記・参照で保全する。 |
+| 否定時作用 | 旧文書・claimと正本／evidenceが矛盾したら現行正本を優先し、unsupported／UNKNOWNを成功表示せず差分を残す。 |
+| 停止／Recovery | source／artifactの根拠がない主張は公開状態へ進めず、文書修正だけで製品failure／AcceptanceをPASS化しない。 |
+| 標準OS候補 | 五OSの利用・配布claimを扱う文書consumer。各OSのinstalled適合は別々に未成立／UNKNOWNとして管理する。 |
+| 配布物 | README等の製品案内とRelease説明。実Installer／packageではない。 |
+| 既存実装 | 列挙した製品文書・current v4 set・Manifest/Conformance/Release Gateが存在する。全現行文書の横断整合監査を完了した意味ではない。 |
+| BUILD_GAP | 全文書と現Release candidate artifact／installed UXを同一候補に結ぶ監査は未成立。C31旧文書更新statusのみでは現行整合を証明しない。 |
+| ソース識別値（SourceSHA） | 旧C31の9 refs中8件は変更前main 9c3838e8f06c5d2233830fab8b6ea23982a28860でbaseline blob一致。docs/QE_2026-11-13/進捗.mdはbaseline SHA d75e96eb788a6f980465575337a1afcca3dc135cから現行pre-edit SHA d67d0199e48458510defd765499ff3d1054d0442へ更新済み。 |
+| 試験区分（TestClass） | DOC／MANIFEST／CONFORMANCE／RELEASE_GATEのconsumer。ここで実行する文書構造検査は製品Document consumerの検査であり、製品runtime testはNOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。文書hash／Manifest合格を製品QAや公開承認へしない。 |
+| 阻害要因（Blocker） | 専用C31 Registry IDはなし。comprehensive_extension_rev1_completionはunresolved。具体的なOS／配布blockerはそれぞれのRegistry条件を保持。 |
+| 状態 | C31の過去文書更新statusとFAIL履歴を維持。今回のC31 E0-04 mapping記録済み。N11／E0 OPEN。 |
+| 残余 | 公開文書全数のcandidate同一性監査、五OS installed evidence・Registry同期、N11結合。 |
+
+#### C32 最終開発監査validator
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 旧C32 最終開発監査／対応表検査。v4 N11/K19。 |
+| 旧ID | 総合機能拡張rev1 C32／Phase 42・44。C0〜C31のmapping structure／path／ID／残余分類を検査した旧checker／Conformance PASS履歴。C32〜C34は未監査。 |
+| 原文参照 | rev1工程表・進捗C32、docs/D4_POCKET_PHASE_MAPPING.md Phase 42／44、v4仕様S04 N11/S05 K19、final-development-audit.json/.md、tooling/final_development_audit.py。 |
+| 対象 | 旧C0〜C31静的対応表と、C32−C34を未監査として明示するfinal-development-audit構造検査。 |
+| 目的 | 要求対応資料のfield／参照path／ID／risk分類の欠落を検出し、開発監査の記録整合を確認する。 |
+| 生成元（Producer） | final-development-audit.jsonのscopeとC0〜C31 mapping／参照source。 |
+| 実Consumer | tooling/final_development_audit.py→report result、tooling/conformance_tests/test_final_development_audit.py→構造・entry検査。 |
+| 契約／Data | `audit` `report` `schema`、`required` `fields`、`path` `existence`、`C` `ID` `range`、`risk` `classification`、`not-audited` `range`。 |
+| 正常時作用 | 構造と参照整合だけを判定し、未監査IDを明示する。 |
+| 否定時作用 | field/path/ID/classification欠落・不正値をfailureにし、report passedを実runtime／Acceptance passとして扱わない。 |
+| 停止／Recovery | 参照欠損や未知ID時はreportを未完了に留め、Owner GO／Registry／Product statusを変更しない。 |
+| 標準OS候補 | Repository-local Python validator／Conformance。対象OSのruntimeやinstalled appを起動しない。 |
+| 配布物 | 独立配布物なし。静的監査器と報告data。 |
+| 既存実装 | final-development-audit.json／.md、Python checker、unittest／Conformance sourcesがある。 |
+| BUILD_GAP | C32〜C34、全N/P/Phase/K/BUF/Q/FQ/W/OS/artifactの現行E0／N11一体監査は未成立。 |
+| ソース識別値（SourceSHA） | 旧C32 SourceSHA tableの6 pathは変更前main 9c3838e8f06c5d2233830fab8b6ea23982a28860で6/6 blob一致。 |
+| 試験区分（TestClass） | STRUCTURE／UNIT／CONFORMANCEの旧source履歴。旧checker限定PASSを保持。本mappingでのchecker／test実行はNOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。旧C32のC0〜C31 static audit結果は現行N11 Evidenceにならない。 |
+| 阻害要因（Blocker） | comprehensive_extension_rev1_completion unresolved。owner_goもunresolvedだが、これは最終Release判断であり構造検査の実行権ではない。 |
+| 状態 | 旧C32 checkerの限定PASS・C32〜C34未監査を保持。E0-04 mapping記録済み、N11／E0 OPEN。 |
+| 残余 | 現行全要求台帳、artifact／OS identity、Evidence／Blocker一体validation、未監査範囲の実Consumer対応。 |
+
+#### C33 Windows導入済み製品の証拠経路
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 旧C33 Windows最大到達点。v4 N10/N11、K16/K19。 |
+| 旧ID | 総合機能拡張rev1 C33／Phase 34・44。Release build／Broker smoke／collector／Conformanceの限定PASSと、Windows installed total evidenceのFAIL履歴を保持。 |
+| 原文参照 | rev1工程表・進捗C33、docs/D4_POCKET_PHASE_MAPPING.md Phase 34／44、v4仕様S02/S04 N10・N11/S05 K16・K19、docs/WINDOWS_RELEASE_PLAN.md／WINDOWS_RELEASE_EVIDENCE.md。 |
+| 対象 | Windows staged／installed appとBrokerからcollector／release evidence validatorへ候補起動・first-run・証拠provenanceを収集する範囲。 |
+| 目的 | current installed candidateのsource／artifact／profile／runtime／config／Audit identityを束ね、現行Windows製品証拠として検査できるようにする。 |
+| 生成元（Producer） | 同一sourceから構築したWindows app／Launcher／Broker、導入・first-run実行、stage_installed_app.ps1／collect_installed_smoke.ps1。 |
+| 実Consumer | `installed` `app`／`Broker`→`collect_installed_smoke.ps1`／`collect_broker_smoke.ps1`→`windows_release_evidence.py`／`release_smoke.py`→`release` `registry`。 |
+| 契約／Data | `Source` `commit`、`launcher`／`Broker`／`app` `hash`、`isolated` `user` `profile`、`runtime`/`config`/`Audit` `store` `identity`、`installed` `evidence` `schema`／`artifact` `path`。 |
+| 正常時作用 | current candidateから生成された全一致証拠だけを同一Release runとして受け入れる。各subgateと総合gateを分離する。 |
+| 否定時作用 | stale source／artifact、同一profile、path漏れ、Setup Doctor未通過、Audit anchor欠落、旧proof copyをrejectまたは未成立とする。 |
+| 停止／Recovery | provenance mismatch・欠測・collector failureでevidence採用を停止し、旧bundleを現候補へ再結合しない。 |
+| 標準OS候補 | Windows standard VM／isolated profileに加え所有Windows PCの最終確認。ここではどちらも実行していない。全OS releaseは別N10 row。 |
+| 配布物 | 最終Windows general installer／.exe candidateを想定。現在のstage/debug/evidence copyは通常配布物でない。 |
+| 既存実装 | stage／collector／Windows evidence validator／release smoke sourceあり。旧proof packにはsource commit 28a700f由来の2026-06-07 evidence copyがある。release_evidenceは.gitkeepのみ。 |
+| BUILD_GAP | current candidateのclean installed bundle、正規installer→first-run→Task→Update／Repair／Rollback／Uninstall、owner PC confirmation、external Audit anchorが未成立。 |
+| ソース識別値（SourceSHA） | 旧C33 SourceSHA tableの8 pathは変更前main 9c3838e8f06c5d2233830fab8b6ea23982a28860で8/8 blob一致。 |
+| 試験区分（TestClass） | 旧subgate SOURCE／LIVE_RUNTIME／EXTERNAL_EVIDENCE copyを履歴分離。旧C33総合installed statusはFAIL。現candidate collector／installed QAはNOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。古いEXTERNAL_EVIDENCE copyおよび旧subgate PASSをcurrent candidate Acceptanceへ持ち込まない。 |
+| 阻害要因（Blocker） | 現Registryのwindows_evidence_provenance_isolation、windows_installer_first_run_smoke、windows_setup_doctor_smoke、windows_broker_installed_smoke、audit_anchor_external_tamper_evidence_proof、rev2_desktop_product_distribution、comprehensive_extension_rev1_completionはunresolved。 |
+| 状態 | 旧C33総合FAILを維持。C33 E0-04 mapping記録済み、N10／N11／E0 OPEN、release_ready=false。 |
+| 残余 | source/artifact identity付きfresh installed candidate、clean別profile、Setup Doctor／Broker／Audit、Windows owner physical confirmation、five-OS evidence join。 |
+
+#### C34 正式公開準備／責任者決裁
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 旧C34 正式Release前準備。v4 N10/N11、K16/K17/K19。 |
+| 旧ID | 総合機能拡張rev1 C34／Phase 45。旧進捗は未着手。Publisher identity、formal signing、offline Audit signature、標準OS／実機証拠、strict release、Owner GO要求を保持。 |
+| 原文参照 | rev1工程表・進捗C34、docs/D4_POCKET_PHASE_MAPPING.md Phase 45、v4仕様S02/S04 N10・N11/S07/S08/S09、release_blockers.registry.json、FINAL_QA_QUEUE.md、RELEASE_CHECKLIST.md。 |
+| 対象 | candidate source／contract／artifact／OS evidence／18 blockerを集約し、strict release gateとOwnerの独立判断へ渡す最終準備。 |
+| 目的 | 技術適合、配布資格、production signing／Audit key、release_ready、Owner GOを別々に判定し、未成立を公開扱いにしない。 |
+| 生成元（Producer） | 現行要求・Registry、evidence collectors／bundle、OS package identities、strict gate result、責任者の独立判断。 |
+| 実Consumer | `tooling`/`evidence_bundle.py`／`release_runtime_assertions.py`→`release_gate_check.py`／`Strict` `Release`→`Registry`／`RELEASE_CHECKLIST`／`FINAL_QA_QUEUE`→`Owner` `decision`。 |
+| 契約／Data | 18 `named` `blocker` `statuses`、`candidate`/`source`/`artifact` `hash`、`OS`/`arch`/`install`/`runtime`/`audit` `evidence`, `signing`/`publisher` `identity`, `production` `Audit` `checkpoint`, `release_ready`, `GO` `record`。 |
+| 正常時作用 | 完全な同一candidate evidenceがgate条件を満たした結果をOwner判断材料にする。gate passだけでは公開やOwner GOを生成しない。 |
+| 否定時作用 | missing/invalid evidence、unresolved blocker、provenance mismatch、strict gate failureはrelease_ready=false／rejectを維持する。 |
+| 停止／Recovery | 署名鍵・Publisher・production Audit key・Owner GO不足ではformal release actionを止める。現段階で公開・署名を実行しない。 |
+| 標準OS候補 | Windows/macOS/Linux native/Android/iOSの各宣言標準環境とOS固有package。候補version／archはrelease時点で固定し、現時点で全受入れ未成立。 |
+| 配布物 | Windows installer、macOS bundle/package、Linux native package、Android package、iOS正規配布artifact。署名／Store／Publisher条件は個別。 |
+| 既存実装 | Registry 18 IDs、evidence bundle／runtime assertion／release gate／checklist／queue sourcesあり。release_evidence current bundleは不存在。 |
+| BUILD_GAP | E0/N11全数結合、candidate一致の五OS artifact・installed evidence、formal signing／Publisher／offline Audit key、全gate／Owner decisionは未成立。 |
+| ソース識別値（SourceSHA） | 旧C34 SourceSHA tableの7 pathは変更前main 9c3838e8f06c5d2233830fab8b6ea23982a28860で7/7 blob一致。 |
+| 試験区分（TestClass） | GATE_SOURCE／REGISTRY／DOC。旧進捗C34は未着手。本mappingのstrict release／署名／配布／Owner decisionはNOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。E0 mappingはRelease EvidenceまたはGO記録ではない。 |
+| 阻害要因（Blocker） | Registry 18件中16 unresolved／2 resolved、release_ready=false。該当するwindows／linux／mobile distribution・evidence、audit_anchor_external_tamper_evidence_proof、comprehensive_extension_rev1_completion、owner_go等の既存IDを維持。 |
+| 状態 | 旧C34未着手statusとRegistryを変更せず、E0-04 mappingのみ記録。N10／N11／E0 OPEN。 |
+| 残余 | Release candidate固定、全OS evidence・全blocker判定、Publisher／signing／production Audit key、Ownerの正式GO。 |
+
+C24〜C34の11 ID×21 fieldを文書上展開した。旧C28の8時間FAIL、C33のinstalled総合FAIL、C34未着手は履歴として保持。今回のmappingは製品test・OS installed acceptanceではなく、N10／N11／E0のOPENやRelease Registryを閉じない。次のE0全数作業はPhase／K等の未完全fieldとN11 Evidence／Blocker／OS Artifact結合。
 
 ## v4対応：Phase 0〜45とK01〜K20のSource→Consumer crosswalk
 
