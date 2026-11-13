@@ -411,10 +411,10 @@ N11は`OPEN`。ValidatorとRelease Gateは一部のRegistry/Windows evidence/man
 | P9 | Standalone Export。旧rev5で製品構築受入れ`CLOSED`。構成から新identity/Manifest/選択moduleを持つ独立Appを出力する。 | v4仕様S05の直接対応はN06。関連能力はK15。Phase 32はD4追加範囲。Phase 33のModule pruning (P10)と分離する。施工線E。 | Export UI→Broker receipt/Manifest→Windows/Linux Developer Exporter→Launcher。現source/hashとManifest consumption/pruning limitはN06節。 | 旧Exporter/Product Build証拠は独立installed製品の実動作ではない。runtime manifest consumption、normal installer/installed runは未成立、`standalone_app_verified=false`。v4 N06/W05は`OPEN`。P10のbinary/resource除去も本IDへ統合しない。 |
 | P10 | Module Selection / Pruning。旧rev5で機能上の除外範囲を`CLOSED`。選択dependency closure、compile-time UI除外、必須画面保持。 | v4仕様S05の直接対応はN06、関連能力K15。Phase 33のD4追加範囲で、同等のrev1 C工程なし。施工線E/F。 | Export Module plan→build define/receipt→Flutter UIの除外経路。Exporter/Launcherへの現source接続とhashはN06節。 | 旧plan/Widgetは`CONFIG`/`FIXTURE`。Windows AOT source面の一致とLinux WSL2 fixtureのsize差は限定観測で、binary実除去・Rust/第三者依存pruning・実行時resource保証ではない。`binary_pruning_verified=false`、FQ-MODULE-PRUNING／`rev2_module_pruning_binary_and_measurement`を保持。v4 N06/W05は`OPEN`。 |
 | P11 | Windows Productization。旧rev5で製品機能受入れ`CLOSED`。P9 portable ZIPをbootstrapに使うBroker-owned Install/Update/Repair/Rollback/Uninstall導線。 | v4仕様S05の直接対応はN10、関連能力K16。Phase 34はC33/C34の配布範囲と関連。施工線G/F。 | Windows package/portable→bootstrap/Update Center→Broker product install/update→Launcher/Setup Doctor。現候補source・package役割・workflow・hashはN10節。 | 旧acceptanceはMSI/Setup.exeやsigned release artifact作成を主張しない。v4 N10は`OPEN`で、一般配布・同一candidateのinstalled lifecycle・署名/Publisher identityは未成立。`rev2_desktop_product_distribution`と`windows_distribution_identity`を保持。 |
-| P12 | 製品全体統合。REV5進捗ではWindows側`FEATURE COMPLETE`。正式release/Owner GOと分離された製品機能統合の履歴。 | v4仕様S05の直接対応はN01/N09/N10、関連能力K19。Phase 39〜45はC27〜C34のQC/回帰/文書/出荷範囲に関連。単一施工線へ閉じない。 | Windows product entry→Task/result/operation UI→OS product lifecycle。実TaskはN01、operation/observation/recoveryはN09、installed OS distribution/lifecycleはN10の現ConsumerとSHA節へ分割記録。 | `FEATURE COMPLETE`を正式Release/QAへ昇格しない。v4 N01/N09/N10は`OPEN`、Q0〜Q7は`DEFERRED`、`release_ready=false`。統合後の全候補・全OS acceptanceは未成立。 |
+| P12 | 製品全体統合。REV5進捗ではWindows側`FEATURE COMPLETE`。正式release/Owner GOと分離された製品機能統合の履歴。 | v4仕様S05の直接対応はN01/N09/N10、関連能力K19。Phase 39〜45はC27〜C34の全体QC/回帰/文書/出荷範囲に関連する後続gateで、旧P12 Acceptanceの再実施範囲ではない。単一施工線へ閉じない。 | Windows product entry→Task/result/operation UI→OS product lifecycle。実TaskはN01、operation/observation/recoveryはN09、installed OS distribution/lifecycleはN10の現ConsumerとSHA節へ分割記録。P12固有の代表UI/tray source hashは個別E0-04節へ記録済み。 | `FEATURE COMPLETE`を正式Release/QAへ昇格しない。v4 N01/N09/N10は`OPEN`、Q0〜Q7は`DEFERRED`、`release_ready=false`。統合後の全候補・全OS acceptanceは未成立。 |
 | P13 | Mobile / Non-Windows Product Build。REV5履歴は2026-10-09に有限Product Build acceptanceを閉鎖したと要約する。旧Acceptanceの詳細evidence identity/classは本照合資料から`UNKNOWN`。 | v4仕様S05の直接対応はN10、関連能力K17。Phase 35/36はC24〜C26範囲に関連。施工線H/I。Linux native必須性は別途現行AGENTS/v4正本に従う。 | Linux/macOS Desktop、Android/iOS Mobile runner/native transport→Rust Broker／OS capability→installed product lifecycle。OS別source、package、workflow候補とSHAはN10節。 | 旧P13閉鎖を現行五OS標準installed QAへ移さない。Linux nativeは完全対応必須で、WSL/Xvfb/Headlessだけでは成立しない。Android/iOS実機を前提にせずEmulator/Simulator等を用いる。N10は`OPEN`、`linux_native_product_support`、`rev2_mobile_distribution`、`rev2_mobile_device_evidence`を保持。 |
 
-P0〜P13全14 IDの旧要求範囲・限定statusをv4 N/K/Consumerへ接続した。これは旧statusの書換え、v4 acceptance、N01〜N11のCLOSED、E0完了のいずれも意味しない。C0〜C34、Phase0〜45、K01〜K20のSource→Consumer/scope mappingを記録した。P0〜P11は本節後段で全E0-04 fieldを個別補完し、P12〜P13とN11 Evidence/Blocker/OS Artifact行結合は継続する。P0/P1/P4の直接対応はv4仕様S05の明示mappingへ合わせて訂正し、旧statusは変更していない。P13の詳細evidence identity/classは`UNKNOWN`として保持する。
+P0〜P13全14 IDの旧要求範囲・限定statusをv4 N/K/Consumerへ接続した。これは旧statusの書換え、v4 acceptance、N01〜N11のCLOSED、E0完了のいずれも意味しない。C0〜C34、Phase0〜45、K01〜K20のSource→Consumer/scope mappingを記録した。P0〜P12は本節後段で全E0-04 fieldを個別補完し、P13とN11 Evidence/Blocker/OS Artifact行結合は継続する。P0/P1/P4の直接対応はv4仕様S05の明示mappingへ合わせて訂正し、旧statusは変更していない。P13の詳細evidence identity/classは`UNKNOWN`として保持する。
 
 ### P0〜P3 E0-04項目の個別補完（2026-11-13、ソースと利用先の照合）
 
@@ -1049,6 +1049,55 @@ P6の旧CLOSEDは上記Product Build限定機能と当時条件に適用する�
 | `.github/workflows/windows-manual-export-build.yml` | `f8255269ad70a63f329b6abb78f6da3d62cde960` |
 | `tooling/conformance_tests/run_conformance_skeleton.py` | `c6f31d8cb561b48513c6784e54c85969c9cb953e` |
 
+### P12 E0-04項目の個別補完（2026-11-13、製品全体統合）
+
+以下は旧P12のWindows Product Build統合記録を現行v4のConsumerへ結ぶE0照合である。旧rev5のP12 `CLOSED（Windows 機能実装完了）`と`FEATURE COMPLETE`はその時点の機能統合範囲で保持し、正式Release、現候補のinstalled end-to-end、五OSの製品受入れへ昇格しない。v4仕様S05の直接対応はN01/N09/N10、関連能力はK19。Phase 39〜45／C27〜C34は全体QC・回帰・文書・出荷の後続対応であり、P12の旧Acceptanceや個別CLOSEDを置き換えない。照合HEADは`dfe4db6231838709022cf5517fe857dde2b8fcbc`。製品ソース比較基準`d503a4ef6daac8942abd1cb011442ce28c78ec55`からP12の代表Flutter／Windows tray sourceに差分がないことを確認した。詳細なTask／操作／OS lifecycle consumerとsource SHAはN01/N09/N10の正本節を参照する。
+
+| 照合項目 | 内容 |
+|---|---|
+| 現行ID | 旧P12。v4仕様S05の直接対応はN01（実Task）、N09（製品操作・観測・復旧）、N10（五OS製品化）、関連能力はK19。製品操作を含む施工線C、Windows製品線G、証拠・最終品質の線Jと接点を持つ。Phase 39〜45／C27〜C34は後続QC・回帰・文書・出荷範囲として関連し、P12のAcceptanceへ合算しない。現行受入座標はN01/N09/N10、W06/G6-WIN、W07/G6-OS、N11。 |
+| 旧ID | P12「製品全体統合」。rev5ではWindows側`FEATURE COMPLETE`、Product Build `CLOSED`。15段階の正常利用scenarioを製品経路へ接続した記録があり、接続単位1〜10は主に個別Widget/Fixture、単位11はWindows Debug Runnerのnative tray正常終了。15段階を一度のinstalled-product `LIVE_RUNTIME`で通した記録ではない。 |
+| 原文参照 | `docs/REV5_PRODUCT_PROGRESS.md`のP12接続単位1〜11・受入判定、`docs/D4_POCKET_PHASE_MAPPING.md`のPhase 34および39〜45/C27〜C34、v4仕様S04 N01/N09/N10・S05 P12/K19、工程表R03の施工線C/G/J・R06〜R08、現行N01/N09/N10/N11節。旧P12のstatusと証拠classは当時の履歴として保持する。 |
+| 対象 | Dashboard／first-runからAgent Center、Provider/Model設定、Runtime/Workspace登録、Agent Session/Task、Compare事前検査、Handoff、History/Diff導線、MCP Center/Tool request、Compose/Export、Update Center、Windows native tray終了へつなぐWindows製品UI経路。 |
+| 目的 | 既存の製品機能を通常の利用導線へ接続し、画面・検索・コマンドから利用者が目的の機能へ到達できるようにする。Task、権限、OS操作は既存Broker/native責任境界を維持し、画面接続の完了を製品配布・Release・他OS完成と混同しない。 |
+| 生成側 | Flutter DesktopのDashboard／first-run、Agent Center、Settings、全体検索・コマンドパレット、およびWindows Runnerのnative tray。TaskやMCP操作は操作者の明示要求から既存clientがBroker要求を生成する。 |
+| 実際の受け取り先 | Flutter `ShellCoreClient.brokerTransport`から既存`AgentTaskClient`／Task coordinator、Compare/Handoff、History、MCP、Compose/Export、Update clientへ接続する。Rust Brokerと各operationの責務はN01/N09/N10の現行Source→Consumer表を参照。trayの終了要求はWindows `TrayController`／`FlutterWindow`へ渡り、対象Debug Runnerのprocess終了を観測した。Fake Broker経由のWidget応答を実Brokerの受入れとみなさない。 |
+| 契約とデータ | 新しい権限契約は追加していない。既存Broker request/response、Task/Session/Workspace binding、result hash／bounded projection、MCP metadata/receipt、Compose Manifest、Update候補一覧、native tray終了を利用する。Permission／Approval／CredentialをUI stateやfixtureから生成・継承しない。契約とsource identityの詳細はN01/N09/N10節へ委譲する。 |
+| 正常時の作用 | 旧P12単位1〜10では、first-run導線、Provider/ModelとRuntime/Workspace登録、Agent TaskのUI接続、Compare preflight、Handoff、History/Diff導線、MCP接続一覧、Compose/Export、Update一覧、MCP Tool receipt投影を個別scenarioで接続した。単位11では記録されたWindows Debug Runner artifactをtray「終了」から終了し、process exit code 0を観測した。Task/MCP等のFixture応答は実Provider／MCP副作用を示さない。 |
+| 否定時の作用 | 過去Widget記録はBroker未接続時に登録・更新等を実行しない、起動時にMCP/Update作用を自動要求しない、明示操作前にTool callを送らない、permission/approvalを登録payloadへ含めない、Task結果画面と独立Workspace観測を同一視しない等の限定条件を確認した。P12全体を通す実Broker権限拒否・secret boundary・cross-OS negative matrixは本履歴で成立していない。既存安全条件と負例はN01/N09/N10/N11の現行gateに残す。 |
+| 停止と回復 | P12単位11でDebug Runnerのnative tray終了がexit code 0となった記録がある。これはBroker finalization／終端Audit、installed製品の停止、crash・deadline・process群回復、Update/Rollback/Uninstall全体の連続動作を証明しない。これらはN01/N09/N10、FQ、Q2/Q5および既存blockerの責任範囲に残し、P12を再開しない。 |
+| 標準対象OSの候補 | P12の機能統合記録はWindows Desktopに限定される。tray証拠はWindows Debug Runner、source commit `eaea63b52a5a4c35c44117b50b7979dbc2c57024`、生成時刻`2026-10-06T15:50:05Z`、artifact SHA-256 `68ad367d0d6053ea44e179d5dce9dc53b5ee5795889879178f0858aa658550a0`。他OSの一般利用・installed受入れはP12の範囲外であり、Linux nativeを含む五OS条件はN10/W07で継続する。 |
+| 配布 | P12自体は一般配布Installerを生成・検証していない。前工程P11のportable ZIP bootstrap上の限定機能受入れと、P12のDebug Runner tray記録を区別する。MSI/Setup.exe、正式署名、Publisher identity、同一候補の通常Installer→first-run→実Task→更新／復旧／撤去の連続証拠は未成立。 |
+| 既存実装 | Desktop Flutterの導線・各client接続とWindows tray sourceは現HEADに存在する。N01/N09/N10に記録したSource→Consumerはコード上の`WIRED`範囲を示す。P12の旧Product Build受入れは歴史status `CLOSED`のまま。UI sourceの存在・widget fixtureだけからinstalled製品動作を主張しない。 |
+| 実装不足 | 同一Release candidateのinstalled Windows productで、一般導入からnative Owner/Broker、実Provider Task、結果・diff・History、MCP実作用、Update/Repair/Rollback/Uninstall、durable AuditとRecoveryまでを一体検証した証拠がない。macOS/Linux native/Android/iOSの標準配布・installed機能もP12では未受入れ。N01/N09/N10のcurrent BUILD_GAP／UNKNOWNは各正本節に残す。 |
+| ソース識別値 | P12の代表Flutter導線・Widget integration test、Windows tray／window、旧P12履歴とFinal QA参照の12 fileを照合HEAD `dfe4db6231838709022cf5517fe857dde2b8fcbc`のGit blob識別値へ結合した。これは現物同一性であり実行証拠ではない。Broker／OS別の追加sourceはN01/N09/N10 SHA表を正本とする。 |
+| 試験区分 | 旧P12単位1はfocused Widget test 2件、単位2〜10は各1件のfocused Widget testを記録し、主な証拠classは`FIXTURE`。単位11は別途`LIVE_RUNTIME`に分類されたWindows Debug Runner tray試験だが、範囲はnative tray／window lifecycleだけ。旧Schema／Conformance／Manifest／Gate結果は各当時の条件に限定する。本E0 mappingでは旧試験・製品Rust/Flutter・workflow・installed product・OS QAを再実行せず`NOT_RUN`。 |
+| 証拠ID | `NONE`。旧P12の個別Fixture記録とDebug Runner tray hashは履歴参照であり、現行v4 N01/N09/N10/N11向けEvidence IDやcurrent Release candidate evidenceではない。 |
+| 阻止要件 | 現行N01/N09/N10、W06/G6-WIN、W07/G6-OSをOPENのまま保持する。既存Registryの`windows_evidence_provenance_isolation`、`windows_installer_first_run_smoke`、`windows_setup_doctor_smoke`、`windows_broker_installed_smoke`、`windows_distribution_identity`、`rev2_desktop_product_distribution`、`rev2_flutter_broker_channel_boundary`、`rev2_export_owner_ui_authority_path`は現状`unresolved`として参照し、statusを変更しない。正式Q0〜Q7は`DEFERRED`、`release_ready=false`。新規blockerは作成しない。 |
+| 状態 | 旧rev5 P12 Windows Product Build `CLOSED`／`FEATURE COMPLETE`を当時の機能統合・限定証拠の範囲で維持する。P12のE0-04 source→consumer mappingは本単位で記録完了。現行N01/N09/N10、W06/W07、N11およびE0は`OPEN`で、正式Release／QA、全OS installed acceptanceは未成立。 |
+| 残件 | N01の実AI Task・結果／停止／Recovery、N09の同一Taskへ結合した操作・観測・Diff/Eval/Resource/Audit/Recovery、N10の五OS標準配布と同一候補installed lifecycle、N11の全要求・証拠・Artifact・Blocker統合を各現行IDの後続工程で閉じる。P12は再開せず、P13のE0-04 mappingへ進む。Linux nativeは必須製品対象のまま保持する。 |
+
+#### P12 ソース識別値・該当ファイル
+
+下表は照合HEAD `dfe4db6231838709022cf5517fe857dde2b8fcbc`上のGit blob識別値。製品sourceは比較基準`d503a4ef6daac8942abd1cb011442ce28c78ec55`から変更されていない。履歴文書の一部はE0後続更新を含む。N01/N09/N10/N11の他source・Contract・OS artifact hashは各Canonical SHA表を参照し、重複転記しない。
+
+| ファイル | 対象ファイル識別値 |
+|---|---|
+| `docs/REV5_PRODUCT_PROGRESS.md` | `9c978021d3982690e9aaa87896436bad7125b433` |
+| `docs/D4_POCKET_PHASE_MAPPING.md` | `064ea334f86b137d94fba2370d2a2fd732f6e972` |
+| `docs/FINAL_QA_QUEUE.md` | `7b332cccab70bb68aa1ff4f8e23acc0e816d8282` |
+| `apps/desktop_flutter/lib/main.dart` | `6109c821ab5dc809224bec5234c4c59db1d5f988` |
+| `apps/desktop_flutter/lib/screens/dashboard.dart` | `3a1002c7eaa5c546f72865c71fc3226ac1ab920e` |
+| `apps/desktop_flutter/lib/screens/agent_center.dart` | `2472faeb31a64d624423c30a0a30d0f153d2e2a3` |
+| `apps/desktop_flutter/lib/screens/settings.dart` | `66374ec4157d573939e7f9cc5c36aecf5d65e251` |
+| `apps/desktop_flutter/test/widget_test.dart` | `f4e9c7b93f832ba2a2cefee779fd12426f240b04` |
+| `apps/desktop_flutter/windows/runner/tray_controller.cpp` | `2676afcc76e5c6e53fff2dd00d0fbb3ae531ccc1` |
+| `apps/desktop_flutter/windows/runner/tray_controller.h` | `67ec337a335b948115559394ad5b55bffadb7502` |
+| `apps/desktop_flutter/windows/runner/flutter_window.cpp` | `67849099e5141b696b237ec7390729793bc0e843` |
+| `apps/desktop_flutter/windows/runner/flutter_window.h` | `bc0bb661a9ef7c2b639856a6d5e46b68b98ca4b0` |
+
+P12の旧CLOSED status、test／artifact scope、v4のN01/N09/N10 OPEN状態は分離して保持する。この個別mapping完了はP12再受入れ、既存CLOSEDの再試験、N01/N09/N10/N11のclosure、E0全体完了を意味しない。
+
 ## 旧C0〜C6のv4 Source→Consumer crosswalk（E0差分）
 
 旧rev1の仕様・工程・進捗は当時の要求範囲と履歴statusを確認する資料として読み、現在statusはv4 S04/S05、工程表R03、現行Source→Consumerへ接続した。C0〜C6の旧statusは変更しない。v4 target statusはN11/C0のbaseline記録を含め、製品受入は未成立のままである。Phase対応は`docs/D4_POCKET_PHASE_MAPPING.md`の既存逆引きを参照した。
@@ -1542,7 +1591,7 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 |---|---:|---|---|
 | 新規要求 N01〜N11 | 11 | v4仕様S04 | 初期Producer/Consumer差分を記録。契約・否定・OS・証拠の全項目は未完 |
 | 全体施工線 A〜J | 10 | v4工程表R03・Codex指示I04 | 全線同時BUILDのproducer/consumerと現行実装配置を全数照合中 |
-| 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P11は全E0-04 fieldを個別記録。P12〜P13の個別field、P13の旧evidence identity/class、N11 Evidence/Blocker/OS Artifact全数結合は未完／UNKNOWN |
+| 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P12は全E0-04 fieldを個別記録。P13の個別field・旧evidence identity/class、N11 Evidence/Blocker/OS Artifact全数結合は未完／UNKNOWN |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのSource→Consumer crosswalkを記録。個々の全E0-04列とv4 Acceptance／Evidence/N11結合は継続 |
 | D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDをv4 N01〜N11/A〜J/Kへcrosswalk済み。Phase固有E0-04全field、Evidence ID/Blocker、Acceptanceは未完 |
 | 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K別の完全E0-04 field、OS/Evidence/Blocker確認は継続 |
@@ -1587,7 +1636,7 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 
 ## 次のE0照合作業
 
-1. P12〜P13をID順に全E0-04 field、N11 Evidence ID、Blocker、OS対象/Artifactへ結合する。P0〜P11は完了済みmappingとして保持。続けてN/P/C/Phase/K残行へ展開し、既存CLOSED/FAILは履歴保持して再試験しない。
+1. P13を全E0-04 field、N11 Evidence ID、Blocker、OS対象/Artifactへ結合する。P0〜P12は完了済みmappingとして保持。続けてN/P/C/Phase/K残行へ展開し、既存CLOSED/FAILは履歴保持して再試験しない。
 2. BUF-R/T crosswalkをCanonical N08/N10/N11 source SHA・各IDの完全E0-04 field・B5 evidenceへ結合する。B0〜B6の工程・状態・受入Consumer・証拠のcrosswalkは記録済み。個別cause/effect、OS/Artifact、N11 Evidence/Blockerの結合は継続。
 3. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 4. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
