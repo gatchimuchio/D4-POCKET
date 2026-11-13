@@ -2516,11 +2516,39 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 | G/H/I／N10 | Windows/Linux/macOS Desktop runners、`apps/mobile_flutter` Dart/Android Kotlin/iOS Swift source | `native/rust_helper/src/desktop_launcher.rs`、Linux/macOS launcher・worker、Mobile Device Link native services | Windows installerに複数PowerShell収集/配置scriptがある。`installer/linux/README.md`・`installer/macos/README.md`はあるが、当該installer root内にpackage builderは見当たらない。別locationを含む正規package経路は`UNKNOWN` |
 | J／N11 | `docs/QE_2026-11-13/`、README/Checklist/Progress | `tooling/manifest.py`、`tooling/release_gate_check.py`、`tooling/conformance_tests/run_conformance_skeleton.py`、`release_blockers.registry.json` | v4正本/Registry/validatorの参照は同期済み。E0全ID/Consumer/Evidence validator・完全なrelease candidate結合は`UNKNOWN` |
 
+## 新規要求の個別E0-04照合
+
+### N01 実仕事
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | N01 実仕事 |
+| 旧ID | P0／P1、K01／K08、W01／G1。C0〜C34とPhase 0〜45の個別ID接続は既存crosswalkに残し、各IDのE0-04完了へは昇格しない。 |
+| 原文参照 | v4仕様S04「N01 実仕事」。仕様原本SHA-256=8CEEDF21F881A783E35EE8642673FAAEEF949465343DF65E63DC21B04EE5A3EF。受入条件は一般利用入口の実Task、無権限拒否、Cancel／Deadline／Crash。 |
+| 対象 | 使用者が選択したAgent／Runtime／Session／WorkspaceとTask指示から始まる一般利用製品経路、および実Task状態・結果・Audit・停止・復旧を消費するDesktop／Mobile面。 |
+| 目的 | 使用者の目的をBroker統治下の実Runtime作用へ渡し、許可済みWorkspace内で結果を得て、現在Taskの状態・内容露出・停止・復旧を製品へ戻す。旧W01の限定成立を全OS・全配布・全Runtimeへ拡張しない。 |
+| `Producer` | Desktop Flutter Agent CenterのTask要求作成・事前検査・開始・取消操作。入力はruntime／session／workspace ID、Task instruction、現在のPermission／Approval state。製品使用者の操作はBroker権限を直接生成しない。 |
+| 実Consumer | DesktopはAgent Center→AgentTaskClient／AgentTaskExecutionCoordinator→BrokerTransport→Rust Broker protocol／dialogue→登録Adapter（Codex CLI）→Workspace／Task state・result／Audit→Coordinator／Agent Centerの候補経路がWIRED。Mobile Agent StatusはAdapter metadataの読取表示のみで、Task開始consumerではない。 |
+| 契約／Data | specs/agent_task.schema.json、agent_task_request.schema.json、agent_task_scratch_recovery.schema.json。Runtime／Session／Workspace identity、instruction hash、独立Workspace Permission／Owner Approval receipt、一回Task request、status・result hash・bounded result projection、監査相関を使用。UI／Adapter metadataはAuthorityではない。 |
+| 正常時作用 | Brokerが現在Runtime／Workspace binding、Adapter capability、Permission、本文・条件hashに束縛された別個Approvalを検査し、一回消費してAdapterを実行する。状態・結果はTask IDを基点に読戻し、結果本文は別の内容露出制御後に表示する。 |
+| 否定作用 | 不正・staleな要求、未知／非対応Runtime、Permission／Approval欠落、Workspace不一致はBroker側で拒否する。cancel／deadline／crashはTaskを成功へ偽装せず停止・Recoveryへ渡す。Mobile Device Link allowlistにTask実行操作がないことを確認した。 |
+| 停止／Recovery | Desktop sourceにcancel要求、期限付き実行、Broker再起動後のinterrupted Taskをsuspendedとして記録するRecovery journalがある。消費済みPermission／Approvalを復元しない。W01ではWindows限定条件のcancel／deadline／crash、子process停止、scratch回収を検収済み。全OS・一般配布候補の停止保証は未成立。 |
+| 標準OS候補 | Windows：一般installed Desktop。Linux native：Ubuntu 24.04 LTS／x86_64を候補、保証範囲・Wayland等はUNKNOWN。macOS：標準installed条件UNKNOWN。Android：API 35 Google APIs／x86_64 Emulator候補。iOS：iPhone 16 Pro／iOS 18.5 Simulator候補。これらは候補であり、現行QA合格を意味しない。 |
+| 配布物 | Windows portable ZIP／D4PKG01 update payload候補。Linux Ubuntu 24.04／amd64 portable tar.gz・bootstrap deb・D4PKG01候補。macOSはmacos-15 manual debug/UI workflow候補。Androidはdebug APK／AAB、iOSはSimulator app候補。通常利用者向けの全OS installer／配布／installed lifecycleは未成立。 |
+| 既存実装 | Desktop: agent_center.dart、desktop services／agent_task_client.dart、agent_task_execution_coordinator.dart、agent_orchestration package、Rust broker/protocol.rs・dialogue.rs、adapters/codex_cli.rs、broker/agent_task_scratch.rs。Mobile: agent_status.dartはmetadata投影、device_link.rsは限定操作allowlist。SchemaとDesktop／Rust／Android／iOSの関連test sourceが存在する。 |
+| BUILD_GAP | Desktop source配線とWindows W01の限定LIVE_PRODUCTを確認。現行統合候補の一般installed／配布・他OS一巡は未成立。Linux #286はUbuntu 22.04 hosted Xvfb／X11・normal Release・local no-auth fixtureの限定positive Task。macOS installed TaskはUNKNOWN。Android／iOSにTask開始経路がなくBUILD_GAP。 |
+| `SourceSHA` | 照合HEAD=57d905c5bb89070a156e8f9ff83b60ecfa8acdb9。Git blob: apps/desktop_flutter/lib/screens/agent_center.dart=2472faeb31a64d624423c30a0a30d0f153d2e2a3; apps/desktop_flutter/lib/services/agent_task_client.dart=f54cefac29eba3dcf383bba19b4f64ee682e6217; apps/desktop_flutter/lib/services/agent_task_execution_coordinator.dart=5d8f48d0557bdcb1af838239abf9651893bce7f1; packages/agent_orchestration/lib/agent_task_client.dart=a31fbb9f980a0039f809fd763c91f055fe9d02d0; packages/agent_orchestration/lib/agent_task_execution_coordinator.dart=feb9aacb7ed77e6f4e76e9d9371290decca9cf7b; native/rust_helper/src/broker/protocol.rs=9b2076d5f31ca6d77f1f87973d1b394aaf751961; native/rust_helper/src/broker/dialogue.rs=c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999; native/rust_helper/src/adapters/codex_cli.rs=e5c9d1581ae9a1c0a3ae7fcfa626fdca6fea6d28; native/rust_helper/src/broker/agent_task_scratch.rs=de743cd819fb4533c9c3070c4e7bcae82e42d938; apps/mobile_flutter/lib/screens/agent_status.dart=52e4907897c2bb3674bb8523204a787d3a6cb002; native/rust_helper/src/broker/device_link.rs=c2e1ff88ff34a5764b2b4fb1d3f7abd8727e5c51; apps/desktop_flutter/test/agent_task_client_test.dart=0477a0bbbb321082494b6b55711815d34419fdd9; native/rust_helper/tests/agent_task_production_e2e.rs=fdc7565aa58fa7466e6e24e5492321e8015567eb; native/rust_helper/tests/agent_task_crash_recovery_e2e.rs=23517fcfe8ef94b2357a94e04879d423c3360501; apps/mobile_flutter/android/app/src/androidTest/kotlin/com/example/gui_shell_mobile/NativeDeviceLinkProductFlowTest.kt=4f4a79e0bd80b1f5eb280857dec7a7d5df12258c; apps/mobile_flutter/ios/RunnerUITests/DeviceLinkProductUITests.swift=b74c1f4a846c07eed9b6ae9244ac18b4f1030eec; specs/agent_task.schema.json=a552389072088d6cd42b3588fefda332be4ae6b6; specs/agent_task_request.schema.json=cb25bb3684656bfd670ea5832bbb7fc5988845b6; specs/agent_task_scratch_recovery.schema.json=40f1eac71cd9645396ae7230d49cad25f3b77237。 |
+| `TestClass` | 現source／契約／fixture分類の存在確認のみ。今回のruntime testはNOT_RUN。既存W01/G1およびLinux run #286は原記録上の限定LIVE_PRODUCT履歴で、現行候補のOS別QAへ転用しない。v4標準TestClassへの対応付けはN11側で行う。 |
+| `Evidence ID` | Windows W01/G1: ../QE_2026-11-05/W01_G1_通常ReleaseAgentTask証拠_20261107.md。Linux run #286: ../QE_2026-11-09/進捗.md（export evidence SHA-256=8fb4d23f8f7f54b8e894f007d0e9e39747acdee6da8719d3971d4b62980f0f93、package SHA-256=1282ec26c9aa64002475dfea0451978515a000a77e34ec75ee66e71e293ac030。artifactは保持されていない）。 |
+| `Blocker` | 既存Registryとの関係: windows_broker_installed_smoke、windows_evidence_provenance_isolation、linux_native_product_support、comprehensive_extension_rev1_completion、rev2_mobile_device_evidence、rev2_mobile_flutter_native_device_link_boundary。現在の状態は各Registry記録を維持し、新規Blockerは追加しない。 |
+| 状態 | OPEN（N01のE0-04 mappingは本記録で全21項目を充足。N01製品AcceptanceはOPEN）。 |
+| 残余 | 現行Release候補のWindows installed provenance／一般installer、Linux native標準GUI・配布、macOS installed Task、Android／iOS Task consumer、全OS標準保証・artifact identity、同一候補でのTask／停止／Recovery／結果露出／Auditの結合証拠は未成立またはUNKNOWN。README.mdの2026-11-10記載（Linuxの限定normal Release履歴）は日付・証拠範囲のまま扱う。現行v4 CLAIM.md／COMPATIBILITY_MATRIX.mdのinstalled QA未成立と混同せず、保証表示の整合はN11で照合する。 |
+
 ## 要求母集団・照合状態
 
 | 母集団 | 件数 | 正本・原典 | v4 E0状態 |
 |---|---:|---|---|
-| 新規要求 N01〜N11 | 11 | v4仕様S04 | 初期Producer/Consumer差分を記録。契約・否定・OS・証拠の全項目は未完 |
+| 新規要求 N01〜N11 | 11 | v4仕様S04 | N01はE0-04全21項目をSourceSHAへ結合済み。N01製品AcceptanceはOPEN、N02〜N11の個別全数照合は未完 |
 | 全体施工線 A〜J | 10 | v4工程表R03・Codex指示I04 | 全線同時BUILDのproducer/consumerと現行実装配置を全数照合中 |
 | 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13は全E0-04 fieldを個別記録。P13旧aggregate evidence identity/classは`UNKNOWN`。N11 Evidence/Blocker/OS Artifact全数結合は未完 |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのSource→Consumer crosswalkを記録。個々の全E0-04列とv4 Acceptance／Evidence/N11結合は継続 |
@@ -2567,11 +2595,12 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 
 ## 次のE0照合作業
 
-1. P0〜P13、BUF-R01〜R09、BUF-T01〜T24の個別21 field mappingを記録済み。次はN/P/C/Phase/Kの残行をCanonical N source/consumer・N11 Evidence/Blocker/OS Artifactへ結合する。既存CLOSED/FAILは履歴として保持し再試験しない。
-2. BUF-R/TのSourceSHAとConsumer scopeを記録した。製品AcceptanceはOPEN。B0〜B6の工程・状態・Consumer crosswalkを保持し、原因→effect、N08/N10/N11、OS/Artifact/evidence結合を続ける。
-3. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
-4. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
-5. N10の各OS標準候補・配布・実装・workflow/test・限定履歴を記録する。保証version/arch/resource/package条件は公式条件と実測から固定し、未知をUNKNOWNにする。
-6. N11 Evidence/Registry/validator/QA queue consumer mappingに全ID・全OS artifactを接続する。Acceptance/E3 BUILD_COVERED/E4 QC/E5 QA/E6 Release判定は正本工程の順序と区分を維持する。
+1. N01のE0-04 21項目は照合済み。N01製品AcceptanceはOPENのまま維持し、次にN02のProducer/実Consumer、契約、正常/否定作用、停止/Recovery、5 OS・配布物・SourceSHA・証拠・Blockerを個別に結合する。
+2. 残るN/P/C/Phase/K要求をCanonical N source/consumer・N11 Evidence/Blocker/OS Artifactへ接続する。旧CLOSED/FAILは履歴として保持し、再試験しない。
+3. BUF-R/TのSourceSHAとConsumer scopeは記録済み。AcceptanceはOPEN。B0〜B6の状態を保持し、原因→effect、N08/N10/N11、OS/Artifact/evidence結合を続ける。
+4. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
+5. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
+6. N10の各OS標準候補・配布・実装・workflow/test・限定履歴を記録する。保証version/arch/resource/package条件は公式条件と実測から固定し、未知をUNKNOWNにする。
+7. N11 Evidence/Registry/validator/QA queue consumer mappingに全ID・全OS artifactを接続する。Acceptance/E3 BUILD_COVERED/E4 QC/E5 QA/E6 Release判定は正本工程の順序と区分を維持する。
 
 上記未完了のため、E0は`OPEN`。E1全体BUILDの網羅、BUILD_COVERED、QC/QA、Releaseの成立は主張しない。
