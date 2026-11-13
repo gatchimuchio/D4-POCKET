@@ -2986,6 +2986,90 @@ Phase 9〜11の3行は各E0-04全21項目を記録し、計41件のSourceSHA参�
 
 Phase 12〜14の3行は各E0-04全21項目を記録し、計52件のSourceSHA参照（50 unique path）を編集前mainへ結合した。旧C4/C5/C6 status、N09、Registry、Evidence IDは変更せず、製品Acceptanceを発行していない。Phase 15〜45、K01〜K20個別field、N11 Evidence/Blocker/OS Artifact結合は未完了、E0はOPEN。
 
+#### Phase 15〜17 E0-04個別記録（2026-11-13）
+
+旧Phase/Cとの関係と過去statusを保持し、現行v4の要求consumerへ接続する。下記SourceSHAは全て照合基準main `3a573cbe76bea863318c1cb37fec49f21dec223e`時点のGit blobであり、製品動作・Acceptanceを証明しない。
+
+##### Phase 15 個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | D4追加Phase 15「接続先・Model設定」。現行要求consumerはv4仕様S04 N03、能力対応はS05 K06、施工線B。 |
+| 旧ID | rev1に独立した同一C工程なし。旧製品P4 Provider/Model Centerは範囲の一部が重なる履歴であり、Phase 15/N03全体と同一視しない。 |
+| 原文参照 | `docs/D4_POCKET_PHASE_MAPPING.md` Phase 15、v4仕様S04 N03／S05 P4・K06、工程表R03線B、施工指示書I04-B。旧P4範囲は本台帳P4照合を参照。 |
+| 対象 | Provider／Model選択、Runtime/Adapter登録・能力確認、選択Runtimeへの共通AgentTask dispatch・Result・failure・Authority境界。 |
+| 目的 | Provider/Modelの選択を登録・Broker認可・実Runtime作用へ一貫して結び、未対応・未確認の能力や接続を成功と誤表示しない。少なくとも二種類の独立したTask-capable Runtimeを比較可能な共通契約へ接続する。 |
+| 生成元（Producer） | Agent CenterのProvider/Model/Runtime選択とOwner-bound登録要求、Broker Runtime/Agent Catalog、各Adapterの実能力とTask要求。選択値・宣言metadata自体はAuthorityではない。 |
+| 実Consumer | Agent Center登録画面→native Launcher確認→Rust Broker IPC/protocol→`ProviderModelSelection`／Runtime registry→Adapter選択→共通AgentTask dispatch→Codex CLIまたは明示非対応の拒否。Runtime Centerは限定Catalog/lifecycle投影を表示する。 |
+| 契約／Data | `provider_model_selection.schema.json`、`agent_cli_runtime_workspace_registration.schema.json`、`agent_adapter.schema.json`、Adapter管理契約。現sourceのProvider IDはCodex CLI向け固定、Model ID検査、自動fallback無効。実Credential値は選択projectionへ含めない。 |
+| 正常時作用 | 現在確認できるCodex経路ではModel IDが登録要求からBroker Adapterを経てCLI `--model`へ渡る。Provider接続・Model実在性・実能力は観測した範囲でのみ表示し、未確認はunknownとする。 |
+| 否定時作用 | 未知/未対応Provider、malformed/stale登録、許可外Model ID、能力不一致、Task非対応Runtimeを拒否する。Adapter/Agent metadataから実能力・Trust・Permissionを昇格せず、自動Provider fallbackをしない。 |
+| 停止／Recovery | Owner/Broker検査、interface probe、Runtime dispatchの失敗をその操作の失敗として返す。結果不明のTaskを再送・過去Approvalで再開せず、通常AgentTaskのAudit/Recovery規則へ接続する。 |
+| 標準OS候補 | Windows／macOS／Linux native／Android／iOSが対象。現Provider/AgentTaskのsource経路は主にDesktop。Linux nativeは必須対象だが、五OSの同等installed経路やMobile AgentTask consumerは未成立。保証version/arch/sessionはN10のUNKNOWNを保持する。 |
+| 配布物 | Phase 15固有artifactなし。Runtime/Adapterの同梱・導入・更新と一般利用者経路はN10およびOS契約に属する。既存Codex CLI試験を利用者へのterminal/CLI導入要求へ読み替えない。 |
+| 既存実装 | Codex CLI一経路のProvider/Model selection、Model validator、native確認、Broker登録、共通Task dispatchとCodex Adapterがsource上接続。MINIDORAは対話AdapterでTask未対応として拒否する。P4の過去fixture/build履歴は限定履歴のまま。 |
+| BUILD_GAP | 二つ目の独立Task-capable Runtimeの実Task・失敗・権限証拠、実Provider/Model到達、宣言Capabilityと実動作の照合、同一候補の五OS installed経路が未成立。MINIDORAを第二Task Runtimeとして数えない。 |
+| ソース識別値（SourceSHA） | 編集前main `3a573cbe76bea863318c1cb37fec49f21dec223e`のGit blob: `docs/specs/adapter-conformance.md`=`e095d9f3bf9d4e6931dac193a304f43d75355c3d`; `specs/provider_model_selection.schema.json`=`348ef6104b9d73a5529a0ad81f9a268ae59e4a64`; `specs/agent_cli_runtime_workspace_registration.schema.json`=`32a09f2ce33a5a215d64350ee22e24e93f9037c7`; `specs/agent_adapter.schema.json`=`e0792589a2bae168ba221af4f4f9abb505815c12`; `specs/adapter_management_request.schema.json`=`2c9c98d0c60603adfaa246f9efa4753bfc0e7597`; `specs/adapter_management_receipt.schema.json`=`7b43a2d2b74c5bd0a931ead66f32f55663919b04`; `specs/adapter_management_manifest.schema.json`=`1f1b75c7d4299c96fcf5039b652d718f7805cd2d`; `native/rust_helper/src/main.rs`=`b0a5df285db357172e7970074d7a67189f3384a3`; `native/rust_helper/src/adapters/mod.rs`=`06c540a59437b903b3f045b5aafb3790c21103bd`; `native/rust_helper/src/adapters/codex_cli.rs`=`e5c9d1581ae9a1c0a3ae7fcfa626fdca6fea6d28`; `native/rust_helper/src/adapters/minidora.rs`=`31c756ac7c9a264d73ed0e9654dbae599be83921`; `native/rust_helper/src/broker/ipc_server.rs`=`58a404b920ef5905e174668ec2de0e04a9e8b044`; `native/rust_helper/src/broker/dialogue.rs`=`c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999`; `native/rust_helper/src/broker/protocol.rs`=`9b2076d5f31ca6d77f1f87973d1b394aaf751961`; `native/rust_helper/src/broker/runtime_registry.rs`=`9ff28610862586a599848d75f9e891a6c6cadf2f`; `native/rust_helper/src/broker/adapter_center.rs`=`66575bb77e4a375dca4f8488f97df442960bb5a9`; `native/rust_helper/src/desktop_launcher.rs`=`6a9f335de07fa474ca10043aea63ad6e988b572d`; `apps/desktop_flutter/lib/screens/runtime_center.dart`=`d2c7af172073d2b10c76a6416b90f011f10e95db`; `apps/desktop_flutter/lib/screens/agent_center.dart`=`2472faeb31a64d624423c30a0a30d0f153d2e2a3`; `apps/desktop_flutter/test/widget_test.dart`=`f4e9c7b93f832ba2a2cefee779fd12426f240b04`; `native/rust_helper/tests/agent_task_production_e2e.rs`=`fdc7565aa58fa7466e6e24e5492321e8015567eb`; `native/rust_helper/tests/fixtures/fake_codex_cli.rs`=`f74302045176eeabd9ed36e85205fed3adc13767`. |
+| 試験区分（TestClass） | Rust UNIT/FIXTURE、Flutter WIDGET、Schema/Conformance test sourceあり。本Source mapping単位の製品testはNOT_RUN。fake CLI、source test、過去P4結果は実Provider接続や二Runtime Acceptanceではない。 |
+| 証拠ID（Evidence ID） | NONE。P4の過去限定証拠は元候補・範囲の履歴として保持し、N03/W03へ転記しない。 |
+| 阻害要因（Blocker） | Registry 18件（16 unresolved／2 resolved）と`release_ready=false`を維持。N03との直接帰属が確定しない項目はUNKNOWN。新規Blocker登録・既存status変更なし。 |
+| 状態 | Phase 15のE0-04全21項目を記録。旧P4の限定CLOSED履歴は維持し、N03/W03/G3およびE0製品AcceptanceはOPEN。 |
+| 残余 | 第二RuntimeのTask-capable実装と正常/失敗/権限証拠、実Provider/Model確認、能力差表示、五OS標準配布・installed consumer、N11 Evidence/Blocker/Artifact結合。 |
+
+##### Phase 16 個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 旧C7「資格情報保管庫」。現行consumerはN01/N02/N05/N10、施工線A/B/F、能力K07/K08/K17。 |
+| 旧ID | 総合機能拡張rev1 C7／Phase 16。Owner登録、DPAPI等の限定store、metadata一覧、秘密非投影、当時の拒否・fixture履歴はその範囲の履歴として保持する。 |
+| 原文参照 | `docs/D4_POCKET_PHASE_MAPPING.md` Phase 16、v4仕様S04 N01/N02/N05/N10・S05 K07/K08/K17、工程表R03/R06、施工指示I04-A/B/F、`docs/specs/credential-vault.md`とOS別binding契約、本台帳C7照合。 |
+| 対象 | OwnerによるCredential登録・metadata参照・更新／失効／削除要求と、承認済みProvider/MCP用途での対象限定Credential利用。Device Link credentialは別用途・別主体として区別する。 |
+| 目的 | 秘密の保存・限定利用をBroker/OS保護境界へ閉じ、実値のFlutter/IPC projection/Audit/error/log/trace/test artifactへの露出と、Credential所持からPermission/Approval/Trustへの昇格を防ぐ。 |
+| 生成元（Producer） | native OS入力面のOwner要求、Rust Broker credential registration/revocation、OS vault metadata、Brokerが検査するProvider/MCP用途・対象binding。 |
+| 実Consumer | Windows/macOS/Linux native credential input→Rust Broker `credential_vault`/`credential_storage`→OS保管先。Providerは許可済みCodex Task→Broker resolver→Codex CLI parent process、MCPはMCP Center→Broker `mcp_center`→対象stdio child。Flutterには検証済metadataのみ投影する。 |
+| 契約／Data | Credential registration/receipt/list/revocation schemas、MCP connection/tool schemas、Credential VaultとOS別binding文書。公開要求はID/purpose/target/secret-free metadataに限る。secret実値はOS storeおよび短命な限定Rust処理へ閉じる。 |
+| 正常時作用 | native Owner操作後BrokerがAudit/store状態・用途・対象を照合して登録する。通常listはmetadata-only。利用直前に登録hash・失効・対象binding・Task/MCP認可を再検査し、現在の許可されたCLIまたはstdio childへ限定する。 |
+| 否定時作用 | malformed/unknown fields、重複ID、Audit/store欠落・改変、失効、用途/対象不一致、非対応保管先を拒否する。secret値は画面・通常IPC・Audit本文・log/error/traceへ返さない。 |
+| 停止／Recovery | 登録/Audit/storeの検査不成立なら利用を開始しない。失効後の再利用は禁止し、新規Owner要求で再登録する。物理削除/Recoveryおよび各子孫process cleanupの完全保証は未接続・OS依存としてunknownのまま。 |
+| 標準OS候補 | Windows/macOS/Linux native/Android/iOS全て標準製品対象。現Credential provider/MCP sourceは主にDesktop三OS、Android Keystore/iOS Keychainを含む同一Task経路は未成立。Device Link資格は一般Provider/MCP Credential consumerの証拠ではない。Linux nativeは必須。 |
+| 配布物 | Phase 16独自artifactなし。OS別vault、native Owner input、provider/MCP process binding、通常配布とinstalled lifecycleはN10対象。source・bridge testはinstalled受入れではない。 |
+| 既存実装 | Rust Broker vault/storage、Windows DPAPI、Linux Secret Service、macOS Keychain向け限定source、native入力、Codex/MCP credential binding、metadata-only client projectionがある。旧C7/C9/P6の試験履歴は元scopeで保持。 |
+| BUILD_GAP | 五OS installedでOwner登録→保管→Task利用→失効/更新/削除/復旧を結ぶ証拠なし。Android/iOS一般Provider/MCP vault consumer、物理削除/Recovery、全OS process isolation/cleanupの一体保証は未成立。 |
+| ソース識別値（SourceSHA） | 編集前main `3a573cbe76bea863318c1cb37fec49f21dec223e`のGit blob: `docs/specs/credential-vault.md`=`f27d54012cf5932356c186d4ebef295dbd535178`; `docs/specs/macos-credential-vault.md`=`73af335c3c33a6788d3ac0070156535b022c6608`; `docs/specs/macos-provider-credential-binding.md`=`39a1a5db2a132a025f146681817dc4fadc0cb983`; `docs/specs/macos-mcp-credential-binding.md`=`a86e2a10bafd63caeb392159d31f4fd7d5c1fa9a`; `specs/credential_registration.schema.json`=`65c8bc535e36c040e8574277f06ab1ecb2589d19`; `specs/credential_receipt.schema.json`=`657bfc7917123d212cff462ff7572886effc3457`; `specs/credential_list.schema.json`=`61f706b09533181df57ac781d7eed5adb1199254`; `specs/credential_revocation_request.schema.json`=`43aed5aa2d4f8dc56d9f91386b69b73bed7a3427`; `specs/mcp_connection.schema.json`=`a8d613bd911c9e88f949b984b1a2032eb19db332`; `specs/mcp_tool_call.schema.json`=`54c044cdfb53588ea5bab4bd056404372dc39acd`; `specs/mcp_tool_call_receipt.schema.json`=`0049a393104b035bbf047e653e962754bc4009b3`; `specs/agent_mcp_tool_request.schema.json`=`f3aa71661ac1dadf453954141802a7663755da9d`; `native/rust_helper/src/broker/credential_vault.rs`=`029dccda7671d51c2bbd3debd4fe5d7e92221162`; `native/rust_helper/src/broker/credential_storage.rs`=`86cf0459915bb748f2d3d5848b20913d9c6080f2`; `native/rust_helper/src/broker/mcp_center.rs`=`8f9ab897bdc625e448241ebd9b46f995cd1f22f6`; `native/rust_helper/src/adapters/codex_cli.rs`=`e5c9d1581ae9a1c0a3ae7fcfa626fdca6fea6d28`; `native/rust_helper/src/adapters/mcp_stdio.rs`=`b7e08327541ad75bca53bb1563e0e20d576d9b66`; `native/rust_helper/src/mcp_task_tool_stdio.rs`=`6107890e27be2b9f6bef93a9d46828a488aa1bf1`; `native/rust_helper/src/windows_credential_input.rs`=`3f22358ce15f69d34a93ab5f46186374caba13ec`; `native/rust_helper/src/macos_credential_input.rs`=`f4a44a0dd9d374243e38dab8726bb44c51970422`; `native/rust_helper/src/linux_credential_input.rs`=`8594403a89e4ed1f8eab38b0bb73c62bbceeb79b`; `native/rust_helper/src/broker/protocol.rs`=`9b2076d5f31ca6d77f1f87973d1b394aaf751961`; `apps/desktop_flutter/lib/main.dart`=`6109c821ab5dc809224bec5234c4c59db1d5f988`; `apps/desktop_flutter/lib/screens/mcp_connection_center.dart`=`4c2dd1122e2162a4c3ab30b5c2536e267fee8519`; `apps/desktop_flutter/lib/services/mcp_connection_client.dart`=`12a173a3956368c53615255c56ef06a2f5939c9a`; `apps/desktop_flutter/lib/services/agent_mcp_task_controller.dart`=`fba6642904d98890339197bef269164970031830`; `packages/agent_orchestration/lib/mcp_connection_client.dart`=`71b17973216160bdd2bc447243ba0b04fd0fec63`; `packages/agent_orchestration/lib/agent_mcp_task_controller.dart`=`fa46ff071cfb306d3e463a9ad2c79b9149dab6f5`; `apps/desktop_flutter/test/mcp_connection_center_test.dart`=`c81a37ca78b15e57c838f48519aa3e4abb6d6665`; `apps/desktop_flutter/test/agent_mcp_task_controller_test.dart`=`5c165d5362eea4906b6e739407b0d0e75c34485c`; `apps/desktop_flutter/test/linux_credential_vault_test.dart`=`64c250a967fcfbc3b5da941810afbf558178dfe7`; `apps/desktop_flutter/test/macos_credential_vault_test.dart`=`5d2ae1900cf31f7ff06ee6236ede132b0e933ea3`; `native/rust_helper/tests/unit/codex_cli_fixture.rs`=`40e5750bf267ccf9e583971e0d2ba4e6125d9a5d`; `native/rust_helper/tests/fixtures/fake_codex_cli.rs`=`f74302045176eeabd9ed36e85205fed3adc13767`; `apps/desktop_flutter/test/support/real_broker_mcp_probe.dart`=`0cc9aeb2b1ae6f0e14f1573d4e0cbd7aef7fa137`. |
+| 試験区分（TestClass） | Rust UNIT、Flutter bridge/client/widget、Schema/negative fixture sourceあり。旧C7/P6の集計は履歴。本Source mapping単位のtestはNOT_RUN、五OS installed testではない。 |
+| 証拠ID（Evidence ID） | NONE。過去の限定OS/store/fixture記録を現candidateの五OS Credential Acceptanceへ転記しない。 |
+| 阻害要因（Blocker） | Registry 18件（16 unresolved／2 resolved）と`release_ready=false`を維持。C7直接Blockerの帰属が不明なものはUNKNOWN。新規追加・状態変更なし。 |
+| 状態 | Phase 16のE0-04全21項目を記録。旧C7 status/証拠範囲は履歴のまま、N01/N02/N05/N10とE0製品AcceptanceはOPEN。 |
+| 残余 | Android/iOS一般Credential consumer、五OS installed一体経路、更新/物理削除/Recovery、Provider/MCP子processの失敗後cleanup境界、N11 artifact/evidence/blocker結合。 |
+
+##### Phase 17 個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 旧C8 MCP接続契約。現行consumerはN02/N05/N10、施工線A/D、能力K08/K17。 |
+| 旧ID | 総合機能拡張rev1 C8／Phase 17。metadata-only契約、当時のfixture/conformance結果と実接続をPhase 19/C9へ分けた履歴を保持する。 |
+| 原文参照 | `docs/D4_POCKET_PHASE_MAPPING.md` Phase 17、v4仕様S04 N02/N05/N10・S05 K08/K17、工程表R03、施工指示I04-A/D、`docs/specs/mcp-contract.md`、本台帳C8/C9照合。 |
+| 対象 | MCP Server/Transport/Connection、Tool/Resource/Prompt metadata、Tool inputSchema、Credential reference、Capability差分とBrokerでの検査契約。実接続・外部作用はPhase 19/C9の別consumer。 |
+| 目的 | 外部MCP metadata/schemaを未信頼入力として検査し、Tool identity/引数契約と現在Broker Catalogの一致を保つ。Metadata/description/Trust/Credential reference/CapabilityからAuthorityを作らない。 |
+| 生成元（Producer） | MCP discovery/connection応答の外部metadata、Tool/Resource/Prompt description・schema、OperatorのServer/Tool選択。Brokerが外部値を検査・正規化したcatalogを生成する。 |
+| 実Consumer | Rust `mcp_center`/`mcp_stdio`はconnection/catalog/Tool identity/inputSchemaを検査。Flutter MCP CenterはBroker projectionを表示。ComposeとAgent orchestrationは限定Catalog参照、Tool dispatchは別途現行認可済みC9/N02/N05 consumerへ渡す。 |
+| 契約／Data | `mcp_contract`、connection/list/receipt、disconnect、tool_call/receipt、Agent MCP request schemasと`mcp-contract.md`。Resource/Prompt schema/metadataの存在は全操作consumerの成立を意味しない。 |
+| 正常時作用 | 対応範囲のServer/Tool Catalogを表示し、Tool作用直前に現在Server/Tool ID・name・schema・argumentを再照合する。実作用にはnative Owner確認、一回Permission、Audit、適切なCredential bindingが別途必要。 |
+| 否定時作用 | malformed/unknown field、外部schema参照、unsupported dialect、サイズ上限超過、Authority/secret混入、stale catalog、identity/schema不一致を拒否する。外部metadataはTrust/Permission/Approvalを生成しない。 |
+| 停止／Recovery | Discovery/schema/transport失敗を成功扱いしない。契約metadataから実行・自動retry/Recoveryを起動せず、作用結果不明なら既存C9停止/隔離/Audit規則へ戻す。 |
+| 標準OS候補 | Windows/macOS/Linux native Desktopにsource経路、Android/iOSのMCP Tool action consumerは未接続。Linux native必須。source/conformanceの存在はOS別installed acceptanceではない。 |
+| 配布物 | 独自配布物なし。MCP Serverは接続先、D4 Pocketの通常package/installed process boundaryはN10対象。 |
+| 既存実装 | MCP contract/connection/call schemas、Broker Catalog/Tool validator、Rust stdio adapter、Flutter MCP Center、Compose/Agent限定参照sourceがある。旧C8のmetadata contract/conformance履歴と実接続C9の区分を維持。 |
+| BUILD_GAP | Resource/Prompt完全処理、五OS installed conformance、Mobile Tool作用、現candidateの外部MCPから同Agent follow-up/Auditまでの一体証拠は未成立。C8 contract sourceをC9実接続成功とみなさない。 |
+| ソース識別値（SourceSHA） | 編集前main `3a573cbe76bea863318c1cb37fec49f21dec223e`のGit blob: `docs/specs/mcp-contract.md`=`62fffe6af42253af5656ca06f630868487f277bc`; `docs/specs/mcp-connection-center.md`=`64d46042f19fccb0f7a947a95711e9aae87a1564`; `specs/mcp_contract.schema.json`=`733f1ecf2ad968e98c7d0c3557e5ec897a4cac23`; `specs/mcp_connection.schema.json`=`a8d613bd911c9e88f949b984b1a2032eb19db332`; `specs/mcp_connection_receipt.schema.json`=`ef8909932c68391ce680bbf53b8d80db2254c5f2`; `specs/mcp_connection_list.schema.json`=`45f5613aa46be7f936bd87995da0b6b6b38d047f`; `specs/mcp_tool_call.schema.json`=`54c044cdfb53588ea5bab4bd056404372dc39acd`; `specs/mcp_tool_call_receipt.schema.json`=`0049a393104b035bbf047e653e962754bc4009b3`; `specs/mcp_disconnect.schema.json`=`0808dab9afcafa3e2cd04743a081d33bb30e227d`; `specs/mcp_disconnect_receipt.schema.json`=`7c635dd550354263df062b68136b4a19f224aad7`; `specs/agent_mcp_tool_request.schema.json`=`f3aa71661ac1dadf453954141802a7663755da9d`; `native/rust_helper/src/mcp.rs`=`0ba59eb42c2b2328c05044dc4d459f6b0e288703`; `native/rust_helper/src/adapters/mcp_stdio.rs`=`b7e08327541ad75bca53bb1563e0e20d576d9b66`; `native/rust_helper/src/broker/mcp_center.rs`=`8f9ab897bdc625e448241ebd9b46f995cd1f22f6`; `native/rust_helper/src/broker/protocol.rs`=`9b2076d5f31ca6d77f1f87973d1b394aaf751961`; `native/rust_helper/src/broker/credential_vault.rs`=`029dccda7671d51c2bbd3debd4fe5d7e92221162`; `native/rust_helper/src/broker/compose_center.rs`=`d80658fd9a342140acc35560b2e4c4e4ae97d888`; `apps/desktop_flutter/lib/screens/mcp_connection_center.dart`=`4c2dd1122e2162a4c3ab30b5c2536e267fee8519`; `apps/desktop_flutter/lib/services/mcp_connection_client.dart`=`12a173a3956368c53615255c56ef06a2f5939c9a`; `apps/desktop_flutter/lib/services/agent_mcp_task_controller.dart`=`fba6642904d98890339197bef269164970031830`; `apps/desktop_flutter/lib/screens/settings.dart`=`66374ec4157d573939e7f9cc5c36aecf5d65e251`; `packages/agent_orchestration/lib/mcp_connection_client.dart`=`71b17973216160bdd2bc447243ba0b04fd0fec63`; `packages/agent_orchestration/lib/agent_mcp_task_controller.dart`=`fa46ff071cfb306d3e463a9ad2c79b9149dab6f5`; `apps/desktop_flutter/test/mcp_connection_center_test.dart`=`c81a37ca78b15e57c838f48519aa3e4abb6d6665`; `apps/desktop_flutter/test/agent_mcp_task_controller_test.dart`=`5c165d5362eea4906b6e739407b0d0e75c34485c`; `apps/desktop_flutter/test/support/real_broker_mcp_probe.dart`=`0cc9aeb2b1ae6f0e14f1573d4e0cbd7aef7fa137`; `native/rust_helper/tests/unit/mcp_disconnect.rs`=`98b5ac79fc023f0188690fd787ca685ae88a40b2`; `native/rust_helper/tests/agent_task_production_e2e.rs`=`fdc7565aa58fa7466e6e24e5492321e8015567eb`. |
+| 試験区分（TestClass） | Rust UNIT/FIXTURE、Schema/Conformance、Flutter client/widget、real-broker probe sourceあり。本mappingの実MCP/installed試験はNOT_RUN。Fake serverやSchema PASSは外部MCP作用の証拠でない。 |
+| 証拠ID（Evidence ID） | NONE。旧C8 metadata/conformance履歴およびC9限定接続履歴は各条件内で保持し、現候補installed Acceptanceへ転用しない。 |
+| 阻害要因（Blocker） | Registry 18件（16 unresolved／2 resolved）、`release_ready=false`を維持。C8直接Blockerの帰属が不明なものはUNKNOWN。新規追加・既存状態変更なし。 |
+| 状態 | Phase 17のE0-04全21項目を記録。旧C8 status/履歴不変。N02/N05/N10およびE0製品AcceptanceはOPEN。 |
+| 残余 | MCP Resource/Prompt実consumer、C9の外部MCP実作用と同Agent follow-up、五OS installed接続、Mobile Tool action、N11 Evidence/Blocker/Artifact結合。 |
+
+Phase 15〜17の3行は各E0-04全21項目を記録し、85件（65 unique path）のSourceSHA参照を編集前main `3a573cbe76bea863318c1cb37fec49f21dec223e`へ結合した。P4、C7、C8の過去status/証拠範囲、N02/N03/N05/N10、Registry、Evidence IDは変更せず、現行製品Acceptanceを発行していない。Phase 18〜45、K01〜K20個別field、N11 Evidence/Blocker/OS Artifact結合は未完、E0はOPEN。Rust/Flutter product testとinstalled/五OS QAはNOT_RUN。
+
 ### 製品能力K01〜K20
 
 | K／S05能力 | v4関連N／施工線A〜J | 現行Producer→Consumer参照 | Source状態・残余・証拠境界 |
@@ -4529,7 +4613,7 @@ Phase 12〜14の3行は各E0-04全21項目を記録し、計52件のSourceSHA参
 | 全体施工線 A〜J | 10 | v4工程表R03・Codex指示I04 | 全線同時BUILDのproducer/consumerと現行実装配置を全数照合中 |
 | 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13は全E0-04 fieldを個別記録。P13旧aggregate evidence identity/classは`UNKNOWN`。N11 Evidence/Blocker/OS Artifact全数結合は未完 |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのE0-04 21 fieldを個別記録。旧status維持、N11 Evidence/Blocker/OS Artifact結合と製品Acceptanceは継続 |
-| D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜14はE0-04全21 fieldを個別記録、Phase 15〜45は個別field未完。Evidence/Blocker/OS Artifact結合・Acceptance未完 |
+| D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜17はE0-04全21 fieldを個別記録、Phase 18〜45は個別field未完。Evidence/Blocker/OS Artifact結合・Acceptance未完 |
 | 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K別の完全E0-04 field、OS/Evidence/Blocker確認は継続 |
 | Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 33 IDのscope/Consumer/現証拠境界と各21 fieldを記録。BUF-R/T Acceptance、cause/effectの全件結合、N11 evidence、OS artifactとの結合は未完 |
 | Buffer工程 B0〜B6 | 7 | `docs/緩衝基盤_rev5補遺_QC/`・v4仕様S06 | B0〜B4の限定CLOSEDを保持、B5 OPEN、B6未成立。詳細Consumer照合が未完 |
@@ -4573,7 +4657,7 @@ Phase 12〜14の3行は各E0-04全21項目を記録し、計52件のSourceSHA参
 ## 次のE0照合作業
 
 1. N01〜N10のE0-04 21項目は現行SourceSHAへ個別照合済み。各製品AcceptanceはOPENのまま維持し、N10の五OS実導入・利用・更新・Recovery QAは後続の製品Acceptanceに残す。
-2. C0〜C34個別field記録を維持し、Phase 15〜45／K01〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
+2. C0〜C34個別field記録を維持し、Phase 18〜45／K01〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
 3. BUF-R/TのSourceSHAとConsumer scopeは記録済み。AcceptanceはOPEN。B0〜B6の状態を保持し、原因→effect、N08/N10/N11、OS/Artifact/evidence結合を続ける。
 4. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 5. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
