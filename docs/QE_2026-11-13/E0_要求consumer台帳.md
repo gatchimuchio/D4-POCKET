@@ -3750,7 +3750,7 @@ Phase37のE0-04欄を全21項目で記録し、24件（24 unique path）のSourc
 | K08 MCP server/transport/tool/resource/prompt/Center/isolation/AI consumption | N02/N05／A・D | Desktop Broker stdio Catalog→native Owner／Permission／Audit Tool→N02同Agent fresh-authorized follow-up、N05 current Compose→元Tool | Desktop Windows/Linux/macOS source WIRED。Resource/Prompt本文、HTTP/OAuth、Mobile作用なし。W02/G2・W04/G4 installed acceptance OPEN。 |
 | K09 Profile/Channel/signed update/rollback/repair | N09/N10/N11／C・G・H・I・J | Profile config/apply intent→Broker/Audit; per-channel signed candidate→Broker Update Center/native Owner→stage/active-version/rollback/repair | 詳細はK09 E0-04。Profile Runtime apply consumerなし、Mobile consumerなし。Desktop sourceはWIREDの範囲と五OS installed Acceptanceを分離。 |
 | K10 通知／Trace／Metric／観測と正式Auditの非同一性 | N09/N11／C・J | 永続Audit確定後のBroker内部Span/Metric、Audit由来の固定通知→認証Broker IPC→Desktop表示／Windows tray／Mobile read-only summary。C3/K04資源観測は別経路。 | 通知・観測はAudit/Authorityを置換しない。Runtime/Adapter/Tool Span、Task lineage、Windows toast、他OS native notification host、外部export、五OS installed Acceptanceは未成立。 |
-| K11 A2A Card/Task/Message/Stream/Artifact/Host/identity/Trust | N04／B | A2A/Host UI→Broker operation/Host metadata registry (N04) | 外部metadataからTrustを生成しない。OS別作用を分離し、macOS metadata-only、Host越境Task/外部installed E2E未成立。 |
+| K11 A2A Card/Task/Message/Stream/Artifact/Host/identity/Trust | N04／B | A2A Card／Message／Task／Artifact／Stream UI→Broker外部作用、Host UI→metadata registry／表示Context (N04) | 外部metadataからTrustを生成しない。OS別作用を分け、macOSのMessage送信矛盾、Host越境Task、外部Agent installed E2E未成立を記録。 |
 | K12 Adapter Publisher/version/hash/signature/risk/compat/quarantine/update/stop | N03/N05／B・D | Adapter catalog/manage operation→Broker registry/compatibility and risk projection（C19/N03/N05） | C19 sourceはmetadata管理範囲。署名・隔離・更新・停止の全lifecycle実consumerとinstalled proofは全数未確認/OPEN。 |
 | K13 Desktop Tray/quick stop/Palette/Search/Agent Center/Problems/Evidence/Recovery/Settings | N09／C | Flutter/Native surface→Broker Task/history/notification/recovery/search/tray handlers（N09） | Surface sourceと個別projectionはある。同一実Task/installed UI→stop/recovery/EvidenceのE2Eは未成立。 |
 | K14 Compose/Preview/AI Edit/diff/independent review/controlled apply | N05/N07／D | Capability Catalog→Compose manifest/MCP Tool; AI proposal→independent review/apply candidate（N05/N07） | Composeはmanifest/source経路、AI Editはproposal/audit。independent review resultとBroker controlled apply/rollbackはBUILD_GAP。 |
@@ -6148,6 +6148,106 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 | tooling/canonicalization_vectors/runtime_resource_observation_decimal.json | ce00c0ea9571409a707c4e1993069c61761cb6a0 |
 | tooling/conformance_tests/run_conformance_skeleton.py | c6f31d8cb561b48513c6784e54c85969c9cb953e |
 
+### K11 E0-04 21項目の個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | K11 A2A Agent Card／Task／Message／Stream／Artifact、Host、identity／Trust、Host越境拒否。現行v4 S05 K11。N04/N11および施工線B/C/Jへ接続する。 |
+| 旧ID | P7、C15〜C19、Phase 24〜27、K11/K12、W03/G3の関係記録。旧CLOSED／FAILと限定証拠は各当時の条件に固定し、現K11 acceptanceへ遡及転記しない。 |
+| 原文参照 | 採用v4仕様S04 N04/N11・S05 K11、工程表R03 B/C・R08、施工指示I04-B/C・I07、docs/D4_POCKET_PHASE_MAPPING.md Phase 24〜27、docs/specs/a2a-contract.md、a2a-connection-center.md、a2a-streaming.md、macos-a2a-center.md、host-registry.md、host-operation-surface.md、macos-host-registration.md。仕様原本SHA-256=8CEEDF21F881A783E35EE8642673FAAEEF949465343DF65E63DC21B04EE5A3EF。 |
+| 対象 | Desktop A2A Agent Card接続、Message送信、Task状態／Artifact一覧照会、選択text Artifact表示と内部Agent Task draft、Windows/Linux限定Stream送信、Host metadata登録／一覧／表示Context切替、Agent／Host identityとTrust、Host間Authority非継承・越境拒否。macOSとMobileのscopeを個別に記録する。 |
+| 目的 | 外部Agent／Hostの宣言metadataを未信頼のまま扱い、現在要求に束縛したBroker作用だけを許し、Agent Card、Task、Message、Artifact、Stream、Host identity／Trust、履歴からPermission／Approval／Credential／Authorityを生成またはHost間で転用しない。 |
+| 生成元（Producer） | Desktop A2A CenterがAgent ID／Card URI／Message／Task ID／選択Artifactを公開要求として生成し、Agent Center handoffは明示Artifactと別入力を内部Task draftへまとめる。Host CenterはHost ID／表示名／Platform／identity hash／申告件数のmetadataを作る。identity値は本人確認ではなく申告・宣言値である。 |
+| 実Consumer | A2A接続／Message／Task query／Stream要求はFlutter clientから通常Brokerへ接続され、Rust A2A CenterがCard HTTP取得または外部JSON-RPC作用を処理する。Task query／選択Artifact／Stream UIはWindows/Linuxでgateされる。Host登録／一覧／表示切替はRust Host registryで消費されるが、remote Host接続・Host単位Runtime／Task consumerはない。macOS MessageはUI・Swift・Rust sourceに経路がある一方、AGENTS.mdの現行制約と矛盾するためUNKNOWN／SUSPEND。MobileにA2A／Host操作consumerは確認できない。 |
+| 契約／Data | A2A connection／receipt／list、Message／Task query／Stream request・responseのSchema、Agent Card metadata／endpoint hash、Host registration／receipt／list／capability／switchのSchemaを使用する。Trustはpending_review、公開範囲はmetadata_only、authority_strip=true、権限生成なし。Message／Artifact本文・credential実値・接続先実値をAudit／永続receiptへ複製しない。 |
+| 正常時作用 | Desktop Brokerで接続済みCardの再確認後、一回Message／Windows・Linux限定のTask metadata照会・safe text Artifact選択表示・一回Streamを行うsourceがある。Artifactから内部Agent Taskへの受渡しは揮発draftと通常Task preflightまでで、受信Taskはfresh Permission／Approvalを必要とする。Hostはowner controlによる未審査metadata登録、通常IPCのbounded一覧、表示Context切替だけを行う。 |
+| 否定時作用 | Malformed／unknown Schema、stale receipt、Agent／interface／payload hash不一致、未知Task／Artifact、unsafeまたはsize超過Artifact、未対応Credential要求、Trust／authority field注入、Host重複／上限超過／不正identity状態、未知Host切替を拒否またはfail-closedにするsourceとtestがある。Agent Card／Host identity／Capability／Trust metadataは接続・実行権限へ昇格しない。Host AのPermission等をHost Bへ持ち込むsource testはmetadata切替の内部試験であり、実remote Host隔離証拠ではない。 |
+| 停止／Recovery | 外部作用後のtimeout、通信切断、不正応答、Audit確定失敗、Broker再起動時の未終端要求はunknown／SUSPENDへ閉じ、自動retry／再送しない契約がある。復元receiptはpending reviewへ降格し、旧承認を再利用しない。native Owner拒否は作用前に止める。Host registryはboundedな永続metadataとAuditの起動時検証を持つが、remote Host接続やHost越境TaskのRecovery consumerはない。 |
+| 標準OS候補 | Windows/Linux DesktopはMessage等のA2A sourceを持ち、Task query／Artifact／Streamの画面gateも両OS。macOSの現行AGENTS許可範囲はIPv4 loopback Card取得とmetadata-only一覧までだが、Flutter Messageボタン・Swift operation timeout・Rust native Owner sourceおよび追記文書にはMessage送信経路がありUNKNOWN／SUSPEND。macOS Task query／Artifact／Streamは画面未対応。Android/iOSはA2A／Host action consumerなし。五OSの同一候補受入れはない。 |
+| 配布物 | 独立A2A／Host製品packageはなくD4 Pocket Desktop／Mobile候補の一部。Windows／Linux／macOSのsource接続や過去の限定Card evidenceは、同一Release候補での外部Agent lifecycle、Host境界、正式配布の証拠ではない。Mobileに該当操作の配布consumerはない。 |
+| 既存実装 | Flutter A2A／Host画面とclient、Rust Broker A2A Center／HTTP client／Host registry、OS別Broker IPC／native Owner入口、A2A／Host Schema、限定unit／Widget／loopback fixture test、metadata-only／authority strip契約を確認した。Sourceと実Consumerの範囲を次のSourceSHAへ固定する。 |
+| BUILD_GAP | 実外部Agentとのinstalled一貫作用、A2A identityの本人性／Trust審査、実remote Host登録・接続・Runtime／Task列挙、Host間Workspace／Permission／Credential隔離と越境拒否、Compare／Handoffとの一体境界、五OS同一候補受入れは未成立。macOS Messageは現AGENTS.mdのmetadata-only制約とUI／Swift／Rust／文書のsource配線が矛盾し、許可範囲を推定できない。Mobile A2A／Host consumerなし。 |
+| ソース識別値（SourceSHA） | 照合HEAD=155c2c3cee441ce06e2882af8fa1b150ef3c0d5f（K11編集前main）。次表68 tracked pathのGit blobをこのHEADへ固定した。source mappingであり、K11/N04 product acceptanceやinstalled runtime evidenceではない。 |
+| 試験区分（TestClass） | Rust unit／loopback fixture、Flutter fake Broker／Widget、Schema positive／negative、Conformanceのtest sourceを識別した。本mappingではこれらの製品testを実行せずNOT_RUN。source testの存在をinstalled external Agent／実Host／OS acceptanceへ昇格しない。 |
+| 証拠ID（Evidence ID） | NONE。Phase 24〜26の過去mappingおよび限定macOS Card LIVE_RUNTIMEは当時の対象・条件を保持し、K11の外部Message／Task／Artifact／Host越境の受入れEvidenceへ転記しない。 |
+| 阻害要因（Blocker） | Release Registry 18件（16 unresolved／2 resolved）、release_ready=falseを維持。今回のSource mappingだけで新しいBlockerを追加・再分類しない。macOS scope不整合は既存の文書・規則不整合としてOPENのまま記録する。 |
+| 状態 | K11 E0-04全21項目および編集前main SourceSHAを個別結合した。K11製品Acceptance、N04/N11、W03/G3、E0全体はOPEN。旧C/P/PhaseのCLOSED／FAIL statusは変更しない。 |
+| 残余 | macOS Message scopeの正本不整合、実外部Agent／identity審査／Host接続と越境隔離、Artifact handoffのinstalled一体作用、Mobile consumer欠落、五OSの配布・受入れ、N11 Evidence／Blocker／OS Artifactの結合。権限範囲の決着まではmacOS Messageを実行・受入れ扱いしない。 |
+
+#### K11 SourceSHA（編集前mainのGit blob）
+
+照合対象commit=155c2c3cee441ce06e2882af8fa1b150ef3c0d5f。A2A／Hostの直接source、OS橋渡し、関連Task consumer、Schema、既存test source、Mobileの非consumer確認対象を含む68 pathをGit blobへ固定した。
+
+| 対象ファイル | Git blob |
+|---|---|
+| AGENTS.md | 1eafcadd129fd01f1f2f683594c381605ed7d48d |
+| docs/QE_2026-11-13/01_D4Pocket_統合製品実装仕様書_v4.md | 352c53180cbad07888beb956aad0fb2a58074c58 |
+| docs/specs/a2a-contract.md | abe32b25bf7c186faf6e1beb3ae3f5d754de61c5 |
+| docs/specs/a2a-connection-center.md | a2f815d61aed80b4e1f619c0a2f947960d7bd317 |
+| docs/specs/a2a-streaming.md | 2b1cd55f29cd9c7f4af177d2703b677071e9e96a |
+| docs/specs/macos-a2a-center.md | 6f5bc7444f2e406aa5c7d21d1aea1f7599c743ad |
+| docs/specs/host-registry.md | a8a94c5c656ca74e016294bd708525bc1909aa34 |
+| docs/specs/host-operation-surface.md | 149ee962e8d464615ec375d9baa81c1d1b0e7679 |
+| docs/specs/macos-host-registration.md | c7b379163a4aec66ef8cfe178034439afae1fcd8 |
+| docs/specs/authority-strip-conformance.md | 117cfed2bd13af62b3fe6c464a98d183fa9fb657 |
+| docs/specs/macos-desktop-channel.md | 0611524b89c09365d35c33d23367a5fb6f65a4d6 |
+| apps/desktop_flutter/lib/main.dart | 6109c821ab5dc809224bec5234c4c59db1d5f988 |
+| apps/desktop_flutter/lib/models/generated_contracts.dart | 64e7a80a308c2734eb18c9d4b26eb50c8354f67b |
+| apps/desktop_flutter/lib/screens/agent_center.dart | 2472faeb31a64d624423c30a0a30d0f153d2e2a3 |
+| apps/desktop_flutter/lib/screens/a2a_connection_center.dart | 2716d1c2fa22a184044e6f4e2eb401cb33c6e011 |
+| apps/desktop_flutter/lib/screens/host_operation_center.dart | e16605e6bb39bbfc12806e6154e08d6fbab1b93b |
+| apps/desktop_flutter/lib/screens/host_capability_center.dart | e8fa774a435e713a3b75b0d33f00bd500b0a2d7f |
+| apps/desktop_flutter/lib/services/broker_client.dart | 122de14350dfe1f160c7f5f911dd1e1d56da8233 |
+| apps/desktop_flutter/lib/services/agent_coordination.dart | bdc13464f0e42b740a2bca3b7e8828a5019056d0 |
+| apps/desktop_flutter/lib/services/agent_handoff.dart | a85110d96cbade732ae0e1bfea2529f03f37523c |
+| apps/desktop_flutter/lib/services/a2a_connection_client.dart | 19335054afe35bc06597629d92ca2e635ce50069 |
+| apps/desktop_flutter/lib/services/a2a_artifact_handoff.dart | e7e2f3454e2843f1d4f4e7b5aedfa55014cde05c |
+| apps/desktop_flutter/lib/services/host_registration_client.dart | 3bc3b45bddddf4e1131e051acb3cdee599ca4d3d |
+| packages/agent_orchestration/lib/agent_task_client.dart | a31fbb9f980a0039f809fd763c91f055fe9d02d0 |
+| packages/agent_orchestration/lib/agent_task_execution_coordinator.dart | feb9aacb7ed77e6f4e76e9d9371290decca9cf7b |
+| apps/desktop_flutter/test/a2a_connection_center_test.dart | 5ebdbb4cee62e581062370ed6c305c36df89b7e2 |
+| apps/desktop_flutter/test/a2a_artifact_handoff_test.dart | e47005320917f59dfa55ae1e04c4b99d452676de |
+| apps/desktop_flutter/test/host_registration_test.dart | 74ab39e078bf72214a3bbe84f69ebc77fceb2493 |
+| apps/desktop_flutter/test/agent_handoff_test.dart | c6bc9bef8cc8d153ef59bf421efbd989185f8e0c |
+| apps/desktop_flutter/test/widget_test.dart | f4e9c7b93f832ba2a2cefee779fd12426f240b04 |
+| apps/desktop_flutter/macos/Runner/BrokerProcessChannel.swift | a1269e01608bc194b0f0913a6f96cd489b926155 |
+| apps/desktop_flutter/windows/runner/broker_pipe_controller.cpp | e645d2d8cc25a1e61d9cb702013b5c3ee2e31eef |
+| apps/desktop_flutter/windows/runner/broker_pipe_controller.h | f178545f83a1d2980b29c197f3d4d82ba1c4dbab |
+| apps/desktop_flutter/linux/runner/broker_process_channel.cc | 98d6f7e73baae7228c25d72d29343a2564291d97 |
+| apps/desktop_flutter/linux/runner/broker_process_channel.h | 0ee8f4587c6464d98e08a943949bbc369ebb9646 |
+| native/rust_helper/src/main.rs | b0a5df285db357172e7970074d7a67189f3384a3 |
+| native/rust_helper/src/a2a.rs | 9d7c6d9ab938ad5178d6ca46b3933dc3e61c6061 |
+| native/rust_helper/src/macos_desktop_owner.rs | 31e13a57fcde422878fae63083bd323e07f482ec |
+| native/rust_helper/src/broker/mod.rs | b89af2d97706970e26df89daef961251fdc4a797 |
+| native/rust_helper/src/broker/protocol.rs | 9b2076d5f31ca6d77f1f87973d1b394aaf751961 |
+| native/rust_helper/src/broker/ipc_server.rs | 58a404b920ef5905e174668ec2de0e04a9e8b044 |
+| native/rust_helper/src/broker/a2a_center.rs | 73ad601abd64a33ccefde4b73ab5f9dc4f728504 |
+| native/rust_helper/src/broker/host_center.rs | c27707faa61e5270b1c6d79e3ee3c5fe6ccd0bf8 |
+| native/rust_helper/src/broker/host_capability.rs | 08a82c7e52947439229447dc82b69097af67ba1f |
+| native/rust_helper/src/broker/audit.rs | eb1dcf5018d95c7fdf6171aadd4bca9554d1996f |
+| native/rust_helper/src/broker/store.rs | 356b490e403b693db499befb777789784b57d40d |
+| native/rust_helper/examples/macos_a2a_fixture.rs | 20299e4cdd564e07abce8f97c5b128404f150282 |
+| specs/a2a_contract.schema.json | 8c7f50bb7fb12dde41293727e5dc9109445d1bc3 |
+| specs/a2a_connection.schema.json | 1dbbe44e54b302a1196d7e4e55f1cae35cda569b |
+| specs/a2a_connection_list.schema.json | ee18b204349b025464ca3af8adaa355add34e650 |
+| specs/a2a_connection_receipt.schema.json | f63fd0d61b6200cdd8cc4b23d5cf7968a82fa5c5 |
+| specs/a2a_message_send_request.schema.json | 0a5f87250f17a88b6be55e7838d32b8e9114bbed |
+| specs/a2a_message_send_response.schema.json | 23ee690e0ce350ac94c64d86f6920afb63c199f6 |
+| specs/a2a_task_get_request.schema.json | df11a5fd3291de0ae379694c6c1b49de51f2f157 |
+| specs/a2a_task_get_response.schema.json | 56a55f348d6b0ba7cb0092ee7ea2b4ec809e5360 |
+| specs/a2a_stream_send_request.schema.json | e0a0841f2fd9f7e92e0fb8a036ebaa6852e198d8 |
+| specs/a2a_stream_send_response.schema.json | a526fed89fb5b3766a03c52444a338060caf16cc |
+| specs/host_registration.schema.json | 8bed26fb2fe8f8e296c1d3404978f3215d571240 |
+| specs/host_receipt.schema.json | 237a84717cf27d000357d0dac53d33dd6f535766 |
+| specs/host_list.schema.json | 93880c43b04a5408c033bf351ee695073e54664a |
+| specs/host_capability.schema.json | 6b721b5ab7842edc7df6562bc56fdd5b73d5de79 |
+| specs/host_switch.schema.json | 01e5fc7322e8d4d2c9142375e7641fc4255148d5 |
+| specs/host_switch_receipt.schema.json | cb60df0b174a38c871e0e8835c65537a17d022fb |
+| apps/mobile_flutter/lib/main.dart | abf16b9774d135c2f960633ad922be608b5fd0c5 |
+| apps/mobile_flutter/lib/services/mobile_projection_client.dart | ba82e4ddeaa5692793237a1bc3258ce53b7aa3ed |
+| apps/mobile_flutter/test/mobile_projection_client_test.dart | 74661d2f2e58046a83e99f711435e4c1b2a74b08 |
+| tooling/schema_check/check_schemas.py | 7dca27717cbe5cccb45e1013b3436918a2322e75 |
+| tooling/conformance_tests/run_conformance_skeleton.py | c6f31d8cb561b48513c6784e54c85969c9cb953e |
 
 ## 要求母集団・照合状態
 
@@ -6158,7 +6258,7 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 | 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13は全E0-04 fieldを個別記録。P13旧aggregate evidence identity/classは`UNKNOWN`。N11 Evidence/Blocker/OS Artifact全数結合は未完 |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのE0-04 21 fieldを個別記録。旧status維持、N11 Evidence/Blocker/OS Artifact結合と製品Acceptanceは継続 |
 | D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜45はE0-04全21 fieldを個別記録。Evidence/Blocker/OS Artifact全数結合・Acceptance未完 |
-| 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K01〜K10はE0-04全21 fieldとSourceSHAを個別記録済み。K11〜K20の個別fieldとN11 Evidence/Blocker/OS Artifact結合は継続 |
+| 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K01〜K11はE0-04全21 fieldとSourceSHAを個別記録済み。K12〜K20の個別fieldとN11 Evidence/Blocker/OS Artifact結合は継続 |
 | Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 33 IDのscope/Consumer/現証拠境界と各21 fieldを記録。BUF-R/T Acceptance、cause/effectの全件結合、N11 evidence、OS artifactとの結合は未完 |
 | Buffer工程 B0〜B6 | 7 | `docs/緩衝基盤_rev5補遺_QC/`・v4仕様S06 | B0〜B4の限定CLOSEDを保持、B5 OPEN、B6未成立。詳細Consumer照合が未完 |
 | QE/監査 D4-QE-R01〜R13／D4-LNX-T01〜T08／D4-AUD-F01〜F07 | 13／8／7 | `docs/QE_2026-10-22/`・各採用記録 | 旧証拠と現在の実装/Validatorへの接続が未完 |
@@ -6201,7 +6301,7 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 ## 次のE0照合作業
 
 1. N01〜N10のE0-04 21項目は現行SourceSHAへ個別照合済み。各製品AcceptanceはOPENのまま維持し、N10の五OS実導入・利用・更新・Recovery QAは後続の製品Acceptanceに残す。
-2. C0〜C34およびPhase 0〜45の個別field記録を維持し、K01〜K10のSource mappingを再試験せず、K11〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
+2. C0〜C34およびPhase 0〜45の個別field記録を維持し、K01〜K11のSource mappingを再試験せず、K12〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
 3. BUF-R/TのSourceSHAとConsumer scopeは記録済み。AcceptanceはOPEN。B0〜B6の状態を保持し、原因→effect、N08/N10/N11、OS/Artifact/evidence結合を続ける。
 4. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 5. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
