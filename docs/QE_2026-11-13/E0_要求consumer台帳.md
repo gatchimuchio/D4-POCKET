@@ -414,7 +414,7 @@ N11は`OPEN`。ValidatorとRelease Gateは一部のRegistry/Windows evidence/man
 | P12 | 製品全体統合。REV5進捗ではWindows側`FEATURE COMPLETE`。正式release/Owner GOと分離された製品機能統合の履歴。 | v4仕様S05の直接対応はN01/N09/N10、関連能力K19。Phase 39〜45はC27〜C34のQC/回帰/文書/出荷範囲に関連。単一施工線へ閉じない。 | Windows product entry→Task/result/operation UI→OS product lifecycle。実TaskはN01、operation/observation/recoveryはN09、installed OS distribution/lifecycleはN10の現ConsumerとSHA節へ分割記録。 | `FEATURE COMPLETE`を正式Release/QAへ昇格しない。v4 N01/N09/N10は`OPEN`、Q0〜Q7は`DEFERRED`、`release_ready=false`。統合後の全候補・全OS acceptanceは未成立。 |
 | P13 | Mobile / Non-Windows Product Build。REV5履歴は2026-10-09に有限Product Build acceptanceを閉鎖したと要約する。旧Acceptanceの詳細evidence identity/classは本照合資料から`UNKNOWN`。 | v4仕様S05の直接対応はN10、関連能力K17。Phase 35/36はC24〜C26範囲に関連。施工線H/I。Linux native必須性は別途現行AGENTS/v4正本に従う。 | Linux/macOS Desktop、Android/iOS Mobile runner/native transport→Rust Broker／OS capability→installed product lifecycle。OS別source、package、workflow候補とSHAはN10節。 | 旧P13閉鎖を現行五OS標準installed QAへ移さない。Linux nativeは完全対応必須で、WSL/Xvfb/Headlessだけでは成立しない。Android/iOS実機を前提にせずEmulator/Simulator等を用いる。N10は`OPEN`、`linux_native_product_support`、`rev2_mobile_distribution`、`rev2_mobile_device_evidence`を保持。 |
 
-P0〜P13全14 IDの旧要求範囲・限定statusをv4 N/K/Consumerへ接続した。これは旧statusの書換え、v4 acceptance、N01〜N11のCLOSED、E0完了のいずれも意味しない。C0〜C34、Phase0〜45、K01〜K20のSource→Consumer/scope mappingを記録した。P0〜P6は本節後段で全E0-04 fieldを個別補完し、P7〜P13とN11 Evidence/Blocker/OS Artifact行結合は継続する。P0/P1/P4の直接対応はv4仕様S05の明示mappingへ合わせて訂正し、旧statusは変更していない。P13の詳細evidence identity/classは`UNKNOWN`として保持する。
+P0〜P13全14 IDの旧要求範囲・限定statusをv4 N/K/Consumerへ接続した。これは旧statusの書換え、v4 acceptance、N01〜N11のCLOSED、E0完了のいずれも意味しない。C0〜C34、Phase0〜45、K01〜K20のSource→Consumer/scope mappingを記録した。P0〜P7は本節後段で全E0-04 fieldを個別補完し、P8〜P13とN11 Evidence/Blocker/OS Artifact行結合は継続する。P0/P1/P4の直接対応はv4仕様S05の明示mappingへ合わせて訂正し、旧statusは変更していない。P13の詳細evidence identity/classは`UNKNOWN`として保持する。
 
 ### P0〜P3 E0-04項目の個別補完（2026-11-13、ソースと利用先の照合）
 
@@ -652,6 +652,81 @@ P5の旧CLOSED履歴は限定Product Build機能と当時testだけに適用す�
 | `native/rust_helper/tests/fixtures/fake_codex_cli.rs` | `f74302045176eeabd9ed36e85205fed3adc13767` |
 
 P6の旧CLOSEDは上記Product Build限定機能と当時条件に適用する。N02/N05/W02/W04/E0のOPEN、Release Registry、`release_ready=false`を変更せず、P6のSource mappingを現行製品受入れへ拡張しない。
+
+### P7 E0-04項目の個別補完（2026-11-13、A2A／Host／Adapter）
+
+以下は旧A2A／複数Host／Adapter管理要求を現行v4へ結ぶE0照合である。旧範囲とProduct Build判定は`docs/REV5_PRODUCT_PROGRESS.md`のP7節、Phase 24〜27／C15〜C19の対応は`docs/D4_POCKET_PHASE_MAPPING.md`に照合した。v4仕様S05の直接対応はN03/N04、関連能力はK11/K12である。N04のCompare／内部Handoff受入れ範囲は旧P2/P3 mappingの責任に残し、P7のA2A／Host経路へ重複計上しない。Source照合HEADは`4e8233f0519f71ce136415b691431557249f612c`。
+
+| E0-04項目 | 記録値 |
+|---|---|
+| 現行ID | 旧製品要求`P7`。v4仕様S05の直接対応先は`N03/N04`、関連能力は`K11/K12`。Phase 24〜27／C15〜C19と施工線B/Fは工程上の対応であり、旧P7の状態を現行受入れへ移さない。 |
+| 旧ID | `P7 対A2A連携／複数Host／Adapter管理`。rev5 Product Buildは`CLOSED`。当時の限定受入れと証拠classを履歴として保持し、外部Runtime・Agentの全能力保証へ拡張しない。 |
+| 原文参照 | `docs/REV5_PRODUCT_PROGRESS.md`のP7全節、`docs/D4_POCKET_PHASE_MAPPING.md`のPhase 24〜27／C15〜C19、v4仕様S04 N03/N04・S05 P7/K11/K12、工程表R03線B/F。旧P7の実接続／fixtureと未成立範囲は同進捗記録の記載を維持する。 |
+| 対象 | Codex CLIとMINIDORAのRuntime能力差、Desktop A2AのAgent Card／Message／Stream／Task状態取得／選択Artifact、Host登録・一覧・表示・Broker snapshot由来capability/degraded状態、Adapter既存record操作とManifest metadata登録／更新。Host／Agent／Adapterの外部実接続、Runtime Task、filesystem導入、process起動は別々のconsumerとして扱う。 |
+| 目的 | 異種Runtime・外部Agent・Host・AdapterをBrokerの既存統治経路へ接続し、宣言metadataと実能力、ローカルBroker状態とremote Host状態、metadata管理と実artifact導入を区別する。外部AgentやAdapterの宣言からTrust／Permission／Approval／Credential／Authorityを生成しない。 |
+| 生成側 | Agent CenterのRuntime／Agent選択、Desktop A2A接続画面、Host登録・操作・能力画面、Runtime CenterのAdapter管理、Brokerが保持するRuntime／Host／A2A／Adapter状態。Agent Card／Host／Adapter由来dataは未信頼入力として受け取る。 |
+| 実際の受け取り先 | Runtime起動引数→Broker登録→共通`実行系Adapter`→Agent Task consumer。Desktop A2A画面→`A2aConnectionClient`→認証Broker operation→`a2a_center`→`a2a.rs`。Host画面→`host_registration_client`／Broker snapshot→`host_center`・`host_capability`。Runtime Center→`shell_core_client`→Broker `protocol`→`adapter_center`。現行source上、Host registryはmetadata管理でremote Host実行経路ではない。 |
+| 契約とデータ | Adapter／Runtime、A2A Contract・Connection・Message／Stream／Task request、Host registration／list／capability／switch、Adapter Manifest／management request・receiptの個別Schemaを使う。A2A作用は現在endpoint・payload hash・native確認／一回Permission／Auditに結合する。Host／Agent Card／Capability／Adapter metadataはAuthorityではない。 |
+| 正常時の作用 | Source上、Codex CLIはBroker Agent Taskを実行できる。MINIDORAはloopback対話APIへ接続するがAgent Task methodは持たず、既定unsupportedを返す。Windows/Linux A2A sourceはCard取得・Message／Stream／GetTaskをBroker経由で扱い、Host登録・snapshot表示とAdapter catalog metadata操作も接続済み。Adapter Manifest操作は登録／更新metadataまでで、外部artifact取得・filesystem変更・Adapter process起動を行わない。 |
+| 否定時の作用 | 未対応Runtime Task、虚偽のCapability、未知／不正Schema、endpoint・payload・要求hashの不一致、古いAdapter record hash、署名未検証Adapterの有効化、非Broker／fallback snapshotからの実測表示は拒否または未観測として返す。Agent Card／Host／Adapter metadataはTrust・Permission・Approvalを昇格しない。 |
+| 停止と回復 | A2Aの非冪等作用後に応答・Auditが不確定なら`unknown/suspended`で停止し自動再送しない。Audit確定に失敗した作用を成功にしない。macOS A2AはAgent Card／metadata限定でMessage／Task／Artifact／Stream作用を有効化せず、Mobile consumerは未確認。Host metadataからremote capabilityやWorkspace権限を推定せず、Adapter metadata登録をprocess／filesystem導入成功へ読み替えない。 |
+| 標準対象OSの候補 | Windows／macOS／Linux native／Android／iOSの五OS。現行A2A network sourceはWindows/Linux、macOSはloopback Card／metadata限定、MobileのA2A／Host／Adapter作用は未確認。Codex CLI TaskのW01証拠は限定Windows候補、MINIDORA Taskや二つ目のTask-capable Runtimeは未成立。五OS標準installed product parityはN10へ接続し、WSL／fixtureをLinux native受入れへ転用しない。 |
+| 配布 | 通常配布・installed productにおけるRuntime選択→外部A2A作用→Host越境拒否→Adapter取得・導入・更新・停止は五OSとも未成立。既存Adapter Manifest機能はBroker catalog metadata操作に限られ、署名／artifact取得／filesystem／processを含む導入済み製品能力ではない。通常配布物・Publisher identityはN10／既存Release Registryの別条件。 |
+| 既存実装 | `a2a_center`／`a2a.rs`、Host registry／capability投影、Adapter catalog／Manifest metadata操作、Desktop Runtime／Host／A2A画面、Codex CLI／MINIDORA Adapter、各request／receipt Schemaが現HEADに存在する。N03のCodex TaskとN04のA2A／UI接続はsource上`WIRED`。Host remote action、第二Task Runtime、A2A installed external-agent chain、Adapter filesystem/process導入は`BUILD_GAP`または未確認。 |
+| 実装不足 | N03: Agent Task可能な二つ目の独立Runtime、MINIDORAのTask-capable接続・GUI登録・能力差表示・実Task証拠がない。N04: 同一installed候補で外部Agent Card→Message／Artifact→受信Agent Task→Auditを完走した証拠、Host間の実Workspace隔離／remote capability、全OS作用 parityがない。Adapterの外部artifact取得・検証・導入／削除・実process管理と製品利用者向け実証も未成立。W03/G3、N03/N04、E0は`OPEN`。 |
+| ソース識別値 | P7に直接関係するRust／Dart／Schema／Test source 40件のGit blob SHAを現HEADで下表に記録した。N03/N04のより広いProducer→Consumer表と追加sourceは本台帳「N03/N04 現行Source→Consumer追跡」を併用する。v4採用基準HEADから製品source／Schema／Testの差分は0で、ここで列挙した識別値は上記照合HEADの値である。 |
+| 試験区分 | rev5 P7履歴はA2A Rust境界9、native Owner確認候補1、Broker gate 1、Flutter A2A 9、Navigation 2、Host画面54、Adapter Center Rust 7、Owner候補／中継2、Adapter Manifest Rust 9、Win32 Owner画面自動操作、Desktop画面57、Schema 158／正常例155／否定例205、Conformance 234、Windows debug build等の限定PASSを記録する。Rust全体443 pass／2 fail／9 ignoredのloopback／TLS fixture失敗も履歴のまま保持する。本E0 mappingで旧試験を再実行せず、現Rust／Flutter／installed product試験は`NOT_RUN`。旧Win32確認画面自動操作は製品installed受入れへ昇格しない。 |
+| 証拠ID | `NONE`。旧P7のRust／Flutter fixture、開発build、Owner画面自動操作は当時のProduct Build範囲に限り、v4 N03/N04/W03/E0向けEvidence IDを発行していない。外部Agent／通常配布／五OS installed chainの証拠ではない。 |
+| 阻止要件 | P7専用Release Registry IDは確認できない。`comprehensive_extension_rev1_completion`、`rev2_flutter_broker_channel_boundary`、`linux_native_product_support`、`rev2_desktop_product_distribution`等は広域の関連候補だが、P7への個別帰属・新規blocker化は`UNKNOWN`。Registryの18 ID／status／分類を変更しない。W03/G3の未成立は現行工程台帳で保持する。 |
+| 状態 | 旧`P7 Product Build=CLOSED`と当時の限定受入れ／FAIL履歴を維持。現行`N03/N04/W03/E0=OPEN`。A2A／Adapterの一部sourceは`WIRED`、MINIDORA Agent Task・Host remote action等は`BUILD_GAP`または未確認、v4 Evidence IDは`NONE`。本mappingは旧P7を再開せず、現行要求の受入れ完了も意味しない。 |
+| 残件 | N03の二つ目のTask-capable Runtimeと製品経路、N04の外部A2A実作用・Artifactのfresh認可付きAI消費・Host分離、Adapter artifactの実導入／process管理をBroker経路へ結び、Windows／macOS／Linux／Android／iOSの標準対象範囲を個別に記録する。Source接続とinstalled／VM product証拠、比較・Handoffとの境界、全OSのunsupportedを明示する。 |
+
+#### P7 ソース識別値・該当ファイル
+
+下表のGit blob SHAは現HEAD `4e8233f0519f71ce136415b691431557249f612c`から取得した。既存source／testの存在は、本単位での実行や製品受入れを意味しない。
+
+| ファイル | 識別値 |
+|---|---|
+| `docs/REV5_PRODUCT_PROGRESS.md` | `9c978021d3982690e9aaa87896436bad7125b433` |
+| `native/rust_helper/src/adapters/mod.rs` | `06c540a59437b903b3f045b5aafb3790c21103bd` |
+| `native/rust_helper/src/adapters/codex_cli.rs` | `e5c9d1581ae9a1c0a3ae7fcfa626fdca6fea6d28` |
+| `native/rust_helper/src/adapters/minidora.rs` | `31c756ac7c9a264d73ed0e9654dbae599be83921` |
+| `native/rust_helper/src/broker/ipc_server.rs` | `58a404b920ef5905e174668ec2de0e04a9e8b044` |
+| `native/rust_helper/src/broker/dialogue.rs` | `c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999` |
+| `native/rust_helper/src/broker/protocol.rs` | `9b2076d5f31ca6d77f1f87973d1b394aaf751961` |
+| `native/rust_helper/src/a2a.rs` | `9d7c6d9ab938ad5178d6ca46b3933dc3e61c6061` |
+| `native/rust_helper/src/broker/a2a_center.rs` | `73ad601abd64a33ccefde4b73ab5f9dc4f728504` |
+| `native/rust_helper/src/broker/host_center.rs` | `c27707faa61e5270b1c6d79e3ee3c5fe6ccd0bf8` |
+| `native/rust_helper/src/broker/host_capability.rs` | `08a82c7e52947439229447dc82b69097af67ba1f` |
+| `native/rust_helper/src/broker/adapter_center.rs` | `66575bb77e4a375dca4f8488f97df442960bb5a9` |
+| `native/rust_helper/src/desktop_launcher.rs` | `6a9f335de07fa474ca10043aea63ad6e988b572d` |
+| `apps/desktop_flutter/lib/screens/runtime_center.dart` | `d2c7af172073d2b10c76a6416b90f011f10e95db` |
+| `apps/desktop_flutter/lib/screens/host_operation_center.dart` | `e16605e6bb39bbfc12806e6154e08d6fbab1b93b` |
+| `apps/desktop_flutter/lib/screens/host_capability_center.dart` | `e8fa774a435e713a3b75b0d33f00bd500b0a2d7f` |
+| `apps/desktop_flutter/lib/screens/a2a_connection_center.dart` | `2716d1c2fa22a184044e6f4e2eb401cb33c6e011` |
+| `apps/desktop_flutter/lib/services/a2a_connection_client.dart` | `19335054afe35bc06597629d92ca2e635ce50069` |
+| `apps/desktop_flutter/lib/services/host_registration_client.dart` | `3bc3b45bddddf4e1131e051acb3cdee599ca4d3d` |
+| `apps/desktop_flutter/lib/services/shell_core_client.dart` | `f08db061bd15649ff7c2fc3fc9e37184433cbf18` |
+| `specs/agent_adapter.schema.json` | `e0792589a2bae168ba221af4f4f9abb505815c12` |
+| `specs/adapter_manifest.schema.json` | `116f5830983d195f501cc344a25990d58bf323c0` |
+| `specs/adapter_management_request.schema.json` | `2c9c98d0c60603adfaa246f9efa4753bfc0e7597` |
+| `specs/adapter_management_receipt.schema.json` | `7b43a2d2b74c5bd0a931ead66f32f55663919b04` |
+| `specs/adapter_management_manifest.schema.json` | `1f1b75c7d4299c96fcf5039b652d718f7805cd2d` |
+| `specs/adapter_management_list.schema.json` | `530bc79a6a5117bb29d0de9e0932e3c40d8d785d` |
+| `specs/a2a_contract.schema.json` | `8c7f50bb7fb12dde41293727e5dc9109445d1bc3` |
+| `specs/a2a_connection.schema.json` | `1dbbe44e54b302a1196d7e4e55f1cae35cda569b` |
+| `specs/a2a_connection_receipt.schema.json` | `f63fd0d61b6200cdd8cc4b23d5cf7968a82fa5c5` |
+| `specs/a2a_message_send_request.schema.json` | `0a5f87250f17a88b6be55e7838d32b8e9114bbed` |
+| `specs/a2a_stream_send_request.schema.json` | `e0a0841f2fd9f7e92e0fb8a036ebaa6852e198d8` |
+| `specs/a2a_task_get_request.schema.json` | `df11a5fd3291de0ae379694c6c1b49de51f2f157` |
+| `specs/host_registration.schema.json` | `8bed26fb2fe8f8e296c1d3404978f3215d571240` |
+| `specs/host_list.schema.json` | `93880c43b04a5408c033bf351ee695073e54664a` |
+| `specs/host_capability.schema.json` | `6b721b5ab7842edc7df6562bc56fdd5b73d5de79` |
+| `specs/host_switch.schema.json` | `01e5fc7322e8d4d2c9142375e7641fc4255148d5` |
+| `specs/host_switch_receipt.schema.json` | `cb60df0b174a38c871e0e8835c65537a17d022fb` |
+| `apps/desktop_flutter/test/a2a_connection_center_test.dart` | `5ebdbb4cee62e581062370ed6c305c36df89b7e2` |
+| `apps/desktop_flutter/test/host_registration_test.dart` | `74ab39e078bf72214a3bbe84f69ebc77fceb2493` |
+| `apps/desktop_flutter/test/widget_test.dart` | `f4e9c7b93f832ba2a2cefee779fd12426f240b04` |
 
 ## 旧C0〜C6のv4 Source→Consumer crosswalk（E0差分）
 
