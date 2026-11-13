@@ -2733,7 +2733,7 @@ C24〜C34の11 ID×21 fieldを文書上展開した。旧C28の8時間FAIL、C33
 | 状態 | `Phase 5`記録。`N01`/`N09`の受入れは`OPEN`。 |
 | 残余 | 他OS installed Task/UI、same Task result/diff/Audit/Recovery、Mobile境界。 |
 
-Phase 0〜8の9行はE0-04全項目を記録した。旧Phase/C/P status、N01/N02/N03/N04/N09/N11のOPEN、W01限定CLOSED、W03/G3、Release Blockerは変更していない。Phase 9〜45、K01〜K20の個別fieldとN11 Evidence/Blocker/OS Artifact行結合は未完了。E0はOPEN。
+Phase 0〜11の12行はE0-04全項目を記録した。旧Phase/C/P status、N01/N02/N03/N04/N09/N11のOPEN、W01限定CLOSED、W03/G3、Release Blockerは変更していない。Phase 12〜45、K01〜K20の個別fieldとN11 Evidence/Blocker/OS Artifact行結合は未完了。E0はOPEN。
 #### Phase 6〜8 E0-04個別記録（2026-11-13）
 
 旧Phase/Cの履歴状態を保持し、現行v4要求consumerへE0-04全21項目で接続する。SourceSHAは編集前main 3bd056d65cb5e1d8450c4995fd240964dfb567edのGit blob値で、製品Acceptanceの証拠ではない。本mapping単位で製品testは再実行しない。
@@ -2816,7 +2816,91 @@ Phase 0〜8の9行はE0-04全項目を記録した。旧Phase/C/P status、N01/N
 | 状態 | Phase 8のE0-04 mapping 21項目を記録。旧Phase/C/P status不変、N04・W03/G3・E0 acceptanceはOPEN。 |
 | 残余 | installed target reauthorization→result/Audit、selected Artifact boundary、Mobile consumer、macOS A2A作用範囲。 |
 
-Phase 6〜8の3行は各E0-04全21項目を記録。旧Phase/C/P status、N01/N02/N04/N09/N11、W03/G3、Release Blockerは変更せず、Evidence IDは全てNONE。Phase 9〜45、K01〜K20個別field、N11 Evidence/Blocker/OS Artifact行結合は未完了で、E0はOPEN。
+Phase 6〜8の3行は各E0-04全21項目を記録。旧Phase/C/P status、N01/N02/N04/N09/N11、W03/G3、Release Blockerは変更せず、Evidence IDは全てNONE。続くPhase 9〜11の記録後も、Phase 12〜45、K01〜K20個別field、N11 Evidence/Blocker/OS Artifact行結合は未完了で、E0はOPEN。
+
+#### Phase 9〜11 E0-04個別記録（2026-11-13）
+
+旧Phase/Cの履歴状態を維持し、現行v4の要求consumerへE0-04全21項目で対応付ける。SourceSHAは編集前main 5ce80af0ce23b87269d91d817aa4ec4ff71c43a6のGit blob値であり、製品Acceptanceの証拠ではない。製品testの再実行は本mapping単位の範囲外でNOT_RUNとする。
+
+##### Phase 9 個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | Phase 9 実行履歴。現行consumerはN09、施工線C、能力K03/K10。 |
+| 旧ID | Phase 9/C2 History。過去の局所status・証拠は当時の条件に保持し、再判定しない。 |
+| 原文参照 | docs/D4_POCKET_PHASE_MAPPING.md Phase 9/C2、v4仕様書S04 N09・S05 K03/K10、工程表R03線C、施工指示書I04-C。 |
+| 対象 | AgentTask履歴metadataとRuntime Dialogue履歴・bounded contentの参照、履歴画面の一覧・詳細投影。 |
+| 目的 | 現在許可された範囲の履歴を表示し、記録や履歴本文をApproval・Permission・現在の実行状態として扱わない。 |
+| 生成元（Producer） | BrokerのAgentTask execution record、Dialogue record、現在のHistory閲覧grant。 |
+| 実Consumer | Desktop History screen/content dialog→共有HistoryClient→Broker history_access/execution_history。AgentTask履歴metadataとDialogue履歴・内容閲覧は異なるoperationとして扱う。 |
+| 契約／Data | runtime_history_access、runtime_execution_history/page、runtime_agent_task_history_request/access。record identity、Runtime、grant、期限、ページ上限をBroker側で検査する。 |
+| 正常時作用 | 有効grantの範囲でbounded pageを表示する。AgentTaskはmetadata projection、Dialogue本文は別の現在grantへ一致した場合にだけ期限付きで表示する。 |
+| 否定時作用 | 不正・期限切れgrant、異なるRuntime/session、改変・不整合record、範囲外要求を拒否する。過去の履歴・UI stateは現在のAuthorityを生成しない。 |
+| 停止／Recovery | grant失効・期限超過・identity/Audit不一致では内容取得と表示を停止する。AgentTaskのcrash recovery、再実行、復旧操作が履歴画面に統合済みとは扱わない。 |
+| 標準OS候補 | Windows/macOS/Linux native Desktop。Mobileは限定metadata projectionで、Desktopの履歴内容閲覧との同等性は未確認。Linux nativeは必須対象、installed受入れはN10に従う。 |
+| 配布物 | Phase 9固有artifactなし。各OS通常installed packageはN10の候補・受入れ範囲に従う。 |
+| 既存実装 | apps/desktop_flutter/lib/screens/history_screen.dart、history_content_dialog.dart、packages/gui_shell_ui/lib/src/history_client.dart、Rust Broker history_access.rs/execution_history.rs/protocol.rs、History/ExecutionHistory/AgentTaskHistory schema群。 |
+| BUILD_GAP | AgentTask履歴のmetadata表示はあるが、Task単位のdurable Audit検索・Recovery・result/diff/test projectionとの一体consumerは未成立。Dialogue本文の閲覧範囲は現在grantに限定され、Task result本文の表示と混同しない。 |
+| ソース識別値（SourceSHA） | 照合HEAD=5ce80af0ce23b87269d91d817aa4ec4ff71c43a6。apps/desktop_flutter/lib/screens/history_screen.dart=dacc4c0ca15325c7f597cd1827a6455fb8ab5560; apps/desktop_flutter/lib/screens/history_content_dialog.dart=4602a29edc7a0c7c2b90e5b3b8a55155a28cfdb6; packages/gui_shell_ui/lib/src/history_client.dart=7f14ec2caf8b1e383bbf93483ae052100f921ae7; native/rust_helper/src/broker/history_access.rs=c004056b45c2f26859bf7f70a9ff2b632e358523; native/rust_helper/src/broker/execution_history.rs=8eeb1c26d06a9e4b01806413a4bfa8c2a73357d6; native/rust_helper/src/broker/protocol.rs=9b2076d5f31ca6d77f1f87973d1b394aaf751961; specs/runtime_history_access.schema.json=8187ddce917c3e80f40c8ce1c4b89059277f1cfd; specs/runtime_execution_history.schema.json=5b260e9b6026758dc0a730d3381b4f7d72ba2e98; specs/runtime_execution_history_page.schema.json=e6dab615707d30c9266df7dc67fc90df24d0ed9b; specs/runtime_agent_task_history_request.schema.json=0bff21625a0f339367ae8352910b643b1f76b361; specs/runtime_agent_task_history_access.schema.json=baddfeb38762fe0a04513cb1edcfcd258bd804ed; apps/desktop_flutter/test/history_screen_test.dart=7828dc17fbf50cd0a2dca3255d90c3760030e58f; apps/desktop_flutter/test/history_content_test.dart=af34c1e4e61415916fe651a3f5096a95f946022b. |
+| 試験区分（TestClass） | Flutter UNIT/WIDGET、Rust UNIT/FIXTUREのsourceあり。本mapping単位ではこれらのtestを実行していない（NOT_RUN）。 |
+| 証拠ID（Evidence ID） | NONE。Source mappingと既存test sourceはN09のinstalled AcceptanceやTask単位のdurable履歴証拠ではない。 |
+| 阻害要因（Blocker） | N09製品Acceptance OPEN。既存Registry 18件（16 unresolved/2 resolved）、release_ready=falseを維持し、新規Blockerを追加しない。直接帰属はN11照合までUNKNOWN。 |
+| 状態 | Phase 9のE0-04 mapping 21項目を記録。旧Phase/C status不変、N09製品AcceptanceとE0はOPEN。 |
+| 残余 | Task単位のdurable履歴・Audit・Recovery検索と、履歴由来のTask操作を現在の認可へ接続するconsumer、五OS installed証拠。 |
+
+##### Phase 10 個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | Phase 10 再実行・分岐。現行consumerはN09、施工線C、能力K03/K05。 |
+| 旧ID | Phase 10/C2 replay・branch。過去Dialogueの再実行／分岐とAgentTaskの再実行を同一能力へ読み替えない。 |
+| 原文参照 | docs/D4_POCKET_PHASE_MAPPING.md Phase 10/C2、v4仕様書S04 N09・S05 K03/K05、工程表R03線C、施工指示書I04-C。 |
+| 対象 | History selectionからのRuntime Dialogue replay/branch要求と、AgentTask履歴から将来新しいTaskを作成する境界。 |
+| 目的 | 再実行・分岐を新規要求として識別・監査し、履歴、過去Permission/Approval、Session stateからAuthorityを再利用しない。 |
+| 生成元（Producer） | 利用者の明示的なDialogue履歴選択、新規入力・条件、Brokerの履歴recordと現在のSession/Runtime binding。 |
+| 実Consumer | History screen→HistoryClient→Broker dialogue operationでDialogue replay/branchを要求する。AgentTask履歴metadataは別operationであり、履歴からAgentTaskを再実行する一体consumerは未成立。 |
+| 契約／Data | runtime_dialogue_operation/request/response/comparisonとruntime_agent_task_history_request/access。参照Audit ID/hashを保持し、新しい要求・Session・Runtime条件をBrokerで検査する。 |
+| 正常時作用 | Dialogue replay/branchは履歴を参照して新しい入力・requestとして処理する。AgentTaskの履歴選択を現在条件でpreflightし新Permission/Approvalを得る製品経路はBUILD_GAP。 |
+| 否定時作用 | 改変・stale history、異なるSession/Runtime、期限切れgrant、旧Permission/Approvalの再利用を拒否する。履歴選択だけで実行・評価・許可を開始しない。 |
+| 停止／Recovery | reference identity/Audit不一致または不明な要求結果では停止し、旧承認を使った再送をしない。Dialogue replay/branchはAgentTaskのrestart/recoveryではない。 |
+| 標準OS候補 | Windows/macOS/Linux native Desktop。Mobile履歴projectionは限定metadataであり、Desktop Dialogue replay/branchまたはAgentTask再実行の製品同等性は未確認。 |
+| 配布物 | Phase 10固有artifactなし。通常installed Desktop packageとOS別QAはN10の範囲に従う。 |
+| 既存実装 | history_screen.dart、共有history_client.dart、Broker history_access.rs/execution_history.rs/dialogue.rs/protocol.rs、Dialogue operation/request/response/comparisonとAgentTask History schema群。 |
+| BUILD_GAP | AgentTask履歴から新Session/WorkspaceのTaskを作り、現行Workspace Permissionと独立Owner Approvalを再評価したうえで結果/Audit/Recoveryへ結ぶconsumerは未成立。Dialogue replay/branchは独立した会話要求である。 |
+| ソース識別値（SourceSHA） | 照合HEAD=5ce80af0ce23b87269d91d817aa4ec4ff71c43a6。apps/desktop_flutter/lib/screens/history_screen.dart=dacc4c0ca15325c7f597cd1827a6455fb8ab5560; packages/gui_shell_ui/lib/src/history_client.dart=7f14ec2caf8b1e383bbf93483ae052100f921ae7; native/rust_helper/src/broker/history_access.rs=c004056b45c2f26859bf7f70a9ff2b632e358523; native/rust_helper/src/broker/execution_history.rs=8eeb1c26d06a9e4b01806413a4bfa8c2a73357d6; native/rust_helper/src/broker/dialogue.rs=c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999; native/rust_helper/src/broker/protocol.rs=9b2076d5f31ca6d77f1f87973d1b394aaf751961; specs/runtime_dialogue_operation.schema.json=8793ab0f59ea2320b7102afec7256cfe62264fc5; specs/runtime_dialogue_request.schema.json=fe0bd153eaf3a0a2354b25cffc3ed9af934fbae1; specs/runtime_dialogue_response.schema.json=5e7220e8ce5954057ee270cd77cb4a68e1ef830f; specs/runtime_dialogue_comparison.schema.json=874dd1158a6aa911ff30d85e141b4bd4927c91e3; specs/runtime_agent_task_history_request.schema.json=0bff21625a0f339367ae8352910b643b1f76b361; specs/runtime_agent_task_history_access.schema.json=baddfeb38762fe0a04513cb1edcfcd258bd804ed; apps/desktop_flutter/test/history_screen_test.dart=7828dc17fbf50cd0a2dca3255d90c3760030e58f; apps/desktop_flutter/test/runtime_dialogue_test.dart=899912f92ee3751f8616632d434e04f95ee5ef77; packages/gui_shell_ui/test/runtime_dialogue_test.dart=f997ac25c0d8227e2898dc6d1351d324911324e4. |
+| 試験区分（TestClass） | Flutter UNIT/WIDGET、Rust UNIT/FIXTURE sourceあり。本mapping単位では履歴外部作用・Task再実行testを実行していない（NOT_RUN）。 |
+| 証拠ID（Evidence ID） | NONE。Dialogue fixture/testやsource mappingをAgentTask再実行のinstalled Acceptanceへ転用しない。 |
+| 阻害要因（Blocker） | N09製品Acceptance OPEN。既存Registryの状態を維持し、新規Blockerを追加しない。直接帰属はN11照合までUNKNOWN。 |
+| 状態 | Phase 10のE0-04 mapping 21項目を記録。旧Phase/C status不変、N09製品AcceptanceとE0はOPEN。 |
+| 残余 | AgentTask履歴→現在条件でのfresh Task preflight/Permission/Approval→結果/Audit/Recovery、各OS installed経路。 |
+
+##### Phase 11 個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | Phase 11 実行系資源監視。現行consumerはN09、施工線C、能力K04/K10。 |
+| 旧ID | Phase 11/C3 Resource monitoring。旧Windows開発接続・Broker observation・Flutter表示と未実施scopeは履歴として保持する。 |
+| 原文参照 | docs/D4_POCKET_PHASE_MAPPING.md Phase 11/C3、v4仕様書S04 N09・S05 K04/K10、工程表R03線C、施工指示書I04-C。 |
+| 対象 | 登録Runtimeに対するBroker資源観測とDesktop Runtime Center／限定Mobile resource projection。 |
+| 目的 | 実測可能な値だけを表示し、取得不能・未対応・失敗をunknown/unavailableとして維持する。Resource telemetryをTask result・Audit・Authorityと混同しない。 |
+| 生成元（Producer） | Broker/OS observation source、Runtime registry、測定時刻付きmetricまたは明示的unknown。GPU/VRAM等は取得できる場合だけ値を生成する。 |
+| 実Consumer | Runtime Center→Desktop RuntimeResourceClient→共有RuntimeResourceClient→Broker resource query/RuntimeResourceRegistry。Mobile resource overviewはDevice Linkの限定projectionを読む。 |
+| 契約／Data | runtime_resource_query、runtime_resource_observation、正規化metric vectorとcanonical decimal vector。Runtime identity・時刻・source/evidence class・値可用性を保持し、metadataからPermission/Approvalを生成しない。 |
+| 正常時作用 | 有効なRuntime queryに測定済みmetricとunknown/unavailable metricを分けて返す。Mobileは許可された限定projectionだけを表示する。 |
+| 否定時作用 | 未取得値を0で代用しない。invalid Runtime/metric/timestamp、stale source、証拠class不整合、不正Mobile requestは拒否またはunknownへ閉じる。 |
+| 停止／Recovery | Source停止・観測不能時は前回値をfreshとして表示せずstale/unknown化する。観測失敗はRuntime processの起動・停止や権限変更を起こさない。 |
+| 標準OS候補 | Desktop Windows/macOS/Linux native、限定Mobile Android/iOS。Linux nativeは必須製品対象。各OSのinstalled実測・負荷・長時間QAは未成立。 |
+| 配布物 | Phase 11固有artifactなし。OS別通常packageとinstalled計測はN10候補および製品QAに従う。 |
+| 既存実装 | Desktop画面の`apps/desktop_flutter/lib/screens/runtime_center.dart`と`RuntimeResourceClient`、Mobile画面の`apps/mobile_flutter/lib/screens/resource_overview.dart`、Rust Brokerの`runtime_registry.rs`／`observation_center.rs`／`device_link.rs`、`runtime_resource_query`／`runtime_resource_observation` schema、正規化vector。 |
+| BUILD_GAP | Resource observationはRuntime ID単位でAgentTask ID・Task duration/result/test/failureへ結合されない。五OS installed計測範囲、unknown projection、long-run/負荷性能の製品受入れは未成立。 |
+| ソース識別値（SourceSHA） | 照合HEAD=5ce80af0ce23b87269d91d817aa4ec4ff71c43a6。apps/desktop_flutter/lib/screens/runtime_center.dart=d2c7af172073d2b10c76a6416b90f011f10e95db; apps/desktop_flutter/lib/services/runtime_resource_client.dart=d8da9ebee9afdd64b8d1d3afa0a82f3a4cb53cfd; packages/gui_shell_ui/lib/src/runtime_resource_client.dart=3a8e611b94136e27f6d132e550a49bcbaf586eaf; apps/mobile_flutter/lib/screens/resource_overview.dart=322af6bc2935c571017dab3f03b9c7a0cea7c616; native/rust_helper/src/broker/runtime_registry.rs=9ff28610862586a599848d75f9e891a6c6cadf2f; native/rust_helper/src/broker/observation_center.rs=62896e497a0d78267020db6bae2ecadf704fa1fb; native/rust_helper/src/broker/device_link.rs=c2e1ff88ff34a5764b2b4fb1d3f7abd8727e5c51; specs/runtime_resource_query.schema.json=c7617ba9c2283255fb04b6cfa529ff7b04f6137f; specs/runtime_resource_observation.schema.json=62f587b8c88d0c5c0bd316eaa3d0a15c9c1bd2d1; tooling/canonicalization_vectors/runtime_resource_observation_decimal.json=ce00c0ea9571409a707c4e1993069c61761cb6a0; apps/desktop_flutter/test/runtime_resource_test.dart=c44d66bb3797bf523be0f48f24d626068b8e4894; packages/gui_shell_ui/test/runtime_resource_client_test.dart=46c52c83eab712e5b84599c7e29eed660af0ed12; apps/mobile_flutter/test/resource_overview_test.dart=7695155627699274b8c0768c0de302344caa9eec. |
+| 試験区分（TestClass） | Desktop/shared/Mobile Flutter UNIT/WIDGET、Rust UNIT/FIXTURE sourceあり。本mapping単位で製品資源test・OS実測は実行していない（NOT_RUN）。 |
+| 証拠ID（Evidence ID） | NONE。Schema/vector/test sourceはinstalled OS resource measurementや性能Acceptanceの証拠ではない。 |
+| 阻害要因（Blocker） | N09製品Acceptance OPEN。Registry状態を維持し、新規Blockerを追加しない。直接帰属はN11照合までUNKNOWN。 |
+| 状態 | Phase 11のE0-04 mapping 21項目を記録。旧Phase/C status不変、N09製品AcceptanceとE0はOPEN。 |
+| 残余 | Task ID単位のResource/duration比較、五OS installed実測・unknown表示・負荷／長時間QA。 |
+
+Phase 9〜11の3行は各E0-04全21項目を記録し、計41件のSourceSHA参照（33 unique path）を編集前mainへ結合した。旧C2/C3 status、N09、Release Registry、Evidence IDは変更せず、製品Acceptanceを発行していない。Phase 12〜45、K01〜K20個別fieldおよびN11 Evidence/Blocker/OS Artifact結合は未完了、E0はOPEN。
 
 ### 製品能力K01〜K20
 
@@ -4361,7 +4445,7 @@ Phase 6〜8の3行は各E0-04全21項目を記録。旧Phase/C/P status、N01/N0
 | 全体施工線 A〜J | 10 | v4工程表R03・Codex指示I04 | 全線同時BUILDのproducer/consumerと現行実装配置を全数照合中 |
 | 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13は全E0-04 fieldを個別記録。P13旧aggregate evidence identity/classは`UNKNOWN`。N11 Evidence/Blocker/OS Artifact全数結合は未完 |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのE0-04 21 fieldを個別記録。旧status維持、N11 Evidence/Blocker/OS Artifact結合と製品Acceptanceは継続 |
-| D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜8はE0-04全21 fieldを個別記録、Phase 9〜45は個別field未完。Evidence/Blocker/OS Artifact結合・Acceptance未完 |
+| D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜11はE0-04全21 fieldを個別記録、Phase 12〜45は個別field未完。Evidence/Blocker/OS Artifact結合・Acceptance未完 |
 | 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K別の完全E0-04 field、OS/Evidence/Blocker確認は継続 |
 | Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 33 IDのscope/Consumer/現証拠境界と各21 fieldを記録。BUF-R/T Acceptance、cause/effectの全件結合、N11 evidence、OS artifactとの結合は未完 |
 | Buffer工程 B0〜B6 | 7 | `docs/緩衝基盤_rev5補遺_QC/`・v4仕様S06 | B0〜B4の限定CLOSEDを保持、B5 OPEN、B6未成立。詳細Consumer照合が未完 |
@@ -4405,7 +4489,7 @@ Phase 6〜8の3行は各E0-04全21項目を記録。旧Phase/C/P status、N01/N0
 ## 次のE0照合作業
 
 1. N01〜N10のE0-04 21項目は現行SourceSHAへ個別照合済み。各製品AcceptanceはOPENのまま維持し、N10の五OS実導入・利用・更新・Recovery QAは後続の製品Acceptanceに残す。
-2. C0〜C34個別field記録を維持し、Phase 9〜45／K01〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
+2. C0〜C34個別field記録を維持し、Phase 12〜45／K01〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
 3. BUF-R/TのSourceSHAとConsumer scopeは記録済み。AcceptanceはOPEN。B0〜B6の状態を保持し、原因→effect、N08/N10/N11、OS/Artifact/evidence結合を続ける。
 4. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 5. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
