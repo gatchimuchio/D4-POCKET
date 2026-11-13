@@ -3745,7 +3745,7 @@ Phase37のE0-04欄を全21項目で記録し、24件（24 unique path）のSourc
 | K03 Workspace Inspector/tree/diff/history/rerun/branch/recovery | N09／C | WorkspaceInspector→WorkspaceClient→Broker WorkspaceRegistry/Reader/Diff。HistoryScreen→HistoryClient→HistoryAccess/execution_history/replay。RecoveryCenter→ShellCoreClient snapshot（N09） | 個別source consumerはWIRED。Workspace baseline diffとAgentTask result diff、Dialogue replayとAgentTask replay、previewと実Recoveryを分離。Task結合・live Recovery・installed acceptanceはOPEN。 |
 | K04 PID/CPU/RAM/I/O/Latency/error/optional GPU/lifecycle | N09／C | Runtime Center／Agent Center／限定Mobile projection→RuntimeResourceClient→Broker `実行系資源観測`→Windows `RuntimeResourceRegistry`。Lifecycle UI→Broker status／approval／execute→trusted Adapter（N09） | Windowsのloopback-bound観測は一部値を`LIVE_RUNTIME`、Broker内統計は`INTERNAL_STATE`、未取得値は`unknown`として投影。非Windowsはcollector unsupported。通常Releaseにtrusted lifecycle Adapterがなく実操作未接続。K04 product AcceptanceはOPEN。 |
 | K05 Eval/Dataset/Case/regression/deterministic evaluator/Runtime compare | N09/N11／C・J | Evaluation Lab→EvaluationClient→Broker evaluation_control/evaluation_lab→Case/Runtimeごとの既存Dialogue・Owner承認・deterministic evaluator。Regression Caseは別のnative Owner operation→Broker→ProtectedStore（N09） | C5 Evaluationはsource上接続済みだが同一AgentTaskのtest/result/diff/Auditへ非結合。Dataset登録/private readはWindows ProtectedStoreに限定され、非Windowsはfail-closed。C6からDatasetへ自動importしない。installed Runtime横断比較と同一candidate AcceptanceはOPEN。 |
-| K06 Provider/Model/Runtime Adapter管理・選択・失敗・unsupported | N03／B | Provider/Runtime Catalog→Adapter capability check→Broker Task dispatch/reject（N03） | Codex CLIは限定実装・証拠。MINIDORA Task非対応は明示reject、第二の実Task RuntimeはBUILD_GAP。 |
+| K06 Provider/Model/Runtime Adapter管理・選択・失敗・unsupported | N03／B | Agent Center選択→Broker ProviderModelSelection検証→Codex CLI Adapter／Capability→Task dispatchまたは明示reject（N03） | source上はProviderがCodex CLI固定、Model値を`--model`へ渡し、自動fallbackなし。MINIDORAは対話のみ。normal Release Windows/Linuxの`supported`宣言と`agent-runtime.md`の`unsupported`契約記述が不一致。第二のTask RuntimeとN03 AcceptanceはOPEN。 |
 | K07 Credential Vault/secret boundary/OS protection/lifecycle | N02/N05／A・B・F | native Owner operation→Broker credential metadata/OS vault→対象Tool/provider request（N02/N05） | 秘密のprojection/log/Audit非露出を維持。全OSのsecure storage/installed taskとの一体証拠は未成立。 |
 | K08 MCP server/transport/tool/resource/prompt/Center/isolation/AI consumption | N02/N05／A・D | MCP Center/Catalog→Broker connect/call/credential binding→Tool result→同Agent follow-up context（N02/N05） | Desktop source WIRED、fixture testsあり。installed same-candidate real MCP→result-dependent Task→Auditは未成立、MobileはBUILD_GAP。 |
 | K09 Profile/Channel/signed update/rollback/repair | N09/N10/N11／C・G・H・I・J | Profile config/apply intent→Audit/config; signed package/update→OS installer/update center（N10/N11） | Profileの実Runtime consumerは特定されずBUILD_GAP/UNKNOWN。update sourceと製品lifecycle/正式署名は別で、配布証拠未成立。 |
@@ -4083,6 +4083,88 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 ## v4対応：BUF-R01〜R09／BUF-T01〜T24 Source→Consumer crosswalk
 
 現行要求の正本はv4仕様S06（採用原本SHA-256 8CEEDF21F881A783E35EE8642673FAAEEF949465343DF65E63DC21B04EE5A3EF）。緩衝基盤実装仕様書§2.1/§8.3（HEAD 5f1bb53のblob 2d0e98fb0b58ceec65244fde6a8fbf8e27c49b7e、SHA-256 A354E8493EE3A86DD480FCEF256FD9BDB569631B5735B3155FAC41EA77E38473）は採用済み要求の意味・来歴を参照する補助資料とし、現行status・CLOSED範囲・受入を上書きしない。以下は要求ID全33件の固有目的・現Consumer・状態境界を明示する。実装fileごとの現行blob SHAはN08/N10/N11各SHA表、過去自己適用evidenceはdocs/緩衝基盤_rev5補遺_QC/B5_自己適用.mdと採用記録を参照する。
+
+### K06 E0-04 21項目の個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | K06 Provider／Model／Runtime Adapter管理・選択・失敗・unsupported。現行v4 S05能力ID。製品受入状態はN03およびW03/G3のAcceptanceで判定する。 |
+| 旧ID | P4 Provider／Model CenterとD4 Phase 15を現行K06/N03へ対応付ける。旧P4 Product Build CLOSED、旧Phase status、当時のfixture・限定実装はその時点の履歴であり、現行N03 Acceptanceへ昇格しない。 |
+| 原文参照 | 採用済みv4仕様S04 N03・S05 K06、工程表R03線B・W03/G3、施工指示I04-B、docs/specs/agent-runtime.md、docs/specs/runtime-catalog.md。仕様原本SHA-256=8CEEDF21F881A783E35EE8642673FAAEEF949465343DF65E63DC21B04EE5A3EF。 |
+| 対象 | Agent CenterのProvider／Model値とCodex CLI Runtime登録、Broker ProviderModelSelection検査、Runtime／Adapter Catalog capability、共通AgentTaskの実行またはunsupported拒否、結果・失敗のBroker経路。 |
+| 目的 | Provider／Model／Runtimeの選択値を境界付きAdapterから共通Task／Result／Capabilityへ接続し、未対応Runtime・Capabilityを明示拒否する。選択metadataはPermission、Approval、Trust、実行権限を生成しない。 |
+| 生成元（Producer） | Agent CenterのCodex CLI登録UIが固定Provider ID、入力Model ID、認証方式と任意Credential ID参照を含む要求を生成する。Brokerが実CLI interfaceを照合してCodex Adapterを登録し、AdapterがOS／build条件付きCapability metadataを返す。Runtime CenterはRuntime stateを表示する。 |
+| 実Consumer | Agent Center→Broker transport→Rust protocol.rsで選択／登録要求を検査→create_cli_adapterがCodex CLIだけを構築→Broker dialogue.rs／Runtime registryが登録Adapter metadataと実Adapter実装を再照合してTaskを実行または拒否。MINIDORAは同じAdapter traitの既定Task非対応を維持し、対話以外のTask経路へ接続されない。 |
+| 契約／Data | provider_model_selection.schema.json、agent_cli_runtime_workspace_registration.schema.json、agent_runtime.schema.json、runtime.schema.json、agent_task_request.schema.json、agent_task.schema.json、Adapter manifest schemas。Providerはopenai_codex_cli固定、Model IDはCLI引数値、認証はCodex CLI管理またはVault参照、automatic_fallback=false。Credential実値・Permission・Approvalは選択payloadへ含めない。 |
+| 正常時作用 | 現行UIはCodex CLI登録のみを提示する。選択したModel IDはRust Codex AdapterからCLI --modelへ渡されるが、Modelの実在性・Provider到達性・契約／利用可能性は登録時に推測しない。Sourceのnormal Release CapabilityはWorkspace-write interfaceとOS条件を満たすWindows/Linuxでsupported、debug/test・他OSではunsupported。これはN03の二Runtime製品Acceptanceではない。 |
+| 否定時作用 | unknown Provider、壊れた選択／Model値、誤ったVault参照、automatic_fallback=true、未対応Adapter ID、Capability欠落／unknown／unsupported、Runtime／Workspace対応不一致を拒否する。MINIDORAのTaskはtrait既定値でAgentTask非対応。自動fallbackやmetadataからのAuthority昇格を行わない。Provider接続／Model availability不明を成功へ見せない。 |
+| 停止／Recovery | 登録要求・Adapter interface・Capability・Workspace結合の不一致はTask permission／approval／起動へ進む前に拒否し、通常のBroker failure／Audit経路へ返す。起動後の失敗・取消・期限等はAgentTask Recovery契約に従う。Provider選択の変更で既存Permission／Approvalを再利用しない。 |
+| 標準OS候補 | v4の必須対象はWindows／macOS／Linux DesktopとAndroid／iOS Mobile。現sourceのnormal Release AgentTask CapabilityはWindows/Linuxに限定され、その他OSはunsupported。Linux nativeは必須製品対象だが、Codex Task capability sourceの存在だけでLinux製品Acceptance・配布・GUI・権限境界を成立扱いしない。N10の標準候補・artifact条件に接続する。 |
+| 配布物 | v4 N10が定めるOS別候補artifactへ接続する。Provider／Model選択とCodex CLI登録sourceは存在するが、正式なProvider接続保証、5 OS同一Task能力、Runtime同梱／導入・installed lifecycleの完成をこのmappingから主張しない。未固定version／archはUNKNOWN。 |
+| 既存実装 | Desktop Agent Center／Runtime Center、Flutter Task client、Rust ProviderModelSelection／Codex CLI Adapter／MINIDORA Adapter、Broker protocol／dialogue／Runtime registry／Adapter center、Python reference Catalog、JSON Schemaとvalid／negative例、Rust embedded unit／fixture、Flutter Widget／client test、単一CodexのAgentTask E2E sourceがある。 |
+| BUILD_GAP | 実Taskを処理する独立第二Runtime、Runtime／Provider／Modelの複数候補管理、第二Runtimeの登録・選択・失敗・権限・結果経路、Provider実接続・Model availabilityの独立確認、5 OS installed acceptanceは未成立または未確認。加えて、docs/specs/agent-runtime.mdは現行Codex Adapterをunsupportedと記載する一方、Rust sourceはnormal Release Windows/Linuxでsupportedを返す。適用対象／改訂状態が照合できずCapability契約が不整合。 |
+| ソース識別値（SourceSHA） | 照合HEAD=80f2e978c925de0f3573a25502000685956d0168。以下51 unique tracked pathを編集前mainのGit blobへ個別照合した。path／blob SHAは直下のK06 SourceSHA表に記録する。 |
+| 試験区分（`TestClass`） | Provider selection Schemaのvalid／negative例、Rust Adapter／Broker UNIT・FIXTURE、Flutter client／Widget、単一Codex Task E2Eのsourceがある。これらの既存testは本mappingではNOT_RUN。過去のW01/G1はWindows Codex CLI単独の限定証拠で、独立第二Runtimeを証明しない。今回の製品Rust／Flutter、installed Runtime、Provider実接続、OS別Acceptance testもNOT_RUN。 |
+| 証拠ID（`Evidence ID`） | NONE。SourceSHAはconsumer sourceの識別でありRuntime実作用・Provider到達性・N03 Acceptanceの証拠ではない。W01/G1を第二Runtime証拠へ転用しない。 |
+| 阻害要因（`Blocker`） | W03/G3とN03はOPEN。Registry 18件（16 unresolved／2 resolved）、release_ready=falseを維持する。第二の独立Task Runtimeは既存BUILD_GAP。契約文書とCapability sourceの不一致は観測事実として記録するが、新規Blocker／Evidenceは追加しない。 |
+| 状態 | K06 E0-04 21項目と51 SourceSHAのsource mappingを記録。K06の製品AcceptanceおよびN03/W03/G3はOPEN。Capability契約の記述差は未解決のまま保持する。 |
+| 残余 | 第二のTask-capable Runtimeと共通Broker経路を後続工程で実装・検証する。agent-runtime.mdのunsupported契約とRust normal ReleaseのWindows/Linux supported宣言は責任正本・適用範囲を照合してから同期する。Provider到達性、Model可用性、全OSのinstalled acceptanceも別Consumer／EvidenceとしてN10/N11へ結合する。 |
+
+### K06 SourceSHA（編集前mainのGit blob）
+
+| 対象ファイル | 識別値 |
+|---|---|
+| AGENTS.md | 1eafcadd129fd01f1f2f683594c381605ed7d48d |
+| ROADMAP.md | 6a922a38cca617690bc08297274e907f0425b722 |
+| release_blockers.registry.json | 244adc04a01e7b406c4ebcdeb829f7077d4aa35f |
+| docs/QE_2026-11-13/01_D4Pocket_統合製品実装仕様書_v4.md | 352c53180cbad07888beb956aad0fb2a58074c58 |
+| docs/QE_2026-11-13/02_D4Pocket_統合開発工程表_v4.md | d32dd251e5f7cbb97d92f6e7540d6b6ed0ecec05 |
+| docs/QE_2026-11-13/03_D4Pocket_Codex施工指示書_v4.md | 49447973e88c50a09b2f4978adfed84fd464c6d0 |
+| docs/QE_2026-11-13/採用記録.md | f159c1aa6ea5bc6e80e0877d8068f7e44da4c4d3 |
+| docs/QE_2026-11-13/進捗.md | 17e4dea46c5fd2c553a86a966e7e50f1ef3e6adf |
+| docs/QE_2026-11-13/E0_要求consumer台帳.md | a93e3a8f2400be69d171e174588ec4c93c06fba1 |
+| docs/QE_2026-11-13/差分移行台帳.md | e8c1852b29fb43e1730bc115f6925dee50945543 |
+| docs/REV5_PRODUCT_PROGRESS.md | 9c978021d3982690e9aaa87896436bad7125b433 |
+| docs/specs/agent-runtime.md | 195e5e2e28e14fa65e2212db9f2adba81cbdb5c0 |
+| docs/specs/runtime-catalog.md | 2c289a105dc671fd99662f4daeac1ef631b144d9 |
+| docs/specs/runtime-dialogue.md | 16354d270b5e09d9341963eaed66d23aec38a42d |
+| apps/desktop_flutter/lib/screens/agent_center.dart | 2472faeb31a64d624423c30a0a30d0f153d2e2a3 |
+| apps/desktop_flutter/lib/screens/runtime_center.dart | d2c7af172073d2b10c76a6416b90f011f10e95db |
+| apps/desktop_flutter/lib/services/agent_task_client.dart | f54cefac29eba3dcf383bba19b4f64ee682e6217 |
+| packages/agent_orchestration/lib/agent_task_client.dart | a31fbb9f980a0039f809fd763c91f055fe9d02d0 |
+| native/rust_helper/src/adapters/mod.rs | 06c540a59437b903b3f045b5aafb3790c21103bd |
+| native/rust_helper/src/adapters/codex_cli.rs | e5c9d1581ae9a1c0a3ae7fcfa626fdca6fea6d28 |
+| native/rust_helper/src/adapters/minidora.rs | 31c756ac7c9a264d73ed0e9654dbae599be83921 |
+| native/rust_helper/src/broker/protocol.rs | 9b2076d5f31ca6d77f1f87973d1b394aaf751961 |
+| native/rust_helper/src/broker/dialogue.rs | c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999 |
+| native/rust_helper/src/broker/runtime_registry.rs | 9ff28610862586a599848d75f9e891a6c6cadf2f |
+| native/rust_helper/src/broker/adapter_center.rs | 66575bb77e4a375dca4f8488f97df442960bb5a9 |
+| packages/runtime_catalog/catalog.py | 003d3c533cbb48bb5f6520cb9b7a3566f2493748 |
+| packages/agent_runtime/contract.py | 9e05ca1dd63883ad21d1871c62ddfdfef307d82f |
+| specs/provider_model_selection.schema.json | 348ef6104b9d73a5529a0ad81f9a268ae59e4a64 |
+| specs/runtime.schema.json | bdef33f26fe06b334eb6f94124930fd08594bbc9 |
+| specs/agent_runtime.schema.json | b8e031e53f582048211f0e1a6deeb2e5cb87e4fb |
+| specs/agent_task_request.schema.json | cb25bb3684656bfd670ea5832bbb7fc5988845b6 |
+| specs/agent_task.schema.json | a552389072088d6cd42b3588fefda332be4ae6b6 |
+| specs/agent_cli_runtime_workspace_registration.schema.json | 32a09f2ce33a5a215d64350ee22e24e93f9037c7 |
+| specs/adapter_manifest.schema.json | 116f5830983d195f501cc344a25990d58bf323c0 |
+| specs/adapter_management_manifest.schema.json | 1f1b75c7d4299c96fcf5039b652d718f7805cd2d |
+| examples/contracts/provider_model_selection.valid.json | 872c76f704899d2c8f39ddc1710b93bf0d2a17d4 |
+| examples/contracts/provider_model_selection_vault.valid.json | f921a5a0510bc533cf0ea69656f3161da71ce465 |
+| examples/contracts/agent_runtime.valid.json | 8ca2fe1ce502a75446646d28a5e857c2ff94808b |
+| examples/contracts/invalid/provider_model_selection_unknown_provider.invalid.json | fcb46f8ff1bf74bf326f0161c0ff59cb227639b5 |
+| examples/contracts/invalid/provider_model_selection_vault_missing_id.invalid.json | f20f029b9b1f1452967ed0bdb15479c2157ecb82 |
+| examples/contracts/invalid/provider_model_selection_vault_malformed_id.invalid.json | c9455bfd2ec532c1cc276a7e553b08900d34611a |
+| apps/desktop_flutter/test/agent_coordination_test.dart | 6783e87a492d8436a855a7088b7cece38d122bd5 |
+| apps/desktop_flutter/test/compose_client_test.dart | c3fe30faa668482e5a4e42b2f5f5e5b218a01dc8 |
+| apps/desktop_flutter/test/widget_test.dart | f4e9c7b93f832ba2a2cefee779fd12426f240b04 |
+| native/rust_helper/tests/agent_task_production_e2e.rs | fdc7565aa58fa7466e6e24e5492321e8015567eb |
+| native/rust_helper/tests/agent_task_crash_recovery_e2e.rs | 23517fcfe8ef94b2357a94e04879d423c3360501 |
+| native/rust_helper/tests/unit/codex_cli_fixture.rs | 40e5750bf267ccf9e583971e0d2ba4e6125d9a5d |
+| native/rust_helper/tests/support/broker_codex_fixture.rs | 876fca97d6b9a1eb8ef9dfe1aaf4462d1a96c3ec |
+| native/rust_helper/tests/support/codex_loopback_responses.rs | f825bbdd6ad3a78f46ccb1387af6be06971d87df |
+| tooling/schema_check/check_schemas.py | 7dca27717cbe5cccb45e1013b3436918a2322e75 |
+| tooling/conformance_tests/run_conformance_skeleton.py | c6f31d8cb561b48513c6784e54c85969c9cb953e |
 
 ### E0-04共通field値と適用範囲
 
@@ -5594,7 +5676,7 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 | 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13は全E0-04 fieldを個別記録。P13旧aggregate evidence identity/classは`UNKNOWN`。N11 Evidence/Blocker/OS Artifact全数結合は未完 |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのE0-04 21 fieldを個別記録。旧status維持、N11 Evidence/Blocker/OS Artifact結合と製品Acceptanceは継続 |
 | D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜45はE0-04全21 fieldを個別記録。Evidence/Blocker/OS Artifact全数結合・Acceptance未完 |
-| 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K01〜K05はE0-04全21 fieldとSourceSHAを個別記録済み。K06〜K20の個別fieldとN11 Evidence/Blocker/OS Artifact結合は継続 |
+| 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K01〜K06はE0-04全21 fieldとSourceSHAを個別記録済み。K07〜K20の個別fieldとN11 Evidence/Blocker/OS Artifact結合は継続 |
 | Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 33 IDのscope/Consumer/現証拠境界と各21 fieldを記録。BUF-R/T Acceptance、cause/effectの全件結合、N11 evidence、OS artifactとの結合は未完 |
 | Buffer工程 B0〜B6 | 7 | `docs/緩衝基盤_rev5補遺_QC/`・v4仕様S06 | B0〜B4の限定CLOSEDを保持、B5 OPEN、B6未成立。詳細Consumer照合が未完 |
 | QE/監査 D4-QE-R01〜R13／D4-LNX-T01〜T08／D4-AUD-F01〜F07 | 13／8／7 | `docs/QE_2026-10-22/`・各採用記録 | 旧証拠と現在の実装/Validatorへの接続が未完 |
@@ -5637,7 +5719,7 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 ## 次のE0照合作業
 
 1. N01〜N10のE0-04 21項目は現行SourceSHAへ個別照合済み。各製品AcceptanceはOPENのまま維持し、N10の五OS実導入・利用・更新・Recovery QAは後続の製品Acceptanceに残す。
-2. C0〜C34およびPhase 0〜45の個別field記録を維持し、K01〜K05のSource mappingを再試験せず、K06〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
+2. C0〜C34およびPhase 0〜45の個別field記録を維持し、K01〜K06のSource mappingを再試験せず、K07〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
 3. BUF-R/TのSourceSHAとConsumer scopeは記録済み。AcceptanceはOPEN。B0〜B6の状態を保持し、原因→effect、N08/N10/N11、OS/Artifact/evidence結合を続ける。
 4. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 5. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
