@@ -3744,7 +3744,7 @@ Phase37のE0-04欄を全21項目で記録し、24件（24 unique path）のSourc
 | K02 独立Compare/Handoff/Workspace分離/同時Task/選択適用/Authority非継承 | N04／B・C | Compare coordinator/Handoff package→per-Agent Task preflight→selected result/new target Task（N04） | UI/source wiringあり。installed cross-agent contamination、cancellation/failure isolation、filesystem isolation/Auditの実証未成立。 |
 | K03 Workspace Inspector/tree/diff/history/rerun/branch/recovery | N09／C | WorkspaceInspector→WorkspaceClient→Broker WorkspaceRegistry/Reader/Diff。HistoryScreen→HistoryClient→HistoryAccess/execution_history/replay。RecoveryCenter→ShellCoreClient snapshot（N09） | 個別source consumerはWIRED。Workspace baseline diffとAgentTask result diff、Dialogue replayとAgentTask replay、previewと実Recoveryを分離。Task結合・live Recovery・installed acceptanceはOPEN。 |
 | K04 PID/CPU/RAM/I/O/Latency/error/optional GPU/lifecycle | N09／C | Runtime Center／Agent Center／限定Mobile projection→RuntimeResourceClient→Broker `実行系資源観測`→Windows `RuntimeResourceRegistry`。Lifecycle UI→Broker status／approval／execute→trusted Adapter（N09） | Windowsのloopback-bound観測は一部値を`LIVE_RUNTIME`、Broker内統計は`INTERNAL_STATE`、未取得値は`unknown`として投影。非Windowsはcollector unsupported。通常Releaseにtrusted lifecycle Adapterがなく実操作未接続。K04 product AcceptanceはOPEN。 |
-| K05 Eval/Dataset/Case/regression/deterministic evaluator/Runtime compare | N09/N11／C・J | Evaluation Lab/Dataset/Case→Broker evaluation→bounded result/history（N09） | Source/wiring区分はN09参照。LLM Judge単独を保証にせず、実Runtime横断比較と全要求評価は未成立。 |
+| K05 Eval/Dataset/Case/regression/deterministic evaluator/Runtime compare | N09/N11／C・J | Evaluation Lab→EvaluationClient→Broker evaluation_control/evaluation_lab→Case/Runtimeごとの既存Dialogue・Owner承認・deterministic evaluator。Regression Caseは別のnative Owner operation→Broker→ProtectedStore（N09） | C5 Evaluationはsource上接続済みだが同一AgentTaskのtest/result/diff/Auditへ非結合。Dataset登録/private readはWindows ProtectedStoreに限定され、非Windowsはfail-closed。C6からDatasetへ自動importしない。installed Runtime横断比較と同一candidate AcceptanceはOPEN。 |
 | K06 Provider/Model/Runtime Adapter管理・選択・失敗・unsupported | N03／B | Provider/Runtime Catalog→Adapter capability check→Broker Task dispatch/reject（N03） | Codex CLIは限定実装・証拠。MINIDORA Task非対応は明示reject、第二の実Task RuntimeはBUILD_GAP。 |
 | K07 Credential Vault/secret boundary/OS protection/lifecycle | N02/N05／A・B・F | native Owner operation→Broker credential metadata/OS vault→対象Tool/provider request（N02/N05） | 秘密のprojection/log/Audit非露出を維持。全OSのsecure storage/installed taskとの一体証拠は未成立。 |
 | K08 MCP server/transport/tool/resource/prompt/Center/isolation/AI consumption | N02/N05／A・D | MCP Center/Catalog→Broker connect/call/credential binding→Tool result→同Agent follow-up context（N02/N05） | Desktop source WIRED、fixture testsあり。installed same-candidate real MCP→result-dependent Task→Auditは未成立、MobileはBUILD_GAP。 |
@@ -3881,7 +3881,7 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 
 #### Phase/K crosswalkの判定
 
-旧Phase 0〜45の46 ID、K01〜K20の20 IDを、現v4 N01〜N11・R03 A〜J・正本Consumerへ対応付けた。旧C番号との対応は履歴範囲として保持し、P0〜P13は別のv4 S05 direct mappingに従う。Phase固有SourceSHA/TestClassは各Phase行、K04〜K20は参照N節へ接続し、Phase/K固有Evidence IDはNONEを維持する。K01〜K04は下記E0-04全21 fieldを個別記録済みだが、K05〜K20の個別fieldは未完。ここでのmappingは範囲・Consumer参照の整備だけであり、N/K/Phase Acceptance、E3 BUILD_COVERED、全OS QC/QAをCLOSEDにしない。N11 Evidence ID・Blocker・全OS artifact/standard guaranteesとの行単位結合、B0〜B6、Q/FQ/W/QE/AUD全数照合は継続。BUF-R01〜R09とBUF-T01〜T24は個別21 fieldを記録済みだが、AcceptanceはOPEN。
+旧Phase 0〜45の46 ID、K01〜K20の20 IDを、現v4 N01〜N11・R03 A〜J・正本Consumerへ対応付けた。旧C番号との対応は履歴範囲として保持し、P0〜P13は別のv4 S05 direct mappingに従う。Phase固有SourceSHA/TestClassは各Phase行、K06〜K20は参照N節へ接続し、Phase/K固有Evidence IDはNONEを維持する。K01〜K05は下記E0-04全21 fieldを個別記録済み、K06〜K20の個別fieldは未完。ここでのmappingは範囲・Consumer参照の整備だけであり、N/K/Phase Acceptance、E3 BUILD_COVERED、全OS QC/QAをCLOSEDにしない。N11 Evidence ID・Blocker・全OS artifact/standard guaranteesとの行単位結合、B0〜B6、Q/FQ/W/QE/AUD全数照合は継続。BUF-R01〜R09とBUF-T01〜T24は個別21 fieldを記録済みだが、AcceptanceはOPEN。
 
 ### K01 E0-04 21項目の個別照合
 
@@ -3987,6 +3987,98 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 | 阻害要因（`Blocker`） | Registry 18件（16 unresolved／2 resolved）、`release_ready=false`を維持。K04への既存Blocker直接帰属が確認できない項目は`UNKNOWN`。このE0 mappingを理由とするBlocker新設・変更なし。 |
 | 状態 | E0-04 K04の21 field／SourceSHAを現行mainへ個別結合済み。N09／K04 mappingは記録完了。K04／N09／N10／E0の製品Acceptanceは`OPEN`。 |
 | 残余 | Windows外native resource collector、task/Agent/result/trace結合、保持・load・標準環境性能、production Runtime Lifecycle Adapterと実作用／Recovery、五OS installed consumer・Artifact/Evidence対応をE1以降の実Consumerへ接続する。 |
+
+### K05 E0-04 21項目の個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | K05 Eval/Dataset/Case/Regression Case/deterministic evaluator/Runtime compare。現行v4 S05能力ID。製品受入はN09/N10/N11のAcceptance条件で判断する。 |
+| 旧ID | C5／Phase 13のEvaluation LabとC6／Phase 14のRegression Case登録を対応付ける。C5とC6は別契約のまま保持し、旧局所statusや当時の検査をv4 Acceptanceへ昇格しない。 |
+| 原文参照 | 採用済みv4仕様S04 N09/N11、S05 K05、工程R03-C/R06、施工指示I04-C、docs/D4_POCKET_PHASE_MAPPING.md Phase 13/14、docs/specs/evaluation-lab.md、docs/specs/regression-case.md。 |
+| 対象 | Owner登録Dataset revision、Case/Evaluator定義、Experiment、Result/Comparison、Evaluation Labの公開projection、ならびに独立したOwner明示登録によるRegression Case。 |
+| 目的 | 同一Dataset revisionに対する各Case/Runtimeの観測結果を決定論的に評価し、比較可能なbounded resultを返す。評価結果・Evaluator・Runtime metadata・過去履歴はPermission、Approval、Trust、Audit validity、Recovery、Release判断を生成しない。 |
+| 生成元（Producer） | Owner専用登録操作が受け取るprivate Dataset payload、Evaluation LabのDataset/Runtime選択とExperiment要求、BrokerのDialogue結果・監査相関・deterministic evaluator出力。Regression Caseは完了Dialogue receiptとOwnerが明示redactionした登録payloadを別Producerとする。 |
+| 実Consumer | Desktop Evaluation Lab→EvaluationClient→shared EvaluationClient→Rust Broker evaluation_control/evaluation_lab。Brokerは各Case/Runtimeで既存Dialogue request/sessionと個別Owner承認経路を使い、公開応答projectionのみEvaluatorへ渡す。Regression Case list/delete/RecoveryはRegressionCaseClient/OwnerClient→native confirmation→Broker→Windows ProtectedStoreであり、C5 Dataset consumerではない。 |
+| 契約／Data | evaluation_dataset、evaluation_case、evaluation_evaluator、evaluation_dataset_registration、evaluation_experiment、evaluation_result、evaluation_public_result、evaluation_comparison、runtime_dialogue_*、regression_case_* schemas。公開projectionはbounded metadata/hash中心。raw prompt、期待本文、regex/JSON Schema本文、応答本文、credential、endpoint、command、環境変数を通常IPC/Flutter/Auditへ露出しない。 |
+| 正常時作用 | Brokerが登録済みDataset revision・Runtime・Case/Evaluator・Experiment関係を検査し、Case/Runtimeごとに通常DialogueのOwner承認後の公開応答projectionをdeterministic evaluatorへ渡す。Result/ComparisonをDataset/Experiment identityと監査相関へ束縛して公開projectionにする。Evaluator種類はcontract範囲に限る。 |
+| 否定時作用 | malformed/unknown/stale Dataset・Runtime・Evaluator・Experiment、revision再登録/巻戻し、result binding不整合、Authority metadata混入、raw/private content要求を拒否・制限する。LLM-as-judgeは未実装で、将来追加されても単独で品質保証・Authority・Release判定に使わない。非Windowsのprivate Dataset登録/readはfail-closed。 |
+| 停止／Recovery | Owner承認前の中断・期限切れ・未送信を開始済みとして扱わず、部分Evaluatorや不完全Resultを成立へ昇格しない。Audit/result correlation不一致、Runtime隔離、private payload integrity不一致時はComparisonを保留する。失敗や中止を再送成功・Task完了へ置換しない。C5評価状態はAgentTask Recoveryの代替ではない。 |
+| 標準OS候補 | Windows／macOS／Linux native Desktop。Linux nativeは必須製品対象。Android/iOSのmetadata projectionやDevice LinkはEvaluation実行／比較の同等性を証明しない。登録/private readの現sourceはWindows限定で、macOS/Linuxの保護保管対応は未成立。OS候補値と標準環境はN10を参照する。 |
+| 配布物 | C5固有の独立配布物は確認できない。Evaluation LabはDesktop product UIとRust Broker内機能。通常OS package／installed lifecycleはN10候補に含むが、このmappingで配布やinstalled Acceptanceを主張しない。 |
+| 既存実装 | Evaluation Lab画面・client、shared EvaluationClient、Broker evaluation_control/evaluation_lab、Owner CLI登録・Windows ProtectedStore、公開Schema、Regression Caseの別client/native確認、development-only evaluation_contract_check、UNIT/FIXTURE/WIDGET test sourceがある。各Case/Runtimeは既存Dialogue/Approval経路を利用する。 |
+| BUILD_GAP | Evaluation resultは同一AgentTask IDのTask test result/Diff/Auditへ接続されず、C5 ExperimentはAgentTask比較ではない。非WindowsのDataset登録/private readが未成立。Installed実Runtime横断比較、全要求を覆うDataset、同一candidate Acceptance、OS別保護保管、配布/Recovery結合は未確認または未成立。C6 Regression CaseからC5 Datasetへの自動importはscope外として実装しない。 |
+| ソース識別値（SourceSHA） | 照合HEAD=294a3535e036fc706cc16c9cbc8787934e11d7a2。以下の61 unique tracked pathを編集前mainのGit blobへ個別照合した。pathとblob SHAは直下のK05 SourceSHA表に記録する。 |
+| 試験区分（TestClass） | Evaluation UI/shared client/Rust Broker/Schema/Owner操作/Regression CaseにUNIT、FIXTURE、WIDGET、development validatorのsourceがある。本mapping作業での製品Rust/Flutter、installed Runtime、OS別Acceptance testはNOT_RUN。旧candidateの検査数やfixtureを現candidateの受入証拠へ転用しない。 |
+| 証拠ID（Evidence ID） | NONE。SourceSHAはsource識別であり、LIVE_RUNTIMEやinstalled Product Evidenceではない。 |
+| 阻害要因（Blocker） | Release Registry 18件（16 unresolved／2 resolved）とrelease_ready=falseを維持する。K05への直接帰属が確定できないblockerはUNKNOWN。新規Blocker/Evidenceを追加・変更しない。 |
+| 状態 | K05のE0-04 21項目と61 SourceSHAのsource mappingを記録。C5/C6旧statusとN09/N10/N11/E0の現AcceptanceはOPENのまま。 |
+| 残余 | AgentTaskのresult/test/diff/Auditへの結合、非Windows保護Dataset登録/read、installed Runtime横断Comparison、同一candidateの要求網羅評価、OS別配布・Recovery・保護保管を後続N09/N10/N11工程で実装・評価する。 |
+
+### K05 SourceSHA（編集前mainのGit blob）
+
+| 対象ファイル | 識別値 |
+|---|---|
+| AGENTS.md | 1eafcadd129fd01f1f2f683594c381605ed7d48d |
+| docs/QE_2026-11-13/採用記録.md | f159c1aa6ea5bc6e80e0877d8068f7e44da4c4d3 |
+| docs/QE_2026-11-13/01_D4Pocket_統合製品実装仕様書_v4.md | 352c53180cbad07888beb956aad0fb2a58074c58 |
+| docs/QE_2026-11-13/02_D4Pocket_統合開発工程表_v4.md | d32dd251e5f7cbb97d92f6e7540d6b6ed0ecec05 |
+| docs/QE_2026-11-13/03_D4Pocket_Codex施工指示書_v4.md | 49447973e88c50a09b2f4978adfed84fd464c6d0 |
+| docs/QE_2026-11-13/進捗.md | 12de511bf2fbd77a6535e78148c75639206f8de7 |
+| docs/QE_2026-11-13/E0_要求consumer台帳.md | e8d4c04d7e869a0dceb6b1fe6aaf923c1c1f463b |
+| docs/D4_POCKET_PHASE_MAPPING.md | 064ea334f86b137d94fba2370d2a2fd732f6e972 |
+| docs/REV5_PRODUCT_PROGRESS.md | 9c978021d3982690e9aaa87896436bad7125b433 |
+| release_blockers.registry.json | 244adc04a01e7b406c4ebcdeb829f7077d4aa35f |
+| docs/specs/evaluation-lab.md | 14be6c857db00414a021b5ea6442e4da9219e4b0 |
+| docs/specs/regression-case.md | ce58a891facfca9f1e8e498e13bf983011350ba3 |
+| docs/specs/performance-validation.md | 6746542d94a1f417d443f1a3992779e6480e74ed |
+| specs/evaluation_dataset.schema.json | 8a90b7248e16c04d7b51ab9bca0a9a5f6c459ed1 |
+| specs/evaluation_case.schema.json | 5fed01706bb374697294ccb19eec1ae309d53f6a |
+| specs/evaluation_evaluator.schema.json | d2d5298afc927dfb82c73f136db7dce77bdccf13 |
+| specs/evaluation_dataset_registration.schema.json | a79c103e32229dc47d263e62c05914624085610b |
+| specs/evaluation_experiment.schema.json | e35d7a242a0a9d318900673df9fb900e841b93a2 |
+| specs/evaluation_result.schema.json | f1b994e19dfaf1473a615cbf1347de22f72ccbed |
+| specs/evaluation_public_result.schema.json | 77a285a53a0473fc4185d18b37b863f90be71ada |
+| specs/evaluation_comparison.schema.json | 124af9c4e4def4c048751e911809b6f2ed3b577a |
+| specs/runtime_dialogue_comparison.schema.json | 874dd1158a6aa911ff30d85e141b4bd4927c91e3 |
+| specs/runtime_dialogue_operation.schema.json | 8793ab0f59ea2320b7102afec7256cfe62264fc5 |
+| specs/runtime_dialogue_request.schema.json | fe0bd153eaf3a0a2354b25cffc3ed9af934fbae1 |
+| specs/runtime_dialogue_response.schema.json | 5e7220e8ce5954057ee270cd77cb4a68e1ef830f |
+| specs/runtime_dialogue_session.schema.json | 5bfc5b8c86ce40626d76b1e37ebdf7989afdef90 |
+| specs/runtime_dialogue_submission_receipt.schema.json | 204b7871ab08539c16da2431541a5764b023f1fe |
+| specs/regression_case_registration.schema.json | 04165813e2791196c38fe515c84b4e1adeefd000 |
+| specs/regression_case_list_request.schema.json | 72ded3ae0e37214b442811ba973bdf4a490aa854 |
+| specs/regression_case_list.schema.json | a7f99f9784b287b7bb21678bc12ab531debf5af0 |
+| specs/regression_case_receipt.schema.json | 3defc85eab0e8ed4ebac4ba85a1a5b83de6016a4 |
+| apps/desktop_flutter/lib/main.dart | 6109c821ab5dc809224bec5234c4c59db1d5f988 |
+| apps/desktop_flutter/lib/screens/evaluation_lab.dart | b74b3e96e7cd746874d1e19e05175548a5c66192 |
+| apps/desktop_flutter/lib/services/evaluation_client.dart | d617dbbf10334754652a131e8612d3ca99aa61e6 |
+| apps/desktop_flutter/lib/services/regression_case_client.dart | c29054e8b6256b15f097bd5e7de57b9cf2117e3a |
+| apps/desktop_flutter/lib/services/broker_client.dart | 122de14350dfe1f160c7f5f911dd1e1d56da8233 |
+| apps/desktop_flutter/lib/models/generated_contracts.dart | 64e7a80a308c2734eb18c9d4b26eb50c8354f67b |
+| apps/desktop_flutter/test/evaluation_lab_test.dart | 9b068a34d9d22743bee74ba409c8d95bee938638 |
+| packages/gui_shell_ui/lib/gui_shell_ui.dart | a22f8e6b03b9a404e4bf30993b74da47264d8d72 |
+| packages/gui_shell_ui/lib/evaluation_client.dart | 2978d56c9aecbf4e31efe9ec2ed072883c62fbc1 |
+| packages/gui_shell_ui/lib/src/evaluation_client.dart | 3fe93e4a19bcba7c825f2a6e887f96f00016aa75 |
+| packages/gui_shell_ui/lib/src/regression_case_client.dart | f14bd4aeda1d6f3262cdb1be4b924884d7128e5b |
+| packages/gui_shell_ui/lib/src/regression_case_owner_client.dart | 1f1d10cecca70dff2075bed1e5f331267e0ea296 |
+| packages/gui_shell_ui/test/evaluation_client_test.dart | 044d71b4b18b7efa8891a7df735f28e6ed674ac1 |
+| packages/gui_shell_ui/test/regression_case_client_test.dart | a30a002abf021730f0ba09e66126ebbb2a39e12a |
+| packages/gui_shell_ui/test/regression_case_owner_client_test.dart | 48a895c5a2f139eb2823df67f4aad3e1b8639748 |
+| native/rust_helper/Cargo.toml | 6352fd7de3188b4c7335167f4f8875a4f8f4e28b |
+| native/rust_helper/src/main.rs | b0a5df285db357172e7970074d7a67189f3384a3 |
+| native/rust_helper/src/owner_cli.rs | 987f0f4cce1331a3b1884a4738b29fe719bab005 |
+| native/rust_helper/src/protected_store.rs | 4b6e066012b9797b0dff1737859f62b4568df2fd |
+| native/rust_helper/src/broker/mod.rs | b89af2d97706970e26df89daef961251fdc4a797 |
+| native/rust_helper/src/broker/ipc_server.rs | 58a404b920ef5905e174668ec2de0e04a9e8b044 |
+| native/rust_helper/src/broker/protocol.rs | 9b2076d5f31ca6d77f1f87973d1b394aaf751961 |
+| native/rust_helper/src/broker/evaluation_control.rs | 570485772c3fce43d170d031f1769b7617214d40 |
+| native/rust_helper/src/broker/evaluation_lab.rs | 3645202da2597e5f63cf9ef96a891e9ae801e2b2 |
+| native/rust_helper/src/broker/regression_case.rs | cf229213a54f0eaa512781fb417692506bf06775 |
+| native/rust_helper/src/broker/dialogue.rs | c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999 |
+| native/rust_helper/src/broker/audit.rs | eb1dcf5018d95c7fdf6171aadd4bca9554d1996f |
+| native/rust_helper/src/broker/adapter_center.rs | 66575bb77e4a375dca4f8488f97df442960bb5a9 |
+| native/rust_helper/tests/broker_ipc.rs | e57f4509e9957923b88baf8b998b6a50e5f3a123 |
+| tooling/evaluation_contract_check.py | c5d8623fe25ea43de2e7557311b2552b395e8fb7 |
 
 ## v4対応：BUF-R01〜R09／BUF-T01〜T24 Source→Consumer crosswalk
 
@@ -5502,7 +5594,7 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 | 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13は全E0-04 fieldを個別記録。P13旧aggregate evidence identity/classは`UNKNOWN`。N11 Evidence/Blocker/OS Artifact全数結合は未完 |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのE0-04 21 fieldを個別記録。旧status維持、N11 Evidence/Blocker/OS Artifact結合と製品Acceptanceは継続 |
 | D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜45はE0-04全21 fieldを個別記録。Evidence/Blocker/OS Artifact全数結合・Acceptance未完 |
-| 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K01〜K04はE0-04全21 fieldとSourceSHAを個別記録済み。K05〜K20の個別fieldとN11 Evidence/Blocker/OS Artifact結合は継続 |
+| 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K01〜K05はE0-04全21 fieldとSourceSHAを個別記録済み。K06〜K20の個別fieldとN11 Evidence/Blocker/OS Artifact結合は継続 |
 | Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 33 IDのscope/Consumer/現証拠境界と各21 fieldを記録。BUF-R/T Acceptance、cause/effectの全件結合、N11 evidence、OS artifactとの結合は未完 |
 | Buffer工程 B0〜B6 | 7 | `docs/緩衝基盤_rev5補遺_QC/`・v4仕様S06 | B0〜B4の限定CLOSEDを保持、B5 OPEN、B6未成立。詳細Consumer照合が未完 |
 | QE/監査 D4-QE-R01〜R13／D4-LNX-T01〜T08／D4-AUD-F01〜F07 | 13／8／7 | `docs/QE_2026-10-22/`・各採用記録 | 旧証拠と現在の実装/Validatorへの接続が未完 |
@@ -5545,7 +5637,7 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 ## 次のE0照合作業
 
 1. N01〜N10のE0-04 21項目は現行SourceSHAへ個別照合済み。各製品AcceptanceはOPENのまま維持し、N10の五OS実導入・利用・更新・Recovery QAは後続の製品Acceptanceに残す。
-2. C0〜C34およびPhase 0〜45の個別field記録を維持し、K01〜K04のSource mappingを再試験せず、K05〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
+2. C0〜C34およびPhase 0〜45の個別field記録を維持し、K01〜K05のSource mappingを再試験せず、K06〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
 3. BUF-R/TのSourceSHAとConsumer scopeは記録済み。AcceptanceはOPEN。B0〜B6の状態を保持し、原因→effect、N08/N10/N11、OS/Artifact/evidence結合を続ける。
 4. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 5. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
