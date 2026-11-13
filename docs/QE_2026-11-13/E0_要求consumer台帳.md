@@ -3749,7 +3749,7 @@ Phase37のE0-04欄を全21項目で記録し、24件（24 unique path）のSourc
 | K07 Credential Vault/secret boundary/OS protection/lifecycle | N02/N05／A・B・F | native Owner request→Broker metadata/Audit/OS vault→Codex ProviderまたはMCP stdio child（N02/N05） | Desktop三OSの限定source consumerを確認。Linux `linux_secret_service`値が登録／receipt Schema enumから欠落。更新・物理削除／Recovery、五OS installed一体受入れは未成立。Mobile Device Link資格は別consumer。 |
 | K08 MCP server/transport/tool/resource/prompt/Center/isolation/AI consumption | N02/N05／A・D | Desktop Broker stdio Catalog→native Owner／Permission／Audit Tool→N02同Agent fresh-authorized follow-up、N05 current Compose→元Tool | Desktop Windows/Linux/macOS source WIRED。Resource/Prompt本文、HTTP/OAuth、Mobile作用なし。W02/G2・W04/G4 installed acceptance OPEN。 |
 | K09 Profile/Channel/signed update/rollback/repair | N09/N10/N11／C・G・H・I・J | Profile config/apply intent→Broker/Audit; per-channel signed candidate→Broker Update Center/native Owner→stage/active-version/rollback/repair | 詳細はK09 E0-04。Profile Runtime apply consumerなし、Mobile consumerなし。Desktop sourceはWIREDの範囲と五OS installed Acceptanceを分離。 |
-| K10 Notification/Trace/MetricとAuditの分離 | N09/N11／C・J | Broker observation/notification→Flutter UI; Audit remains separate Broker store/finalizer（N09/N11） | notification/trace/metricはAuditに昇格しない。OS toast・complete spans・全画面同一Task projectionに残差。 |
+| K10 通知／Trace／Metric／観測と正式Auditの非同一性 | N09/N11／C・J | 永続Audit確定後のBroker内部Span/Metric、Audit由来の固定通知→認証Broker IPC→Desktop表示／Windows tray／Mobile read-only summary。C3/K04資源観測は別経路。 | 通知・観測はAudit/Authorityを置換しない。Runtime/Adapter/Tool Span、Task lineage、Windows toast、他OS native notification host、外部export、五OS installed Acceptanceは未成立。 |
 | K11 A2A Card/Task/Message/Stream/Artifact/Host/identity/Trust | N04／B | A2A/Host UI→Broker operation/Host metadata registry (N04) | 外部metadataからTrustを生成しない。OS別作用を分離し、macOS metadata-only、Host越境Task/外部installed E2E未成立。 |
 | K12 Adapter Publisher/version/hash/signature/risk/compat/quarantine/update/stop | N03/N05／B・D | Adapter catalog/manage operation→Broker registry/compatibility and risk projection（C19/N03/N05） | C19 sourceはmetadata管理範囲。署名・隔離・更新・停止の全lifecycle実consumerとinstalled proofは全数未確認/OPEN。 |
 | K13 Desktop Tray/quick stop/Palette/Search/Agent Center/Problems/Evidence/Recovery/Settings | N09／C | Flutter/Native surface→Broker Task/history/notification/recovery/search/tray handlers（N09） | Surface sourceと個別projectionはある。同一実Task/installed UI→stop/recovery/EvidenceのE2Eは未成立。 |
@@ -6049,6 +6049,106 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 | apps/mobile_flutter/lib/main.dart | abf16b9774d135c2f960633ad922be608b5fd0c5 |
 | apps/mobile_flutter/lib/services/device_link_client.dart | e8c49337127cb7f62fad248988b99707c5e49219 |
 
+### K10 E0-04 21項目の個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | K10 通知／Trace／Metric／観測と正式Auditの非同一性。現行v4 S05 K10。N09/N11・施工線C/Jへ接続し、K13/K17/K19を関連consumerとして扱う。Runtime資源観測K04/C3は別契約。 |
+| 旧ID | Phase 22／C12 Notification、Phase 23／C13 Observation・C14 Trace Inspector。旧C12〜C14・C3のstatusと条件付き証拠は各履歴のまま保持し、現K10 acceptanceへ遡及転記しない。 |
+| 原文参照 | 採用v4仕様S04 N09/N11・S05 K10/K13/K17/K19、工程表R03線C/R04/R08、施工指示I04-C/I06/I07、docs/D4_POCKET_PHASE_MAPPING.md Phase 22/23、docs/specs/notification-center.md、observability-center.md、trace-inspector.md、runtime-resource-observation.md。仕様原本SHA-256=`8CEEDF21F881A783E35EE8642673FAAEEF949465343DF65E63DC21B04EE5A3EF`。 |
+| 対象 | Broker確定Auditから生成する通知summary、Broker内bounded Span/Trace/Metric、Desktop通知・Observation・Trace Inspector、Windows tray表示、Mobileの読取summary。C3 Runtime資源観測はK04の別source・別evidenceとして分離する。 |
+| 目的 | 性能・挙動・運用状態をboundedに観測・表示しながら、正式Auditの確定性・責任・安全記録を置き換えず、通知・Trace・Metric・履歴からPermission/Approval/Authority/Capability/Credentialを生成しない。 |
+| 生成元（Producer） | Rust Broker `append_audit`がAudit eventを永続storeへ追加し、verified logへ反映した後だけObservationCenterへ完了Spanを記録する。通知は固定operation対応に従い確定Auditから射影する。Caller任意の通知／Span登録経路はない。 |
+| 実Consumer | Notification/Observationは通常認証Broker IPCの`通知一覧`・読取/破棄・`観測一覧`で取得する。Desktop FlutterのNotificationClient/NotificationsScreen、ObservationClient/ObservabilityCenter/TraceInspector、Windows tray client/native menuが消費。Mobileは既存Device Linkの許可operationを通じMobileProjectionClient/NotificationsScreenでread-only summaryを表示する。 |
+| 契約／Data | `notification`/`notification_list`/`notification_action`と`observation_list`/`observation_span`/`observation_trace`/`observation_metric` Schema。通知は固定summary/hash/状態を持ちAudit reason/raw payload/metadata/Credentialを含めない。ObservationはBroker限定spanと`INTERNAL_STATE`を示す。`runtime_resource_query`/`runtime_resource_observation`はK04/C3別契約。 |
+| 正常時作用 | Notificationは直近4096 Audit eventを走査し最大256件を返す。既読/破棄は現在notification hashへ束縛し永続化・監査する。ObservationはBroker内spanを最大1024件保持し、一覧は最大256 Span/Traceと固定Metricを返す。Trace Inspectorは手動更新の読取投影であり、資源表示はC3経路を別消費する。 |
+| 否定時作用 | 不明operation、malformed/unknown field、範囲外limit、重複／不正な通知状態、hash不一致・stale通知を拒否またはfail-closedにする。Audit確定に失敗した処理はSpanにしない。通知・Observation入力で権限や実作用を起こさず、未観測spanやresource値を推定しない。 |
+| 停止／Recovery | Audit永続化またはverified反映失敗時はBrokerがエラー／停止経路へ入り、ObservationSpanを追加しない。Notificationの表示状態は永続storeから再読込し、不正状態で起動時に受理しない。読取/破棄の保存失敗時は成功を返さず、メモリ状態を戻す。ObservationCenterは揮発memoryで再起動後に復元しない。 |
+| 標準OS候補 | Windows/macOS/Linux DesktopにFlutter画面sourceがある。Windows native trayは通知summaryのmenu表示だが、native toast送出は未接続。macOS/Linux native通知hostは対象sourceから未確認。Android/iOSはDevice Link経由のアプリ内summary sourceで、push通知ではない。C3資源観測の実装範囲をK10の五OS計測へ拡張しない。 |
+| 配布物 | 独立Notification/Observation packageはなく、D4 Pocket Desktop/Mobile製品候補の一部。各OSの標準環境に導入した同一候補で通知・Trace・Metricの表示、停止、再起動挙動を結合した受入れは未実施。 |
+| 既存実装 | Rust Broker Audit finalization、NotificationCenter/永続表示状態、bounded ObservationCenter、Desktop client/screen、Windows tray、Mobile read-only projection、各Schema・fixture・Rust/Flutter test sourceを確認。OpenTelemetry export・外部collectorはunsupported。 |
+| BUILD_GAP | 現Observation producerはBroker Audit finalizationのみでRuntime/Adapter/Tool/MCP/A2A/外部通信Span、Task/Session lineage、親Span接続がない。長期保存・external exportは未接続。Windows toast host未接続、他Desktop OS native notification hostはsource上未確認、Mobile pushなし。五OS installed表示・故障／再起動の一体Acceptanceは未成立。C3/K04資源観測は別機能・別証拠である。 |
+| ソース識別値（SourceSHA） | 照合HEAD=`0d004e5b9c988bc3aacf6d394084fc4032c7ce9d`（K10編集前main）。下表の66 tracked pathをGit blobへ固定する。Source mappingであり、K10製品Acceptanceやinstalled runtime evidenceではない。 |
+| 試験区分（TestClass） | Rust UNIT/FIXTURE、Desktop Flutter client/widget/tray、Mobile projection/resource UI、Schema positive/negative、Conformanceのtest sourceがある。本mappingでは製品test・installed product・標準OS QAを`NOT_RUN`とする。 |
+| 証拠ID（Evidence ID） | `NONE`。既存C12〜C14/C3の限定記録は元版・条件の履歴として保持し、新しいLIVE_RUNTIME／installed／五OS Evidenceを発行しない。 |
+| 阻害要因（Blocker） | 既存Release Registry 18件（16 unresolved／2 resolved）、`release_ready=false`を維持する。K10への直接帰属が現行sourceで確認できないBlockerを新設・再分類しない。 |
+| 状態 | K10 E0-04全21項目と編集前main SourceSHAを個別結合した。K10製品Acceptance、N09/N11、E0全体は`OPEN`。旧C12〜C14/C3のstatusは変更しない。 |
+| 残余 | Runtime/Adapter/Tool/MCP/A2Aの実SpanとTask/Session結合、Windows toastおよび各OS native通知host、Mobile push、長期・外部Traceの要求整理と接続、五OS installed候補での必要な製品Acceptance、N11へのArtifact/Evidence/Blocker結合。 |
+
+#### K10 SourceSHA（編集前mainのGit blob）
+
+照合対象commit=`0d004e5b9c988bc3aacf6d394084fc4032c7ce9d`。過去Phase 22/23のsource pathを現HEADで再照合し、OS/Consumer/current contractの追加pathを含め66件すべてGit追跡blobへ照合した。
+
+| 対象ファイル | `Git blob` |
+|---|---|
+| AGENTS.md | 1eafcadd129fd01f1f2f683594c381605ed7d48d |
+| ROADMAP.md | 6a922a38cca617690bc08297274e907f0425b722 |
+| apps/desktop_flutter/lib/main.dart | 6109c821ab5dc809224bec5234c4c59db1d5f988 |
+| apps/desktop_flutter/lib/screens/notifications.dart | 850ac48a96ccff94b64b154a4e38d608aabb5d3c |
+| apps/desktop_flutter/lib/screens/observability_center.dart | 497fe25368b9b108d62bee921d454145b712b657 |
+| apps/desktop_flutter/lib/screens/runtime_center.dart | d2c7af172073d2b10c76a6416b90f011f10e95db |
+| apps/desktop_flutter/lib/screens/trace_inspector.dart | c196c8e20786d151edc4b709b71dd3b8fa88812b |
+| apps/desktop_flutter/lib/services/notification_client.dart | 746c74805ef5b80febf020306daeb360ff43b4e6 |
+| apps/desktop_flutter/lib/services/observation_client.dart | 97a28fb5aadd82c77028d74928bb7fa86a0220cc |
+| apps/desktop_flutter/lib/services/runtime_resource_client.dart | d8da9ebee9afdd64b8d1d3afa0a82f3a4cb53cfd |
+| apps/desktop_flutter/lib/services/windows_tray_client.dart | cf8214ceb95fa1b24c7eed4f14b312bda80e0b15 |
+| apps/desktop_flutter/linux/runner/main.cc | aed7d44034536c80dd748eac9515be35716d790d |
+| apps/desktop_flutter/linux/runner/my_application.cc | c5c0943f4ce4058290e1cb56ff64286aa7b54f54 |
+| apps/desktop_flutter/macos/Runner/AppDelegate.swift | b32d02ff0255eae0226b96b5f0a3aa2fe5cfc41f |
+| apps/desktop_flutter/test/notification_client_test.dart | e92e994e4a6107abc83de34cfed6032f260dd550 |
+| apps/desktop_flutter/test/observation_client_test.dart | 6d6ac31671e16d771bbc1a39fa7edcd9a3929dfb |
+| apps/desktop_flutter/test/runtime_resource_test.dart | c44d66bb3797bf523be0f48f24d626068b8e4894 |
+| apps/desktop_flutter/test/widget_test.dart | f4e9c7b93f832ba2a2cefee779fd12426f240b04 |
+| apps/desktop_flutter/test/windows_tray_client_test.dart | 0b24e07221087e43355ac465ca4ace73a48af31e |
+| apps/desktop_flutter/windows/runner/tray_controller.cpp | 2676afcc76e5c6e53fff2dd00d0fbb3ae531ccc1 |
+| apps/desktop_flutter/windows/runner/tray_controller.h | 67ec337a335b948115559394ad5b55bffadb7502 |
+| apps/mobile_flutter/android/app/src/main/kotlin/com/example/gui_shell_mobile/DeviceLinkNativeService.kt | 0fd3c6f5bd09e7a18df9fefe97e2e7bb9e9da706 |
+| apps/mobile_flutter/android/app/src/main/kotlin/com/example/gui_shell_mobile/MainActivity.kt | 5c0e28f0ad371f80671d26072bd1c1a134a881d9 |
+| apps/mobile_flutter/ios/Runner/AppDelegate.swift | c5fe56698d097e6e03587de9c1be10107e28e855 |
+| apps/mobile_flutter/ios/Runner/DeviceLinkNativeService.swift | 9d185729c439934dce0553b490f2fcd1f7b28a0d |
+| apps/mobile_flutter/lib/main.dart | abf16b9774d135c2f960633ad922be608b5fd0c5 |
+| apps/mobile_flutter/lib/screens/notifications.dart | 243c59c321cb1cbff39cc6cc993bd01d589c760f |
+| apps/mobile_flutter/lib/screens/resource_overview.dart | 322af6bc2935c571017dab3f03b9c7a0cea7c616 |
+| apps/mobile_flutter/lib/services/device_link_client.dart | e8c49337127cb7f62fad248988b99707c5e49219 |
+| apps/mobile_flutter/lib/services/mobile_projection_client.dart | ba82e4ddeaa5692793237a1bc3258ce53b7aa3ed |
+| apps/mobile_flutter/test/mobile_projection_client_test.dart | 74661d2f2e58046a83e99f711435e4c1b2a74b08 |
+| apps/mobile_flutter/test/resource_overview_test.dart | 7695155627699274b8c0768c0de302344caa9eec |
+| docs/D4_POCKET_PHASE_MAPPING.md | 064ea334f86b137d94fba2370d2a2fd732f6e972 |
+| docs/QE_2026-11-13/01_D4Pocket_統合製品実装仕様書_v4.md | 352c53180cbad07888beb956aad0fb2a58074c58 |
+| docs/QE_2026-11-13/02_D4Pocket_統合開発工程表_v4.md | d32dd251e5f7cbb97d92f6e7540d6b6ed0ecec05 |
+| docs/QE_2026-11-13/03_D4Pocket_Codex施工指示書_v4.md | 49447973e88c50a09b2f4978adfed84fd464c6d0 |
+| docs/QE_2026-11-13/E0_要求consumer台帳.md | 78193b1661250b722ebf4aa8735eceedaa481ec7 |
+| docs/QE_2026-11-13/採用記録.md | f159c1aa6ea5bc6e80e0877d8068f7e44da4c4d3 |
+| docs/QE_2026-11-13/進捗.md | 0454ed2354d4b0354d9f8334eaef4c3ece8674a8 |
+| docs/REV5_PRODUCT_PROGRESS.md | 9c978021d3982690e9aaa87896436bad7125b433 |
+| docs/specs/notification-center.md | 81b4ed30b2defd538a56c9323fecb566a1fad8dd |
+| docs/specs/observability-center.md | f379cd60bdaeaffa1f6970a377999ccaaa393498 |
+| docs/specs/runtime-resource-observation.md | af29714c0372592a5a86141c6d4ea4f491cbf851 |
+| docs/specs/trace-inspector.md | d7ca9524d7e3bf26c6fe03e55c6175ca6abfc61a |
+| native/rust_helper/src/broker/audit.rs | eb1dcf5018d95c7fdf6171aadd4bca9554d1996f |
+| native/rust_helper/src/broker/mod.rs | b89af2d97706970e26df89daef961251fdc4a797 |
+| native/rust_helper/src/broker/notification_center.rs | ca6828a33baf94abd7101781d9730b22daca4a78 |
+| native/rust_helper/src/broker/observation_center.rs | 62896e497a0d78267020db6bae2ecadf704fa1fb |
+| native/rust_helper/src/broker/protocol.rs | 9b2076d5f31ca6d77f1f87973d1b394aaf751961 |
+| native/rust_helper/src/broker/runtime_registry.rs | 9ff28610862586a599848d75f9e891a6c6cadf2f |
+| native/rust_helper/src/broker/store.rs | 356b490e403b693db499befb777789784b57d40d |
+| packages/gui_shell_ui/lib/runtime_resource_client.dart | 2df13807ceed7f3305e13ca752cd31f824583543 |
+| packages/gui_shell_ui/lib/src/runtime_resource_client.dart | 3a8e611b94136e27f6d132e550a49bcbaf586eaf |
+| packages/gui_shell_ui/test/runtime_resource_client_test.dart | 46c52c83eab712e5b84599c7e29eed660af0ed12 |
+| release_blockers.registry.json | 244adc04a01e7b406c4ebcdeb829f7077d4aa35f |
+| specs/notification.schema.json | 3028750ccf7b647867314664cf5280ea7ec26812 |
+| specs/notification_action.schema.json | d7ab880c65799ac8e69a02c1ae1da594989e8f17 |
+| specs/notification_list.schema.json | 0fa037e50d58c10c4b5a7364c0a7472e708996b6 |
+| specs/observation_list.schema.json | 1c4eba48d5b8a3318253e7ba6890305bd5e89e7c |
+| specs/observation_metric.schema.json | eaa8757dd6b43611728c358a7277ac84efa5f242 |
+| specs/observation_span.schema.json | 8cc3b8e66f242e8009db546145ae8f3fa1582786 |
+| specs/observation_trace.schema.json | 8365f277eab716618c02e7635eaf5896e6a84820 |
+| specs/runtime_resource_observation.schema.json | 62f587b8c88d0c5c0bd316eaa3d0a15c9c1bd2d1 |
+| specs/runtime_resource_query.schema.json | c7617ba9c2283255fb04b6cfa529ff7b04f6137f |
+| tooling/canonicalization_vectors/runtime_resource_observation_decimal.json | ce00c0ea9571409a707c4e1993069c61761cb6a0 |
+| tooling/conformance_tests/run_conformance_skeleton.py | c6f31d8cb561b48513c6784e54c85969c9cb953e |
+
+
 ## 要求母集団・照合状態
 
 | 母集団 | 件数 | 正本・原典 | v4 E0状態 |
@@ -6058,7 +6158,7 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 | 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13は全E0-04 fieldを個別記録。P13旧aggregate evidence identity/classは`UNKNOWN`。N11 Evidence/Blocker/OS Artifact全数結合は未完 |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのE0-04 21 fieldを個別記録。旧status維持、N11 Evidence/Blocker/OS Artifact結合と製品Acceptanceは継続 |
 | D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜45はE0-04全21 fieldを個別記録。Evidence/Blocker/OS Artifact全数結合・Acceptance未完 |
-| 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K01〜K09はE0-04全21 fieldとSourceSHAを個別記録済み。K10〜K20の個別fieldとN11 Evidence/Blocker/OS Artifact結合は継続 |
+| 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K01〜K10はE0-04全21 fieldとSourceSHAを個別記録済み。K11〜K20の個別fieldとN11 Evidence/Blocker/OS Artifact結合は継続 |
 | Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 33 IDのscope/Consumer/現証拠境界と各21 fieldを記録。BUF-R/T Acceptance、cause/effectの全件結合、N11 evidence、OS artifactとの結合は未完 |
 | Buffer工程 B0〜B6 | 7 | `docs/緩衝基盤_rev5補遺_QC/`・v4仕様S06 | B0〜B4の限定CLOSEDを保持、B5 OPEN、B6未成立。詳細Consumer照合が未完 |
 | QE/監査 D4-QE-R01〜R13／D4-LNX-T01〜T08／D4-AUD-F01〜F07 | 13／8／7 | `docs/QE_2026-10-22/`・各採用記録 | 旧証拠と現在の実装/Validatorへの接続が未完 |
@@ -6101,7 +6201,7 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 ## 次のE0照合作業
 
 1. N01〜N10のE0-04 21項目は現行SourceSHAへ個別照合済み。各製品AcceptanceはOPENのまま維持し、N10の五OS実導入・利用・更新・Recovery QAは後続の製品Acceptanceに残す。
-2. C0〜C34およびPhase 0〜45の個別field記録を維持し、K01〜K09のSource mappingを再試験せず、K10〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
+2. C0〜C34およびPhase 0〜45の個別field記録を維持し、K01〜K10のSource mappingを再試験せず、K11〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
 3. BUF-R/TのSourceSHAとConsumer scopeは記録済み。AcceptanceはOPEN。B0〜B6の状態を保持し、原因→effect、N08/N10/N11、OS/Artifact/evidence結合を続ける。
 4. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 5. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
