@@ -3753,7 +3753,7 @@ Phase37のE0-04欄を全21項目で記録し、24件（24 unique path）のSourc
 | K11 A2A Card/Task/Message/Stream/Artifact/Host/identity/Trust | N04／B | A2A Card／Message／Task／Artifact／Stream UI→Broker外部作用、Host UI→metadata registry／表示Context (N04) | 外部metadataからTrustを生成しない。OS別作用を分け、macOSのMessage送信矛盾、Host越境Task、外部Agent installed E2E未成立を記録。 |
 | K12 Adapter Publisher/version/hash/signature/risk/compat/quarantine/update/stop | N03/N05／B・D | Desktop Runtime Center→Windows/macOS/Linux native Owner→Rust Broker Adapter Center→署名・state・quarantine consumer | 三Desktop OSのsource経路、署名検査と隔離時のBroker拒否を確認。外部artifact lifecycle、active process stop／Recovery、K12 Mobile管理consumer、installed acceptanceは未成立。K12はOPEN。 |
 | K13 Desktop Tray/quick stop/Palette/Search/Agent Center/Problems/Evidence/Recovery/Settings | N09／C | Flutter/Native surface→Broker Task・起動時ShellSnapshot・notification・recovery/search/tray projection（N09） | Agent CenterのTask start/state/cancel、SettingsのBroker client、Windows trayのbounded stop receiptはsource接続。Problems/Evidence/Recovery/Searchは起動時snapshot消費。Paletteは仕様のnavigation-onlyに対しtarget/path/commandをClipboardへ写す差分がある。同一Taskの結果・停止・Recovery・Evidence統合およびinstalled UI証拠は未成立。 |
-| K14 Compose/Preview/AI Edit/diff/independent review/controlled apply | N05/N07／D | Capability Catalog→Compose manifest/MCP Tool; AI proposal→independent review/apply candidate（N05/N07） | Composeはmanifest/source経路、AI Editはproposal/audit。independent review resultとBroker controlled apply/rollbackはBUILD_GAP。 |
+| K14 Compose/Preview/AI Edit/diff/independent review/controlled apply | N05/N07／D | Settings Compose/Preview→Rust Broker→MCP Tool; AI proposal→Agent Center Task/result／Workspace Inspector（N05/N07） | Desktop sourceはCompose／Preview／MCP Toolとproposal／Task事前検査までWIRED。Previewはrollbackを実行せず、proposalと審査結果・適用差分の独立結合、Broker controlled apply／rollbackはBUILD_GAP。Mobile consumer・installed artifact結合はなし。 |
 | K15 Export/module selection/pruning/identity/Broker/Installer/config consumption | N06/N10／E・G・H・I | Compose config→Exporter→identity/manifest/launcher/package/runtime candidate（N06/N10） | identity/manifest sourceあり。runtime config consumption、independent installed app、binary/resource pruningは未成立。 |
 | K16 Windows install/first-run/Setup Doctor/update/rollback/repair/uninstall | N10/N11／G・J | Windows artifact/staging→installed app/Broker→collector/Release Gate（N10/N11） | Build/staging/collector sourceあり。一般利用installer-first-run lifecycleとcurrent candidate evidence不足、Registry blocker unresolved。 |
 | K17 Linux native/macOS/Android/iOS IPC/protection/Device Link/GUI/install | N10およびN01/N02 Mobile／G・H・I | OS native bridge/package→Flutter/Core/Broker/Device Link→standard installed consumer (N10) | Linux nativeは必須。workflow/source候補はOS別だが標準package/installed lifecycle未成立。Mobile Task/MCPはBUILD_GAP、物理端末は不要。 |
@@ -6443,6 +6443,76 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 | tooling/conformance_tests/run_conformance_skeleton.py | c6f31d8cb561b48513c6784e54c85969c9cb953e |
 | tooling/schema_check/check_schemas.py | 7dca27717cbe5cccb45e1013b3436918a2322e75 |
 
+### K14 E0-04 21項目の個別照合
+
+| 現ID | K14 Compose／Preview／AI Edit／差分／独立審査／controlled apply。v4仕様S05 K14、N05/N07、工程表R03-D、施工指示I04-Dの横断能力として照合する。 |
+|---|---|
+| 旧ID | rev5 P8、D4 Phase 29〜31、旧K14。Phase 32 Export/Manifest bundleはN06/K15へ分離し、旧P8の当時status・限定証拠は変更しない。 |
+| 元原文／正本参照 | v4仕様S04 N05/N07・S05 K14・S09、工程表R03-D・R06 W04/G4／W05/G5、施工指示I04-D。正本hashは仕様8CEEDF21F881A783E35EE8642673FAAEEF949465343DF65E63DC21B04EE5A3EF、工程54F1B3E207EC884CBAA67233AEF22D0CADA2DD0D28FB66E23DA91FFBC5C7F721、指示334A79CBC8F7B17D81D27C040C451586C70AD1D355E9B45D6DE758DD1AA4F55F。 |
+| 対象 | Desktop Settings内Compose Catalog／Manifest／Preview／MCP Tool action、AI Edit proposal、Agent Centerの通常Task事前検査・Task/result表示、Workspace Inspectorの独立差分表示、およびRust Brokerの対応処理。Export/Module削除とOS installer lifecycleはK15/K16。 |
+| 目的 | 現在のRuntime／Agent／MCP Tool条件に基づく構成作成・Previewと、AI提案を未信頼のまま別主体で審査・検査し、明示した現在のWorkspace Permission／一回Approval下で適用・巻戻し可能にする。提案・Preview・結果表示は権限や適用ではない。 |
+| 生成元（Producer） | 操作者のSettings入力がCompose Manifest／候補Preview要求とAI Edit proposalを生成する。Brokerは現在のRuntime／Agent metadataおよびMCP Server/Tool Catalogを読み、Compose／Preview／Tool実行時に再検査する。AI Edit提案Taskの実結果、Workspace baseline/diffは別のAgentTask／Workspace read producer。 |
+| 実Consumer | ComposeClient→GUI Shell構成Catalog／構成／Preview Broker operations。SettingsのCompose Tool action→MCP connection client→Broker MCP call_tool（Manifest／Server／Tool束縛、現在Catalog／Schema・native Owner・一回Permission／Approval・Audit）。AI Edit client→Broker proposal receipt／Audit→Agent Centerの未信頼Task文脈・通常Task preflight。Taskの結果ProjectionとWorkspace Inspectorは別consumerであり、結果は未検証Agent申告として表示、Workspace diffは別のBroker読取／baselineに束縛。proposalから独立審査verdictを作るconsumerと専用controlled apply／rollback consumerは見つからない。 |
+| 契約／Data | gui_shell_compose、compose_catalog／receipt、gui_shell_preview、gui_shell_edit_proposal／receipt、agent_task_request、workspace_diff Schema。Composeは選択IDとCapability要求、Previewはcurrent/candidate Manifest・target・version_rollback mode・bounded diff、AI Editはedit ID・scope・instruction・target paths・expected changes・payload hash／Audit IDを扱う。Task受渡しはproposal/result provenanceとhashを未信頼contextとして渡し、Permission／Approval／Credential／Trust／Authorityを継承しない。Workspace diffは独立した登録・baseline・Content Exposure経路。 |
+| 正常時作用 | ComposeはCatalog整合を再検査してManifest receiptを返すがbuild／App identity／Permissionは生成しない。Previewは候補Manifestと決定論的差分・機能要求を返し、build／Export／rollbackを実行しない（rollback_available=false）。Compose Manifest付きのMCP Tool callはBrokerで現Catalog／Schemaと個別許可を再評価して元Toolを一回実行する。AI proposalはOwner/Developer明示要求として記録・Auditされ、通常のAgent Taskへ未信頼入力として渡す。別Workspace Taskの開始後は通常のfresh Permission／Approval経路を使う。 |
+| 否定時作用 | 不正／未知field、古いCatalog選択、Manifestに含まれないServer／Tool組合せ、invalid proposal／path、self-approval、通常資格によるproposal要求、Audit失敗はBroker/clientで拒否またはerrorにする。Agent申告のsummary／changed files／diff／testは独立証拠へ昇格しない。Capability metadataはAuthorityを作らない。N05記録済みのCapability registry不足・複数Server間Tool ID衝突gapは本行で重複Blocker化しない。 |
+| 停止／Recovery | Previewのrollbackは表示専用で実行不可。Proposal拒否／Audit失敗は書込み・Permission／Approval生成なしで停止。通常Taskは一般AgentTaskのfresh認可・取消・Recoveryへ接続するが、AI Edit専用apply／rollback状態機械・proposal差分との実変更照合・失敗後の専用Recoveryは未接続。Workspace recovery previewは別の読取契約でproposalへ束縛されない。 |
+| 標準OS候補 | 現sourceで明示確認できるのはDesktop Flutter／Rust Broker面。Windows installed K14候補との版・Artifact結合はUNKNOWN。macOS/LinuxのK14専用installed consumer／OS保証はUNKNOWN。Compose／AI EditのMobile source検索ではAndroid/iOS consumerなし。いずれも本Source mappingはOS QAではない。 |
+| 配布物 | Desktop Flutter UIとRust Brokerのsource consumer。現行Release候補・OS packageへK14構成やAI Edit controlled applyが結合した証拠はNONE。Standalone Export／Module pruningはN06/K15で別照合し、Manifest/portable bundleを完成Productと数えない。 |
+| 既存実装 | Settings Compose/Preview/MCP panel、ComposeClient、AiEditClient、Agent Centerのproposal／result／apply Task preflight、WorkspaceClient／Inspector／Diff panel、Rust compose_center／mcp_center／ai_edit_center／protocol／dialogue／workspace／workspace_diff、および各Schema・test source。Compose／Preview／Tool actionとproposal／Task-preflightはDesktop source上WIRED。 |
+| BUILD_GAP | 独立審査の結果と結論をBrokerが保持し、適用前に提案・審査記録・適用先Workspace・現差分を照合する利用先がない。Brokerによる変更範囲限定適用、適用結果の期待hash照合、AI Edit専用の巻戻し・復旧も未実装。現在の「結果適用Task」は別Workspaceを対象とする通常Agent Taskの事前検査であり、Brokerが結果差分を制御適用する処理ではない。実Capability目録／依存解決不足とTool ID重複はN05記録を参照し、Mobile利用経路不在を保持する。 |
+| ソース識別値 | 照合基準main HEAD=8855229d9caec6f6cbf94f9c2e135aa8f4c1a336。以下38の追跡対象ソース／契約／試験ファイルをこのHEADのGit blobで固定。SHAはソース同一性のみを示し、実行・導入済み製品の挙動は証明しない。 |
+| 試験区分 | 既存Rust UNIT: compose_centerの目録／Manifest／Preview／MCP組合せ検査、ai_edit_centerのowner-only proposal／self-approval／secret path拒否、Workspace差分。Flutter UNIT/widget: compose_client、settings_compose、ai_edit_client、agent_task_client、workspace_inspector。本単位では既存試験の実行なし。実製品／導入済み製品／外部MCP作用・OS受入れの証拠ではない。 |
+| 証拠ID | NONE。旧P8／Phase 29〜31の限定CLOSED・過去fixtureは履歴参照のみ。Git blob SHAを実行証拠へ昇格しない。 |
+| 既存阻止要件 | 既存W04/G4（N05）・W05/G5（N07）をOPENのまま参照。Release Registryは18件中16 unresolved／2 resolved、release_ready=falseを維持。新規Blocker・Evidenceは追加しない。 |
+| 状態 | K14 E0-04 21 fieldと編集前mainの38 SourceSHAを個別記録。Desktop Compose／Preview／MCP Toolおよびproposal／通常Task事前検査はsource WIRED、independent review→controlled apply／rollbackはBUILD_GAP。K14/N05/N07/W04/W05/E0はOPEN。 |
+| 残余 | 独立審査の記録・結論、Broker管理の適用／巻戻し、提案内容と実変更の照合、実能力目録／依存解決、複数MCP Server間のTool ID重複、Mobile利用経路なし、Desktop導入済み候補の未確認。既存N05/N07/W04/W05/K15/K17/E0の範囲に割り当て、新規Blockerは追加しない。 |
+
+#### K14 ソース識別値（編集前mainのGit記録）
+
+照合対象commit=8855229d9caec6f6cbf94f9c2e135aa8f4c1a336。38件すべてを編集前mainのGit treeと照合した。
+
+| 対象ファイル | Git識別値 |
+|---|---|
+| AGENTS.md | 1eafcadd129fd01f1f2f683594c381605ed7d48d |
+| docs/QE_2026-11-13/採用記録.md | f159c1aa6ea5bc6e80e0877d8068f7e44da4c4d3 |
+| docs/QE_2026-11-13/01_D4Pocket_統合製品実装仕様書_v4.md | 352c53180cbad07888beb956aad0fb2a58074c58 |
+| docs/QE_2026-11-13/02_D4Pocket_統合開発工程表_v4.md | d32dd251e5f7cbb97d92f6e7540d6b6ed0ecec05 |
+| docs/QE_2026-11-13/03_D4Pocket_Codex施工指示書_v4.md | 49447973e88c50a09b2f4978adfed84fd464c6d0 |
+| docs/QE_2026-11-13/E0_要求consumer台帳.md | 4d0d7fd57de60527b6fb43563728f59ee02d6f94 |
+| docs/QE_2026-11-13/進捗.md | fc2013a7e7f89e8754054d449003943e8e553a52 |
+| docs/specs/gui-shell-ai-edit.md | 33d2df562d2231d0d894afcbf6097c512a8efd8b |
+| docs/specs/gui-shell-compose.md | 6b43bb80f73d4268e734ac0afbc58b33ba07339f |
+| apps/desktop_flutter/lib/screens/agent_center.dart | 2472faeb31a64d624423c30a0a30d0f153d2e2a3 |
+| apps/desktop_flutter/lib/screens/settings.dart | 66374ec4157d573939e7f9cc5c36aecf5d65e251 |
+| apps/desktop_flutter/lib/screens/workspace_diff_panel.dart | 5e2154b870921a707b3da9a79c9f55055ce3cb1f |
+| apps/desktop_flutter/lib/screens/workspace_inspector.dart | a02c95ec5062583f9c37523fbaf604a8d2da107e |
+| apps/desktop_flutter/lib/services/agent_task_client.dart | f54cefac29eba3dcf383bba19b4f64ee682e6217 |
+| apps/desktop_flutter/lib/services/ai_edit_client.dart | ba5e62311a02749d2f9fe0e4e72e2b0d4e0a497d |
+| apps/desktop_flutter/lib/services/compose_client.dart | 8f9657d866b007a4d2212abefca4df9add81a702 |
+| apps/desktop_flutter/lib/services/workspace_client.dart | 870b48e8f4bbd648bcfebc5886addca3784bcfaf |
+| apps/desktop_flutter/test/agent_task_client_test.dart | 0477a0bbbb321082494b6b55711815d34419fdd9 |
+| apps/desktop_flutter/test/ai_edit_client_test.dart | c5ecd0353fdc811ec7c4d52a9c2b7d10e1d01723 |
+| apps/desktop_flutter/test/compose_client_test.dart | c3fe30faa668482e5a4e42b2f5f5e5b218a01dc8 |
+| apps/desktop_flutter/test/settings_compose_test.dart | a78353f93617cc7b17391549ea256f007a7acdb1 |
+| apps/desktop_flutter/test/workspace_inspector_test.dart | 2f6e53c2a38d5e23c88f2ad91e079bf8be4808a5 |
+| native/rust_helper/src/broker/ai_edit_center.rs | 7a1c2418dc6f71e14fc971385b6f4f2454d55b1c |
+| native/rust_helper/src/broker/compose_center.rs | d80658fd9a342140acc35560b2e4c4e4ae97d888 |
+| native/rust_helper/src/broker/dialogue.rs | c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999 |
+| native/rust_helper/src/broker/mcp_center.rs | 8f9ab897bdc625e448241ebd9b46f995cd1f22f6 |
+| native/rust_helper/src/broker/protocol.rs | 9b2076d5f31ca6d77f1f87973d1b394aaf751961 |
+| native/rust_helper/src/broker/workspace.rs | 68075d680a3c7d57785083e64d3d21523d79374c |
+| native/rust_helper/src/workspace_diff.rs | 990041d9f2a67e2d372371e74fafb225e4e78e79 |
+| native/rust_helper/tests/workspace_diff.rs | a467a45c233112c6f81ab8ffe504781e53aa937c |
+| specs/agent_task_request.schema.json | cb25bb3684656bfd670ea5832bbb7fc5988845b6 |
+| specs/gui_shell_compose.schema.json | 89b3d8e0e09c802d555fd6fee233daebc0fec045 |
+| specs/gui_shell_compose_catalog.schema.json | f9c76f5fa87bfb0866f33745dcd5a8a4e74864d5 |
+| specs/gui_shell_compose_receipt.schema.json | 7c4ac9d0f28f38f79a0074ed7d6c84d9124aadaa |
+| specs/gui_shell_edit_proposal.schema.json | b1a0b41570d5e1e1eadbf2ded3e8984d9fe21130 |
+| specs/gui_shell_edit_proposal_receipt.schema.json | d9f426e20254c8cf009b90e7be4cbccf453db286 |
+| specs/gui_shell_preview.schema.json | c8aa1c4b54f3395e603fbaae143ac9d8005c4659 |
+| specs/workspace_diff.schema.json | 1389ad85c48e263e688ab6dfa5276f96eb26fef0 |
+
 ## 要求母集団・照合状態
 
 | 母集団 | 件数 | 正本・原典 | v4 E0状態 |
@@ -6452,7 +6522,7 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 | 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13は全E0-04 fieldを個別記録。P13旧aggregate evidence identity/classは`UNKNOWN`。N11 Evidence/Blocker/OS Artifact全数結合は未完 |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのE0-04 21 fieldを個別記録。旧status維持、N11 Evidence/Blocker/OS Artifact結合と製品Acceptanceは継続 |
 | D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜45はE0-04全21 fieldを個別記録。Evidence/Blocker/OS Artifact全数結合・Acceptance未完 |
-| 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K01〜K13はE0-04全21 fieldとSourceSHAを個別記録済み。K14〜K20の個別fieldとN11 Evidence/Blocker/OS Artifact結合は継続 |
+| 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K01〜K14はE0-04全21 fieldとSourceSHAを個別記録済み。K15〜K20の個別fieldとN11 Evidence/Blocker/OS Artifact結合は継続 |
 | Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 33 IDのscope/Consumer/現証拠境界と各21 fieldを記録。BUF-R/T Acceptance、cause/effectの全件結合、N11 evidence、OS artifactとの結合は未完 |
 | Buffer工程 B0〜B6 | 7 | `docs/緩衝基盤_rev5補遺_QC/`・v4仕様S06 | B0〜B4の限定CLOSEDを保持、B5 OPEN、B6未成立。詳細Consumer照合が未完 |
 | QE/監査 D4-QE-R01〜R13／D4-LNX-T01〜T08／D4-AUD-F01〜F07 | 13／8／7 | `docs/QE_2026-10-22/`・各採用記録 | 旧証拠と現在の実装/Validatorへの接続が未完 |
@@ -6495,7 +6565,7 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 ## 次のE0照合作業
 
 1. N01〜N10のE0-04 21項目は現行SourceSHAへ個別照合済み。各製品AcceptanceはOPENのまま維持し、N10の五OS実導入・利用・更新・Recovery QAは後続の製品Acceptanceに残す。
-2. C0〜C34およびPhase 0〜45の個別field記録を維持し、K01〜K13のSource mappingを再試験せず、K14〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
+2. C0〜C34およびPhase 0〜45の個別field記録を維持し、K01〜K14のSource mappingを再試験せず、K15〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
 3. BUF-R/TのSourceSHAとConsumer scopeは記録済み。AcceptanceはOPEN。B0〜B6の状態を保持し、原因→effect、N08/N10/N11、OS/Artifact/evidence結合を続ける。
 4. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 5. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
