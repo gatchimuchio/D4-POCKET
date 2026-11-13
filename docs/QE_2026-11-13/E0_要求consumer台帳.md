@@ -414,7 +414,7 @@ N11は`OPEN`。ValidatorとRelease Gateは一部のRegistry/Windows evidence/man
 | P12 | 製品全体統合。REV5進捗ではWindows側`FEATURE COMPLETE`。正式release/Owner GOと分離された製品機能統合の履歴。 | v4仕様S05の直接対応はN01/N09/N10、関連能力K19。Phase 39〜45はC27〜C34のQC/回帰/文書/出荷範囲に関連。単一施工線へ閉じない。 | Windows product entry→Task/result/operation UI→OS product lifecycle。実TaskはN01、operation/observation/recoveryはN09、installed OS distribution/lifecycleはN10の現ConsumerとSHA節へ分割記録。 | `FEATURE COMPLETE`を正式Release/QAへ昇格しない。v4 N01/N09/N10は`OPEN`、Q0〜Q7は`DEFERRED`、`release_ready=false`。統合後の全候補・全OS acceptanceは未成立。 |
 | P13 | Mobile / Non-Windows Product Build。REV5履歴は2026-10-09に有限Product Build acceptanceを閉鎖したと要約する。旧Acceptanceの詳細evidence identity/classは本照合資料から`UNKNOWN`。 | v4仕様S05の直接対応はN10、関連能力K17。Phase 35/36はC24〜C26範囲に関連。施工線H/I。Linux native必須性は別途現行AGENTS/v4正本に従う。 | Linux/macOS Desktop、Android/iOS Mobile runner/native transport→Rust Broker／OS capability→installed product lifecycle。OS別source、package、workflow候補とSHAはN10節。 | 旧P13閉鎖を現行五OS標準installed QAへ移さない。Linux nativeは完全対応必須で、WSL/Xvfb/Headlessだけでは成立しない。Android/iOS実機を前提にせずEmulator/Simulator等を用いる。N10は`OPEN`、`linux_native_product_support`、`rev2_mobile_distribution`、`rev2_mobile_device_evidence`を保持。 |
 
-P0〜P13全14 IDの旧要求範囲・限定statusをv4 N/K/Consumerへ接続した。これは旧statusの書換え、v4 acceptance、N01〜N11のCLOSED、E0完了のいずれも意味しない。C0〜C34、Phase0〜45、K01〜K20のSource→Consumer/scope mappingを記録した。P0〜P5は本節後段で全E0-04 fieldを個別補完し、P6〜P13とN11 Evidence/Blocker/OS Artifact行結合は継続する。P0/P1/P4の直接対応はv4仕様S05の明示mappingへ合わせて訂正し、旧statusは変更していない。P13の詳細evidence identity/classは`UNKNOWN`として保持する。
+P0〜P13全14 IDの旧要求範囲・限定statusをv4 N/K/Consumerへ接続した。これは旧statusの書換え、v4 acceptance、N01〜N11のCLOSED、E0完了のいずれも意味しない。C0〜C34、Phase0〜45、K01〜K20のSource→Consumer/scope mappingを記録した。P0〜P6は本節後段で全E0-04 fieldを個別補完し、P7〜P13とN11 Evidence/Blocker/OS Artifact行結合は継続する。P0/P1/P4の直接対応はv4仕様S05の明示mappingへ合わせて訂正し、旧statusは変更していない。P13の詳細evidence identity/classは`UNKNOWN`として保持する。
 
 ### P0〜P3 E0-04項目の個別補完（2026-11-13、ソースと利用先の照合）
 
@@ -585,6 +585,73 @@ P4の阻止要件欄はRegistryに存在しない旧P専用IDを作成せず、�
 | 残件 | 同一AgentTask IDへのWorkspace diff/result/evaluation/test/resource/trace/Audit/Recovery/search結合、AgentTask操作の停止・再開・復旧、live evidence consumer、Regression CaseからEvaluation Datasetへの独立Owner操作を含む契約、Mobile/五OS installed consumer、N11 Evidence ID/Artifact/Blocker結合が残る。これらを本P5 mappingで実装要求へ昇格せず、N09/N11および後続QE工程の既存要件として保持する。 |
 
 P5の旧CLOSED履歴は限定Product Build機能と当時testだけに適用する。N09/N11のOPEN、Registry blocker状態、Evidence ID `NONE`を維持し、P5 E0行の完成を製品AcceptanceやE0全体完了へ拡張しない。
+
+### P6 E0-04項目の個別補完（2026-11-13、ソースと利用先の照合）
+
+以下は旧資格情報／MCP製品要求を現行v4へ結ぶE0照合である。rev5原本仕様書§16（原本SHA-256 `c0b78cfba1fb9c5c5de1947d01b47d0898f01b24de1aa8e1b0a0bd89e35c0877`）は`D4-AUD-F07`の全文・要求差分確認済み履歴に依拠し、原本全文を今回取得したとは主張しない。旧Product Build範囲は`docs/REV5_PRODUCT_PROGRESS.md`のP6節に照合した。v4仕様S05の直接対応はN02/N05、能力対応はK07/K08。Phase 16〜19・C7〜C9は歴史的関連範囲、施工線A/D/Fは工程対応であり、P6の旧状態を現在のN02/N05へ移さない。照合HEADは`2f6bdcb425b88bf75850b0e91d99f11213eaaf09`。
+
+| E0-04項目 | 記録値 |
+|---|---|
+| 現行ID | 旧製品要求`P6`。v4仕様S05の直接対応先は`N02/N05`、能力対応は`K07/K08`。Phase 16〜19／C7〜C9／施工線A・D・Fは別軸の対応である。 |
+| 旧ID | `P6 Credential / MCP`。rev5 Product Buildは`CLOSED`。当時の限定credential/MCP機能状態として保持し、現行N02/N05の完了へ移さない。 |
+| 原文参照 | rev5統合仕様書§16、原本SHA-256 `c0b78cfba1fb9c5c5de1947d01b47d0898f01b24de1aa8e1b0a0bd89e35c0877`。同一性・要求差分は`D4-AUD-F07`の`VERIFIED`履歴に依拠する。Product Build範囲・試験は`docs/REV5_PRODUCT_PROGRESS.md` P6節。現行契約はv4仕様S04/N02・N05、S05/K07・K08。 |
+| 対象 | OwnerによるCredential登録・metadata一覧・失効、Provider/Tool/Server/purposeへ束縛するCredential ID、Providerへの秘密値解決、MCP stdio接続/discovery/Tool実行・監査、およびTool結果を同一Agentへfresh認可付き後続Taskで渡す限定経路。Mobile Device Link用pairing Credentialは別契約で、P6 Provider/MCP Credentialには含めない。 |
+| 目的 | 秘密値をOS保護保管へ結び、現在の対象・用途・Permission/ApprovalをBrokerが再確認した後に限り指定Provider processまたは指定MCP childへ渡す。MCP Toolの実作用と未信頼結果をBrokerで監査・束縛し、権限を継承しない新AgentTaskが利用できるようにする。Credential参照・Capability metadataからAuthorityを作らない。 |
+| 生成側 | Native Owner Credential入力／登録・失効要求、Desktop MCP Connection CenterのServer/Tool/Credential ID metadata要求、Agent CenterのCodex Task内一回MCP提案、AI orchestration coordinatorの結果依存後続Task要求。Flutterはsecretを取得・保持・返却するproducerではない。 |
+| 実際の受け取り先 | Native OS入力→Rust Broker `credential_vault`→OS別保管先／Credential Audit。Provider要求→認証Broker→現在Task Permission/Approval後のCredential resolver→Codex Adapter→Codex CLI親process。MCP Center→`McpConnectionClient`→認証Broker `mcp_center`→現在のCatalog/Schema/Owner確認/一回Permission/Audit→`mcp_stdio`の対象stdio child。N02のTool結果はtask/runtime/session/workspace/source Task/hashに束縛したvolatile one-shot contextを経て`AgentMcpTaskController`の新Taskへ渡る。N05 Compose callは同じManifest/現在CatalogをBrokerが再確認して元Toolを呼ぶ。 |
+| 契約とデータ | Credential登録/list/receipt/revocation schema、MCP connection/tool call/receipt schema、Agent MCP提案schemaを個別に使用する。公開要求はCredential ID・用途・対象Server/Provider・環境変数名等の参照metadata。secretの保存hash/状態/用途/対象をBrokerが照合し、secret実値はFlutter・通常IPCのprojection・Audit content/log/error/trace/test artifactへ返さない。Device Link用`device_link_credential`は用途・主体が異なる。P6全体を一つに統合するSchemaはない。 |
+| 正常時の作用 | rev5履歴のProvider経路は有効Task grantsと使用Audit確定後に合成CredentialをCodex CLI親processへ渡し、CLI引数/result/Auditから除外し、tool child環境からも除外する。MCP経路は対象Credentialを接続stdio childだけへ渡し、metadata-only discoveryを返す。Tool callは現在Catalog・identity・Schemaを再確認しOwner確認／一回Permission／Audit後に一度実行し、本文を露出せずhash/bounded metadataを返す。後続Taskはsource Task/result hashを束縛し、新Permissionと新Owner Approvalを受ける。 |
+| 否定時の作用 | 不正/未知/revoked/期限切れCredential、用途・対象Provider/Server・env var名の不一致、保管hash/state不一致、Permission/Approval欠落、Tool/Catalog/Schema stale、Authority類似metadata、replay、不正なsecret encoding、Audit失敗は拒否し、未認可時にresolver/child起動/外部Tool callを行わない。MCP Catalog/Agent metadataからTrust・Permission・Approvalを生成しない。Mobile Device Link CredentialをProvider/MCP secretへ転用しない。 |
+| 停止と回復 | MCP Credential使用Auditを確定できない場合はTool/stdio childを停止し隔離する。Tool結果不明時は再送せず副作用確認を求める。Broker再起動でN02のvolatile result contextは失われ、後続Taskをfail-closedにする。Provider failureで自動fallbackしない。旧実Codex CLI／合成loopback試験はAPI要求前のMxC `CreateProcessSecurityEnvironment` failureで停止し、Provider/model状態を`unknown`のままにした。Credential revokeは既存のOwner操作・Broker規則で処理し、本mappingから物理削除・復旧保証を追加しない。 |
+| 標準対象OSの候補 | Windows/macOS/Linux native/Android/iOSが現行標準対象。Credential storage sourceにはWindows protected storage、Linux Secret Service、macOS Keychain経路がある。Provider/MCPの主要UI・Tool実行はDesktop sourceでWindows/Linux/macOS cfgを持つ。MobileのDevice Link pairing Credentialは別用途で、Mobile MCP Tool/Agent follow-up consumerはない。Linux nativeはWindows/macOSと同列の必須対象であり、WSLだけへ限定しない。各OSの保証version/arch/GUI条件はN10の`UNKNOWN`を維持する。 |
+| 配布 | 旧Windows Product BuildのDPAPI/fake CLI/`cmd.exe` fixture試験は一般Release・一般配布・別profile installed Credential操作の証拠ではない。Linux Secret Service/macOS Keychain sourceの存在も通常配布からCredential登録→installed MCP/Provider Taskまでの証明ではない。五OSの通常配布Artifact・署名identity・installed lifecycleはN10へ接続し未成立。Linux native package/GUI/secret service/IPCを必須製品経路として残す。 |
+| 既存実装 | Rust Broker `credential_vault`・`credential_storage`、Windows/Linux/macOS native credential input、Codex Adapter credential binding、MCP Center/Catalog/Tool call、stdio transport、AgentMcpTaskControllerと一回結果context、credential/MCP/agent request schemas、Desktop MCP Center/clientが現HEAD source上存在する。Linux Secret ServiceとmacOS Keychain向けstore実装も存在する。N02 Desktop Tool→fresh follow-up、N05 Compose→current MCP Tool sourceは`WIRED`だが、実installed all-OS acceptanceではない。 |
+| 実装不足 | N02/W02の実Codex→実MCP server→同じAgent結果依存Task→Auditのcurrent installed candidate証拠は未成立。N05/W04のCapability宣言と実能力の一致、同一candidate installedの元Tool作用/Auditも未成立。五OSごとのNative Owner input・OS vault・provider/stdio process・secret境界を同じ通常配布候補で通した証拠がない。MobileにProvider/MCP Credential経路・Tool action・AgentTask follow-upがない。Credential更新・対象変更・物理消去/recoveryなどの範囲を現行Sourceから完了扱いしない。 |
+| ソース識別SHA | 現HEAD blob SHA 30件を直下のP6 source表へ記録した。N02/N05の全Source→Consumer/test候補は本台帳N01/N02・N05 canonical source表、Evidence/GateのSourceSHAはN11表を併用する。各SHAは照合HEAD `2f6bdcb425b88bf75850b0e91d99f11213eaaf09`で検証する。 |
+| 試験区分 | rev5 P6履歴はSchema 158、正常例155、負例203、Conformance 234、Credential Vault Rust 7、Broker resolver境界1、偽Codex CLI合成Credential1、MCP Broker2、MCP stdio5、Desktop MCP metadata12、Credential ID登録画面1、および`cargo build --locked` PASSを記録する。Credential/MCPに関する子process試験は合成secret／`cmd.exe` fixtureで、外部Provider API成功ではない。実Codex CLI 0.160.0のloopback runはAPI要求前のMxC process failure。aggregate Rust 432 pass/2 fail/7 ignored、および別run 431 pass/0 fail/7 ignored/3 filteredのloopback/TLS履歴と`FQ-TEST-LOOPBACK`記録をその条件のまま保持する。本E0 mappingではこれら旧試験を再実行せず、現N02/N05 test sourceも`NOT_RUN`。 |
+| 証拠ID | `NONE`。旧Windows Product Build・fixture・Action run履歴は旧candidate/条件の記録であり、v4 P6/N02/N05/W02/W04向けEvidence IDは発行していない。Registry narrative内の個別run参照も同candidateのP6受入証拠に昇格しない。 |
+| 阻止要件 | P6専用Registry IDは確認できない。`comprehensive_extension_rev1_completion`はN02/N05を含む全体要件のblockerとして関連する。`linux_native_product_support`、`windows_installer_first_run_smoke`、`windows_broker_installed_smoke`、`rev2_flutter_broker_channel_boundary`、`rev2_mobile_flutter_native_device_link_boundary`はOS/IPC横断の関連候補だが、P6への直接帰属は`UNKNOWN`。Registry上の既存status/classificationを維持し、新blockerは作らない。 |
+| 状態 | 旧`P6 Product Build=CLOSED`と当時の限定範囲・試験/FAIL履歴を維持。現行`N02/N05/W02/W04=OPEN`、E0=`OPEN`、Evidence ID=`NONE`。P6 mapping完了は通常Release capability、外部Provider接続、五OS製品受入れ、N02/N05 closureを意味しない。 |
+| 残件 | 同一current candidateのCredential Owner入力→OS保管→Permission/Approval→実ProviderまたはMCP child→Tool結果→同Agent fresh Task→Audit/停止/Recoveryを各標準OSへ接続し、実secretを露出せず確認すること。Linux native標準package/GUI/Secret Service/IPCは必須。Mobileの未実装Provider/MCP操作とN02 follow-upはBUILD_GAPとして残す。N11 Evidence ID/Artifact/Blocker全数結合は別E0残件。 |
+
+#### P6 ソース識別値・該当ファイル
+
+下表は現HEAD `2f6bdcb425b88bf75850b0e91d99f11213eaaf09`上のGit管理ファイル識別値。試験用ソースの存在は本単位の実行・受入れを意味しない。
+
+| ファイル | 識別値 |
+|---|---|
+| `docs/REV5_PRODUCT_PROGRESS.md` | `9c978021d3982690e9aaa87896436bad7125b433` |
+| `native/rust_helper/src/broker/credential_vault.rs` | `029dccda7671d51c2bbd3debd4fe5d7e92221162` |
+| `native/rust_helper/src/broker/credential_storage.rs` | `86cf0459915bb748f2d3d5848b20913d9c6080f2` |
+| `native/rust_helper/src/broker/mcp_center.rs` | `8f9ab897bdc625e448241ebd9b46f995cd1f22f6` |
+| `native/rust_helper/src/adapters/codex_cli.rs` | `e5c9d1581ae9a1c0a3ae7fcfa626fdca6fea6d28` |
+| `native/rust_helper/src/adapters/mcp_stdio.rs` | `b7e08327541ad75bca53bb1563e0e20d576d9b66` |
+| `native/rust_helper/src/mcp_task_tool_stdio.rs` | `6107890e27be2b9f6bef93a9d46828a488aa1bf1` |
+| `native/rust_helper/src/windows_credential_input.rs` | `3f22358ce15f69d34a93ab5f46186374caba13ec` |
+| `native/rust_helper/src/linux_credential_input.rs` | `8594403a89e4ed1f8eab38b0bb73c62bbceeb79b` |
+| `native/rust_helper/src/macos_credential_input.rs` | `f4a44a0dd9d374243e38dab8726bb44c51970422` |
+| `apps/desktop_flutter/lib/main.dart` | `6109c821ab5dc809224bec5234c4c59db1d5f988` |
+| `apps/desktop_flutter/lib/screens/mcp_connection_center.dart` | `4c2dd1122e2162a4c3ab30b5c2536e267fee8519` |
+| `apps/desktop_flutter/lib/services/mcp_connection_client.dart` | `12a173a3956368c53615255c56ef06a2f5939c9a` |
+| `apps/desktop_flutter/lib/services/agent_mcp_task_controller.dart` | `fba6642904d98890339197bef269164970031830` |
+| `packages/agent_orchestration/lib/mcp_connection_client.dart` | `71b17973216160bdd2bc447243ba0b04fd0fec63` |
+| `packages/agent_orchestration/lib/agent_mcp_task_controller.dart` | `fa46ff071cfb306d3e463a9ad2c79b9149dab6f5` |
+| `specs/credential_registration.schema.json` | `65c8bc535e36c040e8574277f06ab1ecb2589d19` |
+| `specs/credential_list.schema.json` | `61f706b09533181df57ac781d7eed5adb1199254` |
+| `specs/credential_receipt.schema.json` | `657bfc7917123d212cff462ff7572886effc3457` |
+| `specs/credential_revocation_request.schema.json` | `43aed5aa2d4f8dc56d9f91386b69b73bed7a3427` |
+| `specs/mcp_connection.schema.json` | `a8d613bd911c9e88f949b984b1a2032eb19db332` |
+| `specs/mcp_tool_call.schema.json` | `54c044cdfb53588ea5bab4bd056404372dc39acd` |
+| `specs/mcp_tool_call_receipt.schema.json` | `0049a393104b035bbf047e653e962754bc4009b3` |
+| `specs/agent_mcp_tool_request.schema.json` | `f3aa71661ac1dadf453954141802a7663755da9d` |
+| `apps/desktop_flutter/test/mcp_connection_center_test.dart` | `c81a37ca78b15e57c838f48519aa3e4abb6d6665` |
+| `apps/desktop_flutter/test/agent_mcp_task_controller_test.dart` | `5c165d5362eea4906b6e739407b0d0e75c34485c` |
+| `apps/desktop_flutter/test/linux_credential_vault_test.dart` | `64c250a967fcfbc3b5da941810afbf558178dfe7` |
+| `apps/desktop_flutter/test/macos_credential_vault_test.dart` | `5d2ae1900cf31f7ff06ee6236ede132b0e933ea3` |
+| `native/rust_helper/tests/unit/codex_cli_fixture.rs` | `40e5750bf267ccf9e583971e0d2ba4e6125d9a5d` |
+| `native/rust_helper/tests/fixtures/fake_codex_cli.rs` | `f74302045176eeabd9ed36e85205fed3adc13767` |
+
+P6の旧CLOSEDは上記Product Build限定機能と当時条件に適用する。N02/N05/W02/W04/E0のOPEN、Release Registry、`release_ready=false`を変更せず、P6のSource mappingを現行製品受入れへ拡張しない。
 
 ## 旧C0〜C6のv4 Source→Consumer crosswalk（E0差分）
 
@@ -1079,7 +1146,7 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 |---|---:|---|---|
 | 新規要求 N01〜N11 | 11 | v4仕様S04 | 初期Producer/Consumer差分を記録。契約・否定・OS・証拠の全項目は未完 |
 | 全体施工線 A〜J | 10 | v4工程表R03・Codex指示I04 | 全線同時BUILDのproducer/consumerと現行実装配置を全数照合中 |
-| 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P5は全E0-04 fieldを個別記録。P6〜P13の個別field、P13の旧evidence identity/class、N11 Evidence/Blocker/OS Artifact全数結合は未完／UNKNOWN |
+| 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P6は全E0-04 fieldを個別記録。P7〜P13の個別field、P13の旧evidence identity/class、N11 Evidence/Blocker/OS Artifact全数結合は未完／UNKNOWN |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのSource→Consumer crosswalkを記録。個々の全E0-04列とv4 Acceptance／Evidence/N11結合は継続 |
 | D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDをv4 N01〜N11/A〜J/Kへcrosswalk済み。Phase固有E0-04全field、Evidence ID/Blocker、Acceptanceは未完 |
 | 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K別の完全E0-04 field、OS/Evidence/Blocker確認は継続 |
@@ -1124,7 +1191,7 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 
 ## 次のE0照合作業
 
-1. P6〜P13をID順に全E0-04 field、N11 Evidence ID、Blocker、OS対象/Artifactへ結合する。P0〜P5は完了済みmappingとして保持。続けてN/P/C/Phase/K残行へ展開し、既存CLOSED/FAILは履歴保持して再試験しない。
+1. P7〜P13をID順に全E0-04 field、N11 Evidence ID、Blocker、OS対象/Artifactへ結合する。P0〜P6は完了済みmappingとして保持。続けてN/P/C/Phase/K残行へ展開し、既存CLOSED/FAILは履歴保持して再試験しない。
 2. BUF-R/T crosswalkをCanonical N08/N10/N11 source SHA・各IDの完全E0-04 field・B5 evidenceへ結合する。B0〜B6の工程・状態・受入Consumer・証拠のcrosswalkは記録済み。個別cause/effect、OS/Artifact、N11 Evidence/Blockerの結合は継続。
 3. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 4. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
