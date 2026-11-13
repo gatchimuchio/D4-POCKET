@@ -3748,7 +3748,7 @@ Phase37のE0-04欄を全21項目で記録し、24件（24 unique path）のSourc
 | K06 Provider/Model/Runtime Adapter管理・選択・失敗・unsupported | N03／B | Agent Center選択→Broker ProviderModelSelection検証→Codex CLI Adapter／Capability→Task dispatchまたは明示reject（N03） | source上はProviderがCodex CLI固定、Model値を`--model`へ渡し、自動fallbackなし。MINIDORAは対話のみ。normal Release Windows/Linuxの`supported`宣言と`agent-runtime.md`の`unsupported`契約記述が不一致。第二のTask RuntimeとN03 AcceptanceはOPEN。 |
 | K07 Credential Vault/secret boundary/OS protection/lifecycle | N02/N05／A・B・F | native Owner request→Broker metadata/Audit/OS vault→Codex ProviderまたはMCP stdio child（N02/N05） | Desktop三OSの限定source consumerを確認。Linux `linux_secret_service`値が登録／receipt Schema enumから欠落。更新・物理削除／Recovery、五OS installed一体受入れは未成立。Mobile Device Link資格は別consumer。 |
 | K08 MCP server/transport/tool/resource/prompt/Center/isolation/AI consumption | N02/N05／A・D | Desktop Broker stdio Catalog→native Owner／Permission／Audit Tool→N02同Agent fresh-authorized follow-up、N05 current Compose→元Tool | Desktop Windows/Linux/macOS source WIRED。Resource/Prompt本文、HTTP/OAuth、Mobile作用なし。W02/G2・W04/G4 installed acceptance OPEN。 |
-| K09 Profile/Channel/signed update/rollback/repair | N09/N10/N11／C・G・H・I・J | Profile config/apply intent→Audit/config; signed package/update→OS installer/update center（N10/N11） | Profileの実Runtime consumerは特定されずBUILD_GAP/UNKNOWN。update sourceと製品lifecycle/正式署名は別で、配布証拠未成立。 |
+| K09 Profile/Channel/signed update/rollback/repair | N09/N10/N11／C・G・H・I・J | Profile config/apply intent→Broker/Audit; per-channel signed candidate→Broker Update Center/native Owner→stage/active-version/rollback/repair | 詳細はK09 E0-04。Profile Runtime apply consumerなし、Mobile consumerなし。Desktop sourceはWIREDの範囲と五OS installed Acceptanceを分離。 |
 | K10 Notification/Trace/MetricとAuditの分離 | N09/N11／C・J | Broker observation/notification→Flutter UI; Audit remains separate Broker store/finalizer（N09/N11） | notification/trace/metricはAuditに昇格しない。OS toast・complete spans・全画面同一Task projectionに残差。 |
 | K11 A2A Card/Task/Message/Stream/Artifact/Host/identity/Trust | N04／B | A2A/Host UI→Broker operation/Host metadata registry (N04) | 外部metadataからTrustを生成しない。OS別作用を分離し、macOS metadata-only、Host越境Task/外部installed E2E未成立。 |
 | K12 Adapter Publisher/version/hash/signature/risk/compat/quarantine/update/stop | N03/N05／B・D | Adapter catalog/manage operation→Broker registry/compatibility and risk projection（C19/N03/N05） | C19 sourceはmetadata管理範囲。署名・隔離・更新・停止の全lifecycle実consumerとinstalled proofは全数未確認/OPEN。 |
@@ -5950,6 +5950,105 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 | `docs/specs/linux-product-package.md` | `faad8b2a9487afc9a818ad3938e0ff92c77cc268` |
 | `release_blockers.registry.json` | `244adc04a01e7b406c4ebcdeb829f7077d4aa35f` |
 
+### K09 E0-04 21項目の個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | K09 Profile／Channel／署名Update／Rollback／Repair。現行v4 S05 K09。製品AcceptanceはN09/N10/N11と、Windows K16・全Desktop/MobileのK17に関連するが、source mappingをinstalled product acceptanceへ昇格しない。 |
+| 旧ID | C10／Phase 20 Profile、C11／Phase 21 Update Center。旧status・限定evidenceは当時のscopeに固定し、現K09 acceptanceへ転記しない。C12〜C14・Phase 22〜23のNotification/ObservationはK10等の別能力であり混在させない。 |
+| 原文参照 | 採用v4仕様S04 N09/N10/N11・S05 K09、工程表R03線C/G/H/I/J・R05/R06、施工指示I04-C/G/H/I/J・I06/I07。docs/D4_POCKET_PHASE_MAPPING.md Phase 20/21、docs/specs/operation-profile.md、docs/specs/update-center.md。仕様原本SHA-256=`8CEEDF21F881A783E35EE8642673FAAEEF949465343DF65E63DC21B04EE5A3EF`。 |
+| 対象 | Desktop SettingsのProfile CRUD/import/export/apply要求と、Broker所有Update Trust/Catalog、署名candidate確認・取得・stage・active-version切替・rollback・限定repair。OS別のnative Owner確認、Installer/Package、起動項目・Bootstrapperまでを境界別に照合する。 |
+| 目的 | Profileを再利用可能な設定dataとして保持し、Runtime/Taskへ適用する実consumerができてもPermission/Approval/Credential/Authorityの発行源にしない。UpdateではBroker所有trustと現在候補・package identityを照合し、Ownerが個別に確認した限定作用だけを実行する。 |
+| 生成元（Producer） | OperatorのSettings入力／Profile選択、更新候補取得要求、製品Manifestまたはcompile-time設定に束縛する公開Update Trust、channel別HTTPS source、署名済みcandidate metadata。秘密署名鍵はD4へ渡さない。 |
+| 実Consumer | Profile: Flutter `settings.dart`→`profile_client.dart`→認証Broker IPC→Rust `profile_center`／永続store→receipt/list表示。Update: Settings→`update_client`→既存Broker→`update_center`／`update_download`／`update_verification`→Windows Launcher、macOS/Linux Rust native Owner経路→`product_install`／`product_bootstrapper`／OS起動項目。Android/iOSにK09 Profile/Update consumerは見つからない。 |
+| 契約／Data | `profile`／`profile_list`／`profile_receipt`、`update`／`update_candidate`／`update_catalog`／`update_trust`／`update_list`／`update_receipt`／`update_download_job`、製品package manifest。ProfileにはRuntime/Adapter/requested Capability/Content Exposure/resource/UI preference等を保持するがAuthority fieldは不可。候補channel・署名対象bytes・Ed25519署名者fingerprint・package SHA-256/byte length・app/audit identity・固定導入root・Owner要求hashを結合。 |
+| 正常時作用 | ProfileはCRUD/複製/import/exportとcurrent hash検査付きapply intentをAuditし永続化する。apply応答は`apply_requested`で、Runtime設定やPermission ledgerを変更しない。UpdateはBrokerがchannel/source/trust/candidateを照合し、native Owner確認後にdownload→署名package検証→未起動version stage→個別確認によるactive record切替または前版rollbackを行う。Repairは記録された範囲の起動項目／有効payload回復に限定する。 |
+| 否定時作用 | Profile malformed/未知・Authority/secret混入/重複ID/stale hash/上限超過、永続state異常を拒否または起動時fail-closed。Updateはtrust不在/不正、署名不正・未信頼者、channel/source不一致、redirect/proxy/private-local address、size/digest/inventory/identity/path不一致、stale/unknown candidate、Owner不在・要求hash相違を拒否し、既存有効版を保つ。 |
+| 停止／Recovery | Profile更新はAuditとpersistent writeを要求し、起動時再検査する。apply後Rollback/Recovery consumerはない。Update download jobはprocess内状態で、Broker再起動後に自動適用せず、再要求時にcandidate/package/stageを再検証する。Rollbackはactive-version recordだけを切り替え、稼働中processやpackage/stageを変更・削除しない。Repairは検証不能なactive record/payloadを上書きしない。 |
+| 標準OS候補 | Windows／macOS／Linux DesktopにBroker Updateとnative Ownerのsource経路を確認。Linux nativeは独立必須対象。Android／iOSは現Mobile Device Link/UI経路にProfile/Update操作consumerなし。五OSすべての標準環境・版・archでのK09 acceptanceは未成立。 |
+| 配布物 | Windows／Linux exporter・product manifestおよびpackage/update fixture/harness sourceを確認。macOSのnative owner/launcher sourceを確認するが、一般installed update lifecycleは別未成立。Android/iOSのupdate package・Profile consumerは未確認。compile-time trustまたはExport Manifestの設定sourceは本番Publisher identity／実署名運用／配布物の成立を証明しない。 |
+| 既存実装 | Rust Profile Center/store dispatch、Update Center/HTTPS download/Ed25519 verification/package stage/active-version rollback、Windows Bootstrapper/起動項目修復、Mac/Linux native Owner要求、Flutter Settings/clients、Windows/Linux exporterとLinux installed acceptance harness、Schema/negative example・Rust/Flutter test source。 |
+| BUILD_GAP | Profileのapplyを実Runtime/Agent Task設定へ反映するconsumerと適用後Recoveryなし。Update Centerのchannel metadata/source bindingはあるが、通常利用者が配布channelを選択・切替する独立consumerは現sourceから特定できず`UNKNOWN`。Android/iOS K09 consumerなし。全OSの一般配布→installed→signed update→rollback/repair/uninstall lifecycle、production trust provisioning/Publisher identityの実証は未成立。 |
+| ソース識別値（SourceSHA） | 照合HEAD=`c9a09970a9b60b9231f9a9d7c6e6b81eec1532b3`（K09編集前main）。下段SourceSHA表のtracked path/blobをこのcommitへ固定。これはsource mappingでありruntime/package acceptanceではない。 |
+| 試験区分（TestClass） | Rust Profile/Update unit・fixture、Flutter client/widget、Schema positive/negative、Linux package/update acceptance harnessのsourceを確認。今回のSource mappingでは製品testは`NOT_RUN`。旧evidenceは記録当時のscopeのみ。 |
+| 証拠ID（Evidence ID） | `NONE`。source/contract/test-source mappingを現K09 installed product、五OS update、正式署名の実証へ転記しない。 |
+| 阻害要因（Blocker） | Registry 18件（16 unresolved／2 resolved）、`release_ready=false`と関連N09/N10/N11・K16/K17・W06/G6-WIN・W07/G6-OSのOPENを維持。新規Blocker/Evidence追加・status変更なし。 |
+| 状態 | K09 E0-04全21項目と編集前main SourceSHAを個別結合。K09 product acceptanceおよびE0全体は`OPEN`。旧C10/C11/Phase20/21の歴史statusを変更しない。 |
+| 残余 | Profile設定を実際の`Runtime`／`Task`へ反映する処理と適用後の復旧、一般利用者による更新`channel`選択の要件、本番公開鍵の登録運用、`Windows`／`macOS`／`Linux`で導入済み製品を更新する一連の処理、`Android`／`iOS`の操作consumer、各OS別の配布物・証拠・阻害要因をN11へ結合する作業。E1以降で既存sourceを再利用して不足consumerを全体`BUILD`へ接続する。 |
+
+#### K09 SourceSHA（編集前mainのGit blob）
+
+照合対象commit=`c9a09970a9b60b9231f9a9d7c6e6b81eec1532b3`。すべてGit追跡blobを個別照合する。
+
+| 対象ファイル | `Git blob` |
+|---|---|
+| AGENTS.md | 1eafcadd129fd01f1f2f683594c381605ed7d48d |
+| ROADMAP.md | 6a922a38cca617690bc08297274e907f0425b722 |
+| MANIFEST.sha256.json | 7eb11caf880704aeaed9f2dbc44ce8c61cf0aaae |
+| release_blockers.registry.json | 244adc04a01e7b406c4ebcdeb829f7077d4aa35f |
+| docs/QE_2026-11-13/01_D4Pocket_統合製品実装仕様書_v4.md | 352c53180cbad07888beb956aad0fb2a58074c58 |
+| docs/QE_2026-11-13/02_D4Pocket_統合開発工程表_v4.md | d32dd251e5f7cbb97d92f6e7540d6b6ed0ecec05 |
+| docs/QE_2026-11-13/03_D4Pocket_Codex施工指示書_v4.md | 49447973e88c50a09b2f4978adfed84fd464c6d0 |
+| docs/QE_2026-11-13/採用記録.md | f159c1aa6ea5bc6e80e0877d8068f7e44da4c4d3 |
+| docs/QE_2026-11-13/進捗.md | add6f7c3ffba169897e686ffe4cf1e175ff4367f |
+| docs/QE_2026-11-13/E0_要求consumer台帳.md | a1985d34e1ac44b276277432a71978c279a282db |
+| docs/D4_POCKET_PHASE_MAPPING.md | 064ea334f86b137d94fba2370d2a2fd732f6e972 |
+| docs/REV5_PRODUCT_PROGRESS.md | 9c978021d3982690e9aaa87896436bad7125b433 |
+| docs/specs/operation-profile.md | c53720b7eb4ad6983d3d84bb6cb3de563936c5e5 |
+| docs/specs/update-center.md | be37e1f661cb3e4cb05e7c1242051263665a92b2 |
+| docs/specs/windows-desktop-launcher.md | 609a0c724d5bb77ca15c7721e760267ac3c4d018 |
+| docs/specs/linux-product-package.md | faad8b2a9487afc9a818ad3938e0ff92c77cc268 |
+| docs/specs/linux-desktop-channel.md | c1cc8c1624c5b3ecc053bae32131b335456e47d5 |
+| docs/specs/macos-desktop-channel.md | 0611524b89c09365d35c33d23367a5fb6f65a4d6 |
+| specs/profile.schema.json | 8619ff6bb553d2d75a6400fd4a4528ca2b83c733 |
+| specs/profile_list.schema.json | df38cbef669704b4489a4111d579e975d91c544f |
+| specs/profile_receipt.schema.json | 7b9298f9fc5423051a33bfccc7bd28c4d8e875a6 |
+| specs/update.schema.json | 351a76c29f0279cc2cef92970f082ba7c2f7aaf1 |
+| specs/update_candidate.schema.json | 1d803d8a2aaf22576346c77f4c7113ad834d213c |
+| specs/update_catalog.schema.json | faa9297d56029f326cfe0c0962a5c89f55c97470 |
+| specs/update_download_job.schema.json | 42f457bf1fb1275c17f55a90f671cc91e8a51e2e |
+| specs/update_list.schema.json | b4ff3283dfd7e781bf6af9a0c208caf3aa7ed7e1 |
+| specs/update_receipt.schema.json | 86471c54dd55fa55bc1cdc7ebe32050d9f30ed36 |
+| specs/update_trust.schema.json | 5caa430cf621c09e6e3d96bd6c377758095b9491 |
+| specs/d4_pocket_product_package_manifest.schema.json | 3151ba81a869b87e6c0fa8f8633a0e424fc43ae7 |
+| native/rust_helper/src/broker/audit.rs | eb1dcf5018d95c7fdf6171aadd4bca9554d1996f |
+| native/rust_helper/src/broker/profile_center.rs | d56264a07ee9f51ffe25317e5a304aa7b97ae45a |
+| native/rust_helper/src/broker/protocol.rs | 9b2076d5f31ca6d77f1f87973d1b394aaf751961 |
+| native/rust_helper/src/broker/store.rs | 356b490e403b693db499befb777789784b57d40d |
+| native/rust_helper/src/broker/update_center.rs | f6fc98155fcd476765b60d382a680c7f7c6d675e |
+| native/rust_helper/src/broker/update_download.rs | 9f9f9b23113e724a206427bea082a11dd4764115 |
+| native/rust_helper/src/broker/product_install.rs | c91115bdf88dd28e5f3445e7ed66127902909677 |
+| native/rust_helper/src/broker/export_center.rs | 477e44d86ebf18d2b004a7294c9cdb14e35aa0f0 |
+| native/rust_helper/src/update_verification.rs | 6347d90043cc7196feece6d708fafe96d27f3f19 |
+| native/rust_helper/src/product_bootstrapper.rs | 3b0495dfc9a1937ba64f3f99c95ae4cc739ddc69 |
+| native/rust_helper/src/product_package.rs | a2deb2b6e77bc00ae8d01cd5ca306ee63baa20e5 |
+| native/rust_helper/src/desktop_launcher.rs | 6a9f335de07fa474ca10043aea63ad6e988b572d |
+| native/rust_helper/src/bin/gui_shell_desktop_launcher.rs | 809efba7a03eacddf9e172011149d9a8d5e3fda7 |
+| native/rust_helper/src/linux_desktop_launcher.rs | f58fb226f21093c2d1f062259d394b4f8ec022f6 |
+| native/rust_helper/src/linux_desktop_worker.rs | c7910e61c78e978d3cfb0c3cf882eed010c4730f |
+| native/rust_helper/src/linux_product_bundle.rs | f71ed312c629e81914c61180baeb9723b315a69a |
+| native/rust_helper/src/macos_desktop_worker.rs | 09fa26563fc671e07f23c73f7dd2a7f2cf3fed7e |
+| native/rust_helper/src/macos_desktop_owner.rs | 31e13a57fcde422878fae63083bd323e07f482ec |
+| native/rust_helper/src/bin/gui_shell_macos_broker.rs | 6c830d9de6e3e43bb4d829dae39412799a8704f9 |
+| apps/desktop_flutter/lib/main.dart | 6109c821ab5dc809224bec5234c4c59db1d5f988 |
+| apps/desktop_flutter/lib/screens/settings.dart | 66374ec4157d573939e7f9cc5c36aecf5d65e251 |
+| apps/desktop_flutter/lib/services/profile_client.dart | ab967d9fb3f84c48b7bbc9a1193fbf7563d99105 |
+| apps/desktop_flutter/lib/services/update_client.dart | 26d2e946b5b15ea3328867e606e9f75bf4bfc2d1 |
+| apps/desktop_flutter/test/profile_client_test.dart | ba2bba18bf3b7bc299940984d9240cd4eeffd29a |
+| apps/desktop_flutter/test/update_client_test.dart | f70bb4a6dbc2340b5d26d867496952629dad1218 |
+| apps/desktop_flutter/test/settings_install_flow_test.dart | 73fc7b9706a7f4246972db46d5398d8b73decb09 |
+| apps/desktop_flutter/test/widget_test.dart | f4e9c7b93f832ba2a2cefee779fd12426f240b04 |
+| tooling/export_windows_product.py | 31856179881a5a5aae1ba4451732e6de6cd7f338 |
+| tooling/export_linux_product.py | 47fe9a3032a5b2680e3f7d39b7cd64120ac83843 |
+| tooling/package_linux_product.py | 0d32d04ec5b43e1815b3664a323c17db79bc928a |
+| tooling/tests/run_linux_same_source_update_acceptance.py | 6891a0a2db378577d30aec9c9466af594864b8ec |
+| tooling/tests/linux_installed_product_smoke.py | 8020ed8d1d68d59cff6acf70c55856fdeb2125e3 |
+| tooling/tests/test_linux_installed_product_smoke.py | dc94f9b782d3699810bbe50230a5e9510a5739f7 |
+| tooling/tests/test_export_linux_product.py | 079a187de49cf8b2fb6a7ddadb4175d6916163d1 |
+| tooling/tests/test_linux_update_catalog_fixture.py | a841f259911eefe99f4e474e18c57aae91cde994 |
+| apps/mobile_flutter/lib/main.dart | abf16b9774d135c2f960633ad922be608b5fd0c5 |
+| apps/mobile_flutter/lib/services/device_link_client.dart | e8c49337127cb7f62fad248988b99707c5e49219 |
+
 ## 要求母集団・照合状態
 
 | 母集団 | 件数 | 正本・原典 | v4 E0状態 |
@@ -5959,7 +6058,7 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 | 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13は全E0-04 fieldを個別記録。P13旧aggregate evidence identity/classは`UNKNOWN`。N11 Evidence/Blocker/OS Artifact全数結合は未完 |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのE0-04 21 fieldを個別記録。旧status維持、N11 Evidence/Blocker/OS Artifact結合と製品Acceptanceは継続 |
 | D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜45はE0-04全21 fieldを個別記録。Evidence/Blocker/OS Artifact全数結合・Acceptance未完 |
-| 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K01〜K08はE0-04全21 fieldとSourceSHAを個別記録済み。K09〜K20の個別fieldとN11 Evidence/Blocker/OS Artifact結合は継続 |
+| 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K01〜K09はE0-04全21 fieldとSourceSHAを個別記録済み。K10〜K20の個別fieldとN11 Evidence/Blocker/OS Artifact結合は継続 |
 | Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 33 IDのscope/Consumer/現証拠境界と各21 fieldを記録。BUF-R/T Acceptance、cause/effectの全件結合、N11 evidence、OS artifactとの結合は未完 |
 | Buffer工程 B0〜B6 | 7 | `docs/緩衝基盤_rev5補遺_QC/`・v4仕様S06 | B0〜B4の限定CLOSEDを保持、B5 OPEN、B6未成立。詳細Consumer照合が未完 |
 | QE/監査 D4-QE-R01〜R13／D4-LNX-T01〜T08／D4-AUD-F01〜F07 | 13／8／7 | `docs/QE_2026-10-22/`・各採用記録 | 旧証拠と現在の実装/Validatorへの接続が未完 |
@@ -6002,7 +6101,7 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 ## 次のE0照合作業
 
 1. N01〜N10のE0-04 21項目は現行SourceSHAへ個別照合済み。各製品AcceptanceはOPENのまま維持し、N10の五OS実導入・利用・更新・Recovery QAは後続の製品Acceptanceに残す。
-2. C0〜C34およびPhase 0〜45の個別field記録を維持し、K01〜K06のSource mappingを再試験せず、K09〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
+2. C0〜C34およびPhase 0〜45の個別field記録を維持し、K01〜K09のSource mappingを再試験せず、K10〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
 3. BUF-R/TのSourceSHAとConsumer scopeは記録済み。AcceptanceはOPEN。B0〜B6の状態を保持し、原因→effect、N08/N10/N11、OS/Artifact/evidence結合を続ける。
 4. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 5. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
