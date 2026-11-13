@@ -426,6 +426,103 @@ blob SHAは照合HEAD `3d7213f1a36ad5f938f9602040570ac4777d1af0`上の値。
 | `native/rust_helper/src/broker/protocol.rs` | `9b2076d5f31ca6d77f1f87973d1b394aaf751961` |
 | `native/rust_helper/src/broker/dialogue.rs` | `c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999` |
 
+### N09 E0-04 21項目の個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | N09 利用・観測・復旧。Agent Center／Workspace／History／Diff／Eval／Resource／Trace／Problems／Audit／Recoveryを同一の実Taskへ結ぶ要求。 |
+| 旧ID | rev5 P0／P5／P12、総合機能拡張rev1 C1〜C6／C12〜C14／C20〜C23。製品能力K03／K04／K05／K10／K13。現行施工座標は仕様S04・S05、工程R03-C・R06 W00、指示I04-C。旧status・旧証拠は各履歴を保持し、N09へ転記しない。 |
+| 原文参照 | v4仕様S04 N09・S01・S03・S08・S09、S05 K03／K04／K05／K10／K13。工程表R03-C、R06 W00、R08。施工指示I04-C、I05、I10。旧P/C/Phase対応は本台帳の既存crosswalkおよび正本の原文を参照する。 |
+| 対象 | Agent Centerから開始したAgentTaskと、Workspace／History／Diff／Evaluation／Resource／Observation／Notification／Audit／Problems／Recovery／Search／Trayの製品面。各表示・操作を実Broker状態、同一Task ID、Workspace／Session／Runtime、Audit／Recoveryへ正しく束縛する範囲。 |
+| 目的 | 利用者が実行中・完了・失敗した同一Taskを操作・観測・結果確認・検索・復旧できるようにし、古いsnapshot、別Runtime操作、Dialogue replay、fixtureをTask実体として表示しない。停止と復旧の結果をBroker状態へ帰還させる。 |
+| 生成元（Producer） | 利用者のTask要求、Agent CenterのAgentTask preflight／start／state／cancel、BrokerのTask・Workspace・Runtime・Audit・Recovery状態、各観測operationの実測値またはunknown、通知対象Audit event。UI／Agent／MCP metadataはAuthorityの生成元ではない。 |
+| 実Consumer | Desktop Agent Center→AgentTaskClient→Rust Brokerのinspect／start／state／cancel。Workspace Inspector→WorkspaceClient→Brokerの限定tree／read／compare／change-list／diff／Recovery preview。HistoryClientはTask履歴metadataとDialogue履歴・replay／branchを別経路で扱う。EvaluationClient、RuntimeResourceClient、Observation／Notification clientは各Broker operationへ接続する。Audit／Problems／Recovery／Global SearchはShellCoreClientが起動時に取得したShellSnapshotを参照する。Windows Trayはsnapshot投影とOwner再確認待ちの全Runtime停止要求を持つ。Runtime Centerのpause／resume／restartはRuntime lifecycleでありAgentTask操作ではない。Mobile Device Linkは許可されたmetadata／resource／lifecycle／notification／History／stop要求を投影するがAgentTaskのstart／state／cancel／result consumerを持たない。詳細source pathは既存N09 traceおよび下記現行SourceSHA参照。 |
+| 契約／Data | `AgentTask request`／`ID`／`record`／`history page`／`content exposure`、Workspace登録／`inspection`／`diff`、`History grant`／`execution history`、`Evaluation Dataset`／`Experiment`／`result`、`Runtime resource query`／`observation`、`Observation span`／`trace`／`metric`、`Notification`、`Audit`／`Recovery`、`Windows tray stop`、`Mobile Device Link request`／`control`の現行`Schema`と`Broker protocol`。ID・hash・期限・対象・一回承認は各Broker境界で再検査し、Trace／Metric／History／Profile／通知／Adapter metadataからPermissionやApprovalを生成しない。 |
+| 正常時作用 | Agent CenterでTaskをinspectし、独立したPermission／Approvalを経てstartし、同Task IDでstate／cancel／resultを取得する経路はsource上WIRED。Workspace／History／Evaluation／Resource／Observation／Notificationの各限定operationも個別にBrokerへ接続される。Audit／Recovery／Searchは現状snapshot由来のbounded表示であり、同じTaskのlive履歴・Recoveryとしては扱わない。結果本文はBrokerのContent Exposure経路に従う。 |
+| 否定時作用 | 不正／未知ID、期限切れgrant、Workspace／Runtime binding不一致、余分なfield、未許可Device Link operation、欠落またはunknownの測定値は該当Client／Broker／Schemaで拒否・unknownとして扱う。Tray／Mobile全Runtime stop要求は実停止済みとして表示せず、Owner再確認待ちを返す。過去のWidget／Fixture成功をinstalled動作の証拠にしない。 |
+| 停止／Recovery | AgentTask cancel要求は同じTask IDへ送られ、Broker終端状態を再読する。Runtime停止は別のRuntime lifecycle／Owner承認経路。Workspace Recovery previewは候補表示で、実Recoveryではない。Audit／Problems／Recovery画面は起動時snapshotでありTask crash後のlive Recovery catalogではない。AgentTask pause／resume／restart／replayの完全な製品操作、全Taskに結合したprocess cleanup／Recovery表示は未接続。 |
+| 標準OS候補 | Windows／macOS／Linux native／Android／iOSの五OSを製品対象とする。現sourceはDesktop Flutter／Rust Broker、Windows固有Tray、および限定Mobile Device Link projectionを含む。Linux nativeは必須製品対象。OSごとのTask連続操作・観測・Recoveryのinstalled一致は本source mappingから推定せず、未確認。 |
+| 配布物 | N09固有の配布物なし。通常配布・install／update／repair／rollback／uninstallはN10のOS別package／installerへ接続する。Debug／portable／test fixtureはN09 installed acceptanceの代替ではない。 |
+| 既存実装 | AgentTask inspect/start/state/cancelとhash／Audit ID表示、Workspace限定読取／diff／Recovery preview、History Task metadataとDialogue replay／branch、独立Evaluation／Runtime Resource／Observation／Notification、snapshot型Audit／Problems／Recovery／Search、Windows Tray、Runtime lifecycle、Mobile projectionがある。Trace上限・応答上限、Credential／Audit／内容露出の既存境界は維持する。 |
+| BUILD_GAP | Diff／changed files／test result／Evaluation／Resource／Trace／Audit／Recovery／Searchの統一投影が同一AgentTask IDへ結合されていない。EvaluationとResourceはTask IDでなくDataset／Runtimeを受け取る。Workspace diffはWorkspace／baseline基準でTask成果Artifactではない。Dialogue replay／branchは新規要求でありAgentTask replayではない。Task pause／resume／restartはなく、Runtime lifecycleと混同できない。永続Audit／RecoveryのTask別検索と通知、Trayの実停止、Mobile Task operationは未成立。過去W02-B01のWindows UI Responding=False／CPU増加は観測済みだが、fake widgetでは再現せず原因・修正・同条件installed再検証はUNKNOWN。 |
+| `SourceSHA` | 基準HEAD=dd29c100c06ea5f029603932ab2f50259e84a794。直前のN09 source traceに記録した39 production blobは全39件が現在HEADでも同一SHA。追加の18 test sourceおよび46 Schema blobを下記現行表へ記録し、総計103 Git blobを個別照合した。ハッシュはGit blob識別値であり、test実行や製品Acceptanceの証拠ではない。 |
+| 試験区分（TestClass） | UNIT／FIXTURE／WIDGETのtest sourceとSchema／正常・否定exampleが存在する。今回Source mapping単位では製品Rust／Flutter／installed testを実行していない（NOT_RUN）。テストsourceの存在・hash照合はruntime動作の証拠ではない。 |
+| 証拠ID（Evidence ID） | NONE。W02-B01等の旧限定観測は履歴として保持し、N09の現候補Evidenceへ転用しない。 |
+| 阻害要因（Blocker） | N09製品AcceptanceはOPEN、W00はSCOPED_PASS。関連するW02はOPEN。Release Registry 18件中16 unresolved／2 resolved、release_ready=falseを維持する。N09固有Blockerの新規追加・既存Blockerの状態変更は行わず、既存Blockerとの直接帰属はUNKNOWNのままとする。 |
+| 状態 | N09 E0-04の21項目と現行source／test／Schema mappingは完了。N09製品AcceptanceおよびE0全体はOPEN。 |
+| 残余 | 同一Task IDに結び付いた結果・差分・試験・評価・資源・観測・監査・復旧・検索の表示と、Task停止／再開／再起動／再実行／分岐／通知の実操作接続。Task異常終了後の復旧一覧、Windows UI応答停止の根因是正と同条件確認、Mobile Task境界、五OSの通常配布済み製品経路・OS別証拠、N11の証拠／阻害要因／成果物結合が残る。 |
+
+#### N09 E0-04 現行SourceSHA補足
+
+下記は照合HEAD dd29c100c06ea5f029603932ab2f50259e84a794におけるtest source 18件と、N09関連Schema 46件のGit blob SHA。39 production sourceの個別path／SHAは上記N09履歴trace表にあり、全39件の現HEAD一致を確認済み。
+
+| 区分 | 出典ファイル | Git識別値 |
+|---|---|---|
+| 試験 | apps/desktop_flutter/test/agent_task_client_test.dart | 0477a0bbbb321082494b6b55711815d34419fdd9 |
+| 試験 | apps/desktop_flutter/test/history_screen_test.dart | 7828dc17fbf50cd0a2dca3255d90c3760030e58f |
+| 試験 | apps/desktop_flutter/test/history_content_test.dart | af34c1e4e61415916fe651a3f5096a95f946022b |
+| 試験 | apps/desktop_flutter/test/workspace_inspector_test.dart | 2f6e53c2a38d5e23c88f2ad91e079bf8be4808a5 |
+| 試験 | apps/desktop_flutter/test/evaluation_lab_test.dart | 9b068a34d9d22743bee74ba409c8d95bee938638 |
+| 試験 | apps/desktop_flutter/test/runtime_resource_test.dart | c44d66bb3797bf523be0f48f24d626068b8e4894 |
+| 試験 | apps/desktop_flutter/test/runtime_lifecycle_test.dart | 57cb17c453c3a50169d3f9e39de150c691e8e160 |
+| 試験 | apps/desktop_flutter/test/observation_client_test.dart | 6d6ac31671e16d771bbc1a39fa7edcd9a3929dfb |
+| 試験 | apps/desktop_flutter/test/notification_client_test.dart | e92e994e4a6107abc83de34cfed6032f260dd550 |
+| 試験 | apps/desktop_flutter/test/global_search_index_test.dart | 2b96129f13ab11bd38afb0aba5e9a5b07d8eb3e3 |
+| 試験 | apps/desktop_flutter/test/windows_tray_client_test.dart | 0b24e07221087e43355ac465ca4ace73a48af31e |
+| 試験 | apps/desktop_flutter/test/widget_test.dart | f4e9c7b93f832ba2a2cefee779fd12426f240b04 |
+| 試験 | apps/mobile_flutter/test/mobile_projection_client_test.dart | 74661d2f2e58046a83e99f711435e4c1b2a74b08 |
+| 試験 | apps/mobile_flutter/test/resource_overview_test.dart | 7695155627699274b8c0768c0de302344caa9eec |
+| 試験 | apps/mobile_flutter/test/device_link_test.dart | 509b4febc424d1c0fd330b71529b00457b5cf429 |
+| 試験 | packages/gui_shell_ui/test/evaluation_client_test.dart | 044d71b4b18b7efa8891a7df735f28e6ed674ac1 |
+| 試験 | packages/gui_shell_ui/test/runtime_resource_client_test.dart | 46c52c83eab712e5b84599c7e29eed660af0ed12 |
+| 試験 | packages/gui_shell_ui/test/runtime_lifecycle_client_test.dart | 1b1f274cdcd8d4cf92225db173eafcc09c0c9b8f |
+| Schema定義 | specs/agent_task_content_exposure.schema.json | a85b99c0213d18daaab3d5d863adcd3661f379a0 |
+| Schema定義 | specs/agent_task_history_page.schema.json | 4658365b2d4784becc96a1c84f004826d8cecd8e |
+| Schema定義 | specs/agent_task_id_request.schema.json | 4c6cb2096acbbf55e8a43f63e7d933e13ba42c22 |
+| Schema定義 | specs/agent_task_owner_approval.schema.json | d190c9a8cc3d715eb199459c37c14e5de0ad6ad8 |
+| Schema定義 | specs/agent_task_request.schema.json | cb25bb3684656bfd670ea5832bbb7fc5988845b6 |
+| Schema定義 | specs/agent_task_scratch_recovery.schema.json | 40f1eac71cd9645396ae7230d49cad25f3b77237 |
+| Schema定義 | specs/agent_task_workspace_permission_request.schema.json | 05f7a7f97c7bac884ce706cc7f1533792c35e486 |
+| Schema定義 | specs/agent_task_workspace_permission.schema.json | 01be05df95431e38ca5dc3ec1b5f04416b506fb2 |
+| Schema定義 | specs/agent_task.schema.json | a552389072088d6cd42b3588fefda332be4ae6b6 |
+| Schema定義 | specs/agent_workspace.schema.json | 47058678398b5aac1b0b1467cac7e78daef72b32 |
+| Schema定義 | specs/audit_checkpoint.schema.json | 9d18b2d8129f47c147e4bda79c5fdc7f84086023 |
+| Schema定義 | specs/audit.schema.json | 01da4c598b52b2ae80ebf46f9e9050d7bec16ca3 |
+| Schema定義 | specs/device_link_control.schema.json | a850f7b44eb4197ff7addfb0830fd339bdd5d592 |
+| Schema定義 | specs/device_link_request.schema.json | f0539522c5900148753c3e6eb500c935f7b11ac2 |
+| Schema定義 | specs/evaluation_case.schema.json | 5fed01706bb374697294ccb19eec1ae309d53f6a |
+| Schema定義 | specs/evaluation_comparison.schema.json | 124af9c4e4def4c048751e911809b6f2ed3b577a |
+| Schema定義 | specs/evaluation_dataset_registration.schema.json | a79c103e32229dc47d263e62c05914624085610b |
+| Schema定義 | specs/evaluation_dataset.schema.json | 8a90b7248e16c04d7b51ab9bca0a9a5f6c459ed1 |
+| Schema定義 | specs/evaluation_evaluator.schema.json | d2d5298afc927dfb82c73f136db7dce77bdccf13 |
+| Schema定義 | specs/evaluation_experiment.schema.json | e35d7a242a0a9d318900673df9fb900e841b93a2 |
+| Schema定義 | specs/evaluation_public_result.schema.json | 77a285a53a0473fc4185d18b37b863f90be71ada |
+| Schema定義 | specs/evaluation_result.schema.json | f1b994e19dfaf1473a615cbf1347de22f72ccbed |
+| Schema定義 | specs/mobile_local_recovery_audit.schema.json | aa30b130979b5f869b5a08cc21315f3918679747 |
+| Schema定義 | specs/notification_action.schema.json | d7ab880c65799ac8e69a02c1ae1da594989e8f17 |
+| Schema定義 | specs/notification_list.schema.json | 0fa037e50d58c10c4b5a7364c0a7472e708996b6 |
+| Schema定義 | specs/notification.schema.json | 3028750ccf7b647867314664cf5280ea7ec26812 |
+| Schema定義 | specs/observation_list.schema.json | 1c4eba48d5b8a3318253e7ba6890305bd5e89e7c |
+| Schema定義 | specs/observation_metric.schema.json | eaa8757dd6b43611728c358a7277ac84efa5f242 |
+| Schema定義 | specs/observation_span.schema.json | 8cc3b8e66f242e8009db546145ae8f3fa1582786 |
+| Schema定義 | specs/observation_trace.schema.json | 8365f277eab716618c02e7635eaf5896e6a84820 |
+| Schema定義 | specs/recovery.schema.json | 9a147fdb00678d20eab3668b60e65f357c06c771 |
+| Schema定義 | specs/regression_case_delete_recovery_receipt.schema.json | b9b1de18f811bc03f38d5dfaa497f673e335e496 |
+| Schema定義 | specs/regression_case_delete_recovery_request.schema.json | c69d71ef2f07a2a7090ba3d0d648448c60ca1c4e |
+| Schema定義 | specs/runtime_agent_task_history_access.schema.json | baddfeb38762fe0a04513cb1edcfcd258bd804ed |
+| Schema定義 | specs/runtime_agent_task_history_request.schema.json | 0bff21625a0f339367ae8352910b643b1f76b361 |
+| Schema定義 | specs/runtime_execution_history_page.schema.json | e6dab615707d30c9266df7dc67fc90df24d0ed9b |
+| Schema定義 | specs/runtime_execution_history.schema.json | 5b260e9b6026758dc0a730d3381b4f7d72ba2e98 |
+| Schema定義 | specs/runtime_history_access.schema.json | 8187ddce917c3e80f40c8ce1c4b89059277f1cfd |
+| Schema定義 | specs/runtime_resource_observation.schema.json | 62f587b8c88d0c5c0bd316eaa3d0a15c9c1bd2d1 |
+| Schema定義 | specs/runtime_resource_query.schema.json | c7617ba9c2283255fb04b6cfa529ff7b04f6137f |
+| Schema定義 | specs/tray_stop_request.schema.json | 579755262940027079b37ef859e6d2f32a071cc0 |
+| Schema定義 | specs/tray_stop_response.schema.json | d6cce063d5deaf7104b97ef67f4efb14f780cc72 |
+| Schema定義 | specs/windows_tray_projection.schema.json | 5c3975e03b34281a0f202374cf91127357f2a1e0 |
+| Schema定義 | specs/workspace_diff.schema.json | 1389ad85c48e263e688ab6dfa5276f96eb26fef0 |
+| Schema定義 | specs/workspace_inspection_request.schema.json | a8210c300b2909c040188d0766633f1e30884e7a |
+| Schema定義 | specs/workspace_inspection_response.schema.json | 6cc9f80f4dd9b8bd9f71441bee845017428fa38a |
+
 ## N10 標準OS導入・利用・更新・撤去 Source→Consumer追跡（E0差分）
 
 照合HEADは`2c220a4bdb06fff26471393422b063c9735811cc`。製品source比較基準は`d503a4ef6daac8942abd1cb011442ce28c78ec55`で、v4文書採用・台帳作業は以下の製品sourceを変更していない。`WIRED`は確認できたコード上のProducer→Consumer接続だけを意味し、一般利用者向け配布・installed lifecycle・対象OSの合格を意味しない。本単位はE0 source mappingであり、N10 acceptance test、現在候補の実OS QA、出荷適格性は`NOT_RUN`／未成立のまま扱う。
@@ -2897,7 +2994,7 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 
 | 母集団 | 件数 | 正本・原典 | v4 E0状態 |
 |---|---:|---|---|
-| 新規要求 N01〜N11 | 11 | v4仕様S04 | N01〜N08はE0-04全21項目を現行SourceSHAへ個別結合済み。製品AcceptanceはすべてOPEN、N09〜N11の個別全数照合は未完 |
+| 新規要求 N01〜N11 | 11 | v4仕様S04 | N01〜N09はE0-04全21項目を現行SourceSHAへ個別結合済み。製品AcceptanceはすべてOPEN、N10〜N11の個別全数照合は未完 |
 | 全体施工線 A〜J | 10 | v4工程表R03・Codex指示I04 | 全線同時BUILDのproducer/consumerと現行実装配置を全数照合中 |
 | 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13は全E0-04 fieldを個別記録。P13旧aggregate evidence identity/classは`UNKNOWN`。N11 Evidence/Blocker/OS Artifact全数結合は未完 |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのSource→Consumer crosswalkを記録。個々の全E0-04列とv4 Acceptance／Evidence/N11結合は継続 |
@@ -2944,7 +3041,7 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 
 ## 次のE0照合作業
 
-1. N01〜N08のE0-04 21項目は現行SourceSHAへ個別照合済み。各製品AcceptanceはOPENのまま維持し、次はN09製品操作・観測・RecoveryをProducer・実Consumer・拒否境界へ個別に結合する。
+1. N01〜N09のE0-04 21項目は現行SourceSHAへ個別照合済み。各製品AcceptanceはOPENのまま維持し、次はN10の五OS導入・利用・更新・Recovery consumerを個別に結合する。
 2. 残るN/P/C/Phase/K要求をCanonical N source/consumer・N11 Evidence/Blocker/OS Artifactへ接続する。旧CLOSED/FAILは履歴として保持し、再試験しない。
 3. BUF-R/TのSourceSHAとConsumer scopeは記録済み。AcceptanceはOPEN。B0〜B6の状態を保持し、原因→effect、N08/N10/N11、OS/Artifact/evidence結合を続ける。
 4. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
