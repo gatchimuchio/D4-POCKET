@@ -3070,6 +3070,90 @@ Phase 12〜14の3行は各E0-04全21項目を記録し、計52件のSourceSHA参
 
 Phase 15〜17の3行は各E0-04全21項目を記録し、85件（65 unique path）のSourceSHA参照を編集前main `3a573cbe76bea863318c1cb37fec49f21dec223e`へ結合した。P4、C7、C8の過去status/証拠範囲、N02/N03/N05/N10、Registry、Evidence IDは変更せず、現行製品Acceptanceを発行していない。Phase 18〜45、K01〜K20個別field、N11 Evidence/Blocker/OS Artifact結合は未完、E0はOPEN。Rust/Flutter product testとinstalled/五OS QAはNOT_RUN。
 
+#### Phase 18〜20 E0-04個別記録（2026-11-13）
+
+現行v4要求と実ConsumerをPhase別に照合する。SourceSHAは編集前main 1a3fffdd9cf140e80658723edaea4c07c85f987bのGit blob値であり、source mappingやfixtureは製品Acceptanceを証明しない。
+
+##### Phase 18 個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 旧Phase 18 MCP試験基盤。v4ではMCP契約／接続の否定・適合試験を支える限定test infrastructure。 |
+| 旧ID | Phase 18／C8・C9。fake server、fixture、conformanceの当時範囲と旧statusを履歴として保持する。 |
+| 原文参照 | v4仕様S04 N02/N05/N08/N11、S05 K08/K19/K20、工程表R03、docs/D4_POCKET_PHASE_MAPPING.md Phase 18、docs/specs/mcp-contract.md、docs/specs/mcp-connection-center.md。 |
+| 対象 | MCP discovery/catalog/Tool requestと応答のSchema・validator・Broker／Flutter consumerをfixtureで検査する開発用基盤。 |
+| 目的 | malformed、未知field、stale identity、Tool schema不適合、Authority／Credential混入などを検出し、試験用応答を実MCP接続やTrustへ昇格させない。 |
+| 生成元（Producer） | conformance vectors、Schema正常／否定例、Rust/Flutter test fixture、および開発専用synthetic stdio Server。 |
+| 実Consumer | tooling/conformance_tests/run_conformance_skeleton.py、Rust mcp parser／Broker validator、Flutter MCP client/controller testがfixture dataを消費する。macOS synthetic serverは開発用exampleで通常製品へ同梱しない。 |
+| 契約／Data | mcp_contract、connection/list/receipt、disconnect、tool_call/receipt、agent_mcp_tool_request Schemaとstdio JSON-RPC discovery／Tool応答。 |
+| 正常時作用 | 合成discovery／catalog／Tool応答と正常Schema例をvalidator・Broker consumerへ与え、期待するprojection／receipt形を検査できる。fixtureの応答は外部作用ではない。 |
+| 否定時作用 | malformed／unknown／oversize／unsupported schema、metadataによるAuthority主張、Tool identity／引数不一致等を拒否する試験sourceがある。 |
+| 停止／Recovery | fixtureまたはconformance不成立は失敗として扱い、実MCP操作・自動retry・Permission／Approvalを発行しない。開発fixtureのcleanup挙動を全OS production cleanupへ一般化しない。 |
+| 標準OS候補 | Rust／Flutterのtest sourceはある。synthetic MCP exampleはmacOS向け開発専用。Windows／macOS／Linux nativeのinstalled testを本mappingで実行・確認しておらず、Android／iOSのTool作用consumerは未接続。Linux nativeは必須製品対象。 |
+| 配布物 | test/conformance sourceと開発専用example。通常のD4 Pocket配布物へfixtureを含める契約はない。製品package／導入／OS別実行はN10で別途扱う。 |
+| 既存実装 | MCP Schema群、Rust parser／Broker code、Flutter test／controller source、conformance validator、およびmacOS専用synthetic stdio exampleを確認。実行結果は本単位では未取得。 |
+| BUILD_GAP | 現候補での実MCP接続・同Agent結果依存Task・Auditをfixture基盤から証明できない。OS別testの実行・installed product Acceptanceも本mappingの範囲外で未成立。 |
+| ソース識別値（SourceSHA） | 編集前mainのGit blob: docs/specs/mcp-contract.md=62fffe6af42253af5656ca06f630868487f277bc; specs/mcp_contract.schema.json=733f1ecf2ad968e98c7d0c3557e5ec897a4cac23; specs/mcp_connection.schema.json=a8d613bd911c9e88f949b984b1a2032eb19db332; specs/mcp_connection_receipt.schema.json=ef8909932c68391ce680bbf53b8d80db2254c5f2; specs/mcp_connection_list.schema.json=45f5613aa46be7f936bd87995da0b6b6b38d047f; specs/mcp_disconnect.schema.json=0808dab9afcafa3e2cd04743a081d33bb30e227d; specs/mcp_disconnect_receipt.schema.json=7c635dd550354263df062b68136b4a19f224aad7; specs/mcp_tool_call.schema.json=54c044cdfb53588ea5bab4bd056404372dc39acd; specs/mcp_tool_call_receipt.schema.json=0049a393104b035bbf047e653e962754bc4009b3; specs/agent_mcp_tool_request.schema.json=f3aa71661ac1dadf453954141802a7663755da9d; native/rust_helper/src/mcp.rs=0ba59eb42c2b2328c05044dc4d459f6b0e288703; native/rust_helper/src/broker/mcp_center.rs=8f9ab897bdc625e448241ebd9b46f995cd1f22f6; native/rust_helper/src/adapters/mcp_stdio.rs=b7e08327541ad75bca53bb1563e0e20d576d9b66; native/rust_helper/tests/unit/mcp_disconnect.rs=98b5ac79fc023f0188690fd787ca685ae88a40b2; native/rust_helper/examples/macos_mcp_fixture.rs=b7b805544a2445b10075dc920c8bd2d0d51f10ae; apps/desktop_flutter/test/mcp_connection_center_test.dart=c81a37ca78b15e57c838f48519aa3e4abb6d6665; apps/desktop_flutter/test/agent_mcp_task_controller_test.dart=5c165d5362eea4906b6e739407b0d0e75c34485c; apps/desktop_flutter/test/support/real_broker_mcp_probe.dart=0cc9aeb2b1ae6f0e14f1573d4e0cbd7aef7fa137; tooling/conformance_tests/run_conformance_skeleton.py=c6f31d8cb561b48513c6784e54c85969c9cb953e. |
+| 試験区分（TestClass） | Rust UNIT／FIXTURE、Flutter client／controller／widget、Schema／conformance、synthetic stdio source。各testは本Source mapping単位でNOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。本mappingでは新規Evidenceを発行せず、fixture／Schema／test sourceをLIVE_PRODUCT evidenceとしない。 |
+| 阻害要因（Blocker） | Registry 18件（16 unresolved／2 resolved）とrelease_ready=falseを維持。Phase 18固有の直接Blockerは未確定としてUNKNOWN。新規追加・既存status変更なし。 |
+| 状態 | Phase 18のE0-04全21項目を記録。旧C8/C9 status・試験履歴は元scopeに保持し、N02/N05/N08/N11の製品AcceptanceはOPEN。 |
+| 残余 | fixture／validatorの本単位実行、実外部MCPの現候補接続、五OS installed試験、N11 Evidence／Blocker／OS Artifact結合。 |
+
+##### Phase 19 個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 旧Phase 19 MCP接続管理。v4ではN02/N05とK08に属する実MCP discovery／connect／catalog／Tool作用／結果投影consumer。 |
+| 旧ID | Phase 19／C9。catalog・receipt・拒否試験の履歴statusを保持し、Phase 18 test infrastructureと実接続を混同しない。 |
+| 原文参照 | v4仕様S04 N02/N05/N10、S05 K08/K17、工程表R03、施工線A/D、docs/D4_POCKET_PHASE_MAPPING.md Phase 19、docs/specs/mcp-connection-center.md、docs/specs/mcp-contract.md、OS別MCP契約。 |
+| 対象 | Flutter MCP Centerから認証済Brokerを経由するstdio ServerのOwner確認付き接続・一覧・切断、明示Tool call、およびAgent MCP結果context接続。 |
+| 目的 | 実Tool作用を現在のBroker Catalog／Schema／一回Permission／Owner確認／Auditで統治し、Agent／Server metadataやMCP結果からTrust・Authorityを生成しない。 |
+| 生成元（Producer） | OperatorのServer設定・connect/list/disconnect/Tool要求、およびAgent Task本文から抽出する未信頼MCP Tool proposal。 |
+| 実Consumer | Flutter MCP Center→Broker client→Rust protocol／mcp_center→mcp_stdio child。Agent連携はmcp_connection_client／agent_mcp_task_controllerからBroker Tool result contextとfresh follow-up Taskへ接続する。Credential実値は対象stdio childに限定。 |
+| 契約／Data | MCP接続／一覧／受領記録、切断要求／受領記録、Tool実行要求／受領記録、資格情報ID参照、登録済み能力一覧の識別値、Tool識別子／引数識別値、監査ID、元Task結果識別値、Agent／Session／Workspaceへの結合情報。 |
+| 正常時作用 | Brokerが接続要求をnative Owner確認と既存Permission／Audit境界で処理し、Catalogを検査。明示Tool call時にcurrent Catalog／Schema／Credential bindingを再評価して一度dispatchし、許可された結果依存経路は同Agentの新しいTaskへ未信頼contextを渡す。 |
+| 否定時作用 | 未知Server／Tool、malformed／stale catalog、schema不一致、失効Credential、Owner／Permission／Audit不成立、Task／Session／Workspace結合ずれを拒否・隔離する。外部Toolの成否不明を成功にせず自動再送しない。 |
+| 停止／Recovery | transport／Tool結果が不明または監査不成立なら停止・隔離し、結果依存follow-upへ進めない。後続Taskは現在条件でPermission／Approvalを新規評価する。OS固有process containmentを維持し、全OS一様な子孫cleanupを推論しない。 |
+| 標準OS候補 | Windows／macOS／Linux native Desktopにsource経路。Linux nativeは必須製品対象だが本source mappingはinstalled acceptanceでない。Android／iOSのMCP Tool作用consumerはBUILD_GAP。 |
+| 配布物 | 独立MCP Center配布物なし。stdio Serverは利用者が接続する外部runtimeであり、D4 PocketのOS別通常package／installed境界はN10対象。 |
+| 既存実装 | Rust MCP parser／Broker catalog・Tool処理・stdio adapter、Windows native launcher／macOS限定Owner経路、Flutter Center／client／Agent controller、Credential bindingと関連test／probe sourceを確認。 |
+| BUILD_GAP | W02/G2の現候補installed実Codex→実MCP Tool→結果依存同Agent Task→AuditはOPEN。五OSのinstalled一体証拠、Mobile Tool作用、OS間process cleanup同等性も未成立。 |
+| ソース識別値（SourceSHA） | 編集前mainのGit blob: docs/specs/mcp-connection-center.md=64d46042f19fccb0f7a947a95711e9aae87a1564; docs/specs/mcp-contract.md=62fffe6af42253af5656ca06f630868487f277bc; docs/specs/macos-mcp-center.md=62482591a7db1948e279cdb09b06de7b3ded2afb; docs/specs/macos-mcp-credential-binding.md=a86e2a10bafd63caeb392159d31f4fd7d5c1fa9a; specs/mcp_contract.schema.json=733f1ecf2ad968e98c7d0c3557e5ec897a4cac23; specs/mcp_connection.schema.json=a8d613bd911c9e88f949b984b1a2032eb19db332; specs/mcp_connection_receipt.schema.json=ef8909932c68391ce680bbf53b8d80db2254c5f2; specs/mcp_connection_list.schema.json=45f5613aa46be7f936bd87995da0b6b6b38d047f; specs/mcp_disconnect.schema.json=0808dab9afcafa3e2cd04743a081d33bb30e227d; specs/mcp_disconnect_receipt.schema.json=7c635dd550354263df062b68136b4a19f224aad7; specs/mcp_tool_call.schema.json=54c044cdfb53588ea5bab4bd056404372dc39acd; specs/mcp_tool_call_receipt.schema.json=0049a393104b035bbf047e653e962754bc4009b3; specs/agent_mcp_tool_request.schema.json=f3aa71661ac1dadf453954141802a7663755da9d; native/rust_helper/src/mcp.rs=0ba59eb42c2b2328c05044dc4d459f6b0e288703; native/rust_helper/src/broker/mcp_center.rs=8f9ab897bdc625e448241ebd9b46f995cd1f22f6; native/rust_helper/src/adapters/mcp_stdio.rs=b7e08327541ad75bca53bb1563e0e20d576d9b66; native/rust_helper/src/broker/protocol.rs=9b2076d5f31ca6d77f1f87973d1b394aaf751961; native/rust_helper/src/broker/credential_vault.rs=029dccda7671d51c2bbd3debd4fe5d7e92221162; native/rust_helper/src/broker/credential_storage.rs=86cf0459915bb748f2d3d5848b20913d9c6080f2; native/rust_helper/src/mcp_task_tool_stdio.rs=6107890e27be2b9f6bef93a9d46828a488aa1bf1; native/rust_helper/src/broker/compose_center.rs=d80658fd9a342140acc35560b2e4c4e4ae97d888; native/rust_helper/src/desktop_launcher.rs=6a9f335de07fa474ca10043aea63ad6e988b572d; apps/desktop_flutter/lib/screens/mcp_connection_center.dart=4c2dd1122e2162a4c3ab30b5c2536e267fee8519; apps/desktop_flutter/lib/services/mcp_connection_client.dart=12a173a3956368c53615255c56ef06a2f5939c9a; apps/desktop_flutter/lib/services/agent_mcp_task_controller.dart=fba6642904d98890339197bef269164970031830; packages/agent_orchestration/lib/mcp_connection_client.dart=71b17973216160bdd2bc447243ba0b04fd0fec63; packages/agent_orchestration/lib/agent_mcp_task_controller.dart=fa46ff071cfb306d3e463a9ad2c79b9149dab6f5; native/rust_helper/tests/unit/mcp_disconnect.rs=98b5ac79fc023f0188690fd787ca685ae88a40b2; native/rust_helper/tests/agent_task_production_e2e.rs=fdc7565aa58fa7466e6e24e5492321e8015567eb; apps/desktop_flutter/test/mcp_connection_center_test.dart=c81a37ca78b15e57c838f48519aa3e4abb6d6665; apps/desktop_flutter/test/agent_mcp_task_controller_test.dart=5c165d5362eea4906b6e739407b0d0e75c34485c; apps/desktop_flutter/test/support/real_broker_mcp_probe.dart=0cc9aeb2b1ae6f0e14f1573d4e0cbd7aef7fa137; apps/desktop_flutter/test/widget_test.dart=f4e9c7b93f832ba2a2cefee779fd12426f240b04. |
+| 試験区分（TestClass） | Rust UNIT／FIXTURE／production E2E source、Flutter client／controller／widget、real Broker probe sourceあり。本mappingでは再実行しておらず、installed外部MCP Acceptanceではない。 |
+| 証拠ID（Evidence ID） | NONE。既存W02/G2履歴は当時のcandidate／条件で保持し、本mappingから新しいLIVE_PRODUCT Evidenceを発行しない。 |
+| 阻害要因（Blocker） | W02/G2はOPEN。Registry 18件（16 unresolved／2 resolved）・release_ready=falseを維持し、C9以外への直接帰属はUNKNOWN。新規Blockerなし。 |
+| 状態 | Phase 19のE0-04全21項目を記録。旧C9 status・Evidenceは履歴のまま、N02/N05/N10およびE0製品AcceptanceはOPEN。 |
+| 残余 | 現候補installed W02/G2、OS別実MCP接続・結果追跡、Mobile Tool consumer、N11 Evidence／Blocker／OS Artifact結合。 |
+
+##### Phase 20 個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 旧Phase 20 運用Profile。v4能力K09に直接対応し、N09/N11は運用状態確認・Audit／Evidence投影の境界で関係する。 |
+| 旧ID | Phase 20／C10。Profile CRUD・永続化・Permission非生成の旧statusを保持し、実Runtime適用の未接続を維持する。 |
+| 原文参照 | v4仕様S05 K09、S04 N09/N11の関連consumer、工程表R03/R06、docs/D4_POCKET_PHASE_MAPPING.md Phase 20、docs/specs/operation-profile.md。 |
+| 対象 | Desktop SettingsからProfileを作成／複製／一覧／適用要求／削除／export／importし、Brokerが文書を永続化・検査する経路。 |
+| 目的 | 再利用可能なRuntime／Adapter／Capability／Content Exposure／resource要求とUI preferenceを保持する一方、ProfileからPermission／Approval／Credential／Authorityを発行しない。 |
+| 生成元（Producer） | OperatorのSettings入力と選択からFlutter profile_clientがBroker operation requestを生成する。 |
+| 実Consumer | Settings→profile_client→認証済Broker IPC→Rust profile_center→Broker store内profiles.json。SettingsはBroker receipt／list projectionを表示する。Runtime／Agent TaskへProfileを適用するconsumerは現sourceから特定できない。 |
+| 契約／Data | profile／profile_list／profile_receipt Schema。Profile文書、ProfileID/hash、Runtime／Adapter ID、要求Capability、Content Exposure、network/resource limit、UI preference。 |
+| 正常時作用 | BrokerがCRUD／複製／入出力／一覧を処理する。適用要求は現在Profile hashを照合し、適用意図をAuditへ記録するだけでRuntime設定・Permission ledgerを変更しない。 |
+| 否定時作用 | unknown field、Authority／Credential混入、malformed／duplicate ID、stale hash、上限超過を拒否し、不正な永続stateを起動時fail-closedとする。 |
+| 停止／Recovery | atomic persistent writeと起動時再検査を用いる。Runtime適用consumer、適用後rollback、専用file pickerは未接続。Profile apply intentを実作用と扱わない。 |
+| 標準OS候補 | Desktop Flutter／Rust Broker sourceを確認。製品対象はWindows／macOS／Linux native／Android／iOSのまま。各OS installed Profile操作は本mappingでは未確認で、Linux native必須を維持。 |
+| 配布物 | 独立Profile packageなし。通常D4 Pocket productの一部候補であり、OS別package／installed lifecycleはN10に属する。 |
+| 既存実装 | Profile schemas、Rust profile_center／store dispatch、Flutter profile_client／Settings CRUD・apply intentおよびclient test sourceあり。実Runtime適用は見つからない。 |
+| BUILD_GAP | Profile valueをRuntime／Agent Taskの現在設定へ適用する実consumer、適用変更のRecovery、OS別installed Acceptanceは未成立。N09/N11との存在だけで適用完了としない。 |
+| ソース識別値（SourceSHA） | 編集前mainのGit blob: docs/specs/operation-profile.md=c53720b7eb4ad6983d3d84bb6cb3de563936c5e5; specs/profile.schema.json=8619ff6bb553d2d75a6400fd4a4528ca2b83c733; specs/profile_list.schema.json=df38cbef669704b4489a4111d579e975d91c544f; specs/profile_receipt.schema.json=7b9298f9fc5423051a33bfccc7bd28c4d8e875a6; native/rust_helper/src/broker/profile_center.rs=d56264a07ee9f51ffe25317e5a304aa7b97ae45a; native/rust_helper/src/broker/protocol.rs=9b2076d5f31ca6d77f1f87973d1b394aaf751961; native/rust_helper/src/broker/store.rs=356b490e403b693db499befb777789784b57d40d; apps/desktop_flutter/lib/services/profile_client.dart=ab967d9fb3f84c48b7bbc9a1193fbf7563d99105; apps/desktop_flutter/lib/screens/settings.dart=66374ec4157d573939e7f9cc5c36aecf5d65e251; apps/desktop_flutter/test/profile_client_test.dart=ba2bba18bf3b7bc299940984d9240cd4eeffd29a. |
+| 試験区分（TestClass） | Rust profile center source/unit coverage, Flutter profile client test, Schema/negative input source. 本Source mappingでtestはNOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。既存局所証拠を五OS Product acceptanceへ転記せず、新規Evidenceを発行しない。 |
+| 阻害要因（Blocker） | Registry 18件（16 unresolved／2 resolved）・release_ready=falseを維持。C10への直接Blocker帰属が不明なものはUNKNOWN。新規追加・状態変更なし。 |
+| 状態 | Phase 20のE0-04全21項目を記録。旧C10 status・証拠範囲は履歴のまま、K09関連・E0製品AcceptanceはOPEN。 |
+| 残余 | 実Runtime／Task適用、適用時のAudit／Recovery、専用file picker、OS別installed consumer、N11 Evidence／Blocker／OS Artifact結合。 |
+
+Phase 18〜20の3行は各E0-04全21項目を記録し、62件（44 unique path）のSourceSHA参照を編集前main 1a3fffdd9cf140e80658723edaea4c07c85f987bへ結合した。C8/C9/C10の旧status、N02/N05/N08/N09/N10/N11、W02/G2、Registry 18件（16 unresolved／2 resolved）、release_ready=falseを変更せず、新規Evidence ID／Blockerなし。fixture／Schema／sourceを製品Acceptanceへ昇格していない。Phase 21〜45、K01〜K20個別field、N11 Evidence／Blocker／OS Artifact全数結合、E0は未完／OPEN。製品test・installed runtime・五OS QAはNOT_RUN。
+
 ### 製品能力K01〜K20
 
 | K／S05能力 | v4関連N／施工線A〜J | 現行Producer→Consumer参照 | Source状態・残余・証拠境界 |
@@ -4613,7 +4697,7 @@ Phase 15〜17の3行は各E0-04全21項目を記録し、85件（65 unique path�
 | 全体施工線 A〜J | 10 | v4工程表R03・Codex指示I04 | 全線同時BUILDのproducer/consumerと現行実装配置を全数照合中 |
 | 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13は全E0-04 fieldを個別記録。P13旧aggregate evidence identity/classは`UNKNOWN`。N11 Evidence/Blocker/OS Artifact全数結合は未完 |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのE0-04 21 fieldを個別記録。旧status維持、N11 Evidence/Blocker/OS Artifact結合と製品Acceptanceは継続 |
-| D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜17はE0-04全21 fieldを個別記録、Phase 18〜45は個別field未完。Evidence/Blocker/OS Artifact結合・Acceptance未完 |
+| D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜20はE0-04全21 fieldを個別記録、Phase 21〜45は個別field未完。Evidence/Blocker/OS Artifact結合・Acceptance未完 |
 | 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K別の完全E0-04 field、OS/Evidence/Blocker確認は継続 |
 | Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 33 IDのscope/Consumer/現証拠境界と各21 fieldを記録。BUF-R/T Acceptance、cause/effectの全件結合、N11 evidence、OS artifactとの結合は未完 |
 | Buffer工程 B0〜B6 | 7 | `docs/緩衝基盤_rev5補遺_QC/`・v4仕様S06 | B0〜B4の限定CLOSEDを保持、B5 OPEN、B6未成立。詳細Consumer照合が未完 |
@@ -4657,7 +4741,7 @@ Phase 15〜17の3行は各E0-04全21項目を記録し、85件（65 unique path�
 ## 次のE0照合作業
 
 1. N01〜N10のE0-04 21項目は現行SourceSHAへ個別照合済み。各製品AcceptanceはOPENのまま維持し、N10の五OS実導入・利用・更新・Recovery QAは後続の製品Acceptanceに残す。
-2. C0〜C34個別field記録を維持し、Phase 18〜45／K01〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
+2. C0〜C34個別field記録を維持し、Phase 21〜45／K01〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
 3. BUF-R/TのSourceSHAとConsumer scopeは記録済み。AcceptanceはOPEN。B0〜B6の状態を保持し、原因→effect、N08/N10/N11、OS/Artifact/evidence結合を続ける。
 4. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 5. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
