@@ -61,7 +61,7 @@ LedgerのE0-04列は、現ID、旧ID、原文参照、対象、目的、Producer
 | N04 | Compare／Handoff／A2Aの実作用と権限非継承 | Compare/Handoff/A2A source consumerはある。N04個別E0-04へ現HEADのsource/hash・契約・試験源を記録済み。Compare実行時のfilesystem隔離、外部Agent連携、Artifact転送、Host越境は現installed候補の一貫した実証なし。Hostはmetadata registry。 | `OPEN`。source接続と実作用証拠を分離し、Compare/Handoff/A2A/Hostの残件を照合する。 |
 | N05 | 現実在Capability CatalogからComposeを経て元Toolを実行 | Brokerの現在Runtime/Agent metadata・接続MCP Tool CatalogをCompose時と実行時に再照合するsource経路は`WIRED`。N05 E0-04個別mappingを現HEADへ記録済み。 | `OPEN`。CapabilityはAgent Adapterの未信頼宣言metadataで、実Capability Catalog／依存解決のconsumerは未確認。重複Tool IDのBroker拒否も未成立。既存Windows fixture testは未実行、installed evidenceなし。 |
 | N06 | 独立App Exportと選択Moduleの実除去 | N06 E0-04へ現HEADのProducer→Consumer・Contract・実装状態を個別記録済み。Brokerの新規App/Audit identity・Manifest・依存plan、Windows/Linux developer bundle、Launcherのhash/identity検査はsource上接続。 | `OPEN`。Windows/Linux evidenceは`runtime_manifest_consumed=false`、`binary_pruning_verified=false`。Module planは依存閉包までで実除去なし。macOS/Mobile Export consumerも未接続。正規配布・独立Appの実機能・実除去/資源比較は未成立。 |
-| N07 | AI Edit proposalを別主体で審査しcontrolled apply/rollback | owner proposalのAudit、提案由来を束縛した別Workspace Taskの事前検査、fresh Permission/Approvalの通常経路はsource接続あり。 | `OPEN`。独立審査結果をapply前に確定するTask／Broker状態と、proposal由来の変更を照合するcontrolled apply/rollbackが`BUILD_GAP`。 |
+| N07 | AI Edit proposalを別主体で審査しcontrolled apply/rollback | N07 E0-04全21項目と現HEAD `cd06f58b`の45 SourceSHAを個別結合済み。Owner-only proposal/Audit、提案・結果の未信頼束縛、別Workspace Task事前検査、fresh Permission/Approvalはsource接続あり。 | `OPEN`。独立審査結果をapply前に確定するTask／Broker状態と、proposal由来の変更を照合するcontrolled apply/rollbackが`BUILD_GAP`。 |
 | N08 | Bufferが元Taskの意味を保ってOS/依存差を調停 | Codex CLI Task専用Workspace scratch・TEMP/TMP束縛・journal Recoveryと、Task終端の非権限Buffer記録はsource接続あり。 | `OPEN`。実装は限定的なCodex TEMP/scratch調停。全OS/依存差、独立した前後意味・副作用比較、B5自己適用・B6全Consumerは未成立／`BUILD_GAP`。 |
 | N09 | UIから実Task、結果、観測、停止・Recoveryを操作 | Desktop Agent CenterはBrokerのTask start/state/cancel/resultをTask IDへ束縛。Workspace Inspector、History、Eval、Resource、Observation、Notificationにも個別のBroker consumerがある。Trayは停止要求のみ。旧対応はP0/P5/P12、C1..6/C12..14/C20..23、K03/K04/K05/K10/K13。 | 部分`WIRED`。同一TaskへのDiff/Eval/Resource/Trace/Audit/Recovery/Searchの結合は未成立。Audit/Problems/Recovery/Searchは起動時snapshot由来、History replay/branchはDialogue新規要求でAgentTask再生ではない。AgentTask pause/resume/restart未実装。MobileにAgentTask操作なし。W02-B01 UI応答停止の原因は`UNKNOWN`。N09/W00は`OPEN`／`BUILD_GAP`。 |
 | N10 | Windows/macOS/Linux/Android/iOSで通常導入・利用・更新・撤去 | Windows/LinuxにはExport・portable/bootstrap/updateの部分経路、macOS/Android/iOSにはnative/UI・debug/Simulator build経路がある。一般利用者のOS正規配布からinstalled実Task・更新/復旧/撤去まで結ぶ現Release候補は未成立。 | `OPEN`。OS別source・package役割・既存test/evidence・不足を下記へ記録。標準保証のversion/arch/package/最低資源と各OSの一貫したinstalled lifecycleは未確定。 |
@@ -181,6 +181,82 @@ LedgerのE0-04列は、現ID、旧ID、原文参照、対象、目的、Producer
 | 否定／Authority | Brokerは通常資格での提案、自己承認、秘密pathを拒否する。Apply contextはAuthority/Permission/Approval/Credential/Trust非継承。異なるtarget Session/Workspace、fresh Task Permission/Approval、Owner apply instructionを使い、apply preparation中はTaskを開始しない。 |
 | TestClass / Evidence | Rust `ai_edit_center.rs` owner-only/proposal-only/secret-path negative unit tests、Flutter `ai_edit_client_test.dart` receipt/hash/Audit/untrusted-data tests、`agent_coordination_test.dart` snapshot-binding test、`agent_task_client_test.dart` unused-session condition test、`widget_test.dart` fake Brokerでのproposal/preflight/別Workspace準備testが存在。`UNIT`／`FIXTURE`。実Agentによる独立review、専用Broker apply/rollback、installed product evidenceはこのsource群で確認できない。 |
 | OS／状態 | 調査したsourceはFlutter Desktop設定・Agent Centerと共通Rust Broker。MobileのAI Edit consumer、各OS installed path/identityは`UNKNOWN`。Source traceのためRust/Flutter product testsは`NOT_RUN`。N07は部分`WIRED`、受入`OPEN`。 |
+
+#### N07 E0-04 21項目の個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | N07（AI提案／差分→別実行主体の審査・検査Task→使用者承認→controlled apply／rollback） |
+| 旧ID | v4 S05で`P8→N05/N07`、`Phase 31` AI編集提案、`K14`。工程座標は施工線D、`W05/G5`。旧P8のProduct Build状態・旧Phase履歴は維持し、現N07 Acceptanceへ昇格しない。 |
+| 原文参照 | v4仕様S04 N07／S05 K14、工程表R03線D・W05/G5、施工指示I04-D。提案と適用を分け、別Workspace／Session／実行主体で独立検査し、使用者の許可後にBroker管理の適用・rollbackへ接続する。提案入力とAgent申告は未信頼情報で、Authorityを継承しない。 |
+| 対象 | SettingsのAI Edit proposal→Broker `GUI Shell編集提案`→Audit付きreceipt→Owner／Developerの明示確認→Agent Centerの通常Task事前検査→異なるWorkspace／未使用Sessionへの結果受け渡し。現Consumerは最終的に通常Agent Taskへ戻り、専用のBroker apply／rollback operationは持たない。 |
+| 目的 | Owner／Developerが開始した開発TaskでAI提案を扱い、提案者の主張だけで変更を承認・適用しない。独立した審査結果、fresh Permission／Approval、proposal由来の実変更照合と回復をBroker境界に接続する。 |
+| 生成元（`Producer`） | Settings UIで指示・対象path・予定変更を明示し、`AiEditClient.propose`が要求を生成する。別Workspaceへの適用準備では、Agent Centerが元proposal ID／payload hash／Audit ID、元Task／完了result hash、target Session／Workspaceをsnapshotへ束縛し、Owner／Developerの適用指示を含む新規`AgentTaskRequest`を作る。 |
+| 実Consumer | Rust `ai_edit_center::propose`はOwner経路でproposalを検査し、`INTERNAL_STATE` Audit receiptを返す。Flutterは確認済みproposalを未信頼contextとしてAgent Centerへ渡す。適用準備側はsnapshotを再照合し、異なる未使用Sessionへ`require_unused_task_session=true`付き要求を送り、`AgentTaskClient.inspect`まで実施する。Task開始後の書込は、対象Workspaceの通常PermissionとTask単位Approvalを新規取得するAgent Task経路の作用であり、AI Edit専用apply consumerではない。 |
+| 契約／Data | `gui_shell_edit_proposal.schema.json`／receipt schema、`ipc_request`／`ipc_response`、`agent_task_request`／`agent_task`、Workspace Permission request／record、Owner Approval、Content Exposure、`approval.schema.json`。意味正本は`docs/specs/gui-shell-ai-edit.md`、Task履歴は`docs/specs/agent-task-history.md`。Proposal hashとAudit ID、source Task/result hash、target Session／Workspace、unused-session条件を束縛する。本文・Result・権限は相互継承しない。 |
+| 正常時作用 | Brokerは`owner_required`、schema、ID／範囲／target path、repository rule acknowledgement、`self_approval=false`、`execution_mode=proposal_only`を検証し、本文をAuditへ保存せずpayload hashを記録する。受理receiptは`apply_status=not_started`、`files_written=false`、`permission_generated=false`を固定する。明示確認後のTask準備と実行は通常Brokerの事前検査・fresh Permission／Approvalへ戻る。 |
+| 否定時作用 | 非Owner、unknown field、禁止path／secret／`.git`等、自己承認、`proposal_only`以外、不正ID／指示／変更数をrejectする。result・source Task・Session／Workspace／proposal hashの不一致、Content Exposure不足、使用済みtarget Sessionまたは履歴照合不能は事前検査を拒否する。拒否をaccepted／appliedへ昇格しない。 |
+| 停止／Recovery | proposal Audit append失敗は受理を返さない。snapshotが入力待機中またはBroker応答中に変化した場合、full resultが許可されない場合、targetが使用済みの場合、Broker／fresh Permission／Approvalが得られない場合はTask開始・書込前に停止する。開始後は通常TaskのRecoveryへ接続するが、AI Edit専用のrollback transaction／result-to-diff recovery consumerは見つからない。 |
+| 標準OS候補 | 共有Flutter Desktop UIとRust Brokerのsource経路を確認。Windows／macOS／Linux nativeのinstalled AI Edit候補は現mappingで未実証、Android／iOSにはAI Edit UI／consumerを確認できない。Linuxは必須製品対象のまま維持し、他OSの未確認をPASSとしない。 |
+| 配布物 | N07専用の配布物はない。通常製品のOS package／install／updateはN10へ接続する。N07のsource・schema・fixtureは独立Productの配布・installed動作を示さない。 |
+| 既存実装 | `settings.dart`／`ai_edit_client.dart`のproposal UI・request、`ai_edit_center.rs`のOwner-only proposal受付とAudit hash、`main.dart`／`agent_center.dart`の明示受渡し、`AgentAiEditResultApplySnapshot`のprovenance束縛、`agent_task_client.dart`のpreflight、`dialogue.rs`／`execution_history.rs`のTask・未使用Session照合を確認。秘密値やApprovalを提案から移送しない。 |
+| BUILD_GAP | 独立審査の結果をapply前に固定する専用Task／Broker状態がない。現行apply準備指示は、同一の通常Taskに調査・検査とWorkspace変更を依頼するため、審査完了と適用許可を独立した段階として確定しない。Brokerが実changed files／diffをproposalと照合するapply operation、AI Edit専用rollback／recovery、変更後の実Consumer確認も未接続。 |
+| `SourceSHA` | 照合HEAD=`cd06f58b6541131bc5d4d39bb5434b31eed6b3cb`。下記45 Git blobを個別に記録し、全path／blobを照合した。既存N07/N08先行trace（HEAD `03f7b92d…`）とP8 crosswalkは履歴として残す。 |
+| 試験区分（`TestClass`） | Rust `ai_edit_center.rs`等のUNIT、Flutter `ai_edit_client_test.dart`／`agent_coordination_test.dart`／`agent_task_client_test.dart`／widget testsのFake Broker・snapshot binding、Schema valid／negative fixture、Conformance static check。これらはSOURCE／UNIT／FIXTUREであり、独立Agent review、専用apply／rollback、installed productのEvidenceではない。本mapping作業では製品Rust／Flutter／installed testを`NOT_RUN`とする。 |
+| 証拠ID（`Evidence ID`） | `NONE`。本作業は現HEADへのSourceSHA mapping。既存N07/N08 source trace、P8局所試験、schema／fixtureを現N07 installed acceptanceへ転記しない。 |
+| 阻害要因（`Blocker`） | N07／施工線D／W05-G5は`OPEN`。Registry 18件（16 unresolved／2 resolved）、`release_ready=false`を保持し、新規Blocker／Acceptanceは追加しない。 |
+| 状態 | N07 E0-04 mappingは21 field・45 SourceSHAを現HEADへ結合済み。N07製品Acceptance、W05/G5、E0全体は`OPEN`。 |
+| 残余 | 審査結果を別実行主体の独立成果として確定するBroker consumer、Ownerの審査後許可を束縛したcontrolled apply、実diff照合、専用rollback／Recovery、各OS installed候補の実作用が残る。 |
+
+##### N07 現行ソース識別値（`SourceSHA`）
+
+| `Source file` | `Git blob SHA` |
+|---|---|
+| `apps/desktop_flutter/lib/screens/settings.dart` | `66374ec4157d573939e7f9cc5c36aecf5d65e251` |
+| `apps/desktop_flutter/lib/main.dart` | `6109c821ab5dc809224bec5234c4c59db1d5f988` |
+| `apps/desktop_flutter/lib/screens/agent_center.dart` | `2472faeb31a64d624423c30a0a30d0f153d2e2a3` |
+| `apps/desktop_flutter/lib/services/ai_edit_client.dart` | `ba5e62311a02749d2f9fe0e4e72e2b0d4e0a497d` |
+| `apps/desktop_flutter/lib/services/agent_coordination.dart` | `bdc13464f0e42b740a2bca3b7e8828a5019056d0` |
+| `apps/desktop_flutter/lib/services/agent_task_client.dart` | `f54cefac29eba3dcf383bba19b4f64ee682e6217` |
+| `apps/desktop_flutter/test/ai_edit_client_test.dart` | `c5ecd0353fdc811ec7c4d52a9c2b7d10e1d01723` |
+| `apps/desktop_flutter/test/agent_coordination_test.dart` | `6783e87a492d8436a855a7088b7cece38d122bd5` |
+| `apps/desktop_flutter/test/agent_task_client_test.dart` | `0477a0bbbb321082494b6b55711815d34419fdd9` |
+| `apps/desktop_flutter/test/settings_compose_test.dart` | `a78353f93617cc7b17391549ea256f007a7acdb1` |
+| `apps/desktop_flutter/test/widget_test.dart` | `f4e9c7b93f832ba2a2cefee779fd12426f240b04` |
+| `native/rust_helper/src/broker/ai_edit_center.rs` | `7a1c2418dc6f71e14fc971385b6f4f2454d55b1c` |
+| `native/rust_helper/src/broker/protocol.rs` | `9b2076d5f31ca6d77f1f87973d1b394aaf751961` |
+| `native/rust_helper/src/broker/dialogue.rs` | `c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999` |
+| `native/rust_helper/src/broker/execution_history.rs` | `8eeb1c26d06a9e4b01806413a4bfa8c2a73357d6` |
+| `native/rust_helper/src/broker/agent_task_scratch.rs` | `de743cd819fb4533c9c3070c4e7bcae82e42d938` |
+| `native/rust_helper/src/adapters/codex_cli.rs` | `e5c9d1581ae9a1c0a3ae7fcfa626fdca6fea6d28` |
+| `native/rust_helper/tests/agent_task_production_e2e.rs` | `fdc7565aa58fa7466e6e24e5492321e8015567eb` |
+| `native/rust_helper/tests/unit/agent_task_fixture_fs.rs` | `d19ac79583b98bec9b828d6e064fe832af95bfa5` |
+| `specs/gui_shell_edit_proposal.schema.json` | `b1a0b41570d5e1e1eadbf2ded3e8984d9fe21130` |
+| `specs/gui_shell_edit_proposal_receipt.schema.json` | `d9f426e20254c8cf009b90e7be4cbccf453db286` |
+| `specs/ipc_request.schema.json` | `f4cb3a2d9a5eeba88638eff084f25ef615fc5813` |
+| `specs/ipc_response.schema.json` | `52b2dd30bb291bae4e4fdfa328cbc8c27ab0908b` |
+| `specs/agent_task_request.schema.json` | `cb25bb3684656bfd670ea5832bbb7fc5988845b6` |
+| `specs/agent_task.schema.json` | `a552389072088d6cd42b3588fefda332be4ae6b6` |
+| `specs/agent_task_workspace_permission_request.schema.json` | `05f7a7f97c7bac884ce706cc7f1533792c35e486` |
+| `specs/agent_task_workspace_permission.schema.json` | `01be05df95431e38ca5dc3ec1b5f04416b506fb2` |
+| `specs/agent_task_owner_approval.schema.json` | `d190c9a8cc3d715eb199459c37c14e5de0ad6ad8` |
+| `specs/agent_task_content_exposure.schema.json` | `a85b99c0213d18daaab3d5d863adcd3661f379a0` |
+| `specs/approval.schema.json` | `11d60398c8f8a753f804624d0420922a4bace54d` |
+| `docs/specs/gui-shell-ai-edit.md` | `33d2df562d2231d0d894afcbf6097c512a8efd8b` |
+| `docs/specs/agent-task-history.md` | `8fd4cc57560662fc5f5dd5398ade8badeb98f32f` |
+| `docs/specs/approval-visibility-boundary.md` | `c0c0ba87c96872344ce3968a16fc3a0ebf54a1bc` |
+| `docs/specs/content-exposure-policy.md` | `9c07d3ce6bd393a3043ba507e11c0e8abd50f44a` |
+| `examples/contracts/gui_shell_edit_proposal.valid.json` | `055f5b5b2d98cc755a725640122489d2408ee7f3` |
+| `examples/contracts/gui_shell_edit_proposal_receipt.valid.json` | `3515521b9bc85bf666d98ff78e922967c60fd3e7` |
+| `examples/contracts/invalid/gui_shell_edit_proposal_self_approval.invalid.json` | `958989e4be92acc4b482824dd16bb5628f7b0dda` |
+| `examples/contracts/invalid/gui_shell_edit_proposal_receipt_apply.invalid.json` | `6a679ba144c7dae8023c1718c984dbf545bcf5e1` |
+| `examples/contracts/invalid/gui_shell_edit_proposal_receipt_missing_count.invalid.json` | `061c93a5dc590f79a8ce7191afa3a6f4feb3ccc3` |
+| `examples/contracts/agent_task_request.valid.json` | `29fbec0225e7c77cb1af694f16b8a6c51bca4ff5` |
+| `examples/contracts/agent_task.valid.json` | `fa69e50ac55ce1e6e34ae038db0c5ddc9755d3c3` |
+| `examples/contracts/agent_task_workspace_permission_request.valid.json` | `66a26513dd6756331819fed5ba6df185fae6ad6a` |
+| `examples/contracts/agent_task_owner_approval.valid.json` | `678f59ae0826099c70454a6fe9d3356d7dfbd7e5` |
+| `examples/contracts/agent_task_content_exposure.valid.json` | `91fc6f2c0fac829610749918e67cb7f3c8a71880` |
+| `tooling/conformance_tests/run_conformance_skeleton.py` | `c6f31d8cb561b48513c6784e54c85969c9cb953e` |
 
 ### N08 Buffer／調停
 
@@ -2760,7 +2836,7 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 
 | 母集団 | 件数 | 正本・原典 | v4 E0状態 |
 |---|---:|---|---|
-| 新規要求 N01〜N11 | 11 | v4仕様S04 | N01〜N06はE0-04全21項目を現行SourceSHAへ個別結合済み。製品AcceptanceはすべてOPEN、N07〜N11の個別全数照合は未完 |
+| 新規要求 N01〜N11 | 11 | v4仕様S04 | N01〜N07はE0-04全21項目を現行SourceSHAへ個別結合済み。製品AcceptanceはすべてOPEN、N08〜N11の個別全数照合は未完 |
 | 全体施工線 A〜J | 10 | v4工程表R03・Codex指示I04 | 全線同時BUILDのproducer/consumerと現行実装配置を全数照合中 |
 | 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13は全E0-04 fieldを個別記録。P13旧aggregate evidence identity/classは`UNKNOWN`。N11 Evidence/Blocker/OS Artifact全数結合は未完 |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのSource→Consumer crosswalkを記録。個々の全E0-04列とv4 Acceptance／Evidence/N11結合は継続 |
@@ -2807,7 +2883,7 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 
 ## 次のE0照合作業
 
-1. N01〜N06のE0-04 21項目は現行SourceSHAへ個別照合済み。各製品AcceptanceはOPENのまま維持し、次はN07 AI Editのproposal→独立審査→controlled apply／rollbackについてProducer・実Consumer・拒否境界を個別に結合する。
+1. N01〜N07のE0-04 21項目は現行SourceSHAへ個別照合済み。各製品AcceptanceはOPENのまま維持し、次はN08 Buffer／調停の意味保持・前後作用・失敗復旧をProducer・実Consumer・拒否境界へ個別に結合する。
 2. 残るN/P/C/Phase/K要求をCanonical N source/consumer・N11 Evidence/Blocker/OS Artifactへ接続する。旧CLOSED/FAILは履歴として保持し、再試験しない。
 3. BUF-R/TのSourceSHAとConsumer scopeは記録済み。AcceptanceはOPEN。B0〜B6の状態を保持し、原因→effect、N08/N10/N11、OS/Artifact/evidence結合を続ける。
 4. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
