@@ -414,7 +414,7 @@ N11は`OPEN`。ValidatorとRelease Gateは一部のRegistry/Windows evidence/man
 | P12 | 製品全体統合。REV5進捗ではWindows側`FEATURE COMPLETE`。正式release/Owner GOと分離された製品機能統合の履歴。 | v4仕様S05の直接対応はN01/N09/N10、関連能力K19。Phase 39〜45はC27〜C34のQC/回帰/文書/出荷範囲に関連。単一施工線へ閉じない。 | Windows product entry→Task/result/operation UI→OS product lifecycle。実TaskはN01、operation/observation/recoveryはN09、installed OS distribution/lifecycleはN10の現ConsumerとSHA節へ分割記録。 | `FEATURE COMPLETE`を正式Release/QAへ昇格しない。v4 N01/N09/N10は`OPEN`、Q0〜Q7は`DEFERRED`、`release_ready=false`。統合後の全候補・全OS acceptanceは未成立。 |
 | P13 | Mobile / Non-Windows Product Build。REV5履歴は2026-10-09に有限Product Build acceptanceを閉鎖したと要約する。旧Acceptanceの詳細evidence identity/classは本照合資料から`UNKNOWN`。 | v4仕様S05の直接対応はN10、関連能力K17。Phase 35/36はC24〜C26範囲に関連。施工線H/I。Linux native必須性は別途現行AGENTS/v4正本に従う。 | Linux/macOS Desktop、Android/iOS Mobile runner/native transport→Rust Broker／OS capability→installed product lifecycle。OS別source、package、workflow候補とSHAはN10節。 | 旧P13閉鎖を現行五OS標準installed QAへ移さない。Linux nativeは完全対応必須で、WSL/Xvfb/Headlessだけでは成立しない。Android/iOS実機を前提にせずEmulator/Simulator等を用いる。N10は`OPEN`、`linux_native_product_support`、`rev2_mobile_distribution`、`rev2_mobile_device_evidence`を保持。 |
 
-P0〜P13全14 IDの旧要求範囲・限定statusをv4 N/K/Consumerへ接続した。これは旧statusの書換え、v4 acceptance、N01〜N11のCLOSED、E0完了のいずれも意味しない。C0〜C34、Phase0〜45、K01〜K20のSource→Consumer/scope mappingを記録した。P0〜P7は本節後段で全E0-04 fieldを個別補完し、P8〜P13とN11 Evidence/Blocker/OS Artifact行結合は継続する。P0/P1/P4の直接対応はv4仕様S05の明示mappingへ合わせて訂正し、旧statusは変更していない。P13の詳細evidence identity/classは`UNKNOWN`として保持する。
+P0〜P13全14 IDの旧要求範囲・限定statusをv4 N/K/Consumerへ接続した。これは旧statusの書換え、v4 acceptance、N01〜N11のCLOSED、E0完了のいずれも意味しない。C0〜C34、Phase0〜45、K01〜K20のSource→Consumer/scope mappingを記録した。P0〜P8は本節後段で全E0-04 fieldを個別補完し、P9〜P13とN11 Evidence/Blocker/OS Artifact行結合は継続する。P0/P1/P4の直接対応はv4仕様S05の明示mappingへ合わせて訂正し、旧statusは変更していない。P13の詳細evidence identity/classは`UNKNOWN`として保持する。
 
 ### P0〜P3 E0-04項目の個別補完（2026-11-13、ソースと利用先の照合）
 
@@ -727,6 +727,81 @@ P6の旧CLOSEDは上記Product Build限定機能と当時条件に適用する�
 | `apps/desktop_flutter/test/a2a_connection_center_test.dart` | `5ebdbb4cee62e581062370ed6c305c36df89b7e2` |
 | `apps/desktop_flutter/test/host_registration_test.dart` | `74ab39e078bf72214a3bbe84f69ebc77fceb2493` |
 | `apps/desktop_flutter/test/widget_test.dart` | `f4e9c7b93f832ba2a2cefee779fd12426f240b04` |
+
+### P8 E0-04項目の個別補完（2026-11-13、Compose／AI Edit）
+
+以下は旧P8「GUI-Shell Compose」をv4へ結ぶE0照合である。旧Product Build範囲・status・限定証拠はdocs/REV5_PRODUCT_PROGRESS.mdのP8節、Phase 29〜31のD4追加範囲はdocs/D4_POCKET_PHASE_MAPPING.mdに照合した。v4仕様S04の直接対応はN05/N07、能力対応はK14、施工線はD。Compose Manifestを作ることと元Toolを実行すること、AI proposalを受理することと変更を制御適用することを分ける。P8 UIにあったModule選択は、Manifest・Export Module planの境界に限り記録し、独立Export／実binary pruningのN06・P9/P10受入れをP8へ重複計上しない。照合HEADは9eb663789b64adf15d0abb14b64d23400fa3c978。
+
+| E0-04項目 | 記録値 |
+|---|---|
+| 現行ID | 旧製品要求P8。v4仕様S05の直接対応先はN05/N07、関連能力はK14。Phase 29〜31／施工線Dは工程上の対応であり、旧P8のstatusを現在受入れへ移さない。 |
+| 旧ID | P8 GUI-Shell Compose。rev5 Product BuildはCLOSED。Compose UI、Manifest/Preview、module選択の受渡し、AI Edit proposalの当時受入れ範囲として保持する。 |
+| 原文参照 | docs/REV5_PRODUCT_PROGRESS.mdのP8節、docs/D4_POCKET_PHASE_MAPPING.mdのPhase 29〜31、v4仕様S04 N05/N07・S05 K14、工程表R03線D。旧P8試験の範囲・制約はrev5進捗の記録を維持する。 |
+| 対象 | Runtime/Agent/MCP Tool候補のCatalog表示、能力・依存のCompose、Manifest作成とPreview、Theme/表示密度/Content Exposure要求等のUI設定、Compose画面からのModule選択表示、およびOwner/Developerが明示開始するAI Edit proposalと別Workspace Task準備。 |
+| 目的 | 現在のRuntime/Agent/MCP CatalogをBroker境界で照合して構成Manifestを作り、選択結果から元Tool作用へのBroker経路へ接続する。AIの編集案は未信頼proposalとして受け取り、独立レビュー・fresh認可・制御適用が成立するまでfile変更とAuthority生成を行わない。 |
+| 生成側 | Desktop SettingsのCompose/Preview/AI Edit操作、BrokerのRuntime/Agent/MCP Catalog、Owner/Developerが入力する変更指示と対象範囲。Catalog metadata、proposal本文、Agent結果は未信頼入力として扱う。 |
+| 実際の受け取り先 | Composeはcompose_client.dartからRust BrokerのCatalog/Compose/Preview operation、compose_center.rsへ届く。受理Manifestを使うTool操作はSettingsからMCP client/BrokerのMCP Tool実行へ進み、mcp_center.rsが現在Runtime/Agent/接続/Toolを再確認してから既存のnative Owner・一回Permission・Audit境界を通し元MCP Toolを呼ぶ。AI Editはai_edit_client.dart→BrokerのGUI Shell編集提案→ai_edit_center.rsでproposal receipt/Auditとなり、main.dartからAgent Centerへ渡される。Agent Centerは別Workspace/Sessionの通常Agent Taskを事前検査するが、直接applyしない。 |
+| 契約とデータ | gui_shell_compose.schema.json、gui_shell_compose_catalog.schema.json、gui_shell_compose_receipt.schema.json、agent_adapter.schema.json、MCP接続/Tool CatalogとCompose Manifest。AI Editはgui_shell_edit_proposal.schema.json、gui_shell_edit_proposal_receipt.schema.json、agent_task_request.schema.json、Workspace Permission/Owner Approval契約を使う。Capability宣言はmetadataでありAuthorityではない。 |
+| 正常時の作用 | Composeは同一Runtime/Agent instanceの現在能力とMCP接続・Tool選択を検査しmanifest_onlyのManifestを返す。Previewは受理済みManifestと候補の差分を返し、build/export/rollbackを行わない。選択Tool実行時にBrokerが同じManifestを再評価し、認可・Audit後に元Toolを呼ぶ。AI EditはOwner/Developer明示proposalをhash/Audit付き審査待ちで記録し、本文をAuditへ保存せず、fileを書かず、Agent Centerで別Task準備へ渡す。 |
+| 否定時の作用 | unknown/unsupported Runtime・Agent・Capability、異なるinstance間の互換性寄せ集め、stale/unknown MCP connection/Tool、現在Manifestとの不一致をBrokerが拒否する。Owner確認・Permission・Audit不成立時はToolを呼ばない。AI Editは通常資格、自己承認、proposal_only以外、許可外/secret path、不正fieldやstaleなproposal/result/sessionを拒否し、提案受理やTask事前検査を変更完了へ昇格しない。 |
+| 停止と回復 | Compose/Tool要求のBroker/Audit失敗は成功表示せず作用前に停止する。Tool結果/Auditが不確定な場合は通常MCPのunknown/suspended境界を使い自動再送しない。proposal拒否・事前検査失敗はfileを変更せず、Task下書きは未消費のまま保持または破棄可能。別Workspace Taskの実行には現在のWorkspace Permissionと独立一回Approvalを新規に通す。Proposal専用controlled apply/rollbackとそのRecovery consumerは未成立。 |
+| 標準対象OSの候補 | v4標準候補はWindows/macOS/Linux native/Android/iOSの五対象。確認したP8のSettings/Compose/AI Edit consumerはDesktop Flutterと共通Rust Broker。MobileのCompose/AI Edit consumerは未確認または未接続。各OSの標準version/arch/GUI条件とinstalled parityはN10でUNKNOWN/未成立のまま。 |
+| 配布 | Manifest作成・Preview・proposal・Task事前検査のsource/UIは独立Appの通常配布、導入済み製品による一連作用の証拠ではない。P8のModule選択表示はP9/P10の独立Export・Manifest実消費・binary pruningを成立させず、通常Installer/installed identityはN06/N10へ分離する。 |
+| 既存実装 | N05はCatalog/Compose/Preview/MCP Tool再検査と実行までDesktop/Rust sourceで部分WIRED。Composeのmanifest_only、metadata非権限性、stale選択拒否のtest sourceがある。N07はOwner-only proposal、receipt/Audit、Agent Centerへの未信頼受渡し、別Workspace/unused Sessionの通常Agent Task事前検査がsource接続済み。 |
+| 実装不足 | N05はCapability metadataと実Capabilityの一致を保証する専用正規Registry consumerが未確認。AI自発要求と同一installed candidateでの実MCP作用・結果・Auditまでは本source mappingで実証していない。N07は別実行主体による独立review/test結果をapply前に確定するBroker状態、提案由来と実changed files/diffを照合するcontrolled apply、AI Edit専用rollback/recoveryがBUILD_GAP。Mobile consumerと五OS installed経路も未成立。 |
+| ソース識別SHA | 次のP8表に現HEAD 9eb663789b64adf15d0abb14b64d23400fa3c978上のsource/schema/test/validator 40件を記録した。40件中39件はv4採用基準d503a4efから差分なし。Conformance validator 1件は採用基準後に更新されており、現HEAD blobを記録した。 |
+| 試験区分 | rev5 P8履歴はCompose client/Widget 12件、Rust Compose/Preview 7件、Export/Module plan 13件、AI Edit 2件、Schema 158/155/205、Conformance 234 checksのPASSを記録する。変更Dart 4 file analyzeとMobile全体analyzeはPASS、Desktop全体analyzeは未変更agent_center.dartの既存deprecated情報5件でexit 1、Windows debug buildはASCII一時複製でPASS（MSB8029警告）、OneDrive上のFlutter試験はbuild/unit_test_assets削除失敗のためASCII一時複製を使った。いずれも当時の限定履歴で、本source mapping単位の製品testはNOT_RUN。 |
+| 証拠ID | NONE。旧P8のfixture・Schema・local debug buildは当時のProduct Build範囲であり、v4 N05/N07/W04/W05のEvidence IDやinstalled/runtime Acceptanceを発行していない。 |
+| 阻止要件 | P8専用Release Registry IDは確認できない。N05/W04/G4、N07/W05/G5は現行工程の受入れ座標としてOPEN。広域のcomprehensive_extension_rev1_completion等のRegistry statusは変更せず、P8へ個別帰属できないblockerはUNKNOWNのまま保持し、新規blockerを追加しない。 |
+| 状態 | 旧P8 Product Build=CLOSEDと当時の試験結果/制約を維持。現行N05/N07/W04/W05/E0=OPEN。N05は部分WIRED、N07はproposal/Task事前検査までWIRED、独立review結果とcontrolled apply/rollbackはBUILD_GAP。 |
+| 残件 | N05の実Capability Catalog/互換性から通常installed MCP Tool作用までの実Consumer・結果・Audit、N07の独立review/test Task結果・fresh target approval・Broker controlled apply/rollback/Recovery、Mobileおよび五OS標準installed範囲を後続BUILD/QC/QAで接続・確認する。P8のSource mapping完了をN05/N07 AcceptanceまたはE0全体CLOSEDへ拡張しない。 |
+
+#### P8 ソース識別値・該当ファイル
+
+下表のGit blob SHAは照合HEAD 9eb663789b64adf15d0abb14b64d23400fa3c978から取得した。source/testの存在と過去PASSは本単位での実行・製品受入れを意味しない。
+
+| ファイル | 識別値 |
+|---|---|
+| docs/REV5_PRODUCT_PROGRESS.md | 9c978021d3982690e9aaa87896436bad7125b433 |
+| docs/D4_POCKET_PHASE_MAPPING.md | 064ea334f86b137d94fba2370d2a2fd732f6e972 |
+| docs/specs/gui-shell-compose.md | 6b43bb80f73d4268e734ac0afbc58b33ba07339f |
+| docs/specs/gui-shell-ai-edit.md | 33d2df562d2231d0d894afcbf6097c512a8efd8b |
+| specs/agent_adapter.schema.json | e0792589a2bae168ba221af4f4f9abb505815c12 |
+| specs/capability.schema.json | a243a84b22cdd704875f35afc56e3450f9c9e1ca |
+| specs/gui_shell_compose.schema.json | 89b3d8e0e09c802d555fd6fee233daebc0fec045 |
+| specs/gui_shell_compose_catalog.schema.json | f9c76f5fa87bfb0866f33745dcd5a8a4e74864d5 |
+| specs/gui_shell_compose_receipt.schema.json | 7c4ac9d0f28f38f79a0074ed7d6c84d9124aadaa |
+| specs/gui_shell_edit_proposal.schema.json | b1a0b41570d5e1e1eadbf2ded3e8984d9fe21130 |
+| specs/gui_shell_edit_proposal_receipt.schema.json | d9f426e20254c8cf009b90e7be4cbccf453db286 |
+| specs/agent_task_request.schema.json | cb25bb3684656bfd670ea5832bbb7fc5988845b6 |
+| specs/agent_task.schema.json | a552389072088d6cd42b3588fefda332be4ae6b6 |
+| specs/agent_task_workspace_permission.schema.json | 01be05df95431e38ca5dc3ec1b5f04416b506fb2 |
+| specs/agent_task_owner_approval.schema.json | d190c9a8cc3d715eb199459c37c14e5de0ad6ad8 |
+| specs/agent_task_content_exposure.schema.json | a85b99c0213d18daaab3d5d863adcd3661f379a0 |
+| apps/desktop_flutter/lib/screens/settings.dart | 66374ec4157d573939e7f9cc5c36aecf5d65e251 |
+| apps/desktop_flutter/lib/main.dart | 6109c821ab5dc809224bec5234c4c59db1d5f988 |
+| apps/desktop_flutter/lib/screens/agent_center.dart | 2472faeb31a64d624423c30a0a30d0f153d2e2a3 |
+| apps/desktop_flutter/lib/services/compose_client.dart | 8f9657d866b007a4d2212abefca4df9add81a702 |
+| apps/desktop_flutter/lib/services/ai_edit_client.dart | ba5e62311a02749d2f9fe0e4e72e2b0d4e0a497d |
+| apps/desktop_flutter/lib/services/agent_coordination.dart | bdc13464f0e42b740a2bca3b7e8828a5019056d0 |
+| apps/desktop_flutter/lib/services/agent_task_client.dart | f54cefac29eba3dcf383bba19b4f64ee682e6217 |
+| apps/desktop_flutter/lib/services/agent_task_execution_coordinator.dart | 5d8f48d0557bdcb1af838239abf9651893bce7f1 |
+| apps/desktop_flutter/lib/services/mcp_connection_client.dart | 12a173a3956368c53615255c56ef06a2f5939c9a |
+| native/rust_helper/src/broker/compose_center.rs | d80658fd9a342140acc35560b2e4c4e4ae97d888 |
+| native/rust_helper/src/broker/ai_edit_center.rs | 7a1c2418dc6f71e14fc971385b6f4f2454d55b1c |
+| native/rust_helper/src/broker/dialogue.rs | c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999 |
+| native/rust_helper/src/broker/mcp_center.rs | 8f9ab897bdc625e448241ebd9b46f995cd1f22f6 |
+| native/rust_helper/src/broker/protocol.rs | 9b2076d5f31ca6d77f1f87973d1b394aaf751961 |
+| native/rust_helper/src/broker/ipc_server.rs | 58a404b920ef5905e174668ec2de0e04a9e8b044 |
+| native/rust_helper/src/adapters/codex_cli.rs | e5c9d1581ae9a1c0a3ae7fcfa626fdca6fea6d28 |
+| apps/desktop_flutter/test/compose_client_test.dart | c3fe30faa668482e5a4e42b2f5f5e5b218a01dc8 |
+| apps/desktop_flutter/test/settings_compose_test.dart | a78353f93617cc7b17391549ea256f007a7acdb1 |
+| apps/desktop_flutter/test/ai_edit_client_test.dart | c5ecd0353fdc811ec7c4d52a9c2b7d10e1d01723 |
+| apps/desktop_flutter/test/agent_coordination_test.dart | 6783e87a492d8436a855a7088b7cece38d122bd5 |
+| apps/desktop_flutter/test/agent_task_client_test.dart | 0477a0bbbb321082494b6b55711815d34419fdd9 |
+| apps/desktop_flutter/test/mcp_connection_center_test.dart | c81a37ca78b15e57c838f48519aa3e4abb6d6665 |
+| apps/desktop_flutter/test/widget_test.dart | f4e9c7b93f832ba2a2cefee779fd12426f240b04 |
+| tooling/conformance_tests/run_conformance_skeleton.py | c6f31d8cb561b48513c6784e54c85969c9cb953e |
 
 ## 旧C0〜C6のv4 Source→Consumer crosswalk（E0差分）
 

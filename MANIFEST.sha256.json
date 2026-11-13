@@ -1460,7 +1460,7 @@
     },
     {
       "path": "docs/QE_2026-11-13/E0_\u8981\u6c42consumer\u53f0\u5e33.md",
-      "sha256": "89fb337e78225ef74879e9e5a9fde9bc0bae89a096a11b43bc7a762b87cae895"
+      "sha256": "fe24fe8e1b6500d19626874004d3916c63023fd76367c45b453e36e6e7448d00"
     },
     {
       "path": "docs/QE_2026-11-13/\u5dee\u5206\u79fb\u884c\u53f0\u5e33.md",
@@ -1472,7 +1472,7 @@
     },
     {
       "path": "docs/QE_2026-11-13/\u9032\u6357.md",
-      "sha256": "6891f5df0fe7e79ebb32a01227a4eeb07abbe788e90d038c33496a044f86ed01"
+      "sha256": "6ef8fa044fd58154d1086636c0dd4a439563f1a42eb2c040c9073e10b8bbe1e8"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
