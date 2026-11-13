@@ -526,6 +526,36 @@ P0〜P13全14 IDの旧要求範囲・限定statusをv4 N/K/Consumerへ接続し�
 
 P0〜P3の阻止要件欄はRegistryとの関連範囲を記録し、Registryに存在しない旧P専用Blockerを作っていない。五OSの標準候補・保証値はN10表のまま`UNKNOWN`を保持する。P0〜P3の全E0-04欄が埋まったことは、この4 IDの製品受入れ、N01/N02/N04/N09/N11の`CLOSED`、E0全体完了を意味しない。
 
+### P4 E0-04項目の個別補完（2026-11-13、ソースと利用先の照合）
+
+以下は旧Provider／Model製品要求を現行v4へ結ぶE0照合である。rev5原本仕様書§14（原本SHA-256 `c0b78cfba1fb9c5c5de1947d01b47d0898f01b24de1aa8e1b0a0bd89e35c0877`）は、`D4-AUD-F07`で全文・要求差分照合済みの歴史的原本参照を用いる。原本全文は現Repositoryにないため今回あらためて取得・読了したとは主張しない。Product Buildの旧受入れ範囲は`docs/REV5_PRODUCT_PROGRESS.md`のP4節を照合した。現行直接対応はv4 S05のN03/K06であり、隣接N05へ直接mappingを広げない。Source blob SHAは現HEAD `06831aad622186dc59e83335030b720bd5288755`で確認した。
+
+| E0-04項目 | 記録値 |
+|---|---|
+| 現行ID | 旧製品要求`P4`。v4仕様S05の直接対応先は`N03`、能力対応は`K06`。`Phase 15`はD4追加範囲で、rev1のC工程と同一視しない。 |
+| 旧ID | `P4 Provider / Model Center`。rev5 Product Buildは`CLOSED`。この履歴を現行N03の完了へ移さない。 |
+| 原文参照 | rev5統合仕様書§14、原本SHA-256 `c0b78cfba1fb9c5c5de1947d01b47d0898f01b24de1aa8e1b0a0bd89e35c0877`。原本同一性・要求差分は`D4-AUD-F07`（VERIFIED）の履歴に依拠する。旧P4受入れ条件と実施範囲は`docs/REV5_PRODUCT_PROGRESS.md`「P4 提供元・模型管理」。現行契約はv4仕様S04/N03・S05/K06。 |
+| 対象 | Agent Center内のCodex CLI Provider選択、登録ごとのModel ID、Runtime Adapter metadata、登録後のModel引渡しとProvider/Model状態表示。 |
+| 目的 | 利用者が選んだProvider経路とModel IDをBroker登録・Owner確認・Codex CLI実行へ一貫して結び、未確認のProvider接続・Model利用可否や自動代替を成功扱いしない。 |
+| 生成側 | Flutter Agent CenterのRuntime/Workspace/Agent CLI登録画面。Providerは現在`openai_codex_cli`固定、Model IDは利用者入力。 |
+| 実際の受け取り先 | Agent Center登録要求→native Launcherの同一要求hashに束縛したOwner確認→認証Broker IPC/`broker/protocol.rs`→`ProviderModelSelection`検査とCodex Adapter生成→Codex CLIの`--model`。実Provider接続はこの選択・登録経路のConsumerでは未確認。 |
+| 契約とデータ | `provider_model_selection.schema.json`はversion 1、provider ID固定、1〜128文字の許可Model ID、`codex_cli_managed`またはP6に属する`broker_credential_vault`参照、`automatic_fallback=false`を定義。登録契約は`agent_cli_runtime_workspace_registration.schema.json`、Adapter投影は`agent_adapter.schema.json`。Credential実値はpayload/summary/metadataへ含めず、P4旧要求の認証は既存Codex CLI設定委譲としてP6のVault経路と分離する。 |
+| 正常時の作用 | 現実装の一経路`OpenAI via Codex CLI`と利用者指定Model IDを登録要求・native Owner確認・Broker Adapterへ保持し、Task実行時に同じModel IDをCLI `--model`へ渡す。Provider接続/Model実在性は`unknown`、自動fallbackは無効。Capability宣言は実Task capabilityを増やさない。 |
+| 否定時の作用 | 未対応Provider、未知field/authority類似field、許可外・長さ違反Model ID、自動fallback有効値、認証source/credential参照不整合を拒否する。未確認のProvider/Model healthを推測せず、失敗時に別Providerへ自動迂回しない。 |
+| 停止と回復 | native Owner確認またはBroker検査が拒否/不成立なら登録しない。Codex CLI interface検査・起動・実行失敗は該当操作の失敗として返し、P4経路でprovider fallbackを行わない。Provider healthとModel利用可否はunknownのまま。結果不明のTask再送・権限再利用は通常AgentTask規則へ従い、本mappingで新しい回復保証を追加しない。 |
+| 標準対象OSの候補 | v4標準対象Windows/macOS/Linux native/Android/iOS。現在のP4画面とCodex CLI登録はDesktop Consumer。Linux nativeは必須対象だが、P4の五OS installed parityやMobile AgentTask Consumerは未確認／一部`BUILD_GAP`。保証version/arch/GUI条件はN10の`UNKNOWN`を保持する。 |
+| 配布 | P4の旧試験はCodex CLI interface／偽CLI利用を含み、Provider資格・一般利用者へのCLI導入方法を確定しない。N10標準配布Artifact、Runtime同梱/導入、installed identity/lifecycleは未確定。CLI/terminalを一般利用者へ要求できるという意味へ拡張しない。 |
+| 既存実装 | Agent Center登録画面とModel validator、登録schema、Rustの`ProviderModelSelection`/Codex Adapter、native Owner確認summary、Codex CLI `--model`引渡し、Provider/model capability表示が存在。Provider選択は一実装経路のみ。旧rev5 P4 Product Buildは限定範囲で`CLOSED`。 |
+| 実装不足 | v4 N03が要求する二種類以上の独立Task-capable Runtimeの実Task/失敗/Authority証拠は未成立。MINIDORAは対話AdapterでAgent Taskを実装せず、第二Runtime要件を満たさない。実Provider接続・Model利用権限・Capability宣言との実測一致、現candidateの五OS installed経路も未確認。 |
+| ソース識別SHA | 現HEAD blob SHA: `apps/desktop_flutter/lib/screens/agent_center.dart`=`2472faeb31a64d624423c30a0a30d0f153d2e2a3`; `apps/desktop_flutter/test/widget_test.dart`=`f4e9c7b93f832ba2a2cefee779fd12426f240b04`; `native/rust_helper/src/adapters/mod.rs`=`06c540a59437b903b3f045b5aafb3790c21103bd`; `native/rust_helper/src/adapters/codex_cli.rs`=`e5c9d1581ae9a1c0a3ae7fcfa626fdca6fea6d28`; `native/rust_helper/src/broker/protocol.rs`=`9b2076d5f31ca6d77f1f87973d1b394aaf751961`; `native/rust_helper/src/desktop_launcher.rs`=`6a9f335de07fa474ca10043aea63ad6e988b572d`; `native/rust_helper/tests/fixtures/fake_codex_cli.rs`=`f74302045176eeabd9ed36e85205fed3adc13767`; `specs/provider_model_selection.schema.json`=`348ef6104b9d73a5529a0ad81f9a268ae59e4a64`; `specs/agent_adapter.schema.json`=`e0792589a2bae168ba221af4f4f9abb505815c12`; `specs/agent_cli_runtime_workspace_registration.schema.json`=`32a09f2ce33a5a215d64350ee22e24e93f9037c7`. |
+| 試験区分 | 旧P4 Product BuildではSchema 155/155正常例/199負例、Conformance 233、Agent Center Widget 50、Desktop test 166、Desktop/Mobile analyze、Windows debug build、Rust debug/release build、登録native 4件、fake Codex CLIのModel引渡し試験がPASSと記録されている。実Windows Codex CLI 0.160.0のhelp確認はinterface存在のみ。Provider API呼出し・実Model利用は未実施。本E0照合単位で再試験していない（`NOT_RUN`）。aggregate Rust 423 pass/2 fail/6 ignoredの二失敗は個別再実行でPASS、P4経路外として`FQ-TEST-LOOPBACK`へ履歴送致済み。 |
+| 証拠ID | `NONE` — v4のP4/N03/W03受入れ証拠は発行していない。旧rev5 Product Build記録は旧候補・旧条件の履歴。 |
+| 阻止要件 | P4専用Registry IDは存在しない。`comprehensive_extension_rev1_completion`はN03を含む広範な未解決項目、`linux_native_product_support`等はOS横断条件として関連し得るが、P4への直接blocker帰属は`UNKNOWN`。Registry状態・18件分類を変更しない。 |
+| 状態 | 旧`P4 Product Build=CLOSED`を維持。現行`N03/W03=OPEN`、E0は`OPEN`。K06は能力対応先であり、本台帳の完了だけでは受入れ完了としない。 |
+| 残件 | 第二の独立Task-capable Runtimeと実作用/失敗/Authority証拠、Provider/Model実接続の範囲、OS標準配布・installed consumer、N11 Evidence/Blocker/Artifact全数結合が残る。P4の旧条件を再開せず、残余はN03/K06/N10/N11へ帰属する。 |
+
+P4の阻止要件欄はRegistryに存在しない旧P専用IDを作成せず、関連と直接帰属不明を区別した。旧Product Build CLOSEDは当時の限定機能範囲に固定し、現行N03/W03/E0の状態を変更しない。
+
 ## 旧C0〜C6のv4 Source→Consumer crosswalk（E0差分）
 
 旧rev1の仕様・工程・進捗は当時の要求範囲と履歴statusを確認する資料として読み、現在statusはv4 S04/S05、工程表R03、現行Source→Consumerへ接続した。C0〜C6の旧statusは変更しない。v4 target statusはN11/C0のbaseline記録を含め、製品受入は未成立のままである。Phase対応は`docs/D4_POCKET_PHASE_MAPPING.md`の既存逆引きを参照した。
@@ -1019,7 +1049,7 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 |---|---:|---|---|
 | 新規要求 N01〜N11 | 11 | v4仕様S04 | 初期Producer/Consumer差分を記録。契約・否定・OS・証拠の全項目は未完 |
 | 全体施工線 A〜J | 10 | v4工程表R03・Codex指示I04 | 全線同時BUILDのproducer/consumerと現行実装配置を全数照合中 |
-| 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P3は全E0-04 fieldを個別記録。P4〜P13の個別field、P13の旧evidence identity/class、N11 Evidence/Blocker/OS Artifact全数結合は未完／UNKNOWN |
+| 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P4は全E0-04 fieldを個別記録。P5〜P13の個別field、P13の旧evidence identity/class、N11 Evidence/Blocker/OS Artifact全数結合は未完／UNKNOWN |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのSource→Consumer crosswalkを記録。個々の全E0-04列とv4 Acceptance／Evidence/N11結合は継続 |
 | D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDをv4 N01〜N11/A〜J/Kへcrosswalk済み。Phase固有E0-04全field、Evidence ID/Blocker、Acceptanceは未完 |
 | 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K別の完全E0-04 field、OS/Evidence/Blocker確認は継続 |
@@ -1064,7 +1094,7 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 
 ## 次のE0照合作業
 
-1. P4〜P13をID順に全E0-04 field、N11 Evidence ID、Blocker、OS対象/Artifactへ結合する。P0〜P3は完了済みmappingとして保持。続けてN/P/C/Phase/K残行へ展開し、既存CLOSED/FAILは履歴保持して再試験しない。
+1. P5〜P13をID順に全E0-04 field、N11 Evidence ID、Blocker、OS対象/Artifactへ結合する。P0〜P4は完了済みmappingとして保持。続けてN/P/C/Phase/K残行へ展開し、既存CLOSED/FAILは履歴保持して再試験しない。
 2. BUF-R/T crosswalkをCanonical N08/N10/N11 source SHA・各IDの完全E0-04 field・B5 evidenceへ結合する。B0〜B6の工程・状態・受入Consumer・証拠のcrosswalkは記録済み。個別cause/effect、OS/Artifact、N11 Evidence/Blockerの結合は継続。
 3. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 4. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
