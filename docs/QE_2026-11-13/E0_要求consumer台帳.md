@@ -3710,6 +3710,32 @@ Phase37のE0-04欄を全21項目で記録し、24件（24 unique path）のSourc
 | 状態 | Phase40のE0-04全21項目と47 SourceSHAを照合し、C29文書の8/9件差を同期した。これはC29実行、Q2、N11、E0、製品AcceptanceのCLOSEDではない。 |
 | 残余 | 現candidate C29 runnerと統合Release candidateのQ2は未実行。外部Runtime/MCP/A2A・実ディスクfull・installed processの障害保証は未成立。過去9/9は旧sourceの履歴に限る。追加の障害fixtureや受入条件は現行Phaseへ導入しない。 |
 
+##### Phase 41 個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 旧Phase/Cの性能測定を現行v4 S04 N09/N11、S05 K04/K19、S08 Q4へ証拠境界付きで対応する。C27自体は現行v4の製品Acceptance IDではない。 |
+| 旧ID | D4 Phase 41「性能評価」／rev1 C27。snapshot・Flutter projection・4096行diffの限定開発測定履歴を保持し、現candidateの性能合格へ転記しない。 |
+| 原文参照 | 現行v4仕様S04 N09/N11、S05 K04/K19、S08 Q4、工程R03線C/J・R08 Q4、施工指示I07-04、`docs/FINAL_QA_QUEUE.md` Q4、`docs/D4_POCKET_PHASE_MAPPING.md` Phase41、`docs/specs/performance-validation.md`。`docs/REV2_PROGRESS.md`と`docs/総合機能拡張_rev1/進捗.md`は旧計測条件・結果の履歴資料。 |
+| 対象 | `tooling/performance_validation.py`、`tooling/shell_snapshot.py`、`apps/desktop_flutter/test/c27_performance_validation_test.dart`と、その参照projection/client。installed product・実Runtime性能は対象外。 |
+| 目的 | 開発中のbounded snapshot／Flutter表示projectionに明白な遅延や停止がないか検知する。C27のwatchdog／局所時間を性能SLA、実画面frame、実Runtime負荷、release証拠へ拡張しない。 |
+| 生成元（`Producer`） | `build_shell_snapshot()`の生成状態、Flutter mock snapshot、512件Runtime projection、検索、200件notification fixture、12指標`unknown`のresource fixture、4096行diff widget。旧履歴には2026-09-24 snapshot 870ms／Flutter process 7,087ms、2026-09-25（旧source commit `8202ac796eba0909c9d5b83cf71e89d8fc97fc5a`）snapshot 1,016ms／Flutter process 20,245ms等が記録される。 |
+| 実Consumer | `tooling/validate_all.py`はFlutter利用可能時の非`--python-only`構成で`c27_performance_validation`を追加する。stepは`in_release_scope=False`で製品release blockerにならない。Python runnerはgenerated snapshotを計測後、Flutter test processを同期起動しstdout JSONと`PERF_C27`行を出す。`full_regression_validation.py`とConformance skeletonはC27 runnerを起動しない。 |
+| 契約／Data | Snapshotの値はreference stateから生成された`INTERNAL_STATE`、Flutter transport／snapshot／diffは`FIXTURE`。Python結果はelapsed／status／evidence classを標準出力へ出すが、永続Evidence Schema・N11への自動固定はない。Flutter内の各計測値はdebug出力。12 resource metricは値`null`、状態`unknown`を保持する。 |
+| 正常時作用 | snapshot生成が5秒未満、Flutter testが正常終了し、テスト内watchdog／bounded projection assertionを満たす場合に限り開発smokeがpassedとなる。test sourceにはmodel初期化、snapshot読込、projection/search、fixture notification/resource、lazy diffの2試験がある。 |
+| 否定時作用 | assertion失敗またはFlutter非zero exitを失敗として返す。async操作・widget pumpの一部には5秒Future timeoutがあるが、同期計算は完了後の計測判定であり中断されない。外側のFlutter `subprocess.run`および`validate_all.py`のstep実行にprocess timeoutがなく、停止したchildを確実に終了する契約はない。 |
+| 停止／Recovery | C27 runnerに独立したcancel／deadline／child process kill／Recovery／cleanup保証はない。resource値は取得不能時に`unknown`を維持する。process停止時の堅牢な期限・回収は将来C27を実行する必要がある場合のharness課題であり、このPhase41 mappingの新blockerとはしない。 |
+| 標準OS候補 | v4のWindows／macOS／Linux native／Android／iOS母集団を保持。今回のsource mappingはWindows上のinstalled productや他OS標準環境の性能試験を行わず、OS別Q4結果を生成しない。 |
+| 配布物 | 開発用Python validator、Flutter test process、mock／generated dataのみ。一般installer、installed Release candidate、署名済artifact、実Agent／Runtime／MCP／A2A loadは使用しない。 |
+| 既存実装 | C27 validator／spec／Flutter testと`validate_all.py`接続がある。ConformanceおよびC30 regressionとは別step。旧C27の過去計測は`docs/総合機能拡張_rev1/進捗.md`／`docs/REV2_PROGRESS.md`に条件付きで記録され、現mainでの再測定ではない。 |
+| BUILD_GAP | C27開発smokeのsource接続を確認。v4全体候補に対する実installed性能／資源／長時間Q4 consumerとQA証拠は未成立だが、Q4は全体候補後の後段QAであり、本E0 mappingへ新しい製品Acceptance／Blockerを追加しない。 |
+| ソース識別値（`SourceSHA`） | 照合HEAD=`157ea8dfd1dbec7f55fedee6b4dd216886419025`。編集前baselineの32 unique tracked pathを個別照合し、全blob SHA一致。`AGENTS.md`=`1eafcadd129fd01f1f2f683594c381605ed7d48d`<br>`docs/QE_2026-11-13/01_D4Pocket_統合製品実装仕様書_v4.md`=`352c53180cbad07888beb956aad0fb2a58074c58`<br>`docs/QE_2026-11-13/02_D4Pocket_統合開発工程表_v4.md`=`d32dd251e5f7cbb97d92f6e7540d6b6ed0ecec05`<br>`docs/QE_2026-11-13/03_D4Pocket_Codex施工指示書_v4.md`=`49447973e88c50a09b2f4978adfed84fd464c6d0`<br>`docs/QE_2026-11-13/採用記録.md`=`f159c1aa6ea5bc6e80e0877d8068f7e44da4c4d3`<br>`docs/D4_POCKET_PHASE_MAPPING.md`=`064ea334f86b137d94fba2370d2a2fd732f6e972`<br>`docs/QE_2026-11-13/E0_要求consumer台帳.md`=`a97446c84456ab089b5b28ac772adbb0af989921`<br>`docs/QE_2026-11-13/進捗.md`=`d3f7b141a1ed33f393271b9fdc93728467c6f153`<br>`docs/FINAL_QA_QUEUE.md`=`7b332cccab70bb68aa1ff4f8e23acc0e816d8282`<br>`docs/specs/performance-validation.md`=`6746542d94a1f417d443f1a3992779e6480e74ed`<br>`docs/REV2_PROGRESS.md`=`56f0f168b22d1e64303db2bc6f2c66668393dba2`<br>`docs/総合機能拡張_rev1/進捗.md`=`1392588f0cd5273013578e84d8e33c5c9dc9a01a`<br>`release_blockers.registry.json`=`244adc04a01e7b406c4ebcdeb829f7077d4aa35f`<br>`tooling/performance_validation.py`=`d0744916a8be65e10b61a453864bb8b80318241e`<br>`tooling/shell_snapshot.py`=`34823638523ae93fa750e52aeb51a078169932c1`<br>`installer/setup_doctor.py`=`23b43a8a00814e4033addec71efa11126d3b916a`<br>`packages/shell_core/invariant_evaluator.py`=`960c5ee99109796512dd720ec27e132f87dcfaaf`<br>`packages/shell_core/release_smoke.py`=`f5adf1eba0401d48d70bfa2acfc29774e4e139f6`<br>`tooling/validate_all.py`=`2744f9a10702872f6dc0aad705f922466fc198fc`<br>`tooling/full_regression_validation.py`=`8a33a9fab9ecbc18119302ae312201d41618012e`<br>`tooling/conformance_tests/run_conformance_skeleton.py`=`c6f31d8cb561b48513c6784e54c85969c9cb953e`<br>`apps/desktop_flutter/test/c27_performance_validation_test.dart`=`e833fbd760a8d2e6c4c90e4c6bee6a8c3cb7cff1`<br>`apps/desktop_flutter/lib/models/generated_contracts.dart`=`64e7a80a308c2734eb18c9d4b26eb50c8354f67b`<br>`apps/desktop_flutter/lib/screens/workspace_diff_panel.dart`=`5e2154b870921a707b3da9a79c9f55055ce3cb1f`<br>`apps/desktop_flutter/lib/services/global_search_index.dart`=`f71d2f6c4563b011fa3621ea3aee596bffb099f0`<br>`apps/desktop_flutter/lib/services/notification_client.dart`=`746c74805ef5b80febf020306daeb360ff43b4e6`<br>`apps/desktop_flutter/lib/services/shell_core_client.dart`=`f08db061bd15649ff7c2fc3fc9e37184433cbf18`<br>`packages/gui_shell_ui/lib/runtime_resource_client.dart`=`2df13807ceed7f3305e13ca752cd31f824583543`<br>`tooling/manifest.py`=`aa4525ff20293cb8641e5598a2439561a3bfbd3b`<br>`tooling/release_gate_check.py`=`22a8d7bfe9adb259f44ce8501fb215652e1d58c6`<br>`tooling/schema_check/check_schemas.py`=`7dca27717cbe5cccb45e1013b3436918a2322e75`<br>`tooling/日本語基底監査.py`=`77474767dd93eb4d69382af5ea4a0ea384eeccbe`。 |
+| 試験区分（`TestClass`） | SOURCE／`INTERNAL_STATE`／`FIXTURE`。本単位はE0のsource mappingと文書整合のみ。C27 runner、Flutter/Rust product test、installed product、Q4は`NOT_RUN`。旧C27 PASSは旧source／旧環境の履歴。Conformance等の文書batch validationは進捗に別記する。 |
+| 証拠ID（`Evidence ID`） | `NONE`。current v4 C27/Q4の性能Evidenceは発行しない。 |
+| 阻害要因（`Blocker`） | Release Registry 18件（16 unresolved／2 resolved）、`release_ready=false`、N11/E0 OPEN、Q0〜Q7 `DEFERRED`を維持。harnessのprocess timeout欠如を新Blockerへ複製しない。 |
+| 状態 | Phase41のE0-04全21項目と32 SourceSHAを現mainへ結合。C27の限定開発consumer／timeout範囲を明確化した。これは現行Q4、N09/N11、E0、製品AcceptanceのCLOSEDではない。 |
+| 残余 | Q4で同一候補の8GB級Windows代表・対象OS別resource・起動・CPU/memory/process leak・module pruning・反復Task/Compare/Handoffを後段で測定し、N11 Evidenceへ結合する。C27を将来実行する場合は、実際に使うharnessのprocess-level deadline／停止・結果保存の保証を確認する。性能SLAは実測前に定義・主張しない。 |
+
 ### 製品能力K01〜K20
 
 | K／S05能力 | v4関連N／施工線A〜J | 現行Producer→Consumer参照 | Source状態・残余・証拠境界 |
@@ -5253,7 +5279,7 @@ Phase37のE0-04欄を全21項目で記録し、24件（24 unique path）のSourc
 | 全体施工線 A〜J | 10 | v4工程表R03・Codex指示I04 | 全線同時BUILDのproducer/consumerと現行実装配置を全数照合中 |
 | 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13は全E0-04 fieldを個別記録。P13旧aggregate evidence identity/classは`UNKNOWN`。N11 Evidence/Blocker/OS Artifact全数結合は未完 |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのE0-04 21 fieldを個別記録。旧status維持、N11 Evidence/Blocker/OS Artifact結合と製品Acceptanceは継続 |
-| D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜40はE0-04全21 fieldを個別記録、Phase 41〜45は個別field未完。Evidence/Blocker/OS Artifact結合・Acceptance未完 |
+| D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜41はE0-04全21 fieldを個別記録、Phase 42〜45は個別field未完。Evidence/Blocker/OS Artifact結合・Acceptance未完 |
 | 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K別の完全E0-04 field、OS/Evidence/Blocker確認は継続 |
 | Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 33 IDのscope/Consumer/現証拠境界と各21 fieldを記録。BUF-R/T Acceptance、cause/effectの全件結合、N11 evidence、OS artifactとの結合は未完 |
 | Buffer工程 B0〜B6 | 7 | `docs/緩衝基盤_rev5補遺_QC/`・v4仕様S06 | B0〜B4の限定CLOSEDを保持、B5 OPEN、B6未成立。詳細Consumer照合が未完 |
@@ -5297,7 +5323,7 @@ Phase37のE0-04欄を全21項目で記録し、24件（24 unique path）のSourc
 ## 次のE0照合作業
 
 1. N01〜N10のE0-04 21項目は現行SourceSHAへ個別照合済み。各製品AcceptanceはOPENのまま維持し、N10の五OS実導入・利用・更新・Recovery QAは後続の製品Acceptanceに残す。
-2. C0〜C34個別field記録を維持し、Phase 41〜45／K01〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
+2. C0〜C34個別field記録を維持し、Phase 42〜45／K01〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
 3. BUF-R/TのSourceSHAとConsumer scopeは記録済み。AcceptanceはOPEN。B0〜B6の状態を保持し、原因→effect、N08/N10/N11、OS/Artifact/evidence結合を続ける。
 4. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 5. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
