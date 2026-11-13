@@ -5694,6 +5694,71 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 
 このcrosswalkは工程の現Consumerと証拠の所在・限界を特定するもの。既存CLOSEDの再試験、新たなEvidence ID発行、B5/B6の受入判定は行っていない。BUF-R01〜R09とBUF-T01〜T24の個別E0-04全21 fieldおよびSourceSHA／Consumerは記録済み。N11 Evidence ID・Blocker・OS／Artifactとの全ID結合は継続し、R/T要求の製品AcceptanceはOPENのまま。
 
+## BUF-R/T → N08/N10/N11 原因・Consumer・Artifact・Evidence結合
+
+照合基準は編集前main `1f7372d16509f8725dc4f2917bf6a5e78c5225fe`。各IDの既存E0-04 21-field記録とSourceSHAを再利用し、Acceptance・B0〜B6判定・製品試験は再実行しない。33 IDのSourceSHA欄にある52 path/blob組を現HEADへ照合し、51組は一致、1組は`docs/QE_2026-11-13/進捗.md`の自己参照が旧内容を指すものだった（欠損0）。この自己参照を製品Source driftとして扱わず、今回のsource inspection baselineを上記commitに固定する。
+
+### 共通の接続点と証拠限界
+
+- **N08:** 現行の実行経路では、Codex AgentTaskが`WorkspaceTaskScratch`／`TaskTemporaryEnvironment`を用意し、Broker journalと`dialogue.rs`が観測結果を照合する。Brokerは非権限のBuffer記録とAuditを作り、Agent Centerへハッシュのみを表示する。記録状態は`作用後未照合`／意味同等性未証明であり、汎用Bufferから許可済みToolを実行する経路、独立読戻し、実行時Schema検査、全OSの原因別介入には未接続。開発runnerや履歴資料を製品の実行時利用先へ数えない。
+- **N10:** 各IDの「標準OS候補」「配布物」をN10の五OS表へ接続する。現候補はWindowsのportable ZIP／D4PKG01更新payload、Linux Ubuntu 24.04 x86_64のportable tar.gz／bootstrap `.deb`／D4PKG01、macOSのdebug/UI build、Android API 35 Emulatorのdebug APK/AAB、iOS Simulatorのdebug build。いずれもBuffer専用の導入済み成果物ではなく、その成果物hashも未取得。一般配布・導入後の一連動作・N08受入れの証拠ではない。保証条件の`UNKNOWN`は維持する。T06の`Smart App Control`はWindows利用先に限り、他OSの署名条件は未確認。
+- **N11:** 33 IDすべての製品`Evidence ID`は`NONE`。現行Registryは18件（16 unresolved／2 resolved）、`release_ready=false`。`release_evidence/`には現候補の証拠がなく`.gitkeep`のみ、Q0〜Q7は`DEFERRED`。`Manifest`／`Conformance`／`Release Gate`のCONFIG・FIXTURE・INTERNAL_STATE結果を導入済み実行時証拠へ昇格しない。
+
+| 適用区分 | 現行Registry ID／適用範囲 |
+|---|---|
+| `C` | `comprehensive_extension_rev1_completion`（全体統合、全OS）。各BUF行への個別status付与ではなく、N11全体の既存Release gateとして参照。 |
+| `W` | Windows固有: `windows_evidence_provenance_isolation`、`windows_installer_first_run_smoke`、`windows_setup_doctor_smoke`、`windows_broker_installed_smoke`、`rev2_desktop_product_distribution`、`windows_distribution_identity`、`rev2_flutter_broker_channel_boundary`、`rev2_export_owner_ui_authority_path`、`rev2_module_pruning_binary_and_measurement`。Windowsの導入・証拠・Broker・配布・Export・Pruningに限る。 |
+| `L` | `linux_native_product_support`。Linux native製品・配布のN10範囲に限る。 |
+| `M` | `rev2_mobile_device_evidence`、`rev2_mobile_distribution`、`rev2_mobile_flutter_native_device_link_boundary`。N10 Android／iOSのartifact・lifecycleに限る。物理端末をE0条件へ追加しない。 |
+| `AU` | `audit_anchor_external_tamper_evidence_proof`（Windows／Mobile tracks）。監査証拠の改変検出・外部固定に関する既存gate。 |
+| `GO` | `owner_go`（全Release tracks）。責任者の最終決裁として保持し、E0のBUF行別技術Blockerには割り当てない。 |
+| `resolved`（履歴のみ） | `rev2_desktop_launch_regression`、`windows_rust_integration_test_execution_policy`。既存resolved状態を維持し、今回のOPEN scopeへ戻さない。 |
+| `FQ` | `FQ-TEST-LOOPBACK`はT05の過去試験queueであり、Release Registry Blockerではない。 |
+
+RegistryにmacOS専用Blocker IDはない。macOS候補はN10のOS別Artifact対応として記録し、全体gate `C` の適用範囲を保持する。上記IDのstatusは変えず、各BUF行へ新しいBlockerを割り当てない。
+
+### 33 IDの対応表
+
+`OS5`は当該E0-04行に記録済みのWindows／macOS／Linux native／Android／iOS候補をN10の同OS行へ結ぶ意味であり、5 OSでの実行・配布・Acceptanceを意味しない。`C`と`W/L/M`は上表のscope codeに従って既存gateの適用範囲を示し、`AU`は`audit_anchor_external_tamper_evidence_proof`、`FB`は`rev2_flutter_broker_channel_boundary`、`FQ`はT05の過去試験queueを表す。scope codeはE0上の行別statusや新規Blocker割当ではない。`owner_go`は上表のとおり別個のRelease最終決裁として保持する。全行のEvidence IDは上記共通状態どおり`NONE`。
+
+| ID | N08 現利用先／原因の流れ | N10成果物 | N11証拠・原因・Blockerの利用先 |
+|---|---|---|---|
+| BUF-R01 | B0の原記録・不足証拠→E0/N11。N08の実行時観測は`scratch`に限られ、全記録の収集処理なし。 | OS5 | B0台帳→N11証拠・Blocker台帳、`C/W/L/M`。 |
+| BUF-R02 | Codex Task scratch/TEMP binding→Broker journal/Audit。汎用Bufferから元Toolへ渡すconsumerなし。 | OS5 | B2限定Task履歴→N11、`C/W/L/M`。 |
+| BUF-R03 | Codex adapterとCargo/Flutter開発runnerのみ。全OS・言語・Tool共通consumerなし。 | OS5 | B0/B3・runner履歴→E0/Registry、`C/W/L/M`。 |
+| BUF-R04 | `dialogue.rs`の観測照合・Task終了時の投影・静的Schema。独立読戻しなし。 | OS5 | 限定的なAudit記録・Schema fixture→N11、`C/AU/W/L/M`。 |
+| BUF-R05 | Rust protocol/dialogue/scratchの限定Broker経路。全Buffer介入のAuthority consumerなし。 | OS5 | Broker Authority/Audit境界→N11、`C/AU/FB/W/L/M`。 |
+| BUF-R06 | B0/B3原因記録とisolated runner。一般cause reuse／工数効果consumerなし。 | OS5 | B0/B3履歴→Evidence/Registry、`C/W/L/M`。 |
+| BUF-R07 | Cargo/Flutter isolated runnerと限定B5履歴。製品全体の自己適用なし。 | OS5 | runner/B5記録（製品Evidenceではない）→N11、`C/W/L/M`。 |
+| BUF-R08 | AGENTS/v4/E0/進捗・manifest/conformance/gate。統治上の利用先であり製品QC/QAではない。 | OS5 | Registry/Gate/Final QA Queueの利用先、`C/W/L/M`。 |
+| BUF-R09 | B0→B1→B2/B3/B4→B5の記録連鎖。製品内の自動feedback利用先なし。 | OS5 | 原因記録→E0/Registry、`C/W/L/M`。 |
+| BUF-T01 | B0 cause/deficiency ledger。全run/source収集consumerなし。 | OS5 | 原因・証拠の記録→N11、`C/W/L/M`。 |
+| BUF-T02 | Cargo/Flutter隔離runnerとfixture。製品全OS dependency consumerではない。 | OS5 | runner/lockfile履歴→N11、`C/W/L/M`。 |
+| BUF-T03 | Schema checker/conformance fixtureと`dialogue.rs`。runtime Schema validation未接続。 | OS5 | 静的なSchema/fixture→N11、`C/W/L/M`。 |
+| BUF-T04 | Flutter隔離runner・B5記録。SyncEngine終端consumerなし。 | OS5 | B5 local history→N11（製品Evidenceなし）、`C/W/L/M`。 |
+| BUF-T05 | probe→parser/summary→B5。root-cause process consumerなし。 | OS5 | `FQ-TEST-LOOPBACK`/B5履歴→N11、`C/FQ/W/L/M`。 |
+| BUF-T06 | 通常runnerとB5のWindows policy履歴。全policy inventory・他OS証拠なし。 | OS5（SAC直接対象はWindows） | Windows policy/evidence→N11、`C/W`。他OS署名条件はUNKNOWN。 |
+| BUF-T07 | `workspace_root.rs`／Task scratch／Workspace protocolのBroker経路。 | OS5 | Workspace境界を扱う試験コード→N11、`C/W/L/M`。 |
+| BUF-T08 | Rust Broker authority/dialogue/protocolとAgentTask operation。 | OS5 | Permission/Approval/Audit境界→N11、`C/AU/FB/W/L/M`。 |
+| BUF-T09 | Broker process supervision・Task scratch Recovery。現test sourceは全OS installed proofではない。 | OS5 | 異常終了時の復旧試験コード→N11、`C/W/L/M`。 |
+| BUF-T10 | Codex adapter・Task別scratch・Compare/result consumer。全Host汚染防止は未成立。 | OS5 | Task分離の試験コード→N11、`C/W/L/M`。 |
+| BUF-T11 | isolated dev runnerとLinux update verifier fixture。汎用cache recoveryなし。 | OS5 | Linux updater fixture→N11、`C/L`（他OSは各artifact範囲）。 |
+| BUF-T12 | Codex adapter→dialogue/Task resultとfake CLI fixture。 | OS5 | 終了値・結果を扱うfixture→N11、`C/W/L/M`。 |
+| BUF-T13 | Manifest/evidence bundle/release validators/Registryの静的consumer。 | OS5 | CONFIG/FIXTURE/INTERNAL_STATE→N11。LIVE_RUNTIME未接続、`C/W/L/M`。 |
+| BUF-T14 | Broker Export/install/update modules、OS tooling、N10/N11 validatorの部分consumer。 | OS5 | 配布物・識別子の検査器→N11、`C/W/L/M`。 |
+| BUF-T15 | B5限定matched比較とobservation/resource計測点。汎用comparatorなし。 | OS5 | 部分B5記録→N11、`C/W/L/M`。 |
+| BUF-T16 | isolated runner・B5 history・Manifest。現candidate全入口への自己適用なし。 | OS5 | source固定・Manifest・B5→N11、`C/W/L/M`。 |
+| BUF-T17 | Adapter/Runtime registryとBroker unsupported/deny path。 | OS5 | 拒否・適合検査のコード→N11、`C/W/L/M`。 |
+| BUF-T18 | FINAL_QA_QUEUE・release gate・Conformanceの部分consumer。 | OS5 | QA QueueはQ0〜Q7 `DEFERRED`、`C/W/L/M`。 |
+| BUF-T19 | E0 ledger・runtime result Schema・Evidence bundle/Registryの部分consumer。 | OS5 | 要求から証拠までの追跡記録→N11、`C/W/L/M`。 |
+| BUF-T20 | B0/B1の反例・原因選択履歴。汎用runtime feedbackなし。 | OS5 | 原因履歴→E0/Registry、`C/W/L/M`。 |
+| BUF-T21 | AGENTS/v4指示・進捗/E0 ledger・各機能consumer。統治要件でruntime consumerではない。 | OS5 | 統治文書・Manifest・Conformance・Gate→N11、`C/W/L/M`。 |
+| BUF-T22 | B5 matched record・Pktmon/Cargo fixture。専用因果comparatorなし。 | OS5 | 一部条件一致の履歴→N11、`C/W/L/M`。 |
+| BUF-T23 | B5 snapshot/shared Pub cacheの限定local結果とresource observation。 | OS5 | local-only/resource記録→N11、`C/W/L/M`。 |
+| BUF-T24 | FINAL_QA_QUEUE・採用記録/進捗・Evidence bundleの部分consumer。 | OS5 | 候補版ごとのQA・Evidence結合、Q0〜Q7 `DEFERRED`、`C/W/L/M`。 |
+
+このrow joinは既存cause/evidence/consumerの所在と責任範囲を明示したE0 mappingであり、BUF-R/T Acceptance、B0〜B6 status、N08/N10/N11、E0のCLOSEDを意味しない。
+
 ## 実装ファイルの初期目録（CODE_PRESENTのみ）
 
 下記は`d503a4ef6daac8942abd1cb011442ce28c78ec55`時点のパス存在・責務候補を読み取った初期目録である。名前・コードの存在だけではProducer→Consumer接続、installed/runtime実作用、Acceptanceを証明しない。各行の`WIRED`、実作用、正常/否定/Recovery、Evidence、OS別状態は未照合なら`UNKNOWN`。
@@ -6937,7 +7002,7 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのE0-04 21 fieldを個別記録。旧status維持、N11 Evidence/Blocker/OS Artifact結合と製品Acceptanceは継続 |
 | D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜45はE0-04全21 fieldを個別記録。Evidence/Blocker/OS Artifact全数結合・Acceptance未完 |
 | 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K01〜K20はE0-04全21 fieldとSourceSHAを個別記録済み。N11 Evidence/Blocker/OS Artifact全数結合を継続 |
-| Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 33 IDのscope/Consumer/現証拠境界と各21 fieldを記録。BUF-R/T Acceptance、cause/effectの全件結合、N11 evidence、OS artifactとの結合は未完 |
+| Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 33 IDの21 field／SourceSHAを維持し、N08/N10/N11の原因・Consumer・5 OS Artifact・Evidence/既存Blocker scope row joinを記録済み。Evidence ID NONE、全Acceptance OPEN。B0〜B6 statusは不変 |
 | Buffer工程 B0〜B6 | 7 | `docs/緩衝基盤_rev5補遺_QC/`・v4仕様S06 | B0〜B4の限定CLOSEDを保持、B5 OPEN、B6未成立。詳細Consumer照合が未完 |
 | QE/監査 D4-QE-R01〜R13／D4-LNX-T01〜T08／D4-AUD-F01〜F07 | 13／8／7 | `docs/QE_2026-10-22/`・各採用記録 | 旧証拠と現在の実装/Validatorへの接続が未完 |
 | Q0〜Q7、FQ群、W00〜W08 | 8／13／9 | v4工程表R05〜R08、`docs/FINAL_QA_QUEUE.md`、進捗履歴 | Q0〜Q7はDEFERRED。FQ/W各IDの現在Consumer・証拠・残余の照合が未完 |
@@ -6980,7 +7045,7 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 
 1. N01〜N10のE0-04 21項目は現行SourceSHAへ個別照合済み。各製品AcceptanceはOPENのまま維持し、N10の五OS実導入・利用・更新・Recovery QAは後続の製品Acceptanceに残す。
 2. C0〜C34およびPhase 0〜45の個別field記録、K01〜K20のSource mappingを維持し再試験しない。N11 Evidence／Blocker／OS Artifact行結合と残存E0母集団を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
-3. BUF-R/TのSourceSHAとConsumer scopeは記録済み。AcceptanceはOPEN。B0〜B6の状態を保持し、原因→effect、N08/N10/N11、OS/Artifact/evidence結合を続ける。
+3. BUF-R/T 33 IDのSourceSHA／Consumer scopeを維持し、原因→Consumer、N08/N10/N11、5 OS artifact、Evidence/既存Blocker scopeをrow join済み。現runtimeはCodex Task scratchの限定経路、Evidence ID NONE、Acceptance OPEN。B0〜B6の履歴status不変。
 4. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 5. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
 6. N10の各OS標準候補・配布・実装・workflow/test・限定履歴を記録する。保証version/arch/resource/package条件は公式条件と実測から固定し、未知をUNKNOWNにする。
