@@ -3757,7 +3757,7 @@ Phase37のE0-04欄を全21項目で記録し、24件（24 unique path）のSourc
 | K15 Export/module selection/pruning/identity/Broker/Installer/config consumption | N06/N10／E・G・H・I | Compose config→Exporter→identity/manifest/launcher/package/runtime candidate（N06/N10） | E0-04全21項目を編集前main `4f1eab7e9520e7a6ee68ceba266433ec5ef175d9`へ記録。44 source blobはN06 source表と全一致。runtime config consumption、independent installed app、binary/resource pruningは未成立。 |
 | K16 Windows install/first-run/Setup Doctor/update/rollback/repair/uninstall | N10/N11／G・J | Windows artifact/staging→installed app/Broker→collector/Release Gate（N10/N11） | K16 E0-04全21項目を編集前main `af8d314945f9ee1047acaa77da047352f07c4328`へ記録。N10 Windows/common source 61/61とK16追加source 16/16を照合。一般利用installer-first-run lifecycleとcurrent candidate evidenceは未成立、既存Registry blockerを保持。 |
 | K17 Linux native/macOS/Android/iOS IPC/protection/Device Link/GUI/install | N10およびN01/N02 Mobile／G・H・I | Linux Runner→Rust launcher/Broker、macOS Runner→native helper/Broker、Android/iOS Flutter→固定Channel→OS native Device Link→Desktop Broker／N10 installed consumer | K17 E0-04 21項目と59 unique source/test/contract blobを現mainへ結合。四OSのsource接続・試験sourceは確認。Linux nativeを必須のまま維持し、通常配布・installed lifecycle・標準OS acceptanceはOPEN。Mobile AgentTask/MCPはBUILD_GAP、物理端末必須条件なし。 |
-| K18 MINIDORA等の外部Runtime/contract接続 | N03/N08／B・F | external Runtime Adapter→Broker Catalog/Task capability/timeout/failure path（N03） | Adapterは外部接続境界。MINIDORA内部実装をCoreへ輸入せず、現production dependencyやTask supportを偽装しない。 |
+| K18 MINIDORA等の外部Runtime/contract接続 | N03/N08／B・F | 公開Runtime API→Rust Broker Dialogue Adapter→対話結果／Audit。N03 AgentTask capabilityとN08 Buffer scopeを別に判定 | 外部対話APIのsource接続はWIRED。AgentTaskはunsupported、第二Task Runtime・N08 Buffer同等性・installed受入れは未成立。MINIDORA内部実装をCoreへ輸入せず、production dependencyにも追加しない。 |
 | K19 long-run/performance/fault/full regression/docs/release | N09/N11／C・J | local validator/evidence/Manifest/Registry→Conformance/Release Gate (N11) | local validator/source coverageあり。旧C27〜C34限定PASS/FAILは保持。installed product QA/8h/strict releaseは未成立。 |
 | K20 Buffer/root causes/B0〜B6/self-application/side effects/equivalence | N08／F | OS/dependency/cache/process/network cause→Buffer mediation→original Task/Audit/Recovery（N08） | N08 source is Codex CLI TEMP/scratch限定。B0〜B4の限定closedを保持、B5 OPEN/B6未成立、全OS意味・副作用同等性は未検証。 |
 
@@ -6681,6 +6681,91 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 | `Mobile Device Link channel contract` | `specs/mobile_device_link_channel_request.schema.json` | `5de3cbe5f3df5c60df77228e00f6a138ae319578` |
 | `Mobile Workspace selection contract` | `specs/mobile_workspace_selection.schema.json` | `6963dbea6db4e876340ea40bbd13a394fae92e23` |
 | `Mobile local recovery audit contract` | `specs/mobile_local_recovery_audit.schema.json` | `aa30b130979b5f869b5a08cc21315f3918679747` |
+
+#### K18 E0-04個別記録（2026-11-14）
+
+照合基準コミットSHAはc91f41d83ddecc5753db681891c6560cc841f4b9。既存Phase 37とN03の履歴は保持し、K18現行要求に対するソースと利用側の対応を再確認した。これは設計・実装箇所の記録であり、導入済製品の受入れ記録ではない。
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | v4仕様S05 K18「MINIDORA等を外部Runtime/契約で接続」。対応する製品要求はS04 N03、N08。工程表R03線B/F、Codex施工指示I04-B/F。 |
+| 旧ID | D4 Phase 37「MINIDORA接続口」、Phase 38「MINIDORA段階統合」、P4/P7、C15〜C19、W03/G3、N03/N08。旧statusと限定証拠は当時のscopeで保持し、K18やN03のAcceptanceへ遡及転記しない。 |
+| 元原文／正本参照 | 現行v4採用記録・仕様S04 N03/N08、S05 K18、工程表R03-B/F、Codex指示I04-B/FとI05。MINIDORA公開interfaceの照合固定点は公開Repository commit 3400a3bb68b37efa1dc14ee8aaa28fda779bf1f8。確認対象はsrc/minidora/製品版/api.py、型.py、製品チャット.py、監査.pyのみ。非公開内部実装は対象外。 |
+| 対象 | MINIDORA等の独立外部実行系の公開接続仕様、Rustの接続部品、Brokerへの登録・対話・監査処理、Desktop画面からBrokerへの要求経路、構造契約と正常・拒否例、契約照合、停止・中止境界。Agentの作業実行能力とN08の緩衝適用範囲を分けて確認する。 |
+| 目的 | 外部Runtimeの明示された公開契約をRust BrokerのRuntime-neutral Adapter境界へ接続し、API metadata・Capability宣言・Runtime応答からPermission／Approval／Trust／AgentTask capabilityを生成しない。非公開内部実装をimport・copyせず、現在のproduction pathへ外部Runtime依存を追加しない。 |
+| 生成元（Producer） | 外部MINIDORA Product APIの固定commitにあるGET /health、GET /api/capabilities、POST /api/chat、GET /api/trace/{trace_id}。API版はMINIDORA-PRODUCT-API-v1。入力はmessage/session_id、対話応答はsession_id、response、status、route、trace_id、trace_hash、capabilities、sources、metadataを持つ。 |
+| 実Consumer | 起動時の--minidora-runtime ID=127.0.0.1:port→Rust main.rsの設定解析→ipc_server.rsがMinidoraAdapterを生成してBrokerへ登録→dialogue.rsの汎用実行系Adapter→固定loopback HTTP endpoint。Desktop main.dartのRuntimeDialogueScreen→RuntimeDialogueClient→BrokerClient→認証IPC/protocol.rs→Broker Dialogueへつながるsourceがある。送信は要求queueのみでnetworkを呼ばず、owner専用の別control操作が同一要求hashを承認してからAdapterを起動し、対話取得で結果を返す。登録引数は接続先宣言であり、実行許可ではない。 |
+| 契約／Data | 外部wireはHTTP/1.0・1.1、JSON、Content-Length付きresponse。Broker sideはruntime_dialogue_operation/request/response/session/session_list/submission_receipt/comparison SchemaおよびAdapter/Runtime Schemaを使う。Adapterは127.0.0.1のIPv4と明示portだけを許し、redirect/proxy/DNS/任意URLを追加しない。health/api_version、session一致、status、trace ID/hashを検査する。Runtime capabilitiesは非信頼metadata。sourcesは題名/出典/URLだけを投影し、source本文を渡さない。要求・受信bodyの永続Auditはhash中心で、raw responseは限定したprocess memory内に限る。 |
+| 通常時作用 | Brokerがowner承認済みの一件だけにAdapterを起動し、health・capabilities・chat・traceを固定順で照会する。Content-Lengthとapplication/jsonを検査し、sessionとtraceの一致を確認してBroker-owned resultへ射影する。statusの既知値だけを対応づけ、capability/source metadataは表示情報として扱う。これらは現source上の接続であり、現在のinstalled artifactや外部Runtimeを使った製品実行結果ではない。 |
+| 否定時作用 | 非loopback/port不正、非200、重複Content-Length、transfer/content encoding、非JSON、header/body上限超過、JSON/field/hash/session/trace不整合、未知statusは拒否または失敗として返す。外部capability・Agent metadataからTask実装や権限を追加しない。Brokerの既定AgentTask実行対応=falseとAgentTask非対応によりMINIDORA Taskを開始しない。 |
+| 停止／Recovery | 接続・読書き・全体期限と取消tokenをAdapterが確認し、失敗を固定分類へ返す。自動再送・権限拡大を行わず、再試行は新しい要求と現行Owner承認を要する。公開MINIDORA APIにはcancel endpointがないため、送信後の中止はBroker側の待機・結果採用終了であり、外部Runtime process停止を意味しない。N08のWorkspaceTaskScratch/TEMP調停は現状Codex CLI限定で、このAdapterの意味保持・副作用同等性は未成立。 |
+| 標準OS候補 | Desktop候補はWindows/macOS/LinuxのRust helperと固定IPv4 loopback。これはOS別compile候補であり、各OSのinstalled UI・サービス接続・Task・Recovery・配布QAを意味しない。Android/iOSにMINIDORA Adapter/AgentTask consumerは確認できず、Device Link経由の接続へ拡張しない。保証OS版、architecture、minimum resourceはN10とN11で未確定。 |
+| 配布物 | D4側にはRust helperとFlutter Desktop Dialogue画面のsourceがある。MINIDORA本体をD4へbundle、起動、更新、署名、配布するsourceはない。現在のAdapter登録はBroker起動引数に依存し、一般利用者向けのRuntime導入・登録・更新・撤去product flowや各OS installed Runtime artifactは未成立。 |
+| 既存実装 | native/rust_helper/src/adapters/minidora.rsが公開HTTP対話Adapter、adapters/mod.rsとbroker/dialogue.rsが汎用trait、ipc_server.rs/main.rsが起動時登録、protocol.rsがBroker operation、Desktop/shared Flutterが対話UI/clientを担う。Rust Cargo.tomlへMINIDORA内部package依存はない。tooling/minidora_live_check.pyは外部reference用検査harnessでありproduction dependencyではない。N03の現行source mapとPhase 37の履歴を参照する。 |
+| BUILD_GAP | ①K18の公開Dialogue Adapterはsource上WIREDだが、現行同一installed候補での外部Runtime接続・結果・Audit・失敗Recoveryは未受入れ。②N03が要求する第二の独立AgentTask-capable Runtimeはない。MINIDORAは対話のみでTask非対応。③MINIDORA登録はCLI引数のみで通常利用者向けRuntime Center onboardingが未成立。④外部Runtimeのcommit/artifact identityと現Audit/Release provenanceを結合していない。⑤送信後cancelで外部process停止は保証されず、N08 BufferのMINIDORA適用は未成立。これらは既存N03/N08/N10/N11とRegistry scopeへ保持し、新規Blockerを作らない。 |
+| ソース識別値（SourceSHA） | 編集前main c91f41d83ddecc5753db681891c6560cc841f4b9の48 unique local pathを下表へ固定。全blobはGit HEAD:pathで照合。外部公開契約の独立識別値はMINIDORA commit 3400a3bb68b37efa1dc14ee8aaa28fda779bf1f8。 |
+| 試験区分（TestClass） | source内Rust UNIT/FIXTURE: MinidoraAdapterのloopback、HTTP framing、malformed response、session/trace、期限/取消試験、およびBroker Dialogue/ProtocolのOwner・Authority・Task unsupported試験。Flutter client/UIはFake Broker test。Schema validator/Conformanceは正常例・Authority/形式否定fixtureを消費する。tooling/minidora_live_check.pyは固定外部referenceを用いるLIVE_RUNTIME候補harness。今回このK18 mappingで各test/harness・外部Runtime・installed productは実行せずNOT_RUN。 |
+| 証拠ID | NONE。固定外部commitは公開契約の参照identityでありD4製品の実行Evidenceではない。過去Phase 37/C28等の結果は元source、host、fixture、scopeの履歴に限定する。 |
+| 既存阻害要件 | N03/W03/G3とN08/B5/B6をOPEN維持。既存Release Registry 18件（16 unresolved／2 resolved）、release_ready=falseを変更しない。N11で個別blocker/evidence結合が未完のため新しいBlocker/Evidence IDは追加しない。 |
+| 状態 | K18 E0-04の21項目を記録し、48 local blobと固定外部API commitをsource/consumerへ結合。K18のsource Dialogue接続はWIRED、N03第二Task Runtime・N08 Buffer範囲・K18製品Acceptance・N11全数結合はOPEN。 |
+| 残余 | 一般利用者が外部Runtimeを導入・登録して通常のinstalled productから使う経路、独立した第二Task-capable Runtime、external Runtime identity/provenance、送信後停止の期待保証、N08 Bufferの意味保持と副作用、各OS標準配布・installed acceptanceを後続E1/E2/E3およびE4/E5で扱う。 |
+
+#### K18 Source SHA・対象ファイル
+
+下表のGit blobは編集前main c91f41d83ddecc5753db681891c6560cc841f4b9に対する値。external Runtime sourceは上記固定commitを参照し、private implementationは記録・複製しない。
+
+| ソースファイル | 識別値 |
+|---|---|
+| apps/desktop_flutter/lib/main.dart | 6109c821ab5dc809224bec5234c4c59db1d5f988 |
+| apps/desktop_flutter/lib/screens/runtime_dialogue.dart | 803edd0a687acdfd00e19898fbb5ba6b85ce1449 |
+| apps/desktop_flutter/lib/services/runtime_dialogue_client.dart | a0853ee7327cafa60ee89b0c5ee49312b73c46c4 |
+| apps/desktop_flutter/lib/services/broker_client.dart | 122de14350dfe1f160c7f5f911dd1e1d56da8233 |
+| apps/desktop_flutter/test/runtime_dialogue_test.dart | 899912f92ee3751f8616632d434e04f95ee5ef77 |
+| packages/gui_shell_ui/lib/src/runtime_dialogue.dart | f78083b376f80d06f284387bb8b7aa2d769141bf |
+| packages/gui_shell_ui/lib/src/runtime_dialogue_client.dart | 44f810aa2509a8a28ddf2933a5491528f3b07147 |
+| packages/gui_shell_ui/test/runtime_dialogue_test.dart | f997ac25c0d8227e2898dc6d1351d324911324e4 |
+| packages/gui_shell_ui/test/runtime_dialogue_independent_poll_test.dart | 89e16f9be8c5a32ff464eb98754db88682cc8fbc |
+| native/rust_helper/src/main.rs | b0a5df285db357172e7970074d7a67189f3384a3 |
+| native/rust_helper/src/broker/ipc_server.rs | 58a404b920ef5905e174668ec2de0e04a9e8b044 |
+| native/rust_helper/src/broker/protocol.rs | 9b2076d5f31ca6d77f1f87973d1b394aaf751961 |
+| native/rust_helper/src/broker/dialogue.rs | c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999 |
+| native/rust_helper/src/adapters/mod.rs | 06c540a59437b903b3f045b5aafb3790c21103bd |
+| native/rust_helper/src/adapters/minidora.rs | 31c756ac7c9a264d73ed0e9654dbae599be83921 |
+| native/rust_helper/Cargo.toml | 6352fd7de3188b4c7335167f4f8875a4f8f4e28b |
+| native/rust_helper/README.md | 33a2952a9a496ddd9178adf44d2286944f07e2e3 |
+| docs/specs/runtime-dialogue.md | 16354d270b5e09d9341963eaed66d23aec38a42d |
+| docs/specs/runtime-lifecycle.md | 095466f888827cc7bf84c75866555c9cf78a78a1 |
+| docs/specs/agent-runtime.md | 195e5e2e28e14fa65e2212db9f2adba81cbdb5c0 |
+| specs/adapter.schema.json | 0fee764bc04ad524665e4be2b02828dcdb488f73 |
+| specs/runtime.schema.json | bdef33f26fe06b334eb6f94124930fd08594bbc9 |
+| specs/runtime_dialogue_comparison.schema.json | 874dd1158a6aa911ff30d85e141b4bd4927c91e3 |
+| specs/runtime_dialogue_operation.schema.json | 8793ab0f59ea2320b7102afec7256cfe62264fc5 |
+| specs/runtime_dialogue_request.schema.json | fe0bd153eaf3a0a2354b25cffc3ed9af934fbae1 |
+| specs/runtime_dialogue_response.schema.json | 5e7220e8ce5954057ee270cd77cb4a68e1ef830f |
+| specs/runtime_dialogue_session.schema.json | 5bfc5b8c86ce40626d76b1e37ebdf7989afdef90 |
+| specs/runtime_dialogue_session_list.schema.json | c1b03e9dec25005cf4c916920d981404e8a7c9c9 |
+| specs/runtime_dialogue_submission_receipt.schema.json | 204b7871ab08539c16da2431541a5764b023f1fe |
+| examples/contracts/runtime_dialogue_comparison.valid.json | 073cda95a5428b921363041e6a4d8097086c6db1 |
+| examples/contracts/runtime_dialogue_operation.valid.json | c48161c506cc6bb95513a82505875a030a9127fa |
+| examples/contracts/runtime_dialogue_request.valid.json | 99a3787dd8a13c5a3ab832b8522c7207b6cc4090 |
+| examples/contracts/runtime_dialogue_response.valid.json | 4d8dfe4def0b4970ebd0b71f0f5bace6dc34d103 |
+| examples/contracts/runtime_dialogue_session.valid.json | 988e3e348cbfccd2a0f449a776d14b8c8157d222 |
+| examples/contracts/runtime_dialogue_session_list.valid.json | 7cec5cf15826d21db83ddba4bc07f25f5826da00 |
+| examples/contracts/runtime_dialogue_submission_receipt.valid.json | 5dddc4753733d4a80d53c2a3ae46481c1b3fdfc5 |
+| examples/contracts/invalid/runtime_dialogue_comparison_authority.invalid.json | a5b9b7f9bf9b84b55bda8c6ac926900f06ab52c6 |
+| examples/contracts/invalid/runtime_dialogue_operation_authority.invalid.json | fb384229e1aee6440389956999a5aa6b6d01e6f8 |
+| examples/contracts/invalid/runtime_dialogue_operation_filter.invalid.json | c1b442c0fcbe1b29fe0851c4b7bc6fffc867fecc |
+| examples/contracts/invalid/runtime_dialogue_request_authority.invalid.json | 2d012317b89aa123b7c7ccc9a54cd27590f556af |
+| examples/contracts/invalid/runtime_dialogue_response_authority.invalid.json | 3b21bf4b352a87b58043d607fba9b29e29de745c |
+| examples/contracts/invalid/runtime_dialogue_session_authority.invalid.json | 4eb80af6821be815211b0b56103b8d5c012ac735 |
+| examples/contracts/invalid/runtime_dialogue_session_list_content.invalid.json | 832679d9a7d3d765f3852931205a5a15f71bf8a8 |
+| examples/contracts/invalid/runtime_dialogue_submission_receipt_authority.invalid.json | da693f2d910f821045f72c4bec4d22d1022f8867 |
+| tooling/minidora_live_check.py | 400bf04a05480ffaf77e4960dbf5abdd0904427f |
+| tooling/conformance_tests/run_conformance_skeleton.py | c6f31d8cb561b48513c6784e54c85969c9cb953e |
+| tooling/schema_check/check_schemas.py | 7dca27717cbe5cccb45e1013b3436918a2322e75 |
+| release_blockers.registry.json | 244adc04a01e7b406c4ebcdeb829f7077d4aa35f |
+
+### 要求母集団・照合状態
 
 ### 要求母集団・照合状態
 
