@@ -414,7 +414,7 @@ N11は`OPEN`。ValidatorとRelease Gateは一部のRegistry/Windows evidence/man
 | P12 | 製品全体統合。REV5進捗ではWindows側`FEATURE COMPLETE`。正式release/Owner GOと分離された製品機能統合の履歴。 | v4仕様S05の直接対応はN01/N09/N10、関連能力K19。Phase 39〜45はC27〜C34のQC/回帰/文書/出荷範囲に関連。単一施工線へ閉じない。 | Windows product entry→Task/result/operation UI→OS product lifecycle。実TaskはN01、operation/observation/recoveryはN09、installed OS distribution/lifecycleはN10の現ConsumerとSHA節へ分割記録。 | `FEATURE COMPLETE`を正式Release/QAへ昇格しない。v4 N01/N09/N10は`OPEN`、Q0〜Q7は`DEFERRED`、`release_ready=false`。統合後の全候補・全OS acceptanceは未成立。 |
 | P13 | Mobile / Non-Windows Product Build。REV5履歴は2026-10-09に有限Product Build acceptanceを閉鎖したと要約する。旧Acceptanceの詳細evidence identity/classは本照合資料から`UNKNOWN`。 | v4仕様S05の直接対応はN10、関連能力K17。Phase 35/36はC24〜C26範囲に関連。施工線H/I。Linux native必須性は別途現行AGENTS/v4正本に従う。 | Linux/macOS Desktop、Android/iOS Mobile runner/native transport→Rust Broker／OS capability→installed product lifecycle。OS別source、package、workflow候補とSHAはN10節。 | 旧P13閉鎖を現行五OS標準installed QAへ移さない。Linux nativeは完全対応必須で、WSL/Xvfb/Headlessだけでは成立しない。Android/iOS実機を前提にせずEmulator/Simulator等を用いる。N10は`OPEN`、`linux_native_product_support`、`rev2_mobile_distribution`、`rev2_mobile_device_evidence`を保持。 |
 
-P0〜P13全14 IDの旧要求範囲・限定statusをv4 N/K/Consumerへ接続した。これは旧statusの書換え、v4 acceptance、N01〜N11のCLOSED、E0完了のいずれも意味しない。C0〜C34、Phase0〜45、K01〜K20のSource→Consumer/scope mappingを記録した。P0〜P10は本節後段で全E0-04 fieldを個別補完し、P11〜P13とN11 Evidence/Blocker/OS Artifact行結合は継続する。P0/P1/P4の直接対応はv4仕様S05の明示mappingへ合わせて訂正し、旧statusは変更していない。P13の詳細evidence identity/classは`UNKNOWN`として保持する。
+P0〜P13全14 IDの旧要求範囲・限定statusをv4 N/K/Consumerへ接続した。これは旧statusの書換え、v4 acceptance、N01〜N11のCLOSED、E0完了のいずれも意味しない。C0〜C34、Phase0〜45、K01〜K20のSource→Consumer/scope mappingを記録した。P0〜P11は本節後段で全E0-04 fieldを個別補完し、P12〜P13とN11 Evidence/Blocker/OS Artifact行結合は継続する。P0/P1/P4の直接対応はv4仕様S05の明示mappingへ合わせて訂正し、旧statusは変更していない。P13の詳細evidence identity/classは`UNKNOWN`として保持する。
 
 ### P0〜P3 E0-04項目の個別補完（2026-11-13、ソースと利用先の照合）
 
@@ -958,6 +958,97 @@ P6の旧CLOSEDは上記Product Build限定機能と当時条件に適用する�
 | `tooling/tests/test_linux_workflow_helpers.py` | `15c71a2ba5ac09ddab2c6ea23b36db256aeab85a` |
 | `tooling/conformance_tests/run_conformance_skeleton.py` | `c6f31d8cb561b48513c6784e54c85969c9cb953e` |
 
+### P11 E0-04項目の個別補完（2026-11-13、Windows製品化）
+
+以下は旧P11 Windows Productizationを現行v4へ結ぶE0照合である。旧Product Buildの限定受入れ・statusは`docs/REV5_PRODUCT_PROGRESS.md`のP11節を保持した。v4仕様S04の直接ConsumerはN10、S05の能力対応はK16、工程表R03の施工線G/F、Phase 34とC33/C34の配布範囲が関係する。portable bootstrap上の機能試験と、一般利用者向けInstaller・同一候補のinstalled lifecycle・正式配布を区別する。照合HEADは`70673ad56c69d8a03d087cc8e182497f0a5262ce`。
+
+| 照合項目 | 内容 |
+|---|---|
+| 現行ID | 旧P11。v4仕様S05の直接対応はN10、能力対応はK16。Phase 34はC33/C34と関連するD4製品配布工程であり、施工線G（Windows製品）とF（安全・回復境界）が関係する。現行Windows受入座標はW06/G6-WIN。 |
+| 旧ID | P11 Windows Productization。rev5 Product Buildは`CLOSED`。閉鎖範囲はP9 portable ZIPをbootstrapとして利用するInstall／Update Center／Broker操作、first-run／Setup Doctor、Update、Rollback、固定root／payload欠損時の限定Repair、Uninstall、version表示の機能実装と限定試験。別個のMSI／Setup.exeや署名済み一般配布物を作成したとは主張しない。 |
+| 原文参照 | `docs/REV5_PRODUCT_PROGRESS.md`のP11節、`docs/D4_POCKET_PHASE_MAPPING.md`のPhase 34およびC33/C34逆引き、v4仕様S04 N10・S05 P11/K16、工程表R03線G/F・W06、N10 OS別Consumer表。旧P11の試験範囲・限定statusは履歴として保持する。 |
+| 対象 | Windows portable ZIP bootstrap→Update Center→Rust Brokerの製品Install／Update／Repair／Rollback／Uninstall、first-run／Setup Doctor、active version／Start Menu登録までの候補経路。一般向けInstaller、正式配布、Publisher identityは別条件として追跡する。 |
+| 目的 | Windows利用者が導入・初回設定・更新・復旧・撤去できる製品経路を成立させ、file／process／署名検査／AuditをRust Broker・native helperへ置く。Flutterは表示・要求に限り、権限判定やOS作用を所有しない。 |
+| 生成側 | 利用者がportable bootstrapまたは製品内SettingsのInstall／Update Centerから明示操作を行う。package builder／Update catalogは候補・package metadataを供給するが、それ自体は信頼・Permission・Approvalではない。 |
+| 実際の受け取り先 | Flutter Settings／`update_client.dart`→Windows Runner／PID束縛IPC→既存Rust Broker `update_center.rs`／`product_install.rs`。Rust `product_bootstrapper.rs`／`product_package.rs`とWindows package toolingが候補を検査し、固定rootへのstage／version切替／rollback／uninstall作用を受け持つ。Setup Doctorは専用画面／collectorへ投影する。現行N10のsourceは接続候補を示すが、一般Installerからinstalled製品までの一貫した実consumerは未成立。 |
+| 契約とデータ | Product Package Manifest／D4PKG01、Update Trust／Catalog／Candidate／Receipt／Download Job、Setup Doctor reportと各Schema／正常・負例JSONを照合した。package hash／署名・target・固定root・version・Audit IDを扱う。Credential実値、Approval、Permissionをpackage／UI metadataから継承しない。 |
+| 正常時の作用 | 旧P11の試験記録はFlutter `settings_install_flow_test.dart`／`settings_compose_test.dart`／`update_client_test.dart`計17件PASS、Rustのdownload／native Owner確認・stage／version switch／portable activationに関するfocused test各1件PASSを含む。既存progress記録ではBrokerの固定product root、durable Audit、active version、Start Menu、Update／Rollback／限定Repair／Uninstallへのsource・fixture接続を確認した。これはinstalled正式製品の一連実作用ではない。 |
+| 否定時の作用 | Update Trust未設定、不正なpackage／Catalog／署名・hash・target、path境界違反、危険policy、Setup DoctorのAuthority claim等をSchema・source・fixtureで拒否する設計を確認した。旧P11のPASS済みunit／Widget／Conformance範囲を保持し、すべての否定例がinstalled製品経路で実行されたとはしない。信頼metadataや画面状態から権限・署名を生成しない。 |
+| 停止と回復 | 旧P11はstage／version切替／Rollback fixture、Download境界、固定root／payload限定Repairの局所条件を記録した。crash／電源断・別profile・完全Repair・正式Installer導入からの連続回復は未成立。Uninstaller finalizer自身の一時directory cleanupと失敗時の回復証拠は`FQ-P11-UNINSTALL-FINALIZER-CLEANUP`として後続Final QAへ保留し、旧P11を再開しない。 |
+| 標準対象OSの候補 | P11の対象はWindows Desktop。現行N10に`windows-2025`のmanual build workflow候補とportable／D4PKG01 package sourceはあるが、workflow build fixtureはinstalled acceptanceではない。v4は標準Windows環境でのinstalled QAに加えてOwner所有Windows実機の確認結果を記録する。対象edition／build／arch／最低資源と一般配布package条件は未確定。 |
+| 配布 | 旧P11の入口はP9 portable ZIPをbootstrapにするDeveloper／限定Product Build経路である。別個のMSI／Setup.exe、署名済みrelease artifact、Publisher identity、一般利用者向け正規配布は成立していない。P9 portable ZIP、D4PKG01 update payload、stage scriptを製品Installerと同一視しない。 |
+| 既存実装 | Flutter Install／Update／Setup Doctor UI、Windows Runner／Broker IPC、Rust package／install／update、Windows Export／portable／product package tooling、Setup Doctor・evidence collector、manual build workflow、Schema／正常・負例fixtureはsource上`CODE_PRESENT`／`WIRED`。旧P11の限定Product Build acceptanceは`CLOSED`のまま。 |
+| 実装不足 | 同一候補の一般利用者向けInstaller→first-run→native Owner／Broker→実Task→Update／Repair／Rollback／Uninstallを結ぶN10 installed lifecycle、別profile、公式配布package・署名／Publisher identity・trust provisioning、現候補provenance、Windows所有実機のQA evidenceは未成立。`windows_installer_first_run_smoke`等のRegistry条件とN10/W06をOPENのまま保持する。 |
+| ソース識別値 | P11に関係する旧進捗・Phase／Final QA・package/Update/Setup Doctor契約と正常・負例、Flutter UI/test、Windows Runner、Rust Broker、Installer/tooling/workflow/Conformanceの56 fileを、照合HEAD `70673ad56c69d8a03d087cc8e182497f0a5262ce`のGit object識別値で下表に結合する。識別値はsource同一性で、test実行・installed acceptanceを意味しない。 |
+| 試験区分 | 旧P11記録：Flutter 17件、Rust focused test 3件、Schema 161／正常例157／負例208、Conformance 236 checks、Manifest／通常Release Gate PASS。試験はunit／fixture／build evidenceの範囲であり、正式Installer、一般配布、別profile installed run、同一候補の全lifecycle、crash／電源断、Windows所有実機の完成品QAを証明しない。本mappingでは旧試験・製品Rust／Flutter・workflow・installed productを再実行せず`NOT_RUN`。 |
+| 証拠ID | `NONE`。旧rev5 P11の限定CLOSED記録は保持する。v4 N10/W06向けinstalled product／QA Evidence IDは発行しない。 |
+| 阻止要件 | 既存Registryの`windows_installer_first_run_smoke`、`windows_setup_doctor_smoke`、`windows_broker_installed_smoke`、`windows_evidence_provenance_isolation`、`windows_distribution_identity`、`rev2_desktop_product_distribution`を参照する。`FQ-P11-UNINSTALL-FINALIZER-CLEANUP`は後続Final QA項目として区別する。各status・分類を変更せず、新規blockerを追加しない。 |
+| 状態 | 旧rev5 P11 Product Build機能受入れは`CLOSED`。E0-04 P11 source→consumer mappingは本単位で記録完了。v4 N10/W06/G6-WIN/E0は`OPEN`、Windows一般配布・installed lifecycle・正式署名は未成立。`release_ready=false`と既存Registry statusを維持する。 |
+| 残件 | N10/G線で一つのcandidate identityに固定したWindows標準環境installed lifecycle、native Owner／Broker・Audit・Setup Doctor・実Task・Update／Repair／Rollback／Uninstall、provenance、Owner所有実機QAを接続する。package／署名／Publisherと一般配布資格は別のRelease条件として保持する。finalizer cleanupはFQ/Q5の後続Final QAで扱い、本P11 acceptanceへ混ぜない。 |
+
+#### P11 ソース識別値・該当ファイル
+
+下表は照合HEAD `70673ad56c69d8a03d087cc8e182497f0a5262ce`のGit object識別値である。Source、Schema、fixture、test、workflowの存在は本単位での実行やinstalled製品受入れを意味しない。
+
+| ファイル | 対象ファイル識別値 |
+|---|---|
+| `docs/REV5_PRODUCT_PROGRESS.md` | `9c978021d3982690e9aaa87896436bad7125b433` |
+| `docs/D4_POCKET_PHASE_MAPPING.md` | `064ea334f86b137d94fba2370d2a2fd732f6e972` |
+| `docs/FINAL_QA_QUEUE.md` | `7b332cccab70bb68aa1ff4f8e23acc0e816d8282` |
+| `docs/specs/windows-product-package.md` | `19c5c45dc8cbdbd4560b7b2cb8fe5d8e9f82a2c3` |
+| `docs/QE_2026-11-09/進捗.md` | `dbfe0e52ff510d8248a90154681ab4c144e23ce2` |
+| `release_blockers.registry.json` | `244adc04a01e7b406c4ebcdeb829f7077d4aa35f` |
+| `specs/d4_pocket_product_package_manifest.schema.json` | `3151ba81a869b87e6c0fa8f8633a0e424fc43ae7` |
+| `specs/update_trust.schema.json` | `5caa430cf621c09e6e3d96bd6c377758095b9491` |
+| `specs/update_catalog.schema.json` | `faa9297d56029f326cfe0c0962a5c89f55c97470` |
+| `specs/update_candidate.schema.json` | `1d803d8a2aaf22576346c77f4c7113ad834d213c` |
+| `specs/update.schema.json` | `351a76c29f0279cc2cef92970f082ba7c2f7aaf1` |
+| `specs/update_receipt.schema.json` | `86471c54dd55fa55bc1cdc7ebe32050d9f30ed36` |
+| `specs/update_download_job.schema.json` | `42f457bf1fb1275c17f55a90f671cc91e8a51e2e` |
+| `specs/setup_doctor_report.schema.json` | `9c083d42cdbf176989b105d8e3dfd4c44116a72f` |
+| `examples/contracts/d4_pocket_product_package_manifest.valid.json` | `da9fc2eeec548deae980f9dc90898fe08f2d7629` |
+| `examples/contracts/invalid/d4_pocket_product_package_manifest_parent_path.invalid.json` | `e5c3a55e87e7f25bb7ceebd485b4be2a9ba626d9` |
+| `examples/contracts/update_trust.valid.json` | `17f01e0d53312d919888863c1afbaf46884b6557` |
+| `examples/contracts/update_catalog.valid.json` | `8fe1df4c289e04322b331259b4a6b75f2b0d7e7b` |
+| `examples/contracts/update_candidate.valid.json` | `09955e5e9ed97e9435ec6cc96f53a05b2d1a755b` |
+| `examples/contracts/update.valid.json` | `04e8649af6e603266903f0818f1f907e9d3bf808` |
+| `examples/contracts/update_receipt.valid.json` | `a6c54ca5bbc1bbacb3433bf31055a077d4a9a1da` |
+| `examples/contracts/update_download_job.valid.json` | `f2b45d607352c84fa178fc41503063198ff3d8b4` |
+| `examples/contracts/setup_doctor_report.valid.json` | `5eef23d2af04c44d41fc42bfa1187d01a59d7a9d` |
+| `examples/contracts/invalid/update_trust.invalid.json` | `b5b9c73800f30e37663c079aca341b4e8cced2f1` |
+| `examples/contracts/invalid/update_unsafe_policy.invalid.json` | `7a1ad2e938de711e9c315c090b66ff59c3a0c402` |
+| `examples/contracts/invalid/update_download_job_path_leak.invalid.json` | `66e6ef09467e915988c0cc1ed88835f37fff480b` |
+| `examples/contracts/invalid/setup_doctor_report_authority_escalation.invalid.json` | `b8d782b3f2b9e6af2b1f4eed9cc4c057aae10e3d` |
+| `native/rust_helper/src/product_package.rs` | `a2deb2b6e77bc00ae8d01cd5ca306ee63baa20e5` |
+| `native/rust_helper/src/product_bootstrapper.rs` | `3b0495dfc9a1937ba64f3f99c95ae4cc739ddc69` |
+| `native/rust_helper/src/broker/product_install.rs` | `c91115bdf88dd28e5f3445e7ed66127902909677` |
+| `native/rust_helper/src/broker/update_center.rs` | `f6fc98155fcd476765b60d382a680c7f7c6d675e` |
+| `native/rust_helper/src/desktop_launcher.rs` | `6a9f335de07fa474ca10043aea63ad6e988b572d` |
+| `native/rust_helper/src/broker/ipc_server.rs` | `58a404b920ef5905e174668ec2de0e04a9e8b044` |
+| `native/rust_helper/src/main.rs` | `b0a5df285db357172e7970074d7a67189f3384a3` |
+| `apps/desktop_flutter/windows/runner/main.cpp` | `be0084505135d0d33311915948fd660e59ea66ab` |
+| `apps/desktop_flutter/windows/runner/broker_pipe_controller.cpp` | `e645d2d8cc25a1e61d9cb702013b5c3ee2e31eef` |
+| `apps/desktop_flutter/windows/runner/broker_pipe_controller.h` | `f178545f83a1d2980b29c197f3d4d82ba1c4dbab` |
+| `apps/desktop_flutter/windows/runner/CMakeLists.txt` | `84f310a9a3887b627ec88dbe8601753db48be30d` |
+| `apps/desktop_flutter/lib/screens/settings.dart` | `66374ec4157d573939e7f9cc5c36aecf5d65e251` |
+| `apps/desktop_flutter/lib/services/update_client.dart` | `26d2e946b5b15ea3328867e606e9f75bf4bfc2d1` |
+| `apps/desktop_flutter/lib/screens/setup_doctor.dart` | `41fe7f3e904fcc2179ccc8c8373e53f0b646d1fe` |
+| `apps/desktop_flutter/test/settings_install_flow_test.dart` | `73fc7b9706a7f4246972db46d5398d8b73decb09` |
+| `apps/desktop_flutter/test/settings_compose_test.dart` | `a78353f93617cc7b17391549ea256f007a7acdb1` |
+| `apps/desktop_flutter/test/update_client_test.dart` | `f70bb4a6dbc2340b5d26d867496952629dad1218` |
+| `installer/windows/README.md` | `46287d463b38b1093a29e9818c0f0bfd99465393` |
+| `installer/windows/stage_installed_app.ps1` | `c6d0797299624d69b71042416400b2f454787cc7` |
+| `installer/windows/collect_setup_doctor.ps1` | `3695f3402dd175f8eafead3baa2c82bcc45e6364` |
+| `installer/windows/collect_installed_smoke.ps1` | `92c4720e82eb0af91002659c742f8e03b15aa2de` |
+| `installer/windows/collect_broker_smoke.ps1` | `f5f8abfad981d64c30a6cf1f4e9eafde1b43c357` |
+| `installer/setup_doctor.py` | `23b43a8a00814e4033addec71efa11126d3b916a` |
+| `tooling/export_windows_product.py` | `31856179881a5a5aae1ba4451732e6de6cd7f338` |
+| `tooling/package_windows_portable.py` | `d6cfba6941da10fbae35228e7137d7f87f8d3889` |
+| `tooling/package_windows_product.py` | `c6f9155f2457ef0d89ecb711fa94424fbb1501ee` |
+| `tooling/windows_release_evidence.py` | `6f7957c6193c86c7bc15165e743f11651464f29c` |
+| `.github/workflows/windows-manual-export-build.yml` | `f8255269ad70a63f329b6abb78f6da3d62cde960` |
+| `tooling/conformance_tests/run_conformance_skeleton.py` | `c6f31d8cb561b48513c6784e54c85969c9cb953e` |
+
 ## 旧C0〜C6のv4 Source→Consumer crosswalk（E0差分）
 
 旧rev1の仕様・工程・進捗は当時の要求範囲と履歴statusを確認する資料として読み、現在statusはv4 S04/S05、工程表R03、現行Source→Consumerへ接続した。C0〜C6の旧statusは変更しない。v4 target statusはN11/C0のbaseline記録を含め、製品受入は未成立のままである。Phase対応は`docs/D4_POCKET_PHASE_MAPPING.md`の既存逆引きを参照した。
@@ -1451,7 +1542,7 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 |---|---:|---|---|
 | 新規要求 N01〜N11 | 11 | v4仕様S04 | 初期Producer/Consumer差分を記録。契約・否定・OS・証拠の全項目は未完 |
 | 全体施工線 A〜J | 10 | v4工程表R03・Codex指示I04 | 全線同時BUILDのproducer/consumerと現行実装配置を全数照合中 |
-| 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P10は全E0-04 fieldを個別記録。P11〜P13の個別field、P13の旧evidence identity/class、N11 Evidence/Blocker/OS Artifact全数結合は未完／UNKNOWN |
+| 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P11は全E0-04 fieldを個別記録。P12〜P13の個別field、P13の旧evidence identity/class、N11 Evidence/Blocker/OS Artifact全数結合は未完／UNKNOWN |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのSource→Consumer crosswalkを記録。個々の全E0-04列とv4 Acceptance／Evidence/N11結合は継続 |
 | D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDをv4 N01〜N11/A〜J/Kへcrosswalk済み。Phase固有E0-04全field、Evidence ID/Blocker、Acceptanceは未完 |
 | 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K別の完全E0-04 field、OS/Evidence/Blocker確認は継続 |
@@ -1496,7 +1587,7 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 
 ## 次のE0照合作業
 
-1. P11〜P13をID順に全E0-04 field、N11 Evidence ID、Blocker、OS対象/Artifactへ結合する。P0〜P10は完了済みmappingとして保持。続けてN/P/C/Phase/K残行へ展開し、既存CLOSED/FAILは履歴保持して再試験しない。
+1. P12〜P13をID順に全E0-04 field、N11 Evidence ID、Blocker、OS対象/Artifactへ結合する。P0〜P11は完了済みmappingとして保持。続けてN/P/C/Phase/K残行へ展開し、既存CLOSED/FAILは履歴保持して再試験しない。
 2. BUF-R/T crosswalkをCanonical N08/N10/N11 source SHA・各IDの完全E0-04 field・B5 evidenceへ結合する。B0〜B6の工程・状態・受入Consumer・証拠のcrosswalkは記録済み。個別cause/effect、OS/Artifact、N11 Evidence/Blockerの結合は継続。
 3. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 4. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
