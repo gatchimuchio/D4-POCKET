@@ -1505,7 +1505,7 @@ C0〜C6の7 IDについて、旧要求・Phase・旧statusを変更せずv4の�
 
 ## 旧C7〜C14のv4 Source→Consumer crosswalk（E0差分）
 
-旧仕様・工程・進捗のstatusはrev1当時の履歴として保持し、変更しない。以下の現行source観測基準はmain f8a6b5ed521495fe7d0a4b5c79292fa3a7c169a0。N/K対応はv4 S04/S05およびR03の実consumerに限り、現行のN受入れやPhase完了へ旧C statusを昇格しない。旧Phase対応はdocs/D4_POCKET_PHASE_MAPPING.mdの逆引きである。Evidence IDのない現候補受入れはUNKNOWN、列挙するtest sourceは本source-mapping単位でNOT_RUN。
+旧仕様・工程・進捗のstatusはrev1当時の履歴として保持し、変更しない。この要約と旧SourceSHA表はmain f8a6b5ed521495fe7d0a4b5c79292fa3a7c169a0を基準に作成した履歴値であり、現行v4の製品受入れではない。現行N/K対応はv4 S04/S05およびR03の実consumerに限り、旧C statusを現行N受入れやPhase完了へ昇格しない。旧Phase対応はdocs/D4_POCKET_PHASE_MAPPING.mdの逆引きである。現候補Evidence IDのない受入れはUNKNOWN、列挙するtest sourceは本source-mapping単位でNOT_RUN。
 
 | 旧ID／Phase | 主語・目的／rev1時点のstatus | v4対応 | 現行Producer→Consumer・契約・source状態 | 否定・停止・Authority・Recovery | OS・配布・TestClass・Evidence・残差 |
 |---|---|---|---|---|---|
@@ -1520,7 +1520,7 @@ C0〜C6の7 IDについて、旧要求・Phase・旧statusを変更せずv4の�
 
 ### C7〜C14 Source SHA・test source
 
-下記blob SHAはsource照合基準main f8a6b5ed521495fe7d0a4b5c79292fa3a7c169a0の値。production source内Rust unit testsを含み、別OSのinstalled/runtime証拠ではない。C7〜C11の主要SourceとC12〜C14のSource/Testを列挙する。既存N02/N05/N09節はそれぞれの広域consumer／追加SHAを保持する。
+下記blob SHAは当初のsource照合基準main f8a6b5ed521495fe7d0a4b5c79292fa3a7c169a0で採取した履歴値である。今回の現行HEAD照合では63 pathすべて同一blob SHAであることを確認した。production source内Rust unit testsを含み、別OSのinstalled/runtime証拠ではない。C7〜C11の主要SourceとC12〜C14のSource/Testを列挙する。既存N02/N05/N09節はそれぞれの広域consumer／追加SHAを保持する。
 
 | source file | blob SHA |
 |---|---|
@@ -1588,7 +1588,230 @@ C0〜C6の7 IDについて、旧要求・Phase・旧statusを変更せずv4の�
 | apps/desktop_flutter/lib/screens/observability_center.dart | 497fe25368b9b108d62bee921d454145b712b657 |
 | apps/desktop_flutter/test/observation_client_test.dart | 6d6ac31671e16d771bbc1a39fa7edcd9a3929dfb |
 
-C7〜C14のSource/Schema/test blob SHAは現行source baselineへ固定した。上記test sourceはUNIT／FIXTURE／WIDGET／CONFORMANCEのコード存在であり、この作業単位ではNOT_RUN。C7〜C14のinstalled／実OS acceptance Evidenceは新規発行していない。C7〜C14の旧statusはrev1履歴のまま、v4 N01/N02/N05/N09/N10、K07〜K10/K13/K16はそれぞれの現行ledgerでOPENを維持する。
+C7〜C14の旧Source/Schema/test blob SHA一覧は履歴として保持した。現行main 78a067eb4ddb6150b4ac0465569eb97ab36abffbとの63 path一致は今回の照合結果である。上記test sourceはUNIT／FIXTURE／WIDGET／CONFORMANCEのコード存在であり、この作業単位ではNOT_RUN。C7〜C14のinstalled／実OS acceptance Evidenceは新規発行していない。C7〜C14の旧statusはrev1履歴のまま、v4 N01/N02/N05/N09/N10、K07〜K10/K13/K16はそれぞれの現行ledgerでOPENを維持する。
+
+### C7〜C14 E0-04全21項目の現行Source→Consumer照合（2026-11-13）
+
+現行main HEAD 78a067eb4ddb6150b4ac0465569eb97ab36abffbで旧SourceSHA表63 pathを再照合し、63/63一致。旧表に含まれない更新実装の追加sourceは下段に個別記録する。以下は要求・実Consumer・責任境界のmappingであり、Cの履歴status変更、v4製品Acceptance、E3 BUILD_COVERED、OS別QAを意味しない。Source mapping作業の製品試験とEvidence発行はNOT_RUN／NONE。
+
+#### C7 資格情報保管庫
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 旧C7 Credential Vault。秘密値のBroker保管、metadata投影、限定consumerへの受渡しと失効。 |
+| 旧ID | 総合機能拡張rev1 C7／Phase 16。過去のOwner登録、DPAPI、metadata一覧、秘密非投影と限定fail-closedを履歴保持。 |
+| 原文参照 | v4仕様S04 N01/N02/N05/N10、S05 K07/K08/K17、工程R03/R06、credential-vault.mdとOS別binding契約。 |
+| 対象 | Ownerによる登録・metadata一覧・論理失効、承認済みCodex Provider TaskおよびMCP stdio childへの用途限定利用。 |
+| 目的 | 秘密をUI／IPC／Audit／error／log／traceへ漏らさず、所持をPermission／Approval／Trustへ変換しない。 |
+| 生成元（Producer） | Rust native Owner入力が登録要求をBrokerへ送り、BrokerがAuditとOS保管先へ記録。Provider TaskまたはMCP接続はCredential ID等を参照する。 |
+| 実Consumer | Rust credential_vault／credential_storage、Windows／macOS／Linux native入力、固定openai_codex_cli経路、MCP Center→mcp_center／mcp_stdio→対象stdio child。通常画面はmetadata-only一覧を受け取る。 |
+| 契約／Data | credential_registration／receipt／list／revocation schema。ID、用途、対象、種類、保管方式、状態、暗号文hash、Audit ID。秘密実値は保管先と短命Rust処理内に限定。 |
+| 正常時作用 | Owner確認後にBrokerがAuditを確定しOS保管先へ登録。通常一覧はmetadataのみ。利用時はAudit／hash／用途／対象／失効を再確認し、対象CLIまたはstdio childへ限定する。 |
+| 否定時作用 | 重複ID、未知field、Audit不在、store欠落・改変、対象／用途不一致、失効、未対応保管先を拒否。秘密値を公開面へ出さない。 |
+| 停止／Recovery | 検証・Audit・store不成立時は利用を開始しない。論理失効後の再利用は禁止し、新IDで再登録。物理削除とRecoveryは未接続。Linux group外子孫・Broker crash後cleanupは保証しない。 |
+| 標準OS候補 | 製品対象はWindows／macOS／Linux native／Android／iOS。現sourceの限定consumerはDesktop三OS中心で、Android Keystore・iOS Keychainを含む五OS保証は未成立。Linux nativeは必須対象。 |
+| 配布物 | 独自配布物なし。N10のOS別通常package／導入経路が対象。source・fixtureはinstalled製品の証拠ではない。 |
+| 既存実装 | Windows DPAPI、Linux Secret Service、macOS固有bindingの一部、metadata一覧、Owner確認、論理失効、Codex Provider／MCP限定注入のsourceを確認。 |
+| BUILD_GAP | 五OS installedでの登録・再起動・利用・失効・復旧が一体受入れされていない。Android／iOS保管consumer、物理削除／Recovery、任意Runtime／A2Aへの一般注入は未接続。 |
+| ソース識別値（`SourceSHA`） | 旧SourceSHA節のC7 source 11 pathを現HEAD 78a067eへ照合し全件一致。Schema、Rust vault/storage、三OS入力、Mac/Linux bridge testのhashは同節。 |
+| 試験区分（TestClass） | Rust UNIT、Flutter bridge test、Schema／negative fixture sourceあり。本mappingでの再実行はNOT_RUN。五OS installed testではない。 |
+| 証拠ID（Evidence ID） | NONE。過去の局所証拠は元OS・build・scope内の履歴として保持し、現行五OS Acceptanceへ転記しない。 |
+| 阻害要因（Blocker） | Registry 18件（16 unresolved／2 resolved）の現状態を維持。C7への個別帰属が不明なものはUNKNOWN。新規登録・状態変更なし。 |
+| 状態 | C7 E0-04 mapping記載済み。旧status不変。現行N01/N02/N05/N10およびE0製品AcceptanceはOPEN。 |
+| 残余 | Android／iOS保管、五OS installed一体試験、Provider／MCPの失敗後cleanup境界、物理削除とRecovery、N11のArtifact／Evidence／Blocker接続。 |
+
+#### C8 MCP契約
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 旧C8 MCP Server／Tool／Resource／Prompt等のmetadata contractと検査境界。 |
+| 旧ID | 総合機能拡張rev1 C8／Phase 17。metadata-only contractと当時のfixture／conformance状態を履歴保持。 |
+| 原文参照 | v4仕様S04 N02/N05/N10、S05 K08/K17、工程R03、mcp-contract.mdとMCP schema群。 |
+| 対象 | 外部MCP由来metadata、Capability差分、Tool inputSchemaをBroker catalogへ取り込む契約と実行前検査。 |
+| 目的 | description／metadata／Trust／Credential referenceをAuthorityにせず、Tool call前に現在のBroker状態と引数契約を検査する。 |
+| 生成元（Producer） | MCP discovery応答からBrokerが未信頼metadataを正規化し、接続catalogとTool／Resource／Prompt情報を生成する。 |
+| 実Consumer | Rust mcp_center／mcp_stdioが接続catalogとTool identity／inputSchemaを検査。Flutter MCP CenterはBroker projectionを表示し、Compose／Agent orchestrationは限定metadataを参照する。 |
+| 契約／Data | mcp_contract／connection／tool_call／tool_call_receipt schemaとmcp-contract.md。Resource／Promptの全概念はschema上の存在だけで実処理済みとしない。 |
+| 正常時作用 | 対応範囲内で検証したTool catalogを表示。実callは現在のServer／Tool ID・名前・schemaを送信直前に再照合し、別途native Owner確認・一回Permission・Auditを通す。 |
+| 否定時作用 | 未知field、外部schema参照、unsupported dialect、上限超過、Authority／Credential混入、stale catalog、identity不一致、schema不適合を拒否する。 |
+| 停止／Recovery | discovery／Schema失敗を成功扱いしない。metadataだけで実行・retry・Recoveryを起動せず、Tool作用はC9の明示操作と現行権限へ戻す。 |
+| 標準OS候補 | Desktop Windows／macOS／Linux nativeにsource経路。Android／iOSにTool作用consumerなし。Linux nativeは必須でありsourceをinstalled acceptanceへ昇格しない。 |
+| 配布物 | 独自配布物なし。MCP Serverは接続先、D4 Pocket packageはN10対象。 |
+| 既存実装 | MCP contract schema、Broker catalog／Tool validator、Rust stdio adapter、Flutter connection UIのsourceあり。C8契約とC9接続・作用は別判定。 |
+| BUILD_GAP | Resource／Promptの完全consumer、五OS installed conformance、Mobile Tool作用、現candidateの実MCP証拠は未成立。 |
+| ソース識別値（`SourceSHA`） | 旧SourceSHA節のC8 source／schema／test pathを現HEAD 78a067eへ照合し全件一致。mcp-contract、mcp_center、mcp_stdio、protocol等のhashは同節。 |
+| 試験区分（TestClass） | Rust UNIT、Schema／conformance、Flutter client／widget、fixture probe sourceあり。本mappingの試験はNOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。Schema／fixture／conformance sourceを実MCP installed acceptanceとして扱わない。 |
+| 阻害要因（Blocker） | Registry 18件の状態を維持。C8直接Blockerが明示できない場合はUNKNOWN。新規Blockerなし。 |
+| 状態 | C8 E0-04 mapping記載済み。旧status不変。現行N02/N05/N10およびE0はOPEN。 |
+| 残余 | Resource／Prompt実作用、五OS installed接続、Mobile Tool consumer、実Server・現candidate Acceptance evidence。 |
+
+#### C9 MCP接続センター
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 旧C9 MCP Centerのdiscovery／接続／Tool実行とAgent結果利用。 |
+| 旧ID | 総合機能拡張rev1 C9／Phase 18・19。catalog・receipt・拒否試験の旧statusを履歴保持。 |
+| 原文参照 | v4仕様S04 N02/N05/N10、S05 K08/K17、工程R03、mcp-connection-center.md、credential-vault.md、N02／W02記録。 |
+| 対象 | Flutter MCP CenterからBroker管理stdio Server、metadata一覧、明示Tool call、Task result bindingを経てAgentへ結果を渡す範囲。 |
+| 目的 | Tool作用を既存BrokerのAuthority／Permission／Approval／Audit境界内で実行し、外部結果を未信頼入力として扱う。 |
+| 生成元（Producer） | OperatorのServer登録・接続・一覧・Tool call要求、およびCodex Agent Taskが生成する未信頼Tool proposal。 |
+| 実Consumer | Flutter MCP Center→通常Broker client→Rust mcp_center／mcp_stdio→stdio child。Task連携はagent_mcp_task_controllerとBroker結果contextから同Agentのfresh Permission／Approval付き後続Taskへsource接続する。 |
+| 契約／Data | MCP connection／tool call／receipt、Credential ID参照、catalog hash、Tool ID／argument hash、Audit ID、Task／Session／Workspace binding付き結果context。 |
+| 正常時作用 | 接続・catalog更新後、現在catalog／schema／credential binding・Owner確認・一回Permission・Auditを再検査して一度dispatch。許可されたN02経路は未信頼Tool結果を同Agentの新規Task contextへ渡す。 |
+| 否定時作用 | timeout、malformed応答、stale catalog、失効Credential、未知Tool、Permission／Owner／Audit不成立、Task bindingずれを拒否または隔離し、自動再送しない。 |
+| 停止／Recovery | 外部作用の成否不明を成功へ昇格せず、既存停止・隔離・Auditへ接続。後続Taskはfresh Permission／Approvalを要求する。OSごとのprocess containment差を維持する。 |
+| 標準OS候補 | Desktop Windows／macOS／Linux nativeにsource。Android／iOSのTool作用はBUILD_GAP。Linux nativeは必須で、group外子孫／Broker crash cleanupを保証しない。 |
+| 配布物 | MCP Center独自配布物なし。接続Serverと通常OS別D4 Pocket packageはN10対象。 |
+| 既存実装 | Broker catalog／Tool execution、Credential ID限定注入、Flutter画面、Agent MCP coordinator、result-context bindingとtest／probe sourceを確認。 |
+| BUILD_GAP | 実Codexが実MCPを呼び結果依存follow-upまで同一installed candidateで通るW02/G2はOPEN。五OS一体証拠、全OS cleanup保証、Mobile Tool作用も未成立。 |
+| ソース識別値（`SourceSHA`） | 旧SourceSHA節のC9 UI／client／orchestration／Rust／schema／test pathを現HEAD 78a067eへ照合し全件一致。N02追加source traceも参照。 |
+| 試験区分（TestClass） | Rust UNIT／FIXTURE、Flutter client／controller、real_broker_mcp_probe sourceあり。本mappingではNOT_RUN。sourceはinstalled LIVE_PRODUCT結果ではない。 |
+| 証拠ID（Evidence ID） | NONE。過去の限定実接続・W02履歴は元candidateと条件内に保持する。 |
+| 阻害要因（Blocker） | W02/G2はOPEN。Registry 18件（16 unresolved／2 resolved）を維持し、C9直接帰属不明はUNKNOWN。新規追加なし。 |
+| 状態 | C9 E0-04 mapping記載済み。旧status不変。N02/N05/W02/N10/E0製品AcceptanceはOPEN。 |
+| 残余 | W02 installed実Codex→Tool→follow-up、OS別installed経路、process cleanup限界、Mobile Tool consumer、N11証拠結合。 |
+
+#### C10 運用プロファイル
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 旧C10 運用Profileの作成・複製・適用要求・削除・export・import。 |
+| 旧ID | 総合機能拡張rev1 C10／Phase 20。Profile永続化とPermission非生成の過去状態を維持。 |
+| 原文参照 | v4仕様S05 K09、工程R03/R06、operation-profile.mdとprofile schema群。直接のN対応を無理に割り当てない。 |
+| 対象 | Desktop Settingsと認証済Broker IPCを通るProfile文書のCRUD／複製／適用意図／入出力。 |
+| 目的 | Runtime運用要求を再利用しつつ、ProfileからPermission・Approval・Credential・Authorityを発行しない。 |
+| 生成元（Producer） | OperatorがSettingsでProfileの要求設定を入力し、profile_clientがBroker要求を生成する。 |
+| 実Consumer | profile_client→Rust profile_center→Broker永続profiles.json。SettingsはBroker receipt／list projectionを表示する。 |
+| 契約／Data | profile／profile_list／profile_receipt schema。Runtime／Adapter ID、Capability要求、Content Exposure、network/resource limit、UI preference。 |
+| 正常時作用 | Brokerが作成・複製・削除・export／import・一覧を処理。適用要求は現Profile hashを照合し、意図をAuditへ記録するだけ。 |
+| 否定時作用 | 未知field、Authority／Credential情報、malformed state、重複ID、stale hash、上限超過を拒否。不正永続状態は起動fail-closed。 |
+| 停止／Recovery | atomic writeと起動時再検査を使う。実Runtimeへの適用consumerや適用後rollbackは未接続で、apply-intentを実作用扱いしない。 |
+| 標準OS候補 | Desktop Settings／Broker sourceあり。五OS製品対象を維持し、各OS installed Profile操作は本mappingで未確認。Linux native必須。 |
+| 配布物 | 独自配布物なし。通常D4 PocketのN10 packageに含む候補で、独立配布・installed acceptanceは未確認。 |
+| 既存実装 | Profile schema、Rust永続Broker処理、Flutter profile clientとSettings接続のsourceあり。仕様はC10の限定範囲を定義する。 |
+| BUILD_GAP | ProfileからRuntime／Agent Taskへの実適用、専用file picker、適用変更のRecovery、現candidate installed受入れ未成立。 |
+| ソース識別値（`SourceSHA`） | 旧SourceSHA節のC10 spec／schema／Broker／client／Settings／testの7 pathを現HEAD 78a067eへ照合し全件一致。 |
+| 試験区分（TestClass） | Rust UNIT、Flutter client test、Schema／negative fixture sourceあり。本mappingでの実行はNOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。過去の局所実装状態を五OS Product acceptanceへ転記しない。 |
+| 阻害要因（Blocker） | Registry 18件の状態不変。C10直接帰属が不明なblockerはUNKNOWN。新規登録・状態変更なし。 |
+| 状態 | C10 E0-04 mapping記載済み。旧status不変。K09関連とE0の製品AcceptanceはOPEN。 |
+| 残余 | Profileの実consumer適用、OS別UI／保存境界、適用時Audit／RecoveryとN11結合。 |
+
+#### C11 更新センター
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 旧C11 Update Centerの候補検証・取得・適用・延期・rollback・限定修復。 |
+| 旧ID | 総合機能拡張rev1 C11／Phase 21。候補一覧・署名・UI等の歴史statusを変更しない。 |
+| 原文参照 | v4仕様S04 N10、S05 K09/K16/K17、工程R03/R06、update-center.mdとwindows-desktop-launcher.md。 |
+| 対象 | Broker-owned trust／fixed sourceからの署名候補取得、package download／stage、active version切替、rollback、限定Repair／Uninstall。 |
+| 目的 | UpdateをFlutterの任意network／filesystem／process動作から分離し、trust・package identity・Owner確認・Auditで統治する。 |
+| 生成元（Producer） | Operatorの明示Update操作、固定trust／source、署名候補metadata、Broker download job。 |
+| 実Consumer | Flutter update_client→Rust update_center／update_download／update_verification。Windows product_install／product_bootstrapperとLauncherがfixed root／active recordを消費する。 |
+| 契約／Data | update／candidate／list／trust schema、package SHA-256・byte length、channel・candidate hash、Owner confirmation、Audit ID、active version record。秘密署名鍵はbundleしない。 |
+| 正常時作用 | Brokerがfixed HTTPS sourceから署名候補を検査し、別個native Owner確認後にdownload／stage／active record／Start Menu切替／直前版toggleを行う。process起動は固定Launcher契約。 |
+| 否定時作用 | 不正署名／trust、source不一致、redirect／proxy／非global DNS、byte長・hash・inventory不一致、unknown path／identity、stale requestを拒否し既存有効版を保持。 |
+| 停止／Recovery | Broker jobは再起動で消え、明示再要求時にpackage／stageを再検証する。途中stage不整合を自動適用しない。fixtureはinstalled crash／電源断Recoveryではない。 |
+| 標準OS候補 | 製品対象五OS。詳細な更新・Launcher sourceはWindows中心。Linux native／macOS／Android／iOSの標準更新・rollback・uninstall lifecycleは未成立としてN10に残す。 |
+| 配布物 | Windows bootstrap／Broker-managed package sourceあり。一般向けPublisher署名配布や五OS packageはN10別条件であり、組立sourceは製品受入れでない。 |
+| 既存実装 | Rust署名検証、fixed HTTPS候補取得、download／stage／rollback、Windows active record／Start Menu／限定repair、Flutter UIとRust／TLS fixture test sourceあり。 |
+| BUILD_GAP | 実配布元・本番trust provision、同一installed candidateの導入→更新→起動→rollback→uninstall、crash recovery、五OS lifecycle／Artifact結合は未成立。 |
+| ソース識別値（`SourceSHA`） | 旧SourceSHA節のC11 docs／schema／Broker／client／test pathは現HEAD 78a067eで一致。追加SourceSHAは下段に記録する。 |
+| 試験区分（TestClass） | Rust UNIT／FIXTURE、TLS fixture、native dialog／Flutter client test sourceあり。本mappingではNOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。旧Product Build／fixtureを現行N10 installed lifecycle Acceptanceへ昇格しない。 |
+| 阻害要因（Blocker） | Registry 18件（16 unresolved／2 resolved）とrelease_ready=falseを維持。OS別direct blockerの特定不能はUNKNOWN。新規追加なし。 |
+| 状態 | C11 E0-04 mapping記載済み。旧status不変。N10/K09/K16/E0製品AcceptanceはOPEN。 |
+| 残余 | 本番署名identity、五OS標準package／Lifecycle、installed update recovery、Artifact provenance、N11同候補結合。 |
+
+#### C12 通知センター
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 旧C12 Notification CenterのAudit event由来summary・一覧・状態操作。 |
+| 旧ID | 総合機能拡張rev1 C12／Phase 22。旧summary／hash-bound state／UI接続を履歴保持。 |
+| 原文参照 | v4仕様S04 N09/N10、S05 K10/K13/K17、工程R03/R06、notification-center.mdとschema群。 |
+| 対象 | Broker確定Auditから作る固定summary、永続notification state、Desktop一覧・既読／破棄／navigation。 |
+| 目的 | Boundedな通知を返しAudit本文・秘密・通知経由の権限作用を公開しない。 |
+| 生成元（Producer） | Brokerの固定operation mappingが確定Audit eventをsummaryへ射影。caller任意通知登録なし。 |
+| 実Consumer | Rust notification_centerがAuditとnotifications.jsonを読み、通常認証Broker IPCへ返す。Flutter notification_client／notifications screenが表示し、openは既存画面へ遷移。 |
+| 契約／Data | notification／notification_list／notification_action schema。通知ID・hash・summary・固定種別・read/discard state。Audit reason／payload／Credentialは含めない。 |
+| 正常時作用 | 直近4096 Audit eventをscanし最大256件を返す。既読／破棄は現在hashに束縛しBrokerへ記録する。 |
+| 否定時作用 | caller任意source、未知operation、malformed／duplicate state、hash不一致、stale notificationを拒否。通知からPermission／Approval／Authorityを生成しない。 |
+| 停止／Recovery | 永続状態不正・Audit確定失敗はactionを成功扱いしない。navigationからsensitive actionを直実行しない。 |
+| 標準OS候補 | Desktop UI／Broker sourceあり。Windows native toast host capability未接続。Mobile summaryは別範囲。五OS installed parity未確認。Linux native必須。 |
+| 配布物 | 独自配布物なし。OS別通知機能・Desktop package統合はN10で判定する。 |
+| 既存実装 | Rust固定Audit projection、bounded scan／return、hash-bound persistent state、Flutter通知screen／client／test sourceあり。 |
+| BUILD_GAP | Windows native toast、全Runtime event source、Mobile parity、同一installed candidateでの全OS表示・Recovery証拠は未成立。 |
+| ソース識別値（`SourceSHA`） | 旧SourceSHA節のC12 docs／schema／Broker／client／screen／test pathを現HEAD 78a067eへ照合し全件一致。 |
+| 試験区分（TestClass） | Rust UNIT、Flutter client／navigation、Schema／negative fixture sourceあり。本mappingでの実行はNOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。局所UI／Broker sourceをinstalled notification evidenceにしない。 |
+| 阻害要因（Blocker） | Registry 18件の状態不変。C12直接帰属の不明分はUNKNOWN。新規Blockerなし。 |
+| 状態 | C12 E0-04 mapping記載済み。旧status不変。N09/N10/E0製品AcceptanceはOPEN。 |
+| 残余 | Windows toast host、OS別通知経路、全必要event producer、Task／Release evidenceとの同一candidate結合。 |
+
+#### C13 内部観測センター
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 旧C13 Auditから独立したSpan／Trace／Metric観測面。 |
+| 旧ID | 総合機能拡張rev1 C13／Phase 23。Broker内bounded観測・IPC・Desktop画面の旧状態を維持。 |
+| 原文参照 | v4仕様S04 N09/N11、S05 K10/K13/K19、工程R03/R08、observability-center.mdとobservation schema群。 |
+| 対象 | Broker Audit finalization処理由来の内部Span／Trace／Metric、認証済一覧IPCとDesktop表示。 |
+| 目的 | 性能・挙動・運用状態をboundedに観測し、Audit責任、Permission、Approval、Authorityを置き換えない。 |
+| 生成元（Producer） | Audit確定後にRust ObservationCenterが内部処理時間等を記録。callerのSpan登録なし。 |
+| 実Consumer | Rust observation_centerが保持中データを集約し、Broker IPCのobservation_listをFlutter observation_client／observability_centerが表示する。 |
+| 契約／Data | observation_list／span／trace／metric schema。内部Audit確定の範囲・関連Audit IDのみで、raw payload／reason／Credentialを投影しない。 |
+| 正常時作用 | 最大1024 Spanをsession memoryに保持。応答は最大256 Span／Trace・16 Metric。測定不能値は0でなくunknown。 |
+| 否定時作用 | 不正limit／TraceID／未知field、Audit append失敗を拒否。MetricからPermission／Approval／Capabilityを導かない。 |
+| 停止／Recovery | Audit未確定の処理は観測済みと記録しない。上限超過では古い観測を落とす。再起動後の永続復元や長時間運転を主張しない。 |
+| 標準OS候補 | Broker／Desktop sourceあり。実測対象はBroker内部Audit finalizationのみ。五OS installed resource／runtime観測は未成立。Linux native必須。 |
+| 配布物 | 独自配布物なし。通常packageへ含む候補だが、製品resource／外部collector未接続。 |
+| 既存実装 | Rust bounded ObservationCenter、通常Broker IPC、schema、Flutter Observability Centerとclient/test sourceあり。 |
+| BUILD_GAP | Runtime／Adapter／Tool／外部通信span、OpenTelemetry export／collector、長期保持、OS resource観測、installed／long-run evidence未接続。 |
+| ソース識別値（`SourceSHA`） | 旧SourceSHA節のC13 schema／Broker／client／screen／test pathを現HEAD 78a067eへ照合し全件一致。 |
+| 試験区分（TestClass） | Rust UNIT、Flutter client／widget、Schema／conformance sourceあり。本mappingでの実行はNOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。内部観測をLIVE_RUNTIMEまたは正式Audit証拠としない。 |
+| 阻害要因（Blocker） | Registry 18件の状態不変。C13への直接Blocker対応が不明なものはUNKNOWN。 |
+| 状態 | C13 E0-04 mapping記載済み。旧status不変。N09/N11/E0製品AcceptanceはOPEN。 |
+| 残余 | 実Runtime／Adapter／Tool測定、unknown投影、保持・負荷評価、五OS installed接続とN11 evidence結合。 |
+
+#### C14 追跡情報閲覧
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 旧C14 read-only Trace Inspector。 |
+| 旧ID | 総合機能拡張rev1 C14／Phase 23。C13一覧再利用・Broker-only表示の旧statusを維持。 |
+| 原文参照 | v4仕様S04 N09/N11、S05 K10/K13/K19、工程R03/R08、trace-inspector.md／observability-center.md。 |
+| 対象 | DesktopがBroker observation listをTraceIDで絞り、Span時間軸・status・duration・parent・error分類・関連Audit IDを表示する範囲。 |
+| 目的 | 内部観測を限定表示し、Audit証拠・Authority・実行状態を再構成したように見せない。 |
+| 生成元（Producer） | C13 ObservationCenterがBroker内Audit finalizationからSpanを生成する。Trace Inspector自身は観測を生成しない。 |
+| 実Consumer | Flutter Trace Inspector→observation_client→通常認証Broker IPC→Rust observation_centerのTraceID filter／bounded一覧。 |
+| 契約／Data | observation_list／span／trace schema。TraceID、SpanID、parent、開始／終了、状態、時間、限定error分類、関連Audit ID、証拠種別。 |
+| 正常時作用 | 読み取り専用でbounded waterfallを表示し、観測source範囲がBroker内であることと証拠種別を示す。 |
+| 否定時作用 | 不正TraceID／limitをBrokerが拒否。Trace／parent／Audit IDからPermission／Approval／Authorityや未観測spanを補完しない。 |
+| 停止／Recovery | 一覧を取得できない時は未取得と表示し、古いsnapshotをlive statusへ昇格しない。TraceからTask cancel／Recoveryを起動しない。 |
+| 標準OS候補 | Desktop Flutter sourceあり。Mobile consumer未確認。五OS installed Trace parity未成立。Linux native必須。 |
+| 配布物 | 独自配布物なし。Desktop製品UIに含む候補で、N10 package／installed証拠へ接続する。 |
+| 既存実装 | TraceID filter、manual refresh、waterfall、duration／status／parent／error／Audit ID表示のFlutter sourceとBroker list sourceあり。 |
+| BUILD_GAP | Runtime／Adapter／Tool／外部通信span、A2A実接続、長期trace、export／collector、Mobile／全OS installed evidence未成立。 |
+| ソース識別値（`SourceSHA`） | 旧SourceSHA節のC14 docs／schema／Broker／client／screen／test pathを現HEAD 78a067eへ照合し全件一致。 |
+| 試験区分（TestClass） | Rust UNIT、Flutter client／widget、Schema／conformance sourceあり。本mappingでの実行はNOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。画面sourceや内部観測を実Runtime span／正式QA evidenceへしない。 |
+| 阻害要因（Blocker） | Registry 18件の状態不変。C14直接帰属が不明な項目はUNKNOWN。新規登録なし。 |
+| 状態 | C14 E0-04 mapping記載済み。旧status不変。N09/N11/E0製品AcceptanceはOPEN。 |
+| 残余 | 実Runtime段階のSpan producer、同一Task／Trace結合、OS別installed表示、長期運用とN11証拠統合。 |
+
+##### C11追加SourceSHA（現行main 78a067eb4ddb6150b4ac0465569eb97ab36abffb）
+
+| 出典ファイル | `Git blob SHA` |
+|---|---|
+| native/rust_helper/src/update_verification.rs | 6347d90043cc7196feece6d708fafe96d27f3f19 |
+| native/rust_helper/src/broker/product_install.rs | c91115bdf88dd28e5f3445e7ed66127902909677 |
+| native/rust_helper/src/product_bootstrapper.rs | 3b0495dfc9a1937ba64f3f99c95ae4cc739ddc69 |
+| docs/specs/windows-desktop-launcher.md | 609a0c724d5bb77ca15c7721e760267ac3c4d018 |
+
+以上8 IDのE0-04個別mappingは文書上完了。旧C7〜C14 status、N02/N05/N09/N10/N11、W02/G2、Release Registryは変更しない。ここでのsource照合はProducer／Consumerの同定とGit blob一致のみで、runtime再試験・製品Acceptance・五OS QAではない。
 
 ## 旧C15〜C23のv4 Source→Consumer crosswalk（E0差分）
 
