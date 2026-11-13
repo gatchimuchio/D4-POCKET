@@ -3755,7 +3755,7 @@ Phase37のE0-04欄を全21項目で記録し、24件（24 unique path）のSourc
 | K13 Desktop Tray/quick stop/Palette/Search/Agent Center/Problems/Evidence/Recovery/Settings | N09／C | Flutter/Native surface→Broker Task・起動時ShellSnapshot・notification・recovery/search/tray projection（N09） | Agent CenterのTask start/state/cancel、SettingsのBroker client、Windows trayのbounded stop receiptはsource接続。Problems/Evidence/Recovery/Searchは起動時snapshot消費。Paletteは仕様のnavigation-onlyに対しtarget/path/commandをClipboardへ写す差分がある。同一Taskの結果・停止・Recovery・Evidence統合およびinstalled UI証拠は未成立。 |
 | K14 Compose/Preview/AI Edit/diff/independent review/controlled apply | N05/N07／D | Settings Compose/Preview→Rust Broker→MCP Tool; AI proposal→Agent Center Task/result／Workspace Inspector（N05/N07） | Desktop sourceはCompose／Preview／MCP Toolとproposal／Task事前検査までWIRED。Previewはrollbackを実行せず、proposalと審査結果・適用差分の独立結合、Broker controlled apply／rollbackはBUILD_GAP。Mobile consumer・installed artifact結合はなし。 |
 | K15 Export/module selection/pruning/identity/Broker/Installer/config consumption | N06/N10／E・G・H・I | Compose config→Exporter→identity/manifest/launcher/package/runtime candidate（N06/N10） | E0-04全21項目を編集前main `4f1eab7e9520e7a6ee68ceba266433ec5ef175d9`へ記録。44 source blobはN06 source表と全一致。runtime config consumption、independent installed app、binary/resource pruningは未成立。 |
-| K16 Windows install/first-run/Setup Doctor/update/rollback/repair/uninstall | N10/N11／G・J | Windows artifact/staging→installed app/Broker→collector/Release Gate（N10/N11） | Build/staging/collector sourceあり。一般利用installer-first-run lifecycleとcurrent candidate evidence不足、Registry blocker unresolved。 |
+| K16 Windows install/first-run/Setup Doctor/update/rollback/repair/uninstall | N10/N11／G・J | Windows artifact/staging→installed app/Broker→collector/Release Gate（N10/N11） | K16 E0-04全21項目を編集前main `af8d314945f9ee1047acaa77da047352f07c4328`へ記録。N10 Windows/common source 61/61とK16追加source 16/16を照合。一般利用installer-first-run lifecycleとcurrent candidate evidenceは未成立、既存Registry blockerを保持。 |
 | K17 Linux native/macOS/Android/iOS IPC/protection/Device Link/GUI/install | N10およびN01/N02 Mobile／G・H・I | OS native bridge/package→Flutter/Core/Broker/Device Link→standard installed consumer (N10) | Linux nativeは必須。workflow/source候補はOS別だが標準package/installed lifecycle未成立。Mobile Task/MCPはBUILD_GAP、物理端末は不要。 |
 | K18 MINIDORA等の外部Runtime/contract接続 | N03/N08／B・F | external Runtime Adapter→Broker Catalog/Task capability/timeout/failure path（N03） | Adapterは外部接続境界。MINIDORA内部実装をCoreへ輸入せず、現production dependencyやTask supportを偽装しない。 |
 | K19 long-run/performance/fault/full regression/docs/release | N09/N11／C・J | local validator/evidence/Manifest/Registry→Conformance/Release Gate (N11) | local validator/source coverageあり。旧C27〜C34限定PASS/FAILは保持。installed product QA/8h/strict releaseは未成立。 |
@@ -6539,6 +6539,55 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 | 状態 | K15 E0-04全21 fieldを編集前mainへ記録し、N06の44 source blobが同一であることを現行HEAD上で確認した。K15/N06/N10/W05/G5/E0および製品AcceptanceはOPEN。旧P9/P10／Phase 32/33のstatusは変更しない。 |
 | 残余 | Manifestのruntime構成消費、独立Appとしての通常導入・実Task、OS別正式Installer、Module binary/resource実除去と必須機能・安全Core保持の同一候補計測が残る。macOS/Mobile Export consumerなし。Windows/Linux installer lifecycleはN10/K16/K17、resource/size/startup計測はE4。 |
 
+### K16 E0-04 21項目の個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | K16 Windows install／first launch／Setup Doctor／update／rollback／repair／uninstallと候補同一性。v4仕様S05 K16、S04 N10/N11。 |
+| 旧ID | rev5 P11 Windows製品化、P12のUpdate関連scope、Phase 21/C11 Update Center、Phase 34/C33・C34配布、Phase 44 Windows最大到達。旧status・限定証拠は当時の履歴として保持し、現K16/N10受入れへ転記しない。 |
+| 元原文／正本参照 | 採用v4仕様S01-01〜05／S02-01〜09／S04 N10・N11／S05 K16、工程表R00・R02 E0-04・R03 G/J・R07、施工指示I04-G/J・I06・I10。一般利用者向けWindows installerから初回起動・Setup Doctor・実Task・同一candidateのupdate／rollback／repair／uninstall、および候補provenanceを要求する。 |
+| 対象 | Windows Flutter Desktop UI／Runner／Rust Launcher・Broker、per-user install/update・Setup Doctor、installed candidateの初回起動とTask、Windows installed evidence collector／validator／Release Gate。Developer staging、portable bundle、synthetic evidenceは製品install経路と区別する。 |
+| 目的 | 通常のWindows利用者が開発環境・terminal・source buildを要求されず、一般配布物を導入し、同一candidate上で初期設定・Broker管理下のTask・更新／修復／rollback／撤去を利用でき、その実体と証拠のidentityを一貫して追跡できるようにする。 |
+| 生成元（Producer） | versioned source／toolchain、Flutter Release／Windows Runner／Rust Launcher・Broker、package／install・first-run・Setup Doctor・update／rollback／repair／uninstall操作、Windows user profile、同一runのcandidate identity／evidence collector。 |
+| 実Consumer | 通常要求は`Flutter → Windows Runner → Rust desktop_launcher → 認証Broker`へ接続する。Setup Doctorは認証Brokerのreport/config projectionを消費する。`product_install.rs`／`update_center.rs`にはper-user install・stage・activate・rollback・限定repair/uninstall sourceがある。`collect_installed_smoke.ps1`等からWindows evidence validator／Release Gateへ証拠を渡す。`stage_installed_app.ps1`はDeveloper／release-evidence stagingであり一般利用installerではない。 |
+| 契約／Data | 製品package manifest（配布manifest）／`D4PKG01`、`update candidate`（更新候補）、`receipt`（受領記録）、`trust`（信頼設定）、`App ID`（アプリ識別値）／`Audit-store ID`（監査保存先識別値）、`source commit`とFlutter／Launcher／Brokerのhash、`runtime identity`（実行環境識別値）、`installed root`（導入root）、Windows user profile／session、Setup Doctor初回設定のconfig／report hash、Broker lifecycle／Task・Audit投影を扱う。Credential実値・Approval・権限をmanifestや証拠投影へ複製しない。 |
+| 通常時作用 | sourceはFlutter UI→Runner→Rust Launcher→認証Broker、Developer staging、per-user Store、Setup Doctor、Broker update部品、installed smoke collector／validatorを備える。collectorはLauncher起動・child／process identity・session・実Broker endpoint/store/Audit等を観測し、release validatorはprovenance／profile／first-run／Broker等を照合する。一般利用者向けinstallerから実Task・全lifecycleまでの同一candidate成立は未実証。 |
+| 否定時作用 | 不正manifest／package、App／Audit identity・hash／version／root不一致、stale／不正update trustや証拠provenance不一致を各検証層で拒否するsourceがある。collectorは別profileの正式条件を検査し、同一SIDでの観測は診断扱いとする。portable／synthetic／debug証拠を正式installed PASSへ昇格しない。 |
+| 停止／Recovery | Brokerのstage／activate／rollback／限定repair／uninstall sourceとLauncher／Brokerの起動時検査は存在する。既存validatorは不整合な候補証拠を受入れず、Release Gateは未解決blockerを保持する。通常installerからのfirst-run、crash後recovery、同一candidateのupdate／rollback／repair／uninstallを一連で実行した証拠はない。 |
+| 標準OS候補 | Windowsが対象。OS edition／build、CPU architecture、一般installer形式、minimum resourceの保証値は未確定。8GB級PCは設計候補であり測定済み下限ではない。Windows所有実機確認とVMの適合証拠は独立して扱う。 |
+| 配布物 | 現source候補はWindows portable ZIP／`D4PKG01`更新payloadとDeveloper staging。`installer/windows/stage_installed_app.ps1`は一般利用者向け`.exe` installerではない。manual workflowはsynthetic Receipt／Manifestによるunsigned bundle buildであり、installed launch・Owner確認・Task・update／rollback／uninstallの証拠を作らない。正式Publisher／署名identityは独立条件。 |
+| 既存実装 | `desktop_launcher.rs`／Windows launcher binary／Runner pipe経路、`product_install.rs`／`update_center.rs`、`setup_doctor.dart`／`update_client.dart`、`stage_installed_app.ps1`、`collect_installed_smoke.ps1`／`collect_setup_doctor.ps1`／`collect_broker_smoke.ps1`、`windows_release_evidence.py`／`release_gate_check.py`等のsourceとfocused test sourceを確認した。`release_evidence/`に現candidate証拠JSONはなく`.gitkeep`のみ。 |
+| BUILD_GAP | 一般利用者向け署名・identityを備えたinstallerと別profileからの通常導入、初回起動→Setup Doctor→実Broker／Task→同一candidateのupdate／rollback／repair／uninstallまでの一貫した実動線・証拠が不足。source／collector／validatorの存在だけではinstalled Product acceptanceにならない。正式Publisher identityは技術施工と独立した条件として残す。 |
+| ソース識別値（`SourceSHA`） | 編集前main=`af8d314945f9ee1047acaa77da047352f07c4328`。上段N10のWindows/commonを含む61 source／test／Schema blobを現HEADへ再照合し61/61一致。下段16件はK16固有のWindows Launcher／Runner／collector／validator／Registry sourceとして同じHEADへ個別照合し16/16一致。両表はsource同一性のみを示し、実行証拠ではない。 |
+| 試験区分（`TestClass`） | Rust `UNIT`、Flutter Fake Broker `WIDGET`／client test、release validator／Conformance、installed smoke collectorのsourceを区別する。K16 E0は文書・source mappingのみで、Rust／Flutter製品test、manual workflow、installed Windows／実Broker／Task、別profile、所有実機、update／rollback／repair／uninstallを実行していない（`NOT_RUN`）。 |
+| 証拠ID | `NONE`。W01/G1と旧C33等のWindows履歴は当時のsource／candidate／scopeに限定し、現K16/N10の正式installed evidenceへ転記しない。 |
+| 阻害要件（`Blocker`） | 既存Registryの`windows_evidence_provenance_isolation`、`windows_installer_first_run_smoke`、`windows_setup_doctor_smoke`、`windows_broker_installed_smoke`、`rev2_desktop_product_distribution`は未解決。`windows_distribution_identity`も独立条件として未解決。Registry 18件（16 unresolved／2 resolved）、`release_ready=false`を維持し、新規Blocker／Evidenceを追加しない。 |
+| 状態 | K16 E0-04全21項目を編集前mainへ記録し、N10の61 blobとK16追加16 blobを現HEADへ結合した。K16/N10/N11/W06/G6-WINと製品Acceptanceは`OPEN`、Evidence ID `NONE`。既存blocker・旧statusを変更しない。 |
+| 残余 | 一般利用installer、別profileでの初回起動・Setup Doctor・Broker／Task、同一candidateのupdate／rollback／repair／uninstall、source→artifact→installed runtime→Audit store provenance、Windows実機／VM条件別evidenceが残る。edition／build／arch／minimum resource／Publisher条件は未確定。これらは既存N10/N11/W06/G6-WINとRelease blockerへ保持する。 |
+
+#### K16 現行Source SHA・追加ファイル
+
+下記16件は編集前main `af8d314945f9ee1047acaa77da047352f07c4328`のGit blobで照合した。N10に記録済みの61件とは重複せず、K16固有のWindows launcher／Runner／installed evidence／Release consumerを補う。
+
+| 役割 | 対象ファイル | Git blob識別値 |
+|---|---|---|
+| Windows起動器（Launcher） | `native/rust_helper/src/desktop_launcher.rs` | `6a9f335de07fa474ca10043aea63ad6e988b572d` |
+| Launcher実行入口 | `native/rust_helper/src/bin/gui_shell_desktop_launcher.rs` | `809efba7a03eacddf9e172011149d9a8d5e3fda7` |
+| Broker／Launcher契約 | `native/rust_helper/src/broker/protocol.rs` | `9b2076d5f31ca6d77f1f87973d1b394aaf751961` |
+| Windows実行枠（Runner） | `apps/desktop_flutter/windows/runner/main.cpp` | `be0084505135d0d33311915948fd660e59ea66ab` |
+| Broker pipe中継 | `apps/desktop_flutter/windows/runner/broker_pipe_controller.cpp` | `e645d2d8cc25a1e61d9cb702013b5c3ee2e31eef` |
+| Broker pipe契約 | `apps/desktop_flutter/windows/runner/broker_pipe_controller.h` | `f178545f83a1d2980b29c197f3d4d82ba1c4dbab` |
+| Flutter Window／終了・寿命管理 | `apps/desktop_flutter/windows/runner/flutter_window.cpp` | `67849099e5141b696b237ec7390729793bc0e843` |
+| Windows実行枠のビルド設定 | `apps/desktop_flutter/windows/runner/CMakeLists.txt` | `84f310a9a3887b627ec88dbe8601753db48be30d` |
+| installed smoke収集 | `installer/windows/collect_installed_smoke.ps1` | `92c4720e82eb0af91002659c742f8e03b15aa2de` |
+| Setup Doctor収集 | `installer/windows/collect_setup_doctor.ps1` | `3695f3402dd175f8eafead3baa2c82bcc45e6364` |
+| Broker smoke収集 | `installer/windows/collect_broker_smoke.ps1` | `f5f8abfad981d64c30a6cf1f4e9eafde1b43c357` |
+| Windows evidence検査 | `tooling/windows_release_evidence.py` | `6f7957c6193c86c7bc15165e743f11651464f29c` |
+| Release Gate／正式配布判定 | `tooling/release_gate_check.py` | `22a8d7bfe9adb259f44ce8501fb215652e1d58c6` |
+| 実行時assertion／条件検査 | `tooling/release_runtime_assertions.py` | `0a0a351fe17151ad86517bd0a965358f40c61490` |
+| 証拠bundle生成 | `tooling/evidence_bundle.py` | `68dead851236b0f1b69899151c37371e593ff3f9` |
+| Blocker Registry／阻害要件登録簿 | `release_blockers.registry.json` | `244adc04a01e7b406c4ebcdeb829f7077d4aa35f` |
+
 ### 要求母集団・照合状態
 
 | 母集団 | 件数 | 正本・原典 | v4 E0状態 |
@@ -6548,7 +6597,7 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 | 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13は全E0-04 fieldを個別記録。P13旧aggregate evidence identity/classは`UNKNOWN`。N11 Evidence/Blocker/OS Artifact全数結合は未完 |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのE0-04 21 fieldを個別記録。旧status維持、N11 Evidence/Blocker/OS Artifact結合と製品Acceptanceは継続 |
 | D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜45はE0-04全21 fieldを個別記録。Evidence/Blocker/OS Artifact全数結合・Acceptance未完 |
-| 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K01〜K15はE0-04全21 fieldとSourceSHAを個別記録済み。K16〜K20の個別fieldとN11 Evidence/Blocker/OS Artifact結合は継続 |
+| 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K01〜K16はE0-04全21 fieldとSourceSHAを個別記録済み。K17〜K20の個別fieldとN11 Evidence/Blocker/OS Artifact結合は継続 |
 | Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 33 IDのscope/Consumer/現証拠境界と各21 fieldを記録。BUF-R/T Acceptance、cause/effectの全件結合、N11 evidence、OS artifactとの結合は未完 |
 | Buffer工程 B0〜B6 | 7 | `docs/緩衝基盤_rev5補遺_QC/`・v4仕様S06 | B0〜B4の限定CLOSEDを保持、B5 OPEN、B6未成立。詳細Consumer照合が未完 |
 | QE/監査 D4-QE-R01〜R13／D4-LNX-T01〜T08／D4-AUD-F01〜F07 | 13／8／7 | `docs/QE_2026-10-22/`・各採用記録 | 旧証拠と現在の実装/Validatorへの接続が未完 |
@@ -6591,7 +6640,7 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 ## 次のE0照合作業
 
 1. N01〜N10のE0-04 21項目は現行SourceSHAへ個別照合済み。各製品AcceptanceはOPENのまま維持し、N10の五OS実導入・利用・更新・Recovery QAは後続の製品Acceptanceに残す。
-2. C0〜C34およびPhase 0〜45の個別field記録を維持し、K01〜K15のSource mappingを再試験せず、K16〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
+2. C0〜C34およびPhase 0〜45の個別field記録を維持し、K01〜K16のSource mappingを再試験せず、K17〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
 3. BUF-R/TのSourceSHAとConsumer scopeは記録済み。AcceptanceはOPEN。B0〜B6の状態を保持し、原因→effect、N08/N10/N11、OS/Artifact/evidence結合を続ける。
 4. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 5. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
