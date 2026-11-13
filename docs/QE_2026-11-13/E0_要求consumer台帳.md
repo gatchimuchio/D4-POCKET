@@ -3324,6 +3324,91 @@ Phase 21〜23の3行は各E0-04全21項目を記録し、69件（67 unique path�
 
 Phase 24〜26の3行は各E0-04全21項目を記録し、61件（47 unique path）のSourceSHA参照を編集前main 895a856e6ecf6904fdae153d52d027ce42acf1a6へ結合した。旧C15〜C18 statusと限定証拠、N04／K11／K13／K17、Registry 18件（16 unresolved／2 resolved）、release_ready=falseを変更せず、新Evidence ID／Registry Blockerなし。Phase 2／28とのcrosswalkを保持し、Phase 27〜45、K01〜K20個別field、N11 Evidence／Blocker／OS Artifact結合、E0はOPEN。macOS A2A MessageについてはAGENTS.mdのmetadata-only制限と現行製品文書／Swift sourceの不整合を記録し、許可済み・LIVE_RUNTIMEとは判定しない。製品Rust／Flutter／installed A2A／Host test、五OS QAはNOT_RUN。
 
+
+#### Phase 27〜29 E0-04個別記録（2026-11-13）
+
+現行v4のN03／N05／N09／N10と旧Phase／C crosswalkを、Phase単位で照合する。以下のSourceSHAは編集前main 87461aaf0e44388833cc4d2bd95ff034177a6c0dのGit blobである。旧C19〜C23の限定status／証拠は履歴scopeに保持し、現行N要件やOS別installed acceptanceへ転記しない。
+
+##### Phase 27 個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 現行v4 N03／N05、施工線B／D、K06／K12。Adapter管理とRuntime Centerの接続。 |
+| 旧ID | D4 Phase 27／総合機能拡張rev1 C19「Adapter管理操作」。旧C19の局所履歴をそのまま保持する。 |
+| 原文参照 | v4仕様S04 N03／N05、S05 K06／K12、工程表R03 B／D、施工指示I04-B／I04-D、docs/D4_POCKET_PHASE_MAPPING.md Phase 27、docs/specs/adapter-management-surface.md、docs/specs/adapter-conformance.md。 |
+| 対象 | Runtime CenterのAdapter metadata一覧、登録、署名検証、状態管理、有効化／無効化、隔離、更新、catalog record削除。 |
+| 目的 | Runtime Adapterの申告とBroker管理状態を表示・統制し、Adapter metadata、Capability申告、署名表示からPermission、Approval、Trust、Credential、Authorityを生成しない。 |
+| 生成元（Producer） | 操作者が提示するAdapter manifest／管理要求、現在のBroker catalog record、Broker所有の署名trustと監査状態。 |
+| 実Consumer | Runtime Center→ShellCoreClient→認証Broker IPC／Owner control→adapter_center、署名検証、永続catalog、Audit。macOSはBrokerProcessChannelからnative Owner確認と既存Broker receiverへ接続する限定sourceがある。 |
+| 契約／Data | adapter／adapter_manifest／adapter_management_manifest／request／receipt／list Schema。Adapter ID・version・hash・source・publisher・signature metadata・要求Capability・permission diff・risk・compatibility・Content Exposure。 |
+| 正常時作用 | 一覧はmetadata-only。導入／更新はBroker catalogへのmetadata登録、検証はBroker trustと正本byteの照合、状態操作はBroker内recordだけを変更する。隔離済Runtime IDは実行へ再利用しない。 |
+| 否定時作用 | 未知operation、malformed／stale hash、対象record不一致、未検証署名の有効化、隔離recordの再利用、通常IPCからの無Owner変更、危険な権限昇格を拒否する。 |
+| 停止／Recovery | Owner要求hash・対象ID／現hashの不一致、Audit／永続化失敗では変更を成立させない。再起動後はBroker catalogを読み戻す。外部fileやprocessの削除・停止を成功扱いしない。 |
+| 標準OS候補 | Desktop Flutter／Brokerの共通source候補はWindows／Linux。macOSはnative Owner経路の限定sourceあり。Android／iOS consumerは未確認。Linux nativeは必須対象だがinstalled product受入れを意味しない。 |
+| 配布物 | 独立Adapter packageではない。D4 Pocket Desktop内のRuntime Center／Broker機能候補。OS別installed artifact・標準Installerの受入れはN10へ接続する。 |
+| 既存実装 | adapter_centerのmetadata操作・署名検証境界・永続record・否定試験、Runtime CenterとShellCoreClient、通常IPC／Owner control、macOS native Owner経路のsourceを確認。 |
+| BUILD_GAP | 外部artifactの実download、filesystem導入／更新／削除、実process起動・停止、一般的なRuntime Adapter実仕事、五OS installed lifecycleは本C19範囲で未成立。 |
+| ソース識別値（SourceSHA） | 編集前mainのGit blob: docs/D4_POCKET_PHASE_MAPPING.md=064ea334f86b137d94fba2370d2a2fd732f6e972; docs/specs/adapter-management-surface.md=d13859c61b7042d7d5492feea1cdbc1662eee398; docs/specs/adapter-conformance.md=e095d9f3bf9d4e6931dac193a304f43d75355c3d; docs/specs/macos-desktop-channel.md=0611524b89c09365d35c33d23367a5fb6f65a4d6; specs/adapter.schema.json=0fee764bc04ad524665e4be2b02828dcdb488f73; specs/adapter_manifest.schema.json=116f5830983d195f501cc344a25990d58bf323c0; specs/adapter_management_manifest.schema.json=1f1b75c7d4299c96fcf5039b652d718f7805cd2d; specs/adapter_management_request.schema.json=2c9c98d0c60603adfaa246f9efa4753bfc0e7597; specs/adapter_management_receipt.schema.json=7b43a2d2b74c5bd0a931ead66f32f55663919b04; specs/adapter_management_list.schema.json=530bc79a6a5117bb29d0de9e0932e3c40d8d785d; specs/capability.schema.json=a243a84b22cdd704875f35afc56e3450f9c9e1ca; native/rust_helper/src/broker/adapter_center.rs=66575bb77e4a375dca4f8488f97df442960bb5a9; native/rust_helper/src/broker/protocol.rs=9b2076d5f31ca6d77f1f87973d1b394aaf751961; native/rust_helper/src/broker/audit.rs=eb1dcf5018d95c7fdf6171aadd4bca9554d1996f; native/rust_helper/src/macos_desktop_owner.rs=31e13a57fcde422878fae63083bd323e07f482ec; apps/desktop_flutter/lib/services/shell_core_client.dart=f08db061bd15649ff7c2fc3fc9e37184433cbf18; apps/desktop_flutter/lib/screens/runtime_center.dart=d2c7af172073d2b10c76a6416b90f011f10e95db; apps/desktop_flutter/lib/models/generated_contracts.dart=64e7a80a308c2734eb18c9d4b26eb50c8354f67b; apps/desktop_flutter/macos/Runner/BrokerProcessChannel.swift=a1269e01608bc194b0f0913a6f96cd489b926155; apps/desktop_flutter/macos/RunnerUITests/AdapterOwnerUITests.swift=eeab11b1123165a8f82da55ebbb014eab8803862; apps/desktop_flutter/test/widget_test.dart=f4e9c7b93f832ba2a2cefee779fd12426f240b04; apps/desktop_flutter/test/authenticated_loopback_broker_transport_test.dart=c511e97f5dfbf3ab55e6c193d939d82517123ff5; apps/desktop_flutter/test/broker_client_payload_hash_test.dart=7e978416326730f639976d0abe4313d6a8e4e2e6; tooling/conformance_tests/run_conformance_skeleton.py=c6f31d8cb561b48513c6784e54c85969c9cb953e。 |
+| 試験区分（TestClass） | Rust UNIT／Broker protocol、Flutter widget／loopback transport、Schema・Conformanceのsourceと旧C19記録を確認。本mappingでは製品test未実行。実artifact／installed動作の証拠ではない。 |
+| 証拠ID（Evidence ID） | NONE。旧C19の限定Schema／Broker／UI記録を履歴scopeのまま保持し、N03／N05製品Evidenceへ昇格しない。 |
+| 阻害要因（Blocker） | 既存Release Registry 18件（16 unresolved／2 resolved）とrelease_ready=falseを維持。旧BlockerのN11個別帰属は別工程で照合し、新規Blockerなし。 |
+| 状態 | Phase 27のE0-04全21項目を記録。旧C19の限定範囲を保持し、現N03／N05、K06／K12、E0はOPEN。 |
+| 残余 | 外部artifactの取得・実適用・実process lifecycle、独立Runtime TaskとAdapterの接続、五OS installed evidence、N11 Evidence／Blocker／OS Artifact結合。 |
+
+##### Phase 28 個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 現行v4 N09／N10、施工線C／G、K13／K16。Desktop operation surfaceの到達性と既存Broker consumer。 |
+| 旧ID | D4 Phase 28／C18 Host操作面のDesktop表面、C20 Windows常駐トレイ、C21 Command Palette、C22 Global Search、C23 Desktop UX統合。Phase 26のHost registry・表示contextは重複完了扱いしない。 |
+| 原文参照 | v4仕様S04 N09／N10、S05 K13／K16、工程表R03 C／G、施工指示I04-C／I04-G、docs/D4_POCKET_PHASE_MAPPING.md Phase 28、C18／C20〜C23の各責任正本。 |
+| 対象 | Windows Tray、Desktop Command Palette、読み取り専用Global Search、4つのNavigation groupと全体表示、Host操作画面への到達。 |
+| 目的 | Desktop上の表示・画面遷移とBroker操作を明確に分け、表示状態や検索結果からPermission、Approval、Credential、Authority、Runtime実作用を生成しない。 |
+| 生成元（Producer） | 操作者による表示・検索・画面移動要求、Windowsの常駐トレイ通知、Broker由来の状態情報・通知概要・上限付き停止要求記録。 |
+| 実Consumer | Win32 tray_controller→Flutterの固定tray channel→windows_tray_client／ShellCoreClient→Broker通常IPC。main.dartはPalette／Search／Navigationを現在画面とShellSnapshotへ結合し、GlobalSearchIndexはsnapshotと固定surface entryを読む。 |
+| 契約／Data | windows_tray_projection／tray_stop_request／response Schema、通知summary、Palette command ID、GlobalSearchIndexのbounded metadata、Navigation groupと現在21画面。 |
+| 正常時作用 | Trayは前面化・status／保留件数・重大通知件数・終了、Broker経由の停止要求receiptを表示。Paletteは画面遷移、Searchはsnapshot metadataと固定surface entryの絞込み、Navigation groupはRail表示だけを変更する。 |
+| 否定時作用 | 取得不能値を0にしない。未検証snapshot出所を信頼しない。検索上限・結果上限・secret／本文除外を維持し、Palette／Search／Navigationから直接Broker、filesystem、process、network、credentialへ到達しない。 |
+| 停止／Recovery | TrayのBroker pollはwindow visible中だけに制限し、非表示時に停止・不明化する。Tray停止要求はowner再承認待ちreceiptまでで、kill／実停止ではない。画面遷移や検索から再実行・再認可を起こさない。 |
+| 標準OS候補 | 共通Desktop Flutter操作面はWindows／macOS／Linux source候補。native TrayはWindows限定。Mobile NavigationはC24別scope。各OS installed UI evidenceは本source mappingでは未実施。 |
+| 配布物 | D4 Pocket DesktopのUI／Windows Runner。独立packageなし。OS別正規Installer、tray常駐、実Task統合、installed同一候補証拠はN10へ接続する。 |
+| 既存実装 | Win32 tray controllerとFlutter channel/client、Broker通知／stop receipt、Palette／Search／NavigationのFlutter実装、各surface正本、widget／Conformance sourceを確認。 |
+| BUILD_GAP | installed製品での各画面・Tray実操作、同一Task IDに結合した検索／結果／Recovery、実Runtime横断のlive index、全Runtime実停止lifecycle、macOS／Linux native trayは未成立または非対応。C18 registry自体はPhase 26の範囲。 |
+| ソース識別値（SourceSHA） | 編集前mainのGit blob: docs/D4_POCKET_PHASE_MAPPING.md=064ea334f86b137d94fba2370d2a2fd732f6e972; docs/specs/windows-tray-surface.md=c7f9317e26b16098301989a8f4b5eaa11540e714; docs/specs/command-palette-surface.md=05867c94592a66b3a0d788d6f29456bb9ba6bc15; docs/specs/global-search-surface.md=1a74b337e239dc7c23cf70d2f6dbc6f55ac5234e; docs/specs/desktop-ux-integration.md=b73ec534c2b4df94ca7eb52be5d7929cf0a20aa1; specs/windows_tray_projection.schema.json=5c3975e03b34281a0f202374cf91127357f2a1e0; specs/tray_stop_request.schema.json=579755262940027079b37ef859e6d2f32a071cc0; specs/tray_stop_response.schema.json=d6cce063d5deaf7104b97ef67f4efb14f780cc72; apps/desktop_flutter/lib/main.dart=6109c821ab5dc809224bec5234c4c59db1d5f988; apps/desktop_flutter/lib/services/global_search_index.dart=f71d2f6c4563b011fa3621ea3aee596bffb099f0; apps/desktop_flutter/lib/services/windows_tray_client.dart=cf8214ceb95fa1b24c7eed4f14b312bda80e0b15; apps/desktop_flutter/lib/services/shell_core_client.dart=f08db061bd15649ff7c2fc3fc9e37184433cbf18; apps/desktop_flutter/windows/runner/tray_controller.cpp=2676afcc76e5c6e53fff2dd00d0fbb3ae531ccc1; apps/desktop_flutter/windows/runner/tray_controller.h=67ec337a335b948115559394ad5b55bffadb7502; apps/desktop_flutter/windows/runner/flutter_window.cpp=67849099e5141b696b237ec7390729793bc0e843; native/rust_helper/src/broker/protocol.rs=9b2076d5f31ca6d77f1f87973d1b394aaf751961; native/rust_helper/src/broker/notification_center.rs=ca6828a33baf94abd7101781d9730b22daca4a78; apps/desktop_flutter/test/windows_tray_client_test.dart=0b24e07221087e43355ac465ca4ace73a48af31e; apps/desktop_flutter/test/global_search_index_test.dart=2b96129f13ab11bd38afb0aba5e9a5b07d8eb3e3; apps/desktop_flutter/test/widget_test.dart=f4e9c7b93f832ba2a2cefee779fd12426f240b04; tooling/conformance_tests/run_conformance_skeleton.py=c6f31d8cb561b48513c6784e54c85969c9cb953e。 |
+| 試験区分（TestClass） | 旧C20〜C23のSchema／Conformance／Flutter試験・Debug build履歴を保持。現sourceにはTray／Search／Widget testがある。本mappingでの製品test、installed OS実行はNOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。旧局所証拠はsurface／fixture／debug buildの履歴scopeに保持し、N09／N10 installed acceptanceへ転記しない。 |
+| 阻害要因（Blocker） | 既存Registry 18件（16 unresolved／2 resolved）、release_ready=falseを維持。N11でC20〜C23とOS別Blockerを照合し、本mappingでは追加しない。 |
+| 状態 | Phase 28のE0-04全21項目を記録。C18 Host surfaceのPhase 26との重複を分離し、現N09／N10、K13／K16、E0はOPEN。 |
+| 残余 | Windows installed tray／UI操作、各OSの製品UI・実Task統合、同一Task result／Audit／Recoveryの横断consumer、N11 Evidence／Blocker／OS Artifact結合。 |
+
+##### Phase 29 個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 現行v4 N05、施工線D、K14。GUI-Shell構成のManifest生成と既存Catalog／Tool consumerへの接続。 |
+| 旧ID | D4 Phase 29「GUI-Shell構成作成」。総合機能拡張rev1に同一の独立C工程はないD4追加範囲。 |
+| 原文参照 | v4仕様S04 N05、S05 K14、工程表R03 D、施工指示I04-D、docs/D4_POCKET_PHASE_MAPPING.md Phase 29、docs/specs/gui-shell-compose.md。 |
+| 対象 | Desktop SettingsからRuntime／Agent／Tool／MCP参照ID、Theme、表示設定、Capability requirementをCompose Manifestへまとめ、Brokerで検証する。 |
+| 目的 | 構成意図を機械可読Manifestへまとめ、Authority／Permission／Approval／Credential／Audit chainを継承せず、未確認Catalog宣言を実行権限へ昇格しない。 |
+| 生成元（Producer） | 使用者のDesktop設定入力とBroker Compose Catalogの現在Runtime／Agent／互換情報。Tool／MCP参照IDやCapability requirementは入力された申告値。 |
+| 実Consumer | Settings→ComposeClient→認証Broker IPC→compose_centerのCatalog／Manifest検証／receipt。mcp_centerはTool要求に添付されたManifestを選択照合し、export_centerは別の書出し要求でManifestを解析する。Compose UIから実Tool作用・独立App生成まで一体acceptanceは未成立。 |
+| 契約／Data | gui_shell_compose／catalog／receipt、capability、mcp_tool_call、gui_shell_export Schema。output_mode=manifest_only、継承policyはすべてnone。Module selectionは別Export要求。 |
+| 正常時作用 | Brokerが現在CatalogとのRuntime／Agent対応、重複、識別子、互換性、Capability要件、表示範囲、継承禁止を再検査し、INTERNAL_STATEの監査付きCompose receiptとManifestを返す。 |
+| 否定時作用 | malformed／unknown field、重複選択、Runtime／Agent対応不一致、互換性・Capability不整合、Authority等の継承値を拒否する。入力IDの記載だけで実在・接続・Trustを成立させない。 |
+| 停止／Recovery | Catalog mismatch、Broker／Audit失敗、構造不正ではManifest acceptanceを返さない。Previewは差分表示だけで、構成適用、Build、Rollback、Export、Tool再実行を自動しない。 |
+| 標準OS候補 | Desktop Flutter／Rust Brokerの共通source候補はWindows／macOS／Linux。ComposeのMobile consumerは未確認。Linux native必須性は維持するが、source存在をnative installed受入れにしない。 |
+| 配布物 | D4 Pocket DesktopのSettingsとBroker。現在の出力はManifestのみで、Standalone App、Installer、Binary、独立identityを生成しない。 |
+| 既存実装 | Broker Compose Catalog／Manifest検証／Preview source、Settings／ComposeClient、MCP Tool要求時のManifest照合、Export要求側Manifest parser、Schema／fixture／Flutter testを確認。 |
+| BUILD_GAP | 入力画面はCatalog候補を発見・実在確認せず参照IDを受け取る。実Capability dependency resolutionから構成消費、実Tool作用、Task結果／Auditまでの統合経路と独立Appへの構成反映は未成立。 |
+| ソース識別値（SourceSHA） | 編集前mainのGit blob: docs/D4_POCKET_PHASE_MAPPING.md=064ea334f86b137d94fba2370d2a2fd732f6e972; docs/specs/gui-shell-compose.md=6b43bb80f73d4268e734ac0afbc58b33ba07339f; specs/gui_shell_compose.schema.json=89b3d8e0e09c802d555fd6fee233daebc0fec045; specs/gui_shell_compose_catalog.schema.json=f9c76f5fa87bfb0866f33745dcd5a8a4e74864d5; specs/gui_shell_compose_receipt.schema.json=7c4ac9d0f28f38f79a0074ed7d6c84d9124aadaa; specs/capability.schema.json=a243a84b22cdd704875f35afc56e3450f9c9e1ca; specs/mcp_tool_call.schema.json=54c044cdfb53588ea5bab4bd056404372dc39acd; specs/gui_shell_export.schema.json=8b96d344ac0f6a54011237be8b2d85964be48c4b; native/rust_helper/src/broker/compose_center.rs=d80658fd9a342140acc35560b2e4c4e4ae97d888; native/rust_helper/src/broker/mcp_center.rs=8f9ab897bdc625e448241ebd9b46f995cd1f22f6; native/rust_helper/src/broker/export_center.rs=477e44d86ebf18d2b004a7294c9cdb14e35aa0f0; native/rust_helper/src/broker/protocol.rs=9b2076d5f31ca6d77f1f87973d1b394aaf751961; apps/desktop_flutter/lib/services/compose_client.dart=8f9657d866b007a4d2212abefca4df9add81a702; apps/desktop_flutter/lib/services/shell_core_client.dart=f08db061bd15649ff7c2fc3fc9e37184433cbf18; apps/desktop_flutter/lib/screens/settings.dart=66374ec4157d573939e7f9cc5c36aecf5d65e251; apps/desktop_flutter/lib/services/export_client.dart=70d77edc6beb9e209e6b362219d1b22d69375489; apps/desktop_flutter/test/compose_client_test.dart=c3fe30faa668482e5a4e42b2f5f5e5b218a01dc8; apps/desktop_flutter/test/settings_compose_test.dart=a78353f93617cc7b17391549ea256f007a7acdb1; apps/desktop_flutter/test/widget_test.dart=f4e9c7b93f832ba2a2cefee779fd12426f240b04; examples/contracts/gui_shell_compose.valid.json=d72bf3e84f73bf906106ce97d8df7749475fea74; examples/contracts/invalid/gui_shell_compose_authority.invalid.json=3dc3b2fa9b1330739b8b7aa4468dede5f83da30c; examples/contracts/invalid/mcp_tool_call_compose_authority.invalid.json=44bf1b10e691283f88324858a762a7b03386b9fb; tooling/conformance_tests/run_conformance_skeleton.py=c6f31d8cb561b48513c6784e54c85969c9cb953e。 |
+| 試験区分（TestClass） | Rust UNIT（Compose／MCP／Export contract）、Flutter Fake Broker／widget、Schema／fixture／Conformance sourceを確認。本mappingでは製品Rust／Flutter／Tool runtime試験を実行していない。 |
+| 証拠ID（Evidence ID） | NONE。Manifest／fixture／unit履歴をN05実使用Acceptanceへ転記しない。 |
+| 阻害要因（Blocker） | 既存Release Registry 18件（16 unresolved／2 resolved）とrelease_ready=falseを保持。N11の現要求／OS別帰属確認前のBlocker追加なし。 |
+| 状態 | Phase 29のE0-04全21項目を記録。D4追加Compose scopeを旧C工程へ混同せず、現N05／K14／E0はOPEN。 |
+| 残余 | 実Catalogの網羅、Capability dependency／permission requirement照合、Composeから元Toolへの実作用、Manifest構成の独立Product消費、五OS installed QA、N11結合。 |
+
+Phase 27〜29の3行は各E0-04全21項目を記録し、68件（57 unique path）のSourceSHA参照を編集前main blobへ結合した。旧C19〜C23 status／証拠、現N03／N05／N09／N10、K06／K12／K13／K14／K16、Registry 18件（16 unresolved／2 resolved）、release_ready=falseを変更せず、新Evidence／Blockerなし。Phase 28のC18 Host surfaceはPhase 26のregistry／context範囲と分離した。製品Rust／Flutter／installed Adapter／Tray／Compose Tool実作用、五OS QAは本mapping単位でNOT_RUN。
+
 ### 製品能力K01〜K20
 
 | K／S05能力 | v4関連N／施工線A〜J | 現行Producer→Consumer参照 | Source状態・残余・証拠境界 |
@@ -4867,7 +4952,7 @@ Phase 24〜26の3行は各E0-04全21項目を記録し、61件（47 unique path�
 | 全体施工線 A〜J | 10 | v4工程表R03・Codex指示I04 | 全線同時BUILDのproducer/consumerと現行実装配置を全数照合中 |
 | 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13は全E0-04 fieldを個別記録。P13旧aggregate evidence identity/classは`UNKNOWN`。N11 Evidence/Blocker/OS Artifact全数結合は未完 |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのE0-04 21 fieldを個別記録。旧status維持、N11 Evidence/Blocker/OS Artifact結合と製品Acceptanceは継続 |
-| D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜26はE0-04全21 fieldを個別記録、Phase 27〜45は個別field未完。Evidence/Blocker/OS Artifact結合・Acceptance未完 |
+| D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜29はE0-04全21 fieldを個別記録、Phase 30〜45は個別field未完。Evidence/Blocker/OS Artifact結合・Acceptance未完 |
 | 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K別の完全E0-04 field、OS/Evidence/Blocker確認は継続 |
 | Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 33 IDのscope/Consumer/現証拠境界と各21 fieldを記録。BUF-R/T Acceptance、cause/effectの全件結合、N11 evidence、OS artifactとの結合は未完 |
 | Buffer工程 B0〜B6 | 7 | `docs/緩衝基盤_rev5補遺_QC/`・v4仕様S06 | B0〜B4の限定CLOSEDを保持、B5 OPEN、B6未成立。詳細Consumer照合が未完 |
@@ -4911,7 +4996,7 @@ Phase 24〜26の3行は各E0-04全21項目を記録し、61件（47 unique path�
 ## 次のE0照合作業
 
 1. N01〜N10のE0-04 21項目は現行SourceSHAへ個別照合済み。各製品AcceptanceはOPENのまま維持し、N10の五OS実導入・利用・更新・Recovery QAは後続の製品Acceptanceに残す。
-2. C0〜C34個別field記録を維持し、Phase 27〜45／K01〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
+2. C0〜C34個別field記録を維持し、Phase 30〜45／K01〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
 3. BUF-R/TのSourceSHAとConsumer scopeは記録済み。AcceptanceはOPEN。B0〜B6の状態を保持し、原因→effect、N08/N10/N11、OS/Artifact/evidence結合を続ける。
 4. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 5. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
