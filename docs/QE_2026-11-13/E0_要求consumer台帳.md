@@ -3747,7 +3747,7 @@ Phase37のE0-04欄を全21項目で記録し、24件（24 unique path）のSourc
 | K05 Eval/Dataset/Case/regression/deterministic evaluator/Runtime compare | N09/N11／C・J | Evaluation Lab→EvaluationClient→Broker evaluation_control/evaluation_lab→Case/Runtimeごとの既存Dialogue・Owner承認・deterministic evaluator。Regression Caseは別のnative Owner operation→Broker→ProtectedStore（N09） | C5 Evaluationはsource上接続済みだが同一AgentTaskのtest/result/diff/Auditへ非結合。Dataset登録/private readはWindows ProtectedStoreに限定され、非Windowsはfail-closed。C6からDatasetへ自動importしない。installed Runtime横断比較と同一candidate AcceptanceはOPEN。 |
 | K06 Provider/Model/Runtime Adapter管理・選択・失敗・unsupported | N03／B | Agent Center選択→Broker ProviderModelSelection検証→Codex CLI Adapter／Capability→Task dispatchまたは明示reject（N03） | source上はProviderがCodex CLI固定、Model値を`--model`へ渡し、自動fallbackなし。MINIDORAは対話のみ。normal Release Windows/Linuxの`supported`宣言と`agent-runtime.md`の`unsupported`契約記述が不一致。第二のTask RuntimeとN03 AcceptanceはOPEN。 |
 | K07 Credential Vault/secret boundary/OS protection/lifecycle | N02/N05／A・B・F | native Owner request→Broker metadata/Audit/OS vault→Codex ProviderまたはMCP stdio child（N02/N05） | Desktop三OSの限定source consumerを確認。Linux `linux_secret_service`値が登録／receipt Schema enumから欠落。更新・物理削除／Recovery、五OS installed一体受入れは未成立。Mobile Device Link資格は別consumer。 |
-| K08 MCP server/transport/tool/resource/prompt/Center/isolation/AI consumption | N02/N05／A・D | MCP Center/Catalog→Broker connect/call/credential binding→Tool result→同Agent follow-up context（N02/N05） | Desktop source WIRED、fixture testsあり。installed same-candidate real MCP→result-dependent Task→Auditは未成立、MobileはBUILD_GAP。 |
+| K08 MCP server/transport/tool/resource/prompt/Center/isolation/AI consumption | N02/N05／A・D | Desktop Broker stdio Catalog→native Owner／Permission／Audit Tool→N02同Agent fresh-authorized follow-up、N05 current Compose→元Tool | Desktop Windows/Linux/macOS source WIRED。Resource/Prompt本文、HTTP/OAuth、Mobile作用なし。W02/G2・W04/G4 installed acceptance OPEN。 |
 | K09 Profile/Channel/signed update/rollback/repair | N09/N10/N11／C・G・H・I・J | Profile config/apply intent→Audit/config; signed package/update→OS installer/update center（N10/N11） | Profileの実Runtime consumerは特定されずBUILD_GAP/UNKNOWN。update sourceと製品lifecycle/正式署名は別で、配布証拠未成立。 |
 | K10 Notification/Trace/MetricとAuditの分離 | N09/N11／C・J | Broker observation/notification→Flutter UI; Audit remains separate Broker store/finalizer（N09/N11） | notification/trace/metricはAuditに昇格しない。OS toast・complete spans・全画面同一Task projectionに残差。 |
 | K11 A2A Card/Task/Message/Stream/Artifact/Host/identity/Trust | N04／B | A2A/Host UI→Broker operation/Host metadata registry (N04) | 外部metadataからTrustを生成しない。OS別作用を分離し、macOS metadata-only、Host越境Task/外部installed E2E未成立。 |
@@ -4299,6 +4299,156 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 | tooling/manifest.py | aa4525ff20293cb8641e5598a2439561a3bfbd3b |
 | tooling/日本語基底監査.py | 77474767dd93eb4d69382af5ea4a0ea384eeccbe |
 
+### K08 E0-04 21項目の個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | K08 MCP Server／stdio Transport／Tool・Resource・Prompt catalog／接続Center／process群監督／Agent消費。製品AcceptanceはN02・N05とW02/G2・W04/G4で判定する。 |
+| 旧ID | 旧C8 MCP外部概念契約、C9 stdio接続・一覧・Tool実行、Phase 18 MCP試験基盤。旧C8/C9のCLOSED・FAIL・限定証拠は当時のscopeとsourceへ固定し、現行K08/N02/N05へ移さない。 |
+| 原文参照 | 採用済みv4仕様S04 N02/N05・S05 K08、工程表R03線A/D・R06 W02/G2・W04/G4、施工指示I04-A/D、docs/specs/mcp-contract.md、docs/specs/mcp-connection-center.mdおよびOS別Owner／Credential契約。仕様原本SHA-256=8CEEDF21F881A783E35EE8642673FAAEEF949465343DF65E63DC21B04EE5A3EF。 |
+| 対象 | DesktopのMCP接続Center、Rust Brokerのstdio child／Catalog／Tool call／Credential binding／Audit／process群停止、Codex Task内の一回MCP提案と同Agent結果依存follow-up、Composeから元Toolへの接続。Mobileは現行MCP状態画面と許可境界を照合する。 |
+| 目的 | 外部MCP metadataからAuthorityを作らず、明示されたstdio Serverの現在Catalog・Tool identity・JSON Schema・一回Permission・native Owner Approval・Auditを照合して作用させる。Tool resultを未信頼dataとして扱い、必要な結果依存Agent Taskには新規Permission／Approvalを要求する。 |
+| 生成元（Producer） | Ownerが指定するServer／stdio実行要求とServer discoveryがMCP Catalogを生成する。Codex AdapterはTask内d4_submit_mcp_tool_requestを一回の未権限proposalとしてBrokerへ提出し、Agent Task結果が後続のTool proposalを供給する。 |
+| 実Consumer | Desktop Flutter MCP Center→既存Broker IPC→mcp_center::connect/list/call_tool/disconnect→McpStdioConnection→stdio server/discover／initializeとtools/list／resources/list／prompts/list。Tool作用はnative Owner→current Catalog/schema→一回Permission/Audit→同child tools/call。Agent経路はCoordinator→source Task全文のOwner-approved projection→proposal/current Catalog→Broker Tool→Task/runtime/session/workspace結合の一回result context→fresh Permission/Approvalの同Agent後続Task。Compose ManifestはTool要求時にBroker再検査される。 |
+| 契約／Data | MCP contract、connection/list/receipt、tool_call/receipt、disconnect/receipt、agent_mcp_tool_request、agent_tool_call、agent_task_request、Compose schemas。公開receiptはmetadata/hash中心。Resource URI、Tool inputSchema、Credential refは境界付きmetadataで、秘密実値・Permission・Approval・Trustを生成しない。stdioだけが実接続対象。 |
+| 正常時作用 | Windows／Linux／macOS sourceにstdio接続・Catalog discovery・native Owner経路・Tool実行sourceがある。Toolは送信直前に接続／ID／Schema／引数を再検査し、一回だけ送信。通常Center receiptは本文を返さずhash-only。別N02経路では承認済みsource Taskのproposalを確認後、Tool resultのbounded one-shot contextを同じAgentの新規Taskへ渡すsource接続がある。 |
+| 否定時作用 | unknown/stale Server／Tool／Schema、malformed／上限超過／Authority・secret field入り引数、Owner拒否、失効Credential、未確定Audit、timeout／ID不一致／malformed／partial response、quarantined接続、古いproposal/result/hashは拒否または未送信。外部metadata、Tool結果、Credential ref、Compose manifestからPermission／Approval／Trustを生成しない。 |
+| 停止／Recovery | 送信後のtimeout・不正応答・結果Audit失敗は結果不明として接続をquarantineし、自動再送しない。Owner切断は所有process範囲の停止確認とAudit後に接続記録を解消する。Windows Job Object、Linux guardian所有group、macOS所有process groupの保証範囲は異なり、sandbox・group外daemon・外部副作用のrollbackを意味しない。Broker再起動後に揮発Agent result contextは復元されず後続要求はfail-closed。 |
+| 標準OS候補 | Windows／Linux／macOS Desktopにsource consumer。Linux nativeは必須製品対象で、sourceにguardian監督・native Owner／Secret Service経路があるがinstalled K08 acceptanceは未確立。Android／iOSはMCP未観測／作用を明示的に行わないMobile画面のみで、Tool consumerはBUILD_GAP。 |
+| 配布物 | Windows／Linux／macOSの通常配布・installed artifact identityはN10/W06/W07で確定する。MobileはMCP作用consumerを持つ配布経路なし。Source・fixture・旧Mac P13／Linux限定runは現行v4 K08の全OS acceptance／正式配布を証明しない。 |
+| 既存実装 | Rust mcp.rsのbounded JSON-RPC／Catalog／Schema検査、stdio adapter、Broker MCP Center、Desktop/Linux/macOS launcher、Windows Job Object／Linux process-group guardian／macOS group、Flutter CenterとAgentMcpTaskController、Codex proposal tool、Compose call binding、Credential/Audit経路、対応Schema／valid・negative例、Rust／Flutter test sourceを確認。 |
+| BUILD_GAP | Resource本文resources/read・Prompt本文prompts/getの実行／Agent消費なし。実Transportはstdio限定でstreamable HTTP／OAuthは未接続。Mobile MCP Tool consumerなし。v4同一installed candidateでの実Codex→実MCP→結果依存Task→Audit（W02/G2）および実Capability→Compose→Tool（W04/G4）は未受入れ。N05で既記録の実Capability Catalog不足／Tool ID collision拒否不足は同じdependencyとして保持。Linux Credential enum不整合はK07へ帰属。MCP Centerに「Agentへの結果引渡し未対応」と表示するcopyは現N02 source経路と紛らわしく、E1で意味を同期する。 |
+| ソース識別値（SourceSHA） | 照合HEAD=1bbdb0fc3b97f19e554e191de6817813ef64368b。下段K08 SourceSHA表の118 unique tracked pathを編集前mainのGit blobへ固定した。 |
+| 試験区分（TestClass） | Rust UNIT／FIXTURE（stdio discovery・Tool call・異常応答・process supervision・Broker permission/Audit）、Flutter client/widget、Schema valid/negative、Conformance／failure-injectionおよびLinux installed-smoke test sourceあり。本E0 source-mapping単位では製品Rust／Flutter／installed testを実行しない。旧Mac P13・Linux Actions証拠は当時のcommit／fixture／OS scopeの履歴に限定。 |
+| 証拠ID（Evidence ID） | NONE。SourceSHAとtest sourceを対応付けるだけで、v4 K08 installed acceptance／W02／W04の証拠として扱わない。 |
+| 阻害要因（Blocker） | W02/G2・W04/G4・N02/N05はOPEN。Registryは18件（16 unresolved／2 resolved）、linux_native_product_support=unresolved、release_ready=falseを維持する。新規Evidence／Release blockerは追加せず、既存statusを変更しない。 |
+| 状態 | K08 E0-04全21 fieldとSourceSHAを編集前mainへ結合するsource mapping。K08/N02/N05製品Acceptance、W02/G2、W04/G4、E0全体はOPEN。 |
+| 残余 | Resource／Prompt実作用、Mobile対応要否・consumer、HTTP/OAuth、Linuxと旧C9文書の境界同期、K07 Credential契約、Compose capabilityの実在性、現candidate installedのAI→Tool→AI／Audit証拠、N11へのEvidence／Blocker／OS Artifact結合。E1 BUILDではcurrent v4要求の不足実装へ進み、CLOSED範囲・別OS保証を推測で補わない。 |
+
+### K08 SourceSHA（編集前mainのGit blob）
+
+| 対象ファイル | 識別値 |
+|---|---|
+| AGENTS.md | 1eafcadd129fd01f1f2f683594c381605ed7d48d |
+| ROADMAP.md | 6a922a38cca617690bc08297274e907f0425b722 |
+| apps/desktop_flutter/lib/screens/agent_center.dart | 2472faeb31a64d624423c30a0a30d0f153d2e2a3 |
+| apps/desktop_flutter/lib/screens/mcp_connection_center.dart | 4c2dd1122e2162a4c3ab30b5c2536e267fee8519 |
+| apps/desktop_flutter/lib/services/agent_mcp_task_controller.dart | fba6642904d98890339197bef269164970031830 |
+| apps/desktop_flutter/lib/services/agent_task_client.dart | f54cefac29eba3dcf383bba19b4f64ee682e6217 |
+| apps/desktop_flutter/lib/services/agent_task_execution_coordinator.dart | 5d8f48d0557bdcb1af838239abf9651893bce7f1 |
+| apps/desktop_flutter/lib/services/broker_client.dart | 122de14350dfe1f160c7f5f911dd1e1d56da8233 |
+| apps/desktop_flutter/lib/services/mcp_connection_client.dart | 12a173a3956368c53615255c56ef06a2f5939c9a |
+| apps/desktop_flutter/macos/Runner/BrokerProcessChannel.swift | a1269e01608bc194b0f0913a6f96cd489b926155 |
+| apps/desktop_flutter/macos/RunnerUITests/AdapterOwnerUITests.swift | eeab11b1123165a8f82da55ebbb014eab8803862 |
+| apps/desktop_flutter/test/agent_mcp_task_controller_test.dart | 5c165d5362eea4906b6e739407b0d0e75c34485c |
+| apps/desktop_flutter/test/mcp_connection_center_test.dart | c81a37ca78b15e57c838f48519aa3e4abb6d6665 |
+| apps/desktop_flutter/test/support/real_broker_mcp_probe.dart | 0cc9aeb2b1ae6f0e14f1573d4e0cbd7aef7fa137 |
+| apps/mobile_flutter/lib/screens/mcp_status.dart | 40af06807f8bdf1280d860b3d9ffa32ee2e22cc0 |
+| docs/D4_POCKET_PHASE_MAPPING.md | 064ea334f86b137d94fba2370d2a2fd732f6e972 |
+| docs/FINAL_QA_QUEUE.md | 7b332cccab70bb68aa1ff4f8e23acc0e816d8282 |
+| docs/QE_2026-11-13/01_D4Pocket_統合製品実装仕様書_v4.md | 352c53180cbad07888beb956aad0fb2a58074c58 |
+| docs/QE_2026-11-13/02_D4Pocket_統合開発工程表_v4.md | d32dd251e5f7cbb97d92f6e7540d6b6ed0ecec05 |
+| docs/QE_2026-11-13/03_D4Pocket_Codex施工指示書_v4.md | 49447973e88c50a09b2f4978adfed84fd464c6d0 |
+| docs/QE_2026-11-13/E0_要求consumer台帳.md | fee75f04d758efd16b7bf4d6aff077c52919e448 |
+| docs/QE_2026-11-13/採用記録.md | f159c1aa6ea5bc6e80e0877d8068f7e44da4c4d3 |
+| docs/QE_2026-11-13/進捗.md | 8156e3a2e2af6d9267f3b9d5709b58bf7414c6b9 |
+| docs/REV5_PRODUCT_PROGRESS.md | 9c978021d3982690e9aaa87896436bad7125b433 |
+| docs/specs/credential-vault.md | f27d54012cf5932356c186d4ebef295dbd535178 |
+| docs/specs/gui-shell-compose.md | 6b43bb80f73d4268e734ac0afbc58b33ba07339f |
+| docs/specs/macos-mcp-center.md | 62482591a7db1948e279cdb09b06de7b3ded2afb |
+| docs/specs/macos-mcp-credential-binding.md | a86e2a10bafd63caeb392159d31f4fd7d5c1fa9a |
+| docs/specs/mcp-connection-center.md | 64d46042f19fccb0f7a947a95711e9aae87a1564 |
+| docs/specs/mcp-contract.md | 62fffe6af42253af5656ca06f630868487f277bc |
+| examples/contracts/agent_mcp_tool_request.valid.json | 235abb1afa23b220c65b57b4f6a7b257fd74254a |
+| examples/contracts/agent_task_request.valid.json | 29fbec0225e7c77cb1af694f16b8a6c51bca4ff5 |
+| examples/contracts/agent_tool_call.valid.json | b074568fd39f224c681f0708eb83de0e6495cbd6 |
+| examples/contracts/gui_shell_compose.valid.json | d72bf3e84f73bf906106ce97d8df7749475fea74 |
+| examples/contracts/gui_shell_compose_catalog.valid.json | 3a48143ce7498de2868f3cf04bae896224fec1c1 |
+| examples/contracts/gui_shell_compose_receipt.valid.json | b1a92b425460c3020db1bbfc1355e939fb5516a5 |
+| examples/contracts/invalid/agent_mcp_tool_request_too_many_arguments.invalid.json | e652bd7361b18da816d48a0c0476815748b2b210 |
+| examples/contracts/invalid/agent_mcp_tool_request_unknown_field.invalid.json | 3e368d1ab0ff7f0f4501280ead27ea2e882cca05 |
+| examples/contracts/invalid/agent_task_request_authority_escalation.invalid.json | ab5dca808c78e0cc7c767d96607cf0baa0a139fe |
+| examples/contracts/invalid/gui_shell_compose_authority.invalid.json | 3dc3b2fa9b1330739b8b7aa4468dede5f83da30c |
+| examples/contracts/invalid/mcp_connection_credential_secret.invalid.json | 5c98e862e877d5a7ef8b230c8af895f625307ee2 |
+| examples/contracts/invalid/mcp_connection_unknown_authority.invalid.json | 506531b79ce56eb25ba7a344dc6aa85ec1bf8bd5 |
+| examples/contracts/invalid/mcp_contract_authority.invalid.json | 1a30d14ee3c93c4356ced6d2199b07c81a96b479 |
+| examples/contracts/invalid/mcp_contract_credential_secret.invalid.json | 42d0aab5f4c3f43bd0c80610bb47aa69b0258ee1 |
+| examples/contracts/invalid/mcp_tool_call_authority.invalid.json | 209fde794498725f03bc2ca3e812e33315b98276 |
+| examples/contracts/invalid/mcp_tool_call_bad_tool_id.invalid.json | b7ed9e7f02f2b05e9d6d9b032ff86142ccccd1cc |
+| examples/contracts/invalid/mcp_tool_call_receipt_full_content.invalid.json | f19d32e0fdefb0d41f78d6201ae4899e0b9111e4 |
+| examples/contracts/mcp_connection.valid.json | d5ef46dd127b9413e3460c7d194ec8e99197f76d |
+| examples/contracts/mcp_connection_credential.valid.json | 3804825e4149fcffd6c3b4191bfd2936a9fc4491 |
+| examples/contracts/mcp_connection_list.valid.json | 450860fc290d7b4ea6e7e96c9d2be40af5d3bf9f |
+| examples/contracts/mcp_contract.valid.json | 6250e729afc81adb090d9306becb428da9d48572 |
+| examples/contracts/mcp_disconnect.valid.json | 106e4568e2a7697ad7c6ef3975c7c377b963d28e |
+| examples/contracts/mcp_disconnect_receipt.valid.json | 0b05822f9a236985c527004f1950d6caaf2bb7d0 |
+| examples/contracts/mcp_tool_call.valid.json | 473d505cd23fb0f2c123d87e0f1fc9cf5cf52cae |
+| examples/contracts/mcp_tool_call_receipt.valid.json | 1b1cc73969c6f5b1588dfef83edf5632c87e3d35 |
+| native/process_supervision/Cargo.toml | f5076b81cf6747940f77453c9003974bf0f47503 |
+| native/process_supervision/src/lib.rs | 4887f42eba04bc0e067c76638ceaf647293ec452 |
+| native/process_supervision/src/windows_job.rs | aad1712543acb5d4d747fc32e9505cd8e82e7d55 |
+| native/rust_helper/Cargo.lock | 8647830893561de17e82063231b651322c8909bd |
+| native/rust_helper/Cargo.toml | 6352fd7de3188b4c7335167f4f8875a4f8f4e28b |
+| native/rust_helper/src/adapters/codex_cli.rs | e5c9d1581ae9a1c0a3ae7fcfa626fdca6fea6d28 |
+| native/rust_helper/src/adapters/mcp_stdio.rs | b7e08327541ad75bca53bb1563e0e20d576d9b66 |
+| native/rust_helper/src/adapters/mod.rs | 06c540a59437b903b3f045b5aafb3790c21103bd |
+| native/rust_helper/src/adapters/process_tree.rs | 66b5159f4c7da08e2d2e7de0ce8dfef95431254e |
+| native/rust_helper/src/bin/gui_shell_desktop_launcher.rs | 809efba7a03eacddf9e172011149d9a8d5e3fda7 |
+| native/rust_helper/src/bin/gui_shell_linux_broker.rs | 40e2ad056978b723f9dff91e3cf4242c2e6a26a1 |
+| native/rust_helper/src/bin/gui_shell_macos_broker.rs | 6c830d9de6e3e43bb4d829dae39412799a8704f9 |
+| native/rust_helper/src/broker/audit.rs | eb1dcf5018d95c7fdf6171aadd4bca9554d1996f |
+| native/rust_helper/src/broker/compose_center.rs | d80658fd9a342140acc35560b2e4c4e4ae97d888 |
+| native/rust_helper/src/broker/credential_storage.rs | 86cf0459915bb748f2d3d5848b20913d9c6080f2 |
+| native/rust_helper/src/broker/credential_vault.rs | 029dccda7671d51c2bbd3debd4fe5d7e92221162 |
+| native/rust_helper/src/broker/dialogue.rs | c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999 |
+| native/rust_helper/src/broker/ipc_server.rs | 58a404b920ef5905e174668ec2de0e04a9e8b044 |
+| native/rust_helper/src/broker/mcp_center.rs | 8f9ab897bdc625e448241ebd9b46f995cd1f22f6 |
+| native/rust_helper/src/broker/mod.rs | b89af2d97706970e26df89daef961251fdc4a797 |
+| native/rust_helper/src/broker/protocol.rs | 9b2076d5f31ca6d77f1f87973d1b394aaf751961 |
+| native/rust_helper/src/desktop_launcher.rs | 6a9f335de07fa474ca10043aea63ad6e988b572d |
+| native/rust_helper/src/lib.rs | 02d6b4421c9140ee22219a2af515cfb792b1e800 |
+| native/rust_helper/src/linux_credential_input.rs | 8594403a89e4ed1f8eab38b0bb73c62bbceeb79b |
+| native/rust_helper/src/linux_desktop_launcher.rs | f58fb226f21093c2d1f062259d394b4f8ec022f6 |
+| native/rust_helper/src/linux_desktop_worker.rs | c7910e61c78e978d3cfb0c3cf882eed010c4730f |
+| native/rust_helper/src/macos_desktop_owner.rs | 31e13a57fcde422878fae63083bd323e07f482ec |
+| native/rust_helper/src/mcp.rs | 0ba59eb42c2b2328c05044dc4d459f6b0e288703 |
+| native/rust_helper/src/mcp_task_tool_stdio.rs | 6107890e27be2b9f6bef93a9d46828a488aa1bf1 |
+| native/rust_helper/src/process_group_guardian.rs | 1fb2a93d0df7798bf4231598878c84c463cdde3b |
+| native/rust_helper/tests/agent_task_crash_recovery_e2e.rs | 23517fcfe8ef94b2357a94e04879d423c3360501 |
+| native/rust_helper/tests/agent_task_production_e2e.rs | fdc7565aa58fa7466e6e24e5492321e8015567eb |
+| native/rust_helper/tests/unit/mcp_disconnect.rs | 98b5ac79fc023f0188690fd787ca685ae88a40b2 |
+| packages/agent_orchestration/lib/agent_mcp_task_controller.dart | fa46ff071cfb306d3e463a9ad2c79b9149dab6f5 |
+| packages/agent_orchestration/lib/agent_task_client.dart | a31fbb9f980a0039f809fd763c91f055fe9d02d0 |
+| packages/agent_orchestration/lib/agent_task_execution_coordinator.dart | feb9aacb7ed77e6f4e76e9d9371290decca9cf7b |
+| packages/agent_orchestration/lib/mcp_connection_client.dart | 71b17973216160bdd2bc447243ba0b04fd0fec63 |
+| release_blockers.registry.json | 244adc04a01e7b406c4ebcdeb829f7077d4aa35f |
+| specs/agent_mcp_tool_request.schema.json | f3aa71661ac1dadf453954141802a7663755da9d |
+| specs/agent_task.schema.json | a552389072088d6cd42b3588fefda332be4ae6b6 |
+| specs/agent_task_request.schema.json | cb25bb3684656bfd670ea5832bbb7fc5988845b6 |
+| specs/agent_tool_call.schema.json | 67c9b6abe2f1d2ccf53719de886d83cbeed7a748 |
+| specs/capability.schema.json | a243a84b22cdd704875f35afc56e3450f9c9e1ca |
+| specs/gui_shell_compose.schema.json | 89b3d8e0e09c802d555fd6fee233daebc0fec045 |
+| specs/gui_shell_compose_catalog.schema.json | f9c76f5fa87bfb0866f33745dcd5a8a4e74864d5 |
+| specs/gui_shell_compose_receipt.schema.json | 7c4ac9d0f28f38f79a0074ed7d6c84d9124aadaa |
+| specs/mcp_connection.schema.json | a8d613bd911c9e88f949b984b1a2032eb19db332 |
+| specs/mcp_connection_list.schema.json | 45f5613aa46be7f936bd87995da0b6b6b38d047f |
+| specs/mcp_connection_receipt.schema.json | ef8909932c68391ce680bbf53b8d80db2254c5f2 |
+| specs/mcp_contract.schema.json | 733f1ecf2ad968e98c7d0c3557e5ec897a4cac23 |
+| specs/mcp_disconnect.schema.json | 0808dab9afcafa3e2cd04743a081d33bb30e227d |
+| specs/mcp_disconnect_receipt.schema.json | 7c635dd550354263df062b68136b4a19f224aad7 |
+| specs/mcp_tool_call.schema.json | 54c044cdfb53588ea5bab4bd056404372dc39acd |
+| specs/mcp_tool_call_receipt.schema.json | 0049a393104b035bbf047e653e962754bc4009b3 |
+| tooling/conformance_tests/run_conformance_skeleton.py | c6f31d8cb561b48513c6784e54c85969c9cb953e |
+| tooling/failure_injection_validation.py | cace434de47d60f7f848656f229336d8293908ff |
+| tooling/manifest.py | aa4525ff20293cb8641e5598a2439561a3bfbd3b |
+| tooling/release_gate_check.py | 22a8d7bfe9adb259f44ce8501fb215652e1d58c6 |
+| tooling/schema_check/check_schemas.py | 7dca27717cbe5cccb45e1013b3436918a2322e75 |
+| tooling/tests/linux_installed_product_smoke.py | 8020ed8d1d68d59cff6acf70c55856fdeb2125e3 |
+| tooling/tests/test_linux_installed_product_smoke.py | dc94f9b782d3699810bbe50230a5e9510a5739f7 |
+| tooling/validate_all.py | 2744f9a10702872f6dc0aad705f922466fc198fc |
+| 規定/正本索引.json | ba250de80a3ec94109171c09adf54cbe227add10 |
+
+各hashは編集前mainのGit blob ID。pathの存在・同一性だけを示し、試験実行・runtime接続・installed acceptanceを証明しない。
 ### E0-04共通field値と適用範囲
 
 | E0-04 field | このcrosswalkで共通に使う値 |
@@ -5809,7 +5959,7 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 | 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13は全E0-04 fieldを個別記録。P13旧aggregate evidence identity/classは`UNKNOWN`。N11 Evidence/Blocker/OS Artifact全数結合は未完 |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのE0-04 21 fieldを個別記録。旧status維持、N11 Evidence/Blocker/OS Artifact結合と製品Acceptanceは継続 |
 | D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜45はE0-04全21 fieldを個別記録。Evidence/Blocker/OS Artifact全数結合・Acceptance未完 |
-| 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K01〜K07はE0-04全21 fieldとSourceSHAを個別記録済み。K08〜K20の個別fieldとN11 Evidence/Blocker/OS Artifact結合は継続 |
+| 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K01〜K08はE0-04全21 fieldとSourceSHAを個別記録済み。K09〜K20の個別fieldとN11 Evidence/Blocker/OS Artifact結合は継続 |
 | Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 33 IDのscope/Consumer/現証拠境界と各21 fieldを記録。BUF-R/T Acceptance、cause/effectの全件結合、N11 evidence、OS artifactとの結合は未完 |
 | Buffer工程 B0〜B6 | 7 | `docs/緩衝基盤_rev5補遺_QC/`・v4仕様S06 | B0〜B4の限定CLOSEDを保持、B5 OPEN、B6未成立。詳細Consumer照合が未完 |
 | QE/監査 D4-QE-R01〜R13／D4-LNX-T01〜T08／D4-AUD-F01〜F07 | 13／8／7 | `docs/QE_2026-10-22/`・各採用記録 | 旧証拠と現在の実装/Validatorへの接続が未完 |
@@ -5852,7 +6002,7 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 ## 次のE0照合作業
 
 1. N01〜N10のE0-04 21項目は現行SourceSHAへ個別照合済み。各製品AcceptanceはOPENのまま維持し、N10の五OS実導入・利用・更新・Recovery QAは後続の製品Acceptanceに残す。
-2. C0〜C34およびPhase 0〜45の個別field記録を維持し、K01〜K06のSource mappingを再試験せず、K07〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
+2. C0〜C34およびPhase 0〜45の個別field記録を維持し、K01〜K06のSource mappingを再試験せず、K09〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
 3. BUF-R/TのSourceSHAとConsumer scopeは記録済み。AcceptanceはOPEN。B0〜B6の状態を保持し、原因→effect、N08/N10/N11、OS/Artifact/evidence結合を続ける。
 4. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 5. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
