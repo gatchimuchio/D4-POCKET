@@ -3752,7 +3752,7 @@ Phase37のE0-04欄を全21項目で記録し、24件（24 unique path）のSourc
 | K10 通知／Trace／Metric／観測と正式Auditの非同一性 | N09/N11／C・J | 永続Audit確定後のBroker内部Span/Metric、Audit由来の固定通知→認証Broker IPC→Desktop表示／Windows tray／Mobile read-only summary。C3/K04資源観測は別経路。 | 通知・観測はAudit/Authorityを置換しない。Runtime/Adapter/Tool Span、Task lineage、Windows toast、他OS native notification host、外部export、五OS installed Acceptanceは未成立。 |
 | K11 A2A Card/Task/Message/Stream/Artifact/Host/identity/Trust | N04／B | A2A Card／Message／Task／Artifact／Stream UI→Broker外部作用、Host UI→metadata registry／表示Context (N04) | 外部metadataからTrustを生成しない。OS別作用を分け、macOSのMessage送信矛盾、Host越境Task、外部Agent installed E2E未成立を記録。 |
 | K12 Adapter Publisher/version/hash/signature/risk/compat/quarantine/update/stop | N03/N05／B・D | Desktop Runtime Center→Windows/macOS/Linux native Owner→Rust Broker Adapter Center→署名・state・quarantine consumer | 三Desktop OSのsource経路、署名検査と隔離時のBroker拒否を確認。外部artifact lifecycle、active process stop／Recovery、K12 Mobile管理consumer、installed acceptanceは未成立。K12はOPEN。 |
-| K13 Desktop Tray/quick stop/Palette/Search/Agent Center/Problems/Evidence/Recovery/Settings | N09／C | Flutter/Native surface→Broker Task/history/notification/recovery/search/tray handlers（N09） | Surface sourceと個別projectionはある。同一実Task/installed UI→stop/recovery/EvidenceのE2Eは未成立。 |
+| K13 Desktop Tray/quick stop/Palette/Search/Agent Center/Problems/Evidence/Recovery/Settings | N09／C | Flutter/Native surface→Broker Task・起動時ShellSnapshot・notification・recovery/search/tray projection（N09） | Agent CenterのTask start/state/cancel、SettingsのBroker client、Windows trayのbounded stop receiptはsource接続。Problems/Evidence/Recovery/Searchは起動時snapshot消費。Paletteは仕様のnavigation-onlyに対しtarget/path/commandをClipboardへ写す差分がある。同一Taskの結果・停止・Recovery・Evidence統合およびinstalled UI証拠は未成立。 |
 | K14 Compose/Preview/AI Edit/diff/independent review/controlled apply | N05/N07／D | Capability Catalog→Compose manifest/MCP Tool; AI proposal→independent review/apply candidate（N05/N07） | Composeはmanifest/source経路、AI Editはproposal/audit。independent review resultとBroker controlled apply/rollbackはBUILD_GAP。 |
 | K15 Export/module selection/pruning/identity/Broker/Installer/config consumption | N06/N10／E・G・H・I | Compose config→Exporter→identity/manifest/launcher/package/runtime candidate（N06/N10） | identity/manifest sourceあり。runtime config consumption、independent installed app、binary/resource pruningは未成立。 |
 | K16 Windows install/first-run/Setup Doctor/update/rollback/repair/uninstall | N10/N11／G・J | Windows artifact/staging→installed app/Broker→collector/Release Gate（N10/N11） | Build/staging/collector sourceあり。一般利用installer-first-run lifecycleとcurrent candidate evidence不足、Registry blocker unresolved。 |
@@ -6354,6 +6354,95 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 | tooling/conformance_tests/run_conformance_skeleton.py | c6f31d8cb561b48513c6784e54c85969c9cb953e |
 | release_blockers.registry.json | 244adc04a01e7b406c4ebcdeb829f7077d4aa35f |
 
+### K13 E0-04 21項目の個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | K13 Desktop Tray／quick stop／Command Palette／Global Search／Agent Center／Problems／Evidence／Recovery／Settings。現行v4 S05 K13、N09／工程表R03-Cの製品操作面。 |
+| 旧ID | rev5 P0／P5／P12、総合機能拡張rev1 C1〜C6／C12〜C14／C20〜C23、旧Phase 28。K03／K04／K05／K10との重複consumerを分離し、過去status・限定試験は各履歴のまま保持する。 |
+| 原文参照 | 採用v4仕様S04 N09・S05 K13・S09、工程表R03-C／R06 W00、施工指示I04-C／I04-J、現行AGENTS.md §§19／20／24〜29、docs/specs/command-palette-surface.md、global-search-surface.md、windows-tray-surface.md、notification-center.md、agent-task-history.md。本仕様原本SHA-256=8CEEDF21F881A783E35EE8642673FAAEEF949465343DF65E63DC21B04EE5A3EF。 |
+| 対象 | DesktopのAgent Center、Problems、Evidence、Recovery、Settings、Command Palette、Global Search、Windows native Trayと、それぞれのFlutter／native入口からBrokerまたは画面投影への現在consumerを照合する。K03のWorkspace/History、K10のNotification/Trace/Metric、K14〜K16のSettings配下機能は既存の責任行へ参照し、再評価しない。 |
+| 目的 | 操作者がBroker由来のTask・状態・要約情報を識別可能な表示面から扱う。表示・検索・ナビゲーション・Clipboard copyをAuthority／Permission／Approvalへ昇格させない。Tray停止要求は実停止と区別し、取得不能な状態をunknownとして扱う。 |
+| 生成元（Producer） | Agent CenterのTask操作は操作者入力からAgentTaskClient requestを作る。ShellCoreClient.productはBrokerのhealth／初回設定／Setup Doctor／Host／Adapter／Agent／Sessionと境界probeへの受理応答から起動時ShellSnapshotを組み立て、Problems／Evidence／Recoveryの初期行もそのprobe結果から生成する。PaletteとSearchはそのSnapshot・画面一覧・固定surface entryを入力とする。TrayはSnapshot投影とBroker通知一覧を入力とする。SettingsはSnapshot表示と各専用clientの操作入力を使う。 |
+| 実Consumer | main.dartが共通画面navigation、Palette、Search、Tray actionを接続する。Agent CenterはAgentTaskClientのinspect／start／state／cancelをBroker transportへ送り、Task ID／Sessionに状態を束縛する。Problems／Evidence／RecoveryはShellCoreClient.getSnapshot()を読み、Recovery／Problemの行操作はcommand/pathのClipboard copy、Evidenceはsummary exportとSnapshot import previewに限る。PaletteはSnapshot由来entryを最大30件表示し選択後に画面を移動する。GlobalSearchIndexはSnapshotをローカル検索し選択後に画面を移動する。Windows tray_controller→gui_shell/tray channel→WindowsTrayClient→main.dartから通知一覧または全Runtime停止要求へ接続する。SettingsScreenはProfile／Update／MCP／Compose／Export／AI Edit専用clientを共有Broker transportへ接続する。 |
+| 契約／Data | ShellSnapshot／generated_contractsの表示用recordを使用する。全体検索はquery 128文字、index 512件、結果30件に制限し、本文・Audit raw payload・Credential実値・任意pathをindexしない。Paletteは最大30件を表示する。WindowsTrayProjectionは停止可否・状態・保留承認数・重大通知数・evidence sourceを型付きchannelで渡し、Tray Stop requestはversion-only要求／bounded receiptを使う。通知一覧はK10の固定projectionを参照する。SettingsのProfile／Update等の各契約はK07〜K09／K14〜K16の責任行に属する。 |
+| 正常時作用 | Desktop navigationは対象画面を開く。Agent Centerは現在Taskの状態取得・開始・個別取消要求をBrokerへ送る。問題／復旧の表示とコマンド／パスcopy、Evidenceの状態・件数summary exportと読込Snapshot比較preview、検索・Palette選択、Settingsの各Broker client要求、Trayの状態・通知summary・前面化・通常終了がコード上接続されている。Tray停止要求はowner再承認待ちreceiptを表示するところまでである。 |
+| 否定時作用 | Broker未接続または未検証Snapshotはbroker_unavailable／unknown／unverifiedへ区別する。Searchはquery上限超過を空結果にし、固定surface entryを外部接続成立と扱わない。Trayの通知取得失敗・不可視・native channel未利用時はunknownを表示し、数値0へ置換しない。停止応答が停止未実行・owner再承認待ち境界を保持しなければclientが拒否する。注意すべきsource差分として、Palette選択時はmain.dartがproblem.targetまたはrecovery.command/pathをClipboardへコピーしてから遷移するが、command-palette-surface.mdは選択作用を画面遷移のみと定める。 |
+| 停止／Recovery | Agent Centerのcancel要求は該当Session／Task ID、現在の登録一致、active state、重複取消gateを確認してBrokerへ送信し、UIは応答を停止完了とせずBroker state再取得を要求する。Trayの全Runtime停止要求はruntime対象一覧のreceiptに留まり、停止実行済み=false、承認状態=owner_reapproval_required、権限生成なしを維持する。Problems／Recovery画面は復旧文言・path・commandの表示／copyであり、Recovery作用を実行しない。起動時Problem／Recoveryと同一Taskの実結果・process停止・Recovery実行は未結合。 |
+| 標準OS候補 | Flutter Desktop共通画面のWindows／macOS／Linux sourceがある。Windows native Trayだけが確認でき、macOS／Linux Tray sourceはない。Linux nativeは必須製品対象のまま、WSLやshared Flutter sourceをLinux installed受入れへ読み替えない。AgentTaskを操作する同等Mobile consumerは本K13範囲で確認できない。 |
+| 配布物 | 現sourceはFlutter Desktop UIとWindows Runner内tray_controllerの構成。K13 surfaceを含む同一通常Release installed artifact、別profileからのUI操作、全OSの導入・更新・終了を結合する現行evidenceはない。Settings配下のinstaller／update／Export配布責務はK15／K16／N10へ分離する。 |
+| 既存実装 | Surfaceとsource経路は存在する。ShellCoreClientはBroker応答に基づき起動時Snapshotを構築するが、Problems／Evidence／Recoveryは各画面を開くたびの専用Broker list queryではない。Evidence Center exportは状態・phase・件数・release_ready_claimed=falseのsummary JSONで、正式Evidence bundleの生成ではない。Agent CenterはTask start/state/cancelを直接扱う。Settingsは複数の専用clientを持つ。Trayは可視中30秒周期のprojection更新・世代確認とWindows native menuを持つ。 |
+| BUILD_GAP | N09はOPEN。起動時Snapshotの鮮度・各surfaceでの再取得、同一AgentTaskのresult/diff/Eval/Resource/Trace/Audit/Problems/Recovery/Searchへのbinding、Task cancel後の実process停止確認、Recovery作用、正式Evidence生成・同一installed Taskへの結合、Tray停止要求から許可済みlifecycle停止までの連結、K13を含むinstalled UI evidenceは未成立または別工程の既存blocker。Global Searchは現責任正本どおりSnapshot＋固定surface entryの読取専用でlive横断検索なし。Command PaletteのClipboard作用は仕様とのsource差分として記録し、E0では仕様を弱めずE1設計・施工へ送る。N09に記録済みのW02-B01 UI応答停止根因UNKNOWNも維持する。 |
+| ソース識別値（SourceSHA） | 照合HEAD=f31a22d50cc4975f1887790d79ed54df35889a56（K13編集前のGitHub main）。下記56 tracked pathのblob SHAを固定した。この一覧はConsumer source同一性であり、製品実行・installed UI・五OS Acceptanceの証拠ではない。 |
+| 試験区分（TestClass） | 既存のFlutter widget／unit／fake Broker tests、AgentTask client tests、Windows tray client tests、Rust protocol／Runtime lifecycle／Notification unit tests、tray request／response／projection Schemaを確認した。本source mapping単位では製品Rust／Flutter／native／installed testを実行しない。既存K03／K10のtestとAcceptanceを再実行しない。 |
+| 証拠ID（Evidence ID） | NONE。本mappingで新規Evidenceを発行しない。ShellSnapshot内の起動probe由来LIVE_RUNTIME表示、過去C20〜C23のlimited source/test記録、K10通知の既存限定evidenceは各当時・契約の範囲に保持し、K13 installed product evidenceへ転記しない。 |
+| 阻害要因（Blocker） | release_blockers.registry.jsonの18件（16 unresolved／2 resolved）、release_ready=falseを維持する。既存Windows installed UI／Tray evidence gateとN09の未成立条件を現分類に保持し、新規Blockerの追加・再分類・release_ready変更は行わない。 |
+| 状態 | K13 E0-04全21項目および編集前main SourceSHA 56件を個別結合した。K13製品Acceptance、N09／N11、E0全体はOPEN。旧C20〜C23／Phase 28の履歴statusは変更しない。 |
+| 残余 | Paletteの仕様・Clipboard source差分、起動Snapshotの鮮度と各surfaceのlive再取得、同一Task result→Recovery／Evidence結合、Tray停止要求と実lifecycle停止の範囲、UI応答停止root cause UNKNOWN、Windows installed証拠、macOS／LinuxのTray非提供および各OS installed UI、Mobile K13相当操作の未接続。これらを理由に本mappingを製品Acceptanceへ昇格せず、現行E0／後続E1・N09・N10へ割り当てる。 |
+
+#### K13 ソース識別値（編集前mainのGit記録）
+
+照合対象commit=f31a22d50cc4975f1887790d79ed54df35889a56。56ファイルを編集前mainのGit tree上でhash固定した。対象にはv4正本・既存crosswalk、K13 surface contract、Flutter画面／client／Snapshot model、Windows tray native bridge、Broker stop／notification処理、関連Schema／test sourceを含む。SourceSHAはソース同一性のみを証明する。
+
+| 対象ファイル | Git識別値 |
+|---|---|
+| AGENTS.md | 1eafcadd129fd01f1f2f683594c381605ed7d48d |
+| docs/QE_2026-11-13/採用記録.md | f159c1aa6ea5bc6e80e0877d8068f7e44da4c4d3 |
+| docs/QE_2026-11-13/01_D4Pocket_統合製品実装仕様書_v4.md | 352c53180cbad07888beb956aad0fb2a58074c58 |
+| docs/QE_2026-11-13/02_D4Pocket_統合開発工程表_v4.md | d32dd251e5f7cbb97d92f6e7540d6b6ed0ecec05 |
+| docs/QE_2026-11-13/03_D4Pocket_Codex施工指示書_v4.md | 49447973e88c50a09b2f4978adfed84fd464c6d0 |
+| docs/QE_2026-11-13/E0_要求consumer台帳.md | 20f711b181e3bb4c97c0db37a0a2e9594f53c12d |
+| docs/QE_2026-11-13/進捗.md | b5c1be5b00f99708e276df9e51480868a0ca75a4 |
+| docs/D4_POCKET_PHASE_MAPPING.md | 064ea334f86b137d94fba2370d2a2fd732f6e972 |
+| docs/REV5_PRODUCT_PROGRESS.md | 9c978021d3982690e9aaa87896436bad7125b433 |
+| docs/specs/agent-task-history.md | 8fd4cc57560662fc5f5dd5398ade8badeb98f32f |
+| docs/specs/command-palette-surface.md | 05867c94592a66b3a0d788d6f29456bb9ba6bc15 |
+| docs/specs/global-search-surface.md | 1a74b337e239dc7c23cf70d2f6dbc6f55ac5234e |
+| docs/specs/notification-center.md | 81b4ed30b2defd538a56c9323fecb566a1fad8dd |
+| docs/specs/windows-tray-surface.md | c7f9317e26b16098301989a8f4b5eaa11540e714 |
+| apps/desktop_flutter/lib/main.dart | 6109c821ab5dc809224bec5234c4c59db1d5f988 |
+| apps/desktop_flutter/lib/models/generated_contracts.dart | 64e7a80a308c2734eb18c9d4b26eb50c8354f67b |
+| apps/desktop_flutter/lib/screens/agent_center.dart | 2472faeb31a64d624423c30a0a30d0f153d2e2a3 |
+| apps/desktop_flutter/lib/screens/evidence_center.dart | d7b2c2384d0af5fe82d55c681a11d81f5b5d8bef |
+| apps/desktop_flutter/lib/screens/problems_panel.dart | be2b95ba68356df91d770be634e55b93dd399199 |
+| apps/desktop_flutter/lib/screens/recovery_center.dart | 4eeda112b05af3dc3289e0f962fabda85b157bdf |
+| apps/desktop_flutter/lib/screens/settings.dart | 66374ec4157d573939e7f9cc5c36aecf5d65e251 |
+| apps/desktop_flutter/lib/services/agent_task_client.dart | f54cefac29eba3dcf383bba19b4f64ee682e6217 |
+| apps/desktop_flutter/lib/services/agent_task_execution_coordinator.dart | 5d8f48d0557bdcb1af838239abf9651893bce7f1 |
+| apps/desktop_flutter/lib/services/compose_client.dart | 8f9657d866b007a4d2212abefca4df9add81a702 |
+| apps/desktop_flutter/lib/services/export_client.dart | 70d77edc6beb9e209e6b362219d1b22d69375489 |
+| apps/desktop_flutter/lib/services/ai_edit_client.dart | ba5e62311a02749d2f9fe0e4e72e2b0d4e0a497d |
+| apps/desktop_flutter/lib/services/global_search_index.dart | f71d2f6c4563b011fa3621ea3aee596bffb099f0 |
+| apps/desktop_flutter/lib/services/mcp_connection_client.dart | 12a173a3956368c53615255c56ef06a2f5939c9a |
+| apps/desktop_flutter/lib/services/notification_client.dart | 746c74805ef5b80febf020306daeb360ff43b4e6 |
+| apps/desktop_flutter/lib/services/profile_client.dart | ab967d9fb3f84c48b7bbc9a1193fbf7563d99105 |
+| apps/desktop_flutter/lib/services/shell_core_client.dart | f08db061bd15649ff7c2fc3fc9e37184433cbf18 |
+| apps/desktop_flutter/lib/services/update_client.dart | 26d2e946b5b15ea3328867e606e9f75bf4bfc2d1 |
+| apps/desktop_flutter/lib/services/windows_tray_client.dart | cf8214ceb95fa1b24c7eed4f14b312bda80e0b15 |
+| apps/desktop_flutter/test/agent_task_client_test.dart | 0477a0bbbb321082494b6b55711815d34419fdd9 |
+| apps/desktop_flutter/test/global_search_index_test.dart | 2b96129f13ab11bd38afb0aba5e9a5b07d8eb3e3 |
+| apps/desktop_flutter/test/notification_client_test.dart | e92e994e4a6107abc83de34cfed6032f260dd550 |
+| apps/desktop_flutter/test/settings_compose_test.dart | a78353f93617cc7b17391549ea256f007a7acdb1 |
+| apps/desktop_flutter/test/settings_install_flow_test.dart | 73fc7b9706a7f4246972db46d5398d8b73decb09 |
+| apps/desktop_flutter/test/widget_test.dart | f4e9c7b93f832ba2a2cefee779fd12426f240b04 |
+| apps/desktop_flutter/test/windows_tray_client_test.dart | 0b24e07221087e43355ac465ca4ace73a48af31e |
+| apps/desktop_flutter/windows/runner/CMakeLists.txt | 84f310a9a3887b627ec88dbe8601753db48be30d |
+| apps/desktop_flutter/windows/runner/flutter_window.cpp | 67849099e5141b696b237ec7390729793bc0e843 |
+| apps/desktop_flutter/windows/runner/flutter_window.h | bc0bb661a9ef7c2b639856a6d5e46b68b98ca4b0 |
+| apps/desktop_flutter/windows/runner/tray_controller.cpp | 2676afcc76e5c6e53fff2dd00d0fbb3ae531ccc1 |
+| apps/desktop_flutter/windows/runner/tray_controller.h | 67ec337a335b948115559394ad5b55bffadb7502 |
+| native/rust_helper/src/broker/notification_center.rs | ca6828a33baf94abd7101781d9730b22daca4a78 |
+| native/rust_helper/src/broker/protocol.rs | 9b2076d5f31ca6d77f1f87973d1b394aaf751961 |
+| native/rust_helper/src/broker/runtime_lifecycle.rs | 2746ec301e9a47a5ececf1485ca7ad8a17304388 |
+| packages/agent_orchestration/lib/agent_task_client.dart | a31fbb9f980a0039f809fd763c91f055fe9d02d0 |
+| packages/agent_orchestration/lib/agent_task_execution_coordinator.dart | feb9aacb7ed77e6f4e76e9d9371290decca9cf7b |
+| release_blockers.registry.json | 244adc04a01e7b406c4ebcdeb829f7077d4aa35f |
+| specs/tray_stop_request.schema.json | 579755262940027079b37ef859e6d2f32a071cc0 |
+| specs/tray_stop_response.schema.json | d6cce063d5deaf7104b97ef67f4efb14f780cc72 |
+| specs/windows_tray_projection.schema.json | 5c3975e03b34281a0f202374cf91127357f2a1e0 |
+| tooling/conformance_tests/run_conformance_skeleton.py | c6f31d8cb561b48513c6784e54c85969c9cb953e |
+| tooling/schema_check/check_schemas.py | 7dca27717cbe5cccb45e1013b3436918a2322e75 |
+
 ## 要求母集団・照合状態
 
 | 母集団 | 件数 | 正本・原典 | v4 E0状態 |
@@ -6363,7 +6452,7 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 | 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13は全E0-04 fieldを個別記録。P13旧aggregate evidence identity/classは`UNKNOWN`。N11 Evidence/Blocker/OS Artifact全数結合は未完 |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのE0-04 21 fieldを個別記録。旧status維持、N11 Evidence/Blocker/OS Artifact結合と製品Acceptanceは継続 |
 | D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜45はE0-04全21 fieldを個別記録。Evidence/Blocker/OS Artifact全数結合・Acceptance未完 |
-| 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K01〜K12はE0-04全21 fieldとSourceSHAを個別記録済み。K13〜K20の個別fieldとN11 Evidence/Blocker/OS Artifact結合は継続 |
+| 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K01〜K13はE0-04全21 fieldとSourceSHAを個別記録済み。K14〜K20の個別fieldとN11 Evidence/Blocker/OS Artifact結合は継続 |
 | Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 33 IDのscope/Consumer/現証拠境界と各21 fieldを記録。BUF-R/T Acceptance、cause/effectの全件結合、N11 evidence、OS artifactとの結合は未完 |
 | Buffer工程 B0〜B6 | 7 | `docs/緩衝基盤_rev5補遺_QC/`・v4仕様S06 | B0〜B4の限定CLOSEDを保持、B5 OPEN、B6未成立。詳細Consumer照合が未完 |
 | QE/監査 D4-QE-R01〜R13／D4-LNX-T01〜T08／D4-AUD-F01〜F07 | 13／8／7 | `docs/QE_2026-10-22/`・各採用記録 | 旧証拠と現在の実装/Validatorへの接続が未完 |
@@ -6406,7 +6495,7 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 ## 次のE0照合作業
 
 1. N01〜N10のE0-04 21項目は現行SourceSHAへ個別照合済み。各製品AcceptanceはOPENのまま維持し、N10の五OS実導入・利用・更新・Recovery QAは後続の製品Acceptanceに残す。
-2. C0〜C34およびPhase 0〜45の個別field記録を維持し、K01〜K12のSource mappingを再試験せず、K13〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
+2. C0〜C34およびPhase 0〜45の個別field記録を維持し、K01〜K13のSource mappingを再試験せず、K14〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
 3. BUF-R/TのSourceSHAとConsumer scopeは記録済み。AcceptanceはOPEN。B0〜B6の状態を保持し、原因→effect、N08/N10/N11、OS/Artifact/evidence結合を続ける。
 4. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 5. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
