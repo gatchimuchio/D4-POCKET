@@ -1550,12 +1550,12 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 
 #### Phase/K crosswalkの判定
 
-旧Phase 0〜45の46 ID、K01〜K20の20 IDを、現v4 N01〜N11・R03 A〜J・正本Consumerへ対応付けた。旧C番号との対応は履歴範囲として保持し、P0〜P13は別のv4 S05 direct mappingに従う。Source SHA/TestClassは参照N節、Phase/K固有Evidence IDはNONE、個別の完全E0-04行は未充足のものをUNKNOWNとして残す。ここでのmappingは範囲・Consumer参照の整備だけであり、N/K/Phase Acceptance、E3 BUILD_COVERED、全OS QC/QAをCLOSEDにしない。N11 Evidence ID・Blocker・全OS artifact/standard guaranteesとの行単位結合、BUF-R/Tの個別E0-04欄、B0〜B6、Q/FQ/W/QE/AUD全数照合は次工程に残る。
+旧Phase 0〜45の46 ID、K01〜K20の20 IDを、現v4 N01〜N11・R03 A〜J・正本Consumerへ対応付けた。旧C番号との対応は履歴範囲として保持し、P0〜P13は別のv4 S05 direct mappingに従う。Source SHA/TestClassは参照N節、Phase/K固有Evidence IDはNONE、個別の完全E0-04行は未充足のものをUNKNOWNとして残す。ここでのmappingは範囲・Consumer参照の整備だけであり、N/K/Phase Acceptance、E3 BUILD_COVERED、全OS QC/QAをCLOSEDにしない。N11 Evidence ID・Blocker・全OS artifact/standard guaranteesとの行単位結合、BUF-T01〜T24の個別E0-04欄、B0〜B6、Q/FQ/W/QE/AUD全数照合は次工程に残る。BUF-R01〜R09は21 fieldの個別mappingを記録したが、AcceptanceはOPEN。
 
 
 ## v4対応：BUF-R01〜R09／BUF-T01〜T24 Source→Consumer crosswalk
 
-要求原文はv4仕様S06（採用原本SHA-256 8CEEDF21F881A783E35EE8642673FAAEEF949465343DF65E63DC21B04EE5A3EF）および緩衝基盤実装仕様書§2.1/§8.3（current git blob 2d0e98fb0b58ceec65244fde6a8fbf8e27c49b7e、SHA-256 A354E8493EE3A86DD480FCEF256FD9BDB569631B5735B3155FAC41EA77E38473）に固定する。以下は要求ID全33件の固有目的・現Consumer・状態境界を明示する。実装fileごとの現行blob SHAはN08/N10/N11各SHA表、過去自己適用evidenceはdocs/緩衝基盤_rev5補遺_QC/B5_自己適用.mdと採用記録を参照する。
+現行要求の正本はv4仕様S06（採用原本SHA-256 8CEEDF21F881A783E35EE8642673FAAEEF949465343DF65E63DC21B04EE5A3EF）。緩衝基盤実装仕様書§2.1/§8.3（HEAD 5f1bb53のblob 2d0e98fb0b58ceec65244fde6a8fbf8e27c49b7e、SHA-256 A354E8493EE3A86DD480FCEF256FD9BDB569631B5735B3155FAC41EA77E38473）は採用済み要求の意味・来歴を参照する補助資料とし、現行status・CLOSED範囲・受入を上書きしない。以下は要求ID全33件の固有目的・現Consumer・状態境界を明示する。実装fileごとの現行blob SHAはN08/N10/N11各SHA表、過去自己適用evidenceはdocs/緩衝基盤_rev5補遺_QC/B5_自己適用.mdと採用記録を参照する。
 
 ### E0-04共通field値と適用範囲
 
@@ -1583,6 +1583,244 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 | BUF-R07 D4Pocket自身の実開発・検査へ自己適用 | D4 source/build/test task→isolated Cargo/Flutter runner→same-source artifact/result/cleanup | run_cargo_isolated.py、IsolatedFlutterWorkspace、B5のWindows局所記録あり。別条件・複数環境・全開発consumerは未接続。 | OPEN。B5自己適用の局所結果を保持、全体の同条件因果比較・副作用/別境界転移は未完。 |
 | BUF-R08 要求から設計・実装・検査・是正・配布まで品質責任を連続させる | v4 E0〜E6 / A〜J BUILD→QE_QC→QE_QA→Release Review | AGENTS/v4工程/進捗/台帳がprocess consumer。文書整合は製品QC/QAではない。 | OPEN。局所施工QCと全体統合QC/標準OS QA/Owner Release decisionを分離し、Q0〜Q7を勝手に開始しない。 |
 | BUF-R09 品質不適合を要求・設計・境界・検査方法まで根因へ戻す | 失敗/evidence→B0 cause row→B1 design→implementation/test correction→matched observation | B0/B1/B5 cause/evidence docs and local test harnesses. Cause update is record-driven; no generic product feedback consumer. | OPEN。根因未確定をUNKNOWNのまま保持し、下流移転・反証・同条件再観測を行う。 |
+
+### BUF-R01〜R09（E0-04全21 fieldの個別記録）
+
+この小節は各R要求をE0-04の21 fieldで個別化したSource→Consumer記録である。要求の現行意味はv4仕様S06を優先し、採用済み緩衝補遺は意味の来歴と限定証拠の参照に使う。補遺の旧QC工程や旧CLOSEDは、現行製品Acceptanceへ昇格させない。各SourceSHAは照合基準HEAD 5f1bb53c827cf52f8a2cb012f632931374b6989eのGit blob。UNIT／CONFORMANCE／DOCの存在は、この文書単位で試験を実行したことや製品Acceptanceを示さない。
+
+#### BUF-R01 全ボトルネックと欠測を取得可能範囲付きで全件追跡
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | BUF-R01 |
+| 旧ID | BUF-R01（識別子を維持） |
+| 原文参照 | v4仕様S06、仕様原本SHA-256 8CEEDF21F881A783E35EE8642673FAAEEF949465343DF65E63DC21B04EE5A3EF。採用済み補遺の実装仕様書§1.2・§3は来歴資料。 |
+| 対象 | D4Pocket開発で観測可能な障害・失敗・未解明事象と、その取得可能なsource／run／job／log／artifactの母集団。 |
+| 目的 | 期間・証拠源・実行対象を明示し、既知・未解決・取得不能を全件追跡する。未知を既知原因や解決済みへ変換しない。 |
+| 生成元（`Producer`） | Repository履歴、手動Actions履歴、source／workflow差分、実行log／artifactの可用性、開発作業で観測したfailure。 |
+| 実Consumer | B0原因対応台帳・不足証拠一覧が事象と欠測を記録し、E0要求台帳とN11 Evidence／Gateが現候補への関係を受け取る。既存B0の限定CLOSEDはこの全母集団の完了を意味しない。 |
+| 契約／Data | 既存B0台帳とE0-04の出典、対象、Producer、Consumer、SourceSHA、証拠区分、Blocker、残余。根拠の種類と直接観測／推定／UNKNOWNを分離する。新しいruntime schemaは追加しない。 |
+| 正常時作用 | 取得可能な各記録を出典とscopeへ結び、欠測・重複・未解明の状態を残したまま要求と現Consumerへ対応付ける。 |
+| 否定時作用 | HTTP 410／404、artifactなし、source不一致、同型failureのみの場合に個別原因・因果・解決を推定しない。 |
+| 停止／Recovery | 根拠不足はUNKNOWN／欠測として保持し、取得元や再取得可能性を記録する。過去記録を黙って再分類せず、追加取得時は該当行を追補する。 |
+| 標準OS候補 | Windows、macOS、Linux native、Android、iOS。OS別のfailure母集団や候補version／archは未確定値をUNKNOWNとする。Linux nativeは必須製品対象。 |
+| 配布物 | 5 OSの配布候補はN10の現行対応表に従う。Installer／package／version／archは未確定ならUNKNOWN。WSL／Xvfbの記録をLinux native製品証拠にしない。 |
+| 既存実装 | B0_原因対応台帳.md（限定された履歴・原因対応）、B0_不足証拠一覧.md（欠測と未解明）、E0 ledger（要求対応）。 |
+| BUILD_GAP | 全開発期間・全取得可能sourceの一意な母集団化と、現在の要求・現Consumer・Evidence Registryまでの全件結合が未完。 |
+| 参照元ハッシュ（`SourceSHA`） | v4仕様S06原本のSHA-256=`8CEEDF21F881A783E35EE8642673FAAEEF949465343DF65E63DC21B04EE5A3EF`。照合時Git commit=`5f1bb53`のGit blob: `docs/緩衝基盤_rev5補遺_QC/B0_原因対応台帳.md`=`299c68b3a5266ab4b1946f4b06caa9e4069274a9`、`docs/緩衝基盤_rev5補遺_QC/B0_不足証拠一覧.md`=`ff35b791d6a022f1879d3f0002ed0d219e89578b`、docs/QE_2026-11-13/E0_要求consumer台帳.md d58c09023e9b34568f13e032ad147633b06591e。 |
+| 試験区分（`TestClass`） | DOC／HISTORY／LEDGER。全母集団の再走査・製品実行は本mappingでNOT_RUN。 |
+| 証拠ID（`Evidence ID`） | `NONE`（製品Evidence IDを発行しない）。 |
+| 阻害要因（`Blocker`） | E0 mappingはOPEN。Release blocker registryは変更せず、新規Blockerを作成しない。 |
+| 状態 | `OPEN`（E0-04 row mappingは記載、R01の全件Acceptanceは未成立）。 |
+| 残余 | 欠測run／jobと原因UNKNOWNを含む全source provenance、全原因の現行要求結合が残る。 |
+
+#### BUF-R02 緩衝主体が成立可能な下位操作を実行
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | BUF-R02 |
+| 旧ID | BUF-R02（識別子を維持） |
+| 原文参照 | v4仕様S06、仕様原本SHA-256 8CEEDF21F881A783E35EE8642673FAAEEF949465343DF65E63DC21B04EE5A3EF。補遺実装仕様書§1.2・§4は来歴資料。 |
+| 対象 | failure報告で終わらず、既存の許可範囲にある互換変換・隔離・状態調停・実行接続再構成等を実行し、元のTool作用と結果へ戻す経路。 |
+| 目的 | 成立可能な下位操作を緩衝主体が実行し、上位のTaskを本来の意味のまま完了または明示失敗へ導く。 |
+| 生成元（`Producer`） | Runtime／OS／Toolchainからの実行要求、環境観測、原因候補、現在のBroker Task／Workspace束縛。 |
+| 実Consumer | 現在はCodex CLI TaskのWorkspaceTaskScratch／TEMP・TMP bindingとBroker journal／Audit、開発用isolated Cargo／Flutter runner。汎用Bufferから許可Toolへ渡す本番Consumerは未接続。 |
+| 契約／Data | 非権限のbuffer_intervention_record v2とsource／Task／Host／Workspace／input／Toolchain指紋・作用参照・結果証拠。recordは権限や成功を発行しない。 |
+| 正常時作用 | 既存Brokerで適格性と許可を再確認した範囲だけ介入し、指定された元Toolを実行して作用後の結果を観測する。 |
+| 否定時作用 | 未知・非対応・意味変更・未証明の提案は実行しない。記録作成やfailure reportだけで吸収成立と扱わない。 |
+| 停止／Recovery | Brokerの既存deny／Task failure／suspendと、既存Task journal／Recovery境界を使う。隔離runner cleanupは製品Task Recoveryと混同しない。 |
+| 標準OS候補 | Windows、macOS、Linux native、Android、iOS。現行作用のOS保証範囲は個別N08／N10／N11記録に限る。Linux nativeは必須製品対象。 |
+| 配布物 | 5 OSのproduction packageはN10対応表へ委譲し、具体package／version／archはUNKNOWNなら確定しない。開発runnerは配布物ではない。 |
+| 既存実装 | codex_cli.rsのTask scratchと環境binding、agent_task_scratch.rsのjournal／recovery、dialogue.rsのBroker照合・Audit・結果projection、toolingのisolated runners。 |
+| BUILD_GAP | 一般Buffer介入の実作用、元Tool実行、前後の独立結果測定、原因別の安全な選択がproduction全体へ接続されていない。 |
+| 参照元ハッシュ（`SourceSHA`） | v4仕様S06原本のSHA-256=`8CEEDF21F881A783E35EE8642673FAAEEF949465343DF65E63DC21B04EE5A3EF`。照合時Git commit=`5f1bb53`のGit blob: `native/rust_helper/src/adapters/codex_cli.rs`=`e5c9d1581ae9a1c0a3ae7fcfa626fdca6fea6d28`、`native/rust_helper/src/broker/agent_task_scratch.rs`=`de743cd819fb4533c9c3070c4e7bcae82e42d938`、`native/rust_helper/src/broker/dialogue.rs`=`c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999`。 |
+| 試験区分（`TestClass`） | CODE_PRESENT／UNIT／限定LIVE_RUNTIMEの過去証拠。今回の製品runtime testはNOT_RUN。 |
+| 証拠ID（`Evidence ID`） | `NONE`。過去の限定Task証拠をR02の汎用Acceptanceへ昇格しない。 |
+| 阻害要因（`Blocker`） | E0 mapping OPEN。既存FQ／Registryはそれぞれのscopeのまま維持し、新規Blockerを作成しない。 |
+| 状態 | `OPEN`。 |
+| 残余 | Generic Buffer→既存Broker許可Tool→元Tool結果までの実作用と、因果・副作用の観測が未成立。 |
+
+#### BUF-R03 新しい言語・OS・依存・外部Toolへ汎用責任モデルを適用
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | BUF-R03 |
+| 旧ID | BUF-R03（識別子を維持） |
+| 原文参照 | v4仕様S06、仕様原本SHA-256 8CEEDF21F881A783E35EE8642673FAAEEF949465343DF65E63DC21B04EE5A3EF。補遺実装仕様書§1.2・§5は来歴資料。 |
+| 対象 | 新しい依存、ABI/API、言語、OS、Runtime、外部Toolが加わったときの共通責任とAdapter／Broker接続。 |
+| 目的 | 既知エラーの個別ハードコードを避け、未知入力を含む新しい実行対象にも同じauthority・意味・証拠境界を適用する。 |
+| 生成元（`Producer`） | OS／Runtime Adapter、dependency・Toolchain情報、元Taskの固定済み入力と現在の実行Host。 |
+| 実Consumer | 限定Codex CLI adapter、tooling/run_cargo_isolated.py、tooling/flutter_workspace.pyが個別Consumer。全OS／言語／Tool共通のBuffer Consumerは確認できない。 |
+| 契約／Data | Runtime中立のBroker／Adapter責任境界とbuffer_intervention_record v2。Vendor／Tool metadataからauthorityを生成しない。 |
+| 正常時作用 | 対応済みConsumerは各自の既存Tool契約で処理し、共通記録には検証可能なscope・source・結果だけを結ぶ。 |
+| 否定時作用 | 未知Runtime／未対応OS／不明ABIやTool契約を既知環境へ読み替えず、fallbackで成功扱いしない。 |
+| 停止／Recovery | Adapterがない、証拠が不足、契約が不一致なら現在Brokerでdeny／suspendし、対象環境の未成立を記録する。 |
+| 標準OS候補 | Windows、macOS、Linux native、Android、iOS。候補version／arch／ABIは実測前に固定しない。Linux nativeは完全対応必須。 |
+| 配布物 | 5 OSごとの製品Installer／Package／更新／削除はN10に対応付ける。具体形式・保証値が確定していない箇所はUNKNOWN。WSL等はnative Linuxを代替しない。 |
+| 既存実装 | codex_cli.rs、run_cargo_isolated.py、flutter_workspace.py、既存Broker contract/conformance。各々が限定scopeであり汎用cross-platform接続ではない。 |
+| BUILD_GAP | 同じ責任モデルを適用する製品Adapter／Tool consumer、標準OSごとの導入・実行・配布経路と拡張conformanceが未完成。 |
+| 参照元ハッシュ（`SourceSHA`） | v4仕様S06原本のSHA-256=`8CEEDF21F881A783E35EE8642673FAAEEF949465343DF65E63DC21B04EE5A3EF`。照合時Git commit=`5f1bb53`のGit blob: `native/rust_helper/src/adapters/codex_cli.rs`=`e5c9d1581ae9a1c0a3ae7fcfa626fdca6fea6d28`、`tooling/run_cargo_isolated.py`=`6890c89b384db2169b92a7326f04dbd2ea6341e1`、`tooling/flutter_workspace.py`=`dab1c73e2dad774fd7c8c385991a4d66a969ca19`。 |
+| 試験区分（`TestClass`） | UNIT／CONFORMANCE／開発runnerの限定試験。5 OS製品適合・新Tool一般化は本mappingでNOT_RUN。 |
+| 証拠ID（`Evidence ID`） | `NONE`。 |
+| 阻害要因（`Blocker`） | E0 mapping OPEN。既存OS／release blockerを維持し、R03専用の新規登録は行わない。 |
+| 状態 | `OPEN`。 |
+| 残余 | 新OS・言語・依存・Toolに対する同一責任のproduction consumerと対象別配布証拠が不足。 |
+
+#### BUF-R04 元要求・結果・権限・成功条件の意味を保持
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | BUF-R04 |
+| 旧ID | BUF-R04（識別子を維持） |
+| 原文参照 | v4仕様S06、仕様原本SHA-256 8CEEDF21F881A783E35EE8642673FAAEEF949465343DF65E63DC21B04EE5A3EF。補遺実装仕様書§1.2・§6は来歴資料。 |
+| 対象 | 調停前後の要求、権限範囲、元Tool結果、成功判定、状態差と副作用。 |
+| 目的 | 同等性が証明できる作用だけを許し、意味を変える／証明できない変換を適用しない。 |
+| 生成元（`Producer`） | 元Task要求・成功条件・source／input／Host／Workspace指紋、調停記録、作用後Tool結果。 |
+| 実Consumer | dialogue.rsのBroker observation照合とTask終端投影、buffer_intervention_record schema／Conformance、将来の独立結果検査。独立readback consumerは未確認。 |
+| 契約／Data | version 2の非権限recordと固定されたTool成功条件、作用参照、前後の実測結果・hash。Schemaがvalidでもruntimeの意味同等性を証明しない。 |
+| 正常時作用 | 同一要求のまま作用を実行し、元Toolの実結果を独立に読み戻して要求・成功条件と照合する。 |
+| 否定時作用 | planned hash、record内自己申告、Schema適合だけでは作用や成功を認めない。欠落・不一致時はTaskを成功にしない。 |
+| 停止／Recovery | 意味・hash・Host／Workspace束縛の不一致では確定を拒否し、既存Broker failure／Audit／Recoveryへ接続する。 |
+| 標準OS候補 | Windows、macOS、Linux native、Android、iOS。各候補の独立readback／成功条件は未測定範囲をUNKNOWNとする。 |
+| 配布物 | 5 OSの実行候補と配布形態はN10対応表。形式・version／archが未確定ならUNKNOWN。 |
+| 既存実装 | buffer_intervention_record.schema.json、conformance skeletonの正常／authority注入／未証明吸収negative、dialogue.rsの記録とprojection。 |
+| BUILD_GAP | Rust生成recordのruntime Schema validation、予定値と独立実測の分離、元Tool結果のindependent readbackと意味比較が未成立。 |
+| 参照元ハッシュ（`SourceSHA`） | v4仕様S06原本のSHA-256=`8CEEDF21F881A783E35EE8642673FAAEEF949465343DF65E63DC21B04EE5A3EF`。照合時Git commit=`5f1bb53`のGit blob: `specs/buffer_intervention_record.schema.json`=`26a1fa8ee9d010f18c157f5d3b66b9b34bdf94d5`、`native/rust_helper/src/broker/dialogue.rs`=`c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999`、`tooling/conformance_tests/run_conformance_skeleton.py`=`c6f31d8cb561b48513c6784e54c85969c9cb953e`。 |
+| 試験区分（`TestClass`） | CONFORMANCE／FIXTURE／UNITが存在。今回これらはNOT_RUN、独立実作用比較も未成立。 |
+| 証拠ID（`Evidence ID`） | `NONE`。 |
+| 阻害要因（`Blocker`） | E0 mapping OPEN。既存Blocker registryは無変更。 |
+| 状態 | `OPEN`。 |
+| 残余 | 実際のpre/post結果、意味同等性、状態差、副作用の独立比較が未確認。 |
+
+#### BUF-R05 BrokerのAuthority・Permission・Approval・Audit・Recovery等を維持
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | BUF-R05 |
+| 旧ID | BUF-R05（識別子を維持） |
+| 原文参照 | v4仕様S06、仕様原本SHA-256 8CEEDF21F881A783E35EE8642673FAAEEF949465343DF65E63DC21B04EE5A3EF。補遺実装仕様書§1.2・§7は来歴資料。 |
+| 対象 | 既存Rust Brokerが所有するAuthority、Permission、Approval、Credential／secret、Audit、Recovery、Content Exposure、Host／Workspace境界。 |
+| 目的 | Bufferは実行主体の権限源にならず、既存Brokerの許可・scope・結果・監査責任を維持する。 |
+| 生成元（`Producer`） | UI／Agent／Adapter／Toolからの既存Task要求と非権限のBuffer record。 |
+| 実Consumer | Rust Broker protocol／dialogue／Task scratch pathが限定的に再評価する。Flutterから新しいAuthority経路は作らない。全Buffer介入のBroker consumerは未接続。 |
+| 契約／Data | 現BrokerのTask／Runtime／Host／Workspace束縛、Permission／一回Approval、Audit／Recovery、許可された内容投影。buffer recordはmetadata／evidenceのみで権限を持たない。 |
+| 正常時作用 | 現在条件でBrokerが既存権限を再評価し、許可範囲の下位作用だけを実行し、Audit／Recovery／表示境界を保持する。 |
+| 否定時作用 | UI／Adapter／Agent／MCP／A2A metadata、履歴、過去Approval、Buffer判定から権限を生成・再利用・昇格しない。 |
+| 停止／Recovery | Permission／Approval不成立、scope不一致、Audit不能、secret境界違反はBrokerで拒否し、危険作用を停止する。既存Recoveryへ戻し、代替Authority経路を作らない。 |
+| 標準OS候補 | Windows、macOS、Linux native、Android、iOS。共通Coreの存在を各OSのruntime保証へ昇格しない。 |
+| 配布物 | 5 OSのnative Bridge／Broker packagingはN10およびOS別契約に従う。未確認のpackage／version／署名状態はUNKNOWN。 |
+| 既存実装 | protocol.rs、dialogue.rs、agent_task_scratch.rs、buffer record schema。現行Codex Task pathの限定record・Audit・hash-only projection。 |
+| BUILD_GAP | 全てのBuffer作用のBroker統治・permission／approval消費・secret／Content Exposure・Host／Workspace scope・failure Auditを全対象へ接続した実証がない。 |
+| 参照元ハッシュ（`SourceSHA`） | v4仕様S06原本のSHA-256=`8CEEDF21F881A783E35EE8642673FAAEEF949465343DF65E63DC21B04EE5A3EF`。照合時Git commit=`5f1bb53`のGit blob: `native/rust_helper/src/broker/protocol.rs`=`9b2076d5f31ca6d77f1f87973d1b394aaf751961`、`native/rust_helper/src/broker/dialogue.rs`=`c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999`、`native/rust_helper/src/broker/agent_task_scratch.rs`=`de743cd819fb4533c9c3070c4e7bcae82e42d938`、`specs/buffer_intervention_record.schema.json`=`26a1fa8ee9d010f18c157f5d3b66b9b34bdf94d5`。 |
+| 試験区分（`TestClass`） | UNIT／CONFORMANCE／限定LIVE_RUNTIME履歴。全Buffer作用の実Broker negative・全OS確認は本mappingでNOT_RUN。 |
+| 証拠ID（`Evidence ID`） | `NONE`。 |
+| 阻害要因（`Blocker`） | E0 mapping OPEN。現行authority／OS／release blockerを保持し、新規Blockerを加えない。 |
+| 状態 | `OPEN`。 |
+| 残余 | 汎用Bufferの全作用を既存Brokerの権限・監査・内容露出・回復境界へ通すproduction経路は未成立。 |
+
+#### BUF-R06 同原因の反復調査と人手介入を減らし障害を隠さない
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | BUF-R06 |
+| 旧ID | BUF-R06（識別子を維持） |
+| 原文参照 | v4仕様S06、仕様原本SHA-256 8CEEDF21F881A783E35EE8642673FAAEEF949465343DF65E63DC21B04EE5A3EF。補遺実装仕様書§1.2・§8は来歴資料。 |
+| 対象 | 同原因の調査反復、人手介入、場当たり的再試行と、それらのfailure／副作用の可視性。 |
+| 目的 | 再利用可能な修正で反復負担を減らし、failure・根因不明・新しい副作用を隠さない。 |
+| 生成元（`Producer`） | B0 cause row、同一条件のfailure観測、scope fingerprint、再実行・介入の時間／回数／人手記録。 |
+| 実Consumer | B0/B3資料は原因整理の記録consumer。run_cargo_isolated.py等のrunnerは限定隔離consumer。一般のcause-reuse production consumerや工数計測consumerは未確認。 |
+| 契約／Data | Cause identityと根拠class／scopeを結び、retry・recovery・result・副作用・所要時間を区別する。比較基準の計測契約は未実装。 |
+| 正常時作用 | 同じ根拠とscopeで再利用できる修正だけを適用し、成功条件・副作用・人手介入の実測値を元Tool結果と共に残す。 |
+| 否定時作用 | error類似だけ、retry成功だけ、assertion緩和だけで根因解消・負担削減を主張しない。 |
+| 停止／Recovery | 原因のscope／証拠が違うか効果が確認できなければ再利用を止め、failure／UNKNOWNを保持し、既存復旧手順に戻す。 |
+| 標準OS候補 | Windows、macOS、Linux native、Android、iOS。現行測定値がないOSの時間・人手効果はUNKNOWN。 |
+| 配布物 | 5 OSのproduction candidateはN10表を参照。開発用runnerの再利用効果を製品配布物の保証へ転用しない。 |
+| 既存実装 | B0原因台帳・不足証拠一覧、B3原因機構対応、isolated Cargo runnerとその限定test。効果比較データは未確認。 |
+| BUILD_GAP | 同原因の再利用consumer、介入前後の調査回数／人手時間／成功・副作用の同条件比較が未成立。 |
+| 参照元ハッシュ（`SourceSHA`） | v4仕様S06原本のSHA-256=`8CEEDF21F881A783E35EE8642673FAAEEF949465343DF65E63DC21B04EE5A3EF`。照合時Git commit=`5f1bb53`のGit blob: `docs/緩衝基盤_rev5補遺_QC/B0_原因対応台帳.md`=`299c68b3a5266ab4b1946f4b06caa9e4069274a9`、`docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md`=`8a25f3ddacada889ba95de1d4761af77a074d26b`、`tooling/run_cargo_isolated.py`=`6890c89b384db2169b92a7326f04dbd2ea6341e1`、`tooling/conformance_tests/test_run_cargo_isolated.py`=`b5a8c42b6c9fee9f9886b6dd3fb7e39f65530a99`。 |
+| 試験区分（`TestClass`） | DOC／HISTORY／UNIT。介入効果・反復削減・人手削減の比較testはNOT_RUN／未確認。 |
+| 証拠ID（`Evidence ID`） | `NONE`。 |
+| 阻害要因（`Blocker`） | E0 mapping OPEN。新しいrelease blockerは作らず、既存Registryは無変更。 |
+| 状態 | `OPEN`。 |
+| 残余 | 因果効果や負担削減の定量値なし。ログ・失敗の可視性と副作用を含む一般consumerも未成立。 |
+
+#### BUF-R07 D4Pocket自身の実開発・検査へ適用
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | BUF-R07 |
+| 旧ID | BUF-R07（識別子を維持） |
+| 原文参照 | v4仕様S06、仕様原本SHA-256 8CEEDF21F881A783E35EE8642673FAAEEF949465343DF65E63DC21B04EE5A3EF。補遺実装仕様書§1.2・§9、B5自己適用記録は限定履歴。 |
+| 対象 | D4Pocketのsource、build、test、artifact、cleanupを含む実際の開発・検査経路。 |
+| 目的 | 同じsourceと条件で緩衝基盤を自己適用し、過去failureとの因果差・副作用・境界移転を検査する。 |
+| 生成元（`Producer`） | D4 source commit、実際の開発／test request、OS・Host・Workspace・Toolchain入力。 |
+| 実Consumer | tooling/run_cargo_isolated.py、tooling/flutter_workspace.py、launch_owner_desktop_isolated.py、限定されたB5記録とrunner test。 |
+| 契約／Data | source commit／snapshot hash、固定入力・Host／Toolchain、実行command、元Tool result、生成物hash、state diff、cleanup状態を結合する。既存B5の各記録は同じ粒度・条件ではない。 |
+| 正常時作用 | 対象sourceのisolated runを開始し、同条件で元Tool結果とcleanup／差分を観測できる。現在の限定runnerが持つ範囲だけを再利用する。 |
+| 否定時作用 | source／入力／Host／Toolchain条件が一致しないrunを因果比較へ使わない。別OSのPASSを対象OS／製品の代替にしない。 |
+| 停止／Recovery | snapshot／hash不一致またはcleanup失敗を成功扱いせず、隔離runを終了・回収できない範囲は未成立として保持する。共有cacheは別所有物として勝手に削除しない。 |
+| 標準OS候補 | Windows、macOS、Linux native、Android、iOS。候補ごとの開発host実測と製品OS証拠を分ける。Linux nativeは必須。 |
+| 配布物 | 5 OS product packageはN10に従う。isolated Cargo／Flutter runnerは開発用で配布物ではない。具体候補が未確定ならUNKNOWN。 |
+| 既存実装 | run_cargo_isolated.py、flutter_workspace.pyのIsolatedFlutterWorkspace、isolated launcher、B5自己適用のWindows限定記録。 |
+| BUILD_GAP | 全D4開発経路の接続、同一source・同条件の因果比較、全OSへの転移確認、Artifact／副作用／cleanupの統合記録が未成立。 |
+| 参照元ハッシュ（`SourceSHA`） | v4仕様S06原本のSHA-256=`8CEEDF21F881A783E35EE8642673FAAEEF949465343DF65E63DC21B04EE5A3EF`。照合時Git commit=`5f1bb53`のGit blob: `tooling/run_cargo_isolated.py`=`6890c89b384db2169b92a7326f04dbd2ea6341e1`、`tooling/flutter_workspace.py`=`dab1c73e2dad774fd7c8c385991a4d66a969ca19`、`tooling/launch_owner_desktop_isolated.py`=`208f0fae05cceb40c52930d6c782acf179a60794`、`tooling/conformance_tests/test_run_cargo_isolated.py`=`b5a8c42b6c9fee9f9886b6dd3fb7e39f65530a99`、`docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md`=`16081537b6699c176144e32ca97d6bdd20d98866`。 |
+| 試験区分（`TestClass`） | UNIT／CONFORMANCE／限定Windows LIVE_RUNTIMEの過去記録。今回再実行せず、全B5 acceptanceは未成立。 |
+| 証拠ID（`Evidence ID`） | `NONE`。B5の局所履歴は製品Evidence IDではない。 |
+| 阻害要因（`Blocker`） | E0 mapping OPEN。既存B5／OS blocker状態を変更しない。 |
+| 状態 | `OPEN`。 |
+| 残余 | 本体の全開発・検査へ自己適用した同条件効果と、別OS／製品境界の独立検証が未完。 |
+
+#### BUF-R08 構想から配布まで品質責任を連続させる
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | BUF-R08 |
+| 旧ID | BUF-R08（識別子を維持） |
+| 原文参照 | v4仕様S06、仕様原本SHA-256 8CEEDF21F881A783E35EE8642673FAAEEF949465343DF65E63DC21B04EE5A3EF。補遺実装仕様書§1.2・§10は来歴資料。 |
+| 対象 | 要求・設計・実装・試験・是正・配布を通じた継続的な品質責任と実Consumer結合。 |
+| 目的 | QCを後段だけの活動にせず、要求から実作用・失敗・回復・OS packageまでの責任と証拠をつなぐ。 |
+| 生成元（`Producer`） | 現行仕様／工程／指示、変更されたsource／contract、build／test／runtime結果、是正記録。 |
+| 実Consumer | AGENTS.md、v4三点セット、E0 ledger／進捗が開発processを統治。manifest、conformance、release gate validatorは機械的な文書／契約consumerであり製品QC／QAではない。 |
+| 契約／Data | QE_DESIGN→QE_BUILD→SYSTEM_SHAPED→BUILD_COVERED→QE_QC→QE_QA→QE_RELEASE_REVIEW、現行AcceptanceとSource→Consumer→Evidence追跡。 |
+| 正常時作用 | 各工程で責任・受入条件・consumer・必要な検査・残余を更新し、BUILD完了とQC／QA／Release判断を別状態で扱う。 |
+| 否定時作用 | 文書・schema・mock・validatorのPASSを実runtime／製品QA／配布成功へ読み替えない。未接続必須consumerをCLOSEDにしない。 |
+| 停止／Recovery | 必須consumer・責任・要求の欠落をBUILD_GAPとして保持する。安全重要境界は作用時に必要なnegative／停止確認を行い、工程外のrelease gateはそのまま残す。 |
+| 標準OS候補 | Windows、macOS、Linux native、Android、iOSを対象に、開発／QC／QAの証拠classを分離する。Linux nativeは必須。 |
+| 配布物 | 全5 OSの正規package／installer／update／rollback／uninstallはN10に対応付ける。詳細仕様や候補が未確定ならUNKNOWNであり、文書上の宣言は完成証拠ではない。 |
+| 既存実装 | AGENTS、v4仕様／工程／施工指示、E0 ledger／progress、manifest.py、run_conformance_skeleton.py、release_gate_check.py。 |
+| BUILD_GAP | 文書上のQC過程を全製品Producer／ConsumerとOS別実作用・package・QAへ通したsystem evidenceは未成立。 |
+| 参照元ハッシュ（`SourceSHA`） | v4仕様S06原本のSHA-256=`8CEEDF21F881A783E35EE8642673FAAEEF949465343DF65E63DC21B04EE5A3EF`。照合時Git commit=`5f1bb53`のGit blob: `AGENTS.md`=`1eafcadd129fd01f1f2f683594c381605ed7d48d`、`docs/QE_2026-11-13/01_D4Pocket_統合製品実装仕様書_v4.md`=`352c53180cbad07888beb956aad0fb2a58074c58`、`docs/QE_2026-11-13/02_D4Pocket_統合開発工程表_v4.md`=`d32dd251e5f7cbb97d92f6e7540d6b6ed0ecec05`、`docs/QE_2026-11-13/03_D4Pocket_Codex施工指示書_v4.md`=`49447973e88c50a09b2f4978adfed84fd464c6d0`、docs/QE_2026-11-13/E0_要求consumer台帳.md d58c09023e9b34568f13e032ad147633b06591e、`docs/QE_2026-11-13/進捗.md`=`0601b9c96a09eebd33a5b1513b8b483e9d1ba47e`、`tooling/manifest.py`=`aa4525ff20293cb8641e5598a2439561a3bfbd3b`、`tooling/conformance_tests/run_conformance_skeleton.py`=`c6f31d8cb561b48513c6784e54c85969c9cb953e`、`tooling/release_gate_check.py`=`22a8d7bfe9adb259f44ce8501fb215652e1d58c6`。 |
+| 試験区分（`TestClass`） | DOC／MANIFEST／CONFORMANCE／RELEASE_GATE。これらのprocess checksは本mapping後に実行、Product runtime／五OS QAはNOT_RUN。 |
+| 証拠ID（`Evidence ID`） | `NONE`。 |
+| 阻害要因（`Blocker`） | E0 mapping OPEN。現行18件のRelease blockerとQ0〜Q7 DEFERREDを保持し、新規登録なし。 |
+| 状態 | `OPEN`。 |
+| 残余 | 全機能統合後のsystem QC、標準OS QA、正式Release Reviewは後続工程であり、現在の文書mappingで成立しない。 |
+
+#### BUF-R09 不適合を上流の目的・設計・境界・検査方法へ帰還
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | BUF-R09 |
+| 旧ID | BUF-R09（識別子を維持） |
+| 原文参照 | v4仕様S06、仕様原本SHA-256 8CEEDF21F881A783E35EE8642673FAAEEF949465343DF65E63DC21B04EE5A3EF。補遺実装仕様書§1.2・§11、B0／B1／B5限定記録は来歴。 |
+| 対象 | 不適合のcause、上流目的／モデル／責任境界／設計／検査方法と是正後の影響。 |
+| 目的 | 機械的retryや事後報告で閉じず、根因に応じ上流へ戻り、是正の副作用・別境界への移転も再観測する。 |
+| 生成元（`Producer`） | Runtime／test failure、Audit・source／result evidence、欠測・反証、比較条件と過去cause row。 |
+| 実Consumer | B0 causes／deficiency → B1設計QC → B2/B3/B4機構・接続記録 → B5自己適用と matched observation。製品共通の自動feedback consumerは未確認。 |
+| 契約／Data | 直接観測・強い推定・UNKNOWNの区別、causeのsource／scope、要求と責任、仮説・反証、修正、同条件結果、副作用・移転状態。 |
+| 正常時作用 | 根因に対応する上流条件・設計・実装／test責任へ戻し、同条件の再観測と別consumerへの影響を記録する。 |
+| 否定時作用 | 別Host／source／成功条件でのretry PASS、ログの後付け、症状だけの変更でroot cause closureを主張しない。 |
+| 停止／Recovery | 根因や転移が確定しない場合はUNKNOWN／OPENのまま維持し、作用が安全でない範囲を停止する。既存Broker recoveryと原因記録を分離しない。 |
+| 標準OS候補 | Windows、macOS、Linux native、Android、iOS。根因・影響が観測されていないOSへ結果を転用しない。Linux nativeは必須。 |
+| 配布物 | 全5 OSの候補とrelease evidenceはN10／N11へ結ぶ。具体形式／version／archが未確定ならUNKNOWN。 |
+| 既存実装 | B0_原因対応台帳.md、B0_不足証拠一覧.md、B1_設計QC.md、B3_全原因機構対応.md、B5_自己適用.md。これらは範囲限定の記録であり汎用runtime feedback loopではない。 |
+| BUILD_GAP | 原因recordから要求／design／implementation／test ownerへ製品全体で結び、matched post-fix observation・副作用・downstream transferを一体追跡するconsumerが未成立。 |
+| 参照元ハッシュ（`SourceSHA`） | v4仕様S06原本のSHA-256=`8CEEDF21F881A783E35EE8642673FAAEEF949465343DF65E63DC21B04EE5A3EF`。照合時Git commit=`5f1bb53`のGit blob: `docs/緩衝基盤_rev5補遺_QC/B0_原因対応台帳.md`=`299c68b3a5266ab4b1946f4b06caa9e4069274a9`、`docs/緩衝基盤_rev5補遺_QC/B0_不足証拠一覧.md`=`ff35b791d6a022f1879d3f0002ed0d219e89578b`、`docs/緩衝基盤_rev5補遺_QC/B1_設計QC.md`=`aa113006eb7a108848211f4dfb3475dc0cfbc9d5`、`docs/緩衝基盤_rev5補遺_QC/B3_全原因機構対応.md`=`8a25f3ddacada889ba95de1d4761af77a074d26b`、`docs/緩衝基盤_rev5補遺_QC/B5_自己適用.md`=`16081537b6699c176144e32ca97d6bdd20d98866`。 |
+| 試験区分（`TestClass`） | DOC／HISTORY／UNIT／限定LIVE_RUNTIME。cause update・matched effect・全consumer transferの統合testはNOT_RUN／未成立。 |
+| 証拠ID（`Evidence ID`） | `NONE`。 |
+| 阻害要因（`Blocker`） | E0 mapping OPEN。既存failure／release blocker statusを変えず、新規Blockerを作成しない。 |
+| 状態 | `OPEN`。 |
+| 残余 | 全原因の上流帰還と修正後の同条件因果観測、下流への障害移転監視が未完。 |
 
 ### BUF-T01〜T24（試験要求→現試験Consumer）
 
@@ -1629,7 +1867,7 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 | B5 開発への自己適用 | D4 Pocket自身のtoolchain／OS／開発検査へ同条件で介入前後を適用し、原因効果・副作用・問題移送を確認。全体OPEN。 | 開発検査要求→`tooling/validate_all.py`／`tooling/flutter_workspace.py`／`tooling/run_cargo_isolated.py`等→元Flutter/Cargo検査とsnapshot/cache/process観測。実行入口ごとの適用・結果・cleanupを結合する。 | `B5_自己適用.md`にはWindows開発用`LIVE_RUNTIME`、hosted/manual補助、UNIT/FIXTUREを含む局所結果がある。BUF-T23の限定PASS、T04/T15/T22の部分観測、T05/T06のOPEN、T16の部分範囲等を各記録の条件内で保持する。source／command／OneDrive実状態が一致しない過去記録は因果証明にしない。 | B5 OPEN。OneDrive同一条件の因果、loopback/TLS根因、保護状態の全条件、全OSへの適用、波及・長期資源を未成立のまま保持。 |
 | B6 有限受入・回帰固定 | 24試験の必要範囲、局所肯定／否定／副作用／回帰、QC上流帰還の実効性を統合して判定。未解決はOPENのまま分離。 | BUF-T01〜T24→該当するN08/N10/N11の実Consumer・通常検査・安全回帰・証拠Registry。既存Conformance／Release Gateは個々の静的・構造条件だけを検査し、B6全体受入consumerとしては未接続。 | B6の有限受入条件は工程表に定義済みだが、B6をCLOSEDとする受入記録は確認できない。既存272 Conformance checksや文書crosswalkは`CONFIG`/`FIXTURE`/静的整合の範囲であり、B6の全数実作用・回帰・QC帰還を証明しない。正式Q0〜Q7もDEFERRED。 | 未成立。全BUF-Tの現candidate適用範囲、該当runtime証拠、副作用・回帰、未解決残余の統合判定が必要。B5やB6をCLOSEDへ変更しない。 |
 
-このcrosswalkは工程の現Consumerと証拠の所在・限界を特定するもの。既存CLOSEDの再試験、新たなEvidence ID発行、B5/B6の受入判定は行っていない。BUF-R/T各行のE0-04詳細field、個別cause/effect、N11 Evidence ID・Blocker・OS/Artifactとの完全結合は未完である。
+このcrosswalkは工程の現Consumerと証拠の所在・限界を特定するもの。既存CLOSEDの再試験、新たなEvidence ID発行、B5/B6の受入判定は行っていない。BUF-R01〜R09は個別E0-04全21 fieldと現Consumer／SourceSHAを記録済み。BUF-T01〜T24の個別fieldとN11 Evidence ID・Blocker・OS／Artifactとの全ID結合は未完である。R要求の製品AcceptanceはOPENのまま。
 
 ## 実装ファイルの初期目録（CODE_PRESENTのみ）
 
@@ -1657,7 +1895,7 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのSource→Consumer crosswalkを記録。個々の全E0-04列とv4 Acceptance／Evidence/N11結合は継続 |
 | D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDをv4 N01〜N11/A〜J/Kへcrosswalk済み。Phase固有E0-04全field、Evidence ID/Blocker、Acceptanceは未完 |
 | 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K別の完全E0-04 field、OS/Evidence/Blocker確認は継続 |
-| Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 33 IDのscope/Consumer/現証拠境界をcrosswalk。個別完全E0-04欄・全根因/effect/evidenceは未完 |
+| Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 33 IDのscope/Consumer/現証拠境界をcrosswalk。BUF-R01〜R09は個別21 fieldとSourceSHAを記録済み。BUF-T01〜T24・全根因/effect・N11 evidence結合は未完 |
 | Buffer工程 B0〜B6 | 7 | `docs/緩衝基盤_rev5補遺_QC/`・v4仕様S06 | B0〜B4の限定CLOSEDを保持、B5 OPEN、B6未成立。詳細Consumer照合が未完 |
 | QE/監査 D4-QE-R01〜R13／D4-LNX-T01〜T08／D4-AUD-F01〜F07 | 13／8／7 | `docs/QE_2026-10-22/`・各採用記録 | 旧証拠と現在の実装/Validatorへの接続が未完 |
 | Q0〜Q7、FQ群、W00〜W08 | 8／13／9 | v4工程表R05〜R08、`docs/FINAL_QA_QUEUE.md`、進捗履歴 | Q0〜Q7はDEFERRED。FQ/W各IDの現在Consumer・証拠・残余の照合が未完 |
@@ -1698,8 +1936,8 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 
 ## 次のE0照合作業
 
-1. P0〜P13のE0-04 field mappingは記録済み。次はBUF-R/TとN/P/C/Phase/Kの残行をCanonical N source/consumer・N11 Evidence/Blocker/OS Artifactへ結合し、既存CLOSED/FAILは履歴として保持して再試験しない。
-2. BUF-R/T crosswalkをCanonical N08/N10/N11 source SHA・各IDの完全E0-04 field・B5 evidenceへ結合する。B0〜B6の工程・状態・受入Consumer・証拠のcrosswalkは記録済み。個別cause/effect、OS/Artifact、N11 Evidence/Blockerの結合は継続。
+1. P0〜P13のE0-04 field mappingは記録済み。BUF-R01〜R09の個別E0-04 mappingは完了。次はBUF-T01〜T24の各21 fieldを記録し、N/P/C/Phase/Kの残行をCanonical N source/consumer・N11 Evidence/Blocker/OS Artifactへ結合する。既存CLOSED/FAILは履歴として保持し再試験しない。
+2. BUF-T01〜T24 crosswalkをCanonical N08/N10/N11 source SHA・各IDの完全E0-04 field・B5 evidenceへ結合する。BUF-R01〜R09は個別21 field mapping済み、製品AcceptanceはOPEN。B0〜B6の工程・状態・受入Consumer・証拠のcrosswalkは記録済み。個別cause/effect、OS/Artifact、N11 Evidence/Blockerの結合は継続。
 3. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 4. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
 5. N10の各OS標準候補・配布・実装・workflow/test・限定履歴を記録する。保証version/arch/resource/package条件は公式条件と実測から固定し、未知をUNKNOWNにする。
