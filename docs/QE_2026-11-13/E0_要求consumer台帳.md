@@ -871,6 +871,22 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 
 この33行はID別scope/Consumer/既存証拠境界の照合であり、BUF-R/T Acceptance、B0〜B6判定、E0完了を意味しない。N08限定source、開発runner、fixture、文書/Registry consumerを製品Bufferの一般保証と数えない。BUF-R/T各IDの残る個別E0-04欄（対象/目的/Producer/Consumer/契約/作用/否定/Recovery/OS/配布/実装分類/SourceSHA/TestClass/Evidence/Blocker/状態/残余）の確定はN08/N10/N11のCanonical source rowsへ結合し、未知はUNKNOWNのままとする。今回のB0〜B6進捗状態は変更しない。
 
+## v4対応：Buffer工程B0〜B6のAcceptance→Consumer／証拠crosswalk
+
+本表は`docs/緩衝基盤_rev5補遺_QC/工程表.md`の工程条件、同補遺のB0〜B5受入記録、およびv4仕様S06・工程表R03/R09・施工指示I02-03/I04-Fを現行Consumerへ対応づける。旧工程の限定CLOSEDは履歴のまま保持する。表のConsumer対応はE0照合であり、工程Acceptanceの再判定、BUF-R/Tの全数成立、N08/W08/G7のCLOSEDを意味しない。
+
+| 工程 | 原受入条件・過去の判定範囲 | 現v4 Producer→Consumer／責任面 | 証拠・証拠classと限界 | v4状態・残余 |
+|---|---|---|---|---|
+| B0 全数調査 | 取得可能な履歴範囲、欠測、事象→原因→既存対処／候補の追跡。2026-10-10時点の限定CLOSED。 | Actions・進捗・source履歴→`B0_原因対応台帳`／不足証拠・重複境界・参照原本一覧→本E0台帳／N11 Evidence・Blocker台帳。製品Runtime consumerではない。 | `B0_参照原本一覧.md`の限定受入は356 run、203 failure、直接参照147件、原因対応190/203、13 run-level UNKNOWN、取得不能log等を明記。DOC/HISTORY。CLOSEDは取得範囲内の索引成立で、全世界の実行履歴や全根因の解決を証明しない。 | 旧B0限定CLOSEDを維持。v4では全要求・証拠の行単位結合がOPEN。欠測・UNKNOWNを既知原因へ補完しない。 |
+| B1 設計QC | 緩衝の意味、非権限責任、代替案、反例、契約形状の設計受入。実作用は範囲外。限定CLOSED。 | 日本語意味条件→`specs/buffer_intervention_record.schema.json`→正常／否定例→`tooling/conformance_tests/run_conformance_skeleton.py`。現在確認できるconsumerは設計契約の静的検査で、runtimeの証拠真偽・fingerprint一致を評価するconsumerではない。 | `B1_設計QC.md` §§1,5–8およびSchema/conformanceの履歴。STATIC_CONFORMANCE／FIXTURE。設計・契約形状とAuthority field拒否のみで、製品作用や意味同等性の実証ではない。 | 旧B1限定CLOSEDを維持。v4の全OS・全Tool・実Broker接続はOPEN／BUILD_GAP。 |
+| B2 最小縦断 | 既存Broker認可→限定媒介→元Toolchain実行→独立結果確認、拒否・失敗伝播。Codex CLI scratch/TEMP限定でCLOSED。 | Agent Task→既存Rust BrokerのPermission／一回Approval→`adapters/codex_cli.rs::TaskTemporaryEnvironment`／`WorkspaceTaskScratch`→実Codex CLI→Broker結果・Audit。Consumer sourceはN08 canonical rows参照。 | `B2_実行QC.md` §§3–5の`LIVE_RUNTIME`記録は、local Rust Broker、実Codex CLI/MxC、synthetic localhost Responses API、Task完了・Workspace marker・負例を対象とする。Owner UI／installed product／通常Release capabilityの証拠ではない。 | 旧B2限定CLOSEDを維持。現v4ではCodex Taskの限定経路。OS/API/ABI/toolchain/cache/network一般化、同条件効果・副作用の独立照合はOPEN。 |
+| B3 原因群対応 | B0原因対応行を既存機構／吸収実証／実証した吸収不能／未成立・未知へ分類し、保護境界と残余を明示。153/153行分類の限定CLOSED。 | B0原因行→`B3-M01〜M75`の分類・是正記録→N08/N10のsource/test consumerとE0残余。分類記録は各製品機構のruntime consumerそのものではない。 | `B3_全原因機構対応.md` §79。局所受入記録75件で153原因対応行を分類。DOC/HISTORYおよび各記録に明記されたsource/test/run証拠。未知行を保持し、分類完了を故障解消へ読み替えない。 | 旧B3限定CLOSEDを維持。現行sourceへのcause単位接続、未解決原因の解消、全OS機構はOPEN／BUILD_GAP。 |
+| B4 製品接続 | Agent/Runtime/Workspace/Host、Broker、Audit、Agent Centerを既存製品入口で接続。Windows Desktopのstaged `r2-e2e` buildに限るCLOSED。 | Codex Adapterのscratch observation→Broker `dialogue.rs`／`agent_task_scratch.rs`照合→Buffer record／Audit→Agent Center hash-only projection。現source pathとSHAはN08 canonical rows参照。 | `B4_製品接続設計.md`の2026-10-17記録はTask completed、result/record hash、Audit chain、Workspace境界、localhost synthetic APIを含む`LIVE_RUNTIME`。Evidenceはlocal staged `r2-e2e`候補限定で、通常Release・全OS installed productの証拠ではない。 | 旧B4限定CLOSEDを維持。通常Release `task_execution=unsupported`、`release_ready=false`を保持。現在候補の全Consumer接続と他OSはOPEN。 |
+| B5 開発への自己適用 | D4 Pocket自身のtoolchain／OS／開発検査へ同条件で介入前後を適用し、原因効果・副作用・問題移送を確認。全体OPEN。 | 開発検査要求→`tooling/validate_all.py`／`tooling/flutter_workspace.py`／`tooling/run_cargo_isolated.py`等→元Flutter/Cargo検査とsnapshot/cache/process観測。実行入口ごとの適用・結果・cleanupを結合する。 | `B5_自己適用.md`にはWindows開発用`LIVE_RUNTIME`、hosted/manual補助、UNIT/FIXTUREを含む局所結果がある。BUF-T23の限定PASS、T04/T15/T22の部分観測、T05/T06のOPEN、T16の部分範囲等を各記録の条件内で保持する。source／command／OneDrive実状態が一致しない過去記録は因果証明にしない。 | B5 OPEN。OneDrive同一条件の因果、loopback/TLS根因、保護状態の全条件、全OSへの適用、波及・長期資源を未成立のまま保持。 |
+| B6 有限受入・回帰固定 | 24試験の必要範囲、局所肯定／否定／副作用／回帰、QC上流帰還の実効性を統合して判定。未解決はOPENのまま分離。 | BUF-T01〜T24→該当するN08/N10/N11の実Consumer・通常検査・安全回帰・証拠Registry。既存Conformance／Release Gateは個々の静的・構造条件だけを検査し、B6全体受入consumerとしては未接続。 | B6の有限受入条件は工程表に定義済みだが、B6をCLOSEDとする受入記録は確認できない。既存272 Conformance checksや文書crosswalkは`CONFIG`/`FIXTURE`/静的整合の範囲であり、B6の全数実作用・回帰・QC帰還を証明しない。正式Q0〜Q7もDEFERRED。 | 未成立。全BUF-Tの現candidate適用範囲、該当runtime証拠、副作用・回帰、未解決残余の統合判定が必要。B5やB6をCLOSEDへ変更しない。 |
+
+このcrosswalkは工程の現Consumerと証拠の所在・限界を特定するもの。既存CLOSEDの再試験、新たなEvidence ID発行、B5/B6の受入判定は行っていない。BUF-R/T各行のE0-04詳細field、個別cause/effect、N11 Evidence ID・Blocker・OS/Artifactとの完全結合は未完である。
+
 ## 実装ファイルの初期目録（CODE_PRESENTのみ）
 
 下記は`d503a4ef6daac8942abd1cb011442ce28c78ec55`時点のパス存在・責務候補を読み取った初期目録である。名前・コードの存在だけではProducer→Consumer接続、installed/runtime実作用、Acceptanceを証明しない。各行の`WIRED`、実作用、正常/否定/Recovery、Evidence、OS別状態は未照合なら`UNKNOWN`。
@@ -939,7 +955,7 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 ## 次のE0照合作業
 
 1. N/P/C/Phase/Kの各要求行へ完全なE0-04 field、N11 Evidence ID、Blocker、OS対象/Artifactを結合する。既存CLOSED/FAILは履歴保持し、再試験しない。
-2. BUF-R/T crosswalkをCanonical N08/N10/N11 source SHA・各IDの完全E0-04 field・B5 evidenceへ結合する。続けてB0〜B6の工程・状態・受入Consumer・証拠を照合する。
+2. BUF-R/T crosswalkをCanonical N08/N10/N11 source SHA・各IDの完全E0-04 field・B5 evidenceへ結合する。B0〜B6の工程・状態・受入Consumer・証拠のcrosswalkは記録済み。個別cause/effect、OS/Artifact、N11 Evidence/Blockerの結合は継続。
 3. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 4. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
 5. N10の各OS標準候補・配布・実装・workflow/test・限定履歴を記録する。保証version/arch/resource/package条件は公式条件と実測から固定し、未知をUNKNOWNにする。
