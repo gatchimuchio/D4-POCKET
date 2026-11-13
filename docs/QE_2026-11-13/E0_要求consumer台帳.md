@@ -3656,6 +3656,33 @@ Phase37のE0-04欄を全21項目で記録し、24件（24 unique path）のSourc
 | 状態 | Phase38のE0-04全21項目と38 SourceSHAを現mainへ結合済み。Phase38のmodule置換Acceptance、N03／N08／K18／K20、E0全体はOPEN。 |
 | 残余 | 現行v4ではmodule置換対象・比較値・切替条件が未定義のためUNKNOWNに残す。旧版の詳細gateを自動継承せず、reference live harnessの実対話を置換Acceptanceへ昇格しない。N03／N08の既存残件、N11 Evidence／Blocker／五OS Artifact結合を継続。 |
 
+
+##### Phase 39 個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 旧Phase39/C28を現行v4 N01／N08／N11、S05 K19／K20、QA Q4へ対応するE0照合。N11のEvidence結合対象であり、Q4や製品Acceptanceを閉じるIDではない。 |
+| 旧ID | `docs/D4_POCKET_PHASE_MAPPING.md` Phase 39「長時間運用」／`C28`。短時間試験を長時間合格へ昇格しないという履歴条件を保持する。 |
+| 原文参照 | 現行v4仕様S04 N01／N08／N11、S05 K19／K20、S08 QE_QA Q4、工程R03線F/J・R08 Q4、施工指示I07-04／I07-07、`docs/FINAL_QA_QUEUE.md` Q4。`docs/specs/long-run-validation.md`と`docs/REV2_PROGRESS.md`はC28の実装範囲／失敗履歴を示す補助資料。 |
+| 対象 | 統合候補の長時間Task運用、Runtime/Broker再起動・接続断、bounded history/Audit、resource／storageの持続観測。現C28 runnerは開発用Rust Broker＋localhost Runtime fixtureで、v4 Q4は候補全体の反復Task／Compare／Handoffと資源・OSを対象とする。 |
+| 目的 | 正常・予定内接続断・予期しない失敗・再起動後の状態を長時間条件で観測し、source・candidate・OS・証拠classを固定する。開発fixtureの成功をinstalled product、実Runtime、製品SLAへ拡張しない。 |
+| 生成元（`Producer`） | `tooling/long_run_validation.py`の`--duration-seconds`／`--duration-hours`／`--interval-seconds`、反復Dialogue、localhost MINIDORA API fixture、Broker再起動・Runtime停止／復帰、Broker resource/store observation。 |
+| 実Consumer | C28 runnerはdebug Rust helperをbuildし、normal IPCとowner IPCでBroker processを起動する。`LongRun.run`はDialogue、fixture restart、development lifecycle fixture、Broker restart、network disconnect/reconnect、bounded historyとresource samplesを繰り返し、report JSONを更新する。`full_regression_validation.py`はC28を30秒で呼ぶsourceであり、正式Q4 consumerではない。ConformanceはC28 unit suiteを起動する。 |
+| 契約／Data | C28 CLIの既定30秒と明示hour option、atomic reportの`running/passed/failed`、最大512 resource samples／32 HTTP result／128 trace references、固定failure codesと診断allowlist。Reportはcredentialや対話本文を保存せず、runtime Report Schema／N11受入bindingの実consumerは確認できない。 |
+| 正常時作用 | source上は実Broker IPC・永続store・履歴を通るDialogueの反復、fixture／Broker再起動、bounded metrics採取が実装される。証拠classはBroker `LIVE_RUNTIME`、Runtime `FIXTURE`、metrics `INTERNAL_STATE`。現candidateの8時間完遂は未確認で、sourceの存在は成功結果ではない。 |
+| 否定時作用 | 停止中fixtureへのDialogueを失敗として扱い、復帰後に再接続する。予期しない結果・timeout・Broker拒否はfixed failure codeでfailedを返す。fixture serverのwrite/flush記録はclient受信・検証を証明しない。clean commitの歴史的8時間runは22.766秒でfailedし、根因は未確定のまま維持する。 |
+| 停止／Recovery | runnerはRuntime fixtureとBrokerを再起動し同じ永続storeへ戻る。Broker shutdownが10秒で完了しない場合は子processをkillする。期限後の資格file削除は20回まで再試行し失敗時はrunをfailedにする。最終temp root削除は`ignore_errors=True`のbest-effortであり、不在確認を生成しない。 |
+| 標準OS候補 | v4五OSを保証対象として維持。Phase39の旧C28履歴はWindows長時間運転が中心。runnerはWindows/Linuxのhelper binary名を分けるが、各OS installed product／GUI／native authority／配布でのC28/Q4証拠を意味しない。Q4の対象OS resource QAは未実施。 |
+| 配布物 | C28は`native/rust_helper/target/debug`の開発helperと開発lifecycle fixtureを使う。標準installer、installed Release candidate、署名済配布物、外部Runtimeを使う経路ではない。 |
+| 既存実装 | `long_run_validation.py`、C28固有unit suite、Conformanceへのunit起動登録、`full_regression_validation.py`の30秒smoke呼出しがある。C28 reportは範囲を自己記述する一方、最終reportはcurrent Q4／Release Registryへ自動受入結合されない。 |
+| BUILD_GAP | 現行source baselineの8時間／24時間candidate完遂・正式QA evidenceはない。既存unit／Conformanceはharness境界だけ、C30側の30秒設定は長時間Acceptanceではない。C28 runnerはDialogue中心で、v4 Q4が列挙する同一候補の反復Task／Compare／Handoff、installed product、対象OS resource／Audit増加を一括証明しない。N11証拠結合とQ4はOPEN／DEFERRED。新Blockerは追加しない。 |
+| ソース識別値（`SourceSHA`） | 照合HEAD=`f53035662078c5179819f4148413f3287c144f6d`。以下38 pathのGit blobを編集前HEADとworking treeで個別一致確認：`AGENTS.md`=`1eafcadd129fd01f1f2f683594c381605ed7d48d`<br>`docs/QE_2026-11-13/01_D4Pocket_統合製品実装仕様書_v4.md`=`352c53180cbad07888beb956aad0fb2a58074c58`<br>`docs/QE_2026-11-13/02_D4Pocket_統合開発工程表_v4.md`=`d32dd251e5f7cbb97d92f6e7540d6b6ed0ecec05`<br>`docs/QE_2026-11-13/03_D4Pocket_Codex施工指示書_v4.md`=`49447973e88c50a09b2f4978adfed84fd464c6d0`<br>`docs/QE_2026-11-13/採用記録.md`=`f159c1aa6ea5bc6e80e0877d8068f7e44da4c4d3`<br>`docs/D4_POCKET_PHASE_MAPPING.md`=`064ea334f86b137d94fba2370d2a2fd732f6e972`<br>`docs/QE_2026-11-13/E0_要求consumer台帳.md`=`f8044860367c9f2c05d0a110b521ae680f25a63d`<br>`docs/QE_2026-11-13/進捗.md`=`9afb8e85ad58a03c2492efc926d703e8125a7f3e`<br>`docs/FINAL_QA_QUEUE.md`=`7b332cccab70bb68aa1ff4f8e23acc0e816d8282`<br>`docs/specs/long-run-validation.md`=`ebba5dc1cc97fa69525502d12dfc059e89023380`<br>`docs/specs/full-regression-validation.md`=`dd5953d3bea595c2f25474ed0a9c42cf01ff51e3`<br>`docs/REV2_PROGRESS.md`=`56f0f168b22d1e64303db2bc6f2c66668393dba2`<br>`release_blockers.registry.json`=`244adc04a01e7b406c4ebcdeb829f7077d4aa35f`<br>`tooling/long_run_validation.py`=`00d1ec4fa0a7b7fea4ef678a94a56f20367a243c`<br>`tooling/conformance_tests/test_long_run_validation.py`=`3976e57497d86aa8a3ca612758227c091db617cb`<br>`tooling/full_regression_validation.py`=`8a33a9fab9ecbc18119302ae312201d41618012e`<br>`tooling/conformance_tests/run_conformance_skeleton.py`=`c6f31d8cb561b48513c6784e54c85969c9cb953e`<br>`tooling/manifest.py`=`aa4525ff20293cb8641e5598a2439561a3bfbd3b`<br>`tooling/release_gate_check.py`=`22a8d7bfe9adb259f44ce8501fb215652e1d58c6`<br>`tooling/evidence_bundle.py`=`68dead851236b0f1b69899151c37371e593ff3f9`<br>`tooling/release_runtime_assertions.py`=`0a0a351fe17151ad86517bd0a965358f40c61490`<br>`tooling/日本語基底監査.py`=`77474767dd93eb4d69382af5ea4a0ea384eeccbe`<br>`native/rust_helper/src/main.rs`=`b0a5df285db357172e7970074d7a67189f3384a3`<br>`native/rust_helper/src/adapters/minidora.rs`=`31c756ac7c9a264d73ed0e9654dbae599be83921`<br>`native/rust_helper/src/broker/adapter_center.rs`=`66575bb77e4a375dca4f8488f97df442960bb5a9`<br>`native/rust_helper/src/broker/ipc_server.rs`=`58a404b920ef5905e174668ec2de0e04a9e8b044`<br>`native/rust_helper/src/broker/dialogue.rs`=`c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999`<br>`native/rust_helper/src/broker/runtime_registry.rs`=`9ff28610862586a599848d75f9e891a6c6cadf2f`<br>`native/rust_helper/src/broker/audit.rs`=`eb1dcf5018d95c7fdf6171aadd4bca9554d1996f`<br>`native/rust_helper/src/broker/store.rs`=`356b490e403b693db499befb777789784b57d40d`<br>`native/rust_helper/src/broker/execution_history.rs`=`8eeb1c26d06a9e4b01806413a4bfa8c2a73357d6`<br>`native/rust_helper/src/broker/agent_task_scratch.rs`=`de743cd819fb4533c9c3070c4e7bcae82e42d938`<br>`specs/runtime.schema.json`=`bdef33f26fe06b334eb6f94124930fd08594bbc9`<br>`specs/runtime_resource_query.schema.json`=`c7617ba9c2283255fb04b6cfa529ff7b04f6137f`<br>`specs/runtime_resource_observation.schema.json`=`62f587b8c88d0c5c0bd316eaa3d0a15c9c1bd2d1`<br>`specs/audit.schema.json`=`01da4c598b52b2ae80ebf46f9e9050d7bec16ca3`<br>`specs/runtime_execution_history.schema.json`=`5b260e9b6026758dc0a730d3381b4f7d72ba2e98`<br>`specs/buffer_intervention_record.schema.json`=`26a1fa8ee9d010f18c157f5d3b66b9b34bdf94d5`。 |
+| 試験区分（`TestClass`） | `SOURCE`／`UNIT`／`LIVE_RUNTIME`／`FIXTURE`／`INTERNAL_STATE`を分離。`tooling/conformance_tests/run_conformance_skeleton.py`の272 checks内でC28 unit suiteが実行される。C28 unit suiteはpassしたが、8時間／24時間runner本体・installed product・Q4全OS QAは本E0 mappingでは未実行。 |
+| 証拠ID（`Evidence ID`） | `NONE`。current v4 candidateのC28長時間Evidenceは未発行。過去の8時間FAILは`docs/REV2_PROGRESS.md`の当時のsource・条件・report hashへ限定した履歴であり、current PASSにはしない。 |
+| 阻害要因（`Blocker`） | Release Registry 18件（16 unresolved／2 resolved）と`release_ready=false`を維持。N11はOPEN、Q0〜Q7は`DEFERRED`。C28 old failureを新規Blockerへ複製せず、K19/K20のEvidence／Blocker完全結合はN11の残作業。 |
+| 状態 | Phase39のE0-04全21項目と38 SourceSHAを現mainへ結合済み。Phase39/C28の長時間Acceptance、v4 Q4、N11、E0全体は未成立／OPENのまま。 |
+| 残余 | 8時間／24時間candidate試験はQ4開始条件・同一候補・対象OSと結合して後段で行う。歴史的22.766秒FAIL、120秒等の短時間限定結果は保持し、現candidateへ転記しない。runnerの最終temp-root cleanupはbest-effortで不在未確認だが、現v4のPhase39 E0 mappingでは新Acceptance／Blockerにせず、長時間検証実行時のartifact cleanup確認へ送る。 |
+
 ### 製品能力K01〜K20
 
 | K／S05能力 | v4関連N／施工線A〜J | 現行Producer→Consumer参照 | Source状態・残余・証拠境界 |
@@ -5199,7 +5226,7 @@ Phase37のE0-04欄を全21項目で記録し、24件（24 unique path）のSourc
 | 全体施工線 A〜J | 10 | v4工程表R03・Codex指示I04 | 全線同時BUILDのproducer/consumerと現行実装配置を全数照合中 |
 | 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13は全E0-04 fieldを個別記録。P13旧aggregate evidence identity/classは`UNKNOWN`。N11 Evidence/Blocker/OS Artifact全数結合は未完 |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのE0-04 21 fieldを個別記録。旧status維持、N11 Evidence/Blocker/OS Artifact結合と製品Acceptanceは継続 |
-| D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜38はE0-04全21 fieldを個別記録、Phase 39〜45は個別field未完。Evidence/Blocker/OS Artifact結合・Acceptance未完 |
+| D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜39はE0-04全21 fieldを個別記録、Phase 40〜45は個別field未完。Evidence/Blocker/OS Artifact結合・Acceptance未完 |
 | 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K別の完全E0-04 field、OS/Evidence/Blocker確認は継続 |
 | Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 33 IDのscope/Consumer/現証拠境界と各21 fieldを記録。BUF-R/T Acceptance、cause/effectの全件結合、N11 evidence、OS artifactとの結合は未完 |
 | Buffer工程 B0〜B6 | 7 | `docs/緩衝基盤_rev5補遺_QC/`・v4仕様S06 | B0〜B4の限定CLOSEDを保持、B5 OPEN、B6未成立。詳細Consumer照合が未完 |
@@ -5243,7 +5270,7 @@ Phase37のE0-04欄を全21項目で記録し、24件（24 unique path）のSourc
 ## 次のE0照合作業
 
 1. N01〜N10のE0-04 21項目は現行SourceSHAへ個別照合済み。各製品AcceptanceはOPENのまま維持し、N10の五OS実導入・利用・更新・Recovery QAは後続の製品Acceptanceに残す。
-2. C0〜C34個別field記録を維持し、Phase 39〜45／K01〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
+2. C0〜C34個別field記録を維持し、Phase 40〜45／K01〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
 3. BUF-R/TのSourceSHAとConsumer scopeは記録済み。AcceptanceはOPEN。B0〜B6の状態を保持し、原因→effect、N08/N10/N11、OS/Artifact/evidence結合を続ける。
 4. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 5. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
