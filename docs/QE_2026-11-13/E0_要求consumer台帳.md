@@ -2733,7 +2733,7 @@ C24〜C34の11 ID×21 fieldを文書上展開した。旧C28の8時間FAIL、C33
 | 状態 | `Phase 5`記録。`N01`/`N09`の受入れは`OPEN`。 |
 | 残余 | 他OS installed Task/UI、same Task result/diff/Audit/Recovery、Mobile境界。 |
 
-Phase 0〜11の12行はE0-04全項目を記録した。旧Phase/C/P status、N01/N02/N03/N04/N09/N11のOPEN、W01限定CLOSED、W03/G3、Release Blockerは変更していない。Phase 12〜45、K01〜K20の個別fieldとN11 Evidence/Blocker/OS Artifact行結合は未完了。E0はOPEN。
+Phase 0〜14の15行はE0-04全項目を記録した。旧Phase/C/P status、N01/N02/N03/N04/N09/N11のOPEN、W01限定CLOSED、W03/G3、Release Blockerは変更していない。Phase 15〜45、K01〜K20の個別fieldとN11 Evidence/Blocker/OS Artifact行結合は未完了。E0はOPEN。
 #### Phase 6〜8 E0-04個別記録（2026-11-13）
 
 旧Phase/Cの履歴状態を保持し、現行v4要求consumerへE0-04全21項目で接続する。SourceSHAは編集前main 3bd056d65cb5e1d8450c4995fd240964dfb567edのGit blob値で、製品Acceptanceの証拠ではない。本mapping単位で製品testは再実行しない。
@@ -2816,7 +2816,7 @@ Phase 0〜11の12行はE0-04全項目を記録した。旧Phase/C/P status、N01
 | 状態 | Phase 8のE0-04 mapping 21項目を記録。旧Phase/C/P status不変、N04・W03/G3・E0 acceptanceはOPEN。 |
 | 残余 | installed target reauthorization→result/Audit、selected Artifact boundary、Mobile consumer、macOS A2A作用範囲。 |
 
-Phase 6〜8の3行は各E0-04全21項目を記録。旧Phase/C/P status、N01/N02/N04/N09/N11、W03/G3、Release Blockerは変更せず、Evidence IDは全てNONE。続くPhase 9〜11の記録後も、Phase 12〜45、K01〜K20個別field、N11 Evidence/Blocker/OS Artifact行結合は未完了で、E0はOPEN。
+Phase 6〜8の3行は各E0-04全21項目を記録。旧Phase/C/P status、N01/N02/N04/N09/N11、W03/G3、Release Blockerは変更せず、Evidence IDは全てNONE。続くPhase 9〜14の記録後も、Phase 15〜45、K01〜K20個別field、N11 Evidence/Blocker/OS Artifact行結合は未完了で、E0はOPEN。
 
 #### Phase 9〜11 E0-04個別記録（2026-11-13）
 
@@ -2900,7 +2900,91 @@ Phase 6〜8の3行は各E0-04全21項目を記録。旧Phase/C/P status、N01/N0
 | 状態 | Phase 11のE0-04 mapping 21項目を記録。旧Phase/C status不変、N09製品AcceptanceとE0はOPEN。 |
 | 残余 | Task ID単位のResource/duration比較、五OS installed実測・unknown表示・負荷／長時間QA。 |
 
-Phase 9〜11の3行は各E0-04全21項目を記録し、計41件のSourceSHA参照（33 unique path）を編集前mainへ結合した。旧C2/C3 status、N09、Release Registry、Evidence IDは変更せず、製品Acceptanceを発行していない。Phase 12〜45、K01〜K20個別fieldおよびN11 Evidence/Blocker/OS Artifact結合は未完了、E0はOPEN。
+Phase 9〜11の3行は各E0-04全21項目を記録し、計41件のSourceSHA参照（33 unique path）を編集前mainへ結合した。旧C2/C3 status、N09、Release Registry、Evidence IDは変更せず、製品Acceptanceを発行していない。後続Phase 12〜14記録後もPhase 15〜45、K01〜K20個別fieldおよびN11 Evidence/Blocker/OS Artifact結合は未完了、E0はOPEN。
+
+#### Phase 12〜14 E0-04個別記録（2026-11-13）
+
+旧Phase/Cの履歴状態を保持し、現行v4要求consumerへE0-04全21項目で対応付ける。SourceSHAは編集前main 1d15ceec1b85bea1d7b857a48fd7c8dbd92f5d37のGit blob値であり、製品Acceptanceの証拠ではない。本mapping単位で製品testは再実行せずNOT_RUNとする。
+
+##### Phase 12 個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | Phase 12 Runtime lifecycle。現行consumerはN09、施工線C、能力K04/K13。 |
+| 旧ID | Phase 12/C4。Runtime start/stop/restart/pause/resume/quarantineのcapability-first契約を保持し、旧debug/fixture statusは当時の限定範囲にとどめる。 |
+| 原文参照 | docs/D4_POCKET_PHASE_MAPPING.md Phase 12/C4、v4仕様書S04 N09・S05 K04/K13、工程表R03線C、施工指示書I04-C。 |
+| 対象 | Brokerが管理するRuntimeの状態照会と、登録Adapterへ要求するRuntime lifecycle操作。AgentTask lifecycleとは別対象。 |
+| 目的 | 現在登録されたRuntime capability・Permission・独立ApprovalをBrokerで再検査し、操作結果・Audit・Recoveryを同じ要求へ結合する。 |
+| 生成元（Producer） | 利用者のRuntime lifecycle request、BrokerのRuntime登録・capability・Permission・Approval状態。Adapter metadataはAuthorityを生成しない。 |
+| 実Consumer | Runtime Center→Desktop RuntimeLifecycleClient→共有RuntimeLifecycleClient→Rust Brokerのstatus/approval/execute→登録Adapter。通常ReleaseのRuntimeRegistryは現在unsupportedを返す。 |
+| 契約／Data | runtime_lifecycle_request/result、Runtime identity、operation capability、要求hash、Permission、Approval、RecoveryAction、Audit binding。 |
+| 正常時作用 | 信頼済みAdapter・対応capability・有効なPermission・一回Approval・RecoveryActionが揃う場合だけ操作し、Brokerが結果とAuditを確定する。現在の通常Releaseにはtrusted lifecycle adapterがなく、この作用は未成立。 |
+| 否定時作用 | unsupported/unknown Runtime・capability、期限切れ/不一致承認、invalid transition、Audit/Recovery欠落を副作用前に拒否する。未対応を成功へ変換しない。 |
+| 停止／Recovery | Adapter失敗・応答不一致・Audit/Recovery失敗では成功表示を止め、必要な隔離を行う。Runtime停止結果とAgentTask process群の停止結果は別状態として扱う。 |
+| 標準OS候補 | Windows/macOS/Linux native Desktop。Mobile操作面の存在はOS process authorityの証拠ではない。Linux nativeは必須、installed環境はN10へ接続する。 |
+| 配布物 | Phase 12固有artifactなし。Adapterを含むOS別通常package・installed lifecycleはN10と各OS契約に従う。 |
+| 既存実装 | Runtime Center、Desktop/shared RuntimeLifecycleClient、Rust runtime_lifecycle.rs/runtime_registry.rs/protocol.rs、request/result schemasとFlutter/Rust test source。 |
+| BUILD_GAP | 通常Releaseにtrusted lifecycle adapterがなく、production Runtimeへの作用は未接続。旧debug/fixtureとclient operationはinstalled作用の証拠でなく、AgentTask単位のpause/resume/restartも未接続。 |
+| ソース識別値（SourceSHA） | 照合HEAD=1d15ceec1b85bea1d7b857a48fd7c8dbd92f5d37。apps/desktop_flutter/lib/screens/runtime_center.dart=d2c7af172073d2b10c76a6416b90f011f10e95db; apps/desktop_flutter/lib/services/runtime_lifecycle_client.dart=332e438a3d67fc01118ca6cc48745a372c44e01e; packages/gui_shell_ui/lib/src/runtime_lifecycle_client.dart=d34d773ec25f21bb682577faa7688d350921f059; native/rust_helper/src/broker/runtime_lifecycle.rs=2746ec301e9a47a5ececf1485ca7ad8a17304388; native/rust_helper/src/broker/runtime_registry.rs=9ff28610862586a599848d75f9e891a6c6cadf2f; native/rust_helper/src/broker/protocol.rs=9b2076d5f31ca6d77f1f87973d1b394aaf751961; specs/runtime_lifecycle_request.schema.json=7c1ae69a0088cd32593481c7c803c4219baa6444; specs/runtime_lifecycle_result.schema.json=1695ec8c3cc2d2e492ff0ac326f8990ec00fe77e; apps/desktop_flutter/test/runtime_lifecycle_test.dart=57cb17c453c3a50169d3f9e39de150c691e8e160; packages/gui_shell_ui/test/runtime_lifecycle_client_test.dart=1b1f274cdcd8d4cf92225db173eafcc09c0c9b8f. |
+| 試験区分（TestClass） | Flutter UNIT/WIDGET、Rust UNIT/FIXTUREのsourceあり。本mapping単位ではRuntime操作testを実行していない（NOT_RUN）。 |
+| 証拠ID（Evidence ID） | NONE。debug/fixture sourceやCapability表示はproduction Runtime作用のinstalled Acceptanceではない。 |
+| 阻害要因（Blocker） | N09製品Acceptance OPEN。Release Registryの既存状態を維持し、新規Blockerを追加しない。直接帰属はN11照合までUNKNOWN。 |
+| 状態 | Phase 12のE0-04 mapping 21項目を記録。旧C4 statusは履歴のまま、N09製品AcceptanceとE0はOPEN。 |
+| 残余 | trusted production Adapter、Windows/macOS/Linux installed Runtime操作、failure/Recoveryの実作用、AgentTask lifecycleとの正しい結合。 |
+
+##### Phase 13 個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | Phase 13 Evaluation Lab。現行consumerはN09、施工線C、能力K05。 |
+| 旧ID | Phase 13/C5。Dataset/Case/Evaluator/Experiment/Result/Comparisonと旧Windows局所statusは履歴のまま保持する。 |
+| 原文参照 | docs/D4_POCKET_PHASE_MAPPING.md Phase 13/C5、v4仕様書S04 N09・S05 K05、工程表R03線C、施工指示書I04-C。LLM Judge単独を保証にしない。 |
+| 対象 | Owner管理Evaluation Dataset/Case/Evaluator、明示Experiment、bounded Result/Comparison。Regression Case管理は別consumerとして区別する。 |
+| 目的 | 評価入力・対象・結果のidentityを保ち、決定論的評価を実施する。評価metadataやscoreをPermission/Approval/release authorityへ変換しない。 |
+| 生成元（Producer） | Ownerが管理するDataset/Case/Evaluatorと明示Experiment request、Brokerの評価Result/Comparison。 |
+| 実Consumer | Evaluation Lab→Desktop EvaluationClient→共有EvaluationClient→Broker evaluation_control/evaluation_lab。Regression Caseの一覧/delete/recoveryだけは別clientへ接続し、登録・private内容表示・自動importはしない。 |
+| 契約／Data | evaluation_case/dataset/registration/evaluator/experiment/result/public_result/comparison schemas、Runtime identity、bounded result、公開・非公開範囲。 |
+| 正常時作用 | BrokerがDataset/Runtime/要求を検査し、許可された決定論EvaluatorのExperiment結果・Comparisonを返す。評価実行自体は製品AcceptanceやTask resultではない。 |
+| 否定時作用 | malformed/unknown Dataset・Runtime、無効Evaluator/Experiment、stale request、Authority metadata混入、private result露出を拒否・制限する。LLM Judge単独結果は保証として扱わない。 |
+| 停止／Recovery | 失敗・部分Result・Audit/hash不一致をPASSへ昇格せず、表示・比較を保留する。Evaluation resultでTask失敗・Runtime停止を置換しない。 |
+| 標準OS候補 | Windows/macOS/Linux native Desktop。Mobile metadata投影をEvaluation実行/比較の同等性と扱わない。Linux native必須、installed候補はN10参照。 |
+| 配布物 | Phase 13固有artifactなし。OS別通常packageとinstalled Evaluation QAはN10の範囲へ接続する。 |
+| 既存実装 | Evaluation画面の`apps/desktop_flutter/lib/screens/evaluation_lab.dart`、Desktop/sharedの`EvaluationClient`、Rust Brokerの`evaluation_control.rs`／`evaluation_lab.rs`／`authority.rs`／`protocol.rs`、8件の`schema`、Flutter `UNIT`／`WIDGET` test source。 |
+| BUILD_GAP | Evaluation Resultは同一AgentTask IDのtest result/Diff/Auditへ未結合。Runtime横断比較・同一candidate acceptanceのinstalled evidence、旧Dataset import/version残差はOPEN。 |
+| ソース識別値（SourceSHA） | 照合HEAD=1d15ceec1b85bea1d7b857a48fd7c8dbd92f5d37。apps/desktop_flutter/lib/screens/evaluation_lab.dart=b74b3e96e7cd746874d1e19e05175548a5c66192; apps/desktop_flutter/lib/services/evaluation_client.dart=d617dbbf10334754652a131e8612d3ca99aa61e6; packages/gui_shell_ui/lib/src/evaluation_client.dart=3fe93e4a19bcba7c825f2a6e887f96f00016aa75; native/rust_helper/src/broker/evaluation_control.rs=570485772c3fce43d170d031f1769b7617214d40; native/rust_helper/src/broker/evaluation_lab.rs=3645202da2597e5f63cf9ef96a891e9ae801e2b2; native/rust_helper/src/broker/authority.rs=067a36442138897aac396bdb588c2e01f90a5318; native/rust_helper/src/broker/protocol.rs=9b2076d5f31ca6d77f1f87973d1b394aaf751961; specs/evaluation_case.schema.json=5fed01706bb374697294ccb19eec1ae309d53f6a; specs/evaluation_dataset.schema.json=8a90b7248e16c04d7b51ab9bca0a9a5f6c459ed1; specs/evaluation_dataset_registration.schema.json=a79c103e32229dc47d263e62c05914624085610b; specs/evaluation_evaluator.schema.json=d2d5298afc927dfb82c73f136db7dce77bdccf13; specs/evaluation_experiment.schema.json=e35d7a242a0a9d318900673df9fb900e841b93a2; specs/evaluation_result.schema.json=f1b994e19dfaf1473a615cbf1347de22f72ccbed; specs/evaluation_public_result.schema.json=77a285a53a0473fc4185d18b37b863f90be71ada; specs/evaluation_comparison.schema.json=124af9c4e4def4c048751e911809b6f2ed3b577a; apps/desktop_flutter/test/evaluation_lab_test.dart=9b068a34d9d22743bee74ba409c8d95bee938638; packages/gui_shell_ui/test/evaluation_client_test.dart=044d71b4b18b7efa8891a7df735f28e6ed674ac1. |
+| 試験区分（TestClass） | Flutter UNIT/WIDGET、Rust UNIT/FIXTURE sourceあり。本mapping単位で評価testを実行していない（NOT_RUN）。 |
+| 証拠ID（Evidence ID） | NONE。旧C5局所test/結果を同一Task評価またはN09 installed Acceptanceへ転用しない。 |
+| 阻害要因（Blocker） | N09製品Acceptance OPEN。Registry 18件（16 unresolved/2 resolved）とrelease_ready=falseを維持し、新規Blockerなし。 |
+| 状態 | Phase 13のE0-04 mapping 21項目を記録。旧C5 status不変、N09製品AcceptanceとE0はOPEN。 |
+| 残余 | 同一Task IDのtest/Result/Diff/Audit接続、Runtime横断実比較、Dataset import/version、五OS installed QA。 |
+
+##### Phase 14 個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | Phase 14 DialogueからRegression CaseをOwner登録。現行consumerはN09、施工線C、能力K05。実Task生成境界はN01/N09。 |
+| 旧ID | Phase 14/C6。完了DialogueからOwnerが明示redactionしたRegression Caseを登録する旧Windows ProtectedStore/metadata receipt/delete-recovery scopeを保持。 |
+| 原文参照 | docs/D4_POCKET_PHASE_MAPPING.md Phase 14/C6、docs/specs/regression-case.md、v4仕様書S04 N01/N09・S05 K05、工程表R03線C、施工指示書I04-C。 |
+| 対象 | Broker-bound Dialogue submission receiptとOwner明示redaction済みRegression Caseの登録、metadata list、Owner delete/recovery。 |
+| 目的 | 内容露出境界内で意図した回帰入力を保存し、Dialogue resultからEvaluation Dataset・Permission・Approvalを暗黙生成しない。 |
+| 生成元（Producer） | Dialogue submission receipt/終了Auditと、利用者が明示redactionしたCase payloadおよび操作別native confirmation要求。 |
+| 実Consumer | Dialogue UI→RuntimeDialogueClient/RegressionCaseOwnerClient→Windows Rust launcher native confirmation→Broker RegressionCase operation→ProtectedStore/hash-only receipt。通常一覧はmetadata-only RegressionCaseClient。 |
+| 契約／Data | runtime_dialogue_submission_receipt、regression_case_registration/receipt/list/delete/delete-recovery schemas。Request hash、source identity、redaction、Owner confirmation、Broker Audit bindingを検査する。 |
+| 正常時作用 | Brokerがreceipt/Audit/hash/redaction/current policyを再照合して許可されたCaseを保存し、hash-only receipt/metadataを返す。登録・private contentの画面表示・C5への自動importとは別。 |
+| 否定時作用 | raw/secret content、tampered receipt、stale request/approval、hash mismatch、不許可delete/recoveryを拒否する。Windows native confirmationはWindows本人性・OS account identity proofではない。 |
+| 停止／Recovery | receipt/Audit/stored object不一致では成功表示せず、Recovery状態を保持する。deleteと中断Recoveryは別Owner-bound requestであり、保存済Caseは過去Authorityを与えない。 |
+| 標準OS候補 | Windows Desktop source consumerのみ確認。macOS/Linux nativeの同等ProtectedStore/native confirmation/installed作用は未確立。Mobileは本Consumer外。Linux native自体は必須対象。 |
+| 配布物 | Phase 14固有artifactなし。各OSの正式artifact・Owner UI・store・installed lifecycleはN10/OS契約で確認する。 |
+| 既存実装 | docs/specs/regression-case.md、Desktop Dialogue/RegressionCase UI・client、Rust regression_case.rs/protocol.rs/ipc_server.rs/desktop_launcher.rs、登録/list/delete/recovery schemas、UNIT/FIXTURE/Conformance test source。 |
+| BUILD_GAP | 現candidate installed Owner register/delete/recovery、Windows以外の保護store/confirmation、AgentTask result artifactへの完全bindingは未成立。C5 Dataset importには独立Owner操作/versionが必要で自動importなし。 |
+| ソース識別値（SourceSHA） | 照合HEAD=1d15ceec1b85bea1d7b857a48fd7c8dbd92f5d37。docs/specs/regression-case.md=ce58a891facfca9f1e8e498e13bf983011350ba3; specs/runtime_dialogue_submission_receipt.schema.json=204b7871ab08539c16da2431541a5764b023f1fe; specs/regression_case_registration.schema.json=04165813e2791196c38fe515c84b4e1adeefd000; specs/regression_case_receipt.schema.json=3defc85eab0e8ed4ebac4ba85a1a5b83de6016a4; specs/regression_case_list_request.schema.json=72ded3ae0e37214b442811ba973bdf4a490aa854; specs/regression_case_list.schema.json=a7f99f9784b287b7bb21678bc12ab531debf5af0; specs/regression_case_delete_request.schema.json=7ed67c02cb4796da94adc6dd0b1674f4b8a91ca4; specs/regression_case_delete_receipt.schema.json=d051f4e795f8c05051356b0f1d1dc89947db3633; specs/regression_case_delete_recovery_request.schema.json=c69d71ef2f07a2a7090ba3d0d648448c60ca1c4e; specs/regression_case_delete_recovery_receipt.schema.json=b9b1de18f811bc03f38d5dfaa497f673e335e496; native/rust_helper/src/broker/regression_case.rs=cf229213a54f0eaa512781fb417692506bf06775; native/rust_helper/src/broker/protocol.rs=9b2076d5f31ca6d77f1f87973d1b394aaf751961; native/rust_helper/src/broker/ipc_server.rs=58a404b920ef5905e174668ec2de0e04a9e8b044; native/rust_helper/src/desktop_launcher.rs=6a9f335de07fa474ca10043aea63ad6e988b572d; packages/gui_shell_ui/lib/src/runtime_dialogue_client.dart=44f810aa2509a8a28ddf2933a5491528f3b07147; packages/gui_shell_ui/lib/src/runtime_dialogue.dart=f78083b376f80d06f284387bb8b7aa2d769141bf; packages/gui_shell_ui/lib/src/regression_case_owner_client.dart=1f1d10cecca70dff2075bed1e5f331267e0ea296; packages/gui_shell_ui/lib/src/regression_case_client.dart=f14bd4aeda1d6f3262cdb1be4b924884d7128e5b; apps/desktop_flutter/lib/screens/runtime_dialogue.dart=803edd0a687acdfd00e19898fbb5ba6b85ce1449; apps/desktop_flutter/lib/services/runtime_dialogue_client.dart=a0853ee7327cafa60ee89b0c5ee49312b73c46c4; apps/desktop_flutter/lib/services/regression_case_client.dart=c29054e8b6256b15f097bd5e7de57b9cf2117e3a; packages/gui_shell_ui/test/regression_case_owner_client_test.dart=48a895c5a2f139eb2823df67f4aad3e1b8639748; packages/gui_shell_ui/test/regression_case_client_test.dart=a30a002abf021730f0ba09e66126ebbb2a39e12a; tooling/conformance_tests/run_conformance_skeleton.py=c6f31d8cb561b48513c6784e54c85969c9cb953e; apps/desktop_flutter/test/runtime_dialogue_test.dart=899912f92ee3751f8616632d434e04f95ee5ef77. |
+| 試験区分（TestClass） | Flutter UNIT/WIDGET、Rust UNIT/FIXTURE、STATIC_CONFORMANCE sourceあり。本mapping単位ではinstalled Owner actionを実行していない（NOT_RUN）。 |
+| 証拠ID（Evidence ID） | NONE。過去Broker/ProtectedStore限定証拠とsource mappingは現候補のinstalled Owner Acceptanceではない。 |
+| 阻害要因（Blocker） | N09製品Acceptance OPEN。C6専用Blockerの直接帰属はUNKNOWN、Registryへの追加・状態変更なし。 |
+| 状態 | Phase 14のE0-04 mapping 21項目を記録。旧C6 statusは履歴のまま、N09製品AcceptanceとE0はOPEN。 |
+| 残余 | 導入済み製品での`Owner`登録・削除・復旧、OS別保護保存先・確認、同一`Task`結果/成果物との束縛、`C5 Dataset`への明示取込・版管理。 |
+
+Phase 12〜14の3行は各E0-04全21項目を記録し、計52件のSourceSHA参照（50 unique path）を編集前mainへ結合した。旧C4/C5/C6 status、N09、Registry、Evidence IDは変更せず、製品Acceptanceを発行していない。Phase 15〜45、K01〜K20個別field、N11 Evidence/Blocker/OS Artifact結合は未完了、E0はOPEN。
 
 ### 製品能力K01〜K20
 
@@ -4445,7 +4529,7 @@ Phase 9〜11の3行は各E0-04全21項目を記録し、計41件のSourceSHA参�
 | 全体施工線 A〜J | 10 | v4工程表R03・Codex指示I04 | 全線同時BUILDのproducer/consumerと現行実装配置を全数照合中 |
 | 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13は全E0-04 fieldを個別記録。P13旧aggregate evidence identity/classは`UNKNOWN`。N11 Evidence/Blocker/OS Artifact全数結合は未完 |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのE0-04 21 fieldを個別記録。旧status維持、N11 Evidence/Blocker/OS Artifact結合と製品Acceptanceは継続 |
-| D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜11はE0-04全21 fieldを個別記録、Phase 12〜45は個別field未完。Evidence/Blocker/OS Artifact結合・Acceptance未完 |
+| D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜14はE0-04全21 fieldを個別記録、Phase 15〜45は個別field未完。Evidence/Blocker/OS Artifact結合・Acceptance未完 |
 | 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K別の完全E0-04 field、OS/Evidence/Blocker確認は継続 |
 | Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 33 IDのscope/Consumer/現証拠境界と各21 fieldを記録。BUF-R/T Acceptance、cause/effectの全件結合、N11 evidence、OS artifactとの結合は未完 |
 | Buffer工程 B0〜B6 | 7 | `docs/緩衝基盤_rev5補遺_QC/`・v4仕様S06 | B0〜B4の限定CLOSEDを保持、B5 OPEN、B6未成立。詳細Consumer照合が未完 |
@@ -4489,7 +4573,7 @@ Phase 9〜11の3行は各E0-04全21項目を記録し、計41件のSourceSHA参�
 ## 次のE0照合作業
 
 1. N01〜N10のE0-04 21項目は現行SourceSHAへ個別照合済み。各製品AcceptanceはOPENのまま維持し、N10の五OS実導入・利用・更新・Recovery QAは後続の製品Acceptanceに残す。
-2. C0〜C34個別field記録を維持し、Phase 12〜45／K01〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
+2. C0〜C34個別field記録を維持し、Phase 15〜45／K01〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
 3. BUF-R/TのSourceSHAとConsumer scopeは記録済み。AcceptanceはOPEN。B0〜B6の状態を保持し、原因→effect、N08/N10/N11、OS/Artifact/evidence結合を続ける。
 4. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 5. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
