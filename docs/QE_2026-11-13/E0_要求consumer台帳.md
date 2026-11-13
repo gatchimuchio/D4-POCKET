@@ -3788,6 +3788,35 @@ Phase37のE0-04欄を全21項目で記録し、24件（24 unique path）のSourc
 | 阻害要因（`Blocker`） | 既存Release Registry 18件（16 unresolved／2 resolved）、`release_ready=false`、N11/E0 OPEN、Q0〜Q7 `DEFERRED`を維持する。今回新しいrelease blocker／acceptanceを追加しない。C30のprocess-tree cleanup未規定を今回のE0 blockerへ昇格しない。 |
 | 状態 | Phase 42のE0-04全21項目を編集前main `4aea4bb47b9bc9e283cb60e39566003d0ce5ea2f`に対するSourceSHAと結合し、C30/C32の実Consumerと証拠上限を記録した。これはC30回帰実行、C32監査実行、C32〜C34、N11、E0、製品AcceptanceのCLOSEDではない。 |
 | 残余 | E0ではPhase43〜45等の未記録fieldを継続する。C30/C32結果の同一candidate・N11 evidence chain結合、C33 Windows installed evidence、C34 release前条件、全OS標準環境QAはそれぞれ現行後段工程に残る。新しい試験要求は追加しない。 |
+
+#### Phase 43 E0-04個別記録（2026-11-14）
+
+##### Phase 43 個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 旧D4 Phase 43「文書・ブランド統合」。現行v4ではN11／K19へ接続するE0 source→consumer照合IDであり、C31の旧statusや製品Acceptanceを変更するIDではない。 |
+| 旧ID | `docs/D4_POCKET_PHASE_MAPPING.md`ではPhase 43はC31に対応し、C31はPhase 1にも対応する。既存C31の状態、限定証拠、失敗履歴をその時点の記録として保持する。 |
+| 原文参照 | v4採用記録、仕様S00/S10/N11/K19、工程E0-04、施工指示のE0・文書同期規則、Phase mapping Phase 43、rev1 C31記録。旧版は当時の履歴参照に限る。 |
+| 対象 | 現行製品文書の版・保証・状態のconsumer、および文書内容／識別値を検査するManifest、Conformance、Release Gate、日本語基底監査の接続範囲。 |
+| 目的 | 製品説明を現行v4要求・確認済みsource・証拠・Release状態へ結び、履歴文書を現行実証と誤認させない。文書存在や検査成功を製品runtime／QA成立へ昇格しない。 |
+| 生成元（`Producer`） | 採用hash付きv4三点、現在の進捗・要求台帳、実装source、Release Registry、過去のC31および製品検証記録。 |
+| 実Consumer | 利用者向けREADME／QUICKSTART／ROADMAP／CLAIM／COMPATIBILITY_MATRIX／RELEASE_CHECKLIST／SECURITY、操作面・設定・Mobile状態文書、FINAL_QA_QUEUE、Manifest／日本語監査／Schema／Conformance／通常Release Gate。`docs/REV2_PROGRESS.md`とrev1進捗は履歴consumerとして区別する。 |
+| 契約／Data | 文書版・採用hash、機能／OS範囲、Source／Artifact identity、evidence class、OPEN／FAIL／NOT_RUN、Release blocker、claim境界。文言・metadata・履歴はAuthorityやPermissionを生成しない。 |
+| 正常時作用 | 現行文書のv4導入部は五OSを必須対象とし、候補installed QA未成立、正式Release未宣言、`release_ready=false`等の状態を表示する。履歴部分は日付・対象・限定範囲を保持する。 |
+| 否定時作用 | 古いclaimを現行状態として示す、根拠のないOS保証を表示する、または文書検査結果をruntime保証へ読み替える場合は不整合として扱い、成功・Release readinessを主張しない。 |
+| 停止／Recovery | 現行正本と文書記述の意味上の不一致は該当claimをUNKNOWNとして保留し、現行正本側で原因を解消する。履歴の改変や文書修正だけによるAcceptance／Blockerの昇格は行わない。 |
+| 標準OS候補 | Windows／macOS／Linux Desktop、Android／iOS Mobileの五OSを文書母集団に含める。標準環境へのinstalled製品適合はOS別の後続証拠で判定する。物理非Windows端末の不在を施工条件にしない。 |
+| 配布物 | README、Quickstart、Release説明などの文書。実Installer、署名済artifact、installed製品をこのmappingで生成・検証しない。 |
+| 既存実装 | README／ROADMAP／MOBILE_STATUS／COMPATIBILITY_MATRIX／CLAIM／RELEASE_CHECKLISTには現行v4状態の節があり、QUICKSTARTは現行進捗を参照する。GUI_OPERATION_SURFACES／SECURITY／CONFIGには2026-09-24基準のC31記述が残る。REV2_PROGRESSは履歴資料である。 |
+| BUILD_GAP | Manifestはhash整合、Conformance／Schema／Release Gateは各々の構造・契約・登録条件、日本語監査は散文の静的ヒューリスティックを検査するが、これらは全公開文書の意味的一貫性、候補artifact／installed UXとの同一性、五OS製品挙動を証明しない。全claimと同一Release候補を結ぶ監査およびN11のEvidence／Blocker／OS Artifact全数結合は未完。 |
+| ソース識別値（`SourceSHA`） | 照合HEAD=`b66c74966ec338f1ad681bf3b5bdeb6cb3d7ae36`。編集前mainの32 unique tracked path/blobを個別固定した。<br>`AGENTS.md`=`1eafcadd129fd01f1f2f683594c381605ed7d48d`<br>`規定/00_日本語基底規定.md`=`f3a050806228d2f50b22c95bcc30259d7bc0733f`<br>`規定/正本索引.json`=`ba250de80a3ec94109171c09adf54cbe227add10`<br>`docs/QE_2026-11-13/01_D4Pocket_統合製品実装仕様書_v4.md`=`352c53180cbad07888beb956aad0fb2a58074c58`<br>`docs/QE_2026-11-13/02_D4Pocket_統合開発工程表_v4.md`=`d32dd251e5f7cbb97d92f6e7540d6b6ed0ecec05`<br>`docs/QE_2026-11-13/03_D4Pocket_Codex施工指示書_v4.md`=`49447973e88c50a09b2f4978adfed84fd464c6d0`<br>`docs/QE_2026-11-13/採用記録.md`=`f159c1aa6ea5bc6e80e0877d8068f7e44da4c4d3`<br>`docs/D4_POCKET_PHASE_MAPPING.md`=`064ea334f86b137d94fba2370d2a2fd732f6e972`<br>`README.md`=`38664991fe614acfc516eb6743dde6dce754191c`<br>`ROADMAP.md`=`6a922a38cca617690bc08297274e907f0425b722`<br>`docs/GUI_OPERATION_SURFACES.md`=`4b48d55a69866dd0e1b3180e2192fc9efcc90598`<br>`SECURITY.md`=`6784fb68043aaceccc6d063b253c5d7d50210065`<br>`CONFIG.md`=`7349ca355614fa265a80c104f2be3b3503a92590`<br>`MOBILE_STATUS.md`=`476b565a3f583be52ef58966f67c51abbb774aa8`<br>`COMPATIBILITY_MATRIX.md`=`c4885d5b67202712c0bcdecc6da634cb778cd6d3`<br>`CLAIM.md`=`0bfbf988469e0f34c9e7f96f805ce26faf3b1044`<br>`RELEASE_CHECKLIST.md`=`35f31043a9311d49c94acdc9631e30b61949c65d`<br>`QUICKSTART.md`=`9653c4276f04392eead13736ba6b36ee2031bdb5`<br>`docs/REV2_PROGRESS.md`=`56f0f168b22d1e64303db2bc6f2c66668393dba2`<br>`docs/FINAL_QA_QUEUE.md`=`7b332cccab70bb68aa1ff4f8e23acc0e816d8282`<br>`docs/総合機能拡張_rev1/進捗.md`=`1392588f0cd5273013578e84d8e33c5c9dc9a01a`<br>`docs/specs/final-development-audit.json`=`8126944c55339a3be272af5ba183a9bc2e3517dc`<br>`docs/QE_2026-11-13/進捗.md`=`5bace45844d87c34a4be584221a50917a1da0c58`<br>`docs/QE_2026-11-13/E0_要求consumer台帳.md`=`a00c65554ee8b0e4018319b089e92cc10911f745`<br>`release_blockers.registry.json`=`244adc04a01e7b406c4ebcdeb829f7077d4aa35f`<br>`MANIFEST.sha256.json`=`db5b8ef4ca4ccc774ac07b064268bb61d7cd01b5`<br>`tooling/日本語基底監査.py`=`77474767dd93eb4d69382af5ea4a0ea384eeccbe`<br>`tooling/schema_check/check_schemas.py`=`7dca27717cbe5cccb45e1013b3436918a2322e75`<br>`tooling/conformance_tests/run_conformance_skeleton.py`=`c6f31d8cb561b48513c6784e54c85969c9cb953e`<br>`tooling/manifest.py`=`aa4525ff20293cb8641e5598a2439561a3bfbd3b`<br>`tooling/validate_all.py`=`2744f9a10702872f6dc0aad705f922466fc198fc`<br>`tooling/release_gate_check.py`=`22a8d7bfe9adb259f44ce8501fb215652e1d58c6` |
+| 試験区分（`TestClass`） | `SOURCE`／`DOC`／`CONFIG`のread-only照合。後続の文書構造検査は文書・Manifest・Schema・Conformance・通常Release Gateの範囲に限定する。Strict Release、C31旧試験、製品Rust／Flutter、installed product、五OS QAは本mappingで実行しない。 |
+| 証拠ID（`Evidence ID`） | `NONE`。SourceSHAと既存文書／validator接続の照合のみで、製品QA／公開承認のEvidenceを発行しない。 |
+| 阻害要因（`Blocker`） | 既存Registry 18件（16 unresolved／2 resolved）、`release_ready=false`、正式Q0〜Q7 `DEFERRED`、N11／E0 `OPEN`を維持する。新規Release blocker／Acceptanceは追加しない。 |
+| 状態 | Phase 43のE0-04全21項目を編集前main `b66c74966ec338f1ad681bf3b5bdeb6cb3d7ae36`に対するSourceSHAへ結合し、文書・validator consumerと保証限界を記録した。C31の過去status／FAIL、五OS製品Acceptance、N11、E0は変更していない。 |
+| 残余 | Phase44〜45の個別field、N11 Evidence／Blocker／OS Artifactの全数結合、Release候補と文書claim・installed製品の同一性確認を後続へ残す。歴史的C31文書の全面書換えや製品試験は本mappingの対象外。 |
+
 #### Phase/K crosswalkの判定
 
 旧Phase 0〜45の46 ID、K01〜K20の20 IDを、現v4 N01〜N11・R03 A〜J・正本Consumerへ対応付けた。旧C番号との対応は履歴範囲として保持し、P0〜P13は別のv4 S05 direct mappingに従う。Source SHA/TestClassは参照N節、Phase/K固有Evidence IDはNONE、個別の完全E0-04行が未充足のものはUNKNOWNとして残す。ここでのmappingは範囲・Consumer参照の整備だけであり、N/K/Phase Acceptance、E3 BUILD_COVERED、全OS QC/QAをCLOSEDにしない。N11 Evidence ID・Blocker・全OS artifact/standard guaranteesとの行単位結合、B0〜B6、Q/FQ/W/QE/AUD全数照合は継続。BUF-R01〜R09とBUF-T01〜T24は個別21 fieldを記録済みだが、AcceptanceはOPEN。
@@ -5306,7 +5335,7 @@ Phase37のE0-04欄を全21項目で記録し、24件（24 unique path）のSourc
 | 全体施工線 A〜J | 10 | v4工程表R03・Codex指示I04 | 全線同時BUILDのproducer/consumerと現行実装配置を全数照合中 |
 | 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13は全E0-04 fieldを個別記録。P13旧aggregate evidence identity/classは`UNKNOWN`。N11 Evidence/Blocker/OS Artifact全数結合は未完 |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのE0-04 21 fieldを個別記録。旧status維持、N11 Evidence/Blocker/OS Artifact結合と製品Acceptanceは継続 |
-| D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜42はE0-04全21 fieldを個別記録、Phase 43〜45は個別field未完。Evidence/Blocker/OS Artifact結合・Acceptance未完 |
+| D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜43はE0-04全21 fieldを個別記録、Phase 44〜45は個別field未完。Evidence/Blocker/OS Artifact結合・Acceptance未完 |
 | 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K別の完全E0-04 field、OS/Evidence/Blocker確認は継続 |
 | Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 33 IDのscope/Consumer/現証拠境界と各21 fieldを記録。BUF-R/T Acceptance、cause/effectの全件結合、N11 evidence、OS artifactとの結合は未完 |
 | Buffer工程 B0〜B6 | 7 | `docs/緩衝基盤_rev5補遺_QC/`・v4仕様S06 | B0〜B4の限定CLOSEDを保持、B5 OPEN、B6未成立。詳細Consumer照合が未完 |
