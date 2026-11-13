@@ -59,7 +59,7 @@ LedgerのE0-04列は、現ID、旧ID、原文参照、対象、目的、Producer
 |---|---|---|---|
 | N03 | 独立した異種Runtimeを共通Task/Result契約で使用 | Codex CLIはBrokerのAgent Task Adapter。MINIDORAは共通対話AdapterだがAgent Task methodを実装せず、既定unsupported。Desktop登録UIはCodex CLIのみ。N03個別E0-04へ現HEADのsource/hash・契約・試験源を記録済み。 | `OPEN`。二つ目の独立したTask-capable Runtime、能力選択・拒否・結果・権限の製品経路と実Runtime証拠が不足（`BUILD_GAP`）。 |
 | N04 | Compare／Handoff／A2Aの実作用と権限非継承 | Compare/Handoff/A2A source consumerはある。N04個別E0-04へ現HEADのsource/hash・契約・試験源を記録済み。Compare実行時のfilesystem隔離、外部Agent連携、Artifact転送、Host越境は現installed候補の一貫した実証なし。Hostはmetadata registry。 | `OPEN`。source接続と実作用証拠を分離し、Compare/Handoff/A2A/Hostの残件を照合する。 |
-| N05 | Capability CatalogからComposeを経て元Toolを実行 | 現行BrokerのRuntime/Agent metadata投影と接続中MCP CatalogをCompose前後で再照合。Settings UIは受理済みManifestを`MCP Tool実行`へ渡し、Brokerが同じManifestを再検査して元Toolを呼ぶ。旧W00のsource gapは現source上解消。 | `OPEN`。source `WIRED`。CapabilityはAdapterの未信頼宣言metadataで、専用の正規Capability Registryとの接続は未確認。Windows fixture test sourceは存在するが未実行。実installed product evidenceは未成立。 |
+| N05 | 現実在Capability CatalogからComposeを経て元Toolを実行 | Brokerの現在Runtime/Agent metadata・接続MCP Tool CatalogをCompose時と実行時に再照合するsource経路は`WIRED`。N05 E0-04個別mappingを現HEADへ記録済み。 | `OPEN`。CapabilityはAgent Adapterの未信頼宣言metadataで、実Capability Catalog／依存解決のconsumerは未確認。重複Tool IDのBroker拒否も未成立。既存Windows fixture testは未実行、installed evidenceなし。 |
 | N06 | 独立App Exportと選択Moduleの実除去 | Brokerが新規App/Audit identity・Manifest・Module依存planを作る。Windows/Linux Developer ExporterとLauncherはManifest hash/identityを扱う。Flutter UI Moduleのcompile-time define/AOT比較も存在する。 | `OPEN`。runtime evidenceは`runtime_manifest_consumed=false`、`standalone_app_verified=false`、`binary_pruning_verified=false`。Rust/第三者Module除去、構成による実機能変化、cold-start/resource測定、独立Installer/installed evidenceに`BUILD_GAP`。 |
 | N07 | AI Edit proposalを別主体で審査しcontrolled apply/rollback | owner proposalのAudit、提案由来を束縛した別Workspace Taskの事前検査、fresh Permission/Approvalの通常経路はsource接続あり。 | `OPEN`。独立審査結果をapply前に確定するTask／Broker状態と、proposal由来の変更を照合するcontrolled apply/rollbackが`BUILD_GAP`。 |
 | N08 | Bufferが元Taskの意味を保ってOS/依存差を調停 | Codex CLI Task専用Workspace scratch・TEMP/TMP束縛・journal Recoveryと、Task終端の非権限Buffer記録はsource接続あり。 | `OPEN`。実装は限定的なCodex TEMP/scratch調停。全OS/依存差、独立した前後意味・副作用比較、B5自己適用・B6全Consumerは未成立／`BUILD_GAP`。 |
@@ -104,9 +104,9 @@ LedgerのE0-04列は、現ID、旧ID、原文参照、対象、目的、Producer
 
 関連test source: `native/rust_helper/src/adapters/minidora.rs`、`native/rust_helper/src/broker/dialogue.rs`、`native/rust_helper/src/broker/a2a_center.rs`、`native/rust_helper/src/broker/protocol.rs`のRust test、`apps/desktop_flutter/test/agent_coordination_test.dart`、`agent_handoff_test.dart`、`a2a_connection_center_test.dart`、`a2a_artifact_handoff_test.dart`。これらはE0 source mappingで確認した既存対象で、今回のRuntime/installed acceptance結果ではない。
 
-## N05/N06 現行Source→Consumer追跡（E0差分）
+## N05/N06 初期Source→Consumer追跡（履歴参照）
 
-照合HEADは`06db10a8411c7c9f7e9913c01e8b2ff82b7c75e8`、製品コード比較基準は`d503a4ef6daac8942abd1cb011442ce28c78ec55`。列挙したN05/N06製品source・schema・test fileは基準からの差分0。Source traceだけを行い、Rust/Flutter/Exporter/product testはこの作業単位で実行していない。`WIRED`はsource call graph、`FIXTURE`はtest fixture、どちらもinstalled product acceptanceではない。
+この旧い粗粒度mappingは照合HEAD `06db10a8411c7c9f7e9913c01e8b2ff82b7c75e8`時点の履歴であり、下記の現行N05 E0-04個別mappingがN05の状態を更新する。製品コード比較基準は`d503a4ef6daac8942abd1cb011442ce28c78ec55`。当時列挙したsource/schema/testの差分0という記録、旧範囲、未実行状態は履歴として保持する。`WIRED`はsource接続、`FIXTURE`はtest fixtureであり、どちらもinstalled acceptanceではない。
 
 ### N05 Capability/Compose
 
@@ -2622,11 +2622,70 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 | 状態 | OPEN（N04のE0-04 mappingは21項目を充足。N04製品Acceptance、W03/G3、E0全体はOPEN）。 |
 | 残余 | installed候補で独立Workspaceを使う実Compare、実外部Agentとの作用、選択Artifactからfresh Permission／Approval付き受信Task・Auditまでの一体証拠が残る。Host registryからremote TaskへのConsumerは存在しない。各OSの標準package／installed経路はN10と結合する。 |
 
+### N05 Capability Catalog→Compose→元Tool実作用
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | N05（Capability Catalog、依存／互換／権限検査、Compose、元Tool実作用） |
+| 旧ID | v4 S05対応は`P6→N02/N05`、`P8→N05/N07`、`K14`、W04/G4。旧Phase 29/30はCompose/Preview、Phase 31はAI EditのためN07へ分離する。旧PのCLOSEDは当時の範囲のまま保持し、N05へ移さない。 |
+| 原文参照 | v4仕様S04 N05／S05 K14、工程表R03線D・W04/G4、施工指示I04-D。現行3点セットの採用記録・hashは冒頭基準表のとおり。要求は現実在Capability→依存／互換／権限検査→Compose→元Tool実作用であり、不在／衝突／危険条件を拒否する。 |
+| 対象 | Desktop SettingsのCompose UI、Broker Runtime/AgentとMCP Catalog、Compose Manifest/Preview、MCP Tool call、Windows/Linux/macOS native Owner境界。Android/iOSのMCP状態画面は接続・Tool作用を非対応として示す。 |
+| 目的 | Manifest作成だけで完了扱いせず、現在実在するCapabilityとToolを確認し、危険・不在・衝突を拒否したうえで、承認された構成から元MCP Toolを実行し、bounded結果とAuditへ結ぶ。 |
+| 生成元（`Producer`） | `settings.dart`がBroker Runtime/Agent Catalogと接続MCP/Tool Catalogを取得し、OperatorがRuntime、Agent、接続、Tool、Capability requirementを選ぶ。`ComposeClient`がManifest/Preview要求をBrokerへ渡す。受理Manifestとdraftが一致した状態での明示Tool操作が既存`McpConnectionClient.callTool`要求を生成する。AI自発要求や新しい権限はCompose操作から生成しない。 |
+| 実Consumer | `protocol.rs`が既存Broker operationを`compose_center`／`mcp_center`へ配送する。Composeは現在Runtime/Agent/MCP/Tool Catalogを再照合して`manifest_only`を返す。Tool callは同Manifestを再検査後、native Owner確認、永続Audit、Tool identity/schema、Broker内一回Permissionを通し、登録済み接続の元Toolを呼ぶ。Receiptはhashとbounded metadataで、Flutterは本文を表示しない。 |
+| 契約／Data | `gui_shell_compose.schema.json`、`gui_shell_compose_catalog.schema.json`、`gui_shell_compose_receipt.schema.json`、`agent_adapter.schema.json`、`capability.schema.json`、`mcp_connection_list.schema.json`、`mcp_tool_call.schema.json`、`mcp_tool_call_receipt.schema.json`。Composeは`manifest_only`、Authority/Permission/Approval/Credential/Audit chain継承なし。MCP Tool実作用のPermission/Approvalは別のBroker operationで一回・対象束縛する。 |
+| 正常時作用 | 現在のRuntime/Agent/MCP/Tool選択からCompose Manifestを生成し、Brokerが受理する。Tool call時に現在Manifestと接続を再検査し、native Owner確認、Tool/引数検査、Audit、`server_id/tool_id/arguments_hash`束縛の一回Permission後に元Toolを一度呼ぶ。成功receiptは`result_hash`、content type/count、状態、Audit ID等に限定する。 |
+| 否定時作用 | unknown/stale Runtime、Agent、Capability、unsupported宣言、Runtime instanceをまたぐCapability寄せ集め、unknown/stale接続／Tool、invalid schema、Owner拒否、Audit不成立、失効Credential、隔離済み接続を拒否または送信前停止する。異なるMCP Serverに同じTool IDがある場合、Flutterは実行対象を一意に決められずボタンを無効化する。ただしBroker側Composeは現在Tool IDを接続横断の集合で照合し、重複を明示rejectしていない（具体的なBUILD_GAP）。 |
+| 停止／Recovery | 送信前の不一致・Permission・Approval・Audit失敗はfail-closedでToolを呼ばない。送信後に結果不明なら自動再送せず接続を隔離・子process群停止を試み、結果不明／停止失敗を別errorとRecoveryActionで返し、外部副作用をOwnerが確認してから再接続する。Compose/Preview自体はbuild・Export・rollbackを実行しない。 |
+| 標準OS候補 | Windows、Linux native、macOS DesktopではBroker/MCP Tool callのsource経路とOS固有Owner確認入口を確認。これは各OSのinstalled候補・実MCP接続のAcceptanceを意味しない。Android/iOSにはCompose/Tool実作用consumerがなく、mobile状態画面はTool操作非対応を明示するためBUILD_GAP。Linuxは必須製品対象。 |
+| 配布物 | OS別のinstalled候補・正規PackageはN10/W07で候補同一性と共に扱う。現mappingはWindows/Linux/macOSの同一installed候補でCapability→Compose→実Toolを通した配布／実使用証拠を含まない。Android/iOSのCompose/Tool対応配布経路も未成立。 |
+| 既存実装 | `dialogue.rs::compose_catalog_snapshot`は登録済Runtime IDと`agent_adapter_projection` metadataを投影する。`compose_center.rs::validate_catalog_selection`は宣言Capability supportを互換条件として読むが、Compose専用のBroker-owned実Capability Catalog／dependency graph consumerは見つからない。一般`capability.schema.json`やPython conformance stateは、このRust Compose runtime consumerの証拠ではない。MCP実行側の権限判定は`authority.rs`および`mcp_center.rs`にあり、Agent metadataからAuthorityを生成しない。 |
+| BUILD_GAP | ①実Capability CatalogをComposeが消費して、依存・実能力・permission requirementを現在のBroker状態と照合するproducer→consumerが未接続／未確認。現行はAgent Adapterの未信頼宣言値を照合する。②異なるMCP Server間のTool ID衝突をBroker自身が拒否しない。③Android/iOSのCompose→Tool consumerがない。④実Capability→Compose→元Tool→結果/Auditの同一installed候補・実サービス証拠がない。 |
+| `SourceSHA` | 照合HEAD=`1f072c632009199e84ffb519017bb345fbbf1664`。以下28 Git blobを個別に記録し、本HEADの`HEAD:path`と照合した。 |
+| 試験区分（`TestClass`） | Rust UNIT: `compose_center.rs`のCatalog/compatibility/manifest-only/非継承 test。Rust FIXTURE: Windows限定`mcp_center.rs::mcp_catalog_compose_rechecks_current_connection_and_rejects_stale_selection`は子`cmd.exe` MCP fixtureでstale拒否と一回作用を扱う。Flutter client/widget testはFake Broker。いずれもsource上のtest classであり、本mapping作業ではRust/Flutter/product testを実行していない（NOT_RUN）。 |
+| 証拠ID（`Evidence ID`） | `NONE`。SourceSHAによる現行source mappingのみ。fixture、schema、旧W00/P8証拠を現N05のinstalled product acceptanceへ転記しない。 |
+| 阻害要因（`Blocker`） | W04/G4とN05はOPEN。既存Release Registry 18件（16 unresolved／2 resolved）、`release_ready=false`を維持する。N11で直接対応が確定するまでは既存blockerのN05帰属は`UNKNOWN`。新規Release blockerは追加しない。 |
+| 状態 | E0-04 N05 mappingは21 fieldと28 SourceSHAを現HEADへ結合済み。N05製品Acceptance、W04/G4、E0全体はOPEN。 |
+| 残余 | 実Capability Catalog／依存解決、Broker側Tool ID collision rejection、Mobile consumer、同一installed候補の実Tool/Audit証拠が残る。AI自発Tool要求やAI EditはN02/N07へ分離し、Compose manifestの存在を実使用と見なさない。 |
+
+#### `N05 SourceSHA`
+
+| `Source file` | `Git blob SHA` |
+|---|---|
+| `apps/desktop_flutter/lib/screens/settings.dart` | `66374ec4157d573939e7f9cc5c36aecf5d65e251` |
+| `apps/desktop_flutter/lib/services/compose_client.dart` | `8f9657d866b007a4d2212abefca4df9add81a702` |
+| `apps/desktop_flutter/lib/services/mcp_connection_client.dart` | `12a173a3956368c53615255c56ef06a2f5939c9a` |
+| `packages/agent_orchestration/lib/mcp_connection_client.dart` | `71b17973216160bdd2bc447243ba0b04fd0fec63` |
+| `apps/mobile_flutter/lib/screens/mcp_status.dart` | `40af06807f8bdf1280d860b3d9ffa32ee2e22cc0` |
+| `native/rust_helper/src/broker/compose_center.rs` | `d80658fd9a342140acc35560b2e4c4e4ae97d888` |
+| `native/rust_helper/src/broker/dialogue.rs` | `c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999` |
+| `native/rust_helper/src/broker/mcp_center.rs` | `8f9ab897bdc625e448241ebd9b46f995cd1f22f6` |
+| `native/rust_helper/src/broker/protocol.rs` | `9b2076d5f31ca6d77f1f87973d1b394aaf751961` |
+| `native/rust_helper/src/broker/authority.rs` | `067a36442138897aac396bdb588c2e01f90a5318` |
+| `native/rust_helper/src/desktop_launcher.rs` | `6a9f335de07fa474ca10043aea63ad6e988b572d` |
+| `native/rust_helper/src/linux_desktop_launcher.rs` | `f58fb226f21093c2d1f062259d394b4f8ec022f6` |
+| `native/rust_helper/src/macos_desktop_owner.rs` | `31e13a57fcde422878fae63083bd323e07f482ec` |
+| `native/rust_helper/src/broker/device_link.rs` | `c2e1ff88ff34a5764b2b4fb1d3f7abd8727e5c51` |
+| `specs/gui_shell_compose.schema.json` | `89b3d8e0e09c802d555fd6fee233daebc0fec045` |
+| `specs/gui_shell_compose_catalog.schema.json` | `f9c76f5fa87bfb0866f33745dcd5a8a4e74864d5` |
+| `specs/gui_shell_compose_receipt.schema.json` | `7c4ac9d0f28f38f79a0074ed7d6c84d9124aadaa` |
+| `specs/agent_adapter.schema.json` | `e0792589a2bae168ba221af4f4f9abb505815c12` |
+| `specs/capability.schema.json` | `a243a84b22cdd704875f35afc56e3450f9c9e1ca` |
+| `specs/mcp_connection_list.schema.json` | `45f5613aa46be7f936bd87995da0b6b6b38d047f` |
+| `specs/mcp_tool_call.schema.json` | `54c044cdfb53588ea5bab4bd056404372dc39acd` |
+| `specs/mcp_tool_call_receipt.schema.json` | `0049a393104b035bbf047e653e962754bc4009b3` |
+| `apps/desktop_flutter/test/compose_client_test.dart` | `c3fe30faa668482e5a4e42b2f5f5e5b218a01dc8` |
+| `apps/desktop_flutter/test/settings_compose_test.dart` | `a78353f93617cc7b17391549ea256f007a7acdb1` |
+| `apps/desktop_flutter/test/mcp_connection_center_test.dart` | `c81a37ca78b15e57c838f48519aa3e4abb6d6665` |
+| `docs/specs/agent-runtime.md` | `195e5e2e28e14fa65e2212db9f2adba81cbdb5c0` |
+| `docs/specs/mcp-connection-center.md` | `64d46042f19fccb0f7a947a95711e9aae87a1564` |
+| `docs/specs/gui-shell-compose.md` | `6b43bb80f73d4268e734ac0afbc58b33ba07339f` |
+
 ## 要求母集団・照合状態
 
 | 母集団 | 件数 | 正本・原典 | v4 E0状態 |
 |---|---:|---|---|
-| 新規要求 N01〜N11 | 11 | v4仕様S04 | N01〜N04はE0-04全21項目を現行SourceSHAへ個別結合済み。製品AcceptanceはすべてOPEN、N05〜N11の個別全数照合は未完 |
+| 新規要求 N01〜N11 | 11 | v4仕様S04 | N01〜N05はE0-04全21項目を現行SourceSHAへ個別結合済み。製品AcceptanceはすべてOPEN、N06〜N11の個別全数照合は未完 |
 | 全体施工線 A〜J | 10 | v4工程表R03・Codex指示I04 | 全線同時BUILDのproducer/consumerと現行実装配置を全数照合中 |
 | 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13は全E0-04 fieldを個別記録。P13旧aggregate evidence identity/classは`UNKNOWN`。N11 Evidence/Blocker/OS Artifact全数結合は未完 |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのSource→Consumer crosswalkを記録。個々の全E0-04列とv4 Acceptance／Evidence/N11結合は継続 |
