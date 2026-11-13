@@ -414,7 +414,7 @@ N11は`OPEN`。ValidatorとRelease Gateは一部のRegistry/Windows evidence/man
 | P12 | 製品全体統合。REV5進捗ではWindows側`FEATURE COMPLETE`。正式release/Owner GOと分離された製品機能統合の履歴。 | v4仕様S05の直接対応はN01/N09/N10、関連能力K19。Phase 39〜45はC27〜C34のQC/回帰/文書/出荷範囲に関連。単一施工線へ閉じない。 | Windows product entry→Task/result/operation UI→OS product lifecycle。実TaskはN01、operation/observation/recoveryはN09、installed OS distribution/lifecycleはN10の現ConsumerとSHA節へ分割記録。 | `FEATURE COMPLETE`を正式Release/QAへ昇格しない。v4 N01/N09/N10は`OPEN`、Q0〜Q7は`DEFERRED`、`release_ready=false`。統合後の全候補・全OS acceptanceは未成立。 |
 | P13 | Mobile / Non-Windows Product Build。REV5履歴は2026-10-09に有限Product Build acceptanceを閉鎖したと要約する。旧Acceptanceの詳細evidence identity/classは本照合資料から`UNKNOWN`。 | v4仕様S05の直接対応はN10、関連能力K17。Phase 35/36はC24〜C26範囲に関連。施工線H/I。Linux native必須性は別途現行AGENTS/v4正本に従う。 | Linux/macOS Desktop、Android/iOS Mobile runner/native transport→Rust Broker／OS capability→installed product lifecycle。OS別source、package、workflow候補とSHAはN10節。 | 旧P13閉鎖を現行五OS標準installed QAへ移さない。Linux nativeは完全対応必須で、WSL/Xvfb/Headlessだけでは成立しない。Android/iOS実機を前提にせずEmulator/Simulator等を用いる。N10は`OPEN`、`linux_native_product_support`、`rev2_mobile_distribution`、`rev2_mobile_device_evidence`を保持。 |
 
-P0〜P13全14 IDの旧要求範囲・限定statusをv4 N/K/Consumerへ接続した。これは旧statusの書換え、v4 acceptance、N01〜N11のCLOSED、E0完了のいずれも意味しない。C0〜C34、Phase0〜45、K01〜K20のSource→Consumer/scope mappingを記録した。P0〜P8は本節後段で全E0-04 fieldを個別補完し、P9〜P13とN11 Evidence/Blocker/OS Artifact行結合は継続する。P0/P1/P4の直接対応はv4仕様S05の明示mappingへ合わせて訂正し、旧statusは変更していない。P13の詳細evidence identity/classは`UNKNOWN`として保持する。
+P0〜P13全14 IDの旧要求範囲・限定statusをv4 N/K/Consumerへ接続した。これは旧statusの書換え、v4 acceptance、N01〜N11のCLOSED、E0完了のいずれも意味しない。C0〜C34、Phase0〜45、K01〜K20のSource→Consumer/scope mappingを記録した。P0〜P9は本節後段で全E0-04 fieldを個別補完し、P10〜P13とN11 Evidence/Blocker/OS Artifact行結合は継続する。P0/P1/P4の直接対応はv4仕様S05の明示mappingへ合わせて訂正し、旧statusは変更していない。P13の詳細evidence identity/classは`UNKNOWN`として保持する。
 
 ### P0〜P3 E0-04項目の個別補完（2026-11-13、ソースと利用先の照合）
 
@@ -802,6 +802,84 @@ P6の旧CLOSEDは上記Product Build限定機能と当時条件に適用する�
 | apps/desktop_flutter/test/mcp_connection_center_test.dart | c81a37ca78b15e57c838f48519aa3e4abb6d6665 |
 | apps/desktop_flutter/test/widget_test.dart | f4e9c7b93f832ba2a2cefee779fd12426f240b04 |
 | tooling/conformance_tests/run_conformance_skeleton.py | c6f31d8cb561b48513c6784e54c85969c9cb953e |
+
+### P9 E0-04項目の個別補完（2026-11-13、Standalone Export）
+
+以下は旧P9 Standalone Exportを現行v4へ結ぶE0照合である。旧Product Build条件・status・限定証拠はdocs/REV5_PRODUCT_PROGRESS.mdのP9節、Phase 32のD4追加範囲はdocs/D4_POCKET_PHASE_MAPPING.mdに照合した。v4仕様S04のN06、S05のP9/P10→N06とK15、工程表R03線Eが現行の対応先である。Phase 32がN10にも接続する配布・導入要件と、Phase 33／旧P10のbinary pruning要件は、P9の旧CLOSED範囲へ混ぜない。照合HEADはdadfc7154771bb6ab3bb445075779d66efc0775e。
+
+| E0-04項目 | 記録値 |
+|---|---|
+| 現行ID | 旧製品要求P9。v4仕様S05の直接対応はN06、関連能力はK15。Phase 32／施工線Eは関連工程で、Phase 32のN10配布consumerはN10側で別に追跡する。 |
+| 旧ID | P9 Standalone Export。rev5 Product BuildはCLOSED。固定fixture入力を使ったWindows portable bundle生成・限定起動の当時範囲を保持し、Owner承認済みの実構成による一般製品受入れへ拡張しない。 |
+| 原文参照 | docs/REV5_PRODUCT_PROGRESS.mdのP9節、docs/D4_POCKET_PHASE_MAPPING.mdのPhase 32／C33・C34対応、v4仕様S04 N06・S05 P9/P10/K15、工程表R03線E。旧P9の試験・失敗・cleanup・証拠境界はREV5進捗の記録を保持する。 |
+| 対象 | Compose Manifestから新App/Audit Store identity、設定・Runtime manifest、選択Module planを持つ独立Appを作る経路。Settings Export UI、Rust Broker、Windows/Linux Developer ExporterとLauncher、Manifest/runtime構成消費、利用者向けInstaller/Export Appを別consumerとして扱う。 |
+| 目的 | 選択構成を独立identity・Broker・Runtimeへ束縛したAppとして生成し、実行時に構成を消費して要求機能を動かす。Authorityを継承せず安全Coreを保ち、構成の実使用・独立導入・Moduleの選択結果を証拠と結ぶ。 |
+| 生成側 | Desktop SettingsのCompose/Export操作、compose_client.dartで得るManifest、export_client.dartのplatform/Module選択、Rust BrokerのOwner確認済み要求がproducer。Manifest、Receipt、build evidence、bundleは信頼権限ではなく構成・証拠データである。 |
+| 実際の受け取り先 | export_client.dart→既存Brokerのexport operation→broker/export_center.rsが固定Export領域へManifest/Receiptを作成。tooling/export_windows_product.py／export_linux_product.pyがReceiptとManifestを検査しportable bundleを生成し、desktop_launcher.rs／linux_desktop_launcher.rsがbundle内Manifest hash・identity・非継承条件を確認する。RuntimeはComposeのRuntime/Agent/Tool/Capability/Module構成を実消費しておらず、そのproducer→consumer接続はBUILD_GAP。 |
+| 契約とデータ | gui_shell_export.schema.json、gui_shell_export_manifest.schema.json、gui_shell_export_receipt.schema.json、gui_shell_module_catalog.json/schema、runtime_manifest.schema.json、Windows/Linux build evidenceとProduct Package Manifest Schemaを使う。App ID・Audit Store ID・platform・Manifest hash・Module dependency closureを束縛する。Credential/Permission/Approval/Audit chainの実値や権限はManifestへ継承しない。 |
+| 正常時の作用 | Source上、Brokerは新規App ID/Audit Store IDを生成し、権限非継承を記録したManifest/Receiptを固定先へ出力する。Module planはrequired/safety Moduleを保持しoptional依存閉包と選択/除外IDを記録する。Windows/Linux Exporterは検査済Manifestをbyte-for-byte bundleへ入れ、build evidenceとcompile-time identityを作る。Launcherはhash/identity/platform/非継承条件を照合する。runtime_manifest_consumed=falseのため、Compose構成から実Runtime機能を設定する作用は成立していない。 |
+| 否定時の作用 | 不正Schema/Receipt/Manifest、hash・target・identity不一致、unknown/duplicate/required Module選択、reparse point等の不正入力、既存出力の上書き要求、Owner確認/Audit不成立は拒否または失敗として扱う。Receipt/metadataからAuthorityを作らず、Credential実値をbundleへ含めないという限定契約を維持する。既知pattern scanは未知形式の秘密不存在を証明しない。 |
+| 停止と回復 | BrokerのOwner/Audit・出力作成前検査が不成立ならExporterへ進めない。Exporterは検証失敗時にbundle成功を報告せず、Brokerのtemporary manifest cleanup情報と既存Recovery扱いへ留める。Runtime構成消費・Installer・rollback成功を推定しない。過去P9起動確認のcleanupはnormal exitではなく、異常終了dialogを伴った限定cleanupとして履歴保持する。 |
+| 標準対象OSの候補 | v4対象はWindows/macOS/Linux native/Android/iOSの五OS。現行Export sourceはWindows/Linux Developer Exporterと各Launcherまで確認。Windowsには合成fixture bundleの限定build/起動履歴、LinuxにはExporter/archive fixture sourceがある。macOS・Android・iOSの独立Export consumer、全OS標準installed parityはUNKNOWN/BUILD_GAP。WSL/XvfbはLinux native製品の受入れではない。 |
+| 配布 | 旧P9はWindows portable ZIP相当のDeveloper bundleであり、通常Installer、別profileへの独立導入、Publisher/署名、一般利用者への正規配布ではない。Linux sourceのbundle/archive fixtureもnative installed distributionではない。Installer・update/rollback/uninstallと五OS標準packageはN10/Phase 32側の別Consumerとして保持する。 |
+| 既存実装 | Broker新規identity/Manifest/Receipt/Module dependency plan、Windows/Linux Developer Exporter、LauncherのManifest hash/identity検査はsource上WIRED。Windowsの旧P9 bundleはRust LauncherからFlutter childを起動し専用runtime root/Audit anchorを作る限定LIVE_RUNTIME履歴がある。入力はsynthetic checked-in fixtureで、Owner承認済みproduction Exportではない。 |
+| 実装不足 | v4 N06ではManifestのRuntime構成実消費、生成Appでの要求機能・Agent/Tool実作用、正規Installer/installed product経路、選択Moduleだけの実binary/resource効果と測定がBUILD_GAP。runtime_manifest_consumed=false、Windows standalone_app_verified=false、両Exporterのbinary_pruning_verified=falseを維持する。Module pruning詳細は旧P10/Phase 33、InstallerはN10へ分離する。 |
+| ソース識別値 | P9に関係する仕様履歴、Schema/example/negative、Flutter、Rust Broker/Launcher、Windows/Linux Exporter、test、Conformanceを現HEAD dadfc7154771bb6ab3bb445075779d66efc0775eのGit blob SHAで下表に記録する。SHAは現物同一性であり、test実行・製品Acceptanceではない。 |
+| 試験区分 | 旧P9記録はFlutter 3.44.0/Dart 3.12.0、Rust/Cargo 1.95.0のWindows Release build、14 files/62,856,402 bytes、Manifest byte copy、known-pattern 0件、synthetic fixture bundleのprocess/window/runtime root/Audit anchor観測を記録する。Owner production Export、正常終了、一般Installer、runtime Manifest消費は未確認。現SourceのRust unit、Linux Python fixture、Conformance testは存在するが、本mapping単位では全てNOT_RUN。 |
+| 証拠ID | NONE。旧P9の限定bundle launch evidenceはrev5 Product Build履歴だけに属する。v4 N06/W05向けEvidence ID、通常配布・構成消費・全OS受入れの証拠は発行しない。 |
+| 阻止要件 | 既存rev2_export_owner_ui_authority_pathとrev2_module_pruning_binary_and_measurementを関連する既存Release blockerとして参照し、各々の既存分類/statusを変更しない。通常Installer/installed lifecycleはrev2_desktop_product_distribution等のN10範囲で扱う。新規blockerは追加しない。 |
+| 状態 | 旧P9 Product Build=CLOSEDと限定証拠/cleanup制約を維持。現行N06/W05/G5/E0=OPEN。Source上のManifest/identity/bundle接続はWIREDだが、Manifest実消費・standalone installed acceptance・binary pruningは未成立。 |
+| 残件 | N06の構成実消費と独立Appの正常/否定実Task、Authority非継承、Module機能保持/実除外・size/resource計測をE線で接続する。N10の正規Installer/OS別installed lifecycleとは証拠を分ける。旧P9を再試験せず、P10 pruning、P11〜P13、Evidence/Blocker/全OS結合へ旧状態を混在させない。 |
+
+#### P9 ソース識別値・該当ファイル
+
+下表は照合HEAD dadfc7154771bb6ab3bb445075779d66efc0775eの`Git blob SHA`である。過去fixture・source/test fileの存在は本単位の実行や製品受入れを意味しない。
+
+| ファイル | 対象ファイル識別値 |
+|---|---|
+| `docs/REV5_PRODUCT_PROGRESS.md` | `9c978021d3982690e9aaa87896436bad7125b433` |
+| `docs/D4_POCKET_PHASE_MAPPING.md` | `064ea334f86b137d94fba2370d2a2fd732f6e972` |
+| `docs/specs/gui-shell-export.md` | `3d7a1156e4bf095e4f6a64792b6e1683c14f9b17` |
+| `docs/specs/gui-shell-module-pruning.md` | `5568c677be30402d709cc365b79eceb0e96ce831` |
+| `specs/agent_adapter.schema.json` | `e0792589a2bae168ba221af4f4f9abb505815c12` |
+| `specs/gui_shell_compose.schema.json` | `89b3d8e0e09c802d555fd6fee233daebc0fec045` |
+| `specs/gui_shell_export.schema.json` | `8b96d344ac0f6a54011237be8b2d85964be48c4b` |
+| `specs/gui_shell_export_manifest.schema.json` | `bf136b1a1daa258d33af3635ee414a2d4312bec5` |
+| `specs/gui_shell_export_receipt.schema.json` | `0448ec5f631509fa6fbe25cb4957bd6cf51e1562` |
+| `specs/gui_shell_module_catalog.json` | `339cb8894b25ae963956e582c42b9e8fcc0d3931` |
+| `specs/gui_shell_module_catalog.schema.json` | `bd54dd7903a1734ea4027d3f780b7a2b49e10c8e` |
+| `specs/gui_shell_windows_export_build.schema.json` | `5c7234692a8f178882edfc42c1a762038e7414fa` |
+| `specs/gui_shell_linux_export_build.schema.json` | `6f1af3d3da2277807dabac5d753897f5ddee453c` |
+| `specs/gui_shell_module_build_evidence.schema.json` | `1a37d4b831f998ce334fc9f0126c5dd2ee09a01b` |
+| `specs/runtime_manifest.schema.json` | `27c5566d1243274a06bf68aaa55c4adc3c47db06` |
+| `specs/d4_pocket_product_package_manifest.schema.json` | `3151ba81a869b87e6c0fa8f8633a0e424fc43ae7` |
+| `specs/d4_pocket_linux_product_package_manifest.schema.json` | `34087f190e7189641b34ae3163b568a038c9f1c2` |
+| `examples/contracts/gui_shell_export.valid.json` | `ea10286920a82f019ce9ee8b1e8cc4cf710adde4` |
+| `examples/contracts/gui_shell_export_manifest.valid.json` | `8e845373fdfcbfd77f555d3030ef3d35b3dd4ed4` |
+| `examples/contracts/gui_shell_export_receipt.valid.json` | `fae30c21b719d2ae9bf9bcff99228bf6eb6b0df1` |
+| `examples/contracts/gui_shell_windows_export_build.valid.json` | `31915727f6f0899bf4358996f709a23a76e9554d` |
+| `examples/contracts/gui_shell_linux_export_build.valid.json` | `fd710b0597b140d41f610085b7f3fcd6722b97bb` |
+| `examples/contracts/d4_pocket_product_package_manifest.valid.json` | `da9fc2eeec548deae980f9dc90898fe08f2d7629` |
+| `examples/contracts/d4_pocket_linux_product_package_manifest.valid.json` | `05d4fc3c08efd5338943d44c8f105af1672c0812` |
+| `examples/contracts/invalid/gui_shell_export_credential.invalid.json` | `8c03e7f4ae329271a1b78a6869c8ae4050d7d164` |
+| `examples/contracts/invalid/gui_shell_export_receipt_inherited.invalid.json` | `52faca660ce45470ef5ce5136a9946181ebbdbb6` |
+| `examples/contracts/invalid/gui_shell_export_receipt_pruning_claim.invalid.json` | `6766cfe13dd417fe762cb30dddeb2644a14fb354` |
+| `examples/contracts/invalid/gui_shell_export_unknown_module.invalid.json` | `ae5a354654aaddf15821eb64a90f29c00a2fcc0e` |
+| `apps/desktop_flutter/lib/screens/settings.dart` | `66374ec4157d573939e7f9cc5c36aecf5d65e251` |
+| `apps/desktop_flutter/lib/services/compose_client.dart` | `8f9657d866b007a4d2212abefca4df9add81a702` |
+| `apps/desktop_flutter/lib/services/export_client.dart` | `70d77edc6beb9e209e6b362219d1b22d69375489` |
+| `apps/desktop_flutter/test/export_client_test.dart` | `b4ec8686b91370b1eaff06dd88b301ee6ef0370c` |
+| `apps/desktop_flutter/test/settings_compose_test.dart` | `a78353f93617cc7b17391549ea256f007a7acdb1` |
+| `native/rust_helper/src/broker/export_center.rs` | `477e44d86ebf18d2b004a7294c9cdb14e35aa0f0` |
+| `native/rust_helper/src/broker/ipc_server.rs` | `58a404b920ef5905e174668ec2de0e04a9e8b044` |
+| `native/rust_helper/src/desktop_launcher.rs` | `6a9f335de07fa474ca10043aea63ad6e988b572d` |
+| `native/rust_helper/src/linux_desktop_launcher.rs` | `f58fb226f21093c2d1f062259d394b4f8ec022f6` |
+| `tooling/export_windows_product.py` | `31856179881a5a5aae1ba4451732e6de6cd7f338` |
+| `tooling/export_linux_product.py` | `47fe9a3032a5b2680e3f7d39b7cd64120ac83843` |
+| `tooling/build_module_pruned_windows.py` | `490aae7209ea5988f8e2cdcb05fe092b3d29504a` |
+| `tooling/tests/test_export_linux_product.py` | `079a187de49cf8b2fb6a7ddadb4175d6916163d1` |
+| `tooling/tests/test_linux_portable_archive.py` | `c04ac3c5d6d58396f650e9530b6731c6bb2037d6` |
+| `tooling/conformance_tests/run_conformance_skeleton.py` | `c6f31d8cb561b48513c6784e54c85969c9cb953e` |
 
 ## 旧C0〜C6のv4 Source→Consumer crosswalk（E0差分）
 
@@ -1296,7 +1374,7 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 |---|---:|---|---|
 | 新規要求 N01〜N11 | 11 | v4仕様S04 | 初期Producer/Consumer差分を記録。契約・否定・OS・証拠の全項目は未完 |
 | 全体施工線 A〜J | 10 | v4工程表R03・Codex指示I04 | 全線同時BUILDのproducer/consumerと現行実装配置を全数照合中 |
-| 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P6は全E0-04 fieldを個別記録。P7〜P13の個別field、P13の旧evidence identity/class、N11 Evidence/Blocker/OS Artifact全数結合は未完／UNKNOWN |
+| 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P9は全E0-04 fieldを個別記録。P10〜P13の個別field、P13の旧evidence identity/class、N11 Evidence/Blocker/OS Artifact全数結合は未完／UNKNOWN |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのSource→Consumer crosswalkを記録。個々の全E0-04列とv4 Acceptance／Evidence/N11結合は継続 |
 | D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDをv4 N01〜N11/A〜J/Kへcrosswalk済み。Phase固有E0-04全field、Evidence ID/Blocker、Acceptanceは未完 |
 | 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K別の完全E0-04 field、OS/Evidence/Blocker確認は継続 |
@@ -1341,7 +1419,7 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 
 ## 次のE0照合作業
 
-1. P7〜P13をID順に全E0-04 field、N11 Evidence ID、Blocker、OS対象/Artifactへ結合する。P0〜P6は完了済みmappingとして保持。続けてN/P/C/Phase/K残行へ展開し、既存CLOSED/FAILは履歴保持して再試験しない。
+1. P10〜P13をID順に全E0-04 field、N11 Evidence ID、Blocker、OS対象/Artifactへ結合する。P0〜P9は完了済みmappingとして保持。続けてN/P/C/Phase/K残行へ展開し、既存CLOSED/FAILは履歴保持して再試験しない。
 2. BUF-R/T crosswalkをCanonical N08/N10/N11 source SHA・各IDの完全E0-04 field・B5 evidenceへ結合する。B0〜B6の工程・状態・受入Consumer・証拠のcrosswalkは記録済み。個別cause/effect、OS/Artifact、N11 Evidence/Blockerの結合は継続。
 3. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 4. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
