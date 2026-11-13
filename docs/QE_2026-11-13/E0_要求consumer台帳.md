@@ -2573,6 +2573,167 @@ C24〜C34の11 ID×21 fieldを文書上展開した。旧C28の8時間FAIL、C33
 | Phase 44 Windows最大到達／C32・C33 | N10/N11／G・J／K16/K19 | installed app/Broker/Setup Doctor→Windows evidence collector/Registry (N10/N11) | 旧C33 total FAIL保持。現candidate installed evidence未収集。旧copy/旧commit evidenceを再結合しない。 |
 | Phase 45 正式公開／C34 | N10/N11／G・H・I・J／K16/K17/K19 | five-OS candidate/package/evidence→strict gate/Release Registry→responsible owner decision（N10/N11） | 16 unresolved／2 resolved、release_ready=false。Publisher/signing/Audit production key/Final GOは未成立のまま。 |
 
+#### Phase 0〜5 E0-04個別記録（2026-11-13）
+
+旧Phase/Cの関係を保持し、現行v4 N consumerへ全21項目で接続する。SourceSHAは編集前main `ec68d1c00f7546cf4efbbc3ebe17c81543225564` のGit blob値であり製品受入れを証明しない。
+
+##### Phase 0 個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 基準状態固定。 |
+| 旧ID | `C0`旧baselineと検査結果を履歴保持。 |
+| 原文参照 | `docs/D4_POCKET_PHASE_MAPPING.md` `Phase 0`/`C0`、`v4` `R02` `E0-01〜08` `S10` `I01/I09`。 |
+| 対象 | GitHub/local main、dirty/worktree、復旧ref、Registry、Manifest、source/test台帳。 |
+| 目的 | 編集基準と保護差分を観測し旧PASSを現候補へ転記しない。 |
+| 生成元（Producer） | origin/main、local Git、Registry、Manifest、検査tooling。 |
+| 実Consumer | `manifest.py`／`release_gate_check.py`／`run_conformance_skeleton.py`→E0台帳/Gate。 |
+| 契約／Data | Commit/blob SHA、Manifest hash、Registry status、worktree/dirty、E0-04参照。 |
+| 正常時作用 | HEAD・復旧ref・Manifest/Gate整合を調べ記録する。 |
+| 否定時作用 | hash不一致・欠測・dirtyはUNKNOWN/FAILで残し旧C0を現行PASSにしない。 |
+| 停止／Recovery | 既存差分/稼働中worktreeをreset/cleanせず、衝突時は対象だけ保護し復旧refを再照合。 |
+| 標準OS候補 | 開発基準Windows。製品保証五OSはN10対象で、この行はOS製品受入れでない。 |
+| 配布物 | Git管理source/規定/検査記録。製品artifactは生成しない。 |
+| 既存実装 | Git backup、Manifest、Release Gate、Conformance skeleton、旧C0記録。 |
+| BUILD_GAP | 旧baseline整合だけではE0/N11全数・OS/artifact結合を満たさない。 |
+| ソース識別値（SourceSHA） | `HEAD=ec68d1c00f7546cf4efbbc3ebe17c81543225564`。`release_blockers.registry.json=244adc04a01e7b406c4ebcdeb829f7077d4aa35f`；`tooling/manifest.py=aa4525ff20293cb8641e5598a2439561a3bfbd3b`；`tooling/release_gate_check.py=22a8d7bfe9adb259f44ce8501fb215652e1d58c6`；`tooling/conformance_tests/run_conformance_skeleton.py=c6f31d8cb561b48513c6784e54c85969c9cb953e` |
+| 試験区分（TestClass） | MANIFEST/CONFORMANCE/RELEASE_GATE既存source。製品test `NOT_RUN`。 |
+| 証拠ID（Evidence ID） | `NONE`。旧C0 log/hashは履歴。 |
+| 阻害要因（Blocker） | Registry 18件（16 unresolved/2 resolved）、release_ready=false維持。新規blockerなし。 |
+| 状態 | Phase 0 mapping記録。C0 status不変、E0 `OPEN`。 |
+| 残余 | 全要求・consumer・候補同一性・N11証拠結合が残る。 |
+
+##### Phase 1 個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 製品境界。 |
+| 旧ID | `C31`文書整備との歴史的関係を維持。製品境界はD4追加範囲。 |
+| 原文参照 | `docs/D4_POCKET_PHASE_MAPPING.md` Phase 1/C31、v4 S00/S10、R02/R03、I01/I03/I12、採用record。 |
+| 対象 | D4 Pocket製品、GUI-Shell技術基盤、Runtime/Agent/Tool制御面、現行説明文書。 |
+| 目的 | 製品と技術の責任を分け、ブランド変更を技術契約renameに波及させない。 |
+| 生成元（Producer） | owner採用v4三点、AGENTS、README/ROADMAP、製品文書。 |
+| 実Consumer | `AGENTS.md`／`README.md`／`ROADMAP.md`／v4三点→開発者/利用者説明。 |
+| 契約／Data | v4 S00/S10、採用hash、Repository identity、製品名/基盤名の役割。 |
+| 正常時作用 | D4 Pocketを製品、GUI-Shellを基盤として説明し要求と未成立を維持。 |
+| 否定時作用 | Repository/public schema/API/save pathをrenameしない。旧版や会話を現正本にしない。 |
+| 停止／Recovery | 正本衝突時は採用record/責任正本へ戻り、C31履歴を遡及変更しない。 |
+| 標準OS候補 | 五OS共通境界。version/archはN10母集団を参照し文書をOS合格にしない。 |
+| 配布物 | 三点・採用record・Git文書。installed packageは別Acceptance。 |
+| 既存実装 | v4三点/hash、AGENTS、README、ROADMAPが存在。 |
+| BUILD_GAP | 文書定義だけではTask/配布/権限/Audit/Recoveryの実consumerを成立させない。 |
+| ソース識別値（SourceSHA） | `HEAD=ec68d1c00f7546cf4efbbc3ebe17c81543225564`。`docs/QE_2026-11-13/01_D4Pocket_統合製品実装仕様書_v4.md=352c53180cbad07888beb956aad0fb2a58074c58`；`docs/QE_2026-11-13/02_D4Pocket_統合開発工程表_v4.md=d32dd251e5f7cbb97d92f6e7540d6b6ed0ecec05`；`docs/QE_2026-11-13/03_D4Pocket_Codex施工指示書_v4.md=49447973e88c50a09b2f4978adfed84fd464c6d0`；`docs/QE_2026-11-13/採用記録.md=f159c1aa6ea5bc6e80e0877d8068f7e44da4c4d3`；`README.md=38664991fe614acfc516eb6743dde6dce754191c`；`ROADMAP.md=6a922a38cca617690bc08297274e907f0425b722`；`AGENTS.md=1eafcadd129fd01f1f2f683594c381605ed7d48d` |
+| 試験区分（TestClass） | DOCUMENTATION/SOURCEのみ。Rust/Flutter/installed test `NOT_RUN`。 |
+| 証拠ID（Evidence ID） | `NONE`。旧C31 statusは履歴。 |
+| 阻害要因（Blocker） | 既存18 blocker維持。専用blocker追加なし。 |
+| 状態 | Phase 1 mapping記録。製品acceptance未成立、E0 `OPEN`。 |
+| 残余 | OS別実配線・package・権限/Audit/Recovery検査は後続へ。 |
+
+##### Phase 2 個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 接続先能力の観測。 |
+| 旧ID | `C17`複数Host登録履歴。metadataをTrust/権限へ拡張しない。 |
+| 原文参照 | `docs/D4_POCKET_PHASE_MAPPING.md` Phase 2/C17、S04 N03/N04・S05 K01/K06/K11、R03線B/C。 |
+| 対象 | Runtime Catalog、Host metadata登録、Runtime/Host Centerの限定表示。 |
+| 目的 | 接続先識別と宣言能力を観測しmetadataからTrust/実行許可を作らない。 |
+| 生成元（Producer） | Agent/Runtime/Host登録要求とBroker registry。 |
+| 実Consumer | `runtime_center.dart`／`host_operation_center.dart`→`host_center.rs`／Runtime registry→bounded表示。 |
+| 契約／Data | `host_registration.schema.json`／`host_list.schema.json`、識別子/公開metadata。 |
+| 正常時作用 | 妥当なmetadataを登録・一覧・表示し能力を未信頼宣言として扱う。 |
+| 否定時作用 | malformed/unknown/duplicate/scope違反を拒否。metadataからTrust/Permission/Approval/remote Taskを生成しない。 |
+| 停止／Recovery | Broker/Audit/応答異常は停止しunknown表示。古い登録からTaskを実行しない。 |
+| 標準OS候補 | Desktop候補Windows/macOS/Linux。Mobileはread-only projection。版/archはN10正本。 |
+| 配布物 | Desktop package候補。UI/sourceはinstalled Host接続証拠でない。 |
+| 既存実装 | `runtime_center.dart`、`host_operation_center.dart`、`host_center.rs`、`dialogue.rs`、`Host`用`Schema`群。 |
+| BUILD_GAP | Host registryはmetadataのみ。remote Task/Trustと二つ目のTask Runtimeは未成立。 |
+| ソース識別値（SourceSHA） | `HEAD=ec68d1c00f7546cf4efbbc3ebe17c81543225564`。`apps/desktop_flutter/lib/screens/runtime_center.dart=d2c7af172073d2b10c76a6416b90f011f10e95db`；`apps/desktop_flutter/lib/screens/host_operation_center.dart=e16605e6bb39bbfc12806e6154e08d6fbab1b93b`；`native/rust_helper/src/broker/host_center.rs=c27707faa61e5270b1c6d79e3ee3c5fe6ccd0bf8`；`native/rust_helper/src/broker/dialogue.rs=c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999`；`specs/host_registration.schema.json=8bed26fb2fe8f8e296c1d3404978f3215d571240`；`specs/host_list.schema.json=93880c43b04a5408c033bf351ee695073e54664a` |
+| 試験区分（TestClass） | N03/N04 UNIT/FIXTURE source。mapping中product test `NOT_RUN`。 |
+| 証拠ID（Evidence ID） | `NONE`。C17/fake記録は限定履歴。 |
+| 阻害要因（Blocker） | N03/N04/W03・Registry既存status維持。新blockerなし。 |
+| 状態 | Phase 2記録。N03/N04 product acceptance `OPEN`。 |
+| 残余 | 実Host接続、Trust、第二Runtime、OS installed証拠。 |
+
+##### Phase 3 個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | Agent接続契約。D4追加、旧C同等IDなし。 |
+| 旧ID | 旧C直接対応なし。N03/N01 statusへ接続。 |
+| 原文参照 | `docs/D4_POCKET_PHASE_MAPPING.md` Phase 3、S04 N01/N03・S05 K01/K06、R03線A/B、I04-A/B。 |
+| 対象 | `Agent Runtime`識別子、`Task`能力契約、`Adapter`／`Broker`境界。 |
+| 目的 | 実interface/対応能力/unsupportedを固定しmetadataを権限に変えず共通Taskへ接続。 |
+| 生成元（Producer） | 利用者選択Runtime binding、interface probe、Task要求。 |
+| 実Consumer | `agent_runtime.schema.json`→`adapters/mod.rs`→Broker `dialogue.rs` capability検査→Adapter。 |
+| 契約／Data | `agent_runtime.schema.json`／`agent_task_request.schema.json`／`agent_task.schema.json`。 |
+| 正常時作用 | 対応Runtime Task要求をBroker境界へ渡しunsupportedを拒否。 |
+| 否定時作用 | unknown Runtime、malformed contract、metadata escalation、history/UI stateからApproval再利用を拒否。 |
+| 停止／Recovery | Broker capability/Permission/Approvalが失敗/不明なら開始せず権限をRuntime間で移さない。 |
+| 標準OS候補 | Desktop候補。N10 Windows/macOS/Linux参照。Mobile Task consumerはBUILD_GAP。 |
+| 配布物 | Desktop/Runtime候補。Codex CLI sourceはあるが一般Provider配布保証なし。 |
+| 既存実装 | `adapters/mod.rs`、`codex_cli.rs`、`dialogue.rs`、`Task` Schema群、`E2E`ソース。 |
+| BUILD_GAP | Task AdapterはCodex CLI。第二Runtime/一般Provider実作用/五OS証拠なし。MINIDORAをTask対応扱いしない。 |
+| ソース識別値（SourceSHA） | `HEAD=ec68d1c00f7546cf4efbbc3ebe17c81543225564`。`specs/agent_runtime.schema.json=b8e031e53f582048211f0e1a6deeb2e5cb87e4fb`；`native/rust_helper/src/adapters/mod.rs=06c540a59437b903b3f045b5aafb3790c21103bd`；`native/rust_helper/src/adapters/codex_cli.rs=e5c9d1581ae9a1c0a3ae7fcfa626fdca6fea6d28`；`native/rust_helper/src/broker/dialogue.rs=c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999`；`native/rust_helper/tests/agent_task_production_e2e.rs=fdc7565aa58fa7466e6e24e5492321e8015567eb` |
+| 試験区分（TestClass） | UNIT/FIXTUREとproduction E2E source。第二Runtime/installed test `NOT_RUN`。 |
+| 証拠ID（Evidence ID） | `NONE`。W01は限定履歴。 |
+| 阻害要因（Blocker） | N03/W03/G3・Registry既存OPEN維持。blocker追加なし。 |
+| 状態 | `Phase 3`記録。`N01`/`N03`の受入れと`E0`は`OPEN`。 |
+| 残余 | 独立第二Runtime、Task/Result/拒否、OS installed証拠。 |
+
+##### Phase 4 個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | Agent起動器。D4追加、旧C同等IDなし。 |
+| 旧ID | 旧C直接対応なし。Phase 3契約を使う起動範囲。 |
+| 原文参照 | `docs/D4_POCKET_PHASE_MAPPING.md` Phase 4、S04 N01/N03・S05 K01/K06、R03線A/B、I04-A/B/I05。 |
+| 対象 | Broker認可TaskからAdapter/CLI childを起動しprocess/result/scratchを回収。 |
+| 目的 | 確認済interfaceのみ起動しBroker Task/result/stop/Recoveryを保つ。 |
+| 生成元（Producer） | Broker認可Task、Runtime登録、対応CLI path/config。 |
+| 実Consumer | `dialogue.rs`→`codex_cli.rs`→`Codex`子プロセス／作業用領域の監督→`Broker`状態／結果。 |
+| 契約／Data | Runtime/Task schema、Adapter起動設定、process/scratch identity。CredentialをUI/Auditへ返さない。 |
+| 正常時作用 | Codex CLI AdapterにTask起動・結果返却sourceがある。 |
+| 否定時作用 | unsupported Runtime/version、path/config不一致、stale Taskを起動しない。output/metadataから権限を作らない。 |
+| 停止／Recovery | cancel/deadline/crashはBroker stop/scratch Recoveryへ。結果不明をcompleted/retryにしない。 |
+| 標準OS候補 | Desktop Windows/macOS/Linux候補をN10で管理。Mobile launcherでない。 |
+| 配布物 | Desktop/Runtime候補。通常Installerと依存配布はN10未成立。 |
+| 既存実装 | `codex_cli.rs`、`agent_task_scratch.rs`、`dialogue.rs`、`Task`／`crash`用`E2E`ソース。 |
+| BUILD_GAP | CLI sourceと限定Windows履歴あり。第二Runtime、全OS supervision、同一配布は未成立。 |
+| ソース識別値（SourceSHA） | `HEAD=ec68d1c00f7546cf4efbbc3ebe17c81543225564`。`native/rust_helper/src/adapters/codex_cli.rs=e5c9d1581ae9a1c0a3ae7fcfa626fdca6fea6d28`；`native/rust_helper/src/broker/agent_task_scratch.rs=de743cd819fb4533c9c3070c4e7bcae82e42d938`；`native/rust_helper/src/broker/dialogue.rs=c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999`；`native/rust_helper/tests/agent_task_production_e2e.rs=fdc7565aa58fa7466e6e24e5492321e8015567eb`；`native/rust_helper/tests/agent_task_crash_recovery_e2e.rs=23517fcfe8ef94b2357a94e04879d423c3360501` |
+| 試験区分（TestClass） | UNIT/FIXTURE/E2E source。mappingでprocess/installed test `NOT_RUN`。 |
+| 証拠ID（Evidence ID） | `NONE`。W01/N01履歴限定。 |
+| 阻害要因（Blocker） | N01/N03/Registry status維持。promotion/blocker追加なし。 |
+| 状態 | `Phase 4`対応記録。`Runtime`受入れは`OPEN`。 |
+| 残余 | 異種Runtime/OS installed launch、failure/Recovery、package identity。 |
+
+##### Phase 5 個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | Agent操作表示盤。旧C1範囲との関係。 |
+| 旧ID | `C1` Agent Center/Workspace表示履歴。W01はWindows normal Release/Codex CLI限定。 |
+| 原文参照 | `docs/D4_POCKET_PHASE_MAPPING.md` Phase 5/C1、S01/S04 N01/N09・S05 K01/K13、R03線A/C、I04-A/C。 |
+| 対象 | Desktop Agent CenterのAgent/Task操作・状態/result表示。Workspace Inspectorとは別。 |
+| 目的 | Broker由来の許可状態を表示しUIにAuthorityを持たせない。 |
+| 生成元（Producer） | Task操作、Broker receipt/state/result、Runtime/Session/Workspace。 |
+| 実Consumer | `agent_center.dart`→`agent_task_client.dart`→`Broker`の`dialogue.rs`→`Task`表示。 |
+| 契約／Data | `agent_task_request.schema.json`、`Task`／`runtime`／`session`／`workspace`の束縛、公開内容の上限。 |
+| 正常時作用 | Task requestをBrokerへ渡しTask IDに束縛された許可状態を投影。 |
+| 否定時作用 | stale/unknown ID、scope不一致、malformed result、secret/未許可内容を拒否。履歴をApprovalにしない。 |
+| 停止／Recovery | cancel receiptと実停止を区別。Audit/result不明はunknown、再起動で旧Authorityを復活しない。 |
+| 標準OS候補 | Desktop N10候補。W01はWindows/Codex限定LIVE_PRODUCT履歴。Mobileはread-onlyでTask開始なし。 |
+| 配布物 | Desktop candidate。各OS packageはN10別Acceptance。 |
+| 既存実装 | `agent_center.dart`、`agent_task_client.dart`、`dialogue.rs`、`Task` Schema、`Flutter`試験。 |
+| BUILD_GAP | 全OS installedのTask/result/diff/stop/recovery/Audit一体証拠なし。Mobile TaskはBUILD_GAP。 |
+| ソース識別値（SourceSHA） | `HEAD=ec68d1c00f7546cf4efbbc3ebe17c81543225564`。`apps/desktop_flutter/lib/screens/agent_center.dart=2472faeb31a64d624423c30a0a30d0f153d2e2a3`；`packages/agent_orchestration/lib/agent_task_client.dart=a31fbb9f980a0039f809fd763c91f055fe9d02d0`；`native/rust_helper/src/broker/dialogue.rs=c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999`；`specs/agent_task_request.schema.json=cb25bb3684656bfd670ea5832bbb7fc5988845b6`；`apps/desktop_flutter/test/agent_task_client_test.dart=0477a0bbbb321082494b6b55711815d34419fdd9` |
+| 試験区分（TestClass） | Flutter UNIT/WIDGET、Rust UNIT/FIXTURE source。W01は過去限定。product test `NOT_RUN`。 |
+| 証拠ID（Evidence ID） | `NONE`。W01を現候補へ転記しない。 |
+| 阻害要因（Blocker） | N01/N09/W01/Registry status維持。再開・blocker追加なし。 |
+| 状態 | `Phase 5`記録。`N01`/`N09`の受入れは`OPEN`。 |
+| 残余 | 他OS installed Task/UI、same Task result/diff/Audit/Recovery、Mobile境界。 |
+
+Phase 0〜5の6行はE0-04全項目を記録した。旧Phase/C status、N01/N03/N04/N09/N11のOPEN、W01限定CLOSED、Release Blockerは変更していない。Phase 6〜45、K01〜K20の個別fieldとN11 Evidence/Blocker/OS Artifact行結合は未完了。E0はOPEN。
 ### 製品能力K01〜K20
 
 | K／S05能力 | v4関連N／施工線A〜J | 現行Producer→Consumer参照 | Source状態・残余・証拠境界 |
@@ -4115,8 +4276,8 @@ C24〜C34の11 ID×21 fieldを文書上展開した。旧C28の8時間FAIL、C33
 | 新規要求 N01〜N11 | 11 | v4仕様S04 | N01〜N10はE0-04全21項目を現行SourceSHAへ個別結合済み。製品AcceptanceはすべてOPEN、N11の個別全数照合は未完 |
 | 全体施工線 A〜J | 10 | v4工程表R03・Codex指示I04 | 全線同時BUILDのproducer/consumerと現行実装配置を全数照合中 |
 | 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13は全E0-04 fieldを個別記録。P13旧aggregate evidence identity/classは`UNKNOWN`。N11 Evidence/Blocker/OS Artifact全数結合は未完 |
-| 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのSource→Consumer crosswalkを記録。個々の全E0-04列とv4 Acceptance／Evidence/N11結合は継続 |
-| D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDをv4 N01〜N11/A〜J/Kへcrosswalk済み。Phase固有E0-04全field、Evidence ID/Blocker、Acceptanceは未完 |
+| 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのE0-04 21 fieldを個別記録。旧status維持、N11 Evidence/Blocker/OS Artifact結合と製品Acceptanceは継続 |
+| D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜5はE0-04全21 fieldを個別記録、Phase 6〜45は個別field未完。Evidence/Blocker/OS Artifact結合・Acceptance未完 |
 | 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K別の完全E0-04 field、OS/Evidence/Blocker確認は継続 |
 | Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 33 IDのscope/Consumer/現証拠境界と各21 fieldを記録。BUF-R/T Acceptance、cause/effectの全件結合、N11 evidence、OS artifactとの結合は未完 |
 | Buffer工程 B0〜B6 | 7 | `docs/緩衝基盤_rev5補遺_QC/`・v4仕様S06 | B0〜B4の限定CLOSEDを保持、B5 OPEN、B6未成立。詳細Consumer照合が未完 |
@@ -4160,7 +4321,7 @@ C24〜C34の11 ID×21 fieldを文書上展開した。旧C28の8時間FAIL、C33
 ## 次のE0照合作業
 
 1. N01〜N10のE0-04 21項目は現行SourceSHAへ個別照合済み。各製品AcceptanceはOPENのまま維持し、N10の五OS実導入・利用・更新・Recovery QAは後続の製品Acceptanceに残す。
-2. 残るC／Phase／Kの個別fieldと未完了crosswalkを現行N consumer・N11 Evidence／Blocker／OS Artifactへ結ぶ。旧CLOSED／FAILは履歴として保持し、再試験しない。
+2. C0〜C34個別field記録を維持し、Phase 6〜45／K01〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
 3. BUF-R/TのSourceSHAとConsumer scopeは記録済み。AcceptanceはOPEN。B0〜B6の状態を保持し、原因→effect、N08/N10/N11、OS/Artifact/evidence結合を続ける。
 4. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 5. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
