@@ -3238,6 +3238,92 @@ Phase 18〜20の3行は各E0-04全21項目を記録し、62件（44 unique path�
 
 Phase 21〜23の3行は各E0-04全21項目を記録し、69件（67 unique path）のSourceSHA参照を編集前main 32c02bd9de6ceca6fa90b1e82db28f114568e77dへ結合した。旧C11〜C14 status、N09/N10/N11、K04/K09/K10/K13/K16/K17、Registry 18件（16 unresolved／2 resolved）、release_ready=falseを変更せず、新規Evidence ID／Blockerなし。Phase 24〜45、K01〜K20個別field、N11 Evidence／Blocker／OS Artifact全数結合、E0は未完／OPEN。製品Rust／Flutter test、installed update／notification／observation、五OS QAはNOT_RUN。
 
+
+
+#### Phase 24〜26 E0-04個別記録（2026-11-13）
+
+現行v4 N04／K11等のConsumerと旧C15〜C18をPhase単位で照合する。以下のSourceSHAは編集前main 895a856e6ecf6904fdae153d52d027ce42acf1a6 のGit blobである。旧P7／C15〜C18の局所status・Evidenceは当時scopeに保持し、現行N04／K11の製品受入れへ転記しない。
+
+##### Phase 24 個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 現行v4 N04／K11、施工線B。Agent間接続契約のA2A概念・metadata射影。 |
+| 旧ID | D4 Phase 24／総合機能拡張rev1 C15「エージェント間接続契約（A2A Contract）」。旧C15の契約・fixture・Conformance記録を当時の範囲で保持する。 |
+| 原文参照 | v4仕様S04 N04、S05 K11、工程表R03 B、docs/D4_POCKET_PHASE_MAPPING.md Phase 24、docs/specs/a2a-contract.md、docs/specs/authority-strip-conformance.md。 |
+| 対象 | A2A Agent Card／Task／Message／Artifact／StreamをGUI-Shellのbounded metadataへ射影するcontract、Authority Strip、外部宣言の未信頼境界。 |
+| 目的 | 外部Agentの概念を共通表示・契約へ正規化し、Card／Task／Message／Artifact／Stream metadataからTrust、Permission、Approval、Authorityを作らない。 |
+| 生成元（Producer） | 外部A2A Card／Task／Message／Artifact／Stream宣言とRust A2A正規化・Broker projection。 |
+| 実Consumer | Rust a2a正規化とA2A Broker projection、a2a_contract Schema／Conformance、Desktop A2A接続client／画面がmetadataを消費する。contract単独では外部操作を発生させない。 |
+| 契約／Data | a2a_contract Schema、metadata_only、authority_strip=true、権限生成なし、interface URL hash、protocol／version／boundedなID・状態・件数・hash・content visibility。 |
+| 正常時作用 | Cardと外部概念を検証・bounded metadataへ射影する。A2A v1.0の安全境界を守る限定SendMessage／Stream等はPhase 25の別実作用として扱う。 |
+| 否定時作用 | malformed／unknown／unsupported field、認証要件のあるinterface、raw endpoint／credential／contentや権限注入を拒否またはunsupportedへ落とし、Agent宣言を実行可能性・Trustとみなさない。 |
+| 停止／Recovery | bounded失敗を返し、過去receiptはowner再確認待ちへ降格する。Card／Task状態からPermission・Approval・Audit identity・Recovery actionを復元せず、自動再送しない。 |
+| 標準OS候補 | Schema／正規化は共通。Desktop A2A consumerはWindows／Linux経路を持つ。macOSはAgent Card metadata-onlyの履歴証拠に限定し、Mobile A2A consumerは未確認／未接続。Linux nativeは必須対象で、fixtureは製品配布証拠ではない。 |
+| 配布物 | 独立packageなし。D4 Pocket Desktopの契約・Broker・UIに含む候補であり、OS別配布とinstalled acceptanceはN10／N04で別途判断。 |
+| 既存実装 | a2a_contract Schema、RustのCard／概念正規化、Authority Strip／Conformance source、Desktop metadata client／画面とfixture testを確認。旧C15のsource・fixture・Conformanceは実外部接続を証明しない。 |
+| BUILD_GAP | C15単体では実外部Card／Task／Message／Artifact／Streamの完全相互運用、Credentialを要するinterface、全Artifact型、Task lifecycle、Mobile consumerを成立させない。現N04の実外部Agent作用・OS別統合もOPEN。 |
+| ソース識別値（SourceSHA） | 編集前mainのGit blob: docs/specs/a2a-contract.md=abe32b25bf7c186faf6e1beb3ae3f5d754de61c5; docs/specs/a2a-streaming.md=2b1cd55f29cd9c7f4af177d2703b677071e9e96a; docs/specs/authority-strip-conformance.md=117cfed2bd13af62b3fe6c464a98d183fa9fb657; specs/a2a_contract.schema.json=8c7f50bb7fb12dde41293727e5dc9109445d1bc3; native/rust_helper/src/a2a.rs=9d7c6d9ab938ad5178d6ca46b3933dc3e61c6061; native/rust_helper/src/broker/a2a_center.rs=73ad601abd64a33ccefde4b73ab5f9dc4f728504; native/rust_helper/src/broker/protocol.rs=9b2076d5f31ca6d77f1f87973d1b394aaf751961; apps/desktop_flutter/lib/services/a2a_connection_client.dart=19335054afe35bc06597629d92ca2e635ce50069; apps/desktop_flutter/lib/screens/a2a_connection_center.dart=2716d1c2fa22a184044e6f4e2eb401cb33c6e011; apps/desktop_flutter/test/a2a_connection_center_test.dart=5ebdbb4cee62e581062370ed6c305c36df89b7e2; tooling/conformance_tests/run_conformance_skeleton.py=c6f31d8cb561b48513c6784e54c85969c9cb953e. |
+| 試験区分（TestClass） | Rust UNIT（a2a正規化・負例source）、Schema／Conformance、Flutter client／widgetのFake Broker test source。本mappingではNOT_RUN。fixture／Schemaは実外部Agentや製品QAのEvidenceではない。 |
+| 証拠ID（Evidence ID） | NONE。旧C15のSchema／fixture／Conformance記録は履歴scopeのまま。現N04／K11 Acceptanceへ新Evidenceを転記しない。 |
+| 阻害要因（Blocker） | 既存Release Registry 18件（16 unresolved／2 resolved）とrelease_ready=falseを維持。C15への直接Blocker／OS帰属はN11確認前のためUNKNOWN。新規Registry Blockerなし。 |
+| 状態 | Phase 24のE0-04全21項目を記録。旧C15 status／証拠範囲を保持し、現N04／K11／E0製品AcceptanceはOPEN。 |
+| 残余 | 実外部interface・認証／unsupported判定・全Artifact／Stream・Task lifecycleの相互運用、Mobile接続、五OS installed product接続とN11 Evidence／Blocker／OS Artifact結合。 |
+
+##### Phase 25 個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 現行v4 N04／K11、施工線B。外部A2A接続・限定操作のProducer→Broker→結果projection。 |
+| 旧ID | D4 Phase 25／総合機能拡張rev1 C16「A2A接続センター」。旧C16のCard接続、限定操作、Mac Card-only受入れを元scope／条件で保持する。 |
+| 原文参照 | v4仕様S04 N04、S05 K11、工程表R03 B、docs/D4_POCKET_PHASE_MAPPING.md Phase 25、docs/specs/a2a-connection-center.md、docs/specs/macos-a2a-center.md。 |
+| 対象 | Owner明示のAgent Card取得・接続receipt、通常一覧、Windows／Linux Desktopの限定SendMessage／手動GetTask／選択text Artifact／Stream source、およびmacOSのA2A入口境界。 |
+| 目的 | A2A接続を既存Rust Broker／native Owner／単回Permission／Auditへ束縛し、外部Agent metadataを信頼・権限へ昇格させず結果不明時の再送を防ぐ。 |
+| 生成元（Producer） | 操作者の明示接続／送信要求、現在のA2A connection receipt・interface hash、外部Agent Card／JSON-RPC／SSE response。 |
+| 実Consumer | Desktop A2A接続client／screen→Rust Broker a2a_center／a2a helper／固定HTTP(S) transport→bounded result／Audit。macOS RunnerのBrokerProcessChannelはA2A接続・A2Aメッセージ送信を分類し、Rust native Owner候補と既存Brokerへ接続するsourceを含む。 |
+| 契約／Data | a2a_connection／receipt／list、SendMessage／GetTask／Stream request／response Schema、Agent ID・interface hash・request hash・単回Permission・Audit ID・bounded metadata。Credential実値は未使用。 |
+| 正常時作用 | Windows／Linux DesktopでOwner確認後、公開Cardをmetadata-only接続し、契約で限定された一回作用をBroker経由で実行するsourceがある。macOS Card接続は過去の限定LIVE_RUNTIME記録。Mac message sourceは現AGENTS.md制限との不整合があるため許可済み／LIVE_RUNTIMEとして数えない。 |
+| 否定時作用 | 認証要件、private／非global宛先、redirect／proxy、malformed／oversize response、stale receipt/interface hash、Task／Artifact不一致、unsafe／non-text contentを拒否。unknown outcomeを成功や再送へ昇格しない。 |
+| 停止／Recovery | 接続receipt復元はpending_review／owner_reapproval_requiredへ降格。Broker／Audit／永続化失敗はfail-closed。送信・照会の結果不明、期限、再起動で自動retry／polling／reconnectしない。 |
+| 標準OS候補 | Windows／Linux DesktopにA2A操作source。macOSはAGENTS.md上、Agent Card metadata-onlyの限定controlのみ。macOS product documents／Swift BrokerProcessChannelにMessage送信記述・入口分類があり規則矛盾。Mobile A2A consumerは未確認。Linux nativeは必須だがinstalled一般外部Agent QAは未成立。 |
+| 配布物 | 独立packageなし。D4 Pocket Desktop候補の一機能。標準OS installer／署名・更新・撤去・installed同一candidate証拠はN10へ接続。 |
+| 既存実装 | Rust bounded HTTP／HTTPS Card取得・Broker A2A center・SendMessage／GetTask／Artifact／Stream source、Desktop接続画面、Mac Card接続の限定旧受入れを確認。SwiftはA2A接続／メッセージ送信を分類する。 |
+| BUILD_GAP | 実外部Agentの一般互換／Credential、全Task lifecycle・cancel・reconnect、file/data／全Artifact、Mobile consumer、五OS installed acceptanceは未成立。macOS A2A Message操作はAGENTS.mdのmetadata-only制限と製品文書／Swift sourceが不一致で、利用可能なconsumer範囲をUNKNOWN／SUSPENDとして扱う。 |
+| ソース識別値（SourceSHA） | 編集前mainのGit blob: docs/specs/a2a-connection-center.md=a2f815d61aed80b4e1f619c0a2f947960d7bd317; docs/specs/a2a-contract.md=abe32b25bf7c186faf6e1beb3ae3f5d754de61c5; docs/specs/a2a-streaming.md=2b1cd55f29cd9c7f4af177d2703b677071e9e96a; docs/specs/macos-a2a-center.md=6f5bc7444f2e406aa5c7d21d1aea1f7599c743ad; docs/specs/macos-desktop-channel.md=0611524b89c09365d35c33d23367a5fb6f65a4d6; specs/a2a_connection.schema.json=1dbbe44e54b302a1196d7e4e55f1cae35cda569b; specs/a2a_connection_receipt.schema.json=f63fd0d61b6200cdd8cc4b23d5cf7968a82fa5c5; specs/a2a_connection_list.schema.json=ee18b204349b025464ca3af8adaa355add34e650; specs/a2a_message_send_request.schema.json=0a5f87250f17a88b6be55e7838d32b8e9114bbed; specs/a2a_message_send_response.schema.json=23ee690e0ce350ac94c64d86f6920afb63c199f6; specs/a2a_task_get_request.schema.json=df11a5fd3291de0ae379694c6c1b49de51f2f157; specs/a2a_task_get_response.schema.json=56a55f348d6b0ba7cb0092ee7ea2b4ec809e5360; specs/a2a_stream_send_request.schema.json=e0a0841f2fd9f7e92e0fb8a036ebaa6852e198d8; specs/a2a_stream_send_response.schema.json=a526fed89fb5b3766a03c52444a338060caf16cc; native/rust_helper/src/a2a.rs=9d7c6d9ab938ad5178d6ca46b3933dc3e61c6061; native/rust_helper/src/broker/a2a_center.rs=73ad601abd64a33ccefde4b73ab5f9dc4f728504; native/rust_helper/src/broker/update_download.rs=9f9f9b23113e724a206427bea082a11dd4764115; native/rust_helper/src/broker/protocol.rs=9b2076d5f31ca6d77f1f87973d1b394aaf751961; native/rust_helper/src/broker/audit.rs=eb1dcf5018d95c7fdf6171aadd4bca9554d1996f; native/rust_helper/src/broker/dialogue.rs=c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999; native/rust_helper/src/macos_desktop_owner.rs=31e13a57fcde422878fae63083bd323e07f482ec; native/rust_helper/examples/macos_a2a_fixture.rs=20299e4cdd564e07abce8f97c5b128404f150282; apps/desktop_flutter/lib/services/a2a_connection_client.dart=19335054afe35bc06597629d92ca2e635ce50069; apps/desktop_flutter/lib/screens/a2a_connection_center.dart=2716d1c2fa22a184044e6f4e2eb401cb33c6e011; apps/desktop_flutter/lib/services/a2a_artifact_handoff.dart=e7e2f3454e2843f1d4f4e7b5aedfa55014cde05c; apps/desktop_flutter/test/a2a_connection_center_test.dart=5ebdbb4cee62e581062370ed6c305c36df89b7e2; apps/desktop_flutter/test/a2a_artifact_handoff_test.dart=e47005320917f59dfa55ae1e04c4b99d452676de; apps/desktop_flutter/macos/Runner/BrokerProcessChannel.swift=a1269e01608bc194b0f0913a6f96cd489b926155; apps/desktop_flutter/macos/RunnerUITests/AdapterOwnerUITests.swift=eeab11b1123165a8f82da55ebbb014eab8803862. |
+| 試験区分（TestClass） | Rust UNIT／FIXTURE（embedded／loopback A2A・response negative）、Flutter Fake Broker test、歴史的macOS Card-only product LIVE_RUNTIME記録あり。これはMac Message／Task操作や実外部Agentの現候補QAではない。本mappingでRust／Flutter／installed testはNOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。旧C16／MAC-A2Aの限定Card evidenceは履歴条件で保持し、現N04の一般外部Agent操作へ転記しない。 |
+| 阻害要因（Blocker） | 既存Registry 18件（16 unresolved／2 resolved）、release_ready=falseを維持。A2A関連BlockerのPhase25／OSへの直接帰属はN11で確認し、ここでは新規追加しない。 |
+| 状態 | Phase 25のE0-04 fieldは記録するが、macOS A2A Message範囲はAGENTS.mdと現行製品記述／sourceの不整合によりUNKNOWN／SUSPEND。現N04／K11／E0はOPEN。規則を拡張・緩和せず、既存コードも変更しない。 |
+| 残余 | macOS A2A Messageの正本整合・許可範囲の解決が必要。その他、実外部Agent／Credential／全Task lifecycle・Artifact／Mobile／五OS installed evidenceとN11結合が残る。 |
+
+##### Phase 26 個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 現行v4 N04／K11・K13・K17、施工線B/C。Host registryと表示Context操作。 |
+| 旧ID | D4 Phase 26／総合機能拡張rev1 C17「複数Host」＋C18「Host操作面」。C17はPhase 2とも、C18はPhase 28とも対応するため機能範囲を重複完了扱いしない。 |
+| 原文参照 | v4仕様S04 N04／N10、S05 K11／K13／K17、工程表R03 B/C、docs/D4_POCKET_PHASE_MAPPING.md Phase 2／26／28、docs/specs/macos-host-registration.md。 |
+| 対象 | 公開Host metadataのowner registration・bounded registry／一覧、Hostの表示context切替、Host別Runtime／Agent summaryの可視性境界。 |
+| 目的 | Hostごとに識別・表示を分け、Host metadataや切替からremote trust、Task実行先、Permission、Approval、Credential、Authorityを生成・継承しない。 |
+| 生成元（Producer） | 操作者の明示Host登録／一覧／切替要求と、Owner確認済み公開metadata、Broker registry／現在Host観測。 |
+| 実Consumer | Rust host_center／host_capabilityとBroker protocol／Audit、Desktop host_registration_client、Host操作面／Host capability画面。macOSはnative Owner確認から同じ既存Broker登録へ接続するsourceと限定CLOSED product recordがある。 |
+| 契約／Data | host_registration／host_list／host_receipt／host_capability／host_switch／host_switch_receipt Schema。Host ID・display/platform・identity hash・申告件数・metadata_only・Trust pending_review・authority_strip。 |
+| 正常時作用 | Owner control登録、通常IPC metadata一覧、Audit付き表示context切替を行う。Host切替後のRuntime／Agentは現在Broker観測Hostが一致する範囲だけを表示し、切替自体はremote再接続ではない。 |
+| 否定時作用 | 重複／未知Host、malformed／権限field注入、stale receipt、Host不一致を拒否または未観測へ制限。Host間Permission／Approval／Credential／Authority持越しをしない。 |
+| 停止／Recovery | 登録は期限付きOwner確認・永続Audit失敗時に不受理。bounded persistent stateの破損／再起動はfail-closed。switchは表示のみでreconnect／remote作用を自動起動しない。 |
+| 標準OS候補 | Desktop Rust／Flutter consumer。macOSの公開metadata登録・一覧・表示切替には履歴限定LIVE_RUNTIME。Windows／Linux product pathはsource上で確認するが、このmappingではOS別installed acceptanceを主張しない。Mobile consumer／native Host parityは未確認。Linux native必須対象は維持。 |
+| 配布物 | 独立Host packageなし。D4 Pocket DesktopのBroker／UI内機能候補。OS別installer／installed product evidenceはN10に接続する。 |
+| 既存実装 | bounded Rust Host registry・owner registration／regular list／switch receipt／Audit・hash-only identity、Desktop UI/client、macOS native Owner Host登録sourceと過去の有限製品受入れを確認。 |
+| BUILD_GAP | Host registration／display selectionはlive remote Host connection、Trust attestation、remote Runtime／Agent discovery、Host間Workspace isolationを成立させない。Android／iOS consumerと五OS installed acceptanceは未接続／未証明。 |
+| ソース識別値（SourceSHA） | 編集前mainのGit blob: docs/D4_POCKET_PHASE_MAPPING.md=064ea334f86b137d94fba2370d2a2fd732f6e972; docs/specs/macos-host-registration.md=c7b379163a4aec66ef8cfe178034439afae1fcd8; docs/specs/macos-desktop-channel.md=0611524b89c09365d35c33d23367a5fb6f65a4d6; specs/host_registration.schema.json=8bed26fb2fe8f8e296c1d3404978f3215d571240; specs/host_list.schema.json=93880c43b04a5408c033bf351ee695073e54664a; specs/host_receipt.schema.json=237a84717cf27d000357d0dac53d33dd6f535766; specs/host_capability.schema.json=6b721b5ab7842edc7df6562bc56fdd5b73d5de79; specs/host_switch.schema.json=01e5fc7322e8d4d2c9142375e7641fc4255148d5; specs/host_switch_receipt.schema.json=cb60df0b174a38c871e0e8835c65537a17d022fb; native/rust_helper/src/broker/host_center.rs=c27707faa61e5270b1c6d79e3ee3c5fe6ccd0bf8; native/rust_helper/src/broker/host_capability.rs=08a82c7e52947439229447dc82b69097af67ba1f; native/rust_helper/src/broker/protocol.rs=9b2076d5f31ca6d77f1f87973d1b394aaf751961; native/rust_helper/src/broker/audit.rs=eb1dcf5018d95c7fdf6171aadd4bca9554d1996f; native/rust_helper/src/macos_desktop_owner.rs=31e13a57fcde422878fae63083bd323e07f482ec; apps/desktop_flutter/lib/services/host_registration_client.dart=3bc3b45bddddf4e1131e051acb3cdee599ca4d3d; apps/desktop_flutter/lib/screens/host_operation_center.dart=e16605e6bb39bbfc12806e6154e08d6fbab1b93b; apps/desktop_flutter/lib/screens/host_capability_center.dart=e8fa774a435e713a3b75b0d33f00bd500b0a2d7f; apps/desktop_flutter/test/host_registration_test.dart=74ab39e078bf72214a3bbe84f69ebc77fceb2493; apps/desktop_flutter/test/widget_test.dart=f4e9c7b93f832ba2a2cefee779fd12426f240b04; apps/desktop_flutter/macos/Runner/BrokerProcessChannel.swift=a1269e01608bc194b0f0913a6f96cd489b926155; apps/desktop_flutter/macos/RunnerUITests/AdapterOwnerUITests.swift=eeab11b1123165a8f82da55ebbb014eab8803862. |
+| 試験区分（TestClass） | Rust単体の否定試験（重複登録、権限注入、未知Host、Host間状態）、FlutterのHost画面試験、macOSの限定製品実行履歴を確認した。本単位ではRust／Flutter／導入済み製品試験を実行していない。Macの証拠はHost登録／表示だけ。 |
+| 証拠ID（Evidence ID） | NONE。過去MAC-HOST/P13 limited evidenceは当時の公開metadata／表示範囲で保持し、N04のremote Host／trust／workspace isolationへ転記しない。 |
+| 阻害要因（Blocker） | 既存Registry 18件（16 unresolved／2 resolved）とrelease_ready=falseを保持。C17／C18の個別Blocker帰属はN11で照合し、このmappingで新規追加しない。 |
+| 状態 | Phase 26のE0-04全21項目を記録。旧C17／C18 statusと証拠範囲を保持し、Phase 2／28との重複を分離。現N04／K11／K13／K17／E0はOPEN。 |
+| 残余 | 実Host接続／Trust検証／remote discovery／Workspace隔離、Mobile／五OS installed parity、N11 Evidence／Blocker／OS Artifact結合。 |
+
+Phase 24〜26の3行は各E0-04全21項目を記録し、61件（47 unique path）のSourceSHA参照を編集前main 895a856e6ecf6904fdae153d52d027ce42acf1a6へ結合した。旧C15〜C18 statusと限定証拠、N04／K11／K13／K17、Registry 18件（16 unresolved／2 resolved）、release_ready=falseを変更せず、新Evidence ID／Registry Blockerなし。Phase 2／28とのcrosswalkを保持し、Phase 27〜45、K01〜K20個別field、N11 Evidence／Blocker／OS Artifact結合、E0はOPEN。macOS A2A MessageについてはAGENTS.mdのmetadata-only制限と現行製品文書／Swift sourceの不整合を記録し、許可済み・LIVE_RUNTIMEとは判定しない。製品Rust／Flutter／installed A2A／Host test、五OS QAはNOT_RUN。
+
 ### 製品能力K01〜K20
 
 | K／S05能力 | v4関連N／施工線A〜J | 現行Producer→Consumer参照 | Source状態・残余・証拠境界 |
@@ -4781,7 +4867,7 @@ Phase 21〜23の3行は各E0-04全21項目を記録し、69件（67 unique path�
 | 全体施工線 A〜J | 10 | v4工程表R03・Codex指示I04 | 全線同時BUILDのproducer/consumerと現行実装配置を全数照合中 |
 | 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13は全E0-04 fieldを個別記録。P13旧aggregate evidence identity/classは`UNKNOWN`。N11 Evidence/Blocker/OS Artifact全数結合は未完 |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのE0-04 21 fieldを個別記録。旧status維持、N11 Evidence/Blocker/OS Artifact結合と製品Acceptanceは継続 |
-| D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜23はE0-04全21 fieldを個別記録、Phase 24〜45は個別field未完。Evidence/Blocker/OS Artifact結合・Acceptance未完 |
+| D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜26はE0-04全21 fieldを個別記録、Phase 27〜45は個別field未完。Evidence/Blocker/OS Artifact結合・Acceptance未完 |
 | 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K別の完全E0-04 field、OS/Evidence/Blocker確認は継続 |
 | Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 33 IDのscope/Consumer/現証拠境界と各21 fieldを記録。BUF-R/T Acceptance、cause/effectの全件結合、N11 evidence、OS artifactとの結合は未完 |
 | Buffer工程 B0〜B6 | 7 | `docs/緩衝基盤_rev5補遺_QC/`・v4仕様S06 | B0〜B4の限定CLOSEDを保持、B5 OPEN、B6未成立。詳細Consumer照合が未完 |
@@ -4825,7 +4911,7 @@ Phase 21〜23の3行は各E0-04全21項目を記録し、69件（67 unique path�
 ## 次のE0照合作業
 
 1. N01〜N10のE0-04 21項目は現行SourceSHAへ個別照合済み。各製品AcceptanceはOPENのまま維持し、N10の五OS実導入・利用・更新・Recovery QAは後続の製品Acceptanceに残す。
-2. C0〜C34個別field記録を維持し、Phase 24〜45／K01〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
+2. C0〜C34個別field記録を維持し、Phase 27〜45／K01〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
 3. BUF-R/TのSourceSHAとConsumer scopeは記録済み。AcceptanceはOPEN。B0〜B6の状態を保持し、原因→effect、N08/N10/N11、OS/Artifact/evidence結合を続ける。
 4. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 5. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
