@@ -3756,7 +3756,7 @@ Phase37のE0-04欄を全21項目で記録し、24件（24 unique path）のSourc
 | K14 Compose/Preview/AI Edit/diff/independent review/controlled apply | N05/N07／D | Settings Compose/Preview→Rust Broker→MCP Tool; AI proposal→Agent Center Task/result／Workspace Inspector（N05/N07） | Desktop sourceはCompose／Preview／MCP Toolとproposal／Task事前検査までWIRED。Previewはrollbackを実行せず、proposalと審査結果・適用差分の独立結合、Broker controlled apply／rollbackはBUILD_GAP。Mobile consumer・installed artifact結合はなし。 |
 | K15 Export/module selection/pruning/identity/Broker/Installer/config consumption | N06/N10／E・G・H・I | Compose config→Exporter→identity/manifest/launcher/package/runtime candidate（N06/N10） | E0-04全21項目を編集前main `4f1eab7e9520e7a6ee68ceba266433ec5ef175d9`へ記録。44 source blobはN06 source表と全一致。runtime config consumption、independent installed app、binary/resource pruningは未成立。 |
 | K16 Windows install/first-run/Setup Doctor/update/rollback/repair/uninstall | N10/N11／G・J | Windows artifact/staging→installed app/Broker→collector/Release Gate（N10/N11） | K16 E0-04全21項目を編集前main `af8d314945f9ee1047acaa77da047352f07c4328`へ記録。N10 Windows/common source 61/61とK16追加source 16/16を照合。一般利用installer-first-run lifecycleとcurrent candidate evidenceは未成立、既存Registry blockerを保持。 |
-| K17 Linux native/macOS/Android/iOS IPC/protection/Device Link/GUI/install | N10およびN01/N02 Mobile／G・H・I | OS native bridge/package→Flutter/Core/Broker/Device Link→standard installed consumer (N10) | Linux nativeは必須。workflow/source候補はOS別だが標準package/installed lifecycle未成立。Mobile Task/MCPはBUILD_GAP、物理端末は不要。 |
+| K17 Linux native/macOS/Android/iOS IPC/protection/Device Link/GUI/install | N10およびN01/N02 Mobile／G・H・I | Linux Runner→Rust launcher/Broker、macOS Runner→native helper/Broker、Android/iOS Flutter→固定Channel→OS native Device Link→Desktop Broker／N10 installed consumer | K17 E0-04 21項目と59 unique source/test/contract blobを現mainへ結合。四OSのsource接続・試験sourceは確認。Linux nativeを必須のまま維持し、通常配布・installed lifecycle・標準OS acceptanceはOPEN。Mobile AgentTask/MCPはBUILD_GAP、物理端末必須条件なし。 |
 | K18 MINIDORA等の外部Runtime/contract接続 | N03/N08／B・F | external Runtime Adapter→Broker Catalog/Task capability/timeout/failure path（N03） | Adapterは外部接続境界。MINIDORA内部実装をCoreへ輸入せず、現production dependencyやTask supportを偽装しない。 |
 | K19 long-run/performance/fault/full regression/docs/release | N09/N11／C・J | local validator/evidence/Manifest/Registry→Conformance/Release Gate (N11) | local validator/source coverageあり。旧C27〜C34限定PASS/FAILは保持。installed product QA/8h/strict releaseは未成立。 |
 | K20 Buffer/root causes/B0〜B6/self-application/side effects/equivalence | N08／F | OS/dependency/cache/process/network cause→Buffer mediation→original Task/Audit/Recovery（N08） | N08 source is Codex CLI TEMP/scratch限定。B0〜B4の限定closedを保持、B5 OPEN/B6未成立、全OS意味・副作用同等性は未検証。 |
@@ -6588,6 +6588,100 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 | 証拠bundle生成 | `tooling/evidence_bundle.py` | `68dead851236b0f1b69899151c37371e593ff3f9` |
 | Blocker Registry／阻害要件登録簿 | `release_blockers.registry.json` | `244adc04a01e7b406c4ebcdeb829f7077d4aa35f` |
 
+#### K17 E0-04個別記録（2026-11-14）
+
+照合基準は編集前main e0606d33d98b52e5fe2d5d9a9662ba45259536eb。これは要求consumer source mappingであり、実装追加・製品Acceptance・OS QAの実行ではない。
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | 現行v4 S05 K17。N10の五OS製品導入、N01/N02のMobile Agent Task・MCP consumer、および工程表R03のH macOS/Linux、I Android/iOSを結ぶOS native bridge／protection／GUI／distribution source mapping。 |
+| 旧ID | Phase 0〜45、P13、C24〜C26等に分散したOS別・Mobile・Device Link履歴。過去statusと証拠は当時のsource／candidate／scopeのまま保持し、現K17の受入へ遡及転記しない。 |
+| 元原文／正本参照 | 現行v4仕様S01/S02、S04 N01/N02/N10、S05 K17、工程表R03-H/I・R07・R10-02、Codex指示I04-H/I・I06・I12。AGENTSのLinux native必須条件、Mobile native transport／秘密境界、物理非Windows端末を要求しない条件。N10のOS候補はsource/config候補であり保証対象の確定値ではない。 |
+| 対象 | Linux native Desktop、macOS Desktop、Android Mobile、iOS MobileのFlutter/OS Runner/native service/Rust Broker IPC、Device Link、Keychain/Keystore、package・導入・更新・撤去・標準OS test source。N01/N02 Mobile Task/MCP consumerの有無を含む。 |
+| 目的 | 各OSの実source producerから実consumerへの現在接続とBUILD_GAPを固定し、debug build・fixture・manual workflow・旧限定evidenceを通常配布・installed product acceptanceへ誤昇格しない。 |
+| 生成元（Producer） | Flutter Desktop/Mobile source、Linux C++ Runner、macOS Swift Runner、Android Kotlin service/store/TLS、iOS Swift service/store/TLS、Rust Linux/macOS launcher/helper/Broker、Device Link Broker、OS別package/build設定、manual workflowとfocused test source。 |
+| 実Consumer | Linuxは `Flutter Linux Runner` の固定 `Broker process channel` から `Rust Linux launcher/worker/Broker` を通り、既存Brokerの導入・更新・端末連携機能を利用する。macOSは `Flutter Runner` の固定 `Broker channel` から同梱 `Rust helper` を経て既存認証Brokerへ接続する。Android/iOSはFlutter固定 `gui_shell/mobile_device_link` channelからOS nativeの `Device Link service/store/TLS` を通ってDesktop Rust Brokerの許可操作だけを中継する。OS package builder/workflowは各OSのbuild artifactを消費する。MobileのAgent Task/MCP operationは現sourceにconsumerなし。 |
+| 契約／Data | 対象はデスクトップの `IPC request/response`、モバイルの `Device Link channel request`、`Broker operation allowlist`、`native credential store`、`TLS transport`、`OS permission/session`、`package manifest/update candidate`。FlutterはUIと秘密を含まない制限付きprojection、Broker requestのみを扱う。招待・端末資格・secret実値は `Android Keystore`／`iOS ThisDeviceOnly Keychain` 等のnative境界に保ち、Flutter snapshot/channel argument/logへ渡さない。Agent metadataや端末連携、OS capabilityはPermission/Approval/Trustを生成せず、Rust Brokerが唯一のAuthority source。 |
+| 通常時作用 | Linux/macOS Desktop UIが既存Rust BrokerへIPCし、Mobile UIは固定channel経由で登録Desktopへの許可済みruntime status/dialogue/notification/stop等を中継するsourceがある。Linux package/update builder、macOS/Apple build、Android Emulator、iOS Simulatorのworkflow/test sourceがある。これはsource上の接続・候補であり、通常利用者の配布から初回設定、実Task、更新・Recovery・撤去までの製品動作を示さない。 |
+| 否定時作用 | 不明operation／malformed・過大channel payload・不正receiptはUI/native boundaryで拒否し、Mobile Task/MCP操作は未許可のまま。native store、TLS、OS permission、Brokerが利用不能ならfallback／別Authority経路へ進めず失敗する。Invalid package/hash/identityやstale updateを既存検査が拒否するsourceがある。これらの製品実動作をK17で再実行していない。 |
+| 停止／Recovery | Linux/macOS helper／launcherにprocess lifecycle・限定Owner channelのsourceがあり、既存Broker install/updateにはstage/rollback等の部分経路がある。Mobile native serviceはcredential/store/transport失敗時に停止し、秘密の平文fallbackをしない。OSごとの一般installerからの中断・crash・update・rollback・repair・uninstallの一貫したinstalled recoveryは未成立で、既存N10 blockerを保持する。 |
+| 標準OS候補 | Linux: GitHub Actions候補は `ubuntu-24.04` 上のX11と隔離 `Weston/Wayland`、別試験scopeの `ubuntu-22.04`。macOS: `macos-15` manual Apple workflow、deployment targetのsource設定 `10.15`。Android: `API 35` Google APIs `x86_64 Emulator`、`compileSdk 37`。iOS: `iPhone 16 Pro`／`iOS 18.5 Simulator`、deployment target `13.0`。いずれも現行workflow/sourceに現れる候補で、保証version/arch/APIではない。Linux native X11/Waylandは必須対象。物理非Windows端末は前提にしない。 |
+| 配布物 | Linux: portable tar.gz候補、bootstrap用d4-pocket-setup .deb、D4PKG01 update payload。bootstrap .debは製品本体installerではない。macOS: debug/build workflow source、通常配布installerと署名/notarization lifecycleは未成立。Android: debug APK/AAB build/install候補。iOS: Simulator debug app candidateで、device distribution artifactとは別。production identity/signingとOS通常配布・更新・撤去は成立を主張しない。 |
+| 既存実装 | Linuxは `Flutter Runner`、`Rust linux_desktop_launcher/worker/product_bundle/workspace_selection/credential_input`、`gui_shell_linux_broker`、`Linux package/export/bootstrap builder`、installer文書、installed smoke/testとmanual workflow。macOSは `Runner AppDelegate/BrokerProcessChannel/AppInfo`、`Rust macOS worker/owner/credential/workspace-selection`、`gui_shell_macos_broker`、Owner UI testとApple workflow。MobileはFlutter Device Link client/controller/UI、Android Kotlin `MainActivity/DeviceLinkNativeService/NativeStore/Models/TLS`、Manifest/Gradle/JVM+instrumentation test、iOS Swift `AppDelegate/DeviceLinkNativeService/TLS/NativeStore/Models`、Entitlements/Xcode project/XCTest/UI test、共有Device Link schemaとBroker consumer。詳細sourceを下表59件へ固定。 |
+| BUILD_GAP | Linux native installed product lifecycleと標準desktop session／配布／更新／撤去QAが未成立。macOS一般配布形式・正式identity/signingとinstalled lifecycleが未成立。Android/iOS通常配布・supported OS/ABI・identity・update/recovery/uninstall acceptanceが未成立。Mobile Agent Task/MCPを実行するBroker-authorized consumerがない。各OSの最低資源・保証対象version/archはUNKNOWN。これらは既存N10/N01/N02/W07/G6-OS/Registry条件に属し、新規blockerにはしない。 |
+| ソース識別値（SourceSHA） | K17 source/test/schema/workflowの59 unique pathを編集前main e0606d33d98b52e5fe2d5d9a9662ba45259536ebからGit blobで取得。表の59/59は現基準へのsource identityでありruntime test結果ではない。N10の既存61 blobとK16の16追加blobはK16時点で照合済み。af8d314945f9ee1047acaa77da047352f07c4328からe0606d33までの差分はManifestとQE文書のみで、製品sourceは不変。 |
+| 試験区分（TestClass） | Rust UNIT/native integration、Linux installed smoke/package testsとmanual X11/Wayland workflow、macOS XCTest/UI testとApple workflow、Android JVM/instrumentationとEmulator workflow、iOS XCTest/UI testとApple workflow、Flutter Device Link client/widget test sourceを分類。今回のK17は文書/source mappingのみ。Rust/Flutter製品test、manual Actions、installed OS実行、実Device Link、OS QAはNOT_RUN。 |
+| 証拠ID | NONE。過去Linux hosted run、旧C24〜C26/P13やdebug/Simulator記録は元commit・candidate・scopeに限定し、現K17/N10のinstalled product acceptanceへ転記しない。 |
+| 阻害要件（Blocker） | 既存Registryのlinux_native_product_support、rev2_mobile_device_evidence、rev2_mobile_distribution、rev2_mobile_flutter_native_device_link_boundary、rev2_flutter_broker_channel_boundary、rev2_desktop_product_distribution等を既存状態のまま参照する。18件中16 unresolved／2 resolved、release_ready=falseを維持。新規Blocker／Evidenceを追加しない。 |
+| 状態 | K17 E0-04全21項目と59 source blobのProducer→Consumer mappingを記録。Source接続はOS/featureごとにCODE_PRESENT/WIRED/BUILD_GAPを分けた。K17/N10/N01/N02製品Acceptance、N11全数Evidence/Blocker/OS Artifact結合はOPEN。Evidence ID NONE。 |
+| 残余 | 対象distro/API/OS/architecture/resource、production package/publisher/signing identity、通常配布から初回起動・installed Task・update/rollback/recovery/uninstall、Linux X11/Wayland installed QA、Mobile端末連携のinstalled QAとAgentTask/MCP実作用、source→artifact→installed runtime provenanceが残る。既存N10/W07/G6-OSとRegistry blockerへ保持する。 |
+
+#### K17 Source SHA・対象ファイル
+
+下表は編集前main e0606d33d98b52e5fe2d5d9a9662ba45259536ebのGit blob識別値である。N10表と重複するsourceもK17 producer/consumerとして再掲し、全行をK17の同一基準へ結合する。識別値はsource同一性だけを示す。
+
+| OS／役割 | 対象ファイル | Git blob識別値 |
+|---|---|---|
+| `Linux UI Runner` | `apps/desktop_flutter/linux/runner/main.cc` | `aed7d44034536c80dd748eac9515be35716d790d` |
+| `Linux Broker IPC` | `apps/desktop_flutter/linux/runner/broker_process_channel.cc` | `98d6f7e73baae7228c25d72d29343a2564291d97` |
+| `Linux Broker IPC contract` | `apps/desktop_flutter/linux/runner/broker_process_channel.h` | `0ee8f4587c6464d98e08a943949bbc369ebb9646` |
+| `Linux launcher` | `native/rust_helper/src/linux_desktop_launcher.rs` | `f58fb226f21093c2d1f062259d394b4f8ec022f6` |
+| `Linux lifecycle worker` | `native/rust_helper/src/linux_desktop_worker.rs` | `c7910e61c78e978d3cfb0c3cf882eed010c4730f` |
+| `Linux product bundle` | `native/rust_helper/src/linux_product_bundle.rs` | `f71ed312c629e81914c61180baeb9723b315a69a` |
+| `Linux Workspace selection` | `native/rust_helper/src/linux_workspace_selection.rs` | `c54d303def7ac93ca2dcd3d1ead22d92c43352a8` |
+| `Linux credential input` | `native/rust_helper/src/linux_credential_input.rs` | `8594403a89e4ed1f8eab38b0bb73c62bbceeb79b` |
+| `Linux Broker binary` | `native/rust_helper/src/bin/gui_shell_linux_broker.rs` | `40e2ad056978b723f9dff91e3cf4242c2e6a26a1` |
+| `Mobile Broker Device Link` | `native/rust_helper/src/broker/device_link.rs` | `c2e1ff88ff34a5764b2b4fb1d3f7abd8727e5c51` |
+| `Shared install consumer` | `native/rust_helper/src/broker/product_install.rs` | `c91115bdf88dd28e5f3445e7ed66127902909677` |
+| `Shared update consumer` | `native/rust_helper/src/broker/update_center.rs` | `f6fc98155fcd476765b60d382a680c7f7c6d675e` |
+| `Linux export builder` | `tooling/export_linux_product.py` | `47fe9a3032a5b2680e3f7d39b7cd64120ac83843` |
+| `Linux product package builder` | `tooling/package_linux_product.py` | `0d32d04ec5b43e1815b3664a323c17db79bc928a` |
+| `Linux bootstrap package builder` | `tooling/package_linux_deb_setup.py` | `e7a057b2f3db2fca8bbe91401e25d71fb88ceca3` |
+| `Linux setup inspection` | `tooling/linux_debian_setup_workflow.py` | `297d1dedc0a633277aa98f40a7162c9ef3627ba9` |
+| `Linux installer boundary` | `installer/linux/README.md` | `25e80411d6ca8f96e6d70718d59c19e7dc6a58e3` |
+| `Linux portable guidance` | `installer/linux/PORTABLE_README_ja.txt` | `703f86b2d113c165f7930f026b842df762f2b205` |
+| `Linux installed smoke producer` | `tooling/tests/linux_installed_product_smoke.py` | `8020ed8d1d68d59cff6acf70c55856fdeb2125e3` |
+| `Linux installed smoke test` | `tooling/tests/test_linux_installed_product_smoke.py` | `dc94f9b782d3699810bbe50230a5e9510a5739f7` |
+| `Linux product package test` | `tooling/tests/test_linux_product_package.py` | `3bb3b520d3c4d15b1f4d43993c8cddb0f0c08ee1` |
+| `Linux manual workflow` | `.github/workflows/linux-manual-export-build.yml` | `8d59dd1e9e54a9a4ebb16992f59a402c1ab77c67` |
+| `macOS Flutter entry` | `apps/desktop_flutter/macos/Runner/AppDelegate.swift` | `b32d02ff0255eae0226b96b5f0a3aa2fe5cfc41f` |
+| `macOS Broker channel` | `apps/desktop_flutter/macos/Runner/BrokerProcessChannel.swift` | `a1269e01608bc194b0f0913a6f96cd489b926155` |
+| `macOS App identity setting` | `apps/desktop_flutter/macos/Runner/Configs/AppInfo.xcconfig` | `b278481bc9b75d1851c11fa67313a2c6cd64c1e3` |
+| `macOS Owner UI test` | `apps/desktop_flutter/macos/RunnerUITests/AdapterOwnerUITests.swift` | `eeab11b1123165a8f82da55ebbb014eab8803862` |
+| `macOS Broker worker` | `native/rust_helper/src/macos_desktop_worker.rs` | `09fa26563fc671e07f23c73f7dd2a7f2cf3fed7e` |
+| `macOS Owner surface` | `native/rust_helper/src/macos_desktop_owner.rs` | `31e13a57fcde422878fae63083bd323e07f482ec` |
+| `macOS credential input` | `native/rust_helper/src/macos_credential_input.rs` | `f4a44a0dd9d374243e38dab8726bb44c51970422` |
+| `macOS Workspace selection` | `native/rust_helper/src/macos_workspace_selection.rs` | `b32123aca163724bc1bc947b18c29443575e748c` |
+| `macOS Broker binary` | `native/rust_helper/src/bin/gui_shell_macos_broker.rs` | `6c830d9de6e3e43bb4d829dae39412799a8704f9` |
+| `macOS installer status` | `installer/macos/README.md` | `b3f3326fa37e9977c47cb0efc7702294a6e1d33a` |
+| `Apple manual workflow` | `.github/workflows/apple-manual-build.yml` | `ed60235da7b35cdfaac23a9fd2d07023e1d29843` |
+| `Mobile Flutter Device Link client` | `apps/mobile_flutter/lib/services/device_link_client.dart` | `e8c49337127cb7f62fad248988b99707c5e49219` |
+| `Mobile Flutter Device Link controller` | `apps/mobile_flutter/lib/services/device_link_controller.dart` | `d8240d454e76ca7917cb1d62bcb41f40e34a976f` |
+| `Mobile Device Link UI` | `apps/mobile_flutter/lib/screens/device_connection.dart` | `4adb15803bf6b208c13aca930bb5496f03b4d6b8` |
+| `Android Flutter host` | `apps/mobile_flutter/android/app/src/main/kotlin/com/example/gui_shell_mobile/MainActivity.kt` | `5c0e28f0ad371f80671d26072bd1c1a134a881d9` |
+| `Android native Device Link service` | `apps/mobile_flutter/android/app/src/main/kotlin/com/example/gui_shell_mobile/DeviceLinkNativeService.kt` | `0fd3c6f5bd09e7a18df9fefe97e2e7bb9e9da706` |
+| `Android native store` | `apps/mobile_flutter/android/app/src/main/kotlin/com/example/gui_shell_mobile/DeviceLinkNativeStore.kt` | `55484d80a94abaad907074defebf116fdcf7aeb7` |
+| `Android native models` | `apps/mobile_flutter/android/app/src/main/kotlin/com/example/gui_shell_mobile/DeviceLinkModels.kt` | `1a14056a1cadb5b9a2d23f4b295b9ed5ad793839` |
+| `Android TLS transport` | `apps/mobile_flutter/android/app/src/main/kotlin/com/example/gui_shell_mobile/DeviceLinkTlsClient.kt` | `c47456791740765ae5c8a311a6dc0777de907027` |
+| `Android OS manifest` | `apps/mobile_flutter/android/app/src/main/AndroidManifest.xml` | `dd33cc927554248e402c699561c15863477c0ff1` |
+| `Android build identity/config` | `apps/mobile_flutter/android/app/build.gradle.kts` | `fe96edfa0f714c2d2be509ce3bc21bec6253a714` |
+| `Android policy test` | `apps/mobile_flutter/android/app/src/test/kotlin/com/example/gui_shell_mobile/DeviceLinkPolicyTest.kt` | `cca69277be00014e8681f59db3a04a4adbb9fb23` |
+| `Android Emulator native product test` | `apps/mobile_flutter/android/app/src/androidTest/kotlin/com/example/gui_shell_mobile/NativeDeviceLinkProductFlowTest.kt` | `4f4a79e0bd80b1f5eb280857dec7a7d5df12258c` |
+| `Android manual Emulator workflow` | `.github/workflows/android-manual-emulator.yml` | `f0c1ecb7185c91375adfbbdbfaf49e55a2672b57` |
+| `iOS Flutter host` | `apps/mobile_flutter/ios/Runner/AppDelegate.swift` | `c5fe56698d097e6e03587de9c1be10107e28e855` |
+| `iOS native Device Link service` | `apps/mobile_flutter/ios/Runner/DeviceLinkNativeService.swift` | `9d185729c439934dce0553b490f2fcd1f7b28a0d` |
+| `iOS TLS transport` | `apps/mobile_flutter/ios/Runner/DeviceLinkTLSClient.swift` | `35163651ca550f198d04dd70db53be82f2e7c737` |
+| `iOS native store` | `apps/mobile_flutter/ios/Runner/DeviceLinkNativeStore.swift` | `04d8e5fcea97b3d05268f593da5a40e212d1e518` |
+| `iOS native models` | `apps/mobile_flutter/ios/Runner/DeviceLinkModels.swift` | `296eda00b60cd8c2c5203cc2e09183f265a2a884` |
+| `iOS Entitlements` | `apps/mobile_flutter/ios/Runner/Runner.entitlements` | `18a645490361df74f9acc3b0f61b2f7f99c6a3b0` |
+| `iOS Xcode project` | `apps/mobile_flutter/ios/Runner.xcodeproj/project.pbxproj` | `73876a3b79b5ee5bd50dea0428764f1632dfcb19` |
+| `iOS Simulator Device Link UI test` | `apps/mobile_flutter/ios/RunnerUITests/DeviceLinkProductUITests.swift` | `b74c1f4a846c07eed9b6ae9244ac18b4f1030eec` |
+| `iOS XCTest` | `apps/mobile_flutter/ios/RunnerTests/RunnerTests.swift` | `86841901b49b5631879d5c1dbdcae99730446b9e` |
+| `Shared Device Link request contract` | `specs/device_link_request.schema.json` | `f0539522c5900148753c3e6eb500c935f7b11ac2` |
+| `Mobile Device Link channel contract` | `specs/mobile_device_link_channel_request.schema.json` | `5de3cbe5f3df5c60df77228e00f6a138ae319578` |
+| `Mobile Workspace selection contract` | `specs/mobile_workspace_selection.schema.json` | `6963dbea6db4e876340ea40bbd13a394fae92e23` |
+| `Mobile local recovery audit contract` | `specs/mobile_local_recovery_audit.schema.json` | `aa30b130979b5f869b5a08cc21315f3918679747` |
+
 ### 要求母集団・照合状態
 
 | 母集団 | 件数 | 正本・原典 | v4 E0状態 |
@@ -6597,7 +6691,7 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 | 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13は全E0-04 fieldを個別記録。P13旧aggregate evidence identity/classは`UNKNOWN`。N11 Evidence/Blocker/OS Artifact全数結合は未完 |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのE0-04 21 fieldを個別記録。旧status維持、N11 Evidence/Blocker/OS Artifact結合と製品Acceptanceは継続 |
 | D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜45はE0-04全21 fieldを個別記録。Evidence/Blocker/OS Artifact全数結合・Acceptance未完 |
-| 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K01〜K16はE0-04全21 fieldとSourceSHAを個別記録済み。K17〜K20の個別fieldとN11 Evidence/Blocker/OS Artifact結合は継続 |
+| 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K01〜K17はE0-04全21 fieldとSourceSHAを個別記録済み。K18〜K20およびN11 Evidence/Blocker/OS Artifact全数結合を継続 |
 | Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 33 IDのscope/Consumer/現証拠境界と各21 fieldを記録。BUF-R/T Acceptance、cause/effectの全件結合、N11 evidence、OS artifactとの結合は未完 |
 | Buffer工程 B0〜B6 | 7 | `docs/緩衝基盤_rev5補遺_QC/`・v4仕様S06 | B0〜B4の限定CLOSEDを保持、B5 OPEN、B6未成立。詳細Consumer照合が未完 |
 | QE/監査 D4-QE-R01〜R13／D4-LNX-T01〜T08／D4-AUD-F01〜F07 | 13／8／7 | `docs/QE_2026-10-22/`・各採用記録 | 旧証拠と現在の実装/Validatorへの接続が未完 |
