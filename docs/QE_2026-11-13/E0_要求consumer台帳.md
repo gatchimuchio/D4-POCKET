@@ -1469,7 +1469,7 @@ P12の旧CLOSED status、test／artifact scope、v4のN01/N09/N10 OPEN状態は�
 | C5／Phase 13 | 評価Dataset/Case/Evaluator/Experiment/Result/Comparison。旧進捗はWindows Broker、owner専用Dataset、決定論評価器、UIとSchema/Conformance/Rust/Flutterの当時検査を記録。実稼働Runtimeの受入とreleaseは未成立。 | N09、K05。 | Evaluation Lab→`EvaluationClient`→Broker `evaluation_control`、Dataset/Experiment/status/compare、既存Dialogue承認経路。詳細はN09 Evaluation/Resource行。 | Evaluationは同一AgentTask IDのtest結果を評価していない。旧検査数・debug画面は現v4 installed QAではない。Runtime横断比較と同一candidate acceptanceはOPEN。 |
 | C6／Phase 14 | 完了Dialogueから明示redaction済みRegression Caseをowner登録。旧進捗はBroker証跡照合、Windows ProtectedStore、hash-only receipt、metadata一覧、Owner確認付きdelete/recoveryのsource/component接続を記録。installed Owner操作未証明、C5 Dataset revisionへのimport未完。 | N09、K05（Regression Case/Evaluation）。Dialogueの実Task/result producerはN01との境界確認が必要。 | Runtime Dialogue pane→送信receiptの要求ID/hash→ownerの明示redacted Case→Rust launcher native confirmation→Broker `回帰Case登録`→結果receipt/終了Audit再照合→Windows ProtectedStore。通常一覧はmetadata only。Current specs/source SHAは次表。 | 旧C6はRuntime Dialogueからの登録で、N09同一AgentTaskのTask bindingを証明しない。C5 Datasetへの自動importは禁止・未実装（独立owner操作/revisionが必要）。Installed product上のOwner登録/delete/recovery実作用は未証明。native confirmationはWindows本人性証明ではない。 |
 
-C6のsource hashは現HEAD `b2e20c2a16e2f324f3848ecc06203103755ceabf`上のGit blob SHA。ここではpath/consumerの同一性を記録し、実行・Acceptanceを意味しない。
+C6 source hash欄は旧crosswalk記録時の照合HEAD `b2e20c2a16e2f324f3848ecc06203103755ceabf`上のGit blob SHA。履歴を保持し、以下の現行E0-04表では現在HEADを別途照合する。いずれもpath/consumerの同一性を記録するもので、実行・Acceptanceを意味しない。
 
 | Source | Blob SHA |
 |---|---|
@@ -2778,6 +2778,308 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 
 24 IDすべてに21 fieldを記録した。これはE0 mappingであり、BUF-T Acceptance、B工程判定、N08/N10/N11受入、E0完了を意味しない。今回の製品runtime／Rust／Flutter／installed OS testは`NOT_RUN`。過去のCLOSED／FAIL／部分PASSは元source・OS・条件の履歴として保持し、再試験・status変更・新規Evidence/Blocker発行を行っていない。
 
+
+## 旧C0〜C6 E0-04個別照合（現行v4）
+
+以下は旧要求IDごとの21-field Source→Consumer mapping。旧状態・旧証拠は上の履歴crosswalkのまま保持し、v4のE0照合状態と製品Acceptanceを分離する。照合HEADはmain `d2355704dd108987ae3469eaa17d62fb38915254`。SourceSHA表はそのHEADにおけるGit blob IDで、source同一性を示す。今回、C0〜C6の製品Rust／Flutter／installed／OS testは再実行していない。CLOSED履歴の再試験、新規Evidence ID・Blockerの発行はない。
+
+### C0 — Baseline再固定
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | C0 Baseline再固定（現行v4ではN11／E0の基準・証拠統治へ対応）。 |
+| 旧ID | C0／Phase 0。旧rev1の「基準検証保存・先行検証整理中」、旧main・検査数・外部logをその時点の履歴として保持。 |
+| 原文参照 | 旧rev1工程表C0。v4仕様S04 N11、S06、採用記録付き三点セット（仕様／工程表／指示書）のmanifest SHAは採用記録に固定。 |
+| 対象 | 現行main／manifest／Schema・example・conformance／検査器／Release Blocker Registry／E0 source台帳の基準同一性。製品機能の実行経路ではない。 |
+| 目的 | 現候補を再現可能なcommit・資産・検査範囲へ束縛し、過去baselineや部分検査を現候補の製品合格へ誤転記しない。 |
+| 生成元（Producer） | 確認済みremote mainとlocal HEAD、追跡ファイル、manifest、正本採用記録、検査器出力、現Registry。 |
+| 実Consumer | manifest.pyがtracked file hashを照合し、release_gate_check.pyが現Registry等を検査する。E0台帳／進捗が要求・source・試験範囲・残余を記録する。三点セット採用hashは採用記録が保持する。 |
+| 契約／Data | Git commit／blob、三点セットSHA-256・Git blob、MANIFEST.sha256.json、release_blockers.registry.json、Schema／Conformance inventory、validation commandとその結果。 |
+| 正常時作用 | 現HEAD・三点セット・追跡manifest・Registry・実行した検査を同じ候補へ結び、旧C0の検査数は旧source／条件に固定する。 |
+| 否定時作用 | remote/local不一致、未保護差分、manifest/hash不一致、正本pin不一致、invalid schema／fixture、Release Gate失敗をPASSへ昇格せず、差分・条件を特定する。 |
+| 停止／Recovery | 既存2世代復旧refを保持し、履歴証拠を上書きしない。不一致時はmanifestまたはRelease判定を成功扱いせず、root cause確認までbaselineを未確定とする。 |
+| 標準OS候補 | Windows／macOS／Linux native／Android／iOS。各OS候補はN10の標準環境表に従う。ここでのsource照合は各OS実行を意味しない。Linux nativeは必須製品対象。 |
+| 配布物 | C0固有の配布物なし。製品artifact／installer／更新・撤去はN10のOS別契約。 |
+| 既存実装 | tooling/manifest.py、tooling/release_gate_check.py、tooling/conformance_tests/run_conformance_skeleton.py、tooling/validate_all.py、Registry、採用記録。 |
+| BUILD_GAP | C0の旧検査結果はv4 candidateのQAではない。全OS installed evidence・Release証拠・E0の全要求結合は未成立。manifest checkだけで全runtimeを保証しない。 |
+| 参照元ハッシュ（SourceSHA） | 現HEAD d2355704dd108987ae3469eaa17d62fb38915254。C0 SourceSHA表の9 pathを参照。自己参照するE0台帳／進捗／生成後MANIFEST blobは循環を避けて含めず、manifest検証結果は独立checkで確認する。 |
+| 試験区分（TestClass） | STATIC_CONFORMANCE／Schema／manifest／Release Gate。旧C0のvalidate_all.py `--desktop-platform windows --include-mobile-release`成功は歴史範囲のみ。本mappingは製品試験NOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。C0の旧外部log／旧commitは当時の証拠に限定し、v4製品Evidenceへ転用しない。 |
+| 阻害要因（Blocker） | comprehensive_extension_rev1_completion等の既存Registry状態を維持。追加／状態変更なし。Registryは18件（16 unresolved／2 resolved）、release_ready=false。 |
+| 状態 | OPEN（E0 mapping対象）。旧C0の履歴statusを変更せず、N11／E0と製品Release判定もOPEN。 |
+| 残余 | 現候補の全要求・source・test・証拠・OS／artifactのN11結合と、最終QA／Release Review。 |
+
+### C1 — 作業領域インスペクタ
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | C1 Workspace Inspector／現行v4 N09、K03。 |
+| 旧ID | C1／Phase 5・6。File Tree、Diff、Tool／Shell履歴、Test結果、Approval／Audit、rollback候補。旧部分実装と未完範囲は履歴crosswalkを維持。 |
+| 原文参照 | 旧rev1工程表C1。v4仕様S04 N09、S05 K03、工程R03-C／R06、施工指示I04-C。 |
+| 対象 | 選択Workspaceのtree／bounded read／比較／差分表示／change list／Recovery previewと、Workspace permission・秘密・root境界。 |
+| 目的 | 利用者が現在のBroker許可範囲内のWorkspace状態と差分を確認し、外部／secret内容を露出させず復旧候補を理解できるようにする。 |
+| 生成元（Producer） | UIのWorkspace選択・許可済みread request、Brokerの登録root・permission・baseline・inspection result。 |
+| 実Consumer | Agent Center／Workspace Inspector→WorkspaceClient→Flutter Broker transport→Rust Brokerのtree／read／compare／change-list／diff／recovery-preview。表示はBroker responseを消費する。 |
+| 契約／Data | workspace_inspection_request／response、workspace_diff、Workspace登録・Task Workspace Permission request、Broker operation／result。結果／diffはWorkspace／baseline基準でTask成果物と同一とは限らない。 |
+| 正常時作用 | Brokerが登録Workspaceと現在Permissionを検査し、bounded tree／read／diff等を返し、UIが現行応答を投影する。Recovery previewは候補の表示にとどまる。 |
+| 否定時作用 | secret／Workspace外／未知root／期限切れPermission／stale request／malformed diffをBroker境界で拒否し、binary／oversize内容はcontract上の制限に従い露出を抑える。 |
+| 停止／Recovery | permission・登録hash・Audit・response bindingの不一致は停止し、実Recovery成功として表示しない。Preview以後のrestore／rollback実作用は別の統治済み経路が必要。 |
+| 標準OS候補 | Desktop Windows／macOS／Linux native。Mobileの限定投影は別Consumerで、Inspector全機能の同等性を示さない。各OSの標準候補はN10参照、Linux native必須。 |
+| 配布物 | C1固有なし。Desktop／Mobileの実installed artifactはN10のOS別候補。形式が未確定の範囲はUNKNOWN。 |
+| 既存実装 | workspace_inspector.dart、workspace_diff_panel.dart、WorkspaceClient、Rust workspace／workspace_root／workspace_reader／workspace_diff／protocol、関連Schemaとtests。 |
+| BUILD_GAP | Task由来のresult／diff artifact・changed files・test resultへの結合、Tool／Shell履歴の実Task表示、実restore／rollback、旧巨大file等の残差は未成立。N09の同一AgentTask投影gapを保持。 |
+| 参照元ハッシュ（SourceSHA） | 照合HEAD d2355704dd108987ae3469eaa17d62fb38915254。C1 SourceSHA表の15 pathを参照。 |
+| 試験区分（TestClass） | UNIT／FIXTURE／WIDGET sourceあり（Flutter workspace_inspector_test、Rust workspace_reader／workspace_diff）。このmappingでは試験NOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。旧C1局所証拠は当時の範囲に限定。 |
+| 阻害要因（Blocker） | N09製品Acceptance OPEN、W00 SCOPED_PASS。専用Blockerの直接帰属はUNKNOWN。Registry変更なし。 |
+| 状態 | OPEN（C1の現行Consumer mapping）。旧C1の部分成立／未完statusを保持し、N09 acceptanceへ昇格しない。 |
+| 残余 | 同一Task result／diff／test投影、Task binding、実復旧作用、installed製品の境界証拠。 |
+
+### C2 — 実行履歴・再実行・分岐
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | C2 History／replay／branch。現行v4 N09、K03。 |
+| 旧ID | C2／Phase 9・10。過去履歴の表示、再実行／分岐における新規要求・識別子・Audit、旧権限の非継承。 |
+| 原文参照 | 旧rev1工程表C2。v4仕様S04 N09、S05 K03、工程R03-C／R06、施工指示I04-C。 |
+| 対象 | AgentTask履歴metadata、Runtime Dialogue履歴・bounded content、Dialogue replay／branchとその新規要求生成。 |
+| 目的 | 記録を参照し再実行を新しい要求として作成し、過去Approval／Permission／Session stateをauthorityとして再利用させない。 |
+| 生成元（Producer） | Brokerの実行履歴・Dialogue recordと、利用者が明示する新しいreplay／branch要求。 |
+| 実Consumer | History screen／content dialog→共有HistoryClient→Broker history access／execution history／dialogue operation。AgentTask history metadataとDialogue replay／branchは異なるoperationとして扱う。 |
+| 契約／Data | runtime_history_access、runtime_execution_history／page、runtime_dialogue_operation／request／response／comparison、runtime_agent_task_history request／access。各recordはidentity・範囲・grantをBrokerで検査する。 |
+| 正常時作用 | 許可されたbounded履歴を表示する。Dialogue replay／branchは元内容を参照して新しい入力／requestを作る。 |
+| 否定時作用 | 履歴改変、invalid／expired grant、closed／別Session・Runtime、旧Approval／Permissionの転用を拒否する。過去履歴やUI stateはApprovalではない。 |
+| 停止／Recovery | identity／grant／Audit不一致は表示・再実行を停止する。AgentTask自体のreplay／restore／crash recoveryの一体consumerは未成立であり、Dialogue replayをそれと称さない。 |
+| 標準OS候補 | Desktop Windows／macOS／Linux native。Mobile history projectionは限定metadataで、Desktop replay／branchの製品同等性を示さない。Linux native必須、OS別候補はN10参照。 |
+| 配布物 | C2固有なし。OS別の通常installed artifactはN10候補に従う。 |
+| 既存実装 | history_screen.dart、history_content_dialog.dart、共有HistoryClient、Broker history_access／execution_history／dialogue／protocol、History／Dialogue SchemaとFlutter tests。 |
+| BUILD_GAP | 表示されたAgentTask historyから同じAgentTaskを新権限・新承認で再実行するconsumer、Task result／Audit／Recoveryを束ねる統合、旧C2のRecovery残差は未成立。Dialogue branchはAgentTask branchではない。 |
+| 参照元ハッシュ（SourceSHA） | 照合HEAD d2355704dd108987ae3469eaa17d62fb38915254。C2 SourceSHA表の20 pathを参照。 |
+| 試験区分（TestClass） | UNIT／FIXTURE／WIDGET sourceあり（history screen/content、runtime dialogue）。本mappingは実行履歴や外部作用を再試験せずNOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。旧C2の限定UI／Broker証拠はその時点のstatusを保持。 |
+| 阻害要因（Blocker） | N09製品Acceptance OPEN。既存Registryの18件状態を維持し、新規帰属／Blockerを作らない。 |
+| 状態 | OPEN（現行source mapping）。 |
+| 残余 | AgentTaskの履歴→新規認可付き再実行、結果／差分／Audit／RecoveryのTask単位結合とinstalled evidence。 |
+
+### C3 — 資源監視
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | C3 Runtime resource observation。現行v4 N09、K04／K10。 |
+| 旧ID | C3／Phase 11。process／CPU／RAM／Disk／Network／uptime、取得可能時のみGPU、Runtime Center表示。旧Windows開発用接続と未実施scopeは履歴crosswalkに保持。 |
+| 原文参照 | 旧rev1工程表C3。v4仕様S04 N09、S05 K04／K10、工程R03-C／R06、施工指示I04-C。 |
+| 対象 | Brokerが取得可能なRuntime資源観測とDesktop／限定Mobile投影。 |
+| 目的 | 計測可能な実値だけを観測として表示し、未取得・非対応・失敗をunknownとして保つ。 |
+| 生成元（Producer） | Rust Broker／OS observation producer。GPU等の値は取得できる場合だけ生成。 |
+| 実Consumer | Runtime Center→RuntimeResourceClient→Broker resource query／RuntimeResourceRegistry。Mobile resource overview／Device Linkは許可された限定projection。 |
+| 契約／Data | runtime_resource_query、runtime_resource_observation、正規化vector、Runtime identity／測定時刻／可用性。権限・Approvalはresource metadataから生成しない。 |
+| 正常時作用 | 現在のRuntimeに対応する測定値を返し、取れないmetricはunknown／unavailableとして投影する。 |
+| 否定時作用 | 未取得を0として捏造しない。invalid Runtime／metric／timestamp、stale observation、unauthorized Mobile requestを拒否またはunknownにする。 |
+| 停止／Recovery | Sourceが停止・観測不能なら古い値を新値として表示せずstale／unknown化する。観測失敗でRuntime processを起動・停止しない。 |
+| 標準OS候補 | Windows／macOS／Linux native Desktop、Android／iOSの限定Mobile observation。全OSの標準環境候補はN10参照。Linux native必須。各OSの実測・installed QAは未確立。 |
+| 配布物 | C3固有なし。各OS配布候補はN10。 |
+| 既存実装 | `runtime_center.dart`、デスクトップ／共通の`RuntimeResourceClient`、`resource_overview.dart`、`Broker`の`observation_center`／`runtime_registry`／`device_link`、資源Schema・正規化規約・試験源。 |
+| BUILD_GAP | 資源観測は`Runtime` ID単位であり、`AgentTask` IDと結合されず、`Task`結果・実行時間・失敗比較でもない。全OSのインストール済み製品における資源測定・長時間／負荷の受入れは未成立。 |
+| 参照元ハッシュ（SourceSHA） | 照合HEAD d2355704dd108987ae3469eaa17d62fb38915254。C3 SourceSHA表の13 pathを参照。 |
+| 試験区分（TestClass） | UNIT／FIXTURE／WIDGET sourceあり（Desktop／shared／Mobile）。今回試験NOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。このmappingは現行source接続の所在だけを記録する。 |
+| 阻害要因（Blocker） | N09製品Acceptance OPEN。追加Registry項目なし。 |
+| 状態 | OPEN（現行resource consumer mapping）。 |
+| 残余 | Task単位のResource／duration比較、OS installed環境での取得範囲・unknownの表示・計測負荷確認。 |
+
+### C4 — Runtimeライフサイクル
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | C4 Runtime lifecycle。現行v4 N09、K04／K13のRuntime操作境界。 |
+| 旧ID | C4／Phase 12。start／stop／restart／pause／resume／quarantineのcapability-first要求と旧限定debug／fixture実装を履歴として保持。 |
+| 原文参照 | 旧rev1工程表C4。v4仕様S04 N09、S05 K04／K13、工程R03-C／R06、施工指示I04-C。 |
+| 対象 | Broker管理Runtimeの状態照会、capability・Permission・Approval・Audit・Recoveryを介したRuntime lifecycle要求。AgentTask lifecycleとは別対象。 |
+| 目的 | 登録Runtimeに宣言された操作だけを既存Broker Authority経路で実行し、承認・記録・Recoveryを同一要求へ結ぶ。 |
+| 生成元（Producer） | 利用者のRuntime操作要求、Brokerのregistered Runtime／capability／Permission／Approval state。 |
+| 実Consumer | Runtime Center→RuntimeLifecycleClient→Broker lifecycle status／approval／execute→登録Adapter。現Release buildにtrusted lifecycle adapterを同梱しない旨を実装commentが明記。 |
+| 契約／Data | `runtime_lifecycle_request`／`runtime_lifecycle_result`、実行系登録状態・操作能力・要求`hash`、`Permission`／`Approval`／`RecoveryAction`／`Audit`への束縛。 |
+| 正常時作用 | 登録Runtime・対応capability・有効な権限・一回Approval・RecoveryActionが揃った時だけAdapterへ操作し、状態とAudit resultを返す。 |
+| 否定時作用 | unknown Runtime／capability、permission denied、approval missing／expired／stale、invalid transition、Audit失敗、Recovery missingは副作用前に拒否・停止する。 |
+| 停止／Recovery | Adapter失敗・state mismatch・Audit／Recovery不成立を成功へ昇格しない。quarantine／Recovery recordはBrokerの現状態を再確認し、AgentTask停止と混同しない。 |
+| 標準OS候補 | Windows／macOS／Linux native Desktop。Mobile操作が存在してもOSごとのRuntime process authorityを証明しない。Linux native必須。標準環境・実測はN10参照。 |
+| 配布物 | C4固有なし。Runtime adapterの通常配布・有効化もN10および各OS contractへ従う。 |
+| 既存実装 | Runtime Center、Desktop／shared RuntimeLifecycleClient、runtime_lifecycle.rs、runtime_registry.rs、protocol、request/result SchemaとUNIT tests。 |
+| BUILD_GAP | trusted lifecycle adapterが通常Releaseにないためproduction Runtimeへの実作用は未成立。既存fixture/debug接続は製品installed作用ではない。AgentTask単位のpause／resume／restartも別途未接続。 |
+| 参照元ハッシュ（SourceSHA） | 照合HEAD d2355704dd108987ae3469eaa17d62fb38915254。C4 SourceSHA表の10 pathを参照。 |
+| 試験区分（TestClass） | UNIT／FIXTURE／WIDGET sourceあり。旧debug／fixture試験は当時の限定証拠。本mappingのRuntime操作試験NOT_RUN。 |
+| 証拠ID（Evidence ID） | `NONE`。 |
+| 阻害要因（Blocker） | N09製品Acceptance OPEN。existing release blocker registry不変。 |
+| 状態 | `OPEN`（ライフサイクル実装とConsumerの対応付け）。 |
+| 残余 | Trusted production adapter／installed Runtime実作用、state transition・failure・Recoveryの製品経路。 |
+
+### C5 — 評価ラボ
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | C5 Evaluation Lab／現行v4 N09、K05。 |
+| 旧ID | C5／Phase 13。Dataset／Case／Evaluator／Experiment／Result／Comparison、旧Windows Broker／Owner-only dataset・決定論評価器・UIの局所statusを保持。 |
+| 原文参照 | 旧rev1工程表C5。v4仕様S04 N09、S05 K05（LLM Judge単独保証不可）、工程R03-C／R06、施工指示I04-C。 |
+| 対象 | Evaluation Dataset登録・Case／Evaluator定義・Experiment実行・Result閲覧・Runtime横断ComparisonとRegression Caseの別個の明示操作。 |
+| 目的 | 決定論的Evaluatorを基礎に評価入力・対象・結果・比較のidentityを保持し、評価metadataをPermission／Approval／Release Authorityにしない。 |
+| 生成元（Producer） | Ownerが作成・登録したDataset／Case／Evaluatorと明示Experiment要求、Brokerが返すResult／Comparison。 |
+| 実Consumer | Evaluation Lab→EvaluationClient→Broker evaluation_control／evaluation_lab。Regression Case一覧・削除・Recoveryは別RegressionCaseClient／OwnerClientとして接続。 |
+| 契約／Data | evaluation_case／dataset／registration／evaluator／experiment／result／public_result／comparison schemas、runtime IDs、bounded result。LLM judge単独は保証としない。 |
+| 正常時作用 | Brokerが登録済みdataset／runtimeと要求を検査し、決定論評価を実行してExperiment result／ComparisonをUIへ返す。 |
+| 否定時作用 | malformed／unknown Dataset・Runtime、無効Evaluator／Experiment、stale request、Authority metadata混入、private result露出を拒否・制限する。 |
+| 停止／Recovery | Experiment失敗や不完全resultをPASS扱いしない。Audit／result binding不一致は表示・比較を保留。Task失敗やRuntime停止を評価resultで置き換えない。 |
+| 標準OS候補 | Windows／macOS／Linux native Desktop。MobileからのmetadataがあってもEvaluation実行／比較同等性ではない。Linux native必須。N10標準環境参照。 |
+| 配布物 | C5固有なし。各OSの候補artifactはN10へ。 |
+| 既存実装 | `evaluation_lab.dart`、デスクトップ／共通の`EvaluationClient`、`evaluation_control.rs`／`evaluation_lab.rs`／`authority.rs`／`protocol.rs`、8件のスキーマ定義、Flutter画面の試験源。 |
+| BUILD_GAP | Evaluation resultは同一AgentTask IDのTask test result・Diff・Auditへ結合されていない。Runtime横断比較／同一candidate acceptanceのinstalled evidenceはOPEN。旧C5 Dataset import gapは維持。 |
+| 参照元ハッシュ（SourceSHA） | 照合HEAD d2355704dd108987ae3469eaa17d62fb38915254。C5 SourceSHA表の17 pathを参照。 |
+| 試験区分（TestClass） | UNIT／FIXTURE／WIDGET sourceあり（Evaluation Lab／shared client）。今回試験NOT_RUN。旧検査数は旧candidateの履歴。 |
+| 証拠ID（Evidence ID） | NONE。旧C5局所証拠をN09 acceptanceへ転用しない。 |
+| 阻害要因（Blocker） | N09製品Acceptance OPEN。Registry 18／16／2とrelease_ready=falseを維持。新規Blockerなし。 |
+| 状態 | `OPEN`（評価機能の`Consumer`対応付け）。 |
+| 残余 | 同一Taskのtest／result／diff／Audit接続、Runtime横断の実結果比較、dataset import／versionとinstalled QA。 |
+
+### C6 — 対話→回帰Case登録
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | C6 `Regression Case`の`Owner`登録。現行v4 N09／K05。`Dialogue`実`Task`はN01／N09の生成元境界。 |
+| 旧ID | C6／Phase 14。完了対話から明示redaction済みRegression CaseをOwner登録。旧Windows ProtectedStore／metadata receipt／Owner delete-recoveryの限定履歴を保持。 |
+| 原文参照 | 旧rev1工程表C6とdocs/specs/regression-case.md。v4仕様S04 N01／N09、S05 K05、工程R03-C／R06、施工指示I04-C。 |
+| 対象 | Runtime Dialogue submission receiptとOwnerが明示redactionしたRegression Caseの登録、metadata listing、Owner delete／recovery。 |
+| 目的 | 内容露出境界を守り明示された回帰入力だけを保存し、Dialogue結果からEvaluation Datasetや権限を暗黙生成しない。 |
+| 生成元（Producer） | Runtime DialogueのBroker-bound submission receipt／Auditと、Ownerが確認したredacted Case payload。 |
+| 実Consumer | Dialogue UI→RuntimeDialogueClient／RegressionCaseOwnerClient→Rust launcher native confirmation→Broker 回帰Case登録→Windows ProtectedStore／receipt。Case listはmetadata-only RegressionCaseClientから読む。 |
+| 契約／Data | runtime_dialogue_submission_receipt、regression_case_registration／receipt／list／delete／recovery schemas。Request hash・source identity・redaction・Owner confirmation・Broker Audit bindingを維持。 |
+| 正常時作用 | Native confirmation後、Brokerがreceipt／Audit／hash／redaction・current policyを再照合し、許可されたCaseを保存してhash-only receipt／metadataを返す。 |
+| 否定時作用 | raw／secret content、tampered receipt、stale request／approval、hash mismatch、unauthorized delete／recoveryを拒否。Native confirmationはWindows本人性・OS account identity proofではない。 |
+| 停止／Recovery | receipt／Audit／stored object mismatch時は成功表示せず、Brokerのfailure状態を維持。Case delete／recoveryは別のOwner-bound request。保存済みCaseが過去Approval／Permissionを与えない。 |
+| 標準OS候補 | Windows Desktop source経路あり。macOS／Linux nativeの同等protected store／native confirmation／installed作用は別OS候補として未確立。Android／iOSは本C6のConsumerではない。Linux native必須製品対象、環境候補はN10参照。 |
+| 配布物 | C6固有なし。ProtectedStore／Owner UIを含む正式OS artifact・installed lifecycleはN10と各OS contractへ接続し、現時点UNKNOWN／未成立。 |
+| 既存実装 | `docs/specs/regression-case.md`、`Dialogue`／`RegressionCase` UI・client、Rust `regression_case`／`protocol`／`ipc_server`／`desktop_launcher`、`Schema`、`UNIT`／`FIXTURE`／`Conformance`の試験源。 |
+| BUILD_GAP | installed製品上のOwner register／delete／recovery実作用と別OS保管・確認経路は未証明。保存CaseからC5 Datasetへの自動importなし（独立Owner操作／revisionが必要）。同一AgentTask ID／result artifactとの完全結合も未証明。 |
+| 参照元ハッシュ（SourceSHA） | 照合HEAD d2355704dd108987ae3469eaa17d62fb38915254。C6 SourceSHA表の25 pathを参照。 |
+| 試験区分（TestClass） | UNIT／FIXTURE／WIDGET／STATIC_CONFORMANCE sourceあり。過去Broker／ProtectedStore evidenceは当時の限定scope。今回installed Owner action NOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。旧証拠を現v4 installed acceptanceへ昇格しない。 |
+| 阻害要因（Blocker） | N09製品Acceptance OPEN。C6専用Blockerの直接帰属はUNKNOWN。Registryに追加／状態変更なし。 |
+| 状態 | OPEN（source mapping）。旧C6の局所statusは履歴のまま。 |
+| 残余 | 現candidate installed Owner action、OS別ProtectedStore／confirmation、Task ID／redacted result binding、Evaluation Datasetへの明示import path。 |
+
+### C0〜C6 SourceSHA（現HEAD d2355704）
+
+各hashは`git rev-parse HEAD:path`で得たGit blob ID。pathの存在・同一性だけを証明し、test実行・runtime接続・OS installed Acceptanceを証明しない。C0の三点セットは採用記録にpinされた原本SHA-256と対応する現行Git blobを示す。
+
+| 旧ID | `Source path` | `Git blob SHA` |
+|---|---|---|
+| C0 | docs/QE_2026-11-13/01_D4Pocket_統合製品実装仕様書_v4.md | 352c53180cbad07888beb956aad0fb2a58074c58 |
+| C0 | docs/QE_2026-11-13/02_D4Pocket_統合開発工程表_v4.md | d32dd251e5f7cbb97d92f6e7540d6b6ed0ecec05 |
+| C0 | docs/QE_2026-11-13/03_D4Pocket_Codex施工指示書_v4.md | 49447973e88c50a09b2f4978adfed84fd464c6d0 |
+| C0 | docs/QE_2026-11-13/採用記録.md | f159c1aa6ea5bc6e80e0877d8068f7e44da4c4d3 |
+| C0 | release_blockers.registry.json | 244adc04a01e7b406c4ebcdeb829f7077d4aa35f |
+| C0 | tooling/manifest.py | aa4525ff20293cb8641e5598a2439561a3bfbd3b |
+| C0 | tooling/release_gate_check.py | 22a8d7bfe9adb259f44ce8501fb215652e1d58c6 |
+| C0 | tooling/conformance_tests/run_conformance_skeleton.py | c6f31d8cb561b48513c6784e54c85969c9cb953e |
+| C0 | tooling/validate_all.py | 2744f9a10702872f6dc0aad705f922466fc198fc |
+| C1 | apps/desktop_flutter/lib/screens/workspace_inspector.dart | a02c95ec5062583f9c37523fbaf604a8d2da107e |
+| C1 | apps/desktop_flutter/lib/screens/workspace_diff_panel.dart | 5e2154b870921a707b3da9a79c9f55055ce3cb1f |
+| C1 | apps/desktop_flutter/lib/services/workspace_client.dart | 870b48e8f4bbd648bcfebc5886addca3784bcfaf |
+| C1 | native/rust_helper/src/broker/workspace.rs | 68075d680a3c7d57785083e64d3d21523d79374c |
+| C1 | native/rust_helper/src/broker/workspace_root.rs | 15f208e0b855b8cee53e878d2b27aaf457ea2937 |
+| C1 | native/rust_helper/src/workspace_reader.rs | 3d635b50f85cffb6db382ed3c061ff6068238099 |
+| C1 | native/rust_helper/src/workspace_diff.rs | 990041d9f2a67e2d372371e74fafb225e4e78e79 |
+| C1 | native/rust_helper/src/broker/protocol.rs | 9b2076d5f31ca6d77f1f87973d1b394aaf751961 |
+| C1 | specs/workspace_inspection_request.schema.json | a8210c300b2909c040188d0766633f1e30884e7a |
+| C1 | specs/workspace_inspection_response.schema.json | 6cc9f80f4dd9b8bd9f71441bee845017428fa38a |
+| C1 | specs/workspace_diff.schema.json | 1389ad85c48e263e688ab6dfa5276f96eb26fef0 |
+| C1 | specs/agent_task_workspace_permission_request.schema.json | 05f7a7f97c7bac884ce706cc7f1533792c35e486 |
+| C1 | apps/desktop_flutter/test/workspace_inspector_test.dart | 2f6e53c2a38d5e23c88f2ad91e079bf8be4808a5 |
+| C1 | native/rust_helper/tests/workspace_reader.rs | 4723cbb121a0fe50d2e73ad6592ca9eac6c42a39 |
+| C1 | native/rust_helper/tests/workspace_diff.rs | a467a45c233112c6f81ab8ffe504781e53aa937c |
+| C2 | apps/desktop_flutter/lib/screens/history_screen.dart | dacc4c0ca15325c7f597cd1827a6455fb8ab5560 |
+| C2 | apps/desktop_flutter/lib/screens/history_content_dialog.dart | 4602a29edc7a0c7c2b90e5b3b8a55155a28cfdb6 |
+| C2 | packages/gui_shell_ui/lib/src/history_client.dart | 7f14ec2caf8b1e383bbf93483ae052100f921ae7 |
+| C2 | native/rust_helper/src/broker/history_access.rs | c004056b45c2f26859bf7f70a9ff2b632e358523 |
+| C2 | native/rust_helper/src/broker/execution_history.rs | 8eeb1c26d06a9e4b01806413a4bfa8c2a73357d6 |
+| C2 | native/rust_helper/src/broker/dialogue.rs | c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999 |
+| C2 | native/rust_helper/src/broker/protocol.rs | 9b2076d5f31ca6d77f1f87973d1b394aaf751961 |
+| C2 | specs/runtime_history_access.schema.json | 8187ddce917c3e80f40c8ce1c4b89059277f1cfd |
+| C2 | specs/runtime_execution_history.schema.json | 5b260e9b6026758dc0a730d3381b4f7d72ba2e98 |
+| C2 | specs/runtime_execution_history_page.schema.json | e6dab615707d30c9266df7dc67fc90df24d0ed9b |
+| C2 | specs/runtime_dialogue_operation.schema.json | 8793ab0f59ea2320b7102afec7256cfe62264fc5 |
+| C2 | specs/runtime_dialogue_request.schema.json | fe0bd153eaf3a0a2354b25cffc3ed9af934fbae1 |
+| C2 | specs/runtime_dialogue_response.schema.json | 5e7220e8ce5954057ee270cd77cb4a68e1ef830f |
+| C2 | specs/runtime_dialogue_comparison.schema.json | 874dd1158a6aa911ff30d85e141b4bd4927c91e3 |
+| C2 | specs/runtime_agent_task_history_request.schema.json | 0bff21625a0f339367ae8352910b643b1f76b361 |
+| C2 | specs/runtime_agent_task_history_access.schema.json | baddfeb38762fe0a04513cb1edcfcd258bd804ed |
+| C2 | apps/desktop_flutter/test/history_screen_test.dart | 7828dc17fbf50cd0a2dca3255d90c3760030e58f |
+| C2 | apps/desktop_flutter/test/history_content_test.dart | af34c1e4e61415916fe651a3f5096a95f946022b |
+| C2/C6 | apps/desktop_flutter/test/runtime_dialogue_test.dart | 899912f92ee3751f8616632d434e04f95ee5ef77 |
+| C2 | packages/gui_shell_ui/test/runtime_dialogue_test.dart | f997ac25c0d8227e2898dc6d1351d324911324e4 |
+| C3 | apps/desktop_flutter/lib/screens/runtime_center.dart | d2c7af172073d2b10c76a6416b90f011f10e95db |
+| C3 | apps/desktop_flutter/lib/services/runtime_resource_client.dart | d8da9ebee9afdd64b8d1d3afa0a82f3a4cb53cfd |
+| C3 | packages/gui_shell_ui/lib/src/runtime_resource_client.dart | 3a8e611b94136e27f6d132e550a49bcbaf586eaf |
+| C3 | apps/mobile_flutter/lib/screens/resource_overview.dart | 322af6bc2935c571017dab3f03b9c7a0cea7c616 |
+| C3/C4 | native/rust_helper/src/broker/runtime_registry.rs | 9ff28610862586a599848d75f9e891a6c6cadf2f |
+| C3 | native/rust_helper/src/broker/observation_center.rs | 62896e497a0d78267020db6bae2ecadf704fa1fb |
+| C3 | native/rust_helper/src/broker/device_link.rs | c2e1ff88ff34a5764b2b4fb1d3f7abd8727e5c51 |
+| C3 | specs/runtime_resource_query.schema.json | c7617ba9c2283255fb04b6cfa529ff7b04f6137f |
+| C3 | specs/runtime_resource_observation.schema.json | 62f587b8c88d0c5c0bd316eaa3d0a15c9c1bd2d1 |
+| C3 | tooling/canonicalization_vectors/runtime_resource_observation_decimal.json | ce00c0ea9571409a707c4e1993069c61761cb6a0 |
+| C3 | apps/desktop_flutter/test/runtime_resource_test.dart | c44d66bb3797bf523be0f48f24d626068b8e4894 |
+| C3 | packages/gui_shell_ui/test/runtime_resource_client_test.dart | 46c52c83eab712e5b84599c7e29eed660af0ed12 |
+| C3 | apps/mobile_flutter/test/resource_overview_test.dart | 7695155627699274b8c0768c0de302344caa9eec |
+| C4 | apps/desktop_flutter/lib/screens/runtime_center.dart | d2c7af172073d2b10c76a6416b90f011f10e95db |
+| C4 | apps/desktop_flutter/lib/services/runtime_lifecycle_client.dart | 332e438a3d67fc01118ca6cc48745a372c44e01e |
+| C4 | packages/gui_shell_ui/lib/src/runtime_lifecycle_client.dart | d34d773ec25f21bb682577faa7688d350921f059 |
+| C4 | native/rust_helper/src/broker/runtime_lifecycle.rs | 2746ec301e9a47a5ececf1485ca7ad8a17304388 |
+| C4 | native/rust_helper/src/broker/protocol.rs | 9b2076d5f31ca6d77f1f87973d1b394aaf751961 |
+| C4 | specs/runtime_lifecycle_request.schema.json | 7c1ae69a0088cd32593481c7c803c4219baa6444 |
+| C4 | specs/runtime_lifecycle_result.schema.json | 1695ec8c3cc2d2e492ff0ac326f8990ec00fe77e |
+| C4 | apps/desktop_flutter/test/runtime_lifecycle_test.dart | 57cb17c453c3a50169d3f9e39de150c691e8e160 |
+| C4 | packages/gui_shell_ui/test/runtime_lifecycle_client_test.dart | 1b1f274cdcd8d4cf92225db173eafcc09c0c9b8f |
+| C5 | apps/desktop_flutter/lib/screens/evaluation_lab.dart | b74b3e96e7cd746874d1e19e05175548a5c66192 |
+| C5 | apps/desktop_flutter/lib/services/evaluation_client.dart | d617dbbf10334754652a131e8612d3ca99aa61e6 |
+| C5 | packages/gui_shell_ui/lib/src/evaluation_client.dart | 3fe93e4a19bcba7c825f2a6e887f96f00016aa75 |
+| C5 | native/rust_helper/src/broker/evaluation_control.rs | 570485772c3fce43d170d031f1769b7617214d40 |
+| C5 | native/rust_helper/src/broker/evaluation_lab.rs | 3645202da2597e5f63cf9ef96a891e9ae801e2b2 |
+| C5 | native/rust_helper/src/broker/authority.rs | 067a36442138897aac396bdb588c2e01f90a5318 |
+| C5 | native/rust_helper/src/broker/protocol.rs | 9b2076d5f31ca6d77f1f87973d1b394aaf751961 |
+| C5 | specs/evaluation_case.schema.json | 5fed01706bb374697294ccb19eec1ae309d53f6a |
+| C5 | specs/evaluation_dataset.schema.json | 8a90b7248e16c04d7b51ab9bca0a9a5f6c459ed1 |
+| C5 | specs/evaluation_dataset_registration.schema.json | a79c103e32229dc47d263e62c05914624085610b |
+| C5 | specs/evaluation_evaluator.schema.json | d2d5298afc927dfb82c73f136db7dce77bdccf13 |
+| C5 | specs/evaluation_experiment.schema.json | e35d7a242a0a9d318900673df9fb900e841b93a2 |
+| C5 | specs/evaluation_result.schema.json | f1b994e19dfaf1473a615cbf1347de22f72ccbed |
+| C5 | specs/evaluation_public_result.schema.json | 77a285a53a0473fc4185d18b37b863f90be71ada |
+| C5 | specs/evaluation_comparison.schema.json | 124af9c4e4def4c048751e911809b6f2ed3b577a |
+| C5 | apps/desktop_flutter/test/evaluation_lab_test.dart | 9b068a34d9d22743bee74ba409c8d95bee938638 |
+| C5 | packages/gui_shell_ui/test/evaluation_client_test.dart | 044d71b4b18b7efa8891a7df735f28e6ed674ac1 |
+| C6 | docs/specs/regression-case.md | ce58a891facfca9f1e8e498e13bf983011350ba3 |
+| C6 | specs/runtime_dialogue_submission_receipt.schema.json | 204b7871ab08539c16da2431541a5764b023f1fe |
+| C6 | specs/regression_case_registration.schema.json | 04165813e2791196c38fe515c84b4e1adeefd000 |
+| C6 | specs/regression_case_receipt.schema.json | 3defc85eab0e8ed4ebac4ba85a1a5b83de6016a4 |
+| C6 | specs/regression_case_list_request.schema.json | 72ded3ae0e37214b442811ba973bdf4a490aa854 |
+| C6 | specs/regression_case_list.schema.json | a7f99f9784b287b7bb21678bc12ab531debf5af0 |
+| C6 | specs/regression_case_delete_request.schema.json | 7ed67c02cb4796da94adc6dd0b1674f4b8a91ca4 |
+| C6 | specs/regression_case_delete_receipt.schema.json | d051f4e795f8c05051356b0f1d1dc89947db3633 |
+| C6 | specs/regression_case_delete_recovery_request.schema.json | c69d71ef2f07a2a7090ba3d0d648448c60ca1c4e |
+| C6 | specs/regression_case_delete_recovery_receipt.schema.json | b9b1de18f811bc03f38d5dfaa497f673e335e496 |
+| C6 | native/rust_helper/src/broker/regression_case.rs | cf229213a54f0eaa512781fb417692506bf06775 |
+| C6 | native/rust_helper/src/broker/protocol.rs | 9b2076d5f31ca6d77f1f87973d1b394aaf751961 |
+| C6 | native/rust_helper/src/broker/ipc_server.rs | 58a404b920ef5905e174668ec2de0e04a9e8b044 |
+| C6 | native/rust_helper/src/desktop_launcher.rs | 6a9f335de07fa474ca10043aea63ad6e988b572d |
+| C6 | packages/gui_shell_ui/lib/src/runtime_dialogue_client.dart | 44f810aa2509a8a28ddf2933a5491528f3b07147 |
+| C6 | packages/gui_shell_ui/lib/src/runtime_dialogue.dart | f78083b376f80d06f284387bb8b7aa2d769141bf |
+| C6 | packages/gui_shell_ui/lib/src/regression_case_owner_client.dart | 1f1d10cecca70dff2075bed1e5f331267e0ea296 |
+| C6 | packages/gui_shell_ui/lib/src/regression_case_client.dart | f14bd4aeda1d6f3262cdb1be4b924884d7128e5b |
+| C6 | apps/desktop_flutter/lib/screens/runtime_dialogue.dart | 803edd0a687acdfd00e19898fbb5ba6b85ce1449 |
+| C6 | apps/desktop_flutter/lib/services/runtime_dialogue_client.dart | a0853ee7327cafa60ee89b0c5ee49312b73c46c4 |
+| C6 | apps/desktop_flutter/lib/services/regression_case_client.dart | c29054e8b6256b15f097bd5e7de57b9cf2117e3a |
+| C6 | packages/gui_shell_ui/test/regression_case_owner_client_test.dart | 48a895c5a2f139eb2823df67f4aad3e1b8639748 |
+| C6 | packages/gui_shell_ui/test/regression_case_client_test.dart | a30a002abf021730f0ba09e66126ebbb2a39e12a |
+| C6 | tooling/conformance_tests/run_conformance_skeleton.py | c6f31d8cb561b48513c6784e54c85969c9cb953e |
+
+上記C0〜C6の各行は現HEADのpath/blob対を照合したsource mappingである。E0-04は21 fieldを満たすが、C1〜C6の製品Acceptance・N09・N11・全体E0はOPENのまま。各Cの詳細なProducer→Consumer境界、差分、履歴statusを本節と上記crosswalkで保持する。
 
 ## v4対応：Buffer工程B0〜B6のAcceptance→Consumer／証拠crosswalk
 
