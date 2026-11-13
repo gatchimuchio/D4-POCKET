@@ -269,6 +269,67 @@ LedgerのE0-04列は、現ID、旧ID、原文参照、対象、目的、Producer
 | 既存Runtime証拠 | `docs/REV3_PROGRESS.md`の過去installed候補ではMxC `mxc_appcontainer` TEMP write失敗が複数記録され、別runではchild中write PASSでもTaskは別のcontinuation timeoutでfailed、probe cleanupは`not_attempted`だった。別記録のD4-owned `.d4p-tmp-*` journalが空でもMxC TEMP物理削除は未証明。これらは限定`LIVE_RUNTIME`＋`FIXTURE`履歴であり、N08全体PASSへ昇格しない。MxC AppContainer TEMPとD4-owned WorkspaceTaskScratchは別責任境界として保持する。 |
 | TestClass / Gap / 状態 | `codex_cli.rs`にenvironment binding、cleanup failure/Recovery、並行Task isolation tests、`agent_task_scratch.rs`にrestart recovery/identity mismatch tests、`dialogue.rs`にobservation mismatch/Audit failure/terminal projection tests、`protocol.rs`にBroker crash/restart scratch recovery tests、Flutter Agent Task state/UI hash-only projection tests、static schema fixturesが存在。Rust unit/fixture/conformanceは本単位`NOT_RUN`。既存実装はCodex Task scratch/TEMPの限定調停であり、全OS/API/ABI/toolchain/cache/process/network/OneDrive原因母集団、調停前後の同条件効果・副作用比較、B5自己適用、B6全Consumer/QCは未成立。B0〜B4の限定CLOSED、B5 `OPEN`、B6未成立を維持し、N08/W08/G7は`OPEN`。 |
 
+#### N08 E0-04 21項目の個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | N08（OS／API／ABI／toolchain／cache／process／network／OneDrive差異→意味保持調停→元Task成立） |
+| 旧ID | v4 S06のBUF-R01〜R09、BUF-T01〜T24、B0〜B6。既存製品能力K07／K20、施工線F、W08/G7へ接続する。既存B0〜B4の限定CLOSEDとB5／B6の現状態は維持する。 |
+| 原文参照 | v4仕様S04 N08・S06、工程表R03-F／R06／R09、指示書I04-F。採用済み緩衝補遺の要求意味・証拠履歴・BUF／B工程の詳細は補助参照とし、v4の現状態を上書きしない。 |
+| 対象 | 元Taskの要求・成功条件・権限・Host／Workspaceを保ったまま、環境差・依存・一時状態・失敗を緩衝処理し、元Toolの作用・結果・副作用へ接続する責任境界。現行実consumerはCodex Agent TaskのWorkspaceTaskScratch／TEMP bindingとBroker記録へ限定される。 |
+| 目的 | 下位の互換変換・隔離・状態調停・実行再構成が有効な場合にBufferが実施し、元のTask意味を保った成功または明示失敗へ戻す。未知・未証明を成功として隠さず、Authorityを緩和しない。 |
+| 生成元（`Producer`） | Rust BrokerのAgentTask request／Runtime／Workspace／Host binding、Codex CLI実行環境、Task scratch作成・cleanup観測、元Toolの終了値とresult hash。開発時はCargo／Flutterの隔離runnerが環境・source差分を扱う。 |
+| 実Consumer | Codex AdapterはBrokerから渡されたTask／Workspace／Recovery contextで`.d4p-tmp-*`を作り、`TEMP`／`TMP`（Linuxでは`TMPDIR`も）とCodex sandbox overrideを束縛する。Broker Protocolは永続scratch journalを開き、Workspace登録時にRecoveryを行う。DialogueはTask bindingを照合し、成功結果＋observationがある場合にv2記録／Audit／terminal historyを作る。AgentTask stateはhash-onlyを返し、Flutter Agent Centerがstatus／hash／Audit IDを表示する。`run_cargo_isolated.py`／`flutter_workspace.py`は開発用Consumerであり、製品Bufferではない。 |
+| 契約／Data | `buffer_intervention_record.schema.json` v2はTask／Broker session由来Host／Workspace／入力・Toolchain指紋・介入・実作用・元Tool結果・証拠・未解決理由を含む非権限記録。`agent_task_scratch_recovery.schema.json`は最大256件のbounded journalを定義する。Task terminal historyは記録hash／状態／Audit IDだけを保持し、UI projectionは`hash_only`。Schemaの存在・fixture合格はruntimeでのSchema実行や意味同等性を証明しない。 |
+| 正常時作用 | 登録Workspace root identityを固定してTask専用scratchをjournalへ予約・作成し、OS別TEMP環境を束縛して元Codex Taskを実行する。成功結果、終了値、Task binding一致、cleanup observationがそろうとBrokerは調停記録を`作用後未照合`としてAuditし、result／record hashをTask履歴とAgent Centerへ投影する。これはscratch運用の限定接続で、調停成功や意味同等性の判定ではない。 |
+| 否定時作用 | scratch生成／環境binding／cleanupの失敗でTaskを失敗させ、journalを残してRecoveryへ渡す。Workspace／Task／Runtime／Recovery bindingまたはroot／scratch identity不一致、unsafe path、journal HMAC不一致は削除せず拒否・保留する。Tool結果不整合、Broker binding不一致、Audit／record生成失敗はTaskを隔離し、結果／Buffer projectionを返さない。Schema fixtureはAuthority注入と未証明吸収を拒否する。 |
+| 停止／Recovery | bounded・永続journalをBroker起動後に再読し、Workspace ID・Task／Runtime／Recovery binding・root／scratch directory identityが一致した所有scratchだけを回収する。不一致・改竄・安全でないpathはfail-closedで残して保留する。これはTask scratchの限定Recoveryであり、任意のcache／process／network状態や一般Buffer介入を復旧するconsumerではない。 |
+| 標準OS候補 | Windows／macOS／Linux native／Android／iOS。Rust sourceはLinuxで`TMPDIR`を追加束縛する分岐を持つ。現行Agent Task／Buffer UIはDesktop Rust／Flutter経路に限られ、Mobile Flutterの実AgentTask consumerは見つからない。5 OSのinstalled N08作用・保証は本mappingでは未確認。Linux nativeは必須対象で、WSL／headless証拠へ置換しない。 |
+| 配布物 | N08専用の配布物はない。開発用isolated runner、Schema／fixture、source codeは製品配布証拠ではない。各OSの通常Installer／Package／更新・撤去はN10へ接続し、N08 installed AcceptanceはOPEN。 |
+| 既存実装 | `codex_cli.rs`のTask scratch／環境binding、`agent_task_scratch.rs`のbounded journal／回収、`protocol.rs`のBroker起動Recovery、`dialogue.rs`／`execution_history.rs`の記録・Audit・Task state、Flutter `agent_task_client.dart`／Agent Centerのhash-only投影、Cargo／Flutter隔離runner、Buffer／scratch Schemaとstatic Conformance。いずれも限定Consumerとして保持する。 |
+| BUILD_GAP | 汎用Buffer dispatcher／原因選択と、全OS・API／ABI・依存／toolchain・cache・process・network・OneDrive原因のproduction Consumerは見つからない。Task成功にobservationが必須ではなく、observationが`None`ならBuffer記録を作らず成功できる経路がある。`after_state_hash`は予定環境値から構成され、独立readbackではない。Rust生成recordのruntime Schema validation、元Task結果との独立readback・意味比較、調停前後の副作用／因果比較、B5自己適用の全条件、B6の全Consumer結合は未成立。 |
+| `SourceSHA` | 照合HEAD=`885e22bdd2e6beb863abd7c44e975bbc059591f1`。下記30 Git blobを個別照合し、全path／hashが一致した。旧N07/N08 SourceSHA表（HEAD `03f7b92d…`）と既存BUF-R/T全21-field mappingは履歴／別要求として維持する。 |
+| 試験区分（`TestClass`） | Rust UNIT／integration・crash-recovery test、Flutter fake-Broker／widget test、Schema valid／negative fixture、static Conformanceがsourceに存在する。補遺の過去B4／B5／MxC記録は限定scopeの`LIVE_RUNTIME`／`FIXTURE`履歴。これらのRust／Flutter／installed product testは本mapping単位で`NOT_RUN`。 |
+| 証拠ID（`Evidence ID`） | `NONE`。SourceSHA mappingのみで、限定履歴を現行N08 installed Acceptanceへ昇格しない。 |
+| 阻害要因（`Blocker`） | N08／W08/G7、B5は`OPEN`、B6は未成立。既存Registry 18件（16 unresolved／2 resolved）、`release_ready=false`を維持し、新規Blockerは追加しない。 |
+| 状態 | N08 E0-04 mappingは21 field・30 SourceSHAを現HEADへ結合済み。N08製品Acceptance、B5／B6、E0全体は`OPEN`／未成立。 |
+| 残余 | OS／Toolchain差異の完全な原因母集団と実Consumer、元要求・実結果の独立同等性測定、観測欠落時の必須停止、原因に対応した介入・副作用比較、標準5 OSのinstalled経路、B5自己適用とB6結合検査、N11 Evidence／Blocker／Artifactへの全件接続が残る。 |
+
+##### N08 現行ソース識別値（`SourceSHA`）
+
+| `Source file` | `Git blob SHA` |
+|---|---|
+| `native/rust_helper/src/adapters/codex_cli.rs` | `e5c9d1581ae9a1c0a3ae7fcfa626fdca6fea6d28` |
+| `native/rust_helper/src/broker/agent_task_scratch.rs` | `de743cd819fb4533c9c3070c4e7bcae82e42d938` |
+| `native/rust_helper/src/broker/dialogue.rs` | `c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999` |
+| `native/rust_helper/src/broker/execution_history.rs` | `8eeb1c26d06a9e4b01806413a4bfa8c2a73357d6` |
+| `native/rust_helper/src/broker/history_access.rs` | `c004056b45c2f26859bf7f70a9ff2b632e358523` |
+| `native/rust_helper/src/broker/protocol.rs` | `9b2076d5f31ca6d77f1f87973d1b394aaf751961` |
+| `native/rust_helper/src/broker/workspace_root.rs` | `15f208e0b855b8cee53e878d2b27aaf457ea2937` |
+| `native/rust_helper/src/main.rs` | `b0a5df285db357172e7970074d7a67189f3384a3` |
+| `native/rust_helper/tests/agent_task_crash_recovery_e2e.rs` | `23517fcfe8ef94b2357a94e04879d423c3360501` |
+| `native/rust_helper/tests/agent_task_production_e2e.rs` | `fdc7565aa58fa7466e6e24e5492321e8015567eb` |
+| `native/rust_helper/tests/unit/agent_task_fixture_fs.rs` | `d19ac79583b98bec9b828d6e064fe832af95bfa5` |
+| `packages/agent_orchestration/lib/agent_task_client.dart` | `a31fbb9f980a0039f809fd763c91f055fe9d02d0` |
+| `apps/desktop_flutter/lib/screens/agent_center.dart` | `2472faeb31a64d624423c30a0a30d0f153d2e2a3` |
+| `apps/desktop_flutter/test/agent_task_client_test.dart` | `0477a0bbbb321082494b6b55711815d34419fdd9` |
+| `apps/desktop_flutter/test/widget_test.dart` | `f4e9c7b93f832ba2a2cefee779fd12426f240b04` |
+| `specs/buffer_intervention_record.schema.json` | `26a1fa8ee9d010f18c157f5d3b66b9b34bdf94d5` |
+| `specs/agent_task_scratch_recovery.schema.json` | `40f1eac71cd9645396ae7230d49cad25f3b77237` |
+| `examples/contracts/buffer_intervention_record.valid.json` | `3ebaf07e8a6241f9e44b8c78fefa45fa23523abf` |
+| `examples/contracts/invalid/buffer_intervention_record_authority.invalid.json` | `981178ad70376fa633a76a686ed6e7d12287095d` |
+| `examples/contracts/invalid/buffer_intervention_record_unproven_absorption.invalid.json` | `073dbfd11943588e045360dcce2009ae7245ebbf` |
+| `examples/contracts/agent_task_scratch_recovery.valid.json` | `0c5e671a7482da04715fb3cb4ec9cef68429766f` |
+| `examples/contracts/invalid/agent_task_scratch_recovery_absolute_path.invalid.json` | `951d41849671a76f20fbd178b479eeed5983ced7` |
+| `tooling/conformance_tests/run_conformance_skeleton.py` | `c6f31d8cb561b48513c6784e54c85969c9cb953e` |
+| `tooling/run_cargo_isolated.py` | `6890c89b384db2169b92a7326f04dbd2ea6341e1` |
+| `tooling/flutter_workspace.py` | `dab1c73e2dad774fd7c8c385991a4d66a969ca19` |
+| `tooling/conformance_tests/test_run_cargo_isolated.py` | `b5a8c42b6c9fee9f9886b6dd3fb7e39f65530a99` |
+| `docs/specs/agent-task-history.md` | `8fd4cc57560662fc5f5dd5398ade8badeb98f32f` |
+| `docs/specs/content-exposure-policy.md` | `9c07d3ce6bd393a3043ba507e11c0e8abd50f44a` |
+| `docs/specs/process-supervision.md` | `5b07fc9ddacb75eb9e66c547e49201183ae06290` |
+| `docs/specs/failure-injection-validation.md` | `14d2a946f424b0e800a4a271c51da8b5f797dfac` |
+
 ### N07/N08 Source SHA・該当ファイル
 
 blob SHAは照合HEAD `03f7b92d4dc67a544e8fa1e9bbaac5d3d912723e`の値。各fileとroleの詳細は上記traceを参照する。
@@ -2836,7 +2897,7 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 
 | 母集団 | 件数 | 正本・原典 | v4 E0状態 |
 |---|---:|---|---|
-| 新規要求 N01〜N11 | 11 | v4仕様S04 | N01〜N07はE0-04全21項目を現行SourceSHAへ個別結合済み。製品AcceptanceはすべてOPEN、N08〜N11の個別全数照合は未完 |
+| 新規要求 N01〜N11 | 11 | v4仕様S04 | N01〜N08はE0-04全21項目を現行SourceSHAへ個別結合済み。製品AcceptanceはすべてOPEN、N09〜N11の個別全数照合は未完 |
 | 全体施工線 A〜J | 10 | v4工程表R03・Codex指示I04 | 全線同時BUILDのproducer/consumerと現行実装配置を全数照合中 |
 | 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13は全E0-04 fieldを個別記録。P13旧aggregate evidence identity/classは`UNKNOWN`。N11 Evidence/Blocker/OS Artifact全数結合は未完 |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのSource→Consumer crosswalkを記録。個々の全E0-04列とv4 Acceptance／Evidence/N11結合は継続 |
@@ -2883,7 +2944,7 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 
 ## 次のE0照合作業
 
-1. N01〜N07のE0-04 21項目は現行SourceSHAへ個別照合済み。各製品AcceptanceはOPENのまま維持し、次はN08 Buffer／調停の意味保持・前後作用・失敗復旧をProducer・実Consumer・拒否境界へ個別に結合する。
+1. N01〜N08のE0-04 21項目は現行SourceSHAへ個別照合済み。各製品AcceptanceはOPENのまま維持し、次はN09製品操作・観測・RecoveryをProducer・実Consumer・拒否境界へ個別に結合する。
 2. 残るN/P/C/Phase/K要求をCanonical N source/consumer・N11 Evidence/Blocker/OS Artifactへ接続する。旧CLOSED/FAILは履歴として保持し、再試験しない。
 3. BUF-R/TのSourceSHAとConsumer scopeは記録済み。AcceptanceはOPEN。B0〜B6の状態を保持し、原因→effect、N08/N10/N11、OS/Artifact/evidence結合を続ける。
 4. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
