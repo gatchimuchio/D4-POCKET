@@ -1901,6 +1901,248 @@ C7〜C14の旧Source/Schema/test blob SHA一覧は履歴として保持した。
 
 C15〜C23の旧statusはrev1履歴として保持した。source/schema/test blob SHAとSource→Consumer対応は現行候補の同一性を示すだけで、test実行や製品Acceptance evidenceではない。A2A／Host／Adapter／Desktop surfaceの製品受入れは未判定、N03/N04/N09/N10および関連KのOPEN状態を維持する。C0〜C34の35 IDはcrosswalk済みだが、全E0-04列、Phase/K等の全数照合とE0完了は未成立である。
 
+### C15〜C23 E0-04全21項目の現行Source→Consumer照合（2026-11-13）
+
+変更前main f66234f46a22366dc1f63ef46ea933e583e7884cで既存C15〜C23 source表63 pathを照合し、63/63が同一Git blob SHA。照合baseline 3c188ae54de6ea353490a60d91c1a75757d06e74以降、対象source pathの変更は0。以下は旧要求ごとの全field mappingであり、旧status、新N受入れ、E3 BUILD_COVERED、五OS QAを変更しない。本mappingでの製品Rust／Flutter／installed試験はNOT_RUN、Evidence IDはNONE。
+
+#### C15 A2A外部概念Contract
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | C15 A2A外部Agent Card／Task／Message／Artifact／Streamの境界付き契約射影。 |
+| 旧ID | 総合機能拡張rev1 C15／Phase 24。metadata-only Schema、Authority Strip、Trust非生成と当時の未接続範囲を履歴保持。 |
+| 原文参照 | rev1実装仕様・工程・進捗C15／Phase 24、docs/D4_POCKET_PHASE_MAPPING.md、v4仕様S03 ARC-D・S04 N04・S05 K11、docs/specs/a2a-contract.md。 |
+| 対象 | 外部A2A v1.0のCard、Task、Message、Artifact、Stream概念と認証要件を内部の未信頼metadataへ射影する契約。 |
+| 目的 | 外部状態・能力・本文をTrust、Permission、Approval、Audit identity、Authorityへ変換せず、対応形状のみを限定的に受け取る。 |
+| 生成元（Producer） | 外部Agent CardとA2A response／eventが未信頼入力を生成する。C15契約自体は外部作用を起動しない。 |
+| 実Consumer | specs/a2a_contract.schema.json、Rust a2a.rsのparse／validation、Broker a2a_centerとC16接続処理。 |
+| 契約／Data | Card／Task／Message／Artifact／Streamの限定field、hash、状態、part種別、securityRequirements／securitySchemesの有無。raw本文・秘密・Authority fieldは投影しない。 |
+| 正常時作用 | 対応形状をbounded metadataへ正規化する。security要件が未設定または空の場合だけ、C16の限定一回Message経路へ候補を渡す。 |
+| 否定時作用 | malformed／unknown構造、未知variant、外部Authority／Credential field、非空または不正なsecurity要件を拒否する。 |
+| 停止／Recovery | parse／Schema／identity検査が不成立ならdispatchしない。外部作用後の応答不明はunknown／SUSPENDで止め、自動再送しない。 |
+| 標準OS候補 | Schemaは共通。Desktop作用sourceはWindows／Linux。macOSはCard／metadata-only、Message等は未対応。Mobile consumer未確認。Linux nativeは必須だがinstalled証拠なし。 |
+| 配布物 | 独立配布物なし。D4 Pocket Desktop本体の契約。外部A2A Agentは接続先。 |
+| 既存実装 | Contract文書・Schema、Rust parser／Broker consumer、Authority境界と否定条件、A2A接続fixture sourceあり。外部相互運用・Trust lifecycleは未成立。 |
+| BUILD_GAP | 外部Agentとのinstalled相互運用、外部Agent identity／Trust lifecycle、Mobile consumer、全OSの実consumerは未成立。 |
+| ソース識別値（SourceSHA） | C15〜C23 SourceSHA表のa2a-contract.md、a2a_contract.schema.json、a2a.rs、a2a_connection_center_test.dart等を現HEADへ照合し63/63一致。 |
+| 試験区分（TestClass） | Schema／Rust UNIT／FIXTURE sourceあり。本mappingではNOT_RUN。外部Agent installed試験ではない。 |
+| 証拠ID（Evidence ID） | NONE。Contract／Schema／fixtureを外部Agent実動Acceptanceへ昇格しない。 |
+| 阻害要因（Blocker） | Registry 18件は不変。comprehensive_extension_rev1_completionはunresolved。C15個別の正式Registry対応はUNKNOWN。 |
+| 状態 | C15 E0-04 mapping記載済み。旧status不変。N04／W03／E0製品AcceptanceはOPEN。 |
+| 残余 | 外部AgentでのContract相互運用、Trust評価との境界、標準installed consumer、N11 Evidence／Artifact結合。 |
+
+#### C16 A2A接続センター
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | C16 外部A2A Agentの接続・一回作用・限定Task／Artifact projectionを行うDesktop Center。 |
+| 旧ID | 総合機能拡張rev1 C16／Phase 25。Owner Card取得、loopback HTTP、receipt／一覧と当時の未完範囲を履歴保持。 |
+| 原文参照 | rev1実装仕様・工程・進捗C16／Phase 25、docs/D4_POCKET_PHASE_MAPPING.md、v4仕様S04 N04・S05 K02/K11、a2a-connection-center.md、a2a-streaming.md、macos-a2a-center.md。 |
+| 対象 | Flutter CenterからBrokerへ接続し、Windows／Linux Desktopで一回SendMessage、明示一回GetTask／Stream、選択済みtext Artifact表示とTask preflightを行う範囲。 |
+| 目的 | 外部作用をendpoint／Agent／interfaceへ束縛したnative確認・一回Permission・Auditへ通し、応答をAuthorityにせず失敗をunknownで止める。 |
+| 生成元（Producer） | Operatorの明示接続／送信／状態照会／Artifact選択要求と、接続先AgentのCard／Message／Task／Stream応答。 |
+| 実Consumer | Flutter a2a_connection_center／A2aConnectionClient→通常Broker a2a_center→Rust a2a.rs HTTP(S)。ArtifactはFlutter handoff preflight／Agent Task要求へ接続する。 |
+| 契約／Data | A2A connection／receipt／message／stream／task schemas、Agent ID、interface／request／response hash、Audit ID、限定Artifact ID／hash／text parts。 |
+| 正常時作用 | native Owner確認・永続Audit・一回Permission後に限定要求を一度送る。Artifactは内容表示確認後に未信頼Task draftへ渡す。受信Task開始には新規Permission／Approvalが必要。 |
+| 否定時作用 | endpoint／interface stale、malformed応答、未知event、Credential必要、Task／Context不一致、Artifact hash／size／part不適合、Owner／Permission／Audit不成立を拒否する。 |
+| 停止／Recovery | timeout、切断、Audit不確定、Broker再起動はunknown／SUSPEND。retry／reconnect／pollingなし。本文・draftは揮発保持し失敗／切替で消去する。 |
+| 標準OS候補 | Windows／Linux Desktopに限定作用source。macOSはmetadata-only、送信未対応。Android／iOS作用未確認。native installed QA未成立。 |
+| 配布物 | 独立配布物なし。D4 Pocket Desktopへ統合。A2A Agentは外部service。 |
+| 既存実装 | Flutter画面／接続部品、Rust Broker／通信経路、Schema、選択した文章Artifactの引継ぎ、macOSのメタデータ限定境界と試験ひな型あり。外部Agentを導入した一連の実証なし。 |
+| BUILD_GAP | installed候補で外部接続→Agent作用→Artifact→受信Task→Audit／Recoveryの一気通貫、remote Host、macOS作用、Mobile consumerは未成立。 |
+| ソース識別値（SourceSHA） | SourceSHA表のA2A connection／stream／macOS docs、schemas、a2a_center、client、handoff、関連testを現HEADへ照合し63/63一致。 |
+| 試験区分（TestClass） | Rust UNIT／FIXTURE、Flutter fake Broker／Widget／handoff fixture sourceあり。本mappingではNOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。過去の限定loopback／fixtureを現候補の外部Agent Acceptanceにしない。 |
+| 阻害要因（Blocker） | comprehensive_extension_rev1_completion等の既存unresolved状態を保持。C16個別の正式Registry linkはUNKNOWN。 |
+| 状態 | C16 E0-04 mapping記載済み。旧status不変。N04／N10／W03／E0はOPEN。 |
+| 残余 | 現候補の外部Agent chain、結果依存後続AI実仕事、OS別native確認／配布／Recovery証拠。 |
+
+#### C17 複数Host registry
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | C17 Host登録・metadata registry・bounded persistence。 |
+| 旧ID | 総合機能拡張rev1 C17／Phase 2・26。Owner登録、通常一覧、hash-only identity、再起動時fail-closedの履歴。 |
+| 原文参照 | rev1実装仕様・工程・進捗C17、docs/D4_POCKET_PHASE_MAPPING.md、v4仕様S03 ARC-D・S04 N04・S05 K11、host-registry.md。 |
+| 対象 | Ownerが登録したHost metadataをBrokerで限定永続化し、認証IPC経由で一覧表示する範囲。 |
+| 目的 | Host登録を接続・Trust・Permission・Approval・Credential・Task権限と混同せず、別HostのAuthorityを分離する。 |
+| 生成元（Producer） | Owner確認済みHost登録要求。遠隔Hostの稼働時探索／接続結果は対象外。 |
+| 実Consumer | Flutter host_registration_client→Rust host_center→bounded hosts.json／Audit。Host listは通常認証IPCで投影する。 |
+| 契約／Data | host registration／receipt／list schemas、Host ID、表示metadata、identity hash、状態、bounded登録記録、Audit reference。秘密・Task authorityなし。 |
+| 正常時作用 | Owner確認後に登録metadataをAudit付きで保存し一覧を返す。pending_review等はmetadata状態であり、接続済み・Trust verifiedではない。 |
+| 否定時作用 | malformed／unknown field、ID／hash不整合、上限外・破損stateを拒否し、登録metadataから外部identity保証を推論しない。 |
+| 停止／Recovery | 保存／Audit失敗は成功receiptにしない。破損stateやunknown fieldはBroker起動時fail-closed。失効／quarantine／再接続は未接続。 |
+| 標準OS候補 | Desktop Windows／macOS／Linuxに登録・一覧source。Mobile consumer未確認。Linux native installed acceptanceなし。 |
+| 配布物 | 独立配布物なし。D4 Pocket DesktopのBroker state。 |
+| 既存実装 | Host registry contract／Schema、Rust host_center、Flutter client、一覧／永続化／Auditとfixture sourceあり。 |
+| BUILD_GAP | remote discovery／connection、失効／quarantine、Host配下Runtime／Agent route、越境Task実installed拒否は未成立。 |
+| ソース識別値（SourceSHA） | SourceSHA表のhost-registry.md、host registration/list schemas、host_center.rs、client、host_registration_test.dartを照合し63/63一致。 |
+| 試験区分（TestClass） | Rust UNIT／Flutter client fixture／Schema sourceあり。本mappingではNOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。metadata registry／fixtureをlive Host接続証拠にしない。 |
+| 阻害要因（Blocker） | Host registry契約はlive discovery／接続等を出荷阻害条件として記載。Registry 18件の状態は不変で、C17個別のRegistry識別子対応はUNKNOWN。 |
+| 状態 | C17 E0-04 mapping記載済み。旧status不変。N04／W03／E0はOPEN。 |
+| 残余 | remote Host接続／Trust lifecycle、越境拒否の実結果、Host別Task／Audit／Recovery installed evidence。 |
+
+#### C18 Host操作面
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | C18 Host一覧・状態表示・切替context・Capability projection。 |
+| 旧ID | 総合機能拡張rev1 C18／Phase 26・28。Host表示・切替と旧境界を履歴保持。 |
+| 原文参照 | rev1実装仕様・工程・進捗C18、docs/D4_POCKET_PHASE_MAPPING.md、v4仕様S04 N04/N09・S05 K11/K13、host-operation-surface.md。 |
+| 対象 | Flutter HostOperationCenter／HostCapabilityCenterがBroker Host list／switch／Capability metadataを表示する操作面。 |
+| 目的 | Host選択を表示contextに限定し、非current HostのCapabilityをlive能力／Trustへ見せかけない。 |
+| 生成元（Producer） | OperatorのHost切替要求、registry metadata、現在Brokerの限定Capability projection。 |
+| 実Consumer | Flutter host_operation_center／host_capability_center→registration client→Broker IPCのHost list／switch／capability consumer。 |
+| 契約／Data | host_switch／receipt／host_capability schemas、Host ID、current Host、表示context、Capability metadataと観測範囲。 |
+| 正常時作用 | 登録Host metadataを一覧・切替表示する。product初期化で受理したBroker snapshot sourceとHost IDが一致する場合だけ現在BrokerのRuntime／Agent観測を表示し、それ以外は未観測とする。 |
+| 否定時作用 | unknown Host、不一致receipt、stale登録、Owner拒否を接続成功へ昇格せず、metadata-only値をverified Trustとしない。 |
+| 停止／Recovery | Broker取得失敗・不一致時は成功表示しない。stale projectionをlive stateとして使わず、Host切替からTask停止／Recoveryを起動しない。 |
+| 標準OS候補 | Desktop Flutter／Broker source。一部macOS／Linux metadata操作あり。Mobile consumer未確認。Linux installed UX未検証。 |
+| 配布物 | 独立配布物なし。Desktop製品のHost操作面。 |
+| 既存実装 | Host操作／Capability画面、switch schemas、Broker consumer、registration clientとfixture sourceあり。remote Runtime／Agent列挙なし。 |
+| BUILD_GAP | remote Host再接続、配下Runtime／Agent列挙、Host越境Task route／Authority拒否の実作用、全OS installed surfaceは未成立。 |
+| ソース識別値（SourceSHA） | SourceSHA表のhost-operation／macOS docs、switch／capability schemas、host_capability.rs、screens、client／testを照合し63/63一致。 |
+| 試験区分（TestClass） | Rust／Flutter client／widget fixture sourceあり。本mappingではNOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。UI／fixtureをremote Host操作・Trust evidenceにしない。 |
+| 阻害要因（Blocker） | Host操作契約はlive再接続／Trust検証／remote Runtime列挙を出荷阻害条件として記載。Registry状態は不変で、C18個別の識別子対応はUNKNOWN。 |
+| 状態 | C18 E0-04 mapping記載済み。旧status不変。N04／N09／N10／E0はOPEN。 |
+| 残余 | remote Host／Runtime実状態consumer、越境実作用境界、OS別installed UI／Recovery evidence。 |
+
+#### C19 Adapter管理
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | C19 Adapter catalog管理・署名状態確認・有効化／隔離のmetadata操作面。 |
+| 旧ID | 総合機能拡張rev1 C19／Phase 27。Catalog、Owner Broker操作、署名検査／隔離、Desktop Runtime Centerの履歴。 |
+| 原文参照 | rev1実装仕様・工程・進捗C19、docs/D4_POCKET_PHASE_MAPPING.md、v4仕様S03 ARC-C/ARC-G・S04 N03/N10・S05 K06/K12、adapter-management-surface.md、adapter-conformance.md。 |
+| 対象 | Flutter Runtime CenterからBrokerへAdapter manifest／catalogの限定操作を送り、Brokerがcatalog recordとAuditを管理する範囲。 |
+| 目的 | Adapter宣言・署名metadata・有効状態をTrust／Permission／Approval／Credentialへ変換せず、Adapter適合境界を保つ。 |
+| 生成元（Producer） | Operatorの明示管理要求と、Brokerに登録されたmanifest／catalog metadata。 |
+| 実Consumer | Runtime Center／Broker client→Rust adapter_center→bounded Adapter catalog／Audit。外部artifact installer／process launcherではない。 |
+| 契約／Data | Adapter管理の契約定義・一覧・要求・受領票、識別子、版、照合値、発行者／署名情報、危険度／互換性、状態、監査ID。 |
+| 正常時作用 | Owner controlで宣言書登録／検証・有効／無効化・隔離等のcatalog metadataを管理しAuditへ記録する。外部成果物取得・filesystem書込／削除・Adapter起動は行わない。 |
+| 否定時作用 | malformed manifest、未知field、signature／hash不一致、unsupported／非適合Adapterを有効化せず、metadataから実能力／Trustを推論しない。 |
+| 停止／Recovery | Broker／Audit不成立時は成功receiptにしない。隔離Runtime IDをTask／lifecycleへ再利用しない。artifact展開後Recoveryは未接続。 |
+| 標準OS候補 | Desktop Rust／Flutter source。全OSのinstalled artifact lifecycleは未成立。Mobile consumer未確認。 |
+| 配布物 | 独立配布物なし。Adapter artifactは別配布物になり得るが、本管理面は導入／削除installerではない。 |
+| 既存実装 | Adapter contract／Schema、Rust adapter_center、Runtime Center／client、signature／catalog metadataとWidget test sourceあり。 |
+| BUILD_GAP | artifact取得・署名鎖・隔離展開・install／update／rollback／uninstall、Adapter process起動、全OS lifecycleは未成立。 |
+| ソース識別値（SourceSHA） | SourceSHA表のadapter-management／conformance docs、adapter schemas、adapter_center.rs、runtime_center.dart、widget_test.dartを照合し63/63一致。 |
+| 試験区分（TestClass） | Rust UNIT／Flutter widget／Schema fixture sourceあり。本mappingではNOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。catalog／signature fixtureを実artifact導入／Trust証拠にしない。 |
+| 阻害要因（Blocker） | Adapter管理契約は外部成果物の実導入／削除／process起動とWindows導入済み実証を出荷阻害条件として記載。Registry状態は不変で、C19とのID対応はUNKNOWN。 |
+| 状態 | C19 E0-04 mapping記載済み。旧status不変。N03／N10／W03／E0はOPEN。 |
+| 残余 | Adapter artifact取得／install／隔離実体／process起動・停止、OS別更新／撤去、候補provenance。 |
+
+#### C20 Windows常駐トレイ
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | C20 Windows system trayの限定表示・操作入口。 |
+| 旧ID | 総合機能拡張rev1 C20／Phase 28。表示、前面化、status／件数projection、stop receipt、exit入口の履歴。 |
+| 原文参照 | rev1実装仕様・工程・進捗C20、docs/D4_POCKET_PHASE_MAPPING.md、v4仕様S04 N09/N10・S05 K13/K16、windows-tray-surface.md。 |
+| 対象 | Windows native tray controllerからFlutter／Broker由来statusを限定表示し、停止要求receiptまたはDesktop UI終了へ接続する範囲。 |
+| 目的 | Trayを表示・要求入口に限定し、Runtime Authority、Permission、Approval、Runtime停止完了の主体にしない。 |
+| 生成元（Producer） | Windows tray event、Desktop status projection、Operatorのstop request／exit操作。 |
+| 実Consumer | Windows tray_controller.cpp／.h→Flutter windows_tray_client→対象surface／Broker projection。ExitはDesktop UIへ渡る。 |
+| 契約／Data | windows_tray_projection、tray_stop_request／response schemas。status、bounded counts、request receipt、executed=false等。 |
+| 正常時作用 | Trayから画面表示・前面化・状態確認を行い、stop操作は実行待ちreceiptを返す。UI exitはDesktop appを閉じる。 |
+| 否定時作用 | unavailable／unknown値を0にせず、receiptをRuntime停止済み・Permission・Approvalと扱わない。任意process操作なし。 |
+| 停止／Recovery | Broker／Flutter応答なし・拒否時はunknown／未実行。Tray exit後のRuntime停止やinstalled起動復旧は保証しない。 |
+| 標準OS候補 | Windows native trayのみ。この契約はmacOS／Linux／Mobileへ拡張しない。Linux Desktop全体の可否へ一般化しない。 |
+| 配布物 | Windows D4 Pocket Desktop packageに含む候補。独立配布物なし。installed lifecycle evidenceなし。 |
+| 既存実装 | Native controller、Flutter client、projection／stop schemasとclient test sourceあり。Runtime停止実体は未接続。 |
+| BUILD_GAP | Owner確認後のRuntime stop、process lifecycle結果receipt、Windows installed tray／Recovery evidenceは未成立。 |
+| ソース識別値（SourceSHA） | SourceSHA表のtray docs／schemas、windows_tray_client.dart、tray_controller.h／cpp、client testを照合し63/63一致。 |
+| 試験区分（TestClass） | Windows native／Flutter client test sourceあり。本mappingではNOT_RUN。installed product試験ではない。 |
+| 証拠ID（Evidence ID） | NONE。tray／receipt fixtureをRuntime stopやinstalled Acceptanceとしない。 |
+| 阻害要因（Blocker） | Tray契約はWindows導入済みtray evidenceと実Runtime停止統合を出荷阻害条件として記載。Registry状態は不変で、C20とのID対応はUNKNOWN。 |
+| 状態 | C20 E0-04 mapping記載済み。旧status不変。N09／N10／E0はOPEN。 |
+| 残余 | Broker owner stopとprocess lifecycle、停止Audit／Recovery、現候補Windows installed evidence。 |
+
+#### C21 コマンドパレット
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | C21 Command Paletteによるbounded command検索と画面遷移。 |
+| 旧ID | 総合機能拡張rev1 C21／Phase 28。既存Palette拡張と全機能実行／installed evidence不足を履歴保持。 |
+| 原文参照 | rev1実装仕様・工程・進捗C21、docs/D4_POCKET_PHASE_MAPPING.md、v4仕様S04 N09・S05 K13、command-palette-surface.md。 |
+| 対象 | Desktop main.dartのCtrl+K／Ctrl+P Paletteから固定候補を検索し既存screenへ遷移する範囲。 |
+| 目的 | Keyboard-first navigationを提供し、Palette選択を実作用・Owner許可・Authorityにしない。 |
+| 生成元（Producer） | Operatorのshortcut／query／選択。固定command catalogはUI navigation entry。 |
+| 実Consumer | Flutter main.dartが最大30件を表示し、選択後に既存navigation／screenを開く。候補名は処理APIではない。 |
+| 契約／Data | command-palette-surface.mdとFlutter内command entry／query state。Broker permission／外部command契約なし。 |
+| 正常時作用 | 候補を表示して画面遷移する。MCP接続・Host切替・評価・停止要求も入口画面を開くのみ。 |
+| 否定時作用 | unknown command／queryは実行せず、Permission／Approval／Credential／filesystem／process／network authorityを作らない。 |
+| 停止／Recovery | Palette終了・候補なし・遷移失敗を処理済み／Runtime作用済みと表示しない。 |
+| 標準OS候補 | Desktop Flutter候補。Windows／macOS／Linux installed keyboard／navigation未検証。Mobile navigationは別範囲。 |
+| 配布物 | 独立配布物なし。D4 Pocket Desktop UIの一部。 |
+| 既存実装 | Palette surface文書、main.dart shortcut／bounded候補、module_pruning_test sourceあり。実処理へのdirect linkなし。 |
+| BUILD_GAP | 実Broker／Runtime operationへのcommand接続、各Desktop OS installed keyboard／accessibility evidenceは未成立。 |
+| ソース識別値（SourceSHA） | SourceSHA表のcommand-palette-surface.md、main.dart、module_pruning_test.dartを照合し63/63一致。 |
+| 試験区分（TestClass） | Flutter widget／navigation sourceあり。本mappingではNOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。画面遷移を実操作／installed keyboard acceptanceにしない。 |
+| 阻害要因（Blocker） | Palette契約は全機能の実作用とWindows導入済みkeyboard evidenceを出荷阻害条件として記載。Registry状態は不変で、C21とのID対応はUNKNOWN。 |
+| 状態 | C21 E0-04 mapping記載済み。旧status不変。N09／N10／E0はOPEN。 |
+| 残余 | installed keyboard／accessibility、各操作面の実Consumer、製品一連操作への接続。 |
+
+#### C22 全体検索
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | C22 bounded Global Searchによるsnapshot／surface entry検索。 |
+| 旧ID | 総合機能拡張rev1 C22／Phase 28。bounded snapshot検索とlive横断検索不足を履歴保持。 |
+| 原文参照 | rev1実装仕様・工程・進捗C22、docs/D4_POCKET_PHASE_MAPPING.md、v4仕様S04 N09・S05 K13、global-search-surface.md。 |
+| 対象 | Flutter ShellSnapshotをlocal indexへ取り込み、固定上限のquery結果／surface entryを表示するDesktop UI。 |
+| 目的 | 表示情報を検索し、秘密・会話本文・Audit raw payloadを複製せず、検索からAuthorityを生成しない。 |
+| 生成元（Producer） | Broker projectionとして渡されたShellSnapshotと固定surface entry。任意path・生会話・秘密は対象外。 |
+| 実Consumer | Flutter global_search_index.dartがquery 128文字、index 512件、result 30件以内で処理しSearch UIへ返す。 |
+| 契約／Data | global-search-surface.md、ShellSnapshotのbounded text／metadata、surface navigation entry。live Broker query契約ではない。 |
+| 正常時作用 | 受信snapshotの候補を検索・表示する。source未確認snapshotは不明とし、surface entryは入口の存在だけを示す。 |
+| 否定時作用 | 上限を超える入力を制限し、会話本文、Approval／Audit raw payload、秘密、任意filesystem pathをindexしない。 |
+| 停止／Recovery | snapshot未取得／stale／source不明はlive状態と見なさない。更新失敗を未取得と表示し旧snapshotから作用しない。 |
+| 標準OS候補 | Desktop Flutter UI。Windows／macOS／Linux installed Search未確認。Mobileは別consumer。Linux native必須だが本source mappingは保証でない。 |
+| 配布物 | 独立配布物なし。D4 Pocket Desktop UIに含む候補。 |
+| 既存実装 | Search surface contract、bounded index、navigationとunit/widget test sourceあり。全Broker横断live searchなし。 |
+| BUILD_GAP | Brokerの現在状態を問い合わせる実経路、全画面を横断する受取先、導入済み製品でのOS別検索証拠は未成立。 |
+| ソース識別値（SourceSHA） | SourceSHA表のglobal-search-surface.md、global_search_index.dart、関連test、main.dart／widget_test.dartを照合し63/63一致。 |
+| 試験区分（TestClass） | Flutter UNIT／WIDGET／snapshot fixture sourceあり。本mappingではNOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。snapshot／fixture検索をlive cross-Broker実測やinstalled Acceptanceへしない。 |
+| 阻害要因（Blocker） | 全体検索契約は実Runtime／Agent等を含む導入済み横断検索とartifact結合を出荷阻害条件として記載。Registry状態は不変で、C22とのID対応はUNKNOWN。 |
+| 状態 | C22 E0-04 mapping記載済み。旧status不変。N09／N10／E0はOPEN。 |
+| 残余 | snapshot鮮度／source-bound live query、検索対象の完全性、installed UI、N11証拠結合。 |
+
+#### C23 Desktop UX統合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | C23 Desktop navigation groupと全screen到達性を統合するUX surface。 |
+| 旧ID | 総合機能拡張rev1 C23／Phase 28。既存画面grouping／到達性とWindows installed未検証を履歴保持。 |
+| 原文参照 | rev1実装仕様・工程・進捗C23、docs/D4_POCKET_PHASE_MAPPING.md、v4仕様S04 N09/N10・S05 K13、desktop-ux-integration.md。 |
+| 対象 | Desktop main.dart NavigationRail／group stateから既存surfaceへ到達し、palette／search導線を保つ画面構成。 |
+| 目的 | 画面選択と操作導線を一貫させ、UI整理で機能・Permission・Broker境界を削除／変形しない。 |
+| 生成元（Producer） | OperatorのNavigation group／screen selectionと各既存画面のnavigation entry。 |
+| 実Consumer | Flutter main.dartのnavigation stateが21画面を運用／安全／開発／設定groupへ表示し既存screenへ切り替える。 |
+| 契約／Data | desktop-ux-integration.md、Flutter内group／selected screen state、既存route。共通権限／外部作用Schemaなし。 |
+| 正常時作用 | Group選択で画面表示を切り替え、既存surfaceとpalette／search導線への到達性を保つ。 |
+| 否定時作用 | group切替でsurface／Authority／Permission／filesystem／process／network／Credential capabilityを暗黙に削除・追加しない。 |
+| 停止／Recovery | navigation失敗・画面破棄はUI状態に留まり、Broker状態変更・Task cancel・Recovery成功を偽装しない。 |
+| 標準OS候補 | Desktop Flutter UX。Windows／macOS／Linux installed navigation／accessibility未成立。Mobile navigationは別実装範囲。 |
+| 配布物 | 独立配布物なし。D4 Pocket Desktop main UI。 |
+| 既存実装 | Desktop UX contract、main.dart group/navigation、関連widget test sourceあり。screen sourceはinstalled操作受入れでない。 |
+| BUILD_GAP | OS標準installed候補での画面到達性、全surface実Consumer、製品UX／accessibility受入れは未成立。 |
+| ソース識別値（SourceSHA） | SourceSHA表のdesktop-ux-integration.md、main.dart、widget_test.dart、共有palette／search sourceを照合し63/63一致。 |
+| 試験区分（TestClass） | Flutter WIDGET／navigation fixture sourceあり。本mappingではNOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。Navigation fixtureを製品UX／OS installed QAとしない。 |
+| 阻害要因（Blocker） | Desktop UX契約はWindows導入済み画面証拠、全C0〜C34完成、Owner最終判断を出荷阻害条件として記載。Registry状態は不変で、C23とのID対応はUNKNOWN。 |
+| 状態 | C23 E0-04 mapping記載済み。旧status不変。N09／N10／E0はOPEN。 |
+| 残余 | 各Desktop OS向け導入済み製品での画面操作、21画面の到達性と実作用、支援技術対応、N11証拠と配布物の結合。 |
+
+C15〜C23のE0-04個別mappingは文書上完了。旧C15〜C23 status、N03/N04/N09/N10、W03、Release Registryを変更しない。63件のSourceSHA一致はソース同一性のみを示し、外部Agent、Host、Adapter、Tray、installed Desktopの実行・Acceptance・五OS QAを意味しない。
+
+## 旧C24〜C34のv4 Source→Consumer crosswalk（E0差分）
+
 ## 旧C24〜C34のv4 Source→Consumer crosswalk（E0差分）
 
 旧C24〜C34の要求、Phase、進捗statusはrev1履歴として保持し、再判定・書換えをしない。以下のsource観測baselineはmain `d45fa6109fa6300ed42449ea03a93bfe25f7ae95`。v4対応はS04/S05・R03上の対応関係であり、旧statusはN/K受入れへ昇格しない。Test sourceは存在と種類だけを示し、このmapping単位では`NOT_RUN`。Phase対応は`docs/D4_POCKET_PHASE_MAPPING.md`。
