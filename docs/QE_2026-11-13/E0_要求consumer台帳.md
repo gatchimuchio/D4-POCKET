@@ -414,7 +414,117 @@ N11は`OPEN`。ValidatorとRelease Gateは一部のRegistry/Windows evidence/man
 | P12 | 製品全体統合。REV5進捗ではWindows側`FEATURE COMPLETE`。正式release/Owner GOと分離された製品機能統合の履歴。 | v4仕様S05の直接対応はN01/N09/N10、関連能力K19。Phase 39〜45はC27〜C34のQC/回帰/文書/出荷範囲に関連。単一施工線へ閉じない。 | Windows product entry→Task/result/operation UI→OS product lifecycle。実TaskはN01、operation/observation/recoveryはN09、installed OS distribution/lifecycleはN10の現ConsumerとSHA節へ分割記録。 | `FEATURE COMPLETE`を正式Release/QAへ昇格しない。v4 N01/N09/N10は`OPEN`、Q0〜Q7は`DEFERRED`、`release_ready=false`。統合後の全候補・全OS acceptanceは未成立。 |
 | P13 | Mobile / Non-Windows Product Build。REV5履歴は2026-10-09に有限Product Build acceptanceを閉鎖したと要約する。旧Acceptanceの詳細evidence identity/classは本照合資料から`UNKNOWN`。 | v4仕様S05の直接対応はN10、関連能力K17。Phase 35/36はC24〜C26範囲に関連。施工線H/I。Linux native必須性は別途現行AGENTS/v4正本に従う。 | Linux/macOS Desktop、Android/iOS Mobile runner/native transport→Rust Broker／OS capability→installed product lifecycle。OS別source、package、workflow候補とSHAはN10節。 | 旧P13閉鎖を現行五OS標準installed QAへ移さない。Linux nativeは完全対応必須で、WSL/Xvfb/Headlessだけでは成立しない。Android/iOS実機を前提にせずEmulator/Simulator等を用いる。N10は`OPEN`、`linux_native_product_support`、`rev2_mobile_distribution`、`rev2_mobile_device_evidence`を保持。 |
 
-P0〜P13全14 IDの旧要求範囲・限定statusをv4 N/K/Consumerへ接続した。これは旧statusの書換え、v4 acceptance、N01〜N11のCLOSED、E0完了のいずれも意味しない。C0〜C34、Phase0〜45、K01〜K20のSource→Consumer/scope mappingを記録した。各行の完全なE0-04列・N11 Evidence結合は継続する。P0/P1/P4の直接対応はv4仕様S05の明示mappingへ合わせて訂正し、旧statusは変更していない。P13の詳細evidence identity/classは`UNKNOWN`として保持する。
+P0〜P13全14 IDの旧要求範囲・限定statusをv4 N/K/Consumerへ接続した。これは旧statusの書換え、v4 acceptance、N01〜N11のCLOSED、E0完了のいずれも意味しない。C0〜C34、Phase0〜45、K01〜K20のSource→Consumer/scope mappingを記録した。P0〜P3は本節後段で全E0-04 fieldを個別補完し、P4〜P13とN11 Evidence/Blocker/OS Artifact行結合は継続する。P0/P1/P4の直接対応はv4仕様S05の明示mappingへ合わせて訂正し、旧statusは変更していない。P13の詳細evidence identity/classは`UNKNOWN`として保持する。
+
+### P0〜P3 E0-04項目の個別補完（2026-11-13、ソースと利用先の照合）
+
+以下は現行v4 S05の直接mappingに対するE0照合である。旧rev5原本3点は`D4-AUD-F07`で受領SHA-256と全文一致が確認された資料を原文参照とし、原本要求と現行S05/N Consumerを分けて記す。コード・SchemaのGit blob SHAは本表の列挙値を現HEAD `4d795f00858496bc038def2eb974a59eb325259d`で照合した。source/testの存在や過去statusは今回の製品Acceptanceではない。
+
+#### P0 — 既存基盤の再利用
+
+| E0-04項目 | 記録値 |
+|---|---|
+| 現行ID | 旧製品要求`P0`。v4仕様S05の直接対応先は`N01/N09/N11`。 |
+| 旧ID | `P0`。単独の新機能Acceptance IDではなく、Agent Taskと製品操作の共有基盤要求。 |
+| 原文参照 | rev5仕様書 §§0–3（SHA-256 `c0b78cfba1fb9c5c5de1947d01b47d0898f01b24de1aa8e1b0a0bd89e35c0877`）、`D4-AUD-F07` §要求差分。原文同一性は同記録の`VERIFIED`履歴。現行対応はv4仕様S05。 |
+| 対象 | Rust `Broker`、`Authority`、`Permission`/`Approval`/`Audit`、`Runtime`/`Workspace`登録、Desktop shell/launcher/IPCという既存基盤。 |
+| 目的 | 基盤を再実装せず、製品機能が現行`Broker`統治経路を共有し、UI/Adapterに`Authority`を持たせない。 |
+| 生成側 | Desktop Flutter起動・Agent Center・Workspace/History/Runtime/Observation画面、native LauncherからのBroker要求。 |
+| 実際の受け取り先 | native Launcher→認証Broker IPC→Runtime/Workspace registry・Broker operation→Task/Workspace/Audit consumer。画面はBroker応答を表示する。N01/N09/N11追跡節を参照。 |
+| 契約とデータ | P0全体を表す単一schemaはない。Runtime/Workspace登録、Broker operation、AgentTask、Permission/Approval、Audit、Workspace検査/履歴の個別契約をN01/N09/N11で追跡する。 |
+| 正常時の作用 | 登録済みRuntime/WorkspaceをBrokerが管理し、許可された要求を既存IPCで処理してTask/operation state・Auditを既存consumerへ返す。 |
+| 否定時の作用 | 不正・未登録・unsupported要求、Authority/Permission/Approval不足、stale/replay要求はBrokerが拒否する。Flutterからfilesystem/process/credential/networkへ直接作用させない。 |
+| 停止と回復 | Brokerの拒否・失敗をUI成功へ読み替えずAudit/Task stateへ返す。AgentTask scratch/restart recoveryはN01の範囲。基盤全体を束ねる独立P0回復契約は`UNKNOWN`。 |
+| 標準対象OSの候補 | v4対象のWindows/macOS/Linux native/Android/iOS。Linux nativeは必須。候補はN10表、保証version/arch/GUI範囲は`UNKNOWN`。MobileのTask実行consumerは現sourceで`BUILD_GAP`。 |
+| 配布 | N10記載のOS別候補を参照。一般配布artifact・Publisher identity・installed lifecycleは未確定。portable/debug/hosted候補を通常製品配布へ昇格しない。 |
+| 既存実装 | Launcher/Broker/Runtime/Workspace/Audit sourceとDesktop UI consumerは存在し接続候補がある。N01/N09 source traceは限定`WIRED`。W01はWindows限定の過去履歴で、本P0統合の受入れではない。 |
+| 実装不足 | 現行candidateで共有Broker基盤から全製品機能・五OS標準installed artifactまでを結ぶ受入れは未成立。Mobile AgentTask consumer欠落、同一candidateのOS別起動/権限/配布結合、N11全要求証拠結合が残る。 |
+| ソース識別SHA | 現HEADのblob SHA: `apps/desktop_flutter/lib/main.dart`=`6109c821ab5dc809224bec5234c4c59db1d5f988`; `apps/desktop_flutter/lib/screens/agent_center.dart`=`2472faeb31a64d624423c30a0a30d0f153d2e2a3`; `apps/desktop_flutter/lib/screens/workspace_inspector.dart`=`a02c95ec5062583f9c37523fbaf604a8d2da107e`; `native/rust_helper/src/desktop_launcher.rs`=`6a9f335de07fa474ca10043aea63ad6e988b572d`; `native/rust_helper/src/broker/runtime_registry.rs`=`9ff28610862586a599848d75f9e891a6c6cadf2f`; `native/rust_helper/src/broker/protocol.rs`=`9b2076d5f31ca6d77f1f87973d1b394aaf751961`; `native/rust_helper/src/broker/audit.rs`=`eb1dcf5018d95c7fdf6171aadd4bca9554d1996f`; `tooling/release_gate_check.py`=`22a8d7bfe9adb259f44ce8501fb215652e1d58c6`; `tooling/conformance_tests/run_conformance_skeleton.py`=`c6f31d8cb561b48513c6784e54c85969c9cb953e`; `release_blockers.registry.json`=`244adc04a01e7b406c4ebcdeb829f7077d4aa35f`. |
+| 試験区分 | 既存sourceに`UNIT`/`FIXTURE`/`WIDGET`/`CONFIG`と過去の限定`LIVE_PRODUCT`がある。本source/consumer照合では製品試験を実行していない（`NOT_RUN`）。 |
+| 証拠ID | `NONE` — 新しいP0受入れ証拠IDは発行していない。過去のW01/N11参照は元の範囲を維持する。 |
+| 阻止要件 | P0専用のRegistry IDはない。関連する未解決の横断項目は`comprehensive_extension_rev1_completion`、`windows_broker_installed_smoke`、`rev2_flutter_broker_channel_boundary`、`linux_native_product_support`、`rev2_mobile_flutter_native_device_link_boundary`。Registryの状態を維持し、P0への直接割当ては`UNKNOWN`。 |
+| 状態 | 旧P0は共有基盤の再利用要求であり、独立した`CLOSED`条件ではない。現行v4 `N01/N09/N11=OPEN`、`E0=OPEN`。 |
+| 残件 | P0の各要件と現行N11証拠/阻止要件、OS artifactの対応付けが残る。本記録はConsumer照合でありE3/E4/E5の受入れではない。 |
+
+#### P1 — エージェントの課題実行
+
+| E0-04項目 | 記録値 |
+|---|---|
+| 現行ID | 旧製品要求`P1`。v4仕様S05の直接対応先は`N01/N02`、製品能力は`K01`。 |
+| 旧ID | `P1`。旧進捗はAgent Taskの製品開発成立を記録し、正常経路を後続機能の基盤とする。 |
+| 原文参照 | rev5仕様書 §§10–11（SHA-256 `c0b78cfba1fb9c5c5de1947d01b47d0898f01b24de1aa8e1b0a0bd89e35c0877`）、`D4-AUD-F07` §要求差分。現行対応はv4仕様S05とN01/N02。 |
+| 対象 | Agent Task要求、独立認可、Runtime Adapter実行、Workspace作用、Task state/result/Audit。 |
+| 目的 | Ownerが開始したTaskをBroker境界内で実行し、結果・失敗・停止状態を同じTask identityへ返す。 |
+| 生成側 | Desktop Agent CenterのTask inspect/start/result/cancel要求と`AgentTaskClient`/execution coordinator。 |
+| 実際の受け取り先 | `BrokerTransport`→Rust Broker `AgentTask実行`→登録Adapter/Codex CLI→Workspace/Task state/result→Coordinator/Agent Center。N02は同Task内のMCP proposalからBroker Tool作用、結果を使う新Taskへ接続する別契約。 |
+| 契約とデータ | `agent_task_request`, `agent_task`, `agent_task_workspace_permission`, `agent_task_owner_approval`, `agent_task_content_exposure`; Runtime/Session/Workspace/Task ID・本文/条件hash・Result/Audit参照。 |
+| 正常時の作用 | 現在のRuntime/Workspace/capabilityを事前照合し、Workspace Permissionと別Owner Approvalを一回消費してCodex CLI Taskを実行、結果hash/state/Auditを表示する。N02 Tool follow-upは現在Catalog/native Owner・一回Permission/Audit・新TaskのPermission/Approvalを経る。 |
+| 否定時の作用 | 未登録/unsupported Runtime、Workspace不一致、Permission/Approval不足/stale/replay、条件hash不一致、MCP catalog/tool/credential mismatchをBrokerが拒否する。Mobile Task/MCP operationはunsupported/BUILD_GAPとして扱う。 |
+| 停止と回復 | cancel/deadline/crash時にTask process/scratchを停止し、interrupted Taskを`suspended`で回復して旧Permission/Approvalを再利用しないsourceがある。MCP結果不明時は隔離して再送しない。Broker再起動後にvolatile result contextが失われた場合はfail-closedする。 |
+| 標準対象OSの候補 | Windows/macOS/Linux native/Android/iOSの五対象。Desktop Task sourceはWindows/Linux/macOS系Rust、Mobile Task受取先はない。標準version/arch/GUIはN10参照・`UNKNOWN`。 |
+| 配布 | OS別配布候補はN10表。Windows/Linux候補履歴はportable/bootstrap/hostedに限定。macOS通常配布・Android/iOS store/device package/installed lifecycleは未成立。 |
+| 既存実装 | Desktop AgentTask/MCP sourceは`WIRED`。W01/G1のWindows normal Release Codex CLI completed TaskとLinux #286 hosted Xvfb/X11/local no-auth fixtureは履歴範囲限定。MCP結果依存follow-up W02/G2は`OPEN`。 |
+| 実装不足 | 同一v4 candidateの一般Provider Task→結果/Audit/recovery、MCP Tool→同Agent follow-up、五OS installed pathは未成立。Mobile AgentTask/MCP consumerは`BUILD_GAP`。 |
+| ソース識別SHA | 現HEAD blob SHA: `apps/desktop_flutter/lib/screens/agent_center.dart`=`2472faeb31a64d624423c30a0a30d0f153d2e2a3`; `apps/desktop_flutter/lib/services/agent_task_client.dart`=`f54cefac29eba3dcf383bba19b4f64ee682e6217`; `apps/desktop_flutter/lib/services/agent_task_execution_coordinator.dart`=`5d8f48d0557bdcb1af838239abf9651893bce7f1`; `packages/agent_orchestration/lib/agent_task_client.dart`=`a31fbb9f980a0039f809fd763c91f055fe9d02d0`; `packages/agent_orchestration/lib/agent_task_execution_coordinator.dart`=`feb9aacb7ed77e6f4e76e9d9371290decca9cf7b`; `native/rust_helper/src/broker/protocol.rs`=`9b2076d5f31ca6d77f1f87973d1b394aaf751961`; `native/rust_helper/src/broker/dialogue.rs`=`c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999`; `native/rust_helper/src/adapters/codex_cli.rs`=`e5c9d1581ae9a1c0a3ae7fcfa626fdca6fea6d28`; `native/rust_helper/src/broker/mcp_center.rs`=`8f9ab897bdc625e448241ebd9b46f995cd1f22f6`; `specs/agent_task_request.schema.json`=`cb25bb3684656bfd670ea5832bbb7fc5988845b6`; `specs/agent_task.schema.json`=`a552389072088d6cd42b3588fefda332be4ae6b6`; `specs/agent_task_workspace_permission.schema.json`=`01be05df95431e38ca5dc3ec1b5f04416b506fb2`; `specs/agent_task_owner_approval.schema.json`=`d190c9a8cc3d715eb199459c37c14e5de0ad6ad8`; `specs/agent_task_content_exposure.schema.json`=`a85b99c0213d18daaab3d5d863adcd3661f379a0`. |
+| 試験区分 | 既存試験sourceは`UNIT`/`FIXTURE`/`WIDGET`、過去の限定`LIVE_PRODUCT`（W01/G1）。N02 W02/G2は`OPEN`。本v4照合での試験/製品受入れは`NOT_RUN`。 |
+| 証拠ID | `NONE`。過去のW01/G1とLinux run #286は元の候補/範囲を保ち、五OS証拠とは扱わない。 |
+| 阻止要件 | P1専用のRegistry IDはない。関連する未解決項目は`comprehensive_extension_rev1_completion`、`windows_broker_installed_smoke`、`rev2_flutter_broker_channel_boundary`、`linux_native_product_support`、`rev2_mobile_flutter_native_device_link_boundary`。P1への直接割当ては`UNKNOWN`で、Registry状態は変更しない。 |
+| 状態 | 旧進捗の製品開発完了記録と限定正常経路を保持する。現行`N01/N02=OPEN`、Mobile Task/MCP=`BUILD_GAP`、`E0=OPEN`。 |
+| 残件 | 五OSの通常配布受入れ、現候補のW02結果依存MCP完了証拠、Mobile Task受取先がない。 |
+
+#### P2 — 複数Agent比較
+
+| E0-04項目 | 記録値 |
+|---|---|
+| 現行ID | 旧製品要求`P2`。v4 S05の直接対応先は`N04`、製品能力は`K02`。 |
+| 旧ID | `P2`。旧rev5の`Product Build`受入れは`CLOSED`。 |
+| 原文参照 | rev5仕様書 §12、工程表 §§5–6、指示書 §§7–10（原本仕様SHA-256 `c0b78cfba1fb9c5c5de1947d01b47d0898f01b24de1aa8e1b0a0bd89e35c0877`）、`D4-AUD-F07` §要求差分。現行対応はv4 S05/N04。 |
+| 対象 | 同じTaskを独立Agent A/Bへ渡す比較、結果差分、選択と選択結果の適用。 |
+| 目的 | AgentごとにSession/Workspace/Task/resultを隔離し、比較と選択結果の適用をBroker認可・Auditの下で行う。 |
+| 生成側 | Agent CenterのCompare操作→Session/Workspace事前検査→`agent_comparison` coordinator。 |
+| 実際の受け取り先 | coordinatorは独立Session/Workspaceごとに二つのBroker Task要求を開始し、Task ID別にstate/resultを読む。選択結果は直接書かず、新しい第三のtarget Taskへ渡す。 |
+| 契約とデータ | `agent_comparison.schema.json`、AgentTask request/result/hash、Session/Workspace ID、各TaskのPermission/Approval、selected result binding。Task test/resourceは実測値とAgent申告を区別する。 |
+| 正常時の作用 | A/Bを別々に認可して同じTaskを開始し、結果/diff/test申告/duration/failure/resource/Auditを分けて表示する。Owner/Developerが選んだ一方だけを、新しいtarget Taskとして再評価・適用する。 |
+| 否定時の作用 | Session/Workspace重複、source/result/hash/target変更、不正authority metadataを拒否する。片側の開始/照会失敗は他方へ伝播せず、曖昧なstartは再送しない。Test結果を独立実行証拠と誤認しない。 |
+| 停止と回復 | cancelはSession単位。各TaskはBrokerの通常cancel/failure処理に従う。選択/apply時はsource/result/targetを再照合し、不一致なら停止する。Compare全体の導入済み製品でのcrash/recoveryは未確認。 |
+| 標準対象OSの候補 | 五OS対象の製品機能母集団を適用する。現行Compare UI/Coordinatorの受け取り先はDesktop Agent Center。Mobile Compare actionの受け取り先は`UNKNOWN`。Linux nativeは必須。保証version/archはN10表の`UNKNOWN`。 |
+| 配布 | N10のOS別候補とArtifact範囲を参照する。Compareを実行する同一installed product artifact/identityは未確定。 |
+| 既存実装 | Compare UI/coordinator/Broker Task要求/schema sourceは`WIRED`。旧`Product Build`受入れstatusは`CLOSED`だが、過去testは主に`FIXTURE`/`WIDGET`で導入済み製品のCompareを証明しない。 |
+| 実装不足 | 同一installed candidateでの同時A/B実行、実Workspace/scratchの混入防止、result/diff/Audit、選択結果の適用、片側failure/cancelの分離を連続して示す証拠がない。 |
+| ソース識別SHA | 現HEAD blob SHA: `apps/desktop_flutter/lib/screens/agent_center.dart`=`2472faeb31a64d624423c30a0a30d0f153d2e2a3`; `apps/desktop_flutter/lib/services/agent_coordination.dart`=`bdc13464f0e42b740a2bca3b7e8828a5019056d0`; `packages/agent_orchestration/lib/agent_comparison_coordinator.dart`=`6b5deaacb500a23e6bfdc37649d61ebc0d885127`; `specs/agent_comparison.schema.json`=`d2993ce1145674214fb2d80d696fc2c161cfbffe`; `apps/desktop_flutter/test/agent_coordination_test.dart`=`6783e87a492d8436a855a7088b7cece38d122bd5`. |
+| 試験区分 | 既存Rust試験は`UNIT`、Flutter試験は`FIXTURE`/`WIDGET`。`agent_coordination_test.dart`は`LIVE_PRODUCT`ではない。現candidateの製品受入れは`NOT_RUN`。 |
+| 証拠ID | `NONE`。旧P2 `Product Build`の`CLOSED`と証拠区分は旧条件のまま保持し、v4 E4証拠は発行していない。 |
+| 阻止要件 | P2専用のRegistry IDはない。広範な未解決項目`comprehensive_extension_rev1_completion`が関連し、`rev2_flutter_broker_channel_boundary`と`linux_native_product_support`は横断的な基盤条件。P2への直接帰属は`UNKNOWN`。Registry状態を維持する。 |
+| 状態 | 旧P2の`Product Build=CLOSED`を維持。現行`N04/W03=OPEN`。このE0照合は旧受入れを再開せず、v4受入れも閉じない。 |
+| 残件 | 導入済み製品でのA/B同時実行、Workspace/scratch/result分離、独立したtest/result証拠、選択結果の適用とAuditを、後続の製品BUILD/QCで現candidateに結び付ける。 |
+
+#### P3 — エージェント間の引継ぎ
+
+| E0-04項目 | 記録値 |
+|---|---|
+| 現行ID | 旧製品要求`P3`。v4 S05の直接対応先は`N04`、能力は`K02`。 |
+| 旧ID | `P3`。旧rev5の`Product Build`受入れは`CLOSED`。 |
+| 原文参照 | rev5仕様書 §13、工程表 §§5–6、指示書 §§7–10（原本仕様SHA-256 `c0b78cfba1fb9c5c5de1947d01b47d0898f01b24de1aa8e1b0a0bd89e35c0877`）、`D4-AUD-F07` §要求差分。現行対応はv4 S05/N04。 |
+| 対象 | 完了Taskのcontext/result/artifact/diff/test declarationを別Agentへ渡すHandoff。 |
+| 目的 | 受信側が成果を利用できる一方、送信元のPermission/Approval/Credential/Trust/hidden stateを継承せず、新しい条件で認可する。 |
+| 生成側 | 承認済みの完了source Task result→`AgentHandoffPackage`／選択済みA2A Artifact package。 |
+| 実際の受け取り先 | Agent CenterのHandoff事前検査→別Runtime/Session/Workspace向け新AgentTask request→Broker事前検査→受信側AgentTask consumer。事前検査だけではTaskを実行しない。 |
+| 契約とデータ | `agent_handoff_package.schema.json`、`agent_handoff.schema.json`、AgentTask request。context/result/artifact/changed files/diff/test declarationは上限付きでsource Task/result hashに結合する。Authority/Credential/Trust/hidden stateを含めない。 |
+| 正常時の作用 | 完了・承認済みsource resultを固定し、target identity/Workspaceを検査後、Handoff packageを新規Task要求へ渡す。Brokerは新しいPermissionとOwner Approvalを別々に要求し、受信結果/Auditを新Taskへ結び付ける。 |
+| 否定時の作用 | 未完了/未承認result、source/target identity/hash変更、size/path/schema違反、不正Authority field、source/target同一性違反を拒否する。Artifactは上限付きtext-only/untrusted inputとして扱い、metadataからTrust/Permissionを与えない。 |
+| 停止と回復 | 事前検査失敗ではTaskを開始しない。再認可不成立時はfail-closed。結果不明の外部作用を自動再送しない。導入済み製品の連続crash/recoveryは未確認。 |
+| 標準対象OSの候補 | 五OS対象の製品機能母集団。現ConsumerはDesktop Agent Center/Internal HandoffとA2A Artifact UI。Mobile Handoff actionは`UNKNOWN`。Linux nativeは必須、保証version/archはN10参照・`UNKNOWN`。 |
+| 配布 | N10のOS別候補を参照。Handoff実行用の同一installed artifactと通常配布identityは未確定。 |
+| 既存実装 | Internal Handoff/package/事前検査とA2A Artifact事前検査sourceは`WIRED`。schema/否定fixtureあり。旧`Product Build=CLOSED`の履歴試験は主に`FIXTURE`/`WIDGET`。 |
+| 実装不足 | 現候補で実Agent間の導入済みartifact受渡し→新しい受信側認可→Task実行→result/Auditを連続して示す`LIVE_PRODUCT`証拠がない。A2A外部作用の全範囲はN04の別残件。 |
+| ソース識別SHA | 現HEAD blob SHA: `apps/desktop_flutter/lib/screens/agent_center.dart`=`2472faeb31a64d624423c30a0a30d0f153d2e2a3`; `apps/desktop_flutter/lib/services/agent_handoff.dart`=`a85110d96cbade732ae0e1bfea2529f03f37523c`; `apps/desktop_flutter/lib/services/a2a_artifact_handoff.dart`=`e7e2f3454e2843f1d4f4e7b5aedfa55014cde05c`; `specs/agent_handoff.schema.json`=`e37a276f8c3e19816bc4f80824efce546a116d00`; `specs/agent_handoff_package.schema.json`=`a8ae1e2a3be6c0ed5666849fc6553c98083a1cc3`; `apps/desktop_flutter/test/agent_handoff_test.dart`=`c6bc9bef8cc8d153ef59bf421efbd989185f8e0c`; `apps/desktop_flutter/test/a2a_artifact_handoff_test.dart`=`e47005320917f59dfa55ae1e04c4b99d452676de`. |
+| 試験区分 | 既存schema否定fixture、Rust `UNIT`、Flutter `FIXTURE`/`WIDGET`。現行導入済み製品Handoff受入れは`NOT_RUN`。 |
+| 証拠ID | `NONE`。旧P3 `Product Build=CLOSED`と試験範囲は変更せず、v4受入れ証拠は発行していない。 |
+| 阻止要件 | P3専用Registry IDはない。広範な未解決項目`comprehensive_extension_rev1_completion`が関連し、`rev2_flutter_broker_channel_boundary`と`linux_native_product_support`は横断条件。P3への直接帰属は`UNKNOWN`。 |
+| 状態 | 旧P3 `Product Build=CLOSED`を維持。現行`N04/W03=OPEN`。この照合はv4受入れではない。 |
+| 残件 | 導入済み製品の送信元から受信先への受渡し、result/diff/test declaration表示、新Permission/Approval、受信側実行/Audit、現Artifact provenanceの受入れが残る。 |
+
+P0〜P3の阻止要件欄はRegistryとの関連範囲を記録し、Registryに存在しない旧P専用Blockerを作っていない。五OSの標準候補・保証値はN10表のまま`UNKNOWN`を保持する。P0〜P3の全E0-04欄が埋まったことは、この4 IDの製品受入れ、N01/N02/N04/N09/N11の`CLOSED`、E0全体完了を意味しない。
 
 ## 旧C0〜C6のv4 Source→Consumer crosswalk（E0差分）
 
@@ -909,7 +1019,7 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 |---|---:|---|---|
 | 新規要求 N01〜N11 | 11 | v4仕様S04 | 初期Producer/Consumer差分を記録。契約・否定・OS・証拠の全項目は未完 |
 | 全体施工線 A〜J | 10 | v4工程表R03・Codex指示I04 | 全線同時BUILDのproducer/consumerと現行実装配置を全数照合中 |
-| 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13の旧履歴→v4 scope/Consumer crosswalkを記録。詳細Contract/OS/Evidence、P13の旧evidence identity/classは未完／UNKNOWN |
+| 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P3は全E0-04 fieldを個別記録。P4〜P13の個別field、P13の旧evidence identity/class、N11 Evidence/Blocker/OS Artifact全数結合は未完／UNKNOWN |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのSource→Consumer crosswalkを記録。個々の全E0-04列とv4 Acceptance／Evidence/N11結合は継続 |
 | D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDをv4 N01〜N11/A〜J/Kへcrosswalk済み。Phase固有E0-04全field、Evidence ID/Blocker、Acceptanceは未完 |
 | 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K別の完全E0-04 field、OS/Evidence/Blocker確認は継続 |
@@ -954,7 +1064,7 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 
 ## 次のE0照合作業
 
-1. N/P/C/Phase/Kの各要求行へ完全なE0-04 field、N11 Evidence ID、Blocker、OS対象/Artifactを結合する。既存CLOSED/FAILは履歴保持し、再試験しない。
+1. P4〜P13をID順に全E0-04 field、N11 Evidence ID、Blocker、OS対象/Artifactへ結合する。P0〜P3は完了済みmappingとして保持。続けてN/P/C/Phase/K残行へ展開し、既存CLOSED/FAILは履歴保持して再試験しない。
 2. BUF-R/T crosswalkをCanonical N08/N10/N11 source SHA・各IDの完全E0-04 field・B5 evidenceへ結合する。B0〜B6の工程・状態・受入Consumer・証拠のcrosswalkは記録済み。個別cause/effect、OS/Artifact、N11 Evidence/Blockerの結合は継続。
 3. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 4. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
