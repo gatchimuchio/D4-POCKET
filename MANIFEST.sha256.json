@@ -1460,7 +1460,7 @@
     },
     {
       "path": "docs/QE_2026-11-13/E0_\u8981\u6c42consumer\u53f0\u5e33.md",
-      "sha256": "dd0483e56a58d7237bee7306e82bb780b36a64a8f557a11ade8328bfe1d9eefe"
+      "sha256": "7faf69d8aa74748dd58a1a734a6baa4947a5f32273fe5e1e20edd156350a0a1d"
     },
     {
       "path": "docs/QE_2026-11-13/\u5dee\u5206\u79fb\u884c\u53f0\u5e33.md",
@@ -1472,7 +1472,7 @@
     },
     {
       "path": "docs/QE_2026-11-13/\u9032\u6357.md",
-      "sha256": "3062315027da255c79561a5aaa31238b0fa6bd5a55684306b524f8890edb25e0"
+      "sha256": "3ef2a29ecb7f399d26a9b1471c00f771f4605106bd130c5e3aa7a208148124a8"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1652,7 +1652,7 @@
     },
     {
       "path": "docs/specs/failure-injection-validation.md",
-      "sha256": "fa192564b359e9b2af1060649775d7b3f40de59bc91b2da2b216d49dc5b8cc5d"
+      "sha256": "092793e9bccec4e0e32b94a6309839d844e187ac3b9a5734bf494bb3aac8f5a4"
     },
     {
       "path": "docs/specs/final-development-audit.json",

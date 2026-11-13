@@ -4,12 +4,13 @@
 
 C29は、障害を成功、権限、承認、監査、復旧完了へ昇格させないことを、実Broker経路と境界付きfixtureで確認する開発用検証単位である。
 
-対象は次の8件とする。
+対象は次の9件とする。
 
 ```text
 Runtime crash相当
 Broker crash
 MCP timeout
+MCP malformed inputSchema
 A2A timeout
 credential unavailable
 disk full simulation
@@ -24,6 +25,7 @@ corrupt state
 - Runtime crash相当: localhost Runtime fixtureを停止し、対話を通信失敗として確定した後、再接続を確認する。
 - Broker crash: Broker processを停止し、停止後のIPCを失敗させ、明示再起動後のhealthだけを確認する。
 - MCP timeout: 実MCP stdio Adapterへ応答停止fixtureを接続し、`mcp_timeout`を拒否へ射影する。
+- MCP malformed inputSchema: 未対応dialectのTool Schemaを返すstdio fixtureを使い、接続時のTool catalog検証で`mcp_tool_schema_dialect_unsupported`として拒否する。
 - A2A timeout: localhostのA2Aカード応答を検証用fixtureで停止させ、`a2a_timeout`を拒否へ射影する。
 - credential unavailable: 必須Credentialを持つMCP接続を、実値注入なしに拒否する。
 - disk full simulation: regular fileをstore pathへ置き換え、書込不能をBroker起動拒否として観測する。実ディスク容量枯渇の証拠ではない。
