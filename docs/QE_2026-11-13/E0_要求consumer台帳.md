@@ -60,7 +60,7 @@ LedgerのE0-04列は、現ID、旧ID、原文参照、対象、目的、Producer
 | N03 | 独立した異種Runtimeを共通Task/Result契約で使用 | Codex CLIはBrokerのAgent Task Adapter。MINIDORAは共通対話AdapterだがAgent Task methodを実装せず、既定unsupported。Desktop登録UIはCodex CLIのみ。N03個別E0-04へ現HEADのsource/hash・契約・試験源を記録済み。 | `OPEN`。二つ目の独立したTask-capable Runtime、能力選択・拒否・結果・権限の製品経路と実Runtime証拠が不足（`BUILD_GAP`）。 |
 | N04 | Compare／Handoff／A2Aの実作用と権限非継承 | Compare/Handoff/A2A source consumerはある。N04個別E0-04へ現HEADのsource/hash・契約・試験源を記録済み。Compare実行時のfilesystem隔離、外部Agent連携、Artifact転送、Host越境は現installed候補の一貫した実証なし。Hostはmetadata registry。 | `OPEN`。source接続と実作用証拠を分離し、Compare/Handoff/A2A/Hostの残件を照合する。 |
 | N05 | 現実在Capability CatalogからComposeを経て元Toolを実行 | Brokerの現在Runtime/Agent metadata・接続MCP Tool CatalogをCompose時と実行時に再照合するsource経路は`WIRED`。N05 E0-04個別mappingを現HEADへ記録済み。 | `OPEN`。CapabilityはAgent Adapterの未信頼宣言metadataで、実Capability Catalog／依存解決のconsumerは未確認。重複Tool IDのBroker拒否も未成立。既存Windows fixture testは未実行、installed evidenceなし。 |
-| N06 | 独立App Exportと選択Moduleの実除去 | Brokerが新規App/Audit identity・Manifest・Module依存planを作る。Windows/Linux Developer ExporterとLauncherはManifest hash/identityを扱う。Flutter UI Moduleのcompile-time define/AOT比較も存在する。 | `OPEN`。runtime evidenceは`runtime_manifest_consumed=false`、`standalone_app_verified=false`、`binary_pruning_verified=false`。Rust/第三者Module除去、構成による実機能変化、cold-start/resource測定、独立Installer/installed evidenceに`BUILD_GAP`。 |
+| N06 | 独立App Exportと選択Moduleの実除去 | N06 E0-04へ現HEADのProducer→Consumer・Contract・実装状態を個別記録済み。Brokerの新規App/Audit identity・Manifest・依存plan、Windows/Linux developer bundle、Launcherのhash/identity検査はsource上接続。 | `OPEN`。Windows/Linux evidenceは`runtime_manifest_consumed=false`、`binary_pruning_verified=false`。Module planは依存閉包までで実除去なし。macOS/Mobile Export consumerも未接続。正規配布・独立Appの実機能・実除去/資源比較は未成立。 |
 | N07 | AI Edit proposalを別主体で審査しcontrolled apply/rollback | owner proposalのAudit、提案由来を束縛した別Workspace Taskの事前検査、fresh Permission/Approvalの通常経路はsource接続あり。 | `OPEN`。独立審査結果をapply前に確定するTask／Broker状態と、proposal由来の変更を照合するcontrolled apply/rollbackが`BUILD_GAP`。 |
 | N08 | Bufferが元Taskの意味を保ってOS/依存差を調停 | Codex CLI Task専用Workspace scratch・TEMP/TMP束縛・journal Recoveryと、Task終端の非権限Buffer記録はsource接続あり。 | `OPEN`。実装は限定的なCodex TEMP/scratch調停。全OS/依存差、独立した前後意味・副作用比較、B5自己適用・B6全Consumerは未成立／`BUILD_GAP`。 |
 | N09 | UIから実Task、結果、観測、停止・Recoveryを操作 | Desktop Agent CenterはBrokerのTask start/state/cancel/resultをTask IDへ束縛。Workspace Inspector、History、Eval、Resource、Observation、Notificationにも個別のBroker consumerがある。Trayは停止要求のみ。旧対応はP0/P5/P12、C1..6/C12..14/C20..23、K03/K04/K05/K10/K13。 | 部分`WIRED`。同一TaskへのDiff/Eval/Resource/Trace/Audit/Recovery/Searchの結合は未成立。Audit/Problems/Recovery/Searchは起動時snapshot由来、History replay/branchはDialogue新規要求でAgentTask再生ではない。AgentTask pause/resume/restart未実装。MobileにAgentTask操作なし。W02-B01 UI応答停止の原因は`UNKNOWN`。N09/W00は`OPEN`／`BUILD_GAP`。 |
@@ -106,7 +106,7 @@ LedgerのE0-04列は、現ID、旧ID、原文参照、対象、目的、Producer
 
 ## N05/N06 初期Source→Consumer追跡（履歴参照）
 
-この旧い粗粒度mappingは照合HEAD `06db10a8411c7c9f7e9913c01e8b2ff82b7c75e8`時点の履歴であり、下記の現行N05 E0-04個別mappingがN05の状態を更新する。製品コード比較基準は`d503a4ef6daac8942abd1cb011442ce28c78ec55`。当時列挙したsource/schema/testの差分0という記録、旧範囲、未実行状態は履歴として保持する。`WIRED`はsource接続、`FIXTURE`はtest fixtureであり、どちらもinstalled acceptanceではない。
+この旧い粗粒度mappingは照合HEAD `06db10a8411c7c9f7e9913c01e8b2ff82b7c75e8`時点の履歴であり、下記の現行N05/N06 E0-04個別mappingが各要求の状態を更新する。製品コード比較基準は`d503a4ef6daac8942abd1cb011442ce28c78ec55`。当時列挙したsource/schema/testの差分0という記録、旧範囲、未実行状態は履歴として保持する。`WIRED`はsource接続、`FIXTURE`はtest fixtureであり、どちらもinstalled acceptanceではない。
 
 ### N05 Capability/Compose
 
@@ -2681,11 +2681,86 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 | `docs/specs/mcp-connection-center.md` | `64d46042f19fccb0f7a947a95711e9aae87a1564` |
 | `docs/specs/gui-shell-compose.md` | `6b43bb80f73d4268e734ac0afbc58b33ba07339f` |
 
+### N06 Compose→独立App／Installer／Module実除去
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | N06（Compose構成から独立identity・Broker・Runtime・Manifest・選択Moduleを持つ独立App／Installerを生成） |
+| 旧ID | v4 S05対応は`P9/P10→N06`、`K15`、`W05/G5`のExport／Pruning範囲。旧Phase 32はStandalone Export、Phase 33はModule選択／除外。P9/P10の旧rev5局所CLOSED・fixture／build証拠は当時の条件へ固定し、現N06へ移さない。W05のAI Edit portionはN07。 |
+| 原文参照 | v4仕様S04 N06／S05 K15、工程表R03線E・W05/G5、施工指示I04-E。構成を実消費する独立App、別identity/Broker/Runtime/Package、選択外Moduleの実除去と必要機能保持を要求する。実測サイズ／起動／最小資源の詳細は後続E4。署名は別条件。 |
+| 対象 | `settings.dart`の書出し画面→Broker `GUI Shell書出し`→固定`Manifest`／`Receipt`→Windows/Linuxの`export_windows_product.py`／`export_linux_product.py`・`package builder`→Rust `Launcher`／Broker。`macOS`向けBrokerの配布対象情報、Android／iOS対象の拒否も照合する。OS別の配布物／導入／更新／撤去の詳細は現行N10のOS表を参照し、N06の独立製品への設定消費と混同しない。 |
+| 目的 | 新しいApp identityとAudit store identityを作り、Authority等を継承せず、選択したCompose／Runtime／Adapter／Module構成を独立Appが実際に読み込み、必要機能を動作させ、除外した機能をbinary/resourceから除く。Manifestやportable bundleを独立Product完成と見なさない。 |
+| 生成元（`Producer`） | SettingsのExport UIがaccepted Compose Manifest、target platform、optional Module selection、distribution channel、任意Update trust metadataを`ExportClient`経由で既存Brokerへ渡す。BrokerはCompose/current catalogと固定Module Catalogを検査し、App ID・Audit store IDを新規生成、non-inheritance policyとmodule dependency planを含むExport Manifest/Receiptを固定Export directoryへ作る。 |
+| 実Consumer | `tooling/export_windows_product.py`／`export_linux_product.py`がBroker Receipt・Manifestのschema/hash/target/module planを検査し、Windows/Linux portable bundleへManifestをbyte-for-byte格納する。Windows/Linux Launcherは製品Manifestのhash、target、App/Audit identity、非継承条件と`binary_pruning_status=not_applied`を検査する。現Exporter evidence自身が`runtime_manifest_consumed=false`、`binary_pruning_verified=false`を明記し、Launcherは選択Runtime／Adapter設定を動作構成へ反映するconsumerではない。 |
+| 契約／Data | `gui_shell_export.schema.json`、`gui_shell_export_manifest.schema.json`、`gui_shell_export_receipt.schema.json`、`gui_shell_module_catalog.json/schema`、`gui_shell_module_build_evidence.schema.json`、`gui_shell_module_comparison_evidence.schema.json`、Windows/Linux Export build schema、Windows/Linux product-package manifest schema。Manifestは新App/Audit identity、settings、runtime ID、Adapter ID、Capability requirement、target/channel、Module planを持ち、Authority／Permission／Approval／Credential／Audit chainは`none`。Credential実値をBundleしない。 |
+| 正常時作用 | Brokerは新規App ID/Audit store ID、Manifest hash、module plan、fixed-path Manifest file/Receiptを生成する。Module planは固定Catalogのrequired 10、unprunable security core 8、optional 8を分け、unknown/duplicate/required module指定を拒否し、依存閉包を解決する。Windows/Linux developer toolはvalidな入力からportable bundle/packageを組み、Launcherはhash-bound identity／非継承Manifestを検査する。 |
+| 否定時作用 | malformed/stale Compose catalog、unknown/duplicate/required Module、未知または循環依存、Manifest/Receipt hash・target・identity不一致、binary pruningを`applied`と偽るManifest、symlink/reparseや不正Package inventoryは拒否する。Broker Exportは任意保存path/overwriteを受けない。Android/iOS targetはBrokerで拒否する。 |
+| 停止／Recovery | Brokerの受理Audit／Manifest作成／完了Auditを順に記録し、Audit失敗やManifest write/cleanup不整合は成功receiptへ昇格せずRecovery stateを返す。Exporter/package buildの不一致はbundle/packageを受理せず停止する。LauncherはManifest検証失敗時にProduct processを起動しない。選択Moduleによる実機能変更・旧版Rollback・インストール復旧の成立は本mappingでは確認されず、N10/E4へ接続する。 |
+| 標準OS候補 | Export Broker targetはWindows/Linux/macOSを受理するが、現Export build consumerはWindows/Linuxのみ。macOSは現行OS表上、通常Product Export/Installer未接続。Android/iOSはExport targetを拒否しMobile Export consumerなし。Linux nativeは必須製品対象。各OSの保証版／arch／正規導入候補はN10で管理し、portable/VM/fixtureを通常配布合格へ転用しない。 |
+| 配布物 | Windows portable ZIPとD4PKG update payload、Linux portable `tar.gz`／D4PKG update payloadおよびbootstrap-only setup `.deb`のsourceがある。現在のExport evidenceは`installer_status=not_started`、`signed=false`、`formal_distribution_claimed=false`（Windowsは`standalone_app_verified=false`）を明示。`.deb` bootstrap／D4PKG updateを製品Installerと呼ばず、詳細はN10 OS/package表に従う。 |
+| 既存実装 | `export_center.rs`はnew identity・Manifest・module dependency planとOwner/Audit境界を生成。Windows/Linux ExporterとPackage writerはManifest hashとidentityを保存・検査。Desktop Launcher/Linux Launcherは固定hashのManifestを検証。`resolve_module_plan`は安全Coreをunprunableに保ち、dependency closure・unknown/duplicate/required拒否を実装。Windows `build_module_pruned_windows.py`はDeveloper build用compile-time Dart defineをUI surfaceに適用し、AOT comparisonを生成する。 |
+| BUILD_GAP | ①Compose ManifestのRuntime／Agent／Tool／Capability設定を独立Appがruntime configurationとして消費する経路がない。②Module Catalogの`source_surfaces`はoptional Flutter UI surface中心で、必要機能の完全なsource／dependency closureを示さない。③Export planは`binary_pruning_status=not_applied`。Windows define/AOT比較はUI surface限定で`runtime_unverified`、resource comparison未測定、Rust/third-party Moduleは除去されない。Linuxの実pruning、macOS/Mobile exporter/consumerも未接続。④Windows/Linux package builderはあるが現sourceで通常利用者向けInstaller／正式配布や同一候補のinstalled独立Product動作は成立していない。⑤実除去後の必要機能・権限・Broker・Audit・Runtime同一候補検証がない。実測サイズ／起動／資源はE4へ送る。 |
+| `SourceSHA` | 照合HEAD=`c1ee25071ea5b5f2e73af6d4b3c2dd5a7043b6d2`。以下44 Git blobを個別に記録し、本HEADの`HEAD:path`と照合した。 |
+| 試験区分（`TestClass`） | Rust UNITは`export_center.rs`のidentity/non-inheritance、fixed-path write、dependency closure、unknown/duplicate/required Module拒否。Launcher UNITはManifest hash/identity/non-inheritance拒否。Flutter client/widgetはFake Broker。Linux Exporter/packageにはPython unit/integration source、Windows pruningにはConformance／AOT evidence pathがある。旧P9/P10限定build/fixture証拠は当時のscopeであり、今回のN06 acceptanceではない。本mappingでRust／Flutter／Exporter/package／installed product testは`NOT_RUN`。 |
+| 証拠ID（`Evidence ID`） | `NONE`。SourceSHAと既存source/test classの対応付けのみ。旧P9/P10 Product Build、portable bundle、Module UI除外/AOT comparisonの限定evidenceは履歴を保持し、現N06の独立App／Manifest consumption／binary pruning acceptanceへ転記しない。 |
+| 阻害要因（`Blocker`） | N06/W05/G5はOPEN。既存Registryの`rev2_export_owner_ui_authority_path`と`rev2_module_pruning_binary_and_measurement`を保持。Registry 18件（16 unresolved／2 resolved）、`release_ready=false`を変えず、新しいBlocker／Acceptanceは追加しない。 |
+| 状態 | E0-04 N06 mappingは21 field・44 SourceSHAを現HEADへ結合済み。N06製品Acceptance、W05/G5、E0全体はOPEN。 |
+| 残余 | Manifestを使って構成を実行する独立Product consumer、Windows/Linux正式Installerとinstalled受入れ、macOS/Mobile Export経路、binary/resourceからのModule実除去と必要機能保持の実証が残る。E4の実測範囲、N10のOS lifecycle、署名／Publisher条件をそれぞれの責任工程へ送る。 |
+
+#### `N06 SourceSHA`
+
+| `Source file` | `Git blob SHA` |
+|---|---|
+| `apps/desktop_flutter/lib/screens/settings.dart` | `66374ec4157d573939e7f9cc5c36aecf5d65e251` |
+| `apps/desktop_flutter/lib/services/compose_client.dart` | `8f9657d866b007a4d2212abefca4df9add81a702` |
+| `apps/desktop_flutter/lib/services/export_client.dart` | `70d77edc6beb9e209e6b362219d1b22d69375489` |
+| `apps/desktop_flutter/test/settings_compose_test.dart` | `a78353f93617cc7b17391549ea256f007a7acdb1` |
+| `apps/desktop_flutter/test/export_client_test.dart` | `b4ec8686b91370b1eaff06dd88b301ee6ef0370c` |
+| `apps/desktop_flutter/test/module_pruning_test.dart` | `20470e523c2640b681e54c51f9c6749ee35f5e05` |
+| `native/rust_helper/src/broker/export_center.rs` | `477e44d86ebf18d2b004a7294c9cdb14e35aa0f0` |
+| `native/rust_helper/src/broker/protocol.rs` | `9b2076d5f31ca6d77f1f87973d1b394aaf751961` |
+| `native/rust_helper/src/broker/product_install.rs` | `c91115bdf88dd28e5f3445e7ed66127902909677` |
+| `native/rust_helper/src/desktop_launcher.rs` | `6a9f335de07fa474ca10043aea63ad6e988b572d` |
+| `native/rust_helper/src/linux_desktop_launcher.rs` | `f58fb226f21093c2d1f062259d394b4f8ec022f6` |
+| `native/rust_helper/src/linux_product_bundle.rs` | `f71ed312c629e81914c61180baeb9723b315a69a` |
+| `native/rust_helper/src/product_package.rs` | `a2deb2b6e77bc00ae8d01cd5ca306ee63baa20e5` |
+| `native/rust_helper/src/bin/gui_shell_desktop_launcher.rs` | `809efba7a03eacddf9e172011149d9a8d5e3fda7` |
+| `tooling/export_windows_product.py` | `31856179881a5a5aae1ba4451732e6de6cd7f338` |
+| `tooling/export_linux_product.py` | `47fe9a3032a5b2680e3f7d39b7cd64120ac83843` |
+| `tooling/package_windows_product.py` | `c6f9155f2457ef0d89ecb711fa94424fbb1501ee` |
+| `tooling/package_windows_portable.py` | `d6cfba6941da10fbae35228e7137d7f87f8d3889` |
+| `tooling/package_linux_product.py` | `0d32d04ec5b43e1815b3664a323c17db79bc928a` |
+| `tooling/package_linux_deb_setup.py` | `e7a057b2f3db2fca8bbe91401e25d71fb88ceca3` |
+| `tooling/build_module_pruned_windows.py` | `490aae7209ea5988f8e2cdcb05fe092b3d29504a` |
+| `tooling/compare_module_builds_windows.py` | `09d926b9c6b611cd59e524cc947ce2dce1c81247` |
+| `tooling/tests/test_export_linux_product.py` | `079a187de49cf8b2fb6a7ddadb4175d6916163d1` |
+| `tooling/tests/test_linux_product_package.py` | `3bb3b520d3c4d15b1f4d43993c8cddb0f0c08ee1` |
+| `tooling/tests/test_linux_deb_setup_package.py` | `2467e29b9eb13bd65065fea5a80872a3068cdfcd` |
+| `tooling/tests/test_linux_installed_product_smoke.py` | `dc94f9b782d3699810bbe50230a5e9510a5739f7` |
+| `tooling/tests/test_linux_portable_archive.py` | `c04ac3c5d6d58396f650e9530b6731c6bb2037d6` |
+| `tooling/conformance_tests/run_conformance_skeleton.py` | `c6f31d8cb561b48513c6784e54c85969c9cb953e` |
+| `specs/gui_shell_export.schema.json` | `8b96d344ac0f6a54011237be8b2d85964be48c4b` |
+| `specs/gui_shell_export_manifest.schema.json` | `bf136b1a1daa258d33af3635ee414a2d4312bec5` |
+| `specs/gui_shell_export_receipt.schema.json` | `0448ec5f631509fa6fbe25cb4957bd6cf51e1562` |
+| `specs/gui_shell_module_catalog.json` | `339cb8894b25ae963956e582c42b9e8fcc0d3931` |
+| `specs/gui_shell_module_catalog.schema.json` | `bd54dd7903a1734ea4027d3f780b7a2b49e10c8e` |
+| `specs/gui_shell_module_build_evidence.schema.json` | `1a37d4b831f998ce334fc9f0126c5dd2ee09a01b` |
+| `specs/gui_shell_module_comparison_evidence.schema.json` | `801ba33bfc0656a4048aa5ca1920b96b7787c304` |
+| `specs/gui_shell_windows_export_build.schema.json` | `5c7234692a8f178882edfc42c1a762038e7414fa` |
+| `specs/gui_shell_linux_export_build.schema.json` | `6f1af3d3da2277807dabac5d753897f5ddee453c` |
+| `specs/d4_pocket_product_package_manifest.schema.json` | `3151ba81a869b87e6c0fa8f8633a0e424fc43ae7` |
+| `specs/d4_pocket_linux_product_package_manifest.schema.json` | `34087f190e7189641b34ae3163b568a038c9f1c2` |
+| `docs/specs/gui-shell-export.md` | `3d7a1156e4bf095e4f6a64792b6e1683c14f9b17` |
+| `docs/specs/gui-shell-module-pruning.md` | `5568c677be30402d709cc365b79eceb0e96ce831` |
+| `docs/specs/windows-product-package.md` | `19c5c45dc8cbdbd4560b7b2cb8fe5d8e9f82a2c3` |
+| `docs/specs/linux-product-package.md` | `faad8b2a9487afc9a818ad3938e0ff92c77cc268` |
+| `release_blockers.registry.json` | `244adc04a01e7b406c4ebcdeb829f7077d4aa35f` |
+
 ## 要求母集団・照合状態
 
 | 母集団 | 件数 | 正本・原典 | v4 E0状態 |
 |---|---:|---|---|
-| 新規要求 N01〜N11 | 11 | v4仕様S04 | N01〜N05はE0-04全21項目を現行SourceSHAへ個別結合済み。製品AcceptanceはすべてOPEN、N06〜N11の個別全数照合は未完 |
+| 新規要求 N01〜N11 | 11 | v4仕様S04 | N01〜N06はE0-04全21項目を現行SourceSHAへ個別結合済み。製品AcceptanceはすべてOPEN、N07〜N11の個別全数照合は未完 |
 | 全体施工線 A〜J | 10 | v4工程表R03・Codex指示I04 | 全線同時BUILDのproducer/consumerと現行実装配置を全数照合中 |
 | 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13は全E0-04 fieldを個別記録。P13旧aggregate evidence identity/classは`UNKNOWN`。N11 Evidence/Blocker/OS Artifact全数結合は未完 |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのSource→Consumer crosswalkを記録。個々の全E0-04列とv4 Acceptance／Evidence/N11結合は継続 |
@@ -2732,7 +2807,7 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 
 ## 次のE0照合作業
 
-1. N01〜N04のE0-04 21項目は照合済み。各製品AcceptanceはOPENのまま維持し、次はN05 Capability／Composeから元Tool実作用までのProducer・実Consumer・拒否境界を個別に結合する。
+1. N01〜N06のE0-04 21項目は現行SourceSHAへ個別照合済み。各製品AcceptanceはOPENのまま維持し、次はN07 AI Editのproposal→独立審査→controlled apply／rollbackについてProducer・実Consumer・拒否境界を個別に結合する。
 2. 残るN/P/C/Phase/K要求をCanonical N source/consumer・N11 Evidence/Blocker/OS Artifactへ接続する。旧CLOSED/FAILは履歴として保持し、再試験しない。
 3. BUF-R/TのSourceSHAとConsumer scopeは記録済み。AcceptanceはOPEN。B0〜B6の状態を保持し、原因→effect、N08/N10/N11、OS/Artifact/evidence結合を続ける。
 4. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
