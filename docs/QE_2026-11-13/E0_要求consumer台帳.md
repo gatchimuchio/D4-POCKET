@@ -2733,7 +2733,91 @@ C24〜C34の11 ID×21 fieldを文書上展開した。旧C28の8時間FAIL、C33
 | 状態 | `Phase 5`記録。`N01`/`N09`の受入れは`OPEN`。 |
 | 残余 | 他OS installed Task/UI、same Task result/diff/Audit/Recovery、Mobile境界。 |
 
-Phase 0〜5の6行はE0-04全項目を記録した。旧Phase/C status、N01/N03/N04/N09/N11のOPEN、W01限定CLOSED、Release Blockerは変更していない。Phase 6〜45、K01〜K20の個別fieldとN11 Evidence/Blocker/OS Artifact行結合は未完了。E0はOPEN。
+Phase 0〜8の9行はE0-04全項目を記録した。旧Phase/C/P status、N01/N02/N03/N04/N09/N11のOPEN、W01限定CLOSED、W03/G3、Release Blockerは変更していない。Phase 9〜45、K01〜K20の個別fieldとN11 Evidence/Blocker/OS Artifact行結合は未完了。E0はOPEN。
+#### Phase 6〜8 E0-04個別記録（2026-11-13）
+
+旧Phase/Cの履歴状態を保持し、現行v4要求consumerへE0-04全21項目で接続する。SourceSHAは編集前main 3bd056d65cb5e1d8450c4995fd240964dfb567edのGit blob値で、製品Acceptanceの証拠ではない。本mapping単位で製品testは再実行しない。
+
+##### Phase 6 個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | Phase 6 作業領域検査。現行consumerはN09、施工線C、能力K03。 |
+| 旧ID | Phase 6／C1 Workspace Inspector。旧statusと過去の差分・履歴は当時の記録として維持し、再判定しない。 |
+| 原文参照 | docs/D4_POCKET_PHASE_MAPPING.md Phase 6/C1、v4仕様S04 N09・S05 K03、工程表R03線C、施工指示I04-C。 |
+| 対象 | Desktop Workspace Inspectorのtree、bounded read、change list、diff、history、Recovery preview。 |
+| 目的 | Broker境界内でWorkspaceを確認し、UI表示を権限・復旧作用と混同させない。 |
+| 生成元（Producer） | Broker管理のWorkspace登録/root、許可されたread/change/history、比較基準、Recovery候補。 |
+| 実Consumer | `workspace_inspector.dart→workspace_client.dart→Broker workspace operations→workspace_root.rs／workspace_reader.rs／workspace_diff.rs。結果はInspector/Diff panelへ戻る。` |
+| 契約／Data | workspace_inspection_request.schema.json、workspace_inspection_response.schema.json、workspace_diff.schema.json。Workspace ID・登録root・要求範囲・bounded resultを束縛。 |
+| 正常時作用 | 現在の登録・許可を検査しtree/read/change list/history/diff/Recovery previewを返す。baseline diffとTask result diffは別data。 |
+| 否定時作用 | 未登録/stale Workspace、root外path、secret、malformed request、上限超過を拒否し、不明な結果を成功表示しない。 |
+| 停止／Recovery | 登録・権限・Audit不整合は拒否またはsuspend。Recovery previewは候補表示のみでrollback実行ではない。 |
+| 標準OS候補 | Desktop N10候補のWindows/Linux/macOS。Mobile Inspector consumerは未接続。各OSのinstalled acceptanceは未成立。 |
+| 配布物 | Desktop候補packageはN10管理。source/debug buildを通常配布・installed受入れへ昇格しない。 |
+| 既存実装 | `apps/desktop_flutter/lib/screens/workspace_inspector.dart、workspace_diff_panel.dart、services/workspace_client.dart、native/rust_helper/src/broker/workspace.rs、workspace_root.rs、workspace_reader.rs、workspace_diff.rs。` |
+| BUILD_GAP | Task result/diff/testをTask単位で示すconsumer、全Workspace・大容量file、Mobile parity、五OS installed一体証拠は未成立。 |
+| ソース識別値（SourceSHA） | `HEAD=3bd056d65cb5e1d8450c4995fd240964dfb567ed。docs/D4_POCKET_PHASE_MAPPING.md=064ea334f86b137d94fba2370d2a2fd732f6e972; apps/desktop_flutter/lib/screens/workspace_inspector.dart=a02c95ec5062583f9c37523fbaf604a8d2da107e; apps/desktop_flutter/lib/screens/workspace_diff_panel.dart=5e2154b870921a707b3da9a79c9f55055ce3cb1f; apps/desktop_flutter/lib/services/workspace_client.dart=870b48e8f4bbd648bcfebc5886addca3784bcfaf; native/rust_helper/src/broker/workspace.rs=68075d680a3c7d57785083e64d3d21523d79374c; native/rust_helper/src/broker/workspace_root.rs=15f208e0b855b8cee53e878d2b27aaf457ea2937; native/rust_helper/src/workspace_reader.rs=3d635b50f85cffb6db382ed3c061ff6068238099; native/rust_helper/src/workspace_diff.rs=990041d9f2a67e2d372371e74fafb225e4e78e79; specs/workspace_inspection_request.schema.json=a8210c300b2909c040188d0766633f1e30884e7a; specs/workspace_inspection_response.schema.json=6cc9f80f4dd9b8bd9f71441bee845017428fa38a; specs/workspace_diff.schema.json=1389ad85c48e263e688ab6dfa5276f96eb26fef0; apps/desktop_flutter/test/workspace_inspector_test.dart=2f6e53c2a38d5e23c88f2ad91e079bf8be4808a5; native/rust_helper/tests/workspace_reader.rs=4723cbb121a0fe50d2e73ad6592ca9eac6c42a39; native/rust_helper/tests/workspace_diff.rs=a467a45c233112c6f81ab8ffe504781e53aa937c; native/rust_helper/tests/workspace_startup.rs=e497c2747d58fba4d5d31c9fe9d7fc6a4152510a.` |
+| 試験区分（TestClass） | Flutter UNIT/WIDGET、Rust UNIT/FIXTURE sourceあり。source/installed product testは本mapping単位でNOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。Source mappingはN09 installed acceptance、Task result projection、OS別証拠を証明しない。 |
+| 阻害要因（Blocker） | N09/W00等とRegistry 18件（16 unresolved／2 resolved）、release_ready=falseを維持。新規Blockerなし。直接帰属はN11照合までUNKNOWN。 |
+| 状態 | Phase 6のE0-04 mapping 21項目を記録。旧Phase/C status不変、N09製品AcceptanceとE0はOPEN。 |
+| 残余 | Task result diffとbaseline diff、Task test表示、bounded Workspace/大容量処理、各OS installed受入れ。 |
+
+##### Phase 7 個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | Phase 7 Compare／AgentTask／Session／Workspace結合。現行N01/N02/N04、施工線A/B/C、能力K01/K02/K03/K08。 |
+| 旧ID | Phase 7／C1・C30。旧P2対応と旧C/P statusは履歴として保持し、現N04 acceptanceへ移さない。 |
+| 原文参照 | docs/D4_POCKET_PHASE_MAPPING.md Phase 7/C1/C30、v4仕様S04 N01/N02/N04・S05 K01/K02/K03/K08、工程表R03線A/B/C、施工指示I04-A/B/C。 |
+| 対象 | 同一Taskを独立Session/Workspaceへ束縛したAgent A/Bの実行、結果比較・選択、failure/cancel isolation。 |
+| 目的 | 同一Workspace書込みや共有Authorityを避け、AgentごとのTask/result/認可を分離。 |
+| 生成元（Producer） | Agent Center Task要求、comparison coordinator、Session/Workspace、Broker Task receipt/result、変更/test情報。 |
+| 実Consumer | `agent_center.dart／agent_coordination.dart→agent_comparison_coordinator.dart→agent_task_client.dart／agent_task_execution_coordinator.dart→Broker dialogue/workspace/scratch→Codex CLI adapter。` |
+| 契約／Data | agent_comparison.schema.json、agent_task_request.schema.json、agent_task.schema.json、agent_workspace.schema.json、Workspace Permission/Owner Approval/scratch/content exposure contracts。ID・Session・Workspace・result hashを独立束縛。 |
+| 正常時作用 | 独立preflightからBroker Taskを別々に開始・照会しbounded result/diff/testを比較。Windows/Linux normal ReleaseのCodex task_execution=supportedは限定Agent Task能力で、Compare acceptanceではない。 |
+| 否定時作用 | 同一Workspace、不正Session、stale/unknown Task、権限欠落、Agent metadata escalation、cross-agent contaminationを許可しない。選択結果は未信頼入力。 |
+| 停止／Recovery | 片側failure/cancelを他方へ伝播させず、曖昧な開始・停止結果は再送しない。旧Approvalは再利用しない。installed descendant isolationは未実証。 |
+| 標準OS候補 | Desktop N10候補のWindows/Linux/macOS。MobileにCompare/Task実作用consumerなし。 |
+| 配布物 | Desktop候補packageはN10 scope。Linux nativeを含む各OSのinstalled Compareは未成立。 |
+| 既存実装 | `packages/agent_orchestration/lib/agent_comparison_coordinator.dart、apps/desktop_flutter/lib/services/agent_coordination.dart、screens/agent_center.dart、services/agent_task_execution_coordinator.dart、agent_task_client.dart、Rust broker/dialogue.rs、workspace.rs、agent_task_scratch.rs、adapters/codex_cli.rs。` |
+| BUILD_GAP | installed同時Codex A/B、実filesystem隔離/cross-agent contamination、selected result projection/apply、failure/cancel isolation、resource/time/result Audit acceptanceは未成立。 |
+| ソース識別値（SourceSHA） | `HEAD=3bd056d65cb5e1d8450c4995fd240964dfb567ed。packages/agent_orchestration/lib/agent_comparison_coordinator.dart=6b5deaacb500a23e6bfdc37649d61ebc0d885127; apps/desktop_flutter/lib/services/agent_coordination.dart=bdc13464f0e42b740a2bca3b7e8828a5019056d0; apps/desktop_flutter/lib/screens/agent_center.dart=2472faeb31a64d624423c30a0a30d0f153d2e2a3; packages/agent_orchestration/lib/agent_task_client.dart=a31fbb9f980a0039f809fd763c91f055fe9d02d0; apps/desktop_flutter/lib/services/agent_task_execution_coordinator.dart=5d8f48d0557bdcb1af838239abf9651893bce7f1; native/rust_helper/src/broker/dialogue.rs=c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999; native/rust_helper/src/broker/workspace.rs=68075d680a3c7d57785083e64d3d21523d79374c; native/rust_helper/src/broker/agent_task_scratch.rs=de743cd819fb4533c9c3070c4e7bcae82e42d938; native/rust_helper/src/adapters/codex_cli.rs=e5c9d1581ae9a1c0a3ae7fcfa626fdca6fea6d28; specs/agent_comparison.schema.json=d2993ce1145674214fb2d80d696fc2c161cfbffe; specs/agent_task_request.schema.json=cb25bb3684656bfd670ea5832bbb7fc5988845b6; specs/agent_task.schema.json=a552389072088d6cd42b3588fefda332be4ae6b6; specs/agent_workspace.schema.json=47058678398b5aac1b0b1467cac7e78daef72b32; specs/agent_task_workspace_permission_request.schema.json=05f7a7f97c7bac884ce706cc7f1533792c35e486; specs/agent_task_workspace_permission.schema.json=01be05df95431e38ca5dc3ec1b5f04416b506fb2; specs/agent_task_owner_approval.schema.json=d190c9a8cc3d715eb199459c37c14e5de0ad6ad8; specs/agent_task_scratch_recovery.schema.json=40f1eac71fb4533c9c3070c4e7bcae82e42d938; specs/agent_task_content_exposure.schema.json=a85b99c0213d18daaab3d5d863adcd3661f379a0; apps/desktop_flutter/test/agent_coordination_test.dart=6783e87a492d8436a855a7088b7cece38d122bd5; apps/desktop_flutter/test/agent_task_client_test.dart=0477a0bbbb321082494b6b55711815d34419fdd9; native/rust_helper/tests/agent_task_production_e2e.rs=fdc7565aa58fa7466e6e24e5492321e8015567eb; native/rust_helper/tests/agent_task_crash_recovery_e2e.rs=23517fcfe8ef94b2357a94e04879d423c3360501.` |
+| 試験区分（TestClass） | Flutter UNIT/WIDGET、Rust UNIT/FIXTURE sourceあり。installed Compare、filesystem隔離、failure/cancel、selected result apply/AuditはNOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。fixture/local runtimeや別条件のTask証拠をN04 Compare acceptanceへ転記しない。 |
+| 阻害要因（Blocker） | N01/N02/N04、W03/G3、Registry 18件（16 unresolved／2 resolved）、release_ready=falseを維持。新規Blockerなし。直接帰属はN11までUNKNOWN。 |
+| 状態 | Phase 7のE0-04 mapping 21項目を記録。旧Phase/C/P status不変、N01/N02/N04・W03/G3・E0 acceptanceはOPEN。 |
+| 残余 | installed同時比較、実Workspace/Task隔離、cross-agent contamination、selected result apply、failure/cancel isolation、Audit、各OS consumer。 |
+
+##### Phase 8 個別照合
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | Phase 8 Agent引継ぎ。現行N04-Handoff、施工線B、能力K02/K11。 |
+| 旧ID | Phase 8／C30、旧P3との関係は履歴crosswalkのみ。過去C/P statusを現N04へ移さない。 |
+| 原文参照 | docs/D4_POCKET_PHASE_MAPPING.md Phase 8/C30、v4仕様S04 N04・S05 K02/K11、工程表R03線B、施工指示I04-B。 |
+| 対象 | 完了Taskの公開result/context/Artifact/diff/test resultを別Agentへbounded handoffし新規Taskとして扱う内部HandoffとA2A Artifact path。 |
+| 目的 | 成果物を渡しながらPermission/Approval/Credential/Trust/Authority/hidden stateを継承せず、受信側で現在条件を再評価。 |
+| 生成元（Producer） | source AgentTask result/Artifact/diff/test projectionと明示handoff context。A2A Artifactは別のuntrusted source。 |
+| 実Consumer | `agent_handoff.dart／a2a_artifact_handoff.dart→Agent Center→agent_task_client.dart fresh preflight→Broker dialogue.rs。A2Aはa2a_center.rs／a2a.rs。` |
+| 契約／Data | agent_handoff.schema.json、agent_handoff_package.schema.json、agent_task_request.schema.json、agent_task.schema.json、a2a_contract.schema.jsonおよび限定A2A Message/Task schemas。target Session/Workspace・result/artifact hashを束縛。 |
+| 正常時作用 | source resultをbounded package化して別targetのfresh AgentTask preflightへ渡す。Brokerが新規Workspace Permissionと別Approvalを判定し、handoff自体は権限を持たない。 |
+| 否定時作用 | 未完了/未承認source、stale hash、target混同、oversized/malformed Artifact、secret、Authority/Approval/Credential/Trust/hidden state継承を拒否。metadata/CardはTrustを生成しない。 |
+| 停止／Recovery | target preflight失敗・結果不明は停止し、曖昧なA2A非冪等作用を再送しない。internal receipt projectionをdurable Auditと扱わない。 |
+| 標準OS候補 | Desktop N10候補のWindows/Linux/macOS。ただしmacOS A2Aはloopback Card/metadata-onlyで作用なし。Mobile Handoff consumer未接続。 |
+| 配布物 | 各OS Desktop候補packageはN10 scope。通常配布・installed Handoff/A2A一体受入れは未成立。 |
+| 既存実装 | `apps/desktop_flutter/lib/services/agent_handoff.dart、a2a_artifact_handoff.dart、screens/agent_center.dart、packages/agent_orchestration/lib/agent_task_client.dart、native/rust_helper/src/broker/dialogue.rs、broker/a2a_center.rs、a2a.rs。` |
+| BUILD_GAP | installed source→selected public result/Artifact→new target Task→Permission/Approval→result/Audit、Mobile parity、macOS metadataを越えるA2A作用は未成立。 |
+| ソース識別値（SourceSHA） | `HEAD=3bd056d65cb5e1d8450c4995fd240964dfb567ed。docs/D4_POCKET_PHASE_MAPPING.md=064ea334f86b137d94fba2370d2a2fd732f6e972; apps/desktop_flutter/lib/services/agent_handoff.dart=a85110d96cbade732ae0e1bfea2529f03f37523c; apps/desktop_flutter/lib/services/a2a_artifact_handoff.dart=e7e2f3454e2843f1d4f4e7b5aedfa55014cde05c; apps/desktop_flutter/lib/screens/agent_center.dart=2472faeb31a64d624423c30a0a30d0f153d2e2a3; packages/agent_orchestration/lib/agent_task_client.dart=a31fbb9f980a0039f809fd763c91f055fe9d02d0; native/rust_helper/src/broker/dialogue.rs=c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999; native/rust_helper/src/broker/a2a_center.rs=73ad601abd64a33ccefde4b73ab5f9dc4f728504; native/rust_helper/src/a2a.rs=9d7c6d9ab938ad5178d6ca46b3933dc3e61c6061; specs/agent_handoff.schema.json=e37a276f8c3e19816bc4f80824efce546a116d00; specs/agent_handoff_package.schema.json=a8ae1e2a3be6c0ed5666849fc6553c98083a1cc3; specs/agent_task_request.schema.json=cb25bb3684656bfd670ea5832bbb7fc5988845b6; specs/agent_task.schema.json=a552389072088d6cd42b3588fefda332be4ae6b6; specs/a2a_contract.schema.json=8c7f50bb7fb12dde41293727e5dc9109445d1bc3; specs/a2a_task_get_request.schema.json=df11a5fd3291de0ae379694c6c1b49de51f2f157; specs/a2a_task_get_response.schema.json=56a55f348d6b0ba7cb0092ee7ea2b4ec809e5360; specs/a2a_message_send_request.schema.json=0a5f87250f17a88b6be55e7838d32b8e9114bbed; apps/desktop_flutter/test/agent_handoff_test.dart=c6bc9bef8cc8d153ef59bf421efbd989185f8e0c; apps/desktop_flutter/test/a2a_artifact_handoff_test.dart=e47005320917f59dfa55ae1e04c4b99d452676de.` |
+| 試験区分（TestClass） | Flutter UNIT/WIDGET、Rust UNIT/FIXTURE sourceあり。installed target reauthorization、A2A external action、durable AuditはNOT_RUN。 |
+| 証拠ID（Evidence ID） | NONE。fixture/loopback Card metadata evidenceはinstalled external Handoff acceptanceを証明しない。 |
+| 阻害要因（Blocker） | N04/W03/G3、Registry 18件（16 unresolved／2 resolved）、release_ready=falseを維持。新規Blockerなし。 |
+| 状態 | Phase 8のE0-04 mapping 21項目を記録。旧Phase/C/P status不変、N04・W03/G3・E0 acceptanceはOPEN。 |
+| 残余 | installed target reauthorization→result/Audit、selected Artifact boundary、Mobile consumer、macOS A2A作用範囲。 |
+
+Phase 6〜8の3行は各E0-04全21項目を記録。旧Phase/C/P status、N01/N02/N04/N09/N11、W03/G3、Release Blockerは変更せず、Evidence IDは全てNONE。Phase 9〜45、K01〜K20個別field、N11 Evidence/Blocker/OS Artifact行結合は未完了で、E0はOPEN。
+
 ### 製品能力K01〜K20
 
 | K／S05能力 | v4関連N／施工線A〜J | 現行Producer→Consumer参照 | Source状態・残余・証拠境界 |
@@ -4277,7 +4361,7 @@ Phase 0〜5の6行はE0-04全項目を記録した。旧Phase/C status、N01/N03
 | 全体施工線 A〜J | 10 | v4工程表R03・Codex指示I04 | 全線同時BUILDのproducer/consumerと現行実装配置を全数照合中 |
 | 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13は全E0-04 fieldを個別記録。P13旧aggregate evidence identity/classは`UNKNOWN`。N11 Evidence/Blocker/OS Artifact全数結合は未完 |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのE0-04 21 fieldを個別記録。旧status維持、N11 Evidence/Blocker/OS Artifact結合と製品Acceptanceは継続 |
-| D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜5はE0-04全21 fieldを個別記録、Phase 6〜45は個別field未完。Evidence/Blocker/OS Artifact結合・Acceptance未完 |
+| D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜8はE0-04全21 fieldを個別記録、Phase 9〜45は個別field未完。Evidence/Blocker/OS Artifact結合・Acceptance未完 |
 | 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K別の完全E0-04 field、OS/Evidence/Blocker確認は継続 |
 | Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 33 IDのscope/Consumer/現証拠境界と各21 fieldを記録。BUF-R/T Acceptance、cause/effectの全件結合、N11 evidence、OS artifactとの結合は未完 |
 | Buffer工程 B0〜B6 | 7 | `docs/緩衝基盤_rev5補遺_QC/`・v4仕様S06 | B0〜B4の限定CLOSEDを保持、B5 OPEN、B6未成立。詳細Consumer照合が未完 |
@@ -4321,7 +4405,7 @@ Phase 0〜5の6行はE0-04全項目を記録した。旧Phase/C status、N01/N03
 ## 次のE0照合作業
 
 1. N01〜N10のE0-04 21項目は現行SourceSHAへ個別照合済み。各製品AcceptanceはOPENのまま維持し、N10の五OS実導入・利用・更新・Recovery QAは後続の製品Acceptanceに残す。
-2. C0〜C34個別field記録を維持し、Phase 6〜45／K01〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
+2. C0〜C34個別field記録を維持し、Phase 9〜45／K01〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
 3. BUF-R/TのSourceSHAとConsumer scopeは記録済み。AcceptanceはOPEN。B0〜B6の状態を保持し、原因→effect、N08/N10/N11、OS/Artifact/evidence結合を続ける。
 4. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 5. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
