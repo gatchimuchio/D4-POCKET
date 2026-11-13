@@ -409,12 +409,12 @@ N11は`OPEN`。ValidatorとRelease Gateは一部のRegistry/Windows evidence/man
 | P7 | A2A / Multi-Host / Adapter管理。旧rev5でProduct Build `CLOSED`。A2A、Host metadata/capability、接続性、degraded mode、local/remote Runtime区別。 | v4仕様S05の直接対応はN03/N04。関連能力はK11/K12。Phase 24〜27（C15〜C19範囲）。施工線B/F。 | Runtime/AdapterとAgent Center/A2A UI→Broker Runtime/Host/A2A consumer。実Runtime capability・A2A action・Host境界のsourceとhashはN03/N04節。 | 旧P7の決定的fixture/限定接続をinstalled external-agent保証へ昇格しない。現v4 N03/N04・W03は`OPEN`。二つ目の実Runtime Task、外部Agent action、Host間Workspace/Authority隔離、Mac/Mobileの同等作用は未成立またはunsupported。 |
 | P8 | GUI-Shell Compose。旧rev5で製品構築受入れ`CLOSED`。Capability/Dependency選択、Manifest/preview、AI edit proposalと制御適用を区別。 | v4仕様S05の直接対応はN05/N07。関連能力はK14。Phase 29〜31はD4追加範囲で、同等のrev1 C工程を主張しない。施工線D。 | Catalog/Compose UI→Broker compatibility check/Manifest→MCP Tool consumerはN05節。AI proposal→別Workspaceの審査Task→controlled apply/rollback候補はN07節。 | 現ConsumerはManifestの独立Appによる完全消費を示さず、AI Editはproposal/Task準備が中心でBroker-controlled apply/rollbackに`BUILD_GAP`。旧Product Build statusのまま、v4 N05/N07・W04/W05は`OPEN`。 |
 | P9 | Standalone Export。旧rev5で製品構築受入れ`CLOSED`。構成から新identity/Manifest/選択moduleを持つ独立Appを出力する。 | v4仕様S05の直接対応はN06。関連能力はK15。Phase 32はD4追加範囲。Phase 33のModule pruning (P10)と分離する。施工線E。 | Export UI→Broker receipt/Manifest→Windows/Linux Developer Exporter→Launcher。現source/hashとManifest consumption/pruning limitはN06節。 | 旧Exporter/Product Build証拠は独立installed製品の実動作ではない。runtime manifest consumption、normal installer/installed runは未成立、`standalone_app_verified=false`。v4 N06/W05は`OPEN`。P10のbinary/resource除去も本IDへ統合しない。 |
-| P10 | Module Selection / Pruning。旧rev5で機能上の除外範囲を`CLOSED`。選択dependency closure、compile-time UI除外、必須画面保持。 | v4仕様S05の直接対応はN06、関連能力K15。Phase 33のD4追加範囲で、同等のrev1 C工程なし。施工線E/F。 | Export Module plan→build define/receipt→Flutter UIの除外経路。Exporter/Launcherへの現source接続とhashはN06節。 | 旧plan/Widgetは`CONFIG`/`FIXTURE`。AOT/binary実除去、Rust/third-party dependency pruning、size/resourceの意味保証は未成立。`binary_pruning_verified=false`、FQ-MODULE-PRUNING／`rev2_module_pruning_binary_and_measurement`を保持。v4 N06/W05は`OPEN`。 |
+| P10 | Module Selection / Pruning。旧rev5で機能上の除外範囲を`CLOSED`。選択dependency closure、compile-time UI除外、必須画面保持。 | v4仕様S05の直接対応はN06、関連能力K15。Phase 33のD4追加範囲で、同等のrev1 C工程なし。施工線E/F。 | Export Module plan→build define/receipt→Flutter UIの除外経路。Exporter/Launcherへの現source接続とhashはN06節。 | 旧plan/Widgetは`CONFIG`/`FIXTURE`。Windows AOT source面の一致とLinux WSL2 fixtureのsize差は限定観測で、binary実除去・Rust/第三者依存pruning・実行時resource保証ではない。`binary_pruning_verified=false`、FQ-MODULE-PRUNING／`rev2_module_pruning_binary_and_measurement`を保持。v4 N06/W05は`OPEN`。 |
 | P11 | Windows Productization。旧rev5で製品機能受入れ`CLOSED`。P9 portable ZIPをbootstrapに使うBroker-owned Install/Update/Repair/Rollback/Uninstall導線。 | v4仕様S05の直接対応はN10、関連能力K16。Phase 34はC33/C34の配布範囲と関連。施工線G/F。 | Windows package/portable→bootstrap/Update Center→Broker product install/update→Launcher/Setup Doctor。現候補source・package役割・workflow・hashはN10節。 | 旧acceptanceはMSI/Setup.exeやsigned release artifact作成を主張しない。v4 N10は`OPEN`で、一般配布・同一candidateのinstalled lifecycle・署名/Publisher identityは未成立。`rev2_desktop_product_distribution`と`windows_distribution_identity`を保持。 |
 | P12 | 製品全体統合。REV5進捗ではWindows側`FEATURE COMPLETE`。正式release/Owner GOと分離された製品機能統合の履歴。 | v4仕様S05の直接対応はN01/N09/N10、関連能力K19。Phase 39〜45はC27〜C34のQC/回帰/文書/出荷範囲に関連。単一施工線へ閉じない。 | Windows product entry→Task/result/operation UI→OS product lifecycle。実TaskはN01、operation/observation/recoveryはN09、installed OS distribution/lifecycleはN10の現ConsumerとSHA節へ分割記録。 | `FEATURE COMPLETE`を正式Release/QAへ昇格しない。v4 N01/N09/N10は`OPEN`、Q0〜Q7は`DEFERRED`、`release_ready=false`。統合後の全候補・全OS acceptanceは未成立。 |
 | P13 | Mobile / Non-Windows Product Build。REV5履歴は2026-10-09に有限Product Build acceptanceを閉鎖したと要約する。旧Acceptanceの詳細evidence identity/classは本照合資料から`UNKNOWN`。 | v4仕様S05の直接対応はN10、関連能力K17。Phase 35/36はC24〜C26範囲に関連。施工線H/I。Linux native必須性は別途現行AGENTS/v4正本に従う。 | Linux/macOS Desktop、Android/iOS Mobile runner/native transport→Rust Broker／OS capability→installed product lifecycle。OS別source、package、workflow候補とSHAはN10節。 | 旧P13閉鎖を現行五OS標準installed QAへ移さない。Linux nativeは完全対応必須で、WSL/Xvfb/Headlessだけでは成立しない。Android/iOS実機を前提にせずEmulator/Simulator等を用いる。N10は`OPEN`、`linux_native_product_support`、`rev2_mobile_distribution`、`rev2_mobile_device_evidence`を保持。 |
 
-P0〜P13全14 IDの旧要求範囲・限定statusをv4 N/K/Consumerへ接続した。これは旧statusの書換え、v4 acceptance、N01〜N11のCLOSED、E0完了のいずれも意味しない。C0〜C34、Phase0〜45、K01〜K20のSource→Consumer/scope mappingを記録した。P0〜P9は本節後段で全E0-04 fieldを個別補完し、P10〜P13とN11 Evidence/Blocker/OS Artifact行結合は継続する。P0/P1/P4の直接対応はv4仕様S05の明示mappingへ合わせて訂正し、旧statusは変更していない。P13の詳細evidence identity/classは`UNKNOWN`として保持する。
+P0〜P13全14 IDの旧要求範囲・限定statusをv4 N/K/Consumerへ接続した。これは旧statusの書換え、v4 acceptance、N01〜N11のCLOSED、E0完了のいずれも意味しない。C0〜C34、Phase0〜45、K01〜K20のSource→Consumer/scope mappingを記録した。P0〜P10は本節後段で全E0-04 fieldを個別補完し、P11〜P13とN11 Evidence/Blocker/OS Artifact行結合は継続する。P0/P1/P4の直接対応はv4仕様S05の明示mappingへ合わせて訂正し、旧statusは変更していない。P13の詳細evidence identity/classは`UNKNOWN`として保持する。
 
 ### P0〜P3 E0-04項目の個別補完（2026-11-13、ソースと利用先の照合）
 
@@ -879,6 +879,83 @@ P6の旧CLOSEDは上記Product Build限定機能と当時条件に適用する�
 | `tooling/build_module_pruned_windows.py` | `490aae7209ea5988f8e2cdcb05fe092b3d29504a` |
 | `tooling/tests/test_export_linux_product.py` | `079a187de49cf8b2fb6a7ddadb4175d6916163d1` |
 | `tooling/tests/test_linux_portable_archive.py` | `c04ac3c5d6d58396f650e9530b6731c6bb2037d6` |
+| `tooling/conformance_tests/run_conformance_skeleton.py` | `c6f31d8cb561b48513c6784e54c85969c9cb953e` |
+
+### P10 E0-04項目の個別補完（2026-11-13、Module Selection / Pruning）
+
+以下は旧P10 Module Selection / Pruningを現行v4へ結ぶE0照合である。旧Product Buildの機能上の除外CLOSEDと限定証拠は`docs/REV5_PRODUCT_PROGRESS.md`のP10節および2026-11-11追補に照合した。v4仕様S05の直接対応はN06、能力対応はK15、工程表R03の線E/F、Phase 33のD4追加範囲である。機能上のUI除外、AOT source surface観測、artifact size差、意味上のbinary pruningを別の主張として記録し、旧P10のCLOSEDを実binary除去へ拡張しない。照合HEADは`f418f5e879dc2c3ae64302284c0b315bf1f5be74`。
+
+| 照合項目 | 内容 |
+|---|---|
+| 現行ID | 旧P10。v4仕様S05の直接ConsumerはN06、関連能力はK15。工程表R03線E（独立製品）と線F（安全Core維持・差分緩衝）が関係する。Phase 33は同等のrev1 C工程がないD4追加範囲であり、安全Core保持と実binary／比較証拠を別々に追跡する。 |
+| 旧ID | P10 Module Selection / Pruning。rev5 Product Buildは`CLOSED（機能上の除外）`。成立範囲は依存閉包計画、選択結果のcompile-time UI define、Flutter画面上の機能除外と必須画面維持。AOT／binaryやRust／第三者依存の意味上の除去は当時から対象外であり、`binary_pruning_verified=false`を保持する。 |
+| 原文参照 | `docs/REV5_PRODUCT_PROGRESS.md`のP10節・2026-11-11 Linux WSL2 fixture追補、`docs/specs/gui-shell-module-pruning.md`、`docs/D4_POCKET_PHASE_MAPPING.md`のPhase 33、v4仕様S04 N06・S05 P9/P10/K15、工程表R03線E/F。P10の過去試験と失敗・限定範囲は履歴として維持する。 |
+| 対象 | ExportのModule Catalog／選択→BrokerのModule plan・dependency closure→build define／receipt→Flutter UIの任意画面・操作除外。安全Core・required moduleの保持は独立条件。Runtime構成消費、実binary pruning、installer／installed productは別Consumerとして扱う。 |
+| 目的 | 任意UI機能を構成選択に応じて除外し、required／安全Coreを保持する。選択情報は構成データであり、Authority・Permission・Approval・Credential・Auditを生成・継承しない。 |
+| 生成側 | SettingsのExport UI／`export_client.dart`がModule選択要求を生成し、既存Brokerの`export_center.rs`が固定Catalogに基づくplanを作る。Windows/Linux exporterは検証済みReceiptからbuild defineを構成する。選択内容とbuild evidenceは非権威データである。 |
+| 実際の受け取り先 | Broker `resolve_module_plan`がunknown／duplicate／required module不正選択とdependency closureを処理し、Receiptへ含める。Windows Flutter buildはcompile-time define、Flutter `main.dart`／Settings screenは任意UIの可視性・操作に消費する。Widget試験はfake Broker／fixtureでUI consumerを確認する。Launcher／RuntimeはManifestの機能構成を実消費しておらず、製品機能を構成するconsumerは`BUILD_GAP`。 |
+| 契約とデータ | `specs/gui_shell_module_catalog.json`、Catalog／Receipt／Module build・comparison／Windows・Linux向けExport build証拠の各Schema、正常・負例JSONを対象とする。任意機能ID・依存関係・包含／除外ID・ビルド定義・生成物識別値を扱う。ビルド証拠Schemaは`binary_pruning_verified=false`を固定し、compile-time define適用後の比較待ちを記録する。Authorityや製品完成の主張を受け付けない。 |
+| 正常時の作用 | 旧Windows plan-only試験はTrace Inspectorと依存Observabilityを選択し、optional 8件中6件を除外、required画面と固定安全Coreを保持する計画を生成した。旧Flutter Widget試験2件は8 optional画面無効時に任意navが隠れ、required 13画面が残り、除外画面選択時に例外／未搭載画面表示がなく、除外Host操作Commandが送信されないことを`FIXTURE`で確認した。2026-11-12 Windows portable buildのAOT reportは選択2画面／除外6画面のsource surface一致を`INTERNAL_STATE`として記録するが、意味上の除去ではない。2026-11-11 Ubuntu 24.04.5 WSL2 same-source Linux Release fixture比較では、選択2／除外6のvariant間で`libapp.so`が8,078,224→7,783,312 bytes（294,912 bytes、3.65%減）、bundle inventoryが53,766,771→53,473,069 bytes（293,702 bytes、0.55%減）。両variantのXvfb GTK window-close smokeはPASSしたが、native Linux installed productの証拠ではない。 |
+| 否定時の作用 | 現Catalog／Schemaと負例はmissing safety Core、unknown dependency、unknown／duplicate／required選択、Authority claim、product／binary pruning claimを拒否する契約を表す。旧P10で明示実行した試験としてはplanとWidget 2件、Schema 158／正常例155／負例205、Conformance 234 checksの範囲を保持する。これら全ての負例を本mapping単位で再実行したとは主張しない。Manifest／Receipt／AOT reportからAuthorityやbinary pruningを昇格させず、`binary_pruning_verified=false`を維持する。 |
+| 停止と回復 | 旧Flutter試験は初回asset付き起動がOneDrive配下の`build/unit_test_assets`削除拒否でtest本体前に失敗し、asset不要の同対象を`--no-test-assets`で再実行して2件PASSした。旧Windows portable UIは別名windowをcomputer-use targetとして取得できず、視覚確認なしとした。Linux WSL2 fixtureは両variantでwindow-close smoke PASS。これらは限定環境の履歴であり、製品crash／Recovery・installed process停止を証明しない。build／Schema検証失敗時は成功扱いしない。 |
+| 標準対象OSの候補 | v4の標準対象はWindows、macOS、Linux native、Android、iOSの5 OS。Module UI／Windows build defineのsourceは存在し、Linux exporter／WSL2 fixture evidenceもある。macOS／Android／iOSの独立Module選択→installed product consumerは未確認。WSL2／Xvfbの成功をLinux native GUI・導入・権限境界・配布の受入へ転用しない。 |
+| 配布 | 旧P10はModule plan／Flutter UI除外を閉じたもので、独立製品の一般配布ではない。Windows portable bundleはP9のDeveloper fixture、Linux WSL2 archiveは比較用fixtureである。正規Installer、Publisher／署名、OS別installed Export、runtime Manifest消費はN06/N10の別条件であり未成立。 |
+| 既存実装 | Catalog／dependency plan、Windows Flutter compile-time define、任意UIのWidget test source、Windows/Linux exporter、build／comparison evidence Schema、否定fixtureはsource上`WIRED`または`CODE_PRESENT`。旧P10のplan・Widgetは限定Product Build条件としてCLOSED。AOT source surfaceとWSL2 fixture size差は後続の限定観測として記録されている。 |
+| 実装不足 | RuntimeがManifestから選択構成を消費する経路、選択moduleに応じた実機能／元Toolの起動・除外、意味上のAOT／binary除去、Rust／third-party依存pruning、安全Coreの生成artifact内実測、cold-start／runtime resource比較、正規Installer／installed acceptanceは`BUILD_GAP`。`runtime_manifest_consumed=false`、`standalone_app_verified=false`、Windows/Linux `binary_pruning_verified=false`を保持する。サイズ差とAOT source surface一致だけではこれらを成立扱いしない。 |
+| ソース識別値 | P10関連の履歴、契約・正常／負例、Flutter producer/consumer・Widget、Rust Broker、Windows/Linux build・comparison source、test、Conformanceの42 fileを、照合HEAD `f418f5e879dc2c3ae64302284c0b315bf1f5be74`のGit object識別値で下表に結合する。識別値はsource同一性であり、試験実行・製品Acceptanceではない。 |
+| 試験区分 | 旧P10記録：Flutter 3.44.0／Dart 3.12.0、対象Widget 2件PASS、Windows plan-only、Schema 158／正常例155／負例205、Conformance 234 checks PASS。2026-11-11 WSL2 Linux Release fixture比較はsize差と両variantのXvfb GTK window-close smokeを記録。2026-11-12 Windows portable AOT reportは選択面一致を`INTERNAL_STATE`で記録。これらの履歴試験は再実行していない。本mappingのRust／Flutter／exporter／installed product testは`NOT_RUN`。文書・Manifest・Conformance・通常Release Gateの検査結果は進捗へ別記し、製品受入へ昇格しない。 |
+| 証拠ID | `NONE`。旧P10の限定CLOSED範囲、AOT／size fixture記録を保持する。v4 N06/K15、native Linux、installed product、意味上のbinary pruningのEvidence IDは発行しない。 |
+| 阻止要件 | 既存`FQ-MODULE-PRUNING`とRegistryの`rev2_module_pruning_binary_and_measurement`を参照し、現行status・release分類を変更しない。N06/W05の既存未成立範囲を維持する。新規blockerは追加しない。 |
+| 状態 | 旧rev5 P10 Product Buildの機能上除外は`CLOSED`。E0-04 P10のsource→consumer mappingは本単位で記録完了。v4 N06/W05/G5/E0は`OPEN`。`binary_pruning_verified=false`、`release_ready=false`および既存blocker状態を維持する。 |
+| 残件 | 線E/Phase 33でRuntime Manifest実消費、実binary／依存除去、安全Core保持、選択結果から生じる機能差、測定可能なsize／startup／resourceとOS別consumerを統合する。Linux nativeは必須対象のまま後段で実装・検証する。N10の通常配布・Installer/installed lifecycleとは証拠を分離し、FQ-MODULE-PRUNINGの条件で処理する。 |
+
+#### P10 ソース識別値・該当ファイル
+
+下表は照合HEAD `f418f5e879dc2c3ae64302284c0b315bf1f5be74`のGit object識別値である。Source、Schema、fixture、testの存在は本単位での実行や製品受入れを意味しない。
+
+| ファイル | 対象ファイル識別値 |
+|---|---|
+| `docs/REV5_PRODUCT_PROGRESS.md` | `9c978021d3982690e9aaa87896436bad7125b433` |
+| `docs/D4_POCKET_PHASE_MAPPING.md` | `064ea334f86b137d94fba2370d2a2fd732f6e972` |
+| `docs/QE_2026-11-09/進捗.md` | `dbfe0e52ff510d8248a90154681ab4c144e23ce2` |
+| `docs/specs/gui-shell-module-pruning.md` | `5568c677be30402d709cc365b79eceb0e96ce831` |
+| `docs/FINAL_QA_QUEUE.md` | `7b332cccab70bb68aa1ff4f8e23acc0e816d8282` |
+| `release_blockers.registry.json` | `244adc04a01e7b406c4ebcdeb829f7077d4aa35f` |
+| `specs/gui_shell_export_receipt.schema.json` | `0448ec5f631509fa6fbe25cb4957bd6cf51e1562` |
+| `specs/gui_shell_module_catalog.json` | `339cb8894b25ae963956e582c42b9e8fcc0d3931` |
+| `specs/gui_shell_module_catalog.schema.json` | `bd54dd7903a1734ea4027d3f780b7a2b49e10c8e` |
+| `specs/gui_shell_module_build_evidence.schema.json` | `1a37d4b831f998ce334fc9f0126c5dd2ee09a01b` |
+| `specs/gui_shell_module_comparison_evidence.schema.json` | `801ba33bfc0656a4048aa5ca1920b96b7787c304` |
+| `specs/gui_shell_windows_export_build.schema.json` | `5c7234692a8f178882edfc42c1a762038e7414fa` |
+| `specs/gui_shell_linux_export_build.schema.json` | `6f1af3d3da2277807dabac5d753897f5ddee453c` |
+| `examples/contracts/gui_shell_export_receipt.valid.json` | `fae30c21b719d2ae9bf9bcff99228bf6eb6b0df1` |
+| `examples/contracts/invalid/gui_shell_export_receipt_pruning_claim.invalid.json` | `6766cfe13dd417fe762cb30dddeb2644a14fb354` |
+| `examples/contracts/gui_shell_module_catalog.valid.json` | `6d5902928fb3edac491e6c56a982f5826c9c4b93` |
+| `examples/contracts/invalid/gui_shell_module_catalog_missing_core.invalid.json` | `6a72157b94b65f785249f99f6e06f773cbdb9319` |
+| `examples/contracts/invalid/gui_shell_module_catalog_unknown_dependency.invalid.json` | `5264ee627f7e01f0ed0a910aec44d686d2534d7b` |
+| `examples/contracts/gui_shell_module_build_evidence.valid.json` | `55aaf255258e67258a247c46acabcea451101ed7` |
+| `examples/contracts/invalid/gui_shell_module_build_evidence_authority_claim.invalid.json` | `d8ea3736c96c61b0280450cbb9710532333ae59e` |
+| `examples/contracts/invalid/gui_shell_module_build_evidence_product_claim.invalid.json` | `d2c8d2271196322c5f60a279625d004d326a570d` |
+| `examples/contracts/gui_shell_module_comparison_evidence.valid.json` | `d635ad7d042e80d452424da180b6635e89bc0349` |
+| `examples/contracts/invalid/gui_shell_module_comparison_evidence_pruning_claim.invalid.json` | `cafa6b9ae9f5fc1f00ad885c222ef9d6916370f3` |
+| `examples/contracts/gui_shell_windows_export_build.valid.json` | `31915727f6f0899bf4358996f709a23a76e9554d` |
+| `examples/contracts/invalid/gui_shell_windows_export_build_authority.invalid.json` | `b29a306a0fe8e4e2061730ade3b69071fe41f80c` |
+| `examples/contracts/gui_shell_linux_export_build.valid.json` | `fd710b0597b140d41f610085b7f3fcd6722b97bb` |
+| `examples/contracts/invalid/gui_shell_linux_export_build_authority.invalid.json` | `bc3708f85596ae327ee9b9d50afc9f8e8c80f23c` |
+| `examples/contracts/invalid/gui_shell_linux_export_build_wrong_target.invalid.json` | `1c6aa19d32236efba543a8f6685e73290ff41920` |
+| `apps/desktop_flutter/lib/main.dart` | `6109c821ab5dc809224bec5234c4c59db1d5f988` |
+| `apps/desktop_flutter/lib/screens/settings.dart` | `66374ec4157d573939e7f9cc5c36aecf5d65e251` |
+| `apps/desktop_flutter/lib/services/export_client.dart` | `70d77edc6beb9e209e6b362219d1b22d69375489` |
+| `apps/desktop_flutter/test/module_pruning_test.dart` | `20470e523c2640b681e54c51f9c6749ee35f5e05` |
+| `native/rust_helper/src/broker/export_center.rs` | `477e44d86ebf18d2b004a7294c9cdb14e35aa0f0` |
+| `tooling/build_module_pruned_windows.py` | `490aae7209ea5988f8e2cdcb05fe092b3d29504a` |
+| `tooling/compare_module_builds_windows.py` | `09d926b9c6b611cd59e524cc947ce2dce1c81247` |
+| `tooling/export_windows_product.py` | `31856179881a5a5aae1ba4451732e6de6cd7f338` |
+| `tooling/export_linux_product.py` | `47fe9a3032a5b2680e3f7d39b7cd64120ac83843` |
+| `tooling/linux_export_workflow.py` | `64af2da3282e1cc83deb8daa105939fab4858614` |
+| `tooling/linux_manual_export_build.sh` | `29c05203cd513e4322d0a323778053a7ccfd87c5` |
+| `tooling/tests/test_linux_portable_archive.py` | `c04ac3c5d6d58396f650e9530b6731c6bb2037d6` |
+| `tooling/tests/test_linux_workflow_helpers.py` | `15c71a2ba5ac09ddab2c6ea23b36db256aeab85a` |
 | `tooling/conformance_tests/run_conformance_skeleton.py` | `c6f31d8cb561b48513c6784e54c85969c9cb953e` |
 
 ## 旧C0〜C6のv4 Source→Consumer crosswalk（E0差分）
@@ -1374,7 +1451,7 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 |---|---:|---|---|
 | 新規要求 N01〜N11 | 11 | v4仕様S04 | 初期Producer/Consumer差分を記録。契約・否定・OS・証拠の全項目は未完 |
 | 全体施工線 A〜J | 10 | v4工程表R03・Codex指示I04 | 全線同時BUILDのproducer/consumerと現行実装配置を全数照合中 |
-| 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P9は全E0-04 fieldを個別記録。P10〜P13の個別field、P13の旧evidence identity/class、N11 Evidence/Blocker/OS Artifact全数結合は未完／UNKNOWN |
+| 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P10は全E0-04 fieldを個別記録。P11〜P13の個別field、P13の旧evidence identity/class、N11 Evidence/Blocker/OS Artifact全数結合は未完／UNKNOWN |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのSource→Consumer crosswalkを記録。個々の全E0-04列とv4 Acceptance／Evidence/N11結合は継続 |
 | D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDをv4 N01〜N11/A〜J/Kへcrosswalk済み。Phase固有E0-04全field、Evidence ID/Blocker、Acceptanceは未完 |
 | 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K別の完全E0-04 field、OS/Evidence/Blocker確認は継続 |
@@ -1419,7 +1496,7 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 
 ## 次のE0照合作業
 
-1. P10〜P13をID順に全E0-04 field、N11 Evidence ID、Blocker、OS対象/Artifactへ結合する。P0〜P9は完了済みmappingとして保持。続けてN/P/C/Phase/K残行へ展開し、既存CLOSED/FAILは履歴保持して再試験しない。
+1. P11〜P13をID順に全E0-04 field、N11 Evidence ID、Blocker、OS対象/Artifactへ結合する。P0〜P10は完了済みmappingとして保持。続けてN/P/C/Phase/K残行へ展開し、既存CLOSED/FAILは履歴保持して再試験しない。
 2. BUF-R/T crosswalkをCanonical N08/N10/N11 source SHA・各IDの完全E0-04 field・B5 evidenceへ結合する。B0〜B6の工程・状態・受入Consumer・証拠のcrosswalkは記録済み。個別cause/effect、OS/Artifact、N11 Evidence/Blockerの結合は継続。
 3. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 4. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
