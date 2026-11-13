@@ -6765,6 +6765,91 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 | tooling/schema_check/check_schemas.py | 7dca27717cbe5cccb45e1013b3436918a2322e75 |
 | release_blockers.registry.json | 244adc04a01e7b406c4ebcdeb829f7077d4aa35f |
 
+#### K19 E0-04個別記録（2026-11-14）
+
+照合基準コミットSHAは編集前main `6e79589c8eb9c2934e1191094889403f855a1978`。旧C27〜C34／Phase 39〜45の記録・失敗・限定statusを履歴として保持し、長期運転、性能、障害注入、全数回帰、文書・ブランド、正式出荷を現行v4のSource→Consumerへ再配置した。これはE0の設計・Source mappingであり、製品AcceptanceやQC/QAの合格記録ではない。
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | v4仕様S05 K19「長期運転／性能／故障注入／全数回帰／文書・ブランド／正式出荷」。S04 N11、工程R03線J・R04・R05・R07・R08、Codex指示I04-J・I05〜I07・I10〜I13へ接続する。 |
+| 旧ID | D4 Phase 39/C28（長時間）、40/C29（障害注入）、41/C27（性能）、42/C30・C32（回帰・開発監査）、43/C31（文書）、44/C32・C33（Windows到達）、45/C34（正式公開）。C27〜C34、Q0〜Q7、W08/G7の旧statusと当時の証拠範囲を保持し、K19や現行候補のAcceptanceへ遡及転記しない。 |
+| 元原文／正本参照 | 現行v4採用記録・仕様S04 N11／S05 K19／S07〜S10、工程表R01〜R08・R03線J、施工指示I04-J・I05〜I13、`docs/D4_POCKET_PHASE_MAPPING.md` Phase 39〜45、総合機能拡張rev1 C27〜C34、`docs/FINAL_QA_QUEUE.md`、`RELEASE_CHECKLIST.md`、`release_blockers.registry.json`。仕様原本SHA-256=`8CEEDF21F881A783E35EE8642673FAAEEF949465343DF65E63DC21B04EE5A3EF`。 |
+| 対象 | C27〜C30の開発用性能・長期運転・障害注入・回帰検査、C31の利用者向け文書・ブランド、C32〜C34の開発監査／Windows evidence／正式出荷経路、各validator・evidence consumer・Release Registry・Q queue。実installed製品、五OS QA、署名・Publisher・Owner GOは別の保証／責任境界として扱う。 |
+| 目的 | K19の品質検査・文書・出荷責任のproducerから、現在の検査器、利用者向け主張、Evidence/Blocker/Release判定への接続を追跡し、内部State／Fixture／実Broker／外部証拠の範囲を混同しない。局所検査や文書監査を製品完成・`release_ready`へ昇格させない。 |
+| 生成元（Producer） | `tooling/validate_all.py`が通常pipelineのC27/C28/C29/C30/C32 stepを構成する。個別producerは`performance_validation.py`（snapshotとFlutter投影）、`long_run_validation.py`（実Broker IPCとlocalhost Runtime fixture）、`failure_injection_validation.py`（9障害case）、`full_regression_validation.py`（6群・7 command）、`final_development_audit.py`（C0〜C31対応表）。出荷側はWindows evidence validator、Evidence Bundle、Runtime Assertions、Release Smoke、Manifest／Schema／Conformance、Release Gate、Registryが構成・判定材料を作る。 |
+| 実Consumer | 開発用C27〜C30/C32結果は`validate_all.py`のlocal reportへ入り、該当stepはrelease対象外としてscope説明を付す。C30はRust試験・Evidence assertion・localhost Runtime・Codex interface probe・Compare fixture・Device Link fixtureを消費する。`evidence_bundle.py`はWindows evidence validator等を読みdevelopment-only bundleを構成し、`release_gate_check.py`は文書claim・Registry・進捗・Manifestを照合して通常／strict／technical-complete判定を返す。C32はC0〜C31のみを監査しC32〜C34を未監査として残す。README／CLAIM／Release・OS文書は利用者・責任者向けの主張境界を伝える。 |
+| 契約／Data | C27のbounded測定値と`INTERNAL_STATE`／`FIXTURE`区分、C28 reportのstatus・固定失敗code・資源sample・cleanup結果、C29の9 case別結果と`LIVE_RUNTIME`／`FIXTURE`／`INTERNAL_STATE`、C30のarea／command／status／evidence class／claim scope、C32のC0〜C31監査JSON、Windows evidence field provenance、development evidence bundle、18件Registry、Q0〜Q7 status、Manifest hashを扱う。現在のRegistryは16 unresolved／2 resolvedで、bundleは`release_ready=false`を固定する。 |
+| 通常時作用 | C27はgenerated snapshot・Runtime/Audit/History fixture projection・search・notification・resource parsing・4096行diffをboundedに測る。C28は既定30秒smokeまたは明示8時間運転でBroker再起動／接続断／対話／資源を観測するがRuntime側はlocalhost fixture。C29はRuntime/Broker crash、MCP timeout/schema、A2A timeout、Credential unavailable、disk-full simulation、Audit failure、corrupt stateの9件を実行する。C30は6群・7 command、C32は静的対応表を検査する。出荷consumerはcandidate evidenceと18 blockerを読んで範囲別gateを計算する。今回のK19 mapping作業ではこれらを実行していない。 |
+| 否定時作用 | validatorは必須path・field・参照・hash・Registry同期・claim分類の欠落をerrorにする。長期／故障／回帰runnerの`failed`・`timeout`・`unavailable`を成功へ変換せず、C29は想定外の成功・再接続不能・Audit不能等をcase failureとして返す。Release Gateは未解決blockerを拒否し、Evidence Bundleは`release_ready=true`を拒否する。Development fixtureや過去evidenceを現candidate／外部整合の証拠として受け入れない。 |
+| 停止／Recovery | 各runnerはbounded timeout・temporary store・process lifecycle・fixture cleanupの範囲で終了し、cleanup／Broker／store異常をPASSへ丸めない。8時間未完・資源unknown・標準OS artifact欠落・provenance不整合・署名／資格／Owner decision未成立は`NOT_RUN`／`UNKNOWN`または既存release blockerとして保持する。正式署名、Publisher identity、production Audit key、Owner GOは独立した人間責任事項であり、検査器から生成しない。 |
+| 標準OS候補 | K19の開発runnerはWindows host上のPython/Rust/Flutterを含むが、C27のFlutter projectionはfixture、C28/C29のRuntime・MCP/A2Aはlocal fixtureを含む。製品保証母集団はv4のWindows／macOS／Linux／Android／iOSであり、標準version／arch／resource等はE0 OS表の`UNKNOWN`を維持する。E5はOS標準VM／hosted／Emulator／Simulator installed検査とWindows所有実機確認を要求する。今回それらは未実行。 |
+| 配布物 | 各OSのInstaller／package／installed artifactとsource／artifact identityはN10/N11及びK16/K17のconsumer。K19のsourceにはWindows release evidence collector／validatorと各OS配布文書があるが、このmappingで製品artifactをbuild・install・更新・署名していない。正式配布資格と各OS artifact SHAは未成立／未確定。 |
+| 既存実装 | `validate_all.py`のC27〜C30/C32 developer step、各専用runner、C27 Flutter fixture test、C28/C32 unit tests、C29 9-case harness、C30 6群/7 command harness、C32 C0〜C31静的監査、Windows release evidence validator、development-only Evidence Bundle、strict/normal Release Gate、Registry、Schema/Conformance/Manifest、README／CLAIM／compatibility／OS／release文書にSource/Consumer候補が存在する。下表50 unique pathで編集前baseline SHAを固定する。 |
+| BUILD_GAP | ①C27は`INTERNAL_STATE`／`FIXTURE`の開発測定であり、installed cold/warm start、実画面frame/GPU、実Runtime負荷、8時間leak/SLAを測定しない。runner子processにprocess-level timeout／終了保証がない既存記録を保持する。②8時間runの履歴失敗（22.766秒）を保持し、現candidate installed 8時間検査は`NOT_RUN`。③C29は9つの開発fixture／内部state caseで、実容量枯渇・installed製品・外部サービス耐障害を証明しない。④C30は6群/7 commandの開発matrixで、全要求・全OS・installed candidateの全数回帰ではなく、今回未実行。⑤C32はC0〜C31の静的mapを検査しC32〜C34を未監査として残し、実作用・全証拠の総合監査ではない。⑥文書・ブランドの一部は明示した測定時点の履歴であり現行候補の保証とは別。⑦正式Releaseは16 blocker unresolved／Q0〜Q7 DEFERRED／`release_ready=false`で、同一candidateの総合QC/QA、OS installed artifact、署名・Publisher・Audit key・Owner GOは未成立。既存N11/K16/K17/K20・Release Registryへ保持し、新規Blockerは追加しない。 |
+| ソース識別値（SourceSHA） | 編集前main `6e79589c8eb9c2934e1191094889403f855a1978`の50 unique local path/blob。下表のhashはすべてGit blob IDであり、変更前source基線を示す。 |
+| 試験区分（TestClass） | SOURCE／CONFIG：C31文書、Registry、Manifest、Schema、対応表checker。INTERNAL_STATE／FIXTURE：C27、C28 report/resource、C29 store/外部service fixture、C30の一部。LIVE_RUNTIME：開発用実Broker IPC／process。EXTERNAL_EVIDENCE：Windows collectorが要求する現候補の直接計測値。今回のmappingではvalidator/test runner・Rust/Flutter・installed product・8時間run・五OS QA・Strict Releaseを実行せず`NOT_RUN`。履歴PASS／FAILは原source commit・当時scopeに限定。 |
+| 証拠ID | NONE。Source・検査器・過去の限定結果を対応付けたE0記録であり、現candidateの製品実行Evidenceを発行していない。 |
+| 既存阻害要件 | 既存Release Registry 18件（16 unresolved／2 resolved）、N11/E0、K19製品Acceptance、Q0〜Q7 `DEFERRED`を維持。関連する既存IDは`comprehensive_extension_rev1_completion`、Windows installed evidence群、Audit anchor外部改変証拠、`owner_go`等。Registry statusや`release_ready=false`は変更せず、新規Blockerを追加しない。 |
+| 状態 | K19 E0-04の21項目と50 current-source blobをproducer／consumerへ記録。C27〜C30/C32は開発検証器としてsource上`WIRED`、実installed／全数保証のK19製品Acceptanceは`OPEN`。C31文書の時点・主張境界、C34のOwner／署名関門は保持。 |
+| 残余 | 8時間installed運用、同一candidateの実性能・故障注入・全要求回帰、全OS標準installed QA、候補provenanceとartifact/evidence結合、C32〜C34を含む監査、利用者向け各文書の現実との同期、formal release／Publisher／signing／production Audit key／Owner GOをE1〜E6・N10/N11・既存Release blockerの各責任範囲で扱う。 |
+
+#### K19 Source SHA・対象ファイル
+
+下表のSourceSHAは編集前main `6e79589c8eb9c2934e1191094889403f855a1978`に対するGit blob ID。
+
+| ソースファイル | 識別値 |
+|---|---|
+| README.md | 38664991fe614acfc516eb6743dde6dce754191c |
+| ROADMAP.md | 6a922a38cca617690bc08297274e907f0425b722 |
+| CLAIM.md | 0bfbf988469e0f34c9e7f96f805ce26faf3b1044 |
+| COMPATIBILITY_MATRIX.md | c4885d5b67202712c0bcdecc6da634cb778cd6d3 |
+| MOBILE_STATUS.md | 476b565a3f583be52ef58966f67c51abbb774aa8 |
+| INSTALLER_STATUS.md | 341d7f577bf0c1c5827dee9d8a2ec18774b8bcb1 |
+| SECURITY.md | 6784fb68043aaceccc6d063b253c5d7d50210065 |
+| SECURITY_REVIEW.md | 2bce3fda7f10b5d1409df656c1b120522d02769a |
+| CONFIG.md | 7349ca355614fa265a80c104f2be3b3503a92590 |
+| RELEASE_CHECKLIST.md | 35f31043a9311d49c94acdc9631e30b61949c65d |
+| docs/GUI_OPERATION_SURFACES.md | 4b48d55a69866dd0e1b3180e2192fc9efcc90598 |
+| docs/FINAL_QA_QUEUE.md | 7b332cccab70bb68aa1ff4f8e23acc0e816d8282 |
+| docs/COMPLETION_AUDIT_ROADMAP.md | 350915a2fdceaf516b64f6672a0e9a1d8528d808 |
+| docs/RELEASE_VALIDATION.md | b4b0462e628ad8176264473879dedb1f6201da7c |
+| docs/WINDOWS_RELEASE_PLAN.md | 5d4c35f8c9599c9f38b7c02ae475710e8c5a64e8 |
+| docs/WINDOWS_RELEASE_EVIDENCE.md | 9c836b028c352da8d37f9feae53dcb27b537199d |
+| docs/D4_POCKET_PHASE_MAPPING.md | 064ea334f86b137d94fba2370d2a2fd732f6e972 |
+| docs/REV5_PRODUCT_PROGRESS.md | 9c978021d3982690e9aaa87896436bad7125b433 |
+| docs/総合機能拡張_rev1/工程表.md | 0d03c001efeabfda53d3c0b44fc5c9b6e0f1e14e |
+| docs/総合機能拡張_rev1/実装仕様書.md | 75f87b9d08483887eca5014c01ebd4b931a40b56 |
+| docs/総合機能拡張_rev1/実装指示書.md | 76e135cacc199f3b55cf4b9b0ecce844ea8742ad |
+| docs/総合機能拡張_rev1/受領記録.json | e8433d4b4769200c00f1aa0c6e1b4c7671229352 |
+| docs/総合機能拡張_rev1/進捗.md | 1392588f0cd5273013578e84d8e33c5c9dc9a01a |
+| docs/specs/performance-validation.md | 6746542d94a1f417d443f1a3992779e6480e74ed |
+| docs/specs/long-run-validation.md | ebba5dc1cc97fa69525502d12dfc059e89023380 |
+| docs/specs/failure-injection-validation.md | 4542fff2f9de57dddf4fe007adbd858ac788035a |
+| docs/specs/full-regression-validation.md | dd5953d3bea595c2f25474ed0a9c42cf01ff51e3 |
+| docs/specs/final-development-audit.md | cc3734d7647dbbbbd27bad49153f775bfc980f3f |
+| docs/specs/final-development-audit.json | 8126944c55339a3be272af5ba183a9bc2e3517dc |
+| docs/specs/audit-checkpoint.md | 190d736f1ca23bfd4cefdf5f76c95b019be24b2a |
+| tooling/validate_all.py | 2744f9a10702872f6dc0aad705f922466fc198fc |
+| tooling/performance_validation.py | d0744916a8be65e10b61a453864bb8b80318241e |
+| tooling/long_run_validation.py | 00d1ec4fa0a7b7fea4ef678a94a56f20367a243c |
+| tooling/failure_injection_validation.py | cace434de47d60f7f848656f229336d8293908ff |
+| tooling/full_regression_validation.py | 8a33a9fab9ecbc18119302ae312201d41618012e |
+| tooling/final_development_audit.py | 913c81bc22f71bc5bb3447fa4f4bd266326932ec |
+| tooling/release_gate_check.py | 22a8d7bfe9adb259f44ce8501fb215652e1d58c6 |
+| tooling/evidence_bundle.py | 68dead851236b0f1b69899151c37371e593ff3f9 |
+| tooling/release_runtime_assertions.py | 0a0a351fe17151ad86517bd0a965358f40c61490 |
+| tooling/release_smoke.py | e9f38cea998a31bbf9272880dbf4965de5eb0113 |
+| tooling/windows_release_evidence.py | 6f7957c6193c86c7bc15165e743f11651464f29c |
+| tooling/audit_checkpoint_verifier.py | 71d6ada188163bb56f73da5f5be85566bc973bf5 |
+| tooling/manifest.py | aa4525ff20293cb8641e5598a2439561a3bfbd3b |
+| tooling/schema_check/check_schemas.py | 7dca27717cbe5cccb45e1013b3436918a2322e75 |
+| tooling/conformance_tests/run_conformance_skeleton.py | c6f31d8cb561b48513c6784e54c85969c9cb953e |
+| tooling/conformance_tests/test_long_run_validation.py | 3976e57497d86aa8a3ca612758227c091db617cb |
+| tooling/conformance_tests/test_final_development_audit.py | 628c77a50adf867e87b4e4a893d5e691df8111d1 |
+| apps/desktop_flutter/test/c27_performance_validation_test.dart | e833fbd760a8d2e6c4c90e4c6bee6a8c3cb7cff1 |
+| release_blockers.registry.json | 244adc04a01e7b406c4ebcdeb829f7077d4aa35f |
+| specs/audit_checkpoint.schema.json | 9d18b2d8129f47c147e4bda79c5fdc7f84086023 |
+
 ### 要求母集団・照合状態
 
 ### 要求母集団・照合状態
@@ -6776,7 +6861,7 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 | 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13は全E0-04 fieldを個別記録。P13旧aggregate evidence identity/classは`UNKNOWN`。N11 Evidence/Blocker/OS Artifact全数結合は未完 |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのE0-04 21 fieldを個別記録。旧status維持、N11 Evidence/Blocker/OS Artifact結合と製品Acceptanceは継続 |
 | D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDのscope crosswalk済み。Phase 0〜45はE0-04全21 fieldを個別記録。Evidence/Blocker/OS Artifact全数結合・Acceptance未完 |
-| 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K01〜K17はE0-04全21 fieldとSourceSHAを個別記録済み。K18〜K20およびN11 Evidence/Blocker/OS Artifact全数結合を継続 |
+| 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K01〜K19はE0-04全21 fieldとSourceSHAを個別記録済み。K20およびN11 Evidence/Blocker/OS Artifact全数結合を継続 |
 | Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 33 IDのscope/Consumer/現証拠境界と各21 fieldを記録。BUF-R/T Acceptance、cause/effectの全件結合、N11 evidence、OS artifactとの結合は未完 |
 | Buffer工程 B0〜B6 | 7 | `docs/緩衝基盤_rev5補遺_QC/`・v4仕様S06 | B0〜B4の限定CLOSEDを保持、B5 OPEN、B6未成立。詳細Consumer照合が未完 |
 | QE/監査 D4-QE-R01〜R13／D4-LNX-T01〜T08／D4-AUD-F01〜F07 | 13／8／7 | `docs/QE_2026-10-22/`・各採用記録 | 旧証拠と現在の実装/Validatorへの接続が未完 |
@@ -6819,7 +6904,7 @@ Phase45 E0-04 mappingでは、v4要求・C34履歴・Registry／Gate／Evidence 
 ## 次のE0照合作業
 
 1. N01〜N10のE0-04 21項目は現行SourceSHAへ個別照合済み。各製品AcceptanceはOPENのまま維持し、N10の五OS実導入・利用・更新・Recovery QAは後続の製品Acceptanceに残す。
-2. C0〜C34およびPhase 0〜45の個別field記録を維持し、K01〜K16のSource mappingを再試験せず、K17〜K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
+2. C0〜C34およびPhase 0〜45の個別field記録を維持し、K01〜K19のSource mappingを再試験せず、K20の個別fieldとN11 Evidence／Blocker／OS Artifact行結合を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
 3. BUF-R/TのSourceSHAとConsumer scopeは記録済み。AcceptanceはOPEN。B0〜B6の状態を保持し、原因→effect、N08/N10/N11、OS/Artifact/evidence結合を続ける。
 4. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 5. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
