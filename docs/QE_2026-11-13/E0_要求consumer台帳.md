@@ -412,9 +412,9 @@ N11は`OPEN`。ValidatorとRelease Gateは一部のRegistry/Windows evidence/man
 | P10 | Module Selection / Pruning。旧rev5で機能上の除外範囲を`CLOSED`。選択dependency closure、compile-time UI除外、必須画面保持。 | v4仕様S05の直接対応はN06、関連能力K15。Phase 33のD4追加範囲で、同等のrev1 C工程なし。施工線E/F。 | Export Module plan→build define/receipt→Flutter UIの除外経路。Exporter/Launcherへの現source接続とhashはN06節。 | 旧plan/Widgetは`CONFIG`/`FIXTURE`。Windows AOT source面の一致とLinux WSL2 fixtureのsize差は限定観測で、binary実除去・Rust/第三者依存pruning・実行時resource保証ではない。`binary_pruning_verified=false`、FQ-MODULE-PRUNING／`rev2_module_pruning_binary_and_measurement`を保持。v4 N06/W05は`OPEN`。 |
 | P11 | Windows Productization。旧rev5で製品機能受入れ`CLOSED`。P9 portable ZIPをbootstrapに使うBroker-owned Install/Update/Repair/Rollback/Uninstall導線。 | v4仕様S05の直接対応はN10、関連能力K16。Phase 34はC33/C34の配布範囲と関連。施工線G/F。 | Windows package/portable→bootstrap/Update Center→Broker product install/update→Launcher/Setup Doctor。現候補source・package役割・workflow・hashはN10節。 | 旧acceptanceはMSI/Setup.exeやsigned release artifact作成を主張しない。v4 N10は`OPEN`で、一般配布・同一candidateのinstalled lifecycle・署名/Publisher identityは未成立。`rev2_desktop_product_distribution`と`windows_distribution_identity`を保持。 |
 | P12 | 製品全体統合。REV5進捗ではWindows側`FEATURE COMPLETE`。正式release/Owner GOと分離された製品機能統合の履歴。 | v4仕様S05の直接対応はN01/N09/N10、関連能力K19。Phase 39〜45はC27〜C34の全体QC/回帰/文書/出荷範囲に関連する後続gateで、旧P12 Acceptanceの再実施範囲ではない。単一施工線へ閉じない。 | Windows product entry→Task/result/operation UI→OS product lifecycle。実TaskはN01、operation/observation/recoveryはN09、installed OS distribution/lifecycleはN10の現ConsumerとSHA節へ分割記録。P12固有の代表UI/tray source hashは個別E0-04節へ記録済み。 | `FEATURE COMPLETE`を正式Release/QAへ昇格しない。v4 N01/N09/N10は`OPEN`、Q0〜Q7は`DEFERRED`、`release_ready=false`。統合後の全候補・全OS acceptanceは未成立。 |
-| P13 | Mobile / Non-Windows Product Build。REV5履歴は2026-10-09に有限Product Build acceptanceを閉鎖したと要約する。旧Acceptanceの詳細evidence identity/classは本照合資料から`UNKNOWN`。 | v4仕様S05の直接対応はN10、関連能力K17。Phase 35/36はC24〜C26範囲に関連。施工線H/I。Linux native必須性は別途現行AGENTS/v4正本に従う。 | Linux/macOS Desktop、Android/iOS Mobile runner/native transport→Rust Broker／OS capability→installed product lifecycle。OS別source、package、workflow候補とSHAはN10節。 | 旧P13閉鎖を現行五OS標準installed QAへ移さない。Linux nativeは完全対応必須で、WSL/Xvfb/Headlessだけでは成立しない。Android/iOS実機を前提にせずEmulator/Simulator等を用いる。N10は`OPEN`、`linux_native_product_support`、`rev2_mobile_distribution`、`rev2_mobile_device_evidence`を保持。 |
+| P13 | Mobile / Non-Windows Product Build。REV5履歴は2026-10-09に有限Product Build acceptanceを閉鎖したと要約する。旧Acceptanceの詳細evidence identity/classは本照合資料から`UNKNOWN`。個別のmacOS、Android、iOS作業記録はREV5 P13節に残る。 | v4仕様S05の直接対応はN10、関連能力K17。Phase 35/36はC24〜C26範囲に関連。施工線H/I。Linux nativeは完全対応必須。 | Linux/macOS Desktop、Android/iOS Mobile runner/native transport→Rust Broker／OS capability→installed product lifecycle。OS別source、package、workflow候補とSHAはN10節および以下のP13個別補完。 | 旧P13閉鎖を現行五OS標準installed QAへ移さない。Linux nativeは完全対応必須で、WSL/Xvfb/Headlessだけでは成立しない。Android/iOS実機を前提にせずEmulator/Simulator等を用いる。N10は`OPEN`、`linux_native_product_support`、`rev2_mobile_distribution`、`rev2_mobile_device_evidence`、`rev2_mobile_flutter_native_device_link_boundary`を保持。 |
 
-P0〜P13全14 IDの旧要求範囲・限定statusをv4 N/K/Consumerへ接続した。これは旧statusの書換え、v4 acceptance、N01〜N11のCLOSED、E0完了のいずれも意味しない。C0〜C34、Phase0〜45、K01〜K20のSource→Consumer/scope mappingを記録した。P0〜P12は本節後段で全E0-04 fieldを個別補完し、P13とN11 Evidence/Blocker/OS Artifact行結合は継続する。P0/P1/P4の直接対応はv4仕様S05の明示mappingへ合わせて訂正し、旧statusは変更していない。P13の詳細evidence identity/classは`UNKNOWN`として保持する。
+P0〜P13全14 IDの旧要求範囲・限定statusをv4 N/K/Consumerへ接続した。これは旧statusの書換え、v4 acceptance、N01〜N11のCLOSED、E0完了のいずれも意味しない。C0〜C34、Phase0〜45、K01〜K20のSource→Consumer/scope mappingを記録した。P0〜P13は全E0-04 fieldを個別補完済み。N11 Evidence/Blocker/OS Artifactの要求単位結合、残る要求行の詳細台帳化、E0完了判定は継続する。P0/P1/P4の直接対応はv4仕様S05の明示mappingへ合わせて訂正し、旧statusは変更していない。P13旧Acceptance全体の詳細evidence identity/classは`UNKNOWN`として保持する。
 
 ### P0〜P3 E0-04項目の個別補完（2026-11-13、ソースと利用先の照合）
 
@@ -1098,6 +1098,68 @@ P6の旧CLOSEDは上記Product Build限定機能と当時条件に適用する�
 
 P12の旧CLOSED status、test／artifact scope、v4のN01/N09/N10 OPEN状態は分離して保持する。この個別mapping完了はP12再受入れ、既存CLOSEDの再試験、N01/N09/N10/N11のclosure、E0全体完了を意味しない。
 
+### P13 E0-04項目の個別補完（2026-11-13、非Windows／モバイル製品構築）
+
+以下は旧P13の有限Product Build履歴を、現行v4のN10/K17と標準OS Consumerへ対応付けるE0照合である。旧P13の受入れ完了日はREV5記録の2026-10-09を維持する。これは現行五OSの通常配布・installed lifecycle・実利用QAの合格ではない。v4の直接対応はN10、関連能力はK17、工程表の施工線はH/I、受入座標はW07/G6-OS。Phase 35/36とC24〜C26は関連履歴として扱い、P13の旧statusを置き換えない。照合HEADは`10c0a969d917a0b8dc84a31b91f67a818d7d9899`。旧P13全体のevidence identity/classは採用正本・履歴索引から一意に特定できず`UNKNOWN`とする。個別のrun記録がある場合も、そのscopeを越えて集約しない。
+
+| E0-04項目 | 記録値 |
+|---|---|
+| 現行ID | 旧P13。v4仕様S05の直接対応はN10、能力対応はK17。工程表R03のH（macOS/Linux）・I（Android/iOS）、R06のW07/G6-OSへ接続する。Linux nativeは必須製品対象。Phase 35/36、C24〜C26は関連範囲で、直接N mappingを変更しない。 |
+| 旧ID | P13「`Mobile / Non-Windows Product Build`」。`docs/REV5_PRODUCT_PROGRESS.md`は2026-10-09に有限`Product Build`受入れを`CLOSED`と記録する。閉鎖対象の個別記録には`macOS Broker/Owner/Workspace/CLI/Host/A2A/MCP`、`iOS native Device Link`、`Android native Device Link`等がある。旧`CLOSED`の履歴statusは保持する。 |
+| 原文参照 | `docs/REV5_PRODUCT_PROGRESS.md`の「P13モバイル／非Windows製品構築 — 受入れ完了」節（`macOS/iOS/Android`個別単位）、`docs/D4_POCKET_PHASE_MAPPING.md`の`Phase 35/36`・`C24〜C26`、v4仕様`S02/S04 N10/S05 P13・K17`、工程表`R03`線H/I・`R06 W07`・`R07`、現行N10表とOS別ソース識別値表。各参照は旧履歴と現行要求を分離して使う。 |
+| 対象 | Linux/macOS Desktop、Android/iOS MobileにおけるFlutter UIとOS-native adapter/transport、Rust Broker接続、OS固有資格情報・session・配布候補、および一般使用者向け導入から実利用・更新・修復・撤去までの現行製品要求。旧P13の具体的に記録された個別作業範囲と、v4で要求する五OS lifecycleを別対象として扱う。 |
+| 目的 | 非Windows各OSでD4 Pocketが通常の製品として導入・起動・設定され、Native IPC/OS保護を保ったままBroker統治下の仕事を利用できる構成へ接続する。旧P13の有限受入れ履歴を保持しつつ、現行N10が要求するOSごとの標準配布・installed product・仕事・更新／復旧／撤去の成立状況を独立に可視化する。 |
+| 生成側 | `Linux/macOS Flutter Desktop Runner`、`Android Kotlin/iOS Swift native Device Link`、`Rust helper/Broker`、OS別`package/export builder`、手動`workflow`およびnative `UI/API`がソース・候補・要求を生成する。`metadata`、`workflow`、`package builder`自体を`Authority`や配布承認の源としない。 |
+| 実際の受け取り先 | N10正本表の実Consumer。Linuxはexport/package tool→Linux product bundle/launcher→Rust Broker product install/update。macOSはFlutter Runner→`macos_desktop_worker`/`macos_desktop_owner`→Broker。AndroidはFlutter→Kotlin `MainActivity`/native Device Link→既存Rust Broker transport。iOSはFlutter→Swift `DeviceLinkNativeService`/Keychain→既存Rust Broker transport。現行N10表に示すOS別導入・利用・Update/Repair/Rollback/Uninstallの一貫Consumerは未成立。 |
+| 契約とデータ | 現行OS別`package/build`設定、`Rust Broker IPC`、native `Device Link request`、`Keychain/Keystore`、OSの`permission/session`、`Task/Workspace/Audit`に接続する既存`contract`と、各OSの`package/workflow/test source`を参照する。`Flutter`へ秘密実値やOwner/Authority判断を渡さず、native `transport`からPermission/Approval/Trustを生成しない。N10の既存source/schema/test正本を消費し、新しいcontractは本mappingで追加しない。 |
+| 正常時の作用 | REV5 P13節は有限Product Build単位の閉鎖を記録し、macOSのOwner/Broker/Workspace/CLI/Host/A2A/MCP各操作、iOSの製品UI/native service/Device LinkとSimulator局所検証、Android native Device Linkとbuild/test等を個別記録する。P13全体を同一Release candidate・五OS・installed lifecycleで一度に通した証拠とは扱わない。v4 N10の一般導入→初回設定→実仕事→更新/復旧/撤去は本mappingで未実行。 |
+| 否定時の作用 | 個別の旧P13負例・拒否・取消はREV5各単位の正確なscopeに限る。旧P13全体のnegative TestClass/evidence identityは`UNKNOWN`で、横断したPermission/secret/Device Link/OS-install negative matrixは本照合資料から確認できない。現行contractはnative/Broker境界で拒否し、UI/Adapter metadataから権限を生成しない。現行OS installed経路での否定動作はN10 acceptance未実行。 |
+| 停止と復旧 | 旧P13個別記録にある操作取消・正常終了・局所cleanupはそれぞれ記録された範囲に限る。旧P13全体のcrash/recovery/更新復旧保証は`UNKNOWN`または現行N10未成立として扱う。各OSの同一candidateにおける再起動、Broker/Native process回復、Update/Rollback/Repair/Uninstallの連続検証は未実行で、N10/W07後続工程に残す。 |
+| 標準対象OSの候補 | Linux: Ubuntu 24.04 LTS/x86_64 portable `tar.gz`候補と24.04/amd64 bootstrap `.deb`候補。macOS: `macos-15` manual debug/UI、deployment target 10.15 source候補。Android: API 35 Google APIs x86_64 Emulator候補、compileSdk 37 source値。iOS: iPhone 16 Pro/iOS 18.5 Simulator候補、deployment target 13.0 source値。これらはN10で観測したcandidate値であり、v4の保証範囲・minimum・supported OS/ABIとして固定しない。Linux nativeは標準Linux GUI/sessionの必須対象であり、WSL/WSLg/Xvfb/headless単独では合格しない。 |
+| 配布 | 旧P13のCLOSEDは一般利用者向けの署名済みinstaller/store配布の証拠ではない。Linux `tar.gz`はunsigned開発archive候補、`d4-pocket-setup` `.deb`はbootstrap UI用で製品本体installerではない。macOSは通常配布/署名/notarizationが未成立。Android workflowのdebug APK/AABとiOS Simulator artifactは通常配布・device artifactではない。通常配布形式、署名・Publisher/App identity、Store/Notarization資格は保証確定前で`UNKNOWN`。 |
+| 既存実装 | N10 E0 source inventoryは共通package/bootstrapper 2件、Linux 10件、macOS 5件、macOS/iOS workflow 1件、Android 4件、iOS 3件を列挙する。UI/native adapter、package builder、manual workflow、focused test sourceの一部は`CODE_PRESENT`/`WIRED`。sourceの存在・接続と一般利用者向け配布・現候補のinstalled acceptanceを分離する。現行source SHAは下記25件で個別固定し、N10のWindows分を含む全5OS正本表を参照する。 |
+| BUILD_GAP | 五OSそれぞれで通常配布→installed product→初回起動/設定→Broker統治された実仕事→Audit/拒否/停止→更新/Repair/Rollback/Uninstallを同一候補で結ぶ受入れは未成立。Linux nativeの通常GUI session、OS package、X11/Wayland範囲、標準distro・arch、macOS一般配布とidentity、Mobileのsupported API/ABI・署名配布・lifecycle、および最低resourceの保証値も未確定。N10は`OPEN`。 |
+| ソース識別値 | 下表25件は照合HEAD `10c0a969d917a0b8dc84a31b91f67a818d7d9899`のGit blob SHA。N10の当初source表（照合HEAD `2c220a4bdb06fff26471393422b063c9735811cc`）にある該当blobと一致することを現HEADで確認した。これはsource同一性であり、test実行・製品動作・旧P13 evidence identityの証明ではない。 |
+| 試験区分 | 旧P13全体を代表する集約classは`UNKNOWN`。REV5の個別記録はmacOS XCTest/UI・Rust/Flutter、Android build/instrumentation、iOS Simulator/XCTest等の個別範囲を記載するが、全P13証拠を同一candidateへ集約しない。現N10 source表のtest候補はLinux `UNIT`/hosted `LIVE_PRODUCT`、macOS/iOS `XCTest/UI`、Android instrumentation/Emulator。本mappingは文書・Git object照合のみで、製品test/workflowは`NOT_RUN`。 |
+| 証拠ID | `NONE`（現行v4 N10/N11向け）。旧P13の有限CLOSED記録は履歴参照であり、個々のrun/artifactをP13全体の単一Evidence IDへ統合しない。現行N11へ取り込むOS/Artifact/SourceSHA/実結果の行単位結合は後続作業。 |
+| 阻止要件 | Registryの既存`unresolved`を保持し、新規追加・status変更なし。P13/N10に直接関連する`linux_native_product_support`、`rev2_mobile_device_evidence`、`rev2_mobile_distribution`、`rev2_mobile_flutter_native_device_link_boundary`、`rev2_desktop_product_distribution`は未解決のまま。OS別N10のblocker詳細とRelease GateはRegistryを正本とし、本mappingを解消根拠にしない。 |
+| 状態 | 旧REV5 P13有限Product Build acceptanceは`CLOSED`（2026-10-09）の履歴statusを維持。P13のv4 E0-04 field mappingは本単位で記録完了。現行N10、W07/G6-OS、N11、E0は`OPEN`。Linux native product supportと全OS installed QA、正式Releaseは未成立。`release_ready=false`を維持する。 |
+| 残件 | 五OSの保証母集団・配布形式・OS/arch/resource値をE0-06で確定し、N10/W07で同一candidateの標準OS installed lifecycleを実装・検証する。Linux native GUI/package/permission/Update/撤去を必須完了する。macOS署名/notarization、Android/iOSの通常配布と署名資格を分離して記録する。N11にOS別source/artifact/evidence/blocker/statusを一意結合する。旧P13は再試験せず、現行N10作業を継続する。 |
+
+#### P13 現行Source SHA・該当ファイル
+
+下表はP13対象OSと共通package経路の25 source/test/workflowについて、現在HEAD `10c0a969d917a0b8dc84a31b91f67a818d7d9899`で照合したGit blob SHAである。Windows固有sourceはN10の全5OS表に残し、本P13表へ重複転記しない。OS別test/workflowは候補sourceであり、今回実行していない。
+
+| OS/範囲 | ソースファイル | Git blob識別値 |
+|---|---|---|
+| 共通 | `native/rust_helper/src/product_package.rs` | `a2deb2b6e77bc00ae8d01cd5ca306ee63baa20e5` |
+| 共通 | `native/rust_helper/src/product_bootstrapper.rs` | `3b0495dfc9a1937ba64f3f99c95ae4cc739ddc69` |
+| Linux | `installer/linux/README.md` | `25e80411d6ca8f96e6d70718d59c19e7dc6a58e3` |
+| Linux | `tooling/export_linux_product.py` | `47fe9a3032a5b2680e3f7d39b7cd64120ac83843` |
+| Linux | `tooling/package_linux_product.py` | `0d32d04ec5b43e1815b3664a323c17db79bc928a` |
+| Linux | `tooling/package_linux_deb_setup.py` | `e7a057b2f3db2fca8bbe91401e25d71fb88ceca3` |
+| Linux | `native/rust_helper/src/linux_product_bundle.rs` | `f71ed312c629e81914c61180baeb9723b315a69a` |
+| Linux | `native/rust_helper/src/linux_desktop_launcher.rs` | `f58fb226f21093c2d1f062259d394b4f8ec022f6` |
+| Linux | `tooling/tests/linux_installed_product_smoke.py` | `8020ed8d1d68d59cff6acf70c55856fdeb2125e3` |
+| Linux | `tooling/tests/test_linux_installed_product_smoke.py` | `dc94f9b782d3699810bbe50230a5e9510a5739f7` |
+| Linux | `tooling/tests/test_linux_product_package.py` | `3bb3b520d3c4d15b1f4d43993c8cddb0f0c08ee1` |
+| Linux | `.github/workflows/linux-manual-export-build.yml` | `8d59dd1e9e54a9a4ebb16992f59a402c1ab77c67` |
+| macOS | `installer/macos/README.md` | `b3f3326fa37e9977c47cb0efc7702294a6e1d33a` |
+| macOS | `apps/desktop_flutter/macos/Runner/Configs/AppInfo.xcconfig` | `b278481bc9b75d1851c11fa67313a2c6cd64c1e3` |
+| macOS | `native/rust_helper/src/macos_desktop_worker.rs` | `09fa26563fc671e07f23c73f7dd2a7f2cf3fed7e` |
+| macOS | `native/rust_helper/src/macos_desktop_owner.rs` | `31e13a57fcde422878fae63083bd323e07f482ec` |
+| macOS | `apps/desktop_flutter/macos/RunnerUITests/AdapterOwnerUITests.swift` | `eeab11b1123165a8f82da55ebbb014eab8803862` |
+| macOS/iOS | `.github/workflows/apple-manual-build.yml` | `ed60235da7b35cdfaac23a9fd2d07023e1d29843` |
+| `Android` | `apps/mobile_flutter/android/app/build.gradle.kts` | `fe96edfa0f714c2d2be509ce3bc21bec6253a714` |
+| `Android` | `apps/mobile_flutter/android/app/src/main/kotlin/com/example/gui_shell_mobile/MainActivity.kt` | `5c0e28f0ad371f80671d26072bd1c1a134a881d9` |
+| `Android` | `apps/mobile_flutter/android/app/src/androidTest/kotlin/com/example/gui_shell_mobile/NativeDeviceLinkProductFlowTest.kt` | `4f4a79e0bd80b1f5eb280857dec7a7d5df12258c` |
+| `Android` | `.github/workflows/android-manual-emulator.yml` | `f0c1ecb7185c91375adfbbdbfaf49e55a2672b57` |
+| `iOS` | `apps/mobile_flutter/ios/Runner.xcodeproj/project.pbxproj` | `73876a3b79b5ee5bd50dea0428764f1632dfcb19` |
+| `iOS` | `apps/mobile_flutter/ios/Runner/DeviceLinkNativeService.swift` | `9d185729c439934dce0553b490f2fcd1f7b28a0d` |
+| `iOS` | `apps/mobile_flutter/ios/RunnerUITests/DeviceLinkProductUITests.swift` | `b74c1f4a846c07eed9b6ae9244ac18b4f1030eec` |
+
+このP13個別補完は旧P13の再受入れ、N10/W07/N11のCLOSED、E0完了、正式配布またはRelease承認を意味しない。旧P13・旧証拠のstatusと現行N10の未成立条件を分離して保持する。
+
 ## 旧C0〜C6のv4 Source→Consumer crosswalk（E0差分）
 
 旧rev1の仕様・工程・進捗は当時の要求範囲と履歴statusを確認する資料として読み、現在statusはv4 S04/S05、工程表R03、現行Source→Consumerへ接続した。C0〜C6の旧statusは変更しない。v4 target statusはN11/C0のbaseline記録を含め、製品受入は未成立のままである。Phase対応は`docs/D4_POCKET_PHASE_MAPPING.md`の既存逆引きを参照した。
@@ -1591,7 +1653,7 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 |---|---:|---|---|
 | 新規要求 N01〜N11 | 11 | v4仕様S04 | 初期Producer/Consumer差分を記録。契約・否定・OS・証拠の全項目は未完 |
 | 全体施工線 A〜J | 10 | v4工程表R03・Codex指示I04 | 全線同時BUILDのproducer/consumerと現行実装配置を全数照合中 |
-| 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P12は全E0-04 fieldを個別記録。P13の個別field・旧evidence identity/class、N11 Evidence/Blocker/OS Artifact全数結合は未完／UNKNOWN |
+| 製品要求 P0〜P13 | 14 | `docs/REV5_PRODUCT_PROGRESS.md`、v4仕様S05/S10 | P0〜P13は全E0-04 fieldを個別記録。P13旧aggregate evidence identity/classは`UNKNOWN`。N11 Evidence/Blocker/OS Artifact全数結合は未完 |
 | 総合機能 C0〜C34 | 35 | `docs/総合機能拡張_rev1/` | C0〜C34全35 IDのSource→Consumer crosswalkを記録。個々の全E0-04列とv4 Acceptance／Evidence/N11結合は継続 |
 | D4 Phase 0〜45 | 46 | `docs/D4_POCKET_PHASE_MAPPING.md` | 46 IDをv4 N01〜N11/A〜J/Kへcrosswalk済み。Phase固有E0-04全field、Evidence ID/Blocker、Acceptanceは未完 |
 | 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K別の完全E0-04 field、OS/Evidence/Blocker確認は継続 |
@@ -1636,7 +1698,7 @@ C24〜C34のSource／Schema／validator／旧evidence blob SHAは照合baseline�
 
 ## 次のE0照合作業
 
-1. P13を全E0-04 field、N11 Evidence ID、Blocker、OS対象/Artifactへ結合する。P0〜P12は完了済みmappingとして保持。続けてN/P/C/Phase/K残行へ展開し、既存CLOSED/FAILは履歴保持して再試験しない。
+1. P0〜P13のE0-04 field mappingは記録済み。次はBUF-R/TとN/P/C/Phase/Kの残行をCanonical N source/consumer・N11 Evidence/Blocker/OS Artifactへ結合し、既存CLOSED/FAILは履歴として保持して再試験しない。
 2. BUF-R/T crosswalkをCanonical N08/N10/N11 source SHA・各IDの完全E0-04 field・B5 evidenceへ結合する。B0〜B6の工程・状態・受入Consumer・証拠のcrosswalkは記録済み。個別cause/effect、OS/Artifact、N11 Evidence/Blockerの結合は継続。
 3. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 4. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
