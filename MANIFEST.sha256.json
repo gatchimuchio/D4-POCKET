@@ -81,7 +81,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "6e18678e164c3d3c8ddc6b482fc4f407d0283473f10cdc0d894b5f4a89bc8894"
+      "sha256": "29ed002d6981ecc23d1c379f0e450c9b0c08fec139cb1c8305efd94c81413348"
     },
     {
       "path": ".github/workflows/linux-manual-export-build.yml",
@@ -1513,7 +1513,7 @@
     },
     {
       "path": "docs/QE_2026-11-14/\u9032\u6357.md",
-      "sha256": "ae658816613bdb59ddec06ad577f5b9828fe709d7a216652a44290b76854b9ae"
+      "sha256": "02f0fa4d6f3730478533ba94670f0461615292f8cd5ea1ca85fa3be42bb9d531"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -2305,7 +2305,7 @@
     },
     {
       "path": "examples/contracts/gui_shell_macos_export_build.valid.json",
-      "sha256": "79833f93cf031f0040c003033c9484806b420c0a09e035b221609db93bebefb1"
+      "sha256": "b256ead3b1c6fdca0a4d3d89e947f56e0cf8f735e37f28edb28d4257b0b3a803"
     },
     {
       "path": "examples/contracts/gui_shell_module_build_evidence.valid.json",
@@ -2802,6 +2802,10 @@
     {
       "path": "examples/contracts/invalid/gui_shell_macos_export_build.invalid.json",
       "sha256": "12c2b68312cda8018d9a29937e1cd5ea57118ede98655085cf912844614815d9"
+    },
+    {
+      "path": "examples/contracts/invalid/gui_shell_macos_export_build_framework_mismatch.invalid.json",
+      "sha256": "8ef73fc3e8970c426678d3ab6180a1cd48887bb1a98c9e349111f84cd49a4375"
     },
     {
       "path": "examples/contracts/invalid/gui_shell_module_build_evidence_authority_claim.invalid.json",
@@ -5089,7 +5093,7 @@
     },
     {
       "path": "specs/gui_shell_macos_export_build.schema.json",
-      "sha256": "2be15c7e8dc8af21ecc1c1fb815a56e167daa37091edbaf89a078e9910b9ab7f"
+      "sha256": "c482e93d6b99d7b5334a2c06347dae3a502107c4d64117f8235dd0a31f59e5b0"
     },
     {
       "path": "specs/gui_shell_module_build_evidence.schema.json",
@@ -5577,7 +5581,7 @@
     },
     {
       "path": "tooling/export_macos_product.py",
-      "sha256": "315eda1f0aa4c8137ebe25702e5a64e83423088a818bd261d3c7843e5278c7df"
+      "sha256": "573ce2bd00f801ae204b0f25f76dc631f17466f43056714a03a382129ba72e19"
     },
     {
       "path": "tooling/export_windows_product.py",
@@ -5745,7 +5749,7 @@
     },
     {
       "path": "tooling/tests/test_export_macos_product.py",
-      "sha256": "9554f55e3fb345ee60fb38e8f04c720fdb38fe3d8c7a180ede93b62ce65b69b8"
+      "sha256": "60639fa8bd7a8fdfa3884440d02107b288f41f4e5fa34734188a1dbe2df95c31"
     },
     {
       "path": "tooling/tests/test_linux_deb_setup_package.py",

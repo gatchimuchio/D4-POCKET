@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/gui-shell/schemas/gui_shell_macos_export_build.schema.json",
-  "title": "D4 Pocket macOS Export build記録 v2",
+  "title": "D4 Pocket macOS Export build記録 v3",
   "type": "object",
   "required": [
     "version", "evidence_type", "evidence_source", "product", "target_platform", "build_mode",
@@ -19,7 +19,7 @@
   ],
   "additionalProperties": false,
   "properties": {
-    "version": { "const": 2 },
+    "version": { "const": 3 },
     "evidence_type": { "const": "d4_pocket_macos_export_build" },
     "evidence_source": { "const": "INTERNAL_STATE" },
     "product": { "const": "D4 Pocket" },
@@ -143,7 +143,7 @@
         "d4_resource_sealed_bundle_signatures": { "const": 0 },
         "flutter_toolchain_framework": {
           "type": "object",
-          "required": ["source", "sdk_revision", "engine_revision", "source_relative_path", "embedded_relative_path", "source_tree_sha256", "embedded_tree_sha256", "strict_signature_verified", "authority_present", "team_identifier_set", "timestamp_present", "cms_digest_present", "sealed_resources_present"],
+          "required": ["source", "sdk_revision", "engine_revision", "source_relative_path", "embedded_relative_path", "source_tree_sha256", "embedded_tree_sha256", "source_binary_sha256", "embedded_binary_sha256", "architecture_slice_sha256", "binary_architecture", "binary_architecture_slice_verified", "non_binary_content_verified", "framework_copy_transform_verified", "strict_signature_verified", "authority_present", "team_identifier_set", "timestamp_present", "cms_digest_present", "sealed_resources_present"],
           "additionalProperties": false,
           "properties": {
             "source": { "const": "pinned_flutter_release_engine_cache" },
@@ -153,6 +153,13 @@
             "embedded_relative_path": { "const": "Contents/Frameworks/FlutterMacOS.framework" },
             "source_tree_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
             "embedded_tree_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "source_binary_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "embedded_binary_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "architecture_slice_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "binary_architecture": { "enum": ["arm64", "x86_64"] },
+            "binary_architecture_slice_verified": { "const": true },
+            "non_binary_content_verified": { "const": true },
+            "framework_copy_transform_verified": { "const": true },
             "strict_signature_verified": { "const": true },
             "authority_present": { "const": true },
             "team_identifier_set": { "const": true },

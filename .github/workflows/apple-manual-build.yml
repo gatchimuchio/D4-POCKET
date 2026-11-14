@@ -741,9 +741,10 @@ jobs:
             --allow-verification-branch 2>&1 | tee "$evidence/export-build.txt"
           cp "$output/d4_pocket_macos_export_build.json" "$evidence/macos-export-build.json"
           python3 -B -X utf8 - "$output/d4_pocket_macos_export_build.json" <<'PY'
-          import json, pathlib, sys
+          import json, pathlib, re, sys
           path = pathlib.Path(sys.argv[1])
           record = json.loads(path.read_text(encoding='utf-8'))
+          assert record['version'] == 3
           assert record['target_platform'] == 'macos'
           assert record['app_id'] == 'd4-pocket-app-33333333333333333333333333333333'
           assert record['audit_store_id'] == 'audit-store-44444444444444444444444444444444'
@@ -758,7 +759,14 @@ jobs:
           assert framework['source'] == 'pinned_flutter_release_engine_cache'
           assert framework['sdk_revision'] == record['toolchain']['flutter_sdk_revision']
           assert framework['engine_revision'] == record['toolchain']['flutter_engine_revision']
-          assert framework['source_tree_sha256'] == framework['embedded_tree_sha256']
+          for field in ('source_tree_sha256', 'embedded_tree_sha256', 'source_binary_sha256',
+                        'embedded_binary_sha256', 'architecture_slice_sha256'):
+              assert re.fullmatch(r'[0-9a-f]{64}', framework[field])
+          assert framework['binary_architecture'] == record['target_architecture']
+          assert framework['binary_architecture_slice_verified'] is True
+          assert framework['embedded_binary_sha256'] == framework['architecture_slice_sha256']
+          assert framework['non_binary_content_verified'] is True
+          assert framework['framework_copy_transform_verified'] is True
           assert framework['strict_signature_verified'] is True
           assert record['target_architecture'] in ('arm64', 'x86_64')
           assert record['target_architecture'] == record['toolchain']['architecture']

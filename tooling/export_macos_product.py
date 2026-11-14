@@ -57,6 +57,15 @@ FLUTTER_ENGINE_FRAMEWORK_RELATIVE_PATH = PurePosixPath(
 APP_FLUTTER_FRAMEWORK_RELATIVE_PATH = PurePosixPath(
     "Contents/Frameworks/FlutterMacOS.framework"
 )
+FLUTTER_MACOS_FRAMEWORK_BINARY_RELATIVE_PATH = PurePosixPath(
+    "Versions/A/FlutterMacOS"
+)
+FLUTTER_MACOS_FRAMEWORK_DENYLISTED_FILES = frozenset(
+    {"entitlements.txt", "without_entitlements.txt", "unsigned_binaries.txt"}
+)
+# These modes and exclusions mirror the pinned Flutter macOS unpack target.
+FLUTTER_RSYNC_DIRECTORY_MODE = 0o755
+FLUTTER_RSYNC_FILE_MODE = 0o644
 MACOS_ENVIRONMENT_ALLOWLIST = {
     "CARGO_HOME",
     "DEVELOPER_DIR",
@@ -462,6 +471,166 @@ def _macos_bundle_tree_sha256(bundle: Path) -> str:
     return digest.hexdigest()
 
 
+def _macos_bundle_entries(bundle: Path) -> dict[str, dict[str, Any]]:
+    _validate_bundle_symlinks(bundle)
+    entries: dict[str, dict[str, Any]] = {}
+    paths = [
+        bundle,
+        *sorted(bundle.rglob("*"), key=lambda item: item.relative_to(bundle).as_posix()),
+    ]
+    for path in paths:
+        metadata = path.lstat()
+        relative = "." if path == bundle else path.relative_to(bundle).as_posix()
+        mode = stat.S_IMODE(metadata.st_mode)
+        if stat.S_ISLNK(metadata.st_mode):
+            entries[relative] = {
+                "kind": "symlink",
+                "mode": mode,
+                "target": os.readlink(path),
+            }
+        elif stat.S_ISDIR(metadata.st_mode):
+            entries[relative] = {"kind": "directory", "mode": mode}
+        elif stat.S_ISREG(metadata.st_mode):
+            entries[relative] = {
+                "kind": "file",
+                "mode": mode,
+                "size_bytes": metadata.st_size,
+                "sha256": _sha256_file(path),
+            }
+        else:
+            raise ValueError("Flutter Framework treeに通常file／directory以外がある")
+    return entries
+
+
+def _flutter_framework_copy_exclusions(
+    source_entries: dict[str, dict[str, Any]],
+) -> set[str]:
+    excluded: set[str] = set()
+    excluded_directories = {
+        path
+        for path, entry in source_entries.items()
+        if entry["kind"] == "directory" and PurePosixPath(path).name == ".DS_Store"
+    }
+    for directory in excluded_directories:
+        excluded.update(
+            path
+            for path in source_entries
+            if path == directory or path.startswith(directory + "/")
+        )
+    excluded.update(
+        path
+        for path, entry in source_entries.items()
+        if entry["kind"] == "file"
+        and PurePosixPath(path).name in FLUTTER_MACOS_FRAMEWORK_DENYLISTED_FILES
+    )
+    return excluded
+
+
+def _verify_flutter_framework_copy_entries(
+    source_framework: Path, embedded_framework: Path
+) -> tuple[str, str]:
+    source_entries = _macos_bundle_entries(source_framework)
+    embedded_entries = _macos_bundle_entries(embedded_framework)
+    exclusions = _flutter_framework_copy_exclusions(source_entries)
+    expected_paths = set(source_entries) - exclusions
+    if set(embedded_entries) != expected_paths:
+        raise ValueError(
+            "embedded FlutterMacOS.frameworkのfile layoutが固定Flutter copy規則と一致しない"
+        )
+
+    binary_relative = FLUTTER_MACOS_FRAMEWORK_BINARY_RELATIVE_PATH.as_posix()
+    source_binary = source_entries.get(binary_relative)
+    embedded_binary = embedded_entries.get(binary_relative)
+    if (
+        source_binary is None
+        or embedded_binary is None
+        or source_binary.get("kind") != "file"
+        or embedded_binary.get("kind") != "file"
+    ):
+        raise ValueError("FlutterMacOS.framework内の固定Mach-O binaryが一意でない")
+
+    for relative in sorted(expected_paths):
+        source_entry = source_entries[relative]
+        embedded_entry = embedded_entries[relative]
+        if source_entry["kind"] != embedded_entry["kind"]:
+            raise ValueError(
+                f"embedded FlutterMacOS.framework entry typeが固定Flutterと異なる: {relative}"
+            )
+        kind = source_entry["kind"]
+        allowed_modes = {source_entry["mode"]}
+        if kind == "directory":
+            allowed_modes.add(FLUTTER_RSYNC_DIRECTORY_MODE)
+        elif kind == "file":
+            allowed_modes.add(FLUTTER_RSYNC_FILE_MODE)
+        elif kind == "symlink":
+            allowed_modes.add(0o777)
+        if embedded_entry["mode"] not in allowed_modes:
+            raise ValueError(
+                f"embedded FlutterMacOS.framework modeが固定Flutter copy規則と異なる: {relative}"
+            )
+        if relative == binary_relative:
+            continue
+        source_content = {key: value for key, value in source_entry.items() if key != "mode"}
+        embedded_content = {
+            key: value for key, value in embedded_entry.items() if key != "mode"
+        }
+        if source_content != embedded_content:
+            raise ValueError(
+                f"embedded FlutterMacOS.framework contentが固定Flutterと異なる: {relative}"
+            )
+
+    return source_binary["sha256"], embedded_binary["sha256"]
+
+
+def _flutter_framework_architecture_slice_sha256(
+    source_framework: Path,
+    *,
+    lipo: str,
+    architecture: str,
+    verification_directory: Path,
+    environment: dict[str, str],
+) -> str:
+    if architecture not in {"arm64", "x86_64"}:
+        raise ValueError("FlutterMacOS.framework thin architectureが未対応である")
+    if verification_directory.is_symlink() or not verification_directory.is_dir():
+        raise ValueError("Flutter framework slice検証先が通常directoryではない")
+    source_binary = source_framework.joinpath(
+        *FLUTTER_MACOS_FRAMEWORK_BINARY_RELATIVE_PATH.parts
+    )
+    if source_binary.is_symlink() or not source_binary.is_file():
+        raise ValueError("pinned FlutterMacOS.framework binaryが通常fileではない")
+    probe_environment = dict(environment)
+    probe_environment.update(
+        {"LANG": "C", "LC_ALL": "C", "TMPDIR": str(verification_directory)}
+    )
+    with tempfile.TemporaryDirectory(
+        prefix="d4p-macos-framework-slice-", dir=verification_directory
+    ) as temp:
+        output = Path(temp) / "FlutterMacOS"
+        result = subprocess.run(
+            [lipo, "-output", str(output), "-extract", architecture, str(source_binary)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=probe_environment,
+            check=False,
+        )
+        if result.returncode != 0:
+            raise ValueError(
+                "pinned FlutterMacOS.frameworkからtarget architecture sliceを生成できない"
+            )
+        metadata = output.lstat() if output.exists() or output.is_symlink() else None
+        if (
+            metadata is None
+            or not stat.S_ISREG(metadata.st_mode)
+            or stat.S_ISLNK(metadata.st_mode)
+        ):
+            raise ValueError("pinned FlutterMacOS.framework architecture sliceが通常fileではない")
+        return _sha256_file(output)
+
+
 def _capture_codesign(
     command: list[str], *, environment: dict[str, str]
 ) -> subprocess.CompletedProcess[str]:
@@ -597,6 +766,9 @@ def _verify_embedded_flutter_framework(
     reference: FlutterFrameworkReference,
     *,
     codesign: str,
+    lipo: str,
+    architecture: str,
+    verification_directory: Path,
     environment: dict[str, str],
 ) -> dict[str, Any]:
     if app_bundle.is_symlink() or not app_bundle.is_dir():
@@ -623,8 +795,20 @@ def _verify_embedded_flutter_framework(
     if source_tree_after != reference.tree_sha256:
         raise ValueError("Flutter SDK cache内のpinned Frameworkが検証中に変化した")
     embedded_tree_before = _macos_bundle_tree_sha256(framework)
-    if embedded_tree_before != reference.tree_sha256:
-        raise ValueError("Export App Bundle内Flutter Frameworkがpinned SDK cacheと一致しない")
+    source_binary_sha256, embedded_binary_sha256 = _verify_flutter_framework_copy_entries(
+        reference.source_path, framework
+    )
+    architecture_slice_sha256 = _flutter_framework_architecture_slice_sha256(
+        reference.source_path,
+        lipo=lipo,
+        architecture=architecture,
+        verification_directory=verification_directory,
+        environment=environment,
+    )
+    if embedded_binary_sha256 != architecture_slice_sha256:
+        raise ValueError(
+            "embedded FlutterMacOS.framework binaryがpinned Flutter architecture sliceと一致しない"
+        )
     embedded_facts = _verify_pinned_flutter_framework_signature(
         framework, codesign=codesign, environment=environment
     )
@@ -641,6 +825,13 @@ def _verify_embedded_flutter_framework(
         "embedded_relative_path": APP_FLUTTER_FRAMEWORK_RELATIVE_PATH.as_posix(),
         "source_tree_sha256": reference.tree_sha256,
         "embedded_tree_sha256": embedded_tree_sha256,
+        "source_binary_sha256": source_binary_sha256,
+        "embedded_binary_sha256": embedded_binary_sha256,
+        "architecture_slice_sha256": architecture_slice_sha256,
+        "binary_architecture": architecture,
+        "binary_architecture_slice_verified": True,
+        "non_binary_content_verified": True,
+        "framework_copy_transform_verified": True,
         "strict_signature_verified": True,
         **embedded_facts,
     }
@@ -651,11 +842,20 @@ def _require_macos_code_without_publisher_identity(
     *,
     flutter_framework: FlutterFrameworkReference,
     codesign: str,
+    lipo: str,
+    architecture: str,
+    verification_directory: Path,
     environment: dict[str, str],
 ) -> dict[str, Any]:
     framework_path = bundle.joinpath(*APP_FLUTTER_FRAMEWORK_RELATIVE_PATH.parts)
     flutter_framework_evidence = _verify_embedded_flutter_framework(
-        bundle, flutter_framework, codesign=codesign, environment=environment
+        bundle,
+        flutter_framework,
+        codesign=codesign,
+        lipo=lipo,
+        architecture=architecture,
+        verification_directory=verification_directory,
+        environment=environment,
     )
     code_objects = _macos_code_objects(bundle, collapsed_bundle=framework_path)
     if len(code_objects) < 2:
@@ -972,6 +1172,9 @@ def build_macos_product(
                 app_bundle,
                 flutter_framework=flutter_framework,
                 codesign=tools["codesign"],
+                lipo=tools["lipo"],
+                architecture=target_architecture,
+                verification_directory=temporary_root,
                 environment=environment,
             )
 
@@ -1012,7 +1215,7 @@ def build_macos_product(
         elapsed_ms = round((time.perf_counter() - started) * 1000)
         catalog = _load_catalog()
         evidence = {
-            "version": 2,
+            "version": 3,
             "evidence_type": "d4_pocket_macos_export_build",
             "evidence_source": "INTERNAL_STATE",
             "product": "D4 Pocket",
@@ -1094,7 +1297,16 @@ def build_macos_product(
             },
             "credential_artifact_scan": credential_scan,
         }
-        _validate_build_evidence(evidence, staging_root, app_bundle, manifest_raw)
+        _validate_build_evidence(
+            evidence,
+            staging_root,
+            app_bundle,
+            manifest_raw,
+            flutter_framework_reference=flutter_framework,
+            lipo=tools["lipo"],
+            verification_directory=staging_root,
+            environment=environment,
+        )
         (staging_root / RECEIPT_NAME).write_text(
             json.dumps(evidence, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
         )
@@ -1105,7 +1317,15 @@ def build_macos_product(
 
 
 def _validate_build_evidence(
-    evidence: dict[str, Any], root: Path, app_bundle: Path, manifest_raw: bytes
+    evidence: dict[str, Any],
+    root: Path,
+    app_bundle: Path,
+    manifest_raw: bytes,
+    *,
+    flutter_framework_reference: FlutterFrameworkReference,
+    lipo: str,
+    verification_directory: Path,
+    environment: dict[str, str],
 ) -> None:
     schema = json.loads(
         (ROOT / "specs/gui_shell_macos_export_build.schema.json").read_text(encoding="utf-8")
@@ -1122,10 +1342,37 @@ def _validate_build_evidence(
     signature_scan = evidence.get("app_code_signature_scan", {})
     flutter_framework = signature_scan.get("flutter_toolchain_framework", {})
     embedded_flutter_framework = app_bundle.joinpath(*APP_FLUTTER_FRAMEWORK_RELATIVE_PATH.parts)
+    embedded_flutter_binary = embedded_flutter_framework.joinpath(
+        *FLUTTER_MACOS_FRAMEWORK_BINARY_RELATIVE_PATH.parts
+    )
     try:
+        source_framework_tree_hash = _macos_bundle_tree_sha256(
+            flutter_framework_reference.source_path
+        )
         embedded_flutter_tree_hash = _macos_bundle_tree_sha256(embedded_flutter_framework)
+        source_binary_hash, embedded_copy_binary_hash = _verify_flutter_framework_copy_entries(
+            flutter_framework_reference.source_path, embedded_flutter_framework
+        )
+        binary_metadata = embedded_flutter_binary.lstat()
+        embedded_flutter_binary_hash = (
+            _sha256_file(embedded_flutter_binary)
+            if stat.S_ISREG(binary_metadata.st_mode) and not stat.S_ISLNK(binary_metadata.st_mode)
+            else ""
+        )
+        architecture_slice_hash = _flutter_framework_architecture_slice_sha256(
+            flutter_framework_reference.source_path,
+            lipo=lipo,
+            architecture=evidence.get("target_architecture", ""),
+            verification_directory=verification_directory,
+            environment=environment,
+        )
     except (OSError, ValueError):
+        source_framework_tree_hash = ""
         embedded_flutter_tree_hash = ""
+        source_binary_hash = ""
+        embedded_copy_binary_hash = ""
+        embedded_flutter_binary_hash = ""
+        architecture_slice_hash = ""
     if (
         evidence.get("evidence_type") != "d4_pocket_macos_export_build"
         or evidence.get("target_platform") != "macos"
@@ -1165,12 +1412,24 @@ def _validate_build_evidence(
         or flutter_framework.get("sdk_revision") != PINNED_FLUTTER_REVISION
         or flutter_framework.get("engine_revision")
         != evidence.get("toolchain", {}).get("flutter_engine_revision")
+        or flutter_framework.get("engine_revision")
+        != flutter_framework_reference.engine_revision
         or flutter_framework.get("source_relative_path")
         != FLUTTER_ENGINE_FRAMEWORK_RELATIVE_PATH.as_posix()
         or flutter_framework.get("embedded_relative_path")
         != APP_FLUTTER_FRAMEWORK_RELATIVE_PATH.as_posix()
-        or flutter_framework.get("source_tree_sha256") != embedded_flutter_tree_hash
+        or source_framework_tree_hash != flutter_framework_reference.tree_sha256
+        or flutter_framework.get("source_tree_sha256") != source_framework_tree_hash
         or flutter_framework.get("embedded_tree_sha256") != embedded_flutter_tree_hash
+        or flutter_framework.get("source_binary_sha256") != source_binary_hash
+        or flutter_framework.get("embedded_binary_sha256") != embedded_copy_binary_hash
+        or flutter_framework.get("embedded_binary_sha256") != embedded_flutter_binary_hash
+        or flutter_framework.get("architecture_slice_sha256") != architecture_slice_hash
+        or flutter_framework.get("embedded_binary_sha256") != architecture_slice_hash
+        or flutter_framework.get("binary_architecture") != evidence.get("target_architecture")
+        or flutter_framework.get("binary_architecture_slice_verified") is not True
+        or flutter_framework.get("non_binary_content_verified") is not True
+        or flutter_framework.get("framework_copy_transform_verified") is not True
         or flutter_framework.get("strict_signature_verified") is not True
         or any(
             flutter_framework.get(field) is not True
