@@ -12,7 +12,7 @@
     "compile_time_update_trust", "build_duration_ms", "runtime_storage_root_template",
     "bundle_name", "bundle_identifier_verified", "product_manifest_copied_byte_for_byte",
     "target_architecture", "macos_binary_architecture_scan", "app_code_signature_scan",
-    "runtime_manifest_consumed", "module_pruning_verified", "package_signed", "app_signed",
+    "runtime_manifest_consumed", "module_pruning_verified", "package_signed", "app_publisher_identity_signed",
     "launch_status", "installed_product_verified", "formal_distribution_claimed", "artifact_root",
     "artifact_files", "artifact_total_bytes", "artifact_tree_sha256", "package", "app_archive",
     "credential_artifact_scan"
@@ -24,7 +24,7 @@
     "evidence_source": { "const": "INTERNAL_STATE" },
     "product": { "const": "D4 Pocket" },
     "target_platform": { "const": "macos" },
-    "build_mode": { "const": "release_unsigned_candidate" },
+    "build_mode": { "const": "release_candidate_no_publisher_identity" },
     "source_ref": { "type": "string", "pattern": "^refs/heads/(main|codex/[A-Za-z0-9._/-]+)$" },
     "source_commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
     "source_archive_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
@@ -119,14 +119,21 @@
     "runtime_manifest_consumed": { "const": false },
     "module_pruning_verified": { "const": false },
     "package_signed": { "const": false },
-    "app_signed": { "const": false },
+    "app_publisher_identity_signed": { "const": false },
     "app_code_signature_scan": {
       "type": "object",
-      "required": ["status", "code_objects_checked"],
+      "required": [
+        "status", "code_objects_checked", "unsigned_code_objects", "adhoc_executable_signatures",
+        "publisher_identity_signatures", "resource_sealed_bundle_signatures"
+      ],
       "additionalProperties": false,
       "properties": {
-        "status": { "const": "passed_unsigned" },
-        "code_objects_checked": { "type": "integer", "minimum": 2 }
+        "status": { "const": "passed_no_publisher_identity" },
+        "code_objects_checked": { "type": "integer", "minimum": 2 },
+        "unsigned_code_objects": { "type": "integer", "minimum": 0 },
+        "adhoc_executable_signatures": { "type": "integer", "minimum": 0 },
+        "publisher_identity_signatures": { "const": 0 },
+        "resource_sealed_bundle_signatures": { "const": 0 }
       }
     },
     "launch_status": { "const": "not_verified" },

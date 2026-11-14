@@ -4,7 +4,7 @@
   "evidence_source": "INTERNAL_STATE",
   "product": "D4 Pocket",
   "target_platform": "macos",
-  "build_mode": "release_unsigned_candidate",
+  "build_mode": "release_candidate_no_publisher_identity",
   "source_ref": "refs/heads/main",
   "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "source_archive_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -69,10 +69,14 @@
   "runtime_manifest_consumed": false,
   "module_pruning_verified": false,
   "package_signed": false,
-  "app_signed": false,
+  "app_publisher_identity_signed": false,
   "app_code_signature_scan": {
-    "status": "passed_unsigned",
-    "code_objects_checked": 2
+    "status": "passed_no_publisher_identity",
+    "code_objects_checked": 2,
+    "unsigned_code_objects": 1,
+    "adhoc_executable_signatures": 1,
+    "publisher_identity_signatures": 0,
+    "resource_sealed_bundle_signatures": 0
   },
   "launch_status": "not_verified",
   "installed_product_verified": false,

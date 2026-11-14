@@ -16,7 +16,7 @@ from tooling.export_macos_product import (
     _patch_app_identity,
     _patch_macos_export_build_settings,
     _require_macos_binary_architecture,
-    _require_unsigned_macos_code,
+    _require_macos_code_without_publisher_identity,
     _scan_macos_artifacts,
     _validate_build_evidence,
     build_macos_product,
@@ -173,7 +173,7 @@ class MacOSProductExportTests(unittest.TestCase):
                             binaries, lipo="/usr/bin/lipo", architecture="arm64", environment={}
                         )
 
-    def test_unsigned_app_scan_checks_macho_and_bundle_objects(self) -> None:
+    def test_app_scan_accepts_unsigned_and_unsealed_adhoc_executable_signatures(self) -> None:
         with tempfile.TemporaryDirectory(prefix="d4p-macos-codesign-scan-") as temp:
             app = Path(temp) / "D4Pocket.app"
             executable = app / "Contents/MacOS/gui_shell_desktop"
@@ -183,32 +183,90 @@ class MacOSProductExportTests(unittest.TestCase):
             framework_binary = framework / "Versions/A/Flutter"
             framework_binary.parent.mkdir(parents=True)
             framework_binary.write_bytes(b"\xfe\xed\xfa\xcfunsigned fixture")
+            adhoc = subprocess.CompletedProcess(
+                args=[],
+                returncode=0,
+                stdout=(
+                    "Format=app bundle with Mach-O thin (arm64)\n"
+                    "CodeDirectory v=20500 size=250 flags=0x2(adhoc) hashes=3+0 location=embedded\n"
+                    "Signature=adhoc\n"
+                    "TeamIdentifier=not set\n"
+                ),
+            )
             unsigned = subprocess.CompletedProcess(
                 args=[], returncode=1, stdout="code object is not signed at all\n"
             )
-            with patch("tooling.export_macos_product.subprocess.run", return_value=unsigned) as run:
-                result = _require_unsigned_macos_code(app, codesign="/usr/bin/codesign", environment={})
+            responses = [adhoc, adhoc, unsigned, adhoc]
+            with patch("tooling.export_macos_product.subprocess.run", side_effect=responses) as run:
+                result = _require_macos_code_without_publisher_identity(
+                    app, codesign="/usr/bin/codesign", environment={}
+                )
 
-            self.assertEqual(result, {"status": "passed_unsigned", "code_objects_checked": 4})
+            self.assertEqual(
+                result,
+                {
+                    "status": "passed_no_publisher_identity",
+                    "code_objects_checked": 4,
+                    "unsigned_code_objects": 1,
+                    "adhoc_executable_signatures": 3,
+                    "publisher_identity_signatures": 0,
+                    "resource_sealed_bundle_signatures": 0,
+                },
+            )
             self.assertEqual(run.call_count, 4)
             self.assertTrue(all(call.kwargs["env"]["LC_ALL"] == "C" for call in run.call_args_list))
+            self.assertTrue(all("--verbose=4" in call.args[0] for call in run.call_args_list))
 
-    def test_unsigned_app_scan_rejects_signed_or_unclassified_code(self) -> None:
+    def test_app_scan_rejects_publisher_or_resource_sealed_signatures(self) -> None:
         with tempfile.TemporaryDirectory(prefix="d4p-macos-codesign-negative-") as temp:
             app = Path(temp) / "D4Pocket.app"
             executable = app / "Contents/MacOS/gui_shell_desktop"
             executable.parent.mkdir(parents=True)
-            executable.write_bytes(b"\xcf\xfa\xed\xfeunsigned fixture")
-            signed = subprocess.CompletedProcess(args=[], returncode=0, stdout="Signature=adhoc\n")
-            with patch("tooling.export_macos_product.subprocess.run", return_value=signed):
-                with self.assertRaisesRegex(ValueError, r"署名済みcode object.*\. \(signature_kind=ad_hoc\)"):
-                    _require_unsigned_macos_code(app, codesign="/usr/bin/codesign", environment={})
+            executable.write_bytes(b"\xcf\xfa\xed\xfefixture")
+            disallowed_signatures = [
+                subprocess.CompletedProcess(
+                    args=[],
+                    returncode=0,
+                    stdout=(
+                        "Authority=Developer ID Application: Example (TEAM123)\n"
+                        "TeamIdentifier=TEAM123\n"
+                        "Signature=Developer ID Application\n"
+                    ),
+                ),
+                subprocess.CompletedProcess(
+                    args=[],
+                    returncode=0,
+                    stdout=(
+                        "Format=app bundle with Mach-O thin (arm64)\n"
+                        "CodeDirectory v=20500 size=250 flags=0x2(adhoc) hashes=3+0 location=embedded\n"
+                        "Signature=adhoc\n"
+                        "Sealed Resources version=2 rules=13 files=4\n"
+                    ),
+                ),
+                subprocess.CompletedProcess(
+                    args=[],
+                    returncode=0,
+                    stdout=(
+                        "CodeDirectory v=20500 size=250 flags=0x2(adhoc) hashes=3+0 location=embedded\n"
+                        "CodeDirectory v=20500 size=250 flags=0x10000(runtime) hashes=3+0 location=embedded\n"
+                        "Signature=adhoc\n"
+                    ),
+                ),
+            ]
+            for signed in disallowed_signatures:
+                with patch("tooling.export_macos_product.subprocess.run", return_value=signed):
+                    with self.assertRaisesRegex(ValueError, "Publisher identity付きまたは許容外署名"):
+                        _require_macos_code_without_publisher_identity(
+                            app, codesign="/usr/bin/codesign", environment={}
+                        )
             ambiguous = subprocess.CompletedProcess(args=[], returncode=1, stdout="verification failed\n")
             with patch("tooling.export_macos_product.subprocess.run", return_value=ambiguous):
-                with self.assertRaisesRegex(ValueError, "unsignedとして確定できない"):
-                    _require_unsigned_macos_code(app, codesign="/usr/bin/codesign", environment={})
+                with self.assertRaisesRegex(ValueError, "code signature状態を分類できない"):
+                    _require_macos_code_without_publisher_identity(
+                        app, codesign="/usr/bin/codesign", environment={}
+                    )
 
-    def test_build_evidence_schema_rejects_unsigned_candidate_claims(self) -> None:
+    def test_build_evidence_schema_rejects_publisher_signed_candidate_claims(self) -> None:
         schema = json.loads(
             (Path(__file__).resolve().parents[2] / "specs/gui_shell_macos_export_build.schema.json")
             .read_text(encoding="utf-8")
@@ -219,13 +277,19 @@ class MacOSProductExportTests(unittest.TestCase):
         )
         evidence = json.loads(example_path.read_text(encoding="utf-8"))
         self.assertNotIn("--no-codesign", evidence["flutter_build_arguments"])
-        self.assertEqual(evidence["app_code_signature_scan"]["status"], "passed_unsigned")
+        self.assertEqual(
+            evidence["app_code_signature_scan"]["status"], "passed_no_publisher_identity"
+        )
+        self.assertEqual(evidence["build_mode"], "release_candidate_no_publisher_identity")
         self.assertEqual(evidence["target_architecture"], evidence["toolchain"]["architecture"])
         self.assertEqual(
             evidence["macos_binary_architecture_scan"]["status"], "passed_host_architecture"
         )
         self.assertEqual(validate_instance(evidence, schema), [])
         evidence["package_signed"] = True
+        self.assertTrue(validate_instance(evidence, schema))
+        evidence["package_signed"] = False
+        evidence["app_publisher_identity_signed"] = True
         self.assertTrue(validate_instance(evidence, schema))
 
     def test_build_evidence_is_bound_to_manifest_and_artifact_tree(self) -> None:
@@ -267,8 +331,12 @@ class MacOSProductExportTests(unittest.TestCase):
                     "artifact_total_bytes": total_bytes,
                     "artifact_tree_sha256": tree_hash,
                     "app_code_signature_scan": {
-                        "status": "passed_unsigned",
+                        "status": "passed_no_publisher_identity",
                         "code_objects_checked": 2,
+                        "unsigned_code_objects": 1,
+                        "adhoc_executable_signatures": 1,
+                        "publisher_identity_signatures": 0,
+                        "resource_sealed_bundle_signatures": 0,
                     },
                     "package": {
                         "file_name": package_path.name,

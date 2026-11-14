@@ -1,4 +1,4 @@
-"""Broker Export Receiptからunsigned macOS App Bundle／pkg候補を構築する開発tool。"""
+"""Broker Export ReceiptからPublisher identityなしのmacOS App Bundle／pkg候補を構築する開発tool。"""
 
 from __future__ import annotations
 
@@ -335,7 +335,36 @@ def _macos_code_objects(bundle: Path) -> list[Path]:
     return list(unique.values())
 
 
-def _require_unsigned_macos_code(
+def _is_unsealed_adhoc_executable_signature(output: str) -> bool:
+    """Accept only identity-free, resource-unsealed ad-hoc executable signatures."""
+    if re.search(r"(?im)^\s*Signature=adhoc\s*$", output) is None:
+        return False
+    code_directories = re.findall(
+        r"(?im)^\s*CodeDirectory\b.*?\bflags=(0x[0-9a-f]+)\(([^)]*)\)", output
+    )
+    if not code_directories:
+        return False
+    for raw_flags_value, raw_flags in code_directories:
+        try:
+            flags_value = int(raw_flags_value, 16)
+        except ValueError:
+            return False
+        flags = {flag.strip().casefold() for flag in raw_flags.split(",")}
+        if flags_value != 0x2 or flags != {"adhoc"}:
+            return False
+    if re.search(r"(?im)^\s*Authority=", output):
+        return False
+    team_identifiers = re.findall(r"(?im)^\s*TeamIdentifier=(.*)$", output)
+    if any(value.strip().casefold() not in {"", "not set"} for value in team_identifiers):
+        return False
+    if re.search(r"(?im)^\s*(?:Signed Time|Timestamp|CMSDigest)=", output):
+        return False
+    if re.search(r"(?im)^\s*Sealed Resources version=", output):
+        return False
+    return True
+
+
+def _require_macos_code_without_publisher_identity(
     bundle: Path, *, codesign: str, environment: dict[str, str]
 ) -> dict[str, Any]:
     code_objects = _macos_code_objects(bundle)
@@ -343,9 +372,11 @@ def _require_unsigned_macos_code(
         raise ValueError("macOS App Bundle内の実行codeを署名検査できない")
     probe_environment = dict(environment)
     probe_environment.update({"LANG": "C", "LC_ALL": "C"})
+    unsigned_code_objects = 0
+    adhoc_executable_signatures = 0
     for path in code_objects:
         result = subprocess.run(
-            [codesign, "--display", "--verbose=2", str(path)],
+            [codesign, "--display", "--verbose=4", str(path)],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -356,17 +387,32 @@ def _require_unsigned_macos_code(
         )
         relative_path = path.relative_to(bundle).as_posix() or "."
         if result.returncode == 0:
-            signature_kind = "ad_hoc" if "adhoc" in result.stdout.casefold() else "other_or_unknown"
+            if _is_unsealed_adhoc_executable_signature(result.stdout):
+                adhoc_executable_signatures += 1
+                continue
+            signature_kind = (
+                "ad_hoc_or_identity"
+                if "adhoc" in result.stdout.casefold()
+                else "other_or_unknown"
+            )
             raise ValueError(
-                "macOS Export candidateに署名済みcode objectがある: "
+                "macOS Export candidateにPublisher identity付きまたは許容外署名がある: "
                 f"{relative_path} (signature_kind={signature_kind})"
             )
         if "code object is not signed at all" not in result.stdout.casefold():
             raise ValueError(
-                "macOS code signing状態をunsignedとして確定できない: "
+                "macOS code signature状態を分類できない: "
                 f"{relative_path}"
             )
-    return {"status": "passed_unsigned", "code_objects_checked": len(code_objects)}
+        unsigned_code_objects += 1
+    return {
+        "status": "passed_no_publisher_identity",
+        "code_objects_checked": len(code_objects),
+        "unsigned_code_objects": unsigned_code_objects,
+        "adhoc_executable_signatures": adhoc_executable_signatures,
+        "publisher_identity_signatures": 0,
+        "resource_sealed_bundle_signatures": 0,
+    }
 
 
 def _validate_bundle_symlinks(bundle: Path) -> None:
@@ -623,7 +669,7 @@ def build_macos_product(
             if product_manifest.read_bytes() != manifest_raw:
                 raise ValueError("Export Manifestをbyte-for-byteでbundleへ保持できなかった")
             _validate_bundle_symlinks(app_bundle)
-            app_code_signature_scan = _require_unsigned_macos_code(
+            app_code_signature_scan = _require_macos_code_without_publisher_identity(
                 app_bundle, codesign=tools["codesign"], environment=environment
             )
 
@@ -669,7 +715,7 @@ def build_macos_product(
             "evidence_source": "INTERNAL_STATE",
             "product": "D4 Pocket",
             "target_platform": "macos",
-            "build_mode": "release_unsigned_candidate",
+            "build_mode": "release_candidate_no_publisher_identity",
             "source_ref": source_ref,
             "source_commit": commit,
             "source_archive_sha256": archive_hash,
@@ -722,7 +768,7 @@ def build_macos_product(
             "runtime_manifest_consumed": False,
             "module_pruning_verified": False,
             "package_signed": False,
-            "app_signed": False,
+            "app_publisher_identity_signed": False,
             "app_code_signature_scan": app_code_signature_scan,
             "launch_status": "not_verified",
             "installed_product_verified": False,
@@ -789,9 +835,16 @@ def _validate_build_evidence(
         or evidence.get("formal_distribution_claimed") is not False
         or evidence.get("installed_product_verified") is not False
         or evidence.get("package_signed") is not False
-        or evidence.get("app_signed") is not False
-        or evidence.get("app_code_signature_scan", {}).get("status") != "passed_unsigned"
+        or evidence.get("app_publisher_identity_signed") is not False
+        or evidence.get("app_code_signature_scan", {}).get("status") != "passed_no_publisher_identity"
         or evidence.get("app_code_signature_scan", {}).get("code_objects_checked", 0) < 2
+        or (
+            evidence.get("app_code_signature_scan", {}).get("unsigned_code_objects", -1)
+            + evidence.get("app_code_signature_scan", {}).get("adhoc_executable_signatures", -1)
+            != evidence.get("app_code_signature_scan", {}).get("code_objects_checked", -2)
+        )
+        or evidence.get("app_code_signature_scan", {}).get("publisher_identity_signatures") != 0
+        or evidence.get("app_code_signature_scan", {}).get("resource_sealed_bundle_signatures") != 0
         or evidence.get("target_architecture") != evidence.get("toolchain", {}).get("architecture")
         or evidence.get("macos_binary_architecture_scan", {}).get("status") != "passed_host_architecture"
         or evidence.get("macos_binary_architecture_scan", {}).get("architecture") != evidence.get("target_architecture")
@@ -799,7 +852,7 @@ def _validate_build_evidence(
         or evidence.get("product_manifest_copied_byte_for_byte") is not True
         or (app_bundle / "Contents/Resources/product_manifest.json").read_bytes() != manifest_raw
     ):
-        raise ValueError("macOS Export build evidenceが候補の未署名／identity条件に適合しない")
+        raise ValueError("macOS Export build evidenceが候補の署名／Publisher identity条件に適合しない")
     package = root / evidence["package"]["file_name"]
     archive = root / evidence["app_archive"]["file_name"]
     if (
@@ -815,7 +868,7 @@ def _validate_build_evidence(
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Broker Receipt／Manifestからunsigned macOS .app／.pkg候補を構築する"
+        description="Broker Receipt／ManifestからPublisher identityなしのmacOS .app／.pkg候補を構築する"
     )
     parser.add_argument("--receipt", type=Path, required=True)
     parser.add_argument("--manifest-file", type=Path, required=True)
