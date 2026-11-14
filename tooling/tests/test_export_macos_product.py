@@ -20,6 +20,7 @@ from tooling.export_macos_product import (
     _capture_macos_aot_surface_analysis,
     _load_catalog,
     _macos_bundle_tree_sha256,
+    _macos_main_executable_path,
     _macos_artifact_inventory,
     _macos_environment,
     _darwin_build_architecture,
@@ -133,6 +134,15 @@ def _flutter_framework_fixture(
     executable = app / "Contents/MacOS/gui_shell_desktop"
     executable.parent.mkdir(parents=True)
     executable.write_bytes(b"\xcf\xfa\xed\xfeD4 Pocket fixture")
+    (app / "Contents/Info.plist").write_bytes(
+        plistlib.dumps(
+            {
+                "CFBundleExecutable": "gui_shell_desktop",
+                "CFBundleIdentifier": "com.d4p.fixture",
+            },
+            fmt=plistlib.FMT_XML,
+        )
+    )
     aot_framework = app.joinpath(*MACOS_AOT_FRAMEWORK_RELATIVE_PATH.parts)
     aot_binary = aot_framework / "Versions/A/App"
     aot_binary.parent.mkdir(parents=True)
@@ -725,6 +735,9 @@ class MacOSProductExportTests(unittest.TestCase):
     def test_app_scan_accepts_unsigned_and_unsealed_adhoc_executable_signatures(self) -> None:
         with tempfile.TemporaryDirectory(prefix="d4p-macos-codesign-scan-") as temp:
             app, flutter_framework = _flutter_framework_fixture(Path(temp))
+            extra_executable = app / "Contents/Frameworks/gui_shell_extra"
+            extra_executable.parent.mkdir(parents=True, exist_ok=True)
+            extra_executable.write_bytes(b"\xcf\xfa\xed\xfeD4 Pocket extra fixture")
             linker_adhoc = subprocess.CompletedProcess(
                 args=[],
                 returncode=0,
@@ -736,6 +749,17 @@ class MacOSProductExportTests(unittest.TestCase):
                     "CMSDigest=SHA-256\n"
                 ),
             )
+            sealed_aot_framework = subprocess.CompletedProcess(
+                args=[],
+                returncode=0,
+                stdout=(
+                    "Format=app bundle with Mach-O thin (arm64)\n"
+                    "CodeDirectory v=20400 size=382 flags=0x2(adhoc) hashes=9+0\n"
+                    "Signature=adhoc\n"
+                    "TeamIdentifier=not set\n"
+                    "Sealed Resources version=2 rules=13 files=4\n"
+                ),
+            )
             unsigned = subprocess.CompletedProcess(
                 args=[], returncode=1, stdout="code object is not signed at all\n"
             )
@@ -744,9 +768,9 @@ class MacOSProductExportTests(unittest.TestCase):
                 _entitlement_response(EXPECTED_MACOS_APP_ENTITLEMENTS),
                 _entitlement_response(EXPECTED_MACOS_BROKER_HELPER_ENTITLEMENTS),
                 _sandboxed_app_bundle_signature(),
-                _sandboxed_app_bundle_signature(),
-                unsigned,
+                sealed_aot_framework,
                 linker_adhoc,
+                unsigned,
             ]
             with patch(
                 "tooling.export_macos_product.subprocess.run",
@@ -822,6 +846,13 @@ class MacOSProductExportTests(unittest.TestCase):
                 },
             )
             self.assertEqual(run.call_count, 11)
+            main_executable = app / "Contents/MacOS/gui_shell_desktop"
+            signature_scan_paths = [
+                Path(call.args[0][-1]).resolve()
+                for call in run.call_args_list
+                if "--display" in call.args[0] and "--verbose=4" in call.args[0]
+            ]
+            self.assertNotIn(main_executable.resolve(), signature_scan_paths)
             self.assertTrue(all(call.kwargs["env"]["LC_ALL"] == "C" for call in run.call_args_list))
             self.assertEqual(
                 run.call_args_list[0].args[0][1:6],
@@ -851,6 +882,26 @@ class MacOSProductExportTests(unittest.TestCase):
                 run.call_args_list[6].args[0][1:5],
                 ["--display", "--entitlements", ":-", "--xml"],
             )
+
+    def test_app_main_executable_name_is_confined_to_bundle_metadata(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-macos-main-executable-") as temp:
+            app, _flutter_framework = _flutter_framework_fixture(Path(temp))
+            info_path = app / "Contents/Info.plist"
+            info_path.write_bytes(
+                plistlib.dumps(
+                    {
+                        "CFBundleExecutable": "../gui_shell_desktop",
+                        "CFBundleIdentifier": "com.d4p.fixture",
+                    },
+                    fmt=plistlib.FMT_XML,
+                )
+            )
+            with self.assertRaisesRegex(ValueError, "CFBundleExecutableが不正"):
+                _macos_main_executable_path(app)
+
+            info_path.write_bytes(b"not a plist")
+            with self.assertRaisesRegex(ValueError, "Info.plistを安全に読めない"):
+                _macos_main_executable_path(app)
 
     def test_signature_diagnostic_reports_flags_without_identity_values(self) -> None:
         output = (

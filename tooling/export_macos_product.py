@@ -600,6 +600,52 @@ def _macos_code_objects(bundle: Path, *, collapsed_bundles: tuple[Path, ...]) ->
     return list(unique.values())
 
 
+def _macos_main_executable_path(bundle: Path) -> Path:
+    """Resolve the app's primary executable from its bounded bundle metadata."""
+    contents = bundle / "Contents"
+    macos_directory = contents / "MacOS"
+    for directory, label in (
+        (contents, "macOS App Contents"),
+        (macos_directory, "macOS App executable directory"),
+    ):
+        try:
+            metadata = directory.lstat()
+        except OSError as error:
+            raise ValueError(f"{label}が一意に存在しない") from error
+        if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISDIR(metadata.st_mode):
+            raise ValueError(f"{label}が通常directoryではない")
+
+    info_path = contents / "Info.plist"
+    try:
+        info_raw = _read_regular_file(info_path, 1024 * 1024, "macOS App Info.plist")
+        info = plistlib.loads(info_raw)
+    except (OSError, ValueError, plistlib.InvalidFileException) as error:
+        raise ValueError("macOS App Info.plistを安全に読めない") from error
+    executable_name = info.get("CFBundleExecutable") if isinstance(info, dict) else None
+    if not isinstance(executable_name, str) or re.fullmatch(
+        r"[A-Za-z0-9._-]{1,128}", executable_name
+    ) is None:
+        raise ValueError("macOS App Info.plistのCFBundleExecutableが不正")
+
+    executable = macos_directory / executable_name
+    try:
+        metadata = executable.lstat()
+    except OSError as error:
+        raise ValueError("macOS App主実行fileが一意に存在しない") from error
+    if (
+        stat.S_ISLNK(metadata.st_mode)
+        or not stat.S_ISREG(metadata.st_mode)
+        or metadata.st_size == 0
+        or bool(getattr(metadata, "st_file_attributes", 0) & 0x400)
+    ):
+        raise ValueError("macOS App主実行fileが通常の非empty fileではない")
+    resolved_bundle = bundle.resolve(strict=True)
+    resolved_executable = executable.resolve(strict=True)
+    if not resolved_executable.is_relative_to(resolved_bundle):
+        raise ValueError("macOS App主実行fileがBundle外を指している")
+    return resolved_executable
+
+
 def _is_unsealed_adhoc_executable_signature(output: str) -> bool:
     """Accept only identity-free, resource-unsealed ad-hoc executable signatures."""
     if re.search(r"(?im)^\s*Signature=adhoc\s*$", output) is None:
@@ -1294,6 +1340,16 @@ def _require_macos_code_without_publisher_identity(
     code_objects = _macos_code_objects(
         bundle, collapsed_bundles=(framework_path, aot_framework_path)
     )
+    main_executable_path = _macos_main_executable_path(bundle)
+    main_executable_matches = [
+        path for path in code_objects if path.resolve(strict=True) == main_executable_path
+    ]
+    if len(main_executable_matches) != 1:
+        raise ValueError("macOS App主実行fileが署名scan対象に一意に含まれない")
+    # The App's deep signature verification covers this Mach-O; codesign reports
+    # the root bundle's resource seal again when the executable path is queried.
+    # Count the App signature once while continuing to inspect every nested code object.
+    code_objects = [path for path in code_objects if path != main_executable_matches[0]]
     if len(code_objects) < 2:
         raise ValueError("macOS App Bundle内の実行codeを署名検査できない")
     probe_environment = dict(environment)
