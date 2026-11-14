@@ -37,7 +37,7 @@ import 'shared.dart';
 import 'workspace_inspector.dart';
 import 'mobile_agent_task_inbox.dart';
 
-class AgentCenter extends StatefulWidget {
+class AgentCenter extends StatelessWidget {
   const AgentCenter({
     super.key,
     required this.client,
@@ -62,7 +62,49 @@ class AgentCenter extends StatefulWidget {
   final VoidCallback? onDiscardA2aArtifactHandoff;
 
   @override
-  State<AgentCenter> createState() => _AgentCenterState();
+  // The screen owns Broker-scoped registrations, Sessions, Task results, and
+  // pending reads. Replacing the Broker transport disposes that state so an
+  // old Broker response cannot repopulate the screen for a different Broker.
+  Widget build(BuildContext context) => _AgentCenterScreen(
+        key: ObjectKey(client.brokerTransport ?? client),
+        client: client,
+        active: active,
+        taskExecutionCoordinator: taskExecutionCoordinator,
+        developerEditProposal: developerEditProposal,
+        onDeveloperEditProposalPrepared: onDeveloperEditProposalPrepared,
+        onDiscardDeveloperEditProposal: onDiscardDeveloperEditProposal,
+        a2aArtifactHandoffSource: a2aArtifactHandoffSource,
+        onA2aArtifactHandoffConsumed: onA2aArtifactHandoffConsumed,
+        onDiscardA2aArtifactHandoff: onDiscardA2aArtifactHandoff,
+      );
+}
+
+class _AgentCenterScreen extends StatefulWidget {
+  const _AgentCenterScreen({
+    super.key,
+    required this.client,
+    this.active = true,
+    this.taskExecutionCoordinator,
+    this.developerEditProposal,
+    this.onDeveloperEditProposalPrepared,
+    this.onDiscardDeveloperEditProposal,
+    this.a2aArtifactHandoffSource,
+    this.onA2aArtifactHandoffConsumed,
+    this.onDiscardA2aArtifactHandoff,
+  });
+
+  final ShellCoreClient client;
+  final bool active;
+  final AgentTaskExecutionCoordinator? taskExecutionCoordinator;
+  final AiEditProposalReview? developerEditProposal;
+  final ValueChanged<AiEditProposalReview>? onDeveloperEditProposalPrepared;
+  final VoidCallback? onDiscardDeveloperEditProposal;
+  final A2aTaskQueryResult? a2aArtifactHandoffSource;
+  final ValueChanged<A2aTaskQueryResult>? onA2aArtifactHandoffConsumed;
+  final VoidCallback? onDiscardA2aArtifactHandoff;
+
+  @override
+  State<_AgentCenterScreen> createState() => _AgentCenterState();
 }
 
 class _AgentTaskUiState {
@@ -177,7 +219,8 @@ class _ComparisonRuntimeResourceState {
   final String? error;
 }
 
-class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
+class _AgentCenterState extends State<_AgentCenterScreen>
+    with WidgetsBindingObserver {
   bool _registrationPending = false;
   bool _sessionPending = false;
   bool _comparisonPending = false;
@@ -276,17 +319,9 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
   }
 
   @override
-  void didUpdateWidget(covariant AgentCenter oldWidget) {
+  void didUpdateWidget(covariant _AgentCenterScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.client.brokerTransport != widget.client.brokerTransport) {
-      _comparisonResourceGeneration++;
-      _comparisonResourcePending = false;
-      _comparisonResourceStatus = null;
-      _comparisonResourceA = null;
-      _comparisonResourceB = null;
-    }
-    if (oldWidget.taskExecutionCoordinator != widget.taskExecutionCoordinator ||
-        oldWidget.client.brokerTransport != widget.client.brokerTransport) {
+    if (oldWidget.taskExecutionCoordinator != widget.taskExecutionCoordinator) {
       _subscribeTaskExecutionUpdates();
     }
     if (oldWidget.active != widget.active && !widget.active) {

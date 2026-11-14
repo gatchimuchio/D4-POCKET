@@ -1922,6 +1922,111 @@ void main() {
     );
   });
 
+  testWidgets('Broker client切替後は旧Broker状態と遅延応答をAgent Centerへ残さない',
+      (WidgetTester tester) async {
+    final oldRegistrationResponse = _brokerAcceptedBody(
+      'AgentCLI実行系作業領域登録',
+      {
+        'runtime_id': 'runtime-old-broker',
+        'workspace_id': 'workspace-old-broker',
+        'registration_lifetime': 'broker_process',
+        'task_execution': 'unsupported',
+        'permission_generated': false,
+        'approval_generated': false,
+        'credential_value_accepted': false,
+      },
+    );
+    final oldBrokerRegistrationGate = Completer<void>();
+    final oldBrokerResponses = _shellCoreProductBootstrapResponses()
+      ..insert(
+        5,
+        _brokerDialogueSessionListResponse(sessions: [
+          {
+            '対話セッションID': _testSessionId('a'),
+            '実行系ID': 'runtime-old-broker',
+            '状態': '利用中',
+            '作成監査ID': 'audit-old-broker-session',
+            '作業領域ID': 'workspace-old-broker',
+            '作業領域結合監査ID': 'audit-old-broker-workspace',
+          },
+        ]),
+      )
+      ..add(oldRegistrationResponse);
+    final oldBrokerTransport = _FakeBrokerTransport(
+      oldBrokerResponses,
+      beforeResponse: (operation) async {
+        if (operation == 'AgentCLI実行系作業領域登録') {
+          await oldBrokerRegistrationGate.future;
+        }
+      },
+    );
+    final oldClient = await ShellCoreClient.product(
+      transport: oldBrokerTransport,
+    );
+
+    final newBrokerResponses = _shellCoreProductBootstrapResponses()
+      ..insert(
+        5,
+        _brokerDialogueSessionListResponse(sessions: [
+          {
+            '対話セッションID': _testSessionId('b'),
+            '実行系ID': 'runtime-new-broker',
+            '状態': '利用中',
+            '作成監査ID': 'audit-new-broker-session',
+            '作業領域ID': 'workspace-new-broker',
+            '作業領域結合監査ID': 'audit-new-broker-workspace',
+          },
+        ]),
+      );
+    final newClient = await ShellCoreClient.product(
+      transport: _FakeBrokerTransport(newBrokerResponses),
+    );
+
+    var selectedClient = oldClient;
+    late StateSetter replaceClient;
+    await tester.pumpWidget(MaterialApp(
+      home: StatefulBuilder(
+        builder: (context, setState) {
+          replaceClient = setState;
+          return Scaffold(body: AgentCenter(client: selectedClient));
+        },
+      ),
+    ));
+    expect(find.text('workspace-old-broker'), findsOneWidget);
+    expect(find.text('workspace-new-broker'), findsNothing);
+
+    await tester.tap(find.text('登録を開始'));
+    await tester.pumpAndSettle();
+    final fields = find.byType(TextFormField);
+    await tester.enterText(fields.at(0), 'model-test-01');
+    await tester.enterText(fields.at(1), 'runtime-old-broker');
+    await tester.enterText(fields.at(2), r'C:\Tools\Codex\codex.exe');
+    await tester.enterText(fields.at(3), 'workspace-old-broker');
+    await tester.enterText(fields.at(4), r'C:\d4-old-broker-workspace');
+    await tester.enterText(fields.at(5), '.env');
+    await tester.tap(find.text('native Owner確認へ進む'));
+    await tester.pump();
+    expect(
+      oldBrokerTransport.operations,
+      contains('AgentCLI実行系作業領域登録'),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byType(TextFormField), findsNothing);
+
+    replaceClient(() => selectedClient = newClient);
+    await tester.pump();
+    expect(find.text('workspace-new-broker'), findsOneWidget);
+    expect(find.text('workspace-old-broker'), findsNothing);
+    expect(find.text('runtime-old-broker'), findsNothing);
+
+    oldBrokerRegistrationGate.complete();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 1));
+    expect(find.text('runtime-old-broker'), findsNothing);
+    expect(find.text('workspace-new-broker'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Codex登録UIは指定値だけをnative Owner確認Broker要求へ渡す',
       (WidgetTester tester) async {
     final transport = _FakeBrokerTransport([
