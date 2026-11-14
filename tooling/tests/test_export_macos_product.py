@@ -12,8 +12,10 @@ from unittest.mock import patch
 from tooling.export_macos_product import (
     _macos_artifact_inventory,
     _macos_environment,
+    _darwin_build_architecture,
     _patch_app_identity,
-    _patch_macos_export_signing,
+    _patch_macos_export_build_settings,
+    _require_macos_binary_architecture,
     _require_unsigned_macos_code,
     _scan_macos_artifacts,
     _validate_build_evidence,
@@ -90,6 +92,15 @@ class MacOSProductExportTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             bundle_identifier_for_app("d4-pocket-app-../outside")
 
+    def test_darwin_architecture_is_canonical_and_unknown_hosts_fail_closed(self) -> None:
+        with patch("tooling.export_macos_product.platform.machine", return_value="arm64"):
+            self.assertEqual(_darwin_build_architecture(), "arm64")
+        with patch("tooling.export_macos_product.platform.machine", return_value="AMD64"):
+            self.assertEqual(_darwin_build_architecture(), "x86_64")
+        with patch("tooling.export_macos_product.platform.machine", return_value="riscv64"):
+            with self.assertRaisesRegex(ValueError, "host architectureが未対応"):
+                _darwin_build_architecture()
+
     def test_source_snapshot_changes_only_the_export_bundle_identifier(self) -> None:
         with tempfile.TemporaryDirectory(prefix="d4p-macos-config-") as temp:
             config = Path(temp) / "apps/desktop_flutter/macos/Runner/Configs/AppInfo.xcconfig"
@@ -105,7 +116,7 @@ class MacOSProductExportTests(unittest.TestCase):
             self.assertIn(bundle_identifier_for_app(APP_ID), updated)
             self.assertNotIn("com.example.guiShellDesktop", updated)
 
-    def test_export_snapshot_disables_xcode_and_helper_code_signing(self) -> None:
+    def test_export_snapshot_disables_signing_and_pins_host_architecture(self) -> None:
         with tempfile.TemporaryDirectory(prefix="d4p-macos-unsigned-") as temp:
             source_project = (
                 Path(__file__).resolve().parents[2]
@@ -115,14 +126,41 @@ class MacOSProductExportTests(unittest.TestCase):
             project.parent.mkdir(parents=True)
             shutil.copyfile(source_project, project)
 
-            _patch_macos_export_signing(Path(temp))
+            _patch_macos_export_build_settings(Path(temp), architecture="arm64")
 
             updated = project.read_text(encoding="utf-8")
             self.assertEqual(updated.count("CODE_SIGNING_ALLOWED = NO;"), 15)
             self.assertEqual(updated.count("CODE_SIGNING_REQUIRED = NO;"), 15)
+            self.assertEqual(updated.count("ARCHS = arm64;"), 15)
             self.assertIn("/usr/bin/install -m 755", updated)
             self.assertNotIn("/usr/bin/codesign --force --sign", updated)
             self.assertIn("/usr/bin/codesign --force --sign", source_project.read_text(encoding="utf-8"))
+
+    def test_binary_architecture_scan_requires_exact_host_architecture(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-macos-arch-scan-") as temp:
+            binaries = [Path(temp) / "app", Path(temp) / "broker"]
+            for binary in binaries:
+                binary.write_bytes(b"Mach-O fixture")
+            matching = subprocess.CompletedProcess(args=[], returncode=0, stdout="arm64\n")
+            with patch("tooling.export_macos_product.subprocess.run", return_value=matching):
+                result = _require_macos_binary_architecture(
+                    binaries, lipo="/usr/bin/lipo", architecture="arm64", environment={}
+                )
+            self.assertEqual(
+                result,
+                {
+                    "status": "passed_host_architecture",
+                    "architecture": "arm64",
+                    "binary_files_checked": 2,
+                },
+            )
+            for output in ("x86_64\n", "arm64 x86_64\n"):
+                mismatch = subprocess.CompletedProcess(args=[], returncode=0, stdout=output)
+                with patch("tooling.export_macos_product.subprocess.run", return_value=mismatch):
+                    with self.assertRaisesRegex(ValueError, "architectureがbuild hostと一致しない"):
+                        _require_macos_binary_architecture(
+                            binaries, lipo="/usr/bin/lipo", architecture="arm64", environment={}
+                        )
 
     def test_unsigned_app_scan_checks_macho_and_bundle_objects(self) -> None:
         with tempfile.TemporaryDirectory(prefix="d4p-macos-codesign-scan-") as temp:
@@ -171,6 +209,10 @@ class MacOSProductExportTests(unittest.TestCase):
         evidence = json.loads(example_path.read_text(encoding="utf-8"))
         self.assertNotIn("--no-codesign", evidence["flutter_build_arguments"])
         self.assertEqual(evidence["app_code_signature_scan"]["status"], "passed_unsigned")
+        self.assertEqual(evidence["target_architecture"], evidence["toolchain"]["architecture"])
+        self.assertEqual(
+            evidence["macos_binary_architecture_scan"]["status"], "passed_host_architecture"
+        )
         self.assertEqual(validate_instance(evidence, schema), [])
         evidence["package_signed"] = True
         self.assertTrue(validate_instance(evidence, schema))
@@ -204,6 +246,12 @@ class MacOSProductExportTests(unittest.TestCase):
                     "installer_identifier": bundle_identifier_for_app(APP_ID) + ".installer",
                     "bundle_name": app.name,
                     "source_manifest_sha256": manifest_hash,
+                    "target_architecture": "arm64",
+                    "macos_binary_architecture_scan": {
+                        "status": "passed_host_architecture",
+                        "architecture": "arm64",
+                        "binary_files_checked": 2,
+                    },
                     "artifact_files": records,
                     "artifact_total_bytes": total_bytes,
                     "artifact_tree_sha256": tree_hash,
@@ -241,6 +289,14 @@ class MacOSProductExportTests(unittest.TestCase):
                 }
             )
             _validate_build_evidence(evidence, output, app, manifest_raw)
+            evidence["target_architecture"] = "x86_64"
+            with self.assertRaises(ValueError):
+                _validate_build_evidence(evidence, output, app, manifest_raw)
+            evidence["target_architecture"] = "arm64"
+            evidence["macos_binary_architecture_scan"]["architecture"] = "x86_64"
+            with self.assertRaises(ValueError):
+                _validate_build_evidence(evidence, output, app, manifest_raw)
+            evidence["macos_binary_architecture_scan"]["architecture"] = "arm64"
             evidence["compile_time_identity"]["manifest_sha256"] = "0" * 64
             with self.assertRaises(ValueError):
                 _validate_build_evidence(evidence, output, app, manifest_raw)

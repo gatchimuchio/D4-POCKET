@@ -60,6 +60,12 @@
   "bundle_name": "D4Pocket-333333333333.app",
   "bundle_identifier_verified": true,
   "product_manifest_copied_byte_for_byte": true,
+  "target_architecture": "arm64",
+  "macos_binary_architecture_scan": {
+    "status": "passed_host_architecture",
+    "architecture": "arm64",
+    "binary_files_checked": 2
+  },
   "runtime_manifest_consumed": false,
   "module_pruning_verified": false,
   "package_signed": false,

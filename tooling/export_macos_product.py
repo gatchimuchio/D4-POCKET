@@ -80,6 +80,12 @@ MACH_O_MAGICS = {
     b"\xca\xfe\xba\xbf",
     b"\xbf\xba\xfe\xca",
 }
+DARWIN_ARCHITECTURES = {
+    "aarch64": "arm64",
+    "arm64": "arm64",
+    "amd64": "x86_64",
+    "x86_64": "x86_64",
+}
 
 
 def _git_value(*arguments: str) -> str:
@@ -136,6 +142,14 @@ def bundle_identifier_for_app(app_id: str) -> str:
     return f"com.d4p.export.{suffix}"
 
 
+def _darwin_build_architecture() -> str:
+    machine = platform.machine().lower()
+    architecture = DARWIN_ARCHITECTURES.get(machine)
+    if architecture is None:
+        raise ValueError("macOS host architectureが未対応である")
+    return architecture
+
+
 def _macos_environment(temp_root: Path, *, flutter_root: Path) -> dict[str, str]:
     environment = {
         key: value
@@ -171,6 +185,7 @@ def _tool_paths() -> dict[str, str]:
         "rustc",
         "xcodebuild",
         "codesign",
+        "lipo",
         "pkgbuild",
         "ditto",
         "plutil",
@@ -234,7 +249,9 @@ def _patch_app_identity(source_root: Path, bundle_id: str) -> None:
     config.write_text("".join(lines), encoding="utf-8", newline="")
 
 
-def _patch_macos_export_signing(source_root: Path) -> None:
+def _patch_macos_export_build_settings(source_root: Path, *, architecture: str) -> None:
+    if architecture not in {"arm64", "x86_64"}:
+        raise ValueError("macOS Export build architectureが未対応である")
     project = source_root / "apps/desktop_flutter/macos/Runner.xcodeproj/project.pbxproj"
     raw = _read_regular_file(project, 2 * 1024 * 1024, "macOS Runner project").decode("utf-8")
     configuration_count = raw.count("isa = XCBuildConfiguration;")
@@ -243,11 +260,12 @@ def _patch_macos_export_signing(source_root: Path) -> None:
         raise ValueError("macOS Xcode build configurationの構造が想定と一致しない")
     raw, patched_count = re.subn(
         r"\bbuildSettings = \{",
-        "buildSettings = { CODE_SIGNING_ALLOWED = NO; CODE_SIGNING_REQUIRED = NO;",
+        "buildSettings = { CODE_SIGNING_ALLOWED = NO; CODE_SIGNING_REQUIRED = NO; "
+        f"ARCHS = {architecture};",
         raw,
     )
     if patched_count != configuration_count:
-        raise ValueError("macOS Export用の署名無効設定を全configurationへ適用できない")
+        raise ValueError("macOS Export用の署名無効／architecture設定を全configurationへ適用できない")
     helper_sign_command = (
         r'/usr/bin/codesign --force --sign \"${EXPANDED_CODE_SIGN_IDENTITY:--}\" '
         r'--entitlements \"$PROJECT_DIR/Runner/BrokerHelper.entitlements\" \"$destination\"\n'
@@ -258,6 +276,35 @@ def _patch_macos_export_signing(source_root: Path) -> None:
     if "/usr/bin/codesign --force --sign" in raw:
         raise ValueError("Export用sourceに独自codesign工程が残っている")
     project.write_text(raw, encoding="utf-8", newline="")
+
+
+def _require_macos_binary_architecture(
+    binaries: list[Path], *, lipo: str, architecture: str, environment: dict[str, str]
+) -> dict[str, Any]:
+    if architecture not in {"arm64", "x86_64"} or len(binaries) != 2:
+        raise ValueError("macOS binary architecture検査条件が不正である")
+    for binary in binaries:
+        metadata = binary.lstat()
+        if not stat.S_ISREG(metadata.st_mode) or stat.S_ISLNK(metadata.st_mode):
+            raise ValueError("macOS architecture検査対象binaryが通常fileではない")
+        result = subprocess.run(
+            [lipo, "-archs", str(binary)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=environment,
+            check=False,
+        )
+        found = result.stdout.strip().split()
+        if result.returncode != 0 or found != [architecture]:
+            raise ValueError("macOS App／Broker binary architectureがbuild hostと一致しない")
+    return {
+        "status": "passed_host_architecture",
+        "architecture": architecture,
+        "binary_files_checked": len(binaries),
+    }
 
 
 def _macos_code_objects(bundle: Path) -> list[Path]:
@@ -440,6 +487,7 @@ def build_macos_product(
     bundle_name = f"D4Pocket-{suffix[:12]}.app"
     installer_id = f"{bundle_id}.installer"
     tools = _tool_paths()
+    target_architecture = _darwin_build_architecture()
     defines = dart_defines(plan)
     started = time.perf_counter()
     with tempfile.TemporaryDirectory(prefix=OUTPUT_TEMP_PREFIX, dir=output.parent) as output_temp:
@@ -461,10 +509,12 @@ def build_macos_product(
                 raise ValueError("Product VersionをmacOS packageへ安全に渡せない")
             flutter_project = source_root / "apps/desktop_flutter"
             _patch_app_identity(source_root, bundle_id)
-            _patch_macos_export_signing(source_root)
+            _patch_macos_export_build_settings(
+                source_root, architecture=target_architecture
+            )
 
             toolchain = {
-                "architecture": platform.machine().lower(),
+                "architecture": target_architecture,
                 "flutter": _tool_version([tools["flutter"], "--version"], cwd=flutter_project, environment=environment),
                 "cargo": _tool_version([tools["cargo"], "+" + RUST_TOOLCHAIN, "--version"], cwd=source_root, environment=environment),
                 "rustc": _tool_version([tools["rustc"], "+" + RUST_TOOLCHAIN, "--version"], cwd=source_root, environment=environment),
@@ -513,7 +563,8 @@ def build_macos_product(
                 environment=environment,
             )
             built_app = flutter_project / "build/macos/Build/Products/Release/gui_shell_desktop.app"
-            _require_file(built_app / "Contents/Info.plist", "macOS Info.plist")
+            app_info_plist = built_app / "Contents/Info.plist"
+            _require_file(app_info_plist, "macOS Info.plist")
             built_bundle_id = _run(
                 [tools["plutil"], "-extract", "CFBundleIdentifier", "raw", "-o", "-", str(built_app / "Contents/Info.plist")],
                 cwd=source_root,
@@ -521,8 +572,23 @@ def build_macos_product(
             ).strip()
             if built_bundle_id != bundle_id:
                 raise ValueError("built App Bundle identifierがExport App identityと一致しない")
+            built_executable_name = _run(
+                [tools["plutil"], "-extract", "CFBundleExecutable", "raw", "-o", "-", str(app_info_plist)],
+                cwd=source_root,
+                environment=environment,
+            ).strip()
+            if re.fullmatch(r"[A-Za-z0-9._-]{1,128}", built_executable_name) is None:
+                raise ValueError("macOS App executable名が不正である")
+            built_executable = built_app / "Contents/MacOS" / built_executable_name
+            _require_file(built_executable, "macOS App executable")
             built_helper = built_app / "Contents/MacOS/gui_shell_macos_broker"
             _require_file(built_helper, "macOS Broker helper")
+            macos_binary_architecture_scan = _require_macos_binary_architecture(
+                [built_executable, built_helper],
+                lipo=tools["lipo"],
+                architecture=target_architecture,
+                environment=environment,
+            )
             _validate_bundle_symlinks(built_app)
 
             app_bundle = staging_root / bundle_name
@@ -618,6 +684,8 @@ def build_macos_product(
                 "excluded_optional_module_ids": list(plan.excluded_optional_ids),
             },
             "toolchain": toolchain,
+            "target_architecture": target_architecture,
+            "macos_binary_architecture_scan": macos_binary_architecture_scan,
             "flutter_pub_get_arguments": ["pub", "get", "--enforce-lockfile"],
             "flutter_build_arguments": [
                 "build", "macos", "--release", "--no-pub",
@@ -709,6 +777,10 @@ def _validate_build_evidence(
         or evidence.get("app_signed") is not False
         or evidence.get("app_code_signature_scan", {}).get("status") != "passed_unsigned"
         or evidence.get("app_code_signature_scan", {}).get("code_objects_checked", 0) < 2
+        or evidence.get("target_architecture") != evidence.get("toolchain", {}).get("architecture")
+        or evidence.get("macos_binary_architecture_scan", {}).get("status") != "passed_host_architecture"
+        or evidence.get("macos_binary_architecture_scan", {}).get("architecture") != evidence.get("target_architecture")
+        or evidence.get("macos_binary_architecture_scan", {}).get("binary_files_checked") != 2
         or evidence.get("product_manifest_copied_byte_for_byte") is not True
         or (app_bundle / "Contents/Resources/product_manifest.json").read_bytes() != manifest_raw
     ):
