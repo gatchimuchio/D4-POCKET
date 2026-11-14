@@ -72,6 +72,9 @@ MACOS_AOT_REPORT_ROOT = "App (Dart AOT)"
 MACOS_AOT_IMAGE_RELATIVE_PATH = PurePosixPath(
     "Contents/Frameworks/App.framework/Versions/A/App"
 )
+MACOS_AOT_FRAMEWORK_RELATIVE_PATH = PurePosixPath(
+    "Contents/Frameworks/App.framework"
+)
 MACOS_AOT_REPORT_SENTINEL = (
     "A summary of your macOS bundle analysis can be found at:"
 )
@@ -345,11 +348,35 @@ def _sign_macos_export_bundle(
         EXPECTED_MACOS_BROKER_HELPER_ENTITLEMENTS,
         "macOS Broker helper entitlement source",
     )
+    aot_framework = bundle.joinpath(*MACOS_AOT_FRAMEWORK_RELATIVE_PATH.parts)
+    try:
+        aot_metadata = aot_framework.lstat()
+    except OSError as error:
+        raise ValueError("macOS AOT App.frameworkが存在しない") from error
+    if not stat.S_ISDIR(aot_metadata.st_mode) or stat.S_ISLNK(aot_metadata.st_mode):
+        raise ValueError("macOS AOT App.frameworkが通常directoryではない")
     helper = bundle / "Contents/MacOS/gui_shell_macos_broker"
     _require_file(helper, "macOS Broker helper for sandbox signing")
 
-    # Nested code is signed first. The fixed ad-hoc identity applies entitlements without
-    # introducing an owner Publisher identity into the export candidate.
+    # Sign nested code individually, from the AOT framework outward. Frameworks receive
+    # no entitlements; the helper and root App receive their distinct fixed contracts.
+    _run(
+        [codesign, "--force", "--sign", "-", str(aot_framework)],
+        cwd=source_root,
+        environment=environment,
+    )
+    _run(
+        [
+            codesign,
+            "--verify",
+            "--strict",
+            "--all-architectures",
+            "--verbose=2",
+            str(aot_framework),
+        ],
+        cwd=source_root,
+        environment=environment,
+    )
     _run(
         [
             codesign,
@@ -533,7 +560,7 @@ def _require_macos_binary_architecture(
     }
 
 
-def _macos_code_objects(bundle: Path, *, collapsed_bundle: Path) -> list[Path]:
+def _macos_code_objects(bundle: Path, *, collapsed_bundles: tuple[Path, ...]) -> list[Path]:
     if bundle.is_symlink() or not bundle.is_dir():
         raise ValueError("署名検査対象のmacOS App Bundleが通常directoryではない")
     objects = [bundle]
@@ -541,7 +568,7 @@ def _macos_code_objects(bundle: Path, *, collapsed_bundle: Path) -> list[Path]:
         metadata = path.lstat()
         if stat.S_ISLNK(metadata.st_mode):
             continue
-        if path != collapsed_bundle and path.is_relative_to(collapsed_bundle):
+        if any(path != collapsed and path.is_relative_to(collapsed) for collapsed in collapsed_bundles):
             continue
         if stat.S_ISDIR(metadata.st_mode):
             if path.suffix.casefold() in MACOS_CODE_BUNDLE_SUFFIXES:
@@ -588,8 +615,8 @@ def _is_unsealed_adhoc_executable_signature(output: str) -> bool:
     return True
 
 
-def _is_sandboxed_adhoc_app_bundle_signature(output: str) -> bool:
-    """Accept only the local ad-hoc signature used to enforce the fixed App Sandbox."""
+def _is_identity_free_adhoc_sealed_bundle_signature(output: str) -> bool:
+    """Accept an ad-hoc resource-sealed bundle without Publisher identity."""
     if re.search(r"(?im)^\s*Signature=adhoc\s*$", output) is None:
         return False
     code_directories = re.findall(
@@ -613,6 +640,11 @@ def _is_sandboxed_adhoc_app_bundle_signature(output: str) -> bool:
     if re.search(r"(?im)^\s*(?:Signed Time|Timestamp)=", output):
         return False
     return re.search(r"(?im)^\s*Sealed Resources version=", output) is not None
+
+
+def _is_sandboxed_adhoc_app_bundle_signature(output: str) -> bool:
+    """Accept only the local ad-hoc signature used to enforce the fixed App Sandbox."""
+    return _is_identity_free_adhoc_sealed_bundle_signature(output)
 
 
 def _macos_signature_diagnostic(output: str) -> str:
@@ -1235,7 +1267,16 @@ def _require_macos_code_without_publisher_identity(
         verification_directory=verification_directory,
         environment=environment,
     )
-    code_objects = _macos_code_objects(bundle, collapsed_bundle=framework_path)
+    aot_framework_path = bundle.joinpath(*MACOS_AOT_FRAMEWORK_RELATIVE_PATH.parts)
+    try:
+        aot_framework_metadata = aot_framework_path.lstat()
+    except OSError as error:
+        raise ValueError("macOS AOT App.frameworkが一意に存在しない") from error
+    if not stat.S_ISDIR(aot_framework_metadata.st_mode) or stat.S_ISLNK(aot_framework_metadata.st_mode):
+        raise ValueError("macOS AOT App.frameworkが通常directoryではない")
+    code_objects = _macos_code_objects(
+        bundle, collapsed_bundles=(framework_path, aot_framework_path)
+    )
     if len(code_objects) < 2:
         raise ValueError("macOS App Bundle内の実行codeを署名検査できない")
     probe_environment = dict(environment)
@@ -1261,6 +1302,7 @@ def _require_macos_code_without_publisher_identity(
     unsigned_code_objects = 0
     adhoc_executable_signatures = 0
     sandboxed_adhoc_app_bundle_signatures = 0
+    generated_adhoc_aot_framework_signatures = 0
     verified_toolchain_framework_signatures = 0
     for path in code_objects:
         if path == framework_path:
@@ -1278,9 +1320,22 @@ def _require_macos_code_without_publisher_identity(
         )
         relative_path = path.relative_to(bundle).as_posix() or "."
         if result.returncode == 0:
-            if path == bundle and _is_sandboxed_adhoc_app_bundle_signature(result.stdout):
-                sandboxed_adhoc_app_bundle_signatures += 1
-                continue
+            if path == bundle:
+                if _is_sandboxed_adhoc_app_bundle_signature(result.stdout):
+                    sandboxed_adhoc_app_bundle_signatures += 1
+                    continue
+                raise ValueError(
+                    "macOS Export candidateにPublisher identity付きまたは許容外署名がある: "
+                    f"{relative_path} ({_macos_signature_diagnostic(result.stdout)})"
+                )
+            if path == aot_framework_path:
+                if _is_identity_free_adhoc_sealed_bundle_signature(result.stdout):
+                    generated_adhoc_aot_framework_signatures += 1
+                    continue
+                raise ValueError(
+                    "macOS Export candidateにPublisher identity付きまたは許容外署名がある: "
+                    f"{relative_path} ({_macos_signature_diagnostic(result.stdout)})"
+                )
             if _is_unsealed_adhoc_executable_signature(result.stdout):
                 adhoc_executable_signatures += 1
                 continue
@@ -1296,15 +1351,20 @@ def _require_macos_code_without_publisher_identity(
         unsigned_code_objects += 1
     if sandboxed_adhoc_app_bundle_signatures != 1:
         raise ValueError("macOS Export App Bundleに固定sandbox entitlement付きad-hoc署名がない")
+    if generated_adhoc_aot_framework_signatures != 1:
+        raise ValueError("macOS AOT App.frameworkにad-hoc resource sealが一つない")
     return {
         "status": "passed_no_d4_publisher_identity",
         "code_objects_checked": len(code_objects),
         "unsigned_code_objects": unsigned_code_objects,
         "adhoc_executable_signatures": adhoc_executable_signatures,
         "sandboxed_adhoc_app_bundle_signatures": sandboxed_adhoc_app_bundle_signatures,
+        "generated_adhoc_aot_framework_signatures": generated_adhoc_aot_framework_signatures,
         "verified_toolchain_framework_signatures": verified_toolchain_framework_signatures,
         "d4_publisher_identity_signatures": 0,
-        "d4_resource_sealed_bundle_signatures": sandboxed_adhoc_app_bundle_signatures,
+        "d4_resource_sealed_bundle_signatures": (
+            sandboxed_adhoc_app_bundle_signatures + generated_adhoc_aot_framework_signatures
+        ),
         "sandbox_entitlements": {
             "status": "passed_exact_expected_entitlements",
             "app_sandbox_entitlements_verified": True,
@@ -2008,7 +2068,7 @@ def build_macos_product(
         elapsed_ms = round((time.perf_counter() - started) * 1000)
         catalog = _load_catalog()
         evidence = {
-            "version": 6,
+            "version": 7,
             "evidence_type": "d4_pocket_macos_export_build",
             "evidence_source": "INTERNAL_STATE",
             "product": "D4 Pocket",
@@ -2206,7 +2266,7 @@ def _validate_build_evidence(
         embedded_flutter_binary_hash = ""
         architecture_slice_hash = ""
     if (
-        evidence.get("version") != 6
+        evidence.get("version") != 7
         or evidence.get("evidence_type") != "d4_pocket_macos_export_build"
         or evidence.get("target_platform") != "macos"
         or evidence.get("app_id") != expected_app_id
@@ -2232,13 +2292,15 @@ def _validate_build_evidence(
             signature_scan.get("unsigned_code_objects", -1)
             + signature_scan.get("adhoc_executable_signatures", -1)
             + signature_scan.get("sandboxed_adhoc_app_bundle_signatures", -1)
+            + signature_scan.get("generated_adhoc_aot_framework_signatures", -1)
             + signature_scan.get("verified_toolchain_framework_signatures", -1)
             != signature_scan.get("code_objects_checked", -2)
         )
         or signature_scan.get("sandboxed_adhoc_app_bundle_signatures") != 1
+        or signature_scan.get("generated_adhoc_aot_framework_signatures") != 1
         or signature_scan.get("verified_toolchain_framework_signatures") != 1
         or signature_scan.get("d4_publisher_identity_signatures") != 0
-        or signature_scan.get("d4_resource_sealed_bundle_signatures") != 1
+        or signature_scan.get("d4_resource_sealed_bundle_signatures") != 2
         or signature_scan.get("sandbox_entitlements", {}).get("status")
         != "passed_exact_expected_entitlements"
         or signature_scan.get("sandbox_entitlements", {}).get("app_sandbox_entitlements_verified") is not True

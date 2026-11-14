@@ -1,5 +1,5 @@
 {
-  "version": 6,
+  "version": 7,
   "evidence_type": "d4_pocket_macos_export_build",
   "evidence_source": "INTERNAL_STATE",
   "product": "D4 Pocket",
@@ -133,12 +133,12 @@
   "app_publisher_identity_signed": false,
   "app_code_signature_scan": {
     "status": "passed_no_d4_publisher_identity",
-    "code_objects_checked": 4,
+    "code_objects_checked": 5,
     "unsigned_code_objects": 1,
     "adhoc_executable_signatures": 1,
     "verified_toolchain_framework_signatures": 1,
     "d4_publisher_identity_signatures": 0,
-    "d4_resource_sealed_bundle_signatures": 1,
+    "d4_resource_sealed_bundle_signatures": 2,
     "flutter_toolchain_framework": {
       "source": "pinned_flutter_release_engine_cache",
       "sdk_revision": "559ffa3f75e7402d65a8def9c28389a9b2e6fe42",
@@ -162,6 +162,7 @@
       "sealed_resources_present": true
     },
     "sandboxed_adhoc_app_bundle_signatures": 1,
+    "generated_adhoc_aot_framework_signatures": 1,
     "sandbox_entitlements": {
       "status": "passed_exact_expected_entitlements",
       "app_sandbox_entitlements_verified": true,

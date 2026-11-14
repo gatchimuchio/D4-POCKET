@@ -19,7 +19,7 @@
   ],
   "additionalProperties": false,
   "properties": {
-    "version": { "const": 6 },
+    "version": { "const": 7 },
     "evidence_type": { "const": "d4_pocket_macos_export_build" },
     "evidence_source": { "const": "INTERNAL_STATE" },
     "product": { "const": "D4 Pocket" },
@@ -174,7 +174,8 @@
       "type": "object",
       "required": [
         "status", "code_objects_checked", "unsigned_code_objects", "adhoc_executable_signatures",
-        "sandboxed_adhoc_app_bundle_signatures", "verified_toolchain_framework_signatures",
+        "sandboxed_adhoc_app_bundle_signatures", "generated_adhoc_aot_framework_signatures",
+        "verified_toolchain_framework_signatures",
         "d4_publisher_identity_signatures", "d4_resource_sealed_bundle_signatures",
         "sandbox_entitlements", "flutter_toolchain_framework"
       ],
@@ -185,11 +186,15 @@
         "unsigned_code_objects": { "type": "integer", "minimum": 0 },
         "adhoc_executable_signatures": { "type": "integer", "minimum": 0 },
         "sandboxed_adhoc_app_bundle_signatures": { "const": 1 },
+        "generated_adhoc_aot_framework_signatures": {
+          "const": 1,
+          "description": "D4が生成したApp.frameworkをentitlementなしで署名したad-hoc resource seal。Publisher identity署名ではない。"
+        },
         "verified_toolchain_framework_signatures": { "const": 1 },
         "d4_publisher_identity_signatures": { "const": 0 },
         "d4_resource_sealed_bundle_signatures": {
-          "const": 1,
-          "description": "一意のmacOS Export App root bundleにある固定App Sandbox entitlement付きad-hoc resource seal。D4 Publisher identity署名ではない。"
+          "const": 2,
+          "description": "D4 Export App root bundleと生成AOT App.frameworkのad-hoc resource seal。rootには固定App Sandbox entitlementを適用し、どちらもD4 Publisher identity署名ではない。"
         },
         "sandbox_entitlements": {
           "type": "object",

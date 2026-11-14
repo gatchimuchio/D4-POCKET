@@ -748,7 +748,7 @@ jobs:
           import hashlib, json, pathlib, plistlib, re, sys
           path = pathlib.Path(sys.argv[1])
           record = json.loads(path.read_text(encoding='utf-8'))
-          assert record['version'] == 6
+          assert record['version'] == 7
           assert record['target_platform'] == 'macos'
           assert record['app_id'] == 'd4-pocket-app-33333333333333333333333333333333'
           assert record['audit_store_id'] == 'audit-store-44444444444444444444444444444444'
@@ -765,9 +765,10 @@ jobs:
           assert scan['status'] == 'passed_no_d4_publisher_identity'
           assert scan['code_objects_checked'] >= 2
           assert scan['sandboxed_adhoc_app_bundle_signatures'] == 1
+          assert scan['generated_adhoc_aot_framework_signatures'] == 1
           assert scan['verified_toolchain_framework_signatures'] == 1
           assert scan['d4_publisher_identity_signatures'] == 0
-          assert scan['d4_resource_sealed_bundle_signatures'] == 1
+          assert scan['d4_resource_sealed_bundle_signatures'] == 2
           sandbox = scan['sandbox_entitlements']
           assert sandbox['status'] == 'passed_exact_expected_entitlements'
           assert sandbox['app_sandbox_entitlements_verified'] is True

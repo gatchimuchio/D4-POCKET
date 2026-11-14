@@ -29,6 +29,7 @@ from tooling.export_macos_product import (
     EXPECTED_MACOS_BROKER_HELPER_ENTITLEMENTS,
     MACOS_BROKER_HELPER_ENTITLEMENTS,
     MACOS_RUNNER_ENTITLEMENTS,
+    MACOS_AOT_FRAMEWORK_RELATIVE_PATH,
     _require_macos_binary_architecture,
     _require_macos_code_without_publisher_identity,
     _sign_macos_export_bundle,
@@ -132,6 +133,11 @@ def _flutter_framework_fixture(
     executable = app / "Contents/MacOS/gui_shell_desktop"
     executable.parent.mkdir(parents=True)
     executable.write_bytes(b"\xcf\xfa\xed\xfeD4 Pocket fixture")
+    aot_framework = app.joinpath(*MACOS_AOT_FRAMEWORK_RELATIVE_PATH.parts)
+    aot_binary = aot_framework / "Versions/A/App"
+    aot_binary.parent.mkdir(parents=True)
+    aot_binary.write_bytes(b"\xcf\xfa\xed\xfeD4 Pocket AOT fixture")
+    (aot_framework / "Versions/A/Info.plist").write_bytes(b"D4 AOT framework fixture metadata")
     helper = app / "Contents/MacOS/gui_shell_macos_broker"
     helper.write_bytes(b"\xcf\xfa\xed\xfeD4 Pocket Broker fixture")
     reference = FlutterFrameworkReference(
@@ -610,6 +616,11 @@ class MacOSProductExportTests(unittest.TestCase):
             helper = bundle / "Contents/MacOS/gui_shell_macos_broker"
             helper.parent.mkdir(parents=True)
             helper.write_bytes(b"broker fixture")
+            aot_framework = bundle.joinpath(*MACOS_AOT_FRAMEWORK_RELATIVE_PATH.parts)
+            aot_binary = aot_framework / "Versions/A/App"
+            aot_binary.parent.mkdir(parents=True)
+            aot_binary.write_bytes(b"AOT fixture")
+            (aot_framework / "Versions/A/Info.plist").write_bytes(b"AOT framework metadata")
             for relative in (MACOS_RUNNER_ENTITLEMENTS, MACOS_BROKER_HELPER_ENTITLEMENTS):
                 target = source_root / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
@@ -618,7 +629,7 @@ class MacOSProductExportTests(unittest.TestCase):
             successful = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
             with patch(
                 "tooling.export_macos_product.subprocess.run",
-                side_effect=[successful] * 4,
+                side_effect=[successful] * 6,
             ) as run:
                 hashes = _sign_macos_export_bundle(
                     bundle,
@@ -628,21 +639,28 @@ class MacOSProductExportTests(unittest.TestCase):
                 )
 
             commands = [call.args[0] for call in run.call_args_list]
-            self.assertEqual(len(commands), 4)
+            self.assertEqual(len(commands), 6)
             self.assertEqual(commands[0][1:4], ["--force", "--sign", "-"])
-            self.assertEqual(
-                commands[0][commands[0].index("--entitlements") + 1],
-                str(source_root / MACOS_BROKER_HELPER_ENTITLEMENTS),
-            )
-            self.assertEqual(commands[0][-1], str(helper))
+            self.assertEqual(commands[0][-1], str(aot_framework))
+            self.assertNotIn("--entitlements", commands[0])
             self.assertEqual(commands[1][1:4], ["--verify", "--strict", "--all-architectures"])
+            self.assertEqual(commands[1][-1], str(aot_framework))
             self.assertEqual(commands[2][1:4], ["--force", "--sign", "-"])
             self.assertEqual(
                 commands[2][commands[2].index("--entitlements") + 1],
+                str(source_root / MACOS_BROKER_HELPER_ENTITLEMENTS),
+            )
+            self.assertEqual(commands[2][-1], str(helper))
+            self.assertEqual(commands[3][1:4], ["--verify", "--strict", "--all-architectures"])
+            self.assertEqual(commands[3][-1], str(helper))
+            self.assertEqual(commands[4][1:4], ["--force", "--sign", "-"])
+            self.assertEqual(
+                commands[4][commands[4].index("--entitlements") + 1],
                 str(source_root / MACOS_RUNNER_ENTITLEMENTS),
             )
-            self.assertEqual(commands[2][-1], str(bundle))
-            self.assertEqual(commands[3][1:4], ["--verify", "--deep", "--strict"])
+            self.assertEqual(commands[4][-1], str(bundle))
+            self.assertEqual(commands[5][1:4], ["--verify", "--deep", "--strict"])
+            self.assertEqual(commands[5][-1], str(bundle))
             self.assertEqual(set(hashes), {"app_entitlements_sha256", "helper_entitlements_sha256"})
             for digest in hashes.values():
                 self.assertRegex(digest, r"^[0-9a-f]{64}$")
@@ -684,6 +702,7 @@ class MacOSProductExportTests(unittest.TestCase):
                 _entitlement_response(EXPECTED_MACOS_APP_ENTITLEMENTS),
                 _entitlement_response(EXPECTED_MACOS_BROKER_HELPER_ENTITLEMENTS),
                 _sandboxed_app_bundle_signature(),
+                _sandboxed_app_bundle_signature(),
                 unsigned,
                 linker_adhoc,
             ]
@@ -705,13 +724,14 @@ class MacOSProductExportTests(unittest.TestCase):
                 result,
                 {
                     "status": "passed_no_d4_publisher_identity",
-                    "code_objects_checked": 4,
+                    "code_objects_checked": 5,
                     "unsigned_code_objects": 1,
                     "adhoc_executable_signatures": 1,
                     "sandboxed_adhoc_app_bundle_signatures": 1,
+                    "generated_adhoc_aot_framework_signatures": 1,
                     "verified_toolchain_framework_signatures": 1,
                     "d4_publisher_identity_signatures": 0,
-                    "d4_resource_sealed_bundle_signatures": 1,
+                    "d4_resource_sealed_bundle_signatures": 2,
                     "sandbox_entitlements": {
                         "status": "passed_exact_expected_entitlements",
                         "app_sandbox_entitlements_verified": True,
@@ -759,7 +779,7 @@ class MacOSProductExportTests(unittest.TestCase):
                     },
                 },
             )
-            self.assertEqual(run.call_count, 10)
+            self.assertEqual(run.call_count, 11)
             self.assertTrue(all(call.kwargs["env"]["LC_ALL"] == "C" for call in run.call_args_list))
             self.assertEqual(
                 run.call_args_list[0].args[0][1:6],
@@ -905,7 +925,37 @@ class MacOSProductExportTests(unittest.TestCase):
                 "tooling.export_macos_product.subprocess.run",
                 side_effect=_macos_test_subprocess_side_effect(missing_seal_responses),
             ):
-                with self.assertRaisesRegex(ValueError, "固定sandbox entitlement付きad-hoc署名がない"):
+                with self.assertRaisesRegex(ValueError, "Publisher identity付きまたは許容外署名"):
+                    _require_macos_code_without_publisher_identity(
+                        app,
+                        flutter_framework=flutter_framework,
+                        codesign="/usr/bin/codesign",
+                        lipo="/usr/bin/lipo",
+                        architecture="arm64",
+                        verification_directory=app.parent,
+                        environment={},
+                    )
+            unsealed_aot = subprocess.CompletedProcess(
+                args=[],
+                returncode=0,
+                stdout=(
+                    "CodeDirectory v=20400 size=382 flags=0x20002(adhoc,linker-signed) hashes=9+0\n"
+                    "Signature=adhoc\n"
+                    "TeamIdentifier=not set\n"
+                ),
+            )
+            unsealed_aot_responses = [
+                *_successful_framework_signature_responses(),
+                _entitlement_response(EXPECTED_MACOS_APP_ENTITLEMENTS),
+                _entitlement_response(EXPECTED_MACOS_BROKER_HELPER_ENTITLEMENTS),
+                _sandboxed_app_bundle_signature(),
+                unsealed_aot,
+            ]
+            with patch(
+                "tooling.export_macos_product.subprocess.run",
+                side_effect=_macos_test_subprocess_side_effect(unsealed_aot_responses),
+            ):
+                with self.assertRaisesRegex(ValueError, "Publisher identity付きまたは許容外署名"):
                     _require_macos_code_without_publisher_identity(
                         app,
                         flutter_framework=flutter_framework,
@@ -1178,7 +1228,7 @@ class MacOSProductExportTests(unittest.TestCase):
             embedded_binary_hash = hashlib.sha256(FLUTTER_FRAMEWORK_ARM64_BINARY).hexdigest()
             aot_binary = b"\xcf\xfa\xed\xfe AOT evidence fixture"
             exported_aot = app.joinpath(*MACOS_AOT_IMAGE_RELATIVE_PATH.parts)
-            exported_aot.parent.mkdir(parents=True)
+            exported_aot.parent.mkdir(parents=True, exist_ok=True)
             exported_aot.write_bytes(aot_binary)
             profiled_app = temp_root / "profile.app"
             profiled_aot = profiled_app.joinpath(*MACOS_AOT_IMAGE_RELATIVE_PATH.parts)
@@ -1264,13 +1314,14 @@ class MacOSProductExportTests(unittest.TestCase):
                     ],
                     "app_code_signature_scan": {
                         "status": "passed_no_d4_publisher_identity",
-                        "code_objects_checked": 4,
+                        "code_objects_checked": 5,
                         "unsigned_code_objects": 1,
                         "adhoc_executable_signatures": 1,
                         "sandboxed_adhoc_app_bundle_signatures": 1,
+                        "generated_adhoc_aot_framework_signatures": 1,
                         "verified_toolchain_framework_signatures": 1,
                         "d4_publisher_identity_signatures": 0,
-                        "d4_resource_sealed_bundle_signatures": 1,
+                        "d4_resource_sealed_bundle_signatures": 2,
                         "sandbox_entitlements": {
                             "status": "passed_exact_expected_entitlements",
                             "app_sandbox_entitlements_verified": True,
