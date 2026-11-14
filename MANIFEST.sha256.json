@@ -76,11 +76,11 @@
     },
     {
       "path": ".github/workflows/android-manual-emulator.yml",
-      "sha256": "dba94da8fcff4bb68976eb88aee3d6e01cc8b06bf4d510faff68e0099b7cb958"
+      "sha256": "fdfe1a7d361d38d084de9f33f4731742b8bbd09de82f1384bccc0f476d2102cf"
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "89f9b9b66c9c35a96749b23f2256b5c5c2a1465d0d56d1b4c59ee5277ff31871"
+      "sha256": "be2015295e1919c168f04273028c5f62848edf13657fbae195996ad39ca047d1"
     },
     {
       "path": ".github/workflows/linux-manual-export-build.yml",
@@ -273,6 +273,10 @@
     {
       "path": "apps/desktop_flutter/lib/screens/mcp_connection_center.dart",
       "sha256": "5c13a5a75bb090414a6538b30a785322a58bdc995ea63976f769d9ef5ee4ee16"
+    },
+    {
+      "path": "apps/desktop_flutter/lib/screens/mobile_agent_task_inbox.dart",
+      "sha256": "11011ad126cdeaba2c702212ac4e07ccb0f86aeaccfb97b9decc753f04c21968"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/notifications.dart",
@@ -697,6 +701,10 @@
     {
       "path": "apps/desktop_flutter/test/mcp_connection_center_test.dart",
       "sha256": "304487fc4d8eb992d391002f63a9228b25ea94419480010f32c5b030ee222e37"
+    },
+    {
+      "path": "apps/desktop_flutter/test/mobile_agent_task_inbox_test.dart",
+      "sha256": "d27c908c4054ef79f9e3713bed5f96eadce1f81ea11f0cf160bc1c468a1cb94f"
     },
     {
       "path": "apps/desktop_flutter/test/module_pruning_test.dart",
@@ -1207,6 +1215,10 @@
       "sha256": "fab88231f5c7281d97190c441d607902cf06c9a510f6da9366c368f691725a36"
     },
     {
+      "path": "apps/mobile_flutter/lib/screens/mobile_agent_task.dart",
+      "sha256": "6cf538dc5d0a42e737a89b8d4a9b6469de3de95250505faee80b6fe7dc8ee430"
+    },
+    {
       "path": "apps/mobile_flutter/lib/screens/mobile_dashboard.dart",
       "sha256": "e767c780a4b297188f6bbd3efd2853644ec4912626b909e886309aa796b57157"
     },
@@ -1249,6 +1261,10 @@
     {
       "path": "apps/mobile_flutter/test/device_link_test.dart",
       "sha256": "20be3bfb5300cebd542a7629959ca86ac4e5aad49b244b4ec17923b86c05afb0"
+    },
+    {
+      "path": "apps/mobile_flutter/test/mobile_agent_task_test.dart",
+      "sha256": "2ff443b44d6ece1d5822a853c54f9f39af84d57cebf20ce1d4910e26a5f9ebe8"
     },
     {
       "path": "apps/mobile_flutter/test/mobile_projection_client_test.dart",
@@ -4389,6 +4405,10 @@
     {
       "path": "packages/agent_orchestration/lib/mcp_connection_client.dart",
       "sha256": "f392d9af0ba8962555c990c4cd9feb6505fbcc45da7e59cdb14d9ff7225ec24c"
+    },
+    {
+      "path": "packages/agent_orchestration/lib/mobile_agent_task_client.dart",
+      "sha256": "312bc7a771a6b8f237059f187e9c18fc8393d5ad67b6cbdfa0b9f5659d43ab95"
     },
     {
       "path": "packages/agent_orchestration/lib/runtime_platform.dart",

@@ -60,7 +60,21 @@ jobs:
           # 固定Flutterの要求NDKを照合し、専用runnerの未使用版だけを標準工具で除く。
           grep -F 'val ndkVersion: String = "28.2.13676358"' "$RUNNER_TEMP/flutter/packages/flutter_tools/gradle/src/main/kotlin/FlutterExtension.kt"
           grep -F 'ndkVersion = flutter.ndkVersion' apps/mobile_flutter/android/app/build.gradle.kts
-          "$sdkmanager" --uninstall "ndk;27.3.13750724" "ndk;29.0.14206865" </dev/null 2>&1 | tee evidence/sdk-unused-ndk-removal.txt
+          for package in "ndk;27.3.13750724" "ndk;29.0.14206865"; do
+            if grep -Fq "$package" evidence/sdk-installed-before.txt; then
+              # sdkmanagerの確認入力を明示し、既にないpackageは再試行失敗にしない。
+              printf 'y\n' | "$sdkmanager" --uninstall "$package" 2>&1 | tee -a evidence/sdk-unused-ndk-removal.txt
+            else
+              printf 'not-installed: %s\n' "$package" | tee -a evidence/sdk-unused-ndk-removal.txt
+            fi
+          done
+          "$sdkmanager" --list_installed > evidence/sdk-installed-after-ndk-removal.txt
+          for package in "ndk;27.3.13750724" "ndk;29.0.14206865"; do
+            if grep -Fq "$package" evidence/sdk-installed-after-ndk-removal.txt; then
+              echo "unused NDK package remained installed: $package" >&2
+              exit 1
+            fi
+          done
           test -d "$ANDROID_HOME/ndk/28.2.13676358"
           # Android 17 / API 37 is preview-only; the current repository exposes its base platform as 37.0.
           "$sdkmanager" "platforms;android-37.0" --channel=3 </dev/null 2>&1 | tee evidence/sdk-preview-platform-install.txt

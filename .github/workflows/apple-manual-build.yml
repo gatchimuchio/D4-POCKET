@@ -833,16 +833,17 @@ jobs:
         run: |
           set -euo pipefail
           simulator_id="$(<evidence/ios-simulator-selected.txt)"
-          product_args=()
           if [ '${{ inputs.target }}' = 'ios_product_ui' ]; then
-            product_args+=(--ios-product-ui)
+            set -- --ios-product-ui
+          else
+            set --
           fi
           python3 tooling/minidora_live_check.py \
             --reference "$RUNNER_TEMP/minidora-reference" \
             --ios-simulator "$simulator_id" \
             --ios-derived-data "$RUNNER_TEMP/gui-shell-ios-native-tests" \
             --ios-result-bundle "$RUNNER_TEMP/gui-shell-ios-native-tests.xcresult" \
-            "${product_args[@]}" \
+            "$@" \
             2>&1 | tee evidence/ios-native-test.txt
 
       - name: XCTest結果要約
