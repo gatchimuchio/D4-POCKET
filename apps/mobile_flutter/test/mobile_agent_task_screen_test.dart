@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gui_shell_mobile/screens/mobile_agent_task.dart';
@@ -5,6 +7,9 @@ import 'package:gui_shell_mobile/services/device_link_client.dart';
 import 'package:gui_shell_mobile/services/device_link_controller.dart';
 
 const _sessionId = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const _requestId = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+const _instructionHash =
+    'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
 Map<String, Object?> _response(
   String operation,
@@ -96,6 +101,104 @@ class _TaskSubmissionPort implements DeviceLinkNativePort {
   }
 }
 
+class _LifecyclePort implements DeviceLinkNativePort {
+  _LifecyclePort({
+    required this.runtimeId,
+    required this.workspaceId,
+    this.requests = const [],
+    this.firstRuntimeResponse,
+    this.firstRuntimeStarted,
+    this.statusResponse,
+    this.statusRequestStarted,
+  });
+
+  final String runtimeId;
+  final String workspaceId;
+  final List<Map<String, Object?>> requests;
+  final Completer<Map<String, Object?>>? firstRuntimeResponse;
+  final Completer<void>? firstRuntimeStarted;
+  final Completer<Map<String, Object?>>? statusResponse;
+  final Completer<void>? statusRequestStarted;
+  int runtimeCalls = 0;
+  int statusRequestCount = 0;
+  final operations = <String>[];
+
+  @override
+  Future<DeviceLinkSnapshot> readState() async => const DeviceLinkSnapshot(
+    storageReady: true,
+    paired: true,
+    connected: true,
+    foreground: true,
+    status: '接続中',
+  );
+
+  @override
+  Future<List<DeviceLinkLocalRecoveryAuditEvent>>
+  readLocalRecoveryAudit() async => const [];
+
+  @override
+  Future<DeviceLinkSnapshot> pair() => readState();
+
+  @override
+  Future<DeviceLinkSnapshot> disconnect() => readState();
+
+  @override
+  Future<DeviceLinkSnapshot> localDelete() => readState();
+
+  @override
+  Future<Map<String, Object?>> request(
+    String operation, {
+    Map<String, Object?>? payload,
+  }) async {
+    operations.add(operation);
+    switch (operation) {
+      case '実行系列挙':
+        runtimeCalls++;
+        if (runtimeCalls == 1 && firstRuntimeResponse != null) {
+          firstRuntimeStarted?.complete();
+          return firstRuntimeResponse!.future;
+        }
+        return _response(operation, 'accepted', {
+          '実行系': [runtimeId],
+        });
+      case '作業領域一覧':
+        return _response(operation, 'accepted', {
+          '作業領域': [
+            {'実行系ID': runtimeId, '作業領域ID': workspaceId},
+          ],
+        });
+      case 'AgentTask端末申請一覧':
+        return _response(operation, 'accepted', {'申請': requests});
+      case 'AgentTask端末状態':
+        if (statusRequestStarted != null &&
+            !statusRequestStarted!.isCompleted) {
+          statusRequestStarted!.complete();
+        }
+        final requestIndex = statusRequestCount++;
+        if (requestIndex == 0 && statusResponse != null) {
+          return statusResponse!.future;
+        }
+        return _response(operation, 'accepted', {
+          '申請ID': payload?['申請ID'],
+          '状態': 'Owner確認待ち',
+        });
+      default:
+        throw StateError('想定外のBroker操作: $operation');
+    }
+  }
+}
+
+Map<String, Object?> _ownRequestRow() => {
+  '申請ID': _requestId,
+  '実行系ID': 'runtime-old',
+  '対話セッションID': _sessionId,
+  '作業領域ID': 'workspace-old',
+  '指示hash': _instructionHash,
+  '作成時刻': 1_800_000_000,
+  '期限': 1_800_000_900,
+  'task_id': null,
+};
+
 void main() {
   Future<void> submitFromScreen(
     WidgetTester tester,
@@ -144,5 +247,201 @@ void main() {
     expect(port.sessionCloseCount, 1);
     expect(find.textContaining('Brokerが申請を拒否しました'), findsOneWidget);
     expect(find.textContaining('Sessionを終了しました'), findsOneWidget);
+  });
+
+  testWidgets('再接続後の新しい一覧を古い読取応答で上書きしない', (tester) async {
+    final staleRuntimeResponse = Completer<Map<String, Object?>>();
+    final firstRuntimeStarted = Completer<void>();
+    final port = _LifecyclePort(
+      runtimeId: 'runtime-current',
+      workspaceId: 'workspace-current',
+      firstRuntimeResponse: staleRuntimeResponse,
+      firstRuntimeStarted: firstRuntimeStarted,
+    );
+    final controller = DeviceLinkController(nativePort: port)..ready = true;
+    var connected = true;
+    late StateSetter update;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StatefulBuilder(
+          builder: (context, setState) {
+            update = setState;
+            return Scaffold(
+              body: MobileAgentTaskScreen(
+                controller: controller,
+                connected: connected,
+                active: true,
+              ),
+            );
+          },
+        ),
+      ),
+    );
+    await firstRuntimeStarted.future.timeout(const Duration(seconds: 2));
+
+    update(() => connected = false);
+    await tester.pump();
+    update(() => connected = true);
+    await tester.pump();
+    await tester.pumpAndSettle();
+    expect(find.text('runtime-current'), findsOneWidget);
+
+    staleRuntimeResponse.complete(
+      _response('実行系列挙', 'accepted', {
+        '実行系': ['runtime-stale'],
+      }),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('runtime-current'), findsOneWidget);
+    expect(find.text('runtime-stale'), findsNothing);
+    controller.dispose();
+  });
+
+  testWidgets('切断中に残った状態読取が再接続後の操作を塞がない', (tester) async {
+    final staleStatusResponse = Completer<Map<String, Object?>>();
+    final statusRequestStarted = Completer<void>();
+    final port = _LifecyclePort(
+      runtimeId: 'runtime-current',
+      workspaceId: 'workspace-current',
+      requests: [_ownRequestRow()],
+      statusResponse: staleStatusResponse,
+      statusRequestStarted: statusRequestStarted,
+    );
+    final controller = DeviceLinkController(nativePort: port)..ready = true;
+    var connected = true;
+    late StateSetter update;
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StatefulBuilder(
+          builder: (context, setState) {
+            update = setState;
+            return Scaffold(
+              body: MobileAgentTaskScreen(
+                controller: controller,
+                connected: connected,
+                active: true,
+              ),
+            );
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final requestCard = find.byKey(
+      const ValueKey('mobile-agent-task-$_requestId'),
+    );
+    await tester.tap(requestCard);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Broker状態'));
+    await tester.pump();
+    expect(statusRequestStarted.isCompleted, isTrue);
+
+    update(() => connected = false);
+    await tester.pump();
+    update(() => connected = true);
+    await tester.pump();
+    await tester.pumpAndSettle();
+    expect(find.text('runtime-current'), findsOneWidget);
+
+    await tester.tap(requestCard);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Broker状態'));
+    await tester.pumpAndSettle();
+    expect(
+      port.operations.where((operation) => operation == 'AgentTask端末状態'),
+      hasLength(2),
+    );
+    expect(find.textContaining('Owner確認待ち'), findsOneWidget);
+
+    staleStatusResponse.complete(
+      _response('AgentTask端末状態', 'accepted', {
+        '申請ID': _requestId,
+        '状態': '開始候補',
+      }),
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Owner確認待ち'), findsOneWidget);
+    expect(find.text('開始候補'), findsNothing);
+    controller.dispose();
+  });
+
+  testWidgets('別Controllerへ切り替えた後に旧Task状態を表示しない', (tester) async {
+    final oldStatusResponse = Completer<Map<String, Object?>>();
+    final oldStatusStarted = Completer<void>();
+    final oldPort = _LifecyclePort(
+      runtimeId: 'runtime-old',
+      workspaceId: 'workspace-old',
+      requests: [_ownRequestRow()],
+      statusResponse: oldStatusResponse,
+      statusRequestStarted: oldStatusStarted,
+    );
+    final newPort = _LifecyclePort(
+      runtimeId: 'runtime-new',
+      workspaceId: 'workspace-new',
+    );
+    final oldController = DeviceLinkController(nativePort: oldPort)
+      ..ready = true;
+    final newController = DeviceLinkController(nativePort: newPort)
+      ..ready = true;
+    var controller = oldController;
+    late StateSetter update;
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StatefulBuilder(
+          builder: (context, setState) {
+            update = setState;
+            return Scaffold(
+              body: MobileAgentTaskScreen(
+                controller: controller,
+                connected: true,
+                active: true,
+              ),
+            );
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(oldPort.operations, ['実行系列挙', '作業領域一覧', 'AgentTask端末申請一覧']);
+    expect(find.textContaining('取得できません'), findsNothing);
+    final requestCard = find.byKey(
+      const ValueKey('mobile-agent-task-$_requestId'),
+    );
+    expect(requestCard, findsOneWidget);
+    await tester.tap(requestCard);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Broker状態'));
+    await tester.pump();
+    expect(oldStatusStarted.isCompleted, isTrue);
+
+    update(() => controller = newController);
+    await tester.pump();
+    await tester.pumpAndSettle();
+    expect(find.text('runtime-new'), findsOneWidget);
+    expect(find.textContaining(_requestId), findsNothing);
+
+    oldStatusResponse.complete(
+      _response('AgentTask端末状態', 'accepted', {
+        '申請ID': _requestId,
+        '状態': '開始候補',
+      }),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('runtime-new'), findsOneWidget);
+    expect(find.textContaining(_requestId), findsNothing);
+    expect(find.text('開始候補'), findsNothing);
+    oldController.dispose();
+    newController.dispose();
   });
 }

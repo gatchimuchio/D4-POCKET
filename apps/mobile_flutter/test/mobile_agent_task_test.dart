@@ -124,6 +124,36 @@ void main() {
     expect(review.canStart, isFalse);
   });
 
+  test('自端末一覧は本文を返さない指示hash付きprojectionを受理する', () async {
+    String? operationSeen;
+    final client = MobileAgentTaskClient((operation, payload) async {
+      operationSeen = operation;
+      expect(payload, isEmpty);
+      return _accepted(operation, {
+        '申請': [
+          {
+            '申請ID': _idB,
+            '実行系ID': 'codex-runtime',
+            '対話セッションID': _idA,
+            '作業領域ID': 'workspace-a',
+            '指示hash': _hashF,
+            '作成時刻': 100,
+            '期限': 1000,
+            'task_id': null,
+          },
+        ],
+      });
+    });
+
+    final requests = await client.ownRequests();
+
+    expect(operationSeen, 'AgentTask端末申請一覧');
+    expect(requests, hasLength(1));
+    expect(requests.single.requestId, _idB);
+    expect(requests.single.instruction, isEmpty);
+    expect(requests.single.instructionHash, _hashF);
+  });
+
   test('inbox rejects hidden fields and duplicate request IDs', () async {
     Future<Map<String, Object?>> unsafeInbox(
       String operation,

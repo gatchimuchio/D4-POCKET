@@ -3,11 +3,10 @@ import 'package:broker_contract/broker_transport.dart'
 
 import 'agent_task_client.dart';
 
-typedef MobileAgentTaskBrokerRequest =
-    Future<Map<String, Object?>> Function(
-      String operation,
-      Map<String, Object?> payload,
-    );
+typedef MobileAgentTaskBrokerRequest = Future<Map<String, Object?>> Function(
+  String operation,
+  Map<String, Object?> payload,
+);
 
 const _requestIdPattern = r'^[a-f0-9]{32}$';
 const _safeIdentifierPattern = r'^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$';
@@ -42,12 +41,12 @@ class MobileAgentTaskDraft {
   bool get linked => taskId != null;
 
   AgentTaskRequest toAgentTaskRequest() => AgentTaskRequest(
-    runtimeId: runtimeId,
-    sessionId: sessionId,
-    workspaceId: workspaceId,
-    instruction: instruction,
-    mobileTaskRequestId: requestId,
-  );
+        runtimeId: runtimeId,
+        sessionId: sessionId,
+        workspaceId: workspaceId,
+        instruction: instruction,
+        mobileTaskRequestId: requestId,
+      );
 
   factory MobileAgentTaskDraft.fromInbox(Object? raw) {
     final row = _stringMap(raw, '端末Task申請');
@@ -124,7 +123,8 @@ class MobileAgentTaskDraft {
         workspaceId is! String ||
         !RegExp(_safeIdentifierPattern).hasMatch(workspaceId) ||
         instruction is! String ||
-        (instruction.trim().isEmpty && instructionHash == null) ||
+        (instruction.isEmpty && instructionHash == null) ||
+        (instruction.isNotEmpty && instruction.trim().isEmpty) ||
         instruction.runes.length > 32768 ||
         (instructionHash != null &&
             (instructionHash is! String ||
@@ -147,7 +147,11 @@ class MobileAgentTaskDraft {
       workspaceId: workspaceId,
       instruction: instruction,
     );
-    digest.validate();
+    // Own-request projections intentionally omit the Task body on Mobile.
+    // The identifiers and stored instruction hash have already been checked
+    // above; the execution request validator requires a body and is not
+    // applicable to this redacted projection.
+    if (instruction.isNotEmpty) digest.validate();
     return MobileAgentTaskDraft(
       requestId: requestId,
       deviceId: deviceId as String?,
@@ -263,9 +267,8 @@ class MobileAgentTaskClient {
     final body = await _acceptedBody('AgentTask端末申請一覧', const {});
     final rows = body['申請'];
     if (body.length != 1 || rows is! List || rows.length > 64) _invalid();
-    final result = rows
-        .map(MobileAgentTaskDraft.fromInbox)
-        .toList(growable: false);
+    final result =
+        rows.map(MobileAgentTaskDraft.fromInbox).toList(growable: false);
     if (result.map((draft) => draft.requestId).toSet().length !=
         result.length) {
       _invalid();
@@ -277,9 +280,8 @@ class MobileAgentTaskClient {
     final body = await _acceptedBody('AgentTask端末申請一覧', const {});
     final rows = body['申請'];
     if (body.length != 1 || rows is! List || rows.length > 16) _invalid();
-    final result = rows
-        .map(MobileAgentTaskDraft.fromOwnRequest)
-        .toList(growable: false);
+    final result =
+        rows.map(MobileAgentTaskDraft.fromOwnRequest).toList(growable: false);
     if (result.map((draft) => draft.requestId).toSet().length !=
         result.length) {
       _invalid();

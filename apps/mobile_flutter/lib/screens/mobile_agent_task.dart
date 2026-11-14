@@ -27,6 +27,10 @@ class MobileAgentTaskScreen extends StatefulWidget {
 
 class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
   final _instruction = TextEditingController();
+  int _connectionGeneration = 0;
+  int _operationSequence = 0;
+  int? _activeOperation;
+  bool _activeOperationReadOnly = false;
   List<String> _runtimes = const [];
   Map<String, List<String>> _workspaces = const {};
   List<MobileAgentTaskDraft> _requests = const [];
@@ -37,10 +41,10 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
   bool _loading = false;
   bool _busy = false;
 
-  MobileAgentTaskClient get _client => MobileAgentTaskClient(
-    (operation, payload) =>
-        widget.controller.request(operation, payload: payload),
-  );
+  MobileAgentTaskClient _clientFor(DeviceLinkController controller) =>
+      MobileAgentTaskClient(
+        (operation, payload) => controller.request(operation, payload: payload),
+      );
 
   @override
   void initState() {
@@ -51,12 +55,45 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
   @override
   void didUpdateWidget(covariant MobileAgentTaskScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.connected &&
-        widget.active &&
-        (!oldWidget.connected || !oldWidget.active)) {
-      _reload();
+    final controllerChanged = !identical(
+      oldWidget.controller,
+      widget.controller,
+    );
+    if (controllerChanged ||
+        oldWidget.connected != widget.connected ||
+        oldWidget.active != widget.active) {
+      _connectionGeneration++;
+      _loading = false;
+      _runtimes = const [];
+      _workspaces = const {};
+      _requests = const [];
+      _statuses.clear();
+      _runtime = null;
+      _workspace = null;
+      _message = null;
+      if (controllerChanged || _activeOperationReadOnly) {
+        // A stale read cannot keep the recovered connection's controls busy.
+        _activeOperation = null;
+        _activeOperationReadOnly = false;
+        _busy = false;
+      }
+      if (controllerChanged) {
+        // A prompt/session selected for one paired device must not silently
+        // become a request to another Broker.
+        _instruction.clear();
+      }
+      if (widget.connected && widget.active) {
+        _reload();
+      }
     }
   }
+
+  bool _isCurrentConnection(int generation, DeviceLinkController controller) =>
+      mounted &&
+      generation == _connectionGeneration &&
+      identical(widget.controller, controller) &&
+      widget.connected &&
+      widget.active;
 
   @override
   void dispose() {
@@ -65,17 +102,21 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
   }
 
   Future<void> _reload() async {
-    if (_loading || !widget.connected) return;
+    if (_loading || !widget.connected || !widget.active) return;
+    final generation = _connectionGeneration;
+    final controller = widget.controller;
     setState(() {
       _loading = true;
       _message = null;
     });
     try {
-      final dialogue = widget.controller.dialogue;
+      final dialogue = controller.dialogue;
       final runtimes = await dialogue.runtimes();
+      if (!_isCurrentConnection(generation, controller)) return;
       final workspaces = await dialogue.workspaceIdsByRuntime();
-      final requests = await _client.ownRequests();
-      if (!mounted) return;
+      if (!_isCurrentConnection(generation, controller)) return;
+      final requests = await _clientFor(controller).ownRequests();
+      if (!_isCurrentConnection(generation, controller)) return;
       setState(() {
         _runtimes = runtimes;
         _workspaces = workspaces;
@@ -92,10 +133,14 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
         );
       });
     } catch (_) {
-      if (mounted)
+      if (_isCurrentConnection(generation, controller))
         setState(() => _message = '登録済みRuntime／Workspaceまたは端末Taskを取得できません。');
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted &&
+          generation == _connectionGeneration &&
+          identical(widget.controller, controller)) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -105,11 +150,16 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
     final instruction = _instruction.text;
     if (_busy ||
         !widget.connected ||
+        !widget.active ||
         runtime == null ||
         workspace == null ||
         instruction.trim().isEmpty) {
       return;
     }
+    final generation = _connectionGeneration;
+    final controller = widget.controller;
+    final operation = ++_operationSequence;
+    _activeOperation = operation;
     setState(() {
       _busy = true;
       _message = null;
@@ -117,10 +167,19 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
     String? sessionId;
     var submissionMayHaveReachedBroker = false;
     try {
-      sessionId = await widget.controller.dialogue.start(
+      sessionId = await controller.dialogue.start(
         runtime,
         workspaceId: workspace,
       );
+      if (!_isCurrentConnection(generation, controller)) {
+        try {
+          await controller.dialogue.close(sessionId);
+        } catch (_) {
+          // A newly created empty Session is closed only when submission did
+          // not reach the Broker; close failure remains an unknown outcome.
+        }
+        return;
+      }
       final request = AgentTaskRequest(
         runtimeId: runtime,
         sessionId: sessionId,
@@ -129,8 +188,8 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
       );
       request.validate();
       submissionMayHaveReachedBroker = true;
-      final draft = await _client.submit(request);
-      if (!mounted) return;
+      final draft = await _clientFor(controller).submit(request);
+      if (!_isCurrentConnection(generation, controller)) return;
       setState(() {
         _requests = [
           draft,
@@ -144,13 +203,13 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
       var sessionClosed = false;
       if (sessionId != null) {
         try {
-          await widget.controller.dialogue.close(sessionId);
+          await controller.dialogue.close(sessionId);
           sessionClosed = true;
         } catch (_) {
           // 明示拒否後の空Sessionだけを閉じる。
         }
       }
-      if (mounted) {
+      if (_isCurrentConnection(generation, controller)) {
         setState(
           () => _message = sessionClosed
               ? 'Brokerが申請を拒否しました。Taskは受理されず、Sessionを終了しました。'
@@ -161,13 +220,13 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
       var sessionClosed = false;
       if (sessionId != null && !submissionMayHaveReachedBroker) {
         try {
-          await widget.controller.dialogue.close(sessionId);
+          await controller.dialogue.close(sessionId);
           sessionClosed = true;
         } catch (_) {
           // 申請前に失敗した空Sessionだけを閉じる。
         }
       }
-      if (mounted) {
+      if (_isCurrentConnection(generation, controller)) {
         setState(
           () => _message = submissionMayHaveReachedBroker
               ? '申請結果が不明です。Sessionを維持しました。再送せず、一覧を更新してください。'
@@ -179,27 +238,44 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
         );
       }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted && _activeOperation == operation) {
+        _activeOperation = null;
+        setState(() => _busy = false);
+      }
+      if (submissionMayHaveReachedBroker &&
+          generation != _connectionGeneration &&
+          mounted &&
+          identical(widget.controller, controller) &&
+          widget.connected &&
+          widget.active) {
+        _reload();
+      }
     }
   }
 
   Future<void> _refreshStatus(MobileAgentTaskDraft draft) async {
-    await _perform(draft, () async {
-      final status = await _client.status(draft);
-      if (!mounted) return;
+    await _perform(draft, (controller, generation) async {
+      final status = await _clientFor(controller).status(draft);
+      if (!_isCurrentConnection(generation, controller) ||
+          !_requests.any((request) => request.requestId == draft.requestId)) {
+        return;
+      }
       setState(() {
         _statuses[draft.requestId] = status;
         _message = '申請状態をBrokerで更新しました。';
       });
-    });
+    }, readOnly: true);
   }
 
   Future<void> _start(MobileAgentTaskDraft draft) async {
     final current = _statuses[draft.requestId];
     if (current?.canStart != true) return;
-    await _perform(draft, () async {
-      final task = await _client.start(draft);
-      if (!mounted) return;
+    await _perform(draft, (controller, generation) async {
+      final task = await _clientFor(controller).start(draft);
+      if (!_isCurrentConnection(generation, controller) ||
+          !_requests.any((request) => request.requestId == draft.requestId)) {
+        return;
+      }
       setState(() {
         _statuses[draft.requestId] = MobileAgentTaskStatus(
           requestId: draft.requestId,
@@ -216,9 +292,12 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
     final task = current?.task;
     if (task == null || !const {'pending', 'running'}.contains(task.status))
       return;
-    await _perform(draft, () async {
-      final updated = await _client.cancel(draft);
-      if (!mounted) return;
+    await _perform(draft, (controller, generation) async {
+      final updated = await _clientFor(controller).cancel(draft);
+      if (!_isCurrentConnection(generation, controller) ||
+          !_requests.any((request) => request.requestId == draft.requestId)) {
+        return;
+      }
       setState(() {
         _statuses[draft.requestId] = MobileAgentTaskStatus(
           requestId: draft.requestId,
@@ -232,24 +311,36 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
 
   Future<void> _perform(
     MobileAgentTaskDraft draft,
-    Future<void> Function() operation,
-  ) async {
-    if (_busy || !widget.connected) return;
+    Future<void> Function(DeviceLinkController controller, int generation)
+    operation, {
+    bool readOnly = false,
+  }) async {
+    if (_busy || !widget.connected || !widget.active) return;
+    final generation = _connectionGeneration;
+    final controller = widget.controller;
+    final operationId = ++_operationSequence;
+    _activeOperation = operationId;
+    _activeOperationReadOnly = readOnly;
     setState(() {
       _busy = true;
       _message = null;
     });
     try {
-      await operation();
+      await operation(controller, generation);
     } catch (_) {
-      if (mounted) {
+      if (_isCurrentConnection(generation, controller) &&
+          _requests.any((request) => request.requestId == draft.requestId)) {
         setState(() {
           _statuses.remove(draft.requestId);
           _message = '操作結果を確認できません。自動再送せず、Broker状態を更新してください。';
         });
       }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted && _activeOperation == operationId) {
+        _activeOperation = null;
+        _activeOperationReadOnly = false;
+        setState(() => _busy = false);
+      }
     }
   }
 
@@ -307,7 +398,7 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
           controller: _instruction,
           maxLines: 5,
           maxLength: 32768,
-          enabled: !_busy && widget.connected,
+          enabled: !_busy && widget.connected && widget.active,
           onChanged: (_) => setState(() {}),
           decoration: const InputDecoration(
             border: OutlineInputBorder(),
@@ -323,6 +414,7 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
               onPressed:
                   _busy ||
                       !widget.connected ||
+                      !widget.active ||
                       _runtime == null ||
                       _workspace == null ||
                       _instruction.text.trim().isEmpty
@@ -332,7 +424,8 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
               label: Text(_busy ? 'Broker応答待ち…' : '新規申請を送信'),
             ),
             OutlinedButton.icon(
-              onPressed: _loading || _busy || !widget.connected
+              onPressed:
+                  _loading || _busy || !widget.connected || !widget.active
                   ? null
                   : _reload,
               icon: const Icon(Icons.refresh),
@@ -352,7 +445,7 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
           _MobileAgentTaskRequestCard(
             draft: draft,
             status: _statuses[draft.requestId],
-            busy: _busy || !widget.connected,
+            busy: _busy || !widget.connected || !widget.active,
             onRefresh: () => _refreshStatus(draft),
             onStart: () => _start(draft),
             onCancel: () => _cancel(draft),
