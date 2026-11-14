@@ -52,6 +52,9 @@ const OP_UNINSTALL_FAILED: &str = "製品アンインストール失敗";
 const EMBEDDED_PRODUCT_APP_ID: Option<&str> = option_env!("GUI_SHELL_PRODUCT_APP_ID");
 const EMBEDDED_PRODUCT_AUDIT_STORE_ID: Option<&str> =
     option_env!("GUI_SHELL_PRODUCT_AUDIT_STORE_ID");
+#[cfg(target_os = "macos")]
+const EMBEDDED_PRODUCT_MANIFEST_SHA256: Option<&str> =
+    option_env!("GUI_SHELL_PRODUCT_MANIFEST_SHA256");
 const EMBEDDED_PRODUCT_UPDATE_TRUST_JSON: Option<&str> = option_env!("GUI_SHELL_UPDATE_TRUST_JSON");
 
 // Linux installed acceptanceでBroker thread panicの処理区間だけを数値分類する。
@@ -626,14 +629,30 @@ fn resolve_build_update_trust(
     }
 }
 
-/// Linux製品helperへcompile-time build inputだけからidentityを渡す。
+/// Linux／macOS製品helperへcompile-time build inputだけからidentityを渡す。
 /// 半端・不正なpairは拒否し、通常／開発buildでは両方省略できる。
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 pub(crate) fn embedded_product_identity() -> Result<Option<(String, String)>, &'static str> {
     product_identity_from_build(EMBEDDED_PRODUCT_APP_ID, EMBEDDED_PRODUCT_AUDIT_STORE_ID)
 }
 
-#[cfg(any(target_os = "linux", test))]
+#[cfg(target_os = "macos")]
+pub(crate) fn embedded_product_manifest_sha256() -> Result<Option<&'static str>, &'static str> {
+    match EMBEDDED_PRODUCT_MANIFEST_SHA256 {
+        None => Ok(None),
+        Some(value)
+            if value.len() == 64
+                && value
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)) =>
+        {
+            Ok(Some(value))
+        }
+        _ => Err("製品Manifest compile-time hashが不正である"),
+    }
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos", test))]
 fn product_identity_from_build(
     app_id: Option<&str>,
     audit_store_id: Option<&str>,

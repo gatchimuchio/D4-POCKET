@@ -81,7 +81,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "be2015295e1919c168f04273028c5f62848edf13657fbae195996ad39ca047d1"
+      "sha256": "c1bfe46c04872a8710ae6994f90f7f8a2854d4a430242355c71aabe833f7af6a"
     },
     {
       "path": ".github/workflows/linux-manual-export-build.yml",
@@ -1513,7 +1513,7 @@
     },
     {
       "path": "docs/QE_2026-11-14/\u9032\u6357.md",
-      "sha256": "141cce67fa3b33aa65c731ab51b4529ef5ed7886cfb406a3d839a79c85c39d5a"
+      "sha256": "45c19375fc422bf007db7dbb7e56b23f77df246be308b2edbb339a43eb978063"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -2304,6 +2304,10 @@
       "sha256": "260cc4efa40daff6f413db7763bc12c98fe4e4e80aa2e7cedf46a336a2ed0396"
     },
     {
+      "path": "examples/contracts/gui_shell_macos_export_build.valid.json",
+      "sha256": "c762438568cc1068ede415d0a290af4ca3c379fe4cc7b5eaa66782693249274f"
+    },
+    {
       "path": "examples/contracts/gui_shell_module_build_evidence.valid.json",
       "sha256": "501e48ae0ed8ea60713248da451910f31420c3e87f18d31fc687fee56e795268"
     },
@@ -2794,6 +2798,10 @@
     {
       "path": "examples/contracts/invalid/gui_shell_linux_export_build_wrong_target.invalid.json",
       "sha256": "64fb2ecd30db607fad0622b639f85a15e52a93e9cef11af824aecc9d181e745d"
+    },
+    {
+      "path": "examples/contracts/invalid/gui_shell_macos_export_build.invalid.json",
+      "sha256": "12c2b68312cda8018d9a29937e1cd5ea57118ede98655085cf912844614815d9"
     },
     {
       "path": "examples/contracts/invalid/gui_shell_module_build_evidence_authority_claim.invalid.json",
@@ -4017,7 +4025,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "ce240f23b04c361a44b6f512c89b817f8a7eaf1e8e8665b9c6d29949f8176a03"
+      "sha256": "f20567989afa807d57d19dcd33811ee5c3bf03eae0089af4f71262923ce5e033"
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
@@ -4097,7 +4105,7 @@
     },
     {
       "path": "native/rust_helper/src/macos_desktop_worker.rs",
-      "sha256": "c6712c14ad4ad478c4aac24cd13c8ec1bc37691dbbd0a44d57ccfbc59c0ac8a7"
+      "sha256": "72b0519f686565199e005224f90c867ca163091cefb79ab8caa6c7ff9c500a5e"
     },
     {
       "path": "native/rust_helper/src/macos_workspace_selection.rs",
@@ -5080,6 +5088,10 @@
       "sha256": "a530d507987f963836a6a16b6b2db12b3f635cd917a188976393198b85f9a171"
     },
     {
+      "path": "specs/gui_shell_macos_export_build.schema.json",
+      "sha256": "cf3cb604934de6dade9a08b31acf1bd3f27cf502a5fd859207949addd342cce9"
+    },
+    {
       "path": "specs/gui_shell_module_build_evidence.schema.json",
       "sha256": "75c38d67b3fd4f83af703fe225e6df2e04de5df96aa404c244157a929fc8d284"
     },
@@ -5564,6 +5576,10 @@
       "sha256": "381cb7271f88cbdd825e5177bb9c3dbe1ff3ed09f27cbf335eb6d460c608e94d"
     },
     {
+      "path": "tooling/export_macos_product.py",
+      "sha256": "9e5eb2ec2b0389b21289e76dd1c080e9b920bca040758a15e0a72c64ea486a48"
+    },
+    {
       "path": "tooling/export_windows_product.py",
       "sha256": "8a8970c19defb9019dad533606f14ea3b5f1513042309dcf5b0cec3caeba6c8a"
     },
@@ -5673,7 +5689,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "a50b92b7bdfeb2b9e45c136149ccc24d978b5016d4abcbab3f56ad93730cce74"
+      "sha256": "075bc6c0288b9382f0c2df49a25a20cbd89f5a022ea91a4a8eac5144cdb5f2d0"
     },
     {
       "path": "tooling/shell_snapshot.py",
@@ -5690,6 +5706,10 @@
     {
       "path": "tooling/tests/create_linux_update_catalog_fixture.py",
       "sha256": "22c6910c5d8546ac3c327d9431b290e07c6005f5c6ddea68d450b7f3780124de"
+    },
+    {
+      "path": "tooling/tests/create_macos_export_fixture.py",
+      "sha256": "fee6167fcca356dd44ae35b501b90b0ce00b36ff6d792eeba218b82fcb1cc20a"
     },
     {
       "path": "tooling/tests/fixtures/linux-update-catalog/linux-installed-catalog-display.pkg",
@@ -5722,6 +5742,10 @@
     {
       "path": "tooling/tests/test_export_linux_product.py",
       "sha256": "5fc789ea4bf803b4f715f2fa2f2fdd78e8cecb1cdde8e595a60b5a376e9c0833"
+    },
+    {
+      "path": "tooling/tests/test_export_macos_product.py",
+      "sha256": "f5afb14ccd1b238cea15333c60676a82cec61d0ae8dcc6b0dd5ffb31d23b3745"
     },
     {
       "path": "tooling/tests/test_linux_deb_setup_package.py",

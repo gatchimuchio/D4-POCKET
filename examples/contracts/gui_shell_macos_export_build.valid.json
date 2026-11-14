@@ -1,0 +1,109 @@
+{
+  "version": 1,
+  "evidence_type": "d4_pocket_macos_export_build",
+  "evidence_source": "INTERNAL_STATE",
+  "product": "D4 Pocket",
+  "target_platform": "macos",
+  "build_mode": "release_unsigned_candidate",
+  "source_ref": "refs/heads/main",
+  "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "source_archive_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "source_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "source_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "export_id": "export-macos-fixture",
+  "app_id": "d4-pocket-app-33333333333333333333333333333333",
+  "audit_store_id": "audit-store-44444444444444444444444444444444",
+  "bundle_identifier": "com.d4p.export.33333333333333333333333333333333",
+  "installer_identifier": "com.d4p.export.33333333333333333333333333333333.installer",
+  "authority_boundary": {
+    "source_authority_verified": false,
+    "owner_authorization_verified": false,
+    "authority_strip": true,
+    "credential_values_explicitly_supplied": false,
+    "credential_inherited": false,
+    "permission_inherited": false,
+    "approval_inherited": false,
+    "audit_chain_inherited": false
+  },
+  "module_plan": {
+    "catalog_version": 1,
+    "selection_mode": "explicit_optional",
+    "requested_optional_module_ids": ["shell.providers"],
+    "unprunable_core_ids": ["shell.core"],
+    "included_module_ids": ["shell.core", "shell.providers"],
+    "excluded_optional_module_ids": []
+  },
+  "toolchain": {
+    "architecture": "arm64",
+    "flutter": "Flutter 3.44.0",
+    "cargo": "cargo 1.95.0",
+    "rustc": "rustc 1.95.0",
+    "xcodebuild": "Xcode 27.0",
+    "macos_version": "15.0"
+  },
+  "flutter_pub_get_arguments": ["pub", "get", "--enforce-lockfile"],
+  "flutter_build_arguments": ["build", "macos", "--release", "--no-pub", "--no-codesign"],
+  "compile_time_identity": {
+    "source": "schema_validated_manifest",
+    "app_id": "d4-pocket-app-33333333333333333333333333333333",
+    "audit_store_id": "audit-store-44444444444444444444444444444444",
+    "manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  },
+  "compile_time_update_trust": {
+    "source": "not_configured",
+    "configured": false,
+    "public_key_fingerprint": null,
+    "package_source_count": 0
+  },
+  "build_duration_ms": 1234,
+  "runtime_storage_root_template": "$HOME/Library/Application Support/D4Pocket/apps/<App ID>/stores/<Audit Store ID>",
+  "bundle_name": "D4Pocket-333333333333.app",
+  "bundle_identifier_verified": true,
+  "product_manifest_copied_byte_for_byte": true,
+  "runtime_manifest_consumed": false,
+  "module_pruning_verified": false,
+  "package_signed": false,
+  "app_signed": false,
+  "launch_status": "not_verified",
+  "installed_product_verified": false,
+  "formal_distribution_claimed": false,
+  "artifact_root": ".",
+  "artifact_files": [
+    {
+      "path": "D4Pocket-333333333333.app/Contents/Resources/product_manifest.json",
+      "kind": "file",
+      "size_bytes": 10,
+      "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    {
+      "path": "D4Pocket-333333333333.app/Contents/Frameworks/Current",
+      "kind": "symlink",
+      "target": "Versions/A"
+    }
+  ],
+  "artifact_total_bytes": 10,
+  "artifact_tree_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "package": {
+    "file_name": "D4Pocket-333333333333.pkg",
+    "format": "macOS flat pkg",
+    "byte_length": 20,
+    "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "signed": false,
+    "installed_product_verified": false
+  },
+  "app_archive": {
+    "file_name": "D4Pocket-333333333333.app.zip",
+    "byte_length": 30,
+    "sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+  },
+  "credential_artifact_scan": {
+    "version": 1,
+    "status": "passed_known_patterns",
+    "scope": "macos_app_regular_files_and_package_archives",
+    "coverage": "known_patterns_only",
+    "files_scanned": 2,
+    "bytes_scanned": 60,
+    "findings": 0,
+    "artifact_tree_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  }
+}

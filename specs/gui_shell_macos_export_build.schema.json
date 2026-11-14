@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/gui_shell_macos_export_build.schema.json",
+  "title": "D4 Pocket macOS Export build記録",
+  "type": "object",
+  "required": [
+    "version", "evidence_type", "evidence_source", "product", "target_platform", "build_mode",
+    "source_ref", "source_commit", "source_archive_sha256", "source_receipt_sha256",
+    "source_manifest_sha256", "export_id", "app_id", "audit_store_id", "bundle_identifier",
+    "installer_identifier", "authority_boundary", "module_plan", "toolchain",
+    "flutter_pub_get_arguments", "flutter_build_arguments", "compile_time_identity",
+    "compile_time_update_trust", "build_duration_ms", "runtime_storage_root_template",
+    "bundle_name", "bundle_identifier_verified", "product_manifest_copied_byte_for_byte",
+    "runtime_manifest_consumed", "module_pruning_verified", "package_signed", "app_signed",
+    "launch_status", "installed_product_verified", "formal_distribution_claimed", "artifact_root",
+    "artifact_files", "artifact_total_bytes", "artifact_tree_sha256", "package", "app_archive",
+    "credential_artifact_scan"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "evidence_type": { "const": "d4_pocket_macos_export_build" },
+    "evidence_source": { "const": "INTERNAL_STATE" },
+    "product": { "const": "D4 Pocket" },
+    "target_platform": { "const": "macos" },
+    "build_mode": { "const": "release_unsigned_candidate" },
+    "source_ref": { "type": "string", "pattern": "^refs/heads/(main|codex/[A-Za-z0-9._/-]+)$" },
+    "source_commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "source_archive_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "source_receipt_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "source_manifest_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "export_id": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9._-]+$" },
+    "app_id": { "type": "string", "pattern": "^d4-pocket-app-[0-9a-f]{32}$" },
+    "audit_store_id": { "type": "string", "pattern": "^audit-store-[0-9a-f]{32}$" },
+    "bundle_identifier": { "type": "string", "pattern": "^com\\.d4p\\.export\\.[0-9a-f]{32}$" },
+    "installer_identifier": { "type": "string", "pattern": "^com\\.d4p\\.export\\.[0-9a-f]{32}\\.installer$" },
+    "authority_boundary": {
+      "type": "object",
+      "required": ["source_authority_verified", "owner_authorization_verified", "authority_strip", "credential_values_explicitly_supplied", "credential_inherited", "permission_inherited", "approval_inherited", "audit_chain_inherited"],
+      "additionalProperties": false,
+      "properties": {
+        "source_authority_verified": { "const": false },
+        "owner_authorization_verified": { "const": false },
+        "authority_strip": { "const": true },
+        "credential_values_explicitly_supplied": { "const": false },
+        "credential_inherited": { "const": false },
+        "permission_inherited": { "const": false },
+        "approval_inherited": { "const": false },
+        "audit_chain_inherited": { "const": false }
+      }
+    },
+    "module_plan": {
+      "type": "object",
+      "required": ["catalog_version", "selection_mode", "requested_optional_module_ids", "unprunable_core_ids", "included_module_ids", "excluded_optional_module_ids"],
+      "additionalProperties": false,
+      "properties": {
+        "catalog_version": { "const": 1 },
+        "selection_mode": { "enum": ["all", "explicit_optional"] },
+        "requested_optional_module_ids": { "type": "array", "items": { "type": "string" } },
+        "unprunable_core_ids": { "type": "array", "items": { "type": "string" } },
+        "included_module_ids": { "type": "array", "items": { "type": "string" } },
+        "excluded_optional_module_ids": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "toolchain": {
+      "type": "object",
+      "required": ["architecture", "flutter", "cargo", "rustc", "xcodebuild", "macos_version"],
+      "additionalProperties": false,
+      "properties": {
+        "architecture": { "enum": ["arm64", "aarch64", "x86_64", "amd64"] },
+        "flutter": { "type": "string", "minLength": 1 },
+        "cargo": { "type": "string", "minLength": 1 },
+        "rustc": { "type": "string", "minLength": 1 },
+        "xcodebuild": { "type": "string", "minLength": 1 },
+        "macos_version": { "type": "string", "pattern": "^[0-9]+(?:\\.[0-9]+){1,2}$" }
+      }
+    },
+    "flutter_pub_get_arguments": { "type": "array", "items": { "type": "string" } },
+    "flutter_build_arguments": { "type": "array", "items": { "type": "string" } },
+    "compile_time_identity": {
+      "type": "object",
+      "required": ["source", "app_id", "audit_store_id", "manifest_sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "source": { "const": "schema_validated_manifest" },
+        "app_id": { "type": "string", "pattern": "^d4-pocket-app-[0-9a-f]{32}$" },
+        "audit_store_id": { "type": "string", "pattern": "^audit-store-[0-9a-f]{32}$" },
+        "manifest_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "compile_time_update_trust": {
+      "type": "object",
+      "required": ["source", "configured", "public_key_fingerprint", "package_source_count"],
+      "additionalProperties": false,
+      "properties": {
+        "source": { "enum": ["not_configured", "schema_validated_manifest"] },
+        "configured": { "type": "boolean" },
+        "public_key_fingerprint": { "type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$" },
+        "package_source_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "build_duration_ms": { "type": "integer", "minimum": 0 },
+    "runtime_storage_root_template": { "const": "$HOME/Library/Application Support/D4Pocket/apps/<App ID>/stores/<Audit Store ID>" },
+    "bundle_name": { "type": "string", "pattern": "^D4Pocket-[0-9a-f]{12}\\.app$" },
+    "bundle_identifier_verified": { "const": true },
+    "product_manifest_copied_byte_for_byte": { "const": true },
+    "runtime_manifest_consumed": { "const": false },
+    "module_pruning_verified": { "const": false },
+    "package_signed": { "const": false },
+    "app_signed": { "const": false },
+    "launch_status": { "const": "not_verified" },
+    "installed_product_verified": { "const": false },
+    "formal_distribution_claimed": { "const": false },
+    "artifact_root": { "const": "." },
+    "artifact_files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["path", "kind"],
+        "additionalProperties": false,
+        "properties": {
+          "path": { "type": "string", "minLength": 1, "maxLength": 2048 },
+          "kind": { "enum": ["file", "symlink"] },
+          "size_bytes": { "type": "integer", "minimum": 0 },
+          "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "target": { "type": "string", "minLength": 1, "maxLength": 2048 }
+        }
+      }
+    },
+    "artifact_total_bytes": { "type": "integer", "minimum": 1 },
+    "artifact_tree_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "package": {
+      "type": "object",
+      "required": ["file_name", "format", "byte_length", "sha256", "signed", "installed_product_verified"],
+      "additionalProperties": false,
+      "properties": {
+        "file_name": { "type": "string", "pattern": "^D4Pocket-[0-9a-f]{12}\\.pkg$" },
+        "format": { "const": "macOS flat pkg" },
+        "byte_length": { "type": "integer", "minimum": 1 },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "signed": { "const": false },
+        "installed_product_verified": { "const": false }
+      }
+    },
+    "app_archive": {
+      "type": "object",
+      "required": ["file_name", "byte_length", "sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "file_name": { "type": "string", "pattern": "^D4Pocket-[0-9a-f]{12}\\.app\\.zip$" },
+        "byte_length": { "type": "integer", "minimum": 1 },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "credential_artifact_scan": {
+      "type": "object",
+      "required": ["version", "status", "scope", "coverage", "files_scanned", "bytes_scanned", "findings", "artifact_tree_sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "version": { "const": 1 },
+        "status": { "const": "passed_known_patterns" },
+        "scope": { "const": "macos_app_regular_files_and_package_archives" },
+        "coverage": { "const": "known_patterns_only" },
+        "files_scanned": { "type": "integer", "minimum": 1 },
+        "bytes_scanned": { "type": "integer", "minimum": 1 },
+        "findings": { "const": 0 },
+        "artifact_tree_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    }
+  }
+}
