@@ -63,7 +63,11 @@ FLUTTER_MACOS_FRAMEWORK_BINARY_RELATIVE_PATH = PurePosixPath(
 FLUTTER_MACOS_FRAMEWORK_DENYLISTED_FILES = frozenset(
     {"entitlements.txt", "without_entitlements.txt", "unsigned_binaries.txt"}
 )
-# These modes and exclusions mirror the pinned Flutter macOS unpack target.
+# Pinned xcode_backend.dart embed filters these exact entry names at every depth.
+FLUTTER_MACOS_FRAMEWORK_EMBED_FILTERED_BASENAMES = frozenset(
+    {".DS_Store", "Headers", "Modules"}
+)
+# The pinned Flutter macOS unpack target normalizes copied entry modes.
 FLUTTER_RSYNC_DIRECTORY_MODE = 0o755
 FLUTTER_RSYNC_FILE_MODE = 0o644
 MACOS_ENVIRONMENT_ALLOWLIST = {
@@ -506,12 +510,12 @@ def _flutter_framework_copy_exclusions(
     source_entries: dict[str, dict[str, Any]],
 ) -> set[str]:
     excluded: set[str] = set()
-    excluded_directories = {
+    embed_filtered_paths = {
         path
-        for path, entry in source_entries.items()
-        if entry["kind"] == "directory" and PurePosixPath(path).name == ".DS_Store"
+        for path in source_entries
+        if PurePosixPath(path).name in FLUTTER_MACOS_FRAMEWORK_EMBED_FILTERED_BASENAMES
     }
-    for directory in excluded_directories:
+    for directory in embed_filtered_paths:
         excluded.update(
             path
             for path in source_entries

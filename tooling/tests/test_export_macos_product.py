@@ -24,6 +24,7 @@ from tooling.export_macos_product import (
     _require_macos_code_without_publisher_identity,
     _verify_pinned_flutter_checkout,
     _verify_pinned_flutter_framework_signature,
+    _flutter_framework_copy_exclusions,
     _macos_signature_diagnostic,
     _scan_macos_artifacts,
     _verify_flutter_framework_copy_entries,
@@ -71,6 +72,16 @@ def _flutter_framework_fixture(
         )
         info = framework / "Versions/A/Info.plist"
         info.write_bytes(b"pinned Flutter framework metadata")
+    for relative, content in {
+        "Headers/FlutterMacOS.h": b"public framework header",
+        "Modules/module.modulemap": b"framework module map",
+        "Versions/A/Headers/FlutterMacOS.h": b"versioned public framework header",
+        "Versions/A/Modules/module.modulemap": b"versioned framework module map",
+        "Versions/A/.DS_Store": b"Finder metadata",
+    }.items():
+        path = source_framework / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
     (source_framework / "entitlements.txt").write_text("filtered by Flutter", encoding="utf-8")
     (source_framework / ".DS_Store" / "nested").mkdir(parents=True)
     (source_framework / ".DS_Store" / "nested" / "ignored.bin").write_bytes(b"filtered directory")
@@ -122,6 +133,58 @@ def _macos_test_subprocess_side_effect(
 
 
 class MacOSProductExportTests(unittest.TestCase):
+    def test_pinned_flutter_framework_embed_filters_are_exact_and_recursive(self) -> None:
+        source_entries = {
+            "Headers": {"kind": "symlink", "mode": 0o777, "target": "Versions/Current/Headers"},
+            "Modules": {"kind": "symlink", "mode": 0o777, "target": "Versions/Current/Modules"},
+            "Versions/A/Headers": {"kind": "directory", "mode": 0o755},
+            "Versions/A/Headers/FlutterMacOS.h": {"kind": "file", "mode": 0o644},
+            "Versions/A/Modules": {"kind": "directory", "mode": 0o755},
+            "Versions/A/Modules/module.modulemap": {"kind": "file", "mode": 0o644},
+            "Versions/A/.DS_Store": {"kind": "file", "mode": 0o644},
+            "Versions/A/Resources/keep.dat": {"kind": "file", "mode": 0o644},
+        }
+
+        self.assertEqual(
+            _flutter_framework_copy_exclusions(source_entries),
+            {
+                "Headers",
+                "Modules",
+                "Versions/A/Headers",
+                "Versions/A/Headers/FlutterMacOS.h",
+                "Versions/A/Modules",
+                "Versions/A/Modules/module.modulemap",
+                "Versions/A/.DS_Store",
+            },
+        )
+
+    def test_framework_copy_accepts_pinned_macos_embed_header_and_module_filters(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-macos-framework-embed-filter-") as temp:
+            app, reference = _flutter_framework_fixture(Path(temp))
+            embedded = app.joinpath(*APP_FLUTTER_FRAMEWORK_RELATIVE_PATH.parts)
+
+            for relative in (
+                "Headers/FlutterMacOS.h",
+                "Modules/module.modulemap",
+                "Versions/A/Headers/FlutterMacOS.h",
+                "Versions/A/Modules/module.modulemap",
+                "Versions/A/.DS_Store",
+            ):
+                self.assertTrue((reference.source_path / relative).is_file())
+                self.assertFalse((embedded / relative).exists())
+
+            source_hash, embedded_hash = _verify_flutter_framework_copy_entries(
+                reference.source_path, embedded
+            )
+            self.assertEqual(
+                source_hash,
+                hashlib.sha256(FLUTTER_FRAMEWORK_SOURCE_BINARY).hexdigest(),
+            )
+            self.assertEqual(
+                embedded_hash,
+                hashlib.sha256(FLUTTER_FRAMEWORK_ARM64_BINARY).hexdigest(),
+            )
+
     def test_framework_layout_mismatch_reports_bounded_path_differences(self) -> None:
         with tempfile.TemporaryDirectory(prefix="d4p-macos-framework-layout-") as temp:
             app, reference = _flutter_framework_fixture(Path(temp))
