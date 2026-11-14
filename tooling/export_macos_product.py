@@ -260,12 +260,16 @@ def _patch_macos_export_build_settings(source_root: Path, *, architecture: str) 
         raise ValueError("macOS Xcode build configurationの構造が想定と一致しない")
     raw, patched_count = re.subn(
         r"\bbuildSettings = \{",
-        "buildSettings = { CODE_SIGNING_ALLOWED = NO; CODE_SIGNING_REQUIRED = NO; "
+        'buildSettings = { CODE_SIGNING_ALLOWED = NO; CODE_SIGNING_REQUIRED = NO; CODE_SIGN_IDENTITY = ""; '
         f"ARCHS = {architecture};",
         raw,
     )
     if patched_count != configuration_count:
         raise ValueError("macOS Export用の署名無効／architecture設定を全configurationへ適用できない")
+    default_identity = 'CODE_SIGN_IDENTITY = "-";'
+    if default_identity not in raw:
+        raise ValueError("macOS Xcodeのad-hoc署名identity設定が想定と一致しない")
+    raw = raw.replace(default_identity, 'CODE_SIGN_IDENTITY = "";')
     helper_sign_command = (
         r'/usr/bin/codesign --force --sign \"${EXPANDED_CODE_SIGN_IDENTITY:--}\" '
         r'--entitlements \"$PROJECT_DIR/Runner/BrokerHelper.entitlements\" \"$destination\"\n'
@@ -347,10 +351,18 @@ def _require_unsigned_macos_code(
             env=probe_environment,
             check=False,
         )
+        relative_path = path.relative_to(bundle).as_posix() or "."
         if result.returncode == 0:
-            raise ValueError("macOS Export candidateに署名済みcode objectがある")
+            signature_kind = "ad_hoc" if "adhoc" in result.stdout.casefold() else "other_or_unknown"
+            raise ValueError(
+                "macOS Export candidateに署名済みcode objectがある: "
+                f"{relative_path} (signature_kind={signature_kind})"
+            )
         if "code object is not signed at all" not in result.stdout.casefold():
-            raise ValueError("macOS code signing状態をunsignedとして確定できない")
+            raise ValueError(
+                "macOS code signing状態をunsignedとして確定できない: "
+                f"{relative_path}"
+            )
     return {"status": "passed_unsigned", "code_objects_checked": len(code_objects)}
 
 

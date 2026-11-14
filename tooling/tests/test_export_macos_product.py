@@ -131,6 +131,11 @@ class MacOSProductExportTests(unittest.TestCase):
             updated = project.read_text(encoding="utf-8")
             self.assertEqual(updated.count("CODE_SIGNING_ALLOWED = NO;"), 15)
             self.assertEqual(updated.count("CODE_SIGNING_REQUIRED = NO;"), 15)
+            self.assertEqual(
+                updated.count('CODE_SIGN_IDENTITY = "";'),
+                15 + source_project.read_text(encoding="utf-8").count('CODE_SIGN_IDENTITY = "-";'),
+            )
+            self.assertNotIn('CODE_SIGN_IDENTITY = "-";', updated)
             self.assertEqual(updated.count("ARCHS = arm64;"), 15)
             self.assertIn("/usr/bin/install -m 755", updated)
             self.assertNotIn("/usr/bin/codesign --force --sign", updated)
@@ -190,7 +195,7 @@ class MacOSProductExportTests(unittest.TestCase):
             executable.write_bytes(b"\xcf\xfa\xed\xfeunsigned fixture")
             signed = subprocess.CompletedProcess(args=[], returncode=0, stdout="Signature=adhoc\n")
             with patch("tooling.export_macos_product.subprocess.run", return_value=signed):
-                with self.assertRaisesRegex(ValueError, "署名済みcode object"):
+                with self.assertRaisesRegex(ValueError, r"署名済みcode object.*\. \(signature_kind=ad_hoc\)"):
                     _require_unsigned_macos_code(app, codesign="/usr/bin/codesign", environment={})
             ambiguous = subprocess.CompletedProcess(args=[], returncode=1, stdout="verification failed\n")
             with patch("tooling.export_macos_product.subprocess.run", return_value=ambiguous):
