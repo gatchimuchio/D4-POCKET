@@ -657,8 +657,43 @@ def _capture_codesign(
     )
 
 
+def _codesign_verification_failure_class(output: str) -> str:
+    lowered = output.casefold()
+    classifications = (
+        (
+            "sealed_resource_missing_or_invalid",
+            ("a sealed resource is missing or invalid",),
+        ),
+        (
+            "resource_envelope_incompatible",
+            (
+                "code has no resources but signature indicates they must be present",
+                "resource envelope is obsolete",
+            ),
+        ),
+        ("code_object_unsigned", ("code object is not signed at all",)),
+        (
+            "signature_invalid",
+            ("invalid signature", "signature verification failed", "failed to verify code signature"),
+        ),
+        (
+            "certificate_validation_failed",
+            (
+                "certificate has expired",
+                "certificate revoked",
+                "unable to build chain to self-signed root",
+                "cssmerr_tp_cert_expired",
+            ),
+        ),
+    )
+    for classification, needles in classifications:
+        if any(needle in lowered for needle in needles):
+            return classification
+    return "unclassified"
+
+
 def _verify_pinned_flutter_framework_signature(
-    framework: Path, *, codesign: str, environment: dict[str, str]
+    framework: Path, *, codesign: str, environment: dict[str, str], scope: str
 ) -> dict[str, bool]:
     if framework.is_symlink() or not framework.is_dir():
         raise ValueError("pinned FlutterMacOS.frameworkが通常directoryではない")
@@ -676,7 +711,11 @@ def _verify_pinned_flutter_framework_signature(
         environment=environment,
     )
     if verification.returncode != 0:
-        raise ValueError("pinned FlutterMacOS.frameworkのstrict code signature検証に失敗した")
+        failure_class = _codesign_verification_failure_class(verification.stdout)
+        raise ValueError(
+            f"{scope} FlutterMacOS.frameworkのstrict code signature検証に失敗した "
+            f"(codesign_failure_class={failure_class})"
+        )
     display = _capture_codesign(
         [codesign, "--display", "--verbose=4", str(framework)], environment=environment
     )
@@ -729,7 +768,10 @@ def _prepare_pinned_flutter_framework(
         raise ValueError("pinned FlutterMacOS.frameworkがengine cacheにない")
     tree_sha256 = _macos_bundle_tree_sha256(source_path)
     signature_facts = _verify_pinned_flutter_framework_signature(
-        source_path, codesign=codesign, environment=environment
+        source_path,
+        codesign=codesign,
+        environment=environment,
+        scope="Flutter SDK cache",
     )
     if _macos_bundle_tree_sha256(source_path) != tree_sha256:
         raise ValueError("Flutter SDK cache内Frameworkが署名検証中に変化した")
@@ -796,7 +838,10 @@ def _verify_embedded_flutter_framework(
     if source_tree_before != reference.tree_sha256:
         raise ValueError("Flutter SDK cache内のpinned Frameworkがbuild中に変化した")
     source_facts = _verify_pinned_flutter_framework_signature(
-        reference.source_path, codesign=codesign, environment=environment
+        reference.source_path,
+        codesign=codesign,
+        environment=environment,
+        scope="Flutter SDK cache",
     )
     if source_facts != reference.signature_facts:
         raise ValueError("Flutter SDK cache内Frameworkの署名metadataがbuild中に変化した")
@@ -819,7 +864,10 @@ def _verify_embedded_flutter_framework(
             "embedded FlutterMacOS.framework binaryがpinned Flutter architecture sliceと一致しない"
         )
     embedded_facts = _verify_pinned_flutter_framework_signature(
-        framework, codesign=codesign, environment=environment
+        framework,
+        codesign=codesign,
+        environment=environment,
+        scope="Export App Bundle",
     )
     if embedded_facts != reference.signature_facts:
         raise ValueError("Export App Bundle内Flutter Framework署名metadataがsourceと一致しない")

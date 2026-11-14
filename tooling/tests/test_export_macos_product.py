@@ -26,6 +26,7 @@ from tooling.export_macos_product import (
     _verify_pinned_flutter_framework_signature,
     _flutter_framework_copy_exclusions,
     _macos_signature_diagnostic,
+    _codesign_verification_failure_class,
     _scan_macos_artifacts,
     _verify_flutter_framework_copy_entries,
     _validate_build_evidence,
@@ -625,16 +626,26 @@ class MacOSProductExportTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="d4p-macos-framework-signature-") as temp:
             _app, reference = _flutter_framework_fixture(Path(temp))
             failed_verification = subprocess.CompletedProcess(
-                args=[], returncode=1, stdout="signature invalid\n"
+                args=[],
+                returncode=1,
+                stdout=(
+                    "/Users/runner/work/D4-POCKET/FlutterMacOS.framework: "
+                    "a sealed resource is missing or invalid\n"
+                ),
             )
             with patch(
                 "tooling.export_macos_product.subprocess.run", return_value=failed_verification
             ) as run:
-                with self.assertRaisesRegex(ValueError, "strict code signature検証に失敗"):
+                with self.assertRaisesRegex(
+                    ValueError,
+                    "Export App Bundle.*strict code signature検証に失敗した "
+                    r"\(codesign_failure_class=sealed_resource_missing_or_invalid\)",
+                ):
                     _verify_pinned_flutter_framework_signature(
                         reference.source_path,
                         codesign="/usr/bin/codesign",
                         environment={},
+                        scope="Export App Bundle",
                     )
             self.assertIn("--strict", run.call_args.args[0])
 
@@ -657,7 +668,22 @@ class MacOSProductExportTests(unittest.TestCase):
                         reference.source_path,
                         codesign="/usr/bin/codesign",
                         environment={},
+                        scope="Flutter SDK cache",
                     )
+
+    def test_codesign_verification_failure_diagnostic_is_allowlisted(self) -> None:
+        self.assertEqual(
+            _codesign_verification_failure_class(
+                "a sealed resource is missing or invalid\n"
+            ),
+            "sealed_resource_missing_or_invalid",
+        )
+        self.assertEqual(
+            _codesign_verification_failure_class(
+                "Authority=SECRET_CERTIFICATE_ID\nTEAM=PRIVATE_TEAM_ID\n"
+            ),
+            "unclassified",
+        )
 
     def test_flutter_checkout_revision_and_cleanliness_are_required(self) -> None:
         root = Path("/tmp/flutter-fixture")
