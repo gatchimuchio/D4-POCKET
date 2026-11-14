@@ -81,7 +81,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "889932ae7eeae97318155a5d802a75639fb75fcbf491f969d7aff595f4cd283e"
+      "sha256": "78ebd43b26e917c507ea12f9f1e52915c735a31001071b251f61dec8319e9412"
     },
     {
       "path": ".github/workflows/linux-manual-export-build.yml",
@@ -3694,6 +3694,10 @@
     {
       "path": "installer/macos/README.md",
       "sha256": "9e0be232d7b91f81e97a93680ea9e07b2643a9b0e6368e9de246d1275acda069"
+    },
+    {
+      "path": "installer/macos/uninstall/postinstall.sh.in",
+      "sha256": "1367b90b15e3a6cad52f073fe44bad68d50aff2e7bcd24dfa2b822c2b3bf64f5"
     },
     {
       "path": "installer/setup_doctor.py",

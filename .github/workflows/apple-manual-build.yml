@@ -800,8 +800,7 @@ jobs:
           output="$RUNNER_TEMP/macos-export-output"
           evidence="$RUNNER_TEMP/macos-export-evidence"
           record="$output/d4_pocket_macos_export_build.json"
-          read -r bundle_name bundle_id app_id audit_id install_pkg uninstaller_pkg install_id <<EOF
-          $(python3 - "$record" <<'PY'
+          metadata="$(python3 - "$record" <<'PY'
           import json, pathlib, re, sys
           record = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding='utf-8'))
           fields = [record['bundle_name'], record['bundle_identifier'], record['app_id'],
@@ -816,7 +815,8 @@ jobs:
           assert fields[6] == fields[1] + '.installer'
           print(' '.join(fields))
           PY
-          )
+          )"
+          IFS=' ' read -r bundle_name bundle_id app_id audit_id install_pkg uninstaller_pkg install_id <<< "$metadata"
           app_path="/Applications/$bundle_name"
           state_root="$HOME/Library/Application Support/D4Pocket/apps/$app_id/stores/$audit_id"
           marker="$state_root/uninstaller-smoke-marker.txt"
