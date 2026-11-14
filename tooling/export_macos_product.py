@@ -15,6 +15,7 @@ import sys
 import tarfile
 import tempfile
 import time
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -48,6 +49,14 @@ RECEIPT_NAME = "d4_pocket_macos_export_build.json"
 BUILD_TEMP_PREFIX = "d4p-macos-build-"
 OUTPUT_TEMP_PREFIX = "d4p-macos-output-"
 RUST_TOOLCHAIN = "1.95.0"
+PINNED_FLUTTER_REVISION = "559ffa3f75e7402d65a8def9c28389a9b2e6fe42"
+FLUTTER_ENGINE_FRAMEWORK_RELATIVE_PATH = PurePosixPath(
+    "bin/cache/artifacts/engine/darwin-x64-release/FlutterMacOS.xcframework/"
+    "macos-arm64_x86_64/FlutterMacOS.framework"
+)
+APP_FLUTTER_FRAMEWORK_RELATIVE_PATH = PurePosixPath(
+    "Contents/Frameworks/FlutterMacOS.framework"
+)
 MACOS_ENVIRONMENT_ALLOWLIST = {
     "CARGO_HOME",
     "DEVELOPER_DIR",
@@ -60,6 +69,16 @@ MACOS_ENVIRONMENT_ALLOWLIST = {
     "SDKROOT",
     "TMPDIR",
 }
+
+
+@dataclass(frozen=True)
+class FlutterFrameworkReference:
+    source_path: Path
+    engine_revision: str
+    tree_sha256: str
+    signature_facts: dict[str, bool]
+
+
 MACOS_CODE_BUNDLE_SUFFIXES = {
     ".app",
     ".appex",
@@ -314,13 +333,15 @@ def _require_macos_binary_architecture(
     }
 
 
-def _macos_code_objects(bundle: Path) -> list[Path]:
+def _macos_code_objects(bundle: Path, *, collapsed_bundle: Path) -> list[Path]:
     if bundle.is_symlink() or not bundle.is_dir():
         raise ValueError("署名検査対象のmacOS App Bundleが通常directoryではない")
     objects = [bundle]
     for path in sorted(bundle.rglob("*"), key=lambda item: item.as_posix()):
         metadata = path.lstat()
         if stat.S_ISLNK(metadata.st_mode):
+            continue
+        if path != collapsed_bundle and path.is_relative_to(collapsed_bundle):
             continue
         if stat.S_ISDIR(metadata.st_mode):
             if path.suffix.casefold() in MACOS_CODE_BUNDLE_SUFFIXES:
@@ -369,6 +390,13 @@ def _is_unsealed_adhoc_executable_signature(output: str) -> bool:
 
 def _macos_signature_diagnostic(output: str) -> str:
     """Return signature facts without exposing certificate or team identifier values."""
+    facts = _macos_signature_facts(output)
+    return "; ".join(
+        f"{key}={value}" for key, value in facts.items() if key != "adhoc_code_directory"
+    )
+
+
+def _macos_signature_facts(output: str) -> dict[str, Any]:
     signature_values = re.findall(r"(?im)^\s*Signature=(.*?)\s*$", output)
     if signature_values and all(value.strip().casefold() == "adhoc" for value in signature_values):
         signature_class = "adhoc"
@@ -392,9 +420,13 @@ def _macos_signature_diagnostic(output: str) -> str:
     team_identifier_set = any(
         value.strip().casefold() not in {"", "not set"} for value in team_identifiers
     )
-    facts = {
+    code_directory_values = re.findall(
+        r"(?im)^\s*CodeDirectory\b.*?\bflags=(0x[0-9a-f]+)\(([^)]*)\)", output
+    )
+    return {
         "signature_class": signature_class,
         "code_directory_flags": "|".join(code_directory_flags) or "none",
+        "adhoc_code_directory": any(int(value, 16) & 0x2 for value, _flags in code_directory_values),
         "authority_present": bool(re.search(r"(?im)^\s*Authority=", output)),
         "team_identifier_set": team_identifier_set,
         "signed_time_present": bool(re.search(r"(?im)^\s*Signed Time=", output)),
@@ -402,20 +434,241 @@ def _macos_signature_diagnostic(output: str) -> str:
         "cms_digest_present": bool(re.search(r"(?im)^\s*CMSDigest=", output)),
         "sealed_resources_present": bool(re.search(r"(?im)^\s*Sealed Resources version=", output)),
     }
-    return "; ".join(f"{key}={value}" for key, value in facts.items())
+
+
+def _macos_bundle_tree_sha256(bundle: Path) -> str:
+    _validate_bundle_symlinks(bundle)
+    digest = hashlib.sha256()
+    entries = [
+        bundle,
+        *sorted(bundle.rglob("*"), key=lambda item: item.relative_to(bundle).as_posix()),
+    ]
+    for path in entries:
+        metadata = path.lstat()
+        relative = "." if path == bundle else path.relative_to(bundle).as_posix()
+        mode = stat.S_IMODE(metadata.st_mode)
+        if stat.S_ISLNK(metadata.st_mode):
+            digest.update(
+                f"link\0{relative}\0{mode:o}\0{os.readlink(path)}\n".encode("utf-8")
+            )
+        elif stat.S_ISDIR(metadata.st_mode):
+            digest.update(f"directory\0{relative}\0{mode:o}\n".encode("utf-8"))
+        elif stat.S_ISREG(metadata.st_mode):
+            digest.update(
+                f"file\0{relative}\0{mode:o}\0{metadata.st_size}\0{_sha256_file(path)}\n".encode("utf-8")
+            )
+        else:
+            raise ValueError("Flutter Framework treeに通常file／directory以外がある")
+    return digest.hexdigest()
+
+
+def _capture_codesign(
+    command: list[str], *, environment: dict[str, str]
+) -> subprocess.CompletedProcess[str]:
+    probe_environment = dict(environment)
+    probe_environment.update({"LANG": "C", "LC_ALL": "C"})
+    return subprocess.run(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        env=probe_environment,
+        check=False,
+    )
+
+
+def _verify_pinned_flutter_framework_signature(
+    framework: Path, *, codesign: str, environment: dict[str, str]
+) -> dict[str, bool]:
+    if framework.is_symlink() or not framework.is_dir():
+        raise ValueError("pinned FlutterMacOS.frameworkが通常directoryではない")
+    _validate_bundle_symlinks(framework)
+    verification = _capture_codesign(
+        [
+            codesign,
+            "--verify",
+            "--deep",
+            "--strict",
+            "--all-architectures",
+            "--verbose=2",
+            str(framework),
+        ],
+        environment=environment,
+    )
+    if verification.returncode != 0:
+        raise ValueError("pinned FlutterMacOS.frameworkのstrict code signature検証に失敗した")
+    display = _capture_codesign(
+        [codesign, "--display", "--verbose=4", str(framework)], environment=environment
+    )
+    if display.returncode != 0:
+        raise ValueError("pinned FlutterMacOS.frameworkのsignature metadataを取得できない")
+    facts = _macos_signature_facts(display.stdout)
+    required_facts = (
+        "authority_present",
+        "team_identifier_set",
+        "timestamp_present",
+        "cms_digest_present",
+        "sealed_resources_present",
+    )
+    if (
+        facts["signature_class"] == "adhoc"
+        or facts["adhoc_code_directory"]
+        or facts["code_directory_flags"] == "none"
+        or any(facts[name] is not True for name in required_facts)
+    ):
+        safe_facts = {name: facts[name] for name in (*required_facts, "code_directory_flags")}
+        raise ValueError(
+            "pinned FlutterMacOS.frameworkが期待する上流署名条件を満たさない: "
+            + "; ".join(f"{key}={value}" for key, value in safe_facts.items())
+        )
+    return {name: bool(facts[name]) for name in required_facts}
+
+
+def _prepare_pinned_flutter_framework(
+    flutter_root: Path,
+    *,
+    flutter: str,
+    codesign: str,
+    environment: dict[str, str],
+) -> FlutterFrameworkReference:
+    _verify_pinned_flutter_checkout(flutter_root, environment=environment)
+    engine_version_file = flutter_root / "bin/internal/engine.version"
+    _require_file(engine_version_file, "Flutter engine revision")
+    engine_revision = engine_version_file.read_text(encoding="ascii").strip()
+    if re.fullmatch(r"[0-9a-f]{40}", engine_revision) is None:
+        raise ValueError("Flutter engine revisionが40桁lowercase SHA-1ではない")
+    _run([flutter, "precache", "--macos"], cwd=flutter_root, environment=environment)
+    _verify_pinned_flutter_checkout(flutter_root, environment=environment)
+    source_path = flutter_root.joinpath(*FLUTTER_ENGINE_FRAMEWORK_RELATIVE_PATH.parts)
+    current = flutter_root
+    for part in FLUTTER_ENGINE_FRAMEWORK_RELATIVE_PATH.parts:
+        current = current / part
+        if current.is_symlink():
+            raise ValueError("pinned Flutter Framework cache pathにsymlinkがある")
+    if not source_path.is_dir():
+        raise ValueError("pinned FlutterMacOS.frameworkがengine cacheにない")
+    tree_sha256 = _macos_bundle_tree_sha256(source_path)
+    signature_facts = _verify_pinned_flutter_framework_signature(
+        source_path, codesign=codesign, environment=environment
+    )
+    if _macos_bundle_tree_sha256(source_path) != tree_sha256:
+        raise ValueError("Flutter SDK cache内Frameworkが署名検証中に変化した")
+    return FlutterFrameworkReference(
+        source_path=source_path,
+        engine_revision=engine_revision,
+        tree_sha256=tree_sha256,
+        signature_facts=signature_facts,
+    )
+
+
+def _verify_pinned_flutter_checkout(
+    flutter_root: Path, *, environment: dict[str, str]
+) -> None:
+    head = subprocess.run(
+        ["git", "-C", str(flutter_root), "rev-parse", "HEAD"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        env=environment,
+        check=False,
+    )
+    if head.returncode != 0 or head.stdout.strip() != PINNED_FLUTTER_REVISION:
+        raise ValueError("Flutter SDKが固定revisionと一致しない")
+    status = subprocess.run(
+        ["git", "-C", str(flutter_root), "status", "--porcelain", "--untracked-files=all"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        env=environment,
+        check=False,
+    )
+    if status.returncode != 0 or status.stdout.strip():
+        raise ValueError("Flutter SDK checkoutに未commit変更がある")
+
+
+def _verify_embedded_flutter_framework(
+    app_bundle: Path,
+    reference: FlutterFrameworkReference,
+    *,
+    codesign: str,
+    environment: dict[str, str],
+) -> dict[str, Any]:
+    if app_bundle.is_symlink() or not app_bundle.is_dir():
+        raise ValueError("Export App Bundle rootが通常directoryではない")
+    _validate_bundle_symlinks(app_bundle)
+    framework = app_bundle.joinpath(*APP_FLUTTER_FRAMEWORK_RELATIVE_PATH.parts)
+    if framework.is_symlink() or not framework.is_dir():
+        raise ValueError("Export App BundleにFlutterMacOS.frameworkが一意に存在しない")
+    matching_frameworks = sorted(
+        (path for path in app_bundle.rglob("FlutterMacOS.framework") if path.is_dir()),
+        key=lambda path: path.relative_to(app_bundle).as_posix(),
+    )
+    if matching_frameworks != [framework]:
+        raise ValueError("Export App BundleにFlutterMacOS.frameworkが一意に存在しない")
+    source_tree_before = _macos_bundle_tree_sha256(reference.source_path)
+    if source_tree_before != reference.tree_sha256:
+        raise ValueError("Flutter SDK cache内のpinned Frameworkがbuild中に変化した")
+    source_facts = _verify_pinned_flutter_framework_signature(
+        reference.source_path, codesign=codesign, environment=environment
+    )
+    if source_facts != reference.signature_facts:
+        raise ValueError("Flutter SDK cache内Frameworkの署名metadataがbuild中に変化した")
+    source_tree_after = _macos_bundle_tree_sha256(reference.source_path)
+    if source_tree_after != reference.tree_sha256:
+        raise ValueError("Flutter SDK cache内のpinned Frameworkが検証中に変化した")
+    embedded_tree_before = _macos_bundle_tree_sha256(framework)
+    if embedded_tree_before != reference.tree_sha256:
+        raise ValueError("Export App Bundle内Flutter Frameworkがpinned SDK cacheと一致しない")
+    embedded_facts = _verify_pinned_flutter_framework_signature(
+        framework, codesign=codesign, environment=environment
+    )
+    if embedded_facts != reference.signature_facts:
+        raise ValueError("Export App Bundle内Flutter Framework署名metadataがsourceと一致しない")
+    embedded_tree_sha256 = _macos_bundle_tree_sha256(framework)
+    if embedded_tree_sha256 != embedded_tree_before:
+        raise ValueError("Export App Bundle内Flutter Frameworkが署名検証中に変化した")
+    return {
+        "source": "pinned_flutter_release_engine_cache",
+        "sdk_revision": PINNED_FLUTTER_REVISION,
+        "engine_revision": reference.engine_revision,
+        "source_relative_path": FLUTTER_ENGINE_FRAMEWORK_RELATIVE_PATH.as_posix(),
+        "embedded_relative_path": APP_FLUTTER_FRAMEWORK_RELATIVE_PATH.as_posix(),
+        "source_tree_sha256": reference.tree_sha256,
+        "embedded_tree_sha256": embedded_tree_sha256,
+        "strict_signature_verified": True,
+        **embedded_facts,
+    }
 
 
 def _require_macos_code_without_publisher_identity(
-    bundle: Path, *, codesign: str, environment: dict[str, str]
+    bundle: Path,
+    *,
+    flutter_framework: FlutterFrameworkReference,
+    codesign: str,
+    environment: dict[str, str],
 ) -> dict[str, Any]:
-    code_objects = _macos_code_objects(bundle)
+    framework_path = bundle.joinpath(*APP_FLUTTER_FRAMEWORK_RELATIVE_PATH.parts)
+    flutter_framework_evidence = _verify_embedded_flutter_framework(
+        bundle, flutter_framework, codesign=codesign, environment=environment
+    )
+    code_objects = _macos_code_objects(bundle, collapsed_bundle=framework_path)
     if len(code_objects) < 2:
         raise ValueError("macOS App Bundle内の実行codeを署名検査できない")
     probe_environment = dict(environment)
     probe_environment.update({"LANG": "C", "LC_ALL": "C"})
     unsigned_code_objects = 0
     adhoc_executable_signatures = 0
+    verified_toolchain_framework_signatures = 0
     for path in code_objects:
+        if path == framework_path:
+            verified_toolchain_framework_signatures += 1
+            continue
         result = subprocess.run(
             [codesign, "--display", "--verbose=4", str(path)],
             stdout=subprocess.PIPE,
@@ -442,12 +695,14 @@ def _require_macos_code_without_publisher_identity(
             )
         unsigned_code_objects += 1
     return {
-        "status": "passed_no_publisher_identity",
+        "status": "passed_no_d4_publisher_identity",
         "code_objects_checked": len(code_objects),
         "unsigned_code_objects": unsigned_code_objects,
         "adhoc_executable_signatures": adhoc_executable_signatures,
-        "publisher_identity_signatures": 0,
-        "resource_sealed_bundle_signatures": 0,
+        "verified_toolchain_framework_signatures": verified_toolchain_framework_signatures,
+        "d4_publisher_identity_signatures": 0,
+        "d4_resource_sealed_bundle_signatures": 0,
+        "flutter_toolchain_framework": flutter_framework_evidence,
     }
 
 
@@ -596,6 +851,12 @@ def build_macos_product(
             temporary_root = Path(build_temp)
             flutter_root = Path(tools["flutter"]).resolve(strict=True).parent.parent
             environment = _macos_environment(temporary_root, flutter_root=flutter_root)
+            flutter_framework = _prepare_pinned_flutter_framework(
+                flutter_root,
+                flutter=tools["flutter"],
+                codesign=tools["codesign"],
+                environment=environment,
+            )
             source_root = temporary_root / "source"
             source_root.mkdir(mode=0o700)
             source_archive_path = temporary_root / "source.tar"
@@ -613,6 +874,8 @@ def build_macos_product(
             toolchain = {
                 "architecture": target_architecture,
                 "flutter": _tool_version([tools["flutter"], "--version"], cwd=flutter_project, environment=environment),
+                "flutter_sdk_revision": PINNED_FLUTTER_REVISION,
+                "flutter_engine_revision": flutter_framework.engine_revision,
                 "cargo": _tool_version([tools["cargo"], "+" + RUST_TOOLCHAIN, "--version"], cwd=source_root, environment=environment),
                 "rustc": _tool_version([tools["rustc"], "+" + RUST_TOOLCHAIN, "--version"], cwd=source_root, environment=environment),
                 "xcodebuild": _tool_version([tools["xcodebuild"], "-version"], cwd=source_root, environment=environment),
@@ -706,7 +969,10 @@ def build_macos_product(
                 raise ValueError("Export Manifestをbyte-for-byteでbundleへ保持できなかった")
             _validate_bundle_symlinks(app_bundle)
             app_code_signature_scan = _require_macos_code_without_publisher_identity(
-                app_bundle, codesign=tools["codesign"], environment=environment
+                app_bundle,
+                flutter_framework=flutter_framework,
+                codesign=tools["codesign"],
+                environment=environment,
             )
 
             app_archive_path = staging_root / f"{bundle_name}.zip"
@@ -746,12 +1012,12 @@ def build_macos_product(
         elapsed_ms = round((time.perf_counter() - started) * 1000)
         catalog = _load_catalog()
         evidence = {
-            "version": 1,
+            "version": 2,
             "evidence_type": "d4_pocket_macos_export_build",
             "evidence_source": "INTERNAL_STATE",
             "product": "D4 Pocket",
             "target_platform": "macos",
-            "build_mode": "release_candidate_no_publisher_identity",
+            "build_mode": "release_candidate_no_d4_publisher_identity",
             "source_ref": source_ref,
             "source_commit": commit,
             "source_archive_sha256": archive_hash,
@@ -853,6 +1119,13 @@ def _validate_build_evidence(
     expected_bundle_id = bundle_identifier_for_app(expected_app_id)
     expected_bundle_name = f"D4Pocket-{expected_app_id.removeprefix('d4-pocket-app-')[:12]}.app"
     records, _regular_files, total_bytes, tree_hash = _macos_artifact_inventory(root, app_bundle)
+    signature_scan = evidence.get("app_code_signature_scan", {})
+    flutter_framework = signature_scan.get("flutter_toolchain_framework", {})
+    embedded_flutter_framework = app_bundle.joinpath(*APP_FLUTTER_FRAMEWORK_RELATIVE_PATH.parts)
+    try:
+        embedded_flutter_tree_hash = _macos_bundle_tree_sha256(embedded_flutter_framework)
+    except (OSError, ValueError):
+        embedded_flutter_tree_hash = ""
     if (
         evidence.get("evidence_type") != "d4_pocket_macos_export_build"
         or evidence.get("target_platform") != "macos"
@@ -872,15 +1145,43 @@ def _validate_build_evidence(
         or evidence.get("installed_product_verified") is not False
         or evidence.get("package_signed") is not False
         or evidence.get("app_publisher_identity_signed") is not False
-        or evidence.get("app_code_signature_scan", {}).get("status") != "passed_no_publisher_identity"
-        or evidence.get("app_code_signature_scan", {}).get("code_objects_checked", 0) < 2
+        or evidence.get("build_mode") != "release_candidate_no_d4_publisher_identity"
+        or signature_scan.get("status") != "passed_no_d4_publisher_identity"
+        or signature_scan.get("code_objects_checked", 0) < 2
         or (
-            evidence.get("app_code_signature_scan", {}).get("unsigned_code_objects", -1)
-            + evidence.get("app_code_signature_scan", {}).get("adhoc_executable_signatures", -1)
-            != evidence.get("app_code_signature_scan", {}).get("code_objects_checked", -2)
+            signature_scan.get("unsigned_code_objects", -1)
+            + signature_scan.get("adhoc_executable_signatures", -1)
+            + signature_scan.get("verified_toolchain_framework_signatures", -1)
+            != signature_scan.get("code_objects_checked", -2)
         )
-        or evidence.get("app_code_signature_scan", {}).get("publisher_identity_signatures") != 0
-        or evidence.get("app_code_signature_scan", {}).get("resource_sealed_bundle_signatures") != 0
+        or signature_scan.get("verified_toolchain_framework_signatures") != 1
+        or signature_scan.get("d4_publisher_identity_signatures") != 0
+        or signature_scan.get("d4_resource_sealed_bundle_signatures") != 0
+        or evidence.get("toolchain", {}).get("flutter_sdk_revision") != PINNED_FLUTTER_REVISION
+        or re.fullmatch(
+            r"[0-9a-f]{40}", evidence.get("toolchain", {}).get("flutter_engine_revision", "")
+        ) is None
+        or flutter_framework.get("source") != "pinned_flutter_release_engine_cache"
+        or flutter_framework.get("sdk_revision") != PINNED_FLUTTER_REVISION
+        or flutter_framework.get("engine_revision")
+        != evidence.get("toolchain", {}).get("flutter_engine_revision")
+        or flutter_framework.get("source_relative_path")
+        != FLUTTER_ENGINE_FRAMEWORK_RELATIVE_PATH.as_posix()
+        or flutter_framework.get("embedded_relative_path")
+        != APP_FLUTTER_FRAMEWORK_RELATIVE_PATH.as_posix()
+        or flutter_framework.get("source_tree_sha256") != embedded_flutter_tree_hash
+        or flutter_framework.get("embedded_tree_sha256") != embedded_flutter_tree_hash
+        or flutter_framework.get("strict_signature_verified") is not True
+        or any(
+            flutter_framework.get(field) is not True
+            for field in (
+                "authority_present",
+                "team_identifier_set",
+                "timestamp_present",
+                "cms_digest_present",
+                "sealed_resources_present",
+            )
+        )
         or evidence.get("target_architecture") != evidence.get("toolchain", {}).get("architecture")
         or evidence.get("macos_binary_architecture_scan", {}).get("status") != "passed_host_architecture"
         or evidence.get("macos_binary_architecture_scan", {}).get("architecture") != evidence.get("target_architecture")

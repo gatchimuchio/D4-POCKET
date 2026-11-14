@@ -1,10 +1,10 @@
 {
-  "version": 1,
+  "version": 2,
   "evidence_type": "d4_pocket_macos_export_build",
   "evidence_source": "INTERNAL_STATE",
   "product": "D4 Pocket",
   "target_platform": "macos",
-  "build_mode": "release_candidate_no_publisher_identity",
+  "build_mode": "release_candidate_no_d4_publisher_identity",
   "source_ref": "refs/heads/main",
   "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "source_archive_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -36,6 +36,8 @@
   "toolchain": {
     "architecture": "arm64",
     "flutter": "Flutter 3.44.0",
+    "flutter_sdk_revision": "559ffa3f75e7402d65a8def9c28389a9b2e6fe42",
+    "flutter_engine_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "cargo": "cargo 1.95.0",
     "rustc": "rustc 1.95.0",
     "xcodebuild": "Xcode 27.0",
@@ -71,12 +73,28 @@
   "package_signed": false,
   "app_publisher_identity_signed": false,
   "app_code_signature_scan": {
-    "status": "passed_no_publisher_identity",
-    "code_objects_checked": 2,
+    "status": "passed_no_d4_publisher_identity",
+    "code_objects_checked": 3,
     "unsigned_code_objects": 1,
     "adhoc_executable_signatures": 1,
-    "publisher_identity_signatures": 0,
-    "resource_sealed_bundle_signatures": 0
+    "verified_toolchain_framework_signatures": 1,
+    "d4_publisher_identity_signatures": 0,
+    "d4_resource_sealed_bundle_signatures": 0,
+    "flutter_toolchain_framework": {
+      "source": "pinned_flutter_release_engine_cache",
+      "sdk_revision": "559ffa3f75e7402d65a8def9c28389a9b2e6fe42",
+      "engine_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "source_relative_path": "bin/cache/artifacts/engine/darwin-x64-release/FlutterMacOS.xcframework/macos-arm64_x86_64/FlutterMacOS.framework",
+      "embedded_relative_path": "Contents/Frameworks/FlutterMacOS.framework",
+      "source_tree_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "embedded_tree_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "strict_signature_verified": true,
+      "authority_present": true,
+      "team_identifier_set": true,
+      "timestamp_present": true,
+      "cms_digest_present": true,
+      "sealed_resources_present": true
+    }
   },
   "launch_status": "not_verified",
   "installed_product_verified": false,
@@ -90,12 +108,30 @@
       "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
     },
     {
-      "path": "D4Pocket-333333333333.app/Contents/Frameworks/Current",
+      "path": "D4Pocket-333333333333.app/Contents/Frameworks/FlutterMacOS.framework/Versions/A/FlutterMacOS",
+      "kind": "file",
+      "size_bytes": 50,
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "path": "D4Pocket-333333333333.app/Contents/Frameworks/FlutterMacOS.framework/Versions/Current",
       "kind": "symlink",
-      "target": "Versions/A"
+      "target": "A"
+    },
+    {
+      "path": "D4Pocket-333333333333.app.zip",
+      "kind": "file",
+      "size_bytes": 30,
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    {
+      "path": "D4Pocket-333333333333.pkg",
+      "kind": "file",
+      "size_bytes": 20,
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
     }
   ],
-  "artifact_total_bytes": 10,
+  "artifact_total_bytes": 110,
   "artifact_tree_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
   "package": {
     "file_name": "D4Pocket-333333333333.pkg",
@@ -115,8 +151,8 @@
     "status": "passed_known_patterns",
     "scope": "macos_app_regular_files_and_package_archives",
     "coverage": "known_patterns_only",
-    "files_scanned": 2,
-    "bytes_scanned": 60,
+    "files_scanned": 4,
+    "bytes_scanned": 110,
     "findings": 0,
     "artifact_tree_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
   }

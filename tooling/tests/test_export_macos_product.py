@@ -10,6 +10,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tooling.export_macos_product import (
+    APP_FLUTTER_FRAMEWORK_RELATIVE_PATH,
+    FLUTTER_ENGINE_FRAMEWORK_RELATIVE_PATH,
+    FlutterFrameworkReference,
+    _macos_bundle_tree_sha256,
     _macos_artifact_inventory,
     _macos_environment,
     _darwin_build_architecture,
@@ -17,6 +21,8 @@ from tooling.export_macos_product import (
     _patch_macos_export_build_settings,
     _require_macos_binary_architecture,
     _require_macos_code_without_publisher_identity,
+    _verify_pinned_flutter_checkout,
+    _verify_pinned_flutter_framework_signature,
     _macos_signature_diagnostic,
     _scan_macos_artifacts,
     _validate_build_evidence,
@@ -30,6 +36,53 @@ from tooling.tests.create_macos_export_fixture import (
     AUDIT_STORE_ID,
     macos_export_pair,
 )
+
+
+FLUTTER_ENGINE_REVISION_FIXTURE = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+FLUTTER_FRAMEWORK_SIGNATURE_OUTPUT = (
+    "Format=app bundle with Mach-O thin (arm64)\n"
+    "CodeDirectory v=20500 size=250 flags=0x10000(runtime) hashes=3+0 location=embedded\n"
+    "Authority=Apple Development: Flutter Fixture (TEAMFIXTURE)\n"
+    "TeamIdentifier=TEAMFIXTURE\n"
+    "Timestamp=present\n"
+    "CMSDigest=SHA-256\n"
+    "Sealed Resources version=2 rules=13 files=4\n"
+)
+
+
+def _flutter_framework_fixture(root: Path) -> tuple[Path, FlutterFrameworkReference]:
+    flutter_root = root / "flutter"
+    source_framework = flutter_root.joinpath(*FLUTTER_ENGINE_FRAMEWORK_RELATIVE_PATH.parts)
+    app = root / "D4Pocket.app"
+    embedded_framework = app.joinpath(*APP_FLUTTER_FRAMEWORK_RELATIVE_PATH.parts)
+    for framework in (source_framework, embedded_framework):
+        binary = framework / "Versions/A/FlutterMacOS"
+        binary.parent.mkdir(parents=True)
+        binary.write_bytes(b"\xfe\xed\xfa\xcfpinned Flutter framework fixture")
+    executable = app / "Contents/MacOS/gui_shell_desktop"
+    executable.parent.mkdir(parents=True)
+    executable.write_bytes(b"\xcf\xfa\xed\xfeD4 Pocket fixture")
+    reference = FlutterFrameworkReference(
+        source_path=source_framework,
+        engine_revision=FLUTTER_ENGINE_REVISION_FIXTURE,
+        tree_sha256=_macos_bundle_tree_sha256(source_framework),
+        signature_facts={
+            "authority_present": True,
+            "team_identifier_set": True,
+            "timestamp_present": True,
+            "cms_digest_present": True,
+            "sealed_resources_present": True,
+        },
+    )
+    return app, reference
+
+
+def _successful_framework_signature_responses() -> list[subprocess.CompletedProcess[str]]:
+    verified = subprocess.CompletedProcess(args=[], returncode=0, stdout="valid on disk\n")
+    displayed = subprocess.CompletedProcess(
+        args=[], returncode=0, stdout=FLUTTER_FRAMEWORK_SIGNATURE_OUTPUT
+    )
+    return [verified, displayed, verified, displayed]
 
 
 class MacOSProductExportTests(unittest.TestCase):
@@ -176,24 +229,7 @@ class MacOSProductExportTests(unittest.TestCase):
 
     def test_app_scan_accepts_unsigned_and_unsealed_adhoc_executable_signatures(self) -> None:
         with tempfile.TemporaryDirectory(prefix="d4p-macos-codesign-scan-") as temp:
-            app = Path(temp) / "D4Pocket.app"
-            executable = app / "Contents/MacOS/gui_shell_desktop"
-            executable.parent.mkdir(parents=True)
-            executable.write_bytes(b"\xcf\xfa\xed\xfeunsigned fixture")
-            framework = app / "Contents/Frameworks/Flutter.framework"
-            framework_binary = framework / "Versions/A/Flutter"
-            framework_binary.parent.mkdir(parents=True)
-            framework_binary.write_bytes(b"\xfe\xed\xfa\xcfunsigned fixture")
-            adhoc = subprocess.CompletedProcess(
-                args=[],
-                returncode=0,
-                stdout=(
-                    "Format=app bundle with Mach-O thin (arm64)\n"
-                    "CodeDirectory v=20500 size=250 flags=0x2(adhoc) hashes=3+0 location=embedded\n"
-                    "Signature=adhoc\n"
-                    "TeamIdentifier=not set\n"
-                ),
-            )
+            app, flutter_framework = _flutter_framework_fixture(Path(temp))
             linker_adhoc = subprocess.CompletedProcess(
                 args=[],
                 returncode=0,
@@ -208,26 +244,49 @@ class MacOSProductExportTests(unittest.TestCase):
             unsigned = subprocess.CompletedProcess(
                 args=[], returncode=1, stdout="code object is not signed at all\n"
             )
-            responses = [adhoc, linker_adhoc, unsigned, linker_adhoc]
+            responses = [*_successful_framework_signature_responses(), unsigned, linker_adhoc]
             with patch("tooling.export_macos_product.subprocess.run", side_effect=responses) as run:
                 result = _require_macos_code_without_publisher_identity(
-                    app, codesign="/usr/bin/codesign", environment={}
+                    app,
+                    flutter_framework=flutter_framework,
+                    codesign="/usr/bin/codesign",
+                    environment={},
                 )
 
             self.assertEqual(
                 result,
                 {
-                    "status": "passed_no_publisher_identity",
-                    "code_objects_checked": 4,
+                    "status": "passed_no_d4_publisher_identity",
+                    "code_objects_checked": 3,
                     "unsigned_code_objects": 1,
-                    "adhoc_executable_signatures": 3,
-                    "publisher_identity_signatures": 0,
-                    "resource_sealed_bundle_signatures": 0,
+                    "adhoc_executable_signatures": 1,
+                    "verified_toolchain_framework_signatures": 1,
+                    "d4_publisher_identity_signatures": 0,
+                    "d4_resource_sealed_bundle_signatures": 0,
+                    "flutter_toolchain_framework": {
+                        "source": "pinned_flutter_release_engine_cache",
+                        "sdk_revision": "559ffa3f75e7402d65a8def9c28389a9b2e6fe42",
+                        "engine_revision": FLUTTER_ENGINE_REVISION_FIXTURE,
+                        "source_relative_path": FLUTTER_ENGINE_FRAMEWORK_RELATIVE_PATH.as_posix(),
+                        "embedded_relative_path": APP_FLUTTER_FRAMEWORK_RELATIVE_PATH.as_posix(),
+                        "source_tree_sha256": flutter_framework.tree_sha256,
+                        "embedded_tree_sha256": flutter_framework.tree_sha256,
+                        "strict_signature_verified": True,
+                        **flutter_framework.signature_facts,
+                    },
                 },
             )
-            self.assertEqual(run.call_count, 4)
+            self.assertEqual(run.call_count, 6)
             self.assertTrue(all(call.kwargs["env"]["LC_ALL"] == "C" for call in run.call_args_list))
-            self.assertTrue(all("--verbose=4" in call.args[0] for call in run.call_args_list))
+            self.assertEqual(
+                run.call_args_list[0].args[0][1:6],
+                ["--verify", "--deep", "--strict", "--all-architectures", "--verbose=2"],
+            )
+            self.assertEqual(
+                run.call_args_list[2].args[0][1:6],
+                ["--verify", "--deep", "--strict", "--all-architectures", "--verbose=2"],
+            )
+            self.assertTrue(all("--verbose=4" in call.args[0] for call in (run.call_args_list[1], run.call_args_list[3], *run.call_args_list[4:])))
 
     def test_signature_diagnostic_reports_flags_without_identity_values(self) -> None:
         output = (
@@ -255,10 +314,7 @@ class MacOSProductExportTests(unittest.TestCase):
 
     def test_app_scan_rejects_publisher_or_resource_sealed_signatures(self) -> None:
         with tempfile.TemporaryDirectory(prefix="d4p-macos-codesign-negative-") as temp:
-            app = Path(temp) / "D4Pocket.app"
-            executable = app / "Contents/MacOS/gui_shell_desktop"
-            executable.parent.mkdir(parents=True)
-            executable.write_bytes(b"\xcf\xfa\xed\xfefixture")
+            app, flutter_framework = _flutter_framework_fixture(Path(temp))
             disallowed_signatures = [
                 subprocess.CompletedProcess(
                     args=[],
@@ -310,17 +366,126 @@ class MacOSProductExportTests(unittest.TestCase):
                 ),
             ]
             for signed in disallowed_signatures:
-                with patch("tooling.export_macos_product.subprocess.run", return_value=signed):
+                responses = [
+                    *_successful_framework_signature_responses(),
+                    subprocess.CompletedProcess(
+                        args=[], returncode=1, stdout="code object is not signed at all\n"
+                    ),
+                    signed,
+                ]
+                with patch("tooling.export_macos_product.subprocess.run", side_effect=responses):
                     with self.assertRaisesRegex(ValueError, "Publisher identity付きまたは許容外署名"):
                         _require_macos_code_without_publisher_identity(
-                            app, codesign="/usr/bin/codesign", environment={}
+                            app,
+                            flutter_framework=flutter_framework,
+                            codesign="/usr/bin/codesign",
+                            environment={},
                         )
             ambiguous = subprocess.CompletedProcess(args=[], returncode=1, stdout="verification failed\n")
-            with patch("tooling.export_macos_product.subprocess.run", return_value=ambiguous):
+            responses = [
+                *_successful_framework_signature_responses(),
+                subprocess.CompletedProcess(
+                    args=[], returncode=1, stdout="code object is not signed at all\n"
+                ),
+                ambiguous,
+            ]
+            with patch("tooling.export_macos_product.subprocess.run", side_effect=responses):
                 with self.assertRaisesRegex(ValueError, "code signature状態を分類できない"):
                     _require_macos_code_without_publisher_identity(
-                        app, codesign="/usr/bin/codesign", environment={}
+                        app,
+                        flutter_framework=flutter_framework,
+                        codesign="/usr/bin/codesign",
+                        environment={},
                     )
+
+    def test_app_scan_rejects_framework_content_mismatch_and_missing_path(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-macos-framework-mismatch-") as temp:
+            app, flutter_framework = _flutter_framework_fixture(Path(temp))
+            embedded = app.joinpath(*APP_FLUTTER_FRAMEWORK_RELATIVE_PATH.parts)
+            (embedded / "Versions/A/FlutterMacOS").write_bytes(b"substituted framework")
+            with patch(
+                "tooling.export_macos_product.subprocess.run",
+                side_effect=_successful_framework_signature_responses()[:2],
+            ) as run:
+                with self.assertRaisesRegex(ValueError, "pinned SDK cacheと一致しない"):
+                    _require_macos_code_without_publisher_identity(
+                        app,
+                        flutter_framework=flutter_framework,
+                        codesign="/usr/bin/codesign",
+                        environment={},
+                    )
+            self.assertEqual(run.call_count, 2)
+            self.assertTrue(
+                all(str(flutter_framework.source_path) == call.args[0][-1] for call in run.call_args_list)
+            )
+
+            shutil.rmtree(embedded)
+            with self.assertRaisesRegex(ValueError, "FlutterMacOS.frameworkが一意に存在しない"):
+                _require_macos_code_without_publisher_identity(
+                    app,
+                    flutter_framework=flutter_framework,
+                    codesign="/usr/bin/codesign",
+                    environment={},
+                )
+
+    def test_pinned_flutter_framework_requires_strict_signature_and_provenance_facts(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-macos-framework-signature-") as temp:
+            _app, reference = _flutter_framework_fixture(Path(temp))
+            failed_verification = subprocess.CompletedProcess(
+                args=[], returncode=1, stdout="signature invalid\n"
+            )
+            with patch(
+                "tooling.export_macos_product.subprocess.run", return_value=failed_verification
+            ) as run:
+                with self.assertRaisesRegex(ValueError, "strict code signature検証に失敗"):
+                    _verify_pinned_flutter_framework_signature(
+                        reference.source_path,
+                        codesign="/usr/bin/codesign",
+                        environment={},
+                    )
+            self.assertIn("--strict", run.call_args.args[0])
+
+            valid = subprocess.CompletedProcess(args=[], returncode=0, stdout="valid on disk\n")
+            incomplete_metadata = subprocess.CompletedProcess(
+                args=[],
+                returncode=0,
+                stdout=(
+                    "CodeDirectory v=20500 size=250 flags=0x10000(runtime)\n"
+                    "TeamIdentifier=TEAMFIXTURE\n"
+                    "Signature=Developer ID Application\n"
+                ),
+            )
+            with patch(
+                "tooling.export_macos_product.subprocess.run",
+                side_effect=[valid, incomplete_metadata],
+            ):
+                with self.assertRaisesRegex(ValueError, "期待する上流署名条件"):
+                    _verify_pinned_flutter_framework_signature(
+                        reference.source_path,
+                        codesign="/usr/bin/codesign",
+                        environment={},
+                    )
+
+    def test_flutter_checkout_revision_and_cleanliness_are_required(self) -> None:
+        root = Path("/tmp/flutter-fixture")
+        wrong_revision = subprocess.CompletedProcess(
+            args=[], returncode=0, stdout="0" * 40 + "\n"
+        )
+        with patch("tooling.export_macos_product.subprocess.run", return_value=wrong_revision):
+            with self.assertRaisesRegex(ValueError, "固定revisionと一致しない"):
+                _verify_pinned_flutter_checkout(root, environment={})
+
+        pinned = subprocess.CompletedProcess(
+            args=[],
+            returncode=0,
+            stdout="559ffa3f75e7402d65a8def9c28389a9b2e6fe42\n",
+        )
+        dirty = subprocess.CompletedProcess(args=[], returncode=0, stdout=" M bin/flutter\n")
+        with patch(
+            "tooling.export_macos_product.subprocess.run", side_effect=[pinned, dirty]
+        ):
+            with self.assertRaisesRegex(ValueError, "未commit変更がある"):
+                _verify_pinned_flutter_checkout(root, environment={})
 
     def test_build_evidence_schema_rejects_publisher_signed_candidate_claims(self) -> None:
         schema = json.loads(
@@ -334,9 +499,9 @@ class MacOSProductExportTests(unittest.TestCase):
         evidence = json.loads(example_path.read_text(encoding="utf-8"))
         self.assertNotIn("--no-codesign", evidence["flutter_build_arguments"])
         self.assertEqual(
-            evidence["app_code_signature_scan"]["status"], "passed_no_publisher_identity"
+            evidence["app_code_signature_scan"]["status"], "passed_no_d4_publisher_identity"
         )
-        self.assertEqual(evidence["build_mode"], "release_candidate_no_publisher_identity")
+        self.assertEqual(evidence["build_mode"], "release_candidate_no_d4_publisher_identity")
         self.assertEqual(evidence["target_architecture"], evidence["toolchain"]["architecture"])
         self.assertEqual(
             evidence["macos_binary_architecture_scan"]["status"], "passed_host_architecture"
@@ -363,6 +528,10 @@ class MacOSProductExportTests(unittest.TestCase):
             resources = app / "Contents/Resources"
             resources.mkdir(parents=True)
             (resources / "product_manifest.json").write_bytes(manifest_raw)
+            framework = app.joinpath(*APP_FLUTTER_FRAMEWORK_RELATIVE_PATH.parts)
+            (framework / "Versions/A").mkdir(parents=True)
+            (framework / "Versions/A/FlutterMacOS").write_bytes(b"pinned framework fixture")
+            framework_tree_hash = _macos_bundle_tree_sha256(framework)
             package_path = output / "D4Pocket-333333333333.pkg"
             package_path.write_bytes(b"unsigned package fixture")
             archive_path = output / "D4Pocket-333333333333.app.zip"
@@ -387,12 +556,28 @@ class MacOSProductExportTests(unittest.TestCase):
                     "artifact_total_bytes": total_bytes,
                     "artifact_tree_sha256": tree_hash,
                     "app_code_signature_scan": {
-                        "status": "passed_no_publisher_identity",
-                        "code_objects_checked": 2,
+                        "status": "passed_no_d4_publisher_identity",
+                        "code_objects_checked": 3,
                         "unsigned_code_objects": 1,
                         "adhoc_executable_signatures": 1,
-                        "publisher_identity_signatures": 0,
-                        "resource_sealed_bundle_signatures": 0,
+                        "verified_toolchain_framework_signatures": 1,
+                        "d4_publisher_identity_signatures": 0,
+                        "d4_resource_sealed_bundle_signatures": 0,
+                        "flutter_toolchain_framework": {
+                            "source": "pinned_flutter_release_engine_cache",
+                            "sdk_revision": "559ffa3f75e7402d65a8def9c28389a9b2e6fe42",
+                            "engine_revision": FLUTTER_ENGINE_REVISION_FIXTURE,
+                            "source_relative_path": FLUTTER_ENGINE_FRAMEWORK_RELATIVE_PATH.as_posix(),
+                            "embedded_relative_path": APP_FLUTTER_FRAMEWORK_RELATIVE_PATH.as_posix(),
+                            "source_tree_sha256": framework_tree_hash,
+                            "embedded_tree_sha256": framework_tree_hash,
+                            "strict_signature_verified": True,
+                            "authority_present": True,
+                            "team_identifier_set": True,
+                            "timestamp_present": True,
+                            "cms_digest_present": True,
+                            "sealed_resources_present": True,
+                        },
                     },
                     "package": {
                         "file_name": package_path.name,
@@ -424,6 +609,14 @@ class MacOSProductExportTests(unittest.TestCase):
                 }
             )
             _validate_build_evidence(evidence, output, app, manifest_raw)
+            evidence["app_code_signature_scan"]["flutter_toolchain_framework"][
+                "source_tree_sha256"
+            ] = "0" * 64
+            with self.assertRaises(ValueError):
+                _validate_build_evidence(evidence, output, app, manifest_raw)
+            evidence["app_code_signature_scan"]["flutter_toolchain_framework"][
+                "source_tree_sha256"
+            ] = framework_tree_hash
             evidence["target_architecture"] = "x86_64"
             with self.assertRaises(ValueError):
                 _validate_build_evidence(evidence, output, app, manifest_raw)
