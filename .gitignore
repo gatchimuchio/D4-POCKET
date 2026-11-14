@@ -16,6 +16,9 @@ apps/mobile_flutter/build/
 /release_evidence/*
 !/release_evidence/.gitkeep
 
+packages/agent_orchestration/.dart_tool/
+packages/agent_orchestration/pubspec.lock
+
 packages/gui_shell_ui/.dart_tool/
 packages/gui_shell_ui/build/
 packages/gui_shell_ui/pubspec.lock

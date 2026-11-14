@@ -1812,6 +1812,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
       coordinator.observeStartedTask(
         request: request,
         task: initialTask,
+        expectedInstructionHash: state.preflightInstructionHash,
         allowMcpContinuation: allowMcpContinuation,
       ),
     );

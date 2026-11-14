@@ -53,10 +53,26 @@ class AgentTaskExecutionCoordinator {
   Future<void> observeStartedTask({
     required AgentTaskRequest request,
     required AgentTaskRecord task,
+    required String? expectedInstructionHash,
     AgentTaskExecutionUpdateHandler? onUpdate,
     bool allowMcpContinuation = true,
   }) async {
-    if (_disposed || !_remember(task.taskId)) return;
+    if (_disposed) return;
+    if (task.runtimeId != request.runtimeId ||
+        task.sessionId != request.sessionId ||
+        task.workspaceId != request.workspaceId) {
+      await _reportRejectedTaskBinding(
+        sessionId: request.sessionId,
+        taskId: task.taskId,
+        message: '開始TaskのRuntime／Session／Workspaceが要求と一致しないため、監視と結果連携を停止しました。',
+        onUpdate: onUpdate,
+      );
+      return;
+    }
+    if (!_remember(task.taskId)) return;
+    final instructionMatchesPreflight =
+        expectedInstructionHash != null &&
+        task.instructionHash == expectedInstructionHash;
     final scope = _scopeFor(request);
     final priorTaskId = _currentTaskByScope[scope];
     if (priorTaskId != null && priorTaskId != task.taskId) {
@@ -66,7 +82,12 @@ class AgentTaskExecutionCoordinator {
     final run = _TaskRun(
       request: request,
       initialTask: task,
-      allowMcpContinuation: allowMcpContinuation,
+      allowMcpContinuation: allowMcpContinuation && instructionMatchesPreflight,
+      initialWarning: instructionMatchesPreflight
+          ? null
+          : expectedInstructionHash == null
+          ? '開始Taskの事前検査hashがないため、MCP結果連携を停止しました。'
+          : '開始Taskの指示hashが事前検査と一致しないため、MCP結果連携を停止しました。',
       onUpdate: onUpdate,
     );
     _runs[task.taskId] = run;
@@ -114,6 +135,9 @@ class AgentTaskExecutionCoordinator {
   Future<void> _monitor(_TaskRun run) async {
     var current = run.initialTask;
     _emit(run, task: current);
+    if (run.initialWarning case final warning?) {
+      _emit(run, error: warning);
+    }
     if (!_isCurrent(run)) return;
 
     if (const {'pending', 'running'}.contains(current.status)) {
@@ -125,7 +149,18 @@ class AgentTaskExecutionCoordinator {
         await run.wait(delay);
         if (!_isCurrent(run)) return;
         try {
-          current = await AgentTaskClient(_transport).state(current.taskId);
+          final observed = await AgentTaskClient(
+            _transport,
+          ).state(current.taskId);
+          if (!_sameTaskExecutionBinding(run.initialTask, observed)) {
+            _emit(
+              run,
+              error:
+                  'Broker Task状態のTask／Runtime／Session／Workspace／指示hashが開始時から変化したため、結果連携を停止しました。',
+            );
+            return;
+          }
+          current = observed;
           _emit(run, task: current);
         } on Object catch (error) {
           _emit(run, message: _errorMessage(error));
@@ -176,10 +211,16 @@ class AgentTaskExecutionCoordinator {
       final followup = outcome.followupTask;
       final followupRequest = outcome.followupRequest;
       if (followup == null || followupRequest == null) return;
+      final followupPreflight = outcome.followupPreflight;
+      if (followupPreflight == null) {
+        _emit(run, error: '後続Taskの事前検査hashがないため、Task監視とMCP継続を停止しました。');
+        return;
+      }
       unawaited(
         observeStartedTask(
           request: followupRequest,
           task: followup,
+          expectedInstructionHash: followupPreflight.instructionHash,
           allowMcpContinuation: true,
           onUpdate: run.onUpdate,
         ),
@@ -203,6 +244,36 @@ class AgentTaskExecutionCoordinator {
       await observer(update);
     } on Object {
       // Recovery notices are informational and never own execution progression.
+    }
+  }
+
+  static bool _sameTaskExecutionBinding(
+    AgentTaskRecord expected,
+    AgentTaskRecord observed,
+  ) =>
+      expected.taskId == observed.taskId &&
+      expected.runtimeId == observed.runtimeId &&
+      expected.sessionId == observed.sessionId &&
+      expected.workspaceId == observed.workspaceId &&
+      expected.instructionHash == observed.instructionHash;
+
+  Future<void> _reportRejectedTaskBinding({
+    required String sessionId,
+    required String taskId,
+    required String message,
+    AgentTaskExecutionUpdateHandler? onUpdate,
+  }) async {
+    final update = AgentTaskExecutionUpdate(
+      sessionId: sessionId,
+      sourceTaskId: taskId,
+      error: message,
+    );
+    _publishToStream(update);
+    if (onUpdate == null) return;
+    try {
+      await onUpdate(update);
+    } on Object {
+      // A display observer cannot convert an unbound Task into an accepted one.
     }
   }
 
@@ -273,12 +344,14 @@ class _TaskRun {
     required this.request,
     required this.initialTask,
     required this.allowMcpContinuation,
+    required this.initialWarning,
     required this.onUpdate,
   });
 
   final AgentTaskRequest request;
   final AgentTaskRecord initialTask;
   final bool allowMcpContinuation;
+  final String? initialWarning;
   final AgentTaskExecutionUpdateHandler? onUpdate;
   bool active = true;
   Timer? _pollTimer;

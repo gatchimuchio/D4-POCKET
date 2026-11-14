@@ -160,6 +160,7 @@ void main() {
     await coordinator.observeStartedTask(
       request: _sourceRequest,
       task: _sourceTask,
+      expectedInstructionHash: _instructionHash,
     );
 
     expect(transport.operations, [
@@ -252,6 +253,7 @@ void main() {
     await coordinator.observeStartedTask(
       request: _sourceRequest,
       task: _sourceTask,
+      expectedInstructionHash: _instructionHash,
       onUpdate: (update) {
         final task = update.task;
         if (task?.taskId == finalTaskId &&
@@ -335,6 +337,7 @@ void main() {
     await coordinator.observeStartedTask(
       request: _sourceRequest,
       task: _sourceTask,
+      expectedInstructionHash: _instructionHash,
       onUpdate: (update) {
         if (update.error != null && !refusal.isCompleted) {
           refusal.complete(update);
@@ -375,6 +378,7 @@ void main() {
         status: 'running',
         auditEventId: 'audit-pending-monitor-dispose',
       ),
+      expectedInstructionHash: _instructionHash,
       allowMcpContinuation: false,
       onUpdate: (_) {
         if (!firstUpdate.isCompleted) firstUpdate.complete();
@@ -403,6 +407,7 @@ void main() {
         status: 'running',
         auditEventId: 'audit-replaced-monitor',
       ),
+      expectedInstructionHash: _instructionHash,
       allowMcpContinuation: false,
       onUpdate: (_) {
         if (!firstUpdate.isCompleted) firstUpdate.complete();
@@ -421,6 +426,7 @@ void main() {
         status: 'completed',
         auditEventId: 'audit-current-replacement-task',
       ),
+      expectedInstructionHash: _instructionHash,
       allowMcpContinuation: false,
       onUpdate: (_) {},
     );
@@ -489,6 +495,7 @@ void main() {
               status: 'running',
               auditEventId: 'audit-${scope.taskId}-start',
             ),
+            expectedInstructionHash: _instructionHash,
             allowMcpContinuation: false,
           ),
         )
@@ -525,6 +532,7 @@ void main() {
             status: 'completed',
             auditEventId: 'audit-completed-without-continuation',
           ),
+          expectedInstructionHash: _instructionHash,
           allowMcpContinuation: false,
           onUpdate: (_) {
             observed++;
@@ -535,6 +543,151 @@ void main() {
 
     expect(observed, 1);
     observerGate.complete();
+    coordinator.dispose();
+  });
+
+  test('開始Taskの指示hashが事前検査と異なる場合はMCP結果連携を行わない', () async {
+    final transport = _FakeBrokerTransport([]);
+    final coordinator = AgentTaskExecutionCoordinator(transport);
+    final updates = <AgentTaskExecutionUpdate>[];
+
+    await coordinator.observeStartedTask(
+      request: _sourceRequest,
+      task: const AgentTaskRecord(
+        taskId: _sourceTaskId,
+        runtimeId: 'codex-local',
+        sessionId: _session,
+        workspaceId: 'workspace-local',
+        instructionHash: _conditionsHash,
+        status: 'completed',
+        auditEventId: 'audit-mismatched-instruction',
+        resultHash: _sourceResultHash,
+        resultContentAvailable: true,
+      ),
+      expectedInstructionHash: _instructionHash,
+      onUpdate: updates.add,
+    );
+
+    expect(transport.operations, isEmpty);
+    expect(updates, hasLength(2));
+    expect(updates.last.error, contains('指示hashが事前検査と一致しない'));
+    coordinator.dispose();
+  });
+
+  test('事前検査hashがない開始TaskはMCP結果連携を行わない', () async {
+    final transport = _FakeBrokerTransport([]);
+    final coordinator = AgentTaskExecutionCoordinator(transport);
+    final updates = <AgentTaskExecutionUpdate>[];
+
+    await coordinator.observeStartedTask(
+      request: _sourceRequest,
+      task: _sourceTask,
+      expectedInstructionHash: null,
+      onUpdate: updates.add,
+    );
+
+    expect(transport.operations, isEmpty);
+    expect(updates, hasLength(2));
+    expect(updates.last.error, contains('事前検査hashがない'));
+    coordinator.dispose();
+  });
+
+  test('要求とRuntime／Session／Workspaceが異なる開始Taskを監視しない', () async {
+    const unboundTasks = [
+      AgentTaskRecord(
+        taskId: _sourceTaskId,
+        runtimeId: 'codex-other',
+        sessionId: _session,
+        workspaceId: 'workspace-local',
+        instructionHash: _instructionHash,
+        status: 'completed',
+        auditEventId: 'audit-other-runtime',
+      ),
+      AgentTaskRecord(
+        taskId: _sourceTaskId,
+        runtimeId: 'codex-local',
+        sessionId: 'session-other',
+        workspaceId: 'workspace-local',
+        instructionHash: _instructionHash,
+        status: 'completed',
+        auditEventId: 'audit-other-session',
+      ),
+      AgentTaskRecord(
+        taskId: _sourceTaskId,
+        runtimeId: 'codex-local',
+        sessionId: _session,
+        workspaceId: 'workspace-other',
+        instructionHash: _instructionHash,
+        status: 'completed',
+        auditEventId: 'audit-other-workspace',
+      ),
+    ];
+
+    for (final task in unboundTasks) {
+      final transport = _FakeBrokerTransport([]);
+      final coordinator = AgentTaskExecutionCoordinator(transport);
+      final updates = <AgentTaskExecutionUpdate>[];
+
+      await coordinator.observeStartedTask(
+        request: _sourceRequest,
+        task: task,
+        expectedInstructionHash: _instructionHash,
+        onUpdate: updates.add,
+      );
+
+      expect(transport.operations, isEmpty);
+      expect(updates, hasLength(1));
+      expect(
+          updates.single.error, contains('Runtime／Session／Workspaceが要求と一致しない'));
+      coordinator.dispose();
+    }
+  });
+
+  test('Task状態のWorkspace差替え後は結果露出とMCP作用を停止する', () async {
+    final transport = _FakeBrokerTransport([
+      _accepted('AgentTask状態', {
+        'task_id': _sourceTaskId,
+        'record_version': 2,
+        'agent_runtime_id': 'codex-local',
+        'session_id': _session,
+        'workspace_id': 'workspace-replaced',
+        'description': 'Agent作業Task（結果本文とWorkspace差分は別の権限経路）',
+        'instruction_hash': _instructionHash,
+        'status': 'completed',
+        'audit_event_id': 'audit-replaced-workspace',
+        'result_hash': _sourceResultHash,
+        'result_content_available': true,
+      }),
+    ]);
+    final coordinator = AgentTaskExecutionCoordinator(transport);
+    final rejected = Completer<AgentTaskExecutionUpdate>();
+    final monitoring = coordinator.observeStartedTask(
+      request: _sourceRequest,
+      task: const AgentTaskRecord(
+        taskId: _sourceTaskId,
+        runtimeId: 'codex-local',
+        sessionId: _session,
+        workspaceId: 'workspace-local',
+        instructionHash: _instructionHash,
+        status: 'running',
+        auditEventId: 'audit-source-task-running',
+        resultContentAvailable: true,
+      ),
+      expectedInstructionHash: _instructionHash,
+      onUpdate: (update) {
+        if (update.error != null && !rejected.isCompleted) {
+          rejected.complete(update);
+        }
+      },
+    );
+
+    final update = await rejected.future.timeout(const Duration(seconds: 5));
+    await monitoring;
+
+    expect(update.error, contains('Workspace／指示hashが開始時から変化'));
+    expect(transport.operations, ['AgentTask状態']);
+    expect(transport.operations, isNot(contains('AgentTask結果表示承認')));
+    expect(transport.operations, isNot(contains('MCP Tool実行')));
     coordinator.dispose();
   });
 
@@ -550,6 +703,7 @@ void main() {
     final oldRun = coordinator.observeStartedTask(
       request: _sourceRequest,
       task: _sourceTask,
+      expectedInstructionHash: _instructionHash,
       onUpdate: (_) {},
     );
     await requestStarted.future.timeout(const Duration(seconds: 1));
@@ -565,6 +719,7 @@ void main() {
         status: 'completed',
         auditEventId: 'audit-new-current-task',
       ),
+      expectedInstructionHash: _instructionHash,
       allowMcpContinuation: false,
       onUpdate: (_) {},
     );
@@ -1010,6 +1165,7 @@ Future<
   final oldRun = coordinator.observeStartedTask(
     request: _sourceRequest,
     task: _sourceTask,
+    expectedInstructionHash: _instructionHash,
     onUpdate: updates.add,
   );
 
@@ -1025,6 +1181,7 @@ Future<
       status: 'completed',
       auditEventId: 'audit-replacement-task',
     ),
+    expectedInstructionHash: _instructionHash,
     allowMcpContinuation: false,
     onUpdate: (_) {},
   );
