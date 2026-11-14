@@ -711,8 +711,11 @@ jobs:
           git clone --depth 1 --branch 3.44.0 https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
           test "$(git -C "$RUNNER_TEMP/flutter" rev-parse HEAD)" = 559ffa3f75e7402d65a8def9c28389a9b2e6fe42
           echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+          export RUSTUP_HOME="$RUNNER_TEMP/rustup"
+          mkdir -p "$RUSTUP_HOME"
           rustup toolchain install 1.95.0 --profile minimal
-          rustup show active-toolchain | tee "$evidence/rust-toolchain.txt"
+          printf 'RUSTUP_HOME=%s\n' "$RUSTUP_HOME" >> "$GITHUB_ENV"
+          { rustc +1.95.0 --version; cargo +1.95.0 --version; } | tee "$evidence/rust-toolchain.txt"
       - name: macOS Broker identity境界試験
         shell: bash
         run: |

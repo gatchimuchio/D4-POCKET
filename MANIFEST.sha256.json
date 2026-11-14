@@ -81,7 +81,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "23d9ccc2cdda9c0d67a62c829ff22cc32890471fe85922005759141d49e2174c"
+      "sha256": "d500706a31f51768514f9774703120bf4d36736044aa310ebcf6366d7bd7fdb3"
     },
     {
       "path": ".github/workflows/linux-manual-export-build.yml",
@@ -1513,7 +1513,7 @@
     },
     {
       "path": "docs/QE_2026-11-14/\u9032\u6357.md",
-      "sha256": "f0744016da76b8f97b7fa9538248ac3684235ff0461a35e5254c3e4798af8516"
+      "sha256": "6621f100b7132d170e8f826363dcc3dc022f1a0d4d3f723e3856b59d0df4ffd2"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -5577,7 +5577,7 @@
     },
     {
       "path": "tooling/export_macos_product.py",
-      "sha256": "9e5eb2ec2b0389b21289e76dd1c080e9b920bca040758a15e0a72c64ea486a48"
+      "sha256": "3ad708f8a177af8dde6a9919bf55f45ce1279e223671f11470b908eba83de200"
     },
     {
       "path": "tooling/export_windows_product.py",
@@ -5745,7 +5745,7 @@
     },
     {
       "path": "tooling/tests/test_export_macos_product.py",
-      "sha256": "f5afb14ccd1b238cea15333c60676a82cec61d0ae8dcc6b0dd5ffb31d23b3745"
+      "sha256": "15c0700d97530bb042bc05d417eac90fa7b1878f34913be690d0832d1a66930c"
     },
     {
       "path": "tooling/tests/test_linux_deb_setup_package.py",

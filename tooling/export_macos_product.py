@@ -375,7 +375,6 @@ def build_macos_product(
                 "rustc": _tool_version([tools["rustc"], "+" + RUST_TOOLCHAIN, "--version"], cwd=source_root, environment=environment),
                 "xcodebuild": _tool_version([tools["xcodebuild"], "-version"], cwd=source_root, environment=environment),
                 "macos_version": _tool_version(["/usr/bin/sw_vers", "-productVersion"], cwd=source_root, environment=environment),
-                "macos_version": _tool_version(["/usr/bin/sw_vers", "-productVersion"], cwd=source_root, environment=environment),
             }
             app_owner_manifest = source_root / "native/macos_owner/Cargo.toml"
             broker_manifest = source_root / "native/rust_helper/Cargo.toml"

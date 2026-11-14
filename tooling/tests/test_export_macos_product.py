@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 from tooling.export_macos_product import (
     _macos_artifact_inventory,
+    _macos_environment,
     _patch_app_identity,
     _scan_macos_artifacts,
     _validate_build_evidence,
@@ -25,6 +26,40 @@ from tooling.tests.create_macos_export_fixture import (
 
 
 class MacOSProductExportTests(unittest.TestCase):
+    def test_isolated_macos_environment_preserves_explicit_rustup_home(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-macos-env-") as temp:
+            root = Path(temp)
+            flutter_root = root / "flutter"
+            rustup_home = root / "runner-rustup"
+            flutter_root.mkdir()
+            rustup_home.mkdir()
+            with patch.dict(
+                "os.environ",
+                {
+                    "PATH": "/fixed/bin",
+                    "RUSTUP_HOME": str(rustup_home),
+                    "AWS_SECRET_ACCESS_KEY": "must-not-propagate",
+                },
+                clear=True,
+            ):
+                environment = _macos_environment(root, flutter_root=flutter_root)
+
+            self.assertEqual(environment["PATH"], "/fixed/bin")
+            self.assertEqual(environment["RUSTUP_HOME"], str(rustup_home))
+            self.assertEqual(environment["HOME"], str(root / "home"))
+            self.assertEqual(environment["CARGO_HOME"], str(root / "cargo"))
+            self.assertEqual(environment["FLUTTER_ROOT"], str(flutter_root))
+            self.assertNotIn("AWS_SECRET_ACCESS_KEY", environment)
+
+    def test_isolated_macos_environment_rejects_missing_rustup_home(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-macos-env-missing-") as temp:
+            root = Path(temp)
+            flutter_root = root / "flutter"
+            flutter_root.mkdir()
+            with patch.dict("os.environ", {"PATH": "/fixed/bin"}, clear=True):
+                with self.assertRaisesRegex(ValueError, "toolchain環境が不足"):
+                    _macos_environment(root, flutter_root=flutter_root)
+
     def test_macos_receipt_and_manifest_are_valid_for_macos_module_plan(self) -> None:
         receipt_raw, manifest_raw = macos_export_pair()
         receipt, manifest, plan, receipt_hash, manifest_hash = validate_export_inputs(
