@@ -1,8 +1,8 @@
 # GUI Shell の主張境界
 
-## v4の現行主張・保証範囲（2026-11-13）
+## v5の現行主張・保証範囲（2026-11-14）
 
-現行製品はD4 Pocketで、Windows／macOS／LinuxのDesktopとAndroid／iOSのMobileを必須対象とする。Windows-firstは優先順位であり、Linuxを開発用の補助対象へ限定しない。現行の製品要求・工程・状態は[v4採用記録](docs/QE_2026-11-13/採用記録.md)と[v4進捗](docs/QE_2026-11-13/進捗.md)、rev5受入れ履歴は[REV5_PRODUCT_PROGRESS.md](docs/REV5_PRODUCT_PROGRESS.md)、QE施工方法は[2026-10-22 QE正本](docs/QE_2026-10-22/採用記録.md)、出荷関門は`release_blockers.registry.json`を参照する。v4の標準OS installed製品QAは未成立であり、過去の局所実証をv4候補へ転記しない。非Windows物理端末を要求しない。
+現行製品はD4 Pocketで、Windows／macOS／LinuxのDesktopとAndroid／iOSのMobileを必須対象とする。Windows-firstは優先順位であり、Linuxを開発用の補助対象へ限定しない。現行の製品要求・工程・状態は[v5採用記録](docs/QE_2026-11-14/採用記録.md)と[v5進捗](docs/QE_2026-11-14/進捗.md)、旧v4は[当時の履歴](docs/QE_2026-11-13/進捗.md)。rev5受入れ履歴は[REV5_PRODUCT_PROGRESS.md](docs/REV5_PRODUCT_PROGRESS.md)、QE施工方法は[2026-10-22 QE正本](docs/QE_2026-10-22/採用記録.md)、出荷関門は`release_blockers.registry.json`を参照する。v5の標準OS installed製品QAは未成立であり、過去の局所実証をv5候補へ転記しない。各OSでInstaller/Packageを導入してサービス利用できる完成製品を目標とし、Windows所有PCの完成品最終確認以外のOS別物理端末試験を必須としない。非Windowsは宣言標準OSの合法な仮想/hosted/Emulator/Simulatorで検査し、未実証範囲の保証を主張しない。
 
 ## v3時点の製品証拠（履歴、2026-11-08）
 

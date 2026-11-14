@@ -1,6 +1,6 @@
 # D4Pocket エージェント実装・監査規定
 
-本書はD4Pocket（旧GUI-Shell）のAI実装エージェントが守るリポジトリ共通規律である。QE方法論・工程・2026-10-22の是正工程の詳細は、採用記録付きの現行QE方法論3点（docs/QE_2026-10-22/）を適用する。現在の製品要求・工程・施工指示・進捗は、ユーザー指示で採用したdocs/QE_2026-11-13/を適用する。2026-11-09以前の統合製品文書は当時の要求・判断・証拠として保持し、現行状態を上書きしない。既存の製品要求、安全境界、権限、復旧、OS別証拠、Git運用を保持する。BLUE側のHDS-BRAIN実装、192小単位、別リポジトリの成果や書込み権限は移植しない。
+本書はD4Pocket（旧GUI-Shell）のAI実装エージェントが守る**恒常的な責任・安全・資産保全・証拠規律**であり、製品別工程や「次の局所BUILD_BATCH」の選定機構ではない。製品の主語・目的・全要求は`docs/QE_2026-11-14/01_D4Pocket_SPEC_v5_JA.md`、製造工程は同`02_D4Pocket_PLAN_v5_JA.md`、施工対象・順序・完了条件は同`03_D4Pocket_CODEX_v5_JA.md`が責任正本。現行進捗は同`進捗.md`。QE方法論・2026-10-22是正工程は採用済み`docs/QE_2026-10-22/`を保持する。`docs/QE_2026-11-13/` v4以下は当時の要求・判断・証拠として保持し、現行指示へ昇格しない。既存の製品要求、安全境界、権限、復旧、OS別証拠、Git運用を保持する。BLUE側のHDS-BRAIN実装、192小単位、別リポジトリの成果や書込み権限は移植しない。
 
 ## 第I部 共通基底規律
 
@@ -16,13 +16,15 @@
 - `QE_QA`：同一候補のQC証拠から、対象・機能・OS・版・条件ごとに`QA_SCOPED`／`QA_NOT_ESTABLISHED`／`OUT_OF_SCOPE`を判断する。
 - `QE_RELEASE_REVIEW`：正式出荷、鍵、署名、不可逆判断、Final GOはOwnerが独立して決める。
 
-**作業の切れ目と品質／Gitを閉じる単位を分離する。** 毎小タスクの開始・切替・再開時に、Ownerの最新指示、適用AGENTS.md、指定指示書、最新HEAD・remote・dirty差分、目的・作用・入出力・次consumerを再読する。これは目的ドリフトを減らすための再同期であって内部状態が消えた保証ではない。小単位では接続状態と残差を記録するだけでよく、関連する小単位を**BUILD_BATCH**へ束ねて必要な技術確認・Git保全・報告を閉じる。小単位のたびに全suite・QA判定・バックアップ回転・commit/pushを繰り返さない。
+**作業の切れ目と品質／Gitを閉じる単位を分離する。** 工程上の施工母集団・着工順・退出条件はv5施工指示書の専権であり、本書から局所BUILD_BATCHを自動選定しない。作業開始、指示・対象・HEAD・writer・安全境界の実質的変化時には関連する原文・現物差分を再同期する。個々の編集で全履歴/全3点/全suiteを再読・再検査せず、意味ある製品実Source/Consumer変更をまとめて技術確認・Git保全・報告する。文書・台帳・Manifestだけの反復を製品BUILDの完了扱いにしない。
 
 **安全第一・堅牢性第二。** Authority、Permission、Approval、Credential、秘密、Audit、Recovery、Content Exposure、Workspace／Host、process監督、OS保護、非冪等外部作用の境界はBUILD中も常時維持し、当該変更の必要な否定試験・安全停止をその場で実施する。不成立なら危険な経路を無効化・隔離する。既存試験・リリースゲートの削除や恒久skipは許可しない。
 
-対象OSはWindows-firstの優先順位を維持した上で**Windows／macOS／Linux（Desktop）、Android／iOS（Mobile）**。Linux nativeは独立した**必須の製品対象**であり、製品機能・導入・GUI・権限境界・配布まで完全対応する。Linux対応の対象可否や施工開始を、2026-10-12再構成3文書v1.1の採否待ちにしてはならない。2026-10-22 QE正本に記載されたLinux要求・試験・工程IDの現行状態は、その採用記録および各文書内の区分に従い、候補を黙ってAcceptanceへ昇格させない。WSL Ubuntu、WSLg X11、headlessの開発用証拠をLinux nativeの導入・GUI・権限・配布・Waylandの完成へ転用しない。現在のLinux製品受入状態は`docs/REV5_PRODUCT_PROGRESS.md`を参照する。
+対象OSはWindows-firstの優先順位を維持した上で**Windows／macOS／Linux（Desktop）、Android／iOS（Mobile）**。Linux nativeは独立した**必須の製品対象**であり、製品機能・導入・GUI・権限境界・配布まで完全対応する。Linux対応の対象可否や施工開始を、2026-10-12再構成3文書v1.1の採否待ちにしてはならない。2026-10-22 QE正本に記載されたLinux要求・試験・工程IDの現行状態は、その採用記録および各文書内の区分に従い、候補を黙ってAcceptanceへ昇格させない。WSL Ubuntu、WSLg X11、headlessの開発用証拠をLinux nativeの導入・GUI・権限・配布・Waylandの完成へ転用しない。現在のLinux製品受入状態は`docs/QE_2026-11-14/進捗.md`、以前の証拠は`docs/REV5_PRODUCT_PROGRESS.md`を参照する。
 
-本§0、§19、§20、§25、§28〜31は採用済みの**QE施工方法**を優先して示す。既存のrev5原本、採用済み緩衝補遺（`BUF-R01〜R09`、`BUF-T01〜T24`）、製品契約、安全・release gate、過去のCLOSED／FAILは削除しない。従来文書に小単位ごとの全suite／個別QA／毎回Git閉包が残れば、その部分は旧施工方式の残差として別途文書同期し、今回の`AGENTS.md`だけの更新で他文書を改竄しない。安全上の強い条件は常に保持する。
+使用者体験の共通到達点は、各OSに対応した通常インストーラー／正規配布形式の取得→導入→起動→サービス利用→更新・撤去である。Windows所有実機の最終確認を除き、他OSの物理端末試験を着工・完成の必須条件にせず、宣言標準OSを合法なVM/hosted/Emulator/Simulatorで検証する。未観測のOS/機能を保証済みと偽らず、配布資格・署名・Owner GOは別責任とする。
+
+本§0、§19、§20、§25、§28〜31は採用済みの**共通QE・証拠・保全境界**を示し、v5の製造順を独立に指示しない。既存rev5原本、採用済み緩衝補遺（`BUF-R01〜R09`、`BUF-T01〜T24`）、製品契約、安全・release gate、過去のCLOSED／FAILは削除しない。旧文書中の小単位全suite／個別QA／台帳先行は採用当時の施工履歴と区別し、現行v5に反する工程指示は再利用しない。安全上の強い条件は保持する。
 
 ### 1. 目的と規則優先順位
 
@@ -43,6 +45,8 @@
 `規定/正本索引.json`は、現行正本、責任地図、外部参照固定点を機械可読に示す索引である。各正本の実質要求を置き換えず、索引と実ファイルが矛盾する場合は不整合としてSUSPENDし、責任正本を確認する。
 
 現行状態の判断では、最新版として明示された仕様・工程表・進捗・実装指示を正本とする。旧版は、特に明示がない限り、当時の決定・失敗・証拠を確認する補助的な履歴資料であり、旧版の要求を現行要件へ自動継承したり、現行正本の状態を上書きしたりしない。索引・現行正本・実装の間に矛盾があれば旧版で補完せず、現行責任正本を特定して不整合を解消する。
+
+**正本の役割分離**：本書は共通安全・権限・Git等の不変条件、v5仕様書は製品要求、v5工程表は工程状態、v5施工指示書は施工順・対象選定・終了条件を担う。本書の「task最小変更」や「BUILD_BATCH」記述を、A〜J全躯体一巡を延期する局所Gateへ転換しない。工程の衝突はv5指示書に従って解消し、安全不変条件の衝突は該当危険作用を停止する。
 
 リポジトリ拡張規則は、本リポジトリのために共通基底規律を限定、強化、具体化できる。安全、権限境界、監査可能性、検証証拠、復旧要件を無言で弱めてはならない。
 
@@ -78,6 +82,8 @@
 - 完了報告前に、taskが導入した残骸、古いTODO、放棄した部分経路、一時的な実装残余を除去する。
 
 大量の生成構造は、完全性の証拠ではない。
+
+ここでの「最小の変更」は**未指示範囲の変更・権限拡張を防ぐ意味**であり、v5で指示された全A〜Jの製品施工母集団を個別機能の逐次完成へ縮小する根拠ではない。製品施工順序と全体出口はv5施工指示書に一本化する。
 
 #### 3.1 ローカル品質基準と手動補助実行
 
@@ -686,7 +692,7 @@ Product UI完成をcontract完成として扱わない。
 
 第I部の優先順位modelの範囲内で、リポジトリ固有の現行指針を次の順に使用する。
 
-1. 作業対象についてユーザーが明示した最新版の仕様・工程表・実装指示書と、それへ同期した現行進捗。現在のD4-N01〜N11、工程E0〜E6、施工線A〜J、W00〜W08のAcceptance・状態は、2026-11-13統合製品v4の採用記録と現行進捗が決める。W番号は受入座標であり、施工を番号順に直列化しない。2026-11-09以前の文書は当時の要求・判断・証拠として保持し、現行状態を上書きしない。
+1. 作業対象についてユーザーが明示した最新版の仕様・工程表・実装指示書と、それへ同期した現行進捗。現在のD4-N01〜N11、工程E0〜E6、施工線A〜J、W00〜W08のAcceptance・状態は、2026-11-14統合製品v5の採用記録と現行進捗が決める。W番号は受入座標であり、施工を番号順に直列化しない。2026-11-13 v4以前の文書は当時の要求・判断・証拠として保持し、現行状態を上書きしない。
 2. `docs/specs/adapter-conformance.md`、`docs/specs/content-exposure-policy.md`、`docs/specs/approval-visibility-boundary.md`および関連する`docs/specs/`契約。`docs/specs/gui-shell-spec-v1.md`は基盤仕様として扱い、最新版の現行指示で置き換えられていない技術責任範囲にだけ適用する。
 3. `specs/*.schema.json`
 4. `tooling/conformance_tests/`
@@ -701,24 +707,20 @@ Product UI完成をcontract完成として扱わない。
 
 衝突がある場合は、Shell Core authority boundary、Schema integrity、conformance coverage、operator safetyを保持する、より厳格な規則を選ぶ。
 
-### 25. 毎タスクの再読とBUILD_BATCHの必須作業順序
+### 25. 施工指示書との境界・変更時の再同期
 
-1. **小単位を開始・切替・再開するたび**、Owner最新指示、適用AGENTS、指定指示書、現行仕様・工程・進捗を読み直す。過去会話・古いphase番号で現況を推定しない。
-2. 現在の`main`／remote HEADとdirty差分、他writer、関連code・contract・testを照合する。既存作業のreset／clean／revert／上書きを禁止する。
-3. 元目的、対象・非対象、入力・作用・出力、次consumer、対象OS／Host、観測結果、安全・停止条件を短く固定する。
-4. 基盤仕様`docs/specs/gui-shell-spec-v1.md`、該当`docs/specs/`、拡張標準、関連Schemaを必要範囲で読み、Shell Core／UI／Adapter／Rust helperの責任を維持する。
-5. 契約変更は意味正本→Schema→必要なConformance→実consumerへ接続する。技術的に継続を阻む欠陥は局所修正し、安全・権限・秘密の欠陥は直ちに修復・停止する。
-6. 小単位では`CODE_PRESENT/WIRED/BUILD_GAP/BLOCKED_AUTHORITY`を記録して次consumerへ進み、新しい切れ目で1へ戻る。小単位ごとの全suite／QC／QA／Git回転は行わない。
-7. 実接続が前進したBUILD_BATCH末だけ、§19の必要技術確認・安全検証、§20のD4固有2世代**remote tag**・限定commit/push・remote HEAD照合を行い、根拠・未実施・残差を報告する。
-8. `BUILD_COVERED`後に実物QE_QC、対象別QE_QA、Owner最終判断へ進む。ただし既存Q0〜Q7の新規開始、通常Release、Owner GOは別の明示条件とする。
+施工者の**具体的な作業対象、工程順序、BUILD_BATCH構成、次consumer、終了判定は現行v5施工指示書のみ**で指定する。本§25は独立した作業割当、先行台帳作業、局所BUILD_BATCH選択、独自Gateを追加しない。
 
-後続の安全、検証可能性、正式出荷の根拠を弱める局所最適化を禁止する。
+- 着工時とOwner指示・HEAD/remote・writer・安全境界・変更対象が実質的に変わった時に、該当する最新版・現物差分と影響Consumerを再同期する。毎編集に全資料を再読する義務はない。
+- dirty/staged差分と他worktree・他writerを保護し、`reset/clean/revert`等でユーザー資産を消さない。共有契約・Rust Broker Authority・日本語意味正本・Schema/実Consumerの境界を保つ。
+- 重大な安全・認可・Credential・Audit・Recoveryの欠陥は該当作用を即時停止・隔離し、独立して施工できる製品線を一律停止しない。
+- 対象変更に必要な限定検査は§19、意味ある施工または許可された単発統治変更のGit閉包は§20を適用する。文書/台帳だけの変更を製品BUILD進捗へ数えない。正式Q0〜Q7・Owner GOは別条件である。
 
 ### 26. 現行指示・ROADMAP参照
 
 現行ROADMAPの正本は`ROADMAP.md`である。
 
-基盤の共通実装仕様はdocs/specs/gui-shell-spec-v1.mdである。現行製品要求・工程・施工指示と全体BUILD進捗は、ユーザー指示で採用したdocs/QE_2026-11-13/を正本とする。2026-11-09以前の三点・受入証拠は採用・判断・状態の履歴として保持し、現行状態を上書きしない。製品機能の原要求、既存AcceptanceとRelease Gateはrev5原本、採用済み緩衝補遺、docs/REV5_PRODUCT_PROGRESS.mdに保持する。QE方法論・工程・D4-AUD是正手順は採用記録付きのdocs/QE_2026-10-22/を引き続き正本とし、製品三点セットはQE方法論を置換しない。2026-10-12のQE再構成3文書は履歴・補助資料であり、現行正本の状態を上書きしない。
+基盤の共通実装仕様はdocs/specs/gui-shell-spec-v1.mdである。**現行製品3点セットおよび全体BUILD進捗は`docs/QE_2026-11-14/`を正本**とし、原本v4 `docs/QE_2026-11-13/`と2026-11-09以前の三点・受入証拠は履歴として保持する。製品機能の原要求、既存AcceptanceとRelease Gateはrev5原本、採用済み緩衝補遺、docs/REV5_PRODUCT_PROGRESS.mdに保持する。QE方法論・D4-AUD是正手順は採用記録付き`docs/QE_2026-10-22/`を引き続き正本とし、製品三点セットはQE方法論を置換しない。2026-10-12のQE再構成3文書は履歴・補助資料であり、現行正本の状態を上書きしない。
 
 拡張標準は`docs/standards/gui-shell-extended-standard.md`である。
 
@@ -754,7 +756,7 @@ QEは要求・設計・実装・観測・是正を通じた上位思想である
 
 ### 29. rev5製品・B工程の現況と施工境界
 
-rev5／緩衝基盤の製品Acceptance履歴と証拠にはdocs/REV5_PRODUCT_PROGRESS.mdを、現在の工程E0〜E6、施工線A〜JとW00〜W08受入状態にはdocs/QE_2026-11-13/進捗.mdを参照する。2026-11-09以前の統合製品進捗は当時の状態として保持する。以下の2026-10-12、2026-10-19記述は履歴snapshotであり、現在の施工境界として使わない。
+rev5／緩衝基盤の製品Acceptance履歴と証拠にはdocs/REV5_PRODUCT_PROGRESS.mdを、現在の工程E0〜E6、施工線A〜JとW00〜W08の受入状態にはdocs/QE_2026-11-14/進捗.mdを参照する。v4台帳・進捗は履歴と未完了要求の引継ぎ元であり、v5のE0着工Gateではない。以下の2026-10-12、2026-10-19記述とその「次作業」は履歴snapshotであり、現在の施工境界・作業選択に使わない。
 
 履歴snapshot（2026-10-12）: P2 Compare／P3 Handoff／P12 Windows／P13 Mobile・Non-Windowsは局所CLOSED、B0〜B3はCLOSED、B4-L1／B4-L2は局所CLOSED、当時のB4全体はOPEN。B4統合製品経路は2026-10-17に限定Acceptanceを満たしてCLOSEDとなった。詳細は現行進捗とB4記録を参照する。
 
@@ -774,6 +776,6 @@ W01/G1のCLOSED範囲はWindows normal Release／Codex CLIに限る。別個のL
 
 Linux nativeは完全対応が必須の独立Desktop製品対象であり、その実装・工程開始は2026-10-12詳細案の採否に依存しない。QE方法論・工程・`D4-AUD-20261022`是正工程の現行正本は、Owner採用済みの[2026-10-22統合3点](docs/QE_2026-10-22/採用記録.md)とする。これらはrev5の製品機能要求を欠落なく置換したものではないため、rev5・既存Contract／Schema・緩衝補遺の要求意味、既存CLOSED／FAIL、製品状態、Release Gateを保持する。3点内で候補・未採用と明記されたIDや詳細工程はその区分も保持し、Linux必須性を弱めず、黙って拘束的Acceptanceへ昇格させない。正式Q0〜Q7、通常Release capability、Owner GOは既存の開始条件を維持する。
 
-2026-11-05〜09統合製品文書は、Ownerが当時採用した要求・状態・証拠として保持する。現在の製品要求・工程・施工指示は2026-11-13 v4三点セットであり、採用記録（docs/QE_2026-11-13/採用記録.md）と現HEAD状態を示す進捗（docs/QE_2026-11-13/進捗.md）を参照する。工程E0〜E6で全要求を照合し、A〜Jを全体BUILDへ投入する。W00=SCOPED_PASS、W01/G1=CLOSED（Windows normal Release／Codex CLI限定）、W02/G2=OPEN、B5=OPEN、B6未完了、正式Q0〜Q7=DEFERRED、release_ready=falseを維持する。v4は2026-10-22 QE方法論を置換せず、rev5／緩衝基盤、既存CLOSED／FAIL、Final QA、責任者GOの履歴・責任を保持する。
+2026-11-13 v4三点と2026-11-05〜09統合製品文書は当時の要求・判断・証拠として保持する。**現行製品要求・工程・施工指示は2026-11-14 v5三点セット**（`docs/QE_2026-11-14/`）であり、同所の採用記録・進捗を参照する。E0は4出力の着工同期に限定し、詳細台帳完成はE3へ移す。施工者は現行指示書に従いA〜J全躯体の本番Sourceを一巡で構築してから接続・全数監査・統合QC・対象別QAへ進む。旧W00=SCOPED_PASS、W01/G1=限定CLOSED、W02/G2=OPEN、B5=OPEN、B6未完了、正式Q0〜Q7=DEFERRED、release_ready=falseは**新たな反証/実証がない限り旧履歴範囲**で保持する。v5採用は2026-10-22 QE方法論、rev5製品要求・緩衝基盤、安全・Release Gate、Final QA、責任者GOを置換しない。
 
 D4Pocket固有のremoteバックアップ正本は`refs/tags/codex/backup-main`と`refs/tags/codex/backup-main-prev`。BLUE側の`refs/heads`へ自動変更しない。D4の手動`workflow_dispatch`限定Actions運用、direct-main、単一writer、Shell Core／Broker authority、各OSの証拠区分を保持する。LinuxはWindows・macOSと並ぶ独立Desktop対象だが、native製品の実接続・導入・Release・保証が実証済みとは主張しない。既存試験・Release Gateを省略せず、作業開始時に現物と正本を再読する。

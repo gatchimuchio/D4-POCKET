@@ -3898,7 +3898,7 @@ def test_strict_release_requires_current_n_w_consumer_evidence() -> list[str]:
         no_evidence = complete_ledger.replace("[evidence](evidence.md)", "[evidence](missing.md)", 1)
         if not any("W00" in error and "evidence" in error for error in workplan_acceptance_errors(no_evidence, root, progress_directory)):
             errors.append("存在しないlocal evidenceをstrict releaseが受理した")
-    current_progress = ROOT / "docs" / "QE_2026-11-13" / "進捗.md"
+    current_progress = ROOT / "docs" / "QE_2026-11-14" / "進捗.md"
     if current_progress.is_file():
         current_errors = workplan_acceptance_errors(current_progress.read_text(encoding="utf-8"), ROOT)
         if not any("W02" in error for error in current_errors):
@@ -7523,7 +7523,7 @@ def test_packaging_portability_utf8_governance_allowlist_is_exact() -> list[str]
         )
 
     current_qe_document_errors = portable_path_errors(
-        [ROOT / "docs" / "QE_2026-11-13" / "03_D4Pocket_Codex施工指示書_v4.md"]
+        [ROOT / "docs" / "QE_2026-11-14" / "03_D4Pocket_CODEX_v5_JA.md"]
     )
     if current_qe_document_errors:
         errors.append(

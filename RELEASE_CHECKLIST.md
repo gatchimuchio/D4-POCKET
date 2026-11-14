@@ -1,8 +1,8 @@
 # リリースチェックリスト
 
-## v4の現行対象と関門（2026-11-13）
+## v5の現行対象と関門（2026-11-14）
 
-製品対象はWindows／macOS／LinuxのDesktopとAndroid／iOSのMobile。現行工程・状態は[v4進捗](docs/QE_2026-11-13/進捗.md)、rev5受入れ履歴は[REV5_PRODUCT_PROGRESS.md](docs/REV5_PRODUCT_PROGRESS.md)、出荷関門は`release_blockers.registry.json`を参照する。現在18項目中16項目がunresolvedである。v4では非Windows物理端末を必須条件にせず、宣言した標準OSのinstalled製品をVM/hosted/Emulator/Simulatorで検証する。Windows所有実機での完成品確認は記録する。署名・Publisher identity・配布資格・Owner GOは独立関門のまま維持する。以下の旧欄は測定時点の状態・結果を保持し、v4候補の実証へ転記しない。
+製品対象はWindows／macOS／LinuxのDesktopとAndroid／iOSのMobile。現行工程・状態は[v5進捗](docs/QE_2026-11-14/進捗.md)、rev5受入れ履歴は[REV5_PRODUCT_PROGRESS.md](docs/REV5_PRODUCT_PROGRESS.md)、出荷関門は`release_blockers.registry.json`を参照する。採用前観測で18項目中16項目がunresolvedである。v5では非Windows物理端末を必須条件にせず、宣言した標準OSのinstalled製品を合法なVM/hosted/Emulator/Simulatorで検証する。Windows所有実機での完成品最終確認は記録する。署名・Publisher identity・配布資格・Owner GOは独立関門のまま維持する。以下の旧欄は測定時点の状態・結果を保持し、v5候補の実証へ転記しない。
 
 Windows B4はstaged `r2-e2e`の有限経路に限定してCLOSED、B5はOPEN。run #55（source `1e57a828`）はRust試験572成功／0失敗／13除外でもcapture判定でworkflow FAILし、Broker build／IPC smokeはSKIP。Linux run #107（source `bf2a51ac`）の成功はUbuntu 24.04／Xvfb・X11の導入済みGTK製品・合成MCPだけで、同runの資格情報保管・更新等の受入れstepは対象外SKIPである。別run #77／#94の限定成功はそれぞれのsourceに結合する。[F03実績文書対応](docs/QE_2026-10-22/F03_実績文書対応.md)に各実行の射程を示す。
 
@@ -55,7 +55,7 @@ Windows-first product path と LLM-readable substrate の demonstration path を
   registry_id: rev2_mobile_flutter_native_device_link_boundary
   reason: Dart直接経路は廃止し、Android Kotlin／iOS Swiftのnative招待・Keychain／Keystore・TLS経路とnative Workspace選択面を実装済み。iOS Simulator buildとnative XCTest 8件は手動Actions run #22でPASSしたが、実端末のOS保管・実TLS・lifecycle、Brokerとのnative LIVE_RUNTIME接続は未確認。過去Dart経路やSimulator fixtureだけではproduction経路の成立を証明しない。
   historical: true
-  required_action: （旧v3時点の記録。現行v4条件はregistry_id=rev2_mobile_flutter_native_device_link_boundaryに従う。）
+  required_action: （旧v3時点の記録。現行v5条件はregistry_id=rev2_mobile_flutter_native_device_link_boundaryに従う。）
   blocks_release: yes
 
 - item: D4 Pocket 更新取得のDNS期限・破損package Recovery・installed updateが未成立

@@ -1,10 +1,16 @@
 # GUI Shell ロードマップ
 
-## 現行統合製品工程（2026-11-13 v4）
+## 現行統合製品工程（2026-11-14 v5）
 
-ユーザー指示により採用した現行仕様・工程・Codex施工指示はdocs/QE_2026-11-13/に保存し、採用記録と現行進捗を参照する。E0の全要求照合後、A〜Jを同じ全体BUILD期間へ投入し、E1全体BUILD→E2接続→E3 BUILD_COVERED→E4全体QC→E5標準OS QA→E6 Release Reviewへ進む。W00〜W08、P／B／Q等は要求・受入座標・履歴であり、番号順の施工待ちにしない。v4初期状態はW00=SCOPED_PASS、W01/G1=CLOSED（Windows normal Release／Codex CLI限定）、W02/G2=OPEN、B5=OPEN、B6未完了、正式Q0〜Q7=DEFERRED、Release Blockerは18件中16件unresolved／2件resolved、release_ready=false。v3以前の採用記録・進捗・失敗は履歴として保持し、現行状態を上書きしない。非Windowsの物理端末を製品施工・QAの必須条件にせず、宣言対象OSのinstalled製品を標準VM/hosted/Emulator/Simulatorで検証する。
+製品仕様・工程・施工指示の正本は[`docs/QE_2026-11-14/`](docs/QE_2026-11-14/)のv5三点、採用記録、進捗とする。**施工順、全A〜Jの対象選定、工程完了条件はv5施工指示書が一元的に指示**し、ROADMAPやAGENTS.mdは「次の局所BUILD_BATCH」を別個に選定しない。E0の出口は現HEAD/正本・要求全ID索引・共通契約/施工先・安全停止範囲の4出力だけであり、21列級の全ID消費台帳はE1全躯体実Source施工→E2全Consumer接続後のE3で全数監査する。文書/台帳/Manifest反復を製品BUILDとは数えない。技術的な依存と安全隔離を除き、各機能・OSの完成待ちで他線の着工を止めない。
 
-QE段階・BUILD_BATCH・結合後QC／QAの方法論はOwner採用済みの[`docs/QE_2026-10-22/`](docs/QE_2026-10-22/)に従う。rev5製品要求、既存P／B／Qの履歴、緩衝基盤、Release Gateは保持し、v4は過去の限定CLOSED／FAILを遡及変更しない。以下のv3施工記録は履歴であり、上記現行工程の状態を上書きしない。
+対象はWindows/macOS/Linux DesktopとAndroid/iOS。一般利用者は各OSの通常Installer/Packageを導入して使用できる製品体験を目標とし、所有Windows PCで完成候補の最終実機確認を行う。他OSは宣言標準OSに対する合法なVM/hosted/Emulator/Simulatorで検査し、物理端末の全数検証を義務化しない。未実証範囲は`QA_NOT_ESTABLISHED`とする。既存のAuthority、安全、Release Registry、Owner GO、過去の限定CLOSED/FAILは不変。
+
+### 履歴：2026-11-13 v4（非現行）
+
+当時ユーザー指示により採用したv4仕様・工程・Codex施工指示はdocs/QE_2026-11-13/に保存し、v4採用記録と当時の進捗を参照する。v4ではE0の全要求照合後、A〜Jを同じ全体BUILD期間へ投入し、E1全体BUILD→E2接続→E3 BUILD_COVERED→E4全体QC→E5標準OS QA→E6 Release Reviewへ進むと定義した。W00〜W08、P／B／Q等は要求・受入座標・履歴であり、番号順の施工待ちにしない。v4初期状態はW00=SCOPED_PASS、W01/G1=CLOSED（Windows normal Release／Codex CLI限定）、W02/G2=OPEN、B5=OPEN、B6未完了、正式Q0〜Q7=DEFERRED、Release Blockerは18件中16件unresolved／2件resolved、release_ready=false。v3以前の採用記録・進捗・失敗は履歴として保持し、v4当時の状態を上書きしない。非Windowsの物理端末を製品施工・QAの必須条件にせず、宣言対象OSのinstalled製品を標準VM/hosted/Emulator/Simulatorで検証するとした。**本項はv4履歴であり、現行施工に適用する順序・着工Gateは冒頭のv5を使用する。**
+
+QE段階・BUILD_BATCH・結合後QC／QAの方法論はOwner採用済みの[`docs/QE_2026-10-22/`](docs/QE_2026-10-22/)に従う。rev5製品要求、既存P／B／Qの履歴、緩衝基盤、Release Gateは保持し、v4は過去の限定CLOSED／FAILを遡及変更しない。以下のv3施工記録は履歴であり、冒頭v5現行工程の状態を上書きしない。
 
 ## 2026-11-09〜11-12 v3施工履歴（非現行）
 
@@ -406,7 +412,7 @@ R2追補（2026-09-30）: Rust公開APIの旧更新署名入口は署名値が�
 
 R2追補（2026-09-30）: Windows Broker スモーク収集器 v6は実Rust Broker processへ通常loopback credentialでAgent Task Workspace Permission／Owner Approvalの発行要求を送り、両方が`desktop_native_owner_confirmation_required`で拒否されることを実測・必須化した。現行Rust 対象ソースcommit `e8ea0587031402a19fc9dff260d7c925403cca2e`由来のstandalone Release helperでLIVE_RUNTIME成功したが、作業treeの文書／tooling差分を含む状態でのbuildであり、導入済み製品、Desktop native Owner操作、Agent Task実行、release evidence provenanceではない。Task対応は`unsupported`、Windows installed-smoke blockerと`release_ready=false`を維持する。詳細は`docs/REV3_PROGRESS.md`および`release_blockers.registry.json`。
 
-履歴（2026-09-29）：当時受領したrev3統合仕様・工程表を開発基準としていた。R0で再測定した基準commit、検証結果、環境差、formal evidence、既存blockerの一覧は[`docs/REV3_PROGRESS.md`](docs/REV3_PROGRESS.md)に記録した。旧rev1／rev2の進捗記録は履歴として保持し、rev3の完成証拠へ読み替えない。現在の施工正本は冒頭に示す2026-11-13 v4である。
+履歴（2026-09-29）：当時受領したrev3統合仕様・工程表を開発基準としていた。R0で再測定した基準commit、検証結果、環境差、formal evidence、既存blockerの一覧は[`docs/REV3_PROGRESS.md`](docs/REV3_PROGRESS.md)に記録した。旧rev1／rev2の進捗記録は履歴として保持し、rev3の完成証拠へ読み替えない。現在の施工正本は冒頭に示す2026-11-14 v5である。
 
 rev3工程はR0からR16までを履歴追加型で進める。Windows 1.0のTechnical CompleteはR0–R14の技術工程で判定し、R15の非Windows工程およびR16のOwner Finalizationと混同しない。Owner操作を routine 検証の前提にせず、production identity／署名、production Audit key、Final GOはTechnical Complete後のOwner Finalizationに限定する。
 

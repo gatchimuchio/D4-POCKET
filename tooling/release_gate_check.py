@@ -12,7 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 RELEASE_BLOCKERS_REGISTRY = ROOT / "release_blockers.registry.json"
-CURRENT_ACCEPTANCE_PROGRESS = ROOT / "docs" / "QE_2026-11-13" / "進捗.md"
+CURRENT_ACCEPTANCE_PROGRESS = ROOT / "docs" / "QE_2026-11-14" / "進捗.md"
 REQUIRED_WORK_PHASES = tuple(f"W{index:02d}" for index in range(9))
 REQUIRED_PRODUCT_REQUIREMENTS = tuple(f"N{index:02d}" for index in range(1, 12))
 WINDOWS_EVIDENCE_STATUS_SOURCE = "windows_release_evidence"

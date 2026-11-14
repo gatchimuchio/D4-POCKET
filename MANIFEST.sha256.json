@@ -108,7 +108,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "4c56a4a9f1741c8b7eb466adfc7049786500b9991bf190a829e759a1d80b1fae"
+      "sha256": "76bfab7fc677cdf8b47a750b16b19e9882fbfb8eb2bbff48772b83956f5996ae"
     },
     {
       "path": "AUDIT.md",
@@ -124,11 +124,11 @@
     },
     {
       "path": "CLAIM.md",
-      "sha256": "f00cc1ad4e3cfcdee6c9522a290e206ef602cc2d2c11ea7f3aa17c6f4d3dfca6"
+      "sha256": "2c3b228fc145fc3bfc7610472915982768dcef2043888e6fa1414adf77cf831f"
     },
     {
       "path": "COMPATIBILITY_MATRIX.md",
-      "sha256": "5a18bc28e20e8ed5b356bb3583720b0f0118365e98d7370f5acd42d08040ff8b"
+      "sha256": "20d3d1d0d64e442f33e557d48ac83d0461608c3c756ecf3a96a7cd4d1aaab170"
     },
     {
       "path": "CONFIG.md",
@@ -144,7 +144,7 @@
     },
     {
       "path": "INSTALLER_STATUS.md",
-      "sha256": "9134b4a7026fe86895467feea9517171119dd1375de60b923606eec51c3706ec"
+      "sha256": "7f80112bc312f3ff9212e3ba94c830d4cf49526c0e984f5c529c8e349b1308e7"
     },
     {
       "path": "LICENSE",
@@ -160,7 +160,7 @@
     },
     {
       "path": "MOBILE_STATUS.md",
-      "sha256": "e4928e13f7fa0c21b57dd0ff87fc8fcbe6058ec063baf242e1ccd635262b8b64"
+      "sha256": "99dae77d9e4c8f77008d7b0ec786b107650d2f020a9f2047a3fa1936b9be9bcf"
     },
     {
       "path": "NOTICE",
@@ -168,19 +168,19 @@
     },
     {
       "path": "QUICKSTART.md",
-      "sha256": "2f4d988dd782511133ac9df31f5e22c0818df6930f919c1866350db30f35ce6f"
+      "sha256": "faccad54a62eef0f711d1b1d29cd251acdb0b5d2acaf5b3d990a47ca701fb0b2"
     },
     {
       "path": "README.md",
-      "sha256": "8b2d656c4c581085cca36dd96cc418a96725aaa44521d7e22c03d2f51205f575"
+      "sha256": "31c79f6482f384eedf1ff678c80466b6ce8c9184ca4c6a7eed0e81fa9c88895f"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "e4439deda55aa42ea47fdf84bbecea05208e5e17c013b37f1a345919672a2e11"
+      "sha256": "376ba18cf0b16dbaa2d4e4ea752334a50962c4c3b92462a9b90fb1e65a49ab8c"
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "c811323c49008d33728664e6b7dfbf111940997a73eb4669bb9e14cdc27ce22a"
+      "sha256": "fd1561e8d4e762566d24204142cc37fb3a87f09863fc4bdc34e22bcd52ece710"
     },
     {
       "path": "SECURITY.md",
@@ -1473,6 +1473,26 @@
     {
       "path": "docs/QE_2026-11-13/\u9032\u6357.md",
       "sha256": "7997296eb047406b8de1711f8adca4284748b695596e496a6725936ec8fa8669"
+    },
+    {
+      "path": "docs/QE_2026-11-14/01_D4Pocket_SPEC_v5_JA.md",
+      "sha256": "40c6b5c03653179d19ebc81fdd5b4693f7395fbb5c5a92c06b972ea1ef64758b"
+    },
+    {
+      "path": "docs/QE_2026-11-14/02_D4Pocket_PLAN_v5_JA.md",
+      "sha256": "100d9c1a0b3d3627b2c9d3a83f37c0675da345b3153dcc35a8d290204b35079a"
+    },
+    {
+      "path": "docs/QE_2026-11-14/03_D4Pocket_CODEX_v5_JA.md",
+      "sha256": "c663589224ebf1611f95d710812f973b70ca7d2aaa88f58d587bf9908c80ae1c"
+    },
+    {
+      "path": "docs/QE_2026-11-14/\u63a1\u7528\u8a18\u9332.md",
+      "sha256": "963cb8eed54929142aec894629d9e310b084cccda3c4768d4dc726217d8bbd9f"
+    },
+    {
+      "path": "docs/QE_2026-11-14/\u9032\u6357.md",
+      "sha256": "1b41fa2e684989aa2fe5cd0f5ce8abafef24f42031aa46f92b3213c30ae86fa6"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -5464,7 +5484,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "21e4e6678f177d8ff44847f210bf5aab886c753fcf9512b156cf9d82daa00d4d"
+      "sha256": "63d9fea3bd108371a6710fa0257fd74719f5560e13ccdbc64e21185c551323a6"
     },
     {
       "path": "tooling/conformance_tests/test_final_development_audit.py",
@@ -5604,7 +5624,7 @@
     },
     {
       "path": "tooling/release_gate_check.py",
-      "sha256": "e695f0084dc18072f2059d34393e6b37a6819a285c704fcf7bf7bc1f846a7949"
+      "sha256": "9341ca287f7e1f4431f5811ed38f8e11b47232fb4d23867211de398ffe99c73f"
     },
     {
       "path": "tooling/release_runtime_assertions.py",
@@ -5728,7 +5748,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "16f91841993609d7b73ff541a63f0a54ca99f6f423b836bf0694469ca558dcce"
+      "sha256": "bb71f1ed9f44b9c42efbadbdefecf10583152a0edff43e368d627b7f4ccb03f0"
     }
   ]
 }

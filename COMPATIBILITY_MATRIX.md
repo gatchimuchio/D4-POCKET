@@ -1,8 +1,8 @@
 # 互換性対応表
 
-## v4の現行対象・保証境界（2026-11-13）
+## v5の現行対象・保証境界（2026-11-14）
 
-現行製品正本は[2026-11-13 v4](docs/QE_2026-11-13/採用記録.md)、現行状態は[v4進捗](docs/QE_2026-11-13/進捗.md)。Windows／macOS／Linux／Android／iOSを必須対象とする。採用時点でv4候補のOS別installed QAは未成立であり、以下の過去のscope限定証拠をv4候補へ転記しない。Windowsは所有実機で完成品確認を記録し、非Windowsは宣言した標準OS環境のVM/hosted/Emulator/Simulatorへ実製品を導入して確認する。物理Mac/Android/iPhoneを要求しない。署名・配布資格は別のRelease条件である。
+現行製品正本は[2026-11-14 v5](docs/QE_2026-11-14/採用記録.md)、現行状態は[v5進捗](docs/QE_2026-11-14/進捗.md)。Windows／macOS／Linux／Android／iOSを必須対象とする。採用時点でv5候補のOS別installed QAは未成立であり、以下の過去のscope限定証拠をv5候補へ転記しない。Windowsは所有実機で完成品最終確認を記録し、非Windowsは宣言した標準OS環境の合法なVM/hosted/Emulator/Simulatorへ実製品を導入して確認する。物理Mac/Android/iPhoneを要求しない。各OSの正規Installer/Package、版/Arch/ABIの宣言と署名・配布資格は別の成立条件である。
 
 ## v3時点の対象別証拠（履歴、2026-11-10）
 
@@ -13,7 +13,7 @@
 | macOS／Android／iOS製品経路 | 2026-10-09にP13の有限Product Build受入れCLOSED。対象ごとのhosted／Emulator／Simulator証拠を保持 | v3当時は物理端末・全一般環境・正式署名／配布の保証外。v4では標準OS installed QAへ移行 |
 | 緩衝基盤と検査 | B4 CLOSED、B5 OPEN。Windows #55はRust試験572成功／0失敗／13除外でもcapture判定FAIL | loopback根因、OneDrive因果、長期・資源、B5全体。単独PASSを根因閉鎖へ昇格しない |
 
-証拠の日時・source・環境・結果は[F03実績文書対応](docs/QE_2026-10-22/F03_実績文書対応.md)、v3までの過去状態は[rev5進捗](docs/REV5_PRODUCT_PROGRESS.md)と[v3進捗](docs/QE_2026-11-09/進捗.md)、現行状態は[v4進捗](docs/QE_2026-11-13/進捗.md)を参照。Linux nativeは必須の独立対象である。既存のWindows／Linux normal Release Codex CLI能力証拠とLinux全体製品の未受入れは別状態であり、v4のOS別統合QAを成立させない。`release_ready=false`、正式Q0〜Q7 `DEFERRED`と既存Release Gateを保持する。
+証拠の日時・source・環境・結果は[F03実績文書対応](docs/QE_2026-10-22/F03_実績文書対応.md)、過去状態は[rev5履歴](docs/REV5_PRODUCT_PROGRESS.md)・[v3進捗](docs/QE_2026-11-09/進捗.md)・[v4進捗](docs/QE_2026-11-13/進捗.md)、現行状態は[v5進捗](docs/QE_2026-11-14/進捗.md)を参照。Linux nativeは必須の独立対象である。既存のWindows／Linux normal Release Codex CLI能力証拠とLinux全体製品の未受入れは別状態であり、v5のOS別統合QAを成立させない。`release_ready=false`、正式Q0〜Q7 `DEFERRED`と既存Release Gateを保持する。
 
 以下はC31／旧v1.0／rev2の履歴表である。各「現行」「現在」は記録当時の意味に限り、旧Mobile範囲外やmacOS環境不在を現在状態へ転用しない。
 

@@ -1,8 +1,8 @@
 # Installer 状態
 
-## 現行の製品・導入状態（2026-11-14、v4）
+## 現行の製品・導入状態（2026-11-14、v5）
 
-現行の製品要求・工程・施工指示は[2026-11-13 v4採用記録](docs/QE_2026-11-13/採用記録.md)と[現行進捗](docs/QE_2026-11-13/進捗.md)を参照する。現行進捗ではE0要求照合が`OPEN`で、五OSの標準環境におけるinstalled製品QAは未成立。Linux nativeは必須の製品対象であり、WSLや過去のhosted runを代替証拠にしない。Release Registryは18件中16件`unresolved`／2件`resolved`、`release_ready=false`。以下は2026-10-22時点のrev5導入証拠とそれ以前の履歴であり、v4の製品受入れ・出荷状態を示さない。
+現行の製品要求・工程・施工指示は[2026-11-14 v5採用記録](docs/QE_2026-11-14/採用記録.md)と[現行進捗](docs/QE_2026-11-14/進捗.md)を参照する。E0の4出力着工同期は`OPEN`で、五OSの標準環境におけるinstalled製品QAは未成立。各OSの一般ユーザーが正規Installer/Packageを取得・導入・起動してサービスを利用することが製品目標。Windows所有実機の完成版最終確認以外、物理端末試験を要求せず、非Windowsは合法な標準仮想環境で検査する。Linux nativeは必須の製品対象であり、WSLや過去のhosted runを製品全体の代替証拠にしない。Release Registryは採用前観測で18件中16件`unresolved`／2件`resolved`、`release_ready=false`。以下は2026-10-22時点のrev5導入証拠とそれ以前の履歴であり、v5の製品受入れ・出荷状態を示さない。
 
 ## rev5時点の製品・導入証拠（履歴、2026-10-22照合）
 

@@ -7,9 +7,9 @@ AIエージェントが高度になるほど、次に難しくなるのは「何
 
 名前のとおり目指すのは、異なる能力やRuntimeを必要に応じて取り出し、安全に組み合わせられる**エージェントのための四次元ポケット**。特定のLLMやBLUE-TANUKI専用のフロントエンドではありません。
 
-[現行工程](docs/QE_2026-11-13/進捗.md) · [v4採用記録](docs/QE_2026-11-13/採用記録.md) · [rev5受入れ履歴](docs/REV5_PRODUCT_PROGRESS.md) · [クイックスタート](QUICKSTART.md) · [アーキテクチャ仕様](docs/specs/gui-shell-spec-v1.md) · [責任境界](CLAIM.md) · [エージェント向け開発規則](AGENTS.md)
+[現行工程・進捗 v5](docs/QE_2026-11-14/進捗.md) · [v5採用記録](docs/QE_2026-11-14/採用記録.md) · [v5施工指示書](docs/QE_2026-11-14/03_D4Pocket_CODEX_v5_JA.md) · [rev5受入れ履歴](docs/REV5_PRODUCT_PROGRESS.md) · [クイックスタート](QUICKSTART.md) · [アーキテクチャ仕様](docs/specs/gui-shell-spec-v1.md) · [責任境界](CLAIM.md) · [エージェント向け開発規則](AGENTS.md)
 
-> **開発中 — 製品リリース未宣言。** 現行施工正本は[2026-11-13統合製品3点 v4](docs/QE_2026-11-13/進捗.md)です。E0要求照合から全体BUILDへ進み、A〜Jを同じ製造期間に投入します。W00〜W08は受入座標で、施工順の待機列ではありません。W00=SCOPED_PASS、W01=CLOSED（Windows normal Release／Codex CLI限定）、W02=OPEN。旧局所PASSはv4の別OS・別候補の受入れへ自動転記しません。Linux nativeを含む五OSは必須製品対象です。OS別の標準環境installed製品試験は未成立で、非Windows物理端末を前提にしません。`release_ready=false`、18件中16件のRelease Blocker未解決、正式Q0〜Q7=DEFERREDです。過去の製品受入れ範囲は[v3進捗](docs/QE_2026-11-09/進捗.md)と[rev5進捗](docs/REV5_PRODUCT_PROGRESS.md)を参照してください。
+> **開発中 — 製品リリース未宣言。** 現行正本は[2026-11-14統合製品3点 v5](docs/QE_2026-11-14/採用記録.md)です。E0は着工に必要な4出力に限定し、製品A〜J全躯体の実Source一巡→全Consumer接続→全数監査→統合QC→OS別QAの順に施工します。W00〜W08は受入座標で施工順の待機列ではありません。W00=SCOPED_PASS、W01=CLOSED（Windows normal Release／Codex CLI限定）、W02=OPEN。旧局所PASSはv5の別OS・別候補の受入れへ自動転記しません。Linux nativeを含む五OSは必須製品対象。一般使用者は各OS対応インストーラーを取得・導入してサービス利用できる体験を目標とし、Windows所有実機で完成品を最終確認、他OSは宣言標準仮想環境で検証します。OS別installed製品QAは未成立。`release_ready=false`、18件中16件のRelease Blocker未解決、正式Q0〜Q7=DEFERREDです。過去の範囲は[v4進捗](docs/QE_2026-11-13/進捗.md)、[v3進捗](docs/QE_2026-11-09/進捗.md)と[rev5履歴](docs/REV5_PRODUCT_PROGRESS.md)を参照してください。
 
 ## D4 Pocketが変えようとしていること
 
