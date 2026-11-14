@@ -310,6 +310,92 @@ void main() {
     expect(tooMany.statusMessage, contains('8件'));
   });
 
+  test('Task結果は現在のSession identityが開始時要求と一致する場合だけ結合する', () {
+    const instructionHash =
+        'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const taskId = 'task-session-binding';
+    const request = AgentTaskRequest(
+      runtimeId: 'codex-cli',
+      sessionId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      workspaceId: 'workspace-original',
+      instruction: '同じTask',
+    );
+    const record = AgentTaskRecord(
+      taskId: taskId,
+      runtimeId: 'codex-cli',
+      sessionId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      workspaceId: 'workspace-original',
+      instructionHash: instructionHash,
+      status: 'completed',
+      auditEventId: 'audit-task-session-binding',
+      resultHash:
+          'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      resultContentAvailable: true,
+    );
+    final originalSession = _session(
+      request.sessionId,
+      request.workspaceId,
+      agentRuntimeId: request.runtimeId,
+      status: '利用中',
+    );
+
+    bool matches(AgentSessionRecord currentSession) =>
+        agentTaskRecordMatchesCurrentSession(
+          startedRequest: request,
+          record: record,
+          currentSession: currentSession,
+          expectedInstructionHash: instructionHash,
+          expectedTaskId: taskId,
+        );
+
+    expect(matches(originalSession), isTrue);
+    expect(
+      matches(_session(
+        request.sessionId,
+        request.workspaceId,
+        agentRuntimeId: 'different-runtime',
+        status: '利用中',
+      )),
+      isFalse,
+    );
+    expect(
+      matches(_session(
+        request.sessionId,
+        'workspace-reassigned',
+        agentRuntimeId: request.runtimeId,
+        status: '利用中',
+      )),
+      isFalse,
+    );
+    expect(
+      matches(_session(
+        'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        request.workspaceId,
+        agentRuntimeId: request.runtimeId,
+        status: '利用中',
+      )),
+      isFalse,
+    );
+    expect(
+      agentTaskRecordMatchesCurrentSession(
+        startedRequest: request,
+        record: const AgentTaskRecord(
+          taskId: 'different-task',
+          runtimeId: 'codex-cli',
+          sessionId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          workspaceId: 'workspace-original',
+          instructionHash: instructionHash,
+          status: 'completed',
+          auditEventId: 'audit-other-task',
+        ),
+        currentSession: originalSession,
+        expectedInstructionHash: instructionHash,
+        expectedTaskId: taskId,
+      ),
+      isFalse,
+    );
+  });
+
   test('Agent比較は識別不能Runtimeを拒否し同一Runtimeを許容する', () {
     final missingRuntime = AgentComparisonProjection.fromSessions([
       _session('agent-one', 'workspace-a', agentRuntimeId: ''),

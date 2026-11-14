@@ -1769,9 +1769,10 @@ class _AgentCenterState extends State<_AgentCenterScreen>
     AgentTaskRequest request,
   ) =>
       _sessionStillMatchesRegistration(session) &&
-      request.runtimeId == session.agentRuntimeId &&
-      request.sessionId == session.sessionId &&
-      request.workspaceId == session.workspace;
+      agentTaskRequestMatchesSessionIdentity(
+        startedRequest: request,
+        currentSession: session,
+      );
 
   Future<void> _runAgentTaskAction(
     AgentSessionRecord session,
@@ -1852,13 +1853,40 @@ class _AgentCenterState extends State<_AgentCenterScreen>
   bool _taskRecordMatchesUiState(
     _AgentTaskUiState? state,
     AgentTaskRecord? record,
-  ) =>
-      state != null &&
-      !state.taskBindingRejected &&
-      _taskRecordMatchesStartedRequest(state, record);
+  ) {
+    if (state == null ||
+        record == null ||
+        state.taskBindingRejected ||
+        !_taskRecordMatchesStartedRequest(state, record)) {
+      return false;
+    }
+    final startedRequest = state.lastStartedRequest;
+    final currentSession =
+        startedRequest == null ? null : _sessionById(startedRequest.sessionId);
+    return startedRequest != null &&
+        currentSession != null &&
+        _sessionStillMatchesRegistration(currentSession) &&
+        agentTaskRecordMatchesCurrentSession(
+          startedRequest: startedRequest,
+          record: record,
+          currentSession: currentSession,
+          expectedInstructionHash: state.lastStartedInstructionHash,
+          expectedTaskId: state.lastStartedTaskId,
+        );
+  }
 
   static const _taskBindingMismatchMessage =
       'Task状態が開始時のRuntime／Session／Workspace／指示hashと一致しません。結果表示・比較・適用を停止しました。';
+  static const _taskSessionBindingMismatchMessage =
+      '現在のBroker Session／Workspace登録がTask開始時のRuntime／Session／Workspaceと一致しません。結果表示・比較・適用を停止しました。';
+
+  String _taskBindingFailureMessage(
+    _AgentTaskUiState? state,
+    AgentTaskRecord? record,
+  ) =>
+      _taskRecordMatchesStartedRequest(state, record)
+          ? _taskSessionBindingMismatchMessage
+          : _taskBindingMismatchMessage;
 
   Future<void> _startAgentTask(AgentSessionRecord session) async {
     await _runAgentTaskAction(session, (client, state) async {
@@ -2248,7 +2276,7 @@ class _AgentCenterState extends State<_AgentCenterScreen>
     if (transport == null ||
         state == null ||
         taskId == null ||
-        !_taskRecordMatchesUiState(state, state.record) ||
+        !_taskRecordMatchesStartedRequest(state, state.record) ||
         _taskPreflightSession == session.sessionId ||
         _taskCancellationGate.isPending(session.sessionId) ||
         !_sessionStillMatchesRegistration(session) ||
@@ -2345,7 +2373,9 @@ class _AgentCenterState extends State<_AgentCenterScreen>
             if (task != null) 'Task識別子: ${task.taskId}',
             if (task != null) 'Task状態: ${task.status}',
             if (task != null)
-              '開始時要求結合: ${taskBound ? '一致' : '不一致／未確認（結果・適用を停止）'}',
+              '開始時Task／要求結合: ${_taskRecordMatchesStartedRequest(taskState, task) ? '一致' : '不一致／未確認'}',
+            if (task != null)
+              '現在Session／Workspace結合: ${taskBound ? '一致' : '不一致／未確認（結果・比較・適用を停止）'}',
             if (taskState.refreshError case final error?) 'Task状態照合: $error',
             if (task != null) '指示hash: ${task.instructionHash}',
             if (taskState.mcpCapabilitySnapshotHash != null)
@@ -2455,7 +2485,7 @@ class _AgentCenterState extends State<_AgentCenterScreen>
           onPressed: busy ? null : () => _refreshAgentTask(session),
           child: const Text('Task状態を更新'),
         ),
-      if (taskBound &&
+      if (_taskRecordMatchesStartedRequest(taskState, task) &&
           task != null &&
           const {'pending', 'running'}.contains(task.status))
         OutlinedButton(
@@ -2626,9 +2656,12 @@ class _AgentCenterState extends State<_AgentCenterScreen>
         'MCP結果依存後続Task: $followup',
       if (taskState?.mcpContinuationStatus case final status?)
         'AI→MCP→AI Controller: $status',
-      task?.resultContentAvailable == true
+      task?.resultContentAvailable == true &&
+              _taskRecordMatchesUiState(taskState, task)
           ? 'Task結果本文: native Owner確認後にContent Exposure範囲でAgent報告を取得可能'
-          : 'Task結果本文: Broker内に現在取得可能な本文なし',
+          : task?.resultContentAvailable == true
+              ? 'Task結果本文: 現在のSession／Workspace結合を確認できないため表示停止中'
+              : 'Task結果本文: Broker内に現在取得可能な本文なし',
       '変更ファイル／差分概要: 選択Runtime／Workspaceに絞ったWorkspace Inspectorで、別のWorkspace承認と基準点を使って確認します。Task結果と同一視しません。',
       '道具呼出し: AgentTask APIから未提供',
       'シェルコマンド／試験状態: Agent報告の主張は未検証。Broker実行済みtest証跡はunknown',
@@ -2717,7 +2750,7 @@ class _AgentCenterState extends State<_AgentCenterScreen>
                 onSelected: (_) => onSelect(),
               ),
             if (task?.status == 'completed' && !taskBound)
-              const Text(_taskBindingMismatchMessage),
+              Text(_taskBindingFailureMessage(state, task)),
           ],
         ),
       ),

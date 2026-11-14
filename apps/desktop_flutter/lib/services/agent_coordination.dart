@@ -1,6 +1,31 @@
 import '../models/generated_contracts.dart';
 import 'package:agent_orchestration/agent_task_client.dart'
-    show AgentTaskRecord, AgentTaskResultProjection;
+    show AgentTaskRecord, AgentTaskRequest, AgentTaskResultProjection;
+
+bool agentTaskRequestMatchesSessionIdentity({
+  required AgentTaskRequest startedRequest,
+  required AgentSessionRecord currentSession,
+}) =>
+    startedRequest.runtimeId == currentSession.agentRuntimeId &&
+    startedRequest.sessionId == currentSession.sessionId &&
+    startedRequest.workspaceId == currentSession.workspace;
+
+bool agentTaskRecordMatchesCurrentSession({
+  required AgentTaskRequest startedRequest,
+  required AgentTaskRecord record,
+  required AgentSessionRecord currentSession,
+  required String? expectedInstructionHash,
+  required String? expectedTaskId,
+}) =>
+    agentTaskRequestMatchesSessionIdentity(
+      startedRequest: startedRequest,
+      currentSession: currentSession,
+    ) &&
+    record.isBoundTo(
+      startedRequest,
+      expectedInstructionHash: expectedInstructionHash,
+      expectedTaskId: expectedTaskId,
+    );
 
 class AgentComparisonProjection {
   const AgentComparisonProjection({
