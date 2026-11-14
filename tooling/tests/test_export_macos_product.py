@@ -194,10 +194,21 @@ class MacOSProductExportTests(unittest.TestCase):
                     "TeamIdentifier=not set\n"
                 ),
             )
+            linker_adhoc = subprocess.CompletedProcess(
+                args=[],
+                returncode=0,
+                stdout=(
+                    "Format=app bundle with Mach-O thin (arm64)\n"
+                    "CodeDirectory v=20400 size=382 flags=0x20002(adhoc,linker-signed) hashes=9+0\n"
+                    "Signature=adhoc\n"
+                    "TeamIdentifier=not set\n"
+                    "CMSDigest=SHA-256\n"
+                ),
+            )
             unsigned = subprocess.CompletedProcess(
                 args=[], returncode=1, stdout="code object is not signed at all\n"
             )
-            responses = [adhoc, adhoc, unsigned, adhoc]
+            responses = [adhoc, linker_adhoc, unsigned, linker_adhoc]
             with patch("tooling.export_macos_product.subprocess.run", side_effect=responses) as run:
                 result = _require_macos_code_without_publisher_identity(
                     app, codesign="/usr/bin/codesign", environment={}
@@ -275,6 +286,26 @@ class MacOSProductExportTests(unittest.TestCase):
                         "CodeDirectory v=20500 size=250 flags=0x2(adhoc) hashes=3+0 location=embedded\n"
                         "CodeDirectory v=20500 size=250 flags=0x10000(runtime) hashes=3+0 location=embedded\n"
                         "Signature=adhoc\n"
+                    ),
+                ),
+                subprocess.CompletedProcess(
+                    args=[],
+                    returncode=0,
+                    stdout=(
+                        "CodeDirectory v=20400 size=382 flags=0x20002(adhoc,linker-signed) hashes=9+0\n"
+                        "Signature=adhoc\n"
+                        "TeamIdentifier=TEAM123\n"
+                        "CMSDigest=SHA-256\n"
+                    ),
+                ),
+                subprocess.CompletedProcess(
+                    args=[],
+                    returncode=0,
+                    stdout=(
+                        "CodeDirectory v=20400 size=382 flags=0x20003(adhoc,linker-signed,runtime) hashes=9+0\n"
+                        "Signature=adhoc\n"
+                        "TeamIdentifier=not set\n"
+                        "CMSDigest=SHA-256\n"
                     ),
                 ),
             ]

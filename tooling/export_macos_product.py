@@ -349,15 +349,18 @@ def _is_unsealed_adhoc_executable_signature(output: str) -> bool:
             flags_value = int(raw_flags_value, 16)
         except ValueError:
             return False
-        flags = {flag.strip().casefold() for flag in raw_flags.split(",")}
-        if flags_value != 0x2 or flags != {"adhoc"}:
+        flags = frozenset(flag.strip().casefold() for flag in raw_flags.split(","))
+        if (flags_value, flags) not in {
+            (0x2, frozenset({"adhoc"})),
+            (0x20002, frozenset({"adhoc", "linker-signed"})),
+        }:
             return False
     if re.search(r"(?im)^\s*Authority=", output):
         return False
     team_identifiers = re.findall(r"(?im)^\s*TeamIdentifier=(.*)$", output)
     if any(value.strip().casefold() not in {"", "not set"} for value in team_identifiers):
         return False
-    if re.search(r"(?im)^\s*(?:Signed Time|Timestamp|CMSDigest)=", output):
+    if re.search(r"(?im)^\s*(?:Signed Time|Timestamp)=", output):
         return False
     if re.search(r"(?im)^\s*Sealed Resources version=", output):
         return False
