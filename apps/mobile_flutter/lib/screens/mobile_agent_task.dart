@@ -3,7 +3,8 @@ import 'package:agent_orchestration/agent_orchestration.dart'
         AgentTaskRequest,
         MobileAgentTaskClient,
         MobileAgentTaskDraft,
-        MobileAgentTaskStatus;
+        MobileAgentTaskStatus,
+        MobileAgentTaskSubmissionRejected;
 import 'package:flutter/material.dart';
 
 import '../services/device_link_controller.dart';
@@ -114,19 +115,21 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
       _message = null;
     });
     String? sessionId;
+    var submissionMayHaveReachedBroker = false;
     try {
       sessionId = await widget.controller.dialogue.start(
         runtime,
         workspaceId: workspace,
       );
-      final draft = await _client.submit(
-        AgentTaskRequest(
-          runtimeId: runtime,
-          sessionId: sessionId,
-          workspaceId: workspace,
-          instruction: instruction,
-        ),
+      final request = AgentTaskRequest(
+        runtimeId: runtime,
+        sessionId: sessionId,
+        workspaceId: workspace,
+        instruction: instruction,
       );
+      request.validate();
+      submissionMayHaveReachedBroker = true;
+      final draft = await _client.submit(request);
       if (!mounted) return;
       setState(() {
         _requests = [
@@ -137,15 +140,44 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
         _message =
             '申請をBrokerへ送信しました。Desktop側のAgent Centerで内容確認と新規Permission／Approvalが必要です。';
       });
-    } catch (_) {
+    } on MobileAgentTaskSubmissionRejected {
+      var sessionClosed = false;
       if (sessionId != null) {
         try {
           await widget.controller.dialogue.close(sessionId);
+          sessionClosed = true;
         } catch (_) {
-          // 結果不明のSessionは自動再送せず、Broker側の期限・状態確認に委ねる。
+          // 明示拒否後の空Sessionだけを閉じる。
         }
       }
-      if (mounted) setState(() => _message = '申請結果を確認できません。再送せず、一覧を更新してください。');
+      if (mounted) {
+        setState(
+          () => _message = sessionClosed
+              ? 'Brokerが申請を拒否しました。Taskは受理されず、Sessionを終了しました。'
+              : 'Brokerが申請を拒否しました。Taskは受理されていません。Session終了は未確認です。',
+        );
+      }
+    } catch (_) {
+      var sessionClosed = false;
+      if (sessionId != null && !submissionMayHaveReachedBroker) {
+        try {
+          await widget.controller.dialogue.close(sessionId);
+          sessionClosed = true;
+        } catch (_) {
+          // 申請前に失敗した空Sessionだけを閉じる。
+        }
+      }
+      if (mounted) {
+        setState(
+          () => _message = submissionMayHaveReachedBroker
+              ? '申請結果が不明です。Sessionを維持しました。再送せず、一覧を更新してください。'
+              : sessionId == null
+              ? 'Session開始を確認できません。申請は再送せず、状態を更新してください。'
+              : sessionClosed
+              ? '申請前に停止しました。空のSessionを終了しました。'
+              : '申請前に停止しました。Session終了は未確認です。',
+        );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }

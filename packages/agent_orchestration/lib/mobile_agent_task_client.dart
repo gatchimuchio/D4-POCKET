@@ -213,7 +213,11 @@ class MobileAgentTaskClient {
         request.requireUnusedTaskSession) {
       _invalid();
     }
-    final body = await _acceptedBody('AgentTask端末申請', request.toPayload());
+    final body = await _acceptedBody(
+      'AgentTask端末申請',
+      request.toPayload(),
+      distinguishDefinitiveRejection: true,
+    );
     const keys = {
       '版',
       '申請ID',
@@ -348,8 +352,9 @@ class MobileAgentTaskClient {
 
   Future<Map<String, Object?>> _acceptedBody(
     String operation,
-    Map<String, Object?> payload,
-  ) async {
+    Map<String, Object?> payload, {
+    bool distinguishDefinitiveRejection = false,
+  }) async {
     final response = await _request(operation, payload);
     final auditId = response['audit_event_id'];
     if (response['operation'] != operation ||
@@ -358,7 +363,16 @@ class MobileAgentTaskClient {
         auditId.length > 256) {
       _invalid();
     }
-    if (response['status'] != 'accepted' || response['error'] != null) {
+    final error = response['error'];
+    if (distinguishDefinitiveRejection &&
+        response['status'] == 'rejected' &&
+        error is Map &&
+        error.length == 1 &&
+        error['code'] is String &&
+        (error['code'] as String).isNotEmpty) {
+      throw const MobileAgentTaskSubmissionRejected();
+    }
+    if (response['status'] != 'accepted' || error != null) {
       throw const BrokerClientException('端末Agent Task操作がBrokerで拒否されました');
     }
     if (response['body'] is! Map) _invalid();
@@ -442,6 +456,13 @@ class MobileAgentTaskClient {
   static void _validateRequestId(String requestId) {
     if (!RegExp(_requestIdPattern).hasMatch(requestId)) _invalid();
   }
+}
+
+/// Brokerが申請を明示的に拒否した応答。
+/// 通信失敗・応答不明・suspendedとは区別し、送信元Sessionを安全に閉じられる。
+class MobileAgentTaskSubmissionRejected extends BrokerClientException {
+  const MobileAgentTaskSubmissionRejected()
+      : super('端末Agent Task申請はBrokerに拒否されました');
 }
 
 bool _exactKeys(Map<String, Object?> value, Set<String> keys) =>
