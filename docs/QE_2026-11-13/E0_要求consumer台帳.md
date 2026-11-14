@@ -5759,6 +5759,378 @@ RegistryにmacOS専用Blocker IDはない。macOS候補はN10のOS別Artifact対
 
 このrow joinは既存cause/evidence/consumerの所在と責任範囲を明示したE0 mappingであり、BUF-R/T Acceptance、B0〜B6 status、N08/N10/N11、E0のCLOSEDを意味しない。
 
+## D4-QE方法論要求の現行Consumer照合
+### D4-QE-R01〜R13 現行Consumer照合（E0-04個別記録）
+
+照合基準は編集前main f9b74b6c0d8d06088bf11db4774918759a8d7668。旧IDの原定義は2026-10-22仕様書§3、現行意味と施工条件はOwner採用済みv4三点・現AGENTSを正本とする。旧IDはQE方法論の座標であり、製品AcceptanceやE1の施工順ではない。13件すべてをE0-04全21 fieldへ個別化し、旧の製品status、Q0〜Q7、Registryを変更しない。
+
+### SourceSHAの共通固定点
+
+以下は編集前mainのGit blob ID。全13行はこの共通source setを参照し、下表にID別Consumer sourceを追加する。blob IDはsource同一性のみで、経路実行・適合・受入を証明しない。
+
+| 共通ソース | `Git blob SHA` |
+|---|---|
+| `AGENTS.md` | `1eafcadd129fd01f1f2f683594c381605ed7d48d` |
+| `docs/QE_2026-10-22/D4Pocket_01_QE統合実装仕様書_20261022.md` | `400cbfbd524fa76ca34e3f062641be629227246d` |
+| `docs/QE_2026-10-22/採用記録.md` | `1f9d6332132759ed68f3af8b4587368b162096c2` |
+| `docs/QE_2026-11-13/採用記録.md` | `f159c1aa6ea5bc6e80e0877d8068f7e44da4c4d3` |
+| `docs/QE_2026-11-13/01_D4Pocket_統合製品実装仕様書_v4.md` | `352c53180cbad07888beb956aad0fb2a58074c58` |
+| `docs/QE_2026-11-13/02_D4Pocket_統合開発工程表_v4.md` | `d32dd251e5f7cbb97d92f6e7540d6b6ed0ecec05` |
+| `docs/QE_2026-11-13/03_D4Pocket_Codex施工指示書_v4.md` | `49447973e88c50a09b2f4978adfed84fd464c6d0` |
+
+| 要件ID | 追加の現行consumer参照元／`Git blob SHA` |
+|---|---|
+| `R02` | `tooling/conformance_tests/run_conformance_skeleton.py` `c6f31d8cb561b48513c6784e54c85969c9cb953e`; `tooling/release_gate_check.py` `22a8d7bfe9adb259f44ce8501fb215652e1d58c6` |
+| `R04` | `apps/desktop_flutter/lib/services/agent_task_client.dart` `f54cefac29eba3dcf383bba19b4f64ee682e6217`; `native/rust_helper/src/adapters/codex_cli.rs` `e5c9d1581ae9a1c0a3ae7fcfa626fdca6fea6d28`; `native/rust_helper/src/broker/dialogue.rs` `c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999`; `native/rust_helper/src/broker/agent_task_scratch.rs` `de743cd819fb4533c9c3070c4e7bcae82e42d938` |
+| `R05` | `tooling/manifest.py` `aa4525ff20293cb8641e5598a2439561a3bfbd3b`; `.github/workflows/windows-manual-rust-validation.yml` `3bce337fcb5988fb3fb6c292eb964d889fb4ffb8` |
+| `R06` | `native/rust_helper/src/broker/protocol.rs` `9b2076d5f31ca6d77f1f87973d1b394aaf751961`; `native/rust_helper/src/broker/audit.rs` `eb1dcf5018d95c7fdf6171aadd4bca9554d1996f`; `native/rust_helper/src/broker/workspace_root.rs` `15f208e0b855b8cee53e878d2b27aaf457ea2937` |
+| `R07` | `tooling/final_development_audit.py` `913c81bc22f71bc5bb3447fa4f4bd266326932ec`; `docs/FINAL_QA_QUEUE.md` `7b332cccab70bb68aa1ff4f8e23acc0e816d8282` |
+| `R08` | `tooling/release_gate_check.py` `22a8d7bfe9adb259f44ce8501fb215652e1d58c6`; `tooling/windows_release_evidence.py` `6f7957c6193c86c7bc15165e743f11651464f29c`; `release_blockers.registry.json` `244adc04a01e7b406c4ebcdeb829f7077d4aa35f` |
+| `R09` | `tooling/release_gate_check.py` `22a8d7bfe9adb259f44ce8501fb215652e1d58c6`; `release_blockers.registry.json` `244adc04a01e7b406c4ebcdeb829f7077d4aa35f`; `RELEASE_CHECKLIST.md` `35f31043a9311d49c94acdc9631e30b61949c65d` |
+| `R10` | `.github/workflows/windows-manual-rust-validation.yml` `3bce337fcb5988fb3fb6c292eb964d889fb4ffb8`; `.github/workflows/linux-manual-rust-validation.yml` `8c03bdd11e6bbfe3d9acd006b2200e7bc46f7788`; `.github/workflows/linux-manual-export-build.yml` `8d59dd1e9e54a9a4ebb16992f59a402c1ab77c67` |
+| `R11` | `tooling/evidence_bundle.py` `68dead851236b0f1b69899151c37371e593ff3f9`; `packages/shell_core/audit_chain.py` `2fb6afb5a840fd38601a3ca90d70378a2f793bb4`; `packages/shell_core/audit_store.py` `80e2c5a6529e882bb68dc3c5886f66b6d52699ee`; `tooling/manifest.py` `aa4525ff20293cb8641e5598a2439561a3bfbd3b` |
+| `R12` | `規定/正本索引.json` `ba250de80a3ec94109171c09adf54cbe227add10`; `tooling/manifest.py` `aa4525ff20293cb8641e5598a2439561a3bfbd3b` |
+| `R13` | `apps/desktop_flutter/linux/runner/broker_process_channel.cc` `98d6f7e73baae7228c25d72d29343a2564291d97`; `native/rust_helper/src/linux_desktop_launcher.rs` `f58fb226f21093c2d1f062259d394b4f8ec022f6`; `native/rust_helper/src/linux_desktop_worker.rs` `c7910e61c78e978d3cfb0c3cf882eed010c4730f`; `installer/linux/README.md` `25e80411d6ca8f96e6d70718d59c19e7dc6a58e3`; `tooling/tests/linux_installed_product_smoke.py` `8020ed8d1d68d59cff6acf70c55856fdeb2125e3` |
+
+R01/R03はSource→Consumerの統治主体が共通Source set内のAGENTS・採用済み工程・指示書である。R05はGit refsと実操作も観測対象であり、workflow source hashをrun evidenceとして扱わない。
+### D4-QE-R01 E0-04 21項目
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | D4-QE-R01 |
+| 旧ID | D4-QE-R01。識別子を保持し、N/P/C/Phase/K等の機能要求へ置換しない。 |
+| 元原文/正本参照 | 2026-10-22仕様書§3 R01。現行意味はv4採用記録・三点、AGENTS §0/§27と施工指示I01・I02。 |
+| 対象 | 要求、前提、目的、対象外、実行主体、責任者、採否者を編集前に確定する工程入口。 |
+| 目的 | 施工中の主語・目的の入替えと仕様外の拡張を防ぐ。 |
+| 生成元（`Producer`） | Ownerが採用した現行三点、適用AGENTS、現mainと作業要求。 |
+| 実Consumer | Codexの有限作業定義、E0 ledger、各線のProducer→Consumer記録と停止判断。 |
+| 契約/データ | 対象、主体、目的、入力、作用、出力、次Consumer、制約、証拠、採否者、停止条件。 |
+| 通常作用 | 編集前に現行正本とHEADをそろえ、目的・作用・完了条件を同じ記録へ固定する。 |
+| 否定作用 | 正本間の矛盾、目的・採否者の欠落、根拠のない仮定を見つけたらUNKNOWNとして保護し、独自に目的を補完しない。 |
+| 停止/復旧 | 競合を記録し、保護差分を維持して責任正本へ帰還する。本人判断が必要な採否だけをOwnerへ戻す。 |
+| 標準OS候補 | Windows、macOS、Linux native、Android、iOS。方法論の適用母集団であり、各OSの実動作・QA成立を意味しない。 |
+| 配布物 | 各OS成果物はN10現行候補表を参照。版、arch、identity、保証値がUNKNOWNの値は未確定のまま保持し、方法論crosswalkを配布Acceptanceにしない。 |
+| 既存実装 | AGENTS開始順、現行v4採用記録・工程・施工指示、E0の現ID/目的/Producer/Consumer項目。 |
+| BUILD_GAP | 13方法論IDすべてのE0-04照合、全要求母集団の完結、全Producer→Consumer検査は未完。 |
+| 参照元ハッシュ（`SourceSHA`） | 共通SourceSHA集合のみ。規範文書のsource identityであり、全作業がこの入口を実行した機械証拠ではない。 |
+| 試験区分（`TestClass`） | DOC／LEDGER／局所の作業開始照合。本crosswalkでは製品実行をしない。 |
+| 証拠ID | NONE。今回のE0 source-to-consumer mappingは製品Evidenceを発行しない。 |
+| 阻害要因（`Blocker`） | N11/E0全体に対する既存comprehensive_extension_rev1_completionをscope上参照。方法論IDへ行別Blocker statusを新設しない。 |
+| 状態 | OPEN（E0-04 mapping状態。独立製品Acceptance statusを新設しない。） |
+| 残余 | 全要求での適用実績と、判断不要な設計を正本だけで一意に定められる範囲が未確認。 |
+
+### D4-QE-R02 E0-04 21項目
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | D4-QE-R02 |
+| 旧ID | D4-QE-R02。識別子と工程要求の来歴を保持する。 |
+| 元原文/正本参照 | 2026-10-22仕様書§3 R02。現行工程R01/E0、AGENTS §0/§19/§28、施工指示I03/I05。 |
+| 対象 | QE_DESIGN→QE_BUILD→SYSTEM_SHAPED→BUILD_COVERED→QE_QC→QE_QA→QE_RELEASE_REVIEWの工程遷移。 |
+| 目的 | 設計・全体接続・実物QC・対象別QA・Owner決裁の順序と責任を保つ。 |
+| 生成元（`Producer`） | 現行工程表のStage/Acceptance条件、各BUILD_BATCH成果と観測。 |
+| 実Consumer | 進捗記録、工程入口・終了判断、Conformance/Release Gateの限定構造検査、後続作業。 |
+| 契約/データ | Stage名、入口条件、完了条件、未成立・UNKNOWN、所有責任者、遷移証拠。 |
+| 通常作用 | 前段の成立条件を記録し、対象に必要な範囲だけ次段へ移す。 |
+| 否定作用 | 文書・fixture・局所PASSを実物QC/QA/Release PASSへ昇格しない。未承認Stage移行を止める。 |
+| 停止/復旧 | 根因が前段へ及ぶとき該当範囲だけ戻し、旧CLOSED/FAILを履歴として残す。 |
+| 標準OS候補 | Windows、macOS、Linux native、Android、iOS。方法論の適用母集団であり、各OSの実動作・QA成立を意味しない。 |
+| 配布物 | 各OS成果物はN10現行候補表を参照。版、arch、identity、保証値がUNKNOWNの値は未確定のまま保持し、方法論crosswalkを配布Acceptanceにしない。 |
+| 既存実装 | AGENTSのQE stage定義、v4工程表R01/E0、release_gate_check.py、Conformance skeleton。 |
+| BUILD_GAP | E0がOPENでBUILD_COVERED以前。実物統合QC・各OS QA・Release Reviewは後段で未成立。 |
+| 参照元ハッシュ（`SourceSHA`） | 共通SourceSHA集合＋R02追加SourceSHA。validator blobは工程の構造検査を示すだけでStage実物の合格ではない。 |
+| 試験区分（`TestClass`） | DOC／CONFIG／STATIC_CONFORMANCE。現行ConformanceとRelease Gateを今回確認。Product QC/QAはNOT_RUN。 |
+| 証拠ID | NONE。今回のE0 source-to-consumer mappingは製品Evidenceを発行しない。 |
+| 阻害要因（`Blocker`） | N11/E0全体に対する既存comprehensive_extension_rev1_completionをscope上参照。方法論IDへ行別Blocker statusを新設しない。 |
+| 状態 | OPEN（E0-04 mapping状態。独立製品Acceptance statusを新設しない。） |
+| 残余 | 全候補を同一版で段階間結合し、正式なQA票とOwner判断へ渡す経路が未実証。 |
+
+### D4-QE-R03 E0-04 21項目
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | D4-QE-R03 |
+| 旧ID | D4-QE-R03。小単位再同期の要求IDを保持する。 |
+| 元原文/正本参照 | 2026-10-22仕様書§3 R03。現行AGENTS §0/§4、施工指示I01、工程R00。 |
+| 対象 | 新規・切替・中断後再開の各作業単位での正本・HEAD・目的・Consumer再確認。 |
+| 目的 | 以前の確認を現在状態と誤認することと、主体・目的のドリフトを防ぐ。 |
+| 生成元（`Producer`） | Ownerの最新指示、AGENTS、現行三点、Git remote/main/status/worktree/backupの現在観測。 |
+| 実Consumer | Codexの次の編集判断、保護差分選別、同一単位のConsumer確認。 |
+| 契約/データ | 時刻・branch・HEAD/remote・dirty・writer・対象・前提・作用・次Consumer・停止条件。 |
+| 通常作用 | 編集直前にfetchとstatusを照合し、変更の基準HEADを固定する。 |
+| 否定作用 | 同期差、dirty/未追跡、競合Writer、古い採用文書があれば上書きせず保留・分類する。 |
+| 停止/復旧 | 未保護差分をreset/cleanせず、最新正本を再読して安全に続けられる範囲へ切り分ける。 |
+| 標準OS候補 | Windows、macOS、Linux native、Android、iOS。方法論の適用母集団であり、各OSの実動作・QA成立を意味しない。 |
+| 配布物 | 各OS成果物はN10現行候補表を参照。版、arch、identity、保証値がUNKNOWNの値は未確定のまま保持し、方法論crosswalkを配布Acceptanceにしない。 |
+| 既存実装 | AGENTS開始順、v4指示I01、Git single-writer/main policy、各progress itemの観測基線。 |
+| BUILD_GAP | 毎回の手順を製品の自動保証とする機械Consumerはなく、全作業単位の適用台帳も未完。 |
+| 参照元ハッシュ（`SourceSHA`） | 共通SourceSHA集合。作業開始時のHEAD・worktree観測値は本書記録の現在事実で、Git blobではない。 |
+| 試験区分（`TestClass`） | DOC／LOCAL_GIT。今回remote/main・worktree一覧・backup refsを読み取り照合。製品testはNOT_RUN。 |
+| 証拠ID | NONE。今回のE0 source-to-consumer mappingは製品Evidenceを発行しない。 |
+| 阻害要因（`Blocker`） | N11/E0全体に対する既存comprehensive_extension_rev1_completionをscope上参照。方法論IDへ行別Blocker statusを新設しない。 |
+| 状態 | OPEN（E0-04 mapping状態。独立製品Acceptance statusを新設しない。） |
+| 残余 | 複数writerの全活動やCodex外状態を自動検出する保証はなく、作業開始時に再観測する。 |
+
+### D4-QE-R04 E0-04 21項目
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | D4-QE-R04 |
+| 旧ID | D4-QE-R04。実consumer接続の方法論IDを保持する。 |
+| 元原文/正本参照 | 2026-10-22仕様書§3 R04、現行v4仕様S04/S05と工程R02/E0、施工指示I03/I04。 |
+| 対象 | 要求の実Producerから実Consumer、元作用、結果、Audit/表示/後続consumerまでの経路。 |
+| 目的 | Schema/mock/UIの存在だけを製品機能完成と取り違えない。 |
+| 生成元（`Producer`） | 製品入口からの現在認可済みTask/Tool request。 |
+| 実Consumer | Desktop Agent Center→Rust Broker dialogue→Codex Adapter/CLI→Task result/Audit→Flutter projectionという限定経路。 |
+| 契約/データ | Task/session/workspace/runtime/permission/approval/source/result/audit identityの一致と未信頼result処理。 |
+| 通常作用 | 実Producerを正規Broker/Adapter consumerへ接続し、元Toolの作用と結果を記録する。 |
+| 否定作用 | mock-only、contract-only、metadata-only、失敗を成功へ昇格せずBUILD_GAPを残す。 |
+| 停止/復旧 | Brokerのdeny/failure/journal/Recoveryを保持し、曖昧な作用を再送しない。 |
+| 標準OS候補 | Windows、macOS、Linux native、Android、iOS。方法論の適用母集団であり、各OSの実動作・QA成立を意味しない。 |
+| 配布物 | 各OS成果物はN10現行候補表を参照。版、arch、identity、保証値がUNKNOWNの値は未確定のまま保持し、方法論crosswalkを配布Acceptanceにしない。 |
+| 既存実装 | agent_task_client.dart、codex_cli.rs、dialogue.rs、agent_task_scratch.rsの限定Codex Task経路。 |
+| BUILD_GAP | 全要求・Tool・Runtime・OSの実consumer縦断、独立readback、全要件の結果再消費は未接続。 |
+| 参照元ハッシュ（`SourceSHA`） | 共通SourceSHA集合＋R04追加SourceSHA。各blobはsource identityのみ。 |
+| 試験区分（`TestClass`） | CODE_PRESENT／WIREDのsource追跡、UNIT/FIXTUREと限定旧LIVE_RUNTIME履歴を識別。本作業でRust/Flutter runtime testはNOT_RUN。 |
+| 証拠ID | NONE。今回のE0 source-to-consumer mappingは製品Evidenceを発行しない。 |
+| 阻害要因（`Blocker`） | N11/E0全体に対する既存comprehensive_extension_rev1_completionをscope上参照。方法論IDへ行別Blocker statusを新設しない。 |
+| 状態 | OPEN（E0-04 mapping状態。独立製品Acceptance statusを新設しない。） |
+| 残余 | 現実装の限定経路を一般Buffer・全OS・全AIへ外挿しない。 |
+
+### D4-QE-R05 E0-04 21項目
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | D4-QE-R05 |
+| 旧ID | D4-QE-R05。BUILD_BATCH方式と小単位非閉包の要求を保持する。 |
+| 元原文/正本参照 | 2026-10-22仕様書§3 R05、現行AGENTS §0/§3/§4/§19、施工指示I05/I12、工程R02。 |
+| 対象 | 関連する複数小変更を一つのBUILD_BATCHで必要検査・復旧・Git閉包する運用。 |
+| 目的 | 個別票・全suite・QA・backup rotationの乱発を防ぎつつ、意味ある変更をmainに安全還元する。 |
+| 生成元（`Producer`） | 承認済みの有限変更群、現在mainと直近2世代の復旧ref。 |
+| 実Consumer | 変更後の局所検査、manifest/conformance/gate、commit、push、remote SHA/backup/clean state照合。 |
+| 契約/データ | 対象差分、関連Consumer、必要検査、backup main/prev、正確なcommit、remote HEAD、clean status。 |
+| 通常作用 | 編集前に二世代を保全し、適切な単位で検査・直接main commit/push・remote確認をまとめて行う。 |
+| 否定作用 | 共有worktree・保護差分・tag競合・検査失敗を強制削除・force overwrite・検査結果偽装で越えない。 |
+| 停止/復旧 | 不一致時は書込み停止、参照を再取得し、失敗した正確なref/commandと復旧点を記録する。 |
+| 標準OS候補 | Windows、macOS、Linux native、Android、iOS。方法論の適用母集団であり、各OSの実動作・QA成立を意味しない。 |
+| 配布物 | 各OS成果物はN10現行候補表を参照。版、arch、identity、保証値がUNKNOWNの値は未確定のまま保持し、方法論crosswalkを配布Acceptanceにしない。 |
+| 既存実装 | AGENTS Git/backup規則、workflow_dispatch制約、manifest/conformance/gate、current backup refs。 |
+| BUILD_GAP | 全プロジェクトを通じた全BUILD_BATCH台帳・他worktree writer状態は一括機械管理されず、各batchで観測が要る。 |
+| 参照元ハッシュ（`SourceSHA`） | 共通SourceSHA集合＋R05追加SourceSHA。ref SHAはGit commit、source blob SHAとは別の値。 |
+| 試験区分（`TestClass`） | DOC／LOCAL_GIT／STATIC_CONFORMANCE。今回の前batch Git閉包を確認し、本batch後も同条件で閉じる。 |
+| 証拠ID | NONE。今回のE0 source-to-consumer mappingは製品Evidenceを発行しない。 |
+| 阻害要因（`Blocker`） | N11/E0全体に対する既存comprehensive_extension_rev1_completionをscope上参照。方法論IDへ行別Blocker statusを新設しない。 |
+| 状態 | OPEN（E0-04 mapping状態。独立製品Acceptance statusを新設しない。） |
+| 残余 | Git閉包はこの方法論mappingを製品QC/QAやE0完了へ昇格させない。 |
+
+### D4-QE-R06 E0-04 21項目
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | D4-QE-R06 |
+| 旧ID | D4-QE-R06。全工程で安全境界を維持する要求を保持する。 |
+| 元原文/正本参照 | 2026-10-22仕様書§3 R06、現行AGENTS §§2,6,12–14、v4仕様S02/S07、施工指示I04-F/I05。 |
+| 対象 | `Permission`／`Approval`／`Credential`／`secret`／`Audit`／`Recovery`／`Content Exposure`／`Workspace`／`Host`／`process`／OSの権限境界。 |
+| 目的 | 機能追加・環境変化・buffer介入が権限や秘密境界を弱めるのを防ぐ。 |
+| 生成元（`Producer`） | UI/Adapter/Tool/OSからのuntrusted requestとBroker-owned current state。 |
+| 実Consumer | Rust Brokerの認可・Permission/Approval・Workspace/Secret・process・Audit・Recovery gatesと各下流操作。 |
+| 契約/データ | 現Broker authorityだけ、fresh one-shot authorization、input validation、audit/fail-closed、秘密非露出。 |
+| 通常作用 | 現在のBroker認可とscopeを照合した作用だけ実行し、必要なAuditと結果制限を適用する。 |
+| 否定作用 | UI/metadata/history/profile/fixtureから権限を生成・昇格しない。認可不一致・Audit不能・未知状態で拒否する。 |
+| 停止/復旧 | 危険なpathをdisable/suspendし、既存journal/recoveryを使用。安全不能を成功へ昇格しない。 |
+| 標準OS候補 | Windows、macOS、Linux native、Android、iOS。方法論の適用母集団であり、各OSの実動作・QA成立を意味しない。 |
+| 配布物 | 各OS成果物はN10現行候補表を参照。版、arch、identity、保証値がUNKNOWNの値は未確定のまま保持し、方法論crosswalkを配布Acceptanceにしない。 |
+| 既存実装 | Rust protocol/audit/workspace_root/codex adapter、AGENTSの秘密・権限境界、各OS native bridge contract。 |
+| BUILD_GAP | 全source/consumer/OSに対する一貫した安全否定・回復証拠と全機能の縦断は未成立。 |
+| 参照元ハッシュ（`SourceSHA`） | 共通SourceSHA集合＋R06追加SourceSHA。過去の限定LIVE_RUNTIMEは元候補・条件だけを識別。 |
+| 試験区分（`TestClass`） | CODE_PRESENT／UNIT／CONFORMANCE／限定LIVE_RUNTIME履歴。今回安全runtime/fault testsはNOT_RUN。 |
+| 証拠ID | NONE。今回のE0 source-to-consumer mappingは製品Evidenceを発行しない。 |
+| 阻害要因（`Blocker`） | 既存audit_anchor_external_tamper_evidence_proof等を現行scopeに限って参照。行別statusは付さず新規Blockerなし。 |
+| 状態 | OPEN（E0-04 mapping状態。独立製品Acceptance statusを新設しない。） |
+| 残余 | 全OS installed candidateでのAuthority・停止・Recovery・外部監査証拠は別途未成立。 |
+
+### D4-QE-R07 E0-04 21項目
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | D4-QE-R07 |
+| 旧ID | D4-QE-R07。結合後の実物をQCする要求IDを保持する。 |
+| 元原文/正本参照 | 2026-10-22仕様書§3 R07、AGENTS §0/§28、v4工程R03/E1–E4、施工指示I03/I05/I07。 |
+| 対象 | BUILD_COVERED後の統合candidateに対する正例、否定、failure、性能・資源・OS差・長時間・副作用QC。 |
+| 目的 | 完成していない系に最終QCを偽装せず、実不適合を根因へ返す。 |
+| 生成元（`Producer`） | 固定source/artifact identityを持つ統合candidateと定義済みQC条件。 |
+| 実Consumer | 各実物test/instrument、final development audit、QC記録、上流requirement/design/code/test correction。 |
+| 契約/データ | 候補ID/hash、OS/version/arch、入力／`command`、期待値／観測値、障害分類、復旧、回帰範囲。 |
+| 通常作用 | 一つのcandidateで必要なQC母集団を観測し、結果・限界をE0/QC evidenceへ結ぶ。 |
+| 否定作用 | testをskip/弱体化せず、fixture/CI/local partial passを実物・全体合格へ拡張しない。 |
+| 停止/復旧 | 根因を上流へ戻し、対象差分と直接依存・必須回帰を再検証。無影響履歴は保持する。 |
+| 標準OS候補 | Windows、macOS、Linux native、Android、iOS。方法論の適用母集団であり、各OSの実動作・QA成立を意味しない。 |
+| 配布物 | 各OS成果物はN10現行候補表を参照。版、arch、identity、保証値がUNKNOWNの値は未確定のまま保持し、方法論crosswalkを配布Acceptanceにしない。 |
+| 既存実装 | AGENTS QE_QC stage、final_development_audit.py、現行QA queueとproduct test source。 |
+| BUILD_GAP | BUILD_COVERED未到達。全体統合candidate・長時間/fault/performance/side-effect QCは未開始または未成立。 |
+| 参照元ハッシュ（`SourceSHA`） | 共通SourceSHA集合＋R07追加SourceSHA。検査器sourceのhashはQC実行結果ではない。 |
+| 試験区分（`TestClass`） | TEST_SOURCE/STATIC/旧限定実績。今回R07 QC testはNOT_RUN。 |
+| 証拠ID | NONE。今回のE0 source-to-consumer mappingは製品Evidenceを発行しない。 |
+| 阻害要因（`Blocker`） | N11/E0全体に対する既存comprehensive_extension_rev1_completionをscope上参照。方法論IDへ行別Blocker statusを新設しない。 |
+| 状態 | OPEN（E0-04 mapping状態。独立製品Acceptance statusを新設しない。） |
+| 残余 | 実物QCの固定candidate・全OS条件・根因是正記録はQE_QC段階の残務。 |
+
+### D4-QE-R08 E0-04 21項目
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | D4-QE-R08 |
+| 旧ID | D4-QE-R08。対象別QA保証の要求IDを保持する。 |
+| 元原文/正本参照 | 2026-10-22仕様書§3 R08、AGENTS §0/§19/§28、v4工程R03/R07–R08、施工指示I03/I06/I10。 |
+| 対象 | 同一QC candidateの製品・機能・OS・版・前提条件別保証可否とQA status。 |
+| 目的 | 局所証拠を別版/OS/利用条件へ拡張しない。 |
+| 生成元（`Producer`） | QE_QCのcandidate-bound結果、OS標準条件と配布artifact identity。 |
+| 実Consumer | Windows evidence validator、release_gate_check、Q0–Q7 queue、OS別QA表とrelease review。 |
+| 契約/データ | QA_SCOPED／QA_NOT_ESTABLISHED／OUT_OF_SCOPE、candidate/hash/OS/version/arch/installer/runtime条件。 |
+| 通常作用 | 各OS・機能条件で直接支持される範囲だけを保証し、未試験を別枠に残す。 |
+| 否定作用 | Windows/WSL/Emulator/Simulator/debug/mock evidenceを他OS・installed/release条件へ転用しない。 |
+| 停止/復旧 | candidate差が出たら影響するQA範囲だけを失効・再取得し、無関係証拠を保持する。 |
+| 標準OS候補 | Windows、macOS、Linux native、Android、iOS。方法論の適用母集団であり、各OSの実動作・QA成立を意味しない。 |
+| 配布物 | 各OS成果物はN10現行候補表を参照。版、arch、identity、保証値がUNKNOWNの値は未確定のまま保持し、方法論crosswalkを配布Acceptanceにしない。 |
+| 既存実装 | `release_gate_check.py`、`windows_release_evidence.py`、`FINAL_QA_QUEUE.md`、`Release Registry`。 |
+| BUILD_GAP | 現candidateの統合QE_QC未成立。Q0–Q7 DEFERRED、五OS標準 installed QA未完。 |
+| 参照元ハッシュ（`SourceSHA`） | 共通SourceSHA集合＋R08追加SourceSHA。Gate/validator identityは判定器sourceを指す。 |
+| 試験区分（`TestClass`） | 設定／Windows証拠validatorのsource／手動workflowの構造。今回はOS実動作QAを行っていない。 |
+| 証拠ID | NONE。今回のE0 source-to-consumer mappingは製品Evidenceを発行しない。 |
+| 阻害要因（`Blocker`） | 既存Windows/Linux/Mobile/全体gateをN10/N11の範囲で参照。新規行別Blockerなし。 |
+| 状態 | OPEN（E0-04 mapping状態。独立製品Acceptance statusを新設しない。） |
+| 残余 | 保証可能な版・arch・resource・native security条件の一部がUNKNOWN。 |
+
+### D4-QE-R09 E0-04 21項目
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | D4-QE-R09 |
+| 旧ID | D4-QE-R09。QAとOwner公開決裁を分離する要求を保持する。 |
+| 元原文/正本参照 | 2026-10-22仕様書§3 R09、v4仕様S07、工程R00/R08、施工指示I02/I10/I11、AGENTS §0。 |
+| 対象 | QE_QA結果と公開・正式配布・署名・Owner GOの独立責任境界。 |
+| 目的 | 技術検査やCodex判断にOwnerの最終責任を持たせない。 |
+| 生成元（`Producer`） | 版固定されたQC/QA結果、署名・配布資格・business decision条件。 |
+| 実Consumer | `Registry`の`owner_go`、`release gate`、`RELEASE_CHECKLIST.md`、Ownerによる最終`Release Review`。 |
+| 契約/データ | QA status、release_ready、task_execution、publisher/signing identity、Owner GOを別状態として扱う。 |
+| 通常作用 | 技術証拠だけを更新し、公開許可とOwner決裁を独立経路に残す。 |
+| 否定作用 | CI/gate/LLM/歴史PASSからGOやsupportedを自動生成しない。 |
+| 停止/復旧 | 条件不足ではrelease_ready=falseを維持し、必要なOwner責任だけを別途記録する。 |
+| 標準OS候補 | Windows、macOS、Linux native、Android、iOS。方法論の適用母集団であり、各OSの実動作・QA成立を意味しない。 |
+| 配布物 | 各OS成果物はN10現行候補表を参照。版、arch、identity、保証値がUNKNOWNの値は未確定のまま保持し、方法論crosswalkを配布Acceptanceにしない。 |
+| 既存実装 | release_blockers.registry.json、release_gate_check.py、RELEASE_CHECKLIST.mdとv4 §S07。 |
+| BUILD_GAP | 公開候補の全体QA、正式publisher/signing identityとOwner GOは未成立。 |
+| 参照元ハッシュ（`SourceSHA`） | 共通SourceSHA集合＋R09追加SourceSHA。Registry blobは現在stateのsource identityを表す。 |
+| 試験区分（`TestClass`） | 設定／静的Release Gate。今回は最終Release Reviewを行っていない。 |
+| 証拠ID | NONE。今回のE0 source-to-consumer mappingは製品Evidenceを発行しない。 |
+| 阻害要因（`Blocker`） | owner_goとcomprehensive_extension_rev1_completionは既存Release gateとしてのみ参照。 |
+| 状態 | OPEN（E0-04 mapping状態。独立製品Acceptance statusを新設しない。） |
+| 残余 | Owner GOは明示された最終責任者の将来判断であり、今回のE0 mappingでは要求・実行しない。 |
+
+### D4-QE-R10 E0-04 21項目
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | D4-QE-R10 |
+| 旧ID | D4-QE-R10。D4固有の技術・Git tag・manual Actions・履歴保持の要求IDを保持する。 |
+| 元原文/正本参照 | 2026-10-22仕様書§3 R10、AGENTS §3.1/§4/§20、v4 instruction I01/I05/I09/I12。 |
+| 対象 | single-writer main運用、2世代remote tags、workflow_dispatch補助検査、既存CLOSED/FAILとD4安全条件の保持。 |
+| 目的 | 他repositoryのworkflow/branch運用を誤移植せず、検査と正本・復旧をD4方式で運用する。 |
+| 生成元（`Producer`） | 現GitHub main、local worktree、復旧refs/tags、manual validation candidateとworkflow result。 |
+| 実Consumer | Codex Git操作、manual workflow inputs、Manifest/Conformance/Gate、progress history。 |
+| 契約/データ | `main`への直接反映、tagのCAS更新、`workflow_dispatch`限定、対象SourceSHA、結果scope、remote HEADとbackup refの一致。 |
+| 通常作用 | 許可済み検査に必要な補助runだけ固定commitへ手動実行し、結果範囲を記録する。 |
+| 否定作用 | CI trigger/required check/PR/force overwrite/別repo branch規則を導入せず、旧FAIL/PASSを書換えない。 |
+| 停止/復旧 | tag competition/remote driftで停止し再取得。成功した対象commitだけを正規mainへ反映し検証branchは整理する。 |
+| 標準OS候補 | Windows、macOS、Linux native、Android、iOS。方法論の適用母集団であり、各OSの実動作・QA成立を意味しない。 |
+| 配布物 | 各OS成果物はN10現行候補表を参照。版、arch、identity、保証値がUNKNOWNの値は未確定のまま保持し、方法論crosswalkを配布Acceptanceにしない。 |
+| 既存実装 | AGENTSのGit／Actions規則、Windows／Linuxの手動`workflow`、local／remoteの2世代`backup tag`。 |
+| BUILD_GAP | 全OS QC/QA・正式配布証拠は未成立。Actionsの補助成功はproduct completionを代替しない。 |
+| 参照元ハッシュ（`SourceSHA`） | 共通SourceSHA集合＋R10追加SourceSHA。workflow blobsは設定sourceの識別で、run evidenceではない。 |
+| 試験区分（`TestClass`） | 文書／workflow source／local Git。今回GitHub Actionsは起動していない。 |
+| 証拠ID | NONE。今回のE0 source-to-consumer mappingは製品Evidenceを発行しない。 |
+| 阻害要因（`Blocker`） | N11/E0全体に対する既存comprehensive_extension_rev1_completionをscope上参照。方法論IDへ行別Blocker statusを新設しない。 |
+| 状態 | OPEN（E0-04 mapping状態。独立製品Acceptance statusを新設しない。） |
+| 残余 | 手動ActionsのOS成果は対象commit/run毎に限定し、未実行OSはUNKNOWN/NOT_RUN。 |
+
+### D4-QE-R11 E0-04 21項目
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | D4-QE-R11 |
+| 旧ID | D4-QE-R11。履歴・現状・欠測・推論・未実施を区別する要求IDを保持する。 |
+| 元原文/正本参照 | 2026-10-22仕様書§3 R11、AGENTS §§4,5,9,11、v4工程R01/E0/R07。 |
+| 対象 | 旧candidate evidence、現候補、各source class、missing/unavailable、inference、NOT_RUN、historical statusの分離。 |
+| 目的 | 過去PASS/FAIL・静的検査・推論を現在の製品証拠へ転記しない。 |
+| 生成元（`Producer`） | Git履歴、workflow／artifact、runtime観測、Registry／evidence collector、現HEADのinventory。 |
+| 実Consumer | E0 ledger、進捗、Evidence Bundle、Audit/Release validators、要求別下流判断。 |
+| 契約/データ | 証拠class、候補identity、Source／Artifact hash、OS／条件、直接観測、限界、状態、保持期間。 |
+| 通常作用 | 各事実を時点と証拠源へ結びUNKNOWN/取得不能を残し、旧履歴を保持する。 |
+| 否定作用 | artifact missing/source mismatch/static-only fixtureを因果・runtime successへ昇格しない。 |
+| 停止/復旧 | 不一致時は現source/hashを再取得し、該当範囲だけ訂正する。旧記録は履歴で保つ。 |
+| 標準OS候補 | Windows、macOS、Linux native、Android、iOS。方法論の適用母集団であり、各OSの実動作・QA成立を意味しない。 |
+| 配布物 | 各OS成果物はN10現行候補表を参照。版、arch、identity、保証値がUNKNOWNの値は未確定のまま保持し、方法論crosswalkを配布Acceptanceにしない。 |
+| 既存実装 | E0/進捗台帳、evidence_bundle.py、audit_chain/store、manifest.py、Registry。 |
+| BUILD_GAP | 全要求と全候補証拠の全数結合・現candidate artifact collectionは未完。 |
+| 参照元ハッシュ（`SourceSHA`） | 共通SourceSHA集合＋R11追加SourceSHA。歴史blobは各々の当時commitに結び、現候補hashと分ける。 |
+| 試験区分（`TestClass`） | 文書／履歴／静的validator。日本語基底strict監査は文書lintであり、製品runtimeの証拠ではない。 |
+| 証拠ID | NONE。今回のE0 source-to-consumer mappingは製品Evidenceを発行しない。 |
+| 阻害要因（`Blocker`） | N11/E0全体に対する既存comprehensive_extension_rev1_completionをscope上参照。方法論IDへ行別Blocker statusを新設しない。 |
+| 状態 | OPEN（E0-04 mapping状態。独立製品Acceptance statusを新設しない。） |
+| 残余 | 一部古い履歴は取得不能。過去件数や外部artifact expiryを推定で補わない。 |
+
+### D4-QE-R12 E0-04 21項目
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | D4-QE-R12 |
+| 旧ID | D4-QE-R12。矛盾時の現行正本・実物再取得とOwner採否の要求IDを保持する。 |
+| 元原文/正本参照 | 2026-10-22仕様書§3 R12、現AGENTS §1/§26、v4採用記録・I01/I12。 |
+| 対象 | 正本間または文書・source・observed runtimeの矛盾処理と方法論変更の採否。 |
+| 目的 | 旧文書・local checkout・validatorに現行正本を無言で置き換えさせない。 |
+| 生成元（`Producer`） | Owner指定の最新版三点、採用済みmanifest/hash、現行remote main、実consumer。 |
+| 実Consumer | 正本索引、採用記録、Codex作業開始、manifest／conformance、E0 change-control record。 |
+| 契約/データ | 責任文書・版/hash、衝突内容、scope、impact、Ownerの採用判断、current HEAD、是正と履歴。 |
+| 通常作用 | 新要求を現行採用hashへ照合し、矛盾は責任範囲を分け、必要な採否を明示記録する。 |
+| 否定作用 | 候補/旧版を正本と推測せず、安全・release条件を緩和しない。 |
+| 停止/復旧 | 作業範囲を保護し、最新責任正本を読み直して差分を監査記録へ戻す。 |
+| 標準OS候補 | Windows、macOS、Linux native、Android、iOS。方法論の適用母集団であり、各OSの実動作・QA成立を意味しない。 |
+| 配布物 | 各OS成果物はN10現行候補表を参照。版、arch、identity、保証値がUNKNOWNの値は未確定のまま保持し、方法論crosswalkを配布Acceptanceにしない。 |
+| 既存実装 | 採用記録、規定/正本索引.json、manifest.py、AGENTSの正本規則。 |
+| BUILD_GAP | 全履歴・全出力Consumerでの自動矛盾検出、E0全母集団の参照結合は未完。 |
+| 参照元ハッシュ（`SourceSHA`） | 共通SourceSHA集合＋R12追加SourceSHA。採用記録にv4 ZIP・3原本のhashを固定。 |
+| 試験区分（`TestClass`） | 文書／設定／静的conformance。現行manifest/gateは構造検査のみで、製品runtime testではない。 |
+| 証拠ID | NONE。今回のE0 source-to-consumer mappingは製品Evidenceを発行しない。 |
+| 阻害要因（`Blocker`） | N11/E0全体に対する既存comprehensive_extension_rev1_completionをscope上参照。方法論IDへ行別Blocker statusを新設しない。 |
+| 状態 | OPEN（E0-04 mapping状態。独立製品Acceptance statusを新設しない。） |
+| 残余 | Ownerによる未決の方法論変更と公開・鍵・署名判断は技術作業に含めない。 |
+
+### D4-QE-R13 E0-04 21項目
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | D4-QE-R13 |
+| 旧ID | D4-QE-R13。Linuxの独立Desktop製品対象と環境別証拠要求を維持する。 |
+| 元原文/正本参照 | 2026-10-22仕様書§3 R13/§6.1、現AGENTS §§0,13,23,31、v4仕様S02/S04-N10、工程R03-H/R07/R10、指示I04-H/I06。 |
+| 対象 | Linux native製品、Tool、導入、GUI、権限、配布物の更新・撤去と、WSL／WSLg／headlessの証拠分離。 |
+| 目的 | Linuxを独立必須製品対象として実装し、開発用Linux PASSをnative/installed QAへ誤昇格させない。 |
+| 生成元（`Producer`） | Linux Flutter UI／Runner、Rust Launcher／Worker／Broker、package／update builder、native Linux環境とevidence collector。 |
+| 実Consumer | Linux native Owner／IPC／Broker／Runtime／Agent Task／Tool／Audit／Recovery／installer／update／rollback／uninstallの各consumerとOS evidence gate。 |
+| 契約/データ | 宣言distro／version／kernel／arch／libc／GUI／session／filesystem／sandbox／resource／package。Linux nativeをWSL／WSLg／headlessと区別する。 |
+| 通常作用 | 標準Linux host／VMへ通常導入し、GUI・権限・実Task・Audit・停止／復旧・更新／撤去を同一candidateへ結ぶ。 |
+| 否定作用 | WSL／Xvfb／headless／Windows／macOSの証拠をLinux native acceptanceへ流用しない。未宣言OS／securityはUNKNOWNとする。 |
+| 停止/復旧 | package／permission／IPC／processの失敗はfail-closedとし、Windows Job Objectやcredential機構を根拠なく流用しない。 |
+| 標準OS候補 | Linux nativeは必須。Windows／macOS／Android／iOSも製品母集団に含め、五OSのQA範囲を分離する。 |
+| 配布物 | Linux portable archive／bootstrap package／update payloadは候補として存在する。一般利用者向け署名package、version／arch保証、installer lifecycle全体はUNKNOWN／OPEN。 |
+| 既存実装 | Linux Runner／Broker channel、linux_desktop_launcher.rs／linux_desktop_worker.rs、installer/linux文書、manual workflow、Linux installed productのprobe／test。 |
+| BUILD_GAP | Linux native標準環境／package、GUI／X11／Wayland、secret／storage／IPC、全製品consumer、正式配布の証拠が未成立。 |
+| 参照元ハッシュ（`SourceSHA`） | 共通SourceSHA集合＋R13追加SourceSHA。Linux test source／履歴のhashは、現candidateでtestを実行した証明ではない。 |
+| 試験区分（`TestClass`） | CODE_PRESENT／UNIT／FIXTURE／過去の限定LIVE_PRODUCT #286。今回のE0 mappingでは現Linux native run／OS QAを行っていない。 |
+| 証拠ID | NONE。今回のE0 source-to-consumer mappingは製品Evidenceを発行しない。 |
+| 阻害要因（`Blocker`） | 既存linux_native_product_support／comprehensive_extension_rev1_completionのscopeを参照するだけで、新規blockerや物理実機条件は追加しない。 |
+| 状態 | OPEN（E0 mapping状態。Linux native product acceptanceとN10 OS QAは別々にOPENを維持する。） |
+| 残余 | 旧D4-LNX-T01..08の詳細と標準Linuxごとの受入証拠は、現行v4に沿ったmapping／実行が残る。非Windowsの物理実機testは追加しない。 |
+13行すべてE0-04 21 fieldを記録し、SourceSHA 共有7件とID別consumer sourceを編集前mainへ固定した。これはQE方法論のSource→Consumer対応であり、E0または製品機能AcceptanceのCLOSED、QE_QC/QE_QA合格、Owner GOを意味しない。D4-QE-R13のLinux必須性は現AGENTS/v4で有効だが、旧D4-LNX詳細試験の全受入れ・Linux製品完成は未成立。
 ## 実装ファイルの初期目録（CODE_PRESENTのみ）
 
 下記は`d503a4ef6daac8942abd1cb011442ce28c78ec55`時点のパス存在・責務候補を読み取った初期目録である。名前・コードの存在だけではProducer→Consumer接続、installed/runtime実作用、Acceptanceを証明しない。各行の`WIRED`、実作用、正常/否定/Recovery、Evidence、OS別状態は未照合なら`UNKNOWN`。
@@ -7004,7 +7376,7 @@ RegistryにmacOS専用Blocker IDはない。macOS候補はN10のOS別Artifact対
 | 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K01〜K20はE0-04全21 fieldとSourceSHAを個別記録済み。N11 Evidence/Blocker/OS Artifact全数結合を継続 |
 | Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 33 IDの21 field／SourceSHAを維持し、N08/N10/N11の原因・Consumer・5 OS Artifact・Evidence/既存Blocker scope row joinを記録済み。Evidence ID NONE、全Acceptance OPEN。B0〜B6 statusは不変 |
 | Buffer工程 B0〜B6 | 7 | `docs/緩衝基盤_rev5補遺_QC/`・v4仕様S06 | B0〜B4の限定CLOSEDを保持、B5 OPEN、B6未成立。詳細Consumer照合が未完 |
-| QE/監査 D4-QE-R01〜R13／D4-LNX-T01〜T08／D4-AUD-F01〜F07 | 13／8／7 | `docs/QE_2026-10-22/`・各採用記録 | 旧証拠と現在の実装/Validatorへの接続が未完 |
+| QE/監査 D4-QE-R01〜R13／D4-LNX-T01〜T08／D4-AUD-F01〜F07 | 13／8／7 | `docs/QE_2026-10-22/`・各採用記録 | D4-QE-R01〜R13はE0-04 21項目と現行sourceを照合済み。Evidence ID NONE、Acceptance OPEN。D4-LNX-T01〜T08／D4-AUD-F01〜F07は未照合 |
 | Q0〜Q7、FQ群、W00〜W08 | 8／13／9 | v4工程表R05〜R08、`docs/FINAL_QA_QUEUE.md`、進捗履歴 | Q0〜Q7はDEFERRED。FQ/W各IDの現在Consumer・証拠・残余の照合が未完 |
 | Release Blocker | 18 | `release_blockers.registry.json` | 18件中16件unresolved／2件resolvedを保持。18件すべてのv4条件移行を個別に照合中 |
 
@@ -7046,7 +7418,7 @@ RegistryにmacOS専用Blocker IDはない。macOS候補はN10のOS別Artifact対
 1. N01〜N10のE0-04 21項目は現行SourceSHAへ個別照合済み。各製品AcceptanceはOPENのまま維持し、N10の五OS実導入・利用・更新・Recovery QAは後続の製品Acceptanceに残す。
 2. C0〜C34およびPhase 0〜45の個別field記録、K01〜K20のSource mappingを維持し再試験しない。N11 Evidence／Blocker／OS Artifact行結合と残存E0母集団を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
 3. BUF-R/T 33 IDのSourceSHA／Consumer scopeを維持し、原因→Consumer、N08/N10/N11、5 OS artifact、Evidence/既存Blocker scopeをrow join済み。現runtimeはCodex Task scratchの限定経路、Evidence ID NONE、Acceptance OPEN。B0〜B6の履歴status不変。
-4. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
+4. D4-QE-R01〜R13はE0-04 mapping済み（SourceSHAはsource同一性のみ、Evidence ID NONE、Acceptance OPEN）。次にD4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 5. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
 6. N10の各OS標準候補・配布・実装・workflow/test・限定履歴を記録する。保証version/arch/resource/package条件は公式条件と実測から固定し、未知をUNKNOWNにする。
 7. N11 Evidence/Registry/validator/QA queue consumer mappingに全ID・全OS artifactを接続する。Acceptance/E3 BUILD_COVERED/E4 QC/E5 QA/E6 Release判定は正本工程の順序と区分を維持する。
