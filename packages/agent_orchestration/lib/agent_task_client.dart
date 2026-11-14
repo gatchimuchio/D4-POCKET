@@ -6,6 +6,7 @@ import 'package:broker_contract/broker_transport.dart'
 final _runtimeId = RegExp(r'^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$');
 final _sessionId = RegExp(r'^[a-f0-9]{32}$');
 final _hash = RegExp(r'^sha256:[a-f0-9]{64}$');
+final _mobileTaskRequestId = RegExp(r'^[a-f0-9]{32}$');
 
 const _agentTaskExecutionPolicy =
     'gui-shell-agent-task-sandbox-v1-max-runtime-900s';
@@ -30,6 +31,7 @@ class AgentTaskRequest {
     this.mcpResultId,
     this.mcpResultHash,
     this.requireUnusedTaskSession = false,
+    this.mobileTaskRequestId,
   });
 
   final String runtimeId;
@@ -40,6 +42,7 @@ class AgentTaskRequest {
   final String? mcpResultId;
   final String? mcpResultHash;
   final bool requireUnusedTaskSession;
+  final String? mobileTaskRequestId;
 
   Map<String, Object?> toPayload() => {
     'agent_runtime_id': runtimeId,
@@ -51,6 +54,8 @@ class AgentTaskRequest {
     if (mcpResultId != null) 'mcp_result_id': mcpResultId,
     if (mcpResultHash != null) 'mcp_result_hash': mcpResultHash,
     if (requireUnusedTaskSession) 'require_unused_task_session': true,
+    if (mobileTaskRequestId != null)
+      'mobile_task_request_id': mobileTaskRequestId,
   };
 
   void validate() {
@@ -66,7 +71,9 @@ class AgentTaskRequest {
               r'^mcp-agent-result-[a-f0-9]{32}$',
             ).hasMatch(mcpResultId!)) ||
         (mcpResultId == null) != (mcpResultHash == null) ||
-        (mcpResultHash != null && !_hash.hasMatch(mcpResultHash!))) {
+        (mcpResultHash != null && !_hash.hasMatch(mcpResultHash!)) ||
+        (mobileTaskRequestId != null &&
+            !_mobileTaskRequestId.hasMatch(mobileTaskRequestId!))) {
       throw const BrokerClientException('Agent Task要求の形式が不正です');
     }
   }

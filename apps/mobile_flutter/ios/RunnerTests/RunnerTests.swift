@@ -25,6 +25,28 @@ class RunnerTests: XCTestCase {
     }
   }
 
+  func testAgentTaskOperationsRemainPayloadOnlyAndRejectAuthorityFields() throws {
+    XCTAssertNoThrow(try DeviceLinkPayloadPolicy.validate("AgentTask端末申請", payload: [
+      "agent_runtime_id": "codex-runtime",
+      "session_id": String(repeating: "a", count: 32),
+      "workspace_id": "workspace-a",
+      "instruction": "inspect the selected files",
+    ]))
+    XCTAssertNoThrow(try DeviceLinkPayloadPolicy.validate("AgentTask端末申請一覧", payload: [:]))
+    for operation in ["AgentTask端末状態", "AgentTask端末実行", "AgentTask端末取消"] {
+      XCTAssertNoThrow(try DeviceLinkPayloadPolicy.validate(operation, payload: [
+        "申請ID": String(repeating: "b", count: 32),
+      ]))
+    }
+    XCTAssertThrowsError(try DeviceLinkPayloadPolicy.validate("AgentTask端末申請", payload: [
+      "agent_runtime_id": "codex-runtime",
+      "session_id": String(repeating: "a", count: 32),
+      "workspace_id": "workspace-a",
+      "instruction": "inspect the selected files",
+      "approval": "owner",
+    ]))
+  }
+
   func testInvitationParsingBindsHostDeviceAndExpiry() throws {
     let deviceID = try XCTUnwrap(randomHex(byteCount: 16))
     let invitation: [String: Any] = [

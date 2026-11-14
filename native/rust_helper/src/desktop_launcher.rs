@@ -83,6 +83,7 @@ enum DesktopOwnerOperationSummary {
         instruction_hash: String,
         mcp_capability_snapshot_hash: Option<String>,
         mcp_result_hash: Option<String>,
+        mobile_task_request_id: Option<String>,
         payload_hash: String,
     },
     AgentTaskResultExposure {
@@ -291,6 +292,8 @@ struct AgentTaskOwnerApprovalRequest {
     mcp_result_id: Option<String>,
     #[serde(default)]
     mcp_result_hash: Option<String>,
+    #[serde(default)]
+    mobile_task_request_id: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -759,6 +762,13 @@ fn agent_task_permission_identifier_is_valid(value: &str) -> bool {
 }
 
 fn agent_task_result_identifier_is_valid(value: &str) -> bool {
+    value.len() == 32
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn mobile_task_request_identifier_is_valid(value: &str) -> bool {
     value.len() == 32
         && value
             .bytes()
@@ -2136,6 +2146,10 @@ fn owner_operation_candidate_with_product_identity(
                             .bytes()
                             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
                 })
+                || request
+                    .mobile_task_request_id
+                    .as_deref()
+                    .is_some_and(|id| !mobile_task_request_identifier_is_valid(id))
             {
                 return None;
             }
@@ -2147,6 +2161,7 @@ fn owner_operation_candidate_with_product_identity(
                 instruction_hash: sha256_tagged(request.instruction.as_bytes()),
                 mcp_capability_snapshot_hash: request.mcp_capability_snapshot_hash,
                 mcp_result_hash: request.mcp_result_hash,
+                mobile_task_request_id: request.mobile_task_request_id,
                 payload_hash,
             }
         }
@@ -2958,6 +2973,7 @@ fn owner_confirmation_text_for_identity(
             instruction_hash,
             mcp_capability_snapshot_hash,
             mcp_result_hash,
+            mobile_task_request_id,
             payload_hash,
         } => {
             let mcp_context = match (mcp_capability_snapshot_hash, mcp_result_hash) {
@@ -2972,8 +2988,16 @@ fn owner_confirmation_text_for_identity(
                 ),
                 (None, None) => String::new(),
             };
+            let mobile_context = mobile_task_request_id.as_deref().map_or_else(
+                String::new,
+                |request_id| {
+                    format!(
+                        "\n\n送信元: Device Link Agent Task申請 {request_id}（受信側Ownerの新規確認が必要）"
+                    )
+                },
+            );
             format!(
-                "このAgent Taskの一回限りOwner Approvalを発行しますか？\n\nRuntime ID: {runtime_id}\nSession ID: {session_id}\nWorkspace ID: {workspace_id}\n指示文字数: {instruction_characters}\n指示hash: {instruction_hash}{mcp_context}\n要求ポリシー: gui-shell-agent-task-sandbox-v1-max-runtime-900s\n範囲: このSession・Workspace・指示hash・実行条件に限定、Approval発行後5分以内に開始、開始後の最大実行時間15分\n\nCompose画面でTask本文を確認してから判断してください。この確認画面は本文を表示しません。このApprovalはTask開始と最大15分の実行を一回だけ許可し、Workspace差分の確認と判断は別操作です。Credential等の秘密をTask本文へ含めないでください。発行はTaskを保存・変更・実行せず、実行可能なsandboxの存在も証明しません。Windows accountの再認証ではありません。\n\npayload hash:\n{payload_hash}"
+                "このAgent Taskの一回限りOwner Approvalを発行しますか？\n\nRuntime ID: {runtime_id}\nSession ID: {session_id}\nWorkspace ID: {workspace_id}\n指示文字数: {instruction_characters}\n指示hash: {instruction_hash}{mcp_context}{mobile_context}\n要求ポリシー: gui-shell-agent-task-sandbox-v1-max-runtime-900s\n範囲: このSession・Workspace・指示hash・実行条件に限定、Approval発行後5分以内に開始、開始後の最大実行時間15分\n\nCompose画面でTask本文を確認してから判断してください。この確認画面は本文を表示しません。このApprovalはTask開始と最大15分の実行を一回だけ許可し、Workspace差分の確認と判断は別操作です。Credential等の秘密をTask本文へ含めないでください。発行はTaskを保存・変更・実行せず、実行可能なsandboxの存在も証明しません。Windows accountの再認証ではありません。\n\npayload hash:\n{payload_hash}"
             )
         }
         DesktopOwnerOperationSummary::AgentTaskResultExposure {
@@ -4588,6 +4612,7 @@ mod tests {
                 instruction_hash,
                 mcp_capability_snapshot_hash,
                 mcp_result_hash,
+                mobile_task_request_id,
                 payload_hash,
             } => json!({
                 "summary": {
@@ -4599,6 +4624,7 @@ mod tests {
                     "instruction_hash": instruction_hash,
                     "mcp_capability_snapshot_hash": mcp_capability_snapshot_hash,
                     "mcp_result_hash": mcp_result_hash,
+                    "mobile_task_request_id": mobile_task_request_id,
                     "payload_hash": payload_hash
                 },
                 "confirm": confirm
@@ -5163,6 +5189,7 @@ mod tests {
             instruction_hash: sha256_tagged(instruction.as_bytes()),
             mcp_capability_snapshot_hash: None,
             mcp_result_hash: None,
+            mobile_task_request_id: None,
             payload_hash: sha256_tagged(b"owner-ui-test-payload"),
         };
 
@@ -5470,6 +5497,8 @@ mod tests {
                 mcp_capability_snapshot_hash: Option<String>,
                 #[serde(default)]
                 mcp_result_hash: Option<String>,
+                #[serde(default)]
+                mobile_task_request_id: Option<String>,
                 payload_hash: String,
             },
             AgentTaskResultExposure {
@@ -5604,6 +5633,7 @@ mod tests {
                 instruction_hash,
                 mcp_capability_snapshot_hash,
                 mcp_result_hash,
+                mobile_task_request_id,
                 payload_hash,
             } => DesktopOwnerOperationSummary::AgentTaskOwnerApproval {
                 runtime_id,
@@ -5613,6 +5643,7 @@ mod tests {
                 instruction_hash,
                 mcp_capability_snapshot_hash,
                 mcp_result_hash,
+                mobile_task_request_id,
                 payload_hash,
             },
             TestSummary::AgentTaskResultExposure {
@@ -9306,12 +9337,13 @@ mod tests {
             "agent_runtime_id": "fixture-agent",
             "session_id": "fixture-session",
             "workspace_id": "fixture-workspace",
-            "instruction": instruction
+            "instruction": instruction,
+            "mobile_task_request_id": "c".repeat(32)
         });
         let input = serde_json::json!({
             "request_id": "desktop-agent-task-approval",
             "operation": "AgentTaskOwnerApprovalGrant",
-            "payload": payload,
+            "payload": payload.clone(),
             "payload_hash": canonical_payload_hash(Some(&payload)),
             "nonce": "desktop-agent-task-approval-nonce",
             "issued_at": BrokerRequestEnvelope::current_issued_at(),
@@ -9333,6 +9365,8 @@ mod tests {
         assert!(text.contains("gui-shell-agent-task-sandbox-v1-max-runtime-900s"));
         assert!(text.contains("開始後の最大実行時間15分"));
         assert!(text.contains("Taskを保存・変更・実行せず"));
+        assert!(text.contains("Device Link Agent Task申請"));
+        assert!(text.contains(&"c".repeat(32)));
         assert!(!text.contains(instruction));
 
         let escalated = serde_json::json!({
@@ -9348,6 +9382,19 @@ mod tests {
             "payload": escalated,
             "payload_hash": canonical_payload_hash(Some(&escalated)),
             "nonce": "desktop-agent-task-approval-escalated-nonce",
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {"client": "desktop_flutter"}
+        });
+        assert!(owner_operation_candidate(invalid.to_string().as_bytes(), &endpoint).is_none());
+
+        let mut malformed = payload.clone();
+        malformed["mobile_task_request_id"] = serde_json::json!("C".repeat(32));
+        let invalid = serde_json::json!({
+            "request_id": "desktop-agent-task-approval-invalid-mobile-id",
+            "operation": "AgentTaskOwnerApprovalGrant",
+            "payload": malformed,
+            "payload_hash": canonical_payload_hash(Some(&malformed)),
+            "nonce": "desktop-agent-task-approval-invalid-mobile-id-nonce",
             "issued_at": BrokerRequestEnvelope::current_issued_at(),
             "metadata": {"client": "desktop_flutter"}
         });

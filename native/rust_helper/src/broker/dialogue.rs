@@ -573,6 +573,8 @@ struct Agent作業要求 {
     mcp_result_id: Option<String>,
     #[serde(default)]
     mcp_result_hash: Option<String>,
+    #[serde(default)]
+    mobile_task_request_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -843,9 +845,11 @@ fn AgentTask実行条件hash(
     registration_hash: &str,
     permission_id: &str,
     require_unused_task_session: bool,
+    mobile_task_request_id: Option<&str>,
 ) -> String {
     let material = format!(
-        "gui-shell-agent-task-execution-conditions-v2\0{runtime_id}\0{session_id}\0{workspace_id}\0{registration_hash}\0{permission_id}\0require_unused_task_session={require_unused_task_session}\0{AGENT_TASK_EXECUTION_POLICY}"
+        "gui-shell-agent-task-execution-conditions-v3\0{runtime_id}\0{session_id}\0{workspace_id}\0{registration_hash}\0{permission_id}\0require_unused_task_session={require_unused_task_session}\0mobile_task_request_id={}\0{AGENT_TASK_EXECUTION_POLICY}",
+        mobile_task_request_id.unwrap_or("none")
     );
     sha256_tagged(material.as_bytes())
 }
@@ -881,6 +885,10 @@ fn Agent作業Context参照妥当(request: &Agent作業要求) -> bool {
         && request.mcp_result_id.as_deref().is_none_or(result_id_valid)
         && request.mcp_result_hash.as_deref().is_none_or(hash_valid)
         && request.mcp_result_id.is_some() == request.mcp_result_hash.is_some()
+        && request
+            .mobile_task_request_id
+            .as_deref()
+            .is_none_or(固定長hex識別子妥当)
 }
 
 fn 固定長hex識別子妥当(value: &str) -> bool {
@@ -1313,6 +1321,7 @@ impl 対話制御 {
         registration_hash: &str,
         instruction_hash: &str,
         require_unused_task_session: bool,
+        mobile_task_request_id: Option<&str>,
         now: i64,
     ) -> bool {
         self.agent_task_permissions
@@ -1336,6 +1345,7 @@ impl 対話制御 {
                                 registration_hash,
                                 &grant.permission_id,
                                 require_unused_task_session,
+                                mobile_task_request_id,
                             )
                 })
             })
@@ -1664,6 +1674,7 @@ impl 対話制御 {
                     binding.registration_hash(),
                     &instruction_hash,
                     request.require_unused_task_session.unwrap_or(false),
+                    request.mobile_task_request_id.as_deref(),
                     現在,
                 ) {
                     "有効"
@@ -1834,6 +1845,7 @@ impl 対話制御 {
                     binding.registration_hash(),
                     &permission.permission_id,
                     request.require_unused_task_session.unwrap_or(false),
+                    request.mobile_task_request_id.as_deref(),
                 );
                 let expires_at_epoch_seconds = 現在.saturating_add(300);
                 監査(
@@ -1944,6 +1956,7 @@ impl 対話制御 {
                     binding.registration_hash(),
                     &instruction_hash,
                     request.require_unused_task_session.unwrap_or(false),
+                    request.mobile_task_request_id.as_deref(),
                     現在,
                 ) {
                     return Err(対話失敗::権限拒否);
@@ -2004,6 +2017,7 @@ impl 対話制御 {
                             binding.registration_hash(),
                             &permission_id,
                             request.require_unused_task_session.unwrap_or(false),
+                            request.mobile_task_request_id.as_deref(),
                         ),
                     })
                     .to_string()
@@ -4768,6 +4782,28 @@ mod tests {
     }
 
     #[test]
+    fn MobileTask申請IDはOwnerApproval実行条件へ束縛される() {
+        let session_id = "a".repeat(32);
+        let registration_hash = "registration-hash";
+        let permission_id = "permission-id";
+        let base = |request_id| {
+            AgentTask実行条件hash(
+                "codex-runtime",
+                &session_id,
+                "workspace-a",
+                registration_hash,
+                permission_id,
+                false,
+                request_id,
+            )
+        };
+        let request_a = "b".repeat(32);
+        let request_b = "c".repeat(32);
+        assert_ne!(base(None), base(Some(&request_a)));
+        assert_ne!(base(Some(&request_a)), base(Some(&request_b)));
+    }
+
+    #[test]
     fn AgentTask実行は期限切れOwnerApprovalを有効Permissionから分離して拒否する() {
         for wall_clock_expired in [true, false] {
             let (mut c, calls) = 準備(false, false, false);
@@ -4806,6 +4842,7 @@ mod tests {
                 &registration_hash,
                 &instruction_hash,
                 false,
+                None,
                 100,
             ));
             assert_eq!(
@@ -4844,6 +4881,7 @@ mod tests {
                 &registration_hash,
                 &instruction_hash,
                 false,
+                None,
                 100,
             ));
 
@@ -4864,6 +4902,7 @@ mod tests {
                         &grant.workspace_registration_hash,
                         &grant.permission_id,
                         false,
+                        None,
                     ),
                 );
 
@@ -4888,6 +4927,7 @@ mod tests {
                 &registration_hash,
                 &instruction_hash,
                 false,
+                None,
                 100,
             ));
             assert_eq!(

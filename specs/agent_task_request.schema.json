@@ -49,6 +49,11 @@
       "pattern": "^sha256:[a-f0-9]{64}$",
       "description": "MCP Tool結果contextのhash。参照値だけでは結果取得・権限・Approvalを与えない。"
     },
+    "mobile_task_request_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$",
+      "description": "Device Linkで受信した未使用Agent Task申請への束縛参照。申請照合とOwner Approvalの実行条件hashに含め、PermissionやApprovalを生成しない。"
+    },
     "require_unused_task_session": {
       "type": "boolean",
       "const": true,

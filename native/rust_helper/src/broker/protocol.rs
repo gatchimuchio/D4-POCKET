@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 use unicode_normalization::UnicodeNormalization;
 
 use std::path::{Path, PathBuf};
@@ -539,6 +539,8 @@ pub enum BrokerOperation {
     AgentTask状態,
     #[serde(rename = "AgentTask取消")]
     AgentTask取消,
+    #[serde(rename = "AgentTask端末申請一覧")]
+    AgentTask端末申請一覧,
     #[serde(rename = "AgentCLI実行系作業領域登録")]
     AgentCLI実行系作業領域登録,
     #[serde(rename = "作業領域OS選択")]
@@ -766,6 +768,7 @@ impl BrokerOperation {
             BrokerOperation::AgentTask実行 => "AgentTask実行",
             BrokerOperation::AgentTask状態 => "AgentTask状態",
             BrokerOperation::AgentTask取消 => "AgentTask取消",
+            BrokerOperation::AgentTask端末申請一覧 => "AgentTask端末申請一覧",
             BrokerOperation::AgentCLI実行系作業領域登録 => "AgentCLI実行系作業領域登録",
             BrokerOperation::作業領域OS選択 => "作業領域OS選択",
             BrokerOperation::AgentCLI実行fileOS選択 => "AgentCLI実行fileOS選択",
@@ -2536,6 +2539,11 @@ impl Broker {
                 owner,
                 &payload_hash,
             ),
+            BrokerOperation::AgentTask端末申請一覧 => self.AgentTask端末申請一覧処理(
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                &payload_hash,
+            ),
             BrokerOperation::ホスト能力 => self.ホスト能力処理(
                 &request_id,
                 envelope.payload.as_ref().unwrap_or(&Value::Null),
@@ -3647,6 +3655,358 @@ impl Broker {
         }
     }
 
+    #[allow(non_snake_case)]
+    fn AgentTask端末状態投影(task: &Value) -> Result<Value, &'static str> {
+        let task_id = task
+            .get("task_id")
+            .and_then(Value::as_str)
+            .ok_or("AgentTask ID応答不正")?;
+        let runtime_id = task
+            .get("agent_runtime_id")
+            .and_then(Value::as_str)
+            .ok_or("AgentTask Runtime応答不正")?;
+        let session_id = task
+            .get("session_id")
+            .and_then(Value::as_str)
+            .ok_or("AgentTask Session応答不正")?;
+        let workspace_id = task
+            .get("workspace_id")
+            .and_then(Value::as_str)
+            .ok_or("AgentTask Workspace応答不正")?;
+        let instruction_hash = task
+            .get("instruction_hash")
+            .and_then(Value::as_str)
+            .ok_or("AgentTask 指示hash応答不正")?;
+        let status = task
+            .get("status")
+            .and_then(Value::as_str)
+            .ok_or("AgentTask 状態応答不正")?;
+        let result_content_available = task
+            .get("result_content_available")
+            .and_then(Value::as_bool)
+            .ok_or("AgentTask 結果状態応答不正")?;
+        let result_hash = task.get("result_hash").cloned().unwrap_or(Value::Null);
+        let valid_identifier = |value: &str| {
+            let bytes = value.as_bytes();
+            !bytes.is_empty()
+                && bytes.len() <= 128
+                && bytes[0].is_ascii_alphanumeric()
+                && bytes.iter().all(|byte| {
+                    byte.is_ascii_alphanumeric() || matches!(*byte, b'_' | b'.' | b':' | b'-')
+                })
+        };
+        let valid_sha256 = |value: &str| {
+            value.len() == 71
+                && value.starts_with("sha256:")
+                && value[7..]
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        };
+        if !super::device_link::hex形状(task_id, 32)
+            || !super::device_link::hex形状(session_id, 32)
+            || !valid_identifier(runtime_id)
+            || !valid_identifier(workspace_id)
+            || !valid_sha256(instruction_hash)
+            || ![
+                "pending",
+                "running",
+                "blocked",
+                "completed",
+                "failed",
+                "cancelled",
+                "quarantined",
+            ]
+            .contains(&status)
+            || !result_hash.is_null() && !result_hash.as_str().is_some_and(valid_sha256)
+        {
+            return Err("AgentTask projection不正");
+        }
+        Ok(json!({
+            "task_id": task_id,
+            "実行系ID": runtime_id,
+            "対話セッションID": session_id,
+            "作業領域ID": workspace_id,
+            "指示hash": instruction_hash,
+            "状態": status,
+            "結果hash": result_hash,
+            "結果本文あり": result_content_available,
+        }))
+    }
+
+    #[allow(non_snake_case)]
+    fn AgentTask端末申請一覧処理(
+        &mut self,
+        id: &str,
+        payload: &Value,
+        hash: &str,
+    ) -> BrokerResponse {
+        if !payload.as_object().is_some_and(|fields| fields.is_empty()) {
+            return self.reject_with_payload_hash(
+                id,
+                "AgentTask端末申請一覧",
+                "要求不正",
+                "入力fieldなしの一覧要求が必要",
+                true,
+                hash,
+            );
+        }
+        let received = match self.append_audit(
+            id,
+            "AgentTask端末申請一覧",
+            "received",
+            "Device Link Task申請一覧を取得。本文はAuditへ保存しない",
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            hash,
+        ) {
+            Ok(event) => event.event_id,
+            Err(_) => {
+                return self.audit_store_failed_response(
+                    id,
+                    "AgentTask端末申請一覧",
+                    "監査失敗",
+                    "監査修復後に申請一覧を再確認",
+                )
+            }
+        };
+        let now = self.current_epoch_seconds();
+        let requests = self
+            .端末
+            .as_mut()
+            .map(|device| device.AgentTask申請一覧(now))
+            .unwrap_or_default();
+        let rows = requests
+            .iter()
+            .map(|request| {
+                json!({
+                    "申請ID": request.申請ID,
+                    "端末ID": request.端末ID,
+                    "要求": request.要求,
+                    "作成時刻": request.作成時刻,
+                    "期限": request.期限,
+                    "task_id": request.TaskID,
+                })
+            })
+            .collect::<Vec<_>>();
+        let body = json!({"申請": rows});
+        let digest = sha256_tagged(body.to_string().as_bytes());
+        match self.append_audit(
+            id,
+            "AgentTask端末申請一覧",
+            "accepted",
+            &format!("期限内申請={}。本文はAuditへ保存しない", requests.len()),
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            &digest,
+        ) {
+            Ok(event) => self.端末成功応答(
+                id,
+                "AgentTask端末申請一覧",
+                body,
+                event.event_id,
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+            ),
+            Err(_) => self.audit_store_failed_response(
+                &received,
+                "AgentTask端末申請一覧",
+                "監査失敗",
+                "申請一覧の応答を確定できないため再確認",
+            ),
+        }
+    }
+
+    #[allow(non_snake_case)]
+    fn 端末AgentTask操作(
+        &mut self,
+        id: &str,
+        credential_id: &str,
+        operation: &str,
+        payload: &Value,
+        hash: &str,
+    ) -> Result<(Value, String), &'static str> {
+        let now = self.current_epoch_seconds();
+        match operation {
+            "AgentTask端末申請" => {
+                if payload.to_string().len() > 32 * 1024 {
+                    return Err("AgentTask申請上限");
+                }
+                let preflight = self.対話要求処理(
+                    id,
+                    BrokerOperation::Agent作業要求検査,
+                    payload,
+                    false,
+                    EVIDENCE_SOURCE_INTERNAL_STATE,
+                    hash,
+                );
+                if preflight.status != BrokerStatus::Accepted {
+                    return Err("AgentTask事前検査拒否");
+                }
+                let preflight_body = preflight.body.ok_or("AgentTask事前検査応答不正")?;
+                let request = self
+                    .端末
+                    .as_mut()
+                    .ok_or("端末経路が未設定")?
+                    .AgentTask申請を記録する(credential_id, payload, now)?;
+                Ok((
+                    json!({
+                        "版": 1,
+                        "申請ID": request.申請ID,
+                        "状態": "Owner確認待ち",
+                        "実行系ID": preflight_body["実行系ID"],
+                        "対話セッションID": preflight_body["対話セッションID"],
+                        "作業領域ID": preflight_body["作業領域ID"],
+                        "指示hash": preflight_body["指示hash"],
+                        "期限": request.期限,
+                    }),
+                    EVIDENCE_SOURCE_INTERNAL_STATE.to_owned(),
+                ))
+            }
+            "AgentTask端末申請一覧" => {
+                let requests = self
+                    .端末
+                    .as_mut()
+                    .ok_or("端末経路が未設定")?
+                    .AgentTask申請一覧取得(credential_id, now)?
+                    .into_iter()
+                    .map(|request| {
+                        json!({
+                            "申請ID": request.申請ID,
+                            "実行系ID": request.要求["agent_runtime_id"],
+                            "対話セッションID": request.要求["session_id"],
+                            "作業領域ID": request.要求["workspace_id"],
+                            "指示hash": sha256_tagged(
+                                request.要求["instruction"].as_str().unwrap_or_default().as_bytes()
+                            ),
+                            "作成時刻": request.作成時刻,
+                            "期限": request.期限,
+                            "task_id": request.TaskID,
+                        })
+                    })
+                    .collect::<Vec<_>>();
+                Ok((
+                    json!({"申請": requests}),
+                    EVIDENCE_SOURCE_INTERNAL_STATE.to_owned(),
+                ))
+            }
+            "AgentTask端末状態" | "AgentTask端末実行" | "AgentTask端末取消" => {
+                let request_id = payload
+                    .get("申請ID")
+                    .and_then(Value::as_str)
+                    .ok_or("要求不正")?;
+                let draft = self
+                    .端末
+                    .as_mut()
+                    .ok_or("端末経路が未設定")?
+                    .AgentTask申請取得(credential_id, request_id, now)?;
+                if operation == "AgentTask端末状態" {
+                    if let Some(task_id) = draft.TaskID {
+                        let response = self.対話要求処理(
+                            id,
+                            BrokerOperation::AgentTask状態,
+                            &json!({"task_id": task_id}),
+                            false,
+                            EVIDENCE_SOURCE_INTERNAL_STATE,
+                            hash,
+                        );
+                        if response.status != BrokerStatus::Accepted {
+                            return Err("AgentTask状態取得拒否");
+                        }
+                        let task = Self::AgentTask端末状態投影(
+                            response.body.as_ref().ok_or("AgentTask状態応答不正")?,
+                        )?;
+                        return Ok((
+                            json!({"申請ID":request_id,"状態":"Task状態","Task":task}),
+                            response.evidence_source,
+                        ));
+                    }
+                    let response = self.対話要求処理(
+                        id,
+                        BrokerOperation::Agent作業要求検査,
+                        &draft.要求,
+                        false,
+                        EVIDENCE_SOURCE_INTERNAL_STATE,
+                        hash,
+                    );
+                    if response.status != BrokerStatus::Accepted {
+                        return Err("AgentTask事前検査拒否");
+                    }
+                    let preflight = response.body.as_ref().ok_or("AgentTask事前検査応答不正")?;
+                    let state = if preflight["Permission状態"] == "有効"
+                        && preflight["Approval状態"] == "有効"
+                    {
+                        "開始候補"
+                    } else {
+                        "Owner確認待ち"
+                    };
+                    return Ok((
+                        json!({"申請ID":request_id,"状態":state}),
+                        EVIDENCE_SOURCE_INTERNAL_STATE.to_owned(),
+                    ));
+                }
+                if operation == "AgentTask端末取消" {
+                    let task_id = draft.TaskID.ok_or("AgentTask未実行")?;
+                    let response = self.対話要求処理(
+                        id,
+                        BrokerOperation::AgentTask取消,
+                        &json!({"task_id":task_id}),
+                        false,
+                        EVIDENCE_SOURCE_INTERNAL_STATE,
+                        hash,
+                    );
+                    if response.status != BrokerStatus::Accepted {
+                        return Err("AgentTask取消拒否");
+                    }
+                    let task = Self::AgentTask端末状態投影(
+                        response.body.as_ref().ok_or("AgentTask取消応答不正")?,
+                    )?;
+                    return Ok((
+                        json!({"申請ID":request_id,"状態":"Task取消要求済み","Task":task}),
+                        response.evidence_source,
+                    ));
+                }
+                if draft.TaskID.is_some() {
+                    return Err("AgentTask申請は既に使用済み");
+                }
+                let mut execution_payload = draft.要求.clone();
+                let execution_fields = execution_payload
+                    .as_object_mut()
+                    .ok_or("AgentTask申請の形式不正")?;
+                execution_fields.insert(
+                    "mobile_task_request_id".to_owned(),
+                    Value::String(request_id.to_owned()),
+                );
+                let start = self.対話要求処理(
+                    id,
+                    BrokerOperation::AgentTask実行,
+                    &execution_payload,
+                    false,
+                    EVIDENCE_SOURCE_INTERNAL_STATE,
+                    hash,
+                );
+                if start.status != BrokerStatus::Accepted {
+                    return Err("AgentTask実行拒否。Owner Permission／Approvalを確認してください");
+                }
+                let body = start.body.ok_or("AgentTask開始応答不正")?;
+                let task_id = body
+                    .get("task_id")
+                    .and_then(Value::as_str)
+                    .ok_or("AgentTask ID応答不正")?;
+                let linked_task_id = self
+                    .端末
+                    .as_mut()
+                    .ok_or("端末経路が未設定")?
+                    .AgentTask申請のTaskID取得(credential_id, request_id, now)?;
+                if linked_task_id.as_deref() != Some(task_id) {
+                    return Err("AgentTask申請へのTask結合を確認できません");
+                }
+                let task = Self::AgentTask端末状態投影(&body)?;
+                Ok((
+                    json!({"申請ID":request_id,"状態":"Task開始済み","Task":task}),
+                    start.evidence_source,
+                ))
+            }
+            _ => Err("AgentTask端末操作不正"),
+        }
+    }
+
     fn 端末作業領域選択投影(body: &Value) -> Result<Value, &'static str> {
         let object = body
             .as_object()
@@ -3781,6 +4141,16 @@ impl Broker {
                             serde_json::json!({"状態":"失効"}),
                             EVIDENCE_SOURCE_INTERNAL_STATE.to_string(),
                         ));
+                    }
+                    if matches!(
+                        op,
+                        "AgentTask端末申請"
+                            | "AgentTask端末申請一覧"
+                            | "AgentTask端末状態"
+                            | "AgentTask端末実行"
+                            | "AgentTask端末取消"
+                    ) {
+                        return self.端末AgentTask操作(id, &r.資格ID, op, &r.内容, &hash);
                     }
                     let response = match op {
                         "実行系資源観測" => {
@@ -4781,6 +5151,57 @@ impl Broker {
                 payload_hash,
             );
         }
+        let mobile_task_request_binding = match payload.get("mobile_task_request_id") {
+            None => None,
+            Some(Value::String(mobile_request_id))
+                if matches!(
+                    operation,
+                    BrokerOperation::Agent作業要求検査
+                        | BrokerOperation::AgentTaskOwnerApprovalGrant
+                        | BrokerOperation::AgentTask実行
+                ) && super::device_link::hex形状(mobile_request_id, 32) =>
+            {
+                let mut original_request = payload.clone();
+                let Some(fields) = original_request.as_object_mut() else {
+                    return self.reject_with_payload_hash(
+                        request_id,
+                        operation.as_str(),
+                        "mobile_agent_task_request_invalid",
+                        "Mobile Agent Task申請の形式を確認できないため停止しました",
+                        true,
+                        payload_hash,
+                    );
+                };
+                fields.remove("mobile_task_request_id");
+                let now = self.current_epoch_seconds();
+                let matched = self.端末.as_mut().is_some_and(|device| {
+                    device
+                        .AgentTask申請照合(mobile_request_id, &original_request, now)
+                        .is_ok()
+                });
+                if !matched {
+                    return self.reject_with_payload_hash(
+                        request_id,
+                        operation.as_str(),
+                        "mobile_agent_task_request_invalid",
+                        "未使用・期限内の同一Mobile Agent Task申請を確認できないため停止しました",
+                        true,
+                        payload_hash,
+                    );
+                }
+                Some((mobile_request_id.clone(), original_request))
+            }
+            Some(_) => {
+                return self.reject_with_payload_hash(
+                    request_id,
+                    operation.as_str(),
+                    "mobile_agent_task_request_invalid",
+                    "Mobile Agent Task申請IDが不正か、この操作では利用できません",
+                    true,
+                    payload_hash,
+                );
+            }
+        };
         let (effective_payload, mcp_result_to_consume) =
             match super::mcp_center::enrich_agent_task_payload(self, operation.as_str(), payload) {
                 Ok(value) => value,
@@ -5019,17 +5440,71 @@ impl Broker {
             );
         }
         match result {
-            Ok(body) => BrokerResponse {
-                request_id: request_id.into(),
-                operation: operation.as_str().into(),
-                status: BrokerStatus::Accepted,
-                evidence_source: audit_evidence_source.into(),
-                audit_event_id: last_event,
-                error: None,
-                health: None,
-                body: Some(body),
-                shutdown_requested: false,
-            },
+            Ok(body) => {
+                if operation == BrokerOperation::AgentTask実行 {
+                    if let Some((mobile_request_id, original_request)) =
+                        mobile_task_request_binding.as_ref()
+                    {
+                        let Some(task_id) = body.get("task_id").and_then(Value::as_str) else {
+                            return self.reject_with_payload_hash(
+                                request_id,
+                                operation.as_str(),
+                                "mobile_agent_task_link_failed",
+                                "Task開始後にTask IDを確認できません。自動再送せず、Broker状態を確認してください。",
+                                true,
+                                payload_hash,
+                            );
+                        };
+                        let linked = self.端末.as_mut().is_some_and(|device| {
+                            device
+                                .AgentTask申請へTask結合する(
+                                    mobile_request_id,
+                                    original_request,
+                                    task_id,
+                                    now,
+                                )
+                                .is_ok()
+                        });
+                        if !linked {
+                            let link_failure_hash = sha256_tagged(
+                                json!({
+                                    "task_id": task_id,
+                                    "mobile_request_id_hash": sha256_tagged(mobile_request_id.as_bytes()),
+                                })
+                                .to_string()
+                                .as_bytes(),
+                            );
+                            let _ = self.append_audit(
+                                request_id,
+                                operation.as_str(),
+                                "mobile_request_link_failed",
+                                "Task開始後に端末申請との結合を確認できない。本文は保存せず、自動再送しない",
+                                EVIDENCE_SOURCE_INTERNAL_STATE,
+                                &link_failure_hash,
+                            );
+                            return self.reject_with_payload_hash(
+                                request_id,
+                                operation.as_str(),
+                                "mobile_agent_task_link_failed",
+                                "Taskは開始済みですがMobile申請との結合を確認できません。自動再送せず、Broker状態を確認してください。",
+                                true,
+                                payload_hash,
+                            );
+                        }
+                    }
+                }
+                BrokerResponse {
+                    request_id: request_id.into(),
+                    operation: operation.as_str().into(),
+                    status: BrokerStatus::Accepted,
+                    evidence_source: audit_evidence_source.into(),
+                    audit_event_id: last_event,
+                    error: None,
+                    health: None,
+                    body: Some(body),
+                    shutdown_requested: false,
+                }
+            }
             Err(対話失敗::監査失敗) => self.audit_store_failed_response(
                 request_id,
                 operation.as_str(),
@@ -10779,6 +11254,30 @@ mod 端末統治試験 {
     #[allow(non_snake_case)]
     fn Mobileの読み取り投影は既存Broker統治経路だけを通りowner作用を拒否する() {
         let mut e = 環境生成();
+        let task_fixture = json!({
+                "task_id":"d".repeat(32),
+                "agent_runtime_id":"fixture-agent",
+                "session_id":"a".repeat(32),
+                "workspace_id":"mobile-fixture-workspace",
+                "instruction_hash":format!("sha256:{}", "b".repeat(64)),
+                "status":"completed",
+                "result_hash":null,
+                "result_content_available":false,
+                "audit_event_id":"must-not-reach-mobile",
+                "description":"must-not-reach-mobile"
+        });
+        let mobile_task_projection =
+            Broker::AgentTask端末状態投影(&task_fixture).expect("端末向けTask状態投影");
+        assert_eq!(mobile_task_projection.as_object().unwrap().len(), 8);
+        assert!(!mobile_task_projection
+            .to_string()
+            .contains("audit_event_id"));
+        assert!(!mobile_task_projection
+            .to_string()
+            .contains("must-not-reach-mobile"));
+        let mut unsafe_runtime = task_fixture.clone();
+        unsafe_runtime["agent_runtime_id"] = json!("../../runtime");
+        assert!(Broker::AgentTask端末状態投影(&unsafe_runtime).is_err());
         let agent_fixture: Value = serde_json::from_str(include_str!(
             "../../../../examples/contracts/agent_adapter.valid.json"
         ))

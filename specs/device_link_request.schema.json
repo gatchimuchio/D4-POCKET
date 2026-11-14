@@ -64,7 +64,12 @@
         "対話中止",
         "対話終了",
         "対話履歴閲覧状態",
-        "対話履歴閲覧"
+        "対話履歴閲覧",
+        "AgentTask端末申請",
+        "AgentTask端末申請一覧",
+        "AgentTask端末状態",
+        "AgentTask端末実行",
+        "AgentTask端末取消"
       ]
     },
     "内容": {
@@ -351,6 +356,61 @@
               }
             }
           }
+        }
+      }
+    },
+    {
+      "properties": {
+        "操作": { "const": "AgentTask端末申請" },
+        "内容": {
+          "type": "object",
+          "required": ["agent_runtime_id", "session_id", "workspace_id", "instruction"],
+          "additionalProperties": false,
+          "properties": {
+            "agent_runtime_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$(?![\\s\\S])" },
+            "session_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$(?![\\s\\S])" },
+            "workspace_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$(?![\\s\\S])" },
+            "instruction": { "type": "string", "minLength": 1, "maxLength": 32768, "pattern": "\\S" }
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "操作": { "const": "AgentTask端末申請一覧" },
+        "内容": { "type": "object", "maxProperties": 0, "additionalProperties": false }
+      }
+    },
+    {
+      "properties": {
+        "操作": { "const": "AgentTask端末状態" },
+        "内容": {
+          "type": "object",
+          "required": ["申請ID"],
+          "additionalProperties": false,
+          "properties": { "申請ID": { "type": "string", "pattern": "^[a-f0-9]{32}$(?![\\s\\S])" } }
+        }
+      }
+    },
+    {
+      "properties": {
+        "操作": { "const": "AgentTask端末実行" },
+        "内容": {
+          "type": "object",
+          "required": ["申請ID"],
+          "additionalProperties": false,
+          "properties": { "申請ID": { "type": "string", "pattern": "^[a-f0-9]{32}$(?![\\s\\S])" } }
+        }
+      }
+    },
+    {
+      "properties": {
+        "操作": { "const": "AgentTask端末取消" },
+        "内容": {
+          "type": "object",
+          "required": ["申請ID"],
+          "additionalProperties": false,
+          "properties": { "申請ID": { "type": "string", "pattern": "^[a-f0-9]{32}$(?![\\s\\S])" } }
         }
       }
     }

@@ -64,6 +64,7 @@ S02-07 セキュリティ重大不成立は**該当する危険作用のみ**即
 S03-01 共通契約の変更は全影響Producer/Consumer/Native/Flutter/Installer/Export/Schema/Testsを同じ意味構造として補正する。局所PASSのための別経路・重複権限系を作らない。
 S03-02 全A〜Jは初回製造**同一一巡の施工母集団**。順番はID番号によらず実依存・ファイル競合・安全隔離だけで決める。特定線の完成/QA合格を他線の着工Gateにしない。
 S03-03 既存の正当な能力・Code・test・証拠・型を再利用し、改修で性能・機能を黙って落とさない。新しいstub/mockは検査器限定とし、production欠損を隠さない。
+S03-04 Mobile Agent Task申請はDevice Linkで既存Brokerへ送る期限付き・件数上限付きの**依頼下書き**であり、受信だけではTask・Permission・Approvalを生成しない。実装上の保持上限は端末ごと16件、全端末合計64件、期限は15分とする。Desktop Agent Centerが依頼本文を表示し、Ownerが現在のRuntime/Workspace/本文を確認した後、Workspace PermissionとTask固有の一回Owner Approvalを既存Broker/native確認経路で別々に発行する。Owner Approvalの実行条件hashは申請IDへ束縛する。Mobileの開始候補表示は状態の投影に限り、開始要求時にBrokerが申請の同一性・期限・現在Permission/Approvalを再評価する。Mobileは対になった自端末の申請だけを状態確認・一回開始・取消要求できる。Mobile向け申請/Task本文投影にAudit識別子・Credential・Permission/Approval metadata・Authorityを含めず、Task本文も返さない。Device Link共通応答envelopeの監査receiptは既存契約どおり返し、Task clientは検証後に画面へ露出しない。結果本文の取得とContent ExposureはDesktopの別個の既存Owner確認経路に限る。
 
 ## S04 新製品要求 N01〜N11（全11件、先行施工順ではない）
 

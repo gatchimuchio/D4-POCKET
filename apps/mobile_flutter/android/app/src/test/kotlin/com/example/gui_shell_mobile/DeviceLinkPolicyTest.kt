@@ -65,6 +65,35 @@ class DeviceLinkPolicyTest {
     }
 
     @Test
+    fun allowsOnlyBoundedAgentTaskOperationsWithoutAuthorityFields() {
+        DeviceLinkPayloadPolicy.validate(
+            "AgentTask端末申請",
+            mapOf(
+                "agent_runtime_id" to "codex-runtime",
+                "session_id" to "a".repeat(32),
+                "workspace_id" to "workspace-a",
+                "instruction" to "inspect the selected files",
+            ),
+        )
+        DeviceLinkPayloadPolicy.validate("AgentTask端末申請一覧", emptyMap())
+        for (operation in listOf("AgentTask端末状態", "AgentTask端末実行", "AgentTask端末取消")) {
+            DeviceLinkPayloadPolicy.validate(operation, mapOf("申請ID" to "b".repeat(32)))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            DeviceLinkPayloadPolicy.validate(
+                "AgentTask端末申請",
+                mapOf(
+                    "agent_runtime_id" to "codex-runtime",
+                    "session_id" to "a".repeat(32),
+                    "workspace_id" to "workspace-a",
+                    "instruction" to "inspect the selected files",
+                    "approval" to "owner",
+                ),
+            )
+        }
+    }
+
+    @Test
     fun responseProjectionRejectsCredentialKeysAndValues() {
         DeviceLinkPayloadPolicy.validateResponseTree(
             mapOf("authentication" to mapOf("secret_value_present" to true, "secret_paths" to listOf(".env"))),

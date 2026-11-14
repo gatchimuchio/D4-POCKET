@@ -32,6 +32,11 @@ pub(crate) const 許可操作: &[&str] = &[
     "対話取得",
     "対話中止",
     "対話終了",
+    "AgentTask端末申請",
+    "AgentTask端末申請一覧",
+    "AgentTask端末状態",
+    "AgentTask端末実行",
+    "AgentTask端末取消",
     "端末確認",
     "端末離脱",
 ];
@@ -65,7 +70,22 @@ struct 結合 {
     nonce: BTreeSet<String>,
     セッション: BTreeSet<String>,
     要求: BTreeSet<String>,
+    AgentTask申請: BTreeMap<String, AgentTask端末申請>,
 }
+
+#[derive(Debug, Clone)]
+pub(crate) struct AgentTask端末申請 {
+    pub 申請ID: String,
+    pub 端末ID: String,
+    pub 要求: Value,
+    pub 作成時刻: i64,
+    pub 期限: i64,
+    pub TaskID: Option<String>,
+}
+
+const AGENT_TASK_REQUEST_TTL_SECONDS: i64 = 900;
+const MAX_AGENT_TASK_REQUESTS_PER_DEVICE: usize = 16;
+const MAX_AGENT_TASK_REQUESTS_TOTAL: usize = 64;
 
 #[derive(Debug)]
 pub(crate) struct 端末制御 {
@@ -224,6 +244,7 @@ impl 端末制御 {
                 nonce: BTreeSet::from([r.nonce.clone()]),
                 セッション: BTreeSet::new(),
                 要求: BTreeSet::new(),
+                AgentTask申請: BTreeMap::new(),
             },
         );
         Ok(
@@ -266,7 +287,12 @@ impl 端末制御 {
             return Err("nonce再使用または上限");
         }
         match r.操作.as_str() {
-            "実行系列挙" | "Agent一覧" | "作業領域一覧" | "端末確認" | "端末離脱"
+            "実行系列挙"
+            | "Agent一覧"
+            | "作業領域一覧"
+            | "AgentTask端末申請一覧"
+            | "端末確認"
+            | "端末離脱"
                 if !fields(&r.内容, &[]) =>
             {
                 return Err("要求不正")
@@ -282,6 +308,19 @@ impl 端末制御 {
             "対話取得" | "対話中止" => {
                 if !pair.要求.contains(field(&r.内容, "要求ID")?) {
                     return Err("要求所有者不一致");
+                }
+            }
+            "AgentTask端末申請" => {
+                if !pair.セッション.contains(field(&r.内容, "session_id")?) {
+                    return Err("AgentTask Session所有者不一致");
+                }
+            }
+            "AgentTask端末状態" | "AgentTask端末実行" | "AgentTask端末取消" => {
+                if !fields(&r.内容, &["申請ID"]) {
+                    return Err("要求不正");
+                }
+                if !pair.AgentTask申請.contains_key(field(&r.内容, "申請ID")?) {
+                    return Err("AgentTask申請所有者不一致");
                 }
             }
             _ => {}
@@ -310,6 +349,126 @@ impl 端末制御 {
             _ => {}
         }
         Ok(())
+    }
+
+    /// Device Linkで届いたAgent Taskを実行せず、起動中Broker内のOwner review用申請として保持する。
+    pub fn AgentTask申請を記録する(
+        &mut self,
+        credential_id: &str,
+        body: &Value,
+        now: i64,
+    ) -> Result<AgentTask端末申請, &'static str> {
+        for pair in self.結合.values_mut() {
+            pair.AgentTask申請.retain(|_, request| request.期限 > now);
+        }
+        let total_requests = self
+            .結合
+            .values()
+            .map(|pair| pair.AgentTask申請.len())
+            .sum::<usize>();
+        if total_requests >= MAX_AGENT_TASK_REQUESTS_TOTAL {
+            return Err("AgentTask全体申請上限");
+        }
+        let pair = self.結合.get_mut(credential_id).ok_or("資格拒否")?;
+        if pair.AgentTask申請.len() >= MAX_AGENT_TASK_REQUESTS_PER_DEVICE {
+            return Err("AgentTask申請上限");
+        }
+        let request_id = 識別子生成().map_err(|_| "識別子生成失敗")?;
+        let request = AgentTask端末申請 {
+            申請ID: request_id.clone(),
+            端末ID: pair.端末ID.clone(),
+            要求: body.clone(),
+            作成時刻: now,
+            期限: now.saturating_add(AGENT_TASK_REQUEST_TTL_SECONDS),
+            TaskID: None,
+        };
+        pair.AgentTask申請.insert(request_id, request.clone());
+        Ok(request)
+    }
+
+    pub fn AgentTask申請一覧(&mut self, now: i64) -> Vec<AgentTask端末申請> {
+        for pair in self.結合.values_mut() {
+            pair.AgentTask申請.retain(|_, request| request.期限 > now);
+        }
+        self.結合
+            .values()
+            .flat_map(|pair| pair.AgentTask申請.values().cloned())
+            .collect()
+    }
+
+    pub fn AgentTask申請一覧取得(
+        &mut self,
+        credential_id: &str,
+        now: i64,
+    ) -> Result<Vec<AgentTask端末申請>, &'static str> {
+        let pair = self.結合.get_mut(credential_id).ok_or("資格拒否")?;
+        pair.AgentTask申請.retain(|_, request| request.期限 > now);
+        Ok(pair.AgentTask申請.values().cloned().collect())
+    }
+
+    pub fn AgentTask申請取得(
+        &mut self,
+        credential_id: &str,
+        request_id: &str,
+        now: i64,
+    ) -> Result<AgentTask端末申請, &'static str> {
+        let pair = self.結合.get_mut(credential_id).ok_or("資格拒否")?;
+        pair.AgentTask申請.retain(|_, request| request.期限 > now);
+        pair.AgentTask申請
+            .get(request_id)
+            .cloned()
+            .ok_or("AgentTask申請不在")
+    }
+
+    /// AgentTask実行時に元申請とpayloadを再照合し、同じ申請への二重結合を拒否する。
+    pub fn AgentTask申請へTask結合する(
+        &mut self,
+        request_id: &str,
+        request_body: &Value,
+        task_id: &str,
+        now: i64,
+    ) -> Result<(), &'static str> {
+        let mut found = None;
+        for (credential_id, pair) in &mut self.結合 {
+            pair.AgentTask申請.retain(|_, request| request.期限 > now);
+            if let Some(request) = pair.AgentTask申請.get_mut(request_id) {
+                if request.要求 != *request_body || request.TaskID.is_some() {
+                    return Err("AgentTask申請内容不一致または再使用");
+                }
+                request.TaskID = Some(task_id.to_owned());
+                found = Some(credential_id.clone());
+                break;
+            }
+        }
+        found.map(|_| ()).ok_or("AgentTask申請不在")
+    }
+
+    pub fn AgentTask申請照合(
+        &mut self,
+        request_id: &str,
+        request_body: &Value,
+        now: i64,
+    ) -> Result<(), &'static str> {
+        for pair in self.結合.values_mut() {
+            pair.AgentTask申請.retain(|_, request| request.期限 > now);
+            if let Some(request) = pair.AgentTask申請.get(request_id) {
+                if request.TaskID.is_some() || request.要求 != *request_body {
+                    return Err("AgentTask申請内容不一致または再使用");
+                }
+                return Ok(());
+            }
+        }
+        Err("AgentTask申請不在")
+    }
+
+    pub fn AgentTask申請のTaskID取得(
+        &mut self,
+        credential_id: &str,
+        request_id: &str,
+        now: i64,
+    ) -> Result<Option<String>, &'static str> {
+        let request = self.AgentTask申請取得(credential_id, request_id, now)?;
+        Ok(request.TaskID)
     }
     pub fn 失効(&mut self, id: &str) -> Result<Vec<String>, &'static str> {
         Ok(self
@@ -447,5 +606,128 @@ mod tests {
         for host in ["0.0.0.0", "8.8.8.8", "localhost", "::1", "192.168.0.256"] {
             assert!(!接続先検査(host));
         }
+    }
+
+    #[test]
+    fn AgentTask申請は送信端末のSessionへ束縛し期限と一回Task結合を守る() {
+        let (mut c, invitation) = 準備();
+        let credential = c
+            .結合する(&要求(&invitation, "端末結合", 1001), 1001)
+            .unwrap();
+        let credential_id = credential["結合ID"].as_str().unwrap();
+        let session_id = "a".repeat(32);
+        c.所有記録(
+            credential_id,
+            "対話開始",
+            &json!({"対話セッションID":session_id}),
+        )
+        .unwrap();
+
+        let mut request = 要求(&credential, "AgentTask端末申請", 1002);
+        request.内容 = json!({
+            "agent_runtime_id":"codex-cli",
+            "session_id":session_id,
+            "workspace_id":"mobile-workspace",
+            "instruction":"inspect the requested files"
+        });
+        assert!(c.認証する(&request, 1002).is_ok());
+        let draft = c
+            .AgentTask申請を記録する(credential_id, &request.内容, 1002)
+            .unwrap();
+        assert_eq!(draft.TaskID, None);
+        assert_eq!(c.AgentTask申請一覧(1002).len(), 1);
+
+        let wrong_request = json!({
+            "agent_runtime_id":"codex-cli",
+            "session_id":session_id,
+            "workspace_id":"mobile-workspace",
+            "instruction":"changed after owner review"
+        });
+        assert!(c
+            .AgentTask申請へTask結合する(&draft.申請ID, &wrong_request, "task-1", 1003)
+            .is_err());
+        assert!(c
+            .AgentTask申請へTask結合する(&draft.申請ID, &request.内容, "task-1", 1003)
+            .is_ok());
+        assert!(c
+            .AgentTask申請へTask結合する(&draft.申請ID, &request.内容, "task-2", 1003)
+            .is_err());
+        assert_eq!(
+            c.AgentTask申請のTaskID取得(credential_id, &draft.申請ID, 1003)
+                .unwrap()
+                .as_deref(),
+            Some("task-1")
+        );
+        assert!(c
+            .AgentTask申請取得(credential_id, &draft.申請ID, draft.期限)
+            .is_err());
+    }
+
+    #[test]
+    fn AgentTask申請は別端末のSessionから作成できない() {
+        let (mut c, invitation) = 準備();
+        let credential = c
+            .結合する(&要求(&invitation, "端末結合", 1001), 1001)
+            .unwrap();
+        let mut request = 要求(&credential, "AgentTask端末申請", 1002);
+        request.内容 = json!({
+            "agent_runtime_id":"codex-cli",
+            "session_id":"f".repeat(32),
+            "workspace_id":"mobile-workspace",
+            "instruction":"do work"
+        });
+        assert_eq!(
+            c.認証する(&request, 1002),
+            Err("AgentTask Session所有者不一致")
+        );
+    }
+
+    #[test]
+    fn AgentTask申請は端末別と全体の上限を守り期限切れ分を回収する() {
+        let (mut c, _) = 準備();
+        let body = json!({
+            "agent_runtime_id":"codex-cli",
+            "session_id":"a".repeat(32),
+            "workspace_id":"mobile-workspace",
+            "instruction":"bounded request"
+        });
+        let mut credentials = Vec::new();
+        for index in 0..4 {
+            let (invitation, _) = c
+                .制御(
+                    "端末招待",
+                    &json!({"端末ID":format!("{:032x}", index + 1),"接続先Host":"127.0.0.1"}),
+                    1000,
+                )
+                .unwrap();
+            credentials.push(
+                c.結合する(&要求(&invitation, "端末結合", 1001), 1001)
+                    .unwrap()["結合ID"]
+                    .as_str()
+                    .unwrap()
+                    .to_owned(),
+            );
+        }
+        for credential in &credentials {
+            for _ in 0..MAX_AGENT_TASK_REQUESTS_PER_DEVICE {
+                c.AgentTask申請を記録する(credential, &body, 1002).unwrap();
+            }
+        }
+        assert_eq!(
+            c.AgentTask申請一覧(1002).len(),
+            MAX_AGENT_TASK_REQUESTS_TOTAL
+        );
+        assert_eq!(
+            c.AgentTask申請を記録する(&credentials[0], &body, 1002)
+                .unwrap_err(),
+            "AgentTask全体申請上限"
+        );
+        assert!(c
+            .AgentTask申請を記録する(
+                &credentials[0],
+                &body,
+                1000 + AGENT_TASK_REQUEST_TTL_SECONDS + 2
+            )
+            .is_ok());
     }
 }

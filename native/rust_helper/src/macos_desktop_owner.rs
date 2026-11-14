@@ -83,6 +83,8 @@ struct AgentTaskOwnerApprovalRequest {
     mcp_result_id: Option<String>,
     #[serde(default)]
     mcp_result_hash: Option<String>,
+    #[serde(default)]
+    mobile_task_request_id: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -107,6 +109,10 @@ fn valid_task_id(value: &str) -> bool {
         && value
             .bytes()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn valid_mobile_task_request_id(value: &str) -> bool {
+    valid_task_id(value)
 }
 
 fn valid_sha256(value: &str) -> bool {
@@ -715,17 +721,30 @@ fn candidate(frame: &[u8], endpoint: &BrokerEndpoint) -> Option<Candidate> {
                 .as_deref()
                 .is_some_and(|value| !valid_sha256(value))
             || request.mcp_result_id.is_some() != request.mcp_result_hash.is_some()
+            || request
+                .mobile_task_request_id
+                .as_deref()
+                .is_some_and(|value| !valid_mobile_task_request_id(value))
         {
             return None;
         }
         let instruction_hash = crate::audit_hash::sha256_tagged(request.instruction.as_bytes());
+        let mobile_context = request.mobile_task_request_id.as_deref().map_or_else(
+            String::new,
+            |request_id| {
+                format!(
+                    "\n\n送信元: Device Link Agent Task申請 {request_id}（受信側Ownerの新規確認が必要）"
+                )
+            },
+        );
         format!(
-            "このAgent Taskに一回限りのOwner Approvalを発行しますか？\n\nRuntime ID: {}\nSession ID: {}\nWorkspace ID: {}\n指示文字数: {}\n指示hash: {}\n実行上限: 最大15分\n\nCompose画面でTask本文を確認してから判断してください。この確認画面には本文を表示しません。Approvalは本文hashと現在の実行条件に束縛され、Permission・Credential・Trustを付与せず、Taskを実行しません。\n\n要求hash: {hash}",
+            "このAgent Taskに一回限りのOwner Approvalを発行しますか？\n\nRuntime ID: {}\nSession ID: {}\nWorkspace ID: {}\n指示文字数: {}\n指示hash: {}{}\n実行上限: 最大15分\n\nCompose画面でTask本文を確認してから判断してください。この確認画面には本文を表示しません。Approvalは本文hashと現在の実行条件に束縛され、Permission・Credential・Trustを付与せず、Taskを実行しません。\n\n要求hash: {hash}",
             request.agent_runtime_id,
             request.session_id,
             request.workspace_id,
             request.instruction.chars().count(),
-            instruction_hash
+            instruction_hash,
+            mobile_context
         )
     } else if operation == "AgentTask結果表示承認" {
         let request: AgentTaskResultExposureRequest =
@@ -1607,17 +1626,26 @@ mod task_owner_tests {
             "mcp_result_id": "mcp-agent-result-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "mcp_result_hash": format!("sha256:{}", "b".repeat(64))
         });
-        let valid = request("AgentTaskOwnerApprovalGrant", payload.clone());
+        let mut mobile_payload = payload.clone();
+        mobile_payload["mobile_task_request_id"] = json!("c".repeat(32));
+        let valid = request("AgentTaskOwnerApprovalGrant", mobile_payload.clone());
         let bytes = serde_json::to_vec(&valid).unwrap();
         let summary = candidate(&bytes, &endpoint()).unwrap().summary;
         assert!(summary.contains("codex-runtime"));
         assert!(summary.contains("workspace-project"));
+        assert!(summary.contains("Device Link Agent Task申請"));
+        assert!(summary.contains(&"c".repeat(32)));
         assert!(summary.contains(&crate::audit_hash::sha256_tagged(instruction.as_bytes())));
         assert!(summary.contains(valid["payload_hash"].as_str().unwrap()));
         assert!(!summary.contains(instruction));
         assert!(!summary.contains(payload["mcp_capability_snapshot_hash"].as_str().unwrap()));
         assert!(!summary.contains(payload["mcp_result_id"].as_str().unwrap()));
         assert!(!summary.contains(payload["mcp_result_hash"].as_str().unwrap()));
+
+        let mut invalid_mobile_request_id = mobile_payload.clone();
+        invalid_mobile_request_id["mobile_task_request_id"] = json!("C".repeat(32));
+        let invalid = request("AgentTaskOwnerApprovalGrant", invalid_mobile_request_id);
+        assert!(candidate(&serde_json::to_vec(&invalid).unwrap(), &endpoint()).is_none());
 
         let mut invalid_snapshot = payload.clone();
         invalid_snapshot["mcp_capability_snapshot_hash"] = json!("sha256:invalid");

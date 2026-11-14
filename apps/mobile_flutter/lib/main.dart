@@ -12,6 +12,7 @@ import 'screens/resource_overview.dart';
 import 'screens/runtime_status.dart';
 import 'screens/history.dart';
 import 'screens/mcp_status.dart';
+import 'screens/mobile_agent_task.dart';
 import 'services/device_link_controller.dart';
 
 void main() {
@@ -59,6 +60,7 @@ class _MobileHomeState extends State<MobileHome> with WidgetsBindingObserver {
     '資源',
     '履歴',
     'MCP',
+    'Agent Task',
   ];
   static const _icons = [
     Icons.dashboard_outlined,
@@ -74,6 +76,7 @@ class _MobileHomeState extends State<MobileHome> with WidgetsBindingObserver {
     Icons.memory_outlined,
     Icons.history_outlined,
     Icons.extension_outlined,
+    Icons.assignment_outlined,
   ];
   @override
   void initState() {
@@ -140,6 +143,11 @@ class _MobileHomeState extends State<MobileHome> with WidgetsBindingObserver {
         ),
         MobileHistory(controller: c, connected: c.ready && c.foreground),
         const MobileMcpStatus(),
+        MobileAgentTaskScreen(
+          controller: c,
+          connected: c.ready && c.foreground,
+          active: _selected == 13,
+        ),
       ];
       return Scaffold(
         appBar: AppBar(

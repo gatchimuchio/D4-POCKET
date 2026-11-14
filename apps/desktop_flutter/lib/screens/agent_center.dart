@@ -35,6 +35,7 @@ import '../services/shell_core_client.dart';
 import '../services/agent_coordination.dart';
 import 'shared.dart';
 import 'workspace_inspector.dart';
+import 'mobile_agent_task_inbox.dart';
 
 class AgentCenter extends StatefulWidget {
   const AgentCenter({
@@ -290,7 +291,9 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
       _clearAllResultProjections();
     }
     if (!identical(
-        oldWidget.a2aArtifactHandoffSource, widget.a2aArtifactHandoffSource)) {
+      oldWidget.a2aArtifactHandoffSource,
+      widget.a2aArtifactHandoffSource,
+    )) {
       _a2aArtifactHandoffPending = false;
       _a2aArtifactTaskContextController.clear();
       _a2aArtifactHandoffStatus = null;
@@ -897,8 +900,9 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     ) async {
       try {
         return _ComparisonRuntimeResourceState(
-          observation: await RuntimeResourceClient(transport)
-              .observe(session.agentRuntimeId),
+          observation: await RuntimeResourceClient(
+            transport,
+          ).observe(session.agentRuntimeId),
         );
       } on BrokerClientException catch (error) {
         return _ComparisonRuntimeResourceState(error: error.message);
@@ -915,17 +919,15 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
       if (sharedRuntime) {
         outcomeA = await observe(agentA);
       } else {
-        final outcomes = await Future.wait([
-          observe(agentA),
-          observe(agentB),
-        ]);
+        final outcomes = await Future.wait([observe(agentA), observe(agentB)]);
         outcomeA = outcomes[0];
         outcomeB = outcomes[1];
       }
       if (!mounted || generation != _comparisonResourceGeneration) return;
-      final successCount = [outcomeA, outcomeB]
-          .where((outcome) => outcome?.observation != null)
-          .length;
+      final successCount = [
+        outcomeA,
+        outcomeB,
+      ].where((outcome) => outcome?.observation != null).length;
       setState(() {
         _comparisonResourceA = outcomeA;
         _comparisonResourceB = outcomeB;
@@ -1292,8 +1294,9 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
         !sourceTaskBound ||
         !resultBound ||
         targetState != null ||
-        !_availableAiEditApplyTargets(sourceSessionId)
-            .any((session) => session.sessionId == target.sessionId)) {
+        !_availableAiEditApplyTargets(
+          sourceSessionId,
+        ).any((session) => session.sessionId == target.sessionId)) {
       setState(() {
         _aiEditApplyStatusBySource[sourceSessionId] =
             'AI Edit Taskの由来・full結果・別Workspaceの未使用Sessionを確認できません。';
@@ -1646,9 +1649,11 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
       widget.onA2aArtifactHandoffConsumed?.call(source);
     } on Object catch (error) {
       if (!mounted) return;
-      setState(() => _a2aArtifactHandoffStatus = error is BrokerClientException
-          ? error.message
-          : '外部A2A Artifactの新規Task事前検査に失敗しました。');
+      setState(
+        () => _a2aArtifactHandoffStatus = error is BrokerClientException
+            ? error.message
+            : '外部A2A Artifactの新規Task事前検査に失敗しました。',
+      );
     } finally {
       if (mounted) setState(() => _a2aArtifactHandoffPending = false);
     }
@@ -1827,8 +1832,12 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     setState(() {
       if (update.task case final task?) {
         state.record = task;
-        if (const {'completed', 'failed', 'cancelled', 'quarantined'}
-            .contains(task.status)) {
+        if (const {
+          'completed',
+          'failed',
+          'cancelled',
+          'quarantined',
+        }.contains(task.status)) {
           state.terminalObservedAt = DateTime.now();
         }
       }
@@ -2346,12 +2355,11 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
                       }),
             ),
             if (!resultProjectionMatchesTask)
-              const Text(
-                '提案元TaskのContent Exposureでfull結果を個別に許可して表示してください。',
-              ),
+              const Text('提案元TaskのContent Exposureでfull結果を個別に許可して表示してください。'),
             OutlinedButton(
-              key:
-                  ValueKey('prepare-ai-edit-result-apply-${session.sessionId}'),
+              key: ValueKey(
+                'prepare-ai-edit-result-apply-${session.sessionId}',
+              ),
               onPressed: aiEditApplyReady &&
                       !_aiEditApplyPending &&
                       !_comparisonPending &&
@@ -2476,13 +2484,9 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
                   ],
                 ),
             ] else if (projectionMatchesTask)
-              const Text(
-                '承認済み結果の形式または項目上限が不正なため比較表示を停止しました。',
-              )
+              const Text('承認済み結果の形式または項目上限が不正なため比較表示を停止しました。')
             else
-              const Text(
-                'Agent申告summary／changed files／diff: 全文のBroker承認後に表示',
-              ),
+              const Text('Agent申告summary／changed files／diff: 全文のBroker承認後に表示'),
             const Text(
               '実WorkspaceのChanged files／diffはWorkspace Inspectorで別途承認して確認',
             ),
@@ -2523,8 +2527,10 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('外部A2A Artifactから新規Taskを作成',
-              style: Theme.of(context).textTheme.titleMedium),
+          Text(
+            '外部A2A Artifactから新規Taskを作成',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
           const Text(
             '外部Artifactは未信頼です。Artifact取得のnative確認は内容表示の許可だけを示し、Task実行のPermission／Approvalや外部AgentのTrustを与えません。',
           ),
@@ -2533,9 +2539,11 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
           else ...[
             Text('Source Agent / Task: ${source.agentId} / ${source.taskId}'),
             Text(
-                'Artifact ID / hash: ${artifact.artifactId} / ${artifact.artifactHash}'),
+              'Artifact ID / hash: ${artifact.artifactId} / ${artifact.artifactHash}',
+            ),
             Text(
-                'Content hash / bytes: ${artifact.contentHash} / ${artifact.byteLength}'),
+              'Content hash / bytes: ${artifact.contentHash} / ${artifact.byteLength}',
+            ),
             Text('取得Audit: ${source.auditEventId}'),
             for (final part in artifact.parts) SelectableText(part),
           ],
@@ -2560,12 +2568,14 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
               labelText: '新規Taskの受信Agent Session',
             ),
             items: targets
-                .map((session) => DropdownMenuItem<String>(
-                      value: session.sessionId,
-                      child: Text(
-                        'Runtime ${session.agentRuntimeId} / Workspace ${session.workspace}',
-                      ),
-                    ))
+                .map(
+                  (session) => DropdownMenuItem<String>(
+                    value: session.sessionId,
+                    child: Text(
+                      'Runtime ${session.agentRuntimeId} / Workspace ${session.workspace}',
+                    ),
+                  ),
+                )
                 .toList(growable: false),
             onChanged: _a2aArtifactHandoffPending
                 ? null
@@ -2581,9 +2591,11 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
               OutlinedButton(
                 key: const ValueKey('prepare-a2a-artifact-agent-task'),
                 onPressed: canPrepare ? _prepareA2aArtifactHandoffTask : null,
-                child: Text(_a2aArtifactHandoffPending
-                    ? 'Broker事前検査中…'
-                    : '新規TaskをBrokerで事前検査'),
+                child: Text(
+                  _a2aArtifactHandoffPending
+                      ? 'Broker事前検査中…'
+                      : '新規TaskをBrokerで事前検査',
+                ),
               ),
               OutlinedButton(
                 key: const ValueKey('discard-a2a-artifact-handoff'),
@@ -2782,6 +2794,8 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     return ShellPage(
       title: 'エージェントセンター',
       children: [
+        if (client.mode == 'broker' && client.brokerTransport != null)
+          MobileAgentTaskInbox(transport: client.brokerTransport!),
         if (widget.developerEditProposal != null)
           BorderedPanel(
             key: const ValueKey('agent-ai-edit-task-draft'),
@@ -3253,8 +3267,9 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
                 if (_sessionAvailable(session)) ...[
                   OutlinedButton(
                     onPressed: _taskPreflightSession == session.sessionId ||
-                            _taskCancellationGate
-                                .isPending(session.sessionId) ||
+                            _taskCancellationGate.isPending(
+                              session.sessionId,
+                            ) ||
                             (widget.developerEditProposal != null &&
                                 _taskPreflightSession != null)
                         ? null
@@ -3684,10 +3699,8 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
   Future<void> _registerLinuxProviderCredential() =>
       _registerProviderCredential(
         expectedPlatform: TargetPlatform.linux,
-        register: (client, credentialId) =>
-            client.registerLinuxNativeProviderCredential(
-          credentialId: credentialId,
-        ),
+        register: (client, credentialId) => client
+            .registerLinuxNativeProviderCredential(credentialId: credentialId),
       );
 
   Future<void> _registerWindowsProviderCredential() =>
@@ -3701,17 +3714,16 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
 
   Future<void> _registerMacProviderCredential() => _registerProviderCredential(
         expectedPlatform: TargetPlatform.macOS,
-        register: (client, credentialId) =>
-            client.registerMacNativeProviderCredential(
-          credentialId: credentialId,
-        ),
+        register: (client, credentialId) => client
+            .registerMacNativeProviderCredential(credentialId: credentialId),
       );
 
   Future<void> _registerProviderCredential({
     required TargetPlatform expectedPlatform,
     required Future<void> Function(
-            McpConnectionClient client, String credentialId)
-        register,
+      McpConnectionClient client,
+      String credentialId,
+    ) register,
   }) async {
     final transport = widget.transport;
     if (transport == null ||
@@ -3949,9 +3961,7 @@ class _AgentTaskInstructionDialogState
   @override
   void initState() {
     super.initState();
-    _instruction = TextEditingController(
-      text: widget.initialInstruction ?? '',
-    );
+    _instruction = TextEditingController(text: widget.initialInstruction ?? '');
   }
 
   @override
