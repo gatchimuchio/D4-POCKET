@@ -533,9 +533,14 @@ def _verify_flutter_framework_copy_entries(
     embedded_entries = _macos_bundle_entries(embedded_framework)
     exclusions = _flutter_framework_copy_exclusions(source_entries)
     expected_paths = set(source_entries) - exclusions
-    if set(embedded_entries) != expected_paths:
+    embedded_paths = set(embedded_entries)
+    if embedded_paths != expected_paths:
+        missing_paths = sorted(expected_paths - embedded_paths)
+        unexpected_paths = sorted(embedded_paths - expected_paths)
         raise ValueError(
-            "embedded FlutterMacOS.frameworkのfile layoutが固定Flutter copy規則と一致しない"
+            "embedded FlutterMacOS.frameworkのfile layoutが固定Flutter copy規則と一致しない: "
+            f"missing_count={len(missing_paths)}, missing={missing_paths[:12]!r}, "
+            f"unexpected_count={len(unexpected_paths)}, unexpected={unexpected_paths[:12]!r}"
         )
 
     binary_relative = FLUTTER_MACOS_FRAMEWORK_BINARY_RELATIVE_PATH.as_posix()

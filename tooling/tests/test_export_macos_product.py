@@ -26,6 +26,7 @@ from tooling.export_macos_product import (
     _verify_pinned_flutter_framework_signature,
     _macos_signature_diagnostic,
     _scan_macos_artifacts,
+    _verify_flutter_framework_copy_entries,
     _validate_build_evidence,
     build_macos_product,
     bundle_identifier_for_app,
@@ -121,6 +122,20 @@ def _macos_test_subprocess_side_effect(
 
 
 class MacOSProductExportTests(unittest.TestCase):
+    def test_framework_layout_mismatch_reports_bounded_path_differences(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-macos-framework-layout-") as temp:
+            app, reference = _flutter_framework_fixture(Path(temp))
+            embedded = app.joinpath(*APP_FLUTTER_FRAMEWORK_RELATIVE_PATH.parts)
+            extra = embedded / "_CodeSignature/CodeResources"
+            extra.parent.mkdir(parents=True)
+            extra.write_bytes(b"unexpected copied signature resource")
+
+            with self.assertRaisesRegex(
+                ValueError,
+                r"unexpected_count=2, unexpected=\['_CodeSignature', '_CodeSignature/CodeResources'\]",
+            ):
+                _verify_flutter_framework_copy_entries(reference.source_path, embedded)
+
     def test_isolated_macos_environment_preserves_explicit_rustup_home(self) -> None:
         with tempfile.TemporaryDirectory(prefix="d4p-macos-env-") as temp:
             root = Path(temp)
