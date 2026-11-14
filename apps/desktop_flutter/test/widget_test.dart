@@ -1571,6 +1571,45 @@ void main() {
     expect(find.textContaining('段階Bの所有者利用を失敗扱いにせず'), findsOneWidget);
   });
 
+  testWidgets('問題と復旧の段階B判定が矛盾すると継続可能を表示しない', (WidgetTester tester) async {
+    final snapshot = ShellSnapshot.fromJson({
+      'problems': [
+        {
+          'problem_id': 'problem-conflicting-phase-b-state',
+          'item': '判定が矛盾する問題',
+          'recovery_id': 'recover-conflicting-phase-b-state',
+          'safe_to_ignore_for_phase_b': true,
+        },
+        {
+          'problem_id': 'problem-without-recovery',
+          'item': '復旧レコードがない問題',
+          'safe_to_ignore_for_phase_b': true,
+        },
+      ],
+      'recovery_playbook': [
+        {
+          'recovery_id': 'recover-conflicting-phase-b-state',
+          'safe_to_ignore_for_phase_b': false,
+        },
+      ],
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body:
+              ProblemsPanel(client: ShellCoreClient.local(snapshot: snapshot)),
+        ),
+      ),
+    );
+
+    final rows = tester.widget<DataTable>(find.byType(DataTable)).rows;
+    expect(
+      rows.map((row) => (row.cells[3].child as Text).data),
+      orderedEquals(['いいえ', 'はい']),
+    );
+  });
+
   testWidgets('証拠センターがWindows厳格検証の予期された失敗を表示する', (WidgetTester tester) async {
     final releaseEvidence = File(
       'release_evidence/windows_installed_smoke.json',

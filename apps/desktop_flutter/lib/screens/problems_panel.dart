@@ -80,8 +80,9 @@ class ProblemsPanel extends StatelessWidget {
   ) {
     final recovery = recoveryById[problem.recoveryId];
     final authority = authorityByRecoveryId[problem.recoveryId];
-    final safeForPhaseB = problem.safeToIgnoreForPhaseB ||
-        recovery?.safeToIgnoreForPhaseB == true;
+    final safeForPhaseB = recovery == null
+        ? problem.safeToIgnoreForPhaseB
+        : problem.safeToIgnoreForPhaseB && recovery.safeToIgnoreForPhaseB;
     final blocksOwnerUse =
         problem.blocksOwnerUse || recovery?.blocksOwnerUse == true;
     final blocksProductRelease = problem.blocksCompletedProductRelease ||
