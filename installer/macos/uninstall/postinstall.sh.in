@@ -5,10 +5,11 @@ set -eu
 expected_app_bundle='@D4P_APP_BUNDLE_NAME@'
 expected_bundle_identifier='@D4P_BUNDLE_IDENTIFIER@'
 
-if [ "$#" -lt 1 ]; then
+if [ "$#" -lt 3 ]; then
     exit 1
 fi
-target_volume=$1
+# Installer passes package path, install destination, then destination volume.
+target_volume=$3
 case "$target_volume" in
     /*) ;;
     *) exit 1 ;;
