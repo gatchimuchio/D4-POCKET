@@ -52,6 +52,14 @@ ownerの招待取消は未使用招待を失効させる。ownerの端末失効�
 
 Desktop再起動時はHostIDと証明書を更新し、全端末資格・招待・未完了対話を失効させる。これは起動世代を跨ぐ復元を実装しない明示的境界である。古い資格から自動再結合・自動再送しない。
 
+## Mobile Agent Task向けMCP能力参照
+
+対になったDevice Link端末だけが、空payloadの`AgentTask端末MCP能力取得`を要求できる。Rust Brokerは既存の`MCP接続一覧` handlerを通常のBroker経路で呼び、Auditを確定した後、版・現在Agent能力snapshot hash・能力件数・状態・`metadata_only`範囲だけを端末へ投影する。接続先／Server／Tool名、Tool schema、Credential参照、Audit識別子、Tool結果、Permission／Approval情報は投影しない。Brokerの一覧handlerが拒否・停止した場合は能力を返さない。
+
+MobileのAgent Task画面で使用者が明示選択した場合だけ、取得直後のsnapshot hashを`AgentTask端末申請`へ含める。hashは能力の参照値であり、Tool実行・Permission・Approvalを与えない。Desktop Agent Centerで依頼本文を確認し、既存Brokerが現行Runtime／Workspace、現在Catalog、Permission、申請IDへ束縛した一回Owner Approvalを再評価する。申請後にCatalogが変わった場合はBrokerが開始を拒否し、Mobileから暗黙に再取得・再送しない。MCP能力を確認できない、またはTool件数が0の場合はMCP付きTaskを送らず、通常のMCPなし申請は継続できる。
+
+MobileはTool接続・呼出しを行わず、能力一覧やTask結果本文も取得しない。Device Link共通応答envelopeの監査receiptは共通契約どおり受け取り、Clientが検証後に捨てる。Capability metadata、Agent request、UI選択はいずれもAuthorityではない。
+
 ## Mobileの保管とlifecycle
 
 Mobileは端末ID、Hostの固定情報、結合ID、端末秘密、有効期限だけをAndroidの安全保管／iOS Keychainへ保存する。招待秘密は結合後に消去する。一般設定、標準preferences、log、clipboardへの自動書出し、バックアップからの自動復元へ秘密を置かない。保管失敗時に平文へfallbackしない。
@@ -86,7 +94,7 @@ Android実装はAndroid Keystore保護のnative暗号化保管を使い、iOSは
 
 このchannelはMobile製品内のnative transport／保管境界であり、Rust Brokerを迂回する別bridgeではない。Schema・fixture・静的conformanceは契約形状の証拠に限る。実Device Link、Android/iOS OS保管、TLS、background停止のLIVE_RUNTIME証拠とは区別する。
 
-端末wire要求の操作集合はRust `device_link.rs`の通常資格allowlistと一致させる。招待資格では空payloadの`端末結合`だけを使い、結合資格では空payloadの`端末確認`、`端末離脱`、`実行系列挙`、`Agent一覧`、`対話履歴閲覧状態`を許可する。`対話開始`は`実行系ID`、`対話送信`は`対話セッションID`と`入力`、`対話取得`／`対話中止`は`要求ID`、`対話終了`は`対話セッションID`を受け取る。Runtime状態・資源観測は`版`と`実行系ID`、通知一覧は`版`と任意の`未読のみ`／`上限`、全Runtime停止要求は`版`だけを受け取る。履歴閲覧は`approval_id`とbounded `query`を受け取り、既存のowner承認が現在有効な範囲だけを閲覧する。owner専用の端末管理・承認操作はこの集合に含めない。
+端末wire要求の操作集合はRust `device_link.rs`の通常資格allowlistと一致させる。招待資格では空payloadの`端末結合`だけを使い、結合資格では空payloadの`端末確認`、`端末離脱`、`実行系列挙`、`Agent一覧`、`対話履歴閲覧状態`、`AgentTask端末MCP能力取得`を許可する。`対話開始`は`実行系ID`、`対話送信`は`対話セッションID`と`入力`、`対話取得`／`対話中止`は`要求ID`、`対話終了`は`対話セッションID`を受け取る。Runtime状態・資源観測は`版`と`実行系ID`、通知一覧は`版`と任意の`未読のみ`／`上限`、全Runtime停止要求は`版`だけを受け取る。履歴閲覧は`approval_id`とbounded `query`を受け取り、既存のowner承認が現在有効な範囲だけを閲覧する。Task申請では任意の`mcp_capability_snapshot_hash`を受け取るが、Brokerが再検査しない hash はTaskを実行できない。owner専用の端末管理・承認操作はこの集合に含めない。
 
 `specs/device_link_request.schema.json`は、要求全体と操作別payloadを閉じたSchemaとして表す。ConformanceはSchemaの操作集合とRust通常資格allowlistの差分、各操作の正例、未知field・owner昇格・不一致payload・範囲外値の拒否を検査する。Schema適合はRustでの資格、所有関係、現在のApproval、Audit成立を代替しない。
 

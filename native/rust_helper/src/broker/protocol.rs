@@ -3814,6 +3814,43 @@ impl Broker {
     }
 
     #[allow(non_snake_case)]
+    fn AgentTask端末MCP能力投影(body: &Value) -> Result<Value, &'static str> {
+        let capability_hash = body.get("Agent能力hash").ok_or("MCP能力hash応答不正")?;
+        let capability_count = body
+            .get("Agent能力件数")
+            .and_then(Value::as_u64)
+            .ok_or("MCP能力件数応答不正")?;
+        let capability_state = body
+            .get("Agent能力状態")
+            .and_then(Value::as_str)
+            .ok_or("MCP能力状態応答不正")?;
+        if body.get("公開範囲").and_then(Value::as_str) != Some("metadata_only") {
+            return Err("MCP能力公開範囲不正");
+        }
+        let valid_hash = capability_hash
+            .as_str()
+            .and_then(|value| value.strip_prefix("sha256:"))
+            .is_some_and(|hex| {
+                hex.len() == 64
+                    && hex
+                        .bytes()
+                        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            });
+        match capability_state {
+            "available" if valid_hash => {}
+            "unsupported" if capability_hash.is_null() && capability_count == 0 => {}
+            _ => return Err("MCP能力snapshot不整合"),
+        }
+        Ok(json!({
+            "版": 1,
+            "Agent能力hash": capability_hash,
+            "Agent能力件数": capability_count,
+            "Agent能力状態": capability_state,
+            "公開範囲": "metadata_only",
+        }))
+    }
+
+    #[allow(non_snake_case)]
     fn 端末AgentTask操作(
         &mut self,
         id: &str,
@@ -3824,6 +3861,19 @@ impl Broker {
     ) -> Result<(Value, String), &'static str> {
         let now = self.current_epoch_seconds();
         match operation {
+            "AgentTask端末MCP能力取得" => {
+                if !payload.as_object().is_some_and(|fields| fields.is_empty()) {
+                    return Err("MCP能力要求不正");
+                }
+                let response = super::mcp_center::list(self, id, &json!({"版": 1}), false, hash);
+                if response.status != BrokerStatus::Accepted {
+                    return Err("MCP能力取得拒否");
+                }
+                let projection = Self::AgentTask端末MCP能力投影(
+                    response.body.as_ref().ok_or("MCP能力取得応答不正")?,
+                )?;
+                Ok((projection, response.evidence_source))
+            }
             "AgentTask端末申請" => {
                 if payload.to_string().len() > 32 * 1024 {
                     return Err("AgentTask申請上限");
@@ -4146,6 +4196,7 @@ impl Broker {
                         op,
                         "AgentTask端末申請"
                             | "AgentTask端末申請一覧"
+                            | "AgentTask端末MCP能力取得"
                             | "AgentTask端末状態"
                             | "AgentTask端末実行"
                             | "AgentTask端末取消"
@@ -10453,6 +10504,84 @@ mod 端末統治試験 {
         .unwrap();
         (c, pending)
     }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn モバイルAgentTask向けMCP能力取得は既存Catalogから限定投影する() {
+        let mut e = 環境生成();
+        let invitation = 制御(
+            &mut e.broker,
+            "端末招待",
+            json!({"端末ID":"c".repeat(32),"接続先Host":"127.0.0.1"}),
+        )
+        .body
+        .unwrap();
+        let credential = 通信(&mut e.broker, &invitation, "端末結合", json!({}))
+            .body
+            .unwrap();
+        let catalog = 通常要求(
+            &mut e.broker,
+            BrokerOperation::MCP接続一覧,
+            json!({"版": 1}),
+        );
+        assert_eq!(catalog.status, BrokerStatus::Accepted, "{catalog:?}");
+
+        let response = 通信(
+            &mut e.broker,
+            &credential,
+            "AgentTask端末MCP能力取得",
+            json!({}),
+        );
+        assert_eq!(response.status, BrokerStatus::Accepted, "{response:?}");
+        let body = response.body.expect("Mobile MCP能力projection");
+        assert_eq!(body.as_object().map(serde_json::Map::len), Some(5));
+        assert_eq!(body["版"], 1);
+        assert_eq!(body["公開範囲"], "metadata_only");
+        assert_eq!(
+            body["Agent能力hash"],
+            catalog.body.as_ref().unwrap()["Agent能力hash"]
+        );
+        assert_eq!(
+            body["Agent能力件数"],
+            catalog.body.as_ref().unwrap()["Agent能力件数"]
+        );
+        assert_eq!(
+            body["Agent能力状態"],
+            catalog.body.as_ref().unwrap()["Agent能力状態"]
+        );
+        let encoded = body.to_string();
+        assert!(!encoded.contains("MCP接続一覧"));
+        assert!(!encoded.contains("Credential"));
+        assert!(!encoded.contains("audit_event_id"));
+
+        let extra = 通信(
+            &mut e.broker,
+            &credential,
+            "AgentTask端末MCP能力取得",
+            json!({"版": 1}),
+        );
+        assert_eq!(extra.status, BrokerStatus::Rejected);
+
+        let sensitive_catalog = json!({
+            "Agent能力hash": format!("sha256:{}", "a".repeat(64)),
+            "Agent能力件数": 1,
+            "Agent能力状態": "available",
+            "公開範囲": "metadata_only",
+            "MCP接続一覧": [{"Credential":"TEST_ONLY_SECRET_SENTINEL"}]
+        });
+        let projection =
+            Broker::AgentTask端末MCP能力投影(&sensitive_catalog).expect("bounded MCP projection");
+        assert_eq!(projection.as_object().map(serde_json::Map::len), Some(5));
+        assert!(!projection.to_string().contains("TEST_ONLY_SECRET_SENTINEL"));
+        assert!(Broker::AgentTask端末MCP能力投影(&json!({
+            "Agent能力hash": "sha256:BAD",
+            "Agent能力件数": 1,
+            "Agent能力状態": "available",
+            "公開範囲": "metadata_only"
+        }))
+        .is_err());
+    }
+
     #[test]
     fn agent_list_rejects_untrusted_adapter_metadata_with_audit_and_no_leak() {
         let secret_marker = "TEST_ONLY_SECRET_SENTINEL";

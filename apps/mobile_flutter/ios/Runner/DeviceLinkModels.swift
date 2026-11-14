@@ -218,7 +218,7 @@ struct DeviceLinkSnapshot {
 enum DeviceLinkPayloadPolicy {
   private static let operations: Set<String> = [
     "実行系列挙", "Agent一覧", "作業領域一覧", "対話開始", "対話送信", "対話取得", "対話中止", "対話終了",
-    "AgentTask端末申請", "AgentTask端末申請一覧", "AgentTask端末状態", "AgentTask端末実行", "AgentTask端末取消",
+    "AgentTask端末申請", "AgentTask端末申請一覧", "AgentTask端末MCP能力取得", "AgentTask端末状態", "AgentTask端末実行", "AgentTask端末取消",
     "実行系ライフサイクル状態", "実行系資源観測", "通知一覧", "全Runtime停止要求",
     "対話履歴閲覧状態", "対話履歴閲覧",
   ]

@@ -28,6 +28,90 @@ Map<String, Object?> _taskRecord({String status = 'pending'}) => {
 };
 
 void main() {
+  test('MCP能力取得はhash・件数・状態だけを受け付ける', () async {
+    String? operationSeen;
+    final client = MobileAgentTaskClient((operation, payload) async {
+      operationSeen = operation;
+      expect(payload, isEmpty);
+      return _accepted(operation, {
+        '版': 1,
+        'Agent能力hash': _hashF,
+        'Agent能力件数': 2,
+        'Agent能力状態': 'available',
+        '公開範囲': 'metadata_only',
+      });
+    });
+
+    final snapshot = await client.mcpCapabilitySnapshot();
+
+    expect(operationSeen, 'AgentTask端末MCP能力取得');
+    expect(snapshot.hash, _hashF);
+    expect(snapshot.toolCount, 2);
+    expect(snapshot.usable, isTrue);
+  });
+
+  test('MCP能力なしは利用不可として扱い、余分なCatalog情報は拒否する', () async {
+    final unsupported = MobileAgentTaskClient(
+      (operation, payload) async => _accepted(operation, {
+        '版': 1,
+        'Agent能力hash': null,
+        'Agent能力件数': 0,
+        'Agent能力状態': 'unsupported',
+        '公開範囲': 'metadata_only',
+      }),
+    );
+    final snapshot = await unsupported.mcpCapabilitySnapshot();
+    expect(snapshot.usable, isFalse);
+
+    final unsafe = MobileAgentTaskClient(
+      (operation, payload) async => _accepted(operation, {
+        '版': 1,
+        'Agent能力hash': _hashF,
+        'Agent能力件数': 1,
+        'Agent能力状態': 'available',
+        '公開範囲': 'metadata_only',
+        'MCP接続一覧': [],
+      }),
+    );
+    await expectLater(
+      unsafe.mcpCapabilitySnapshot(),
+      throwsA(isA<Exception>()),
+    );
+  });
+
+  test('Task申請は任意のBroker MCP能力snapshot hashを束縛する', () async {
+    late Map<String, Object?> payloadSeen;
+    final now = DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000;
+    final client = MobileAgentTaskClient((operation, payload) async {
+      payloadSeen = payload;
+      return _accepted(operation, {
+        '版': 1,
+        '申請ID': _idB,
+        '状態': 'Owner確認待ち',
+        '実行系ID': 'codex-runtime',
+        '対話セッションID': _idA,
+        '作業領域ID': 'workspace-a',
+        '指示hash': _hashF,
+        '期限': now + 900,
+      });
+    });
+
+    await client.submit(
+      AgentTaskRequest(
+        runtimeId: 'codex-runtime',
+        sessionId: _idA,
+        workspaceId: 'workspace-a',
+        instruction: 'Use the current MCP capability if it helps.',
+        mcpCapabilitySnapshotHash: _hashF,
+      ),
+    );
+
+    expect(payloadSeen['mcp_capability_snapshot_hash'], _hashF);
+    expect(payloadSeen.keys, isNot(contains('permission')));
+    expect(payloadSeen.keys, isNot(contains('approval')));
+    expect(payloadSeen.keys, isNot(contains('mcp_result_id')));
+  });
+
   test('申請はAuthorityを含まず、Brokerのfalse保証を照合する', () async {
     String? operationSeen;
     Map<String, Object?>? payloadSeen;

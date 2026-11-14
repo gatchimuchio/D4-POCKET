@@ -4096,8 +4096,9 @@ def 端末契約の構造と禁止操作を検査する() -> list[str]:
                   "対話取得": {"要求ID": "b" * 32}, "対話中止": {"要求ID": "b" * 32}, "対話終了": {"対話セッションID": "a" * 32},
                   "対話履歴閲覧状態": {},
                   "対話履歴閲覧": {"approval_id": "a" * 32, "query": {"after": 0, "limit": 20, "filter": {"実行系ID": "local"}}},
-                  "AgentTask端末申請": {"agent_runtime_id": "local", "session_id": "a" * 32, "workspace_id": "workspace-a", "instruction": "inspect selected files"},
+                  "AgentTask端末申請": {"agent_runtime_id": "local", "session_id": "a" * 32, "workspace_id": "workspace-a", "instruction": "inspect selected files", "mcp_capability_snapshot_hash": "sha256:" + "c" * 64},
                   "AgentTask端末申請一覧": {},
+                  "AgentTask端末MCP能力取得": {},
                   "AgentTask端末状態": {"申請ID": "c" * 32},
                   "AgentTask端末実行": {"申請ID": "c" * 32},
                   "AgentTask端末取消": {"申請ID": "c" * 32}}
@@ -4111,6 +4112,7 @@ def 端末契約の構造と禁止操作を検査する() -> list[str]:
     if not validate_instance({**sample, "操作": "対話取得", "内容": {"対話セッションID": "a" * 32}}, schema):
         errors.append("端末要求が操作と内容の不一致を受理")
     invalid_payloads = (
+        ("AgentTask端末MCP能力取得", {"版": 1}),
         ("実行系ライフサイクル状態", {"版": 2, "実行系ID": "local"}),
         ("実行系資源観測", {"版": 1, "実行系ID": "../runtime"}),
         ("通知一覧", {"版": 1, "上限": 257}),
@@ -4135,8 +4137,9 @@ def Mobile_native_Device_Link_channelを秘密非通過に制限する() -> list
         {"version": 1, "method": "pair"},
         {"version": 1, "method": "broker_request", "broker_operation": "Agent一覧", "payload": {}},
         {"version": 1, "method": "broker_request", "broker_operation": "作業領域一覧", "payload": {}},
-        {"version": 1, "method": "broker_request", "broker_operation": "AgentTask端末申請", "payload": {"agent_runtime_id": "local", "session_id": "a" * 32, "workspace_id": "workspace-a", "instruction": "inspect selected files"}},
+        {"version": 1, "method": "broker_request", "broker_operation": "AgentTask端末申請", "payload": {"agent_runtime_id": "local", "session_id": "a" * 32, "workspace_id": "workspace-a", "instruction": "inspect selected files", "mcp_capability_snapshot_hash": "sha256:" + "c" * 64}},
         {"version": 1, "method": "broker_request", "broker_operation": "AgentTask端末申請一覧", "payload": {}},
+        {"version": 1, "method": "broker_request", "broker_operation": "AgentTask端末MCP能力取得", "payload": {}},
         {"version": 1, "method": "broker_request", "broker_operation": "AgentTask端末状態", "payload": {"申請ID": "c" * 32}},
         {"version": 1, "method": "broker_request", "broker_operation": "AgentTask端末実行", "payload": {"申請ID": "c" * 32}},
         {"version": 1, "method": "broker_request", "broker_operation": "AgentTask端末取消", "payload": {"申請ID": "c" * 32}},
@@ -9564,6 +9567,19 @@ def test_agent_task_request_cannot_carry_authority_or_dialogue_approval() -> lis
     expected_fields = {"agent_runtime_id", "session_id", "workspace_id", "instruction"}
     if set(valid) != expected_fields:
         return ["Agent作業要求fixtureのfield集合が固定されていない"]
+
+    with_mcp_snapshot = {
+        **valid,
+        "mcp_capability_snapshot_hash": "sha256:" + "c" * 64,
+    }
+    if validate_instance(with_mcp_snapshot, schema):
+        errors.append("Agent作業要求がBroker MCP能力snapshot hashを拒否した")
+    malformed_mcp_snapshot = {
+        **valid,
+        "mcp_capability_snapshot_hash": "sha256:invalid",
+    }
+    if validate_instance(malformed_mcp_snapshot, schema) == []:
+        errors.append("Agent作業要求が不正なMCP能力snapshot hashを受け入れた")
 
     invalid = load_contract_fixture(
         "invalid/agent_task_request_authority_escalation.invalid.json"

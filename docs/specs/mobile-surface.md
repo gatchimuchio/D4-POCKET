@@ -31,7 +31,7 @@ Mobile Flutter → Device Link TLS → Desktop Rust Broker → 既存の読み�
 | 資源概要 | 実行系資源観測の実測とunknown値 | 取得不能値を0へ変換せず、観測値は権限を生成しない |
 | 履歴 | 現在のowner履歴承認に結合したメタデータ | 本文閲覧、再実行、分岐、承認発行を行わない |
 | 接続先 | 保存資格からのHost／HostID／証明書hash表示 | 接続先メタデータからTrustやPermissionを生成しない |
-| MCP | Desktop owner管理面のみを示す未観測表示 | Mobileから接続、Tool実行、Credential参照を行わない |
+| MCP | Desktop owner管理面の状態と、使用者が選んだAgent Taskに限るBroker生成の能力snapshot参照 | Mobileから接続・Tool実行・Credential参照・Tool一覧／結果本文の取得を行わない。能力hashは権限でなく、Desktop Brokerが現行CatalogとPermission／Approvalを再評価する |
 | 緊急停止要求 | Brokerのowner再承認待ち停止受付記録表示 | 実停止、kill、owner承認生成を行わない |
 | Recovery（復旧） | 資格再確認、失効確認、再結合の既存導線 | 自動再送、秘密値復元、過去Approval再利用を行わない |
 

@@ -73,9 +73,11 @@ class DeviceLinkPolicyTest {
                 "session_id" to "a".repeat(32),
                 "workspace_id" to "workspace-a",
                 "instruction" to "inspect the selected files",
+                "mcp_capability_snapshot_hash" to "sha256:${"c".repeat(64)}",
             ),
         )
         DeviceLinkPayloadPolicy.validate("AgentTask端末申請一覧", emptyMap())
+        DeviceLinkPayloadPolicy.validate("AgentTask端末MCP能力取得", emptyMap())
         for (operation in listOf("AgentTask端末状態", "AgentTask端末実行", "AgentTask端末取消")) {
             DeviceLinkPayloadPolicy.validate(operation, mapOf("申請ID" to "b".repeat(32)))
         }

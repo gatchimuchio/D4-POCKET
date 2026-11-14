@@ -34,6 +34,7 @@ pub(crate) const 許可操作: &[&str] = &[
     "対話終了",
     "AgentTask端末申請",
     "AgentTask端末申請一覧",
+    "AgentTask端末MCP能力取得",
     "AgentTask端末状態",
     "AgentTask端末実行",
     "AgentTask端末取消",
@@ -291,6 +292,7 @@ impl 端末制御 {
             | "Agent一覧"
             | "作業領域一覧"
             | "AgentTask端末申請一覧"
+            | "AgentTask端末MCP能力取得"
             | "端末確認"
             | "端末離脱"
                 if !fields(&r.内容, &[]) =>

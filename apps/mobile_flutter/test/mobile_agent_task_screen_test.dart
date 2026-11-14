@@ -10,6 +10,8 @@ const _sessionId = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const _requestId = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 const _instructionHash =
     'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const _mcpCapabilityHash =
+    'sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc';
 
 Map<String, Object?> _response(
   String operation,
@@ -98,6 +100,47 @@ class _TaskSubmissionPort implements DeviceLinkNativePort {
       default:
         throw StateError('想定外のBroker操作: $operation');
     }
+  }
+}
+
+class _McpTaskPort extends _TaskSubmissionPort {
+  _McpTaskPort({this.capabilityAvailable = true})
+    : super(definitiveRejection: false);
+
+  final bool capabilityAvailable;
+  final operations = <String>[];
+  Map<String, Object?>? submittedPayload;
+
+  @override
+  Future<Map<String, Object?>> request(
+    String operation, {
+    Map<String, Object?>? payload,
+  }) async {
+    operations.add(operation);
+    if (operation == 'AgentTask端末MCP能力取得') {
+      return _response(operation, 'accepted', {
+        '版': 1,
+        'Agent能力hash': capabilityAvailable ? _mcpCapabilityHash : null,
+        'Agent能力件数': capabilityAvailable ? 1 : 0,
+        'Agent能力状態': capabilityAvailable ? 'available' : 'unsupported',
+        '公開範囲': 'metadata_only',
+      });
+    }
+    if (operation == 'AgentTask端末申請') {
+      submittedPayload = payload;
+      final now = DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000;
+      return _response(operation, 'accepted', {
+        '版': 1,
+        '申請ID': _requestId,
+        '状態': 'Owner確認待ち',
+        '実行系ID': 'codex-runtime',
+        '対話セッションID': _sessionId,
+        '作業領域ID': 'workspace-a',
+        '指示hash': _instructionHash,
+        '期限': now + 900,
+      });
+    }
+    return super.request(operation, payload: payload);
   }
 }
 
@@ -247,6 +290,99 @@ void main() {
     expect(port.sessionCloseCount, 1);
     expect(find.textContaining('Brokerが申請を拒否しました'), findsOneWidget);
     expect(find.textContaining('Sessionを終了しました'), findsOneWidget);
+  });
+
+  testWidgets('MCP選択時は現在の能力hashを先に取得してTask申請へ含める', (tester) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final port = _McpTaskPort();
+    final controller = DeviceLinkController(nativePort: port)..ready = true;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MobileAgentTaskScreen(
+            controller: controller,
+            connected: true,
+            active: true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final instruction = find.byKey(
+      const ValueKey('mobile-agent-task-instruction'),
+    );
+    await tester.ensureVisible(instruction);
+    await tester.enterText(instruction, 'MCP能力を使って調査する');
+    final mcpToggle = find.byKey(
+      const ValueKey('mobile-agent-task-mcp-capabilities'),
+    );
+    await tester.ensureVisible(mcpToggle);
+    await tester.tap(mcpToggle);
+    await tester.pumpAndSettle();
+    final submit = find.byKey(const ValueKey('mobile-agent-task-submit'));
+    await tester.ensureVisible(submit);
+    await tester.tap(submit);
+    await tester.pumpAndSettle();
+
+    expect(
+      port.operations.indexOf('AgentTask端末MCP能力取得'),
+      lessThan(port.operations.indexOf('対話開始')),
+    );
+    expect(
+      port.operations.indexOf('AgentTask端末MCP能力取得'),
+      lessThan(port.operations.indexOf('AgentTask端末申請')),
+    );
+    expect(
+      port.submittedPayload?['mcp_capability_snapshot_hash'],
+      _mcpCapabilityHash,
+    );
+    expect(find.textContaining('申請をBrokerへ送信しました'), findsOneWidget);
+    controller.dispose();
+  });
+
+  testWidgets('MCP能力を確認できない場合はSessionもTask申請も作らない', (tester) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final port = _McpTaskPort(capabilityAvailable: false);
+    final controller = DeviceLinkController(nativePort: port)..ready = true;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MobileAgentTaskScreen(
+            controller: controller,
+            connected: true,
+            active: true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final instruction = find.byKey(
+      const ValueKey('mobile-agent-task-instruction'),
+    );
+    await tester.ensureVisible(instruction);
+    await tester.enterText(instruction, 'MCP能力を使って調査する');
+    final mcpToggle = find.byKey(
+      const ValueKey('mobile-agent-task-mcp-capabilities'),
+    );
+    await tester.ensureVisible(mcpToggle);
+    await tester.tap(mcpToggle);
+    await tester.pumpAndSettle();
+    final submit = find.byKey(const ValueKey('mobile-agent-task-submit'));
+    await tester.ensureVisible(submit);
+    await tester.tap(submit);
+    await tester.pumpAndSettle();
+
+    expect(port.operations, contains('AgentTask端末MCP能力取得'));
+    expect(port.operations, isNot(contains('対話開始')));
+    expect(port.operations, isNot(contains('AgentTask端末申請')));
+    expect(find.textContaining('Task申請を送信しませんでした'), findsOneWidget);
+    controller.dispose();
   });
 
   testWidgets('再接続後の新しい一覧を古い読取応答で上書きしない', (tester) async {

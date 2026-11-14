@@ -31,8 +31,10 @@ class RunnerTests: XCTestCase {
       "session_id": String(repeating: "a", count: 32),
       "workspace_id": "workspace-a",
       "instruction": "inspect the selected files",
+      "mcp_capability_snapshot_hash": "sha256:" + String(repeating: "c", count: 64),
     ]))
     XCTAssertNoThrow(try DeviceLinkPayloadPolicy.validate("AgentTask端末申請一覧", payload: [:]))
+    XCTAssertNoThrow(try DeviceLinkPayloadPolicy.validate("AgentTask端末MCP能力取得", payload: [:]))
     for operation in ["AgentTask端末状態", "AgentTask端末実行", "AgentTask端末取消"] {
       XCTAssertNoThrow(try DeviceLinkPayloadPolicy.validate(operation, payload: [
         "申請ID": String(repeating: "b", count: 32),

@@ -15,6 +15,7 @@ const _operations = <String>{
   '対話終了',
   'AgentTask端末申請',
   'AgentTask端末申請一覧',
+  'AgentTask端末MCP能力取得',
   'AgentTask端末状態',
   'AgentTask端末実行',
   'AgentTask端末取消',

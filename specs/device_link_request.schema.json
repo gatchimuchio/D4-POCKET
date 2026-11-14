@@ -67,6 +67,7 @@
         "対話履歴閲覧",
         "AgentTask端末申請",
         "AgentTask端末申請一覧",
+        "AgentTask端末MCP能力取得",
         "AgentTask端末状態",
         "AgentTask端末実行",
         "AgentTask端末取消"
@@ -370,7 +371,8 @@
             "agent_runtime_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$(?![\\s\\S])" },
             "session_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$(?![\\s\\S])" },
             "workspace_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$(?![\\s\\S])" },
-            "instruction": { "type": "string", "minLength": 1, "maxLength": 32768, "pattern": "\\S" }
+            "instruction": { "type": "string", "minLength": 1, "maxLength": 32768, "pattern": "\\S" },
+            "mcp_capability_snapshot_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])", "description": "現在のBroker MCP能力snapshot参照。権限やApprovalを生成せず、BrokerがTask事前検査で再照合する。" }
           }
         }
       }
@@ -378,6 +380,12 @@
     {
       "properties": {
         "操作": { "const": "AgentTask端末申請一覧" },
+        "内容": { "type": "object", "maxProperties": 0, "additionalProperties": false }
+      }
+    },
+    {
+      "properties": {
+        "操作": { "const": "AgentTask端末MCP能力取得" },
         "内容": { "type": "object", "maxProperties": 0, "additionalProperties": false }
       }
     },

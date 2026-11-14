@@ -203,15 +203,59 @@ class MobileAgentTaskRecord {
   final bool resultContentAvailable;
 }
 
+class MobileAgentMcpCapabilitySnapshot {
+  const MobileAgentMcpCapabilitySnapshot({
+    required this.hash,
+    required this.toolCount,
+    required this.state,
+  });
+
+  final String? hash;
+  final int toolCount;
+  final String state;
+
+  bool get usable => state == 'available' && hash != null && toolCount > 0;
+}
+
 class MobileAgentTaskClient {
   MobileAgentTaskClient(this._request);
 
   final MobileAgentTaskBrokerRequest _request;
 
+  Future<MobileAgentMcpCapabilitySnapshot> mcpCapabilitySnapshot() async {
+    const operation = 'AgentTask端末MCP能力取得';
+    final body = await _acceptedBody(operation, const {});
+    const keys = {
+      '版',
+      'Agent能力hash',
+      'Agent能力件数',
+      'Agent能力状態',
+      '公開範囲',
+    };
+    final rawHash = body['Agent能力hash'];
+    final count = body['Agent能力件数'];
+    final state = body['Agent能力状態'];
+    if (!_exactKeys(body, keys) ||
+        body['版'] != 1 ||
+        body['公開範囲'] != 'metadata_only' ||
+        count is! int ||
+        count < 0 ||
+        (state == 'available' &&
+            (rawHash is! String || !RegExp(_hashPattern).hasMatch(rawHash))) ||
+        (state == 'unsupported' && (rawHash != null || count != 0)) ||
+        !const {'available', 'unsupported'}.contains(state)) {
+      _invalid();
+    }
+    return MobileAgentMcpCapabilitySnapshot(
+      hash: rawHash as String?,
+      toolCount: count,
+      state: state as String,
+    );
+  }
+
   Future<MobileAgentTaskDraft> submit(AgentTaskRequest request) async {
     request.validate();
     if (request.mobileTaskRequestId != null ||
-        request.mcpCapabilitySnapshotHash != null ||
         request.mcpResultId != null ||
         request.mcpResultHash != null ||
         request.requireUnusedTaskSession) {

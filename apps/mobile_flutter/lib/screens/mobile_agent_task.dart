@@ -2,6 +2,7 @@ import 'package:agent_orchestration/agent_orchestration.dart'
     show
         AgentTaskRequest,
         MobileAgentTaskClient,
+        MobileAgentMcpCapabilitySnapshot,
         MobileAgentTaskDraft,
         MobileAgentTaskStatus,
         MobileAgentTaskSubmissionRejected;
@@ -40,6 +41,7 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
   String? _message;
   bool _loading = false;
   bool _busy = false;
+  bool _includeMcpCapabilities = false;
 
   MobileAgentTaskClient _clientFor(DeviceLinkController controller) =>
       MobileAgentTaskClient(
@@ -166,7 +168,21 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
     });
     String? sessionId;
     var submissionMayHaveReachedBroker = false;
+    var mcpCapabilityReadPending = false;
     try {
+      MobileAgentMcpCapabilitySnapshot? mcpCapabilities;
+      if (_includeMcpCapabilities) {
+        mcpCapabilityReadPending = true;
+        mcpCapabilities = await _clientFor(controller).mcpCapabilitySnapshot();
+        mcpCapabilityReadPending = false;
+        if (!_isCurrentConnection(generation, controller)) return;
+        if (!mcpCapabilities.usable) {
+          setState(
+            () => _message = '利用可能なMCP Tool能力を確認できないため、Task申請を送信しませんでした。',
+          );
+          return;
+        }
+      }
       sessionId = await controller.dialogue.start(
         runtime,
         workspaceId: workspace,
@@ -185,6 +201,7 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
         sessionId: sessionId,
         workspaceId: workspace,
         instruction: instruction,
+        mcpCapabilitySnapshotHash: mcpCapabilities?.hash,
       );
       request.validate();
       submissionMayHaveReachedBroker = true;
@@ -230,6 +247,8 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
         setState(
           () => _message = submissionMayHaveReachedBroker
               ? '申請結果が不明です。Sessionを維持しました。再送せず、一覧を更新してください。'
+              : mcpCapabilityReadPending
+              ? '現在のMCP能力を確認できません。Task申請は送信していません。'
               : sessionId == null
               ? 'Session開始を確認できません。申請は再送せず、状態を更新してください。'
               : sessionClosed
@@ -404,6 +423,18 @@ class _MobileAgentTaskScreenState extends State<MobileAgentTaskScreen> {
             border: OutlineInputBorder(),
             labelText: 'Task依頼',
             hintText: '実行したい作業を記入',
+          ),
+        ),
+        SwitchListTile.adaptive(
+          key: const ValueKey('mobile-agent-task-mcp-capabilities'),
+          contentPadding: EdgeInsets.zero,
+          value: _includeMcpCapabilities,
+          onChanged: _busy || !widget.connected || !widget.active
+              ? null
+              : (value) => setState(() => _includeMcpCapabilities = value),
+          title: const Text('このTaskでMCP Tool能力を使う'),
+          subtitle: const Text(
+            '現在のBroker能力hashだけを申請へ含めます。Permission／ApprovalはDesktopで別途必要です。Tool一覧や結果本文はMobileへ返りません。',
           ),
         ),
         Wrap(
