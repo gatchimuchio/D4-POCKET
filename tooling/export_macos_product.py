@@ -174,6 +174,31 @@ def bundle_identifier_for_app(app_id: str) -> str:
     return f"com.d4p.export.{suffix}"
 
 
+def uninstaller_package_identifier_for_app(bundle_identifier: str) -> str:
+    if re.fullmatch(r"com\.d4p\.export\.[0-9a-f]{32}", bundle_identifier) is None:
+        raise ValueError("macOS uninstaller package identityがExport Appに束縛されていない")
+    return f"{bundle_identifier}.uninstaller"
+
+
+def render_macos_uninstaller_postinstall(
+    template: str, *, bundle_name: str, bundle_identifier: str
+) -> str:
+    match = re.fullmatch(r"com\.d4p\.export\.([0-9a-f]{32})", bundle_identifier)
+    if match is None or bundle_name != f"D4Pocket-{match.group(1)[:12]}.app":
+        raise ValueError("macOS uninstaller targetがExport App identityと一致しない")
+    replacements = {
+        "@D4P_APP_BUNDLE_NAME@": bundle_name,
+        "@D4P_BUNDLE_IDENTIFIER@": bundle_identifier,
+    }
+    for token, value in replacements.items():
+        if template.count(token) != 1:
+            raise ValueError("macOS uninstaller template tokenが一意でない")
+        template = template.replace(token, value)
+    if "@D4P_" in template:
+        raise ValueError("macOS uninstaller templateに未解決tokenがある")
+    return template
+
+
 def _darwin_build_architecture() -> str:
     machine = platform.machine().lower()
     architecture = DARWIN_ARCHITECTURES.get(machine)
@@ -1202,6 +1227,7 @@ def build_macos_product(
     bundle_id = bundle_identifier_for_app(app_id)
     bundle_name = f"D4Pocket-{suffix[:12]}.app"
     installer_id = f"{bundle_id}.installer"
+    uninstaller_id = uninstaller_package_identifier_for_app(bundle_id)
     tools = _tool_paths()
     target_architecture = _darwin_build_architecture()
     defines = dart_defines(plan)
@@ -1366,6 +1392,32 @@ def build_macos_product(
             )
             _require_file(package_path, "macOS package candidate")
 
+            uninstaller_template_path = source_root / "installer/macos/uninstall/postinstall.sh.in"
+            uninstaller_template = _read_regular_file(
+                uninstaller_template_path, 32 * 1024, "macOS uninstaller script template"
+            ).decode("utf-8")
+            uninstaller_script = render_macos_uninstaller_postinstall(
+                uninstaller_template,
+                bundle_name=bundle_name,
+                bundle_identifier=bundle_id,
+            )
+            uninstaller_scripts = temporary_root / "uninstaller-scripts"
+            uninstaller_scripts.mkdir(mode=0o700)
+            postinstall_path = uninstaller_scripts / "postinstall"
+            postinstall_path.write_bytes(uninstaller_script.encode("utf-8"))
+            postinstall_path.chmod(0o755)
+            uninstaller_package_path = (
+                staging_root / f"D4Pocket-{suffix[:12]}-Uninstaller.pkg"
+            )
+            _run(
+                [tools["pkgbuild"], "--nopayload", "--scripts", str(uninstaller_scripts),
+                 "--identifier", uninstaller_id, "--version", version,
+                 str(uninstaller_package_path)],
+                cwd=source_root,
+                environment=environment,
+            )
+            _require_file(uninstaller_package_path, "macOS uninstaller package candidate")
+
             package_manifest = (install_bundle / "Contents/Resources/product_manifest.json").read_bytes()
             if product_manifest.read_bytes() != manifest_raw or package_manifest != manifest_raw:
                 raise ValueError("Export Manifestがpackage対象App Bundleから変化した")
@@ -1379,7 +1431,7 @@ def build_macos_product(
         elapsed_ms = round((time.perf_counter() - started) * 1000)
         catalog = _load_catalog()
         evidence = {
-            "version": 3,
+            "version": 4,
             "evidence_type": "d4_pocket_macos_export_build",
             "evidence_source": "INTERNAL_STATE",
             "product": "D4 Pocket",
@@ -1454,6 +1506,17 @@ def build_macos_product(
                 "signed": False,
                 "installed_product_verified": False,
             },
+            "uninstaller_package": {
+                "file_name": uninstaller_package_path.name,
+                "identifier": uninstaller_id,
+                "format": "macOS flat pkg",
+                "byte_length": uninstaller_package_path.stat().st_size,
+                "sha256": _sha256_file(uninstaller_package_path),
+                "signed": False,
+                "removed_scope": "matching_app_bundle_only",
+                "user_data_preserved": True,
+                "keychain_preserved": True,
+            },
             "app_archive": {
                 "file_name": app_archive_path.name,
                 "byte_length": app_archive_path.stat().st_size,
@@ -1502,6 +1565,21 @@ def _validate_build_evidence(
     expected_manifest_hash = hashlib.sha256(manifest_raw).hexdigest()
     expected_bundle_id = bundle_identifier_for_app(expected_app_id)
     expected_bundle_name = f"D4Pocket-{expected_app_id.removeprefix('d4-pocket-app-')[:12]}.app"
+    expected_uninstaller_name = (
+        f"D4Pocket-{expected_app_id.removeprefix('d4-pocket-app-')[:12]}-Uninstaller.pkg"
+    )
+    expected_uninstaller_id = uninstaller_package_identifier_for_app(expected_bundle_id)
+    uninstaller_evidence = evidence.get("uninstaller_package", {})
+    if (
+        uninstaller_evidence.get("file_name") != expected_uninstaller_name
+        or uninstaller_evidence.get("identifier") != expected_uninstaller_id
+        or uninstaller_evidence.get("format") != "macOS flat pkg"
+        or uninstaller_evidence.get("signed") is not False
+        or uninstaller_evidence.get("removed_scope") != "matching_app_bundle_only"
+        or uninstaller_evidence.get("user_data_preserved") is not True
+        or uninstaller_evidence.get("keychain_preserved") is not True
+    ):
+        raise ValueError("macOS uninstaller evidenceがExport App identityまたは削除範囲に一致しない")
     records, _regular_files, total_bytes, tree_hash = _macos_artifact_inventory(root, app_bundle)
     signature_scan = evidence.get("app_code_signature_scan", {})
     flutter_framework = signature_scan.get("flutter_toolchain_framework", {})
@@ -1614,10 +1692,13 @@ def _validate_build_evidence(
     ):
         raise ValueError("macOS Export build evidenceが候補の署名／Publisher identity条件に適合しない")
     package = root / evidence["package"]["file_name"]
+    uninstaller_package = root / uninstaller_evidence["file_name"]
     archive = root / evidence["app_archive"]["file_name"]
     if (
         _sha256_file(package) != evidence["package"]["sha256"]
         or package.stat().st_size != evidence["package"]["byte_length"]
+        or _sha256_file(uninstaller_package) != uninstaller_evidence["sha256"]
+        or uninstaller_package.stat().st_size != uninstaller_evidence["byte_length"]
         or _sha256_file(archive) != evidence["app_archive"]["sha256"]
         or archive.stat().st_size != evidence["app_archive"]["byte_length"]
         or evidence["credential_artifact_scan"]["artifact_tree_sha256"]
@@ -1657,6 +1738,7 @@ def main() -> int:
         "audit_store_id": evidence["audit_store_id"],
         "bundle_identifier": evidence["bundle_identifier"],
         "package_sha256": evidence["package"]["sha256"],
+        "uninstaller_package_sha256": evidence["uninstaller_package"]["sha256"],
         "artifact_tree_sha256": evidence["artifact_tree_sha256"],
         "signed": False,
         "installed_product_verified": False,

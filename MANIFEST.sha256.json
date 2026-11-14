@@ -81,7 +81,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "29ed002d6981ecc23d1c379f0e450c9b0c08fec139cb1c8305efd94c81413348"
+      "sha256": "889932ae7eeae97318155a5d802a75639fb75fcbf491f969d7aff595f4cd283e"
     },
     {
       "path": ".github/workflows/linux-manual-export-build.yml",
@@ -1513,7 +1513,7 @@
     },
     {
       "path": "docs/QE_2026-11-14/\u9032\u6357.md",
-      "sha256": "4a270af38c37b205ac19a84c1b5f0ee39bc96f715cecb1cc0bcad441223debcf"
+      "sha256": "e76af16ffc4f5cd0d284ca44311f610d1f86094df759241fc00fb8f3a52b86bd"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -2305,7 +2305,7 @@
     },
     {
       "path": "examples/contracts/gui_shell_macos_export_build.valid.json",
-      "sha256": "b256ead3b1c6fdca0a4d3d89e947f56e0cf8f735e37f28edb28d4257b0b3a803"
+      "sha256": "b724db3be738922d532967514fa770d97b13a9e06a7047db9a8191018e89dad1"
     },
     {
       "path": "examples/contracts/gui_shell_module_build_evidence.valid.json",
@@ -3693,7 +3693,7 @@
     },
     {
       "path": "installer/macos/README.md",
-      "sha256": "8b59e6fe225aaa57e024c58620e756de32cf03ca7c2b76ead176da4ea762a433"
+      "sha256": "9e0be232d7b91f81e97a93680ea9e07b2643a9b0e6368e9de246d1275acda069"
     },
     {
       "path": "installer/setup_doctor.py",
@@ -5093,7 +5093,7 @@
     },
     {
       "path": "specs/gui_shell_macos_export_build.schema.json",
-      "sha256": "c482e93d6b99d7b5334a2c06347dae3a502107c4d64117f8235dd0a31f59e5b0"
+      "sha256": "d445b47a99532bb55187e88c4196a942894b14787ecc43e447ace74ae699ade7"
     },
     {
       "path": "specs/gui_shell_module_build_evidence.schema.json",
@@ -5581,7 +5581,7 @@
     },
     {
       "path": "tooling/export_macos_product.py",
-      "sha256": "0ca0257c9864ed189fdf634c1fcf9c1838c9324db3916c6cfd47a16d1389185b"
+      "sha256": "729b69aab6f43b42b430689801983754cf9187399e296cff03b43995b9e169b2"
     },
     {
       "path": "tooling/export_windows_product.py",
@@ -5749,7 +5749,7 @@
     },
     {
       "path": "tooling/tests/test_export_macos_product.py",
-      "sha256": "13c858d21748d20ae4bf75283a976da56ed946650ccdb7efa9e17264e845786b"
+      "sha256": "c1733017d96d66fb7c45987ba3b90e2bf7da4cfab4f30c20912e21d56c256611"
     },
     {
       "path": "tooling/tests/test_linux_deb_setup_package.py",

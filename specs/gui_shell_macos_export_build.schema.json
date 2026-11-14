@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/gui-shell/schemas/gui_shell_macos_export_build.schema.json",
-  "title": "D4 Pocket macOS Export build記録 v3",
+  "title": "D4 Pocket macOS Export build記録 v4",
   "type": "object",
   "required": [
     "version", "evidence_type", "evidence_source", "product", "target_platform", "build_mode",
@@ -14,12 +14,12 @@
     "target_architecture", "macos_binary_architecture_scan", "app_code_signature_scan",
     "runtime_manifest_consumed", "module_pruning_verified", "package_signed", "app_publisher_identity_signed",
     "launch_status", "installed_product_verified", "formal_distribution_claimed", "artifact_root",
-    "artifact_files", "artifact_total_bytes", "artifact_tree_sha256", "package", "app_archive",
+    "artifact_files", "artifact_total_bytes", "artifact_tree_sha256", "package", "uninstaller_package", "app_archive",
     "credential_artifact_scan"
   ],
   "additionalProperties": false,
   "properties": {
-    "version": { "const": 3 },
+    "version": { "const": 4 },
     "evidence_type": { "const": "d4_pocket_macos_export_build" },
     "evidence_source": { "const": "INTERNAL_STATE" },
     "product": { "const": "D4 Pocket" },
@@ -203,6 +203,22 @@
         "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
         "signed": { "const": false },
         "installed_product_verified": { "const": false }
+      }
+    },
+    "uninstaller_package": {
+      "type": "object",
+      "required": ["file_name", "identifier", "format", "byte_length", "sha256", "signed", "removed_scope", "user_data_preserved", "keychain_preserved"],
+      "additionalProperties": false,
+      "properties": {
+        "file_name": { "type": "string", "pattern": "^D4Pocket-[0-9a-f]{12}-Uninstaller\\.pkg$" },
+        "identifier": { "type": "string", "pattern": "^com\\.d4p\\.export\\.[0-9a-f]{32}\\.uninstaller$" },
+        "format": { "const": "macOS flat pkg" },
+        "byte_length": { "type": "integer", "minimum": 1 },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "signed": { "const": false },
+        "removed_scope": { "const": "matching_app_bundle_only" },
+        "user_data_preserved": { "const": true },
+        "keychain_preserved": { "const": true }
       }
     },
     "app_archive": {

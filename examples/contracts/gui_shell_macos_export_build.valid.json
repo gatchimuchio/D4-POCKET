@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "evidence_type": "d4_pocket_macos_export_build",
   "evidence_source": "INTERNAL_STATE",
   "product": "D4 Pocket",
@@ -136,9 +136,15 @@
       "kind": "file",
       "size_bytes": 20,
       "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "path": "D4Pocket-333333333333-Uninstaller.pkg",
+      "kind": "file",
+      "size_bytes": 30,
+      "sha256": "3333333333333333333333333333333333333333333333333333333333333333"
     }
   ],
-  "artifact_total_bytes": 110,
+  "artifact_total_bytes": 140,
   "artifact_tree_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
   "package": {
     "file_name": "D4Pocket-333333333333.pkg",
@@ -147,6 +153,17 @@
     "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
     "signed": false,
     "installed_product_verified": false
+  },
+  "uninstaller_package": {
+    "file_name": "D4Pocket-333333333333-Uninstaller.pkg",
+    "identifier": "com.d4p.export.33333333333333333333333333333333.uninstaller",
+    "format": "macOS flat pkg",
+    "byte_length": 30,
+    "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "signed": false,
+    "removed_scope": "matching_app_bundle_only",
+    "user_data_preserved": true,
+    "keychain_preserved": true
   },
   "app_archive": {
     "file_name": "D4Pocket-333333333333.app.zip",
@@ -158,8 +175,8 @@
     "status": "passed_known_patterns",
     "scope": "macos_app_regular_files_and_package_archives",
     "coverage": "known_patterns_only",
-    "files_scanned": 4,
-    "bytes_scanned": 110,
+    "files_scanned": 5,
+    "bytes_scanned": 140,
     "findings": 0,
     "artifact_tree_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
   }

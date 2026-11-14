@@ -33,6 +33,8 @@ from tooling.export_macos_product import (
     _validate_build_evidence,
     build_macos_product,
     bundle_identifier_for_app,
+    render_macos_uninstaller_postinstall,
+    uninstaller_package_identifier_for_app,
 )
 from tooling.export_windows_product import validate_export_inputs
 from tooling.schema_check.check_schemas import validate_instance
@@ -294,6 +296,29 @@ class MacOSProductExportTests(unittest.TestCase):
         )
         with self.assertRaises(ValueError):
             bundle_identifier_for_app("d4-pocket-app-../outside")
+
+    def test_uninstaller_script_is_bound_to_one_export_identity(self) -> None:
+        root = Path(__file__).resolve().parents[2]
+        bundle_id = bundle_identifier_for_app(APP_ID)
+        bundle_name = "D4Pocket-333333333333.app"
+        template = (root / "installer/macos/uninstall/postinstall.sh.in").read_text(
+            encoding="utf-8"
+        )
+        rendered = render_macos_uninstaller_postinstall(
+            template, bundle_name=bundle_name, bundle_identifier=bundle_id
+        )
+        self.assertEqual(uninstaller_package_identifier_for_app(bundle_id), bundle_id + ".uninstaller")
+        self.assertIn("expected_app_bundle='D4Pocket-333333333333.app'", rendered)
+        self.assertIn(f"expected_bundle_identifier='{bundle_id}'", rendered)
+        self.assertIn("/usr/libexec/PlistBuddy", rendered)
+        self.assertIn('/bin/rm -rf "$app_bundle"', rendered)
+        self.assertNotIn("pkgutil --forget", rendered)
+        with self.assertRaisesRegex(ValueError, "identityと一致しない"):
+            render_macos_uninstaller_postinstall(
+                template, bundle_name="D4Pocket-aaaaaaaaaaaa.app", bundle_identifier=bundle_id
+            )
+        with self.assertRaisesRegex(ValueError, "identityがExport Appに束縛されていない"):
+            uninstaller_package_identifier_for_app("com.example.other")
 
     def test_darwin_architecture_is_canonical_and_unknown_hosts_fail_closed(self) -> None:
         with patch("tooling.export_macos_product.platform.machine", return_value="arm64"):
@@ -766,6 +791,9 @@ class MacOSProductExportTests(unittest.TestCase):
         evidence["package_signed"] = False
         evidence["app_publisher_identity_signed"] = True
         self.assertTrue(validate_instance(evidence, schema))
+        evidence["app_publisher_identity_signed"] = False
+        evidence["uninstaller_package"]["user_data_preserved"] = False
+        self.assertTrue(validate_instance(evidence, schema))
 
     def test_build_evidence_is_bound_to_manifest_and_artifact_tree(self) -> None:
         root = Path(__file__).resolve().parents[2]
@@ -793,6 +821,8 @@ class MacOSProductExportTests(unittest.TestCase):
             embedded_binary_hash = hashlib.sha256(FLUTTER_FRAMEWORK_ARM64_BINARY).hexdigest()
             package_path = output / "D4Pocket-333333333333.pkg"
             package_path.write_bytes(b"unsigned package fixture")
+            uninstaller_path = output / "D4Pocket-333333333333-Uninstaller.pkg"
+            uninstaller_path.write_bytes(b"unsigned uninstaller package fixture")
             archive_path = output / "D4Pocket-333333333333.app.zip"
             archive_path.write_bytes(b"app archive fixture")
 
@@ -852,6 +882,17 @@ class MacOSProductExportTests(unittest.TestCase):
                         "sha256": hashlib.sha256(package_path.read_bytes()).hexdigest(),
                         "signed": False,
                         "installed_product_verified": False,
+                    },
+                    "uninstaller_package": {
+                        "file_name": uninstaller_path.name,
+                        "identifier": bundle_identifier_for_app(APP_ID) + ".uninstaller",
+                        "format": "macOS flat pkg",
+                        "byte_length": uninstaller_path.stat().st_size,
+                        "sha256": hashlib.sha256(uninstaller_path.read_bytes()).hexdigest(),
+                        "signed": False,
+                        "removed_scope": "matching_app_bundle_only",
+                        "user_data_preserved": True,
+                        "keychain_preserved": True,
                     },
                     "app_archive": {
                         "file_name": archive_path.name,
@@ -925,6 +966,16 @@ class MacOSProductExportTests(unittest.TestCase):
             evidence["compile_time_identity"]["manifest_sha256"] = "0" * 64
             with self.assertRaises(ValueError):
                 validate_current_evidence()
+            evidence["compile_time_identity"]["manifest_sha256"] = manifest_hash
+            evidence["uninstaller_package"]["sha256"] = "0" * 64
+            with self.assertRaises(ValueError):
+                validate_current_evidence()
+            evidence["uninstaller_package"]["sha256"] = hashlib.sha256(
+                uninstaller_path.read_bytes()
+            ).hexdigest()
+            evidence["uninstaller_package"]["identifier"] = "com.example.uninstaller"
+            with self.assertRaises(ValueError):
+                validate_current_evidence()
 
     def test_inventory_binds_app_files_package_and_archive(self) -> None:
         with tempfile.TemporaryDirectory(prefix="d4p-macos-inventory-") as temp:
@@ -933,11 +984,12 @@ class MacOSProductExportTests(unittest.TestCase):
             (app / "Contents/Resources").mkdir(parents=True)
             (app / "Contents/Resources/product_manifest.json").write_bytes(b"manifest")
             (root / "candidate.pkg").write_bytes(b"package")
+            (root / "candidate-uninstaller.pkg").write_bytes(b"uninstaller")
             (root / "candidate.app.zip").write_bytes(b"archive")
             records, files, total, tree_hash = _macos_artifact_inventory(root, app)
-            self.assertEqual(len(records), 3)
-            self.assertEqual(len(files), 3)
-            self.assertEqual(total, len(b"manifestpackagearchive"))
+            self.assertEqual(len(records), 4)
+            self.assertEqual(len(files), 4)
+            self.assertEqual(total, len(b"manifestpackageuninstallerarchive"))
             self.assertEqual(len(tree_hash), 64)
             scan = _scan_macos_artifacts(root, app, records, files, total, tree_hash)
             self.assertEqual(scan["status"], "passed_known_patterns")

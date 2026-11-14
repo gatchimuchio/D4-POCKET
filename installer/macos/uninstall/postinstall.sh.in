@@ -1,0 +1,57 @@
+#!/bin/sh
+set -eu
+
+# This script runs only when the user applies the matching D4 Pocket uninstaller package.
+expected_app_bundle='@D4P_APP_BUNDLE_NAME@'
+expected_bundle_identifier='@D4P_BUNDLE_IDENTIFIER@'
+
+if [ "$#" -lt 1 ]; then
+    exit 1
+fi
+target_volume=$1
+case "$target_volume" in
+    /*) ;;
+    *) exit 1 ;;
+esac
+if [ -L "$target_volume" ] || [ ! -d "$target_volume" ]; then
+    exit 1
+fi
+target_root=$(cd -P "$target_volume" 2>/dev/null && /bin/pwd -P) || exit 1
+if [ "$target_root" = "/" ]; then
+    applications=/Applications
+else
+    applications="$target_root/Applications"
+fi
+if [ -L "$applications" ]; then
+    exit 1
+fi
+if [ ! -d "$applications" ]; then
+    exit 0
+fi
+
+app_bundle="$applications/$expected_app_bundle"
+if [ ! -e "$app_bundle" ] && [ ! -L "$app_bundle" ]; then
+    exit 0
+fi
+if [ -L "$app_bundle" ] || [ ! -d "$app_bundle" ]; then
+    exit 1
+fi
+contents="$app_bundle/Contents"
+if [ -L "$contents" ] || [ ! -d "$contents" ]; then
+    exit 1
+fi
+info_plist="$contents/Info.plist"
+if [ -L "$info_plist" ] || [ ! -f "$info_plist" ]; then
+    exit 1
+fi
+actual_bundle_identifier=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$info_plist" 2>/dev/null) || exit 1
+if [ "$actual_bundle_identifier" != "$expected_bundle_identifier" ]; then
+    exit 1
+fi
+
+# Remove only this identity-bound app bundle. User data, Keychain entries, and package receipts remain untouched.
+/bin/rm -rf "$app_bundle"
+if [ -e "$app_bundle" ] || [ -L "$app_bundle" ]; then
+    exit 1
+fi
+exit 0
