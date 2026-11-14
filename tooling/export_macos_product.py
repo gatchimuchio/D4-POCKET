@@ -60,6 +60,26 @@ MACOS_ENVIRONMENT_ALLOWLIST = {
     "SDKROOT",
     "TMPDIR",
 }
+MACOS_CODE_BUNDLE_SUFFIXES = {
+    ".app",
+    ".appex",
+    ".bundle",
+    ".framework",
+    ".kext",
+    ".plugin",
+    ".systemextension",
+    ".xpc",
+}
+MACH_O_MAGICS = {
+    b"\xfe\xed\xfa\xce",
+    b"\xce\xfa\xed\xfe",
+    b"\xfe\xed\xfa\xcf",
+    b"\xcf\xfa\xed\xfe",
+    b"\xca\xfe\xba\xbe",
+    b"\xbe\xba\xfe\xca",
+    b"\xca\xfe\xba\xbf",
+    b"\xbf\xba\xfe\xca",
+}
 
 
 def _git_value(*arguments: str) -> str:
@@ -150,6 +170,7 @@ def _tool_paths() -> dict[str, str]:
         "cargo",
         "rustc",
         "xcodebuild",
+        "codesign",
         "pkgbuild",
         "ditto",
         "plutil",
@@ -211,6 +232,79 @@ def _patch_app_identity(source_root: Path, bundle_id: str) -> None:
         raise ValueError("macOS AppInfo.xcconfig identity設定が再読時に変化した")
     lines[index] = f"{match.group(1)}PRODUCT_BUNDLE_IDENTIFIER = {bundle_id}{ending}"
     config.write_text("".join(lines), encoding="utf-8", newline="")
+
+
+def _patch_macos_export_signing(source_root: Path) -> None:
+    project = source_root / "apps/desktop_flutter/macos/Runner.xcodeproj/project.pbxproj"
+    raw = _read_regular_file(project, 2 * 1024 * 1024, "macOS Runner project").decode("utf-8")
+    configuration_count = raw.count("isa = XCBuildConfiguration;")
+    settings_count = raw.count("buildSettings = {")
+    if configuration_count == 0 or configuration_count != settings_count:
+        raise ValueError("macOS Xcode build configurationの構造が想定と一致しない")
+    raw, patched_count = re.subn(
+        r"\bbuildSettings = \{",
+        "buildSettings = { CODE_SIGNING_ALLOWED = NO; CODE_SIGNING_REQUIRED = NO;",
+        raw,
+    )
+    if patched_count != configuration_count:
+        raise ValueError("macOS Export用の署名無効設定を全configurationへ適用できない")
+    helper_sign_command = (
+        r'/usr/bin/codesign --force --sign \"${EXPANDED_CODE_SIGN_IDENTITY:--}\" '
+        r'--entitlements \"$PROJECT_DIR/Runner/BrokerHelper.entitlements\" \"$destination\"\n'
+    )
+    if raw.count(helper_sign_command) != 1:
+        raise ValueError("macOS Broker helper署名工程が一意に確認できない")
+    raw = raw.replace(helper_sign_command, "")
+    if "/usr/bin/codesign --force --sign" in raw:
+        raise ValueError("Export用sourceに独自codesign工程が残っている")
+    project.write_text(raw, encoding="utf-8", newline="")
+
+
+def _macos_code_objects(bundle: Path) -> list[Path]:
+    if bundle.is_symlink() or not bundle.is_dir():
+        raise ValueError("署名検査対象のmacOS App Bundleが通常directoryではない")
+    objects = [bundle]
+    for path in sorted(bundle.rglob("*"), key=lambda item: item.as_posix()):
+        metadata = path.lstat()
+        if stat.S_ISLNK(metadata.st_mode):
+            continue
+        if stat.S_ISDIR(metadata.st_mode):
+            if path.suffix.casefold() in MACOS_CODE_BUNDLE_SUFFIXES:
+                objects.append(path)
+        elif stat.S_ISREG(metadata.st_mode):
+            with path.open("rb") as source:
+                if source.read(4) in MACH_O_MAGICS:
+                    objects.append(path)
+    unique: dict[str, Path] = {}
+    for path in objects:
+        unique[str(path.resolve(strict=True))] = path
+    return list(unique.values())
+
+
+def _require_unsigned_macos_code(
+    bundle: Path, *, codesign: str, environment: dict[str, str]
+) -> dict[str, Any]:
+    code_objects = _macos_code_objects(bundle)
+    if len(code_objects) < 2:
+        raise ValueError("macOS App Bundle内の実行codeを署名検査できない")
+    probe_environment = dict(environment)
+    probe_environment.update({"LANG": "C", "LC_ALL": "C"})
+    for path in code_objects:
+        result = subprocess.run(
+            [codesign, "--display", "--verbose=2", str(path)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=probe_environment,
+            check=False,
+        )
+        if result.returncode == 0:
+            raise ValueError("macOS Export candidateに署名済みcode objectがある")
+        if "code object is not signed at all" not in result.stdout.casefold():
+            raise ValueError("macOS code signing状態をunsignedとして確定できない")
+    return {"status": "passed_unsigned", "code_objects_checked": len(code_objects)}
 
 
 def _validate_bundle_symlinks(bundle: Path) -> None:
@@ -367,6 +461,7 @@ def build_macos_product(
                 raise ValueError("Product VersionをmacOS packageへ安全に渡せない")
             flutter_project = source_root / "apps/desktop_flutter"
             _patch_app_identity(source_root, bundle_id)
+            _patch_macos_export_signing(source_root)
 
             toolchain = {
                 "architecture": platform.machine().lower(),
@@ -405,7 +500,7 @@ def build_macos_product(
                 [tools["flutter"], "pub", "get", "--enforce-lockfile"], cwd=flutter_project, environment=environment
             )
             flutter_arguments = [
-                "build", "macos", "--release", "--no-pub", "--no-codesign",
+                "build", "macos", "--release", "--no-pub",
                 *[
                     f"--dart-define={name}={str(enabled).lower()}"
                     for name, enabled in defines.items()
@@ -447,6 +542,9 @@ def build_macos_product(
             if product_manifest.read_bytes() != manifest_raw:
                 raise ValueError("Export Manifestをbyte-for-byteでbundleへ保持できなかった")
             _validate_bundle_symlinks(app_bundle)
+            app_code_signature_scan = _require_unsigned_macos_code(
+                app_bundle, codesign=tools["codesign"], environment=environment
+            )
 
             app_archive_path = staging_root / f"{bundle_name}.zip"
             _run(
@@ -522,7 +620,7 @@ def build_macos_product(
             "toolchain": toolchain,
             "flutter_pub_get_arguments": ["pub", "get", "--enforce-lockfile"],
             "flutter_build_arguments": [
-                "build", "macos", "--release", "--no-pub", "--no-codesign",
+                "build", "macos", "--release", "--no-pub",
                 *[f"--dart-define={name}={str(enabled).lower()}" for name, enabled in defines.items()],
                 f"--dart-define=GUI_SHELL_PRODUCT_VERSION={version}",
             ],
@@ -542,6 +640,7 @@ def build_macos_product(
             "module_pruning_verified": False,
             "package_signed": False,
             "app_signed": False,
+            "app_code_signature_scan": app_code_signature_scan,
             "launch_status": "not_verified",
             "installed_product_verified": False,
             "formal_distribution_claimed": False,
@@ -608,6 +707,8 @@ def _validate_build_evidence(
         or evidence.get("installed_product_verified") is not False
         or evidence.get("package_signed") is not False
         or evidence.get("app_signed") is not False
+        or evidence.get("app_code_signature_scan", {}).get("status") != "passed_unsigned"
+        or evidence.get("app_code_signature_scan", {}).get("code_objects_checked", 0) < 2
         or evidence.get("product_manifest_copied_byte_for_byte") is not True
         or (app_bundle / "Contents/Resources/product_manifest.json").read_bytes() != manifest_raw
     ):

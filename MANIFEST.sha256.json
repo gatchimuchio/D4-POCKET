@@ -81,7 +81,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "d500706a31f51768514f9774703120bf4d36736044aa310ebcf6366d7bd7fdb3"
+      "sha256": "0d1b9b1bf4e19d3fdcb01273cd66ba69969f4e717faa490eef61d819c5a44920"
     },
     {
       "path": ".github/workflows/linux-manual-export-build.yml",
@@ -1513,7 +1513,7 @@
     },
     {
       "path": "docs/QE_2026-11-14/\u9032\u6357.md",
-      "sha256": "6621f100b7132d170e8f826363dcc3dc022f1a0d4d3f723e3856b59d0df4ffd2"
+      "sha256": "f56e7c0b21bd7e8f5e9403251ebddee9d88115d08aeecc493619220df12ea6e1"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -2305,7 +2305,7 @@
     },
     {
       "path": "examples/contracts/gui_shell_macos_export_build.valid.json",
-      "sha256": "c762438568cc1068ede415d0a290af4ca3c379fe4cc7b5eaa66782693249274f"
+      "sha256": "89fbcf064bb193141ad394aefc3bad3683e0d5e7451c8ef8a55fcf70bd8f0eda"
     },
     {
       "path": "examples/contracts/gui_shell_module_build_evidence.valid.json",
@@ -5089,7 +5089,7 @@
     },
     {
       "path": "specs/gui_shell_macos_export_build.schema.json",
-      "sha256": "cf3cb604934de6dade9a08b31acf1bd3f27cf502a5fd859207949addd342cce9"
+      "sha256": "e340c23046f24886615c4341d8330b62c045ace6e874c8937c5b7828567be173"
     },
     {
       "path": "specs/gui_shell_module_build_evidence.schema.json",
@@ -5577,7 +5577,7 @@
     },
     {
       "path": "tooling/export_macos_product.py",
-      "sha256": "3ad708f8a177af8dde6a9919bf55f45ce1279e223671f11470b908eba83de200"
+      "sha256": "0d0651c9ee481346f10d521c948641a17d02fe0dc16252314ecb1ecb0aa1d578"
     },
     {
       "path": "tooling/export_windows_product.py",
@@ -5745,7 +5745,7 @@
     },
     {
       "path": "tooling/tests/test_export_macos_product.py",
-      "sha256": "15c0700d97530bb042bc05d417eac90fa7b1878f34913be690d0832d1a66930c"
+      "sha256": "5fb8ca5cdaf347a1be99a8cec0657f736c173bedfb1301fbbbee61d2b44a8979"
     },
     {
       "path": "tooling/tests/test_linux_deb_setup_package.py",

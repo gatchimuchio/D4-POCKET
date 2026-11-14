@@ -749,12 +749,15 @@ jobs:
           assert record['audit_store_id'] == 'audit-store-44444444444444444444444444444444'
           assert record['bundle_identifier'].endswith('33333333333333333333333333333333')
           assert record['package_signed'] is False and record['app_signed'] is False
+          assert record['app_code_signature_scan']['status'] == 'passed_unsigned'
+          assert record['app_code_signature_scan']['code_objects_checked'] >= 2
           assert record['formal_distribution_claimed'] is False
           assert record['installed_product_verified'] is False
           assert record['credential_artifact_scan']['findings'] == 0
           print(json.dumps({'app': record['bundle_name'], 'bundle_identifier': record['bundle_identifier'],
                             'pkg_sha256': record['package']['sha256'],
                             'artifact_tree_sha256': record['artifact_tree_sha256'],
+                            'app_code_signature_scan': record['app_code_signature_scan'],
                             'signed': False, 'installed_product_verified': False}, separators=(',', ':')))
           PY
       - name: build候補とfixtureを回収

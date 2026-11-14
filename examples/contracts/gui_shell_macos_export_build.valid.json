@@ -42,7 +42,7 @@
     "macos_version": "15.0"
   },
   "flutter_pub_get_arguments": ["pub", "get", "--enforce-lockfile"],
-  "flutter_build_arguments": ["build", "macos", "--release", "--no-pub", "--no-codesign"],
+  "flutter_build_arguments": ["build", "macos", "--release", "--no-pub"],
   "compile_time_identity": {
     "source": "schema_validated_manifest",
     "app_id": "d4-pocket-app-33333333333333333333333333333333",
@@ -64,6 +64,10 @@
   "module_pruning_verified": false,
   "package_signed": false,
   "app_signed": false,
+  "app_code_signature_scan": {
+    "status": "passed_unsigned",
+    "code_objects_checked": 2
+  },
   "launch_status": "not_verified",
   "installed_product_verified": false,
   "formal_distribution_claimed": false,

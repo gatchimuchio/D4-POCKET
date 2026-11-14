@@ -11,6 +11,7 @@
     "flutter_pub_get_arguments", "flutter_build_arguments", "compile_time_identity",
     "compile_time_update_trust", "build_duration_ms", "runtime_storage_root_template",
     "bundle_name", "bundle_identifier_verified", "product_manifest_copied_byte_for_byte",
+    "app_code_signature_scan",
     "runtime_manifest_consumed", "module_pruning_verified", "package_signed", "app_signed",
     "launch_status", "installed_product_verified", "formal_distribution_claimed", "artifact_root",
     "artifact_files", "artifact_total_bytes", "artifact_tree_sha256", "package", "app_archive",
@@ -108,6 +109,15 @@
     "module_pruning_verified": { "const": false },
     "package_signed": { "const": false },
     "app_signed": { "const": false },
+    "app_code_signature_scan": {
+      "type": "object",
+      "required": ["status", "code_objects_checked"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "const": "passed_unsigned" },
+        "code_objects_checked": { "type": "integer", "minimum": 2 }
+      }
+    },
     "launch_status": { "const": "not_verified" },
     "installed_product_verified": { "const": false },
     "formal_distribution_claimed": { "const": false },
