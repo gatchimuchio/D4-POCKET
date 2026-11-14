@@ -35,6 +35,24 @@ python -X utf8 tooling/export_windows_product.py `
 
 同期対象source上でFlutterまたはCargoを直接buildしない。Export Receiptがない場合はstagingを代替手順で強行せず、Brokerの通常Export経路を先に成立させる。staging tool自体はDeveloper／release-evidence用で、正式installerではない。
 
+## 利用者向けWindows Setup bootstrap
+
+`d4_pocket_bootstrap_setup.iss`と`tooling/build_windows_installer.py`は、検証済みWindows Export bundleからper-user `D4Pocket-Setup-<version>.exe`を生成する。build sourceはBroker Export Receipt内のsource commitと、cleanなGitHub `main` SHAを一致させる。Product Manifest／compile-time App ID／Audit Store IDも照合し、不一致・receipt欠落・既存output上書きは拒否する。build機にInno Setup 6 `ISCC.exe`が必要で、利用者に開発toolchainは要求しない。
+
+Setupは`PrivilegesRequired=lowest`で動き、payloadをInno Setup自身のrun固有`{tmp}`下へ展開してRust Desktop Launcherを通常起動する。Launcherが終了するまでSetupは待機し、Setup終了時にその一時rootをInno Setupが削除する。Setupは固定製品root、Start Menu、registry、AppDataへ直接書き込まず、別uninstallerも登録しない。初回導入・更新・修復・rollback・アンインストールは、起動後のD4 Pocket UIから既存Brokerの署名検証・native Owner確認・Audit経路へ接続する。インストール後のStart Menu shortcutと削除はBrokerの既存管理経路が所有する。
+
+現行mainのclean Exportからbundleを作成した後、Repository／OneDrive外の**未作成output directory**を用意し、次を実行する。
+
+```powershell
+$installerOutput = '<Repository／OneDrive外の未作成output directory>'
+New-Item -ItemType Directory -Path $installerOutput | Out-Null
+python -B -X utf8 tooling/build_windows_installer.py `
+  --source-dir $bundle `
+  --output-dir $installerOutput
+```
+
+このsource/build recipeは通常Setupの配布候補生成までであり、実bundleからのSetup実生成・署名、別profileのinstalled first-run、実AI Task、Update／Repair／Rollback／Uninstallの一気通貫LIVE_RUNTIME受入れを意味しない。実出力はAuthenticode未署名で、未確定のPublisher identityも埋め込まない。これらとW06/G6-WINは未完のまま保持する。署名identityがないことを理由にsource施工を停止せず、署名・公開はRelease側で別判定する。
+
 D4 Pocket Exportから作った起動器をstageするときは、同じExport artifactの`product_manifest.json`を`-ProductManifestJson`で渡す。stagerはManifestのApp ID／Audit store IDと起動器のcompile-time埋込値を照合し、製品固有の`%LOCALAPPDATA%\D4Pocket\apps\<App ID>\stores\<Audit store ID>`をruntime rootとして記録し、Manifestをbyte-preservingでstage rootへ複製する。compile-time identityがあるのにManifestがない場合、またはidentityが一致しない場合はstagingを拒否する。この照合はExport時の正本Schema検証を置き換えない。runtime Manifestを起動器が読み込むという意味ではなく、保存pathの証拠を一致させるためのstaging metadataである。Manifestを渡さないのは製品identity未埋込のgeneric GUI-Shell起動器に限る。
 
 staged manifestの`launcher_runtime`は起動器identityに対応した保存先を示す`CONFIG`宣言で、per-user scope、`isolated=false`、`formal_runtime_proof=false`を明記する。`launcher_runtime.session_file`は製品の実接続先宣言である。一方、manifestの`runtime_dir`／`store_dir`／`config_dir`／`audit_dir`および`broker_session_file`は、証拠collectorと独立Broker smoke用の分離scratch pathであり、標準起動器の保存先ではない。`collect_broker_smoke.ps1`は引数のsession fileを事前削除し得るため、製品runtimeのsession pathを同scriptへ渡してはならない。この差をWindows installed evidenceで解消せず、二つのpathを同じruntimeとして報告してはならない。

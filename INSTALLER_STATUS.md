@@ -4,6 +4,12 @@
 
 現行の製品要求・工程・施工指示は[2026-11-14 v5採用記録](docs/QE_2026-11-14/採用記録.md)と[現行進捗](docs/QE_2026-11-14/進捗.md)を参照する。E0の4出力着工同期は`OPEN`で、五OSの標準環境におけるinstalled製品QAは未成立。各OSの一般ユーザーが正規Installer/Packageを取得・導入・起動してサービスを利用することが製品目標。Windows所有実機の完成版最終確認以外、物理端末試験を要求せず、非Windowsは合法な標準仮想環境で検査する。Linux nativeは必須の製品対象であり、WSLや過去のhosted runを製品全体の代替証拠にしない。Release Registryは採用前観測で18件中16件`unresolved`／2件`resolved`、`release_ready=false`。以下は2026-10-22時点のrev5導入証拠とそれ以前の履歴であり、v5の製品受入れ・出荷状態を示さない。
 
+## v5 Windows Setup source（2026-11-14）
+
+`installer/windows/d4_pocket_bootstrap_setup.iss`と`tooling/build_windows_installer.py`を追加し、Broker Export Receipt・current main commit・Product Manifest identityに束縛したper-user Setup生成経路を実装した。Setupはrun固有temporary rootへ展開してRust Launcherを起動し、固定導入root・Start Menu・AppData・uninstall registryを直接変更しない。製品の導入・更新等は既存Broker経路へ委ねる。
+
+この変更はSource／Build recipeの範囲。実Export bundleからのSetup実生成・Authenticode署名・別profile installed runtime・first-runからAI Task／Update／Repair／Rollback／Uninstallまでの一気通貫確認は未実施であり、未確定のPublisher identityは設定していない。W06/G6-WIN、`windows_installer_first_run_smoke`、`release_ready=false`を維持する。
+
 ## rev5時点の製品・導入証拠（履歴、2026-10-22照合）
 
 当時の製品状態は[rev5進捗](docs/REV5_PRODUCT_PROGRESS.md)と、その時点のRelease Registryを参照する。Windows P11／P12の開発受入れ、Windows B4のstaged `r2-e2e`有限CLOSEDと、別SID等の正式installed-path証拠を区別する。B5はOPEN。正式なインストール済み製品の全条件を本書の旧段階B記録で代替しない。

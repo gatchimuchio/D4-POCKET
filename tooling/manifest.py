@@ -38,6 +38,7 @@ GLOB_PATTERNS = [
     "native/windows_dns/src/**/*.rs",
     "installer/**/*.py",
     "installer/**/*.ps1",
+    "installer/**/*.iss",
     "installer/**/*.md",
     "scripts/**/*",
     "docs/**/*.md",

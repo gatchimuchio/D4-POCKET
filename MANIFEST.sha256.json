@@ -30,6 +30,7 @@
       "native/windows_dns/src/**/*.rs",
       "installer/**/*.py",
       "installer/**/*.ps1",
+      "installer/**/*.iss",
       "installer/**/*.md",
       "scripts/**/*",
       "docs/**/*.md"
@@ -144,7 +145,7 @@
     },
     {
       "path": "INSTALLER_STATUS.md",
-      "sha256": "7f80112bc312f3ff9212e3ba94c830d4cf49526c0e984f5c529c8e349b1308e7"
+      "sha256": "5b4bbb5fc4b12043990106a83fe34217c7c26ccb847eb825545847643e0abf5a"
     },
     {
       "path": "LICENSE",
@@ -1512,7 +1513,7 @@
     },
     {
       "path": "docs/QE_2026-11-14/\u9032\u6357.md",
-      "sha256": "8721e1b29d04b0035ab0f5d92ebfc23291be0240eb439558a5be14a39de2da3b"
+      "sha256": "b60e78ad339211640662757f7e7aa24af1296e5ad7f77dcfd46f8c1bd74488cc"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -3688,7 +3689,7 @@
     },
     {
       "path": "installer/windows/README.md",
-      "sha256": "fa2918304dd47dbe9b109886cf36bfccbea012f3ae018200fdd0387f05917f70"
+      "sha256": "a9a6bf7d72e6519c86c2243f1142c38556bf4bcb22c40dd44898ab09b4b77a09"
     },
     {
       "path": "installer/windows/collect_audit_anchor_proof.ps1",
@@ -3705,6 +3706,10 @@
     {
       "path": "installer/windows/collect_setup_doctor.ps1",
       "sha256": "ef62c9776d431a6ba7d1e03c3be88da5688ec01f02d3c94a876d13b0775674d5"
+    },
+    {
+      "path": "installer/windows/d4_pocket_bootstrap_setup.iss",
+      "sha256": "7f3f3cada0d764201d1a65d241d53bfeb1b76972b35aa0a2f5daeba63b9ddbf9"
     },
     {
       "path": "installer/windows/stage_installed_app.ps1",
@@ -5487,6 +5492,10 @@
       "sha256": "565a885ed741093ee8fde4f175f4c799ee07a71afc0e55d803809b30356c4661"
     },
     {
+      "path": "tooling/build_windows_installer.py",
+      "sha256": "aeda7d439d71d1ef1d1b19a0b155424f1171107d1ca0cc4f9cca61650075300d"
+    },
+    {
       "path": "tooling/canonicalization_vectors/runtime_resource_observation_decimal.json",
       "sha256": "0a4cf0ef4c1098a5c9c59297dd049ac7ebd340b7a113e84b628c9529d9b2643b"
     },
@@ -5604,7 +5613,7 @@
     },
     {
       "path": "tooling/manifest.py",
-      "sha256": "e46c1188a0f409cbf4e5cc7e049d2d076d45bd934f77155af5498a9a291a239a"
+      "sha256": "3012bfc3cfc3223c58c940d893025f0acdb40dd56c5e1e6309baf7923bfcdc24"
     },
     {
       "path": "tooling/manual_workflow_check.py",
@@ -5741,6 +5750,10 @@
     {
       "path": "tooling/tests/test_linux_workflow_helpers.py",
       "sha256": "0569578e9a96ecded4ac9eee27cc07d6241569233264e356cbf976ef25d8bb59"
+    },
+    {
+      "path": "tooling/tests/test_windows_bootstrap_setup.py",
+      "sha256": "64185fd3b63ce29c926ed9252b1ee8222d0d84ab0da944f7b730306d431aed54"
     },
     {
       "path": "tooling/ui_snapshot_tests/README.md",
