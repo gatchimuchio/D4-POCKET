@@ -6425,6 +6425,244 @@ Git blob IDは編集前mainのsource同一性だけを示す。実行・導入�
 
 8 IDすべてをE0-04の21項目で個別記録した。既存source/workflow/testを要求台帳へ接続したが、sourceの存在は受入れではない。過去Linux runのhost/GUI/fixture/identity/artifact範囲を保持し、現v4 Evidence IDは全件NONE、Linux Acceptance/N10/K17/BUILD_COVERED/Linux OS QA/E0はOPENのままとした。Release Registryと既存blocker statusは変更せず、Linux物理端末条件も追加していない。
 
+## D4-AUD-F01〜F07 監査所見→現行Consumer照合
+
+照合基準は編集前main `af4e59fd8b35c52bda591014e79c322c73018624`。原定義は2026-10-22 QE正本とF01〜F07記録を保持し、v4工程R09・指示I02/I07/I09、現行AGENTS.mdへ対応させた。ここでのSourceSHAはsource同一性であり、Audit/Release/製品受入れEvidenceではない。各行の`Evidence ID`はNONE、新規Blockerは作成せず、旧記録の`VERIFIED`・`FAIL`をv4へ遡及転記しない。
+
+### SourceSHA共通固定点
+
+Gitが内容を識別する固定値は、編集前mainに含まれるfileの同一性だけを示す。
+
+| ソースID | 対象file | Git上の内容識別値 |
+|---|---|---|
+| S01 | `AGENTS.md` | `1eafcadd129fd01f1f2f683594c381605ed7d48d` |
+| S02 | `docs/QE_2026-11-13/採用記録.md` | `f159c1aa6ea5bc6e80e0877d8068f7e44da4c4d3` |
+| S03 | `docs/QE_2026-11-13/01_D4Pocket_統合製品実装仕様書_v4.md` | `352c53180cbad07888beb956aad0fb2a58074c58` |
+| S04 | `docs/QE_2026-11-13/02_D4Pocket_統合開発工程表_v4.md` | `d32dd251e5f7cbb97d92f6e7540d6b6ed0ecec05` |
+| S05 | `docs/QE_2026-11-13/03_D4Pocket_Codex施工指示書_v4.md` | `49447973e88c50a09b2f4978adfed84fd464c6d0` |
+| S06 | `docs/QE_2026-11-13/進捗.md` | `852ce88f4e6d5afd792d2442a42270c006035672` |
+| S07 | `docs/QE_2026-11-13/差分移行台帳.md` | `e8c1852b29fb43e1730bc115f6925dee50945543` |
+| S08 | `release_blockers.registry.json` | `244adc04a01e7b406c4ebcdeb829f7077d4aa35f` |
+| S09 | `tooling/final_development_audit.py` | `913c81bc22f71bc5bb3447fa4f4bd266326932ec` |
+| S10 | `tooling/conformance_tests/test_final_development_audit.py` | `628c77a50adf867e87b4e4a893d5e691df8111d1` |
+| S11 | `docs/specs/final-development-audit.json` | `8126944c55339a3be272af5ba183a9bc2e3517dc` |
+| S12 | `docs/総合機能拡張_rev1/受領記録.json` | `e8433d4b4769200c00f1aa0c6e1b4c7671229352` |
+| S13 | `docs/総合機能拡張_rev1/進捗.md` | `1392588f0cd5273013578e84d8e33c5c9dc9a01a` |
+| S14 | `tooling/validate_all.py` | `2744f9a10702872f6dc0aad705f922466fc198fc` |
+| S15 | `tooling/日本語基底監査.py` | `77474767dd93eb4d69382af5ea4a0ea384eeccbe` |
+| S16 | `規定/日本語基底例外.json` | `8162263176208212ee6baf138c08325bf92246a4` |
+| S17 | `tooling/conformance_tests/run_conformance_skeleton.py` | `c6f31d8cb561b48513c6784e54c85969c9cb953e` |
+| S18 | `規定/正本索引.json` | `ba250de80a3ec94109171c09adf54cbe227add10` |
+| S19 | `README.md` | `38664991fe614acfc516eb6743dde6dce754191c` |
+| S20 | `CLAIM.md` | `0bfbf988469e0f34c9e7f96f805ce26faf3b1044` |
+| S21 | `RELEASE_CHECKLIST.md` | `35f31043a9311d49c94acdc9631e30b61949c65d` |
+| S22 | `COMPATIBILITY_MATRIX.md` | `c4885d5b67202712c0bcdecc6da634cb778cd6d3` |
+| S23 | `MOBILE_STATUS.md` | `476b565a3f583be52ef58966f67c51abbb774aa8` |
+| S24 | `INSTALLER_STATUS.md` | `341d7f577bf0c1c5827dee9d8a2ec18774b8bcb1` |
+| S25 | `ROADMAP.md` | `6a922a38cca617690bc08297274e907f0425b722` |
+| S26 | `docs/REV5_PRODUCT_PROGRESS.md` | `9c978021d3982690e9aaa87896436bad7125b433` |
+| S27 | `docs/QE_2026-10-22/採用記録.md` | `1f9d6332132759ed68f3af8b4587368b162096c2` |
+| S28 | `docs/QE_2026-10-22/D4Pocket_01_QE統合実装仕様書_20261022.md` | `400cbfbd524fa76ca34e3f062641be629227246d` |
+| S29 | `docs/QE_2026-10-22/D4Pocket_02_QE統合工程表_20261022.md` | `331daeecc141ca95a49e4a758aa9f1dbe643cf07` |
+| S30 | `docs/QE_2026-10-22/D4Pocket_03_Codex_QE施工指示書_20261022.md` | `8f1cb26aa9673ba29d5c1cc50eaeff7ec0b55993` |
+| S31 | `docs/QE_2026-10-22/F03_実績文書対応.md` | `a7d3dcf44e8c4e4af0a1723928c3656911385eb1` |
+| S32 | `docs/QE_2026-10-22/F04_日本語基底監査原文_20261030.json.txt` | `24d089cb4ff2395d89dd78eb6ac61d1dd294ddcb` |
+| S33 | `docs/QE_2026-10-22/F04_分類・是正台帳_20261030.md` | `5b61b8293658ace18d51448eddb0a2bcb69ce59f` |
+| S34 | `docs/QE_2026-10-22/F04_分類・是正台帳_20261030.txt` | `b75a5bfb4002310554e51d6b26a1d800ed518967` |
+| S35 | `docs/QE_2026-10-22/F05_remote_codex_branch棚卸し_20261030.md` | `81bf78d8e93e57318b4d57ad4d12a393602817ba` |
+| S36 | `docs/QE_2026-10-22/F06_正本索引重複参照_20261030.md` | `8179ff6e5501e224ba9256abb30f3556f34f3852` |
+| S37 | `docs/QE_2026-10-22/F07_rev5原本要求照合_20261030.md` | `771aa797ca1b420810215fe561d347a4ff3a14fa` |
+| S38 | `docs/緩衝基盤_rev5補遺_QC/採用記録.md` | `e3501a997acffd80c4964c67cdde840b5ad5d677` |
+| S39 | `docs/specs/mcp-contract.md` | `62fffe6af42253af5656ca06f630868487f277bc` |
+| S40 | `tooling/release_gate_check.py` | `22a8d7bfe9adb259f44ce8501fb215652e1d58c6` |
+| S41 | `docs/FINAL_QA_QUEUE.md` | `7b332cccab70bb68aa1ff4f8e23acc0e816d8282` |
+
+### D4-AUD-F01 E0-04 21項目
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | D4-AUD-F01。v4のC32監査表と受入資料のrepository-relative path consumer。 |
+| 旧ID | D4-AUD-F01。`_relative_path()`のPOSIX区切り変換誤り。 |
+| 元原文/正本参照 | 2026-10-22仕様書§8、施工指示書§3/F01、工程表§8/F01、v4仕様S06、工程R09、指示I07。 |
+| 対象 | C32 final development auditの参照path正規化、Repository root containment、存在検査と結果JSON。 |
+| 目的 | POSIX/Windows区切り差で実在参照を誤欠落にせず、root外pathや不正参照は不受理とする。 |
+| 生成元（Producer） | `docs/specs/final-development-audit.json`のpath参照と`tooling/final_development_audit.py`。 |
+| 実Consumer | `tooling/validate_all.py`がC32工程から監査器を呼び、C32受領記録・進捗検査と`tooling/conformance_tests/test_final_development_audit.py`が結果を検査する。 |
+| 契約/データ | Repository相対POSIX path、Windows separator正規化、存在性、解決後root containment、C32 Audit JSON。 |
+| 通常作用 | 既存/Windows区切り参照をroot内へ解決し、pathごとの検査結果をJSONへ返す。 |
+| 否定作用 | 空欄、`..`、absolute、drive-qualified、UNC、NUL、root外symlinkを拒否し、実欠落をエラーにする。 |
+| 停止/復旧 | 参照単位の不正/解決不能をerror listへ積み、後続pathを継続検査。監査全体の不正入力は非0終了で報告する。 |
+| 標準OS候補 | WindowsとLinux/POSIX。macOS/POSIXはpath実装の潜在対象だが本照合での実行はNOT_RUN。 |
+| 配布物 | 開発監査toolと受領資料。一般利用者向け製品packageには含めない。 |
+| 既存実装 | `_relative_path()`はPurePosixPath/PureWindowsPathで正規化し、解決後のRepository containmentを確認。単体試験sourceはseparator、traversal、drive、UNC、欠落、symlink、error accumulationを含む。 |
+| BUILD_GAP | 現行source/testの接続を確認。今回のmappingではLinux native上の256参照全数を実行せず、C32のcurrent candidate受入Evidenceも発行していない。 |
+| 参照元ハッシュ（SourceSHA） | S01〜S05、S09〜S14、S17、S27〜S30を参照。 |
+| 試験区分（TestClass） | SOURCE/UNIT/CONFORMANCE sourceあり。E0照合での個別C32実行はNOT_RUN。 |
+| 証拠ID | NONE。過去の修正/試験記録はその時点の記録として保持。 |
+| 阻害要件（Blocker） | 新規追加なし。既存`comprehensive_extension_rev1_completion`を変更しない。 |
+| 状態 | E0 mapping完了。F01の過去是正記録を保持し、current v4 Linux/POSIX実行受入れとは区別。E0 OPEN。 |
+| 残余 | C32結果は静的監査表の成立だけを示す。Linux製品QAや`release_ready`へ昇格させない。 |
+
+### D4-AUD-F02 E0-04 21項目
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | D4-AUD-F02。二世代recovery refの同一性、履歴保全、更新consumer。 |
+| 旧ID | D4-AUD-F02。`backup-main`と`backup-main-prev`の二世代性。 |
+| 元原文/正本参照 | 2026-10-22仕様書§8、施工指示書§3/F02、工程表§8/F02、現AGENTS Git規則、v4工程R04/R09、指示I09。 |
+| 対象 | local `codex/backup-main`/`codex/backup-main-prev`、remote tag二世代、main commitとrotation手順。 |
+| 目的 | 直近push済みmainとそれ以前の異なる復旧点を保持し、編集前後の戻り先を識別可能にする。 |
+| 生成元（Producer） | current `main` commitとAGENTS指定の単回backup rotation。 |
+| 実Consumer | 作業開始時のGit保全手順、`git push`先tag、終了時の`git ls-remote`/`git cat-file`照合。 |
+| 契約/データ | current commit、直前世代commit、local branch ref、remote `refs/tags/codex/backup-main*`。 |
+| 通常作用 | この単位開始時に、remote/local `backup-main=af4e59fd8b35c52bda591014e79c322c73018624`、`backup-main-prev=1f2e431ae5abefcc69f02f8312bdcfe54eb50b31`へ回転し、tagを照合した。 |
+| 否定作用 | 同一SHA二世代、観測していないtag上書き、force-push main、他branch削除を許可しない。 |
+| 停止/復旧 | tag拒否・不一致なら変更前に停止。Gitのworktree-prune ACL拒否は別状態として残し、権限迂回や手動削除をしない。 |
+| 標準OS候補 | Gitを使用するWindows開発hostとGitHub remote。これはD4製品OSの受入れではない。 |
+| 配布物 | 製品配布物なし。復旧参照はGit commit objectとlocal/remote ref。 |
+| 既存実装 | AGENTSがlocal branch回転、remote tag更新、main push/HEAD照合を規定。F03記録に過去の別SHA復旧参照が残る。 |
+| BUILD_GAP | 現二世代は異なるcommit objectを指す。今回、実worktreeへ復元する操作はしておらず、履歴上の復元可能性を新たに実証していない。 |
+| 参照元ハッシュ（SourceSHA） | S01、S02、S04〜S06、S27、S31を参照。 |
+| 試験区分（TestClass） | Git ref/read-only object照合。破壊を伴う復元試験はNOT_RUN。 |
+| 証拠ID | NONE。現ref値はこの文書内の状態記録でありrelease Evidenceではない。 |
+| 阻害要件（Blocker） | 新規追加なし。既存backup運用を維持し、Release Registry状態を変更しない。 |
+| 状態 | E0 mapping完了。local/remote二世代のSHAは異なる。過去F02/F03判断は履歴として保持。E0 OPEN。 |
+| 残余 | Git metadata回収がACL拒否を出す環境残余を保持。force cleanupやtag保護回避をしない。 |
+
+### D4-AUD-F03 E0-04 21項目
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | D4-AUD-F03。Product/Release文書の主張とsource・日時・OS・試験範囲の対応。 |
+| 旧ID | D4-AUD-F03。Linux run #107等を全体Releaseへ誤拡張しない文書同期。 |
+| 元原文/正本参照 | 2026-10-22仕様書§8/F03、工程表§8/F03、`F03_実績文書対応.md`、v4工程R09/R10、指示I10/I11。 |
+| 対象 | README、CLAIM、RELEASE_CHECKLIST、COMPATIBILITY_MATRIX、MOBILE_STATUS、INSTALLER_STATUS、ROADMAPと製品進捗。 |
+| 目的 | 使用者/Reviewerへ現行製品状態と当時の限定実証を別時点・別対象で示し、過去fixture/hosted結果をcurrent candidate acceptanceへ移さない。 |
+| 生成元（Producer） | v4採用記録、v4進捗、Registry、各対象の時点付きrun/evidence記録。 |
+| 実Consumer | Repositoryの製品案内、互換性・配布・Mobile状態、Release checklistを読む利用者と担当者。 |
+| 契約/データ | Source commit、日時、OS/backend、installed/synthetic/fixture範囲、PASS/FAIL/SKIP、release blocker、v4 current-status link。 |
+| 通常作用 | 上記6 root文書はv4の状態・採用記録を入口にし、旧runをv3/rev5の日時付き履歴へ分離する。`INSTALLER_STATUS.md`へv4 current-status欄を追加し、2026-10-22欄を履歴に明示した。 |
+| 否定作用 | Linux #107/#282/#283、Windows #55、P13履歴をv4標準OS installed QA、全機能、正式配布へ昇格させない。 |
+| 停止/復旧 | source/時点/結果が特定できない主張はcurrent PASSへ出さず、v4進捗/Registryを参照する。歴史記録の結果自体は書き換えない。 |
+| 標準OS候補 | Windows/macOS/Linux/Android/iOSの全5対象。文書はOS別保証を示すが、OS実行証拠そのものではない。 |
+| 配布物 | README/Release docsは情報consumer。Installer/packageの存在や署名を生成しない。 |
+| 既存実装 | README等にv4 current sectionとdated historyがある。INSTALLER_STATUSの入口だけがrev5 progressを「現在」と参照していたためv4へ同期した。 |
+| BUILD_GAP | status更新は複数文書の手作業で、全claimをRegistry/Evidenceから自動生成・完全照合するconsumerは確認できない。文書変更はこのF03項目に限定した。 |
+| 参照元ハッシュ（SourceSHA） | S01〜S08、S19〜S26、S31を参照。 |
+| 試験区分（TestClass） | DOCUMENT/source review。各記述のscopeとリンクを照合。製品OS runはNOT_RUN。 |
+| 証拠ID | NONE。旧F03 `VERIFIED`は2026-10-22文書対応の履歴。 |
+| 阻害要件（Blocker） | 新規追加なし。既存`linux_native_product_support`と18項目の状態を維持。 |
+| 状態 | E0 mapping完了。v4入口との不一致1件を修正し、履歴本文を時点付きで保持。F03旧判定を改変せず、E0 OPEN。 |
+| 残余 | 文書は人手更新であり、次の状態変更時もv4進捗とRegistryへ照合する。 |
+
+### D4-AUD-F04 E0-04 21項目
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | D4-AUD-F04。日本語基底監査器・例外台帳・validation consumer。 |
+| 旧ID | D4-AUD-F04。33 files/220 detectionsの全件分類と誤翻訳防止。 |
+| 元原文/正本参照 | 2026-10-22仕様書§8/F04、F04原文・分類台帳、v4工程R09、指示I10。 |
+| 対象 | `tooling/日本語基底監査.py`、`規定/日本語基底例外.json`、`validate_all.py`の厳格検査工程、`tooling/conformance_tests/run_conformance_skeleton.py`の自己試験。 |
+| 目的 | 利用者向け散文の日本語基底を保ちつつ、schema/wire/CLI/OS/API固定tokenを意味破壊する翻訳から守る。 |
+| 生成元（Producer） | Markdown/code scanner、現在の例外registry、`規定/正本索引.json`上のauthority policy。 |
+| 実Consumer | `validate_all.py --strict`と直接CLI。報告は検出file/line/ruleとして修正者へ返る。 |
+| 契約/データ | finding path/line/category、例外ID/scope、strict終了値、監査原文・220行分類履歴。 |
+| 通常作用 | current repositoryを走査し、例外を明示適用してfindingとsummaryを出力する。 |
+| 否定作用 | 例外外の散文を暗黙許可しない。機械token、引用、CLI、固定契約を無差別翻訳しない。strict findingsをPASSへ変換しない。 |
+| 停止/復旧 | 例外台帳不整合・監査器の自己検査失敗はFAIL。修正後に同じstrict条件を実行する。 |
+| 標準OS候補 | Windows/Linux/macOS等のPython開発host。OS製品保証ではなくrepository quality gate。 |
+| 配布物 | 開発/validation tool。D4 Pocket runtime packageではない。 |
+| 既存実装 | F04原文と分類220件を保持。旧最終9 files/12 findingsは旧時点の結果。現strict観測は78 files/1,163 findingsでFAIL、self-testは46件PASS。 |
+| BUILD_GAP | 現strict baselineの78/1,163 findingsをF04旧12件と同一母集団として扱えない。残件分類・是正は未完。今回しきい値や例外を緩和しない。 |
+| 参照元ハッシュ（SourceSHA） | S01、S05、S14〜S17、S27〜S34を参照。 |
+| 試験区分（TestClass） | STRICT_AUDIT/SELF_TEST。今回の現strictはFAIL 78/1,163、self-test PASS 46。 |
+| 証拠ID | NONE。監査summaryはlocal validation結果で製品QA evidenceではない。 |
+| 阻害要件（Blocker） | 新規Release Blockerなし。既存Registry 18件を変更しない。 |
+| 状態 | E0 mapping完了。F04旧分類結果を保持し、current strict failureを別版の現状として記録。E0 OPEN。 |
+| 残余 | strict findingsをすべて適切に分類・是正する作業は後続QE単位。 |
+
+### D4-AUD-F05 E0-04 21項目
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | D4-AUD-F05。remote `codex/*` branch、local worktree、writer、変更差分の識別。 |
+| 旧ID | D4-AUD-F05。2026-10-30の3 branch棚卸し。 |
+| 元原文/正本参照 | 2026-10-22仕様書§8/F05、F05棚卸し記録、v4工程R04/R09、指示I09。 |
+| 対象 | GitHub上とローカルの作業枝、7件の登録済みworktree、作業差分、所有者と稼働状況。 |
+| 目的 | 未統合・dirty workを消さずにwriter競合を避け、single-writer mainへ安全に還元する。 |
+| 生成元（Producer） | GitHubとローカルの参照、`git worktree list/status`による一覧・状態、OSの稼働process情報。 |
+| 実Consumer | 作業開始gate、backup rotation、direct-main commit/push、branch/worktree lifecycle。専用自動branch owner registryは確認できない。 |
+| 契約/データ | 各枝の先端SHA、mainとの差分、未確定変更のpath、worktree登録、所有者・使用状態。 |
+| 通常作用 | 現時点のremote `codex/*` 5本: `b5-pktmon-safe-log`=`4d0a222fcc594dfbe12462f9a8666c446dbb393c`; `linux-installed-workspace-acceptance`=`9659fa63e1b499723635ee4754c56bc930ba6ba2`; `linux-mcp-discovery-diagnostic`=`611136525d71234589ded2526483b4fee4cef399`; `r2-inspector-owner-confirmation-20261002`=`fca1d0c9d83f03108ebaaf64ea742ca38079b4fc`; `w02-mcp-stdio-diagnostic-20261112`=`9da80618cd0a85c15cc1c58069296d036514d348`。 |
+| 否定作用 | remote branch名やauthorだけからowner不在/作業終了を推定しない。dirty worktree・未統合tipを無断削除/上書きしない。 |
+| 停止/復旧 | main single-writer競合時はmain変更を停止し、他の独立作業を保護する。prune ACL拒否は手動強制削除へ迂回しない。 |
+| 標準OS候補 | GitHub remoteとこのWindows hostのlocal worktree。別hostのwriter状態は未確認。 |
+| 配布物 | 製品配布物なし。管理対象はGit commit/ref/worktree metadata。 |
+| 既存実装 | 現観測は7 local worktree/5 dirty、5 remote branch。ownerを示す機械記録なし。build系process query一致0件だが別PC/会話を証明しない。 |
+| BUILD_GAP | remote branchとlocal差分の自動owner/consumer照合は未接続。観測したdirty worktreeは保持し、branch削除・mergeは行っていない。 |
+| 参照元ハッシュ（SourceSHA） | S01、S04〜S06、S25、S35を参照。 |
+| 試験区分（TestClass） | GIT_REF/WORKTREE/PROCESS_SNAPSHOT。F05旧`VERIFIED`は2026-10-30の3 branch観測に限定。 |
+| 証拠ID | NONE。今回snapshotは監査観測記録で、別hostのwriter不在を証明しない。 |
+| 阻害要件（Blocker） | 新規追加なし。既存branch/worktree資産は保持。 |
+| 状態 | E0 mapping完了。現在5 branch/7 worktreeを時点付き識別。ownerはUNKNOWN、既存F05履歴は変更しない。E0 OPEN。 |
+| 残余 | fetch/maintenance時に旧`.git/worktrees` pathのACL拒否が発生。現登録外metadataの破壊的pruneは未実施。 |
+
+### D4-AUD-F06 E0-04 21項目
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | D4-AUD-F06。`規定/正本索引.json`の現行正本Producer/Consumerとpath責任。 |
+| 旧ID | D4-AUD-F06。`docs/specs/mcp-contract.md`重複参照の確認。 |
+| 元原文/正本参照 | 2026-10-22仕様書§8/F06、F06索引記録、v4仕様S01/S03、工程R09、指示I01/I12。 |
+| 対象 | index rows、path/責任、schema glob/directory、利用するaudit/conformance consumers。 |
+| 目的 | 正本と補助資料を一意に列挙し、責任を保ったまま参照先を検証する。 |
+| 生成元（Producer） | `規定/正本索引.json`の`現行正本`配列。 |
+| 実Consumer | `tooling/日本語基底監査.py`、`tooling/conformance_tests/run_conformance_skeleton.py`内のindex checks、package portability checks。 |
+| 契約/データ | `{path,責任}`の行、直接指定されたfile・directory、glob patternの展開結果、責任の説明。 |
+| 通常作用 | 現indexは142 rows/142 unique path、140 files、1 directory、`specs/*.schema.json` 1 pattern/179 matches。欠落/空欄0。 |
+| 否定作用 | 現行path literal重複は0。`docs/specs/mcp-contract.md`は1 rowに集約し、C8/C9の二つの責任を同じ記述に保持する。 |
+| 停止/復旧 | malformed JSON、missing path、空責任、期待glob無一致はvalidation failure。path deletionや契約削除で整合を装わない。 |
+| 標準OS候補 | Windows/Linux/macOSのrepository validation host。これはproduct runtime index consumerではない。 |
+| 配布物 | 正本索引と開発/validation tooling。end-user artifactではない。 |
+| 既存実装 | `現行正本`をaudit/conformance checksが読み、F06修正後のMCP二責任を保持。F06旧記録の112行値は当時の時点値。 |
+| BUILD_GAP | current local parse/reference snapshotは整合。全index checkの同一条件実行記録をこのE0 mappingでは新Evidence化しない。 |
+| 参照元ハッシュ（SourceSHA） | S01〜S08、S15、S17、S18、S36、S39を参照。 |
+| 試験区分（TestClass） | JSON/STATIC_REFERENCE/CONFORMANCE source。今回の独立snapshot parse/reference checkはPASS。 |
+| 証拠ID | NONE。index健全性はproduct QAやRelease Evidenceではない。 |
+| 阻害要件（Blocker） | 新規追加なし。旧F06 `VERIFIED`とRegistry状態を維持。 |
+| 状態 | E0 mapping完了。142/142 unique、literal missing 0、glob matched、MCP責任1 row。E0 OPEN。 |
+| 残余 | indexは機械可読だが、文書本文の正本意味を置き換えない。正本間矛盾は該当ownerへ戻す。 |
+
+### D4-AUD-F07 E0-04 21項目
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | D4-AUD-F07。rev5原本SHA/要求差分履歴から現行正本採用記録への由来。 |
+| 旧ID | D4-AUD-F07。rev5三文書の同一性・全条文要求照合。 |
+| 元原文/正本参照 | F07照合記録、2026-10-22採用記録、緩衝基盤rev5採用記録、2026-11-13 v4採用記録。 |
+| 対象 | rev5統合仕様/工程/指示の原本hash、QE方法論の採用境界、現行v4三文書の版/hash。 |
+| 目的 | 旧原本要求・旧判断・Owner採否の来歴を保ち、現行正本の変更を旧版へ遡及させない。 |
+| 生成元（Producer） | 2026-10-30 F07原本照合記録、rev5/QE採用記録、Owner採用済み2026-11-13 v4 ZIPと記録。 |
+| 実Consumer | v4採用記録、差分移行台帳、E0 ledger、current progress、AGENTSの版優先規則。 |
+| 契約/データ | rev5原本のSHAは仕様=`c0b78cfba1fb9c5c5de1947d01b47d0898f01b24de1aa8e1b0a0bd89e35c0877`、工程=`828ab42ad2dc151b6b037c06e4efc3f833bc9f571d95e81679988741d34c9744`、指示=`aa4cd2ec3c96e75468a1f4f87db09127b58c3b0943a9ec2f19d7d03e83bcc87e`。現行v4採用ZIP SHA=`E39FAF584037B88D69E2181F6093BE2FF343266E0710932DE3155D7AC955C392`。 |
+| 通常作用 | 現行文書は製品・工程・施工の正本としてv4を示す。rev5以前の記録は適用範囲を保った履歴として残し、QE方法論は製品仕様と分ける。 |
+| 否定作用 | 旧製品要求・状態をv4の現状へ優先させない。v4採用をRuntime完成、出荷可能、Owner GOの根拠にしない。 |
+| 停止/復旧 | 原本欠落またはSHA不一致は`UNVERIFIED_ORIGINAL`として両記録を保全し、同一原本との置換主張を停止する。現行採用原本のSHAはv4採用記録を参照する。 |
+| 標準OS候補 | Repositoryと文書の来歴が対象。OS上のRuntimeは対象外。 |
+| 配布物 | 製品artifactなし。Source ZIPと文書のhashは採用来歴だけを示す。 |
+| 既存実装 | F07記録はrev5原本3点と全要求差分を`VERIFIED`と判定した。v4採用記録はZIP・3文書のhash、Owner採用、採用前基準を保持する。 |
+| BUILD_GAP | F07の過去検証を履歴として維持する。v4採用は別途hash確認済みだが、いずれの文書照合も製品挙動を証明しない。 |
+| 参照元ハッシュ（SourceSHA） | S01〜S08、S27〜S30、S37〜S38を参照。 |
+| 試験区分（TestClass） | SHA256/REQUIREMENT_DIFF/OWNER_ADOPTION_RECORD。今回のE0照合ではF07の原本全文抽出を再実施しない。 |
+| 証拠ID | NONE。既存F07 `VERIFIED`は文書来歴の過去判定。v4製品Evidenceではない。 |
+| 阻害要件（Blocker） | 新規追加なし。既存`comprehensive_extension_rev1_completion`を維持。 |
+| 状態 | E0 mapping完了。F07 historical verificationとv4採用SHAを別の履歴層として接続。E0 OPEN。 |
+| 残余 | 将来の正本切替時も、ZIP hash・各document hash・adoption authority・影響consumerを同じ形で記録する。 |
+
+### D4-AUD-F01〜F07 E0対応の結論
+
+7 IDすべてをE0-04全21項目でSource→Consumerへ対応付け、41 unique path/blobを編集前main `af4e59fd8b35c52bda591014e79c322c73018624`へ固定した。F02のlocal/remote backupは別SHAへ回転済みだが、実worktree restore試験は行っていない。F03の`INSTALLER_STATUS.md` current entryをv4へ合わせ、2026-10-22本文は履歴と明示した。F04 current strict auditは78 files/1,163 findingsでFAIL。F05はremote branch 5本/registered worktree 7本を観測し、owner UNKNOWN・dirty work保護・ACL拒否を保持。F06の現indexは142/142 unique path、欠落/空欄0。F07の過去VERIFIEDとv4 adopted hashesは別時点のまま保持する。全7行Evidence ID NONE、Release Registry 18件（16 unresolved/2 resolved）、`release_ready=false`、新規Blockerなし。製品Runtime/installed/OS QAはこのmappingで実行していない。
+
 ## 実装ファイルの初期目録（CODE_PRESENTのみ）
 
 下記は`d503a4ef6daac8942abd1cb011442ce28c78ec55`時点のパス存在・責務候補を読み取った初期目録である。名前・コードの存在だけではProducer→Consumer接続、installed/runtime実作用、Acceptanceを証明しない。各行の`WIRED`、実作用、正常/否定/Recovery、Evidence、OS別状態は未照合なら`UNKNOWN`。
@@ -7670,7 +7908,7 @@ Git blob IDは編集前mainのsource同一性だけを示す。実行・導入�
 | 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K01〜K20はE0-04全21 fieldとSourceSHAを個別記録済み。N11 Evidence/Blocker/OS Artifact全数結合を継続 |
 | Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 33 IDの21 field／SourceSHAを維持し、N08/N10/N11の原因・Consumer・5 OS Artifact・Evidence/既存Blocker scope row joinを記録済み。Evidence ID NONE、全Acceptance OPEN。B0〜B6 statusは不変 |
 | Buffer工程 B0〜B6 | 7 | `docs/緩衝基盤_rev5補遺_QC/`・v4仕様S06 | B0〜B4の限定CLOSEDを保持、B5 OPEN、B6未成立。詳細Consumer照合が未完 |
-| QE/監査 D4-QE-R01〜R13／D4-LNX-T01〜T08／D4-AUD-F01〜F07 | 13／8／7 | `docs/QE_2026-10-22/`・各採用記録 | D4-QE-R01〜R13およびD4-LNX-T01〜T08はE0-04 21項目と現行sourceを照合済み。全件Evidence ID NONE、製品Acceptance OPEN。D4-AUD-F01〜F07は未照合 |
+| QE/監査 D4-QE-R01〜R13／D4-LNX-T01〜T08／D4-AUD-F01〜F07 | 13／8／7 | `docs/QE_2026-10-22/`・各採用記録 | 3群すべてE0-04 21項目と現行SourceSHAを照合済み。全件Evidence ID NONE、製品Acceptance OPEN。D4-AUD-F01〜F07は進捗96で照合し、F04 strict auditは現行78 files／1,163 findingsでFAIL。旧判定は履歴保持 |
 | Q0〜Q7、FQ群、W00〜W08 | 8／13／9 | v4工程表R05〜R08、`docs/FINAL_QA_QUEUE.md`、進捗履歴 | Q0〜Q7はDEFERRED。FQ/W各IDの現在Consumer・証拠・残余の照合が未完 |
 | Release Blocker | 18 | `release_blockers.registry.json` | 18件中16件unresolved／2件resolvedを保持。18件すべてのv4条件移行を個別に照合中 |
 
@@ -7712,7 +7950,7 @@ Git blob IDは編集前mainのsource同一性だけを示す。実行・導入�
 1. N01〜N10のE0-04 21項目は現行SourceSHAへ個別照合済み。各製品AcceptanceはOPENのまま維持し、N10の五OS実導入・利用・更新・Recovery QAは後続の製品Acceptanceに残す。
 2. C0〜C34およびPhase 0〜45の個別field記録、K01〜K20のSource mappingを維持し再試験しない。N11 Evidence／Blocker／OS Artifact行結合と残存E0母集団を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
 3. BUF-R/T 33 IDのSourceSHA／Consumer scopeを維持し、原因→Consumer、N08/N10/N11、5 OS artifact、Evidence/既存Blocker scopeをrow join済み。現runtimeはCodex Task scratchの限定経路、Evidence ID NONE、Acceptance OPEN。B0〜B6の履歴status不変。
-4. D4-QE-R01〜R13およびD4-LNX-T01〜T08はE0-04 mapping済み（SourceSHAはsource同一性のみ、Evidence ID NONE、Acceptance OPEN）。次にD4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
+4. D4-QE-R01〜R13、D4-LNX-T01〜T08、D4-AUD-F01〜F07はE0-04 mapping済み（SourceSHAはsource同一性のみ、Evidence ID NONE、Acceptance OPEN）。次にQ0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 5. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
 6. N10の各OS標準候補・配布・実装・workflow/test・限定履歴を記録する。保証version/arch/resource/package条件は公式条件と実測から固定し、未知をUNKNOWNにする。
 7. N11 Evidence/Registry/validator/QA queue consumer mappingに全ID・全OS artifactを接続する。Acceptance/E3 BUILD_COVERED/E4 QC/E5 QA/E6 Release判定は正本工程の順序と区分を維持する。

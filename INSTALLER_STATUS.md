@@ -1,12 +1,16 @@
 # Installer 状態
 
-## 現行の製品・導入証拠（2026-10-22）
+## 現行の製品・導入状態（2026-11-14、v4）
 
-現在の製品状態は[rev5進捗](docs/REV5_PRODUCT_PROGRESS.md)と`release_blockers.registry.json`を参照する。Windows P11／P12の開発受入れ、Windows B4のstaged `r2-e2e`有限CLOSEDと、別SID等の正式installed-path証拠を区別する。B5はOPEN。正式なインストール済み製品の全条件を本書の旧段階B記録で代替しない。
+現行の製品要求・工程・施工指示は[2026-11-13 v4採用記録](docs/QE_2026-11-13/採用記録.md)と[現行進捗](docs/QE_2026-11-13/進捗.md)を参照する。現行進捗ではE0要求照合が`OPEN`で、五OSの標準環境におけるinstalled製品QAは未成立。Linux nativeは必須の製品対象であり、WSLや過去のhosted runを代替証拠にしない。Release Registryは18件中16件`unresolved`／2件`resolved`、`release_ready=false`。以下は2026-10-22時点のrev5導入証拠とそれ以前の履歴であり、v4の製品受入れ・出荷状態を示さない。
+
+## rev5時点の製品・導入証拠（履歴、2026-10-22照合）
+
+当時の製品状態は[rev5進捗](docs/REV5_PRODUCT_PROGRESS.md)と、その時点のRelease Registryを参照する。Windows P11／P12の開発受入れ、Windows B4のstaged `r2-e2e`有限CLOSEDと、別SID等の正式installed-path証拠を区別する。B5はOPEN。正式なインストール済み製品の全条件を本書の旧段階B記録で代替しない。
 
 Linuxは完全対応が必須。run #77（source `e7804a24`）はUbuntu 24.04／Xvfb・X11の導入済みGTK製品でtest identityと非実行test packageを使った更新・Rollback／Export／Uninstall等の限定受入れを記録する。#94の資格情報保管と#107の合成MCPは別run・別sourceの証拠であり、#107で導入lifecycleを再実行したわけではない。正式署名／配布、Wayland描画、一般Linux環境と残る製品機能は未受入れで、`linux_native_product_support`はunresolvedのまま。[F03実績文書対応](docs/QE_2026-10-22/F03_実績文書対応.md)に条件を記録する。
 
-以下の旧段階B・v1.0の環境・状態記述は履歴として保持する。引き継いだ安全・復旧・出荷関門を弱めず、通常Release `task_execution=unsupported`／`release_ready=false`、正式Q0〜Q7 `DEFERRED`を維持する。
+以下の旧段階B・v1.0の環境・状態記述は履歴として保持する。引き継いだ安全・復旧・出荷関門を弱めず、当時の通常Release `task_execution=unsupported`／`release_ready=false`、正式Q0〜Q7 `DEFERRED`を記録する。
 
 旧段階Bの状態記録: 当時の所有者利用は完了。Installer 作業はまだ有償/製品 QC として扱わず、完成製品 release には実測済み Windows インストール先証拠が必要とされていた。
 

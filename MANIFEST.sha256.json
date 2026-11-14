@@ -144,7 +144,7 @@
     },
     {
       "path": "INSTALLER_STATUS.md",
-      "sha256": "40baa8fa3dbea1d094a851a7b9fc5163fd4f512745688fbec98aa25ef9655cba"
+      "sha256": "9134b4a7026fe86895467feea9517171119dd1375de60b923606eec51c3706ec"
     },
     {
       "path": "LICENSE",
@@ -1460,7 +1460,7 @@
     },
     {
       "path": "docs/QE_2026-11-13/E0_\u8981\u6c42consumer\u53f0\u5e33.md",
-      "sha256": "a5e9df523a45ca114371ec6dc59a5543a612a09a5ab4c06a4dd265363d127ee8"
+      "sha256": "a1b7365ccacb673a9548de50090126262ae03803426e14c47ef40435d1504232"
     },
     {
       "path": "docs/QE_2026-11-13/\u5dee\u5206\u79fb\u884c\u53f0\u5e33.md",
@@ -1472,7 +1472,7 @@
     },
     {
       "path": "docs/QE_2026-11-13/\u9032\u6357.md",
-      "sha256": "b0374d653f508a7d18f1fb0f70105a9d554df9eedd222eb6b847aab8dc58c028"
+      "sha256": "14bc6f229100c9553a3d78163544ea2aa5623a57dda5566df366279d0dcbdf1a"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
