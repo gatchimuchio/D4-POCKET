@@ -364,6 +364,44 @@ def _is_unsealed_adhoc_executable_signature(output: str) -> bool:
     return True
 
 
+def _macos_signature_diagnostic(output: str) -> str:
+    """Return signature facts without exposing certificate or team identifier values."""
+    signature_values = re.findall(r"(?im)^\s*Signature=(.*?)\s*$", output)
+    if signature_values and all(value.strip().casefold() == "adhoc" for value in signature_values):
+        signature_class = "adhoc"
+    elif signature_values:
+        signature_class = "other"
+    else:
+        signature_class = "unknown"
+
+    code_directory_flags: list[str] = []
+    for raw_value, raw_flags in re.findall(
+        r"(?im)^\s*CodeDirectory\b.*?\bflags=(0x[0-9a-f]+)\(([^)]*)\)", output
+    ):
+        safe_flags = [
+            flag.strip().casefold()
+            for flag in raw_flags.split(",")
+            if re.fullmatch(r"[A-Za-z0-9_-]{1,40}", flag.strip())
+        ]
+        code_directory_flags.append(f"{raw_value.casefold()}({','.join(safe_flags)})")
+
+    team_identifiers = re.findall(r"(?im)^\s*TeamIdentifier=(.*)$", output)
+    team_identifier_set = any(
+        value.strip().casefold() not in {"", "not set"} for value in team_identifiers
+    )
+    facts = {
+        "signature_class": signature_class,
+        "code_directory_flags": "|".join(code_directory_flags) or "none",
+        "authority_present": bool(re.search(r"(?im)^\s*Authority=", output)),
+        "team_identifier_set": team_identifier_set,
+        "signed_time_present": bool(re.search(r"(?im)^\s*Signed Time=", output)),
+        "timestamp_present": bool(re.search(r"(?im)^\s*Timestamp=", output)),
+        "cms_digest_present": bool(re.search(r"(?im)^\s*CMSDigest=", output)),
+        "sealed_resources_present": bool(re.search(r"(?im)^\s*Sealed Resources version=", output)),
+    }
+    return "; ".join(f"{key}={value}" for key, value in facts.items())
+
+
 def _require_macos_code_without_publisher_identity(
     bundle: Path, *, codesign: str, environment: dict[str, str]
 ) -> dict[str, Any]:
@@ -390,14 +428,9 @@ def _require_macos_code_without_publisher_identity(
             if _is_unsealed_adhoc_executable_signature(result.stdout):
                 adhoc_executable_signatures += 1
                 continue
-            signature_kind = (
-                "ad_hoc_or_identity"
-                if "adhoc" in result.stdout.casefold()
-                else "other_or_unknown"
-            )
             raise ValueError(
                 "macOS Export candidateにPublisher identity付きまたは許容外署名がある: "
-                f"{relative_path} (signature_kind={signature_kind})"
+                f"{relative_path} ({_macos_signature_diagnostic(result.stdout)})"
             )
         if "code object is not signed at all" not in result.stdout.casefold():
             raise ValueError(

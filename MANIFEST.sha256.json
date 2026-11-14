@@ -1513,7 +1513,7 @@
     },
     {
       "path": "docs/QE_2026-11-14/\u9032\u6357.md",
-      "sha256": "21c7f5118ec98a2a684adfdab489547685a5d8087c726b294387d1368a82f786"
+      "sha256": "e6bf3759c3d0fcd9d35f259ffb3ab877ecf21db6fbba0fb83aea4f16575a9263"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -5577,7 +5577,7 @@
     },
     {
       "path": "tooling/export_macos_product.py",
-      "sha256": "841f0202682efc4f442eb62c075637b76ed1df74b3dd5f1eb3e945166d37abf5"
+      "sha256": "0eb1626f0b0c22d01884adb754191279d716475cc96187bc8118e777d8a9cb67"
     },
     {
       "path": "tooling/export_windows_product.py",
@@ -5745,7 +5745,7 @@
     },
     {
       "path": "tooling/tests/test_export_macos_product.py",
-      "sha256": "67b9d81cd83d68694c27da3dab3b737e01054656f43bb4996c2e456a63e454e2"
+      "sha256": "f6f49e8405ca7754dc31600e77182d0e57011b07c8a03350c668264121780722"
     },
     {
       "path": "tooling/tests/test_linux_deb_setup_package.py",

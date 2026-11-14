@@ -17,6 +17,7 @@ from tooling.export_macos_product import (
     _patch_macos_export_build_settings,
     _require_macos_binary_architecture,
     _require_macos_code_without_publisher_identity,
+    _macos_signature_diagnostic,
     _scan_macos_artifacts,
     _validate_build_evidence,
     build_macos_product,
@@ -216,6 +217,30 @@ class MacOSProductExportTests(unittest.TestCase):
             self.assertEqual(run.call_count, 4)
             self.assertTrue(all(call.kwargs["env"]["LC_ALL"] == "C" for call in run.call_args_list))
             self.assertTrue(all("--verbose=4" in call.args[0] for call in run.call_args_list))
+
+    def test_signature_diagnostic_reports_flags_without_identity_values(self) -> None:
+        output = (
+            "CodeDirectory v=20400 size=382 flags=0x20002(adhoc,linker-signed) hashes=9+0\n"
+            "Authority=Developer ID Application: Sensitive Example (TEAMSECRET)\n"
+            "TeamIdentifier=TEAMSECRET\n"
+            "Signature=adhoc\n"
+            "Signed Time=Nov 14, 2026 at 13:30:00\n"
+            "Timestamp=present\n"
+            "CMSDigest=present\n"
+            "Sealed Resources version=2 rules=13 files=4\n"
+        )
+
+        diagnostic = _macos_signature_diagnostic(output)
+
+        self.assertEqual(
+            diagnostic,
+            "signature_class=adhoc; code_directory_flags=0x20002(adhoc,linker-signed); "
+            "authority_present=True; team_identifier_set=True; signed_time_present=True; "
+            "timestamp_present=True; cms_digest_present=True; sealed_resources_present=True",
+        )
+        self.assertNotIn("Sensitive Example", diagnostic)
+        self.assertNotIn("TEAMSECRET", diagnostic)
+        self.assertNotIn("Nov 14", diagnostic)
 
     def test_app_scan_rejects_publisher_or_resource_sealed_signatures(self) -> None:
         with tempfile.TemporaryDirectory(prefix="d4p-macos-codesign-negative-") as temp:
