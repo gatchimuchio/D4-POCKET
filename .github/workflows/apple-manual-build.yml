@@ -745,10 +745,10 @@ jobs:
             "$evidence/analysis/macos-code-size-analysis.json"
           python3 -B -X utf8 - "$output/d4_pocket_macos_export_build.json" \
             "$evidence/analysis/macos-code-size-analysis.json" <<'PY'
-          import hashlib, json, pathlib, re, sys
+          import hashlib, json, pathlib, plistlib, re, sys
           path = pathlib.Path(sys.argv[1])
           record = json.loads(path.read_text(encoding='utf-8'))
-          assert record['version'] == 5
+          assert record['version'] == 6
           assert record['target_platform'] == 'macos'
           assert record['app_id'] == 'd4-pocket-app-33333333333333333333333333333333'
           assert record['audit_store_id'] == 'audit-store-44444444444444444444444444444444'
@@ -764,8 +764,28 @@ jobs:
           framework = scan['flutter_toolchain_framework']
           assert scan['status'] == 'passed_no_d4_publisher_identity'
           assert scan['code_objects_checked'] >= 2
+          assert scan['sandboxed_adhoc_app_bundle_signatures'] == 1
           assert scan['verified_toolchain_framework_signatures'] == 1
           assert scan['d4_publisher_identity_signatures'] == 0
+          assert scan['d4_resource_sealed_bundle_signatures'] == 1
+          sandbox = scan['sandbox_entitlements']
+          assert sandbox['status'] == 'passed_exact_expected_entitlements'
+          assert sandbox['app_sandbox_entitlements_verified'] is True
+          assert sandbox['helper_inherited_sandbox_entitlements_verified'] is True
+          expected_app = {
+              'com.apple.security.app-sandbox': True,
+              'com.apple.security.files.user-selected.read-write': True,
+              'com.apple.security.network.client': True,
+              'com.apple.security.network.server': True,
+          }
+          expected_helper = {
+              'com.apple.security.app-sandbox': True,
+              'com.apple.security.inherit': True,
+          }
+          assert sandbox['app_entitlements_sha256'] == hashlib.sha256(
+              plistlib.dumps(expected_app, fmt=plistlib.FMT_XML, sort_keys=True)).hexdigest()
+          assert sandbox['helper_entitlements_sha256'] == hashlib.sha256(
+              plistlib.dumps(expected_helper, fmt=plistlib.FMT_XML, sort_keys=True)).hexdigest()
           assert framework['source'] == 'pinned_flutter_release_engine_cache'
           assert framework['sdk_revision'] == record['toolchain']['flutter_sdk_revision']
           assert framework['engine_revision'] == record['toolchain']['flutter_engine_revision']
@@ -826,105 +846,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          output="$RUNNER_TEMP/macos-export-output"
-          evidence="$RUNNER_TEMP/macos-export-evidence"
-          record="$output/d4_pocket_macos_export_build.json"
-          metadata="$(python3 - "$record" <<'PY'
-          import json, pathlib, re, sys
-          record = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding='utf-8'))
-          fields = [record['bundle_name'], record['bundle_identifier'], record['app_id'],
-                    record['audit_store_id'], record['package']['file_name'],
-                    record['uninstaller_package']['file_name'], record['installer_identifier']]
-          assert re.fullmatch(r'D4Pocket-[0-9a-f]{12}\.app', fields[0])
-          assert re.fullmatch(r'com\.d4p\.export\.[0-9a-f]{32}', fields[1])
-          assert re.fullmatch(r'd4-pocket-app-[0-9a-f]{32}', fields[2])
-          assert re.fullmatch(r'audit-store-[0-9a-f]{32}', fields[3])
-          assert re.fullmatch(r'D4Pocket-[0-9a-f]{12}\.pkg', fields[4])
-          assert re.fullmatch(r'D4Pocket-[0-9a-f]{12}-Uninstaller\.pkg', fields[5])
-          assert fields[6] == fields[1] + '.installer'
-          print(' '.join(fields))
-          PY
-          )"
-          IFS=' ' read -r bundle_name bundle_id app_id audit_id install_pkg uninstaller_pkg install_id <<< "$metadata"
-          app_path="/Applications/$bundle_name"
-          state_root="$HOME/Library/Application Support/D4Pocket/apps/$app_id/stores/$audit_id"
-          marker="$state_root/uninstaller-smoke-marker.txt"
-          ownership_marker="$RUNNER_TEMP/macos-install-smoke-ownership"
-          test ! -e "$app_path" && test ! -L "$app_path"
-          test ! -e "$state_root" && test ! -L "$state_root"
-          printf 'D4P-MACOS-EXPORT-SMOKE\n' > "$ownership_marker"
-          mkdir -p "$state_root"
-          printf 'D4P-MACOS-UNINSTALL-KEEP\n' > "$marker"
-          app_present() {
-            test -d "$app_path" && test ! -L "$app_path"
-            test -d "$app_path/Contents" && test ! -L "$app_path/Contents"
-            test -f "$app_path/Contents/Info.plist" && test ! -L "$app_path/Contents/Info.plist"
-            actual_bundle_id=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app_path/Contents/Info.plist")
-            test "$actual_bundle_id" = "$bundle_id"
-          }
-          sudo /usr/sbin/installer -pkg "$output/$install_pkg" -target /
-          app_present
-          # Simulate a damaged app payload, then reapply the same normal package as repair.
-          sudo /bin/rm -rf "$app_path"
-          test ! -e "$app_path" && test ! -L "$app_path"
-          sudo /usr/sbin/installer -pkg "$output/$install_pkg" -target /
-          app_present
-          sudo /usr/sbin/installer -pkg "$output/$uninstaller_pkg" -target /
-          test ! -e "$app_path" && test ! -L "$app_path"
-          test "$(cat "$marker")" = 'D4P-MACOS-UNINSTALL-KEEP'
-          python3 - "$record" "$evidence/macos-installer-smoke.json" "$(sw_vers -productVersion)" "$(uname -m)" <<'PY'
-          import json, pathlib, sys
-          record = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding='utf-8'))
-          result = {
-              'version': 1,
-              'evidence_type': 'd4_pocket_macos_installer_smoke',
-              'evidence_source': 'LIVE_RUNTIME',
-              'source_commit': record['source_commit'],
-              'macos_version': sys.argv[3],
-              'architecture': sys.argv[4],
-              'bundle_identifier': record['bundle_identifier'],
-              'install_package_sha256': record['package']['sha256'],
-              'uninstaller_package_sha256': record['uninstaller_package']['sha256'],
-              'install': {'native_installer_completed': True, 'bundle_identifier_verified': True},
-              'repair': {'same_package_reapplied_after_app_removal': True, 'bundle_restored': True},
-              'uninstall': {'native_installer_completed': True, 'matching_bundle_removed': True,
-              'user_data_marker_preserved': True, 'keychain_accessed': False},
-              'publisher_signed': False,
-              'launch_verified': False,
-              'formal_distribution_claimed': False,
-          }
-          pathlib.Path(sys.argv[2]).write_text(json.dumps(result, separators=(',', ':')) + '\n', encoding='utf-8')
-          print(json.dumps(result, separators=(',', ':')))
-          PY
+          python3 -B -X utf8 tooling/tests/macos_export_installer_smoke.py \
+            "$RUNNER_TEMP/macos-export-output" "$RUNNER_TEMP/macos-export-evidence" \
+            "$(sw_vers -productVersion)" "$(uname -m)"
       - name: build候補とfixtureを回収
         if: always()
         shell: bash
         run: |
           set -euo pipefail
-          ownership_marker="$RUNNER_TEMP/macos-install-smoke-ownership"
-          app_path="/Applications/D4Pocket-333333333333.app"
-          if [ -f "$ownership_marker" ] && [ ! -L "$ownership_marker" ] \
-             && [ "$(cat "$ownership_marker")" = 'D4P-MACOS-EXPORT-SMOKE' ]; then
-            if [ -e "$app_path" ] || [ -L "$app_path" ]; then
-              test ! -L "$app_path" && test -d "$app_path"
-              test -d "$app_path/Contents" && test ! -L "$app_path/Contents"
-              test -f "$app_path/Contents/Info.plist" && test ! -L "$app_path/Contents/Info.plist"
-              actual_bundle_id=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app_path/Contents/Info.plist")
-              test "$actual_bundle_id" = 'com.d4p.export.33333333333333333333333333333333'
-              sudo /bin/rm -rf "$app_path"
-              test ! -e "$app_path" && test ! -L "$app_path"
-            fi
-            state_root="$HOME/Library/Application Support/D4Pocket/apps/d4-pocket-app-33333333333333333333333333333333/stores/audit-store-44444444444444444444444444444444"
-            marker="$state_root/uninstaller-smoke-marker.txt"
-            if [ -f "$marker" ] && [ ! -L "$marker" ] \
-               && [ "$(cat "$marker")" = 'D4P-MACOS-UNINSTALL-KEEP' ]; then
-              rm -f "$marker"
-              rmdir "$state_root" 2>/dev/null || true
-              rmdir "${state_root%/stores/*}/stores" 2>/dev/null || true
-              rmdir "${state_root%/stores/*}" 2>/dev/null || true
-            fi
-            rm -f "$ownership_marker"
-          fi
           for path in "$RUNNER_TEMP/macos-export-output" "$RUNNER_TEMP/macos-export-fixture"; do
             if [ -e "$path" ]; then test ! -L "$path"; rm -rf -- "$path"; fi
             test ! -e "$path"

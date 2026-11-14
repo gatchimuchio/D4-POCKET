@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 import platform
+import plistlib
 import re
 import shutil
 import stat
@@ -53,6 +54,20 @@ from tooling.schema_check.check_schemas import validate_instance
 RECEIPT_NAME = "d4_pocket_macos_export_build.json"
 BUILD_TEMP_PREFIX = "d4p-macos-build-"
 OUTPUT_TEMP_PREFIX = "d4p-macos-output-"
+MACOS_RUNNER_ENTITLEMENTS = Path("apps/desktop_flutter/macos/Runner/Release.entitlements")
+MACOS_BROKER_HELPER_ENTITLEMENTS = Path(
+    "apps/desktop_flutter/macos/Runner/BrokerHelper.entitlements"
+)
+EXPECTED_MACOS_APP_ENTITLEMENTS = {
+    "com.apple.security.app-sandbox": True,
+    "com.apple.security.files.user-selected.read-write": True,
+    "com.apple.security.network.client": True,
+    "com.apple.security.network.server": True,
+}
+EXPECTED_MACOS_BROKER_HELPER_ENTITLEMENTS = {
+    "com.apple.security.app-sandbox": True,
+    "com.apple.security.inherit": True,
+}
 MACOS_AOT_REPORT_ROOT = "App (Dart AOT)"
 MACOS_AOT_IMAGE_RELATIVE_PATH = PurePosixPath(
     "Contents/Frameworks/App.framework/Versions/A/App"
@@ -292,6 +307,140 @@ def _run(command: list[str], *, cwd: Path, environment: dict[str, str]) -> str:
     return completed.stdout.strip()
 
 
+def _validated_macos_entitlements_source(
+    source_root: Path, relative_path: Path, expected: dict[str, bool], label: str
+) -> tuple[Path, str]:
+    path = source_root / relative_path
+    raw = _read_regular_file(path, 64 * 1024, label)
+    try:
+        entitlements = plistlib.loads(raw)
+    except (plistlib.InvalidFileException, ValueError, TypeError) as error:
+        raise ValueError(f"{label}がproperty listとして読めない") from error
+    if (
+        not isinstance(entitlements, dict)
+        or entitlements != expected
+        or any(type(value) is not bool for value in entitlements.values())
+    ):
+        raise ValueError(f"{label}が許可済みの固定entitlement集合と一致しない")
+    canonical = plistlib.dumps(entitlements, fmt=plistlib.FMT_XML, sort_keys=True)
+    return path, hashlib.sha256(canonical).hexdigest()
+
+
+def _sign_macos_export_bundle(
+    bundle: Path,
+    *,
+    source_root: Path,
+    codesign: str,
+    environment: dict[str, str],
+) -> dict[str, str]:
+    app_entitlements_path, app_entitlements_sha256 = _validated_macos_entitlements_source(
+        source_root,
+        MACOS_RUNNER_ENTITLEMENTS,
+        EXPECTED_MACOS_APP_ENTITLEMENTS,
+        "macOS Runner entitlement source",
+    )
+    helper_entitlements_path, helper_entitlements_sha256 = _validated_macos_entitlements_source(
+        source_root,
+        MACOS_BROKER_HELPER_ENTITLEMENTS,
+        EXPECTED_MACOS_BROKER_HELPER_ENTITLEMENTS,
+        "macOS Broker helper entitlement source",
+    )
+    helper = bundle / "Contents/MacOS/gui_shell_macos_broker"
+    _require_file(helper, "macOS Broker helper for sandbox signing")
+
+    # Nested code is signed first. The fixed ad-hoc identity applies entitlements without
+    # introducing an owner Publisher identity into the export candidate.
+    _run(
+        [
+            codesign,
+            "--force",
+            "--sign",
+            "-",
+            "--entitlements",
+            str(helper_entitlements_path),
+            "--generate-entitlement-der",
+            str(helper),
+        ],
+        cwd=source_root,
+        environment=environment,
+    )
+    _run(
+        [
+            codesign,
+            "--verify",
+            "--strict",
+            "--all-architectures",
+            "--verbose=2",
+            str(helper),
+        ],
+        cwd=source_root,
+        environment=environment,
+    )
+    _run(
+        [
+            codesign,
+            "--force",
+            "--sign",
+            "-",
+            "--entitlements",
+            str(app_entitlements_path),
+            "--generate-entitlement-der",
+            str(bundle),
+        ],
+        cwd=source_root,
+        environment=environment,
+    )
+    _run(
+        [
+            codesign,
+            "--verify",
+            "--deep",
+            "--strict",
+            "--all-architectures",
+            "--verbose=2",
+            str(bundle),
+        ],
+        cwd=source_root,
+        environment=environment,
+    )
+    return {
+        "app_entitlements_sha256": app_entitlements_sha256,
+        "helper_entitlements_sha256": helper_entitlements_sha256,
+    }
+
+
+def _read_signed_macos_entitlements(
+    codesign: str, code_path: Path, *, environment: dict[str, str]
+) -> dict[str, Any]:
+    result = subprocess.run(
+        [codesign, "--display", "--entitlements", ":-", "--xml", str(code_path)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        env=environment,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise ValueError("macOS code signatureからentitlementを取得できない")
+    output = result.stdout
+    start = output.find("<?xml")
+    if start < 0:
+        start = output.find("<plist")
+    end = output.rfind("</plist>")
+    if start < 0 or end < start:
+        raise ValueError("macOS code signatureのentitlement plist境界が不正である")
+    payload = output[start : end + len("</plist>")].encode("utf-8")
+    try:
+        entitlements = plistlib.loads(payload)
+    except (plistlib.InvalidFileException, ValueError, TypeError) as error:
+        raise ValueError("macOS code signatureのentitlement plistが不正である") from error
+    if not isinstance(entitlements, dict):
+        raise ValueError("macOS code signatureのentitlementがobjectではない")
+    return entitlements
+
+
 def _tool_version(command: list[str], *, cwd: Path, environment: dict[str, str]) -> str:
     output = _run(command, cwd=cwd, environment=environment)
     first_line = next((line.strip() for line in output.splitlines() if line.strip()), "")
@@ -437,6 +586,33 @@ def _is_unsealed_adhoc_executable_signature(output: str) -> bool:
     if re.search(r"(?im)^\s*Sealed Resources version=", output):
         return False
     return True
+
+
+def _is_sandboxed_adhoc_app_bundle_signature(output: str) -> bool:
+    """Accept only the local ad-hoc signature used to enforce the fixed App Sandbox."""
+    if re.search(r"(?im)^\s*Signature=adhoc\s*$", output) is None:
+        return False
+    code_directories = re.findall(
+        r"(?im)^\s*CodeDirectory\b.*?\bflags=(0x[0-9a-f]+)\(([^)]*)\)", output
+    )
+    if not code_directories:
+        return False
+    for raw_flags_value, raw_flags in code_directories:
+        try:
+            flags_value = int(raw_flags_value, 16)
+        except ValueError:
+            return False
+        flags = frozenset(flag.strip().casefold() for flag in raw_flags.split(","))
+        if (flags_value, flags) != (0x2, frozenset({"adhoc"})):
+            return False
+    if re.search(r"(?im)^\s*Authority=", output):
+        return False
+    team_identifiers = re.findall(r"(?im)^\s*TeamIdentifier=(.*)$", output)
+    if any(value.strip().casefold() not in {"", "not set"} for value in team_identifiers):
+        return False
+    if re.search(r"(?im)^\s*(?:Signed Time|Timestamp)=", output):
+        return False
+    return re.search(r"(?im)^\s*Sealed Resources version=", output) is not None
 
 
 def _macos_signature_diagnostic(output: str) -> str:
@@ -1064,8 +1240,27 @@ def _require_macos_code_without_publisher_identity(
         raise ValueError("macOS App Bundle内の実行codeを署名検査できない")
     probe_environment = dict(environment)
     probe_environment.update({"LANG": "C", "LC_ALL": "C"})
+    helper_path = bundle / "Contents/MacOS/gui_shell_macos_broker"
+    _require_file(helper_path, "macOS Broker helper entitlement verification")
+    app_entitlements = _read_signed_macos_entitlements(
+        codesign, bundle, environment=probe_environment
+    )
+    helper_entitlements = _read_signed_macos_entitlements(
+        codesign, helper_path, environment=probe_environment
+    )
+    if app_entitlements != EXPECTED_MACOS_APP_ENTITLEMENTS:
+        raise ValueError("macOS App signature entitlementが固定sandbox契約と一致しない")
+    if helper_entitlements != EXPECTED_MACOS_BROKER_HELPER_ENTITLEMENTS:
+        raise ValueError("macOS Broker helper signature entitlementが継承sandbox契約と一致しない")
+    app_entitlements_sha256 = hashlib.sha256(
+        plistlib.dumps(app_entitlements, fmt=plistlib.FMT_XML, sort_keys=True)
+    ).hexdigest()
+    helper_entitlements_sha256 = hashlib.sha256(
+        plistlib.dumps(helper_entitlements, fmt=plistlib.FMT_XML, sort_keys=True)
+    ).hexdigest()
     unsigned_code_objects = 0
     adhoc_executable_signatures = 0
+    sandboxed_adhoc_app_bundle_signatures = 0
     verified_toolchain_framework_signatures = 0
     for path in code_objects:
         if path == framework_path:
@@ -1083,6 +1278,9 @@ def _require_macos_code_without_publisher_identity(
         )
         relative_path = path.relative_to(bundle).as_posix() or "."
         if result.returncode == 0:
+            if path == bundle and _is_sandboxed_adhoc_app_bundle_signature(result.stdout):
+                sandboxed_adhoc_app_bundle_signatures += 1
+                continue
             if _is_unsealed_adhoc_executable_signature(result.stdout):
                 adhoc_executable_signatures += 1
                 continue
@@ -1096,14 +1294,24 @@ def _require_macos_code_without_publisher_identity(
                 f"{relative_path}"
             )
         unsigned_code_objects += 1
+    if sandboxed_adhoc_app_bundle_signatures != 1:
+        raise ValueError("macOS Export App Bundleに固定sandbox entitlement付きad-hoc署名がない")
     return {
         "status": "passed_no_d4_publisher_identity",
         "code_objects_checked": len(code_objects),
         "unsigned_code_objects": unsigned_code_objects,
         "adhoc_executable_signatures": adhoc_executable_signatures,
+        "sandboxed_adhoc_app_bundle_signatures": sandboxed_adhoc_app_bundle_signatures,
         "verified_toolchain_framework_signatures": verified_toolchain_framework_signatures,
         "d4_publisher_identity_signatures": 0,
-        "d4_resource_sealed_bundle_signatures": 0,
+        "d4_resource_sealed_bundle_signatures": sandboxed_adhoc_app_bundle_signatures,
+        "sandbox_entitlements": {
+            "status": "passed_exact_expected_entitlements",
+            "app_sandbox_entitlements_verified": True,
+            "helper_inherited_sandbox_entitlements_verified": True,
+            "app_entitlements_sha256": app_entitlements_sha256,
+            "helper_entitlements_sha256": helper_entitlements_sha256,
+        },
         "flutter_toolchain_framework": flutter_framework_evidence,
     }
 
@@ -1709,6 +1917,12 @@ def build_macos_product(
         if product_manifest.read_bytes() != manifest_raw:
             raise ValueError("Export Manifestをbyte-for-byteでbundleへ保持できなかった")
         _validate_bundle_symlinks(app_bundle)
+        _sign_macos_export_bundle(
+            app_bundle,
+            source_root=source_root,
+            codesign=tools["codesign"],
+            environment=environment,
+        )
         app_code_signature_scan = _require_macos_code_without_publisher_identity(
             app_bundle,
             flutter_framework=flutter_framework,
@@ -1794,7 +2008,7 @@ def build_macos_product(
         elapsed_ms = round((time.perf_counter() - started) * 1000)
         catalog = _load_catalog()
         evidence = {
-            "version": 5,
+            "version": 6,
             "evidence_type": "d4_pocket_macos_export_build",
             "evidence_source": "INTERNAL_STATE",
             "product": "D4 Pocket",
@@ -1992,7 +2206,8 @@ def _validate_build_evidence(
         embedded_flutter_binary_hash = ""
         architecture_slice_hash = ""
     if (
-        evidence.get("evidence_type") != "d4_pocket_macos_export_build"
+        evidence.get("version") != 6
+        or evidence.get("evidence_type") != "d4_pocket_macos_export_build"
         or evidence.get("target_platform") != "macos"
         or evidence.get("app_id") != expected_app_id
         or evidence.get("audit_store_id") != expected_audit_id
@@ -2016,12 +2231,34 @@ def _validate_build_evidence(
         or (
             signature_scan.get("unsigned_code_objects", -1)
             + signature_scan.get("adhoc_executable_signatures", -1)
+            + signature_scan.get("sandboxed_adhoc_app_bundle_signatures", -1)
             + signature_scan.get("verified_toolchain_framework_signatures", -1)
             != signature_scan.get("code_objects_checked", -2)
         )
+        or signature_scan.get("sandboxed_adhoc_app_bundle_signatures") != 1
         or signature_scan.get("verified_toolchain_framework_signatures") != 1
         or signature_scan.get("d4_publisher_identity_signatures") != 0
-        or signature_scan.get("d4_resource_sealed_bundle_signatures") != 0
+        or signature_scan.get("d4_resource_sealed_bundle_signatures") != 1
+        or signature_scan.get("sandbox_entitlements", {}).get("status")
+        != "passed_exact_expected_entitlements"
+        or signature_scan.get("sandbox_entitlements", {}).get("app_sandbox_entitlements_verified") is not True
+        or signature_scan.get("sandbox_entitlements", {}).get("helper_inherited_sandbox_entitlements_verified") is not True
+        or signature_scan.get("sandbox_entitlements", {}).get("app_entitlements_sha256")
+        != hashlib.sha256(
+            plistlib.dumps(
+                EXPECTED_MACOS_APP_ENTITLEMENTS,
+                fmt=plistlib.FMT_XML,
+                sort_keys=True,
+            )
+        ).hexdigest()
+        or signature_scan.get("sandbox_entitlements", {}).get("helper_entitlements_sha256")
+        != hashlib.sha256(
+            plistlib.dumps(
+                EXPECTED_MACOS_BROKER_HELPER_ENTITLEMENTS,
+                fmt=plistlib.FMT_XML,
+                sort_keys=True,
+            )
+        ).hexdigest()
         or evidence.get("toolchain", {}).get("flutter_sdk_revision") != PINNED_FLUTTER_REVISION
         or re.fullmatch(
             r"[0-9a-f]{40}", evidence.get("toolchain", {}).get("flutter_engine_revision", "")

@@ -81,7 +81,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "7c74b7deba22ea098498eb71a83648de6aca2e0e20f2a1eb31010cfd524cbc1e"
+      "sha256": "82078e97412d842df5a9949eebd355907db454719239ddaa4e0fe397b560bda6"
     },
     {
       "path": ".github/workflows/linux-manual-export-build.yml",
@@ -2305,7 +2305,7 @@
     },
     {
       "path": "examples/contracts/gui_shell_macos_export_build.valid.json",
-      "sha256": "b45ff6c6a7aef9f4b135399ecdb779886a0a0030415943f292677c9a2283097e"
+      "sha256": "4569449a85b7eb1b7a11d4000314ee9e0a5ddf12b94fd25f51a0d75542f2d7eb"
     },
     {
       "path": "examples/contracts/gui_shell_module_build_evidence.valid.json",
@@ -2805,7 +2805,7 @@
     },
     {
       "path": "examples/contracts/invalid/gui_shell_macos_export_build_framework_mismatch.invalid.json",
-      "sha256": "16513d5e33d56ed8d4b447e040dd4937ad912d07ac0e5b915002cae94b12dc52"
+      "sha256": "f1943d50f2f6d5f4f197a5f9a4b5a2b80431a8ecb0848a7f68a7ea33d0b37172"
     },
     {
       "path": "examples/contracts/invalid/gui_shell_module_build_evidence_authority_claim.invalid.json",
@@ -5097,7 +5097,7 @@
     },
     {
       "path": "specs/gui_shell_macos_export_build.schema.json",
-      "sha256": "fff7d530df266f8681a4808a774a53499e6ae3020e4c5c4fefb2d754d9a45be9"
+      "sha256": "692059a1edd4b3483fc1c255cb5e14d35e55c4f425aa9a63d2de94757ed898ce"
     },
     {
       "path": "specs/gui_shell_module_build_evidence.schema.json",
@@ -5585,7 +5585,7 @@
     },
     {
       "path": "tooling/export_macos_product.py",
-      "sha256": "0dcfc30321d1a8e072b932f3dd7c442c182401027f8c580abf0f7c07fe775a70"
+      "sha256": "f86f8998e6aca3a2ab8404e7cdc377f32cca8c5427b63cd797f0c30a1c266594"
     },
     {
       "path": "tooling/export_windows_product.py",
@@ -5753,7 +5753,7 @@
     },
     {
       "path": "tooling/tests/test_export_macos_product.py",
-      "sha256": "9194eef4ada7c6171037290c0ba209d60d71efc671c580484d0b637859456c39"
+      "sha256": "b96d841b6ecab65b02960fd33d0f47a133ce9d36a2ed4a08ad81566933860aa4"
     },
     {
       "path": "tooling/tests/test_linux_deb_setup_package.py",
