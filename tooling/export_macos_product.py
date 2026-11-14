@@ -333,7 +333,11 @@ def _sign_macos_export_bundle(
     bundle: Path,
     *,
     source_root: Path,
+    flutter_framework: FlutterFrameworkReference,
     codesign: str,
+    lipo: str,
+    architecture: str,
+    verification_directory: Path,
     environment: dict[str, str],
 ) -> dict[str, str]:
     app_entitlements_path, app_entitlements_sha256 = _validated_macos_entitlements_source(
@@ -357,6 +361,19 @@ def _sign_macos_export_bundle(
         raise ValueError("macOS AOT App.frameworkが通常directoryではない")
     helper = bundle / "Contents/MacOS/gui_shell_macos_broker"
     _require_file(helper, "macOS Broker helper for sandbox signing")
+
+    # Flutter's pinned embed filter can omit resources covered by the upstream
+    # FlutterMacOS.framework seal. Restore and strictly verify them before the
+    # root App signature seals the bundle's resource envelope.
+    _verify_embedded_flutter_framework(
+        bundle,
+        flutter_framework,
+        codesign=codesign,
+        lipo=lipo,
+        architecture=architecture,
+        verification_directory=verification_directory,
+        environment=environment,
+    )
 
     # Sign nested code individually, from the AOT framework outward. Frameworks receive
     # no entitlements; the helper and root App receive their distinct fixed contracts.
@@ -1980,7 +1997,11 @@ def build_macos_product(
         _sign_macos_export_bundle(
             app_bundle,
             source_root=source_root,
+            flutter_framework=flutter_framework,
             codesign=tools["codesign"],
+            lipo=tools["lipo"],
+            architecture=target_architecture,
+            verification_directory=temporary_root,
             environment=environment,
         )
         app_code_signature_scan = _require_macos_code_without_publisher_identity(

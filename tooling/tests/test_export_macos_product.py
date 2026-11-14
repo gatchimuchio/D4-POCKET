@@ -621,6 +621,9 @@ class MacOSProductExportTests(unittest.TestCase):
             aot_binary.parent.mkdir(parents=True)
             aot_binary.write_bytes(b"AOT fixture")
             (aot_framework / "Versions/A/Info.plist").write_bytes(b"AOT framework metadata")
+            _framework_app, flutter_framework = _flutter_framework_fixture(
+                root / "pinned-framework"
+            )
             for relative in (MACOS_RUNNER_ENTITLEMENTS, MACOS_BROKER_HELPER_ENTITLEMENTS):
                 target = source_root / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
@@ -631,12 +634,27 @@ class MacOSProductExportTests(unittest.TestCase):
                 "tooling.export_macos_product.subprocess.run",
                 side_effect=[successful] * 6,
             ) as run:
-                hashes = _sign_macos_export_bundle(
-                    bundle,
-                    source_root=source_root,
-                    codesign="/usr/bin/codesign",
-                    environment={},
-                )
+                def preflight_before_signing(app_bundle, reference, **kwargs):
+                    self.assertEqual(app_bundle, bundle)
+                    self.assertIs(reference, flutter_framework)
+                    self.assertEqual(kwargs["architecture"], "arm64")
+                    self.assertEqual(run.call_count, 0)
+
+                with patch(
+                    "tooling.export_macos_product._verify_embedded_flutter_framework",
+                    side_effect=preflight_before_signing,
+                ) as framework_preflight:
+                    hashes = _sign_macos_export_bundle(
+                        bundle,
+                        source_root=source_root,
+                        flutter_framework=flutter_framework,
+                        codesign="/usr/bin/codesign",
+                        lipo="/usr/bin/lipo",
+                        architecture="arm64",
+                        verification_directory=root,
+                        environment={},
+                    )
+                    framework_preflight.assert_called_once()
 
             commands = [call.args[0] for call in run.call_args_list]
             self.assertEqual(len(commands), 6)
@@ -665,6 +683,26 @@ class MacOSProductExportTests(unittest.TestCase):
             for digest in hashes.values():
                 self.assertRegex(digest, r"^[0-9a-f]{64}$")
 
+            with patch("tooling.export_macos_product.subprocess.run") as rejected_run:
+                with patch(
+                    "tooling.export_macos_product._verify_embedded_flutter_framework",
+                    side_effect=ValueError("pinned Flutter framework rejected"),
+                ):
+                    with self.assertRaisesRegex(
+                        ValueError, "pinned Flutter framework rejected"
+                    ):
+                        _sign_macos_export_bundle(
+                            bundle,
+                            source_root=source_root,
+                            flutter_framework=flutter_framework,
+                            codesign="/usr/bin/codesign",
+                            lipo="/usr/bin/lipo",
+                            architecture="arm64",
+                            verification_directory=root,
+                            environment={},
+                        )
+                rejected_run.assert_not_called()
+
             altered = dict(EXPECTED_MACOS_APP_ENTITLEMENTS)
             altered["com.apple.security.network.client"] = False
             (source_root / MACOS_RUNNER_ENTITLEMENTS).write_bytes(
@@ -675,7 +713,11 @@ class MacOSProductExportTests(unittest.TestCase):
                     _sign_macos_export_bundle(
                         bundle,
                         source_root=source_root,
+                        flutter_framework=flutter_framework,
                         codesign="/usr/bin/codesign",
+                        lipo="/usr/bin/lipo",
+                        architecture="arm64",
+                        verification_directory=root,
                         environment={},
                     )
             rejected_run.assert_not_called()
