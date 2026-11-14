@@ -433,7 +433,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/windows_tray_client.dart",
-      "sha256": "ea7b51d27f86999f0467fac654bfb65ad084837855cb31b44df51b558b01ab39"
+      "sha256": "322b15827d1c2165dcc4b45170c312e724ebdf8dd1e7d975b26643efa609eab3"
     },
     {
       "path": "apps/desktop_flutter/lib/services/workspace_client.dart",
@@ -465,7 +465,7 @@
     },
     {
       "path": "apps/desktop_flutter/linux/runner/CMakeLists.txt",
-      "sha256": "3c9b029d8916ba9e6254343f622245fa35e287ac026f2350c683855809a9275d"
+      "sha256": "d9d5468344f987c47334952955f148efd6ac279fad45223fed0d70dddcf3642b"
     },
     {
       "path": "apps/desktop_flutter/linux/runner/broker_process_channel.cc",
@@ -476,12 +476,28 @@
       "sha256": "67e29a074348d8250449bd35be3a6b14138fb68a01ba4aa7a74df72c244429b2"
     },
     {
+      "path": "apps/desktop_flutter/linux/runner/linux_status_notifier.cc",
+      "sha256": "608f13f7e2f406c1c97ef3f2da1027f4ad406cb3b3e83f9b9dc1cea4a019419d"
+    },
+    {
+      "path": "apps/desktop_flutter/linux/runner/linux_status_notifier.h",
+      "sha256": "aa1a838125b143e857870ac870c05f5928c09d136d117d82fa33889e649c743a"
+    },
+    {
+      "path": "apps/desktop_flutter/linux/runner/linux_tray_controller.cc",
+      "sha256": "a86d79e01d9e7c77fe9d80a83a3e4723e6f2d06a1ef12b56a29f10c2a91a33ec"
+    },
+    {
+      "path": "apps/desktop_flutter/linux/runner/linux_tray_controller.h",
+      "sha256": "d06dfe2292b014e1351822528e7133d2922c24d1f2c91c3cdb21d8a9e3839d3e"
+    },
+    {
       "path": "apps/desktop_flutter/linux/runner/main.cc",
       "sha256": "c181e155acd32aa803e3b603c9c4986297ee88fcec1390352aca9ecfbe785f5d"
     },
     {
       "path": "apps/desktop_flutter/linux/runner/my_application.cc",
-      "sha256": "c21fcd4134a7200dc177ee9e075a3142e3ca34bb3acaeb4b42ac480b3857cf55"
+      "sha256": "2648ec2e635b06bd9f37aa313a340483778fee02ac7dac4ad6abfa88f1f71138"
     },
     {
       "path": "apps/desktop_flutter/linux/runner/my_application.h",
@@ -761,7 +777,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
-      "sha256": "4ce574eaea871e47b595abe8530a8c41381c4ba5403beadfafb138426bf40316"
+      "sha256": "24db45aa90d5b83ee4c694f6663fcd2410e25a50e23ac1c0597ada11274e6e39"
     },
     {
       "path": "apps/desktop_flutter/test/workspace_inspector_test.dart",
@@ -1513,7 +1529,7 @@
     },
     {
       "path": "docs/QE_2026-11-14/\u9032\u6357.md",
-      "sha256": "141cce67fa3b33aa65c731ab51b4529ef5ed7886cfb406a3d839a79c85c39d5a"
+      "sha256": "dca37a412c2d252d57359270251cb32a0a652608dbba734fa6cf3228d2a4689e"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -5605,7 +5621,7 @@
     },
     {
       "path": "tooling/linux_manual_export_build.sh",
-      "sha256": "874576deb7e37d26f4e987d043426440691668345e0d8c6079890af710be2d6d"
+      "sha256": "47677a4b68ba5d419381fb2b39a91eebddc33c30a2ccb91dffde2eccbf290ae7"
     },
     {
       "path": "tooling/long_run_validation.py",
@@ -5706,6 +5722,10 @@
     {
       "path": "tooling/tests/linux_installed_product_smoke.py",
       "sha256": "18580c0c411f69b80736036f6bf0d0ea2fcbf543015e015c0e96b88f5aa368f6"
+    },
+    {
+      "path": "tooling/tests/linux_status_notifier_test.cc",
+      "sha256": "f214f3991c0e7cf7cd37128967d6fcdb1d9c7b56e1f5645988b0ab98ef5dd187"
     },
     {
       "path": "tooling/tests/linux_update_https_server.py",

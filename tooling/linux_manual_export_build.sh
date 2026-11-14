@@ -25,6 +25,12 @@ if [ "$D4P_ACCEPTANCE_SCOPE" = 'host_registration' ]; then
   fixture_arguments+=(--include-host-operations)
 fi
 python3 tooling/tests/create_linux_export_fixture.py "${fixture_arguments[@]}"
+g++ -std=c++14 -Wall -Wextra -Werror \
+  tooling/tests/linux_status_notifier_test.cc \
+  apps/desktop_flutter/linux/runner/linux_status_notifier.cc \
+  -o "$D4P_EXPORT_ROOT/linux-status-notifier-test" \
+  $(pkg-config --cflags --libs gio-2.0)
+"$D4P_EXPORT_ROOT/linux-status-notifier-test"
 export_arguments=(
   --receipt "$fixture_root/d4_pocket_export_receipt.json"
   --manifest-file "$fixture_root/d4-pocket-app-11111111111111111111111111111111.json"
