@@ -81,7 +81,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "c1bfe46c04872a8710ae6994f90f7f8a2854d4a430242355c71aabe833f7af6a"
+      "sha256": "23d9ccc2cdda9c0d67a62c829ff22cc32890471fe85922005759141d49e2174c"
     },
     {
       "path": ".github/workflows/linux-manual-export-build.yml",
@@ -1513,7 +1513,7 @@
     },
     {
       "path": "docs/QE_2026-11-14/\u9032\u6357.md",
-      "sha256": "45c19375fc422bf007db7dbb7e56b23f77df246be308b2edbb339a43eb978063"
+      "sha256": "f0744016da76b8f97b7fa9538248ac3684235ff0461a35e5254c3e4798af8516"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",

@@ -705,35 +705,38 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p evidence
-          { git rev-parse HEAD; sw_vers; uname -m; xcodebuild -version; } | tee evidence/environment.txt
+          evidence="$RUNNER_TEMP/macos-export-evidence"
+          mkdir -p "$evidence"
+          { git rev-parse HEAD; sw_vers; uname -m; xcodebuild -version; } | tee "$evidence/environment.txt"
           git clone --depth 1 --branch 3.44.0 https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
           test "$(git -C "$RUNNER_TEMP/flutter" rev-parse HEAD)" = 559ffa3f75e7402d65a8def9c28389a9b2e6fe42
           echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
           rustup toolchain install 1.95.0 --profile minimal
-          rustup show active-toolchain | tee evidence/rust-toolchain.txt
+          rustup show active-toolchain | tee "$evidence/rust-toolchain.txt"
       - name: macOS Broker identity境界試験
         shell: bash
         run: |
           set -euo pipefail
+          evidence="$RUNNER_TEMP/macos-export-evidence"
           cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib \
             macos_desktop_worker::tests::exported_bundle_manifest_is_compile_time_bound_and_storage_isolated \
-            -- --exact 2>&1 | tee evidence/macos-export-identity-test.txt
+            -- --exact 2>&1 | tee "$evidence/macos-export-identity-test.txt"
       - name: 合成ReceiptからmacOS Productをbuild
         shell: bash
         run: |
           set -euo pipefail
+          evidence="$RUNNER_TEMP/macos-export-evidence"
           fixture="$RUNNER_TEMP/macos-export-fixture"
           output="$RUNNER_TEMP/macos-export-output"
           test ! -e "$fixture"; test ! -L "$fixture"
           test ! -e "$output"; test ! -L "$output"
-          python3 -B -X utf8 tooling/tests/create_macos_export_fixture.py --output-dir "$fixture" | tee evidence/fixture.json
+          python3 -B -X utf8 tooling/tests/create_macos_export_fixture.py --output-dir "$fixture" | tee "$evidence/fixture.json"
           receipt="$fixture/d4_pocket_export_receipt.json"
           manifest="$fixture/d4-pocket-app-33333333333333333333333333333333.json"
           python3 -B -X utf8 tooling/export_macos_product.py \
             --receipt "$receipt" --manifest-file "$manifest" --output-dir "$output" \
-            --allow-verification-branch 2>&1 | tee evidence/export-build.txt
-          cp "$output/d4_pocket_macos_export_build.json" evidence/macos-export-build.json
+            --allow-verification-branch 2>&1 | tee "$evidence/export-build.txt"
+          cp "$output/d4_pocket_macos_export_build.json" "$evidence/macos-export-build.json"
           python3 -B -X utf8 - "$output/d4_pocket_macos_export_build.json" <<'PY'
           import json, pathlib, sys
           path = pathlib.Path(sys.argv[1])
@@ -765,7 +768,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: macos-export-candidate-${{ github.sha }}
-          path: evidence/
+          path: ${{ runner.temp }}/macos-export-evidence/
           retention-days: 3
           if-no-files-found: error
 
