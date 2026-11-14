@@ -6131,6 +6131,300 @@ R01/R03はSource→Consumerの統治主体が共通Source set内のAGENTS・採�
 | 状態 | OPEN（E0 mapping状態。Linux native product acceptanceとN10 OS QAは別々にOPENを維持する。） |
 | 残余 | 旧D4-LNX-T01..08の詳細と標準Linuxごとの受入証拠は、現行v4に沿ったmapping／実行が残る。非Windowsの物理実機testは追加しない。 |
 13行すべてE0-04 21 fieldを記録し、SourceSHA 共有7件とID別consumer sourceを編集前mainへ固定した。これはQE方法論のSource→Consumer対応であり、E0または製品機能AcceptanceのCLOSED、QE_QC/QE_QA合格、Owner GOを意味しない。D4-QE-R13のLinux必須性は現AGENTS/v4で有効だが、旧D4-LNX詳細試験の全受入れ・Linux製品完成は未成立。
+## D4-LNX-T01〜T08 Linux独立Acceptance→現行Consumer照合
+
+照合基準は編集前main 1f2e431ae5abefcc69f02f8312bdcfe54eb50b31。D4-LNXの原定義は2026-10-22仕様書§6.1と同指示書§3-Cを保持する。現行保証条件は採用v4のS02/S04-N10、工程R02 E0-06/R03線H/R07/R10、指示I01/I02/I04-H/I06へ対応させた。非Windows物理端末は要求せず、宣言したLinux標準OS VMまたはhosted native sessionを対象にする。WSL/WSLg/headlessをLinux nativeと同一視せず、X11/Waylandも別の実行条件として扱う。
+
+本節はE0-04 Source→Consumer mappingであり、Linux製品Acceptance、BUILD_COVERED、QE_QC、QE_QA、ReleaseのPASSを発行しない。既存の限定LIVE_RUNTIME/HOSTED_OS_PRODUCT履歴は条件付き補助記録とし、現candidateの証拠IDへ転記しない。linux_native_product_support=unresolved、Registry 18件（16 unresolved/2 resolved）、release_ready=falseを保持する。
+
+### SourceSHA共通固定点
+
+Git blob IDは編集前mainのsource同一性だけを示す。実行・導入済み製品・受入れの証拠ではない。
+
+| ソースID | 対象file | Git管理上のblob識別値 |
+|---|---|---|
+| C01 | AGENTS.md | 1eafcadd129fd01f1f2f683594c381605ed7d48d |
+| C02 | docs/QE_2026-11-13/採用記録.md | f159c1aa6ea5bc6e80e0877d8068f7e44da4c4d3 |
+| C03 | docs/QE_2026-11-13/01_D4Pocket_統合製品実装仕様書_v4.md | 352c53180cbad07888beb956aad0fb2a58074c58 |
+| C04 | docs/QE_2026-11-13/02_D4Pocket_統合開発工程表_v4.md | d32dd251e5f7cbb97d92f6e7540d6b6ed0ecec05 |
+| C05 | docs/QE_2026-11-13/03_D4Pocket_Codex施工指示書_v4.md | 49447973e88c50a09b2f4978adfed84fd464c6d0 |
+| C06 | docs/QE_2026-10-22/D4Pocket_01_QE統合実装仕様書_20261022.md | 400cbfbd524fa76ca34e3f062641be629227246d |
+| C07 | docs/QE_2026-10-22/D4Pocket_03_Codex_QE施工指示書_20261022.md | 8f1cb26aa9673ba29d5c1cc50eaeff7ec0b55993 |
+| C08 | docs/QE_2026-10-22/採用記録.md | 1f9d6332132759ed68f3af8b4587368b162096c2 |
+| C09 | docs/REV5_PRODUCT_PROGRESS.md | 9c978021d3982690e9aaa87896436bad7125b433 |
+| C10 | docs/QE_2026-11-09/進捗.md | dbfe0e52ff510d8248a90154681ab4c144e23ce2 |
+| C11 | release_blockers.registry.json | 244adc04a01e7b406c4ebcdeb829f7077d4aa35f |
+
+### Linux固有Consumer SourceSHA
+
+| ソースID | 対象file | Git管理上のblob識別値 |
+|---|---|---|
+| L01 | tooling/tests/linux_installed_product_smoke.py | 8020ed8d1d68d59cff6acf70c55856fdeb2125e3 |
+| L02 | tooling/tests/test_linux_installed_product_smoke.py | dc94f9b782d3699810bbe50230a5e9510a5739f7 |
+| L03 | tooling/linux_installed_acceptance_summary.py | 8a774d4e1d90c350ca79d6a3bfac722c4ec3fd55 |
+| L04 | .github/workflows/linux-manual-export-build.yml | 8d59dd1e9e54a9a4ebb16992f59a402c1ab77c67 |
+| L05 | specs/d4_pocket_linux_product_package_manifest.schema.json | 34087f190e7189641b34ae3163b568a038c9f1c2 |
+| L06 | apps/desktop_flutter/linux/runner/main.cc | aed7d44034536c80dd748eac9515be35716d790d |
+| L07 | apps/desktop_flutter/linux/runner/my_application.cc | c5c0943f4ce4058290e1cb56ff64286aa7b54f54 |
+| L08 | apps/desktop_flutter/linux/runner/broker_process_channel.cc | 98d6f7e73baae7228c25d72d29343a2564291d97 |
+| L09 | native/rust_helper/src/linux_desktop_launcher.rs | f58fb226f21093c2d1f062259d394b4f8ec022f6 |
+| L10 | native/rust_helper/src/linux_desktop_worker.rs | c7910e61c78e978d3cfb0c3cf882eed010c4730f |
+| L11 | native/rust_helper/src/bin/gui_shell_linux_broker.rs | 40e2ad056978b723f9dff91e3cf4242c2e6a26a1 |
+| L12 | apps/desktop_flutter/lib/screens/agent_center.dart | 2472faeb31a64d624423c30a0a30d0f153d2e2a3 |
+| L13 | apps/desktop_flutter/lib/services/agent_task_client.dart | f54cefac29eba3dcf383bba19b4f64ee682e6217 |
+| L14 | apps/desktop_flutter/test/agent_task_client_test.dart | 0477a0bbbb321082494b6b55711815d34419fdd9 |
+| L15 | specs/agent_task_request.schema.json | cb25bb3684656bfd670ea5832bbb7fc5988845b6 |
+| L16 | specs/agent_task.schema.json | a552389072088d6cd42b3588fefda332be4ae6b6 |
+| L17 | native/rust_helper/tests/agent_task_production_e2e.rs | fdc7565aa58fa7466e6e24e5492321e8015567eb |
+| L18 | native/rust_helper/src/linux_credential_input.rs | 8594403a89e4ed1f8eab38b0bb73c62bbceeb79b |
+| L19 | native/rust_helper/src/linux_workspace_selection.rs | c54d303def7ac93ca2dcd3d1ead22d92c43352a8 |
+| L20 | native/rust_helper/src/broker/credential_storage.rs | 86cf0459915bb748f2d3d5848b20913d9c6080f2 |
+| L21 | native/rust_helper/src/broker/credential_vault.rs | 029dccda7671d51c2bbd3debd4fe5d7e92221162 |
+| L22 | native/rust_helper/src/broker/workspace_root.rs | 15f208e0b855b8cee53e878d2b27aaf457ea2937 |
+| L23 | native/rust_helper/src/broker/workspace.rs | 68075d680a3c7d57785083e64d3d21523d79374c |
+| L24 | apps/desktop_flutter/test/linux_credential_vault_test.dart | 64c250a967fcfbc3b5da941810afbf558178dfe7 |
+| L25 | specs/linux_workspace_selection.schema.json | 842b55c0be8abfbff0524bf4ddbbc44dadbf4b12 |
+| L26 | specs/agent_task_workspace_permission_request.schema.json | 05f7a7f97c7bac884ce706cc7f1533792c35e486 |
+| L27 | specs/agent_task_owner_approval.schema.json | d190c9a8cc3d715eb199459c37c14e5de0ad6ad8 |
+| L28 | specs/credential_registration.schema.json | 65c8bc535e36c040e8574277f06ab1ecb2589d19 |
+| L29 | native/rust_helper/src/adapters/process_tree.rs | 66b5159f4c7da08e2d2e7de0ce8dfef95431254e |
+| L30 | native/rust_helper/src/adapters/codex_cli.rs | e5c9d1581ae9a1c0a3ae7fcfa626fdca6fea6d28 |
+| L31 | native/rust_helper/src/broker/agent_task_scratch.rs | de743cd819fb4533c9c3070c4e7bcae82e42d938 |
+| L32 | native/rust_helper/tests/agent_task_crash_recovery_e2e.rs | 23517fcfe8ef94b2357a94e04879d423c3360501 |
+| L33 | specs/agent_task_scratch_recovery.schema.json | 40f1eac71cd9645396ae7230d49cad25f3b77237 |
+| L34 | native/rust_helper/src/linux_product_bundle.rs | f71ed312c629e81914c61180baeb9723b315a69a |
+| L35 | tooling/export_linux_product.py | 47fe9a3032a5b2680e3f7d39b7cd64120ac83843 |
+| L36 | tooling/package_linux_product.py | 0d32d04ec5b43e1815b3664a323c17db79bc928a |
+| L37 | tooling/tests/test_linux_product_package.py | 3bb3b520d3c4d15b1f4d43993c8cddb0f0c08ee1 |
+| L38 | tooling/tests/test_linux_portable_archive.py | c04ac3c5d6d58396f650e9530b6731c6bb2037d6 |
+| L39 | tooling/tests/test_linux_workflow_helpers.py | 15c71a2ba5ac09ddab2c6ea23b36db256aeab85a |
+| L40 | tooling/tests/test_linux_deb_setup_package.py | 2467e29b9eb13bd65065fea5a80872a3068cdfcd |
+| L41 | installer/linux/README.md | 25e80411d6ca8f96e6d70718d59c19e7dc6a58e3 |
+| L42 | installer/linux/PORTABLE_README_ja.txt | 703f86b2d113c165f7930f026b842df762f2b205 |
+| L43 | native/rust_helper/src/broker/runtime_registry.rs | 9ff28610862586a599848d75f9e891a6c6cadf2f |
+| L44 | native/rust_helper/src/broker/dialogue.rs | c3c3fddb630dd06b7e6cc1c13b39f3d4f6f6a999 |
+| L45 | native/rust_helper/src/broker/host_center.rs | c27707faa61e5270b1c6d79e3ee3c5fe6ccd0bf8 |
+| L46 | native/rust_helper/src/broker/a2a_center.rs | 73ad601abd64a33ccefde4b73ab5f9dc4f728504 |
+| L47 | native/rust_helper/src/broker/mcp_center.rs | 8f9ab897bdc625e448241ebd9b46f995cd1f22f6 |
+| L48 | native/rust_helper/src/broker/audit.rs | eb1dcf5018d95c7fdf6171aadd4bca9554d1996f |
+| L49 | native/rust_helper/src/broker/content_recovery.rs | 0a0d14c9b113f6d03bd1388e7d48fc4b2717191a |
+| L50 | native/rust_helper/src/adapters/mcp_stdio.rs | b7e08327541ad75bca53bb1563e0e20d576d9b66 |
+| L51 | native/rust_helper/src/adapters/minidora.rs | 31c756ac7c9a264d73ed0e9654dbae599be83921 |
+| L52 | apps/desktop_flutter/lib/screens/runtime_center.dart | d2c7af172073d2b10c76a6416b90f011f10e95db |
+| L53 | tooling/tests/test_linux_gtk_bundle_smoke.py | 2f962348665fc80c29cd040c9c399734f084eb6b |
+
+### D4-LNX-T01 E0-04 21項目
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | D4-LNX-T01。v4のOS保証母集団S02、工程R02 E0-06/R07、Linux製品導線N10/K17/R03-Hに対応。 |
+| 旧ID | D4-LNX-T01。環境識別と証拠分類。 |
+| 元原文/正本参照 | 2026-10-22仕様書§6.1 T01、同指示書§3-C-1、v4仕様S02/S04-N10、工程R02 E0-06/R03-H/R07/R10、指示I04-H/I06。 |
+| 対象 | Linux native、WSL開発、WSLg/X11、headless、およびdistro/version/kernel/arch/libc/filesystem/GUI/toolchain/host/sourceの識別。 |
+| 目的 | Linux製品のSource・実行Host・OS artifactを再識別可能にし、開発環境の結果を製品証拠へ誤昇格させない。 |
+| 生成元（Producer） | E0 OS保証行、手動Linux workflow、installed acceptance harness、package manifest/build evidence producer。 |
+| 実Consumer | E0 OS candidate/Release evidence validator、linux_installed_product_smoke、linux_installed_acceptance_summary、Ubuntu/arch/display scopeを確認するworkflow。 |
+| 契約/データ | package manifestはsource commit・artifact/package/tree hash・app/runtime identityを束縛する。Ubuntu 24.04/amd64、X11/Wayland、隔離headlessは個別試験条件に現れるが、distro/kernel/libc/filesystem/GUI保証全体の正規契約は未確認。 |
+| 通常作用 | 宣言runのsource commit、package/app identity、installed tree、GUI backend、Ubuntu/architecture条件をsummaryとworkflowに記録する。 |
+| 否定作用 | WSL/WSLg/headless/Windowsの成功をnative Linux installed QAへ昇格させない。未宣言環境をruntimeが全面識別・拒否する経路は確認できない。 |
+| 停止/復旧 | 必須環境値やsource/artifact identityが欠ける場合はUNKNOWN/QA_NOT_ESTABLISHEDを維持する。統一runtime classifierと復旧契約は未接続。 |
+| 標準OS候補 | Linux nativeは必須。Ubuntu 24.04 LTS/amd64やUbuntu 22.04 hosted Xvfb/X11は過去の候補条件で、保証distro/version/kernel/arch/libc/filesystem/GUI範囲は未固定。 |
+| 配布物 | portable tar.gz、bootstrap .deb、D4PKG01 update payloadの生成源あり。署名済み一般配布物として未受入れ。 |
+| 既存実装 | Harnessのsource/package/tree/provenance確認、workflowのUbuntu/architecture guard、GTK X11/headless Wayland準備、Linux package manifest。 |
+| BUILD_GAP | 標準Linuxのdistro/version/kernel/arch/libc/filesystem/display/GUI session/Toolchain/source/host保証と同一candidate evidence identityの全結合が未完了。 |
+| 参照元ハッシュ（SourceSHA） | C01〜C11共通＋L01〜L05,L34〜L36,L41。上記SourceSHA表を参照。 |
+| 試験区分（TestClass） | SOURCE/CONTRACT/UNIT/manual workflow sourceあり。過去の限定HOSTED_OS_PRODUCT/LIVE_RUNTIME履歴あり。本mappingでの実行はNOT_RUN。 |
+| 証拠ID | NONE。旧Linux runはC09/C10の履歴で、現v4 candidate evidenceではない。 |
+| 阻害要件（Blocker） | linux_native_product_support、comprehensive_extension_rev1_completionの既存scopeのみ。新規Blockerなし。 |
+| 状態 | E0 mapping完了。T01 acceptance OPEN、N10/K17/OS QA OPEN、E0 OPEN。 |
+| 残余 | 標準対象の宣言と実host測定を固定する。Linux物理端末を追加条件にしない。 |
+
+### D4-LNX-T02 E0-04 21項目
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | D4-LNX-T02。Linux native Desktop→Owner→認証IPC→Broker→Runtime/Agent Task→結果/Audit/Agent Centerの縦断経路。 |
+| 旧ID | D4-LNX-T02。単一Task縦断。 |
+| 元原文/正本参照 | 2026-10-22仕様書§6.1 T02、同指示書§3-C-2、v4仕様S02/S04-N01/N02/N10/S05 K01/K17、工程R03-A/H/R07、指示I04-A/H/I06。 |
+| 対象 | Linux Flutter/GTK入口、Rust所有Owner確認、認証private IPC、normal Broker、Runtime Adapter、Agent Task/Tool結果、Audit、Agent Center投影。 |
+| 目的 | 一つの実TaskでLinux nativeの通常利用者経路と権限・結果境界をつなぎ、fixtureだけの成功を製品実作用と誤認しない。 |
+| 生成元（Producer） | Agent Center Task要求、Linux Runner broker channel、Rust launcher/workerのsession-bound relay、Broker Task/Agent AdapterとAudit投影。 |
+| 実Consumer | Linux Runner→Rust launcher/worker→gui_shell_linux_broker→Broker Task handler→Codex/MCP consumer→AgentTaskClient/Agent Center。installed harnessはUI/Task/Tool/Owner状態を観測する。 |
+| 契約/データ | agent_task_request/agent_task/permission/approval schema、認証relay、Task/Workspace ID、Owner要求binding、result hash、Audit identity、bounded content exposure。 |
+| 通常作用 | Linux sourceには通常Broker pathとTask UIがある。Hosted installed harnessは限定Task/MCP fixtureを実行する。歴史上のrun #286はUbuntu 22.04 hosted Xvfb/X11、normal Release、local no-auth fixtureの限定positive Task。 |
+| 否定作用 | UI/fixture metadataだけ、Owner/Permission/Approvalなし、別Workspace/Host再利用、実Tool未到達をSYSTEM_SHAPEDへ昇格させない。 |
+| 停止/復旧 | Rust relay/Owner拒否/Broker拒否のsourceは存在する。current-v4 installed Linuxでsame-Task failure/cancel/recoveryを通した証拠はない。 |
+| 標準OS候補 | Linux native必須。Ubuntu 24.04/amd64は候補。Ubuntu 22.04 hosted/Xvfbの履歴は限定条件で、WSLはnative installed証拠ではない。 |
+| 配布物 | Linux GTK product bundle、portable archive、bootstrap package候補。正式配布と同一sourceの一般installer lifecycleはN10/K17でOPEN。 |
+| 既存実装 | 参照する実装群: `GTK Runner channel、Rust Linux launcher/worker/Broker binary、Agent Center client、Task schema、Rust production E2E test source、installed harness`。 |
+| BUILD_GAP | 同一candidateのLinux native installed UI→実Agent/provider/tool→結果再利用→durable Audit→Agent Centerまでの実Agent Task acceptanceは未成立。local no-auth/MCP fixtureは外部実接続の代用にならない。 |
+| 参照元ハッシュ（SourceSHA） | C01〜C11共通＋L01〜L17。上記SourceSHA表を参照。 |
+| 試験区分（TestClass） | SOURCE/UNIT/FIXTURE/Rust E2E test source/過去限定HOSTED_OS_PRODUCT。本mappingではLinux product runtime NOT_RUN。 |
+| 証拠ID | NONE。#286はC10の限定履歴で、現candidate Evidenceではない。 |
+| 阻害要件（Blocker） | linux_native_product_support、comprehensive_extension_rev1_completionの既存scope。新規Blockerなし。 |
+| 状態 | E0 mapping完了。T02 acceptance OPEN、N01/N02/N10/K17 OPEN、E0 OPEN。 |
+| 残余 | current-v4 installed native/VM Linuxで実Agent Taskを通し、source/artifact/Owner/Permission/Approval/Tool/Audit/UIを一組として記録する。 |
+
+### D4-LNX-T03 E0-04 21項目
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | D4-LNX-T03。Linux Permission/Approval/secret/Workspace root/path/IPC拒否。 |
+| 旧ID | D4-LNX-T03。OS安全境界。 |
+| 元原文/正本参照 | 2026-10-22仕様書§6.1 T03、同指示書§3-C-2、v4仕様S02/S04-N01/N02/N09/N10、工程R00-06/R03-A/H/R07、指示I04-H/I06/I07。 |
+| 対象 | Native Owner UI、Broker Permission/Approval、Linux Secret Service、credential vault、Workspace選択/root、symlink/hardlink/path containment、IPC/process permission denial。 |
+| 目的 | Linux OS権限境界を製品Brokerへつなぎ、秘密やWorkspace外作用を許可条件なしに通さずfail-closedにする。 |
+| 生成元（Producer） | Rust Linux Owner/Credential/Workspace UI adapter、Flutter非秘密要求、Broker credential/workspace/permission/approval service。 |
+| 実Consumer | 対象consumer: `linux_desktop_worker native operation relay、linux_credential_input、linux_workspace_selection、Broker credential_storage/credential_vault/workspace_root/workspace、Flutter credential UI、installer runtime`。 |
+| 契約/データ | credential登録metadata/private secret input、linux_workspace_selection schema、Workspace root identity、一回Permission/Approval、nofollow root/path検査、Audit metadata。 |
+| 通常作用 | 秘密はnative Rust/GTK UIから入力しLinux Secret Serviceへ保存するsourceがある。Workspace選択はprivate Rust経路を通り、Task Permission/ApprovalはBrokerが保持する。 |
+| 否定作用 | Flutter/snapshot/logへのsecret露出、symlink root、Workspace外path、不正selection frame、古いOwner応答、OS権限拒否、未認可IPCを権限や成功へ変換しない。 |
+| 停止/復旧 | parse/identity/path/Audit失敗は操作を拒否する。unsafe scratch/rootは保持または拒否する。Linux製品全体の復旧は未証明。 |
+| 標準OS候補 | Ubuntu 24.04 LTS/amd64は候補。Secret Service sessionとLinux file permissionを含む最終distro/API/filesystem範囲はUNKNOWN。 |
+| 配布物 | Rust helper/GTK runnerを含むLinux bundle/package。Secret Service利用可否はpackage導入とは別の環境条件。 |
+| 既存実装 | 実装source: `Linux credential/workspace modules、Broker storage/vault/root/workspace、schema、Flutter widget test、Rust Linux storage/worker test source`。 |
+| BUILD_GAP | 一つのcurrent artifactでinstalled native Owner/Permission/Approval、実Secret Service、Workspace symlink/hardlink/outside deny、Auditまで統合した受入れはない。 |
+| 参照元ハッシュ（SourceSHA） | C01〜C11共通＋L08,L10,L18〜L28。上記SourceSHA表を参照。 |
+| 試験区分（TestClass） | SOURCE/CONTRACT/UNIT/FIXTURE。本mappingでinstalled Linux negative/secret-boundary run NOT_RUN。 |
+| 証拠ID | NONE。個別の過去結果はC09/C10の範囲に留まり、統合current-candidate evidenceではない。 |
+| 阻害要件（Blocker） | linux_native_product_supportとcomprehensive_extension_rev1_completionの既存security/runtime scopeのみ。 |
+| 状態 | E0 mapping完了。T03 acceptance OPEN、N01/N02/N09/N10/K17 OPEN、E0 OPEN。 |
+| 残余 | 同一Linux candidateでinstalled native許可/拒否、path/secret/Auditを検査する。非Windows物理端末は不要。 |
+
+### D4-LNX-T04 E0-04 21項目
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | D4-LNX-T04。Linux Task process descendants、deadline/cancel/crash、scratch隔離、再起動Recovery。 |
+| 旧ID | D4-LNX-T04。Linux process supervisionとRecovery。 |
+| 元原文/正本参照 | 2026-10-22仕様書§6.1 T04、同指示書§3-C-3、v4 N01/N02/N09/N10、工程R00-06/R03-A/H/R07/R10、指示I04-A/H/I06/I07。 |
+| 対象 | 対象状態: `Linux process group guardian、Codex/MCP子process、Broker Task scratch journal、cancel/deadline、Broker/child crash、再起動照合、orphan/contamination`。 |
+| 目的 | Task終了・異常時に子process、scratch、古いApproval、Task間状態を残さない。 |
+| 生成元（Producer） | Rust process_treeがLinux所有guardian/groupを作る。Codex adapterとBroker AgentTask scratchが予約・記録・照合し、Linux workerがBroker relayを担う。 |
+| 実Consumer | 実consumer: `adapter child実行/process group cleanup、Broker AgentTask scratch journal/Recovery、installed harnessのprocess inventory/terminal Task observer`。 |
+| 契約/データ | data項目: `Task-bound process group、deadline/cancel terminal result、scratch recovery schema、Task/Workspace/Runtime/Toolchain identity、bounded journal/Audit ID`。 |
+| 通常作用 | Linux guardian process groupとTask scratch Recoveryのsource、unit/Rust E2E testがある。過去Actions/WSL結果はその環境・test条件に限る。 |
+| 否定作用 | guardian消失、group identity不明、scratch journal不一致、危険path、deadline/cancel失敗をTask成功へ昇格しない。古いApprovalを再使用しない。 |
+| 停止/復旧 | guardian lossはsource test上fail-closed。Broker journalは安全な範囲を照合し、不安全・不一致pathを保持する。installed Linux全lifecycleでのcancel/deadline/crash/restartは未証明。 |
+| 標準OS候補 | 宣言したLinux native VM/hosted distroで検査。Windows Job Objectの結果はLinux証拠にしない。 |
+| 配布物 | Rust helper/Brokerを含むLinux GTK/Release bundle。package identityとinstalled process ownershipはN10/K17範囲。 |
+| 既存実装 | 実装source: `process_tree.rs Linux guardian、codex_cli.rs、agent_task_scratch.rs、linux_desktop_worker.rs、scratch-recovery schema、production/crash E2E test source`。 |
+| BUILD_GAP | 同一installed Taskのdeadline/cancel/descendant stop、Broker/Codex/launcher crash Recovery、scratch cleanup/restart、stale authorityなしを現artifactで閉じていない。 |
+| 参照元ハッシュ（SourceSHA） | C01〜C11共通＋L09,L10,L29〜L33。上記SourceSHA表を参照。 |
+| 試験区分（TestClass） | SOURCE/UNIT/FIXTURE/Rust E2E test source。本mappingでLinux installed lifecycle/fault run NOT_RUN。 |
+| 証拠ID | NONE。C09/C10の履歴はcurrent candidate挙動を証明しない。 |
+| 阻害要件（Blocker） | linux_native_product_supportとcomprehensive_extension_rev1_completionの既存scopeのみ。 |
+| 状態 | E0 mapping完了。T04 acceptance OPEN、N01/N02/N09/N10/K17 OPEN、E0 OPEN。 |
+| 残余 | 宣言VM/hosted native Linuxでinstalled Taskのcancel/deadline/crash/Recoveryを閉じる。物理端末は不要。 |
+
+### D4-LNX-T05 E0-04 21項目
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | D4-LNX-T05。native Linux GUI条件をX11/Wayland別に扱う。 |
+| 旧ID | D4-LNX-T05。GUI可視、Owner操作、停止/状態消去、Broker/UI一致。 |
+| 元原文/正本参照 | 2026-10-22仕様書§6.1 T05、同指示書§3-C-2/4、v4 S02/S04-N10、工程R03-H/R07/R10、指示I04-H/I06。 |
+| 対象 | Flutter GTK app、native Owner操作、X11/Wayland session、accessibility/window visibility、Broker result projection、停止/状態消去。 |
+| 目的 | 宣言したLinux GUI backendごとに通常操作でき、Brokerが決めた状態と操作結果を画面へ一致して示す。 |
+| 生成元（Producer） | 実装source: `Flutter Linux runner、GTK Owner dialog/channel、installed smoke harness、session-specific workflow`。 |
+| 実Consumer | GTK Runner→Broker channel→installed UI、AT-SPI observer、GTK/Wayland起動harnessによるwindow/action/process観測。 |
+| 契約/データ | display backend/session、DISPLAY/WAYLAND_DISPLAY、accessible window/action tree、Owner応答binding、Broker Task result/Audit ID。 |
+| 通常作用 | Hosted X11 UIおよびisolated Weston/Pixman Wayland test履歴あり。Wayland履歴はGTK top-levelのAT-SPI SHOWINGとowned process cleanupまでで、surface renderingや実desktop/compositorを示さない。 |
+| 否定作用 | X11 PASSをWaylandへ拡張しない。WSLg/Xvfb/headlessをnative desktop sessionと扱わず、accessible target欠落や古いUI状態を成功にしない。 |
+| 停止/復旧 | display/session不足またはUI/Broker不一致では当該backendをQA_NOT_ESTABLISHEDとする。harnessは所有processを終了・回収する。 |
+| 標準OS候補 | 宣言した各backendのLinux native VM/hosted。Ubuntu 24.04.5 hostedやisolated headless Weston/Pixmanは限定観測条件。 |
+| 配布物 | GTK bundle/desktop entry/Linux package。同一source/artifact identityでinstalled起動する。 |
+| 既存実装 | 実装source: `GTK Runner、broker_process_channel.cc、linux_installed_product_smoke.py、AT-SPI producer、Wayland environment helper、manual workflow`。 |
+| BUILD_GAP | current source/packageで標準X11/Wayland installed UI、Owner操作、描画、状態消去/停止、Broker結果一致を各々受け入れた記録がない。 |
+| 参照元ハッシュ（SourceSHA） | C01〜C11共通＋L01〜L04,L06〜L08,L53。上記SourceSHA表を参照。 |
+| 試験区分（TestClass） | SOURCE/UNIT/過去限定HOSTED_OS_PRODUCT/LIVE_RUNTIME。本mappingでcurrent backend QA NOT_RUN。 |
+| 証拠ID | NONE。過去X11/Wayland runはC09/C10の履歴で、現candidate QAではない。 |
+| 阻害要件（Blocker） | linux_native_product_supportとcomprehensive_extension_rev1_completionの既存scope。 |
+| 状態 | E0 mapping完了。T05 acceptance OPEN、N10/K17/Linux OS QA OPEN、E0 OPEN。 |
+| 残余 | 宣言標準OSでX11/Waylandを個別に受け入れる。Linux物理機は不要。 |
+
+### D4-LNX-T06 E0-04 21項目
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | D4-LNX-T06。Linux distributionのbuild/package→install→first-run→update/rollback→uninstall lifecycle。 |
+| 旧ID | D4-LNX-T06。同一source package provenanceと利用者lifecycle。 |
+| 元原文/正本参照 | 2026-10-22仕様書§6.1 T06、同指示書§3-C-4、v4 S02/S04-N10、工程R03-H/R07/R10、指示I04-H/I06/I07。 |
+| 対象 | Linux exporter/package、package manifest、install/bootstrap、初回起動、update source/trust、rollback、uninstall、data保全、installed artifact identity。 |
+| 目的 | 宣言Linux packageを一つのsource/manifest/hashへ結び、end-userへ開発toolchainの導入を求めず通常lifecycleを成立させる。 |
+| 生成元（Producer） | linux_product_bundle/export/package tooling、update catalog、manual workflowのpackage/evidence producer。 |
+| 実Consumer | Linux bootstrap/setupまたはinstalled GTK app、Broker update/rollback/uninstall、package manager/desktop entry、Audit store、validation summary。 |
+| 契約/データ | 契約data: `Linux product package manifest、source commit、bundle/package/tree SHA-256、app/runtime/audit-store identity、version/channel/update record、Owner decision`。 |
+| 通常作用 | portable archive、bootstrap .deb、D4PKG01 payloadのsourceあり。過去hosted runで一部lifecycleを試験。run #277はtest identity/Xvfb/X11によるrun-owned HTTPS/update/rollback/export/uninstallで、正式配布ではない。 |
+| 否定作用 | build成功、WSL起動、source bundle、fixture payload、unsigned/test-key package、Windows installerを一般配布Linux製品の証拠にしない。 |
+| 停止/復旧 | source/hash/signature/Owner決定不一致は候補を拒否する。rollback/uninstallは利用者dataを保全する。current-v4同一artifactの全lifecycleは未成立。 |
+| 標準OS候補 | Ubuntu 24.04 LTS/amd64はpackage候補環境。workflowのbwrap制約にはUbuntu 22.04 scopeもある。保証distro/version/archはE0で未確定。 |
+| 配布物 | portable tar.gz、bootstrap .deb、D4PKG01 update payload候補。正式署名、通常installer、support matrix、配布channelはOPEN。 |
+| 既存実装 | 実装source: `Linux package/export source、Debian/portable test、installer docs、manual workflow、installed acceptance summary/product smoke`。 |
+| BUILD_GAP | 同一current candidateの標準OS package install/first-run/update/rollback/uninstall、provenance/signing、data保全の一連受入れはない。過去hosted lifecycleはT06を閉じない。 |
+| 参照元ハッシュ（SourceSHA） | C01〜C11共通＋L01〜L05,L34〜L42,L53。上記SourceSHA表を参照。 |
+| 試験区分（TestClass） | SOURCE/UNIT/FIXTURE/過去限定HOSTED_OS_PRODUCT。本mappingでcurrent-v4 lifecycle NOT_RUN。 |
+| 証拠ID | NONE。過去lifecycle記録はC09/C10の限定scope。 |
+| 阻害要件（Blocker） | linux_native_product_supportとcomprehensive_extension_rev1_completionの既存scope。新規Blockerなし。 |
+| 状態 | E0 mapping完了。T06 acceptance OPEN、N10/K17/Linux OS QA OPEN、E0 OPEN。 |
+| 残余 | 標準distro/package matrixを固定しcurrent artifactで全lifecycleを確認する。非Windows物理hostは不要。 |
+
+### D4-LNX-T07 E0-04 21項目
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | D4-LNX-T07。Linux nativeのRuntime/Agent、Provider/MCP/A2A/Host、Workspace、Buffer、Audit/Recovery要求母集団。 |
+| 旧ID | D4-LNX-T07。機能ごとの接続・未接続・拒否一覧。 |
+| 元原文/正本参照 | 2026-10-22仕様書§6.1 T07、同指示書§3-C-2/4、v4 N01〜N11/S05 K01〜K20、工程R02/R03-A〜J/R05/R07/R10、指示I02/I04/I06/I07。 |
+| 対象 | Linux installed Runtime登録/Agent Task、MCP/A2A/Host、Workspace/scratch、Permission/Credential、Audit/Recovery、update/export/package、標準GUIの実consumer。 |
+| 目的 | Linux要求母集団を実consumerと作用ごとに分け、部分機能やmetadata UIだけでLinux全体を完成扱いしない。 |
+| 生成元（Producer） | 共通Flutter/Rust feature producer、Linux Runner/launcher/package、および各feature contract/test。 |
+| 実Consumer | Linux helperから共有Rust Brokerへ接続し、runtime_registry/dialogue、Codex/MCP adapter、mcp_center/a2a_center/host_center、workspace/root、agent_task_scratch、credential vault/storage、audit/content_recovery、Agent Center/runtime screenがsource上にある。 |
+| 契約/データ | 現行v4 feature schema/contract、Broker所有Permission/Approval/Audit/Recovery、OS package/runtime identity。共有codeの存在はLinux製品経路全ての接続証明ではない。 |
+| 通常作用 | 現sourceにLinux launcher/worker/Broker pathと共有Broker feature moduleがある。過去Task/package/UI記録はC09/C10に記載された個別範囲に限る。 |
+| 否定作用 | Host metadata、Agent Card、MCP catalog、Adapter metadata、schema/fixture、一つのinstalled featureをLinux全機能のauthority/acceptanceとしない。未接続能力はBUILD_GAP、非対応能力は明示する。 |
+| 停止/復旧 | 操作は共有Broker contractの境界に留める。OS境界失敗はreject/suspendする。feature別のLinux restart/Recovery/Audit接続は包括確認されていない。 |
+| 標準OS候補 | 宣言したLinux native distro/archとX11/Wayland backend。Windows/macOS/mobile証拠で代替しない。 |
+| 配布物 | Linux bundle/packageへのmodule inclusionと同一source identity、正式署名、全機能consumer matrixが未確定。 |
+| 既存実装 | Linux Runner/helper、共有Runtime/Agent/MCP/A2A/Host/Workspace/Audit/Recovery module、関連schema/test source。 |
+| BUILD_GAP | 全Linux operationについてper-feature WIRED/BUILD_GAP/BLOCKED_AUTHORITY、package inclusion、failure/Recovery、evidence classを結ぶ母集団表が未完。共有moduleだけではLinux wiringを証明しない。 |
+| 参照元ハッシュ（SourceSHA） | C01〜C11共通＋L06〜L16,L19〜L23,L29〜L31,L43〜L52。上記SourceSHA表を参照。 |
+| 試験区分（TestClass） | SOURCE/CONTRACT/UNIT/FIXTURE。feature別の過去hosted記録は限定的。Linux全consumer QC/QAはNOT_RUN。 |
+| 証拠ID | NONE。集約Linux evidenceは発行しない。 |
+| 阻害要件（Blocker） | linux_native_product_supportとcomprehensive_extension_rev1_completionの既存scopeのみ。 |
+| 状態 | E0 mapping完了。T07 acceptance OPEN、N01〜N11/K17/BUILD_COVERED OPEN、E0 OPEN。 |
+| 残余 | source/contract/consumer全数表を完成し、後段でLinux製品QC/QAを行う。非Windows物理端末待ちで停止しない。 |
+
+### D4-LNX-T08 E0-04 21項目
+
+| E0-04項目 | 個別値 |
+|---|---|
+| 現ID | D4-LNX-T08。Linux bufferなし/ありの同条件比較、横断回帰、fault、長時間、resource、副作用。 |
+| 旧ID | D4-LNX-T08。Linux固有比較QCとOS間副作用確認。 |
+| 元原文/正本参照 | 2026-10-22仕様書§6.1 T08、同指示書§3-C-5、v4 S02/S05 K19/K20、工程R03-F/H/J/R05/R07/R10、指示I04-F/H/I05/I07。 |
+| 対象 | 宣言Linux candidate、Buffer intervention/基準動作、source/Toolchain/Workspace/Task、実Tool result、独立比較、process/resource、他OSへの影響。 |
+| 目的 | 同一入力で限定介入が元Linux Taskに与える効果を測り、結果意味と安全を保ち、副作用を別OS/backendへ移さない。 |
+| 生成元（Producer） | Buffer failure/cause/intervention record、Linux Task/process/scratch consumer、比較/evidence collector、OS resource observer。 |
+| 実Consumer | Broker dialogue/AgentTask scratchの限定Task-bound観測、process tree、Linux installed harnessが候補consumer。一般Buffer engineや独立結果比較を実装・証明したものではない。 |
+| 契約/データ | Buffer cause/intervention/source commit、同一Task/environment/Workspace、元Tool結果、独立比較、failure/side-effect、duration/resource、bounded Audit。 |
+| 通常作用 | Linux process/scratch sourceと過去WSL/hosted testがある。current installed Linuxでbuffer-off/onの同条件結果比較、長時間、OS間副作用の証拠は確認できない。 |
+| 否定作用 | retry成功、fixture結果、source hash、local compile、Windows/WSL結果をLinux介入効果、意味同等性、性能、全Linux保証へ昇格しない。 |
+| 停止/復旧 | 比較欠落・効果不明はUNKNOWN/NOT_RUN。安全・検証不能な介入は拒否/suspendし、既存Broker Audit/Recoveryへ戻す。 |
+| 標準OS候補 | 比較する両条件でLinux distro/version/arch/backend/source/Toolchainを一致させる。OS横断はscopeを明示して別比較。保証母集団は未確定。 |
+| 配布物 | 両条件で同一installed Linux artifact identityを要求する。このmappingでは生成・試験なし。 |
+| 既存実装 | B0〜B5履歴、限定Broker scratch mediation、Linux process supervision、installed harness。一般Linux因果Buffer比較は未確認。 |
+| BUILD_GAP | current candidateの実Taskでbuffer-off/onを対にし、独立結果/副作用比較、resource/長時間/fault、OS横断回帰を測定した証拠がない。 |
+| 参照元ハッシュ（SourceSHA） | C01〜C11共通＋L01,L02,L29〜L33,L44。上記SourceSHA表を参照。 |
+| 試験区分（TestClass） | SOURCE/UNIT/FIXTUREと過去開発記録のみ。Linux比較製品QC/performance/endurance NOT_RUN。 |
+| 証拠ID | NONE。C09/C10のB5/WSL/hosted履歴はLinux比較Acceptanceではない。 |
+| 阻害要件（Blocker） | linux_native_product_support/comprehensive_extension_rev1_completionとN08/N11の既存scopeのみ。新規Blockerなし。 |
+| 状態 | E0 mapping完了。T08 acceptance OPEN、K19/K20/B5/B6/QC/QA OPEN、E0 OPEN。 |
+| 残余 | v4 QC段階で宣言済みinstalled Linux candidate上の有限比較を行う。このmappingだけでは現工程へ新規blockerを追加しない。 |
+
+### D4-LNX-T01〜T08 E0対応の結論
+
+8 IDすべてをE0-04の21項目で個別記録した。既存source/workflow/testを要求台帳へ接続したが、sourceの存在は受入れではない。過去Linux runのhost/GUI/fixture/identity/artifact範囲を保持し、現v4 Evidence IDは全件NONE、Linux Acceptance/N10/K17/BUILD_COVERED/Linux OS QA/E0はOPENのままとした。Release Registryと既存blocker statusは変更せず、Linux物理端末条件も追加していない。
+
 ## 実装ファイルの初期目録（CODE_PRESENTのみ）
 
 下記は`d503a4ef6daac8942abd1cb011442ce28c78ec55`時点のパス存在・責務候補を読み取った初期目録である。名前・コードの存在だけではProducer→Consumer接続、installed/runtime実作用、Acceptanceを証明しない。各行の`WIRED`、実作用、正常/否定/Recovery、Evidence、OS別状態は未照合なら`UNKNOWN`。
@@ -7376,7 +7670,7 @@ R01/R03はSource→Consumerの統治主体が共通Source set内のAGENTS・採�
 | 製品能力 K01〜K20 | 20 | v4仕様S05 | 20 IDをv4 N01〜N11/A〜JとCanonical N consumerへcrosswalk済み。K01〜K20はE0-04全21 fieldとSourceSHAを個別記録済み。N11 Evidence/Blocker/OS Artifact全数結合を継続 |
 | Buffer BUF-R01〜R09／BUF-T01〜T24 | 9／24 | 緩衝基盤採用記録・v4仕様S06 | 33 IDの21 field／SourceSHAを維持し、N08/N10/N11の原因・Consumer・5 OS Artifact・Evidence/既存Blocker scope row joinを記録済み。Evidence ID NONE、全Acceptance OPEN。B0〜B6 statusは不変 |
 | Buffer工程 B0〜B6 | 7 | `docs/緩衝基盤_rev5補遺_QC/`・v4仕様S06 | B0〜B4の限定CLOSEDを保持、B5 OPEN、B6未成立。詳細Consumer照合が未完 |
-| QE/監査 D4-QE-R01〜R13／D4-LNX-T01〜T08／D4-AUD-F01〜F07 | 13／8／7 | `docs/QE_2026-10-22/`・各採用記録 | D4-QE-R01〜R13はE0-04 21項目と現行sourceを照合済み。Evidence ID NONE、Acceptance OPEN。D4-LNX-T01〜T08／D4-AUD-F01〜F07は未照合 |
+| QE/監査 D4-QE-R01〜R13／D4-LNX-T01〜T08／D4-AUD-F01〜F07 | 13／8／7 | `docs/QE_2026-10-22/`・各採用記録 | D4-QE-R01〜R13およびD4-LNX-T01〜T08はE0-04 21項目と現行sourceを照合済み。全件Evidence ID NONE、製品Acceptance OPEN。D4-AUD-F01〜F07は未照合 |
 | Q0〜Q7、FQ群、W00〜W08 | 8／13／9 | v4工程表R05〜R08、`docs/FINAL_QA_QUEUE.md`、進捗履歴 | Q0〜Q7はDEFERRED。FQ/W各IDの現在Consumer・証拠・残余の照合が未完 |
 | Release Blocker | 18 | `release_blockers.registry.json` | 18件中16件unresolved／2件resolvedを保持。18件すべてのv4条件移行を個別に照合中 |
 
@@ -7418,7 +7712,7 @@ R01/R03はSource→Consumerの統治主体が共通Source set内のAGENTS・採�
 1. N01〜N10のE0-04 21項目は現行SourceSHAへ個別照合済み。各製品AcceptanceはOPENのまま維持し、N10の五OS実導入・利用・更新・Recovery QAは後続の製品Acceptanceに残す。
 2. C0〜C34およびPhase 0〜45の個別field記録、K01〜K20のSource mappingを維持し再試験しない。N11 Evidence／Blocker／OS Artifact行結合と残存E0母集団を続ける。旧CLOSED／FAILは履歴として保持し、再試験しない。
 3. BUF-R/T 33 IDのSourceSHA／Consumer scopeを維持し、原因→Consumer、N08/N10/N11、5 OS artifact、Evidence/既存Blocker scopeをrow join済み。現runtimeはCodex Task scratchの限定経路、Evidence ID NONE、Acceptance OPEN。B0〜B6の履歴status不変。
-4. D4-QE-R01〜R13はE0-04 mapping済み（SourceSHAはsource同一性のみ、Evidence ID NONE、Acceptance OPEN）。次にD4-LNX-T01〜T08、D4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
+4. D4-QE-R01〜R13およびD4-LNX-T01〜T08はE0-04 mapping済み（SourceSHAはsource同一性のみ、Evidence ID NONE、Acceptance OPEN）。次にD4-AUD-F01〜F07、Q0〜Q7、FQ群、W00〜W08、18 blockerを現行Consumer/証拠/gateへ一意に接続する。
 5. specs/Schema、Shell Core、Rust Broker、Flutter、Native、Installer、Toolingのproducer/consumer inventoryを現在HEADへ再照合し、SourceSHA・TestClass・Evidence ID・BUILD_GAPを埋める。
 6. N10の各OS標準候補・配布・実装・workflow/test・限定履歴を記録する。保証version/arch/resource/package条件は公式条件と実測から固定し、未知をUNKNOWNにする。
 7. N11 Evidence/Registry/validator/QA queue consumer mappingに全ID・全OS artifactを接続する。Acceptance/E3 BUILD_COVERED/E4 QC/E5 QA/E6 Release判定は正本工程の順序と区分を維持する。
