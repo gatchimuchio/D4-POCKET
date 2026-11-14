@@ -1737,17 +1737,17 @@ def _capture_macos_aot_surface_analysis(
     profiled_size, profiled_hash = _macos_aot_image(
         profiled_image, "Flutter macOS profile AOT image"
     )
-    exported_size, exported_hash = _macos_aot_image(
-        exported_image, "macOS Export bundle AOT image"
+    presign_export_size, presign_export_hash = _macos_aot_image(
+        exported_image, "macOS pre-sign Export bundle AOT image"
     )
     if (
         not isinstance(aot_root.get("value"), int)
         or isinstance(aot_root.get("value"), bool)
         or aot_root.get("value") != profiled_size
-        or profiled_size != exported_size
-        or profiled_hash != exported_hash
     ):
-        raise ValueError("Flutter AOT report／profile／Export bundle image identityが一致しない")
+        raise ValueError("Flutter AOT report root sizeがprofile imageと一致しない")
+    if profiled_size != presign_export_size or profiled_hash != presign_export_hash:
+        raise ValueError("Flutter AOT report／profile／pre-sign Export bundle image identityが一致しない")
 
     analysis_directory = staging_root / "analysis"
     analysis_directory.mkdir(mode=0o700, exist_ok=False)
@@ -1769,10 +1769,10 @@ def _capture_macos_aot_surface_analysis(
         "included_source_surfaces": included_surfaces,
         "excluded_source_surfaces": excluded_surfaces,
         "profiled_aot_image_size_bytes": profiled_size,
-        "exported_aot_image_size_bytes": exported_size,
         "profiled_aot_image_sha256": profiled_hash,
-        "exported_aot_image_sha256": exported_hash,
-        "image_matches_export": True,
+        "presign_export_aot_image_size_bytes": presign_export_size,
+        "presign_export_aot_image_sha256": presign_export_hash,
+        "profile_matches_presign_export": True,
     }
 
 
@@ -1851,21 +1851,27 @@ def _validate_macos_aot_surface_evidence(
     )
     exported_size, exported_hash = _macos_aot_image(
         app_bundle.joinpath(*MACOS_AOT_IMAGE_RELATIVE_PATH.parts),
-        "macOS exported AOT image",
+        "macOS signed exported AOT image",
     )
     if (
         not isinstance(aot_root.get("value"), int)
         or isinstance(aot_root.get("value"), bool)
         or aot_root.get("value") != profiled_size
-        or profiled_size != exported_size
-        or profiled_hash != exported_hash
         or analysis["profiled_aot_image_size_bytes"] != profiled_size
-        or analysis["exported_aot_image_size_bytes"] != exported_size
         or analysis["profiled_aot_image_sha256"] != profiled_hash
-        or analysis["exported_aot_image_sha256"] != exported_hash
-        or analysis["image_matches_export"] is not True
     ):
-        raise ValueError("macOS AOT report／profile／bundle image evidenceが一致しない")
+        raise ValueError("macOS AOT report／profile image evidenceが一致しない")
+    if (
+        analysis["presign_export_aot_image_size_bytes"] != profiled_size
+        or analysis["presign_export_aot_image_sha256"] != profiled_hash
+        or analysis["profile_matches_presign_export"] is not True
+    ):
+        raise ValueError("macOS AOT profile／pre-sign bundle copy evidenceが一致しない")
+    if (
+        analysis["exported_aot_image_size_bytes"] != exported_size
+        or analysis["exported_aot_image_sha256"] != exported_hash
+    ):
+        raise ValueError("macOS signed AOT image evidenceがartifactと一致しない")
 
     expected_defines = [
         "--dart-define=GUI_SHELL_MODULE_"
@@ -2050,25 +2056,6 @@ def build_macos_product(
         if product_manifest.read_bytes() != manifest_raw:
             raise ValueError("Export Manifestをbyte-for-byteでbundleへ保持できなかった")
         _validate_bundle_symlinks(app_bundle)
-        _sign_macos_export_bundle(
-            app_bundle,
-            source_root=source_root,
-            flutter_framework=flutter_framework,
-            codesign=tools["codesign"],
-            lipo=tools["lipo"],
-            architecture=target_architecture,
-            verification_directory=temporary_root,
-            environment=environment,
-        )
-        app_code_signature_scan = _require_macos_code_without_publisher_identity(
-            app_bundle,
-            flutter_framework=flutter_framework,
-            codesign=tools["codesign"],
-            lipo=tools["lipo"],
-            architecture=target_architecture,
-            verification_directory=temporary_root,
-            environment=environment,
-        )
         catalog = _load_catalog()
         aot_surface_analysis = _capture_macos_aot_surface_analysis(
             output=flutter_output,
@@ -2081,7 +2068,35 @@ def build_macos_product(
             catalog=catalog,
             included_module_ids=set(plan.included_optional_ids),
         )
-
+        _sign_macos_export_bundle(
+            app_bundle,
+            source_root=source_root,
+            flutter_framework=flutter_framework,
+            codesign=tools["codesign"],
+            lipo=tools["lipo"],
+            architecture=target_architecture,
+            verification_directory=temporary_root,
+            environment=environment,
+        )
+        signed_aot_image_size, signed_aot_image_sha256 = _macos_aot_image(
+            app_bundle.joinpath(*MACOS_AOT_IMAGE_RELATIVE_PATH.parts),
+            "macOS signed exported AOT image",
+        )
+        aot_surface_analysis.update(
+            {
+                "exported_aot_image_size_bytes": signed_aot_image_size,
+                "exported_aot_image_sha256": signed_aot_image_sha256,
+            }
+        )
+        app_code_signature_scan = _require_macos_code_without_publisher_identity(
+            app_bundle,
+            flutter_framework=flutter_framework,
+            codesign=tools["codesign"],
+            lipo=tools["lipo"],
+            architecture=target_architecture,
+            verification_directory=temporary_root,
+            environment=environment,
+        )
         app_archive_path = staging_root / f"{bundle_name}.zip"
         _run(
             [tools["ditto"], "-c", "-k", "--sequesterRsrc", "--keepParent", str(app_bundle), str(app_archive_path)],
@@ -2145,7 +2160,7 @@ def build_macos_product(
         elapsed_ms = round((time.perf_counter() - started) * 1000)
         catalog = _load_catalog()
         evidence = {
-            "version": 7,
+            "version": 8,
             "evidence_type": "d4_pocket_macos_export_build",
             "evidence_source": "INTERNAL_STATE",
             "product": "D4 Pocket",
@@ -2343,7 +2358,7 @@ def _validate_build_evidence(
         embedded_flutter_binary_hash = ""
         architecture_slice_hash = ""
     if (
-        evidence.get("version") != 7
+        evidence.get("version") != 8
         or evidence.get("evidence_type") != "d4_pocket_macos_export_build"
         or evidence.get("target_platform") != "macos"
         or evidence.get("app_id") != expected_app_id

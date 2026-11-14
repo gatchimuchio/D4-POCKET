@@ -1,5 +1,5 @@
 {
-  "version": 7,
+  "version": 8,
   "evidence_type": "d4_pocket_macos_export_build",
   "evidence_source": "INTERNAL_STATE",
   "product": "D4 Pocket",
@@ -296,9 +296,11 @@
       "apps/desktop_flutter/lib/screens/setup_doctor.dart"
     ],
     "profiled_aot_image_size_bytes": 27,
+    "presign_export_aot_image_size_bytes": 27,
     "exported_aot_image_size_bytes": 27,
     "profiled_aot_image_sha256": "dc9566d02b844625ecb1f40b4902e3f470a654d4259527e13b479b6acef25e31",
+    "presign_export_aot_image_sha256": "dc9566d02b844625ecb1f40b4902e3f470a654d4259527e13b479b6acef25e31",
     "exported_aot_image_sha256": "dc9566d02b844625ecb1f40b4902e3f470a654d4259527e13b479b6acef25e31",
-    "image_matches_export": true
+    "profile_matches_presign_export": true
   }
 }

@@ -483,10 +483,37 @@ class MacOSProductExportTests(unittest.TestCase):
                 if module["module_id"] not in included
                 for surface in module["source_surfaces"]
             ))
-            self.assertTrue(analysis["image_matches_export"])
+            self.assertTrue(analysis["profile_matches_presign_export"])
+            self.assertEqual(
+                analysis["profiled_aot_image_size_bytes"],
+                analysis["presign_export_aot_image_size_bytes"],
+            )
+            self.assertEqual(
+                analysis["profiled_aot_image_sha256"],
+                analysis["presign_export_aot_image_sha256"],
+            )
             self.assertTrue(
                 (staging_root / "analysis/macos-code-size-analysis.json").is_file()
             )
+
+            bundle_image = bundle_root.joinpath(*MACOS_AOT_IMAGE_RELATIVE_PATH.parts)
+            bundle_image.write_bytes(binary + b"unexpected pre-sign change")
+            with self.assertRaisesRegex(ValueError, "profile／pre-sign Export bundle image identity"):
+                _capture_macos_aot_surface_analysis(
+                    output=(
+                        "A summary of your macOS bundle analysis can be found at: "
+                        f"{report_path}\n"
+                    ),
+                    isolated_home=home,
+                    input_directory=input_directory,
+                    profiled_app=profiled_app,
+                    bundle_root=bundle_root,
+                    staging_root=root / "rejected-presign-artifact",
+                    target_architecture="arm64",
+                    catalog=catalog,
+                    included_module_ids=included,
+                )
+            bundle_image.write_bytes(binary)
 
             report_path.write_text(
                 json.dumps(_macos_aot_report(len(binary), [*included_surfaces, excluded_surface])),
@@ -1363,6 +1390,14 @@ class MacOSProductExportTests(unittest.TestCase):
                 catalog=catalog,
                 included_module_ids=included_module_ids,
             )
+            signed_aot = aot_binary + b"\x00adhoc-signature"
+            exported_aot.write_bytes(signed_aot)
+            aot_surface_analysis.update(
+                {
+                    "exported_aot_image_size_bytes": len(signed_aot),
+                    "exported_aot_image_sha256": hashlib.sha256(signed_aot).hexdigest(),
+                }
+            )
             package_path = output / "D4Pocket-333333333333.pkg"
             package_path.write_bytes(b"unsigned package fixture")
             uninstaller_path = output / "D4Pocket-333333333333-Uninstaller.pkg"
@@ -1516,6 +1551,10 @@ class MacOSProductExportTests(unittest.TestCase):
                     )
 
             validate_current_evidence()
+            exported_aot.write_bytes(signed_aot + b"tampered")
+            with self.assertRaisesRegex(ValueError, "signed AOT image evidence"):
+                validate_current_evidence()
+            exported_aot.write_bytes(signed_aot)
             evidence["app_code_signature_scan"]["flutter_toolchain_framework"][
                 "source_tree_sha256"
             ] = "0" * 64

@@ -748,7 +748,7 @@ jobs:
           import hashlib, json, pathlib, plistlib, re, sys
           path = pathlib.Path(sys.argv[1])
           record = json.loads(path.read_text(encoding='utf-8'))
-          assert record['version'] == 7
+          assert record['version'] == 8
           assert record['target_platform'] == 'macos'
           assert record['app_id'] == 'd4-pocket-app-33333333333333333333333333333333'
           assert record['audit_store_id'] == 'audit-store-44444444444444444444444444444444'
@@ -811,7 +811,9 @@ jobs:
           assert record['credential_artifact_scan']['findings'] == 0
           analysis = record['aot_surface_analysis']
           assert analysis['scope'] == 'flutter_macos_release_aot_catalog_surfaces'
-          assert analysis['image_matches_export'] is True
+          assert analysis['profile_matches_presign_export'] is True
+          assert analysis['profiled_aot_image_size_bytes'] == analysis['presign_export_aot_image_size_bytes']
+          assert analysis['profiled_aot_image_sha256'] == analysis['presign_export_aot_image_sha256']
           assert analysis['aot_surface_libraries'] == analysis['included_source_surfaces']
           assert {item['name'] for item in analysis['inputs']} == {
               f"snapshot.{record['target_architecture']}.json",
