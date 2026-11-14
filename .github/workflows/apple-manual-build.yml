@@ -740,11 +740,15 @@ jobs:
             --receipt "$receipt" --manifest-file "$manifest" --output-dir "$output" \
             --allow-verification-branch 2>&1 | tee "$evidence/export-build.txt"
           cp "$output/d4_pocket_macos_export_build.json" "$evidence/macos-export-build.json"
-          python3 -B -X utf8 - "$output/d4_pocket_macos_export_build.json" <<'PY'
-          import json, pathlib, re, sys
+          mkdir -p "$evidence/analysis"
+          cp "$output/analysis/macos-code-size-analysis.json" \
+            "$evidence/analysis/macos-code-size-analysis.json"
+          python3 -B -X utf8 - "$output/d4_pocket_macos_export_build.json" \
+            "$evidence/analysis/macos-code-size-analysis.json" <<'PY'
+          import hashlib, json, pathlib, re, sys
           path = pathlib.Path(sys.argv[1])
           record = json.loads(path.read_text(encoding='utf-8'))
-          assert record['version'] == 4
+          assert record['version'] == 5
           assert record['target_platform'] == 'macos'
           assert record['app_id'] == 'd4-pocket-app-33333333333333333333333333333333'
           assert record['audit_store_id'] == 'audit-store-44444444444444444444444444444444'
@@ -784,10 +788,35 @@ jobs:
           assert record['formal_distribution_claimed'] is False
           assert record['installed_product_verified'] is False
           assert record['credential_artifact_scan']['findings'] == 0
+          analysis = record['aot_surface_analysis']
+          assert analysis['scope'] == 'flutter_macos_release_aot_catalog_surfaces'
+          assert analysis['image_matches_export'] is True
+          assert analysis['aot_surface_libraries'] == analysis['included_source_surfaces']
+          assert {item['name'] for item in analysis['inputs']} == {
+              f"snapshot.{record['target_architecture']}.json",
+              f"trace.{record['target_architecture']}.json",
+          }
+          report_path = pathlib.Path(analysis['report']['path'])
+          report = path.parent / report_path
+          report_bytes = report.read_bytes()
+          assert len(report_bytes) == analysis['report']['size_bytes']
+          assert hashlib.sha256(report_bytes).hexdigest() == analysis['report']['sha256']
+          assert pathlib.Path(sys.argv[2]).read_bytes() == report_bytes
+          report_artifact = next(item for item in record['artifact_files']
+                                 if item['path'] == report_path.as_posix())
+          assert report_artifact['size_bytes'] == analysis['report']['size_bytes']
+          assert report_artifact['sha256'] == analysis['report']['sha256']
+          aot_image_path = (pathlib.Path(record['bundle_name']) / 'Contents/Frameworks'
+                            / 'App.framework/Versions/A/App').as_posix()
+          aot_image = next(item for item in record['artifact_files']
+                           if item['path'] == aot_image_path)
+          assert aot_image['size_bytes'] == analysis['exported_aot_image_size_bytes']
+          assert aot_image['sha256'] == analysis['exported_aot_image_sha256']
           print(json.dumps({'app': record['bundle_name'], 'bundle_identifier': record['bundle_identifier'],
                             'pkg_sha256': record['package']['sha256'],
                             'uninstaller_pkg_sha256': uninstaller['sha256'],
                             'artifact_tree_sha256': record['artifact_tree_sha256'],
+                            'aot_surface_analysis': analysis,
                             'app_code_signature_scan': record['app_code_signature_scan'],
                             'target_architecture': record['target_architecture'],
                             'macos_binary_architecture_scan': record['macos_binary_architecture_scan'],

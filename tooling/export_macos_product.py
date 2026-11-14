@@ -23,7 +23,11 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from tooling.build_module_pruned_windows import _load_catalog, dart_defines
+from tooling.build_module_pruned_windows import (
+    MODULE_DEFINE_NAMES,
+    _load_catalog,
+    dart_defines,
+)
 from tooling.export_windows_product import (
     CREDENTIAL_PATTERNS,
     CREDENTIAL_SCAN_CHUNK_BYTES,
@@ -48,6 +52,14 @@ from tooling.schema_check.check_schemas import validate_instance
 RECEIPT_NAME = "d4_pocket_macos_export_build.json"
 BUILD_TEMP_PREFIX = "d4p-macos-build-"
 OUTPUT_TEMP_PREFIX = "d4p-macos-output-"
+MACOS_AOT_REPORT_ROOT = "App (Dart AOT)"
+MACOS_AOT_IMAGE_RELATIVE_PATH = PurePosixPath(
+    "Contents/Frameworks/App.framework/Versions/A/App"
+)
+MACOS_AOT_REPORT_SENTINEL = (
+    "A summary of your macOS bundle analysis can be found at:"
+)
+MAX_SIZE_ANALYSIS_BYTES = 50_000_000
 RUST_TOOLCHAIN = "1.95.0"
 PINNED_FLUTTER_REVISION = "559ffa3f75e7402d65a8def9c28389a9b2e6fe42"
 FLUTTER_ENGINE_FRAMEWORK_RELATIVE_PATH = PurePosixPath(
@@ -1201,6 +1213,320 @@ def _require_file(path: Path, label: str) -> None:
         raise ValueError(f"{label}が通常の非empty fileではない")
 
 
+def _macos_aot_report_root(report: dict[str, Any]) -> dict[str, Any]:
+    roots: list[dict[str, Any]] = []
+    pending: list[Any] = [report]
+    while pending:
+        value = pending.pop()
+        if isinstance(value, dict):
+            if value.get("n") == MACOS_AOT_REPORT_ROOT:
+                roots.append(value)
+            pending.extend(value.values())
+        elif isinstance(value, list):
+            pending.extend(value)
+    if len(roots) != 1:
+        raise ValueError("Flutter macOS size-analysis reportにDart AOT treeが一意に存在しない")
+    return roots[0]
+
+
+def _macos_aot_surface_libraries(
+    report: dict[str, Any], catalog: dict[str, Any]
+) -> list[str]:
+    targets: dict[str, tuple[str, ...]] = {}
+    lib_root = PurePosixPath("apps/desktop_flutter/lib")
+    package_root = ("package:gui_shell_desktop",)
+    for module in catalog["optional_modules"]:
+        for surface in module["source_surfaces"]:
+            source = PurePosixPath(surface)
+            try:
+                relative = source.relative_to(lib_root)
+            except ValueError as error:
+                raise ValueError(
+                    f"Catalog surfaceがDesktop Flutter lib外にある: {surface}"
+                ) from error
+            if not relative.parts or source.suffix != ".dart":
+                raise ValueError(f"Catalog surfaceがDart library pathではない: {surface}")
+            targets[surface] = (*package_root, *relative.parts)
+
+    found: set[str] = set()
+    pending: list[tuple[Any, tuple[str, ...]]] = [(_macos_aot_report_root(report), ())]
+    while pending:
+        value, ancestors = pending.pop()
+        if isinstance(value, dict):
+            name = value.get("n")
+            path = (*ancestors, name) if isinstance(name, str) else ancestors
+            for surface, target in targets.items():
+                if len(path) >= len(target) and path[-len(target) :] == target:
+                    found.add(surface)
+            pending.extend((child, path) for child in value.values())
+        elif isinstance(value, list):
+            pending.extend((child, ancestors) for child in value)
+    return sorted(found)
+
+
+def _macos_module_source_surfaces(
+    catalog: dict[str, Any], included_module_ids: set[str]
+) -> tuple[list[str], list[str]]:
+    included = sorted(
+        surface
+        for module in catalog["optional_modules"]
+        if module["module_id"] in included_module_ids
+        for surface in module["source_surfaces"]
+    )
+    excluded = sorted(
+        surface
+        for module in catalog["optional_modules"]
+        if module["module_id"] not in included_module_ids
+        for surface in module["source_surfaces"]
+    )
+    return included, excluded
+
+
+def _macos_aot_report_path(output: str, isolated_home: Path) -> Path:
+    paths = [
+        line.partition(":")[2].strip()
+        for line in output.splitlines()
+        if line.startswith(MACOS_AOT_REPORT_SENTINEL)
+    ]
+    if len(paths) != 1 or not paths[0]:
+        raise ValueError("Flutter macOS AOT size-analysis reportの出力pathが一意でない")
+    candidate = Path(paths[0])
+    if not candidate.is_absolute():
+        raise ValueError("Flutter macOS AOT size-analysis report pathが絶対pathではない")
+    expected_directory = isolated_home / ".flutter-devtools"
+    try:
+        directory_metadata = expected_directory.lstat()
+        if not stat.S_ISDIR(directory_metadata.st_mode) or stat.S_ISLNK(directory_metadata.st_mode):
+            raise ValueError("Flutter macOS AOT report directoryが通常directoryではない")
+        resolved_home = isolated_home.resolve(strict=True)
+        resolved_directory = expected_directory.resolve(strict=True)
+        resolved_directory.relative_to(resolved_home)
+        resolved_candidate = candidate.resolve(strict=True)
+        resolved_candidate.relative_to(resolved_directory)
+    except (OSError, ValueError) as error:
+        raise ValueError("Flutter macOS AOT reportが隔離HOME外にある") from error
+    if not re.fullmatch(r"macos-code-size-analysis_[0-9]+\.json", candidate.name):
+        raise ValueError("Flutter macOS AOT report filenameが固定形式ではない")
+    return candidate
+
+
+def _macos_aot_image(path: Path, label: str) -> tuple[int, str]:
+    try:
+        metadata = path.lstat()
+    except OSError as error:
+        raise ValueError(f"{label}が存在しない") from error
+    if not stat.S_ISREG(metadata.st_mode) or stat.S_ISLNK(metadata.st_mode):
+        raise ValueError(f"{label}が通常fileではない")
+    return metadata.st_size, _sha256_file(path)
+
+
+def _capture_macos_aot_surface_analysis(
+    *,
+    output: str,
+    isolated_home: Path,
+    input_directory: Path,
+    profiled_app: Path,
+    bundle_root: Path,
+    staging_root: Path,
+    target_architecture: str,
+    catalog: dict[str, Any],
+    included_module_ids: set[str],
+) -> dict[str, Any]:
+    if target_architecture not in {"arm64", "x86_64"}:
+        raise ValueError("macOS AOT size-analysis architectureが未対応である")
+    report_path = _macos_aot_report_path(output, isolated_home)
+    report_raw = _read_regular_file(
+        report_path, MAX_SIZE_ANALYSIS_BYTES, "Flutter macOS AOT size-analysis report"
+    )
+    report = _parse_json_bytes(report_raw)
+    if not isinstance(report, dict) or report.get("type") != "macos":
+        raise ValueError("Flutter size-analysis reportがmacOS形式ではない")
+    aot_root = _macos_aot_report_root(report)
+    actual_surfaces = _macos_aot_surface_libraries(report, catalog)
+    included_surfaces, excluded_surfaces = _macos_module_source_surfaces(
+        catalog, included_module_ids
+    )
+    if actual_surfaces != included_surfaces:
+        missing = sorted(set(included_surfaces) - set(actual_surfaces))
+        unexpected = sorted(set(actual_surfaces) - set(included_surfaces))
+        raise ValueError(
+            "Flutter macOS Release AOT libraryがModule選択と一致しない: "
+            f"missing={missing}, unexpected={unexpected}"
+        )
+
+    input_records: list[dict[str, Any]] = []
+    expected_input_names = {
+        f"snapshot.{target_architecture}.json",
+        f"trace.{target_architecture}.json",
+    }
+    actual_input_names = {path.name for path in input_directory.iterdir()}
+    if actual_input_names != expected_input_names:
+        raise ValueError("Flutter macOS AOT input file setが対象architectureと一致しない")
+    for name in sorted(expected_input_names):
+        input_path = input_directory / name
+        raw = _read_regular_file(input_path, MAX_SIZE_ANALYSIS_BYTES, "Flutter macOS AOT input")
+        if not isinstance(_parse_json_bytes(raw), dict):
+            raise ValueError("Flutter macOS AOT size-analysis inputがJSON objectではない")
+        input_records.append(
+            {"name": name, "size_bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
+        )
+
+    profiled_image = profiled_app.joinpath(*MACOS_AOT_IMAGE_RELATIVE_PATH.parts)
+    exported_image = bundle_root.joinpath(*MACOS_AOT_IMAGE_RELATIVE_PATH.parts)
+    profiled_size, profiled_hash = _macos_aot_image(
+        profiled_image, "Flutter macOS profile AOT image"
+    )
+    exported_size, exported_hash = _macos_aot_image(
+        exported_image, "macOS Export bundle AOT image"
+    )
+    if (
+        not isinstance(aot_root.get("value"), int)
+        or isinstance(aot_root.get("value"), bool)
+        or aot_root.get("value") != profiled_size
+        or profiled_size != exported_size
+        or profiled_hash != exported_hash
+    ):
+        raise ValueError("Flutter AOT report／profile／Export bundle image identityが一致しない")
+
+    analysis_directory = staging_root / "analysis"
+    analysis_directory.mkdir(mode=0o700, exist_ok=False)
+    report_destination = analysis_directory / "macos-code-size-analysis.json"
+    with report_destination.open("xb") as destination:
+        destination.write(report_raw)
+        destination.flush()
+        os.fsync(destination.fileno())
+    report_record = {
+        "path": "analysis/macos-code-size-analysis.json",
+        "size_bytes": len(report_raw),
+        "sha256": hashlib.sha256(report_raw).hexdigest(),
+    }
+    return {
+        "scope": "flutter_macos_release_aot_catalog_surfaces",
+        "report": report_record,
+        "inputs": input_records,
+        "aot_surface_libraries": actual_surfaces,
+        "included_source_surfaces": included_surfaces,
+        "excluded_source_surfaces": excluded_surfaces,
+        "profiled_aot_image_size_bytes": profiled_size,
+        "exported_aot_image_size_bytes": exported_size,
+        "profiled_aot_image_sha256": profiled_hash,
+        "exported_aot_image_sha256": exported_hash,
+        "image_matches_export": True,
+    }
+
+
+def _validate_macos_aot_surface_evidence(
+    evidence: dict[str, Any],
+    root: Path,
+    profiled_app: Path,
+    app_bundle: Path,
+    input_directory: Path,
+) -> None:
+    analysis = evidence["aot_surface_analysis"]
+    if analysis["scope"] != "flutter_macos_release_aot_catalog_surfaces":
+        raise ValueError("macOS AOT surface evidence scopeが未対応である")
+    report_record = analysis["report"]
+    if report_record["path"] != "analysis/macos-code-size-analysis.json":
+        raise ValueError("macOS AOT report pathが固定evidence位置ではない")
+    report_raw = _read_regular_file(
+        root / report_record["path"],
+        MAX_SIZE_ANALYSIS_BYTES,
+        "macOS AOT evidence report",
+    )
+    if (
+        len(report_raw) != report_record["size_bytes"]
+        or hashlib.sha256(report_raw).hexdigest() != report_record["sha256"]
+    ):
+        raise ValueError("macOS AOT report identityがevidenceと一致しない")
+    report = _parse_json_bytes(report_raw)
+    if not isinstance(report, dict) or report.get("type") != "macos":
+        raise ValueError("macOS AOT evidence report typeが不正である")
+    aot_root = _macos_aot_report_root(report)
+
+    catalog = _load_catalog()
+    optional_ids = {item["module_id"] for item in catalog["optional_modules"]}
+    included_ids = set(evidence["module_plan"]["included_module_ids"]) & optional_ids
+    actual_surfaces = _macos_aot_surface_libraries(report, catalog)
+    included_surfaces, excluded_surfaces = _macos_module_source_surfaces(
+        catalog, included_ids
+    )
+    if (
+        actual_surfaces != included_surfaces
+        or analysis["aot_surface_libraries"] != actual_surfaces
+        or analysis["included_source_surfaces"] != included_surfaces
+        or analysis["excluded_source_surfaces"] != excluded_surfaces
+    ):
+        raise ValueError("macOS AOT surface report／ModulePlan／evidenceが一致しない")
+
+    architecture = evidence["target_architecture"]
+    expected_input_names = {
+        f"snapshot.{architecture}.json",
+        f"trace.{architecture}.json",
+    }
+    records = analysis["inputs"]
+    if {record["name"] for record in records} != expected_input_names or len(records) != 2:
+        raise ValueError("macOS AOT input evidenceがtarget architectureと一致しない")
+    input_metadata = input_directory.lstat()
+    if not stat.S_ISDIR(input_metadata.st_mode) or stat.S_ISLNK(input_metadata.st_mode):
+        raise ValueError("macOS AOT input directoryが通常directoryではない")
+    if {path.name for path in input_directory.iterdir()} != expected_input_names:
+        raise ValueError("macOS AOT input file setがevidence後に変化した")
+    for record in records:
+        raw = _read_regular_file(
+            input_directory / record["name"],
+            MAX_SIZE_ANALYSIS_BYTES,
+            "macOS AOT input evidence",
+        )
+        if (
+            len(raw) != record["size_bytes"]
+            or hashlib.sha256(raw).hexdigest() != record["sha256"]
+            or not isinstance(_parse_json_bytes(raw), dict)
+        ):
+            raise ValueError("macOS AOT input file identityがevidenceと一致しない")
+
+    profiled_size, profiled_hash = _macos_aot_image(
+        profiled_app.joinpath(*MACOS_AOT_IMAGE_RELATIVE_PATH.parts),
+        "macOS profiled AOT image",
+    )
+    exported_size, exported_hash = _macos_aot_image(
+        app_bundle.joinpath(*MACOS_AOT_IMAGE_RELATIVE_PATH.parts),
+        "macOS exported AOT image",
+    )
+    if (
+        not isinstance(aot_root.get("value"), int)
+        or isinstance(aot_root.get("value"), bool)
+        or aot_root.get("value") != profiled_size
+        or profiled_size != exported_size
+        or profiled_hash != exported_hash
+        or analysis["profiled_aot_image_size_bytes"] != profiled_size
+        or analysis["exported_aot_image_size_bytes"] != exported_size
+        or analysis["profiled_aot_image_sha256"] != profiled_hash
+        or analysis["exported_aot_image_sha256"] != exported_hash
+        or analysis["image_matches_export"] is not True
+    ):
+        raise ValueError("macOS AOT report／profile／bundle image evidenceが一致しない")
+
+    expected_defines = [
+        "--dart-define=GUI_SHELL_MODULE_"
+        + MODULE_DEFINE_NAMES[module["module_id"]]
+        + "="
+        + str(module["module_id"] in included_ids).lower()
+        for module in catalog["optional_modules"]
+    ]
+    actual_defines = [
+        argument
+        for argument in evidence["flutter_build_arguments"]
+        if argument.startswith("--dart-define=GUI_SHELL_MODULE_")
+    ]
+    if (
+        actual_defines != expected_defines
+        or "--analyze-size" not in evidence["flutter_build_arguments"]
+        or "--code-size-directory=<isolated-size-analysis>"
+        not in evidence["flutter_build_arguments"]
+    ):
+        raise ValueError("macOS Flutter build argumentsがModulePlan／AOT analysisと一致しない")
+
+
 def build_macos_product(
     receipt_path: Path,
     manifest_path: Path,
@@ -1299,8 +1625,11 @@ def build_macos_product(
             _run(
                 [tools["flutter"], "pub", "get", "--enforce-lockfile"], cwd=flutter_project, environment=environment
             )
+            size_analysis_input_directory = temporary_root / "macos-size-analysis-inputs"
+            size_analysis_input_directory.mkdir(mode=0o700)
             flutter_arguments = [
-                "build", "macos", "--release", "--no-pub",
+                "build", "macos", "--release", "--no-pub", "--analyze-size",
+                f"--code-size-directory={size_analysis_input_directory}",
                 *[
                     f"--dart-define={name}={str(enabled).lower()}"
                     for name, enabled in defines.items()
@@ -1367,6 +1696,18 @@ def build_macos_product(
                 verification_directory=temporary_root,
                 environment=environment,
             )
+            catalog = _load_catalog()
+            aot_surface_analysis = _capture_macos_aot_surface_analysis(
+                output=flutter_output,
+                isolated_home=Path(environment["HOME"]),
+                input_directory=size_analysis_input_directory,
+                profiled_app=built_app,
+                bundle_root=app_bundle,
+                staging_root=staging_root,
+                target_architecture=target_architecture,
+                catalog=catalog,
+                included_module_ids=set(plan.included_optional_ids),
+            )
 
             app_archive_path = staging_root / f"{bundle_name}.zip"
             _run(
@@ -1431,7 +1772,7 @@ def build_macos_product(
         elapsed_ms = round((time.perf_counter() - started) * 1000)
         catalog = _load_catalog()
         evidence = {
-            "version": 4,
+            "version": 5,
             "evidence_type": "d4_pocket_macos_export_build",
             "evidence_source": "INTERNAL_STATE",
             "product": "D4 Pocket",
@@ -1470,10 +1811,12 @@ def build_macos_product(
             "macos_binary_architecture_scan": macos_binary_architecture_scan,
             "flutter_pub_get_arguments": ["pub", "get", "--enforce-lockfile"],
             "flutter_build_arguments": [
-                "build", "macos", "--release", "--no-pub",
+                "build", "macos", "--release", "--no-pub", "--analyze-size",
+                "--code-size-directory=<isolated-size-analysis>",
                 *[f"--dart-define={name}={str(enabled).lower()}" for name, enabled in defines.items()],
                 f"--dart-define=GUI_SHELL_PRODUCT_VERSION={version}",
             ],
+            "aot_surface_analysis": aot_surface_analysis,
             "compile_time_identity": {
                 "source": "schema_validated_manifest",
                 "app_id": app_id,
@@ -1533,6 +1876,8 @@ def build_macos_product(
             lipo=tools["lipo"],
             verification_directory=staging_root,
             environment=environment,
+            profiled_app=built_app,
+            size_analysis_input_directory=size_analysis_input_directory,
         )
         (staging_root / RECEIPT_NAME).write_text(
             json.dumps(evidence, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
@@ -1553,12 +1898,21 @@ def _validate_build_evidence(
     lipo: str,
     verification_directory: Path,
     environment: dict[str, str],
+    profiled_app: Path,
+    size_analysis_input_directory: Path,
 ) -> None:
     schema = json.loads(
         (ROOT / "specs/gui_shell_macos_export_build.schema.json").read_text(encoding="utf-8")
     )
     if validate_instance(evidence, schema):
         raise ValueError("macOS Export build evidenceが専用Schemaに適合しない")
+    _validate_macos_aot_surface_evidence(
+        evidence,
+        root,
+        profiled_app,
+        app_bundle,
+        size_analysis_input_directory,
+    )
     manifest = _parse_json_bytes(manifest_raw)
     expected_app_id = manifest["manifest"]["app_identity"]["app_id"]
     expected_audit_id = manifest["manifest"]["audit_store"]["store_id"]

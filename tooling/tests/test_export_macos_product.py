@@ -6,14 +6,18 @@ import json
 import shutil
 import subprocess
 import unittest
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from unittest.mock import patch
 
 from tooling.export_macos_product import (
     APP_FLUTTER_FRAMEWORK_RELATIVE_PATH,
     FLUTTER_ENGINE_FRAMEWORK_RELATIVE_PATH,
     FLUTTER_MACOS_FRAMEWORK_BINARY_RELATIVE_PATH,
+    MACOS_AOT_IMAGE_RELATIVE_PATH,
+    MACOS_AOT_REPORT_ROOT,
     FlutterFrameworkReference,
+    _capture_macos_aot_surface_analysis,
+    _load_catalog,
     _macos_bundle_tree_sha256,
     _macos_artifact_inventory,
     _macos_environment,
@@ -37,12 +41,35 @@ from tooling.export_macos_product import (
     uninstaller_package_identifier_for_app,
 )
 from tooling.export_windows_product import validate_export_inputs
+from tooling.build_module_pruned_windows import dart_defines
 from tooling.schema_check.check_schemas import validate_instance
 from tooling.tests.create_macos_export_fixture import (
     APP_ID,
     AUDIT_STORE_ID,
     macos_export_pair,
 )
+
+
+def _macos_aot_report(image_size: int, surfaces: list[str]) -> dict[str, object]:
+    package_node: dict[str, object] = {"n": "package:gui_shell_desktop", "children": []}
+    for surface in surfaces:
+        relative = PurePosixPath(surface).relative_to(
+            PurePosixPath("apps/desktop_flutter/lib")
+        )
+        node = package_node
+        for part in relative.parts:
+            children = node.setdefault("children", [])
+            child = next((item for item in children if item.get("n") == part), None)
+            if child is None:
+                child = {"n": part, "children": []}
+                children.append(child)
+            node = child
+    return {
+        "type": "macos",
+        "children": [
+            {"n": MACOS_AOT_REPORT_ROOT, "value": image_size, "children": [package_node]}
+        ],
+    }
 
 
 FLUTTER_ENGINE_REVISION_FIXTURE = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -288,6 +315,93 @@ class MacOSProductExportTests(unittest.TestCase):
                 manifest_raw,
                 target_platform="macos",
             )
+
+    def test_macos_aot_surface_analysis_binds_selected_modules_to_export_image(self) -> None:
+        receipt_raw, manifest_raw = macos_export_pair()
+        _receipt, _manifest, plan, _receipt_hash, _manifest_hash = validate_export_inputs(
+            receipt_raw, manifest_raw, target_platform="macos"
+        )
+        catalog = _load_catalog()
+        included = set(plan.included_optional_ids)
+        included_surfaces = sorted(
+            surface
+            for module in catalog["optional_modules"]
+            if module["module_id"] in included
+            for surface in module["source_surfaces"]
+        )
+        excluded_surface = next(
+            surface
+            for module in catalog["optional_modules"]
+            if module["module_id"] not in included
+            for surface in module["source_surfaces"]
+        )
+        binary = b"\xcf\xfa\xed\xfe macOS AOT image fixture"
+        with tempfile.TemporaryDirectory(prefix="d4p-macos-aot-") as temp:
+            root = Path(temp)
+            home = root / "isolated-home"
+            report_directory = home / ".flutter-devtools"
+            report_directory.mkdir(parents=True)
+            input_directory = root / "aot-inputs"
+            input_directory.mkdir()
+            for name in ("snapshot.arm64.json", "trace.arm64.json"):
+                (input_directory / name).write_text('{"fixture":true}\n', encoding="utf-8")
+            profiled_app = root / "profile.app"
+            bundle_root = root / "D4Pocket-333333333333.app"
+            for app in (profiled_app, bundle_root):
+                image = app.joinpath(*MACOS_AOT_IMAGE_RELATIVE_PATH.parts)
+                image.parent.mkdir(parents=True)
+                image.write_bytes(binary)
+
+            report_path = report_directory / "macos-code-size-analysis_01.json"
+            report = _macos_aot_report(len(binary), included_surfaces)
+            report_path.write_text(json.dumps(report), encoding="utf-8")
+            staging_root = root / "artifact"
+            staging_root.mkdir()
+            analysis = _capture_macos_aot_surface_analysis(
+                output=(
+                    "A summary of your macOS bundle analysis can be found at: "
+                    f"{report_path}\n"
+                ),
+                isolated_home=home,
+                input_directory=input_directory,
+                profiled_app=profiled_app,
+                bundle_root=bundle_root,
+                staging_root=staging_root,
+                target_architecture="arm64",
+                catalog=catalog,
+                included_module_ids=included,
+            )
+            self.assertEqual(analysis["aot_surface_libraries"], included_surfaces)
+            self.assertEqual(analysis["excluded_source_surfaces"], sorted(
+                surface
+                for module in catalog["optional_modules"]
+                if module["module_id"] not in included
+                for surface in module["source_surfaces"]
+            ))
+            self.assertTrue(analysis["image_matches_export"])
+            self.assertTrue(
+                (staging_root / "analysis/macos-code-size-analysis.json").is_file()
+            )
+
+            report_path.write_text(
+                json.dumps(_macos_aot_report(len(binary), [*included_surfaces, excluded_surface])),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "Module選択と一致しない"):
+                _capture_macos_aot_surface_analysis(
+                    output=(
+                        "A summary of your macOS bundle analysis can be found at: "
+                        f"{report_path}\n"
+                    ),
+                    isolated_home=home,
+                    input_directory=input_directory,
+                    profiled_app=profiled_app,
+                    bundle_root=bundle_root,
+                    staging_root=root / "rejected-artifact",
+                    target_architecture="arm64",
+                    catalog=catalog,
+                    included_module_ids=included,
+                )
 
     def test_bundle_identifier_is_derived_from_valid_app_id(self) -> None:
         self.assertEqual(
@@ -805,10 +919,14 @@ class MacOSProductExportTests(unittest.TestCase):
             .read_text(encoding="utf-8")
         )
         receipt_raw, manifest_raw = macos_export_pair()
-        del receipt_raw
+        _receipt, _manifest, plan, _receipt_hash, _manifest_hash = validate_export_inputs(
+            receipt_raw, manifest_raw, target_platform="macos"
+        )
         manifest_hash = hashlib.sha256(manifest_raw).hexdigest()
         with tempfile.TemporaryDirectory(prefix="d4p-macos-evidence-") as temp:
-            output = Path(temp)
+            temp_root = Path(temp)
+            output = temp_root / "artifact"
+            output.mkdir()
             app, framework_reference = _flutter_framework_fixture(
                 output, app_name="D4Pocket-333333333333.app"
             )
@@ -822,6 +940,50 @@ class MacOSProductExportTests(unittest.TestCase):
             framework_tree_hash = _macos_bundle_tree_sha256(framework)
             source_binary_hash = hashlib.sha256(FLUTTER_FRAMEWORK_SOURCE_BINARY).hexdigest()
             embedded_binary_hash = hashlib.sha256(FLUTTER_FRAMEWORK_ARM64_BINARY).hexdigest()
+            aot_binary = b"\xcf\xfa\xed\xfe AOT evidence fixture"
+            exported_aot = app.joinpath(*MACOS_AOT_IMAGE_RELATIVE_PATH.parts)
+            exported_aot.parent.mkdir(parents=True)
+            exported_aot.write_bytes(aot_binary)
+            profiled_app = temp_root / "profile.app"
+            profiled_aot = profiled_app.joinpath(*MACOS_AOT_IMAGE_RELATIVE_PATH.parts)
+            profiled_aot.parent.mkdir(parents=True)
+            profiled_aot.write_bytes(aot_binary)
+            catalog = _load_catalog()
+            included_module_ids = set(plan.included_optional_ids)
+            included_surfaces = sorted(
+                surface
+                for module in catalog["optional_modules"]
+                if module["module_id"] in included_module_ids
+                for surface in module["source_surfaces"]
+            )
+            isolated_home = temp_root / "isolated-home"
+            report_directory = isolated_home / ".flutter-devtools"
+            report_directory.mkdir(parents=True)
+            report_path = report_directory / "macos-code-size-analysis_01.json"
+            report_path.write_text(
+                json.dumps(_macos_aot_report(len(aot_binary), included_surfaces)),
+                encoding="utf-8",
+            )
+            size_analysis_input_directory = temp_root / "aot-inputs"
+            size_analysis_input_directory.mkdir()
+            for name in ("snapshot.arm64.json", "trace.arm64.json"):
+                (size_analysis_input_directory / name).write_text(
+                    '{"fixture":true}\n', encoding="utf-8"
+                )
+            aot_surface_analysis = _capture_macos_aot_surface_analysis(
+                output=(
+                    "A summary of your macOS bundle analysis can be found at: "
+                    f"{report_path}\n"
+                ),
+                isolated_home=isolated_home,
+                input_directory=size_analysis_input_directory,
+                profiled_app=profiled_app,
+                bundle_root=app,
+                staging_root=output,
+                target_architecture="arm64",
+                catalog=catalog,
+                included_module_ids=included_module_ids,
+            )
             package_path = output / "D4Pocket-333333333333.pkg"
             package_path.write_bytes(b"unsigned package fixture")
             uninstaller_path = output / "D4Pocket-333333333333-Uninstaller.pkg"
@@ -838,6 +1000,14 @@ class MacOSProductExportTests(unittest.TestCase):
                     "installer_identifier": bundle_identifier_for_app(APP_ID) + ".installer",
                     "bundle_name": app.name,
                     "source_manifest_sha256": manifest_hash,
+                    "module_plan": {
+                        "catalog_version": catalog["version"],
+                        "selection_mode": plan.selection_mode,
+                        "requested_optional_module_ids": list(plan.requested_optional_ids),
+                        "unprunable_core_ids": catalog["unprunable_core_ids"],
+                        "included_module_ids": list(plan.included_module_ids),
+                        "excluded_optional_module_ids": list(plan.excluded_optional_ids),
+                    },
                     "target_architecture": "arm64",
                     "macos_binary_architecture_scan": {
                         "status": "passed_host_architecture",
@@ -847,6 +1017,15 @@ class MacOSProductExportTests(unittest.TestCase):
                     "artifact_files": records,
                     "artifact_total_bytes": total_bytes,
                     "artifact_tree_sha256": tree_hash,
+                    "aot_surface_analysis": aot_surface_analysis,
+                    "flutter_build_arguments": [
+                        "build", "macos", "--release", "--no-pub", "--analyze-size",
+                        "--code-size-directory=<isolated-size-analysis>",
+                        *[
+                            f"--dart-define={name}={str(enabled).lower()}"
+                            for name, enabled in dart_defines(plan, catalog).items()
+                        ],
+                    ],
                     "app_code_signature_scan": {
                         "status": "passed_no_d4_publisher_identity",
                         "code_objects_checked": 3,
@@ -932,6 +1111,8 @@ class MacOSProductExportTests(unittest.TestCase):
                         lipo="/usr/bin/lipo",
                         verification_directory=output,
                         environment={},
+                        profiled_app=profiled_app,
+                        size_analysis_input_directory=size_analysis_input_directory,
                     )
 
             validate_current_evidence()

@@ -1,14 +1,14 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/gui-shell/schemas/gui_shell_macos_export_build.schema.json",
-  "title": "D4 Pocket macOS Export build記録 v4",
+  "title": "D4 Pocket macOS Export build記録 v5",
   "type": "object",
   "required": [
     "version", "evidence_type", "evidence_source", "product", "target_platform", "build_mode",
     "source_ref", "source_commit", "source_archive_sha256", "source_receipt_sha256",
     "source_manifest_sha256", "export_id", "app_id", "audit_store_id", "bundle_identifier",
     "installer_identifier", "authority_boundary", "module_plan", "toolchain",
-    "flutter_pub_get_arguments", "flutter_build_arguments", "compile_time_identity",
+    "flutter_pub_get_arguments", "flutter_build_arguments", "aot_surface_analysis", "compile_time_identity",
     "compile_time_update_trust", "build_duration_ms", "runtime_storage_root_template",
     "bundle_name", "bundle_identifier_verified", "product_manifest_copied_byte_for_byte",
     "target_architecture", "macos_binary_architecture_scan", "app_code_signature_scan",
@@ -19,7 +19,7 @@
   ],
   "additionalProperties": false,
   "properties": {
-    "version": { "const": 4 },
+    "version": { "const": 5 },
     "evidence_type": { "const": "d4_pocket_macos_export_build" },
     "evidence_source": { "const": "INTERNAL_STATE" },
     "product": { "const": "D4 Pocket" },
@@ -80,6 +80,51 @@
     },
     "flutter_pub_get_arguments": { "type": "array", "items": { "type": "string" } },
     "flutter_build_arguments": { "type": "array", "items": { "type": "string" } },
+    "aot_surface_analysis": {
+      "type": "object",
+      "required": [
+        "scope", "report", "inputs", "aot_surface_libraries", "included_source_surfaces",
+        "excluded_source_surfaces", "profiled_aot_image_size_bytes", "exported_aot_image_size_bytes",
+        "profiled_aot_image_sha256", "exported_aot_image_sha256", "image_matches_export"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "scope": { "const": "flutter_macos_release_aot_catalog_surfaces" },
+        "report": {
+          "type": "object",
+          "required": ["path", "size_bytes", "sha256"],
+          "additionalProperties": false,
+          "properties": {
+            "path": { "const": "analysis/macos-code-size-analysis.json" },
+            "size_bytes": { "type": "integer", "minimum": 1, "maximum": 50000000 },
+            "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+          }
+        },
+        "inputs": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+            "required": ["name", "size_bytes", "sha256"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string", "pattern": "^(snapshot|trace)\\.(arm64|x86_64)\\.json$" },
+              "size_bytes": { "type": "integer", "minimum": 1, "maximum": 50000000 },
+              "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+            }
+          }
+        },
+        "aot_surface_libraries": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "included_source_surfaces": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "excluded_source_surfaces": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "profiled_aot_image_size_bytes": { "type": "integer", "minimum": 1 },
+        "exported_aot_image_size_bytes": { "type": "integer", "minimum": 1 },
+        "profiled_aot_image_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "exported_aot_image_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "image_matches_export": { "const": true }
+      }
+    },
     "compile_time_identity": {
       "type": "object",
       "required": ["source", "app_id", "audit_store_id", "manifest_sha256"],
