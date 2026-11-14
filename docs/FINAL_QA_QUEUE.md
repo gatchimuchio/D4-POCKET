@@ -12,7 +12,9 @@
 製品工程・Final QA要求正本: ユーザー提示の最新版v4仕様書・工程表・実装指示書。QE施工方法・BUILD_BATCH工程正本: [2026-10-22 QE統合3点](QE_2026-10-22/採用記録.md)。両者の責任範囲を分け、旧版および過去のphase記録は補助履歴として扱う。
 現行製品工程: `docs/QE_2026-11-13/進捗.md`。rev5のAcceptance履歴: `docs/REV5_PRODUCT_PROGRESS.md`。
 
-## 0. 現在の凍結・進行状態
+## 0. 旧候補のFinal QA実施履歴（2026-10-07）
+
+次の表は、旧候補commit `ab746d4b33b003761f5ddcef60a88afa97132a40`に対する当時のQ0/Q1実施記録である。現行v4候補の状態ではない。現行v4の正式Q0〜Q7は製品全体E3 `BUILD_COVERED`前のため`DEFERRED`であり、この表の旧結果を現行候補へ引き継がない。
 
 | 段階 | 状態 | 対象／証拠 |
 | --- | --- | --- |
@@ -33,7 +35,7 @@ Rust初回・再runでA2A／Update TLS loopback fixtureの間欠failureを観測
 
 ## 1. 運用規則
 
-この一覧はFinal QA用の保留記録であり、最新版の明示modeが`PRODUCT_BUILD_MODE`である間は現在の作業schedulerやblockerとして使わない。過去のQ0／Q1／Q2証拠・失敗記録を削除・改変せず保持する。Final QAは、現行の実装指示に沿ってmodeが切り替わった時点で再開する。
+この一覧はFinal QA用の保留記録であり、現行v4進捗がE0〜E3の製品製造・接続・`BUILD_COVERED`を示す間は作業schedulerや開発blockerとして使わない。過去のQ0／Q1／Q2証拠・失敗記録は削除・改変せず保持する。正式Q0〜Q7は現行v4が定めるE4/E5/E6の開始条件とcandidate固定後に行う。
 
 安全・Authority・Permission・Approval・Audit・Recovery・secret境界はFinal QAまで無効化・迂回しない。既存証拠と過去のFAILは履歴として参照するが、異なる製品状態に対する現行試験結果へ昇格しない。MxC、OS、Provider等の外部component内部完全性をD4 Pocketの保証へ取り込まない。
 

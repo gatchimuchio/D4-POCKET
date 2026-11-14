@@ -1288,7 +1288,7 @@
     },
     {
       "path": "docs/FINAL_QA_QUEUE.md",
-      "sha256": "25c8da78402624e646f0ca72f1caf6b7fb067e9d80a8ccfc15dee8469b188578"
+      "sha256": "91f6a5be516a76a1c7d0925d096f38ca1c45b78d1ffd2fcf318fabe60172ad5d"
     },
     {
       "path": "docs/FIRST_RUN.md",
@@ -1460,7 +1460,7 @@
     },
     {
       "path": "docs/QE_2026-11-13/E0_\u8981\u6c42consumer\u53f0\u5e33.md",
-      "sha256": "a1b7365ccacb673a9548de50090126262ae03803426e14c47ef40435d1504232"
+      "sha256": "720aa307447446c32599d6a789193bd50950babff2eaf90f05935d817e07e453"
     },
     {
       "path": "docs/QE_2026-11-13/\u5dee\u5206\u79fb\u884c\u53f0\u5e33.md",
@@ -1472,7 +1472,7 @@
     },
     {
       "path": "docs/QE_2026-11-13/\u9032\u6357.md",
-      "sha256": "14bc6f229100c9553a3d78163544ea2aa5623a57dda5566df366279d0dcbdf1a"
+      "sha256": "7997296eb047406b8de1711f8adca4284748b695596e496a6725936ec8fa8669"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
