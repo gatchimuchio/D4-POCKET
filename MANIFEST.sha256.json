@@ -5585,7 +5585,7 @@
     },
     {
       "path": "tooling/export_macos_product.py",
-      "sha256": "cbda0f98f96896a4cda76f3c8ce62fecc9d1b8961c68fa138af9cf9c1b50c15f"
+      "sha256": "79ce1286a09c3d460a51ab4b03a0f4ff3b725746e5b5e49adfb795dea28b3143"
     },
     {
       "path": "tooling/export_windows_product.py",
@@ -5753,7 +5753,7 @@
     },
     {
       "path": "tooling/tests/test_export_macos_product.py",
-      "sha256": "00bde09411716fd83c1938321c95d6416adaf31c00887d6b0ac9ffe3b977f7f6"
+      "sha256": "9194eef4ada7c6171037290c0ba209d60d71efc671c580484d0b637859456c39"
     },
     {
       "path": "tooling/tests/test_linux_deb_setup_package.py",

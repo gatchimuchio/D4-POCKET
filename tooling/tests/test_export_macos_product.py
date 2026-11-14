@@ -33,6 +33,8 @@ from tooling.export_macos_product import (
     _codesign_verification_failure_class,
     _restore_pinned_flutter_framework_embed_filtered_resources,
     _scan_macos_artifacts,
+    _require_file,
+    _safe_export_error_detail,
     _verify_flutter_framework_copy_entries,
     _validate_build_evidence,
     build_macos_product,
@@ -164,6 +166,22 @@ def _macos_test_subprocess_side_effect(
 
 
 class MacOSProductExportTests(unittest.TestCase):
+    def test_os_error_diagnostic_omits_user_path_and_shows_source_operation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            missing = Path(temporary) / "private-input-token.txt"
+            try:
+                _require_file(missing, "diagnostic fixture")
+            except FileNotFoundError as error:
+                detail = _safe_export_error_detail(error)
+            else:
+                self.fail("missing file did not raise FileNotFoundError")
+
+        self.assertIn("_require_file:", detail)
+        self.assertIn("errno=2", detail)
+        self.assertIn("reason=", detail)
+        self.assertNotIn(str(missing), detail)
+        self.assertNotIn(missing.name, detail)
+
     def test_pinned_flutter_framework_embed_filters_are_exact_and_recursive(self) -> None:
         source_entries = {
             "Headers": {"kind": "symlink", "mode": 0o777, "target": "Versions/Current/Headers"},

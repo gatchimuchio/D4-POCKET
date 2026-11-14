@@ -15,6 +15,7 @@ import sys
 import tarfile
 import tempfile
 import time
+import traceback
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -1213,6 +1214,25 @@ def _require_file(path: Path, label: str) -> None:
         raise ValueError(f"{label}が通常の非empty fileではない")
 
 
+def _safe_export_error_detail(error: BaseException) -> str:
+    if not isinstance(error, OSError):
+        return ""
+    source_frames = [
+        frame
+        for frame in traceback.extract_tb(error.__traceback__)
+        if Path(frame.filename).name == Path(__file__).name
+    ]
+    detail: list[str] = []
+    if source_frames:
+        frame = source_frames[-1]
+        detail.append(f"{frame.name}:{frame.lineno}")
+    if error.errno is not None:
+        detail.append(f"errno={error.errno}")
+    if error.strerror:
+        detail.append(f"reason={error.strerror}")
+    return "; ".join(detail)
+
+
 def _macos_aot_report_root(report: dict[str, Any]) -> dict[str, Any]:
     roots: list[dict[str, Any]] = []
     pending: list[Any] = [report]
@@ -2082,7 +2102,11 @@ def main() -> int:
             allow_verification_branch=args.allow_verification_branch,
         )
     except (OSError, ValueError, subprocess.CalledProcessError, json.JSONDecodeError, tarfile.TarError) as error:
-        message = f": {error}" if isinstance(error, ValueError) else ""
+        if isinstance(error, ValueError):
+            message = f": {error}"
+        else:
+            detail = _safe_export_error_detail(error)
+            message = f": {detail}" if detail else ""
         print(f"macOS Export buildを停止した: {type(error).__name__}{message}", file=sys.stderr)
         return 1
     print(json.dumps({
