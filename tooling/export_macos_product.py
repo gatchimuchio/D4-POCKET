@@ -1578,216 +1578,218 @@ def build_macos_product(
     target_architecture = _darwin_build_architecture()
     defines = dart_defines(plan)
     started = time.perf_counter()
-    with tempfile.TemporaryDirectory(prefix=OUTPUT_TEMP_PREFIX, dir=output.parent) as output_temp:
+    # 最終evidence検証でprofiled AppとAOT入力を再読するため、両一時領域を検証後まで保持する。
+    with tempfile.TemporaryDirectory(
+        prefix=OUTPUT_TEMP_PREFIX, dir=output.parent
+    ) as output_temp, tempfile.TemporaryDirectory(
+        prefix=BUILD_TEMP_PREFIX, dir=_resolve_build_temp_root()
+    ) as build_temp:
         staging_root = Path(output_temp) / "product"
         staging_root.mkdir(mode=0o700)
-        with tempfile.TemporaryDirectory(
-            prefix=BUILD_TEMP_PREFIX, dir=_resolve_build_temp_root()
-        ) as build_temp:
-            temporary_root = Path(build_temp)
-            flutter_root = Path(tools["flutter"]).resolve(strict=True).parent.parent
-            environment = _macos_environment(temporary_root, flutter_root=flutter_root)
-            flutter_framework = _prepare_pinned_flutter_framework(
-                flutter_root,
-                flutter=tools["flutter"],
-                codesign=tools["codesign"],
-                environment=environment,
-            )
-            source_root = temporary_root / "source"
-            source_root.mkdir(mode=0o700)
-            source_archive_path = temporary_root / "source.tar"
-            archive_hash = _write_source_archive(commit, source_archive_path)
-            _safe_extract_source(source_archive_path, source_root)
-            version = product_version_from_source(source_root)
-            if not re.fullmatch(r"[0-9A-Za-z.+_-]{1,64}", version):
-                raise ValueError("Product VersionをmacOS packageへ安全に渡せない")
-            flutter_project = source_root / "apps/desktop_flutter"
-            _patch_app_identity(source_root, bundle_id)
-            _patch_macos_export_build_settings(
-                source_root, architecture=target_architecture
-            )
+        temporary_root = Path(build_temp)
+        flutter_root = Path(tools["flutter"]).resolve(strict=True).parent.parent
+        environment = _macos_environment(temporary_root, flutter_root=flutter_root)
+        flutter_framework = _prepare_pinned_flutter_framework(
+            flutter_root,
+            flutter=tools["flutter"],
+            codesign=tools["codesign"],
+            environment=environment,
+        )
+        source_root = temporary_root / "source"
+        source_root.mkdir(mode=0o700)
+        source_archive_path = temporary_root / "source.tar"
+        archive_hash = _write_source_archive(commit, source_archive_path)
+        _safe_extract_source(source_archive_path, source_root)
+        version = product_version_from_source(source_root)
+        if not re.fullmatch(r"[0-9A-Za-z.+_-]{1,64}", version):
+            raise ValueError("Product VersionをmacOS packageへ安全に渡せない")
+        flutter_project = source_root / "apps/desktop_flutter"
+        _patch_app_identity(source_root, bundle_id)
+        _patch_macos_export_build_settings(
+            source_root, architecture=target_architecture
+        )
 
-            toolchain = {
-                "architecture": target_architecture,
-                "flutter": _tool_version([tools["flutter"], "--version"], cwd=flutter_project, environment=environment),
-                "flutter_sdk_revision": PINNED_FLUTTER_REVISION,
-                "flutter_engine_revision": flutter_framework.engine_revision,
-                "cargo": _tool_version([tools["cargo"], "+" + RUST_TOOLCHAIN, "--version"], cwd=source_root, environment=environment),
-                "rustc": _tool_version([tools["rustc"], "+" + RUST_TOOLCHAIN, "--version"], cwd=source_root, environment=environment),
-                "xcodebuild": _tool_version([tools["xcodebuild"], "-version"], cwd=source_root, environment=environment),
-                "macos_version": _tool_version(["/usr/bin/sw_vers", "-productVersion"], cwd=source_root, environment=environment),
+        toolchain = {
+            "architecture": target_architecture,
+            "flutter": _tool_version([tools["flutter"], "--version"], cwd=flutter_project, environment=environment),
+            "flutter_sdk_revision": PINNED_FLUTTER_REVISION,
+            "flutter_engine_revision": flutter_framework.engine_revision,
+            "cargo": _tool_version([tools["cargo"], "+" + RUST_TOOLCHAIN, "--version"], cwd=source_root, environment=environment),
+            "rustc": _tool_version([tools["rustc"], "+" + RUST_TOOLCHAIN, "--version"], cwd=source_root, environment=environment),
+            "xcodebuild": _tool_version([tools["xcodebuild"], "-version"], cwd=source_root, environment=environment),
+            "macos_version": _tool_version(["/usr/bin/sw_vers", "-productVersion"], cwd=source_root, environment=environment),
+        }
+        app_owner_manifest = source_root / "native/macos_owner/Cargo.toml"
+        broker_manifest = source_root / "native/rust_helper/Cargo.toml"
+        _run(
+            [tools["cargo"], "+" + RUST_TOOLCHAIN, "build", "--release", "--locked", "--manifest-path", str(app_owner_manifest), "--lib"],
+            cwd=source_root,
+            environment=environment,
+        )
+        rust_environment = dict(environment)
+        rust_environment.update(
+            {
+                "GUI_SHELL_PRODUCT_APP_ID": app_id,
+                "GUI_SHELL_PRODUCT_AUDIT_STORE_ID": audit_store_id,
+                "GUI_SHELL_PRODUCT_MANIFEST_SHA256": manifest_hash,
             }
-            app_owner_manifest = source_root / "native/macos_owner/Cargo.toml"
-            broker_manifest = source_root / "native/rust_helper/Cargo.toml"
-            _run(
-                [tools["cargo"], "+" + RUST_TOOLCHAIN, "build", "--release", "--locked", "--manifest-path", str(app_owner_manifest), "--lib"],
-                cwd=source_root,
-                environment=environment,
+        )
+        update_trust = manifest_file.get("update_trust")
+        if update_trust is not None:
+            rust_environment["GUI_SHELL_UPDATE_TRUST_JSON"] = json.dumps(
+                update_trust, ensure_ascii=False, sort_keys=True, separators=(",", ":")
             )
-            rust_environment = dict(environment)
-            rust_environment.update(
-                {
-                    "GUI_SHELL_PRODUCT_APP_ID": app_id,
-                    "GUI_SHELL_PRODUCT_AUDIT_STORE_ID": audit_store_id,
-                    "GUI_SHELL_PRODUCT_MANIFEST_SHA256": manifest_hash,
-                }
-            )
-            update_trust = manifest_file.get("update_trust")
-            if update_trust is not None:
-                rust_environment["GUI_SHELL_UPDATE_TRUST_JSON"] = json.dumps(
-                    update_trust, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-                )
-            _run(
-                [tools["cargo"], "+" + RUST_TOOLCHAIN, "build", "--release", "--locked", "--manifest-path", str(broker_manifest), "--bin", "gui_shell_macos_broker"],
-                cwd=source_root,
-                environment=rust_environment,
-            )
-            _run(
-                [tools["flutter"], "pub", "get", "--enforce-lockfile"], cwd=flutter_project, environment=environment
-            )
-            size_analysis_input_directory = temporary_root / "macos-size-analysis-inputs"
-            size_analysis_input_directory.mkdir(mode=0o700)
-            flutter_arguments = [
-                "build", "macos", "--release", "--no-pub", "--analyze-size",
-                f"--code-size-directory={size_analysis_input_directory}",
-                *[
-                    f"--dart-define={name}={str(enabled).lower()}"
-                    for name, enabled in defines.items()
-                ],
-                f"--dart-define=GUI_SHELL_PRODUCT_VERSION={version}",
-            ]
-            flutter_output = _run(
-                [tools["flutter"], *flutter_arguments],
-                cwd=flutter_project,
-                environment=environment,
-            )
-            built_app = flutter_project / "build/macos/Build/Products/Release/gui_shell_desktop.app"
-            app_info_plist = built_app / "Contents/Info.plist"
-            _require_file(app_info_plist, "macOS Info.plist")
-            built_bundle_id = _run(
-                [tools["plutil"], "-extract", "CFBundleIdentifier", "raw", "-o", "-", str(built_app / "Contents/Info.plist")],
-                cwd=source_root,
-                environment=environment,
-            ).strip()
-            if built_bundle_id != bundle_id:
-                raise ValueError("built App Bundle identifierがExport App identityと一致しない")
-            built_executable_name = _run(
-                [tools["plutil"], "-extract", "CFBundleExecutable", "raw", "-o", "-", str(app_info_plist)],
-                cwd=source_root,
-                environment=environment,
-            ).strip()
-            if re.fullmatch(r"[A-Za-z0-9._-]{1,128}", built_executable_name) is None:
-                raise ValueError("macOS App executable名が不正である")
-            built_executable = built_app / "Contents/MacOS" / built_executable_name
-            _require_file(built_executable, "macOS App executable")
-            built_helper = built_app / "Contents/MacOS/gui_shell_macos_broker"
-            _require_file(built_helper, "macOS Broker helper")
-            macos_binary_architecture_scan = _require_macos_binary_architecture(
-                [built_executable, built_helper],
-                lipo=tools["lipo"],
-                architecture=target_architecture,
-                environment=environment,
-            )
-            _validate_bundle_symlinks(built_app)
+        _run(
+            [tools["cargo"], "+" + RUST_TOOLCHAIN, "build", "--release", "--locked", "--manifest-path", str(broker_manifest), "--bin", "gui_shell_macos_broker"],
+            cwd=source_root,
+            environment=rust_environment,
+        )
+        _run(
+            [tools["flutter"], "pub", "get", "--enforce-lockfile"], cwd=flutter_project, environment=environment
+        )
+        size_analysis_input_directory = temporary_root / "macos-size-analysis-inputs"
+        size_analysis_input_directory.mkdir(mode=0o700)
+        flutter_arguments = [
+            "build", "macos", "--release", "--no-pub", "--analyze-size",
+            f"--code-size-directory={size_analysis_input_directory}",
+            *[
+                f"--dart-define={name}={str(enabled).lower()}"
+                for name, enabled in defines.items()
+            ],
+            f"--dart-define=GUI_SHELL_PRODUCT_VERSION={version}",
+        ]
+        flutter_output = _run(
+            [tools["flutter"], *flutter_arguments],
+            cwd=flutter_project,
+            environment=environment,
+        )
+        built_app = flutter_project / "build/macos/Build/Products/Release/gui_shell_desktop.app"
+        app_info_plist = built_app / "Contents/Info.plist"
+        _require_file(app_info_plist, "macOS Info.plist")
+        built_bundle_id = _run(
+            [tools["plutil"], "-extract", "CFBundleIdentifier", "raw", "-o", "-", str(built_app / "Contents/Info.plist")],
+            cwd=source_root,
+            environment=environment,
+        ).strip()
+        if built_bundle_id != bundle_id:
+            raise ValueError("built App Bundle identifierがExport App identityと一致しない")
+        built_executable_name = _run(
+            [tools["plutil"], "-extract", "CFBundleExecutable", "raw", "-o", "-", str(app_info_plist)],
+            cwd=source_root,
+            environment=environment,
+        ).strip()
+        if re.fullmatch(r"[A-Za-z0-9._-]{1,128}", built_executable_name) is None:
+            raise ValueError("macOS App executable名が不正である")
+        built_executable = built_app / "Contents/MacOS" / built_executable_name
+        _require_file(built_executable, "macOS App executable")
+        built_helper = built_app / "Contents/MacOS/gui_shell_macos_broker"
+        _require_file(built_helper, "macOS Broker helper")
+        macos_binary_architecture_scan = _require_macos_binary_architecture(
+            [built_executable, built_helper],
+            lipo=tools["lipo"],
+            architecture=target_architecture,
+            environment=environment,
+        )
+        _validate_bundle_symlinks(built_app)
 
-            app_bundle = staging_root / bundle_name
-            shutil.copytree(built_app, app_bundle, symlinks=True)
-            resources = app_bundle / "Contents/Resources"
-            if resources.exists() or resources.is_symlink():
-                resource_metadata = resources.lstat()
-                if not stat.S_ISDIR(resource_metadata.st_mode) or stat.S_ISLNK(resource_metadata.st_mode):
-                    raise ValueError("macOS App Bundle Resourcesが通常directoryではない")
-            else:
-                resources.mkdir(mode=0o755)
-            product_manifest = resources / "product_manifest.json"
-            if product_manifest.exists() or product_manifest.is_symlink():
-                raise ValueError("build outputに予約済みproduct_manifest.jsonが存在する")
-            with product_manifest.open("xb") as target:
-                target.write(manifest_raw)
-            if product_manifest.read_bytes() != manifest_raw:
-                raise ValueError("Export Manifestをbyte-for-byteでbundleへ保持できなかった")
-            _validate_bundle_symlinks(app_bundle)
-            app_code_signature_scan = _require_macos_code_without_publisher_identity(
-                app_bundle,
-                flutter_framework=flutter_framework,
-                codesign=tools["codesign"],
-                lipo=tools["lipo"],
-                architecture=target_architecture,
-                verification_directory=temporary_root,
-                environment=environment,
-            )
-            catalog = _load_catalog()
-            aot_surface_analysis = _capture_macos_aot_surface_analysis(
-                output=flutter_output,
-                isolated_home=Path(environment["HOME"]),
-                input_directory=size_analysis_input_directory,
-                profiled_app=built_app,
-                bundle_root=app_bundle,
-                staging_root=staging_root,
-                target_architecture=target_architecture,
-                catalog=catalog,
-                included_module_ids=set(plan.included_optional_ids),
-            )
+        app_bundle = staging_root / bundle_name
+        shutil.copytree(built_app, app_bundle, symlinks=True)
+        resources = app_bundle / "Contents/Resources"
+        if resources.exists() or resources.is_symlink():
+            resource_metadata = resources.lstat()
+            if not stat.S_ISDIR(resource_metadata.st_mode) or stat.S_ISLNK(resource_metadata.st_mode):
+                raise ValueError("macOS App Bundle Resourcesが通常directoryではない")
+        else:
+            resources.mkdir(mode=0o755)
+        product_manifest = resources / "product_manifest.json"
+        if product_manifest.exists() or product_manifest.is_symlink():
+            raise ValueError("build outputに予約済みproduct_manifest.jsonが存在する")
+        with product_manifest.open("xb") as target:
+            target.write(manifest_raw)
+        if product_manifest.read_bytes() != manifest_raw:
+            raise ValueError("Export Manifestをbyte-for-byteでbundleへ保持できなかった")
+        _validate_bundle_symlinks(app_bundle)
+        app_code_signature_scan = _require_macos_code_without_publisher_identity(
+            app_bundle,
+            flutter_framework=flutter_framework,
+            codesign=tools["codesign"],
+            lipo=tools["lipo"],
+            architecture=target_architecture,
+            verification_directory=temporary_root,
+            environment=environment,
+        )
+        catalog = _load_catalog()
+        aot_surface_analysis = _capture_macos_aot_surface_analysis(
+            output=flutter_output,
+            isolated_home=Path(environment["HOME"]),
+            input_directory=size_analysis_input_directory,
+            profiled_app=built_app,
+            bundle_root=app_bundle,
+            staging_root=staging_root,
+            target_architecture=target_architecture,
+            catalog=catalog,
+            included_module_ids=set(plan.included_optional_ids),
+        )
 
-            app_archive_path = staging_root / f"{bundle_name}.zip"
-            _run(
-                [tools["ditto"], "-c", "-k", "--sequesterRsrc", "--keepParent", str(app_bundle), str(app_archive_path)],
-                cwd=source_root,
-                environment=environment,
-            )
-            _require_file(app_archive_path, "macOS App archive")
+        app_archive_path = staging_root / f"{bundle_name}.zip"
+        _run(
+            [tools["ditto"], "-c", "-k", "--sequesterRsrc", "--keepParent", str(app_bundle), str(app_archive_path)],
+            cwd=source_root,
+            environment=environment,
+        )
+        _require_file(app_archive_path, "macOS App archive")
 
-            payload_root = temporary_root / "payload"
-            install_bundle = payload_root / "Applications" / bundle_name
-            install_bundle.parent.mkdir(parents=True, mode=0o700)
-            shutil.copytree(app_bundle, install_bundle, symlinks=True)
-            if (install_bundle / "Contents/Resources/product_manifest.json").read_bytes() != manifest_raw:
-                raise ValueError("package staging App BundleがProduct Manifestを保持していない")
-            package_path = staging_root / f"D4Pocket-{suffix[:12]}.pkg"
-            _run(
-                [tools["pkgbuild"], "--root", str(payload_root), "--identifier", installer_id,
-                 "--version", version, "--install-location", "/", "--ownership", "preserve",
-                 str(package_path)],
-                cwd=source_root,
-                environment=environment,
-            )
-            _require_file(package_path, "macOS package candidate")
+        payload_root = temporary_root / "payload"
+        install_bundle = payload_root / "Applications" / bundle_name
+        install_bundle.parent.mkdir(parents=True, mode=0o700)
+        shutil.copytree(app_bundle, install_bundle, symlinks=True)
+        if (install_bundle / "Contents/Resources/product_manifest.json").read_bytes() != manifest_raw:
+            raise ValueError("package staging App BundleがProduct Manifestを保持していない")
+        package_path = staging_root / f"D4Pocket-{suffix[:12]}.pkg"
+        _run(
+            [tools["pkgbuild"], "--root", str(payload_root), "--identifier", installer_id,
+             "--version", version, "--install-location", "/", "--ownership", "preserve",
+             str(package_path)],
+            cwd=source_root,
+            environment=environment,
+        )
+        _require_file(package_path, "macOS package candidate")
 
-            uninstaller_template_path = source_root / "installer/macos/uninstall/postinstall.sh.in"
-            uninstaller_template = _read_regular_file(
-                uninstaller_template_path, 32 * 1024, "macOS uninstaller script template"
-            ).decode("utf-8")
-            uninstaller_script = render_macos_uninstaller_postinstall(
-                uninstaller_template,
-                bundle_name=bundle_name,
-                bundle_identifier=bundle_id,
-            )
-            uninstaller_scripts = temporary_root / "uninstaller-scripts"
-            uninstaller_scripts.mkdir(mode=0o700)
-            postinstall_path = uninstaller_scripts / "postinstall"
-            postinstall_path.write_bytes(uninstaller_script.encode("utf-8"))
-            postinstall_path.chmod(0o755)
-            uninstaller_package_path = (
-                staging_root / f"D4Pocket-{suffix[:12]}-Uninstaller.pkg"
-            )
-            _run(
-                [tools["pkgbuild"], "--nopayload", "--scripts", str(uninstaller_scripts),
-                 "--identifier", uninstaller_id, "--version", version,
-                 str(uninstaller_package_path)],
-                cwd=source_root,
-                environment=environment,
-            )
-            _require_file(uninstaller_package_path, "macOS uninstaller package candidate")
+        uninstaller_template_path = source_root / "installer/macos/uninstall/postinstall.sh.in"
+        uninstaller_template = _read_regular_file(
+            uninstaller_template_path, 32 * 1024, "macOS uninstaller script template"
+        ).decode("utf-8")
+        uninstaller_script = render_macos_uninstaller_postinstall(
+            uninstaller_template,
+            bundle_name=bundle_name,
+            bundle_identifier=bundle_id,
+        )
+        uninstaller_scripts = temporary_root / "uninstaller-scripts"
+        uninstaller_scripts.mkdir(mode=0o700)
+        postinstall_path = uninstaller_scripts / "postinstall"
+        postinstall_path.write_bytes(uninstaller_script.encode("utf-8"))
+        postinstall_path.chmod(0o755)
+        uninstaller_package_path = (
+            staging_root / f"D4Pocket-{suffix[:12]}-Uninstaller.pkg"
+        )
+        _run(
+            [tools["pkgbuild"], "--nopayload", "--scripts", str(uninstaller_scripts),
+             "--identifier", uninstaller_id, "--version", version,
+             str(uninstaller_package_path)],
+            cwd=source_root,
+            environment=environment,
+        )
+        _require_file(uninstaller_package_path, "macOS uninstaller package candidate")
 
-            package_manifest = (install_bundle / "Contents/Resources/product_manifest.json").read_bytes()
-            if product_manifest.read_bytes() != manifest_raw or package_manifest != manifest_raw:
-                raise ValueError("Export Manifestがpackage対象App Bundleから変化した")
-            records, regular_files, total_bytes, tree_hash = _macos_artifact_inventory(
-                staging_root, app_bundle
-            )
-            credential_scan = _scan_macos_artifacts(
-                staging_root, app_bundle, records, regular_files, total_bytes, tree_hash
-            )
+        package_manifest = (install_bundle / "Contents/Resources/product_manifest.json").read_bytes()
+        if product_manifest.read_bytes() != manifest_raw or package_manifest != manifest_raw:
+            raise ValueError("Export Manifestがpackage対象App Bundleから変化した")
+        records, regular_files, total_bytes, tree_hash = _macos_artifact_inventory(
+            staging_root, app_bundle
+        )
+        credential_scan = _scan_macos_artifacts(
+            staging_root, app_bundle, records, regular_files, total_bytes, tree_hash
+        )
 
         elapsed_ms = round((time.perf_counter() - started) * 1000)
         catalog = _load_catalog()
