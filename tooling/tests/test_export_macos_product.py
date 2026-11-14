@@ -45,6 +45,9 @@ class MacOSProductExportTests(unittest.TestCase):
                     "PATH": "/fixed/bin",
                     "RUSTUP_HOME": str(rustup_home),
                     "AWS_SECRET_ACCESS_KEY": "must-not-propagate",
+                    "FLUTTER_XCODE_CODE_SIGNING_ALLOWED": "YES",
+                    "FLUTTER_XCODE_CODE_SIGNING_REQUIRED": "YES",
+                    "FLUTTER_XCODE_CODE_SIGN_IDENTITY": "unexpected-parent-identity",
                 },
                 clear=True,
             ):
@@ -55,6 +58,9 @@ class MacOSProductExportTests(unittest.TestCase):
             self.assertEqual(environment["HOME"], str(root / "home"))
             self.assertEqual(environment["CARGO_HOME"], str(root / "cargo"))
             self.assertEqual(environment["FLUTTER_ROOT"], str(flutter_root))
+            self.assertEqual(environment["FLUTTER_XCODE_CODE_SIGNING_ALLOWED"], "NO")
+            self.assertEqual(environment["FLUTTER_XCODE_CODE_SIGNING_REQUIRED"], "NO")
+            self.assertEqual(environment["FLUTTER_XCODE_CODE_SIGN_IDENTITY"], "")
             self.assertNotIn("AWS_SECRET_ACCESS_KEY", environment)
 
     def test_isolated_macos_environment_rejects_missing_rustup_home(self) -> None:

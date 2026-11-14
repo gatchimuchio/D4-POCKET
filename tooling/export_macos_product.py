@@ -169,6 +169,9 @@ def _macos_environment(temp_root: Path, *, flutter_root: Path) -> dict[str, str]
             "FLUTTER_ROOT": str(flutter_root),
             "CI": "true",
             "FLUTTER_SUPPRESS_ANALYTICS": "true",
+            "FLUTTER_XCODE_CODE_SIGNING_ALLOWED": "NO",
+            "FLUTTER_XCODE_CODE_SIGNING_REQUIRED": "NO",
+            "FLUTTER_XCODE_CODE_SIGN_IDENTITY": "",
         }
     )
     return environment
