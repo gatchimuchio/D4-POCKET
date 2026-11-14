@@ -506,28 +506,132 @@ def _macos_bundle_entries(bundle: Path) -> dict[str, dict[str, Any]]:
     return entries
 
 
-def _flutter_framework_copy_exclusions(
+def _flutter_framework_embed_filtered_paths(
     source_entries: dict[str, dict[str, Any]],
 ) -> set[str]:
-    excluded: set[str] = set()
     embed_filtered_paths = {
         path
         for path in source_entries
         if PurePosixPath(path).name in FLUTTER_MACOS_FRAMEWORK_EMBED_FILTERED_BASENAMES
     }
+    filtered: set[str] = set()
     for directory in embed_filtered_paths:
-        excluded.update(
+        filtered.update(
             path
             for path in source_entries
             if path == directory or path.startswith(directory + "/")
         )
-    excluded.update(
+    return filtered
+
+
+def _flutter_framework_denylisted_paths(
+    source_entries: dict[str, dict[str, Any]],
+) -> set[str]:
+    return {
         path
         for path, entry in source_entries.items()
         if entry["kind"] == "file"
         and PurePosixPath(path).name in FLUTTER_MACOS_FRAMEWORK_DENYLISTED_FILES
-    )
+    }
+
+
+def _flutter_framework_copy_exclusions(
+    source_entries: dict[str, dict[str, Any]],
+) -> set[str]:
+    excluded = _flutter_framework_embed_filtered_paths(source_entries)
+    excluded.update(_flutter_framework_denylisted_paths(source_entries))
     return excluded
+
+
+def _flutter_framework_export_exclusions(
+    source_entries: dict[str, dict[str, Any]],
+) -> set[str]:
+    return _flutter_framework_denylisted_paths(source_entries)
+
+
+def _restore_pinned_flutter_framework_embed_filtered_resources(
+    source_framework: Path, embedded_framework: Path
+) -> int:
+    source_entries = _macos_bundle_entries(source_framework)
+    if embedded_framework.is_symlink() or not embedded_framework.is_dir():
+        raise ValueError("Export App Bundle内FlutterMacOS.frameworkが通常directoryではない")
+    embedded_entries = _macos_bundle_entries(embedded_framework)
+    restore_paths = _flutter_framework_embed_filtered_paths(source_entries)
+    restore_paths.difference_update(_flutter_framework_denylisted_paths(source_entries))
+    restored_count = 0
+
+    for relative in sorted(restore_paths, key=lambda value: (value.count("/"), value)):
+        source_entry = source_entries[relative]
+        source_path = source_framework.joinpath(*PurePosixPath(relative).parts)
+        target_path = embedded_framework.joinpath(*PurePosixPath(relative).parts)
+        parent = embedded_framework
+        for part in PurePosixPath(relative).parts[:-1]:
+            parent = parent / part
+            try:
+                parent_metadata = parent.lstat()
+            except FileNotFoundError as error:
+                raise ValueError("Flutter Framework復元先parentが存在しない") from error
+            if stat.S_ISLNK(parent_metadata.st_mode) or not stat.S_ISDIR(parent_metadata.st_mode):
+                raise ValueError("Flutter Framework復元先parentが通常directoryではない")
+        try:
+            target_metadata = target_path.lstat()
+        except FileNotFoundError:
+            target_metadata = None
+
+        if target_metadata is not None:
+            target_entry = embedded_entries.get(relative)
+            if target_entry is None:
+                raise ValueError("Flutter Framework復元対象をExport Bundleから安全に読めない")
+            source_content = {
+                key: value for key, value in source_entry.items() if key != "mode"
+            }
+            target_content = {
+                key: value for key, value in target_entry.items() if key != "mode"
+            }
+            if source_content != target_content:
+                raise ValueError("Export Bundle内filtered Flutter resourceがpinned sourceと異なる")
+            continue
+
+        if source_entry["kind"] == "directory":
+            target_path.mkdir(mode=source_entry["mode"])
+            os.chmod(target_path, source_entry["mode"])
+            embedded_entries[relative] = {
+                "kind": "directory",
+                "mode": stat.S_IMODE(target_path.lstat().st_mode),
+            }
+        elif source_entry["kind"] == "file":
+            with source_path.open("rb") as source, target_path.open("xb") as target:
+                shutil.copyfileobj(source, target, length=1024 * 1024)
+            os.chmod(target_path, source_entry["mode"])
+            target_metadata = target_path.lstat()
+            copied_sha256 = _sha256_file(target_path)
+            if (
+                not stat.S_ISREG(target_metadata.st_mode)
+                or stat.S_ISLNK(target_metadata.st_mode)
+                or target_metadata.st_size != source_entry["size_bytes"]
+                or copied_sha256 != source_entry["sha256"]
+            ):
+                raise ValueError("pinned Flutter resource copy後のfile hash照合に失敗した")
+            embedded_entries[relative] = {
+                "kind": "file",
+                "mode": stat.S_IMODE(target_metadata.st_mode),
+                "size_bytes": target_metadata.st_size,
+                "sha256": copied_sha256,
+            }
+        elif source_entry["kind"] == "symlink":
+            link_target = os.readlink(source_path)
+            os.symlink(link_target, target_path)
+            embedded_entries[relative] = {
+                "kind": "symlink",
+                "mode": stat.S_IMODE(target_path.lstat().st_mode),
+                "target": os.readlink(target_path),
+            }
+        else:
+            raise ValueError("pinned Flutter filtered resource typeが未対応である")
+        restored_count += 1
+
+    _validate_bundle_symlinks(embedded_framework)
+    return restored_count
 
 
 def _verify_flutter_framework_copy_entries(
@@ -535,7 +639,7 @@ def _verify_flutter_framework_copy_entries(
 ) -> tuple[str, str]:
     source_entries = _macos_bundle_entries(source_framework)
     embedded_entries = _macos_bundle_entries(embedded_framework)
-    exclusions = _flutter_framework_copy_exclusions(source_entries)
+    exclusions = _flutter_framework_export_exclusions(source_entries)
     expected_paths = set(source_entries) - exclusions
     embedded_paths = set(embedded_entries)
     if embedded_paths != expected_paths:
@@ -845,6 +949,9 @@ def _verify_embedded_flutter_framework(
     )
     if source_facts != reference.signature_facts:
         raise ValueError("Flutter SDK cache内Frameworkの署名metadataがbuild中に変化した")
+    _restore_pinned_flutter_framework_embed_filtered_resources(
+        reference.source_path, framework
+    )
     source_tree_after = _macos_bundle_tree_sha256(reference.source_path)
     if source_tree_after != reference.tree_sha256:
         raise ValueError("Flutter SDK cache内のpinned Frameworkが検証中に変化した")

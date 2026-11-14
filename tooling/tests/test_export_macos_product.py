@@ -27,6 +27,7 @@ from tooling.export_macos_product import (
     _flutter_framework_copy_exclusions,
     _macos_signature_diagnostic,
     _codesign_verification_failure_class,
+    _restore_pinned_flutter_framework_embed_filtered_resources,
     _scan_macos_artifacts,
     _verify_flutter_framework_copy_entries,
     _validate_build_evidence,
@@ -159,20 +160,32 @@ class MacOSProductExportTests(unittest.TestCase):
             },
         )
 
-    def test_framework_copy_accepts_pinned_macos_embed_header_and_module_filters(self) -> None:
+    def test_framework_copy_restores_pinned_macos_embed_filtered_resources(self) -> None:
         with tempfile.TemporaryDirectory(prefix="d4p-macos-framework-embed-filter-") as temp:
             app, reference = _flutter_framework_fixture(Path(temp))
             embedded = app.joinpath(*APP_FLUTTER_FRAMEWORK_RELATIVE_PATH.parts)
 
-            for relative in (
+            filtered_resources = (
                 "Headers/FlutterMacOS.h",
                 "Modules/module.modulemap",
                 "Versions/A/Headers/FlutterMacOS.h",
                 "Versions/A/Modules/module.modulemap",
                 "Versions/A/.DS_Store",
-            ):
+                ".DS_Store/nested/ignored.bin",
+            )
+            for relative in filtered_resources:
                 self.assertTrue((reference.source_path / relative).is_file())
                 self.assertFalse((embedded / relative).exists())
+
+            restored = _restore_pinned_flutter_framework_embed_filtered_resources(
+                reference.source_path, embedded
+            )
+            self.assertGreater(restored, 0)
+            for relative in filtered_resources:
+                self.assertEqual(
+                    (embedded / relative).read_bytes(),
+                    (reference.source_path / relative).read_bytes(),
+                )
 
             source_hash, embedded_hash = _verify_flutter_framework_copy_entries(
                 reference.source_path, embedded
@@ -186,10 +199,26 @@ class MacOSProductExportTests(unittest.TestCase):
                 hashlib.sha256(FLUTTER_FRAMEWORK_ARM64_BINARY).hexdigest(),
             )
 
+    def test_framework_embed_resource_restore_rejects_existing_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="d4p-macos-framework-embed-restore-") as temp:
+            app, reference = _flutter_framework_fixture(Path(temp))
+            embedded = app.joinpath(*APP_FLUTTER_FRAMEWORK_RELATIVE_PATH.parts)
+            mismatched = embedded / "Versions/A/Headers/FlutterMacOS.h"
+            mismatched.parent.mkdir(parents=True)
+            mismatched.write_bytes(b"substituted sealed resource")
+
+            with self.assertRaisesRegex(ValueError, "filtered Flutter resourceがpinned sourceと異なる"):
+                _restore_pinned_flutter_framework_embed_filtered_resources(
+                    reference.source_path, embedded
+                )
+
     def test_framework_layout_mismatch_reports_bounded_path_differences(self) -> None:
         with tempfile.TemporaryDirectory(prefix="d4p-macos-framework-layout-") as temp:
             app, reference = _flutter_framework_fixture(Path(temp))
             embedded = app.joinpath(*APP_FLUTTER_FRAMEWORK_RELATIVE_PATH.parts)
+            _restore_pinned_flutter_framework_embed_filtered_resources(
+                reference.source_path, embedded
+            )
             extra = embedded / "_CodeSignature/CodeResources"
             extra.parent.mkdir(parents=True)
             extra.write_bytes(b"unexpected copied signature resource")
@@ -756,6 +785,9 @@ class MacOSProductExportTests(unittest.TestCase):
             resources.mkdir(parents=True, exist_ok=True)
             (resources / "product_manifest.json").write_bytes(manifest_raw)
             framework = app.joinpath(*APP_FLUTTER_FRAMEWORK_RELATIVE_PATH.parts)
+            _restore_pinned_flutter_framework_embed_filtered_resources(
+                framework_reference.source_path, framework
+            )
             framework_tree_hash = _macos_bundle_tree_sha256(framework)
             source_binary_hash = hashlib.sha256(FLUTTER_FRAMEWORK_SOURCE_BINARY).hexdigest()
             embedded_binary_hash = hashlib.sha256(FLUTTER_FRAMEWORK_ARM64_BINARY).hexdigest()
