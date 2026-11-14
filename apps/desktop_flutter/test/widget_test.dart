@@ -4049,7 +4049,9 @@ void main() {
     await tester.tap(find.text('native Owner確認へ進む'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('登録Workspaceで対話Sessionを開始'));
+    final startSessionButton = find.text('登録Workspaceで対話Sessionを開始');
+    await tester.ensureVisible(startSessionButton);
+    await tester.tap(startSessionButton);
     await tester.pumpAndSettle();
     expect(find.text(sessionId), findsOneWidget);
 
@@ -4372,7 +4374,9 @@ void main() {
         ),
       ),
     ));
-    await tester.tap(find.text('登録を開始'));
+    final registrationButton = find.text('登録を開始');
+    await tester.ensureVisible(registrationButton);
+    await tester.tap(registrationButton);
     await tester.pumpAndSettle();
     final registrationFields = find.byType(TextFormField);
     await tester.enterText(registrationFields.at(0), 'model-ai-edit-fixture');
@@ -4870,7 +4874,9 @@ void main() {
     await tester.enterText(registrationFields.at(5), '.env');
     await tester.tap(find.text('native Owner確認へ進む'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('登録Workspaceで対話Sessionを開始'));
+    final startSessionButton = find.text('登録Workspaceで対話Sessionを開始');
+    await tester.ensureVisible(startSessionButton);
+    await tester.tap(startSessionButton);
     await tester.pumpAndSettle();
 
     final preflightButton = find.text('Task実行能力を事前検査（実行なし）');
@@ -5296,7 +5302,9 @@ void main() {
     await tester.enterText(registrationFields.at(5), '.env');
     await tester.tap(find.text('native Owner確認へ進む'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('登録Workspaceで対話Sessionを開始'));
+    final startSessionButton = find.text('登録Workspaceで対話Sessionを開始');
+    await tester.ensureVisible(startSessionButton);
+    await tester.tap(startSessionButton);
     await tester.pumpAndSettle();
 
     final preflight = find.text('Task実行能力を事前検査（実行なし）');

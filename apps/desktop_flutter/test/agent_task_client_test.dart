@@ -16,6 +16,70 @@ const _resultHash =
     'sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
 
 void main() {
+  test('Task記録の利用は開始要求と事前検査hashの全項目一致を要求する', () {
+    const record = AgentTaskRecord(
+      taskId: _task,
+      runtimeId: 'codex-local',
+      sessionId: _session,
+      workspaceId: 'workspace-local',
+      instructionHash: _instructionHash,
+      status: 'completed',
+      auditEventId: 'audit-task-complete',
+    );
+
+    AgentTaskRequest request({
+      String runtimeId = 'codex-local',
+      String sessionId = _session,
+      String workspaceId = 'workspace-local',
+    }) =>
+        AgentTaskRequest(
+          runtimeId: runtimeId,
+          sessionId: sessionId,
+          workspaceId: workspaceId,
+          instruction: _request.instruction,
+        );
+
+    expect(
+      record.isBoundTo(
+        _request,
+        expectedInstructionHash: _instructionHash,
+        expectedTaskId: _task,
+      ),
+      isTrue,
+    );
+    expect(
+      record.isBoundTo(
+        _request,
+        expectedInstructionHash: _instructionHash,
+        expectedTaskId: 'dddddddddddddddddddddddddddddddd',
+      ),
+      isFalse,
+    );
+    expect(
+      record.isBoundTo(request(runtimeId: 'other-runtime'),
+          expectedInstructionHash: _instructionHash),
+      isFalse,
+    );
+    expect(
+      record.isBoundTo(request(sessionId: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'),
+          expectedInstructionHash: _instructionHash),
+      isFalse,
+    );
+    expect(
+      record.isBoundTo(request(workspaceId: 'other-workspace'),
+          expectedInstructionHash: _instructionHash),
+      isFalse,
+    );
+    expect(
+      record.isBoundTo(_request, expectedInstructionHash: _conditionsHash),
+      isFalse,
+    );
+    expect(
+      record.isBoundTo(_request, expectedInstructionHash: null),
+      isFalse,
+    );
+  });
+
   test('AI Edit適用Taskだけ未使用Session条件を要求へ結合する', () {
     const applyRequest = AgentTaskRequest(
       runtimeId: 'codex-local',

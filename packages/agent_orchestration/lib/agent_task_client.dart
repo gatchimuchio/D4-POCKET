@@ -115,6 +115,18 @@ class AgentTaskRecord {
   final String? resultHash;
   final bool resultContentAvailable;
   final AgentTaskBufferIntervention? bufferIntervention;
+
+  bool isBoundTo(
+    AgentTaskRequest request, {
+    required String? expectedInstructionHash,
+    String? expectedTaskId,
+  }) =>
+      expectedInstructionHash != null &&
+      (expectedTaskId == null || taskId == expectedTaskId) &&
+      runtimeId == request.runtimeId &&
+      sessionId == request.sessionId &&
+      workspaceId == request.workspaceId &&
+      instructionHash == expectedInstructionHash;
 }
 
 class AgentTaskBufferIntervention {

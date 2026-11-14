@@ -86,6 +86,8 @@ class _AgentTaskUiState {
   final AgentTaskRequest originalRequest;
   final String preflightInstructionHash;
   AgentTaskRequest? lastStartedRequest;
+  String? lastStartedInstructionHash;
+  String? lastStartedTaskId;
   final String? mcpCapabilitySnapshotHash;
   String? taskContext;
   AgentHandoffPackage? handoffPackage;
@@ -104,6 +106,7 @@ class _AgentTaskUiState {
   AgentTaskRecord? mcpSourceTaskRecord;
   DateTime? terminalObservedAt;
   String? refreshError;
+  bool taskBindingRejected = false;
   String? mcpContinuationStatus;
   String? mcpFollowupTaskId;
 }
@@ -834,8 +837,24 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
       final outcomeB = outcomes[1];
       final recordA = outcomeA.record;
       final recordB = outcomeB.record;
-      if (recordA != null) stateA.record = recordA;
-      if (recordB != null) stateB.record = recordB;
+      stateA.lastStartedRequest = requestA;
+      stateA.lastStartedInstructionHash = comparison.instructionHash;
+      stateA.lastStartedTaskId = recordA?.taskId;
+      stateB.lastStartedRequest = requestB;
+      stateB.lastStartedInstructionHash = comparison.instructionHash;
+      stateB.lastStartedTaskId = recordB?.taskId;
+      if (recordA != null) {
+        stateA.record = recordA;
+        final recordABound = _taskRecordMatchesStartedRequest(stateA, recordA);
+        stateA.taskBindingRejected = !recordABound;
+        stateA.refreshError = recordABound ? null : _taskBindingMismatchMessage;
+      }
+      if (recordB != null) {
+        stateB.record = recordB;
+        final recordBBound = _taskRecordMatchesStartedRequest(stateB, recordB);
+        stateB.taskBindingRejected = !recordBBound;
+        stateB.refreshError = recordBBound ? null : _taskBindingMismatchMessage;
+      }
       if (recordA != null &&
           !const {'pending', 'running'}.contains(recordA.status)) {
         stateA.terminalObservedAt = DateTime.now();
@@ -852,10 +871,15 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
           recordA?.status ?? _comparisonStartFailure(outcomeA.error);
       final bStatus =
           recordB?.status ?? _comparisonStartFailure(outcomeB.error);
+      final bothRecordsBound =
+          _taskRecordMatchesStartedRequest(stateA, recordA) &&
+              _taskRecordMatchesStartedRequest(stateB, recordB);
       setState(
-        () => _comparisonStatus = recordA != null && recordB != null
+        () => _comparisonStatus = bothRecordsBound
             ? '独立Taskを開始しました。片方の失敗・取消は他方へ連鎖させません。'
-            : 'Agent A=$aStatus / Agent B=$bStatus。受理済み側は独立継続し、失敗側は再送しません。',
+            : recordA != null && recordB != null
+                ? '開始応答のTask結合を確認できないため、結果表示・選択・適用を停止しました。'
+                : 'Agent A=$aStatus / Agent B=$bStatus。受理済み側は独立継続し、失敗側は再送しません。',
       );
     } finally {
       if (mounted) setState(() => _comparisonPending = false);
@@ -1036,9 +1060,17 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
       for (var index = 0; index < outcomes.length; index++) {
         final state = states[index];
         if (outcomes[index] is AgentTaskRecord) {
-          state.record = outcomes[index] as AgentTaskRecord;
+          final refreshed = outcomes[index] as AgentTaskRecord;
+          if (!_taskRecordMatchesStartedRequest(state, refreshed)) {
+            state.taskBindingRejected = true;
+            state.refreshError = _taskBindingMismatchMessage;
+            state.resultProjection = null;
+            continue;
+          }
+          state.record = refreshed;
+          state.taskBindingRejected = false;
           state.refreshError = null;
-          if (!const {'pending', 'running'}.contains(state.record!.status)) {
+          if (!const {'pending', 'running'}.contains(refreshed.status)) {
             state.terminalObservedAt ??= DateTime.now();
           }
         } else {
@@ -1057,6 +1089,8 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
   }
 
   void _selectComparisonResult(String sessionId) {
+    final state = _agentTasks[sessionId];
+    final task = state?.record;
     final comparison = _comparison;
     if (_comparisonPending ||
         comparison == null ||
@@ -1064,7 +1098,8 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
           comparison.agentASessionId,
           comparison.agentBSessionId,
         }.contains(sessionId) ||
-        _agentTasks[sessionId]?.record?.status != 'completed') {
+        task?.status != 'completed' ||
+        !_taskRecordMatchesUiState(state, task)) {
       return;
     }
     setState(() {
@@ -1090,7 +1125,9 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
         comparison == null ||
         source == null ||
         target == null ||
+        sourceState == null ||
         sourceTask == null ||
+        !_taskRecordMatchesUiState(sourceState, sourceTask) ||
         sourceTask.status != 'completed' ||
         projection == null ||
         projection.visibility != 'full' ||
@@ -1142,8 +1179,16 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     );
     bool snapshotIsCurrent() {
       final currentComparison = _comparison;
+      final currentSourceState = _agentTasks[snapshot.sourceSessionId];
       final currentTargetState = _agentTasks[snapshot.targetSessionId];
-      if (!identical(currentTargetState, targetState)) return false;
+      if (!identical(currentSourceState, sourceState) ||
+          !_taskRecordMatchesUiState(
+            currentSourceState,
+            currentSourceState?.record,
+          ) ||
+          !identical(currentTargetState, targetState)) {
+        return false;
+      }
       return snapshot.matchesCurrent(
         currentAgentASessionId: currentComparison?.agentASessionId,
         currentAgentBSessionId: currentComparison?.agentBSessionId,
@@ -1151,9 +1196,8 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
         currentComparisonInstructionHash: currentComparison?.instructionHash,
         currentComparisonStartedAt: currentComparison?.startedAt,
         currentSessions: _sessions,
-        currentSourceTask: _agentTasks[snapshot.sourceSessionId]?.record,
-        currentSourceResult:
-            _agentTasks[snapshot.sourceSessionId]?.resultProjection,
+        currentSourceTask: currentSourceState?.record,
+        currentSourceResult: currentSourceState?.resultProjection,
         currentTargetTask: currentTargetState?.record,
         currentTargetHasRequest: currentTargetState?.request != null,
       );
@@ -1270,10 +1314,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     final sourceTaskBound = sourceState != null &&
         sourceTask != null &&
         sourceState.aiEditTaskId == sourceTask.taskId &&
-        sourceTask.instructionHash == sourceState.preflightInstructionHash &&
-        sourceTask.runtimeId == sourceState.originalRequest.runtimeId &&
-        sourceTask.sessionId == sourceState.originalRequest.sessionId &&
-        sourceTask.workspaceId == sourceState.originalRequest.workspaceId;
+        _taskRecordMatchesUiState(sourceState, sourceTask);
     final resultBound = sourceTask != null &&
         sourceTask.status == 'completed' &&
         sourceTask.resultContentAvailable &&
@@ -1319,6 +1360,10 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
       final currentSourceState = _agentTasks[snapshot.sourceSessionId];
       final currentTargetState = _agentTasks[snapshot.targetSessionId];
       if (!identical(currentSourceState, sourceState) ||
+          !_taskRecordMatchesUiState(
+            currentSourceState,
+            currentSourceState?.record,
+          ) ||
           currentTargetState != null) {
         return false;
       }
@@ -1460,6 +1505,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
         final task = state?.record;
         final projection = state?.resultProjection;
         return _sessionAvailable(session) &&
+            _taskRecordMatchesUiState(state, task) &&
             task?.status == 'completed' &&
             task?.resultContentAvailable == true &&
             projection?.visibility == 'full' &&
@@ -1497,6 +1543,10 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
       return;
     }
     final sourceState = _agentTasks[source.sessionId]!;
+    if (!_taskRecordMatchesUiState(sourceState, sourceState.record)) {
+      setState(() => _handoffStatus = _taskBindingMismatchMessage);
+      return;
+    }
     try {
       final package = AgentHandoffPackage.fromSource(
         source: source,
@@ -1527,6 +1577,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     if (package == null ||
         source == null ||
         target == null ||
+        !_taskRecordMatchesUiState(sourceState, sourceState?.record) ||
         sourceState?.record?.taskId != package.sourceTaskId ||
         sourceState?.resultProjection?.visibility != 'full' ||
         sourceState?.resultProjection?.resultHash !=
@@ -1566,6 +1617,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
       if (!mounted ||
           !_sessionAvailable(source) ||
           !_sessionAvailable(target) ||
+          !_taskRecordMatchesUiState(sourceState, sourceState?.record) ||
           sourceState?.record?.taskId != package.sourceTaskId ||
           sourceState?.resultProjection?.resultHash !=
               package.approvedResultHash ||
@@ -1746,6 +1798,33 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     });
   }
 
+  bool _taskRecordMatchesStartedRequest(
+    _AgentTaskUiState? state,
+    AgentTaskRecord? record,
+  ) {
+    if (state == null || record == null) return false;
+    final request = state.lastStartedRequest;
+    final taskId = state.lastStartedTaskId;
+    return request != null &&
+        taskId != null &&
+        record.isBoundTo(
+          request,
+          expectedInstructionHash: state.lastStartedInstructionHash,
+          expectedTaskId: taskId,
+        );
+  }
+
+  bool _taskRecordMatchesUiState(
+    _AgentTaskUiState? state,
+    AgentTaskRecord? record,
+  ) =>
+      state != null &&
+      !state.taskBindingRejected &&
+      _taskRecordMatchesStartedRequest(state, record);
+
+  static const _taskBindingMismatchMessage =
+      'Task状態が開始時のRuntime／Session／Workspace／指示hashと一致しません。結果表示・比較・適用を停止しました。';
+
   Future<void> _startAgentTask(AgentSessionRecord session) async {
     await _runAgentTaskAction(session, (client, state) async {
       if (state.permissionStatus != '有効' || state.approvalStatus != '有効') {
@@ -1756,16 +1835,19 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
       final startedRequest = state.request!;
       final startedTask = await client.start(startedRequest);
       state.lastStartedRequest = startedRequest;
+      state.lastStartedInstructionHash = state.preflightInstructionHash;
+      state.lastStartedTaskId = startedTask.taskId;
       state.record = startedTask;
-      state.aiEditTaskId = state.aiEditProvenance != null &&
-              startedTask.instructionHash == state.preflightInstructionHash &&
-              startedTask.runtimeId == startedRequest.runtimeId &&
-              startedTask.sessionId == startedRequest.sessionId &&
-              startedTask.workspaceId == startedRequest.workspaceId
+      final startedTaskBound =
+          _taskRecordMatchesStartedRequest(state, startedTask);
+      state.taskBindingRejected = !startedTaskBound;
+      state.refreshError =
+          startedTaskBound ? null : _taskBindingMismatchMessage;
+      state.aiEditTaskId = state.aiEditProvenance != null && startedTaskBound
           ? startedTask.taskId
           : null;
       final handoffPackage = state.handoffPackage;
-      if (handoffPackage != null) {
+      if (startedTaskBound && handoffPackage != null) {
         state.handoffReceipt = buildAgentHandoffReceipt(
           package: handoffPackage,
           targetTask: state.record!,
@@ -1773,12 +1855,17 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
         state.handoffPackage = null;
       }
       final a2aArtifactHandoffPackage = state.a2aArtifactHandoffPackage;
-      if (a2aArtifactHandoffPackage != null) {
+      if (startedTaskBound && a2aArtifactHandoffPackage != null) {
         state.handoffReceipt = buildA2aArtifactHandoffReceipt(
           package: a2aArtifactHandoffPackage,
           targetTask: state.record!,
         );
         state.a2aArtifactHandoffPackage = null;
+      }
+      if (!startedTaskBound) {
+        state.handoffPackage = null;
+        state.a2aArtifactHandoffPackage = null;
+        state.resultProjection = null;
       }
       state.request = null;
     });
@@ -1786,6 +1873,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     final task = state?.record;
     if (state == null ||
         task == null ||
+        !_taskRecordMatchesUiState(state, task) ||
         !const {'pending', 'running', 'completed'}.contains(task.status)) {
       return;
     }
@@ -1830,19 +1918,69 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
         state.record!.taskId != state.mcpFollowupTaskId) {
       return;
     }
+    final updatedTask = update.task;
+    if (updatedTask != null &&
+        !_taskRecordMatchesStartedRequest(state, updatedTask)) {
+      state.taskBindingRejected = true;
+      setState(() {
+        state.resultProjection = null;
+        state.refreshError = _taskBindingMismatchMessage;
+        state.mcpContinuationStatus = _taskBindingMismatchMessage;
+        _taskPreflightStatus[sessionId] = _taskBindingMismatchMessage;
+      });
+      return;
+    }
+    final mcpUpdate = update.mcpUpdate;
+    final mcpProjection = mcpUpdate?.projection;
+    if (mcpProjection != null &&
+        (!_taskRecordMatchesUiState(state, state.record) ||
+            state.record?.taskId != mcpProjection.taskId ||
+            state.record?.resultHash != mcpProjection.resultHash)) {
+      state.taskBindingRejected = true;
+      setState(() {
+        state.resultProjection = null;
+        state.refreshError = _taskBindingMismatchMessage;
+        state.mcpContinuationStatus = _taskBindingMismatchMessage;
+        _taskPreflightStatus[sessionId] = _taskBindingMismatchMessage;
+      });
+      return;
+    }
+    final followupTask = mcpUpdate?.followupTask;
+    if (followupTask != null) {
+      final followupRequest = mcpUpdate?.followupRequest;
+      final followupInstructionHash =
+          mcpUpdate?.followupPreflight?.instructionHash;
+      if (followupRequest == null ||
+          !followupTask.isBoundTo(
+            followupRequest,
+            expectedInstructionHash: followupInstructionHash,
+            expectedTaskId: followupTask.taskId,
+          )) {
+        state.taskBindingRejected = true;
+        setState(() {
+          state.resultProjection = null;
+          state.refreshError = _taskBindingMismatchMessage;
+          state.mcpContinuationStatus = _taskBindingMismatchMessage;
+          _taskPreflightStatus[sessionId] = _taskBindingMismatchMessage;
+        });
+        return;
+      }
+    }
     setState(() {
-      if (update.task case final task?) {
-        state.record = task;
+      if (updatedTask != null) {
+        state.record = updatedTask;
+        state.taskBindingRejected = false;
+        state.refreshError = null;
         if (const {
           'completed',
           'failed',
           'cancelled',
           'quarantined',
-        }.contains(task.status)) {
+        }.contains(updatedTask.status)) {
           state.terminalObservedAt = DateTime.now();
         }
       }
-      if (update.mcpUpdate case final mcpUpdate?) {
+      if (mcpUpdate != null) {
         state.mcpContinuationStatus = mcpUpdate.message;
         _taskPreflightStatus[sessionId] = mcpUpdate.message;
         if (mcpUpdate.projection case final projection?) {
@@ -1881,7 +2019,13 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
         if (mcpUpdate.followupTask case final task?) {
           state.mcpFollowupTaskId = task.taskId;
           state.lastStartedRequest = mcpUpdate.followupRequest;
+          state.lastStartedInstructionHash =
+              mcpUpdate.followupPreflight?.instructionHash;
+          state.lastStartedTaskId = task.taskId;
           state.record = task;
+          state.taskBindingRejected = false;
+          state.resultProjection = null;
+          state.refreshError = null;
           state.request = null;
           state.permissionStatus = 'Task開始時に一回消費';
           state.approvalStatus = 'Task開始時に一回消費';
@@ -1922,8 +2066,24 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
       _taskPreflightStatus[session.sessionId] = 'Broker Task状態を更新中です。';
     });
     try {
-      state.record = await AgentTaskClient(transport).state(taskId);
-      if (!mounted) return;
+      final refreshed = await AgentTaskClient(transport).state(taskId);
+      if (!mounted ||
+          !identical(_agentTasks[session.sessionId], state) ||
+          state.record?.taskId != taskId) {
+        return;
+      }
+      if (!_taskRecordMatchesStartedRequest(state, refreshed)) {
+        state.taskBindingRejected = true;
+        setState(() {
+          state.refreshError = _taskBindingMismatchMessage;
+          state.resultProjection = null;
+          _taskPreflightStatus[session.sessionId] = _taskBindingMismatchMessage;
+        });
+        return;
+      }
+      state.record = refreshed;
+      state.taskBindingRejected = false;
+      state.refreshError = null;
       setState(() {
         _taskPreflightStatus[session.sessionId] =
             'Broker Task状態: ${state.record!.status}。';
@@ -1946,6 +2106,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     if (transport == null ||
         state == null ||
         task == null ||
+        !_taskRecordMatchesUiState(state, task) ||
         task.status != 'completed' ||
         !task.resultContentAvailable ||
         _taskPreflightSession != null ||
@@ -1955,6 +2116,9 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     }
     final taskId = task.taskId;
     final visibility = state.resultVisibility;
+    bool taskStillBound() =>
+        state.record?.taskId == taskId &&
+        _taskRecordMatchesUiState(state, state.record);
     _clearAllResultProjections(
       preserveTaskContextForSession: session.sessionId,
       invalidatePendingExposure: false,
@@ -1973,7 +2137,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
           !identical(_agentTasks[session.sessionId], state) ||
           !widget.active ||
           resultContextGeneration != _resultContextGeneration ||
-          state.record?.taskId != taskId ||
+          !taskStillBound() ||
           state.resultVisibility != visibility ||
           !_sessionStillMatchesRegistration(session)) {
         return;
@@ -1996,7 +2160,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
           !identical(_agentTasks[session.sessionId], state) ||
           !_active ||
           resultContextGeneration != _resultContextGeneration ||
-          state.record?.taskId != taskId ||
+          !taskStillBound() ||
           state.resultVisibility != visibility ||
           !_sessionStillMatchesRegistration(session)) {
         return;
@@ -2007,7 +2171,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
           !identical(_agentTasks[session.sessionId], state) ||
           !_active ||
           resultGeneration != _resultGeneration ||
-          state.record?.taskId != taskId ||
+          !taskStillBound() ||
           state.resultVisibility != visibility) {
         return;
       }
@@ -2049,6 +2213,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     if (transport == null ||
         state == null ||
         taskId == null ||
+        !_taskRecordMatchesUiState(state, state.record) ||
         _taskPreflightSession == session.sessionId ||
         _taskCancellationGate.isPending(session.sessionId) ||
         !_sessionStillMatchesRegistration(session) ||
@@ -2069,8 +2234,19 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
           state.record?.taskId != taskId) {
         return;
       }
+      if (!_taskRecordMatchesStartedRequest(state, cancelled)) {
+        state.taskBindingRejected = true;
+        setState(() {
+          state.refreshError = _taskBindingMismatchMessage;
+          state.resultProjection = null;
+          _taskPreflightStatus[session.sessionId] = _taskBindingMismatchMessage;
+        });
+        return;
+      }
       setState(() {
         state.record = cancelled;
+        state.taskBindingRejected = false;
+        state.refreshError = null;
         _taskPreflightStatus[session.sessionId] =
             '取消要求を記録しました。停止完了はBroker状態の再確認が必要です。';
       });
@@ -2088,15 +2264,13 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     final taskState = _agentTasks[session.sessionId];
     if (taskState == null) return const [];
     final task = taskState.record;
-    final resultProjection = taskState.resultProjection;
-    final aiEditTaskBound = task != null &&
+    final taskBound = _taskRecordMatchesUiState(taskState, task);
+    final resultProjection = taskBound ? taskState.resultProjection : null;
+    final aiEditTaskBound = taskBound &&
+        task != null &&
         task.status == 'completed' &&
         taskState.aiEditProvenance != null &&
-        taskState.aiEditTaskId == task.taskId &&
-        task.instructionHash == taskState.preflightInstructionHash &&
-        task.runtimeId == taskState.originalRequest.runtimeId &&
-        task.sessionId == taskState.originalRequest.sessionId &&
-        task.workspaceId == taskState.originalRequest.workspaceId;
+        taskState.aiEditTaskId == task.taskId;
     final aiEditApplyTargets = aiEditTaskBound
         ? _availableAiEditApplyTargets(session.sessionId)
         : const <AgentSessionRecord>[];
@@ -2105,7 +2279,8 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     final selectedAiEditApplyTargetIsAvailable = aiEditApplyTargets.any(
       (candidate) => candidate.sessionId == selectedAiEditApplyTarget,
     );
-    final resultProjectionMatchesTask = task != null &&
+    final resultProjectionMatchesTask = taskBound &&
+        task != null &&
         resultProjection?.visibility == 'full' &&
         resultProjection?.taskId == task.taskId &&
         resultProjection?.resultHash == task.resultHash;
@@ -2134,6 +2309,9 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
             'Task一回承認状態（Owner Approval）: ${taskState.approvalStatus}',
             if (task != null) 'Task識別子: ${task.taskId}',
             if (task != null) 'Task状態: ${task.status}',
+            if (task != null)
+              '開始時要求結合: ${taskBound ? '一致' : '不一致／未確認（結果・適用を停止）'}',
+            if (taskState.refreshError case final error?) 'Task状態照合: $error',
             if (task != null) '指示hash: ${task.instructionHash}',
             if (taskState.mcpCapabilitySnapshotHash != null)
               'Broker MCP能力snapshot: ${taskState.mcpCapabilitySnapshotHash}',
@@ -2242,7 +2420,9 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
           onPressed: busy ? null : () => _refreshAgentTask(session),
           child: const Text('Task状態を更新'),
         ),
-      if (task != null && const {'pending', 'running'}.contains(task.status))
+      if (taskBound &&
+          task != null &&
+          const {'pending', 'running'}.contains(task.status))
         OutlinedButton(
           key: ValueKey('agent-task-cancel-${session.sessionId}'),
           onPressed: busy ? null : () => _cancelAgentTask(session),
@@ -2252,7 +2432,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
                 : 'Task停止を要求',
           ),
         ),
-      if (task?.status == 'completed') ...[
+      if (task?.status == 'completed' && taskBound) ...[
         const SizedBox(height: 8),
         const Text('Agent Task結果（Agent報告。test結果・正しさをBrokerは検証しません）'),
         DropdownButton<String>(
@@ -2284,7 +2464,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
               : () => _showAgentTaskResult(session),
           child: const Text('native Owner確認後に結果を表示'),
         ),
-        if (taskState.resultProjection case final projection?) ...[
+        if (resultProjection case final projection?) ...[
           Text('表示範囲: ${projection.visibility}・Task ${projection.taskId}'),
           if (projection.projection == null) const Text('結果本文は表示しません。'),
           if (projection.projection is Map<String, Object?> &&
@@ -2318,7 +2498,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
               ),
             Text(
               'Agent申告test（未検証）: '
-              '${resultProjection!.agentClaimedTestResult ?? '構造化申告なし'}',
+              '${resultProjection.agentClaimedTestResult ?? '構造化申告なし'}',
             ),
           ],
           if (aiEditTaskBound) ...[
@@ -2377,6 +2557,8 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
               Text(status),
           ],
         ],
+        if (task?.status == 'completed' && !taskBound)
+          const Text(_taskBindingMismatchMessage),
       ],
     ];
   }
@@ -2388,10 +2570,7 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     final aiEditTaskBound = taskState != null &&
         task != null &&
         taskState.aiEditTaskId == task.taskId &&
-        task.instructionHash == taskState.preflightInstructionHash &&
-        task.runtimeId == taskState.originalRequest.runtimeId &&
-        task.sessionId == taskState.originalRequest.sessionId &&
-        task.workspaceId == taskState.originalRequest.workspaceId;
+        _taskRecordMatchesUiState(taskState, task);
     final workspace = session.workspace.trim();
     return [
       workspace.isEmpty
@@ -2434,8 +2613,10 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
     required VoidCallback onSelect,
   }) {
     final task = state?.record;
+    final taskBound = _taskRecordMatchesUiState(state, task);
     final projection = state?.resultProjection;
-    final projectionMatchesTask = task != null &&
+    final projectionMatchesTask = taskBound &&
+        task != null &&
         projection?.visibility == 'full' &&
         projection?.taskId == task.taskId &&
         projection?.resultHash == task.resultHash;
@@ -2493,13 +2674,15 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
             ),
             const Text('Broker独立test実行record／Task専用Resource計測: unknown'),
             Text('Agent申告test（未検証）: $claimedTestText'),
-            if (task?.status == 'completed')
+            if (task?.status == 'completed' && taskBound)
               ChoiceChip(
                 key: ValueKey('select-compare-result-$sessionId'),
                 label: Text(selected ? '選択中の結果' : 'この結果を選択'),
                 selected: selected,
                 onSelected: (_) => onSelect(),
               ),
+            if (task?.status == 'completed' && !taskBound)
+              const Text(_taskBindingMismatchMessage),
           ],
         ),
       ),
