@@ -86,7 +86,7 @@ class IosProductCandidateTests(unittest.TestCase):
             xcode_version="16.4",
         )
 
-    def test_creates_distinct_unsigned_simulator_and_device_archives(self) -> None:
+    def test_creates_distinct_simulator_and_device_candidate_archives(self) -> None:
         evidence = self._build()
         self.assertTrue(self.output.is_dir())
         self.assertEqual(evidence["distribution_ready"], False)
@@ -94,12 +94,12 @@ class IosProductCandidateTests(unittest.TestCase):
         self.assertEqual(evidence["simulator_artifact"]["build_configuration"], "debug")
         self.assertEqual(evidence["device_artifact"]["build_configuration"], "release")
         self.assertEqual(
-            evidence["simulator_artifact"]["app_bundle_signature_scan"],
-            "codesign_display_unsigned",
+            evidence["simulator_artifact"]["app_bundle_signature_state"],
+            "unsigned",
         )
         self.assertEqual(
-            evidence["device_artifact"]["app_bundle_signature_scan"],
-            "codesign_display_unsigned",
+            evidence["device_artifact"]["app_bundle_signature_state"],
+            "unsigned",
         )
         self.assertNotEqual(
             evidence["simulator_artifact"]["sha256"],
@@ -109,7 +109,7 @@ class IosProductCandidateTests(unittest.TestCase):
             {path.name for path in self.output.iterdir()},
             {
                 "d4-pocket-ios-simulator-app.zip",
-                "d4-pocket-ios-device-unsigned-app.zip",
+                "d4-pocket-ios-device-app.zip",
                 "ios-product-candidate.json",
             },
         )
@@ -121,12 +121,15 @@ class IosProductCandidateTests(unittest.TestCase):
             self._build()
         self.assertFalse(self.output.exists())
 
-    def test_rejects_code_signature_and_provisioning_profile(self) -> None:
+    def test_rejects_developer_identity_and_provisioning_profile(self) -> None:
         (self.device / "_CodeSignature").mkdir()
         self._codesign_result = subprocess.CompletedProcess(
-            ["/usr/bin/codesign"], 0, stdout="Identifier=com.example.guiShellMobile", stderr=""
+            ["/usr/bin/codesign"],
+            0,
+            stdout="Authority=Apple Development: private identity\nTeamIdentifier=ABCDE12345\n",
+            stderr="",
         )
-        with self.assertRaisesRegex(ValueError, "signature"):
+        with self.assertRaisesRegex(ValueError, "identity"):
             self._build()
         (self.device / "_CodeSignature").rmdir()
         self._codesign_result = subprocess.CompletedProcess(
@@ -140,15 +143,36 @@ class IosProductCandidateTests(unittest.TestCase):
             self._build()
         self.assertFalse(self.output.exists())
 
+    def test_records_linker_adhoc_signature_without_claiming_distribution_identity(self) -> None:
+        self._codesign_result = subprocess.CompletedProcess(
+            ["/usr/bin/codesign"],
+            0,
+            stdout=(
+                "CodeDirectory v=20400 flags=0x20002(adhoc,linker-signed)\n"
+                "Signature=adhoc\nTeamIdentifier=not set\n"
+            ),
+            stderr="",
+        )
+        evidence = self._build()
+        self.assertEqual(
+            evidence["simulator_artifact"]["app_bundle_signature_state"],
+            "adhoc_no_identity",
+        )
+        self.assertEqual(
+            evidence["device_artifact"]["app_bundle_signature_state"],
+            "adhoc_no_identity",
+        )
+        self.assertEqual(evidence["bundle_identity"]["distribution_identity"], False)
+        self.assertEqual(evidence["distribution_ready"], False)
+
     def test_accepts_code_resources_directory_when_codesign_reports_unsigned(self) -> None:
         signature_metadata = self.device / "_CodeSignature"
         signature_metadata.mkdir()
         (signature_metadata / "CodeResources").write_text("unsigned fixture", encoding="utf-8")
         evidence = self._build()
-        self.assertFalse(evidence["device_artifact"]["app_bundle_signed"])
         self.assertEqual(
-            evidence["device_artifact"]["app_bundle_signature_scan"],
-            "codesign_display_unsigned",
+            evidence["device_artifact"]["app_bundle_signature_state"],
+            "unsigned",
         )
 
     def test_fails_closed_when_codesign_cannot_classify_bundle(self) -> None:

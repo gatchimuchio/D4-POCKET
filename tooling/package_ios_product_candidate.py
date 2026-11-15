@@ -1,4 +1,4 @@
-"""Build reproducible iOS Simulator and unsigned device-app archives for QA.
+"""Build reproducible iOS Simulator and non-distribution device-app archives for QA.
 
 This developer tool does not create a signed IPA or a distribution-ready app.
 It records two distinct Apple platform builds from one source commit while
@@ -48,6 +48,7 @@ class BundleFacts:
     architectures: tuple[str, ...]
     platform: str
     build_configuration: str
+    signature_state: str
 
 
 def _sha256_file(path: Path) -> str:
@@ -58,12 +59,12 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _ensure_unsigned_app_bundle(bundle: Path) -> None:
+def _inspect_app_bundle_signature(bundle: Path) -> str:
     codesign = shutil.which("codesign")
     if not codesign:
         raise ValueError("iOS candidate確認に必要なmacOS codesignがない")
     result = subprocess.run(
-        [codesign, "--display", "--verbose=2", str(bundle)],
+        [codesign, "--display", "--verbose=4", str(bundle)],
         check=False,
         capture_output=True,
         text=True,
@@ -72,9 +73,15 @@ def _ensure_unsigned_app_bundle(bundle: Path) -> None:
     )
     diagnostic = f"{result.stdout}\n{result.stderr}".lower()
     if result.returncode == 0:
-        raise ValueError("unsigned iOS app bundleにroot code signatureがある")
+        ad_hoc_signature = re.search(r"(?m)^signature=adhoc\s*$", diagnostic)
+        no_team_identity = re.search(r"(?m)^teamidentifier=not set\s*$", diagnostic)
+        has_authority = re.search(r"(?m)^authority=", diagnostic)
+        if ad_hoc_signature and no_team_identity and not has_authority:
+            return "adhoc_no_identity"
+        raise ValueError("iOS app bundleにPublisher/developer identityまたは未分類signatureがある")
     if "code object is not signed at all" not in diagnostic:
         raise ValueError("iOS app bundleのcode signature状態を分類できない")
+    return "unsigned"
 
 
 def _safe_app_bundle(
@@ -92,7 +99,7 @@ def _safe_app_bundle(
         raise ValueError("iOS app bundle rootが通常directoryではない")
     if bundle.name != EXPECTED_BUNDLE_NAME:
         raise ValueError("iOS product targetのapp bundle名がRunner.appではない")
-    _ensure_unsigned_app_bundle(bundle)
+    signature_state = _inspect_app_bundle_signature(bundle)
 
     info_path = bundle / "Info.plist"
     info_metadata = info_path.lstat()
@@ -161,7 +168,7 @@ def _safe_app_bundle(
             candidate = current_path / name
             relative = candidate.relative_to(bundle).as_posix()
             if name == "embedded.mobileprovision":
-                raise ValueError("unsigned iOS candidateにprovisioning profileがある")
+                raise ValueError("iOS non-distribution candidateにprovisioning profileがある")
             metadata = candidate.lstat()
             if stat.S_ISLNK(metadata.st_mode):
                 _hash_symlink(candidate, bundle, digest)
@@ -187,6 +194,7 @@ def _safe_app_bundle(
         architectures=architectures,
         platform=expected_platform,
         build_configuration=build_configuration,
+        signature_state=signature_state,
     )
 
 
@@ -235,8 +243,8 @@ def _artifact_record(path: Path, bundle: BundleFacts) -> dict[str, Any]:
         "architectures": list(bundle.architectures),
         "platform": bundle.platform,
         "build_configuration": bundle.build_configuration,
-        "app_bundle_signature_scan": "codesign_display_unsigned",
-        "app_bundle_signed": False,
+        "app_bundle_signature_state": bundle.signature_state,
+        "signature_inspection": "codesign_display",
         "provisioning_profile_present": False,
     }
 
@@ -290,7 +298,7 @@ def build_ios_product_candidate(
     stage = Path(tempfile.mkdtemp(prefix="d4p-ios-candidate-", dir=parent))
     try:
         simulator_archive = stage / "d4-pocket-ios-simulator-app.zip"
-        device_archive = stage / "d4-pocket-ios-device-unsigned-app.zip"
+        device_archive = stage / "d4-pocket-ios-device-app.zip"
         _archive_app(simulator, simulator_archive)
         _archive_app(device, device_archive)
         simulator_artifact = _artifact_record(simulator_archive, simulator)
@@ -340,7 +348,7 @@ def build_ios_product_candidate(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="iOS Simulator／unsigned device buildを別artifactとして記録する")
+    parser = argparse.ArgumentParser(description="iOS Simulator／非配布device buildを別artifactとして記録する")
     parser.add_argument("--simulator-app", type=Path, required=True)
     parser.add_argument("--device-app", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
@@ -363,7 +371,7 @@ def main() -> int:
     print(json.dumps({
         "source_commit": evidence["source_commit"],
         "simulator_artifact_sha256": evidence["simulator_artifact"]["sha256"],
-        "device_unsigned_artifact_sha256": evidence["device_artifact"]["sha256"],
+        "device_artifact_sha256": evidence["device_artifact"]["sha256"],
         "bundle_identifier": evidence["bundle_identity"]["bundle_identifier"],
         "distribution_ready": False,
         "formal_distribution_claimed": False,

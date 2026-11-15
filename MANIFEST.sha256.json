@@ -1517,7 +1517,7 @@
     },
     {
       "path": "docs/QE_2026-11-14/\u9032\u6357.md",
-      "sha256": "96dbe47261a277fae5df0d000f915e9e900c776386efe5b439344eeac478d071"
+      "sha256": "81ba0a131e97dab214114ec1b517f56e673a7c5e2c414d923c0f88653a1d516d"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -2305,7 +2305,7 @@
     },
     {
       "path": "examples/contracts/gui_shell_ios_product_candidate.valid.json",
-      "sha256": "65da36e81e691812672cea5331a9017f7915a8c29363e196dd0d525b47806516"
+      "sha256": "69d791366f090d71ae94adb71d16c3636d3be20db55f417ba5e678025147a064"
     },
     {
       "path": "examples/contracts/gui_shell_linux_export_build.valid.json",
@@ -2809,7 +2809,7 @@
     },
     {
       "path": "examples/contracts/invalid/gui_shell_ios_product_candidate_distribution_claim.invalid.json",
-      "sha256": "e0014059a300a156c03dc314cf18068b78e99361c1f81a8e1a5079f1781b80bb"
+      "sha256": "b5055d9d454b724dae984a15121b3643db8e1e6d84a1355b1d95428329fa9843"
     },
     {
       "path": "examples/contracts/invalid/gui_shell_linux_export_build_authority.invalid.json",
@@ -5113,7 +5113,7 @@
     },
     {
       "path": "specs/gui_shell_ios_product_candidate.schema.json",
-      "sha256": "b6b258f353c7deb5fe1db13f1b14317e8d83fccb09ab0c4b590b1dec6f5ab58a"
+      "sha256": "3c0b6a0b45df869a102aefad3989002721191799eaddab8cd58b0923f534cc4f"
     },
     {
       "path": "specs/gui_shell_linux_export_build.schema.json",
@@ -5681,7 +5681,7 @@
     },
     {
       "path": "tooling/package_ios_product_candidate.py",
-      "sha256": "42eedab56dd8781a1c34e9594e8d92ad52fb335565d7d51f57c70d3de36ae94d"
+      "sha256": "2fe3652f417b955d2592052032fbe6a61d5ea35f6d59ef78f390ec2614a39bdb"
     },
     {
       "path": "tooling/package_linux_deb_setup.py",
@@ -5801,7 +5801,7 @@
     },
     {
       "path": "tooling/tests/test_ios_product_candidate.py",
-      "sha256": "df0fc614e2984b0745a4408d254b9a68c06946dbfaa5453485497530cd102115"
+      "sha256": "fe4b0d02176f1a28b784016acb492c62711329fc9bd1827c2741874b54e33256"
     },
     {
       "path": "tooling/tests/test_linux_deb_setup_package.py",

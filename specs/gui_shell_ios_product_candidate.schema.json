@@ -72,9 +72,9 @@
     "artifact": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["file_name", "sha256", "size_bytes", "bundle_identifier", "main_executable_sha256", "bundle_tree_sha256", "bundle_file_count", "bundle_uncompressed_bytes", "architectures", "platform", "build_configuration", "app_bundle_signature_scan", "app_bundle_signed", "provisioning_profile_present"],
+      "required": ["file_name", "sha256", "size_bytes", "bundle_identifier", "main_executable_sha256", "bundle_tree_sha256", "bundle_file_count", "bundle_uncompressed_bytes", "architectures", "platform", "build_configuration", "app_bundle_signature_state", "signature_inspection", "provisioning_profile_present"],
       "properties": {
-        "file_name": { "type": "string", "pattern": "^d4-pocket-ios-(simulator-app|device-unsigned-app)\\.zip$" },
+        "file_name": { "type": "string", "pattern": "^d4-pocket-ios-(simulator-app|device-app)\\.zip$" },
         "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
         "size_bytes": { "type": "integer", "minimum": 1, "maximum": 2000000000 },
         "bundle_identifier": { "type": "string", "pattern": "^[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+){1,7}$" },
@@ -85,8 +85,8 @@
         "architectures": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["arm64", "arm64e", "x86_64", "i386", "armv7", "armv7s"] } },
         "platform": { "enum": ["IOS", "IOSSIMULATOR"] },
         "build_configuration": { "enum": ["debug", "release"] },
-        "app_bundle_signature_scan": { "const": "codesign_display_unsigned" },
-        "app_bundle_signed": { "const": false },
+        "app_bundle_signature_state": { "enum": ["unsigned", "adhoc_no_identity"] },
+        "signature_inspection": { "const": "codesign_display" },
         "provisioning_profile_present": { "const": false }
       }
     }
