@@ -194,6 +194,7 @@ REQUIRED = {
     "gui_shell_windows_export_build.schema.json",
     "gui_shell_linux_export_build.schema.json",
     "gui_shell_ios_product_candidate.schema.json",
+    "gui_shell_android_product_candidate.schema.json",
     "host_capability.schema.json",
     "ipc_request.schema.json",
     "ipc_response.schema.json",

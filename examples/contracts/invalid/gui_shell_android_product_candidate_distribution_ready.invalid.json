@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "evidence_type": "d4_pocket_android_product_candidate",
+  "evidence_source": "INTERNAL_STATE",
+  "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "source_clean": true,
+  "application_id": "com.example.gui_shell_mobile",
+  "application_identity_confirmed": false,
+  "version_code": 1,
+  "version_name": "0.1.0",
+  "toolchain": {
+    "flutter": "3.44.0",
+    "java": "17.0.12",
+    "android_build_tools": "37.0.0"
+  },
+  "artifacts": {
+    "emulator_debug": {
+      "file_name": "d4-pocket-android-emulator-debug.apk",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "size_bytes": 100,
+      "build_configuration": "debug",
+      "signature_state": "debug_signed",
+      "native_abis": ["arm64-v8a"]
+    },
+    "release_candidate": {
+      "file_name": "d4-pocket-android-release-unsigned.apk",
+      "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "size_bytes": 90,
+      "build_configuration": "release",
+      "signature_state": "unsigned",
+      "native_abis": ["arm64-v8a"]
+    }
+  },
+  "distribution_ready": true,
+  "formal_distribution_claimed": false,
+  "publisher_identity_included": false,
+  "credential_included": false,
+  "installed_product_verified": false
+}

@@ -1,0 +1,9 @@
+# Android製品build候補
+
+この候補生成は、同じclean source commitから生成したAndroid Emulator用Debug APKとRelease APKを分離して保管し、Android package identity、version、ABI、署名状態、SHA-256、size、Flutter／Java／Android Build Toolsを機械記録する。
+
+Release APKは署名なしで生成する。生成物は正式Publisher identityを持たず、正式application identityの確定、Credentialの同梱不存在、インストール済み製品の実証、正式配布可能性を主張しない。候補Schemaでこれらをfalseに固定する。正式署名・配布資格・配布準備完了は本候補の責任外である。
+
+出力先はRepositoryとOneDrive同期領域の外に限定する。Repository sourceが指定commitと一致し、未commit差分がないことをbuild前後で確認する。APKのpackage identityはbuild出力そのものを`aapt`で読み、署名状態は`apksigner`で検査する。Release側で署名検査が失敗した場合、未署名を示す既知の診断が明示されない限り状態を分類できないとして公開を停止する。
+
+手動ActionsはAndroid toolchainがあるLinux hosted runnerで候補を作る補助経路である。結果は当該source commitでのAPK生成・候補記録だけを証明し、installed product、Device Link、OS lifecycle、正式配布、他OSの挙動を証明しない。

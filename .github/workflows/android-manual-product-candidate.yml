@@ -1,0 +1,124 @@
+name: Android manual product build candidate
+
+'on':
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android-product-candidate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact workflow commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Record source and host
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/d4p-android-evidence"
+          echo "D4P_EVIDENCE_DIR=$RUNNER_TEMP/d4p-android-evidence" >> "$GITHUB_ENV"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          {
+            printf 'source_commit=%s\n' "$(git rev-parse HEAD)"
+            printf 'runner_os=%s\n' "$(uname -a)"
+            printf 'architecture=%s\n' "$(uname -m)"
+            printf 'android_home=%s\n' "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-unknown}}"
+            df -B1 .
+          } | tee "$RUNNER_TEMP/d4p-android-evidence/environment.txt"
+          test -d "${JAVA_HOME_17_X64:?JDK 17 is required on the hosted runner}"
+          echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
+          echo "$JAVA_HOME_17_X64/bin" >> "$GITHUB_PATH"
+          java -version 2>&1 | tee "$RUNNER_TEMP/d4p-android-evidence/java-version.txt"
+
+      - name: Install pinned Flutter SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch 3.44.0 https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          test "$(git -C "$RUNNER_TEMP/flutter" rev-parse HEAD)" = 559ffa3f75e7402d65a8def9c28389a9b2e6fe42
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/flutter/bin/flutter" --version --machine | tee "$D4P_EVIDENCE_DIR/flutter-version.json"
+
+      - name: Install Android compile and inspection packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:?Android SDK is required on the hosted runner}}"
+          sdkmanager="$sdk_root/cmdline-tools/latest/bin/sdkmanager"
+          test -x "$sdkmanager"
+          echo "ANDROID_HOME=$sdk_root" >> "$GITHUB_ENV"
+          "$sdkmanager" --list_installed > "$D4P_EVIDENCE_DIR/android-packages-before.txt"
+          "$sdkmanager" --channel=3 \
+            "platforms;android-37.0" \
+            "build-tools;37.0.0" \
+            "ndk;28.2.13676358" \
+            "platform-tools" </dev/null 2>&1 | tee "$D4P_EVIDENCE_DIR/android-sdk-install.txt"
+          test -d "$sdk_root/platforms/android-37.0"
+          test -x "$sdk_root/build-tools/37.0.0/aapt"
+          test -f "$sdk_root/build-tools/37.0.0/apksigner"
+          test -d "$sdk_root/ndk/28.2.13676358"
+          "$sdkmanager" --list_installed > "$D4P_EVIDENCE_DIR/android-packages-after.txt"
+          grep -F 'platforms;android-37.0' "$D4P_EVIDENCE_DIR/android-packages-after.txt"
+          grep -F 'build-tools;37.0.0' "$D4P_EVIDENCE_DIR/android-packages-after.txt"
+          grep -F 'ndk;28.2.13676358' "$D4P_EVIDENCE_DIR/android-packages-after.txt"
+
+      - name: Validate and build Android APK candidates
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tooling/schema_check/check_schemas.py
+          python3 -m unittest tooling.tests.test_android_product_candidate -v 2>&1 | tee "$D4P_EVIDENCE_DIR/android-candidate-tests.txt"
+          cd apps/mobile_flutter
+          flutter pub get --enforce-lockfile 2>&1 | tee "$D4P_EVIDENCE_DIR/mobile-pub-get.txt"
+          flutter analyze --no-pub 2>&1 | tee "$D4P_EVIDENCE_DIR/mobile-analyze.txt"
+          flutter test --no-pub --reporter expanded 2>&1 | tee "$D4P_EVIDENCE_DIR/mobile-test.txt"
+          flutter build apk --debug --no-pub 2>&1 | tee "$D4P_EVIDENCE_DIR/android-debug-apk-build.txt"
+          flutter build apk --release --no-pub 2>&1 | tee "$D4P_EVIDENCE_DIR/android-release-apk-build.txt"
+          cd ../..
+          git diff --exit-code
+          git diff --cached --exit-code
+          test -z "$(git status --porcelain --untracked-files=all)"
+          java_version="$(java -version 2>&1 | sed -n '1s/.*version \"\([^\"]*\)\".*/\1/p')"
+          test -n "$java_version"
+          flutter_version="$("$RUNNER_TEMP/flutter/bin/flutter" --version --machine | python3 -c 'import json,sys; print(json.load(sys.stdin)["frameworkVersion"])')"
+          candidate_dir="$RUNNER_TEMP/android-product-candidate"
+          python3 tooling/package_android_product_candidate.py \
+            --debug-apk apps/mobile_flutter/build/app/outputs/flutter-apk/app-debug.apk \
+            --release-apk apps/mobile_flutter/build/app/outputs/flutter-apk/app-release.apk \
+            --output-dir "$candidate_dir" \
+            --source-commit "$GITHUB_SHA" \
+            --flutter-version "$flutter_version" \
+            --java-version "$java_version" \
+            --android-build-tools-version 37.0.0 \
+            --aapt "$ANDROID_HOME/build-tools/37.0.0/aapt" \
+            --apksigner "$ANDROID_HOME/build-tools/37.0.0/apksigner" \
+            2>&1 | tee "$D4P_EVIDENCE_DIR/android-candidate-package.txt"
+          python3 -m json.tool "$candidate_dir/android-product-candidate.json" > "$D4P_EVIDENCE_DIR/android-candidate-record.pretty.json"
+          sha256sum "$candidate_dir"/*.apk "$candidate_dir/android-product-candidate.json" | tee "$D4P_EVIDENCE_DIR/android-candidate-output-sha256.txt"
+
+      - name: Upload bounded candidate and evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: android-product-candidate-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/d4p-android-evidence/
+            ${{ runner.temp }}/android-product-candidate/
+          retention-days: 3
+          if-no-files-found: warn
+
+      - name: Clean generated runner outputs
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -x "$RUNNER_TEMP/flutter/bin/flutter" ]; then
+            cd apps/mobile_flutter
+            "$RUNNER_TEMP/flutter/bin/flutter" clean
+          fi
+          rm -rf -- "$RUNNER_TEMP/android-product-candidate" "$RUNNER_TEMP/d4p-android-evidence" "$RUNNER_TEMP/flutter"

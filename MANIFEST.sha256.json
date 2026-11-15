@@ -80,6 +80,10 @@
       "sha256": "18cc4b76e2c985606b37488b16a4f2a93f80dfe97b8ecdd62893edbfa4bbc4d0"
     },
     {
+      "path": ".github/workflows/android-manual-product-candidate.yml",
+      "sha256": "bb522d380392c98bc65e88736ba513240949f43c13a22a282619aeb19091204f"
+    },
+    {
       "path": ".github/workflows/apple-manual-build.yml",
       "sha256": "6023e9699146d399286ae82314ba09f3e3fe2152fcf87d12f0a8f6a799d574f9"
     },
@@ -1517,7 +1521,7 @@
     },
     {
       "path": "docs/QE_2026-11-14/\u9032\u6357.md",
-      "sha256": "60eb91820e97218a5267fa94d448072243d3cad1d8a0abdb0ee268f706d583ba"
+      "sha256": "4542a8798770e608bcfc6ebe876d910b34d212fb9589e006bec64ed7082d689a"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1654,6 +1658,10 @@
     {
       "path": "docs/specs/agent-task-history.md",
       "sha256": "782208da039a2c27301f3fc69c1232d783b8ca81c65ec25b695cf8b98a7f1dd9"
+    },
+    {
+      "path": "docs/specs/android-product-candidate.md",
+      "sha256": "d47f5a3407b68b9742f8ce3300bb66f95a41f9d0bc47c02c0d98ade8c1d76c42"
     },
     {
       "path": "docs/specs/approval-visibility-boundary.md",
@@ -2272,6 +2280,10 @@
       "sha256": "b7f79de1f4418831d0ba72b0d16439443b2cd723a46b4e7d42e058731a6ffccb"
     },
     {
+      "path": "examples/contracts/gui_shell_android_product_candidate.valid.json",
+      "sha256": "83af20ee5695896c7c219df70e1401aeeb699f4ae48518cdc0d41206d12470ce"
+    },
+    {
       "path": "examples/contracts/gui_shell_compose.valid.json",
       "sha256": "5934152a64d469f9c2f9fe1c092d710454a329060bebda4c9f02ef4c7a056bb3"
     },
@@ -2762,6 +2774,10 @@
     {
       "path": "examples/contracts/invalid/framework_risk_profile_bad_interval.invalid.json",
       "sha256": "64bb53c0f351f38efe83c16ae4f04bc72e9c709c88f059f6f130535941689fa3"
+    },
+    {
+      "path": "examples/contracts/invalid/gui_shell_android_product_candidate_distribution_ready.invalid.json",
+      "sha256": "beded6d67eff4e3e13a4f257f0db3b9b80de20a3f7d7b22c0d3a0812641d960f"
     },
     {
       "path": "examples/contracts/invalid/gui_shell_compose_authority.invalid.json",
@@ -5080,6 +5096,10 @@
       "sha256": "95c7dfa683d24c9fbe0b68d2203be98321418e3a70fc7ac7ec57629d416ca25c"
     },
     {
+      "path": "specs/gui_shell_android_product_candidate.schema.json",
+      "sha256": "7197f3de4147bd33a7778da064b1c95ac4208efc102d57227490dedda9e2219f"
+    },
+    {
       "path": "specs/gui_shell_compose.schema.json",
       "sha256": "5e473a17523857775a196639a8fce79e638e6115713f65ba2fa7d8d05da6a840"
     },
@@ -5680,6 +5700,10 @@
       "sha256": "7daa9b71dc12bea520f68d7a63e239fd45b29f8a7eab2d90b8093296b4ae24e1"
     },
     {
+      "path": "tooling/package_android_product_candidate.py",
+      "sha256": "62df020befaa2cf8aff71d8e8fb988d912119cc5ec6236e12900fca35a61a0fb"
+    },
+    {
       "path": "tooling/package_ios_product_candidate.py",
       "sha256": "6c382aab3786d1629bfa031578e7292ec3f6e73e740f4e4a28c75220b42b0a84"
     },
@@ -5733,7 +5757,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "90fbf8585af42fe51118f8519d2d1438afbe76447c46e904a3afe3ff99eaaea6"
+      "sha256": "f3c27ac0e8380f4bf7c182d3a21f0101da8946b8b3f2c02f5579b8a1352efb5f"
     },
     {
       "path": "tooling/shell_snapshot.py",
@@ -5790,6 +5814,10 @@
     {
       "path": "tooling/tests/run_linux_same_source_update_acceptance.py",
       "sha256": "1f890685570f4528c084061c5c2a69ec3876f18865b35c9fc44e830758e8fc19"
+    },
+    {
+      "path": "tooling/tests/test_android_product_candidate.py",
+      "sha256": "b69248b7d316fce052098451ae2ba652034db1d1511b58bf253da71503a3bfbd"
     },
     {
       "path": "tooling/tests/test_export_linux_product.py",
