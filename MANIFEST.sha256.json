@@ -221,7 +221,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
-      "sha256": "51cab6fe9bfac70ebd3690da6b936c9d4251e67c8f8d6cf7bb3dfe09d94824dd"
+      "sha256": "598ce36e6eab57ecdb1e6e4adf5767130dd508d5cbd57dc71e826d9e17ceca3e"
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
@@ -297,11 +297,11 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/problems_panel.dart",
-      "sha256": "97356c28d6b7d1c93e1118bb37b1df732ed5ec48ae7df190e6d427b6b3312128"
+      "sha256": "5a31f3275c399efb25a5a386f4ea1d5a7a25a10a510afd9fd49730bb194c053f"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/recovery_center.dart",
-      "sha256": "9463055221e7ac81f3a75fc3f0382b70180ac25e63650f0915b7f50437c456b2"
+      "sha256": "1d7cea59bc97a614ae17d9282c8207877c98be85444ea654002094672be1cee1"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/runtime_center.dart",
@@ -321,7 +321,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/shared.dart",
-      "sha256": "97b05fa1e71408ad570da73fd37ca1f0129333b3096d411f69a10d3f850a94b3"
+      "sha256": "2f8f616ffeb56b3ecd61921c60ae635092aef251da0eb40bad0d1d703a14ce9d"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/trace_inspector.dart",
@@ -429,7 +429,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/shell_core_client.dart",
-      "sha256": "a8f83bc74a4adc97cec341ba596e3c6bd061fa1ceaa7adc34cf9939076e8794f"
+      "sha256": "92a3d7b38305441bc9a94bdb1369c8bef08c6b7d5a102460da121b5e6027971a"
     },
     {
       "path": "apps/desktop_flutter/lib/services/update_client.dart",
@@ -769,7 +769,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/setup_doctor_test.dart",
-      "sha256": "b3ad2ca5f861d3a619dc6791c29db073f94e5641294799e295a857c18199c6e8"
+      "sha256": "96a18a3219593d00f61fcfde6fdce7f1edeed4460e5bee476462255d91542b18"
     },
     {
       "path": "apps/desktop_flutter/test/shell_core_unavailable_test.dart",
@@ -1549,7 +1549,7 @@
     },
     {
       "path": "docs/QE_2026-11-14/\u9032\u6357.md",
-      "sha256": "a679307d32e1ae4a562dc3bb2fed9770964225daf3a41cca4620e786ca7c2003"
+      "sha256": "e6652116ef76821eac76457c511e9330b7b88d40fee4b3ec6fa06ba7dfe7caf8"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",

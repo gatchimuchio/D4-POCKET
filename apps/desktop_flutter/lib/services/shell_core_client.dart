@@ -1455,15 +1455,10 @@ ShellSnapshot _brokerSnapshot({
     'permissions': [],
     'pending_approvals': [],
     'audit_events': <Object?>[],
-    'recovery_actions': [
-      for (final problem in problems)
-        {
-          'recovery_id': problem['recovery_id'],
-          'severity': problem['severity'],
-          'message': problem['required_action'],
-          'safe_to_retry': true,
-        },
-    ],
+    // The startup probes produce recovery guidance, not executable recovery
+    // records. Keep this empty instead of asserting that every action is safe
+    // to retry without a Broker-owned recovery decision.
+    'recovery_actions': <Object?>[],
     'invariant_flags': {
       'flutter_imported_by_shell_core': false,
       'blue_tanuki_imported_by_shell_core': false,
@@ -1633,7 +1628,7 @@ ShellSnapshot _brokerUnavailableSnapshot() {
         'recovery_id': 'recover-broker-product-path',
         'severity': 'error',
         'message': 'ブローカーIPCを復旧するまで権限作用は無効です。',
-        'safe_to_retry': true,
+        'safe_to_retry': false,
       },
     ],
     'invariant_flags': {

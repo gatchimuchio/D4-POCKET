@@ -447,8 +447,8 @@ class _ShellHomePageState extends State<ShellHomePage> {
       ),
       ApprovalCenter(client: widget.client),
       AuditViewer(client: widget.client),
-      RecoveryCenter(client: widget.client),
-      ProblemsPanel(client: widget.client),
+      RecoveryCenter(client: widget.client, active: selectedIndex == 8),
+      ProblemsPanel(client: widget.client, active: selectedIndex == 9),
       EvidenceCenter(client: widget.client),
       SettingsScreen(
         client: widget.client,

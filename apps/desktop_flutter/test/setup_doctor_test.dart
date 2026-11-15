@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gui_shell_desktop/screens/audit_viewer.dart';
+import 'package:gui_shell_desktop/screens/problems_panel.dart';
+import 'package:gui_shell_desktop/screens/recovery_center.dart';
 import 'package:gui_shell_desktop/screens/setup_doctor.dart';
 import 'package:gui_shell_desktop/services/broker_client.dart';
 import 'package:gui_shell_desktop/services/shell_core_client.dart';
@@ -158,6 +160,145 @@ void main() {
     expect(button.onPressed, isNull);
     expect(find.textContaining('試験用Snapshot'), findsOneWidget);
     expect(transport.requests, isEmpty);
+  });
+
+  testWidgets('問題一覧はactive時に現在のBroker診断を取得する', (tester) async {
+    final transport = _SetupDoctorTransport();
+    final client = await ShellCoreClient.product(transport: transport);
+    transport.nextReportResponse = _setupDoctorResponse(
+      status: 'warning',
+      message: '現在のBroker診断で確認した状態です。',
+      unknownFirstCheck: true,
+      auditId: 'audit-problems-current',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: ProblemsPanel(client: client, active: false)),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      transport.requests
+          .where((request) => request['operation'] == 'Setup Doctor報告取得'),
+      hasLength(1),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: ProblemsPanel(client: client, active: true)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('現在のBroker診断で確認した状態です。'), findsOneWidget);
+    expect(find.text('監査イベントID: audit-problems-current'), findsOneWidget);
+    expect(find.text('起動時の診断です。'), findsNothing);
+    expect(
+      transport.requests
+          .where((request) => request['operation'] == 'Setup Doctor報告取得'),
+      hasLength(2),
+    );
+  });
+
+  testWidgets('復旧画面はBrokerの最新案内を表示し再試行安全性を捏造しない', (tester) async {
+    final transport = _SetupDoctorTransport();
+    final client = await ShellCoreClient.product(transport: transport);
+    transport.nextReportResponse = _setupDoctorResponse(
+      status: 'warning',
+      message: '最新の復旧対象をBrokerが観測しました。',
+      unknownFirstCheck: true,
+      auditId: 'audit-recovery-current',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: RecoveryCenter(client: client, active: true)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('最新の復旧対象をBrokerが観測しました。'), findsOneWidget);
+    expect(find.text('Broker接続後に再取得してください。'), findsOneWidget);
+    expect(find.text('監査イベントID: audit-recovery-current'), findsOneWidget);
+    expect(find.text('診断表示は再試行の安全性や実行許可を意味しません。'), findsOneWidget);
+    expect(find.text('再試行可能'), findsNothing);
+  });
+
+  testWidgets('復旧画面はBroker切替後に旧Brokerの遅延報告を破棄する', (tester) async {
+    final firstTransport = _SetupDoctorTransport();
+    final firstClient =
+        await ShellCoreClient.product(transport: firstTransport);
+    final secondClient = await ShellCoreClient.product(
+      transport: _SetupDoctorTransport(initialMessage: '切替先Brokerの最新診断です。'),
+    );
+    final pending = Completer<Map<String, Object?>>();
+    firstTransport.holdNextReport = pending;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: RecoveryCenter(client: firstClient, active: true)),
+      ),
+    );
+    await tester.pump();
+    expect(
+      firstTransport.requests
+          .where((request) => request['operation'] == 'Setup Doctor報告取得'),
+      hasLength(2),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home:
+            Scaffold(body: RecoveryCenter(client: secondClient, active: true)),
+      ),
+    );
+    await tester.pumpAndSettle();
+    pending.complete(
+      _setupDoctorResponse(
+        status: 'warning',
+        message: '旧Brokerの復旧報告です。',
+        unknownFirstCheck: true,
+        auditId: 'audit-stale-recovery',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('切替先Brokerの最新診断です。'), findsOneWidget);
+    expect(find.text('旧Brokerの復旧報告です。'), findsNothing);
+  });
+
+  testWidgets('ProblemsのBroker取得失敗時は起動Snapshotを現在状態として残さない', (tester) async {
+    final transport = _SetupDoctorTransport();
+    final client = await ShellCoreClient.product(transport: transport);
+    transport.nextReportResponse = {
+      'request_id': 'test-setup-doctor-rejected',
+      'operation': 'Setup Doctor報告取得',
+      'status': 'rejected',
+      'evidence_source': 'LIVE_RUNTIME',
+      'audit_event_id': 'audit-setup-doctor-rejected',
+      'error': {
+        'code': 'fixture_failure',
+        'message': 'SENSITIVE_SYNTHETIC_BROKER_DETAIL',
+      },
+      'body': null,
+    };
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: ProblemsPanel(client: client, active: true)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('意味: 最新の問題状態を取得できません。Broker接続を確認して再試行してください。'),
+      findsOneWidget,
+    );
+    expect(find.text('起動時の診断です。'), findsNothing);
+    expect(
+        find.textContaining('SENSITIVE_SYNTHETIC_BROKER_DETAIL'), findsNothing);
+    expect(find.textContaining('audit-setup-doctor-rejected'), findsNothing);
   });
 
   testWidgets('監査ビューアーは明示要求後にBrokerの検証済みpageを表示する', (tester) async {

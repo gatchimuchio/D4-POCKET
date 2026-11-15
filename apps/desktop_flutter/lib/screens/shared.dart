@@ -346,6 +346,49 @@ class EmptyStatePanel extends StatelessWidget {
   }
 }
 
+class BrokerReportStatusPanel extends StatelessWidget {
+  const BrokerReportStatusPanel({
+    super.key,
+    required this.title,
+    required this.meaning,
+    required this.nextAction,
+    this.loading = false,
+  });
+
+  final String title;
+  final String meaning;
+  final String nextAction;
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) {
+    return BorderedPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (loading)
+                const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                const Icon(Icons.info_outline, size: 20),
+              const SizedBox(width: 8),
+              Text(title, style: Theme.of(context).textTheme.titleMedium),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text('意味: $meaning'),
+          Text('次の対応: $nextAction'),
+        ],
+      ),
+    );
+  }
+}
+
 class SnapshotInfoPanel extends StatelessWidget {
   const SnapshotInfoPanel({super.key, required this.snapshot});
 
