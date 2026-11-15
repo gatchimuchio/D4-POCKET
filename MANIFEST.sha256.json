@@ -1525,7 +1525,7 @@
     },
     {
       "path": "docs/QE_2026-11-14/\u9032\u6357.md",
-      "sha256": "9458bb1ed6f051c0f48f41f5d6af017906857278f030f004737024c4d0b6233a"
+      "sha256": "c5dfd10dab9b80f6c3c409a6738548117bc3e75f21210aab69073b0cf8035e2c"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -1893,7 +1893,7 @@
     },
     {
       "path": "docs/specs/workspace-inspection.md",
-      "sha256": "79dada8d628f862a747969e7c7d79483ec3d4a8c90ef43af02b65909975675fe"
+      "sha256": "d6e9758fbe08e42f7b5cfed40b9c50916854b617a4b657a847b47b264c53636b"
     },
     {
       "path": "docs/standards/gui-shell-extended-standard.md",
@@ -4089,7 +4089,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/workspace_root.rs",
-      "sha256": "fb28a443474a6dc3819514e1b7fe113a0424adcd5093d21278bc2a878985ab08"
+      "sha256": "1784c65f0bd2e30582566f263012e8f2e8c4a4e5298bc3e706cdd54dcc1e5528"
     },
     {
       "path": "native/rust_helper/src/checkpoint.rs",

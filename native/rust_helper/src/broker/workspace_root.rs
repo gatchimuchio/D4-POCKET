@@ -235,12 +235,22 @@ fn open_path_handles(
 #[cfg(target_os = "linux")]
 fn unix_filesystem(root: &Dir) -> Result<&'static str, &'static str> {
     let fs = rustix::fs::fstatfs(root).map_err(|_| "root filesystemを確認できない")?;
-    if fs.f_type as i64 == libc::EXT4_SUPER_MAGIC as i64 {
-        Ok("ext4")
-    } else if fs.f_type as i64 == libc::TMPFS_MAGIC as i64 {
-        Ok("tmpfs")
-    } else {
-        Err("root filesystemが対応対象外")
+    linux_filesystem_name(fs.f_type as i64).ok_or("root filesystemが対応対象外")
+}
+
+#[cfg(target_os = "linux")]
+fn linux_filesystem_name(magic: i64) -> Option<&'static str> {
+    // XFS_SUPER_MAGIC is defined by Linux UAPI include/uapi/linux/magic.h.
+    // libc does not expose it on every Linux libc target (notably musl).
+    const XFS_SUPER_MAGIC: i64 = 0x5846_5342;
+
+    match magic {
+        value if value == libc::EXT4_SUPER_MAGIC as i64 => Some("ext4"),
+        value if value == libc::TMPFS_MAGIC as i64 => Some("tmpfs"),
+        value if value == libc::BTRFS_SUPER_MAGIC as i64 => Some("btrfs"),
+        value if value == XFS_SUPER_MAGIC => Some("xfs"),
+        value if value == libc::F2FS_SUPER_MAGIC as i64 => Some("f2fs"),
+        _ => None,
     }
 }
 #[cfg(target_os = "macos")]
@@ -363,4 +373,30 @@ pub(crate) fn open_isolated_root_with_ancestry(
         return Err("確認中のroot置換を拒否");
     }
     Ok((root, filesystem, ancestry))
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod linux_filesystem_tests {
+    use super::linux_filesystem_name;
+
+    #[test]
+    fn common_local_linux_filesystems_are_recognized_from_kernel_magic() {
+        let cases = [
+            (libc::EXT4_SUPER_MAGIC as i64, "ext4"),
+            (libc::TMPFS_MAGIC as i64, "tmpfs"),
+            (libc::BTRFS_SUPER_MAGIC as i64, "btrfs"),
+            (0x5846_5342, "xfs"),
+            (libc::F2FS_SUPER_MAGIC as i64, "f2fs"),
+        ];
+
+        for (magic, expected) in cases {
+            assert_eq!(linux_filesystem_name(magic), Some(expected));
+        }
+    }
+
+    #[test]
+    fn unknown_and_overlay_filesystems_remain_rejected() {
+        assert_eq!(linux_filesystem_name(0), None);
+        assert_eq!(linux_filesystem_name(0x794c_7630), None);
+    }
 }
