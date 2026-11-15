@@ -18,7 +18,7 @@ class _HistoryScreenState extends State<HistoryScreen>
   AgentTaskHistoryPage? _taskPage;
   HistoryGrant? _grant;
   bool _showTaskHistory = false;
-  Timer? _expiryTimer, _refreshTimer;
+  Timer? _expiryTimer, _grantCheckTimer, _replayRefreshTimer;
   final _input = TextEditingController();
   final _inputFocus = FocusNode();
   final _requestFilter = TextEditingController();
@@ -54,7 +54,8 @@ class _HistoryScreenState extends State<HistoryScreen>
 
     _generation++;
     _expiryTimer?.cancel();
-    _refreshTimer?.cancel();
+    _grantCheckTimer?.cancel();
+    _replayRefreshTimer?.cancel();
     _client = widget.client;
     _page = null;
     _taskPage = null;
@@ -84,7 +85,8 @@ class _HistoryScreenState extends State<HistoryScreen>
     _active = state == AppLifecycleState.resumed;
     _generation++;
     _expiryTimer?.cancel();
-    _refreshTimer?.cancel();
+    _grantCheckTimer?.cancel();
+    _replayRefreshTimer?.cancel();
     setState(() {
       _page = null;
       _taskPage = null;
@@ -99,7 +101,8 @@ class _HistoryScreenState extends State<HistoryScreen>
   void dispose() {
     _generation++;
     _expiryTimer?.cancel();
-    _refreshTimer?.cancel();
+    _grantCheckTimer?.cancel();
+    _replayRefreshTimer?.cancel();
     _input.dispose();
     _requestFilter.dispose();
     _sessionFilter.dispose();
@@ -111,7 +114,8 @@ class _HistoryScreenState extends State<HistoryScreen>
   Future<void> _load({int after = 0}) async {
     if (!_active) return;
     _expiryTimer?.cancel();
-    _refreshTimer?.cancel();
+    _grantCheckTimer?.cancel();
+    _replayRefreshTimer?.cancel();
     final generation = ++_generation;
     final previousGrant = _grant;
     final restoreInputFocus = _inputFocus.hasFocus;
@@ -144,7 +148,8 @@ class _HistoryScreenState extends State<HistoryScreen>
           }
           _taskPage = taskPage;
           _grant = taskPage.grant;
-          _message = 'Agent Taskの過去状態です。本文・現在の権限・実行状態を示しません。';
+          _message =
+              'Agent Taskの取得時点の過去状態です。「先頭から更新」で再取得します。本文・現在の権限・実行状態を示しません。';
         });
         _scheduleExpiry(taskPage.grant);
       } else {
@@ -161,7 +166,7 @@ class _HistoryScreenState extends State<HistoryScreen>
           _expanded.retainAll(page.entries.map((e) => e.auditId));
           _page = page;
           _grant = page.grant;
-          _message = '要求ごとの最後の観測です。現在の稼働・実行許可を示しません。';
+          _message = '取得時点の一覧です。「先頭から更新」で再取得します。現在の稼働・実行許可を示しません。';
         });
         _scheduleExpiry(page.grant);
       }
@@ -176,11 +181,6 @@ class _HistoryScreenState extends State<HistoryScreen>
           }
         });
       }
-      _refreshTimer = Timer(const Duration(seconds: 2), () {
-        if (mounted && _active && generation == _generation) {
-          _load(after: after);
-        }
-      });
     } catch (_) {
       if (mounted && generation == _generation) {
         setState(() {
@@ -193,7 +193,77 @@ class _HistoryScreenState extends State<HistoryScreen>
       }
     } finally {
       if (mounted && generation == _generation) setState(() => _busy = false);
+      final grant = _grant;
+      if (mounted &&
+          generation == _generation &&
+          grant != null &&
+          (_page != null || _taskPage != null)) {
+        _scheduleGrantCheck(generation, grant);
+      }
     }
+  }
+
+  // Grant revocation still clears the view promptly. Keep the larger history
+  // page point-in-time and reread it only after an explicit user action.
+  void _scheduleGrantCheck(int generation, HistoryGrant grant) {
+    _grantCheckTimer?.cancel();
+    if (!mounted ||
+        !_active ||
+        generation != _generation ||
+        _grant == null ||
+        !_grant!.same(grant)) {
+      return;
+    }
+    _grantCheckTimer = Timer(const Duration(seconds: 2), () {
+      _grantCheckTimer = null;
+      unawaited(_checkGrant(generation, grant));
+    });
+  }
+
+  Future<void> _checkGrant(int generation, HistoryGrant grant) async {
+    final client = _client;
+    if (!mounted ||
+        !_active ||
+        _busy ||
+        generation != _generation ||
+        client == null) {
+      return;
+    }
+    try {
+      final current = await client.status();
+      if (!mounted || !_active || generation != _generation) return;
+      if (current == null || !grant.same(current) || !current.current) {
+        _clearHistoryForGrantFailure(
+          '現在の履歴閲覧承認を確認できないため表示を消去しました。',
+        );
+        return;
+      }
+      _scheduleGrantCheck(generation, current);
+    } catch (_) {
+      if (mounted && _active && generation == _generation) {
+        _clearHistoryForGrantFailure(
+          '現在の履歴閲覧承認を確認できないため表示を消去しました。',
+        );
+      }
+    }
+  }
+
+  void _clearHistoryForGrantFailure(String message) {
+    _generation++;
+    _expiryTimer?.cancel();
+    _expiryTimer = null;
+    _grantCheckTimer?.cancel();
+    _grantCheckTimer = null;
+    _replayRefreshTimer?.cancel();
+    _replayRefreshTimer = null;
+    setState(() {
+      _page = null;
+      _taskPage = null;
+      _grant = null;
+      _busy = false;
+      _clearSelection();
+      _message = message;
+    });
   }
 
   void _scheduleExpiry(HistoryGrant grant) {
@@ -206,7 +276,10 @@ class _HistoryScreenState extends State<HistoryScreen>
         return;
       }
       _generation++;
-      _refreshTimer?.cancel();
+      _grantCheckTimer?.cancel();
+      _grantCheckTimer = null;
+      _replayRefreshTimer?.cancel();
+      _replayRefreshTimer = null;
       setState(() {
         _page = null;
         _taskPage = null;
@@ -220,7 +293,8 @@ class _HistoryScreenState extends State<HistoryScreen>
 
   void _selectHistory(bool taskHistory) {
     if (_busy || _showTaskHistory == taskHistory) return;
-    _refreshTimer?.cancel();
+    _grantCheckTimer?.cancel();
+    _replayRefreshTimer?.cancel();
     _clearSelection();
     setState(() {
       _showTaskHistory = taskHistory;
@@ -234,7 +308,8 @@ class _HistoryScreenState extends State<HistoryScreen>
     final page = _page;
     final selected = _selected;
     if (_busy || page == null || selected == null) return;
-    _refreshTimer?.cancel();
+    _grantCheckTimer?.cancel();
+    _replayRefreshTimer?.cancel();
     final generation = ++_generation;
     setState(() {
       _busy = true;
@@ -259,7 +334,8 @@ class _HistoryScreenState extends State<HistoryScreen>
     } finally {
       if (mounted && generation == _generation) {
         setState(() => _busy = false);
-        _refreshTimer = Timer(const Duration(seconds: 2), () {
+        _replayRefreshTimer = Timer(const Duration(seconds: 2), () {
+          _replayRefreshTimer = null;
           if (mounted && _active && generation == _generation) _load();
         });
       }

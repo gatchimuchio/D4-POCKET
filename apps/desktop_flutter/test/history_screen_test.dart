@@ -6,6 +6,7 @@ import 'package:gui_shell_desktop/screens/history_screen.dart';
 
 class Fixture implements BrokerTransport {
   bool revoked = false;
+  bool failStatus = false;
   bool withProof = false;
   bool withContent = false;
   bool withInputSummary = false;
@@ -52,6 +53,9 @@ class Fixture implements BrokerTransport {
   Future<Map<String, Object?>> request(String op,
       {Map<String, Object?>? payload}) async {
     operations.add(op);
+    if (op == '対話履歴閲覧状態' && failStatus) {
+      throw const BrokerClientException('fixture failure');
+    }
     if (op == '対話履歴閲覧') {
       expect((payload!['query'] as Map)['latest_per_request'], true);
       lastFilter = (payload['query'] as Map)['filter'] as Map;
@@ -558,6 +562,57 @@ void main() {
     expect(f.operations.any((op) => op == '対話履歴承認'), false);
     await tester.pumpWidget(const SizedBox());
   });
+
+  testWidgets('履歴画面は承認状態だけを定期確認し一覧は手動更新する', (tester) async {
+    final f = Fixture();
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(body: HistoryScreen(client: HistoryClient(f)))));
+    await tester.pumpAndSettle();
+
+    int historyReads() =>
+        f.operations.where((operation) => operation == '対話履歴閲覧').length;
+    expect(historyReads(), 1);
+
+    f.state = '保留';
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+    expect(historyReads(), 1);
+    expect(find.textContaining('成功 ／'), findsOneWidget);
+
+    await tester.tap(find.text('先頭から更新'));
+    await tester.pumpAndSettle();
+    expect(historyReads(), 2);
+    expect(find.textContaining('保留 ／'), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+    expect(historyReads(), 2);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('定期Grant照会に失敗したら履歴表示を消去する', (tester) async {
+    final f = Fixture();
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(body: HistoryScreen(client: HistoryClient(f)))));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('成功 ／'), findsOneWidget);
+
+    f.failStatus = true;
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('成功 ／'), findsNothing);
+    expect(
+      find.text('現在の履歴閲覧承認を確認できないため表示を消去しました。'),
+      findsOneWidget,
+    );
+    expect(
+      f.operations.where((operation) => operation == '対話履歴閲覧').length,
+      1,
+    );
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('履歴承認期限の到来で表示を破棄する', (tester) async {
     final f = Fixture()
       ..expiry = DateTime.now().millisecondsSinceEpoch ~/ 1000 + 2;
