@@ -16,23 +16,53 @@ class ObservabilityCenter extends StatefulWidget {
 class _ObservabilityCenterState extends State<ObservabilityCenter> {
   ObservationClient? _observationClient;
   Future<Map<String, Object?>>? _observationsFuture;
+  int _requestGeneration = 0;
 
   @override
   void initState() {
     super.initState();
-    _observationClient = widget.client.brokerTransport == null
-        ? null
-        : ObservationClient(widget.client.brokerTransport!);
+    _observationClient = _clientFor(widget.client);
+    _refresh();
+  }
+
+  ObservationClient? _clientFor(ShellCoreClient client) {
+    final transport = client.brokerTransport;
+    return transport == null ? null : ObservationClient(transport);
+  }
+
+  @override
+  void didUpdateWidget(covariant ObservabilityCenter oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (identical(
+      oldWidget.client.brokerTransport,
+      widget.client.brokerTransport,
+    )) {
+      return;
+    }
+
+    _observationClient = _clientFor(widget.client);
+    _observationsFuture = null;
     _refresh();
   }
 
   void _refresh() {
+    final generation = ++_requestGeneration;
     final client = _observationClient;
     if (client == null) {
       _observationsFuture = null;
       return;
     }
-    _observationsFuture = client.list();
+    _observationsFuture = _load(client, generation);
+  }
+
+  Future<Map<String, Object?>> _load(
+    ObservationClient client,
+    int generation,
+  ) async {
+    final observations = await client.list();
+    return generation == _requestGeneration
+        ? observations
+        : const <String, Object?>{};
   }
 
   @override
