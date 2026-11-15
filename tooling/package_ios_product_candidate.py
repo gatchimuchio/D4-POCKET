@@ -58,6 +58,25 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _ensure_unsigned_app_bundle(bundle: Path) -> None:
+    codesign = shutil.which("codesign")
+    if not codesign:
+        raise ValueError("iOS candidate確認に必要なmacOS codesignがない")
+    result = subprocess.run(
+        [codesign, "--display", "--verbose=2", str(bundle)],
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    diagnostic = f"{result.stdout}\n{result.stderr}".lower()
+    if result.returncode == 0:
+        raise ValueError("unsigned iOS app bundleにroot code signatureがある")
+    if "code object is not signed at all" not in diagnostic:
+        raise ValueError("iOS app bundleのcode signature状態を分類できない")
+
+
 def _safe_app_bundle(
     path: Path,
     *,
@@ -73,8 +92,7 @@ def _safe_app_bundle(
         raise ValueError("iOS app bundle rootが通常directoryではない")
     if bundle.name != EXPECTED_BUNDLE_NAME:
         raise ValueError("iOS product targetのapp bundle名がRunner.appではない")
-    if (bundle / "_CodeSignature").exists() or (bundle / "_CodeSignature").is_symlink():
-        raise ValueError("unsigned iOS app bundleにroot code signatureがある")
+    _ensure_unsigned_app_bundle(bundle)
 
     info_path = bundle / "Info.plist"
     info_metadata = info_path.lstat()
@@ -217,6 +235,7 @@ def _artifact_record(path: Path, bundle: BundleFacts) -> dict[str, Any]:
         "architectures": list(bundle.architectures),
         "platform": bundle.platform,
         "build_configuration": bundle.build_configuration,
+        "app_bundle_signature_scan": "codesign_display_unsigned",
         "app_bundle_signed": False,
         "provisioning_profile_present": False,
     }

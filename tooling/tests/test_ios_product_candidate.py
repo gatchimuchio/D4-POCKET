@@ -20,6 +20,12 @@ class IosProductCandidateTests(unittest.TestCase):
         self.simulator = self._app("simulator", b"simulator executable")
         self.device = self._app("device", b"device executable")
         self.output = self.output_parent / "candidate"
+        self._codesign_result = subprocess.CompletedProcess(
+            ["/usr/bin/codesign"],
+            1,
+            stdout="",
+            stderr="code object is not signed at all",
+        )
         self._platform = patch.object(candidate.platform, "system", return_value="Darwin")
         self._which = patch.object(candidate.shutil, "which", side_effect=self._which_tool)
         self._run = patch.object(candidate.subprocess, "run", side_effect=self._run_tool)
@@ -46,10 +52,15 @@ class IosProductCandidateTests(unittest.TestCase):
 
     @staticmethod
     def _which_tool(name: str) -> str | None:
-        return {"xcrun": "/usr/bin/xcrun", "ditto": "/usr/bin/ditto"}.get(name)
+        return {
+            "codesign": "/usr/bin/codesign",
+            "xcrun": "/usr/bin/xcrun",
+            "ditto": "/usr/bin/ditto",
+        }.get(name)
 
-    @staticmethod
-    def _run_tool(arguments: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+    def _run_tool(self, arguments: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        if arguments[0] == "/usr/bin/codesign":
+            return self._codesign_result
         if arguments[1:3] == ["lipo", "-archs"]:
             return subprocess.CompletedProcess(arguments, 0, stdout="arm64\n", stderr="")
         if arguments[1:3] == ["vtool", "-show-build"]:
@@ -82,6 +93,14 @@ class IosProductCandidateTests(unittest.TestCase):
         self.assertEqual(evidence["formal_distribution_claimed"], False)
         self.assertEqual(evidence["simulator_artifact"]["build_configuration"], "debug")
         self.assertEqual(evidence["device_artifact"]["build_configuration"], "release")
+        self.assertEqual(
+            evidence["simulator_artifact"]["app_bundle_signature_scan"],
+            "codesign_display_unsigned",
+        )
+        self.assertEqual(
+            evidence["device_artifact"]["app_bundle_signature_scan"],
+            "codesign_display_unsigned",
+        )
         self.assertNotEqual(
             evidence["simulator_artifact"]["sha256"],
             evidence["device_artifact"]["sha256"],
@@ -104,20 +123,55 @@ class IosProductCandidateTests(unittest.TestCase):
 
     def test_rejects_code_signature_and_provisioning_profile(self) -> None:
         (self.device / "_CodeSignature").mkdir()
+        self._codesign_result = subprocess.CompletedProcess(
+            ["/usr/bin/codesign"], 0, stdout="Identifier=com.example.guiShellMobile", stderr=""
+        )
         with self.assertRaisesRegex(ValueError, "signature"):
             self._build()
         (self.device / "_CodeSignature").rmdir()
+        self._codesign_result = subprocess.CompletedProcess(
+            ["/usr/bin/codesign"],
+            1,
+            stdout="",
+            stderr="code object is not signed at all",
+        )
         (self.device / "embedded.mobileprovision").write_bytes(b"fixture")
         with self.assertRaisesRegex(ValueError, "provisioning"):
             self._build()
         self.assertFalse(self.output.exists())
 
+    def test_accepts_code_resources_directory_when_codesign_reports_unsigned(self) -> None:
+        signature_metadata = self.device / "_CodeSignature"
+        signature_metadata.mkdir()
+        (signature_metadata / "CodeResources").write_text("unsigned fixture", encoding="utf-8")
+        evidence = self._build()
+        self.assertFalse(evidence["device_artifact"]["app_bundle_signed"])
+        self.assertEqual(
+            evidence["device_artifact"]["app_bundle_signature_scan"],
+            "codesign_display_unsigned",
+        )
+
+    def test_fails_closed_when_codesign_cannot_classify_bundle(self) -> None:
+        self._codesign_result = subprocess.CompletedProcess(
+            ["/usr/bin/codesign"], 1, stdout="", stderr="codesign tool failure"
+        )
+        with self.assertRaisesRegex(ValueError, "signature状態を分類できない"):
+            self._build()
+        self.assertFalse(self.output.exists())
+
     def test_rejects_missing_arm64_slice(self) -> None:
+        def no_arm64(arguments: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+            if arguments[0] == "/usr/bin/codesign":
+                return self._codesign_result
+            if arguments[1:3] == ["lipo", "-archs"]:
+                return subprocess.CompletedProcess(arguments, 0, stdout="x86_64\n", stderr="")
+            raise AssertionError(f"unexpected command: {arguments}")
+
         self._run.stop()
         self._run = patch.object(
             candidate.subprocess,
             "run",
-            return_value=subprocess.CompletedProcess([], 0, stdout="x86_64\n", stderr=""),
+            side_effect=no_arm64,
         )
         self._run.start()
         self.addCleanup(self._run.stop)
@@ -127,6 +181,8 @@ class IosProductCandidateTests(unittest.TestCase):
 
     def test_rejects_wrong_apple_platform(self) -> None:
         def wrong_platform(arguments: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+            if arguments[0] == "/usr/bin/codesign":
+                return self._codesign_result
             if arguments[1:3] == ["lipo", "-archs"]:
                 return subprocess.CompletedProcess(arguments, 0, stdout="arm64\n", stderr="")
             if arguments[1:3] == ["vtool", "-show-build"]:

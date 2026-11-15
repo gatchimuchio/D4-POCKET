@@ -24,6 +24,7 @@
     "architectures": ["arm64"],
     "platform": "IOSSIMULATOR",
     "build_configuration": "debug",
+    "app_bundle_signature_scan": "codesign_display_unsigned",
     "app_bundle_signed": false,
     "provisioning_profile_present": false
   },
@@ -39,6 +40,7 @@
     "architectures": ["arm64"],
     "platform": "IOS",
     "build_configuration": "release",
+    "app_bundle_signature_scan": "codesign_display_unsigned",
     "app_bundle_signed": false,
     "provisioning_profile_present": false
   },
