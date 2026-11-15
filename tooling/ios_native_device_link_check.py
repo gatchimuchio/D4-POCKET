@@ -33,6 +33,9 @@ def 検証(owner, binary, root, simulator, derived_data, result_bundle, product_
     stop = threading.Event()
     issued = {}
     bridge_errors = []
+    bridge_state = {"accepted": False, "device_id_received": False,
+                    "invitation_issued": False, "response_sent": False}
+    bridge_stage = ["accept"]
     invitation_path = root / ("ios-native-invitation-" + uuid.uuid4().hex + ".json")
 
     def serve_invitation():
@@ -40,6 +43,8 @@ def 検証(owner, binary, root, simulator, derived_data, result_bundle, product_
             while not stop.is_set():
                 try:
                     connection, _ = listener.accept()
+                    bridge_state["accepted"] = True
+                    bridge_stage[0] = "read_device_id"
                     break
                 except socket.timeout:
                     continue
@@ -57,6 +62,8 @@ def 検証(owner, binary, root, simulator, derived_data, result_bundle, product_
                     raise RuntimeError("device_id_frame")
                 device_id = request[:-1].decode("ascii")
                 issued["device_id"] = device_id
+                bridge_state["device_id_received"] = True
+                bridge_stage[0] = "owner_invitation"
                 created = subprocess.run(
                     [str(binary), "対話承認操作", "--session-file", str(root / "owner.json"),
                      "端末招待", device_id, "127.0.0.1", str(invitation_path)],
@@ -69,10 +76,15 @@ def 検証(owner, binary, root, simulator, derived_data, result_bundle, product_
                 if not isinstance(secret, str) or secret in created.stdout + created.stderr:
                     raise RuntimeError("owner_output_boundary")
                 issued["secret"] = secret
+                bridge_state["invitation_issued"] = True
+                bridge_stage[0] = "send_invitation"
                 connection.sendall(json.dumps(invitation, ensure_ascii=False, separators=(",", ":")).encode("utf-8") + b"\n")
-        except Exception as error:
+                bridge_state["response_sent"] = True
+                bridge_stage[0] = "complete"
+        except Exception:
             if not stop.is_set():
-                bridge_errors.append(type(error).__name__)
+                # 固定stageだけを記録し、例外本文・招待・資格値は出力しない。
+                bridge_errors.append(bridge_stage[0])
 
     bridge = threading.Thread(target=serve_invitation, name="ios-native-invitation", daemon=True)
     stage = "xctest"
@@ -115,6 +127,11 @@ def 検証(owner, binary, root, simulator, derived_data, result_bundle, product_
             match = re.search(marker + r"_FAIL ([a-z_]+)", output)
             if match:
                 stage = match.group(1)
+                if stage.startswith("invitation_"):
+                    print(json.dumps({"ios_invitation_bridge": {
+                        **bridge_state,
+                        "failure_stage": bridge_errors[0] if bridge_errors else None,
+                    }}, sort_keys=True))
                 if not issued:
                     for line in output.splitlines():
                         if re.fullmatch(r"D4_IOS_PRODUCT_INITIAL [0-3] exists=(true|false) type=[0-9]+ enabled=(true|false) visible=(true|false)", line):

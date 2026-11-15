@@ -245,8 +245,9 @@ class NativeDeviceLinkLiveTests: XCTestCase {
     do {
       let initial = try store.loadOrCreate()
       try require(initial.credential == nil)
-      stage = "invitation_bridge"
+      stage = "invitation_receive"
       let raw = try receiveInvitation(port: port, deviceID: initial.deviceID)
+      stage = "invitation_parse"
       let invitation = try DeviceLinkCredential.invitation(raw, expectedDeviceID: initial.deviceID)
       stage = "wrong_pin"
       let wrongHash = String(repeating: "0", count: 64)
@@ -291,6 +292,9 @@ class NativeDeviceLinkLiveTests: XCTestCase {
       let revoked = try transport.exchange(reloaded, operation: "端末確認", payload: [:], canSend: { true })
       try require(revoked["status"] as? String == "rejected")
       print("D4_IOS_NATIVE_LIVE_PASS")
+    } catch let error as NativeInvitationFailure {
+      // 固定分類だけを出し、招待JSON・秘密・network error本文を出力しない。
+      XCTFail("D4_IOS_NATIVE_LIVE_FAIL \(stage)_\(error.rawValue)")
     } catch {
       // assertionのactual/expectedや例外本文に資格値を出さない。
       XCTFail("D4_IOS_NATIVE_LIVE_FAIL \(stage)")
@@ -312,13 +316,20 @@ class NativeDeviceLinkLiveTests: XCTestCase {
     var buffer = Data()
     func receive() {
       connection.receive(minimumIncompleteLength: 1, maximumLength: 8192) { data, _, complete, error in
-        guard error == nil else { result.finish(nil); return }
+        guard error == nil else { result.finish(nil, failure: .receiveFailed); return }
         if let data { buffer.append(data) }
-        guard buffer.count <= 8193 else { result.finish(nil); return }
+        guard buffer.count <= 8193 else { result.finish(nil, failure: .oversizedFrame); return }
         if let newline = buffer.firstIndex(of: 0x0A) {
-          guard buffer.index(after: newline) == buffer.endIndex else { result.finish(nil); return }
-          result.finish(String(data: buffer[..<newline], encoding: .utf8))
-        } else if complete { result.finish(nil) }
+          guard buffer.index(after: newline) == buffer.endIndex else {
+            result.finish(nil, failure: .trailingFrameData)
+            return
+          }
+          guard let value = String(data: buffer[..<newline], encoding: .utf8) else {
+            result.finish(nil, failure: .invalidUTF8)
+            return
+          }
+          result.finish(value)
+        } else if complete { result.finish(nil, failure: .truncatedFrame) }
         else { receive() }
       }
     }
@@ -326,9 +337,10 @@ class NativeDeviceLinkLiveTests: XCTestCase {
       switch state {
       case .ready:
         connection.send(content: Data((deviceID + "\n").utf8), completion: .contentProcessed { error in
-          if error == nil { receive() } else { result.finish(nil) }
+          if error == nil { receive() } else { result.finish(nil, failure: .sendFailed) }
         })
-      case .failed, .cancelled: result.finish(nil)
+      case .failed: result.finish(nil, failure: .connectFailed)
+      case .cancelled: result.finish(nil, failure: .connectionCancelled)
       default: break
       }
     }
@@ -339,27 +351,44 @@ class NativeDeviceLinkLiveTests: XCTestCase {
 }
 
 
+private enum NativeInvitationFailure: String, Error {
+  case connectFailed = "connect_failed"
+  case sendFailed = "send_failed"
+  case connectionCancelled = "connection_cancelled"
+  case receiveFailed = "receive_failed"
+  case oversizedFrame = "oversized_frame"
+  case trailingFrameData = "trailing_frame_data"
+  case invalidUTF8 = "invalid_utf8"
+  case truncatedFrame = "truncated_frame"
+  case timeout = "timeout"
+}
+
 private final class NativeInvitationResult {
   private let lock = NSLock()
   private let semaphore = DispatchSemaphore(value: 0)
   private var finished = false
   private var value: String?
+  private var failure: NativeInvitationFailure?
 
-  func finish(_ value: String?) {
+  func finish(_ value: String?, failure: NativeInvitationFailure? = nil) {
     lock.lock()
     guard !finished else { lock.unlock(); return }
     finished = true
     self.value = value
+    self.failure = failure
     lock.unlock()
     semaphore.signal()
   }
 
   func wait() throws -> String {
-    guard semaphore.wait(timeout: .now() + .seconds(20)) == .success else { throw DeviceLinkTransportError.failed }
+    guard semaphore.wait(timeout: .now() + .seconds(20)) == .success else {
+      throw NativeInvitationFailure.timeout
+    }
     lock.lock()
     let result = value
+    let reason = failure
     lock.unlock()
-    guard let result else { throw DeviceLinkTransportError.failed }
+    guard let result else { throw reason ?? NativeInvitationFailure.receiveFailed }
     return result
   }
 }
