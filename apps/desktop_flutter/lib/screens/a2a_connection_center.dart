@@ -24,7 +24,8 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
   final _agentCardUriController = TextEditingController();
   final _interfaceUriController = TextEditingController();
   final _messageController = TextEditingController();
-  late final A2aConnectionClient? _client;
+  late A2aConnectionClient? _client;
+  int _transportGeneration = 0;
   List<A2aConnectionSummary> _connections = const [];
   bool _loading = false;
   bool _connecting = false;
@@ -45,11 +46,57 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
     super.initState();
     final transport = widget.transport;
     _client = transport == null ? null : A2aConnectionClient(transport);
-    if (_client != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _loadConnections();
-      });
-    }
+    _scheduleConnectionRefresh(_transportGeneration);
+  }
+
+  @override
+  void didUpdateWidget(covariant A2aConnectionCenter oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (identical(oldWidget.transport, widget.transport)) return;
+
+    final previousMutationMayBePending = _connecting || _sendingMessage;
+    _transportGeneration++;
+    final transport = widget.transport;
+    _client = transport == null ? null : A2aConnectionClient(transport);
+    _connections = const [];
+    _loading = false;
+    _connecting = false;
+    _sendingMessage = false;
+    _gettingTask = false;
+    _selectedAgentId = null;
+    _message = null;
+    _sendMessageStatus = previousMutationMayBePending
+        ? '切替前のBrokerへA2A接続または外部送信を要求済みです。結果は不明として扱い、新しいBrokerへ引き継がず、自動再送していません。旧Brokerの監査で状態を確認してください。'
+        : null;
+    _clearPendingTask();
+    _streamResult = null;
+    _agentIdController.clear();
+    _agentCardUriController.clear();
+    _interfaceUriController.clear();
+    _messageController.clear();
+    _scheduleConnectionRefresh(_transportGeneration);
+  }
+
+  void _scheduleConnectionRefresh(int generation) {
+    if (_client == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && generation == _transportGeneration) {
+        _loadConnections();
+      }
+    });
+  }
+
+  bool _isCurrentClient(A2aConnectionClient? client, int generation) =>
+      mounted &&
+      generation == _transportGeneration &&
+      identical(client, _client);
+
+  void _clearPendingTask() {
+    _pendingTaskAgentId = null;
+    _pendingTaskInterfaceUri = null;
+    _pendingTaskInterfaceHash = null;
+    _pendingTaskId = null;
+    _taskQueryResult = null;
   }
 
   @override
@@ -427,13 +474,14 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
   Future<void> _loadConnections() async {
     final client = _client;
     if (client == null || _loading || _connecting || _gettingTask) return;
+    final generation = _transportGeneration;
     setState(() {
       _loading = true;
       _message = null;
     });
     try {
       final connections = await client.list();
-      if (!mounted) return;
+      if (!_isCurrentClient(client, generation)) return;
       setState(() {
         _connections = connections;
         if (!_connections.any((connection) =>
@@ -456,18 +504,21 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
         _message = 'Brokerのmetadata-only一覧を更新しました。';
       });
     } on Object {
-      if (!mounted) return;
+      if (!_isCurrentClient(client, generation)) return;
       setState(() {
         _message = 'Broker一覧を取得できませんでした。接続状態を成功扱いにはしていません。';
       });
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (_isCurrentClient(client, generation)) {
+        setState(() => _loading = false);
+      }
     }
   }
 
   Future<void> _connect() async {
     final client = _client;
     if (client == null || _loading || _connecting || _gettingTask) return;
+    final generation = _transportGeneration;
     setState(() {
       _connecting = true;
       _message = '要求をBrokerへ送信しています。native Owner確認後に接続します。';
@@ -477,29 +528,29 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
         agentId: _agentIdController.text,
         agentCardUri: _agentCardUriController.text,
       );
-      if (!mounted) return;
+      if (!_isCurrentClient(client, generation)) return;
       setState(() {
         _message =
             '接続metadataを受理しました。Trustは未審査のままです。Audit=${receipt.connectionAuditId}';
       });
       try {
         final connections = await client.list();
-        if (!mounted) return;
+        if (!_isCurrentClient(client, generation)) return;
         setState(() => _connections = connections);
       } on Object {
-        if (!mounted) return;
+        if (!_isCurrentClient(client, generation)) return;
         setState(() {
           _message =
               '接続receiptは受理されましたが一覧を更新できません。Audit=${receipt.connectionAuditId}';
         });
       }
     } on Object {
-      if (!mounted) return;
+      if (!_isCurrentClient(client, generation)) return;
       setState(() {
         _message = 'A2A接続を確認できませんでした。受理receiptがないため成功表示はしていません。';
       });
     } finally {
-      if (mounted) {
+      if (_isCurrentClient(client, generation)) {
         _agentCardUriController.clear();
         setState(() => _connecting = false);
       }
@@ -517,6 +568,7 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
         _sendingMessage) {
       return;
     }
+    final generation = _transportGeneration;
     setState(() {
       _sendingMessage = true;
       _streamResult = null;
@@ -530,7 +582,7 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
         interfaceUri: _interfaceUriController.text,
         message: _messageController.text,
       );
-      if (!mounted) return;
+      if (!_isCurrentClient(client, generation)) return;
       setState(() {
         _taskQueryResult = null;
         _sendMessageStatus = result.status == 'unknown'
@@ -546,15 +598,17 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
         }
       });
     } on Object {
-      if (!mounted) return;
+      if (!_isCurrentClient(client, generation)) return;
       setState(() {
         _sendMessageStatus =
             'Brokerから確定応答を得られませんでした。外部作用の結果が不明な場合は再送せず、Auditを確認してください。';
       });
     } finally {
-      _interfaceUriController.clear();
-      _messageController.clear();
-      if (mounted) setState(() => _sendingMessage = false);
+      if (_isCurrentClient(client, generation)) {
+        _interfaceUriController.clear();
+        _messageController.clear();
+        setState(() => _sendingMessage = false);
+      }
     }
   }
 
@@ -573,6 +627,7 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
             connection.streaming)) {
       return;
     }
+    final generation = _transportGeneration;
     setState(() {
       _sendingMessage = true;
       _clearPendingTask();
@@ -586,7 +641,7 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
         interfaceUri: _interfaceUriController.text,
         message: _messageController.text,
       );
-      if (!mounted) return;
+      if (!_isCurrentClient(client, generation)) return;
       setState(() {
         _streamResult = result;
         _taskQueryResult = null;
@@ -595,16 +650,18 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
             : 'Streamを一回処理しました。event本文とTask/Message IDは画面へ表示せず、Authorityも生成しません。Audit=${result.auditEventId}';
       });
     } on Object {
-      if (!mounted) return;
+      if (!_isCurrentClient(client, generation)) return;
       setState(() {
         _streamResult = null;
         _sendMessageStatus =
             'Stream結果を確定できませんでした。外部作用の結果が不明な場合は再接続・再送せず、Auditを確認してください。';
       });
     } finally {
-      _interfaceUriController.clear();
-      _messageController.clear();
-      if (mounted) setState(() => _sendingMessage = false);
+      if (_isCurrentClient(client, generation)) {
+        _interfaceUriController.clear();
+        _messageController.clear();
+        setState(() => _sendingMessage = false);
+      }
     }
   }
 
@@ -623,6 +680,7 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
         _sendingMessage) {
       return;
     }
+    final generation = _transportGeneration;
     setState(() {
       _gettingTask = true;
       _taskQueryResult = null;
@@ -635,7 +693,7 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
         interfaceUri: interfaceUri,
         taskId: taskId,
       );
-      if (!mounted) return;
+      if (!_isCurrentClient(client, generation)) return;
       setState(() {
         _taskQueryResult = result.status == 'accepted' ? result : null;
         _sendMessageStatus = result.status == 'unknown'
@@ -643,13 +701,15 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
             : 'Task metadataを取得しました。state=${result.state} / artifact count=${result.artifactCount} / history count=0 / response hash=${result.resultHash} / Audit=${result.auditEventId}';
       });
     } on Object {
-      if (!mounted) return;
+      if (!_isCurrentClient(client, generation)) return;
       setState(() {
         _sendMessageStatus =
             'Task状態を確定できませんでした。自動再取得しません。再照会には新しいnative Owner確認が必要です。';
       });
     } finally {
-      if (mounted) setState(() => _gettingTask = false);
+      if (_isCurrentClient(client, generation)) {
+        setState(() => _gettingTask = false);
+      }
     }
   }
 
@@ -673,6 +733,7 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
         _sendingMessage) {
       return;
     }
+    final generation = _transportGeneration;
     setState(() {
       _gettingTask = true;
       _taskQueryResult = null;
@@ -687,21 +748,23 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
         artifactId: artifact.artifactId,
         artifactHash: artifact.artifactHash,
       );
-      if (!mounted) return;
+      if (!_isCurrentClient(client, generation)) return;
       setState(() {
         _taskQueryResult = result;
         _sendMessageStatus =
             '選択Artifactを現在hashと照合し、揮発状態で全文表示しました。保存・Audit本文記録はありません。Audit=${result.auditEventId}';
       });
     } on Object {
-      if (!mounted) return;
+      if (!_isCurrentClient(client, generation)) return;
       setState(() {
         _taskQueryResult = null;
         _sendMessageStatus =
             'Artifactを安全に表示できませんでした。自動再取得しません。新しいOwner確認を含む明示操作が必要です。';
       });
     } finally {
-      if (mounted) setState(() => _gettingTask = false);
+      if (_isCurrentClient(client, generation)) {
+        setState(() => _gettingTask = false);
+      }
     }
   }
 
@@ -722,14 +785,6 @@ class _A2aConnectionCenterState extends State<A2aConnectionCenter> {
           '選択ArtifactをAgent Centerの揮発Task draftへ移しました。新規Taskは未検査・未実行です。';
     });
     callback(source);
-  }
-
-  void _clearPendingTask() {
-    _pendingTaskAgentId = null;
-    _pendingTaskInterfaceUri = null;
-    _pendingTaskInterfaceHash = null;
-    _pendingTaskId = null;
-    _taskQueryResult = null;
   }
 }
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -875,6 +876,93 @@ void main() {
     );
     expect(find.textContaining('接続状態: 接続済み'), findsOneWidget);
   });
+
+  testWidgets('Broker transport切替時に旧A2A接続とArtifact状態を破棄する', (tester) async {
+    final previousTransport = _A2aTransport([
+      _response(
+        'A2A接続一覧',
+        'audit-previous-list',
+        _listBody([_receipt()]),
+        evidence: 'INTERNAL_STATE',
+      ),
+    ]);
+    final replacementTransport = _A2aTransport([
+      _response(
+        'A2A接続一覧',
+        'audit-replacement-list',
+        _listBody(const []),
+        evidence: 'INTERNAL_STATE',
+      ),
+    ]);
+
+    Widget buildApp(BrokerTransport transport) => MaterialApp(
+          home: Scaffold(body: A2aConnectionCenter(transport: transport)),
+        );
+
+    await tester.pumpWidget(buildApp(previousTransport));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Fixture Agent'), findsOneWidget);
+
+    await tester.pumpWidget(buildApp(replacementTransport));
+    await tester.pumpAndSettle();
+
+    expect(replacementTransport.operations, ['A2A接続一覧']);
+    expect(find.textContaining('Fixture Agent'), findsNothing);
+    expect(find.text('Broker一覧にA2A接続metadataはありません。'), findsOneWidget);
+  });
+
+  testWidgets('Broker切替後に旧Brokerの遅延接続応答を取り込まず結果不明を表示する', (tester) async {
+    final previousTransport = _DeferredA2aConnectTransport([
+      _response(
+        'A2A接続一覧',
+        'audit-previous-list',
+        _listBody(const []),
+        evidence: 'INTERNAL_STATE',
+      ),
+    ]);
+    final replacementTransport = _A2aTransport([
+      _response(
+        'A2A接続一覧',
+        'audit-current-list',
+        _listBody(const []),
+        evidence: 'INTERNAL_STATE',
+      ),
+    ]);
+
+    Widget buildApp(BrokerTransport transport) => MaterialApp(
+          home: Scaffold(body: A2aConnectionCenter(transport: transport)),
+        );
+
+    await tester.pumpWidget(buildApp(previousTransport));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).at(0), 'fixture-agent');
+    await tester.enterText(
+      find.byType(TextField).at(1),
+      'http://127.0.0.1:9080/card',
+    );
+    await tester.tap(find.text('Owner確認して接続'));
+    await tester.pump();
+    expect(previousTransport.operations, ['A2A接続一覧', 'A2A接続']);
+
+    await tester.pumpWidget(buildApp(replacementTransport));
+    await tester.pumpAndSettle();
+    expect(find.text('Broker一覧にA2A接続metadataはありません。'), findsOneWidget);
+    expect(find.textContaining('結果は不明として扱い'), findsOneWidget);
+
+    previousTransport.complete(
+      _response(
+        'A2A接続',
+        'audit-stale-connect',
+        _receipt(),
+        evidence: 'INTERNAL_STATE',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Fixture Agent'), findsNothing);
+    expect(find.text('Broker一覧にA2A接続metadataはありません。'), findsOneWidget);
+    expect(find.textContaining('結果は不明として扱い'), findsOneWidget);
+  });
 }
 
 class _A2aTransport implements BrokerTransport {
@@ -891,6 +979,26 @@ class _A2aTransport implements BrokerTransport {
     payloads.add(payload);
     if (responses.isEmpty) throw StateError('fixture応答がありません: $operation');
     return responses.removeAt(0);
+  }
+}
+
+class _DeferredA2aConnectTransport implements BrokerTransport {
+  _DeferredA2aConnectTransport(this.responses);
+
+  final List<Map<String, Object?>> responses;
+  final Completer<Map<String, Object?>> connectionResponse = Completer();
+  final operations = <String>[];
+
+  void complete(Map<String, Object?> value) =>
+      connectionResponse.complete(value);
+
+  @override
+  Future<Map<String, Object?>> request(String operation,
+      {Map<String, Object?>? payload}) {
+    operations.add(operation);
+    return operation == 'A2A接続'
+        ? connectionResponse.future
+        : Future.value(responses.removeAt(0));
   }
 }
 
