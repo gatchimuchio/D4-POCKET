@@ -16,21 +16,43 @@ class HostOperationCenter extends StatefulWidget {
 }
 
 class _HostOperationCenterState extends State<HostOperationCenter> {
+  static const _initialMessage = 'Hostを選択すると、表示コンテキストだけをBroker監査付きで切り替えます。';
+
   String? _activeHostId;
   late List<HostRegistryRecord> _hosts;
   String? _candidateHostId;
   bool _busy = false;
-  String _message = 'Hostを選択すると、表示コンテキストだけをBroker監査付きで切り替えます。';
+  String _message = _initialMessage;
+  int _clientGeneration = 0;
 
   @override
   void initState() {
     super.initState();
     final hosts = widget.client.getSnapshot().hosts;
-    _hosts = hosts;
-    if (hosts.isNotEmpty) {
-      _activeHostId = hosts.first.hostId;
-      _candidateHostId = hosts.first.hostId;
+    _setHosts(hosts);
+  }
+
+  void _setHosts(List<HostRegistryRecord> hosts) {
+    _hosts = List<HostRegistryRecord>.unmodifiable(hosts);
+    _activeHostId = hosts.isEmpty ? null : hosts.first.hostId;
+    _candidateHostId = _activeHostId;
+  }
+
+  @override
+  void didUpdateWidget(covariant HostOperationCenter oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final oldHosts = oldWidget.client.getSnapshot().hosts;
+    final hosts = widget.client.getSnapshot().hosts;
+    if (identical(
+            oldWidget.client.brokerTransport, widget.client.brokerTransport) &&
+        identical(oldHosts, hosts)) {
+      return;
     }
+
+    _clientGeneration++;
+    _setHosts(hosts);
+    _busy = false;
+    _message = _initialMessage;
   }
 
   @override
@@ -95,6 +117,7 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
   }
 
   Future<void> _switchHost(HostRegistryRecord host) async {
+    final generation = _clientGeneration;
     setState(() {
       _busy = true;
       _message = '${host.displayName} へのHost切替をBrokerへ要求しています。';
@@ -102,7 +125,7 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
     try {
       final receipt =
           await widget.client.selectHost(host.hostId, selectedHost: host);
-      if (!mounted) return;
+      if (!mounted || generation != _clientGeneration) return;
       setState(() {
         _activeHostId = receipt.hostId;
         _candidateHostId = receipt.hostId;
@@ -111,7 +134,7 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
         _busy = false;
       });
     } on Object {
-      if (!mounted) return;
+      if (!mounted || generation != _clientGeneration) return;
       setState(() {
         _message = 'Host切替の結果を確認できません。Brokerから最新状態を取得してください。';
         _busy = false;
@@ -120,9 +143,10 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
   }
 
   Future<void> _registerHost() async {
+    final generation = _clientGeneration;
     final input = await showDialog<_HostInput>(
         context: context, builder: (_) => const _HostRegistrationDialog());
-    if (input == null || !mounted) return;
+    if (input == null || !mounted || generation != _clientGeneration) return;
     setState(() {
       _busy = true;
       _message = '別個のnative確認後にHost metadataをBrokerへ要求します。';
@@ -138,22 +162,25 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
           identityHash: input.hash,
           runtimeCount: input.runtimes,
           agentCount: input.agents);
+      if (!mounted || generation != _clientGeneration) return;
       final hosts = await client.refresh();
+      if (!mounted || generation != _clientGeneration) return;
       if (!hosts.any((h) => h.hostId == input.id)) throw StateError('現在一覧で未確認');
-      if (!mounted) return;
       setState(() {
         _hosts = hosts;
         _candidateHostId = input.id;
         _message = 'Host metadataを登録しました。未審査のままです。Audit=$auditId';
       });
     } on Object {
-      if (mounted) {
+      if (mounted && generation == _clientGeneration) {
         setState(() {
           _message = 'Host登録または一覧更新は未成立です。Brokerの拒否・Auditを確認してください。自動再送しません。';
         });
       }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted && generation == _clientGeneration) {
+        setState(() => _busy = false);
+      }
     }
   }
 }
