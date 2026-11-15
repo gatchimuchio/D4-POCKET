@@ -252,6 +252,31 @@ void main() {
     );
   });
 
+  test('recoverable=falseでは既知codeでも再要求を案内しない', () async {
+    final broker = TestBroker()
+      ..failureOperation = '作業領域一覧'
+      ..failureCode = '作業領域拒否'
+      ..failureRecoverable = false;
+    final client = WorkspaceClient(broker);
+
+    await expectLater(
+      client.list(),
+      throwsA(
+        isA<WorkspaceClientFailure>()
+            .having((failure) => failure.recoverable, 'recoverable', isFalse)
+            .having(
+              (failure) => failure.recoveryAction,
+              'safe recovery action',
+              allOf(
+                contains('復旧可能としていません'),
+                contains('自動再試行せず'),
+                isNot(contains('Approvalを更新')),
+              ),
+            ),
+      ),
+    );
+  });
+
   test('未知codeとAudit unavailableを一般化しraw errorを露出しない', () async {
     final broker = TestBroker()
       ..failureOperation = '作業領域一覧'

@@ -62,12 +62,14 @@ class WorkspaceClientFailure implements Exception {
         code == 'broker_audit_append_failed') {
       return 'Broker永続監査を復旧し、状態を確認するまで内容操作を停止してください。再送はせず、確認後に別要求として再開してください。';
     }
+    if (!recoverable) {
+      return 'Brokerがこの操作を復旧可能としていません。自動再試行せず、Broker状態とAuditを確認してから操作を判断してください。';
+    }
     return switch (code) {
       '権限拒否' => 'native Owner確認を完了した後、登録状態を更新してください。自動再試行はしていません。',
       '作業領域期限超過' => '登録状態を更新し、必要なら新しい期限付きWorkspace読取Approvalを要求してください。',
       '作業領域拒否' =>
         '現在の登録・Workspace範囲・読取Approvalを更新して確認してください。再試行は状態確認後に別要求として行ってください。',
-      _ when !recoverable => '自動再試行していません。Broker状態とAuditを確認してから、操作を判断してください。',
       _ => '登録・Approval状態を更新して確認してください。再試行は状態確認後に別要求として行ってください。',
     };
   }
