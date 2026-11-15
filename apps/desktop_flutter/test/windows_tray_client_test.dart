@@ -82,6 +82,17 @@ void main() {
     expect(projection.stopRequestSupported, isFalse);
   });
 
+  test('Broker snapshotでもApproval一覧未取得を0件と表示しない', () async {
+    final source = ShellCoreClient.local().getSnapshot();
+    final brokerSnapshot = source.copyWith(snapshotSource: 'broker');
+    final projection = await WindowsTrayProjection.fromSnapshot(
+      brokerSnapshot,
+      null,
+    );
+
+    expect(projection.pendingApprovalCount, '不明');
+  });
+
   test('隠れた常駐トレイはBrokerをpollせず全ての測定値を不明にする', () async {
     final transport = _TrayTransport();
     final projection = await WindowsTrayProjection.fromSnapshot(

@@ -317,7 +317,12 @@ String _snapshotExportJson(ShellSnapshot snapshot) {
       'runtime_status': snapshot.operationStatus.runtimeStatus,
       'invariant_status': snapshot.operationStatus.invariantStatus,
       'trust_status': snapshot.operationStatus.trustStatus,
-      'pending_approvals_count': snapshot.operationStatus.pendingApprovalsCount,
+      'pending_approvals_count': snapshot.snapshotSource == 'broker' &&
+              snapshot.operationStatus.pendingApprovalsCountKnown
+          ? snapshot.operationStatus.pendingApprovalsCount
+          : null,
+      'pending_approvals_count_known': snapshot.snapshotSource == 'broker' &&
+          snapshot.operationStatus.pendingApprovalsCountKnown,
       'audit_chain_status': snapshot.operationStatus.auditChainStatus,
       'problems_count': snapshot.operationStatus.problemsCount,
       'release_state': snapshot.operationStatus.releaseState,
@@ -337,7 +342,13 @@ String _snapshotExportJson(ShellSnapshot snapshot) {
       'problems': snapshot.problems.length,
       'evidence': snapshot.evidence.length,
       'recovery_playbook': snapshot.recoveryPlaybook.length,
-      'pending_approvals': snapshot.pendingApprovals.length,
+      'pending_approvals': snapshot.snapshotSource == 'broker' &&
+              snapshot.pendingApprovalsInventoryKnown
+          ? snapshot.pendingApprovals.length
+          : null,
+      'pending_approvals_inventory_known':
+          snapshot.snapshotSource == 'broker' &&
+              snapshot.pendingApprovalsInventoryKnown,
     },
     'release_ready_claimed': false,
   };

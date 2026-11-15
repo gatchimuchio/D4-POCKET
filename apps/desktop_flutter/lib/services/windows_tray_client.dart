@@ -60,9 +60,10 @@ class WindowsTrayProjection {
     return WindowsTrayProjection(
       runtimeStatus:
           brokerSnapshot ? snapshot.operationStatus.runtimeStatus : '不明',
-      pendingApprovalCount: brokerSnapshot
-          ? snapshot.operationStatus.pendingApprovalsCount
-          : '不明',
+      pendingApprovalCount:
+          brokerSnapshot && snapshot.operationStatus.pendingApprovalsCountKnown
+              ? snapshot.operationStatus.pendingApprovalsCount
+              : '不明',
       criticalNotificationCount: criticalCount,
       evidenceSource: brokerSnapshot ? 'INTERNAL_STATE' : '不明',
       stopRequestSupported: transport != null,

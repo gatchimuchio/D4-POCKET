@@ -815,6 +815,7 @@ class OperationStatusRecord {
     required this.invariantStatus,
     required this.trustStatus,
     required this.pendingApprovalsCount,
+    this.pendingApprovalsCountKnown = false,
     required this.auditChainStatus,
     required this.problemsCount,
     required this.releaseState,
@@ -824,6 +825,7 @@ class OperationStatusRecord {
   final String invariantStatus;
   final String trustStatus;
   final int pendingApprovalsCount;
+  final bool pendingApprovalsCountKnown;
   final String auditChainStatus;
   final int problemsCount;
   final String releaseState;
@@ -834,6 +836,8 @@ class OperationStatusRecord {
       invariantStatus: json['invariant_status'] as String? ?? 'unknown',
       trustStatus: json['trust_status'] as String? ?? 'unknown',
       pendingApprovalsCount: json['pending_approvals_count'] as int? ?? 0,
+      pendingApprovalsCountKnown:
+          json['pending_approvals_count_known'] as bool? ?? false,
       auditChainStatus: json['audit_chain_status'] as String? ?? 'unknown',
       problemsCount: json['problems_count'] as int? ?? 0,
       releaseState: json['release_state'] as String? ?? 'not claimed',
@@ -845,6 +849,7 @@ class OperationStatusRecord {
     String? invariantStatus,
     String? trustStatus,
     int? pendingApprovalsCount,
+    bool? pendingApprovalsCountKnown,
     String? auditChainStatus,
     int? problemsCount,
     String? releaseState,
@@ -855,6 +860,8 @@ class OperationStatusRecord {
       trustStatus: trustStatus ?? this.trustStatus,
       pendingApprovalsCount:
           pendingApprovalsCount ?? this.pendingApprovalsCount,
+      pendingApprovalsCountKnown:
+          pendingApprovalsCountKnown ?? this.pendingApprovalsCountKnown,
       auditChainStatus: auditChainStatus ?? this.auditChainStatus,
       problemsCount: problemsCount ?? this.problemsCount,
       releaseState: releaseState ?? this.releaseState,
@@ -988,6 +995,8 @@ class ShellSnapshot {
     this.snapshotPath = '',
     this.snapshotGeneratedAt = '',
     this.snapshotFreshness = 'unknown',
+    this.pendingApprovalsInventoryKnown = false,
+    this.permissionInventoryKnown = false,
   });
 
   final PhaseStatusRecord phaseStatus;
@@ -1022,6 +1031,8 @@ class ShellSnapshot {
   final String snapshotPath;
   final String snapshotGeneratedAt;
   final String snapshotFreshness;
+  final bool pendingApprovalsInventoryKnown;
+  final bool permissionInventoryKnown;
 
   factory ShellSnapshot.fromJson(Map<String, Object?> json) {
     final runtimes = _records(json['runtimes'], RuntimeRecord.fromJson);
@@ -1088,6 +1099,10 @@ class ShellSnapshot {
           _records(json['host_capabilities'], HostCapabilityRecord.fromJson),
       agentAdapters:
           _records(json['agent_adapters'], AgentAdapterRecord.fromJson),
+      permissionInventoryKnown:
+          json['permission_inventory_known'] as bool? ?? false,
+      pendingApprovalsInventoryKnown:
+          json['pending_approvals_inventory_known'] as bool? ?? false,
       // Serialized JSON is not provenance evidence. The product Broker path
       // assigns its source only after the required responses are accepted.
       snapshotSource: 'unverified',
@@ -1112,6 +1127,8 @@ class ShellSnapshot {
     String? snapshotPath,
     String? snapshotGeneratedAt,
     String? snapshotFreshness,
+    bool? pendingApprovalsInventoryKnown,
+    bool? permissionInventoryKnown,
   }) {
     return ShellSnapshot(
       phaseStatus: phaseStatus ?? this.phaseStatus,
@@ -1147,6 +1164,10 @@ class ShellSnapshot {
       snapshotPath: snapshotPath ?? this.snapshotPath,
       snapshotGeneratedAt: snapshotGeneratedAt ?? this.snapshotGeneratedAt,
       snapshotFreshness: snapshotFreshness ?? this.snapshotFreshness,
+      pendingApprovalsInventoryKnown:
+          pendingApprovalsInventoryKnown ?? this.pendingApprovalsInventoryKnown,
+      permissionInventoryKnown:
+          permissionInventoryKnown ?? this.permissionInventoryKnown,
     );
   }
 }

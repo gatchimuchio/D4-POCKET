@@ -1434,6 +1434,7 @@ ShellSnapshot _brokerSnapshot({
       'invariant_status': protectedEditRejected ? 'ok' : 'blocked',
       'trust_status': brokerReady ? 'restricted' : 'blocked',
       'pending_approvals_count': 0,
+      'pending_approvals_count_known': false,
       'audit_chain_status': 'unknown',
       'problems_count': problems.length,
       'release_state': 'not claimed',
@@ -1453,7 +1454,9 @@ ShellSnapshot _brokerSnapshot({
     'agent_sessions': _agentSessionSnapshotJson(agentSessionList),
     'agent_adapters': _agentAdapterSnapshotJson(agentAdapterList),
     'permissions': [],
+    'permission_inventory_known': false,
     'pending_approvals': [],
+    'pending_approvals_inventory_known': false,
     'audit_events': <Object?>[],
     // The startup probes produce recovery guidance, not executable recovery
     // records. Keep this empty instead of asserting that every action is safe
@@ -1606,6 +1609,7 @@ ShellSnapshot _brokerUnavailableSnapshot() {
       'invariant_status': 'blocked',
       'trust_status': 'blocked',
       'pending_approvals_count': 0,
+      'pending_approvals_count_known': false,
       'audit_chain_status': 'not_ready',
       'problems_count': 1,
       'release_state': 'not claimed',
@@ -1621,7 +1625,9 @@ ShellSnapshot _brokerUnavailableSnapshot() {
     ],
     'agent_sessions': [],
     'permissions': [],
+    'permission_inventory_known': false,
     'pending_approvals': [],
+    'pending_approvals_inventory_known': false,
     'audit_events': <Object?>[],
     'recovery_actions': [
       {

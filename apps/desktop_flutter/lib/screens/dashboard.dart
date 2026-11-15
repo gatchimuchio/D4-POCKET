@@ -97,7 +97,10 @@ class Dashboard extends StatelessWidget {
             ),
             MetricItem(
               label: '保留中の承認',
-              value: '${operation.pendingApprovalsCount}',
+              value: snapshot.snapshotSource == 'broker' &&
+                      operation.pendingApprovalsCountKnown
+                  ? '${operation.pendingApprovalsCount}'
+                  : '不明',
             ),
             MetricItem(label: '問題', value: '${operation.problemsCount}'),
             MetricItem(label: '証拠', value: evidence.evidenceBundle),

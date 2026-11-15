@@ -6341,9 +6341,21 @@ void main() {
   });
 
   testWidgets('承認センターが非表示の完全内容を公開しない', (WidgetTester tester) async {
+    final source = ShellCoreClient.local().getSnapshot();
+    final brokerProjection = source.copyWith(
+      snapshotSource: 'broker',
+      operationStatus: source.operationStatus.copyWith(
+        pendingApprovalsCountKnown: true,
+      ),
+      pendingApprovalsInventoryKnown: true,
+    );
     await tester.pumpWidget(
       MaterialApp(
-        home: Scaffold(body: ApprovalCenter(client: ShellCoreClient.local())),
+        home: Scaffold(
+          body: ApprovalCenter(
+            client: ShellCoreClient.mock(snapshot: brokerProjection),
+          ),
+        ),
       ),
     );
 

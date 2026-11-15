@@ -33,6 +33,10 @@ class GlobalSearchIndex {
     final results = <GlobalSearchResult>[];
     final evidenceSource =
         snapshot.snapshotSource == 'broker' ? 'INTERNAL_STATE' : '不明';
+    final permissionsKnown = snapshot.snapshotSource == 'broker' &&
+        snapshot.permissionInventoryKnown;
+    final approvalsKnown = snapshot.snapshotSource == 'broker' &&
+        snapshot.pendingApprovalsInventoryKnown;
 
     void add({
       required String category,
@@ -112,14 +116,16 @@ class GlobalSearchIndex {
         pageIndex: 12,
       );
     }
-    for (final permission in snapshot.permissions) {
-      add(
-        category: '権限',
-        title: permission.permissionId,
-        detail: '${permission.capabilityId} / ${permission.decision}',
-        recordId: permission.permissionId,
-        pageIndex: 4,
-      );
+    if (permissionsKnown) {
+      for (final permission in snapshot.permissions) {
+        add(
+          category: '権限',
+          title: permission.permissionId,
+          detail: '${permission.capabilityId} / ${permission.decision}',
+          recordId: permission.permissionId,
+          pageIndex: 4,
+        );
+      }
     }
     for (final diff in snapshot.permissionDiffs) {
       if (results.length >= maxEntries) break;
@@ -148,15 +154,17 @@ class GlobalSearchIndex {
         pageIndex: 3,
       );
     }
-    for (final approval in snapshot.pendingApprovals) {
-      add(
-        category: '承認',
-        title: approval.approvalId,
-        detail:
-            '${approval.operation} / ${approval.status} / ${approval.contentVisibility}',
-        recordId: approval.approvalId,
-        pageIndex: 6,
-      );
+    if (approvalsKnown) {
+      for (final approval in snapshot.pendingApprovals) {
+        add(
+          category: '承認',
+          title: approval.approvalId,
+          detail:
+              '${approval.operation} / ${approval.status} / ${approval.contentVisibility}',
+          recordId: approval.approvalId,
+          pageIndex: 6,
+        );
+      }
     }
     for (final audit in snapshot.auditEvents) {
       add(

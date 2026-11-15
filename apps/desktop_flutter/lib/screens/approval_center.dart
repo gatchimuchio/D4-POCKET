@@ -10,11 +10,21 @@ class ApprovalCenter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final approvals = client.getSnapshot().pendingApprovals;
+    final snapshot = client.getSnapshot();
+    final approvalsKnown = snapshot.snapshotSource == 'broker' &&
+        snapshot.pendingApprovalsInventoryKnown;
+    final approvals = snapshot.pendingApprovals;
     return ShellPage(
       title: '承認センター',
       children: [
-        if (approvals.isEmpty)
+        if (!approvalsKnown)
+          const EmptyStatePanel(
+            title: '承認待ち状態は未取得',
+            meaning: '現在のBroker snapshotに承認一覧が含まれていません。空配列は「承認なし」を意味しません。',
+            phaseBBlocked: false,
+            nextAction: 'Brokerの承認一覧Consumerが接続されるまで、承認状態は不明として扱います。',
+          )
+        else if (approvals.isEmpty)
           const EmptyStatePanel(
             title: '保留中の承認なし',
             meaning: 'Shell Coreには、所有者の確認を待つ承認射影がありません。',
