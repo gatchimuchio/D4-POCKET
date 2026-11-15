@@ -135,6 +135,8 @@ REQUIRED_SCHEMA_NAMES = {
     "workspace_inspection_request",
     "workspace_startup",
     "workspace_inspection_response",
+    "audit_inspection_request",
+    "audit_inspection_response",
     "runtime_dialogue_operation",
     "runtime_dialogue_request",
     "runtime_dialogue_submission_receipt",
@@ -9198,7 +9200,8 @@ def test_desktop_flutter_exposes_operation_surfaces() -> list[str]:
     authority = (DESKTOP_FLUTTER / "lib" / "screens" / "authority_map.dart").read_text(encoding="utf-8")
     problems = (DESKTOP_FLUTTER / "lib" / "screens" / "problems_panel.dart").read_text(encoding="utf-8")
     evidence = (DESKTOP_FLUTTER / "lib" / "screens" / "evidence_center.dart").read_text(encoding="utf-8")
-    combined = "\n".join([main, dashboard, runtime, settings, audit, recovery, trust, authority, problems, evidence])
+    shell_client = (DESKTOP_FLUTTER / "lib" / "services" / "shell_core_client.dart").read_text(encoding="utf-8")
+    combined = "\n".join([main, dashboard, runtime, settings, audit, recovery, trust, authority, problems, evidence, shell_client])
     required = [
         "TrustCenter",
         "AuthorityMap",
@@ -9207,7 +9210,10 @@ def test_desktop_flutter_exposes_operation_surfaces() -> list[str]:
         "問題一覧",
         "証拠センター",
         "コマンドパレット",
-        "事象をコピー／JSONLを書き出し／鎖を検証",
+        "監査一覧を取得",
+        "監査鎖状態",
+        "refreshAuditInspection",
+        "_validatedAuditInspectionPage",
         "事前確認",
         "ShellStatusBar",
     ]

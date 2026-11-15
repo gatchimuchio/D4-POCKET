@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/audit_inspection_response.schema.json",
+  "title": "検証済み永続監査一覧取得応答（AuditInspectionPage）",
+  "type": "object",
+  "required": [
+    "version",
+    "integrity_status",
+    "anchor_status",
+    "verified_event_count",
+    "snapshot_head_event_id",
+    "has_older_events",
+    "next_before_event_id",
+    "events"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {"const": 1},
+    "integrity_status": {"const": "verified"},
+    "anchor_status": {"const": "verified"},
+    "verified_event_count": {"type": "integer", "minimum": 0},
+    "snapshot_head_event_id": {
+      "oneOf": [
+        {"type": "string", "pattern": "^broker-audit-[1-9][0-9]*$", "maxLength": 64},
+        {"type": "null"}
+      ]
+    },
+    "has_older_events": {"type": "boolean"},
+    "next_before_event_id": {
+      "oneOf": [
+        {"type": "string", "pattern": "^broker-audit-[1-9][0-9]*$", "maxLength": 64},
+        {"type": "null"}
+      ]
+    },
+    "events": {
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "type": "object",
+        "required": ["event_id", "action", "result", "payload_hash", "previous_event_hash", "event_hash"],
+        "additionalProperties": false,
+        "properties": {
+          "event_id": {"type": "string", "pattern": "^broker-audit-[1-9][0-9]*$", "maxLength": 64},
+          "action": {"type": "string", "minLength": 1, "maxLength": 128},
+          "result": {"enum": ["success", "warning", "blocked", "recorded"]},
+          "payload_hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+          "previous_event_hash": {
+            "oneOf": [
+              {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+              {"type": "null"}
+            ]
+          },
+          "event_hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"}
+        }
+      }
+    }
+  }
+}

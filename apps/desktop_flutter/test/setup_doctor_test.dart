@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gui_shell_desktop/screens/audit_viewer.dart';
 import 'package:gui_shell_desktop/screens/setup_doctor.dart';
 import 'package:gui_shell_desktop/services/broker_client.dart';
 import 'package:gui_shell_desktop/services/shell_core_client.dart';
@@ -158,6 +159,107 @@ void main() {
     expect(find.textContaining('試験用Snapshot'), findsOneWidget);
     expect(transport.requests, isEmpty);
   });
+
+  testWidgets('監査ビューアーは明示要求後にBrokerの検証済みpageを表示する', (tester) async {
+    final transport = _SetupDoctorTransport();
+    final client = await ShellCoreClient.product(transport: transport);
+    transport.nextAuditResponse = _auditInspectionResponse();
+
+    await tester.pumpWidget(
+      MaterialApp(home: Scaffold(body: AuditViewer(client: client))),
+    );
+    expect(find.text('Broker監査一覧は未取得'), findsOneWidget);
+    expect(
+      transport.requests.where((request) => request['operation'] == '監査一覧取得'),
+      isEmpty,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('audit-inspection-refresh')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('監査鎖状態: 検証済み'), findsOneWidget);
+    expect(find.text('ハッシュ鎖状態: 検証済み'), findsOneWidget);
+    expect(find.text('broker-audit-1'), findsOneWidget);
+    expect(find.textContaining('safe-action'), findsOneWidget);
+    expect(find.textContaining('PRIVATE_REQUEST'), findsNothing);
+    expect(find.textContaining('PRIVATE_REASON'), findsNothing);
+    final request = transport.requests.singleWhere(
+      (item) => item['operation'] == '監査一覧取得',
+    );
+    expect(request['payload'], const <String, Object?>{
+      'version': 1,
+      'limit': 100,
+    });
+  });
+
+  testWidgets('監査一覧の再取得失敗時に前回pageを消しBroker詳細を表示しない', (tester) async {
+    final transport = _SetupDoctorTransport();
+    final client = await ShellCoreClient.product(transport: transport);
+    transport.nextAuditResponse = _auditInspectionResponse();
+
+    await tester.pumpWidget(
+      MaterialApp(home: Scaffold(body: AuditViewer(client: client))),
+    );
+    await tester.tap(find.byKey(const ValueKey('audit-inspection-refresh')));
+    await tester.pumpAndSettle();
+    expect(find.text('broker-audit-1'), findsOneWidget);
+
+    transport.nextAuditResponse = {
+      'request_id': 'test-audit-rejected',
+      'operation': '監査一覧取得',
+      'status': 'suspended',
+      'evidence_source': 'LIVE_RUNTIME',
+      'audit_event_id': 'broker-audit-2',
+      'error': {
+        'code': 'audit_integrity_failure',
+        'message': 'PRIVATE_BROKER_ERROR_DETAIL',
+      },
+      'body': null,
+    };
+    await tester.tap(find.byKey(const ValueKey('audit-inspection-refresh')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('broker-audit-1'), findsNothing);
+    expect(find.text('Broker監査一覧は表示できません'), findsOneWidget);
+    expect(find.textContaining('PRIVATE_BROKER_ERROR_DETAIL'), findsNothing);
+  });
+
+  testWidgets('さらに古い監査eventは取得したcursorだけをBrokerへ送る', (tester) async {
+    final transport = _SetupDoctorTransport();
+    final client = await ShellCoreClient.product(transport: transport);
+    transport.auditResponses.addAll([
+      _auditLatestPageResponse(),
+      _auditOlderPageResponse(),
+    ]);
+
+    await tester.pumpWidget(
+      MaterialApp(home: Scaffold(body: AuditViewer(client: client))),
+    );
+    await tester.tap(find.byKey(const ValueKey('audit-inspection-refresh')));
+    await tester.pumpAndSettle();
+    expect(find.text('さらに古い監査event'), findsOneWidget);
+    expect(find.text('broker-audit-103'), findsOneWidget);
+
+    await tester
+        .ensureVisible(find.byKey(const ValueKey('audit-inspection-older')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('audit-inspection-older')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('broker-audit-1'), findsOneWidget);
+    expect(find.text('broker-audit-3'), findsOneWidget);
+    expect(find.text('broker-audit-4'), findsNothing);
+    expect(find.text('さらに古い監査event'), findsNothing);
+    final auditRequests = transport.requests
+        .where((request) => request['operation'] == '監査一覧取得')
+        .toList();
+    expect(auditRequests, hasLength(2));
+    expect(auditRequests.last['payload'], const <String, Object?>{
+      'version': 1,
+      'limit': 100,
+      'before_event_id': 'broker-audit-4',
+    });
+  });
 }
 
 class _SetupDoctorTransport implements BrokerTransport {
@@ -167,6 +269,8 @@ class _SetupDoctorTransport implements BrokerTransport {
   final requests = <Map<String, Object?>>[];
   int _reportCount = 0;
   Map<String, Object?>? nextReportResponse;
+  Map<String, Object?>? nextAuditResponse;
+  final auditResponses = <Map<String, Object?>>[];
   Completer<Map<String, Object?>>? holdNextReport;
 
   @override
@@ -178,6 +282,13 @@ class _SetupDoctorTransport implements BrokerTransport {
       'operation': operation,
       if (payload != null) 'payload': Map<String, Object?>.from(payload),
     });
+    if (operation == '監査一覧取得') {
+      if (auditResponses.isNotEmpty) return auditResponses.removeAt(0);
+      final next = nextAuditResponse;
+      nextAuditResponse = null;
+      if (next != null) return next;
+      throw const BrokerClientException('No audit fixture response');
+    }
     if (operation == 'Setup Doctor報告取得') {
       _reportCount++;
       final next = nextReportResponse;
@@ -269,6 +380,94 @@ class _SetupDoctorTransport implements BrokerTransport {
     }
     throw BrokerClientException('Unexpected fixture operation: $operation');
   }
+}
+
+Map<String, Object?> _auditInspectionResponse() => {
+      'request_id': 'test-audit-inspection',
+      'operation': '監査一覧取得',
+      'status': 'accepted',
+      'evidence_source': 'LIVE_RUNTIME',
+      'audit_event_id': 'broker-audit-2',
+      'error': null,
+      'body': {
+        'version': 1,
+        'integrity_status': 'verified',
+        'anchor_status': 'verified',
+        'verified_event_count': 1,
+        'snapshot_head_event_id': 'broker-audit-1',
+        'has_older_events': false,
+        'next_before_event_id': null,
+        'events': [
+          {
+            'event_id': 'broker-audit-1',
+            'action': 'safe-action',
+            'result': 'success',
+            'payload_hash': 'sha256:${'0' * 64}',
+            'previous_event_hash': null,
+            'event_hash': 'sha256:${'1' * 64}',
+          },
+        ],
+      },
+    };
+
+Map<String, Object?> _auditLatestPageResponse() => _auditPageResponse(
+      requestId: 'test-audit-latest',
+      auditId: 'broker-audit-105',
+      count: 103,
+      head: 'broker-audit-103',
+      eventSequences: List<int>.generate(100, (index) => index + 4),
+      hasOlder: true,
+      nextBefore: 'broker-audit-4',
+    );
+
+Map<String, Object?> _auditOlderPageResponse() => _auditPageResponse(
+      requestId: 'test-audit-older',
+      auditId: 'broker-audit-105',
+      count: 104,
+      head: 'broker-audit-104',
+      eventSequences: const [1, 2, 3],
+      hasOlder: false,
+    );
+
+Map<String, Object?> _auditPageResponse({
+  required String requestId,
+  required String auditId,
+  required int count,
+  required String head,
+  required List<int> eventSequences,
+  required bool hasOlder,
+  String? nextBefore,
+}) {
+  String hashFor(int sequence) =>
+      'sha256:${sequence.toRadixString(16).padLeft(64, '0')}';
+  return {
+    'request_id': requestId,
+    'operation': '監査一覧取得',
+    'status': 'accepted',
+    'evidence_source': 'LIVE_RUNTIME',
+    'audit_event_id': auditId,
+    'error': null,
+    'body': {
+      'version': 1,
+      'integrity_status': 'verified',
+      'anchor_status': 'verified',
+      'verified_event_count': count,
+      'snapshot_head_event_id': head,
+      'has_older_events': hasOlder,
+      'next_before_event_id': nextBefore,
+      'events': [
+        for (final sequence in eventSequences)
+          {
+            'event_id': 'broker-audit-$sequence',
+            'action': 'safe-action',
+            'result': 'success',
+            'payload_hash': hashFor(0),
+            'previous_event_hash': sequence == 1 ? null : hashFor(sequence - 1),
+            'event_hash': hashFor(sequence),
+          },
+      ],
+    },
+  };
 }
 
 Map<String, Object?> _accepted(

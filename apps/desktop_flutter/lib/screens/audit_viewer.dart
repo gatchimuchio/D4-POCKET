@@ -20,11 +20,53 @@ class _AuditViewerState extends State<AuditViewer> {
   final TextEditingController _searchController = TextEditingController();
   String _category = 'all';
   String _result = 'all';
+  AuditInspectionPage? _page;
+  bool _loading = false;
+  String? _loadError;
+  int _loadGeneration = 0;
 
   @override
   void dispose() {
+    _loadGeneration++;
     _searchController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant AuditViewer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.client, widget.client) ||
+        !identical(
+            oldWidget.client.brokerTransport, widget.client.brokerTransport)) {
+      _loadGeneration++;
+      _page = null;
+      _loading = false;
+      _loadError = null;
+    }
+  }
+
+  Future<void> _loadPage({String? beforeEventId}) async {
+    final generation = ++_loadGeneration;
+    setState(() {
+      _page = null;
+      _loading = true;
+      _loadError = null;
+    });
+    try {
+      final page = await widget.client.refreshAuditInspection(
+        limit: 100,
+        beforeEventId: beforeEventId,
+      );
+      if (!mounted || generation != _loadGeneration) return;
+      setState(() => _page = page);
+    } on Object {
+      if (!mounted || generation != _loadGeneration) return;
+      setState(() => _loadError = 'Broker監査一覧を取得できません。接続と監査状態を確認してください。');
+    } finally {
+      if (mounted && generation == _loadGeneration) {
+        setState(() => _loading = false);
+      }
+    }
   }
 
   @override
@@ -32,7 +74,11 @@ class _AuditViewerState extends State<AuditViewer> {
     final snapshot = widget.client.getSnapshot();
     final brokerMode = widget.client.mode == 'broker';
     final brokerUnavailableMode = widget.client.mode == 'broker_unavailable';
-    final auditEvents = snapshot.auditEvents.where(_matchesFilters).toList();
+    final brokerPage = brokerMode ? _page : null;
+    final sourceEvents = brokerMode
+        ? brokerPage?.events ?? const <AuditRecord>[]
+        : snapshot.auditEvents;
+    final auditEvents = sourceEvents.where(_matchesFilters).toList();
     return ShellPage(
       title: '監査ビューアー',
       children: [
@@ -70,7 +116,13 @@ class _AuditViewerState extends State<AuditViewer> {
                       onSelected: (_) => setState(() => _category = category),
                     ),
                   const SizedBox(width: 8),
-                  for (final result in ['all', 'success', 'warning', 'blocked'])
+                  for (final result in [
+                    'all',
+                    'success',
+                    'warning',
+                    'blocked',
+                    'recorded',
+                  ])
                     FilterChip(
                       label: Text(_resultLabel(result)),
                       selected: _result == result,
@@ -78,31 +130,65 @@ class _AuditViewerState extends State<AuditViewer> {
                     ),
                 ],
               ),
+              if (brokerMode) ...[
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  key: const ValueKey('audit-inspection-refresh'),
+                  onPressed: _loading ? null : () => _loadPage(),
+                  icon: _loading
+                      ? const SizedBox.square(
+                          dimension: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.refresh),
+                  label: Text(_page == null ? '監査一覧を取得' : '最新の監査一覧へ更新'),
+                ),
+                if (_loadError != null) ...[
+                  const SizedBox(height: 8),
+                  Text(_loadError!),
+                ],
+              ],
             ],
           ),
         ),
         SectionList(
           title: '監査鎖状態',
           rows: [
-            '監査一覧取得: ${brokerMode ? 'Broker経路未接続' : brokerUnavailableMode ? 'Broker接続不可' : '診断fixtureのみ'}',
-            '監査鎖状態: 未検証',
-            'ハッシュ鎖状態: 未検証',
-            '操作: 表示中の診断fixtureをコピーできます。永続監査記録と鎖の検証結果は未取得です。',
+            '監査一覧取得: ${brokerPage != null ? 'Brokerから取得済み' : _loading ? '取得中' : brokerMode ? '未取得' : brokerUnavailableMode ? 'Broker接続不可' : '診断fixtureのみ'}',
+            '監査鎖状態: ${brokerPage != null ? '検証済み' : '未検証'}',
+            'ハッシュ鎖状態: ${brokerPage != null ? '検証済み' : '未検証'}',
+            brokerPage != null
+                ? '全記録 ${brokerPage.verifiedEventCount} 件の保存chainとanchorをBrokerが検証。取得境界: ${brokerPage.snapshotHeadEventId ?? '記録なし'}。表示は最大100件です。'
+                : brokerMode
+                    ? '明示取得後にBrokerが検証したbounded pageだけを表示します。'
+                    : '診断fixtureのコピーだけが利用できます。永続監査記録は取得していません。',
           ],
         ),
         if (auditEvents.isEmpty)
           EmptyStatePanel(
             title: brokerMode
-                ? 'Broker監査一覧は未接続'
+                ? brokerPage != null
+                    ? '表示条件に一致する監査eventなし'
+                    : _loading
+                        ? 'Broker監査一覧を取得中'
+                        : _loadError != null
+                            ? 'Broker監査一覧は表示できません'
+                            : 'Broker監査一覧は未取得'
                 : brokerUnavailableMode
                     ? 'Broker監査一覧を取得できません'
                     : '一致する診断fixtureなし',
-            meaning: brokerMode || brokerUnavailableMode
-                ? '永続監査記録はBrokerから取得していません。起動時応答の監査参照IDだけから一覧を作りません。'
-                : '現在の絞込み条件では診断用fixtureが非表示です。',
+            meaning: brokerMode
+                ? brokerPage != null
+                    ? '現在の絞込み条件ではこの検証済みpageに一致するeventがありません。'
+                    : _loadError ?? '永続監査記録はBrokerから明示取得した後に表示します。'
+                : brokerUnavailableMode
+                    ? 'Broker接続を復旧後に一覧を取得してください。'
+                    : '現在の絞込み条件では診断用fixtureが非表示です。',
             phaseBBlocked: false,
             nextAction: brokerMode
-                ? 'Brokerの監査一覧読取経路が接続されるまで、実監査記録は表示できません。'
+                ? brokerPage != null
+                    ? '絞込みを解除するか、別pageへ移動してください。'
+                    : '「監査一覧を取得」を選択してBrokerから検証済みpageを取得してください。'
                 : brokerUnavailableMode
                     ? 'Brokerへの接続を復旧してから、監査一覧の読取状態を確認してください。'
                     : '絞込みを解除して診断fixtureを再表示してください。',
@@ -112,11 +198,12 @@ class _AuditViewerState extends State<AuditViewer> {
             scrollDirection: Axis.horizontal,
             child: DataTable(
               columns: const [
-                DataColumn(label: Text('診断fixture事象')),
+                DataColumn(label: Text('監査event')),
                 DataColumn(label: Text('作用')),
                 DataColumn(label: Text('結果')),
                 DataColumn(label: Text('内容ハッシュ')),
                 DataColumn(label: Text('直前')),
+                DataColumn(label: Text('event hash')),
                 DataColumn(label: Text('関連')),
                 DataColumn(label: Text('コピー')),
               ],
@@ -129,10 +216,11 @@ class _AuditViewerState extends State<AuditViewer> {
                       DataCell(Text(event.result)),
                       DataCell(Text(event.payloadHash)),
                       DataCell(Text(event.previousEventHash ?? 'root')),
+                      DataCell(Text(event.eventHash ?? '—')),
                       DataCell(Text(_relatedText(snapshot, event))),
                       DataCell(
                         IconButton(
-                          tooltip: '診断fixture JSONをコピー',
+                          tooltip: '監査投影JSONをコピー',
                           icon: const Icon(Icons.copy, size: 18),
                           onPressed: () => Clipboard.setData(
                             ClipboardData(text: _eventJson(event)),
@@ -144,25 +232,60 @@ class _AuditViewerState extends State<AuditViewer> {
               ],
             ),
           ),
+        if (brokerPage?.hasOlderEvents == true)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              key: const ValueKey('audit-inspection-older'),
+              onPressed: _loading
+                  ? null
+                  : () => _loadPage(
+                        beforeEventId: brokerPage!.nextBeforeEventId,
+                      ),
+              icon: const Icon(Icons.history),
+              label: const Text('さらに古い監査event'),
+            ),
+          ),
       ],
     );
   }
 
   bool _matchesFilters(AuditRecord event) {
     final searchable =
-        '${event.eventId} ${event.action} ${event.result} ${event.payloadHash} ${event.previousEventHash ?? ''}'
+        '${event.eventId} ${event.action} ${event.result} ${event.payloadHash} ${event.previousEventHash ?? ''} ${event.eventHash ?? ''}'
             .toLowerCase();
     final query = _searchController.text.trim().toLowerCase();
     if (query.isNotEmpty && !searchable.contains(query)) {
       return false;
     }
-    if (_category != 'all' && !searchable.contains(_category)) {
+    if (_category != 'all' && !_matchesCategory(event)) {
       return false;
     }
     if (_result != 'all' && !event.result.toLowerCase().contains(_result)) {
       return false;
     }
     return true;
+  }
+
+  bool _matchesCategory(AuditRecord event) {
+    final action = event.action.toLowerCase();
+    return switch (_category) {
+      'runtime' => action.contains('runtime') ||
+          action.contains('agenttask') ||
+          action.contains('実行系'),
+      'approval' => action.contains('approval') ||
+          action.contains('承認') ||
+          action.contains('許可'),
+      'recovery' => action.contains('recovery') ||
+          action.contains('回復') ||
+          action.contains('復旧'),
+      'evidence' => action.contains('evidence') ||
+          action.contains('証拠') ||
+          action.contains('監査'),
+      'setup_doctor' =>
+        action.contains('setup doctor') || action.contains('環境診断'),
+      _ => true,
+    };
   }
 }
 
@@ -184,6 +307,7 @@ String _resultLabel(String value) {
     'success' => '成功',
     'warning' => '警告',
     'blocked' => '遮断',
+    'recorded' => '記録',
     _ => value,
   };
 }
@@ -209,5 +333,6 @@ String _eventJson(AuditRecord event) {
     'result': event.result,
     'payload_hash': event.payloadHash,
     'previous_event_hash': event.previousEventHash,
+    if (event.eventHash != null) 'event_hash': event.eventHash,
   });
 }

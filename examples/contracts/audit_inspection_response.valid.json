@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "integrity_status": "verified",
+  "anchor_status": "verified",
+  "verified_event_count": 1,
+  "snapshot_head_event_id": "broker-audit-1",
+  "has_older_events": false,
+  "next_before_event_id": null,
+  "events": [
+    {
+      "event_id": "broker-audit-1",
+      "action": "health",
+      "result": "success",
+      "payload_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "previous_event_hash": null,
+      "event_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  ]
+}

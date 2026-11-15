@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/audit_inspection_request.schema.json",
+  "title": "永続監査一覧取得要求（AuditInspectionRequest）",
+  "type": "object",
+  "required": ["version", "limit"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {"const": 1},
+    "limit": {"type": "integer", "minimum": 1, "maximum": 200},
+    "before_event_id": {
+      "type": "string",
+      "pattern": "^broker-audit-[1-9][0-9]*$",
+      "maxLength": 64
+    }
+  }
+}

@@ -191,6 +191,13 @@ impl BrokerPersistentStore {
     }
 
     pub fn append_audit_event(&self, event: &BrokerAuditEvent) -> Result<(), BrokerStoreError> {
+        let existing_log = self.load_audit_log()?;
+        self.verify_audit_anchor(&existing_log)?;
+        let mut expected_log = existing_log;
+        expected_log
+            .push_verified(event.clone())
+            .map_err(BrokerStoreError::TamperedAuditState)?;
+
         let serialized = serde_json::to_string(event).map_err(|error| {
             BrokerStoreError::MalformedAuditState(format!(
                 "broker audit eventのserializeに失敗: {error}"
@@ -199,6 +206,11 @@ impl BrokerPersistentStore {
         append_jsonl_line(&self.audit_path, &serialized)
             .map_err(|error| BrokerStoreError::Io(format!("audit eventの追記に失敗: {error}")))?;
         let anchored_log = self.load_audit_log()?;
+        if anchored_log != expected_log {
+            return Err(BrokerStoreError::TamperedAuditState(
+                "audit event追記中に保存chainが期待値から変化した".to_string(),
+            ));
+        }
         self.write_audit_anchor(&anchored_log)
     }
 
@@ -1437,6 +1449,74 @@ mod update_trust_store_tests {
 
         fs::write(&path, vec![b' '; MAX_UPDATE_TRUST_BYTES + 1]).unwrap();
         assert!(store.load_update_trust().is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod audit_append_integrity_tests {
+    use super::*;
+
+    fn temp_store(label: &str) -> (PathBuf, BrokerPersistentStore) {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "gui-shell-audit-append-{label}-{}-{unique}",
+            std::process::id()
+        ));
+        let (store, _) = BrokerPersistentStore::open_or_create(&root, "audit-append-test")
+            .expect("永続storeを初期化する");
+        (root, store)
+    }
+
+    #[test]
+    fn append_rejects_modified_anchored_history_without_resealing_or_appending() {
+        let (root, store) = temp_store("reject-tamper");
+        let mut original_log = BrokerAuditLog::default();
+        let original_event = original_log.append(
+            "request-original",
+            "health",
+            "accepted",
+            "original reason",
+            "LIVE_RUNTIME",
+            "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        );
+        store
+            .append_audit_event(&original_event)
+            .expect("正規eventを追記する");
+        let original_anchor = fs::read(&store.audit_anchor_path).unwrap();
+
+        let mut modified_log = BrokerAuditLog::default();
+        let modified_event = modified_log.append(
+            "request-original",
+            "health",
+            "accepted",
+            "modified reason",
+            "LIVE_RUNTIME",
+            "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        );
+        let modified_line = serde_json::to_string(&modified_event).unwrap();
+        let modified_bytes = format!("{modified_line}\n").into_bytes();
+        fs::write(&store.audit_path, &modified_bytes).unwrap();
+
+        let next_event = modified_log.build_next(
+            "request-next",
+            "health",
+            "accepted",
+            "follow-up",
+            "LIVE_RUNTIME",
+            "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        );
+        assert!(matches!(
+            store.append_audit_event(&next_event),
+            Err(BrokerStoreError::TamperedAuditState(_))
+        ));
+        assert_eq!(fs::read(&store.audit_path).unwrap(), modified_bytes);
+        assert_eq!(fs::read(&store.audit_anchor_path).unwrap(), original_anchor);
+        assert!(store.verified_audit_log().is_err());
+
         fs::remove_dir_all(root).unwrap();
     }
 }

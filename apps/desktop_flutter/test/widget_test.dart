@@ -1822,7 +1822,7 @@ void main() {
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(body: AuditViewer(client: client)),
     ));
-    expect(find.text('Broker監査一覧は未接続'), findsOneWidget);
+    expect(find.text('Broker監査一覧は未取得'), findsOneWidget);
     expect(find.textContaining('監査鎖状態: 未検証'), findsOneWidget);
     expect(find.textContaining('audit-session-list-read'), findsNothing);
     expect(find.textContaining('1111111111111111111111111111111111111111'),

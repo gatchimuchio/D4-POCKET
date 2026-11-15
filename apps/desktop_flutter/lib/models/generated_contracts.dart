@@ -211,6 +211,7 @@ class AuditRecord {
     required this.result,
     required this.payloadHash,
     this.previousEventHash,
+    this.eventHash,
   });
 
   final String eventId;
@@ -218,6 +219,7 @@ class AuditRecord {
   final String result;
   final String payloadHash;
   final String? previousEventHash;
+  final String? eventHash;
 
   factory AuditRecord.fromJson(Map<String, Object?> json) {
     return AuditRecord(
@@ -226,8 +228,25 @@ class AuditRecord {
       result: json['result'] as String? ?? '',
       payloadHash: json['payload_hash'] as String? ?? '',
       previousEventHash: json['previous_event_hash'] as String?,
+      eventHash: json['event_hash'] as String?,
     );
   }
+}
+
+class AuditInspectionPage {
+  const AuditInspectionPage({
+    required this.verifiedEventCount,
+    required this.snapshotHeadEventId,
+    required this.hasOlderEvents,
+    required this.nextBeforeEventId,
+    required this.events,
+  });
+
+  final int verifiedEventCount;
+  final String? snapshotHeadEventId;
+  final bool hasOlderEvents;
+  final String? nextBeforeEventId;
+  final List<AuditRecord> events;
 }
 
 class RecoveryRecord {

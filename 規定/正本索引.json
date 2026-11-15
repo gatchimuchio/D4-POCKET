@@ -140,6 +140,10 @@
       "責任": "Approvalの表示・編集境界"
     },
     {
+      "path": "docs/specs/audit-inspection.md",
+      "責任": "Rust Broker永続AuditのHMAC・hash chain検証、bounded page、秘密を除いたAudit Viewer投影"
+    },
+    {
       "path": "specs/*.schema.json",
       "責任": "runtime、Adapter、Capability、Permission、Approval、Audit、Recovery等の機械契約"
     },

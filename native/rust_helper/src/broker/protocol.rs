@@ -50,6 +50,14 @@ struct SetupDoctorReportRequest {
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+struct AuditInspectionRequest {
+    version: u8,
+    limit: usize,
+    before_event_id: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct FirstRunConfigurationRequest {
     version: u8,
 }
@@ -457,6 +465,8 @@ impl BrokerStateStore {
 pub enum BrokerOperation {
     #[serde(rename = "Setup Doctor報告取得")]
     SetupDoctor報告取得,
+    #[serde(rename = "監査一覧取得")]
+    監査一覧取得,
     #[serde(rename = "初回設定取得")]
     初回設定取得,
     #[serde(rename = "対話履歴承認")]
@@ -721,6 +731,7 @@ impl BrokerOperation {
     pub fn as_str(&self) -> &'static str {
         match self {
             BrokerOperation::SetupDoctor報告取得 => "Setup Doctor報告取得",
+            BrokerOperation::監査一覧取得 => "監査一覧取得",
             BrokerOperation::初回設定取得 => "初回設定取得",
             BrokerOperation::作業領域一覧 => "作業領域一覧",
             BrokerOperation::作業領域承認 => "作業領域承認",
@@ -2938,6 +2949,11 @@ impl Broker {
                 &payload_hash,
             ),
             BrokerOperation::SetupDoctor報告取得 => self.setup_doctor_report(
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                &payload_hash,
+            ),
+            BrokerOperation::監査一覧取得 => self.audit_inspection(
                 &request_id,
                 envelope.payload.as_ref().unwrap_or(&Value::Null),
                 &payload_hash,
@@ -5941,6 +5957,171 @@ impl Broker {
         }
     }
 
+    fn audit_inspection(
+        &mut self,
+        request_id: &str,
+        payload: &Value,
+        payload_hash: &str,
+    ) -> BrokerResponse {
+        let operation = BrokerOperation::監査一覧取得.as_str();
+        let request = match serde_json::from_value::<AuditInspectionRequest>(payload.clone()) {
+            Ok(request)
+                if request.version == 1
+                    && (1..=200).contains(&request.limit)
+                    && payload.get("before_event_id").is_none_or(Value::is_string)
+                    && request
+                        .before_event_id
+                        .as_ref()
+                        .is_none_or(|event_id| audit_event_sequence(event_id).is_some()) =>
+            {
+                request
+            }
+            _ => {
+                return self.reject_with_payload_hash(
+                    request_id,
+                    operation,
+                    "audit_inspection_request_invalid",
+                    "監査一覧要求は版1、1〜200件、現行記録cursorだけを受け付けます",
+                    true,
+                    payload_hash,
+                );
+            }
+        };
+
+        if !self.state_store.persistence_ready() {
+            return self.reject_with_payload_hash(
+                request_id,
+                operation,
+                "audit_persistence_unavailable",
+                "永続監査storeを確認できないため一覧を返しません",
+                true,
+                payload_hash,
+            );
+        }
+
+        let receipt_reason = "Capability=監査記録の限定読取 Permission=認証Broker sessionで検証済みpage最大200件だけを取得 Approval=状態・権限・contentを変更しない読取のため追加owner approvalなし RecoveryAction=失敗時は一覧を表示せずBroker固定Audit storeを復旧";
+        if let Err(error) = self.append_audit(
+            request_id,
+            operation,
+            "received",
+            receipt_reason,
+            EVIDENCE_SOURCE_LIVE_RUNTIME,
+            payload_hash,
+        ) {
+            return self.audit_store_failed_response(
+                request_id,
+                operation,
+                "broker_audit_append_failed",
+                &error.message(),
+            );
+        }
+
+        let verified_log = match self.state_store.verified_audit_log() {
+            Ok(Some(log)) if log.events() == self.audit_events() => log,
+            Ok(Some(_)) => {
+                return self.audit_store_failed_response(
+                    request_id,
+                    operation,
+                    "broker_audit_snapshot_mismatch",
+                    "永続監査とBroker実行状態が一致しないため一覧を返しません",
+                );
+            }
+            Ok(None) => {
+                return self.audit_store_failed_response(
+                    request_id,
+                    operation,
+                    "audit_persistence_unavailable",
+                    "永続監査storeを確認できないため一覧を返しません",
+                );
+            }
+            Err(_) => {
+                return self.audit_store_failed_response(
+                    request_id,
+                    operation,
+                    "broker_audit_verification_failed",
+                    "監査鎖またはanchorを検証できないため一覧を返しません",
+                );
+            }
+        };
+
+        let events = verified_log.events();
+        let end = if let Some(before_event_id) = request.before_event_id.as_deref() {
+            match events
+                .iter()
+                .position(|event| event.event_id == before_event_id)
+            {
+                Some(index) => index,
+                None => {
+                    return self.reject_with_payload_hash(
+                        request_id,
+                        operation,
+                        "audit_inspection_cursor_unknown",
+                        "監査一覧cursorが現在の検証済み記録にありません。最新一覧を再取得してください",
+                        true,
+                        payload_hash,
+                    );
+                }
+            }
+        } else {
+            events.len()
+        };
+        let start = end.saturating_sub(request.limit);
+        let page = &events[start..end];
+        let mut projected_events = Vec::with_capacity(page.len());
+        for event in page {
+            if event.operation.is_empty()
+                || event.operation.len() > 128
+                || event.operation.chars().any(char::is_control)
+                || super::contains_known_credential_marker(&event.operation)
+                || !is_tagged_sha256(&event.payload_hash)
+                || !is_tagged_sha256(&event.event_hash)
+                || event
+                    .previous_event_hash
+                    .as_deref()
+                    .is_some_and(|hash| !is_tagged_sha256(hash))
+            {
+                return self.audit_store_failed_response(
+                    request_id,
+                    operation,
+                    "broker_audit_projection_invalid",
+                    "監査記録の限定投影を安全に構成できないため一覧を返しません",
+                );
+            }
+            projected_events.push(json!({
+                "event_id": event.event_id,
+                "action": event.operation,
+                "result": audit_result_projection(&event.decision),
+                "payload_hash": event.payload_hash,
+                "previous_event_hash": event.previous_event_hash,
+                "event_hash": event.event_hash,
+            }));
+        }
+
+        let has_older_events = start > 0;
+        let next_before_event_id = if has_older_events {
+            page.first().map(|event| event.event_id.clone())
+        } else {
+            None
+        };
+        let body = json!({
+            "version": 1,
+            "integrity_status": "verified",
+            "anchor_status": "verified",
+            "verified_event_count": events.len(),
+            "snapshot_head_event_id": events.last().map(|event| event.event_id.clone()),
+            "has_older_events": has_older_events,
+            "next_before_event_id": next_before_event_id,
+            "events": projected_events,
+        });
+        self.accept_body_with_evidence(
+            request_id,
+            BrokerOperation::監査一覧取得,
+            body,
+            EVIDENCE_SOURCE_LIVE_RUNTIME,
+            payload_hash,
+        )
+    }
+
     fn ホスト能力処理(
         &mut self,
         request_id: &str,
@@ -6448,6 +6629,24 @@ pub(super) fn is_tagged_sha256(value: &str) -> bool {
             .iter()
             .skip(7)
             .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+}
+
+fn audit_event_sequence(event_id: &str) -> Option<usize> {
+    if event_id.len() > 64 {
+        return None;
+    }
+    let sequence = event_id.strip_prefix("broker-audit-")?;
+    let parsed = sequence.parse::<usize>().ok()?;
+    (parsed > 0 && format!("broker-audit-{parsed}") == event_id).then_some(parsed)
+}
+
+fn audit_result_projection(decision: &str) -> &'static str {
+    match decision {
+        "accepted" | "completed" | "succeeded" => "success",
+        "warning" => "warning",
+        "rejected" | "blocked" | "suspended" | "failed" | "denied" => "blocked",
+        _ => "recorded",
+    }
 }
 
 /// approval IDは外部targetや統治情報を埋め込めないASCII識別子に限る。
@@ -7597,6 +7796,16 @@ mod tests {
         request
     }
 
+    fn audit_inspection_request(request_id: &str, payload: Value) -> BrokerRequestEnvelope {
+        let mut request = BrokerRequestEnvelope::health(request_id, &format!("nonce-{request_id}"));
+        request.session_id = Some("session-1".to_string());
+        request.operation = Some(BrokerOperation::監査一覧取得);
+        request.payload = Some(payload);
+        request.issued_at = Some("2026-06-01T00:00:30Z".to_string());
+        request.refresh_payload_hash();
+        request
+    }
+
     fn first_run_configuration_request(request_id: &str, payload: Value) -> BrokerRequestEnvelope {
         let mut request = BrokerRequestEnvelope::health(request_id, &format!("nonce-{request_id}"));
         request.session_id = Some("first-run-session".to_string());
@@ -8151,6 +8360,171 @@ mod tests {
         assert_eq!(
             fs::read(root.join("setup_doctor_report.json")).unwrap(),
             bytes
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn audit_inspection_returns_bounded_verified_pages_without_request_or_reason_content() {
+        let root = temp_store_dir("audit-inspection-pages");
+        let mut broker = persistent_test_broker(&root);
+        for index in 0..3 {
+            broker
+                .append_audit(
+                    &format!("PRIVATE_REQUEST_ID_{index}"),
+                    "health",
+                    "accepted",
+                    "PRIVATE_REASON_MUST_NOT_BE_PROJECTED",
+                    EVIDENCE_SOURCE_LIVE_RUNTIME,
+                    ZERO_PAYLOAD_HASH,
+                )
+                .expect("初期監査事象を保存する");
+        }
+        let seed_count = broker.audit_events().len();
+
+        let first = broker.handle(audit_inspection_request(
+            "audit-page-first",
+            json!({"version": 1, "limit": 2}),
+        ));
+        assert_eq!(first.status, BrokerStatus::Accepted);
+        assert_eq!(first.evidence_source, EVIDENCE_SOURCE_LIVE_RUNTIME);
+        assert_eq!(
+            first.audit_event_id,
+            format!("broker-audit-{}", seed_count + 2)
+        );
+        let first_body = first.body.expect("検証済み監査page");
+        assert_eq!(first_body["integrity_status"], "verified");
+        assert_eq!(first_body["anchor_status"], "verified");
+        assert_eq!(first_body["verified_event_count"], seed_count + 1);
+        assert_eq!(
+            first_body["snapshot_head_event_id"],
+            format!("broker-audit-{}", seed_count + 1)
+        );
+        assert_eq!(first_body["events"].as_array().unwrap().len(), 2);
+        assert_eq!(
+            first_body["events"][0]["event_id"],
+            format!("broker-audit-{seed_count}")
+        );
+        assert_eq!(
+            first_body["events"][1]["event_id"],
+            format!("broker-audit-{}", seed_count + 1)
+        );
+        assert_eq!(first_body["events"][0]["result"], "success");
+        assert_eq!(first_body["has_older_events"], true);
+        assert_eq!(
+            first_body["next_before_event_id"],
+            format!("broker-audit-{seed_count}")
+        );
+        let serialized_page = serde_json::to_string(&first_body).unwrap();
+        assert!(!serialized_page.contains("PRIVATE_REQUEST_ID"));
+        assert!(!serialized_page.contains("PRIVATE_REASON_MUST_NOT_BE_PROJECTED"));
+        for event in first_body["events"].as_array().unwrap() {
+            assert!(event.get("request_id").is_none());
+            assert!(event.get("reason").is_none());
+            assert!(event.get("event_hash").is_some());
+        }
+
+        let second = broker.handle(audit_inspection_request(
+            "audit-page-older",
+            json!({
+                "version": 1,
+                "limit": 2,
+                "before_event_id": first_body["next_before_event_id"]
+            }),
+        ));
+        assert_eq!(second.status, BrokerStatus::Accepted);
+        let second_body = second.body.expect("older verified page");
+        assert_eq!(second_body["events"].as_array().unwrap().len(), 2);
+        assert_eq!(
+            second_body["events"][0]["event_id"],
+            format!("broker-audit-{}", seed_count - 2)
+        );
+        assert_eq!(
+            second_body["events"][1]["event_id"],
+            format!("broker-audit-{}", seed_count - 1)
+        );
+        assert_eq!(second_body["has_older_events"], false);
+        assert!(second_body["next_before_event_id"].is_null());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn audit_inspection_rejects_unknown_fields_and_does_not_return_a_page() {
+        let root = temp_store_dir("audit-inspection-unknown-field");
+        let mut broker = persistent_test_broker(&root);
+        let response = broker.handle(audit_inspection_request(
+            "audit-page-invalid",
+            json!({"version": 1, "limit": 10, "permission": "task.execute"}),
+        ));
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(response.body, None);
+        assert_eq!(
+            response.error.as_ref().map(|error| error.code.as_str()),
+            Some("audit_inspection_request_invalid")
+        );
+
+        let null_cursor = broker.handle(audit_inspection_request(
+            "audit-page-null-cursor",
+            json!({"version": 1, "limit": 10, "before_event_id": null}),
+        ));
+        assert_eq!(null_cursor.status, BrokerStatus::Rejected);
+        assert!(null_cursor.body.is_none());
+        assert_eq!(
+            null_cursor.error.as_ref().map(|error| error.code.as_str()),
+            Some("audit_inspection_request_invalid")
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn audit_inspection_fails_closed_on_post_start_store_tampering() {
+        let root = temp_store_dir("audit-inspection-tamper");
+        let mut broker = persistent_test_broker(&root);
+        broker
+            .append_audit(
+                "original-request",
+                "health",
+                "accepted",
+                "original reason",
+                EVIDENCE_SOURCE_LIVE_RUNTIME,
+                ZERO_PAYLOAD_HASH,
+            )
+            .expect("初期eventを保存する");
+        let original_anchor = fs::read(root.join("audit_anchor.json")).unwrap();
+
+        let mut modified_log = BrokerAuditLog::default();
+        let modified_event = modified_log.append(
+            "original-request",
+            "health",
+            "accepted",
+            "modified reason",
+            EVIDENCE_SOURCE_LIVE_RUNTIME,
+            ZERO_PAYLOAD_HASH,
+        );
+        fs::write(
+            root.join("audit.jsonl"),
+            format!("{}\n", serde_json::to_string(&modified_event).unwrap()),
+        )
+        .unwrap();
+
+        let response = broker.handle(audit_inspection_request(
+            "audit-page-after-tamper",
+            json!({"version": 1, "limit": 10}),
+        ));
+        assert_eq!(response.status, BrokerStatus::Suspended);
+        assert!(response.body.is_none());
+        assert_eq!(
+            response.error.as_ref().map(|error| error.code.as_str()),
+            Some("broker_audit_append_failed")
+        );
+        assert_eq!(
+            fs::read(root.join("audit_anchor.json")).unwrap(),
+            original_anchor
+        );
+        let modified_record = fs::read_to_string(root.join("audit.jsonl")).unwrap();
+        assert_eq!(
+            serde_json::from_str::<BrokerAuditEvent>(modified_record.trim()).unwrap(),
+            modified_event
         );
         fs::remove_dir_all(root).unwrap();
     }

@@ -241,6 +241,48 @@ class ShellCoreClient {
     );
   }
 
+  Future<AuditInspectionPage> refreshAuditInspection({
+    int limit = 100,
+    String? beforeEventId,
+  }) async {
+    final broker = brokerTransport;
+    if (mode != 'broker' || broker == null) {
+      throw const BrokerClientException(
+        '永続監査一覧は認証Broker接続時だけ取得できます',
+      );
+    }
+    if (limit < 1 ||
+        limit > 200 ||
+        (beforeEventId != null &&
+            !_isBrokerAuditEventIdentifier(beforeEventId))) {
+      throw const BrokerClientException('監査一覧要求を構成できません');
+    }
+    final response = await broker.request(
+      '監査一覧取得',
+      payload: <String, Object?>{
+        'version': 1,
+        'limit': limit,
+        if (beforeEventId != null) 'before_event_id': beforeEventId,
+      },
+    );
+    final auditEventId = response['audit_event_id'];
+    final bodyValue = response['body'];
+    if (response['operation'] != '監査一覧取得' ||
+        response['status'] != 'accepted' ||
+        response['evidence_source'] != 'LIVE_RUNTIME' ||
+        response['error'] != null ||
+        auditEventId is! String ||
+        !_isSafeAuditIdentifier(auditEventId) ||
+        bodyValue is! Map) {
+      throw const BrokerClientException('Broker監査一覧の応答を確認できません');
+    }
+    return _validatedAuditInspectionPage(
+      Map<String, Object?>.from(bodyValue),
+      limit: limit,
+      beforeEventId: beforeEventId,
+    );
+  }
+
   Future<List<AgentSessionRecord>> refreshAgentSessions() async {
     final broker = brokerTransport;
     if (mode != 'broker' || broker == null) {
@@ -790,6 +832,143 @@ bool _isSafeAuditIdentifier(String value) =>
     value.trim().isNotEmpty &&
     value.length <= 256 &&
     !value.codeUnits.any((unit) => unit < 0x20 || unit == 0x7f);
+
+bool _isBrokerAuditEventIdentifier(String value) =>
+    value.length <= 64 && RegExp(r'^broker-audit-[1-9][0-9]*$').hasMatch(value);
+
+AuditInspectionPage _validatedAuditInspectionPage(
+  Map<String, Object?> value, {
+  required int limit,
+  required String? beforeEventId,
+}) {
+  const fields = <String>{
+    'version',
+    'integrity_status',
+    'anchor_status',
+    'verified_event_count',
+    'snapshot_head_event_id',
+    'has_older_events',
+    'next_before_event_id',
+    'events',
+  };
+  if (value.length != fields.length ||
+      !value.keys.every(fields.contains) ||
+      value['version'] != 1 ||
+      value['integrity_status'] != 'verified' ||
+      value['anchor_status'] != 'verified') {
+    throw const BrokerClientException('Broker監査一覧の検証状態が不正です');
+  }
+  final count = value['verified_event_count'];
+  final head = value['snapshot_head_event_id'];
+  final hasOlder = value['has_older_events'];
+  final nextBefore = value['next_before_event_id'];
+  final eventValues = value['events'];
+  final headSequence = head is String && _isBrokerAuditEventIdentifier(head)
+      ? int.tryParse(head.substring('broker-audit-'.length))
+      : null;
+  final cursorSequence = beforeEventId == null
+      ? null
+      : _isBrokerAuditEventIdentifier(beforeEventId)
+          ? int.tryParse(beforeEventId.substring('broker-audit-'.length))
+          : null;
+  if (count is! int ||
+      count < 0 ||
+      hasOlder is! bool ||
+      (head != null &&
+          (head is! String || !_isBrokerAuditEventIdentifier(head))) ||
+      (nextBefore != null &&
+          (nextBefore is! String ||
+              !_isBrokerAuditEventIdentifier(nextBefore))) ||
+      eventValues is! List ||
+      eventValues.length > limit ||
+      count < eventValues.length ||
+      (count == 0 ? head != null : head == null || headSequence != count) ||
+      (beforeEventId != null && cursorSequence == null)) {
+    throw const BrokerClientException('Broker監査一覧の境界値が不正です');
+  }
+
+  const eventFields = <String>{
+    'event_id',
+    'action',
+    'result',
+    'payload_hash',
+    'previous_event_hash',
+    'event_hash',
+  };
+  final hashPattern = RegExp(r'^sha256:[a-f0-9]{64}$');
+  final events = <AuditRecord>[];
+  int? previousSequence;
+  String? previousHash;
+  for (final eventValue in eventValues) {
+    if (eventValue is! Map) {
+      throw const BrokerClientException('Broker監査eventの形が不正です');
+    }
+    final event = Map<String, Object?>.from(eventValue);
+    if (event.length != eventFields.length ||
+        !event.keys.every(eventFields.contains)) {
+      throw const BrokerClientException('Broker監査eventの公開項目が不正です');
+    }
+    final eventId = event['event_id'];
+    final action = event['action'];
+    final result = event['result'];
+    final payloadHash = event['payload_hash'];
+    final parentHash = event['previous_event_hash'];
+    final eventHash = event['event_hash'];
+    final sequence = eventId is String && _isBrokerAuditEventIdentifier(eventId)
+        ? int.tryParse(eventId.substring('broker-audit-'.length))
+        : null;
+    if (eventId is! String ||
+        sequence == null ||
+        (previousSequence != null && sequence != previousSequence + 1) ||
+        action is! String ||
+        action.isEmpty ||
+        action.length > 128 ||
+        action.codeUnits.any((unit) => unit < 0x20 || unit == 0x7f) ||
+        !const {'success', 'warning', 'blocked', 'recorded'}.contains(result) ||
+        payloadHash is! String ||
+        !hashPattern.hasMatch(payloadHash) ||
+        eventHash is! String ||
+        !hashPattern.hasMatch(eventHash) ||
+        (parentHash != null &&
+            (parentHash is! String || !hashPattern.hasMatch(parentHash))) ||
+        (sequence == 1 ? parentHash != null : parentHash is! String) ||
+        (previousSequence != null && parentHash != previousHash)) {
+      throw const BrokerClientException('Broker監査eventの内容検証に失敗しました');
+    }
+    events.add(AuditRecord(
+      eventId: eventId,
+      action: action,
+      result: result as String,
+      payloadHash: payloadHash,
+      previousEventHash: parentHash as String?,
+      eventHash: eventHash,
+    ));
+    previousSequence = sequence;
+    previousHash = eventHash;
+  }
+  if (hasOlder) {
+    if (events.isEmpty || nextBefore != events.first.eventId) {
+      throw const BrokerClientException('Broker監査一覧のcursor境界が不正です');
+    }
+  } else if (nextBefore != null) {
+    throw const BrokerClientException('Broker監査一覧のcursor終端が不正です');
+  }
+  if (events.isNotEmpty &&
+      ((cursorSequence == null && events.last.eventId != head) ||
+          (cursorSequence != null &&
+              int.tryParse(
+                      events.last.eventId.substring('broker-audit-'.length)) !=
+                  cursorSequence - 1))) {
+    throw const BrokerClientException('Broker監査一覧のpage境界が不正です');
+  }
+  return AuditInspectionPage(
+    verifiedEventCount: count,
+    snapshotHeadEventId: head as String?,
+    hasOlderEvents: hasOlder,
+    nextBeforeEventId: nextBefore as String?,
+    events: List<AuditRecord>.unmodifiable(events),
+  );
+}
 
 String _boundedBrokerDisplayText(String value) {
   final output = StringBuffer();

@@ -130,6 +130,8 @@ REQUIRED = {
     "permission.schema.json",
     "approval.schema.json",
     "audit.schema.json",
+    "audit_inspection_request.schema.json",
+    "audit_inspection_response.schema.json",
     "recovery.schema.json",
     "diagnostic.schema.json",
     "update.schema.json",

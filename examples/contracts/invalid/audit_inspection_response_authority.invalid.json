@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "integrity_status": "verified",
+  "anchor_status": "verified",
+  "verified_event_count": 0,
+  "snapshot_head_event_id": null,
+  "has_older_events": false,
+  "next_before_event_id": null,
+  "authority": true,
+  "events": []
+}
