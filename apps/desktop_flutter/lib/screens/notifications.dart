@@ -25,13 +25,35 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Future<Map<String, Object?>>? _notificationsFuture;
   bool _unreadOnly = false;
   String? _message;
+  int _clientGeneration = 0;
 
   @override
   void initState() {
     super.initState();
-    _notificationClient = widget.client.brokerTransport == null
-        ? null
-        : NotificationClient(widget.client.brokerTransport!);
+    _notificationClient = _clientFor(widget.client);
+    _refresh();
+  }
+
+  NotificationClient? _clientFor(ShellCoreClient client) {
+    final transport = client.brokerTransport;
+    return transport == null ? null : NotificationClient(transport);
+  }
+
+  @override
+  void didUpdateWidget(covariant NotificationsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (identical(
+      oldWidget.client.brokerTransport,
+      widget.client.brokerTransport,
+    )) {
+      return;
+    }
+
+    _clientGeneration++;
+    _notificationClient = _clientFor(widget.client);
+    _notificationsFuture = null;
+    _unreadOnly = false;
+    _message = null;
     _refresh();
   }
 
@@ -45,15 +67,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Future<void> _run(Future<Map<String, Object?>> operation) async {
+    final generation = _clientGeneration;
     try {
       await operation;
-      if (!mounted) return;
+      if (!mounted || generation != _clientGeneration) return;
       setState(() {
         _message = '通知の表示状態を更新しました。';
         _refresh();
       });
     } on Object {
-      if (!mounted) return;
+      if (!mounted || generation != _clientGeneration) return;
       setState(() {
         _message = '通知の状態を更新できません。Broker接続と通知状態を確認してください。';
       });
