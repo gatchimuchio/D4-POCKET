@@ -30,7 +30,7 @@ PACKAGE_LINE = re.compile(
 DEBUG_CERTIFICATE_DN = frozenset({"cn=androiddebug", "o=android", "c=us"})
 APK_SIGNING_BLOCK_MAGIC = b"APK Sig Block 42"
 UNSIGNED_APK_DIAGNOSTIC = re.compile(
-    r"(?mi)^ERROR:\s*No signatures found in APK\s*$"
+    r"(?mi)^ERROR:\s*(?:No signatures found in APK|Missing META-INF/MANIFEST\.MF)\s*$"
 )
 
 if str(ROOT) not in sys.path:

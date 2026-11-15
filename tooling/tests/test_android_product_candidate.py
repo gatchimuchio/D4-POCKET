@@ -41,6 +41,7 @@ class AndroidProductCandidateTests(unittest.TestCase):
         self._write_apk(self.release_apk, marker=b"release-build")
         self.app_id, self.version_name, self.version_code = candidate._application_identity()
         self.debug_dn_prefix = "V2 Signer: certificate DN: "
+        self.release_unsigned_diagnostic = "ERROR: No signatures found in APK\n"
         sdk_tools = self.root / "sdk" / "build-tools" / "37.0.0"
         sdk_tools.mkdir(parents=True)
         self.aapt = sdk_tools / "aapt"
@@ -83,7 +84,7 @@ class AndroidProductCandidateTests(unittest.TestCase):
             arguments,
             1,
             stdout="DOES NOT VERIFY\n",
-            stderr="ERROR: No signatures found in APK\n",
+            stderr=self.release_unsigned_diagnostic,
         )
 
     def _package(self) -> dict[str, object]:
@@ -128,6 +129,11 @@ class AndroidProductCandidateTests(unittest.TestCase):
 
     def test_accepts_legacy_apksigner_debug_signer_line(self) -> None:
         self.debug_dn_prefix = "Signer #1 certificate DN: "
+        evidence = self._package()
+        self.assertEqual(evidence["release_signature_state"], "unsigned")
+
+    def test_accepts_build_tools_37_unsigned_apksigner_diagnostic(self) -> None:
+        self.release_unsigned_diagnostic = "ERROR: Missing META-INF/MANIFEST.MF\n"
         evidence = self._package()
         self.assertEqual(evidence["release_signature_state"], "unsigned")
 
