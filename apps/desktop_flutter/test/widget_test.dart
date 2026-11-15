@@ -4447,6 +4447,33 @@ void main() {
         applyTaskRecord(status: 'running'),
       ),
     ], responseForOperation: (operation, payload) {
+      if (operation == '作業領域一覧') {
+        return {
+          ..._brokerWorkspaceListResponse(),
+          'body': {
+            '作業領域': [
+              {
+                '作業領域ID': workspaceId,
+                '実行系ID': runtimeId,
+                '登録hash': 'sha256:${List.filled(64, 'a').join()}',
+                '承認状態': 'denied',
+                '有効期限': null,
+                '表示範囲': 'none',
+                'approval_id': null,
+              },
+              {
+                '作業領域ID': targetWorkspaceId,
+                '実行系ID': runtimeId,
+                '登録hash': 'sha256:${List.filled(64, 'b').join()}',
+                '承認状態': 'denied',
+                '有効期限': null,
+                '表示範囲': 'none',
+                'approval_id': null,
+              },
+            ],
+          },
+        };
+      }
       if (operation != 'AgentTask状態') return null;
       if (payload?['task_id'] == targetTaskId) {
         return _brokerAcceptedBody(
@@ -4736,6 +4763,48 @@ void main() {
     expect(
       find.textContaining('Task一回承認状態（Owner Approval）: 未取得'),
       findsOneWidget,
+    );
+
+    final targetWorkspaceInspector = find.byKey(
+      const ValueKey('ai-edit-apply-workspace-inspector-$targetSessionId'),
+    );
+    expect(targetWorkspaceInspector, findsOneWidget);
+    final workspaceListCountBeforeExpand = transport.operations
+        .where((operation) => operation == '作業領域一覧')
+        .length;
+    await tester.ensureVisible(targetWorkspaceInspector);
+    await tester.tap(targetWorkspaceInspector);
+    await tester.pumpAndSettle();
+    final targetWorkspaceInspectorContent = find.byKey(
+      const ValueKey(
+        'ai-edit-apply-workspace-inspector-content-$targetSessionId',
+      ),
+    );
+    expect(targetWorkspaceInspectorContent, findsOneWidget);
+    expect(
+      find.descendant(
+        of: targetWorkspaceInspectorContent,
+        matching: find.text(targetWorkspaceId),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: targetWorkspaceInspectorContent,
+        matching: find.text(workspaceId),
+      ),
+      findsNothing,
+      reason: '適用元Workspaceを適用先Inspectorへ混在させない',
+    );
+    expect(
+      transport.operations.where((operation) => operation == '作業領域一覧'),
+      hasLength(greaterThan(workspaceListCountBeforeExpand)),
+    );
+    expect(
+      transport.operations.where((operation) =>
+          operation.startsWith('作業領域') && operation != '作業領域一覧'),
+      isEmpty,
+      reason: 'Inspector表示では内容読取・Approval・baseline操作を開始しない',
     );
 
     final targetPermissionButton = find.byKey(

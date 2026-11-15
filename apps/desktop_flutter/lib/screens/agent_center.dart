@@ -2300,6 +2300,13 @@ class _AgentCenterState extends State<_AgentCenterScreen>
     if (taskState == null) return const [];
     final task = taskState.record;
     final taskBound = _taskRecordMatchesUiState(taskState, task);
+    final aiEditApplyTargetRequest =
+        taskState.request ?? taskState.lastStartedRequest;
+    final aiEditApplyTargetBound = taskState.aiEditApplyLineage != null &&
+        aiEditApplyTargetRequest != null &&
+        aiEditApplyTargetRequest.runtimeId == session.agentRuntimeId &&
+        aiEditApplyTargetRequest.sessionId == session.sessionId &&
+        aiEditApplyTargetRequest.workspaceId == session.workspace;
     final resultProjection = taskBound ? taskState.resultProjection : null;
     final aiEditTaskBound = taskBound &&
         task != null &&
@@ -2333,6 +2340,37 @@ class _AgentCenterState extends State<_AgentCenterScreen>
           _comparison!.agentBSessionId,
         }.contains(session.sessionId);
     return [
+      if (aiEditApplyTargetBound && widget.client.workspaceClient != null)
+        ExpansionTile(
+          key: ValueKey(
+            'ai-edit-apply-workspace-inspector-${session.sessionId}',
+          ),
+          tilePadding: EdgeInsets.zero,
+          title: const Text('AI Edit適用先Workspaceの変更確認'),
+          subtitle: const Text('対象Workspaceの登録metadataを表示します。'),
+          children: [
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  'baselineと変更一覧はWorkspace全体の情報で、特定Taskの成果やAgent申告を証明しません。登録状態の確認だけでは内容を読み取らず、ApprovalやTask実行権も付与しません。',
+                ),
+              ),
+            ),
+            BorderedPanel(
+              child: WorkspaceInspector(
+                key: ValueKey(
+                  'ai-edit-apply-workspace-inspector-content-${session.sessionId}',
+                ),
+                client: widget.client.workspaceClient!,
+                runtimeId: aiEditApplyTargetRequest.runtimeId,
+                workspaceId: aiEditApplyTargetRequest.workspaceId,
+                active: widget.active && _appActive,
+              ),
+            ),
+          ],
+        ),
       Semantics(
         container: true,
         explicitChildNodes: true,
