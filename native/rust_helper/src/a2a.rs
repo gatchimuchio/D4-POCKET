@@ -2529,6 +2529,12 @@ mod tests {
 
     #[test]
     fn A2A_GetTask選択Artifactは完了textだけhash一致後に全文を返す() {
+        let unicode_text_parts = vec!["日本語", " café"];
+        assert_eq!(
+            sha256_tagged(&serde_json::to_vec(&unicode_text_parts).unwrap()),
+            "sha256:90004b5b1307322ef2bea01b4aea91b44cdcc6bc2f3bd7e600f1744de6b8a664"
+        );
+
         let text = "bounded external result";
         let artifact = json!({
             "artifactId":"artifact-exact",

@@ -337,11 +337,11 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/a2a_artifact_handoff.dart",
-      "sha256": "c6702261d7fc767e26fb3997fd53bfe8417893b3a57dac1aa90f829f3253b46c"
+      "sha256": "4b7dd7d9df0d55b5645fc19caded0db71f975cbb8644fabfd96319cac03dad70"
     },
     {
       "path": "apps/desktop_flutter/lib/services/a2a_connection_client.dart",
-      "sha256": "58f5f7307cdf0689e9c251266311174f1989a3ad206d7beebff73c14c823038a"
+      "sha256": "37118d3de26cb2c63e6e1027b15579f0a9af23cb99748b2302d141dbd46cc7fa"
     },
     {
       "path": "apps/desktop_flutter/lib/services/agent_coordination.dart",
@@ -641,11 +641,11 @@
     },
     {
       "path": "apps/desktop_flutter/test/a2a_artifact_handoff_test.dart",
-      "sha256": "426fca7c4a2b6a81de8fe629e4ae49fc37bc8413acdaf85a60874c7d58eb00f3"
+      "sha256": "31bc0ea63d3fd22b6baa224ad8bd6e7146a387dd96304804ac949275a675985a"
     },
     {
       "path": "apps/desktop_flutter/test/a2a_connection_center_test.dart",
-      "sha256": "8f71b3fdfc9aa0f33a5641bac78738163e684928bc70b9d0c09a8a0f01d85c4a"
+      "sha256": "533edfac5f1c2d34f8592823b25d4fe190c81587aceef0569a1e7e2ead82d420"
     },
     {
       "path": "apps/desktop_flutter/test/agent_coordination_test.dart",
@@ -1529,7 +1529,7 @@
     },
     {
       "path": "docs/QE_2026-11-14/\u9032\u6357.md",
-      "sha256": "716a3a680209ee9d33f5dd33340e240016a536d6e76f3ea102269c349a64adad"
+      "sha256": "8363d87d915eb6cef1c7e01e4abc058bc16033642597a5accb5a060c818ac71a"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -3825,7 +3825,7 @@
     },
     {
       "path": "native/rust_helper/src/a2a.rs",
-      "sha256": "8b2bdd8abf0b08a2cc65e0b71827a444dca03121196ac256c91b4b472ac15399"
+      "sha256": "8baca304e1761d9e5ec773a7ddb13d4258d087bce9a7beeb6de51d5c5f37648d"
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
@@ -4061,7 +4061,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "aed6205970e1483d26196e3d061b61472c271aa2b52f72979cd5db31eca7f2d9"
+      "sha256": "0aa49c1e728d27e2941f7712e6e9fbaffb8aae99ff0bb6fab0effc4b34ed11bb"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -4505,7 +4505,7 @@
     },
     {
       "path": "packages/broker_contract/lib/broker_request_envelope.dart",
-      "sha256": "1bf2d94df33d8c857e67c94a8f8cae244fc7566ac0dec96e6fa0c9ce7d1e6a1b"
+      "sha256": "1cd309a81f81cf53a8f6aa3930c22dc58149d58ab9206b6bb5a17f0dedcdc16a"
     },
     {
       "path": "packages/broker_contract/lib/broker_transport.dart",

@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:broker_contract/broker_request_envelope.dart'
+    show brokerCanonicalJsonHash;
 import 'package:broker_contract/broker_transport.dart' show BrokerTransport;
 
 import '../models/generated_contracts.dart';
@@ -85,6 +87,7 @@ class A2aArtifactHandoffPackage {
         artifact.byteLength > 65536 ||
         actualBytes != artifact.byteLength ||
         artifact.parts.any((part) => !_safeText(part, 65536)) ||
+        brokerCanonicalJsonHash(artifact.parts) != artifact.contentHash ||
         matchingManifest.length != 1 ||
         !matchingManifest.single.textOnly ||
         matchingManifest.single.partCount != artifact.parts.length ||

@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:broker_contract/broker_request_envelope.dart'
+    show brokerCanonicalJsonHash;
 import 'package:gui_shell_ui/runtime_dialogue_client.dart'
     show BrokerClientException, BrokerTransport;
 
@@ -904,6 +906,8 @@ class A2aConnectionClient {
           parts.isEmpty ||
           parts.length > 32 ||
           parts.any((part) => part is! String || !_safeArtifactText(part)) ||
+          brokerCanonicalJsonHash(parts.cast<String>()) !=
+              value['content_hash'] ||
           parts.cast<String>().fold<int>(
                   0, (sum, part) => sum + utf8.encode(part).length) !=
               value['byte_length'] ||

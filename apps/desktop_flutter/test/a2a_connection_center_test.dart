@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:broker_contract/broker_request_envelope.dart'
+    show brokerCanonicalJsonHash;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -312,7 +314,8 @@ void main() {
   test('GetTaskは選択Artifactだけをfresh requestで全文表示し本文をmetadata結果へ漏らさない', () async {
     const artifactId = 'artifact-output-1';
     final artifactHash = 'sha256:${List<String>.filled(64, 'a').join()}';
-    final contentHash = 'sha256:${List<String>.filled(64, 'd').join()}';
+    const visibleText = 'private result body';
+    final contentHash = brokerCanonicalJsonHash(const [visibleText]);
     final metadata = await A2aConnectionClient(_A2aTransport([
       _taskGetResponse(
         'audit-a2a-artifacts',
@@ -337,7 +340,6 @@ void main() {
     expect(metadata.artifacts.single.textOnly, isTrue);
     expect(metadata.selectedArtifact, isNull);
 
-    const visibleText = 'private result body';
     final transport = _A2aTransport([
       _taskGetArtifactResponse(
         'audit-a2a-artifact-full',
@@ -360,6 +362,27 @@ void main() {
     expect(transport.payloads.single?['ArtifactID'], artifactId);
     expect(transport.payloads.single?['Artifact hash'], artifactHash);
     expect(jsonEncode(transport.payloads), isNot(contains(visibleText)));
+
+    final mismatchedContentHash = _A2aTransport([
+      _taskGetArtifactResponse(
+        'audit-a2a-artifact-content-hash-mismatch',
+        taskId: 'remote-task-42',
+        artifactId: artifactId,
+        artifactHash: artifactHash,
+        contentHash: 'sha256:${List<String>.filled(64, 'e').join()}',
+        parts: const [visibleText],
+      ),
+    ]);
+    await expectLater(
+      A2aConnectionClient(mismatchedContentHash).getTask(
+        agentId: 'fixture-agent',
+        interfaceUri: 'http://127.0.0.1:9080/rpc',
+        taskId: 'remote-task-42',
+        artifactId: artifactId,
+        artifactHash: artifactHash,
+      ),
+      throwsA(isA<BrokerClientException>()),
+    );
 
     final forged = _taskGetResponse(
       'audit-a2a-artifact-forged',
@@ -723,7 +746,7 @@ void main() {
       const visibleText = 'untrusted-artifact-visible-only';
       A2aTaskQueryResult? transferredArtifact;
       final artifactHash = 'sha256:${List<String>.filled(64, 'a').join()}';
-      final contentHash = 'sha256:${List<String>.filled(64, 'b').join()}';
+      final contentHash = brokerCanonicalJsonHash(const [visibleText]);
       final receipt = _receipt();
       final transport = _A2aTransport([
         _response('A2A接続一覧', 'audit-empty', _listBody(const []),

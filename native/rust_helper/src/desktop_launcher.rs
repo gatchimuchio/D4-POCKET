@@ -3146,7 +3146,7 @@ fn owner_confirmation_text_for_identity(
                 )
             } else {
                 format!(
-                    "未信頼の外部A2A AgentからTask状態metadataとArtifact一覧を一回取得しますか？\n\nAgent ID: {}\n接続先: {}\nTransport: {}\nTask ID: {}\n\nGetTask応答にArtifact partsが含まれる場合も、画面へ返すのはTask状態とArtifact ID/hash/type/size、response hashだけです。Artifact本文はprojection・Audit・Workspaceへ出しません。Credential、Approval、Trust、Authorityを生成しません。各取得に新しい一回限りPermissionを要求し、再取得は新しいnative Owner確認が必要です。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
+                    "未信頼の外部A2A AgentからTask状態metadataとArtifact一覧を一回取得しますか？\n\nAgent ID: {}\n接続先: {}\nTransport: {}\nTask ID: {}\n\nGetTask応答にArtifact partsが含まれる場合も（Task／Artifact本文を含む場合も）、画面へ返すのはTask状態とArtifact ID/hash/type/size、response hashだけです。Artifact本文はprojection・Audit・Workspaceへ出しません。Credential、Approval、Trust、Authorityを生成しません。各取得に新しい一回限りPermissionを要求し、再取得は新しいnative Owner確認が必要です。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
                     owner_confirmation_value(agent_id),
                     owner_confirmation_value(target),
                     transport,

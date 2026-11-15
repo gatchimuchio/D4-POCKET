@@ -25,7 +25,15 @@ Map<String, Object?> buildBrokerRequestEnvelope({
 
 /// Returns the Rust Broker compatible hash for canonical JSON payload data.
 String brokerPayloadHash(Map<String, Object?>? payload) {
-  final canonicalJson = jsonEncode(_canonicalizeJsonValue(payload));
+  return brokerCanonicalJsonHash(payload);
+}
+
+/// Returns the Rust Broker compatible hash for any canonical JSON value.
+///
+/// This is a content-integrity value only. It does not authenticate a caller
+/// or grant permission, approval, or authority.
+String brokerCanonicalJsonHash(Object? value) {
+  final canonicalJson = jsonEncode(_canonicalizeJsonValue(value));
   return _sha256Tagged(utf8.encode(canonicalJson));
 }
 
