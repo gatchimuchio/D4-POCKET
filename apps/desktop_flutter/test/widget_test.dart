@@ -4780,9 +4780,8 @@ void main() {
       const ValueKey('ai-edit-apply-workspace-inspector-$targetSessionId'),
     );
     expect(targetWorkspaceInspector, findsOneWidget);
-    final workspaceListCountBeforeExpand = transport.operations
-        .where((operation) => operation == '作業領域一覧')
-        .length;
+    final workspaceListCountBeforeExpand =
+        transport.operations.where((operation) => operation == '作業領域一覧').length;
     await tester.ensureVisible(targetWorkspaceInspector);
     await tester.tap(targetWorkspaceInspector);
     await tester.pumpAndSettle();
@@ -4812,8 +4811,8 @@ void main() {
       hasLength(greaterThan(workspaceListCountBeforeExpand)),
     );
     expect(
-      transport.operations.where((operation) =>
-          operation.startsWith('作業領域') && operation != '作業領域一覧'),
+      transport.operations.where(
+          (operation) => operation.startsWith('作業領域') && operation != '作業領域一覧'),
       isEmpty,
       reason: 'Inspector表示では内容読取・Approval・baseline操作を開始しない',
     );
@@ -5934,7 +5933,7 @@ void main() {
       ..._shellCoreProductBootstrapResponses(),
       _brokerAdapterManifestMutationResponse('導入', 'ui_fixture_adapter'),
       list,
-      _brokerAdapterSuspendedResponse(),
+      _brokerAdapterSuspendedResponse(adapterId: 'ui_fixture_adapter'),
     ]);
     final client = await ShellCoreClient.product(transport: transport);
     expect(
@@ -7032,7 +7031,9 @@ Map<String, Object?> _brokerCommandSuspendedResponse() {
   };
 }
 
-Map<String, Object?> _brokerAdapterSuspendedResponse() {
+Map<String, Object?> _brokerAdapterSuspendedResponse({
+  String adapterId = 'mock_local_llm_adapter',
+}) {
   return {
     'request_id': 'test-adapter-management',
     'operation': 'アダプター検証',
@@ -7044,7 +7045,7 @@ Map<String, Object?> _brokerAdapterSuspendedResponse() {
     'body': {
       '版': 1,
       '操作': '検証',
-      'Adapter ID': 'mock_local_llm_adapter',
+      'Adapter ID': adapterId,
       '実行状態': 'suspended',
       '承認状態': 'owner_reapproval_required',
       '権限生成': 'なし',

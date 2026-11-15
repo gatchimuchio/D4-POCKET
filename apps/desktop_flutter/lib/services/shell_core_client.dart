@@ -423,25 +423,44 @@ class ShellCoreClient {
         'Adapter hash': adapter.hash,
       },
     );
-    final body = response['body'] is Map
-        ? Map<String, Object?>.from(response['body'] as Map)
+    final status = response['status'];
+    final auditId = response['audit_event_id'];
+    if (response['operation'] != brokerOperation ||
+        response['evidence_source'] != 'INTERNAL_STATE' ||
+        !_adapterManagementStatuses.contains(status) ||
+        auditId is! String ||
+        !_isSafeAuditIdentifier(auditId) ||
+        (status == 'accepted' && response['error'] != null) ||
+        (status == 'rejected' && response['error'] is! Map)) {
+      throw const BrokerClientException('Adapter操作のBroker receiptを確認できません');
+    }
+    final statusValue = status as String;
+    final rawBody = response['body'];
+    final body = rawBody is Map
+        ? Map<String, Object?>.from(rawBody)
         : const <String, Object?>{};
-    final error = response['error'];
+    if ((status == 'accepted' || status == 'suspended') &&
+        !_adapterManagementReceiptMatches(
+          body,
+          adapterId: adapter.adapterId,
+          operation: operation,
+          status: statusValue,
+        )) {
+      throw const BrokerClientException('Adapter操作receiptの対象または安全境界が不正です');
+    }
     return AdapterManagementResult(
-      status: response['status']?.toString() ?? 'unknown',
-      operation: response['operation']?.toString() ?? brokerOperation,
-      adapterId: body['Adapter ID']?.toString() ?? adapterId,
-      managementState:
-          body['管理状態']?.toString() ?? adapter.managementState,
-      verificationState:
-          body['検証状態']?.toString() ?? adapter.verificationStatus,
-      auditId: response['audit_event_id']?.toString() ??
-          body['監査ID']?.toString() ??
-          '',
-      recoveryId: body['復旧ID']?.toString() ?? 'recover-adapter-management',
-      message: error is Map
-          ? error['message']?.toString() ?? response.toString()
-          : body['承認状態']?.toString() ?? response.toString(),
+      status: statusValue,
+      operation: brokerOperation,
+      adapterId: adapter.adapterId,
+      managementState: _adapterManagementStates.contains(body['管理状態'])
+          ? body['管理状態']! as String
+          : adapter.managementState,
+      verificationState: _adapterVerificationStates.contains(body['検証状態'])
+          ? body['検証状態']! as String
+          : adapter.verificationStatus,
+      auditId: auditId,
+      recoveryId: _adapterManagementRecoveryId,
+      message: _adapterManagementSafeMessage(statusValue, body),
     );
   }
 
@@ -500,39 +519,46 @@ class ShellCoreClient {
 
     final brokerOperation = operation == '導入' ? 'アダプター導入' : 'アダプター更新';
     final response = await transport.request(brokerOperation, payload: payload);
-    if (response['operation'] != brokerOperation) {
-      throw const BrokerClientException('Broker応答がAdapter Manifest要求と一致しません');
+    final status = response['status'];
+    final auditId = response['audit_event_id'];
+    if (response['operation'] != brokerOperation ||
+        response['evidence_source'] != 'INTERNAL_STATE' ||
+        !_adapterManagementStatuses.contains(status) ||
+        auditId is! String ||
+        !_isSafeAuditIdentifier(auditId) ||
+        (status == 'accepted' && response['error'] != null) ||
+        (status == 'rejected' && response['error'] is! Map)) {
+      throw const BrokerClientException(
+          'Adapter ManifestのBroker receiptを確認できません');
     }
-    final body = response['body'] is Map
-        ? Map<String, Object?>.from(response['body'] as Map)
+    final statusValue = status as String;
+    final rawBody = response['body'];
+    final body = rawBody is Map
+        ? Map<String, Object?>.from(rawBody)
         : const <String, Object?>{};
-    if (response['status'] == 'accepted' &&
-        (response['evidence_source'] != 'INTERNAL_STATE' ||
-            body['Adapter ID'] != adapterId ||
-            body['操作'] != operation ||
-            body['公開範囲'] != 'metadata_only' ||
-            body['権限生成'] != 'なし' ||
-            body['authority_strip'] != true ||
-            !_isSafeAuditIdentifier(
-              response['audit_event_id']?.toString() ?? '',
-            ))) {
-      throw const BrokerClientException('Adapter Manifest receiptの証拠またはAuthority境界が不正です');
+    if ((status == 'accepted' || status == 'suspended') &&
+        !_adapterManagementReceiptMatches(
+          body,
+          adapterId: adapterId,
+          operation: operation,
+          status: statusValue,
+        )) {
+      throw const BrokerClientException(
+          'Adapter Manifest receiptの対象または安全境界が不正です');
     }
-    final error = response['error'];
-    final errorMessage = error is Map ? error['message'] : null;
     return AdapterManagementResult(
-      status: response['status']?.toString() ?? 'unknown',
+      status: statusValue,
       operation: brokerOperation,
-      adapterId: body['Adapter ID']?.toString() ?? adapterId,
-      managementState: body['管理状態']?.toString() ?? 'unchanged',
-      verificationState: body['検証状態']?.toString() ?? 'unknown',
-      auditId: response['audit_event_id']?.toString() ??
-          body['監査ID']?.toString() ??
-          '',
-      recoveryId: body['復旧ID']?.toString() ?? 'recover-adapter-management',
-      message: errorMessage is String && errorMessage.isNotEmpty
-          ? _boundedBrokerDisplayText(errorMessage)
-          : body['承認状態']?.toString() ?? 'BrokerがManifest要求を処理しました。',
+      adapterId: adapterId,
+      managementState: _adapterManagementStates.contains(body['管理状態'])
+          ? body['管理状態']! as String
+          : 'unchanged',
+      verificationState: _adapterVerificationStates.contains(body['検証状態'])
+          ? body['検証状態']! as String
+          : 'unknown',
+      auditId: auditId,
+      recoveryId: _adapterManagementRecoveryId,
+      message: _adapterManagementSafeMessage(statusValue, body),
     );
   }
 
@@ -841,6 +867,75 @@ bool _isSafeAuditIdentifier(String value) =>
     value.length <= 256 &&
     !value.codeUnits.any((unit) => unit < 0x20 || unit == 0x7f);
 
+const _adapterManagementRecoveryId = 'recover-adapter-management';
+const _adapterManagementStatuses = <String>{
+  'accepted',
+  'rejected',
+  'suspended',
+};
+const _adapterManagementStates = <String>{
+  'installed',
+  'verified',
+  'enabled',
+  'disabled',
+  'quarantined',
+  'removed',
+};
+const _adapterVerificationStates = <String>{
+  'verified',
+  'pending_review',
+  'rejected',
+  'unverified',
+};
+
+bool _adapterManagementReceiptMatches(
+  Map<String, Object?> body, {
+  required String adapterId,
+  required String operation,
+  required String status,
+}) {
+  if (body['版'] != 1 ||
+      body['Adapter ID'] != adapterId ||
+      body['操作'] != operation ||
+      body['権限生成'] != 'なし' ||
+      body['authority_strip'] != true ||
+      body['公開範囲'] != 'metadata_only' ||
+      body['証拠種別'] != 'INTERNAL_STATE' ||
+      body['復旧ID'] != _adapterManagementRecoveryId) {
+    return false;
+  }
+  if (status == 'suspended') {
+    return body['実行状態'] == 'suspended' &&
+        body['承認状態'] == 'owner_reapproval_required';
+  }
+  if (status != 'accepted' ||
+      body['実行状態'] != 'accepted' ||
+      !_adapterManagementStates.contains(body['管理状態'])) {
+    return false;
+  }
+  final verificationState = body['検証状態'];
+  return verificationState == null ||
+      _adapterVerificationStates.contains(verificationState);
+}
+
+String _adapterManagementSafeMessage(
+  String status,
+  Map<String, Object?> body,
+) {
+  switch (status) {
+    case 'accepted':
+      return 'BrokerがAdapter操作を受理しました。';
+    case 'suspended':
+      return body['承認状態'] == 'owner_reapproval_required'
+          ? 'Adapter操作は再承認が必要なため停止しました（owner_reapproval_required）。'
+          : 'Adapter操作はBrokerにより停止されました。';
+    case 'rejected':
+      return 'BrokerがAdapter操作を拒否しました。';
+    default:
+      return 'Adapter操作の状態を確認できません。';
+  }
+}
+
 bool _isBrokerAuditEventIdentifier(String value) =>
     value.length <= 64 && RegExp(r'^broker-audit-[1-9][0-9]*$').hasMatch(value);
 
@@ -976,24 +1071,6 @@ AuditInspectionPage _validatedAuditInspectionPage(
     nextBeforeEventId: nextBefore as String?,
     events: List<AuditRecord>.unmodifiable(events),
   );
-}
-
-String _boundedBrokerDisplayText(String value) {
-  final output = StringBuffer();
-  var count = 0;
-  for (final codepoint in value.runes) {
-    if (count >= 256) break;
-    final unsafe = codepoint <= 0x1f ||
-        (codepoint >= 0x7f && codepoint <= 0x9f) ||
-        codepoint == 0x061c ||
-        codepoint == 0x200e ||
-        codepoint == 0x200f ||
-        (codepoint >= 0x202a && codepoint <= 0x202e) ||
-        (codepoint >= 0x2066 && codepoint <= 0x206f);
-    output.write(unsafe ? '�' : String.fromCharCode(codepoint));
-    count++;
-  }
-  return output.toString();
 }
 
 const _adapterIdSnapshotKey = 'adapter_id';

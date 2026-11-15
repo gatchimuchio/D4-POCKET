@@ -331,9 +331,10 @@ class _RuntimeCenterState extends State<RuntimeCenter>
         _adapterMessages[adapter.adapterId] =
             '${result.status} / ${result.message} / 監査（Audit）=${result.auditId} / 復旧（Recovery）=${result.recoveryId}$refreshMessage';
       });
-    } catch (error) {
+    } catch (_) {
       if (!mounted) return;
-      setState(() => _adapterMessages[adapter.adapterId] = '操作失敗: $error');
+      setState(() => _adapterMessages[adapter.adapterId] =
+          'Adapter操作の結果を確認できません。Adapter一覧とAuditを確認し、結果が確定するまで再送しないでください。');
     } finally {
       if (mounted) {
         setState(() => _adapterBusy.remove(adapter.adapterId));
