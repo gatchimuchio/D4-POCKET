@@ -1595,7 +1595,7 @@ class _GlobalSearchDialogState extends State<_GlobalSearchDialog> {
                   prefixIcon: Icon(Icons.manage_search),
                   labelText: '全体検索',
                   helperText:
-                      'Runtime、Agent、Session、Auditなどを横断検索します。検索結果は表示専用です。',
+                      'Runtime、Agent、信頼、許可差分、監査、復旧、診断などを横断検索します。検索結果は表示専用です。',
                 ),
                 onChanged: (_) => setState(() {}),
                 onSubmitted: (_) {

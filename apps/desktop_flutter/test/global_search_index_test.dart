@@ -18,6 +18,82 @@ void main() {
     expect(a2a.first.evidenceSource, '不明');
   });
 
+  test('全体検索はBrokerの信頼・診断・許可差分・復旧を専用画面へ表示する', () {
+    final snapshot = ShellSnapshot.fromJson({
+      'trust_records': [
+        {
+          'scope': 'agent:claude\u200B',
+          'state': 'untrusted\u202E',
+          'source': 'private-secret-marker',
+          'expires_at': 'private-secret-marker',
+          'blocked_operations': ['workspace.write'],
+        },
+      ],
+      'setup_doctor_checks': [
+        {
+          'check_id': 'diagnostic-check-41',
+          'status': 'fail',
+          'message': 'private-secret-marker',
+          'recovery_instruction': 'C:\\private-secret-marker',
+          'grants_authority': false,
+        },
+      ],
+      'permission_diffs': [
+        {
+          'subject': 'workspace-policy-17',
+          'added': ['workspace.write\u202E'],
+          'removed': ['workspace.read'],
+          'changed': ['terminal.spawn'],
+          'dangerous': ['filesystem.delete'],
+        },
+      ],
+      'recovery_playbook': [
+        {
+          'recovery_id': 'recovery-case-7',
+          'item': 'private-secret-marker',
+          'severity': 'critical\u202E',
+          'classification': 'required_for_v1',
+          'safe_to_ignore_for_phase_b': false,
+          'required_action': 'private-secret-marker',
+          'blocks_completed_product_release': true,
+          'blocks_owner_use': true,
+          'command': 'private-secret-marker',
+          'path': 'C:\\private-secret-marker',
+        },
+      ],
+    }).copyWith(snapshotSource: 'broker');
+
+    final trust = GlobalSearchIndex.search(snapshot, 'agent:claude').single;
+    final doctor =
+        GlobalSearchIndex.search(snapshot, 'diagnostic-check-41').single;
+    final permission =
+        GlobalSearchIndex.search(snapshot, 'workspace-policy-17').single;
+    final recovery =
+        GlobalSearchIndex.search(snapshot, 'recovery-case-7').single;
+
+    expect((trust.category, trust.pageIndex), ('信頼状態', 2));
+    expect(trust.title, 'agent:claude');
+    expect(trust.detail, contains('Authorityではありません'));
+    expect((doctor.category, doctor.pageIndex), ('環境診断', 1));
+    expect(doctor.detail, contains('診断結果はPermission／Approvalを発行しません'));
+    expect((permission.category, permission.pageIndex), ('許可差分', 3));
+    expect(permission.detail, contains('workspace.write'));
+    expect(permission.detail, contains('許可差分は承認ではありません'));
+    expect(permission.detail, isNot(contains('\u202E')));
+    expect((recovery.category, recovery.pageIndex), ('復旧Playbook', 8));
+    expect(recovery.detail, contains('製品Releaseを阻害'));
+    expect(recovery.detail, isNot(contains('\u202E')));
+    expect(
+      GlobalSearchIndex.search(snapshot, 'private-secret-marker'),
+      isEmpty,
+    );
+    for (final result in [trust, doctor, permission, recovery]) {
+      expect(result.evidenceSource, 'INTERNAL_STATE');
+      expect(result.title, isNot(contains('\u202E')));
+      expect(result.detail, isNot(contains('private-secret-marker')));
+    }
+  });
+
   test('全体検索はqueryと結果件数をboundedにしraw contentを射影しない', () {
     final snapshot = ShellCoreClient.mock().getSnapshot();
 

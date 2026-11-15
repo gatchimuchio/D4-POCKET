@@ -63,6 +63,46 @@ class GlobalSearchIndex {
         pageIndex: 3,
       );
     }
+    for (final trust in snapshot.trustRecords) {
+      if (results.length >= maxEntries) break;
+      final scope = _safeUntrustedLabel(trust.scope, 128);
+      if (scope.isEmpty) continue;
+      final state = _safeUntrustedLabel(trust.state, 48);
+      final blockedOperations = trust.blockedOperations
+          .take(16)
+          .map((operation) => _safeUntrustedLabel(operation, 96))
+          .where((operation) => operation.isNotEmpty)
+          .toList(growable: false);
+      add(
+        category: '信頼状態',
+        title: scope,
+        detail: [
+          if (state.isNotEmpty) '状態=$state',
+          if (blockedOperations.isNotEmpty)
+            '遮断操作=${blockedOperations.join(', ')}',
+          '信頼metadataはPermission／Approval／Authorityではありません',
+        ].join(' / '),
+        recordId: scope,
+        pageIndex: 2,
+      );
+    }
+    for (final check in snapshot.setupDoctorChecks) {
+      if (results.length >= maxEntries) break;
+      final checkId = _safeUntrustedLabel(check.checkId, 128);
+      if (checkId.isEmpty) continue;
+      final status = _safeUntrustedLabel(check.status, 48);
+      add(
+        category: '環境診断',
+        title: checkId,
+        detail: [
+          if (status.isNotEmpty) '状態=$status',
+          if (check.grantsAuthority) '権限付与が報告されています',
+          '診断結果はPermission／Approvalを発行しません',
+        ].join(' / '),
+        recordId: checkId,
+        pageIndex: 1,
+      );
+    }
     for (final session in snapshot.agentSessions) {
       add(
         category: '対話セッション',
@@ -79,6 +119,33 @@ class GlobalSearchIndex {
         detail: '${permission.capabilityId} / ${permission.decision}',
         recordId: permission.permissionId,
         pageIndex: 4,
+      );
+    }
+    for (final diff in snapshot.permissionDiffs) {
+      if (results.length >= maxEntries) break;
+      final subject = _safeUntrustedLabel(diff.subject, 128);
+      if (subject.isEmpty) continue;
+      List<String> safeItems(List<String> values) => values
+          .take(16)
+          .map((value) => _safeUntrustedLabel(value, 96))
+          .where((value) => value.isNotEmpty)
+          .toList(growable: false);
+      final added = safeItems(diff.added);
+      final removed = safeItems(diff.removed);
+      final changed = safeItems(diff.changed);
+      final dangerous = safeItems(diff.dangerous);
+      add(
+        category: '許可差分',
+        title: subject,
+        detail: [
+          if (added.isNotEmpty) '追加=${added.join(', ')}',
+          if (removed.isNotEmpty) '削除=${removed.join(', ')}',
+          if (changed.isNotEmpty) '変更=${changed.join(', ')}',
+          if (dangerous.isNotEmpty) '危険=${dangerous.join(', ')}',
+          '許可差分は承認ではありません',
+        ].join(' / '),
+        recordId: subject,
+        pageIndex: 3,
       );
     }
     for (final approval in snapshot.pendingApprovals) {
@@ -106,6 +173,26 @@ class GlobalSearchIndex {
         title: recovery.recoveryId,
         detail: '${recovery.severity} / ${recovery.message}',
         recordId: recovery.recoveryId,
+        pageIndex: 8,
+      );
+    }
+    for (final recovery in snapshot.recoveryPlaybook) {
+      if (results.length >= maxEntries) break;
+      final recoveryId = _safeUntrustedLabel(recovery.recoveryId, 128);
+      if (recoveryId.isEmpty) continue;
+      final severity = _safeUntrustedLabel(recovery.severity, 48);
+      final classification = _safeUntrustedLabel(recovery.classification, 64);
+      add(
+        category: '復旧Playbook',
+        title: recoveryId,
+        detail: [
+          if (severity.isNotEmpty) '重要度=$severity',
+          if (classification.isNotEmpty) '分類=$classification',
+          if (recovery.blocksOwnerUse) 'Owner利用を阻害',
+          if (recovery.blocksCompletedProductRelease) '製品Releaseを阻害',
+          'Playbook metadataはApprovalではありません',
+        ].join(' / '),
+        recordId: recoveryId,
         pageIndex: 8,
       );
     }
