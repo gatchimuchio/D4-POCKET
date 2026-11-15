@@ -1,23 +1,14 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gui_shell_desktop/services/observation_client.dart';
-import 'package:gui_shell_ui/runtime_dialogue_client.dart' show BrokerTransport;
+import 'package:gui_shell_ui/runtime_dialogue_client.dart'
+    show BrokerTransport, BrokerClientException;
 
 class _FakeObservationTransport implements BrokerTransport {
   final operations = <String>[];
+  Map<String, Object?>? lastPayload;
   Map<String, Object?> response = {
     'status': 'accepted',
-    'body': {
-      '版': 1,
-      'Span一覧': [],
-      'Trace一覧': [],
-      'Metric一覧': [],
-      '件数': 0,
-      '証拠種別': 'INTERNAL_STATE',
-      '観測範囲': 'broker_audit_finalization',
-      'Auditとの責任分離': 'Audit=責任・安全・証拠; Observation=性能・挙動・運用状態',
-      'OpenTelemetry export': 'unsupported',
-      '権限生成': 'なし',
-    },
+    'body': _validBody(),
   };
 
   @override
@@ -26,13 +17,26 @@ class _FakeObservationTransport implements BrokerTransport {
     Map<String, Object?>? payload,
   }) async {
     operations.add(operation);
-    expect(payload?['版'], 1);
+    lastPayload = payload == null ? null : Map<String, Object?>.from(payload);
     return response;
   }
 }
 
+Map<String, Object?> _validBody() => {
+      '版': 1,
+      'Span一覧': <Map<String, Object?>>[],
+      'Trace一覧': <Map<String, Object?>>[],
+      'Metric一覧': <Map<String, Object?>>[],
+      '件数': 0,
+      '証拠種別': 'INTERNAL_STATE',
+      '観測範囲': 'broker_audit_finalization',
+      'Auditとの責任分離': 'Audit=責任・安全・証拠; Observation=性能・挙動・運用状態',
+      'OpenTelemetry export': 'unsupported',
+      '権限生成': 'なし',
+    };
+
 void main() {
-  test('観測clientはBrokerのbounded一覧だけを要求する', () async {
+  test('観測clientは契約内のbounded一覧をBrokerへ要求する', () async {
     final transport = _FakeObservationTransport();
     final body = await ObservationClient(transport).list(
       limit: 12,
@@ -40,7 +44,119 @@ void main() {
     );
 
     expect(transport.operations, ['観測一覧']);
+    expect(transport.lastPayload, {
+      '版': 1,
+      '上限': 12,
+      'TraceID': 'observation-trace-1',
+    });
     expect(body['証拠種別'], 'INTERNAL_STATE');
     expect(body['OpenTelemetry export'], 'unsupported');
+  });
+
+  test('範囲外の上限とTraceIDはBrokerへ送らない', () async {
+    final transport = _FakeObservationTransport();
+    final client = ObservationClient(transport);
+
+    for (final limit in [0, 257]) {
+      await expectLater(
+        () => client.list(limit: limit),
+        throwsA(isA<BrokerClientException>()),
+      );
+    }
+    for (final traceId in ['', List.filled(43, 'あ').join()]) {
+      await expectLater(
+        () => client.list(traceId: traceId),
+        throwsA(isA<BrokerClientException>()),
+      );
+    }
+
+    expect(transport.operations, isEmpty);
+  });
+
+  test('128-byte TraceIDと256件上限は受理する', () async {
+    final transport = _FakeObservationTransport();
+    await ObservationClient(transport).list(
+      limit: 256,
+      traceId: List.filled(128, 'x').join(),
+    );
+
+    expect(transport.lastPayload?['上限'], 256);
+    expect(transport.lastPayload?['TraceID'], List.filled(128, 'x').join());
+  });
+
+  test('契約外・上限超過・Authority誤表記の応答を拒否する', () async {
+    final invalidBodies = <Map<String, Object?>>[];
+
+    final missingField = _validBody()..remove('証拠種別');
+    invalidBodies.add(missingField);
+
+    final extraField = _validBody()..['追加'] = '未定義';
+    invalidBodies.add(extraField);
+
+    final wrongCount = _validBody()..['件数'] = 1;
+    invalidBodies.add(wrongCount);
+
+    final wrongAuthority = _validBody()..['権限生成'] = 'あり';
+    invalidBodies.add(wrongAuthority);
+
+    final wrongEvidence = _validBody()..['証拠種別'] = 'EXTERNAL_EVIDENCE';
+    invalidBodies.add(wrongEvidence);
+
+    final oversized = _validBody()
+      ..['Span一覧'] = List<Map<String, Object?>>.generate(
+        257,
+        (_) => <String, Object?>{},
+      )
+      ..['件数'] = 257;
+    invalidBodies.add(oversized);
+
+    final oversizedTraces = _validBody()
+      ..['Trace一覧'] = List<Map<String, Object?>>.generate(
+        257,
+        (_) => <String, Object?>{},
+      );
+    invalidBodies.add(oversizedTraces);
+
+    final oversizedMetrics = _validBody()
+      ..['Metric一覧'] = List<Map<String, Object?>>.generate(
+        17,
+        (_) => <String, Object?>{},
+      );
+    invalidBodies.add(oversizedMetrics);
+
+    for (final body in invalidBodies) {
+      final transport = _FakeObservationTransport()
+        ..response = {'status': 'accepted', 'body': body};
+      await expectLater(
+        () => ObservationClient(transport).list(),
+        throwsA(isA<BrokerClientException>()),
+      );
+    }
+
+    final nonObject = _FakeObservationTransport()
+      ..response = {'status': 'accepted', 'body': <Object?>[]};
+    await expectLater(
+      () => ObservationClient(nonObject).list(),
+      throwsA(isA<BrokerClientException>()),
+    );
+  });
+
+  test('Broker拒否の自由記述を例外へ露出しない', () async {
+    final transport = _FakeObservationTransport()
+      ..response = {
+        'status': 'rejected',
+        'error': {'message': 'secret/path/command detail'},
+      };
+
+    await expectLater(
+      () => ObservationClient(transport).list(),
+      throwsA(
+        isA<BrokerClientException>().having(
+          (error) => error.toString(),
+          'sanitized error',
+          isNot(contains('secret/path/command detail')),
+        ),
+      ),
+    );
   });
 }
